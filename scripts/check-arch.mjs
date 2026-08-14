@@ -18,6 +18,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const LAYER = {
   "@omni/protocol": 0,
   "@omni/approval": 1,
+  "@omni/store": 1,
   "@omni/worksite": 1,
   "@omni/journal": 1,
   "@omni/handoff": 1,

@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@omni/approval": "workspace:*",
-    "@omni/protocol": "workspace:*"
+    "@omni/protocol": "workspace:*",
+    "@omni/engine": "workspace:*",
+    "@omni/host": "workspace:*",
+    "@omni/store": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

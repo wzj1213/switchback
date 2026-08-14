@@ -8,7 +8,13 @@
       "path": "packages/approval"
     },
     {
+      "path": "packages/store"
+    },
+    {
       "path": "packages/engine"
+    },
+    {
+      "path": "packages/host"
     }
   ]
 }

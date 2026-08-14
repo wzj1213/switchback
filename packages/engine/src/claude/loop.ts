@@ -8,67 +8,57 @@ interface RawMessage {
   type: string
   subtype?: string
   is_error?: boolean
-  uuid?: string
   message?: { content?: unknown }
 }
 
-interface LoopState {
-  turn: TurnId | undefined
+/**
+ * 当前轮次。宿主在 `prompt()` 时写入，引擎在收到 result 时清空。
+ * 用可变引用而不是参数，是因为消息循环跑在会话整个生命周期上，
+ * 而轮次会在这期间反复开合。
+ */
+export interface TurnRef {
+  current: TurnId | undefined
+  /** item id 序号，跨轮递增，保证同一会话内不重复 */
   seq: number
 }
 
-function openTurn(state: LoopState, req: StartRequest, at: number): TurnId {
-  const existing = state.turn
-  if (existing !== undefined) return existing
-  state.seq += 1
-  const turnId = `${req.threadId}:t${String(state.seq)}`
-  state.turn = turnId
-  req.emit({
-    type: "turn.started",
-    at,
-    turn: {
-      id: turnId,
-      threadId: req.threadId,
-      engine: "claude",
-      status: "running",
-      startedAt: at,
-    },
-  })
-  return turnId
-}
-
-function makeIdMinter(state: LoopState, turnId: TurnId): () => ItemId {
+function makeIdMinter(ref: TurnRef, turnId: TurnId): () => ItemId {
   return () => {
-    state.seq += 1
-    return `${turnId}:i${String(state.seq)}`
+    ref.seq += 1
+    return `${turnId}:i${String(ref.seq)}`
   }
 }
 
-function onAssistant(msg: RawMessage, state: LoopState, req: StartRequest, at: number): void {
-  const turnId = openTurn(state, req, at)
+function onAssistant(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const turnId = ref.current
+  // 宿主总是先开轮次再 prompt；没有轮次说明这条消息不属于任何一次请求，丢掉
+  if (turnId === undefined) return
   const content = msg.message?.content
   if (!Array.isArray(content)) return
-  for (const item of assistantItems(content, { turnId, at, nextId: makeIdMinter(state, turnId) })) {
+  for (const item of assistantItems(content, { turnId, at, nextId: makeIdMinter(ref, turnId) })) {
     req.emit({ type: "item.started", at, item })
   }
 }
 
-function onResult(msg: RawMessage, state: LoopState, req: StartRequest, at: number): void {
-  const turnId = state.turn
-  state.turn = undefined
+function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const turnId = ref.current
+  ref.current = undefined
   if (turnId === undefined) return
-  const status = turnStatus(msg.subtype ?? "", msg.is_error === true)
-  const event: Event = { type: "turn.completed", at, turnId, status }
-  req.emit(event)
+  req.emit({
+    type: "turn.completed",
+    at,
+    turnId,
+    status: turnStatus(msg.subtype ?? "", msg.is_error === true),
+  })
 }
 
-function dispatch(msg: RawMessage, state: LoopState, req: StartRequest, at: number): void {
+function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
   switch (msg.type) {
     case "assistant":
-      onAssistant(msg, state, req, at)
+      onAssistant(msg, ref, req, at)
       return
     case "result":
-      onResult(msg, state, req, at)
+      onResult(msg, ref, req, at)
       return
     case "system":
       if (msg.subtype === "init") {
@@ -90,20 +80,22 @@ function dispatch(msg: RawMessage, state: LoopState, req: StartRequest, at: numb
 export async function runMessageLoop(
   handle: ReturnType<typeof query>,
   req: StartRequest,
+  ref: TurnRef,
 ): Promise<void> {
-  const state: LoopState = { turn: undefined, seq: 0 }
   try {
     for await (const msg of handle) {
-      dispatch(msg as RawMessage, state, req, Date.now())
+      dispatch(msg as RawMessage, ref, req, Date.now())
     }
   } catch (error) {
-    req.emit({
+    const detail = error instanceof Error ? error.message : String(error)
+    const crashed: Event = {
       type: "engine.status",
       at: Date.now(),
       threadId: req.threadId,
       status: "crashed",
-      detail: error instanceof Error ? error.message : String(error),
-    })
+      detail,
+    }
+    req.emit(crashed)
     throw error
   }
   req.emit({ type: "engine.status", at: Date.now(), threadId: req.threadId, status: "exited" })

@@ -35,9 +35,18 @@ importers:
       '@omni/approval':
         specifier: workspace:*
         version: link:../../packages/approval
+      '@omni/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+      '@omni/host':
+        specifier: workspace:*
+        version: link:../../packages/host
       '@omni/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@omni/store':
+        specifier: workspace:*
+        version: link:../../packages/store
     devDependencies:
       '@types/node':
         specifier: ^26.2.0
@@ -89,7 +98,28 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
 
+  packages/host:
+    dependencies:
+      '@omni/approval':
+        specifier: workspace:*
+        version: link:../approval
+      '@omni/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@omni/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@omni/store':
+        specifier: workspace:*
+        version: link:../store
+
   packages/protocol: {}
+
+  packages/store:
+    dependencies:
+      '@omni/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
 packages:
 

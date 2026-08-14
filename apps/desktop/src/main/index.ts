@@ -1,5 +1,6 @@
 import { join } from "node:path"
 import { app, BrowserWindow, nativeTheme, shell } from "electron"
+import { attachHost, seedDefaultThread } from "./host.js"
 
 /**
  * Electron 主进程。
@@ -44,10 +45,18 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-void app.whenReady().then(() => {
-  createWindow()
+void app.whenReady().then(async () => {
+  const host = attachHost(() => BrowserWindow.getAllWindows())
+  const win = createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+  // 等窗口挂上监听再开会话，否则最早的几条事件发给了还没订阅的渲染层
+  win.webContents.once("did-finish-load", () => {
+    void seedDefaultThread(host, process.cwd())
+  })
+  app.on("before-quit", () => {
+    void host.dispose()
   })
 })
 

@@ -1,4 +1,4 @@
-import type { EngineId, Event, ItemId, ThreadId, Trust } from "@omni/protocol"
+import type { EngineId, Event, ItemId, ThreadId, TurnId, Trust } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 
 /** 需要人工裁决时递给宿主的东西。文本字段可能来自引擎，渲染前必须转义。 */
@@ -37,7 +37,12 @@ export interface StartRequest {
 
 export interface EngineSession {
   readonly threadId: ThreadId
-  prompt: (text: string) => Promise<void>
+  /**
+   * `turnId` 由**宿主**铸造并传入——prompt 是宿主发出的，所以它知道一轮什么时候开始。
+   * 引擎只负责给自己产出的 item 铸 id，以及在收工时发 `turn.completed`
+   * （只有引擎知道自己什么时候真的停下）。
+   */
+  prompt: (text: string, turnId: TurnId) => Promise<void>
   interrupt: () => Promise<void>
   setTrust: (trust: Trust) => Promise<void>
   /** 幂等。返回时进程应已退出。 */

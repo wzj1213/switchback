@@ -42,7 +42,8 @@ async function run(prompt: string, answer: boolean, isolate: boolean): Promise<R
       return Promise.resolve({ allow: answer, remember: false })
     },
   })
-  await session.prompt(prompt)
+  // 轮次由宿主铸造——live test 里我们扮演宿主
+  await session.prompt(prompt, "live-turn-1")
   await new Promise<void>((resolve) => {
     const timer = setInterval(() => {
       if (events.some((e) => e.type === "turn.completed")) {

@@ -1,0 +1,21 @@
+{
+  "name": "@omni/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "会话编制与进程生命周期。唯一允许做编排的地方。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@omni/approval": "workspace:*",
+    "@omni/engine": "workspace:*",
+    "@omni/protocol": "workspace:*",
+    "@omni/store": "workspace:*"
+  }
+}

@@ -1,0 +1,71 @@
+import type { ApprovalItem, Event, ItemId, TurnId } from "@omni/protocol"
+import type { ApprovalAnswer, ApprovalAsk } from "@omni/engine"
+
+export interface OpenRequest {
+  ask: ApprovalAsk
+  turnId: TurnId
+  at: number
+  /** 审批卡自己的 item id（与被审批的工具调用 id 不同） */
+  itemId: ItemId
+}
+
+export interface Gate {
+  /** 发一张审批卡进 transcript，返回一个等用户落定的 promise */
+  open: (req: OpenRequest) => Promise<ApprovalAnswer>
+  /** 渲染层落定。命中返回 true；找不到（重复点击、已 settle）返回 false。 */
+  resolve: (itemId: ItemId, answer: ApprovalAnswer) => boolean
+  /**
+   * 把还挂着的一律按**拒绝**落定。
+   * 会话关闭时必须调用——否则驱动会永远等在 `canUseTool` 里，`dispose()` 挂死。
+   */
+  settleAll: () => void
+}
+
+interface Pending {
+  resolve: (answer: ApprovalAnswer) => void
+  item: ApprovalItem
+}
+
+const DENIED: ApprovalAnswer = { allow: false, remember: false }
+
+function card(req: OpenRequest, status: ApprovalItem["status"]): ApprovalItem {
+  return {
+    id: req.itemId,
+    turnId: req.turnId,
+    kind: "approval",
+    at: req.at,
+    toolCallId: req.ask.toolCallId,
+    tool: req.ask.tool,
+    summary: req.ask.summary,
+    status,
+    reason: req.ask.reason,
+    ...(req.ask.rememberHint === undefined ? {} : { rememberHint: req.ask.rememberHint }),
+  }
+}
+
+export function createGate(emit: (event: Event) => void): Gate {
+  const pending = new Map<ItemId, Pending>()
+
+  const settle = (itemId: ItemId, answer: ApprovalAnswer, at: number): boolean => {
+    const entry = pending.get(itemId)
+    if (entry === undefined) return false
+    pending.delete(itemId)
+    const status = answer.allow ? "allowed" : "denied"
+    emit({ type: "item.updated", at, item: { ...entry.item, status } })
+    entry.resolve(answer)
+    return true
+  }
+
+  return {
+    open: (req) =>
+      new Promise<ApprovalAnswer>((resolve) => {
+        const item = card(req, "pending")
+        pending.set(req.itemId, { resolve, item })
+        emit({ type: "item.started", at: req.at, item })
+      }),
+    resolve: (itemId, answer) => settle(itemId, answer, Date.now()),
+    settleAll: () => {
+      for (const itemId of [...pending.keys()]) settle(itemId, DENIED, Date.now())
+    },
+  }
+}

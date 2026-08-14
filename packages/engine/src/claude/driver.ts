@@ -1,10 +1,10 @@
 import { query, type Options, type PermissionResult, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
-import type { Trust } from "@omni/protocol"
+import type { Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createQueue } from "../queue.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
-import { runMessageLoop } from "./loop.js"
+import { runMessageLoop, type TurnRef } from "./loop.js"
 
 /**
  * `permissionMode` 固定为 `'default'`，三个信任档都不变。
@@ -36,6 +36,7 @@ class ClaudeSession implements EngineSession {
   private readonly input = createQueue<SDKUserMessage>()
   private readonly abort = new AbortController()
   private readonly trust: { current: Trust }
+  private readonly turn: TurnRef = { current: undefined, seq: 0 }
   private loop: Promise<void> | undefined
   private handle: ReturnType<typeof query> | undefined
 
@@ -55,7 +56,7 @@ class ClaudeSession implements EngineSession {
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
     }
     this.handle = query({ prompt: this.input, options })
-    this.loop = runMessageLoop(this.handle, this.req)
+    this.loop = runMessageLoop(this.handle, this.req, this.turn)
   }
 
   /**
@@ -93,7 +94,9 @@ class ClaudeSession implements EngineSession {
     return this.req.threadId
   }
 
-  async prompt(text: string): Promise<void> {
+  async prompt(text: string, turnId: TurnId): Promise<void> {
+    // 轮次由宿主铸造；引擎只在这里认领它，收工时由消息循环清空
+    this.turn.current = turnId
     this.input.push({
       type: "user",
       message: { role: "user", content: text },

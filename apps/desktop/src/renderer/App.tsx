@@ -1,14 +1,12 @@
 import { useState } from "react"
 import type { EngineId, Thread, Trust } from "@omni/protocol"
-import { DEMO_ITEMS, DEMO_THREADS } from "./demo.js"
+import { itemsOf, threadsOf } from "@omni/store"
 import { ItemView } from "./components/ItemView.js"
 import { Sidebar } from "./components/Sidebar.js"
 import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
+import { useOmni } from "./useOmni.js"
 
-function labelOf<T extends { id: string; label: string }>(
-  list: readonly T[],
-  id: string,
-): string {
+function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
   return list.find((x) => x.id === id)?.label ?? id
 }
 
@@ -29,23 +27,63 @@ function TopBar({ thread }: { thread: Thread }): React.JSX.Element {
   )
 }
 
+function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.Element {
+  return (
+    <div className="transcript">
+      <div className="transcript__inner">
+        <div className={fatal ? "error" : "reasoning"}>{text}</div>
+      </div>
+    </div>
+  )
+}
+
 export function App(): React.JSX.Element {
-  const [selectedId, setSelectedId] = useState(DEMO_THREADS[0]?.id ?? "")
-  const [engine, setEngine] = useState<EngineId>("codex")
+  const { state, send, bridgeMissing } = useOmni()
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  const [engine, setEngine] = useState<EngineId>("claude")
   const [trust, setTrust] = useState<Trust>("auto-edit")
 
-  const thread = DEMO_THREADS.find((t) => t.id === selectedId) ?? DEMO_THREADS[0]
-  if (thread === undefined) return <div>没有会话</div>
+  const threads = threadsOf(state)
+  const thread = threads.find((t) => t.id === selectedId) ?? threads[0]
+
+  if (thread === undefined) {
+    return (
+      <div className="shell">
+        <Sidebar threads={threads} selectedId="" onSelect={setSelectedId} />
+        <main className="main">
+          <Notice
+            fatal={bridgeMissing}
+            text={
+              bridgeMissing
+                ? "与主进程的通道没建立（preload 未注入）。界面此时点什么都不会有反应——先查主进程日志。"
+                : "正在打开工作区…"
+            }
+          />
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="shell">
-      <Sidebar threads={DEMO_THREADS} selectedId={selectedId} onSelect={setSelectedId} />
+      <Sidebar threads={threads} selectedId={thread.id} onSelect={setSelectedId} />
       <main className="main">
         <TopBar thread={thread} />
         <div className="transcript">
           <div className="transcript__inner">
-            {DEMO_ITEMS.map((item) => (
-              <ItemView key={item.id} item={item} />
+            {itemsOf(state, thread.id).map((item) => (
+              <ItemView
+                key={item.id}
+                item={item}
+                onResolve={(itemId, allow, remember) => {
+                  send({
+                    type: "approval.resolve",
+                    itemId,
+                    allow,
+                    remember: remember ? "project" : "once",
+                  })
+                }}
+              />
             ))}
           </div>
         </div>
@@ -53,7 +91,13 @@ export function App(): React.JSX.Element {
           engine={engine}
           trust={trust}
           onEngineChange={setEngine}
-          onTrustChange={setTrust}
+          onTrustChange={(next) => {
+            setTrust(next)
+            send({ type: "thread.setTrust", threadId: thread.id, trust: next })
+          }}
+          onSend={(text) => {
+            send({ type: "thread.prompt", threadId: thread.id, text })
+          }}
         />
       </main>
     </div>
