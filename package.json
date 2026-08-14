@@ -1,0 +1,31 @@
+{
+  "name": "omni",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "omni · 同文 —— 一个界面，统一驱动各家原生 coding agent",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run docs && pnpm run test",
+    "typecheck": "tsc --build && tsc -p apps/desktop/tsconfig.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "arch": "node scripts/check-arch.mjs",
+    "docs": "node scripts/check-changelog.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "pnpm --filter @omni/desktop dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  }
+}

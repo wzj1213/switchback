@@ -1,0 +1,15 @@
+{
+  "name": "@omni/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "omni 的归一化领域模型：thread / turn / item。零依赖，纯类型。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  }
+}

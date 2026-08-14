@@ -1,0 +1,94 @@
+/**
+ * shell 命令的保守切分。
+ *
+ * 明确不做的事：不展开 `$(...)`、反引号、变量、别名，不解析 `eval` / `source`。
+ * 凡是含这些结构的命令一律标 `unparseable`，由 decide() 判 escalate。
+ * **解析不了的东西绝不自动放行**——这是本模块唯一重要的安全性质。
+ */
+
+export interface Segment {
+  /** 已去引号的 argv */
+  argv: readonly string[]
+  program: string
+  flags: readonly string[]
+  /** 非 flag 的位置参数 */
+  operands: readonly string[]
+}
+
+export interface SplitResult {
+  segments: readonly Segment[]
+  unparseable: boolean
+  /** unparseable 时说明原因，会进 Verdict.reason */
+  reason?: string
+}
+
+/** 会改变「实际执行什么」的结构——出现即放弃解析。 */
+const OPAQUE_PATTERNS: readonly (readonly [RegExp, string])[] = [
+  [/\$\(/, "命令替换 $(...)"],
+  [/`/, "反引号命令替换"],
+  [/(^|\s)eval(\s|$)/, "eval"],
+  [/(^|\s)source(\s|$)/, "source"],
+  [/(^|\s)\.\s+\S/, "点号 source"],
+  [/(^|\s)exec(\s|$)/, "exec 替换进程"],
+  [/<\(/, "进程替换 <(...)"],
+]
+
+const SEPARATOR = /(?:&&|\|\||;|\||\n)/
+
+/** 带子命令的程序——签名要带上子命令才有区分度（`git push` vs `git status`）。 */
+const SUBCOMMAND_PROGRAMS: ReadonlySet<string> = new Set([
+  "git", "npm", "pnpm", "yarn", "bun", "cargo", "go", "docker", "kubectl",
+  "brew", "pip", "pip3", "uv", "gh", "systemctl", "launchctl",
+])
+
+function tokenize(text: string): string[] {
+  const tokens: string[] = []
+  const matcher = /"([^"]*)"|'([^']*)'|(\S+)/g
+  for (const m of text.matchAll(matcher)) {
+    tokens.push(m[1] ?? m[2] ?? m[3] ?? "")
+  }
+  return tokens.filter((t) => t !== "")
+}
+
+function toSegment(text: string): Segment | undefined {
+  const argv = tokenize(text.trim())
+  const program = argv[0]
+  if (program === undefined) return undefined
+  return {
+    argv,
+    program,
+    flags: argv.filter((a) => a.startsWith("-")),
+    operands: argv.slice(1).filter((a) => !a.startsWith("-")),
+  }
+}
+
+export function splitSegments(command: string): SplitResult {
+  for (const [pattern, label] of OPAQUE_PATTERNS) {
+    if (pattern.test(command)) {
+      return { segments: [], unparseable: true, reason: `命令含${label}，无法静态判定` }
+    }
+  }
+  const segments = command
+    .split(SEPARATOR)
+    .map(toSegment)
+    .filter((s): s is Segment => s !== undefined)
+
+  if (segments.length === 0) {
+    return { segments: [], unparseable: true, reason: "命令为空或无法切分" }
+  }
+  return { segments, unparseable: false }
+}
+
+/** 归一签名，供记忆规则做模式匹配。`pnpm run test -- --watch` → `pnpm run`。 */
+export function signature(segment: Segment): string {
+  if (!SUBCOMMAND_PROGRAMS.has(segment.program)) return segment.program
+  const sub = segment.operands[0]
+  return sub === undefined ? segment.program : `${segment.program} ${sub}`
+}
+
+/** 该 segment 是否带了任一 flag（同时匹配短横线与双横线写法）。 */
+export function hasFlag(segment: Segment, ...names: readonly string[]): boolean {
+  return segment.flags.some((flag) =>
+    names.some((name) => flag === name || (flag.startsWith("-") && !flag.startsWith("--") && name.length === 2 && flag.includes(name.slice(1)))),
+  )
+}

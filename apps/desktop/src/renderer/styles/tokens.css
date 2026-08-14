@@ -1,0 +1,81 @@
+/*
+ * 设计 token —— 界面里所有颜色、间距、圆角都必须走这里。
+ * 组件里出现字面量颜色视为 bug：那是上一版界面失控的起点。
+ *
+ * 基调：中性灰阶、近白内容区、极细边框、克制的强调色。
+ * 强调色只用于焦点与链接；主按钮用近黑，不用彩色。
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* 层次 */
+  --bg: #ffffff;
+  --bg-sunken: #f7f7f8;
+  --bg-raised: #ffffff;
+  --bg-hover: #f0f0f2;
+  --bg-active: #e8e8ec;
+  --bg-code: #f6f6f7;
+
+  /* 描边 */
+  --border: #e6e6e9;
+  --border-strong: #d6d6da;
+
+  /* 文字 */
+  --text: #16161a;
+  --text-muted: #6a6a73;
+  --text-faint: #9a9aa4;
+  --text-inverse: #ffffff;
+
+  /* 语义 */
+  --accent: #3b6fd4;
+  --danger: #c2412d;
+  --warn: #9a6b12;
+  --ok: #2f7a4d;
+
+  /* 度量 */
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 13px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-base: 13.5px;
+  --text-lg: 15px;
+
+  --sidebar-w: 232px;
+  --content-max: 760px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --bg-sunken: #101012;
+    --bg-raised: #1d1d21;
+    --bg-hover: #232328;
+    --bg-active: #2c2c33;
+    --bg-code: #202024;
+
+    --border: #2a2a30;
+    --border-strong: #3a3a42;
+
+    --text: #ececef;
+    --text-muted: #9d9da8;
+    --text-faint: #6d6d78;
+    --text-inverse: #17171a;
+
+    --accent: #7aa2f7;
+    --danger: #e0705c;
+    --warn: #d3a044;
+    --ok: #6cc48d;
+  }
+}
