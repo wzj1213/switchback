@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { ipcMain, type BrowserWindow } from "electron"
 import type { Command, Event, ThreadId } from "@omni/protocol"
-import { createClaudeDriver } from "@omni/engine"
+import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
+import { devEngine } from "./devtools.js"
 
 export interface Attached {
   host: Host
@@ -28,7 +29,7 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   }
 
   const host = createHost({
-    drivers: { claude: createClaudeDriver() },
+    drivers: { claude: createClaudeDriver(), codex: createCodexDriver() },
     home: homedir(),
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
@@ -63,7 +64,7 @@ export async function seedDefaultThread(
   await attached.host.dispatch({
     type: "thread.create",
     cwd,
-    engine: "claude",
+    engine: devEngine(),
     trust: "auto-edit",
     title: cwd.split("/").pop() ?? "工作区",
   })

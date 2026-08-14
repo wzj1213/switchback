@@ -36,11 +36,32 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
 const PATH_ARG_KEYS = ["file_path", "path", "notebook_path", "filePath", "cwd"] as const
 const URL_ARG_KEYS = ["url", "uri"] as const
 
+/**
+ * 一次请求涉及**多个**路径的情况。
+ *
+ * codex 的一个 `apply_patch` 可以同时改好几个文件；只认单数键的话，
+ * 「写到工作区外」这类红线会漏掉第一个之外的所有路径——
+ * 接第二家引擎才暴露出来的缺口。
+ */
+const PATH_LIST_KEYS = ["paths"] as const
+
 function stringArg(args: Readonly<Record<string, unknown>>, keys: readonly string[]): string[] {
   const out: string[] = []
   for (const key of keys) {
     const value = args[key]
     if (typeof value === "string" && value !== "") out.push(value)
+  }
+  return out
+}
+
+function stringListArg(args: Readonly<Record<string, unknown>>, keys: readonly string[]): string[] {
+  const out: string[] = []
+  for (const key of keys) {
+    const value = args[key]
+    if (!Array.isArray(value)) continue
+    for (const entry of value as readonly unknown[]) {
+      if (typeof entry === "string" && entry !== "") out.push(entry)
+    }
   }
   return out
 }
@@ -77,7 +98,7 @@ export function classify(req: Request, home: string): Normalized {
   const split: SplitResult =
     command === undefined ? { segments: [], unparseable: false } : splitSegments(command)
 
-  const fromArgs = stringArg(req.args, PATH_ARG_KEYS)
+  const fromArgs = [...stringArg(req.args, PATH_ARG_KEYS), ...stringListArg(req.args, PATH_LIST_KEYS)]
   const urlArgs = stringArg(req.args, URL_ARG_KEYS)
   const scraped = fromCommand(split)
 

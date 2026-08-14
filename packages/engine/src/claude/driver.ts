@@ -1,4 +1,10 @@
-import { query, type Options, type PermissionResult, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
+import {
+  query,
+  type Options,
+  type PermissionResult,
+  type SDKUserMessage,
+  type SpawnedProcess,
+} from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
 import type { Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
@@ -64,8 +70,10 @@ class ClaudeSession implements EngineSession {
       permissionMode: PERMISSION_MODE,
       canUseTool: (tool, input, meta) => this.judge(tool, input, meta as AskMeta),
       abortController: this.abort,
-      // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言
-      spawnClaudeCodeProcess: (o) => this.owner.spawn(o),
+      // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言。
+      // 强转放这里而不放 subprocess.ts：`SpawnedProcess` 是 Claude SDK 的要求，
+      // 进程所有权模块是各引擎共用的，不该反过来迁就某一家的类型。
+      spawnClaudeCodeProcess: (o) => this.owner.spawn(o) as unknown as SpawnedProcess,
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
     }
     this.handle = query({ prompt: this.input, options })

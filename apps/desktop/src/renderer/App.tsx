@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { EngineId, Thread, Trust } from "@omni/protocol"
+import type { Thread } from "@omni/protocol"
 import { itemsOf, threadsOf } from "@omni/store"
 import { ItemView } from "./components/ItemView.js"
 import { Sidebar } from "./components/Sidebar.js"
@@ -43,8 +43,6 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
 export function App(): React.JSX.Element {
   const { state, send, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
-  const [engine, setEngine] = useState<EngineId>("claude")
-  const [trust, setTrust] = useState<Trust>("auto-edit")
 
   const threads = threadsOf(state)
   const thread = threads.find((t) => t.id === selectedId) ?? threads[0]
@@ -97,11 +95,22 @@ export function App(): React.JSX.Element {
           </div>
         </div>
         <Composer
-          engine={engine}
-          trust={trust}
-          onEngineChange={setEngine}
+          // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
+          // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
+          engine={thread.engine}
+          trust={thread.trust}
+          onEngineChange={(next) => {
+            // 换引擎 = 在同一个工作区另开一个会话。会话中途接力（`thread.handoff`）
+            // 还没实现，与其让这个下拉框点了没反应，不如让它做一件真做得到的事。
+            send({
+              type: "thread.create",
+              cwd: thread.cwd,
+              engine: next,
+              trust: thread.trust,
+              title: thread.title,
+            })
+          }}
           onTrustChange={(next) => {
-            setTrust(next)
             send({ type: "thread.setTrust", threadId: thread.id, trust: next })
           }}
           onSend={(text) => {

@@ -1,8 +1,21 @@
 import { spawn, type ChildProcess } from "node:child_process"
-import type { SpawnOptions, SpawnedProcess } from "@anthropic-ai/claude-agent-sdk"
+
+/**
+ * 起一个引擎进程要的最少信息。
+ *
+ * 有意**不** import Claude SDK 的 `SpawnOptions`：本模块给所有引擎共用，
+ * codex 驱动也要靠它拿进程组所有权，不该为此背上一个厂商 SDK 的类型。
+ * 结构上是兼容的——SDK 递过来的对象字段是这几个的超集。
+ */
+export interface SpawnRequest {
+  command: string
+  args: readonly string[]
+  cwd?: string
+  env?: Readonly<Record<string, string | undefined>>
+}
 
 export interface ReclaimConfig {
-  /** SDK 的 stdin-EOF 优雅窗口之后，我们再等多久让它自己退 */
+  /** 引擎自己的优雅退出窗口之后，我们再等多久让它自己退 */
   exitGraceMs: number
   /** SIGTERM 之后等多久再升级到 SIGKILL */
   termGraceMs: number
@@ -24,8 +37,8 @@ export interface ReclaimReport {
 }
 
 export interface ProcessOwner {
-  /** 交给 SDK 的 `spawnClaudeCodeProcess` */
-  spawn: (options: SpawnOptions) => SpawnedProcess
+  /** Claude 侧交给 SDK 的 `spawnClaudeCodeProcess`；codex 侧自己调。 */
+  spawn: (options: SpawnRequest) => ChildProcess
   /** 回收阶梯。幂等；返回时要么有退出证明，要么 rung 是 `escaped`。 */
   reclaim: () => Promise<ReclaimReport>
 }
@@ -67,10 +80,10 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
   const cfg = { ...DEFAULTS, ...config }
   const state: { owned: Owned | undefined } = { owned: undefined }
 
-  const doSpawn = (options: SpawnOptions): SpawnedProcess => {
+  const doSpawn = (options: SpawnRequest): ChildProcess => {
     // detached: true 让子进程成为新进程组的组长，我们才能用负 pid 一次收掉整棵树。
     // 代价：omni 硬崩时子进程不会被系统连坐带走——这是有意的取舍，见 README。
-    const child = spawn(options.command, options.args, {
+    const child = spawn(options.command, [...options.args], {
       cwd: options.cwd,
       env: options.env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -83,7 +96,7 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
       owned.signal = signal
     })
     state.owned = owned
-    return child as unknown as SpawnedProcess
+    return child
   }
 
   const report = (rung: Rung, started: number): ReclaimReport => {

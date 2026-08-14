@@ -7,6 +7,7 @@ import { app, type BrowserWindow } from "electron"
  * | 变量 | 作用 |
  * | --- | --- |
  * | `OMNI_DEV_PROMPT` | 默认会话建好后自动发这条提示词 |
+ * | `OMNI_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -16,6 +17,12 @@ import { app, type BrowserWindow } from "electron"
 export function devPrompt(): string | undefined {
   const text = process.env["OMNI_DEV_PROMPT"]
   return text === undefined || text === "" ? undefined : text
+}
+
+/** 换引擎跑一遍是验证归一化模型的主要手段，所以给它留了个口子。 */
+export function devEngine(): string {
+  const engine = process.env["OMNI_DEV_ENGINE"]
+  return engine === undefined || engine === "" ? "claude" : engine
 }
 
 export function scheduleDevShot(win: BrowserWindow): void {
