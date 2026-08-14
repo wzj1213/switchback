@@ -62,7 +62,7 @@ desktop   ← 只依赖 host + protocol
 | `更新日志.md`（根目录） | **使用者** | 每个**用户可见**的特性/改动，顶部新增一条 |
 | `docs/工程时间线.md` | dev | 每次架构决策、依赖变更、批量重构 |
 
-`更新日志.md` 格式固定（`pnpm docs` 校验）：
+`更新日志.md` 格式固定（`pnpm check:docs` 校验）：
 
 ```
 ## 标题 · YYYY-MM-DD
