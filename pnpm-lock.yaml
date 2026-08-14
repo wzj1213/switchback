@@ -32,6 +32,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: ^0.3.231
+        version: 0.3.231(@anthropic-ai/sdk@0.116.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)
       '@omni/approval':
         specifier: workspace:*
         version: link:../../packages/approval

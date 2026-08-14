@@ -36,7 +36,7 @@ class ClaudeSession implements EngineSession {
   private readonly input = createQueue<SDKUserMessage>()
   private readonly abort = new AbortController()
   private readonly trust: { current: Trust }
-  private readonly turn: TurnRef = { current: undefined, seq: 0 }
+  private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map() }
   private loop: Promise<void> | undefined
   private handle: ReturnType<typeof query> | undefined
 

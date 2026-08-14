@@ -1,7 +1,7 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
-import type { Event, ItemId, TurnId } from "@omni/protocol"
+import type { Event, ItemId, ToolCallItem, TurnId } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
-import { assistantItems, turnStatus } from "./translate.js"
+import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
 interface RawMessage {
@@ -20,6 +20,11 @@ export interface TurnRef {
   current: TurnId | undefined
   /** item id 序号，跨轮递增，保证同一会话内不重复 */
   seq: number
+  /**
+   * 已发出但还没收到结果的工具调用，键是 Claude 的 tool_use id（也是我们的 item id）。
+   * `item.updated` 要带整条 item，所以必须把它留着。
+   */
+  tools: Map<ItemId, ToolCallItem>
 }
 
 function makeIdMinter(ref: TurnRef, turnId: TurnId): () => ItemId {
@@ -36,7 +41,23 @@ function onAssistant(msg: RawMessage, ref: TurnRef, req: StartRequest, at: numbe
   const content = msg.message?.content
   if (!Array.isArray(content)) return
   for (const item of assistantItems(content, { turnId, at, nextId: makeIdMinter(ref, turnId) })) {
+    if (item.kind === "tool_call") ref.tools.set(item.id, item)
     req.emit({ type: "item.started", at, item })
+  }
+}
+
+/**
+ * Claude 把工具结果作为 **user 角色**的消息发回来。不认这一类，
+ * 界面上的工具调用会永远停在 `running`——这个 bug 是把界面跑起来才看见的。
+ */
+function onToolResults(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const content = msg.message?.content
+  if (!Array.isArray(content)) return
+  for (const result of toolResults(content)) {
+    const pending = ref.tools.get(result.toolUseId)
+    if (pending === undefined) continue
+    ref.tools.delete(result.toolUseId)
+    req.emit({ type: "item.updated", at, item: applyResult(pending, result) })
   }
 }
 
@@ -56,6 +77,9 @@ function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
   switch (msg.type) {
     case "assistant":
       onAssistant(msg, ref, req, at)
+      return
+    case "user":
+      onToolResults(msg, ref, req, at)
       return
     case "result":
       onResult(msg, ref, req, at)

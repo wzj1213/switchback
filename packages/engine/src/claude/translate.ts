@@ -1,4 +1,4 @@
-import type { Item, ItemId, ToolDetail, TurnId } from "@omni/protocol"
+import type { Item, ItemId, ToolCallItem, ToolDetail, TurnId } from "@omni/protocol"
 
 /**
  * Claude 内容块的**结构性**最小类型。
@@ -90,6 +90,54 @@ export function assistantItems(
     if (item !== undefined) items.push(item)
   }
   return items
+}
+
+export interface ToolResult {
+  toolUseId: string
+  text: string
+  isError: boolean
+}
+
+/** 把 tool_result 的 content 压成一段文本；它可能是字符串，也可能是内容块数组。 */
+function resultText(content: unknown): string {
+  if (typeof content === "string") return content
+  if (!Array.isArray(content)) return ""
+  return content
+    .map((b) => (typeof b === "object" && b !== null ? strOf((b as RawBlock).text) : undefined))
+    .filter((t): t is string => t !== undefined)
+    .join("\n")
+}
+
+/**
+ * 从一条 user 消息里捞出工具结果。
+ *
+ * Claude 把工具结果作为 **user 角色**的消息发回来——不认这一类，
+ * 界面上的工具调用就会永远停在 `running`。
+ */
+export function toolResults(content: readonly unknown[]): readonly ToolResult[] {
+  const out: ToolResult[] = []
+  for (const raw of content) {
+    if (typeof raw !== "object" || raw === null) continue
+    const block = raw as RawBlock & { tool_use_id?: string; content?: unknown; is_error?: boolean }
+    if (block.type !== "tool_result") continue
+    const toolUseId = strOf(block.tool_use_id)
+    if (toolUseId === undefined) continue
+    out.push({ toolUseId, text: resultText(block.content), isError: block.is_error === true })
+  }
+  return out
+}
+
+const MAX_OUTPUT = 4000
+
+/** 把结果并进已发出的工具调用 item。输出截断，避免单条 item 撑爆事件流。 */
+export function applyResult(item: ToolCallItem, result: ToolResult): ToolCallItem {
+  const text = result.text.length > MAX_OUTPUT ? `${result.text.slice(0, MAX_OUTPUT)}\n…（已截断）` : result.text
+  const status = result.isError ? "failed" : "ok"
+  const detail: ToolDetail =
+    item.detail.kind === "shell" ? { ...item.detail, output: text } : item.detail
+  return result.isError
+    ? { ...item, status, detail, error: text }
+    : { ...item, status, detail }
 }
 
 /** SDK 的 result 消息 → turn 终态。`is_error` 优先于 `subtype`。 */
