@@ -54,3 +54,22 @@ describe("applyResult", () => {
     expect(output.endsWith("（已截断）")).toBe(true)
   })
 })
+
+import { assistantItems } from "./translate.js"
+
+describe("assistantItems", () => {
+  const ctx = { turnId: "t1", at: 0, nextId: () => "i1" }
+
+  it("空文本块不产生 item——否则会打断工具调用的分组，界面上出现空隙", () => {
+    expect(assistantItems([{ type: "text", text: "" }], ctx)).toEqual([])
+    expect(assistantItems([{ type: "text" }], ctx)).toEqual([])
+  })
+
+  it("空 thinking 块同理", () => {
+    expect(assistantItems([{ type: "thinking", thinking: "" }], ctx)).toEqual([])
+  })
+
+  it("非空文本正常产生 item", () => {
+    expect(assistantItems([{ type: "text", text: "hi" }], ctx)).toHaveLength(1)
+  })
+})

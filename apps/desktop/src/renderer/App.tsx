@@ -4,7 +4,10 @@ import { itemsOf, threadsOf } from "@omni/store"
 import { ItemView } from "./components/ItemView.js"
 import { Sidebar } from "./components/Sidebar.js"
 import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
+import { ToolRun } from "./components/ToolRun.js"
+import { groupRows } from "./group.js"
 import { useOmni } from "./useOmni.js"
+import { useStickToBottom } from "./useStickToBottom.js"
 
 function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
   return list.find((x) => x.id === id)?.label ?? id
@@ -45,6 +48,8 @@ export function App(): React.JSX.Element {
 
   const threads = threadsOf(state)
   const thread = threads.find((t) => t.id === selectedId) ?? threads[0]
+  const items = thread === undefined ? [] : itemsOf(state, thread.id)
+  const scroller = useStickToBottom<HTMLDivElement>(items.length)
 
   if (thread === undefined) {
     return (
@@ -69,22 +74,26 @@ export function App(): React.JSX.Element {
       <Sidebar threads={threads} selectedId={thread.id} onSelect={setSelectedId} />
       <main className="main">
         <TopBar thread={thread} />
-        <div className="transcript">
+        <div className="transcript" ref={scroller}>
           <div className="transcript__inner">
-            {itemsOf(state, thread.id).map((item) => (
-              <ItemView
-                key={item.id}
-                item={item}
-                onResolve={(itemId, allow, remember) => {
-                  send({
-                    type: "approval.resolve",
-                    itemId,
-                    allow,
-                    remember: remember ? "project" : "once",
-                  })
-                }}
-              />
-            ))}
+            {groupRows(items).map((row) =>
+              row.kind === "run" ? (
+                <ToolRun key={row.items[0]?.id} items={row.items} />
+              ) : (
+                <ItemView
+                  key={row.item.id}
+                  item={row.item}
+                  onResolve={(itemId, allow, remember) => {
+                    send({
+                      type: "approval.resolve",
+                      itemId,
+                      allow,
+                      remember: remember ? "project" : "once",
+                    })
+                  }}
+                />
+              ),
+            )}
           </div>
         </div>
         <Composer

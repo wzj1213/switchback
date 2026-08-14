@@ -59,10 +59,17 @@ export interface TranslateContext {
 function blockToItem(block: RawBlock, ctx: TranslateContext): Item | undefined {
   const base = { id: ctx.nextId(), turnId: ctx.turnId, at: ctx.at }
   switch (block.type) {
+    // 只带工具调用的 assistant 消息常常附一个空文本块。发出去会得到一条
+    // 看不见的 item——它不显示任何内容，却会把连续的工具调用分组打断，
+    // 在界面上表现为一段莫名其妙的空隙。
     case "text":
-      return { ...base, kind: "agent_message", text: block.text ?? "", complete: true }
+      return block.text === undefined || block.text === ""
+        ? undefined
+        : { ...base, kind: "agent_message", text: block.text, complete: true }
     case "thinking":
-      return { ...base, kind: "reasoning", text: block.thinking ?? "", complete: true }
+      return block.thinking === undefined || block.thinking === ""
+        ? undefined
+        : { ...base, kind: "reasoning", text: block.thinking, complete: true }
     case "tool_use":
       return {
         ...base,

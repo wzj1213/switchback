@@ -1,5 +1,6 @@
 export { createClaudeDriver } from "./claude/driver.js"
 export { createQueue } from "./queue.js"
+export { createProcessOwner } from "./subprocess.js"
 export {
   sanitize,
   forcesHumanPrompt,
@@ -14,3 +15,4 @@ export type { EngineDriver, EngineSession, StartRequest, ApprovalAsk, ApprovalAn
 export type { ClaudeDriverConfig } from "./claude/driver.js"
 export type { AskMeta, RequestContext } from "./claude/permission.js"
 export type { PushQueue } from "./queue.js"
+export type { ProcessOwner, ReclaimConfig, ReclaimReport, Rung } from "./subprocess.js"

@@ -39,67 +39,93 @@
   }
 }
 
-/* ── 工具调用 ────────────────────────────────────────── */
-.tool {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
-  overflow: hidden;
-}
-
-.tool__head {
+/* ── 工具活动：扁平行 + 左轨，不是一摞卡片 ──────────────── */
+.run {
   display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 7px var(--sp-3);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
+  flex-direction: column;
+  gap: 1px;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border);
 }
 
-.tool__kind {
-  font-weight: 600;
+.step {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.step--open {
+  cursor: default;
+}
+
+.step--open:hover {
   color: var(--text);
 }
 
-.tool__target {
+.step__verb {
+  flex: none;
+  min-width: 2.6em;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.step__target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tool__status {
+/* 可展开的行给一个轻提示，避免「哪些能点」全靠猜 */
+.step--open .step__target::after {
+  content: " ⌄";
+  color: var(--text-faint);
+}
+
+.step--expanded .step__target::after {
+  content: " ⌃";
+}
+
+.step__state {
+  flex: none;
   margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
 }
 
-.tool__status--ok {
-  color: var(--ok);
-}
-
-.tool__status--failed,
-.tool__status--denied {
+.step__state--failed,
+.step__state--denied {
   color: var(--danger);
 }
 
-.tool__body {
+.step__state--running {
+  color: var(--warn);
+}
+
+.step__out {
+  margin: 2px 0 var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  border-top: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background: var(--bg-code);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-x: auto;
-  max-height: 260px;
-}
-
-.diffstat {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  max-height: 320px;
 }
 
 .diffstat__add {

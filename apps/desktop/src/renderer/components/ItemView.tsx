@@ -1,58 +1,8 @@
 import { useState } from "react"
-import type { ApprovalItem, Item, ItemId, ToolCallItem, ToolDetail } from "@omni/protocol"
+import type { ApprovalItem, Item, ItemId, ToolCallItem } from "@omni/protocol"
 
 /** 用户对一张审批卡的裁决。remember 为真表示勾了「本项目不再询问」。 */
 export type ResolveApproval = (itemId: ItemId, allow: boolean, remember: boolean) => void
-
-const TOOL_LABEL: Record<ToolDetail["kind"], string> = {
-  shell: "执行",
-  file_edit: "编辑",
-  file_read: "读取",
-  fetch: "请求",
-  other: "调用",
-}
-
-function toolTarget(detail: ToolDetail): string {
-  switch (detail.kind) {
-    case "shell":
-      return detail.command
-    case "file_edit":
-    case "file_read":
-      return detail.path
-    case "fetch":
-      return detail.url
-    case "other":
-      return detail.name
-  }
-}
-
-function toolBody(detail: ToolDetail): string | undefined {
-  if (detail.kind === "shell") return detail.output
-  if (detail.kind === "file_edit") return detail.diff
-  return undefined
-}
-
-function ToolCall({ item }: { item: ToolCallItem }): React.JSX.Element {
-  const body = toolBody(item.detail)
-  const edit = item.detail.kind === "file_edit" ? item.detail : undefined
-  return (
-    <div className="tool">
-      <div className="tool__head">
-        <span className="tool__kind">{TOOL_LABEL[item.detail.kind]}</span>
-        <span className="tool__target">{toolTarget(item.detail)}</span>
-        {edit !== undefined ? (
-          <span className="diffstat">
-            <span className="diffstat__add">+{edit.added}</span>{" "}
-            <span className="diffstat__del">−{edit.removed}</span>
-          </span>
-        ) : (
-          <span className={`tool__status tool__status--${item.status}`}>{item.status}</span>
-        )}
-      </div>
-      {body !== undefined ? <div className="tool__body">{body}</div> : null}
-    </div>
-  )
-}
 
 /**
  * 审批卡。**整个产品最关键的界面**——上一版把它放在另一个页面（班组台），
@@ -116,24 +66,28 @@ function Plan({ steps }: { steps: readonly { text: string; status: string }[] })
     dropped: "×",
   }
   return (
-    <div className="tool">
-      <div className="tool__head">
-        <span className="tool__kind">计划</span>
+    <div className="run">
+      <div className="step">
+        <span className="step__verb">计划</span>
       </div>
-      <div className="tool__body">
+      <pre className="step__out">
         {steps.map((s) => `${mark[s.status] ?? "·"} ${s.text}`).join("\n")}
-      </div>
+      </pre>
     </div>
   )
 }
 
+/**
+ * 除工具调用之外的 item。工具调用由 `ToolRun` 成组渲染——
+ * 这里把它从类型上排除掉，switch 才能保持穷尽，漏一种就编译不过。
+ */
 export function ItemView({
   item,
   onResolve,
 }: {
-  item: Item
+  item: Exclude<Item, ToolCallItem>
   onResolve: ResolveApproval
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   switch (item.kind) {
     case "user_message":
       return <div className="msg--user">{item.text}</div>
@@ -143,8 +97,6 @@ export function ItemView({
       )
     case "reasoning":
       return <div className="reasoning">{item.text}</div>
-    case "tool_call":
-      return <ToolCall item={item} />
     case "plan":
       return <Plan steps={item.steps} />
     case "approval":

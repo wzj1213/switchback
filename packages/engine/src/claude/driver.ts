@@ -5,6 +5,7 @@ import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createQueue } from "../queue.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
+import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 
 /**
  * `permissionMode` 固定为 `'default'`，三个信任档都不变。
@@ -16,6 +17,11 @@ import { runMessageLoop, type TurnRef } from "./loop.js"
  * 所以档位必须表达在 `@omni/approval` 的判定里，不能表达在 SDK 模式里。
  */
 const PERMISSION_MODE = "default" as const
+
+/** 等消息循环自然收尾的上限；超过就进入信号阶梯。 */
+const GRACEFUL_WAIT_MS = 4000
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 export interface ClaudeDriverConfig {
   /**
@@ -30,6 +36,8 @@ export interface ClaudeDriverConfig {
    * 设为 `true` 时传 `settingSources: []`，omni 成为唯一权威，**但也会丢掉 CLAUDE.md**。
    */
   isolateSettings?: boolean
+  /** 回收阶梯的三个窗口，见 `subprocess.ts` */
+  reclaim?: Partial<ReclaimConfig>
 }
 
 class ClaudeSession implements EngineSession {
@@ -37,6 +45,7 @@ class ClaudeSession implements EngineSession {
   private readonly abort = new AbortController()
   private readonly trust: { current: Trust }
   private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map() }
+  private readonly owner: ProcessOwner
   private loop: Promise<void> | undefined
   private handle: ReturnType<typeof query> | undefined
 
@@ -45,6 +54,8 @@ class ClaudeSession implements EngineSession {
     private readonly config: ClaudeDriverConfig,
   ) {
     this.trust = { current: req.trust }
+    // 字段初始化器里读不到构造参数属性，只能在这里建
+    this.owner = createProcessOwner(config.reclaim)
   }
 
   start(): void {
@@ -53,6 +64,8 @@ class ClaudeSession implements EngineSession {
       permissionMode: PERMISSION_MODE,
       canUseTool: (tool, input, meta) => this.judge(tool, input, meta as AskMeta),
       abortController: this.abort,
+      // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言
+      spawnClaudeCodeProcess: (o) => this.owner.spawn(o),
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
     }
     this.handle = query({ prompt: this.input, options })
@@ -116,10 +129,31 @@ class ClaudeSession implements EngineSession {
     return Promise.resolve()
   }
 
+  /**
+   * 回收阶梯。**顺序是有讲究的**：
+   *
+   * 1. 关输入流 → SDK 看到 stdin EOF，走它自己的 ~2s 优雅窗口（`GRACEFUL_EXIT_TIMEOUT_MS`）
+   * 2. 等消息循环自然结束（正常退出会走到这里）
+   * 3. 才 abort——提前 abort 会抢在 SDK 的优雅路径前面，CLI 自己的优雅退出就没机会跑
+   * 4. `owner.reclaim()` 补上 SIGTERM → SIGKILL → 整树退出证明
+   *
+   * 逃逸（`escaped`）**必须上报**，不能吞。一个悄悄泄漏的引擎子进程
+   * 表现出来就是「机器越来越慢」，最难查。
+   */
   async dispose(): Promise<void> {
     this.input.close()
+    await Promise.race([this.loop?.catch(() => undefined), sleep(GRACEFUL_WAIT_MS)])
     this.abort.abort()
-    await this.loop?.catch(() => undefined)
+    const report = await this.owner.reclaim()
+    if (report.rung === "escaped") {
+      this.req.emit({
+        type: "engine.status",
+        at: Date.now(),
+        threadId: this.req.threadId,
+        status: "crashed",
+        detail: `引擎进程组未能回收（pid ${String(report.pid)}），可能已泄漏`,
+      })
+    }
   }
 }
 
