@@ -10,8 +10,11 @@
   white-space: pre-wrap;
 }
 
+/* 注意：这里**不能**有 white-space: pre-wrap。内容是 Markdown 渲染出的元素树，
+   pre-wrap 会把标签之间的换行符当成真实换行，每个块级元素之间凭空多出一整行。
+   字面量文本只剩用户消息（.msg--user），pre-wrap 留在那里。 */
 .msg--agent {
-  white-space: pre-wrap;
+  min-width: 0;
 }
 
 .reasoning {
@@ -19,7 +22,6 @@
   border-left: 2px solid var(--border);
   color: var(--text-muted);
   font-size: var(--text-sm);
-  white-space: pre-wrap;
 }
 
 .caret::after {

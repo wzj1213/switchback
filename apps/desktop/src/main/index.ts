@@ -39,6 +39,15 @@ function createWindow(): BrowserWindow {
     return { action: "deny" }
   })
 
+  // 渲染的是模型产出的 Markdown，里面可能有链接。带 target 的走上面的
+  // handler 去外部浏览器；没有 target 的会**就地导航**，把整个应用页面顶掉。
+  // 这里兜底：一律拦下并转给系统浏览器。
+  win.webContents.on("will-navigate", (event, url) => {
+    if (url === win.webContents.getURL()) return
+    event.preventDefault()
+    void shell.openExternal(url)
+  })
+
   const devUrl = process.env["ELECTRON_RENDERER_URL"]
   if (isDev && devUrl !== undefined) void win.loadURL(devUrl)
   else void win.loadFile(join(import.meta.dirname, "../renderer/index.html"))

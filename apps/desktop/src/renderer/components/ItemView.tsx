@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Markdown } from "./Markdown.js"
 import type { ApprovalItem, Item, ItemId, ToolCallItem } from "@omni/protocol"
 
 /** 用户对一张审批卡的裁决。remember 为真表示勾了「本项目不再询问」。 */
@@ -91,12 +92,19 @@ export function ItemView({
   switch (item.kind) {
     case "user_message":
       return <div className="msg--user">{item.text}</div>
+    // 用户消息保持字面量：他打的是什么就显示什么，替他解析 Markdown 是意外行为
     case "agent_message":
       return (
-        <div className={`msg--agent${item.complete ? "" : " caret"}`}>{item.text}</div>
+        <div className={`msg--agent${item.complete ? "" : " caret"}`}>
+          <Markdown text={item.text} />
+        </div>
       )
     case "reasoning":
-      return <div className="reasoning">{item.text}</div>
+      return (
+        <div className="reasoning">
+          <Markdown text={item.text} />
+        </div>
+      )
     case "plan":
       return <Plan steps={item.steps} />
     case "approval":
