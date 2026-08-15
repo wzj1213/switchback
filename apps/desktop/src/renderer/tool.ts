@@ -13,7 +13,10 @@ export function target(detail: ToolDetail): string {
   switch (detail.kind) {
     case "shell":
       return detail.command
+    // 一次 apply_patch 可以改好几个文件。只报第一个的话，界面会写着
+    // 「编辑 index.js」而实际上 math.js 也被改了——**说了假话**。
     case "file_edit":
+      return detail.files.length > 1 ? `${String(detail.files.length)} 个文件` : detail.path
     case "file_read":
       return detail.path
     case "fetch":

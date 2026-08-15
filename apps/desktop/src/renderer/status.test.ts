@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Item, Thread, ToolCallItem } from "@omni/protocol"
 import { elapsed, statusLabel } from "./status.js"
-import { brief } from "./tool.js"
+import { brief, target } from "./tool.js"
 
 const thread = (status: Thread["status"]): Thread => ({
   id: "th",
@@ -52,6 +52,35 @@ describe("statusLabel", () => {
   it("越过已完成的工具往前找的行为不存在——只看最后一个", () => {
     const items = [tool({ id: "a" }), tool({ id: "b", status: "ok" })]
     expect(statusLabel(thread("running"), items)).toBe("正在思考")
+  })
+})
+
+describe("target", () => {
+  it("多文件改动报「N 个文件」——只报第一个等于说了假话", () => {
+    expect(
+      target({
+        kind: "file_edit",
+        path: "/w/index.js",
+        files: [
+          { path: "/w/index.js", kind: "add", added: 1, removed: 0 },
+          { path: "/w/math.js", kind: "update", added: 3, removed: 0 },
+        ],
+        added: 4,
+        removed: 0,
+      }),
+    ).toBe("2 个文件")
+  })
+
+  it("单文件仍然报路径", () => {
+    expect(
+      target({
+        kind: "file_edit",
+        path: "/w/math.js",
+        files: [{ path: "/w/math.js", kind: "update", added: 1, removed: 1 }],
+        added: 1,
+        removed: 1,
+      }),
+    ).toBe("/w/math.js")
   })
 })
 

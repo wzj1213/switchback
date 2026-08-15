@@ -1,6 +1,7 @@
 import { useState } from "react"
-import type { ToolCallItem } from "@omni/protocol"
+import type { FileChange, ToolCallItem } from "@omni/protocol"
 import { VERB, target } from "../tool.js"
+import { Diff } from "./Diff.js"
 
 /** 运行期间实时显示的尾部行数。够看清在干什么，又不至于把整屏占满。 */
 const LIVE_LINES = 8
@@ -14,16 +15,22 @@ function lastLines(text: string, n: number): string {
 function body(item: ToolCallItem): string | undefined {
   if (item.error !== undefined && item.error !== "") return item.error
   if (item.detail.kind === "shell") return item.detail.output
-  if (item.detail.kind === "file_edit") return item.detail.diff
   return undefined
+}
+
+/** 文件改动走结构化呈现，不走纯文本那条路。 */
+function files(item: ToolCallItem): readonly FileChange[] {
+  return item.detail.kind === "file_edit" ? item.detail.files : []
 }
 
 function Stat({ item }: { item: ToolCallItem }): React.JSX.Element {
   if (item.detail.kind === "file_edit" && item.status === "ok") {
+    const { added, removed } = item.detail
+    // 零不显示：「+4 −0」里那个 −0 不携带任何信息，只是噪声
     return (
       <span className="step__state">
-        <span className="diffstat__add">+{item.detail.added}</span>{" "}
-        <span className="diffstat__del">−{item.detail.removed}</span>
+        {added > 0 ? <span className="diffstat__add">+{added}</span> : null}
+        {removed > 0 ? <span className="diffstat__del">−{removed}</span> : null}
       </span>
     )
   }
@@ -40,6 +47,7 @@ function Stat({ item }: { item: ToolCallItem }): React.JSX.Element {
 function Step({ item }: { item: ToolCallItem }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const content = body(item)
+  const changed = files(item)
   const live = item.status === "running" && content !== undefined && content !== ""
   const line = (
     <>
@@ -48,6 +56,22 @@ function Step({ item }: { item: ToolCallItem }): React.JSX.Element {
       <Stat item={item} />
     </>
   )
+  if (changed.length > 0) {
+    return (
+      <>
+        <button
+          className={`step step--open${open ? " step--expanded" : ""}`}
+          type="button"
+          onClick={() => {
+            setOpen((v) => !v)
+          }}
+        >
+          {line}
+        </button>
+        {open ? <Diff files={changed} /> : null}
+      </>
+    )
+  }
   if (content === undefined || content === "") return <div className="step">{line}</div>
   return (
     <>

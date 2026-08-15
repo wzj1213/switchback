@@ -1,0 +1,151 @@
+/*
+ * 文件改动视图。
+ *
+ * 底色用极淡的绿/红色调，不是撞色——一屏补丁里几十行高亮，
+ * 饱和度一高整块就没法读了。记号列（+/−）与正文分列，正文因此左对齐，
+ * 缩进层级一眼看得出来。
+ */
+
+.diff {
+  margin: 2px 0 var(--sp-2) 22px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.dfile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.dfile__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 5px var(--sp-2);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+}
+
+.dfile__kind {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  color: var(--text-muted);
+}
+
+.dfile__kind--add {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+
+.dfile__kind--delete {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+
+/*
+ * 路径要挤的时候**挤目录，不挤文件名**。
+ * 整条路径一起 ellipsis 的话，切掉的正是最该看到的那一截
+ * （`/w/src/mat…`），扫一列补丁时眼睛找的就是文件名。
+ */
+.dfile__path {
+  display: flex;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+
+.dfile__dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+}
+
+.dfile__name {
+  flex: none;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.dfile__stat {
+  margin-left: auto;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.dfile__stat > * + * {
+  margin-left: 5px;
+}
+
+.dfile__body {
+  max-height: 420px;
+  overflow: auto;
+  padding: var(--sp-1) 0;
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.dl {
+  display: flex;
+  padding-right: var(--sp-2);
+  white-space: pre;
+}
+
+.dl__sign {
+  flex: none;
+  width: 1.6em;
+  text-align: center;
+  color: var(--text-faint);
+  user-select: none;
+}
+
+.dl__text {
+  min-width: 0;
+}
+
+.dl--add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.dl--add .dl__sign {
+  color: var(--ok);
+}
+
+.dl--del {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.dl--del .dl__sign {
+  color: var(--danger);
+}
+
+/* hunk 头是定位信息不是内容：压到最淡，别和代码抢注意力 */
+.dl--hunk .dl__text,
+.dl--meta .dl__text {
+  color: var(--text-faint);
+}
+
+.dfile__more {
+  display: block;
+  width: 100%;
+  padding: 5px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+}
+
+.dfile__more:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}

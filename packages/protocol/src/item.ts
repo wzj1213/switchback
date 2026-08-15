@@ -40,10 +40,31 @@ export interface ReasoningItem extends ItemBase {
 
 export type ToolStatus = "pending" | "running" | "ok" | "failed" | "denied"
 
+export type FileChangeKind = "add" | "delete" | "update"
+
+/**
+ * 一次改动里的**一个**文件。
+ *
+ * 复数是必须的：codex 的一次 `apply_patch` 可以同时改好几个文件，
+ * 压成单个 path 加一坨拼接的 diff 之后，界面就再也没法按文件分组展示了。
+ */
+export interface FileChange {
+  path: string
+  kind: FileChangeKind
+  /**
+   * `update` 时是标准 unified diff；`add` / `delete` 时各家给的是**文件内容本身**
+   * （没有 `+`/`-` 前缀）——渲染层必须按 `kind` 决定怎么读。
+   */
+  diff?: string
+  added: number
+  removed: number
+}
+
 /** 工具调用的渲染形态。五种覆盖各家 95% 的调用，其余落 `other`。 */
 export type ToolDetail =
   | { kind: "shell"; command: string; cwd?: string; exitCode?: number; output?: string }
-  | { kind: "file_edit"; path: string; diff?: string; added: number; removed: number }
+  /** `path` 是标题用的展示目标（多文件时取第一个）；逐文件明细在 `files`。 */
+  | { kind: "file_edit"; path: string; files: readonly FileChange[]; added: number; removed: number }
   | { kind: "file_read"; path: string; range?: readonly [number, number] }
   | { kind: "fetch"; url: string }
   | { kind: "other"; name: string; input?: unknown; output?: unknown }

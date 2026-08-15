@@ -9,6 +9,8 @@ export type {
   ToolCallItem,
   ToolDetail,
   ToolStatus,
+  FileChange,
+  FileChangeKind,
   PlanItem,
   PlanStep,
   ApprovalItem,

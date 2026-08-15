@@ -60,10 +60,28 @@ describe("fileChange", () => {
     expect(toToolCall(change(), ctx).detail).toEqual({
       kind: "file_edit",
       path: "/w/a.txt",
-      diff: "hi\n",
+      files: [{ path: "/w/a.txt", kind: "add", diff: "hi\n", added: 1, removed: 0 }],
       added: 1,
       removed: 0,
     })
+  })
+
+  it("多文件逐个保留——拼成一坨之后界面就没法按文件分组了", () => {
+    const detail = toToolCall(
+      change({
+        changes: [
+          { path: "/w/a.txt", kind: { type: "add" }, diff: "x\n" },
+          { path: "/w/b.ts", kind: { type: "update" }, diff: "+新\n-旧\n" },
+          { path: "/w/c.ts", kind: { type: "delete" }, diff: "老\n" },
+        ],
+      }),
+      ctx,
+    ).detail
+    expect(detail.kind === "file_edit" ? detail.files.map((f) => [f.path, f.kind]) : []).toEqual([
+      ["/w/a.txt", "add"],
+      ["/w/b.ts", "update"],
+      ["/w/c.ts", "delete"],
+    ])
   })
 
   it("多文件补丁的增删是累加的", () => {

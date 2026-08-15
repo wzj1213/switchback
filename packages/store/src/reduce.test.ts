@@ -177,7 +177,7 @@ describe("shell 输出的实时增量", () => {
           at: 0,
           tool: "apply_patch",
           status: "running",
-          detail: { kind: "file_edit", path: "/w/a.ts", added: 0, removed: 0 },
+          detail: { kind: "file_edit", path: "/w/a.ts", files: [], added: 0, removed: 0 },
         },
       },
       { type: "item.delta", at: 1, itemId: "f1", append: "x" },

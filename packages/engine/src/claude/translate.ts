@@ -41,7 +41,9 @@ export function toolDetail(name: string, input: Record<string, unknown>): ToolDe
     case "file_read":
       return { kind: "file_read", path: strOf(input["file_path"]) ?? "" }
     case "file_edit":
-      return { kind: "file_edit", path: strOf(input["file_path"]) ?? "", added: 0, removed: 0 }
+      // files 为空：Claude 的 Edit 给的是 old_string/new_string，不是 diff。
+      // 合成 diff 是单独一件事，见 README「已知限制」。
+      return { kind: "file_edit", path: strOf(input["file_path"]) ?? "", files: [], added: 0, removed: 0 }
     case "fetch":
       return { kind: "fetch", url: strOf(input["url"]) ?? "" }
     default:

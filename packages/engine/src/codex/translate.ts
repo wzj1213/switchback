@@ -1,5 +1,14 @@
-import type { Item, ToolCallItem, ToolDetail, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
-import type { WireItem, WireTurnStatus } from "./wire.js"
+import type {
+  FileChange,
+  FileChangeKind,
+  Item,
+  ToolCallItem,
+  ToolDetail,
+  ToolStatus,
+  TurnId,
+  TurnStatus,
+} from "@omni/protocol"
+import type { WireFileChangeEntry, WireItem, WireTurnStatus } from "./wire.js"
 
 export interface CodexContext {
   turnId: TurnId
@@ -75,24 +84,29 @@ function commandDetail(item: WireItem): ToolDetail {
   }
 }
 
+const CHANGE_KIND: Readonly<Record<string, FileChangeKind>> = {
+  add: "add",
+  delete: "delete",
+  update: "update",
+}
+
+function toFileChange(entry: WireFileChangeEntry): FileChange {
+  const kind = CHANGE_KIND[entry.kind?.type ?? "update"] ?? "update"
+  const diff = entry.diff ?? ""
+  return { path: entry.path, kind, ...(diff === "" ? {} : { diff }), ...countDiff(kind, diff) }
+}
+
+/**
+ * 逐文件保留，**不拼成一坨**。一次 `apply_patch` 可以改好几个文件；
+ * 拼接之后界面就再也没法按文件分组、按文件折叠、按文件跳编辑器了。
+ */
 function fileChangeDetail(item: WireItem): ToolDetail {
-  const changes = item.changes ?? []
-  const first = changes[0]
-  const diff = changes.map((c) => c.diff ?? "").join("\n")
-  const tally = changes.reduce(
-    (acc, c) => {
-      const n = countDiff(c.kind?.type ?? "update", c.diff ?? "")
-      return { added: acc.added + n.added, removed: acc.removed + n.removed }
-    },
+  const files = (item.changes ?? []).map(toFileChange)
+  const tally = files.reduce(
+    (acc, f) => ({ added: acc.added + f.added, removed: acc.removed + f.removed }),
     { added: 0, removed: 0 },
   )
-  return {
-    kind: "file_edit",
-    // 多文件补丁只在标题显示第一个路径，完整清单在 diff 里
-    path: first?.path ?? "",
-    ...(diff === "" ? {} : { diff }),
-    ...tally,
-  }
+  return { kind: "file_edit", path: files[0]?.path ?? "", files, ...tally }
 }
 
 /** 认不出的 item 落 `other`，原始 type 带上，排查时一眼看得出漏了哪类。 */
