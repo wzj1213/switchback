@@ -1,0 +1,43 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一分支上新的推送取消旧的：CI 排队等一个已经过时的结果没有意义
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # macOS 而不是 ubuntu：进程回收阶梯依赖 `kill(-pid, 0)` 的进程组语义，
+    # 而这个产品的目标平台就是 macOS。在 Linux 上跑绿了不说明在这儿也绿。
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile：CI 里 lockfile 对不上必须是失败，不是「顺手更新一下」
+      - run: pnpm install --frozen-lockfile
+
+      # typecheck / lint / arch / check:docs / test
+      - run: pnpm check
+
+      # 构建单独跑一次：打包器能发现 typecheck 发现不了的问题。
+      # 真踩过——highlight.js 是 lowlight 的传递依赖，类型检查全绿，
+      # 打包时才报 "failed to resolve import"。
+      - run: pnpm --filter @omni/desktop build
+
+      # 引擎必须真的能起来才算数，但 CI 上没有 codex / claude 的登录态，
+      # 所以 live 测试不在这里跑。它们的入口是 `pnpm test:live`，本地手动执行。
