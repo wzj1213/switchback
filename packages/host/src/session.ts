@@ -189,6 +189,18 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
  * 交的还是那份交接包，但语义不同：接力是「接着做」，分叉是「你也做一遍」。
  * 所以只取**目标**，不带「已改动的文件」——那会让第二家以为活已经干了一半。
  */
+/**
+ * 分叉：同一个目标交给另一家，另起一个会话，原会话保留。
+ *
+ * **两个会话共用同一个工作区。** 所以后跑的那家会看见先跑的改动——
+ * 实测过：Codex 先把 JSDoc 补完，Claude 接着跑，如实回答「已经有了，不用补」。
+ *
+ * 这是当前的语义，不是 bug；但它很容易被读成一次对照实验，
+ * 于是得出「Claude 什么都没干」这种完全错误的结论。对比视图
+ * （`Compare.tsx`）在 cwd 相同时会把这句话直接写在界面上。
+ *
+ * 真要做对照，得让两边各拿一份工作区副本（git worktree 之类）——那是另一件事。
+ */
 export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
@@ -208,6 +220,8 @@ export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork"
     effort: undefined,
     // 标题带上引擎名，否则侧栏里两个会话长得一模一样
     title: `${entry.thread.title}（${cmd.to}）`,
+    // 留下血缘，事后才对比得起来。**分叉的意义就在于能比**
+    forkedFrom: cmd.threadId,
     detached: false,
     status: "idle",
     createdAt: at,

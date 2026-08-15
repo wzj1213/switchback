@@ -1,12 +1,13 @@
 import { useState } from "react"
-import { itemsOf, modelsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
+import type { Command, Thread } from "@omni/protocol"
+import type { Notice, ViewState } from "@omni/store"
+import { forkPeerOf, itemsOf, modelsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
 import { Notices } from "./components/Notices.js"
 import { Workspace } from "./components/Workspace.js"
+import { Compare, type ComparePane } from "./components/Compare.js"
 import { useOmni } from "./useOmni.js"
-import { useMenuActions } from "./useMenuActions.js"
-import { toMarkdown } from "./export.js"
-import { labelOf } from "./components/Composer.js"
+import { useWorkspaceActions } from "./useWorkspaceActions.js"
 
 /**
  * 空状态说什么。
@@ -32,57 +33,94 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
   )
 }
 
+/** 一个会话都没有时的主区。故障横幅照样要显示——那往往正是没有会话的原因。 */
+function EmptyScreen({
+  notices,
+  onDismiss,
+  bridgeMissing,
+}: {
+  notices: readonly Notice[]
+  onDismiss: (id: string) => void
+  bridgeMissing: boolean
+}): React.JSX.Element {
+  return (
+    <main className="main">
+      <Notices notices={notices} onDismiss={onDismiss} />
+      <Notice fatal={bridgeMissing} text={emptyText(bridgeMissing, notices.length > 0)} />
+    </main>
+  )
+}
+
+/**
+ * 对比屏。从 `App` 拆出来是行数闸门逼的，但拆完确实更清楚：
+ * 「谁在左边」这个决定有它自己的理由，值得单独一段。
+ */
+function CompareScreen({
+  state,
+  thread,
+  peer,
+  onCopy,
+  onPick,
+  onClose,
+  send,
+}: {
+  state: ViewState
+  thread: Thread
+  peer: Thread
+  onCopy: (text: string) => void
+  onPick: (id: string) => void
+  onClose: () => void
+  send: (command: Command) => void
+}): React.JSX.Element {
+  const paneOf = (t: Thread): ComparePane => ({
+    thread: t,
+    items: itemsOf(state, t.id),
+    turn: turnOf(state, t.id),
+  })
+  // 谁在左边由**创建先后**定，不是由「当前选中的是谁」定：
+  // 从两边分别点进来看到的应该是同一张图，否则「左边那栏」这句话就没法说
+  const [older, newer] = thread.createdAt <= peer.createdAt ? [thread, peer] : [peer, thread]
+  return (
+    <Compare
+      a={paneOf(older)}
+      b={paneOf(newer)}
+      engines={state.engines}
+      onCopy={onCopy}
+      onPick={onPick}
+      onClose={onClose}
+      send={send}
+    />
+  )
+}
+
 /** 选哪个会话、怎么新建。一个会话内部长什么样是 `Workspace` 的事。 */
 export function App(): React.JSX.Element {
   const { state, send, pickFolder, onMenu, find, stopFind, copy, searchFiles, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
   const [finding, setFinding] = useState(false)
+  const [comparing, setComparing] = useState(false)
 
   const rows = threadRowsOf(state)
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
   const notices = state.notices.filter((n) => n.id !== dismissed)
   const thread = rows.find((r) => r.thread.id === selectedId)?.thread ?? rows[0]?.thread
 
-  // 新会话沿用当前会话的引擎与档位：换工作区不该顺带把内核也换了
-  const open = (cwd: string): void => {
-    send({
-      type: "thread.create",
-      cwd,
-      engine: thread?.engine ?? state.engines[0]?.id ?? "claude",
-      trust: thread?.trust ?? "auto-edit",
-      title: cwd.split("/").filter(Boolean).pop() ?? cwd,
-    })
-    setSelectedId(undefined)
-  }
-
-  const openPicker = (): void => {
-    void pickFolder().then((cwd) => {
-      if (cwd !== undefined) open(cwd)
-    })
-  }
-
-  useMenuActions(
+  const { open, openPicker } = useWorkspaceActions({
+    state,
+    thread,
+    send,
+    copy,
+    pickFolder,
     onMenu,
-    {
-      newThread: () => {
-        if (thread === undefined) openPicker()
-        else open(thread.cwd)
-      },
-      openFolder: openPicker,
-      interrupt: () => {
-        if (thread !== undefined) send({ type: "thread.interrupt", threadId: thread.id })
-      },
-      find: () => {
-        setFinding(true)
-      },
-      copyMarkdown: () => {
-        if (thread === undefined) return
-        copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine)))
-      },
+    onSelect: setSelectedId,
+    onFind: () => {
+      setFinding(true)
     },
-    [thread?.id, thread?.cwd, state],
-  )
+    onCompare: () => {
+      setComparing(true)
+    },
+  })
 
   const sidebar = (
     <Sidebar
@@ -106,10 +144,32 @@ export function App(): React.JSX.Element {
     return (
       <div className="shell">
         {sidebar}
-        <main className="main">
-          <Notices notices={notices} onDismiss={setDismissed} />
-          <Notice fatal={bridgeMissing} text={emptyText(bridgeMissing, notices.length > 0)} />
-        </main>
+        <EmptyScreen notices={notices} onDismiss={setDismissed} bridgeMissing={bridgeMissing} />
+      </div>
+    )
+  }
+
+  // 有血缘关系的另一个会话。没有就不显示「对比」——点了没用的按钮比没有糟
+  const peer = forkPeerOf(state, thread.id)
+
+  if (comparing && peer !== undefined) {
+    return (
+      <div className="shell">
+        {sidebar}
+        <CompareScreen
+          state={state}
+          thread={thread}
+          peer={peer}
+          onCopy={copy}
+          onPick={(id) => {
+            setSelectedId(id)
+            setComparing(false)
+          }}
+          onClose={() => {
+            setComparing(false)
+          }}
+          send={send}
+        />
       </div>
     )
   }
@@ -119,6 +179,10 @@ export function App(): React.JSX.Element {
       {sidebar}
       <Workspace
         thread={thread}
+        peer={peer}
+        onCompare={() => {
+          setComparing(true)
+        }}
         items={itemsOf(state, thread.id)}
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}

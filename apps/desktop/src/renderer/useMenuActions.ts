@@ -6,6 +6,7 @@ export interface MenuHandlers {
   interrupt: () => void
   find: () => void
   copyMarkdown: () => void
+  compare: () => void
 }
 
 /**
@@ -22,7 +23,7 @@ export function useMenuActions(
   handlers: MenuHandlers,
   deps: readonly unknown[],
 ): void {
-  const { newThread, openFolder, interrupt, find, copyMarkdown } = handlers
+  const { newThread, openFolder, interrupt, find, copyMarkdown, compare } = handlers
   useEffect(() => {
     const table: Readonly<Record<string, () => void>> = {
       "new-thread": newThread,
@@ -30,6 +31,7 @@ export function useMenuActions(
       interrupt,
       find,
       "copy-markdown": copyMarkdown,
+      compare,
     }
     return onMenu((action) => {
       table[action]?.()

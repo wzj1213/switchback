@@ -37,6 +37,14 @@ export interface Thread {
   model?: string
   /** 推理强度。只有报了 `efforts` 的引擎才有意义。 */
   effort?: string
+  /**
+   * 分叉自哪个会话。
+   *
+   * **分叉的全部意义在于事后能比**——同一个目标交给两家跑，看谁做得对。
+   * 不记这一条，两个会话在侧栏里就只是碰巧标题相似的两行，
+   * 谁也说不清它们本来是一件事。对比视图（`Compare.tsx`）认这个字段。
+   */
+  forkedFrom?: ThreadId
   meta?: Record<string, unknown>
 }
 

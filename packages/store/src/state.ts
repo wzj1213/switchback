@@ -90,6 +90,28 @@ export function threadsOf(state: ViewState): readonly Thread[] {
 }
 
 /**
+ * 和这个会话有分叉血缘的**另一个**会话。
+ *
+ * 三种关系都算：我分叉出来的、把我分叉出来的、和我同源的兄弟。
+ * 都不存在就返回 undefined，界面据此不显示「对比」按钮——
+ * **一个点了没用的按钮比没有按钮糟**。
+ *
+ * 多个候选时取最近创建的那个。分叉三次以上是很少见的用法，
+ * 为它摆一个选择器只会把顶栏挤满；真要比更早那次，从侧栏点过去再比。
+ */
+export function forkPeerOf(state: ViewState, threadId: ThreadId): Thread | undefined {
+  const self = state.threads[threadId]
+  if (self === undefined) return undefined
+  const related = threadsOf(state).filter((t) => {
+    if (t.id === threadId) return false
+    if (t.forkedFrom === threadId) return true
+    if (self.forkedFrom === undefined) return false
+    return t.id === self.forkedFrom || t.forkedFrom === self.forkedFrom
+  })
+  return [...related].sort((a, b) => b.createdAt - a.createdAt)[0]
+}
+
+/**
  * 侧栏一行要的东西。
  *
  * `preview` 取**第一条用户消息**——同一个工作区可以开好几个会话，

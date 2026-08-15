@@ -1,0 +1,157 @@
+/*
+ * 分叉对比视图。
+ *
+ * 布局的一条硬要求：**两栏各自滚动，摘要条不跟着滚**。
+ * 摘要条是这个视图存在的理由（见 `Compare.tsx` 的开头），
+ * 让它滚出屏幕等于把结论藏起来，只剩两栏对不齐的流水账。
+ */
+
+.cmp__summary {
+  flex: none;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.cmp__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.cmp__head-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cmp__spacer {
+  flex: 1;
+}
+
+.cmp__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* 差异多的时候不让它把两栏正文挤没：自己滚 */
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.cmp__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 2px 0;
+  font-size: var(--text-sm);
+}
+
+/* 只有一边动过的那些——这是整个视图里最该被看见的一行 */
+.cmp__row--only {
+  color: var(--warn);
+  font-weight: 500;
+}
+
+.cmp__mark {
+  width: 1.2em;
+  flex: none;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.cmp__row--only .cmp__mark {
+  color: var(--warn);
+}
+
+.cmp__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.cmp__num {
+  flex: none;
+  width: 88px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.cmp__num--head {
+  font-family: var(--font);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cmp__empty,
+.cmp__flag,
+.cmp__open {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.cmp__flag {
+  color: var(--warn);
+}
+
+.cmp__open-label {
+  color: var(--text-faint);
+  margin-right: var(--sp-2);
+}
+
+.cmp__panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.cmp__pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cmp__pane + .cmp__pane {
+  border-left: 1px solid var(--border);
+}
+
+.cmp__pane-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 两栏窄，正文的 max-width 在这里没有意义，撑满更好读 */
+.cmp__pane .transcript {
+  padding: var(--sp-4) var(--sp-3);
+}
+
+.cmp__pane .transcript__inner {
+  max-width: none;
+}
+
+/* 「这不是对照实验」那句。比 flag 更轻，但必须看得见——见 Compare.tsx 开头 */
+.cmp__caveat {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.cmp__caveat strong {
+  color: var(--text);
+}

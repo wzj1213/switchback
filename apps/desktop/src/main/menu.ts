@@ -6,7 +6,7 @@ import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOpti
  * 新建会话、打开文件夹这些要落到当前选中的会话上下文里，主进程不知道那是什么。
  * 所以菜单只发一个意图，怎么做由渲染层决定。
  */
-export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown"
+export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown" | "compare"
 
 const isMac = process.platform === "darwin"
 
@@ -74,6 +74,15 @@ function threadMenu(): MenuItemConstructorOptions {
         accelerator: "Shift+CmdOrCtrl+C",
         click: (_i, focused) => {
           send("copy-markdown", focused)
+        },
+      },
+      {
+        // 没有分叉对手时点它不会有反应——菜单项做不到按会话状态动态启用/禁用
+        // （主进程不知道当前选中的是谁），这是这条通道的固有限制
+        label: "对比分叉",
+        accelerator: "Shift+CmdOrCtrl+D",
+        click: (_i, focused) => {
+          send("compare", focused)
         },
       },
       {

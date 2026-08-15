@@ -14,6 +14,7 @@ import {
   scheduleDevSwitch,
   scheduleDevInterrupt,
   scheduleDevReload,
+  scheduleDevCompare,
   scheduleDevShot,
 } from "./devtools.js"
 
@@ -124,6 +125,7 @@ void app.whenReady().then(async () => {
     scheduleDevFind(win)
     scheduleDevInterrupt(win)
     scheduleDevReload(win)
+    scheduleDevCompare(win)
     scheduleDevSwitch(win, (kind, to) => {
       const threadId = attached.lastThreadId()
       if (threadId === undefined) return

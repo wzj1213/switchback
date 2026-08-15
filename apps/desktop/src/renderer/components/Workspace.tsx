@@ -23,12 +23,17 @@ function TopBar({
   thread,
   usage,
   engines,
+  peer,
   onFork,
+  onCompare,
 }: {
   thread: Thread
   usage: Usage | undefined
   engines: readonly EngineInfo[]
+  /** 有血缘的另一个会话。有才显示「对比」。 */
+  peer: Thread | undefined
   onFork: (to: string) => void
+  onCompare: () => void
 }): React.JSX.Element {
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
@@ -44,6 +49,16 @@ function TopBar({
       ) : null}
       {thread.detached === true ? <span className="pill pill--muted">历史记录</span> : null}
       <span className="pill pill--engine">{labelOf(engines, thread.engine)}</span>
+      {peer === undefined ? null : (
+        <button
+          className="pill pill--action"
+          type="button"
+          title={`和「${peer.title}」并排比一比`}
+          onClick={onCompare}
+        >
+          ⇄ 对比
+        </button>
+      )}
       {next === undefined ? null : (
         <button
           className="pill pill--action"
@@ -63,6 +78,9 @@ function TopBar({
 
 export interface WorkspaceProps {
   thread: Thread
+  /** 分叉出来的另一个会话；有才显示顶栏的「对比」。 */
+  peer: Thread | undefined
+  onCompare: () => void
   items: readonly Item[]
   turn: Turn | undefined
   usage: Usage | undefined
@@ -93,6 +111,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         thread={thread}
         usage={props.usage}
         engines={props.engines}
+        peer={props.peer}
+        onCompare={props.onCompare}
         onFork={(to) => {
           send({ type: "thread.fork", threadId: thread.id, to })
         }}

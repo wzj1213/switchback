@@ -41,6 +41,9 @@ importers:
       '@omni/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@omni/handoff':
+        specifier: workspace:*
+        version: link:../../packages/handoff
       '@omni/host':
         specifier: workspace:*
         version: link:../../packages/host

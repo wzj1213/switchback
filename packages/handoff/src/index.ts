@@ -1,3 +1,5 @@
 export { buildHandoff } from "./build.js"
 export { renderHandoff } from "./render.js"
 export type { Handoff } from "./build.js"
+export { compareRuns } from "./compare.js"
+export type { Comparison, FileDiff, CommandDiff, Side } from "./compare.js"

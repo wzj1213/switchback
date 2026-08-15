@@ -15,6 +15,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
  * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
+ * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -97,6 +98,15 @@ export function scheduleDevReload(win: BrowserWindow): void {
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
     if (!win.isDestroyed()) win.webContents.reload()
+  }, at)
+}
+
+/** 到点打开对比视图。和查找、中断一样，走的是**菜单同一条通道**，验的是真链路。 */
+export function scheduleDevCompare(win: BrowserWindow): void {
+  const at = Number(process.env["OMNI_DEV_COMPARE"] ?? "0")
+  if (!Number.isFinite(at) || at <= 0) return
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.send("omni:menu", "compare")
   }, at)
 }
 
