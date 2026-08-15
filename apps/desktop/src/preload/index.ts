@@ -1,10 +1,29 @@
 import { contextBridge, ipcRenderer } from "electron"
 import type { Command, Event } from "@omni/protocol"
 
+/** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
+export interface Sealed {
+  seq: number
+  event: Event
+}
+
+/**
+ * 全量重建。窗口（重）加载时来一次。
+ *
+ * `resumeAt` 之后的增量才需要应用——之前的要么已经在 `events` 里，
+ * 要么发生在还没订阅的时候。这条规则是防重的关键。
+ */
+export interface Replay {
+  events: readonly Event[]
+  resumeAt: number
+}
+
 /**
  * 渲染层与主进程之间**唯一**的通道：
  *   send(Command)  —— 渲染层请求做事
- *   subscribe(cb)  —— 主进程推事件（**成批**，见 main/batch.ts）
+ *   subscribe(cb)  —— 主进程推**带序号**的增量（成批，见 main/batch.ts）
+ *   onReplay(cb)   —— 全量重建，窗口每次加载来一次
+ *   resync(after)  —— 发现漏了就来补；补不了会回 `{reset:true}`
  *   pickFolder()   —— 借主进程弹一次系统目录选择框
  *   onMenu(cb)     —— 菜单里那些只有渲染层做得到的动作
  *   find/stopFind  —— 借 Chromium 原生的页内查找
@@ -56,14 +75,29 @@ const api = {
       ipcRenderer.off("omni:menu", listener)
     }
   },
-  subscribe(onEvents: (events: readonly Event[]) => void): () => void {
-    const listener = (_e: unknown, events: readonly Event[]): void => {
-      onEvents(events)
+  subscribe(onEvents: (sealed: readonly Sealed[]) => void): () => void {
+    const listener = (_e: unknown, sealed: readonly Sealed[]): void => {
+      onEvents(sealed)
     }
     ipcRenderer.on("omni:events", listener)
     return () => {
       ipcRenderer.off("omni:events", listener)
     }
+  },
+  onReplay(handler: (replay: Replay) => void): () => void {
+    const listener = (_e: unknown, replay: Replay): void => {
+      handler(replay)
+    }
+    ipcRenderer.on("omni:replay", listener)
+    return () => {
+      ipcRenderer.off("omni:replay", listener)
+    }
+  },
+  /** 补 `after` 之后漏掉的。补不了返回 `{reset:true}`，调用方必须等下一次全量。 */
+  async resync(after: number): Promise<{ events: readonly Sealed[] } | { reset: true }> {
+    return (await ipcRenderer.invoke("omni:resync", after)) as
+      | { events: readonly Sealed[] }
+      | { reset: true }
   },
 }
 

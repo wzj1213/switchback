@@ -14,6 +14,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
  * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
+ * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -81,6 +82,21 @@ export function scheduleDevInterrupt(win: BrowserWindow): void {
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
     if (!win.isDestroyed()) win.webContents.send("omni:menu", "interrupt")
+  }, at)
+}
+
+/**
+ * 到点强制重载渲染层。
+ *
+ * 这是验证事件流序号与全量重建的**唯一**自动化手段：重载会把渲染层的状态
+ * 清空，只有主进程那份全量重建靠得住，界面才能恢复原样。
+ * 手工按 ⌘R 也能复现，但复现不了「重载期间引擎还在产出事件」那一段。
+ */
+export function scheduleDevReload(win: BrowserWindow): void {
+  const at = Number(process.env["OMNI_DEV_RELOAD"] ?? "0")
+  if (!Number.isFinite(at) || at <= 0) return
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.reload()
   }, at)
 }
 

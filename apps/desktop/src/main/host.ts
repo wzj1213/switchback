@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { app, clipboard, dialog, ipcMain, type BrowserWindow } from "electron"
-import type { Command, Event, ThreadId } from "@omni/protocol"
+import { app, clipboard, dialog, ipcMain, type BrowserWindow, type WebContents } from "electron"
+import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
@@ -10,20 +10,19 @@ import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
+import { createSequencer, type Sealed } from "./sequence.js"
 import type { Logger } from "./log.js"
 
 export interface Attached {
   host: Host
   /** 回放磁盘上的历史用得到 */
   journal: ReturnType<typeof createJournal>
-  /** 把一批事件直接推给窗口，不经过宿主——回放用 */
-  push: (event: Event) => void
-  /** 立刻发出攒着的事件。回放结束时要调一次，否则最后一批要等窗口到期。 */
-  flush: () => void
   /** 这台机器上注册了哪些引擎。界面据此渲染选择器。 */
   engines: readonly { id: string; label: string }[]
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
+  /** 事件流的序号与补发缓冲。窗口重载时的全量重建要用它对齐游标。 */
+  sequencer: ReturnType<typeof createSequencer>
   /**
    * 把一次失败翻成界面看得见的东西。
    *
@@ -41,19 +40,24 @@ export interface Attached {
  * （持久化接上之前，重开等于新会话）。
  */
 /**
- * 事件出口：合帧 → 广播 → 顺带记日志。
+ * 事件出口：合帧 → 编号 → 广播 → 顺带记日志。
  *
- * 合帧的理由见 `batch.ts`；记日志只挑 `engine.status`，因为那是唯一
- * **用户看不见却必须留痕**的一类——其余事件在界面上都有对应的呈现。
+ * 合帧的理由见 `batch.ts`，编号与补发的理由见 `sequence.ts`；
+ * 记日志只挑 `engine.status`，因为那是唯一**用户看不见却必须留痕**的一类——
+ * 其余事件在界面上都有对应的呈现。
  */
 function createOutlet(
   windows: () => readonly BrowserWindow[],
   log: Logger,
   seen: { thread: ThreadId | undefined },
-): { emit: (event: Event) => void; flush: () => void } {
+): { emit: (event: Event) => void; sequencer: ReturnType<typeof createSequencer> } {
+  const sequencer = createSequencer()
   const batcher = createBatcher((events) => {
+    // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
+    // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
+    const sealed = sequencer.seal(events)
     for (const win of windows()) {
-      if (!win.isDestroyed()) win.webContents.send("omni:events", events)
+      if (!win.isDestroyed()) win.webContents.send("omni:events", sealed)
     }
   })
   return {
@@ -66,18 +70,23 @@ function createOutlet(
       }
       batcher.push(event)
     },
-    flush: () => {
-      batcher.flush()
-    },
+    sequencer,
   }
 }
 
+interface Channels {
+  host: Host
+  log: Logger
+  sequencer: ReturnType<typeof createSequencer>
+  report: (error: unknown, threadId?: ThreadId) => void
+}
+
 /**
- * 渲染层要用、但只有主进程做得到的几件事：弹目录框、写剪贴板、搜文件。
+ * 渲染层要用、但只有主进程做得到的那几件事。
  *
  * 都是**窄到只能做一件事**的通道，不是把 fs 或 ipcRenderer 交出去。
  */
-function installBridgeChannels(): void {
+function installBridgeChannels(deps: Channels): void {
   // 目录选择必须在主进程弹：渲染层没有、也不该有触碰文件系统的能力。
   // 回给渲染层的只是一个用户亲手选中的路径。
   ipcMain.handle("omni:pickFolder", async () => {
@@ -88,6 +97,37 @@ function installBridgeChannels(): void {
     return result.canceled ? undefined : result.filePaths[0]
   })
 
+  // 剪贴板走主进程：渲染层加载的是 file://，那里的 navigator.clipboard
+  // 不算安全上下文，写入会被静默拒绝
+  ipcMain.on("omni:copy", (_e, text: string) => {
+    clipboard.writeText(text)
+  })
+
+  // 一个工作区一份索引，按 cwd 复用：同一目录开好几个会话不该各扫一遍
+  const worksites = new Map<string, Worksite>()
+  ipcMain.handle("omni:searchFiles", async (_e, req: { cwd: string; query: string }) => {
+    const site = worksites.get(req.cwd) ?? createWorksite(req.cwd)
+    worksites.set(req.cwd, site)
+    return (await site.search(req.query)).map((h) => h.path)
+  })
+
+  // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
+  // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
+  ipcMain.handle("omni:resync", (_e, after: number): { events: readonly Sealed[] } | { reset: true } => {
+    const missed = deps.sequencer.since(after)
+    if (missed === undefined) {
+      deps.log.write("warn", "ipc", `补发失败：渲染层停在 ${String(after)}，缓冲已覆盖不到，转全量重建`)
+      return { reset: true }
+    }
+    return { events: missed }
+  })
+
+  ipcMain.on("omni:command", (_e, command: Command) => {
+    // 命令失败不能掐掉主进程：翻成一条状态事件送回界面
+    void deps.host.dispatch(command).catch((error: unknown) => {
+      deps.report(error, "threadId" in command ? command.threadId : undefined)
+    })
+  })
 }
 
 export function attachHost(
@@ -96,7 +136,7 @@ export function attachHost(
 ): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
 
-  const { emit, flush } = createOutlet(windows, log, seen)
+  const { emit, sequencer } = createOutlet(windows, log, seen)
 
   // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
   // 用户换机器迁移、清理应用数据时才找得到、才带得走
@@ -127,8 +167,6 @@ export function attachHost(
     now: () => Date.now(),
   })
 
-  installBridgeChannels()
-
   const report = (error: unknown, threadId?: ThreadId): void => {
     emit({
       type: "engine.status",
@@ -139,62 +177,129 @@ export function attachHost(
     })
   }
 
-  // 剪贴板走主进程：渲染层加载的是 file://，那里的 navigator.clipboard
-  // 不算安全上下文，写入会被静默拒绝
-  ipcMain.on("omni:copy", (_e, text: string) => {
-    clipboard.writeText(text)
-  })
+  installBridgeChannels({ host, log, sequencer, report })
 
-  // 一个工作区一份索引，按 cwd 复用：同一目录开好几个会话不该各扫一遍
-  const worksites = new Map<string, Worksite>()
-  ipcMain.handle("omni:searchFiles", async (_e, req: { cwd: string; query: string }) => {
-    const site = worksites.get(req.cwd) ?? createWorksite(req.cwd)
-    worksites.set(req.cwd, site)
-    return (await site.search(req.query)).map((h) => h.path)
-  })
-
-  ipcMain.on("omni:command", (_e, command: Command) => {
-    // 命令失败不能掐掉主进程：翻成一条状态事件送回界面
-    void host.dispatch(command).catch((error: unknown) => {
-      report(error, "threadId" in command ? command.threadId : undefined)
-    })
-  })
-
-  // 回放要一次灌进去几百上千条，攒着没有意义，直接推
   return {
     host,
     journal,
-    push: emit,
-    flush,
     engines: Object.keys(drivers).map((id) => ({ id, label: labels[id] ?? id })),
     lastThreadId: () => seen.thread,
+    sequencer,
     report,
   }
 }
 
 /**
- * 回放磁盘上的历史。
+ * 把磁盘上的历史 + 当前引擎清单凑成一份「世界现在长什么样」，直接发给某一个窗口。
  *
- * **不经过宿主。** 宿主管的是活着的会话；磁盘上的是历史，背后没有引擎进程。
- * 回放出来的会话最后补一条 `detached: true`，界面据此把输入框关掉——
- * 一个能打字却答非所问的输入框比没有输入框糟得多。
+ * ## 为什么是**发给一个窗口**，不是广播
+ *
+ * 这份东西是给刚（重）加载完的那个窗口补课用的。广播出去，其他早就同步好的
+ * 窗口会把整段历史再应用一遍——item 直接翻倍。
+ *
+ * ## 为什么 `resumeAt` 一定要在读完 journal **之后**取
+ *
+ * 渲染层收到全量之后，会丢掉所有 `seq <= resumeAt` 的增量。
+ * 读 journal 期间引擎完全可能又产出事件：
+ *
+ * - 这些事件会被写进 journal（可能被这次读到），也会以增量广播出去
+ * - 读完之后才取 `resumeAt`，就保证「journal 里有的」全都 `<= resumeAt`，
+ *   于是增量那份被丢掉——**不重**
+ * - 而读完之后才发生的事件 `> resumeAt`，会被应用——**不漏**
+ *
+ * 反过来先取 `resumeAt` 再读 journal，中间那段就会既在全量里又在增量里，
+ * 被应用两次。顺序就是正确性本身。
+ *
+ * `engines.available` 也放在这份里，不走增量：它描述的是「现在有哪些引擎」，
+ * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
+ * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
  */
-export async function replayHistory(attached: Attached): Promise<ThreadId | undefined> {
-  const ids = await attached.journal.list()
-  for (const id of ids) {
-    const events = await attached.journal.read(id)
-    if (events.length === 0) continue
-    for (const event of events) attached.push(event)
-    const last = [...events].reverse().find((e) => e.type === "thread.started" || e.type === "thread.updated")
+export interface ThreadHistory {
+  id: ThreadId
+  events: readonly Event[]
+}
+
+/**
+ * 把「历史 + 活着的会话 + 引擎清单」拼成一份全量。
+ *
+ * 单独一个纯函数是因为顺序在这里**是正确性问题**，而它不该只能靠起 Electron 来验。
+ *
+ * ## 为什么要反着喂
+ *
+ * `journal.list()` 给的是**最近写过的在前**（那是一个列表 API 该有的样子），
+ * 而归约器 `reduce.ts` 是 `order: [id, ...order]`——**往前插**。
+ * 顺着喂，最新的那个会被后来的旧会话一路顶到底下，侧栏变成最旧在前。
+ *
+ * 这个 bug 一直都在，只是以前看不见：启动时最后总会新建一个会话，
+ * 它往前一插就盖住了顺序不对这件事。重载时不新建会话，才露出来。
+ */
+export function replayEvents(
+  engines: readonly { id: string; label: string }[],
+  threads: readonly ThreadHistory[],
+  alive: ReadonlyMap<ThreadId, Thread>,
+  now: number,
+): readonly Event[] {
+  const events: Event[] = [{ type: "engines.available", at: now, engines }]
+  // 反着喂：归约器往前插，所以最旧的先进去，最新的才会落在侧栏顶上
+  for (const thread of [...threads].reverse()) {
+    if (thread.events.length === 0) continue
+    events.push(...thread.events)
+    const live = alive.get(thread.id)
+    if (live !== undefined) {
+      // 用宿主手上那份当前状态收尾：journal 里最后一条可能停在轮次中间
+      events.push({ type: "thread.updated", at: now, thread: live })
+      continue
+    }
+    const last = [...thread.events]
+      .reverse()
+      .find((e) => e.type === "thread.started" || e.type === "thread.updated")
     if (last === undefined || (last.type !== "thread.started" && last.type !== "thread.updated")) continue
-    attached.push({
-      type: "thread.updated",
-      at: Date.now(),
-      thread: { ...last.thread, status: "idle", detached: true },
-    })
+    // 回放出来的会话背后没有引擎进程，补一条 `detached` 让界面关掉输入框——
+    // 一个能打字却答非所问的输入框比没有输入框糟得多
+    events.push({ type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } })
   }
-  attached.flush()
-  return ids[0]
+  return events
+}
+
+/**
+ * 把磁盘上的历史 + 当前引擎清单凑成一份「世界现在长什么样」，直接发给某一个窗口。
+ *
+ * ## 为什么是**发给一个窗口**，不是广播
+ *
+ * 这份东西是给刚（重）加载完的那个窗口补课用的。广播出去，其他早就同步好的
+ * 窗口会把整段历史再应用一遍——item 直接翻倍。
+ *
+ * ## 为什么 `resumeAt` 一定要在读完 journal **之后**取
+ *
+ * 渲染层收到全量之后，会丢掉所有 `seq <= resumeAt` 的增量。
+ * 读 journal 期间引擎完全可能又产出事件：
+ *
+ * - 这些事件会被写进 journal（可能被这次读到），也会以增量广播出去
+ * - 读完之后才取 `resumeAt`，就保证「journal 里有的」全都 `<= resumeAt`，
+ *   于是增量那份被丢掉——**不重**
+ * - 而读完之后才发生的事件 `> resumeAt`，会被应用——**不漏**
+ *
+ * 反过来先取 `resumeAt` 再读 journal，中间那段就会既在全量里又在增量里，
+ * 被应用两次。顺序就是正确性本身。
+ *
+ * `engines.available` 也放在这份里，不走增量：它描述的是「现在有哪些引擎」，
+ * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
+ * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
+ */
+export async function rebuild(attached: Attached, target: WebContents): Promise<ThreadId | undefined> {
+  // **活着的会话不能标 detached。** 它们和历史在 journal 里长得一模一样，
+  // 但背后还有引擎进程。混为一谈的话，重载之后整个应用变成只读，
+  // 而引擎其实还在跑——重载验证第一次跑出来的就是这个
+  const alive = new Map(attached.host.live().map((thread) => [thread.id, thread]))
+  const ids = await attached.journal.list().catch((): readonly ThreadId[] => [])
+  const threads = await Promise.all(
+    ids.map(async (id) => ({ id, events: await attached.journal.read(id).catch((): readonly Event[] => []) })),
+  )
+  const events = replayEvents(attached.engines, threads, alive, Date.now())
+  const resumeAt = attached.sequencer.latest()
+  if (!target.isDestroyed()) target.send("omni:replay", { events, resumeAt })
+  // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
+  return [...alive.keys()][0] ?? ids[0]
 }
 
 /**

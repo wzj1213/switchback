@@ -1,6 +1,6 @@
 import { join } from "node:path"
 import { app, BrowserWindow, nativeTheme, shell } from "electron"
-import { attachHost, replayHistory, seedDefaultThread } from "./host.js"
+import { attachHost, rebuild, seedDefaultThread } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
 import { createLogger } from "./log.js"
@@ -13,6 +13,7 @@ import {
   scheduleDevFind,
   scheduleDevSwitch,
   scheduleDevInterrupt,
+  scheduleDevReload,
   scheduleDevShot,
 } from "./devtools.js"
 
@@ -106,17 +107,23 @@ void app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
   })
-  // 等窗口挂上监听再开会话，否则最早的几条事件发给了还没订阅的渲染层
-  // 先回放历史再开新会话：**顺序不能反**。侧栏最近创建在前，
-  // 反过来的话新会话会被压在一堆历史下面。
+  // **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
+  // 用户按了 ⌘R）之后状态是空的，只补增量补不出前面的历史。
+  win.webContents.on("did-finish-load", () => {
+    void rebuild(attached, win.webContents).catch((error: unknown) => {
+      log.write("error", "ipc", `全量重建失败：${String(error)}`)
+    })
+  })
+  // 开会话只在第一次。`.on` 先注册先执行，所以重建总是排在开会话前面——
+  // 侧栏最近创建在前，反过来的话新会话会被压在一堆历史下面。
   win.webContents.once("did-finish-load", () => {
-    // 引擎清单先于一切：界面要靠它渲染选择器
-    attached.push({ type: "engines.available", at: Date.now(), engines: attached.engines })
-    void replayHistory(attached)
-      .catch(() => undefined)
-      .then((recent) => seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), recent))
+    void attached.journal
+      .list()
+      .catch(() => [])
+      .then((ids) => seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), ids[0]))
     scheduleDevFind(win)
     scheduleDevInterrupt(win)
+    scheduleDevReload(win)
     scheduleDevSwitch(win, (kind, to) => {
       const threadId = attached.lastThreadId()
       if (threadId === undefined) return

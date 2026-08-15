@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command } from "@omni/protocol"
 import { initial, reduceAll, type ViewState } from "@omni/store"
+import { initialStream, received, replayed, reset, resynced, type Sealed, type Step, type Stream } from "./stream.js"
 
 export interface Omni {
   state: ViewState
@@ -33,12 +34,47 @@ export function useOmni(): Omni {
   const [state, setState] = useState<ViewState>(initial)
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
+  // 游标放 ref 不放 state：它每来一批都变，进 state 会多一轮渲染，
+  // 而界面上没有任何东西显示它
+  const stream = useRef<Stream>(initialStream)
+
   useEffect(() => {
     if (bridge === undefined) return undefined
-    // 一批一次 setState：主进程已经合过帧，这里再逐条 set 就白合了
-    return bridge.subscribe((events) => {
-      setState((prev) => reduceAll(prev, events))
+
+    /**
+     * 走一步：应用能连上的，缺了就去补。
+     *
+     * 补发是异步的，回来时再走一次这个函数——所以它必须能被自己调用。
+     * 补不了就重载页面：那会触发主进程的一次全量重建，是唯一能重新对上号的路。
+     */
+    const advance = (step: Step): void => {
+      stream.current = step.stream
+      // 一批一次 setState：主进程已经合过帧，这里再逐条 set 就白合了
+      if (step.apply.length > 0) setState((prev) => reduceAll(prev, step.apply))
+      if (step.resyncFrom === undefined) return
+      void bridge.resync(step.resyncFrom).then((answer) => {
+        if ("reset" in answer) {
+          stream.current = reset()
+          window.location.reload()
+          return
+        }
+        advance(resynced(stream.current, answer.events))
+      })
+    }
+
+    const offEvents = bridge.subscribe((sealed: readonly Sealed[]) => {
+      advance(received(stream.current, sealed))
     })
+    const offReplay = bridge.onReplay((replay) => {
+      // 全量是「世界现在长什么样」，不是增量——先把归约器清回初始态，
+      // 否则重载之后新旧两份历史会叠在一起
+      setState(initial)
+      advance(replayed({ ...stream.current, lastSeq: undefined }, replay))
+    })
+    return () => {
+      offEvents()
+      offReplay()
+    }
   }, [bridge])
 
   const send = useCallback(

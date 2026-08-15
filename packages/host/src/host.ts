@@ -1,4 +1,4 @@
-import type { Command, ThreadId, TurnId } from "@omni/protocol"
+import type { Command, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
 import { type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
@@ -24,6 +24,14 @@ export type { HostDeps } from "./deps.js"
  */
 export interface Host {
   dispatch: (command: Command) => Promise<void>
+  /**
+   * 现在还活着的会话——**背后有引擎进程的那些**。
+   *
+   * 窗口重载时要用它把「活的」和「磁盘上的历史」分开：两者在 journal 里
+   * 长得一模一样，但活的那个输入框该是能用的，历史那个不该。
+   * 分不开的后果是重载之后整个应用变成只读，而引擎其实还在跑。
+   */
+  live: () => readonly Thread[]
   dispose: () => Promise<void>
 }
 
@@ -71,6 +79,7 @@ export function createHost(deps: HostDeps): Host {
   const ctx: Ctx = { deps, live: new Map<ThreadId, Live>(), turnOwner: new Map<TurnId, ThreadId>() }
   return {
     dispatch: (command) => dispatch(ctx, command),
+    live: () => [...ctx.live.values()].map((entry) => entry.thread),
     dispose: () => dispose(ctx),
   }
 }
