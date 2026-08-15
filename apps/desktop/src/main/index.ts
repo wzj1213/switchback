@@ -1,6 +1,6 @@
 import { join } from "node:path"
 import { app, BrowserWindow, nativeTheme, shell } from "electron"
-import { attachHost, seedDefaultThread } from "./host.js"
+import { attachHost, replayHistory, seedDefaultThread } from "./host.js"
 import { devPrompt, scheduleDevShot } from "./devtools.js"
 
 /**
@@ -62,8 +62,12 @@ void app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
   // 等窗口挂上监听再开会话，否则最早的几条事件发给了还没订阅的渲染层
+  // 先回放历史再开新会话：**顺序不能反**。侧栏最近创建在前，
+  // 反过来的话新会话会被压在一堆历史下面。
   win.webContents.once("did-finish-load", () => {
-    void seedDefaultThread(attached, process.cwd(), devPrompt())
+    void replayHistory(attached)
+      .catch(() => undefined)
+      .then(() => seedDefaultThread(attached, process.cwd(), devPrompt()))
     scheduleDevShot(win)
   })
   app.on("before-quit", () => {

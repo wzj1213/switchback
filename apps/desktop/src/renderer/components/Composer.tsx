@@ -15,6 +15,8 @@ const TRUSTS: readonly { id: Trust; label: string }[] = [
 ]
 
 interface Props {
+  /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
+  detached?: boolean
   engine: EngineId
   trust: Trust
   onEngineChange: (engine: EngineId) => void
@@ -22,11 +24,18 @@ interface Props {
   onSend: (text: string) => void
 }
 
-export function Composer({ engine, trust, onEngineChange, onTrustChange, onSend }: Props): React.JSX.Element {
+export function Composer({
+  detached = false,
+  engine,
+  trust,
+  onEngineChange,
+  onTrustChange,
+  onSend,
+}: Props): React.JSX.Element {
   const [text, setText] = useState("")
   const submit = (): void => {
     const trimmed = text.trim()
-    if (trimmed === "") return
+    if (trimmed === "" || detached) return
     onSend(trimmed)
     setText("")
   }
@@ -36,7 +45,12 @@ export function Composer({ engine, trust, onEngineChange, onTrustChange, onSend 
       <div className="composer__inner">
         <textarea
           className="composer__input"
-          placeholder="交代任务…"
+          disabled={detached}
+          // 输入框直接说清为什么用不了。留一个能打字却答非所问的框，
+          // 比把它关掉糟得多
+          placeholder={
+            detached ? "这是重启前的历史记录，引擎那边已经没有这段对话的记忆——请新建会话继续。" : "交代任务…"
+          }
           value={text}
           onChange={(e) => {
             setText(e.target.value)

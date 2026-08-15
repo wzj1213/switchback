@@ -4,11 +4,24 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*"
+  ],
   "references": [
-    { "path": "../protocol" },
-    { "path": "../approval" },
-    { "path": "../store" },
-    { "path": "../engine" }
+    {
+      "path": "../protocol"
+    },
+    {
+      "path": "../approval"
+    },
+    {
+      "path": "../store"
+    },
+    {
+      "path": "../engine"
+    },
+    {
+      "path": "../journal"
+    }
   ]
 }

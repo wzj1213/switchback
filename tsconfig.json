@@ -11,6 +11,9 @@
       "path": "packages/store"
     },
     {
+      "path": "packages/journal"
+    },
+    {
       "path": "packages/engine"
     },
     {

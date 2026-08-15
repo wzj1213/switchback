@@ -1,13 +1,19 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import { dialog, ipcMain, type BrowserWindow } from "electron"
+import { join } from "node:path"
+import { app, dialog, ipcMain, type BrowserWindow } from "electron"
 import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
+import { createJournal } from "@omni/journal"
 import { devEngine, devTrust } from "./devtools.js"
 
 export interface Attached {
   host: Host
+  /** 回放磁盘上的历史用得到 */
+  journal: ReturnType<typeof createJournal>
+  /** 把一批事件直接推给窗口，不经过宿主——回放用 */
+  push: (event: Event) => void
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
   /**
@@ -36,9 +42,14 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     }
   }
 
+  // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
+  // 用户换机器迁移、清理应用数据时才找得到、才带得走
+  const journal = createJournal({ dir: join(app.getPath("userData"), "threads") })
+
   const host = createHost({
     drivers: { claude: createClaudeDriver(), codex: createCodexDriver() },
     home: homedir(),
+    journal,
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
     now: () => Date.now(),
@@ -71,7 +82,30 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     })
   })
 
-  return { host, lastThreadId: () => seen.thread, report }
+  return { host, journal, push: emit, lastThreadId: () => seen.thread, report }
+}
+
+/**
+ * 回放磁盘上的历史。
+ *
+ * **不经过宿主。** 宿主管的是活着的会话；磁盘上的是历史，背后没有引擎进程。
+ * 回放出来的会话最后补一条 `detached: true`，界面据此把输入框关掉——
+ * 一个能打字却答非所问的输入框比没有输入框糟得多。
+ */
+export async function replayHistory(attached: Attached): Promise<void> {
+  const ids = await attached.journal.list()
+  for (const id of ids) {
+    const events = await attached.journal.read(id)
+    if (events.length === 0) continue
+    for (const event of events) attached.push(event)
+    const last = [...events].reverse().find((e) => e.type === "thread.started" || e.type === "thread.updated")
+    if (last === undefined || (last.type !== "thread.started" && last.type !== "thread.updated")) continue
+    attached.push({
+      type: "thread.updated",
+      at: Date.now(),
+      thread: { ...last.thread, status: "idle", detached: true },
+    })
+  }
 }
 
 /**

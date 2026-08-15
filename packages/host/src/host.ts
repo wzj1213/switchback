@@ -1,6 +1,7 @@
 import type { Command, EngineId, Event, ThreadId, Thread, ThreadStatus, TurnId } from "@omni/protocol"
 import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
 import type { Rule } from "@omni/approval"
+import type { Journal } from "@omni/journal"
 import { createGate, type Gate } from "./gate.js"
 
 export interface HostDeps {
@@ -11,6 +12,8 @@ export interface HostDeps {
   /** id 铸造。做成可注入的，测试里就能确定化。 */
   newId: (prefix: string) => string
   now: () => number
+  /** 事件落盘。不传就不落——测试与无盘环境都能跑。 */
+  journal?: Journal
 }
 
 export interface Host {
@@ -29,6 +32,48 @@ interface Live {
 interface Ctx {
   deps: HostDeps
   live: Map<ThreadId, Live>
+  /**
+   * turn id → 它属于哪个会话。
+   *
+   * 落盘要按会话分文件，而 `turn.completed` / `item.*` 只带 turn id。
+   * `Live.turn` 会在轮次结束时被清空，所以不能靠它——必须单独记一份。
+   */
+  turnOwner: Map<TurnId, ThreadId>
+}
+
+/** 一条事件属于哪个会话。判不出就不落盘——宁可少一条，也不要落到错的文件里。 */
+function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
+  switch (event.type) {
+    case "thread.started":
+    case "thread.updated":
+      return event.thread.id
+    case "turn.started":
+      return event.turn.threadId
+    case "turn.completed":
+      return ctx.turnOwner.get(event.turnId)
+    case "item.started":
+    case "item.updated":
+      return ctx.turnOwner.get(event.item.turnId)
+    case "usage.updated":
+    case "engine.status":
+      return event.threadId === "" ? undefined : event.threadId
+    default:
+      return undefined
+  }
+}
+
+/**
+ * **事件的唯一出口。** 所有 `emit` 都必须走这里，落盘才不会漏。
+ *
+ * 顺序有讲究：先发给渲染层，再落盘，最后才做旁路观察。
+ * 界面响应不该等磁盘；而 `observe` 会改会话状态并再发事件，放最后免得穿插。
+ */
+function emit(ctx: Ctx, event: Event): void {
+  if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
+  ctx.deps.emit(event)
+  const owner = ownerOf(ctx, event)
+  if (owner !== undefined) void ctx.deps.journal?.append(owner, event)
+  observe(ctx, event)
 }
 
 const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
@@ -44,7 +89,7 @@ function setStatus(ctx: Ctx, entry: Live, status: ThreadStatus): void {
   if (entry.thread.status === status) return
   const at = ctx.deps.now()
   entry.thread = { ...entry.thread, status, updatedAt: at }
-  ctx.deps.emit({ type: "thread.updated", at, thread: entry.thread })
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
 /**
@@ -106,16 +151,13 @@ async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>
     trust: cmd.trust,
     home: ctx.deps.home,
     memory,
-    // 先原样转发再观察：渲染层拿到的顺序是「turn.completed → thread.updated」，
-    // 因果读起来是顺的
     emit: (event) => {
-      ctx.deps.emit(event)
-      observe(ctx, event)
+      emit(ctx, event)
     },
     askUser: (ask) => askUser(ctx, id, ask),
   })
-  ctx.live.set(id, { thread, session, gate: createGate(ctx.deps.emit), turn: undefined })
-  ctx.deps.emit({ type: "thread.started", at, thread })
+  ctx.live.set(id, { thread, session, gate: createGate((e) => { emit(ctx, e) }), turn: undefined })
+  emit(ctx, { type: "thread.started", at, thread })
 }
 
 async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
@@ -132,8 +174,8 @@ async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>
     startedAt: at,
   }
   setStatus(ctx, entry, "running")
-  ctx.deps.emit({ type: "turn.started", at, turn })
-  ctx.deps.emit({
+  emit(ctx, { type: "turn.started", at, turn })
+  emit(ctx, {
     type: "item.started",
     at,
     item: { id: ctx.deps.newId("it"), turnId, kind: "user_message", at, text: cmd.text },
@@ -147,7 +189,7 @@ async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust
   await entry.session.setTrust(cmd.trust)
   const at = ctx.deps.now()
   entry.thread = { ...entry.thread, trust: cmd.trust, updatedAt: at }
-  ctx.deps.emit({ type: "thread.updated", at, thread: entry.thread })
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
 /** 审批卡 id 全局唯一，所以挨个会话问一遍即可；命中就停。 */
@@ -187,7 +229,7 @@ async function dispose(ctx: Ctx): Promise<void> {
 }
 
 export function createHost(deps: HostDeps): Host {
-  const ctx: Ctx = { deps, live: new Map<ThreadId, Live>() }
+  const ctx: Ctx = { deps, live: new Map<ThreadId, Live>(), turnOwner: new Map<TurnId, ThreadId>() }
   return {
     dispatch: (command) => dispatch(ctx, command),
     dispose: () => dispose(ctx),

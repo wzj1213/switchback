@@ -24,6 +24,7 @@ function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined })
           接力自 {labelOf(ENGINES, thread.engineHistory[0] ?? "")}
         </span>
       ) : null}
+      {thread.detached === true ? <span className="pill pill--muted">历史记录</span> : null}
       <span className="pill pill--engine">{labelOf(ENGINES, thread.engine)}</span>
       <span className="pill">{labelOf(TRUSTS, thread.trust)}</span>
     </header>
@@ -118,6 +119,7 @@ export function App(): React.JSX.Element {
         <Notices notices={notices} onDismiss={setDismissed} />
         <Transcript thread={thread} items={items} turn={turn} send={send} />
         <Composer
+          detached={thread.detached === true}
           // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
           // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
           engine={thread.engine}

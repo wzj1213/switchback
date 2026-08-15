@@ -16,6 +16,7 @@
     "@omni/approval": "workspace:*",
     "@omni/engine": "workspace:*",
     "@omni/protocol": "workspace:*",
-    "@omni/store": "workspace:*"
+    "@omni/store": "workspace:*",
+    "@omni/journal": "workspace:*"
   }
 }

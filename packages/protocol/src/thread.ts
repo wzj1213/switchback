@@ -18,6 +18,14 @@ export interface Thread {
   updatedAt: number
   /** 接力历史：曾经驱动过这个 thread 的引擎，按时间先后。 */
   engineHistory: readonly EngineId[]
+  /**
+   * 从磁盘回放出来、**背后没有活着的引擎进程**。
+   *
+   * 重启之后历史都还在，但引擎那边的对话记忆不在——直接往下发消息，
+   * 模型会像没见过前面那些内容一样回答。所以这类会话是只读的，
+   * 界面必须说清楚，不能让人对着一个能打字却答非所问的输入框发懵。
+   */
+  detached?: boolean
   meta?: Record<string, unknown>
 }
 

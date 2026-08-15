@@ -44,6 +44,9 @@ importers:
       '@omni/host':
         specifier: workspace:*
         version: link:../../packages/host
+      '@omni/journal':
+        specifier: workspace:*
+        version: link:../../packages/journal
       '@omni/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -115,12 +118,25 @@ importers:
       '@omni/engine':
         specifier: workspace:*
         version: link:../engine
+      '@omni/journal':
+        specifier: workspace:*
+        version: link:../journal
       '@omni/protocol':
         specifier: workspace:*
         version: link:../protocol
       '@omni/store':
         specifier: workspace:*
         version: link:../store
+
+  packages/journal:
+    dependencies:
+      '@omni/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
 
   packages/protocol: {}
 
