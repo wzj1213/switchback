@@ -3,4 +3,6 @@ packages:
   - apps/*
 allowBuilds:
   electron: true
+  # 只打 macOS，Windows 安装器的构建脚本没有必要跑
+  electron-winstaller: false
   esbuild: true

@@ -1,7 +1,7 @@
 export { createClaudeDriver } from "./claude/driver.js"
 export { createCodexDriver } from "./codex/driver.js"
 export { createQueue } from "./queue.js"
-export { createProcessOwner } from "./subprocess.js"
+export { createProcessOwner, unpacked } from "./subprocess.js"
 export {
   sanitize,
   forcesHumanPrompt,

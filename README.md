@@ -7,6 +7,21 @@ omni 只负责把它们呈现成同一套交互，并让你**随时在它们之�
 
 名字取自「书同文」——多家写法，一个标准。
 
+## 跑起来
+
+```sh
+pnpm install
+pnpm dev          # 开发模式
+pnpm check        # typecheck / lint / 架构守卫 / 日志守卫 / 测试
+pnpm dist         # 打成可安装的 .dmg（产物在 release/）
+```
+
+前置条件：机器上装好 `codex` 和/或 `claude` 并**登录过**。
+omni 直接用它们的原生登录态，不另外配密钥。
+
+打出来的包**没有签名**（`identity: null`）。首次打开要在
+「系统设置 → 隐私与安全性」里放行，或者 `xattr -dr com.apple.quarantine /Applications/omni.app`。
+
 ## 这是什么 / 不是什么
 
 **是**：一个 GUI。会话、审批、diff、终端、项目、断点续跑、跨引擎接力。

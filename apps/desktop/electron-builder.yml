@@ -1,0 +1,38 @@
+# 打包配置。目标：能装、能双击打开、图标是自己的。
+#
+# 这一步之前 omni 只能从开发目录跑（`pnpm dev` 或者手动调 Electron 二进制）。
+# 一个只能在 checkout 里跑的东西不算产品。
+
+appId: dev.wzj.omni
+productName: omni
+copyright: omni · 同文
+
+directories:
+  buildResources: build
+  output: ../../release
+
+# 只打构建产物。源码、测试、workspace 的其他包都已经被 electron-vite
+# 打进 out/ 了，再塞一遍源码只会让包大一倍还泄漏内部结构。
+files:
+  - out/**
+  - package.json
+
+# Claude Agent SDK 要 spawn 自带的 CLI，不能进 asar——
+# asar 里的文件没有真实路径，它找不到自己的资源。
+asarUnpack:
+  - node_modules/@anthropic-ai/claude-agent-sdk/**
+
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch: [arm64]
+  # 没有开发者证书就不签名。不设这条的话 electron-builder 会去找证书、
+  # 找不到再警告一大段——明确说「不签」比让它每次都试一遍干净。
+  identity: null
+  # 引擎子进程要读 ~/.codex、~/.claude 与工作区，沙箱化会全部挡掉
+  hardenedRuntime: false
+
+dmg:
+  title: omni ${version}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { SpawnOptions } from "@anthropic-ai/claude-agent-sdk"
-import { createProcessOwner } from "./subprocess.js"
+import { createProcessOwner, unpacked } from "./subprocess.js"
 
 const FAST = { exitGraceMs: 200, termGraceMs: 400, killGraceMs: 400 }
 
@@ -72,5 +72,28 @@ describe("回收阶梯", () => {
     owner.spawn(nodeProc("process.exit(0)"))
     await owner.reclaim()
     expect((await owner.reclaim()).rung).toBe("already-exited")
+  })
+})
+
+describe("unpacked", () => {
+  it("把指进 asar 的路径改到解包目录——spawn 交给操作系统，而 asar 是文件不是目录", () => {
+    expect(unpacked("/Applications/omni.app/Contents/Resources/app.asar/node_modules/x/cli.js")).toBe(
+      "/Applications/omni.app/Contents/Resources/app.asar.unpacked/node_modules/x/cli.js",
+    )
+  })
+
+  it("没有 asar 的路径原样返回——开发时跑的是源码目录", () => {
+    expect(unpacked("/Users/me/work/omni/node_modules/x/cli.js")).toBe(
+      "/Users/me/work/omni/node_modules/x/cli.js",
+    )
+  })
+
+  it("只替换目录段，不误伤名字里带 app.asar 的文件", () => {
+    expect(unpacked("/w/my-app.asar-notes.txt")).toBe("/w/my-app.asar-notes.txt")
+  })
+
+  it("已经是 unpacked 的不再改", () => {
+    const p = "/a/app.asar.unpacked/node_modules/x"
+    expect(unpacked(p)).toBe(p)
   })
 })

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process"
+import { sep } from "node:path"
 
 /**
  * 起一个引擎进程要的最少信息。
@@ -57,6 +58,24 @@ export interface ProcessOwner {
   died: () => Promise<Error>
   /** 回收阶梯。幂等；返回时要么有退出证明，要么 rung 是 `escaped`。 */
   reclaim: () => Promise<ReclaimReport>
+}
+
+/**
+ * 把指进 asar 的路径改到解包目录。
+ *
+ * 打包之后引擎的可执行文件落在 `.../Resources/app.asar/node_modules/...`。
+ * Electron 给 `fs` 打了补丁能透明读 asar 里的文件，**但 `spawn` 交给的是操作系统**，
+ * 而 asar 是一个文件不是目录——于是报 `spawn ENOTDIR`。
+ *
+ * 打包配置里已经把这些依赖 `asarUnpack` 出去了，真实文件就在旁边的
+ * `app.asar.unpacked/` 里；这里只需要把路径指过去。
+ *
+ * **只有真打包才会撞上这个**：开发时跑的是源码目录，路径里根本没有 asar。
+ */
+export function unpacked(path: string): string {
+  return path.includes(`${sep}app.asar${sep}`)
+    ? path.replace(`${sep}app.asar${sep}`, `${sep}app.asar.unpacked${sep}`)
+    : path
 }
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -136,7 +155,7 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
   const doSpawn = (options: SpawnRequest): ChildProcess => {
     // detached: true 让子进程成为新进程组的组长，我们才能用负 pid 一次收掉整棵树。
     // 代价：omni 硬崩时子进程不会被系统连坐带走——这是有意的取舍，见 README。
-    const child = spawn(options.command, [...options.args], {
+    const child = spawn(unpacked(options.command), options.args.map(unpacked), {
       cwd: options.cwd,
       env: options.env,
       stdio: ["pipe", "pipe", "pipe"],

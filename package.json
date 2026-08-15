@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "dev": "pnpm --filter @omni/desktop dev",
     "test:live": "vitest run --config vitest.live.config.ts",
-    "check:docs": "node scripts/check-changelog.mjs"
+    "check:docs": "node scripts/check-changelog.mjs",
+    "dist": "pnpm --filter @omni/desktop dist"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
