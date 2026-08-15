@@ -1,35 +1,10 @@
-import { useEffect, useState } from "react"
-import type { Thread, Usage } from "@omni/protocol"
+import { useState } from "react"
 import { itemsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
-import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
-import { Transcript } from "./components/Transcript.js"
-import { ContextMeter } from "./components/ContextMeter.js"
 import { Notices } from "./components/Notices.js"
+import { Workspace } from "./components/Workspace.js"
 import { useOmni } from "./useOmni.js"
-
-function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
-  return list.find((x) => x.id === id)?.label ?? id
-}
-
-function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined }): React.JSX.Element {
-  const handedOff = thread.engineHistory.length > 1
-  return (
-    <header className="topbar">
-      <span className="topbar__title">{thread.title}</span>
-      <span className="topbar__spacer" />
-      <ContextMeter usage={usage} />
-      {handedOff ? (
-        <span className="pill" title={thread.engineHistory.join(" → ")}>
-          接力自 {labelOf(ENGINES, thread.engineHistory[0] ?? "")}
-        </span>
-      ) : null}
-      {thread.detached === true ? <span className="pill pill--muted">历史记录</span> : null}
-      <span className="pill pill--engine">{labelOf(ENGINES, thread.engine)}</span>
-      <span className="pill">{labelOf(TRUSTS, thread.trust)}</span>
-    </header>
-  )
-}
+import { useMenuActions } from "./useMenuActions.js"
 
 /**
  * 空状态说什么。
@@ -55,17 +30,17 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
   )
 }
 
+/** 选哪个会话、怎么新建。一个会话内部长什么样是 `Workspace` 的事。 */
 export function App(): React.JSX.Element {
-  const { state, send, pickFolder, onMenu, bridgeMissing } = useOmni()
+  const { state, send, pickFolder, onMenu, find, stopFind, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
+  const [finding, setFinding] = useState(false)
 
   const rows = threadRowsOf(state)
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
   const notices = state.notices.filter((n) => n.id !== dismissed)
   const thread = rows.find((r) => r.thread.id === selectedId)?.thread ?? rows[0]?.thread
-  const items = thread === undefined ? [] : itemsOf(state, thread.id)
-  const turn = thread === undefined ? undefined : turnOf(state, thread.id)
 
   // 新会话沿用当前会话的引擎与档位：换工作区不该顺带把内核也换了
   const open = (cwd: string): void => {
@@ -85,33 +60,41 @@ export function App(): React.JSX.Element {
     })
   }
 
-  // 菜单只发意图，怎么做在这里决定——它要看当前选中的是哪个会话
-  useEffect(
-    () =>
-      onMenu((action) => {
-        if (action === "open-folder") openPicker()
-        else if (action === "new-thread") {
-          if (thread === undefined) openPicker()
-          else open(thread.cwd)
-        } else if (action === "interrupt" && thread !== undefined) {
-          send({ type: "thread.interrupt", threadId: thread.id })
-        }
-      }),
-    // 只依赖真正会变的东西：open/openPicker 每次渲染都是新函数，
-    // 依赖它们会让订阅每帧重建一次
-    [onMenu, thread?.id, thread?.cwd],
+  useMenuActions(
+    onMenu,
+    {
+      newThread: () => {
+        if (thread === undefined) openPicker()
+        else open(thread.cwd)
+      },
+      openFolder: openPicker,
+      interrupt: () => {
+        if (thread !== undefined) send({ type: "thread.interrupt", threadId: thread.id })
+      },
+      find: () => {
+        setFinding(true)
+      },
+    },
+    [thread?.id, thread?.cwd],
+  )
+
+  const sidebar = (
+    <Sidebar
+      rows={rows}
+      selectedId={thread?.id ?? ""}
+      onSelect={setSelectedId}
+      onNew={() => {
+        if (thread === undefined) openPicker()
+        else open(thread.cwd)
+      }}
+      onOpenFolder={openPicker}
+    />
   )
 
   if (thread === undefined) {
     return (
       <div className="shell">
-        <Sidebar
-          rows={rows}
-          selectedId=""
-          onSelect={setSelectedId}
-          onNew={openPicker}
-          onOpenFolder={openPicker}
-        />
+        {sidebar}
         <main className="main">
           <Notices notices={notices} onDismiss={setDismissed} />
           <Notice fatal={bridgeMissing} text={emptyText(bridgeMissing, notices.length > 0)} />
@@ -122,47 +105,22 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="shell">
-      <Sidebar
-        rows={rows}
-        selectedId={thread.id}
-        onSelect={setSelectedId}
-        onNew={() => {
-          open(thread.cwd)
+      {sidebar}
+      <Workspace
+        thread={thread}
+        items={itemsOf(state, thread.id)}
+        turn={turnOf(state, thread.id)}
+        usage={usageOf(state, thread.id)}
+        notices={notices}
+        onDismiss={setDismissed}
+        finding={finding}
+        onFind={find}
+        onCloseFind={() => {
+          setFinding(false)
+          stopFind()
         }}
-        onOpenFolder={openPicker}
+        send={send}
       />
-      <main className="main">
-        <TopBar thread={thread} usage={usageOf(state, thread.id)} />
-        <Notices notices={notices} onDismiss={setDismissed} />
-        <Transcript thread={thread} items={items} turn={turn} send={send} />
-        <Composer
-          detached={thread.detached === true}
-          // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
-          // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
-          engine={thread.engine}
-          trust={thread.trust}
-          onEngineChange={(next) => {
-            // 换引擎 = 在同一个工作区另开一个会话。会话中途接力（`thread.handoff`）
-            // 还没实现，与其让这个下拉框点了没反应，不如让它做一件真做得到的事。
-            send({
-              type: "thread.create",
-              cwd: thread.cwd,
-              engine: next,
-              trust: thread.trust,
-              title: thread.title,
-            })
-          }}
-          onTrustChange={(next) => {
-            send({ type: "thread.setTrust", threadId: thread.id, trust: next })
-          }}
-          onSend={(text) => {
-            send({ type: "thread.prompt", threadId: thread.id, text })
-          }}
-          onResume={() => {
-            send({ type: "thread.resume", threadId: thread.id })
-          }}
-        />
-      </main>
     </div>
   )
 }

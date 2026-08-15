@@ -11,6 +11,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
  * | `OMNI_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
+ * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -39,6 +40,23 @@ export function devTrust(): Trust {
 /** 续跑只能靠点按钮触发，自动化验证需要一个口子。 */
 export function devResume(): boolean {
   return process.env["OMNI_DEV_RESUME"] === "1"
+}
+
+/**
+ * 到点自动打开查找条。查找要按 ⌘F 才出得来，自动化截图按不了键。
+ *
+ * 走的是**和菜单同一条**通道，所以验证的是真链路，不是一条测试专用的旁路。
+ */
+export function scheduleDevFind(win: BrowserWindow): void {
+  const query = process.env["OMNI_DEV_FIND"]
+  if (query === undefined || query === "") return
+  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 2500
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.send("omni:menu", "find")
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.webContents.send("omni:devFind", query)
+    }, 300)
+  }, Math.max(0, delay))
 }
 
 export function scheduleDevShot(win: BrowserWindow): void {

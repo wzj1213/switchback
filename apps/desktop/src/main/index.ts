@@ -2,8 +2,9 @@ import { join } from "node:path"
 import { app, BrowserWindow, nativeTheme, shell } from "electron"
 import { attachHost, replayHistory, seedDefaultThread } from "./host.js"
 import { installMenu } from "./menu.js"
+import { installFind } from "./find.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import { devPrompt, scheduleDevShot } from "./devtools.js"
+import { devPrompt, scheduleDevFind, scheduleDevShot } from "./devtools.js"
 
 /**
  * Electron 主进程。
@@ -67,6 +68,7 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
 
 void app.whenReady().then(async () => {
   installMenu()
+  installFind(() => BrowserWindow.getAllWindows())
   const attached = attachHost(() => BrowserWindow.getAllWindows())
   const bounds = await loadBounds()
   const win = createWindow(bounds)
@@ -80,6 +82,7 @@ void app.whenReady().then(async () => {
     void replayHistory(attached)
       .catch(() => undefined)
       .then((recent) => seedDefaultThread(attached, process.cwd(), devPrompt(), recent))
+    scheduleDevFind(win)
     scheduleDevShot(win)
   })
   app.on("before-quit", () => {

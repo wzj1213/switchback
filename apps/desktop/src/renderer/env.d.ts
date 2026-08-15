@@ -8,6 +8,12 @@ declare global {
       send: (command: Command) => void
       pickFolder: () => Promise<string | undefined>
       onMenu: (handler: (action: string) => void) => () => void
+      onDevFind: (handler: (query: string) => void) => () => void
+      find: (request: { query: string; next?: boolean; forward?: boolean }) => Promise<{
+        active: number
+        total: number
+      }>
+      stopFind: () => void
       subscribe: (onEvent: (event: Event) => void) => () => void
     }
   }

@@ -9,6 +9,9 @@ export interface Omni {
   pickFolder: () => Promise<string | undefined>
   /** 订阅菜单动作。返回退订函数。 */
   onMenu: (handler: (action: string) => void) => () => void
+  /** 页内查找。桥没接上时永远是 0/0。 */
+  find: (query: string, next: boolean, forward: boolean) => Promise<{ active: number; total: number }>
+  stopFind: () => void
   /**
    * preload 没注入通道。**显式暴露而不是静默 no-op**：
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
@@ -50,5 +53,14 @@ export function useOmni(): Omni {
     [bridge],
   )
 
-  return { state, send, pickFolder, onMenu, bridgeMissing: bridge === undefined }
+  const find = useCallback(
+    async (query: string, next: boolean, forward: boolean) =>
+      (await bridge?.find({ query, next, forward })) ?? { active: 0, total: 0 },
+    [bridge],
+  )
+  const stopFind = useCallback(() => {
+    bridge?.stopFind()
+  }, [bridge])
+
+  return { state, send, pickFolder, onMenu, find, stopFind, bridgeMissing: bridge === undefined }
 }

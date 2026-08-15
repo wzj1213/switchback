@@ -411,3 +411,63 @@ body {
   font-size: var(--text-xs);
   white-space: pre-wrap;
 }
+
+/* ── 会话内查找 ───────────────────────────────────────
+ * 贴在顶栏下方、transcript 上方，不浮在内容上——浮层会挡住你正在找的东西。
+ */
+.findbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  padding: 6px var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sunken);
+}
+
+.findbar__input {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+  padding: 4px var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.findbar__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 一个都没找到时把输入框本身标红：比在旁边加一行字更快被看见 */
+.findbar__input--empty {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.findbar__count {
+  min-width: 52px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.findbar__btn {
+  padding: 2px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: default;
+}
+
+.findbar__btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
