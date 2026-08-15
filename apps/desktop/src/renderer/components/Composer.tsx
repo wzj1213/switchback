@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Prompt } from "./Prompt.js"
 import { ModelPicker } from "./ModelPicker.js"
 import { Select } from "./Select.js"
+import { Chips } from "./Chips.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
 import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
 
@@ -67,6 +68,7 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer__inner">
+        {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} />}
         <Prompt
           value={text}
           detached={detached}

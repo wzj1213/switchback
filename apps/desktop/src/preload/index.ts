@@ -75,6 +75,10 @@ const api = {
   diagnose(): void {
     ipcRenderer.send("omni:diagnose")
   },
+  /** 工作区在哪个分支、脏不脏。不是 git 仓库时返回空对象。 */
+  async worksite(cwd: string): Promise<{ branch?: string; dirty?: boolean }> {
+    return (await ipcRenderer.invoke("omni:worksite", cwd)) as { branch?: string; dirty?: boolean }
+  },
   /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
   async settings(patch?: Record<string, unknown>): Promise<Record<string, unknown>> {
     return (await ipcRenderer.invoke("omni:settings", patch)) as Record<string, unknown>

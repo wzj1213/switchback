@@ -170,3 +170,14 @@ export function PinIcon({ size = 13 }: { size?: number }): React.JSX.Element {
     </Svg>
   )
 }
+
+export function BranchIcon(): React.JSX.Element {
+  return (
+    <Svg>
+      <circle cx="5" cy="4" r="1.5" {...LINE} />
+      <circle cx="5" cy="12" r="1.5" {...LINE} />
+      <circle cx="11.5" cy="5.5" r="1.5" {...LINE} />
+      <path d="M5 5.5v5M10 6.6c0 1.6-1.6 2.4-3 2.6-1 .15-2 .6-2 1.3" {...LINE} />
+    </Svg>
+  )
+}

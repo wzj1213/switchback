@@ -10,6 +10,7 @@ import { ensureEngineFile } from "./engines.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings, installSettingsChannel } from "./settings.js"
+import { installWorksiteChannel } from "./worksite.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
   applyDevTheme,
@@ -166,6 +167,7 @@ function installAppChannels(): void {
 void app.whenReady().then(async () => {
   installSettingsChannel(settings)
   installAppChannels()
+  installWorksiteChannel()
   applyDevTheme()
   log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
   installMenu(

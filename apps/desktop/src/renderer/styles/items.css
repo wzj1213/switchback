@@ -359,3 +359,36 @@
   color: var(--text);
   background: var(--bg-hover);
 }
+
+/* ── 输入区上方的芯片：这句话会发到哪儿去 ───────────────
+ * 见 components/Chips.tsx。分支这一条不是装饰——
+ * 「引擎会改到哪个分支」以前界面上一个字都没有。
+ */
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.chip svg {
+  flex: none;
+}
+
+/* 脏工作区标黄。**不是报错，是提醒**：在别人的改动上面继续动手是合法的，
+   只是出问题时两拨改动会混在一个 diff 里 */
+.chip--warn {
+  color: var(--warn);
+}

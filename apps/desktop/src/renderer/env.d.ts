@@ -36,6 +36,7 @@ declare global {
       reveal: (path: string) => void
       settings: (patch?: Partial<Settings>) => Promise<Settings>
       appInfo: () => Promise<{ version: string; dataDir: string }>
+      worksite: (cwd: string) => Promise<{ branch?: string; dirty?: boolean }>
       openEngines: () => void
       diagnose: () => void
       searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
