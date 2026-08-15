@@ -55,14 +55,16 @@
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
   驱动只翻译 assistant / stream_event / result / system 四类，其余落 `meta` 或丢弃。
   新增覆盖时先确认它是否真的需要进 transcript。
-- **codex 侧只消费 74 种通知里的一小撮**：item 生命周期、三种文本 delta、
-  `turn/completed`、`error`。命令输出的增量（`item/commandExecution/outputDelta`）
-  没接——输出会在 `item/completed` 时一次性到齐，长命令跑着的时候界面上没有滚动。
+- **codex 侧只消费 74 种通知里的一小撮**：item 生命周期、文本与命令输出的 delta、
+  用量、`turn/completed`、`error`。其余（MCP 进度、审批复核、实时语音…）一律丢弃。
 - **codex 的 OS 沙箱在 `thread/start` 时定死，`setTrust` 改不了它。** 往低调没问题
   （omni 拒得更多），往高调会出现「omni 说可以、写下去却被系统拦住」。
   驱动检测到这种情况会发一条 `engine.status` 说明，但真正生效仍需新开会话。
 - **各家自己的放行表都在 omni 之前生效**：Claude 是用户写的 allow 规则，
   codex 是内置可信命令表（`ls`、`sed`、`cat` 这类根本不会送到客户端）。
   这是「引擎原生」这个前提的必然代价——用户的原生配置压过宿主的自动策略。
-- 事件流不做背压。宿主必须能消费得比引擎产出快，否则内存增长。
-- `acp/` 尚未实现。
+- 事件流不做背压。宿主必须能消费得比引擎产出快，否则内存增长
+  （渲染层那一侧已经在主进程做了合帧，见 `apps/desktop/src/main/batch.ts`）。
+- **Claude 的推理强度改不了运行期**：`effort` 是 `query()` 的 `Options` 字段，
+  SDK 没有 setter。所以 Claude 驱动不上报 `efforts`，界面上也就不显示那个控件。
+- `acp/` 尚未实现——ZCode / Kimi 走的是这条路，所以它们还接不进来。

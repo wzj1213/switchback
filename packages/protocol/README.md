@@ -31,3 +31,6 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
   逼迫优先考虑「能不能塞进 `ToolDetail.other` + `meta`」。
 - `meta` 是 `Record<string, unknown>`，不做 schema 校验。跨引擎读 `meta` 前必须自己判类型。
 - 事件流假设**有序且不丢**。传输层（宿主 → 渲染层 IPC）必须保证这一点，本包不做序号与重放。
+  目前 IPC 只做了合帧；真正的序号与重放还没有。
+- `Item` 联合现在 7 种、`Event` 12 种。`Event` 那边有一道**编译期穷尽检查**
+  （`@omni/store` 的 `Handlers` 从 `Event["type"]` 映射出来），新增一种忘了接会编译不过。
