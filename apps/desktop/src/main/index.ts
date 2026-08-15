@@ -11,6 +11,7 @@ import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
+  applyDevTheme,
   devCwd,
   devPrompt,
   scheduleDevFind,
@@ -136,6 +137,7 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
 }
 
 void app.whenReady().then(async () => {
+  applyDevTheme()
   log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
   installMenu(
     () => exportReport(log, crash),

@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises"
-import { app, type BrowserWindow } from "electron"
+import { app, nativeTheme, type BrowserWindow } from "electron"
 import type { Trust } from "@omni/protocol"
 
 /**
@@ -19,6 +19,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
  * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
  * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
+ * | `OMNI_DEV_THEME` | `dark` / `light`，强制主题（深色那套平时没人看得见） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -140,6 +141,16 @@ export function scheduleDevOpenSelect(win: BrowserWindow): void {
       `document.querySelectorAll(".composer__bar .trigger")[${String(nth - 1)}]?.click()`,
     )
   }, Math.max(0, delay))
+}
+
+/**
+ * 强制深浅色。深色那套 token 平时没人看得见，改动 CSS 之后**必须能验一眼**——
+ * 靠改系统设置去验，等于永远不验。
+ */
+export function applyDevTheme(): void {
+  const want = process.env["OMNI_DEV_THEME"]
+  if (want !== "dark" && want !== "light") return
+  nativeTheme.themeSource = want
 }
 
 /**

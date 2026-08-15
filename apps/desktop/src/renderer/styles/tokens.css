@@ -61,6 +61,16 @@
 
   --sidebar-w: 232px;
   --content-max: 760px;
+
+  /*
+   * 浮层的阴影。**做成 token 而不是写死**，因为深浅两套需要的完全不是一个东西：
+   * 浅色下靠阴影把面板从白底上抬起来；深色下阴影几乎看不见（黑上加黑），
+   * 得靠一条更亮的描边来划边界。写死一份的结果是深色模式下浮层和背景糊在一起。
+   */
+  --shadow-pop:
+    0 1px 2px rgb(0 0 0 / 6%),
+    0 8px 28px rgb(0 0 0 / 12%);
+  --border-pop: var(--border);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -90,5 +100,9 @@
     --danger: #e0705c;
     --warn: #d3a044;
     --ok: #6cc48d;
+
+    /* 深色下阴影不管用，改用更亮的描边划边界；阴影只留一点点做纵深 */
+    --shadow-pop: 0 10px 32px rgb(0 0 0 / 55%);
+    --border-pop: #43434d;
   }
 }

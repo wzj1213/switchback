@@ -64,12 +64,10 @@
   max-height: min(60vh, 420px);
   overflow-y: auto;
   padding: var(--sp-1);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-pop);
   border-radius: var(--radius);
   background: var(--bg-raised);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 6%),
-    0 8px 28px rgb(0 0 0 / 12%);
+  box-shadow: var(--shadow-pop);
 }
 
 .pop__section + .pop__section {
