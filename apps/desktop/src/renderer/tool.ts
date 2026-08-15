@@ -1,6 +1,12 @@
 import type { ToolDetail } from "@omni/protocol"
 
-/** 工具形态 → 动词。运行态状态行与工具阶梯共用，两处措辞必须一致。 */
+/**
+ * 工具形态 → 动词。
+ *
+ * **工具阶梯已经改成图标呈现，那里这张表降级为 `aria-label`**；
+ * 但运行态状态行（`status.ts`）与 Markdown 导出（`export.ts`）仍然取字面文本，
+ * 所以这张表**不能删**，措辞也要和图标表达的意思保持一致。
+ */
 export const VERB: Readonly<Record<ToolDetail["kind"], string>> = {
   shell: "执行",
   file_edit: "编辑",

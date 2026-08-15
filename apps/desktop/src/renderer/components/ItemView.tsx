@@ -61,7 +61,15 @@ export const ItemView = memo(function ItemView({
       return <Plan steps={item.steps} />
     case "approval":
       return <Approval item={item} onResolve={onResolve} />
+    // **可恢复的错误不画成红框。** 实测 codex 断线重连会连发十条
+    // `Reconnecting... N/5`，每条都撑成一张整宽红卡片，把正文整个挤没了——
+    // 而它们说的是「还在试，你不用做什么」。压成一行灰字，
+    // 真正的终态错误才配那张红卡
     case "error":
-      return <div className="error">{item.message}</div>
+      return item.fatal ? (
+        <div className="error">{item.message}</div>
+      ) : (
+        <div className="error--soft">{item.message}</div>
+      )
   }
 })

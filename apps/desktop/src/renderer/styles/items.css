@@ -35,10 +35,12 @@
 
 .step {
   display: flex;
-  align-items: baseline;
+  /* **不能是 baseline**：图标是 svg，没有基线，会掉到文字基线以下。
+     换 center 之后图标和文字在同一条中线上 */
+  align-items: center;
   gap: var(--sp-2);
   width: 100%;
-  padding: 3px 0;
+  padding: 4px 0;
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -55,11 +57,18 @@
   color: var(--text);
 }
 
-.step__verb {
+/* 图标槽。**固定宽度**——五种图标画的东西不一样宽，靠居中把它们对到同一列 */
+.step__icon {
+  display: flex;
   flex: none;
-  min-width: 2.6em;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+}
+
+.step--open:hover .step__icon {
+  color: var(--text-muted);
 }
 
 .step__target {
@@ -72,21 +81,25 @@
   white-space: nowrap;
 }
 
-/* 可展开的行给一个轻提示，避免「哪些能点」全靠猜 */
-.step--open .step__target::after {
-  content: " ⌄";
-  color: var(--text-faint);
-}
-
-.step--expanded .step__target::after {
-  content: " ⌃";
-}
-
-.step__state {
+/* 展开提示。**右侧沟槽留给它**，所以状态不能再用 margin-left:auto 甩过去 */
+.step__chev {
+  display: flex;
   flex: none;
   margin-left: auto;
   color: var(--text-faint);
-  font-family: var(--font-mono);
+}
+
+.step--open:hover .step__chev {
+  color: var(--text-muted);
+}
+
+/* 状态紧跟在命令后面。
+   上一版是 `margin-left: auto`，把它甩到离命令三百多像素的地方——
+   读起来像另一张表的一列，而它说的是这一行的事 */
+.step__state {
+  flex: none;
+  margin-left: var(--sp-2);
+  color: var(--text-faint);
   font-size: var(--text-xs);
 }
 
@@ -259,12 +272,26 @@
   background: var(--text);
 }
 
+/* 终态错误：这一轮完了，值得一张卡 */
 .error {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--danger);
   border-radius: var(--radius);
   color: var(--danger);
   font-size: var(--text-sm);
+}
+
+/*
+ * 可恢复的错误：一行灰字。
+ *
+ * 实测 codex 断线时连发十条 `Reconnecting... N/5`，上一版每条都是一张整宽红卡，
+ * 十张叠起来把正文整个挤出屏幕——**而它们的意思是「还在试，你不用做什么」**。
+ * 视觉权重要配得上信息的分量。
+ */
+.error--soft {
+  padding: 2px 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
 }
 
 /* ── composer ───────────────────────────────────────── */
