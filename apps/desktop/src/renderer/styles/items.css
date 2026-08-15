@@ -616,3 +616,48 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
+
+/* ── 报错：人话在上，原文折在「详情」里 ──────────────
+ * 引擎原样吐出来的是一堵墙，但原文一个字都不能少——用户拿它去搜、
+ * 去开 issue，那时要的恰恰是我们觉得没用的那部分。见 components/Failure.tsx。
+ */
+.error__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.error__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.error__more {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  align-items: center;
+  opacity: 0.7;
+  font-size: var(--text-xs);
+}
+
+/* 原文可能很长、可能一行到底。**横向自己滚**，不要把整条对话撑宽 */
+.error__raw {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -1,3 +1,4 @@
+import { humanize } from "../failure.js"
 import type { Notice } from "@omni/store"
 
 /**
@@ -22,7 +23,11 @@ export function Notices({
   return (
     <div className="notice" role="alert">
       <span className="notice__badge">引擎故障</span>
-      <span className="notice__text">{latest.text}</span>
+      {/* 横幅上只放人话那一句：这一条本来就是「扫一眼就走」的东西，
+          真要看原文，同一段也会作为一条 error 落在对话里，那边能展开 */}
+      <span className="notice__text" title={latest.text}>
+        {humanize(latest.text).text}
+      </span>
       <button
         className="notice__close"
         type="button"

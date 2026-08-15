@@ -1,5 +1,6 @@
 import { Markdown } from "./Markdown.js"
 import { Reasoning } from "./Reasoning.js"
+import { Failure } from "./Failure.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
@@ -63,10 +64,6 @@ export const ItemView = memo(function ItemView({
     // 而它们说的是「还在试，你不用做什么」。压成一行灰字，
     // 真正的终态错误才配那张红卡
     case "error":
-      return item.fatal ? (
-        <div className="error">{item.message}</div>
-      ) : (
-        <div className="error--soft">{item.message}</div>
-      )
+      return <Failure text={item.message} soft={item.fatal !== true} />
   }
 })
