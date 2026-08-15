@@ -3,6 +3,8 @@ import { app, BrowserWindow, nativeTheme, shell } from "electron"
 import { attachHost, replayHistory, seedDefaultThread } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
+import { createLogger } from "./log.js"
+import { exportReport } from "./diagnose.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
   devPrompt,
@@ -21,6 +23,19 @@ import {
  */
 
 const isDev = process.env["ELECTRON_RENDERER_URL"] !== undefined
+
+const log = createLogger(join(app.getPath("userData"), "logs"))
+
+/**
+ * 全局兜底。**没有这两条，主进程里任何一个漏网的异常都会静默带走整个应用**——
+ * 用户看到的是窗口突然消失，日志里什么都没有。
+ */
+process.on("uncaughtException", (error: Error) => {
+  log.write("error", "main", `未捕获异常：${error.stack ?? error.message}`)
+})
+process.on("unhandledRejection", (reason: unknown) => {
+  log.write("error", "main", `未处理拒绝：${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`)
+})
 
 function createWindow(bounds: { x: number; y: number; width: number; height: number }): BrowserWindow {
   const win = new BrowserWindow({
@@ -48,7 +63,7 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
   // 它才会进用户能拿到的那份日志。
   win.webContents.on("console-message", (event) => {
     if (event.level !== "error" && event.level !== "warning") return
-    process.stderr.write(`[renderer:${event.level}] ${event.message}\n`)
+    log.write(event.level === "error" ? "error" : "warn", "renderer", event.message)
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -73,9 +88,10 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
 }
 
 void app.whenReady().then(async () => {
-  installMenu()
+  log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
+  installMenu(() => exportReport(log))
   installFind(() => BrowserWindow.getAllWindows())
-  const attached = attachHost(() => BrowserWindow.getAllWindows())
+  const attached = attachHost(() => BrowserWindow.getAllWindows(), log)
   const bounds = await loadBounds()
   const win = createWindow(bounds)
   app.on("activate", () => {

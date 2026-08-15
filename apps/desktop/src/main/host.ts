@@ -9,6 +9,7 @@ import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
+import type { Logger } from "./log.js"
 
 export interface Attached {
   host: Host
@@ -39,6 +40,38 @@ export interface Attached {
  * （持久化接上之前，重开等于新会话）。
  */
 /**
+ * 事件出口：合帧 → 广播 → 顺带记日志。
+ *
+ * 合帧的理由见 `batch.ts`；记日志只挑 `engine.status`，因为那是唯一
+ * **用户看不见却必须留痕**的一类——其余事件在界面上都有对应的呈现。
+ */
+function createOutlet(
+  windows: () => readonly BrowserWindow[],
+  log: Logger,
+  seen: { thread: ThreadId | undefined },
+): { emit: (event: Event) => void; flush: () => void } {
+  const batcher = createBatcher((events) => {
+    for (const win of windows()) {
+      if (!win.isDestroyed()) win.webContents.send("omni:events", events)
+    }
+  })
+  return {
+    emit: (event) => {
+      if (event.type === "thread.started") seen.thread = event.thread.id
+      // detail 里可能带 stderr，长度约束在 log.ts 那一层
+      if (event.type === "engine.status" && event.status !== "ready") {
+        const level = event.status === "crashed" ? "error" : "info"
+        log.write(level, "engine", `${event.status} ${event.detail ?? ""}`)
+      }
+      batcher.push(event)
+    },
+    flush: () => {
+      batcher.flush()
+    },
+  }
+}
+
+/**
  * 渲染层要用、但只有主进程做得到的几件事：弹目录框、写剪贴板、搜文件。
  *
  * 都是**窄到只能做一件事**的通道，不是把 fs 或 ipcRenderer 交出去。
@@ -56,20 +89,13 @@ function installBridgeChannels(): void {
 
 }
 
-export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
+export function attachHost(
+  windows: () => readonly BrowserWindow[],
+  log: Logger,
+): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
 
-  // 合帧再过 IPC：codex 的命令输出是一行一条通知，逐条发会把渲染层压垮
-  const batcher = createBatcher((events) => {
-    for (const win of windows()) {
-      if (!win.isDestroyed()) win.webContents.send("omni:events", events)
-    }
-  })
-
-  const emit = (event: Event): void => {
-    if (event.type === "thread.started") seen.thread = event.thread.id
-    batcher.push(event)
-  }
+  const { emit, flush } = createOutlet(windows, log, seen)
 
   // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
   // 用户换机器迁移、清理应用数据时才找得到、才带得走
@@ -130,9 +156,7 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     host,
     journal,
     push: emit,
-    flush: () => {
-      batcher.flush()
-    },
+    flush,
     engines: Object.keys(drivers).map((id) => ({ id, label: labels[id] ?? id })),
     lastThreadId: () => seen.thread,
     report,
