@@ -92,6 +92,14 @@ const CASES: readonly Case[] = [
   { name: "红线：git clean -fd 要问", trust: "auto-edit", req: bash("git clean -fd"), action: "escalate", redline: "git-destructive" },
   { name: "红线：工作区外写要问", trust: "auto-edit", req: tool("Write", { file_path: "/etc/hosts" }), action: "escalate", redline: "write-outside-worksite" },
   { name: "红线：命令写到工作区外要问", trust: "auto-edit", req: bash("cp build.tgz /usr/local/share/x"), action: "escalate", redline: "exec-writes-outside-worksite" },
+  // **`>` 重定向是 shell 里最常见的写文件方式，而它和程序名无关。**
+  // 原来只按程序名判断（cp/mv/tee…），于是这一条一路放行——
+  // 2026-08-15 实测在「自动编辑」档下真的把 /tmp 里的文件写出来了，一次没问，
+  // 而那一档在界面上写的是「工作区内的改动直接放行，越界才问」
+  { name: "红线：重定向写到工作区外要问", trust: "auto-edit", req: bash("echo ok > /tmp/x.txt"), action: "escalate", redline: "exec-writes-outside-worksite" },
+  { name: "红线：追加重定向到工作区外也要问", trust: "auto-edit", req: bash("echo ok >> /etc/hosts"), action: "escalate", redline: "exec-writes-outside-worksite" },
+  { name: "重定向到工作区**里面**不用问——那正是这一档要放行的东西", trust: "auto-edit", req: bash("echo ok > out.txt"), action: "allow" },
+  { name: "重定向到 /dev/null 不用问", trust: "auto-edit", req: bash("noisy 2>/dev/null"), action: "allow" },
   { name: "红线：全局安装要问", trust: "auto-edit", req: bash("npm i -g typescript"), action: "escalate", redline: "global-install" },
   { name: "红线：改引擎配置要问", trust: "full", req: tool("Write", { file_path: "~/.claude/settings.json" }), action: "escalate", redline: "engine-settings-write" },
   { name: "红线：改 .omni 要问", trust: "full", req: tool("Write", { file_path: ".omni/memory.json" }), action: "escalate", redline: "omni-self-config" },

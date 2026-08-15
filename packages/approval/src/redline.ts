@@ -1,6 +1,6 @@
 import { hasFlag } from "./command.js"
 import type { Normalized } from "./classify.js"
-import { isInside, matchesAnyPrefix } from "./path.js"
+import { isInside, matchesAnyPrefix, resolve } from "./path.js"
 import type { Action, Request, SessionState, Trust } from "./types.js"
 
 export interface RedlineContext {
@@ -125,9 +125,13 @@ export const REDLINES: readonly Redline[] = [
     describe: "命令看起来会写到工作区外",
     hit: (ctx) =>
       ctx.norm.category === "exec" &&
-      anyPathOutside(ctx) &&
       ctx.norm.split.segments.some(
-        (s) => WRITING_PROGRAMS.has(s.program) || (s.program === "sed" && hasFlag(s, "-i")),
+        (s) =>
+          // 重定向的目标**自己就是路径**，不必等 `norm.paths` 认出来——
+          // `echo ok > /tmp/x` 的 argv 里只有 `echo`、`ok`，路径抽取拿不到它
+          s.redirects.some((t) => !isInside(ctx.state.worksite, resolve(ctx.state.worksite, t, ctx.state.home))) ||
+          ((WRITING_PROGRAMS.has(s.program) || (s.program === "sed" && hasFlag(s, "-i"))) &&
+            anyPathOutside(ctx)),
       ),
     action: (trust) => (trust === "full" ? "allow" : "escalate"),
     reason: "命令带有写入语义且目标疑似在工作区外，需要人工确认",

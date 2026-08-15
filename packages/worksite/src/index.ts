@@ -11,7 +11,7 @@ export type { Hit } from "./score.js"
  * 这不是「优化」——`node_modules` 一个目录就能有几十万个文件，
  * 不排除的话第一次索引就把界面挂在那里，而里面**没有一个**是用户想 `@` 的。
  */
-const SKIP_DIRS: ReadonlySet<string> = new Set([
+export const SKIP_DIRS: ReadonlySet<string> = new Set([
   "node_modules",
   ".git",
   ".hg",
@@ -19,7 +19,15 @@ const SKIP_DIRS: ReadonlySet<string> = new Set([
   "dist",
   "build",
   "out",
+  // electron-builder 的默认输出目录，**omni 自己就用它**。
+  // 漏掉的代价实测过：打完包之后在 omni 里打 `@reduce`，九条候选里六条是
+  // `release/mac-arm64/omni.app/Contents/Frameworks/…/locale.pak`——
+  // 它们能命中纯粹因为那串长路径里恰好散落着 r、e、d、u、c、e
+  "release",
   "target",
+  "coverage",
+  "vendor",
+  "Pods",
   ".next",
   ".turbo",
   ".venv",

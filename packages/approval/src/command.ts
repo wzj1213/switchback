@@ -13,6 +13,16 @@ export interface Segment {
   flags: readonly string[]
   /** 非 flag 的位置参数 */
   operands: readonly string[]
+  /**
+   * 重定向写到哪儿去（`> f`、`>> f`、`2> f`、`&> f`）。
+   *
+   * **这是 shell 里最常见的写文件方式，而它和程序名无关。**
+   * 原来只按程序名判断写入语义（cp/mv/tee…），于是
+   * `echo ok > /tmp/x` 这种在「自动编辑」档下一路放行——
+   * 而那一档在界面上写的是「工作区内的改动直接放行，越界才问」。
+   * 实测就是这么把 `/tmp` 里的文件写出来的，一次都没问。
+   */
+  redirects: readonly string[]
 }
 
 export interface SplitResult {
@@ -74,6 +84,28 @@ function tokenize(text: string): string[] {
   return tokens.filter((t) => t !== "")
 }
 
+/**
+ * `>`、`>>`、`2>`、`&>` 后面跟的那个目标。
+ *
+ * 只认**写**的重定向：`<` 是读，`>&1` / `>&2` 是复制文件描述符不是文件。
+ * 认得出多少算多少——真正兜底的是 `OPAQUE_PATTERNS`（含 `$()`、`eval` 一律
+ * 判为「无法静态判定」去问人）。这里做的是**把最常见的那一种从漏网里捞回来**。
+ */
+const REDIRECT = /(?:^|\s)(?:\d*|&)?>>?\s*("[^"]+"|'[^']+'|[^\s;|&<>]+)/g
+
+export function redirectTargets(text: string): readonly string[] {
+  const out: string[] = []
+  for (const hit of text.matchAll(REDIRECT)) {
+    const raw = hit[1]
+    if (raw === undefined) continue
+    const target = raw.replace(/^["']|["']$/g, "")
+    // `>&1`、`>/dev/null` 不是要保护的东西
+    if (target.startsWith("&") || target === "/dev/null" || target === "/dev/stderr") continue
+    out.push(target)
+  }
+  return out
+}
+
 function toSegment(text: string): Segment | undefined {
   const argv = tokenize(text.trim())
   const program = argv[0]
@@ -83,6 +115,7 @@ function toSegment(text: string): Segment | undefined {
     program,
     flags: argv.filter((a) => a.startsWith("-")),
     operands: argv.slice(1).filter((a) => !a.startsWith("-")),
+    redirects: redirectTargets(text),
   }
 }
 

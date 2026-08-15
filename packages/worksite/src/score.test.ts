@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { rank, score } from "./score.js"
+import { SKIP_DIRS } from "./index.js"
 
 describe("score", () => {
   it("匹配不上给 undefined", () => {
@@ -76,5 +77,22 @@ describe("rank", () => {
   it("扩展名也能搜——`.tsx` 找得到组件", () => {
     const [first] = pick(["src/App.tsx", "src/app.ts"], ".tsx")
     expect(first).toBe("src/App.tsx")
+  })
+})
+
+describe("构建产物不该进索引", () => {
+  it("**`release` 也要排除**——electron-builder 的默认输出，omni 自己就用它", () => {
+    expect(SKIP_DIRS.has("release")).toBe(true)
+  })
+
+  it("常见的构建/依赖目录都在表里", () => {
+    for (const dir of ["node_modules", ".git", "dist", "build", "out", "release", "target", "coverage", "vendor"]) {
+      expect(SKIP_DIRS.has(dir)).toBe(true)
+    }
+  })
+
+  it("`src` 这种当然不能排除", () => {
+    expect(SKIP_DIRS.has("src")).toBe(false)
+    expect(SKIP_DIRS.has("packages")).toBe(false)
   })
 })

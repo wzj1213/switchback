@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { signature, splitSegments, unwrapShell } from "./command.js"
+import { redirectTargets, signature, splitSegments, unwrapShell } from "./command.js"
 
 describe("unwrapShell", () => {
   it("剥掉 codex 的包壳", () => {
@@ -34,5 +34,40 @@ describe("包壳不能让判定器失明", () => {
   it("包壳里的分隔符照样切分——`a && rm -rf /` 不能因为包了一层就整段当一条", () => {
     const r = splitSegments(`/bin/zsh -lc 'pnpm test && rm -rf /tmp/x'`)
     expect(r.segments.map((s) => s.program)).toEqual(["pnpm", "rm"])
+  })
+})
+
+describe("重定向目标", () => {
+  it("`> f` 认得出——**这是 shell 里最常见的写文件方式**", () => {
+    expect(redirectTargets("echo ok > /tmp/x.txt")).toEqual(["/tmp/x.txt"])
+  })
+
+  it("`>>` 追加也算写", () => {
+    expect(redirectTargets("echo ok >> out.log")).toEqual(["out.log"])
+  })
+
+  it("`2>` 和 `&>` 也认", () => {
+    expect(redirectTargets("cmd 2> err.txt")).toEqual(["err.txt"])
+    expect(redirectTargets("cmd &> all.txt")).toEqual(["all.txt"])
+  })
+
+  it("带引号的路径去掉引号", () => {
+    expect(redirectTargets(`echo x > "带 空格.txt"`)).toEqual(["带 空格.txt"])
+  })
+
+  it("`<` 是读，不算", () => {
+    expect(redirectTargets("cmd < input.txt")).toEqual([])
+  })
+
+  it("`>&2` 是复制文件描述符，不是文件", () => {
+    expect(redirectTargets("echo boom >&2")).toEqual([])
+  })
+
+  it("`/dev/null` 不用保护", () => {
+    expect(redirectTargets("noisy 2>/dev/null")).toEqual([])
+  })
+
+  it("一条命令里多个重定向都要认", () => {
+    expect(redirectTargets("cmd > a.txt 2> b.txt")).toEqual(["a.txt", "b.txt"])
   })
 })
