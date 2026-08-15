@@ -47,10 +47,23 @@
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --text-xs: 11px;
-  --text-sm: 12.5px;
-  --text-base: 13.5px;
-  --text-lg: 15px;
+
+  /*
+   * 字号。
+   *
+   * 上一版整套小了一档（11 / 12.5 / 13.5），和 codex 并排一放就显得**小气**——
+   * 不是「紧凑」，是像把一个正常界面缩小了 90% 之后的样子。
+   * 桌面应用的正文没有理由比系统默认（13）还小。
+   *
+   * `--text-xl` 是新加的，只给一个地方用：空会话那句大标题。
+   * codex 那句「你想让我们在 crew 中构建什么？」是整个界面的视觉锚点，
+   * 而我上一版用 15px 写它，于是那块地方空得没有重量。
+   */
+  --text-xs: 11.5px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 27px;
 
   /* 语法高亮。四档就够读；全彩会把一屏代码变成圣诞树 */
   --hl-keyword: #8250df;
@@ -59,7 +72,9 @@
   --hl-title: #1f5fbf;
   --hl-type: #0f6b78;
 
-  --sidebar-w: 232px;
+  /* 侧栏宽度。窄一点能多留些正文，但窄到会话标题只能显示七八个字之后，
+     那一列就只剩装饰作用了——省下来的宽度并没有换到东西 */
+  --sidebar-w: 258px;
   --content-max: 760px;
 
   /*

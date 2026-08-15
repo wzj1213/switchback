@@ -7,6 +7,13 @@ interface Sealed {
   event: Event
 }
 
+interface Settings {
+  theme: "system" | "light" | "dark"
+  pinned: readonly string[]
+  defaultEngine: string
+  defaultTrust: "read-only" | "auto-edit" | "full"
+}
+
 interface Replay {
   events: readonly Event[]
   resumeAt: number
@@ -27,6 +34,10 @@ declare global {
       stopFind: () => void
       copy: (text: string) => void
       reveal: (path: string) => void
+      settings: (patch?: Partial<Settings>) => Promise<Settings>
+      appInfo: () => Promise<{ version: string; dataDir: string }>
+      openEngines: () => void
+      diagnose: () => void
       searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
       subscribe: (onEvents: (sealed: readonly Sealed[]) => void) => () => void
       onReplay: (handler: (replay: Replay) => void) => () => void

@@ -1,0 +1,83 @@
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+const dir = { path: mkdtempSync(join(tmpdir(), "omni-settings-")) }
+const theme = { source: "system" }
+
+vi.mock("electron", () => ({
+  app: { getPath: () => dir.path },
+  ipcMain: { handle: vi.fn() },
+  nativeTheme: {
+    get themeSource() {
+      return theme.source
+    },
+    set themeSource(next: string) {
+      theme.source = next
+    },
+  },
+}))
+
+const { createSettings } = await import("./settings.js")
+
+const log = { file: "x", write: () => undefined }
+const file = (): string => join(dir.path, "settings.json")
+
+describe("偏好", () => {
+  beforeEach(() => {
+    dir.path = mkdtempSync(join(tmpdir(), "omni-settings-"))
+    theme.source = "system"
+  })
+
+  it("没有文件时用默认值，不报错——第一次启动是常态", () => {
+    expect(createSettings(log).get()).toEqual({
+      theme: "system",
+      pinned: [],
+      defaultEngine: "",
+      defaultTrust: "auto-edit",
+    })
+  })
+
+  it("写入之后落盘，再读回来还在", () => {
+    const store = createSettings(log)
+    store.patch({ pinned: ["/w/omni"], theme: "dark" })
+    expect(JSON.parse(readFileSync(file(), "utf8")) as unknown).toMatchObject({
+      pinned: ["/w/omni"],
+      theme: "dark",
+    })
+    expect(createSettings(log).get().pinned).toEqual(["/w/omni"])
+  })
+
+  it("**认不出的信任档回落到默认**——查不到的档位在判定器里会落到最宽那一档，那是安全问题", () => {
+    writeFileSync(file(), JSON.stringify({ defaultTrust: "随便写的" }), "utf8")
+    expect(createSettings(log).get().defaultTrust).toBe("auto-edit")
+  })
+
+  it("认不出的主题也回落，不会把 nativeTheme 设成一个非法值", () => {
+    writeFileSync(file(), JSON.stringify({ theme: "霓虹" }), "utf8")
+    expect(createSettings(log).get().theme).toBe("system")
+    expect(theme.source).toBe("system")
+  })
+
+  it("pinned 里的非字符串滤掉——JSON 里塞个数字不该变成一个路径", () => {
+    writeFileSync(file(), JSON.stringify({ pinned: ["/w/a", 7, null, "/w/b"] }), "utf8")
+    expect(createSettings(log).get().pinned).toEqual(["/w/a", "/w/b"])
+  })
+
+  it("文件坏了也用默认值起得来", () => {
+    writeFileSync(file(), "{ 这不是 JSON", "utf8")
+    expect(createSettings(log).get().theme).toBe("system")
+  })
+
+  it("patch 是合并不是替换——只改主题不该把置顶清空", () => {
+    const store = createSettings(log)
+    store.patch({ pinned: ["/w/omni"] })
+    expect(store.patch({ theme: "light" }).pinned).toEqual(["/w/omni"])
+  })
+
+  it("改主题会同步到 nativeTheme，否则设置里选了深色但窗口没变", () => {
+    createSettings(log).patch({ theme: "dark" })
+    expect(theme.source).toBe("dark")
+  })
+})

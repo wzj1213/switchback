@@ -1,4 +1,4 @@
-import type { Command, Thread } from "@omni/protocol"
+import type { Command, Thread, Trust } from "@omni/protocol"
 import { itemsOf, type ViewState } from "@omni/store"
 import { labelOf } from "./components/Composer.js"
 import { toMarkdown } from "./export.js"
@@ -29,16 +29,27 @@ export function useWorkspaceActions(deps: {
   onFind: () => void
   onCompare: () => void
   onFilterThreads: () => void
+  onSettings: () => void
+  /** 偏好里设的默认引擎；空串表示「沿用当前会话的」。 */
+  defaultEngine: string
+  defaultTrust: Trust
 }): WorkspaceActions {
   const { state, thread, send } = deps
 
-  // 新会话沿用当前会话的引擎与档位：换工作区不该顺带把内核也换了
+  /**
+   * 开新会话。
+   *
+   * 优先级：**偏好里设的默认 > 当前会话的 > 兜底**。
+   * 沿用当前会话是为了「换工作区不该顺带把内核也换了」；
+   * 但用户如果在设置里明确指定了默认，那句话就该压过前者——
+   * 他设它就是为了不再每次手改。
+   */
   const open = (cwd: string): void => {
     send({
       type: "thread.create",
       cwd,
-      engine: thread?.engine ?? state.engines[0]?.id ?? "claude",
-      trust: thread?.trust ?? "auto-edit",
+      engine: deps.defaultEngine !== "" ? deps.defaultEngine : (thread?.engine ?? state.engines[0]?.id ?? "claude"),
+      trust: deps.defaultTrust,
       title: cwd.split("/").filter(Boolean).pop() ?? cwd,
     })
     deps.onSelect(undefined)
@@ -63,6 +74,7 @@ export function useWorkspaceActions(deps: {
       },
       find: deps.onFind,
       compare: deps.onCompare,
+      settings: deps.onSettings,
       filterThreads: deps.onFilterThreads,
       copyMarkdown: () => {
         if (thread === undefined) return

@@ -15,7 +15,21 @@ const thread = (id: string, title: string): Thread => ({
   engineHistory: ["codex"],
 })
 
+/** 带一条用户消息——`rebuild` 只留说过话的会话，见下面那组用例。 */
 const history = (id: string, title: string): ThreadHistory => ({
+  id,
+  events: [
+    { type: "thread.started", at: 0, thread: thread(id, title) },
+    {
+      type: "item.started",
+      at: 1,
+      item: { id: `${id}-u`, turnId: "t", at: 1, kind: "user_message", text: "说了一句" },
+    },
+  ],
+})
+
+/** 只开了个头，一个字没说。 */
+const emptyHistory = (id: string, title: string): ThreadHistory => ({
   id,
   events: [{ type: "thread.started", at: 0, thread: thread(id, title) }],
 })
@@ -65,5 +79,23 @@ describe("活着的和历史要分开", () => {
     const alive = new Map<ThreadId, Thread>([["t1", running]])
     const state = reduceAll(initial(), replayEvents([], [history("t1", "旧名字")], alive, 1))
     expect(threadRowsOf(state)[0]?.thread.title).toBe("改过名了")
+  })
+})
+
+describe("空壳会话不进侧栏", () => {
+  it("**一句话都没说过的不算历史**——omni 每次启动都开一个默认会话，不滤掉的话跑一周侧栏全是空壳", () => {
+    const state = reduceAll(initial(), replayEvents([], [emptyHistory("空", "空")], none, 1))
+    expect(threadRowsOf(state)).toEqual([])
+  })
+
+  it("说过话的照常留着", () => {
+    const state = reduceAll(initial(), replayEvents([], [history("有话", "有话")], none, 1))
+    expect(threadRowsOf(state)).toHaveLength(1)
+  })
+
+  it("**活着的空会话是例外**——它正开着，用户随时会在里面打字", () => {
+    const alive = new Map<ThreadId, Thread>([["空", thread("空", "空")]])
+    const state = reduceAll(initial(), replayEvents([], [emptyHistory("空", "空")], alive, 1))
+    expect(threadRowsOf(state)).toHaveLength(1)
   })
 })

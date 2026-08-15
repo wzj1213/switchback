@@ -1,6 +1,6 @@
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
-import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
 import { attachHost, rebuild, seedDefaultThread } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
@@ -9,6 +9,7 @@ import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
+import { createSettings, installSettingsChannel } from "./settings.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
   applyDevTheme,
@@ -22,6 +23,7 @@ import {
   scheduleDevFilter,
   scheduleDevOpenSelect,
   scheduleDevRowMenu,
+  scheduleDevProbe,
   scheduleDevShot,
 } from "./devtools.js"
 
@@ -40,6 +42,12 @@ const log = createLogger(join(app.getPath("userData"), "logs"))
 // **必须在 whenReady 之前**：崩溃处理器要赶在渲染进程被创建之前装上，
 // 否则那些进程崩了不会留下任何转储
 const crash = installCrashReporter(log)
+
+/**
+ * 偏好。**在开窗之前建**：主题要在第一帧之前定下来，
+ * 否则窗口会先按系统色画一下再跳成用户选的那套。
+ */
+const settings = createSettings(log)
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
@@ -136,7 +144,28 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
   return win
 }
 
+/**
+ * 设置面板要用的三条通道。
+ *
+ * 走的是**和菜单同一条路**（`openEngines` / `exportReport`），不复制实现——
+ * 摆两份实现的下场是其中一份迟早不更新，而那份正好是用户用的那份。
+ */
+function installAppChannels(): void {
+  ipcMain.handle("omni:appInfo", () => ({
+    version: app.getVersion(),
+    dataDir: app.getPath("userData"),
+  }))
+  ipcMain.on("omni:openEngines", () => {
+    void shell.openPath(ensureEngineFile(app.getPath("userData")))
+  })
+  ipcMain.on("omni:diagnose", () => {
+    void exportReport(log, crash)
+  })
+}
+
 void app.whenReady().then(async () => {
+  installSettingsChannel(settings)
+  installAppChannels()
   applyDevTheme()
   log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
   installMenu(
@@ -179,6 +208,9 @@ void app.whenReady().then(async () => {
     scheduleDevFilter(win)
     scheduleDevOpenSelect(win)
     scheduleDevRowMenu(win)
+    scheduleDevProbe(win, (m: string) => {
+      log.write("info", "dev", m)
+    })
     scheduleDevSwitch(win, (kind, to) => {
       const threadId = attached.lastThreadId()
       if (threadId === undefined) return

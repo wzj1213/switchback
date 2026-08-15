@@ -59,3 +59,48 @@ export function groupByWorkspace(rows: readonly ThreadRow[]): readonly Group[] {
   }
   return [...groups.values()]
 }
+
+/** 「最近」里放几条。太多就和上面的项目树重复了，太少又起不到「回到刚才」的作用。 */
+export const RECENT_MAX = 6
+
+/** 项目多到一定程度才折叠。少于这个数时「展开显示」只是白多一行。 */
+export const PROJECT_MAX = 6
+
+export interface Sections {
+  pinned: readonly Group[]
+  projects: readonly Group[]
+  /** 跨项目的最近会话，扁平。 */
+  recent: readonly ThreadRow[]
+}
+
+/**
+ * 侧栏分三段。
+ *
+ * ## 为什么要有「最近」
+ *
+ * 项目树回答的是「我有哪些项目」，但人打开应用时想的是
+ * **「我刚才在干嘛」**——那是一个跨项目的问题，项目树答不了：
+ * 上一个会话可能埋在第四个折叠组里。
+ *
+ * 所以「最近」是扁平的、跨项目的、按最后动过的时间排。
+ * 它和上面的项目树**会重复**，这是有意的：两条路通向同一个东西，
+ * 因为人有两种不同的找法。
+ *
+ * ## 置顶为什么单独一段而不是排在最前
+ *
+ * 排在最前的话，它和普通项目长得一样，用户就看不出「这几个是我钉住的」——
+ * 于是也想不起来还能取消置顶。分段本身就是那条说明。
+ */
+export function sectionsOf(rows: readonly ThreadRow[], pinned: readonly string[]): Sections {
+  const groups = groupByWorkspace(rows)
+  const isPinned = new Set(pinned)
+  return {
+    // 按**用户置顶的先后**排，不按最近活动排：钉住的顺序是他自己定的，
+    // 底下再自动重排一次就等于没钉
+    pinned: pinned.flatMap((cwd) => groups.filter((g) => g.cwd === cwd)),
+    projects: groups.filter((g) => !isPinned.has(g.cwd)),
+    recent: [...rows]
+      .sort((a, b) => b.thread.updatedAt - a.thread.updatedAt)
+      .slice(0, RECENT_MAX),
+  }
+}

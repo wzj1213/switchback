@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { filterRows } from "../filter.js"
-import { groupByWorkspace, type Group } from "../sidebar.js"
-import { CopyIcon, FolderIcon, PlusIcon, RevealIcon, SearchIcon, TrashIcon } from "./icons.js"
-import { useContextMenu } from "./Menu.js"
-import { GroupBlock, Row } from "./SidebarRows.js"
+import { sectionsOf, type Group } from "../sidebar.js"
+import { CopyIcon, FolderIcon, GearIcon, PinIcon, PlusIcon, RevealIcon, SearchIcon, TrashIcon } from "./icons.js"
+import { useContextMenu, type Command } from "./Menu.js"
+import { Row } from "./SidebarRows.js"
+import { SectionList } from "./SidebarSections.js"
 
 /**
  * 侧栏。
@@ -42,6 +43,10 @@ interface Props {
   onReveal: (path: string) => void
   /** 写剪贴板。 */
   onCopy: (text: string) => void
+  /** 已置顶的工作区路径。 */
+  pinned: readonly string[]
+  onTogglePin: (cwd: string) => void
+  onOpenSettings: () => void
   /**
    * 变一次就把焦点送进筛选框。
    *
@@ -113,6 +118,33 @@ function Head({
   )
 }
 
+interface Acts {
+  pinned: readonly string[]
+  onNewIn: (cwd: string) => void
+  onTogglePin: (cwd: string) => void
+  onReveal: (path: string) => void
+  onCopy: (text: string) => void
+}
+
+/**
+ * 项目和会话共用的那几条菜单命令。
+ *
+ * 共用是有意的：两者的右键菜单**前四项必须一样**——用户不该记得
+ * 「在会话上右键有复制路径，在项目上右键没有」。会话那边只是多一条删除。
+ */
+function workspaceCommands(cwd: string, acts: Acts): readonly Command[] {
+  return [
+    { label: "在此新建会话", icon: <PlusIcon />, run: () => { acts.onNewIn(cwd) } },
+    {
+      label: acts.pinned.includes(cwd) ? "取消置顶" : "置顶项目",
+      icon: <PinIcon />,
+      run: () => { acts.onTogglePin(cwd) },
+    },
+    { label: "在访达中显示", icon: <RevealIcon />, run: () => { acts.onReveal(cwd) } },
+    { label: "复制路径", icon: <CopyIcon />, run: () => { acts.onCopy(cwd) } },
+  ]
+}
+
 export function Sidebar({
   rows,
   selectedId,
@@ -123,23 +155,34 @@ export function Sidebar({
   onNewIn,
   onReveal,
   onCopy,
+  pinned,
+  onTogglePin,
+  onOpenSettings,
   focusFilter,
 }: Props): React.JSX.Element {
   const [query, setQuery] = useState("")
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
+  /**
+   * **手动展开过的项目**（不是「折叠过的」）。
+   *
+   * 默认全折叠，只有当前会话所在的那个自动展开。上一版反过来——默认全展开——
+   * 于是一个有八个会话的项目自己就占满了整列，而「最近」那一段被顶到屏幕外面，
+   * 等于白做。codex 的项目段也只列文件夹，不把聊天铺开。
+   */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const box = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (focusFilter > 0) box.current?.select()
   }, [focusFilter])
 
   const { open: openMenu, menu } = useContextMenu()
+  const acts: Acts = { pinned, onNewIn, onTogglePin, onReveal, onCopy }
   const shown = filterRows(rows, query)
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
-  const groups = filtering ? [] : groupByWorkspace(shown)
+  const sections = sectionsOf(shown, pinned)
 
   const toggle = (cwd: string): void => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(cwd)) next.delete(cwd)
       else next.add(cwd)
@@ -147,23 +190,17 @@ export function Sidebar({
     })
   }
 
+  // 当前会话所在的项目**始终展开**：选中的那一行必须看得见，
+  // 否则点了侧栏别处再回来，它就藏进一个折叠组里了
+  const here = rows.find((r) => r.thread.id === selectedId)?.thread.cwd
+  const isOpen = (cwd: string): boolean => expanded.has(cwd) || cwd === here
+
   const rowMenu = (event: React.MouseEvent, row: ThreadRow, arm: () => void): void => {
-    openMenu(event, [
-      { label: "在此新建会话", icon: <PlusIcon />, run: () => { onNewIn(row.thread.cwd) } },
-      { label: "在访达中显示", icon: <RevealIcon />, run: () => { onReveal(row.thread.cwd) } },
-      { label: "复制工作区路径", icon: <CopyIcon />, run: () => { onCopy(row.thread.cwd) } },
-      // 省略号表示「还要再确认一次」：点完之后行尾会变成一个红色的「确认」。
-      // 菜单里直接删太危险——菜单是会点错的地方
-      { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm },
-    ])
+    openMenu(event, [...workspaceCommands(row.thread.cwd, acts), { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm }])
   }
 
   const groupMenu = (event: React.MouseEvent, group: Group): void => {
-    openMenu(event, [
-      { label: "在此新建会话", icon: <PlusIcon />, run: () => { onNewIn(group.cwd) } },
-      { label: "在访达中显示", icon: <RevealIcon />, run: () => { onReveal(group.cwd) } },
-      { label: "复制路径", icon: <CopyIcon />, run: () => { onCopy(group.cwd) } },
-    ])
+    openMenu(event, workspaceCommands(group.cwd, acts))
   }
 
   const flat = (row: ThreadRow): React.JSX.Element => (
@@ -177,6 +214,7 @@ export function Sidebar({
       onDelete={() => {
         onDelete(row.thread.id)
       }}
+      flat
       onMenu={(e, arm) => {
         rowMenu(e, row, arm)
       }}
@@ -188,31 +226,39 @@ export function Sidebar({
       <Head onNew={onNew} onOpenFolder={onOpenFolder} box={box} query={query} onQuery={setQuery} />
 
       <div className="sidebar__list">
-        <div className="sidebar__section">
-          {filtering ? `命中 ${String(shown.length)} / ${String(rows.length)}` : "项目"}
-        </div>
-        {filtering && shown.length === 0 ? (
-          // 空列表什么都不说的话，看起来像「会话全没了」
-          <p className="sidebar__empty">没有匹配的会话。</p>
-        ) : null}
-        {filtering
-          ? shown.map(flat)
-          : groups.map((group) => (
-              <GroupBlock
-                key={group.cwd}
-                group={group}
-                collapsed={collapsed.has(group.cwd)}
-                selectedId={selectedId}
-                onToggle={() => {
-                  toggle(group.cwd)
-                }}
-                onSelect={onSelect}
-                onDelete={onDelete}
-                onRowMenu={rowMenu}
-                onGroupMenu={groupMenu}
-              />
-            ))}
+        {filtering ? (
+          <>
+            <div className="sidebar__section sidebar__section--static">
+              命中 {shown.length} / {rows.length}
+            </div>
+            {shown.length === 0 ? (
+              // 空列表什么都不说的话，看起来像「会话全没了」
+              <p className="sidebar__empty">没有匹配的会话。</p>
+            ) : null}
+            {shown.map(flat)}
+          </>
+        ) : (
+          <SectionList
+            sections={sections}
+            on={{
+              selectedId,
+              isOpen,
+              onToggle: toggle,
+              onSelect,
+              onDelete,
+              onRowMenu: rowMenu,
+              onGroupMenu: groupMenu,
+            }}
+          />
+        )}
       </div>
+      <button type="button" className="row row--foot" onClick={onOpenSettings}>
+        <span className="row__slot">
+          <GearIcon />
+        </span>
+        <span className="row__label">设置</span>
+        <span className="row__aside">⌘,</span>
+      </button>
       {menu}
     </aside>
   )

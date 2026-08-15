@@ -48,18 +48,18 @@ body {
  */
 .sidebar {
   --sb-pad: 8px;
-  --sb-slot: 22px;
-  --sb-row-h: 28px;
+  --sb-slot: 24px;
+  --sb-row-h: 32px;
 }
 
 .sidebar__head {
-  padding: 34px var(--sb-pad) var(--sp-2);
+  padding: 34px var(--sb-pad) var(--sp-3);
   -webkit-app-region: drag;
 }
 
 .sidebar__brand {
   padding-left: var(--sb-slot);
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text);
@@ -86,7 +86,7 @@ body {
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   text-align: left;
   cursor: default;
 }
@@ -215,7 +215,7 @@ body {
   background: transparent;
   color: var(--text);
   font-family: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   appearance: none;
 }
 
@@ -236,12 +236,97 @@ body {
 
 /* 分节标题：整个侧栏里唯一不带图标的一行，所以它对着**文字列**，
    而不是图标列——一小段全大写的灰字挂在图标列上会显得悬空 */
+/* 分节标题：整个侧栏里唯一不带图标的一行，所以它对着**文字列**，
+   而不是图标列——一小段灰字挂在图标列上会显得悬空 */
 .sidebar__section {
-  padding: var(--sp-3) var(--sb-pad) var(--sp-1);
-  padding-left: calc(var(--sb-pad) + var(--sb-slot));
-  font-size: var(--text-xs);
-  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: calc(100% - var(--sb-pad) * 2);
+  margin: 0 var(--sb-pad);
+  padding: var(--sp-4) 0 var(--sp-1) var(--sb-slot);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.sidebar__section:hover {
+  color: var(--text-muted);
+}
+
+/* 筛选时那一行只是个计数，点不动 */
+.sidebar__section--static {
+  cursor: default;
+}
+
+/* 「展开显示（还有 N 个）」。**不做分页也不做无限滚动**：
+   项目是几十的量级，一行就够，多一套机制只会多一处出错的地方 */
+.sidebar__more {
+  width: calc(100% - var(--sb-pad) * 2);
+  margin: 2px var(--sb-pad) 0;
+  padding: 4px 0 4px var(--sb-slot);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.sidebar__more:hover {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+/* 底部固定的一行。和上面所有行同一套 `.row`，只是钉在底下、上面加条分隔 */
+.row--foot {
+  flex: none;
+  margin-bottom: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.sidebar > .row--foot {
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: var(--sb-pad);
+  padding-right: var(--sb-pad);
+  margin-top: 0;
+  padding-top: var(--sp-1);
+  padding-bottom: var(--sp-1);
+}
+
+.sidebar > .row--foot:hover {
+  background: var(--bg-hover);
+}
+
+/* 行右侧的一小段附注：「最近」段的项目名、底部那行的快捷键 */
+/* 项目名让位给正文：**这一列是给「哪个项目」做参照的，不是主角**。
+   给它 84px 的时候，会话标题被截成「给 m.js 的 a…」，等于两边都读不出来 */
+.row__aside {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 4px;
+  overflow: hidden;
+  max-width: 62px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 不在项目组里的会话行（筛选结果、最近段）：不缩进那一级 */
+.row--flat .row__slot {
+  margin-left: 0;
 }
 
 .sidebar__empty {
@@ -358,7 +443,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  height: 46px;
+  height: 52px;
   padding: 0 var(--sp-4);
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
@@ -735,16 +820,20 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 62px;
+  height: 62px;
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-faint);
 }
 
+/* 整个界面的视觉锚点。**必须够大**——15px 的一句话摆在一片空白中间，
+   那块地方就只是空着，没有重量 */
 .blank__title {
-  margin: var(--sp-2) 0 0;
-  font-size: var(--text-lg);
+  margin: var(--sp-3) 0 0;
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.35;
   color: var(--text-muted);
 }
 
@@ -755,8 +844,8 @@ body {
 
 /* 路径用等宽：它是要被读准的东西，比例字体下 l/1/I 分不清 */
 .blank__path {
-  margin: 0;
+  margin: var(--sp-1) 0 0;
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-faint);
 }

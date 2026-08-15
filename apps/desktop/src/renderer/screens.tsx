@@ -1,8 +1,11 @@
-import type { Command, Thread } from "@omni/protocol"
+import { useEffect, useState } from "react"
+import type { Command, EngineInfo, Thread } from "@omni/protocol"
 import { itemsOf, turnOf, type Notice as StoreNotice, type ThreadRow, type ViewState } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
+import { SettingsPanel } from "./components/SettingsPanel.js"
+import type { SettingsApi } from "./useSettings.js"
 
 /**
  * 除主区之外的几块屏。
@@ -64,6 +67,9 @@ export function SidebarPane({
   onOpenFolder,
   onReveal,
   onCopy,
+  pinned,
+  onTogglePin,
+  onOpenSettings,
   send,
 }: {
   rows: readonly ThreadRow[]
@@ -75,6 +81,9 @@ export function SidebarPane({
   onOpenFolder: () => void
   onReveal: (path: string) => void
   onCopy: (text: string) => void
+  pinned: readonly string[]
+  onTogglePin: (cwd: string) => void
+  onOpenSettings: () => void
   send: (command: Command) => void
 }): React.JSX.Element {
   return (
@@ -87,6 +96,9 @@ export function SidebarPane({
       onNewIn={onNewIn}
       onReveal={onReveal}
       onCopy={onCopy}
+      pinned={pinned}
+      onTogglePin={onTogglePin}
+      onOpenSettings={onOpenSettings}
       focusFilter={focusFilter}
       onDelete={(id: string) => {
         // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
@@ -139,3 +151,46 @@ export function CompareScreen({
   )
 }
 
+
+/**
+ * 设置屏。把「版本/数据目录」这两样异步拿到的东西留在这里，
+ * 不塞进 `App`——它们只有这块面板用得着。
+ */
+export function SettingsScreen({
+  prefs,
+  engines,
+  onReveal,
+  onCopy,
+  onClose,
+}: {
+  prefs: SettingsApi
+  engines: readonly EngineInfo[]
+  onReveal: (path: string) => void
+  onCopy: (text: string) => void
+  onClose: () => void
+}): React.JSX.Element {
+  const [info, setInfo] = useState({ version: "", dataDir: "" })
+  const bridge = typeof window === "undefined" ? undefined : window.omni
+  useEffect(() => {
+    if (bridge === undefined) return
+    void bridge.appInfo().then(setInfo)
+  }, [bridge])
+  return (
+    <SettingsPanel
+      settings={prefs.settings}
+      engines={engines}
+      version={info.version}
+      dataDir={info.dataDir}
+      onPatch={prefs.patch}
+      onClose={onClose}
+      onReveal={onReveal}
+      onCopy={onCopy}
+      onOpenEngines={() => {
+        bridge?.openEngines()
+      }}
+      onDiagnose={() => {
+        bridge?.diagnose()
+      }}
+    />
+  )
+}

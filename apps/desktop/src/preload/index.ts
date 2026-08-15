@@ -63,6 +63,22 @@ const api = {
   reveal(path: string): void {
     ipcRenderer.send("omni:reveal", path)
   },
+  /** 版本与数据目录。设置面板要显示它们，而渲染层拿不到 `app`。 */
+  async appInfo(): Promise<{ version: string; dataDir: string }> {
+    return (await ipcRenderer.invoke("omni:appInfo")) as { version: string; dataDir: string }
+  },
+  /** 用系统编辑器打开引擎注册表。和菜单里那一项**是同一条路**，不是复制一份实现。 */
+  openEngines(): void {
+    ipcRenderer.send("omni:openEngines")
+  },
+  /** 导出诊断报告。同上，走的是菜单那条路。 */
+  diagnose(): void {
+    ipcRenderer.send("omni:diagnose")
+  },
+  /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
+  async settings(patch?: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return (await ipcRenderer.invoke("omni:settings", patch)) as Record<string, unknown>
+  },
   async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
     return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
   },

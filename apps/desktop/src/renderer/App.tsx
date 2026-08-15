@@ -1,59 +1,56 @@
-import { forkPeerOf, itemsOf, modelsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
+import { forkPeerOf, modelsOf, turnOf, usageOf } from "@omni/store"
 import { Workspace } from "./components/Workspace.js"
-import { useShell } from "./useShell.js"
-import { CompareScreen, EmptyScreen, SidebarPane } from "./screens.js"
-import { useOmni } from "./useOmni.js"
-import { useWorkspaceActions } from "./useWorkspaceActions.js"
+import { CompareScreen, EmptyScreen, SettingsScreen, SidebarPane } from "./screens.js"
+import { useApp } from "./useApp.js"
 
-/** 选哪个会话、怎么新建。一个会话内部长什么样是 `Workspace` 的事。 */
+/**
+ * 选哪一屏。
+ *
+ * **只做这一件事。** 接线（十来个回调、当前会话是哪个、偏好）全在 `useApp` 里——
+ * 混在一起的时候，「渲染哪一屏」这个真正的职责被埋在三十行 props 中间。
+ */
 export function App(): React.JSX.Element {
-  const { state, send, pickFolder, onMenu, find, stopFind, copy, reveal, searchFiles, bridgeMissing } = useOmni()
-  const shell = useShell()
-  const rows = threadRowsOf(state)
-  // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
-  const notices = state.notices.filter((n) => n.id !== shell.dismissed)
-  const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
-
-  const { open, openPicker } = useWorkspaceActions({
-    state,
-    thread,
-    send,
-    copy,
-    pickFolder,
-    onMenu,
-    onSelect: shell.select,
-    onFind: () => {
-      shell.setFinding(true)
-    },
-    onCompare: () => {
-      shell.setComparing(true)
-    },
-    onFilterThreads: shell.askFocusFilter,
-  })
+  const app = useApp()
+  const { shell, prefs, state, thread } = app
 
   const sidebar = (
     <SidebarPane
-      rows={rows}
+      rows={app.rows}
       thread={thread}
       focusFilter={shell.focusFilter}
       onSelect={shell.select}
-      onNew={() => {
-        if (thread === undefined) openPicker()
-        else open(thread.cwd)
+      onNew={app.newHere}
+      onNewIn={app.open}
+      onOpenFolder={app.openPicker}
+      onReveal={app.reveal}
+      onCopy={app.copy}
+      pinned={prefs.settings.pinned}
+      onTogglePin={prefs.togglePin}
+      onOpenSettings={() => {
+        shell.setSettingsOpen(true)
       }}
-      onNewIn={open}
-      onOpenFolder={openPicker}
-      onReveal={reveal}
-      onCopy={copy}
-      send={send}
+      send={app.send}
     />
   )
+
+  const settings = shell.settingsOpen ? (
+    <SettingsScreen
+      prefs={prefs}
+      engines={state.engines}
+      onReveal={app.reveal}
+      onCopy={app.copy}
+      onClose={() => {
+        shell.setSettingsOpen(false)
+      }}
+    />
+  ) : null
 
   if (thread === undefined) {
     return (
       <div className="shell">
         {sidebar}
-        <EmptyScreen notices={notices} onDismiss={shell.dismiss} bridgeMissing={bridgeMissing} />
+        <EmptyScreen notices={app.notices} onDismiss={shell.dismiss} bridgeMissing={app.bridgeMissing} />
+        {settings}
       </div>
     )
   }
@@ -69,7 +66,7 @@ export function App(): React.JSX.Element {
           state={state}
           thread={thread}
           peer={peer}
-          onCopy={copy}
+          onCopy={app.copy}
           onPick={(id) => {
             shell.select(id)
             shell.setComparing(false)
@@ -77,8 +74,9 @@ export function App(): React.JSX.Element {
           onClose={() => {
             shell.setComparing(false)
           }}
-          send={send}
+          send={app.send}
         />
+        {settings}
       </div>
     )
   }
@@ -92,23 +90,24 @@ export function App(): React.JSX.Element {
         onCompare={() => {
           shell.setComparing(true)
         }}
-        items={itemsOf(state, thread.id)}
+        items={app.itemsOf(thread.id)}
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}
         models={modelsOf(state, thread.id)}
         engines={state.engines}
-        notices={notices}
+        notices={app.notices}
         onDismiss={shell.dismiss}
         finding={shell.finding}
-        onFind={find}
+        onFind={app.find}
         onCloseFind={() => {
           shell.setFinding(false)
-          stopFind()
+          app.stopFind()
         }}
-        onCopy={copy}
-        searchFiles={searchFiles}
-        send={send}
+        onCopy={app.copy}
+        searchFiles={app.searchFiles}
+        send={app.send}
       />
+      {settings}
     </div>
   )
 }

@@ -18,6 +18,8 @@ export interface Shell {
   setFinding: (on: boolean) => void
   comparing: boolean
   setComparing: (on: boolean) => void
+  settingsOpen: boolean
+  setSettingsOpen: (on: boolean) => void
   /**
    * 焦点信号。
    *
@@ -33,6 +35,7 @@ export function useShell(): Shell {
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
   const [finding, setFinding] = useState(false)
   const [comparing, setComparing] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [focusFilter, setFocusFilter] = useState(0)
   return {
     selectedId,
@@ -43,6 +46,8 @@ export function useShell(): Shell {
     setFinding,
     comparing,
     setComparing,
+    settingsOpen,
+    setSettingsOpen,
     focusFilter,
     askFocusFilter: () => {
       setFocusFilter((n) => n + 1)

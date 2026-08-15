@@ -153,6 +153,24 @@ export function applyDevTheme(): void {
   nativeTheme.themeSource = want
 }
 
+/** 到点在渲染层跑一段 JS，把结果打进日志。排查用，平时不开。 */
+export function scheduleDevProbe(win: BrowserWindow, log: (message: string) => void): void {
+  const code = process.env["OMNI_DEV_PROBE"]
+  if (code === undefined || code === "") return
+  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 3000
+  setTimeout(() => {
+    if (win.isDestroyed()) return
+    void win.webContents
+      .executeJavaScript(code)
+      .then((value: unknown) => {
+        log(`probe: ${JSON.stringify(value)}`)
+      })
+      .catch((error: unknown) => {
+        log(`probe 失败：${String(error)}`)
+      })
+  }, Math.max(0, delay))
+}
+
 /**
  * 到点在侧栏第 N 行上右键。
  *

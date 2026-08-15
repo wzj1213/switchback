@@ -152,3 +152,21 @@ export function ForkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
     </Svg>
   )
 }
+
+export function GearIcon(): React.JSX.Element {
+  return (
+    <Svg>
+      <circle cx="8" cy="8" r="2.15" {...LINE} />
+      <path d="M8 2.2v1.4M8 12.4v1.4M13.8 8h-1.4M3.6 8H2.2M12.1 3.9l-1 1M4.9 11.1l-1 1M12.1 12.1l-1-1M4.9 4.9l-1-1" {...LINE} />
+    </Svg>
+  )
+}
+
+export function PinIcon({ size = 13 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M9.5 2.5 13.5 6.5l-2 .6-3 3-.4 2.4-4.6-4.6 2.4-.4 3-3z" {...LINE} />
+      <path d="M3.5 12.5 6 10" {...LINE} />
+    </Svg>
+  )
+}

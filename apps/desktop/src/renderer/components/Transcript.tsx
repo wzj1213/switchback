@@ -17,7 +17,7 @@ function Blank({ thread }: { thread: Thread }): React.JSX.Element {
   return (
     <div className="blank">
       <div className="blank__glyph" aria-hidden="true">
-        <svg width="30" height="30" viewBox="0 0 16 16" fill="none">
+        <svg width="34" height="34" viewBox="0 0 16 16" fill="none">
           <path
             d="M3.5 4.5 6 8l-2.5 3.5M8 11.5h4.5"
             stroke="currentColor"

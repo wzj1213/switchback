@@ -25,12 +25,18 @@ const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批"
 export function Row({
   row,
   selected,
+  flat = false,
+  aside,
   onSelect,
   onDelete,
   onMenu,
 }: {
   row: ThreadRow
   selected: boolean
+  /** 不在项目组里（筛选结果、最近段）：不缩进那一级。 */
+  flat?: boolean
+  /** 右侧的一小段附注。「最近」段用它写项目名——那一段是跨项目的。 */
+  aside?: string
   onSelect: () => void
   onDelete: () => void
   /** 右键或点 `···`。`arm` 让菜单能把这一行切进删除确认态。 */
@@ -45,7 +51,7 @@ export function Row({
   }
   return (
     <div
-      className={`row row--thread${selected ? " row--selected" : ""}`}
+      className={`row row--thread${flat ? " row--flat" : ""}${selected ? " row--selected" : ""}`}
       title={thread.cwd}
       onContextMenu={(e) => {
         onMenu(e, arm)
@@ -56,6 +62,7 @@ export function Row({
           <span className={`row__dot${DOT_CLASS[thread.status]}`} />
         </span>
         <span className="row__label">{rowLabelOf(row)}</span>
+        {aside === undefined ? null : <span className="row__aside">{aside}</span>}
         {NOTE[thread.status] === undefined ? null : <span className="row__note">{NOTE[thread.status]}</span>}
       </button>
       {confirming ? (

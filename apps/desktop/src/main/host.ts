@@ -289,6 +289,16 @@ export function replayEvents(
   // 反着喂：归约器往前插，所以最旧的先进去，最新的才会落在侧栏顶上
   for (const thread of [...threads].reverse()) {
     if (thread.events.length === 0) continue
+    // **一句话都没说过的会话不算历史。**
+    //
+    // omni 每次启动都会开一个默认会话，用不用它是另一回事——于是每启动一次
+    // 侧栏就多一行「新会话」。跑一周下来那一列全是空壳，把真正的历史挤没了。
+    //
+    // 这种会话也确实没有可续的东西：续跑要靠引擎侧的句柄接上一段对话，
+    // 而它压根没有对话。活着的那个例外——它正开着，用户随时会在里面打字。
+    if (alive.get(thread.id) === undefined && !thread.events.some((e) => e.type === "item.started" && e.item.kind === "user_message")) {
+      continue
+    }
     events.push(...thread.events)
     const live = alive.get(thread.id)
     if (live !== undefined) {
