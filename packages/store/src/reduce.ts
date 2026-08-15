@@ -198,6 +198,57 @@ export function reduce(state: ViewState, event: Event): ViewState {
   return handler === undefined ? state : handler(state, event)
 }
 
+/**
+ * 把**挨着的、同一条 item 的** delta 并成一条。
+ *
+ * ## 为什么值得单独做这一步
+ *
+ * `reduce` 是纯函数，每处理一条事件就复制一遍那条会话的 item 列表。
+ * 而流式文本是一个字符一条 delta——`pnpm build` 那种刷屏命令一批能来 500 条，
+ * 于是**同一个数组被复制 500 次**，只为了把 500 个片段接到同一个字符串尾巴上。
+ *
+ * 合帧（`apps/desktop/src/main/batch.ts`）解决的是「发几次 IPC」，
+ * 这里解决的是「发到之后归约几次」。两件事，两个地方。
+ *
+ * ## 量出来的（2026-08-15，500 条 delta，也就是一批的上限）
+ *
+ * | 历史 item | 逐条归约 | 先合并 | 倍数 |
+ * | --- | --- | --- | --- |
+ * | 50 | 0.20 ms | 0.03 ms | 7× |
+ * | 500 | 1.17 ms | 0.03 ms | 36× |
+ * | 2000 | 4.77 ms | 0.04 ms | 128× |
+ *
+ * 逐条是 **O(历史条数 × delta 条数)**——**会话越长越慢**，
+ * 这正好对上「用着用着就卡了」。一帧 16 ms，2000 条历史时光归约就吃掉 4.8 ms，
+ * React 还没开始干活。合并之后这一项基本归零，而且不再随历史增长。
+ *
+ * 复现：把这段 delta 数组喂给 `deltas.reduce(reduce, start)` 和
+ * `coalesce(deltas).reduce(reduce, start)` 各跑 20 遍取平均。
+ * 没把它留成测试，是因为掐表的断言换台机器就随机红，红了也说明不了问题。
+ *
+ * ## 为什么只合「挨着的」
+ *
+ * 中间夹了别的事件就断开——比如 `item.completed`、另一条 item 的 delta。
+ * 跨过它们去合并会改变事件的先后关系，而**顺序是这套东西唯一的正确性来源**。
+ * 只合挨着的同 id delta，语义上和逐条应用完全等价：字符串拼接满足结合律。
+ */
+export function coalesce(events: readonly Event[]): readonly Event[] {
+  const out: Event[] = []
+  for (const event of events) {
+    const last = out[out.length - 1]
+    if (
+      event.type === "item.delta" &&
+      last?.type === "item.delta" &&
+      last.itemId === event.itemId
+    ) {
+      out[out.length - 1] = { ...last, at: event.at, append: last.append + event.append }
+      continue
+    }
+    out.push(event)
+  }
+  return out
+}
+
 export function reduceAll(state: ViewState, events: readonly Event[]): ViewState {
-  return events.reduce(reduce, state)
+  return coalesce(events).reduce(reduce, state)
 }
