@@ -91,6 +91,11 @@ feed 地址填在 `apps/desktop/package.json` 的 `omni.updateFeed`
 - **打出来的包仍然没有签名**：本机只有一个自签且 `CSSMERR_TP_NOT_TRUSTED` 的证书，
   electron-builder 会拒绝用它，于是照旧 skip 签名。上面那段配置只有在
   `CSC_NAME` 指向一个真证书时才生效。首次打开仍需在「隐私与安全性」里放行。
+- **Linux / Windows 打得出包，但那个包里的 Claude 引擎起不来。** 实测打 Linux
+  tar.gz 时 electron-builder 明确警告：`@anthropic-ai/claude-agent-sdk-linux-*`
+  这些平台二进制是 optionalDependencies，pnpm 10+ 不会替别的平台装，
+  于是**没被打进产物**。要真支持得先把它们加进 optionalDependencies 再在真机上验。
+  这是「跨平台」目前最硬的一块，不是「没试过」而是**试过、知道缺什么**。
 - **只在 macOS 上验过。** 平台差异收在 `@omni/engine` 的 `platform.ts` 一处：
   查命令（`which` / `where.exe`）与进程树回收（负 pid 信号 / `taskkill /T /F`）。
   Windows 那几支**没有在真机上跑过**——写它们是因为原来的实现在 Windows 上

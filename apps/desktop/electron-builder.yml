@@ -52,8 +52,37 @@ mac:
   # 代价是没有证书时它会警告一行「skipped code signing」——那句话是真的，
   # 让它说出来比用 `identity: null` 捂住好。
 
+# 产物文件名。**必须显式写。**
+#
+# 不写的话 Linux / Windows 那边会用 package.json 的 `name`，
+# 而这个包叫 `@omni/desktop`——于是产物落在 `release/@omni/desktop-0.0.0.tar.gz`，
+# 那个 `@omni` 变成了一级目录。实测踩到的。
+artifactName: ${productName}-${version}-${arch}.${ext}
+
 dmg:
   title: omni ${version}
+
+# ── 以下两个平台：配置写好了，但**没有在真机上跑过** ──────────────
+#
+# 不进默认的 `pnpm dist`（那条只打 mac），要用得显式说：
+#   pnpm --filter @omni/desktop exec electron-builder --linux
+#   pnpm --filter @omni/desktop exec electron-builder --win
+#
+# **已知会缺一块**：Claude Agent SDK 的平台二进制是 optionalDependencies，
+# pnpm 10+ 不会自动装别的平台那几个。实测打 Linux 包时 electron-builder
+# 明确警告 `@anthropic-ai/claude-agent-sdk-linux-*` 没被打进去——
+# 也就是说**那个包里的 Claude 引擎根本起不来**。
+# 要真支持，得先把对应平台的那几个加进 optionalDependencies 并在真机上验一遍。
+linux:
+  category: Development
+  icon: build/icon.icns
+  target:
+    - tar.gz
+    - AppImage
+
+win:
+  target:
+    - zip
 
 # 公证。**没有凭据时整段跳过**——`notarize: false` 是默认值，
 # 只有 CI 上带齐 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID
