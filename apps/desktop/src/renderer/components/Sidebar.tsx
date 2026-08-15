@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { filterRows } from "../filter.js"
 import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 
@@ -40,6 +41,13 @@ interface Props {
   onOpenFolder: () => void
   /** 删除会话。**不可撤销**，所以由行内二次确认把关。 */
   onDelete: (id: string) => void
+  /**
+   * 变一次就把焦点送进筛选框。
+   *
+   * 传的是**次数不是布尔**：连按两次 ⌘K 应该两次都聚焦，
+   * 布尔在第二次不会变化，于是第二下没反应——这类「偶尔失灵」最难查。
+   */
+  focusFilter: number
 }
 
 function Row({
@@ -89,7 +97,21 @@ function Row({
   )
 }
 
-export function Sidebar({ rows, selectedId, onSelect, onNew, onOpenFolder, onDelete }: Props): React.JSX.Element {
+export function Sidebar({
+  rows,
+  selectedId,
+  onSelect,
+  onNew,
+  onOpenFolder,
+  onDelete,
+  focusFilter,
+}: Props): React.JSX.Element {
+  const [query, setQuery] = useState("")
+  const box = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (focusFilter > 0) box.current?.select()
+  }, [focusFilter])
+  const shown = filterRows(rows, query)
   return (
     <aside className="sidebar">
       <div className="sidebar__head">
@@ -111,9 +133,32 @@ export function Sidebar({ rows, selectedId, onSelect, onNew, onOpenFolder, onDel
           <FolderIcon />
         </button>
       </div>
-      <div className="sidebar__group">会话</div>
+      <input
+        className="sidebar__filter"
+        ref={box}
+        type="search"
+        value={query}
+        placeholder="筛选会话…（⌘K）"
+        aria-label="筛选会话"
+        onChange={(e) => {
+          setQuery(e.target.value)
+        }}
+        onKeyDown={(e) => {
+          // Esc 清空而不是失焦：清空之后列表立刻全回来，
+          // 这是「我搜错了」时想要的那个动作
+          if (e.key === "Escape") setQuery("")
+        }}
+      />
+      <div className="sidebar__group">
+        会话
+        {query === "" ? null : <span className="sidebar__count">{shown.length}/{rows.length}</span>}
+      </div>
       <div className="sidebar__list">
-        {rows.map((row) => (
+        {query !== "" && shown.length === 0 ? (
+          // 空列表什么都不说的话，看起来像「会话全没了」
+          <p className="sidebar__empty">没有匹配的会话。</p>
+        ) : null}
+        {shown.map((row) => (
           <Row
             key={row.thread.id}
             row={row}

@@ -16,6 +16,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
  * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
  * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
+ * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -99,6 +100,26 @@ export function scheduleDevReload(win: BrowserWindow): void {
   setTimeout(() => {
     if (!win.isDestroyed()) win.webContents.reload()
   }, at)
+}
+
+/**
+ * 到点把焦点送进侧栏筛选框并打一段字。
+ *
+ * 用 `insertText` 而不是模拟按键：它插进**当前获得焦点的可编辑元素**，
+ * 所以这一条同时验了两件事——⌘K 有没有把焦点送对地方、筛选有没有生效。
+ * 焦点没落在筛选框上的话，字会一个都进不去（或者跑进输入框里），一眼看得出来。
+ */
+export function scheduleDevFilter(win: BrowserWindow): void {
+  const text = process.env["OMNI_DEV_FILTER"]
+  if (text === undefined || text === "") return
+  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 3000
+  setTimeout(() => {
+    if (win.isDestroyed()) return
+    win.webContents.send("omni:menu", "filter-threads")
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.webContents.insertText(text)
+    }, 400)
+  }, Math.max(0, delay))
 }
 
 /** 到点打开对比视图。和查找、中断一样，走的是**菜单同一条通道**，验的是真链路。 */

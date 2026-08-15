@@ -86,6 +86,43 @@ body {
   width: 30px;
 }
 
+/* 筛选框。会话只增不减，用真了两周就得靠它找东西——见 renderer/filter.ts */
+.sidebar__filter {
+  margin: var(--sp-2) var(--sp-2) 0;
+  padding: 5px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  /* Safari 的 search 输入自带一个和这套界面不搭的圆角与内阴影 */
+  appearance: none;
+}
+
+.sidebar__filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sidebar__filter::placeholder {
+  color: var(--text-faint);
+}
+
+.sidebar__count {
+  margin-left: var(--sp-2);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sidebar__empty {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+}
+
 .sidebar__group {
   padding: var(--sp-3) var(--sp-2) var(--sp-1);
   font-size: var(--text-xs);

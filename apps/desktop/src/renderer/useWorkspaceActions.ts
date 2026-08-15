@@ -28,6 +28,7 @@ export function useWorkspaceActions(deps: {
   onSelect: (id: string | undefined) => void
   onFind: () => void
   onCompare: () => void
+  onFilterThreads: () => void
 }): WorkspaceActions {
   const { state, thread, send } = deps
 
@@ -62,6 +63,7 @@ export function useWorkspaceActions(deps: {
       },
       find: deps.onFind,
       compare: deps.onCompare,
+      filterThreads: deps.onFilterThreads,
       copyMarkdown: () => {
         if (thread === undefined) return
         deps.copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine)))

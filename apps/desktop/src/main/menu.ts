@@ -6,7 +6,7 @@ import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOpti
  * 新建会话、打开文件夹这些要落到当前选中的会话上下文里，主进程不知道那是什么。
  * 所以菜单只发一个意图，怎么做由渲染层决定。
  */
-export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown" | "compare"
+export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown" | "compare" | "filter-threads"
 
 const isMac = process.platform === "darwin"
 
@@ -35,6 +35,13 @@ function fileMenu(onEngines: () => void): MenuItemConstructorOptions {
         accelerator: "CmdOrCtrl+N",
         click: (_i, focused) => {
           send("new-thread", focused)
+        },
+      },
+      {
+        label: "筛选会话",
+        accelerator: "CmdOrCtrl+K",
+        click: (_i, focused) => {
+          send("filter-threads", focused)
         },
       },
       {
