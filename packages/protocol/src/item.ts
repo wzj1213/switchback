@@ -38,7 +38,13 @@ export interface ReasoningItem extends ItemBase {
   complete: boolean
 }
 
-export type ToolStatus = "pending" | "running" | "ok" | "failed" | "denied"
+/**
+ * `interrupted` 是必需的一档，不是锦上添花。
+ *
+ * 轮次被中断时，在途的工具调用既没成功也没失败，更不是被拒——
+ * 没有这一档就只能把它留在 `running`，于是界面上出现一条**永远转下去**的工具行。
+ */
+export type ToolStatus = "pending" | "running" | "ok" | "failed" | "denied" | "interrupted"
 
 export type FileChangeKind = "add" | "delete" | "update"
 

@@ -4,7 +4,7 @@ import { attachHost, replayHistory, seedDefaultThread } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import { devPrompt, scheduleDevFind, scheduleDevShot } from "./devtools.js"
+import { devPrompt, scheduleDevFind, scheduleDevInterrupt, scheduleDevShot } from "./devtools.js"
 
 /**
  * Electron 主进程。
@@ -83,6 +83,7 @@ void app.whenReady().then(async () => {
       .catch(() => undefined)
       .then((recent) => seedDefaultThread(attached, process.cwd(), devPrompt(), recent))
     scheduleDevFind(win)
+    scheduleDevInterrupt(win)
     scheduleDevShot(win)
   })
   app.on("before-quit", () => {

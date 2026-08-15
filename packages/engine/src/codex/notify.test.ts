@@ -170,3 +170,47 @@ describe("用量", () => {
     expect(events).toHaveLength(1)
   })
 })
+
+describe("轮次异常收工时清扫在途工具", () => {
+  const exec: WireItem = { type: "commandExecution", id: "e1", command: "sleep 40", status: "inProgress" }
+
+  const withRunning = (): ReturnType<typeof setup> => {
+    const h = setup()
+    handleNotification(h.ctx, "item/started", lifecycle(exec))
+    h.events.length = 0
+    return h
+  }
+
+  it("中断时把在途工具收成 interrupted——不扫的话它永远停在 running", () => {
+    const { ctx, events } = withRunning()
+    handleNotification(ctx, "turn/completed", { threadId: "c", turn: { id: "t", status: "interrupted" } })
+    expect(events[0]).toMatchObject({ type: "item.updated", item: { id: "e1", status: "interrupted" } })
+    expect(events[1]).toMatchObject({ type: "turn.completed", status: "interrupted" })
+  })
+
+  it("失败时收成 failed", () => {
+    const { ctx, events } = withRunning()
+    handleNotification(ctx, "turn/completed", { threadId: "c", turn: { id: "t", status: "failed" } })
+    expect(events[0]).toMatchObject({ item: { status: "failed" } })
+  })
+
+  it("正常收工不扫——那时候每条工具都已经有自己的 item/completed 了", () => {
+    const { ctx, events } = withRunning()
+    handleNotification(ctx, "turn/completed", { threadId: "c", turn: { id: "t", status: "completed" } })
+    expect(events).toHaveLength(1)
+    expect(events[0]?.type).toBe("turn.completed")
+  })
+
+  it("没落地过的 item 不补事件——补了就凭空多一条界面上从来没出现过的工具行", () => {
+    const { ctx, events } = setup()
+    ctx.inflight.set("ghost", exec)
+    handleNotification(ctx, "turn/completed", { threadId: "c", turn: { id: "t", status: "interrupted" } })
+    expect(events).toHaveLength(1)
+  })
+
+  it("扫完清空在途表，下一轮不会重复收尾", () => {
+    const { ctx } = withRunning()
+    handleNotification(ctx, "turn/completed", { threadId: "c", turn: { id: "t", status: "interrupted" } })
+    expect(ctx.inflight.size).toBe(0)
+  })
+})

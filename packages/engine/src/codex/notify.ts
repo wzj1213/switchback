@@ -1,4 +1,4 @@
-import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ItemId, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
 import type {
   WireDelta,
@@ -119,15 +119,39 @@ function onUsage(ctx: NotifyContext, params: WireTokenUsage): void {
   })
 }
 
+/**
+ * 轮次收工时清扫还挂着的工具调用。
+ *
+ * **中断时 codex 不会给在途的 `commandExecution` 补一条 `item/completed`。**
+ * 不扫的话那条工具行永远停在 `running`——界面上是一个转到天荒地老的状态，
+ * 而实际上进程早就被杀了。实测中断一条 40 秒的循环命令时现形。
+ *
+ * 收尾状态跟着轮次走：被中断就是 `interrupted`，失败就是 `failed`。
+ * 一律写成 `failed` 会让「你自己按了停止」看起来像「它出错了」。
+ */
+function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnStatus): void {
+  if (status === "completed") return
+  const ending: ToolStatus = status === "interrupted" ? "interrupted" : "failed"
+  for (const [id, item] of ctx.inflight) {
+    if (!ctx.materialized.has(id)) continue
+    const omni = itemToOmni(item, { turnId, at: ctx.now() }, true)
+    if (omni?.kind !== "tool_call") continue
+    ctx.emit({ type: "item.updated", at: ctx.now(), item: { ...omni, status: ending } })
+  }
+  ctx.inflight.clear()
+}
+
 function onTurnCompleted(ctx: NotifyContext, params: WireTurnLifecycle): void {
   const turnId = ctx.turnId()
   if (turnId === undefined) return
   const message = params.turn.error?.message
+  const status = turnStatus(params.turn.status)
+  sweepInflight(ctx, turnId, status)
   ctx.emit({
     type: "turn.completed",
     at: ctx.now(),
     turnId,
-    status: turnStatus(params.turn.status),
+    status,
     ...(message === undefined ? {} : { error: message }),
   })
 }

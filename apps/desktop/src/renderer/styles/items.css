@@ -108,6 +108,11 @@
 }
 
 .step__state--failed,
+/* 中断不是失败：用中性色，别让「你自己按了停止」看着像出错 */
+.step__state--interrupted {
+  color: var(--text-faint);
+}
+
 .step__state--denied {
   color: var(--danger);
 }

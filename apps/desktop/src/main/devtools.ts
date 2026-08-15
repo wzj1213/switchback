@@ -12,6 +12,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
  * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
+ * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -57,6 +58,15 @@ export function scheduleDevFind(win: BrowserWindow): void {
       if (!win.isDestroyed()) win.webContents.send("omni:devFind", query)
     }, 300)
   }, Math.max(0, delay))
+}
+
+/** 到点自动中断。中断只能靠点按钮或按快捷键触发，自动化验证需要一个口子。 */
+export function scheduleDevInterrupt(win: BrowserWindow): void {
+  const at = Number(process.env["OMNI_DEV_INTERRUPT"] ?? "0")
+  if (!Number.isFinite(at) || at <= 0) return
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.send("omni:menu", "interrupt")
+  }, at)
 }
 
 export function scheduleDevShot(win: BrowserWindow): void {

@@ -1,5 +1,5 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
-import type { Event, ItemId, ToolCallItem, TurnId } from "@omni/protocol"
+import type { Event, ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 
@@ -92,6 +92,21 @@ function onToolResults(msg: RawMessage, ref: TurnRef, req: StartRequest, at: num
   }
 }
 
+/**
+ * 轮次收工时清扫还挂着的工具调用。
+ *
+ * 中断或出错时不会再有 `tool_result` 回来，那条工具行就**永远停在 `running`**。
+ * codex 驱动上踩到过一模一样的坑，两边都要扫。
+ */
+function sweepTools(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus): void {
+  if (status === "completed") return
+  const ending = status === "interrupted" ? "interrupted" : "failed"
+  for (const item of ref.tools.values()) {
+    req.emit({ type: "item.updated", at, item: { ...item, status: ending } })
+  }
+  ref.tools.clear()
+}
+
 function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
   const turnId = ref.current
   ref.current = undefined
@@ -99,12 +114,9 @@ function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
     req.emit({ type: "usage.updated", at, threadId: req.threadId, usage: usageOf(msg.usage) })
   }
   if (turnId === undefined) return
-  req.emit({
-    type: "turn.completed",
-    at,
-    turnId,
-    status: turnStatus(msg.subtype ?? "", msg.is_error === true),
-  })
+  const status = turnStatus(msg.subtype ?? "", msg.is_error === true)
+  sweepTools(ref, req, at, status)
+  req.emit({ type: "turn.completed", at, turnId, status })
 }
 
 function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
