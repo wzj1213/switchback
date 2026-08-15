@@ -519,8 +519,8 @@ describe("审批记忆", () => {
   })
 })
 
-describe("跨引擎接力", () => {
-  const setupTwo = (): { host: Host; events: Event[]; sessions: Fake[]; stored: Event[] } => {
+/** 两家引擎的宿主。接力与分叉两节共用。 */
+const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; stored: Event[] } => {
     const stored: Event[] = []
     const sessions: Fake[] = []
     const driver = (id: string): EngineDriver => ({
@@ -574,8 +574,11 @@ describe("跨引擎接力", () => {
         remove: () => Promise.resolve(),
       },
     })
-    return { host, events, sessions, stored }
-  }
+  return { host, events, sessions, stored }
+}
+
+describe("跨引擎接力", () => {
+  const setupTwo = setupTwoEngines
 
   const handoffTo = async (
     host: Host,
@@ -633,5 +636,53 @@ describe("跨引擎接力", () => {
     await handoffTo(host, events, "fake")
     expect(sessions).toHaveLength(1)
     expect(sessions[0]?.disposed).toBe(false)
+  })
+})
+
+describe("L3 分叉", () => {
+  it("原会话不停——这是分叉和接力唯一的区别", async () => {
+    const { host, events, sessions } = setupTwoEngines()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
+    await host.dispatch({ type: "thread.fork", threadId, to: "other" })
+    expect(sessions[0]?.disposed).toBe(false)
+    expect(sessions).toHaveLength(2)
+  })
+
+  it("新会话是新 id、新引擎历史——不是同一个会话换了家", async () => {
+    const { host, events } = setupTwoEngines()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "目标" })
+    await host.dispatch({ type: "thread.fork", threadId, to: "other" })
+    const started = events.filter((e) => e.type === "thread.started")
+    expect(started).toHaveLength(2)
+    const forked = started[1]?.type === "thread.started" ? started[1].thread : undefined
+    expect(forked?.id).not.toBe(threadId)
+    expect(forked?.engineHistory).toEqual(["other"])
+  })
+
+  it("只交目标，**不带「已改动的文件」**——那会让第二家以为活干了一半", async () => {
+    const { host, events, sessions } = setupTwoEngines()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
+    await host.dispatch({ type: "thread.fork", threadId, to: "other" })
+    const first = sessions[1]?.prompts[0]?.text ?? ""
+    expect(first).toContain("把 X 改成 Y")
+    expect(first).not.toContain("已改动的文件")
+    expect(first).not.toContain("接手")
+  })
+
+  it("标题带上引擎名，否则侧栏里两个会话长得一模一样", async () => {
+    const { host, events } = setupTwoEngines()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "目标" })
+    await host.dispatch({ type: "thread.fork", threadId, to: "other" })
+    const started = events.filter((e) => e.type === "thread.started")
+    const forked = started[1]?.type === "thread.started" ? started[1].thread : undefined
+    expect(forked?.title).toContain("other")
   })
 })

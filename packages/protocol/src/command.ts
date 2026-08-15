@@ -11,6 +11,11 @@ export type Command =
   | { type: "thread.resume"; threadId: ThreadId }
   /** 关掉会话并把它的记录从磁盘上删掉。**不可撤销**，界面必须二次确认。 */
   | { type: "thread.delete"; threadId: ThreadId }
+  /**
+   * L3 分叉：把同一个目标交给另一家引擎**另起一个会话**跑一遍。
+   * 与接力（L2）的区别是原会话**继续存在**，两边可以对着看。
+   */
+  | { type: "thread.fork"; threadId: ThreadId; to: EngineId }
   /** 换模型 / 改推理强度。`effort` 只对报了 `efforts` 的引擎有意义。 */
   | { type: "thread.setModel"; threadId: ThreadId; model: string; effort?: string }
   /** L2 接力：换引擎继续同一个 thread，宿主负责生成交接包。 */

@@ -568,3 +568,18 @@ body {
   color: var(--text-faint);
   font-size: var(--text-xs);
 }
+
+/* 顶栏上可点的那枚 pill（分叉）。默认淡，悬停才实——它不是常用操作 */
+.pill--action {
+  border-style: solid;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+}
+
+.pill--action:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}

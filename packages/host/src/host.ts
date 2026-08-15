@@ -4,6 +4,7 @@ import { type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import {
   create,
+  fork,
   handoff,
   prompt,
   remove,
@@ -26,28 +27,37 @@ export interface Host {
   dispose: () => Promise<void>
 }
 
+/**
+ * 命令 → 处理函数。
+ *
+ * 和归约器同一个做法：**由联合类型映射出来的表**，漏接一种命令编译不过。
+ * switch 的 `default` 会把漏接藏成「点了没反应」，那是最难查的一类故障。
+ */
+type Handlers = {
+  [K in Command["type"]]: (ctx: Ctx, command: Extract<Command, { type: K }>) => Promise<void>
+}
+
+const HANDLERS: Handlers = {
+  "thread.create": create,
+  "thread.prompt": prompt,
+  "thread.setTrust": setTrust,
+  "thread.setModel": setModel,
+  "thread.resume": resume,
+  "thread.delete": remove,
+  "thread.handoff": handoff,
+  "thread.fork": fork,
+  "thread.interrupt": async (ctx, command) => {
+    await ctx.live.get(command.threadId)?.session.interrupt()
+  },
+  "approval.resolve": (ctx, command) => {
+    resolveApproval(ctx, command)
+    return Promise.resolve()
+  },
+}
+
 async function dispatch(ctx: Ctx, command: Command): Promise<void> {
-  switch (command.type) {
-    case "thread.create":
-      return create(ctx, command)
-    case "thread.prompt":
-      return prompt(ctx, command)
-    case "thread.setTrust":
-      return setTrust(ctx, command)
-    case "thread.resume":
-      return resume(ctx, command)
-    case "thread.delete":
-      return remove(ctx, command)
-    case "thread.setModel":
-      return setModel(ctx, command)
-    case "thread.handoff":
-      return handoff(ctx, command)
-    case "thread.interrupt":
-      return ctx.live.get(command.threadId)?.session.interrupt() ?? Promise.resolve()
-    case "approval.resolve":
-      resolveApproval(ctx, command)
-      return Promise.resolve()
-  }
+  const handler = HANDLERS[command.type] as (ctx: Ctx, command: Command) => Promise<void>
+  await handler(ctx, command)
 }
 
 async function dispose(ctx: Ctx): Promise<void> {

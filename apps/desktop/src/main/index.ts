@@ -7,7 +7,7 @@ import { loadBounds, trackBounds } from "./window-state.js"
 import {
   devPrompt,
   scheduleDevFind,
-  scheduleDevHandoff,
+  scheduleDevSwitch,
   scheduleDevInterrupt,
   scheduleDevShot,
 } from "./devtools.js"
@@ -92,15 +92,14 @@ void app.whenReady().then(async () => {
       .then((recent) => seedDefaultThread(attached, process.cwd(), devPrompt(), recent))
     scheduleDevFind(win)
     scheduleDevInterrupt(win)
-    scheduleDevHandoff(win, (to) => {
+    scheduleDevSwitch(win, (kind, to) => {
       const threadId = attached.lastThreadId()
-      if (threadId !== undefined) {
-        void attached.host
-          .dispatch({ type: "thread.handoff", threadId, to })
-          .catch((error: unknown) => {
-            attached.report(error, threadId)
-          })
-      }
+      if (threadId === undefined) return
+      void attached.host
+        .dispatch(kind === "fork" ? { type: "thread.fork", threadId, to } : { type: "thread.handoff", threadId, to })
+        .catch((error: unknown) => {
+          attached.report(error, threadId)
+        })
     })
     scheduleDevShot(win)
   })

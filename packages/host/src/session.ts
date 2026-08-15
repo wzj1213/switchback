@@ -181,6 +181,51 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
 }
 
 /**
+ * L3 分叉：同一个目标，换一家再跑一遍。
+ *
+ * 和接力（L2）**只差一件事**：原会话不停。所以代码上也只差一件事——
+ * 不 dispose 旧的、不复用旧的 thread id。
+ *
+ * 交的还是那份交接包，但语义不同：接力是「接着做」，分叉是「你也做一遍」。
+ * 所以只取**目标**，不带「已改动的文件」——那会让第二家以为活已经干了一半。
+ */
+export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork" }>): Promise<void> {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
+
+  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
+  const packet = buildHandoff(entry.thread, itemsOf(reduceAll(initial(), events), cmd.threadId))
+
+  const at = ctx.deps.now()
+  const thread: Thread = {
+    ...entry.thread,
+    id: ctx.deps.newId("th"),
+    engine: cmd.to,
+    engineHistory: [cmd.to],
+    engineHandle: undefined,
+    model: undefined,
+    effort: undefined,
+    // 标题带上引擎名，否则侧栏里两个会话长得一模一样
+    title: `${entry.thread.title}（${cmd.to}）`,
+    detached: false,
+    status: "idle",
+    createdAt: at,
+    updatedAt: at,
+  }
+  const early = await launch(ctx, thread)
+  emit(ctx, { type: "thread.started", at, thread })
+  if (early !== undefined) rememberHandle(ctx, thread.id, early)
+
+  const asks = packet.asks.length === 0 ? "" : `\n\n过程中追加过的要求：\n${packet.asks.map((a) => `- ${a}`).join("\n")}`
+  await prompt(ctx, {
+    type: "thread.prompt",
+    threadId: thread.id,
+    text: `${packet.goal}${asks}`,
+  })
+}
+
+/**
  * 关掉会话并把记录从磁盘上删掉。
  *
  * 顺序是有讲究的：**先落定挂着的审批，再 dispose，最后才删文件**。

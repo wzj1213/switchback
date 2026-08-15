@@ -13,7 +13,8 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
  * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
- * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话接力给这家 |
+ * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
+ * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -70,16 +71,24 @@ export function scheduleDevInterrupt(win: BrowserWindow): void {
   }, at)
 }
 
-/** 到点自动接力。接力只能靠点下拉触发，自动化验证需要一个口子。 */
-export function scheduleDevHandoff(win: BrowserWindow, run: (to: string) => void): void {
-  const spec = process.env["OMNI_DEV_HANDOFF"]
-  if (spec === undefined || spec === "") return
-  const [msText, to] = spec.split(":")
-  const at = Number(msText)
-  if (!Number.isFinite(at) || to === undefined || to === "") return
-  setTimeout(() => {
-    if (!win.isDestroyed()) run(to)
-  }, at)
+/** 到点自动接力或分叉。这两个动作只能靠点界面触发，自动化验证需要一个口子。 */
+export function scheduleDevSwitch(
+  win: BrowserWindow,
+  run: (kind: "handoff" | "fork", to: string) => void,
+): void {
+  for (const [key, kind] of [
+    ["OMNI_DEV_HANDOFF", "handoff"],
+    ["OMNI_DEV_FORK", "fork"],
+  ] as const) {
+    const spec = process.env[key]
+    if (spec === undefined || spec === "") continue
+    const [msText, to] = spec.split(":")
+    const at = Number(msText)
+    if (!Number.isFinite(at) || to === undefined || to === "") continue
+    setTimeout(() => {
+      if (!win.isDestroyed()) run(kind, to)
+    }, at)
+  }
 }
 
 export function scheduleDevShot(win: BrowserWindow): void {
