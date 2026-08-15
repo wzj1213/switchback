@@ -4,7 +4,7 @@ import type { Command, Event } from "@omni/protocol"
 /**
  * 渲染层与主进程之间**唯一**的通道：
  *   send(Command)  —— 渲染层请求做事
- *   subscribe(cb)  —— 主进程推事件
+ *   subscribe(cb)  —— 主进程推事件（**成批**，见 main/batch.ts）
  *   pickFolder()   —— 借主进程弹一次系统目录选择框
  *   onMenu(cb)     —— 菜单里那些只有渲染层做得到的动作
  *   find/stopFind  —— 借 Chromium 原生的页内查找
@@ -53,13 +53,13 @@ const api = {
       ipcRenderer.off("omni:menu", listener)
     }
   },
-  subscribe(onEvent: (event: Event) => void): () => void {
-    const listener = (_e: unknown, event: Event): void => {
-      onEvent(event)
+  subscribe(onEvents: (events: readonly Event[]) => void): () => void {
+    const listener = (_e: unknown, events: readonly Event[]): void => {
+      onEvents(events)
     }
-    ipcRenderer.on("omni:event", listener)
+    ipcRenderer.on("omni:events", listener)
     return () => {
-      ipcRenderer.off("omni:event", listener)
+      ipcRenderer.off("omni:events", listener)
     }
   },
 }

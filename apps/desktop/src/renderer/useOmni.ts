@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import type { Command } from "@omni/protocol"
-import { initial, reduce, type ViewState } from "@omni/store"
+import { initial, reduceAll, type ViewState } from "@omni/store"
 
 export interface Omni {
   state: ViewState
@@ -33,8 +33,9 @@ export function useOmni(): Omni {
 
   useEffect(() => {
     if (bridge === undefined) return undefined
-    return bridge.subscribe((event) => {
-      setState((prev) => reduce(prev, event))
+    // 一批一次 setState：主进程已经合过帧，这里再逐条 set 就白合了
+    return bridge.subscribe((events) => {
+      setState((prev) => reduceAll(prev, events))
     })
   }, [bridge])
 

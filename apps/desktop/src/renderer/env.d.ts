@@ -15,7 +15,7 @@ declare global {
       }>
       stopFind: () => void
       copy: (text: string) => void
-      subscribe: (onEvent: (event: Event) => void) => () => void
+      subscribe: (onEvents: (events: readonly Event[]) => void) => () => void
     }
   }
 }

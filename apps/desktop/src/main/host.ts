@@ -7,6 +7,7 @@ import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal } from "@omni/journal"
 import { devEngine, devResume, devTrust } from "./devtools.js"
+import { createBatcher } from "./batch.js"
 
 export interface Attached {
   host: Host
@@ -14,6 +15,8 @@ export interface Attached {
   journal: ReturnType<typeof createJournal>
   /** 把一批事件直接推给窗口，不经过宿主——回放用 */
   push: (event: Event) => void
+  /** 立刻发出攒着的事件。回放结束时要调一次，否则最后一批要等窗口到期。 */
+  flush: () => void
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
   /**
@@ -35,11 +38,16 @@ export interface Attached {
 export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
 
+  // 合帧再过 IPC：codex 的命令输出是一行一条通知，逐条发会把渲染层压垮
+  const batcher = createBatcher((events) => {
+    for (const win of windows()) {
+      if (!win.isDestroyed()) win.webContents.send("omni:events", events)
+    }
+  })
+
   const emit = (event: Event): void => {
     if (event.type === "thread.started") seen.thread = event.thread.id
-    for (const win of windows()) {
-      if (!win.isDestroyed()) win.webContents.send("omni:event", event)
-    }
+    batcher.push(event)
   }
 
   // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
@@ -88,7 +96,8 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     })
   })
 
-  return { host, journal, push: emit, lastThreadId: () => seen.thread, report }
+  // 回放要一次灌进去几百上千条，攒着没有意义，直接推
+  return { host, journal, push: emit, flush: () => { batcher.flush() }, lastThreadId: () => seen.thread, report }
 }
 
 /**
@@ -112,6 +121,7 @@ export async function replayHistory(attached: Attached): Promise<ThreadId | unde
       thread: { ...last.thread, status: "idle", detached: true },
     })
   }
+  attached.flush()
   return ids[0]
 }
 
