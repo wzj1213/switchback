@@ -19,7 +19,8 @@
     "dev": "pnpm --filter @omni/desktop dev",
     "test:live": "vitest run --config vitest.live.config.ts",
     "check:docs": "node scripts/check-changelog.mjs",
-    "dist": "pnpm --filter @omni/desktop dist"
+    "dist": "pnpm --filter @omni/desktop dist",
+    "dist:signed": "pnpm --filter @omni/desktop dist:signed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

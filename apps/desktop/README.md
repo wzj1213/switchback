@@ -38,8 +38,13 @@ engine 的运行时依赖，而 Node 从产物所在目录往上找 `node_module
 ```sh
 CSC_NAME="Developer ID Application: <名字> (<TeamID>)" \
 APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=... \
-pnpm dist
+pnpm dist:signed
 ```
+
+`pnpm dist` **永远不签名**（它显式设了 `CSC_IDENTITY_AUTO_DISCOVERY=false`）。
+这不是保守：不关的话 electron-builder 会去翻钥匙串、抓到任何一张证书就开始签，
+而一张不受信任的证书会让 `codesign` 卡在逐个文件签名上——实测跑了 400 秒
+还停在 `locale.pak`，得手动 kill。
 
 需要三样：Apple Developer Program 会员（99 美元/年）、钥匙串里的
 Developer ID Application 证书、App Store Connect 的 app-specific password。
@@ -91,11 +96,11 @@ feed 地址填在 `apps/desktop/package.json` 的 `omni.updateFeed`
 - **打出来的包仍然没有签名**：本机只有一个自签且 `CSSMERR_TP_NOT_TRUSTED` 的证书，
   electron-builder 会拒绝用它，于是照旧 skip 签名。上面那段配置只有在
   `CSC_NAME` 指向一个真证书时才生效。首次打开仍需在「隐私与安全性」里放行。
-- **Linux / Windows 打得出包，但那个包里的 Claude 引擎起不来。** 实测打 Linux
-  tar.gz 时 electron-builder 明确警告：`@anthropic-ai/claude-agent-sdk-linux-*`
-  这些平台二进制是 optionalDependencies，pnpm 10+ 不会替别的平台装，
-  于是**没被打进产物**。要真支持得先把它们加进 optionalDependencies 再在真机上验。
-  这是「跨平台」目前最硬的一块，不是「没试过」而是**试过、知道缺什么**。
+- **Linux / Windows 的包必须在对应平台上打。** Claude Agent SDK 的原生二进制
+  按平台分包，现在已经显式列进 `optionalDependencies`（每个都带 os/cpu 字段，
+  所以本机只装 darwin-arm64 那一个，不占地方）。但**在 macOS 上交叉打 Linux 包
+  仍然拿不到 linux 的那个**——那台机器上根本没装。CI 的三格里各打各的才对。
+  在真机上跑过之前，这仍然算未验证。
 - **只在 macOS 上验过。** 平台差异收在 `@omni/engine` 的 `platform.ts` 一处：
   查命令（`which` / `where.exe`）与进程树回收（负 pid 信号 / `taskkill /T /F`）。
   Windows 那几支**没有在真机上跑过**——写它们是因为原来的实现在 Windows 上

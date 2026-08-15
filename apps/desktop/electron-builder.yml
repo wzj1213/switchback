@@ -43,14 +43,19 @@ mac:
   # 自签证书过不了 Gatekeeper 评估，这一步跳过。有了真证书之后
   # 公证流程自己会做这件事
   gatekeeperAssess: false
-  # **这里有意不写 `identity`。**
+  # **这里有意不写 `identity`**，签不签由脚本决定：
   #
-  # 试过 `identity: ${env.CSC_NAME}`——不行，electron-builder 不对这个字段做
-  # 变量展开，它拿到的是字面量 `${env.CSC_NAME}`，然后报「钥匙串里没有这个证书」。
-  # 留空才是对的：electron-builder 自己认 `CSC_NAME` / `CSC_LINK` 环境变量。
+  #   pnpm dist          → `CSC_IDENTITY_AUTO_DISCOVERY=false`，明确不签
+  #   pnpm dist:signed   → 放开，用 CSC_NAME / CSC_LINK 指定的证书
   #
-  # 代价是没有证书时它会警告一行「skipped code signing」——那句话是真的，
-  # 让它说出来比用 `identity: null` 捂住好。
+  # 两个坑都是实测踩出来的：
+  #
+  # 1. `identity: ${env.CSC_NAME}` 不行——electron-builder 不对这个字段做变量
+  #    展开，拿到的是字面量，然后报「钥匙串里没有这个证书」。
+  # 2. **什么都不写也不行**：那样 electron-builder 会去翻钥匙串，
+  #    抓到任何一张证书就开始签。本机那张自签的会让 `codesign` 卡在
+  #    逐个文件签名上——`pnpm dist` 跑了 400 秒还停在 `locale.pak`，
+  #    最后要手动 kill。所以默认那条脚本必须显式关掉自动发现。
 
 # 产物文件名。**必须显式写。**
 #
