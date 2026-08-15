@@ -156,6 +156,17 @@ export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.res
 export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  /**
+   * **上一轮没跑完就不许发下一轮。**
+   *
+   * 界面已经挡了一道（输入框在跑的时候是禁的），这里是兜底：菜单、快捷键、
+   * 将来的自动化都从这条路进来。不挡的话 `entry.turn` 会被新 turnId 覆盖，
+   * 而引擎还在往**旧的** turnId 上发 item——那些 item 从此无主，
+   * 正在流的回答会整个消失。
+   */
+  if (entry.turn !== undefined) {
+    throw new Error("上一轮还没跑完。等它停下，或者先点「停止」。")
+  }
   const at = ctx.deps.now()
   const turnId = ctx.deps.newId("tn")
   entry.turn = turnId

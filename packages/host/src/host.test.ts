@@ -801,14 +801,25 @@ describe("在途去重", () => {
     expect(starts()).toBe(2)
   })
 
-  it("prompt 不去重——连发两条是合法的，用户就是想追加一句", async () => {
+  it("**上一轮跑完之后**再发是允许的——去重表不该把正常的追问也拦掉", async () => {
     const { host, events, session } = setup()
     await host.dispatch(create)
-    const threadId = events.find((e) => e.type === "thread.started")?.type === "thread.started"
-      ? (events.find((e) => e.type === "thread.started") as Extract<Event, { type: "thread.started" }>).thread.id
-      : ""
+    const first = events.find((e) => e.type === "thread.started")
+    const threadId = first?.type === "thread.started" ? first.thread.id : ""
     await host.dispatch({ type: "thread.prompt", threadId, text: "一" })
+    const turnId = session().prompts[0]?.turnId ?? ""
+    session().emit({ type: "turn.completed", at: 0, turnId, status: "completed" })
     await host.dispatch({ type: "thread.prompt", threadId, text: "二" })
-    expect(session().prompts).toHaveLength(2)
+    expect(session().prompts.map((p) => p.text)).toEqual(["一", "二"])
+  })
+
+  it("**上一轮还在跑就拒**——不拒的话 entry.turn 被覆盖，引擎还在往旧 turnId 上发 item，正在流的回答会整个消失", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const first = events.find((e) => e.type === "thread.started")
+    const threadId = first?.type === "thread.started" ? first.thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "一" })
+    await expect(host.dispatch({ type: "thread.prompt", threadId, text: "二" })).rejects.toThrow("上一轮还没跑完")
+    expect(session().prompts).toHaveLength(1)
   })
 })

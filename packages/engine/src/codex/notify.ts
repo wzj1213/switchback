@@ -129,7 +129,7 @@ function onUsage(ctx: NotifyContext, params: WireTokenUsage): void {
  * 收尾状态跟着轮次走：被中断就是 `interrupted`，失败就是 `failed`。
  * 一律写成 `failed` 会让「你自己按了停止」看起来像「它出错了」。
  */
-function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnStatus): void {
+export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnStatus): void {
   if (status === "completed") return
   const ending: ToolStatus = status === "interrupted" ? "interrupted" : "failed"
   for (const [id, item] of ctx.inflight) {

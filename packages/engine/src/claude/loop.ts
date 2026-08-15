@@ -1,5 +1,5 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
-import type { Event, ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
+import type { ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 
@@ -107,6 +107,18 @@ function sweepTools(ref: TurnRef, req: StartRequest, at: number, status: TurnSta
   ref.tools.clear()
 }
 
+/**
+ * 把还挂着的轮次落成终态。**幂等**：`ref.current` 已经清掉就什么都不做——
+ * 正常收工路径已经发过 `turn.completed`，这里再发一条会往 journal 多写一行。
+ */
+function endTurn(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus): void {
+  const turnId = ref.current
+  if (turnId === undefined) return
+  ref.current = undefined
+  sweepTools(ref, req, at, status)
+  req.emit({ type: "turn.completed", at, turnId, status })
+}
+
 function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
   const turnId = ref.current
   ref.current = undefined
@@ -159,15 +171,21 @@ export async function runMessageLoop(
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    const crashed: Event = {
-      type: "engine.status",
-      at: Date.now(),
-      threadId: req.threadId,
-      status: "crashed",
-      detail,
-    }
-    req.emit(crashed)
+    const at = Date.now()
+    /**
+     * **必须先把轮次落终态，再抛。**
+     *
+     * 只发 `engine.status: crashed` 的话，宿主那边 `entry.turn` 和
+     * `thread.status = "running"` 永远留着——用户看到的是：一条故障横幅、
+     * 一个一直在涨的计时器、和一个点了只会再弹一条横幅的「停止」。
+     * 而且输入框会被那个假的「正在跑」永久锁住。
+     */
+    endTurn(ref, req, at, "failed")
+    req.emit({ type: "engine.status", at, threadId: req.threadId, status: "crashed", detail })
     throw error
   }
-  req.emit({ type: "engine.status", at: Date.now(), threadId: req.threadId, status: "exited" })
+  const at = Date.now()
+  // 正常走完循环但没收到 result 也算没跑完——同样要落终态，理由同上
+  endTurn(ref, req, at, "failed")
+  req.emit({ type: "engine.status", at, threadId: req.threadId, status: "exited" })
 }

@@ -1,11 +1,11 @@
 import type { ChildProcess } from "node:child_process"
 import { decide } from "@omni/approval"
-import type { EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
+import type { EngineStatus, ModelOption, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
-import { handleNotification, type NotifyContext } from "./notify.js"
+import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { buildRequest, decisionFor, toolOf } from "./approve.js"
 import type { WireApprovalPolicy, WireApprovalRequest, WireItem, WireSandbox } from "./wire.js"
 
@@ -168,6 +168,19 @@ class CodexSession implements EngineSession {
     }
   }
 
+  /**
+   * 把还挂着的轮次落成终态。**幂等**——`state.turn` 已经清了就什么都不做，
+   * 否则正常收工路径发过一条之后这里再发一条，journal 里多一行。
+   */
+  private endTurn(status: TurnStatus): void {
+    const turnId = this.state.turn
+    if (turnId === undefined) return
+    // 在途的工具行一起扫掉，不然它们永远停在 running
+    sweepInflight(this.notifyContext(), turnId, status)
+    this.state.turn = undefined
+    this.req.emit({ type: "turn.completed", at: Date.now(), turnId, status })
+  }
+
   private status(status: EngineStatus, detail?: string): void {
     this.req.emit({
       type: "engine.status",
@@ -190,6 +203,11 @@ class CodexSession implements EngineSession {
     })
     child.on("exit", (code) => {
       this.rpc.close(`codex 进程已退出（code ${String(code)}）`)
+      // **进程没了，在跑的那一轮必须落终态。**
+      // 只发 `crashed` 的话宿主那边 `entry.turn` 和 `status: "running"` 永远留着——
+      // 界面上是一条横幅 + 一个一直在涨的计时器 + 一个点了没用的「停止」，
+      // 而且输入框被那个假的「正在跑」永久锁住
+      this.endTurn("failed")
       if (code !== 0 && code !== null) this.status("crashed", this.state.stderr)
     })
   }
