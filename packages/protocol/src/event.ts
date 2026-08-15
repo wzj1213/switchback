@@ -32,6 +32,7 @@ export interface Usage {
 export type Event =
   | { type: "thread.started"; at: number; thread: Thread }
   | { type: "thread.updated"; at: number; thread: Thread }
+  | { type: "thread.removed"; at: number; threadId: ThreadId }
   | { type: "turn.started"; at: number; turn: Turn }
   | { type: "turn.completed"; at: number; turnId: TurnId; status: TurnStatus; error?: string }
   | { type: "item.started"; at: number; item: Item }

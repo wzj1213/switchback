@@ -88,6 +88,11 @@ export function App(): React.JSX.Element {
         else open(thread.cwd)
       }}
       onOpenFolder={openPicker}
+      onDelete={(id) => {
+        // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
+        if (id === thread?.id) setSelectedId(undefined)
+        send({ type: "thread.delete", threadId: id })
+      }}
     />
   )
 

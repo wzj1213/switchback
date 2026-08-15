@@ -225,6 +225,7 @@ describe("续跑", () => {
         },
         read: () => Promise.resolve(stored),
         list: () => Promise.resolve([]),
+        remove: () => Promise.resolve(),
       },
     })
     return { host, events, session, stored }
@@ -275,6 +276,7 @@ describe("续跑", () => {
         },
         read: () => Promise.resolve(stored),
         list: () => Promise.resolve([]),
+        remove: () => Promise.resolve(),
       },
     })
     await host.dispatch(create)
@@ -340,5 +342,72 @@ describe("续跑", () => {
     const before = events.length
     await host.dispatch({ type: "thread.resume", threadId })
     expect(events).toHaveLength(before)
+  })
+})
+
+describe("删除会话", () => {
+  it("先落定审批、再 dispose、最后删文件——反过来会留下一个卡住的驱动和一个删不掉的文件", async () => {
+    const removed: string[] = []
+    const stored: Event[] = []
+    const { driver, session } = fakeDriver()
+    const events: Event[] = []
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers: { fake: driver },
+      home: "/h",
+      emit: (e) => events.push(e),
+      newId: (p) => {
+        counter.n += 1
+        return `${p}-${String(counter.n)}`
+      },
+      now: () => 0,
+      journal: {
+        append: (_id, e) => {
+          stored.push(e)
+          return Promise.resolve()
+        },
+        read: () => Promise.resolve(stored),
+        list: () => Promise.resolve([]),
+        remove: (id) => {
+          // 删文件时驱动必须已经处置完
+          expect(session().disposed).toBe(true)
+          removed.push(id)
+          return Promise.resolve()
+        },
+      },
+    })
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "hi" })
+    const answer = session().ask(ask)
+
+    await host.dispatch({ type: "thread.delete", threadId })
+    expect(removed).toEqual([threadId])
+    await expect(answer).resolves.toEqual({ allow: false, remember: "once" })
+    expect(events.at(-1)).toEqual({ type: "thread.removed", at: 0, threadId })
+  })
+
+  it("删一个只在磁盘上的会话（宿主没登记）同样有效", async () => {
+    const removed: string[] = []
+    const { driver } = fakeDriver()
+    const events: Event[] = []
+    const host = createHost({
+      drivers: { fake: driver },
+      home: "/h",
+      emit: (e) => events.push(e),
+      newId: (p) => `${p}-1`,
+      now: () => 0,
+      journal: {
+        append: () => Promise.resolve(),
+        read: () => Promise.resolve([]),
+        list: () => Promise.resolve([]),
+        remove: (id) => {
+          removed.push(id)
+          return Promise.resolve()
+        },
+      },
+    })
+    await host.dispatch({ type: "thread.delete", threadId: "th-from-disk" })
+    expect(removed).toEqual(["th-from-disk"])
   })
 })

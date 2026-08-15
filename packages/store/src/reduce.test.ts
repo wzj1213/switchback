@@ -248,3 +248,41 @@ describe("引擎故障通知", () => {
     expect(s.notices[19]?.text).toBe("第 29 条")
   })
 })
+
+describe("thread.removed", () => {
+  const seeded = (): ReturnType<typeof initial> =>
+    reduceAll(initial(), [
+      started("a"),
+      started("b"),
+      turnStarted("a", "t1"),
+      { type: "item.started", at: 0, item: msg("m1", "t1", "甲的内容") },
+      { type: "usage.updated", at: 0, threadId: "a", usage: { contextUsed: 100 } },
+    ])
+
+  it("会话、顺序、item、用量一并摘掉", () => {
+    const s = reduce(seeded(), { type: "thread.removed", at: 1, threadId: "a" })
+    expect(threadsOf(s).map((t) => t.id)).toEqual(["b"])
+    expect(itemsOf(s, "a")).toEqual([])
+    expect(s.usage["a"]).toBeUndefined()
+  })
+
+  it("反查表也要清——留着的话一条迟到的 item.updated 会把数据写回一个不存在的会话", () => {
+    const s = reduce(seeded(), { type: "thread.removed", at: 1, threadId: "a" })
+    expect(s.owner["m1"]).toBeUndefined()
+    expect(s.turnOwner["t1"]).toBeUndefined()
+    // 迟到的更新落不进去
+    const later = reduce(s, { type: "item.updated", at: 2, item: msg("m1", "t1", "复活") })
+    expect(itemsOf(later, "a")).toEqual([])
+  })
+
+  it("删不存在的会话是无操作，不抛", () => {
+    const s = seeded()
+    expect(reduce(s, { type: "thread.removed", at: 1, threadId: "nope" })).toEqual(s)
+  })
+
+  it("不误伤别的会话", () => {
+    const s = reduce(seeded(), { type: "thread.removed", at: 1, threadId: "b" })
+    expect(itemsOf(s, "a")).toHaveLength(1)
+    expect(s.owner["m1"]).toBe("a")
+  })
+})

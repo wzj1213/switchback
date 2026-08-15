@@ -102,24 +102,67 @@ body {
 
 .thread {
   display: flex;
+  align-items: flex-start;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.thread__main {
+  display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
-  width: 100%;
+  min-width: 0;
   padding: 6px var(--sp-2);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: inherit;
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: inherit;
   text-align: left;
   cursor: default;
+}
+
+/* 删除按钮平时不显形：它不可撤销，不该一直待在手边 */
+.thread__del {
+  flex: none;
+  align-self: center;
+  margin-right: 2px;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+  opacity: 0;
+}
+
+.thread:hover .thread__del,
+.thread__del:focus-visible,
+.thread__del--confirm {
+  opacity: 1;
+}
+
+.thread__del:hover {
+  color: var(--danger);
+}
+
+/* 确认态就要显眼——这一步之后没有回头路 */
+.thread__del--confirm {
+  background: var(--danger);
+  color: var(--text-inverse);
 }
 
 .thread:hover {
   background: var(--bg-hover);
 }
 
+.thread--selected,
 .thread[aria-selected="true"] {
   background: var(--bg-active);
   color: var(--text);

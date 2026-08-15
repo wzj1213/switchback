@@ -47,6 +47,9 @@ function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
     case "thread.started":
     case "thread.updated":
       return event.thread.id
+    // 删除事件**故意不落盘**：文件已经没了，再写一条只会把它建回来
+    case "thread.removed":
+      return undefined
     case "turn.started":
       return event.turn.threadId
     case "turn.completed":
@@ -266,6 +269,26 @@ function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resol
   }
 }
 
+/**
+ * 关掉会话并把记录从磁盘上删掉。
+ *
+ * 顺序是有讲究的：**先落定挂着的审批，再 dispose，最后才删文件**。
+ * 反过来的话，一个还在等审批的驱动会卡在那里，而它的日志文件已经没了——
+ * 之后它写的每一条都会把文件重新建出来，删除等于没删。
+ *
+ * 对回放出来的会话（宿主这边没有登记）同样有效：直接删文件即可。
+ */
+async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.delete" }>): Promise<void> {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry !== undefined) {
+    entry.gate.settleAll()
+    await entry.session.dispose()
+    ctx.live.delete(cmd.threadId)
+  }
+  await ctx.deps.journal?.remove(cmd.threadId)
+  emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: cmd.threadId })
+}
+
 async function dispatch(ctx: Ctx, command: Command): Promise<void> {
   switch (command.type) {
     case "thread.create":
@@ -276,6 +299,8 @@ async function dispatch(ctx: Ctx, command: Command): Promise<void> {
       return setTrust(ctx, command)
     case "thread.resume":
       return resume(ctx, command)
+    case "thread.delete":
+      return remove(ctx, command)
     case "thread.interrupt":
       return ctx.live.get(command.threadId)?.session.interrupt() ?? Promise.resolve()
     case "approval.resolve":

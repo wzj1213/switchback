@@ -112,6 +112,26 @@ describe("createJournal", () => {
     expect(await j.list()).toEqual(["th-new", "th-old"])
   })
 
+  it("remove 删掉记录，之后读出空数组", async () => {
+    const j = createJournal({ dir: state.dir })
+    await j.append("th-1", started("th-1"))
+    await j.remove("th-1")
+    expect(await j.read("th-1")).toEqual([])
+    expect(await j.list()).toEqual([])
+  })
+
+  it("删不存在的会话不抛——删除是幂等的", async () => {
+    await expect(createJournal({ dir: state.dir }).remove("never")).resolves.toBeUndefined()
+  })
+
+  it("删完之后再写会重新建文件——所以宿主必须先停掉会话再删", async () => {
+    const j = createJournal({ dir: state.dir })
+    await j.append("th-1", started("th-1"))
+    await j.remove("th-1")
+    await j.append("th-1", started("th-1"))
+    expect(await j.read("th-1")).toHaveLength(1)
+  })
+
   it("目录里的杂物不当成会话", async () => {
     const j = createJournal({ dir: state.dir })
     await j.append("th-1", started("th-1"))

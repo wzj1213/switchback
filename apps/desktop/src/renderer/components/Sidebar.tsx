@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 
@@ -37,34 +38,58 @@ interface Props {
   onNew: () => void
   /** 弹系统目录框，选一个工作区再开会话 */
   onOpenFolder: () => void
+  /** 删除会话。**不可撤销**，所以由行内二次确认把关。 */
+  onDelete: (id: string) => void
 }
 
 function Row({
   row,
   selected,
   onSelect,
+  onDelete,
 }: {
   row: ThreadRow
   selected: boolean
   onSelect: () => void
+  onDelete: () => void
 }): React.JSX.Element {
   const { thread, preview } = row
+  // 二次确认做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
+  // 但也不能点一下就没。照 codex 的 confirmArchiveTask。
+  const [confirming, setConfirming] = useState(false)
   return (
-    <button type="button" className="thread" aria-selected={selected} onClick={onSelect} title={thread.cwd}>
-      <span className="thread__line">
-        <span className={`thread__dot${DOT_CLASS[thread.status]}`} />
-        <span className="thread__label">{thread.title}</span>
-        {NOTE[thread.status] === undefined ? null : (
-          <span className="thread__note">{NOTE[thread.status]}</span>
-        )}
-      </span>
-      {/* 同一个工作区可以开好几个会话，光靠目录名它们在侧栏里长得一模一样 */}
-      {preview === undefined ? null : <span className="thread__preview">{preview}</span>}
-    </button>
+    <div className={`thread${selected ? " thread--selected" : ""}`} title={thread.cwd}>
+      <button type="button" className="thread__main" aria-selected={selected} onClick={onSelect}>
+        <span className="thread__line">
+          <span className={`thread__dot${DOT_CLASS[thread.status]}`} />
+          <span className="thread__label">{thread.title}</span>
+          {NOTE[thread.status] === undefined ? null : (
+            <span className="thread__note">{NOTE[thread.status]}</span>
+          )}
+        </span>
+        {/* 同一个工作区可以开好几个会话，光靠目录名它们在侧栏里长得一模一样 */}
+        {preview === undefined ? null : <span className="thread__preview">{preview}</span>}
+      </button>
+      <button
+        type="button"
+        className={`thread__del${confirming ? " thread__del--confirm" : ""}`}
+        aria-label={confirming ? "确认删除" : "删除会话"}
+        title={confirming ? "再点一次就真的删了，不可撤销" : "删除会话"}
+        onClick={() => {
+          if (confirming) onDelete()
+          else setConfirming(true)
+        }}
+        onBlur={() => {
+          setConfirming(false)
+        }}
+      >
+        {confirming ? "确认" : "×"}
+      </button>
+    </div>
   )
 }
 
-export function Sidebar({ rows, selectedId, onSelect, onNew, onOpenFolder }: Props): React.JSX.Element {
+export function Sidebar({ rows, selectedId, onSelect, onNew, onOpenFolder, onDelete }: Props): React.JSX.Element {
   return (
     <aside className="sidebar">
       <div className="sidebar__head">
@@ -95,6 +120,9 @@ export function Sidebar({ rows, selectedId, onSelect, onNew, onOpenFolder }: Pro
             selected={row.thread.id === selectedId}
             onSelect={() => {
               onSelect(row.thread.id)
+            }}
+            onDelete={() => {
+              onDelete(row.thread.id)
             }}
           />
         ))}

@@ -80,6 +80,31 @@ function onTurnCompleted(
   return { ...state, turns: omit(state.turns, threadId) }
 }
 
+/**
+ * 摘掉一个会话的全部痕迹。
+ *
+ * `owner` / `turnOwner` 里的反查项也要清——留着的话，一条迟到的
+ * `item.updated` 会把内容写回一个已经不存在的会话，那份数据从此再也删不掉。
+ */
+function removeThread(state: ViewState, threadId: ThreadId): ViewState {
+  const keepOwner = Object.fromEntries(
+    Object.entries(state.owner).filter(([, id]) => id !== threadId),
+  )
+  const keepTurnOwner = Object.fromEntries(
+    Object.entries(state.turnOwner).filter(([, id]) => id !== threadId),
+  )
+  return {
+    ...state,
+    threads: omit(state.threads, threadId),
+    order: state.order.filter((id) => id !== threadId),
+    items: omit(state.items, threadId),
+    turns: omit(state.turns, threadId),
+    usage: omit(state.usage, threadId),
+    owner: keepOwner,
+    turnOwner: keepTurnOwner,
+  }
+}
+
 /** 只有这两档需要打断用户。`starting` / `ready` / `exited` 是正常生命周期。 */
 const LOUD = new Set(["crashed", "timeout"])
 
@@ -112,6 +137,8 @@ export function reduce(state: ViewState, event: Event): ViewState {
     case "thread.started":
     case "thread.updated":
       return withThread(state, event.thread)
+    case "thread.removed":
+      return removeThread(state, event.threadId)
     case "turn.started":
       return onTurnStarted(state, event)
     case "turn.completed":

@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, readdir, stat } from "node:fs/promises"
+import { appendFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import type { Event, ThreadId } from "@omni/protocol"
 import { decodeAll, encode, fileNameOf, shouldPersist, threadIdOf } from "./codec.js"
@@ -17,6 +17,8 @@ export interface Journal {
   read: (threadId: ThreadId) => Promise<readonly Event[]>
   /** 列出磁盘上有记录的会话，**最近写过的在前**。 */
   list: () => Promise<readonly ThreadId[]>
+  /** 删掉一个会话的记录。不存在也不报错——删除是幂等的。 */
+  remove: (threadId: ThreadId) => Promise<void>
 }
 
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024
@@ -91,5 +93,13 @@ export function createJournal(config: JournalConfig): Journal {
     return stamped.sort((a, b) => b.at - a.at).map((entry) => entry.id)
   }
 
-  return { append, read, list }
+  const remove = async (threadId: ThreadId): Promise<void> => {
+    const file = pathOf(threadId)
+    if (file === undefined) return
+    // 先把这个会话的写入链摘掉，免得删完之后还有一条在途的 append 把文件又建回来
+    chains.delete(threadId)
+    await rm(file, { force: true }).catch(() => undefined)
+  }
+
+  return { append, read, list, remove }
 }
