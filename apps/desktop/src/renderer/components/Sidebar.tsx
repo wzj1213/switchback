@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { filterRows } from "../filter.js"
-import { groupByWorkspace } from "../sidebar.js"
-import { FolderIcon, PlusIcon, SearchIcon } from "./icons.js"
+import { groupByWorkspace, type Group } from "../sidebar.js"
+import { CopyIcon, FolderIcon, PlusIcon, RevealIcon, SearchIcon, TrashIcon } from "./icons.js"
+import { useContextMenu } from "./Menu.js"
 import { GroupBlock, Row } from "./SidebarRows.js"
 
 /**
@@ -35,6 +36,12 @@ interface Props {
   onOpenFolder: () => void
   /** 删除会话。**不可撤销**，所以由行内二次确认把关。 */
   onDelete: (id: string) => void
+  /** 在指定工作区新建会话（右键菜单用）。 */
+  onNewIn: (cwd: string) => void
+  /** 在访达里定位。 */
+  onReveal: (path: string) => void
+  /** 写剪贴板。 */
+  onCopy: (text: string) => void
   /**
    * 变一次就把焦点送进筛选框。
    *
@@ -113,6 +120,9 @@ export function Sidebar({
   onNew,
   onOpenFolder,
   onDelete,
+  onNewIn,
+  onReveal,
+  onCopy,
   focusFilter,
 }: Props): React.JSX.Element {
   const [query, setQuery] = useState("")
@@ -122,6 +132,7 @@ export function Sidebar({
     if (focusFilter > 0) box.current?.select()
   }, [focusFilter])
 
+  const { open: openMenu, menu } = useContextMenu()
   const shown = filterRows(rows, query)
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
@@ -136,6 +147,25 @@ export function Sidebar({
     })
   }
 
+  const rowMenu = (event: React.MouseEvent, row: ThreadRow, arm: () => void): void => {
+    openMenu(event, [
+      { label: "在此新建会话", icon: <PlusIcon />, run: () => { onNewIn(row.thread.cwd) } },
+      { label: "在访达中显示", icon: <RevealIcon />, run: () => { onReveal(row.thread.cwd) } },
+      { label: "复制工作区路径", icon: <CopyIcon />, run: () => { onCopy(row.thread.cwd) } },
+      // 省略号表示「还要再确认一次」：点完之后行尾会变成一个红色的「确认」。
+      // 菜单里直接删太危险——菜单是会点错的地方
+      { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm },
+    ])
+  }
+
+  const groupMenu = (event: React.MouseEvent, group: Group): void => {
+    openMenu(event, [
+      { label: "在此新建会话", icon: <PlusIcon />, run: () => { onNewIn(group.cwd) } },
+      { label: "在访达中显示", icon: <RevealIcon />, run: () => { onReveal(group.cwd) } },
+      { label: "复制路径", icon: <CopyIcon />, run: () => { onCopy(group.cwd) } },
+    ])
+  }
+
   const flat = (row: ThreadRow): React.JSX.Element => (
     <Row
       key={row.thread.id}
@@ -146,6 +176,9 @@ export function Sidebar({
       }}
       onDelete={() => {
         onDelete(row.thread.id)
+      }}
+      onMenu={(e, arm) => {
+        rowMenu(e, row, arm)
       }}
     />
   )
@@ -175,9 +208,12 @@ export function Sidebar({
                 }}
                 onSelect={onSelect}
                 onDelete={onDelete}
+                onRowMenu={rowMenu}
+                onGroupMenu={groupMenu}
               />
             ))}
       </div>
+      {menu}
     </aside>
   )
 }

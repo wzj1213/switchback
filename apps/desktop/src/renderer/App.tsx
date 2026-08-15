@@ -7,7 +7,7 @@ import { useWorkspaceActions } from "./useWorkspaceActions.js"
 
 /** 选哪个会话、怎么新建。一个会话内部长什么样是 `Workspace` 的事。 */
 export function App(): React.JSX.Element {
-  const { state, send, pickFolder, onMenu, find, stopFind, copy, searchFiles, bridgeMissing } = useOmni()
+  const { state, send, pickFolder, onMenu, find, stopFind, copy, reveal, searchFiles, bridgeMissing } = useOmni()
   const shell = useShell()
   const rows = threadRowsOf(state)
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
@@ -41,7 +41,10 @@ export function App(): React.JSX.Element {
         if (thread === undefined) openPicker()
         else open(thread.cwd)
       }}
+      onNewIn={open}
       onOpenFolder={openPicker}
+      onReveal={reveal}
+      onCopy={copy}
       send={send}
     />
   )

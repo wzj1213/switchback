@@ -27,18 +27,30 @@ export function Row({
   selected,
   onSelect,
   onDelete,
+  onMenu,
 }: {
   row: ThreadRow
   selected: boolean
   onSelect: () => void
   onDelete: () => void
+  /** 右键或点 `···`。`arm` 让菜单能把这一行切进删除确认态。 */
+  onMenu: (event: React.MouseEvent, arm: () => void) => void
 }): React.JSX.Element {
   const { thread } = row
   // 二次确认做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
   // 但也不能点一下就没。照 codex 的 confirmArchiveTask。
   const [confirming, setConfirming] = useState(false)
+  const arm = (): void => {
+    setConfirming(true)
+  }
   return (
-    <div className={`row row--thread${selected ? " row--selected" : ""}`} title={thread.cwd}>
+    <div
+      className={`row row--thread${selected ? " row--selected" : ""}`}
+      title={thread.cwd}
+      onContextMenu={(e) => {
+        onMenu(e, arm)
+      }}
+    >
       <button type="button" className="row__main" aria-selected={selected} onClick={onSelect}>
         <span className="row__slot">
           <span className={`row__dot${DOT_CLASS[thread.status]}`} />
@@ -46,21 +58,32 @@ export function Row({
         <span className="row__label">{rowLabelOf(row)}</span>
         {NOTE[thread.status] === undefined ? null : <span className="row__note">{NOTE[thread.status]}</span>}
       </button>
-      <button
-        type="button"
-        className={`row__act${confirming ? " row__act--danger" : ""}`}
-        aria-label={confirming ? "确认删除" : "删除会话"}
-        title={confirming ? "再点一次就真的删了，不可撤销" : "删除会话"}
-        onClick={() => {
-          if (confirming) onDelete()
-          else setConfirming(true)
-        }}
-        onBlur={() => {
-          setConfirming(false)
-        }}
-      >
-        {confirming ? "确认" : "×"}
-      </button>
+      {confirming ? (
+        <button
+          type="button"
+          className="row__act row__act--danger"
+          aria-label="确认删除"
+          title="再点一次就真的删了，不可撤销"
+          onClick={onDelete}
+          onBlur={() => {
+            setConfirming(false)
+          }}
+        >
+          确认
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="row__act"
+          aria-label="更多操作"
+          title="更多操作"
+          onClick={(e) => {
+            onMenu(e, arm)
+          }}
+        >
+          ···
+        </button>
+      )}
     </div>
   )
 }
@@ -72,17 +95,29 @@ export function GroupBlock({
   onToggle,
   onSelect,
   onDelete,
+  onRowMenu,
+  onGroupMenu,
 }: {
   group: Group
   collapsed: boolean
   selectedId: string
   onToggle: () => void
+  onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void) => void
+  onGroupMenu: (event: React.MouseEvent, group: Group) => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
 }): React.JSX.Element {
   return (
     <div className="group">
-      <button type="button" className="row row--group" onClick={onToggle} title={group.cwd}>
+      <button
+        type="button"
+        className="row row--group"
+        onClick={onToggle}
+        title={group.cwd}
+        onContextMenu={(e) => {
+          onGroupMenu(e, group)
+        }}
+      >
         <span className="row__slot">
           <ChevronIcon open={!collapsed} />
         </span>
@@ -104,6 +139,9 @@ export function GroupBlock({
               }}
               onDelete={() => {
                 onDelete(row.thread.id)
+              }}
+              onMenu={(e, arm) => {
+                onRowMenu(e, row, arm)
               }}
             />
           ))}

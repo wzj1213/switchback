@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { app, clipboard, dialog, ipcMain, type BrowserWindow, type WebContents } from "electron"
+import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow, type WebContents } from "electron"
 import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
@@ -106,6 +106,11 @@ function installBridgeChannels(deps: Channels): void {
   // 不算安全上下文，写入会被静默拒绝
   ipcMain.on("omni:copy", (_e, text: string) => {
     clipboard.writeText(text)
+  })
+
+  // 只定位不打开：`showItemInFolder` 在访达里选中它，不会执行任何东西
+  ipcMain.on("omni:reveal", (_e, path: string) => {
+    if (typeof path === "string" && path !== "") shell.showItemInFolder(path)
   })
 
   // 一个工作区一份索引，按 cwd 复用：同一目录开好几个会话不该各扫一遍

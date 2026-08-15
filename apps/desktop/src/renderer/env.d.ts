@@ -26,6 +26,7 @@ declare global {
       }>
       stopFind: () => void
       copy: (text: string) => void
+      reveal: (path: string) => void
       searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
       subscribe: (onEvents: (sealed: readonly Sealed[]) => void) => () => void
       onReplay: (handler: (replay: Replay) => void) => () => void

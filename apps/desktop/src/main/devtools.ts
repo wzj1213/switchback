@@ -18,6 +18,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
  * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
  * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
+ * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -137,6 +138,30 @@ export function scheduleDevOpenSelect(win: BrowserWindow): void {
     if (win.isDestroyed()) return
     void win.webContents.executeJavaScript(
       `document.querySelectorAll(".composer__bar .trigger")[${String(nth - 1)}]?.click()`,
+    )
+  }, Math.max(0, delay))
+}
+
+/**
+ * 到点在侧栏第 N 行上右键。
+ *
+ * 和 `OMNI_DEV_SELECT` 一个道理：菜单是浮层，不点开就进不了截图。
+ */
+export function scheduleDevRowMenu(win: BrowserWindow): void {
+  const nth = Number(process.env["OMNI_DEV_ROWMENU"] ?? "0")
+  if (!Number.isFinite(nth) || nth <= 0) return
+  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 2000
+  setTimeout(() => {
+    if (win.isDestroyed()) return
+    void win.webContents.executeJavaScript(
+      `(() => {
+        const row = document.querySelectorAll(".sidebar__list .row")[${String(nth - 1)}]
+        if (!row) return
+        const box = row.getBoundingClientRect()
+        row.dispatchEvent(new MouseEvent("contextmenu", {
+          bubbles: true, clientX: box.left + 60, clientY: box.top + 12,
+        }))
+      })()`,
     )
   }, Math.max(0, delay))
 }

@@ -28,6 +28,13 @@ export interface PopoverProps {
   onClose: () => void
   /** 触发器元素，用来定位与还焦点。 */
   anchor: HTMLElement | null
+  /**
+   * 定位到一个点（右键菜单）而不是贴着触发器。
+   *
+   * 给了这个就忽略 anchor 的几何，但**仍然用 anchor 还焦点**——
+   * Esc 之后焦点要回到被右键的那一行，不能掉到 body 上。
+   */
+  at?: { x: number; y: number }
   children: React.ReactNode
   /** 面板最小宽度；不给就跟着内容。 */
   minWidth?: number
@@ -41,6 +48,14 @@ interface Placement {
 const GAP = 6
 const MARGIN = 8
 
+/** 贴着鼠标点弹。**默认往右下**，装不下才翻——右下是光标的自然去向。 */
+function placeAtPoint(point: { x: number; y: number }, panel: HTMLElement): Placement {
+  const p = panel.getBoundingClientRect()
+  const left = point.x + p.width + MARGIN <= window.innerWidth ? point.x : point.x - p.width
+  const top = point.y + p.height + MARGIN <= window.innerHeight ? point.y : point.y - p.height
+  return { left: Math.max(MARGIN, left), top: Math.max(MARGIN, top) }
+}
+
 function place(anchor: HTMLElement, panel: HTMLElement): Placement {
   const a = anchor.getBoundingClientRect()
   const p = panel.getBoundingClientRect()
@@ -53,19 +68,24 @@ function place(anchor: HTMLElement, panel: HTMLElement): Placement {
   return { left, top }
 }
 
-export function Popover({ open, onClose, anchor, children, minWidth }: PopoverProps): React.JSX.Element | null {
+export function Popover({ open, onClose, anchor, at: point, children, minWidth }: PopoverProps): React.JSX.Element | null {
   const panel = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState<Placement | undefined>(undefined)
 
   // useLayoutEffect 而不是 useEffect：要在浏览器画之前把位置算好，
   // 否则会看到面板先在左上角闪一下再跳到位
   useLayoutEffect(() => {
-    if (!open || anchor === null || panel.current === null) {
+    if (!open || panel.current === null) {
       setAt(undefined)
       return
     }
+    if (point !== undefined) {
+      setAt(placeAtPoint(point, panel.current))
+      return
+    }
+    if (anchor === null) return
     setAt(place(anchor, panel.current))
-  }, [open, anchor, children])
+  }, [open, anchor, point, children])
 
   /**
    * 打开时把选中项滚进视野。

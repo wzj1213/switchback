@@ -53,6 +53,16 @@ const api = {
   copy(text: string): void {
     ipcRenderer.send("omni:copy", text)
   },
+  /**
+   * 在访达里定位一个路径。
+   *
+   * **只定位，不打开、不执行**（主进程走 `showItemInFolder`）。
+   * 这条通道拿到的路径始终来自宿主发过的会话数据，渲染层自己造不出新的；
+   * 即便造得出，最坏的后果也只是访达里跳出一个窗口。
+   */
+  reveal(path: string): void {
+    ipcRenderer.send("omni:reveal", path)
+  },
   async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
     return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
   },

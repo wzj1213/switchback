@@ -60,7 +60,10 @@ export function SidebarPane({
   focusFilter,
   onSelect,
   onNew,
+  onNewIn,
   onOpenFolder,
+  onReveal,
+  onCopy,
   send,
 }: {
   rows: readonly ThreadRow[]
@@ -68,7 +71,10 @@ export function SidebarPane({
   focusFilter: number
   onSelect: (id: string | undefined) => void
   onNew: () => void
+  onNewIn: (cwd: string) => void
   onOpenFolder: () => void
+  onReveal: (path: string) => void
+  onCopy: (text: string) => void
   send: (command: Command) => void
 }): React.JSX.Element {
   return (
@@ -78,6 +84,9 @@ export function SidebarPane({
       onSelect={onSelect}
       onNew={onNew}
       onOpenFolder={onOpenFolder}
+      onNewIn={onNewIn}
+      onReveal={onReveal}
+      onCopy={onCopy}
       focusFilter={focusFilter}
       onDelete={(id: string) => {
         // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针

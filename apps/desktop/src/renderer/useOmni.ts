@@ -15,6 +15,8 @@ export interface Omni {
   stopFind: () => void
   /** 写系统剪贴板 */
   copy: (text: string) => void
+  /** 在访达里定位一个路径。只定位，不打开。 */
+  reveal: (path: string) => void
   /** 工作区内的文件模糊搜索，给 `@` 用 */
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   /**
@@ -110,6 +112,13 @@ export function useOmni(): Omni {
     [bridge],
   )
 
+  const reveal = useCallback(
+    (path: string) => {
+      bridge?.reveal(path)
+    },
+    [bridge],
+  )
+
   const searchFiles = useCallback(
     async (cwd: string, query: string) => (await bridge?.searchFiles(cwd, query)) ?? [],
     [bridge],
@@ -123,6 +132,7 @@ export function useOmni(): Omni {
     find,
     stopFind,
     copy,
+    reveal,
     searchFiles,
     bridgeMissing: bridge === undefined,
   }
