@@ -1,4 +1,5 @@
 import { Markdown } from "./Markdown.js"
+import { Reasoning } from "./Reasoning.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
@@ -52,11 +53,7 @@ export const ItemView = memo(function ItemView({
         </div>
       )
     case "reasoning":
-      return (
-        <div className="reasoning">
-          <Markdown text={item.text} streaming={!item.complete} />
-        </div>
-      )
+      return <Reasoning text={item.text} running={!item.complete} />
     case "plan":
       return <Plan steps={item.steps} />
     case "approval":

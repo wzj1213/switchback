@@ -9,12 +9,52 @@ import type { Item, ToolCallItem } from "@omni/protocol"
 export type Row =
   | { kind: "item"; item: Exclude<Item, ToolCallItem> }
   | { kind: "run"; items: readonly ToolCallItem[] }
+  /** 一轮的分界：跑完之后插在那一轮的提问和回答之间，说这一轮花了多久。 */
+  | { kind: "turn"; turnId: string; ms: number }
 
-export function groupRows(items: readonly Item[]): readonly Row[] {
+/**
+ * 一轮花了多久，从**这一轮自己的 item** 算。
+ *
+ * 不从 `Turn.startedAt` 算是因为 store 只留当前那一轮，跑完就摘掉了——
+ * 要让历史里每一轮都显示时长，就得再存一份完成记录。
+ * 而「第一条到最后一条」本来就是用户看到的那段时间，多存一份没有换来更准。
+ */
+function spanOf(items: readonly Item[], turnId: string): number {
+  const own = items.filter((i) => i.turnId === turnId)
+  const first = own[0]
+  const last = own[own.length - 1]
+  if (first === undefined || last === undefined) return 0
+  return Math.max(0, last.at - first.at)
+}
+
+/**
+ * @param activeTurnId 正在跑的那一轮。**它不插分界线**——时长还没有定数，
+ *   而底部那条常驻状态行正在实时报时。
+ */
+/** 这条 item 之后要不要插一条分界线。`marked` 会被就地更新——一轮只插一次。 */
+function markFor(
+  items: readonly Item[],
+  item: Item,
+  activeTurnId: string | undefined,
+  marked: Set<string>,
+): Row | undefined {
+  if (item.kind !== "user_message") return undefined
+  if (item.turnId === activeTurnId || marked.has(item.turnId)) return undefined
+  marked.add(item.turnId)
+  const ms = spanOf(items, item.turnId)
+  // 零时长不插：那一轮只有一条提问，没有可交代的过程
+  return ms > 0 ? { kind: "turn", turnId: item.turnId, ms } : undefined
+}
+
+export function groupRows(items: readonly Item[], activeTurnId?: string): readonly Row[] {
   const rows: Row[] = []
+  const marked = new Set<string>()
   for (const item of items) {
     if (item.kind !== "tool_call") {
       rows.push({ kind: "item", item })
+      // 分界线插在提问**之后**：它是这一轮回答的表头，说的是「下面这些花了多久」
+      const mark = markFor(items, item, activeTurnId, marked)
+      if (mark !== undefined) rows.push(mark)
       continue
     }
     const last = rows[rows.length - 1]

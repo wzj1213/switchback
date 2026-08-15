@@ -1,7 +1,17 @@
 /* transcript 内各类 item 的呈现。所有颜色走 token，不得出现字面量。 */
 
+/*
+ * 用户消息靠右。
+ *
+ * 上一版写了 `align-self: flex-end` 但**从来没生效过**——它的父节点是
+ * `Copyable` 那层 div，不是 flex 容器，所以那行声明落在了一个没人看的地方，
+ * 屏幕上一直是一块左对齐的 82% 宽色块。
+ *
+ * 现在让 `Copyable` 自己也参与列排布（`app.css` 的 `.copyable`），
+ * 靠右这件事才真的成立。codex 也是靠右的——提问和回答分列两侧，
+ * 一眼就能扫出「这段是我说的」。
+ */
 .msg--user {
-  align-self: flex-end;
   max-width: 82%;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
@@ -344,6 +354,14 @@
   position: relative;
 }
 
+/* 让「靠右」传得下去：`.msg--user` 的 `align-self` 挂在这一层上才有意义，
+   因为它才是 `.transcript__inner` 那个 flex 列的直接子节点 */
+.copyable:has(> .msg--user) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
 .copyable__btn {
   position: absolute;
   top: 0;
@@ -401,4 +419,134 @@
    只是出问题时两拨改动会混在一个 diff 里 */
 .chip--warn {
   color: var(--warn);
+}
+
+/* ── 一轮的分界 ───────────────────────────────────────
+ * codex 在提问和回答之间放一条「已处理 2 分 11 秒」加一道细线。
+ * 没有它，连着问三轮的 transcript 是一条看不出接缝的长流——
+ * 而「这一轮花了多久」恰恰是回头看时最想知道的一件事。
+ */
+.turnmark {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: calc(var(--sp-2) * -1);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 线画在文字右边，不是上下各一条：上下夹的那种像分节标题，
+   而这只是一个时间戳 */
+.turnmark::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── 推理：一行 ticker，不是一整段 ─────────────────────
+ * 跑的时候只画最后一行，**高度恒定**——它长它的，下面的东西一动不动。
+ * 上一版把它当正文铺开，一条长思考会把你正在读的回答顶出屏幕。
+ * 见 components/Reasoning.tsx。
+ */
+.think {
+  display: flex;
+  flex-direction: column;
+  margin: calc(var(--sp-2) * -1) 0;
+}
+
+.think__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+  /* 扫光要在这一层里裁掉 */
+  position: relative;
+  overflow: hidden;
+}
+
+.think__row:hover {
+  color: var(--text);
+}
+
+.think__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--text-faint);
+}
+
+.think__label {
+  flex: none;
+}
+
+/* 标题和内容之间的一个点。比竖线轻，比空格明确 */
+.think__dot {
+  flex: none;
+  width: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-faint);
+}
+
+/* **这一行是定高的**，整个组件的价值全在这里：
+   `nowrap` + `overflow:hidden`，内容再长也只占一行 */
+.think__line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.think__chev {
+  display: flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* 跑着的时候扫一道光。抄 dsh 的 reasoning-row-sweep：
+   隔几秒扫一次，比一刻不停地转圈省注意力 */
+.think[data-state="running"] .think__row::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 220px;
+  background: linear-gradient(90deg, transparent 0%, var(--bg-hover) 55%, transparent 100%);
+  animation: think-sweep 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes think-sweep {
+  0% {
+    left: -220px;
+  }
+  90%,
+  100% {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .think[data-state="running"] .think__row::after {
+    animation: none;
+  }
+}
+
+.think__body {
+  padding: var(--sp-2) 0 var(--sp-2) 24px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }

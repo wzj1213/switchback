@@ -4,7 +4,8 @@ import { ItemView } from "./ItemView.js"
 import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
-import { groupRows } from "../group.js"
+import { groupRows, type Row } from "../group.js"
+import { spent } from "../status.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 
 /**
@@ -33,6 +34,40 @@ function Blank({ thread }: { thread: Thread }): React.JSX.Element {
       </p>
       <p className="blank__path">{thread.cwd}</p>
     </div>
+  )
+}
+
+/** 一行的 key。三种行各有各的身份来源，抽出来免得写在 JSX 里看不清。 */
+function keyOf(row: Row): string {
+  if (row.kind === "turn") return `mark-${row.turnId}`
+  if (row.kind === "run") return row.items[0]?.id ?? "run"
+  return row.item.id
+}
+
+/** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
+function RowView({
+  row,
+  onCopy,
+  onResolve,
+}: {
+  row: Row
+  onCopy: (text: string) => void
+  onResolve: ResolveApproval
+}): React.JSX.Element {
+  // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
+  // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
+  if (row.kind === "turn") {
+    return (
+      <div className="turnmark">
+        <span>已处理 {spent(row.ms)}</span>
+      </div>
+    )
+  }
+  if (row.kind === "run") return <ToolRun items={row.items} />
+  return (
+    <Copyable item={row.item} onCopy={onCopy}>
+      <ItemView item={row.item} onResolve={onResolve} />
+    </Copyable>
   )
 }
 
@@ -68,15 +103,9 @@ export function Transcript({
     <div className="transcript" ref={scroller}>
       {items.length === 0 && turn === undefined ? <Blank thread={thread} /> : null}
       <div className="transcript__inner" ref={inner}>
-        {groupRows(items).map((row) =>
-          row.kind === "run" ? (
-            <ToolRun key={row.items[0]?.id} items={row.items} />
-          ) : (
-            <Copyable key={row.item.id} item={row.item} onCopy={onCopy}>
-              <ItemView item={row.item} onResolve={onResolve} />
-            </Copyable>
-          ),
-        )}
+        {groupRows(items, turn?.id).map((row) => (
+          <RowView key={keyOf(row)} row={row} onCopy={onCopy} onResolve={onResolve} />
+        ))}
       </div>
     </div>
   )

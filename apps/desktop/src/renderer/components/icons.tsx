@@ -238,3 +238,13 @@ export function DotBoxIcon({ size = 13 }: { size?: number }): React.JSX.Element 
     </Svg>
   )
 }
+
+/** 思考。灯泡太像「提示」，脑袋太具象——用一个想法气泡 */
+export function ThinkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M11.4 11.2H6.2L3.4 13.3v-2.1H2.9a1.4 1.4 0 0 1-1.4-1.4V4.1a1.4 1.4 0 0 1 1.4-1.4h8.5a1.4 1.4 0 0 1 1.4 1.4v5.7a1.4 1.4 0 0 1-1.4 1.4z" {...LINE} />
+      <path d="M5.2 6.9h.01M7.2 6.9h.01M9.2 6.9h.01" {...LINE} />
+    </Svg>
+  )
+}
