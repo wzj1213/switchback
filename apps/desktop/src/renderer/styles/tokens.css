@@ -52,6 +52,13 @@
   --text-base: 13.5px;
   --text-lg: 15px;
 
+  /* 语法高亮。四档就够读；全彩会把一屏代码变成圣诞树 */
+  --hl-keyword: #8250df;
+  --hl-string: #0a6640;
+  --hl-number: #b35900;
+  --hl-title: #1f5fbf;
+  --hl-type: #0f6b78;
+
   --sidebar-w: 232px;
   --content-max: 760px;
 }
@@ -72,6 +79,12 @@
     --text-muted: #9d9da8;
     --text-faint: #6d6d78;
     --text-inverse: #17171a;
+
+    --hl-keyword: #c792ea;
+    --hl-string: #7fd3a2;
+    --hl-number: #f0a868;
+    --hl-title: #82aaff;
+    --hl-type: #6fd6e0;
 
     --accent: #7aa2f7;
     --danger: #e0705c;

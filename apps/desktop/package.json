@@ -16,11 +16,13 @@
     "@omni/approval": "workspace:*",
     "@omni/engine": "workspace:*",
     "@omni/host": "workspace:*",
+    "@omni/journal": "workspace:*",
     "@omni/protocol": "workspace:*",
     "@omni/store": "workspace:*",
+    "highlight.js": "^11.12.0",
+    "lowlight": "^3.3.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "@omni/journal": "workspace:*"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

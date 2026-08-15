@@ -50,6 +50,9 @@ const VENDOR: ReadonlySet<string> = new Set([
   "micromark",
   "micromark-core-commonmark",
   "micromark-extension-gfm",
+  // 语法高亮：hljs 的语法定义又大又几乎不动，正是该进 vendor 的东西
+  "lowlight",
+  "highlight.js",
 ])
 
 /**

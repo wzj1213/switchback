@@ -144,3 +144,68 @@
 .md li > input[type="checkbox"] {
   margin-right: 6px;
 }
+
+/* ── 语法高亮 ─────────────────────────────────────────
+ * 自己写配色而不是引 highlight.js 的现成主题：那些主题自带背景色和字号，
+ * 会把代码块从这套界面里"抠"出来。这里只染字色，其余交给上面的 .md pre。
+ *
+ * 用色克制：关键字/字符串/注释三档拉开就够读，全彩会让一屏代码变成圣诞树。
+ */
+.hljs-comment,
+.hljs-quote {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name {
+  color: var(--hl-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: var(--hl-number);
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-title.class_,
+.hljs-title.function_ {
+  color: var(--hl-title);
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-selector-class,
+.hljs-built_in {
+  color: var(--hl-type);
+}
+
+.hljs-deletion {
+  color: var(--danger);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
