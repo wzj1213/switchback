@@ -39,6 +39,22 @@ export interface ReclaimReport {
 export interface ProcessOwner {
   /** Claude 侧交给 SDK 的 `spawnClaudeCodeProcess`；codex 侧自己调。 */
   spawn: (options: SpawnRequest) => ChildProcess
+  /**
+   * 起进程本身失败了吗（`ENOENT`、权限不足这一类）。
+   *
+   * **必须有人问这一句。** `ChildProcess` 的 `error` 事件没人监听时会变成
+   * 未捕获异常，直接掀翻整个进程——在 Electron 主进程里就是应用当场退出。
+   * 本模块无条件挂上监听，把错误存下来交给调用方判断。
+   */
+  failure: () => Error | undefined
+  /**
+   * 进程起不来或过早退出时 resolve（永不 reject）。
+   *
+   * 用来和握手**赛跑**：起不来这件事在毫秒级就已知，不该让用户干等一个
+   * 二十秒的超时。没 spawn 过的话这个 promise 永远挂着——那正是我们要的，
+   * 它只在 race 的另一边有意义。
+   */
+  died: () => Promise<Error>
   /** 回收阶梯。幂等；返回时要么有退出证明，要么 rung 是 `escaped`。 */
   reclaim: () => Promise<ReclaimReport>
 }
@@ -74,6 +90,43 @@ interface Owned {
   exited: boolean
   code: number | null
   signal: NodeJS.Signals | null
+  error: Error | undefined
+  died: Promise<Error>
+  settle: (error: Error) => void
+}
+
+/**
+ * 接管一个刚起的子进程。
+ *
+ * 两件事都不能省：`error` 必须无条件监听（没人听就是未捕获异常，掀翻整个进程），
+ * `died` 必须只 resolve 一次（后续的 exit 不该覆盖最先发生的那个原因）。
+ */
+function own(child: ChildProcess): Owned {
+  const deferred: { settle: (error: Error) => void } = { settle: () => undefined }
+  const died = new Promise<Error>((resolve) => {
+    deferred.settle = resolve
+  })
+  const owned: Owned = {
+    child,
+    exited: false,
+    code: null,
+    signal: null,
+    error: undefined,
+    died,
+    settle: deferred.settle,
+  }
+  child.on("error", (error: Error) => {
+    owned.error = error
+    owned.exited = true
+    owned.settle(error)
+  })
+  child.on("exit", (code, signal) => {
+    owned.exited = true
+    owned.code = code
+    owned.signal = signal
+    owned.settle(new Error(`进程已退出（code ${String(code)}${signal === null ? "" : ` signal ${signal}`}）`))
+  })
+  return owned
 }
 
 export function createProcessOwner(config: Partial<ReclaimConfig> = {}): ProcessOwner {
@@ -89,13 +142,7 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
       stdio: ["pipe", "pipe", "pipe"],
       detached: true,
     })
-    const owned: Owned = { child, exited: false, code: null, signal: null }
-    child.on("exit", (code, signal) => {
-      owned.exited = true
-      owned.code = code
-      owned.signal = signal
-    })
-    state.owned = owned
+    state.owned = own(child)
     return child
   }
 
@@ -136,5 +183,11 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
     return report("escaped", started)
   }
 
-  return { spawn: doSpawn, reclaim }
+  return {
+    spawn: doSpawn,
+    failure: () => state.owned?.error,
+    // 没 spawn 过就永远挂着——它只在 race 的另一边有意义
+    died: () => state.owned?.died ?? new Promise<Error>(() => undefined),
+    reclaim,
+  }
 }

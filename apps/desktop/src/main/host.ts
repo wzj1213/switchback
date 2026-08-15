@@ -10,6 +10,14 @@ export interface Attached {
   host: Host
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
+  /**
+   * 把一次失败翻成界面看得见的东西。
+   *
+   * **每一条通往 `dispatch` 的路都必须经过它。** 之前只有 IPC 那条有 catch，
+   * 开机自动建会话那条是裸的 `void promise`——引擎起不来时它变成一条未处理拒绝，
+   * 界面就永远停在「正在打开工作区…」，没有报错、没有超时、什么都没有。
+   */
+  report: (error: unknown, threadId?: ThreadId) => void
 }
 
 /**
@@ -46,20 +54,24 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     return result.canceled ? undefined : result.filePaths[0]
   })
 
+  const report = (error: unknown, threadId?: ThreadId): void => {
+    emit({
+      type: "engine.status",
+      at: Date.now(),
+      threadId: threadId ?? "",
+      status: "crashed",
+      detail: error instanceof Error ? error.message : String(error),
+    })
+  }
+
   ipcMain.on("omni:command", (_e, command: Command) => {
     // 命令失败不能掐掉主进程：翻成一条状态事件送回界面
     void host.dispatch(command).catch((error: unknown) => {
-      emit({
-        type: "engine.status",
-        at: Date.now(),
-        threadId: "threadId" in command ? command.threadId : "",
-        status: "crashed",
-        detail: error instanceof Error ? error.message : String(error),
-      })
+      report(error, "threadId" in command ? command.threadId : undefined)
     })
   })
 
-  return { host, lastThreadId: () => seen.thread }
+  return { host, lastThreadId: () => seen.thread, report }
 }
 
 /**
@@ -71,6 +83,16 @@ export async function seedDefaultThread(
   cwd: string,
   prompt?: string,
 ): Promise<void> {
+  try {
+    await seed(attached, cwd, prompt)
+  } catch (error) {
+    // 引擎起不来是最常见的开箱故障（没装、没登录、版本不对），
+    // 它必须变成界面上的一条横幅，而不是一条没人看的未处理拒绝
+    attached.report(error)
+  }
+}
+
+async function seed(attached: Attached, cwd: string, prompt?: string): Promise<void> {
   await attached.host.dispatch({
     type: "thread.create",
     cwd,

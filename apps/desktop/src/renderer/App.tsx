@@ -5,6 +5,7 @@ import { Sidebar } from "./components/Sidebar.js"
 import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
 import { Transcript } from "./components/Transcript.js"
 import { ContextMeter } from "./components/ContextMeter.js"
+import { Notices } from "./components/Notices.js"
 import { useOmni } from "./useOmni.js"
 
 function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
@@ -29,6 +30,20 @@ function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined })
   )
 }
 
+/**
+ * 空状态说什么。
+ *
+ * 有故障横幅时**不能**再说「正在打开工作区…」——那是句谎话，它永远不会打开，
+ * 用户会一直等下去。一个会等到天亮的加载提示比一句直白的失败更糟。
+ */
+function emptyText(bridgeMissing: boolean, failed: boolean): string {
+  if (bridgeMissing) {
+    return "与主进程的通道没建立（preload 未注入）。界面此时点什么都不会有反应——先查主进程日志。"
+  }
+  if (failed) return "没有可用的会话。上方的故障说明了原因；处理好之后点「＋ 新建会话」重试。"
+  return "正在打开工作区…"
+}
+
 function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.Element {
   return (
     <div className="transcript">
@@ -42,8 +57,11 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
 export function App(): React.JSX.Element {
   const { state, send, pickFolder, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  const [dismissed, setDismissed] = useState<string | undefined>(undefined)
 
   const rows = threadRowsOf(state)
+  // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
+  const notices = state.notices.filter((n) => n.id !== dismissed)
   const thread = rows.find((r) => r.thread.id === selectedId)?.thread ?? rows[0]?.thread
   const items = thread === undefined ? [] : itemsOf(state, thread.id)
   const turn = thread === undefined ? undefined : turnOf(state, thread.id)
@@ -77,14 +95,8 @@ export function App(): React.JSX.Element {
           onOpenFolder={openPicker}
         />
         <main className="main">
-          <Notice
-            fatal={bridgeMissing}
-            text={
-              bridgeMissing
-                ? "与主进程的通道没建立（preload 未注入）。界面此时点什么都不会有反应——先查主进程日志。"
-                : "正在打开工作区…"
-            }
-          />
+          <Notices notices={notices} onDismiss={setDismissed} />
+          <Notice fatal={bridgeMissing} text={emptyText(bridgeMissing, notices.length > 0)} />
         </main>
       </div>
     )
@@ -103,6 +115,7 @@ export function App(): React.JSX.Element {
       />
       <main className="main">
         <TopBar thread={thread} usage={usageOf(state, thread.id)} />
+        <Notices notices={notices} onDismiss={setDismissed} />
         <Transcript thread={thread} items={items} turn={turn} send={send} />
         <Composer
           // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，

@@ -207,3 +207,44 @@ describe("threadRowsOf", () => {
     expect(threadRowsOf(state).map((r) => r.thread.id)).toEqual(["b", "a"])
   })
 })
+
+describe("引擎故障通知", () => {
+  const status = (s: string, detail?: string, threadId = "a"): Event => ({
+    type: "engine.status",
+    at: 1,
+    threadId,
+    status: s as "crashed",
+    ...(detail === undefined ? {} : { detail }),
+  })
+
+  it("crashed / timeout 才进通知——starting/ready/exited 是正常生命周期", () => {
+    const s = reduceAll(initial(), [
+      status("starting"),
+      status("ready"),
+      status("exited"),
+      status("crashed", "找不到可执行文件 codex"),
+      status("timeout", "握手超时"),
+    ])
+    expect(s.notices.map((n) => n.text)).toEqual(["找不到可执行文件 codex", "握手超时"])
+  })
+
+  it("没有 detail 时也要有一句话，不能是空白横幅", () => {
+    expect(reduceAll(initial(), [status("crashed")]).notices[0]?.text).toContain("没有描述")
+  })
+
+  it("threadId 为空串时归一成 undefined——建会话就失败时还没有会话", () => {
+    expect(reduceAll(initial(), [status("crashed", "x", "")]).notices[0]?.threadId).toBeUndefined()
+  })
+
+  it("id 由序号生成，归约器是纯函数不能用时间戳或随机数", () => {
+    const s = reduceAll(initial(), [status("crashed", "一"), status("crashed", "二")])
+    expect(s.notices.map((n) => n.id)).toEqual(["n1", "n2"])
+  })
+
+  it("只留最近 20 条——它不是日志", () => {
+    const many = Array.from({ length: 30 }, (_, i) => status("crashed", `第 ${String(i)} 条`))
+    const s = reduceAll(initial(), many)
+    expect(s.notices).toHaveLength(20)
+    expect(s.notices[19]?.text).toBe("第 29 条")
+  })
+})

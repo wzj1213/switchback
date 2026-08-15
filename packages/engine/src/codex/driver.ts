@@ -49,6 +49,24 @@ const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
 
 const STDERR_KEEP = 2000
 
+/** 握手上限。超过这个还没回 `initialize`，就当它起不来了。 */
+const HANDSHAKE_MS = 20_000
+
+/**
+ * 把起进程的失败翻成人能照着做的一句话。
+ *
+ * `Error: spawn codex ENOENT` 对用户毫无意义——他要知道的是「装了没」「装哪了」。
+ * 这是生产可用与否的分界线之一：报错必须说得出下一步该干什么。
+ */
+function startupMessage(command: string, error: Error): string {
+  const code = (error as NodeJS.ErrnoException).code
+  if (code === "ENOENT") {
+    return `找不到可执行文件 \`${command}\`。请确认已安装 codex CLI，且它在 PATH 上（终端里跑 \`which codex\` 验证）。`
+  }
+  if (code === "EACCES") return `没有权限执行 \`${command}\`。`
+  return `启动 \`${command}\` 失败：${error.message}`
+}
+
 interface SessionState {
   child: ChildProcess | undefined
   codexThread: string | undefined
@@ -64,6 +82,8 @@ export interface CodexDriverConfig {
   args?: readonly string[]
   reclaim?: Partial<ReclaimConfig>
 }
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 class CodexSession implements EngineSession {
   private readonly owner: ProcessOwner
@@ -148,8 +168,7 @@ class CodexSession implements EngineSession {
     this.state.child = child
     this.wire(child)
 
-    await this.rpc.call("initialize", { clientInfo: CLIENT_INFO, capabilities: null })
-    this.rpc.notify("initialized")
+    await this.handshake()
     const started = await this.rpc.call("thread/start", {
       cwd: this.req.cwd,
       approvalPolicy: POLICY,
@@ -159,6 +178,28 @@ class CodexSession implements EngineSession {
     if (id === undefined) throw new Error("codex 没有返回 thread id，无法继续")
     this.state.codexThread = id
     this.status("ready")
+  }
+
+  /**
+   * 握手。**必须有超时，也必须看 spawn 本身是否失败**。
+   *
+   * 起不来的进程不会产出任何 stdout，`rpc.call("initialize")` 于是永远不 resolve，
+   * 界面就一直停在「正在打开工作区…」——没有报错、没有超时、什么都没有，
+   * 这是最难查的一类故障。
+   */
+  private async handshake(): Promise<void> {
+    const command = this.config.command ?? "codex"
+    const result = await Promise.race([
+      this.rpc.call("initialize", { clientInfo: CLIENT_INFO, capabilities: null }).then(() => "ok" as const),
+      this.owner.died().then((error) => ({ died: error })),
+      sleep(HANDSHAKE_MS).then(() => "timeout" as const),
+    ])
+    if (typeof result === "object") throw new Error(startupMessage(command, result.died))
+    if (result === "timeout") {
+      const tail = this.state.stderr === "" ? "" : `\n${this.state.stderr}`
+      throw new Error(`codex 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
+    }
+    this.rpc.notify("initialized")
   }
 
   /**

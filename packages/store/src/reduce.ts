@@ -1,5 +1,5 @@
 import type { Event, Item, ItemId, ThreadId } from "@omni/protocol"
-import { type ViewState } from "./state.js"
+import { type Notice, type ViewState } from "./state.js"
 
 function withThread(state: ViewState, thread: ViewState["threads"][string]): ViewState {
   const known = state.threads[thread.id] !== undefined
@@ -80,6 +80,27 @@ function onTurnCompleted(
   return { ...state, turns: omit(state.turns, threadId) }
 }
 
+/** 只有这两档需要打断用户。`starting` / `ready` / `exited` 是正常生命周期。 */
+const LOUD = new Set(["crashed", "timeout"])
+
+/** 最多留这么多条，够排查即可——它不是日志。 */
+const MAX_NOTICES = 20
+
+function onEngineStatus(
+  state: ViewState,
+  event: Extract<Event, { type: "engine.status" }>,
+): ViewState {
+  if (!LOUD.has(event.status)) return state
+  const seq = state.noticeSeq + 1
+  const notice: Notice = {
+    id: `n${String(seq)}`,
+    at: event.at,
+    text: event.detail ?? "引擎报告了一个没有描述的故障",
+    threadId: event.threadId === "" ? undefined : event.threadId,
+  }
+  return { ...state, noticeSeq: seq, notices: [...state.notices, notice].slice(-MAX_NOTICES) }
+}
+
 /**
  * 事件 → 状态。纯函数、不可变。
  *
@@ -105,6 +126,8 @@ export function reduce(state: ViewState, event: Event): ViewState {
       return patchItem(state, event.item.id, () => event.item)
     case "usage.updated":
       return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
+    case "engine.status":
+      return onEngineStatus(state, event)
     default:
       return state
   }

@@ -15,10 +15,38 @@ export interface ViewState {
   turnOwner: Readonly<Record<TurnId, ThreadId>>
   /** 每个会话的上下文用量。引擎不报就没有这一项。 */
   usage: Readonly<Record<ThreadId, Usage>>
+  /** 引擎层面的故障。最新在后。 */
+  notices: readonly Notice[]
+  /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
+  noticeSeq: number
+}
+
+/**
+ * 一条要让用户看见的引擎故障。
+ *
+ * 在这之前 `engine.status` 事件被归约器整个丢弃——引擎起不来、崩了、
+ * 进程泄漏，界面上一律**毫无反应**。那不是「没做的功能」，那是故障被吞掉。
+ */
+export interface Notice {
+  id: string
+  at: number
+  text: string
+  /** 关联的会话；`thread.create` 阶段就失败时没有会话，这里是 undefined。 */
+  threadId: ThreadId | undefined
 }
 
 export function initial(): ViewState {
-  return { threads: {}, order: [], items: {}, turns: {}, owner: {}, turnOwner: {}, usage: {} }
+  return {
+    threads: {},
+    order: [],
+    items: {},
+    turns: {},
+    owner: {},
+    turnOwner: {},
+    usage: {},
+    notices: [],
+    noticeSeq: 0,
+  }
 }
 
 /** 取一个会话的 item 列表；不存在时给空数组，调用方不用判空。 */
