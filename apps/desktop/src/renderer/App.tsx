@@ -109,6 +109,7 @@ export function App(): React.JSX.Element {
           app.stopFind()
         }}
         onCopy={app.copy}
+        onReveal={app.reveal}
         searchFiles={app.searchFiles}
         send={app.send}
       />

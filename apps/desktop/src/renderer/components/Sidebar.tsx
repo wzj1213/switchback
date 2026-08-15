@@ -221,6 +221,7 @@ export function Sidebar({
               onSelect,
               onDelete,
               onRowMenu: rowMenu,
+              onOpenFolder,
               rename,
               onGroupMenu: groupMenu,
             }}

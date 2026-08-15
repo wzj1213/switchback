@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { PROJECT_MAX, baseNameOf, type Group, type Sections } from "../sidebar.js"
-import { ChevronIcon } from "./icons.js"
+import { ChevronIcon, PlusIcon } from "./icons.js"
 import { GroupBlock, Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
 
@@ -12,24 +12,49 @@ import type { RenameCtl } from "./RowName.js"
  * 用户看不出「这几个是我钉住的」，也就想不起来还能取消。
  */
 
-/** 分节标题。`›` 表示整段可折叠——codex 的三段也都是可折叠的。 */
+/**
+ * 分节标题。`›` 表示整段可折叠——codex 的三段也都是可折叠的。
+ *
+ * ## 悬停时右边那颗按钮
+ *
+ * 只有「项目」段有（`+` = 再开一个项目）。**另外两段故意没有。**
+ *
+ * 「置顶」段能想到的操作是「全部取消置顶」，那是一下子推翻用户所有安排的动作，
+ * 藏在一个悬停才出现的小按钮后面太轻率；「最近」段能想到的是「清空」，
+ * 而那一段里躺的是真会话，清掉的是记录本身，不是一份缓存。
+ *
+ * 为了让三段看起来整齐而各摆一颗按钮，是拿危险动作填版面。
+ */
 export function SectionHead({
   title,
   open,
   onToggle,
-  extra,
+  action,
 }: {
   title: string
   open: boolean
   onToggle: () => void
-  extra?: React.ReactNode
+  /** 悬停时右边露出来的那颗。 */
+  action?: { label: string; icon: React.ReactNode; run: () => void }
 }): React.JSX.Element {
   return (
-    <button type="button" className="sidebar__section" onClick={onToggle}>
-      <span>{title}</span>
-      <ChevronIcon open={open} size={11} />
-      {extra}
-    </button>
+    <div className="sidebar__section">
+      <button type="button" className="sidebar__section-main" onClick={onToggle}>
+        <span>{title}</span>
+        <ChevronIcon open={open} size={11} />
+      </button>
+      {action === undefined ? null : (
+        <button
+          type="button"
+          className="row__act sidebar__section-act"
+          aria-label={action.label}
+          title={action.label}
+          onClick={action.run}
+        >
+          {action.icon}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -43,6 +68,8 @@ export interface GroupHandlers {
   onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
   rename?: RenameCtl
   onGroupMenu: (event: React.MouseEvent, group: Group) => void
+  /** 「项目」段标题上那颗 `+`。 */
+  onOpenFolder: () => void
 }
 
 function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
@@ -148,7 +175,14 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         </>
       )}
 
-      <SectionHead title="项目" open={open("proj")} onToggle={() => { toggle("proj") }} />
+      <SectionHead
+        title="项目"
+        open={open("proj")}
+        onToggle={() => {
+          toggle("proj")
+        }}
+        action={{ label: "打开一个文件夹", icon: <PlusIcon />, run: on.onOpenFolder }}
+      />
       {open("proj") ? <Projects groups={sections.projects} on={on} /> : null}
 
       {sections.recent.length === 0 ? null : (

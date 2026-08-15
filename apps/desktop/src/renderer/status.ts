@@ -1,5 +1,6 @@
 import type { Item, Thread } from "@omni/protocol"
 import { VERB, brief } from "./tool.js"
+import { headingOf } from "./reasoning.js"
 
 /**
  * 运行态说什么。
@@ -14,7 +15,16 @@ export function statusLabel(thread: Thread, items: readonly Item[]): string | un
   if (thread.status !== "running") return undefined
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i]
-    if (item?.kind !== "tool_call") continue
+    if (item === undefined) continue
+    // **最后一条推理里模型自己给这一段起的小标题**，比「正在思考」有信息量得多。
+    // 放在工具之前判断是因为它就在工具的上一条——模型先说「我要去看看 X」，
+    // 再去调工具；调用一结束又接着说下一段
+    if (item.kind === "reasoning") {
+      const heading = headingOf(item.text)
+      if (heading !== undefined) return heading
+      break
+    }
+    if (item.kind !== "tool_call") continue
     if (item.status !== "running" && item.status !== "pending") break
     return `${VERB[item.detail.kind]} ${brief(item.detail)}`
   }

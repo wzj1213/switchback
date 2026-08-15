@@ -1,7 +1,9 @@
+import { useRef, useState } from "react"
 import type { Command, EngineInfo, Item, ModelOption, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
 import { Composer, labelOf } from "./Composer.js"
-import { CompareIcon, ForkIcon } from "./icons.js"
+import { CaretIcon, CompareIcon, ForkIcon } from "./icons.js"
+import { EnvCard } from "./EnvCard.js"
 import { Transcript } from "./Transcript.js"
 import { Changed } from "./Changed.js"
 import { ContextMeter } from "./ContextMeter.js"
@@ -49,6 +51,8 @@ function TopBar({
   peer,
   onFork,
   onCompare,
+  onReveal,
+  onCopy,
 }: {
   thread: Thread
   usage: Usage | undefined
@@ -57,12 +61,42 @@ function TopBar({
   peer: Thread | undefined
   onFork: (to: string) => void
   onCompare: () => void
+  onReveal: (path: string) => void
+  onCopy: (text: string) => void
 }): React.JSX.Element {
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
+  const [env, setEnv] = useState(false)
+  const envAnchor = useRef<HTMLButtonElement>(null)
   return (
     <header className="topbar">
-      <span className="topbar__title">{thread.title}</span>
+      {/* 标题点开是环境信息。**把它挂在标题上**而不是另放一颗按钮：
+          「我在哪个会话里」和「这个会话跑在什么环境里」是同一个问题的两半 */}
+      <button
+        ref={envAnchor}
+        type="button"
+        className="topbar__title"
+        title="环境信息"
+        aria-expanded={env}
+        onClick={() => {
+          setEnv((v) => !v)
+        }}
+      >
+        {thread.title}
+        <CaretIcon size={11} />
+      </button>
+      {env ? (
+        <EnvCard
+          thread={thread}
+          engines={engines}
+          anchor={envAnchor.current}
+          onReveal={onReveal}
+          onCopy={onCopy}
+          onClose={() => {
+            setEnv(false)
+          }}
+        />
+      ) : null}
       {thread.detached === true ? <span className="badge badge--muted">历史记录</span> : null}
       {handedOff ? (
         <span className="badge" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
@@ -116,6 +150,8 @@ export interface WorkspaceProps {
   onCloseFind: () => void
   /** 写剪贴板 */
   onCopy: (text: string) => void
+  /** 在访达里定位工作区。环境卡片上那颗按钮用。 */
+  onReveal: (path: string) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   send: (command: Command) => void
 }
@@ -139,6 +175,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onFork={(to) => {
           send({ type: "thread.fork", threadId: thread.id, to })
         }}
+        onReveal={props.onReveal}
+        onCopy={props.onCopy}
       />
       <Notices notices={props.notices} onDismiss={props.onDismiss} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}

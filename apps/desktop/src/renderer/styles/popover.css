@@ -215,3 +215,67 @@
   color: var(--text-faint);
   font-size: var(--text-xs);
 }
+
+/* ── 环境信息卡片 ────────────────────────────────
+ * 「我到底在哪儿、用谁、什么权限」——平时这些字散在四处（各贴各的地方，
+ * 那样是对的），但切会话切多了、或者刚接力换过引擎之后，你要的是全部。
+ */
+.env {
+  padding: var(--sp-3);
+  font-size: var(--text-sm);
+}
+
+.env__title {
+  margin-bottom: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.env__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 3px 0;
+}
+
+.env__icon {
+  display: flex;
+  flex: none;
+  align-self: center;
+  width: 16px;
+  color: var(--text-faint);
+}
+
+/* 标签列定宽：三四行标签左对齐、值也左对齐，扫一眼就能纵向比 */
+.env__label {
+  flex: none;
+  width: 3.5em;
+  color: var(--text-faint);
+}
+
+.env__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.env__warn {
+  margin-left: var(--sp-2);
+  color: var(--warn);
+}
+
+.env__acts {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.btn--slim {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px var(--sp-2);
+  font-size: var(--text-xs);
+}

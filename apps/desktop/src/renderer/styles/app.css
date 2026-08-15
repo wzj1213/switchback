@@ -259,24 +259,38 @@ body {
 }
 
 /* 分节标题：整个侧栏里唯一不带图标的一行，所以它对着**文字列**，
-   而不是图标列——一小段全大写的灰字挂在图标列上会显得悬空 */
-/* 分节标题：整个侧栏里唯一不带图标的一行，所以它对着**文字列**，
    而不是图标列——一小段灰字挂在图标列上会显得悬空 */
 .sidebar__section {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 3px;
   width: calc(100% - var(--sb-pad) * 2);
   margin: 0 var(--sb-pad);
-  padding: var(--sp-4) 0 var(--sp-1) var(--sb-slot);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  padding-left: var(--sb-slot);
   color: var(--text-faint);
-  font: inherit;
   font-size: var(--text-sm);
+}
+
+.sidebar__section-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: var(--sp-4) 0 var(--sp-1);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
   text-align: left;
   cursor: default;
+}
+
+/* 段标题上那颗按钮比行内的低一点点——它要和已经往下压过的标题基线对齐 */
+.sidebar__section-act {
+  align-self: flex-end;
+  margin-bottom: 1px;
 }
 
 .sidebar__section:hover {
@@ -473,12 +487,36 @@ body {
   -webkit-app-region: drag;
 }
 
+/* 标题现在可点（点开环境信息）。**平时看不出是按钮**——它首先是标题，
+   悬停才浮出一层底色。做成一直带框的胶囊会把顶栏最重的那个字变成一个控件 */
 .topbar__title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 40%;
+  margin-left: -6px;
+  padding: 2px 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: var(--text-base);
   font-weight: 550;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.topbar__title:hover {
+  background: var(--bg-hover);
+}
+
+/* 那个小箭头平时淡到几乎看不见——它是「还有更多」的暗示，不是招牌 */
+.topbar__title > svg {
+  flex: none;
+  color: var(--text-faint);
 }
 
 .topbar__spacer {
