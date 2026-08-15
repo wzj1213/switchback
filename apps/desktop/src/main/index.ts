@@ -188,57 +188,107 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
   scheduleDevShot(win)
 }
 
-void app.whenReady().then(async () => {
-  installSettingsChannel(settings)
-  installAppChannels()
-  installWorksiteChannel()
-  applyDevTheme()
-  log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
-  installMenu(
-    () => exportReport(log, crash),
-    () => {
-      // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
-      // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
-      void shell.openPath(ensureEngineFile(app.getPath("userData")))
-    },
-    feed === "" ? undefined : () => runUpdateCheck(true),
-  )
-  // 背景检查只在配了 feed 时跑，而且**只在有新版本时才出声**
-  if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)
-  installFind(() => BrowserWindow.getAllWindows())
-  watchProcesses(log, () => BrowserWindow.getAllWindows())
-  const attached = attachHost(() => BrowserWindow.getAllWindows(), log)
-  const bounds = await loadBounds()
-  const win = createWindow(bounds)
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
+/**
+ * 只允许开一个 omni。
+ *
+ * ## 为什么这不是「体验优化」，是数据完整性
+ *
+ * 两个实例共用同一个 `userData`：**同一份 journal、同一份日志、同一个
+ * Crashpad 数据库**。于是——
+ *
+ * - 两个宿主各自往同一批 jsonl 里 append，谁也不知道对方写了什么；
+ * - 两边各自「开机自动建默认会话」，磁盘上凭空多出一个没人开过的会话
+ *   （2026-08-14 我遇到过一次凭空多出来的分叉，查不出原因，八成就是这个）；
+ * - 两个 crashpad handler 抢同一个数据库，实测直接 `FATAL: mach_port_request_notification`。
+ *
+ * 这些全都**不报错**，只是数据慢慢变得对不上。
+ *
+ * ## 第二个实例做什么
+ *
+ * 不是静默退出——那样双击图标像是「点了没反应」。把已经开着的那扇窗
+ * 举到前面来，这正是用户点第二下想要的东西。
+ */
+function claimSingleInstance(): boolean {
+  if (app.requestSingleInstanceLock()) return true
+  app.quit()
+  return false
+}
+
+if (!claimSingleInstance()) {
+  // `app.quit()` 是异步的，这里必须挡住后面的启动流程，
+  // 否则这个注定要退出的实例还是会先建窗口、先碰一遍 journal
+  log.write("info", "app", "已经有一个 omni 在跑了，把那扇窗举到前面，这个实例退出")
+} else {
+  void bootstrap()
+}
+
+function bootstrap(): Promise<void> {
+  return app.whenReady().then(async () => {
+    installSettingsChannel(settings)
+    installAppChannels()
+    installWorksiteChannel()
+    applyDevTheme()
+    log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
+    installMenu(
+      () => exportReport(log, crash),
+      () => {
+        // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
+        // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
+        void shell.openPath(ensureEngineFile(app.getPath("userData")))
+      },
+      feed === "" ? undefined : () => runUpdateCheck(true),
+    )
+    // 背景检查只在配了 feed 时跑，而且**只在有新版本时才出声**
+    if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)
+    installFind(() => BrowserWindow.getAllWindows())
+    watchProcesses(log, () => BrowserWindow.getAllWindows())
+    const attached = attachHost(() => BrowserWindow.getAllWindows(), log)
+    const bounds = await loadBounds()
+    const win = createWindow(bounds)
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
+    })
+    // **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
+    // 用户按了 ⌘R）之后状态是空的，只补增量补不出前面的历史。
+    // **重建和开会话必须串起来，不能各跑各的。** 两条独立的异步链会互相插队：
+    // 开机自动建的那个会话刚发完事件，重建的全量就把状态清了，
+    // 而那些事件因为「seq <= resumeAt」被当成旧消息丢掉——会话还在，内容没了
+    let seeded = false
+    win.webContents.on("did-finish-load", () => {
+      void rebuild(attached, win.webContents)
+        .then((recent) => {
+          if (seeded) return undefined
+          seeded = true
+          return seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), recent)
+        })
+        .catch((error: unknown) => {
+          log.write("error", "ipc", `全量重建失败：${String(error)}`)
+        })
+    })
+    // 开发钩子只挂一次，和重建是两回事——它们不依赖会话，也不该在重载时重复挂
+    win.webContents.once("did-finish-load", () => {
+      installDevHooks(win, attached, log)
+    })
+    app.on("before-quit", () => {
+      void attached.host.dispose()
+      // 正常退出：把运行标记撤掉，下次启动才不会误报一次崩溃
+      clearMarker()
+    })
   })
-  // **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
-  // 用户按了 ⌘R）之后状态是空的，只补增量补不出前面的历史。
-  // **重建和开会话必须串起来，不能各跑各的。** 两条独立的异步链会互相插队：
-  // 开机自动建的那个会话刚发完事件，重建的全量就把状态清了，
-  // 而那些事件因为「seq <= resumeAt」被当成旧消息丢掉——会话还在，内容没了
-  let seeded = false
-  win.webContents.on("did-finish-load", () => {
-    void rebuild(attached, win.webContents)
-      .then((recent) => {
-        if (seeded) return undefined
-        seeded = true
-        return seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), recent)
-      })
-      .catch((error: unknown) => {
-        log.write("error", "ipc", `全量重建失败：${String(error)}`)
-      })
-  })
-  // 开发钩子只挂一次，和重建是两回事——它们不依赖会话，也不该在重载时重复挂
-  win.webContents.once("did-finish-load", () => {
-    installDevHooks(win, attached, log)
-  })
-  app.on("before-quit", () => {
-    void attached.host.dispose()
-    // 正常退出：把运行标记撤掉，下次启动才不会误报一次崩溃
-    clearMarker()
-  })
+}
+
+/**
+ * 有人又双击了一次图标（或者在终端里又跑了一次）。
+ *
+ * 把已经开着的那扇窗举到前面。**静默退出是不行的**——那样第二下点击
+ * 看起来就是「点了没反应」，而人接下来会点第三下、第四下。
+ */
+app.on("second-instance", () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (win === undefined) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
 })
 
 app.on("window-all-closed", () => {

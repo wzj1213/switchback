@@ -105,6 +105,9 @@ export function SidebarPane({
         if (id === thread?.id) onSelect(undefined)
         send({ type: "thread.delete", threadId: id })
       }}
+      onRename={(id: string, title: string) => {
+        send({ type: "thread.rename", threadId: id, title })
+      }}
     />
   )
 }

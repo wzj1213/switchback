@@ -52,3 +52,22 @@ describe("挨着的 delta 并成一条", () => {
     )
   })
 })
+
+describe("改名归约", () => {
+  const born: Event = {
+    type: "thread.started",
+    at: 0,
+    thread: { id: "t", title: "老名字", cwd: "/w", engine: "claude", trust: "auto-edit", status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["claude"] },
+  }
+
+  it("换掉标题", () => {
+    const s = reduceAll(initial(), [born, { type: "thread.renamed", at: 1, threadId: "t", title: "新名字" }])
+    expect(s.threads["t"]?.title).toBe("新名字")
+  })
+
+  it("**不认识的 id 直接忽略**——凭空造一个只有标题的会话比丢掉这次改名糟得多", () => {
+    const s = reduceAll(initial(), [{ type: "thread.renamed", at: 1, threadId: "查无此人", title: "x" }])
+    expect(s.threads["查无此人"]).toBeUndefined()
+    expect(s.order).toEqual([])
+  })
+})

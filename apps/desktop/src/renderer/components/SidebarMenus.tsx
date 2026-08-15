@@ -1,6 +1,8 @@
 import type { Command } from "./Menu.js"
 import type { Group } from "../sidebar.js"
-import { CopyIcon, PinIcon, PlusIcon, RevealIcon } from "./icons.js"
+import type { ThreadRow } from "@omni/store"
+import { CopyIcon, PinIcon, PlusIcon, RevealIcon, TrashIcon } from "./icons.js"
+import { PencilIcon } from "./icons-activity.js"
 
 /*
  * 侧栏右键菜单的内容：能做什么（`workspaceCommands`）、点的是什么（`ProjectHead`）。
@@ -60,4 +62,31 @@ export function ProjectHead({ group }: { group: Group }): React.JSX.Element {
       </div>
     </>
   )
+}
+
+/**
+ * 两个右键菜单：会话行的、项目行的。
+ *
+ * **前四项必须一样**（见 `workspaceCommands`），差别只在两头：
+ * 会话多「重命名」和「删除」，项目多一张说明卡片。
+ */
+export function useSidebarMenus(
+  acts: Acts,
+  openMenu: (event: React.MouseEvent, commands: readonly Command[], head?: React.ReactNode) => void,
+): {
+  rowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
+  groupMenu: (event: React.MouseEvent, group: Group) => void
+} {
+  return {
+    rowMenu: (event, row, arm, ren) => {
+      openMenu(event, [
+        { label: "重命名", icon: <PencilIcon />, run: ren },
+        ...workspaceCommands(row.thread.cwd, acts),
+        { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm },
+      ])
+    },
+    groupMenu: (event, group) => {
+      openMenu(event, workspaceCommands(group.cwd, acts), <ProjectHead group={group} />)
+    },
+  }
 }

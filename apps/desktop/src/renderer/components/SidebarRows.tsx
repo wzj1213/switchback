@@ -3,6 +3,8 @@ import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 import { rowLabelOf, type Group } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, SpinnerIcon } from "./icons.js"
+import { RowName, type RenameCtl } from "./RowName.js"
+
 
 /**
  * 侧栏里的行。
@@ -33,6 +35,7 @@ export function Row({
   onSelect,
   onDelete,
   onMenu,
+  rename,
 }: {
   row: ThreadRow
   selected: boolean
@@ -42,8 +45,10 @@ export function Row({
   aside?: string
   onSelect: () => void
   onDelete: () => void
-  /** 右键或点 `···`。`arm` 让菜单能把这一行切进删除确认态。 */
-  onMenu: (event: React.MouseEvent, arm: () => void) => void
+  /** 右键或点 `···`。`arm` 让菜单能把这一行切进删除确认态，`ren` 切进改名态。 */
+  onMenu: (event: React.MouseEvent, arm: () => void, ren: () => void) => void
+  /** 改名。**状态由上层持有**——同时只能有一行在改，而这是行与行之间的事。 */
+  rename?: RenameCtl
 }): React.JSX.Element {
   const { thread } = row
   // 二次确认做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
@@ -51,6 +56,9 @@ export function Row({
   const [confirming, setConfirming] = useState(false)
   const arm = (): void => {
     setConfirming(true)
+  }
+  const startRename = (): void => {
+    rename?.start(thread.id)
   }
   /**
    * **武装状态要自己解除。**
@@ -73,14 +81,26 @@ export function Row({
       className={`row row--thread${flat ? " row--flat" : ""}${selected ? " row--selected" : ""}`}
       title={thread.cwd}
       onContextMenu={(e) => {
-        onMenu(e, arm)
+        onMenu(e, arm, startRename)
       }}
+      // 双击标题就能改名。菜单里那一项是给「不知道能双击」的人准备的，
+      // 而知道的人不该为一个高频小动作绕一趟菜单
+      onDoubleClick={startRename}
     >
       <button type="button" className="row__main" aria-selected={selected} onClick={onSelect}>
         <span className="row__slot">
           <span className={`row__dot${DOT_CLASS[thread.status]}`} />
         </span>
-        <span className="row__label">{rowLabelOf(row)}</span>
+        <RowName
+          value={rowLabelOf(row)}
+          editing={rename?.id === thread.id}
+          onCommit={(title) => {
+            rename?.commit(thread.id, title)
+          }}
+          onCancel={() => {
+            rename?.done()
+          }}
+        />
         {aside === undefined ? null : <span className="row__aside">{aside}</span>}
         {/* 跑着的时候右侧转一个圈。**这是唯一能在不切会话的情况下看出「那边还在忙」
             的地方**——状态点太小、又和「有未读」这类含义抢同一个位置 */}
@@ -111,7 +131,7 @@ export function Row({
           aria-label="更多操作"
           title="更多操作"
           onClick={(e) => {
-            onMenu(e, arm)
+            onMenu(e, arm, startRename)
           }}
         >
           ···
@@ -130,12 +150,14 @@ export function GroupBlock({
   onDelete,
   onRowMenu,
   onGroupMenu,
+  rename,
 }: {
   group: Group
   collapsed: boolean
   selectedId: string
   onToggle: () => void
-  onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void) => void
+  onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
+  rename?: RenameCtl
   onGroupMenu: (event: React.MouseEvent, group: Group) => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
@@ -194,8 +216,9 @@ export function GroupBlock({
               onDelete={() => {
                 onDelete(row.thread.id)
               }}
-              onMenu={(e, arm) => {
-                onRowMenu(e, row, arm)
+              rename={rename}
+              onMenu={(e, arm, ren) => {
+                onRowMenu(e, row, arm, ren)
               }}
             />
           ))}

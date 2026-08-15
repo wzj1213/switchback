@@ -828,3 +828,42 @@ describe("在途去重", () => {
     expect(session().prompts).toHaveLength(1)
   })
 })
+
+describe("改名", () => {
+  it("发出 thread.renamed", async () => {
+    const { host, events } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.rename", threadId: id, title: "改分页那个" })
+    expect(events.filter((e) => e.type === "thread.renamed")).toHaveLength(1)
+  })
+
+  it("**不在内存里的会话也能改**——历史会话才是最需要改名的那批", async () => {
+    const { host, events } = setup()
+    await host.dispatch({ type: "thread.rename", threadId: "th-只在磁盘上", title: "旧账" })
+    expect(events.find((e) => e.type === "thread.renamed")).toMatchObject({
+      threadId: "th-只在磁盘上",
+      title: "旧账",
+    })
+  })
+
+  it("空名字不发事件——侧栏那一行会变成一块什么都不写的空白", async () => {
+    const { host, events } = setup()
+    await host.dispatch({ type: "thread.rename", threadId: "th-1", title: "   " })
+    expect(events.filter((e) => e.type === "thread.renamed")).toHaveLength(0)
+  })
+
+  it("首尾空格剪掉", async () => {
+    const { host, events } = setup()
+    await host.dispatch({ type: "thread.rename", threadId: "th-1", title: "  两头有空格  " })
+    expect(events.find((e) => e.type === "thread.renamed")).toMatchObject({ title: "两头有空格" })
+  })
+
+  it("改完之后 live 里那份也是新名字——不然接力/分叉会带着旧标题走", async () => {
+    const { host, events } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.rename", threadId: id, title: "新名字" })
+    expect(host.live().find((t) => t.id === id)?.title).toBe("新名字")
+  })
+})

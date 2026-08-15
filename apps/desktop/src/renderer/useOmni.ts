@@ -24,6 +24,8 @@ export interface Omni {
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
    */
   bridgeMissing: boolean
+  /** 最近一条**增量里**新开的会话 id。新建之后据此跳过去，不靠排序碰运气。 */
+  lastStarted: string | undefined
 }
 
 /**
@@ -39,6 +41,15 @@ export function useOmni(): Omni {
   // 游标放 ref 不放 state：它每来一批都变，进 state 会多一轮渲染，
   // 而界面上没有任何东西显示它
   const stream = useRef<Stream>(initialStream)
+  /**
+   * 最近一条**新开的**会话 id。
+   *
+   * 用来把「新建会话」这个动作和它的结果接上：点下去的那一刻还没有 id，
+   * 会话是宿主起好之后才回来的。上一版的做法是「把选中清空，让排序把新的顶到第一位」
+   * ——**靠排序碰运气**：只要排序规则一改（置顶、按项目分组、最近段），
+   * 点了新建就会跳到一个别的会话上，而且不报错。
+   */
+  const [lastStarted, setLastStarted] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (bridge === undefined) return undefined
@@ -53,6 +64,11 @@ export function useOmni(): Omni {
       stream.current = step.stream
       // 一批一次 setState：主进程已经合过帧，这里再逐条 set 就白合了
       if (step.apply.length > 0) setState((prev) => reduceAll(prev, step.apply))
+      // 只认增量里的新会话。全量重建里也有一堆 `thread.started`，
+      // 那是历史，不是「刚刚新开的」——认了的话每次重载都会跳到最后一条历史上
+      const started = step.apply.filter((e) => e.type === "thread.started")
+      const latest = started[started.length - 1]
+      if (latest?.type === "thread.started") setLastStarted(latest.thread.id)
       if (step.resyncFrom === undefined) return
       void bridge.resync(step.resyncFrom).then((answer) => {
         if ("reset" in answer) {
@@ -72,6 +88,7 @@ export function useOmni(): Omni {
       // 否则重载之后新旧两份历史会叠在一起
       setState(initial)
       advance(replayed({ ...stream.current, lastSeq: undefined }, replay))
+      setLastStarted(undefined)
     })
     return () => {
       offEvents()
@@ -125,6 +142,7 @@ export function useOmni(): Omni {
   )
 
   return {
+    lastStarted,
     state,
     send,
     pickFolder,

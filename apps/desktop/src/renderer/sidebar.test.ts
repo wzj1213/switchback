@@ -114,3 +114,23 @@ describe("侧栏分三段", () => {
     expect(sectionsOf(rows, []).pinned).toEqual([])
   })
 })
+
+describe("起过名的行显示名字", () => {
+  const row = (over: Partial<ThreadRow["thread"]> & { preview?: string }): ThreadRow =>
+    ({
+      thread: { id: "t", title: "标题", cwd: "/w/proj", engine: "claude", trust: "auto-edit", status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["claude"], ...over },
+      preview: over.preview,
+    }) as ThreadRow
+
+  it("没起过名时显示第一句提问——那通常比目录名有用", () => {
+    expect(rowLabelOf(row({ preview: "帮我看看这个报错" }))).toBe("帮我看看这个报错")
+  })
+
+  it("**起过名之后名字最大**，盖过第一句提问；否则改名看起来毫无反应", () => {
+    expect(rowLabelOf(row({ preview: "帮我看看这个报错", title: "改分页那个", named: true }))).toBe("改分页那个")
+  })
+
+  it("起过名但没有 preview 也一样", () => {
+    expect(rowLabelOf(row({ title: "旧账", named: true }))).toBe("旧账")
+  })
+})

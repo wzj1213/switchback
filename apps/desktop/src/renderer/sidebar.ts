@@ -33,6 +33,9 @@ export function baseNameOf(cwd: string): string {
  * 显示「新会话」——比显示一个和组标题重复的目录名有用。
  */
 export function rowLabelOf(row: ThreadRow): string {
+  // **人亲自起的名字最大。** 不加这一条的话改名会「没反应」——
+  // 下面那句 preview 永远赢，而 preview 是自动的
+  if (row.thread.named === true) return row.thread.title
   const preview = row.preview?.trim()
   if (preview !== undefined && preview !== "") return preview
   // 标题和组标题一样时说明它就是目录名，重复一遍没有意义

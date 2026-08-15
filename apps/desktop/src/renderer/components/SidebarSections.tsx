@@ -3,6 +3,7 @@ import type { ThreadRow } from "@omni/store"
 import { PROJECT_MAX, baseNameOf, type Group, type Sections } from "../sidebar.js"
 import { ChevronIcon } from "./icons.js"
 import { GroupBlock, Row } from "./SidebarRows.js"
+import type { RenameCtl } from "./RowName.js"
 
 /**
  * 侧栏的三段：置顶 / 项目 / 最近。
@@ -39,7 +40,8 @@ export interface GroupHandlers {
   onToggle: (cwd: string) => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
-  onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void) => void
+  onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
+  rename?: RenameCtl
   onGroupMenu: (event: React.MouseEvent, group: Group) => void
 }
 
@@ -58,6 +60,7 @@ function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers })
           onSelect={on.onSelect}
           onDelete={on.onDelete}
           onRowMenu={on.onRowMenu}
+          rename={on.rename}
           onGroupMenu={on.onGroupMenu}
         />
       ))}
@@ -114,8 +117,9 @@ function Recent({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers })
           onDelete={() => {
             on.onDelete(row.thread.id)
           }}
-          onMenu={(e, arm) => {
-            on.onRowMenu(e, row, arm)
+          rename={on.rename}
+          onMenu={(e, arm, ren) => {
+            on.onRowMenu(e, row, arm, ren)
           }}
         />
       ))}

@@ -71,6 +71,14 @@ export type Event =
   | { type: "thread.started"; at: number; thread: Thread }
   | { type: "thread.updated"; at: number; thread: Thread }
   | { type: "thread.removed"; at: number; threadId: ThreadId }
+  /**
+   * 改名了。
+   *
+   * 不复用 `thread.updated`（它带整个 `Thread`）是因为**历史会话不在宿主手上**——
+   * 宿主只有活着的那些，而回放出来的会话只存在于渲染层的 store 里。
+   * 只发「哪个 id 改成什么名」，两边都能应用，落盘之后重放也还在。
+   */
+  | { type: "thread.renamed"; at: number; threadId: ThreadId; title: string }
   | { type: "turn.started"; at: number; turn: Turn }
   | { type: "turn.completed"; at: number; turnId: TurnId; status: TurnStatus; error?: string }
   | { type: "item.started"; at: number; item: Item }

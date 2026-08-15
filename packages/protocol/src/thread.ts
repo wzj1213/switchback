@@ -55,6 +55,14 @@ export interface Thread {
    */
   forkedFrom?: ThreadId
   meta?: Record<string, unknown>
+  /**
+   * 用户**亲自起过名**。
+   *
+   * `title` 一直有值（新建时取目录名），所以光看 `title` 分不出「这是自动填的」
+   * 还是「人特意起的」。而侧栏的行标题默认显示第一句提问——那通常比目录名有用——
+   * 于是不区分的话，改完名什么都不会变，因为 preview 永远赢。
+   */
+  named?: boolean
 }
 
 export type TurnStatus = "running" | "completed" | "interrupted" | "failed"

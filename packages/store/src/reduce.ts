@@ -176,6 +176,12 @@ const HANDLERS: Handlers = {
   "thread.started": (state, event) => withThread(state, event.thread),
   "thread.updated": (state, event) => withThread(state, event.thread),
   "thread.removed": (state, event) => removeThread(state, event.threadId),
+  "thread.renamed": (state, event) => {
+    const thread = state.threads[event.threadId]
+    // 不认识的 id 直接忽略：改名事件可能先于会话本身到达（补发乱序），
+    // 而**凭空造一个只有标题的会话**比丢掉这次改名糟得多
+    return thread === undefined ? state : withThread(state, { ...thread, title: event.title, named: true })
+  },
   "turn.started": onTurnStarted,
   "turn.completed": onTurnCompleted,
   "item.started": reduceItem,

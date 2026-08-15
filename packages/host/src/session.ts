@@ -196,6 +196,24 @@ export async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
+/**
+ * 改名。
+ *
+ * **不要求会话还活着**——历史会话才是最需要改名的：默认标题取自第一句提问
+ * （「帮我看看这个报错…」），而三天后你找它时想的是「那个改分页的」。
+ * 所以这里不走 `ctx.live` 必须存在那条路，活着就顺手更新一份，不活着照样发事件。
+ */
+export function rename(ctx: Ctx, cmd: Extract<Command, { type: "thread.rename" }>): Promise<void> {
+  const title = cmd.title.trim()
+  // 空名字不接受：侧栏那一行会变成一块什么都不写的空白，比原来的标题糟得多
+  if (title === "") return Promise.resolve()
+  const at = ctx.deps.now()
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry !== undefined) entry.thread = { ...entry.thread, title, named: true, updatedAt: at }
+  emit(ctx, { type: "thread.renamed", at, threadId: cmd.threadId, title })
+  return Promise.resolve()
+}
+
 export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.setModel" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) return

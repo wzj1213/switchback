@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import { itemsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
 import type { Item } from "@omni/protocol"
 import type { Command, Thread } from "@omni/protocol"
@@ -44,6 +45,22 @@ export function useApp(): AppApi {
   const prefs = useSettings()
 
   const rows = threadRowsOf(omni.state)
+  /**
+   * 新建之后跳到新会话上。
+   *
+   * 点「新建」的那一刻还没有 id——会话是宿主起好之后才回来的。
+   * 所以这里立一个「在等」的旗子，等增量里那条 `thread.started` 到了再选它。
+   *
+   * 上一版是「把选中清空，让排序把新的顶到第一位」——**靠排序碰运气**，
+   * 而且没有任何东西钉住这个巧合：一旦排序规则变了（置顶、分组、最近段），
+   * 点新建就跳到别的会话上，还不报错。
+   */
+  const waiting = useRef(false)
+  useEffect(() => {
+    if (!waiting.current || omni.lastStarted === undefined) return
+    waiting.current = false
+    shell.select(omni.lastStarted)
+  }, [omni.lastStarted, shell])
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
   const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
@@ -55,7 +72,11 @@ export function useApp(): AppApi {
     copy: omni.copy,
     pickFolder: omni.pickFolder,
     onMenu: omni.onMenu,
-    onSelect: shell.select,
+    onSelect: (id) => {
+      // `open()` 用 `undefined` 表示「我刚发了新建，等它回来」
+      if (id === undefined) waiting.current = true
+      shell.select(id)
+    },
     defaultEngine: prefs.settings.defaultEngine,
     defaultTrust: prefs.settings.defaultTrust,
     onFind: () => {

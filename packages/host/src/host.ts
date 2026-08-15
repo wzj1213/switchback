@@ -2,16 +2,7 @@ import type { Command, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
 import { type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
-import {
-  create,
-  fork,
-  handoff,
-  prompt,
-  remove,
-  resume,
-  setModel,
-  setTrust,
-} from "./session.js"
+import { create, fork, handoff, prompt, remove, rename, resume, setModel, setTrust } from "./session.js"
 
 export type { HostDeps } from "./deps.js"
 
@@ -49,6 +40,7 @@ const HANDLERS: Handlers = {
   "thread.create": create,
   "thread.prompt": prompt,
   "thread.setTrust": setTrust,
+  "thread.rename": rename,
   "thread.setModel": setModel,
   "thread.resume": resume,
   "thread.delete": remove,

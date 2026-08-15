@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { filterRows } from "../filter.js"
-import { sectionsOf, type Group } from "../sidebar.js"
-import { FolderIcon, GearIcon, PlusIcon, SearchIcon, TrashIcon } from "./icons.js"
+import { sectionsOf } from "../sidebar.js"
+import { FolderIcon, GearIcon, PlusIcon, SearchIcon } from "./icons.js"
 import { useContextMenu } from "./Menu.js"
-import { ProjectHead, workspaceCommands, type Acts } from "./SidebarMenus.js"
+import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
 import { Row } from "./SidebarRows.js"
+import { useRenaming } from "./RowName.js"
 import { SectionList } from "./SidebarSections.js"
 
 /**
@@ -38,6 +39,8 @@ interface Props {
   onOpenFolder: () => void
   /** 删除会话。**不可撤销**，所以由行内二次确认把关。 */
   onDelete: (id: string) => void
+  /** 改名。空名字不会传到这里——`RowName` 已经按撤销处理了。 */
+  onRename: (id: string, title: string) => void
   /** 在指定工作区新建会话（右键菜单用）。 */
   onNewIn: (cwd: string) => void
   /** 在访达里定位。 */
@@ -126,6 +129,7 @@ export function Sidebar({
   onNew,
   onOpenFolder,
   onDelete,
+  onRename,
   onNewIn,
   onReveal,
   onCopy,
@@ -169,13 +173,8 @@ export function Sidebar({
   const here = rows.find((r) => r.thread.id === selectedId)?.thread.cwd
   const isOpen = (cwd: string): boolean => expanded.has(cwd) || cwd === here
 
-  const rowMenu = (event: React.MouseEvent, row: ThreadRow, arm: () => void): void => {
-    openMenu(event, [...workspaceCommands(row.thread.cwd, acts), { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm }])
-  }
-
-  const groupMenu = (event: React.MouseEvent, group: Group): void => {
-    openMenu(event, workspaceCommands(group.cwd, acts), <ProjectHead group={group} />)
-  }
+  const rename = useRenaming(onRename)
+  const { rowMenu, groupMenu } = useSidebarMenus(acts, openMenu)
 
   const flat = (row: ThreadRow): React.JSX.Element => (
     <Row
@@ -189,8 +188,9 @@ export function Sidebar({
         onDelete(row.thread.id)
       }}
       flat
-      onMenu={(e, arm) => {
-        rowMenu(e, row, arm)
+      rename={rename}
+      onMenu={(e, arm, ren) => {
+        rowMenu(e, row, arm, ren)
       }}
     />
   )
@@ -221,6 +221,7 @@ export function Sidebar({
               onSelect,
               onDelete,
               onRowMenu: rowMenu,
+              rename,
               onGroupMenu: groupMenu,
             }}
           />

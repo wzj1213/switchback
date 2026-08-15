@@ -7,6 +7,11 @@ export type Command =
   | { type: "thread.prompt"; threadId: ThreadId; text: string; attachments?: readonly string[] }
   | { type: "thread.interrupt"; threadId: ThreadId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
+  /**
+   * 改名。**历史会话也能改**——恰恰是历史会话最需要，
+   * 因为默认标题取自第一句提问，而回头找它的时候你想的是「那个改分页的」。
+   */
+  | { type: "thread.rename"; threadId: ThreadId; title: string }
   /** 让一个从磁盘回放出来的会话重新接上引擎，带着引擎那边的历史继续。 */
   | { type: "thread.resume"; threadId: ThreadId }
   /** 关掉会话并把它的记录从磁盘上删掉。**不可撤销**，界面必须二次确认。 */
