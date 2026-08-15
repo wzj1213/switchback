@@ -291,6 +291,8 @@
 }
 
 .composer__inner {
+  /* `@` 候选列表要贴着这个盒子的上边缘弹出来 */
+  position: relative;
   max-width: var(--content-max);
   margin: 0 auto;
   border: 1px solid var(--border-strong);

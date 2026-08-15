@@ -6,6 +6,7 @@ import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
+import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 
@@ -90,6 +91,14 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   // 不算安全上下文，写入会被静默拒绝
   ipcMain.on("omni:copy", (_e, text: string) => {
     clipboard.writeText(text)
+  })
+
+  // 一个工作区一份索引，按 cwd 复用：同一目录开好几个会话不该各扫一遍
+  const worksites = new Map<string, Worksite>()
+  ipcMain.handle("omni:searchFiles", async (_e, req: { cwd: string; query: string }) => {
+    const site = worksites.get(req.cwd) ?? createWorksite(req.cwd)
+    worksites.set(req.cwd, site)
+    return (await site.search(req.query)).map((h) => h.path)
   })
 
   ipcMain.on("omni:command", (_e, command: Command) => {

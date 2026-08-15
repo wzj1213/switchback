@@ -38,6 +38,7 @@ export interface WorkspaceProps {
   onCloseFind: () => void
   /** 写剪贴板 */
   onCopy: (text: string) => void
+  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   send: (command: Command) => void
 }
 
@@ -57,6 +58,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
       <Composer
         detached={thread.detached === true}
+        cwd={thread.cwd}
+        searchFiles={props.searchFiles}
         models={props.models}
         model={thread.model}
         effort={thread.effort}

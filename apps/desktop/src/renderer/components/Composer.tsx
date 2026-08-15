@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { Prompt } from "./Prompt.js"
+import { ModelPicker } from "./ModelPicker.js"
 import type { EngineId, ModelOption, Trust } from "@omni/protocol"
 
 const ENGINES: readonly { id: EngineId; label: string }[] = [
@@ -25,6 +27,9 @@ interface Props {
   model: string | undefined
   effort: string | undefined
   onModelChange: (model: string, effort?: string) => void
+  /** 工作区绝对路径，`@` 文件引用要用 */
+  cwd: string
+  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   onSend: (text: string) => void
@@ -44,6 +49,8 @@ export function Composer({
   model,
   effort,
   onModelChange,
+  cwd,
+  searchFiles,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
   const submit = (): void => {
@@ -56,23 +63,13 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer__inner">
-        <textarea
-          className="composer__input"
-          disabled={detached}
-          // 输入框直接说清为什么用不了。留一个能打字却答非所问的框，
-          // 比把它关掉糟得多
-          placeholder={detached ? "这是重启前的历史记录。点右侧「继续」把引擎接回来。" : "交代任务…"}
+        <Prompt
           value={text}
-          onChange={(e) => {
-            setText(e.target.value)
-          }}
-          onKeyDown={(e) => {
-            // Enter 发送，Shift+Enter 换行；IME 组字期间不拦（否则中文输入会被吞）
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              submit()
-            }
-          }}
+          detached={detached}
+          cwd={cwd}
+          searchFiles={searchFiles}
+          onChange={setText}
+          onSubmit={submit}
         />
         <div className="composer__bar">
           <select
@@ -123,91 +120,6 @@ export function Composer({
         </div>
       </div>
     </div>
-  )
-}
-
-/** 只有当前模型报了 `efforts` 才出现——不支持的引擎上摆一个改了不生效的控件更糟。 */
-function EffortPicker({
-  efforts,
-  value,
-  disabled,
-  onChange,
-}: {
-  efforts: readonly string[]
-  value: string | undefined
-  disabled: boolean
-  onChange: (effort: string) => void
-}): React.JSX.Element | null {
-  if (efforts.length === 0) return null
-  return (
-    <select
-      className="select"
-      disabled={disabled}
-      value={value ?? efforts[0]}
-      title="推理强度"
-      onChange={(e) => {
-        onChange(e.target.value)
-      }}
-    >
-      {efforts.map((level) => (
-        <option key={level} value={level}>
-          {level}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-/**
- * 模型与推理强度。
- *
- * **没得选就不显示**：引擎还没报清单、或者它根本不支持切换时，
- * 摆一个空下拉只会让人以为坏了。强度同理——只有当前模型报了 `efforts` 才出现。
- */
-function ModelPicker({
-  models,
-  model,
-  effort,
-  disabled,
-  onChange,
-}: {
-  models: readonly ModelOption[]
-  model: string | undefined
-  effort: string | undefined
-  disabled: boolean
-  onChange: (model: string, effort?: string) => void
-}): React.JSX.Element | null {
-  if (models.length === 0) return null
-  const current = models.find((m) => m.id === model) ?? models[0]
-  const efforts = current?.efforts ?? []
-  return (
-    <>
-      <select
-        className="select"
-        disabled={disabled}
-        value={current?.id ?? ""}
-        title={current?.description ?? "模型"}
-        onChange={(e) => {
-          const next = models.find((m) => m.id === e.target.value)
-          // 换模型时把强度重置成新模型的默认：旧模型的 high 在新模型上可能根本不存在
-          onChange(e.target.value, next?.defaultEffort)
-        }}
-      >
-        {models.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      <EffortPicker
-        efforts={efforts}
-        value={effort ?? current?.defaultEffort}
-        disabled={disabled}
-        onChange={(next) => {
-          onChange(current?.id ?? "", next)
-        }}
-      />
-    </>
   )
 }
 

@@ -514,3 +514,57 @@ body {
   background: var(--bg-hover);
   color: var(--text);
 }
+
+/* ── @ 文件引用的候选列表 ─────────────────────────────
+ * 悬在输入框**上方**：输入框已经贴着窗口底边，往下弹会被裁掉。
+ */
+.mentions {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(460px, 100%);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 14%);
+}
+
+.mentions__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 4px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.mentions__row--active {
+  background: var(--bg-active);
+}
+
+.mentions__name {
+  flex: none;
+  font-weight: 500;
+}
+
+/* 目录压成次级信息并允许被挤掉——找的是文件名 */
+.mentions__dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}

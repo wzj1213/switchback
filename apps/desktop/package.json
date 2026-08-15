@@ -22,7 +22,8 @@
     "highlight.js": "^11.12.0",
     "lowlight": "^3.3.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "@omni/worksite": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

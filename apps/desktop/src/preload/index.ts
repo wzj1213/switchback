@@ -34,6 +34,9 @@ const api = {
   copy(text: string): void {
     ipcRenderer.send("omni:copy", text)
   },
+  async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
+    return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
+  },
   /** 只在开发钩子下用：把查找词直接塞进查找条，见 main/devtools.ts */
   onDevFind(handler: (query: string) => void): () => void {
     const listener = (_e: unknown, query: string): void => {

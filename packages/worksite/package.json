@@ -1,0 +1,18 @@
+{
+  "name": "@omni/worksite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "工作区文件索引与模糊搜索。引擎无关。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0"
+  }
+}

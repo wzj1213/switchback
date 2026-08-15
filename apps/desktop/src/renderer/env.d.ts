@@ -15,6 +15,7 @@ declare global {
       }>
       stopFind: () => void
       copy: (text: string) => void
+      searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
       subscribe: (onEvents: (events: readonly Event[]) => void) => () => void
     }
   }

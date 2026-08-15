@@ -14,6 +14,8 @@ export interface Omni {
   stopFind: () => void
   /** 写系统剪贴板 */
   copy: (text: string) => void
+  /** 工作区内的文件模糊搜索，给 `@` 用 */
+  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   /**
    * preload 没注入通道。**显式暴露而不是静默 no-op**：
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
@@ -72,5 +74,20 @@ export function useOmni(): Omni {
     [bridge],
   )
 
-  return { state, send, pickFolder, onMenu, find, stopFind, copy, bridgeMissing: bridge === undefined }
+  const searchFiles = useCallback(
+    async (cwd: string, query: string) => (await bridge?.searchFiles(cwd, query)) ?? [],
+    [bridge],
+  )
+
+  return {
+    state,
+    send,
+    pickFolder,
+    onMenu,
+    find,
+    stopFind,
+    copy,
+    searchFiles,
+    bridgeMissing: bridge === undefined,
+  }
 }

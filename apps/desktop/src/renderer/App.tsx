@@ -34,7 +34,7 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
 
 /** 选哪个会话、怎么新建。一个会话内部长什么样是 `Workspace` 的事。 */
 export function App(): React.JSX.Element {
-  const { state, send, pickFolder, onMenu, find, stopFind, copy, bridgeMissing } = useOmni()
+  const { state, send, pickFolder, onMenu, find, stopFind, copy, searchFiles, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
   const [finding, setFinding] = useState(false)
@@ -132,6 +132,7 @@ export function App(): React.JSX.Element {
           stopFind()
         }}
         onCopy={copy}
+        searchFiles={searchFiles}
         send={send}
       />
     </div>

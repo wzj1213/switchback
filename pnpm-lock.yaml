@@ -53,6 +53,9 @@ importers:
       '@omni/store':
         specifier: workspace:*
         version: link:../../packages/store
+      '@omni/worksite':
+        specifier: workspace:*
+        version: link:../../packages/worksite
       highlight.js:
         specifier: ^11.12.0
         version: 11.12.0
@@ -151,6 +154,12 @@ importers:
       '@omni/protocol':
         specifier: workspace:*
         version: link:../protocol
+
+  packages/worksite:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
 
 packages:
 
