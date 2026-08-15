@@ -373,12 +373,14 @@ body {
   flex: 1;
 }
 
-.pill {
+/* 徽章：**只说明状态，永远不可点**。可点的东西是 `.iconbtn` 或 `.trigger`。
+   两者长得一样的话，「能不能点」就没有任何视觉线索了 */
+.badge {
   -webkit-app-region: no-drag;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px var(--sp-2);
+  padding: 2px var(--sp-2);
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg-raised);
@@ -388,7 +390,24 @@ body {
   white-space: nowrap;
 }
 
-.pill--engine {
+/* 图标按钮。顶栏里的动作用它，不用文字胶囊 */
+.iconbtn {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.iconbtn:hover {
+  background: var(--bg-hover);
   color: var(--text);
 }
 
@@ -497,7 +516,7 @@ body {
 }
 
 /* 历史会话的标记：比引擎/档位那两枚更淡，它是状态不是配置 */
-.pill--muted {
+.badge--muted {
   color: var(--text-faint);
   border-style: dashed;
 }
@@ -669,17 +688,72 @@ body {
   font-size: var(--text-xs);
 }
 
-/* 顶栏上可点的那枚 pill（分叉）。默认淡，悬停才实——它不是常用操作 */
-.pill--action {
-  border-style: solid;
-  color: var(--text-faint);
+
+/* 次要按钮：文字的、轻的。对比视图的「退出对比」「接着用这边」用它。
+   顶栏那种一眼就懂的动作用 `.iconbtn`，这里的需要文字说清楚 */
+.tbtn {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
   cursor: default;
 }
 
-.pill--action:hover {
+.tbtn:hover {
   background: var(--bg-hover);
-  color: var(--text);
   border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* ── 空会话 ───────────────────────────────────────────
+ * 空白的正文区技术上没错，但它分不出「新会话 / 正在加载 / 坏了」三种情况。
+ * 见 components/Transcript.tsx 的 Blank。
+ */
+.blank {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 55vh;
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+}
+
+.blank__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-faint);
+}
+
+.blank__title {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+}
+
+.blank__title strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 路径用等宽：它是要被读准的东西，比例字体下 l/1/I 分不清 */
+.blank__path {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
 }

@@ -1,6 +1,7 @@
 import type { Command, EngineInfo, Item, ModelOption, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
-import { Composer, TRUSTS, labelOf } from "./Composer.js"
+import { Composer, labelOf } from "./Composer.js"
+import { CompareIcon, ForkIcon } from "./icons.js"
 import { Transcript } from "./Transcript.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { Notices } from "./Notices.js"
@@ -27,6 +28,19 @@ function nextEngine(engines: readonly EngineInfo[], current: string): EngineInfo
   return usable.length >= 2 ? rotate(usable) : rotate(engines)
 }
 
+/**
+ * 顶栏。
+ *
+ * ## 只放「说明状态」的东西，不放「能改状态」的东西
+ *
+ * 上一版这里摆着引擎和信任档两枚胶囊，而输入区里也有同样两枚——
+ * 一样的文字出现在两个地方，**其中一个还点不动**。用户会去点那个点不动的，
+ * 然后以为界面坏了。能改的那份留在输入区（手就在那儿），
+ * 顶栏只留三类：会话身份、用量、以及**这个会话独有**的动作（分叉、对比）。
+ *
+ * 动作用图标按钮而不是文字胶囊：和旁边那些纯展示的胶囊长得一样的话，
+ * 「可点」这件事就没有任何视觉线索了。
+ */
 function TopBar({
   thread,
   usage,
@@ -48,38 +62,38 @@ function TopBar({
   return (
     <header className="topbar">
       <span className="topbar__title">{thread.title}</span>
-      <span className="topbar__spacer" />
-      <ContextMeter usage={usage} />
+      {thread.detached === true ? <span className="badge badge--muted">历史记录</span> : null}
       {handedOff ? (
-        <span className="pill" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
+        <span className="badge" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
           接力 {thread.engineHistory.length} 手
         </span>
       ) : null}
-      {thread.detached === true ? <span className="pill pill--muted">历史记录</span> : null}
-      <span className="pill pill--engine">{labelOf(engines, thread.engine)}</span>
+      <span className="topbar__spacer" />
+      <ContextMeter usage={usage} />
       {peer === undefined ? null : (
         <button
-          className="pill pill--action"
+          className="iconbtn"
           type="button"
-          title={`和「${peer.title}」并排比一比`}
+          title={`和「${peer.title}」并排比一比（⇧⌘D）`}
+          aria-label="对比分叉"
           onClick={onCompare}
         >
-          ⇄ 对比
+          <CompareIcon size={14} />
         </button>
       )}
       {next === undefined ? null : (
         <button
-          className="pill pill--action"
+          className="iconbtn"
           type="button"
           title={`用 ${next.label} 另起一个会话跑同一件事（原会话保留）`}
+          aria-label={`分叉到 ${next.label}`}
           onClick={() => {
             onFork(next.id)
           }}
         >
-          ⑂ {next.label}
+          <ForkIcon size={14} />
         </button>
       )}
-      <span className="pill">{labelOf(TRUSTS, thread.trust)}</span>
     </header>
   )
 }

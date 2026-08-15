@@ -7,6 +7,35 @@ import { groupRows } from "../group.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 
 /**
+ * 一个字都还没说的会话。
+ *
+ * 空白的正文区技术上没错，但它什么都没告诉人：**这是新会话、还是在加载、
+ * 还是坏了？** 一句话就能把三者区分开，顺带说清「你现在在哪个目录里干活」——
+ * 那是每一句提问的隐含上下文，而它平时只在顶栏的标题里出现一次。
+ */
+function Blank({ thread }: { thread: Thread }): React.JSX.Element {
+  return (
+    <div className="blank">
+      <div className="blank__glyph" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M3.5 4.5 6 8l-2.5 3.5M8 11.5h4.5"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+      <p className="blank__title">
+        在 <strong>{thread.title}</strong> 里做点什么？
+      </p>
+      <p className="blank__path">{thread.cwd}</p>
+    </div>
+  )
+}
+
+/**
  * 对话正文。
  *
  * 滚动跟随的计数把状态行也算进去——它出现时也该把视图顶到底，
@@ -28,6 +57,7 @@ export function Transcript({
   const scroller = useStickToBottom<HTMLDivElement>(items.length + (turn === undefined ? 0 : 1))
   return (
     <div className="transcript" ref={scroller}>
+      {items.length === 0 && turn === undefined ? <Blank thread={thread} /> : null}
       <div className="transcript__inner">
         {groupRows(items).map((row) =>
           row.kind === "run" ? (

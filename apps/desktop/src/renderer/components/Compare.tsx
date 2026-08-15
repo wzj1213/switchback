@@ -147,7 +147,7 @@ export function Compare({
       <header className="topbar">
         <span className="topbar__title">对比：{left} ⟷ {right}</span>
         <span className="topbar__spacer" />
-        <button className="pill pill--action" type="button" onClick={onClose}>
+        <button className="tbtn" type="button" onClick={onClose}>
           退出对比
         </button>
       </header>
@@ -156,10 +156,10 @@ export function Compare({
         {[a, b].map((side, index) => (
           <section className="cmp__pane" key={side.thread.id}>
             <header className="cmp__pane-head">
-              <span className="pill pill--engine">{index === 0 ? left : right}</span>
+              <span className="badge">{index === 0 ? left : right}</span>
               <span className="cmp__spacer" />
               <button
-                className="pill pill--action"
+                className="tbtn"
                 type="button"
                 title="退出对比并切到这一边继续"
                 onClick={() => {
