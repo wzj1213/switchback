@@ -37,6 +37,8 @@ function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
         },
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve(),
+        models: () => Promise.resolve([]),
+        setModel: () => Promise.resolve(),
         dispose: () => {
           fake.disposed = true
           return Promise.resolve()
@@ -255,6 +257,8 @@ describe("续跑", () => {
           prompt: () => Promise.resolve(),
           interrupt: () => Promise.resolve(),
           setTrust: () => Promise.resolve(),
+          models: () => Promise.resolve([]),
+          setModel: () => Promise.resolve(),
           dispose: () => Promise.resolve(),
         })
       },

@@ -100,6 +100,7 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
     items: omit(state.items, threadId),
     turns: omit(state.turns, threadId),
     usage: omit(state.usage, threadId),
+    models: omit(state.models, threadId),
     owner: keepOwner,
     turnOwner: keepTurnOwner,
   }
@@ -132,6 +133,19 @@ function onEngineStatus(
  * **认不出的事件原样返回旧状态**，不抛也不记录。代价是新增事件类型时界面静默无反应，
  * 收益是渲染层永远不会因为一个没见过的事件崩掉。排查「点了没反应」先查这里。
  */
+/** item 三兄弟单独拎出来，纯粹为了让 `reduce` 的分支数不撞闸门。 */
+function reduceItem(
+  state: ViewState,
+  event: Extract<Event, { type: "item.started" | "item.delta" | "item.updated" }>,
+): ViewState {
+  if (event.type === "item.delta") {
+    return patchItem(state, event.itemId, (prev) => applyDelta(prev, event.append))
+  }
+  if (event.type === "item.updated") return patchItem(state, event.item.id, () => event.item)
+  const threadId = state.turnOwner[event.item.turnId]
+  return threadId === undefined ? state : appendItem(state, threadId, event.item)
+}
+
 export function reduce(state: ViewState, event: Event): ViewState {
   switch (event.type) {
     case "thread.started":
@@ -143,16 +157,14 @@ export function reduce(state: ViewState, event: Event): ViewState {
       return onTurnStarted(state, event)
     case "turn.completed":
       return onTurnCompleted(state, event)
-    case "item.started": {
-      const threadId = state.turnOwner[event.item.turnId]
-      return threadId === undefined ? state : appendItem(state, threadId, event.item)
-    }
+    case "item.started":
     case "item.delta":
-      return patchItem(state, event.itemId, (prev) => applyDelta(prev, event.append))
     case "item.updated":
-      return patchItem(state, event.item.id, () => event.item)
+      return reduceItem(state, event)
     case "usage.updated":
       return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
+    case "models.updated":
+      return { ...state, models: { ...state.models, [event.threadId]: event.models } }
     case "engine.status":
       return onEngineStatus(state, event)
     default:

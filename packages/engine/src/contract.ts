@@ -1,4 +1,13 @@
-import type { EngineId, Event, ItemId, RememberScope, ThreadId, TurnId, Trust } from "@omni/protocol"
+import type {
+  EngineId,
+  Event,
+  ItemId,
+  ModelOption,
+  RememberScope,
+  ThreadId,
+  TurnId,
+  Trust,
+} from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 
 /** 需要人工裁决时递给宿主的东西。文本字段可能来自引擎，渲染前必须转义。 */
@@ -64,6 +73,10 @@ export interface EngineSession {
   prompt: (text: string, turnId: TurnId) => Promise<void>
   interrupt: () => Promise<void>
   setTrust: (trust: Trust) => Promise<void>
+  /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */
+  models: () => Promise<readonly ModelOption[]>
+  /** 换模型。`effort` 只有报了 `efforts` 的引擎会用。 */
+  setModel: (model: string, effort?: string) => Promise<void>
   /** 幂等。返回时进程应已退出。 */
   dispose: () => Promise<void>
 }

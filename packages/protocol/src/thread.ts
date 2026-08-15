@@ -33,6 +33,10 @@ export interface Thread {
    * **omni 只负责原样存取，不解释它**。没有句柄的会话恢复出来只能读。
    */
   engineHandle?: string
+  /** 当前模型的引擎侧 id。没设过就是引擎自己的默认，界面显示为「默认」。 */
+  model?: string
+  /** 推理强度。只有报了 `efforts` 的引擎才有意义。 */
+  effort?: string
   meta?: Record<string, unknown>
 }
 

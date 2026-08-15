@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process"
 import { decide } from "@omni/approval"
-import type { EngineStatus, Trust, TurnId } from "@omni/protocol"
+import type { EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { createRpc, type RpcPeer, type ServerCall } from "./rpc.js"
@@ -47,6 +47,39 @@ const POLICY: WireApprovalPolicy = "untrusted"
 
 const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
 
+interface WireModel {
+  id?: string
+  model?: string
+  displayName?: string
+  description?: string
+  hidden?: boolean
+  supportedReasoningEfforts?: readonly (string | { reasoningEffort?: string })[]
+  defaultReasoningEffort?: string
+}
+
+/**
+ * codex 的 effort 列表元素是 `{ reasoningEffort, description }` 对象，
+ * **不是**裸字符串——第一版按 `entry.effort` 读，结果强度选择器整个不出现。
+ * 探真实响应才发现字段名。裸字符串那条分支留着兜底，代价只有一行。
+ */
+function effortOf(entry: string | { reasoningEffort?: string }): string | undefined {
+  return typeof entry === "string" ? entry : entry.reasoningEffort
+}
+
+function toModelOption(raw: WireModel): ModelOption {
+  const efforts = (raw.supportedReasoningEfforts ?? [])
+    .map(effortOf)
+    .filter((e): e is string => e !== undefined)
+  const id = raw.id ?? raw.model ?? ""
+  return {
+    id,
+    label: raw.displayName ?? id,
+    ...(raw.description === undefined ? {} : { description: raw.description }),
+    ...(efforts.length === 0 ? {} : { efforts }),
+    ...(raw.defaultReasoningEffort === undefined ? {} : { defaultEffort: raw.defaultReasoningEffort }),
+  }
+}
+
 const STDERR_KEEP = 2000
 
 /** 握手上限。超过这个还没回 `initialize`，就当它起不来了。 */
@@ -74,6 +107,9 @@ interface SessionState {
   turn: TurnId | undefined
   stderr: string
   sandbox: WireSandbox
+  /** 用户选的模型与强度。`turn/start` 时带上，codex 说它对后续轮次也生效。 */
+  model: string | undefined
+  effort: string | undefined
 }
 
 export interface CodexDriverConfig {
@@ -106,6 +142,8 @@ class CodexSession implements EngineSession {
       turn: undefined,
       stderr: "",
       sandbox: SANDBOX[req.trust],
+      model: undefined,
+      effort: undefined,
     }
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
@@ -258,8 +296,27 @@ class CodexSession implements EngineSession {
     const started = await this.rpc.call("turn/start", {
       threadId: this.state.codexThread,
       input: [{ type: "text", text, text_elements: [] }],
+      ...(this.state.model === undefined ? {} : { model: this.state.model }),
+      ...(this.state.effort === undefined ? {} : { effort: this.state.effort }),
     })
     this.state.codexTurn = (started as { turn?: { id?: string } } | undefined)?.turn?.id
+  }
+
+  /**
+   * 可选模型。`hidden` 的不给——那是 codex 自己的选择器都不显示的，
+   * 我们没有理由比它更啰嗦。
+   */
+  async models(): Promise<readonly ModelOption[]> {
+    const raw = await this.rpc.call("model/list", {}).catch(() => undefined)
+    const list = (raw as { data?: readonly WireModel[] } | undefined)?.data ?? []
+    return list.filter((m) => m.hidden !== true).map(toModelOption)
+  }
+
+  async setModel(model: string, effort?: string): Promise<void> {
+    this.state.model = model
+    this.state.effort = effort
+    // 不用单独发请求：`turn/start` 的 model/effort 覆盖「这一轮及后续」
+    return Promise.resolve()
   }
 
   async interrupt(): Promise<void> {

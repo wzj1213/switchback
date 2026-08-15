@@ -1,4 +1,4 @@
-import type { Command, Item, Thread, Turn, Usage } from "@omni/protocol"
+import type { Command, Item, ModelOption, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
 import { Composer, ENGINES, TRUSTS, labelOf } from "./Composer.js"
 import { Transcript } from "./Transcript.js"
@@ -30,6 +30,7 @@ export interface WorkspaceProps {
   items: readonly Item[]
   turn: Turn | undefined
   usage: Usage | undefined
+  models: readonly ModelOption[]
   notices: readonly Notice[]
   onDismiss: (id: string) => void
   finding: boolean
@@ -56,6 +57,12 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
       <Composer
         detached={thread.detached === true}
+        models={props.models}
+        model={thread.model}
+        effort={thread.effort}
+        onModelChange={(model, effort) => {
+          send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })
+        }}
         // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
         // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
         engine={thread.engine}

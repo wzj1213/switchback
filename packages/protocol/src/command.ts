@@ -11,6 +11,8 @@ export type Command =
   | { type: "thread.resume"; threadId: ThreadId }
   /** 关掉会话并把它的记录从磁盘上删掉。**不可撤销**，界面必须二次确认。 */
   | { type: "thread.delete"; threadId: ThreadId }
+  /** 换模型 / 改推理强度。`effort` 只对报了 `efforts` 的引擎有意义。 */
+  | { type: "thread.setModel"; threadId: ThreadId; model: string; effort?: string }
   /** L2 接力：换引擎继续同一个 thread，宿主负责生成交接包。 */
   | { type: "thread.handoff"; threadId: ThreadId; to: EngineId }
   | { type: "approval.resolve"; itemId: ItemId; allow: boolean; remember: RememberScope }

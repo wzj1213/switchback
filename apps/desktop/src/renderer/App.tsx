@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { itemsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
+import { itemsOf, modelsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
 import { Notices } from "./components/Notices.js"
 import { Workspace } from "./components/Workspace.js"
@@ -122,6 +122,7 @@ export function App(): React.JSX.Element {
         items={itemsOf(state, thread.id)}
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}
+        models={modelsOf(state, thread.id)}
         notices={notices}
         onDismiss={setDismissed}
         finding={finding}

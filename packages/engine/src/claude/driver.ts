@@ -6,7 +6,7 @@ import {
   type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
-import type { Trust, TurnId } from "@omni/protocol"
+import type { ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createQueue } from "../queue.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
@@ -128,6 +128,25 @@ class ClaudeSession implements EngineSession {
       session_id: this.req.threadId,
     } as SDKUserMessage)
     return Promise.resolve()
+  }
+
+  /**
+   * 可选模型。
+   *
+   * **不上报 `efforts`**：SDK 的 `effort` 是 `Options` 字段，只能在 `query()`
+   * 时给，运行期没有 setter。报上去界面就会画一个改了不生效的控件。
+   */
+  async models(): Promise<readonly ModelOption[]> {
+    const list = await this.handle?.supportedModels().catch(() => undefined)
+    return (list ?? []).map((m) => ({
+      id: m.value,
+      label: m.displayName,
+      ...(m.description === "" ? {} : { description: m.description }),
+    }))
+  }
+
+  async setModel(model: string): Promise<void> {
+    await this.handle?.setModel(model)
   }
 
   async interrupt(): Promise<void> {

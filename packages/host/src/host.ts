@@ -59,6 +59,7 @@ function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
       return ctx.turnOwner.get(event.item.turnId)
     case "usage.updated":
     case "engine.status":
+    case "models.updated":
       return event.threadId === "" ? undefined : event.threadId
     default:
       return undefined
@@ -189,6 +190,16 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
     emit(ctx, e)
   })
   ctx.live.set(thread.id, { thread, session, gate, turn: undefined })
+  // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
+  // omni 写死一份清单迟早会和实际能用的对不上。
+  void session
+    .models()
+    .then((models) => {
+      if (models.length > 0) {
+        emit(ctx, { type: "models.updated", at: ctx.deps.now(), threadId: thread.id, models })
+      }
+    })
+    .catch(() => undefined)
   return early.handle
 }
 
@@ -259,6 +270,20 @@ async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
+async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.setModel" }>): Promise<void> {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry === undefined) return
+  await entry.session.setModel(cmd.model, cmd.effort)
+  const at = ctx.deps.now()
+  entry.thread = {
+    ...entry.thread,
+    model: cmd.model,
+    ...(cmd.effort === undefined ? {} : { effort: cmd.effort }),
+    updatedAt: at,
+  }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
 /** 审批卡 id 全局唯一，所以挨个会话问一遍即可；命中就停。 */
 function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resolve" }>): void {
   for (const entry of ctx.live.values()) {
@@ -301,6 +326,8 @@ async function dispatch(ctx: Ctx, command: Command): Promise<void> {
       return resume(ctx, command)
     case "thread.delete":
       return remove(ctx, command)
+    case "thread.setModel":
+      return setModel(ctx, command)
     case "thread.interrupt":
       return ctx.live.get(command.threadId)?.session.interrupt() ?? Promise.resolve()
     case "approval.resolve":

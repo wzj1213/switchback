@@ -1,4 +1,4 @@
-import type { Item, ItemId, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
+import type { Item, ItemId, ModelOption, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -15,6 +15,8 @@ export interface ViewState {
   turnOwner: Readonly<Record<TurnId, ThreadId>>
   /** 每个会话的上下文用量。引擎不报就没有这一项。 */
   usage: Readonly<Record<ThreadId, Usage>>
+  /** 每个会话可选的模型。引擎报了才有。 */
+  models: Readonly<Record<ThreadId, readonly ModelOption[]>>
   /** 引擎层面的故障。最新在后。 */
   notices: readonly Notice[]
   /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
@@ -44,6 +46,7 @@ export function initial(): ViewState {
     owner: {},
     turnOwner: {},
     usage: {},
+    models: {},
     notices: [],
     noticeSeq: 0,
   }
@@ -61,6 +64,10 @@ export function turnOf(state: ViewState, threadId: ThreadId): Turn | undefined {
 
 export function usageOf(state: ViewState, threadId: ThreadId): Usage | undefined {
   return state.usage[threadId]
+}
+
+export function modelsOf(state: ViewState, threadId: ThreadId): readonly ModelOption[] {
+  return state.models[threadId] ?? []
 }
 
 export function threadsOf(state: ViewState): readonly Thread[] {

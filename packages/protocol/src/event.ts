@@ -21,6 +21,21 @@ export interface Usage {
 }
 
 /**
+ * 一个可选的模型。
+ *
+ * `efforts` **只有引擎真能在运行期改推理强度时才填**。Claude 的 effort 是
+ * `Options` 字段，改它要重启会话——所以它不填，界面上也就不会出现一个
+ * 点了没用的控件。
+ */
+export interface ModelOption {
+  id: string
+  label: string
+  description?: string
+  efforts?: readonly string[]
+  defaultEffort?: string
+}
+
+/**
  * 引擎 → 宿主 → 渲染层的单向事件流。
  *
  * 设计取舍：`item.updated` 携带**整条 item 的替换值**而非增量补丁。
@@ -38,6 +53,8 @@ export type Event =
   | { type: "item.started"; at: number; item: Item }
   | { type: "item.delta"; at: number; itemId: ItemId; append: string }
   | { type: "item.updated"; at: number; item: Item }
+  /** 这个会话能选哪些模型。引擎握手完成后报一次。 */
+  | { type: "models.updated"; at: number; threadId: ThreadId; models: readonly ModelOption[] }
   /** 上下文与消耗。引擎给什么报什么，给不出的字段就缺席。 */
   | { type: "usage.updated"; at: number; threadId: ThreadId; usage: Usage }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */
