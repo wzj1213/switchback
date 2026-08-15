@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  强化运行时（hardened runtime）下的授权清单。公证**要求**开强化运行时，
+  而强化运行时默认会掐掉几件 Electron 和 omni 都离不开的事。
+
+  每一条都得有理由，不是抄来的模板：
+
+  - allow-jit / allow-unsigned-executable-memory
+      V8 要 JIT。少了它 Electron 起不来，白屏。
+  - allow-dyld-environment-variables
+      Electron 自己在启动链路上用 DYLD_* 定位 Framework。
+  - disable-library-validation
+      **这条是 omni 特有的。** 我们要 spawn 别人的二进制（codex、
+      各家 ACP 适配器、Claude SDK 自带的 CLI），那些东西**不是我们签的**。
+      库校验开着的话，加载它们会被系统直接拒——而这正是 omni 的核心功能。
+      代价是放宽了一层加固；换来的是这个产品能用。
+  - files.user-selected.read-write
+      用户从系统目录框里亲手选的工作区。
+  - network.client
+      引擎要连各家的 API。
+
+  故意**没有**的：
+  - app-sandbox。开了它引擎子进程就读不到 ~/.codex、~/.claude 的登录态，
+    也读不到工作区之外的任何东西。omni 不上架 App Store，没有必要付这个代价。
+  - allow-dyld-environment-variables 之外的任何调试类授权。
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
+    <true/>
+  </dict>
+</plist>

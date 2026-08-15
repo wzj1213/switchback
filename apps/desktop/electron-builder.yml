@@ -28,11 +28,40 @@ mac:
   target:
     - target: dmg
       arch: [arm64]
-  # 没有开发者证书就不签名。不设这条的话 electron-builder 会去找证书、
-  # 找不到再警告一大段——明确说「不签」比让它每次都试一遍干净。
-  identity: null
-  # 引擎子进程要读 ~/.codex、~/.claude 与工作区，沙箱化会全部挡掉
-  hardenedRuntime: false
+  # 强化运行时**常开**，不等有了 Developer ID 才开。
+  #
+  # 理由是这条最容易在最后一刻咬人：公证强制要求强化运行时，而强化运行时
+  # 默认会掐掉 JIT 和「加载别人签的二进制」——后者正是 omni 的核心功能
+  # （spawn codex / ACP 适配器 / Claude SDK 自带的 CLI）。
+  # 等付完 99 刀那天才第一次打开它，就要在最不该调试的时刻调试它。
+  # 现在用自签证书就能把这条路走通，授权清单见 build/entitlements.mac.plist。
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  # 子进程继承的那份。少了它，Electron 的 Helper 进程拿不到 JIT 授权，
+  # 渲染层直接起不来
+  entitlementsInherit: build/entitlements.mac.plist
+  # 自签证书过不了 Gatekeeper 评估，这一步跳过。有了真证书之后
+  # 公证流程自己会做这件事
+  gatekeeperAssess: false
+  # **这里有意不写 `identity`。**
+  #
+  # 试过 `identity: ${env.CSC_NAME}`——不行，electron-builder 不对这个字段做
+  # 变量展开，它拿到的是字面量 `${env.CSC_NAME}`，然后报「钥匙串里没有这个证书」。
+  # 留空才是对的：electron-builder 自己认 `CSC_NAME` / `CSC_LINK` 环境变量。
+  #
+  # 代价是没有证书时它会警告一行「skipped code signing」——那句话是真的，
+  # 让它说出来比用 `identity: null` 捂住好。
 
 dmg:
   title: omni ${version}
+
+# 公证。**没有凭据时整段跳过**——`notarize: false` 是默认值，
+# 只有 CI 上带齐 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID
+# 才走这一步。缺凭据时报错退出，比悄悄产出一个没公证的包好。
+#
+# 需要什么，一次说清楚：
+#   1. Apple Developer Program 会员（99 美元/年）
+#   2. 钥匙串里的 "Developer ID Application: <名字> (<TeamID>)" 证书
+#   3. App Store Connect 的 app-specific password
+# 齐了之后：CSC_NAME=... APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... \
+#           APPLE_TEAM_ID=... pnpm dist
