@@ -11,6 +11,7 @@ export {
   toDeny,
 } from "./claude/permission.js"
 export { toolDetail, assistantItems, turnStatus } from "./claude/translate.js"
+export { synthDiff, fileChangesOf } from "./claude/diff.js"
 export { createRpc } from "./codex/rpc.js"
 export { handleNotification } from "./codex/notify.js"
 export {

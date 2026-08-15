@@ -1,4 +1,5 @@
 import type { Item, ItemId, ToolCallItem, ToolDetail, TurnId } from "@omni/protocol"
+import { fileChangesOf } from "./diff.js"
 
 /**
  * Claude 内容块的**结构性**最小类型。
@@ -33,6 +34,16 @@ const TOOL_KIND: Readonly<Record<string, ToolDetail["kind"]>> = {
   WebFetch: "fetch",
 }
 
+/** Claude 不给 diff，只给编辑参数——由 `diff.ts` 合成，否则界面上一片空白。 */
+function fileEdit(name: string, input: Record<string, unknown>): ToolDetail {
+  const files = fileChangesOf(name, input)
+  const tally = files.reduce(
+    (acc, f) => ({ added: acc.added + f.added, removed: acc.removed + f.removed }),
+    { added: 0, removed: 0 },
+  )
+  return { kind: "file_edit", path: strOf(input["file_path"]) ?? "", files, ...tally }
+}
+
 /** 认不出的工具落 `other`，原始参数原样带上供 UI 兜底展示。 */
 export function toolDetail(name: string, input: Record<string, unknown>): ToolDetail {
   switch (TOOL_KIND[name]) {
@@ -41,9 +52,7 @@ export function toolDetail(name: string, input: Record<string, unknown>): ToolDe
     case "file_read":
       return { kind: "file_read", path: strOf(input["file_path"]) ?? "" }
     case "file_edit":
-      // files 为空：Claude 的 Edit 给的是 old_string/new_string，不是 diff。
-      // 合成 diff 是单独一件事，见 README「已知限制」。
-      return { kind: "file_edit", path: strOf(input["file_path"]) ?? "", files: [], added: 0, removed: 0 }
+      return fileEdit(name, input)
     case "fetch":
       return { kind: "fetch", url: strOf(input["url"]) ?? "" }
     default:
