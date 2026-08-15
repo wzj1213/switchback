@@ -6,6 +6,7 @@ import type { Command, Event } from "@omni/protocol"
  *   send(Command)  —— 渲染层请求做事
  *   subscribe(cb)  —— 主进程推事件
  *   pickFolder()   —— 借主进程弹一次系统目录选择框
+ *   onMenu(cb)     —— 菜单里那些只有渲染层做得到的动作
  *
  * 不暴露 fs、不暴露 child_process、不暴露 ipcRenderer 本体。
  * 渲染层新增能力必须先在 Command 联合里加一项，或者像 `pickFolder` 这样
@@ -19,6 +20,15 @@ const api = {
   /** 用户取消时返回 undefined。 */
   async pickFolder(): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:pickFolder")) as string | undefined
+  },
+  onMenu(handler: (action: string) => void): () => void {
+    const listener = (_e: unknown, action: string): void => {
+      handler(action)
+    }
+    ipcRenderer.on("omni:menu", listener)
+    return () => {
+      ipcRenderer.off("omni:menu", listener)
+    }
   },
   subscribe(onEvent: (event: Event) => void): () => void {
     const listener = (_e: unknown, event: Event): void => {

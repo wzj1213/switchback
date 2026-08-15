@@ -7,6 +7,8 @@ export interface Omni {
   send: (command: Command) => void
   /** 弹系统目录框。桥没接上时返回 undefined，调用方按「用户取消」处理即可。 */
   pickFolder: () => Promise<string | undefined>
+  /** 订阅菜单动作。返回退订函数。 */
+  onMenu: (handler: (action: string) => void) => () => void
   /**
    * preload 没注入通道。**显式暴露而不是静默 no-op**：
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
@@ -43,5 +45,10 @@ export function useOmni(): Omni {
     [bridge],
   )
 
-  return { state, send, pickFolder, bridgeMissing: bridge === undefined }
+  const onMenu = useCallback(
+    (handler: (action: string) => void) => bridge?.onMenu(handler) ?? ((): void => undefined),
+    [bridge],
+  )
+
+  return { state, send, pickFolder, onMenu, bridgeMissing: bridge === undefined }
 }

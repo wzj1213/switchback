@@ -1,0 +1,81 @@
+import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOptions } from "electron"
+
+/**
+ * 菜单里那些**只有渲染层做得到**的动作。
+ *
+ * 新建会话、打开文件夹这些要落到当前选中的会话上下文里，主进程不知道那是什么。
+ * 所以菜单只发一个意图，怎么做由渲染层决定。
+ */
+export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find"
+
+const isMac = process.platform === "darwin"
+
+/** 菜单回调给的是 `BaseWindow`；只有 `BrowserWindow` 才有 webContents。 */
+function send(action: MenuAction, focused: BaseWindow | undefined): void {
+  if (!(focused instanceof BrowserWindow) || focused.isDestroyed()) return
+  focused.webContents.send("omni:menu", action)
+}
+
+/**
+ * 应用菜单。
+ *
+ * Electron 不设菜单时会给一份默认模板——能用，但里面没有任何 omni 自己的动作，
+ * 于是**新建会话只能靠鼠标点侧栏**，一个每天用几十次的操作没有快捷键。
+ *
+ * 编辑/窗口/显示这几栏一律用 `role`：系统会自己本地化、自己接上原生行为
+ * （撤销栈、拼写检查、缩放）。手写这些只会做得更差。
+ */
+export function installMenu(): void {
+  const appMenu: MenuItemConstructorOptions[] = isMac
+    ? [{ role: "appMenu" }]
+    : []
+  const template: MenuItemConstructorOptions[] = [
+    ...appMenu,
+    {
+      label: "文件",
+      submenu: [
+        {
+          label: "新建会话",
+          accelerator: "CmdOrCtrl+N",
+          click: (_i, focused) => {
+            send("new-thread", focused)
+          },
+        },
+        {
+          label: "打开文件夹…",
+          accelerator: "CmdOrCtrl+O",
+          click: (_i, focused) => {
+            send("open-folder", focused)
+          },
+        },
+        { type: "separator" },
+        { role: isMac ? "close" : "quit" },
+      ],
+    },
+    { role: "editMenu" },
+    {
+      label: "会话",
+      submenu: [
+        {
+          label: "在会话中查找",
+          accelerator: "CmdOrCtrl+F",
+          click: (_i, focused) => {
+            send("find", focused)
+          },
+        },
+        {
+          label: "中断当前轮次",
+          accelerator: "CmdOrCtrl+.",
+          click: (_i, focused) => {
+            send("interrupt", focused)
+          },
+        },
+      ],
+    },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  // 非 mac 上没有 appMenu 角色，退出项挂在「文件」里，这里不再重复
+  if (!isMac) app.on("window-all-closed", () => app.quit())
+}

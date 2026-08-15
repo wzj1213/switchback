@@ -7,6 +7,7 @@ declare global {
     omni: {
       send: (command: Command) => void
       pickFolder: () => Promise<string | undefined>
+      onMenu: (handler: (action: string) => void) => () => void
       subscribe: (onEvent: (event: Event) => void) => () => void
     }
   }

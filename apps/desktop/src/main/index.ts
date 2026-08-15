@@ -1,6 +1,8 @@
 import { join } from "node:path"
 import { app, BrowserWindow, nativeTheme, shell } from "electron"
 import { attachHost, replayHistory, seedDefaultThread } from "./host.js"
+import { installMenu } from "./menu.js"
+import { loadBounds, trackBounds } from "./window-state.js"
 import { devPrompt, scheduleDevShot } from "./devtools.js"
 
 /**
@@ -13,10 +15,9 @@ import { devPrompt, scheduleDevShot } from "./devtools.js"
 
 const isDev = process.env["ELECTRON_RENDERER_URL"] !== undefined
 
-function createWindow(): BrowserWindow {
+function createWindow(bounds: { x: number; y: number; width: number; height: number }): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1180,
-    height: 780,
+    ...bounds,
     minWidth: 860,
     minHeight: 560,
     show: false,
@@ -33,6 +34,7 @@ function createWindow(): BrowserWindow {
   win.once("ready-to-show", () => {
     win.show()
   })
+  trackBounds(win)
 
   // 渲染层的 console 默认只进 DevTools。打包之后没人开 DevTools，
   // 于是「界面崩了」这件事在日志里**一点痕迹都没有**。转发到主进程 stderr，
@@ -63,11 +65,13 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
+  installMenu()
   const attached = attachHost(() => BrowserWindow.getAllWindows())
-  const win = createWindow()
+  const bounds = await loadBounds()
+  const win = createWindow(bounds)
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
   })
   // 等窗口挂上监听再开会话，否则最早的几条事件发给了还没订阅的渲染层
   // 先回放历史再开新会话：**顺序不能反**。侧栏最近创建在前，

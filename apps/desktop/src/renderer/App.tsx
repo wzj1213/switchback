@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Thread, Usage } from "@omni/protocol"
 import { itemsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
@@ -56,7 +56,7 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
 }
 
 export function App(): React.JSX.Element {
-  const { state, send, pickFolder, bridgeMissing } = useOmni()
+  const { state, send, pickFolder, onMenu, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
 
@@ -84,6 +84,23 @@ export function App(): React.JSX.Element {
       if (cwd !== undefined) open(cwd)
     })
   }
+
+  // 菜单只发意图，怎么做在这里决定——它要看当前选中的是哪个会话
+  useEffect(
+    () =>
+      onMenu((action) => {
+        if (action === "open-folder") openPicker()
+        else if (action === "new-thread") {
+          if (thread === undefined) openPicker()
+          else open(thread.cwd)
+        } else if (action === "interrupt" && thread !== undefined) {
+          send({ type: "thread.interrupt", threadId: thread.id })
+        }
+      }),
+    // 只依赖真正会变的东西：open/openPicker 每次渲染都是新函数，
+    // 依赖它们会让订阅每帧重建一次
+    [onMenu, thread?.id, thread?.cwd],
+  )
 
   if (thread === undefined) {
     return (
