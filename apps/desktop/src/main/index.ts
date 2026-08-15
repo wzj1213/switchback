@@ -34,6 +34,14 @@ function createWindow(): BrowserWindow {
     win.show()
   })
 
+  // 渲染层的 console 默认只进 DevTools。打包之后没人开 DevTools，
+  // 于是「界面崩了」这件事在日志里**一点痕迹都没有**。转发到主进程 stderr，
+  // 它才会进用户能拿到的那份日志。
+  win.webContents.on("console-message", (event) => {
+    if (event.level !== "error" && event.level !== "warning") return
+    process.stderr.write(`[renderer:${event.level}] ${event.message}\n`)
+  })
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: "deny" }
