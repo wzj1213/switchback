@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process"
+import { tree } from "./platform.js"
 import { sep } from "node:path"
 
 /**
@@ -87,22 +88,14 @@ const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)
  * 这就是**整树退出证明**——只看直接子进程的 exitCode 是不够的，
  * claude 自己会 spawn bash 之类的孙子进程，父进程死了它们可能还在跑。
  */
-function groupAlive(pid: number): boolean {
-  try {
-    process.kill(-pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function signalGroup(pid: number, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-pid, signal)
-  } catch {
-    // 已经没了。探测和发信号之间有竞态，这不是错误。
-  }
-}
+/**
+ * 「整棵树还在吗」「怎么收它」全部委托给 `platform.ts`。
+ *
+ * 原来这里直接写死 `process.kill(-pid, …)`——那是 POSIX 的进程组语义，
+ * 在 Windows 上负 pid 根本不是「进程组」。结果是回收阶梯每一级都以为
+ * 「已经没了」，引擎进程默默漏在后台。**错得无声无息，比明说不支持糟得多。**
+ */
+const groupAlive = (pid: number): boolean => tree.alive(pid)
 
 interface Owned {
   child: ChildProcess
@@ -195,9 +188,9 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
     if (!groupAlive(pid)) return report("already-exited", started)
 
     if (await settle(pid, cfg.exitGraceMs)) return report("graceful", started)
-    signalGroup(pid, "SIGTERM")
+    tree.term(pid)
     if (await settle(pid, cfg.termGraceMs)) return report("sigterm", started)
-    signalGroup(pid, "SIGKILL")
+    tree.kill(pid)
     if (await settle(pid, cfg.killGraceMs)) return report("sigkill", started)
     return report("escaped", started)
   }

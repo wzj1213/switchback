@@ -1,11 +1,8 @@
-import { execFile } from "node:child_process"
 import { readFile, writeFile } from "node:fs/promises"
-import { promisify } from "node:util"
 import { app, dialog } from "electron"
+import { probeCommand } from "@omni/engine"
 import type { Logger } from "./log.js"
 import { dumpDir, type CrashInfo } from "./crash.js"
-
-const run = promisify(execFile)
 
 /** 日志尾部取多少行进诊断包。够看出「崩之前发生了什么」，又不至于变成一整份日志。 */
 const TAIL_LINES = 400
@@ -14,15 +11,15 @@ const TAIL_LINES = 400
  * 引擎在这台机器上是什么状态。
  *
  * **「装了没」是支持渠道的第一个问题**，而它有三种不同的答案：
- * 不在 PATH 上、在但版本不对、在且能跑。分开报，别都归成「引擎有问题」。
+ * 不在 PATH 上、在但跑不起来、在且能跑。分开报，别都归成「引擎有问题」。
+ *
+ * 直接用 `@omni/engine` 的 `probeCommand`，不在这里再写一份：
+ * 原来这里自己 `which` 了一遍，于是「Windows 上没有 which」这个 bug
+ * 得修两处——而第二处一定会被漏掉。
  */
 async function probeEngine(command: string): Promise<string> {
-  const found = await run("which", [command]).catch(() => undefined)
-  if (found === undefined) return `${command}: 不在 PATH 上`
-  const version = await run(command, ["--version"]).catch((error: unknown) => ({
-    stdout: `（--version 失败：${error instanceof Error ? error.message : String(error)}）`,
-  }))
-  return `${command}: ${found.stdout.trim()} — ${version.stdout.trim()}`
+  const probe = await probeCommand(command)
+  return `${command}: ${probe.state} — ${probe.detail}`
 }
 
 async function tail(file: string): Promise<string> {

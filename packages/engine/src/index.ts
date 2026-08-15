@@ -6,6 +6,8 @@ export { handlePermission, respond as respondPermission } from "./acp/permission
 export type { PermissionContext as AcpPermissionContext } from "./acp/permission.js"
 export { createQueue } from "./queue.js"
 export { probeCommand } from "./probe.js"
+export { isWindows, lookupCommand, tree } from "./platform.js"
+export type { TreeControl } from "./platform.js"
 export type { Probe, ProbeState } from "./probe.js"
 export { createProcessOwner, unpacked } from "./subprocess.js"
 export {

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
+import { lookupCommand } from "./platform.js"
 
 const run = promisify(execFile)
 
@@ -30,7 +31,10 @@ const VERSION_MS = 5000
  * 只问第一步是不够的：装了但装坏了（依赖缺失、架构不对）在 `which` 那关看不出来。
  */
 export async function probeCommand(command: string, hint?: string): Promise<Probe> {
-  const found = await run("which", [command]).catch(() => undefined)
+  // `which` 是 POSIX 的；Windows 上是 `where.exe`。写死 `which` 的话，
+  // Windows 上每一家引擎都会被报成「没装」——见 `platform.ts`
+  const lookup = lookupCommand()
+  const found = await run(lookup.command, lookup.args(command)).catch(() => undefined)
   if (found === undefined) {
     return { state: "missing", detail: [`\`${command}\` 不在 PATH 上。`, hint].filter(Boolean).join("") }
   }
