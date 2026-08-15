@@ -69,16 +69,11 @@
 }
 
 /* ── 状态行 ────────────────────────────────────────── */
-/* 状态行在滚动区**外面**，所以要自己对齐正文那一列 */
+/* 状态行在对话流**里面**，所以跟着 `.transcript__inner` 的列走，不用自己居中 */
 .turnstatus {
   display: flex;
-  flex: none;
   align-items: baseline;
   gap: var(--sp-2);
-  width: 100%;
-  max-width: var(--content-max);
-  margin: 0 auto;
-  padding: var(--sp-1) var(--sp-4) var(--sp-2);
   font-size: var(--text-sm);
 }
 

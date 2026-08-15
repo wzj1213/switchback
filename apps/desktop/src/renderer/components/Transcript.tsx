@@ -7,6 +7,8 @@ import { Copyable } from "./Copyable.js"
 import { groupRows, type Row } from "../group.js"
 import { spent } from "../status.js"
 import { useStickToBottom } from "../useStickToBottom.js"
+import { TurnStatus } from "./TurnStatus.js"
+import { ArrowDownIcon } from "./icons.js"
 
 /**
  * 一个字都还没说的会话。
@@ -90,7 +92,7 @@ export function Transcript({
   send: (command: Command) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const { scroller, inner } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
+  const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
   // **必须是 useCallback。** 写成行内箭头函数的话每次 render 换一个身份，
   // `ItemView` 的 memo 会全部落空——而且是静默落空：功能全对，只是每帧白干一遍
   const onResolve = useCallback<ResolveApproval>(
@@ -106,7 +108,17 @@ export function Transcript({
         {groupRows(items, turn?.id).map((row) => (
           <RowView key={keyOf(row)} row={row} onCopy={onCopy} onResolve={onResolve} />
         ))}
+        {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
+            那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
+        <TurnStatus thread={thread} turn={turn} items={items} />
       </div>
+      {/* 往回翻的时候给一条回去的路。**这才是「逃生口不该滚走」的正确解法**——
+          不是把状态行钉住，而是给一个「回到底部」 */}
+      {atBottom ? null : (
+        <button type="button" className="tobottom" aria-label="回到底部" onClick={toBottom}>
+          <ArrowDownIcon />
+        </button>
+      )}
     </div>
   )
 }

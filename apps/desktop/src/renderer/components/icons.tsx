@@ -248,3 +248,12 @@ export function ThinkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
     </Svg>
   )
 }
+
+/** 回到底部。圆底加一个下箭头——codex 和 dsh 的那颗都是这个形状 */
+export function ArrowDownIcon({ size = 15 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M8 3.2v9.6M4.2 9 8 12.8 11.8 9" {...LINE} />
+    </Svg>
+  )
+}

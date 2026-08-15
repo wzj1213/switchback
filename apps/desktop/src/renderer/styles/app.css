@@ -500,6 +500,7 @@ body {
 }
 
 .transcript {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -848,4 +849,33 @@ body {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--text-faint);
+}
+
+/* ── 回到底部 ─────────────────────────────────────────
+ * 只在没贴底时出现。这才是「逃生口不该跟着内容滚走」的正确解法——
+ * 不是把状态行钉在底部（那会让「它在想什么」离对话十万八千里），
+ * 而是给一条回去的路。抄 dsh 的 `toBottom`。
+ */
+.tobottom {
+  position: sticky;
+  bottom: var(--sp-3);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+
+.tobottom:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }

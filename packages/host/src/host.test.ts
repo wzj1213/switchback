@@ -239,6 +239,7 @@ describe("续跑", () => {
         read: () => Promise.resolve(stored),
         list: () => Promise.resolve([]),
         remove: () => Promise.resolve(),
+        flush: () => Promise.resolve(),
       },
     })
     return { host, events, session, stored }
@@ -292,6 +293,7 @@ describe("续跑", () => {
         read: () => Promise.resolve(stored),
         list: () => Promise.resolve([]),
         remove: () => Promise.resolve(),
+        flush: () => Promise.resolve(),
       },
     })
     await host.dispatch(create)
@@ -393,6 +395,7 @@ describe("删除会话", () => {
           removed.push(id)
           return Promise.resolve()
         },
+        flush: () => Promise.resolve(),
       },
     })
     await host.dispatch(create)
@@ -424,6 +427,7 @@ describe("删除会话", () => {
           removed.push(id)
           return Promise.resolve()
         },
+        flush: () => Promise.resolve(),
       },
     })
     await host.dispatch({ type: "thread.delete", threadId: "th-from-disk" })
@@ -582,6 +586,7 @@ const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; sto
         read: () => Promise.resolve(stored),
         list: () => Promise.resolve([]),
         remove: () => Promise.resolve(),
+        flush: () => Promise.resolve(),
       },
     })
   return { host, events, sessions, stored }

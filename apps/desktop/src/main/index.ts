@@ -1,10 +1,10 @@
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
-import { attachHost, rebuild, seedDefaultThread } from "./host.js"
+import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
-import { createLogger } from "./log.js"
+import { createLogger, type Logger } from "./log.js"
 import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
@@ -164,6 +164,30 @@ function installAppChannels(): void {
   })
 }
 
+/** 开发钩子。全挂在这里，`whenReady` 那段只管应用本身怎么起。 */
+function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger): void {
+  scheduleDevFind(win)
+  scheduleDevInterrupt(win)
+  scheduleDevReload(win)
+  scheduleDevCompare(win)
+  scheduleDevFilter(win)
+  scheduleDevOpenSelect(win)
+  scheduleDevRowMenu(win)
+  scheduleDevProbe(win, (m: string) => {
+    logger.write("info", "dev", m)
+  })
+  scheduleDevSwitch(win, (kind, to) => {
+    const threadId = attached.lastThreadId()
+    if (threadId === undefined) return
+    void attached.host
+      .dispatch(kind === "fork" ? { type: "thread.fork", threadId, to } : { type: "thread.handoff", threadId, to })
+      .catch((error: unknown) => {
+        attached.report(error, threadId)
+      })
+  })
+  scheduleDevShot(win)
+}
+
 void app.whenReady().then(async () => {
   installSettingsChannel(settings)
   installAppChannels()
@@ -191,38 +215,24 @@ void app.whenReady().then(async () => {
   })
   // **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
   // 用户按了 ⌘R）之后状态是空的，只补增量补不出前面的历史。
+  // **重建和开会话必须串起来，不能各跑各的。** 两条独立的异步链会互相插队：
+  // 开机自动建的那个会话刚发完事件，重建的全量就把状态清了，
+  // 而那些事件因为「seq <= resumeAt」被当成旧消息丢掉——会话还在，内容没了
+  let seeded = false
   win.webContents.on("did-finish-load", () => {
-    void rebuild(attached, win.webContents).catch((error: unknown) => {
-      log.write("error", "ipc", `全量重建失败：${String(error)}`)
-    })
+    void rebuild(attached, win.webContents)
+      .then((recent) => {
+        if (seeded) return undefined
+        seeded = true
+        return seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), recent)
+      })
+      .catch((error: unknown) => {
+        log.write("error", "ipc", `全量重建失败：${String(error)}`)
+      })
   })
-  // 开会话只在第一次。`.on` 先注册先执行，所以重建总是排在开会话前面——
-  // 侧栏最近创建在前，反过来的话新会话会被压在一堆历史下面。
+  // 开发钩子只挂一次，和重建是两回事——它们不依赖会话，也不该在重载时重复挂
   win.webContents.once("did-finish-load", () => {
-    void attached.journal
-      .list()
-      .catch(() => [])
-      .then((ids) => seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), ids[0]))
-    scheduleDevFind(win)
-    scheduleDevInterrupt(win)
-    scheduleDevReload(win)
-    scheduleDevCompare(win)
-    scheduleDevFilter(win)
-    scheduleDevOpenSelect(win)
-    scheduleDevRowMenu(win)
-    scheduleDevProbe(win, (m: string) => {
-      log.write("info", "dev", m)
-    })
-    scheduleDevSwitch(win, (kind, to) => {
-      const threadId = attached.lastThreadId()
-      if (threadId === undefined) return
-      void attached.host
-        .dispatch(kind === "fork" ? { type: "thread.fork", threadId, to } : { type: "thread.handoff", threadId, to })
-        .catch((error: unknown) => {
-          attached.report(error, threadId)
-        })
-    })
-    scheduleDevShot(win)
+    installDevHooks(win, attached, log)
   })
   app.on("before-quit", () => {
     void attached.host.dispose()

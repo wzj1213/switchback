@@ -347,6 +347,12 @@ export async function rebuild(attached: Attached, target: WebContents): Promise<
   // 但背后还有引擎进程。混为一谈的话，重载之后整个应用变成只读，
   // 而引擎其实还在跑——重载验证第一次跑出来的就是这个
   const alive = new Map(attached.host.live().map((thread) => [thread.id, thread]))
+  // **先把在途写入落完再读。** 宿主发事件不等落盘，所以「发出去了」和
+  // 「在文件里了」之间有个窗口；在窗口里读到的是残缺的一份，而回放会按
+  // 「resumeAt 之前的都已经在全量里」把那些事件全丢掉——
+  // 表现是会话还在、里面的消息全没了。实测复现过：开机自动建的那个会话
+  // 跑完一整轮，界面上却是空的
+  await attached.journal.flush().catch(() => undefined)
   const ids = await attached.journal.list().catch((): readonly ThreadId[] => [])
   const threads = await Promise.all(
     ids.map(async (id) => ({ id, events: await attached.journal.read(id).catch((): readonly Event[] => []) })),

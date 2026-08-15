@@ -13,6 +13,16 @@ export interface JournalConfig {
 export interface Journal {
   /** 追加一条。**不抛**——落盘失败不该掐断正在进行的会话。 */
   append: (threadId: ThreadId, event: Event) => Promise<void>
+  /**
+   * 等所有在途写入落盘。
+   *
+   * **回放之前必须调一次。** 宿主发事件时是 `void journal.append(...)`（不等），
+   * 所以「事件已经发出去了」和「事件已经在文件里了」之间有一个窗口。
+   * 在这个窗口里读 journal，读到的是残缺的一份——而回放会按
+   * 「`resumeAt` 之前的增量都已经在全量里」把那些事件全丢掉。
+   * 结果就是：会话还在，里面的消息全没了。这个 bug 实测复现过。
+   */
+  flush: () => Promise<void>
   /** 读回一个会话的全部事件，按写入顺序。 */
   read: (threadId: ThreadId) => Promise<readonly Event[]>
   /** 列出磁盘上有记录的会话，**最近写过的在前**。 */
@@ -33,6 +43,22 @@ const DEFAULT_MAX_BYTES = 32 * 1024 * 1024
  * **写入失败一律吞掉并继续。** 磁盘满了、目录被删了，都不该让一个正在跑的
  * 会话中断——用户宁可丢历史也不愿丢正在进行的工作。这是有意的取舍。
  */
+/**
+ * 写一行。
+ *
+ * 超限就停笔——轮转策略以后再说，但**无声地把磁盘写满**是不能接受的。
+ * 提到外面是因为 `createJournal` 撑破了行数闸门，而这一段本来就不依赖闭包里的东西。
+ */
+async function writeOne(file: string, line: string, ready: Promise<boolean>, maxBytes: number): Promise<void> {
+  if (!(await ready)) return
+  const size = await stat(file).then(
+    (info) => info.size,
+    () => 0,
+  )
+  if (size >= maxBytes) return
+  await appendFile(file, `${line}\n`, "utf8")
+}
+
 export function createJournal(config: JournalConfig): Journal {
   const maxBytes = config.maxBytes ?? DEFAULT_MAX_BYTES
   const ready = mkdir(config.dir, { recursive: true }).then(
@@ -47,23 +73,12 @@ export function createJournal(config: JournalConfig): Journal {
     return name === undefined ? undefined : join(config.dir, name)
   }
 
-  const writeOne = async (file: string, line: string): Promise<void> => {
-    if (!(await ready)) return
-    const size = await stat(file).then(
-      (info) => info.size,
-      () => 0,
-    )
-    // 超限就停笔。轮转策略以后再说，但**无声地把磁盘写满**是不能接受的
-    if (size >= maxBytes) return
-    await appendFile(file, `${line}\n`, "utf8")
-  }
-
   const append = async (threadId: ThreadId, event: Event): Promise<void> => {
     if (!shouldPersist(event)) return
     const file = pathOf(threadId)
     if (file === undefined) return
     const prev = chains.get(threadId) ?? Promise.resolve()
-    const next = prev.then(() => writeOne(file, encode(event))).catch(() => undefined)
+    const next = prev.then(() => writeOne(file, encode(event), ready, maxBytes)).catch(() => undefined)
     chains.set(threadId, next)
     return next
   }
@@ -101,5 +116,14 @@ export function createJournal(config: JournalConfig): Journal {
     await rm(file, { force: true }).catch(() => undefined)
   }
 
-  return { append, read, list, remove }
+  return {
+    append,
+    read,
+    list,
+    remove,
+    // 取一次快照再等：等待期间新来的写入不该把这次 flush 无限拖下去
+    flush: async () => {
+      await Promise.all([...chains.values()])
+    },
+  }
 }

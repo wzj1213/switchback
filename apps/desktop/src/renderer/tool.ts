@@ -1,4 +1,4 @@
-import type { ToolDetail } from "@omni/protocol"
+import type { Item, ToolDetail } from "@omni/protocol"
 
 /**
  * 工具形态 → 动词。
@@ -58,4 +58,68 @@ export function brief(detail: ToolDetail): string {
       ? (full.split("/").pop() ?? full)
       : (unwrap(full).split("\n")[0] ?? full)
   return short.length > MAX_BRIEF ? `${short.slice(0, MAX_BRIEF)}…` : short
+}
+
+/**
+ * 做完之后怎么说这件事。
+ *
+ * 和 `VERB` 分开：那个是**正在做**（「执行」「编辑」），配在单行上；
+ * 这个是**做过了**（「运行了命令」「编辑了文件」），配在折叠摘要上。
+ * codex 的折叠行用的就是这套过去式措辞。
+ */
+export const DONE_VERB: Readonly<Record<ToolDetail["kind"], string>> = {
+  shell: "运行了命令",
+  file_edit: "编辑了文件",
+  file_read: "读取了文件",
+  fetch: "请求了网页",
+  other: "调用了工具",
+}
+
+/**
+ * 一串工具调用折成一句话。
+ *
+ * **按首次出现去重**：连着读了五个文件不该写五遍「读取了文件」，
+ * 但顺序要保留——它就是它做事的顺序。
+ */
+export function summarize(kinds: readonly ToolDetail["kind"][]): string {
+  const seen: ToolDetail["kind"][] = []
+  for (const kind of kinds) {
+    if (!seen.includes(kind)) seen.push(kind)
+  }
+  return seen.map((k) => DONE_VERB[k]).join(" · ")
+}
+
+export interface Changes {
+  files: number
+  added: number
+  removed: number
+}
+
+/**
+ * 这一整个会话改了多少东西。
+ *
+ * codex 在输入框上方挂一枚「1 个文件已更改 +43 −5」——**它回答的是
+ * 「我可以走了吗」**：agent 跑了十分钟，你要提交之前想知道它动了多少。
+ * 这件事在 transcript 里是散的（分布在十几条编辑行上），得有人加起来。
+ *
+ * **同一个文件改三次算一个文件**，增删行数累加：用户关心的是「有几个文件
+ * 要看」，不是「发生过几次编辑」。
+ */
+export function changesOf(items: readonly Item[]): Changes {
+  const files = new Map<string, { added: number; removed: number }>()
+  for (const item of items) {
+    if (item.kind !== "tool_call" || item.detail.kind !== "file_edit") continue
+    if (item.status !== "ok") continue
+    for (const file of item.detail.files) {
+      const prev = files.get(file.path) ?? { added: 0, removed: 0 }
+      files.set(file.path, { added: prev.added + file.added, removed: prev.removed + file.removed })
+    }
+  }
+  let added = 0
+  let removed = 0
+  for (const tally of files.values()) {
+    added += tally.added
+    removed += tally.removed
+  }
+  return { files: files.size, added, removed }
 }

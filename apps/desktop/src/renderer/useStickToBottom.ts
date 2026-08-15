@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /** 距底多少像素以内算「贴着底」。留一点余量，滚动惯性不至于打断跟随。 */
 const NEAR_BOTTOM_PX = 80
@@ -30,16 +30,29 @@ export function useStickToBottom<T extends HTMLElement, I extends HTMLElement>()
   scroller: React.RefObject<T | null>
   /** 挂在**内容**容器上（滚动容器的那个子节点）。尺寸变化由它触发跟随。 */
   inner: React.RefObject<I | null>
+  /** 现在是不是贴着底。界面据此决定要不要显示「回到底部」。 */
+  atBottom: boolean
+  /** 手动滚到底。 */
+  toBottom: () => void
 } {
   const scroller = useRef<T | null>(null)
   const inner = useRef<I | null>(null)
   const stuck = useRef(true)
+  /**
+   * 同一件事既要给 effect 用（ref，读的时候要最新值）又要给渲染用（state）。
+   * **只在真的翻面时 setState**——滚动事件一秒能来上百次，
+   * 每次都 setState 等于把整棵树重渲染上百遍。
+   */
+  const [atBottom, setAtBottom] = useState(true)
 
   useEffect(() => {
     const el = scroller.current
     if (el === null) return undefined
     const onScroll = (): void => {
-      stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
+      const near = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
+      if (near === stuck.current) return
+      stuck.current = near
+      setAtBottom(near)
     }
     el.addEventListener("scroll", onScroll, { passive: true })
     return () => {
@@ -65,5 +78,16 @@ export function useStickToBottom<T extends HTMLElement, I extends HTMLElement>()
     }
   }, [])
 
-  return { scroller, inner }
+  return {
+    scroller,
+    inner,
+    atBottom,
+    toBottom: () => {
+      const el = scroller.current
+      if (el === null) return
+      stuck.current = true
+      setAtBottom(true)
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    },
+  }
 }

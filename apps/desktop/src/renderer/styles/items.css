@@ -550,3 +550,50 @@
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
+
+/* 折叠摘要那一行：「编辑了文件 · 读取了文件 · 运行了命令」 */
+.step__folded {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.step__count {
+  flex: none;
+  margin-left: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 摊开之后的那几条缩进一级，看得出是从上面那行展开来的 */
+.run__nested {
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border);
+  margin-left: 7px;
+}
+
+/* ── 变更汇总 ─────────────────────────────────────────
+ * 挂在输入框上方的一枚。它回答的是「我可以走了吗」——见 components/Changed.tsx。
+ */
+.changed {
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--sp-2);
+}
+
+.changed__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}

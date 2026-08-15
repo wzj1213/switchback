@@ -3,7 +3,7 @@ import type { Notice } from "@omni/store"
 import { Composer, labelOf } from "./Composer.js"
 import { CompareIcon, ForkIcon } from "./icons.js"
 import { Transcript } from "./Transcript.js"
-import { TurnStatus } from "./TurnStatus.js"
+import { Changed } from "./Changed.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
@@ -143,16 +143,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <Notices notices={props.notices} onDismiss={props.onDismiss} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
       <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
-      {/* **状态行在滚动区外面。** 放里面的话，往回滚一屏，「还在跑」的信号、
-          计时器、以及唯一的「停止」按钮会一起消失——逃生口不该跟着内容滚走 */}
-      <TurnStatus
-        thread={thread}
-        turn={props.turn}
-        items={props.items}
-        onInterrupt={() => {
-          send({ type: "thread.interrupt", threadId: thread.id })
-        }}
-      />
+      <Changed items={props.items} />
       <Composer
         detached={thread.detached === true}
         // 引擎还在起、或者上一轮还没跑完——两种都发不出去，但原因不同，文案也不同
