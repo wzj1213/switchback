@@ -28,9 +28,18 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   Task: "meta", TodoWrite: "meta", ExitPlanMode: "meta",
   // codex app-server
   shell: "exec", apply_patch: "write", read_file: "read", update_plan: "meta",
-  // ACP
+  // ACP：客户端侧方法（agent 反过来请我们代劳时用）
   "fs/read_text_file": "read", "fs/write_text_file": "write",
   "terminal/create": "exec", "terminal/output": "read",
+  // ACP：agent 侧工具。协议里**没有「工具名」这个字段**，身份就是 `kind`，
+  // 所以加 `acp:` 前缀入表——不加的话，一个叫 `read` 的 kind 会和别家撞名。
+  "acp:read": "read", "acp:search": "read",
+  "acp:edit": "write", "acp:delete": "write", "acp:move": "write",
+  "acp:execute": "exec",
+  "acp:fetch": "net",
+  "acp:think": "meta", "acp:switch_mode": "meta",
+  // `acp:other` 有意不入表：落 `unknown`，auto-edit 及以下一律 escalate。
+  // 这正是想要的——第三方 ACP agent 冒出来的新工具，宁可多问一次。
 }
 
 const PATH_ARG_KEYS = ["file_path", "path", "notebook_path", "filePath", "cwd"] as const

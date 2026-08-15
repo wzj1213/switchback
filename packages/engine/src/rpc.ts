@@ -1,11 +1,16 @@
 /**
- * JSON-RPC 2.0 over 换行分隔的 JSON。codex app-server 的 stdio 传输就是这个。
+ * JSON-RPC 2.0 over 换行分隔的 JSON。
+ *
+ * **两家共用**：codex app-server 与 ACP 的 stdio 传输是同一个东西——
+ * 一行一条 JSON，`jsonrpc: "2.0"`。接 ACP 时本文件从 `codex/` 提到包根，
+ * 一个字没改就跑通了；抄一份的话，两边的分帧 bug 就得各修一次。
  *
  * 有意做成**纯粹的字节进、字节出**：`feed(chunk)` 喂进来，`send(line)` 发出去。
- * 不碰子进程，所以整套协议逻辑能在没有 codex 的机器上跑测试。
+ * 不碰子进程，所以没装任何引擎的机器上也能跑测试。
  */
 
-import type { RequestId } from "./wire.js"
+/** JSON-RPC 允许 id 是字符串或数字。**数字包括 0**——见 `dispatch` 里的判据。 */
+export type RequestId = string | number
 
 /** 服务端发来的请求。必须应答——不答 codex 会一直等着，整轮卡死。 */
 export interface ServerCall {
@@ -75,7 +80,7 @@ function settleReply(state: RpcState, msg: Incoming): void {
   if (waiter === undefined) return
   state.pending.delete(id)
   if (msg.error === undefined) waiter.resolve(msg.result)
-  else waiter.reject(new Error(msg.error.message ?? "codex 返回了错误"))
+  else waiter.reject(new Error(msg.error.message ?? "对端返回了错误"))
 }
 
 /** `respond` 幂等：重复应答同一个 id 会让对端认不出，只认第一次。 */
@@ -100,6 +105,10 @@ function dispatch(state: RpcState, handlers: RpcHandlers, write: Write, line: st
   }
   // 三分支的判据就是 JSON-RPC 的定义：有 id 无 method 是应答，
   // 有 id 有 method 是服务端请求，无 id 是通知。
+  //
+  // 判据写成 `!== undefined` 而不是真值判断：实测 codex-acp 的
+  // `session/request_permission` 用的就是 **id 0**，写成 `if (msg.id)` 会把
+  // 这条请求当成通知，于是永远不应答，整轮卡死在等审批上。
   if (msg.id !== undefined && msg.method === undefined) settleReply(state, msg)
   else if (msg.id !== undefined && msg.method !== undefined) {
     handlers.onRequest(toServerCall(write, msg.id, msg.method, msg.params))

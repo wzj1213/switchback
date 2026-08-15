@@ -1,0 +1,387 @@
+import type { ChildProcess } from "node:child_process"
+import type { EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
+import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
+import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
+import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
+import { currentModeOf, modelsOf, modesOf, startupMessage } from "./setup.js"
+import { pickMode } from "./mode.js"
+import { handlePermission } from "./permission.js"
+import { stopStatus } from "./translate.js"
+import { closeText, createUpdateState, handleUpdate, sweep, type UpdateContext, type UpdateState } from "./update.js"
+import type { AcpInitialize, AcpNewSession, AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
+
+/**
+ * 通用 ACP 驱动。**一个驱动接所有讲 ACP 的引擎**——这是接第三家协议的全部意义：
+ * 前两家各写一个驱动，第 N 家不该再写第 N 个。
+ *
+ * ## 客户端能力：什么都不认领，这是有意的
+ *
+ * ACP 允许客户端认领 `fs/*`（代 agent 读写文件）和 `terminal/*`（代 agent 开终端）。
+ * omni 一个都不认领：
+ *
+ * - `fs` 的用处是让 agent 看见编辑器里**没存盘的缓冲区**。omni 没有编辑器，
+ *   认领了只是把 agent 自己就能做的事绕一圈回到我们这儿，还多一份出错的可能。
+ * - `terminal` 认领了就等于「命令跑在 omni 进程里」，这和「引擎跑自己的原生进程、
+ *   用自己的沙箱」这个产品前提直接冲突——那层 OS 沙箱正是判定错了之后的兜底。
+ *
+ * 实测确认这不影响拿输出：不认领 `terminal` 时 codex-acp 照样自己跑命令，
+ * 输出从 `rawOutput.formatted_output` 回来（见 `translate.ts` 的 `execDetail`）。
+ *
+ * ## 同一个代价：审批的可见性由 agent 决定
+ *
+ * 和 codex 那边一模一样的结构性限制，实测复现过：`agent` 档下让它
+ * `curl` 一个外网地址，agent 直接被自己的沙箱拦下并报告失败，
+ * **一次 `session/request_permission` 都没发**。换到 `read-only` 档，
+ * 同一个改文件的操作立刻变成一条审批请求。
+ *
+ * 也就是说 omni 的判定器只在 agent 决定问我们时才有发言权。这是「引擎原生」
+ * 这个前提的必然代价，不是可以修的 bug——写在 README 的已知限制里。
+ */
+
+const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
+
+const PROTOCOL_VERSION = 1
+const HANDSHAKE_MS = 20_000
+const STDERR_KEEP = 2000
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+export interface AcpDriverConfig {
+  /** 引擎身份，落进事件与判定请求。约定用 `acp:` 前缀，如 `acp:zcode`。 */
+  id: string
+  command: string
+  args?: readonly string[]
+  env?: Readonly<Record<string, string>>
+  reclaim?: Partial<ReclaimConfig>
+}
+
+interface SessionState {
+  child: ChildProcess | undefined
+  acpSession: string | undefined
+  turn: TurnId | undefined
+  stderr: string
+  modes: readonly { id?: string; name?: string }[]
+  mode: string | undefined
+  models: readonly ModelOption[]
+  loadSession: boolean
+}
+
+class AcpSession implements EngineSession {
+  private readonly owner: ProcessOwner
+  private readonly rpc: RpcPeer
+  private readonly inflight = new Map<string, AcpToolCall>()
+  private readonly updates: UpdateState = createUpdateState()
+  private readonly trust: { current: Trust }
+  private readonly state: SessionState
+  private seq = 0
+
+  constructor(
+    private readonly req: StartRequest,
+    private readonly config: AcpDriverConfig,
+  ) {
+    this.trust = { current: req.trust }
+    this.owner = createProcessOwner(config.reclaim)
+    this.state = {
+      child: undefined,
+      acpSession: undefined,
+      turn: undefined,
+      stderr: "",
+      modes: [],
+      mode: undefined,
+      models: [],
+      loadSession: false,
+    }
+    this.rpc = createRpc({
+      send: (line) => this.state.child?.stdin?.write(`${line}\n`),
+      onNotification: (method, params) => {
+        this.onNotification(method, params)
+      },
+      onRequest: (call) => {
+        void this.answer(call)
+      },
+    })
+  }
+
+  private updateContext(): UpdateContext {
+    return {
+      threadId: this.req.threadId,
+      emit: this.req.emit,
+      turnId: () => this.state.turn,
+      inflight: this.inflight,
+      newId: (prefix) => {
+        this.seq += 1
+        return `${prefix}-${String(this.seq)}`
+      },
+      now: () => Date.now(),
+    }
+  }
+
+  private status(status: EngineStatus, detail?: string): void {
+    this.req.emit({
+      type: "engine.status",
+      at: Date.now(),
+      threadId: this.req.threadId,
+      status,
+      ...(detail === undefined || detail === "" ? {} : { detail }),
+    })
+  }
+
+  private onNotification(method: string, params: unknown): void {
+    if (method !== "session/update") return
+    const update = (params as AcpNotification | undefined)?.update
+    if (update === undefined) return
+    handleUpdate(this.updateContext(), this.updates, update)
+  }
+
+  private wire(child: ChildProcess): void {
+    child.stdout?.setEncoding("utf8")
+    child.stdout?.on("data", (chunk: string) => {
+      this.rpc.feed(chunk)
+    })
+    child.stderr?.setEncoding("utf8")
+    child.stderr?.on("data", (chunk: string) => {
+      this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
+    })
+    child.on("exit", (code) => {
+      this.rpc.close(`${this.config.id} 进程已退出（code ${String(code)}）`)
+      if (code !== 0 && code !== null) this.status("crashed", this.state.stderr)
+    })
+  }
+
+  async start(): Promise<void> {
+    this.status("starting")
+    const child = this.owner.spawn({
+      command: this.config.command,
+      args: this.config.args ?? [],
+      cwd: this.req.cwd,
+      env: { ...process.env, ...(this.config.env ?? {}) },
+    })
+    this.state.child = child
+    this.wire(child)
+
+    await this.handshake()
+    await this.openSession()
+    this.status("ready")
+  }
+
+  /**
+   * 握手。超时 + 看 spawn 是否失败，两条都要——理由同 codex 驱动：
+   * 起不来的进程不产出 stdout，`call()` 于是永远不 resolve，界面就一直停在
+   * 「正在打开工作区…」，没有报错也没有超时，是最难查的一类故障。
+   */
+  private async handshake(): Promise<void> {
+    const result = await Promise.race([
+      this.rpc.call("initialize", {
+        protocolVersion: PROTOCOL_VERSION,
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+        clientInfo: CLIENT_INFO,
+      }),
+      this.owner.died().then((error) => ({ died: error })),
+      sleep(HANDSHAKE_MS).then(() => "timeout" as const),
+    ])
+    if (result === "timeout") {
+      const tail = this.state.stderr === "" ? "" : `\n${this.state.stderr}`
+      throw new Error(`${this.config.id} 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
+    }
+    if (typeof result === "object" && result !== null && "died" in result) {
+      throw new Error(startupMessage(this.config.command, (result as { died: Error }).died))
+    }
+    const info = result as AcpInitialize
+    const version = info.protocolVersion
+    // 版本不合就直接说。协议原文：客户端不支持返回的版本时应当断开
+    if (version !== undefined && version > PROTOCOL_VERSION) {
+      throw new Error(
+        `${this.config.id} 讲的是 ACP v${String(version)}，omni 只认到 v${String(PROTOCOL_VERSION)}。请升级 omni。`,
+      )
+    }
+    this.state.loadSession = info.agentCapabilities?.loadSession === true
+  }
+
+  /**
+   * 开会话。带句柄就 `session/load` 续跑。
+   *
+   * **agent 不支持 `loadSession` 时不能静默新开**——用户会以为上下文还在，
+   * 实际模型什么都不记得。宁可把失败摆出来（和 codex 驱动同一条原则）。
+   */
+  private async openSession(): Promise<void> {
+    const shared = { cwd: this.req.cwd, mcpServers: [] }
+    if (this.req.resume !== undefined) {
+      if (!this.state.loadSession) {
+        throw new Error(`${this.config.id} 不支持续跑（没有 loadSession 能力），这个会话没法接着上次跑。`)
+      }
+      await this.rpc.call("session/load", { sessionId: this.req.resume, ...shared })
+      this.state.acpSession = this.req.resume
+      this.req.onHandle?.(this.req.resume)
+      await this.applyMode(this.trust.current, [])
+      return
+    }
+    const created = (await this.rpc.call("session/new", shared)) as AcpNewSession
+    const id = created.sessionId
+    if (id === undefined) throw new Error(`${this.config.id} 没有返回 sessionId，无法继续`)
+    this.state.acpSession = id
+    this.req.onHandle?.(id)
+    this.state.models = modelsOf(created)
+    this.state.modes = modesOf(created)
+    this.state.mode = currentModeOf(created)
+    await this.applyMode(this.trust.current, this.state.modes)
+  }
+
+  /**
+   * 把信任档落到 agent 的 mode 上。
+   *
+   * 匹配不上就**什么都不发**，保持 agent 自己的默认档，并明说一句。
+   * 硬塞一个猜的 mode 比不塞危险得多：塞错方向就是悄悄放开了权限。
+   */
+  private async applyMode(trust: Trust, modes: readonly { id?: string; name?: string }[]): Promise<void> {
+    if (this.state.acpSession === undefined) return
+    if (modes.length === 0) {
+      this.status("ready", `${this.config.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`)
+      return
+    }
+    const target = pickMode(modes, trust)
+    if (target === undefined) {
+      const names = modes.map((m) => m.id ?? "?").join("、")
+      this.status(
+        "ready",
+        `omni 的「${trust}」档在 ${this.config.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`,
+      )
+      return
+    }
+    if (target === this.state.mode) return
+    await this.rpc.call("session/set_mode", { sessionId: this.state.acpSession, modeId: target })
+    this.state.mode = target
+  }
+
+  /**
+   * 应答 agent 发来的请求。**每一条都必须答**——不答 agent 会一直等，整轮卡死。
+   *
+   * 认不出的请求回 JSON-RPC 的 method-not-found，而不是空对象：ACP 的客户端
+   * 方法是**能力协商**出来的，我们没认领 `fs`/`terminal` 却收到这类请求，
+   * 说明对方没看能力表。回一个空对象会让它以为办成了，回错误码它才知道没有。
+   */
+  private async answer(call: ServerCall): Promise<void> {
+    if (call.method !== "session/request_permission") {
+      call.respond({ error: { code: -32601, message: `omni 未认领 ${call.method}` } })
+      return
+    }
+    await handlePermission(
+      {
+        engine: this.config.id,
+        cwd: this.req.cwd,
+        home: this.req.home,
+        trust: () => this.trust.current,
+        memory: this.req.memory,
+        inflight: this.inflight,
+        askUser: this.req.askUser,
+      },
+      call,
+    )
+  }
+
+  get threadId(): StartRequest["threadId"] {
+    return this.req.threadId
+  }
+
+  /**
+   * 发一轮。
+   *
+   * **`session/prompt` 到收工才回**，和 codex 的 `turn/start`（一开始就回）
+   * 正好相反。所以这里不能 await 它——await 了 `prompt()` 就要挂到整轮结束，
+   * 宿主那边的队列会以为这一轮还没发出去。收工事件在 then 里发。
+   */
+  async prompt(text: string, turnId: TurnId): Promise<void> {
+    const sessionId = this.state.acpSession
+    if (sessionId === undefined) throw new Error(`${this.config.id} 会话尚未就绪`)
+    this.state.turn = turnId
+    this.rpc
+      .call("session/prompt", { sessionId, prompt: [{ type: "text", text }] })
+      .then(
+        (result) => {
+          this.finishTurn(turnId, (result as AcpPromptResult | undefined)?.stopReason)
+        },
+        (error: unknown) => {
+          this.failTurn(turnId, error instanceof Error ? error.message : String(error))
+        },
+      )
+    return Promise.resolve()
+  }
+
+  private finishTurn(turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
+    if (this.state.turn !== turnId) return
+    const { status, error } = stopStatus(reason)
+    sweep(this.updateContext(), this.updates, status === "interrupted" ? "interrupted" : "failed")
+    this.state.turn = undefined
+    this.req.emit({
+      type: "turn.completed",
+      at: Date.now(),
+      turnId,
+      status,
+      ...(error === undefined ? {} : { error }),
+    })
+  }
+
+  /**
+   * 一轮直接报错。实测过：适配器版本比配置的模型旧时，`session/prompt`
+   * 回的是 JSON-RPC error 而不是 `stopReason`，两条路都要走通，
+   * 否则那一轮会永远停在「进行中」。
+   */
+  private failTurn(turnId: TurnId, message: string): void {
+    if (this.state.turn !== turnId) return
+    sweep(this.updateContext(), this.updates, "failed")
+    this.state.turn = undefined
+    this.req.emit({ type: "turn.completed", at: Date.now(), turnId, status: "failed", error: message })
+  }
+
+  models(): Promise<readonly ModelOption[]> {
+    return Promise.resolve(this.state.models)
+  }
+
+  /**
+   * 换模型。ACP 的强度编在 modelId 里，所以 `effort` 参数在这里是多余的——
+   * 但契约上它是可选的，忽略即可，不用报错。
+   */
+  async setModel(model: string): Promise<void> {
+    const sessionId = this.state.acpSession
+    if (sessionId === undefined) return
+    await this.rpc.call("session/set_model", { sessionId, modelId: model })
+  }
+
+  /**
+   * 中断。`session/cancel` 是**通知不是请求**——发完不等回应，
+   * 在途的 `session/prompt` 会以 `stopReason: "cancelled"` 收尾。
+   * 当成请求发会永远等不到应答。
+   */
+  interrupt(): Promise<void> {
+    const sessionId = this.state.acpSession
+    if (sessionId === undefined) return Promise.resolve()
+    this.rpc.notify("session/cancel", { sessionId })
+    return Promise.resolve()
+  }
+
+  async setTrust(trust: Trust): Promise<void> {
+    this.trust.current = trust
+    await this.applyMode(trust, this.state.modes)
+  }
+
+  async dispose(): Promise<void> {
+    // 有在途文本就先收口，否则最后一条消息会永远停在「正在输入」
+    closeText(this.updateContext(), this.updates)
+    this.state.child?.stdin?.end()
+    this.rpc.close("会话正在关闭")
+    const report = await this.owner.reclaim()
+    if (report.rung === "escaped") {
+      this.status("crashed", `${this.config.id} 进程组未能回收（pid ${String(report.pid)}），可能已泄漏`)
+    }
+  }
+}
+
+export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
+  return {
+    id: config.id,
+    start: async (req: StartRequest): Promise<EngineSession> => {
+      const session = new AcpSession(req, config)
+      await session.start()
+      return session
+    },
+  }
+}

@@ -14,7 +14,7 @@
  * 全部字段按「可能不存在」声明——线上来的东西不受我们控制。
  */
 
-export type RequestId = string | number
+export type { RequestId } from "../rpc.js"
 
 export interface WireThread {
   id: string
