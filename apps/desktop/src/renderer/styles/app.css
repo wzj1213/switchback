@@ -256,6 +256,9 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding-bottom: var(--sp-4);
+  /* 滚动条压在行上会盖住计数和 `···`。留出槽位，
+     顺带避免「有滚动条时整列文字横向抖一下」 */
+  scrollbar-gutter: stable;
 }
 
 .group + .group {
