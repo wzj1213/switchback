@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { filterRows } from "../filter.js"
 import { sectionsOf, type Group } from "../sidebar.js"
-import { CopyIcon, FolderIcon, GearIcon, PinIcon, PlusIcon, RevealIcon, SearchIcon, TrashIcon } from "./icons.js"
-import { useContextMenu, type Command } from "./Menu.js"
+import { FolderIcon, GearIcon, PlusIcon, SearchIcon, TrashIcon } from "./icons.js"
+import { useContextMenu } from "./Menu.js"
+import { ProjectHead, workspaceCommands, type Acts } from "./SidebarMenus.js"
 import { Row } from "./SidebarRows.js"
 import { SectionList } from "./SidebarSections.js"
 
@@ -118,33 +119,6 @@ function Head({
   )
 }
 
-interface Acts {
-  pinned: readonly string[]
-  onNewIn: (cwd: string) => void
-  onTogglePin: (cwd: string) => void
-  onReveal: (path: string) => void
-  onCopy: (text: string) => void
-}
-
-/**
- * 项目和会话共用的那几条菜单命令。
- *
- * 共用是有意的：两者的右键菜单**前四项必须一样**——用户不该记得
- * 「在会话上右键有复制路径，在项目上右键没有」。会话那边只是多一条删除。
- */
-function workspaceCommands(cwd: string, acts: Acts): readonly Command[] {
-  return [
-    { label: "在此新建会话", icon: <PlusIcon />, run: () => { acts.onNewIn(cwd) } },
-    {
-      label: acts.pinned.includes(cwd) ? "取消置顶" : "置顶项目",
-      icon: <PinIcon />,
-      run: () => { acts.onTogglePin(cwd) },
-    },
-    { label: "在访达中显示", icon: <RevealIcon />, run: () => { acts.onReveal(cwd) } },
-    { label: "复制路径", icon: <CopyIcon />, run: () => { acts.onCopy(cwd) } },
-  ]
-}
-
 export function Sidebar({
   rows,
   selectedId,
@@ -200,7 +174,7 @@ export function Sidebar({
   }
 
   const groupMenu = (event: React.MouseEvent, group: Group): void => {
-    openMenu(event, workspaceCommands(group.cwd, acts))
+    openMenu(event, workspaceCommands(group.cwd, acts), <ProjectHead group={group} />)
   }
 
   const flat = (row: ThreadRow): React.JSX.Element => (
@@ -263,3 +237,4 @@ export function Sidebar({
     </aside>
   )
 }
+

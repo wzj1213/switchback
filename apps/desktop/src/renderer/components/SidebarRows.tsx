@@ -140,26 +140,47 @@ export function GroupBlock({
   onSelect: (id: string) => void
   onDelete: (id: string) => void
 }): React.JSX.Element {
+  const running = group.rows.filter((r) => r.thread.status === "running").length
   return (
     <div className="group">
-      <button
-        type="button"
+      <div
         className="row row--group"
-        onClick={onToggle}
         title={group.cwd}
         onContextMenu={(e) => {
           onGroupMenu(e, group)
         }}
       >
-        <span className="row__slot">
-          <ChevronIcon open={!collapsed} />
-        </span>
-        <span className="row__lead">
-          <FolderIcon />
-        </span>
-        <span className="row__label">{group.label}</span>
-        <span className="row__count">{group.rows.length}</span>
-      </button>
+        <button type="button" className="row__main" onClick={onToggle}>
+          <span className="row__slot">
+            <ChevronIcon open={!collapsed} />
+          </span>
+          <span className="row__lead">
+            <FolderIcon />
+          </span>
+          <span className="row__label">{group.label}</span>
+          {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
+              展开时每行自己会转圈，这里就不重复了 */}
+          {collapsed && running > 0 ? (
+            <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
+              <SpinnerIcon />
+            </span>
+          ) : null}
+          <span className="row__count">{group.rows.length}</span>
+        </button>
+        {/* 项目这一行也给一个 `···`。右键菜单一直都有，但**看不见的功能等于没有**——
+            没人会去右键一个看起来只是分组标题的东西 */}
+        <button
+          type="button"
+          className="row__act"
+          aria-label="项目操作"
+          title="项目操作"
+          onClick={(e) => {
+            onGroupMenu(e, group)
+          }}
+        >
+          ···
+        </button>
+      </div>
       {collapsed
         ? null
         : group.rows.map((row) => (

@@ -139,6 +139,9 @@ body {
 /* 组标题：字号小一档、字重重一档。**左边距和普通行一样**，
    靠展开箭头占住图标列，所以它和下面的会话行是对齐的 */
 .row--group {
+  position: relative;
+  display: flex;
+  align-items: center;
   margin-top: var(--sp-1);
   color: var(--text);
   font-weight: 500;
@@ -151,6 +154,27 @@ body {
   color: var(--text-faint);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+}
+
+/* 组标题现在也是「主按钮 + 贴右的 ···」，和会话行同一套结构 */
+.row--group {
+  padding: 0;
+}
+
+.row--group .row__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--sb-row-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 /* 会话行整体是个 flex，主按钮撑满、删除按钮贴右 */

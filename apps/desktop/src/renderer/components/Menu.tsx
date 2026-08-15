@@ -27,6 +27,8 @@ export interface Command {
 export interface MenuState {
   at: { x: number; y: number }
   commands: readonly Command[]
+  /** 菜单顶上的一小块说明。**只读**，不是菜单项——见 `open` 的注释。 */
+  head?: React.ReactNode
 }
 
 /**
@@ -37,17 +39,25 @@ export interface MenuState {
  * 那一行的 DOM 之外（否则会被行的 `overflow: hidden` 裁掉）。
  */
 export function useContextMenu(): {
-  open: (event: React.MouseEvent, commands: readonly Command[]) => void
+  /**
+   * @param head 菜单顶上那块只读说明（路径、分支、几个会话…）。
+   *   命令回答「我能做什么」，而它回答**「我点的到底是哪个东西」**——
+   *   侧栏里一行只有一个截断的名字，右键之前经常是不确定的。
+   */
+  open: (event: React.MouseEvent, commands: readonly Command[], head?: React.ReactNode) => void
   menu: React.JSX.Element | null
 } {
   const [state, setState] = useState<MenuState | undefined>(undefined)
 
-  const open = useCallback((event: React.MouseEvent, commands: readonly Command[]) => {
-    event.preventDefault()
-    // 空菜单不弹：一个打开就是空的菜单比没有菜单更让人困惑
-    if (commands.length === 0) return
-    setState({ at: { x: event.clientX, y: event.clientY }, commands })
-  }, [])
+  const open = useCallback(
+    (event: React.MouseEvent, commands: readonly Command[], head?: React.ReactNode) => {
+      event.preventDefault()
+      // 空菜单不弹：一个打开就是空的菜单比没有菜单更让人困惑
+      if (commands.length === 0) return
+      setState({ at: { x: event.clientX, y: event.clientY }, commands, head })
+    },
+    [],
+  )
 
   const close = useCallback(() => {
     setState(undefined)
@@ -57,6 +67,7 @@ export function useContextMenu(): {
     state === undefined ? null : (
       <Popover open anchor={null} at={state.at} minWidth={170} onClose={close}>
         <div role="menu">
+          {state.head === undefined ? null : <div className="pop__head">{state.head}</div>}
           {state.commands.map((command) => (
             <button
               type="button"

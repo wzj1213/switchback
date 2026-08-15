@@ -183,3 +183,35 @@
 .pop__cmd:hover .pop__cmd-icon {
   color: inherit;
 }
+
+/* ── 菜单顶上那块只读说明 ──────────────────────────
+ * 命令回答「我能做什么」，这块回答**「我点的到底是哪个东西」**。
+ * 侧栏一行只有一个截断的名字，右键之前经常是不确定的。
+ */
+.pop__head {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.pop__head-title {
+  font-weight: 500;
+}
+
+/* 路径从**左边**截断：尾巴才是项目名，头部的 /Users/xxx 谁都知道 */
+.pop__head-path {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--text-faint);
+  direction: rtl;
+  font-size: var(--text-xs);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pop__head-meta {
+  margin-top: 4px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
