@@ -107,10 +107,26 @@ function threadMenu(): MenuItemConstructorOptions {
  * 帮助：打包之后没有终端，出问题时用户手上什么都没有。
  * 这一项就是「把能说明情况的东西凑成一份」。
  */
-function helpMenu(onDiagnose: () => Promise<void>): MenuItemConstructorOptions {
+function helpMenu(
+  onDiagnose: () => Promise<void>,
+  onCheckUpdate: (() => Promise<void>) | undefined,
+): MenuItemConstructorOptions {
   return {
     role: "help",
     submenu: [
+      // 没配更新源时**这一项根本不出现**，而不是灰着。
+      // 一个永远灰着的菜单项只会让人反复去点它找原因
+      ...(onCheckUpdate === undefined
+        ? []
+        : [
+            {
+              label: "检查更新…",
+              click: (): void => {
+                void onCheckUpdate()
+              },
+            } as MenuItemConstructorOptions,
+            { type: "separator" } as MenuItemConstructorOptions,
+          ]),
       {
         label: "导出诊断报告…",
         click: () => {
@@ -130,7 +146,11 @@ function helpMenu(onDiagnose: () => Promise<void>): MenuItemConstructorOptions {
  * 编辑/显示/窗口三栏一律用 `role`：系统会自己本地化、自己接上原生行为
  * （撤销栈、拼写检查、缩放）。手写这些只会做得更差。
  */
-export function installMenu(onDiagnose: () => Promise<void>, onEngines: () => void): void {
+export function installMenu(
+  onDiagnose: () => Promise<void>,
+  onEngines: () => void,
+  onCheckUpdate?: () => Promise<void>,
+): void {
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: "appMenu" } as MenuItemConstructorOptions] : []),
     fileMenu(onEngines),
@@ -138,7 +158,7 @@ export function installMenu(onDiagnose: () => Promise<void>, onEngines: () => vo
     threadMenu(),
     { role: "viewMenu" },
     { role: "windowMenu" },
-    helpMenu(onDiagnose),
+    helpMenu(onDiagnose, onCheckUpdate),
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   // 非 mac 上没有 appMenu 角色，退出项挂在「文件」里，这里不再重复

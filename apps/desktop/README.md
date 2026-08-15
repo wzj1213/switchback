@@ -66,6 +66,26 @@ codesign -d --entitlements - release/mac-arm64/omni.app
 应用能起、渲染层能画、`which` 探测能跑、codex 子进程能 spawn 并读文件。
 **如果哪天加了新的原生依赖或新的子进程，重跑一遍这三条命令再发版。**
 
+## 更新检查
+
+**只查不装，这是有意的。** macOS 上装更新走 Squirrel.Mac，而它会校验新旧两个
+版本的代码签名——没签名的应用它根本不会给你装。硬塞一个 `electron-updater`
+进来只会在下载完之后卡在安装那一步，而**一个走到最后一步才失败的更新流程，
+比没有更新流程糟**。
+
+feed 地址填在 `apps/desktop/package.json` 的 `omni.updateFeed`
+（`OMNI_UPDATE_FEED` 可覆盖，企业内网自建源用得上）。**留空 = 整个功能不存在**：
+不发请求、不起定时器、菜单里也不出现「检查更新…」。
+
+源返回一个 JSON：
+
+```json
+{ "version": "1.2.3", "url": "https://…/omni-1.2.3.dmg", "notes": "改了什么" }
+```
+
+`url` **只认 https**——一个能被改成 `http://` 或 `file://` 的更新地址，
+就是一条能把用户引去任意地方的路。
+
 ## 已知限制
 
 - **打出来的包仍然没有签名**：本机只有一个自签且 `CSSMERR_TP_NOT_TRUSTED` 的证书，

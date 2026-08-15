@@ -1,5 +1,6 @@
 import { join } from "node:path"
-import { app, BrowserWindow, nativeTheme, shell } from "electron"
+import { readFileSync } from "node:fs"
+import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron"
 import { attachHost, rebuild, seedDefaultThread } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
@@ -7,6 +8,7 @@ import { createLogger } from "./log.js"
 import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
+import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
   devCwd,
@@ -35,6 +37,40 @@ const log = createLogger(join(app.getPath("userData"), "logs"))
 // **必须在 whenReady 之前**：崩溃处理器要赶在渲染进程被创建之前装上，
 // 否则那些进程崩了不会留下任何转储
 const crash = installCrashReporter(log)
+
+/**
+ * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
+ * 只查不装的理由见 `update.ts`：没签名的应用装不了更新。
+ */
+const feed = feedOf(
+  // 打包之后 package.json 在 asar 里，`app.getAppPath()` 指得到它
+  (() => {
+    try {
+      return JSON.parse(readFileSync(join(app.getAppPath(), "package.json"), "utf8")) as {
+        omni?: { updateFeed?: unknown }
+      }
+    } catch {
+      return undefined
+    }
+  })(),
+)
+
+const runUpdateCheck = async (manual: boolean): Promise<void> => {
+  const result = await checkForUpdate({ feed, current: app.getVersion(), fetchText })
+  await announce(
+    result,
+    {
+      ask: async (options) => (await dialog.showMessageBox({ type: "info", ...options })).response,
+      open: (url) => {
+        void shell.openExternal(url)
+      },
+      log: (level, message) => {
+        log.write(level, "update", message)
+      },
+    },
+    manual,
+  )
+}
 
 /**
  * 全局兜底。**没有这两条，主进程里任何一个漏网的异常都会静默带走整个应用**——
@@ -106,7 +142,10 @@ void app.whenReady().then(async () => {
       // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
       void shell.openPath(ensureEngineFile(app.getPath("userData")))
     },
+    feed === "" ? undefined : () => runUpdateCheck(true),
   )
+  // 背景检查只在配了 feed 时跑，而且**只在有新版本时才出声**
+  if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)
   installFind(() => BrowserWindow.getAllWindows())
   watchProcesses(log, () => BrowserWindow.getAllWindows())
   const attached = attachHost(() => BrowserWindow.getAllWindows(), log)

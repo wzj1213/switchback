@@ -1,6 +1,10 @@
 {
   "name": "@omni/desktop",
   "productName": "omni",
+  "omni": {
+    "_updateFeed": "发布时填一个 https 地址，返回 {version,url,notes}。留空 = 更新检查整个关闭，不发任何请求。",
+    "updateFeed": ""
+  },
   "version": "0.0.0",
   "private": true,
   "type": "module",
