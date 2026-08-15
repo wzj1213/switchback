@@ -3,7 +3,16 @@ import type { EngineId, ThreadId, TurnId } from "./ids.js"
 /** 会话的信任档。语义与 `@omni/approval` 的 `Trust` 一致，此处只做承载。 */
 export type Trust = "read-only" | "auto-edit" | "full"
 
-export type ThreadStatus = "idle" | "running" | "waiting_approval" | "failed"
+/**
+ * `starting` 是必需的一档，不是锦上添花。
+ *
+ * 开一个会话要起引擎子进程、走协议握手——实测 codex 是 400ms，但**它不是零**，
+ * 而在这之前界面上必须已经有这一行了。没有这一档的话只有两种做法：
+ * 要么等引擎起完再显示（用户点下去几百毫秒没有任何反应，于是再点一下，
+ * 于是真的建出两个会话——这是实测复现过的），要么显示成 `idle`
+ * （那就是撒谎：输入框看起来能用，打进去的字会丢）。
+ */
+export type ThreadStatus = "starting" | "idle" | "running" | "waiting_approval" | "failed"
 
 /** 一次对话。绑定一个工作区，同一时刻绑定一个引擎（可中途接力换掉）。 */
 export interface Thread {

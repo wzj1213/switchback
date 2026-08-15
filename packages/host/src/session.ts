@@ -99,11 +99,30 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
   return early.handle
 }
 
+/**
+ * 开一个新会话。
+ *
+ * **先让它出现在界面上，再去起引擎。** 上一版的顺序反过来：
+ * `await launch()` 走完整个 spawn + 握手才 emit，于是点下去到列表里出现那一行
+ * 之间界面上什么都没有——没有加载态、没有禁用、什么都没有，
+ * 用户唯一能做的就是再点一下。实测点三下真的会起三个 codex 进程。
+ *
+ * 现在分两步：`starting` 那条立刻出去（界面上有了、输入框是禁的），
+ * 引擎起好再补一条 `idle`。**起不来就把它撤掉**——留一个永远 starting 的
+ * 空壳比没有更糟，而错误由调用方翻成横幅。
+ */
 export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>): Promise<void> {
   const at = ctx.deps.now()
   const thread = newThread(cmd, ctx.deps.newId("th"), at)
-  const early = await launch(ctx, thread)
-  emit(ctx, { type: "thread.started", at, thread })
+  emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
+  let early: string | undefined
+  try {
+    early = await launch(ctx, thread)
+  } catch (error) {
+    emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
+    throw error
+  }
+  emit(ctx, { type: "thread.updated", at: ctx.deps.now(), thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 

@@ -36,6 +36,13 @@ export interface Ctx {
    * `Live.turn` 会在轮次结束时被清空，所以不能靠它——必须单独记一份。
    */
   turnOwner: Map<TurnId, ThreadId>
+  /**
+   * 在途的「起引擎」命令，键见 `host.ts` 的 `inflightKey`。
+   *
+   * 放在 ctx 而不是模块级：一个进程里可能有多个 host 实例（测试就是），
+   * 模块级的表会让它们互相拦。
+   */
+  inflight: Map<string, Promise<void>>
 }
 
 /**

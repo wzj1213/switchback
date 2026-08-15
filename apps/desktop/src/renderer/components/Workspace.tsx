@@ -144,6 +144,11 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
       <Composer
         detached={thread.detached === true}
+        // 引擎还在起、或者上一轮还没跑完——两种都发不出去，但原因不同，文案也不同
+        busy={thread.status === "starting" || props.turn !== undefined}
+        onInterrupt={() => {
+          send({ type: "thread.interrupt", threadId: thread.id })
+        }}
         engines={props.engines}
         cwd={thread.cwd}
         // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了

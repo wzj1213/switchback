@@ -63,9 +63,57 @@ const HANDLERS: Handlers = {
   },
 }
 
+/**
+ * 哪些命令要按「在途去重」拦一道，键是什么。
+ *
+ * **只拦「起引擎」那几条。** 它们都要 spawn 子进程，重入的代价是真的多起一个
+ * 进程、多出一个会话——实测点三下新建会出三个 codex。
+ * 其余命令不拦：`prompt` 连发两条是合法的（用户就是想追加一句），
+ * `interrupt` 更是越快越好。
+ *
+ * `thread.create` 的键带上 (cwd, engine, trust)：**同一个目录开第二个会话是
+ * 合法用法**，不能永久拦住；拦的只是「同一个请求还没落定就又来一次」。
+ */
+function inflightKey(command: Command): string | undefined {
+  switch (command.type) {
+    case "thread.create":
+      return `create:${command.cwd}:${command.engine}:${command.trust}`
+    case "thread.resume":
+      return `resume:${command.threadId}`
+    case "thread.handoff":
+      return `handoff:${command.threadId}`
+    case "thread.fork":
+      return `fork:${command.threadId}`
+    default:
+      return undefined
+  }
+}
+
+/**
+ * 分派。
+ *
+ * 起引擎那几条命令**在途期间重入直接复用同一个 Promise**，不再起第二次。
+ * 拦在这一层而不是界面上：界面有好几个入口（按钮、菜单、快捷键、右键菜单），
+ * 每个入口各加一次防抖迟早会漏掉一个，而漏掉的代价是一个孤儿子进程。
+ */
 async function dispatch(ctx: Ctx, command: Command): Promise<void> {
   const handler = HANDLERS[command.type] as (ctx: Ctx, command: Command) => Promise<void>
-  await handler(ctx, command)
+  const key = inflightKey(command)
+  if (key === undefined) {
+    await handler(ctx, command)
+    return
+  }
+  const running = ctx.inflight.get(key)
+  if (running !== undefined) {
+    await running
+    return
+  }
+  // finally 里删掉：失败也要放行，否则一次失败就把这个键永久锁死
+  const started = handler(ctx, command).finally(() => {
+    ctx.inflight.delete(key)
+  })
+  ctx.inflight.set(key, started)
+  await started
 }
 
 async function dispose(ctx: Ctx): Promise<void> {
@@ -76,7 +124,12 @@ async function dispose(ctx: Ctx): Promise<void> {
 }
 
 export function createHost(deps: HostDeps): Host {
-  const ctx: Ctx = { deps, live: new Map<ThreadId, Live>(), turnOwner: new Map<TurnId, ThreadId>() }
+  const ctx: Ctx = {
+    deps,
+    live: new Map<ThreadId, Live>(),
+    turnOwner: new Map<TurnId, ThreadId>(),
+    inflight: new Map<string, Promise<void>>(),
+  }
   return {
     dispatch: (command) => dispatch(ctx, command),
     live: () => [...ctx.live.values()].map((entry) => entry.thread),

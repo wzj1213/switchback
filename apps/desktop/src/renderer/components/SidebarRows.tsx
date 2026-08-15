@@ -13,6 +13,9 @@ import { ChevronIcon, FolderIcon } from "./icons.js"
  */
 
 const DOT_CLASS: Record<ThreadStatus, string> = {
+  // 起引擎那几百毫秒：和「跑着」用同一个呼吸动画，因为**对用户来说就是同一件事**
+  //（有东西在动、还不能输入），没必要为它发明第三种视觉语言
+  starting: " row__dot--running",
   idle: "",
   running: " row__dot--running",
   waiting_approval: " row__dot--waiting",
@@ -20,7 +23,7 @@ const DOT_CLASS: Record<ThreadStatus, string> = {
 }
 
 /** 光靠颜色说不清「要你去做什么」，等待批准这一档补一句字。 */
-const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批" }
+const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批", starting: "启动中" }
 
 export function Row({
   row,

@@ -21,6 +21,10 @@ const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
 interface Props {
   /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
   detached?: boolean
+  /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
+  busy?: boolean
+  /** busy 时「发送」变成「停止」，点它中断当前轮次。 */
+  onInterrupt?: () => void
   engine: EngineId
   /** 可选引擎。**由宿主给**，不在这里写死——写死的那份迟早和真正注册了的对不上。 */
   engines: readonly EngineInfo[]
@@ -58,12 +62,22 @@ export function Composer({
   onModelChange,
   cwd,
   stamp,
+  busy = false,
+  onInterrupt,
   searchFiles,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
+  /**
+   * 现在能不能发。
+   *
+   * `busy` 覆盖两件事：引擎还在起（`starting`）、上一轮还没跑完。
+   * **第二条是个真 bug 不是洁癖**：轮次跑着时再发一条，
+   * Claude 那边正在流的回答会整个消失——审计里复现过。
+   */
+  const blocked = detached || busy
   const submit = (): void => {
     const trimmed = text.trim()
-    if (trimmed === "" || detached) return
+    if (trimmed === "" || blocked) return
     onSend(trimmed)
     setText("")
   }
@@ -74,7 +88,8 @@ export function Composer({
         {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} stamp={stamp} />}
         <Prompt
           value={text}
-          detached={detached}
+          detached={blocked}
+          busyHint={busy && !detached}
           cwd={cwd}
           searchFiles={searchFiles}
           onChange={setText}
@@ -127,6 +142,12 @@ export function Composer({
           {detached ? (
             <button className="btn btn--primary" type="button" onClick={onResume}>
               继续这个会话
+            </button>
+          ) : busy ? (
+            // 跑着的时候把「发送」换成「停止」而不是灰掉：**这时候人真正想按的是停止**，
+            // 而一个灰掉的发送键只告诉他「不能发」，没告诉他还能做什么
+            <button className="btn" type="button" onClick={onInterrupt} disabled={onInterrupt === undefined}>
+              停止
             </button>
           ) : (
             <button className="btn btn--primary" type="button" onClick={submit}>

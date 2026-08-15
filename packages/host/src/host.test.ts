@@ -160,8 +160,14 @@ describe("host", () => {
     const { host, events, session } = setup()
     await host.dispatch(create)
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    // 开会话本身会补一条 `starting → idle`（见 session.ts 的 create），
+    // 这条链路测的是**发消息之后**的状态流转，所以从这里起算
+    const base = events.filter((e) => e.type === "thread.updated").length
     const statuses = (): string[] =>
-      events.filter((e) => e.type === "thread.updated").map((e) => e.thread.status)
+      events
+        .filter((e) => e.type === "thread.updated")
+        .slice(base)
+        .map((e) => e.thread.status)
 
     await host.dispatch({ type: "thread.prompt", threadId, text: "hi" })
     expect(statuses()).toEqual(["running"])
@@ -291,16 +297,20 @@ describe("续跑", () => {
     await host.dispatch(create)
     const last = events.at(-1)
     expect(last?.type === "thread.updated" ? last.thread.engineHandle : "").toBe("early-handle")
-    // 顺序必须是 started → updated，反过来落盘里就成了「先更新后创建」
-    expect(events.map((e) => e.type)).toEqual(["thread.started", "thread.updated"])
+    // 顺序必须是 started 打头，反过来落盘里就成了「先更新后创建」。
+    // 中间那条 updated 是 `starting → idle`，末尾那条才是补句柄的
+    expect(events[0]?.type).toBe("thread.started")
+    expect(events.map((e) => e.type).slice(1)).toEqual(["thread.updated", "thread.updated"])
   })
 
   it("同一个句柄不重复发事件", async () => {
     const { host, events, session } = setupWithJournal()
     await host.dispatch(create)
+    // 开会话自带一条 `starting → idle` 的 updated，从这里起算
+    const base = events.filter((e) => e.type === "thread.updated").length
     session().report("h")
     session().report("h")
-    expect(events.filter((e) => e.type === "thread.updated")).toHaveLength(1)
+    expect(events.filter((e) => e.type === "thread.updated")).toHaveLength(base + 1)
   })
 
   it("续跑把句柄交给驱动，并把 detached 摘掉", async () => {
@@ -684,5 +694,121 @@ describe("L3 分叉", () => {
     const started = events.filter((e) => e.type === "thread.started")
     const forked = started[1]?.type === "thread.started" ? started[1].thread : undefined
     expect(forked?.title).toContain("other")
+  })
+})
+
+/**
+ * 起引擎慢的那类驱动。真实的 codex 是 400ms——不长，但**不是零**，
+ * 而界面必须在这 400ms 里已经有东西了。
+ */
+function slowDriver(delayMs: number, fail = false): EngineDriver {
+  return {
+    id: "slow",
+    start: async () => {
+      await new Promise((r) => setTimeout(r, delayMs))
+      if (fail) throw new Error("引擎起不来")
+      return {
+        threadId: "t",
+        prompt: () => Promise.resolve(),
+        interrupt: () => Promise.resolve(),
+        setTrust: () => Promise.resolve(),
+        models: () => Promise.resolve([]),
+        setModel: () => Promise.resolve(),
+        dispose: () => Promise.resolve(),
+      }
+    },
+  }
+}
+
+function slowSetup(delayMs: number, fail = false): { host: Host; events: Event[]; starts: () => number } {
+  const events: Event[] = []
+  const counter = { n: 0, starts: 0 }
+  const inner = slowDriver(delayMs, fail)
+  const driver: EngineDriver = {
+    id: "slow",
+    start: (req) => {
+      counter.starts += 1
+      return inner.start(req)
+    },
+  }
+  const host = createHost({
+    drivers: { slow: driver },
+    home: "/home/dev",
+    emit: (e) => events.push(e),
+    newId: (prefix) => {
+      counter.n += 1
+      return `${prefix}-${String(counter.n)}`
+    },
+    now: () => 0,
+  })
+  return { host, events, starts: () => counter.starts }
+}
+
+const slowCreate = { type: "thread.create", cwd: "/w", engine: "slow", trust: "auto-edit" } as const
+
+describe("新建会话：先出现，再起引擎", () => {
+  it("**引擎还没起完，会话就已经在事件流里了**——不然点下去几百毫秒毫无反应", async () => {
+    const { host, events } = slowSetup(120)
+    const pending = host.dispatch(slowCreate)
+    // 不等它跑完就看
+    await new Promise((r) => setTimeout(r, 30))
+    const started = events.find((e) => e.type === "thread.started")
+    expect(started?.type === "thread.started" ? started.thread.status : "").toBe("starting")
+    await pending
+  })
+
+  it("引擎起好之后补一条 idle", async () => {
+    const { host, events } = slowSetup(20)
+    await host.dispatch(slowCreate)
+    const updated = [...events].reverse().find((e) => e.type === "thread.updated")
+    expect(updated?.type === "thread.updated" ? updated.thread.status : "").toBe("idle")
+  })
+
+  it("**引擎起不来就把那一行撤掉**——留一个永远 starting 的空壳比没有更糟", async () => {
+    const { host, events } = slowSetup(10, true)
+    await expect(host.dispatch(slowCreate)).rejects.toThrow("引擎起不来")
+    expect(events.filter((e) => e.type === "thread.removed")).toHaveLength(1)
+  })
+})
+
+describe("在途去重", () => {
+  it("**连点三下只起一个引擎**——实测点三下真的会 spawn 三个 codex", async () => {
+    const { host, starts } = slowSetup(60)
+    await Promise.all([host.dispatch(slowCreate), host.dispatch(slowCreate), host.dispatch(slowCreate)])
+    expect(starts()).toBe(1)
+  })
+
+  it("上一次落定之后再建是允许的——**同一个目录开第二个会话是合法用法**", async () => {
+    const { host, starts } = slowSetup(10)
+    await host.dispatch(slowCreate)
+    await host.dispatch(slowCreate)
+    expect(starts()).toBe(2)
+  })
+
+  it("参数不同的不算重入：换个档位就是另一个请求", async () => {
+    const { host, starts } = slowSetup(60)
+    await Promise.all([
+      host.dispatch(slowCreate),
+      host.dispatch({ ...slowCreate, trust: "read-only" }),
+    ])
+    expect(starts()).toBe(2)
+  })
+
+  it("**失败也要放行**，否则一次失败就把这个键永久锁死", async () => {
+    const { host, starts } = slowSetup(10, true)
+    await expect(host.dispatch(slowCreate)).rejects.toThrow()
+    await expect(host.dispatch(slowCreate)).rejects.toThrow()
+    expect(starts()).toBe(2)
+  })
+
+  it("prompt 不去重——连发两条是合法的，用户就是想追加一句", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const threadId = events.find((e) => e.type === "thread.started")?.type === "thread.started"
+      ? (events.find((e) => e.type === "thread.started") as Extract<Event, { type: "thread.started" }>).thread.id
+      : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "一" })
+    await host.dispatch({ type: "thread.prompt", threadId, text: "二" })
+    expect(session().prompts).toHaveLength(2)
   })
 })

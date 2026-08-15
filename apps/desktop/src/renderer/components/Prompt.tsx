@@ -11,6 +11,7 @@ import { useMentions } from "../useMentions.js"
 export function Prompt({
   value,
   detached,
+  busyHint = false,
   cwd,
   searchFiles,
   onChange,
@@ -18,6 +19,8 @@ export function Prompt({
 }: {
   value: string
   detached: boolean
+  /** 发不出去是因为「正在跑」而不是「这是历史」。文案要说清楚是哪一种。 */
+  busyHint?: boolean
   cwd: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   onChange: (text: string) => void
@@ -47,7 +50,13 @@ export function Prompt({
         className="composer__input"
         disabled={detached}
         // 输入框直接说清为什么用不了。留一个能打字却答非所问的框，比把它关掉糟得多
-        placeholder={detached ? "这是重启前的历史记录。点右侧「继续」把引擎接回来。" : "交代任务…（@ 引用文件）"}
+        placeholder={
+          busyHint
+            ? "这一轮还在跑。等它停下，或者点右侧「停止」。"
+            : detached
+              ? "这是重启前的历史记录。点右侧「继续」把引擎接回来。"
+              : "交代任务…（@ 引用文件）"
+        }
         value={value}
         onChange={(e) => {
           onChange(e.target.value)
