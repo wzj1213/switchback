@@ -6,6 +6,7 @@ declare global {
     /** 由 preload 注入的唯一通道，形状见 src/preload/index.ts */
     omni: {
       send: (command: Command) => void
+      pickFolder: () => Promise<string | undefined>
       subscribe: (onEvent: (event: Event) => void) => () => void
     }
   }

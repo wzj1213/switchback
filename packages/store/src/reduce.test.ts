@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread, ToolCallItem } from "@omni/protocol"
-import { initial, itemsOf, threadsOf } from "./state.js"
+import { initial, itemsOf, threadsOf, threadRowsOf } from "./state.js"
 import { reduce, reduceAll } from "./reduce.js"
 
 const thread = (id: string): Thread => ({
@@ -183,5 +183,27 @@ describe("shell 输出的实时增量", () => {
       { type: "item.delta", at: 1, itemId: "f1", append: "x" },
     ])
     expect(itemsOf(state, "t1")[0]).toMatchObject({ detail: { kind: "file_edit", path: "/w/a.ts" } })
+  })
+})
+
+describe("threadRowsOf", () => {
+  it("preview 取第一条用户消息——同工作区的多个会话光靠目录名分不清", () => {
+    const state = reduceAll(initial(), [
+      started("a"),
+      turnStarted("a", "t1"),
+      { type: "item.started", at: 0, item: { id: "u1", turnId: "t1", kind: "user_message", at: 0, text: "先看看架构" } },
+      { type: "item.started", at: 0, item: msg("m1", "t1", "好的") },
+      { type: "item.started", at: 0, item: { id: "u2", turnId: "t1", kind: "user_message", at: 0, text: "第二条" } },
+    ])
+    expect(threadRowsOf(state)[0]?.preview).toBe("先看看架构")
+  })
+
+  it("还没发过消息的会话 preview 是 undefined，不是空串", () => {
+    expect(threadRowsOf(reduceAll(initial(), [started("a")]))[0]?.preview).toBeUndefined()
+  })
+
+  it("顺序与 threadsOf 一致，最近创建在前", () => {
+    const state = reduceAll(initial(), [started("a"), started("b")])
+    expect(threadRowsOf(state).map((r) => r.thread.id)).toEqual(["b", "a"])
   })
 })

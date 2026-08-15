@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import { ipcMain, type BrowserWindow } from "electron"
+import { dialog, ipcMain, type BrowserWindow } from "electron"
 import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
@@ -34,6 +34,16 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
     now: () => Date.now(),
+  })
+
+  // 目录选择必须在主进程弹：渲染层没有、也不该有触碰文件系统的能力。
+  // 回给渲染层的只是一个用户亲手选中的路径。
+  ipcMain.handle("omni:pickFolder", async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+      title: "选择工作区",
+    })
+    return result.canceled ? undefined : result.filePaths[0]
   })
 
   ipcMain.on("omni:command", (_e, command: Command) => {

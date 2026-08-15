@@ -5,6 +5,8 @@ import { initial, reduce, type ViewState } from "@omni/store"
 export interface Omni {
   state: ViewState
   send: (command: Command) => void
+  /** 弹系统目录框。桥没接上时返回 undefined，调用方按「用户取消」处理即可。 */
+  pickFolder: () => Promise<string | undefined>
   /**
    * preload 没注入通道。**显式暴露而不是静默 no-op**：
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
@@ -36,5 +38,10 @@ export function useOmni(): Omni {
     [bridge],
   )
 
-  return { state, send, bridgeMissing: bridge === undefined }
+  const pickFolder = useCallback(
+    async () => (bridge === undefined ? undefined : bridge.pickFolder()),
+    [bridge],
+  )
+
+  return { state, send, pickFolder, bridgeMissing: bridge === undefined }
 }

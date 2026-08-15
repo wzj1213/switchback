@@ -34,3 +34,22 @@ export function threadsOf(state: ViewState): readonly Thread[] {
     .map((id) => state.threads[id])
     .filter((t): t is Thread => t !== undefined)
 }
+
+/**
+ * 侧栏一行要的东西。
+ *
+ * `preview` 取**第一条用户消息**——同一个工作区可以开好几个会话，
+ * 光靠目录名它们在侧栏里长得一模一样，分不出哪个是哪个。
+ * codex 的 `Thread.preview` 就是这么定义的。
+ */
+export interface ThreadRow {
+  thread: Thread
+  preview: string | undefined
+}
+
+export function threadRowsOf(state: ViewState): readonly ThreadRow[] {
+  return threadsOf(state).map((thread) => {
+    const first = (state.items[thread.id] ?? []).find((i) => i.kind === "user_message")
+    return { thread, preview: first?.kind === "user_message" ? first.text : undefined }
+  })
+}

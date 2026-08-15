@@ -53,6 +53,39 @@ body {
   margin-left: var(--sp-1);
 }
 
+/* 新建动作贴在品牌下方：codex 的侧栏也是这个位置，手会先到这里 */
+.sidebar__actions {
+  display: flex;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+}
+
+.sbtn {
+  flex: 1;
+  padding: 5px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: center;
+  cursor: default;
+}
+
+.sbtn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sbtn--icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+}
+
 .sidebar__group {
   padding: var(--sp-3) var(--sp-2) var(--sp-1);
   font-size: var(--text-xs);
@@ -69,8 +102,8 @@ body {
 
 .thread {
   display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+  flex-direction: column;
+  gap: 2px;
   width: 100%;
   padding: 6px var(--sp-2);
   border: 0;
@@ -139,10 +172,29 @@ body {
   font-size: var(--text-xs);
 }
 
+.thread__line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+}
+
 .thread__label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 第一条用户消息。同一个工作区的多个会话，靠它才分得清哪个是哪个 */
+.thread__preview {
+  width: 100%;
+  padding-left: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
 }
 
 /* ── 主区 ───────────────────────────────────────────── */

@@ -1,14 +1,10 @@
 import { useState } from "react"
 import type { Thread } from "@omni/protocol"
-import { itemsOf, threadsOf, turnOf } from "@omni/store"
-import { ItemView } from "./components/ItemView.js"
+import { itemsOf, threadRowsOf, turnOf } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
 import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
-import { ToolRun } from "./components/ToolRun.js"
-import { TurnStatus } from "./components/TurnStatus.js"
-import { groupRows } from "./group.js"
+import { Transcript } from "./components/Transcript.js"
 import { useOmni } from "./useOmni.js"
-import { useStickToBottom } from "./useStickToBottom.js"
 
 function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
   return list.find((x) => x.id === id)?.label ?? id
@@ -42,19 +38,42 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
 }
 
 export function App(): React.JSX.Element {
-  const { state, send, bridgeMissing } = useOmni()
+  const { state, send, pickFolder, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
 
-  const threads = threadsOf(state)
-  const thread = threads.find((t) => t.id === selectedId) ?? threads[0]
+  const rows = threadRowsOf(state)
+  const thread = rows.find((r) => r.thread.id === selectedId)?.thread ?? rows[0]?.thread
   const items = thread === undefined ? [] : itemsOf(state, thread.id)
   const turn = thread === undefined ? undefined : turnOf(state, thread.id)
-  const scroller = useStickToBottom<HTMLDivElement>(items.length + (turn === undefined ? 0 : 1))
+
+  // 新会话沿用当前会话的引擎与档位：换工作区不该顺带把内核也换了
+  const open = (cwd: string): void => {
+    send({
+      type: "thread.create",
+      cwd,
+      engine: thread?.engine ?? "claude",
+      trust: thread?.trust ?? "auto-edit",
+      title: cwd.split("/").filter(Boolean).pop() ?? cwd,
+    })
+    setSelectedId(undefined)
+  }
+
+  const openPicker = (): void => {
+    void pickFolder().then((cwd) => {
+      if (cwd !== undefined) open(cwd)
+    })
+  }
 
   if (thread === undefined) {
     return (
       <div className="shell">
-        <Sidebar threads={threads} selectedId="" onSelect={setSelectedId} />
+        <Sidebar
+          rows={rows}
+          selectedId=""
+          onSelect={setSelectedId}
+          onNew={openPicker}
+          onOpenFolder={openPicker}
+        />
         <main className="main">
           <Notice
             fatal={bridgeMissing}
@@ -71,34 +90,18 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="shell">
-      <Sidebar threads={threads} selectedId={thread.id} onSelect={setSelectedId} />
+      <Sidebar
+        rows={rows}
+        selectedId={thread.id}
+        onSelect={setSelectedId}
+        onNew={() => {
+          open(thread.cwd)
+        }}
+        onOpenFolder={openPicker}
+      />
       <main className="main">
         <TopBar thread={thread} />
-        <div className="transcript" ref={scroller}>
-          <div className="transcript__inner">
-            {groupRows(items).map((row) =>
-              row.kind === "run" ? (
-                <ToolRun key={row.items[0]?.id} items={row.items} />
-              ) : (
-                <ItemView
-                  key={row.item.id}
-                  item={row.item}
-                  onResolve={(itemId, allow, remember) => {
-                    send({ type: "approval.resolve", itemId, allow, remember })
-                  }}
-                />
-              ),
-            )}
-            <TurnStatus
-              thread={thread}
-              turn={turn}
-              items={items}
-              onInterrupt={() => {
-                send({ type: "thread.interrupt", threadId: thread.id })
-              }}
-            />
-          </div>
-        </div>
+        <Transcript thread={thread} items={items} turn={turn} send={send} />
         <Composer
           // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
           // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。

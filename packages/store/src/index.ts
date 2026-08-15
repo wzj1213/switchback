@@ -1,3 +1,3 @@
-export { initial, itemsOf, threadsOf, turnOf } from "./state.js"
+export { initial, itemsOf, threadsOf, threadRowsOf, turnOf } from "./state.js"
 export { reduce, reduceAll } from "./reduce.js"
-export type { ViewState } from "./state.js"
+export type { ViewState, ThreadRow } from "./state.js"
