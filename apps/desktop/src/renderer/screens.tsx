@@ -79,7 +79,7 @@ export function SidebarPane({
       onNew={onNew}
       onOpenFolder={onOpenFolder}
       focusFilter={focusFilter}
-      onDelete={(id) => {
+      onDelete={(id: string) => {
         // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
         if (id === thread?.id) onSelect(undefined)
         send({ type: "thread.delete", threadId: id })

@@ -1,35 +1,29 @@
 import { useEffect, useRef, useState } from "react"
-import { filterRows } from "../filter.js"
-import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
-
-const DOT_CLASS: Record<ThreadStatus, string> = {
-  idle: "",
-  running: " thread__dot--running",
-  waiting_approval: " thread__dot--waiting",
-  failed: " thread__dot--failed",
-}
+import { filterRows } from "../filter.js"
+import { groupByWorkspace } from "../sidebar.js"
+import { FolderIcon, PlusIcon, SearchIcon } from "./icons.js"
+import { GroupBlock, Row } from "./SidebarRows.js"
 
 /**
- * 文件夹图标。用内联 SVG 而不是 emoji 或字形：
- * emoji 是彩色的、和这套单色界面不搭，字形（`⌸` 之类）在多数字体里
- * 会退化成一个含糊的方框。内联 SVG 跟着 `currentColor` 走，永远对。
+ * 侧栏。
+ *
+ * ## 一条槽，所有东西对着它
+ *
+ * 上一版每样东西各有各的左边距：品牌 12px、按钮 8px、组标题 8px、
+ * 行内文字 32px。看上去就是「没对齐」——而这件事没有任何理由，
+ * 纯粹是每加一个元素就随手写了一个 padding。
+ *
+ * 现在只有两个量：`--sb-pad`（行的外边距）与 `--sb-slot`（图标列宽）。
+ * 所有行共用同一套：图标落在同一列，文字落在同一列，组标题对着图标列。
+ * **新加东西也只能用这两个量**——写第三个 padding 就是这条规则失效的开始。
+ *
+ * ## 为什么按项目分组
+ *
+ * 会话标题默认取目录名，于是同一个项目下的五个会话在侧栏里长得一模一样，
+ * 而真正能区分它们的第一句话被排版成了灰色小字。
+ * 分组之后：目录名说一次（组标题），每行说自己是干什么的。见 `../sidebar.ts`。
  */
-function FolderIcon(): React.JSX.Element {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M1.75 3.5A1.25 1.25 0 0 1 3 2.25h3l1.5 1.5H13a1.25 1.25 0 0 1 1.25 1.25v7A1.25 1.25 0 0 1 13 13.25H3A1.25 1.25 0 0 1 1.75 12z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-/** 光靠颜色说不清「要你去做什么」，等待批准这一档补一句字。 */
-const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批" }
 
 interface Props {
   rows: readonly ThreadRow[]
@@ -50,50 +44,65 @@ interface Props {
   focusFilter: number
 }
 
-function Row({
-  row,
-  selected,
-  onSelect,
-  onDelete,
+/** 侧栏顶部：品牌、两个动作、筛选框。三块都是同一套 `.row`，所以天然对齐。 */
+function Head({
+  onNew,
+  onOpenFolder,
+  box,
+  query,
+  onQuery,
 }: {
-  row: ThreadRow
-  selected: boolean
-  onSelect: () => void
-  onDelete: () => void
+  onNew: () => void
+  onOpenFolder: () => void
+  box: React.RefObject<HTMLInputElement | null>
+  query: string
+  onQuery: (next: string) => void
 }): React.JSX.Element {
-  const { thread, preview } = row
-  // 二次确认做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
-  // 但也不能点一下就没。照 codex 的 confirmArchiveTask。
-  const [confirming, setConfirming] = useState(false)
   return (
-    <div className={`thread${selected ? " thread--selected" : ""}`} title={thread.cwd}>
-      <button type="button" className="thread__main" aria-selected={selected} onClick={onSelect}>
-        <span className="thread__line">
-          <span className={`thread__dot${DOT_CLASS[thread.status]}`} />
-          <span className="thread__label">{thread.title}</span>
-          {NOTE[thread.status] === undefined ? null : (
-            <span className="thread__note">{NOTE[thread.status]}</span>
-          )}
+    <>
+      <div className="sidebar__head">
+        <div className="sidebar__brand">
+          omni<span>同文</span>
+        </div>
+      </div>
+
+      <nav className="sidebar__nav">
+        <button type="button" className="row row--nav" onClick={onNew}>
+          <span className="row__slot">
+            <PlusIcon />
+          </span>
+          <span className="row__label">新建会话</span>
+        </button>
+        <button type="button" className="row row--nav" onClick={onOpenFolder}>
+          <span className="row__slot">
+            <FolderIcon />
+          </span>
+          <span className="row__label">打开文件夹…</span>
+        </button>
+      </nav>
+
+      <div className="row row--search">
+        <span className="row__slot">
+          <SearchIcon />
         </span>
-        {/* 同一个工作区可以开好几个会话，光靠目录名它们在侧栏里长得一模一样 */}
-        {preview === undefined ? null : <span className="thread__preview">{preview}</span>}
-      </button>
-      <button
-        type="button"
-        className={`thread__del${confirming ? " thread__del--confirm" : ""}`}
-        aria-label={confirming ? "确认删除" : "删除会话"}
-        title={confirming ? "再点一次就真的删了，不可撤销" : "删除会话"}
-        onClick={() => {
-          if (confirming) onDelete()
-          else setConfirming(true)
-        }}
-        onBlur={() => {
-          setConfirming(false)
-        }}
-      >
-        {confirming ? "确认" : "×"}
-      </button>
-    </div>
+        <input
+          className="sidebar__filter"
+          ref={box}
+          type="text"
+          value={query}
+          placeholder="筛选会话…"
+          aria-label="筛选会话"
+          onChange={(e) => {
+            onQuery(e.target.value)
+          }}
+          onKeyDown={(e) => {
+            // Esc 清空而不是失焦：清空之后列表立刻全回来，
+            // 这是「我搜错了」时想要的那个动作
+            if (e.key === "Escape") onQuery("")
+          }}
+        />
+      </div>
+    </>
   )
 }
 
@@ -107,70 +116,67 @@ export function Sidebar({
   focusFilter,
 }: Props): React.JSX.Element {
   const [query, setQuery] = useState("")
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const box = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (focusFilter > 0) box.current?.select()
   }, [focusFilter])
+
   const shown = filterRows(rows, query)
+  const filtering = query !== ""
+  // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
+  const groups = filtering ? [] : groupByWorkspace(shown)
+
+  const toggle = (cwd: string): void => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(cwd)) next.delete(cwd)
+      else next.add(cwd)
+      return next
+    })
+  }
+
+  const flat = (row: ThreadRow): React.JSX.Element => (
+    <Row
+      key={row.thread.id}
+      row={row}
+      selected={row.thread.id === selectedId}
+      onSelect={() => {
+        onSelect(row.thread.id)
+      }}
+      onDelete={() => {
+        onDelete(row.thread.id)
+      }}
+    />
+  )
+
   return (
     <aside className="sidebar">
-      <div className="sidebar__head">
-        <div className="sidebar__brand">
-          omni<span>同文</span>
-        </div>
-      </div>
-      <div className="sidebar__actions">
-        <button className="sbtn" type="button" onClick={onNew} title="在当前工作区另开一个会话">
-          ＋ 新建会话
-        </button>
-        <button
-          className="sbtn sbtn--icon"
-          type="button"
-          onClick={onOpenFolder}
-          title="打开其他文件夹…"
-          aria-label="打开其他文件夹"
-        >
-          <FolderIcon />
-        </button>
-      </div>
-      <input
-        className="sidebar__filter"
-        ref={box}
-        type="search"
-        value={query}
-        placeholder="筛选会话…（⌘K）"
-        aria-label="筛选会话"
-        onChange={(e) => {
-          setQuery(e.target.value)
-        }}
-        onKeyDown={(e) => {
-          // Esc 清空而不是失焦：清空之后列表立刻全回来，
-          // 这是「我搜错了」时想要的那个动作
-          if (e.key === "Escape") setQuery("")
-        }}
-      />
-      <div className="sidebar__group">
-        会话
-        {query === "" ? null : <span className="sidebar__count">{shown.length}/{rows.length}</span>}
-      </div>
+      <Head onNew={onNew} onOpenFolder={onOpenFolder} box={box} query={query} onQuery={setQuery} />
+
       <div className="sidebar__list">
-        {query !== "" && shown.length === 0 ? (
+        <div className="sidebar__section">
+          {filtering ? `命中 ${String(shown.length)} / ${String(rows.length)}` : "项目"}
+        </div>
+        {filtering && shown.length === 0 ? (
           // 空列表什么都不说的话，看起来像「会话全没了」
           <p className="sidebar__empty">没有匹配的会话。</p>
         ) : null}
-        {shown.map((row) => (
-          <Row
-            key={row.thread.id}
-            row={row}
-            selected={row.thread.id === selectedId}
-            onSelect={() => {
-              onSelect(row.thread.id)
-            }}
-            onDelete={() => {
-              onDelete(row.thread.id)
-            }}
-          />
-        ))}
+        {filtering
+          ? shown.map(flat)
+          : groups.map((group) => (
+              <GroupBlock
+                key={group.cwd}
+                group={group}
+                collapsed={collapsed.has(group.cwd)}
+                selectedId={selectedId}
+                onToggle={() => {
+                  toggle(group.cwd)
+                }}
+                onSelect={onSelect}
+                onDelete={onDelete}
+              />
+            ))}
       </div>
     </aside>
   )
