@@ -1,7 +1,17 @@
-import type { Command, EngineId, Event, ThreadId, Thread, ThreadStatus, TurnId } from "@omni/protocol"
+import type {
+  Command,
+  EngineId,
+  Event,
+  ItemId,
+  ThreadId,
+  Thread,
+  ThreadStatus,
+  TurnId,
+} from "@omni/protocol"
 import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
 import type { Rule } from "@omni/approval"
-import type { Journal } from "@omni/journal"
+import type { RememberScope } from "@omni/protocol"
+import type { Journal, RuleStore } from "@omni/journal"
 import { createGate, type Gate } from "./gate.js"
 
 export interface HostDeps {
@@ -14,6 +24,11 @@ export interface HostDeps {
   now: () => number
   /** 事件落盘。不传就不落——测试与无盘环境都能跑。 */
   journal?: Journal
+  /**
+   * 审批记忆的落盘。和事件日志分开：事件是某一次会话的流水，
+   * 规则是某个**工作区**的长期设置——删会话不该把规则一起删了。
+   */
+  rules?: RuleStore
 }
 
 export interface Host {
@@ -27,6 +42,13 @@ interface Live {
   gate: Gate
   /** 当前未结束的轮次；审批卡要挂在它下面 */
   turn: TurnId | undefined
+  /**
+   * 这个会话当前生效的记忆规则：开会话时从磁盘读到的 project 级
+   * ＋ 会话中途勾出来的 session 级。**可变**，因为用户随时会加一条。
+   */
+  rules: Rule[]
+  /** 挂着的审批 → 它的建议规则。用户勾了记忆才用得上。 */
+  suggests: Map<ItemId, Rule>
 }
 
 interface Ctx {
@@ -115,14 +137,14 @@ async function askUser(ctx: Ctx, id: ThreadId, ask: ApprovalAsk): Promise<Approv
   // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
   if (entry === undefined || entry.turn === undefined) return DENIED
   setStatus(ctx, entry, "waiting_approval")
+  const itemId = ctx.deps.newId("ap")
+  // 记下建议规则：用户勾了记忆之后，要存的是**规则本身**，
+  // 而 `approval.resolve` 命令只带 itemId 回来
+  if (ask.suggest !== undefined) entry.suggests.set(itemId, ask.suggest)
   try {
-    return await entry.gate.open({
-      ask,
-      turnId: entry.turn,
-      at: ctx.deps.now(),
-      itemId: ctx.deps.newId("ap"),
-    })
+    return await entry.gate.open({ ask, turnId: entry.turn, at: ctx.deps.now(), itemId })
   } finally {
+    entry.suggests.delete(itemId)
     // 无论批还是拒都回到运行中——轮次还没结束，引擎接着往下跑
     if (entry.thread.status === "waiting_approval") setStatus(ctx, entry, "running")
   }
@@ -168,14 +190,22 @@ function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
 async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string | undefined> {
   const driver = ctx.deps.drivers[thread.engine]
   if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
-  const memory: readonly Rule[] = []
   const early: { handle: string | undefined } = { handle: undefined }
+  // 先建条目再起引擎：驱动可能在 start() 里就回调，那时得能读到规则表
+  const live: Live = {
+    thread,
+    session: undefined as unknown as EngineSession,
+    gate: undefined as unknown as Gate,
+    turn: undefined,
+    rules: [...((await ctx.deps.rules?.read(thread.cwd)) ?? [])] as Rule[],
+    suggests: new Map<ItemId, Rule>(),
+  }
   const session = await driver.start({
     threadId: thread.id,
     cwd: thread.cwd,
     trust: thread.trust,
     home: ctx.deps.home,
-    memory,
+    memory: () => live.rules,
     emit: (event) => {
       emit(ctx, event)
     },
@@ -186,10 +216,11 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
     },
     ...(resume === undefined ? {} : { resume }),
   })
-  const gate = createGate((e) => {
+  live.session = session
+  live.gate = createGate((e) => {
     emit(ctx, e)
   })
-  ctx.live.set(thread.id, { thread, session, gate, turn: undefined })
+  ctx.live.set(thread.id, live)
   // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
   // omni 写死一份清单迟早会和实际能用的对不上。
   void session
@@ -284,13 +315,35 @@ async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.setModel
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
+/**
+ * 把一次「记住」落到该落的地方。
+ *
+ * `session` 只进内存表——它的语义就是「这个会话内不再问」，
+ * 落盘反而会让下次启动莫名其妙地少了几次询问。
+ * `project` 两边都要：进内存表（立刻生效）＋ 写盘（下次还在）。
+ */
+function remember(ctx: Ctx, entry: Live, rule: Rule, scope: RememberScope): void {
+  if (scope === "once") return
+  const stored: Rule = { ...rule, scope: scope === "project" ? "project" : "session" }
+  entry.rules = [...entry.rules.filter((r) => r.id !== stored.id), stored]
+  // 展开成新字面量再交出去：`RulePattern` 是 interface，没有索引签名，
+  // 直接传给 `Record<string, unknown>` 过不了类型检查
+  if (scope === "project") {
+    void ctx.deps.rules?.add(entry.thread.cwd, { ...stored, pattern: { ...stored.pattern } })
+  }
+}
+
 /** 审批卡 id 全局唯一，所以挨个会话问一遍即可；命中就停。 */
 function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resolve" }>): void {
   for (const entry of ctx.live.values()) {
+    const suggest = entry.suggests.get(cmd.itemId)
     // 范围原样往下传：以前这里压成 boolean，engine 就再也分不出
     // 「这一次」和「这轮对话」了
     const hit = entry.gate.resolve(cmd.itemId, { allow: cmd.allow, remember: cmd.remember })
-    if (hit) return
+    if (!hit) continue
+    // 只有**放行**才记忆。记住一次拒绝没有意义——下次同样的请求还是该问
+    if (cmd.allow && suggest !== undefined) remember(ctx, entry, suggest, cmd.remember)
+    return
   }
 }
 

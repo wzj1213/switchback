@@ -21,6 +21,13 @@ export interface ApprovalAsk {
   reason: string
   /** 可记忆成什么，用作「允许此对话」那一项的标签。没有就用默认文案。 */
   rememberHint?: string
+  /**
+   * 判定器给出的完整建议规则。
+   *
+   * 只给 `rememberHint`（一句人话）是不够的：用户勾了「始终允许」之后，
+   * 宿主要**把规则本身存下来**，光有描述存不了。
+   */
+  suggest?: Rule
 }
 
 export interface ApprovalAnswer {
@@ -43,8 +50,14 @@ export interface StartRequest {
   trust: Trust
   /** 用户 home 绝对路径。approval 是纯函数，不读环境，所以由这里传。 */
   home: string
-  /** 已生效的记忆规则（session 级与 project 级合并后） */
-  memory: readonly Rule[]
+  /**
+   * 已生效的记忆规则（session 级与 project 级合并后）。
+   *
+   * **是取值函数不是数组**：用户在会话中途勾了「本对话不再问」，
+   * 新规则必须对**接下来的**判定立刻生效。传一份快照进来的话，
+   * 驱动会一直拿着开会话那一刻的旧清单。
+   */
+  memory: () => readonly Rule[]
   /** 事件出口。必须能消费得比引擎产出快——本层不做背压。 */
   emit: (event: Event) => void
   /** 判定为 escalate 时调用，等用户裁决 */

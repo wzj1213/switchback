@@ -268,7 +268,7 @@ class CodexSession implements EngineSession {
       trust: this.trust.current,
       worksite: this.req.cwd,
       home: this.req.home,
-      memory: this.req.memory,
+      memory: this.req.memory(),
     })
     if (verdict.action !== "escalate") {
       call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })
@@ -279,7 +279,7 @@ class CodexSession implements EngineSession {
       tool: toolOf(call.method),
       summary: request.summary ?? toolOf(call.method),
       reason: verdict.reason,
-      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe }),
+      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
     })
     call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
   }

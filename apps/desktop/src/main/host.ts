@@ -5,7 +5,7 @@ import { app, clipboard, dialog, ipcMain, type BrowserWindow } from "electron"
 import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
-import { createJournal } from "@omni/journal"
+import { createJournal, createRuleStore } from "@omni/journal"
 import { devEngine, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 
@@ -53,11 +53,14 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
   // 用户换机器迁移、清理应用数据时才找得到、才带得走
   const journal = createJournal({ dir: join(app.getPath("userData"), "threads") })
+  // 规则和事件分开存：删会话不该把「始终允许」一起删了
+  const rules = createRuleStore(join(app.getPath("userData"), "rules"))
 
   const host = createHost({
     drivers: { claude: createClaudeDriver(), codex: createCodexDriver() },
     home: homedir(),
     journal,
+    rules,
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
     now: () => Date.now(),

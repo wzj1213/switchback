@@ -35,7 +35,7 @@ async function run(prompt: string, answer: boolean, isolate: boolean): Promise<R
     cwd,
     trust: "auto-edit",
     home: homedir(),
-    memory: [],
+    memory: () => [],
     emit: (e) => events.push(e),
     askUser: (ask) => {
       asks.push(ask)

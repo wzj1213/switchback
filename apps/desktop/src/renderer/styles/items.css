@@ -199,6 +199,12 @@
   padding: var(--sp-2) var(--sp-3) var(--sp-3);
 }
 
+/* 「始终允许」推到最左：它是三档里影响最大的一个，
+   不该和「允许一次」挨在一起让人手滑 */
+.approval__always {
+  margin-right: auto;
+}
+
 .approval__split {
   position: relative;
   display: flex;

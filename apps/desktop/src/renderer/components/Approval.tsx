@@ -78,6 +78,18 @@ export function Approval({
         </div>
       </div>
       <div className="approval__actions">
+        {/* 「始终允许」只在判定器给得出可记忆规则时出现——给不出的时候
+            摆一个按钮，用户点了却什么也没记住，比没有这个选项糟得多 */}
+        {item.rememberHint === undefined || settled ? null : (
+          <button
+            className="btn approval__always"
+            type="button"
+            title={`以后在本工作区自动允许：${item.rememberHint}`}
+            onClick={() => { decide(true, "project") }}
+          >
+            始终允许
+          </button>
+        )}
         <button className="btn" type="button" disabled={settled} onClick={() => { decide(false, "once") }}>
           {item.status === "denied" ? "已拒绝" : "拒绝"}
           {settled ? null : <Kbd>⌘⌫</Kbd>}

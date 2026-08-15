@@ -1,3 +1,5 @@
 export { createJournal } from "./journal.js"
+export { createRuleStore, keyOf } from "./rules.js"
 export { shouldPersist, encode, decode, decodeAll, fileNameOf, threadIdOf } from "./codec.js"
 export type { Journal, JournalConfig } from "./journal.js"
+export type { RuleStore, StoredRule } from "./rules.js"

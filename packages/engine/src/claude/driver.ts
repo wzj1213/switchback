@@ -98,7 +98,7 @@ class ClaudeSession implements EngineSession {
       trust: this.trust.current,
       worksite: this.req.cwd,
       home: this.req.home,
-      memory: this.req.memory,
+      memory: this.req.memory(),
     })
     if (verdict.action === "deny") return toDeny(verdict.reason)
     if (verdict.action === "allow" && !forcesHumanPrompt(meta)) return toAllow(false, meta)
@@ -108,7 +108,7 @@ class ClaudeSession implements EngineSession {
       tool,
       summary: summarize(tool, meta),
       reason: verdict.reason,
-      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe }),
+      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
     })
     // `once` 只放行这一次；其余范围回传 SDK 的 suggestions，走它原生的「本会话不再问」
     return answer.allow ? toAllow(answer.remember !== "once", meta) : toDeny("用户拒绝了这次调用")
