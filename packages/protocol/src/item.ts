@@ -23,6 +23,15 @@ export interface UserMessageItem extends ItemBase {
   text: string
   /** 附件的本地绝对路径。 */
   attachments?: readonly string[]
+  /**
+   * 这条不是人打的。
+   *
+   * 目前只有一种：接力时宿主生成的**交接包**。它走的是和普通提问同一条路
+   * （引擎那边就该按「用户说的」来读），但界面上**不能长得一样**——
+   * 一段几百字的机器生成简报顶着「你说的」渲染成右对齐气泡，
+   * 用户会以为自己发过这段话。
+   */
+  origin?: "handoff"
 }
 
 export interface AgentMessageItem extends ItemBase {

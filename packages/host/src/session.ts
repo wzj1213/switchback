@@ -153,7 +153,15 @@ export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.res
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 
-export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
+/**
+ * @param origin 这条不是人打的时候标一下（目前只有接力包）。引擎侧照旧当成
+ *   用户消息发过去——**要改的只是界面怎么呈现**，不是引擎怎么理解。
+ */
+export async function prompt(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+  origin?: "handoff",
+): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
   /**
@@ -182,7 +190,14 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
   emit(ctx, {
     type: "item.started",
     at,
-    item: { id: ctx.deps.newId("it"), turnId, kind: "user_message", at, text: cmd.text },
+    item: {
+      id: ctx.deps.newId("it"),
+      turnId,
+      kind: "user_message",
+      at,
+      text: cmd.text,
+      ...(origin === undefined ? {} : { origin }),
+    },
   })
   await entry.session.prompt(cmd.text, turnId)
 }
@@ -351,5 +366,9 @@ export async function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.ha
 
   // 交接包作为第一条消息发出去，**并且进 transcript**——
   // 用户要看得见接手的一家究竟被告知了什么
-  await prompt(ctx, { type: "thread.prompt", threadId: cmd.threadId, text: renderHandoff(packet, from, cmd.to) })
+  await prompt(
+    ctx,
+    { type: "thread.prompt", threadId: cmd.threadId, text: renderHandoff(packet, from, cmd.to) },
+    "handoff",
+  )
 }

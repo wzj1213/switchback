@@ -1,6 +1,7 @@
 import { Markdown } from "./Markdown.js"
 import { Reasoning } from "./Reasoning.js"
 import { Failure } from "./Failure.js"
+import { HandoffNote } from "./HandoffNote.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
@@ -45,7 +46,13 @@ export const ItemView = memo(function ItemView({
 }): React.JSX.Element {
   switch (item.kind) {
     case "user_message":
-      return <div className="msg--user">{item.text}</div>
+      // 接力的交接包不是人打的，别顶着右对齐气泡出现——**右对齐在这套界面里
+      // 只有一个意思：这句是你说的**
+      return item.origin === "handoff" ? (
+        <HandoffNote text={item.text} />
+      ) : (
+        <div className="msg--user">{item.text}</div>
+      )
     // 用户消息保持字面量：他打的是什么就显示什么，替他解析 Markdown 是意外行为
     case "agent_message":
       return (
