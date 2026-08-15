@@ -14,8 +14,8 @@ function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined })
       <span className="topbar__spacer" />
       <ContextMeter usage={usage} />
       {handedOff ? (
-        <span className="pill" title={thread.engineHistory.join(" → ")}>
-          接力自 {labelOf(ENGINES, thread.engineHistory[0] ?? "")}
+        <span className="pill" title={thread.engineHistory.map((e) => labelOf(ENGINES, e)).join(" → ")}>
+          接力 {thread.engineHistory.length} 手
         </span>
       ) : null}
       {thread.detached === true ? <span className="pill pill--muted">历史记录</span> : null}
@@ -71,15 +71,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         engine={thread.engine}
         trust={thread.trust}
         onEngineChange={(next) => {
-          // 换引擎 = 在同一个工作区另开一个会话。会话中途接力（`thread.handoff`）
-          // 还没实现，与其让这个下拉框点了没反应，不如让它做一件真做得到的事。
-          send({
-            type: "thread.create",
-            cwd: thread.cwd,
-            engine: next,
-            trust: thread.trust,
-            title: thread.title,
-          })
+          // **中途接力**：同一个会话换一家引擎接着做，不是另开一个。
+          // 历史留在原地，交接包会作为第一条消息发给接手的那一家。
+          send({ type: "thread.handoff", threadId: thread.id, to: next })
         }}
         onTrustChange={(next) => {
           send({ type: "thread.setTrust", threadId: thread.id, trust: next })

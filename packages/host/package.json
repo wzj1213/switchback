@@ -17,6 +17,7 @@
     "@omni/engine": "workspace:*",
     "@omni/protocol": "workspace:*",
     "@omni/store": "workspace:*",
-    "@omni/journal": "workspace:*"
+    "@omni/journal": "workspace:*",
+    "@omni/handoff": "workspace:*"
   }
 }

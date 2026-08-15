@@ -122,6 +122,12 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
 
+  packages/handoff:
+    dependencies:
+      '@omni/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/host:
     dependencies:
       '@omni/approval':
@@ -130,6 +136,9 @@ importers:
       '@omni/engine':
         specifier: workspace:*
         version: link:../engine
+      '@omni/handoff':
+        specifier: workspace:*
+        version: link:../handoff
       '@omni/journal':
         specifier: workspace:*
         version: link:../journal

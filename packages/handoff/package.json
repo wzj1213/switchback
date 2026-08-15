@@ -1,0 +1,18 @@
+{
+  "name": "@omni/handoff",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "跨引擎接力的交接包：从 transcript 里提炼结论，而不是搬运原始上下文。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@omni/protocol": "workspace:*"
+  }
+}

@@ -1,370 +1,29 @@
-import type {
-  Command,
-  EngineId,
-  Event,
-  ItemId,
-  ThreadId,
-  Thread,
-  ThreadStatus,
-  TurnId,
-} from "@omni/protocol"
-import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
-import type { Rule } from "@omni/approval"
-import type { RememberScope } from "@omni/protocol"
-import type { Journal, RuleStore } from "@omni/journal"
-import { createGate, type Gate } from "./gate.js"
+import type { Command, ThreadId, TurnId } from "@omni/protocol"
+import { resolveApproval } from "./approval.js"
+import { type Ctx, type Live } from "./ctx.js"
+import type { HostDeps } from "./deps.js"
+import {
+  create,
+  handoff,
+  prompt,
+  remove,
+  resume,
+  setModel,
+  setTrust,
+} from "./session.js"
 
-export interface HostDeps {
-  drivers: Readonly<Record<EngineId, EngineDriver>>
-  /** 用户 home 绝对路径。approval 是纯函数不读环境，得由这里往下传。 */
-  home: string
-  emit: (event: Event) => void
-  /** id 铸造。做成可注入的，测试里就能确定化。 */
-  newId: (prefix: string) => string
-  now: () => number
-  /** 事件落盘。不传就不落——测试与无盘环境都能跑。 */
-  journal?: Journal
-  /**
-   * 审批记忆的落盘。和事件日志分开：事件是某一次会话的流水，
-   * 规则是某个**工作区**的长期设置——删会话不该把规则一起删了。
-   */
-  rules?: RuleStore
-}
+export type { HostDeps } from "./deps.js"
 
+/**
+ * 会话编制。**唯一允许做编排的地方。**
+ *
+ * 这个文件本身只剩两件事：命令怎么分派、进程怎么收场。
+ * 「一个会话怎么活」在 `session.ts`，「审批怎么问怎么记」在 `approval.ts`，
+ * 「事件怎么出去」在 `ctx.ts`。
+ */
 export interface Host {
   dispatch: (command: Command) => Promise<void>
   dispose: () => Promise<void>
-}
-
-interface Live {
-  thread: Thread
-  session: EngineSession
-  gate: Gate
-  /** 当前未结束的轮次；审批卡要挂在它下面 */
-  turn: TurnId | undefined
-  /**
-   * 这个会话当前生效的记忆规则：开会话时从磁盘读到的 project 级
-   * ＋ 会话中途勾出来的 session 级。**可变**，因为用户随时会加一条。
-   */
-  rules: Rule[]
-  /** 挂着的审批 → 它的建议规则。用户勾了记忆才用得上。 */
-  suggests: Map<ItemId, Rule>
-}
-
-interface Ctx {
-  deps: HostDeps
-  live: Map<ThreadId, Live>
-  /**
-   * turn id → 它属于哪个会话。
-   *
-   * 落盘要按会话分文件，而 `turn.completed` / `item.*` 只带 turn id。
-   * `Live.turn` 会在轮次结束时被清空，所以不能靠它——必须单独记一份。
-   */
-  turnOwner: Map<TurnId, ThreadId>
-}
-
-/** 一条事件属于哪个会话。判不出就不落盘——宁可少一条，也不要落到错的文件里。 */
-function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
-  switch (event.type) {
-    case "thread.started":
-    case "thread.updated":
-      return event.thread.id
-    // 删除事件**故意不落盘**：文件已经没了，再写一条只会把它建回来
-    case "thread.removed":
-      return undefined
-    case "turn.started":
-      return event.turn.threadId
-    case "turn.completed":
-      return ctx.turnOwner.get(event.turnId)
-    case "item.started":
-    case "item.updated":
-      return ctx.turnOwner.get(event.item.turnId)
-    case "usage.updated":
-    case "engine.status":
-    case "models.updated":
-      return event.threadId === "" ? undefined : event.threadId
-    default:
-      return undefined
-  }
-}
-
-/**
- * **事件的唯一出口。** 所有 `emit` 都必须走这里，落盘才不会漏。
- *
- * 顺序有讲究：先发给渲染层，再落盘，最后才做旁路观察。
- * 界面响应不该等磁盘；而 `observe` 会改会话状态并再发事件，放最后免得穿插。
- */
-function emit(ctx: Ctx, event: Event): void {
-  if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
-  ctx.deps.emit(event)
-  const owner = ownerOf(ctx, event)
-  if (owner !== undefined) void ctx.deps.journal?.append(owner, event)
-  observe(ctx, event)
-}
-
-const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
-
-/**
- * 会话状态的唯一改写口。
- *
- * 状态一直挂在 `Thread` 上却从来没人改过，于是侧栏那个状态点永远是灰的、
- * 界面上也无从判断「它到底在不在跑」。**状态归宿主**——只有宿主同时看得见
- * 提示词发出、审批挂起、轮次收工这三件事。
- */
-function setStatus(ctx: Ctx, entry: Live, status: ThreadStatus): void {
-  if (entry.thread.status === status) return
-  const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, status, updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-}
-
-/**
- * 引擎事件的旁路观察。轮次收工只有引擎知道，事件是直接发给渲染层的，
- * 宿主看不见——所以在这里截一道，把会话状态收回 idle。
- */
-function observe(ctx: Ctx, event: Event): void {
-  if (event.type !== "turn.completed") return
-  for (const entry of ctx.live.values()) {
-    if (entry.turn !== event.turnId) continue
-    entry.turn = undefined
-    setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
-    return
-  }
-}
-
-async function askUser(ctx: Ctx, id: ThreadId, ask: ApprovalAsk): Promise<ApprovalAnswer> {
-  const entry = ctx.live.get(id)
-  // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
-  if (entry === undefined || entry.turn === undefined) return DENIED
-  setStatus(ctx, entry, "waiting_approval")
-  const itemId = ctx.deps.newId("ap")
-  // 记下建议规则：用户勾了记忆之后，要存的是**规则本身**，
-  // 而 `approval.resolve` 命令只带 itemId 回来
-  if (ask.suggest !== undefined) entry.suggests.set(itemId, ask.suggest)
-  try {
-    return await entry.gate.open({ ask, turnId: entry.turn, at: ctx.deps.now(), itemId })
-  } finally {
-    entry.suggests.delete(itemId)
-    // 无论批还是拒都回到运行中——轮次还没结束，引擎接着往下跑
-    if (entry.thread.status === "waiting_approval") setStatus(ctx, entry, "running")
-  }
-}
-
-function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadId, at: number): Thread {
-  return {
-    id,
-    title: cmd.title ?? "新会话",
-    cwd: cmd.cwd,
-    engine: cmd.engine,
-    trust: cmd.trust,
-    status: "idle",
-    createdAt: at,
-    updatedAt: at,
-    engineHistory: [cmd.engine],
-  }
-}
-
-/**
- * 记下引擎那边的会话句柄。
- *
- * 走 `thread.updated` 而不是私存一份：那样它才会跟着事件流落盘，
- * 下次启动读回来就在 `Thread` 上——**续跑需要的东西必须和历史存在同一个地方**，
- * 否则总有一天会出现「历史在但句柄丢了」。
- */
-function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
-  const entry = ctx.live.get(id)
-  if (entry === undefined || entry.thread.engineHandle === handle) return
-  const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, engineHandle: handle, updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-}
-
-/**
- * 起一个引擎会话并登记。`resume` 有值就是续跑。
- *
- * 返回**在登记完成之前就到达的句柄**。codex 在 `start()` 里就知道自己的 thread id，
- * 那时候 `ctx.live` 还没有这条会话，`rememberHandle` 会扑空——
- * 这个洞第一次跑真实会话才现形（落盘里根本没有 `engineHandle`）。
- * 交给调用方在发完自己的事件之后补上，顺序才是「started → updated」。
- */
-async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string | undefined> {
-  const driver = ctx.deps.drivers[thread.engine]
-  if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
-  const early: { handle: string | undefined } = { handle: undefined }
-  // 先建条目再起引擎：驱动可能在 start() 里就回调，那时得能读到规则表
-  const live: Live = {
-    thread,
-    session: undefined as unknown as EngineSession,
-    gate: undefined as unknown as Gate,
-    turn: undefined,
-    rules: [...((await ctx.deps.rules?.read(thread.cwd)) ?? [])] as Rule[],
-    suggests: new Map<ItemId, Rule>(),
-  }
-  const session = await driver.start({
-    threadId: thread.id,
-    cwd: thread.cwd,
-    trust: thread.trust,
-    home: ctx.deps.home,
-    memory: () => live.rules,
-    emit: (event) => {
-      emit(ctx, event)
-    },
-    askUser: (ask) => askUser(ctx, thread.id, ask),
-    onHandle: (handle) => {
-      if (ctx.live.has(thread.id)) rememberHandle(ctx, thread.id, handle)
-      else early.handle = handle
-    },
-    ...(resume === undefined ? {} : { resume }),
-  })
-  live.session = session
-  live.gate = createGate((e) => {
-    emit(ctx, e)
-  })
-  ctx.live.set(thread.id, live)
-  // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
-  // omni 写死一份清单迟早会和实际能用的对不上。
-  void session
-    .models()
-    .then((models) => {
-      if (models.length > 0) {
-        emit(ctx, { type: "models.updated", at: ctx.deps.now(), threadId: thread.id, models })
-      }
-    })
-    .catch(() => undefined)
-  return early.handle
-}
-
-async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>): Promise<void> {
-  const at = ctx.deps.now()
-  const thread = newThread(cmd, ctx.deps.newId("th"), at)
-  const early = await launch(ctx, thread)
-  emit(ctx, { type: "thread.started", at, thread })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
-}
-
-/**
- * 让一个从磁盘回放出来的会话重新接上引擎。
- *
- * 会话记录只在渲染层（回放不经过宿主），所以这里要**自己从日志里把它读回来**。
- * 没有句柄就不给续——那种情况下起的是个全新会话，模型对上面那段对话一无所知，
- * 而界面看起来像是接上了。**宁可报错也不要制造这种错觉。**
- */
-async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.resume" }>): Promise<void> {
-  if (ctx.live.has(cmd.threadId)) return
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const record = [...events]
-    .reverse()
-    .find((e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
-      e.type === "thread.started" || e.type === "thread.updated",
-    )
-  if (record === undefined) throw new Error(`找不到会话 ${cmd.threadId} 的历史，无法续跑`)
-  const handle = record.thread.engineHandle
-  if (handle === undefined) {
-    throw new Error("这个会话没有留下引擎侧的句柄（可能是旧版本记录），只能新建会话继续")
-  }
-  const at = ctx.deps.now()
-  const thread: Thread = { ...record.thread, detached: false, status: "idle", updatedAt: at }
-  const early = await launch(ctx, thread, handle)
-  emit(ctx, { type: "thread.updated", at, thread })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
-}
-
-async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  const at = ctx.deps.now()
-  const turnId = ctx.deps.newId("tn")
-  entry.turn = turnId
-  const turn = {
-    id: turnId,
-    threadId: cmd.threadId,
-    engine: entry.thread.engine,
-    status: "running" as const,
-    startedAt: at,
-  }
-  setStatus(ctx, entry, "running")
-  emit(ctx, { type: "turn.started", at, turn })
-  emit(ctx, {
-    type: "item.started",
-    at,
-    item: { id: ctx.deps.newId("it"), turnId, kind: "user_message", at, text: cmd.text },
-  })
-  await entry.session.prompt(cmd.text, turnId)
-}
-
-async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) return
-  await entry.session.setTrust(cmd.trust)
-  const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, trust: cmd.trust, updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-}
-
-async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.setModel" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) return
-  await entry.session.setModel(cmd.model, cmd.effort)
-  const at = ctx.deps.now()
-  entry.thread = {
-    ...entry.thread,
-    model: cmd.model,
-    ...(cmd.effort === undefined ? {} : { effort: cmd.effort }),
-    updatedAt: at,
-  }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-}
-
-/**
- * 把一次「记住」落到该落的地方。
- *
- * `session` 只进内存表——它的语义就是「这个会话内不再问」，
- * 落盘反而会让下次启动莫名其妙地少了几次询问。
- * `project` 两边都要：进内存表（立刻生效）＋ 写盘（下次还在）。
- */
-function remember(ctx: Ctx, entry: Live, rule: Rule, scope: RememberScope): void {
-  if (scope === "once") return
-  const stored: Rule = { ...rule, scope: scope === "project" ? "project" : "session" }
-  entry.rules = [...entry.rules.filter((r) => r.id !== stored.id), stored]
-  // 展开成新字面量再交出去：`RulePattern` 是 interface，没有索引签名，
-  // 直接传给 `Record<string, unknown>` 过不了类型检查
-  if (scope === "project") {
-    void ctx.deps.rules?.add(entry.thread.cwd, { ...stored, pattern: { ...stored.pattern } })
-  }
-}
-
-/** 审批卡 id 全局唯一，所以挨个会话问一遍即可；命中就停。 */
-function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resolve" }>): void {
-  for (const entry of ctx.live.values()) {
-    const suggest = entry.suggests.get(cmd.itemId)
-    // 范围原样往下传：以前这里压成 boolean，engine 就再也分不出
-    // 「这一次」和「这轮对话」了
-    const hit = entry.gate.resolve(cmd.itemId, { allow: cmd.allow, remember: cmd.remember })
-    if (!hit) continue
-    // 只有**放行**才记忆。记住一次拒绝没有意义——下次同样的请求还是该问
-    if (cmd.allow && suggest !== undefined) remember(ctx, entry, suggest, cmd.remember)
-    return
-  }
-}
-
-/**
- * 关掉会话并把记录从磁盘上删掉。
- *
- * 顺序是有讲究的：**先落定挂着的审批，再 dispose，最后才删文件**。
- * 反过来的话，一个还在等审批的驱动会卡在那里，而它的日志文件已经没了——
- * 之后它写的每一条都会把文件重新建出来，删除等于没删。
- *
- * 对回放出来的会话（宿主这边没有登记）同样有效：直接删文件即可。
- */
-async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.delete" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry !== undefined) {
-    entry.gate.settleAll()
-    await entry.session.dispose()
-    ctx.live.delete(cmd.threadId)
-  }
-  await ctx.deps.journal?.remove(cmd.threadId)
-  emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: cmd.threadId })
 }
 
 async function dispatch(ctx: Ctx, command: Command): Promise<void> {
@@ -381,14 +40,13 @@ async function dispatch(ctx: Ctx, command: Command): Promise<void> {
       return remove(ctx, command)
     case "thread.setModel":
       return setModel(ctx, command)
+    case "thread.handoff":
+      return handoff(ctx, command)
     case "thread.interrupt":
       return ctx.live.get(command.threadId)?.session.interrupt() ?? Promise.resolve()
     case "approval.resolve":
       resolveApproval(ctx, command)
       return Promise.resolve()
-    case "thread.handoff":
-      // L2 跨引擎接力尚未实现，见 README「已知限制」
-      throw new Error("thread.handoff 尚未实现")
   }
 }
 

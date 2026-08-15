@@ -13,6 +13,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
  * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
+ * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话接力给这家 |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -66,6 +67,18 @@ export function scheduleDevInterrupt(win: BrowserWindow): void {
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
     if (!win.isDestroyed()) win.webContents.send("omni:menu", "interrupt")
+  }, at)
+}
+
+/** 到点自动接力。接力只能靠点下拉触发，自动化验证需要一个口子。 */
+export function scheduleDevHandoff(win: BrowserWindow, run: (to: string) => void): void {
+  const spec = process.env["OMNI_DEV_HANDOFF"]
+  if (spec === undefined || spec === "") return
+  const [msText, to] = spec.split(":")
+  const at = Number(msText)
+  if (!Number.isFinite(at) || to === undefined || to === "") return
+  setTimeout(() => {
+    if (!win.isDestroyed()) run(to)
   }, at)
 }
 

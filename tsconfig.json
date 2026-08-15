@@ -17,6 +17,9 @@
       "path": "packages/worksite"
     },
     {
+      "path": "packages/handoff"
+    },
+    {
       "path": "packages/engine"
     },
     {

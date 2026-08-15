@@ -195,12 +195,12 @@ describe("host", () => {
     await expect(host.dispatch({ ...create, engine: "nope" })).rejects.toThrow("未注册的引擎")
   })
 
-  it("尚未实现的接力明确报错，而不是静默无反应", async () => {
+  it("接力到没注册的引擎要报错，不能把会话停在半路", async () => {
     const { host, events } = setup()
     await host.dispatch(create)
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    await expect(host.dispatch({ type: "thread.handoff", threadId, to: "codex" })).rejects.toThrow(
-      "尚未实现",
+    await expect(host.dispatch({ type: "thread.handoff", threadId, to: "nope" })).rejects.toThrow(
+      "未注册的引擎",
     )
   })
 })
@@ -516,5 +516,122 @@ describe("审批记忆", () => {
     await answer
     expect(saved).toEqual([])
     expect(session().memory()).toEqual([])
+  })
+})
+
+describe("跨引擎接力", () => {
+  const setupTwo = (): { host: Host; events: Event[]; sessions: Fake[]; stored: Event[] } => {
+    const stored: Event[] = []
+    const sessions: Fake[] = []
+    const driver = (id: string): EngineDriver => ({
+      id,
+      start: (req) => {
+        const fake: Fake = {
+          prompts: [],
+          disposed: false,
+          ask: req.askUser,
+          emit: req.emit,
+          resume: req.resume,
+          report: (h) => req.onHandle?.(h),
+          memory: req.memory,
+        }
+        sessions.push(fake)
+        return Promise.resolve({
+          threadId: req.threadId,
+          prompt: (text, turnId) => {
+            fake.prompts.push({ text, turnId })
+            return Promise.resolve()
+          },
+          interrupt: () => Promise.resolve(),
+          setTrust: () => Promise.resolve(),
+          models: () => Promise.resolve([]),
+          setModel: () => Promise.resolve(),
+          dispose: () => {
+            fake.disposed = true
+            return Promise.resolve()
+          },
+        })
+      },
+    })
+    const events: Event[] = []
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers: { fake: driver("fake"), other: driver("other") },
+      home: "/h",
+      emit: (e) => events.push(e),
+      newId: (p) => {
+        counter.n += 1
+        return `${p}-${String(counter.n)}`
+      },
+      now: () => 0,
+      journal: {
+        append: (_id, e) => {
+          stored.push(e)
+          return Promise.resolve()
+        },
+        read: () => Promise.resolve(stored),
+        list: () => Promise.resolve([]),
+        remove: () => Promise.resolve(),
+      },
+    })
+    return { host, events, sessions, stored }
+  }
+
+  const handoffTo = async (
+    host: Host,
+    events: Event[],
+    to: string,
+  ): Promise<string> => {
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
+    await host.dispatch({ type: "thread.handoff", threadId, to })
+    return threadId
+  }
+
+  it("先停旧的再起新的——两个引擎同时对着一个工作区写是最难查的冲突", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    await handoffTo(host, events, "other")
+    expect(sessions).toHaveLength(2)
+    expect(sessions[0]?.disposed).toBe(true)
+    expect(sessions[1]?.disposed).toBe(false)
+  })
+
+  it("交接包作为第一条消息发给接手的那一家，并且带着目标", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    await handoffTo(host, events, "other")
+    const first = sessions[1]?.prompts[0]?.text ?? ""
+    expect(first).toContain("接手")
+    expect(first).toContain("把 X 改成 Y")
+  })
+
+  it("会话 id 不变，引擎历史往后接一手", async () => {
+    const { host, events } = setupTwo()
+    await host.dispatch(create)
+    const threadId = await handoffTo(host, events, "other")
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    const thread = last?.type === "thread.updated" ? last.thread : undefined
+    expect(thread?.id).toBe(threadId)
+    expect(thread?.engineHistory).toEqual(["fake", "other"])
+  })
+
+  it("**旧引擎的会话句柄要清掉**——留着的话续跑会拿它去问新的一家", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    sessions[0]?.report("old-handle")
+    await handoffTo(host, events, "other")
+    const updates = events.filter((e) => e.type === "thread.updated")
+    const afterHandoff = updates.at(-1)
+    const thread = afterHandoff?.type === "thread.updated" ? afterHandoff.thread : undefined
+    expect(thread?.engineHandle).not.toBe("old-handle")
+  })
+
+  it("接力到自己是无操作——不该白白重启一次引擎", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    await handoffTo(host, events, "fake")
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]?.disposed).toBe(false)
   })
 })
