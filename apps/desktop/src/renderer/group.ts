@@ -46,6 +46,38 @@ function markFor(
   return ms > 0 ? { kind: "turn", turnId: item.turnId, ms } : undefined
 }
 
+/** 这一行属于哪一轮。三种行的归属来源不一样，抽出来免得散在调用处。 */
+export function turnIdOf(row: Row): string | undefined {
+  if (row.kind === "turn") return row.turnId
+  if (row.kind === "run") return row.items[0]?.turnId
+  return row.item.turnId
+}
+
+/**
+ * 折起某几轮的**回答**。
+ *
+ * 折的是分界线**之后**、属于同一轮的东西——提问本身永远留着。
+ * 一个折了三轮的 transcript 如果连问题也看不见，那就不是「折叠」，是「清空」：
+ * 人是靠自己问过的那句话来定位「我要找的是哪一段」的。
+ *
+ * 纯函数，所以能直接测「折了以后提问还在不在」这种事。
+ */
+export function foldTurns(rows: readonly Row[], collapsed: ReadonlySet<string>): readonly Row[] {
+  const hiding = new Set<string>()
+  const out: Row[] = []
+  for (const row of rows) {
+    const id = turnIdOf(row)
+    if (row.kind === "turn" && collapsed.has(row.turnId)) {
+      hiding.add(row.turnId)
+      out.push(row)
+      continue
+    }
+    if (id !== undefined && hiding.has(id)) continue
+    out.push(row)
+  }
+  return out
+}
+
 export function groupRows(items: readonly Item[], activeTurnId?: string): readonly Row[] {
   const rows: Row[] = []
   const marked = new Set<string>()

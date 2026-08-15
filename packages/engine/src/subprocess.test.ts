@@ -50,7 +50,12 @@ describe("回收阶梯", () => {
     )
     const report = await owner.reclaim()
     expect(report.rung).toBe("sigkill")
-    expect(child.killed || report.exitCode !== null || report.signal !== null).toBe(true)
+    // **直接探进程组**，而不是看 `child.killed` / `exitCode` / `signal`。
+    // 那三个都是死亡的**代理指标**，而且都不可靠：我们是 `process.kill(-pid)` 收整棵树，
+    // 不是 `child.kill()`，所以 `child.killed` 恒为 false；`exitCode`/`signal` 来自 Node
+    // 的 `exit` 事件，**它可能比 `reclaim()` 返回得晚**——于是这条断言时灵时不灵。
+    // 2026-08-15 它就这么红了一次，而被测代码没有任何问题。
+    expect(alive(child.pid ?? 0)).toBe(false)
   })
 
   it("整树退出：孙子进程也被一起收掉——只看直接子进程是不够的", async () => {

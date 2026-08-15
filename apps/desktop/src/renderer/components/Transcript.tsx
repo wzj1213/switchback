@@ -1,14 +1,14 @@
 import type { Command, Item, Thread, Turn } from "@omni/protocol"
-import { useCallback } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { ItemView } from "./ItemView.js"
 import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
-import { groupRows, type Row } from "../group.js"
+import { foldTurns, groupRows, type Row } from "../group.js"
 import { spent } from "../status.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
-import { ArrowDownIcon } from "./icons.js"
+import { ArrowDownIcon, ChevronIcon } from "./icons.js"
 
 /**
  * 一个字都还没说的会话。
@@ -49,20 +49,35 @@ function keyOf(row: Row): string {
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
 function RowView({
   row,
+  folded,
+  onFold,
   onCopy,
   onResolve,
 }: {
   row: Row
+  folded: boolean
+  onFold: (turnId: string) => void
   onCopy: (text: string) => void
   onResolve: ResolveApproval
 }): React.JSX.Element {
   // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
   // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
   if (row.kind === "turn") {
+    // **整条线可点**：它本来就是这一轮回答的表头，折起来天经地义。
+    // 只把小箭头做成热区的话，那是个 12px 的目标，得瞄准才点得中
     return (
-      <div className="turnmark">
+      <button
+        type="button"
+        className="turnmark"
+        data-folded={folded}
+        aria-expanded={!folded}
+        onClick={() => {
+          onFold(row.turnId)
+        }}
+      >
         <span>已处理 {spent(row.ms)}</span>
-      </div>
+        <ChevronIcon open={!folded} size={11} />
+      </button>
     )
   }
   if (row.kind === "run") return <ToolRun items={row.items} />
@@ -93,6 +108,16 @@ export function Transcript({
   onCopy: (text: string) => void
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
+  /** 折起来的那几轮。**按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管 */
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const onFold = useCallback((turnId: string) => {
+    setFolded((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(turnId)) next.add(turnId)
+      return next
+    })
+  }, [])
+  const rows = useMemo(() => foldTurns(groupRows(items, turn?.id), folded), [items, turn?.id, folded])
   // **必须是 useCallback。** 写成行内箭头函数的话每次 render 换一个身份，
   // `ItemView` 的 memo 会全部落空——而且是静默落空：功能全对，只是每帧白干一遍
   const onResolve = useCallback<ResolveApproval>(
@@ -105,8 +130,15 @@ export function Transcript({
     <div className="transcript" ref={scroller}>
       {items.length === 0 && turn === undefined ? <Blank thread={thread} /> : null}
       <div className="transcript__inner" ref={inner}>
-        {groupRows(items, turn?.id).map((row) => (
-          <RowView key={keyOf(row)} row={row} onCopy={onCopy} onResolve={onResolve} />
+        {rows.map((row) => (
+          <RowView
+            key={keyOf(row)}
+            row={row}
+            folded={row.kind === "turn" && folded.has(row.turnId)}
+            onFold={onFold}
+            onCopy={onCopy}
+            onResolve={onResolve}
+          />
         ))}
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}

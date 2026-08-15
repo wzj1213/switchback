@@ -1,32 +1,11 @@
-/**
- * 图标。
- *
- * ## 为什么是内联 SVG，不是 emoji、不是字形、不是图标库
- *
- * - **emoji** 是彩色的，和这套单色界面不搭，而且各平台画得不一样。
- * - **字形**（`⌸`、`▾` 之类）在多数字体里会退化成一个含糊的方框。
- * - **图标库**要么进 bundle 几百 KB，要么从 CDN 拉——而这个应用是离线优先的。
- *
- * 内联 SVG 跟着 `currentColor` 走，所以 hover / 选中 / 禁用时颜色自动对，
- * 不用为每种状态各写一份。
- *
- * ## 一套画法
- *
- * 全部 16×16 视口、`stroke-width: 1.3`、圆角端点。混用描边和填充是图标看起来
- * 「不是一套」的最常见原因——所以这里只有描边，唯一的例外是需要表达
- * 「实心状态」的那几个（选中的勾、状态点）。
+import { BOX, LINE, Svg } from "./icon-base.js"
+
+/*
+ * 界面骨架用的图标。对话内容里那几个（终端、笔、地球…）在 `icons-activity.tsx`。
+ * 画法的约定、`Svg`/`LINE`/`BOX` 在 `icon-base.tsx`。
  */
 
-const BOX = { viewBox: "0 0 16 16", fill: "none", "aria-hidden": true } as const
-const LINE = { stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round", strokeLinejoin: "round" } as const
-
-function Svg({ size = 14, children }: { size?: number; children: React.ReactNode }): React.JSX.Element {
-  return (
-    <svg width={size} height={size} {...BOX}>
-      {children}
-    </svg>
-  )
-}
+export { Svg } from "./icon-base.js"
 
 export function FolderIcon(): React.JSX.Element {
   return (
@@ -190,64 +169,11 @@ export function BranchIcon(): React.JSX.Element {
  * 动词表本身不能删，还有状态行和 Markdown 导出两处在用它取字面文本。
  */
 
-/** shell：光标提示符。**不画外框**——带框那版是 `EngineIcon`，同屏出现两个带框终端会分不清 */
-export function TerminalIcon({ size = 13 }: { size?: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <path d="M3 4.5 6.25 8 3 11.5M8.25 11.5h4.75" {...LINE} />
-    </Svg>
-  )
-}
 
-/** file_edit：一支笔。写字那一头朝右下，和读取那个「翻开的页」形状上分得开 */
-export function PencilIcon({ size = 13 }: { size?: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <path d="M10.6 2.9 13.1 5.4 5.9 12.6 2.6 13.4 3.4 10.1z" {...LINE} />
-      <path d="M9.4 4.1 11.9 6.6" {...LINE} />
-    </Svg>
-  )
-}
 
-/** file_read：一页纸，右上角折角 */
-export function FileIcon({ size = 13 }: { size?: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <path d="M9 2.2H4.4A1.2 1.2 0 0 0 3.2 3.4v9.2a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2V5.9z" {...LINE} />
-      <path d="M9 2.2v3.7h3.8" {...LINE} />
-    </Svg>
-  )
-}
 
-/** fetch：地球。经线一条就够，画满会在 13px 上糊成一团 */
-export function GlobeIcon({ size = 13 }: { size?: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <circle cx="8" cy="8" r="5.4" {...LINE} />
-      <path d="M2.6 8h10.8M8 2.6c1.5 1.5 2.2 3.4 2.2 5.4S9.5 11.9 8 13.4C6.5 11.9 5.8 10 5.8 8s.7-3.9 2.2-5.4z" {...LINE} />
-    </Svg>
-  )
-}
 
-/** other：认不出的调用。方块加一个点——**刻意不表达任何语义**，因为我们确实不知道它在干什么 */
-export function DotBoxIcon({ size = 13 }: { size?: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <rect x="2.8" y="2.8" width="10.4" height="10.4" rx="2.4" {...LINE} />
-      <circle cx="8" cy="8" r="1.15" fill="currentColor" />
-    </Svg>
-  )
-}
 
-/** 思考。灯泡太像「提示」，脑袋太具象——用一个想法气泡 */
-export function ThinkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <path d="M11.4 11.2H6.2L3.4 13.3v-2.1H2.9a1.4 1.4 0 0 1-1.4-1.4V4.1a1.4 1.4 0 0 1 1.4-1.4h8.5a1.4 1.4 0 0 1 1.4 1.4v5.7a1.4 1.4 0 0 1-1.4 1.4z" {...LINE} />
-      <path d="M5.2 6.9h.01M7.2 6.9h.01M9.2 6.9h.01" {...LINE} />
-    </Svg>
-  )
-}
 
 /** 回到底部。圆底加一个下箭头——codex 和 dsh 的那颗都是这个形状 */
 export function ArrowDownIcon({ size = 15 }: { size?: number }): React.JSX.Element {
@@ -255,5 +181,38 @@ export function ArrowDownIcon({ size = 15 }: { size?: number }): React.JSX.Eleme
     <Svg size={size}>
       <path d="M8 3.2v9.6M4.2 9 8 12.8 11.8 9" {...LINE} />
     </Svg>
+  )
+}
+
+/**
+ * 转圈。**只画四分之三个圆**——整圈转起来看不出在转，缺口才是运动的证据。
+ * 转动交给 CSS（`.row__spin`），这里只管形状。
+ */
+export function SpinnerIcon({ size = 12 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M8 2.4a5.6 5.6 0 1 1-5.6 5.6" {...LINE} />
+    </Svg>
+  )
+}
+
+/** 发送。**箭头朝上**，不是纸飞机——纸飞机在 13px 上只剩一团三角。 */
+export function SendIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M8 13V3.6M3.8 7.8 8 3.6l4.2 4.2" {...LINE} />
+    </Svg>
+  )
+}
+
+/**
+ * 停止。**实心方块**，不是「×」——×是「关掉/取消这个界面」，
+ * 而这里要说的是「让正在跑的东西停下」。播放器用了几十年的那个方块，不用重新发明。
+ */
+export function StopIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} {...BOX}>
+      <rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1.4" fill="currentColor" />
+    </svg>
   )
 }

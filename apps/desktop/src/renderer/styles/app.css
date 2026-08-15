@@ -879,3 +879,61 @@ body {
   color: var(--text);
   border-color: var(--border-strong);
 }
+
+/* 侧栏行里的转圈：那个会话还在跑 */
+.row__spin {
+  display: flex;
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 4px;
+  color: var(--text-faint);
+  animation: row-spin 900ms linear infinite;
+}
+
+@keyframes row-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row__spin {
+    animation: none;
+  }
+}
+
+/* 输入区右下角那颗圆键：闲着是「发送」，跑着是「停止」。
+   同一个位置换形状而不是换文字——手已经知道往哪儿点了，别让它重新找 */
+.send {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+.send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.send:disabled {
+  background: var(--surface-3);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+/* 停止不用主色：主色是「往前走」，而停止是打断 */
+.send--stop {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.send--stop:hover:not(:disabled) {
+  background: var(--surface-4);
+}

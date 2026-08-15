@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 import { rowLabelOf, type Group } from "../sidebar.js"
-import { ChevronIcon, FolderIcon } from "./icons.js"
+import { ChevronIcon, FolderIcon, SpinnerIcon } from "./icons.js"
 
 /**
  * 侧栏里的行。
@@ -82,6 +82,13 @@ export function Row({
         </span>
         <span className="row__label">{rowLabelOf(row)}</span>
         {aside === undefined ? null : <span className="row__aside">{aside}</span>}
+        {/* 跑着的时候右侧转一个圈。**这是唯一能在不切会话的情况下看出「那边还在忙」
+            的地方**——状态点太小、又和「有未读」这类含义抢同一个位置 */}
+        {thread.status === "running" ? (
+          <span className="row__spin" aria-label="正在运行">
+            <SpinnerIcon />
+          </span>
+        ) : null}
         {NOTE[thread.status] === undefined ? null : <span className="row__note">{NOTE[thread.status]}</span>}
       </button>
       {confirming ? (

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
-import { ChevronIcon, ThinkIcon } from "./icons.js"
+import { ChevronIcon } from "./icons.js"
+import { ThinkIcon } from "./icons-activity.js"
 import { Markdown } from "./Markdown.js"
 import { summaryOf } from "../reasoning.js"
 

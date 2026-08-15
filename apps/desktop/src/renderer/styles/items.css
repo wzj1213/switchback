@@ -430,9 +430,28 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  width: 100%;
   margin-top: calc(var(--sp-2) * -1);
+  padding: 2px 0;
+  border: 0;
+  background: none;
   color: var(--text-faint);
+  font: inherit;
   font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 点它折起这一轮的回答。整条线都是热区——只把 11px 的小箭头做成按钮
+   等于让人瞄准，而这是个高频动作（回头翻历史时一路往下折） */
+.turnmark:hover {
+  color: var(--text-dim);
+}
+
+/* 折起来之后线变虚：**光靠一个转了向的箭头不够**，
+   往回翻的时候要一眼扫出「这里我藏了东西」 */
+.turnmark[data-folded="true"]::after {
+  background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px);
 }
 
 /* 线画在文字右边，不是上下各一条：上下夹的那种像分节标题，

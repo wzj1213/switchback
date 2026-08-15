@@ -3,7 +3,7 @@ import { Prompt } from "./Prompt.js"
 import { ModelPicker } from "./ModelPicker.js"
 import { Select } from "./Select.js"
 import { Chips } from "./Chips.js"
-import { EngineIcon, ShieldIcon } from "./icons.js"
+import { EngineIcon, SendIcon, ShieldIcon, StopIcon } from "./icons.js"
 import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
 
 /**
@@ -139,21 +139,14 @@ export function Composer({
             onChange={onModelChange}
           />
           <span style={{ flex: 1 }} />
-          {detached ? (
-            <button className="btn btn--primary" type="button" onClick={onResume}>
-              继续这个会话
-            </button>
-          ) : busy ? (
-            // 跑着的时候把「发送」换成「停止」而不是灰掉：**这时候人真正想按的是停止**，
-            // 而一个灰掉的发送键只告诉他「不能发」，没告诉他还能做什么
-            <button className="btn" type="button" onClick={onInterrupt} disabled={onInterrupt === undefined}>
-              停止
-            </button>
-          ) : (
-            <button className="btn btn--primary" type="button" onClick={submit}>
-              发送
-            </button>
-          )}
+          <Action
+            detached={detached}
+            busy={busy}
+            empty={text.trim() === ""}
+            onResume={onResume}
+            onInterrupt={onInterrupt}
+            onSend={submit}
+          />
         </div>
       </div>
     </div>
@@ -166,3 +159,70 @@ export function labelOf<T extends { id: string; label: string }>(list: readonly 
 }
 
 export { TRUSTS }
+
+/**
+ * 输入区右下角那一颗。**三种状态共用一个位置**：断开时是「继续这个会话」，
+ * 跑着时是停止，其余时候是发送。手已经知道往哪儿点，换的是形状不是位置。
+ */
+function Action({
+  detached,
+  busy,
+  empty,
+  onResume,
+  onInterrupt,
+  onSend,
+}: {
+  detached: boolean
+  busy: boolean
+  empty: boolean
+  onResume?: () => void
+  onInterrupt?: () => void
+  onSend: () => void
+}): React.JSX.Element {
+  if (detached) return <Resume onResume={onResume} />
+  if (busy) {
+    // 跑着的时候把「发送」换成「停止」而不是灰掉：**这时候人真正想按的是停止**，
+    // 而一个灰掉的发送键只告诉他「不能发」，没告诉他还能做什么
+    return (
+      <button
+        className="send send--stop"
+        type="button"
+        title="停止（Esc）"
+        aria-label="停止"
+        onClick={onInterrupt}
+        disabled={onInterrupt === undefined}
+      >
+        <StopIcon />
+      </button>
+    )
+  }
+  return (
+    <button className="send" type="button" title="发送（⌘↵）" aria-label="发送" onClick={onSend} disabled={empty}>
+      <SendIcon />
+    </button>
+  )
+}
+
+/**
+ * 「继续这个会话」——**点下去要立刻有反应**。
+ *
+ * 恢复会话得把引擎重新拉起来、握手、读回历史，几百毫秒到几秒不等。
+ * 上一版点完按钮纹丝不动，于是人会再点一次、再点一次——命令层虽然去重了，
+ * 但那是在**兜底**，不是在回应。按钮自己要说话。
+ */
+function Resume({ onResume }: { onResume?: () => void }): React.JSX.Element {
+  const [going, setGoing] = useState(false)
+  return (
+    <button
+      className="btn btn--primary"
+      type="button"
+      disabled={going || onResume === undefined}
+      onClick={() => {
+        setGoing(true)
+        onResume?.()
+      }}
+    >
+      {going ? "正在恢复…" : "继续这个会话"}
+    </button>
+  )
+}

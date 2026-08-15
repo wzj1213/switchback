@@ -1,7 +1,8 @@
 import { useState } from "react"
 import type { FileChange, ToolCallItem } from "@omni/protocol"
 import { VERB, summarize, target } from "../tool.js"
-import { ChevronIcon, DotBoxIcon, FileIcon, GlobeIcon, PencilIcon, TerminalIcon } from "./icons.js"
+import { ChevronIcon } from "./icons.js"
+import { DotBoxIcon, FileIcon, GlobeIcon, PencilIcon, TerminalIcon } from "./icons-activity.js"
 
 /** 形态 → 图标。和 `VERB` 一一对应，加一种形态时两处都要加。 */
 const GLYPH: Readonly<Record<ToolCallItem["detail"]["kind"], React.JSX.Element>> = {
