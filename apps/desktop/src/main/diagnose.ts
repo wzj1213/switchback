@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
 import { app, dialog } from "electron"
 import type { Logger } from "./log.js"
+import { dumpDir, type CrashInfo } from "./crash.js"
 
 const run = promisify(execFile)
 
@@ -42,7 +43,37 @@ async function tail(file: string): Promise<string> {
  *
  * 说满了比说少了危险：用户会因为一句「绝对安全」而不看就外发。
  */
-export async function buildReport(logger: Logger): Promise<string> {
+/**
+ * 崩溃那一段。
+ *
+ * **只报文件名和时间，不报内容。** 转储里可能有内存快照，而内存里装着
+ * 用户的代码、提示词和路径——这份报告是要发给别人的。
+ * 附上目录路径，真要深挖的人自己去拿。
+ */
+function crashSection(crash: CrashInfo): readonly string[] {
+  if (!crash.uncleanExit && crash.dumps.length === 0) return ["- 没有崩溃记录。"]
+  const lines = crash.uncleanExit ? ["- **上次不是正常退出的。**"] : []
+  if (crash.dumps.length === 0) return [...lines, "- 没有崩溃转储文件。"]
+  return [
+    ...lines,
+    `- 转储目录：\`${dumpDir()}\`（**内容不在本报告里**，里面可能有内存快照）`,
+    ...crash.dumps
+      .slice(0, 5)
+      .map((d) => `- ${d.name} — ${new Date(d.at).toISOString()}`),
+  ]
+}
+
+/**
+ * 系统版本。**取不到就空着，不能因此整份报告生成不出来**——
+ * 诊断报告最该好使的时刻恰恰是「什么都不太对劲」的时候，
+ * 为一个可有可无的字段抛异常是本末倒置。（`getSystemVersion` 是 Electron 才有的。）
+ */
+function systemVersion(): string {
+  const fn = (process as NodeJS.Process & { getSystemVersion?: () => string }).getSystemVersion
+  return typeof fn === "function" ? fn.call(process) : "（取不到系统版本）"
+}
+
+export async function buildReport(logger: Logger, crash: CrashInfo): Promise<string> {
   const engines = await Promise.all([probeEngine("codex"), probeEngine("claude")])
   return [
     "# omni 诊断报告",
@@ -55,11 +86,14 @@ export async function buildReport(logger: Logger): Promise<string> {
     "## 版本",
     `- omni ${app.getVersion()}`,
     `- Electron ${process.versions.electron} / Chromium ${process.versions.chrome} / Node ${process.versions.node}`,
-    `- ${process.platform} ${process.arch} ${process.getSystemVersion()}`,
+    `- ${process.platform} ${process.arch} ${systemVersion()}`,
     `- 已打包：${app.isPackaged ? "是" : "否（开发模式）"}`,
     "",
     "## 引擎",
     ...engines.map((e) => `- ${e}`),
+    "",
+    "## 崩溃",
+    ...crashSection(crash),
     "",
     "## 数据目录",
     `- ${app.getPath("userData")}`,
@@ -73,8 +107,8 @@ export async function buildReport(logger: Logger): Promise<string> {
 }
 
 /** 让用户选个地方存下来。取消就什么都不做。 */
-export async function exportReport(logger: Logger): Promise<void> {
-  const report = await buildReport(logger)
+export async function exportReport(logger: Logger, crash: CrashInfo): Promise<void> {
+  const report = await buildReport(logger, crash)
   const target = await dialog.showSaveDialog({
     title: "导出诊断报告",
     defaultPath: `omni-诊断-${new Date().toISOString().slice(0, 10)}.md`,

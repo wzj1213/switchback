@@ -6,6 +6,7 @@ import { installFind } from "./find.js"
 import { createLogger } from "./log.js"
 import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines.js"
+import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
   devCwd,
@@ -29,6 +30,10 @@ import {
 const isDev = process.env["ELECTRON_RENDERER_URL"] !== undefined
 
 const log = createLogger(join(app.getPath("userData"), "logs"))
+
+// **必须在 whenReady 之前**：崩溃处理器要赶在渲染进程被创建之前装上，
+// 否则那些进程崩了不会留下任何转储
+const crash = installCrashReporter(log)
 
 /**
  * 全局兜底。**没有这两条，主进程里任何一个漏网的异常都会静默带走整个应用**——
@@ -94,7 +99,7 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
 void app.whenReady().then(async () => {
   log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
   installMenu(
-    () => exportReport(log),
+    () => exportReport(log, crash),
     () => {
       // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
       // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
@@ -102,6 +107,7 @@ void app.whenReady().then(async () => {
     },
   )
   installFind(() => BrowserWindow.getAllWindows())
+  watchProcesses(log, () => BrowserWindow.getAllWindows())
   const attached = attachHost(() => BrowserWindow.getAllWindows(), log)
   const bounds = await loadBounds()
   const win = createWindow(bounds)
@@ -139,6 +145,8 @@ void app.whenReady().then(async () => {
   })
   app.on("before-quit", () => {
     void attached.host.dispose()
+    // 正常退出：把运行标记撤掉，下次启动才不会误报一次崩溃
+    clearMarker()
   })
 })
 
