@@ -8,6 +8,7 @@ import "./styles/markdown.css"
 import "./styles/status.css"
 import "./styles/diff.css"
 import "./styles/compare.css"
+import "./styles/popover.css"
 
 const root = document.getElementById("root")
 if (root === null) throw new Error("找不到 #root 挂载点")

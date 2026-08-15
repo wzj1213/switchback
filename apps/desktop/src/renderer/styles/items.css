@@ -324,14 +324,7 @@
   padding-top: var(--sp-1);
 }
 
-.select {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  cursor: default;
-}
+
 
 /* ── 复制按钮 ─────────────────────────────────────────
  * 悬停才出现，贴在消息右上。常驻的话每条消息右上角都挂一个小按钮，

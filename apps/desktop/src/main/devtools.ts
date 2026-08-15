@@ -17,6 +17,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
  * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
  * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
+ * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -119,6 +120,24 @@ export function scheduleDevFilter(win: BrowserWindow): void {
     setTimeout(() => {
       if (!win.isDestroyed()) win.webContents.insertText(text)
     }, 400)
+  }, Math.max(0, delay))
+}
+
+/**
+ * 到点点开输入区里第 N 个下拉。
+ *
+ * 自绘浮层能截到图，原生 `<select>` 的弹出层截不到——**这本身就是换掉它的
+ * 理由之一**。有了这个钩子，下拉长什么样才进得了自动化验证。
+ */
+export function scheduleDevOpenSelect(win: BrowserWindow): void {
+  const nth = Number(process.env["OMNI_DEV_SELECT"] ?? "0")
+  if (!Number.isFinite(nth) || nth <= 0) return
+  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 2000
+  setTimeout(() => {
+    if (win.isDestroyed()) return
+    void win.webContents.executeJavaScript(
+      `document.querySelectorAll(".composer__bar .trigger")[${String(nth - 1)}]?.click()`,
+    )
   }, Math.max(0, delay))
 }
 

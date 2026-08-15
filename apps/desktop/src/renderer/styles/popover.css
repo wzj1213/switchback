@@ -1,0 +1,187 @@
+/*
+ * 自绘下拉：触发器 + 浮层。
+ *
+ * 换掉原生 `<select>` 的理由见 `components/Popover.tsx` 开头。
+ * 这里只说视觉上的一条：**浮层要有阴影和边框两样**。
+ * 只有边框的浮层在浅色背景上「浮」不起来，看着像页面的一部分；
+ * 只有阴影的浮层在深色模式下边界消失。
+ */
+
+/* ── 触发器：一枚可点的胶囊 ─────────────────────────── */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  padding: 3px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+}
+
+.trigger:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 打开时保持高亮：不然面板浮在上面、触发器却是常态，
+   看不出这个面板是从哪儿出来的 */
+.trigger--open {
+  background: var(--bg-active);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.trigger:disabled {
+  opacity: 0.45;
+}
+
+.trigger__icon {
+  display: flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+.trigger--open .trigger__icon,
+.trigger:hover:not(:disabled) .trigger__icon {
+  color: var(--text-muted);
+}
+
+.trigger__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 浮层 ─────────────────────────────────────────── */
+.pop {
+  position: fixed;
+  z-index: 50;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 6%),
+    0 8px 28px rgb(0 0 0 / 12%);
+}
+
+.pop__section + .pop__section {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--border);
+}
+
+.pop__title {
+  padding: var(--sp-1) var(--sp-2) 3px;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.pop__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 5px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.pop__item:hover {
+  background: var(--bg-hover);
+}
+
+/* 勾放在**左边固定一列**：放右边的话，选项长短不一时勾会跳来跳去，
+   而且长文本会把它挤出可视区 */
+.pop__check {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.pop__text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pop__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pop__item--on .pop__label {
+  font-weight: 500;
+}
+
+/* 说明文字**不截断成一行**：它存在的意义就是解释，
+   截成一行之后每条都以「…」结尾，等于没写 */
+.pop__desc {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.pop__note {
+  flex: none;
+  align-self: center;
+  margin-left: var(--sp-2);
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+
+/* ── 右键菜单：和下拉共用浮层，只是条目里带图标 ────────── */
+.pop__cmd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 5px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.pop__cmd:hover {
+  background: var(--bg-hover);
+}
+
+.pop__cmd--danger:hover {
+  background: var(--danger);
+  color: var(--text-inverse);
+}
+
+.pop__cmd-icon {
+  display: flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+.pop__cmd:hover .pop__cmd-icon {
+  color: inherit;
+}

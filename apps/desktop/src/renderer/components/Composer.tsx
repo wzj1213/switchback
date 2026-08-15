@@ -1,12 +1,20 @@
 import { useState } from "react"
 import { Prompt } from "./Prompt.js"
 import { ModelPicker } from "./ModelPicker.js"
+import { Select } from "./Select.js"
+import { EngineIcon, ShieldIcon } from "./icons.js"
 import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
 
-const TRUSTS: readonly { id: Trust; label: string }[] = [
-  { id: "read-only", label: "只读" },
-  { id: "auto-edit", label: "自动编辑" },
-  { id: "full", label: "完全访问" },
+/**
+ * 信任档。
+ *
+ * `hint` 不是可有可无的：这三个词说得出**档位叫什么**，说不出
+ * **它到底会不会问我**。而这正是用户在改这个控件时唯一关心的事。
+ */
+const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
+  { id: "read-only", label: "只读", hint: "任何写入与命令都拒绝" },
+  { id: "auto-edit", label: "自动编辑", hint: "工作区内的改动直接放行，越界才问" },
+  { id: "full", label: "完全访问", hint: "只在红线上问（工作区外、网络、不可逆操作）" },
 ]
 
 interface Props {
@@ -68,36 +76,41 @@ export function Composer({
           onSubmit={submit}
         />
         <div className="composer__bar">
-          <select
-            className="select"
+          <Select
+            label={labelOf(engines, engine)}
+            icon={<EngineIcon />}
+            title="引擎"
             disabled={detached}
-            value={engine}
-            onChange={(e) => {
-              onEngineChange(e.target.value)
-            }}
-          >
-            {engines.map((item) => (
-              // 没装的**仍然可选**，只加个记号：探测也会错，硬拦住一个其实能用的
-              // 引擎比不检查更糟。选中之后真起不来，横幅会说清楚原因
-              <option key={item.id} value={item.id} title={item.detail ?? ""}>
-                {item.state === "missing" ? `${item.label}（未安装）` : item.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
+            sections={[
+              {
+                value: engine,
+                onPick: onEngineChange,
+                // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
+                // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
+                choices: engines.map((item) => ({
+                  id: item.id,
+                  label: item.label,
+                  ...(item.state === "missing" ? { note: "未安装" } : {}),
+                  ...(item.detail === undefined ? {} : { description: item.detail }),
+                })),
+              },
+            ]}
+          />
+          <Select
+            label={labelOf(TRUSTS, trust)}
+            icon={<ShieldIcon />}
+            title="信任档"
             disabled={detached}
-            value={trust}
-            onChange={(e) => {
-              onTrustChange(e.target.value as Trust)
-            }}
-          >
-            {TRUSTS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+            sections={[
+              {
+                value: trust,
+                onPick: (id) => {
+                  onTrustChange(id as Trust)
+                },
+                choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
+              },
+            ]}
+          />
           <ModelPicker
             models={models}
             model={model}
