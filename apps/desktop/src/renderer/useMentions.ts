@@ -26,12 +26,23 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
   const seq = useRef(0)
   const alive = useRef(true)
 
-  useEffect(
-    () => () => {
+  /**
+   * **挂载时把 `alive` 扳回 true，不能只在卸载时扳成 false。**
+   *
+   * `StrictMode` 下 effect 会跑两遍：挂载 → 清理 → 再挂载。
+   * 只写清理的话，第二次挂载后 `alive.current` 永远停在 `false`——
+   * 于是**每一条搜索结果都被当成「组件已经没了」丢掉**，
+   * `@` 引用的候选列表从头到尾是空的。
+   *
+   * 而这件事一点都不吵：搜索发出去了、主进程也老老实实返回了路径
+   * （实测直接调桥能拿到三条），只是结果在最后一步被扔了。
+   */
+  useEffect(() => {
+    alive.current = true
+    return () => {
       alive.current = false
-    },
-    [],
-  )
+    }
+  }, [])
 
   const close = useCallback(() => {
     seq.current += 1
