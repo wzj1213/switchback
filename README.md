@@ -2,10 +2,14 @@
 
 > 一个界面，统一驱动各家原生 coding agent。
 
-切引擎，不换习惯。codex / claude code / zcode / kimi 各自跑自己的原生进程、用自己的鉴权和模型，
+切引擎，不换习惯。各家 agent 跑自己的原生进程、用自己的鉴权和模型，
 omni 只负责把它们呈现成同一套交互，并让你**随时在它们之间切换、甚至中途接力**。
 
 名字取自「书同文」——多家写法，一个标准。
+
+**目前接了两家**：Codex（`codex app-server`）与 Claude Code（Claude Agent SDK）。
+ZCode / Kimi 走通用 ACP 接入，还没做——**界面上的引擎清单由宿主给**，
+没注册的不会出现在下拉里。
 
 ## 跑起来
 

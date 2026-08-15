@@ -6,7 +6,7 @@ import { Workspace } from "./components/Workspace.js"
 import { useOmni } from "./useOmni.js"
 import { useMenuActions } from "./useMenuActions.js"
 import { toMarkdown } from "./export.js"
-import { ENGINES, labelOf } from "./components/Composer.js"
+import { labelOf } from "./components/Composer.js"
 
 /**
  * 空状态说什么。
@@ -49,7 +49,7 @@ export function App(): React.JSX.Element {
     send({
       type: "thread.create",
       cwd,
-      engine: thread?.engine ?? "claude",
+      engine: thread?.engine ?? state.engines[0]?.id ?? "claude",
       trust: thread?.trust ?? "auto-edit",
       title: cwd.split("/").filter(Boolean).pop() ?? cwd,
     })
@@ -78,7 +78,7 @@ export function App(): React.JSX.Element {
       },
       copyMarkdown: () => {
         if (thread === undefined) return
-        copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(ENGINES, thread.engine)))
+        copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine)))
       },
     },
     [thread?.id, thread?.cwd, state],
@@ -123,6 +123,7 @@ export function App(): React.JSX.Element {
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}
         models={modelsOf(state, thread.id)}
+        engines={state.engines}
         notices={notices}
         onDismiss={setDismissed}
         finding={finding}

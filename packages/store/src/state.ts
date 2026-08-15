@@ -1,4 +1,14 @@
-import type { Item, ItemId, ModelOption, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
+import type {
+  EngineInfo,
+  Item,
+  ItemId,
+  ModelOption,
+  Thread,
+  ThreadId,
+  Turn,
+  TurnId,
+  Usage,
+} from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -17,6 +27,8 @@ export interface ViewState {
   usage: Readonly<Record<ThreadId, Usage>>
   /** 每个会话可选的模型。引擎报了才有。 */
   models: Readonly<Record<ThreadId, readonly ModelOption[]>>
+  /** 这台机器上可用的引擎。宿主启动时报一次。 */
+  engines: readonly EngineInfo[]
   /** 引擎层面的故障。最新在后。 */
   notices: readonly Notice[]
   /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
@@ -47,6 +59,7 @@ export function initial(): ViewState {
     turnOwner: {},
     usage: {},
     models: {},
+    engines: [],
     notices: [],
     noticeSeq: 0,
   }

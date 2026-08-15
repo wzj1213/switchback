@@ -85,6 +85,8 @@ void app.whenReady().then(async () => {
   // 先回放历史再开新会话：**顺序不能反**。侧栏最近创建在前，
   // 反过来的话新会话会被压在一堆历史下面。
   win.webContents.once("did-finish-load", () => {
+    // 引擎清单先于一切：界面要靠它渲染选择器
+    attached.push({ type: "engines.available", at: Date.now(), engines: attached.engines })
     void replayHistory(attached)
       .catch(() => undefined)
       .then((recent) => seedDefaultThread(attached, process.cwd(), devPrompt(), recent))

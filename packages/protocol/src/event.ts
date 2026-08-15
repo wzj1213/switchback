@@ -1,4 +1,4 @@
-import type { ItemId, ThreadId, TurnId } from "./ids.js"
+import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
 import type { Item } from "./item.js"
 import type { Thread, Turn, TurnStatus } from "./thread.js"
 
@@ -35,6 +35,12 @@ export interface ModelOption {
   defaultEffort?: string
 }
 
+/** 一个可用的引擎。**清单由宿主给**——界面写死一份，迟早和真正注册了的对不上。 */
+export interface EngineInfo {
+  id: EngineId
+  label: string
+}
+
 /**
  * 引擎 → 宿主 → 渲染层的单向事件流。
  *
@@ -45,6 +51,8 @@ export interface ModelOption {
  * 事件流假设有序且不丢，序号与重放由传输层负责，不在本模型内。
  */
 export type Event =
+  /** 宿主启动时报一次：这台机器上装了哪些引擎。 */
+  | { type: "engines.available"; at: number; engines: readonly EngineInfo[] }
   | { type: "thread.started"; at: number; thread: Thread }
   | { type: "thread.updated"; at: number; thread: Thread }
   | { type: "thread.removed"; at: number; threadId: ThreadId }

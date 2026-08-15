@@ -17,5 +17,5 @@ export type {
   ApprovalStatus,
   ErrorItem,
 } from "./item.js"
-export type { Event, EngineStatus, Usage, ModelOption } from "./event.js"
+export type { Event, EngineStatus, Usage, ModelOption, EngineInfo } from "./event.js"
 export type { Command, RememberScope } from "./command.js"

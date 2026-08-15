@@ -18,6 +18,8 @@ export interface Attached {
   push: (event: Event) => void
   /** 立刻发出攒着的事件。回放结束时要调一次，否则最后一批要等窗口到期。 */
   flush: () => void
+  /** 这台机器上注册了哪些引擎。界面据此渲染选择器。 */
+  engines: readonly { id: string; label: string }[]
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
   /**
@@ -36,6 +38,24 @@ export interface Attached {
  * 事件只往**当前活着的窗口**广播；窗口没了就丢弃——渲染层重开时会重新拉状态
  * （持久化接上之前，重开等于新会话）。
  */
+/**
+ * 渲染层要用、但只有主进程做得到的几件事：弹目录框、写剪贴板、搜文件。
+ *
+ * 都是**窄到只能做一件事**的通道，不是把 fs 或 ipcRenderer 交出去。
+ */
+function installBridgeChannels(): void {
+  // 目录选择必须在主进程弹：渲染层没有、也不该有触碰文件系统的能力。
+  // 回给渲染层的只是一个用户亲手选中的路径。
+  ipcMain.handle("omni:pickFolder", async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+      title: "选择工作区",
+    })
+    return result.canceled ? undefined : result.filePaths[0]
+  })
+
+}
+
 export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
 
@@ -57,8 +77,13 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   // 规则和事件分开存：删会话不该把「始终允许」一起删了
   const rules = createRuleStore(join(app.getPath("userData"), "rules"))
 
+  // **这张表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
+  // 写两份的下场是下拉里列着 ZCode 和 Kimi，选中直接报「未注册的引擎」。
+  const drivers = { claude: createClaudeDriver(), codex: createCodexDriver() }
+  const labels: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex" }
+
   const host = createHost({
-    drivers: { claude: createClaudeDriver(), codex: createCodexDriver() },
+    drivers,
     home: homedir(),
     journal,
     rules,
@@ -67,15 +92,7 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
     now: () => Date.now(),
   })
 
-  // 目录选择必须在主进程弹：渲染层没有、也不该有触碰文件系统的能力。
-  // 回给渲染层的只是一个用户亲手选中的路径。
-  ipcMain.handle("omni:pickFolder", async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ["openDirectory", "createDirectory"],
-      title: "选择工作区",
-    })
-    return result.canceled ? undefined : result.filePaths[0]
-  })
+  installBridgeChannels()
 
   const report = (error: unknown, threadId?: ThreadId): void => {
     emit({
@@ -109,7 +126,17 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
   })
 
   // 回放要一次灌进去几百上千条，攒着没有意义，直接推
-  return { host, journal, push: emit, flush: () => { batcher.flush() }, lastThreadId: () => seen.thread, report }
+  return {
+    host,
+    journal,
+    push: emit,
+    flush: () => {
+      batcher.flush()
+    },
+    engines: Object.keys(drivers).map((id) => ({ id, label: labels[id] ?? id })),
+    lastThreadId: () => seen.thread,
+    report,
+  }
 }
 
 /**

@@ -38,15 +38,19 @@ export interface Ctx {
   turnOwner: Map<TurnId, ThreadId>
 }
 
+/**
+ * 这些事件**不属于任何一个会话**，因此不落盘。
+ * `thread.removed` 尤其要在这里：写了只会把刚删掉的文件建回来。
+ */
+const UNOWNED: ReadonlySet<string> = new Set(["thread.removed", "engines.available"])
+
 /** 一条事件属于哪个会话。判不出就不落盘——宁可少一条，也不要落到错的文件里。 */
 export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
+  if (UNOWNED.has(event.type)) return undefined
   switch (event.type) {
     case "thread.started":
     case "thread.updated":
       return event.thread.id
-    // 删除事件**故意不落盘**：文件已经没了，再写一条只会把它建回来
-    case "thread.removed":
-      return undefined
     case "turn.started":
       return event.turn.threadId
     case "turn.completed":

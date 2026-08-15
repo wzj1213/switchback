@@ -1,14 +1,7 @@
 import { useState } from "react"
 import { Prompt } from "./Prompt.js"
 import { ModelPicker } from "./ModelPicker.js"
-import type { EngineId, ModelOption, Trust } from "@omni/protocol"
-
-const ENGINES: readonly { id: EngineId; label: string }[] = [
-  { id: "claude", label: "Claude Code" },
-  { id: "codex", label: "Codex" },
-  { id: "acp:zcode", label: "ZCode" },
-  { id: "acp:kimi", label: "Kimi" },
-]
+import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
 
 const TRUSTS: readonly { id: Trust; label: string }[] = [
   { id: "read-only", label: "只读" },
@@ -20,6 +13,8 @@ interface Props {
   /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
   detached?: boolean
   engine: EngineId
+  /** 可选引擎。**由宿主给**，不在这里写死——写死的那份迟早和真正注册了的对不上。 */
+  engines: readonly EngineInfo[]
   trust: Trust
   /** 可选模型。空数组时不显示选择器——没得选就别摆一个空下拉。 */
   models: readonly ModelOption[]
@@ -40,6 +35,7 @@ interface Props {
 export function Composer({
   detached = false,
   engine,
+  engines,
   trust,
   onEngineChange,
   onTrustChange,
@@ -80,7 +76,7 @@ export function Composer({
               onEngineChange(e.target.value)
             }}
           >
-            {ENGINES.map((item) => (
+            {engines.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
               </option>
@@ -128,4 +124,4 @@ export function labelOf<T extends { id: string; label: string }>(list: readonly 
   return list.find((x) => x.id === id)?.label ?? id
 }
 
-export { ENGINES, TRUSTS }
+export { TRUSTS }

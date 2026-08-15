@@ -1,12 +1,20 @@
-import type { Command, Item, ModelOption, Thread, Turn, Usage } from "@omni/protocol"
+import type { Command, EngineInfo, Item, ModelOption, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
-import { Composer, ENGINES, TRUSTS, labelOf } from "./Composer.js"
+import { Composer, TRUSTS, labelOf } from "./Composer.js"
 import { Transcript } from "./Transcript.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
 
-function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined }): React.JSX.Element {
+function TopBar({
+  thread,
+  usage,
+  engines,
+}: {
+  thread: Thread
+  usage: Usage | undefined
+  engines: readonly EngineInfo[]
+}): React.JSX.Element {
   const handedOff = thread.engineHistory.length > 1
   return (
     <header className="topbar">
@@ -14,12 +22,12 @@ function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined })
       <span className="topbar__spacer" />
       <ContextMeter usage={usage} />
       {handedOff ? (
-        <span className="pill" title={thread.engineHistory.map((e) => labelOf(ENGINES, e)).join(" → ")}>
+        <span className="pill" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
           接力 {thread.engineHistory.length} 手
         </span>
       ) : null}
       {thread.detached === true ? <span className="pill pill--muted">历史记录</span> : null}
-      <span className="pill pill--engine">{labelOf(ENGINES, thread.engine)}</span>
+      <span className="pill pill--engine">{labelOf(engines, thread.engine)}</span>
       <span className="pill">{labelOf(TRUSTS, thread.trust)}</span>
     </header>
   )
@@ -31,6 +39,7 @@ export interface WorkspaceProps {
   turn: Turn | undefined
   usage: Usage | undefined
   models: readonly ModelOption[]
+  engines: readonly EngineInfo[]
   notices: readonly Notice[]
   onDismiss: (id: string) => void
   finding: boolean
@@ -52,12 +61,13 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
   return (
     <main className="main">
-      <TopBar thread={thread} usage={props.usage} />
+      <TopBar thread={thread} usage={props.usage} engines={props.engines} />
       <Notices notices={props.notices} onDismiss={props.onDismiss} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
       <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
       <Composer
         detached={thread.detached === true}
+        engines={props.engines}
         cwd={thread.cwd}
         searchFiles={props.searchFiles}
         models={props.models}

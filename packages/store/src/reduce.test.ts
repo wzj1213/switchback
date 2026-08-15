@@ -286,3 +286,28 @@ describe("thread.removed", () => {
     expect(s.owner["m1"]).toBe("a")
   })
 })
+
+describe("engines.available", () => {
+  it("引擎清单进 state，界面据此渲染选择器", () => {
+    const s = reduce(initial(), {
+      type: "engines.available",
+      at: 0,
+      engines: [{ id: "codex", label: "Codex" }],
+    })
+    expect(s.engines).toEqual([{ id: "codex", label: "Codex" }])
+  })
+
+  it("再报一次是整份替换，不是追加", () => {
+    const first = reduce(initial(), {
+      type: "engines.available",
+      at: 0,
+      engines: [{ id: "a", label: "A" }],
+    })
+    const second = reduce(first, {
+      type: "engines.available",
+      at: 1,
+      engines: [{ id: "b", label: "B" }],
+    })
+    expect(second.engines).toEqual([{ id: "b", label: "B" }])
+  })
+})

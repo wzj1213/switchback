@@ -133,6 +133,18 @@ function onEngineStatus(
  * **认不出的事件原样返回旧状态**，不抛也不记录。代价是新增事件类型时界面静默无反应，
  * 收益是渲染层永远不会因为一个没见过的事件崩掉。排查「点了没反应」先查这里。
  */
+/** 「整份替换某张表」的几支。和 item 三兄弟一样，拎出来是为了分支数不撞闸门。 */
+function reduceCatalog(
+  state: ViewState,
+  event: Extract<Event, { type: "usage.updated" | "models.updated" | "engines.available" }>,
+): ViewState {
+  if (event.type === "engines.available") return { ...state, engines: event.engines }
+  if (event.type === "models.updated") {
+    return { ...state, models: { ...state.models, [event.threadId]: event.models } }
+  }
+  return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
+}
+
 /** item 三兄弟单独拎出来，纯粹为了让 `reduce` 的分支数不撞闸门。 */
 function reduceItem(
   state: ViewState,
@@ -146,30 +158,44 @@ function reduceItem(
   return threadId === undefined ? state : appendItem(state, threadId, event.item)
 }
 
+/**
+ * 事件 → 处理函数。
+ *
+ * 用**由联合类型映射出来的表**而不是 switch，有两个理由：
+ *
+ * 1. 漏处理一种事件会**编译不过**。原先那个 switch 的 `default: return state`
+ *    恰恰把这件事藏了起来——新增一种事件、忘了接，界面静默无反应，
+ *    而排查的人先怀疑的永远不是归约器。
+ * 2. 分支数就是协议的大小，不是可以拆掉的复杂度；表的形式让它不再是一坨 switch。
+ */
+type Handlers = {
+  [K in Event["type"]]: (state: ViewState, event: Extract<Event, { type: K }>) => ViewState
+}
+
+const HANDLERS: Handlers = {
+  "thread.started": (state, event) => withThread(state, event.thread),
+  "thread.updated": (state, event) => withThread(state, event.thread),
+  "thread.removed": (state, event) => removeThread(state, event.threadId),
+  "turn.started": onTurnStarted,
+  "turn.completed": onTurnCompleted,
+  "item.started": reduceItem,
+  "item.delta": reduceItem,
+  "item.updated": reduceItem,
+  "usage.updated": reduceCatalog,
+  "models.updated": reduceCatalog,
+  "engines.available": reduceCatalog,
+  "engine.status": onEngineStatus,
+}
+
+/**
+ * 事件 → 状态。纯函数、不可变。
+ *
+ * 运行期收到表里没有的事件（比如新版本宿主发来的）**原样返回旧状态**：
+ * 渲染层永远不该因为一个没见过的事件崩掉。
+ */
 export function reduce(state: ViewState, event: Event): ViewState {
-  switch (event.type) {
-    case "thread.started":
-    case "thread.updated":
-      return withThread(state, event.thread)
-    case "thread.removed":
-      return removeThread(state, event.threadId)
-    case "turn.started":
-      return onTurnStarted(state, event)
-    case "turn.completed":
-      return onTurnCompleted(state, event)
-    case "item.started":
-    case "item.delta":
-    case "item.updated":
-      return reduceItem(state, event)
-    case "usage.updated":
-      return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
-    case "models.updated":
-      return { ...state, models: { ...state.models, [event.threadId]: event.models } }
-    case "engine.status":
-      return onEngineStatus(state, event)
-    default:
-      return state
-  }
+  const handler = HANDLERS[event.type] as ((state: ViewState, event: Event) => ViewState) | undefined
+  return handler === undefined ? state : handler(state, event)
 }
 
 export function reduceAll(state: ViewState, events: readonly Event[]): ViewState {
