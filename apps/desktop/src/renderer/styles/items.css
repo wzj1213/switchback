@@ -138,6 +138,12 @@
   color: var(--danger);
 }
 
+/* 运行中的实时尾部：比展开态更淡，暗示"这是正在发生的事，不是最终结果" */
+.step__out--live {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
 /* ── 审批卡：整个产品的关键界面 ──────────────────────────── */
 .approval {
   container-type: inline-size;

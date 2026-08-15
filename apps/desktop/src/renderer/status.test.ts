@@ -64,6 +64,15 @@ describe("brief", () => {
     expect(brief({ kind: "shell", command: "ls\ncat x" })).toBe("ls")
   })
 
+  it("剥掉 codex 的 shell 包壳——那 16 个字符会把真正有信息量的部分挤出截断线", () => {
+    expect(brief({ kind: "shell", command: `/bin/zsh -lc 'pnpm test --run'` })).toBe("pnpm test --run")
+    expect(brief({ kind: "shell", command: `/bin/zsh -c "ls -la"` })).toBe("ls -la")
+  })
+
+  it("不是包壳的原样保留，别把正常命令切坏了", () => {
+    expect(brief({ kind: "shell", command: "zsh install.sh" })).toBe("zsh install.sh")
+  })
+
   it("过长截断并加省略号", () => {
     const long = "x".repeat(80)
     expect(brief({ kind: "shell", command: long })).toHaveLength(49)

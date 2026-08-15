@@ -32,10 +32,27 @@ function patchItem(state: ViewState, itemId: ItemId, next: (prev: Item) => Item)
   return { ...state, items: { ...state.items, [threadId]: updated } }
 }
 
-/** 只有流式文本类 item 吃增量；其余类型忽略（见 README「已知限制」）。 */
+/**
+ * 实时输出的上限，**留尾不留头**。
+ *
+ * 一条 `pnpm build` 能吐几 MB；不封顶的话它一直堆在内存里，而且渲染一个
+ * 几 MB 的 `<pre>` 会把界面拖垮。命令跑着的时候人要看的是它**现在**在干什么，
+ * 不是三分钟前的第一行。
+ *
+ * 收工时 `item.updated` 会用引擎给的完整输出整条替换，所以这里的截断只影响
+ * 运行期间的实时视图。
+ */
+const MAX_LIVE_OUTPUT = 8000
+
+/** 流式文本吃增量；shell 调用的输出也吃——那是「命令跑着时看得到滚动」的来源。 */
 function applyDelta(prev: Item, append: string): Item {
   if (prev.kind === "agent_message" || prev.kind === "reasoning") {
     return { ...prev, text: prev.text + append }
+  }
+  if (prev.kind === "tool_call" && prev.detail.kind === "shell") {
+    const grown = (prev.detail.output ?? "") + append
+    const output = grown.length <= MAX_LIVE_OUTPUT ? grown : grown.slice(-MAX_LIVE_OUTPUT)
+    return { ...prev, detail: { ...prev.detail, output } }
   }
   return prev
 }

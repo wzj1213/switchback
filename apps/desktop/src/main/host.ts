@@ -4,7 +4,7 @@ import { ipcMain, type BrowserWindow } from "electron"
 import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
-import { devEngine } from "./devtools.js"
+import { devEngine, devTrust } from "./devtools.js"
 
 export interface Attached {
   host: Host
@@ -65,7 +65,7 @@ export async function seedDefaultThread(
     type: "thread.create",
     cwd,
     engine: devEngine(),
-    trust: "auto-edit",
+    trust: devTrust(),
     title: cwd.split("/").pop() ?? "工作区",
   })
   const threadId = attached.lastThreadId()

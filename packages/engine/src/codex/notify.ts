@@ -75,6 +75,22 @@ function onDelta(ctx: NotifyContext, params: WireDelta): void {
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
 }
 
+/**
+ * 命令的输出增量。
+ *
+ * 与文本流式 item 不同，工具 item 在 `item/started` 时就已经落地了，
+ * 这里不需要 materialize，直接追加即可。
+ *
+ * 实测确认过一件要紧的事：这些 delta 拼起来**恰好等于**收工时那条
+ * `aggregatedOutput`。所以收工时整条替换不会把输出重复一遍——
+ * 如果哪天 codex 改成「delta 是增量、aggregated 是全量之外的东西」，
+ * 这里就会出现双份输出，那是第一个要查的地方。
+ */
+function onOutputDelta(ctx: NotifyContext, params: WireDelta): void {
+  if (ctx.turnId() === undefined || !ctx.materialized.has(params.itemId)) return
+  ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
+}
+
 function onTurnCompleted(ctx: NotifyContext, params: WireTurnLifecycle): void {
   const turnId = ctx.turnId()
   if (turnId === undefined) return
@@ -121,6 +137,8 @@ export function handleNotification(ctx: NotifyContext, method: string, params: u
     case "item/reasoning/summaryTextDelta":
     case "item/reasoning/textDelta":
       return onDelta(ctx, params as WireDelta)
+    case "item/commandExecution/outputDelta":
+      return onOutputDelta(ctx, params as WireDelta)
     case "turn/completed":
       return onTurnCompleted(ctx, params as WireTurnLifecycle)
     case "error":
