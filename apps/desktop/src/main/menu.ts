@@ -26,7 +26,7 @@ function send(action: MenuAction, focused: BaseWindow | undefined): void {
  * （撤销栈、拼写检查、缩放）。手写这些只会做得更差。
  */
 /** 文件：新建会话与打开文件夹——每天用几十次，必须有快捷键。 */
-function fileMenu(): MenuItemConstructorOptions {
+function fileMenu(onEngines: () => void): MenuItemConstructorOptions {
   return {
     label: "文件",
     submenu: [
@@ -43,6 +43,13 @@ function fileMenu(): MenuItemConstructorOptions {
         click: (_i, focused) => {
           send("open-folder", focused)
         },
+      },
+      { type: "separator" },
+      {
+        // 注册第三方 ACP 引擎。放「文件」里而不是藏在帮助菜单：
+        // 它编辑的是一个真实文件，动作也确实是「打开一个文件」
+        label: "引擎注册表…",
+        click: onEngines,
       },
       { type: "separator" },
       { role: isMac ? "close" : "quit" },
@@ -107,10 +114,10 @@ function helpMenu(onDiagnose: () => Promise<void>): MenuItemConstructorOptions {
  * 编辑/显示/窗口三栏一律用 `role`：系统会自己本地化、自己接上原生行为
  * （撤销栈、拼写检查、缩放）。手写这些只会做得更差。
  */
-export function installMenu(onDiagnose: () => Promise<void>): void {
+export function installMenu(onDiagnose: () => Promise<void>, onEngines: () => void): void {
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: "appMenu" } as MenuItemConstructorOptions] : []),
-    fileMenu(),
+    fileMenu(onEngines),
     { role: "editMenu" },
     threadMenu(),
     { role: "viewMenu" },

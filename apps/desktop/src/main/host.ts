@@ -9,6 +9,7 @@ import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
+import { readEngineFile, registerAcpEngines } from "./engines.js"
 import type { Logger } from "./log.js"
 
 export interface Attached {
@@ -105,8 +106,16 @@ export function attachHost(
 
   // **这张表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
   // 写两份的下场是下拉里列着 ZCode 和 Kimi，选中直接报「未注册的引擎」。
-  const drivers = { claude: createClaudeDriver(), codex: createCodexDriver() }
-  const labels: Readonly<Record<string, string>> = { claude: "Claude Code", codex: "Codex" }
+  //
+  // 第三方 ACP 引擎从 `engines.json` 读，默认没有——**不内置一份猜出来的清单**，
+  // 理由见 `engines.ts`。装了什么由用户说了算，我们只负责讲协议。
+  const acp = registerAcpEngines(readEngineFile(app.getPath("userData"), log))
+  const drivers = { claude: createClaudeDriver(), codex: createCodexDriver(), ...acp.drivers }
+  const labels: Readonly<Record<string, string>> = {
+    claude: "Claude Code",
+    codex: "Codex",
+    ...acp.labels,
+  }
 
   const host = createHost({
     drivers,

@@ -8,6 +8,7 @@ import type { Trust } from "@omni/protocol"
  * | 变量 | 作用 |
  * | --- | --- |
  * | `OMNI_DEV_PROMPT` | 默认会话建好后自动发这条提示词 |
+ * | `OMNI_DEV_CWD` | 默认会话开在哪个目录，默认 `process.cwd()` |
  * | `OMNI_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
  * | `OMNI_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
@@ -24,6 +25,18 @@ import type { Trust } from "@omni/protocol"
 export function devPrompt(): string | undefined {
   const text = process.env["OMNI_DEV_PROMPT"]
   return text === undefined || text === "" ? undefined : text
+}
+
+/**
+ * 默认会话开在哪个目录。
+ *
+ * 不给就用 `process.cwd()`——但在 `pnpm dev` 下那是 `apps/desktop`，
+ * 不是你以为的那个目录。验证时对着一个空目录跑，agent 会老老实实回答
+ * 「这里没有那个文件」，看起来像驱动坏了，其实是工作区搞错了。踩过一次。
+ */
+export function devCwd(fallback: string): string {
+  const dir = process.env["OMNI_DEV_CWD"]
+  return dir === undefined || dir === "" ? fallback : dir
 }
 
 /** 换引擎跑一遍是验证归一化模型的主要手段，所以给它留了个口子。 */

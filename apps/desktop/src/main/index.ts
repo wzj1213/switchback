@@ -5,8 +5,10 @@ import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
 import { createLogger } from "./log.js"
 import { exportReport } from "./diagnose.js"
+import { ensureEngineFile } from "./engines.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import {
+  devCwd,
   devPrompt,
   scheduleDevFind,
   scheduleDevSwitch,
@@ -89,7 +91,14 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
 
 void app.whenReady().then(async () => {
   log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
-  installMenu(() => exportReport(log))
+  installMenu(
+    () => exportReport(log),
+    () => {
+      // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
+      // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
+      void shell.openPath(ensureEngineFile(app.getPath("userData")))
+    },
+  )
   installFind(() => BrowserWindow.getAllWindows())
   const attached = attachHost(() => BrowserWindow.getAllWindows(), log)
   const bounds = await loadBounds()
@@ -105,7 +114,7 @@ void app.whenReady().then(async () => {
     attached.push({ type: "engines.available", at: Date.now(), engines: attached.engines })
     void replayHistory(attached)
       .catch(() => undefined)
-      .then((recent) => seedDefaultThread(attached, process.cwd(), devPrompt(), recent))
+      .then((recent) => seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), recent))
     scheduleDevFind(win)
     scheduleDevInterrupt(win)
     scheduleDevSwitch(win, (kind, to) => {
