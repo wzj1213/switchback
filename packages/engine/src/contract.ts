@@ -40,6 +40,18 @@ export interface StartRequest {
   emit: (event: Event) => void
   /** 判定为 escalate 时调用，等用户裁决 */
   askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+  /**
+   * 引擎那边的会话句柄，用于续跑。传了就接着上次的对话，不传就是全新会话。
+   * 格式由各家自己定，omni 原样存取。
+   */
+  resume?: string
+  /**
+   * 驱动拿到自己的会话句柄时回调。
+   *
+   * **必须是回调而不是返回值**：Claude 的 session id 是在
+   * `system/init` 消息里到达的，比 `start()` 返回晚。
+   */
+  onHandle?: (handle: string) => void
 }
 
 export interface EngineSession {

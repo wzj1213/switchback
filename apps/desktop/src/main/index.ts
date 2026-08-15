@@ -67,7 +67,7 @@ void app.whenReady().then(() => {
   win.webContents.once("did-finish-load", () => {
     void replayHistory(attached)
       .catch(() => undefined)
-      .then(() => seedDefaultThread(attached, process.cwd(), devPrompt()))
+      .then((recent) => seedDefaultThread(attached, process.cwd(), devPrompt(), recent))
     scheduleDevShot(win)
   })
   app.on("before-quit", () => {

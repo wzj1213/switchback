@@ -74,6 +74,8 @@ class ClaudeSession implements EngineSession {
       // 强转放这里而不放 subprocess.ts：`SpawnedProcess` 是 Claude SDK 的要求，
       // 进程所有权模块是各引擎共用的，不该反过来迁就某一家的类型。
       spawnClaudeCodeProcess: (o) => this.owner.spawn(o) as unknown as SpawnedProcess,
+      // 带句柄就接着上次的会话跑；SDK 会把那次的历史加载回来
+      ...(this.req.resume === undefined ? {} : { resume: this.req.resume }),
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
     }
     this.handle = query({ prompt: this.input, options })

@@ -169,15 +169,25 @@ class CodexSession implements EngineSession {
     this.wire(child)
 
     await this.handshake()
-    const started = await this.rpc.call("thread/start", {
-      cwd: this.req.cwd,
-      approvalPolicy: POLICY,
-      sandbox: this.state.sandbox,
-    })
+    const started = await this.openThread()
     const id = (started as { thread?: { id?: string } } | undefined)?.thread?.id
     if (id === undefined) throw new Error("codex 没有返回 thread id，无法继续")
     this.state.codexThread = id
+    // codex 的 thread id 就是它的会话句柄——落盘之后下次能凭它续跑
+    this.req.onHandle?.(id)
     this.status("ready")
+  }
+
+  /**
+   * 开会话。带句柄就续跑，不带就新开。
+   *
+   * 续跑失败（历史被清、版本不兼容）**不能静默降级成新会话**——那样用户会以为
+   * 上下文还在，实际模型什么都不记得。宁可把失败摆出来。
+   */
+  private async openThread(): Promise<unknown> {
+    const shared = { approvalPolicy: POLICY, sandbox: this.state.sandbox, cwd: this.req.cwd }
+    if (this.req.resume === undefined) return this.rpc.call("thread/start", shared)
+    return this.rpc.call("thread/resume", { threadId: this.req.resume, ...shared })
   }
 
   /**

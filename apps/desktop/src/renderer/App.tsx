@@ -141,6 +141,9 @@ export function App(): React.JSX.Element {
           onSend={(text) => {
             send({ type: "thread.prompt", threadId: thread.id, text })
           }}
+          onResume={() => {
+            send({ type: "thread.resume", threadId: thread.id })
+          }}
         />
       </main>
     </div>

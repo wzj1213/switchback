@@ -7,6 +7,8 @@ export type Command =
   | { type: "thread.prompt"; threadId: ThreadId; text: string; attachments?: readonly string[] }
   | { type: "thread.interrupt"; threadId: ThreadId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
+  /** 让一个从磁盘回放出来的会话重新接上引擎，带着引擎那边的历史继续。 */
+  | { type: "thread.resume"; threadId: ThreadId }
   /** L2 接力：换引擎继续同一个 thread，宿主负责生成交接包。 */
   | { type: "thread.handoff"; threadId: ThreadId; to: EngineId }
   | { type: "approval.resolve"; itemId: ItemId; allow: boolean; remember: RememberScope }

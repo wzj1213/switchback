@@ -26,6 +26,13 @@ export interface Thread {
    * 界面必须说清楚，不能让人对着一个能打字却答非所问的输入框发懵。
    */
   detached?: boolean
+  /**
+   * 引擎自己的会话句柄，用于续跑。
+   *
+   * 各家格式不同（codex 是它自己的 thread id，Claude 是 SDK 的 session id），
+   * **omni 只负责原样存取，不解释它**。没有句柄的会话恢复出来只能读。
+   */
+  engineHandle?: string
   meta?: Record<string, unknown>
 }
 

@@ -17,6 +17,8 @@ interface RawMessage {
   is_error?: boolean
   message?: { content?: unknown }
   usage?: RawUsage
+  /** SDK 的会话 id。续跑要靠它，而它**只在 `system/init` 里到达**，比 start() 晚。 */
+  session_id?: string
 }
 
 const num = (v: unknown): number => (typeof v === "number" ? v : 0)
@@ -118,6 +120,7 @@ function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
       return
     case "system":
       if (msg.subtype === "init") {
+        if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
         req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
       }
       return

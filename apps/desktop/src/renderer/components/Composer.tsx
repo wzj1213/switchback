@@ -22,6 +22,8 @@ interface Props {
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   onSend: (text: string) => void
+  /** 让这个历史会话重新接上引擎 */
+  onResume: () => void
 }
 
 export function Composer({
@@ -31,6 +33,7 @@ export function Composer({
   onEngineChange,
   onTrustChange,
   onSend,
+  onResume,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
   const submit = (): void => {
@@ -48,9 +51,7 @@ export function Composer({
           disabled={detached}
           // 输入框直接说清为什么用不了。留一个能打字却答非所问的框，
           // 比把它关掉糟得多
-          placeholder={
-            detached ? "这是重启前的历史记录，引擎那边已经没有这段对话的记忆——请新建会话继续。" : "交代任务…"
-          }
+          placeholder={detached ? "这是重启前的历史记录。点右侧「继续」把引擎接回来。" : "交代任务…"}
           value={text}
           onChange={(e) => {
             setText(e.target.value)
@@ -66,6 +67,7 @@ export function Composer({
         <div className="composer__bar">
           <select
             className="select"
+            disabled={detached}
             value={engine}
             onChange={(e) => {
               onEngineChange(e.target.value)
@@ -79,6 +81,7 @@ export function Composer({
           </select>
           <select
             className="select"
+            disabled={detached}
             value={trust}
             onChange={(e) => {
               onTrustChange(e.target.value as Trust)
@@ -91,9 +94,15 @@ export function Composer({
             ))}
           </select>
           <span style={{ flex: 1 }} />
-          <button className="btn btn--primary" type="button" onClick={submit}>
-            发送
-          </button>
+          {detached ? (
+            <button className="btn btn--primary" type="button" onClick={onResume}>
+              继续这个会话
+            </button>
+          ) : (
+            <button className="btn btn--primary" type="button" onClick={submit}>
+              发送
+            </button>
+          )}
         </div>
       </div>
     </div>

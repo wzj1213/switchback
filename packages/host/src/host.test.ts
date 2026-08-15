@@ -9,6 +9,10 @@ interface Fake {
   ask: (a: ApprovalAsk) => Promise<ApprovalAnswer>
   /** 驱动侧的出口。测试用它冒充引擎发事件，走宿主包装过的那条路。 */
   emit: (e: Event) => void
+  /** 宿主传下来的续跑句柄。没传就是新会话。 */
+  resume: string | undefined
+  /** 驱动上报自己的会话句柄 */
+  report: (handle: string) => void
 }
 
 function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
@@ -16,7 +20,14 @@ function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
   const driver: EngineDriver = {
     id: "fake",
     start: (req) => {
-      const fake: Fake = { prompts: [], disposed: false, ask: req.askUser, emit: req.emit }
+      const fake: Fake = {
+        prompts: [],
+        disposed: false,
+        ask: req.askUser,
+        emit: req.emit,
+        resume: req.resume,
+        report: (handle) => req.onHandle?.(handle),
+      }
       holder.fake = fake
       const session: EngineSession = {
         threadId: req.threadId,
@@ -184,5 +195,150 @@ describe("host", () => {
     await expect(host.dispatch({ type: "thread.handoff", threadId, to: "codex" })).rejects.toThrow(
       "尚未实现",
     )
+  })
+})
+
+describe("续跑", () => {
+  const setupWithJournal = (): {
+    host: Host
+    events: Event[]
+    session: () => Fake
+    stored: Event[]
+  } => {
+    const stored: Event[] = []
+    const { driver, session } = fakeDriver()
+    const events: Event[] = []
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers: { fake: driver },
+      home: "/home/dev",
+      emit: (e) => events.push(e),
+      newId: (prefix) => {
+        counter.n += 1
+        return `${prefix}-${String(counter.n)}`
+      },
+      now: () => 0,
+      journal: {
+        append: (_id, e) => {
+          stored.push(e)
+          return Promise.resolve()
+        },
+        read: () => Promise.resolve(stored),
+        list: () => Promise.resolve([]),
+      },
+    })
+    return { host, events, session, stored }
+  }
+
+  it("驱动上报的句柄走 thread.updated 落盘——续跑要的东西必须和历史存在同一个地方", async () => {
+    const { host, events, session, stored } = setupWithJournal()
+    await host.dispatch(create)
+    session().report("codex-thread-abc")
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.engineHandle : "").toBe("codex-thread-abc")
+    expect(stored.some((e) => e.type === "thread.updated" && e.thread.engineHandle === "codex-thread-abc")).toBe(true)
+  })
+
+  it("**在会话登记完成之前**到达的句柄也不能丢——codex 在 start() 里就知道自己的 id", async () => {
+    const stored: Event[] = []
+    const events: Event[] = []
+    const holder: { report: ((h: string) => void) | undefined } = { report: undefined }
+    const driver: EngineDriver = {
+      id: "fake",
+      start: (req) => {
+        // 冒充 codex：还没返回 session 就先上报句柄
+        req.onHandle?.("early-handle")
+        holder.report = (h) => req.onHandle?.(h)
+        return Promise.resolve({
+          threadId: req.threadId,
+          prompt: () => Promise.resolve(),
+          interrupt: () => Promise.resolve(),
+          setTrust: () => Promise.resolve(),
+          dispose: () => Promise.resolve(),
+        })
+      },
+    }
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers: { fake: driver },
+      home: "/h",
+      emit: (e) => events.push(e),
+      newId: (p) => {
+        counter.n += 1
+        return `${p}-${String(counter.n)}`
+      },
+      now: () => 0,
+      journal: {
+        append: (_id, e) => {
+          stored.push(e)
+          return Promise.resolve()
+        },
+        read: () => Promise.resolve(stored),
+        list: () => Promise.resolve([]),
+      },
+    })
+    await host.dispatch(create)
+    const last = events.at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.engineHandle : "").toBe("early-handle")
+    // 顺序必须是 started → updated，反过来落盘里就成了「先更新后创建」
+    expect(events.map((e) => e.type)).toEqual(["thread.started", "thread.updated"])
+  })
+
+  it("同一个句柄不重复发事件", async () => {
+    const { host, events, session } = setupWithJournal()
+    await host.dispatch(create)
+    session().report("h")
+    session().report("h")
+    expect(events.filter((e) => e.type === "thread.updated")).toHaveLength(1)
+  })
+
+  it("续跑把句柄交给驱动，并把 detached 摘掉", async () => {
+    const { host, events, session } = setupWithJournal()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    session().report("h-1")
+    await host.dispose()
+
+    const revived = setupWithJournal()
+    // 冒充「上次留下的历史」：把刚才那条带句柄的记录塞进去
+    revived.stored.push(...events.filter((e) => e.type === "thread.updated"))
+    await revived.host.dispatch({ type: "thread.resume", threadId })
+    expect(revived.session().resume).toBe("h-1")
+    const last = revived.events.at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.detached : true).toBe(false)
+  })
+
+  it("没有句柄就拒绝续跑——起一个全新会话却看着像接上了，是最坏的结果", async () => {
+    const { host, stored } = setupWithJournal()
+    stored.push({
+      type: "thread.started",
+      at: 0,
+      thread: {
+        id: "th-x",
+        title: "旧",
+        cwd: "/w",
+        engine: "fake",
+        trust: "auto-edit",
+        status: "idle",
+        createdAt: 0,
+        updatedAt: 0,
+        engineHistory: ["fake"],
+      },
+    })
+    await expect(host.dispatch({ type: "thread.resume", threadId: "th-x" })).rejects.toThrow("句柄")
+  })
+
+  it("历史里没有这个会话就报错，不静默新建", async () => {
+    const { host } = setupWithJournal()
+    await expect(host.dispatch({ type: "thread.resume", threadId: "unknown" })).rejects.toThrow("找不到")
+  })
+
+  it("已经活着的会话再点续跑是无操作", async () => {
+    const { host, events } = setupWithJournal()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    const before = events.length
+    await host.dispatch({ type: "thread.resume", threadId })
+    expect(events).toHaveLength(before)
   })
 })

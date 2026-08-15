@@ -10,6 +10,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_PROMPT` | 默认会话建好后自动发这条提示词 |
  * | `OMNI_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
  * | `OMNI_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
+ * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -33,6 +34,11 @@ const TRUSTS = new Set<Trust>(["read-only", "auto-edit", "full"])
 export function devTrust(): Trust {
   const value = process.env["OMNI_DEV_TRUST"]
   return value !== undefined && TRUSTS.has(value as Trust) ? (value as Trust) : "auto-edit"
+}
+
+/** 续跑只能靠点按钮触发，自动化验证需要一个口子。 */
+export function devResume(): boolean {
+  return process.env["OMNI_DEV_RESUME"] === "1"
 }
 
 export function scheduleDevShot(win: BrowserWindow): void {

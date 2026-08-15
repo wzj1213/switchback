@@ -138,26 +138,90 @@ function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadI
   }
 }
 
-async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>): Promise<void> {
-  const driver = ctx.deps.drivers[cmd.engine]
-  if (driver === undefined) throw new Error(`未注册的引擎：${cmd.engine}`)
-  const id = ctx.deps.newId("th")
+/**
+ * 记下引擎那边的会话句柄。
+ *
+ * 走 `thread.updated` 而不是私存一份：那样它才会跟着事件流落盘，
+ * 下次启动读回来就在 `Thread` 上——**续跑需要的东西必须和历史存在同一个地方**，
+ * 否则总有一天会出现「历史在但句柄丢了」。
+ */
+function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
+  const entry = ctx.live.get(id)
+  if (entry === undefined || entry.thread.engineHandle === handle) return
   const at = ctx.deps.now()
-  const thread = newThread(cmd, id, at)
+  entry.thread = { ...entry.thread, engineHandle: handle, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/**
+ * 起一个引擎会话并登记。`resume` 有值就是续跑。
+ *
+ * 返回**在登记完成之前就到达的句柄**。codex 在 `start()` 里就知道自己的 thread id，
+ * 那时候 `ctx.live` 还没有这条会话，`rememberHandle` 会扑空——
+ * 这个洞第一次跑真实会话才现形（落盘里根本没有 `engineHandle`）。
+ * 交给调用方在发完自己的事件之后补上，顺序才是「started → updated」。
+ */
+async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string | undefined> {
+  const driver = ctx.deps.drivers[thread.engine]
+  if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
   const memory: readonly Rule[] = []
+  const early: { handle: string | undefined } = { handle: undefined }
   const session = await driver.start({
-    threadId: id,
-    cwd: cmd.cwd,
-    trust: cmd.trust,
+    threadId: thread.id,
+    cwd: thread.cwd,
+    trust: thread.trust,
     home: ctx.deps.home,
     memory,
     emit: (event) => {
       emit(ctx, event)
     },
-    askUser: (ask) => askUser(ctx, id, ask),
+    askUser: (ask) => askUser(ctx, thread.id, ask),
+    onHandle: (handle) => {
+      if (ctx.live.has(thread.id)) rememberHandle(ctx, thread.id, handle)
+      else early.handle = handle
+    },
+    ...(resume === undefined ? {} : { resume }),
   })
-  ctx.live.set(id, { thread, session, gate: createGate((e) => { emit(ctx, e) }), turn: undefined })
+  const gate = createGate((e) => {
+    emit(ctx, e)
+  })
+  ctx.live.set(thread.id, { thread, session, gate, turn: undefined })
+  return early.handle
+}
+
+async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>): Promise<void> {
+  const at = ctx.deps.now()
+  const thread = newThread(cmd, ctx.deps.newId("th"), at)
+  const early = await launch(ctx, thread)
   emit(ctx, { type: "thread.started", at, thread })
+  if (early !== undefined) rememberHandle(ctx, thread.id, early)
+}
+
+/**
+ * 让一个从磁盘回放出来的会话重新接上引擎。
+ *
+ * 会话记录只在渲染层（回放不经过宿主），所以这里要**自己从日志里把它读回来**。
+ * 没有句柄就不给续——那种情况下起的是个全新会话，模型对上面那段对话一无所知，
+ * 而界面看起来像是接上了。**宁可报错也不要制造这种错觉。**
+ */
+async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.resume" }>): Promise<void> {
+  if (ctx.live.has(cmd.threadId)) return
+  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
+  const record = [...events]
+    .reverse()
+    .find((e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
+      e.type === "thread.started" || e.type === "thread.updated",
+    )
+  if (record === undefined) throw new Error(`找不到会话 ${cmd.threadId} 的历史，无法续跑`)
+  const handle = record.thread.engineHandle
+  if (handle === undefined) {
+    throw new Error("这个会话没有留下引擎侧的句柄（可能是旧版本记录），只能新建会话继续")
+  }
+  const at = ctx.deps.now()
+  const thread: Thread = { ...record.thread, detached: false, status: "idle", updatedAt: at }
+  const early = await launch(ctx, thread, handle)
+  emit(ctx, { type: "thread.updated", at, thread })
+  if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 
 async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
@@ -210,6 +274,8 @@ async function dispatch(ctx: Ctx, command: Command): Promise<void> {
       return prompt(ctx, command)
     case "thread.setTrust":
       return setTrust(ctx, command)
+    case "thread.resume":
+      return resume(ctx, command)
     case "thread.interrupt":
       return ctx.live.get(command.threadId)?.session.interrupt() ?? Promise.resolve()
     case "approval.resolve":

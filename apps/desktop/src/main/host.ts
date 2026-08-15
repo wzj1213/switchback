@@ -6,7 +6,7 @@ import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal } from "@omni/journal"
-import { devEngine, devTrust } from "./devtools.js"
+import { devEngine, devResume, devTrust } from "./devtools.js"
 
 export interface Attached {
   host: Host
@@ -92,7 +92,7 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
  * 回放出来的会话最后补一条 `detached: true`，界面据此把输入框关掉——
  * 一个能打字却答非所问的输入框比没有输入框糟得多。
  */
-export async function replayHistory(attached: Attached): Promise<void> {
+export async function replayHistory(attached: Attached): Promise<ThreadId | undefined> {
   const ids = await attached.journal.list()
   for (const id of ids) {
     const events = await attached.journal.read(id)
@@ -106,6 +106,7 @@ export async function replayHistory(attached: Attached): Promise<void> {
       thread: { ...last.thread, status: "idle", detached: true },
     })
   }
+  return ids[0]
 }
 
 /**
@@ -116,14 +117,22 @@ export async function seedDefaultThread(
   attached: Attached,
   cwd: string,
   prompt?: string,
+  resumeId?: ThreadId,
 ): Promise<void> {
   try {
-    await seed(attached, cwd, prompt)
+    if (resumeId !== undefined && devResume()) await resumeInto(attached, resumeId, prompt)
+    else await seed(attached, cwd, prompt)
   } catch (error) {
     // 引擎起不来是最常见的开箱故障（没装、没登录、版本不对），
     // 它必须变成界面上的一条横幅，而不是一条没人看的未处理拒绝
     attached.report(error)
   }
+}
+
+/** 开发钩子：续跑磁盘上最近那个会话，再往里发一句话。 */
+async function resumeInto(attached: Attached, threadId: ThreadId, prompt?: string): Promise<void> {
+  await attached.host.dispatch({ type: "thread.resume", threadId })
+  if (prompt !== undefined) await attached.host.dispatch({ type: "thread.prompt", threadId, text: prompt })
 }
 
 async function seed(attached: Attached, cwd: string, prompt?: string): Promise<void> {
