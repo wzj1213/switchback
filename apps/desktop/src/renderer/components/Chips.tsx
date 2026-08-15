@@ -14,13 +14,24 @@ import { BranchIcon, FolderIcon } from "./icons.js"
  * 出问题时 `git diff` 里两个人的改动混在一起，分不出哪些是它做的。
  * 所以脏的时候那枚芯片标黄——不是报错，是提醒。
  *
- * ## 为什么每次切会话都重新问一遍
+ * ## 什么时候重新问
  *
- * 分支和脏不脏**随时会变**（用户在终端里切了分支）。缓存的代价是界面显示
- * 一个过期的分支名，而一个过期的分支名比不显示更危险。
+ * 切会话时，**以及每一轮开始和结束时**。分支会被用户在终端里改掉，
+ * 而「脏不脏」更是引擎自己每改一个文件就变一次——第一版只在切会话时问一遍，
+ * 于是它跑完一轮改了三个文件，芯片还显示着「干净」。
+ * 一个过期的状态比不显示更危险，这条对分支和脏都成立。
  */
 
-export function Chips({ cwd, project }: { cwd: string; project: string }): React.JSX.Element {
+export function Chips({
+  cwd,
+  project,
+  stamp,
+}: {
+  cwd: string
+  project: string
+  /** 变一次就重新问一遍。调用方把轮次状态传进来。 */
+  stamp: string
+}): React.JSX.Element {
   const [git, setGit] = useState<{ branch?: string; dirty?: boolean }>({})
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
@@ -34,7 +45,7 @@ export function Chips({ cwd, project }: { cwd: string; project: string }): React
     return () => {
       live = false
     }
-  }, [bridge, cwd])
+  }, [bridge, cwd, stamp])
 
   return (
     <div className="chips">

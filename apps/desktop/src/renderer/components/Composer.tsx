@@ -33,6 +33,8 @@ interface Props {
   onModelChange: (model: string, effort?: string) => void
   /** 工作区绝对路径，`@` 文件引用要用 */
   cwd: string
+  /** 轮次状态。变一次芯片就重新问一遍 git——引擎改完文件之后「脏不脏」就变了。 */
+  stamp: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
@@ -55,6 +57,7 @@ export function Composer({
   effort,
   onModelChange,
   cwd,
+  stamp,
   searchFiles,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
@@ -68,7 +71,7 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer__inner">
-        {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} />}
+        {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} stamp={stamp} />}
         <Prompt
           value={text}
           detached={detached}

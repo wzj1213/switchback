@@ -146,6 +146,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         detached={thread.detached === true}
         engines={props.engines}
         cwd={thread.cwd}
+        // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
+        stamp={props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`}
         searchFiles={props.searchFiles}
         models={props.models}
         model={thread.model}
