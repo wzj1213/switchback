@@ -4,8 +4,11 @@ const DOT_CLASS: Record<ThreadStatus, string> = {
   idle: "",
   running: " thread__dot--running",
   waiting_approval: " thread__dot--waiting",
-  failed: "",
+  failed: " thread__dot--failed",
 }
+
+/** 光靠颜色说不清"要你去做什么"，等待批准这一档补一句字。 */
+const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批" }
 
 interface Props {
   threads: readonly Thread[]
@@ -35,6 +38,9 @@ export function Sidebar({ threads, selectedId, onSelect }: Props): React.JSX.Ele
           >
             <span className={`thread__dot${DOT_CLASS[thread.status]}`} />
             <span className="thread__label">{thread.title}</span>
+            {NOTE[thread.status] === undefined ? null : (
+              <span className="thread__note">{NOTE[thread.status]}</span>
+            )}
           </button>
         ))}
       </div>

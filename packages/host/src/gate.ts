@@ -26,7 +26,7 @@ interface Pending {
   item: ApprovalItem
 }
 
-const DENIED: ApprovalAnswer = { allow: false, remember: false }
+const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
 
 function card(req: OpenRequest, status: ApprovalItem["status"]): ApprovalItem {
   return {

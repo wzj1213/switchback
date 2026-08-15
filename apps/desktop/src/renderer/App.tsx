@@ -1,10 +1,11 @@
 import { useState } from "react"
 import type { Thread } from "@omni/protocol"
-import { itemsOf, threadsOf } from "@omni/store"
+import { itemsOf, threadsOf, turnOf } from "@omni/store"
 import { ItemView } from "./components/ItemView.js"
 import { Sidebar } from "./components/Sidebar.js"
 import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
 import { ToolRun } from "./components/ToolRun.js"
+import { TurnStatus } from "./components/TurnStatus.js"
 import { groupRows } from "./group.js"
 import { useOmni } from "./useOmni.js"
 import { useStickToBottom } from "./useStickToBottom.js"
@@ -47,7 +48,8 @@ export function App(): React.JSX.Element {
   const threads = threadsOf(state)
   const thread = threads.find((t) => t.id === selectedId) ?? threads[0]
   const items = thread === undefined ? [] : itemsOf(state, thread.id)
-  const scroller = useStickToBottom<HTMLDivElement>(items.length)
+  const turn = thread === undefined ? undefined : turnOf(state, thread.id)
+  const scroller = useStickToBottom<HTMLDivElement>(items.length + (turn === undefined ? 0 : 1))
 
   if (thread === undefined) {
     return (
@@ -82,16 +84,19 @@ export function App(): React.JSX.Element {
                   key={row.item.id}
                   item={row.item}
                   onResolve={(itemId, allow, remember) => {
-                    send({
-                      type: "approval.resolve",
-                      itemId,
-                      allow,
-                      remember: remember ? "project" : "once",
-                    })
+                    send({ type: "approval.resolve", itemId, allow, remember })
                   }}
                 />
               ),
             )}
+            <TurnStatus
+              thread={thread}
+              turn={turn}
+              items={items}
+              onInterrupt={() => {
+                send({ type: "thread.interrupt", threadId: thread.id })
+              }}
+            />
           </div>
         </div>
         <Composer

@@ -12,6 +12,9 @@ prompt 是宿主发出的，所以宿主知道一轮什么时候开始；引擎�
 - 会话注册表：thread id → 活着的 `EngineSession`
 - 审批闸（`gate.ts`）：把驱动的 `askUser` 变成一张 transcript 里的审批卡，
   等渲染层的 `approval.resolve` 命令来落定
+- **会话状态**（idle / running / waiting_approval / failed）。只有宿主同时看得见
+  「提示词发出」「审批挂起」「轮次收工」这三件事，所以状态归它改。
+  轮次收工是引擎直接发给渲染层的，宿主看不到——所以在传给驱动的 `emit` 上截了一道
 - 处置：`dispose()` 关掉全部会话，并把还挂着的审批**按拒绝 settle**
 
 ## 不拥有什么
@@ -24,8 +27,10 @@ prompt 是宿主发出的，所以宿主知道一轮什么时候开始；引擎�
 ## 已知限制
 
 - **不做背压**。`emit` 必须同步返回得比引擎产出快，否则事件在内存里堆积。
-- **进程回收只到 `session.dispose()` 为止**，而 Claude 驱动的 dispose 只有
-  `interrupt()` + `AbortController`，没有 SIGTERM→SIGKILL→整树退出证明的阶梯。
-  接第二个引擎前必须补，否则会泄漏引擎子进程。
 - 未接持久化：进程重启后会话全丢。
+- **`remember: "project"` 落不了地**。`RememberScope` 三档里，`once` 与 `session`
+  各家驱动都能表达（codex 的 `accept` / `acceptForSession`，Claude 的
+  `updatedPermissions`），但 `project` 需要把规则写盘并在下次开会话时读回来——
+  那是 `@omni/journal` 的事，还没有。所以界面上**只给了前两档**：
+  宁可少一个选项，也不要一个点了不生效的「始终允许」。
 - `thread.handoff`（跨引擎接力）尚未实现，命令会被拒绝。

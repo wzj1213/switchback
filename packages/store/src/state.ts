@@ -24,6 +24,11 @@ export function itemsOf(state: ViewState, threadId: ThreadId): readonly Item[] {
   return state.items[threadId] ?? []
 }
 
+/** 取一个会话当前未结束的轮次；没有就是 undefined（空闲）。 */
+export function turnOf(state: ViewState, threadId: ThreadId): Turn | undefined {
+  return state.turns[threadId]
+}
+
 export function threadsOf(state: ViewState): readonly Thread[] {
   return state.order
     .map((id) => state.threads[id])

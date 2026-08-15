@@ -7,6 +7,8 @@ interface Fake {
   prompts: { text: string; turnId: string }[]
   disposed: boolean
   ask: (a: ApprovalAsk) => Promise<ApprovalAnswer>
+  /** 驱动侧的出口。测试用它冒充引擎发事件，走宿主包装过的那条路。 */
+  emit: (e: Event) => void
 }
 
 function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
@@ -14,7 +16,7 @@ function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
   const driver: EngineDriver = {
     id: "fake",
     start: (req) => {
-      const fake: Fake = { prompts: [], disposed: false, ask: req.askUser }
+      const fake: Fake = { prompts: [], disposed: false, ask: req.askUser, emit: req.emit }
       holder.fake = fake
       const session: EngineSession = {
         threadId: req.threadId,
@@ -107,13 +109,13 @@ describe("host", () => {
       allow: true,
       remember: "session",
     })
-    await expect(answer).resolves.toEqual({ allow: true, remember: true })
+    await expect(answer).resolves.toEqual({ allow: true, remember: "session" })
 
     const settled = items(events).filter((i) => i.kind === "approval").at(-1)
     expect(settled?.kind === "approval" ? settled.status : "").toBe("allowed")
   })
 
-  it("remember:'once' 不落成记忆", async () => {
+  it("范围原样传到驱动——压成 boolean 就分不出「这一次」和「这轮对话」", async () => {
     const { host, events, session } = setup()
     await host.dispatch(create)
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
@@ -121,7 +123,7 @@ describe("host", () => {
     const answer = session().ask(ask)
     const card = items(events).find((i) => i.kind === "approval")
     await host.dispatch({ type: "approval.resolve", itemId: card?.id ?? "", allow: true, remember: "once" })
-    await expect(answer).resolves.toEqual({ allow: true, remember: false })
+    await expect(answer).resolves.toEqual({ allow: true, remember: "once" })
   })
 
   it("dispose 把挂着的审批按拒绝落定——否则驱动会永远卡在 canUseTool 里", async () => {
@@ -132,8 +134,42 @@ describe("host", () => {
     const answer = session().ask(ask)
 
     await host.dispose()
-    await expect(answer).resolves.toEqual({ allow: false, remember: false })
+    await expect(answer).resolves.toEqual({ allow: false, remember: "once" })
     expect(session().disposed).toBe(true)
+  })
+
+  it("会话状态走完整条链路：running → waiting_approval → running → idle", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    const statuses = (): string[] =>
+      events.filter((e) => e.type === "thread.updated").map((e) => e.thread.status)
+
+    await host.dispatch({ type: "thread.prompt", threadId, text: "hi" })
+    expect(statuses()).toEqual(["running"])
+
+    const answer = session().ask(ask)
+    expect(statuses()).toEqual(["running", "waiting_approval"])
+
+    const card = items(events).find((i) => i.kind === "approval")
+    await host.dispatch({ type: "approval.resolve", itemId: card?.id ?? "", allow: true, remember: "once" })
+    await answer
+    expect(statuses()).toEqual(["running", "waiting_approval", "running"])
+
+    const turnId = session().prompts[0]?.turnId ?? ""
+    session().emit({ type: "turn.completed", at: 0, turnId, status: "completed" })
+    expect(statuses()).toEqual(["running", "waiting_approval", "running", "idle"])
+  })
+
+  it("轮次失败时会话落 failed，不是静悄悄回到空闲", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "hi" })
+    const turnId = session().prompts[0]?.turnId ?? ""
+    session().emit({ type: "turn.completed", at: 0, turnId, status: "failed", error: "上游超时" })
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.status : "").toBe("failed")
   })
 
   it("未注册的引擎直接报错，不静默建一个坏会话", async () => {

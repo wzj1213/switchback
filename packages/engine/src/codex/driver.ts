@@ -192,7 +192,7 @@ class CodexSession implements EngineSession {
       reason: verdict.reason,
       ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe }),
     })
-    call.respond({ decision: decisionFor(answer.allow, answer.remember) })
+    call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
   }
 
   get threadId(): StartRequest["threadId"] {

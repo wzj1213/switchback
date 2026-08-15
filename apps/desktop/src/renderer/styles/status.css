@@ -1,0 +1,153 @@
+/*
+ * 运行态：微光状态行、计时器、快捷键提示、下拉菜单。
+ */
+
+/* ── 有节拍的微光 ────────────────────────────────────────
+ * 一刻不停的加载动画会持续抢注意力；这里是**隔一段扫一道**：
+ * 600ms 后起第一道，之后每 4s 一道，每道约 1s（占整条时间线的 25%）。
+ * 剩下的时间停在终点，所以看上去就是"扫一下，歇一会儿"。
+ * 持续的活着感由旁边那个每秒跳一次的计时器提供，微光不必抢这个活。
+ */
+.shimmer {
+  position: relative;
+  color: var(--text-muted);
+}
+
+.shimmer__sweep {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateX(-60%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 20% 30%, transparent 50% 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 20% 30%, transparent 50% 100%);
+  animation: shimmer-sweep 4s linear 600ms infinite;
+}
+
+/* 内层与外层反向等量位移：文字在屏幕上纹丝不动，动的只有那扇高亮窗口 */
+.shimmer__hi {
+  display: block;
+  width: 100%;
+  color: var(--text);
+  transform: translateX(60%);
+  animation: shimmer-hi 4s linear 600ms infinite;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-60%);
+    animation-timing-function: steps(24, end);
+  }
+  25%,
+  100% {
+    transform: translateX(140%);
+  }
+}
+
+@keyframes shimmer-hi {
+  0% {
+    transform: translateX(60%);
+    animation-timing-function: steps(24, end);
+  }
+  25%,
+  100% {
+    transform: translateX(-140%);
+  }
+}
+
+/* 减少动态效果：整条微光关掉，只留静态的次级色文字 */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer__sweep,
+  .shimmer__hi {
+    animation: none;
+  }
+
+  .shimmer__sweep {
+    display: none;
+  }
+}
+
+/* ── 状态行 ────────────────────────────────────────── */
+.turnstatus {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0 var(--sp-3);
+  font-size: var(--text-base);
+}
+
+/* 等宽数字：秒数跳动时整行不会左右抖 */
+.turnstatus__clock {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.turnstatus__stop {
+  margin-left: auto;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* 停止按钮平时藏起来：它是逃生口，不是常用操作，不该一直占视觉权重 */
+.turnstatus:hover .turnstatus__stop,
+.turnstatus__stop:focus-visible {
+  opacity: 1;
+}
+
+.turnstatus__stop:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ── 快捷键提示 ────────────────────────────────────── */
+.kbd {
+  margin-left: 6px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+  opacity: 0.75;
+}
+
+/* ── 下拉菜单 ──────────────────────────────────────── */
+.menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 10;
+  min-width: 200px;
+  padding: var(--sp-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.menu__item {
+  display: block;
+  width: 100%;
+  padding: 6px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.menu__item:hover {
+  background: var(--bg-hover);
+}

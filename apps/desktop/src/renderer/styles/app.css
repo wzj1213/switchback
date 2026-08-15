@@ -101,12 +101,42 @@ body {
   background: var(--text-faint);
 }
 
+/* 运行中的点会呼吸——侧栏是唯一能一眼看出"哪个会话还在跑"的地方 */
 .thread__dot--running {
   background: var(--ok);
+  animation: dot-breathe 1.8s ease-in-out infinite;
 }
 
 .thread__dot--waiting {
   background: var(--warn);
+}
+
+.thread__dot--failed {
+  background: var(--danger);
+}
+
+@keyframes dot-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread__dot--running {
+    animation: none;
+  }
+}
+
+/* 等待批准的会话在侧栏直接写出来：状态点的颜色说不清"要你去做什么" */
+.thread__note {
+  margin-left: auto;
+  flex: none;
+  color: var(--warn);
+  font-size: var(--text-xs);
 }
 
 .thread__label {

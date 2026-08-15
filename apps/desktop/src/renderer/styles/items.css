@@ -140,36 +140,95 @@
 
 /* ── 审批卡：整个产品的关键界面 ──────────────────────────── */
 .approval {
+  container-type: inline-size;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg-raised);
-  padding: var(--sp-3);
+}
+
+/*
+ * 正文可滚，**操作行在滚动区之外**。
+ * 模型给的命令和 diff 长度不受我们控制；不封顶的话，一条 200 行的补丁
+ * 会把「允许 / 拒绝」顶到屏幕外面去——那时候这张卡就没法用了。
+ */
+.approval__body {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
 }
 
 .approval__title {
   font-weight: 600;
-  margin-bottom: var(--sp-1);
+  margin-bottom: var(--sp-2);
+  overflow-wrap: anywhere;
+}
+
+.approval__detail {
+  display: flex;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+}
+
+/* 「原因」带标签：让人一眼分得清哪句是引擎要做的事、哪句是 omni 拦下来的理由 */
+.approval__label {
+  flex: none;
+  color: var(--text-faint);
 }
 
 .approval__reason {
   color: var(--text-muted);
-  font-size: var(--text-sm);
-  margin-bottom: var(--sp-3);
+  overflow-wrap: anywhere;
 }
 
 .approval__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
 }
 
-.approval__remember {
-  margin-left: auto;
+.approval__split {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
+}
+
+/* 分体按钮：主操作与下拉共用一个外轮廓，中间一道分隔线 */
+.approval__split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.approval__split-more {
+  margin-left: -1px;
+  padding-inline: 7px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-color: color-mix(in srgb, var(--text-inverse) 30%, transparent);
+}
+
+/*
+ * 卡片自己变窄时（不是视口变窄）按钮改成竖排并拉满。
+ * 用容器查询而不是媒体查询：这张卡活在一个宽度会变的栏里，
+ * 跟视口宽度没关系。
+ */
+@container (max-width: 380px) {
+  .approval__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .approval__split {
+    width: 100%;
+  }
+
+  .approval__split-main {
+    flex: 1;
+  }
+
+  .kbd {
+    display: none;
+  }
 }
 
 /* ── 按钮 ───────────────────────────────────────────── */

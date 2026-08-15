@@ -1,27 +1,6 @@
 import { useState } from "react"
-import type { ToolCallItem, ToolDetail } from "@omni/protocol"
-
-const VERB: Record<ToolDetail["kind"], string> = {
-  shell: "执行",
-  file_edit: "编辑",
-  file_read: "读取",
-  fetch: "请求",
-  other: "调用",
-}
-
-function target(detail: ToolDetail): string {
-  switch (detail.kind) {
-    case "shell":
-      return detail.command
-    case "file_edit":
-    case "file_read":
-      return detail.path
-    case "fetch":
-      return detail.url
-    case "other":
-      return detail.name
-  }
-}
+import type { ToolCallItem } from "@omni/protocol"
+import { VERB, target } from "../tool.js"
 
 /** 有内容可展开的才做成按钮；没有的渲染成静态行，避免出现点了没反应的元素。 */
 function body(item: ToolCallItem): string | undefined {

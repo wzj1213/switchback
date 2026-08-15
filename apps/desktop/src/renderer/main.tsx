@@ -4,6 +4,7 @@ import { App } from "./App.js"
 import "./styles/app.css"
 import "./styles/items.css"
 import "./styles/markdown.css"
+import "./styles/status.css"
 
 const root = document.getElementById("root")
 if (root === null) throw new Error("找不到 #root 挂载点")

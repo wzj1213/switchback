@@ -22,6 +22,56 @@ const external = [
   ...builtinModules.map((m) => `node:${m}`),
 ]
 
+/**
+ * 进 `vendor` 块的包名，**按 npm 包名精确列举**。
+ *
+ * 收的是「又大又几乎不动」的渲染管线——Markdown 那一串解析器。
+ * 只有工作区代码**直接 import** 的包需要列：它们私有的传递依赖
+ * （字符表、各种 util）只被这些包引用，rollup 的块着色会自动跟着进来。
+ *
+ * 为什么值得分：接 react-markdown 之后渲染层从 504 KB 涨到 1,066 KB，
+ * 全都挤在一个块里——**改一行界面代码，整整 1 MB 的哈希全变**，
+ * 用户每次更新都要重下。拆开之后改界面只重下 index，vendor 命中缓存。
+ *
+ * ⚠️ **成员必须与 React 无关。** rollup 会把「入口与手工块共享的模块」
+ * 折进手工块里；只要有一个成员 import 了 react，那份唯一的 react 就会被
+ * 拖进 vendor，两个块都得重下，白拆。这条规则借自 dsh 的 apps/web。
+ */
+const VENDOR: ReadonlySet<string> = new Set([
+  "react-markdown",
+  "remark-gfm",
+  "remark-parse",
+  "remark-rehype",
+  "rehype-react",
+  "unified",
+  "mdast-util-from-markdown",
+  "mdast-util-gfm",
+  "mdast-util-to-hast",
+  "micromark",
+  "micromark-core-commonmark",
+  "micromark-extension-gfm",
+])
+
+/**
+ * 解析出模块所属的 npm 包名：最后一个 `node_modules/` 之后的那一段。
+ * pnpm 会把真实包再嵌一层 node_modules，所以取最后一段而不是第一段；
+ * `.pnpm` 那种以点开头的是仓库目录，不是包。
+ */
+function npmPackageOf(id: string): string | undefined {
+  const parts = id.split("/node_modules/")
+  if (parts.length === 1) return undefined
+  const [first, second] = (parts[parts.length - 1] ?? "").split("/")
+  if (first === undefined || first.startsWith(".")) return undefined
+  if (first.startsWith("@")) return second === undefined ? undefined : `${first}/${second}`
+  return first
+}
+
+/** 前缀命中也算：micromark-util-* / mdast-util-* 有几十个小包，逐个列没有意义。 */
+function inVendor(pkg: string): boolean {
+  if (VENDOR.has(pkg)) return true
+  return ["micromark-", "mdast-util-", "unist-util-", "hast-util-"].some((p) => pkg.startsWith(p))
+}
+
 export default defineConfig({
   main: {
     build: { rollupOptions: { input: resolve(here, "src/main/index.ts"), external } },
@@ -32,6 +82,17 @@ export default defineConfig({
   renderer: {
     root: resolve(here, "src/renderer"),
     plugins: [react()],
-    build: { rollupOptions: { input: resolve(here, "src/renderer/index.html") } },
+    build: {
+      rollupOptions: {
+        input: resolve(here, "src/renderer/index.html"),
+        output: {
+          manualChunks: (id: string): string | undefined => {
+            const pkg = npmPackageOf(id)
+            // 工作区代码与 react 一族留在默认的 index 块
+            return pkg !== undefined && inVendor(pkg) ? "vendor" : undefined
+          },
+        },
+      },
+    },
   },
 })

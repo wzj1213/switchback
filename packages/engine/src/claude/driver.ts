@@ -108,7 +108,8 @@ class ClaudeSession implements EngineSession {
       reason: verdict.reason,
       ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe }),
     })
-    return answer.allow ? toAllow(answer.remember, meta) : toDeny("用户拒绝了这次调用")
+    // `once` 只放行这一次；其余范围回传 SDK 的 suggestions，走它原生的「本会话不再问」
+    return answer.allow ? toAllow(answer.remember !== "once", meta) : toDeny("用户拒绝了这次调用")
   }
 
   get threadId(): StartRequest["threadId"] {

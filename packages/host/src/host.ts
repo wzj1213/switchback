@@ -1,4 +1,4 @@
-import type { Command, EngineId, Event, ThreadId, Thread, TurnId } from "@omni/protocol"
+import type { Command, EngineId, Event, ThreadId, Thread, ThreadStatus, TurnId } from "@omni/protocol"
 import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
 import type { Rule } from "@omni/approval"
 import { createGate, type Gate } from "./gate.js"
@@ -31,19 +31,51 @@ interface Ctx {
   live: Map<ThreadId, Live>
 }
 
-const DENIED: ApprovalAnswer = { allow: false, remember: false }
+const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
 
-function makeAskUser(ctx: Ctx, id: ThreadId): (ask: ApprovalAsk) => Promise<ApprovalAnswer> {
-  return (ask) => {
-    const entry = ctx.live.get(id)
-    // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
-    if (entry === undefined || entry.turn === undefined) return Promise.resolve(DENIED)
-    return entry.gate.open({
+/**
+ * 会话状态的唯一改写口。
+ *
+ * 状态一直挂在 `Thread` 上却从来没人改过，于是侧栏那个状态点永远是灰的、
+ * 界面上也无从判断「它到底在不在跑」。**状态归宿主**——只有宿主同时看得见
+ * 提示词发出、审批挂起、轮次收工这三件事。
+ */
+function setStatus(ctx: Ctx, entry: Live, status: ThreadStatus): void {
+  if (entry.thread.status === status) return
+  const at = ctx.deps.now()
+  entry.thread = { ...entry.thread, status, updatedAt: at }
+  ctx.deps.emit({ type: "thread.updated", at, thread: entry.thread })
+}
+
+/**
+ * 引擎事件的旁路观察。轮次收工只有引擎知道，事件是直接发给渲染层的，
+ * 宿主看不见——所以在这里截一道，把会话状态收回 idle。
+ */
+function observe(ctx: Ctx, event: Event): void {
+  if (event.type !== "turn.completed") return
+  for (const entry of ctx.live.values()) {
+    if (entry.turn !== event.turnId) continue
+    entry.turn = undefined
+    setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
+    return
+  }
+}
+
+async function askUser(ctx: Ctx, id: ThreadId, ask: ApprovalAsk): Promise<ApprovalAnswer> {
+  const entry = ctx.live.get(id)
+  // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
+  if (entry === undefined || entry.turn === undefined) return DENIED
+  setStatus(ctx, entry, "waiting_approval")
+  try {
+    return await entry.gate.open({
       ask,
       turnId: entry.turn,
       at: ctx.deps.now(),
       itemId: ctx.deps.newId("ap"),
     })
+  } finally {
+    // 无论批还是拒都回到运行中——轮次还没结束，引擎接着往下跑
+    if (entry.thread.status === "waiting_approval") setStatus(ctx, entry, "running")
   }
 }
 
@@ -74,8 +106,13 @@ async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>
     trust: cmd.trust,
     home: ctx.deps.home,
     memory,
-    emit: ctx.deps.emit,
-    askUser: makeAskUser(ctx, id),
+    // 先原样转发再观察：渲染层拿到的顺序是「turn.completed → thread.updated」，
+    // 因果读起来是顺的
+    emit: (event) => {
+      ctx.deps.emit(event)
+      observe(ctx, event)
+    },
+    askUser: (ask) => askUser(ctx, id, ask),
   })
   ctx.live.set(id, { thread, session, gate: createGate(ctx.deps.emit), turn: undefined })
   ctx.deps.emit({ type: "thread.started", at, thread })
@@ -94,6 +131,7 @@ async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>
     status: "running" as const,
     startedAt: at,
   }
+  setStatus(ctx, entry, "running")
   ctx.deps.emit({ type: "turn.started", at, turn })
   ctx.deps.emit({
     type: "item.started",
@@ -115,10 +153,9 @@ async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust
 /** 审批卡 id 全局唯一，所以挨个会话问一遍即可；命中就停。 */
 function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resolve" }>): void {
   for (const entry of ctx.live.values()) {
-    const hit = entry.gate.resolve(cmd.itemId, {
-      allow: cmd.allow,
-      remember: cmd.remember !== "once",
-    })
+    // 范围原样往下传：以前这里压成 boolean，engine 就再也分不出
+    // 「这一次」和「这轮对话」了
+    const hit = entry.gate.resolve(cmd.itemId, { allow: cmd.allow, remember: cmd.remember })
     if (hit) return
   }
 }

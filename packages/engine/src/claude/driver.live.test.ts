@@ -39,7 +39,7 @@ async function run(prompt: string, answer: boolean, isolate: boolean): Promise<R
     emit: (e) => events.push(e),
     askUser: (ask) => {
       asks.push(ask)
-      return Promise.resolve({ allow: answer, remember: false })
+      return Promise.resolve({ allow: answer, remember: "once" as const })
     },
   })
   // 轮次由宿主铸造——live test 里我们扮演宿主

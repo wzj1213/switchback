@@ -1,4 +1,4 @@
-import type { EngineId, Event, ItemId, ThreadId, TurnId, Trust } from "@omni/protocol"
+import type { EngineId, Event, ItemId, RememberScope, ThreadId, TurnId, Trust } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 
 /** 需要人工裁决时递给宿主的东西。文本字段可能来自引擎，渲染前必须转义。 */
@@ -10,14 +10,21 @@ export interface ApprovalAsk {
   summary: string
   /** 判定器给出的升级理由 */
   reason: string
-  /** 若用户勾选「不再询问」，可记忆成什么 */
+  /** 可记忆成什么，用作「允许此对话」那一项的标签。没有就用默认文案。 */
   rememberHint?: string
 }
 
 export interface ApprovalAnswer {
   allow: boolean
-  /** 用户勾了「不再询问」 */
-  remember: boolean
+  /**
+   * 记住到什么范围。
+   *
+   * 以前这里是个 boolean，界面上表现为一个「本项目不再询问」的勾选框——
+   * 但 boolean 表达不了 codex 那套 accept / acceptForSession 的区分，
+   * 也表达不了「这次放行」和「这轮对话都放行」的差别，于是三种意图被压成两种。
+   * 现在与 `Command.remember` 同型，各家驱动自己决定怎么落到原生语义上。
+   */
+  remember: RememberScope
 }
 
 export interface StartRequest {
