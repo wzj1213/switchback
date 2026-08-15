@@ -12,10 +12,24 @@ concurrency:
 
 jobs:
   check:
-    # macOS 而不是 ubuntu：进程回收阶梯依赖 `kill(-pid, 0)` 的进程组语义，
-    # 而这个产品的目标平台就是 macOS。在 Linux 上跑绿了不说明在这儿也绿。
-    runs-on: macos-latest
-    timeout-minutes: 15
+    # **三个平台都跑，但地位不一样。**
+    #
+    # macOS 是目标平台，它必须绿。Linux 与 Windows 跑的是**防坏死**：
+    # `@omni/engine/platform.ts` 里的进程树回收与命令查找各平台各一套，
+    # 而我手上只有 macOS——那两支代码在本机永远不会执行，
+    # 没有 CI 的话，它们从写下的那一刻起就在慢慢腐烂，而没有人会知道。
+    #
+    # 跑的是真东西不是形式：`subprocess.test.ts` 起真的子进程树、
+    # `platform.test.ts` 跑真的 `which` / `where.exe`。
+    #
+    # `fail-fast: false`：Windows 挂了不该把 macOS 那份结果一起取消掉——
+    # 目标平台的结论是最要紧的那个。
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -31,13 +45,29 @@ jobs:
       # --frozen-lockfile：CI 里 lockfile 对不上必须是失败，不是「顺手更新一下」
       - run: pnpm install --frozen-lockfile
 
-      # typecheck / lint / arch / check:docs / test
-      - run: pnpm check
+      # 目标平台跑全套：typecheck / lint / arch / check:docs / test
+      - if: matrix.os == 'macos-latest'
+        run: pnpm check
 
       # 构建单独跑一次：打包器能发现 typecheck 发现不了的问题。
       # 真踩过——highlight.js 是 lowlight 的传递依赖，类型检查全绿，
       # 打包时才报 "failed to resolve import"。
-      - run: pnpm --filter @omni/desktop build
+      - if: matrix.os == 'macos-latest'
+        run: pnpm --filter @omni/desktop build
+
+      # 另外两个平台**只跑类型检查与引擎包**，这是有意的窄化：
+      #
+      # 引擎包里是真正跨平台的那部分（进程树回收、命令查找），
+      # 它必须在三个平台上都对。而审批与路径判定那些测试用的是
+      # `/etc/passwd`、`/w/a.ts` 这类 POSIX 夹具——在 Windows 上
+      # `resolve("/etc/passwd")` 会变成 `C:\etc\passwd`，跑红了
+      # 说明的是**夹具不通用**，不是代码有问题。
+      #
+      # 把那种红色留在 CI 里，下场是所有人都学会忽略 CI。
+      - if: matrix.os != 'macos-latest'
+        run: pnpm -r exec tsc --noEmit
+      - if: matrix.os != 'macos-latest'
+        run: pnpm -s exec vitest run packages/engine
 
       # 引擎必须真的能起来才算数，但 CI 上没有 codex / claude 的登录态，
       # 所以 live 测试不在这里跑。它们的入口是 `pnpm test:live`，本地手动执行。

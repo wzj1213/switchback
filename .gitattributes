@@ -1,0 +1,12 @@
+# 换行一律 LF，包括在 Windows 上 checkout 出来的工作区。
+#
+# 不写这条的话，Windows 上 git 会把 LF 换成 CRLF，于是一批比较字符串的测试
+# 会莫名其妙地红——而红的原因和被测的代码毫无关系。
+# CI 上刚加了 Windows 这一格，这条是它能跑绿的前提。
+* text=auto eol=lf
+
+# 二进制：不许碰
+*.png binary
+*.icns binary
+*.ico binary
+*.jsonl binary

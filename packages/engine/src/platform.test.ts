@@ -23,8 +23,10 @@ describe("平台适配", () => {
   })
 
   it("**alive 问的是「这个 pid 领头的组」，不是「这个 pid」**——测试里踩到过", async () => {
-    // 自己不是进程组组长，所以 -pid 指向一个不存在的组：报死是对的
-    expect(tree.alive(process.pid)).toBe(false)
+    // POSIX 上自己不是进程组组长，所以 -pid 指向一个不存在的组：报死是对的。
+    // Windows 上没有这层语义（问的就是这个 pid），所以自己一定是活的——
+    // 这个差别正是 `provesWholeTree` 要报出来的那件事
+    expect(tree.alive(process.pid)).toBe(isWindows)
 
     // detached 起来的才是组长，那才是回收阶梯要看的东西
     const child = spawn(process.execPath, ["-e", "setTimeout(()=>{}, 30000)"], { detached: true })
