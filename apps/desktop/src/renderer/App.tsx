@@ -84,7 +84,12 @@ export function App(): React.JSX.Element {
   return (
     <div className="shell">
       {sidebar}
+      {/* **key 按会话隔离。** 不加的话切会话时 Composer 不重挂，
+          上一个会话没发出去的草稿会留在输入框里、被发给新会话——
+          顺带把工具行的展开态、diff 的展开态也按会话隔离，
+          它们同样是「属于那个会话」的状态 */}
       <Workspace
+        key={thread.id}
         thread={thread}
         peer={peer}
         onCompare={() => {

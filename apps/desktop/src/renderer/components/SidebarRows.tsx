@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 import { rowLabelOf, type Group } from "../sidebar.js"
@@ -52,6 +52,22 @@ export function Row({
   const arm = (): void => {
     setConfirming(true)
   }
+  /**
+   * **武装状态要自己解除。**
+   *
+   * 上一版只靠确认按钮的 `onBlur`，而从右键菜单武装时那个按钮根本没拿到过焦点，
+   * 于是 blur 永远不来——那一行就一直挂着「确认」，**下一次点它直接把会话删了**，
+   * 而用户以为自己点的是「更多操作」。删除不可撤销，不能有这种残留。
+   */
+  useEffect(() => {
+    if (!confirming) return undefined
+    const timer = setTimeout(() => {
+      setConfirming(false)
+    }, 4000)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [confirming])
   return (
     <div
       className={`row row--thread${flat ? " row--flat" : ""}${selected ? " row--selected" : ""}`}

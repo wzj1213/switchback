@@ -33,6 +33,9 @@ function Kbd({ children }: { children: React.ReactNode }): React.JSX.Element {
  *   最安全的那档占据最好按的位置。
  * - 正文可滚，**操作行在滚动区之外**（这条学 dsh）：命令再长也不能把按钮顶出屏幕。
  */
+/** 当前持有 ⌘⏎ / ⌘⌫ 的那张卡。见下面 effect 里的说明。 */
+const holder: { id: string | undefined } = { id: undefined }
+
 export function Approval({
   item,
   onResolve,
@@ -44,11 +47,24 @@ export function Approval({
   const primary = useRef<HTMLButtonElement>(null)
   const settled = item.status !== "pending"
 
+  /**
+   * **快捷键只归最新那张卡。**
+   *
+   * 每张卡各自 `window.addEventListener` 的话，屏幕上挂着三张待批时按一下
+   * ⌘⏎ 会**把三张一起批了**——而用户以为自己只批了眼前这一张。
+   * 审批是这个产品里唯一「按错了就真出事」的地方，不能有这种歧义。
+   *
+   * 用一个模块级的持有者做互斥：后挂载的卡抢走持有权（它就是最新那张），
+   * 卸载时只在自己还持有时才归还——否则会把后来者的持有权误清掉。
+   */
   useEffect(() => {
     if (settled || isTyping()) return undefined
+    holder.id = item.id
     primary.current?.focus()
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey) || isTyping()) return
+      // 不是持有者就装作没看见——同一次按键不该批掉屏幕上所有的卡
+      if (holder.id !== item.id) return
       if (e.key === "Enter") {
         e.preventDefault()
         onResolve(item.id, true, "once")
@@ -60,6 +76,7 @@ export function Approval({
     window.addEventListener("keydown", onKey)
     return () => {
       window.removeEventListener("keydown", onKey)
+      if (holder.id === item.id) holder.id = undefined
     }
   }, [settled, item.id, onResolve])
 

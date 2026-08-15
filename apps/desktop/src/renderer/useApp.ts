@@ -45,7 +45,7 @@ export function useApp(): AppApi {
 
   const rows = threadRowsOf(omni.state)
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
-  const notices = omni.state.notices.filter((n) => n.id !== shell.dismissed)
+  const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
 
   const { open, openPicker } = useWorkspaceActions({

@@ -11,8 +11,14 @@ export interface Shell {
   /** 用户手动选中的会话。`undefined` = 跟着「最近那个」走。 */
   selectedId: string | undefined
   select: (id: string | undefined) => void
-  /** 被关掉的那条故障横幅。关的是**那一条**，不是整个通道。 */
-  dismissed: string | undefined
+  /**
+   * 已经关掉的故障横幅。
+   *
+   * **是集合不是单个 id。** 上一版只记最后一个，于是同时挂着两条时，
+   * 关掉 A → 记住 A → B 显示 → 关掉 B → 记住 B → **A 又回来了**，
+   * 那个 × 在两条之间无限来回，永远关不干净。
+   */
+  dismissed: ReadonlySet<string>
   dismiss: (id: string) => void
   finding: boolean
   setFinding: (on: boolean) => void
@@ -32,7 +38,7 @@ export interface Shell {
 
 export function useShell(): Shell {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
-  const [dismissed, setDismissed] = useState<string | undefined>(undefined)
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
   const [finding, setFinding] = useState(false)
   const [comparing, setComparing] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -41,7 +47,9 @@ export function useShell(): Shell {
     selectedId,
     select: setSelectedId,
     dismissed,
-    dismiss: setDismissed,
+    dismiss: (id) => {
+      setDismissed((prev) => new Set(prev).add(id))
+    },
     finding,
     setFinding,
     comparing,
