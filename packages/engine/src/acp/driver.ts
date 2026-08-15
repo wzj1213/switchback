@@ -3,6 +3,7 @@ import type { EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
+import { probeCommand } from "../probe.js"
 import { currentModeOf, modelsOf, modesOf, startupMessage } from "./setup.js"
 import { pickMode } from "./mode.js"
 import { handlePermission } from "./permission.js"
@@ -378,6 +379,7 @@ class AcpSession implements EngineSession {
 export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
   return {
     id: config.id,
+    probe: () => probeCommand(config.command, "检查 engines.json 里写的路径对不对。"),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new AcpSession(req, config)
       await session.start()

@@ -3,6 +3,7 @@ import { decide } from "@omni/approval"
 import type { EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
+import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { handleNotification, type NotifyContext } from "./notify.js"
 import { buildRequest, decisionFor, toolOf } from "./approve.js"
@@ -359,8 +360,10 @@ class CodexSession implements EngineSession {
 }
 
 export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver {
+  const command = config.command ?? "codex"
   return {
     id: "codex",
+    probe: () => probeCommand(command, "装好之后重启 omni。"),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new CodexSession(req, config)
       // 握手失败要在这里就抛出来，别让宿主拿到一个看着正常、一发消息就炸的会话

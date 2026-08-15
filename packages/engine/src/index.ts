@@ -5,6 +5,8 @@ export { modelsOf, modesOf, currentModeOf, startupMessage as acpStartupMessage }
 export { handlePermission, respond as respondPermission } from "./acp/permission.js"
 export type { PermissionContext as AcpPermissionContext } from "./acp/permission.js"
 export { createQueue } from "./queue.js"
+export { probeCommand } from "./probe.js"
+export type { Probe, ProbeState } from "./probe.js"
 export { createProcessOwner, unpacked } from "./subprocess.js"
 export {
   sanitize,

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { app, clipboard, dialog, ipcMain, type BrowserWindow, type WebContents } from "electron"
-import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
+import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
@@ -17,8 +17,13 @@ export interface Attached {
   host: Host
   /** 回放磁盘上的历史用得到 */
   journal: ReturnType<typeof createJournal>
-  /** 这台机器上注册了哪些引擎。界面据此渲染选择器。 */
-  engines: readonly { id: string; label: string }[]
+  /**
+   * 这台机器上注册了哪些引擎。界面据此渲染选择器。
+   *
+   * **异步**，因为每一家还要回答「装了吗」——那要起一次 `which` 甚至 `--version`。
+   * 结果缓存：探测在启动时做一次就够，用户装引擎的频率远低于开窗的频率。
+   */
+  engines: () => Promise<readonly EngineInfo[]>
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
   /** 事件流的序号与补发缓冲。窗口重载时的全量重建要用它对齐游标。 */
@@ -182,7 +187,7 @@ export function attachHost(
   return {
     host,
     journal,
-    engines: Object.keys(drivers).map((id) => ({ id, label: labels[id] ?? id })),
+    engines: probeEngines(drivers, labels, log),
     lastThreadId: () => seen.thread,
     sequencer,
     report,
@@ -214,6 +219,42 @@ export function attachHost(
  * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
  * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
  */
+/**
+ * 问每一家「装了吗」，只问一次。
+ *
+ * 缓存放在闭包里而不是每次重算：`which` + `--version` 要起真的子进程，
+ * 而窗口每次重载都会来要一遍引擎清单。
+ *
+ * 没实现 `probe` 的驱动落 `unknown`——不是 `ok`。**猜不出来就别猜**。
+ */
+function probeEngines(
+  drivers: Readonly<Record<string, { probe?: () => Promise<{ state: string; detail: string }> }>>,
+  labels: Readonly<Record<string, string>>,
+  log: Logger,
+): () => Promise<readonly EngineInfo[]> {
+  let cached: readonly EngineInfo[] | undefined
+  return async () => {
+    if (cached !== undefined) return cached
+    cached = await Promise.all(
+      Object.entries(drivers).map(async ([id, driver]) => {
+        const probe = await driver.probe?.().catch(() => undefined)
+        return {
+          id,
+          label: labels[id] ?? id,
+          state: (probe?.state ?? "unknown") as EngineInfo["state"],
+          ...(probe?.detail === undefined ? {} : { detail: probe.detail }),
+        }
+      }),
+    )
+    // 「这台机器上装了什么」是支持渠道的第一个问题，日志里必须留一行
+    log.write("info", "engines", cached.map((e) => `${e.id}=${e.state ?? "?"}`).join(" "))
+    for (const engine of cached) {
+      if (engine.state === "missing") log.write("warn", "engines", `${engine.id}：${engine.detail ?? ""}`)
+    }
+    return cached
+  }
+}
+
 export interface ThreadHistory {
   id: ThreadId
   events: readonly Event[]
@@ -234,7 +275,7 @@ export interface ThreadHistory {
  * 它往前一插就盖住了顺序不对这件事。重载时不新建会话，才露出来。
  */
 export function replayEvents(
-  engines: readonly { id: string; label: string }[],
+  engines: readonly EngineInfo[],
   threads: readonly ThreadHistory[],
   alive: ReadonlyMap<ThreadId, Thread>,
   now: number,
@@ -295,7 +336,7 @@ export async function rebuild(attached: Attached, target: WebContents): Promise<
   const threads = await Promise.all(
     ids.map(async (id) => ({ id, events: await attached.journal.read(id).catch((): readonly Event[] => []) })),
   )
-  const events = replayEvents(attached.engines, threads, alive, Date.now())
+  const events = replayEvents(await attached.engines(), threads, alive, Date.now())
   const resumeAt = attached.sequencer.latest()
   if (!target.isDestroyed()) target.send("omni:replay", { events, resumeAt })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条

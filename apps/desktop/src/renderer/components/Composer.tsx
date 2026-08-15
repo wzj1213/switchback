@@ -77,8 +77,10 @@ export function Composer({
             }}
           >
             {engines.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
+              // 没装的**仍然可选**，只加个记号：探测也会错，硬拦住一个其实能用的
+              // 引擎比不检查更糟。选中之后真起不来，横幅会说清楚原因
+              <option key={item.id} value={item.id} title={item.detail ?? ""}>
+                {item.state === "missing" ? `${item.label}（未安装）` : item.label}
               </option>
             ))}
           </select>

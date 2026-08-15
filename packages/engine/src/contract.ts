@@ -9,6 +9,7 @@ import type {
   Trust,
 } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
+import type { Probe } from "./probe.js"
 
 /** 需要人工裁决时递给宿主的东西。文本字段可能来自引擎，渲染前必须转义。 */
 export interface ApprovalAsk {
@@ -97,4 +98,15 @@ export interface EngineSession {
 export interface EngineDriver {
   readonly id: EngineId
   start: (req: StartRequest) => Promise<EngineSession>
+  /**
+   * 这台机器上装了吗。
+   *
+   * **由驱动自己回答，不由宿主猜。** 每家的「装了」判据不一样：
+   * codex 是 PATH 上有没有那个二进制；Claude 的 CLI 由 SDK 自己解析，
+   * 不在 PATH 上也可能跑得起来。宿主统一 `which` 一遍的话，
+   * 会把一个能用的引擎灰掉——那比不检查更糟。
+   *
+   * 不实现就是「不知道」，界面照常显示，不做任何标注。
+   */
+  probe?: () => Promise<Probe>
 }

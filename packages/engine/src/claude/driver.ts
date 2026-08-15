@@ -8,6 +8,7 @@ import {
 import { decide } from "@omni/approval"
 import type { ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
+import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
@@ -187,9 +188,27 @@ class ClaudeSession implements EngineSession {
   }
 }
 
+/**
+ * Claude 的「装了没」比别家难答一档。
+ *
+ * SDK 自己解析 CLI 的位置（内部走 `which`，也接受 `pathToClaudeCodeExecutable`），
+ * 所以 **`which claude` 查不到不代表跑不起来**。
+ * 把这种情况报成 `missing` 会灰掉一个能用的引擎，比不检查更糟——
+ * 于是查不到时降成 `unknown`：界面照常显示，不做任何标注。
+ */
+async function probeClaude(): Promise<Probe> {
+  const found = await probeCommand("claude")
+  if (found.state === "ok") return found
+  return {
+    state: "unknown",
+    detail: "PATH 上没有 `claude`，但 SDK 会自己找——真起不来的话，开会话时会报出来。",
+  }
+}
+
 export function createClaudeDriver(config: ClaudeDriverConfig = {}): EngineDriver {
   return {
     id: "claude",
+    probe: probeClaude,
     start: (req: StartRequest): Promise<EngineSession> => {
       const session = new ClaudeSession(req, config)
       session.start()
