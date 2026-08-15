@@ -6,7 +6,7 @@ import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOpti
  * 新建会话、打开文件夹这些要落到当前选中的会话上下文里，主进程不知道那是什么。
  * 所以菜单只发一个意图，怎么做由渲染层决定。
  */
-export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find"
+export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown"
 
 const isMac = process.platform === "darwin"
 
@@ -61,6 +61,13 @@ export function installMenu(): void {
           accelerator: "CmdOrCtrl+F",
           click: (_i, focused) => {
             send("find", focused)
+          },
+        },
+        {
+          label: "复制会话为 Markdown",
+          accelerator: "Shift+CmdOrCtrl+C",
+          click: (_i, focused) => {
+            send("copy-markdown", focused)
           },
         },
         {

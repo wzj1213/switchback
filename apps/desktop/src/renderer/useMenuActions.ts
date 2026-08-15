@@ -5,6 +5,7 @@ export interface MenuHandlers {
   openFolder: () => void
   interrupt: () => void
   find: () => void
+  copyMarkdown: () => void
 }
 
 /**
@@ -21,13 +22,14 @@ export function useMenuActions(
   handlers: MenuHandlers,
   deps: readonly unknown[],
 ): void {
-  const { newThread, openFolder, interrupt, find } = handlers
+  const { newThread, openFolder, interrupt, find, copyMarkdown } = handlers
   useEffect(() => {
     const table: Readonly<Record<string, () => void>> = {
       "new-thread": newThread,
       "open-folder": openFolder,
       interrupt,
       find,
+      "copy-markdown": copyMarkdown,
     }
     return onMenu((action) => {
       table[action]?.()

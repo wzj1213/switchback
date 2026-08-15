@@ -319,3 +319,37 @@
   font-size: var(--text-xs);
   cursor: default;
 }
+
+/* ── 复制按钮 ─────────────────────────────────────────
+ * 悬停才出现，贴在消息右上。常驻的话每条消息右上角都挂一个小按钮，
+ * 一屏下来全是噪声。
+ */
+.copyable {
+  position: relative;
+}
+
+.copyable__btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.copyable:hover .copyable__btn,
+.copyable__btn:focus-visible {
+  opacity: 1;
+}
+
+.copyable__btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}

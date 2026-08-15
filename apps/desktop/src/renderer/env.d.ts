@@ -14,6 +14,7 @@ declare global {
         total: number
       }>
       stopFind: () => void
+      copy: (text: string) => void
       subscribe: (onEvent: (event: Event) => void) => () => void
     }
   }

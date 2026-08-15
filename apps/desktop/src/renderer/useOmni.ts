@@ -12,6 +12,8 @@ export interface Omni {
   /** 页内查找。桥没接上时永远是 0/0。 */
   find: (query: string, next: boolean, forward: boolean) => Promise<{ active: number; total: number }>
   stopFind: () => void
+  /** 写系统剪贴板 */
+  copy: (text: string) => void
   /**
    * preload 没注入通道。**显式暴露而不是静默 no-op**：
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
@@ -62,5 +64,12 @@ export function useOmni(): Omni {
     bridge?.stopFind()
   }, [bridge])
 
-  return { state, send, pickFolder, onMenu, find, stopFind, bridgeMissing: bridge === undefined }
+  const copy = useCallback(
+    (text: string) => {
+      bridge?.copy(text)
+    },
+    [bridge],
+  )
+
+  return { state, send, pickFolder, onMenu, find, stopFind, copy, bridgeMissing: bridge === undefined }
 }

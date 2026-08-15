@@ -5,6 +5,8 @@ import { Notices } from "./components/Notices.js"
 import { Workspace } from "./components/Workspace.js"
 import { useOmni } from "./useOmni.js"
 import { useMenuActions } from "./useMenuActions.js"
+import { toMarkdown } from "./export.js"
+import { ENGINES, labelOf } from "./components/Composer.js"
 
 /**
  * 空状态说什么。
@@ -32,7 +34,7 @@ function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.El
 
 /** 选哪个会话、怎么新建。一个会话内部长什么样是 `Workspace` 的事。 */
 export function App(): React.JSX.Element {
-  const { state, send, pickFolder, onMenu, find, stopFind, bridgeMissing } = useOmni()
+  const { state, send, pickFolder, onMenu, find, stopFind, copy, bridgeMissing } = useOmni()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
   const [finding, setFinding] = useState(false)
@@ -74,8 +76,12 @@ export function App(): React.JSX.Element {
       find: () => {
         setFinding(true)
       },
+      copyMarkdown: () => {
+        if (thread === undefined) return
+        copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(ENGINES, thread.engine)))
+      },
     },
-    [thread?.id, thread?.cwd],
+    [thread?.id, thread?.cwd, state],
   )
 
   const sidebar = (
@@ -124,6 +130,7 @@ export function App(): React.JSX.Element {
           setFinding(false)
           stopFind()
         }}
+        onCopy={copy}
         send={send}
       />
     </div>

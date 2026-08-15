@@ -31,6 +31,9 @@ const api = {
   stopFind(): void {
     ipcRenderer.send("omni:stopFind")
   },
+  copy(text: string): void {
+    ipcRenderer.send("omni:copy", text)
+  },
   /** 只在开发钩子下用：把查找词直接塞进查找条，见 main/devtools.ts */
   onDevFind(handler: (query: string) => void): () => void {
     const listener = (_e: unknown, query: string): void => {

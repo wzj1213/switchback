@@ -1,14 +1,10 @@
 import type { Command, Item, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
-import { Composer, ENGINES, TRUSTS } from "./Composer.js"
+import { Composer, ENGINES, TRUSTS, labelOf } from "./Composer.js"
 import { Transcript } from "./Transcript.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
-
-function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
-  return list.find((x) => x.id === id)?.label ?? id
-}
 
 function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined }): React.JSX.Element {
   const handedOff = thread.engineHistory.length > 1
@@ -39,6 +35,8 @@ export interface WorkspaceProps {
   finding: boolean
   onFind: (query: string, next: boolean, forward: boolean) => Promise<FindResult>
   onCloseFind: () => void
+  /** 写剪贴板 */
+  onCopy: (text: string) => void
   send: (command: Command) => void
 }
 
@@ -55,7 +53,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <TopBar thread={thread} usage={props.usage} />
       <Notices notices={props.notices} onDismiss={props.onDismiss} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
-      <Transcript thread={thread} items={props.items} turn={props.turn} send={send} />
+      <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
       <Composer
         detached={thread.detached === true}
         // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，

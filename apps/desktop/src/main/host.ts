@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { app, dialog, ipcMain, type BrowserWindow } from "electron"
+import { app, clipboard, dialog, ipcMain, type BrowserWindow } from "electron"
 import type { Command, Event, ThreadId } from "@omni/protocol"
 import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
@@ -74,6 +74,12 @@ export function attachHost(windows: () => readonly BrowserWindow[]): Attached {
       detail: error instanceof Error ? error.message : String(error),
     })
   }
+
+  // 剪贴板走主进程：渲染层加载的是 file://，那里的 navigator.clipboard
+  // 不算安全上下文，写入会被静默拒绝
+  ipcMain.on("omni:copy", (_e, text: string) => {
+    clipboard.writeText(text)
+  })
 
   ipcMain.on("omni:command", (_e, command: Command) => {
     // 命令失败不能掐掉主进程：翻成一条状态事件送回界面

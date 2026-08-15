@@ -109,4 +109,9 @@ export function Composer({
   )
 }
 
+/** 引擎/档位 id → 展示名。顶栏、导出、菜单都要用同一套措辞。 */
+export function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
+  return list.find((x) => x.id === id)?.label ?? id
+}
+
 export { ENGINES, TRUSTS }
