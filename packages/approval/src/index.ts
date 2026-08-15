@@ -3,7 +3,7 @@ export { REDLINES, firstRedline } from "./redline.js"
 export { trustVerdict } from "./trust.js"
 export { matchMemory, suggestRule } from "./memory.js"
 export { classify } from "./classify.js"
-export { splitSegments, signature } from "./command.js"
+export { splitSegments, signature, unwrapShell } from "./command.js"
 export { isInside, resolve, normalize, expandHome } from "./path.js"
 
 export type { Action, Request, Rule, RulePattern, SessionState, Trust, Verdict, RememberScope } from "./types.js"

