@@ -49,12 +49,15 @@ function keyOf(row: Row): string {
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
 function RowView({
   row,
+  cwd,
   folded,
   onFold,
   onCopy,
   onResolve,
 }: {
   row: Row
+  /** 工作区路径。工具行据此把绝对路径写成相对的。 */
+  cwd: string
   folded: boolean
   onFold: (turnId: string) => void
   onCopy: (text: string) => void
@@ -80,7 +83,7 @@ function RowView({
       </button>
     )
   }
-  if (row.kind === "run") return <ToolRun items={row.items} />
+  if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
   return (
     <Copyable item={row.item} onCopy={onCopy}>
       <ItemView item={row.item} onResolve={onResolve} />
@@ -134,6 +137,7 @@ export function Transcript({
           <RowView
             key={keyOf(row)}
             row={row}
+            cwd={thread.cwd}
             folded={row.kind === "turn" && folded.has(row.turnId)}
             onFold={onFold}
             onCopy={onCopy}

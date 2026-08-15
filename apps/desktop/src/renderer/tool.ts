@@ -15,21 +15,47 @@ export const VERB: Readonly<Record<ToolDetail["kind"], string>> = {
   other: "调用",
 }
 
-export function target(detail: ToolDetail): string {
+/**
+ * 路径落到工作区里就写相对的。
+ *
+ * 引擎报上来的都是绝对路径，照原样贴出来是这样：
+ *
+ *     /private/tmp/claude-501/-Users-you-learn-agent-learn/c313d…/demo/README.md
+ *
+ * ——一行里 90% 是每一条都一样的前缀，真正在说事的 `README.md` 反倒被截断了。
+ *
+ * **落在工作区外的路径保留绝对形式**，而且这是有意的：那正是「它伸到项目外面去了」
+ * 的时刻，一个突然变长的绝对路径本身就是提醒。缩短它等于把这个信号抹平。
+ */
+export function relPath(path: string, cwd: string): string {
+  const base = cwd.endsWith("/") ? cwd : `${cwd}/`
+  if (!path.startsWith(base)) return path
+  const rest = path.slice(base.length)
+  // `cwd` 本身（rest 为空）不显示成空字符串
+  return rest === "" ? path : rest
+}
+
+export function target(detail: ToolDetail, cwd?: string): string {
   switch (detail.kind) {
     case "shell":
       return detail.command
     // 一次 apply_patch 可以改好几个文件。只报第一个的话，界面会写着
     // 「编辑 index.js」而实际上 math.js 也被改了——**说了假话**。
     case "file_edit":
-      return detail.files.length > 1 ? `${String(detail.files.length)} 个文件` : detail.path
+      return detail.files.length > 1
+        ? `${String(detail.files.length)} 个文件`
+        : shorten(detail.path, cwd)
     case "file_read":
-      return detail.path
+      return shorten(detail.path, cwd)
     case "fetch":
       return detail.url
     case "other":
       return detail.name
   }
+}
+
+function shorten(path: string, cwd: string | undefined): string {
+  return cwd === undefined ? path : relPath(path, cwd)
 }
 
 const MAX_BRIEF = 48

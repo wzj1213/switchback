@@ -68,10 +68,12 @@ function Stat({ item }: { item: ToolCallItem }): React.JSX.Element | null {
 /** 一行的内容。抽出来是为了让 `Step` 只管「这一行是哪种形态」，不再兼管排版。 */
 function StepLine({
   item,
+  cwd,
   open,
   expandable,
 }: {
   item: ToolCallItem
+  cwd: string
   open: boolean
   expandable: boolean
 }): React.JSX.Element {
@@ -81,7 +83,7 @@ function StepLine({
       <span className="step__icon" aria-label={VERB[item.detail.kind]}>
         {GLYPH[item.detail.kind]}
       </span>
-      <span className="step__target">{target(item.detail)}</span>
+      <span className="step__target">{target(item.detail, cwd)}</span>
       <Stat item={item} />
       {/* 可展开的提示做成真元素。上一版是 `::after` 加一个 ⌄ 字形挂在
           `.step__target` 上，而那个元素带 `text-overflow: ellipsis`——
@@ -102,7 +104,7 @@ function StepLine({
  * 才看得到进展，那这个进展等于不存在。跑完自动收回折叠态：那时候人关心的
  * 通常只是「成没成」。
  */
-function Step({ item }: { item: ToolCallItem }): React.JSX.Element {
+function Step({ item, cwd }: { item: ToolCallItem; cwd: string }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const content = body(item)
   const changed = files(item)
@@ -110,7 +112,7 @@ function Step({ item }: { item: ToolCallItem }): React.JSX.Element {
   const expandable = changed.length > 0 || hasOutput
   const live = item.status === "running" && hasOutput
 
-  const line = <StepLine item={item} open={open} expandable={expandable} />
+  const line = <StepLine item={item} cwd={cwd} open={open} expandable={expandable} />
   // 没东西可展开的渲染成静态行，不做成按钮——避免出现点了没反应的元素
   if (!expandable) return <div className="step">{line}</div>
 
@@ -149,11 +151,11 @@ function needsOwnRow(item: ToolCallItem): boolean {
  * **只折成功的。** 失败、被拒、中断的必须自己占一行——那正是你要找的东西，
  * 把它藏进一句「运行了命令」里，等于把出问题的地方藏起来。
  */
-function Folded({ items }: { items: readonly ToolCallItem[] }): React.JSX.Element {
+function Folded({ items, cwd }: { items: readonly ToolCallItem[]; cwd: string }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   if (items.length === 1) {
     const only = items[0]
-    return only === undefined ? <></> : <Step item={only} />
+    return only === undefined ? <></> : <Step item={only} cwd={cwd} />
   }
   return (
     <>
@@ -176,7 +178,7 @@ function Folded({ items }: { items: readonly ToolCallItem[] }): React.JSX.Elemen
       {open ? (
         <div className="run__nested">
           {items.map((item) => (
-            <Step key={item.id} item={item} />
+            <Step key={item.id} item={item} cwd={cwd} />
           ))}
         </div>
       ) : null}
@@ -190,7 +192,7 @@ function Folded({ items }: { items: readonly ToolCallItem[] }): React.JSX.Elemen
  * 做完的**连着折成一行**，没做完和出问题的各占一行——
  * 一屏里最该被看见的是后者。
  */
-export function ToolRun({ items }: { items: readonly ToolCallItem[] }): React.JSX.Element {
+export function ToolRun({ items, cwd }: { items: readonly ToolCallItem[]; cwd: string }): React.JSX.Element {
   // 按「要不要单独一行」切成若干段，段内顺序不变
   const groups: { folded: boolean; items: ToolCallItem[] }[] = []
   for (const item of items) {
@@ -203,9 +205,9 @@ export function ToolRun({ items }: { items: readonly ToolCallItem[] }): React.JS
     <div className="run">
       {groups.map((group, index) =>
         group.folded ? (
-          <Folded key={group.items[0]?.id ?? index} items={group.items} />
+          <Folded key={group.items[0]?.id ?? index} items={group.items} cwd={cwd} />
         ) : (
-          group.items.map((item) => <Step key={item.id} item={item} />)
+          group.items.map((item) => <Step key={item.id} item={item} cwd={cwd} />)
         ),
       )}
     </div>
