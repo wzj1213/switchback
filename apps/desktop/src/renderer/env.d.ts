@@ -42,6 +42,8 @@ declare global {
       searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
       subscribe: (onEvents: (sealed: readonly Sealed[]) => void) => () => void
       onReplay: (handler: (replay: Replay) => void) => () => void
+      /** 渲染层挂好监听之后喊一声，主进程才发全量。 */
+      hello: () => void
       resync: (after: number) => Promise<{ events: readonly Sealed[] } | { reset: true }>
     }
   }

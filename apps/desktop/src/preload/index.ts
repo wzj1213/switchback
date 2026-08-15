@@ -123,6 +123,19 @@ const api = {
       ipcRenderer.off("omni:replay", listener)
     }
   },
+  /**
+   * 「我准备好了，把世界给我。」
+   *
+   * **全量重建必须由渲染层来要，不能由主进程猜时机。** 主进程原来是在
+   * `did-finish-load` 时推一份过来——那一刻页面是加载完了，但 React 还没跑完
+   * 第一轮 effect，`onReplay` 的监听还没挂上，于是那份全量发进了空气里。
+   * 首次启动看不出来，因为紧接着的种子会话是走增量到达的；
+   * **重载就原形毕露：侧栏空的、正文卡在「正在打开工作区…」，而磁盘上会话都在。**
+   */
+  hello(): void {
+    ipcRenderer.send("omni:hello")
+  },
+
   /** 补 `after` 之后漏掉的。补不了返回 `{reset:true}`，调用方必须等下一次全量。 */
   async resync(after: number): Promise<{ events: readonly Sealed[] } | { reset: true }> {
     return (await ipcRenderer.invoke("omni:resync", after)) as

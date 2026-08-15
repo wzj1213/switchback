@@ -254,7 +254,18 @@ function bootstrap(): Promise<void> {
     // 开机自动建的那个会话刚发完事件，重建的全量就把状态清了，
     // 而那些事件因为「seq <= resumeAt」被当成旧消息丢掉——会话还在，内容没了
     let seeded = false
-    win.webContents.on("did-finish-load", () => {
+    /**
+     * **等渲染层喊「我准备好了」再发全量，不要在 `did-finish-load` 时推。**
+     *
+     * `did-finish-load` 那一刻页面确实加载完了，但 React 还没跑完第一轮 effect，
+     * `onReplay` 的监听还没挂上——推过去的全量落进空气里。
+     *
+     * 首次启动看不出来：紧接着的种子会话是走增量到达的，界面照样有东西。
+     * **重载才原形毕露**——那时没有种子，一切都指望这份全量：
+     * 侧栏空的、正文卡在「正在打开工作区…」，而磁盘上会话一个不少。
+     */
+    ipcMain.on("omni:hello", (event) => {
+      if (event.sender !== win.webContents) return
       void rebuild(attached, win.webContents)
         .then((recent) => {
           if (seeded) return undefined

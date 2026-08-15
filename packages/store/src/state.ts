@@ -129,3 +129,18 @@ export function threadRowsOf(state: ViewState): readonly ThreadRow[] {
     return { thread, preview: first?.kind === "user_message" ? first.text : undefined }
   })
 }
+
+/**
+ * 把横幅清空。**全量重建之后必须调一次。**
+ *
+ * 横幅说的是「刚刚发生了一件事」——一个时刻，不是一个状态。
+ * 而 `engine.status` 是落盘的（它要拿来还原会话状态），
+ * 于是全量重放会把**历史上每一次引擎崩溃**重新弹一遍：
+ * 重启 omni，迎面几条上周的红条，而那时候的事早就过去了。
+ *
+ * 和 `thread.removed` 不落盘是同一条道理：
+ * **全量重建出来的是「世界现在长什么样」**，不是「都发生过什么」。
+ */
+export function clearNotices(state: ViewState): ViewState {
+  return state.notices.length === 0 ? state : { ...state, notices: [] }
+}

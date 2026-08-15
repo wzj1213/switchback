@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command } from "@omni/protocol"
-import { initial, reduceAll, type ViewState } from "@omni/store"
+import { clearNotices, initial, reduceAll, type ViewState } from "@omni/store"
 import { initialStream, received, replayed, reset, resynced, type Sealed, type Step, type Stream } from "./stream.js"
 
 export interface Omni {
@@ -88,8 +88,15 @@ export function useOmni(): Omni {
       // 否则重载之后新旧两份历史会叠在一起
       setState(initial)
       advance(replayed({ ...stream.current, lastSeq: undefined }, replay))
+      // **全量之后把横幅清掉。** `engine.status` 是落盘的（要拿它还原会话状态），
+      // 所以重放会把历史上每一次引擎崩溃重新弹一遍——重启一次，
+      // 迎面几条上周的红条。横幅说的是「刚刚发生了一件事」，那是时刻，不是状态
+      setState(clearNotices)
       setLastStarted(undefined)
     })
+    // **两个监听都挂好之后**才喊「我准备好了」。反过来（主进程一加载完就推）
+    // 会把全量发进空气里——重载之后界面是空的，而磁盘上会话都在
+    bridge.hello()
     return () => {
       offEvents()
       offReplay()
