@@ -129,10 +129,10 @@
   z-index: 10;
   min-width: 200px;
   padding: var(--sp-1);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-pop);
   border-radius: var(--radius);
   background: var(--bg-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  box-shadow: var(--shadow-pop);
 }
 
 .menu__item {

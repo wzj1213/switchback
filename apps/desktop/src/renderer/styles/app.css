@@ -797,10 +797,12 @@ body {
   max-height: 260px;
   overflow-y: auto;
   padding: var(--sp-1);
-  border: 1px solid var(--border-strong);
+  /* 和别的浮层用同一套 token。写死一份的话，深色下这一个的阴影
+     只有 14% 而别的是 55%——`@` 列表会是唯一一个和背景糊在一起的浮层 */
+  border: 1px solid var(--border-pop);
   border-radius: var(--radius);
   background: var(--bg-raised);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 14%);
+  box-shadow: var(--shadow-pop);
 }
 
 .mentions__row {

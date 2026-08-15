@@ -14,7 +14,7 @@
   align-items: flex-start;
   justify-content: center;
   padding: 8vh var(--sp-4) var(--sp-4);
-  background: rgb(0 0 0 / 28%);
+  background: var(--scrim);
   overflow-y: auto;
 }
 
@@ -130,5 +130,5 @@
 .seg__item--on {
   background: var(--bg-raised);
   color: var(--text);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  box-shadow: var(--shadow-pop);
 }
