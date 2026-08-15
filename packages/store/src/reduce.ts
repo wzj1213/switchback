@@ -103,6 +103,8 @@ export function reduce(state: ViewState, event: Event): ViewState {
       return patchItem(state, event.itemId, (prev) => applyDelta(prev, event.append))
     case "item.updated":
       return patchItem(state, event.item.id, () => event.item)
+    case "usage.updated":
+      return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
     default:
       return state
   }

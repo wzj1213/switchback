@@ -1,6 +1,13 @@
 import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
-import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireTurnLifecycle } from "./wire.js"
+import type {
+  WireDelta,
+  WireError,
+  WireItem,
+  WireItemLifecycle,
+  WireTokenUsage,
+  WireTurnLifecycle,
+} from "./wire.js"
 
 /**
  * codex 通知 → omni 事件。
@@ -91,6 +98,27 @@ function onOutputDelta(ctx: NotifyContext, params: WireDelta): void {
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
 }
 
+/**
+ * 用量。取 `last.totalTokens` 而不是 `total.totalTokens`——
+ * 后者是**累计账单**，会一路涨到远超窗口大小；前者才是「这次请求占了多少上下文」，
+ * 也就是离压缩那条线还有多远。拿错了这个数，进度条会在第三轮就爆表。
+ */
+function onUsage(ctx: NotifyContext, params: WireTokenUsage): void {
+  const usage = params.tokenUsage
+  const used = usage?.last?.totalTokens
+  if (usage === undefined || used === undefined) return
+  ctx.emit({
+    type: "usage.updated",
+    at: ctx.now(),
+    threadId: ctx.threadId,
+    usage: {
+      contextUsed: used,
+      ...(usage.modelContextWindow === undefined ? {} : { contextWindow: usage.modelContextWindow }),
+      ...(usage.total?.totalTokens === undefined ? {} : { totalTokens: usage.total.totalTokens }),
+    },
+  })
+}
+
 function onTurnCompleted(ctx: NotifyContext, params: WireTurnLifecycle): void {
   const turnId = ctx.turnId()
   if (turnId === undefined) return
@@ -139,6 +167,8 @@ export function handleNotification(ctx: NotifyContext, method: string, params: u
       return onDelta(ctx, params as WireDelta)
     case "item/commandExecution/outputDelta":
       return onOutputDelta(ctx, params as WireDelta)
+    case "thread/tokenUsage/updated":
+      return onUsage(ctx, params as WireTokenUsage)
     case "turn/completed":
       return onTurnCompleted(ctx, params as WireTurnLifecycle)
     case "error":

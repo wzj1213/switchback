@@ -128,3 +128,45 @@ describe("轮次与错误", () => {
     expect(events).toEqual([])
   })
 })
+
+describe("用量", () => {
+  const usageParams = {
+    threadId: "cx",
+    tokenUsage: {
+      last: { totalTokens: 15748 },
+      total: { totalTokens: 47529 },
+      modelContextWindow: 258400,
+    },
+  }
+
+  it("取 last 而不是 total——total 是累计账单，会一路涨到远超窗口大小", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "thread/tokenUsage/updated", usageParams)
+    expect(events[0]).toEqual({
+      type: "usage.updated",
+      at: 100,
+      threadId: "th-1",
+      usage: { contextUsed: 15748, contextWindow: 258400, totalTokens: 47529 },
+    })
+  })
+
+  it("没有 last 就不发事件，宁可不显示也不显示一个错的数", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "thread/tokenUsage/updated", { tokenUsage: { total: { totalTokens: 1 } } })
+    expect(events).toEqual([])
+  })
+
+  it("用量与轮次无关——轮次结束后仍然要能报", () => {
+    const events: Event[] = []
+    const ctx: NotifyContext = {
+      threadId: "th-1",
+      emit: (e) => events.push(e),
+      turnId: () => undefined,
+      inflight: new Map(),
+      materialized: new Set(),
+      now: () => 100,
+    }
+    handleNotification(ctx, "thread/tokenUsage/updated", usageParams)
+    expect(events).toHaveLength(1)
+  })
+})

@@ -263,3 +263,47 @@ body {
   flex-direction: column;
   gap: var(--sp-4);
 }
+
+/* ── 上下文用量表 ─────────────────────────────────────
+ * 顶栏右侧一个窄条 + 数字。平时是中性灰，逼近窗口上限时才变色——
+ * 一直是彩色的话，真到危险区就没有升级空间了。
+ */
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.meter__track {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+
+.meter__fill {
+  display: block;
+  height: 100%;
+  background: var(--text-faint);
+  transition: width 240ms ease;
+}
+
+.meter--warn {
+  color: var(--warn);
+}
+
+.meter--warn .meter__fill {
+  background: var(--warn);
+}
+
+.meter--danger {
+  color: var(--danger);
+}
+
+.meter--danger .meter__fill {
+  background: var(--danger);
+}

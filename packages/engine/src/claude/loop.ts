@@ -4,11 +4,40 @@ import type { StartRequest } from "../contract.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
+interface RawUsage {
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_input_tokens?: number
+  cache_creation_input_tokens?: number
+}
+
 interface RawMessage {
   type: string
   subtype?: string
   is_error?: boolean
   message?: { content?: unknown }
+  usage?: RawUsage
+}
+
+const num = (v: unknown): number => (typeof v === "number" ? v : 0)
+
+/**
+ * Claude 的用量。
+ *
+ * 上下文占用 = 这次请求送上去的输入（含缓存命中的那部分）+ 产出。
+ * **缓存命中必须算进去**——它省的是钱，不是上下文：那些 token 照样占窗口。
+ *
+ * 窗口大小 SDK 不给（它随模型变），所以 `contextWindow` 缺席，
+ * 界面上就只显示数字不画进度条。宁可少画一条，也不要照一个猜出来的分母画。
+ */
+function usageOf(raw: RawUsage): { contextUsed: number } {
+  return {
+    contextUsed:
+      num(raw.input_tokens) +
+      num(raw.cache_read_input_tokens) +
+      num(raw.cache_creation_input_tokens) +
+      num(raw.output_tokens),
+  }
 }
 
 /**
@@ -64,6 +93,9 @@ function onToolResults(msg: RawMessage, ref: TurnRef, req: StartRequest, at: num
 function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
   const turnId = ref.current
   ref.current = undefined
+  if (msg.usage !== undefined) {
+    req.emit({ type: "usage.updated", at, threadId: req.threadId, usage: usageOf(msg.usage) })
+  }
   if (turnId === undefined) return
   req.emit({
     type: "turn.completed",

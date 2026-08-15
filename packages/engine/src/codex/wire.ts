@@ -91,6 +91,17 @@ export interface WireTurnLifecycle {
   turn: WireTurn
 }
 
+export interface WireTokenUsage {
+  threadId?: string
+  tokenUsage?: {
+    /** 最近一次请求：input + output 就是这次占了多少上下文 */
+    last?: { totalTokens?: number }
+    /** 本会话累计 */
+    total?: { totalTokens?: number }
+    modelContextWindow?: number
+  }
+}
+
 export interface WireError {
   error?: { message?: string }
   willRetry?: boolean

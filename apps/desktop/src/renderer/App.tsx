@@ -1,21 +1,23 @@
 import { useState } from "react"
-import type { Thread } from "@omni/protocol"
-import { itemsOf, threadRowsOf, turnOf } from "@omni/store"
+import type { Thread, Usage } from "@omni/protocol"
+import { itemsOf, threadRowsOf, turnOf, usageOf } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
 import { Composer, ENGINES, TRUSTS } from "./components/Composer.js"
 import { Transcript } from "./components/Transcript.js"
+import { ContextMeter } from "./components/ContextMeter.js"
 import { useOmni } from "./useOmni.js"
 
 function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
   return list.find((x) => x.id === id)?.label ?? id
 }
 
-function TopBar({ thread }: { thread: Thread }): React.JSX.Element {
+function TopBar({ thread, usage }: { thread: Thread; usage: Usage | undefined }): React.JSX.Element {
   const handedOff = thread.engineHistory.length > 1
   return (
     <header className="topbar">
       <span className="topbar__title">{thread.title}</span>
       <span className="topbar__spacer" />
+      <ContextMeter usage={usage} />
       {handedOff ? (
         <span className="pill" title={thread.engineHistory.join(" → ")}>
           接力自 {labelOf(ENGINES, thread.engineHistory[0] ?? "")}
@@ -100,7 +102,7 @@ export function App(): React.JSX.Element {
         onOpenFolder={openPicker}
       />
       <main className="main">
-        <TopBar thread={thread} />
+        <TopBar thread={thread} usage={usageOf(state, thread.id)} />
         <Transcript thread={thread} items={items} turn={turn} send={send} />
         <Composer
           // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，

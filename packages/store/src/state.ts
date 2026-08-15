@@ -1,4 +1,4 @@
-import type { Item, ItemId, Thread, ThreadId, Turn, TurnId } from "@omni/protocol"
+import type { Item, ItemId, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -13,10 +13,12 @@ export interface ViewState {
   owner: Readonly<Record<ItemId, ThreadId>>
   /** turn id → 它属于哪个会话。`turn.completed` 同理。 */
   turnOwner: Readonly<Record<TurnId, ThreadId>>
+  /** 每个会话的上下文用量。引擎不报就没有这一项。 */
+  usage: Readonly<Record<ThreadId, Usage>>
 }
 
 export function initial(): ViewState {
-  return { threads: {}, order: [], items: {}, turns: {}, owner: {}, turnOwner: {} }
+  return { threads: {}, order: [], items: {}, turns: {}, owner: {}, turnOwner: {}, usage: {} }
 }
 
 /** 取一个会话的 item 列表；不存在时给空数组，调用方不用判空。 */
@@ -27,6 +29,10 @@ export function itemsOf(state: ViewState, threadId: ThreadId): readonly Item[] {
 /** 取一个会话当前未结束的轮次；没有就是 undefined（空闲）。 */
 export function turnOf(state: ViewState, threadId: ThreadId): Turn | undefined {
   return state.turns[threadId]
+}
+
+export function usageOf(state: ViewState, threadId: ThreadId): Usage | undefined {
+  return state.usage[threadId]
 }
 
 export function threadsOf(state: ViewState): readonly Thread[] {
