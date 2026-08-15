@@ -1,5 +1,6 @@
 import { Markdown } from "./Markdown.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
+import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
 
 function Plan({ steps }: { steps: readonly { text: string; status: string }[] }): React.JSX.Element {
@@ -25,7 +26,15 @@ function Plan({ steps }: { steps: readonly { text: string; status: string }[] })
  * 除工具调用之外的 item。工具调用由 `ToolRun` 成组渲染——
  * 这里把它从类型上排除掉，switch 才能保持穷尽，漏一种就编译不过。
  */
-export function ItemView({
+/**
+ * 包 `memo`：流式期间每 16ms 一次 setState，不包的话**已经定稿的每一条消息
+ * 都会跟着重渲染并重新解析一遍 markdown**。实测 20 条消息的会话，
+ * 一帧要花 30ms——帧预算的两倍。
+ *
+ * 前提是传进来的 props 引用稳定，所以 `onResolve` 在 `Transcript` 那边
+ * 是 `useCallback` 的；换成行内箭头函数这个 memo 立刻失效，而且是静默失效。
+ */
+export const ItemView = memo(function ItemView({
   item,
   onResolve,
 }: {
@@ -38,14 +47,14 @@ export function ItemView({
     // 用户消息保持字面量：他打的是什么就显示什么，替他解析 Markdown 是意外行为
     case "agent_message":
       return (
-        <div className={`msg--agent${item.complete ? "" : " caret"}`}>
-          <Markdown text={item.text} />
+        <div className="msg--agent">
+          <Markdown text={item.text} streaming={!item.complete} />
         </div>
       )
     case "reasoning":
       return (
         <div className="reasoning">
-          <Markdown text={item.text} />
+          <Markdown text={item.text} streaming={!item.complete} />
         </div>
       )
     case "plan":
@@ -55,4 +64,4 @@ export function ItemView({
     case "error":
       return <div className="error">{item.message}</div>
   }
-}
+})

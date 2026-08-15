@@ -157,7 +157,9 @@ export function applyDevTheme(): void {
 export function scheduleDevProbe(win: BrowserWindow, log: (message: string) => void): void {
   const code = process.env["OMNI_DEV_PROBE"]
   if (code === undefined || code === "") return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 3000
+  // **自己的时刻**，不跟截图那个。跟着截图的话探针总是只剩 3 秒可用，
+  // 而要观察流式这种持续过程，得从早跑到晚
+  const delay = Number(process.env["OMNI_DEV_PROBE_AT"] ?? "4000")
   setTimeout(() => {
     if (win.isDestroyed()) return
     void win.webContents

@@ -1,7 +1,8 @@
 import type { Command, Item, Thread, Turn } from "@omni/protocol"
+import { useCallback } from "react"
 import { ItemView } from "./ItemView.js"
+import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
-import { TurnStatus } from "./TurnStatus.js"
 import { Copyable } from "./Copyable.js"
 import { groupRows } from "../group.js"
 import { useStickToBottom } from "../useStickToBottom.js"
@@ -54,33 +55,28 @@ export function Transcript({
   send: (command: Command) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const scroller = useStickToBottom<HTMLDivElement>(items.length + (turn === undefined ? 0 : 1))
+  const { scroller, inner } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
+  // **必须是 useCallback。** 写成行内箭头函数的话每次 render 换一个身份，
+  // `ItemView` 的 memo 会全部落空——而且是静默落空：功能全对，只是每帧白干一遍
+  const onResolve = useCallback<ResolveApproval>(
+    (itemId, allow, remember) => {
+      send({ type: "approval.resolve", itemId, allow, remember })
+    },
+    [send],
+  )
   return (
     <div className="transcript" ref={scroller}>
       {items.length === 0 && turn === undefined ? <Blank thread={thread} /> : null}
-      <div className="transcript__inner">
+      <div className="transcript__inner" ref={inner}>
         {groupRows(items).map((row) =>
           row.kind === "run" ? (
             <ToolRun key={row.items[0]?.id} items={row.items} />
           ) : (
             <Copyable key={row.item.id} item={row.item} onCopy={onCopy}>
-              <ItemView
-                item={row.item}
-                onResolve={(itemId, allow, remember) => {
-                  send({ type: "approval.resolve", itemId, allow, remember })
-                }}
-              />
+              <ItemView item={row.item} onResolve={onResolve} />
             </Copyable>
           ),
         )}
-        <TurnStatus
-          thread={thread}
-          turn={turn}
-          items={items}
-          onInterrupt={() => {
-            send({ type: "thread.interrupt", threadId: thread.id })
-          }}
-        />
       </div>
     </div>
   )

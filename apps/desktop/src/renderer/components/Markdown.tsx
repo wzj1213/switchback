@@ -1,3 +1,4 @@
+import { memo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { rehypeHighlight } from "../highlight.js"
@@ -36,18 +37,46 @@ function Table({ children }: { children?: React.ReactNode }): React.JSX.Element 
   )
 }
 
-export function Markdown({ text }: { text: string }): React.JSX.Element {
+/*
+ * 插件数组与组件表**必须提到模块作用域**。
+ *
+ * 写成行内字面量的话，每次 render 都是新数组、新对象，`ReactMarkdown` 内部
+ * 一律当成「配置变了」重建整条 unified 管线——于是下面那个 `memo` 白包。
+ * 这类失效是静默的：功能全对，只是每帧多花一毫秒，测不出来也看不出来。
+ */
+const REMARK = [remarkGfm]
+// 高亮插件产出的是 **hast 元素树**，不是 HTML 字符串——
+// 所以加它不违反上面那条红线：结构上仍然不存在注入面。见 `highlight.ts`。
+const REHYPE = [rehypeHighlight]
+const REHYPE_NONE: [] = []
+const COMPONENTS = { a: Anchor, table: Table }
+
+/**
+ * @param streaming 这段文字还在流。**流式期间不跑语法高亮**，两个原因：
+ *
+ * 1. 实测同一条消息，只解析 0.53ms，加上高亮 1.49ms——**高亮比解析还贵**，
+ *    占掉三分之二，而它每 16ms 要重来一次。
+ * 2. 没闭合的 ``` 围栏会先按半截内容着一次色，定稿时颜色整块跳变。
+ *    dsh 在流式那支干脆不装会出错的渲染器，同一个道理。
+ *
+ * 定稿之后一次性着色，颜色只出现一次、不再变。
+ */
+export const Markdown = memo(function Markdown({
+  text,
+  streaming = false,
+}: {
+  text: string
+  streaming?: boolean
+}): React.JSX.Element {
   return (
     <div className="md">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        // 高亮插件产出的是 **hast 元素树**，不是 HTML 字符串——
-        // 所以加它不违反上面那条红线：结构上仍然不存在注入面。见 `highlight.ts`。
-        rehypePlugins={[rehypeHighlight]}
-        components={{ a: Anchor, table: Table }}
+        remarkPlugins={REMARK}
+        rehypePlugins={streaming ? REHYPE_NONE : REHYPE}
+        components={COMPONENTS}
       >
         {text}
       </ReactMarkdown>
     </div>
   )
-}
+})

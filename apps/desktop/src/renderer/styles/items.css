@@ -24,23 +24,6 @@
   font-size: var(--text-sm);
 }
 
-.caret::after {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 1em;
-  margin-left: 2px;
-  background: var(--text-faint);
-  vertical-align: text-bottom;
-  animation: blink 1.1s step-end infinite;
-}
-
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
-}
-
 /* ── 工具活动：扁平行 + 左轨，不是一摞卡片 ──────────────── */
 .run {
   display: flex;
