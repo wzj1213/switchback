@@ -222,10 +222,13 @@ export async function prompt(
       kind: "user_message",
       at,
       text: cmd.text,
+      ...(cmd.attachments === undefined || cmd.attachments.length === 0
+        ? {}
+        : { attachments: cmd.attachments }),
       ...(origin === undefined ? {} : { origin }),
     },
   })
-  await entry.session.prompt(cmd.text, turnId)
+  await entry.session.prompt(cmd.text, turnId, cmd.attachments)
 }
 
 export async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust" }>): Promise<void> {

@@ -1208,3 +1208,53 @@ body {
   background: color-mix(in srgb, var(--danger) 16%, transparent);
   color: var(--danger);
 }
+
+/* 输入框上方那排附件。贴完图什么都不变的话，人不知道它收没收到——
+   而这件事出错的方式恰好是「静默地没收到」 */
+.attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.attach__chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.attach__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach__drop {
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  cursor: pointer;
+}
+
+.attach__drop:hover {
+  color: var(--danger);
+}
+
+/* 记录里的附件：跟在那句话下面，比正文淡一档 */
+.msg__attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: 5px;
+  opacity: 0.75;
+  font-size: var(--text-xs);
+}

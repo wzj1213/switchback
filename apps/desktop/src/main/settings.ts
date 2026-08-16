@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app, ipcMain, nativeTheme } from "electron"
+import { SETTINGS_DEFAULTS, type Settings, type ThemeChoice } from "../shared/settings.js"
 import type { Trust } from "@omni/protocol"
 import type { Logger } from "./log.js"
 
@@ -20,24 +21,7 @@ import type { Logger } from "./log.js"
  * 那是安全相关的决定，不该存在一个清一次浏览器缓存就没了的地方。
  */
 
-export type ThemeChoice = "system" | "light" | "dark"
-
-export interface Settings {
-  theme: ThemeChoice
-  /** 置顶的工作区路径，按用户置顶的先后。 */
-  pinned: readonly string[]
-  /** 新会话默认用哪家引擎。空 = 沿用当前会话的。 */
-  defaultEngine: string
-  /** 新会话默认的信任档。 */
-  defaultTrust: Trust
-}
-
-const DEFAULTS: Settings = {
-  theme: "system",
-  pinned: [],
-  defaultEngine: "",
-  defaultTrust: "auto-edit",
-}
+const DEFAULTS: Settings = SETTINGS_DEFAULTS
 
 const FILE = "settings.json"
 const TRUSTS: ReadonlySet<string> = new Set(["read-only", "auto-edit", "full"])
@@ -110,3 +94,6 @@ export function installSettingsChannel(store: Store): void {
     patch === undefined ? store.get() : store.patch(patch),
   )
 }
+
+// 主进程别处（主题、菜单）还按老路径引，这里再导出一次，避免一次性大改
+export type { Settings, ThemeChoice } from "../shared/settings.js"

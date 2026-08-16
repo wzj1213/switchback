@@ -308,14 +308,21 @@ class CodexSession implements EngineSession {
     return this.req.threadId
   }
 
-  async prompt(text: string, turnId: TurnId): Promise<void> {
+  async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
     if (this.state.codexThread === undefined) throw new Error("codex 会话尚未就绪")
     this.state.turn = turnId
     // `turn/start` 在轮次**开始**时就回（status: inProgress），不等收工——
     // 所以这里 await 它是安全的，还能顺手拿到 codex 侧的 turnId 供中断使用。
     const started = await this.rpc.call("turn/start", {
       threadId: this.state.codexThread,
-      input: [{ type: "text", text, text_elements: [] }],
+      // codex 的 input item 认这几种：text / image / localImage / audio /
+      // localAudio / skill / mention（探出来的）。**用 localImage 而不是 image**：
+      // 前者只给路径，后者要把整张图塞进 JSON-RPC——一张截图几 MB，
+      // 走管道既慢又会把日志撑爆
+      input: [
+        { type: "text", text, text_elements: [] },
+        ...(attachments ?? []).map((path) => ({ type: "localImage", path })),
+      ],
       ...(this.state.model === undefined ? {} : { model: this.state.model }),
       ...(this.state.effort === undefined ? {} : { effort: this.state.effort }),
     })

@@ -75,7 +75,13 @@ export interface EngineSession {
    * 引擎只负责给自己产出的 item 铸 id，以及在收工时发 `turn.completed`
    * （只有引擎知道自己什么时候真的停下）。
    */
-  prompt: (text: string, turnId: TurnId) => Promise<void>
+  /**
+   * @param attachments 本地文件的绝对路径。各家怎么送由驱动决定
+   *   （codex 走 `localImage` 直接给路径，Claude 要读成 base64 内容块）——
+   *   **上面各层只管路径，不碰编码**。不支持的引擎（`capabilities().attachments`
+   *   为 false）忽略这个参数即可。
+   */
+  prompt: (text: string, turnId: TurnId, attachments?: readonly string[]) => Promise<void>
   interrupt: () => Promise<void>
   setTrust: (trust: Trust) => Promise<void>
   /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */

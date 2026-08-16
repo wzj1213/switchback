@@ -1,10 +1,10 @@
 import { useState } from "react"
 import { Prompt } from "./Prompt.js"
-import { Action, takeCommand } from "./ComposerAction.js"
-import { ModelPicker } from "./ModelPicker.js"
-import { Select } from "./Select.js"
+import { takeCommand } from "./ComposerAction.js"
 import { Chips } from "./Chips.js"
-import { EngineIcon, ShieldIcon } from "./icons.js"
+import { Attachments } from "./Attachments.js"
+import { Bar } from "./ComposerBar.js"
+import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust } from "@omni/protocol"
 
 /**
@@ -45,9 +45,11 @@ interface Props {
   commands: readonly SlashCommand[]
   /** 选中了一条 omni 自己的命令（`source === "omni"`），就地执行。 */
   onOmni: (name: string) => void
+  /** 这家引擎收不收附件。不收就不给贴图入口。 */
+  canAttach: boolean
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
-  onSend: (text: string) => void
+  onSend: (text: string, attachments: readonly string[]) => void
   /** 让这个历史会话重新接上引擎 */
   onResume: () => void
 }
@@ -72,8 +74,11 @@ export function Composer({
   searchFiles,
   commands,
   onOmni,
+  canAttach,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
+  // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
+  const attach = useAttachments(canAttach)
   /**
    * 现在能不能发。
    *
@@ -86,14 +91,28 @@ export function Composer({
   const blocked = detached
   const submit = (): void => {
     const trimmed = text.trim()
-    if (trimmed === "" || blocked) return
-    onSend(trimmed)
+    // **只有附件、没有文字也该能发**：贴一张报错截图问「这是怎么回事」，
+    // 那句话经常就在图里
+    if ((trimmed === "" && attach.paths.length === 0) || blocked) return
+    onSend(trimmed, attach.paths)
     setText("")
+    attach.clear()
   }
 
   return (
     <div className="composer">
-      <div className="composer__inner">
+      <div
+        className="composer__inner"
+        onDragOver={(e) => {
+          if (canAttach) e.preventDefault()
+        }}
+        onDrop={(e) => {
+          if (!canAttach) return
+          e.preventDefault()
+          attach.drop(e.dataTransfer.files)
+        }}
+      >
+        <Attachments paths={attach.paths} onRemove={attach.remove} />
         {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} stamp={stamp} />}
         <Prompt
           value={text}
@@ -101,6 +120,7 @@ export function Composer({
           busyHint={busy && !detached}
           queueing={busy && !detached}
           cwd={cwd}
+          onPaste={attach.paste}
           commands={commands}
           onCommand={(command) => {
             takeCommand(command, setText, onOmni)
@@ -138,99 +158,3 @@ export function labelOf<T extends { id: string; label: string }>(list: readonly 
 
 export { TRUSTS }
 
-/**
- * 输入框下面那一排：引擎 / 信任档 / 模型 ＋ 右下角那颗键。
- *
- * 从 `Composer` 拆出来是行数闸门逼的。边界还算清楚：上面是「打什么字」，
- * 这一排是「这句话由谁、以什么权限、用哪个模型去跑」——
- * 四件事都不改文本，只改**这句话的去向**。
- */
-function Bar({
-  detached,
-  busy,
-  empty,
-  engine,
-  engines,
-  trust,
-  models,
-  model,
-  effort,
-  onEngineChange,
-  onTrustChange,
-  onModelChange,
-  onResume,
-  onInterrupt,
-  onSend,
-}: {
-  detached: boolean
-  busy: boolean
-  empty: boolean
-  engine: EngineId
-  engines: readonly EngineInfo[]
-  trust: Trust
-  models: readonly ModelOption[]
-  model?: string
-  effort?: string
-  onEngineChange: (next: EngineId) => void
-  onTrustChange: (next: Trust) => void
-  onModelChange: (model: string, effort?: string) => void
-  onResume?: () => void
-  onInterrupt?: () => void
-  onSend: () => void
-}): React.JSX.Element {
-  return (
-  <div className="composer__bar">
-            <Select
-              label={labelOf(engines, engine)}
-              icon={<EngineIcon />}
-              title="引擎"
-              disabled={detached}
-              sections={[
-                {
-                  value: engine,
-                  onPick: onEngineChange,
-                  // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
-                  // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
-                  choices: engines.map((item) => ({
-                    id: item.id,
-                    label: item.label,
-                    ...(item.state === "missing" ? { note: "未安装" } : {}),
-                    ...(item.detail === undefined ? {} : { description: item.detail }),
-                  })),
-                },
-              ]}
-            />
-            <Select
-              label={labelOf(TRUSTS, trust)}
-              icon={<ShieldIcon />}
-              title="信任档"
-              disabled={detached}
-              sections={[
-                {
-                  value: trust,
-                  onPick: (id) => {
-                    onTrustChange(id as Trust)
-                  },
-                  choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
-                },
-              ]}
-            />
-            <ModelPicker
-              models={models}
-              model={model}
-              effort={effort}
-              disabled={detached}
-              onChange={onModelChange}
-            />
-            <span style={{ flex: 1 }} />
-            <Action
-              detached={detached}
-              busy={busy}
-              empty={empty}
-              onResume={onResume}
-              onInterrupt={onInterrupt}
-              onSend={onSend}
-            />
-          </div>
-  )
-}

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron"
 import type { Command, Event } from "@omni/protocol"
+import type { Settings } from "../shared/settings.js"
 
 /** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
 export interface Sealed {
@@ -41,6 +42,19 @@ const api = {
   async pickFolder(): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:pickFolder")) as string | undefined
   },
+  /** 给一条不属于任何项目的对话要一个目录（主进程自动建在 `~/Documents/omni/` 下）。 */
+  async chatDir(): Promise<string> {
+    return (await ipcRenderer.invoke("omni:chatDir")) as string
+  },
+  /**
+   * 把剪贴板里的图片落到盘上，返回路径。类型不认或太大时返回 undefined。
+   *
+   * 传 `ArrayBuffer` 而不是 base64 字符串：后者体积涨三分之一，
+   * 而这条通道每贴一张图就走一次。
+   */
+  async stashImage(mime: string, bytes: ArrayBuffer): Promise<string | undefined> {
+    return (await ipcRenderer.invoke("omni:stashImage", { mime, bytes })) as string | undefined
+  },
   async find(request: { query: string; next?: boolean; forward?: boolean }): Promise<{
     active: number
     total: number
@@ -80,8 +94,8 @@ const api = {
     return (await ipcRenderer.invoke("omni:worksite", cwd)) as { branch?: string; dirty?: boolean }
   },
   /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
-  async settings(patch?: Record<string, unknown>): Promise<Record<string, unknown>> {
-    return (await ipcRenderer.invoke("omni:settings", patch)) as Record<string, unknown>
+  async settings(patch?: Partial<Settings>): Promise<Settings> {
+    return (await ipcRenderer.invoke("omni:settings", patch)) as Settings
   },
   async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
     return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]

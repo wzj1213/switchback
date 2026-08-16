@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
 import { Composer } from "./Composer.js"
@@ -99,6 +100,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
         stamp={props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`}
         searchFiles={props.searchFiles}
+        canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments}
         commands={[...actions.map((a) => a.command), ...props.commands]}
         onOmni={(name: string) => {
           actions.find((a) => a.command.name === name)?.run()
@@ -121,8 +123,13 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onTrustChange={(next) => {
           send({ type: "thread.setTrust", threadId: thread.id, trust: next })
         }}
-        onSend={(text) => {
-          send({ type: "thread.prompt", threadId: thread.id, text })
+        onSend={(text, attachments) => {
+          send({
+            type: "thread.prompt",
+            threadId: thread.id,
+            text,
+            ...(attachments.length === 0 ? {} : { attachments }),
+          })
         }}
         onResume={() => {
           send({ type: "thread.resume", threadId: thread.id })

@@ -1,53 +1,26 @@
 /// <reference types="vite/client" />
-import type { Command, Event } from "@omni/protocol"
 
-/** 与 preload 的 `Sealed` / `Replay` 同形。跨进程的形状只能靠约定对齐。 */
-interface Sealed {
-  seq: number
-  event: Event
-}
-
-interface Settings {
-  theme: "system" | "light" | "dark"
-  pinned: readonly string[]
-  defaultEngine: string
-  defaultTrust: "read-only" | "auto-edit" | "full"
-}
-
-interface Replay {
-  events: readonly Event[]
-  resumeAt: number
-}
-
+/*
+ * 三份手抄的跨进程形状（`Sealed` / `Settings` / `Replay`）已经删掉。
+ * 它们当初的注释写着「跨进程的形状只能靠约定对齐」——那句话本身就是问题：
+ * 靠约定对齐 = 没有任何东西在对齐失败时报错。现在全部从 preload 的真实导出走。
+ */
+import type { OmniBridge } from "../preload/index.js"
 declare global {
   interface Window {
-    /** 由 preload 注入的唯一通道，形状见 src/preload/index.ts */
-    omni: {
-      send: (command: Command) => void
-      pickFolder: () => Promise<string | undefined>
-      onMenu: (handler: (action: string) => void) => () => void
-      onDevFind: (handler: (query: string) => void) => () => void
-      find: (request: { query: string; next?: boolean; forward?: boolean }) => Promise<{
-        active: number
-        total: number
-      }>
-      stopFind: () => void
-      copy: (text: string) => void
-      reveal: (path: string) => void
-      settings: (patch?: Partial<Settings>) => Promise<Settings>
-      appInfo: () => Promise<{ version: string; dataDir: string }>
-      worksite: (cwd: string) => Promise<{ branch?: string; dirty?: boolean }>
-      openEngines: () => void
-      diagnose: () => void
-      searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
-      subscribe: (onEvents: (sealed: readonly Sealed[]) => void) => () => void
-      onReplay: (handler: (replay: Replay) => void) => () => void
-      /** 渲染层挂好监听之后喊一声，主进程才发全量。 */
-      hello: () => void
-      /** 给一条不属于任何项目的对话要一个目录。 */
-      chatDir: () => Promise<string>
-      resync: (after: number) => Promise<{ events: readonly Sealed[] } | { reset: true }>
-    }
+    /**
+     * preload 注入的窄通道。
+     *
+     * **类型从 preload 的真实导出推导，不再手写一份。**
+     * 原来这里是一份手抄的接口，于是它可以和实现对不上而编译器一言不发——
+     * 实测踩过：`chatDir` 和 `stashImage` 写进了这份声明、却没进 preload，
+     * `pnpm check` 全绿，跑起来才 `is not a function`。
+     * 现在少写一个方法会在**用它的地方**编译不过。
+     *
+     * `undefined` 是真实可能：preload 没注入时（打包出错、被安全策略拦掉）
+     * 它就是没有。见 `useOmni` 的 `bridgeMissing`。
+     */
+    omni?: OmniBridge
   }
 }
 

@@ -51,7 +51,20 @@ export const ItemView = memo(function ItemView({
       return item.origin === "handoff" ? (
         <HandoffNote text={item.text} />
       ) : (
-        <div className="msg--user">{item.text}</div>
+        <div className="msg--user">
+          {item.text}
+          {/* 附件要在记录里留痕：三天后回来看「当时贴的是哪张图」，
+              靠的就是这一行 */}
+          {item.attachments === undefined || item.attachments.length === 0 ? null : (
+            <div className="msg__attach">
+              {item.attachments.map((path) => (
+                <span key={path} title={path}>
+                  {path.split("/").pop() ?? path}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )
     // 用户消息保持字面量：他打的是什么就显示什么，替他解析 Markdown 是意外行为
     case "agent_message":

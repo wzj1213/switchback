@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import type { Trust } from "@omni/protocol"
+import { SETTINGS_DEFAULTS, type Settings } from "../shared/settings.js"
 
 /**
  * 偏好。真源在主进程（`main/settings.ts`），这里只做**读一次 + 写回去**。
@@ -7,14 +7,7 @@ import type { Trust } from "@omni/protocol"
  * 没有做本地乐观更新：偏好的改动一秒钟发生不了几次，
  * 而乐观更新要处理「写失败了怎么回滚」，代价换不来任何东西。
  */
-export interface Settings {
-  theme: "system" | "light" | "dark"
-  pinned: readonly string[]
-  defaultEngine: string
-  defaultTrust: Trust
-}
-
-const FALLBACK: Settings = { theme: "system", pinned: [], defaultEngine: "", defaultTrust: "auto-edit" }
+const FALLBACK: Settings = SETTINGS_DEFAULTS
 
 export interface SettingsApi {
   settings: Settings
@@ -60,3 +53,5 @@ export function useSettings(): SettingsApi {
     isPinned: (cwd) => settings.pinned.includes(cwd),
   }
 }
+
+export type { Settings } from "../shared/settings.js"

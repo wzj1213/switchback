@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises"
 import {
   query,
   type Options,
@@ -119,16 +120,15 @@ class ClaudeSession implements EngineSession {
     return this.req.threadId
   }
 
-  async prompt(text: string, turnId: TurnId): Promise<void> {
+  async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
     // 轮次由宿主铸造；引擎只在这里认领它，收工时由消息循环清空
     this.turn.current = turnId
     this.input.push({
       type: "user",
-      message: { role: "user", content: text },
+      message: { role: "user", content: await toContent(text, attachments) },
       parent_tool_use_id: null,
       session_id: this.req.threadId,
     } as SDKUserMessage)
-    return Promise.resolve()
   }
 
   /**
@@ -248,4 +248,54 @@ export function createClaudeDriver(config: ClaudeDriverConfig = {}): EngineDrive
       return Promise.resolve(session)
     },
   }
+}
+
+/** 认得出的图片类型。**认不出就不送**——把一个 zip 当成图片塞过去，模型那边只会报错。 */
+const IMAGE_MIME: Readonly<Record<string, string>> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+}
+
+/**
+ * 文本 ＋ 附件 → SDK 的消息内容。
+ *
+ * 没有附件时**仍然给字符串**，不是单元素数组：那条路每天走几百次，
+ * 形状不变最安全。
+ *
+ * 图片要读成 base64——SDK 走的是 Anthropic 的内容块，那边只认内联数据，
+ * 没有「给个路径你自己读」的形式（codex 有，所以那边用 `localImage`）。
+ * 读不出来的（文件没了、权限不对）**跳过并在文本里说一声**，
+ * 而不是整条消息发不出去：用户已经按了回车，那句话本身还是该送到。
+ */
+async function toContent(
+  text: string,
+  attachments: readonly string[] | undefined,
+): Promise<SDKUserMessage["message"]["content"]> {
+  if (attachments === undefined || attachments.length === 0) return text
+  const blocks: unknown[] = []
+  const failed: string[] = []
+  for (const path of attachments) {
+    const mime = IMAGE_MIME[extOf(path)]
+    if (mime === undefined) {
+      failed.push(`${path}（不是认得出的图片类型）`)
+      continue
+    }
+    const data = await readFile(path, { encoding: "base64" }).catch(() => undefined)
+    if (data === undefined) {
+      failed.push(`${path}（读不出来）`)
+      continue
+    }
+    blocks.push({ type: "image", source: { type: "base64", media_type: mime, data } })
+  }
+  const note = failed.length === 0 ? "" : `\n\n（这些附件没能送达：${failed.join("、")}）`
+  blocks.push({ type: "text", text: text + note })
+  return blocks as SDKUserMessage["message"]["content"]
+}
+
+function extOf(path: string): string {
+  const at = path.lastIndexOf(".")
+  return at === -1 ? "" : path.slice(at).toLowerCase()
 }

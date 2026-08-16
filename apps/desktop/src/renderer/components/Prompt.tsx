@@ -21,6 +21,7 @@ export function Prompt({
   queueing = false,
   cwd,
   searchFiles,
+  onPaste,
   commands,
   onCommand,
   onChange,
@@ -34,6 +35,8 @@ export function Prompt({
   queueing?: boolean
   cwd: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  /** 贴进来的东西里有图就收下。返回 true 表示收了，调用方据此拦掉默认粘贴。 */
+  onPaste: (items: DataTransferItemList | null) => Promise<boolean>
   /** 这个会话能用的斜杠命令：引擎报的 ＋ omni 自己的。 */
   commands: readonly SlashCommand[]
   /** 选中了一条。omni 自己的就地执行，引擎的填进输入框等着按回车。 */
@@ -87,38 +90,62 @@ export function Prompt({
           mentions.refresh(e.target.value, e.target.selectionStart)
           slash.refresh(e.target.value, e.target.selectionStart)
         }}
+        onPaste={(e) => {
+          // 先看有没有图。有图就拦掉默认粘贴——否则文件名会以文本形式落进输入框
+          void onPaste(e.clipboardData.items).then((took) => {
+            if (took) e.preventDefault()
+          })
+        }}
         onBlur={() => {
           mentions.close()
           slash.close()
         }}
         onKeyDown={(e) => {
-          // 命令面板开着时它先吃按键
-          if (slash.onKeyDown(e)) {
-            if (e.key === "Enter" || e.key === "Tab") {
-              e.preventDefault()
-              const command = slash.hits[slash.active]
-              if (command !== undefined) pickCommand(command)
-            }
-            return
-          }
-          // 候选列表开着时它先吃按键：上下移动、Esc 关闭、Enter/Tab 选中
-          if (mentions.onKeyDown(e)) {
-            if (e.key === "Enter" || e.key === "Tab") {
-              e.preventDefault()
-              const path = mentions.paths[mentions.active]
-              if (path !== undefined) choose(path)
-            }
-            return
-          }
-          // Enter 发送，Shift+Enter 换行；IME 组字期间不拦（否则中文输入会被吞）
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault()
-            mentions.close()
-            slash.close()
-            onSubmit()
-          }
+          onPromptKey(e, { mentions, slash, choose, pickCommand, onSubmit })
         }}
       />
     </>
   )
+}
+
+/**
+ * 输入框的按键分派。
+ *
+ * 顺序是有讲究的：**两张候选表先吃**（它们开着的时候，回车是「选中」不是「发送」），
+ * 然后才轮到回车发送。抽出来是行数闸门逼的，但也确实是独立的一件事——
+ * 上面那个组件管「长什么样」，这里管「按下去谁接」。
+ */
+function onPromptKey(
+  e: React.KeyboardEvent<HTMLTextAreaElement>,
+  on: {
+    mentions: ReturnType<typeof useMentions>
+    slash: ReturnType<typeof useSlash>
+    choose: (path: string) => void
+    pickCommand: (command: SlashCommand) => void
+    onSubmit: () => void
+  },
+): void {
+  if (on.slash.onKeyDown(e)) {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault()
+      const command = on.slash.hits[on.slash.active]
+      if (command !== undefined) on.pickCommand(command)
+    }
+    return
+  }
+  if (on.mentions.onKeyDown(e)) {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault()
+      const path = on.mentions.paths[on.mentions.active]
+      if (path !== undefined) on.choose(path)
+    }
+    return
+  }
+  // Enter 发送，Shift+Enter 换行；IME 组字期间不拦（否则中文输入会被吞）
+  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    e.preventDefault()
+    on.mentions.close()
+    on.slash.close()
+    on.onSubmit()
+  }
 }
