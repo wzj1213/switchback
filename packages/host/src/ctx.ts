@@ -24,6 +24,13 @@ export interface Live {
   rules: Rule[]
   /** 挂着的审批 → 它的建议规则。用户勾了记忆才用得上。 */
   suggests: Map<ItemId, Rule>
+  /**
+   * 排着队等这一轮跑完再发的话。**可变**。
+   *
+   * 放在宿主而不是渲染层：渲染层重载一次队列就没了，而用户打完那句话
+   * 就当它已经交出去了。放在这里，重载之后队列还在（全量重建带着 thread 一起回来）。
+   */
+  queued: string[]
 }
 
 export interface Ctx {
@@ -43,6 +50,13 @@ export interface Ctx {
    * 模块级的表会让它们互相拦。
    */
   inflight: Map<string, Promise<void>>
+  /**
+   * 把待发队列里的第一句发出去。**由 `host.ts` 在建 ctx 时填进来。**
+   *
+   * 不直接 import `session.ts` 的 `prompt`：那会绕成
+   * ctx → session → ctx 的循环。这里只留一个洞，谁能干这活谁来填。
+   */
+  drain?: (threadId: ThreadId) => void
 }
 
 /**
@@ -145,6 +159,18 @@ export function observe(ctx: Ctx, event: Event): void {
     // 工具行那边早有 `sweepInflight` 扫尾，审批卡漏扫了。
     if (event.status !== "completed") entry.gate.settleAll()
     setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
+    // **只有正常跑完才接上队列。** 中断/失败之后接着发排队的话是错的：
+    // 人按停止就是要它停下，而不是"停完这句再跑下一句"
+    if (event.status === "completed") ctx.drain?.(entry.thread.id)
+    else if (entry.queued.length > 0) clearQueue(ctx, entry)
     return
   }
+}
+
+/** 清掉待发队列并把变化发出去。中断之后用。 */
+export function clearQueue(ctx: Ctx, entry: Live): void {
+  entry.queued = []
+  const at = ctx.deps.now()
+  entry.thread = { ...entry.thread, queued: [], updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }

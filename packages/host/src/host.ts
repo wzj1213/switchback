@@ -1,6 +1,6 @@
 import type { Command, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
-import { type Ctx, type Live } from "./ctx.js"
+import { clearQueue, emit, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { create, fork, handoff, prompt, remove, rename, resume, setModel, setTrust } from "./session.js"
 
@@ -46,8 +46,17 @@ const HANDLERS: Handlers = {
   "thread.delete": remove,
   "thread.handoff": handoff,
   "thread.fork": fork,
+  "thread.unqueue": (ctx, command) => {
+    const entry = ctx.live.get(command.threadId)
+    if (entry !== undefined && entry.queued.length > 0) clearQueue(ctx, entry)
+    return Promise.resolve()
+  },
   "thread.interrupt": async (ctx, command) => {
-    await ctx.live.get(command.threadId)?.session.interrupt()
+    const entry = ctx.live.get(command.threadId)
+    // **按停止就是要它停下**，排着队的那几句一并作废——
+    // 「停完这句再跑下一句」不是任何人按停止时想要的
+    if (entry !== undefined && entry.queued.length > 0) clearQueue(ctx, entry)
+    await entry?.session.interrupt()
   },
   "approval.resolve": (ctx, command) => {
     resolveApproval(ctx, command)
@@ -121,6 +130,30 @@ export function createHost(deps: HostDeps): Host {
     live: new Map<ThreadId, Live>(),
     turnOwner: new Map<TurnId, ThreadId>(),
     inflight: new Map<string, Promise<void>>(),
+  }
+  /**
+   * 一轮跑完就把排队的下一句发出去。
+   *
+   * **一次只发一句**：发完那句又开了一轮，跑完再由这里接着发下一句。
+   * 一口气全推给引擎是错的——那等于把「我看着它跑、随时补一句」
+   * 变成「我一次性交代五件事」，而后者本来就该写在同一句话里。
+   */
+  ctx.drain = (threadId) => {
+    const entry = ctx.live.get(threadId)
+    const next = entry?.queued.shift()
+    if (entry === undefined || next === undefined) return
+    const at = ctx.deps.now()
+    entry.thread = { ...entry.thread, queued: [...entry.queued], updatedAt: at }
+    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+    void prompt(ctx, { type: "thread.prompt", threadId, text: next }).catch((error: unknown) => {
+      ctx.deps.emit({
+        type: "engine.status",
+        at: ctx.deps.now(),
+        threadId,
+        status: "crashed",
+        detail: `排队的那句没发出去：${String(error)}`,
+      })
+    })
   }
   return {
     dispatch: (command) => dispatch(ctx, command),

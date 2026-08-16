@@ -1103,3 +1103,49 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── 排队中的那句话 ──────────────────────────────────
+ * 打完回车就消失的话，人会以为发出去了——而它还躺在队列里。
+ * 摆在输入框正上方（和「N 个文件已更改」同一条带子上），它属于「还没发生的事」。
+ */
+.queued {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: min(760px, 100%);
+  margin: 0 auto var(--sp-2);
+  padding: 4px var(--sp-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.queued__badge {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.queued__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queued__drop {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.queued__drop:hover {
+  color: var(--danger);
+}

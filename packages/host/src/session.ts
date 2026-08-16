@@ -64,6 +64,7 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
     turn: undefined,
     rules: [...((await ctx.deps.rules?.read(thread.cwd)) ?? [])] as Rule[],
     suggests: new Map<ItemId, Rule>(),
+    queued: [],
   }
   const session = await driver.start({
     threadId: thread.id,
@@ -175,15 +176,24 @@ export async function prompt(
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
   /**
-   * **上一轮没跑完就不许发下一轮。**
+   * **上一轮没跑完时排队，不开新轮次。**
    *
-   * 界面已经挡了一道（输入框在跑的时候是禁的），这里是兜底：菜单、快捷键、
-   * 将来的自动化都从这条路进来。不挡的话 `entry.turn` 会被新 turnId 覆盖，
-   * 而引擎还在往**旧的** turnId 上发 item——那些 item 从此无主，
-   * 正在流的回答会整个消失。
+   * 硬约束没变：`entry.turn` 绝不能被新 turnId 覆盖——引擎还在往**旧的**
+   * turnId 上发 item，覆盖之后那些 item 从此无主，正在流的回答会整个消失。
+   *
+   * 变的是没跑完时怎么办。原来是抛错，界面靠禁用输入框配合；
+   * 而人在 agent 跑的时候最常想做的事恰恰是**补一句**
+   *（「不对，用另一个文件」「顺便把测试也跑了」），
+   * 逼他先中断等于丢掉已经做完的一半。所以排进队里，这一轮一停就接上。
+   *
+   * 排队也守住了那条硬约束：队列不碰 `entry.turn`。
    */
   if (entry.turn !== undefined) {
-    throw new Error("上一轮还没跑完。等它停下，或者先点「停止」。")
+    const queuedAt = ctx.deps.now()
+    entry.queued = [...entry.queued, cmd.text]
+    entry.thread = { ...entry.thread, queued: [...entry.queued], updatedAt: queuedAt }
+    emit(ctx, { type: "thread.updated", at: queuedAt, thread: entry.thread })
+    return
   }
   const at = ctx.deps.now()
   const turnId = ctx.deps.newId("tn")

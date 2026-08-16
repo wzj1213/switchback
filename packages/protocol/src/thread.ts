@@ -63,6 +63,16 @@ export interface Thread {
    * 于是不区分的话，改完名什么都不会变，因为 preview 永远赢。
    */
   named?: boolean
+  /**
+   * 排着队等这一轮跑完再发的话。
+   *
+   * **不是"禁止输入"的替代品，是它的反面。** 以前轮次跑着时输入框直接禁用，
+   * 想补一句「不对，用另一个文件」只能先中断——而中断意味着丢掉它已经做的一半。
+   * 现在照打照发，排进队里，这一轮一停就接上。
+   *
+   * 队列**不跨重启**：引擎都换过一个了，那句话的上下文已经不在。
+   */
+  queued?: readonly string[]
 }
 
 export type TurnStatus = "running" | "completed" | "interrupted" | "failed"

@@ -81,7 +81,9 @@ export function Composer({
    * **第二条是个真 bug 不是洁癖**：轮次跑着时再发一条，
    * Claude 那边正在流的回答会整个消失——审计里复现过。
    */
-  const blocked = detached || busy
+  // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上。
+  // 只有「这是历史记录」才真的不能发（背后没有引擎）
+  const blocked = detached
   const submit = (): void => {
     const trimmed = text.trim()
     if (trimmed === "" || blocked) return
@@ -97,6 +99,7 @@ export function Composer({
           value={text}
           detached={blocked}
           busyHint={busy && !detached}
+          queueing={busy && !detached}
           cwd={cwd}
           commands={commands}
           onCommand={(command) => {

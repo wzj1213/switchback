@@ -818,14 +818,17 @@ describe("在途去重", () => {
     expect(session().prompts.map((p) => p.text)).toEqual(["一", "二"])
   })
 
-  it("**上一轮还在跑就拒**——不拒的话 entry.turn 被覆盖，引擎还在往旧 turnId 上发 item，正在流的回答会整个消失", async () => {
+  it("**上一轮还在跑就不开新轮次**——覆盖 entry.turn 的话，引擎还在往旧 turnId 上发 item，正在流的回答会整个消失", async () => {
+    // 硬约束没变，变的是没跑完时怎么办：以前抛错，现在排队（见「跑着的时候补一句话」那组）。
+    // 这里钉的是那条硬约束本身：**第二句不能变成第二个 turn**
     const { host, events, session } = setup()
     await host.dispatch(create)
     const first = events.find((e) => e.type === "thread.started")
     const threadId = first?.type === "thread.started" ? first.thread.id : ""
     await host.dispatch({ type: "thread.prompt", threadId, text: "一" })
-    await expect(host.dispatch({ type: "thread.prompt", threadId, text: "二" })).rejects.toThrow("上一轮还没跑完")
+    await host.dispatch({ type: "thread.prompt", threadId, text: "二" })
     expect(session().prompts).toHaveLength(1)
+    expect(events.filter((e) => e.type === "turn.started")).toHaveLength(1)
   })
 })
 
@@ -893,5 +896,57 @@ describe("中断之后审批卡不能还挂着", () => {
     session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
     await new Promise((r) => setTimeout(r, 0))
     expect(host.live().find((t) => t.id === id)?.status).toBe("idle")
+  })
+})
+
+describe("跑着的时候补一句话：排队，不是拒绝", () => {
+  const run = async (): Promise<{ host: Host; events: Event[]; session: () => Fake; id: string; turnId: string }> => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    const turnId = events.find((e) => e.type === "turn.started")?.turn.id ?? ""
+    return { host, events, session, id, turnId }
+  }
+
+  it("上一轮还在跑时再发一句，**不报错**，进队列", async () => {
+    const { host, events, id } = await run()
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.thread.queued).toEqual(["补一句"])
+  })
+
+  it("这一轮跑完，排队那句自动发出去", async () => {
+    const { host, session, id, turnId } = await run()
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(session().prompts.map((p) => p.text)).toEqual(["第一句", "补一句"])
+  })
+
+  it("**一次只发一句**：跑完发第二句，第三句还在队里等", async () => {
+    const { host, events, session, id, turnId } = await run()
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "再补一句" })
+    session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(session().prompts.map((p) => p.text)).toEqual(["第一句", "补一句"])
+    expect(events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual(["再补一句"])
+  })
+
+  it("**按停止就把队列作废**——「停完这句再跑下一句」不是任何人按停止时想要的", async () => {
+    const { host, events, session, id } = await run()
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    await host.dispatch({ type: "thread.interrupt", threadId: id })
+    expect(events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual([])
+    expect(session().prompts).toHaveLength(1)
+  })
+
+  it("中断结束的轮次不会把队列接着发出去", async () => {
+    const { host, session, id, turnId } = await run()
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    session().emit({ type: "turn.completed", at: 1, turnId, status: "interrupted" })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(session().prompts).toHaveLength(1)
   })
 })

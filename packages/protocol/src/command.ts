@@ -6,6 +6,11 @@ export type Command =
   | { type: "thread.create"; cwd: string; engine: EngineId; trust: Trust; title?: string }
   | { type: "thread.prompt"; threadId: ThreadId; text: string; attachments?: readonly string[] }
   | { type: "thread.interrupt"; threadId: ThreadId }
+  /**
+   * 撤回排着队还没发出去的话。**不动正在跑的那一轮**——
+   * 「我改主意了，那句不用发了」和「停下」是两件事。
+   */
+  | { type: "thread.unqueue"; threadId: ThreadId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
   /**
    * 改名。**历史会话也能改**——恰恰是历史会话最需要，

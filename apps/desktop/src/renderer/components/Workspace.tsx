@@ -8,6 +8,7 @@ import { nextEngine } from "../engines.js"
 import { EnvCard } from "./EnvCard.js"
 import { Transcript } from "./Transcript.js"
 import { Changed } from "./Changed.js"
+import { Queued } from "./Queued.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
@@ -182,6 +183,14 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
       <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
       <Changed items={props.items} />
+      <Queued
+        texts={thread.queued ?? []}
+        onDrop={() => {
+          // 撤回 = 打断队列。宿主那边中断会把队列一并清掉，
+          // 但这里不该顺带把**正在跑的那一轮**也停了——所以走一条专门的命令
+          send({ type: "thread.unqueue", threadId: thread.id })
+        }}
+      />
       <Composer
         detached={thread.detached === true}
         // 引擎还在起、或者上一轮还没跑完——两种都发不出去，但原因不同，文案也不同

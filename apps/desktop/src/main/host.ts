@@ -9,6 +9,7 @@ import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
+import { createAttention } from "./attention.js"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
 import { createSequencer, type Sealed } from "./sequence.js"
 import type { Logger } from "./log.js"
@@ -57,7 +58,11 @@ function createOutlet(
   seen: { thread: ThreadId | undefined },
 ): { emit: (event: Event) => void; sequencer: ReturnType<typeof createSequencer> } {
   const sequencer = createSequencer()
+  const attention = createAttention(windows)
   const batcher = createBatcher((events) => {
+    // 每条出去的事件顺带过一遍「要不要叫人」。放在发 IPC 的同一处，
+    // 免得将来多一条出口就漏一处
+    for (const event of events) attention.note(event)
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
     const sealed = sequencer.seal(events)
