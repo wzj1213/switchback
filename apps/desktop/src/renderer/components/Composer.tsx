@@ -123,8 +123,11 @@ export function Composer({
           attach.drop(e.dataTransfer.files)
         }}
       >
-        <Attachments paths={attach.paths} onRemove={attach.remove} />
         {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} stamp={stamp} />}
+        {/* 附件排在芯片**下面**、正文上面。芯片说的是「这句话会发到哪儿去」，
+            是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
+            反过来放的话，贴一张图就把抬头顶下去 72 像素 */}
+        <Attachments paths={attach.paths} onRemove={attach.remove} />
         <Prompt
           value={text}
           detached={blocked}

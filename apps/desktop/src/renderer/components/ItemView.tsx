@@ -2,6 +2,7 @@ import { Markdown } from "./Markdown.js"
 import { Reasoning } from "./Reasoning.js"
 import { Failure } from "./Failure.js"
 import { HandoffNote } from "./HandoffNote.js"
+import { Thumb } from "./ImageThumb.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
@@ -53,14 +54,13 @@ export const ItemView = memo(function ItemView({
       ) : (
         <div className="msg--user">
           {item.text}
-          {/* 附件要在记录里留痕：三天后回来看「当时贴的是哪张图」，
-              靠的就是这一行 */}
+          {/* 附件要在记录里留痕：三天后回来看「当时贴的是哪张图」，靠的就是这一行。
+              画的是图本身而不是文件名——文件名是落盘时生成的时间戳，
+              回答不了「当时贴的是哪张」这个唯一要问的问题 */}
           {item.attachments === undefined || item.attachments.length === 0 ? null : (
             <div className="msg__attach">
               {item.attachments.map((path) => (
-                <span key={path} title={path}>
-                  {path.split("/").pop() ?? path}
-                </span>
+                <Thumb key={path} path={path} />
               ))}
             </div>
           )}

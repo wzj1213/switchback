@@ -1118,12 +1118,34 @@ body {
   white-space: nowrap;
 }
 
-/* omni 的和引擎的之间画一道。**只在两者相邻处画一次**，
-   不是给每一行挂角标——上一版那样十行十个角标，说的还是同一件事 */
-.slash__row[data-first-of-kind="true"]:not(:first-child) {
+/* 引擎技能的真名（`/berth-adopt`），跟在中文名后面。
+   淡一档、小一号：它是「打进去会变成什么」，不是这一行的主语 */
+.slash__slug {
+  margin-left: 6px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 分节抬头。照 codex 那张：小字、灰、贴在这一节第一条上面。
+   上一版是在交界处画一道横线——线只说「这儿变了」，说不出变成了什么 */
+.slash__head {
+  padding: 5px var(--sp-2) 3px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.slash__head:not(:first-child) {
   margin-top: 5px;
   border-top: 1px solid var(--border);
   padding-top: 9px;
+}
+
+/* 「个人 / 系统」贴最右。**不许缩**——它只有两个字，
+   一旦参与压缩就会被截成「个…」，那还不如不画 */
+.slash__scope {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
 }
 
 /* 参数提示比命令名淡：它是「还要填什么」，不是命令本身 */
@@ -1215,46 +1237,108 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
-  margin-bottom: var(--sp-2);
+  /* 上边留出 6px：删除按钮压在缩略图右上角**外面**，
+     不留的话它会顶到上一行去，被输入框的圆角切掉半个 */
+  margin: 6px 0 var(--sp-2);
 }
 
-.attach__chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 220px;
-  padding: 2px var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
+/* 缩略图。× 压在右上角**外面一点**——压在图里会盖住内容，
+   而被盖住的往往正是你想确认的那一角 */
+.thumb {
+  position: relative;
+  display: inline-flex;
+  flex: none;
 }
 
-.attach__name {
+.thumb__hit {
+  display: block;
   overflow: hidden;
+  max-width: 72px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  cursor: zoom-in;
+}
+
+.thumb__hit img {
+  display: block;
+  /* 盒子固定 72 见方（排出来是整齐的一行），但图**完整装进去**不裁。
+     裁成方块的话，一张宽截图只剩中间那一块——而你要确认的
+     恰恰是「这张是不是我想发的那张」，被裁掉的部分往往正是判据 */
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+/* 打不开时的退路：显示文件名，而不是一个破图框 */
+.thumb__name {
+  display: block;
+  overflow: hidden;
+  max-width: 72px;
+  padding: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.attach__drop {
-  padding: 0 2px;
-  border: 0;
-  background: none;
-  color: var(--text-faint);
-  font: inherit;
+/* 深色实心圆 + 白叉，压在右上角。
+   **不能用描边浅色**：缩略图底下什么颜色都有，浅色的叉在浅色截图上直接消失
+   ——实测白底截图上那颗几乎看不见 */
+.thumb__drop {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  /* 一圈底色的描边：贴着别的缩略图时也分得开 */
+  border: 2px solid var(--surface-1);
+  border-radius: 999px;
+  background: rgb(24 24 27 / 88%);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
   cursor: pointer;
 }
 
-.attach__drop:hover {
-  color: var(--danger);
+.thumb__drop:hover {
+  background: var(--danger);
 }
 
-/* 记录里的附件：跟在那句话下面，比正文淡一档 */
+/* 全屏看图。点哪儿都能关，所以整块都是 zoom-out */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  background: rgb(0 0 0 / 72%);
+  cursor: zoom-out;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+}
+
+.lightbox__miss {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 记录里的附件：跟在那句话下面 */
 .msg__attach {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
   margin-top: 5px;
-  opacity: 0.75;
-  font-size: var(--text-xs);
 }

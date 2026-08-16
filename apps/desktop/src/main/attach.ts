@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { app, ipcMain } from "electron"
+import { app, ipcMain, nativeImage } from "electron"
 
 /** 允许贴进来的图片类型。**白名单**——不认的一律不落盘。 */
 const EXT: Readonly<Record<string, string>> = {
@@ -40,6 +40,36 @@ export function installAttachChannel(): void {
     await writeFile(path, buf)
     return path
   })
+  ipcMain.handle("omni:thumb", (_e, req: { path: string; max: number }) => thumb(req.path, req.max))
+}
+
+/**
+ * 读一张图，缩到边长不超过 `max`，返回 data URL。
+ *
+ * ## 为什么不让渲染层直接 `<img src="file://…">`
+ *
+ * CSP 是 `img-src 'self' data:`——`file:` 被挡着。而放宽 CSP 为了显示缩略图，
+ * 等于让渲染层能引用**盘上任意路径**；这条通道只认调用方给的具体路径，
+ * 越权的成本高得多。
+ *
+ * ## 为什么在主进程缩
+ *
+ * 一张 12MB 的截图转成 data URL 是 16MB 的字符串，穿过 IPC 再由渲染层缩，
+ * 缩完了那 16MB 还挂在字符串上。在这边缩完再传，走线的通常是几十 KB。
+ *
+ * 缩略图和大图走同一个入口、只差一个 `max`：预览时再要一次大的，
+ * 而不是一开始就按最大尺寸传——列表里有五张图时那是五倍的浪费。
+ */
+function thumb(path: string, max: number): string | undefined {
+  const image = nativeImage.createFromPath(path)
+  // 路径不存在、或者根本不是图片时 `createFromPath` 不抛，返回一张**空图**。
+  // 不挡住的话渲染层会拿到一个 `data:image/png;base64,` 的空壳，画出来是个破框
+  if (image.isEmpty()) return undefined
+  const { width, height } = image.getSize()
+  const long = Math.max(width, height)
+  // 本来就小于目标就别放大：放大只会糊，而且体积还涨
+  const fit = long <= max ? image : image.resize(width >= height ? { width: max } : { height: max })
+  return fit.toDataURL()
 }
 
 /** 文件名带时间，同一秒内贴两张也不撞（后缀随机四位）。 */

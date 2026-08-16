@@ -80,6 +80,13 @@ const api = {
   async stashImage(mime: string, bytes: ArrayBuffer): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:stashImage", { mime, bytes })) as string | undefined
   },
+  /**
+   * 把盘上的一张图缩到边长 `max` 以内，取回 data URL。取不到（文件没了、
+   * 不是图片）返回 undefined——调用方据此退回只显示文件名。
+   */
+  async thumb(path: string, max: number): Promise<string | undefined> {
+    return (await ipcRenderer.invoke("omni:thumb", { path, max })) as string | undefined
+  },
   async find(request: { query: string; next?: boolean; forward?: boolean }): Promise<{
     active: number
     total: number
