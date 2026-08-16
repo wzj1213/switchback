@@ -1,4 +1,4 @@
-import type { EngineId, ItemId, ThreadId } from "./ids.js"
+import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
 import type { Trust } from "./thread.js"
 
 /** 渲染层 → 宿主的反向指令。宿主是唯一执行者，渲染层不直接碰引擎进程。 */
@@ -26,6 +26,21 @@ export type Command =
    * omni 只负责给一个入口。
    */
   | { type: "thread.compact"; threadId: ThreadId }
+  /**
+   * 从某一轮**之前**重来：新开一个会话，只带上那一轮之前的上下文。
+   *
+   * ## 为什么是「新开一个」而不是真的把历史砍掉
+   *
+   * 因为**引擎不会忘**。会话的真实状态在引擎那边（codex 有 rollout 文件、
+   * Claude 有 session），omni 删掉自己这边的记录改变不了它——
+   * 那样只会造出一个「界面上看不见、模型却还记得」的分裂状态，
+   * 比不给这个功能糟得多。
+   *
+   * 所以走一条诚实的路：**开一个新会话，把那一轮之前的内容作为交接包喂进去**，
+   * 原会话原样留着。你得到的是「带着当时的上下文重新开始」，
+   * 而不是一个假装什么都没发生过的会话。
+   */
+  | { type: "thread.rewind"; threadId: ThreadId; turnId: TurnId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
   /**
    * 改名。**历史会话也能改**——恰恰是历史会话最需要，

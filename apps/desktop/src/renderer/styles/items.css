@@ -717,3 +717,44 @@
   padding: 0 var(--sp-3) var(--sp-3);
   border-top: 1px solid var(--border);
 }
+
+/* 分界线那一行：左边是「已处理 X」，右边挂「从这里重来」 */
+.turnmark__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* 平时不显形——它是个岔路口，不该一直待在手边 */
+.turnmark__act,
+.msg__reuse {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.turnmark__row:hover .turnmark__act,
+.copyable:hover .msg__reuse,
+.turnmark__act:focus-visible,
+.msg__reuse:focus-visible {
+  opacity: 1;
+}
+
+.turnmark__act:hover,
+.msg__reuse:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* 「改一改再发」跟在自己那条消息下面，右对齐——和气泡同一侧 */
+.msg__reuse {
+  display: block;
+  margin: 2px 0 0 auto;
+}

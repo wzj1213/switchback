@@ -2,7 +2,7 @@ import type { Command, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
 import { clearQueue, emit, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
-import { create, fork, handoff, prompt, remove, rename, resume, setModel, setTrust } from "./session.js"
+import { create, fork, handoff, prompt, remove, rename, resume, rewind, setModel, setTrust } from "./session.js"
 
 export type { HostDeps } from "./deps.js"
 
@@ -46,6 +46,7 @@ const HANDLERS: Handlers = {
   "thread.delete": remove,
   "thread.handoff": handoff,
   "thread.fork": fork,
+  "thread.rewind": rewind,
   "thread.compact": async (ctx, command) => {
     const entry = ctx.live.get(command.threadId)
     if (entry?.session.compact === undefined) return

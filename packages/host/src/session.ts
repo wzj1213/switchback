@@ -1,4 +1,4 @@
-import type { Command, Event, ItemId, ThreadId, Thread } from "@omni/protocol"
+import type { Command, Event, Item, ItemId, Thread, ThreadId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import { buildHandoff, renderHandoff } from "@omni/handoff"
 import { initial, itemsOf, reduceAll } from "@omni/store"
@@ -293,42 +293,84 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
  *
  * 真要做对照，得让两边各拿一份工作区副本（git worktree 之类）——那是另一件事。
  */
+/**
+ * 从某一轮之前重来。
+ *
+ * 实现上是**只带前面若干轮的分叉**——同一家引擎、同一个工作区，
+ * 交接包只包含那一轮**之前**的 item。原会话不动。
+ *
+ * 和 `fork` 共用一条路：两者的区别只有「换不换引擎」和「带多少上下文」，
+ * 分成两套实现的话，将来改交接包格式就要改两处，而漏改的那处不会报错。
+ */
+export async function rewind(ctx: Ctx, cmd: Extract<Command, { type: "thread.rewind" }>): Promise<void> {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  await branch(ctx, entry, { to: entry.thread.engine, upTo: cmd.turnId, label: "重来" })
+}
+
 export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
+  await branch(ctx, entry, { to: cmd.to, label: cmd.to })
+}
 
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const packet = buildHandoff(entry.thread, itemsOf(reduceAll(initial(), events), cmd.threadId))
+/**
+ * 从一个会话岔出一条新的。分叉（换引擎）与重来（砍掉后面几轮）共用这条路。
+ *
+ * @param upTo 只带这一轮**之前**的内容。不给就是全部。
+ */
+async function branch(
+  ctx: Ctx,
+  entry: Live,
+  opts: { to: string; upTo?: string; label: string },
+): Promise<void> {
+  if (ctx.deps.drivers[opts.to] === undefined) throw new Error(`未注册的引擎：${opts.to}`)
+
+  const events = (await ctx.deps.journal?.read(entry.thread.id)) ?? []
+  const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
+  const items = opts.upTo === undefined ? all : until(all, opts.upTo)
+  const packet = buildHandoff(entry.thread, items)
 
   const at = ctx.deps.now()
   const thread: Thread = {
     ...entry.thread,
     id: ctx.deps.newId("th"),
-    engine: cmd.to,
-    engineHistory: [cmd.to],
+    engine: opts.to,
+    engineHistory: [opts.to],
     engineHandle: undefined,
     model: undefined,
     effort: undefined,
-    // 标题带上引擎名，否则侧栏里两个会话长得一模一样
-    title: `${entry.thread.title}（${cmd.to}）`,
+    // 标题带上来路，否则侧栏里两个会话长得一模一样
+    title: `${entry.thread.title}（${opts.label}）`,
     // 留下血缘，事后才对比得起来。**分叉的意义就在于能比**
-    forkedFrom: cmd.threadId,
+    forkedFrom: entry.thread.id,
     detached: false,
     status: "idle",
     createdAt: at,
     updatedAt: at,
+    queued: [],
   }
   const early = await launch(ctx, thread)
   emit(ctx, { type: "thread.started", at, thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 
   const asks = packet.asks.length === 0 ? "" : `\n\n过程中追加过的要求：\n${packet.asks.map((a) => `- ${a}`).join("\n")}`
-  await prompt(ctx, {
-    type: "thread.prompt",
-    threadId: thread.id,
-    text: `${packet.goal}${asks}`,
-  })
+  await prompt(
+    ctx,
+    { type: "thread.prompt", threadId: thread.id, text: `${packet.goal}${asks}` },
+    "handoff",
+  )
+}
+
+/**
+ * 取这一轮**之前**的 item。
+ *
+ * 边界是「不含这一轮」：用户点「从这里重来」，指的是**回到还没发生这一轮的时候**，
+ * 而不是「再看一遍这一轮」。含进去的话，新会话开局就带着那次走错的尝试。
+ */
+function until(items: readonly Item[], turnId: string): readonly Item[] {
+  const at = items.findIndex((item) => item.turnId === turnId)
+  return at === -1 ? items : items.slice(0, at)
 }
 
 /**

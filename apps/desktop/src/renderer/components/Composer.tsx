@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Prompt } from "./Prompt.js"
 import { takeCommand } from "./ComposerAction.js"
 import { Chips } from "./Chips.js"
@@ -47,6 +47,8 @@ interface Props {
   onOmni: (name: string) => void
   /** 这家引擎收不收附件。不收就不给贴图入口。 */
   canAttach: boolean
+  /** 外面塞进来的文本（「改一改再发」）。`at` 变了才生效。 */
+  prefill?: { text: string; at: number }
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   onSend: (text: string, attachments: readonly string[]) => void
@@ -75,10 +77,19 @@ export function Composer({
   commands,
   onOmni,
   canAttach,
+  prefill,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
   // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
   const attach = useAttachments(canAttach)
+  // **只认序号变化，不认文本变化。** 依赖文本的话，用户在输入框里把它改回原样，
+  // 这个 effect 会再跑一次、把光标弹到末尾
+  const seen = useRef(prefill?.at ?? 0)
+  useEffect(() => {
+    if (prefill === undefined || prefill.at === seen.current) return
+    seen.current = prefill.at
+    setText(prefill.text)
+  }, [prefill])
   /**
    * 现在能不能发。
    *

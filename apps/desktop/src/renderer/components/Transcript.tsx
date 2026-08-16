@@ -50,6 +50,8 @@ function keyOf(row: Row): string {
 function RowView({
   row,
   cwd,
+  onRewind,
+  onReuse,
   folded,
   onFold,
   onCopy,
@@ -58,6 +60,10 @@ function RowView({
   row: Row
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
+  /** 从某一轮之前重来。 */
+  onRewind: (turnId: string) => void
+  /** 把某条自己发过的话填回输入框，改完再发。**对比视图里没有输入框，所以可以缺席。** */
+  onReuse?: (text: string) => void
   folded: boolean
   onFold: (turnId: string) => void
   onCopy: (text: string) => void
@@ -69,6 +75,7 @@ function RowView({
     // **整条线可点**：它本来就是这一轮回答的表头，折起来天经地义。
     // 只把小箭头做成热区的话，那是个 12px 的目标，得瞄准才点得中
     return (
+      <div className="turnmark__row">
       <button
         type="button"
         className="turnmark"
@@ -81,12 +88,38 @@ function RowView({
         <span>已处理 {spent(row.ms)}</span>
         <ChevronIcon open={!folded} size={11} />
       </button>
+      {/* **回到还没发生这一轮的时候。** 走错方向时唯一的出路，
+          否则只能把整个会话丢掉重开——而那会连前面对的部分一起丢 */}
+      <button
+        type="button"
+        className="turnmark__act"
+        title="新开一个会话，只带这一轮之前的内容（原会话保留）"
+        onClick={() => {
+          onRewind(row.turnId)
+        }}
+      >
+        从这里重来
+      </button>
+      </div>
     )
   }
   if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
   return (
     <Copyable item={row.item} onCopy={onCopy}>
       <ItemView item={row.item} onResolve={onResolve} />
+      {/* **只有自己发过的话能「改一改再发」。** agent 说的话改了再发没有意义——
+          那不是你的话，改完发出去等于替它编一句 */}
+      {onReuse !== undefined && row.item.kind === "user_message" && row.item.origin === undefined ? (
+        <button
+          type="button"
+          className="msg__reuse"
+          onClick={() => {
+            onReuse(row.item.kind === "user_message" ? row.item.text : "")
+          }}
+        >
+          改一改再发
+        </button>
+      ) : null}
     </Copyable>
   )
 }
@@ -103,12 +136,15 @@ export function Transcript({
   turn,
   send,
   onCopy,
+  onReuse,
 }: {
   thread: Thread
   items: readonly Item[]
   turn: Turn | undefined
   send: (command: Command) => void
   onCopy: (text: string) => void
+  /** 把一句话填回输入框。对比视图不给（那边没有输入框）。 */
+  onReuse?: (text: string) => void
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
   /** 折起来的那几轮。**按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管 */
@@ -138,6 +174,10 @@ export function Transcript({
             key={keyOf(row)}
             row={row}
             cwd={thread.cwd}
+            onRewind={(turnId) => {
+              send({ type: "thread.rewind", threadId: thread.id, turnId })
+            }}
+            onReuse={onReuse}
             folded={row.kind === "turn" && folded.has(row.turnId)}
             onFold={onFold}
             onCopy={onCopy}

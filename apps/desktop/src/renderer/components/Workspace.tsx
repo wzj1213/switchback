@@ -54,6 +54,13 @@ export interface WorkspaceProps {
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
   const [env, setEnv] = useState(false)
+  /**
+   * 「改一改再发」塞回输入框的文本。
+   *
+   * 带一个递增序号：连着点同一条两次，文本一样但序号变了——
+   * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
+   */
+  const [prefill, setPrefill] = useState<{ text: string; at: number }>({ text: "", at: 0 })
   const actions = useOmniActions(props, {
     onEnv: () => {
       setEnv(true)
@@ -78,7 +85,16 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       />
       <Notices notices={props.notices} onDismiss={props.onDismiss} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
-      <Transcript thread={thread} items={props.items} turn={props.turn} send={send} onCopy={props.onCopy} />
+      <Transcript
+        thread={thread}
+        items={props.items}
+        turn={props.turn}
+        send={send}
+        onCopy={props.onCopy}
+        onReuse={(text) => {
+          setPrefill((prev) => ({ text, at: prev.at + 1 }))
+        }}
+      />
       <Changed items={props.items} />
       <Queued
         texts={thread.queued ?? []}
@@ -100,6 +116,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
         stamp={props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`}
         searchFiles={props.searchFiles}
+        prefill={prefill}
         canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments}
         commands={[...actions.map((a) => a.command), ...props.commands]}
         onOmni={(name: string) => {
