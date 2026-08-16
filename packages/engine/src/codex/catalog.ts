@@ -40,11 +40,25 @@ export function skillsToCommands(raw: unknown): readonly SlashCommand[] {
 function toSlashCommand(skill: WireSkill): SlashCommand {
   const short = skill.interface?.shortDescription ?? undefined
   const display = skill.interface?.displayName ?? undefined
-  const text = short ?? skill.description ?? ""
   return {
     name: skill.name,
-    // displayName 是中文的时候，把它放在说明最前面——列表里一眼能认出来
-    description: display === undefined || display === skill.name ? text : `${display} · ${text}`,
+    // **displayName 当名字用，不再塞进说明里。** codex 自己的面板左边一列
+    // 就是它（「berth 收编」而不是 `/berth-adopt`），因为人扫那一列是在找**那件事**。
+    // 上一版把它拼在说明最前面，结果是左边一列全是英文标识符、
+    // 右边一列每条都以中文名开头——两列都读不痛快
+    ...(display === undefined || display === skill.name ? {} : { label: display }),
+    description: short ?? skill.description ?? "",
     source: "engine",
+    ...(scopeOf(skill.scope) === undefined ? {} : { scope: scopeOf(skill.scope) }),
   }
+}
+
+/**
+ * codex 的 `scope` → omni 的。实测取值是 `user` / `system`；
+ * **不认的一律丢掉**而不是照抄成字符串——界面按枚举画标签，
+ * 混进一个没见过的值只会画出个乱码似的角标。
+ */
+function scopeOf(raw: string | undefined): SlashCommand["scope"] {
+  if (raw === "user" || raw === "project" || raw === "system") return raw
+  return undefined
 }

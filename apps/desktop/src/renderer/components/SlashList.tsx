@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { Fragment, useEffect, useRef } from "react"
 import type { SlashCommand } from "@omni/protocol"
 import {
   CommandIcon,
@@ -66,35 +66,76 @@ export function SlashList({
   return (
     <div className="slash" ref={box} role="listbox">
       {commands.map((command, i) => (
-        <button
-          key={`${command.source}:${command.name}`}
-          type="button"
-          role="option"
-          aria-selected={i === active}
-          data-active={i === active}
-          // 和上一条来源不同就在上面画一道线。**分组是给「行为不同」用的**：
-          // omni 那几条就地执行，引擎那些填进输入框
-          data-first-of-kind={command.source !== commands[i - 1]?.source}
-          className={`slash__row${i === active ? " slash__row--active" : ""}`}
-          // 和 `@` 一样用 mousedown：click 之前输入框会先失焦，
-          // 失焦会把面板关掉，于是这一下点了个空
-          onMouseDown={(e) => {
-            e.preventDefault()
-            onPick(command)
-          }}
-        >
-          <span className="slash__icon">
-            {(command.source === "omni" ? GLYPH[command.name] : undefined) ?? <CommandIcon />}
-          </span>
-          <span className="slash__name">
-            {command.label ?? `/${command.name}`}
-            {command.argumentHint === undefined ? null : (
-              <span className="slash__args"> {command.argumentHint}</span>
-            )}
-          </span>
-          <span className="slash__desc">{command.description}</span>
-        </button>
+        <Fragment key={`${command.source}:${command.name}`}>
+          {/* 来源一变就起一节。**分节是给「行为不同」用的**：
+              引擎的技能发给引擎，omni 那几条就地执行 */}
+          {command.source === commands[i - 1]?.source ? null : (
+            <div className="slash__head">{SECTION[command.source]}</div>
+          )}
+          <Row command={command} active={i === active} onPick={onPick} />
+        </Fragment>
       ))}
     </div>
+  )
+}
+
+/** 分节抬头的字。照 codex 那张：小字、灰、贴在第一条上面。 */
+const SECTION: Readonly<Record<SlashCommand["source"], string>> = {
+  engine: "技能",
+  omni: "omni",
+}
+
+/**
+ * 「这条命令是哪儿来的」，画在最右边——codex 那张图上就是这一列。
+ *
+ * 不是装饰：`system` 是引擎自带的，`user` 是你自己写的，
+ * **出了问题该去改哪儿完全不同**。
+ */
+const SCOPE: Readonly<Record<NonNullable<SlashCommand["scope"]>, string>> = {
+  user: "个人",
+  project: "项目",
+  system: "系统",
+}
+
+function Row({
+  command,
+  active,
+  onPick,
+}: {
+  command: SlashCommand
+  active: boolean
+  onPick: (command: SlashCommand) => void
+}): React.JSX.Element {
+  // 引擎技能的 label 是 displayName（「berth 收编」），但真正要打进输入框的是
+  // `name`。两者不同就把 `/name` 也画出来——菜单上显示一个、插进去另一个，
+  // 第一次遇到时人会以为自己点错了
+  const named = command.label !== undefined && command.label !== command.name
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      data-active={active}
+      className={`slash__row${active ? " slash__row--active" : ""}`}
+      // 和 `@` 一样用 mousedown：click 之前输入框会先失焦，
+      // 失焦会把面板关掉，于是这一下点了个空
+      onMouseDown={(e) => {
+        e.preventDefault()
+        onPick(command)
+      }}
+    >
+      <span className="slash__icon">
+        {(command.source === "omni" ? GLYPH[command.name] : undefined) ?? <CommandIcon />}
+      </span>
+      <span className="slash__name">
+        {command.label ?? `/${command.name}`}
+        {command.argumentHint === undefined ? null : (
+          <span className="slash__args"> {command.argumentHint}</span>
+        )}
+        {named ? <span className="slash__slug">/{command.name}</span> : null}
+      </span>
+      <span className="slash__desc">{command.description}</span>
+      {command.scope === undefined ? null : <span className="slash__scope">{SCOPE[command.scope]}</span>}
+    </button>
   )
 }

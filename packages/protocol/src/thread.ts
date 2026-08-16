@@ -144,4 +144,14 @@ export interface SlashCommand {
   /** 参数提示，如 `<file>` 或 `[<pr#>]`。没有参数就缺席。 */
   argumentHint?: string
   source: "engine" | "omni"
+  /**
+   * 这条命令是**哪儿来的**：你自己装的、这个项目带的、还是引擎自带的。
+   *
+   * codex 的 `skills/list` 每条都报 `scope`（实测取值 `user` / `system`），
+   * 它的面板把这一列画在最右边。这不是装饰——一条 `system` 的技能是厂商
+   * 塞进来的，一条 `user` 的是你自己写的，**出了问题该去改哪儿完全不同**。
+   *
+   * 报不上来就缺席，界面据此什么都不画。
+   */
+  scope?: "user" | "project" | "system"
 }

@@ -46,17 +46,58 @@ describe("筛命令", () => {
     expect(matchCommands(all, "收编").map((c) => c.name)).toEqual(["berth-adopt"])
   })
 
-  it("空查询时 omni 自己的排前面——引擎那几十条技能会把它们淹掉", () => {
-    expect(matchCommands(all, "")[0]?.name).toBe("new")
+  // 这条原来钉的是反的（「omni 排前面，免得被几十条技能淹掉」）。
+  // 反过来是因为那个理由站不住：omni 那几条在界面上**本来就另有入口**，
+  // 而技能没有第二扇门。旧规则的真实后果是 22 条技能一条都没露过面
+  it("空查询时技能排前面——它们在整个界面里没有别的入口", () => {
+    expect(matchCommands(all, "")[0]?.source).toBe("engine")
   })
 
   it("一条都不像就给空——面板据此收起来，而不是摊一张全表", () => {
     expect(matchCommands(all, "zzz这不可能有")).toEqual([])
   })
 
-  it("有上限，不会把几十条技能一次全铺出来", () => {
-    const many = Array.from({ length: 40 }, (_, i) => cmd(`skill-${String(i)}`))
-    expect(matchCommands(many, "skill").length).toBeLessThanOrEqual(12)
+  it("有上限，不会把几百条一次全铺出来", () => {
+    const many = Array.from({ length: 400 }, (_, i) => cmd(`skill-${String(i)}`))
+    expect(matchCommands(many, "skill").length).toBeLessThanOrEqual(100)
+  })
+})
+
+describe("两节的配额：谁也不许把对方挤没", () => {
+  /** 这台机器上的真实数量：codex 报 22 条技能，omni 自己 10 条。 */
+  const real = [
+    ...Array.from({ length: 22 }, (_, i) => cmd(`skill-${String(i)}`)),
+    ...Array.from({ length: 10 }, (_, i) => cmd(`omni-${String(i)}`, "", "omni")),
+  ]
+
+  it("**空查询下技能全都在**——上一版 limit=12 被 omni 的 10 条吃掉，22 条技能一条都没露过面", () => {
+    const hits = matchCommands(real, "")
+    expect(hits.filter((c) => c.source === "engine")).toHaveLength(22)
+    expect(hits.filter((c) => c.source === "omni")).toHaveLength(10)
+  })
+
+  it("技能排在前面：omni 那几条在界面上另有入口，技能没有第二扇门", () => {
+    expect(matchCommands(real, "")[0]?.source).toBe("engine")
+  })
+
+  it("扁平返回，且同一节的连在一起——分节的界线靠相邻两条 source 变化看出来", () => {
+    const sources = matchCommands(real, "").map((c) => c.source)
+    expect(sources.indexOf("omni")).toBe(sources.lastIndexOf("engine") + 1)
+  })
+
+  it("技能多到装不下时，omni 也保得住底——不会反过来被挤没", () => {
+    const many = [
+      ...Array.from({ length: 300 }, (_, i) => cmd(`skill-${String(i)}`)),
+      ...Array.from({ length: 10 }, (_, i) => cmd(`omni-${String(i)}`, "", "omni")),
+    ]
+    const hits = matchCommands(many, "")
+    expect(hits.filter((c) => c.source === "omni").length).toBeGreaterThanOrEqual(4)
+    expect(hits).toHaveLength(100)
+  })
+
+  it("一边为空时另一边吃满，不浪费配额", () => {
+    const only = Array.from({ length: 150 }, (_, i) => cmd(`skill-${String(i)}`))
+    expect(matchCommands(only, "")).toHaveLength(100)
   })
 })
 

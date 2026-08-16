@@ -144,6 +144,8 @@ export interface WireSkill {
   name: string
   description?: string
   enabled?: boolean
+  /** 你自己装的还是引擎自带的。实测取值 `user` / `system`。 */
+  scope?: string
   interface?: {
     displayName?: string | null
     shortDescription?: string | null

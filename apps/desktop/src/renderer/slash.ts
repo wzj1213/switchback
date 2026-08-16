@@ -48,7 +48,8 @@ function hidden(command: SlashCommand): boolean {
 
 /** 命中就给个分，越像越大；没命中给 undefined。用同一套规则排引擎的和 omni 的。 */
 function score(command: SlashCommand, query: string): number | undefined {
-  if (query === "") return command.source === "omni" ? 1 : 0
+  // 空查询全都要，**不分高下**——先后由分节决定，不由这里塞一个偏置决定
+  if (query === "") return 0
   const q = query.toLowerCase()
   const name = command.name.toLowerCase()
   // 中文名也参与前缀匹配：面板上显示的是「新建会话」，人自然会按它去筛
@@ -63,16 +64,52 @@ function score(command: SlashCommand, query: string): number | undefined {
   return undefined
 }
 
+/** 每一节的保底条数。两节都放不下时，谁也不许把对方挤成零。 */
+const SECTION_MIN = 4
+
+/** 按来源分节，排在前面的先拿配额。**技能在前**，理由见 `matchCommands`。 */
+const ORDER: readonly SlashCommand["source"][] = ["engine", "omni"]
+
 /**
- * 筛出候选，排好序。
+ * 两节都放不下时怎么分。前一节优先吃满，但各自先保底 `SECTION_MIN`。
  *
- * **omni 自己的命令在同分时排前面**：它们是「这个界面能做什么」，
- * 数量固定且用户天天见；引擎的技能有几十条，淹掉前者只是时间问题。
+ * 拆成纯函数是为了能直接测边界：一边零条、一边超额、两边都超额。
+ */
+function share(counts: readonly number[], limit: number): readonly number[] {
+  const total = counts.reduce((a, b) => a + b, 0)
+  if (total <= limit) return counts
+  const floors = counts.map((n) => Math.min(n, SECTION_MIN))
+  let rest = Math.max(0, limit - floors.reduce((a, b) => a + b, 0))
+  return counts.map((n, i) => {
+    const extra = Math.min(n - (floors[i] ?? 0), rest)
+    rest -= extra
+    return (floors[i] ?? 0) + extra
+  })
+}
+
+/**
+ * 筛出候选，排好序。返回的是**扁平的一串**（显示顺序即数组顺序），
+ * 分节的界线由相邻两条的 `source` 变化看出来——键盘上下走的还是这一串，
+ * 不用为分节再维护一套二维索引。
+ *
+ * ## 为什么技能排在前面
+ *
+ * omni 自己那十条**每一条在界面上都另有入口**（顶栏、右键菜单、快捷键）——
+ * 那本来就是它们被收进命令面板的标准（见 `omniCommands.ts`）。
+ * 而引擎的技能**在整个界面里没有第二扇门**：不在这儿列出来，
+ * 用户根本不知道自己装的二十几个技能能用。没有别的门的那一节排在上面。
+ *
+ * ## 上一版为什么一条技能都看不见
+ *
+ * `limit` 是 12，而 omni 有 10 条、还在同分时排前面。于是空查询下
+ * **技能最多只剩两条**，还落在列表最底下——面板一屏放不下，等于没有。
+ * 实测这台机器 codex 报了 22 条技能，一条都没露过面。
+ * 所以现在是按节配额 + 面板可滚，而不是一刀切到 12。
  */
 export function matchCommands(
   commands: readonly SlashCommand[],
   query: string,
-  limit = 12,
+  limit = 100,
 ): readonly SlashCommand[] {
   const hits: { command: SlashCommand; score: number }[] = []
   for (const command of commands) {
@@ -80,13 +117,13 @@ export function matchCommands(
     const value = score(command, query)
     if (value !== undefined) hits.push({ command, score: value })
   }
-  hits.sort(
-    (a, b) =>
-      b.score - a.score ||
-      Number(b.command.source === "omni") - Number(a.command.source === "omni") ||
-      (a.command.name < b.command.name ? -1 : 1),
+  hits.sort((a, b) => b.score - a.score || (a.command.name < b.command.name ? -1 : 1))
+  const sections = ORDER.map((source) => hits.filter((h) => h.command.source === source))
+  const quota = share(
+    sections.map((s) => s.length),
+    limit,
   )
-  return hits.slice(0, limit).map((h) => h.command)
+  return sections.flatMap((s, i) => s.slice(0, quota[i]).map((h) => h.command))
 }
 
 /**
