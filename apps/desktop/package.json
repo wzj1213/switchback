@@ -4,9 +4,9 @@
   "omni": {
     "_updateFeed": "发布时填一个 https 地址，返回 {version,url,notes}。留空 = 更新检查整个关闭，不发任何请求。",
     "updateFeed": "",
-    "build": "8fb9e98-dirty"
+    "build": "e0e4c75"
   },
-  "version": "0.0.101",
+  "version": "0.0.107",
   "private": true,
   "type": "module",
   "description": "omni 桌面端：Electron 壳 + React 渲染层",
