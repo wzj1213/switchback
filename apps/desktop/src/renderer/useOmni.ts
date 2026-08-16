@@ -24,8 +24,13 @@ export interface Omni {
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
    */
   bridgeMissing: boolean
-  /** 最近一条**增量里**新开的会话 id。新建之后据此跳过去，不靠排序碰运气。 */
-  lastStarted: string | undefined
+  /**
+   * 最近一条**增量里**新开的会话，带递增序号。
+   *
+   * 序号是必须的：调用方要等的是「我点下新建**之后**冒出来的那个」，
+   * 光有 id 分不出「又来一个」和「还是上次那个」。
+   */
+  lastStarted: { id: string; seq: number } | undefined
 }
 
 /**
@@ -49,7 +54,7 @@ export function useOmni(): Omni {
    * ——**靠排序碰运气**：只要排序规则一改（置顶、按项目分组、最近段），
    * 点了新建就会跳到一个别的会话上，而且不报错。
    */
-  const [lastStarted, setLastStarted] = useState<string | undefined>(undefined)
+  const [lastStarted, setLastStarted] = useState<{ id: string; seq: number } | undefined>(undefined)
 
   useEffect(() => {
     if (bridge === undefined) return undefined
@@ -68,7 +73,12 @@ export function useOmni(): Omni {
       // 那是历史，不是「刚刚新开的」——认了的话每次重载都会跳到最后一条历史上
       const started = step.apply.filter((e) => e.type === "thread.started")
       const latest = started[started.length - 1]
-      if (latest?.type === "thread.started") setLastStarted(latest.thread.id)
+      // **带一个递增序号**。只给 id 的话，调用方没法区分「又开了一个」和
+      // 「还是刚才那个」——而它需要这个区别：等的是**下一个**，不是最近一个
+      if (latest?.type === "thread.started") {
+        const id = latest.thread.id
+        setLastStarted((prev) => ({ id, seq: (prev?.seq ?? 0) + 1 }))
+      }
       if (step.resyncFrom === undefined) return
       void bridge.resync(step.resyncFrom).then((answer) => {
         if ("reset" in answer) {

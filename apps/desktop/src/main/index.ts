@@ -269,8 +269,18 @@ function bootstrap(): Promise<void> {
      * 侧栏空的、正文卡在「正在打开工作区…」，而磁盘上会话一个不少。
      */
     ipcMain.on("omni:hello", (event) => {
-      if (event.sender !== win.webContents) return
-      void rebuild(attached, win.webContents)
+      // **认发来 hello 的那扇窗，不认启动时那扇。**
+      //
+      // 原来写的是 `event.sender !== win.webContents`，闭包捕获的是启动时那个
+      // `win`；而 macOS 上 ⌘W 关窗不退应用，再点 Dock 会**建一扇新窗**。
+      // 那时旧窗已销毁，这行不是「比较为假然后 return」——是**读
+      // `win.webContents` 直接抛 TypeError: Object has been destroyed**，
+      // 被全局 uncaughtException 兜住只写进日志。于是 rebuild 一次都不跑：
+      // 新窗口侧栏空的、引擎选择器空的，点「新建会话」宿主真把进程起起来了，
+      // 界面什么都不出现，点几次多几个进程，全程不报错。
+      const target = BrowserWindow.fromWebContents(event.sender)
+      if (target === null || target.isDestroyed()) return
+      void rebuild(attached, event.sender)
         .then((recent) => {
           if (seeded) return undefined
           seeded = true

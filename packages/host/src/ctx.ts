@@ -49,7 +49,13 @@ export interface Ctx {
  * 这些事件**不属于任何一个会话**，因此不落盘。
  * `thread.removed` 尤其要在这里：写了只会把刚删掉的文件建回来。
  */
-const UNOWNED: ReadonlySet<string> = new Set(["thread.removed", "engines.available"])
+const UNOWNED: ReadonlySet<string> = new Set([
+  "thread.removed",
+  "engines.available",
+  // 斜杠命令**故意不落盘**：它是每次握手现问引擎的（用户装了什么技能只有引擎知道），
+  // 落盘只会在重放时把一份过期的清单塞回界面
+  "commands.updated",
+])
 
 /** 一条事件属于哪个会话。判不出就不落盘——宁可少一条，也不要落到错的文件里。 */
 export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
@@ -58,6 +64,10 @@ export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
     case "thread.started":
     case "thread.updated":
       return event.thread.id
+    // 改名必须落盘。漏了这条的后果是**改完重启就还原**，而且一声不响——
+    // 事件发出去了、界面也变了，只是没人把它写进那个会话的 jsonl
+    case "thread.renamed":
+      return event.threadId
     case "turn.started":
       return event.turn.threadId
     case "turn.completed":
@@ -65,13 +75,25 @@ export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
     case "item.started":
     case "item.updated":
       return ctx.turnOwner.get(event.item.turnId)
-    case "usage.updated":
-    case "engine.status":
-    case "models.updated":
-      return event.threadId === "" ? undefined : event.threadId
     default:
-      return undefined
+      return directOwner(event)
   }
+}
+
+/**
+ * 事件自己带 `threadId` 的那一批。
+ *
+ * 从 `ownerOf` 里分出来纯粹是复杂度闸门逼的——但分完也讲得通：
+ * 上面那些要**查表或拆结构**才知道属于谁（turnOwner、event.thread.id），
+ * 这些是直接写在事件上的。
+ *
+ * 空串当作「不属于任何会话」：引擎级的状态（比如探测结果）会这么报。
+ */
+function directOwner(event: Event): ThreadId | undefined {
+  if (event.type !== "usage.updated" && event.type !== "engine.status" && event.type !== "models.updated") {
+    return undefined
+  }
+  return event.threadId === "" ? undefined : event.threadId
 }
 
 /**

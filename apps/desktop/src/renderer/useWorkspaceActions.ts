@@ -26,6 +26,8 @@ export function useWorkspaceActions(deps: {
   pickFolder: () => Promise<string | undefined>
   onMenu: (handler: (action: string) => void) => () => void
   onSelect: (id: string | undefined) => void
+  /** 刚发出「新建」。调用方据此等下一个 `thread.started`。 */
+  onCreating: () => void
   onFind: () => void
   onCompare: () => void
   onFilterThreads: () => void
@@ -52,7 +54,9 @@ export function useWorkspaceActions(deps: {
       trust: deps.defaultTrust,
       title: cwd.split("/").filter(Boolean).pop() ?? cwd,
     })
-    deps.onSelect(undefined)
+    // 记下「我在等下一个新会话」。**不再用 `onSelect(undefined)` 兼职这个信号**——
+    // 那个信号删会话时也会发，于是删完之后下一个冒出来的会话会被错认成我等的那个
+    deps.onCreating()
   }
 
   const openPicker = (): void => {

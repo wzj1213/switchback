@@ -54,12 +54,30 @@ export function useApp(): AppApi {
    * 上一版是「把选中清空，让排序把新的顶到第一位」——**靠排序碰运气**，
    * 而且没有任何东西钉住这个巧合：一旦排序规则变了（置顶、分组、最近段），
    * 点新建就跳到别的会话上，还不报错。
+   *
+   * ## 为什么记的是「点击那一刻的序号」，不是一个布尔旗子
+   *
+   * 旗子那版有两个洞，第二次点新建就会跳回上一个会话：
+   *
+   * 1. **旗子被别人立**：`onSelect(undefined)` 这个信号被两件事共用——
+   *    「我刚发了新建」和「删掉了当前会话，清空选择」。删一个会话之后，
+   *    下一个冒出来的会话就被当成「我等的那个」。
+   * 2. **旗子被提前消费**：effect 的依赖里有 `shell`，而它每次渲染都是新对象，
+   *    于是每帧重跑；只要在「点新建」和「started 到达」之间有任何一次重渲染
+   *    （流式增量、横幅、改名都算），旗子就被**上一个** `lastStarted` 吃掉了。
+   *    冷启动那次 `lastStarted` 是 undefined，所以第一次总是对的——
+   *    这就是当初手测一次没发现它的原因。
+   *
+   * 记序号就没有这两个问题：等的是「序号比我点的时候大」，
+   * 谁立的、中间重渲染多少次都不影响。
    */
-  const waiting = useRef(false)
+  const awaited = useRef<number | undefined>(undefined)
   useEffect(() => {
-    if (!waiting.current || omni.lastStarted === undefined) return
-    waiting.current = false
-    shell.select(omni.lastStarted)
+    const at = awaited.current
+    const started = omni.lastStarted
+    if (at === undefined || started === undefined || started.seq <= at) return
+    awaited.current = undefined
+    shell.select(started.id)
   }, [omni.lastStarted, shell])
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
   const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
@@ -72,10 +90,10 @@ export function useApp(): AppApi {
     copy: omni.copy,
     pickFolder: omni.pickFolder,
     onMenu: omni.onMenu,
-    onSelect: (id) => {
-      // `open()` 用 `undefined` 表示「我刚发了新建，等它回来」
-      if (id === undefined) waiting.current = true
-      shell.select(id)
+    onSelect: shell.select,
+    // 点「新建」的那一刻记下当前序号，等一个比它大的
+    onCreating: () => {
+      awaited.current = omni.lastStarted?.seq ?? 0
     },
     defaultEngine: prefs.settings.defaultEngine,
     defaultTrust: prefs.settings.defaultTrust,
