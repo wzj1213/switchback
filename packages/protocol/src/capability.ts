@@ -24,10 +24,23 @@ export interface EngineCapabilities {
   compact: boolean
   /** 能接收附件（图片、文件）。 */
   attachments: boolean
+  /**
+   * 能**在一轮跑到一半时改向**——不打断它，也不用等它跑完。
+   *
+   * 人在 agent 跑的时候最常想做的事就是补一句：「不对，用另一个文件」
+   * 「顺便把测试也跑了」。omni 对所有引擎的兜底是**排队**：记下来，
+   * 这一轮停了再发。不丢东西，但那句话要等上几十秒才起作用——
+   * 而它往往正是「别再往下走了」，等它跑完再说等于白说。
+   *
+   * codex 的 app-server 有 `turn/steer`，能把话直接递进正在跑的那一轮。
+   * Claude 那边 SDK 没有对应入口，报 false，继续排队。
+   */
+  steer: boolean
 }
 
 /** 什么都不支持。驱动没表态时的兜底——**默认不给入口**，而不是默认给。 */
 export const NO_CAPABILITIES: EngineCapabilities = {
   compact: false,
   attachments: false,
+  steer: false,
 }

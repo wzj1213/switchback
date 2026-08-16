@@ -955,3 +955,122 @@ describe("跑着的时候补一句话：排队，不是拒绝", () => {
     expect(session().prompts).toHaveLength(1)
   })
 })
+
+describe("跑着的时候补一句话：能改向的当场递进去", () => {
+  /**
+   * 会 steer 的假引擎。**和上面那个共用不了**：它要能记下 steer 收到了什么、
+   * 还要能让 steer 主动失败（那条竞态分支只有这样才测得到）。
+   */
+  const steerable = (): {
+    host: Host
+    events: Event[]
+    steered: { text: string; attachments?: readonly string[] }[]
+    prompts: { text: string }[]
+    fail: { now: boolean }
+  } => {
+    const events: Event[] = []
+    const steered: { text: string; attachments?: readonly string[] }[] = []
+    const prompts: { text: string }[] = []
+    const fail = { now: false }
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers: {
+        fake: {
+          id: "fake",
+          start: (req) =>
+            Promise.resolve({
+              threadId: req.threadId,
+              prompt: (text: string) => {
+                prompts.push({ text })
+                return Promise.resolve()
+              },
+              steer: (text: string, attachments?: readonly string[]) => {
+                if (fail.now) return Promise.reject(new Error("那一轮刚好收工了"))
+                steered.push({ text, ...(attachments === undefined ? {} : { attachments }) })
+                return Promise.resolve()
+              },
+              interrupt: () => Promise.resolve(),
+              setTrust: () => Promise.resolve(),
+              models: () => Promise.resolve([]),
+              capabilities: () => ({ compact: false, attachments: true, steer: true }),
+              setModel: () => Promise.resolve(),
+              dispose: () => Promise.resolve(),
+            } as unknown as EngineSession),
+        },
+      },
+      home: "/home/dev",
+      emit: (e) => events.push(e),
+      newId: (prefix) => {
+        counter.n += 1
+        return `${prefix}-${String(counter.n)}`
+      },
+      now: () => 0,
+    })
+    return { host, events, steered, prompts, fail }
+  }
+
+  const running = async (h: ReturnType<typeof steerable>): Promise<string> => {
+    await h.host.dispatch(create)
+    const id = h.events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    return id
+  }
+
+  it("**不进队列，直接递进正在跑的那一轮**", async () => {
+    const h = steerable()
+    const id = await running(h)
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "不对，用另一个文件" })
+    expect(h.steered.map((s) => s.text)).toEqual(["不对，用另一个文件"])
+    expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued ?? []).toEqual([])
+  })
+
+  it("**不开新轮次**——开了的话引擎还在往旧 turnId 上发 item，正在流的回答会整个消失", async () => {
+    const h = steerable()
+    const id = await running(h)
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    expect(h.events.filter((e) => e.type === "turn.started")).toHaveLength(1)
+  })
+
+  it("那句话挂在**当前这一轮**上：transcript 里就该出现在它实际插话的位置", async () => {
+    const h = steerable()
+    const id = await running(h)
+    const turnId = h.events.find((e) => e.type === "turn.started")?.turn.id
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    const said = items(h.events).filter((i) => i.kind === "user_message")
+    expect(said.map((i) => i.text)).toEqual(["第一句", "补一句"])
+    expect(said[1]?.turnId).toBe(turnId)
+  })
+
+  it("附件跟着一起递过去", async () => {
+    const h = steerable()
+    const id = await running(h)
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "看这张", attachments: ["/tmp/a.png"] })
+    expect(h.steered[0]?.attachments).toEqual(["/tmp/a.png"])
+  })
+
+  it("**递不进去就退回排队**，不报错——主因是那一轮刚好收工，而队列会立刻把它发出去", async () => {
+    const h = steerable()
+    const id = await running(h)
+    h.fail.now = true
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    expect(h.steered).toHaveLength(0)
+    expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual(["补一句"])
+  })
+
+  it("**递不进去时不留下幽灵消息**：先 steer 再发 item，顺序反了就会「你以为说过了」", async () => {
+    const h = steerable()
+    const id = await running(h)
+    h.fail.now = true
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "没送出去的那句" })
+    expect(items(h.events).filter((i) => i.kind === "user_message").map((i) => i.text)).toEqual(["第一句"])
+  })
+
+  it("没在跑的时候照常开新轮次，不走 steer", async () => {
+    const h = steerable()
+    await h.host.dispatch(create)
+    const id = h.events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    expect(h.prompts.map((p) => p.text)).toEqual(["第一句"])
+    expect(h.steered).toHaveLength(0)
+  })
+})

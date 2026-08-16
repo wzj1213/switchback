@@ -118,6 +118,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         searchFiles={props.searchFiles}
         prefill={prefill}
         canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments}
+        canSteer={(thread.capabilities ?? NO_CAPABILITIES).steer}
         commands={[...actions.map((a) => a.command), ...props.commands]}
         onOmni={(name: string) => {
           actions.find((a) => a.command.name === name)?.run()

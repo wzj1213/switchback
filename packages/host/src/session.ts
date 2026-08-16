@@ -5,7 +5,8 @@ import { initial, itemsOf, reduceAll } from "@omni/store"
 import { createGate } from "./gate.js"
 import { askUser } from "./approval.js"
 import type { EngineSession } from "@omni/engine"
-import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
+import { emit, type Ctx, type Live } from "./ctx.js"
+import { prompt } from "./prompt.js"
 import type { Gate } from "./gate.js"
 
 /**
@@ -168,67 +169,6 @@ export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.res
   const early = await launch(ctx, thread, handle)
   emit(ctx, { type: "thread.updated", at, thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
-}
-
-/**
- * @param origin 这条不是人打的时候标一下（目前只有接力包）。引擎侧照旧当成
- *   用户消息发过去——**要改的只是界面怎么呈现**，不是引擎怎么理解。
- */
-export async function prompt(
-  ctx: Ctx,
-  cmd: Extract<Command, { type: "thread.prompt" }>,
-  origin?: "handoff",
-): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  /**
-   * **上一轮没跑完时排队，不开新轮次。**
-   *
-   * 硬约束没变：`entry.turn` 绝不能被新 turnId 覆盖——引擎还在往**旧的**
-   * turnId 上发 item，覆盖之后那些 item 从此无主，正在流的回答会整个消失。
-   *
-   * 变的是没跑完时怎么办。原来是抛错，界面靠禁用输入框配合；
-   * 而人在 agent 跑的时候最常想做的事恰恰是**补一句**
-   *（「不对，用另一个文件」「顺便把测试也跑了」），
-   * 逼他先中断等于丢掉已经做完的一半。所以排进队里，这一轮一停就接上。
-   *
-   * 排队也守住了那条硬约束：队列不碰 `entry.turn`。
-   */
-  if (entry.turn !== undefined) {
-    const queuedAt = ctx.deps.now()
-    entry.queued = [...entry.queued, cmd.text]
-    entry.thread = { ...entry.thread, queued: [...entry.queued], updatedAt: queuedAt }
-    emit(ctx, { type: "thread.updated", at: queuedAt, thread: entry.thread })
-    return
-  }
-  const at = ctx.deps.now()
-  const turnId = ctx.deps.newId("tn")
-  entry.turn = turnId
-  const turn = {
-    id: turnId,
-    threadId: cmd.threadId,
-    engine: entry.thread.engine,
-    status: "running" as const,
-    startedAt: at,
-  }
-  setStatus(ctx, entry, "running")
-  emit(ctx, { type: "turn.started", at, turn })
-  emit(ctx, {
-    type: "item.started",
-    at,
-    item: {
-      id: ctx.deps.newId("it"),
-      turnId,
-      kind: "user_message",
-      at,
-      text: cmd.text,
-      ...(cmd.attachments === undefined || cmd.attachments.length === 0
-        ? {}
-        : { attachments: cmd.attachments }),
-      ...(origin === undefined ? {} : { origin }),
-    },
-  })
-  await entry.session.prompt(cmd.text, turnId, cmd.attachments)
 }
 
 export async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust" }>): Promise<void> {

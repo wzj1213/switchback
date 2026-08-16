@@ -5,7 +5,7 @@ import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
-import { skillsToCommands } from "./catalog.js"
+import { skillsToCommands, toModelOption, type WireModel } from "./catalog.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { buildRequest, decisionFor, toolOf } from "./approve.js"
 import type { WireApprovalPolicy, WireApprovalRequest, WireItem, WireSandbox } from "./wire.js"
@@ -48,39 +48,6 @@ const SANDBOX: Readonly<Record<Trust, WireSandbox>> = {
 const POLICY: WireApprovalPolicy = "untrusted"
 
 const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
-
-interface WireModel {
-  id?: string
-  model?: string
-  displayName?: string
-  description?: string
-  hidden?: boolean
-  supportedReasoningEfforts?: readonly (string | { reasoningEffort?: string })[]
-  defaultReasoningEffort?: string
-}
-
-/**
- * codex 的 effort 列表元素是 `{ reasoningEffort, description }` 对象，
- * **不是**裸字符串——第一版按 `entry.effort` 读，结果强度选择器整个不出现。
- * 探真实响应才发现字段名。裸字符串那条分支留着兜底，代价只有一行。
- */
-function effortOf(entry: string | { reasoningEffort?: string }): string | undefined {
-  return typeof entry === "string" ? entry : entry.reasoningEffort
-}
-
-function toModelOption(raw: WireModel): ModelOption {
-  const efforts = (raw.supportedReasoningEfforts ?? [])
-    .map(effortOf)
-    .filter((e): e is string => e !== undefined)
-  const id = raw.id ?? raw.model ?? ""
-  return {
-    id,
-    label: raw.displayName ?? id,
-    ...(raw.description === undefined ? {} : { description: raw.description }),
-    ...(efforts.length === 0 ? {} : { efforts }),
-    ...(raw.defaultReasoningEffort === undefined ? {} : { defaultEffort: raw.defaultReasoningEffort }),
-  }
-}
 
 const STDERR_KEEP = 2000
 
@@ -315,18 +282,30 @@ class CodexSession implements EngineSession {
     // 所以这里 await 它是安全的，还能顺手拿到 codex 侧的 turnId 供中断使用。
     const started = await this.rpc.call("turn/start", {
       threadId: this.state.codexThread,
-      // codex 的 input item 认这几种：text / image / localImage / audio /
-      // localAudio / skill / mention（探出来的）。**用 localImage 而不是 image**：
-      // 前者只给路径，后者要把整张图塞进 JSON-RPC——一张截图几 MB，
-      // 走管道既慢又会把日志撑爆
-      input: [
-        { type: "text", text, text_elements: [] },
-        ...(attachments ?? []).map((path) => ({ type: "localImage", path })),
-      ],
+      input: inputItems(text, attachments),
       ...(this.state.model === undefined ? {} : { model: this.state.model }),
       ...(this.state.effort === undefined ? {} : { effort: this.state.effort }),
     })
     this.state.codexTurn = (started as { turn?: { id?: string } } | undefined)?.turn?.id
+  }
+
+  /**
+   * 跑到一半改向：把话递进**正在跑的那一轮**，不新起一轮、也不打断它。
+   *
+   * `expectedTurnId` 是 codex 给的并发护栏，必须传。用户按下回车到这条 RPC
+   * 到达之间，那一轮可能刚好收工——不带它的话这句话会被记到**下一轮**头上，
+   * 而用户以为改的是刚才那一轮。对不上时 codex 拒绝，宿主据此退回排队。
+   */
+  async steer(text: string, attachments?: readonly string[]): Promise<void> {
+    const { codexThread, codexTurn } = this.state
+    if (codexThread === undefined || codexTurn === undefined) {
+      throw new Error("没有正在跑的轮次，改不了向")
+    }
+    await this.rpc.call("turn/steer", {
+      threadId: codexThread,
+      expectedTurnId: codexTurn,
+      input: inputItems(text, attachments),
+    })
   }
 
   /**
@@ -359,7 +338,7 @@ class CodexSession implements EngineSession {
 
   /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
   capabilities(): EngineCapabilities {
-    return { compact: true, attachments: true }
+    return { compact: true, attachments: true, steer: true }
   }
 
   async setModel(model: string, effort?: string): Promise<void> {
@@ -431,3 +410,21 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
   }
 }
 
+/**
+ * 一次 `turn/start` 或 `turn/steer` 的输入项。
+ *
+ * codex 的 input item 认这几种（探出来的）：text / image / localImage /
+ * audio / localAudio / skill / mention。**用 localImage 而不是 image**：
+ * 前者只给路径，后者要把整张图塞进 JSON-RPC——一张截图几 MB，
+ * 走管道既慢又会把日志撑爆。
+ *
+ * 抽出来是因为**开一轮和中途改向必须送同一种形状**。两处各写一份的话，
+ * 哪天 codex 改了输入格式，只会有一处被改到——而没被改到的那处
+ * 恰恰是更少被测到的那处。
+ */
+function inputItems(text: string, attachments?: readonly string[]): readonly unknown[] {
+  return [
+    { type: "text", text, text_elements: [] },
+    ...(attachments ?? []).map((path) => ({ type: "localImage", path })),
+  ]
+}

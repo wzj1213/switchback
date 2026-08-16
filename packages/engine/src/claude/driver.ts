@@ -176,7 +176,10 @@ class ClaudeSession implements EngineSession {
    * 不是「这家引擎有没有这个概念」。
    */
   capabilities(): EngineCapabilities {
-    return { compact: false, attachments: true }
+    // steer 报 false：SDK 没有「往正在跑的那一轮里插一句」的入口。
+    // 宿主据此退回排队——**不是假装支持再偷偷排队**，
+    // 那样界面就没法如实告诉用户「这句得等」
+    return { compact: false, attachments: true, steer: false }
   }
 
   async setModel(model: string): Promise<void> {

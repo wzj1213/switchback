@@ -47,6 +47,14 @@ interface Props {
   onOmni: (name: string) => void
   /** 这家引擎收不收附件。不收就不给贴图入口。 */
   canAttach: boolean
+  /**
+   * 这家引擎能不能**跑到一半改向**。
+   *
+   * 只影响一句提示词，但那句话说的是两件完全不同的事：能改向的话你现在打的
+   * 立刻起作用，不能的话要等这一轮跑完。说错了比不说更糟——用户会照着
+   * 「立刻起作用」的预期去打断自己已经跑了两分钟的活。
+   */
+  canSteer: boolean
   /** 外面塞进来的文本（「改一改再发」）。`at` 变了才生效。 */
   prefill?: { text: string; at: number }
   onEngineChange: (engine: EngineId) => void
@@ -77,6 +85,7 @@ export function Composer({
   commands,
   onOmni,
   canAttach,
+  canSteer,
   prefill,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
@@ -132,7 +141,8 @@ export function Composer({
           value={text}
           detached={blocked}
           busyHint={busy && !detached}
-          queueing={busy && !detached}
+          queueing={busy && !detached && !canSteer}
+          steering={busy && !detached && canSteer}
           cwd={cwd}
           onPaste={attach.paste}
           commands={commands}

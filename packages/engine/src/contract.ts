@@ -82,6 +82,17 @@ export interface EngineSession {
    *   为 false）忽略这个参数即可。
    */
   prompt: (text: string, turnId: TurnId, attachments?: readonly string[]) => Promise<void>
+  /**
+   * 把一句话递进**正在跑的那一轮**：不开新轮次，也不打断它。
+   *
+   * **不支持就别实现**（`capabilities().steer` 报 false），宿主会退回排队。
+   *
+   * 实现方要自己守住「递进去的是不是同一轮」：codex 的 `turn/steer` 收一个
+   * `expectedTurnId`，对不上就拒绝——那道护栏必须传下去。
+   * 「用户按下回车」和「RPC 到达引擎」之间那一轮刚好收工，是个真实存在的窗口；
+   * 不校验的话这句话会被塞进**下一轮**，而用户以为它改的是上一轮。
+   */
+  steer?: (text: string, attachments?: readonly string[]) => Promise<void>
   interrupt: () => Promise<void>
   setTrust: (trust: Trust) => Promise<void>
   /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */

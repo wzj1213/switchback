@@ -19,6 +19,7 @@ export function Prompt({
   detached,
   busyHint = false,
   queueing = false,
+  steering = false,
   cwd,
   searchFiles,
   onPaste,
@@ -33,6 +34,13 @@ export function Prompt({
   busyHint?: boolean
   /** 现在发出去会进队列，等这一轮跑完再发。占位文案据此换一种说法。 */
   queueing?: boolean
+  /**
+   * 现在发出去会**直接递进正在跑的那一轮**（codex 的 `turn/steer`）。
+   *
+   * 和 `queueing` 互斥：两者都是「它还在跑的时候你打字」，
+   * 但一个是立刻生效、一个是等着——这正是用户最需要知道的差别。
+   */
+  steering?: boolean
   cwd: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   /** 贴进来的东西里有图就收下。返回 true 表示收了，调用方据此拦掉默认粘贴。 */
@@ -76,7 +84,9 @@ export function Prompt({
         disabled={detached}
         // 输入框直接说清为什么用不了。留一个能打字却答非所问的框，比把它关掉糟得多
         placeholder={
-          queueing
+          steering
+            ? "它还在跑——现在打的会直接插进去，立刻生效。"
+            : queueing
             ? "它还在跑——现在打的会排在后面，这一轮停了就发出去。"
             : busyHint
             ? "这一轮还在跑。等它停下，或者点右侧「停止」。"

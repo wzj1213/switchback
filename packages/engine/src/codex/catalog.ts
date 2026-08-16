@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@omni/protocol"
+import type { ModelOption, SlashCommand } from "@omni/protocol"
 import type { WireSkill, WireSkillGroup } from "./wire.js"
 
 /*
@@ -61,4 +61,42 @@ function toSlashCommand(skill: WireSkill): SlashCommand {
 function scopeOf(raw: string | undefined): SlashCommand["scope"] {
   if (raw === "user" || raw === "project" || raw === "system") return raw
   return undefined
+}
+
+/* ── 模型清单 ─────────────────────────────────
+ * 和技能一样是**形状转换**，所以住在这儿而不是驱动里：
+ * 驱动只管发 RPC 和收通知，「codex 的模型长什么样」只该有一个文件知道。
+ */
+
+export interface WireModel {
+  id?: string
+  model?: string
+  displayName?: string
+  description?: string
+  hidden?: boolean
+  supportedReasoningEfforts?: readonly (string | { reasoningEffort?: string })[]
+  defaultReasoningEffort?: string
+}
+
+/**
+ * codex 的 effort 列表元素是 `{ reasoningEffort, description }` 对象，
+ * **不是**裸字符串——第一版按 `entry.effort` 读，结果强度选择器整个不出现。
+ * 探真实响应才发现字段名。裸字符串那条分支留着兜底，代价只有一行。
+ */
+function effortOf(entry: string | { reasoningEffort?: string }): string | undefined {
+  return typeof entry === "string" ? entry : entry.reasoningEffort
+}
+
+export function toModelOption(raw: WireModel): ModelOption {
+  const efforts = (raw.supportedReasoningEfforts ?? [])
+    .map(effortOf)
+    .filter((e): e is string => e !== undefined)
+  const id = raw.id ?? raw.model ?? ""
+  return {
+    id,
+    label: raw.displayName ?? id,
+    ...(raw.description === undefined ? {} : { description: raw.description }),
+    ...(efforts.length === 0 ? {} : { efforts }),
+    ...(raw.defaultReasoningEffort === undefined ? {} : { defaultEffort: raw.defaultReasoningEffort }),
+  }
 }
