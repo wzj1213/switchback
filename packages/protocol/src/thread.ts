@@ -1,3 +1,4 @@
+import type { EngineCapabilities } from "./capability.js"
 import type { EngineId, ThreadId, TurnId } from "./ids.js"
 
 /** 会话的信任档。语义与 `@omni/approval` 的 `Trust` 一致，此处只做承载。 */
@@ -73,6 +74,13 @@ export interface Thread {
    * 队列**不跨重启**：引擎都换过一个了，那句话的上下文已经不在。
    */
   queued?: readonly string[]
+  /**
+   * 这个会话背后的引擎能做什么。握手时由驱动自报。
+   *
+   * **界面只看它，不看 `engine` 是哪家。** 回放出来的历史会话没有这一项
+   * （引擎都没起），那时界面按「都不支持」处理，正好——那些入口本来也点不动。
+   */
+  capabilities?: EngineCapabilities
 }
 
 export type TurnStatus = "running" | "completed" | "interrupted" | "failed"

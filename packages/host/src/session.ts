@@ -86,6 +86,9 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
   live.gate = createGate((e) => {
     emit(ctx, e)
   })
+  // 能力握手时问一次就够——它不随轮次变。挂到 thread 上，
+  // 界面只看它，不看引擎叫什么名字
+  live.thread = { ...live.thread, capabilities: session.capabilities() }
   ctx.live.set(thread.id, live)
   // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
   // omni 写死一份清单迟早会和实际能用的对不上。
@@ -133,7 +136,9 @@ export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.cre
     emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
     throw error
   }
-  emit(ctx, { type: "thread.updated", at: ctx.deps.now(), thread })
+  // **发 `live` 里那一份，不是这个局部变量**——`launch` 期间会往上面挂东西
+  //（现在是引擎能力）。发局部的那份等于把它们原地丢掉，而且一声不响
+  emit(ctx, { type: "thread.updated", at: ctx.deps.now(), thread: ctx.live.get(thread.id)?.thread ?? thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 

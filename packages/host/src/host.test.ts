@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Event, Item } from "@omni/protocol"
 import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
 import type { Rule } from "@omni/approval"
@@ -43,6 +44,7 @@ function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
+        capabilities: () => NO_CAPABILITIES,
         setModel: () => Promise.resolve(),
         dispose: () => {
           fake.disposed = true
@@ -270,6 +272,7 @@ describe("续跑", () => {
           interrupt: () => Promise.resolve(),
           setTrust: () => Promise.resolve(),
           models: () => Promise.resolve([]),
+        capabilities: () => NO_CAPABILITIES,
           setModel: () => Promise.resolve(),
           dispose: () => Promise.resolve(),
         })
@@ -559,6 +562,7 @@ const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; sto
           interrupt: () => Promise.resolve(),
           setTrust: () => Promise.resolve(),
           models: () => Promise.resolve([]),
+        capabilities: () => NO_CAPABILITIES,
           setModel: () => Promise.resolve(),
           dispose: () => {
             fake.disposed = true
@@ -718,6 +722,7 @@ function slowDriver(delayMs: number, fail = false): EngineDriver {
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
+        capabilities: () => NO_CAPABILITIES,
         setModel: () => Promise.resolve(),
         dispose: () => Promise.resolve(),
       }

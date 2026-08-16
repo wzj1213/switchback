@@ -1,13 +1,14 @@
 import type { ChildProcess } from "node:child_process"
 import { decide } from "@omni/approval"
-import type { EngineStatus, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
+import type { EngineCapabilities, EngineStatus, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
+import { skillsToCommands } from "./catalog.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { buildRequest, decisionFor, toolOf } from "./approve.js"
-import type { WireApprovalPolicy, WireApprovalRequest, WireItem, WireSandbox, WireSkill, WireSkillGroup } from "./wire.js"
+import type { WireApprovalPolicy, WireApprovalRequest, WireItem, WireSandbox } from "./wire.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -331,32 +332,10 @@ class CodexSession implements EngineSession {
     return list.filter((m) => m.hidden !== true).map(toModelOption)
   }
 
-  /**
-   * 能用哪些斜杠命令。
-   *
-   * codex 这边对应的是 **`skills/list`**——app-server 没有「斜杠命令」这个概念，
-   * 它把用户装的技能报上来，而 ChatGPT.app 的 `/` 面板正是拿它铺的。
-   *
-   * **`params` 不能省**：不传的话 app-server 回
-   * `Invalid request: missing field 'params'`（实测），而空对象是合法的。
-   *
-   * 返回是按 cwd 分组的（一个 app-server 可以同时服务多个工作区），
-   * 这里全铺平——一个 omni 会话只对着一个工作区，分组信息对用户没有意义。
-   * **停用的技能不给**：它在 codex 那边就不生效，列出来只会让人白点一次。
-   */
+  /** 能用哪些斜杠命令。翻译在 `catalog.ts`——那是**形状转换**，不是协议调用。 */
   async commands(): Promise<readonly SlashCommand[]> {
     const raw = await this.rpc.call("skills/list", {}).catch(() => undefined)
-    const groups = (raw as { data?: readonly WireSkillGroup[] } | undefined)?.data ?? []
-    const seen = new Set<string>()
-    const out: SlashCommand[] = []
-    for (const group of groups) {
-      for (const skill of group.skills ?? []) {
-        if (skill.enabled === false || seen.has(skill.name)) continue
-        seen.add(skill.name)
-        out.push(toSlashCommand(skill))
-      }
-    }
-    return out
+    return skillsToCommands(raw)
   }
 
   /**
@@ -369,6 +348,11 @@ class CodexSession implements EngineSession {
     const { codexThread } = this.state
     if (codexThread === undefined) throw new Error("会话还没起来，没法压缩")
     await this.rpc.call("thread/compact/start", { threadId: codexThread })
+  }
+
+  /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
+  capabilities(): EngineCapabilities {
+    return { compact: true, attachments: true }
   }
 
   async setModel(model: string, effort?: string): Promise<void> {
@@ -440,21 +424,3 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
   }
 }
 
-/**
- * 一条技能 → 一条斜杠命令。
- *
- * 名字用 `name`（那是**真正要打进输入框的东西**），而说明优先用
- * `interface.shortDescription`——技能的 `description` 是写给模型看的触发条件，
- * 动辄两百字还带一串触发词，摆在选择列表里读不了。
- */
-function toSlashCommand(skill: WireSkill): SlashCommand {
-  const short = skill.interface?.shortDescription ?? undefined
-  const display = skill.interface?.displayName ?? undefined
-  const text = short ?? skill.description ?? ""
-  return {
-    name: skill.name,
-    // displayName 是中文的时候，把它放在说明最前面——列表里一眼能认出来
-    description: display === undefined || display === skill.name ? text : `${display} · ${text}`,
-    source: "engine",
-  }
-}

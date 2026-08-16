@@ -1,4 +1,4 @@
-import type { EngineId, Event, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
+import type { EngineCapabilities, EngineId, Event, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
 
@@ -98,6 +98,13 @@ export interface EngineSession {
    * `thread/compact/start`，但它不在 `skills/list` 里，所以必须由这里补。
    */
   compact?: () => Promise<void>
+  /**
+   * 这家引擎能做什么。**握手完成后由宿主问一次**，挂到会话上给界面用。
+   *
+   * 不做成可选：新增一种能力时，编译器会逼每个驱动表态——
+   * 一家引擎支不支持某件事，只能由它自己回答，不该让界面去猜。
+   */
+  capabilities: () => EngineCapabilities
   /** 幂等。返回时进程应已退出。 */
   dispose: () => Promise<void>
 }

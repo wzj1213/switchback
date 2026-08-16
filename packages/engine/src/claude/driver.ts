@@ -6,7 +6,7 @@ import {
   type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
-import type { ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
+import type { EngineCapabilities, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
@@ -162,6 +162,21 @@ class ClaudeSession implements EngineSession {
       ...(c.argumentHint === "" ? {} : { argumentHint: c.argumentHint }),
       source: "engine" as const,
     }))
+  }
+
+  /**
+   * **`compact` 报 false 是有意的。**
+   *
+   * Claude 当然会压缩上下文——但它的 `/compact` 已经在 `supportedCommands()`
+   * 里，会经斜杠命令面板原样露给用户。omni 再给一个「压缩上下文」，
+   * 面板上就有两条长得不一样、干同一件事的入口，
+   * 而人会先花时间想「这俩有什么区别」。
+   *
+   * 这一条正是这层抽象要表达的东西：能力问的是**「omni 该不该提供入口」**，
+   * 不是「这家引擎有没有这个概念」。
+   */
+  capabilities(): EngineCapabilities {
+    return { compact: false, attachments: true }
   }
 
   async setModel(model: string): Promise<void> {

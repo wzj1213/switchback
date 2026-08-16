@@ -1,5 +1,6 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
+import { NO_CAPABILITIES } from "@omni/protocol"
+import type { EngineCapabilities, EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
@@ -341,6 +342,14 @@ class AcpSession implements EngineSession {
    * 换模型。ACP 的强度编在 modelId 里，所以 `effort` 参数在这里是多余的——
    * 但契约上它是可选的，忽略即可，不用报错。
    */
+  /**
+   * ACP 协议里没有压缩，附件那部分各家实现差异也没验过。
+   * **没探过就报 false**——宁可少一个入口，也不要给一个点了没反应的。
+   */
+  capabilities(): EngineCapabilities {
+    return NO_CAPABILITIES
+  }
+
   async setModel(model: string): Promise<void> {
     const sessionId = this.state.acpSession
     if (sessionId === undefined) return

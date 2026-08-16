@@ -19,3 +19,5 @@ export type {
 } from "./item.js"
 export type { Event, EngineStatus, Usage, ModelOption, EngineInfo } from "./event.js"
 export type { Command, RememberScope } from "./command.js"
+export { NO_CAPABILITIES } from "./capability.js"
+export type { EngineCapabilities } from "./capability.js"
