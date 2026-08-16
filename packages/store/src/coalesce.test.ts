@@ -99,3 +99,45 @@ describe("全量重建之后横幅要清掉", () => {
     expect(clearNotices(s)).toBe(s)
   })
 })
+
+describe("批量归约的可变累加器不能污染传入的状态", () => {
+  const born = (id: string): Event => ({
+    type: "thread.started",
+    at: 0,
+    thread: { id, title: id, cwd: "/w", engine: "claude", trust: "auto-edit", status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["claude"] },
+  })
+  const turn = (id: string, threadId: string): Event => ({
+    type: "turn.started",
+    at: 0,
+    turn: { id, threadId, engine: "claude", status: "running", startedAt: 0 },
+  })
+  const item = (id: string, turnId: string): Event => ({
+    type: "item.started",
+    at: 0,
+    item: { id, kind: "agent_message", turnId, at: 0, text: "x", complete: true },
+  })
+
+  it("**传进去的 state 一个字段都不能被改**——这是 transient 手法安全的前提", () => {
+    const before = reduceAll(initial(), [born("t"), turn("r", "t"), item("a", "r")])
+    const snapshot = JSON.stringify(before)
+    reduceAll(before, [item("b", "r"), item("c", "r")])
+    expect(JSON.stringify(before)).toBe(snapshot)
+  })
+
+  it("批量的结果和逐条一模一样", () => {
+    const events = [born("t"), turn("r", "t"), item("a", "r"), item("b", "r"), item("c", "r")]
+    const 逐条 = events.reduce((s, e) => reduceAll(s, [e]), initial())
+    const 成批 = reduceAll(initial(), events)
+    expect(成批.owner).toEqual(逐条.owner)
+    expect(itemsOf(成批, "t").map((i) => i.id)).toEqual(itemsOf(逐条, "t").map((i) => i.id))
+  })
+
+  it("批量之后 owner 仍然能定位到 item（`item.updated` 靠它找宿主会话）", () => {
+    const s = reduceAll(initial(), [born("t"), turn("r", "t"), item("a", "r"), item("b", "r")])
+    const patched = reduceAll(s, [
+      { type: "item.updated", at: 1, item: { id: "a", kind: "agent_message", turnId: "r", at: 1, text: "改过了", complete: true } },
+      { type: "item.updated", at: 1, item: { id: "b", kind: "agent_message", turnId: "r", at: 1, text: "也改过", complete: true } },
+    ])
+    expect(itemsOf(patched, "t").map((i) => ("text" in i ? i.text : ""))).toEqual(["改过了", "也改过"])
+  })
+})
