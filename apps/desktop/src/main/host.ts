@@ -362,7 +362,15 @@ export async function rebuild(attached: Attached, target: WebContents): Promise<
   const threads = await Promise.all(
     ids.map(async (id) => ({ id, events: await attached.journal.read(id).catch((): readonly Event[] => []) })),
   )
-  const events = replayEvents(await attached.engines(), threads, alive, Date.now())
+  const events = [
+    ...replayEvents(await attached.engines(), threads, alive, Date.now()),
+    // **不落盘的那些现状要补在最后。** 斜杠命令和额度都不进 journal
+    //（现问引擎的东西落盘只会在重放时塞回一份过期的），于是全量里没有它们；
+    // 而它们作为增量发出去的那一次又 `seq <= resumeAt`，被渲染层当旧消息丢掉。
+    // 两头都不留，就永久没了——实测去掉这一行，重载之后 `/` 面板里
+    // 22 条技能一条不剩，只剩 omni 自己那 8 条
+    ...attached.host.liveState(),
+  ]
   const resumeAt = attached.sequencer.latest()
   if (!target.isDestroyed()) target.send("omni:replay", { events, resumeAt })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条

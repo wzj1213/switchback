@@ -1,6 +1,6 @@
-import type { Command, Thread, ThreadId, TurnId } from "@omni/protocol"
+import type { Command, Event, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
-import { clearQueue, emit, type Ctx, type Live } from "./ctx.js"
+import { clearQueue, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { create, fork, handoff, prompt, remove, rename, resume, rewind, setModel, setTrust } from "./session.js"
 
@@ -23,6 +23,14 @@ export interface Host {
    * 分不开的后果是重载之后整个应用变成只读，而引擎其实还在跑。
    */
   live: () => readonly Thread[]
+  /**
+   * 不落盘、但描述现状的事件（斜杠命令、额度），各留最后一条。
+   *
+   * 重建全量时**必须**把它们补进去：它们既不在 journal 里，
+   * 又会被渲染层按 `seq <= resumeAt` 当旧消息丢掉——两头都不留，就永久没了。
+   * 实测代价是 `/` 面板里一条技能都不显示，而链路上每一环看起来都是好的。
+   */
+  liveState: () => readonly Event[]
   dispose: () => Promise<void>
 }
 
@@ -138,6 +146,7 @@ export function createHost(deps: HostDeps): Host {
     live: new Map<ThreadId, Live>(),
     turnOwner: new Map<TurnId, ThreadId>(),
     inflight: new Map<string, Promise<void>>(),
+    liveState: new Map<string, Event>(),
   }
   /**
    * 一轮跑完就把排队的下一句发出去。
@@ -166,6 +175,7 @@ export function createHost(deps: HostDeps): Host {
   return {
     dispatch: (command) => dispatch(ctx, command),
     live: () => [...ctx.live.values()].map((entry) => entry.thread),
+    liveState: () => liveStateOf(ctx),
     dispose: () => dispose(ctx),
   }
 }

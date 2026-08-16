@@ -51,6 +51,12 @@ export interface Ctx {
    */
   inflight: Map<string, Promise<void>>
   /**
+   * 不落盘、但描述现状的事件，各留最后一条（见 `LIVE_STATE`）。
+   * 窗口重载时靠它补全——否则这些事实会在「没落盘」和「全量只读 journal」
+   * 之间掉进缝里，永久消失。
+   */
+  liveState: Map<string, Event>
+  /**
    * 把待发队列里的第一句发出去。**由 `host.ts` 在建 ctx 时填进来。**
    *
    * 不直接 import `session.ts` 的 `prompt`：那会绕成
@@ -73,6 +79,33 @@ const UNOWNED: ReadonlySet<string> = new Set([
   // 落盘只会在重放时把一份过期的清单塞回界面
   "commands.updated",
 ])
+
+/**
+ * 不落盘、但**描述现状**的事件。重建全量时必须把最后一条补发出去。
+ *
+ * ## 这条规则是拿一个真 bug 换来的
+ *
+ * 「不落盘」和「重建只读 journal」两条规则各自都对，合在一起就有个缝：
+ * 这类事件既不在全量里，又会因为 `seq <= resumeAt` 被渲染层当旧消息丢掉，
+ * **于是永久消失**。实测表现是 `/` 面板里一条技能都没有——codex 明明报了 22 条，
+ * `skills/list` 也是通的，事件也确实发出去过，就是没活到界面上。
+ *
+ * 同病的还有 `limits.updated`（额度条重载后一直空着）。
+ *
+ * 区别于 `thread.removed`：那是一次**变化**，补发只会把删掉的东西变回来。
+ * 收进这里的标准是「它描述的是现在是什么样，重放一遍不会有副作用」。
+ */
+const LIVE_STATE: ReadonlySet<string> = new Set(["limits.updated", "commands.updated"])
+
+/**
+ * 这类事件按「说的是哪一份」留最后一条：额度按引擎、命令按会话。
+ * 键错了的后果是互相覆盖——两家引擎的额度只剩一份。
+ */
+function liveKey(event: Event): string | undefined {
+  if (event.type === "limits.updated") return `limits:${event.engine}`
+  if (event.type === "commands.updated") return `commands:${event.threadId}`
+  return undefined
+}
 
 /** 一条事件属于哪个会话。判不出就不落盘——宁可少一条，也不要落到错的文件里。 */
 export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
@@ -121,10 +154,24 @@ function directOwner(event: Event): ThreadId | undefined {
  */
 export function emit(ctx: Ctx, event: Event): void {
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
+  const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
+  if (key !== undefined) ctx.liveState.set(key, event)
   ctx.deps.emit(event)
   const owner = ownerOf(ctx, event)
   if (owner !== undefined) void ctx.deps.journal?.append(owner, event)
   observe(ctx, event)
+}
+
+/**
+ * 重建全量时要补发的那些事件（见 `LIVE_STATE`）。
+ *
+ * 会话已经不在了的就别补了——它对应的那一行界面上都没有，
+ * 补一份技能清单过去只会在 store 里留一条永远不会被读到的记录。
+ */
+export function liveStateOf(ctx: Ctx): readonly Event[] {
+  return [...ctx.liveState.entries()]
+    .filter(([key]) => !key.startsWith("commands:") || ctx.live.has(key.slice("commands:".length) as ThreadId))
+    .map(([, event]) => event)
 }
 
 
