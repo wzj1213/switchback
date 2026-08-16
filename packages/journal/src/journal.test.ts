@@ -182,3 +182,41 @@ describe("删会话不能被在途写入救回来", () => {
     expect(await j.read("th-2")).toHaveLength(2)
   })
 })
+
+describe("写满了要出声", () => {
+  it("**超限时叫一声**——停笔是对的，停得一声不响不对", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const full: string[] = []
+    // 上限设成 1 字节：第一条写进去，第二条就超
+    const journal = createJournal({ dir, maxBytes: 1, onFull: (id) => full.push(id) })
+    await journal.append("th-1", started("th-1"))
+    await journal.append("th-1", started("th-1"))
+    await journal.flush()
+    expect(full).toEqual(["th-1"])
+  })
+
+  it("**每个会话只叫一次**：之后每条事件都叫等于刷屏", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const full: string[] = []
+    const journal = createJournal({ dir, maxBytes: 1, onFull: (id) => full.push(id) })
+    for (let i = 0; i < 5; i += 1) await journal.append("th-1", started("th-1"))
+    await journal.flush()
+    expect(full).toHaveLength(1)
+  })
+
+  it("没写满就不叫", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const full: string[] = []
+    const journal = createJournal({ dir, onFull: (id) => full.push(id) })
+    await journal.append("th-1", started("th-1"))
+    await journal.flush()
+    expect(full).toEqual([])
+  })
+
+  it("不给回调也不能崩——它是可选的", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const journal = createJournal({ dir, maxBytes: 1 })
+    await journal.append("th-1", started("th-1"))
+    await expect(journal.append("th-1", started("th-1"))).resolves.toBeUndefined()
+  })
+})

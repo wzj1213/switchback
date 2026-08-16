@@ -8,6 +8,15 @@ export interface JournalConfig {
   dir: string
   /** 每个会话的文件上限；超过就停止追加。默认 32 MB。 */
   maxBytes?: number
+  /**
+   * 某个会话写满了、开始丢事件时叫一声。**每个会话只叫一次。**
+   *
+   * 不给就是静默停笔——而那正是这条回调要治的病：
+   * 停笔本身是对的（无声地把磁盘写满更糟），但**停得一声不响**就成了
+   * 「你以为还在记，其实早就不记了」。重启之后才发现历史断在半个月前，
+   * 那时候已经补不回来了。
+   */
+  onFull?: (threadId: ThreadId) => void
 }
 
 export interface Journal {
@@ -49,13 +58,25 @@ const DEFAULT_MAX_BYTES = 32 * 1024 * 1024
  * 超限就停笔——轮转策略以后再说，但**无声地把磁盘写满**是不能接受的。
  * 提到外面是因为 `createJournal` 撑破了行数闸门，而这一段本来就不依赖闭包里的东西。
  */
-async function writeOne(file: string, line: string, ready: Promise<boolean>, maxBytes: number): Promise<void> {
+interface WriteCtx {
+  /** 目录建好了吗。没建好就整个不写——不然每条事件都要试一次。 */
+  ready: Promise<boolean>
+  maxBytes: number
+  /** 写满了叫一声。调用方负责「只叫一次」。 */
+  onFull: () => void
+}
+
+async function writeOne(file: string, line: string, ctx: WriteCtx): Promise<void> {
+  const { ready, maxBytes, onFull } = ctx
   if (!(await ready)) return
   const size = await stat(file).then(
     (info) => info.size,
     () => 0,
   )
-  if (size >= maxBytes) return
+  if (size >= maxBytes) {
+    onFull()
+    return
+  }
   await appendFile(file, `${line}\n`, "utf8")
 }
 
@@ -84,6 +105,16 @@ async function listThreads(dir: string): Promise<readonly ThreadId[]> {
     return stamped.sort((a, b) => b.at - a.at).map((entry) => entry.id)
   }
 
+/** 包一层「同一个会话只叫一次」。不给回调时是个空操作。 */
+function onceEach(fn: ((threadId: ThreadId) => void) | undefined): (threadId: ThreadId) => void {
+  const seen = new Set<ThreadId>()
+  return (threadId) => {
+    if (fn === undefined || seen.has(threadId)) return
+    seen.add(threadId)
+    fn(threadId)
+  }
+}
+
 export function createJournal(config: JournalConfig): Journal {
   const maxBytes = config.maxBytes ?? DEFAULT_MAX_BYTES
   const ready = mkdir(config.dir, { recursive: true }).then(
@@ -107,6 +138,11 @@ export function createJournal(config: JournalConfig): Journal {
    * 里面是完整正文。用户明确点了删除，内容还在。
    */
   const removed = new Set<ThreadId>()
+  /**
+   * 「写满了」的通知口。**每个会话只喊一次**——之后每条事件都喊等于刷屏，
+   * 而它说的一直是同一件事。
+   */
+  const announce = onceEach(config.onFull)
 
   const append = async (threadId: ThreadId, event: Event): Promise<void> => {
     if (!shouldPersist(event) || removed.has(threadId)) return
@@ -115,7 +151,17 @@ export function createJournal(config: JournalConfig): Journal {
     const prev = chains.get(threadId) ?? Promise.resolve()
     // 排队期间被删掉的也要认墓碑：这条 append 可能等了几百毫秒才轮到自己
     const next = prev
-      .then(() => (removed.has(threadId) ? undefined : writeOne(file, encode(event), ready, maxBytes)))
+      .then(() =>
+        removed.has(threadId)
+          ? undefined
+          : writeOne(file, encode(event), {
+              ready,
+              maxBytes,
+              onFull: () => {
+                announce(threadId)
+              },
+            }),
+      )
       .catch(() => undefined)
     chains.set(threadId, next)
     return next

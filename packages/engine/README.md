@@ -85,7 +85,12 @@
   用量、`turn/completed`、`error`。其余（MCP 进度、审批复核、实时语音…）一律丢弃。
 - **codex 的 OS 沙箱在 `thread/start` 时定死，`setTrust` 改不了它。** 往低调没问题
   （omni 拒得更多），往高调会出现「omni 说可以、写下去却被系统拦住」。
-  驱动检测到这种情况会发一条 `engine.status` 说明，但真正生效仍需新开会话。
+  **实测证实改不了**：拿 `approvalPolicy: "never"`（完全不问客户端，写没写成纯由沙箱决定）验过，
+  read-only 会话写文件被拦；同连接 `thread/resume` 换成 `workspace-write` 之后**照样被拦**；
+  而全新的 workspace-write 会话写得成。所以判据有区分力，结论是沙箱确实定死。
+  `thread/settings/update` 也不行——它什么都收、回 `{}`、不发任何确认，效果验不了。
+  往上调档时驱动会发一条 `degraded`（**以前发的是 `ready`，而横幅只认 crashed/timeout/degraded，
+  于是那句警告从来没显示过**）。往下调不出声：omni 自己拒得更多，宽出来的沙箱权限用不到。
 - **各家自己的放行表都在 omni 之前生效**：Claude 是用户写的 allow 规则，
   codex 是内置可信命令表（`ls`、`sed`、`cat` 这类根本不会送到客户端）。
   这是「引擎原生」这个前提的必然代价——用户的原生配置压过宿主的自动策略。

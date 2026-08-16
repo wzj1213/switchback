@@ -5,48 +5,18 @@ import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../su
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { skillsToCommands, toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
+import { LOOSENESS, POLICY, SANDBOX } from "./sandbox.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { reportAccount } from "./account.js"
 import { answerApproval } from "./approve.js"
-import type { WireApprovalPolicy, WireItem, WireSandbox } from "./wire.js"
+import type { WireItem, WireSandbox } from "./wire.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
  *
- * ## 沙箱不是标签，是真的沙箱——而且它就是「问不问」的开关
- *
- * 这是接第二家引擎最重要的一个发现，和 Claude 的结构完全不同。
- *
- * Claude 的 `permissionMode` 只是个路由开关，所以我们把它钉死在 `default`，
- * 让**每一次**调用都走 `canUseTool`，档位全部表达在 `@omni/approval` 里。
- *
- * codex 不是。它的 `sandbox` 是操作系统级的真沙箱（macOS 上是 seatbelt），
- * 实测下来：**只有沙箱会拦的操作才会来问客户端**。
- * `workspace-write` 下往工作区里写文件根本不会触发审批——沙箱本来就允许，
- * codex 没有理由问；换成 `read-only`，同一次写就变成一条
- * `item/fileChange/requestApproval` 送到我们手上。
- *
- * 所以信任档**必须**落在 sandbox 上，落在 approvalPolicy 上是没用的：
- *
- * | 档位        | sandbox           | 结果                                             |
- * | ----------- | ----------------- | ------------------------------------------------ |
- * | `read-only` | `read-only`       | 任何写都来问 omni，omni 拒——档位真正生效         |
- * | `auto-edit` | `workspace-write` | 工作区内的写直接过；越界才问——正是这档的语义     |
- * | `full`      | `workspace-write` | 同上，越界时由 omni 的 `full` 判定放行           |
- *
- * `full` **不**升到 `danger-full-access`：那会把 OS 沙箱整个关掉。
- * `full` 的意思是「别拿日常操作烦我」，不是「把安全网撤了」——
- * 判定错了还有沙箱兜底，这层纵深不该为省一次弹窗而放弃。
+ * 信任档怎么落到 codex 的**操作系统沙箱**上，是这个驱动最重要的一个决定，
+ * 单独写在 `sandbox.ts`——那不是一张查找表，是接第二家引擎时最大的发现。
  */
-const SANDBOX: Readonly<Record<Trust, WireSandbox>> = {
-  "read-only": "read-only",
-  "auto-edit": "workspace-write",
-  full: "workspace-write",
-}
-
-/** `untrusted` 把最多的请求路由给客户端，和 Claude 钉死 `default` 是同一个用意。 */
-const POLICY: WireApprovalPolicy = "untrusted"
-
 const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
 
 const STDERR_KEEP = 2000
@@ -430,10 +400,15 @@ class CodexSession implements EngineSession {
    */
   async setTrust(trust: Trust): Promise<void> {
     this.trust.current = trust
-    if (SANDBOX[trust] !== this.state.sandbox) {
+    const want = SANDBOX[trust]
+    // **只有往上调才要出声。** 往下调是安全的：omni 自己的判定会拒得更多，
+    // 而沙箱比新档位更宽这件事永远不会被用到。往上调才有害——
+    // omni 说可以、写下去却被系统拦住，报错还看不出是沙箱干的
+    if (LOOSENESS[want] > LOOSENESS[this.state.sandbox]) {
       this.status(
-        "ready",
-        `信任档已改为 ${trust}，但本会话的 codex 沙箱仍是 ${this.state.sandbox}（开会话时定死）。要让新档位完全生效，请新开一个会话。`,
+        "degraded",
+        `信任档改成了「${trust}」，但**这个会话的系统沙箱改不了**（codex 在开会话时把它定死在 ${this.state.sandbox}）。` +
+          `结果是 omni 这边放行、系统那边照样拦，报错还看不出是沙箱干的。要让新档位真正生效，请新开一个会话。`,
       )
     }
     return Promise.resolve()
