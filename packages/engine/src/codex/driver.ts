@@ -1,5 +1,4 @@
 import type { ChildProcess } from "node:child_process"
-import { decide } from "@omni/approval"
 import type { EngineCapabilities, EngineStatus, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
@@ -7,8 +6,8 @@ import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { skillsToCommands, toModelOption, type WireModel } from "./catalog.js"
 import { emitLimits, handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
-import { buildRequest, decisionFor, toolOf } from "./approve.js"
-import type { WireApprovalPolicy, WireApprovalRequest, WireItem, WireRateLimits, WireSandbox } from "./wire.js"
+import { answerApproval } from "./approve.js"
+import type { WireApprovalPolicy, WireItem, WireRateLimits, WireSandbox } from "./wire.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -95,6 +94,8 @@ class CodexSession implements EngineSession {
   private readonly rpc: RpcPeer
   private readonly inflight = new Map<string, WireItem>()
   private readonly materialized = new Set<string>()
+  /** MCP 服务器上次报的状态。只在翻面时出声——一次启动实测 17 条通知。 */
+  private readonly mcpSeen = new Map<string, string>()
   private readonly trust: { current: Trust }
   private readonly state: SessionState
 
@@ -132,6 +133,7 @@ class CodexSession implements EngineSession {
       turnId: () => this.state.turn,
       inflight: this.inflight,
       materialized: this.materialized,
+      mcpSeen: this.mcpSeen,
       now: () => Date.now(),
     }
   }
@@ -289,37 +291,18 @@ class CodexSession implements EngineSession {
   }
 
   /**
-   * 服务端请求的应答。**必须每一条都答**——不答 codex 会一直等，整轮就此挂住。
-   *
-   * 认不出的请求一律回空对象：宁可让 codex 拿到一个它看不懂的应答，
-   * 也不能让它无限期等下去。审批类的认不出就拒——默认拒是唯一安全的默认。
+   * 服务端请求的应答。判定与措辞在 `approve.ts`——**那个文件就是「codex 的审批
+   * 怎么翻译」**，应答逻辑留在驱动里是错位的：驱动只该管发 RPC 和收通知。
    */
   private async answer(call: ServerCall): Promise<void> {
-    if (!call.method.endsWith("requestApproval")) {
-      call.respond({})
-      return
-    }
-    const params = call.params as WireApprovalRequest
-    const item = this.inflight.get(params.itemId)
-    const request = buildRequest(call.method, params, item, this.req.cwd)
-    const verdict = decide(request, {
-      trust: this.trust.current,
-      worksite: this.req.cwd,
+    await answerApproval(call, {
+      inflight: this.inflight,
+      cwd: this.req.cwd,
       home: this.req.home,
-      memory: this.req.memory(),
+      trust: () => this.trust.current,
+      memory: () => this.req.memory(),
+      askUser: (ask) => this.req.askUser(ask),
     })
-    if (verdict.action !== "escalate") {
-      call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })
-      return
-    }
-    const answer = await this.req.askUser({
-      toolCallId: params.itemId,
-      tool: toolOf(call.method),
-      summary: request.summary ?? toolOf(call.method),
-      reason: verdict.reason,
-      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
-    })
-    call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
   }
 
   get threadId(): StartRequest["threadId"] {
@@ -347,6 +330,20 @@ class CodexSession implements EngineSession {
    * 到达之间，那一轮可能刚好收工——不带它的话这句话会被记到**下一轮**头上，
    * 而用户以为改的是刚才那一轮。对不上时 codex 拒绝，宿主据此退回排队。
    */
+  /** 标题同步给 codex，它自己的会话列表里才认得出这条。 */
+  async setTitle(title: string): Promise<void> {
+    const { codexThread } = this.state
+    if (codexThread === undefined) return
+    await this.rpc.call("thread/name/set", { threadId: codexThread, name: title })
+  }
+
+  /** 归档而不是删除：codex 那边的原始记录是用户的，可逆的操作才轮得到我们替他做。 */
+  async discard(): Promise<void> {
+    const { codexThread } = this.state
+    if (codexThread === undefined) return
+    await this.rpc.call("thread/archive", { threadId: codexThread })
+  }
+
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const { codexThread, codexTurn } = this.state
     if (codexThread === undefined || codexTurn === undefined) {

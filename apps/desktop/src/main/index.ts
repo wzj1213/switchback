@@ -18,7 +18,7 @@ import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch } from "./devtools.js"
+import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
 
 /**
  * Electron 主进程。
@@ -194,6 +194,19 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
     if (threadId === undefined) return
     void attached.host
       .dispatch(kind === "fork" ? { type: "thread.fork", threadId, to } : { type: "thread.handoff", threadId, to })
+      .catch((error: unknown) => {
+        attached.report(error, threadId)
+      })
+  })
+  scheduleDevThreadOps(win, (op) => {
+    const threadId = attached.lastThreadId()
+    if (threadId === undefined) return
+    void attached.host
+      .dispatch(
+        op.kind === "rename"
+          ? { type: "thread.rename", threadId, title: op.title }
+          : { type: "thread.delete", threadId },
+      )
       .catch((error: unknown) => {
         attached.report(error, threadId)
       })

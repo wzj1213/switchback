@@ -22,6 +22,8 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_THEME` | `dark` / `light`，强制主题（深色那套平时没人看得见） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
+ * | `OMNI_DEV_RENAME` | `<ms>:<新名字>`，到点给当前会话改名 |
+ * | `OMNI_DEV_DELETE` | 到点删掉当前会话（毫秒） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
  * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
@@ -250,6 +252,38 @@ export function scheduleDevSwitch(
     setTimeout(() => {
       if (!win.isDestroyed()) run(kind, to)
     }, at)
+  }
+}
+
+/**
+ * 到点给当前会话改名 / 删掉它。
+ *
+ * 加这两个口子是因为它们**只能靠界面触发**（改名要双击标题，删除在行内菜单里
+ * 还带二次确认），而它们现在有了引擎侧的副作用要验：改名要传给
+ * `thread/name/set`，删除要先 `thread/archive` 再 dispose。
+ * 验不了的副作用等于没做。
+ */
+export function scheduleDevThreadOps(
+  win: BrowserWindow,
+  run: (op: { kind: "rename"; title: string } | { kind: "delete" }) => void,
+): void {
+  const rename = process.env["OMNI_DEV_RENAME"]
+  if (rename !== undefined && rename !== "") {
+    // 名字里可能有冒号，所以只按**第一个**冒号切
+    const cut = rename.indexOf(":")
+    const at = Number(rename.slice(0, cut))
+    const title = rename.slice(cut + 1)
+    if (Number.isFinite(at) && title !== "") {
+      setTimeout(() => {
+        if (!win.isDestroyed()) run({ kind: "rename", title })
+      }, at)
+    }
+  }
+  const del = Number(process.env["OMNI_DEV_DELETE"] ?? "0")
+  if (Number.isFinite(del) && del > 0) {
+    setTimeout(() => {
+      if (!win.isDestroyed()) run({ kind: "delete" })
+    }, del)
   }
 }
 

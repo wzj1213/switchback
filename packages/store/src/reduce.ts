@@ -130,8 +130,13 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
   }
 }
 
-/** 只有这两档需要打断用户。`starting` / `ready` / `exited` 是正常生命周期。 */
-const LOUD = new Set(["crashed", "timeout"])
+/**
+ * 只有这几档需要打断用户。`starting` / `ready` / `exited` 是正常生命周期。
+ *
+ * `degraded` 收进来的理由：它描述的是**静默的能力损失**——引擎照跑，
+ * 只是少了工具。不出声的话，你看到的只是「它今天做得不太行」。
+ */
+const LOUD = new Set(["crashed", "timeout", "degraded"])
 
 /** 最多留这么多条，够排查即可——它不是日志。 */
 const MAX_NOTICES = 20

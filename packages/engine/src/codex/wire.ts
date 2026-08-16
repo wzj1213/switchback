@@ -182,3 +182,18 @@ export interface WireRateLimits {
   primary?: WireRateWindow | null
   secondary?: WireRateWindow | null
 }
+
+/**
+ * `mcpServer/startupStatus/updated` 推上来的形状。
+ *
+ * 实测只见过 `status: "starting" | "ready"`（这台机器 5 个服务器全起来了），
+ * 失败态的字面量**没有观察到**，所以判据写成「不是这两个就算失败」——
+ * 见 `notify.ts` 的 `onMcpStatus`。
+ */
+export interface WireMcpStatus {
+  threadId?: string
+  name?: string
+  status?: string
+  error?: unknown
+  failureReason?: unknown
+}

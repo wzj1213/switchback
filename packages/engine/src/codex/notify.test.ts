@@ -11,6 +11,7 @@ const setup = (): { ctx: NotifyContext; events: Event[] } => {
     turnId: () => "tn-1",
     inflight: new Map<string, WireItem>(),
     materialized: new Set<string>(),
+    mcpSeen: new Map<string, string>(),
     now: () => 100,
   }
   return { ctx, events }
@@ -115,6 +116,7 @@ describe("轮次与错误", () => {
       turnId: () => undefined,
       inflight: new Map(),
       materialized: new Set(),
+      mcpSeen: new Map(),
       now: () => 0,
     }
     handleNotification(ctx, "item/started", lifecycle({ type: "commandExecution", id: "x" }))
@@ -184,6 +186,7 @@ describe("用量", () => {
       turnId: () => undefined,
       inflight: new Map(),
       materialized: new Set(),
+      mcpSeen: new Map(),
       now: () => 100,
     }
     handleNotification(ctx, "thread/tokenUsage/updated", usageParams)
@@ -267,5 +270,55 @@ describe("重置时刻：codex 给的是 Unix 秒，不是 ISO 字符串", () =>
       const e = limitsOf(bad)
       expect(e?.type === "limits.updated" ? e.limits.primary?.resetsAt : "缺席").toBeUndefined()
     }
+  })
+})
+
+describe("MCP 服务器起不来：静默的能力损失必须出声", () => {
+  const report = (params: Record<string, unknown>, seen = new Map<string, string>()): Event[] => {
+    const { ctx, events } = setup()
+    handleNotification({ ...ctx, mcpSeen: seen }, "mcpServer/startupStatus/updated", params)
+    return events
+  }
+
+  it("`ready` 不出声——平时它是纯噪声", () => {
+    expect(report({ name: "doc-manager", status: "ready" })).toEqual([])
+  })
+
+  it("`starting` 也不出声：一次启动实测 17 条通知", () => {
+    expect(report({ name: "doc-manager", status: "starting" })).toEqual([])
+  })
+
+  it("**没见过的 status 一律当失败**——失败态的字面量没实测到，猜错了就是永远不报警", () => {
+    const [e] = report({ name: "doc-manager", status: "failed" })
+    expect(e).toMatchObject({ type: "engine.status", status: "degraded" })
+  })
+
+  it("带了 failureReason 就算失败，哪怕 status 看着正常", () => {
+    const [e] = report({ name: "node_repl", status: "ready", failureReason: "命令找不到" })
+    expect(e?.type === "engine.status" ? e.detail : "").toContain("命令找不到")
+  })
+
+  it("**报 degraded 不报 crashed**：引擎好好的，撒谎会把排查引到错的方向", () => {
+    const [e] = report({ name: "x", status: "boom" })
+    expect(e?.type === "engine.status" ? e.status : "").toBe("degraded")
+  })
+
+  it("说清是哪台服务器、以及后果", () => {
+    const [e] = report({ name: "doc-manager", status: "boom" })
+    const detail = e?.type === "engine.status" ? (e.detail ?? "") : ""
+    expect(detail).toContain("doc-manager")
+    expect(detail).toContain("用不了")
+  })
+
+  it("**同一个状态只说一次**，翻面才再说——否则不是提示是刷屏", () => {
+    const seen = new Map<string, string>()
+    expect(report({ name: "x", status: "boom" }, seen)).toHaveLength(1)
+    expect(report({ name: "x", status: "boom" }, seen)).toHaveLength(0)
+    expect(report({ name: "x", status: "ready" }, seen)).toHaveLength(0)
+    expect(report({ name: "x", status: "boom" }, seen)).toHaveLength(1)
+  })
+
+  it("没有名字的一律不管——说不出是哪台服务器的警报没有用", () => {
+    expect(report({ status: "boom" })).toEqual([])
   })
 })

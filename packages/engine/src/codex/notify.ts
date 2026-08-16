@@ -1,6 +1,6 @@
 import type { Event, ItemId, RateLimits, RateWindow, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
-import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireRateLimits, WireRateWindow, WireTokenUsage, WireTurnLifecycle } from "./wire.js"
+import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireMcpStatus, WireRateLimits, WireRateWindow, WireTokenUsage, WireTurnLifecycle } from "./wire.js"
 
 /**
  * codex 通知 → omni 事件。
@@ -20,6 +20,11 @@ export interface NotifyContext {
   inflight: Map<string, WireItem>
   /** 已经发过 `item.started` 的 id。文本流式 item 有内容才落地，见下。 */
   materialized: Set<ItemId>
+  /**
+   * MCP 服务器最近一次报的状态。**只在翻面时出声**——
+   * 一次启动实测报 17 条通知，每条都弹一个横幅的话，那就不是提示是刷屏。
+   */
+  mcpSeen: Map<string, string>
   now: () => number
 }
 
@@ -190,6 +195,8 @@ export function handleNotification(ctx: NotifyContext, method: string, params: u
       return onTurnCompleted(ctx, params as WireTurnLifecycle)
     case "account/rateLimits/updated":
       return onLimits(ctx, params as { rateLimits?: WireRateLimits })
+    case "mcpServer/startupStatus/updated":
+      return onMcpStatus(ctx, params as WireMcpStatus)
     case "error":
       return onError(ctx, params as WireError)
     default:
@@ -214,6 +221,52 @@ export function emitLimits(emit: NotifyContext["emit"], raw: WireRateLimits | un
   const limits = toRateLimits(raw)
   if (limits === undefined) return
   emit({ type: "limits.updated", at: Date.now(), engine: "codex", limits })
+}
+
+/**
+ * MCP 服务器起没起来。
+ *
+ * ## 为什么这件事必须说出来
+ *
+ * MCP 服务器起不来的时候，codex **照跑不误**——只是那台服务器的工具全没了。
+ * 实测这台机器上一个 `codex_apps` 就带 45 个工具。少了它，agent 的表现是
+ * 「今天做得不太行」「说它做不到」，而你完全不知道为什么。
+ * **静默的能力损失是最难查的一类故障**，因为没有任何东西出错。
+ *
+ * 报 `degraded` 不报 `crashed`：引擎好好的，撒谎会把排查引到错的方向。
+ *
+ * ## 失败态的字符串没有实测到，所以不硬编码
+ *
+ * 这台机器上 5 个服务器全起来了，只观察到 `starting` / `ready`。
+ * 于是判据反过来写：**不是这两个就算失败**，另外只要带了 `error` 或
+ * `failureReason` 也算——猜一个 `"failed"` 字面量，猜错了就是永远不报警。
+ */
+function onMcpStatus(ctx: NotifyContext, params: WireMcpStatus): void {
+  const name = params.name ?? ""
+  if (name === "") return
+  const why = mcpFailure(params)
+  const key = `${params.status ?? ""}:${why === undefined ? "ok" : "bad"}`
+  // 翻面才出声：一次启动实测 17 条通知，条条弹横幅就不是提示是刷屏
+  if (ctx.mcpSeen.get(name) === key) return
+  ctx.mcpSeen.set(name, key)
+  if (why === undefined) return
+  ctx.emit({
+    type: "engine.status",
+    at: ctx.now(),
+    threadId: ctx.threadId,
+    status: "degraded",
+    detail: `MCP 服务器「${name}」没起来，它提供的工具这一会话都用不了：${why}`,
+  })
+}
+
+/** 起没起来；是的话给一句能读的原因，没失败给 undefined。 */
+function mcpFailure(params: WireMcpStatus): string | undefined {
+  const status = params.status ?? ""
+  const detail = params.failureReason ?? params.error
+  if (detail !== undefined && detail !== null) {
+    return typeof detail === "string" ? detail : JSON.stringify(detail)
+  }
+  return status === "starting" || status === "ready" ? undefined : status
 }
 
 function toRateLimits(raw: WireRateLimits | undefined): RateLimits | undefined {

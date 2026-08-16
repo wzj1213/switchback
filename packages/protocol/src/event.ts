@@ -103,7 +103,14 @@ export type Event =
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */
   | { type: "engine.status"; at: number; threadId: ThreadId; status: EngineStatus; detail?: string }
 
-export type EngineStatus = "starting" | "ready" | "exited" | "crashed" | "timeout"
+/**
+ * `degraded` 是**引擎还活着、但掉了一部分能力**。
+ *
+ * 加这一档是因为 MCP 服务器起不来：codex 照跑不误，只是那台服务器的工具
+ * 全都不在了。报 `crashed` 是撒谎（引擎好好的），不报又是最坏的一种——
+ * agent 少了几十个工具，你只会看到它「做得不太行」，而不知道为什么。
+ */
+export type EngineStatus = "starting" | "ready" | "exited" | "crashed" | "timeout" | "degraded"
 
 /**
  * 账号额度。

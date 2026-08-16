@@ -1,5 +1,8 @@
-import type { Request as ApprovalRequest } from "@omni/approval"
+import { decide, type Request as ApprovalRequest, type Rule } from "@omni/approval"
+import type { Trust } from "@omni/protocol"
 import { sanitize } from "../claude/permission.js"
+import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
+import type { ServerCall } from "../rpc.js"
 import type { WireApprovalRequest, WireDecision, WireItem } from "./wire.js"
 
 /**
@@ -90,4 +93,56 @@ export function buildRequest(
 export function decisionFor(allow: boolean, remember: boolean): WireDecision {
   if (!allow) return "decline"
   return remember ? "acceptForSession" : "accept"
+}
+
+/**
+ * 一次服务端审批请求怎么答。
+ *
+ * 从驱动搬过来的：驱动只该管发 RPC 和收通知，**「这一次该不该放行」是审批的事**，
+ * 而这个文件本来就是 codex 审批的翻译层。
+ */
+export interface AnswerDeps {
+  /** 在途 item。审批请求只带 itemId，要靠它说清楚在批准什么——见本文件开头。 */
+  inflight: Map<string, WireItem>
+  cwd: string
+  home: string
+  /** 取值函数：档位会在会话中途被改。 */
+  trust: () => Trust
+  /** 同理，记忆规则中途会加。 */
+  memory: () => readonly Rule[]
+  askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+}
+
+/**
+ * **必须每一条都答**——不答 codex 会一直等，整轮就此挂住。
+ *
+ * 认不出的请求一律回空对象：宁可让 codex 拿到一个它看不懂的应答，
+ * 也不能让它无限期等下去。审批类的认不出就拒——默认拒是唯一安全的默认。
+ */
+export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promise<void> {
+    if (!call.method.endsWith("requestApproval")) {
+      call.respond({})
+      return
+    }
+    const params = call.params as WireApprovalRequest
+    const item = deps.inflight.get(params.itemId)
+    const request = buildRequest(call.method, params, item, deps.cwd)
+    const verdict = decide(request, {
+      trust: deps.trust(),
+      worksite: deps.cwd,
+      home: deps.home,
+      memory: deps.memory(),
+    })
+    if (verdict.action !== "escalate") {
+      call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })
+      return
+    }
+    const answer = await deps.askUser({
+      toolCallId: params.itemId,
+      tool: toolOf(call.method),
+      summary: request.summary ?? toolOf(call.method),
+      reason: verdict.reason,
+      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
+    })
+    call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
 }

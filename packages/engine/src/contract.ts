@@ -111,6 +111,25 @@ export interface EngineSession {
    * 不校验的话这句话会被塞进**下一轮**，而用户以为它改的是上一轮。
    */
   steer?: (text: string, attachments?: readonly string[]) => Promise<void>
+  /**
+   * 把标题告诉引擎。**不支持就别实现**，omni 侧照常改名。
+   *
+   * 为什么值得传：引擎自己也存着一份会话列表（codex 的 `thread/list`），
+   * 你在 omni 里把会话改成「修分页那个」，在 codex 自己的界面里
+   * 它还叫第一句提问的前二十个字。**同一条会话在两处叫不同名字**，
+   * 而你要靠名字找到它。
+   */
+  setTitle?: (title: string) => Promise<void>
+  /**
+   * 用户删掉了这条会话——引擎那边也收拾一下。
+   *
+   * **归档不是删除**：codex 的 `thread/archive` 是可逆的，而删除不是。
+   * omni 这边删的是自己的记录，没有理由替用户把引擎那边的原始记录也毁掉；
+   * 但完全不管的话，你在 omni 里删了十条，codex 自己的列表里那十条还在。
+   *
+   * 在 `dispose()` **之前**调用——进程都没了就发不出去了。
+   */
+  discard?: () => Promise<void>
   interrupt: () => Promise<void>
   setTrust: (trust: Trust) => Promise<void>
   /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */

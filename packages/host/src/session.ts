@@ -196,7 +196,12 @@ export function rename(ctx: Ctx, cmd: Extract<Command, { type: "thread.rename" }
   if (title === "") return Promise.resolve()
   const at = ctx.deps.now()
   const entry = ctx.live.get(cmd.threadId)
-  if (entry !== undefined) entry.thread = { ...entry.thread, title, named: true, updatedAt: at }
+  if (entry !== undefined) {
+    entry.thread = { ...entry.thread, title, named: true, updatedAt: at }
+    // 引擎那边也存着一份会话列表。**不传的话同一条会话在两处叫不同名字**，
+    // 而你正是要靠名字找到它。传不过去不影响 omni 侧改名，所以吞掉错误
+    void entry.session.setTitle?.(title).catch(() => undefined)
+  }
   emit(ctx, { type: "thread.renamed", at, threadId: cmd.threadId, title })
   return Promise.resolve()
 }
@@ -249,6 +254,9 @@ export async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.del
   const entry = ctx.live.get(cmd.threadId)
   if (entry !== undefined) {
     entry.gate.settleAll()
+    // **在 dispose 之前**——进程都没了就发不出去了。
+    // 归档不是删除：引擎那边的原始记录是用户的，可逆的操作才轮得到我们替他做
+    await entry.session.discard?.().catch(() => undefined)
     await entry.session.dispose()
     ctx.live.delete(cmd.threadId)
   }
