@@ -203,9 +203,17 @@ export function handleNotification(ctx: NotifyContext, method: string, params: u
  * 那时发一条空的出去只会让界面画一根没有含义的条。
  */
 function onLimits(ctx: NotifyContext, params: { rateLimits?: WireRateLimits }): void {
-  const limits = toRateLimits(params.rateLimits)
+  emitLimits(ctx.emit, params.rateLimits)
+}
+
+/**
+ * 额度发出去。**推送和主动读走同一条路**——两处各写一份翻译的话，
+ * 「握手时读到的」和「跑完一轮推来的」会长得不一样，而它们说的是同一件事。
+ */
+export function emitLimits(emit: NotifyContext["emit"], raw: WireRateLimits | undefined): void {
+  const limits = toRateLimits(raw)
   if (limits === undefined) return
-  ctx.emit({ type: "limits.updated", at: Date.now(), engine: "codex", limits })
+  emit({ type: "limits.updated", at: Date.now(), engine: "codex", limits })
 }
 
 function toRateLimits(raw: WireRateLimits | undefined): RateLimits | undefined {
@@ -215,11 +223,24 @@ function toRateLimits(raw: WireRateLimits | undefined): RateLimits | undefined {
   return { ...(primary === undefined ? {} : { primary }), ...(secondary === undefined ? {} : { secondary }) }
 }
 
+/**
+ * 重置时刻 → ISO 字符串（协议里就是这个形状）。
+ *
+ * codex 给的是 **Unix 秒**。两条都认：字符串原样过（万一哪天它改了），
+ * 数字按秒换算。**不认毫秒**——1787196555 当毫秒解出来是 1970 年，
+ * 一个明显错误的时间比没有时间糟得多，所以宁可只支持实测到的那一种。
+ */
+function resetTime(raw: string | number | null | undefined): string | undefined {
+  if (typeof raw === "string" && raw !== "") return raw
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return undefined
+  return new Date(raw * 1000).toISOString()
+}
+
 function toWindow(raw: WireRateWindow | null | undefined): RateWindow | undefined {
   if (raw === null || raw === undefined || typeof raw.usedPercent !== "number") return undefined
   return {
     usedPercent: raw.usedPercent,
     ...(typeof raw.windowDurationMins === "number" ? { windowDurationMins: raw.windowDurationMins } : {}),
-    ...(typeof raw.resetsAt === "string" ? { resetsAt: raw.resetsAt } : {}),
+    ...(resetTime(raw.resetsAt) === undefined ? {} : { resetsAt: resetTime(raw.resetsAt) }),
   }
 }

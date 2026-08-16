@@ -234,3 +234,38 @@ describe("轮次异常收工时清扫在途工具", () => {
     expect(ctx.inflight.size).toBe(0)
   })
 })
+
+describe("重置时刻：codex 给的是 Unix 秒，不是 ISO 字符串", () => {
+  const limitsOf = (resetsAt: unknown): Event | undefined => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "account/rateLimits/updated", {
+      rateLimits: { primary: { usedPercent: 100, windowDurationMins: 10080, resetsAt } },
+    })
+    return events.find((e) => e.type === "limits.updated")
+  }
+
+  it("**数字按秒换算**——上一版只认字符串，于是重置时刻被整个丢掉，一声不响", () => {
+    const e = limitsOf(1787196555)
+    expect(e?.type === "limits.updated" ? e.limits.primary?.resetsAt : undefined).toBe(
+      new Date(1787196555 * 1000).toISOString(),
+    )
+  })
+
+  it("字符串原样过：万一哪天 codex 改成 ISO，不用再改一次", () => {
+    const e = limitsOf("2026-08-20T03:29:15.000Z")
+    expect(e?.type === "limits.updated" ? e.limits.primary?.resetsAt : undefined).toBe("2026-08-20T03:29:15.000Z")
+  })
+
+  it("**不认毫秒**：1787196555 当毫秒解出来是 1970 年，一个明显错误的时间比没有更糟", () => {
+    const e = limitsOf(1787196555)
+    const iso = e?.type === "limits.updated" ? e.limits.primary?.resetsAt : undefined
+    expect(iso?.startsWith("2026")).toBe(true)
+  })
+
+  it("报不上来就缺席，别编一个", () => {
+    for (const bad of [undefined, null, 0, -5, "", Number.NaN]) {
+      const e = limitsOf(bad)
+      expect(e?.type === "limits.updated" ? e.limits.primary?.resetsAt : "缺席").toBeUndefined()
+    }
+  })
+})

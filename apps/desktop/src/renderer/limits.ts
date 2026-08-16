@@ -29,17 +29,43 @@ export interface LimitNotice {
   window?: string
   /** 已经打满了——那时该说的是「停了」而不是「快满了」。 */
   blocked: boolean
+  /**
+   * 什么时候恢复，人话（「8月20日 11:29」）。报不上来就缺席。
+   *
+   * **只在打满时才有意义**：没满的时候你根本不需要知道窗口什么时候滚动，
+   * 满了的时候这是唯一有行动意义的信息——是等一会儿，还是换个引擎干活。
+   */
+  resetsAt?: string
 }
 
 export function limitNotice(limits: RateLimits | undefined): LimitNotice | undefined {
   const pick = urgent(limits?.primary, limits?.secondary)
   if (pick === undefined || pick.usedPercent < SPEAK_ABOVE) return undefined
   const window = describeWindow(pick.windowDurationMins)
+  const blocked = pick.usedPercent >= 100
+  const resets = blocked ? describeReset(pick.resetsAt) : undefined
   return {
     percent: Math.round(pick.usedPercent),
     ...(window === undefined ? {} : { window }),
-    blocked: pick.usedPercent >= 100,
+    blocked,
+    ...(resets === undefined ? {} : { resetsAt: resets }),
   }
+}
+
+/**
+ * 重置时刻说成人话。
+ *
+ * 用本机时区显示，不显示时区名——codex 自己按美东渲染那串
+ * 「try again at Aug 19th, 2026 11:29 PM」，对一个在东八区的人是错的。
+ * **同一时刻用你自己的钟表述，才是可以照着行动的。**
+ *
+ * 解析不出来就缺席：说错一个恢复时间比不说糟得多。
+ */
+function describeReset(iso: string | undefined): string | undefined {
+  if (iso === undefined) return undefined
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return undefined
+  return `${String(at.getMonth() + 1)}月${String(at.getDate())}日 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`
 }
 
 /** 谁更紧：百分比高的；同高则窗口短的（它更近在眼前）。 */

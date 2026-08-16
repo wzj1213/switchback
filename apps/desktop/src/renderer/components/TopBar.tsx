@@ -88,13 +88,7 @@ export function TopBar({
       ) : null}
       <span className="topbar__spacer" />
       <ContextMeter usage={usage} />
-      {/* 额度只在快用完时出现。放在用量旁边——那儿本来就是「花了多少」的地盘 */}
-      {limits === undefined ? null : (
-        <span className={`limit${limits.blocked ? " limit--blocked" : ""}`} title="账号额度，不是这个会话的用量">
-          {limits.blocked ? "额度已用尽" : `额度 ${String(limits.percent)}%`}
-          {limits.window === undefined ? "" : ` · ${limits.window}`}
-        </span>
-      )}
+      <LimitPill limits={limits} />
       {peer === undefined ? null : (
         <button
           className="iconbtn"
@@ -120,5 +114,28 @@ export function TopBar({
         </button>
       )}
     </header>
+  )
+}
+
+/**
+ * 账号额度那枚 pill。**只在快用完时出现**——见 `limits.ts` 里为什么不常驻。
+ *
+ * 满了和没满说的是两件事：没满时你想知道的是「哪个窗口」（本周还是 5 小时内），
+ * 满了时你想知道的是**「什么时候恢复」**——那是唯一能照着行动的信息。
+ */
+function LimitPill({ limits }: { limits: LimitNotice | undefined }): React.JSX.Element | null {
+  if (limits === undefined) return null
+  const tail = limits.blocked
+    ? limits.resetsAt === undefined
+      ? ""
+      : ` · ${limits.resetsAt} 恢复`
+    : limits.window === undefined
+      ? ""
+      : ` · ${limits.window}`
+  return (
+    <span className={`limit${limits.blocked ? " limit--blocked" : ""}`} title="账号额度，不是这个会话的用量">
+      {limits.blocked ? "额度已用尽" : `额度 ${String(limits.percent)}%`}
+      {tail}
+    </span>
   )
 }

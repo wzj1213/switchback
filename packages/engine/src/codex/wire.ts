@@ -167,7 +167,15 @@ export interface WireSkillGroup {
 export interface WireRateWindow {
   usedPercent?: number
   windowDurationMins?: number
-  resetsAt?: string
+  /**
+   * 什么时候重置。**实测是 Unix 秒（数字），不是 ISO 字符串。**
+   *
+   * 第一版按字符串写，于是 `typeof === "string"` 那道过滤把它**全部丢掉**了——
+   * 一声不响，界面上永远没有「什么时候恢复」。而额度打满时，
+   * 那恰恰是唯一有行动意义的信息。用例里当时填的也是自己编的 ISO 串，
+   * 所以测试是绿的。**形状不能靠想，要探。**
+   */
+  resetsAt?: string | number
 }
 
 export interface WireRateLimits {

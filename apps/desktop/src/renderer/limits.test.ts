@@ -46,3 +46,29 @@ describe("额度提示", () => {
     expect(limitNotice({})).toBeUndefined()
   })
 })
+
+describe("打满之后：说什么时候恢复", () => {
+  it("**满了才说恢复时刻**——没满的时候你不需要知道窗口什么时候滚动", () => {
+    const iso = new Date(1787196555 * 1000).toISOString()
+    expect(limitNotice({ primary: { usedPercent: 100, resetsAt: iso } })?.resetsAt).toBeDefined()
+    expect(limitNotice({ primary: { usedPercent: 80, resetsAt: iso } })?.resetsAt).toBeUndefined()
+  })
+
+  it("满了但报不上重置时刻，就只说满了——不编一个", () => {
+    expect(limitNotice({ primary: { usedPercent: 100 } })).toMatchObject({ blocked: true })
+    expect(limitNotice({ primary: { usedPercent: 100 } })?.resetsAt).toBeUndefined()
+  })
+
+  it("解析不出来的时间戳当作没有", () => {
+    expect(limitNotice({ primary: { usedPercent: 100, resetsAt: "这不是时间" } })?.resetsAt).toBeUndefined()
+  })
+
+  it("用本机时区表述：codex 自己按美东渲染，那对东八区的人是错的", () => {
+    const iso = new Date(1787196555 * 1000).toISOString()
+    const said = limitNotice({ primary: { usedPercent: 100, resetsAt: iso } })?.resetsAt
+    const at = new Date(iso)
+    expect(said).toBe(
+      `${String(at.getMonth() + 1)}月${String(at.getDate())}日 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`,
+    )
+  })
+})
