@@ -37,7 +37,7 @@ describe("一条事件属于哪个会话（决定落不落盘）", () => {
   })
 
   it("usage / engine.status / models 自己带 threadId", () => {
-    expect(ownerOf(ctx, { type: "usage.updated", at: 0, threadId: "th-1", usage: {} })).toBe("th-1")
+    expect(ownerOf(ctx, { type: "usage.updated", at: 0, threadId: "th-1", usage: { contextUsed: 1 } })).toBe("th-1")
   })
 
   it("空 threadId 当作「不属于任何会话」——引擎级状态会这么报", () => {
