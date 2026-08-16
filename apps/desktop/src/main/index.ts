@@ -1,6 +1,7 @@
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
+import { homedir } from "node:os"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { installMenu } from "./menu.js"
@@ -13,21 +14,7 @@ import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import {
-  applyDevTheme,
-  devCwd,
-  devPrompt,
-  scheduleDevFind,
-  scheduleDevSwitch,
-  scheduleDevInterrupt,
-  scheduleDevReload,
-  scheduleDevCompare,
-  scheduleDevFilter,
-  scheduleDevOpenSelect,
-  scheduleDevRowMenu,
-  scheduleDevProbe,
-  scheduleDevShot,
-} from "./devtools.js"
+import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch } from "./devtools.js"
 
 /**
  * Electron 主进程。
@@ -284,7 +271,7 @@ function bootstrap(): Promise<void> {
         .then((recent) => {
           if (seeded) return undefined
           seeded = true
-          return seedDefaultThread(attached, devCwd(process.cwd()), devPrompt(), recent)
+          return seedDefaultThread(attached, defaultWorksite(homedir()), devPrompt(), recent)
         })
         .catch((error: unknown) => {
           log.write("error", "ipc", `全量重建失败：${String(error)}`)
@@ -294,12 +281,43 @@ function bootstrap(): Promise<void> {
     win.webContents.once("did-finish-load", () => {
       installDevHooks(win, attached, log)
     })
-    app.on("before-quit", () => {
-      void attached.host.dispose()
-      // 正常退出：把运行标记撤掉，下次启动才不会误报一次崩溃
-      clearMarker()
+    /**
+     * 退出时**等回收跑完**再真的退。
+     *
+     * 原来是 `void attached.host.dispose()`——发出去就不管了，应用当场退出。
+     * 空闲的引擎恰好没事（主进程一死，OS 关掉 stdio 管道，等价于回收阶梯第一步），
+     * **但正在跑工具的时候退，就漏一整棵进程树**：codex、它拉起的 zsh、
+     * 构建进程全部存活并挂到 ppid 1。子进程是 `detached` 的，父死不连坐。
+     * 而那正好是一个有写/执行权限的无头 agent 继续在你仓库里跑。
+     *
+     * 硬超时 8 秒：回收阶梯本身最长 7 秒（3+3+1），再多给一点余量。
+     * **超时也要退**——一个退不掉的应用比漏一个进程更糟。
+     */
+    let quitting = false
+    app.on("before-quit", (event) => {
+      if (quitting) return
+      quitting = true
+      event.preventDefault()
+      const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))
+      void Promise.race([shutdown(attached, log), deadline]).then(() => {
+        clearMarker()
+        app.exit(0)
+      })
     })
   })
+}
+
+/**
+ * 收摊：先停引擎，再把在途的日志写完。
+ *
+ * **顺序不能反**：`dispose` 里还会 emit 事件（`gate.settleAll()` 把挂着的
+ * 审批落定），那些也要落盘。
+ */
+async function shutdown(attached: Attached, logger: Logger): Promise<void> {
+  await attached.host.dispose().catch((error: unknown) => {
+    logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
+  })
+  await attached.journal.flush().catch(() => undefined)
 }
 
 /**

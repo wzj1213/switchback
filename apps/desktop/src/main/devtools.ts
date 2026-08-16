@@ -45,6 +45,33 @@ export function devCwd(fallback: string): string {
   return dir === undefined || dir === "" ? fallback : dir
 }
 
+/**
+ * 开机自动建的那个会话，工作区开在哪。
+ *
+ * ## 为什么不能用 `process.cwd()`
+ *
+ * 在 `pnpm dev` 里它是仓库根目录，看着挺合理。**而从 Dock 启动的打包应用，
+ * 它是 `/`。** 于是「自动编辑」档承诺的「工作区内直接放行、越界才问」变成了
+ * 「整个文件系统都算工作区内」——所有依赖工作区边界的红线一条都不会命中。
+ *
+ * 这不是理论：`isInside("/", 任何绝对路径)` 恒为真。
+ *
+ * ## 那开在哪
+ *
+ * 用户的家目录。它是个真实存在、有边界的地方，而且**大多数人的代码都在里面**，
+ * 所以第一句话就能用。不选 `~/Documents` 之类是因为那更像在替用户做决定。
+ *
+ * 更根本的解法是「首次启动先让用户选一个文件夹」，那是产品决定，
+ * 单开一件事做；在那之前，至少不能把边界设成整个磁盘。
+ */
+export function defaultWorksite(home: string): string {
+  const dir = process.env["OMNI_DEV_CWD"]
+  if (dir !== undefined && dir !== "") return dir
+  const cwd = process.cwd()
+  // 根目录、或者任何不在 home 底下的诡异 cwd（Dock 启动就是 `/`），都退回 home
+  return cwd === "/" || !cwd.startsWith(home) ? home : cwd
+}
+
 /** 换引擎跑一遍是验证归一化模型的主要手段，所以给它留了个口子。 */
 export function devEngine(): string {
   const engine = process.env["OMNI_DEV_ENGINE"]

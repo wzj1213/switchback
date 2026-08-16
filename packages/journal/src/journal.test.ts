@@ -1,4 +1,5 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -124,12 +125,18 @@ describe("createJournal", () => {
     await expect(createJournal({ dir: state.dir }).remove("never")).resolves.toBeUndefined()
   })
 
-  it("删完之后再写会重新建文件——所以宿主必须先停掉会话再删", async () => {
+  it("**删完之后再写，写不进去**（这条以前反着写，把隐患当成了契约）", async () => {
+    // 旧版本这里断言的是「会重新建文件——所以宿主必须先停掉会话再删」。
+    // 那不是契约，是**当时的行为恰好如此**：删除是用户的明确意图，
+    // 而「先停会话再删」是一个没人能保证的时序约定——
+    // 实测删一个正在刷输出的会话，残余 append 就把文件建回来了，
+    // 而界面从此再也没有入口删第二次（回放要求含 user_message，
+    // 写回来的只是尾巴几条），盘上留一个删不掉的完整正文。
     const j = createJournal({ dir: state.dir })
     await j.append("th-1", started("th-1"))
     await j.remove("th-1")
     await j.append("th-1", started("th-1"))
-    expect(await j.read("th-1")).toHaveLength(1)
+    expect(await j.read("th-1")).toHaveLength(0)
   })
 
   it("目录里的杂物不当成会话", async () => {
@@ -137,5 +144,41 @@ describe("createJournal", () => {
     await j.append("th-1", started("th-1"))
     await writeFile(join(state.dir, "README.txt"), "x")
     expect(await j.list()).toEqual(["th-1"])
+  })
+})
+
+describe("删会话不能被在途写入救回来", () => {
+  it("**删除后残余的 append 不再把文件建回来**——否则盘上留一个界面里删不掉的残留", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-j-"))
+    const j = createJournal({ dir })
+    await j.append("th-1", started("th-1"))
+    // 排一串在途写入，紧接着删——不等它们落定
+    const pending = [1, 2, 3].map((n) => j.append("th-1", message("th-1", `第${String(n)}条`)))
+    await j.remove("th-1")
+    await Promise.all(pending)
+    await j.flush()
+    expect(existsSync(join(dir, "th-1.jsonl"))).toBe(false)
+  })
+
+  it("删完之后再来的 append 也写不进去", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-j-"))
+    const j = createJournal({ dir })
+    await j.append("th-1", started("th-1"))
+    await j.remove("th-1")
+    await j.append("th-1", message("th-1", "迟到的"))
+    await j.flush()
+    expect(existsSync(join(dir, "th-1.jsonl"))).toBe(false)
+  })
+
+  it("删一个不影响另一个", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-j-"))
+    const j = createJournal({ dir })
+    await j.append("th-1", started("th-1"))
+    await j.append("th-2", started("th-2"))
+    await j.remove("th-1")
+    await j.append("th-2", message("th-2", "还在写"))
+    await j.flush()
+    expect(existsSync(join(dir, "th-2.jsonl"))).toBe(true)
+    expect(await j.read("th-2")).toHaveLength(2)
   })
 })

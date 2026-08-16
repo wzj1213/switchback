@@ -59,6 +59,31 @@ async function writeOne(file: string, line: string, ready: Promise<boolean>, max
   await appendFile(file, `${line}\n`, "utf8")
 }
 
+/**
+ * 目录里有哪些会话，最近写过的在前。
+ *
+ * 从 `createJournal` 里拆出来是行数闸门逼的，但拆完也讲得通：
+ * 它只依赖目录，不碰写入链、不碰墓碑。
+ */
+async function listThreads(dir: string): Promise<readonly ThreadId[]> {
+
+    const names = await readdir(dir).catch((): string[] => [])
+    const found = names
+      .map((name) => ({ id: threadIdOf(name), name }))
+      .filter((e): e is { id: string; name: string } => e.id !== undefined)
+    const stamped = await Promise.all(
+      found.map(async (entry) => ({
+        id: entry.id,
+        at: await stat(join(dir, entry.name)).then(
+          (info) => info.mtimeMs,
+          () => 0,
+        ),
+      })),
+    )
+    // 最近写过的在前：重启后侧栏的顺序和关掉之前一致
+    return stamped.sort((a, b) => b.at - a.at).map((entry) => entry.id)
+  }
+
 export function createJournal(config: JournalConfig): Journal {
   const maxBytes = config.maxBytes ?? DEFAULT_MAX_BYTES
   const ready = mkdir(config.dir, { recursive: true }).then(
@@ -73,12 +98,25 @@ export function createJournal(config: JournalConfig): Journal {
     return name === undefined ? undefined : join(config.dir, name)
   }
 
+  /**
+   * 已经删掉的会话。**墓碑必须存在**——光把写入链摘掉挡不住已经排队的那几条。
+   *
+   * 复现过：删一个正在刷输出的会话，`rm()` 之后残余的 append 把文件重新建出来。
+   * 界面上它不会复活（回放要求含 `user_message`，写回来的只是尾巴几条），
+   * 所以用户**再也没有入口删第二次**——盘上留着一个删不掉的 jsonl，
+   * 里面是完整正文。用户明确点了删除，内容还在。
+   */
+  const removed = new Set<ThreadId>()
+
   const append = async (threadId: ThreadId, event: Event): Promise<void> => {
-    if (!shouldPersist(event)) return
+    if (!shouldPersist(event) || removed.has(threadId)) return
     const file = pathOf(threadId)
     if (file === undefined) return
     const prev = chains.get(threadId) ?? Promise.resolve()
-    const next = prev.then(() => writeOne(file, encode(event), ready, maxBytes)).catch(() => undefined)
+    // 排队期间被删掉的也要认墓碑：这条 append 可能等了几百毫秒才轮到自己
+    const next = prev
+      .then(() => (removed.has(threadId) ? undefined : writeOne(file, encode(event), ready, maxBytes)))
+      .catch(() => undefined)
     chains.set(threadId, next)
     return next
   }
@@ -90,29 +128,17 @@ export function createJournal(config: JournalConfig): Journal {
     return decodeAll(text)
   }
 
-  const list = async (): Promise<readonly ThreadId[]> => {
-    const names = await readdir(config.dir).catch((): string[] => [])
-    const found = names
-      .map((name) => ({ id: threadIdOf(name), name }))
-      .filter((e): e is { id: string; name: string } => e.id !== undefined)
-    const stamped = await Promise.all(
-      found.map(async (entry) => ({
-        id: entry.id,
-        at: await stat(join(config.dir, entry.name)).then(
-          (info) => info.mtimeMs,
-          () => 0,
-        ),
-      })),
-    )
-    // 最近写过的在前：重启后侧栏的顺序和关掉之前一致
-    return stamped.sort((a, b) => b.at - a.at).map((entry) => entry.id)
-  }
+  const list = (): Promise<readonly ThreadId[]> => listThreads(config.dir)
 
   const remove = async (threadId: ThreadId): Promise<void> => {
     const file = pathOf(threadId)
     if (file === undefined) return
-    // 先把这个会话的写入链摘掉，免得删完之后还有一条在途的 append 把文件又建回来
+    // **两道一起才挡得住。** 光摘链（原来的做法）只是把 Promise 从表里拿走，
+    // 已经排进链的那几条 `writeOne` 照跑不误，删完又把文件建回来。
+    removed.add(threadId)
+    const inflight = chains.get(threadId)
     chains.delete(threadId)
+    await inflight?.catch(() => undefined)
     await rm(file, { force: true }).catch(() => undefined)
   }
 

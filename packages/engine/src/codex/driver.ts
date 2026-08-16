@@ -413,7 +413,16 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new CodexSession(req, config)
       // 握手失败要在这里就抛出来，别让宿主拿到一个看着正常、一发消息就炸的会话
-      await session.start()
+      // **握手失败也要回收。** `start()` 第一件事就是 spawn，而握手超时 / 对端回
+      // JSON-RPC error / 缺字段这几处抛出都在 spawn 之后；那时 session 还没被登记进
+      // `ctx.live`，异常一抛这个对象就没人持有了——`dispose()` 永远不会被调用，
+      // 进程因为 detached 连应用退出都带不走。点五次「继续」漏五个常驻进程。
+      try {
+        await session.start()
+      } catch (error) {
+        await session.dispose().catch(() => undefined)
+        throw error
+      }
       return session
     },
   }
