@@ -94,8 +94,17 @@ export interface Turn {
  *   点了就在本地执行。
  */
 export interface SlashCommand {
-  /** 不带前导斜杠。 */
+  /** 不带前导斜杠。**这是要打进输入框的东西**，不是给人读的。 */
   name: string
+  /**
+   * 给人读的名字（「新建会话」）。
+   *
+   * codex 的面板左边一列全是人话（初始化、使用情况和计费、推理…），
+   * 而不是 `/init`、`/usage`。人扫这一列是在**找那件事**，不是在认标识符。
+   * 引擎报上来的命令没有这一份（`/code-review` 就叫 `/code-review`），
+   * 那时候退回 `name`。
+   */
+  label?: string
   description: string
   /** 参数提示，如 `<file>` 或 `[<pr#>]`。没有参数就缺席。 */
   argumentHint?: string

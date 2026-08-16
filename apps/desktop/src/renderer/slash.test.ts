@@ -65,3 +65,22 @@ describe("选中之后输入框里是什么", () => {
     expect(applyCommand(cmd("code-review"))).toEqual({ text: "/code-review ", caret: 13 })
   })
 })
+
+describe("不该出现在面板里的", () => {
+  it("`__` 开头是引擎内部命令——实测 Claude 报过 `__remote-workflow`", () => {
+    expect(matchCommands([cmd("__remote-workflow", "内部用的")], "")).toEqual([])
+  })
+
+  it("说明以 `(removed)` 开头的是废弃命令，列出来只会让人白点一次", () => {
+    expect(matchCommands([cmd("agents", "(removed) Ask Claude to…")], "")).toEqual([])
+  })
+
+  it("正常命令不受影响", () => {
+    expect(matchCommands([cmd("review", "审阅")], "").map((c) => c.name)).toEqual(["review"])
+  })
+
+  it("中文名也能筛：面板上写的是「新建会话」，人自然按它打", () => {
+    const c: SlashCommand = { name: "new", label: "新建会话", description: "在当前工作区另开一个", source: "omni" }
+    expect(matchCommands([c], "新建").map((x) => x.name)).toEqual(["new"])
+  })
+})

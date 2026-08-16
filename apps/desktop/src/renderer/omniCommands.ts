@@ -33,20 +33,25 @@ export function omniCommands(acts: {
   onRename: () => void
 }): readonly OmniAction[] {
   const list: (OmniAction | undefined)[] = [
-    make("new", "在当前工作区新建一个会话", acts.onNew),
-    make("rename", "给这个会话改个名字", acts.onRename),
-    make("env", "看这个会话跑在什么环境里", acts.onEnv),
-    make("export", "把整段对话复制成 Markdown", acts.onExport),
+    make("new", "新建会话", "在当前工作区另开一个", acts.onNew),
+    make("rename", "重命名", "给这个会话改个名字", acts.onRename),
+    make("env", "环境信息", "看这个会话跑在什么环境里", acts.onEnv),
+    make("export", "导出对话", "整段复制成 Markdown", acts.onExport),
     // 下面这几条**没有对象就不给**：一个点了没反应的命令比没有这条命令更糟
-    make("fork", "用另一家引擎另起一个会话跑同一件事", acts.onFork),
-    make("handoff", "换一家引擎接着做这个会话", acts.onHandoff),
-    make("compare", "和分叉出来的那个并排比一比", acts.onCompare),
-    make("stop", "打断正在跑的这一轮", acts.onStop),
-    make("settings", "打开设置", acts.onSettings),
+    make("fork", "分叉", "用另一家引擎另起一个跑同一件事", acts.onFork),
+    make("handoff", "接力", "换一家引擎接着做这个会话", acts.onHandoff),
+    make("compare", "对比", "和分叉出来的那个并排比一比", acts.onCompare),
+    make("stop", "停止", "打断正在跑的这一轮", acts.onStop),
+    make("settings", "设置", "打开设置", acts.onSettings),
   ]
   return list.filter((a): a is OmniAction => a !== undefined)
 }
 
-function make(name: string, description: string, run: (() => void) | undefined): OmniAction | undefined {
-  return run === undefined ? undefined : { command: { name, description, source: "omni" }, run }
+function make(
+  name: string,
+  label: string,
+  description: string,
+  run: (() => void) | undefined,
+): OmniAction | undefined {
+  return run === undefined ? undefined : { command: { name, label, description, source: "omni" }, run }
 }

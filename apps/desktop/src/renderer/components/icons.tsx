@@ -216,3 +216,27 @@ export function StopIcon({ size = 14 }: { size?: number }): React.JSX.Element {
     </svg>
   )
 }
+
+/**
+ * 引擎报上来的那些命令共用的图标。
+ *
+ * **故意是个中性的方括号**：我们不知道 `/api-post` 或某个第三方技能到底会做
+ * 什么，配一个「看起来像那么回事」的图标是在替它承诺。codex 给内置命令各配
+ * 一个图标是因为那些是它自己的功能，它知道。
+ */
+export function CommandIcon({ size = 15 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M6.2 3.6H4.2v8.8h2M9.8 3.6h2v8.8h-2" {...LINE} />
+    </Svg>
+  )
+}
+
+/** 停止（面板里用的描边版，和输入区那颗实心方块区分开——那颗是按钮，这个是条目）。 */
+export function StopOutlineIcon({ size = 15 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <rect x="4.4" y="4.4" width="7.2" height="7.2" rx="1.6" {...LINE} />
+    </Svg>
+  )
+}

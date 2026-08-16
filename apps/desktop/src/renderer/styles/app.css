@@ -1003,30 +1003,39 @@ body {
 }
 
 /* ── `/` 命令面板 ────────────────────────────────────
- * 形制照 codex 那张：命令名在左、说明右对齐。说明右对齐是因为命令名长短不一，
- * 左对齐会跟着参差；而人扫这张表是**先扫左边那列名字**，扫到了才往右看一眼。
+ * 形制照 codex 那张：一列图标锚住左边、一列人话名字、说明右对齐。
+ *
+ * 上一版三处不对，对着截图一条条改的：
+ * 1. 名字用了小号等宽——技术感、发挤。codex 那列是**正常字号的正文字体**，
+ *    因为人扫的是「哪件事」，不是在认标识符。
+ * 2. 每行挂一个 `omni` 灰角标。十行十个角标，说的还是同一件事。改用图标区分。
+ * 3. **横向滚动条**：命令名 `flex:none` 不肯缩，遇到 `/__remote-workflow`
+ *    这种长名字就把整行撑破。现在名字也能缩，而且面板 `overflow-x: hidden`
+ *    ——一张选择列表横着滚是没有道理的。
  */
 .slash {
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
   z-index: 20;
-  width: min(560px, 100%);
-  max-height: 300px;
+  width: min(680px, 100%);
+  max-height: 320px;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: var(--sp-1);
+  padding: var(--sp-2);
   border: 1px solid var(--border-pop);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--bg-raised);
   box-shadow: var(--shadow-pop);
 }
 
 .slash__row {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
+  align-items: center;
+  gap: var(--sp-3);
   width: 100%;
-  padding: 5px var(--sp-2);
+  min-width: 0;
+  padding: 6px var(--sp-2);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1042,31 +1051,50 @@ body {
   background: var(--bg-hover);
 }
 
-.slash__name {
+.slash__icon {
+  display: flex;
   flex: none;
-  font-family: var(--mono);
-  font-size: var(--text-xs);
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  color: var(--text-muted);
+}
+
+.slash__row--active .slash__icon {
+  color: var(--text);
+}
+
+/* 名字这一列：**可以缩，而且有上限**。
+   不能缩的话，`/__remote-workflow` 这种长名字会把整行撑出横向滚动条；
+   不封顶的话，`/auto-mode-setup [--request-id <uuid>] {--wizard posture=…}`
+   这种带一长串参数提示的会把说明挤成零宽——那一行等于只剩半句参数。 */
+.slash__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* omni 的和引擎的之间画一道。**只在两者相邻处画一次**，
+   不是给每一行挂角标——上一版那样十行十个角标，说的还是同一件事 */
+.slash__row[data-first-of-kind="true"]:not(:first-child) {
+  margin-top: 5px;
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
 }
 
 /* 参数提示比命令名淡：它是「还要填什么」，不是命令本身 */
 .slash__args {
   color: var(--text-faint);
+  font-size: var(--text-xs);
 }
 
-/* omni 自己的命令标一下——**它们不发给引擎，就地执行**，行为不同就得看得出 */
-.slash__badge {
-  flex: none;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--surface-3);
-  color: var(--text-faint);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-/* 说明贴右，一行为限。命令名那列才是扫读的主轴 */
+/* 说明贴右，一行为限。**它是次要的**——先扫左边那列，扫到了才往右看一眼。
+   `flex: 1 1 0` 让它优先被压缩：宁可说明截断，也别让名字先没 */
 .slash__desc {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   color: var(--text-faint);

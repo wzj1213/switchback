@@ -33,16 +33,32 @@ export function slashAt(text: string, caret: number): Slash | undefined {
   return { start: 0, end: caret, query }
 }
 
+/**
+ * 不该出现在面板里的。
+ *
+ * - `__` 开头是引擎的内部命令（实测 Claude 报了一条 `__remote-workflow`，
+ *   说明写着「Run the workflow script delivered in this session environment」
+ *   ——那是给harness自己用的，不是给人打的）。
+ * - 说明以 `(removed)` 开头的是**已经废弃、只为兼容还留着名字**的
+ *   （实测 `/agents` 就是）。列出来的唯一结果是有人点了然后发现没用。
+ */
+function hidden(command: SlashCommand): boolean {
+  return command.name.startsWith("__") || command.description.trimStart().startsWith("(removed)")
+}
+
 /** 命中就给个分，越像越大；没命中给 undefined。用同一套规则排引擎的和 omni 的。 */
 function score(command: SlashCommand, query: string): number | undefined {
   if (query === "") return command.source === "omni" ? 1 : 0
   const q = query.toLowerCase()
   const name = command.name.toLowerCase()
+  // 中文名也参与前缀匹配：面板上显示的是「新建会话」，人自然会按它去筛
+  if (command.label !== undefined && command.label.toLowerCase().startsWith(q)) return 100 - name.length
   // 前缀最像：打 `/re` 时 `/review` 该排在 `/code-review` 前面
   if (name.startsWith(q)) return 100 - name.length
   if (name.includes(q)) return 50 - name.length
   // **说明也参与匹配**：技能名常常是英文，而用户想的是中文
   //（codex 那边 displayName 就是中文，被拼进了说明里）
+  if (command.label?.toLowerCase().includes(q) === true) return 40 - name.length
   if (command.description.toLowerCase().includes(q)) return 10
   return undefined
 }
@@ -60,6 +76,7 @@ export function matchCommands(
 ): readonly SlashCommand[] {
   const hits: { command: SlashCommand; score: number }[] = []
   for (const command of commands) {
+    if (hidden(command)) continue
     const value = score(command, query)
     if (value !== undefined) hits.push({ command, score: value })
   }
