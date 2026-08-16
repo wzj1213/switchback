@@ -75,8 +75,27 @@ function stringListArg(args: Readonly<Record<string, unknown>>, keys: readonly s
   return out
 }
 
+/**
+ * 这个 token 像不像一个路径。
+ *
+ * **裸相对路径也算。** 只认 `/`、`./`、`~/`、`../` 四种前缀的后果实测过：
+ * `cat .env` 全程放行，而 `cat ./.env` 是 `deny credential-read`——
+ * 同一件事换个写法就过；`cd ~ && rm -rf .ssh`、`cat $HOME/.ssh/id_rsa`
+ * 同样一路绿灯。原因是 `norm.paths` 空了，凭据红线和越界删除红线**同时失明**。
+ *
+ * `fromCommand` 的注释本来就写着「宁滥勿缺——捞多了只会更保守」，
+ * 所以这是实现漏了，不是当初的取舍。
+ */
+/** 明确以路径符号开头的写法：绝对、显式相对、home、变量、Windows 盘符或 UNC。 */
+const PATHY_PREFIX = /^(?:\/|\.\.?\/|~$|~\/|\$|[A-Za-z]:[\\/]|\\\\)/
+
+/** 不带这些前缀但仍是路径：含分隔符（`src/a.ts`），或点开头的名字（`.env`）。 */
+const PATHY_SHAPE = /[/\\]|^\.[^.]/
+
 function looksLikePath(token: string): boolean {
-  return token.startsWith("/") || token.startsWith("./") || token.startsWith("~/") || token.startsWith("../")
+  // flag 不是路径（`-rf` 不是文件）
+  if (token === "" || token.startsWith("-")) return false
+  return PATHY_PREFIX.test(token) || PATHY_SHAPE.test(token)
 }
 
 function looksLikeUrl(token: string): boolean {

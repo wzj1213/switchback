@@ -220,3 +220,97 @@ describe("问的是什么，就得记什么", () => {
     }
   })
 })
+
+describe("裸相对路径也得当成路径", () => {
+  const w = "auto-edit" as const
+
+  it("`cat .env` 拒绝——以前只有 `cat ./.env` 才拦得住，同一件事换个写法就过", () => {
+    expect(decide(bash("cat .env"), state(w)).action).toBe("deny")
+  })
+
+  it("`grep -r secret .env` 同理", () => {
+    expect(decide(bash("grep -r secret .env"), state(w)).action).toBe("deny")
+  })
+
+  it("`cat $HOME/.ssh/id_rsa` 拒绝——只认 `~` 的话它会被解析到工作区里面去", () => {
+    expect(decide(bash("cat $HOME/.ssh/id_rsa"), state(w)).action).toBe("deny")
+  })
+
+  it("`cat ${HOME}/.aws/credentials` 同理", () => {
+    expect(decide(bash("cat ${HOME}/.aws/credentials"), state(w)).action).toBe("deny")
+  })
+
+  it("**工作区内的 `.ssh/xxx` 不该被当成用户的密钥**——那是项目里的文件", () => {
+    expect(decide(bash("cat .ssh/config"), state(w)).action).toBe("allow")
+  })
+
+  it("**普通词不能被误当成路径**：`git status`、`npm run build` 照旧放行", () => {
+    expect(decide(bash("git status"), state(w)).action).toBe("allow")
+    expect(decide(bash("npm run build"), state(w)).action).toBe("allow")
+  })
+
+  it("flag 不算路径（`-rf` 不是文件）", () => {
+    expect(decide(bash("ls -la"), state(w)).action).toBe("allow")
+  })
+})
+
+describe("间接执行不能绕过路径红线", () => {
+  const w = "auto-edit" as const
+  const asks = (cmd: string): boolean => decide(bash(cmd), state(w)).action !== "allow"
+
+  it("`env sh -c '…'`：剥掉执行器前缀才认得出这是包壳", () => {
+    expect(asks("env sh -c 'cat ~/.ssh/id_rsa'")).toBe(true)
+  })
+
+  it("`sh -c '…' 后面还跟参数` 也要认——原来尾部锚死就不认了", () => {
+    expect(asks("sh -c 'cat ~/.ssh/id_rsa' extra")).toBe(true)
+  })
+
+  it("`find -exec`：真正要跑的东西藏在参数里", () => {
+    expect(asks("find ~ -name id_rsa -exec cat {} ;")).toBe(true)
+  })
+
+  it("`xargs`：要跑什么取决于 stdin，静态判不出", () => {
+    expect(asks("xargs -a list.txt rm -rf")).toBe(true)
+  })
+
+  it("解释器 `-c` / `-e` 内联脚本", () => {
+    expect(asks(`python3 -c 'import os;os.remove("/Users/x/.zshrc")'`)).toBe(true)
+    expect(asks(`node -e 'require("fs").writeFileSync("/Users/x/.zshrc","x")'`)).toBe(true)
+  })
+
+  it("**跑脚本文件不受影响**：`node build.js`、`python3 main.py` 照旧放行", () => {
+    expect(asks("node build.js")).toBe(false)
+    expect(asks("python3 main.py")).toBe(false)
+  })
+
+  it("`timeout 30 pnpm test` 剥完还是普通命令，照旧放行", () => {
+    expect(asks("timeout 30 pnpm test")).toBe(false)
+  })
+})
+
+describe("`cd` 之后相对路径按新目录算", () => {
+  const w = "auto-edit" as const
+
+  it("`cd /tmp && echo x > victim.txt` 要问——以前按工作区解析，算出个工作区内的假路径", () => {
+    expect(decide(bash("cd /tmp && echo pwned > victim.txt"), state(w)).action).toBe("escalate")
+  })
+
+  it("`cd ~/.claude && echo {} > settings.json`：静默改引擎自己的配置", () => {
+    expect(decide(bash("cd ~/.claude && echo {} > settings.json"), state(w)).action).not.toBe("allow")
+  })
+
+  it("**cd 到工作区子目录仍然放行**——那正是这一档要放行的东西", () => {
+    expect(decide(bash("cd src && echo x > out.txt"), state(w)).action).toBe("allow")
+  })
+
+  it("没 cd 时行为不变", () => {
+    expect(decide(bash("echo x > out.txt"), state(w)).action).toBe("allow")
+    expect(decide(bash("echo x > /tmp/out.txt"), state(w)).action).toBe("escalate")
+  })
+
+  it("`cd` 目标静态判不出（变量、`cd -`、无参）时整条交人工", () => {
+    expect(decide(bash("cd $DIR && rm -rf ."), state(w)).action).toBe("escalate")
+    expect(decide(bash("cd - && rm -rf ."), state(w)).action).toBe("escalate")
+  })
+})

@@ -26,10 +26,22 @@ export function normalize(p: string): string {
   return joined === "" ? "." : joined
 }
 
-/** 把 `~` 展开成 home。`home` 由调用方传入，本包不读环境。 */
+/**
+ * 把 `~` 和 `$HOME` 展开成 home。`home` 由调用方传入，本包不读环境。
+ *
+ * **`$HOME` 必须一起认。** 只认 `~` 的话，`cat $HOME/.ssh/id_rsa` 会被解析成
+ * `<工作区>/$HOME/.ssh/id_rsa`——**恰好落在工作区里面**，于是凭据红线判不到，
+ * 越界红线也判不到。同一件事换个写法就绕过去了。
+ *
+ * 别的变量（`$FOO`）不展开也不能装作认识：那种情况该判「静态判不出」交人工，
+ * 而不是猜一个路径出来。
+ */
 export function expandHome(p: string, home: string): string {
   if (p === "~") return home
   if (p.startsWith("~/")) return home + "/" + p.slice(2)
+  if (p === "$HOME" || p === "${HOME}") return home
+  if (p.startsWith("$HOME/")) return home + "/" + p.slice(6)
+  if (p.startsWith("${HOME}/")) return home + "/" + p.slice(8)
   return p
 }
 

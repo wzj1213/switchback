@@ -35,6 +35,17 @@ const WRITING_PROGRAMS: ReadonlySet<string> = new Set([
 
 const always = (a: Action) => () => a
 
+/**
+ * 按**这一段自己的 cwd** 解析路径。段里 `cd` 过就用新目录，没有就用会话工作区。
+ *
+ * 段自己的 cwd 也可能是相对的（`cd sub && …`），所以先把它解析成绝对路径。
+ */
+function resolveIn(ctx: RedlineContext, segCwd: string | undefined, target: string): string {
+  const base =
+    segCwd === undefined ? ctx.state.worksite : resolve(ctx.state.worksite, segCwd, ctx.state.home)
+  return resolve(base, target, ctx.state.home)
+}
+
 function anyPathOutside(ctx: RedlineContext): boolean {
   return ctx.norm.paths.some((p) => !isInside(ctx.state.worksite, p))
 }
@@ -129,7 +140,7 @@ export const REDLINES: readonly Redline[] = [
         (s) =>
           // 重定向的目标**自己就是路径**，不必等 `norm.paths` 认出来——
           // `echo ok > /tmp/x` 的 argv 里只有 `echo`、`ok`，路径抽取拿不到它
-          s.redirects.some((t) => !isInside(ctx.state.worksite, resolve(ctx.state.worksite, t, ctx.state.home))) ||
+          s.redirects.some((t) => !isInside(ctx.state.worksite, resolveIn(ctx, s.cwd, t))) ||
           ((WRITING_PROGRAMS.has(s.program) || (s.program === "sed" && hasFlag(s, "-i"))) &&
             anyPathOutside(ctx)),
       ),
