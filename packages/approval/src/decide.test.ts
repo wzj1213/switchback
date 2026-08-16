@@ -50,11 +50,38 @@ const CASES: readonly Case[] = [
   { name: "只读档：执行命令拒绝", trust: "read-only", req: bash("ls"), action: "deny" },
   { name: "只读档：网络拒绝", trust: "read-only", req: tool("WebFetch", { url: "https://a.com/x" }), action: "deny", redline: "network" },
   {
-    name: "只读档：记忆不能把 deny 变 allow",
+    // 这条以前是**假绿**：`pnpm test` 根本不命中任何红线，走的是 trustVerdict
+    // 那条早已 deny 的路，压根没经过「记忆能不能翻案」那段代码
+    name: "只读档：记忆不能把 deny 变 allow（不命中红线的那条路）",
     trust: "read-only",
     req: bash("pnpm test"),
     memory: [rule("m", { commandSignature: "pnpm test" })],
     action: "deny",
+  },
+  {
+    // **真正走 memorable 红线那条路的用例。** 网络红线在 read-only 下是
+    // `deny` 且 `memorable: true`——旧代码只看 memorable 不看 action，
+    // 于是这里会返回 allow
+    name: "只读档：记过的 host **也不能**把网络红线的 deny 翻成 allow",
+    trust: "read-only",
+    req: tool("WebFetch", { url: "https://a.com/x" }),
+    memory: [rule("h", { host: "a.com" })],
+    action: "deny",
+    redline: "network",
+  },
+  {
+    name: "只读档：auto-edit 时记下的命令签名，降档之后一样不放行——**档位是地板**",
+    trust: "read-only",
+    req: bash("curl https://a.com/x"),
+    memory: [rule("sig", { commandSignature: "curl" })],
+    action: "deny",
+  },
+  {
+    name: "自动档：记过的 host 才是记忆该起作用的地方（escalate → allow）",
+    trust: "auto-edit",
+    req: tool("WebFetch", { url: "https://a.com/x" }),
+    memory: [rule("h", { host: "a.com" })],
+    action: "allow",
   },
 
   // ── auto-edit 是日常档，目标是几乎不打扰 ──────────────────────
@@ -167,5 +194,29 @@ describe("decide", () => {
     const covered = new Set(CASES.map((c) => c.redline).filter((r): r is string => r !== undefined))
     const uncovered = REDLINES.filter((r) => !covered.has(r.id)).map((r) => r.id)
     expect(uncovered).toEqual(["write-unknown-target"])
+  })
+})
+
+describe("问的是什么，就得记什么", () => {
+  it("网络红线建议的规则**带 host**，不是一条无约束的 curl 签名", () => {
+    const v = decide(bash("curl https://registry.npmjs.org/x"), state("auto-edit"))
+    expect(v.action).toBe("escalate")
+    expect(v.suggest?.pattern).toEqual({ host: "registry.npmjs.org" })
+  })
+
+  it("**旧行为会记成 `{commandSignature:\"curl\"}`**——那等于放行任意主机的任意 curl", () => {
+    const v = decide(bash("curl https://registry.npmjs.org/x"), state("auto-edit"))
+    expect(v.suggest?.pattern ?? {}).not.toHaveProperty("commandSignature")
+  })
+
+  it("认不出唯一主机时**不给建议**：记一条无约束的签名比不记糟得多", () => {
+    const v = decide(bash("curl https://a.com/x https://b.com/y"), state("auto-edit"))
+    expect(v.suggest).toBeUndefined()
+  })
+
+  it("**不再产出任何命令签名规则**——那条分支只有通过这个 bug 才走得到，已删", () => {
+    for (const cmd of ["curl https://a.com/x", "npm i -g typescript", "git push origin main"]) {
+      expect(decide(bash(cmd), state("auto-edit")).suggest?.pattern ?? {}).not.toHaveProperty("commandSignature")
+    }
   })
 })

