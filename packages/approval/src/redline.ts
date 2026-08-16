@@ -27,6 +27,44 @@ const CREDENTIAL_PREFIXES = [
 
 const ENGINE_HOME_PREFIXES = ["~/.claude", "~/.codex", "~/.omni", "~/.config/omni"] as const
 
+/**
+ * 解析不了的命令里，出现这些迹象才拦。
+ *
+ * ## 为什么不是「解析不了就一律拦」
+ *
+ * 原来是那样，结果实测下来最常触发它的是这种命令：
+ *
+ *     git status --short && echo "$(git branch --show-current)"
+ *
+ * ——一条完全无害的命令，只因为带了 `$()` 就要人点一下。而 agent 用
+ * `$(pwd)`、`$(git rev-parse ...)` 是家常便饭，于是「自动编辑」这一档
+ * **名存实亡**：界面上写着「工作区内直接放行」，实际每隔几条就打断你一次。
+ * 打断得太频繁的后果不是更安全，是**人开始不看内容直接点允许**——
+ * 那时候这道闸就真的没了。
+ *
+ * ## 那还拦什么
+ *
+ * 拦「解析不了」**且**「文本里露出了会动东西的迹象」：写文件的程序、
+ * 删除、网络、提权、重定向到根、凭据路径。这是个**子串扫描**，
+ * 比解析弱得多——但它要回答的问题也弱得多：不是「这条命令到底干什么」，
+ * 而是「它有没有可能碰到工作区以外的东西」。
+ *
+ * 漏网的当然有（`base64 -d | sh` 这种）。但那一档的承诺本来就是
+ * 「工作区内放行」，要一切都问该用只读档；而 codex 侧还有沙箱兜底。
+ */
+const OPAQUE_RISK =
+  /(^|[\s;|&(])(rm|mv|cp|dd|tee|chmod|chown|ln|install|rsync|truncate|curl|wget|ssh|scp|sudo|launchctl|systemctl|kill|pkill)([\s;|&)]|$)|>{1,2}\s*[~/]|\.ssh|\.aws|\.env|credentials|id_rsa/
+
+function smellsRisky(raw: string): boolean {
+  return OPAQUE_RISK.test(raw)
+}
+
+/** 原始命令文本。解析不了的时候，我们手上只剩它。 */
+function rawCommand(req: Request): string {
+  const value = (req.args as Record<string, unknown> | undefined)?.["command"]
+  return typeof value === "string" ? value : ""
+}
+
 /** 带写入语义的常见程序。用于判断 exec 是否可能写到工作区外。 */
 const WRITING_PROGRAMS: ReadonlySet<string> = new Set([
   "cp", "mv", "rm", "tee", "dd", "chmod", "chown", "ln", "mkdir", "touch",
@@ -76,10 +114,14 @@ function gitSubcommandWithFlag(norm: Normalized, sub: string, ...flags: string[]
 export const REDLINES: readonly Redline[] = [
   {
     id: "unparseable-command",
-    describe: "命令含无法静态判定的结构",
-    hit: (ctx) => ctx.norm.split.unparseable,
+    describe: "命令含无法静态判定的结构，而且看起来会动东西",
+    hit: (ctx) =>
+      ctx.norm.split.unparseable &&
+      // `hard` = 真正跑的东西不是你看到的这段（eval、解释器内联脚本…），一律问；
+      // 其余（取值替换）只在文本里露出会动东西的迹象时才问
+      (ctx.norm.split.hard === true || smellsRisky(rawCommand(ctx.req))),
     action: always("escalate"),
-    reason: "命令包含命令替换/eval/source 等结构，无法静态判定影响范围，需要人工确认",
+    reason: "命令里有无法静态判定的结构，看不出它会动什么，需要人工确认",
     memorable: false,
   },
   {

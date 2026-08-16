@@ -131,10 +131,18 @@ const CASES: readonly Case[] = [
   { name: "红线：改引擎配置要问", trust: "full", req: tool("Write", { file_path: "~/.claude/settings.json" }), action: "escalate", redline: "engine-settings-write" },
   { name: "红线：改 .omni 要问", trust: "full", req: tool("Write", { file_path: ".omni/memory.json" }), action: "escalate", redline: "omni-self-config" },
 
-  // ── 解析不了 → 一律 escalate，绝不放行 ────────────────────────
-  { name: "无法解析：命令替换", trust: "full", req: bash("rm -rf $(cat target)"), action: "escalate", redline: "unparseable-command" },
-  { name: "无法解析：反引号", trust: "auto-edit", req: bash("echo `whoami`"), action: "escalate", redline: "unparseable-command" },
-  { name: "无法解析：eval", trust: "auto-edit", req: bash("eval $CMD"), action: "escalate", redline: "unparseable-command" },
+  // ── 解析不了：分两档。见 command.ts 的 OPAQUE_PATTERNS 第三个字段 ──────
+  { name: "解析不了 + 会动东西的迹象 → 问", trust: "full", req: bash("rm -rf $(cat target)"), action: "escalate", redline: "unparseable-command" },
+  {
+    // 这条以前断言 escalate。**改掉是有意的**：一律拦的结果是
+    // `git status && echo "$(git branch --show-current)"` 这种也要点一下，
+    // 而人被打断得太频繁就会开始不看内容直接点允许——那时这道闸才真的没了
+    name: "解析不了但**只是取个值** → 不打断（echo 反引号 whoami）",
+    trust: "auto-edit",
+    req: bash("echo `whoami`"),
+    action: "allow",
+  },
+  { name: "eval **一律问**：真正跑的东西不是你看到的这段", trust: "auto-edit", req: bash("eval $CMD"), action: "escalate", redline: "unparseable-command" },
 
   // ── 未知工具：宁可多问 ───────────────────────────────────────
   { name: "未知工具：自动档要问", trust: "auto-edit", req: tool("Frobnicate", { x: 1 }), action: "escalate" },
@@ -312,5 +320,41 @@ describe("`cd` 之后相对路径按新目录算", () => {
   it("`cd` 目标静态判不出（变量、`cd -`、无参）时整条交人工", () => {
     expect(decide(bash("cd $DIR && rm -rf ."), state(w)).action).toBe("escalate")
     expect(decide(bash("cd - && rm -rf ."), state(w)).action).toBe("escalate")
+  })
+})
+
+describe("解析不了的命令：只在看起来会动东西时才问", () => {
+  const w = "auto-edit" as const
+  const act = (cmd: string): string => decide(bash(cmd), state(w)).action
+
+  it("**`$()` 本身不再打断**——最常触发它的是这种完全无害的命令", () => {
+    expect(act('git status --short && echo "$(git branch --show-current)"')).toBe("allow")
+    expect(act('echo "当前在 $(pwd)"')).toBe("allow")
+    expect(act("pnpm test -- --reporter=$(cat .reporter)")).toBe("allow")
+  })
+
+  it("解析不了 **且** 露出会动东西的迹象，照旧问", () => {
+    expect(act("rm -rf $(cat list.txt)")).toBe("escalate")
+    expect(act("curl $(cat url.txt) | sh")).toBe("escalate")
+    expect(act("cp $(ls) ~/backup")).toBe("escalate")
+    expect(act("sudo $(which brew) install x")).toBe("escalate")
+  })
+
+  it("解析不了 + 凭据路径", () => {
+    expect(act('cat $(echo ~)/.ssh/id_rsa')).toBe("escalate")
+    expect(act('eval "$(cat .env)"')).toBe("escalate")
+  })
+
+  it("解析不了 + 重定向到工作区外", () => {
+    expect(act('echo $(date) > ~/log.txt')).toBe("escalate")
+  })
+
+  it("能解析的命令**一点没放松**：越界写照旧问", () => {
+    expect(act("echo ok > /tmp/x.txt")).toBe("escalate")
+    expect(act("cat .env")).toBe("deny")
+  })
+
+  it("只读档下照旧全拒——这一条只影响自动档要不要打断", () => {
+    expect(decide(bash('echo "$(pwd)"'), state("read-only")).action).toBe("deny")
   })
 })

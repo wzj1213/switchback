@@ -93,7 +93,15 @@ export function Sidebar({
    * 于是一个有八个会话的项目自己就占满了整列，而「最近」那一段被顶到屏幕外面，
    * 等于白做。codex 的项目段也只列文件夹，不把聊天铺开。
    */
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  /**
+   * 用户**明确点过**的项目：true = 他要展开，false = 他要收起。
+   *
+   * 没点过的项目按默认走（当前会话所在的那个默认展开，其余默认收起）。
+   * 原来这里只存「手动展开过的」，而当前会话所在的项目是**强制展开**的——
+   * 于是点它的箭头毫无反应：`toggle` 把它从集合里拿掉了，
+   * 但 `cwd === here` 又把它扳回展开。**一个按了没反应的控件比没有更糟。**
+   */
+  const [choice, setChoice] = useState<ReadonlyMap<string, boolean>>(new Map())
   const box = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (focusFilter > 0) box.current?.select()
@@ -107,18 +115,18 @@ export function Sidebar({
   const sections = sectionsOf(shown, pinned)
 
   const toggle = (cwd: string): void => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(cwd)) next.delete(cwd)
-      else next.add(cwd)
+    setChoice((prev) => {
+      const next = new Map(prev)
+      next.set(cwd, !isOpen(cwd))
       return next
     })
   }
 
-  // 当前会话所在的项目**始终展开**：选中的那一行必须看得见，
-  // 否则点了侧栏别处再回来，它就藏进一个折叠组里了
+  // 当前会话所在的项目**默认**展开：选中的那一行该看得见，
+  // 否则点了侧栏别处再回来，它就藏进一个折叠组里了。
+  // 但这只是默认——用户明确收起来就听他的
   const here = rows.find((r) => r.thread.id === selectedId)?.thread.cwd
-  const isOpen = (cwd: string): boolean => expanded.has(cwd) || cwd === here
+  const isOpen = (cwd: string): boolean => choice.get(cwd) ?? cwd === here
 
   const rename = useRenaming(onRename, { at: askRename, id: selectedId })
   const { rowMenu, groupMenu } = useSidebarMenus(acts, openMenu)

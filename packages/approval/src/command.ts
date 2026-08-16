@@ -42,17 +42,39 @@ export interface SplitResult {
   unparseable: boolean
   /** unparseable 时说明原因，会进 Verdict.reason */
   reason?: string
+  /**
+   * 这次「解析不了」严不严重：true = 真正跑的东西不是你看到的这段（eval、
+   * 解释器内联脚本…），必须问人；false = 只是取值替换（`$(pwd)`），
+   * 由 `redline.ts` 再看文本里有没有危险迹象。
+   */
+  hard?: boolean
 }
 
-/** 会改变「实际执行什么」的结构——出现即放弃解析。 */
-const OPAQUE_PATTERNS: readonly (readonly [RegExp, string])[] = [
-  [/\$\(/, "命令替换 $(...)"],
-  [/`/, "反引号命令替换"],
-  [/(^|\s)eval(\s|$)/, "eval"],
-  [/(^|\s)source(\s|$)/, "source"],
-  [/(^|\s)\.\s+\S/, "点号 source"],
-  [/(^|\s)exec(\s|$)/, "exec 替换进程"],
-  [/<\(/, "进程替换 <(...)"],
+/**
+ * 会改变「实际执行什么」的结构——出现即放弃解析。
+ *
+ * **第三个字段是「要不要一律问人」**，这条分档是实测逼出来的：
+ *
+ * - `eval "$X"` / `source f` / `xargs` / `python3 -c '…'` ——
+ *   **真正跑的东西不是你看到的这段**。看不出它会干什么，那就得问。
+ * - `$(pwd)` / 反引号 —— 绝大多数时候只是**取个值**拼进命令里。
+ *   一律问的结果实测是：最常触发它的命令长这样——
+ *   `git status --short && echo "$(git branch --show-current)"`，
+ *   一条完全无害的命令。而 agent 用 `$(pwd)` 是家常便饭，
+ *   于是「自动编辑」这一档名存实亡，人开始不看内容直接点允许——
+ *   **那时候这道闸才是真的没了。**
+ *
+ * 所以后者改成「解析不了 **且** 文本里露出会动东西的迹象」才问，
+ * 判据见 `redline.ts` 的 `OPAQUE_RISK`。
+ */
+const OPAQUE_PATTERNS: readonly (readonly [RegExp, string, boolean])[] = [
+  [/\$\(/, "命令替换 $(...)", false],
+  [/`/, "反引号命令替换", false],
+  [/<\(/, "进程替换 <(...)", false],
+  [/(^|\s)eval(\s|$)/, "eval", true],
+  [/(^|\s)source(\s|$)/, "source", true],
+  [/(^|\s)\.\s+\S/, "点号 source", true],
+  [/(^|\s)exec(\s|$)/, "exec 替换进程", true],
   /*
    * ── 间接执行：**真正要跑的东西藏在参数里** ──────────────
    *
@@ -68,9 +90,9 @@ const OPAQUE_PATTERNS: readonly (readonly [RegExp, string])[] = [
    * 所有依赖路径的红线集体失明。而 `command.ts` 开头自称的不变量是
    * 「解析不了的东西绝不自动放行」——这里恰恰是误判成能解析然后放行。
    */
-  [/(^|\s)(?:find|fd)\s[\s\S]*\s-exec(?:dir)?(\s|$)/, "find -exec 间接执行"],
-  [/(^|\s)xargs(\s|$)/, "xargs 间接执行"],
-  [/(^|\s)(?:python3?|node|perl|ruby|php|deno|bun)\s+(?:-\S+\s+)*-(?:c|e)(\s|$)/, "解释器 -c/-e 内联脚本"],
+  [/(^|\s)(?:find|fd)\s[\s\S]*\s-exec(?:dir)?(\s|$)/, "find -exec 间接执行", true],
+  [/(^|\s)xargs(\s|$)/, "xargs 间接执行", true],
+  [/(^|\s)(?:python3?|node|perl|ruby|php|deno|bun)\s+(?:-\S+\s+)*-(?:c|e)(\s|$)/, "解释器 -c/-e 内联脚本", true],
 ]
 
 /**
@@ -192,9 +214,9 @@ function toSegment(text: string): Segment | undefined {
 export function splitSegments(raw: string): SplitResult {
   // 先剥壳再判：包在 `zsh -lc '...'` 里的 `$(...)` 也必须被认出来
   const command = unwrapShell(raw)
-  for (const [pattern, label] of OPAQUE_PATTERNS) {
+  for (const [pattern, label, hard] of OPAQUE_PATTERNS) {
     if (pattern.test(command)) {
-      return { segments: [], unparseable: true, reason: `命令含${label}，无法静态判定` }
+      return { segments: [], unparseable: true, reason: `命令含${label}，无法静态判定`, hard }
     }
   }
   const parsed = command
