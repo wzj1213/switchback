@@ -76,6 +76,8 @@ export interface GroupHandlers {
   onNewChat: () => void
   /** 项目行悬停出来的 `+`：在**那个**项目里新建。 */
   onNewIn: (cwd: string) => void
+  /** 各项目设过的图标：路径 → emoji。 */
+  icons: Readonly<Record<string, string>>
 }
 
 function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
@@ -94,6 +96,7 @@ function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers })
           onDelete={on.onDelete}
           onRowMenu={on.onRowMenu}
           onNewIn={on.onNewIn}
+          icon={on.icons[group.cwd]}
           rename={on.rename}
           onGroupMenu={on.onGroupMenu}
         />

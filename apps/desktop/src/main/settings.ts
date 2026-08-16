@@ -49,7 +49,26 @@ function parse(raw: unknown): Settings {
       typeof it.defaultTrust === "string" && TRUSTS.has(it.defaultTrust)
         ? (it.defaultTrust as Trust)
         : DEFAULTS.defaultTrust,
+    projectIcons: icons(it.projectIcons),
   }
+}
+
+/**
+ * 项目图标：路径 → emoji。
+ *
+ * **限长两个字素**。不限的话这里就成了一个「往侧栏塞任意字符串」的口子——
+ * 偏好文件是可以手改的，而侧栏那一列宽度固定，塞进去一段长文本会把整列挤垮。
+ * 两个是因为有些 emoji 带修饰符（肤色、ZWJ 组合），一个字素装不下。
+ */
+function icons(raw: unknown): Record<string, string> {
+  if (typeof raw !== "object" || raw === null) return {}
+  const out: Record<string, string> = {}
+  for (const [cwd, icon] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof icon !== "string" || icon === "") continue
+    if ([...new Intl.Segmenter().segment(icon)].length > 2) continue
+    out[cwd] = icon
+  }
+  return out
 }
 
 export interface Store {

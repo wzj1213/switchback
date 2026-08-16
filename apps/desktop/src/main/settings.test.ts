@@ -36,6 +36,7 @@ describe("偏好", () => {
       pinned: [],
       defaultEngine: "",
       defaultTrust: "auto-edit",
+      projectIcons: {},
     })
   })
 
@@ -79,5 +80,33 @@ describe("偏好", () => {
   it("改主题会同步到 nativeTheme，否则设置里选了深色但窗口没变", () => {
     createSettings(log).patch({ theme: "dark" })
     expect(theme.source).toBe("dark")
+  })
+})
+
+describe("项目图标", () => {
+  /** 偏好文件是**可以手改的**，所以这些用例走「文件里写什么 → 读出来是什么」。 */
+  const readBack = (icons: unknown): Record<string, string> => {
+    writeFileSync(file(), JSON.stringify({ projectIcons: icons }))
+    return createSettings(log).get().projectIcons as Record<string, string>
+  }
+
+  it("路径 → emoji 原样收下", () => {
+    expect(readBack({ "/w/a": "🟦" })).toEqual({ "/w/a": "🟦" })
+  })
+
+  it("带修饰符的 emoji（肤色、ZWJ 组合）也收——一个字素装不下它们", () => {
+    expect(readBack({ "/w/a": "👩‍💻" })["/w/a"]).toBe("👩‍💻")
+  })
+
+  it("**超长的一律丢掉**：偏好文件可以手改，而侧栏那一列宽度固定", () => {
+    expect(readBack({ "/w/a": "这是一段很长的文字会把整列撑垮" })).toEqual({})
+  })
+
+  it("空串、非字符串都丢掉", () => {
+    expect(readBack({ "/w/a": "", "/w/b": 42 })).toEqual({})
+  })
+
+  it("整个字段不是对象时给空表，不炸", () => {
+    expect(readBack("坏了")).toEqual({})
   })
 })

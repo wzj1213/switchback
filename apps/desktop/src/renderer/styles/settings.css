@@ -132,3 +132,17 @@
   color: var(--text);
   box-shadow: var(--shadow-pop);
 }
+
+/* 更新失败时 npm 的原文。**要能看见**——「更新失败」四个字排查不了任何东西 */
+.set__log {
+  max-height: 180px;
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}

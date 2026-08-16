@@ -1,7 +1,7 @@
 import type { Command } from "./Menu.js"
 import type { Group } from "../sidebar.js"
 import type { ThreadRow } from "@omni/store"
-import { CopyIcon, PinIcon, PlusIcon, RevealIcon, TrashIcon } from "./icons.js"
+import { CopyIcon, PinIcon, PlusIcon, RevealIcon, SparkIcon, TrashIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 
 /*
@@ -11,6 +11,8 @@ import { PencilIcon } from "./icons-activity.js"
  */
 
 export interface Acts {
+  /** 给项目设图标。空字符串 = 清掉。 */
+  onSetIcon?: (cwd: string, icon: string) => void
   pinned: readonly string[]
   onNewIn: (cwd: string) => void
   onTogglePin: (cwd: string) => void
@@ -86,7 +88,46 @@ export function useSidebarMenus(
       ])
     },
     groupMenu: (event, group) => {
-      openMenu(event, workspaceCommands(group.cwd, acts), <ProjectHead group={group} />)
+      openMenu(
+        event,
+        [...workspaceCommands(group.cwd, acts), ...iconCommands(group.cwd, acts)],
+        <ProjectHead group={group} />,
+      )
     },
   }
+}
+
+/**
+ * 项目图标那几条。
+ *
+ * ## 为什么是一小撮固定的 emoji，不是完整选择器
+ *
+ * 这件事要解决的问题是「一列长得一样的文件夹图标里一眼认出哪个是哪个」——
+ * **需要的是「好认」，不是「好看」**。给一个能选 3000 个 emoji 的面板，
+ * 人会花两分钟挑一个，然后下次挑了个长得差不多的，于是又认不出来了。
+ *
+ * 八个形状差异极大、颜色也分得开的，够用而且选起来是一秒钟的事。
+ * 想要别的，偏好文件里可以手写任意 emoji（主进程只校验长度）。
+ */
+const ICONS = ["🟦", "🟩", "🟧", "🟪", "🔴", "⚫️", "🐳", "🧪"] as const
+
+function iconCommands(cwd: string, acts: Acts): readonly Command[] {
+  const set = acts.onSetIcon
+  if (set === undefined) return []
+  return [
+    {
+      label: "图标",
+      icon: <SparkIcon />,
+      // 这一条的 `run` 是「清掉图标」（菜单里那个 ×）
+      run: () => {
+        set(cwd, "")
+      },
+      pick: ICONS.map((icon) => ({
+        icon,
+        run: () => {
+          set(cwd, icon)
+        },
+      })),
+    },
+  ]
 }

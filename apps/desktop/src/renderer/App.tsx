@@ -31,6 +31,8 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       onReveal={app.reveal}
       onCopy={app.copy}
       pinned={prefs.settings.pinned}
+      icons={prefs.settings.projectIcons}
+      onSetIcon={prefs.setIcon}
       onTogglePin={prefs.togglePin}
       onOpenSettings={() => {
         shell.setSettingsOpen(true)

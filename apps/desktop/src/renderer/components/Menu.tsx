@@ -22,6 +22,13 @@ export interface Command {
   /** 不可逆的操作标红。**只标不拦**——拦在这里的话用户会去找别的路。 */
   danger?: boolean
   run: () => void
+  /**
+   * 这一条右边摆一排可点的小东西（现在只有项目图标在用）。
+   *
+   * **选一个图标不该再开一层界面。** 二级菜单意味着「点开 → 移过去 →
+   * 再点一下」，而这件事本身只值一次点击。
+   */
+  pick?: readonly { icon: string; run: () => void }[]
 }
 
 export interface MenuState {
@@ -68,21 +75,53 @@ export function useContextMenu(): {
       <Popover open anchor={null} at={state.at} minWidth={170} onClose={close}>
         <div role="menu">
           {state.head === undefined ? null : <div className="pop__head">{state.head}</div>}
-          {state.commands.map((command) => (
-            <button
-              type="button"
-              key={command.label}
-              role="menuitem"
-              className={`pop__cmd${command.danger === true ? " pop__cmd--danger" : ""}`}
-              onClick={() => {
-                close()
-                command.run()
-              }}
-            >
-              <span className="pop__cmd-icon">{command.icon}</span>
-              <span>{command.label}</span>
-            </button>
-          ))}
+          {state.commands.map((command) =>
+            command.pick === undefined ? (
+              <button
+                type="button"
+                key={command.label}
+                role="menuitem"
+                className={`pop__cmd${command.danger === true ? " pop__cmd--danger" : ""}`}
+                onClick={() => {
+                  close()
+                  command.run()
+                }}
+              >
+                <span className="pop__cmd-icon">{command.icon}</span>
+                <span>{command.label}</span>
+              </button>
+            ) : (
+              <div key={command.label} className="pop__pick">
+                <span className="pop__cmd-icon">{command.icon}</span>
+                <span className="pop__pick-label">{command.label}</span>
+                {command.pick.map((option) => (
+                  <button
+                    type="button"
+                    key={option.icon}
+                    className="pop__pick-one"
+                    onClick={() => {
+                      close()
+                      option.run()
+                    }}
+                  >
+                    {option.icon}
+                  </button>
+                ))}
+                {/* 清掉：回到默认的文件夹图标 */}
+                <button
+                  type="button"
+                  className="pop__pick-one pop__pick-clear"
+                  title="不要图标"
+                  onClick={() => {
+                    close()
+                    command.run()
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ),
+          )}
         </div>
       </Popover>
     )

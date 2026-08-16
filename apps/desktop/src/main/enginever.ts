@@ -12,11 +12,17 @@ import type { Logger } from "./log.js"
  * 而界面上一个字都不说。omni 是唯一同时知道「装的是哪版」和
  * 「现在最新是哪版」的地方。
  *
- * ## 为什么不自动装
+ * ## 更新这件事怎么做
  *
- * 更新引擎是往**用户全局环境**里写东西（`npm i -g` 会动 `/opt/homebrew/lib`），
- * 而且新版可能带 breaking change、可能要重新登录。这类事得他自己点头。
- * 所以：**主动检测、明说、一键更新**，但那一键由人按。
+ * 一开始只给了「复制命令」——那等于把活推回给用户。改成真按钮，
+ * 但**把谨慎换个地方落实**：
+ *
+ * - 按之前把要执行的命令原样摆出来（不是「更新」两个字背后藏一条命令）
+ * - 跑完报「从哪版到哪版」，**用重新探测的结果**，不是用我们以为的
+ * - 失败时把 npm 的原文吐出来，而不是「更新失败」四个字
+ *
+ * 这样出了问题你知道发生过什么。靠不给按钮来回避风险，
+ * 只是把风险转成了「用户自己去终端跑，而且没人告诉他跑完是什么状态」。
  *
  * ## 网络
  *
@@ -38,7 +44,41 @@ const KNOWN: Readonly<Record<string, { bin: string; pkg: string }>> = {
   codex: { bin: "codex", pkg: "@openai/codex" },
 }
 
+export interface UpdateResult {
+  ok: boolean
+  /** 更新前装的是哪版。 */
+  before?: string
+  /** 更新后重新探到的版本。**重新探，不是用 npm 说的那个** */
+  after?: string
+  /** npm 的原文。失败时全靠它排查。 */
+  output: string
+}
+
 export function installEngineVersionChannel(log: Logger): void {
+  /**
+   * 真的去更新。
+   *
+   * 用 `npm i -g <pkg>@latest`，和界面上摆出来的那条命令**逐字相同**——
+   * 按钮背后藏一条不一样的命令是最不该有的事。
+   */
+  ipcMain.handle("omni:updateEngine", async (_e, engine: string): Promise<UpdateResult> => {
+    const how = KNOWN[engine]
+    if (how === undefined) return { ok: false, output: `不认识的引擎：${engine}` }
+    const before = await versionOf(how.bin)
+    log.write("info", "engines", `开始更新 ${engine}（当前 ${before ?? "未知"}）`)
+    // 给足时间：全局安装要下载、要编译原生依赖，十几秒到一两分钟都正常
+    const output = await run("npm", ["i", "-g", `${how.pkg}@latest`], 180_000)
+    const after = await versionOf(how.bin)
+    const ok = after !== undefined && (before === undefined || compare(after, before) > 0)
+    log.write(ok ? "info" : "error", "engines", `更新 ${engine}：${before ?? "?"} → ${after ?? "?"}`)
+    return {
+      ok,
+      ...(before === undefined ? {} : { before }),
+      ...(after === undefined ? {} : { after }),
+      output: output ?? "npm 没有任何输出——多半是它自己没跑起来（PATH？）",
+    }
+  })
+
   ipcMain.handle("omni:engineVersions", async () => {
     const out: EngineVersion[] = []
     for (const [engine, how] of Object.entries(KNOWN)) {

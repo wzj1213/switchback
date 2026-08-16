@@ -22,6 +22,19 @@ export interface Settings {
   defaultEngine: string
   /** 新会话默认的信任档。 */
   defaultTrust: Trust
+  /**
+   * 项目自己的图标：工作区路径 → 一个 emoji。
+   *
+   * ## 为什么是 emoji 不是图片文件
+   *
+   * 图片要管理：存哪儿、多大、删项目时谁清理、换机器怎么跟着走。
+   * 而这件事要解决的问题只是「一列长得一样的文件夹图标里，
+   * **一眼认出哪个是哪个**」——一个 emoji 就够了，它还天生跨平台、
+   * 跟着偏好文件走、不占磁盘。
+   *
+   * 存路径不存项目名：同名目录太常见，而路径是这里唯一稳定的身份。
+   */
+  projectIcons: Readonly<Record<string, string>>
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -29,4 +42,5 @@ export const SETTINGS_DEFAULTS: Settings = {
   pinned: [],
   defaultEngine: "",
   defaultTrust: "auto-edit",
+  projectIcons: {},
 }

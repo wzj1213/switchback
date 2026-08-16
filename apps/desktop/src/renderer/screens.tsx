@@ -70,6 +70,8 @@ export function SidebarPane({
   onReveal,
   onCopy,
   pinned,
+  icons,
+  onSetIcon,
   onTogglePin,
   onOpenSettings,
   send,
@@ -86,6 +88,8 @@ export function SidebarPane({
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   pinned: readonly string[]
+  icons: Readonly<Record<string, string>>
+  onSetIcon: (cwd: string, icon: string) => void
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
   send: (command: Command) => void
@@ -101,6 +105,8 @@ export function SidebarPane({
       onReveal={onReveal}
       onCopy={onCopy}
       pinned={pinned}
+      icons={icons}
+      onSetIcon={onSetIcon}
       onTogglePin={onTogglePin}
       onOpenSettings={onOpenSettings}
       focusFilter={focusFilter}

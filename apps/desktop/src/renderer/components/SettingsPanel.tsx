@@ -154,7 +154,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         </Group>
 
         <Group title="引擎">
-          <EngineVersions onCopy={props.onCopy} />
+          <EngineVersions />
         </Group>
 
         <Group title="数据与排查">

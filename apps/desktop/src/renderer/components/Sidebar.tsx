@@ -51,6 +51,10 @@ interface Props {
   onCopy: (text: string) => void
   /** 已置顶的工作区路径。 */
   pinned: readonly string[]
+  /** 各项目设过的图标。 */
+  icons: Readonly<Record<string, string>>
+  /** 给项目设图标；传空字符串表示清掉。 */
+  onSetIcon: (cwd: string, icon: string) => void
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
   /** 变一次就把当前会话切进改名态。`/rename` 命令走这条路。 */
@@ -79,6 +83,8 @@ export function Sidebar({
   onReveal,
   onCopy,
   pinned,
+  icons,
+  onSetIcon,
   onTogglePin,
   onOpenSettings,
   onNewChat,
@@ -129,7 +135,7 @@ export function Sidebar({
   const isOpen = (cwd: string): boolean => choice.get(cwd) ?? cwd === here
 
   const rename = useRenaming(onRename, { at: askRename, id: selectedId })
-  const { rowMenu, groupMenu } = useSidebarMenus(acts, openMenu)
+  const { rowMenu, groupMenu } = useSidebarMenus({ ...acts, onSetIcon }, openMenu)
 
 
   return (
@@ -160,6 +166,7 @@ export function Sidebar({
               onOpenFolder,
               onNewChat,
               onNewIn,
+              icons,
               rename,
               onGroupMenu: groupMenu,
             }}

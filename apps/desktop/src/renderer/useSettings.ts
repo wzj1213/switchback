@@ -15,6 +15,8 @@ export interface SettingsApi {
   /** 置顶/取消置顶一个工作区。 */
   togglePin: (cwd: string) => void
   isPinned: (cwd: string) => boolean
+  /** 给项目设图标；空字符串 = 清掉（键一并删掉，不留空值）。 */
+  setIcon: (cwd: string, icon: string) => void
 }
 
 export function useSettings(): SettingsApi {
@@ -46,10 +48,23 @@ export function useSettings(): SettingsApi {
     [settings.pinned, patch],
   )
 
+  const setIcon = useCallback(
+    (cwd: string, icon: string) => {
+      // 清掉时**把键去掉**，不是存一个空串：留着空值的话，
+      // 偏好文件会随着用过的项目越攒越长，而那些条目一个都不起作用
+      const next = Object.fromEntries(
+        Object.entries(settings.projectIcons).filter(([key]) => key !== cwd),
+      )
+      patch({ projectIcons: icon === "" ? next : { ...next, [cwd]: icon } })
+    },
+    [settings.projectIcons, patch],
+  )
+
   return {
     settings,
     patch,
     togglePin,
+    setIcon,
     isPinned: (cwd) => settings.pinned.includes(cwd),
   }
 }

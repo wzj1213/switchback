@@ -295,3 +295,47 @@
 .env__link:hover {
   text-decoration: underline;
 }
+
+/* 菜单里那一排可选图标。**不开二级菜单**：选一个 emoji 只值一次点击 */
+.pop__pick {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px var(--sp-2);
+}
+
+.pop__pick-label {
+  margin-right: var(--sp-2);
+  color: var(--text-muted);
+}
+
+.pop__pick-one {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pop__pick-one:hover {
+  background: var(--bg-hover);
+}
+
+.pop__pick-clear {
+  color: var(--text-faint);
+}
+
+/* 侧栏项目行上的 emoji：**盖住原来那个文件夹图标的位置**，
+   大小对齐同一列，不然那一列又歪了 */
+.row__emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1;
+}

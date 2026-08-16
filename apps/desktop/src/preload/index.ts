@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron"
 import type { Command, Event } from "@omni/protocol"
 import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
-import type { EngineVersion } from "../main/enginever.js"
+import type { EngineVersion, UpdateResult } from "../main/enginever.js"
 
 /** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
 export interface Sealed {
@@ -47,6 +47,11 @@ const api = {
   /** 各家引擎装的是哪版、有没有新版。查不到就返回空数组（不打扰）。 */
   async engineVersions(): Promise<readonly EngineVersion[]> {
     return (await ipcRenderer.invoke("omni:engineVersions")) as readonly EngineVersion[]
+  },
+
+  /** 真的去更新一家引擎。跑的命令和界面上摆出来的那条逐字相同。 */
+  async updateEngine(engine: string): Promise<UpdateResult> {
+    return (await ipcRenderer.invoke("omni:updateEngine", engine)) as UpdateResult
   },
 
   /** 这个项目的说明文件在不在、两家是不是读的同一份。 */
