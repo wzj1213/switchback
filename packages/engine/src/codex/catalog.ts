@@ -76,6 +76,8 @@ export interface WireModel {
   hidden?: boolean
   supportedReasoningEfforts?: readonly (string | { reasoningEffort?: string })[]
   defaultReasoningEffort?: string
+  /** 引擎自己认的默认模型。实测 `gpt-5.6-sol` 上是 true。 */
+  isDefault?: boolean
 }
 
 /**
@@ -98,6 +100,7 @@ export function toModelOption(raw: WireModel): ModelOption {
     ...(raw.description === undefined ? {} : { description: raw.description }),
     ...(efforts.length === 0 ? {} : { efforts }),
     ...(raw.defaultReasoningEffort === undefined ? {} : { defaultEffort: raw.defaultReasoningEffort }),
+    ...(raw.isDefault === true ? { isDefault: true } : {}),
   }
 }
 

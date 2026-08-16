@@ -1401,3 +1401,64 @@ body {
   font-size: var(--text-sm);
   text-align: left;
 }
+
+/* ── 分层菜单 ─────────────────────────────────────────
+ * 顶层一行一节，右边写着当前值。那一列不是装饰——它让这个面板
+ * 同时是一份「现在什么配置」的摘要，而平铺的版本要自己去列表里找那个勾。
+ */
+.pop__item--row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 当前值贴右，紧挨着那个 ›。**不许缩**：被截断的当前值就是错的信息 */
+.pop__value {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+/* 「恢复默认设置」和上面那几行之间画一道：它不是第 N 个选项，
+   是一个动作。不分开的话，人会在选项列表里数到它 */
+.pop__item--reset {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  border-radius: 0;
+  color: var(--text-muted);
+}
+
+.pop__item--reset svg {
+  margin-left: auto;
+}
+
+/* 二级页顶上那行返回。**做成一整行可点**，不是一个小箭头——
+   小箭头是这类菜单里最容易点空的东西 */
+.pop__back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px var(--sp-2);
+  margin-bottom: 2px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.pop__back:hover {
+  color: var(--text);
+}
+
+.pop__back-arrow {
+  font-size: 15px;
+  line-height: 1;
+}

@@ -66,3 +66,13 @@ export function ThinkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
     </Svg>
   )
 }
+
+/** 恢复默认。一个绕回去的箭头——**不是垃圾桶**：这是撤销一次设置，不是删除什么 */
+export function ResetIcon({ size = 13 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M2.8 6.6A5.4 5.4 0 1 1 2.7 9.3" {...LINE} />
+      <path d="M2.4 3.1v3.6h3.6" {...LINE} />
+    </Svg>
+  )
+}

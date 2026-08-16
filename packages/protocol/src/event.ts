@@ -33,6 +33,13 @@ export interface ModelOption {
   description?: string
   efforts?: readonly string[]
   defaultEffort?: string
+  /**
+   * 引擎自己认的默认模型。
+   *
+   * 界面靠它做「恢复默认设置」——没有这一条的话那句话是空的：
+   * omni 不知道该退回到哪个模型。codex 的 `model/list` 报 `isDefault`（实测）。
+   */
+  isDefault?: boolean
 }
 
 /**
