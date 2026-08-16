@@ -78,6 +78,10 @@ const UNOWNED: ReadonlySet<string> = new Set([
   // 斜杠命令**故意不落盘**：它是每次握手现问引擎的（用户装了什么技能只有引擎知道），
   // 落盘只会在重放时把一份过期的清单塞回界面
   "commands.updated",
+  // 引擎自己存的会话清单、以及它登录的账号：同理，都是现问的，
+  // 而且**不属于任何一个 omni 会话**
+  "engine.history",
+  "account.updated",
 ])
 
 /**
@@ -95,7 +99,12 @@ const UNOWNED: ReadonlySet<string> = new Set([
  * 区别于 `thread.removed`：那是一次**变化**，补发只会把删掉的东西变回来。
  * 收进这里的标准是「它描述的是现在是什么样，重放一遍不会有副作用」。
  */
-const LIVE_STATE: ReadonlySet<string> = new Set(["limits.updated", "commands.updated"])
+const LIVE_STATE: ReadonlySet<string> = new Set([
+  "limits.updated",
+  "commands.updated",
+  "engine.history",
+  "account.updated",
+])
 
 /**
  * 这类事件按「说的是哪一份」留最后一条：额度按引擎、命令按会话。
@@ -104,6 +113,8 @@ const LIVE_STATE: ReadonlySet<string> = new Set(["limits.updated", "commands.upd
 function liveKey(event: Event): string | undefined {
   if (event.type === "limits.updated") return `limits:${event.engine}`
   if (event.type === "commands.updated") return `commands:${event.threadId}`
+  if (event.type === "engine.history") return `history:${event.engine}`
+  if (event.type === "account.updated") return `account:${event.engine}`
   return undefined
 }
 

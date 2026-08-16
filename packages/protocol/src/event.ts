@@ -1,6 +1,6 @@
 import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
 import type { Item } from "./item.js"
-import type { SlashCommand, Thread, Turn, TurnStatus } from "./thread.js"
+import type { EngineAccount, EngineThread, SlashCommand, Thread, Turn, TurnStatus } from "./thread.js"
 
 /**
  * 用量。
@@ -91,6 +91,10 @@ export type Event =
    * Claude 那边技能会**中途变**（agent 走到子目录里发现新技能），所以还会再报。
    */
   | { type: "commands.updated"; at: number; threadId: ThreadId; commands: readonly SlashCommand[] }
+  /** 引擎自己存着哪些会话（你在终端、在别的界面里跑过的）。 */
+  | { type: "engine.history"; at: number; engine: EngineId; threads: readonly EngineThread[] }
+  /** 引擎登录的是哪个账号。额度算在谁头上，看这个。 */
+  | { type: "account.updated"; at: number; engine: EngineId; account: EngineAccount }
   /** 上下文与消耗。引擎给什么报什么，给不出的字段就缺席。 */
   | { type: "usage.updated"; at: number; threadId: ThreadId; usage: Usage }
   /**

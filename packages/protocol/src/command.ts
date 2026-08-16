@@ -3,6 +3,14 @@ import type { Trust } from "./thread.js"
 
 /** 渲染层 → 宿主的反向指令。宿主是唯一执行者，渲染层不直接碰引擎进程。 */
 export type Command =
+  /**
+   * 把**引擎自己存的**一条会话接过来，在 omni 里接着聊。
+   *
+   * 和 `thread.resume` 的区别：那条是「omni 建过、记录在我这儿」的会话重新接上引擎；
+   * 这条是「omni 从来不知道它存在」的会话——你在终端里、在别的界面里跑的。
+   * 所以工作区、标题都得由调用方从引擎的列表里带过来。
+   */
+  | { type: "thread.adopt"; engine: EngineId; handle: string; cwd: string; title: string }
   | {
       type: "thread.create"
       cwd: string

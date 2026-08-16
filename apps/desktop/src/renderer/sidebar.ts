@@ -66,6 +66,13 @@ export function groupByWorkspace(rows: readonly ThreadRow[]): readonly Group[] {
 /** 项目多到一定程度才折叠。少于这个数时「展开显示」只是白多一行。 */
 export const PROJECT_MAX = 6
 
+/**
+ * 「codex 历史」段最多列几条。**和引擎那边的取数上限是同一个数**
+ *（见 `catalog.ts` 的 `HISTORY_MAX`）——两处不一致的话，
+ * 界面会说「只列最近 40 条」而其实只拿到了 20 条。
+ */
+export const FOREIGN_MAX = 40
+
 export interface Sections {
   pinned: readonly Group[]
   projects: readonly Group[]

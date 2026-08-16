@@ -7,7 +7,7 @@ import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
-import { devEngine, devResume, devTrust } from "./devtools.js"
+import { devEngine, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 import { createAttention } from "./attention.js"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
@@ -412,6 +412,12 @@ async function seed(attached: Attached, cwd: string, prompt?: string): Promise<v
     title: cwd.split("/").pop() ?? "工作区",
   })
   const threadId = attached.lastThreadId()
-  if (prompt === undefined || threadId === undefined) return
+  if (threadId === undefined) return
+  // 换模型要在发消息**之前**：`turn/start` 时带的才是这一轮真正用的那个
+  const picked = devModel()
+  if (picked !== undefined) {
+    await attached.host.dispatch({ type: "thread.setModel", threadId, ...picked })
+  }
+  if (prompt === undefined) return
   await attached.host.dispatch({ type: "thread.prompt", threadId, text: prompt })
 }

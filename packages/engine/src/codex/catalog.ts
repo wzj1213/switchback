@@ -1,4 +1,4 @@
-import type { ModelOption, SlashCommand } from "@omni/protocol"
+import type { EngineAccount, EngineThread, ModelOption, SlashCommand } from "@omni/protocol"
 import type { WireSkill, WireSkillGroup } from "./wire.js"
 
 /*
@@ -99,4 +99,67 @@ export function toModelOption(raw: WireModel): ModelOption {
     ...(efforts.length === 0 ? {} : { efforts }),
     ...(raw.defaultReasoningEffort === undefined ? {} : { defaultEffort: raw.defaultReasoningEffort }),
   }
+}
+
+/* ── 引擎自己存的会话 ─────────────────────────────
+ * 同样是形状转换，所以也住这儿。
+ */
+
+/** 一条太长就没法当标题用了。preview 是整段提问，动辄几百字。 */
+const TITLE_MAX = 60
+
+/** 最多带回来这么多条。列表有 cursor，但侧栏里的一段不该是无底洞。 */
+const HISTORY_MAX = 40
+
+interface WireThreadRow {
+  id?: string
+  name?: string | null
+  preview?: string | null
+  cwd?: string | null
+  updatedAt?: number | null
+  recencyAt?: number | null
+}
+
+export function toEngineThreads(raw: unknown): readonly EngineThread[] {
+  const rows = (raw as { data?: readonly WireThreadRow[] } | undefined)?.data ?? []
+  const out: EngineThread[] = []
+  for (const row of rows) {
+    const handle = row.id ?? ""
+    const cwd = row.cwd ?? ""
+    // 没有句柄就接不过来，没有 cwd 工作区边界就错了——**两样缺一个都不给列**，
+    // 列出来的下场是点了报错，那比看不见更糟
+    if (handle === "" || cwd === "") continue
+    out.push({
+      handle,
+      title: titleOf(row),
+      cwd,
+      // codex 报的是**秒**（和 rateLimits 的 resetsAt 同一个坑）
+      updatedAt: (row.updatedAt ?? row.recencyAt ?? 0) * 1000,
+    })
+    if (out.length >= HISTORY_MAX) break
+  }
+  return out
+}
+
+/**
+ * 这条会话在侧栏里叫什么。
+ *
+ * 优先用户起的名字；没有就拿 preview 的**第一行**——它是整段提问，
+ * 里面常常有换行和代码块，整段塞进一行标题里只会看到一堆反引号。
+ */
+function titleOf(row: WireThreadRow): string {
+  const named = (row.name ?? "").trim()
+  if (named !== "") return named
+  const first = (row.preview ?? "").split("\n").find((l) => l.trim() !== "")?.trim() ?? ""
+  if (first === "") return "（没有标题）"
+  return first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX)}…` : first
+}
+
+/** 登录的账号。实测形状：`{account:{type,email,planType}}`，登出时 `account` 是 null。 */
+export function toAccount(raw: unknown): EngineAccount | undefined {
+  const account = (raw as { account?: { email?: string | null; planType?: string | null } | null } | undefined)?.account
+  const label = (account?.email ?? "").trim()
+  if (label === "") return undefined
+  const plan = (account?.planType ?? "").trim()
+  return { label, ...(plan === "" ? {} : { plan }) }
 }

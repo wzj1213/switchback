@@ -231,6 +231,15 @@ const HANDLERS: Handlers = {
     limits: { ...state.limits, [event.engine]: event.limits },
   }),
   "engine.status": onEngineStatus,
+  // 两者都是「整份替换」：引擎报一次就是当前全貌，不是增量
+  "engine.history": (state, event) => ({
+    ...state,
+    engineThreads: { ...state.engineThreads, [event.engine]: event.threads },
+  }),
+  "account.updated": (state, event) => ({
+    ...state,
+    accounts: { ...state.accounts, [event.engine]: event.account },
+  }),
 }
 
 /**

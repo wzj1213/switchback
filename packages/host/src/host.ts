@@ -2,7 +2,7 @@ import type { Command, Event, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
 import { clearQueue, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
-import { create, remove, rename, resume, setModel, setTrust } from "./session.js"
+import { adopt, create, remove, rename, resume, setModel, setTrust } from "./session.js"
 import { fork, handoff, rewind } from "./branch.js"
 import { prompt } from "./prompt.js"
 
@@ -48,6 +48,7 @@ type Handlers = {
 
 const HANDLERS: Handlers = {
   "thread.create": create,
+  "thread.adopt": adopt,
   "thread.prompt": prompt,
   "thread.setTrust": setTrust,
   "thread.rename": rename,

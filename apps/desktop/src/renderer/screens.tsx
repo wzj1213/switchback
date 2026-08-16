@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
-import type { Command, EngineInfo, Thread } from "@omni/protocol"
+import type { Command, EngineInfo, EngineThread, Thread } from "@omni/protocol"
 import { itemsOf, turnOf, type Notice as StoreNotice, type ThreadRow, type ViewState } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
+import type { AccountLine } from "./components/AccountRow.js"
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
@@ -74,6 +75,9 @@ export function SidebarPane({
   onSetIcon,
   onTogglePin,
   onOpenSettings,
+  foreign,
+  onAdopt,
+  account,
   send,
 }: {
   rows: readonly ThreadRow[]
@@ -92,11 +96,19 @@ export function SidebarPane({
   onSetIcon: (cwd: string, icon: string) => void
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
+  /** 引擎自己存着的会话。 */
+  foreign: readonly EngineThread[]
+  onAdopt: (item: EngineThread) => void
+  /** 底部那一行：登录的是谁、还剩多少额度。 */
+  account?: AccountLine
   send: (command: Command) => void
 }): React.JSX.Element {
   return (
     <Sidebar
       rows={rows}
+      foreign={foreign}
+      onAdopt={onAdopt}
+      {...(account === undefined ? {} : { account })}
       selectedId={thread?.id ?? ""}
       onSelect={onSelect}
       onNew={onNew}

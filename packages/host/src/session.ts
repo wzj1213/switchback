@@ -95,6 +95,23 @@ export async function launch(
   // 界面只看它，不看引擎叫什么名字
   live.thread = { ...live.thread, capabilities: session.capabilities() }
   ctx.live.set(thread.id, live)
+  askCatalogs(ctx, thread, session)
+  return early.handle
+}
+
+/**
+ * 握手完向引擎要的那几份清单：能选哪些模型、认哪些斜杠命令、
+ * 它自己存着哪些会话、登录的是哪个账号。
+ *
+ * **四件事各问各的、各自失败各自算**，一件都不 await。理由是同一条：
+ * 它们全都是锦上添花，而 `launch` 返回意味着「这个会话可以用了」——
+ * 让一份清单拖着会话起不来，是拿主线换支线。
+ * 拿不到就是拿不到，界面据此少画一块，不报错。
+ *
+ * **绝不写死任何一份**：模型由账号与配置决定，斜杠命令里大半是用户自己装的技能，
+ * 会话清单更是随时在变。写死的表第二天就过期，而且过期了不报错。
+ */
+function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
   // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
   // omni 写死一份清单迟早会和实际能用的对不上。
   void session
@@ -115,7 +132,24 @@ export async function launch(
       }
     })
     .catch(() => undefined)
-  return early.handle
+  // 引擎自己存着的会话、以及它登录的账号。**各自失败各自算**——
+  // 和模型、命令一样，一样拿不到不该连累另一样
+  void session
+    .history?.()
+    .then((threads) => {
+      if (threads.length > 0) {
+        emit(ctx, { type: "engine.history", at: ctx.deps.now(), engine: thread.engine, threads })
+      }
+    })
+    .catch(() => undefined)
+  void session
+    .account?.()
+    .then((account) => {
+      if (account !== undefined) {
+        emit(ctx, { type: "account.updated", at: ctx.deps.now(), engine: thread.engine, account })
+      }
+    })
+    .catch(() => undefined)
 }
 
 /**
@@ -262,4 +296,53 @@ export async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.del
   }
   await ctx.deps.journal?.remove(cmd.threadId)
   emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: cmd.threadId })
+}
+
+/**
+ * 把**引擎自己存的**一条会话接过来，在 omni 里接着聊。
+ *
+ * ## 和 `resume` 的区别
+ *
+ * `resume` 接的是 omni 建过、日志在自己这儿的会话：内容都在，接上引擎就完事。
+ * 这里接的是 omni **从来不知道存在**的会话——你在终端里、在别的界面里跑的。
+ * 所以工作区、标题都得从引擎的列表里带过来，omni 这边是从零开一条记录。
+ *
+ * ## transcript 会是空的，而且必须说出来
+ *
+ * codex 的 `thread/items/list` 目前明确回 `not supported yet`（实测），
+ * 所以历史内容**取不回来**。引擎那边记得一切，omni 这边一片空白。
+ * 这正是分叉那次特意避免的「看起来丢了但其实没丢」——那次能抄所以抄了，
+ * 这次抄不了，就只能在界面上讲清楚（`adopted` 标记，空态里说明）。
+ * 假装什么都没发生是最坏的选择。
+ */
+export async function adopt(ctx: Ctx, cmd: Extract<Command, { type: "thread.adopt" }>): Promise<void> {
+  const at = ctx.deps.now()
+  const thread: Thread = {
+    id: ctx.deps.newId("th"),
+    title: cmd.title,
+    cwd: cmd.cwd,
+    engine: cmd.engine,
+    // 接过来的会话沿用默认档，不猜它当初在引擎里是什么档——
+    // 猜错的方向如果是放宽，代价是它在一个你没同意的档位上动手
+    trust: "auto-edit",
+    status: "starting",
+    createdAt: at,
+    updatedAt: at,
+    engineHistory: [cmd.engine],
+    engineHandle: cmd.handle,
+    adopted: true,
+  }
+  emit(ctx, { type: "thread.started", at, thread })
+  try {
+    await launch(ctx, thread, cmd.handle)
+  } catch (error) {
+    // 接不上就撤掉：留一个永远 starting 的空壳比没有更糟
+    emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
+    throw error
+  }
+  emit(ctx, {
+    type: "thread.updated",
+    at: ctx.deps.now(),
+    thread: { ...(ctx.live.get(thread.id)?.thread ?? thread), status: "idle" },
+  })
 }

@@ -1,4 +1,4 @@
-import type { EngineCapabilities, EngineId, Event, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineId, EngineThread, Event, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
 
@@ -152,6 +152,15 @@ export interface EngineSession {
    * `thread/compact/start`，但它不在 `skills/list` 里，所以必须由这里补。
    */
   compact?: () => Promise<void>
+  /**
+   * 引擎自己存着哪些会话（你在终端、在别的界面里跑过的）。
+   *
+   * **不支持就别实现**——界面据此不显示那一段，不报错。
+   * 顺序由驱动定（最近活动在前），omni 原样用。
+   */
+  history?: () => Promise<readonly EngineThread[]>
+  /** 登录的是哪个账号。拿不到给 undefined，界面据此不画。 */
+  account?: () => Promise<EngineAccount | undefined>
   /**
    * 这家引擎能做什么。**握手完成后由宿主问一次**，挂到会话上给界面用。
    *

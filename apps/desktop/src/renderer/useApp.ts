@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react"
-import { itemsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
+import { accountOf, engineThreadsOf, itemsOf, limitsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
 import type { Item } from "@omni/protocol"
-import type { Command, Thread } from "@omni/protocol"
+import type { Command, EngineAccount, EngineThread, RateLimits, Thread } from "@omni/protocol"
 import { useOmni } from "./useOmni.js"
 import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
+import type { AccountLine } from "./components/AccountRow.js"
 import { useWorkspaceActions } from "./useWorkspaceActions.js"
 
 /**
@@ -39,6 +40,12 @@ export interface AppApi {
   /** 侧栏「新建会话」：有当前会话就用它的目录，没有就先问路径。 */
   newHere: () => void
   itemsOf: (threadId: string) => readonly Item[]
+  /** 引擎自己存着的会话（你在终端、别处跑过的）。 */
+  foreign: readonly EngineThread[]
+  /** 把引擎那边的一条会话接过来，接完跳过去。 */
+  adopt: (item: EngineThread) => void
+  /** 底部那一行：登录的是谁、还剩多少额度。 */
+  account: AccountLine | undefined
 }
 
 export function useApp(): AppApi {
@@ -134,5 +141,52 @@ export function useApp(): AppApi {
       else open(thread.cwd)
     },
     itemsOf: (threadId) => itemsOf(omni.state, threadId),
+    // 目前只有 codex 报得出这两样。写死引擎名是暂时的：**第二家能报的时候，
+    // 这里要改成按引擎聚合**，而不是再加一个 `if`
+    foreign: engineThreadsOf(omni.state, "codex"),
+    adopt: (item) => {
+      // 和新建走同一条「记下序号、等 thread.started」的路（见上面那段注释），
+      // 接完自动跳过去——不跳的话人得自己去侧栏里找它，
+      // 而它刚从「codex 历史」那一段里消失
+      awaited.current = omni.lastStarted?.seq ?? 0
+      omni.send({
+        type: "thread.adopt",
+        engine: "codex",
+        handle: item.handle,
+        cwd: item.cwd,
+        title: item.title,
+      })
+    },
+    account: accountLineOf(accountOf(omni.state, "codex"), limitsOf(omni.state, "codex")),
   }
+}
+
+/**
+ * 账号 + 额度 → 底部那一行。
+ *
+ * **剩余百分比拿「更紧的那个窗口」算**，和顶栏的警报同一个判据
+ *（见 `limits.ts` 的 `urgent`）：周用了 40%、5 小时用了 95% 的时候，
+ * 说「剩余 60%」是误导——五小时那个窗口才是马上要撞的墙。
+ *
+ * 额度报不上来就**不显示百分比**，不是显示 100%——那是撒谎。
+ */
+function accountLineOf(
+  account: EngineAccount | undefined,
+  limits: RateLimits | undefined,
+): AccountLine | undefined {
+  if (account === undefined) return undefined
+  const used = tightest(limits)
+  return {
+    label: account.label,
+    ...(account.plan === undefined ? {} : { plan: account.plan }),
+    ...(used === undefined ? {} : { remain: Math.max(0, 100 - Math.round(used)) }),
+  }
+}
+
+/** 两个窗口里用得更满的那个。都没有就 undefined。 */
+function tightest(limits: RateLimits | undefined): number | undefined {
+  const values = [limits?.primary?.usedPercent, limits?.secondary?.usedPercent].filter(
+    (v): v is number => typeof v === "number",
+  )
+  return values.length === 0 ? undefined : Math.max(...values)
 }

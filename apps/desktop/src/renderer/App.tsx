@@ -34,6 +34,9 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       icons={prefs.settings.projectIcons}
       onSetIcon={prefs.setIcon}
       onTogglePin={prefs.togglePin}
+      foreign={app.foreign}
+      onAdopt={app.adopt}
+      {...(app.account === undefined ? {} : { account: app.account })}
       onOpenSettings={() => {
         shell.setSettingsOpen(true)
       }}

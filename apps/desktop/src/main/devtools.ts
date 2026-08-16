@@ -11,6 +11,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_CWD` | 默认会话开在哪个目录，默认 `process.cwd()` |
  * | `OMNI_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
  * | `OMNI_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
+ * | `OMNI_DEV_MODEL` | `<模型>[:<强度>]`，默认会话用这个模型跑 |
  * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
  * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
@@ -86,6 +87,25 @@ const TRUSTS = new Set<Trust>(["read-only", "auto-edit", "full"])
 export function devTrust(): Trust {
   const value = process.env["OMNI_DEV_TRUST"]
   return value !== undefined && TRUSTS.has(value as Trust) ? (value as Trust) : "auto-edit"
+}
+
+/**
+ * 默认会话用哪个模型跑。
+ *
+ * 加这个口子是被逼的：验证任何「引擎真的做了什么」的事都要跑一轮真的，
+ * 而账号主额度用满时**每一轮都失败**，验证就整个停摆。
+ * 换一个还有配额的模型就能继续。
+ *
+ * 顺带也验了换模型这条路本身。格式 `<模型>[:<强度>]`——强度要能一起给，
+ * 因为**不是每个模型都支持每一档**：实测把 `max` 发给 spark 直接整轮失败
+ *（`Unsupported value: 'max' is not supported with the ... model`）。
+ */
+export function devModel(): { model: string; effort?: string } | undefined {
+  const spec = process.env["OMNI_DEV_MODEL"]
+  if (spec === undefined || spec === "") return undefined
+  const [model, effort] = spec.split(":")
+  if (model === undefined || model === "") return undefined
+  return { model, ...(effort === undefined || effort === "" ? {} : { effort }) }
 }
 
 /** 续跑只能靠点按钮触发，自动化验证需要一个口子。 */

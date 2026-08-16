@@ -1354,3 +1354,50 @@ body {
   gap: var(--sp-2);
   margin-top: 5px;
 }
+
+/* ── 底部账号行 ─────────────────────────────────────
+ * 常驻，不像顶栏那枚额度 pill 只在快满时出现——这一行说的是「你是谁」，
+ * 不是警报，所以它不该闪也不该跳。
+ */
+.row--account {
+  cursor: default;
+  color: var(--text-muted);
+}
+
+.row--account:hover {
+  background: transparent;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 剩余额度贴右。快见底时标黄——**不标红**：红是「已经出事了」，
+   而这只是「快了」，顶栏那枚警报才是出事时的那一个 */
+.row__aside--warn {
+  color: var(--warn);
+}
+
+/* 接过来的会话，空态里那句说明。**比标题窄**：它是一段要读的话，
+   不是一行标语，太宽了眼睛要横跳 */
+.blank__note {
+  max-width: 30em;
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: left;
+}

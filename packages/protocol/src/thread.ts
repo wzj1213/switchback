@@ -98,6 +98,14 @@ export interface Thread {
    * 缺省视作 `"project"`，老记录回放行为不变，不需要迁移。
    */
   workspaceKind?: "project" | "chat"
+  /**
+   * 这条会话是**从引擎那边接过来的**，不是 omni 建的。
+   *
+   * 界面靠它说清楚一件事：前面的内容在引擎那边，omni 这里没有记录。
+   * 不标的话，用户打开看到一片空白，会以为上下文丢了——
+   * 而它其实什么都记得。**「看起来丢了但其实没丢」比真丢了更难受。**
+   */
+  adopted?: boolean
 }
 
 export type TurnStatus = "running" | "completed" | "interrupted" | "failed"
@@ -154,4 +162,38 @@ export interface SlashCommand {
    * 报不上来就缺席，界面据此什么都不画。
    */
   scope?: "user" | "project" | "system"
+}
+
+/**
+ * **引擎自己存的一条会话**——不是 omni 建的。
+ *
+ * codex 在终端里、在 ChatGPT.app 里跑过的对话都躺在它自己的记录里
+ *（`thread/list`，这台机器上 25 条）。omni 的定位是「统一各家原生 agent」，
+ * 那么「你在别处跑的那些」本来就该看得见、接得上。
+ *
+ * **只带得动列表，带不动内容**：codex 的 `thread/items/list` 目前明确回
+ * `not supported yet`（实测）。所以接过来的会话在 omni 这边 transcript 是空的，
+ * 而引擎那边记得一切——这个落差必须在界面上说出来，不能让人以为内容丢了。
+ */
+export interface EngineThread {
+  /** 引擎侧句柄。omni 靠它把这条会话接过来续跑。 */
+  handle: string
+  title: string
+  /** 它当初开在哪个目录。接过来时沿用，不然工作区边界就错了。 */
+  cwd: string
+  /** 最后活动时间（毫秒）。 */
+  updatedAt: number
+}
+
+/**
+ * 引擎登录的是哪个账号。
+ *
+ * 摆出来是因为**它决定了额度算在谁头上**——一台机器上换过号的人，
+ * 「剩余 12%」是谁的 12% 是个真问题。
+ */
+export interface EngineAccount {
+  /** 给人看的：邮箱或用户名。 */
+  label: string
+  /** 套餐（实测 codex 报 `prolite`）。报不上来就缺席。 */
+  plan?: string
 }

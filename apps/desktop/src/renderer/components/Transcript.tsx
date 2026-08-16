@@ -32,9 +32,19 @@ function Blank({ thread }: { thread: Thread }): React.JSX.Element {
         </svg>
       </div>
       <p className="blank__title">
-        在 <strong>{thread.title}</strong> 里做点什么？
+        {thread.adopted === true ? "接着聊就行" : <>在 <strong>{thread.title}</strong> 里做点什么？</>}
       </p>
       <p className="blank__path">{thread.cwd}</p>
+      {/* **这条必须说清楚。** 接过来的会话在 omni 这边是空的，而引擎那边
+          什么都记得（codex 的 `thread/items/list` 目前回 not supported yet，
+          历史内容取不回来）。不说的话，人打开看到一片空白会以为上下文丢了，
+          于是把已经说过的话再说一遍——「看起来丢了但其实没丢」比真丢了更难受 */}
+      {thread.adopted === true ? (
+        <p className="blank__note">
+          这条是在 codex 里开的。<strong>前面聊过什么它都记得</strong>，
+          只是那些内容存在引擎那边，omni 这里搬不过来，所以上面是空的。
+        </p>
+      ) : null}
     </div>
   )
 }

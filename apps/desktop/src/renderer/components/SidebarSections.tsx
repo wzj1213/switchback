@@ -1,9 +1,11 @@
 import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
+import type { EngineThread } from "@omni/protocol"
 import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { Row } from "./SidebarRows.js"
+import { ForeignSection } from "./ForeignRow.js"
 import { GroupBlock } from "./SidebarGroup.js"
 import type { RenameCtl } from "./RowName.js"
 
@@ -78,6 +80,13 @@ export interface GroupHandlers {
   onNewIn: (cwd: string) => void
   /** 各项目设过的图标：路径 → emoji。 */
   icons: Readonly<Record<string, string>>
+  /**
+   * 引擎自己存着的会话（你在终端、别的界面里跑过的）。
+   * 空数组时那一段仍然渲染段头——「这里能放什么」得让还不知道的人看得见。
+   */
+  foreign: readonly EngineThread[]
+  /** 把引擎那边的一条会话接过来，在 omni 里接着聊。 */
+  onAdopt: (item: EngineThread) => void
 }
 
 function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
@@ -167,8 +176,18 @@ function Chats({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers }):
   )
 }
 
+/**
+ * 「codex 历史」**默认折叠**。
+ *
+ * 它装的是你在别处跑的会话，这台机器上有 25 条——展开着的话，
+ * 侧栏一打开就被一段你没在 omni 里建过的东西占满，
+ * 而你八成是来找自己那几条的。要看的时候点开就是。
+ */
+const SHUT_BY_DEFAULT: readonly string[] = ["hist"]
+
+
 export function SectionList({ sections, on }: { sections: Sections; on: GroupHandlers }): React.JSX.Element {
-  const [shut, setShut] = useState<ReadonlySet<string>>(new Set())
+  const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set(SHUT_BY_DEFAULT))
   const toggle = (key: string): void => {
     setShut((prev) => {
       const next = new Set(prev)
@@ -227,6 +246,8 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
           <Chats rows={sections.chats} on={on} />
         )
       ) : null}
+
+      <ForeignSection open={open("hist")} onToggle={() => { toggle("hist") }} on={on} />
     </>
   )
 }

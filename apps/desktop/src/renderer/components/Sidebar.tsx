@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
+import type { EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
 import { sectionsOf } from "../sidebar.js"
 import { GearIcon } from "./icons.js"
+import { AccountRow, type AccountLine } from "./AccountRow.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
@@ -55,6 +57,12 @@ interface Props {
   icons: Readonly<Record<string, string>>
   /** 给项目设图标；传空字符串表示清掉。 */
   onSetIcon: (cwd: string, icon: string) => void
+  /** 引擎自己存着的会话（你在终端、别处跑过的）。 */
+  foreign: readonly EngineThread[]
+  /** 把引擎那边的一条会话接过来。 */
+  onAdopt: (item: EngineThread) => void
+  /** 引擎登录的账号 + 额度，画在底部那一行。没有就不画。 */
+  account?: AccountLine
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
   /** 变一次就把当前会话切进改名态。`/rename` 命令走这条路。 */
@@ -85,6 +93,9 @@ export function Sidebar({
   pinned,
   icons,
   onSetIcon,
+  foreign,
+  onAdopt,
+  account,
   onTogglePin,
   onOpenSettings,
   onNewChat,
@@ -169,10 +180,15 @@ export function Sidebar({
               icons,
               rename,
               onGroupMenu: groupMenu,
+              foreign,
+              onAdopt,
             }}
           />
         )}
       </div>
+      {/* 账号在设置**上面**：它是「你是谁」，设置是「去改点什么」。
+          最底下那一行是手最容易够到的位置，留给天天点的那个 */}
+      {account === undefined ? null : <AccountRow account={account} />}
       <button type="button" className="row row--foot" onClick={onOpenSettings}>
         <span className="row__slot">
           <GearIcon size={SIDEBAR_ICON} />

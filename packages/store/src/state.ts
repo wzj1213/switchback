@@ -1,4 +1,4 @@
-import type { EngineInfo, Item, ItemId, ModelOption, RateLimits, SlashCommand, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
+import type { EngineAccount, EngineInfo, EngineThread, Item, ItemId, ModelOption, RateLimits, SlashCommand, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -21,6 +21,16 @@ export interface ViewState {
   engines: readonly EngineInfo[]
   /** 引擎层面的故障。最新在后。 */
   notices: readonly Notice[]
+  /**
+   * 引擎自己存着的会话（你在终端、别的界面里跑过的）。按引擎分。
+   *
+   * **和 `threads` 分开存**：那些是 omni 建的、有完整记录的；这些只有一行标题，
+   * 内容还在引擎那边。混进同一张表的话，界面就分不出「这条我有记录」和
+   * 「这条只是听说过」，而这两者能做的事完全不同。
+   */
+  engineThreads: Readonly<Record<string, readonly EngineThread[]>>
+  /** 各家引擎登录的账号。额度算在谁头上，看这个。 */
+  accounts: Readonly<Record<string, EngineAccount>>
   /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
   noticeSeq: number
   /** 每个会话能用的斜杠命令。引擎报什么就是什么，omni 自己那几条在渲染层拼。 */
@@ -66,6 +76,8 @@ export function initial(): ViewState {
     limits: {},
     engines: [],
     notices: [],
+    engineThreads: {},
+    accounts: {},
     noticeSeq: 0,
   }
 }
@@ -158,4 +170,17 @@ export function threadRowsOf(state: ViewState): readonly ThreadRow[] {
  */
 export function clearNotices(state: ViewState): ViewState {
   return state.notices.length === 0 ? state : { ...state, notices: [] }
+}
+
+/**
+ * 引擎自己存着的那些会话。**omni 没有它们的记录**，只有一行标题。
+ * 界面据此单独成段——和 omni 建的会话混在一起会让人以为点开就能看见内容。
+ */
+export function engineThreadsOf(state: ViewState, engine: string): readonly EngineThread[] {
+  return state.engineThreads[engine] ?? []
+}
+
+/** 某家引擎登录的账号。没报过就是 undefined，界面据此什么都不画。 */
+export function accountOf(state: ViewState, engine: string): EngineAccount | undefined {
+  return state.accounts[engine]
 }

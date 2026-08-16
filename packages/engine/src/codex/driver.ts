@@ -1,10 +1,10 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineCapabilities, EngineStatus, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineStatus, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
-import { skillsToCommands, toModelOption, type WireModel } from "./catalog.js"
+import { skillsToCommands, toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { reportAccount } from "./account.js"
 import { answerApproval } from "./approve.js"
@@ -346,6 +346,24 @@ class CodexSession implements EngineSession {
     const raw = await this.rpc.call("model/list", {}).catch(() => undefined)
     const list = (raw as { data?: readonly WireModel[] } | undefined)?.data ?? []
     return list.filter((m) => m.hidden !== true).map(toModelOption)
+  }
+
+  /**
+   * codex 自己存着哪些会话。
+   *
+   * **只取得到列表，取不到内容**：`thread/items/list` 目前明确回
+   * `not supported yet`（实测）。所以这些会话接过来之后 omni 这边是空的，
+   * 而引擎那边记得一切——界面必须把这个落差说出来。
+   */
+  async history(): Promise<readonly EngineThread[]> {
+    const raw = await this.rpc.call("thread/list", {}).catch(() => undefined)
+    return toEngineThreads(raw)
+  }
+
+  /** 登录的是哪个账号。额度算在谁头上，看这个。 */
+  async account(): Promise<EngineAccount | undefined> {
+    const raw = await this.rpc.call("account/read", {}).catch(() => undefined)
+    return toAccount(raw)
   }
 
   /** 能用哪些斜杠命令。翻译在 `catalog.ts`——那是**形状转换**，不是协议调用。 */
