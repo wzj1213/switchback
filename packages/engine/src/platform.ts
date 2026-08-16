@@ -113,3 +113,80 @@ function windowsTree(): TreeControl {
 }
 
 export const tree: TreeControl = isWindows ? windowsTree() : posixTree()
+
+/**
+ * 从登录 shell 里问出真正的 PATH。
+ *
+ * ## 为什么非做不可
+ *
+ * macOS 上从 Dock/Finder 启动的进程，PATH 恒为
+ * `/usr/bin:/bin:/usr/sbin:/sbin`——`launchctl getenv PATH` 是空的，
+ * 图形进程根本不经过 shell 的 rc 文件。而 codex 装在 `/opt/homebrew/bin`，
+ * ACP 引擎多半在 `~/.local/bin` 或 npm 的全局目录。
+ *
+ * 于是：`pnpm dev` 里一切正常（终端启动，PATH 是全的），**装出来的包一开就找不到引擎**，
+ * 而这正好是唯一有真实用户的那条路。
+ *
+ * ## 为什么光有绝对路径不够
+ *
+ * 就算用户在 engines.json 里写死 `/opt/homebrew/bin/codex` 也照样挂：
+ * 那是个 `#!/usr/bin/env node` 脚本，spawn **成功**、子进程立刻以 127 退出，
+ * 报错是 `env: node: No such file or directory`——既不提 PATH 也不提 codex，
+ * 比 ENOENT 更难查。**PATH 是给解释器用的，不只是给可执行文件用的。**
+ *
+ * ## 为什么用哨兵包起来
+ *
+ * 交互式登录 shell 会把 rc 文件里的东西一起打出来（nvm 的提示、fortune、
+ * 各种 `echo`）。取最后一行不可靠——有人的 rc 结尾就打空行。
+ * 用哨兵夹住，从输出里精确抠出来。
+ */
+const SENTINEL = { start: "__OMNI_PATH__", end: "__OMNI_END__" }
+
+/** 问不到时至少把这几个常见位置垫上。装引擎的地方就那么几处。 */
+const COMMON = ["/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin", "~/.bun/bin", "~/.cargo/bin"]
+
+export interface LoginPathDeps {
+  shell: string | undefined
+  home: string | undefined
+  platform: string
+  run: (cmd: string, args: readonly string[], timeoutMs: number) => Promise<string | undefined>
+}
+
+/**
+ * @returns 补齐后的 PATH。**永远不返回比传入更窄的东西**——问 shell 失败时
+ *   退回「原样 + 常见位置」，而不是把用户原有的 PATH 换掉。
+ */
+export async function resolveLoginPath(current: string, deps: LoginPathDeps): Promise<string> {
+  // Windows 的 GUI 进程正常继承用户环境变量，没有这个问题；跑一次 shell 反而是纯风险
+  if (deps.platform === "win32") return current
+  const shell = deps.shell ?? "/bin/zsh"
+  const script = `printf '%s%s%s' '${SENTINEL.start}' "$PATH" '${SENTINEL.end}'`
+  const out = await deps.run(shell, ["-ilc", script], 3000).catch(() => undefined)
+  const asked = out === undefined ? undefined : between(out, SENTINEL.start, SENTINEL.end)
+  const home = deps.home
+  const extras = COMMON.map((p) => (p.startsWith("~/") && home !== undefined ? `${home}/${p.slice(2)}` : p))
+  return merge([asked, current, extras.join(":")])
+}
+
+function between(text: string, start: string, end: string): string | undefined {
+  const a = text.indexOf(start)
+  if (a === -1) return undefined
+  const b = text.indexOf(end, a + start.length)
+  if (b === -1) return undefined
+  const value = text.slice(a + start.length, b).trim()
+  return value === "" ? undefined : value
+}
+
+/** 按先后顺序合并几段 PATH，**保持先来的优先**并去重。 */
+function merge(parts: readonly (string | undefined)[]): string {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of parts) {
+    for (const dir of (part ?? "").split(":")) {
+      if (dir === "" || seen.has(dir)) continue
+      seen.add(dir)
+      out.push(dir)
+    }
+  }
+  return out.join(":")
+}

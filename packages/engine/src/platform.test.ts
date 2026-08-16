@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process"
 import { promisify } from "node:util"
 import { describe, expect, it } from "vitest"
-import { isWindows, lookupCommand, tree } from "./platform.js"
+import { isWindows, lookupCommand, resolveLoginPath, tree, type LoginPathDeps } from "./platform.js"
 
 const run = promisify(execFile)
 
@@ -43,5 +43,46 @@ describe("平台适配", () => {
   it("不存在的 pid 报死，不抛", () => {
     // 2^22 之外，任何系统上都不会有这个 pid
     expect(tree.alive(4_194_303)).toBe(false)
+  })
+})
+
+describe("从登录 shell 问 PATH", () => {
+  const base = "/usr/bin:/bin"
+  const deps = (out: string | undefined, platform = "darwin"): LoginPathDeps => ({
+    shell: "/bin/zsh",
+    home: "/Users/dev",
+    platform,
+    run: () => Promise.resolve(out),
+  })
+
+  it("从哨兵之间抠出 PATH", async () => {
+    const got = await resolveLoginPath(base, deps("__OMNI_PATH__/opt/homebrew/bin:/usr/bin__OMNI_END__"))
+    expect(got.split(":")).toContain("/opt/homebrew/bin")
+  })
+
+  it("**rc 文件的噪声不影响**——取最后一行不可靠，有人的 rc 结尾就打空行", async () => {
+    const noisy = "nvm: 已加载\n今日运势：吉\n__OMNI_PATH__/opt/homebrew/bin__OMNI_END__\n"
+    expect((await resolveLoginPath(base, deps(noisy))).split(":")).toContain("/opt/homebrew/bin")
+  })
+
+  it("问不到时**不能比原来窄**：原 PATH 一个不少，再垫上常见位置", async () => {
+    const got = (await resolveLoginPath(base, deps(undefined))).split(":")
+    expect(got).toContain("/usr/bin")
+    expect(got).toContain("/bin")
+    expect(got).toContain("/opt/homebrew/bin")
+    expect(got).toContain("/Users/dev/.local/bin")
+  })
+
+  it("`~` 按传入的 home 展开，不读环境变量", async () => {
+    expect((await resolveLoginPath(base, deps(undefined))).split(":")).toContain("/Users/dev/.bun/bin")
+  })
+
+  it("去重且保持先来的优先", async () => {
+    const got = await resolveLoginPath("/a:/b", deps("__OMNI_PATH__/b:/c__OMNI_END__"))
+    expect(got.split(":").slice(0, 3)).toEqual(["/b", "/c", "/a"])
+  })
+
+  it("**Windows 原样返回**：那边 GUI 进程正常继承环境变量，跑一次 shell 是纯风险", async () => {
+    expect(await resolveLoginPath("C:\\bin", deps("__OMNI_PATH__/nope__OMNI_END__", "win32"))).toBe("C:\\bin")
   })
 })

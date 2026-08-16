@@ -1,6 +1,7 @@
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
+import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
@@ -224,6 +225,9 @@ if (!claimSingleInstance()) {
 
 function bootstrap(): Promise<void> {
   return app.whenReady().then(async () => {
+    // **第一件事**：把 PATH 补成登录 shell 那一份。探测引擎、spawn 引擎都要用，
+    // 而从 Dock 启动时它默认只有 `/usr/bin:/bin:/usr/sbin:/sbin`
+    await fixPath(log)
     installSettingsChannel(settings)
     installAppChannels()
     installWorksiteChannel()
