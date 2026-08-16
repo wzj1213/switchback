@@ -867,3 +867,31 @@ describe("改名", () => {
     expect(host.live().find((t) => t.id === id)?.title).toBe("新名字")
   })
 })
+
+describe("中断之后审批卡不能还挂着", () => {
+  it("**中断时把待确认的审批落定**——否则事后点「允许」会写进永久规则，而那次调用早作废了", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "跑一下" })
+    const pending = session().ask(ask)
+    await new Promise((r) => setTimeout(r, 0))
+    await host.dispatch({ type: "thread.interrupt", threadId: id })
+    const turnId = events.find((e) => e.type === "turn.started")?.turn.id ?? ""
+    session().emit({ type: "turn.completed", at: 1, turnId, status: "interrupted" })
+    await new Promise((r) => setTimeout(r, 0))
+    // 挂着的那次审批必须已经落定（按拒绝），驱动不会永远等在 canUseTool 里
+    await expect(pending).resolves.toMatchObject({ allow: false })
+  })
+
+  it("正常跑完不动审批卡——那时候没有挂着的，扫一遍也不该有副作用", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "跑一下" })
+    const turnId = events.find((e) => e.type === "turn.started")?.turn.id ?? ""
+    session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(host.live().find((t) => t.id === id)?.status).toBe("idle")
+  })
+})

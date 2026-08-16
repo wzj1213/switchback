@@ -134,6 +134,16 @@ export function observe(ctx: Ctx, event: Event): void {
   for (const entry of ctx.live.values()) {
     if (entry.turn !== event.turnId) continue
     entry.turn = undefined
+    // **这一轮没跑完就结束的，把还挂着的审批卡一并落定。**
+    //
+    // 中断之后轮次回到 idle，而审批卡会停在「待确认」且三个按钮都还能点。
+    // 过一会儿用户点「允许」+「本项目始终允许」，卡片翻成「已允许」——
+    // journal 里永久落盘 `status=allowed`，**重启回放之后这次中断读起来
+    // 像是「用户批准并执行了」**，而那次调用早随中断作废了。
+    // 顺带还能在一个已经死掉的上下文里被诱导授出一条永久规则。
+    //
+    // 工具行那边早有 `sweepInflight` 扫尾，审批卡漏扫了。
+    if (event.status !== "completed") entry.gate.settleAll()
     setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
     return
   }
