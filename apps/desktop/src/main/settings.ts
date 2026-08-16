@@ -43,7 +43,9 @@ function parse(raw: unknown): Settings {
   const it = raw as Partial<Record<keyof Settings, unknown>>
   return {
     theme: typeof it.theme === "string" && THEMES.has(it.theme) ? (it.theme as ThemeChoice) : DEFAULTS.theme,
-    pinned: Array.isArray(it.pinned) ? it.pinned.filter((x): x is string => typeof x === "string") : DEFAULTS.pinned,
+    pinned: strings(it.pinned) ?? DEFAULTS.pinned,
+    pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
+    threadOrder: order(it.threadOrder),
     defaultEngine: typeof it.defaultEngine === "string" ? it.defaultEngine : DEFAULTS.defaultEngine,
     defaultTrust:
       typeof it.defaultTrust === "string" && TRUSTS.has(it.defaultTrust)
@@ -51,6 +53,28 @@ function parse(raw: unknown): Settings {
         : DEFAULTS.defaultTrust,
     projectIcons: icons(it.projectIcons),
   }
+}
+
+/** 一串字符串。不是数组、或者混进了别的类型，就当没有。 */
+function strings(raw: unknown): readonly string[] | undefined {
+  return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : undefined
+}
+
+/**
+ * 每个项目内会话的手动顺序：路径 → 会话 id 数组。
+ *
+ * 偏好文件是可以手改的，所以这里一样要过滤。**空数组的项直接丢掉**：
+ * 「这个项目排过序，但顺序是空的」没有意义，留着只会让排序逻辑多一个分支。
+ */
+function order(raw: unknown): Record<string, readonly string[]> {
+  if (typeof raw !== "object" || raw === null) return {}
+  const out: Record<string, readonly string[]> = {}
+  for (const [cwd, ids] of Object.entries(raw as Record<string, unknown>)) {
+    const list = strings(ids)
+    if (list === undefined || list.length === 0) continue
+    out[cwd] = list
+  }
+  return out
 }
 
 /**

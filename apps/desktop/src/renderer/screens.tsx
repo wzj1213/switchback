@@ -71,6 +71,10 @@ export function SidebarPane({
   onReveal,
   onCopy,
   pinned,
+  pinnedThreads,
+  threadOrder,
+  onReorder,
+  onPinThread,
   icons,
   onSetIcon,
   onTogglePin,
@@ -92,6 +96,12 @@ export function SidebarPane({
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   pinned: readonly string[]
+  /** 已置顶的会话 id。 */
+  pinnedThreads: readonly string[]
+  /** 各项目内会话的手动顺序。 */
+  threadOrder: Readonly<Record<string, readonly string[]>>
+  onReorder: (cwd: string, ids: readonly string[]) => void
+  onPinThread: (id: string, pin: boolean) => void
   icons: Readonly<Record<string, string>>
   onSetIcon: (cwd: string, icon: string) => void
   onTogglePin: (cwd: string) => void
@@ -108,6 +118,10 @@ export function SidebarPane({
       rows={rows}
       foreign={foreign}
       onAdopt={onAdopt}
+      pinnedThreads={pinnedThreads}
+      threadOrder={threadOrder}
+      onReorder={onReorder}
+      onPinThread={onPinThread}
       {...(account === undefined ? {} : { account })}
       selectedId={thread?.id ?? ""}
       onSelect={onSelect}

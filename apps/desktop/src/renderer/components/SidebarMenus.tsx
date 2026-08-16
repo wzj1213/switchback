@@ -14,6 +14,10 @@ export interface Acts {
   /** 给项目设图标。空字符串 = 清掉。 */
   onSetIcon?: (cwd: string, icon: string) => void
   pinned: readonly string[]
+  /** 已置顶的**会话** id。菜单据此显示「置顶」还是「取消置顶」。 */
+  pinnedThreads: readonly string[]
+  /** 置顶 / 取消置顶一条会话。 */
+  onPinThread: (id: string, pin: boolean) => void
   onNewIn: (cwd: string) => void
   onTogglePin: (cwd: string) => void
   onReveal: (path: string) => void
@@ -81,7 +85,17 @@ export function useSidebarMenus(
 } {
   return {
     rowMenu: (event, row, arm, ren) => {
+      // 置顶排在最前：它是这个菜单里唯一**改变这条会话在侧栏位置**的动作，
+      // 而拖拽虽然更快，但得先知道能拖——菜单是给还不知道的人准备的
+      const isPinned = acts.pinnedThreads.includes(row.thread.id)
       openMenu(event, [
+        {
+          label: isPinned ? "取消置顶" : "置顶这个会话",
+          icon: <PinIcon />,
+          run: () => {
+            acts.onPinThread(row.thread.id, !isPinned)
+          },
+        },
         { label: "重命名", icon: <PencilIcon />, run: ren },
         ...workspaceCommands(row.thread.cwd, acts),
         { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm },

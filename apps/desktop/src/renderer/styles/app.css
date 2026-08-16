@@ -1462,3 +1462,28 @@ body {
   font-size: 15px;
   line-height: 1;
 }
+
+/* ── 拖动会话 ─────────────────────────────────────────
+ * 三条规则：同项目内随便排、不能跨项目、可以拖到置顶。
+ * 视觉上只需要说清两件事：**我拖的是哪一条**、**会落在哪儿**。
+ */
+.row--dragging {
+  opacity: 0.4;
+}
+
+/* 落点画在**上边缘**，因为放下的语义是「插到这一条前面」。
+   画成整行高亮的话，「前面」还是「后面」就说不清了 */
+.row--dropping {
+  box-shadow: inset 0 2px 0 0 var(--accent, var(--text));
+}
+
+/* 「置顶」整段都是落点——只让段头能放的话，那是一条 24 像素高的线，
+   而拖动时鼠标下面还压着一行，那种精度不该由用户来凑 */
+.sidebar__droppin {
+  border-radius: var(--radius-sm);
+}
+
+.sidebar__droppin--over {
+  background: color-mix(in srgb, var(--accent, var(--text)) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, var(--text)) 35%, transparent);
+}

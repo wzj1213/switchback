@@ -34,6 +34,10 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       icons={prefs.settings.projectIcons}
       onSetIcon={prefs.setIcon}
       onTogglePin={prefs.togglePin}
+      pinnedThreads={prefs.settings.pinnedThreads}
+      threadOrder={prefs.settings.threadOrder}
+      onReorder={prefs.setOrder}
+      onPinThread={prefs.pinThread}
       foreign={app.foreign}
       onAdopt={app.adopt}
       {...(app.account === undefined ? {} : { account: app.account })}

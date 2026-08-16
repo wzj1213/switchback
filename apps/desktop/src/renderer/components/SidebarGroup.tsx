@@ -2,7 +2,7 @@ import type { ThreadRow } from "@omni/store"
 import type { Group } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, PlusIcon, SpinnerIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
-import { Row } from "./SidebarRows.js"
+import { Row, type RowDrag } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
 
 /*
@@ -23,8 +23,11 @@ export function GroupBlock({
   onNewIn,
   icon,
   rename,
+  drag,
 }: {
   group: Group
+  /** 拖动接线。传下去这一组的会话就能互相排序。 */
+  drag?: RowDrag
   collapsed: boolean
   selectedId: string
   onToggle: () => void
@@ -62,6 +65,7 @@ export function GroupBlock({
                 onDelete(row.thread.id)
               }}
               rename={rename}
+              {...(drag === undefined ? {} : { drag })}
               onMenu={(e, arm, ren) => {
                 onRowMenu(e, row, arm, ren)
               }}
@@ -85,6 +89,8 @@ function GroupHead({
   onGroupMenu,
 }: {
   group: Group
+  /** 拖动接线。传下去这一组的会话就能互相排序。 */
+  drag?: RowDrag
   collapsed: boolean
   icon?: string
   onToggle: () => void

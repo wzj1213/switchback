@@ -4,8 +4,9 @@ import type { EngineThread } from "@omni/protocol"
 import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
-import { Row } from "./SidebarRows.js"
+import { Row, type RowDrag } from "./SidebarRows.js"
 import { ForeignSection } from "./ForeignRow.js"
+import { PinnedSection } from "./SidebarPinned.js"
 import { GroupBlock } from "./SidebarGroup.js"
 import type { RenameCtl } from "./RowName.js"
 
@@ -88,6 +89,14 @@ export interface GroupHandlers {
   foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
   /** 把某一家那边的一条会话接过来，在 omni 里接着聊。 */
   onAdopt: (engine: string, item: EngineThread) => void
+  /** 拖动接线。不给就是这次不能拖（筛选结果里就不给）。 */
+  drag?: RowDrag
+  /** 拖到「置顶」那一段上放手。 */
+  onDropPinned?: () => void
+  /** 现在正悬在「置顶」上（画一条高亮）。 */
+  overPinned?: boolean
+  /** 取消置顶一条会话。 */
+  onUnpinThread?: (id: string) => void
 }
 
 function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
@@ -106,6 +115,7 @@ function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers })
           onDelete={on.onDelete}
           onRowMenu={on.onRowMenu}
           onNewIn={on.onNewIn}
+          {...(on.drag === undefined ? {} : { drag: on.drag })}
           icon={on.icons[group.cwd]}
           rename={on.rename}
           onGroupMenu={on.onGroupMenu}
@@ -209,20 +219,14 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
     <>
       {/* **空了也渲染段头。** 原来是空就整段不显示，于是「怎么置顶」这件事
           只有已经会用的人才看得见——而不会用的人恰恰是需要那行提示的人 */}
-      <SectionHead
-        title="置顶"
+      <PinnedSection
+        sections={sections}
+        on={on}
         open={open("pin")}
         onToggle={() => {
           toggle("pin")
         }}
       />
-      {open("pin") ? (
-        sections.pinned.length === 0 ? (
-          <p className="sidebar__empty">右键项目 → 置顶项目，钉住的会排在这里。</p>
-        ) : (
-          <Groups groups={sections.pinned} on={on} />
-        )
-      ) : null}
 
       <SectionHead
         title="项目"

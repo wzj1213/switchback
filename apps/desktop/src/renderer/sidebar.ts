@@ -74,6 +74,11 @@ export const PROJECT_MAX = 6
 export const FOREIGN_MAX = 40
 
 export interface Sections {
+  /**
+   * 置顶的**会话**。和置顶的项目同处「置顶」那一段，但排在项目前面——
+   * 一条被单独钉住的对话，比一整个文件夹更具体，也更可能是你现在要点的。
+   */
+  pinnedThreads: readonly ThreadRow[]
   pinned: readonly Group[]
   projects: readonly Group[]
   /** 不属于任何项目的对话，扁平，最近动过的在前。 */
@@ -106,16 +111,67 @@ export interface Sections {
  * 排在最前的话，它和普通项目长得一样，用户就看不出「这几个是我钉住的」——
  * 于是也想不起来还能取消置顶。分段本身就是那条说明。
  */
-export function sectionsOf(rows: readonly ThreadRow[], pinned: readonly string[]): Sections {
-  const chats = rows.filter((r) => r.thread.workspaceKind === "chat")
-  const inProjects = rows.filter((r) => r.thread.workspaceKind !== "chat")
-  const groups = groupByWorkspace(inProjects)
-  const isPinned = new Set(pinned)
+export interface Pins {
+  /** 置顶的项目路径，按置顶先后。 */
+  projects: readonly string[]
+  /** 置顶的会话 id，按置顶先后。 */
+  threads: readonly string[]
+  /** 项目内会话的手动顺序：路径 → 会话 id。只有拖过的项目才有。 */
+  order: Readonly<Record<string, readonly string[]>>
+}
+
+export function sectionsOf(rows: readonly ThreadRow[], pins: Pins): Sections {
+  // **置顶的会话从别处摘掉。** 一条会话只出现一次是这套界面的硬约束——
+  // 同时出现在两段里的后果是「一个会话同时亮两行、双击改名两个框一起进编辑态」，
+  // 上一版的「最近」段就是这么翻的车
+  const pinnedIds = new Set(pins.threads)
+  const pinnedThreads = pins.threads
+    .map((id) => rows.find((r) => r.thread.id === id))
+    .filter((r): r is ThreadRow => r !== undefined)
+  const rest = rows.filter((r) => !pinnedIds.has(r.thread.id))
+  const chats = rest.filter((r) => r.thread.workspaceKind === "chat")
+  const inProjects = rest.filter((r) => r.thread.workspaceKind !== "chat")
+  const groups = groupByWorkspace(inProjects).map((g) => ({ ...g, rows: ordered(g.rows, pins.order[g.cwd]) }))
+  const isPinned = new Set(pins.projects)
   return {
+    pinnedThreads,
     // 按**用户置顶的先后**排，不按最近活动排：钉住的顺序是他自己定的，
     // 底下再自动重排一次就等于没钉
-    pinned: pinned.flatMap((cwd) => groups.filter((g) => g.cwd === cwd)),
+    pinned: pins.projects.flatMap((cwd) => groups.filter((g) => g.cwd === cwd)),
     projects: groups.filter((g) => !isPinned.has(g.cwd)),
     chats: [...chats].sort((a, b) => b.thread.updatedAt - a.thread.updatedAt),
   }
+}
+
+/**
+ * 一个项目内的会话怎么排。
+ *
+ * 没拖过就按活跃度（传进来本来就是这个顺序）。**拖过一次，整段就归你排**——
+ * 不做「一半手动一半自动」：那种混合排序没人说得清一条新会话该落在哪，
+ * 而说不清的排序等于随机。
+ *
+ * 顺序表里没提到的（拖过之后新建的、或者从别处移进来的）排在**最前**：
+ * 它最新，也最可能是你现在要点的。顺序表里有、但会话已经删了的，自然被跳过。
+ */
+export function ordered(rows: readonly ThreadRow[], order: readonly string[] | undefined): readonly ThreadRow[] {
+  if (order === undefined || order.length === 0) return rows
+  const rank = new Map(order.map((id, i) => [id, i]))
+  const known = rows.filter((r) => rank.has(r.thread.id))
+  const fresh = rows.filter((r) => !rank.has(r.thread.id))
+  return [...fresh, ...known.sort((a, b) => (rank.get(a.thread.id) ?? 0) - (rank.get(b.thread.id) ?? 0))]
+}
+
+/**
+ * 把一条会话挪到同一组里的某个位置。**返回整组的新顺序**（要整段落盘，见 `Settings.threadOrder`）。
+ *
+ * `to` 是「插到这一条前面」；`to` 为 undefined 表示放到末尾。
+ * 拖到自己身上、或者拖到自己后面那一条的前面，结果都和原来一样——
+ * 这两种是最容易误触的，**必须是无操作而不是抖一下**。
+ */
+export function reorder(ids: readonly string[], from: string, to: string | undefined): readonly string[] {
+  const without = ids.filter((id) => id !== from)
+  if (to === undefined) return [...without, from]
+  const at = without.indexOf(to)
+  if (at < 0) return ids
+  return [...without.slice(0, at), from, ...without.slice(at)]
 }

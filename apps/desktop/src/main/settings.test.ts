@@ -34,6 +34,8 @@ describe("偏好", () => {
     expect(createSettings(log).get()).toEqual({
       theme: "system",
       pinned: [],
+      pinnedThreads: [],
+      threadOrder: {},
       defaultEngine: "",
       defaultTrust: "auto-edit",
       projectIcons: {},
@@ -108,5 +110,38 @@ describe("项目图标", () => {
 
   it("整个字段不是对象时给空表，不炸", () => {
     expect(readBack("坏了")).toEqual({})
+  })
+})
+
+describe("拖动排序存下来的那两项", () => {
+  /** 直接写偏好文件——这几项现在只有界面会写，但文件是用户能手改的。 */
+  const write = (raw: unknown): void => {
+    dir.path = mkdtempSync(join(tmpdir(), "omni-settings-"))
+    writeFileSync(file(), JSON.stringify(raw), "utf8")
+  }
+
+  it("置顶的会话按写入顺序保留", () => {
+    write({ pinnedThreads: ["th-b", "th-a"] })
+    expect(createSettings(log).get().pinnedThreads).toEqual(["th-b", "th-a"])
+  })
+
+  it("**偏好文件是可以手改的**，混进别的类型要过滤掉", () => {
+    write({ pinnedThreads: ["th-a", 42, null] })
+    expect(createSettings(log).get().pinnedThreads).toEqual(["th-a"])
+  })
+
+  it("手动顺序按项目存", () => {
+    write({ threadOrder: { "/w/one": ["b", "a"] } })
+    expect(createSettings(log).get().threadOrder).toEqual({ "/w/one": ["b", "a"] })
+  })
+
+  it("**空数组的项直接丢掉**：「排过序但顺序是空的」没有意义，留着只多一个分支", () => {
+    write({ threadOrder: { "/w/one": [], "/w/two": ["a"] } })
+    expect(createSettings(log).get().threadOrder).toEqual({ "/w/two": ["a"] })
+  })
+
+  it("整项不是对象就当没有，不崩", () => {
+    write({ threadOrder: "乱写的" })
+    expect(createSettings(log).get().threadOrder).toEqual({})
   })
 })
