@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { filterRows } from "../filter.js"
 import { sectionsOf } from "../sidebar.js"
-import { FolderIcon, GearIcon, PlusIcon, SearchIcon } from "./icons.js"
+import { GearIcon } from "./icons.js"
 import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
-import { Row } from "./SidebarRows.js"
+import { Head } from "./SidebarHead.js"
+import { Hits } from "./SidebarHits.js"
 import { useRenaming } from "./RowName.js"
 import { SectionList } from "./SidebarSections.js"
 
@@ -53,6 +54,8 @@ interface Props {
   onOpenSettings: () => void
   /** 变一次就把当前会话切进改名态。`/rename` 命令走这条路。 */
   askRename: number
+  /** 开一条不挑项目的对话。「对话」段头那颗 `+` 用。 */
+  onNewChat: () => void
   /**
    * 变一次就把焦点送进筛选框。
    *
@@ -62,67 +65,6 @@ interface Props {
   focusFilter: number
 }
 
-/** 侧栏顶部：品牌、两个动作、筛选框。三块都是同一套 `.row`，所以天然对齐。 */
-function Head({
-  onNew,
-  onOpenFolder,
-  box,
-  query,
-  onQuery,
-}: {
-  onNew: () => void
-  onOpenFolder: () => void
-  box: React.RefObject<HTMLInputElement | null>
-  query: string
-  onQuery: (next: string) => void
-}): React.JSX.Element {
-  return (
-    <>
-      <div className="sidebar__head">
-        <div className="sidebar__brand">
-          omni<span>同文</span>
-        </div>
-      </div>
-
-      <nav className="sidebar__nav">
-        <button type="button" className="row row--nav" onClick={onNew}>
-          <span className="row__slot">
-            <PlusIcon />
-          </span>
-          <span className="row__label">新建会话</span>
-        </button>
-        <button type="button" className="row row--nav" onClick={onOpenFolder}>
-          <span className="row__slot">
-            <FolderIcon />
-          </span>
-          <span className="row__label">打开文件夹…</span>
-        </button>
-      </nav>
-
-      <div className="row row--search">
-        <span className="row__slot">
-          <SearchIcon />
-        </span>
-        <input
-          className="sidebar__filter"
-          ref={box}
-          type="text"
-          value={query}
-          placeholder="筛选会话…"
-          aria-label="筛选会话"
-          onChange={(e) => {
-            onQuery(e.target.value)
-          }}
-          onKeyDown={(e) => {
-            // Esc 清空而不是失焦：清空之后列表立刻全回来，
-            // 这是「我搜错了」时想要的那个动作
-            if (e.key === "Escape") onQuery("")
-          }}
-        />
-      </div>
-    </>
-  )
-}
 
 export function Sidebar({
   rows,
@@ -138,6 +80,7 @@ export function Sidebar({
   pinned,
   onTogglePin,
   onOpenSettings,
+  onNewChat,
   askRename,
   focusFilter,
 }: Props): React.JSX.Element {
@@ -179,41 +122,22 @@ export function Sidebar({
   const rename = useRenaming(onRename, { at: askRename, id: selectedId })
   const { rowMenu, groupMenu } = useSidebarMenus(acts, openMenu)
 
-  const flat = (row: ThreadRow): React.JSX.Element => (
-    <Row
-      key={row.thread.id}
-      row={row}
-      selected={row.thread.id === selectedId}
-      onSelect={() => {
-        onSelect(row.thread.id)
-      }}
-      onDelete={() => {
-        onDelete(row.thread.id)
-      }}
-      flat
-      rename={rename}
-      onMenu={(e, arm, ren) => {
-        rowMenu(e, row, arm, ren)
-      }}
-    />
-  )
 
   return (
     <aside className="sidebar">
-      <Head onNew={onNew} onOpenFolder={onOpenFolder} box={box} query={query} onQuery={setQuery} />
+      <Head
+        onNew={onNew}
+        onOpenFolder={onOpenFolder}
+        here={here}
+        hereKind={rows.find((r) => r.thread.id === selectedId)?.thread.workspaceKind}
+        box={box}
+        query={query}
+        onQuery={setQuery}
+      />
 
       <div className="sidebar__list">
         {filtering ? (
-          <>
-            <div className="sidebar__section sidebar__section--static">
-              命中 {shown.length} / {rows.length}
-            </div>
-            {shown.length === 0 ? (
-              // 空列表什么都不说的话，看起来像「会话全没了」
-              <p className="sidebar__empty">没有匹配的会话。</p>
-            ) : null}
-            {shown.map(flat)}
-          </>
+          <Hits rows={shown} total={rows.length} selectedId={selectedId} on={{ onSelect, onDelete, rowMenu, rename }} />
         ) : (
           <SectionList
             sections={sections}
@@ -225,6 +149,8 @@ export function Sidebar({
               onDelete,
               onRowMenu: rowMenu,
               onOpenFolder,
+              onNewChat,
+              onNewIn,
               rename,
               onGroupMenu: groupMenu,
             }}

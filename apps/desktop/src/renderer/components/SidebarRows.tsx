@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
-import { rowLabelOf, type Group } from "../sidebar.js"
-import { ChevronIcon, FolderIcon, SpinnerIcon } from "./icons.js"
+import { rowLabelOf } from "../sidebar.js"
+import { SpinnerIcon } from "./icons.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 
 
@@ -141,88 +141,4 @@ export function Row({
   )
 }
 
-export function GroupBlock({
-  group,
-  collapsed,
-  selectedId,
-  onToggle,
-  onSelect,
-  onDelete,
-  onRowMenu,
-  onGroupMenu,
-  rename,
-}: {
-  group: Group
-  collapsed: boolean
-  selectedId: string
-  onToggle: () => void
-  onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
-  rename?: RenameCtl
-  onGroupMenu: (event: React.MouseEvent, group: Group) => void
-  onSelect: (id: string) => void
-  onDelete: (id: string) => void
-}): React.JSX.Element {
-  const running = group.rows.filter((r) => r.thread.status === "running").length
-  return (
-    <div className="group">
-      <div
-        className="row row--group"
-        title={group.cwd}
-        onContextMenu={(e) => {
-          onGroupMenu(e, group)
-        }}
-      >
-        <button type="button" className="row__main" onClick={onToggle}>
-          <span className="row__slot">
-            <ChevronIcon open={!collapsed} />
-          </span>
-          <span className="row__lead">
-            <FolderIcon />
-          </span>
-          <span className="row__label">{group.label}</span>
-          {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
-              展开时每行自己会转圈，这里就不重复了 */}
-          {collapsed && running > 0 ? (
-            <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
-              <SpinnerIcon />
-            </span>
-          ) : null}
-          <span className="row__count">{group.rows.length}</span>
-        </button>
-        {/* 项目这一行也给一个 `···`。右键菜单一直都有，但**看不见的功能等于没有**——
-            没人会去右键一个看起来只是分组标题的东西 */}
-        <button
-          type="button"
-          className="row__act"
-          aria-label="项目操作"
-          title="项目操作"
-          onClick={(e) => {
-            onGroupMenu(e, group)
-          }}
-        >
-          ···
-        </button>
-      </div>
-      {collapsed
-        ? null
-        : group.rows.map((row) => (
-            <Row
-              key={row.thread.id}
-              row={row}
-              selected={row.thread.id === selectedId}
-              onSelect={() => {
-                onSelect(row.thread.id)
-              }}
-              onDelete={() => {
-                onDelete(row.thread.id)
-              }}
-              rename={rename}
-              onMenu={(e, arm, ren) => {
-                onRowMenu(e, row, arm, ren)
-              }}
-            />
-          ))}
-    </div>
-  )
-}
 

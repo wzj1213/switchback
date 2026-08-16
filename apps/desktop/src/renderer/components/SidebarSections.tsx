@@ -1,8 +1,9 @@
 import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
-import { PROJECT_MAX, baseNameOf, type Group, type Sections } from "../sidebar.js"
-import { ChevronIcon, PlusIcon } from "./icons.js"
-import { GroupBlock, Row } from "./SidebarRows.js"
+import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
+import { ChevronIcon, FolderIcon, PlusIcon } from "./icons.js"
+import { Row } from "./SidebarRows.js"
+import { GroupBlock } from "./SidebarGroup.js"
 import type { RenameCtl } from "./RowName.js"
 
 /**
@@ -70,6 +71,10 @@ export interface GroupHandlers {
   onGroupMenu: (event: React.MouseEvent, group: Group) => void
   /** 「项目」段标题上那颗 `+`。 */
   onOpenFolder: () => void
+  /** 「对话」段头那颗 `+`：不挑项目，直接开一条。 */
+  onNewChat: () => void
+  /** 项目行悬停出来的 `+`：在**那个**项目里新建。 */
+  onNewIn: (cwd: string) => void
 }
 
 function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
@@ -87,6 +92,7 @@ function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers })
           onSelect={on.onSelect}
           onDelete={on.onDelete}
           onRowMenu={on.onRowMenu}
+          onNewIn={on.onNewIn}
           rename={on.rename}
           onGroupMenu={on.onGroupMenu}
         />
@@ -123,12 +129,16 @@ function Projects({ groups, on }: { groups: readonly Group[]; on: GroupHandlers 
 }
 
 /**
- * 最近段。
+ * 对话段：**不属于任何项目的会话**。
  *
- * 每行右边挂一个项目名——**这一段是跨项目的，不写就分不清
- * 「读一下 notes.txt」是哪个项目里的那件事**。
+ * 上一版这段叫「最近」，装的是全量会话按时间排前六条——和项目树重复，
+ * 于是同一条会话两行同时高亮、双击改名两个输入框一起进编辑态。
+ * 换成「属不属于项目」之后互斥是天然的（见 `sidebar.ts` 的 `sectionsOf`）。
+ *
+ * 这里**不挂项目名**（上一版挂了，因为那段是跨项目的）：
+ * 这一段里的会话本来就没有项目。
  */
-function Recent({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers }): React.JSX.Element {
+function Chats({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers }): React.JSX.Element {
   return (
     <>
       {rows.map((row) => (
@@ -137,7 +147,6 @@ function Recent({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers })
           row={row}
           selected={row.thread.id === on.selectedId}
           flat
-          aside={baseNameOf(row.thread.cwd)}
           onSelect={() => {
             on.onSelect(row.thread.id)
           }}
@@ -168,12 +177,22 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
 
   return (
     <>
-      {sections.pinned.length === 0 ? null : (
-        <>
-          <SectionHead title="置顶" open={open("pin")} onToggle={() => { toggle("pin") }} />
-          {open("pin") ? <Groups groups={sections.pinned} on={on} /> : null}
-        </>
-      )}
+      {/* **空了也渲染段头。** 原来是空就整段不显示，于是「怎么置顶」这件事
+          只有已经会用的人才看得见——而不会用的人恰恰是需要那行提示的人 */}
+      <SectionHead
+        title="置顶"
+        open={open("pin")}
+        onToggle={() => {
+          toggle("pin")
+        }}
+      />
+      {open("pin") ? (
+        sections.pinned.length === 0 ? (
+          <p className="sidebar__empty">右键项目 → 置顶项目，钉住的会排在这里。</p>
+        ) : (
+          <Groups groups={sections.pinned} on={on} />
+        )
+      ) : null}
 
       <SectionHead
         title="项目"
@@ -181,16 +200,29 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         onToggle={() => {
           toggle("proj")
         }}
-        action={{ label: "打开一个文件夹", icon: <PlusIcon />, run: on.onOpenFolder }}
+        // **图标不能和「对话」段那颗 `+` 一样**：这颗是「加一个项目（选文件夹）」，
+        // 那颗是「开一条对话」。同形不同义比没有图标更误导
+        action={{ label: "打开一个文件夹", icon: <FolderIcon />, run: on.onOpenFolder }}
       />
       {open("proj") ? <Projects groups={sections.projects} on={on} /> : null}
 
-      {sections.recent.length === 0 ? null : (
-        <>
-          <SectionHead title="最近" open={open("recent")} onToggle={() => { toggle("recent") }} />
-          {open("recent") ? <Recent rows={sections.recent} on={on} /> : null}
-        </>
-      )}
+      {/* **段头常驻，空了也在。** 上一版空了整段消失，于是「这里能放什么」
+          只有已经知道的人才看得见——置顶段的老毛病同理 */}
+      <SectionHead
+        title="对话"
+        open={open("chat")}
+        onToggle={() => {
+          toggle("chat")
+        }}
+        action={{ label: "新开一条对话", icon: <PlusIcon />, run: on.onNewChat }}
+      />
+      {open("chat") ? (
+        sections.chats.length === 0 ? (
+          <p className="sidebar__empty">还没有对话。点右边的 + 开一条，不用先选项目。</p>
+        ) : (
+          <Chats rows={sections.chats} on={on} />
+        )
+      ) : null}
     </>
   )
 }

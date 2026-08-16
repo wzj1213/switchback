@@ -44,6 +44,8 @@ declare global {
       onReplay: (handler: (replay: Replay) => void) => () => void
       /** 渲染层挂好监听之后喊一声，主进程才发全量。 */
       hello: () => void
+      /** 给一条不属于任何项目的对话要一个目录。 */
+      chatDir: () => Promise<string>
       resync: (after: number) => Promise<{ events: readonly Sealed[] } | { reset: true }>
     }
   }

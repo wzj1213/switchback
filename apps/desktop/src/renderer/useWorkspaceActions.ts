@@ -13,7 +13,9 @@ import { useMenuActions } from "./useMenuActions.js"
  */
 export interface WorkspaceActions {
   /** 在指定目录开一个新会话。 */
-  open: (cwd: string) => void
+  open: (cwd: string, kind?: "project" | "chat") => void
+  /** 开一条不属于任何项目的对话。 */
+  openChat: () => void
   /** 弹系统目录框，选中了就开。 */
   openPicker: () => void
 }
@@ -24,6 +26,8 @@ export function useWorkspaceActions(deps: {
   send: (command: Command) => void
   copy: (text: string) => void
   pickFolder: () => Promise<string | undefined>
+  /** 给对话要一个自动生成的目录。 */
+  chatDir: () => Promise<string>
   onMenu: (handler: (action: string) => void) => () => void
   onSelect: (id: string | undefined) => void
   /** 刚发出「新建」。调用方据此等下一个 `thread.started`。 */
@@ -46,10 +50,11 @@ export function useWorkspaceActions(deps: {
    * 但用户如果在设置里明确指定了默认，那句话就该压过前者——
    * 他设它就是为了不再每次手改。
    */
-  const open = (cwd: string): void => {
+  const open = (cwd: string, kind: "project" | "chat" = "project"): void => {
     send({
       type: "thread.create",
       cwd,
+      ...(kind === "chat" ? { workspaceKind: "chat" as const, title: "新对话" } : {}),
       engine: deps.defaultEngine !== "" ? deps.defaultEngine : (thread?.engine ?? state.engines[0]?.id ?? "claude"),
       trust: deps.defaultTrust,
       title: cwd.split("/").filter(Boolean).pop() ?? cwd,
@@ -57,6 +62,18 @@ export function useWorkspaceActions(deps: {
     // 记下「我在等下一个新会话」。**不再用 `onSelect(undefined)` 兼职这个信号**——
     // 那个信号删会话时也会发，于是删完之后下一个冒出来的会话会被错认成我等的那个
     deps.onCreating()
+  }
+
+  /**
+   * 开一条**不挑项目**的对话。
+   *
+   * 目录由主进程自动生成——见 `main/chatdir.ts` 里为什么 `cwd` 不能为空。
+   * 用户这边的体感是「点一下就能问」，不用先想「放哪个文件夹」。
+   */
+  const openChat = (): void => {
+    void deps.chatDir().then((cwd) => {
+      open(cwd, "chat")
+    })
   }
 
   const openPicker = (): void => {
@@ -88,5 +105,5 @@ export function useWorkspaceActions(deps: {
     [thread?.id, thread?.cwd, state],
   )
 
-  return { open, openPicker }
+  return { open, openChat, openPicker }
 }

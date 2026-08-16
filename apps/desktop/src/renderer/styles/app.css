@@ -388,7 +388,8 @@ body {
   margin-top: 2px;
 }
 
-/* 删除按钮平时不显形：它不可撤销，不该一直待在手边 */
+/* 行内操作平时不显形，悬停才出来。
+   **`cursor` 必须是 pointer**：它是按钮，长成默认箭头等于告诉人「这儿点不动」 */
 .row__act {
   flex: none;
   margin-right: 4px;
@@ -399,17 +400,29 @@ body {
   color: var(--text-faint);
   font: inherit;
   font-size: var(--text-xs);
-  cursor: default;
+  cursor: pointer;
   opacity: 0;
 }
 
-.row--thread:hover .row__act,
+/* **选择器原来只写了 `.row--thread:hover`**，于是项目行（`.row--group`）
+   和分段标题上的按钮永远是 `opacity: 0`——它们在 DOM 里、能被读屏读到、
+   点得中，但对鼠标用户根本不存在。
+   `SidebarRows.tsx` 里那句「看不见的功能等于没有」被这行 CSS 字面兑现了。 */
+.row:hover .row__act,
+.sidebar__section:hover .row__act,
 .row__act:focus-visible,
 .row__act--danger {
   opacity: 1;
 }
 
+/* 悬停变红是**删除**的语义，不能所有行内按钮都红——
+   现在这一列里还有「在此新建」和「更多操作」，它们不危险 */
 .row__act:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.row__act--danger:hover {
   color: var(--danger);
 }
 

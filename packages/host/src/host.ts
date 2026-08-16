@@ -83,7 +83,9 @@ const HANDLERS: Handlers = {
 function inflightKey(command: Command): string | undefined {
   switch (command.type) {
     case "thread.create":
-      return `create:${command.cwd}:${command.engine}:${command.trust}`
+      // kind 也要进键：将来生成策略若变成固定目录，没有 kind 就会把
+      // 「连开两条对话」当成重复去掉一条
+      return `create:${command.cwd}:${command.engine}:${command.trust}:${command.workspaceKind ?? "project"}`
     case "thread.resume":
       return `resume:${command.threadId}`
     case "thread.handoff":

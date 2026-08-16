@@ -63,31 +63,36 @@ export function groupByWorkspace(rows: readonly ThreadRow[]): readonly Group[] {
   return [...groups.values()]
 }
 
-/** 「最近」里放几条。太多就和上面的项目树重复了，太少又起不到「回到刚才」的作用。 */
-export const RECENT_MAX = 6
-
 /** 项目多到一定程度才折叠。少于这个数时「展开显示」只是白多一行。 */
 export const PROJECT_MAX = 6
 
 export interface Sections {
   pinned: readonly Group[]
   projects: readonly Group[]
-  /** 跨项目的最近会话，扁平。 */
-  recent: readonly ThreadRow[]
+  /** 不属于任何项目的对话，扁平，最近动过的在前。 */
+  chats: readonly ThreadRow[]
 }
 
 /**
- * 侧栏分三段。
+ * 侧栏分三段：置顶 / 项目 / 对话。
  *
- * ## 为什么要有「最近」
+ * ## 一条会话**只出现一次**，这是硬约束
  *
- * 项目树回答的是「我有哪些项目」，但人打开应用时想的是
- * **「我刚才在干嘛」**——那是一个跨项目的问题，项目树答不了：
- * 上一个会话可能埋在第四个折叠组里。
+ * 上一版的第二段叫「最近」，装的是**全量会话按时间排前六条**，
+ * 注释里写着「和项目树重复是有意的：两条路通向同一个东西」。
+ * 想法本身不坏，但它和这套界面的状态模型根本不兼容——
+ * 选中、改名、删除确认全部按 `thread.id` 判定，**一条会话渲染两行，
+ * 这些状态就同时亮两处**：
  *
- * 所以「最近」是扁平的、跨项目的、按最后动过的时间排。
- * 它和上面的项目树**会重复**，这是有意的：两条路通向同一个东西，
- * 因为人有两种不同的找法。
+ * - 正在用的那条必然重复（它 `updatedAt` 最大，必进前六），两行一起高亮
+ * - 双击改名，两个输入框同时进编辑态，光标落到你没点的那一行
+ * - 删除确认的「再点一次」武装在一行上，另一行看不出来
+ *
+ * 所以第二段的判据换成**「属不属于项目」**，而不是「最不最近」——
+ * 互斥是天然的，上面那三个现象是同一个根因，一起消失。
+ *
+ * 而「不需要先有项目就能开的对话」本来就是缺的一块：
+ * 想随手问一句，现在必须先挑一个文件夹。
  *
  * ## 置顶为什么单独一段而不是排在最前
  *
@@ -95,15 +100,15 @@ export interface Sections {
  * 于是也想不起来还能取消置顶。分段本身就是那条说明。
  */
 export function sectionsOf(rows: readonly ThreadRow[], pinned: readonly string[]): Sections {
-  const groups = groupByWorkspace(rows)
+  const chats = rows.filter((r) => r.thread.workspaceKind === "chat")
+  const inProjects = rows.filter((r) => r.thread.workspaceKind !== "chat")
+  const groups = groupByWorkspace(inProjects)
   const isPinned = new Set(pinned)
   return {
     // 按**用户置顶的先后**排，不按最近活动排：钉住的顺序是他自己定的，
     // 底下再自动重排一次就等于没钉
     pinned: pinned.flatMap((cwd) => groups.filter((g) => g.cwd === cwd)),
     projects: groups.filter((g) => !isPinned.has(g.cwd)),
-    recent: [...rows]
-      .sort((a, b) => b.thread.updatedAt - a.thread.updatedAt)
-      .slice(0, RECENT_MAX),
+    chats: [...chats].sort((a, b) => b.thread.updatedAt - a.thread.updatedAt),
   }
 }

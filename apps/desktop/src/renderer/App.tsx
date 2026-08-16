@@ -23,6 +23,7 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       thread={thread}
       focusFilter={shell.focusFilter}
       askRename={shell.askRename}
+      onNewChat={app.openChat}
       onSelect={shell.select}
       onNew={app.newHere}
       onNewIn={app.open}

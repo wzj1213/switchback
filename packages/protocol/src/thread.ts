@@ -81,6 +81,23 @@ export interface Thread {
    * （引擎都没起），那时界面按「都不支持」处理，正好——那些入口本来也点不动。
    */
   capabilities?: EngineCapabilities
+  /**
+   * 这条会话属不属于一个项目。
+   *
+   * - `"project"`（缺省）：挂在某个代码目录下，侧栏按项目分组
+   * - `"chat"`：**不需要先有项目就能开的对话**。它仍然有 `cwd`
+   *   （自动建在 `~/Documents/omni/` 下），只是不进项目树
+   *
+   * ## 为什么 `cwd` 不做成可空
+   *
+   * `cwd` 是**工作区边界的唯一真源**：子进程拿它当工作目录（空了就继承主进程的，
+   * 打包后是 `/`），审批规则按它分桶（空了就全部并成一桶——
+   * 在 A 对话点的「一直允许」会在 B 对话生效）。给对话自动生成一个真目录，
+   * 比让 `cwd` 可空安全得多，代价只是磁盘上多几个空文件夹。
+   *
+   * 缺省视作 `"project"`，老记录回放行为不变，不需要迁移。
+   */
+  workspaceKind?: "project" | "chat"
 }
 
 export type TurnStatus = "running" | "completed" | "interrupted" | "failed"

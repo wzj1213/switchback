@@ -3,7 +3,15 @@ import type { Trust } from "./thread.js"
 
 /** 渲染层 → 宿主的反向指令。宿主是唯一执行者，渲染层不直接碰引擎进程。 */
 export type Command =
-  | { type: "thread.create"; cwd: string; engine: EngineId; trust: Trust; title?: string }
+  | {
+      type: "thread.create"
+      cwd: string
+      engine: EngineId
+      trust: Trust
+      title?: string
+      /** 不给就是项目会话。见 `Thread.workspaceKind`。 */
+      workspaceKind?: "project" | "chat"
+    }
   | { type: "thread.prompt"; threadId: ThreadId; text: string; attachments?: readonly string[] }
   | { type: "thread.interrupt"; threadId: ThreadId }
   /**

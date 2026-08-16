@@ -34,6 +34,8 @@ export interface AppApi {
   open: (cwd: string) => void
   /** 弹目录框再开。 */
   openPicker: () => void
+  /** 开一条不属于任何项目的对话。 */
+  openChat: () => void
   /** 侧栏「新建会话」：有当前会话就用它的目录，没有就先问路径。 */
   newHere: () => void
   itemsOf: (threadId: string) => readonly Item[]
@@ -83,12 +85,13 @@ export function useApp(): AppApi {
   const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
 
-  const { open, openPicker } = useWorkspaceActions({
+  const { open, openChat, openPicker } = useWorkspaceActions({
     state: omni.state,
     thread,
     send: omni.send,
     copy: omni.copy,
     pickFolder: omni.pickFolder,
+    chatDir: omni.chatDir,
     onMenu: omni.onMenu,
     onSelect: shell.select,
     // 点「新建」的那一刻记下当前序号，等一个比它大的
@@ -124,6 +127,7 @@ export function useApp(): AppApi {
     stopFind: omni.stopFind,
     searchFiles: omni.searchFiles,
     open,
+    openChat,
     openPicker,
     newHere: () => {
       if (thread === undefined) openPicker()

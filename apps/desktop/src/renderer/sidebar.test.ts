@@ -9,11 +9,13 @@ const row = (o: {
   title: string
   preview?: string
   updatedAt?: number
+  workspaceKind?: "project" | "chat"
 }): ThreadRow => ({
   thread: {
     id: o.id,
     title: o.title,
     cwd: o.cwd,
+    ...(o.workspaceKind === undefined ? {} : { workspaceKind: o.workspaceKind }),
     engine: "codex",
     trust: "auto-edit",
     status: "idle",
@@ -101,16 +103,32 @@ describe("侧栏分三段", () => {
     expect(sectionsOf(rows, ["/w/删掉了"]).pinned).toEqual([])
   })
 
-  it("最近是**跨项目扁平**的，按最后动过的时间排——「我刚才在干嘛」是跨项目的问题", () => {
-    expect(sectionsOf(rows, []).recent.map((r) => r.thread.id)).toEqual(["a", "c", "b"])
+  it("「对话」段只装不属于项目的会话，按最后动过的时间排", () => {
+    const withChat = [...rows, row({ id: "z", cwd: "/w/聊天目录", title: "随手问问", updatedAt: 9, workspaceKind: "chat" })]
+    expect(sectionsOf(withChat, []).chats.map((r) => r.thread.id)).toEqual(["z"])
   })
 
-  it("最近和上面的项目树会重复，这是有意的：两条路通向同一个东西", () => {
-    const out = sectionsOf(rows, ["/w/omni"])
-    expect(out.recent.some((r) => r.thread.cwd === "/w/omni")).toBe(true)
+  it("**一条会话只出现一次**——这条不变量一破，选中/改名/删除确认就会同时亮两处", () => {
+    const withChat = [...rows, row({ id: "z", cwd: "/w/聊天目录", title: "随手问问", updatedAt: 9, workspaceKind: "chat" })]
+    for (const pins of [[], ["/w/omni"], ["/w/other", "/w/omni"]]) {
+      const out = sectionsOf(withChat, pins)
+      const ids = [
+        ...out.pinned.flatMap((g) => g.rows.map((r) => r.thread.id)),
+        ...out.projects.flatMap((g) => g.rows.map((r) => r.thread.id)),
+        ...out.chats.map((r) => r.thread.id),
+      ]
+      expect(new Set(ids).size).toBe(ids.length)
+      expect(ids.sort()).toEqual(withChat.map((r) => r.thread.id).sort())
+    }
   })
 
-  it("没有置顶时那一段是空的，界面据此整段不显示", () => {
+  it("对话不进项目树——它本来就没有项目", () => {
+    const withChat = [...rows, row({ id: "z", cwd: "/w/聊天目录", title: "随手问问", updatedAt: 9, workspaceKind: "chat" })]
+    const out = sectionsOf(withChat, [])
+    expect(out.projects.some((g) => g.cwd === "/w/聊天目录")).toBe(false)
+  })
+
+  it("没有置顶时那一段是空的（界面照样渲染段头，见 SidebarSections）", () => {
     expect(sectionsOf(rows, []).pinned).toEqual([])
   })
 })

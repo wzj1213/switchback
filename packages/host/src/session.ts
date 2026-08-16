@@ -19,6 +19,7 @@ function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadI
   return {
     id,
     title: cmd.title ?? "新会话",
+    ...(cmd.workspaceKind === undefined ? {} : { workspaceKind: cmd.workspaceKind }),
     cwd: cmd.cwd,
     engine: cmd.engine,
     trust: cmd.trust,

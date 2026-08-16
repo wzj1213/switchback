@@ -8,6 +8,8 @@ export interface Omni {
   send: (command: Command) => void
   /** 弹系统目录框。桥没接上时返回 undefined，调用方按「用户取消」处理即可。 */
   pickFolder: () => Promise<string | undefined>
+  /** 给一条不属于任何项目的对话要一个目录。 */
+  chatDir: () => Promise<string>
   /** 订阅菜单动作。返回退订函数。 */
   onMenu: (handler: (action: string) => void) => () => void
   /** 页内查找。桥没接上时永远是 0/0。 */
@@ -169,6 +171,7 @@ export function useOmni(): Omni {
     copy,
     reveal,
     searchFiles,
+    chatDir: async () => (await bridge?.chatDir()) ?? "",
     bridgeMissing: bridge === undefined,
   }
 }

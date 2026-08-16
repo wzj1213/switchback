@@ -2,6 +2,7 @@ import { join } from "node:path"
 import { readFileSync } from "node:fs"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
 import { homedir } from "node:os"
+import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { installMenu } from "./menu.js"
@@ -218,6 +219,7 @@ function bootstrap(): Promise<void> {
     installSettingsChannel(settings)
     installAppChannels()
     installWorksiteChannel()
+    installChatDirChannel()
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     installMenu(
