@@ -154,3 +154,21 @@ export interface WireSkillGroup {
   cwd?: string
   skills?: readonly WireSkill[]
 }
+
+/**
+ * `account/rateLimits/updated` 推上来的形状。
+ *
+ * 字段名以 codex app-server 协议为准：`primary` / `secondary` 各带
+ * `usedPercent`、`windowDurationMins`。
+ * 两个都可能是 `null`（额度不受限的账号）。
+ */
+export interface WireRateWindow {
+  usedPercent?: number
+  windowDurationMins?: number
+  resetsAt?: string
+}
+
+export interface WireRateLimits {
+  primary?: WireRateWindow | null
+  secondary?: WireRateWindow | null
+}

@@ -93,7 +93,37 @@ export type Event =
   | { type: "commands.updated"; at: number; threadId: ThreadId; commands: readonly SlashCommand[] }
   /** 上下文与消耗。引擎给什么报什么，给不出的字段就缺席。 */
   | { type: "usage.updated"; at: number; threadId: ThreadId; usage: Usage }
+  /**
+   * 账号额度用到哪儿了。引擎每轮推一次。
+   *
+   * **不挂在会话上**：额度是账号级的，同一家引擎的所有会话共享一份。
+   * 挂到会话上就会出现「这个会话说还剩 20%、那个说还剩 80%」。
+   */
+  | { type: "limits.updated"; at: number; engine: EngineId; limits: RateLimits }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */
   | { type: "engine.status"; at: number; threadId: ThreadId; status: EngineStatus; detail?: string }
 
 export type EngineStatus = "starting" | "ready" | "exited" | "crashed" | "timeout"
+
+/**
+ * 账号额度。
+ *
+ * 字段名沿用 codex app-server 协议（`primary` / `secondary` 各带 `usedPercent`、
+ * `windowDurationMins`、`resetsAt`）——**这不是我编的形状**。
+ *
+ * 两个窗口的含义：一般 `primary` 是长周期（比如周），`secondary` 是短周期
+ *（比如 5 小时）。**该报警的是更紧的那个**，不一定是数值大的那个。
+ */
+export interface RateLimits {
+  primary?: RateWindow
+  secondary?: RateWindow
+}
+
+export interface RateWindow {
+  /** 已用百分比。0–100，可能超过 100。 */
+  usedPercent: number
+  /** 这个窗口有多长（分钟）。用来说「5 小时内」还是「本周」。 */
+  windowDurationMins?: number
+  /** 什么时候重置。ISO 字符串。 */
+  resetsAt?: string
+}

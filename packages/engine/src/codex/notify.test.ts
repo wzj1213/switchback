@@ -124,8 +124,28 @@ describe("轮次与错误", () => {
 
   it("认不出的通知静默丢弃——codex 有 74 种通知，我们只消费一小撮", () => {
     const { ctx, events } = setup()
-    handleNotification(ctx, "account/rateLimits/updated", { rateLimits: {} })
+    handleNotification(ctx, "thread/backgroundTerminals/changed", { whatever: 1 })
     expect(events).toEqual([])
+  })
+
+  it("**额度报不出百分比时也不发**——那时发一条空的只会让界面画一根没含义的条", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "account/rateLimits/updated", { rateLimits: {} })
+    handleNotification(ctx, "account/rateLimits/updated", { rateLimits: { primary: null, secondary: null } })
+    expect(events).toEqual([])
+  })
+
+  it("额度报得出就发出去，字段照抄 codex 自己的形状", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "account/rateLimits/updated", {
+      rateLimits: { primary: { usedPercent: 82.5, windowDurationMins: 10080, resetsAt: "2026-08-20T00:00:00Z" } },
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      type: "limits.updated",
+      engine: "codex",
+      limits: { primary: { usedPercent: 82.5, windowDurationMins: 10080 } },
+    })
   })
 })
 

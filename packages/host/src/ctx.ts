@@ -66,6 +66,9 @@ export interface Ctx {
 const UNOWNED: ReadonlySet<string> = new Set([
   "thread.removed",
   "engines.available",
+  // 额度是**账号级**的，不属于任何会话；而且它每轮都变，落盘只会把
+  // 一份过期数字塞回界面
+  "limits.updated",
   // 斜杠命令**故意不落盘**：它是每次握手现问引擎的（用户装了什么技能只有引擎知道），
   // 落盘只会在重放时把一份过期的清单塞回界面
   "commands.updated",

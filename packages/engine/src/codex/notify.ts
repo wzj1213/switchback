@@ -1,13 +1,6 @@
-import type { Event, ItemId, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
+import type { Event, ItemId, RateLimits, RateWindow, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
-import type {
-  WireDelta,
-  WireError,
-  WireItem,
-  WireItemLifecycle,
-  WireTokenUsage,
-  WireTurnLifecycle,
-} from "./wire.js"
+import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireRateLimits, WireRateWindow, WireTokenUsage, WireTurnLifecycle } from "./wire.js"
 
 /**
  * codex 通知 → omni 事件。
@@ -195,9 +188,38 @@ export function handleNotification(ctx: NotifyContext, method: string, params: u
       return onUsage(ctx, params as WireTokenUsage)
     case "turn/completed":
       return onTurnCompleted(ctx, params as WireTurnLifecycle)
+    case "account/rateLimits/updated":
+      return onLimits(ctx, params as { rateLimits?: WireRateLimits })
     case "error":
       return onError(ctx, params as WireError)
     default:
       return
+  }
+}
+
+/**
+ * 账号额度。**只在两个窗口至少有一个报得出百分比时才发**——
+ * 这台机器上实测 `primary`/`secondary` 都可能是 null（免费额度那种账号），
+ * 那时发一条空的出去只会让界面画一根没有含义的条。
+ */
+function onLimits(ctx: NotifyContext, params: { rateLimits?: WireRateLimits }): void {
+  const limits = toRateLimits(params.rateLimits)
+  if (limits === undefined) return
+  ctx.emit({ type: "limits.updated", at: Date.now(), engine: "codex", limits })
+}
+
+function toRateLimits(raw: WireRateLimits | undefined): RateLimits | undefined {
+  const primary = toWindow(raw?.primary)
+  const secondary = toWindow(raw?.secondary)
+  if (primary === undefined && secondary === undefined) return undefined
+  return { ...(primary === undefined ? {} : { primary }), ...(secondary === undefined ? {} : { secondary }) }
+}
+
+function toWindow(raw: WireRateWindow | null | undefined): RateWindow | undefined {
+  if (raw === null || raw === undefined || typeof raw.usedPercent !== "number") return undefined
+  return {
+    usedPercent: raw.usedPercent,
+    ...(typeof raw.windowDurationMins === "number" ? { windowDurationMins: raw.windowDurationMins } : {}),
+    ...(typeof raw.resetsAt === "string" ? { resetsAt: raw.resetsAt } : {}),
   }
 }

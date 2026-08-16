@@ -1,4 +1,4 @@
-import { commandsOf, forkPeerOf, modelsOf, turnOf, usageOf } from "@omni/store"
+import { commandsOf, forkPeerOf, limitsOf, modelsOf, turnOf, usageOf } from "@omni/store"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen, SidebarPane } from "./screens.js"
 import { useApp } from "./useApp.js"
@@ -124,6 +124,7 @@ export function App(): React.JSX.Element {
         onCopy={app.copy}
         onReveal={app.reveal}
         commands={commandsOf(state, thread.id)}
+        limits={limitsOf(state, thread.engine)}
         onNew={app.newHere}
         onRename={shell.requestRename}
         onSettings={() => {

@@ -73,24 +73,50 @@ export function RowName({
   onCommit: (title: string) => void
   onCancel: () => void
 }): React.JSX.Element {
-  const [draft, setDraft] = useState(value)
+  /**
+   * `null` = 用户还没碰过这个输入框。
+   *
+   * 用 `null` 而不是「等于原值」来表达没碰过：两者在提交时行为一样，
+   * 但**在渲染上不一样**——没碰过时显示的是实时的 `value`，
+   * 于是会话在改名期间吐出新内容，输入框跟着更新是对的；
+   * 碰过之后就锁住用户打的字，不再被任何自动变化冲掉。
+   */
+  const [draft, setDraft] = useState<string | null>(null)
+  /**
+   * 进编辑态那一刻的值。
+   *
+   * **不能直接依赖 `value`**：它是 `rowLabelOf(row)` 算出来的，
+   * 而那个会跟着会话的 preview 变——正在跑的会话每吐一段就变一次。
+   * 原来 effect 的依赖里有 `value`，于是「模型输出了新内容」会
+   * **把你打了一半的名字整个替换掉并全选**。
+   */
+  const seed = useRef(value)
   const input = useRef<HTMLInputElement>(null)
 
-  // 进入编辑态时把草稿重置成当前值，并全选——改名通常是**整个换掉**，
-  // 不是在原名字后面追加，光标停在末尾的话每次都要先全选一遍
+  // 不在编辑态时才跟着 value 走；一旦进了编辑态，种子就冻住
   useEffect(() => {
-    if (!editing) return
-    setDraft(value)
+    if (!editing) seed.current = value
+  }, [editing, value])
+
+  // 进入编辑态时把草稿重置，并全选——改名通常是**整个换掉**，
+  // 不是在原名字后面追加，光标停在末尾的话每次都要先全选一遍。
+  // **依赖里只有 `editing`**：加了 `value` 就会被 preview 的变化反复触发
+  useEffect(() => {
+    if (!editing) {
+      setDraft(null)
+      return
+    }
+    setDraft(seed.current)
     const el = input.current
     if (el === null) return
     el.focus()
     el.select()
-  }, [editing, value])
+  }, [editing])
 
   if (!editing) return <span className="row__label">{value}</span>
 
   const commit = (): void => {
-    const next = draft.trim()
+    const next = (draft ?? value).trim()
     if (next === "" || next === value) onCancel()
     else onCommit(next)
   }
@@ -99,7 +125,7 @@ export function RowName({
     <input
       ref={input}
       className="row__label row__rename"
-      value={draft}
+      value={draft ?? value}
       aria-label="会话名称"
       onChange={(e) => {
         setDraft(e.target.value)

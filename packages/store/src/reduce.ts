@@ -219,6 +219,10 @@ const HANDLERS: Handlers = {
   }),
   "models.updated": reduceCatalog,
   "engines.available": reduceCatalog,
+  "limits.updated": (state, event) => ({
+    ...state,
+    limits: { ...state.limits, [event.engine]: event.limits },
+  }),
   "engine.status": onEngineStatus,
 }
 

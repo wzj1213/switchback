@@ -1,4 +1,4 @@
-import type { EngineInfo, Item, ItemId, ModelOption, SlashCommand, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
+import type { EngineInfo, Item, ItemId, ModelOption, RateLimits, SlashCommand, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -25,6 +25,8 @@ export interface ViewState {
   noticeSeq: number
   /** 每个会话能用的斜杠命令。引擎报什么就是什么，omni 自己那几条在渲染层拼。 */
   commands: Readonly<Record<string, readonly SlashCommand[]>>
+  /** 各家引擎的账号额度。**按引擎存不按会话存**——额度是账号级的。 */
+  limits: Readonly<Record<string, RateLimits>>
 }
 
 /**
@@ -52,6 +54,7 @@ export function initial(): ViewState {
     usage: {},
     models: {},
     commands: {},
+    limits: {},
     engines: [],
     notices: [],
     noticeSeq: 0,
@@ -77,6 +80,11 @@ export function modelsOf(state: ViewState, threadId: ThreadId): readonly ModelOp
 }
 
 /** 取一个会话能用的斜杠命令。引擎没报过就是空的，界面据此只显示 omni 自己那几条。 */
+/** 取一家引擎的额度。没报过就是 undefined，界面据此什么都不画。 */
+export function limitsOf(state: ViewState, engine: string): RateLimits | undefined {
+  return state.limits[engine]
+}
+
 export function commandsOf(state: ViewState, threadId: ThreadId): readonly SlashCommand[] {
   return state.commands[threadId] ?? []
 }
