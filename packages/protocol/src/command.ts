@@ -11,6 +11,13 @@ export type Command =
    * 「我改主意了，那句不用发了」和「停下」是两件事。
    */
   | { type: "thread.unqueue"; threadId: ThreadId }
+  /**
+   * 压缩上下文：让引擎把前面的对话总结掉，腾出窗口继续。
+   *
+   * **只有引擎自己能做**——它才知道哪些能扔、总结成什么样喂回去不会失真。
+   * omni 只负责给一个入口。
+   */
+  | { type: "thread.compact"; threadId: ThreadId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
   /**
    * 改名。**历史会话也能改**——恰恰是历史会话最需要，

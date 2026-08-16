@@ -46,6 +46,11 @@ const HANDLERS: Handlers = {
   "thread.delete": remove,
   "thread.handoff": handoff,
   "thread.fork": fork,
+  "thread.compact": async (ctx, command) => {
+    const entry = ctx.live.get(command.threadId)
+    if (entry?.session.compact === undefined) return
+    await entry.session.compact()
+  },
   "thread.unqueue": (ctx, command) => {
     const entry = ctx.live.get(command.threadId)
     if (entry !== undefined && entry.queued.length > 0) clearQueue(ctx, entry)

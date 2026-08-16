@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Item, Thread, Turn } from "@omni/protocol"
+import type { Command, EngineInfo, Item, SlashCommand, Thread, Turn } from "@omni/protocol"
 import { labelOf } from "./components/Composer.js"
 import { nextEngine } from "./engines.js"
 import { toMarkdown } from "./export.js"
@@ -16,6 +16,8 @@ import { omniCommands, type OmniAction } from "./omniCommands.js"
  */
 export function useOmniActions(
   props: {
+    /** 引擎自己报的命令。omni 不重复提供它已经有的东西。 */
+    commands: readonly SlashCommand[]
     thread: Thread
     items: readonly Item[]
     turn: Turn | undefined
@@ -32,6 +34,9 @@ export function useOmniActions(
 ): readonly OmniAction[] {
   const { thread, send } = props
   const next = nextEngine(props.engines, thread.engine)
+  // **引擎自己有 `/compact` 就不重复给**（Claude 就有）。同一件事在面板上
+  // 出现两次，人会以为它们不一样，然后花时间想该点哪个
+  const ownsCompact = props.commands.some((c) => /^(?:compact|autocompact)$/.test(c.name))
   return omniCommands({
     onNew: props.onNew,
     onRename: props.onRename,
@@ -49,6 +54,13 @@ export function useOmniActions(
           },
           onHandoff: () => {
             send({ type: "thread.handoff", threadId: thread.id, to: next.id })
+          },
+        }),
+    ...(ownsCompact
+      ? {}
+      : {
+          onCompact: () => {
+            send({ type: "thread.compact", threadId: thread.id })
           },
         }),
     ...(props.turn === undefined

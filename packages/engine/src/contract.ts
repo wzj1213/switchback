@@ -90,6 +90,14 @@ export interface EngineSession {
    * 上面各层只认 `SlashCommand`。
    */
   commands?: () => Promise<readonly SlashCommand[]>
+  /**
+   * 压缩上下文。**不支持就别实现**——界面据此决定给不给这个入口。
+   *
+   * Claude 不实现：它自己的 `/compact` 已经在斜杠命令列表里了，
+   * 再加一条 omni 的就是同一件事出现两次。codex 那边 app-server 有
+   * `thread/compact/start`，但它不在 `skills/list` 里，所以必须由这里补。
+   */
+  compact?: () => Promise<void>
   /** 幂等。返回时进程应已退出。 */
   dispose: () => Promise<void>
 }

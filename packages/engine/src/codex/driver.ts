@@ -359,6 +359,18 @@ class CodexSession implements EngineSession {
     return out
   }
 
+  /**
+   * 压缩上下文。app-server 的 `thread/compact/start`。
+   *
+   * 它**不在 `skills/list` 里**（那只报用户装的技能），所以 omni 必须自己
+   * 提供入口——否则 codex 会话撞满上下文就只能新开一个，两小时的历史全丢。
+   */
+  async compact(): Promise<void> {
+    const { codexThread } = this.state
+    if (codexThread === undefined) throw new Error("会话还没起来，没法压缩")
+    await this.rpc.call("thread/compact/start", { threadId: codexThread })
+  }
+
   async setModel(model: string, effort?: string): Promise<void> {
     this.state.model = model
     this.state.effort = effort

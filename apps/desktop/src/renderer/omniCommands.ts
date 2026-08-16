@@ -31,6 +31,7 @@ export function omniCommands(acts: {
   onSettings: () => void
   onStop?: () => void
   onRename: () => void
+  onCompact?: () => void
 }): readonly OmniAction[] {
   const list: (OmniAction | undefined)[] = [
     make("new", "新建会话", "在当前工作区另开一个", acts.onNew),
@@ -42,6 +43,7 @@ export function omniCommands(acts: {
     make("handoff", "接力", "换一家引擎接着做这个会话", acts.onHandoff),
     make("compare", "对比", "和分叉出来的那个并排比一比", acts.onCompare),
     make("stop", "停止", "打断正在跑的这一轮", acts.onStop),
+    make("compact", "压缩上下文", "让引擎把前面的对话总结掉，腾出窗口继续", acts.onCompact),
     make("settings", "设置", "打开设置", acts.onSettings),
   ]
   return list.filter((a): a is OmniAction => a !== undefined)
