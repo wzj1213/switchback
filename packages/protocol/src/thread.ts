@@ -80,3 +80,24 @@ export interface Turn {
   error?: string
   meta?: Record<string, unknown>
 }
+
+/**
+ * 一条斜杠命令。
+ *
+ * 两个来源，**界面上要分得出**：
+ *
+ * - `engine`：引擎自己报的。Claude 走 SDK 的 `supportedCommands()`
+ *   （实测这台机器上 52 条，技能和内置命令都在里面）；
+ *   codex 走 app-server 的 `skills/list`。**不硬编码任何一家的命令表**——
+ *   用户装了什么技能只有引擎知道，写死的表第二天就过期。
+ * - `omni`：omni 自己能做的事（新建、分叉、接力、导出…）。它们**不发给引擎**，
+ *   点了就在本地执行。
+ */
+export interface SlashCommand {
+  /** 不带前导斜杠。 */
+  name: string
+  description: string
+  /** 参数提示，如 `<file>` 或 `[<pr#>]`。没有参数就缺席。 */
+  argumentHint?: string
+  source: "engine" | "omni"
+}

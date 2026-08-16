@@ -1,10 +1,11 @@
 import { useState } from "react"
 import { Prompt } from "./Prompt.js"
+import { Action, takeCommand } from "./ComposerAction.js"
 import { ModelPicker } from "./ModelPicker.js"
 import { Select } from "./Select.js"
 import { Chips } from "./Chips.js"
-import { EngineIcon, SendIcon, ShieldIcon, StopIcon } from "./icons.js"
-import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
+import { EngineIcon, ShieldIcon } from "./icons.js"
+import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust } from "@omni/protocol"
 
 /**
  * 信任档。
@@ -40,6 +41,10 @@ interface Props {
   /** 轮次状态。变一次芯片就重新问一遍 git——引擎改完文件之后「脏不脏」就变了。 */
   stamp: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  /** 能用的斜杠命令：引擎报的 ＋ omni 自己的，`Workspace` 拼好再给。 */
+  commands: readonly SlashCommand[]
+  /** 选中了一条 omni 自己的命令（`source === "omni"`），就地执行。 */
+  onOmni: (name: string) => void
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   onSend: (text: string) => void
@@ -65,6 +70,8 @@ export function Composer({
   busy = false,
   onInterrupt,
   searchFiles,
+  commands,
+  onOmni,
 }: Props): React.JSX.Element {
   const [text, setText] = useState("")
   /**
@@ -91,63 +98,31 @@ export function Composer({
           detached={blocked}
           busyHint={busy && !detached}
           cwd={cwd}
+          commands={commands}
+          onCommand={(command) => {
+            takeCommand(command, setText, onOmni)
+          }}
           searchFiles={searchFiles}
           onChange={setText}
           onSubmit={submit}
         />
-        <div className="composer__bar">
-          <Select
-            label={labelOf(engines, engine)}
-            icon={<EngineIcon />}
-            title="引擎"
-            disabled={detached}
-            sections={[
-              {
-                value: engine,
-                onPick: onEngineChange,
-                // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
-                // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
-                choices: engines.map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                  ...(item.state === "missing" ? { note: "未安装" } : {}),
-                  ...(item.detail === undefined ? {} : { description: item.detail }),
-                })),
-              },
-            ]}
-          />
-          <Select
-            label={labelOf(TRUSTS, trust)}
-            icon={<ShieldIcon />}
-            title="信任档"
-            disabled={detached}
-            sections={[
-              {
-                value: trust,
-                onPick: (id) => {
-                  onTrustChange(id as Trust)
-                },
-                choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
-              },
-            ]}
-          />
-          <ModelPicker
-            models={models}
-            model={model}
-            effort={effort}
-            disabled={detached}
-            onChange={onModelChange}
-          />
-          <span style={{ flex: 1 }} />
-          <Action
-            detached={detached}
-            busy={busy}
-            empty={text.trim() === ""}
-            onResume={onResume}
-            onInterrupt={onInterrupt}
-            onSend={submit}
-          />
-        </div>
+        <Bar
+          detached={detached}
+          busy={busy}
+          empty={text.trim() === ""}
+          engine={engine}
+          engines={engines}
+          trust={trust}
+          models={models}
+          model={model}
+          effort={effort}
+          onEngineChange={onEngineChange}
+          onTrustChange={onTrustChange}
+          onModelChange={onModelChange}
+          onResume={onResume}
+          onInterrupt={onInterrupt}
+          onSend={submit}
+        />
       </div>
     </div>
   )
@@ -161,13 +136,25 @@ export function labelOf<T extends { id: string; label: string }>(list: readonly 
 export { TRUSTS }
 
 /**
- * 输入区右下角那一颗。**三种状态共用一个位置**：断开时是「继续这个会话」，
- * 跑着时是停止，其余时候是发送。手已经知道往哪儿点，换的是形状不是位置。
+ * 输入框下面那一排：引擎 / 信任档 / 模型 ＋ 右下角那颗键。
+ *
+ * 从 `Composer` 拆出来是行数闸门逼的。边界还算清楚：上面是「打什么字」，
+ * 这一排是「这句话由谁、以什么权限、用哪个模型去跑」——
+ * 四件事都不改文本，只改**这句话的去向**。
  */
-function Action({
+function Bar({
   detached,
   busy,
   empty,
+  engine,
+  engines,
+  trust,
+  models,
+  model,
+  effort,
+  onEngineChange,
+  onTrustChange,
+  onModelChange,
   onResume,
   onInterrupt,
   onSend,
@@ -175,54 +162,72 @@ function Action({
   detached: boolean
   busy: boolean
   empty: boolean
+  engine: EngineId
+  engines: readonly EngineInfo[]
+  trust: Trust
+  models: readonly ModelOption[]
+  model?: string
+  effort?: string
+  onEngineChange: (next: EngineId) => void
+  onTrustChange: (next: Trust) => void
+  onModelChange: (model: string, effort?: string) => void
   onResume?: () => void
   onInterrupt?: () => void
   onSend: () => void
 }): React.JSX.Element {
-  if (detached) return <Resume onResume={onResume} />
-  if (busy) {
-    // 跑着的时候把「发送」换成「停止」而不是灰掉：**这时候人真正想按的是停止**，
-    // 而一个灰掉的发送键只告诉他「不能发」，没告诉他还能做什么
-    return (
-      <button
-        className="send send--stop"
-        type="button"
-        title="停止（Esc）"
-        aria-label="停止"
-        onClick={onInterrupt}
-        disabled={onInterrupt === undefined}
-      >
-        <StopIcon />
-      </button>
-    )
-  }
   return (
-    <button className="send" type="button" title="发送（⌘↵）" aria-label="发送" onClick={onSend} disabled={empty}>
-      <SendIcon />
-    </button>
-  )
-}
-
-/**
- * 「继续这个会话」——**点下去要立刻有反应**。
- *
- * 恢复会话得把引擎重新拉起来、握手、读回历史，几百毫秒到几秒不等。
- * 上一版点完按钮纹丝不动，于是人会再点一次、再点一次——命令层虽然去重了，
- * 但那是在**兜底**，不是在回应。按钮自己要说话。
- */
-function Resume({ onResume }: { onResume?: () => void }): React.JSX.Element {
-  const [going, setGoing] = useState(false)
-  return (
-    <button
-      className="btn btn--primary"
-      type="button"
-      disabled={going || onResume === undefined}
-      onClick={() => {
-        setGoing(true)
-        onResume?.()
-      }}
-    >
-      {going ? "正在恢复…" : "继续这个会话"}
-    </button>
+  <div className="composer__bar">
+            <Select
+              label={labelOf(engines, engine)}
+              icon={<EngineIcon />}
+              title="引擎"
+              disabled={detached}
+              sections={[
+                {
+                  value: engine,
+                  onPick: onEngineChange,
+                  // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
+                  // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
+                  choices: engines.map((item) => ({
+                    id: item.id,
+                    label: item.label,
+                    ...(item.state === "missing" ? { note: "未安装" } : {}),
+                    ...(item.detail === undefined ? {} : { description: item.detail }),
+                  })),
+                },
+              ]}
+            />
+            <Select
+              label={labelOf(TRUSTS, trust)}
+              icon={<ShieldIcon />}
+              title="信任档"
+              disabled={detached}
+              sections={[
+                {
+                  value: trust,
+                  onPick: (id) => {
+                    onTrustChange(id as Trust)
+                  },
+                  choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
+                },
+              ]}
+            />
+            <ModelPicker
+              models={models}
+              model={model}
+              effort={effort}
+              disabled={detached}
+              onChange={onModelChange}
+            />
+            <span style={{ flex: 1 }} />
+            <Action
+              detached={detached}
+              busy={busy}
+              empty={empty}
+              onResume={onResume}
+              onInterrupt={onInterrupt}
+              onSend={onSend}
+            />
+          </div>
   )
 }

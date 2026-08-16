@@ -1,6 +1,6 @@
 import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
 import type { Item } from "./item.js"
-import type { Thread, Turn, TurnStatus } from "./thread.js"
+import type { SlashCommand, Thread, Turn, TurnStatus } from "./thread.js"
 
 /**
  * 用量。
@@ -86,6 +86,11 @@ export type Event =
   | { type: "item.updated"; at: number; item: Item }
   /** 这个会话能选哪些模型。引擎握手完成后报一次。 */
   | { type: "models.updated"; at: number; threadId: ThreadId; models: readonly ModelOption[] }
+  /**
+   * 这个会话能用哪些斜杠命令。握手后报一次；
+   * Claude 那边技能会**中途变**（agent 走到子目录里发现新技能），所以还会再报。
+   */
+  | { type: "commands.updated"; at: number; threadId: ThreadId; commands: readonly SlashCommand[] }
   /** 上下文与消耗。引擎给什么报什么，给不出的字段就缺席。 */
   | { type: "usage.updated"; at: number; threadId: ThreadId; usage: Usage }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */

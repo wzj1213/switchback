@@ -133,3 +133,24 @@ export type WireSandbox = "read-only" | "workspace-write" | "danger-full-access"
 
 /** `untrusted` 把最多的请求路由给客户端；见 driver.ts 的 POLICY 注释。 */
 export type WireApprovalPolicy = "untrusted" | "on-request" | "never"
+
+/**
+ * `skills/list` 回来的一条技能。
+ *
+ * `interface` 是给界面用的那一份（displayName 常常是中文，比 `name` 好读），
+ * 缺席就退回 `name`/`description`——**不是所有技能都写了那一段**。
+ */
+export interface WireSkill {
+  name: string
+  description?: string
+  enabled?: boolean
+  interface?: {
+    displayName?: string | null
+    shortDescription?: string | null
+  }
+}
+
+export interface WireSkillGroup {
+  cwd?: string
+  skills?: readonly WireSkill[]
+}

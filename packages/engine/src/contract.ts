@@ -1,13 +1,4 @@
-import type {
-  EngineId,
-  Event,
-  ItemId,
-  ModelOption,
-  RememberScope,
-  ThreadId,
-  TurnId,
-  Trust,
-} from "@omni/protocol"
+import type { EngineId, Event, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
 
@@ -91,6 +82,14 @@ export interface EngineSession {
   models: () => Promise<readonly ModelOption[]>
   /** 换模型。`effort` 只有报了 `efforts` 的引擎会用。 */
   setModel: (model: string, effort?: string) => Promise<void>
+  /**
+   * 这个引擎认哪些斜杠命令。**拿不到就给空数组**——界面据此少画一段，不报错。
+   *
+   * 各家名字不一样（Claude 叫 command/skill，codex 叫 skill），
+   * 但对用户是同一件事：打个 `/` 能选的东西。翻译成同一个形状在驱动里做，
+   * 上面各层只认 `SlashCommand`。
+   */
+  commands?: () => Promise<readonly SlashCommand[]>
   /** 幂等。返回时进程应已退出。 */
   dispose: () => Promise<void>
 }

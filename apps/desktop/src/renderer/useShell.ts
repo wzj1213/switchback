@@ -34,6 +34,14 @@ export interface Shell {
    */
   focusFilter: number
   askFocusFilter: () => void
+  /**
+   * 变一次就让侧栏把当前那一行切进改名态。
+   *
+   * 用计数器而不是布尔：布尔要有人负责复位，而「谁来复位」在两个组件之间
+   * 说不清楚——`focusFilter` 当初就是为这个改成计数器的，这里照抄。
+   */
+  askRename: number
+  requestRename: () => void
 }
 
 export function useShell(): Shell {
@@ -43,6 +51,7 @@ export function useShell(): Shell {
   const [comparing, setComparing] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [focusFilter, setFocusFilter] = useState(0)
+  const [askRename, setAskRename] = useState(0)
   return {
     selectedId,
     select: setSelectedId,
@@ -56,6 +65,10 @@ export function useShell(): Shell {
     setComparing,
     settingsOpen,
     setSettingsOpen,
+    askRename,
+    requestRename: () => {
+      setAskRename((n) => n + 1)
+    },
     focusFilter,
     askFocusFilter: () => {
       setFocusFilter((n) => n + 1)

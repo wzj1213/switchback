@@ -51,6 +51,8 @@ interface Props {
   pinned: readonly string[]
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
+  /** 变一次就把当前会话切进改名态。`/rename` 命令走这条路。 */
+  askRename: number
   /**
    * 变一次就把焦点送进筛选框。
    *
@@ -136,6 +138,7 @@ export function Sidebar({
   pinned,
   onTogglePin,
   onOpenSettings,
+  askRename,
   focusFilter,
 }: Props): React.JSX.Element {
   const [query, setQuery] = useState("")
@@ -173,7 +176,7 @@ export function Sidebar({
   const here = rows.find((r) => r.thread.id === selectedId)?.thread.cwd
   const isOpen = (cwd: string): boolean => expanded.has(cwd) || cwd === here
 
-  const rename = useRenaming(onRename)
+  const rename = useRenaming(onRename, { at: askRename, id: selectedId })
   const { rowMenu, groupMenu } = useSidebarMenus(acts, openMenu)
 
   const flat = (row: ThreadRow): React.JSX.Element => (

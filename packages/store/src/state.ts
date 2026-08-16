@@ -1,14 +1,4 @@
-import type {
-  EngineInfo,
-  Item,
-  ItemId,
-  ModelOption,
-  Thread,
-  ThreadId,
-  Turn,
-  TurnId,
-  Usage,
-} from "@omni/protocol"
+import type { EngineInfo, Item, ItemId, ModelOption, SlashCommand, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -33,6 +23,8 @@ export interface ViewState {
   notices: readonly Notice[]
   /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
   noticeSeq: number
+  /** 每个会话能用的斜杠命令。引擎报什么就是什么，omni 自己那几条在渲染层拼。 */
+  commands: Readonly<Record<string, readonly SlashCommand[]>>
 }
 
 /**
@@ -59,6 +51,7 @@ export function initial(): ViewState {
     turnOwner: {},
     usage: {},
     models: {},
+    commands: {},
     engines: [],
     notices: [],
     noticeSeq: 0,
@@ -81,6 +74,11 @@ export function usageOf(state: ViewState, threadId: ThreadId): Usage | undefined
 
 export function modelsOf(state: ViewState, threadId: ThreadId): readonly ModelOption[] {
   return state.models[threadId] ?? []
+}
+
+/** 取一个会话能用的斜杠命令。引擎没报过就是空的，界面据此只显示 omni 自己那几条。 */
+export function commandsOf(state: ViewState, threadId: ThreadId): readonly SlashCommand[] {
+  return state.commands[threadId] ?? []
 }
 
 export function threadsOf(state: ViewState): readonly Thread[] {

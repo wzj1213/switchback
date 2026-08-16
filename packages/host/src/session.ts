@@ -96,6 +96,16 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
       }
     })
     .catch(() => undefined)
+  // 斜杠命令同理，而且更不能写死：**那里面大半是用户自己装的技能**。
+  // 和模型分两次问、各自失败各自算——一家拿不到模型不该连命令也没有
+  void session
+    .commands?.()
+    .then((commands) => {
+      if (commands.length > 0) {
+        emit(ctx, { type: "commands.updated", at: ctx.deps.now(), threadId: thread.id, commands })
+      }
+    })
+    .catch(() => undefined)
   return early.handle
 }
 

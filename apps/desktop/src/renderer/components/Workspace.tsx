@@ -1,8 +1,10 @@
 import { useRef, useState } from "react"
-import type { Command, EngineInfo, Item, ModelOption, Thread, Turn, Usage } from "@omni/protocol"
+import type { Command, EngineInfo, Item, ModelOption, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
 import { Composer, labelOf } from "./Composer.js"
 import { CaretIcon, CompareIcon, ForkIcon } from "./icons.js"
+import { useOmniActions } from "../useOmniActions.js"
+import { nextEngine } from "../engines.js"
 import { EnvCard } from "./EnvCard.js"
 import { Transcript } from "./Transcript.js"
 import { Changed } from "./Changed.js"
@@ -10,26 +12,6 @@ import { ContextMeter } from "./ContextMeter.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
 
-/**
- * 分叉到「下一家」：引擎清单里当前这家之后的那一个，绕回开头。
- *
- * 只有两家时它就是「另一家」，语义毫无歧义；三家以上时按顺序轮。
- * 做成一个按钮而不是一个下拉：分叉不是常用操作，为它摆一个常驻的选择器
- * 只会把顶栏挤满。
- *
- * **跳过探测出「没装」的那些**。分叉是一键动作，没有确认步骤——
- * 一键分叉到一个装都没装的引擎，得到的只有一条报错和一个空会话。
- * 全都没装时退回原来的轮法：探测会错，不能因此让按钮彻底消失。
- */
-function nextEngine(engines: readonly EngineInfo[], current: string): EngineInfo | undefined {
-  if (engines.length < 2) return undefined
-  const rotate = (list: readonly EngineInfo[]): EngineInfo | undefined => {
-    const at = list.findIndex((e) => e.id === current)
-    return list[(at + 1) % list.length]
-  }
-  const usable = engines.filter((e) => e.state !== "missing" || e.id === current)
-  return usable.length >= 2 ? rotate(usable) : rotate(engines)
-}
 
 /**
  * 顶栏。
@@ -53,6 +35,8 @@ function TopBar({
   onCompare,
   onReveal,
   onCopy,
+  env,
+  setEnv,
 }: {
   thread: Thread
   usage: Usage | undefined
@@ -63,10 +47,12 @@ function TopBar({
   onCompare: () => void
   onReveal: (path: string) => void
   onCopy: (text: string) => void
+  /** 环境卡片开着没有。**状态在 `Workspace` 那层**——`/env` 命令也要能开它。 */
+  env: boolean
+  setEnv: (open: boolean) => void
 }): React.JSX.Element {
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
-  const [env, setEnv] = useState(false)
   const envAnchor = useRef<HTMLButtonElement>(null)
   return (
     <header className="topbar">
@@ -79,7 +65,7 @@ function TopBar({
         title="环境信息"
         aria-expanded={env}
         onClick={() => {
-          setEnv((v) => !v)
+          setEnv(!env)
         }}
       >
         {thread.title}
@@ -153,6 +139,12 @@ export interface WorkspaceProps {
   /** 在访达里定位工作区。环境卡片上那颗按钮用。 */
   onReveal: (path: string) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  /** 引擎报的斜杠命令。omni 自己那几条在这里拼上去。 */
+  commands: readonly SlashCommand[]
+  onSettings: () => void
+  /** 让侧栏把当前会话切进改名态。 */
+  onRename: () => void
+  onNew: () => void
   send: (command: Command) => void
 }
 
@@ -164,9 +156,17 @@ export interface WorkspaceProps {
  */
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
+  const [env, setEnv] = useState(false)
+  const actions = useOmniActions(props, {
+    onEnv: () => {
+      setEnv(true)
+    },
+  })
   return (
     <main className="main">
       <TopBar
+        env={env}
+        setEnv={setEnv}
         thread={thread}
         usage={props.usage}
         engines={props.engines}
@@ -194,6 +194,10 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
         stamp={props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`}
         searchFiles={props.searchFiles}
+        commands={[...actions.map((a) => a.command), ...props.commands]}
+        onOmni={(name: string) => {
+          actions.find((a) => a.command.name === name)?.run()
+        }}
         models={props.models}
         model={thread.model}
         effort={thread.effort}

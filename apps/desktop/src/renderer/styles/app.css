@@ -1001,3 +1001,77 @@ body {
 .send--stop:hover:not(:disabled) {
   background: var(--surface-4);
 }
+
+/* ── `/` 命令面板 ────────────────────────────────────
+ * 形制照 codex 那张：命令名在左、说明右对齐。说明右对齐是因为命令名长短不一，
+ * 左对齐会跟着参差；而人扫这张表是**先扫左边那列名字**，扫到了才往右看一眼。
+ */
+.slash {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(560px, 100%);
+  max-height: 300px;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.slash__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 5px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slash__row--active,
+.slash__row:hover {
+  background: var(--bg-hover);
+}
+
+.slash__name {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+/* 参数提示比命令名淡：它是「还要填什么」，不是命令本身 */
+.slash__args {
+  color: var(--text-faint);
+}
+
+/* omni 自己的命令标一下——**它们不发给引擎，就地执行**，行为不同就得看得出 */
+.slash__badge {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* 说明贴右，一行为限。命令名那列才是扫读的主轴 */
+.slash__desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -20,8 +20,19 @@ export interface RenameCtl {
  * 放在行里的话，两行同时进编辑态是可能的（右键一行、又去双击另一行），
  * 那时候回车提交的是哪一个，说不清楚。
  */
-export function useRenaming(onRename: (id: string, title: string) => void): RenameCtl {
+export function useRenaming(
+  onRename: (id: string, title: string) => void,
+  /** 外面请求「给这一行改名」的计数器（`/rename` 命令走这条路）。变一次就进编辑态。 */
+  request?: { at: number; id: string },
+): RenameCtl {
   const [id, setId] = useState<string | undefined>(undefined)
+  const at = request?.at ?? 0
+  const target = request?.id
+  // **只跟着计数器走。** 计数器进 deps、目标 id 不进——不然选中会话一变
+  // 就会重新进一次编辑态，而用户只是切了个会话
+  useEffect(() => {
+    if (at > 0 && target !== undefined) setId(target)
+  }, [at])
   return {
     id,
     start: setId,

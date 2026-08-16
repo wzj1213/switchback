@@ -1,4 +1,4 @@
-import { forkPeerOf, modelsOf, turnOf, usageOf } from "@omni/store"
+import { commandsOf, forkPeerOf, modelsOf, turnOf, usageOf } from "@omni/store"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen, SidebarPane } from "./screens.js"
 import { useApp } from "./useApp.js"
@@ -9,15 +9,20 @@ import { useApp } from "./useApp.js"
  * **只做这一件事。** 接线（十来个回调、当前会话是哪个、偏好）全在 `useApp` 里——
  * 混在一起的时候，「渲染哪一屏」这个真正的职责被埋在三十行 props 中间。
  */
-export function App(): React.JSX.Element {
-  const app = useApp()
-  const { shell, prefs, state, thread } = app
-
-  const sidebar = (
-    <SidebarPane
+/**
+ * 侧栏那一块的接线。
+ *
+ * 从 `App` 拆出来是行数闸门逼的，但边界是对的：`App` 只该回答
+ * 「渲染哪一屏」，而这十几个回调回答的是「侧栏能干什么」。
+ */
+function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
+  const { shell, prefs, thread } = app
+  return (
+<SidebarPane
       rows={app.rows}
       thread={thread}
       focusFilter={shell.focusFilter}
+      askRename={shell.askRename}
       onSelect={shell.select}
       onNew={app.newHere}
       onNewIn={app.open}
@@ -32,6 +37,13 @@ export function App(): React.JSX.Element {
       send={app.send}
     />
   )
+}
+
+export function App(): React.JSX.Element {
+  const app = useApp()
+  const { shell, prefs, state, thread } = app
+
+  const sidebar = <Rail app={app} />
 
   const settings = shell.settingsOpen ? (
     <SettingsScreen
@@ -110,6 +122,12 @@ export function App(): React.JSX.Element {
         }}
         onCopy={app.copy}
         onReveal={app.reveal}
+        commands={commandsOf(state, thread.id)}
+        onNew={app.newHere}
+        onRename={shell.requestRename}
+        onSettings={() => {
+          shell.setSettingsOpen(true)
+        }}
         searchFiles={app.searchFiles}
         send={app.send}
       />

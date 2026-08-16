@@ -188,6 +188,10 @@ const HANDLERS: Handlers = {
   "item.delta": reduceItem,
   "item.updated": reduceItem,
   "usage.updated": reduceCatalog,
+  "commands.updated": (state, event) => ({
+    ...state,
+    commands: { ...state.commands, [event.threadId]: event.commands },
+  }),
   "models.updated": reduceCatalog,
   "engines.available": reduceCatalog,
   "engine.status": onEngineStatus,

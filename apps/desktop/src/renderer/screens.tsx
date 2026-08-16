@@ -61,6 +61,7 @@ export function SidebarPane({
   rows,
   thread,
   focusFilter,
+  askRename,
   onSelect,
   onNew,
   onNewIn,
@@ -75,6 +76,7 @@ export function SidebarPane({
   rows: readonly ThreadRow[]
   thread: Thread | undefined
   focusFilter: number
+  askRename: number
   onSelect: (id: string | undefined) => void
   onNew: () => void
   onNewIn: (cwd: string) => void
@@ -100,6 +102,7 @@ export function SidebarPane({
       onTogglePin={onTogglePin}
       onOpenSettings={onOpenSettings}
       focusFilter={focusFilter}
+      askRename={askRename}
       onDelete={(id: string) => {
         // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
         if (id === thread?.id) onSelect(undefined)

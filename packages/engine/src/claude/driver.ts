@@ -6,7 +6,7 @@ import {
   type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
-import type { ModelOption, Trust, TurnId } from "@omni/protocol"
+import type { ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
@@ -143,6 +143,24 @@ class ClaudeSession implements EngineSession {
       id: m.value,
       label: m.displayName,
       ...(m.description === "" ? {} : { description: m.description }),
+    }))
+  }
+
+  /**
+   * 能用哪些斜杠命令。
+   *
+   * SDK 的 `supportedCommands()` 把内置命令和技能一起给（实测 52 条），
+   * 而**技能是用户自己装的**——`~/.claude/skills`、项目里的、插件带的。
+   * 所以这里绝不能写死一张表：写死的表既漏掉用户自己的技能，
+   * 又会在 Claude 加减命令时过期，而且过期了不报错。
+   */
+  async commands(): Promise<readonly SlashCommand[]> {
+    const list = await this.handle?.supportedCommands().catch(() => undefined)
+    return (list ?? []).map((c) => ({
+      name: c.name,
+      description: c.description,
+      ...(c.argumentHint === "" ? {} : { argumentHint: c.argumentHint }),
+      source: "engine" as const,
     }))
   }
 
