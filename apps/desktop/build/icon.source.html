@@ -1,11 +1,35 @@
-<!doctype html><html><head><meta charset="utf-8"><style>
-  html,body{margin:0;padding:0;width:1024px;height:1024px;background:transparent}
-  /* macOS 的 Dock 图标标准是 1024 画布里占 824，四周留透明边距——
-     铺满的话它会比旁边所有图标都显大一圈 */
-  .pad{width:1024px;height:1024px;display:flex;align-items:center;justify-content:center}
-  .mark{width:824px;height:824px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(160deg,#2a2a31 0%,#131317 100%);border-radius:184px;
-    box-shadow:0 12px 40px rgba(0,0,0,.28)}
-  .glyph{color:#fff;font-family:"PingFang SC","Songti SC",serif;font-size:450px;font-weight:600;
-    line-height:1;transform:translateY(-6px)}
-</style></head><body><div class="pad"><div class="mark"><div class="glyph">同</div></div></div></body></html>
+<!doctype html><html><head><meta charset="utf-8"><title>omni 图标源稿</title><style>
+/*
+ * omni 的产品图标：**三条并成一条**。
+ *
+ * 说的就是这个产品在干什么——不同的引擎从左边进来，一个界面从右边出去。
+ *
+ * ## 为什么不是那个「同」字
+ *
+ * 上一版是把系统字体的「同」放大。三个问题：
+ * 1. 依赖**构建机**装了对应中文字体，换台机器打包，图标可能就变了
+ * 2. 16px（访达列表、菜单栏、⌘Tab）下密笔画糊成一块方糖
+ * 3. 它没说这个产品是干什么的
+ *
+ * ## 为什么画成这样
+ *
+ * - 三条粗细/透明度不同的线 = 三家引擎各有各的样子
+ * - 汇到一点之后**只剩一条、而且更粗** = 一个界面
+ * - 只有四条描边，16px 下还剩得下一个有辨识度的轮廓
+ *
+ * 改完用 `pnpm 图标` 重新生成 icns（见 scripts/make-icon.mjs）。
+ */
+html,body{margin:0;width:1024px;height:1024px;background:transparent}
+.pad{width:1024px;height:1024px;display:flex;align-items:center;justify-content:center}
+.mark{width:824px;height:824px;border-radius:184px;
+  background:linear-gradient(155deg,#3b3b46 0%,#17171c 100%);
+  display:flex;align-items:center;justify-content:center}
+</style></head><body><div class="pad"><div class="mark">
+<svg width="520" height="520" viewBox="0 0 100 100" fill="none">
+  <!-- 三条粗细不同的线从左边进来（三家引擎），并成一条从右边出去（一个界面） -->
+  <path d="M12 26 H44 C58 26 58 50 72 50 H90" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".55"/>
+  <path d="M12 50 H90" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <path d="M12 74 H44 C58 74 58 50 72 50 H90" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".55"/>
+  <path d="M72 50 H90" stroke="#fff" stroke-width="11" stroke-linecap="round"/>
+</svg>
+</div></div></body></html>
