@@ -1,4 +1,4 @@
-import type { EngineAccount, EngineCapabilities, EngineId, EngineThread, Event, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineId, EngineThread, Event, Item, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
 
@@ -161,6 +161,16 @@ export interface EngineSession {
   history?: () => Promise<readonly EngineThread[]>
   /** 登录的是哪个账号。拿不到给 undefined，界面据此不画。 */
   account?: () => Promise<EngineAccount | undefined>
+  /**
+   * 这条会话在引擎那边已经有的对话内容。**接管时用来把 transcript 补齐。**
+   *
+   * 不支持就别实现——那时接过来是一片空白，界面必须自己说清楚
+   *「内容在引擎那边」（codex 就是这种：`thread/items/list` 回 not supported yet）。
+   *
+   * `total` 大于 `items.length` 表示截断过，调用方要把这件事说出来：
+   * 一段被悄悄砍掉一半的历史，比一段明说「只搬了最近这些」糟得多。
+   */
+  transcript?: () => Promise<{ items: readonly Item[]; total: number }>
   /**
    * 这家引擎能做什么。**握手完成后由宿主问一次**，挂到会话上给界面用。
    *

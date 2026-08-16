@@ -180,6 +180,31 @@ export function engineThreadsOf(state: ViewState, engine: string): readonly Engi
   return state.engineThreads[engine] ?? []
 }
 
+/**
+ * 装了的每一家，各一段历史。
+ *
+ * ## 为什么按「装了的引擎」而不是「报过历史的引擎」
+ *
+ * 历史是**握手时问出来的**，也就是说你没在 omni 里开过 Claude 会话，
+ * Claude 那一段就整个不存在。而「这里能放什么」恰恰是还没用过的人最需要知道的
+ * ——这条在侧栏别的段上已经吃过一次亏（置顶段空了就整段消失，
+ * 于是「怎么置顶」只有会用的人看得见）。空着也给段头，空态里说清楚为什么空。
+ *
+ * ## 为什么一家一段而不是合并
+ *
+ * 找的时候人想的是「我昨天在 Claude 里跑的那个」，引擎本身就是最强的筛选条件。
+ * 合成一段之后每行都得挂个引擎角标，而那正是分段能免掉的东西。
+ *
+ * 顺序跟着引擎清单走，**不按条数或时间排**——侧栏里一段的位置每次启动都变的话，
+ * 肌肉记忆就废了。
+ */
+export function foreignByEngine(state: ViewState): readonly { engine: string; threads: readonly EngineThread[] }[] {
+  const listed = state.engines.filter((e) => e.state !== "missing").map((e) => e.id)
+  // 报过历史但不在清单里的也带上：清单迟到时不该让已有的一段闪一下才出现
+  const extra = Object.keys(state.engineThreads).filter((id) => !listed.includes(id))
+  return [...listed, ...extra].map((engine) => ({ engine, threads: state.engineThreads[engine] ?? [] }))
+}
+
 /** 某家引擎登录的账号。没报过就是 undefined，界面据此什么都不画。 */
 export function accountOf(state: ViewState, engine: string): EngineAccount | undefined {
   return state.accounts[engine]

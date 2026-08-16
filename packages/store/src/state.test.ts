@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Thread } from "@omni/protocol"
-import { forkPeerOf, initial, threadRowsOf, type ViewState } from "./state.js"
+import { foreignByEngine, forkPeerOf, initial, threadRowsOf, type ViewState } from "./state.js"
 import { reduceAll } from "./reduce.js"
 
 const thread = (id: string, at: number, forkedFrom?: string): Thread => ({
@@ -62,5 +62,35 @@ describe("侧栏行", () => {
   it("最近创建的在前——归约器往前插，这是它的直接后果", () => {
     const state = stateWith(thread("先", 1), thread("后", 2))
     expect(threadRowsOf(state).map((r) => r.thread.id)).toEqual(["后", "先"])
+  })
+})
+
+describe("历史段：装了的每一家各一段", () => {
+  const withEngines = (engines: { id: string; state?: "ok" | "missing" }[], threads = {}): ViewState => ({
+    ...initial(),
+    engines: engines.map((e) => ({ label: e.id, ...e })) as ViewState["engines"],
+    engineThreads: threads,
+  })
+
+  it("**没报过历史的也给段头**——「这里能放什么」正是还没用过的人最需要知道的", () => {
+    const got = foreignByEngine(withEngines([{ id: "codex" }, { id: "claude" }]))
+    expect(got.map((g) => g.engine)).toEqual(["codex", "claude"])
+    expect(got.every((g) => g.threads.length === 0)).toBe(true)
+  })
+
+  it("没装的那家不给段——摆一段永远空的出来只是噪声", () => {
+    const got = foreignByEngine(withEngines([{ id: "codex" }, { id: "kimi", state: "missing" }]))
+    expect(got.map((g) => g.engine)).toEqual(["codex"])
+  })
+
+  it("顺序跟着引擎清单走，**不按条数排**：位置每次都变的话肌肉记忆就废了", () => {
+    const many = { claude: [{ handle: "a", title: "x", cwd: "/w", updatedAt: 1 }] }
+    const got = foreignByEngine(withEngines([{ id: "codex" }, { id: "claude" }], many))
+    expect(got.map((g) => g.engine)).toEqual(["codex", "claude"])
+  })
+
+  it("报过历史但清单里还没有的也带上——清单迟到时不该让已有的一段闪一下才出现", () => {
+    const got = foreignByEngine(withEngines([], { codex: [{ handle: "a", title: "x", cwd: "/w", updatedAt: 1 }] }))
+    expect(got.map((g) => g.engine)).toEqual(["codex"])
   })
 })

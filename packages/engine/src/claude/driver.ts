@@ -7,12 +7,13 @@ import {
   type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
-import type { EngineCapabilities, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
+import { listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 
 /**
@@ -175,6 +176,32 @@ class ClaudeSession implements EngineSession {
    * 这一条正是这层抽象要表达的东西：能力问的是**「omni 该不该提供入口」**，
    * 不是「这家引擎有没有这个概念」。
    */
+  /**
+   * Claude 自己存着哪些会话。
+   *
+   * SDK 没有「列出历史」的接口，但 Claude Code 把每次对话原样写在
+   * `~/.claude/projects/` 下，而**文件名就是 session id**——正好是 `resume`
+   * 要的句柄。所以这条是读盘，不是问 SDK（细节见 `history.ts`）。
+   */
+  async history(): Promise<readonly EngineThread[]> {
+    return listSessions(this.req.home)
+  }
+
+  /** 登录的是哪个账号。读 `~/.claude.json` 的身份字段，**不碰凭据**。 */
+  async account(): Promise<EngineAccount | undefined> {
+    return readAccount(this.req.home)
+  }
+
+  /**
+   * 这条会话已经聊过什么。**codex 那边做不到这件事**（它的 `thread/items/list`
+   * 回 not supported yet），而这里文件里就是全文，所以接过来能真的摆出来。
+   */
+  async transcript(): Promise<{ items: readonly Item[]; total: number }> {
+    const id = this.req.resume
+    if (id === undefined) return { items: [], total: 0 }
+    return readTranscript(this.req.home, id, Date.now())
+  }
+
   capabilities(): EngineCapabilities {
     // steer 报 false：SDK 没有「往正在跑的那一轮里插一句」的入口。
     // 宿主据此退回排队——**不是假装支持再偷偷排队**，

@@ -96,9 +96,9 @@ export function SidebarPane({
   onSetIcon: (cwd: string, icon: string) => void
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
-  /** 引擎自己存着的会话。 */
-  foreign: readonly EngineThread[]
-  onAdopt: (item: EngineThread) => void
+  /** 报过历史的每一家，各一段。 */
+  foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
+  onAdopt: (engine: string, item: EngineThread) => void
   /** 底部那一行：登录的是谁、还剩多少额度。 */
   account?: AccountLine
   send: (command: Command) => void

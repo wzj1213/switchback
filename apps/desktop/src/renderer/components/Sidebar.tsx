@@ -57,10 +57,10 @@ interface Props {
   icons: Readonly<Record<string, string>>
   /** 给项目设图标；传空字符串表示清掉。 */
   onSetIcon: (cwd: string, icon: string) => void
-  /** 引擎自己存着的会话（你在终端、别处跑过的）。 */
-  foreign: readonly EngineThread[]
-  /** 把引擎那边的一条会话接过来。 */
-  onAdopt: (item: EngineThread) => void
+  /** 报过历史的每一家，各一段。 */
+  foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
+  /** 把某一家那边的一条会话接过来。 */
+  onAdopt: (engine: string, item: EngineThread) => void
   /** 引擎登录的账号 + 额度，画在底部那一行。没有就不画。 */
   account?: AccountLine
   onTogglePin: (cwd: string) => void

@@ -41,8 +41,9 @@ function Blank({ thread }: { thread: Thread }): React.JSX.Element {
           于是把已经说过的话再说一遍——「看起来丢了但其实没丢」比真丢了更难受 */}
       {thread.adopted === true ? (
         <p className="blank__note">
-          这条是在 codex 里开的。<strong>前面聊过什么它都记得</strong>，
-          只是那些内容存在引擎那边，omni 这里搬不过来，所以上面是空的。
+          这条是从引擎那边接过来的。<strong>前面聊过什么它都记得</strong>，
+          只是那些内容存在引擎那边、omni 这里搬不过来，所以上面是空的。
+          （Claude 的历史能搬，codex 目前不行——它还没开放读取历史内容的接口。）
         </p>
       ) : null}
     </div>

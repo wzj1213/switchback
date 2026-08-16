@@ -4,6 +4,7 @@ import { createGate } from "./gate.js"
 import { askUser } from "./approval.js"
 import type { EngineSession } from "@omni/engine"
 import { emit, type Ctx, type Live } from "./ctx.js"
+import { copyTranscript } from "./transcript.js"
 import type { Gate } from "./gate.js"
 
 /**
@@ -349,5 +350,30 @@ export async function adopt(ctx: Ctx, cmd: Extract<Command, { type: "thread.adop
     type: "thread.updated",
     at: ctx.deps.now(),
     thread: { ...(ctx.live.get(thread.id)?.thread ?? thread), status: "idle" },
+  })
+  await fillTranscript(ctx, thread)
+}
+
+/**
+ * 把引擎那边已有的对话搬进来。**搬不动就什么都不做**——那时界面上是空的，
+ * 空态里那句说明会告诉用户内容在引擎那边（codex 走的就是这条路）。
+ *
+ * 截断了一定要说出来：一段被悄悄砍掉一半的历史，
+ * 比一段明说「只搬了最近这些」糟得多。
+ */
+async function fillTranscript(ctx: Ctx, thread: Thread): Promise<void> {
+  const entry = ctx.live.get(thread.id)
+  const read = entry?.session.transcript
+  if (entry === undefined || read === undefined) return
+  const got = await read.call(entry.session).catch(() => undefined)
+  if (got === undefined || got.items.length === 0) return
+  copyTranscript(ctx, thread, got.items)
+  if (got.total <= got.items.length) return
+  ctx.deps.emit({
+    type: "engine.status",
+    at: ctx.deps.now(),
+    threadId: thread.id,
+    status: "degraded",
+    detail: `这条会话有 ${String(got.total)} 条记录，只搬了最近 ${String(got.items.length)} 条进来。完整的还在引擎那边，它自己看得见。`,
   })
 }

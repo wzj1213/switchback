@@ -1,6 +1,6 @@
 import type { EngineThread } from "@omni/protocol"
 import { FOREIGN_MAX } from "../sidebar.js"
-import { SectionHead, type GroupHandlers } from "./SidebarSections.js"
+import { SectionHead } from "./SidebarSections.js"
 import { SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { ForkIcon } from "./icons.js"
 
@@ -73,33 +73,47 @@ export function whenOf(at: number, now = Date.now()): string {
  * 用户会按普通会话的预期去点，然后看到一片空白。
  */
 export function ForeignSection({
+  engine,
+  threads,
   open,
   onToggle,
-  on,
+  onAdopt,
 }: {
+  engine: string
+  threads: readonly EngineThread[]
   open: boolean
   onToggle: () => void
-  on: GroupHandlers
+  onAdopt: (engine: string, item: EngineThread) => void
 }): React.JSX.Element {
   return (
     <>
-      {/* **默认折叠**，见 `SHUT_BY_DEFAULT`：这一段的条数由引擎决定
-          （实测 25 条），展开着会把你自己那几条挤下去 */}
-      <SectionHead title="codex 历史" open={open} onToggle={onToggle} />
+      {/* **默认折叠**（见 `defaultOpen`）：这一段的条数由引擎决定，
+          展开着会把你自己那几条挤下去 */}
+      <SectionHead title={`${engine} 历史`} open={open} onToggle={onToggle} />
       {open ? (
-        on.foreign.length === 0 ? (
-          <p className="sidebar__empty">你在终端或别处跑过的 codex 会话会列在这里。</p>
+        threads.length === 0 ? (
+          // **说清楚为什么空**：历史是握手时问出来的，没开过这家就问不到。
+          // 只写「暂无」的话，人会以为自己在别处跑的会话没被认出来
+          <p className="sidebar__empty">
+            在 omni 里开一个 {engine} 会话之后，你在终端或别处跑过的会列在这里。
+          </p>
         ) : (
-          <>
-            {on.foreign.map((item) => (
-              <ForeignRow key={item.handle} item={item} onAdopt={on.onAdopt} />
-            ))}
-            {/* **截断要说出来。** 不说的话「就这些了」和「只给你看了这些」
-                在界面上长得一模一样 */}
-            {on.foreign.length >= FOREIGN_MAX ? (
-              <p className="sidebar__empty">只列最近 {FOREIGN_MAX} 条。更早的去 codex 里找。</p>
-            ) : null}
-          </>
+        <>
+          {threads.map((item) => (
+            <ForeignRow
+              key={item.handle}
+              item={item}
+              onAdopt={(picked) => {
+                onAdopt(engine, picked)
+              }}
+            />
+          ))}
+          {/* **截断要说出来。** 不说的话「就这些了」和「只给你看了这些」
+              在界面上长得一模一样 */}
+          {threads.length >= FOREIGN_MAX ? (
+            <p className="sidebar__empty">只列最近 {FOREIGN_MAX} 条。更早的去 {engine} 里找。</p>
+          ) : null}
+        </>
         )
       ) : null}
     </>

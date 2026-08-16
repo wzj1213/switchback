@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
-import { accountOf, engineThreadsOf, itemsOf, limitsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
+import { accountOf, foreignByEngine, itemsOf, limitsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
 import type { Item } from "@omni/protocol"
-import type { Command, EngineAccount, EngineThread, RateLimits, Thread } from "@omni/protocol"
+import type { Command, EngineThread, RateLimits, Thread } from "@omni/protocol"
 import { useOmni } from "./useOmni.js"
 import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
@@ -40,10 +40,10 @@ export interface AppApi {
   /** 侧栏「新建会话」：有当前会话就用它的目录，没有就先问路径。 */
   newHere: () => void
   itemsOf: (threadId: string) => readonly Item[]
-  /** 引擎自己存着的会话（你在终端、别处跑过的）。 */
-  foreign: readonly EngineThread[]
-  /** 把引擎那边的一条会话接过来，接完跳过去。 */
-  adopt: (item: EngineThread) => void
+  /** 报过历史的每一家，各一段。 */
+  foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
+  /** 把某一家那边的一条会话接过来，接完跳过去。 */
+  adopt: (engine: string, item: EngineThread) => void
   /** 底部那一行：登录的是谁、还剩多少额度。 */
   account: AccountLine | undefined
 }
@@ -141,23 +141,23 @@ export function useApp(): AppApi {
       else open(thread.cwd)
     },
     itemsOf: (threadId) => itemsOf(omni.state, threadId),
-    // 目前只有 codex 报得出这两样。写死引擎名是暂时的：**第二家能报的时候，
-    // 这里要改成按引擎聚合**，而不是再加一个 `if`
-    foreign: engineThreadsOf(omni.state, "codex"),
-    adopt: (item) => {
+    foreign: foreignByEngine(omni.state),
+    adopt: (engine, item) => {
       // 和新建走同一条「记下序号、等 thread.started」的路（见上面那段注释），
       // 接完自动跳过去——不跳的话人得自己去侧栏里找它，
       // 而它刚从「codex 历史」那一段里消失
       awaited.current = omni.lastStarted?.seq ?? 0
       omni.send({
         type: "thread.adopt",
-        engine: "codex",
+        engine,
         handle: item.handle,
         cwd: item.cwd,
         title: item.title,
       })
     },
-    account: accountLineOf(accountOf(omni.state, "codex"), limitsOf(omni.state, "codex")),
+    // **跟着当前会话的引擎走**：底下那一行说的是「你现在用的是哪个号」，
+    // 而你现在用的是哪一家由选中的会话决定。没选会话时退回唯一报过的那家
+    account: accountLineOf(omni.state, thread?.engine),
   }
 }
 
@@ -170,17 +170,30 @@ export function useApp(): AppApi {
  *
  * 额度报不上来就**不显示百分比**，不是显示 100%——那是撒谎。
  */
-function accountLineOf(
-  account: EngineAccount | undefined,
-  limits: RateLimits | undefined,
-): AccountLine | undefined {
+function accountLineOf(state: ViewState, engine: string | undefined): AccountLine | undefined {
+  const which = pickEngine(state, engine)
+  if (which === undefined) return undefined
+  const account = accountOf(state, which)
   if (account === undefined) return undefined
-  const used = tightest(limits)
+  const used = tightest(limitsOf(state, which))
   return {
     label: account.label,
     ...(account.plan === undefined ? {} : { plan: account.plan }),
     ...(used === undefined ? {} : { remain: Math.max(0, 100 - Math.round(used)) }),
   }
+}
+
+/**
+ * 底部那行显示哪一家的账号。
+ *
+ * 优先当前会话那家；它没报过账号（比如 Claude 的 SDK 就不给）时退回
+ * **唯一**报过的那家。有两家都报过、而当前这家没报，就什么都不显示——
+ * 那时候摆出另一家的号是误导：你看着 A 的会话，底下写着 B 的账号。
+ */
+function pickEngine(state: ViewState, engine: string | undefined): string | undefined {
+  const known = Object.keys(state.accounts)
+  if (engine !== undefined && known.includes(engine)) return engine
+  return known.length === 1 ? known[0] : undefined
 }
 
 /** 两个窗口里用得更满的那个。都没有就 undefined。 */

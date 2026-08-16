@@ -81,12 +81,13 @@ export interface GroupHandlers {
   /** 各项目设过的图标：路径 → emoji。 */
   icons: Readonly<Record<string, string>>
   /**
-   * 引擎自己存着的会话（你在终端、别的界面里跑过的）。
-   * 空数组时那一段仍然渲染段头——「这里能放什么」得让还不知道的人看得见。
+   * 报过历史的每一家，各一段（你在终端、别的界面里跑过的会话）。
+   * **一家一段而不是合并**：找的时候人想的是「我昨天在 Claude 里跑的那个」，
+   * 引擎本身就是最强的筛选条件。
    */
-  foreign: readonly EngineThread[]
-  /** 把引擎那边的一条会话接过来，在 omni 里接着聊。 */
-  onAdopt: (item: EngineThread) => void
+  foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
+  /** 把某一家那边的一条会话接过来，在 omni 里接着聊。 */
+  onAdopt: (engine: string, item: EngineThread) => void
 }
 
 function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
@@ -177,26 +178,32 @@ function Chats({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers }):
 }
 
 /**
- * 「codex 历史」**默认折叠**。
+ * 这一段默认展开还是折叠。
  *
- * 它装的是你在别处跑的会话，这台机器上有 25 条——展开着的话，
- * 侧栏一打开就被一段你没在 omni 里建过的东西占满，
- * 而你八成是来找自己那几条的。要看的时候点开就是。
+ * **历史段默认折叠**：装的是你在别处跑的会话（实测 codex 25 条、Claude 40 条），
+ * 展开着的话侧栏一打开就被一段你没在 omni 里建过的东西占满，
+ * 而你八成是来找自己那几条的。
+ *
+ * 做成函数而不是一张初始集合：历史段的键带引擎名，
+ * **挂载时还不知道有哪几家**（那要等引擎握手报上来）。
  */
-const SHUT_BY_DEFAULT: readonly string[] = ["hist"]
+function defaultOpen(key: string): boolean {
+  return !key.startsWith("hist:")
+}
 
 
 export function SectionList({ sections, on }: { sections: Sections; on: GroupHandlers }): React.JSX.Element {
-  const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set(SHUT_BY_DEFAULT))
+  // 记的是「被人扳过的段」，不是「收起来的段」——默认值由 `defaultOpen` 说了算
+  const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
   const toggle = (key: string): void => {
-    setShut((prev) => {
+    setToggled((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
       return next
     })
   }
-  const open = (key: string): boolean => !shut.has(key)
+  const open = (key: string): boolean => defaultOpen(key) !== toggled.has(key)
 
   return (
     <>
@@ -247,7 +254,19 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         )
       ) : null}
 
-      <ForeignSection open={open("hist")} onToggle={() => { toggle("hist") }} on={on} />
+      {/* 报过历史的每一家各一段，**都默认折叠** */}
+      {on.foreign.map((group) => (
+        <ForeignSection
+          key={group.engine}
+          engine={group.engine}
+          threads={group.threads}
+          open={open(`hist:${group.engine}`)}
+          onToggle={() => {
+            toggle(`hist:${group.engine}`)
+          }}
+          onAdopt={on.onAdopt}
+        />
+      ))}
     </>
   )
 }
