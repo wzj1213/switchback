@@ -3,14 +3,13 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow, type WebContents } from "electron"
 import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
-import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 import { createAttention } from "./attention.js"
-import { readEngineFile, registerAcpEngines } from "./engines.js"
+import { buildRegistry } from "./registry.js"
 import { createSequencer, type Sealed } from "./sequence.js"
 import type { Logger } from "./log.js"
 
@@ -176,18 +175,7 @@ export function attachHost(
   // 规则和事件分开存：删会话不该把「始终允许」一起删了
   const rules = createRuleStore(join(app.getPath("userData"), "rules"))
 
-  // **这张表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
-  // 写两份的下场是下拉里列着 ZCode 和 Kimi，选中直接报「未注册的引擎」。
-  //
-  // 第三方 ACP 引擎从 `engines.json` 读，默认没有——**不内置一份猜出来的清单**，
-  // 理由见 `engines.ts`。装了什么由用户说了算，我们只负责讲协议。
-  const acp = registerAcpEngines(readEngineFile(app.getPath("userData"), log))
-  const drivers = { claude: createClaudeDriver(), codex: createCodexDriver(), ...acp.drivers }
-  const labels: Readonly<Record<string, string>> = {
-    claude: "Claude Code",
-    codex: "Codex",
-    ...acp.labels,
-  }
+  const { drivers, labels } = buildRegistry(app.getPath("userData"), log)
 
   const host = createHost({
     drivers,

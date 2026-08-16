@@ -1,16 +1,18 @@
+import { readFile } from "node:fs/promises"
 import type { ChildProcess } from "node:child_process"
 import { NO_CAPABILITIES } from "@omni/protocol"
-import type { EngineCapabilities, EngineStatus, ModelOption, Trust, TurnId } from "@omni/protocol"
+import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust, TurnId } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
-import { currentModeOf, modelsOf, modesOf, startupMessage } from "./setup.js"
+import { sessionsOf } from "./setup.js"
+import { handshake, openSession, type OpenCtx, type OpenState } from "./open.js"
 import { pickMode } from "./mode.js"
 import { handlePermission } from "./permission.js"
 import { stopStatus } from "./translate.js"
 import { closeText, createUpdateState, handleUpdate, sweep, type UpdateContext, type UpdateState } from "./update.js"
-import type { AcpInitialize, AcpNewSession, AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
+import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
 
 /**
  * 通用 ACP 驱动。**一个驱动接所有讲 ACP 的引擎**——这是接第三家协议的全部意义：
@@ -40,13 +42,12 @@ import type { AcpInitialize, AcpNewSession, AcpNotification, AcpPromptResult, Ac
  * 这个前提的必然代价，不是可以修的 bug——写在 README 的已知限制里。
  */
 
-const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
 
-const PROTOCOL_VERSION = 1
-const HANDSHAKE_MS = 20_000
+
+/** 历史列表最多带回来这么多条。和界面上那一段的上限对齐。 */
+const HISTORY_MAX = 40
 const STDERR_KEEP = 2000
 
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 export interface AcpDriverConfig {
   /** 引擎身份，落进事件与判定请求。约定用 `acp:` 前缀，如 `acp:zcode`。 */
@@ -57,15 +58,9 @@ export interface AcpDriverConfig {
   reclaim?: Partial<ReclaimConfig>
 }
 
-interface SessionState {
+interface SessionState extends OpenState {
   child: ChildProcess | undefined
-  acpSession: string | undefined
   turn: TurnId | undefined
-  stderr: string
-  modes: readonly { id?: string; name?: string }[]
-  mode: string | undefined
-  models: readonly ModelOption[]
-  loadSession: boolean
 }
 
 class AcpSession implements EngineSession {
@@ -92,6 +87,10 @@ class AcpSession implements EngineSession {
       mode: undefined,
       models: [],
       loadSession: false,
+      caps: NO_CAPABILITIES,
+      canList: false,
+      effort: undefined,
+      trust: req.trust,
     }
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
@@ -166,65 +165,18 @@ class AcpSession implements EngineSession {
     this.status("ready")
   }
 
-  /**
-   * 握手。超时 + 看 spawn 是否失败，两条都要——理由同 codex 驱动：
-   * 起不来的进程不产出 stdout，`call()` 于是永远不 resolve，界面就一直停在
-   * 「正在打开工作区…」，没有报错也没有超时，是最难查的一类故障。
-   */
-  private async handshake(): Promise<void> {
-    const result = await Promise.race([
-      this.rpc.call("initialize", {
-        protocolVersion: PROTOCOL_VERSION,
-        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-        clientInfo: CLIENT_INFO,
-      }),
-      this.owner.died().then((error) => ({ died: error })),
-      sleep(HANDSHAKE_MS).then(() => "timeout" as const),
-    ])
-    if (result === "timeout") {
-      const tail = this.state.stderr === "" ? "" : `\n${this.state.stderr}`
-      throw new Error(`${this.config.id} 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
-    }
-    if (typeof result === "object" && result !== null && "died" in result) {
-      throw new Error(startupMessage(this.config.command, (result as { died: Error }).died))
-    }
-    const info = result as AcpInitialize
-    const version = info.protocolVersion
-    // 版本不合就直接说。协议原文：客户端不支持返回的版本时应当断开
-    if (version !== undefined && version > PROTOCOL_VERSION) {
-      throw new Error(
-        `${this.config.id} 讲的是 ACP v${String(version)}，omni 只认到 v${String(PROTOCOL_VERSION)}。请升级 omni。`,
-      )
-    }
-    this.state.loadSession = info.agentCapabilities?.loadSession === true
+  /** 握手 + 开会话。细节在 `open.ts`——**那是「这条会话怎么开场」，不是驱动的日常**。 */
+  /** 开场那几步共用的一份上下文。见 `open.ts`。 */
+  private openCtx(): OpenCtx {
+    return { rpc: this.rpc, owner: this.owner, config: this.config, req: this.req, state: this.state }
   }
 
-  /**
-   * 开会话。带句柄就 `session/load` 续跑。
-   *
-   * **agent 不支持 `loadSession` 时不能静默新开**——用户会以为上下文还在，
-   * 实际模型什么都不记得。宁可把失败摆出来（和 codex 驱动同一条原则）。
-   */
+  private async handshake(): Promise<void> {
+    this.state.caps = await handshake(this.openCtx())
+  }
+
   private async openSession(): Promise<void> {
-    const shared = { cwd: this.req.cwd, mcpServers: [] }
-    if (this.req.resume !== undefined) {
-      if (!this.state.loadSession) {
-        throw new Error(`${this.config.id} 不支持续跑（没有 loadSession 能力），这个会话没法接着上次跑。`)
-      }
-      await this.rpc.call("session/load", { sessionId: this.req.resume, ...shared })
-      this.state.acpSession = this.req.resume
-      this.req.onHandle?.(this.req.resume)
-      await this.applyMode(this.trust.current, [])
-      return
-    }
-    const created = (await this.rpc.call("session/new", shared)) as AcpNewSession
-    const id = created.sessionId
-    if (id === undefined) throw new Error(`${this.config.id} 没有返回 sessionId，无法继续`)
-    this.state.acpSession = id
-    this.req.onHandle?.(id)
-    this.state.models = modelsOf(created)
-    this.state.modes = modesOf(created)
-    this.state.mode = currentModeOf(created)
+    await openSession(this.openCtx())
     await this.applyMode(this.trust.current, this.state.modes)
   }
 
@@ -291,12 +243,13 @@ class AcpSession implements EngineSession {
    * 正好相反。所以这里不能 await 它——await 了 `prompt()` 就要挂到整轮结束，
    * 宿主那边的队列会以为这一轮还没发出去。收工事件在 then 里发。
    */
-  async prompt(text: string, turnId: TurnId): Promise<void> {
+  async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
     const sessionId = this.state.acpSession
     if (sessionId === undefined) throw new Error(`${this.config.id} 会话尚未就绪`)
     this.state.turn = turnId
+    const prompt = [{ type: "text", text }, ...(await this.imageBlocks(attachments))]
     this.rpc
-      .call("session/prompt", { sessionId, prompt: [{ type: "text", text }] })
+      .call("session/prompt", { sessionId, prompt })
       .then(
         (result) => {
           this.finishTurn(turnId, (result as AcpPromptResult | undefined)?.stopReason)
@@ -306,6 +259,30 @@ class AcpSession implements EngineSession {
         },
       )
     return Promise.resolve()
+  }
+
+  /**
+   * 附件 → ACP 的图片内容块。
+   *
+   * 形状是**实测出来的**：`{type:"image", data:<base64>, mimeType}`，
+   * 拿一张写着 `KIMI-4417` 的图发过去，agent 把那串字念了回来。
+   *
+   * 和 codex 那边（给路径）不一样，ACP 要 base64——协议里没有「本地文件」这种块，
+   * 而 agent 可能根本不在同一台机器上。
+   *
+   * **不支持图片的 agent 一个块都不发**：塞过去要么报错、要么被静默丢掉，
+   * 而后者更糟——界面上显示「已附上」，模型其实没看见。
+   * 读不出来的文件跳过，不因为一张图毁掉整句话。
+   */
+  private async imageBlocks(paths: readonly string[] | undefined): Promise<readonly unknown[]> {
+    if (paths === undefined || paths.length === 0 || !this.state.caps.attachments) return []
+    const blocks: unknown[] = []
+    for (const path of paths) {
+      const data = await readFile(path).catch(() => undefined)
+      if (data === undefined) continue
+      blocks.push({ type: "image", data: data.toString("base64"), mimeType: mimeOf(path) })
+    }
+    return blocks
   }
 
   private finishTurn(turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
@@ -343,17 +320,44 @@ class AcpSession implements EngineSession {
    * 但契约上它是可选的，忽略即可，不用报错。
    */
   /**
-   * ACP 协议里没有压缩，附件那部分各家实现差异也没验过。
-   * **没探过就报 false**——宁可少一个入口，也不要给一个点了没反应的。
+   * **agent 自己说的，不是写死的。** 上一版一律报 `NO_CAPABILITIES`，
+   * 于是接进来的引擎就算支持贴图、支持原生分叉，界面上那些入口一个都不给。
+   * 一个驱动接所有讲 ACP 的引擎，那各家能力就只能一家一家问。
    */
   capabilities(): EngineCapabilities {
-    return NO_CAPABILITIES
+    return this.state.caps
   }
 
-  async setModel(model: string): Promise<void> {
+  /**
+   * 换模型（可能连带换强度）。
+   *
+   * 强度有两种表达：有的适配器把它编进 modelId（codex 适配器的
+   * `gpt-5.6-sol[low]`），那时 `effort` 是多余的，忽略即可；
+   * 有的把它做成独立的会话选项（kimi 的 `thinking`），那时要单独发一次。
+   * **两条都走**，因为同一个驱动要接这两种。
+   */
+  async setModel(model: string, effort?: string): Promise<void> {
     const sessionId = this.state.acpSession
     if (sessionId === undefined) return
     await this.rpc.call("session/set_model", { sessionId, modelId: model })
+    if (effort === undefined || effort === this.state.effort) return
+    await this.rpc
+      .call("session/set_config_option", { sessionId, configId: "thinking", value: effort })
+      .then(() => {
+        this.state.effort = effort
+      })
+      // 改不了强度不该把「换模型」也算失败——模型那一步已经成了
+      .catch(() => undefined)
+  }
+
+  /**
+   * agent 自己存着哪些会话。**不支持就不实现这条路**（`canList` 为假时给空数组），
+   * 界面据此不显示那一段。
+   */
+  async history(): Promise<readonly EngineThread[]> {
+    if (!this.state.canList) return []
+    const raw = await this.rpc.call("session/list", { cwd: this.req.cwd }).catch(() => undefined)
+    return sessionsOf(raw, HISTORY_MAX)
   }
 
   /**
@@ -369,6 +373,7 @@ class AcpSession implements EngineSession {
   }
 
   async setTrust(trust: Trust): Promise<void> {
+    this.state.trust = trust
     this.trust.current = trust
     await this.applyMode(trust, this.state.modes)
   }
@@ -404,4 +409,17 @@ export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
       return session
     },
   }
+}
+
+/**
+ * 按扩展名认图片类型。**认不出就当 PNG**——协议要一个 mimeType，
+ * 而这里唯一的替代方案是不发这张图，那比猜错格式糟：
+ * 多数 agent 自己会嗅探真实字节。
+ */
+function mimeOf(path: string): string {
+  const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase()
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg"
+  if (ext === "gif") return "image/gif"
+  if (ext === "webp") return "image/webp"
+  return "image/png"
 }

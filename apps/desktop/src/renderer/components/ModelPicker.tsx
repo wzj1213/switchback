@@ -114,7 +114,9 @@ export function ModelPicker({
   disabled: boolean
   onChange: (model: string, effort?: string) => void
 }): React.JSX.Element | null {
-  const current = models.find((m) => m.id === model) ?? models[0]
+  // 用户选过就用他选的；没选过**优先引擎自己报的当前值**，最后才退回第一个。
+  // 直接退回第一个是在撒谎：kimi 报的当前模型是 K3，而列表第一个是 K2.7
+  const current = models.find((m) => m.id === model) ?? models.find((m) => m.isDefault === true) ?? models[0]
   if (current === undefined) return null
   const level = effort ?? current.defaultEffort
   // 触发器上把两样都写出来：只写模型的话，改了强度之后界面上没有任何变化

@@ -81,6 +81,10 @@
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
   驱动只翻译 assistant / stream_event / result / system 四类，其余落 `meta` 或丢弃。
   新增覆盖时先确认它是否真的需要进 transcript。
+- **ACP 侧的能力由 agent 自报**（`capabilitiesOf`），不再一律 `NO_CAPABILITIES`。
+  实测 kimi（`kimi acp`，0.36.1）报的是：能贴图、能原生分叉、能列历史、能续跑，
+  **不能压缩**（`session/compact` → Method not found）、不能改向（ACP 没这个入口）。
+  `sessionCapabilities` 用空对象当标记，所以判据是「键在不在」不是「值是不是 true」。
 - **codex 侧只消费 74 种通知里的一小撮**：item 生命周期、文本与命令输出的 delta、
   用量、`turn/completed`、`error`。其余（MCP 进度、审批复核、实时语音…）一律丢弃。
 - **codex 的 OS 沙箱在 `thread/start` 时定死，`setTrust` 改不了它。** 往低调没问题

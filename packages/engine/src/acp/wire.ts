@@ -128,6 +128,11 @@ export interface AcpModel {
 
 export interface AcpConfigOption {
   id?: string
+  /**
+   * 这一项在语义上是什么（`model` / `thought_level` / `mode`）。
+   * **认它优先于认 `id`**：id 是各家自己起的名字，category 才是约定的语义位。
+   */
+  category?: string
   currentValue?: unknown
   options?: readonly { value?: unknown; name?: string; description?: string | null }[]
 }
@@ -143,9 +148,25 @@ export interface AcpInitialize {
   protocolVersion?: number
   agentCapabilities?: {
     loadSession?: boolean
-    promptCapabilities?: Record<string, unknown>
+    /** 提示词里能塞什么。实测 kimi 报 `{image:true, audio:false, embeddedContext:true}`。 */
+    promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean }
+    /**
+     * 会话层面能做什么。**存在即支持**——ACP 用空对象当标记，
+     * 实测 kimi 报 `{list:{}, resume:{}, close:{}, delete:{}, fork:{}}`。
+     * 所以判据是「这个键在不在」，不是「它的值是不是 true」。
+     */
+    sessionCapabilities?: Record<string, unknown>
   }
   agentInfo?: { name?: string; title?: string; version?: string }
+}
+
+/** `session/list` 回来的一条。实测 kimi 的字段就这四个。 */
+export interface AcpSessionRow {
+  sessionId?: string
+  cwd?: string
+  title?: string | null
+  /** ISO 字符串。 */
+  updatedAt?: string
 }
 
 export type AcpStopReason =
