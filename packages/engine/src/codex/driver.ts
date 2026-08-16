@@ -79,6 +79,11 @@ interface SessionState {
   /** 用户选的模型与强度。`turn/start` 时带上，codex 说它对后续轮次也生效。 */
   model: string | undefined
   effort: string | undefined
+  /**
+   * 上次问到的模型清单。**留着是为了补强度**——见 `setModel`。
+   * 只在 `models()` 被调用时更新，拿不到就是空的，那时不补。
+   */
+  options: readonly ModelOption[]
 }
 
 export interface CodexDriverConfig {
@@ -115,6 +120,7 @@ class CodexSession implements EngineSession {
       sandbox: SANDBOX[req.trust],
       model: undefined,
       effort: undefined,
+      options: [],
     }
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
@@ -345,7 +351,9 @@ class CodexSession implements EngineSession {
   async models(): Promise<readonly ModelOption[]> {
     const raw = await this.rpc.call("model/list", {}).catch(() => undefined)
     const list = (raw as { data?: readonly WireModel[] } | undefined)?.data ?? []
-    return list.filter((m) => m.hidden !== true).map(toModelOption)
+    const options = list.filter((m) => m.hidden !== true).map(toModelOption)
+    this.state.options = options
+    return options
   }
 
   /**
@@ -389,9 +397,22 @@ class CodexSession implements EngineSession {
     return { compact: true, attachments: true, steer: true, fork: true }
   }
 
+  /**
+   * 换模型。
+   *
+   * ## 为什么强度要**主动补上**，而不是不传就算了
+   *
+   * 不传的话 codex 用它自己配置里的全局默认——而那个默认**未必是这个模型
+   * 支持的档**。实测：配置里默认 `max`，选 gpt-5.3-codex-spark 之后整轮直接失败，
+   * `Unsupported value: 'max' is not supported with the ... model`。
+   *
+   * 一次「换个模型」的操作导致下一句话报一个看不懂的英文错误，
+   * 而错误里提的那个值用户根本没选过。所以这里按模型自己报的默认补齐。
+   * 清单拿不到时不补——那时传什么都是猜。
+   */
   async setModel(model: string, effort?: string): Promise<void> {
     this.state.model = model
-    this.state.effort = effort
+    this.state.effort = effort ?? this.state.options.find((m) => m.id === model)?.defaultEffort
     // 不用单独发请求：`turn/start` 的 model/effort 覆盖「这一轮及后续」
     return Promise.resolve()
   }

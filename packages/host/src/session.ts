@@ -245,8 +245,13 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
   if (entry === undefined) return
   await entry.session.setModel(cmd.model, cmd.effort)
   const at = ctx.deps.now()
+  // **强度要能被清掉。** 上一版是 `...(effort === undefined ? {} : {effort})`，
+  // 于是换到一个不报强度的模型之后，旧模型的 `high` 永远留在记录上——
+  // 界面照着它画一个引擎根本没在用的档位
+  const rest = { ...entry.thread }
+  delete rest.effort
   entry.thread = {
-    ...entry.thread,
+    ...rest,
     model: cmd.model,
     ...(cmd.effort === undefined ? {} : { effort: cmd.effort }),
     updatedAt: at,

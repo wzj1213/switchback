@@ -1074,3 +1074,26 @@ describe("跑着的时候补一句话：能改向的当场递进去", () => {
     expect(h.steered).toHaveLength(0)
   })
 })
+
+describe("换模型时的推理强度", () => {
+  const pick = async (): Promise<{ host: Host; events: Event[]; id: string }> => {
+    const { host, events } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.setModel", threadId: id, model: "a", effort: "high" })
+    return { host, events, id }
+  }
+  const effortOf = (events: Event[]): string | undefined =>
+    events.filter((e) => e.type === "thread.updated").at(-1)?.thread.effort
+
+  it("选了就记下", async () => {
+    const { events } = await pick()
+    expect(effortOf(events)).toBe("high")
+  })
+
+  it("**换到不报强度的模型时要清掉**——留着的话界面会画一个引擎根本没在用的档位", async () => {
+    const { host, events, id } = await pick()
+    await host.dispatch({ type: "thread.setModel", threadId: id, model: "b" })
+    expect(effortOf(events)).toBeUndefined()
+  })
+})
