@@ -1,4 +1,5 @@
 import { FolderIcon, PlusIcon, SearchIcon } from "./icons.js"
+import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
 
 /*
@@ -48,7 +49,7 @@ export function Head({
           title={here === undefined ? "还没有会话，会先让你选一个文件夹" : `在 ${here} 新建`}
         >
           <span className="row__slot">
-            <PlusIcon />
+            <PlusIcon size={SIDEBAR_ICON} />
           </span>
           <span className="row__label">新建会话</span>
           {/* 落点写在右边，和底部「设置 ⌘,」同一套排版。
@@ -59,7 +60,7 @@ export function Head({
         </button>
         <button type="button" className="row row--nav" onClick={onOpenFolder}>
           <span className="row__slot">
-            <FolderIcon />
+            <FolderIcon size={SIDEBAR_ICON} />
           </span>
           <span className="row__label">打开文件夹…</span>
         </button>
@@ -67,7 +68,7 @@ export function Head({
 
       <div className="row row--search">
         <span className="row__slot">
-          <SearchIcon />
+          <SearchIcon size={SIDEBAR_ICON} />
         </span>
         <input
           className="sidebar__filter"

@@ -1,6 +1,7 @@
 import type { ThreadRow } from "@omni/store"
 import type { Group } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, PlusIcon, SpinnerIcon } from "./icons.js"
+import { SIDEBAR_ICON } from "./icon-base.js"
 import { Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
 
@@ -46,10 +47,10 @@ export function GroupBlock({
       >
         <button type="button" className="row__main" onClick={onToggle}>
           <span className="row__slot">
-            <ChevronIcon open={!collapsed} />
+            <ChevronIcon open={!collapsed} size={SIDEBAR_ICON} />
           </span>
           <span className="row__lead">
-            <FolderIcon />
+            <FolderIcon size={SIDEBAR_ICON} />
           </span>
           <span className="row__label">{group.label}</span>
           {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
@@ -72,7 +73,7 @@ export function GroupBlock({
             onNewIn(group.cwd)
           }}
         >
-          <PlusIcon />
+          <PlusIcon size={SIDEBAR_ICON} />
         </button>
         {/* 项目这一行也给一个 `···`。右键菜单一直都有，但**看不见的功能等于没有**——
             没人会去右键一个看起来只是分组标题的东西 */}

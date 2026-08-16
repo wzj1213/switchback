@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, PlusIcon } from "./icons.js"
+import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { Row } from "./SidebarRows.js"
 import { GroupBlock } from "./SidebarGroup.js"
 import type { RenameCtl } from "./RowName.js"
@@ -42,7 +43,7 @@ export function SectionHead({
     <div className="sidebar__section">
       <button type="button" className="sidebar__section-main" onClick={onToggle}>
         <span>{title}</span>
-        <ChevronIcon open={open} size={11} />
+        <ChevronIcon open={open} size={SIDEBAR_ICON_SMALL} />
       </button>
       {action === undefined ? null : (
         <button
@@ -202,7 +203,7 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         }}
         // **图标不能和「对话」段那颗 `+` 一样**：这颗是「加一个项目（选文件夹）」，
         // 那颗是「开一条对话」。同形不同义比没有图标更误导
-        action={{ label: "打开一个文件夹", icon: <FolderIcon />, run: on.onOpenFolder }}
+        action={{ label: "打开一个文件夹", icon: <FolderIcon size={SIDEBAR_ICON} />, run: on.onOpenFolder }}
       />
       {open("proj") ? <Projects groups={sections.projects} on={on} /> : null}
 
@@ -214,7 +215,7 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         onToggle={() => {
           toggle("chat")
         }}
-        action={{ label: "新开一条对话", icon: <PlusIcon />, run: on.onNewChat }}
+        action={{ label: "新开一条对话", icon: <PlusIcon size={SIDEBAR_ICON} />, run: on.onNewChat }}
       />
       {open("chat") ? (
         sections.chats.length === 0 ? (

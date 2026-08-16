@@ -3,6 +3,7 @@ import type { ThreadRow } from "@omni/store"
 import { filterRows } from "../filter.js"
 import { sectionsOf } from "../sidebar.js"
 import { GearIcon } from "./icons.js"
+import { SIDEBAR_ICON } from "./icon-base.js"
 import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
 import { Head } from "./SidebarHead.js"
@@ -159,7 +160,7 @@ export function Sidebar({
       </div>
       <button type="button" className="row row--foot" onClick={onOpenSettings}>
         <span className="row__slot">
-          <GearIcon />
+          <GearIcon size={SIDEBAR_ICON} />
         </span>
         <span className="row__label">设置</span>
         <span className="row__aside">⌘,</span>

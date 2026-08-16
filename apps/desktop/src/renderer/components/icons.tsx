@@ -1,4 +1,4 @@
-import { BOX, LINE, Svg } from "./icon-base.js"
+import { LINE, Svg } from "./icon-base.js"
 
 /*
  * 界面骨架用的图标。对话内容里那几个（终端、笔、地球…）在 `icons-activity.tsx`。
@@ -7,25 +7,25 @@ import { BOX, LINE, Svg } from "./icon-base.js"
 
 export { Svg } from "./icon-base.js"
 
-export function FolderIcon(): React.JSX.Element {
+export function FolderIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <path d="M2 4.25A1.25 1.25 0 0 1 3.25 3h2.4l1.35 1.5h5.75A1.25 1.25 0 0 1 14 5.75v6A1.25 1.25 0 0 1 12.75 13h-9.5A1.25 1.25 0 0 1 2 11.75z" {...LINE} />
     </Svg>
   )
 }
 
-export function PlusIcon(): React.JSX.Element {
+export function PlusIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <path d="M8 3.5v9M3.5 8h9" {...LINE} />
     </Svg>
   )
 }
 
-export function SearchIcon(): React.JSX.Element {
+export function SearchIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <circle cx="7.25" cy="7.25" r="4" {...LINE} />
       <path d="M10.25 10.25 13.5 13.5" {...LINE} />
     </Svg>
@@ -35,54 +35,49 @@ export function SearchIcon(): React.JSX.Element {
 /** 展开/折叠。转 90° 而不是换成另一个图标——转动本身就说明了「同一个东西的两态」。 */
 export function ChevronIcon({ open = false, size = 12 }: { open?: boolean; size?: number }): React.JSX.Element {
   return (
-    <svg
-      width={size}
-      height={size}
-      {...BOX}
-      style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms ease" }}
-    >
+    <Svg size={size} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms ease" }}>
       <path d="M6.25 3.5 10.5 8l-4.25 4.5" {...LINE} />
-    </svg>
+    </Svg>
   )
 }
 
 /** 下拉触发器右侧那个。朝下，和展开用的那个区分开。 */
 export function CaretIcon({ size = 12 }: { size?: number }): React.JSX.Element {
   return (
-    <svg width={size} height={size} {...BOX}>
+    <Svg size={size}>
       <path d="M4 6.5 8 10.5l4-4" {...LINE} />
-    </svg>
+    </Svg>
   )
 }
 
 export function CheckIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
-    <svg width={size} height={size} {...BOX}>
+    <Svg size={size}>
       <path d="M3.5 8.5 6.5 11.5 12.5 4.5" {...LINE} />
-    </svg>
+    </Svg>
   )
 }
 
-export function EngineIcon(): React.JSX.Element {
+export function EngineIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <rect x="3" y="3" width="10" height="10" rx="2.5" {...LINE} />
       <path d="M6.25 6.75 8 8.5l-1.75 1.75M9.5 10.25h1.75" {...LINE} />
     </Svg>
   )
 }
 
-export function ShieldIcon(): React.JSX.Element {
+export function ShieldIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <path d="M8 2.5 12.5 4v4c0 2.6-1.9 4.6-4.5 5.5C5.4 12.6 3.5 10.6 3.5 8V4z" {...LINE} />
     </Svg>
   )
 }
 
-export function SparkIcon(): React.JSX.Element {
+export function SparkIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <path d="M8 2.5 9.3 6.2 13 7.5 9.3 8.8 8 12.5 6.7 8.8 3 7.5l3.7-1.3z" {...LINE} />
     </Svg>
   )
@@ -132,9 +127,9 @@ export function ForkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   )
 }
 
-export function GearIcon(): React.JSX.Element {
+export function GearIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <circle cx="8" cy="8" r="2.15" {...LINE} />
       <path d="M8 2.2v1.4M8 12.4v1.4M13.8 8h-1.4M3.6 8H2.2M12.1 3.9l-1 1M4.9 11.1l-1 1M12.1 12.1l-1-1M4.9 4.9l-1-1" {...LINE} />
     </Svg>
@@ -150,9 +145,9 @@ export function PinIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   )
 }
 
-export function BranchIcon(): React.JSX.Element {
+export function BranchIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
-    <Svg>
+    <Svg size={size}>
       <circle cx="5" cy="4" r="1.5" {...LINE} />
       <circle cx="5" cy="12" r="1.5" {...LINE} />
       <circle cx="11.5" cy="5.5" r="1.5" {...LINE} />
@@ -210,10 +205,11 @@ export function SendIcon({ size = 14 }: { size?: number }): React.JSX.Element {
  * 而这里要说的是「让正在跑的东西停下」。播放器用了几十年的那个方块，不用重新发明。
  */
 export function StopIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  // 实心块，没有描边——但仍然走 `Svg`，免得下次有人照着它再写一个绕过去的
   return (
-    <svg width={size} height={size} {...BOX}>
+    <Svg size={size}>
       <rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1.4" fill="currentColor" />
-    </svg>
+    </Svg>
   )
 }
 

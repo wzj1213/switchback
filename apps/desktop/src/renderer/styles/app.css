@@ -4,6 +4,22 @@
   box-sizing: border-box;
 }
 
+/*
+ * **图标的尺寸只由它自己决定，布局不许改。**
+ *
+ * flex 容器默认 `align-items: stretch`，会把 svg 拉到容器高度，而 svg 保持
+ * 宽高比——宽度跟着变。表现就是「同一个图标在不同地方大小不一样」，
+ * 而且 `icon-base.tsx` 那套按尺寸补偿笔画的算法会**按错误的尺寸算**：
+ * 给定 12、实际渲染 13，笔画就从 1.25 变成 1.35，看起来更粗一点。
+ *
+ * 一条条去补 `align-items: center` 是补不完的——全仓当时有六个装图标的
+ * flex 容器漏写。写在这里，以后新加的也不会踩。
+ */
+svg {
+  flex: none;
+  align-self: center;
+}
+
 html,
 body,
 #root {
@@ -958,11 +974,23 @@ body {
 }
 
 /* 侧栏行里的转圈：那个会话还在跑 */
+/* 转圈。
+ *
+ * **内边距绝不能加在被旋转的元素上。** 原来这里写了 `padding-right: 4px`，
+ * 而 `transform: rotate()` 绕的是**边框盒中心**——非对称内边距把图形的视觉中心
+ * 推离旋转中心 2px，于是它不是在原地转，是**绕着一个偏心点画圈**。
+ * 一眼看上去就是「这个加载图标是歪的」。
+ *
+ * 间距全部改用外边距：外边距不进变换盒。
+ *
+ * `align-items: center` 也不能少：flex 容器默认 `stretch`，会把 svg 拉到行高，
+ * 而 svg 保持宽高比——**宽度跟着变**，于是给定 12 实际渲染 13，
+ * 笔画补偿按 12 算就对不上了（实测视觉笔画 1.35，而全场是 1.25）。 */
 .row__spin {
   display: flex;
   flex: none;
-  margin-left: var(--sp-2);
-  padding-right: 4px;
+  align-items: center;
+  margin: 0 4px 0 var(--sp-2);
   color: var(--text-faint);
   animation: row-spin 900ms linear infinite;
 }
