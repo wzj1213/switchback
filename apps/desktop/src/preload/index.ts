@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron"
 import type { Command, Event } from "@omni/protocol"
 import type { Settings } from "../shared/settings.js"
+import type { ProjectDoc } from "../main/projectdoc.js"
+import type { EngineVersion } from "../main/enginever.js"
 
 /** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
 export interface Sealed {
@@ -42,6 +44,24 @@ const api = {
   async pickFolder(): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:pickFolder")) as string | undefined
   },
+  /** 各家引擎装的是哪版、有没有新版。查不到就返回空数组（不打扰）。 */
+  async engineVersions(): Promise<readonly EngineVersion[]> {
+    return (await ipcRenderer.invoke("omni:engineVersions")) as readonly EngineVersion[]
+  },
+
+  /** 这个项目的说明文件在不在、两家是不是读的同一份。 */
+  async projectDoc(cwd: string): Promise<ProjectDoc> {
+    return (await ipcRenderer.invoke("omni:projectDoc", cwd)) as ProjectDoc
+  },
+  /** 缺什么补什么：建 `AGENTS.md`，并让 `CLAUDE.md` 指过去。 */
+  async ensureProjectDoc(cwd: string): Promise<ProjectDoc> {
+    return (await ipcRenderer.invoke("omni:ensureProjectDoc", cwd)) as ProjectDoc
+  },
+  /** 用系统默认编辑器打开说明文件。 */
+  openProjectDoc(cwd: string): void {
+    void ipcRenderer.invoke("omni:openProjectDoc", cwd)
+  },
+
   /** 给一条不属于任何项目的对话要一个目录（主进程自动建在 `~/Documents/omni/` 下）。 */
   async chatDir(): Promise<string> {
     return (await ipcRenderer.invoke("omni:chatDir")) as string

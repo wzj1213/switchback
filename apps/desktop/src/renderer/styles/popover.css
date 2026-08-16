@@ -279,3 +279,19 @@
   padding: 3px var(--sp-2);
   font-size: var(--text-xs);
 }
+
+/* 环境卡片里可点的那几项。**看起来就该是能点的**——
+   卡片里其余都是只读文字，不给点击线索的话没人会去点 */
+.env__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.env__link:hover {
+  text-decoration: underline;
+}

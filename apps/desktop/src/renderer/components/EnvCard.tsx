@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import type { EngineInfo, Thread } from "@omni/protocol"
 import { Popover } from "./Popover.js"
 import { BranchIcon, CopyIcon, EngineIcon, FolderIcon, RevealIcon, ShieldIcon } from "./icons.js"
+import { FileIcon } from "./icons-activity.js"
+import type { ProjectDoc } from "../../main/projectdoc.js"
 import { labelOf } from "./Composer.js"
 
 /**
@@ -37,6 +39,7 @@ export function EnvCard({
   onCopy: (text: string) => void
 }): React.JSX.Element {
   const [git, setGit] = useState<{ branch?: string; dirty?: boolean }>({})
+  const [doc, setDoc] = useState<ProjectDoc | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
   // 每次打开都重新问一次。分支会被用户在终端里改掉，而一个过期的分支名
@@ -46,6 +49,9 @@ export function EnvCard({
     let live = true
     void bridge.worksite(thread.cwd).then((info) => {
       if (live) setGit(info)
+    })
+    void bridge.projectDoc(thread.cwd).then((info) => {
+      if (live) setDoc(info)
     })
     return () => {
       live = false
@@ -71,6 +77,9 @@ export function EnvCard({
         </Line>
         <Line icon={<ShieldIcon />} label="信任档">
           {TRUST_TEXT[thread.trust]}
+        </Line>
+        <Line icon={<FileIcon size={15} />} label="说明">
+          <ProjectDocLine cwd={thread.cwd} doc={doc} onDoc={setDoc} />
         </Line>
         {thread.engineHistory.length <= 1 ? null : (
           <Line icon={<EngineIcon />} label="接力过">
@@ -128,5 +137,65 @@ function Line({
       <span className="env__label">{label}</span>
       <span className="env__value">{children}</span>
     </div>
+  )
+}
+
+/**
+ * 项目说明那一行。三种状态各说各的话：
+ *
+ * - 都齐了 → 点开看
+ * - 有 `AGENTS.md` 但 Claude 读不到 → 建一行指路牌
+ * - 两份各写各的 → **不替他合并**，只说一声让他自己看
+ *
+ * 最后那条尤其重要：他自己写过的 `CLAUDE.md` 是他的内容，
+ * 我们没有资格替他扔掉——所以那种情况只提示，不动手。
+ */
+function ProjectDocLine({
+  cwd,
+  doc,
+  onDoc,
+}: {
+  cwd: string
+  doc: ProjectDoc | undefined
+  onDoc: (next: ProjectDoc) => void
+}): React.JSX.Element {
+  const bridge = typeof window === "undefined" ? undefined : window.omni
+  if (doc === undefined) return <>…</>
+  if (doc.agents && doc.linked) {
+    return (
+      <button
+        type="button"
+        className="env__link"
+        onClick={() => {
+          bridge?.openProjectDoc(cwd)
+        }}
+      >
+        AGENTS.md（Claude 也读这份）
+      </button>
+    )
+  }
+  if (doc.agents && doc.claude && !doc.linked) {
+    return (
+      <button
+        type="button"
+        className="env__link"
+        onClick={() => {
+          bridge?.openProjectDoc(cwd)
+        }}
+      >
+        两份说明各写各的 · 打开看看
+      </button>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="env__link"
+      onClick={() => {
+        void bridge?.ensureProjectDoc(cwd).then(onDoc)
+      }}
+    >
+      {doc.agents ? "有 AGENTS.md，但 Claude 还读不到 · 建立指向" : "还没有项目说明 · 建一份"}
+    </button>
   )
 }

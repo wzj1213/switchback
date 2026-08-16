@@ -1,6 +1,7 @@
 import type { EngineInfo, Trust } from "@omni/protocol"
 import type { Settings } from "../useSettings.js"
 import { TRUSTS } from "./Composer.js"
+import { EngineVersions } from "./EngineVersions.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 
 /**
@@ -29,7 +30,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-function Field({
+export function Field({
   label,
   hint,
   children,
@@ -152,6 +153,10 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           </Field>
         </Group>
 
+        <Group title="引擎">
+          <EngineVersions onCopy={props.onCopy} />
+        </Group>
+
         <Group title="数据与排查">
           <Field label="数据目录" hint={props.dataDir}>
             <button
@@ -188,3 +193,4 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
     </div>
   )
 }
+

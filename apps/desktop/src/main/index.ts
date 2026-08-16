@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
 import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
+import { installProjectDocChannel } from "./projectdoc.js"
+import { installEngineVersionChannel } from "./enginever.js"
 import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
@@ -144,6 +146,9 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
 function installAppChannels(): void {
   ipcMain.handle("omni:appInfo", () => ({
     version: app.getVersion(),
+    // 构建标识（短 sha）。**版本号本身回答不了「你装的是哪一次构建」**——
+    // 同一个版本号可能对应好几次重打，而 bug 报告要的正是那个精确的点
+    build: buildStamp(),
     dataDir: app.getPath("userData"),
   }))
   ipcMain.on("omni:openEngines", () => {
@@ -152,6 +157,24 @@ function installAppChannels(): void {
   ipcMain.on("omni:diagnose", () => {
     void exportReport(log, crash)
   })
+}
+
+/**
+ * 打包时由 `scripts/stamp-version.mjs` 写进 package.json 的短 sha。
+ * 开发模式下没有这一项，那时说「开发版」——**别编一个假的出来**。
+ */
+function buildStamp(): string {
+  const pkg = (app as unknown as { omni?: { build?: string } }).omni
+  return pkg?.build ?? readBuild()
+}
+
+function readBuild(): string {
+  try {
+    const raw = readFileSync(join(app.getAppPath(), "package.json"), "utf8")
+    return (JSON.parse(raw) as { omni?: { build?: string } }).omni?.build ?? "开发版"
+  } catch {
+    return "开发版"
+  }
 }
 
 /** 开发钩子。全挂在这里，`whenReady` 那段只管应用本身怎么起。 */
@@ -222,6 +245,8 @@ function bootstrap(): Promise<void> {
     installWorksiteChannel()
     installChatDirChannel()
     installAttachChannel()
+    installProjectDocChannel()
+    installEngineVersionChannel(log)
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     installMenu(

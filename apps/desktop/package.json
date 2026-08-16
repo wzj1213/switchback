@@ -3,9 +3,10 @@
   "productName": "omni",
   "omni": {
     "_updateFeed": "发布时填一个 https 地址，返回 {version,url,notes}。留空 = 更新检查整个关闭，不发任何请求。",
-    "updateFeed": ""
+    "updateFeed": "",
+    "build": "8fb9e98-dirty"
   },
-  "version": "0.0.0",
+  "version": "0.0.101",
   "private": true,
   "type": "module",
   "description": "omni 桌面端：Electron 壳 + React 渲染层",
@@ -16,9 +17,9 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "//dist": "默认**关掉钥匙串自动发现**。不关的话 electron-builder 会拿钥匙串里任何一张证书去签——本机那张自签的会让 codesign 卡在逐个文件签名上（实测卡死，要手动 kill）。要签名走 dist:signed。",
-    "dist": "electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "dist": "node ../../scripts/stamp-version.mjs && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
     "//dist:signed": "有 Developer ID 时用。需要 CSC_NAME 或 CSC_LINK，公证还要 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID。",
-    "dist:signed": "electron-vite build && electron-builder --mac"
+    "dist:signed": "node ../../scripts/stamp-version.mjs && electron-vite build && electron-builder --mac"
   },
   "//optionalDependencies": [
     "Claude Agent SDK 各平台的原生二进制。**必须在这里显式列出**——",
