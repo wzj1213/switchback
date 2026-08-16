@@ -39,6 +39,15 @@ export interface Notice {
   id: string
   at: number
   text: string
+  /**
+   * 这是哪一类问题。**横幅的抬头照它写。**
+   *
+   * 上一版抬头写死「引擎故障」。而 `degraded` 说的是引擎好好的、只是掉了能力
+   *（MCP 没起来、没登录），把它顶着「引擎故障」四个字端出去，
+   * 等于把排查引到错的方向——**这正是当初不用 `crashed` 的理由**，
+   * 结果在界面上又还回去了。
+   */
+  kind: "crashed" | "degraded"
   /** 关联的会话；`thread.create` 阶段就失败时没有会话，这里是 undefined。 */
   threadId: ThreadId | undefined
 }

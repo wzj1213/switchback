@@ -673,6 +673,18 @@ body {
   font-size: var(--text-xs);
 }
 
+/* 「能力受限」不用红：引擎好好的，只是掉了点东西。
+   和真故障用同一个红，两件严重程度差很远的事看起来一样，
+   而看多了红的人会连真的那次也一起无视 */
+.notice__badge--soft {
+  color: var(--warn);
+}
+
+.notice:has(.notice__badge--soft) {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
+}
+
 .notice__text {
   min-width: 0;
   color: var(--text);

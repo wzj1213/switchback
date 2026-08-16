@@ -5,9 +5,10 @@ import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../su
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { skillsToCommands, toModelOption, type WireModel } from "./catalog.js"
-import { emitLimits, handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
+import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
+import { reportAccount } from "./account.js"
 import { answerApproval } from "./approve.js"
-import type { WireApprovalPolicy, WireItem, WireRateLimits, WireSandbox } from "./wire.js"
+import type { WireApprovalPolicy, WireItem, WireSandbox } from "./wire.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -265,29 +266,10 @@ class CodexSession implements EngineSession {
       throw new Error(`codex 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
     }
     this.rpc.notify("initialized")
-    this.readLimits()
-  }
-
-  /**
-   * 握手完就问一次额度。
-   *
-   * ## 为什么不能只等推送
-   *
-   * `account/rateLimits/updated` 是**跑完一轮才推**的。也就是说：额度早就用光了，
-   * omni 却一个字都不说，等你打完一句话按下回车，才回一条红色的
-   * `You've hit your usage limit`。实测撞到过——那时这条信息已经晚了，
-   * 「还能不能干活」本来在动手之前就该知道。
-   *
-   * 不 await：额度是锦上添花，**它慢一点、或者失败了，都不该拖着会话起不来**。
-   * 失败就静默——界面据此什么都不画，和「这个账号不受额度限制」表现一致。
-   */
-  private readLimits(): void {
-    void this.rpc
-      .call("account/rateLimits/read", {})
-      .then((raw) => {
-        emitLimits(this.req.emit, (raw as { rateLimits?: WireRateLimits } | undefined)?.rateLimits)
-      })
-      .catch(() => undefined)
+    // 账号侧的现状（额度、登录）——**在动手之前问**，见 `account.ts`
+    reportAccount(this.rpc, (status, detail) => {
+      this.status(status, detail)
+    }, this.req.emit)
   }
 
   /**

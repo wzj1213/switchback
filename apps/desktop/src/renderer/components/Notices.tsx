@@ -2,7 +2,7 @@ import { humanize } from "../failure.js"
 import type { Notice } from "@omni/store"
 
 /**
- * 引擎故障横幅。
+ * 引擎出状况的横幅。
  *
  * 在这之前引擎起不来、崩了、进程泄漏，界面上**一律毫无反应**——
  * 用户只会看到「正在打开工作区…」一直转，或者一个点了没反应的界面。
@@ -22,7 +22,11 @@ export function Notices({
   if (latest === undefined) return null
   return (
     <div className="notice" role="alert">
-      <span className="notice__badge">引擎故障</span>
+      {/* **抬头照实写。** 上一版一律写「引擎故障」，而「MCP 没起来」「没登录」
+          这两种引擎好好的——顶着「故障」端出去，就是把排查引到错的方向 */}
+      <span className={`notice__badge${latest.kind === "degraded" ? " notice__badge--soft" : ""}`}>
+        {latest.kind === "degraded" ? "能力受限" : "引擎故障"}
+      </span>
       {/* 横幅上只放人话那一句：这一条本来就是「扫一眼就走」的东西，
           真要看原文，同一段也会作为一条 error 落在对话里，那边能展开 */}
       <span className="notice__text" title={latest.text}>

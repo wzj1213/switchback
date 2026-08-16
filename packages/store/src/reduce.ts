@@ -151,6 +151,8 @@ function onEngineStatus(
     id: `n${String(seq)}`,
     at: event.at,
     text: event.detail ?? "引擎报告了一个没有描述的故障",
+    // `timeout` 归到 crashed：对用户来说「起不来」和「崩了」是同一件事
+    kind: event.status === "degraded" ? "degraded" : "crashed",
     threadId: event.threadId === "" ? undefined : event.threadId,
   }
   return { ...state, noticeSeq: seq, notices: [...state.notices, notice].slice(-MAX_NOTICES) }
