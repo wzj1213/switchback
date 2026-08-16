@@ -211,8 +211,36 @@ class CodexSession implements EngineSession {
    */
   private async openThread(): Promise<unknown> {
     const shared = { approvalPolicy: POLICY, sandbox: this.state.sandbox, cwd: this.req.cwd }
+    if (this.req.forkOf !== undefined) return this.forkThread(this.req.forkOf)
     if (this.req.resume === undefined) return this.rpc.call("thread/start", shared)
     return this.rpc.call("thread/resume", { threadId: this.req.resume, ...shared })
+  }
+
+  /**
+   * 以分叉开场。`thread/fork` 复制的是**真的会话**——分出来那条记得原会话
+   * 读过哪些文件、写过什么、撞过什么错，而不是只拿到一句提炼过的目标。
+   *
+   * **必须由这个进程自己 fork。** 让原会话那个进程分好再交给这边去 `thread/resume`，
+   * 真机上直接失败：`thread ... already has an active writer`——
+   * 分出来的那条归创建它的进程管，而 omni 一个会话一个进程。
+   * `thread/unsubscribe` 也不放锁（都实测过）。
+   *
+   * `dropTurns` 走 `thread/rollback`，**只作用在分出来的那条上**：
+   * 原会话是用户还要用的，「从这一轮重来」不该把它自己截短。
+   * rollback 失败不算整体失败——上下文完整的分叉已经比交接包强得多，
+   * 为了少砍几轮而把整件事退回「只剩一句目标」是把好的换成差的。
+   *
+   * 分不出来就抛：宿主要靠这个失败退回交接包。默默起一条空会话是最坏的，
+   * 那看起来分叉成功了、其实什么都不记得。
+   */
+  private async forkThread(of: { handle: string; dropTurns?: number }): Promise<unknown> {
+    const forked = await this.rpc.call("thread/fork", { threadId: of.handle })
+    const id = (forked as { thread?: { id?: string } } | undefined)?.thread?.id
+    if (id === undefined || id === "") throw new Error("codex 没有返回分叉出来的会话 id")
+    if (of.dropTurns !== undefined && of.dropTurns > 0) {
+      await this.rpc.call("thread/rollback", { threadId: id, numTurns: of.dropTurns }).catch(() => undefined)
+    }
+    return forked
   }
 
   /**
@@ -361,7 +389,7 @@ class CodexSession implements EngineSession {
 
   /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
   capabilities(): EngineCapabilities {
-    return { compact: true, attachments: true, steer: true }
+    return { compact: true, attachments: true, steer: true, fork: true }
   }
 
   async setModel(model: string, effort?: string): Promise<void> {

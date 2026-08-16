@@ -36,6 +36,18 @@ export interface EngineCapabilities {
    * Claude 那边 SDK 没有对应入口，报 false，继续排队。
    */
   steer: boolean
+  /**
+   * 能**带着完整上下文分叉**（原生 fork），而不是只递一份提炼过的目标。
+   *
+   * omni 对所有引擎的兜底做法是「交接包」：从 transcript 里提炼出目标和
+   * 追加要求，起一个全新会话把它发过去。跨引擎时这是**唯一**可能的做法
+   *（各家的会话格式不通，硬翻既做不对也维护不起）。
+   *
+   * 但同一家引擎内部不必这么糙。codex 的 `thread/fork` 复制的是真的会话，
+   * 分出来那条**记得它读过哪些文件、写过什么、撞过什么错**。
+   * 交接包只有一句目标——「重来」出来的那条会话，其实是从零开始的。
+   */
+  fork: boolean
 }
 
 /** 什么都不支持。驱动没表态时的兜底——**默认不给入口**，而不是默认给。 */
@@ -43,4 +55,5 @@ export const NO_CAPABILITIES: EngineCapabilities = {
   compact: false,
   attachments: false,
   steer: false,
+  fork: false,
 }

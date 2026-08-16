@@ -1,12 +1,9 @@
-import type { Command, Event, Item, ItemId, Thread, ThreadId } from "@omni/protocol"
+import type { Command, Event, ItemId, Thread, ThreadId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
-import { buildHandoff, renderHandoff } from "@omni/handoff"
-import { initial, itemsOf, reduceAll } from "@omni/store"
 import { createGate } from "./gate.js"
 import { askUser } from "./approval.js"
 import type { EngineSession } from "@omni/engine"
 import { emit, type Ctx, type Live } from "./ctx.js"
-import { prompt } from "./prompt.js"
 import type { Gate } from "./gate.js"
 
 /**
@@ -38,7 +35,7 @@ function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadI
  * 下次启动读回来就在 `Thread` 上——**续跑需要的东西必须和历史存在同一个地方**，
  * 否则总有一天会出现「历史在但句柄丢了」。
  */
-function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
+export function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
   const entry = ctx.live.get(id)
   if (entry === undefined || entry.thread.engineHandle === handle) return
   const at = ctx.deps.now()
@@ -54,7 +51,12 @@ function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
  * 这个洞第一次跑真实会话才现形（落盘里根本没有 `engineHandle`）。
  * 交给调用方在发完自己的事件之后补上，顺序才是「started → updated」。
  */
-async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string | undefined> {
+export async function launch(
+  ctx: Ctx,
+  thread: Thread,
+  resume?: string,
+  forkOf?: { handle: string; dropTurns?: number },
+): Promise<string | undefined> {
   const driver = ctx.deps.drivers[thread.engine]
   if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
   const early: { handle: string | undefined } = { handle: undefined }
@@ -83,6 +85,7 @@ async function launch(ctx: Ctx, thread: Thread, resume?: string): Promise<string
       else early.handle = handle
     },
     ...(resume === undefined ? {} : { resume }),
+    ...(forkOf === undefined ? {} : { forkOf }),
   })
   live.session = session
   live.gate = createGate((e) => {
@@ -234,86 +237,6 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
  * 真要做对照，得让两边各拿一份工作区副本（git worktree 之类）——那是另一件事。
  */
 /**
- * 从某一轮之前重来。
- *
- * 实现上是**只带前面若干轮的分叉**——同一家引擎、同一个工作区，
- * 交接包只包含那一轮**之前**的 item。原会话不动。
- *
- * 和 `fork` 共用一条路：两者的区别只有「换不换引擎」和「带多少上下文」，
- * 分成两套实现的话，将来改交接包格式就要改两处，而漏改的那处不会报错。
- */
-export async function rewind(ctx: Ctx, cmd: Extract<Command, { type: "thread.rewind" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  await branch(ctx, entry, { to: entry.thread.engine, upTo: cmd.turnId, label: "重来" })
-}
-
-export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  await branch(ctx, entry, { to: cmd.to, label: cmd.to })
-}
-
-/**
- * 从一个会话岔出一条新的。分叉（换引擎）与重来（砍掉后面几轮）共用这条路。
- *
- * @param upTo 只带这一轮**之前**的内容。不给就是全部。
- */
-async function branch(
-  ctx: Ctx,
-  entry: Live,
-  opts: { to: string; upTo?: string; label: string },
-): Promise<void> {
-  if (ctx.deps.drivers[opts.to] === undefined) throw new Error(`未注册的引擎：${opts.to}`)
-
-  const events = (await ctx.deps.journal?.read(entry.thread.id)) ?? []
-  const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
-  const items = opts.upTo === undefined ? all : until(all, opts.upTo)
-  const packet = buildHandoff(entry.thread, items)
-
-  const at = ctx.deps.now()
-  const thread: Thread = {
-    ...entry.thread,
-    id: ctx.deps.newId("th"),
-    engine: opts.to,
-    engineHistory: [opts.to],
-    engineHandle: undefined,
-    model: undefined,
-    effort: undefined,
-    // 标题带上来路，否则侧栏里两个会话长得一模一样
-    title: `${entry.thread.title}（${opts.label}）`,
-    // 留下血缘，事后才对比得起来。**分叉的意义就在于能比**
-    forkedFrom: entry.thread.id,
-    detached: false,
-    status: "idle",
-    createdAt: at,
-    updatedAt: at,
-    queued: [],
-  }
-  const early = await launch(ctx, thread)
-  emit(ctx, { type: "thread.started", at, thread })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
-
-  const asks = packet.asks.length === 0 ? "" : `\n\n过程中追加过的要求：\n${packet.asks.map((a) => `- ${a}`).join("\n")}`
-  await prompt(
-    ctx,
-    { type: "thread.prompt", threadId: thread.id, text: `${packet.goal}${asks}` },
-    "handoff",
-  )
-}
-
-/**
- * 取这一轮**之前**的 item。
- *
- * 边界是「不含这一轮」：用户点「从这里重来」，指的是**回到还没发生这一轮的时候**，
- * 而不是「再看一遍这一轮」。含进去的话，新会话开局就带着那次走错的尝试。
- */
-function until(items: readonly Item[], turnId: string): readonly Item[] {
-  const at = items.findIndex((item) => item.turnId === turnId)
-  return at === -1 ? items : items.slice(0, at)
-}
-
-/**
  * 关掉会话并把记录从磁盘上删掉。
  *
  * 顺序是有讲究的：**先落定挂着的审批，再 dispose，最后才删文件**。
@@ -331,55 +254,4 @@ export async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.del
   }
   await ctx.deps.journal?.remove(cmd.threadId)
   emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: cmd.threadId })
-}
-
-/**
- * L2 跨引擎接力：同一个会话换一家引擎接着做。
- *
- * **不传原始上下文**——各家 session 格式不通，硬翻既做不对也维护不起。
- * 传的是从 transcript 里提炼出来的**交接包**（见 `@omni/handoff`）。
- *
- * transcript 在渲染层的 store 里，宿主手上没有。但宿主有日志——
- * 把事件回放一遍过同一个归约器就得到同一份 items。
- * **这正是「事件流是真源、归约器是纯函数」这条设计换来的**：
- * 不需要为宿主再维护一份 transcript 副本，也就不会出现两份对不上。
- */
-export async function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  if (entry.thread.engine === cmd.to) return
-  if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
-
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const from = entry.thread.engine
-  const packet = buildHandoff(entry.thread, itemsOf(reduceAll(initial(), events), cmd.threadId))
-
-  // 先停旧的再起新的：两个引擎同时对着一个工作区写，是最难查的一类冲突
-  entry.gate.settleAll()
-  await entry.session.dispose()
-  ctx.live.delete(cmd.threadId)
-
-  const at = ctx.deps.now()
-  const thread: Thread = {
-    ...entry.thread,
-    engine: cmd.to,
-    engineHistory: [...entry.thread.engineHistory, cmd.to],
-    // 换了引擎，上一家的会话句柄就没用了——留着会在续跑时拿它去问新的一家
-    engineHandle: undefined,
-    model: undefined,
-    effort: undefined,
-    status: "idle",
-    updatedAt: at,
-  }
-  const early = await launch(ctx, thread)
-  emit(ctx, { type: "thread.updated", at, thread })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
-
-  // 交接包作为第一条消息发出去，**并且进 transcript**——
-  // 用户要看得见接手的一家究竟被告知了什么
-  await prompt(
-    ctx,
-    { type: "thread.prompt", threadId: cmd.threadId, text: renderHandoff(packet, from, cmd.to) },
-    "handoff",
-  )
 }
