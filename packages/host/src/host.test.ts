@@ -1097,3 +1097,104 @@ describe("换模型时的推理强度", () => {
     expect(effortOf(events)).toBeUndefined()
   })
 })
+
+describe("活会话上限：闲着的先收掉", () => {
+  /**
+   * 一个 codex 会话实测 260 MB / 4 个进程，不设上限开五条就是 1.3 GB，
+   * 而且全闲着。这里钉的是「收谁」和「绝不收谁」——后者更要紧。
+   */
+  const rig = (maxLive: number): { host: Host; events: Event[]; disposed: string[] } => {
+    const events: Event[] = []
+    const disposed: string[] = []
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers: {
+        fake: {
+          id: "fake",
+          start: (req) => {
+            // 报个句柄，不然按规则它不该被收（收了回不来）
+            req.onHandle?.(`cx-${req.threadId}`)
+            return Promise.resolve({
+              threadId: req.threadId,
+              prompt: () => Promise.resolve(),
+              interrupt: () => Promise.resolve(),
+              setTrust: () => Promise.resolve(),
+              models: () => Promise.resolve([]),
+              capabilities: () => NO_CAPABILITIES,
+              setModel: () => Promise.resolve(),
+              dispose: () => {
+                disposed.push(req.threadId)
+                return Promise.resolve()
+              },
+            } as unknown as EngineSession)
+          },
+        },
+      },
+      home: "/home/dev",
+      maxLive,
+      emit: (e) => events.push(e),
+      newId: (prefix) => {
+        counter.n += 1
+        return `${prefix}-${String(counter.n)}`
+      },
+      now: () => counter.n,
+    })
+    return { host, events, disposed }
+  }
+
+  const open = async (r: { host: Host; events: Event[] }): Promise<string> => {
+    await r.host.dispatch(create)
+    return r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+  }
+
+  it("没到上限不收任何东西", async () => {
+    const r = rig(3)
+    await open(r)
+    await open(r)
+    expect(r.disposed).toEqual([])
+  })
+
+  it("**超了就收最久没动的那个**", async () => {
+    const r = rig(2)
+    const first = await open(r)
+    await open(r)
+    await open(r)
+    expect(r.disposed).toEqual([first])
+  })
+
+  it("收掉的标成 detached——界面上就是「点继续接回引擎」，那条路本来就有", async () => {
+    const r = rig(2)
+    const first = await open(r)
+    await open(r)
+    await open(r)
+    const last = r.events.filter((e) => e.type === "thread.updated").filter((e) => e.thread.id === first).at(-1)
+    expect(last?.thread.detached).toBe(true)
+  })
+
+  it("**记录不删**：收起来不是删掉，日志和句柄都还在", async () => {
+    const r = rig(2)
+    const first = await open(r)
+    await open(r)
+    await open(r)
+    expect(r.events.some((e) => e.type === "thread.removed" && e.threadId === first)).toBe(false)
+    const last = r.events.filter((e) => e.type === "thread.updated").filter((e) => e.thread.id === first).at(-1)
+    expect(last?.thread.engineHandle).toBeDefined()
+  })
+
+  it("**正在跑的绝不收**——收掉等于中断用户的活", async () => {
+    const r = rig(2)
+    const first = await open(r)
+    await r.host.dispatch({ type: "thread.prompt", threadId: first, text: "跑着呢" })
+    await open(r)
+    await open(r)
+    expect(r.disposed).not.toContain(first)
+  })
+
+  it("上限内没有可收的就不收，宁可超一点也不动正在跑的", async () => {
+    const r = rig(1)
+    const first = await open(r)
+    await r.host.dispatch({ type: "thread.prompt", threadId: first, text: "跑着呢" })
+    await open(r)
+    expect(r.disposed).toEqual([])
+  })
+})

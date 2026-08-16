@@ -23,6 +23,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_THEME` | `dark` / `light`，强制主题（深色那套平时没人看得见） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
+ * | `OMNI_DEV_MAXLIVE` | 同时活着的引擎会话上限（默认 4）。设很大等于关掉淘汰 |
  * | `OMNI_DEV_RENAME` | `<ms>:<新名字>`，到点给当前会话改名 |
  * | `OMNI_DEV_DELETE` | 到点删掉当前会话（毫秒） |
  * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
@@ -106,6 +107,17 @@ export function devModel(): { model: string; effort?: string } | undefined {
   const [model, effort] = spec.split(":")
   if (model === undefined || model === "") return undefined
   return { model, ...(effort === undefined || effort === "" ? {} : { effort }) }
+}
+
+/**
+ * 同时活着的引擎会话上限。
+ *
+ * 留这个口子有两个用处：**A/B 量淘汰到底省了多少**（设成很大就等于关掉它），
+ * 以及内存大的机器可以自己往上调。认不出就用宿主的缺省。
+ */
+export function devMaxLive(): number | undefined {
+  const raw = Number(process.env["OMNI_DEV_MAXLIVE"] ?? "")
+  return Number.isFinite(raw) && raw >= 1 ? raw : undefined
 }
 
 /** 续跑只能靠点按钮触发，自动化验证需要一个口子。 */

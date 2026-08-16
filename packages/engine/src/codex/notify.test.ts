@@ -293,8 +293,12 @@ describe("MCP 服务器起不来：静默的能力损失必须出声", () => {
     expect(e).toMatchObject({ type: "engine.status", status: "degraded" })
   })
 
-  it("带了 failureReason 就算失败，哪怕 status 看着正常", () => {
-    const [e] = report({ name: "node_repl", status: "ready", failureReason: "命令找不到" })
+  it("**`cancelled` 不算失败**——实测一次启动五台同时报它，而那几台后来都好好的", () => {
+    expect(report({ name: "codex_apps", status: "cancelled", failureReason: "cancelled" })).toEqual([])
+  })
+
+  it("没见过的状态带了原因，就把原因摊出来", () => {
+    const [e] = report({ name: "node_repl", status: "boom", failureReason: "命令找不到" })
     expect(e?.type === "engine.status" ? e.detail : "").toContain("命令找不到")
   })
 

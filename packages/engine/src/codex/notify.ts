@@ -259,14 +259,30 @@ function onMcpStatus(ctx: NotifyContext, params: WireMcpStatus): void {
   })
 }
 
+/**
+ * 不算失败的状态。
+ *
+ * `starting` / `ready` 是显然的。**`cancelled` 是拿误报换来的**：
+ * 判据本来写成「不是 starting/ready 就算失败」（失败态的字面量当时没实测到），
+ * 结果一次启动里五台服务器同时报 `cancelled`，界面上刷了五条横幅——
+ * 而那几台后来都好好的（`codex_apps` 有 45 个工具）。
+ * 所以 `cancelled` 是启动被取消/被顶替的中间态，不是起不来。
+ *
+ * 保留「没见过的一律当失败」这条：**猜一个 `"failed"` 字面量，猜错了就是永远不报警**，
+ * 而多报一次的代价只是一条横幅——但见过的误报要一条条摘掉，不能装看不见。
+ */
+const MCP_FINE: ReadonlySet<string> = new Set(["starting", "ready", "cancelled"])
+
 /** 起没起来；是的话给一句能读的原因，没失败给 undefined。 */
 function mcpFailure(params: WireMcpStatus): string | undefined {
   const status = params.status ?? ""
+  // `cancelled` 常常带着 `failureReason`，所以状态判断要在原因之前
+  if (MCP_FINE.has(status)) return undefined
   const detail = params.failureReason ?? params.error
   if (detail !== undefined && detail !== null) {
     return typeof detail === "string" ? detail : JSON.stringify(detail)
   }
-  return status === "starting" || status === "ready" ? undefined : status
+  return status
 }
 
 function toRateLimits(raw: WireRateLimits | undefined): RateLimits | undefined {

@@ -7,7 +7,7 @@ import { createClaudeDriver, createCodexDriver } from "@omni/engine"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
-import { devEngine, devModel, devResume, devTrust } from "./devtools.js"
+import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 import { createAttention } from "./attention.js"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
@@ -194,6 +194,7 @@ export function attachHost(
     home: homedir(),
     journal,
     rules,
+    ...(devMaxLive() === undefined ? {} : { maxLive: devMaxLive() }),
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
     now: () => Date.now(),
