@@ -94,6 +94,40 @@ function categoryOfLabel(label: string | undefined): Category | undefined {
   return NAME_CATEGORY.find(([re]) => re.test(name))?.[1]
 }
 
+/**
+ * 「跑命令」但**参数里本来就没有命令**的那几个工具。
+ *
+ * 它们的动作不在命令文本里：`KillShell` 杀的是一个已经在跑的后台 shell，
+ * 参数是 shell id。所以下面那条「看不见命令就判不出」不适用于它们——
+ * 它们不是「看不见」，是本来就没有。
+ */
+const EXEC_WITHOUT_COMMAND: ReadonlySet<string> = new Set(["KillShell"])
+
+/**
+ * 命令看不见时该按什么判。
+ *
+ * ## 为什么不能按 exec 放行
+ *
+ * `exec` 在 auto-edit 档下是 `allow`。而**一条我们从没见过的命令**被按 exec 放行，
+ * 等于那 8 条靠命令原文的红线（凭据读取、越界删除、`exec-writes-outside-worksite`、
+ * `git push`、`git-destructive`、`global-install`、`network`、`unparseable-command`）
+ * 全部不存在——它们的判据都在 `norm.split` 里，而 `split` 是从 `args.command` 切出来的。
+ *
+ * 这在 ACP 上是**常态而非例外**：实测 kimi 的审批请求不带命令原文
+ * （`rawInput` 要等批准之后才来），驱动会先等一小会儿（见 `acp/permission.ts`），
+ * 等不到就把 `command` 留空——留空之后就走到这里。
+ *
+ * ## 为什么是 `unknown` 而不是新加一条红线
+ *
+ * 红线的 action 会**盖掉档位地板**：一条 escalate 红线在只读档下会把本该安静的
+ * `deny` 变成一次弹窗。落 `unknown` 则正好让矩阵自己说话——
+ * 只读 `deny`（安静拒掉）、自动编辑 `escalate`（问一次）、完全 `allow`。
+ * 这也正是 `unknown` 那一列注释里写的取舍：宁可多问一次，不可漏判。
+ */
+function blindExec(req: Request, category: Category, command: string | undefined): boolean {
+  return category === "exec" && command === undefined && !EXEC_WITHOUT_COMMAND.has(req.tool)
+}
+
 const PATH_ARG_KEYS = ["file_path", "path", "notebook_path", "filePath", "cwd"] as const
 const URL_ARG_KEYS = ["url", "uri"] as const
 
@@ -174,8 +208,10 @@ function fromCommand(split: SplitResult): { paths: string[]; urls: string[] } {
 
 export function classify(req: Request, home: string): Normalized {
   // 名字只在 `tool` 认不出来时才看；认出来了以 `tool` 为准（见 `NAME_CATEGORY`）
-  const category = TOOL_CATEGORY[req.tool] ?? categoryOfLabel(req.toolLabel) ?? "unknown"
-  const command = typeof req.args["command"] === "string" ? req.args["command"] : undefined
+  const named = TOOL_CATEGORY[req.tool] ?? categoryOfLabel(req.toolLabel) ?? "unknown"
+  const command = typeof req.args["command"] === "string" && req.args["command"] !== "" ? req.args["command"] : undefined
+  // 看不见命令就判不出这是什么动作——落 `unknown`，让档位矩阵自己说话（见 `blindExec`）
+  const category = blindExec(req, named, command) ? "unknown" : named
   const split: SplitResult =
     command === undefined ? { segments: [], unparseable: false } : splitSegments(command)
 

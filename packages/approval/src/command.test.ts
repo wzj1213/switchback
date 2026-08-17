@@ -71,3 +71,29 @@ describe("重定向目标", () => {
     expect(redirectTargets("cmd > a.txt 2> b.txt")).toEqual(["a.txt", "b.txt"])
   })
 })
+
+/**
+ * 点号 source 必须锚在**程序位**。原来是「任意位置的裸 `.`」，
+ * 而表示当前目录的 `.` 是 shell 里最常见的操作数——那条正则把
+ * `find . -name x`、`git add . && …` 全判成了间接执行。
+ *
+ * 这个误判一直没露头，因为 ACP 那条路上命令原文压根没送到判定器。
+ */
+describe("点号 source 只算程序位", () => {
+  const opaque = (command: string): boolean => splitSegments(command).unparseable
+
+  it("真的 source 要认出来", () => {
+    expect(opaque(". ./env.sh")).toBe(true)
+    expect(opaque("cd /w && . ./env.sh")).toBe(true)
+    expect(opaque("echo hi; . setup")).toBe(true)
+    expect(opaque("cat f | . /dev/stdin")).toBe(true)
+  })
+
+  it("当前目录那个 `.` 不算——这才是常态", () => {
+    expect(opaque("find . -name x.json")).toBe(false)
+    expect(opaque("git add . && git commit -m x")).toBe(false)
+    expect(opaque("cp . /tmp/x")).toBe(false)
+    expect(opaque("rg foo . --files")).toBe(false)
+    expect(opaque("git add .")).toBe(false)
+  })
+})

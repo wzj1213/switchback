@@ -22,6 +22,53 @@ export interface PermissionContext {
   /** 在途工具调用表。审批请求只带 id，命令和 diff 全在这里。 */
   inflight: Map<string, AcpToolCall>
   askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+  /** 等详情补齐最多等多久（毫秒）。默认 `DETAIL_WAIT_MS`；测试传 0 就不等。 */
+  waitMs?: number
+}
+
+/**
+ * 等在途表把详情补齐要给多少时间。
+ *
+ * 实测 kimi 的顺序是：`tool_call`（有 kind、没命令）→ `request_permission`
+ * （没 kind、没命令）→ **批准之后** `tool_call_update {rawInput:{command}}`——
+ * 而最后那条只比审批请求晚 **2 毫秒**。300ms 是它的一百多倍余量。
+ *
+ * 上限存在的意义是「等不到也别挂着」：那时命令留空，判定器按「看不见」办
+ * （落 `unknown`：只读档安静拒掉、自动编辑档问一次），而不是拿标题冒充命令。
+ */
+const DETAIL_WAIT_MS = 300
+const DETAIL_POLL_MS = 10
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+/** 判定要用的东西到了没。`rawInput` 带命令，`content`/`locations` 带 diff 与路径。 */
+function hasDetails(call: AcpToolCall): boolean {
+  return call.rawInput !== undefined || call.content !== undefined || call.locations !== undefined
+}
+
+/**
+ * 把审批请求和在途表合起来，**必要时等一下**。
+ *
+ * 审批请求本身只是一个「指回那条工具调用」的引用（实测 kimi 只给
+ * `{toolCallId, title, content}`，连 `kind` 都没有），所以先合并；
+ * 合完还看不见详情就等——那 8 条靠命令原文的红线全指望这一步。
+ *
+ * **不用 `merge`**：那个函数把 `null` 当「显式清空」（`tool_call_update` 是补丁语义），
+ * 而审批请求不是补丁，它是引用；照补丁语义合会把已知的 `kind` 清掉。
+ */
+async function withDetails(
+  ctx: PermissionContext,
+  id: string | undefined,
+  patch: AcpToolCall,
+  ): Promise<AcpToolCall> {
+  const budget = ctx.waitMs ?? DETAIL_WAIT_MS
+  const join = (): AcpToolCall => ({ ...ctx.inflight.get(id ?? ""), ...patch })
+  if (id === undefined) return join()
+  for (let waited = 0; waited < budget; waited += DETAIL_POLL_MS) {
+    if (hasDetails(join())) break
+    await sleep(DETAIL_POLL_MS)
+  }
+  return join()
 }
 
 /**
@@ -48,16 +95,19 @@ export function respond(
 /**
  * 判一条 `session/request_permission`。
  *
- * 请求体里**只有 toolCallId、kind、status**——标题、命令、diff 全都不在，
- * 它们在此前那条 `session/update` 里。所以先查在途表补齐，再送去判定。
- * 查不到也照样判：`buildRequest` 会退化成一句「详情未送达」，
- * 由用户拿主意——而不是替他默默放行。
+ * 请求体里**只有 toolCallId（连 kind 都未必有）**——标题、命令、diff 全都不在，
+ * 它们在别的 `session/update` 里。所以先查在途表补齐，**必要时等一下**
+ * （见 `withDetails`：命令原文实测只比审批请求晚 2ms），再送去判定。
+ *
+ * 等不到也照样判，但**判的是「看不见」而不是「无害」**：命令留空之后
+ * 判定器落 `unknown`（只读档安静拒掉、自动编辑档问一次），
+ * 而 `buildRequest` 的摘要退化成一句「详情未送达」，由用户拿主意——
+ * 绝不替他默默放行。
  */
 export async function handlePermission(ctx: PermissionContext, call: ServerCall): Promise<void> {
   const params = call.params as AcpPermissionRequest
   const id = params.toolCall?.toolCallId
-  const known = id === undefined ? undefined : ctx.inflight.get(id)
-  const merged: AcpToolCall = { ...known, ...params.toolCall }
+  const merged = await withDetails(ctx, id, params.toolCall ?? {})
   const request = buildRequest(ctx.engine, merged, ctx.cwd)
   const verdict = decide(request, {
     trust: ctx.trust(),

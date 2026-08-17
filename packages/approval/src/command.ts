@@ -73,7 +73,22 @@ const OPAQUE_PATTERNS: readonly (readonly [RegExp, string, boolean])[] = [
   [/<\(/, "进程替换 <(...)", false],
   [/(^|\s)eval(\s|$)/, "eval", true],
   [/(^|\s)source(\s|$)/, "source", true],
-  [/(^|\s)\.\s+\S/, "点号 source", true],
+  /*
+   * 点号 source（`. ./env.sh`）。**必须锚在程序位**——命令开头，或者
+   * `;`、`&&`、`||`、`|`、换行之后。
+   *
+   * 原来写的是 `(^|\s)\.\s+\S`，也就是「任何位置的一个裸 `.`，后面还有东西」。
+   * 而 shell 里**表示当前目录的 `.` 是最常见的操作数**：
+   *
+   *   find . -name x.json          ← 被判成 source，escalate
+   *   git add . && git commit -m x ← 同上
+   *   cp . /tmp/x                  ← 同上
+   *
+   * 这个误判一直没露头，因为 ACP 那条路上**命令原文根本没送到判定器**
+   *（退回成标题 `"Bash"`）。命令一旦看得见，它就开始弹窗——
+   * 而这些恰恰是用户口中「简单的 shell 命令也要问」的那些。
+   */
+  [/(?:^|[;&|\n])\s*\.\s+\S/, "点号 source", true],
   [/(^|\s)exec(\s|$)/, "exec 替换进程", true],
   /*
    * ── 间接执行：**真正要跑的东西藏在参数里** ──────────────

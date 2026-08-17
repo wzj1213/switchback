@@ -380,8 +380,26 @@ describe("kind 报 other 时按工具名字补一次分类", () => {
     )
   })
 
-  it("`Shell: …` 认成执行，自动编辑档下直接放行", () => {
-    expect(decide(acp("Shell: cd /x && find . -name '*.json'"), state("auto-edit")).action).toBe("allow")
+  /**
+   * 名字认出方向**不等于看清了动作**。标签里那截命令是引擎排版给人看的字符串，
+   * 判定用的命令只认 `args.command`（见 `acp/approve.ts` 的 `argsOf`）。
+   * 拿不到就按「看不见」办——落 unknown，自动编辑档下问一次。
+   */
+  it("`Shell: …` 只认出方向、命令还没到 → 照样问", () => {
+    expect(decide(acp("Shell: cd /x && find . -name '*.json'"), state("auto-edit")).action).toBe("escalate")
+  })
+
+  it("命令真的到了才放行", () => {
+    expect(decide(acp("Shell", { command: "find . -name '*.json'" }), state("auto-edit")).action).toBe("allow")
+    expect(decide(acp("Shell", { command: "ls -la" }), state("auto-edit")).action).toBe("allow")
+  })
+
+  // 命令到了，红线也就跟着活了——这正是「看得见」的意义
+  it("命令到了，红线也认得出来了", () => {
+    expect(decide(acp("Shell", { command: "cat .env" }), state("auto-edit"))).toMatchObject({
+      action: "deny",
+      redline: "credential-read",
+    })
   })
 
   it("`ReadFile: …` 认成读，连只读档都放行", () => {
@@ -414,5 +432,44 @@ describe("kind 报 other 时按工具名字补一次分类", () => {
   // 红线优先于一切：名字认成读，路径踩了凭据红线照样拒
   it("红线照旧压过名字分类", () => {
     expect(decide(acp("ReadFile: ~/.ssh/id_rsa", { path: "~/.ssh/id_rsa" }), state("auto-edit")).action).toBe("deny")
+  })
+})
+
+/**
+ * ACP 的审批请求**不带命令原文**（实测 kimi：`rawInput` 要等批准之后才来）。
+ * 以前驱动会退回 title 当命令，于是 `splitSegments("Bash")` 得到一条无害命令，
+ * **靠命令原文的 8 条红线一条都匹配不上**，然后按档位静默放行。
+ * 现在命令缺席就缺席，判定按「看不见」办。
+ */
+describe("看不见命令就不能按 exec 放行", () => {
+  const blind = (tool: string): Request => ({ engine: "kimi", tool, args: {}, cwd: WORKSITE })
+
+  it("自动编辑档下问一次，而不是放行", () => {
+    expect(decide(blind("acp:execute"), state("auto-edit")).action).toBe("escalate")
+    expect(decide(blind("Bash"), state("auto-edit")).action).toBe("escalate")
+  })
+
+  // 落 unknown 而不是加一条 escalate 红线，正是为了这一条：
+  // 红线的 action 会盖掉档位地板，只读档下会把本该安静的 deny 变成一次弹窗
+  it("只读档下照旧安静地拒，不弹窗", () => {
+    expect(decide(blind("acp:execute"), state("read-only")).action).toBe("deny")
+  })
+
+  it("完全档下照旧放行——那一档的意思就是别问", () => {
+    expect(decide(blind("acp:execute"), state("full")).action).toBe("allow")
+  })
+
+  it("命令是空串也算看不见", () => {
+    expect(decide({ ...blind("Bash"), args: { command: "" } }, state("auto-edit")).action).toBe("escalate")
+  })
+
+  // 它们的动作本来就不在命令文本里：`KillShell` 杀的是一个已有的后台 shell
+  it("本来就没有命令的 exec 工具不受影响", () => {
+    expect(decide({ ...blind("KillShell"), args: { shell_id: "s1" } }, state("auto-edit")).action).toBe("allow")
+  })
+
+  // 读文件、贴图这些不靠命令文本判，不该被这条规则牵连
+  it("非 exec 的动作不受影响", () => {
+    expect(decide({ ...blind("acp:read"), args: { path: "src/a.ts" } }, state("auto-edit")).action).toBe("allow")
   })
 })

@@ -67,11 +67,34 @@ export function pickOption(
   return options.find((o) => o.optionId?.startsWith(prefix) === true)?.optionId
 }
 
+/** 判定用的命令原文。**只认 `rawInput.command`**，理由见 `argsOf`。 */
+function commandOf(call: AcpToolCall): string | undefined {
+  const raw = call.rawInput?.["command"]
+  return typeof raw === "string" && raw !== "" ? raw : undefined
+}
+
 function argsOf(call: AcpToolCall | undefined): Record<string, unknown> {
   if (call === undefined) return {}
   const detail = detailOf(call)
   if (detail.kind === "shell") {
-    return { command: detail.command, ...(detail.cwd === undefined ? {} : { cwd: detail.cwd }) }
+    /**
+     * **命令原文只认 `rawInput`，不能退回 `title`。**
+     *
+     * `detailOf` 缺 `rawInput` 时会退回 `title`——给人看没问题（"Bash"、
+     * "Running: ls -la" 总比空着好），但把它当命令送去判定就是**拿展示文本
+     * 冒充事实**：实测 kimi 审批时的 title 就是 `"Bash"`，于是
+     * `splitSegments("Bash")` 得到一条叫 Bash 的无害命令，
+     * 靠命令原文的那 8 条红线（凭据读取、越界删除、`npm i -g`、`git push`、
+     * 解析不了…）**一条都匹配不上**，然后按档位静默放行。
+     *
+     * 缺席比编一个好：`command` 不在，判定器就按「看不见」办（落 `unknown`，
+     * 只读档 deny、自动编辑档 escalate），而不是以为自己看清了。
+     */
+    const command = commandOf(call)
+    return {
+      ...(command === undefined ? {} : { command }),
+      ...(detail.cwd === undefined ? {} : { cwd: detail.cwd }),
+    }
   }
   if (detail.kind === "file_edit") {
     const paths = detail.files.map((f) => f.path).filter((p) => p !== "")

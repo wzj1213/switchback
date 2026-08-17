@@ -80,6 +80,8 @@ function ctxWith(
     memory: () => [],
     inflight,
     askUser,
+    // 测试不等：真机上是 300ms，等待本身另有专门的用例
+    waitMs: 0,
   }
 }
 
@@ -205,5 +207,99 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
     expect(pickMode(other, "read-only")).toBe("plan")
     expect(pickMode(other, "auto-edit")).toBe("edit")
     expect(pickMode(other, "full")).toBe("yolo")
+  })
+})
+
+/**
+ * ACP 的审批请求**不带命令原文**。实测 kimi 的顺序是
+ * `tool_call`（有 kind、没命令）→ `request_permission`（没 kind、没命令）
+ * → **批准之后** `tool_call_update {rawInput:{command}}`，而最后那条只晚 2ms。
+ *
+ * 不等就判的代价：靠命令原文的 8 条红线一条都匹配不上，然后按档位静默放行。
+ */
+describe("等在途表把命令补齐", () => {
+  const ask = (): { call: ServerCall; got: { result?: unknown } } => {
+    const got: { result?: unknown } = {}
+    return {
+      got,
+      // kimi 的审批请求就是这个形状：只有 id 和 title，没有 kind、没有命令
+      call: {
+        method: "session/request_permission",
+        params: { toolCall: { toolCallId: "c9", title: "Bash" }, options: REAL_OPTIONS },
+        respond: (result: unknown) => {
+          got.result = result
+        },
+      },
+    }
+  }
+
+  it("详情晚到也等得到，红线跟着活过来", async () => {
+    const inflight = new Map<string, AcpToolCall>([["c9", { toolCallId: "c9", kind: "execute", title: "Bash" }]])
+    const { call, got } = ask()
+    // 审批请求已经在处理中，命令随后才到——就像真机上那 2ms
+    const done = handlePermission({ ...ctxWith("auto-edit", inflight), waitMs: 500 }, call)
+    setTimeout(() => {
+      inflight.set("c9", { toolCallId: "c9", kind: "execute", rawInput: { command: "cat .env" } })
+    }, 30)
+    await done
+    // `cat .env` 是凭据红线：等到了命令才拒得掉，不等就是静默放行
+    expect(got.result).toEqual({ outcome: { outcome: "selected", optionId: "reject_once" } })
+  })
+
+  it("等不到就按「看不见」判：自动编辑档问一次，而不是放行", async () => {
+    const inflight = new Map<string, AcpToolCall>([["c9", { toolCallId: "c9", kind: "execute", title: "Bash" }]])
+    const asked: string[] = []
+    const { call } = ask()
+    await handlePermission(
+      {
+        ...ctxWith("auto-edit", inflight, (a) => {
+          asked.push(a.summary)
+          return Promise.resolve({ allow: false, remember: "once" })
+        }),
+        waitMs: 20,
+      },
+      call,
+    )
+    expect(asked).toHaveLength(1)
+  })
+
+  it("只读档下等不到也不打扰用户——直接拒", async () => {
+    const inflight = new Map<string, AcpToolCall>([["c9", { toolCallId: "c9", kind: "execute", title: "Bash" }]])
+    const asked: string[] = []
+    const { call, got } = ask()
+    await handlePermission(
+      {
+        ...ctxWith("read-only", inflight, (a) => {
+          asked.push(a.summary)
+          return Promise.resolve({ allow: true, remember: "once" })
+        }),
+        waitMs: 20,
+      },
+      call,
+    )
+    expect(asked).toEqual([])
+    expect(got.result).toEqual({ outcome: { outcome: "selected", optionId: "reject_once" } })
+  })
+
+  // 审批请求是**引用**不是补丁：照补丁语义合并会把在途表里已知的 kind 清掉
+  it("请求体里没有的字段不许覆盖在途表里已知的", async () => {
+    const inflight = new Map<string, AcpToolCall>([
+      ["c9", { toolCallId: "c9", kind: "execute", rawInput: { command: "ls -la" } }],
+    ])
+    const asked: string[] = []
+    const { call, got } = ask()
+    await handlePermission(
+      {
+        ...ctxWith("auto-edit", inflight, (a) => {
+          asked.push(a.summary)
+          return Promise.resolve({ allow: false, remember: "once" })
+        }),
+        waitMs: 0,
+      },
+      call,
+    )
+    // kind 保住了 → exec + 命令看得见 → 自动编辑档直接放行，不打扰
+    expect(asked).toEqual([])
+    expect(got.result).toEqual({ outcome: { outcome: "selected", optionId: "allow_once" } })
   })
 })
