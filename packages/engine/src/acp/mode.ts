@@ -1,4 +1,4 @@
-import type { Trust } from "@omni/protocol"
+import type { EngineStatus, Trust } from "@omni/protocol"
 import type { AcpMode } from "./wire.js"
 
 /**
@@ -85,4 +85,64 @@ export function pickMode(modes: readonly AcpMode[], trust: Trust): string | unde
     if (value >= THRESHOLD && (best === undefined || value > best.score)) best = { id, score: value }
   }
   return best?.id
+}
+
+/**
+ * 把信任档落到引擎上，**并且在落不上时说清楚**。
+ *
+ * 从驱动里搬进来是行数闸门逼的，但边界本来就在这儿：上面那张打分表定的是
+ * 「哪个 mode 对应哪一档」，而「发不发 `session/set_mode`、发不出去怎么向用户交代」
+ * 是同一件事的后半段。原来后半段在 `driver.ts`，于是这个文件的注释只能写
+ * 「见 driver.ts」——那正是边界划错了的信号。
+ */
+export interface TrustCtx {
+  /** 引擎 id，落进给用户的那句话里。 */
+  id: string
+  call: (method: string, params: unknown) => Promise<unknown>
+  status: (status: EngineStatus, detail?: string) => void
+  state: {
+    acpSession: string | undefined
+    mode: string | undefined
+    /** 这家自己的审批开关（见 `AcpDriverConfig.nativeApproval`）。 */
+    native: { meta?: Readonly<Record<string, unknown>>; note?: string } | undefined
+  }
+  nativeApproval?: (trust: Trust) => { meta?: Readonly<Record<string, unknown>>; note?: string }
+}
+
+/**
+ * 匹配不上就**什么都不发**，保持 agent 自己的默认档，并明说一句。
+ * 硬塞一个猜的 mode 比不塞危险得多：塞错方向就是悄悄放开了权限。
+ */
+export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly AcpMode[]): Promise<void> {
+  if (ctx.state.acpSession === undefined) return
+  if (modes.length === 0) {
+    // 这家有自己的审批开关时，说它那句更准（见 `nativeApproval` 的 `note`）
+    ctx.status("ready", ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`)
+    return
+  }
+  const target = pickMode(modes, trust)
+  if (target === undefined) {
+    const names = modes.map((m) => m.id ?? "?").join("、")
+    ctx.status("ready", `omni 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`)
+    return
+  }
+  if (target === ctx.state.mode) return
+  await ctx.call("session/set_mode", { sessionId: ctx.state.acpSession, modeId: target })
+  ctx.state.mode = target
+}
+
+/**
+ * 原生审批开关**开会话时就定死了**（grok 的 `yoloMode` 在 `session/new` 里）。
+ *
+ * 改不了就说出来，和 codex 的沙箱同一条原则：一个「界面上换了、引擎那边没换」
+ * 的档位比不给换糟得多——尤其是往严的方向换，用户会以为自己已经收紧了。
+ */
+export function warnNativeFixed(ctx: TrustCtx, trust: Trust): void {
+  const want = ctx.nativeApproval?.(trust)
+  if (want === undefined || ctx.state.native === undefined) return
+  if (JSON.stringify(want.meta ?? {}) === JSON.stringify(ctx.state.native.meta ?? {})) return
+  ctx.status(
+    "degraded",
+    `${ctx.id} 的原生审批开关在开会话时就定死了，换档要重开一条会话才生效。这条会话仍然按开场时那一档在跑。`,
+  )
 }

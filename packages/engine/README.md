@@ -117,11 +117,18 @@
   `_x.ai/session_notification` 的 `turn_completed` 里，窗口大小在
   `models[]._meta.totalContextTokens`。私有通知的解析按引擎注入
   （`AcpDriverConfig.contextUsed`），驱动这一层不认识任何一家的私有方法名。
-- **omni 的信任档对 grok 没有约束力。** 实测 read-only 档下让它改文件，它直接改了，
-  `session/request_permission` **一次都没发**。上一条（审批可见性由 agent 决定）在
-  codex-acp 上是「某些操作不问」，在 grok 上是「一次都不问」。omni 不替它装沙箱——
-  「引擎跑自己的原生进程、用自己的配置」是产品边界；要限制它请用 grok 自己的
-  `--sandbox` / `~/.grok/config.toml`。
+- **grok 的 ACP 会话默认 yolo，必须显式关掉。** 实测对照：不传 `_meta` 时它
+  一次审批都不发、read-only 档下照样改文件（omni 从来没拿到过发言权）；
+  传 `_meta.yoloMode:false` 之后它就来问，请求里还带着 `kind` 和完整命令。
+  所以 `nativeApproval` 按档位给这个开关：**只读档关掉 yolo**（它来问、omni 按
+  只读档直接 deny，真机验过文件没变，而且因为是 deny 不是 escalate，
+  **用户根本不会被打扰**）；自动编辑与完全档保持它原生的不打扰。
+- **grok 没有「安全操作自动放行」这一档。** 它的 TUI 有六个档
+  （`acceptEdits`/`auto`/`dontAsk`/`bypassPermissions`…），**ACP 上一个都没暴露**，
+  只有 `yoloMode` 这个二值开关。所以自动编辑档下 omni 的判定与红线对它不生效，
+  驱动会为此发一条 `engine.status` 说明——闷着不说才是骗人。
+- **原生审批开关开会话时定死**（和 codex 的沙箱同一条）：`yoloMode` 在
+  `session/new` 里，`setTrust` 改不了。改不了就发 `degraded`，不假装改成了。
 - **codex 侧只消费 74 种通知里的一小撮**：item 生命周期、文本与命令输出的 delta、
   用量、`turn/completed`、`error`。其余（MCP 进度、审批复核、实时语音…）一律丢弃。
 - **codex 的 OS 沙箱在 `thread/start` 时定死，`setTrust` 改不了它。** 往低调没问题

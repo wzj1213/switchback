@@ -4,6 +4,7 @@ import {
   createCodexDriver,
   grokContextUsed,
   grokLogPath,
+  grokNativeApproval,
   kimiLogPath,
   type EngineDriver,
 } from "@omni/engine"
@@ -56,6 +57,9 @@ export function buildRegistry(
         logPath: grokLogPath,
         // 它不发 ACP 的 `usage_update`，用量在自己的私有通知里（见 `acp/grok.ts`）
         contextUsed: grokContextUsed,
+        // **不传这一条它的会话默认就是 yolo**：实测只读档下照样改文件，
+        // 一次审批都不发。它唯一的开关是 `session/new` 的 `_meta.yoloMode`
+        nativeApproval: grokNativeApproval,
       }),
       ...acp.drivers,
     },

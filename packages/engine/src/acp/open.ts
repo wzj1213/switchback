@@ -1,4 +1,4 @@
-import type { EngineCapabilities, ModelOption } from "@omni/protocol"
+import type { EngineCapabilities, ModelOption, Trust } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
 import type { RpcPeer } from "../rpc.js"
@@ -32,6 +32,14 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 interface Shared {
   cwd: string
   mcpServers: never[]
+  /** 各家的原生审批开关等等，见 `AcpDriverConfig.nativeApproval`。 */
+  _meta?: Readonly<Record<string, unknown>>
+}
+
+/** 这家的原生审批开关按当前信任档算出来的东西。见 `AcpDriverConfig.nativeApproval`。 */
+export interface Native {
+  meta?: Readonly<Record<string, unknown>>
+  note?: string
 }
 
 /** 开场要改写的那部分状态。驱动把自己的 state 传进来，这里就地填。 */
@@ -59,6 +67,13 @@ export interface OpenState {
   caps: EngineCapabilities
   /** 当前信任档。开场时要按它挑 mode。 */
   trust: string
+  /**
+   * 开会话时按信任档算出来的原生审批开关。
+   *
+   * 留着它有两个用处：那句要对用户说的话（`note`），
+   * 以及中途换档时判断「开会话时定死的那个值和现在要的还一样吗」。
+   */
+  native: Native | undefined
   /** 子进程的 stderr 尾巴。握手超时要把它摊出来，不然只有一句「超时了」。 */
   stderr: string
 }
@@ -66,7 +81,9 @@ export interface OpenState {
 export interface OpenCtx {
   rpc: RpcPeer
   owner: ProcessOwner
-  config: { id: string; command: string }
+  /** 只声明开场用得到的那几项。**不直接引 `AcpDriverConfig`**：那会绕成
+      driver → open → driver 的循环 import。 */
+  config: { id: string; command: string; nativeApproval?: (trust: Trust) => Native }
   req: StartRequest
   state: OpenState
 }
@@ -116,7 +133,16 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
  * 实际模型什么都不记得。宁可把失败摆出来（和 codex 驱动同一条原则）。
  */
 export async function openSession(ctx: OpenCtx): Promise<void> {
-  const shared = { cwd: ctx.req.cwd, mcpServers: [] }
+  // **原生审批开关只在开会话时能设**（grok 的 `yoloMode` 在 `session/new` 里），
+  // 所以它必须在这儿算好，而且续跑/分叉那两条路也要带上——
+  // 只给新会话带的话，接着跑的那条会话会悄悄退回引擎自己的默认档
+  const native = ctx.config.nativeApproval?.(ctx.req.trust as Trust)
+  ctx.state.native = native
+  const shared: Shared = {
+    cwd: ctx.req.cwd,
+    mcpServers: [],
+    ...(native?.meta === undefined ? {} : { _meta: native.meta }),
+  }
   if (ctx.req.forkOf !== undefined) {
     await forkSession(ctx, ctx.req.forkOf.handle, shared)
     return

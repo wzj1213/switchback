@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { grokChatPath, grokContextUsed, grokLogPath, grokWorkspaceDir } from "./grok.js"
+import { grokChatPath, grokContextUsed, grokLogPath, grokNativeApproval, grokWorkspaceDir } from "./grok.js"
 
 /**
  * 目录名的编码规则是从真机上已有的目录反解出来的，所以这张表里的
@@ -98,5 +98,30 @@ describe("grok 的上下文用量", () => {
     expect(grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "turn_completed", usage: { totalTokens: 0 } }))).toBeUndefined()
     expect(grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "turn_completed", usage: { totalTokens: "多" } }))).toBeUndefined()
     expect(grokContextUsed("_x.ai/session_notification", undefined)).toBeUndefined()
+  })
+})
+
+/**
+ * 实测：不给 `_meta` 时 grok 的 ACP 会话默认 yolo=true——只读档下它照样改文件，
+ * 一次审批都不发。所以这一条不是可选优化，是补一个安全洞。
+ */
+describe("grok 的原生审批开关", () => {
+  it("只读档关掉 yolo——它来问，omni 才拒得掉", () => {
+    expect(grokNativeApproval("read-only")).toEqual({ meta: { yoloMode: false } })
+  })
+
+  // 它的 ACP 只有「全问 / 全不问」，没有 kimi 那种「安全操作自动放行」，
+  // 所以自动编辑档只能选不吵——但必须把「omni 判定对它不生效」说出来
+  it("自动编辑与完全档保持它原生的不打扰，并且带一句说明", () => {
+    for (const trust of ["auto-edit", "full"] as const) {
+      const native = grokNativeApproval(trust)
+      expect(native.meta).toEqual({ yoloMode: true })
+      expect(native.note).toContain("不生效")
+    }
+  })
+
+  // 只读档不需要那句话：那一档下 omni 的判定确实在起作用
+  it("只读档不带说明", () => {
+    expect(grokNativeApproval("read-only").note).toBeUndefined()
   })
 })

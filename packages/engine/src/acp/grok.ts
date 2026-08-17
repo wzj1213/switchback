@@ -1,5 +1,6 @@
 import { access, readdir } from "node:fs/promises"
 import { join } from "node:path"
+import type { Trust } from "@omni/protocol"
 
 /**
  * grok 的会话记录在磁盘上的哪儿。
@@ -28,6 +29,52 @@ import { join } from "node:path"
  * 系统提示加每一轮的原文，和 kimi 那边交接的 `wire.jsonl` 是同一类东西。
  * 交接要给的是「全量原文」，给概要就退回成摘要了，那正是这条路要绕开的东西。
  */
+
+/**
+ * grok 的原生审批开关。
+ *
+ * ## 不传它 = 一路放行，而且一声不响
+ *
+ * 实测两组对照（同一个提示词，让它改一个文件）：
+ *
+ * | `session/new` 的 `_meta` | 会话的 yolo 标记 | 审批请求 | 文件 |
+ * | --- | --- | --- | --- |
+ * | 不给 | **true** | **0 次** | 被改了 |
+ * | `{yoloMode:false}` | false | 1 次（带 `kind` 和完整命令） | 拒掉后没变 |
+ *
+ * 也就是说 **grok 的 ACP 会话默认就是 yolo**：不传这一条，omni 的三档对它
+ * 完全没有发言权——用户选「只读」，它照样改文件。这不是体验问题，是安全洞。
+ *
+ * ## 为什么只能是两档
+ *
+ * grok 的 TUI 有六个档（`acceptEdits`/`auto`/`dontAsk`/`bypassPermissions`…），
+ * 但**ACP 上一个都没暴露**：`session/set_mode` 是空壳（连不存在的档位也回 `{}`），
+ * 唯一的开关就是这个 `yoloMode`。所以它没有 kimi 那种「安全操作自动放行」的中间档，
+ * 只有「全问」和「全不问」。
+ *
+ * 映射：**只读档要真只读**，所以关掉 yolo，让它来问、由 omni 按只读档拒；
+ * 自动编辑与完全档保持它原生的不打扰，并且**把这件事说出来**——
+ * 那一档下 omni 的判定与红线对它确实不生效，闷着不说才是骗人。
+ *
+ * ## 只在开会话时生效
+ *
+ * 它在 `session/new` 里，和 codex 的 OS 沙箱一样**开完就定死**。
+ * 中途换档改不了，那时驱动发一条 `degraded`——不假装改成了。
+ */
+export function grokNativeApproval(trust: Trust): {
+  meta: Readonly<Record<string, unknown>>
+  note?: string
+} {
+  const yolo = trust !== "read-only"
+  if (!yolo) return { meta: { yoloMode: false } }
+  return {
+    meta: { yoloMode: true },
+    note:
+      "Grok 在这一档下自动放行一切工具调用——它的 ACP 只有「全问 / 全不问」两档，" +
+      "没有「安全操作自动放行」。omni 的判定与红线对它因此不生效；" +
+      "要真正限制它，用只读档，或者 grok 自己的沙箱（`grok --sandbox` / `~/.grok/config.toml`）。",
+  }
+}
 
 /** grok 把「和模型之间的全部往来」原样写在这个文件里。 */
 const CHAT = "chat_history.jsonl"

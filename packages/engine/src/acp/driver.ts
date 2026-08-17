@@ -7,7 +7,7 @@ import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../su
 import { probeCommand } from "../probe.js"
 import { sessionsOf } from "./setup.js"
 import { handshake, openSession, type OpenCtx, type OpenState } from "./open.js"
-import { pickMode } from "./mode.js"
+import { applyTrust, warnNativeFixed, type TrustCtx } from "./mode.js"
 import { handlePermission } from "./permission.js"
 import { stopStatus } from "./translate.js"
 import { imageBlocks } from "./attach.js"
@@ -89,6 +89,21 @@ export interface AcpDriverConfig {
    * 驱动这一层不认识任何一家的私有方法名。返回 undefined = 这条通知与用量无关。
    */
   contextUsed?: (method: string, params: unknown) => number | undefined
+  /**
+   * 这家的**原生审批开关**怎么按信任档设。
+   *
+   * ACP 的标准做法是 mode（`session/set_mode`），但不是每家都实现：
+   * **grok 的 `set_mode` 是空壳，而它的会话默认 yolo**——实测不传任何 `_meta` 时
+   * 它一次审批都不发，只读档下照样改文件。它唯一的开关是 `session/new` 的
+   * `_meta.yoloMode`（见 `grok.ts` 的实测对照表）。
+   *
+   * `meta` 并进 `session/new` 的 `_meta`；`note` 是要对用户说的一句话
+   * （「这一档下 omni 的判定对它不生效」），替掉「没报告可选档位」那句通用文案。
+   *
+   * **只在开会话时生效**：和 codex 的沙箱一样定死，`setTrust` 改不了它——
+   * 改不了就发 `degraded`，不假装改成了。
+   */
+  nativeApproval?: (trust: Trust) => { meta?: Readonly<Record<string, unknown>>; note?: string }
 }
 
 interface SessionState extends OpenState {
@@ -124,6 +139,7 @@ class AcpSession implements EngineSession {
       canList: undefined,
       windowOf: {},
       contextWindow: undefined,
+      native: undefined,
       effort: undefined,
       trust: req.trust,
     }
@@ -149,6 +165,19 @@ class AcpSession implements EngineSession {
         return `${prefix}-${String(this.seq)}`
       },
       now: () => Date.now(),
+    }
+  }
+
+  /** 信任档那几步共用的一份上下文。见 `mode.ts`——**那是「档位怎么落到引擎上」**。 */
+  private trustCtx(): TrustCtx {
+    return {
+      id: this.config.id,
+      call: (method, params) => this.rpc.call(method, params),
+      status: (status, detail) => {
+        this.status(status, detail)
+      },
+      state: this.state,
+      ...(this.config.nativeApproval === undefined ? {} : { nativeApproval: this.config.nativeApproval }),
     }
   }
 
@@ -229,34 +258,9 @@ class AcpSession implements EngineSession {
 
   private async openSession(): Promise<void> {
     await openSession(this.openCtx())
-    await this.applyMode(this.trust.current, this.state.modes)
+    await applyTrust(this.trustCtx(), this.trust.current, this.state.modes)
   }
 
-  /**
-   * 把信任档落到 agent 的 mode 上。
-   *
-   * 匹配不上就**什么都不发**，保持 agent 自己的默认档，并明说一句。
-   * 硬塞一个猜的 mode 比不塞危险得多：塞错方向就是悄悄放开了权限。
-   */
-  private async applyMode(trust: Trust, modes: readonly { id?: string; name?: string }[]): Promise<void> {
-    if (this.state.acpSession === undefined) return
-    if (modes.length === 0) {
-      this.status("ready", `${this.config.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`)
-      return
-    }
-    const target = pickMode(modes, trust)
-    if (target === undefined) {
-      const names = modes.map((m) => m.id ?? "?").join("、")
-      this.status(
-        "ready",
-        `omni 的「${trust}」档在 ${this.config.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`,
-      )
-      return
-    }
-    if (target === this.state.mode) return
-    await this.rpc.call("session/set_mode", { sessionId: this.state.acpSession, modeId: target })
-    this.state.mode = target
-  }
 
   /**
    * 应答 agent 发来的请求。**每一条都必须答**——不答 agent 会一直等，整轮卡死。
@@ -428,8 +432,10 @@ class AcpSession implements EngineSession {
   async setTrust(trust: Trust): Promise<void> {
     this.state.trust = trust
     this.trust.current = trust
-    await this.applyMode(trust, this.state.modes)
+    warnNativeFixed(this.trustCtx(), trust)
+    await applyTrust(this.trustCtx(), trust, this.state.modes)
   }
+
 
   async dispose(): Promise<void> {
     // 有在途文本就先收口，否则最后一条消息会永远停在「正在输入」
