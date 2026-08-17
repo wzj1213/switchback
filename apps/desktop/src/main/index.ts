@@ -20,7 +20,7 @@ import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { installReviewChannel } from "./workdiff.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
+import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevReview, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
 import { quitNow, shouldStayOpen } from "./quit.js"
 
 /**
@@ -186,6 +186,7 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
   scheduleDevInterrupt(win)
   scheduleDevReload(win)
   scheduleDevCompare(win)
+  scheduleDevReview(win)
   scheduleDevFilter(win)
   scheduleDevOpenSelect(win)
   scheduleDevRowMenu(win)

@@ -50,6 +50,17 @@ export function numbered(lines: readonly DiffLine[]): readonly NumberedLine[] {
   })
 }
 
+/**
+ * 丢掉 `diff --git` / `index` / `---` / `+++` 那四行。
+ *
+ * **它们在这块面板里是纯噪音**：路径就写在正文上方的文件头上，blob 哈希对读代码
+ * 没有任何帮助，而每个文件开头都顶着四行灰字，第一处真正的改动就被推下去了。
+ * 转录区里那份保留它们是另一回事——那里没有文件头。
+ */
+export function trimMeta(lines: readonly NumberedLine[]): readonly NumberedLine[] {
+  return lines.filter((l) => l.kind !== "meta")
+}
+
 export interface SplitRow {
   left?: NumberedLine
   right?: NumberedLine
@@ -187,7 +198,7 @@ export function usePatch(cwd: string, rel: string | undefined, context: number, 
     setOut((was) => ({ ...was, loading: true }))
     void bridge.workPatch(cwd, rel, context).then((got) => {
       if (!live) return
-      setOut({ ...got, lines: numbered(parseDiff(got.patch, "update")), loading: false })
+      setOut({ ...got, lines: trimMeta(numbered(parseDiff(got.patch, "update"))), loading: false })
     })
     return () => {
       live = false

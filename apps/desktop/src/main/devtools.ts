@@ -18,6 +18,7 @@ import { quitNow } from "./quit.js"
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
  * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
  * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
+ * | `OMNI_DEV_REVIEW` | 过这么多毫秒之后打开审核面板 |
  * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
  * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
  * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
@@ -265,6 +266,15 @@ export function scheduleDevCompare(win: BrowserWindow): void {
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
     if (!win.isDestroyed()) win.webContents.send("omni:menu", "compare")
+  }, at)
+}
+
+/** 到点打开审核面板。同上，走菜单那条通道——验的是「⇧⌘R 真的能开出来」。 */
+export function scheduleDevReview(win: BrowserWindow): void {
+  const at = Number(process.env["OMNI_DEV_REVIEW"] ?? "0")
+  if (!Number.isFinite(at) || at <= 0) return
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.send("omni:menu", "review")
   }, at)
 }
 

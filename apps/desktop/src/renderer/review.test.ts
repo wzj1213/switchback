@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ReviewFile } from "../shared/review.js"
 import { parseDiff } from "./diff.js"
-import { filterFiles, numbered, splitRows, tallyReview } from "./review.js"
+import { filterFiles, numbered, splitRows, tallyReview, trimMeta } from "./review.js"
 import { blank } from "./components/Review.js"
 
 const PATCH = [
@@ -141,5 +141,22 @@ describe("空状态的措辞", () => {
 
   it("加载中压过其余三种——那时还不知道是哪一种", () => {
     expect(blank(true, true, 0, 0)).toContain("正在问")
+  })
+})
+
+/**
+ * 文件头那四行在审核面板里是纯噪音：路径写在正文上方，blob 哈希对读代码没帮助，
+ * 而每个文件开头顶四行灰字，第一处真正的改动就被推下去了。
+ */
+describe("trimMeta", () => {
+  it("丢掉 diff --git / index / --- / +++，留下 hunk 头和内容", () => {
+    const out = trimMeta(lines())
+    expect(out.some((l) => l.kind === "meta")).toBe(false)
+    expect(out.some((l) => l.kind === "hunk")).toBe(true)
+    expect(out.some((l) => l.text === "new line")).toBe(true)
+  })
+
+  it("丢完之后行号还是对的——行号在丢之前就算好了", () => {
+    expect(trimMeta(lines()).find((l) => l.text === "old line")?.old).toBe(11)
   })
 })
