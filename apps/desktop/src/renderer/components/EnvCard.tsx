@@ -116,10 +116,11 @@ export function EnvCard({
   )
 }
 
+/** 三档的说法必须和输入框那个选择器**逐字一致**，理由见 `Composer.tsx` 的 `TRUSTS`。 */
 const TRUST_TEXT = {
-  "read-only": "只读——任何写入与命令都拒绝",
-  "auto-edit": "自动编辑——工作区内的改动直接放行",
-  full: "完全访问——只在红线上问",
+  "read-only": "只读——不写文件、不跑命令，四家引擎都是硬的",
+  "auto-edit": "引擎自动——什么算安全由引擎自己判",
+  full: "全部放行——最宽的一档，Kimi 与 Grok 什么都不问",
 } as const
 
 function Line({

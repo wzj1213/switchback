@@ -12,11 +12,27 @@ import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust } from "@om
  *
  * `hint` 不是可有可无的：这三个词说得出**档位叫什么**，说不出
  * **它到底会不会问我**。而这正是用户在改这个控件时唯一关心的事。
+ *
+ * ## 为什么中间那档不再叫「自动编辑」
+ *
+ * 它原来的说明是「工作区内的改动直接放行，越界才问」。那句话对 codex
+ *（真的 OS 沙箱）和 Claude（每次工具调用都经过 omni）成立，对讲 ACP 的那两家
+ * **根本不成立**：这一档落到 Kimi 是它自己的 Auto 档、落到 Grok 是 yolo，
+ * **「什么算安全」由引擎自己判**。实测 Kimi 认为 `cat .env` 属于安全操作，
+ * 直接跑了，omni 全程没被问过——而界面上写着「越界才问」。
+ *
+ * 选择是「保持原生」：不把引擎切到每次都问 omni 的档位（那会丢掉它自己那套
+ * 判断，也丢掉它的速度），而是**把名字改成实话**。档位 id 不动
+ *（`auto-edit` 落在 journal 里，改 id 等于让历史会话读不回来）。
+ *
+ * 只读那一档反过来是**四家都硬**的：Kimi 的 plan 压根不执行工具、
+ * Grok 会来问而 omni 直接拒、codex 是只读沙箱、Claude 走 omni 的判定。
+ * 所以它值得被说成「硬的」——现在只有它当得起这句话。
  */
 const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
-  { id: "read-only", label: "只读", hint: "任何写入与命令都拒绝" },
-  { id: "auto-edit", label: "自动编辑", hint: "工作区内的改动直接放行，越界才问" },
-  { id: "full", label: "完全访问", hint: "只在红线上问（工作区外、网络、不可逆操作）" },
+  { id: "read-only", label: "只读", hint: "不写文件、不跑命令。四家引擎在这一档上都是硬的" },
+  { id: "auto-edit", label: "引擎自动", hint: "什么算安全由引擎自己判（Kimi 的 Auto、Codex 的工作区沙箱）" },
+  { id: "full", label: "全部放行", hint: "最宽的一档。Kimi 与 Grok 在这一档下什么都不问" },
 ]
 
 interface Props {
