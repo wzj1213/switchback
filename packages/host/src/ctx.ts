@@ -57,6 +57,20 @@ export interface Ctx {
    */
   liveState: Map<string, Event>
   /**
+   * **还没发过第一句话的会话**：它的事件先攒在这里，不落盘。
+   *
+   * 点一下「+」就在磁盘上留一条记录是错的——那条会话什么都没发生，
+   * 而它会一直躺在侧栏里，重启还在。你以为自己只是点开看看，
+   * 结果攒出一串「新会话」，还得一条条删。
+   *
+   * 攒着而不是丢掉：**界面照常立刻拿到事件**（`deps.emit` 一直照发），
+   * 只是磁盘要等第一句话。第一句话一发出去（`turn.started`），
+   * 攒下的按原序一次写完，之后这条会话就走正常路径。
+   *
+   * 值是待写事件；键在表里就等于「这条会话还没提交」。
+   */
+  uncommitted: Map<ThreadId, Event[]>
+  /**
    * 把待发队列里的第一句发出去。**由 `host.ts` 在建 ctx 时填进来。**
    *
    * 不直接 import `session.ts` 的 `prompt`：那会绕成
@@ -175,9 +189,34 @@ export function emit(ctx: Ctx, event: Event): void {
   const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
   if (key !== undefined) ctx.liveState.set(key, event)
   ctx.deps.emit(event)
+  // 删掉的会话如果还没提交过，攒下的那些一起扔掉——它从来没上过磁盘
+  if (event.type === "thread.removed") ctx.uncommitted.delete(event.threadId)
   const owner = ownerOf(ctx, event)
-  if (owner !== undefined) void ctx.deps.journal?.append(owner, event)
+  if (owner !== undefined) persist(ctx, owner, event)
   observe(ctx, event)
+}
+
+/**
+ * 落盘。**没发过第一句话的会话先攒着**（见 `Ctx.uncommitted`）。
+ *
+ * 提交的判据是 `turn.started`：那一刻用户真的说了话。
+ * 攒下的连同这一条按原序写完，键从表里摘掉，之后走正常路径。
+ *
+ * 顺序必须原样：`thread.started` 得排在它自己的 `thread.updated` 前面，
+ * 否则重放出来的是一条「先被改过、后才出生」的会话。
+ */
+function persist(ctx: Ctx, owner: ThreadId, event: Event): void {
+  const buffered = ctx.uncommitted.get(owner)
+  if (buffered === undefined) {
+    void ctx.deps.journal?.append(owner, event)
+    return
+  }
+  if (event.type !== "turn.started") {
+    buffered.push(event)
+    return
+  }
+  ctx.uncommitted.delete(owner)
+  for (const pending of [...buffered, event]) void ctx.deps.journal?.append(owner, pending)
 }
 
 /**

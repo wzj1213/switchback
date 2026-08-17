@@ -229,6 +229,10 @@ function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
 export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>): Promise<void> {
   const at = ctx.deps.now()
   const thread = newThread(cmd, ctx.deps.newId("th"), at)
+  // **先挂进待提交表再发事件**：新会话在发出第一句话之前不落盘，
+  // 否则点一下「+」就在磁盘上留一条空会话，重启还在（见 `Ctx.uncommitted`）。
+  // 只有「新建」走这条路——续跑和接管的会话本来就已经在磁盘上了。
+  ctx.uncommitted.set(thread.id, [])
   emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
   let early: string | undefined
   try {

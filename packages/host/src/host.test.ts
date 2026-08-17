@@ -247,13 +247,47 @@ describe("续跑", () => {
     return { host, events, session, stored }
   }
 
+  /**
+   * **要发过一句话才落盘**：新会话在第一句话之前只攒不写（见 `Ctx.uncommitted`），
+   * 所以这里先 prompt 一次再看磁盘。原来的写法是 create 完就查 `stored`，
+   * 那同时也把「点一下 + 就往磁盘写一条空会话」钉成了正确行为。
+   */
   it("驱动上报的句柄走 thread.updated 落盘——续跑要的东西必须和历史存在同一个地方", async () => {
     const { host, events, session, stored } = setupWithJournal()
     await host.dispatch(create)
     session().report("codex-thread-abc")
     const last = events.filter((e) => e.type === "thread.updated").at(-1)
     expect(last?.type === "thread.updated" ? last.thread.engineHandle : "").toBe("codex-thread-abc")
+    // 第一句话之前：事件发出去了，磁盘上还没有
+    expect(stored.some((e) => e.type === "thread.updated")).toBe(false)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? "th-1"
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "开工" })
     expect(stored.some((e) => e.type === "thread.updated" && e.thread.engineHandle === "codex-thread-abc")).toBe(true)
+  })
+
+  it("**一句话都没发的新会话不落盘**——点一下 + 不该在磁盘上留一条空会话", async () => {
+    const { host, stored } = setupWithJournal()
+    await host.dispatch(create)
+    expect(stored).toEqual([])
+  })
+
+  it("发了第一句话就整段落盘，顺序照原样（started 在 updated 之前）", async () => {
+    const { host, events, stored } = setupWithJournal()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? "th-1"
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "开工" })
+    const types = stored.map((e) => e.type)
+    expect(types[0]).toBe("thread.started")
+    expect(types).toContain("turn.started")
+    expect(types.indexOf("thread.started")).toBeLessThan(types.indexOf("turn.started"))
+  })
+
+  it("没提交就删掉的会话，攒下的事件一起扔掉，磁盘上一个字都没有", async () => {
+    const { host, events, stored } = setupWithJournal()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? "th-1"
+    await host.dispatch({ type: "thread.delete", threadId: id })
+    expect(stored).toEqual([])
   })
 
   it("**在会话登记完成之前**到达的句柄也不能丢——codex 在 start() 里就知道自己的 id", async () => {

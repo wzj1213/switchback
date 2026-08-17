@@ -63,6 +63,7 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
       turnOwner: new Map(),
       inflight: new Map(),
       liveState: new Map(),
+      uncommitted: new Map(),
     }) as unknown as Ctx
 
   const commands: Event = {

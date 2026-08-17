@@ -150,6 +150,7 @@ export function createHost(deps: HostDeps): Host {
     turnOwner: new Map<TurnId, ThreadId>(),
     inflight: new Map<string, Promise<void>>(),
     liveState: new Map<string, Event>(),
+    uncommitted: new Map<ThreadId, Event[]>(),
   }
   /**
    * 一轮跑完就把排队的下一句发出去。
