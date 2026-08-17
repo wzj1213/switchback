@@ -107,3 +107,21 @@ describe.skipIf(isWindows)("PATH 上有好几个同名的", () => {
     expect(resolved).toBe(TARGET)
   })
 })
+
+// 实测 zcode-acp-server：`--version` 退出码 0 但什么都不打。
+// 硬接一个破折号的话，下拉里是 `/opt/homebrew/bin/x — `，看起来像出了错
+it("跑得起来但不报版本 → 只显示路径，不留一个空破折号", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "omni-probe-"))
+  const file = join(dir, "omni-哑靶子")
+  writeFileSync(file, "#!/bin/sh\nexit 0\n")
+  chmodSync(file, 0o755)
+  const saved = process.env["PATH"] ?? ""
+  process.env["PATH"] = `${dir}:${saved}`
+  try {
+    const probe = await probeCommand("omni-哑靶子")
+    expect(probe.state).toBe("ok")
+    expect(probe.detail).toBe(file)
+  } finally {
+    process.env["PATH"] = saved
+  }
+})

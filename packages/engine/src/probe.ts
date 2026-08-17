@@ -87,7 +87,9 @@ export async function probeCommand(command: string, hint?: string): Promise<Prob
   }
   for (const path of paths) {
     const version = await versionOf(path)
-    if (version !== undefined) return { state: "ok", detail: `${path} — ${version}`, path }
+    // 有的适配器 `--version` 跑得起来但什么都不打（实测 zcode-acp-server）。
+    // **那时别硬接一个破折号**——`/opt/homebrew/bin/x — ` 这种尾巴看起来像出了错
+    if (version !== undefined) return { state: "ok", detail: version === "" ? path : `${path} — ${version}`, path }
   }
   // 一个都跑不起来。**把试过几个说出来**：只报第一个的话，用户会拿着一条
   // 「/a/b/codex 装坏了」的提示去修一个根本不该用的文件
