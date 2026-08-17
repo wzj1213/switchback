@@ -165,3 +165,25 @@ describe("纯解析", () => {
     expect(looksBinary(Buffer.from([104, 0, 105]))).toBe(true)
   })
 })
+
+/**
+ * 「补丁是空的」和「这文件是新的」是两回事。
+ * 混起来的话，一个刚被改回原样的文件会得到一份「整个文件都是新增的」补丁——
+ * **看起来完全可信的错误答案**，比报错糟得多。
+ */
+describe("空补丁不等于未跟踪", () => {
+  it("跟踪中、此刻和 HEAD 没差别的文件给空补丁，不是整份文件", async () => {
+    const clean = "clean.txt"
+    writeFileSync(join(repo.dir, clean), "same\n")
+    git(repo.dir, "add", clean)
+    git(repo.dir, "commit", "-qm", "clean")
+    const out = await workPatch(repo.dir, clean)
+    expect(out.patch).toBe("")
+    expect(out.added).toBe(0)
+  })
+
+  it("真的未跟踪的还是走 --no-index", async () => {
+    writeFileSync(join(repo.dir, "brand-new.txt"), "hello\n")
+    expect((await workPatch(repo.dir, "brand-new.txt")).patch).toContain("+hello")
+  })
+})

@@ -160,6 +160,14 @@ export async function workPatch(cwd: string, rel: string, context = 3): Promise<
     maxBuffer: BIG * 4,
   }).catch(() => undefined)
   if (tracked !== undefined && tracked.stdout !== "") return shaped(tracked.stdout)
+  // **空补丁不等于「未跟踪」。** 一个跟踪中、但此刻和 HEAD 没差别的文件
+  //（清单取回来之后你在编辑器里改回去了）走到下面那条会得到一份
+  // 「整个文件都是新增的」补丁——那是**看起来完全可信的错误答案**，
+  // 比报错糟得多。所以先问一句 git：它到底认不认识这个文件
+  const known = await run("git", ["ls-files", "--error-unmatch", "--", rel], { cwd: root, timeout: TIMEOUT }).catch(
+    () => undefined,
+  )
+  if (known !== undefined) return { patch: "", added: 0, removed: 0 }
   const fresh = await run("git", ["diff", "--no-index", "--no-color", unified, "--", "/dev/null", rel], {
     cwd: root,
     timeout: TIMEOUT,
