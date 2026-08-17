@@ -26,7 +26,11 @@ export const isWindows = process.platform === "win32"
 export function lookupCommand(): { command: string; args: (target: string) => string[] } {
   return isWindows
     ? { command: "where.exe", args: (target) => [target] }
-    : { command: "which", args: (target) => [target] }
+    : // **`-a`：把 PATH 上所有同名的都列出来，不只第一个。** 第一个可能是别的工具
+      // 塞进 PATH 的坏壳子——真机上遇到过：`~/.vendor-cli/vendor-cli/bin/codex` 排在
+      // homebrew 前面而那个文件已经不存在了，于是 codex 被报成「未安装」，
+      // 而 `/opt/homebrew/bin/codex` 好好的。`where.exe` 本来就列全部。
+      { command: "which", args: (target) => ["-a", target] }
 }
 
 /**

@@ -4,7 +4,7 @@ import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
-import { probeCommand } from "../probe.js"
+import { probeCommand, resolveCommand } from "../probe.js"
 import { sessionsOf } from "./setup.js"
 import { handshake, openSession, type OpenCtx, type OpenState } from "./open.js"
 import { applyTrust, warnNativeFixed, type TrustCtx } from "./mode.js"
@@ -232,8 +232,11 @@ class AcpSession implements EngineSession {
 
   async start(): Promise<void> {
     this.status("starting")
+    // **spawn 真正能跑的那个绝对路径，不是裸名字**：裸名字由 PATH 再解析一次，
+    // 而那次可能落到另一个同名文件上（真机上遇到过一个不存在的空壳排在前面）——
+    // 那样「探测说好、真跑的是另一个」，是最难查的一类故障。见 `resolveCommand`
     const child = this.owner.spawn({
-      command: this.config.command,
+      command: await resolveCommand(this.config.command),
       args: this.config.args ?? [],
       cwd: this.req.cwd,
       env: { ...process.env, ...(this.config.env ?? {}) },

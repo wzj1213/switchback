@@ -2,7 +2,7 @@ import type { ChildProcess } from "node:child_process"
 import type { EngineAccount, EngineCapabilities, EngineStatus, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
-import { probeCommand } from "../probe.js"
+import { probeCommand, resolveCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { skillsToCommands, toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
 import { LOOSENESS, POLICY, SANDBOX } from "./sandbox.js"
@@ -163,8 +163,11 @@ class CodexSession implements EngineSession {
     this.status("starting")
     // 继承父环境：codex 的登录态、PATH、代理设置全在里面。
     // 凭据擦洗是 EngineDescriptor 描述的以后的事，现在擦了就登录不上。
+    // **spawn 真正能跑的那个绝对路径，不是裸名字**：裸名字由 PATH 再解析一次，
+    // 而那次可能落到另一个同名文件上（真机上遇到过一个不存在的空壳排在前面）——
+    // 那样「探测说好、真跑的是另一个」，是最难查的一类故障。见 `resolveCommand`
     const child = this.owner.spawn({
-      command: this.config.command ?? "codex",
+      command: await resolveCommand(this.config.command ?? "codex"),
       args: this.config.args ?? ["app-server", "--stdio"],
       cwd: this.req.cwd,
       env: process.env,

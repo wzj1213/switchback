@@ -1,6 +1,9 @@
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { isWindows } from "./platform.js"
-import { probeCommand } from "./probe.js"
+import { probeCommand, resolveCommand } from "./probe.js"
 
 /**
  * **真跑系统的查找命令**，不 mock。mock 掉之后这个测试就只剩
@@ -35,5 +38,72 @@ describe("探命令", () => {
   it("没给提示时不硬凑一句废话", async () => {
     const probe = await probeCommand("omni-绝不存在的命令")
     expect(probe.detail.trim().endsWith("不在 PATH 上。")).toBe(true)
+  })
+})
+
+/**
+ * **PATH 上第一个同名文件坏掉的时候，不能就此判「没装」。**
+ *
+ * 真机上遇到的：`~/.vendor-cli/vendor-cli/bin/codex` 排在 homebrew 前面，
+ * 而那个文件已经不在了（第三方 CLI 自更新留下的空壳目录），
+ * 于是 omni 报「codex 未安装」，而 `/opt/homebrew/bin/codex` 好好的。
+ * 用户看到的是「codex 读错地方了」。
+ *
+ * 这里把那个故障原样造出来：**自己搭一个假的 PATH**，前面放坏的、后面放好的。
+ */
+describe.skipIf(isWindows)("PATH 上有好几个同名的", () => {
+  /** 造一个目录，里面放一个叫 `omni-探测靶子` 的可执行文件。 */
+  function bin(script: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "omni-probe-"))
+    const file = join(dir, TARGET)
+    writeFileSync(file, script)
+    chmodSync(file, 0o755)
+    return dir
+  }
+
+  const TARGET = "omni-探测靶子"
+  const GOOD = "#!/bin/sh\necho '靶子 9.9.9'\n"
+  /** 坏成两种样子：跑起来就失败，以及**根本不是可执行文件**（空壳）。 */
+  const BROKEN = "#!/bin/sh\nexit 1\n"
+
+  const withPath = async <T>(dirs: readonly string[], fn: () => Promise<T>): Promise<T> => {
+    const saved = process.env["PATH"] ?? ""
+    process.env["PATH"] = [...dirs, saved].join(":")
+    try {
+      return await fn()
+    } finally {
+      process.env["PATH"] = saved
+    }
+  }
+
+  it("第一个坏、后面有好的 → 用好的那个，state 是 ok", async () => {
+    const broken = bin(BROKEN)
+    const good = bin(GOOD)
+    const probe = await withPath([broken, good], () => probeCommand(TARGET))
+    expect(probe.state).toBe("ok")
+    expect(probe.path).toBe(join(good, TARGET))
+    expect(probe.detail).toContain("靶子 9.9.9")
+  })
+
+  it("**spawn 要用的也是那个好的路径**——不然探测说好、真跑的是另一个", async () => {
+    const broken = bin(BROKEN)
+    const good = bin(GOOD)
+    const resolved = await withPath([broken, good], () => resolveCommand(TARGET))
+    expect(resolved).toBe(join(good, TARGET))
+  })
+
+  it("全都坏 → missing，而且**把试过几个说出来**", async () => {
+    const a = bin(BROKEN)
+    const b = bin(BROKEN)
+    const probe = await withPath([a, b], () => probeCommand(TARGET))
+    expect(probe.state).toBe("missing")
+    expect(probe.detail).toContain("2 个同名文件")
+    expect(probe.path).toBeUndefined()
+  })
+
+  // 解析不出来就原样返回，让 spawn 去报 ENOENT——那条错误比我们编的准
+  it("一个都跑不起来时，resolveCommand 原样返回", async () => {
+    const resolved = await withPath([bin(BROKEN)], () => resolveCommand(TARGET))
+    expect(resolved).toBe(TARGET)
   })
 })
