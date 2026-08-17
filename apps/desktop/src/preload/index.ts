@@ -4,6 +4,7 @@ import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
+import type { RemoteStatus } from "../main/remote/install.js"
 
 /** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
 export interface Sealed {
@@ -168,6 +169,31 @@ const api = {
   },
   async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
     return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
+  },
+
+  /**
+   * 远程访问（浏览器端）的四条窄通道。
+   *
+   * **每一条都回一份完整状态**，而不是各自回各自的结果：配对之后设备表变了、
+   * 吊销之后连接数变了、开关一动端口就变了——各回各的会让界面必须再问一次，
+   * 而那一次问和这一次改之间的状态是不确定的。
+   */
+  remote: {
+    async status(): Promise<RemoteStatus> {
+      return (await ipcRenderer.invoke("omni:remote/status")) as RemoteStatus
+    },
+    /** 按当前设置起停服务端。改完 `settings.remote` 必须调一次，否则改了不生效。 */
+    async sync(): Promise<RemoteStatus> {
+      return (await ipcRenderer.invoke("omni:remote/sync")) as RemoteStatus
+    },
+    /** 开一次配对，返回带配对码的状态。**新的一开，上一个就作废**。 */
+    async pair(): Promise<RemoteStatus> {
+      return (await ipcRenderer.invoke("omni:remote/pair")) as RemoteStatus
+    },
+    /** 吊销一台设备。它下一次连接（以及正在跑的那条）立刻失效。 */
+    async revoke(id: string): Promise<RemoteStatus> {
+      return (await ipcRenderer.invoke("omni:remote/revoke", id)) as RemoteStatus
+    },
   },
   /** 只在开发钩子下用：把查找词直接塞进查找条，见 main/devtools.ts */
   onDevFind(handler: (query: string) => void): () => void {

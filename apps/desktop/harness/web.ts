@@ -25,7 +25,9 @@ import { startRemote } from "../src/main/remote/server.js"
 import type { Sink } from "../src/main/sink.js"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
-const PORT = 17801
+/** 端口与可信 Host 都能用环境变量覆盖：隧道那头的域名要填进来才过得了 Host 闸。 */
+const PORT = Number(process.env["OMNI_HARNESS_PORT"] ?? 17801)
+const TRUSTED = (process.env["OMNI_HARNESS_HOSTS"] ?? "").split(/\s+/).filter((s) => s !== "")
 /** 固定令牌，**只在这个 harness 里**。真实的令牌是 32 字节随机数。 */
 const DEV_TOKEN = "harness-dev-token-not-a-secret"
 
@@ -122,7 +124,7 @@ function main(): void {
   const tokens = createTokenStore({ load: () => [device], save: () => undefined, now: () => Date.now() })
 
   void startRemote({
-    config: () => ({ port: PORT, trustedHosts: [], maxTrust: "auto-edit" }),
+    config: () => ({ port: PORT, trustedHosts: TRUSTED, maxTrust: "auto-edit" }),
     webRoot: join(ROOT, "apps/web/dist"),
     tokens,
     ledger,

@@ -157,3 +157,98 @@
   font-size: var(--text-code);
   white-space: pre-wrap;
 }
+
+/* ── 远程访问 ─────────────────────────────────────────── */
+
+/* 那条隧道命令要能被逐字读准、逐字复制 */
+.set__code {
+  display: block;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.set__input {
+  width: 100%;
+  min-height: 28px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+/*
+ * 配对码。**这串是要用眼睛读、用手在另一台设备上打的**，
+ * 所以字号比周围大一档、字距拉开——同样的理由让它用了不含形近字符的字母表。
+ */
+.pairing {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.pairing__code {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  letter-spacing: 0.22em;
+  user-select: all;
+}
+
+.pairing__left {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tbtn--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+}
+
+.tbtn--danger {
+  color: var(--danger);
+}
+
+.devices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 100%;
+}
+
+.devices__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.devices__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+.devices__seen {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}

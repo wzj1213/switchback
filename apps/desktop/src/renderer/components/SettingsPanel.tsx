@@ -2,6 +2,7 @@ import type { EngineInfo, Trust } from "@omni/protocol"
 import type { Settings } from "../useSettings.js"
 import { TRUSTS } from "./Composer.js"
 import { EngineVersions } from "./EngineVersions.js"
+import { RemotePanel } from "./RemotePanel.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 import { useModalKeys } from "../useModalKeys.js"
 
@@ -163,6 +164,10 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
 
         <Group title="引擎">
           <EngineVersions />
+        </Group>
+
+        <Group title="远程访问">
+          <RemotePanel settings={settings} onPatch={onPatch} />
         </Group>
 
         <Group title="数据与排查">

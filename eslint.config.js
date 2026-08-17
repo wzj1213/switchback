@@ -122,16 +122,25 @@ export default tseslint.config(
 
   // ── main 进程与脚本：允许 IO 与 console ─────────────────────────
   {
-    files: ["apps/desktop/src/main/**/*.ts", "apps/desktop/src/preload/**/*.ts", "scripts/**/*.mjs"],
+    files: [
+      "apps/desktop/src/main/**/*.ts",
+      "apps/desktop/src/preload/**/*.ts",
+      // 开发/验收台。跑在 Node 里、靠 console 说话，和 main 同一套尺度
+      "apps/desktop/harness/**/*.ts",
+      "scripts/**/*.mjs",
+    ],
     languageOptions: {
       globals: {
         console: "readonly",
         process: "readonly",
         Buffer: "readonly",
         URL: "readonly",
+        fetch: "readonly",
         __dirname: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
       },
     },
     rules: { "no-console": "off" },
