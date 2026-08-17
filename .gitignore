@@ -7,3 +7,4 @@ out/
 coverage/
 release/
 *.log
+apps/web/dist

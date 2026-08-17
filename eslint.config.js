@@ -91,6 +91,35 @@ export default tseslint.config(
     },
   },
 
+  // ── 浏览器端：同 renderer 的尺度，外加浏览器全局 ──────────────────
+  {
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    languageOptions: {
+      globals: {
+        document: "readonly",
+        window: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        localStorage: "readonly",
+        WebSocket: "readonly",
+        MessageEvent: "readonly",
+        HTMLElement: "readonly",
+        HTMLTextAreaElement: "readonly",
+        HTMLInputElement: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        queueMicrotask: "readonly",
+        navigator: "readonly",
+      },
+    },
+    rules: {
+      "max-lines": ["error", { max: 200, skipBlankLines: true, skipComments: true }],
+      "max-lines-per-function": ["error", { max: 100, skipBlankLines: true, skipComments: true }],
+    },
+  },
+
   // ── main 进程与脚本：允许 IO 与 console ─────────────────────────
   {
     files: ["apps/desktop/src/main/**/*.ts", "apps/desktop/src/preload/**/*.ts", "scripts/**/*.mjs"],

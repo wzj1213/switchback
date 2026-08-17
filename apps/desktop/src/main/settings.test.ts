@@ -42,6 +42,52 @@ describe("偏好", () => {
       defaultTrust: "auto-edit",
       projectIcons: {},
       lastUsed: { engine: "", byEngine: {} },
+      // **远程默认整个关着。** 这一条要写死在断言里：它是一个把服务端打开的开关，
+      // 哪天默认值被改成 true 而没人注意到，用户升级一次就凭空多了一个监听端口
+      remote: { enabled: false, port: 17800, trustedHosts: [], maxTrust: "auto-edit" },
+    })
+  })
+
+  describe("远程那几项", () => {
+    const write = (remote: unknown): void => {
+      writeFileSync(file(), JSON.stringify({ remote }), "utf8")
+    }
+
+    it("**`enabled` 只认字面的 true**——坏值不该被当成「开」", () => {
+      for (const bad of ["true", 1, "yes", {}]) {
+        write({ enabled: bad })
+        expect(createSettings(log).get().remote.enabled).toBe(false)
+      }
+      write({ enabled: true })
+      expect(createSettings(log).get().remote.enabled).toBe(true)
+    })
+
+    it("**档位认不出就回默认，绝不落到最宽的那一档**", () => {
+      write({ maxTrust: "sudo" })
+      expect(createSettings(log).get().remote.maxTrust).toBe("auto-edit")
+      write({ maxTrust: "read-only" })
+      expect(createSettings(log).get().remote.maxTrust).toBe("read-only")
+    })
+
+    it("端口要是合法整数，越界或小数回默认", () => {
+      for (const bad of [-1, 70000, 3.5, "8080", null]) {
+        write({ port: bad })
+        expect(createSettings(log).get().remote.port).toBe(17800)
+      }
+      write({ port: 0 })
+      expect(createSettings(log).get().remote.port).toBe(0)
+    })
+
+    it("trustedHosts 只留字符串", () => {
+      write({ trustedHosts: ["a.example.com", 3, null, "b.example.com"] })
+      expect(createSettings(log).get().remote.trustedHosts).toEqual(["a.example.com", "b.example.com"])
+    })
+
+    it("整个 remote 段是坏的就回默认，不掀翻别的偏好", () => {
+      writeFileSync(file(), JSON.stringify({ theme: "dark", remote: "开" }), "utf8")
+      const settings = createSettings(log).get()
+      expect(settings.remote.enabled).toBe(false)
+      expect(settings.theme).toBe("dark")
     })
   })
 

@@ -1,0 +1,27 @@
+{
+  "name": "@omni/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "omni 浏览器端：手机与桌面浏览器共用的一套远程界面",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@omni/protocol": "workspace:*",
+    "@omni/store": "workspace:*",
+    "@omni/wire": "workspace:*",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vite": "^8.2.1"
+  }
+}

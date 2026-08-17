@@ -17,6 +17,21 @@ files:
   - out/**
   - package.json
 
+# 浏览器端的构建产物，落在 `<Contents>/Resources/web`。
+#
+# **放 extraResources 而不是打进 asar**：asar 里的文件没有真实路径，
+# 而这些是要被 `createReadStream` 一个个送出去的静态文件。放外面还省掉
+# 每次读都过一层 asar 解析。运行时由 `remote/install.ts` 的 `webRoot()`
+# 按 `process.resourcesPath` 找它。
+#
+# 没有它的话远程服务端照常起、API 照常通，只是页面 404——那是有意的降级，
+# 但发版时不该发生：`pnpm dist` 会先跑 `@omni/web` 的 build。
+extraResources:
+  - from: ../web/dist
+    to: web
+    filter:
+      - "**/*"
+
 # Claude Agent SDK 要 spawn 自带的 CLI，不能进 asar——
 # asar 里的文件没有真实路径，它找不到自己的资源。
 asarUnpack:

@@ -26,6 +26,7 @@ const LAYER = {
   "@omni/engine": 2,
   "@omni/host": 3,
   "@omni/desktop": 4,
+  "@omni/web": 4,
 }
 
 /** 这些包不得有任何运行时依赖（devDependencies 不限）。 */

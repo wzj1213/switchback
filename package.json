@@ -9,7 +9,7 @@
   },
   "scripts": {
     "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run check:tokens && pnpm run check:docs && pnpm run test",
-    "typecheck": "tsc --build && tsc -p apps/desktop/tsconfig.json",
+    "typecheck": "tsc --build && tsc -p apps/desktop/tsconfig.json && tsc -p apps/web/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -18,6 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "pnpm --filter @omni/desktop dev",
+    "dev:web": "pnpm --filter @omni/web dev",
+    "build:web": "pnpm --filter @omni/web build",
     "test:live": "vitest run --config vitest.live.config.ts",
     "check:docs": "node scripts/check-changelog.mjs",
     "dist": "pnpm --filter @omni/desktop dist",

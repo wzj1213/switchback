@@ -1,0 +1,18 @@
+{
+  "name": "omni · 同文",
+  "short_name": "omni",
+  "description": "远程看住并放行你机器上的 agent",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111113",
+  "theme_color": "#111113",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

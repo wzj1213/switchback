@@ -1,0 +1,305 @@
+import { afterEach, describe, expect, it } from "vitest"
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { request } from "node:http"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import WebSocket from "ws"
+import type { Command, Event, Trust } from "@omni/protocol"
+import { createLedger, createReassembler, type ServerFrame } from "@omni/wire"
+import { createTokenStore, type Device } from "./tokens.js"
+import { startRemote, WS_PROTOCOL, type RemoteServer } from "./server.js"
+import type { Sink } from "../sink.js"
+
+/**
+ * 真起一个服务端、真配一次对、真连一条 WebSocket。
+ *
+ * 这一条测的是**接线**，不是任何一个零件——零件各有各的表驱动测试。
+ * 接线错了的表现是「每个单元测试都绿，跑起来什么都不动」，
+ * 而那正是只有集成测试逮得到的一类。
+ */
+
+const ev = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: String(n) })
+
+interface Harness {
+  server: RemoteServer
+  base: string
+  ledger: ReturnType<typeof createLedger>
+  dispatched: Command[]
+  sinks: Sink[]
+  code: () => string
+  replays: () => number
+}
+
+const running: RemoteServer[] = []
+
+async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[] } = {}): Promise<Harness> {
+  const dir = mkdtempSync(join(tmpdir(), "omni-remote-"))
+  const file = join(dir, "devices.json")
+  writeFileSync(file, "[]", "utf8")
+  const disk: { devices: readonly Device[] } = { devices: [] }
+  const tokens = createTokenStore({
+    load: () => disk.devices,
+    save: (devices) => {
+      disk.devices = devices
+    },
+    now: () => Date.now(),
+  })
+  const ledger = createLedger(100)
+  const dispatched: Command[] = []
+  const sinks: Sink[] = []
+  const state = { replays: 0, pairing: "" }
+
+  const server = await startRemote({
+    config: () => ({
+      port: 0,
+      trustedHosts: options.trustedHosts ?? [],
+      maxTrust: options.maxTrust ?? "full",
+    }),
+    webRoot: dir,
+    tokens,
+    ledger,
+    sinks: {
+      list: () => sinks,
+      add: (sink) => {
+        sinks.push(sink)
+        return () => {
+          sinks.splice(sinks.indexOf(sink), 1)
+        }
+      },
+    },
+    dispatch: (command) => dispatched.push(command),
+    replay: async (sink) => {
+      state.replays += 1
+      sink.send({ channel: "omni:replay", replay: { events: [ev(0)], resumeAt: ledger.latest() } })
+      await Promise.resolve()
+    },
+    log: () => undefined,
+  })
+  running.push(server)
+  return {
+    server,
+    base: `http://127.0.0.1:${String(server.port())}`,
+    ledger,
+    dispatched,
+    sinks,
+    code: () => {
+      state.pairing = tokens.startPairing().code
+      return state.pairing
+    },
+    replays: () => state.replays,
+  }
+}
+
+afterEach(async () => {
+  while (running.length > 0) await running.pop()?.close()
+})
+
+/** 配一次对，返回令牌。 */
+async function pairUp(h: Harness, name = "测试机"): Promise<string> {
+  const code = h.code()
+  const res = await fetch(`${h.base}/api/pair`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code, name }),
+  })
+  const body = (await res.json()) as { token?: string }
+  return body.token ?? ""
+}
+
+/** 连一条 WebSocket，收帧收到满足条件为止。 */
+function connect(h: Harness, token: string): Promise<{ socket: WebSocket; frames: ServerFrame[] }> {
+  return new Promise((done, fail) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${String(h.server.port())}/api/stream`, [WS_PROTOCOL, token])
+    const frames: ServerFrame[] = []
+    const reassembler = createReassembler()
+    socket.on("message", (data) => {
+      const seen = reassembler.observe(String(data))
+      if (seen.kind === "frame") frames.push(seen.frame)
+    })
+    socket.on("open", () => {
+      done({ socket, frames })
+    })
+    socket.on("error", fail)
+  })
+}
+
+const settle = async (ms = 60): Promise<void> => {
+  await new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * 裸 HTTP 请求。
+ *
+ * **不能用 `fetch` 测这两件事**：① `Host` 是禁止头，undici 不许覆写，
+ * 于是「伪造 Host」这个实验根本发不出去；② WHATWG 的 URL 解析会在发送前
+ * 把 `%2e%2e` 规范化掉，于是「路径穿越」到不了服务端。
+ * 两条都要**绕过客户端的好意**，才测得到服务端自己拦不拦。
+ */
+function raw(port: number, path: string, headers: Record<string, string> = {}): Promise<number> {
+  return new Promise((done, fail) => {
+    const req = request({ host: "127.0.0.1", port, path, method: "GET", headers }, (res) => {
+      res.resume()
+      done(res.statusCode ?? 0)
+    })
+    req.on("error", fail)
+    req.end()
+  })
+}
+
+describe("配对", () => {
+  it("码对了就换到令牌，`/api/me` 认得出它", async () => {
+    const h = await boot()
+    const token = await pairUp(h, "iPhone")
+    expect(token).not.toBe("")
+    const me = await fetch(`${h.base}/api/me`, { headers: { authorization: `Bearer ${token}` } })
+    expect(me.status).toBe(200)
+    expect(await me.json()).toMatchObject({ name: "iPhone", maxTrust: "full" })
+  })
+
+  it("码不对回 403，且不吐令牌", async () => {
+    const h = await boot()
+    h.code()
+    const res = await fetch(`${h.base}/api/pair`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "ZZZZZZZZ", name: "坏人" }),
+    })
+    expect(res.status).toBe(403)
+    expect(await res.json()).not.toHaveProperty("token")
+  })
+
+  it("没有令牌时 `/api/me` 是 401", async () => {
+    const h = await boot()
+    expect((await fetch(`${h.base}/api/me`)).status).toBe(401)
+  })
+})
+
+describe("Host 闸真的在拦", () => {
+  it("**Host 不是我们的就 403**，哪怕请求确实来自本机——那正是 DNS 改绑的样子", async () => {
+    const h = await boot()
+    expect(await raw(h.server.port(), "/api/me", { host: "evil.com" })).toBe(403)
+  })
+
+  it("后缀撞名不算命中", async () => {
+    const h = await boot({ trustedHosts: ["omni.example.com"] })
+    expect(await raw(h.server.port(), "/api/me", { host: "omni.example.com.evil.com" })).toBe(403)
+  })
+
+  it("配进 trustedHosts 就放行", async () => {
+    const h = await boot({ trustedHosts: ["omni.example.com:8443"] })
+    // 过了闸，但没带令牌 → 401 而不是 403。**两个状态码分得开**才说明这是两层
+    expect(await raw(h.server.port(), "/api/me", { host: "omni.example.com:8443" })).toBe(401)
+  })
+
+  it("Origin 和 Host 对不上就 403", async () => {
+    const h = await boot()
+    expect(await raw(h.server.port(), "/api/me", { origin: "http://evil.com" })).toBe(403)
+  })
+
+  it("升级请求也过同一道闸", async () => {
+    const h = await boot()
+    const token = await pairUp(h)
+    await expect(
+      new Promise((done, fail) => {
+        const socket = new WebSocket(`ws://127.0.0.1:${String(h.server.port())}/api/stream`, [WS_PROTOCOL, token], {
+          headers: { host: "evil.com" },
+        })
+        socket.on("open", () => {
+          done("居然连上了")
+        })
+        socket.on("error", fail)
+      }),
+    ).rejects.toThrow()
+  })
+})
+
+describe("WebSocket", () => {
+  it("令牌不对连不上", async () => {
+    const h = await boot()
+    await pairUp(h)
+    await expect(connect(h, "乱写的")).rejects.toThrow()
+  })
+
+  it("连上之后 hello 换回一份全量，并注册成一个 sink", async () => {
+    const h = await boot()
+    const token = await pairUp(h)
+    const { socket, frames } = await connect(h, token)
+    socket.send(JSON.stringify({ type: "hello" }))
+    await settle()
+    expect(h.replays()).toBe(1)
+    expect(frames.some((f) => f.type === "replay")).toBe(true)
+    expect(h.sinks).toHaveLength(1)
+    socket.close()
+  })
+
+  it("**事件真的推得到浏览器那一端**", async () => {
+    const h = await boot()
+    const token = await pairUp(h)
+    const { socket, frames } = await connect(h, token)
+    socket.send(JSON.stringify({ type: "hello" }))
+    await settle()
+    const sealed = h.ledger.seal([ev(7)])
+    for (const sink of h.sinks) sink.send({ channel: "omni:events", sealed })
+    await settle()
+    const events = frames.filter((f) => f.type === "events")
+    expect(events.at(-1)?.type === "events" ? events.at(-1)?.sealed.length : 0).toBe(1)
+    socket.close()
+  })
+
+  it("命令走到 dispatch", async () => {
+    const h = await boot()
+    const token = await pairUp(h)
+    const { socket } = await connect(h, token)
+    socket.send(JSON.stringify({ type: "command", command: { type: "thread.prompt", threadId: "t", text: "hi" } }))
+    await settle()
+    expect(h.dispatched).toEqual([{ type: "thread.prompt", threadId: "t", text: "hi" }])
+    socket.close()
+  })
+
+  it("**档位上限在服务端生效**——浏览器那边改 JS 绕不过去", async () => {
+    const h = await boot({ maxTrust: "read-only" })
+    const token = await pairUp(h)
+    const { socket } = await connect(h, token)
+    socket.send(
+      JSON.stringify({
+        type: "command",
+        command: { type: "thread.create", cwd: "/w", engine: "codex", trust: "full" },
+      }),
+    )
+    await settle()
+    expect(h.dispatched[0]).toMatchObject({ trust: "read-only" })
+    socket.close()
+  })
+
+  it("断开之后从账本里摘掉，不再钉住保留下限", async () => {
+    const h = await boot()
+    const token = await pairUp(h)
+    const { socket } = await connect(h, token)
+    socket.send(JSON.stringify({ type: "hello" }))
+    await settle()
+    expect(Object.keys(h.ledger.stats().acked)).toHaveLength(1)
+    socket.close()
+    await settle(120)
+    expect(Object.keys(h.ledger.stats().acked)).toHaveLength(0)
+    expect(h.sinks).toHaveLength(0)
+  })
+})
+
+describe("HTTP 杂项", () => {
+  it("普通 GET 打到 WebSocket 那条路径上回 426，不退化成别的东西", async () => {
+    const h = await boot()
+    expect((await fetch(`${h.base}/api/stream`)).status).toBe(426)
+  })
+
+  it("没有前端产物时页面 404，但 API 照常通——**问题范围一眼缩到「前端没构建」**", async () => {
+    const h = await boot()
+    expect((await fetch(`${h.base}/`)).status).toBe(404)
+    expect((await fetch(`${h.base}/api/me`)).status).toBe(401)
+  })
+
+  it("路径穿越被挡在 400（百分号编码的点点也算）", async () => {
+    const h = await boot()
+    expect(await raw(h.server.port(), "/%2e%2e/%2e%2e/etc/passwd")).toBe(400)
+    expect(await raw(h.server.port(), "/../../etc/passwd")).toBe(400)
+  })
+})

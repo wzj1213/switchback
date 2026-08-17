@@ -18,11 +18,11 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "//dist": "默认**关掉钥匙串自动发现**。不关的话 electron-builder 会拿钥匙串里任何一张证书去签——本机那张自签的会让 codesign 卡在逐个文件签名上（实测卡死，要手动 kill）。要签名走 dist:signed。",
-    "dist": "node ../../scripts/stamp-version.mjs && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "dist": "node ../../scripts/stamp-version.mjs && pnpm --filter @omni/web run build && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
     "//dist:signed": "有 Developer ID 时用。需要 CSC_NAME 或 CSC_LINK，公证还要 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID。",
-    "dist:signed": "node ../../scripts/stamp-version.mjs && electron-vite build && electron-builder --mac",
+    "dist:signed": "node ../../scripts/stamp-version.mjs && pnpm --filter @omni/web run build && electron-vite build && electron-builder --mac",
     "//dist:local": "只出 release/mac-arm64/omni.app，不打 DMG——本机自更新（应用里那颗「更新到最新代码」）跑的就是这条。DMG 那 208 MB 是给别人装的，自己换一份包用不着，省下的是大头。",
-    "dist:local": "node ../../scripts/stamp-version.mjs && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir"
+    "dist:local": "node ../../scripts/stamp-version.mjs && pnpm --filter @omni/web run build && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir"
   },
   "//optionalDependencies": [
     "Claude Agent SDK 各平台的原生二进制。**必须在这里显式列出**——",
@@ -54,12 +54,14 @@
     "highlight.js": "^11.12.0",
     "lowlight": "^3.3.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.5",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",

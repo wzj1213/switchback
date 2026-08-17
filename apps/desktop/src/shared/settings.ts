@@ -90,6 +90,38 @@ export interface Settings {
    * 只记一个全局模型，换家引擎就成了一条起不来的会话。
    */
   lastUsed: LastUsed
+  /** 远程访问（浏览器端）。**默认整个关着**。 */
+  remote: RemoteSettings
+}
+
+/**
+ * 远程访问。
+ *
+ * ## 为什么没有「绑哪个地址」这一项
+ *
+ * 服务端**永远只 listen 127.0.0.1**，没有开关。一个能改成 `0.0.0.0` 的选项，
+ * 迟早会有人在一台公网机器上打开它——而这台机器上跑着一个有写和执行权限的 agent。
+ * 要从外面访问就开隧道（`ssh -R`），那条路是显式的、可撤销的、留痕的。
+ */
+export interface RemoteSettings {
+  enabled: boolean
+  /** 回环上的端口。0 = 由系统挑一个。 */
+  port: number
+  /**
+   * 隧道那头对外的 authority（`omni.example.com:8443`），可以写多条。
+   *
+   * 不填就只认回环——那时只有 `ssh -L` 那种把端口映到本机的用法能通。
+   * 填的必须是**裸 host[:port]**：写成带路径或带 scheme 的形式会在启动时大声报错，
+   * 因为解析会悄悄改变它授权的范围（见 `remote/fence.ts`）。
+   */
+  trustedHosts: readonly string[]
+  /**
+   * 远程连接的**信任档上限**。手机丢了不该等于在你的仓库里任意执行代码。
+   *
+   * 默认 `auto-edit`：远程能改文件，但每条 shell 命令仍然要弹审批——
+   * 也就是**你在手机上看得见每一条要跑的命令**。
+   */
+  maxTrust: Trust
 }
 
 export interface LastUsed {
@@ -115,4 +147,5 @@ export const SETTINGS_DEFAULTS: Settings = {
   defaultTrust: "auto-edit",
   projectIcons: {},
   lastUsed: { engine: "", byEngine: {} },
+  remote: { enabled: false, port: 17800, trustedHosts: [], maxTrust: "auto-edit" },
 }

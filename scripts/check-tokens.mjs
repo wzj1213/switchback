@@ -21,13 +21,21 @@
  *   `--sb-row-h` / `--sb-act` 定义在 app.css 的 `.sidebar` 规则里，那是有意的
  *   （它们只属于侧栏），不该因此被判成未定义。
  * - `var(--x, 兜底值)` 两参形式**跳过**：那是合法写法，作者已经给了退路。
+ * - **每一端各算各的。** 桌面渲染层和浏览器端是两套独立的样式，各有各的色板；
+ *   合成一个集合的话，浏览器端引用一个只在桌面端定义过的名字会被判成通过，
+ *   而它在真的页面上照样作废——那正是这条守卫要挡的东西。
  */
 import { readFileSync, readdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
-const STYLES = join(ROOT, "apps/desktop/src/renderer/styles")
+
+/** 各自独立的样式根。新增一端就在这里加一行。 */
+const ROOTS = [
+  { name: "desktop", dir: join(ROOT, "apps/desktop/src/renderer/styles") },
+  { name: "web", dir: join(ROOT, "apps/web/src") },
+]
 
 /** `--x: 值` 的左边。允许出现在任何规则里，不限 `:root`。 */
 const DEFINE = /(^|[{;\s])(--[a-z0-9-]+)\s*:/g
@@ -39,16 +47,17 @@ const REGISTER = /@property\s+(--[a-z0-9-]+)/g
 /** `var(--x)`；带兜底的两参形式不算，见文件头。 */
 const USE = /var\(\s*(--[a-z0-9-]+)\s*\)/g
 
-function sheets() {
-  return readdirSync(STYLES)
+function sheets(dir) {
+  return readdirSync(dir)
     .filter((f) => f.endsWith(".css"))
-    .map((f) => ({ file: f, text: readFileSync(join(STYLES, f), "utf8") }))
+    .map((f) => ({ file: f, text: readFileSync(join(dir, f), "utf8") }))
 }
 
-function main() {
-  const files = sheets()
+/** 一端的检查。返回 `{ files, defined, missing }`。 */
+function audit({ name, dir }) {
+  const files = sheets(dir)
   if (files.length === 0) {
-    console.error("token 守卫失败：一个 css 文件都没找到")
+    console.error(`token 守卫失败：${name} 下一个 css 文件都没找到（${dir}）`)
     process.exit(1)
   }
   const defined = new Set()
@@ -60,17 +69,25 @@ function main() {
   for (const { file, text } of files) {
     text.split("\n").forEach((line, i) => {
       for (const m of line.matchAll(USE)) {
-        if (!defined.has(m[1])) missing.push(`${file}:${String(i + 1)} 引用了没有定义的 ${m[1]}`)
+        if (!defined.has(m[1])) missing.push(`${name}/${file}:${String(i + 1)} 引用了没有定义的 ${m[1]}`)
       }
     })
   }
+  return { files, defined, missing }
+}
+
+function main() {
+  const results = ROOTS.map(audit)
+  const missing = results.flatMap((r) => r.missing)
   if (missing.length > 0) {
     console.error(`\ntoken 守卫失败（${String(missing.length)} 处）：\n`)
     for (const m of missing) console.error(`  ✗ ${m}`)
     console.error("\n提示：CSS 里未定义的 var() 会让**整条声明**作废，不报错也不回退。\n")
     process.exit(1)
   }
-  console.log(`token 守卫通过：${String(files.length)} 个样式文件，${String(defined.size)} 个 token，引用全部有定义`)
+  const files = results.reduce((n, r) => n + r.files.length, 0)
+  const tokens = results.reduce((n, r) => n + r.defined.size, 0)
+  console.log(`token 守卫通过：${String(ROOTS.length)} 端 / ${String(files)} 个样式文件 / ${String(tokens)} 个 token，引用全部有定义`)
 }
 
 main()

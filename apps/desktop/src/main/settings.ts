@@ -55,6 +55,31 @@ function parse(raw: unknown): Settings {
         : DEFAULTS.defaultTrust,
     projectIcons: icons(it.projectIcons),
     lastUsed: lastUsed(it.lastUsed),
+    remote: remote(it.remote),
+  }
+}
+
+/**
+ * 远程访问的那几项。
+ *
+ * **`enabled` 只认字面的 `true`**：这是一个把服务端打开的开关，
+ * 一个坏掉的值（`"yes"`、`1`）不该被当成「开」。同理 `maxTrust` 认不出就回默认，
+ * 绝不落到最宽的那一档——档位判定里「查不到就放行」正是最典型的那类洞。
+ *
+ * `trustedHosts` 在这里只做「是不是字符串数组」，**形状校验留给启动时**
+ * （`assertTrustedAuthority`）：那里失败要大声，而这里失败只会静默丢掉一条，
+ * 于是用户看到的是「配了但一直 403」。
+ */
+function remote(raw: unknown): Settings["remote"] {
+  if (typeof raw !== "object" || raw === null) return DEFAULTS.remote
+  const it = raw as Record<string, unknown>
+  const port = typeof it.port === "number" && Number.isInteger(it.port) && it.port >= 0 && it.port <= 65535 ? it.port : DEFAULTS.remote.port
+  return {
+    enabled: it.enabled === true,
+    port,
+    trustedHosts: strings(it.trustedHosts) ?? DEFAULTS.remote.trustedHosts,
+    maxTrust:
+      typeof it.maxTrust === "string" && TRUSTS.has(it.maxTrust) ? (it.maxTrust as Trust) : DEFAULTS.remote.maxTrust,
   }
 }
 

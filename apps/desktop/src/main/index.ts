@@ -10,6 +10,7 @@ import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
+import { installRemote } from "./remote/index.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
@@ -179,6 +180,70 @@ function readBuild(): string {
   }
 }
 
+/**
+ * 浏览器端的服务端。**默认关着**，开关在设置里；开了也只 listen 回环，
+ * 要从外面进来得自己开隧道（见 `docs/手机端远程方案.md`）。
+ *
+ * 命令走的是**和 IPC 完全同一条路**（`host.dispatch` + 同一个 `report`）——
+ * 摆两份实现的下场是其中一份迟早不更新，而那份正好是用户在外面用的那份。
+ */
+function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>): ReturnType<typeof installRemote> {
+  return installRemote({
+    settings: settings.get,
+    ledger: attached.ledger,
+    sinks,
+    dispatch: (command) => {
+      void attached.host.dispatch(command).catch((error: unknown) => {
+        attached.report(error, "threadId" in command ? command.threadId : undefined)
+      })
+    },
+    replay: async (sink) => {
+      await rebuild(attached, sink)
+    },
+    log,
+  })
+}
+
+/**
+ * 「我准备好了，把世界给我。」
+ *
+ * **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
+ * 用户按了 ⌘R）之后状态是空的，只补增量补不出前面的历史。
+ * **重建和开会话必须串起来，不能各跑各的。** 两条独立的异步链会互相插队：
+ * 开机自动建的那个会话刚发完事件，重建的全量就把状态清了，
+ * 而那些事件因为「seq <= resumeAt」被当成旧消息丢掉——会话还在，内容没了。
+ *
+ * **等渲染层喊，不要在 `did-finish-load` 时推。** 那一刻页面确实加载完了，
+ * 但 React 还没跑完第一轮 effect，`onReplay` 的监听还没挂上——推过去的全量
+ * 落进空气里。首次启动看不出来（紧接着的种子会话是走增量到达的），
+ * **重载才原形毕露**：侧栏空的、正文卡在「正在打开工作区…」，而磁盘上会话一个不少。
+ */
+function installHello(attached: Attached): void {
+  const state = { seeded: false }
+  ipcMain.on("omni:hello", (event) => {
+    // **认发来 hello 的那扇窗，不认启动时那扇。**
+    //
+    // 原来写的是 `event.sender !== win.webContents`，闭包捕获的是启动时那个
+    // `win`；而 macOS 上 ⌘W 关窗不退应用，再点 Dock 会**建一扇新窗**。
+    // 那时旧窗已销毁，这行不是「比较为假然后 return」——是**读
+    // `win.webContents` 直接抛 TypeError: Object has been destroyed**，
+    // 被全局 uncaughtException 兜住只写进日志。于是 rebuild 一次都不跑：
+    // 新窗口侧栏空的、引擎选择器空的，点「新建会话」宿主真把进程起起来了，
+    // 界面什么都不出现，点几次多几个进程，全程不报错。
+    const target = BrowserWindow.fromWebContents(event.sender)
+    if (target === null || target.isDestroyed()) return
+    void rebuild(attached, windowSink(target))
+      .then((recent) => {
+        if (state.seeded) return undefined
+        state.seeded = true
+        return seedDefaultThread(attached, defaultWorksite(homedir()), devPrompt(), recent)
+      })
+      .catch((error: unknown) => {
+        log.write("error", "ipc", `全量重建失败：${String(error)}`)
+      })
+  })
+}
+
 /** 开发钩子。全挂在这里，`whenReady` 那段只管应用本身怎么起。 */
 function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger): void {
   scheduleDevFind(win)
@@ -280,49 +345,14 @@ function bootstrap(): Promise<void> {
     watchProcesses(log, () => BrowserWindow.getAllWindows())
     const sinks = createSinks(() => BrowserWindow.getAllWindows())
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log)
+    const remote = attachRemote(attached, sinks)
+    await remote.sync()
     const bounds = await loadBounds()
     const win = createWindow(bounds)
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
     })
-    // **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
-    // 用户按了 ⌘R）之后状态是空的，只补增量补不出前面的历史。
-    // **重建和开会话必须串起来，不能各跑各的。** 两条独立的异步链会互相插队：
-    // 开机自动建的那个会话刚发完事件，重建的全量就把状态清了，
-    // 而那些事件因为「seq <= resumeAt」被当成旧消息丢掉——会话还在，内容没了
-    let seeded = false
-    /**
-     * **等渲染层喊「我准备好了」再发全量，不要在 `did-finish-load` 时推。**
-     *
-     * `did-finish-load` 那一刻页面确实加载完了，但 React 还没跑完第一轮 effect，
-     * `onReplay` 的监听还没挂上——推过去的全量落进空气里。
-     *
-     * 首次启动看不出来：紧接着的种子会话是走增量到达的，界面照样有东西。
-     * **重载才原形毕露**——那时没有种子，一切都指望这份全量：
-     * 侧栏空的、正文卡在「正在打开工作区…」，而磁盘上会话一个不少。
-     */
-    ipcMain.on("omni:hello", (event) => {
-      // **认发来 hello 的那扇窗，不认启动时那扇。**
-      //
-      // 原来写的是 `event.sender !== win.webContents`，闭包捕获的是启动时那个
-      // `win`；而 macOS 上 ⌘W 关窗不退应用，再点 Dock 会**建一扇新窗**。
-      // 那时旧窗已销毁，这行不是「比较为假然后 return」——是**读
-      // `win.webContents` 直接抛 TypeError: Object has been destroyed**，
-      // 被全局 uncaughtException 兜住只写进日志。于是 rebuild 一次都不跑：
-      // 新窗口侧栏空的、引擎选择器空的，点「新建会话」宿主真把进程起起来了，
-      // 界面什么都不出现，点几次多几个进程，全程不报错。
-      const target = BrowserWindow.fromWebContents(event.sender)
-      if (target === null || target.isDestroyed()) return
-      void rebuild(attached, windowSink(target))
-        .then((recent) => {
-          if (seeded) return undefined
-          seeded = true
-          return seedDefaultThread(attached, defaultWorksite(homedir()), devPrompt(), recent)
-        })
-        .catch((error: unknown) => {
-          log.write("error", "ipc", `全量重建失败：${String(error)}`)
-        })
-    })
+    installHello(attached)
     // 开发钩子只挂一次，和重建是两回事——它们不依赖会话，也不该在重载时重复挂
     win.webContents.once("did-finish-load", () => {
       installDevHooks(win, attached, log)
@@ -345,7 +375,7 @@ function bootstrap(): Promise<void> {
       quitting = true
       event.preventDefault()
       const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))
-      void Promise.race([shutdown(attached, log), deadline]).then(() => {
+      void Promise.race([shutdown(attached, log, remote.close), deadline]).then(() => {
         clearMarker()
         app.exit(0)
       })
@@ -359,7 +389,11 @@ function bootstrap(): Promise<void> {
  * **顺序不能反**：`dispose` 里还会 emit 事件（`gate.settleAll()` 把挂着的
  * 审批落定），那些也要落盘。
  */
-async function shutdown(attached: Attached, logger: Logger): Promise<void> {
+async function shutdown(attached: Attached, logger: Logger, closeRemote: () => Promise<void>): Promise<void> {
+  // 先断远程：让还连着的客户端立刻收到关闭，而不是对着一个正在收摊的宿主发命令
+  await closeRemote().catch((error: unknown) => {
+    logger.write("warn", "remote", `关闭远程服务端失败：${String(error)}`)
+  })
   await attached.host.dispose().catch((error: unknown) => {
     logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
   })
