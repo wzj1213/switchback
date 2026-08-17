@@ -93,6 +93,27 @@ describe("下次新会话开成什么样：记下来", () => {
     })
   })
 
+  /**
+   * **记的是他挑的那家，不是此刻正在跑的那家。**
+   *
+   * 开过工的会话切引擎是「下一句生效」，而这个函数跑在命令发给宿主**之前**——
+   * 那一刻 `engine` 还是旧的。只看它的话，在 claude 里切到 codex 再发第一句，
+   * 记下来的是 claude；而第二句起就不再记了（`segments` 非空），
+   * 于是那次选择**永远学不到**，下一条新会话又给你开 claude。
+   */
+  it("**待切换的那家算数**：切到 codex 再发第一句，记的是 codex", () => {
+    const last: LastUsed = { engine: "claude", byEngine: {} }
+    const picked = thread({ engine: "claude", nextEngine: "codex" })
+    expect(learnFrom(last, picked)?.engine).toBe("codex")
+  })
+
+  // 模型 id 是各家私有的：把 claude 的模型记到 codex 名下，下一条新会话就起不来
+  it("换了一家就不带模型过去", () => {
+    const last: LastUsed = { engine: "claude", byEngine: { claude: { model: "opus" } } }
+    const picked = thread({ engine: "claude", nextEngine: "codex", model: "opus" })
+    expect(learnFrom(last, picked)?.byEngine.codex).toBeUndefined()
+  })
+
   // 每条会话的第一句都写一次盘没有意义，还会白白触发一轮渲染
   it("和已经记着的一模一样时不写盘", () => {
     const last: LastUsed = { engine: "codex", byEngine: { codex: { model: "gpt-5.3" } } }

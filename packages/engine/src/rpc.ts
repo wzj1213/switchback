@@ -52,7 +52,7 @@ interface Incoming {
   method?: string
   params?: unknown
   result?: unknown
-  error?: { message?: string }
+  error?: { message?: string; code?: number; data?: unknown }
 }
 
 function parse(line: string): Incoming | undefined {
@@ -80,7 +80,32 @@ function settleReply(state: RpcState, msg: Incoming): void {
   if (waiter === undefined) return
   state.pending.delete(id)
   if (msg.error === undefined) waiter.resolve(msg.result)
-  else waiter.reject(new Error(msg.error.message ?? "对端返回了错误"))
+  else waiter.reject(new Error(errorText(msg.error)))
+}
+
+/**
+ * 对端报的错 → 一句话。**`data` 里那句往往才是真原因。**
+ *
+ * 上一版只取 `message`，于是实测拿到的是光秃秃一句 `Internal error`——
+ * 而真正说清楚的那句（zcode 桥的 `data.details`：
+ * 「unsupported config option or switch failed: model」）被原地丢掉。
+ * 排查时的表现是：日志、界面、测试输出三处都只有「内部错误」四个字。
+ *
+ * `data` 不是字符串时整个 JSON 化：**编不出更好的话时，原文比编的话有用**。
+ */
+function errorText(error: { message?: string; data?: unknown }): string {
+  const head = error.message ?? "对端返回了错误"
+  const detail = detailOf(error.data)
+  return detail === undefined ? head : `${head}：${detail}`
+}
+
+function detailOf(data: unknown): string | undefined {
+  if (typeof data === "string") return data === "" ? undefined : data
+  if (typeof data !== "object" || data === null) return undefined
+  const details = (data as { details?: unknown }).details
+  if (typeof details === "string") return details
+  const text = JSON.stringify(data)
+  return text === "{}" || text === undefined ? undefined : text
 }
 
 /** `respond` 幂等：重复应答同一个 id 会让对端认不出，只认第一次。 */

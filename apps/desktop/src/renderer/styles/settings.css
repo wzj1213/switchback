@@ -15,11 +15,15 @@
   justify-content: center;
   padding: 8vh var(--sp-4) var(--sp-4);
   background: var(--scrim);
-  overflow-y: auto;
 }
 
 .set {
   width: min(560px, 100%);
+  /* **要滚就滚卡片自己。** 让遮罩滚的话，滚动条画在整扇窗口的最右边缘——
+     和「窗口自己永远不滚」（app.css 开头那段）在用户眼里是同一件事。
+     百分比解析的是遮罩的内容盒高度，所以 8vh 只写在遮罩那一处 */
+  max-height: 100%;
+  overflow-y: auto;
   padding: var(--sp-4) var(--sp-5) var(--sp-5);
   border: 1px solid var(--border-pop);
   border-radius: var(--radius-lg);
@@ -102,8 +106,12 @@
 
 /* ── 三段式开关 ─────────────────────────────────────
  * 选项少且互斥时比下拉好：三个都看得见，不用点开才知道有什么。
+ *
+ * **叫 `.switch` 不叫 `.seg`**：`.seg` 被引擎时间线卡片用着（app.css 末尾那段），
+ * 而这个文件加载在后面、权重又相同——撞名的结果是那张卡片里的 uuid 句柄
+ * 被这里的 `inline-flex` 挤成每行一个字符的竖条。
  */
-.seg {
+.switch {
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--border);
@@ -111,7 +119,7 @@
   background: var(--bg-sunken);
 }
 
-.seg__item {
+.switch__item {
   padding: 3px var(--sp-2);
   border: 0;
   border-radius: 4px;
@@ -119,18 +127,19 @@
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
+  line-height: var(--lh-xs);
   white-space: nowrap;
   cursor: default;
 }
 
-.seg__item:hover {
+.switch__item:hover {
   color: var(--text);
 }
 
-.seg__item--on {
+.switch__item--on {
   background: var(--bg-raised);
   color: var(--text);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-1);
 }
 
 /* 更新失败时 npm 的原文。**要能看见**——「更新失败」四个字排查不了任何东西 */
@@ -140,9 +149,11 @@
   padding: var(--sp-2);
   overflow: auto;
   border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
+  /* 机器原文一律走 `--bg-code`：`--bg-sunken` 是「凹下去的槽」，
+     深色下两者方向相反（一个凸 4.5 L*、一个凹 3.2） */
+  background: var(--bg-code);
   color: var(--text-muted);
-  font-family: var(--mono);
-  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
   white-space: pre-wrap;
 }

@@ -117,7 +117,9 @@ export function TopBar({
           setEnv(!env)
         }}
       >
-        {thread.title}
+        {/* 包一层：截断只能写在**子元素**上——flex 项默认 `min-width: auto` 不肯缩，
+            标题会被齐着字形硬切，连后面那个箭头一起裁掉 */}
+        <span className="topbar__title-text">{thread.title}</span>
         <CaretIcon size={11} />
       </button>
       <Cards

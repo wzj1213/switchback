@@ -40,6 +40,8 @@ interface Props {
   detached?: boolean
   /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
   busy?: boolean
+  /** 引擎还在起。**和 `busy` 不是一回事**：那时什么都没在跑，而且发不出去。 */
+  starting?: boolean
   /** busy 时「发送」变成「停止」，点它中断当前轮次。 */
   onInterrupt?: () => void
   engine: EngineId
@@ -51,6 +53,11 @@ interface Props {
   /** 当前模型；undefined 表示用引擎自己的默认 */
   model: string | undefined
   effort: string | undefined
+  /**
+   * 有待切换的引擎时它的名字。**模型选择器据此变成一句说明**——
+   * 手上这份清单是旧那家报的，不能让人挑，但也不该凭空消失。
+   */
+  pending?: string
   onModelChange: (model: string, effort?: string) => void
   /** 工作区绝对路径，`@` 文件引用要用 */
   cwd: string
@@ -80,6 +87,28 @@ interface Props {
   onResume: () => void
 }
 
+/**
+ * 输入区现在处在哪一档。**四档互斥**，而且各有各的文案和右下角那颗键：
+ * 历史记录 / 引擎还在起 / 跑着但能插话 / 跑着只能排队。
+ *
+ * 拎出来是复杂度闸门逼的，但边界也对：这是一次判定，不是渲染。
+ */
+function stateOf(o: { detached: boolean; starting: boolean; busy: boolean; canSteer: boolean }): {
+  blocked: boolean
+  queueing: boolean
+  steering: boolean
+} {
+  const running = o.busy && !o.detached
+  return {
+    // 真正发不出去的只有两种：这是历史记录（背后没有引擎），
+    // 以及**引擎还没起来**——后者不禁的话，回车会先清空输入框、
+    // 再撞上宿主那句「会话不存在」，打好的一句话就这么没了
+    blocked: o.detached || o.starting,
+    queueing: running && !o.canSteer,
+    steering: running && o.canSteer,
+  }
+}
+
 export function Composer({
   detached = false,
   engine,
@@ -92,10 +121,12 @@ export function Composer({
   models,
   model,
   effort,
+  pending,
   onModelChange,
   cwd,
   stamp,
   busy = false,
+  starting = false,
   onInterrupt,
   searchFiles,
   commands,
@@ -115,16 +146,8 @@ export function Composer({
     seen.current = prefill.at
     setText(prefill.text)
   }, [prefill])
-  /**
-   * 现在能不能发。
-   *
-   * `busy` 覆盖两件事：引擎还在起（`starting`）、上一轮还没跑完。
-   * **第二条是个真 bug 不是洁癖**：轮次跑着时再发一条，
-   * Claude 那边正在流的回答会整个消失——审计里复现过。
-   */
-  // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上。
-  // 只有「这是历史记录」才真的不能发（背后没有引擎）
-  const blocked = detached
+  // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
+  const { blocked, queueing, steering } = stateOf({ detached, starting, busy, canSteer })
   const submit = (): void => {
     const trimmed = text.trim()
     // **只有附件、没有文字也该能发**：贴一张报错截图问「这是怎么回事」，
@@ -155,10 +178,10 @@ export function Composer({
         <Attachments paths={attach.paths} onRemove={attach.remove} />
         <Prompt
           value={text}
-          detached={blocked}
-          busyHint={busy && !detached}
-          queueing={busy && !detached && !canSteer}
-          steering={busy && !detached && canSteer}
+          detached={detached}
+          starting={starting}
+          queueing={queueing}
+          steering={steering}
           cwd={cwd}
           onPaste={attach.paste}
           commands={commands}
@@ -172,6 +195,7 @@ export function Composer({
         <Bar
           detached={detached}
           busy={busy}
+          starting={starting}
           empty={text.trim() === ""}
           engine={engine}
           engines={engines}
@@ -179,6 +203,7 @@ export function Composer({
           models={models}
           model={model}
           effort={effort}
+          pending={pending}
           onEngineChange={onEngineChange}
           onTrustChange={onTrustChange}
           onModelChange={onModelChange}

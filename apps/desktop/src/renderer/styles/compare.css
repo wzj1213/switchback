@@ -124,7 +124,7 @@
 }
 
 .cmp__pane + .cmp__pane {
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--border-strong);
 }
 
 .cmp__pane-head {

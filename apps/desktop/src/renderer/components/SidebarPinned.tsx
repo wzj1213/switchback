@@ -30,18 +30,19 @@ export function PinnedSection({
     <div
       className={`sidebar__droppin${on.overPinned === true ? " sidebar__droppin--over" : ""}`}
       onDragOver={(e) => {
-        if (on.drag?.dragging === undefined) return
+        // 会话和项目都能往这儿放
+        if (on.dragKind === undefined) return
         e.preventDefault()
         e.dataTransfer.dropEffect = "move"
         // **悬停要有反馈。** 漏了这一句的时候整段不会高亮，
         // 用户只能靠猜「松手会不会落在这儿」——而落点是一整段，猜不出来
-        on.drag.hoverPinned()
+        on.drag?.hoverPinned()
       }}
       onDragLeave={() => {
         on.drag?.hoverRow("")
       }}
       onDrop={(e) => {
-        if (on.drag?.dragging === undefined) return
+        if (on.dragKind === undefined) return
         e.preventDefault()
         on.onDropPinned?.()
       }}
@@ -55,7 +56,7 @@ export function PinnedSection({
       />
       {open ? (
         sections.pinnedThreads.length === 0 && sections.pinned.length === 0 ? (
-          <p className="sidebar__empty">把会话拖到这里就置顶了；右键项目可以置顶整个项目。</p>
+          <p className="sidebar__empty">把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。</p>
         ) : (
           <>
             {sections.pinnedThreads.map((row) => (
@@ -64,6 +65,8 @@ export function PinnedSection({
                 row={row}
                 selected={row.thread.id === on.selectedId}
                 flat
+                pinned
+                {...(on.drag === undefined ? {} : { drag: on.drag })}
                 aside={baseNameOf(row.thread.cwd)}
                 onSelect={() => {
                   on.onSelect(row.thread.id)
@@ -81,6 +84,8 @@ export function PinnedSection({
                 <GroupBlock
                   key={group.cwd}
                   group={group}
+                  pinned
+                  {...(on.onDropOnProject === undefined ? {} : { onDropOnProject: on.onDropOnProject })}
                   collapsed={!on.isOpen(group.cwd)}
                   selectedId={on.selectedId}
                   onToggle={() => {

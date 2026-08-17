@@ -171,7 +171,8 @@ function reduceCatalog(
 ): ViewState {
   if (event.type === "engines.available") return { ...state, engines: event.engines }
   if (event.type === "models.updated") {
-    return { ...state, models: { ...state.models, [event.threadId]: event.models } }
+    // 连报它的那家引擎一起记下：切引擎之后靠它认出「这份是上一家的」（见 `modelsOf`）
+    return { ...state, models: { ...state.models, [event.threadId]: { engine: event.engine, list: event.models } } }
   }
   return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
 }

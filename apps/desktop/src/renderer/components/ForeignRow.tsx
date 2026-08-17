@@ -25,7 +25,7 @@ export function ForeignRow({
   onAdopt: (item: EngineThread) => void
 }): React.JSX.Element {
   return (
-    <div className="row row--thread">
+    <div className="row row--thread row--flat">
       <button
         type="button"
         className="row__main"
@@ -38,7 +38,7 @@ export function ForeignRow({
           <ForkIcon size={SIDEBAR_ICON_SMALL} />
         </span>
         <span className="row__label">{item.title}</span>
-        <span className="row__note">{whenOf(item.updatedAt)}</span>
+        <span className="row__aside">{whenOf(item.updatedAt)}</span>
       </button>
     </div>
   )

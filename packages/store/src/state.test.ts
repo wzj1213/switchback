@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Thread } from "@omni/protocol"
-import { foreignByEngine, forkPeerOf, initial, threadRowsOf, type ViewState } from "./state.js"
+import { foreignByEngine, forkPeerOf, initial, modelsOf, threadRowsOf, type ViewState } from "./state.js"
 import { reduceAll } from "./reduce.js"
 
 const thread = (id: string, at: number, forkedFrom?: string): Thread => ({
@@ -92,5 +92,31 @@ describe("历史段：装了的每一家各一段", () => {
   it("报过历史但清单里还没有的也带上——清单迟到时不该让已有的一段闪一下才出现", () => {
     const got = foreignByEngine(withEngines([], { codex: [{ handle: "a", title: "x", cwd: "/w", updatedAt: 1 }] }))
     expect(got.map((g) => g.engine)).toEqual(["codex"])
+  })
+})
+
+/**
+ * 模型清单要认「是谁报的」。
+ *
+ * 一条会话中途会换引擎，而模型 id 是各家私有的。切过去之后新那家的清单是
+ * 异步才到的、而且完全可能一个都报不上来（`models()` 失败就是空数组，
+ * 那时宿主什么都不发）——只按会话 id 取的话，那段时间界面上摆的是**上一家的模型**。
+ */
+describe("模型清单认引擎", () => {
+  const withModels = (engine: string): ViewState =>
+    reduceAll(initial(), [
+      { type: "models.updated", at: 1, threadId: "th-1", engine, models: [{ id: "m1", label: "M1" }] },
+    ])
+
+  it("是这家报的就给", () => {
+    expect(modelsOf(withModels("codex"), "th-1", "codex")).toEqual([{ id: "m1", label: "M1" }])
+  })
+
+  it("**换了一家就当没有**——宁可什么都不摆，也不摆一份点了会出错的", () => {
+    expect(modelsOf(withModels("codex"), "th-1", "claude")).toEqual([])
+  })
+
+  it("没报过就是空的", () => {
+    expect(modelsOf(initial(), "th-1", "codex")).toEqual([])
   })
 })

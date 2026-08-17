@@ -127,6 +127,11 @@ export function Popover({ open, onClose, anchor, at: point, children, minWidth }
     <div
       className="pop"
       ref={panel}
+      /* 入场动效挂在这个属性上，**不挂在 `.pop` 上**：位置是挂载之后由
+         `useLayoutEffect` 算出来的，在那之前面板是 `visibility: hidden`。
+         挂在类上今天碰巧不出事，但哪天有人把它改成 `useEffect`，
+         动画就在看不见的那一帧里跑完了——而且不报错 */
+      data-placed={at === undefined ? "false" : "true"}
       role="dialog"
       style={{
         // 位置没算出来之前先藏着，别让它在左上角闪一下

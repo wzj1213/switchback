@@ -15,6 +15,7 @@ import { TRUSTS, labelOf } from "./Composer.js"
 export function Bar({
   detached,
   busy,
+  starting,
   empty,
   engine,
   engines,
@@ -22,6 +23,7 @@ export function Bar({
   models,
   model,
   effort,
+  pending,
   onEngineChange,
   onTrustChange,
   onModelChange,
@@ -31,6 +33,8 @@ export function Bar({
 }: {
   detached: boolean
   busy: boolean
+  /** 引擎还在起：右下角那颗键是禁着的「发送」，不是「停止」。 */
+  starting: boolean
   empty: boolean
   engine: EngineId
   engines: readonly EngineInfo[]
@@ -38,6 +42,8 @@ export function Bar({
   models: readonly ModelOption[]
   model?: string
   effort?: string
+  /** 有待切换的引擎时它的名字；模型选择器据此说明自己在等什么。 */
+  pending?: string
   onEngineChange: (next: EngineId) => void
   onTrustChange: (next: Trust) => void
   onModelChange: (model: string, effort?: string) => void
@@ -87,12 +93,14 @@ export function Bar({
               model={model}
               effort={effort}
               disabled={detached}
+              pending={pending}
               onChange={onModelChange}
             />
             <span style={{ flex: 1 }} />
             <Action
               detached={detached}
               busy={busy}
+              starting={starting}
               empty={empty}
               onResume={onResume}
               onInterrupt={onInterrupt}

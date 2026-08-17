@@ -1,13 +1,13 @@
 import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import type { EngineThread } from "@omni/protocol"
-import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
-import { ChevronIcon, FolderIcon, PlusIcon } from "./icons.js"
+import { type Group, type Sections } from "../sidebar.js"
+import { ChevronIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
 import { ForeignSection } from "./ForeignRow.js"
 import { PinnedSection } from "./SidebarPinned.js"
-import { GroupBlock } from "./SidebarGroup.js"
+import { ProjectsSection } from "./SidebarProjects.js"
 import type { RenameCtl } from "./RowName.js"
 
 /**
@@ -97,59 +97,23 @@ export interface GroupHandlers {
   overPinned?: boolean
   /** 取消置顶一条会话。 */
   onUnpinThread?: (id: string) => void
-}
-
-function Groups({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
-  return (
-    <>
-      {groups.map((group) => (
-        <GroupBlock
-          key={group.cwd}
-          group={group}
-          collapsed={!on.isOpen(group.cwd)}
-          selectedId={on.selectedId}
-          onToggle={() => {
-            on.onToggle(group.cwd)
-          }}
-          onSelect={on.onSelect}
-          onDelete={on.onDelete}
-          onRowMenu={on.onRowMenu}
-          onNewIn={on.onNewIn}
-          {...(on.drag === undefined ? {} : { drag: on.drag })}
-          icon={on.icons[group.cwd]}
-          rename={on.rename}
-          onGroupMenu={on.onGroupMenu}
-        />
-      ))}
-    </>
-  )
-}
-
-/**
- * 项目段。超过 `PROJECT_MAX` 就折起来，留一行「展开显示」。
- *
- * 不做无限滚动也不做分页：项目数量是几十的量级，
- * 一行「展开显示」就够，多一套机制只会多一处出错的地方。
- */
-function Projects({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
-  const [all, setAll] = useState(false)
-  const shown = all ? groups : groups.slice(0, PROJECT_MAX)
-  return (
-    <>
-      <Groups groups={shown} on={on} />
-      {groups.length <= PROJECT_MAX ? null : (
-        <button
-          type="button"
-          className="sidebar__more"
-          onClick={() => {
-            setAll((was) => !was)
-          }}
-        >
-          {all ? "收起" : `展开显示（还有 ${String(groups.length - PROJECT_MAX)} 个）`}
-        </button>
-      )}
-    </>
-  )
+  /**
+   * 现在拖的是哪一类。`undefined` = 没在拖。
+   *
+   * 两段互为**反向落点**：置顶段两类都收（置顶），项目段收置顶过来的那些（取消置顶）。
+   * 只看 `drag.dragging` 的话项目就漏了——它不是一条会话，没有 id。
+   */
+  dragKind?: "thread" | "project"
+  /** 现在拖的东西已经是置顶的（项目段据此决定认不认这次落点）。 */
+  draggingPinned?: boolean
+  /** 拖到「项目」那一段上放手：**取消置顶**。 */
+  onDropProjects?: () => void
+  /** 现在正悬在「项目」段上。 */
+  overProjects?: boolean
+  /** 悬到「项目」段上了（画高亮）。 */
+  onHoverProjects?: () => void
+  /** 把项目拖到另一个项目上：排序。 */
+  onDropOnProject?: (cwd: string) => void
 }
 
 /**
@@ -228,17 +192,14 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         }}
       />
 
-      <SectionHead
-        title="项目"
+      <ProjectsSection
+        sections={sections}
+        on={on}
         open={open("proj")}
         onToggle={() => {
           toggle("proj")
         }}
-        // **图标不能和「对话」段那颗 `+` 一样**：这颗是「加一个项目（选文件夹）」，
-        // 那颗是「开一条对话」。同形不同义比没有图标更误导
-        action={{ label: "打开一个文件夹", icon: <FolderIcon size={SIDEBAR_ICON} />, run: on.onOpenFolder }}
       />
-      {open("proj") ? <Projects groups={sections.projects} on={on} /> : null}
 
       {/* **段头常驻，空了也在。** 上一版空了整段消失，于是「这里能放什么」
           只有已经知道的人才看得见——置顶段的老毛病同理 */}

@@ -7,7 +7,10 @@
  */
 
 .diff {
-  margin: 2px 0 var(--sp-2) 22px;
+  margin: 2px 0 var(--sp-2);
+  /* 对着工具行的图标槽（`--step-slot`，定义在 `.transcript__inner`）。
+     单写一条不并进简写：变量没定义时整条简写作废，上下间距会一起丢 */
+  margin-left: var(--step-slot);
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -58,6 +61,25 @@
   font-family: var(--font-mono);
 }
 
+/* 可点的路径。**平时和静态的一模一样**，悬停才显出来能点——
+   一条工具行里最重要的是「它对哪个文件做了什么」，不是「这里有个链接」。
+   同一套也给工具行的「读文件」用（`.step__target--go`，在 items.css 里） */
+.dfile__path--go {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.dfile__path--go:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .dfile__dir {
   min-width: 0;
   overflow: hidden;
@@ -88,7 +110,7 @@
   padding: var(--sp-1) 0;
   background: var(--bg-raised);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-code);
   line-height: 1.55;
 }
 

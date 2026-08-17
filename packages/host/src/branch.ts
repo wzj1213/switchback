@@ -1,4 +1,4 @@
-import type { Command, Item, Thread, ThreadId } from "@omni/protocol"
+import type { Command, EngineSegment, Item, Thread, ThreadId } from "@omni/protocol"
 import { initial, itemsOf, reduceAll } from "@omni/store"
 import { emit, type Ctx, type Live } from "./ctx.js"
 import { copyTranscript } from "./transcript.js"
@@ -169,6 +169,16 @@ export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff"
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
   if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
 
+  /**
+   * **临时会话当场切**（见 `Thread.provisional`）。
+   *
+   * 「下一句生效」那套是为**开过工的会话**定的：它有正在跑的活、有一段要保住的
+   * 上下文，点错一下的代价很大。临时会话一样都没有——它还什么都没说。
+   * 而推迟在它身上有个实打实的代价：**模型清单是引擎起来之后才报的**，
+   * 不当场切就等于「你必须先说一句话，才能挑这一句用哪个模型」。
+   */
+  if (entry.thread.provisional === true) return switchEngine(ctx, cmd.threadId, cmd.to)
+
   const at = ctx.deps.now()
   const next = { ...entry.thread, updatedAt: at }
   // 选回当前这家 = 取消待切换
@@ -181,10 +191,13 @@ export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff"
 }
 
 /**
- * 真正把引擎换掉。**由 `prompt` 在发出第一句话时调用**，不是用户点下拉的那一刻
- * ——理由见 `Thread.nextEngine`。
+ * 真正把引擎换掉。两个调用点，对应两种会话：
  *
- * 换过去之后：停旧进程、起新的、清掉模型与强度（上一家的模型 id 在新的一家
+ * - **开过工的会话**：由 `prompt` 在发出下一句话时调用，不是用户点下拉的那一刻
+ *   （理由见 `Thread.nextEngine`）
+ * - **临时会话**：`handoff` 直接调用，点下拉当场就换（理由同上）
+ *
+ * 换过去之后：起新进程、停旧的、清掉模型与强度（上一家的模型 id 在新的一家
  * 那里通常根本不存在）、`nextEngine` 清空。
  *
  * **不传原始上下文，也不塞任何文本。** 各家 session 格式不通，硬翻既做不对也
@@ -197,12 +210,6 @@ export async function switchEngine(ctx: Ctx, threadId: ThreadId, to: string): Pr
   if (entry === undefined) throw new Error(`会话不存在：${threadId}`)
   if (entry.thread.engine === to) return
   if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
-  const cmd = { threadId, to }
-
-  // 先停旧的再起新的：两个引擎同时对着一个工作区写，是最难查的一类冲突
-  entry.gate.settleAll()
-  await entry.session.dispose()
-  ctx.live.delete(cmd.threadId)
 
   const at = ctx.deps.now()
   // **切回去要续上那一家自己的那条**，不是新开一条。
@@ -211,23 +218,60 @@ export async function switchEngine(ctx: Ctx, threadId: ThreadId, to: string): Pr
   // 于是：codex 跑了一半，切去 Claude 看一眼，再切回来时 codex 已经不记得
   // 自己做过什么了。而每一家的句柄本来就各存各的（`segments`），
   // 切回来查一下就有。
-  const back = (entry.thread.segments ?? []).find((seg) => seg.engine === cmd.to)
-  const thread: Thread = {
-    ...entry.thread,
-    engine: cmd.to,
-    engineHistory: [...entry.thread.engineHistory, cmd.to],
-    nextEngine: undefined,
+  const back = (entry.thread.segments ?? []).find((seg) => seg.engine === to)
+  const thread = switched(entry.thread, to, back, at)
+  // **先把旧条目摘下来再起新的**：驱动可能在 `start()` 里就回调 `onHandle`，
+  // 那时表里若还留着旧条目，新句柄会写到**旧那条**上，然后被覆盖丢掉
+  entry.gate.settleAll()
+  ctx.live.delete(threadId)
+  const early = await launch(ctx, thread, back?.handle).catch((error: unknown) => {
+    // **起不来就原样退回。** 旧那条这时还活着（下面那行 dispose 还没跑到），
+    // 挂回去就当无事发生——一条会话不该因为「想试试另一家」而报废
+    ctx.live.set(threadId, entry)
+    throw error
+  })
+  /**
+   * **新的起来了才停旧的。**
+   *
+   * 上一版反过来（先 dispose 再 launch），理由是「两个引擎同时对着一个工作区写
+   * 是最难查的一类冲突」。那个顾虑在这里不成立：切换只发生在**没有轮次在跑**
+   * 的时候（`prompt` 里那条判断、以及还没说过话的临时会话），旧那条是空闲的，
+   * 而且这里立刻就把它停掉，重叠只有握手那几百毫秒、双方都不动手。
+   *
+   * 而那个顺序有个真代价：新那家起不来（没装、没登录、版本不对）时，
+   * 旧进程已经没了、新的又没起来，**那条会话从此发不出任何一句话**，
+   * 界面上还看不出为什么。用引擎下拉里那个「未安装」的选项就能复现。
+   */
+  await entry.session.dispose().catch(() => undefined)
+  // **发 `live` 里那一份，不是这个局部变量**——`launch` 会往上面挂新那家的
+  // 引擎能力。发局部的那份等于把**旧那家的能力**留在界面上：换过去之后
+  // 贴图入口、改向提示照着上一家画，而且一声不响（`create` 那边踩过同一个坑）
+  emit(ctx, { type: "thread.updated", at, thread: ctx.live.get(threadId)?.thread ?? thread })
+  if (early !== undefined) rememberHandle(ctx, thread.id, early)
+}
+
+/**
+ * 换过引擎之后这条会话长什么样。
+ *
+ * **模型和强度清掉**：它们跟着引擎走，上一家的模型 id 在新的一家那里
+ * 通常根本不存在。清单同理——渲染层认「这份是谁报的」（见 store 的 `modelsOf`），
+ * 新那家报上来之前，选择器上什么都不摆。
+ */
+function switched(prev: Thread, to: string, back: EngineSegment | undefined, at: number): Thread {
+  const next: Thread = {
+    ...prev,
+    engine: to,
+    // 临时会话在旧那家**什么都没发生过**，历史里不该留一笔——
+    // 点开下拉挑了三次就记三条的话，`/timeline` 会被「我点错了」填满
+    engineHistory: prev.provisional === true ? [to] : [...prev.engineHistory, to],
     ...(back === undefined ? { engineHandle: undefined } : { engineHandle: back.handle }),
-    // 模型和强度是**跟着引擎走**的，换一家就得重新问——上一家的模型 id
-    // 在新的一家那里通常根本不存在
     model: undefined,
     effort: undefined,
     status: "idle",
     updatedAt: at,
   }
-  const early = await launch(ctx, thread, back?.handle)
-  emit(ctx, { type: "thread.updated", at, thread })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
+  delete next.nextEngine
+  return next
 }
 
 

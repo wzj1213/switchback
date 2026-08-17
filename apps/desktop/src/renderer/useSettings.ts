@@ -25,6 +25,8 @@ export interface SettingsApi {
   pinThread: (id: string, pin: boolean) => void
   /** 存下某个项目内会话的手动顺序（整段）。 */
   setOrder: (cwd: string, ids: readonly string[]) => void
+  /** 项目之间的手动顺序。 */
+  setProjectOrder: (order: readonly string[]) => void
 }
 
 export function useSettings(): SettingsApi {
@@ -88,6 +90,14 @@ export function useSettings(): SettingsApi {
     [settings.threadOrder, patch],
   )
 
+  /** 项目排序。和 `setOrder` 同一条规矩，只是尺度从「一个项目内」放大到「项目之间」。 */
+  const setProjectOrder = useCallback(
+    (order: readonly string[]) => {
+      patch({ projectOrder: order })
+    },
+    [patch],
+  )
+
   const setIcon = useCallback(
     (cwd: string, icon: string) => {
       // 清掉时**把键去掉**，不是存一个空串：留着空值的话，
@@ -108,6 +118,7 @@ export function useSettings(): SettingsApi {
     dropProject,
     pinThread,
     setOrder,
+    setProjectOrder,
     setIcon,
     isPinned: (cwd) => settings.pinned.includes(cwd),
   }

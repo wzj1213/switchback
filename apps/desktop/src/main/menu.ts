@@ -1,4 +1,5 @@
 import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOptions } from "electron"
+import { quitNow } from "./quit.js"
 
 /**
  * 菜单里那些**只有渲染层做得到**的动作。
@@ -171,5 +172,6 @@ export function installMenu(
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   // 非 mac 上没有 appMenu 角色，退出项挂在「文件」里，这里不再重复
-  if (!isMac) app.on("window-all-closed", () => app.quit())
+  // 不问确认，理由和 `index.ts` 里那条同名处理器一样：这时已经没有窗口可以取消回去了
+  if (!isMac) app.on("window-all-closed", () => { quitNow() })
 }

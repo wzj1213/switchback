@@ -115,6 +115,13 @@ export interface Pins {
   /** 置顶的项目路径，按置顶先后。 */
   projects: readonly string[]
   /**
+   * 项目的手动顺序。**拖过一次，整段就归你排**——和会话那条规矩一样，
+   * 不做「一半手动一半自动」：那种混合排序没人说得清一个新项目该落在哪。
+   *
+   * 表里没提到的（刚打开的、刚建了第一条会话的）排在最前：它最新。
+   */
+  projectOrder?: readonly string[]
+  /**
    * 打开过的项目。**没有会话的也要出现在侧栏里**——
    * 一个项目不必有会话，你可能只是先把它放进来，明天再开工。
    */
@@ -141,12 +148,13 @@ export function sectionsOf(rows: readonly ThreadRow[], pins: Pins): Sections {
     pins.known ?? [],
   )
   const isPinned = new Set(pins.projects)
+  const projects = groups.filter((g) => !isPinned.has(g.cwd))
   return {
     pinnedThreads,
     // 按**用户置顶的先后**排，不按最近活动排：钉住的顺序是他自己定的，
     // 底下再自动重排一次就等于没钉
     pinned: pins.projects.flatMap((cwd) => groups.filter((g) => g.cwd === cwd)),
-    projects: groups.filter((g) => !isPinned.has(g.cwd)),
+    projects: orderedGroups(projects, pins.projectOrder),
     chats: [...chats].sort((a, b) => b.thread.updatedAt - a.thread.updatedAt),
   }
 }
@@ -163,6 +171,18 @@ function withKnown(groups: readonly Group[], known: readonly string[]): readonly
     .filter((cwd) => !seen.has(cwd))
     .map((cwd) => ({ cwd, label: baseNameOf(cwd), rows: [] as readonly ThreadRow[] }))
   return [...groups, ...empty]
+}
+
+/**
+ * 项目怎么排。规则和会话那条一模一样（`ordered`），只是键从会话 id 换成路径——
+ * **两处共用一套语义**：没拖过按活跃度、拖过一次整段归你排、新的排最前。
+ */
+export function orderedGroups(groups: readonly Group[], order: readonly string[] | undefined): readonly Group[] {
+  if (order === undefined || order.length === 0) return groups
+  const rank = new Map(order.map((cwd, i) => [cwd, i]))
+  const known = groups.filter((g) => rank.has(g.cwd))
+  const fresh = groups.filter((g) => !rank.has(g.cwd))
+  return [...fresh, ...known.sort((a, b) => (rank.get(a.cwd) ?? 0) - (rank.get(b.cwd) ?? 0))]
 }
 
 /**

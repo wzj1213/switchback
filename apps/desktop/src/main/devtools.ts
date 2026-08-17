@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises"
-import { app, nativeTheme, type BrowserWindow } from "electron"
+import { nativeTheme, type BrowserWindow } from "electron"
 import type { Trust } from "@omni/protocol"
+import { quitNow } from "./quit.js"
 
 /**
  * 开发期用的自动化钩子，**全部由环境变量开关，默认完全不生效**。
@@ -328,11 +329,11 @@ export function scheduleDevShot(win: BrowserWindow): void {
       .capturePage()
       .then((image) => writeFile(target, image.toPNG()))
       .then(() => {
-        app.quit()
+        quitNow()
       })
       .catch((error: unknown) => {
         console.error("dev shot failed:", error)
-        app.quit()
+        quitNow()
       })
   }, delay)
 }

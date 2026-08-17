@@ -1,4 +1,5 @@
 import type { Event, ItemId, PlanStep, SlashCommand, ThreadId, ToolStatus, TurnId } from "@omni/protocol"
+import { catalogOf, type Catalog } from "./setup.js"
 import { merge, toToolCall } from "./translate.js"
 import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js"
 
@@ -26,7 +27,14 @@ import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js
  */
 export interface UpdateContext {
   threadId: ThreadId
+  /** 引擎 id。模型清单要带着「谁报的」一起走（见 store 的 `modelsOf`）。 */
+  engine: string
   emit: (event: Event) => void
+  /**
+   * agent 自己把可选项换了。**由驱动落到自己的状态上并转发出去**——
+   * 这里只负责认出这条通知、把它翻成一份清单。
+   */
+  onCatalog?: (catalog: Catalog) => void
   /** 宿主铸造的当前轮次 id。没有轮次就说明这条更新来得不是时候，丢弃。 */
   turnId: () => TurnId | undefined
   /**
@@ -239,6 +247,20 @@ function onModeChanged(ctx: UpdateContext, update: AcpUpdate): void {
 }
 
 /**
+ * agent 那边的可选项变了。
+ *
+ * **换模型之后强度的词表是会变的**：实测 ZCode 的 GLM-5.3 有 low/high/max，
+ * 换到 GLM-5-Turbo 之后一个都没有。不接这条通知的话，界面上还摆着
+ * 上一个模型才有的强度档，点下去引擎直接报错——又是一个会撒谎的控件。
+ *
+ * 和 `available_commands_update` 同一条路子：**引擎自己报的，就以它为准。**
+ */
+function onConfigOptions(ctx: UpdateContext, update: AcpUpdate): void {
+  if (update.configOptions === undefined) return
+  ctx.onCatalog?.(catalogOf({ configOptions: update.configOptions }))
+}
+
+/**
  * 轮次收工时清扫还挂着的工具调用。
  *
  * 和 codex 驱动同一个教训：中断时 agent 不会给在途的工具补一条完成更新，
@@ -283,6 +305,8 @@ export function handleUpdate(ctx: UpdateContext, state: UpdateState, update: Acp
       return onCommands(ctx, update)
     case "current_mode_update":
       return onModeChanged(ctx, update)
+    case "config_option_update":
+      return onConfigOptions(ctx, update)
     default:
       return
   }

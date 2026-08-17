@@ -5,14 +5,17 @@ import { rowLabelOf } from "../sidebar.js"
 import { EllipsisIcon, SpinnerIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { RowName, type RenameCtl } from "./RowName.js"
+import type { DragItem } from "../useThreadDrag.js"
 
 /** 一行需要的拖放接线。状态在 `useThreadDrag`，这里只是把它接到 DOM 事件上。 */
 export interface RowDrag {
   dragging: string | undefined
   over: string | undefined
-  start: (id: string, cwd: string) => void
+  start: (item: DragItem) => void
   end: () => void
   canDropOn: (cwd: string) => boolean
+  /** 拖的是不是一个项目。项目行据此决定认不认这次落点。 */
+  draggingProject?: boolean
   hoverRow: (id: string) => void
   /** 悬在「置顶」那一段上。 */
   hoverPinned: () => void
@@ -53,6 +56,7 @@ const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批"
 function dragProps(
   id: string,
   cwd: string,
+  pinned: boolean,
   drag: RowDrag | undefined,
 ): React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean } {
   if (drag === undefined) return {}
@@ -62,7 +66,8 @@ function dragProps(
       // 拖的是一条会话，不是它的文字。不设的话有的地方会把行内文本当拖拽内容
       e.dataTransfer.effectAllowed = "move"
       e.dataTransfer.setData("text/plain", id)
-      drag.start(id, cwd)
+      // **带上「它现在是不是置顶的」**：落点靠这一条决定要不要顺手取消置顶
+      drag.start({ kind: "thread", id, cwd, pinned })
     },
     onDragEnd: () => {
       drag.end()
@@ -135,6 +140,7 @@ function rowClass(o: { flat: boolean; selected: boolean; dragging: boolean; drop
 export function Row({
   row,
   selected,
+  pinned = false,
   flat = false,
   aside,
   onSelect,
@@ -149,6 +155,8 @@ export function Row({
   flat?: boolean
   /** 右侧的一小段附注。「最近」段用它写项目名——那一段是跨项目的。 */
   aside?: string
+  /** 这一行现在挂在「置顶」段里。拖动时要带上，落点据此决定要不要取消置顶。 */
+  pinned?: boolean
   onSelect: () => void
   onDelete: () => void
   /** 右键或点 `···`。`arm` 让菜单能把这一行切进删除确认态，`ren` 切进改名态。 */
@@ -193,7 +201,7 @@ export function Row({
     <div
       className={rowClass({ flat, selected, dragging: drag?.dragging === thread.id, dropping })}
       title={thread.cwd}
-      {...dragProps(thread.id, thread.cwd, drag)}
+      {...dragProps(thread.id, thread.cwd, pinned, drag)}
       onContextMenu={(e) => {
         onMenu(e, arm, startRename)
       }}

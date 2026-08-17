@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { FileChange } from "@omni/protocol"
 import { kindLabel, parseDiff, splitPath, type DiffLine } from "../diff.js"
+import { reveal, revealable } from "../reveal.js"
 
 /** 默认展示的行数。超过就折叠——一个 800 行的补丁摊在 transcript 里没人会读。 */
 const FOLD_AT = 40
@@ -39,7 +40,8 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
  * 文件头（类型 + 路径 + 增删）永远可见，正文超过阈值折叠——**折叠的是正文不是文件头**，
  * 因为「改了哪些文件」是一眼要看到的，「具体改了什么」才是按需展开的。
  */
-function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
+/** 一个文件的改动。变更汇总卡也用它——同一份补丁不该有两种画法。 */
+export function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const lines = parseDiff(file.diff ?? "", file.kind)
   const folded = !open && lines.length > FOLD_AT
@@ -49,10 +51,26 @@ function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
     <div className="dfile">
       <div className="dfile__head">
         <span className={`dfile__kind dfile__kind--${file.kind}`}>{kindLabel(file.kind)}</span>
-        <span className="dfile__path" title={file.path}>
-          <span className="dfile__dir">{dir}</span>
-          <span className="dfile__name">{name}</span>
-        </span>
+        {/* 路径点一下在访达里定位。**删掉的那种不做成链接**：文件已经不在了，
+            点了什么都不会发生——那正是这个仓库一直在避免的那种元素 */}
+        {file.kind === "delete" || !revealable(file.path) ? (
+          <span className="dfile__path" title={file.path}>
+            <span className="dfile__dir">{dir}</span>
+            <span className="dfile__name">{name}</span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="dfile__path dfile__path--go"
+            title={`在访达中显示\n${file.path}`}
+            onClick={() => {
+              reveal(file.path)
+            }}
+          >
+            <span className="dfile__dir">{dir}</span>
+            <span className="dfile__name">{name}</span>
+          </button>
+        )}
         <Stat added={file.added} removed={file.removed} />
       </div>
       {lines.length === 0 ? null : (

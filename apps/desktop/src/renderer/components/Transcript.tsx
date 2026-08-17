@@ -6,6 +6,7 @@ import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
 import { foldTurns, groupRows, type Row } from "../group.js"
 import { spent } from "../status.js"
+import { TerminalIcon } from "./icons-activity.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ArrowDownIcon, ChevronIcon } from "./icons.js"
@@ -20,16 +21,10 @@ import { ArrowDownIcon, ChevronIcon } from "./icons.js"
 function Blank({ thread }: { thread: Thread }): React.JSX.Element {
   return (
     <div className="blank">
+      {/* 走 `Svg` 的口子，不自己写 `<svg>`：自己写就拿不到那套按尺寸反算的笔画补偿，
+          34px 上手写 1.3 会渲染成 2.76px——全场标准的 2.2 倍，还正好摆在首屏唯一的图形位 */}
       <div className="blank__glyph" aria-hidden="true">
-        <svg width="34" height="34" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M3.5 4.5 6 8l-2.5 3.5M8 11.5h4.5"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <TerminalIcon size={34} />
       </div>
       <p className="blank__title">
         {thread.adopted === true ? "接着聊就行" : <>在 <strong>{thread.title}</strong> 里做点什么？</>}

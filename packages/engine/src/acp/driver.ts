@@ -5,9 +5,10 @@ import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand, resolveCommand } from "../probe.js"
-import { sessionsOf } from "./setup.js"
-import { handshake, openSession, type OpenCtx, type OpenState } from "./open.js"
+import { sessionsOf, type Catalog } from "./setup.js"
+import { adoptCatalog, handshake, openSession, type OpenCtx, type OpenState } from "./open.js"
 import { applyTrust, warnNativeFixed, type TrustCtx } from "./mode.js"
+import { applyModel, type ModelCtx } from "./model.js"
 import { handlePermission } from "./permission.js"
 import { stopStatus } from "./translate.js"
 import { imageBlocks } from "./attach.js"
@@ -141,6 +142,9 @@ class AcpSession implements EngineSession {
       contextWindow: undefined,
       native: undefined,
       effort: undefined,
+      // 两条路由都等开会话时由 agent 自己报的形状决定（见 `open.ts` 的 `adopt`）
+      modelConfig: undefined,
+      effortConfig: undefined,
       trust: req.trust,
     }
     this.rpc = createRpc({
@@ -157,7 +161,11 @@ class AcpSession implements EngineSession {
   private updateContext(): UpdateContext {
     return {
       threadId: this.req.threadId,
+      engine: this.config.id,
       emit: this.req.emit,
+      onCatalog: (catalog) => {
+        this.recatalog(catalog)
+      },
       turnId: () => this.state.turn,
       inflight: this.inflight,
       newId: (prefix) => {
@@ -168,8 +176,12 @@ class AcpSession implements EngineSession {
     }
   }
 
-  /** 信任档那几步共用的一份上下文。见 `mode.ts`——**那是「档位怎么落到引擎上」**。 */
-  private trustCtx(): TrustCtx {
+  /**
+   * 「一个选好的值怎么落到引擎上」那两个模块共用的一份上下文：
+   * 档位在 `mode.ts`、模型与强度在 `model.ts`。两边要的东西一模一样
+   * （引擎 id、发 RPC、出声、状态），摆两份只会有一天漂成两份。
+   */
+  private knobs(): TrustCtx & ModelCtx {
     return {
       id: this.config.id,
       call: (method, params) => this.rpc.call(method, params),
@@ -179,6 +191,21 @@ class AcpSession implements EngineSession {
       state: this.state,
       ...(this.config.nativeApproval === undefined ? {} : { nativeApproval: this.config.nativeApproval }),
     }
+  }
+
+  /**
+   * agent 自己换了可选项（换完模型，强度的词表就变了）：落到状态上，
+   * **并且转发给界面**——不转发的话选择器还摆着引擎已经不认的那几档。
+   */
+  private recatalog(catalog: Catalog): void {
+    adoptCatalog(this.state, catalog)
+    this.req.emit({
+      type: "models.updated",
+      at: Date.now(),
+      threadId: this.req.threadId,
+      engine: this.config.id,
+      models: catalog.models,
+    })
   }
 
   private status(status: EngineStatus, detail?: string): void {
@@ -261,7 +288,7 @@ class AcpSession implements EngineSession {
 
   private async openSession(): Promise<void> {
     await openSession(this.openCtx())
-    await applyTrust(this.trustCtx(), this.trust.current, this.state.modes)
+    await applyTrust(this.knobs(), this.trust.current, this.state.modes)
   }
 
 
@@ -364,27 +391,11 @@ class AcpSession implements EngineSession {
   }
 
   /**
-   * 换模型（可能连带换强度）。
-   *
-   * 强度有两种表达：有的适配器把它编进 modelId（codex 适配器的
-   * `gpt-5.6-sol[low]`），那时 `effort` 是多余的，忽略即可；
-   * 有的把它做成独立的会话选项（kimi 的 `thinking`），那时要单独发一次。
-   * **两条都走**，因为同一个驱动要接这两种。
+   * 换模型（可能连带换强度）。**发哪一发由 agent 报清单的方式决定**——
+   * 那一段连同「发不出去怎么向用户交代」都在 `model.ts`，和 `mode.ts` 同一个边界。
    */
-  async setModel(model: string, effort?: string): Promise<void> {
-    const sessionId = this.state.acpSession
-    if (sessionId === undefined) return
-    await this.rpc.call("session/set_model", { sessionId, modelId: model })
-    // 分母跟着换：同一家的两个模型窗口可以不一样，不换的话比例条会按旧分母画
-    this.state.contextWindow = this.state.windowOf[model] ?? this.state.contextWindow
-    if (effort === undefined || effort === this.state.effort) return
-    await this.rpc
-      .call("session/set_config_option", { sessionId, configId: "thinking", value: effort })
-      .then(() => {
-        this.state.effort = effort
-      })
-      // 改不了强度不该把「换模型」也算失败——模型那一步已经成了
-      .catch(() => undefined)
+  setModel(model: string, effort?: string): Promise<void> {
+    return applyModel(this.knobs(), model, effort)
   }
 
   /**
@@ -435,8 +446,8 @@ class AcpSession implements EngineSession {
   async setTrust(trust: Trust): Promise<void> {
     this.state.trust = trust
     this.trust.current = trust
-    warnNativeFixed(this.trustCtx(), trust)
-    await applyTrust(this.trustCtx(), trust, this.state.modes)
+    warnNativeFixed(this.knobs(), trust)
+    await applyTrust(this.knobs(), trust, this.state.modes)
   }
 
 

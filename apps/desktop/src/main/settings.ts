@@ -47,6 +47,7 @@ function parse(raw: unknown): Settings {
     pinned: strings(it.pinned) ?? DEFAULTS.pinned,
     pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
     threadOrder: order(it.threadOrder),
+    projectOrder: strings(it.projectOrder) ?? DEFAULTS.projectOrder,
     defaultEngine: typeof it.defaultEngine === "string" ? it.defaultEngine : DEFAULTS.defaultEngine,
     defaultTrust:
       typeof it.defaultTrust === "string" && TRUSTS.has(it.defaultTrust)

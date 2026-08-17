@@ -1,7 +1,7 @@
 import type { Command, EngineThread, Thread } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
-import type { AccountLine } from "./components/AccountRow.js"
+import type { AccountLine } from "./components/SidebarFoot.js"
 
 /** 侧栏接线。从 `App` 拆出来是行数闸门逼的，但它确实自成一块。 */
 export function SidebarPane({
@@ -21,7 +21,9 @@ export function SidebarPane({
   onDropProject,
   pinnedThreads,
   threadOrder,
+  projectOrder,
   onReorder,
+  onReorderProjects,
   onPinThread,
   icons,
   onSetIcon,
@@ -52,6 +54,9 @@ export function SidebarPane({
   /** 各项目内会话的手动顺序。 */
   threadOrder: Readonly<Record<string, readonly string[]>>
   onReorder: (cwd: string, ids: readonly string[]) => void
+  /** 项目之间的手动顺序。 */
+  projectOrder: readonly string[]
+  onReorderProjects: (order: readonly string[]) => void
   onPinThread: (id: string, pin: boolean) => void
   icons: Readonly<Record<string, string>>
   onSetIcon: (cwd: string, icon: string) => void
@@ -73,7 +78,9 @@ export function SidebarPane({
       onDropProject={onDropProject}
       pinnedThreads={pinnedThreads}
       threadOrder={threadOrder}
+      projectOrder={projectOrder}
       onReorder={onReorder}
+      onReorderProjects={onReorderProjects}
       onPinThread={onPinThread}
       {...(account === undefined ? {} : { account })}
       selectedId={thread?.id ?? ""}

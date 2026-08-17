@@ -5,6 +5,7 @@ import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
 import { installProjectDocChannel } from "./projectdoc.js"
 import { installEngineVersionChannel } from "./enginever.js"
+import { installSelfUpdateChannel } from "./selfupdate.js"
 import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
@@ -19,6 +20,7 @@ import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
+import { quitNow, shouldStayOpen } from "./quit.js"
 
 /**
  * Electron 主进程。
@@ -236,7 +238,7 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
  */
 function claimSingleInstance(): boolean {
   if (app.requestSingleInstanceLock()) return true
-  app.quit()
+  quitNow()
   return false
 }
 
@@ -260,6 +262,7 @@ function bootstrap(): Promise<void> {
     installAttachChannel()
     installProjectDocChannel()
     installEngineVersionChannel(log)
+    installSelfUpdateChannel(log)
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     installMenu(
@@ -338,8 +341,14 @@ function bootstrap(): Promise<void> {
     let quitting = false
     app.on("before-quit", (event) => {
       if (quitting) return
-      quitting = true
+      // **先拦下来再问**：`preventDefault` 必须在这一拍同步调用，
+      // 弹框是同步的所以顺序上没问题
       event.preventDefault()
+      // **`quitting` 要在问完之后才置。** 置早了、人又点了「取消」，
+      // 这个标志就永久地把确认框关掉了——第二次 ⌘Q 直接杀，
+      // 而那正是这个框想拦住的事
+      if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined)) return
+      quitting = true
       const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))
       void Promise.race([shutdown(attached, log), deadline]).then(() => {
         clearMarker()
@@ -356,6 +365,8 @@ function bootstrap(): Promise<void> {
  * 审批落定），那些也要落盘。
  */
 async function shutdown(attached: Attached, logger: Logger): Promise<void> {
+  // 电源断言先放开：进程马上就没了，但留一个没停的断言给系统是脏活
+  attached.awake.release()
   await attached.host.dispose().catch((error: unknown) => {
     logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
   })
@@ -377,5 +388,8 @@ app.on("second-instance", () => {
 })
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit()
+  // **这条路不问。** 非 mac 上关掉最后一扇窗就是退出，而这时已经没有窗口了：
+  // 弹出来的框要是被点了「取消」，应用就变成一个没有窗、没有托盘图标、
+  // 只能去任务管理器里找的东西——那比静默退出更难收场
+  if (process.platform !== "darwin") quitNow()
 })

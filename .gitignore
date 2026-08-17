@@ -7,3 +7,6 @@ out/
 coverage/
 release/
 *.log
+
+# Claude Code 的工作副本与本地状态，不属于这个仓库
+.claude/

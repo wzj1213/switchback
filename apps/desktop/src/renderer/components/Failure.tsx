@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { ChevronIcon } from "./icons.js"
-import { humanize } from "../failure.js"
+import { humanize } from "../../shared/failure.js"
 
 /**
  * 一条报错。**先说人话，原文折起来。**

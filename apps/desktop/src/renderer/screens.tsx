@@ -4,6 +4,7 @@ import { itemsOf, turnOf, type Notice as StoreNotice, type ViewState } from "@om
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
+import { SpinnerIcon } from "./components/icons.js"
 import type { SettingsApi } from "./useSettings.js"
 
 /**
@@ -27,11 +28,36 @@ function emptyText(bridgeMissing: boolean, failed: boolean): string {
   return "正在打开工作区…"
 }
 
-function Notice({ text, fatal }: { text: string; fatal: boolean }): React.JSX.Element {
+/**
+ * 一个会话都没有时的正文。
+ *
+ * **走 `.blank` 那一套，不借 `.reasoning`**：后者是转录区里 agent 的推理块，
+ * 拿它画应用级的加载态是语义错配——将来调推理块的样式会莫名改到启动屏。
+ *
+ * 转圈只在「真的在等」那一支画：有故障横幅时它永远不会转完，
+ * 而一个会等到天亮的加载提示比一句直白的失败更糟。
+ */
+function Notice({ text, fatal, waiting }: { text: string; fatal: boolean; waiting: boolean }): React.JSX.Element {
+  if (fatal) {
+    return (
+      <div className="transcript">
+        <div className="transcript__inner">
+          <div className="error">{text}</div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="transcript">
       <div className="transcript__inner">
-        <div className={fatal ? "error" : "reasoning"}>{text}</div>
+        <div className="blank">
+          {waiting ? (
+            <div className="blank__glyph blank__glyph--spin" aria-hidden="true">
+              <SpinnerIcon size={34} />
+            </div>
+          ) : null}
+          <p className="blank__title">{text}</p>
+        </div>
       </div>
     </div>
   )
@@ -49,8 +75,13 @@ export function EmptyScreen({
 }): React.JSX.Element {
   return (
     <main className="main">
-      <Notices notices={notices} onDismiss={onDismiss} />
-      <Notice fatal={bridgeMissing} text={emptyText(bridgeMissing, notices.length > 0)} />
+      {/* 一条会话都没有的那一屏：横幅照显，但没有会话可跳 */}
+      <Notices notices={notices} rows={[]} onDismiss={onDismiss} onSelect={() => undefined} />
+      <Notice
+        fatal={bridgeMissing}
+        waiting={!bridgeMissing && notices.length === 0}
+        text={emptyText(bridgeMissing, notices.length > 0)}
+      />
     </main>
   )
 }

@@ -40,22 +40,129 @@ function fromConfigOption(option: AcpConfigOption | undefined): readonly ModelOp
 }
 
 /**
- * 模型清单。
+ * 模型清单，**外加「换模型该往哪儿发」**。
  *
- * **两条路都要走。** 实测同一个 codex 适配器的两个版本：1.3.0 报
- * `models.availableModels`，0.16.0 报 `configOptions[id="model"]`。
- * 只认一条，另一个版本的用户就一个模型都选不出来。
+ * ## 两条路都要走
+ *
+ * 实测同一个 codex 适配器的两个版本：1.3.0 报 `models.availableModels`，
+ * 0.16.0 报 `configOptions[id="model"]`。只认一条，另一个版本的用户
+ * 一个模型都选不出来。
+ *
+ * ## 为什么「从哪儿读的」必须一起带出来
+ *
+ * 因为**换模型要设回同一个地方**。清单从 `configOptions` 读、却拿
+ * `session/set_model` 去设，是实测炸过的：ZCode 的桥（zcode-acp-server）
+ * 只实现了 `session/set_config_option`，规范拼写的 `session/set_model`
+ * 在它那儿是 `Method not found`——界面上于是弹一条红色的「引擎故障」，
+ * 而用户只是点了一下模型下拉。
+ *
+ * 分成两个函数就会漂移：判断走哪条路的条件必须只有一处。
  */
-export function modelsOf(session: AcpNewSession): readonly ModelOption[] {
+export interface ModelCatalog {
+  models: readonly ModelOption[]
+  /**
+   * 换模型走 `session/set_config_option` 时的 `configId`。
+   * **`undefined` 表示走规范的 `session/set_model`**。
+   */
+  configId?: string
+}
+
+export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
   const direct = session.models?.availableModels
   if (direct !== undefined && direct.length > 0) {
     const current = session.models?.currentModelId
-    return direct.map((m) => {
-      const option = toModelOption(m)
-      return option.id === current ? { ...option, isDefault: true } : option
-    })
+    return {
+      models: distinct(
+        direct.map((m) => {
+          const option = toModelOption(m)
+          return option.id === current ? { ...option, isDefault: true } : option
+        }),
+      ),
+    }
   }
-  return fromConfigOption(session.configOptions?.find((o) => o.id === "model"))
+  const option = session.configOptions?.find((o) => o.id === "model")
+  const models = distinct(fromConfigOption(option))
+  return { models, ...(option?.id === undefined || models.length === 0 ? {} : { configId: option.id }) }
+}
+
+/**
+ * 重名的两条要在下拉里分得开。
+ *
+ * 实测 ZCode：会话当前用的模型来自一个**没启用的 provider** 时，桥会把它原样
+ * 补进清单（`anthropic\GLM-5.3`），而它报的名字就是 `GLM-5.3`——于是下拉里出现
+ * **两行一模一样的「GLM-5.3」，其中一行点下去必然失败**（那个 provider 在
+ * ZCode 自己的配置里是坏的）。
+ *
+ * omni 不替引擎判断哪一条能用（那是它自己的事），但两行长得一模一样是界面的事：
+ * 重名就把 id 带上，让人看得出自己在选哪一个。
+ */
+function distinct(models: readonly ModelOption[]): readonly ModelOption[] {
+  const count = new Map<string, number>()
+  for (const m of models) count.set(m.label, (count.get(m.label) ?? 0) + 1)
+  return models.map((m) => ((count.get(m.label) ?? 0) > 1 ? { ...m, label: `${m.label}（${m.id}）` } : m))
+}
+
+/** 只要清单的那一半。换模型要连「设回哪儿」一起看，用 `modelCatalogOf`。 */
+export function modelsOf(session: AcpNewSession): readonly ModelOption[] {
+  return modelCatalogOf(session).models
+}
+
+/**
+ * 一份**能直接用**的模型清单：模型 ＋ 强度 ＋ 两条设置路由。
+ *
+ * ## 为什么合成一个
+ *
+ * 这四样必须同时算出来、同时换掉：清单从哪儿读的决定了设回哪儿（`configId`），
+ * 而**强度的词表是跟着模型走的**——实测 ZCode：GLM-5.3 有 low/high/max，
+ * 换到 GLM-5-Turbo 之后一个都没有（发过去引擎直接报错）。
+ *
+ * 算它的地方有两处（开会话时、agent 中途报 `config_option_update` 时），
+ * 分成两份实现的下场是其中一份迟早漏掉一样，而漏掉不会报错，只会让界面撒谎。
+ */
+export interface Catalog {
+  models: readonly ModelOption[]
+  /** 换模型的 configId；`undefined` = 走 `session/set_model`。 */
+  modelConfig?: string
+  /** 换强度的 configId；没有强度这一项时缺席。 */
+  effortConfig?: string
+  /** 当前强度。 */
+  effort?: string
+}
+
+export function catalogOf(session: AcpNewSession): Catalog {
+  const { models, configId } = modelCatalogOf(session)
+  const levels = effortsOf(session)
+  return {
+    // 强度是**会话级**的（kimi 的 thinking 换模型不换档），所以挂到每个模型上
+    // 都是同一份。界面那套「模型 → 强度」的形状正好装得下
+    models:
+      levels === undefined
+        ? models
+        : models.map((m) => ({
+            ...m,
+            efforts: levels.efforts,
+            ...(levels.current === undefined ? {} : { defaultEffort: levels.current }),
+          })),
+    ...(configId === undefined ? {} : { modelConfig: configId }),
+    ...(levels === undefined ? {} : { effortConfig: levels.id }),
+    ...(levels?.current === undefined ? {} : { effort: levels.current }),
+  }
+}
+
+/**
+ * 换模型这一发**发给谁、带什么**。
+ *
+ * 单拎出来是为了能钉住：坏掉的就是这一个选择（一律发 `session/set_model`），
+ * 而它藏在驱动的一行三元里，谁都测不到。
+ */
+export function modelCall(
+  configId: string | undefined,
+  sessionId: string,
+  model: string,
+): { method: string; params: Readonly<Record<string, string>> } {
+  return configId === undefined
+    ? { method: "session/set_model", params: { sessionId, modelId: model } }
+    : { method: "session/set_config_option", params: { sessionId, configId, value: model } }
 }
 
 /** 档位清单同理：新版报 `modes`，旧版只在 `configOptions[id="mode"]` 里有。 */
@@ -99,6 +206,20 @@ export function contextWindows(session: AcpNewSession): Readonly<Record<string, 
 }
 
 /**
+ * 把一次 RPC 失败翻成人能照着做的一句话。
+ *
+ * `"Method not found": session/set_model` 是**协议实现的事实**，不是用户看得懂的话——
+ * 它真正说的是「这家适配器没实现这件事」。那就直接这么说，并且说清楚现在能怎么办。
+ *
+ * 其余错误**原样带出去**：编不出更好的话时，原文比编出来的话有用。
+ */
+export function sayWhy(engine: string, what: string, error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error)
+  if (!/method not found|-32601/i.test(text)) return `${engine} ${what}失败：${text}`
+  return `${engine} 这个适配器不支持在会话里${what}（对应的 ACP 方法它没实现）。要改就去它自己的界面或配置里改，改完新开一条会话。`
+}
+
+/**
  * 把起进程的失败翻成人能照着做的一句话。
  *
  * `Error: spawn zcode ENOENT` 对用户毫无意义——他要知道的是「装了没」「装哪了」。
@@ -123,17 +244,27 @@ export function startupMessage(command: string, error: Error): string {
  *
  * **是会话级的、不是每个模型一份**，所以挂到每个模型上都是同一份——
  * 这不是偷懒：kimi 那边确实是「换模型不换 thinking 档」。
+ *
+ * ## `id` 必须带出来，不能事后猜
+ *
+ * 设回去的时候要报的正是这个 `id`，而各家起的名字不一样：kimi 是 `thinking`，
+ * **ZCode 是 `thought`**（它的注释里写得很清楚：category 用 `thought_level`
+ * 好让客户端认出来，而 `id` 保持 `thought`，因为那是 `set_config_option`
+ * 寻址用的）。上一版把 `thinking` 写死在设置那一步，于是在 ZCode 上
+ * 选了强度**什么都没发生**——而界面照样把新档位显示出来。
  */
-export function effortsOf(session: AcpNewSession): { efforts: readonly string[]; current?: string } | undefined {
+export function effortsOf(
+  session: AcpNewSession,
+): { id: string; efforts: readonly string[]; current?: string } | undefined {
   const option = session.configOptions?.find(
     (o) => o.category === "thought_level" || o.id === "thinking" || o.id === "effort",
   )
   const efforts = (option?.options ?? [])
     .map((o) => o.value)
     .filter((v): v is string => typeof v === "string")
-  if (efforts.length === 0) return undefined
-  const current = typeof option?.currentValue === "string" ? option.currentValue : undefined
-  return { efforts, ...(current === undefined ? {} : { current }) }
+  if (option?.id === undefined || efforts.length === 0) return undefined
+  const current = typeof option.currentValue === "string" ? option.currentValue : undefined
+  return { id: option.id, efforts, ...(current === undefined ? {} : { current }) }
 }
 
 /**

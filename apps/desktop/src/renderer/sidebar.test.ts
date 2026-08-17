@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest"
 import type { Thread } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
-import { baseNameOf, groupByWorkspace, ordered, reorder, rowLabelOf, sectionsOf, type Pins } from "./sidebar.js"
+import {
+  baseNameOf,
+  groupByWorkspace,
+  ordered,
+  orderedGroups,
+  reorder,
+  rowLabelOf,
+  sectionsOf,
+  type Group,
+  type Pins,
+} from "./sidebar.js"
 import { canDrop } from "./useThreadDrag.js"
 
 /** 老用例只关心「置顶了哪些项目」，其余用空的。 */
@@ -219,7 +229,7 @@ describe("置顶的会话", () => {
 })
 
 describe("不能跨项目——这条是硬的", () => {
-  const dragging = { id: "a", cwd: "/w/one" }
+  const dragging = { kind: "thread", id: "a", cwd: "/w/one", pinned: false } as const
 
   it("同一个项目里可以放", () => {
     expect(canDrop(dragging, "/w/one")).toBe(true)
@@ -230,6 +240,42 @@ describe("不能跨项目——这条是硬的", () => {
   })
 
   it("没在拖的时候什么都不给放——文件、文本拖进侧栏不该有反应", () => {
-    expect(canDrop({ id: undefined, cwd: undefined }, "/w/one")).toBe(false)
+    expect(canDrop(undefined, "/w/one")).toBe(false)
+  })
+
+  it("**拖的是项目时，会话那条路一律不认**——项目落点另有一套（段落 + 项目行）", () => {
+    expect(canDrop({ kind: "project", cwd: "/w/one", pinned: false }, "/w/one")).toBe(false)
+  })
+})
+
+/**
+ * 项目也能拖。规则和会话那条**共用一套语义**（`ordered` / `orderedGroups`）：
+ * 没拖过按活跃度、拖过一次整段归你排、新的排最前。
+ */
+describe("项目排序", () => {
+  const groups = (...cwds: string[]): Group[] => cwds.map((cwd) => ({ cwd, label: cwd, rows: [] }))
+
+  it("没拖过就按传进来的顺序（活跃度）", () => {
+    expect(orderedGroups(groups("/a", "/b"), undefined).map((g) => g.cwd)).toEqual(["/a", "/b"])
+    expect(orderedGroups(groups("/a", "/b"), []).map((g) => g.cwd)).toEqual(["/a", "/b"])
+  })
+
+  it("**拖过一次，整段归你排**", () => {
+    expect(orderedGroups(groups("/a", "/b", "/c"), ["/c", "/a", "/b"]).map((g) => g.cwd)).toEqual(["/c", "/a", "/b"])
+  })
+
+  it("顺序表里没提到的排最前——它最新，也最可能是你现在要点的", () => {
+    expect(orderedGroups(groups("/新", "/a", "/b"), ["/a", "/b"]).map((g) => g.cwd)).toEqual(["/新", "/a", "/b"])
+  })
+
+  /** `reorder` 是会话和项目共用的那一个：拖到自己身上必须是无操作，不是抖一下。 */
+  it("拖到自己身上什么都不变", () => {
+    expect(reorder(["/a", "/b"], "/a", "/a")).toEqual(["/a", "/b"])
+  })
+
+  it("项目段按手动顺序出（`sectionsOf` 认 projectOrder）", () => {
+    const rows = [row({ id: "t1", cwd: "/a", title: "a" }), row({ id: "t2", cwd: "/b", title: "b" })]
+    const out = sectionsOf(rows, { projects: [], threads: [], order: {}, known: [], projectOrder: ["/b", "/a"] })
+    expect(out.projects.map((g) => g.cwd)).toEqual(["/b", "/a"])
   })
 })

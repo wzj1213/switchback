@@ -101,6 +101,13 @@ export interface AcpUpdate {
   used?: number
   size?: number
   currentModeId?: string
+  /**
+   * `config_option_update`：agent 那边的可选项变了。
+   *
+   * **换模型之后强度的词表会变**：实测 ZCode 的 GLM-5.3 有 low/high/max，
+   * 换到 GLM-5-Turbo 之后一个都没有（照旧发过去，引擎直接报错）。
+   */
+  configOptions?: readonly AcpConfigOption[]
   // tool_call / tool_call_update 的字段直接摊平在这一层
   toolCallId?: string
   title?: string | null

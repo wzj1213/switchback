@@ -106,14 +106,36 @@ export function ModelPicker({
   model,
   effort,
   disabled,
+  pending,
   onChange,
 }: {
   models: readonly ModelOption[]
   model: string | undefined
   effort: string | undefined
   disabled: boolean
+  /** 有待切换的引擎时，它的名字。见下面那段。 */
+  pending?: string
   onChange: (model: string, effort?: string) => void
 }): React.JSX.Element | null {
+  /**
+   * **有待切换的引擎时，控件留在原地但点不动**，并且说清楚在等什么。
+   *
+   * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常不存在，
+   * 所以确实不能让人挑。但上一版的做法是把整个控件**藏起来**——
+   * 一个凭空消失的控件读起来就是「坏了」，用户的原话是「一个模型都不显示」。
+   * 留着并写明原因，比消失和撒谎都强。
+   */
+  if (pending !== undefined) {
+    return (
+      <Select
+        label={`切到 ${pending} 后可选`}
+        icon={<SparkIcon />}
+        title={`下一句话会换到 ${pending}，模型清单由它自己报——发出去就能挑了`}
+        disabled
+        sections={[]}
+      />
+    )
+  }
   // 用户选过就用他选的；没选过**优先引擎自己报的当前值**，最后才退回第一个。
   // 直接退回第一个是在撒谎：kimi 报的当前模型是 K3，而列表第一个是 K2.7
   const current = models.find((m) => m.id === model) ?? models.find((m) => m.isDefault === true) ?? models[0]

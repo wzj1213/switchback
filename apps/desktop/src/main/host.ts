@@ -9,6 +9,7 @@ import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 import { createAttention } from "./attention.js"
+import { createAwake, type Awake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import { createSequencer, type Sealed } from "./sequence.js"
 import type { Logger } from "./log.js"
@@ -28,6 +29,8 @@ export interface Attached {
   lastThreadId: () => ThreadId | undefined
   /** 事件流的序号与补发缓冲。窗口重载时的全量重建要用它对齐游标。 */
   sequencer: ReturnType<typeof createSequencer>
+  /** 有活在跑时挡住闲置待机。退出前要 `release()`，否则断言留在系统里。 */
+  awake: Awake
   /**
    * 把一次失败翻成界面看得见的东西。
    *
@@ -55,13 +58,18 @@ function createOutlet(
   windows: () => readonly BrowserWindow[],
   log: Logger,
   seen: { thread: ThreadId | undefined },
-): { emit: (event: Event) => void; sequencer: ReturnType<typeof createSequencer> } {
+  live: () => readonly Thread[],
+): { emit: (event: Event) => void; sequencer: ReturnType<typeof createSequencer>; awake: Awake } {
   const sequencer = createSequencer()
   const attention = createAttention(windows)
+  const awake = createAwake()
   const batcher = createBatcher((events) => {
     // 每条出去的事件顺带过一遍「要不要叫人」。放在发 IPC 的同一处，
     // 免得将来多一条出口就漏一处
     for (const event of events) attention.note(event)
+    // 同一处顺带重算一次「现在还有没有活在跑」——**每次都重算，不记计数器**：
+    // 漏一条 `turn.completed` 的代价从「永远不睡」降成「这一帧算错了」
+    awake.sync(live())
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
     const sealed = sequencer.seal(events)
@@ -70,6 +78,7 @@ function createOutlet(
     }
   })
   return {
+    awake,
     emit: (event) => {
       if (event.type === "thread.started") seen.thread = event.thread.id
       // detail 里可能带 stderr，长度约束在 log.ts 那一层
@@ -150,7 +159,10 @@ export function attachHost(
 ): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
 
-  const { emit, sequencer } = createOutlet(windows, log, seen)
+  // **迟绑定**：outlet 比 host 先建，而它要问 host「现在有几条在跑」。
+  // 传函数而不是值，读到的才是当下那一份
+  const holder: { host: Host | undefined } = { host: undefined }
+  const { emit, sequencer, awake } = createOutlet(windows, log, seen, () => holder.host?.live() ?? [])
 
   // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
   // 用户换机器迁移、清理应用数据时才找得到、才带得走
@@ -198,10 +210,12 @@ export function attachHost(
     })
   }
 
+  holder.host = host
   installBridgeChannels({ host, log, sequencer, report })
 
   return {
     host,
+    awake,
     journal,
     engines: probeEngines(drivers, labels, log),
     lastThreadId: () => seen.thread,
@@ -325,7 +339,30 @@ export function replayEvents(
     // 一个能打字却答非所问的输入框比没有输入框糟得多
     events.push({ type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } })
   }
+  events.push(...unlogged(threads, alive, now))
   return events
+}
+
+/**
+ * **活着、但磁盘上一个字都没有的会话**——也就是临时会话（见 `Thread.provisional`）。
+ *
+ * 它不落盘是有意的（`Ctx.uncommitted`），代价是这份全量拼不出它：全量是从
+ * journal 拼的。不补的话，⌘R 之后那个临时窗口整个消失，而它背后的引擎进程
+ * 还活着——`rebuild` 甚至会把它的 id 当成「重载后该选中的那个」返回，
+ * 于是界面落在一条它自己都不知道存在的会话上。
+ *
+ * 排在最后：归约器往前插，所以最后进去的落在侧栏最上面——临时会话本来就是
+ * 你正在用的那个。（它不会真的出现在侧栏里，那是渲染层按 `provisional` 过滤的。）
+ */
+function unlogged(
+  threads: readonly ThreadHistory[],
+  alive: ReadonlyMap<ThreadId, Thread>,
+  now: number,
+): readonly Event[] {
+  const logged = new Set(threads.filter((t) => t.events.length > 0).map((t) => t.id))
+  return [...alive.values()]
+    .filter((thread) => !logged.has(thread.id))
+    .map((thread) => ({ type: "thread.started" as const, at: now, thread }))
 }
 
 /**

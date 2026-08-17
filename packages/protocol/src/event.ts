@@ -91,8 +91,15 @@ export type Event =
   | { type: "item.started"; at: number; item: Item }
   | { type: "item.delta"; at: number; itemId: ItemId; append: string }
   | { type: "item.updated"; at: number; item: Item }
-  /** 这个会话能选哪些模型。引擎握手完成后报一次。 */
-  | { type: "models.updated"; at: number; threadId: ThreadId; models: readonly ModelOption[] }
+  /**
+   * 这个会话能选哪些模型。引擎握手完成后报一次。
+   *
+   * **`engine` 不是冗余的**：模型 id 是各家私有的，而一条会话中途会换引擎。
+   * 不带这一条的话，切过去之后新那家一个模型都报不上来时（`models()` 失败就是空），
+   * 界面上留着的是**上一家的清单**——点一下就拿 claude 的模型 id 去设给 codex。
+   * 带上它，渲染层就能判「这份清单是谁报的」，对不上就当没有。
+   */
+  | { type: "models.updated"; at: number; threadId: ThreadId; engine: EngineId; models: readonly ModelOption[] }
   /**
    * 这个会话能用哪些斜杠命令。握手后报一次；
    * Claude 那边技能会**中途变**（agent 走到子目录里发现新技能），所以还会再报。

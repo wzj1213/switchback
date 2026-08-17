@@ -52,7 +52,9 @@ function FileRow({ file }: { file: FileDiff }): React.JSX.Element {
       <span className="cmp__mark" title={file.side === "both" ? "两边都动过" : "只有一边动过"}>
         {mark}
       </span>
-      <code className="cmp__path">{file.path}</code>
+      {/* `<bdi>` 隔离双向文本：不隔的话 `direction: rtl` 会把开头那个 `/` 甩到行尾，
+          每一行每一次都错（同一个坑 `.pop__head-path` 修过一次） */}
+      <code className="cmp__path"><bdi>{file.path}</bdi></code>
       <span className="cmp__num">{tally(file.a)}</span>
       <span className="cmp__num">{tally(file.b)}</span>
     </li>

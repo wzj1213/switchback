@@ -17,6 +17,9 @@ import type { Gate } from "./gate.js"
 function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadId, at: number): Thread {
   return {
     id,
+    // **临时的**：引擎照起（模型清单、斜杠命令要它才有），但在发出第一句话之前
+    // 它不进侧栏、不落盘、切引擎当场生效（见 `Thread.provisional`）
+    provisional: true,
     title: cmd.title ?? "新会话",
     ...(cmd.workspaceKind === undefined ? {} : { workspaceKind: cmd.workspaceKind }),
     cwd: cmd.cwd,
@@ -180,7 +183,9 @@ function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
     .models()
     .then((models) => {
       if (models.length > 0) {
-        emit(ctx, { type: "models.updated", at: ctx.deps.now(), threadId: thread.id, models })
+        // **带上是谁报的**：一条会话中途会换引擎，而渲染层要认得出手上这份
+        // 是不是当前这家的（见 store 的 `modelsOf`）
+        emit(ctx, { type: "models.updated", at: ctx.deps.now(), threadId: thread.id, engine: thread.engine, models })
       }
     })
     .catch(() => undefined)
@@ -215,6 +220,24 @@ function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
 }
 
 /**
+ * 建新的临时会话时，把上一条临时会话收掉。**一次只留一条。**
+ *
+ * 临时会话不进侧栏（见 `Thread.provisional`），所以你一旦又点了一次「+」、
+ * 或者切去别的会话，它就**再也点不回来**了——而它背后那个引擎进程还活着
+ *（实测一条 codex 会话 260 MB）。看不见又回不去的东西不该继续占着进程。
+ *
+ * 它从来没上过磁盘（`Ctx.uncommitted`），所以「收掉」只是停进程 + 摘表，
+ * 没有任何东西会丢。收不掉也不拦着新会话：一个停不掉的旧进程不该让你连
+ * 新会话都开不出来。
+ */
+async function dropTemps(ctx: Ctx, keep: ThreadId): Promise<void> {
+  for (const entry of [...ctx.live.values()]) {
+    if (entry.thread.provisional !== true || entry.thread.id === keep) continue
+    await remove(ctx, { type: "thread.delete", threadId: entry.thread.id }).catch(() => undefined)
+  }
+}
+
+/**
  * 开一个新会话。
  *
  * **先让它出现在界面上，再去起引擎。** 上一版的顺序反过来：
@@ -234,6 +257,8 @@ export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.cre
   // 只有「新建」走这条路——续跑和接管的会话本来就已经在磁盘上了。
   ctx.uncommitted.set(thread.id, [])
   emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
+  // 先腾地方再占地方：上一条临时会话这时已经点不回来了（见 `dropTemps`）
+  await dropTemps(ctx, thread.id)
   let early: string | undefined
   try {
     early = await launch(ctx, thread)

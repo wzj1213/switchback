@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { FileChange, ToolCallItem } from "@omni/protocol"
 import { VERB, summarize, target } from "../tool.js"
+import { reveal, revealable } from "../reveal.js"
 import { ChevronIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon, GlobeIcon, PencilIcon, TerminalIcon } from "./icons-activity.js"
 
@@ -83,7 +84,22 @@ function StepLine({
       <span className="step__icon" aria-label={VERB[item.detail.kind]}>
         {GLYPH[item.detail.kind]}
       </span>
-      <span className="step__target">{target(item.detail, cwd)}</span>
+      {/* 读文件那种行本来就是静态的（没东西可展开），路径直接可点；
+          其余的（跑命令、抓网页）不做——`target` 那时是一整条命令，不是路径 */}
+      {item.detail.kind === "file_read" && revealable(item.detail.path) ? (
+        <button
+          type="button"
+          className="step__target step__target--go"
+          title={`在访达中显示\n${item.detail.path}`}
+          onClick={() => {
+            reveal(item.detail.kind === "file_read" ? item.detail.path : "")
+          }}
+        >
+          {target(item.detail, cwd)}
+        </button>
+      ) : (
+        <span className="step__target">{target(item.detail, cwd)}</span>
+      )}
       <Stat item={item} />
       {/* 可展开的提示做成真元素。上一版是 `::after` 加一个 ⌄ 字形挂在
           `.step__target` 上，而那个元素带 `text-overflow: ellipsis`——

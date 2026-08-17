@@ -64,11 +64,25 @@ export function openWith(last: LastUsed, defaultEngine: string, fallback: string
  */
 export function learnFrom(last: LastUsed, thread: Thread): LastUsed | undefined {
   if ((thread.segments ?? []).length > 0) return undefined
-  const pick: EnginePick = {
-    ...(thread.model === undefined ? {} : { model: thread.model }),
-    ...(thread.effort === undefined ? {} : { effort: thread.effort }),
-  }
-  const next: LastUsed = { engine: thread.engine, byEngine: withPick(last.byEngine, thread.engine, pick) }
+  /**
+   * **记的是他挑的那家，不是此刻正在跑的那家。**
+   *
+   * 这一步发生在命令发给宿主**之前**（见 `useApp` 的 `send`），而开过工的会话
+   * 切引擎是「下一句生效」——那一刻 `engine` 还是旧的、`nextEngine` 才是他挑的。
+   * 只看 `engine` 的话：在 claude 里切到 codex 再发第一句，记下来的是 claude，
+   * 而第二句起这个函数就不再记了（`segments` 非空），于是**那次选择永远学不到**。
+   */
+  const engine = thread.nextEngine ?? thread.engine
+  // **换了一家就不带模型。** `thread.model` 是旧那家的 id，记到新那家名下的话，
+  // 下一条新会话会拿一个它根本不认识的模型 id 去开——`openWith` 防的正是这个
+  const pick: EnginePick =
+    engine !== thread.engine
+      ? {}
+      : {
+          ...(thread.model === undefined ? {} : { model: thread.model }),
+          ...(thread.effort === undefined ? {} : { effort: thread.effort }),
+        }
+  const next: LastUsed = { engine, byEngine: withPick(last.byEngine, engine, pick) }
   // 没变就别写盘：每条会话的第一句都写一次没有意义，还会白白触发一轮渲染
   return same(last, next) ? undefined : next
 }

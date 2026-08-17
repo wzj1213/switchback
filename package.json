@@ -8,12 +8,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run check:docs && pnpm run test",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run check:tokens && pnpm run check:docs && pnpm run test",
     "typecheck": "tsc --build && tsc -p apps/desktop/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "arch": "node scripts/check-arch.mjs",
+    "check:tokens": "node scripts/check-tokens.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "pnpm --filter @omni/desktop dev",
