@@ -2,7 +2,16 @@ import type { EngineCapabilities, ModelOption } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
 import type { RpcPeer } from "../rpc.js"
-import { canList, capabilitiesOf, currentModeOf, effortsOf, modelsOf, modesOf, startupMessage } from "./setup.js"
+import {
+  canList,
+  capabilitiesOf,
+  contextWindows,
+  currentModeOf,
+  effortsOf,
+  modelsOf,
+  modesOf,
+  startupMessage,
+} from "./setup.js"
 import type { AcpInitialize, AcpNewSession } from "./wire.js"
 
 /**
@@ -32,10 +41,20 @@ export interface OpenState {
   mode: string | undefined
   models: readonly ModelOption[]
   loadSession: boolean
-  /** agent 支不支持列历史会话（`session/list`）。 */
-  canList: boolean
+  /**
+   * agent 支不支持列历史会话（`session/list`）。
+   *
+   * **三态**：`true` 是它自己声明的；`false` 是问过之后确认不行；
+   * `undefined` 是「它没声明，但也没说不行」——那就问一次再说，见 `driver.ts`
+   * 的 `history()`。实测 grok 就是这一档：能力表是空的，`session/list` 却能答。
+   */
+  canList: boolean | undefined
   /** 当前推理强度。有的适配器把它做成会话级选项（kimi 的 `thinking`）。 */
   effort: string | undefined
+  /** modelId → 上下文窗口大小。见 `contextWindows`：换模型时分母会变。 */
+  windowOf: Readonly<Record<string, number>>
+  /** 当前模型的窗口大小。没有就不画比例条——不猜分母。 */
+  contextWindow: number | undefined
   /** 握手时 agent 自报的能力。**能力位由它推导，不写死**——见 `capabilitiesOf`。 */
   caps: EngineCapabilities
   /** 当前信任档。开场时要按它挑 mode。 */
@@ -83,8 +102,10 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
     )
   }
   ctx.state.loadSession = info.agentCapabilities?.loadSession === true
-  // **能力由 agent 自报，不由 omni 猜**：同一个驱动接的几家本来就不一样
-  ctx.state.canList = canList(info)
+  // **能力由 agent 自报，不由 omni 猜**：同一个驱动接的几家本来就不一样。
+  // 但「没声明」只是没声明——实测 grok 的能力表是空的，`session/list` 却能答，
+  // 所以这里留 undefined，由 `history()` 问一次再定（见那边的注释）
+  ctx.state.canList = canList(info) ? true : undefined
   return capabilitiesOf(info)
 }
 
@@ -151,4 +172,7 @@ function adopt(ctx: OpenCtx, created: AcpNewSession): void {
   ctx.state.effort = levels?.current
   ctx.state.modes = modesOf(created)
   ctx.state.mode = currentModeOf(created)
+  ctx.state.windowOf = contextWindows(created)
+  const current = created.models?.currentModelId
+  ctx.state.contextWindow = current === undefined ? undefined : ctx.state.windowOf[current]
 }

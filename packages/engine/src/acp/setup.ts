@@ -77,6 +77,28 @@ export function currentModeOf(session: AcpNewSession): string | undefined {
 }
 
 /**
+ * 每个模型的上下文窗口有多大。
+ *
+ * ACP **没有为窗口大小定字段**，但它在扩展位里：实测 grok 每个模型都报
+ * `_meta.totalContextTokens`（4.6 与 4.5 都是 500000）。
+ *
+ * 为什么要按模型存一张表、而不是只记当前那个：换模型时窗口是会变的
+ *（同一家的两个模型一个 256k 一个 1M），只记一个数的话换完之后分母就是错的，
+ * 而界面上那条比例条会一本正经地按错分母画。
+ *
+ * 报不上来的模型不入表——**没有分母就不画比例**，而不是猜一个。
+ */
+export function contextWindows(session: AcpNewSession): Readonly<Record<string, number>> {
+  const out: Record<string, number> = {}
+  for (const model of session.models?.availableModels ?? []) {
+    const size = model._meta?.totalContextTokens
+    if (model.modelId === undefined || typeof size !== "number" || size <= 0) continue
+    out[model.modelId] = size
+  }
+  return out
+}
+
+/**
  * 把起进程的失败翻成人能照着做的一句话。
  *
  * `Error: spawn zcode ENOENT` 对用户毫无意义——他要知道的是「装了没」「装哪了」。

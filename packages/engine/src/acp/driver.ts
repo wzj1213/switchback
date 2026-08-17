@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises"
 import type { ChildProcess } from "node:child_process"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust, TurnId } from "@omni/protocol"
@@ -11,7 +10,16 @@ import { handshake, openSession, type OpenCtx, type OpenState } from "./open.js"
 import { pickMode } from "./mode.js"
 import { handlePermission } from "./permission.js"
 import { stopStatus } from "./translate.js"
-import { closeText, createUpdateState, handleUpdate, sweep, type UpdateContext, type UpdateState } from "./update.js"
+import { imageBlocks } from "./attach.js"
+import {
+  closeText,
+  createUpdateState,
+  emitUsage,
+  handleUpdate,
+  sweep,
+  type UpdateContext,
+  type UpdateState,
+} from "./update.js"
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
 
 /**
@@ -59,11 +67,28 @@ export interface AcpDriverConfig {
   /**
    * 这家把会话记录写到哪。**注入进来而不是驱动自己认**：
    * ACP 协议里根本没有「记录在哪」这个概念，各家各写各的
-   * （kimi 的在 `kimi.ts`），驱动这一层不该认识任何一家的目录结构。
+   * （kimi 的在 `kimi.ts`，grok 的在 `grok.ts`），驱动这一层不该认识
+   * 任何一家的目录结构。
+   *
+   * `cwd` 也一并给出去：有的家**按工作区分目录**（grok 的记录在
+   * `sessions/<工作区编码>/<sessionId>/` 下），光有 sessionId 定位不到；
+   * 不需要的那家（kimi 查自己的索引）少收一个参数就行。
    *
    * 不给就是拿不到——换引擎时退回交接包，那条路一直留着。
    */
-  logPath?: (home: string, sessionId: string) => Promise<string | undefined>
+  logPath?: (home: string, sessionId: string, cwd: string) => Promise<string | undefined>
+  /**
+   * 这家怎么报上下文用量——**只用于协议之外的私有通知**。
+   *
+   * 标准路子是 `session/update` 的 `usage_update`，那条驱动自己认（实测 kimi
+   * 一轮收工推一条 `{used, size}`）。但不是每家都走它：**grok 一条 `usage_update`
+   * 都不发**，用量藏在它自己的 `_x.ai/session_notification` 里
+   *（`turn_completed` 带 `usage.totalTokens`）。
+   *
+   * 认这类通知是一家一家的事，所以和 `logPath` 同一个办法注入进来，
+   * 驱动这一层不认识任何一家的私有方法名。返回 undefined = 这条通知与用量无关。
+   */
+  contextUsed?: (method: string, params: unknown) => number | undefined
 }
 
 interface SessionState extends OpenState {
@@ -96,7 +121,9 @@ class AcpSession implements EngineSession {
       models: [],
       loadSession: false,
       caps: NO_CAPABILITIES,
-      canList: false,
+      canList: undefined,
+      windowOf: {},
+      contextWindow: undefined,
       effort: undefined,
       trust: req.trust,
     }
@@ -136,10 +163,27 @@ class AcpSession implements EngineSession {
   }
 
   private onNotification(method: string, params: unknown): void {
-    if (method !== "session/update") return
+    if (method !== "session/update") {
+      this.onForeignNotification(method, params)
+      return
+    }
     const update = (params as AcpNotification | undefined)?.update
     if (update === undefined) return
     handleUpdate(this.updateContext(), this.updates, update)
+  }
+
+  /**
+   * 协议之外的通知。只有一件事要从这里捞：**用量**。
+   *
+   * grok 一条 `usage_update` 都不发（实测），它把 token 数放在自己的
+   * `_x.ai/session_notification` 里。哪个方法名、什么形状由各家的模块认
+   *（见 `AcpDriverConfig.contextUsed`），驱动只负责把它拼成事件——
+   * 分母用当前模型的窗口大小，拿不到就不给，界面据此只显示数字不画比例条。
+   */
+  private onForeignNotification(method: string, params: unknown): void {
+    const used = this.config.contextUsed?.(method, params)
+    if (used === undefined) return
+    emitUsage(this.updateContext(), used, this.state.contextWindow)
   }
 
   private wire(child: ChildProcess): void {
@@ -255,7 +299,7 @@ class AcpSession implements EngineSession {
     const sessionId = this.state.acpSession
     if (sessionId === undefined) throw new Error(`${this.config.id} 会话尚未就绪`)
     this.state.turn = turnId
-    const prompt = [{ type: "text", text }, ...(await this.imageBlocks(attachments))]
+    const prompt = [{ type: "text", text }, ...(await imageBlocks(attachments, this.state.caps.attachments))]
     this.rpc
       .call("session/prompt", { sessionId, prompt })
       .then(
@@ -267,30 +311,6 @@ class AcpSession implements EngineSession {
         },
       )
     return Promise.resolve()
-  }
-
-  /**
-   * 附件 → ACP 的图片内容块。
-   *
-   * 形状是**实测出来的**：`{type:"image", data:<base64>, mimeType}`，
-   * 拿一张写着 `KIMI-4417` 的图发过去，agent 把那串字念了回来。
-   *
-   * 和 codex 那边（给路径）不一样，ACP 要 base64——协议里没有「本地文件」这种块，
-   * 而 agent 可能根本不在同一台机器上。
-   *
-   * **不支持图片的 agent 一个块都不发**：塞过去要么报错、要么被静默丢掉，
-   * 而后者更糟——界面上显示「已附上」，模型其实没看见。
-   * 读不出来的文件跳过，不因为一张图毁掉整句话。
-   */
-  private async imageBlocks(paths: readonly string[] | undefined): Promise<readonly unknown[]> {
-    if (paths === undefined || paths.length === 0 || !this.state.caps.attachments) return []
-    const blocks: unknown[] = []
-    for (const path of paths) {
-      const data = await readFile(path).catch(() => undefined)
-      if (data === undefined) continue
-      blocks.push({ type: "image", data: data.toString("base64"), mimeType: mimeOf(path) })
-    }
-    return blocks
   }
 
   private finishTurn(turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
@@ -348,6 +368,8 @@ class AcpSession implements EngineSession {
     const sessionId = this.state.acpSession
     if (sessionId === undefined) return
     await this.rpc.call("session/set_model", { sessionId, modelId: model })
+    // 分母跟着换：同一家的两个模型窗口可以不一样，不换的话比例条会按旧分母画
+    this.state.contextWindow = this.state.windowOf[model] ?? this.state.contextWindow
     if (effort === undefined || effort === this.state.effort) return
     await this.rpc
       .call("session/set_config_option", { sessionId, configId: "thinking", value: effort })
@@ -359,12 +381,23 @@ class AcpSession implements EngineSession {
   }
 
   /**
-   * agent 自己存着哪些会话。**不支持就不实现这条路**（`canList` 为假时给空数组），
-   * 界面据此不显示那一段。
+   * agent 自己存着哪些会话。拿不到就给空数组，界面据此不显示那一段。
+   *
+   * ## 「没声明」不等于「不支持」
+   *
+   * 实测 grok：`sessionCapabilities` 是个**空对象**，一条能力都不报，
+   * 而 `session/list` 答得好好的——连 cwd、标题、更新时间都齐。
+   * 只认声明的话它的历史区永远是空的，而这其实是「替引擎回答」的另一种写法，
+   * 只不过这次替它答的是「不支持」。
+   *
+   * 所以三态（和 `probe.ts` 那个三态同一个道理）：**声明了**就直接用；
+   * **没声明**的问一次，问不出来才记成不支持，之后不再问。
+   * 代价是对真不支持的引擎多发一次注定失败的 RPC，只有一次。
    */
   async history(): Promise<readonly EngineThread[]> {
-    if (!this.state.canList) return []
+    if (this.state.canList === false) return []
     const raw = await this.rpc.call("session/list", { cwd: this.req.cwd }).catch(() => undefined)
+    this.state.canList = raw !== undefined
     return sessionsOf(raw, HISTORY_MAX)
   }
 
@@ -377,7 +410,7 @@ class AcpSession implements EngineSession {
   async logPath(): Promise<string | undefined> {
     const sessionId = this.state.acpSession
     if (sessionId === undefined || this.config.logPath === undefined) return undefined
-    return this.config.logPath(this.req.home, sessionId).catch(() => undefined)
+    return this.config.logPath(this.req.home, sessionId, this.req.cwd).catch(() => undefined)
   }
 
   /**
@@ -429,17 +462,4 @@ export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
       return session
     },
   }
-}
-
-/**
- * 按扩展名认图片类型。**认不出就当 PNG**——协议要一个 mimeType，
- * 而这里唯一的替代方案是不发这张图，那比猜错格式糟：
- * 多数 agent 自己会嗅探真实字节。
- */
-function mimeOf(path: string): string {
-  const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase()
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg"
-  if (ext === "gif") return "image/gif"
-  if (ext === "webp") return "image/webp"
-  return "image/png"
 }

@@ -1,0 +1,102 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { describe, expect, it } from "vitest"
+import { grokChatPath, grokContextUsed, grokLogPath, grokWorkspaceDir } from "./grok.js"
+
+/**
+ * 目录名的编码规则是从真机上已有的目录反解出来的，所以这张表里的
+ * 期望值都是**照抄磁盘**，不是照着 `encodeURIComponent` 的文档写的。
+ */
+describe("grok 工作区目录名", () => {
+  const cases: readonly (readonly [string, string])[] = [
+    ["/Users/you/work/diagen", "%2FUsers%2Fyou%2Fwork%2Fdiagen"],
+    // `-` 保持原样：这一条排除了「所有非字母数字都编码」那种规则
+    ["/var/folders/8c/T/grok-probe-QCPiIH", "%2Fvar%2Ffolders%2F8c%2FT%2Fgrok-probe-QCPiIH"],
+    ["/Users/you/work/omni", "%2FUsers%2Fyou%2Fwork%2Fomni"],
+  ]
+
+  for (const [cwd, dir] of cases) {
+    it(`${cwd} → ${dir}`, () => {
+      expect(grokWorkspaceDir(cwd)).toBe(dir)
+    })
+  }
+
+  it("拼出来的是那份「和模型之间的全部往来」，不是概要", () => {
+    expect(grokChatPath("/home/u", "/w", "sid")).toBe("/home/u/.grok/sessions/%2Fw/sid/chat_history.jsonl")
+  })
+})
+
+/** 摆一个假的 `~/.grok/sessions`，`dir` 是工作区那一层的目录名。 */
+function plant(dir: string, sessionId: string): string {
+  const home = mkdtempSync(join(tmpdir(), "omni-grok-"))
+  const session = join(home, ".grok", "sessions", dir, sessionId)
+  mkdirSync(session, { recursive: true })
+  writeFileSync(join(session, "chat_history.jsonl"), "{}\n")
+  return home
+}
+
+describe("grok 记录定位", () => {
+  const CWD = "/Users/you/work/omni"
+  const ID = "01a00e5e-2fea-7233-b9d1-617f71ac0a38"
+
+  it("算得中就直接给", async () => {
+    const home = plant(grokWorkspaceDir(CWD), ID)
+    expect(await grokLogPath(home, ID, CWD)).toBe(grokChatPath(home, CWD, ID))
+  })
+
+  /**
+   * 这条才是要紧的：我们是用 `encodeURIComponent` 去对 grok 那边 Rust 写的编码器，
+   * 换一条带中文或空格的路径就可能对不上。**对不上必须还能找到**，
+   * 否则用户只是悄悄退回交接包，而不会知道自己少拿了全量原文。
+   */
+  it("编码规则对不上时按 sessionId 扫出来", async () => {
+    const home = plant("这个目录名和我们算的不一样", ID)
+    expect(await grokLogPath(home, ID, CWD)).toBe(
+      join(home, ".grok", "sessions", "这个目录名和我们算的不一样", ID, "chat_history.jsonl"),
+    )
+  })
+
+  it("真没有就给 undefined，不是编一个路径出来", async () => {
+    const home = plant(grokWorkspaceDir(CWD), "别的会话")
+    expect(await grokLogPath(home, ID, CWD)).toBeUndefined()
+  })
+
+  it("连 sessions 目录都没有也不抛", async () => {
+    expect(await grokLogPath(mkdtempSync(join(tmpdir(), "omni-grok-空-")), ID, CWD)).toBeUndefined()
+  })
+})
+
+/**
+ * grok 一条 ACP `usage_update` 都不发（实测跑完整一轮：kimi 一条，grok 零条），
+ * token 数在它自己的私有通知里。不认这条的话它的上下文用量表永远是空的。
+ */
+describe("grok 的上下文用量", () => {
+  const note = (update: unknown): unknown => ({ sessionId: "s", update })
+
+  it("从 turn_completed 里取 totalTokens", () => {
+    expect(
+      grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "turn_completed", usage: { totalTokens: 15638 } })),
+    ).toBe(15638)
+  })
+
+  // 一轮里可能有好几次模型调用，拿它画比例条会在一轮内反复跳
+  it("response_completed 不算——那是单次模型调用", () => {
+    expect(
+      grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "response_completed", usage: { totalTokens: 99 } })),
+    ).toBeUndefined()
+  })
+
+  it("别家的通知一律不认", () => {
+    expect(grokContextUsed("_x.ai/models/update", note({ sessionUpdate: "turn_completed", usage: { totalTokens: 1 } }))).toBeUndefined()
+    expect(grokContextUsed("session/update", note({ sessionUpdate: "turn_completed", usage: { totalTokens: 1 } }))).toBeUndefined()
+  })
+
+  // 缺字段、0、类型不对都当没有：宁可不画，也不要画一个 0
+  it("拿不到数就给 undefined", () => {
+    expect(grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "turn_completed" }))).toBeUndefined()
+    expect(grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "turn_completed", usage: { totalTokens: 0 } }))).toBeUndefined()
+    expect(grokContextUsed("_x.ai/session_notification", note({ sessionUpdate: "turn_completed", usage: { totalTokens: "多" } }))).toBeUndefined()
+    expect(grokContextUsed("_x.ai/session_notification", undefined)).toBeUndefined()
+  })
+})

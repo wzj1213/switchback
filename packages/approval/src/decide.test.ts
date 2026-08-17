@@ -358,3 +358,61 @@ describe("解析不了的命令：只在看起来会动东西时才问", () => {
     expect(decide(bash('echo "$(pwd)"'), state("read-only")).action).toBe("deny")
   })
 })
+
+/**
+ * ACP 的工具身份是 `kind`，而各家往那张短枚举上映射是**有损的**：
+ * 实测 kimi 只认十个名字，它 k3 那套工具（`Shell`、`ReadFile`…）全报 `other`。
+ * 于是自动编辑档下每条简单命令都要弹一次窗，而用户挑的「自动编辑」
+ * 对应的正是 kimi 自己的 Auto 档（自动放行安全操作）。
+ */
+describe("kind 报 other 时按工具名字补一次分类", () => {
+  const acp = (label: string, args: Record<string, unknown> = {}): Request => ({
+    engine: "kimi",
+    tool: "acp:other",
+    toolLabel: label,
+    args,
+    cwd: WORKSITE,
+  })
+
+  it("以前：认不出方向 → 自动编辑档下也要问", () => {
+    expect(decide({ engine: "kimi", tool: "acp:other", args: {}, cwd: WORKSITE }, state("auto-edit")).action).toBe(
+      "escalate",
+    )
+  })
+
+  it("`Shell: …` 认成执行，自动编辑档下直接放行", () => {
+    expect(decide(acp("Shell: cd /x && find . -name '*.json'"), state("auto-edit")).action).toBe("allow")
+  })
+
+  it("`ReadFile: …` 认成读，连只读档都放行", () => {
+    expect(decide(acp("ReadFile: src/a.ts"), state("read-only")).action).toBe("allow")
+  })
+
+  // 只读档是地板：名字认出来是「跑命令」也照旧拒
+  it("名字认出来不等于放松档位：只读档下 Shell 仍然拒", () => {
+    expect(decide(acp("Shell: ls"), state("read-only")).action).toBe("deny")
+  })
+
+  // `WebFetch` 同时含 fetch 和 web，网络那条必须先判，否则会被别的词根抢走
+  it("网络方向不放行：`WebFetch: …` 在自动编辑档下照旧要问", () => {
+    expect(decide(acp("WebFetch: https://x.dev/a"), state("auto-edit")).action).toBe("escalate")
+  })
+
+  it("认不出方向的名字**照旧 unknown**——这张表没有兜底成 allow 的分支", () => {
+    expect(decide(acp("Frobnicate: 42"), state("auto-edit")).action).toBe("escalate")
+    expect(decide(acp(""), state("auto-edit")).action).toBe("escalate")
+  })
+
+  // `tool` 认得出来的时候一个字都不看标签，否则标签就成了绕过分类的入口
+  it("`tool` 认得出来时以它为准，标签不参与", () => {
+    expect(
+      decide({ engine: "kimi", tool: "acp:fetch", toolLabel: "ReadFile: a.ts", args: {}, cwd: WORKSITE }, state("auto-edit"))
+        .action,
+    ).toBe("escalate")
+  })
+
+  // 红线优先于一切：名字认成读，路径踩了凭据红线照样拒
+  it("红线照旧压过名字分类", () => {
+    expect(decide(acp("ReadFile: ~/.ssh/id_rsa", { path: "~/.ssh/id_rsa" }), state("auto-edit")).action).toBe("deny")
+  })
+})

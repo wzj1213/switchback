@@ -9,6 +9,18 @@ export interface Request {
   engine: string
   /** 引擎侧的工具名原文，如 `Bash` / `shell` / `fs/write_text_file` */
   tool: string
+  /**
+   * 引擎给的**工具标签**，用来在 `tool` 认不出来时补一次分类。
+   *
+   * ACP 那边这一条是必需的：协议里工具的身份是 `kind`，而 `kind` 是**一张短枚举**
+   * ——实测 kimi 只把 `Read/Glob/Grep/Write/Edit/Bash/Terminal/WebFetch/WebSearch/Think`
+   * 这十个名字映射过去，**其余一律报 `other`**。于是它 k3 那套工具（`Shell`、
+   * `ReadFile`…）全都落成 `acp:other` → `unknown` → 自动编辑档下每条都弹窗。
+   * 而 `title` 里带着它自己的工具名，那是唯一还认得出方向的东西。
+   *
+   * **只用来补，不用来覆盖**：`tool` 认得出的时候一个字都不看这里。
+   */
+  toolLabel?: string
   args: Readonly<Record<string, unknown>>
   /** 引擎当前工作目录，绝对路径 */
   cwd: string

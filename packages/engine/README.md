@@ -30,6 +30,10 @@
   - `setup.ts` 从 `session/new` 里挖模型与档位（两代适配器字段名不同）
   - `mode.ts` 信任档 → agent 自己定义的 mode，**打分匹配**
   - `permission.ts` / `approve.ts` 审批判定与选项挑选
+  - `kimi.ts` / `grok.ts` 各家的会话记录落在磁盘的哪儿（换引擎时交接的就是这个路径）。
+    **一家一个文件，不做进驱动**：协议里根本没有「记录在哪」这个概念。
+    kimi 只能查它自己的索引（工作区目录名是它算的哈希），grok 算得出来
+    （`sessions/<工作区 URL 编码>/<sessionId>/chat_history.jsonl`）
 
 ## 不拥有什么
 
@@ -85,6 +89,39 @@
   实测 kimi（`kimi acp`，0.36.1）报的是：能贴图、能原生分叉、能列历史、能续跑，
   **不能压缩**（`session/compact` → Method not found）、不能改向（ACP 没这个入口）。
   `sessionCapabilities` 用空对象当标记，所以判据是「键在不在」不是「值是不是 true」。
+- **但「没声明」不等于「不支持」。** 实测 grok（`grok agent stdio`，0.2.106）的
+  `sessionCapabilities` 是个**空对象**，一条能力都不报，而 `session/list` 答得好好的。
+  只认声明的话它的历史区永远是空的——**那是「替引擎回答」的另一种写法**，
+  只不过这次替它答的是「不支持」。所以 `canList` 是三态：声明了就用，
+  没声明的问一次，问不出来才记成不支持。
+- **grok 的推理强度报得出来、设不了，所以 omni 不上报它。** 四档强度挂在
+  `models.availableModels[]._meta.reasoningEfforts`，但 `session/set_mode` 在这个版本上
+  是个空壳：连**不存在的档位**它也回 `{}`，磁盘上 `reasoning_effort` 纹丝不动。
+  对照组是 `session/set_model`——假 id 回 `-32602 unknown model id`，真 id 落盘。
+  报了强度就是给用户一个点了没用的控件。
+- **ACP 的审批请求里没有命令原文，所以命令红线对 ACP 的 shell 命令是失明的。**
+  真机时序（kimi）：`tool_call`（带 kind、无命令）→ `session/request_permission`
+  （无 kind、无命令）→ **批准之后**才来 `tool_call_update {rawInput:{command}}`。
+  于是判定器拿到的 `args.command` 是标题那个占位串（`"Bash"`），
+  `rm -rf`、凭据读取这类**基于命令文本**的红线一条都匹配不上。
+  协议里没有「批准前告诉我要跑什么」，这一层修不了——档位与路径红线仍然生效，
+  命令红线只对 Claude / codex 那两家有效。
+- **各家往 ACP 的 `kind` 枚举上映射是有损的，所以判定器还看一眼工具名字。**
+  实测 kimi 只映射十个名字（`Read`/`Glob`/`Grep`/`Write`/`Edit`/`Bash`/`Terminal`/
+  `WebFetch`/`WebSearch`/`Think`），**其余一律 `other`**——它 k3 那套工具叫
+  `Shell`、`ReadFile`，全部落成 `acp:other` → `unknown` → 自动编辑档下每条都弹窗。
+  驱动因此把 `title` 原文放进 `Request.toolLabel`，判定器在 `tool` 认不出来时
+  按名字词根补一次方向（`@omni/approval` 的 `NAME_CATEGORY`）。
+  **没有兜底成 allow 的分支**：认不出方向照旧 `unknown`。
+- **grok 不发 ACP 的 `usage_update`**（kimi 一轮一条，grok 零条）。它的 token 数在
+  `_x.ai/session_notification` 的 `turn_completed` 里，窗口大小在
+  `models[]._meta.totalContextTokens`。私有通知的解析按引擎注入
+  （`AcpDriverConfig.contextUsed`），驱动这一层不认识任何一家的私有方法名。
+- **omni 的信任档对 grok 没有约束力。** 实测 read-only 档下让它改文件，它直接改了，
+  `session/request_permission` **一次都没发**。上一条（审批可见性由 agent 决定）在
+  codex-acp 上是「某些操作不问」，在 grok 上是「一次都不问」。omni 不替它装沙箱——
+  「引擎跑自己的原生进程、用自己的配置」是产品边界；要限制它请用 grok 自己的
+  `--sandbox` / `~/.grok/config.toml`。
 - **codex 侧只消费 74 种通知里的一小撮**：item 生命周期、文本与命令输出的 delta、
   用量、`turn/completed`、`error`。其余（MCP 进度、审批复核、实时语音…）一律丢弃。
 - **codex 的 OS 沙箱在 `thread/start` 时定死，`setTrust` 改不了它。** 往低调没问题
@@ -102,8 +139,12 @@
   （渲染层那一侧已经在主进程做了合帧，见 `apps/desktop/src/main/batch.ts`）。
 - **Claude 的推理强度改不了运行期**：`effort` 是 `query()` 的 `Options` 字段，
   SDK 没有 setter。所以 Claude 驱动不上报 `efforts`，界面上也就不显示那个控件。
-- **ACP 侧只消费一小撮 `session/update` 类型**：文本 / 思考 / 工具 / 计划 / 用量 / 换档。
-  其余（`session_info_update`、`config_option_update`、`available_commands_update`…）一律丢弃。
+- **ACP 侧只消费一小撮 `session/update` 类型**：文本 / 思考 / 工具 / 计划 / 用量 / 换档 /
+  可用命令。其余（`session_info_update`、`config_option_update`…）一律丢弃。
+- **ACP 的斜杠命令只能等它推**：协议没有「列命令」的请求方法，所以不像 codex 那样
+  开场问一次，而是收到 `available_commands_update` 就发一条 `commands.updated`。
+  什么时候推、推几次由 agent 定（实测 grok 在 `session/new` 之后推 12 条内建命令，
+  kimi 把它认到的 skill 也报在同一条里）。
 - **omni 不认领 ACP 的 `fs/*` 与 `terminal/*`**。`fs` 的用处是让 agent 看见编辑器里
   没存盘的缓冲区——omni 没有编辑器；`terminal` 认领了就等于命令跑在 omni 进程里，
   和「引擎跑自己的原生进程与沙箱」这个前提直接冲突。实测不认领也拿得到命令输出

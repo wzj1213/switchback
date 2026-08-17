@@ -119,14 +119,25 @@ export function summarize(call: AcpToolCall | undefined): string {
   return detailSummary(call)
 }
 
+/**
+ * 判定用的请求。
+ *
+ * `toolLabel` 带上 agent 给的 `title` **原文**（不是 `summarize` 那份转义过的）：
+ * ACP 的工具身份是 `kind`，而各家往那张短枚举上映射是**有损的**——实测 kimi 只认
+ * 十个名字，k3 那套工具（`Shell`、`ReadFile`…）全报 `other`，于是每条简单命令
+ * 在自动编辑档下都要弹一次窗。`title` 是这时候唯一还认得出方向的东西。
+ * 判定器只在 `kind` 认不出来时才看它，见 `@omni/approval` 的 `NAME_CATEGORY`。
+ */
 export function buildRequest(
   engine: string,
   call: AcpToolCall | undefined,
   cwd: string,
 ): ApprovalRequest {
+  const label = call?.title ?? ""
   return {
     engine,
     tool: toolNameOf(call?.kind),
+    ...(label === "" ? {} : { toolLabel: label }),
     args: argsOf(call),
     cwd,
     summary: summarize(call),

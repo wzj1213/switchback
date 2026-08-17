@@ -1,6 +1,6 @@
-import type { Event, ItemId, PlanStep, ThreadId, ToolStatus, TurnId } from "@omni/protocol"
+import type { Event, ItemId, PlanStep, SlashCommand, ThreadId, ToolStatus, TurnId } from "@omni/protocol"
 import { merge, toToolCall } from "./translate.js"
-import type { AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js"
+import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js"
 
 /**
  * `session/update` → omni 事件。
@@ -153,15 +153,71 @@ function onPlan(ctx: UpdateContext, state: UpdateState, update: AcpUpdate): void
  */
 function onUsage(ctx: UpdateContext, update: AcpUpdate): void {
   if (update.used === undefined) return
+  emitUsage(ctx, update.used, update.size)
+}
+
+/**
+ * 用量事件的**唯一出口**。
+ *
+ * 两条路都从这里出去：协议里的 `usage_update`（上面那条），以及各家私有通知里的
+ * 用量——**grok 一条 `usage_update` 都不发**，它的 token 数在
+ * `_x.ai/session_notification` 里（见 `AcpDriverConfig.contextUsed`）。
+ * 数从哪儿来不一样，拼出来的事件必须一样，所以拼的地方只留一处。
+ *
+ * 没有窗口大小就不带这个字段——界面据此只显示占用数字、不画比例条。
+ * **不猜一个分母**：照猜出来的分母画出的比例，比没有比例更糟。
+ */
+export function emitUsage(ctx: UpdateContext, used: number, window: number | undefined): void {
   ctx.emit({
     type: "usage.updated",
     at: ctx.now(),
     threadId: ctx.threadId,
     usage: {
-      contextUsed: update.used,
-      ...(update.size === undefined ? {} : { contextWindow: update.size }),
+      contextUsed: used,
+      ...(window === undefined ? {} : { contextWindow: window }),
     },
   })
+}
+
+/**
+ * 一条 `AvailableCommand` → omni 的 `SlashCommand`。
+ *
+ * 没名字的丢掉：**这个字段就是要打进输入框的那串字**，空的话面板上会出现
+ * 一条点了什么都不会发生的命令。`label` 不填——引擎报上来的命令没有人话名字
+ * （`/compact` 就叫 `/compact`），协议那边说了这时退回 `name`。
+ */
+function toCommand(raw: AcpCommand): SlashCommand | undefined {
+  const name = (raw.name ?? "").trim()
+  if (name === "") return undefined
+  const hint = (raw.input?.hint ?? "").trim()
+  return {
+    name,
+    description: (raw.description ?? "").trim(),
+    ...(hint === "" ? {} : { argumentHint: hint }),
+    source: "engine",
+  }
+}
+
+/**
+ * 引擎自己认哪些斜杠命令。
+ *
+ * ## 为什么是「收到就发」，不像 codex 那样开场问一次
+ *
+ * ACP **没有「列命令」的请求方法**——agent 是在会话建好之后自己推一条
+ * `available_commands_update` 过来的（实测 grok 在 `session/new` 之后推了
+ * 12 条内建命令，kimi 把它认到的 skill 也一并报在这里）。
+ * 什么时候推、推几次都由它定，所以开场问一次的写法必然漏：
+ * 问的时候还没到，之后到了也没人接。
+ *
+ * `commands.updated` 本来就是「描述现状」的事件（宿主按 threadId 只留最后一条），
+ * 后到的覆盖先到的正好是对的。
+ */
+function onCommands(ctx: UpdateContext, update: AcpUpdate): void {
+  if (update.availableCommands === undefined) return
+  const commands = update.availableCommands
+    .map(toCommand)
+    .filter((c): c is SlashCommand => c !== undefined)
+  ctx.emit({ type: "commands.updated", at: ctx.now(), threadId: ctx.threadId, commands })
 }
 
 /**
@@ -223,6 +279,8 @@ export function handleUpdate(ctx: UpdateContext, state: UpdateState, update: Acp
       return onPlan(ctx, state, update)
     case "usage_update":
       return onUsage(ctx, update)
+    case "available_commands_update":
+      return onCommands(ctx, update)
     case "current_mode_update":
       return onModeChanged(ctx, update)
     default:

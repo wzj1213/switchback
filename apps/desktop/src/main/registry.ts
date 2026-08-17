@@ -1,4 +1,12 @@
-import { createAcpDriver, createClaudeDriver, createCodexDriver, kimiLogPath, type EngineDriver } from "@omni/engine"
+import {
+  createAcpDriver,
+  createClaudeDriver,
+  createCodexDriver,
+  grokContextUsed,
+  grokLogPath,
+  kimiLogPath,
+  type EngineDriver,
+} from "@omni/engine"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
 import type { Logger } from "./log.js"
 
@@ -13,17 +21,20 @@ import type { Logger } from "./log.js"
  */
 
 /**
- * 内置三家。**内置的判据是「验过」，不是「听说过」**：
+ * 内置四家。**内置的判据是「验过」，不是「听说过」**：
  *
  * - `claude` / `codex`：各有一个专门的驱动。
  * - `kimi`：走通用 ACP 驱动。`kimi acp` 是它自己 `--help` 里列着的子命令
  *   （不是我们猜的参数），协议实测跑通到能答话、能读图（发一张写着
  *   `KIMI-4417` 的图，它把那串字念了回来）。**记录路径也认得**——
  *   换引擎时交接的就是它（见 `acp/kimi.ts`）。
+ * - `grok`：同一个 ACP 驱动。它的子命令**不叫 acp**，叫 `grok agent stdio`
+ *   ——这是它自带文档里写明的「Agent Mode (ACP) and IDE Integration」，
+ *   同样不是猜的。记录路径见 `acp/grok.ts`。
  *
- * 三家都有 `probe()`，没装就在下拉里标成「未安装」并给一句能照着做的话。
+ * 四家都有 `probe()`，没装就在下拉里标成「未安装」并给一句能照着做的话。
  * `engines.ts` 反对的是「列出没装的东西」和「把别人的参数抄进代码」——
- * 前者由 probe 挡掉，后者在 kimi 这里不成立（那是它自己文档里的用法）。
+ * 前者由 probe 挡掉，后者在 kimi / grok 这里不成立（那都是它们自己文档里的用法）。
  *
  * 其余 ACP 引擎（ZCode 之类）仍然只从 `engines.json` 读：
  * **这台机器上没装 zcode**，内置一条猜出来的命令行只会让人点了就崩。
@@ -38,12 +49,21 @@ export function buildRegistry(
       claude: createClaudeDriver(),
       codex: createCodexDriver(),
       kimi: createAcpDriver({ id: "kimi", command: "kimi", args: ["acp"], logPath: kimiLogPath }),
+      grok: createAcpDriver({
+        id: "grok",
+        command: "grok",
+        args: ["agent", "stdio"],
+        logPath: grokLogPath,
+        // 它不发 ACP 的 `usage_update`，用量在自己的私有通知里（见 `acp/grok.ts`）
+        contextUsed: grokContextUsed,
+      }),
       ...acp.drivers,
     },
     labels: {
       claude: "Claude Code",
       codex: "Codex",
       kimi: "Kimi Code",
+      grok: "Grok",
       ...acp.labels,
     },
   }

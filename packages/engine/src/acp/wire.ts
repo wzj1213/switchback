@@ -77,10 +77,26 @@ export interface AcpPlanEntry {
   priority?: string
 }
 
+/**
+ * `available_commands_update` 里的一条（ACP 的 `AvailableCommand`）。
+ *
+ * **各家往里塞的东西不一样**：grok 报的是内建命令（`compact`、`context`、
+ * `deep-research`…），kimi 把自己认到的 skill 也一并报在这里。
+ * 对用户是同一件事——打个 `/` 能选的东西，所以不分家。
+ */
+export interface AcpCommand {
+  name?: string
+  description?: string | null
+  /** 参数提示。ACP 把它包了一层：`{ hint }`；没有参数的命令报 null。 */
+  input?: { hint?: string | null } | null
+}
+
 export interface AcpUpdate {
   sessionUpdate?: string
   content?: AcpContent
   entries?: readonly AcpPlanEntry[]
+  /** `available_commands_update`：引擎自己认的斜杠命令。 */
+  availableCommands?: readonly AcpCommand[]
   /** `usage_update`：已用 / 窗口大小。**不是累计账单**，正是 omni 要的那个数。 */
   used?: number
   size?: number
@@ -124,6 +140,12 @@ export interface AcpModel {
   modelId?: string
   name?: string
   description?: string | null
+  /**
+   * 协议的扩展位。**上下文窗口大小就藏在这儿**——ACP 没有为它定字段，
+   * 而实测 grok 每个模型都报 `_meta.totalContextTokens`（grok 4.6 = 500000）。
+   * 拿不到就没有分母，界面上只显示占用数字、不画比例条。
+   */
+  _meta?: { totalContextTokens?: number } | null
 }
 
 export interface AcpConfigOption {

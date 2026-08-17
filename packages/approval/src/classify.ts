@@ -42,6 +42,58 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   // 这正是想要的——第三方 ACP agent 冒出来的新工具，宁可多问一次。
 }
 
+/**
+ * 工具**名字**的方向表。`tool` 认不出来时才用，认出来了一个字都不看。
+ *
+ * ## 为什么必须有这一层
+ *
+ * ACP 里工具的身份是 `kind`，而各家往那张短枚举上映射时是**有损的**：
+ * 实测 kimi 只认十个名字（`Read`/`Glob`/`Grep`/`Write`/`Edit`/`Bash`/`Terminal`/
+ * `WebFetch`/`WebSearch`/`Think`），其余一律报 `other`。它 k3 那套工具叫
+ * `Shell`、`ReadFile`，于是全部落成 `acp:other` → `unknown` → 自动编辑档下
+ * **每条简单命令都要弹一次窗**。而用户挑的「自动编辑」对应的正是 kimi 自己的
+ * Auto 档（自动放行安全操作），体感对不上。
+ *
+ * ## 为什么是前缀而不是全表
+ *
+ * 那些名字是**服务端定义的**，本地枚举不出来（翻遍 kimi 的包也没有 `Shell` 这个
+ * 字面量），所以只能按词根认方向。
+ *
+ * ## 认不出来仍然落 unknown
+ *
+ * 这是这张表的安全前提：**没有兜底成 allow 的分支**。认不出方向的工具照旧
+ * `unknown` → 自动编辑及以下 escalate，和以前一模一样。这一层只把
+ * 「明明看得出是读文件 / 跑命令」的那些捞回来。
+ */
+const NAME_CATEGORY: readonly (readonly [RegExp, Category])[] = [
+  // 网络放在最前面：`WebFetch` 同时含 `fetch` 和 `web`，先判网络才不会被别的词根抢走
+  [/^(?:web|fetch|http|curl|browse|download|url)/i, "net"],
+  [/^(?:shell|bash|term|exec|run|cmd|command|process|kill)/i, "exec"],
+  [/^(?:read|cat|view|show|open|list|ls|dir|glob|grep|search|find|lookup|inspect)/i, "read"],
+  [/^(?:write|edit|create|new|apply|patch|update|insert|replace|append|save|delete|remove|move|rename|mkdir)/i, "write"],
+  [/^(?:think|todo|plan|task|ask|note|memory|remember)/i, "meta"],
+]
+
+/**
+ * 标签 → 名字。各家的标签是「名字 + 冒号 + 主参数」（实测 kimi：
+ * `Shell: cd /x && ls`、`ReadFile: .claude/settings.json`），所以取第一段。
+ *
+ * **冒号后面那截有意不用**：它看着像命令原文，但那是引擎排版给人看的字符串，
+ * 拿它当判定输入等于把展示层接进安全层。命令原文该从 `args.command` 来。
+ */
+function nameOfLabel(label: string | undefined): string {
+  const head = (label ?? "").split(/[:：\s]/, 1)[0] ?? ""
+  return head.trim()
+}
+
+function categoryOfLabel(label: string | undefined): Category | undefined {
+  const name = nameOfLabel(label)
+  if (name === "") return undefined
+  const direct = TOOL_CATEGORY[name]
+  if (direct !== undefined) return direct
+  return NAME_CATEGORY.find(([re]) => re.test(name))?.[1]
+}
+
 const PATH_ARG_KEYS = ["file_path", "path", "notebook_path", "filePath", "cwd"] as const
 const URL_ARG_KEYS = ["url", "uri"] as const
 
@@ -121,7 +173,8 @@ function fromCommand(split: SplitResult): { paths: string[]; urls: string[] } {
 }
 
 export function classify(req: Request, home: string): Normalized {
-  const category = TOOL_CATEGORY[req.tool] ?? "unknown"
+  // 名字只在 `tool` 认不出来时才看；认出来了以 `tool` 为准（见 `NAME_CATEGORY`）
+  const category = TOOL_CATEGORY[req.tool] ?? categoryOfLabel(req.toolLabel) ?? "unknown"
   const command = typeof req.args["command"] === "string" ? req.args["command"] : undefined
   const split: SplitResult =
     command === undefined ? { segments: [], unparseable: false } : splitSegments(command)

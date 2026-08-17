@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { capabilitiesOf, canList, effortsOf, modelsOf, sessionsOf } from "./setup.js"
+import { capabilitiesOf, canList, contextWindows, effortsOf, modelsOf, sessionsOf } from "./setup.js"
 
 /**
  * ACP 的形状全部来自**实测的 kimi 响应**（`kimi acp`，0.36.1），不是照着协议文档编的。
@@ -132,5 +132,44 @@ describe("历史会话清单", () => {
 
   it("认不出的形状给空数组，不抛", () => {
     expect(sessionsOf(undefined, 10)).toEqual([])
+  })
+})
+
+/**
+ * ACP 没有为「窗口多大」定字段，它在扩展位里：实测 grok 每个模型报
+ * `_meta.totalContextTokens`。没有分母就不画比例条，所以这张表不能猜。
+ */
+describe("上下文窗口大小", () => {
+  it("按模型建表", () => {
+    expect(
+      contextWindows({
+        models: {
+          currentModelId: "grok-4.6",
+          availableModels: [
+            { modelId: "grok-4.6", _meta: { totalContextTokens: 500000 } },
+            { modelId: "grok-4.5", _meta: { totalContextTokens: 262144 } },
+          ],
+        },
+      }),
+    ).toEqual({ "grok-4.6": 500000, "grok-4.5": 262144 })
+  })
+
+  it("报不上来的模型不入表——不猜一个分母", () => {
+    expect(
+      contextWindows({
+        models: {
+          availableModels: [
+            { modelId: "a" },
+            { modelId: "b", _meta: null },
+            { modelId: "c", _meta: { totalContextTokens: 0 } },
+            { _meta: { totalContextTokens: 100 } },
+          ],
+        },
+      }),
+    ).toEqual({})
+  })
+
+  it("一个模型都没有也不抛", () => {
+    expect(contextWindows({})).toEqual({})
   })
 })

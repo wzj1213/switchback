@@ -195,3 +195,51 @@ describe("计划与用量", () => {
     expect(s.events).toHaveLength(0)
   })
 })
+
+/**
+ * ACP 没有「列命令」的请求方法，agent 是自己推过来的。以前这条通知被丢掉，
+ * 于是 kimi / grok 的原生命令和 skill 在 `/` 面板里**一条都看不见**。
+ */
+describe("引擎自己认的斜杠命令", () => {
+  const update = (commands: unknown): AcpUpdate =>
+    ({ sessionUpdate: "available_commands_update", availableCommands: commands }) as AcpUpdate
+
+  it("翻成 omni 的形状，参数提示从 input.hint 里取", () => {
+    const s = setup()
+    handleUpdate(
+      s.ctx,
+      s.state,
+      update([
+        { name: "compact", description: "压缩上下文", input: { hint: "要保留什么" } },
+        { name: "context", description: "看上下文用量", input: null },
+      ]),
+    )
+    expect(s.events).toEqual([
+      {
+        type: "commands.updated",
+        at: 1000,
+        threadId: "t1",
+        commands: [
+          { name: "compact", description: "压缩上下文", argumentHint: "要保留什么", source: "engine" },
+          { name: "context", description: "看上下文用量", source: "engine" },
+        ],
+      },
+    ])
+  })
+
+  // 名字就是要打进输入框的那串字。空的话面板上会多一条点了什么都不发生的命令
+  it("没名字的丢掉，剩下的照发", () => {
+    const s = setup()
+    handleUpdate(s.ctx, s.state, update([{ name: "  " }, { description: "没名字" }, { name: "afk" }]))
+    expect(s.events).toMatchObject([{ commands: [{ name: "afk", description: "", source: "engine" }] }])
+  })
+
+  // 后到的覆盖先到的（宿主按 threadId 只留最后一条），所以空清单也要发出去
+  it("字段缺席不发，空清单照发", () => {
+    const s = setup()
+    handleUpdate(s.ctx, s.state, { sessionUpdate: "available_commands_update" })
+    expect(s.events).toHaveLength(0)
+    handleUpdate(s.ctx, s.state, update([]))
+    expect(s.events).toMatchObject([{ type: "commands.updated", commands: [] }])
+  })
+})

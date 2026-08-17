@@ -41,4 +41,12 @@ Request ─→ normalize ─→ redline ─→ memory ─→ trust ─→ Verdic
   反之，`worksite` 内指向外部的软链**判不出来**——这一层交给沙箱兜底。
 - 分类表按工具名硬编码。新引擎的新工具名落 `unknown`，`unknown` 在 `auto-edit` 及以下一律
   `escalate`。这是有意的：宁可多问一次，不可漏判。
+- **`tool` 认不出来时会按 `toolLabel` 的词根补一次方向**（`NAME_CATEGORY`）。
+  这一层是被 ACP 逼出来的：协议里工具的身份是一张短枚举 `kind`，而各家往上映射是
+  有损的——实测 kimi 只认十个名字，其余全报 `other`，于是它 k3 那套工具
+  （`Shell`、`ReadFile`）在自动编辑档下每条都要弹窗。
+  **这张表没有兜底成 allow 的分支**：认不出词根照旧 `unknown`；网络那条排在最前
+  （`WebFetch` 同时含 `fetch` 和 `web`）；档位与红线都在它之前，只读档下
+  名字认成 `Shell` 也一样 `deny`。代价是词根撞名的工具会被归错方向
+  ——比如一个叫 `WriteReport` 的网络工具会被当成写文件。
 - 不做速率限制。同一个命令连续请求一百次会被放行一百次；防重复是宿主的事。
