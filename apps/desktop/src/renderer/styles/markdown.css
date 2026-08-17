@@ -9,6 +9,10 @@
    换行会被渲染成空行。显式声明一次，不依赖上游没设。 */
 .md {
   white-space: normal;
+  /* 长词不许撑破容器。这里的「长词」几乎都是路径和 id
+     ——`/Users/you/.claude/settings.local.json` 这种，浏览器默认**不在 `/` 处断行**，
+     于是一条路径就能把整个转录区推出横向滚动条。 */
+  overflow-wrap: break-word;
 }
 
 .md > :first-child {
@@ -86,6 +90,10 @@
   background: var(--bg-code);
   font-family: var(--font-mono);
   font-size: 0.92em;
+  /* 行内代码里放的就是路径、命令、id ——`break-word` 只在**词与词之间**找机会，
+     一个没有空格的长路径它无能为力，得允许任意处断。
+     `pre` 块不受影响：那边是自己横向滚，断行反而会破坏对齐。 */
+  overflow-wrap: anywhere;
 }
 
 .md pre {

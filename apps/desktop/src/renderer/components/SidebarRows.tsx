@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 import { rowLabelOf } from "../sidebar.js"
-import { SpinnerIcon } from "./icons.js"
+import { EllipsisIcon, SpinnerIcon } from "./icons.js"
+import { SIDEBAR_ICON } from "./icon-base.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 
 /** 一行需要的拖放接线。状态在 `useThreadDrag`，这里只是把它接到 DOM 事件上。 */
@@ -81,7 +82,7 @@ function dragProps(
 }
 
 /**
- * 行尾那颗按钮：平时是「···」，武装之后变成「确认」。
+ * 行尾那颗按钮：平时是「更多」，武装之后变成「确认」。
  *
  * **二次确认做在同一颗按钮上**而不是弹对话框：删一个会话不值得打断整个界面，
  * 但也不能点一下就没。照 codex 的 confirmArchiveTask。
@@ -113,7 +114,7 @@ function RowActions({
   }
   return (
     <button type="button" className="row__act" aria-label="更多操作" title="更多操作" onClick={onMenu}>
-      ···
+      <EllipsisIcon size={SIDEBAR_ICON} />
     </button>
   )
 }

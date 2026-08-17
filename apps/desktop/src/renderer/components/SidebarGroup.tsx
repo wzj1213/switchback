@@ -1,6 +1,6 @@
 import type { ThreadRow } from "@omni/store"
 import type { Group } from "../sidebar.js"
-import { ChevronIcon, FolderIcon, PlusIcon, SpinnerIcon } from "./icons.js"
+import { ChevronIcon, EllipsisIcon, FolderIcon, PlusIcon, SpinnerIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
@@ -142,7 +142,7 @@ function GroupHead({
           >
             <PlusIcon size={SIDEBAR_ICON} />
           </button>
-          {/* 项目这一行也给一个 `···`。右键菜单一直都有，但**看不见的功能等于没有**——
+          {/* 项目这一行也给一个「更多」。右键菜单一直都有，但**看不见的功能等于没有**——
               没人会去右键一个看起来只是分组标题的东西 */}
           <button
             type="button"
@@ -153,7 +153,7 @@ function GroupHead({
               onGroupMenu(e, group)
             }}
           >
-            ···
+            <EllipsisIcon size={SIDEBAR_ICON} />
           </button>
         </div>
   )

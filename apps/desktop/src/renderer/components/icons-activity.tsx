@@ -61,8 +61,8 @@ export function DotBoxIcon({ size = 13 }: { size?: number }): React.JSX.Element 
 export function ThinkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M11.4 11.2H6.2L3.4 13.3v-2.1H2.9a1.4 1.4 0 0 1-1.4-1.4V4.1a1.4 1.4 0 0 1 1.4-1.4h8.5a1.4 1.4 0 0 1 1.4 1.4v5.7a1.4 1.4 0 0 1-1.4 1.4z" {...LINE} />
-      <path d="M5.2 6.9h.01M7.2 6.9h.01M9.2 6.9h.01" {...LINE} />
+      <path d="M12.25 11.2H7.05L4.25 13.3v-2.1H3.75a1.4 1.4 0 0 1-1.4-1.4V4.1a1.4 1.4 0 0 1 1.4-1.4h8.5a1.4 1.4 0 0 1 1.4 1.4v5.7a1.4 1.4 0 0 1-1.4 1.4z" {...LINE} />
+      <path d="M6 6.9h.01M8 6.9h.01M10 6.9h.01" {...LINE} />
     </Svg>
   )
 }

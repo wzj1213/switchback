@@ -23,11 +23,31 @@ export function PlusIcon({ size }: { size?: number } = {}): React.JSX.Element {
   )
 }
 
+/**
+ * 「更多操作」。
+ *
+ * **必须是图标，不能是三个字符 `···`。** 文字按**基线**排版，SVG 按**盒子**居中——
+ * 同一行里放一个 `+`（图标）和一个 `···`（文字），两者天生对不齐，
+ * 而且差多少还跟着字号和行高变。项目行上那两颗按钮就是这么歪的。
+ *
+ * 全套图标里唯一用填充画的「点」：半径不到 1 的圆用描边画出来是三个**圈**，
+ * 在 13–15px 上只会糊成一团。
+ */
+export function EllipsisIcon({ size }: { size?: number } = {}): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <circle cx="3.6" cy="8" r="0.95" fill="currentColor" />
+      <circle cx="8" cy="8" r="0.95" fill="currentColor" />
+      <circle cx="12.4" cy="8" r="0.95" fill="currentColor" />
+    </Svg>
+  )
+}
+
 export function SearchIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
     <Svg size={size}>
-      <circle cx="7.25" cy="7.25" r="4" {...LINE} />
-      <path d="M10.25 10.25 13.5 13.5" {...LINE} />
+      <circle cx="6.9" cy="6.9" r="4" {...LINE} />
+      <path d="M9.9 9.9 13.1 13.1" {...LINE} />
     </Svg>
   )
 }
@@ -36,7 +56,7 @@ export function SearchIcon({ size }: { size?: number } = {}): React.JSX.Element 
 export function ChevronIcon({ open = false, size = 12 }: { open?: boolean; size?: number }): React.JSX.Element {
   return (
     <Svg size={size} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms ease" }}>
-      <path d="M6.25 3.5 10.5 8l-4.25 4.5" {...LINE} />
+      <path d="M5.9 3.5 10.1 8 5.9 12.5" {...LINE} />
     </Svg>
   )
 }
@@ -45,7 +65,7 @@ export function ChevronIcon({ open = false, size = 12 }: { open?: boolean; size?
 export function CaretIcon({ size = 12 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M4 6.5 8 10.5l4-4" {...LINE} />
+      <path d="M4 6 8 10l4-4" {...LINE} />
     </Svg>
   )
 }
@@ -78,7 +98,7 @@ export function ShieldIcon({ size }: { size?: number } = {}): React.JSX.Element 
 export function SparkIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M8 2.5 9.3 6.2 13 7.5 9.3 8.8 8 12.5 6.7 8.8 3 7.5l3.7-1.3z" {...LINE} />
+      <path d="M8 3 9.3 6.7 13 8 9.3 9.3 8 13 6.7 9.3 3 8l3.7-1.3z" {...LINE} />
     </Svg>
   )
 }
@@ -94,7 +114,7 @@ export function TrashIcon({ size = 13 }: { size?: number }): React.JSX.Element {
 export function RevealIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M2.5 5.25A1.25 1.25 0 0 1 3.75 4H6l1.25 1.5h5A1.25 1.25 0 0 1 13.5 6.75l-.6 4.5A1.25 1.25 0 0 1 11.65 12.5H3.9a1.25 1.25 0 0 1-1.25-1.1z" {...LINE} />
+      <path d="M2.5 5A1.25 1.25 0 0 1 3.75 3.75H6l1.25 1.5h5A1.25 1.25 0 0 1 13.5 6.5l-.6 4.5A1.25 1.25 0 0 1 11.65 12.25H3.9a1.25 1.25 0 0 1-1.25-1.1z" {...LINE} />
     </Svg>
   )
 }
@@ -139,8 +159,8 @@ export function GearIcon({ size }: { size?: number } = {}): React.JSX.Element {
 export function PinIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M9.5 2.5 13.5 6.5l-2 .6-3 3-.4 2.4-4.6-4.6 2.4-.4 3-3z" {...LINE} />
-      <path d="M3.5 12.5 6 10" {...LINE} />
+      <path d="M9 3 13 7l-2 .6-3 3-.4 2.4-4.6-4.6 2.4-.4 3-3z" {...LINE} />
+      <path d="M3 13 5.5 10.5" {...LINE} />
     </Svg>
   )
 }
@@ -148,10 +168,10 @@ export function PinIcon({ size = 13 }: { size?: number }): React.JSX.Element {
 export function BranchIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (
     <Svg size={size}>
-      <circle cx="5" cy="4" r="1.5" {...LINE} />
-      <circle cx="5" cy="12" r="1.5" {...LINE} />
-      <circle cx="11.5" cy="5.5" r="1.5" {...LINE} />
-      <path d="M5 5.5v5M10 6.6c0 1.6-1.6 2.4-3 2.6-1 .15-2 .6-2 1.3" {...LINE} />
+      <circle cx="4.75" cy="4" r="1.5" {...LINE} />
+      <circle cx="4.75" cy="12" r="1.5" {...LINE} />
+      <circle cx="11.25" cy="5.5" r="1.5" {...LINE} />
+      <path d="M4.75 5.5v5M9.75 6.6c0 1.6-1.6 2.4-3 2.6-1 .15-2 .6-2 1.3" {...LINE} />
     </Svg>
   )
 }
@@ -195,7 +215,7 @@ export function SpinnerIcon({ size = 12 }: { size?: number }): React.JSX.Element
 export function SendIcon({ size = 14 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M8 13V3.6M3.8 7.8 8 3.6l4.2 4.2" {...LINE} />
+      <path d="M8 12.7V3.3M3.8 7.5 8 3.3l4.2 4.2" {...LINE} />
     </Svg>
   )
 }

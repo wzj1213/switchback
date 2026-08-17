@@ -25,6 +25,10 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* **窗口自己永远不滚。** 各个面板在内部滚（侧栏、转录区），
+     所以整扇窗口出现滚动条只可能是有东西撑破了布局——那时候滚动条不是
+     补救，是把 bug 藏起来：标题栏和输入框会跟着滑走。 */
+  overflow: hidden;
 }
 
 body {
@@ -66,6 +70,11 @@ body {
   --sb-pad: 8px;
   --sb-slot: 24px;
   --sb-row-h: 32px;
+  /* 行尾那几颗图标按钮的方形点击区。**必须是方的**：图标 15、盒子 22，
+     四边各留 3.5——上下左右一样多，图标中心才等于盒子中心。
+     不对称的内边距（原来是 2px 5px）会让两颗按钮的视觉重心既不在同一条
+     水平线上，也不在等距的位置上，看起来就是「歪」。 */
+  --sb-act: 22px;
 }
 
 .sidebar__head {
@@ -406,10 +415,26 @@ body {
 
 /* 行内操作平时不显形，悬停才出来。
    **`cursor` 必须是 pointer**：它是按钮，长成默认箭头等于告诉人「这儿点不动」 */
+/* 照 codex 的做法：**等大的方形点击区，内边距归零，图标靠 flex 居中**。
+ *
+ * 两件事各自都会让这一行看起来歪，所以两件都得改：
+ *
+ * 1. inline 的 `<svg>` 是**贴基线**放的，底下还留着字体下伸部的空间，
+ *    而文字按钮（「确认」）按基线排——同一行里图标偏高、文字偏低。
+ * 2. `padding: 2px 5px` 是**不对称**的：盒子高 19、宽 25，两颗按钮各自的
+ *    视觉重心因此不在同一条水平线上，也不在等距的位置上。
+ *
+ * 方形盒子 + `padding: 0` 之后，图标中心 = 盒子中心 = 行中线，
+ * 两颗之间的间距也只由 `margin-right` 一个数决定。 */
 .row__act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
-  margin-right: 4px;
-  padding: 2px 5px;
+  width: var(--sb-act);
+  height: var(--sb-act);
+  margin-right: 2px;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -442,8 +467,11 @@ body {
   color: var(--danger);
 }
 
-/* 确认态就要显眼——这一步之后没有回头路 */
+/* 确认态就要显眼——这一步之后没有回头路。
+   **它装的是文字不是图标**，所以放开方形约束，否则「确认」两个字会被裁掉 */
 .row__act--danger {
+  width: auto;
+  padding: 2px 6px;
   background: var(--danger);
   color: var(--text-inverse);
 }
@@ -590,11 +618,23 @@ body {
   color: var(--text);
 }
 
+/*
+ * 转录区**只上下滚，绝不左右滚**。
+ *
+ * `overflow-y: auto` 单写一条是不够的：CSS 里两轴只有一个是 `visible` 时，
+ * 那个 `visible` 会被**计算成 `auto`**。也就是说这里其实一直是「横向也能滚」，
+ * 只要有一个子元素宽了一点点，输入框上面就会冒出一条横向滚动条。
+ *
+ * 宽内容自己滚是既定设计（`.md pre` 有 `overflow-x`，宽表格套 `.md__scroll`），
+ * 所以这一层直接钉死。`hidden` 而不是 `clip`：hidden 仍然能被程序滚动，
+ * 万一真有东西被裁掉，它还够得着。
+ */
 .transcript {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--sp-5) var(--sp-4) var(--sp-6);
 }
 
