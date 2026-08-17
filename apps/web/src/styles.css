@@ -132,6 +132,22 @@ textarea {
   }
 }
 
+/*
+ * 宽屏上给正文一条阅读宽度上限。
+ *
+ * 手机上不需要（屏幕本来就窄），桌面浏览器上不加就是**一行拉满整屏**——
+ * 眼睛从行尾扫回行首会丢行。上限落在 `.thread__body` 的直接子项上，
+ * 因为它们才是「一条内容」；给容器加 padding 的话，工具行和审批卡的
+ * 边框会跟着缩进去，看起来像被缩排了。
+ */
+@media (min-width: 900px) {
+  .thread__body > * {
+    width: 100%;
+    max-width: 78ch;
+    align-self: center;
+  }
+}
+
 .empty {
   margin: auto;
   padding: var(--sp-4);
@@ -465,6 +481,19 @@ textarea {
   overscroll-behavior: contain;
 }
 
+/*
+ * **每一条 item 都不许被压扁。**
+ *
+ * flex 项默认 `flex-shrink: 1`：内容总高超过容器时，浏览器会**按比例压缩每一项**。
+ * 在一个能滚动的容器里这是纯粹的错——本该滚，结果变成挤。
+ * 实测的表现是工具行的文字上下各被切掉一截（`.item--tool` 上有 `overflow: hidden`，
+ * 于是压缩直接变成裁切），而且**不报错、不留痕**，只是那一行读不全。
+ * 这是出图才看出来的，肉眼在开发机上很容易当成「字体渲染问题」。
+ */
+.thread__body > * {
+  flex: none;
+}
+
 .thread__running {
   margin: 0;
   color: var(--text-faint);
@@ -654,13 +683,22 @@ textarea {
   font-size: 13px;
 }
 
+/*
+ * **审批卡里的命令要整条看得见，所以这里折行。**
+ *
+ * 别处的等宽块（工具输出、diff）用 `white-space: pre` 是对的：那些东西有列，
+ * 折行会把对齐拆散、读不出来。命令没有列——它只有一串参数和路径，
+ * 而这一屏的全部意义是**你在按「允许」之前读全了它**。
+ * 横滚意味着「屏幕外还有半条命令，你得先想到去划一下」，
+ * 那正是这块界面最不能有的东西。
+ */
 .approval__cmd--block {
   margin: 0 0 var(--sp-3);
   padding: var(--sp-2);
   border-radius: var(--radius-sm);
   background: var(--bg-sunken);
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .approval__scopes {

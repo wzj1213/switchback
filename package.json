@@ -20,6 +20,7 @@
     "dev": "pnpm --filter @omni/desktop dev",
     "dev:web": "pnpm --filter @omni/web dev",
     "build:web": "pnpm --filter @omni/web build",
+    "harness:web": "node --import jiti/register apps/desktop/harness/web.ts",
     "test:live": "vitest run --config vitest.live.config.ts",
     "check:docs": "node scripts/check-changelog.mjs",
     "dist": "pnpm --filter @omni/desktop dist",
@@ -30,9 +31,11 @@
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
+    "jiti": "^2.7.0",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "ws": "^8.21.3"
   }
 }

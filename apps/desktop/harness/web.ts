@@ -1,0 +1,178 @@
+/**
+ * 浏览器端的开发/验收台。**不起 Electron、不起任何引擎。**
+ *
+ * 它把真的远程服务端（`main/remote/server.ts`）接到一份合成的会话数据上，
+ * 于是浏览器端可以脱离整个桌面应用单独跑、单独看、单独截图。
+ *
+ * 用法：
+ *
+ * ```sh
+ * pnpm build:web                       # 先出前端产物
+ * pnpm harness:web                    # 等价于下面这条
+ * node --import jiti/register apps/desktop/harness/web.ts
+ * ```
+ *
+ * 打印出来的令牌可以直接塞进 `localStorage.omni.token`，跳过配对屏。
+ * 加 `--live` 会每两秒往会话里追加一段流式文本，用来看滚动与贴底。
+ */
+import { createHash } from "node:crypto"
+import { join, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
+import type { Command, Event, Item, Thread } from "@omni/protocol"
+import { createLedger } from "@omni/wire"
+import { createTokenStore, type Device } from "../src/main/remote/tokens.js"
+import { startRemote } from "../src/main/remote/server.js"
+import type { Sink } from "../src/main/sink.js"
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
+const PORT = 17801
+/** 固定令牌，**只在这个 harness 里**。真实的令牌是 32 字节随机数。 */
+const DEV_TOKEN = "harness-dev-token-not-a-secret"
+
+const at = 1_760_000_000_000
+
+const thread = (id: string, title: string, status: Thread["status"]): Thread => ({
+  id,
+  title,
+  cwd: "/Users/you/work/omni",
+  engine: id === "t-2" ? "claude" : "codex",
+  trust: "auto-edit",
+  status,
+  createdAt: at,
+  updatedAt: at + (id === "t-1" ? 300 : 100),
+  engineHistory: ["codex"],
+})
+
+const items: readonly Item[] = [
+  { id: "i-1", turnId: "u-1", kind: "user_message", at, text: "把审批那一屏在窄屏上过一遍" },
+  {
+    id: "i-2",
+    turnId: "u-1",
+    kind: "reasoning",
+    at: at + 1,
+    text: "先看看现在的布局……命令原文那一行在 390 点宽下会不会被截断。",
+    complete: true,
+  },
+  {
+    id: "i-3",
+    turnId: "u-1",
+    kind: "agent_message",
+    at: at + 2,
+    text: "看了一遍，有三处要改：\n\n1. **命令原文**要等宽、可横滚\n2. 两颗按钮不小于 44×44\n3. 底部要留 `safe-area`\n\n```ts\nconst MIN_HIT = 44\n```\n\n| 项 | 现状 | 改成 |\n| --- | --- | --- |\n| 字号 | 13px | 13px 等宽 |\n| 换行 | 折行 | 不折，横滚 |",
+    complete: true,
+  },
+  {
+    id: "i-4",
+    turnId: "u-1",
+    kind: "tool_call",
+    at: at + 3,
+    tool: "Bash",
+    status: "ok",
+    detail: { kind: "shell", command: "rg -n 'approval__cmd' apps/web/src", output: "styles.css:640:.approval__cmd {\nstyles.css:645:.approval__cmd--block {" },
+  },
+  {
+    id: "i-5",
+    turnId: "u-1",
+    kind: "tool_call",
+    at: at + 4,
+    tool: "Edit",
+    status: "ok",
+    detail: {
+      kind: "file_edit",
+      path: "apps/web/src/styles.css",
+      added: 4,
+      removed: 1,
+      files: [{ path: "apps/web/src/styles.css", kind: "update", added: 4, removed: 1, diff: "@@ -640,7 +640,10 @@\n-  white-space: normal;\n+  white-space: pre;\n+  overflow-x: auto;" }],
+    },
+  },
+  {
+    id: "i-6",
+    turnId: "u-1",
+    kind: "approval",
+    at: at + 5,
+    toolCallId: "i-7",
+    tool: "Bash",
+    summary: "rm -rf /Users/you/work/omni/apps/web/dist && pnpm --filter @omni/web run build",
+    status: "pending",
+    reason: "这条命令里有 `rm -rf`，解析不出它最终会删到哪儿——按红线表必须问你一次。",
+    rememberHint: "本会话内的构建命令",
+  },
+]
+
+const seed: readonly Event[] = [
+  { type: "engines.available", at, engines: [{ id: "codex", label: "Codex", state: "ok" }] },
+  { type: "thread.started", at, thread: thread("t-3", "更新日志的措辞", "idle") },
+  { type: "thread.started", at, thread: thread("t-2", "ACP 换模型那条红条", "running") },
+  { type: "thread.started", at, thread: thread("t-1", "浏览器端的审批屏", "waiting_approval") },
+  { type: "turn.started", at, turn: { id: "u-1", threadId: "t-1", engine: "codex", status: "running", startedAt: at } },
+  ...items.map((item): Event => ({ type: "item.started", at: item.at, item })),
+  { type: "usage.updated", at, threadId: "t-1", usage: { contextUsed: 42_000, contextWindow: 200_000 } },
+]
+
+function main(): void {
+  const ledger = createLedger()
+  const sinks: Sink[] = []
+  const device: Device = {
+    id: "harness",
+    name: "harness 上的浏览器",
+    hash: createHash("sha256").update(DEV_TOKEN).digest("hex"),
+    createdAt: at,
+    lastSeenAt: at,
+  }
+  const tokens = createTokenStore({ load: () => [device], save: () => undefined, now: () => Date.now() })
+
+  void startRemote({
+    config: () => ({ port: PORT, trustedHosts: [], maxTrust: "auto-edit" }),
+    webRoot: join(ROOT, "apps/web/dist"),
+    tokens,
+    ledger,
+    sinks: {
+      list: () => sinks,
+      add: (sink) => {
+        sinks.push(sink)
+        return () => sinks.splice(sinks.indexOf(sink), 1)
+      },
+    },
+    dispatch: (command: Command) => {
+      console.log("← 命令", JSON.stringify(command))
+      if (command.type === "approval.resolve") {
+        const settled: Item = { ...(items[5] as Item & { kind: "approval" }), status: command.allow ? "allowed" : "denied" }
+        broadcast(ledger, sinks, [{ type: "item.updated", at: Date.now(), item: settled }])
+      }
+      if (command.type === "thread.prompt") {
+        const item: Item = { id: `i-${String(Date.now())}`, turnId: "u-1", kind: "user_message", at: Date.now(), text: command.text }
+        broadcast(ledger, sinks, [{ type: "item.started", at: Date.now(), item }])
+      }
+    },
+    replay: async (sink) => {
+      sink.send({ channel: "omni:replay", replay: { events: seed, resumeAt: ledger.latest() } })
+      await Promise.resolve()
+    },
+    log: (level, message) => {
+      console.log(`[${level}] ${message}`)
+    },
+  }).then(() => {
+    console.log(`\nomni web harness: http://127.0.0.1:${String(PORT)}`)
+    console.log(`令牌：${DEV_TOKEN}`)
+    console.log(`跳过配对：localStorage.setItem("omni.token", ${JSON.stringify(DEV_TOKEN)})\n`)
+    if (process.argv.includes("--live")) live(ledger, sinks)
+  })
+}
+
+/** 每两秒追加一段流式文本，用来看贴底与滚动。 */
+function live(ledger: ReturnType<typeof createLedger>, sinks: Sink[]): void {
+  const state = { n: 0 }
+  setInterval(() => {
+    state.n += 1
+    broadcast(ledger, sinks, [
+      { type: "item.delta", at: Date.now(), itemId: "i-3", append: `\n\n第 ${String(state.n)} 段追加的内容。` },
+    ])
+  }, 2000)
+}
+
+function broadcast(ledger: ReturnType<typeof createLedger>, sinks: readonly Sink[], events: readonly Event[]): void {
+  const sealed = ledger.seal(events)
+  for (const sink of sinks) sink.send({ channel: "omni:events", sealed })
+}
+
+main()
