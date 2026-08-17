@@ -68,6 +68,26 @@ async function steerInto(
   return true
 }
 
+/**
+ * 这条会话**转正**。发出第一句话的那一刻做，一次。
+ *
+ * 两件事一起清，因为它们说的是同一件事——「它开始算数了」：
+ *
+ * - `provisional`：临时会话不进侧栏、切引擎当场生效（见 `Thread.provisional`）。
+ *   这条 `thread.updated` 排在 `turn.started` **之前**，所以攒着的那些事件
+ *   跟着一起落盘，而且顺序是对的（见 `Ctx.uncommitted`）。
+ * - `draft`：**发出去了就不再是草稿**。不清的话，用户改了内容发出去之后，
+ *   下次开这条会话输入框里又冒出那段原始文本。
+ */
+function commit(ctx: Ctx, entry: Live, at: number): void {
+  if (entry.thread.provisional !== true && entry.thread.draft === undefined) return
+  const next = { ...entry.thread }
+  delete next.provisional
+  delete next.draft
+  entry.thread = { ...next, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
 export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
@@ -108,14 +128,7 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
     return prompt(ctx, cmd)
   }
   const at = ctx.deps.now()
-  // **发出去了就不再是草稿。** 不清的话，用户改了内容发出去之后，
-  // 下次开这条会话输入框里又冒出那段原始交接包
-  if (entry.thread.draft !== undefined) {
-    const cleared = { ...entry.thread }
-    delete cleared.draft
-    entry.thread = { ...cleared, updatedAt: at }
-    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-  }
+  commit(ctx, entry, at)
   // **有实际对话才记这一段。** 切过去没说话就切走，不该在时间线上
   // 留一条什么都没发生的记录——那样时间线会被「我点错了」填满
   void recordSegment(ctx, entry)

@@ -106,7 +106,7 @@
 
 .md pre code {
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-code);
   line-height: 1.55;
 }
 
@@ -159,9 +159,12 @@
  *
  * 用色克制：关键字/字符串/注释三档拉开就够读，全彩会让一屏代码变成圣诞树。
  */
+/* 注释走 `--text-muted`：三档拉开就够读，但没说注释必须是全场最淡的那个——
+   11.5px + 斜体 + 2.58:1 之下它比关键字（5.05）和字符串（7.03）都难认，
+   而它恰恰是代码里最接近散文、最需要逐字读的部分 */
 .hljs-comment,
 .hljs-quote {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-style: italic;
 }
 

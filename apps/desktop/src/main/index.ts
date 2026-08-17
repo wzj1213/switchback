@@ -5,9 +5,11 @@ import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
 import { installProjectDocChannel } from "./projectdoc.js"
 import { installEngineVersionChannel } from "./enginever.js"
+import { installSelfUpdateChannel } from "./selfupdate.js"
 import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
+import { createSinks, windowSink } from "./sink.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
@@ -260,6 +262,7 @@ function bootstrap(): Promise<void> {
     installAttachChannel()
     installProjectDocChannel()
     installEngineVersionChannel(log)
+    installSelfUpdateChannel(log)
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     installMenu(
@@ -275,7 +278,8 @@ function bootstrap(): Promise<void> {
     if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)
     installFind(() => BrowserWindow.getAllWindows())
     watchProcesses(log, () => BrowserWindow.getAllWindows())
-    const attached = attachHost(() => BrowserWindow.getAllWindows(), log)
+    const sinks = createSinks(() => BrowserWindow.getAllWindows())
+    const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log)
     const bounds = await loadBounds()
     const win = createWindow(bounds)
     app.on("activate", () => {
@@ -309,7 +313,7 @@ function bootstrap(): Promise<void> {
       // 界面什么都不出现，点几次多几个进程，全程不报错。
       const target = BrowserWindow.fromWebContents(event.sender)
       if (target === null || target.isDestroyed()) return
-      void rebuild(attached, event.sender)
+      void rebuild(attached, windowSink(target))
         .then((recent) => {
           if (seeded) return undefined
           seeded = true

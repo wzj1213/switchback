@@ -39,7 +39,8 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
  * 文件头（类型 + 路径 + 增删）永远可见，正文超过阈值折叠——**折叠的是正文不是文件头**，
  * 因为「改了哪些文件」是一眼要看到的，「具体改了什么」才是按需展开的。
  */
-function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
+/** 一个文件的改动。变更汇总卡也用它——同一份补丁不该有两种画法。 */
+export function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const lines = parseDiff(file.diff ?? "", file.kind)
   const folded = !open && lines.length > FOLD_AT

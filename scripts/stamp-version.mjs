@@ -60,6 +60,15 @@ const file = join(ROOT, "apps/desktop/package.json")
 const pkg = JSON.parse(readFileSync(file, "utf8"))
 const { version, build } = compute()
 pkg.version = version
-pkg.omni = { ...(pkg.omni ?? {}), build }
+/**
+ * `repo` = **这个包是从哪份源码打出来的**（绝对路径）。
+ *
+ * 装好的应用靠它把自己重新构建、重新装上（见 `main/selfupdate.ts`）——
+ * 少掉「切终端 → 打包 → 挂 DMG → 拖进 /Applications」这一整段。
+ *
+ * 拷到别人机器上时这个路径不存在，那边的自更新入口整个不出现——
+ * **不是灰掉，是不画**。所以烤进去的代价只有一行字符串，没有别的。
+ */
+pkg.omni = { ...(pkg.omni ?? {}), build, repo: ROOT }
 writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`)
-console.log(`版本 → ${version}+${build}`)
+console.log(`版本 → ${version}+${build}（源码 ${ROOT}）`)

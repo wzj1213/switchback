@@ -52,16 +52,27 @@ const STROKE_PX = 1.25
 export function Svg({
   size = 14,
   style,
+  className,
   children,
 }: {
   size?: number
   /** 少数图标要转（展开箭头）。**给它开个口子，而不是让它自己写 `<svg>`**——
       自己写就拿不到上面那套笔画补偿，实测四个图标就是这么漏掉的。 */
   style?: React.CSSProperties
+  /** 同一个口子的另一半：**状态和过渡交给 CSS**。写成行内 style 的话，
+      `prefers-reduced-motion` 那条媒体查询压根盖不住它。 */
+  className?: string
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <svg width={size} height={size} strokeWidth={(STROKE_PX * 16) / size} style={style} {...BOX}>
+    <svg
+      width={size}
+      height={size}
+      strokeWidth={(STROKE_PX * 16) / size}
+      style={style}
+      className={className}
+      {...BOX}
+    >
       {children}
     </svg>
   )

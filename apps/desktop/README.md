@@ -71,7 +71,39 @@ codesign -d --entitlements - release/mac-arm64/omni.app
 应用能起、渲染层能画、`which` 探测能跑、codex 子进程能 spawn 并读文件。
 **如果哪天加了新的原生依赖或新的子进程，重跑一遍这三条命令再发版。**
 
-## 更新检查
+## 本机自更新：改完代码，在应用里点一下
+
+装在 `/Applications/omni.app` 的那份是从**这台机器上的源码**打出来的，所以
+「让刚改的代码生效」这件事不必绕一圈终端。侧栏底下那一行（`UpdateRow`）
+在**有源码比这份包新**时出现，点它就是：
+
+```
+pnpm --filter @omni/desktop run dist:local   # 只出 .app，不打 DMG（实测 ~11 秒）
+ditto → 换掉 /Applications/omni.app → open   # 由一个独立脚本在应用退出后做
+```
+
+三件事值得知道：
+
+- **判据是文件时间，不是版本号。** 版本号来自 git 提交数，而开发时的改动
+  大多还没提交——按版本号比，改完它会说「已经是最新」。所以直接问文件系统：
+  有没有源码文件比装着的这份包新（`find -newer`，剪掉 node_modules/.git/release/out/dist）。
+- **源码路径是打包时烤进去的**（`omni.repo`，见 `scripts/stamp-version.mjs`）。
+  包拷到别人机器上时那个路径不存在，这一行**整个不出现**——不是灰掉，是不画。
+- **换包在应用退出之后由独立进程做**：等旧进程真的退出 → `ditto` 到旁边 →
+  同目录两次 `mv`（同盘原子）→ 失败就把旧的挪回来。这一步没有界面能报错，
+  所以它有一条**真跑一遍**的测试（`selfupdate.test.ts`）。
+
+第一次（或者按钮本身坏了）手动装：**先退出 omni**，然后
+
+```sh
+pnpm --filter @omni/desktop run dist:local
+ditto release/mac-arm64/omni.app /Applications/omni.app.新 \
+  && rm -rf /Applications/omni.app \
+  && mv /Applications/omni.app.新 /Applications/omni.app \
+  && open /Applications/omni.app
+```
+
+## 更新检查（远端）
 
 **只查不装，这是有意的。** macOS 上装更新走 Squirrel.Mac，而它会校验新旧两个
 版本的代码签名——没签名的应用它根本不会给你装。硬塞一个 `electron-updater`
@@ -90,6 +122,18 @@ feed 地址填在 `apps/desktop/package.json` 的 `omni.updateFeed`
 
 `url` **只认 https**——一个能被改成 `http://` 或 `file://` 的更新地址，
 就是一条能把用户引去任意地方的路。
+
+## 通知：出声的三件事，以及一个已知的洞
+
+「跑完了 / 跑挂了 / 有人等你批」会发系统通知（`main/attention.ts`）。四条克制：
+窗口在前台不弹、同一件事只弹一次、**15 秒以内跑完的不弹**（那种你八成还盯着屏幕）、
+**自己按停的不弹**（那是你刚做的动作，报告它等于回声）。
+
+**已知的洞**：窗口在前台、但你看的是**另一条**会话时收不到任何信号——
+主进程不知道渲染层选中的是谁，所以老实按「窗口是否前台」抑制，宁可少响一次。
+要补得让渲染层把当前选中的会话报上来，那是另一条通道。
+
+Dock 角标只算**挂起的审批**，不算在跑的轮次：角标是「有事等你做」，不是「它在忙」。
 
 ## 已知限制
 

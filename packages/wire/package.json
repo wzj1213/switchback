@@ -1,0 +1,18 @@
+{
+  "name": "@omni/wire",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "传输层的规矩：编号、按确认保留、分片、游标补洞。宿主与客户端共用同一份。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@omni/protocol": "workspace:*"
+  }
+}

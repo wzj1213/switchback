@@ -3,6 +3,7 @@ import type { Settings } from "../useSettings.js"
 import { TRUSTS } from "./Composer.js"
 import { EngineVersions } from "./EngineVersions.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
+import { useModalKeys } from "../useModalKeys.js"
 
 /**
  * 设置。
@@ -61,14 +62,14 @@ function Segmented<T extends string>({
   onPick: (id: T) => void
 }): React.JSX.Element {
   return (
-    <div className="seg" role="radiogroup">
+    <div className="switch" role="radiogroup">
       {options.map((option) => (
         <button
           key={option.id}
           type="button"
           role="radio"
           aria-checked={option.id === value}
-          className={`seg__item${option.id === value ? " seg__item--on" : ""}`}
+          className={`switch__item${option.id === value ? " switch__item--on" : ""}`}
           onClick={() => {
             onPick(option.id)
           }}
@@ -101,6 +102,8 @@ export interface SettingsPanelProps {
 
 export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
   const { settings, onPatch } = props
+  // 这是最上层的模态，却曾经是唯一按 Esc 关不掉的浮层（见 `useModalKeys`）
+  const box = useModalKeys(props.onClose)
   return (
     <div
       className="set__scrim"
@@ -111,7 +114,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         if (e.target === e.currentTarget) props.onClose()
       }}
     >
-      <div className="set" role="dialog" aria-label="设置">
+      <div className="set" ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-label="设置">
         <header className="set__head">
           <span className="set__heading">设置</span>
           <span className="set__ver">omni {props.version}</span>

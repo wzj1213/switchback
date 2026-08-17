@@ -17,7 +17,7 @@ import { SlashList } from "./SlashList.js"
 export function Prompt({
   value,
   detached,
-  busyHint = false,
+  starting = false,
   queueing = false,
   steering = false,
   cwd,
@@ -30,8 +30,8 @@ export function Prompt({
 }: {
   value: string
   detached: boolean
-  /** 发不出去是因为「正在跑」而不是「这是历史」。文案要说清楚是哪一种。 */
-  busyHint?: boolean
+  /** 引擎还在起：发不出去，但**不是**因为「正在跑」。 */
+  starting?: boolean
   /** 现在发出去会进队列，等这一轮跑完再发。占位文案据此换一种说法。 */
   queueing?: boolean
   /**
@@ -84,12 +84,12 @@ export function Prompt({
         disabled={detached}
         // 输入框直接说清为什么用不了。留一个能打字却答非所问的框，比把它关掉糟得多
         placeholder={
-          steering
+          starting
+            ? "引擎正在启动，起来就能发。"
+            : steering
             ? "它还在跑——现在打的会直接插进去，立刻生效。"
             : queueing
             ? "它还在跑——现在打的会排在后面，这一轮停了就发出去。"
-            : busyHint
-            ? "这一轮还在跑。等它停下，或者点右侧「停止」。"
             : detached
               ? "这是重启前的历史记录。点右侧「继续」把引擎接回来。"
               : "交代任务…（@ 引用文件，/ 用命令）"

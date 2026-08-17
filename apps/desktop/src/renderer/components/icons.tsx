@@ -55,7 +55,7 @@ export function SearchIcon({ size }: { size?: number } = {}): React.JSX.Element 
 /** 展开/折叠。转 90° 而不是换成另一个图标——转动本身就说明了「同一个东西的两态」。 */
 export function ChevronIcon({ open = false, size = 12 }: { open?: boolean; size?: number }): React.JSX.Element {
   return (
-    <Svg size={size} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms ease" }}>
+    <Svg size={size} className={`chev${open ? " chev--open" : ""}`}>
       <path d="M5.9 3.5 10.1 8 5.9 12.5" {...LINE} />
     </Svg>
   )

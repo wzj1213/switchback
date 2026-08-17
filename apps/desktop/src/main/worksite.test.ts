@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest"
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn() } }))
 
-const { worksiteInfo } = await import("./worksite.js")
+const { worksiteInfo, parseStatus } = await import("./worksite.js")
 
 /**
  * 真的建一个 git 仓库来测。
@@ -53,5 +53,33 @@ describe("工作区状态", () => {
 
   it("目录不存在也不抛——界面不该因为一个失效的路径炸掉", async () => {
     expect(await worksiteInfo("/根本没有这个目录/xyz")).toEqual({})
+  })
+})
+
+/**
+ * `git status --porcelain -z` 的解析。
+ *
+ * **用 `-z` 而不是默认输出**：默认那套会给含空格或非 ASCII 的路径加引号并转义
+ * （`"a b/\344\270\255.md"`），自己解那套引号是纯粹的自找麻烦。
+ */
+describe("工作区里变了哪些文件", () => {
+  it("普通的几条", () => {
+    expect(parseStatus(" M src/a.ts\0?? new.md\0")).toEqual(["src/a.ts", "new.md"])
+  })
+
+  it("**含空格和中文的路径原样出来**——这正是不用默认输出的理由", () => {
+    expect(parseStatus(" M 我的 笔记/一 二.md\0")).toEqual(["我的 笔记/一 二.md"])
+  })
+
+  it("**重命名那条的旧名单独占一段**，不能当成另一个改动", () => {
+    expect(parseStatus("R  新.ts\0旧.ts\0 M other.ts\0")).toEqual(["新.ts", "other.ts"])
+  })
+
+  it("干净的工作区就是空的", () => {
+    expect(parseStatus("")).toEqual([])
+  })
+
+  it("末尾没有分隔符也不崩（不同 git 版本给的不完全一样）", () => {
+    expect(parseStatus(" M a.ts")).toEqual(["a.ts"])
   })
 })

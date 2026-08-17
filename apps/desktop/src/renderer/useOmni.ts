@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command } from "@omni/protocol"
 import { clearNotices, initial, reduceAll, type ViewState } from "@omni/store"
-import { initialStream, received, replayed, reset, resynced, type Sealed, type Step, type Stream } from "./stream.js"
+import {
+  initialStream,
+  received,
+  replayed,
+  reset,
+  resynced,
+  type Sealed,
+  type Step,
+  type Stream,
+} from "@omni/wire"
 
 export interface Omni {
   state: ViewState

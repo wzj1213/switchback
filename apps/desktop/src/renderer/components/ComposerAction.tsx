@@ -16,6 +16,7 @@ import { applyCommand } from "../slash.js"
 export function Action({
   detached,
   busy,
+  starting,
   empty,
   onResume,
   onInterrupt,
@@ -23,12 +24,23 @@ export function Action({
 }: {
   detached: boolean
   busy: boolean
+  /** 引擎还在起。**不是「停止」**：那时没有任何东西可停 */
+  starting: boolean
   empty: boolean
   onResume?: () => void
   onInterrupt?: () => void
   onSend: () => void
 }): React.JSX.Element {
   if (detached) return <Resume onResume={onResume} />
+  // 起引擎的那几百毫秒里摆一颗禁着的「发送」——摆「停止」是在说谎，
+  // 那时候没有任何东西可停
+  if (starting) {
+    return (
+      <button className="send" type="button" title="引擎正在启动" aria-label="发送" disabled>
+        <SendIcon />
+      </button>
+    )
+  }
   if (busy) {
     // 跑着的时候把「发送」换成「停止」而不是灰掉：**这时候人真正想按的是停止**，
     // 而一个灰掉的发送键只告诉他「不能发」，没告诉他还能做什么

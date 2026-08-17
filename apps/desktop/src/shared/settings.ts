@@ -45,6 +45,12 @@ export interface Settings {
    * 而说不清的排序等于随机。新建的会话排在最前（它最新，也最可能是你要用的）。
    */
   threadOrder: Readonly<Record<string, readonly string[]>>
+  /**
+   * 项目在侧栏里的手动顺序（路径数组）。空 = 还没拖过，按活跃度排。
+   *
+   * 和 `threadOrder` 是同一条规矩的两个尺度：**拖过一次，整段就归你排**。
+   */
+  projectOrder: readonly string[]
   /** 新会话默认用哪家引擎。空 = 按 `lastUsed` 走（见那边）。 */
   defaultEngine: string
   /** 新会话默认的信任档。 */
@@ -103,6 +109,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   projects: [],
   pinned: [],
   pinnedThreads: [],
+  projectOrder: [],
   threadOrder: {},
   defaultEngine: "",
   defaultTrust: "auto-edit",

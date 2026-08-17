@@ -5,13 +5,13 @@ import type { RpcPeer } from "../rpc.js"
 import {
   canList,
   capabilitiesOf,
+  catalogOf,
   contextWindows,
   currentModeOf,
-  effortsOf,
-  modelsOf,
   modesOf,
   startupMessage,
 } from "./setup.js"
+import type { Catalog } from "./setup.js"
 import type { AcpInitialize, AcpNewSession } from "./wire.js"
 
 /**
@@ -59,6 +59,16 @@ export interface OpenState {
   canList: boolean | undefined
   /** 当前推理强度。有的适配器把它做成会话级选项（kimi 的 `thinking`）。 */
   effort: string | undefined
+  /**
+   * **换模型往哪儿发**：有值就是 `session/set_config_option` 的 `configId`，
+   * `undefined` 就是规范的 `session/set_model`。
+   *
+   * 「清单从哪儿读的，就设回哪儿」——理由见 `modelCatalogOf`：ZCode 的桥
+   * 只实现了前者，拿后者去设会得到一条 `Method not found` 的红色故障。
+   */
+  modelConfig: string | undefined
+  /** 换强度要报的 `configId`。各家名字不一样（kimi `thinking`、ZCode `thought`）。 */
+  effortConfig: string | undefined
   /** modelId → 上下文窗口大小。见 `contextWindows`：换模型时分母会变。 */
   windowOf: Readonly<Record<string, number>>
   /** 当前模型的窗口大小。没有就不画比例条——不猜分母。 */
@@ -178,24 +188,28 @@ async function forkSession(ctx: OpenCtx, handle: string, shared: Shared): Promis
   adopt(ctx, forked)
   }
 
+/**
+ * 把一份清单落到状态上。
+ *
+ * **开场时和 agent 中途自己改配置时走的是同一步**（见 `update.ts` 的
+ * `config_option_update`）。写两遍的下场是其中一遍漏掉一样——
+ * 而漏掉不报错，只会让界面上摆着一个引擎已经不认的选项。
+ */
+export function adoptCatalog(state: OpenState, catalog: Catalog): void {
+  state.models = catalog.models
+  state.modelConfig = catalog.modelConfig
+  state.effortConfig = catalog.effortConfig
+  state.effort = catalog.effort
+}
+
 /** 认领一个刚开出来（或分出来）的会话：记下 id、模型、档位、强度。 */
 function adopt(ctx: OpenCtx, created: AcpNewSession): void {
   const id = created.sessionId
   if (id === undefined) throw new Error(`${ctx.config.id} 没有返回 sessionId，无法继续`)
   ctx.state.acpSession = id
   ctx.req.onHandle?.(id)
-  const levels = effortsOf(created)
-  // 强度是**会话级**的（kimi 的 thinking 换模型不换档），所以挂到每个模型上
-  // 都是同一份。界面那套「模型 → 强度」的形状正好装得下
-  ctx.state.models =
-    levels === undefined
-      ? modelsOf(created)
-      : modelsOf(created).map((m) => ({
-          ...m,
-          efforts: levels.efforts,
-          ...(levels.current === undefined ? {} : { defaultEffort: levels.current }),
-        }))
-  ctx.state.effort = levels?.current
+  // 模型、强度、以及**它们各自设回哪儿**：一次算齐（见 `catalogOf`）
+  adoptCatalog(ctx.state, catalogOf(created))
   ctx.state.modes = modesOf(created)
   ctx.state.mode = currentModeOf(created)
   ctx.state.windowOf = contextWindows(created)

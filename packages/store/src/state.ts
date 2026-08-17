@@ -15,8 +15,12 @@ export interface ViewState {
   turnOwner: Readonly<Record<TurnId, ThreadId>>
   /** 每个会话的上下文用量。引擎不报就没有这一项。 */
   usage: Readonly<Record<ThreadId, Usage>>
-  /** 每个会话可选的模型。引擎报了才有。 */
-  models: Readonly<Record<ThreadId, readonly ModelOption[]>>
+  /**
+   * 每个会话可选的模型，**连同报它的那家引擎**。引擎报了才有。
+   *
+   * 记着「谁报的」是为了切引擎之后不撒谎：见 `modelsOf`。
+   */
+  models: Readonly<Record<ThreadId, { engine: string; list: readonly ModelOption[] }>>
   /** 这台机器上可用的引擎。宿主启动时报一次。 */
   engines: readonly EngineInfo[]
   /** 引擎层面的故障。最新在后。 */
@@ -96,8 +100,23 @@ export function usageOf(state: ViewState, threadId: ThreadId): Usage | undefined
   return state.usage[threadId]
 }
 
-export function modelsOf(state: ViewState, threadId: ThreadId): readonly ModelOption[] {
-  return state.models[threadId] ?? []
+/**
+ * 一个会话现在能选哪些模型。**要求这份清单正是当前这家引擎报的**，
+ * 对不上就当没有。
+ *
+ * ## 为什么不是简单地取出来就完了
+ *
+ * 模型 id 是各家私有的，而一条会话中途会换引擎。切过去之后新那家的清单
+ * 是**异步**才到的，而且它完全可能一个都报不上来（`models()` 失败就是空数组，
+ * 那时宿主什么都不发）。只按会话 id 取的话，那段时间里界面上摆的是
+ * **上一家的模型**——点一下就拿 claude 的模型 id 去设给 codex。
+ *
+ * 判据放在这里而不是让每个调用方自己比：漏比一处就是一个会撒谎的控件，
+ * 而它不会报错。
+ */
+export function modelsOf(state: ViewState, threadId: ThreadId, engine: string): readonly ModelOption[] {
+  const known = state.models[threadId]
+  return known?.engine === engine ? known.list : []
 }
 
 /** 取一个会话能用的斜杠命令。引擎没报过就是空的，界面据此只显示 omni 自己那几条。 */

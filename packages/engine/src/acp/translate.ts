@@ -1,4 +1,5 @@
 import type { FileChange, ToolCallItem, ToolDetail, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
+import { synthDiff } from "../synth.js"
 import type { AcpDiff, AcpStopReason, AcpToolCall } from "./wire.js"
 
 /**
@@ -42,26 +43,37 @@ function stringField(raw: Record<string, unknown> | undefined, key: string): str
   return typeof value === "string" && value !== "" ? value : undefined
 }
 
-/** 逐行数增删。`oldText` 为 null 是新建文件，不是「旧内容是空串」。 */
-function countLines(text: string | null | undefined): number {
-  if (text === undefined || text === null || text === "") return 0
-  return text.split("\n").filter((l) => l !== "").length
-}
-
+/**
+ * ACP 的 diff 内容块 → `FileChange`。
+ *
+ * ## 上一版把「整份文件」当成了「这次改了多少」
+ *
+ * ACP 给的是**前后全文**（`oldText` / `newText`），不是 unified diff。上一版直接
+ * 数这两份全文各有多少行当增删数，于是**在 500 行的文件里改一行，界面上写着
+ * `+500 −500`**；那份「diff」（其实是整份新文件）再逐行过渡染色器，正文里以
+ * `-` 或 `+` 开头的行（Markdown 列表、YAML）全被画成红绿。
+ * 当时的注释写着「别硬造一个假 diff 出来」——那句话防的是**凭空**加前缀，
+ * 而 `synthDiff` 不是凭空：两份全文都在手上，掐掉首尾相同的行就是真的改动范围。
+ *
+ * `add` 那一支照旧把**全文**放进 `diff`（协议规定 add/delete 时它是文件内容本身，
+ * 渲染层按 `kind` 读），但行数也走同一个口径算——不然「新建一个含空行的文件」
+ * 和「改同样多行」会报出两个不同的语义。
+ */
 function toFileChange(entry: AcpDiff): FileChange | undefined {
   if (entry.type !== "diff" || entry.path === undefined) return undefined
   const isNew = entry.oldText === undefined || entry.oldText === null
-  const added = countLines(entry.newText)
-  const removed = countLines(entry.oldText)
-  // ACP 给的是**前后全文**，不是 unified diff——渲染层要靠 kind 区分，
-  // 这里就照实标 add / update，别硬造一个 `+`/`-` 前缀的假 diff 出来
-  return {
-    path: entry.path,
-    kind: isNew ? "add" : "update",
-    ...(entry.newText === undefined ? {} : { diff: entry.newText }),
-    added,
-    removed: isNew ? 0 : removed,
+  const newText = entry.newText ?? ""
+  if (isNew) {
+    return {
+      path: entry.path,
+      kind: "add",
+      ...(entry.newText === undefined ? {} : { diff: entry.newText }),
+      added: synthDiff("", newText).added,
+      removed: 0,
+    }
   }
+  const synth = synthDiff(entry.oldText ?? "", newText)
+  return { path: entry.path, kind: "update", diff: synth.diff, added: synth.added, removed: synth.removed }
 }
 
 function editDetail(call: AcpToolCall): ToolDetail {

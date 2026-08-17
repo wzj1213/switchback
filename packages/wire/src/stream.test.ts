@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Event } from "@omni/protocol"
-import { initialStream, received, replayed, reset, resynced, type Sealed, type Step } from "./stream.js"
+import { initialStream, received, replayed, reset, resynced, type Step } from "./stream.js"
+import type { Sealed } from "./types.js"
 
 const ev = (tag: string): Event => ({ type: "item.delta", at: 0, itemId: "i", append: tag })
 const sealed = (...seqs: number[]): Sealed[] => seqs.map((seq) => ({ seq, event: ev(`#${String(seq)}`) }))

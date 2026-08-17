@@ -56,6 +56,9 @@ importers:
       '@omni/store':
         specifier: workspace:*
         version: link:../../packages/store
+      '@omni/wire':
+        specifier: workspace:*
+        version: link:../../packages/wire
       '@omni/worksite':
         specifier: workspace:*
         version: link:../../packages/worksite
@@ -184,6 +187,12 @@ importers:
   packages/protocol: {}
 
   packages/store:
+    dependencies:
+      '@omni/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/wire:
     dependencies:
       '@omni/protocol':
         specifier: workspace:*

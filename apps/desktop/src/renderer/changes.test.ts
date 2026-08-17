@@ -29,22 +29,30 @@ describe("变更汇总", () => {
     const out = changesOf([edit({ id: "a", path: "/w/x.ts", added: 3, removed: 1 }),
       edit({ id: "b", path: "/w/x.ts", added: 2, removed: 0 }),
       edit({ id: "c", path: "/w/x.ts", added: 1, removed: 1 })])
-    expect(out).toEqual({ files: 1, added: 6, removed: 2 })
+    expect({ files: out.files, added: out.added, removed: out.removed }).toEqual({ files: 1, added: 6, removed: 2 })
+    // 逐个文件也要给得出来——那枚胶囊点开之后要列的就是它
+    expect(out.list.map((f) => [f.path, f.added, f.removed])).toEqual([["/w/x.ts", 6, 2]])
   })
 
   it("多个文件各算各的", () => {
-    expect(changesOf([edit({ id: "a", path: "/w/x.ts", added: 3, removed: 0 }), edit({ id: "b", path: "/w/y.ts", added: 4, removed: 2 })])).toEqual({
-      files: 2,
-      added: 7,
-      removed: 2,
-    })
+    const out = changesOf([
+      edit({ id: "a", path: "/w/x.ts", added: 3, removed: 0 }),
+      edit({ id: "b", path: "/w/y.ts", added: 4, removed: 2 }),
+    ])
+    expect({ files: out.files, added: out.added, removed: out.removed }).toEqual({ files: 2, added: 7, removed: 2 })
+    // **按首次出现排**，不按字母：你回头找的是「它刚才动的那个」
+    expect(out.list.map((f) => f.path)).toEqual(["/w/x.ts", "/w/y.ts"])
   })
 
   it("**没成功的编辑不算**——失败的那次没有真的改到磁盘", () => {
-    expect(changesOf([edit({ id: "a", path: "/w/x.ts", added: 9, removed: 9, status: "failed" })])).toEqual({ files: 0, added: 0, removed: 0 })
+    expect(changesOf([edit({ id: "a", path: "/w/x.ts", added: 9, removed: 9, status: "failed" })])).toMatchObject({
+      files: 0,
+      added: 0,
+      removed: 0,
+    })
   })
 
   it("没有编辑就是零，界面据此整枚不显示", () => {
-    expect(changesOf([])).toEqual({ files: 0, added: 0, removed: 0 })
+    expect(changesOf([])).toEqual({ files: 0, added: 0, removed: 0, list: [] })
   })
 })

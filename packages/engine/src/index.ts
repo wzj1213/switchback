@@ -21,7 +21,9 @@ export {
   toDeny,
 } from "./claude/permission.js"
 export { toolDetail, assistantItems, turnStatus } from "./claude/translate.js"
-export { synthDiff, fileChangesOf } from "./claude/diff.js"
+export { fileChangesOf } from "./claude/diff.js"
+/** 合成 diff。Claude 与 ACP 三家共用——两边拿到的都是「改前 / 改后」两份全文。 */
+export { synthDiff } from "./synth.js"
 export { createRpc } from "./rpc.js"
 export { handleNotification } from "./codex/notify.js"
 export {

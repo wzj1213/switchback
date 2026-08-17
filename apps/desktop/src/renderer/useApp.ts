@@ -5,7 +5,7 @@ import type { Command, EngineThread, RateLimits, Thread } from "@omni/protocol"
 import { useOmni } from "./useOmni.js"
 import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
-import type { AccountLine } from "./components/AccountRow.js"
+import type { AccountLine } from "./components/SidebarFoot.js"
 import { useWorkspaceActions } from "./useWorkspaceActions.js"
 import { learnFrom, openWith } from "./newThreadPrefs.js"
 
@@ -19,7 +19,19 @@ import { learnFrom, openWith } from "./newThreadPrefs.js"
  */
 export interface AppApi {
   state: ViewState
+  /** 全部会话，**含临时的**。选中判定、当前会话都从这份里找。 */
   rows: readonly ThreadRow[]
+  /**
+   * 侧栏那份：**临时会话不在里面**。
+   *
+   * 点一下「+」（以及 omni 启动时自动开的那条）先给的是一个**临时窗口**：
+   * 引擎已经起好了、模型和斜杠命令都能用，但侧栏里没有它——
+   * 发出第一句话它才正式出现（见 `Thread.provisional`）。
+   *
+   * 不这么做的话，你以为自己只是点开看看，结果攒出一串「新会话」还得一条条删；
+   * 而每次启动都自动开一条，跑一周下来侧栏那一列全是空壳。
+   */
+  sidebarRows: readonly ThreadRow[]
   /** 当前选中的会话；一个都没有时是 undefined。 */
   thread: Thread | undefined
   notices: readonly Notice[]
@@ -151,6 +163,9 @@ export function useApp(): AppApi {
   return {
     state: omni.state,
     rows,
+    // 侧栏只看「已经算数」的那些。判据由宿主给（`provisional`），不在这里猜——
+    // 猜的话（比如「没有 item 就算临时」）会把跨引擎分叉出来的空会话一起藏掉
+    sidebarRows: rows.filter((r) => r.thread.provisional !== true),
     thread,
     notices,
     shell,

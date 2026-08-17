@@ -172,19 +172,21 @@ describe("host", () => {
         .map((e) => e.thread.status)
 
     await host.dispatch({ type: "thread.prompt", threadId, text: "hi" })
-    expect(statuses()).toEqual(["running"])
+    // 打头那条 `idle` 是这条会话**转正**（临时 → 正式，见 `prompt.ts` 的 `commit`）：
+    // 状态本身没变，变的是「它开始算数了」——落盘、进侧栏都从这一刻起
+    expect(statuses()).toEqual(["idle", "running"])
 
     const answer = session().ask(ask)
-    expect(statuses()).toEqual(["running", "waiting_approval"])
+    expect(statuses()).toEqual(["idle", "running", "waiting_approval"])
 
     const card = items(events).find((i) => i.kind === "approval")
     await host.dispatch({ type: "approval.resolve", itemId: card?.id ?? "", allow: true, remember: "once" })
     await answer
-    expect(statuses()).toEqual(["running", "waiting_approval", "running"])
+    expect(statuses()).toEqual(["idle", "running", "waiting_approval", "running"])
 
     const turnId = session().prompts[0]?.turnId ?? ""
     session().emit({ type: "turn.completed", at: 0, turnId, status: "completed" })
-    expect(statuses()).toEqual(["running", "waiting_approval", "running", "idle"])
+    expect(statuses()).toEqual(["idle", "running", "waiting_approval", "running", "idle"])
   })
 
   it("轮次失败时会话落 failed，不是静悄悄回到空闲", async () => {
@@ -643,13 +645,58 @@ describe("跨引擎接力", () => {
    * 那时新说的话会排队，切换要等队列被 drain 才发生。
    */
   const handoffTo = async (rig: ReturnType<typeof setupTwoEngines>, to: string): Promise<string> => {
+    const threadId = await worked(rig)
+    await rig.host.dispatch({ type: "thread.handoff", threadId, to })
+    await rig.host.dispatch({ type: "thread.prompt", threadId, text: "接着弄" })
+    return threadId
+  }
+
+  /**
+   * 让这条会话**开过工**：发一句话（它就此从临时会话转正）再让那一轮收工。
+   *
+   * 「下一句生效」那套规则只对开过工的会话成立——还没说过话的临时会话
+   * 切引擎是当场切的（见 `Thread.provisional`），所以每条测它的用例
+   * 都得先走这一步，否则测的是另一条路。
+   */
+  /** 起一个只挂这些驱动的宿主。下面几条用例各要一种特殊驱动（起不来的、报模型的、报能力的）。 */
+  const hostWith = (drivers: Record<string, EngineDriver>): { host: Host; events: Event[] } => {
+    const events: Event[] = []
+    const counter = { n: 0 }
+    const host = createHost({
+      drivers,
+      home: "/h",
+      emit: (e) => events.push(e),
+      newId: (p) => {
+        counter.n += 1
+        return `${p}-${String(counter.n)}`
+      },
+      now: () => 0,
+    })
+    return { host, events }
+  }
+
+  /** 一个只报「我叫什么、我能干什么、我有哪些模型」的驱动。 */
+  const stub = (id: string, caps: Partial<{ attachments: boolean }> = {}): EngineDriver => ({
+    id,
+    start: (req) =>
+      Promise.resolve({
+        threadId: req.threadId,
+        prompt: () => Promise.resolve(),
+        interrupt: () => Promise.resolve(),
+        setTrust: () => Promise.resolve(),
+        models: () => Promise.resolve([{ id: `${id}-model`, label: id }]),
+        capabilities: () => ({ ...NO_CAPABILITIES, ...caps }),
+        setModel: () => Promise.resolve(),
+        dispose: () => Promise.resolve(),
+      } as unknown as EngineSession),
+  })
+
+  const worked = async (rig: ReturnType<typeof setupTwoEngines>): Promise<string> => {
     const { host, events, sessions } = rig
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
     await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
     const first = sessions[0]
     first?.emit({ type: "turn.completed", at: 0, turnId: first.prompts[0]?.turnId ?? "", status: "completed" })
-    await host.dispatch({ type: "thread.handoff", threadId, to })
-    await host.dispatch({ type: "thread.prompt", threadId, text: "接着弄" })
     return threadId
   }
 
@@ -687,10 +734,11 @@ describe("跨引擎接力", () => {
    * 新进程不起、模型不清——那一串副作用发生在用户还什么都没说的时候，
    * 看起来就是莫名其妙地变了。
    */
-  it("只点下拉不说话：什么都没变，旧引擎还活着", async () => {
-    const { host, events, sessions } = setupTwo()
+  it("开过工的会话：只点下拉不说话，什么都没变，旧引擎还活着", async () => {
+    const rig = setupTwo()
+    const { host, events, sessions } = rig
     await host.dispatch(create)
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    const threadId = await worked(rig)
     await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
     expect(sessions).toHaveLength(1)
     expect(sessions[0]?.disposed).toBe(false)
@@ -702,13 +750,110 @@ describe("跨引擎接力", () => {
   })
 
   it("选回当前那家 = 取消待切换", async () => {
-    const { host, events } = setupTwo()
+    const rig = setupTwo()
+    const { host, events } = rig
     await host.dispatch(create)
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    const threadId = await worked(rig)
     await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
     await host.dispatch({ type: "thread.handoff", threadId, to: "fake" })
     const last = events.filter((e) => e.type === "thread.updated").at(-1)
     expect(last?.type === "thread.updated" ? last.thread.nextEngine : "x").toBeUndefined()
+  })
+
+  /**
+   * **临时会话反过来：当场切。**
+   *
+   * 它还什么都没说——没有正在跑的活、没有要保住的上下文，「点错了」的代价是零。
+   * 而推迟有个实打实的代价：模型清单要引擎起来才报，不当场切就等于
+   * 「你得先说一句话，才能挑这一句用哪个模型」。
+   */
+  it("**还没说过话的会话：当场切**——新那家起来了，旧那家停了", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    expect(sessions).toHaveLength(2)
+    expect(sessions[0]?.disposed).toBe(true)
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    const thread = last?.type === "thread.updated" ? last.thread : undefined
+    expect(thread?.engine).toBe("other")
+    expect(thread?.nextEngine).toBeUndefined()
+    // 还是临时的：切引擎不算「说过话」
+    expect(thread?.provisional).toBe(true)
+    // **旧那家什么都没发生过，历史里不留一笔**——挑三次就记三条的话，
+    // 时间线会被「我点错了」填满
+    expect(thread?.engineHistory).toEqual(["other"])
+  })
+
+  /**
+   * **起不来就原样退回。** 上一版是先 dispose 旧的再 launch 新的，于是
+   * 新那家起不来（没装、没登录、版本不对——引擎下拉里那些标着「未安装」的
+   * 仍然可选，故意的）时旧进程也已经没了：**那条会话从此发不出任何一句话**，
+   * 而界面上看不出为什么。
+   */
+  it("**新那家起不来就原样退回**——旧那家还活着，下一句照样发得出去", async () => {
+    const { driver, session } = fakeDriver()
+    const { host, events } = hostWith({
+      fake: driver,
+      bad: { id: "bad", start: () => Promise.reject(new Error("没装")) },
+    })
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await expect(host.dispatch({ type: "thread.handoff", threadId, to: "bad" })).rejects.toThrow("没装")
+    expect(session().disposed).toBe(false)
+    await host.dispatch({ type: "thread.prompt", threadId, text: "接着弄" })
+    expect(session().prompts.map((p) => p.text)).toEqual(["接着弄"])
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.engine : "").toBe("fake")
+  })
+
+  /**
+   * 模型清单**带着报它的那家一起走**。不带的话，切过去而新那家一个模型都报不上来时
+   * （`models()` 失败就是空数组，那时宿主什么都不发），界面上留着的是上一家的清单
+   * ——点一下就拿 claude 的模型 id 去设给 codex。
+   */
+  it("模型清单报的是哪一家，事件里说得出来", async () => {
+    const { host, events } = hostWith({ fake: stub("fake"), other: stub("other") })
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    await new Promise((done) => setTimeout(done, 5))
+    const reported = events
+      .filter((e) => e.type === "models.updated")
+      .map((e) => (e.type === "models.updated" ? [e.engine, e.models.map((m) => m.id).join()] : []))
+    expect(reported).toEqual([
+      ["fake", "fake-model"],
+      ["other", "other-model"],
+    ])
+  })
+
+  /**
+   * **换过去之后界面看到的能力是新那家的。**
+   *
+   * 上一版发的是局部那份 thread（`launch` 之前拼好的），而引擎能力是 `launch`
+   * 期间挂到 `live` 上的——于是换过去之后，贴图入口、改向提示照着**上一家**画。
+   * `create` 那边为同一个坑留过一行注释，这条路当初漏了。
+   */
+  it("换过去之后，界面拿到的是**新那家**的能力", async () => {
+    const { host, events } = hostWith({
+      fake: stub("fake", { attachments: true }),
+      other: stub("other", { attachments: false }),
+    })
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.capabilities?.attachments : "没有").toBe(false)
+  })
+
+  it("临时会话切过引擎之后，第一句话发给的是新那家", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    await host.dispatch({ type: "thread.prompt", threadId, text: "开工" })
+    expect((sessions[1]?.prompts ?? []).map((p) => p.text)).toEqual(["开工"])
+    expect(sessions[0]?.prompts ?? []).toHaveLength(0)
   })
 
   it("会话 id 不变，引擎历史往后接一手", async () => {
@@ -1192,9 +1337,12 @@ describe("活会话上限：闲着的先收掉", () => {
    * 一个 codex 会话实测 260 MB / 4 个进程，不设上限开五条就是 1.3 GB，
    * 而且全闲着。这里钉的是「收谁」和「绝不收谁」——后者更要紧。
    */
-  const rig = (maxLive: number): { host: Host; events: Event[]; disposed: string[] } => {
+  const rig = (
+    maxLive: number,
+  ): { host: Host; events: Event[]; disposed: string[]; emit: (id: string, e: Event) => void } => {
     const events: Event[] = []
     const disposed: string[] = []
+    const emitters = new Map<string, (e: Event) => void>()
     const counter = { n: 0 }
     const host = createHost({
       drivers: {
@@ -1203,6 +1351,7 @@ describe("活会话上限：闲着的先收掉", () => {
           start: (req) => {
             // 报个句柄，不然按规则它不该被收（收了回不来）
             req.onHandle?.(`cx-${req.threadId}`)
+            emitters.set(req.threadId, req.emit)
             return Promise.resolve({
               threadId: req.threadId,
               prompt: () => Promise.resolve(),
@@ -1228,12 +1377,23 @@ describe("活会话上限：闲着的先收掉", () => {
       },
       now: () => counter.n,
     })
-    return { host, events, disposed }
+    return { host, events, disposed, emit: (id, e) => emitters.get(id)?.(e) }
   }
 
-  const open = async (r: { host: Host; events: Event[] }): Promise<string> => {
+  /**
+   * 开一条会话，**发一句话让它转正，再让那一轮收工**。
+   *
+   * 三步缺一不可：一句话都没说的是临时会话，建下一条时本来就会被收掉
+   *（见 `session.ts` 的 `dropTemps`），根本轮不到上限这条规则；
+   * 而不收工的话它永远「正在跑」，那是另一条规则（正在跑的绝不收）。
+   */
+  const open = async (r: ReturnType<typeof rig>): Promise<string> => {
     await r.host.dispatch(create)
-    return r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+    const id = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+    await r.host.dispatch({ type: "thread.prompt", threadId: id, text: "hi" })
+    const turnId = r.events.filter((e) => e.type === "turn.started").at(-1)?.turn.id ?? ""
+    r.emit(id, { type: "turn.completed", at: 0, turnId, status: "completed" })
+    return id
   }
 
   it("没到上限不收任何东西", async () => {
@@ -1285,5 +1445,65 @@ describe("活会话上限：闲着的先收掉", () => {
     await r.host.dispatch({ type: "thread.prompt", threadId: first, text: "跑着呢" })
     await open(r)
     expect(r.disposed).toEqual([])
+  })
+})
+
+/**
+ * 临时会话：**发出第一句话才算数**。
+ *
+ * 点一下「+」（以及 omni 启动时自动开的那条）先给的是一个临时窗口——
+ * 引擎照起（模型清单、斜杠命令都要它才有），但它不进侧栏、不落盘。
+ * 「不进侧栏」是渲染层的事，这里钉的是它下面那条契约：`Thread.provisional`
+ * 什么时候立、什么时候清、以及没人要的那条怎么收场。
+ */
+describe("临时会话：发出第一句话才算数", () => {
+  const idOf = (events: Event[], at = 0): string => {
+    const started = events.filter((e) => e.type === "thread.started")[at]
+    return started?.type === "thread.started" ? started.thread.id : ""
+  }
+
+  it("新建出来就是临时的", async () => {
+    const { host, events } = setup()
+    await host.dispatch(create)
+    const started = events.find((e) => e.type === "thread.started")
+    expect(started?.type === "thread.started" ? started.thread.provisional : undefined).toBe(true)
+  })
+
+  it("**发出第一句话就转正**，而且转正那条排在 turn.started 前面（落盘顺序靠它）", async () => {
+    const { host, events } = setup()
+    await host.dispatch(create)
+    await host.dispatch({ type: "thread.prompt", threadId: idOf(events), text: "开工" })
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.provisional : "还在").toBeUndefined()
+    const types = events.map((e) => e.type)
+    const turned = events.findIndex((e) => e.type === "thread.updated" && e.thread.provisional === undefined)
+    expect(turned).toBeLessThan(types.indexOf("turn.started"))
+  })
+
+  /**
+   * **再点一次「+」，上一条临时会话就收掉。**
+   *
+   * 它不在侧栏里，所以一旦你又点了一次「+」或者切去别的会话，它就再也点不回来了
+   * ——而背后那个引擎进程还活着（实测一条 codex 会话 260 MB）。
+   * 看不见又回不去的东西不该继续占着进程。
+   */
+  it("**建下一条临时会话时，上一条被收掉**", async () => {
+    const { host, events, sessions } = setupTwoEngines()
+    await host.dispatch(create)
+    const first = idOf(events)
+    await host.dispatch(create)
+    expect(sessions[0]?.disposed).toBe(true)
+    expect(events.some((e) => e.type === "thread.removed" && e.threadId === first)).toBe(true)
+    expect(sessions[1]?.disposed).toBe(false)
+  })
+
+  it("**开过工的会话不收**——它已经是一条真会话了", async () => {
+    const { host, events, sessions } = setupTwoEngines()
+    await host.dispatch(create)
+    const first = idOf(events)
+    await host.dispatch({ type: "thread.prompt", threadId: first, text: "开工" })
+    await host.dispatch(create)
+    expect(sessions[0]?.disposed).toBe(false)
+    expect(events.some((e) => e.type === "thread.removed" && e.threadId === first)).toBe(false)
   })
 })

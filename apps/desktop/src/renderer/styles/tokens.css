@@ -15,16 +15,28 @@
   --bg-raised: #ffffff;
   --bg-hover: #f0f0f2;
   --bg-active: #e8e8ec;
+  /* 按下去的那一档。**hover 说的是「这儿能点」，按下态说的是「我点了」**——
+     macOS 上按下与松开之间那一百毫秒是「系统收到了」的唯一凭据。
+     灰阶步长跟着上面那串走（7-8），再深就撞上 --border-strong 了 */
+  --bg-press: #e0e0e5;
   --bg-code: #f6f6f7;
 
-  /* 描边 */
+  /*
+   * 描边分两个角色，**别混用**：
+   * - `--border-strong`：把窗口切成区块的那几条（侧栏/顶栏/输入区/对比分栏），
+   *   以及控件的轮廓。区块两侧的底色只差 2.76 L*，这条边得自己扛住分界。
+   * - `--border`：区块**内部**的分节线、卡片描边。
+   */
   --border: #e6e6e9;
   --border-strong: #d6d6da;
 
   /* 文字 */
   --text: #16161a;
   --text-muted: #6a6a73;
-  --text-faint: #9a9aa4;
+  /* 3.66:1 on 白。上一版 #9a9aa4 是 2.79:1，而深色那侧是 3.50——
+     同一个角色两套主题差 25%。**不再往上推到 4.5**：那会把它和 --text-muted
+     的 ΔL* 从 18.7 压到 10.6，三档文字层级当场变平（见 UI 计划第 35 条） */
+  --text-faint: #85858f;
   --text-inverse: #ffffff;
 
   /* 语义 */
@@ -44,6 +56,28 @@
   --sp-5: 24px;
   --sp-6: 32px;
 
+  /*
+   * 动效。**值与改之前逐字节相同**（同一件「浮现」在四处各写了一遍 120ms），
+   * 立 token 只为一件事：从此有一个来源，包括原来写在 `icons.tsx` 行内 style 里、
+   * 媒体查询根本盖不住的那一条。
+   *
+   * 不加第三档 `--dur-fast`、不改曲线：「ease 对 120ms 太软」是手感断言不是实测，
+   * 而这个仓库对手感改动的标准是出图比稿。
+   */
+  --dur: 120ms;
+  --dur-slow: 240ms;
+  --ease: ease;
+
+  /*
+   * 行高。13px × 1.6 = 20.8 让所有带字的控件都落在小数上（28.8 / 30.8 / 32.8），
+   * 而 2x 屏上 0.8px 是 1.6 个设备像素。定死两档把它们收进 4 的倍数。
+   *
+   * **不定 `--lh-base`**：14px 的控件只有侧栏的行，它已经由 `--sb-row-h` 钉死。
+   * 正文（`.md` / 用户消息）继续走 body 的 1.6——那是要读的东西，不是控件。
+   */
+  --lh-xs: 16px;
+  --lh-sm: 20px;
+
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
@@ -60,6 +94,14 @@
    * 而我上一版用 15px 写它，于是那块地方空得没有重量。
    */
   --text-xs: 11.5px;
+  /*
+   * 等宽正文（代码块、命令原文、diff、机器报错）。**只给等宽用**——
+   * 它不是第六档 UI 字号，界面文字仍然只有 xs/sm/base/lg/xl 五档。
+   *
+   * 上面那段说「桌面应用的正文没有理由比系统默认还小」，同一条推理再往下延一格：
+   * 代码块不是附注，不该和它共用 11.5。760px 列宽下 11.5 → 12.5 是 106 → 98 列，够。
+   */
+  --text-code: 12.5px;
   --text-sm: 13px;
   --text-base: 14px;
   --text-lg: 16px;
@@ -85,6 +127,10 @@
   --shadow-pop:
     0 1px 2px rgb(0 0 0 / 6%),
     0 8px 28px rgb(0 0 0 / 12%);
+  /* 控件用的那道。**浮层那道不能拿来给控件用**：它向下扩散 26px，
+     比一个 24px 的胶囊还高，糊到下一条设置项上。深色下直接不要——
+     那边的层次本来就靠底色差（--bg-raised 与 --bg-sunken 差 6.2 L*）*/
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 6%);
   --border-pop: var(--border);
 
   /*
@@ -102,6 +148,7 @@
     --bg-raised: #1d1d21;
     --bg-hover: #232328;
     --bg-active: #2c2c33;
+    --bg-press: #35353d;
     --bg-code: #202024;
 
     --border: #2a2a30;
@@ -125,6 +172,7 @@
 
     /* 深色下阴影不管用，改用更亮的描边划边界；阴影只留一点点做纵深 */
     --shadow-pop: 0 10px 32px rgb(0 0 0 / 55%);
+    --shadow-1: none;
     --border-pop: #43434d;
     --scrim: rgb(0 0 0 / 60%);
   }

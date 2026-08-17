@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
-import type { Notice } from "@omni/store"
-import { Composer } from "./Composer.js"
+import type { Notice, ThreadRow } from "@omni/store"
+import { Composer, labelOf } from "./Composer.js"
 import { useOmniActions } from "../useOmniActions.js"
 import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
@@ -25,7 +25,11 @@ export interface WorkspaceProps {
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
   notices: readonly Notice[]
+  /** 全部会话。故障横幅要靠它说清「出事的是哪一条」。 */
+  rows: readonly ThreadRow[]
   onDismiss: (id: string) => void
+  /** 点横幅上那个名字跳过去。 */
+  onSelect: (id: string) => void
   finding: boolean
   onFind: (query: string, next: boolean, forward: boolean) => Promise<FindResult>
   onCloseFind: () => void
@@ -98,6 +102,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
    * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
    */
   const { prefill, reuse } = useDraft(props.thread.draft)
+  // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
+  const stamp = props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`
   const actions = useOmniActions(props, {
     onEnv: () => {
       setEnv(true)
@@ -125,7 +131,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onReveal={props.onReveal}
         onCopy={props.onCopy}
       />
-      <Notices notices={props.notices} onDismiss={props.onDismiss} />
+      <Notices notices={props.notices} rows={props.rows} onDismiss={props.onDismiss} onSelect={props.onSelect} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
       <Transcript
         thread={thread}
@@ -135,7 +141,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onCopy={props.onCopy}
         onReuse={reuse}
       />
-      <Changed items={props.items} />
+      <Changed items={props.items} cwd={thread.cwd} stamp={stamp} onReveal={props.onReveal} onCopy={props.onCopy} />
       <Queued
         texts={thread.queued ?? []}
         onDrop={() => {
@@ -146,15 +152,20 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       />
       <Composer
         detached={thread.detached === true}
-        // 引擎还在起、或者上一轮还没跑完——两种都发不出去，但原因不同，文案也不同
-        busy={thread.status === "starting" || props.turn !== undefined}
+        /*
+         * **启动期和「上一轮还在跑」是两回事**，上一版把它们并成一个 `busy`，
+         * 于是引擎还没起来时屏幕上写着「它还在跑——现在打的会排在后面」，
+         * 而其实什么都没在跑；更糟的是输入框没被禁，回车会先清空文本、
+         * 再撞上宿主那句「会话不存在」——**那条消息就这么没了**。
+         */
+        starting={thread.status === "starting"}
+        busy={props.turn !== undefined}
         onInterrupt={() => {
           send({ type: "thread.interrupt", threadId: thread.id })
         }}
         engines={props.engines}
         cwd={thread.cwd}
-        // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
-        stamp={props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`}
+        stamp={stamp}
         searchFiles={props.searchFiles}
         prefill={prefill}
         canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments}
@@ -164,14 +175,18 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           actions.find((a) => a.command.name === name)?.run()
         }}
         /*
-         * 有待切换的引擎时**不给模型选择器**：手上这份清单是**旧那家**报的，
-         * 而它的模型 id 在新的一家那里通常根本不存在。摆一个选了会出错的控件
-         * 比不摆糟。清单空着界面自己就不画（见 `EngineSession.models` 的约定）。
-         * 发出第一句话、引擎真的换过去之后，新那家的清单就来了。
+         * 有待切换的引擎时，模型选择器变成**一句点不动的说明**（「切到 Codex 后可选」）。
+         * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常根本不存在，
+         * 所以确实不能挑；但上一版是把整个控件藏起来，而一个凭空消失的控件
+         * 读起来就是坏了——用户的原话是「切换别的引擎一个模型都不显示」。
+         *
+         * 只有**开过工的会话**会走到这里：还没说过话的临时会话切引擎是当场切的
+         *（见 `Thread.provisional`），那时新那家的清单直接就来了。
          */
-        models={thread.nextEngine === undefined ? props.models : []}
-        model={thread.nextEngine === undefined ? thread.model : undefined}
-        effort={thread.nextEngine === undefined ? thread.effort : undefined}
+        models={props.models}
+        model={thread.model}
+        effort={thread.effort}
+        {...(thread.nextEngine === undefined ? {} : { pending: labelOf(props.engines, thread.nextEngine) })}
         onModelChange={(model, effort) => {
           send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })
         }}

@@ -88,7 +88,12 @@ export function Approval({
   return (
     <div className="approval">
       <div className="approval__body">
-        <div className="approval__title">需要确认：{item.summary}</div>
+        {/* 命令原文走等宽：**它是要被读准的东西**，比例字体下 l/1/I 分不清——
+            同一条道理在工具行的路径上已经写过一遍 */}
+        <div className="approval__title">
+          <span className="approval__label">需要确认</span>
+          <code className="approval__cmd">{item.summary}</code>
+        </div>
         <div className="approval__detail">
           <span className="approval__label">原因</span>
           <span className="approval__reason">{item.reason}</span>

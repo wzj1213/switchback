@@ -20,12 +20,17 @@
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
+  line-height: var(--lh-xs);
   cursor: default;
 }
 
 .trigger:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+.trigger:active:not(:disabled) {
+  background: var(--bg-press);
 }
 
 /* 打开时保持高亮：不然面板浮在上面、触发器却是常态，
@@ -59,6 +64,9 @@
 
 /* ── 浮层 ─────────────────────────────────────────── */
 .pop {
+  /* 顶栏是拖拽区，而浮层可能从顶栏的按钮上弹出来——不写这一行，
+     那些菜单项在 Electron 里收不到点击 */
+  -webkit-app-region: no-drag;
   position: fixed;
   z-index: 50;
   max-height: min(60vh, 420px);
@@ -68,6 +76,26 @@
   border-radius: var(--radius);
   background: var(--bg-raised);
   box-shadow: var(--shadow-pop);
+}
+
+/* 入场：从 98% 淡进来。**只在位置算好之后**（见 `Popover.tsx` 的 `data-placed`）。
+   不做退场——那要引一份「正在关闭」的状态，会和 `close()` 打架。
+   `transform-origin` 保持居中：3% 的缩放在 120ms 里分不出是从哪个角长出来的 */
+.pop[data-placed="true"] {
+  animation: pop-in var(--dur) var(--ease);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop[data-placed="true"] {
+    animation: none;
+  }
 }
 
 .pop__section + .pop__section {
@@ -87,19 +115,90 @@
   align-items: flex-start;
   gap: 6px;
   width: 100%;
-  padding: 5px var(--sp-2);
+  padding: 6px var(--sp-2);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   text-align: left;
   cursor: default;
 }
 
 .pop__item:hover {
   background: var(--bg-hover);
+}
+
+.pop__item:active {
+  background: var(--bg-press);
+}
+
+/* ↓ 以下这几条**必须排在 `.pop__item` 之后**。
+   它们原来住在 app.css 里，而 main.tsx 把 popover.css 排在 app.css 之后——
+   同权重下 `.pop__item` 基类整块把它们盖掉：实测「恢复默认设置」上面那道分隔线
+   `border-top-width` 是 0、字色是正文黑，注释争取的效果一天都没兑现过。 */
+
+/* ── 分层菜单 ─────────────────────────────────────────
+ * 顶层一行一节，右边写着当前值。那一列不是装饰——它让这个面板
+ * 同时是一份「现在什么配置」的摘要，而平铺的版本要自己去列表里找那个勾。
+ */
+.pop__item--row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 当前值贴右，紧挨着那个 ›。**不许缩**：被截断的当前值就是错的信息 */
+.pop__value {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+/* 「恢复默认设置」和上面那几行之间画一道：它不是第 N 个选项，
+   是一个动作。不分开的话，人会在选项列表里数到它 */
+.pop__item--reset {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-2);
+  color: var(--text-muted);
+}
+
+.pop__item--reset svg {
+  margin-left: auto;
+}
+
+/* 二级页顶上那行返回。**做成一整行可点**，不是一个小箭头——
+   小箭头是这类菜单里最容易点空的东西 */
+.pop__back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  margin-bottom: 2px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.pop__back:hover {
+  color: var(--text);
+}
+
+.pop__back-arrow {
+  font-size: 15px;
+  line-height: 1;
 }
 
 /* 勾放在**左边固定一列**：放右边的话，选项长短不一时勾会跳来跳去，
@@ -154,19 +253,25 @@
   align-items: center;
   gap: var(--sp-2);
   width: 100%;
-  padding: 5px var(--sp-2);
+  padding: 6px var(--sp-2);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   text-align: left;
   cursor: default;
 }
 
 .pop__cmd:hover {
   background: var(--bg-hover);
+}
+
+/* 危险项排除：按下「删除」那一瞬红底被灰色盖掉，是最不该出现的一次反馈 */
+.pop__cmd:not(.pop__cmd--danger):active {
+  background: var(--bg-press);
 }
 
 .pop__cmd--danger:hover {
@@ -184,12 +289,21 @@
   color: inherit;
 }
 
+/* 条目右边那截提示（快捷键）。**贴右，而且比正文淡**：
+   它回答的是「还有别的路能到这儿」，不是这一条在说什么 */
+.pop__cmd-hint {
+  margin-left: auto;
+  padding-left: var(--sp-3);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
 /* ── 菜单顶上那块只读说明 ──────────────────────────
  * 命令回答「我能做什么」，这块回答**「我点的到底是哪个东西」**。
  * 侧栏一行只有一个截断的名字，右键之前经常是不确定的。
  */
 .pop__head {
-  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  padding: var(--sp-2);
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
@@ -220,12 +334,16 @@
  * 「我到底在哪儿、用谁、什么权限」——平时这些字散在四处（各贴各的地方，
  * 那样是对的），但切会话切多了、或者刚接力换过引擎之后，你要的是全部。
  */
-.env {
+/* `.card` 是引擎时间线那张（app.css 末尾）。**合并选择器而不是抄一份**：
+   两张卡是同一颗按钮二选一弹出来的，写成两份将来必然分岔 */
+.env,
+.card {
   padding: var(--sp-3);
   font-size: var(--text-sm);
 }
 
-.env__title {
+.env__title,
+.card__head {
   margin-bottom: var(--sp-2);
   color: var(--text-faint);
   font-size: var(--text-xs);

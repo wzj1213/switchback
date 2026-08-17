@@ -37,6 +37,7 @@ describe("偏好", () => {
       pinned: [],
       pinnedThreads: [],
       threadOrder: {},
+      projectOrder: [],
       defaultEngine: "",
       defaultTrust: "auto-edit",
       projectIcons: {},

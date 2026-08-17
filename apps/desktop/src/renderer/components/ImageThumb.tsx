@@ -24,24 +24,31 @@ const FULL_PX = 2000
 /**
  * 取一张图的 data URL。
  *
- * 取不到就是 `undefined`——**调用方据此退回显示文件名，而不是画个破框**。
- * 文件被删了、或者附件根本不是图片（将来可能允许贴别的），都会走到这条路上。
+ * **「还没取到」和「取不到」必须分开。** 上一版两者都是 `undefined`，于是
+ * 每张图在加载的那两百毫秒里都先显示一句「这张图打不开了」——成功路径上
+ * 必然闪一次假话；小图那边还会从 36px 的文件名块跳到 72px 的图，
+ * 整排附件当场往下顶 37.6px。
+ *
+ * `miss` 这一支是真的会到的：主进程那边取不到时明写「不抛，返回一张空图」。
  */
-function useThumb(path: string, max: number): string | undefined {
-  const [url, setUrl] = useState<string | undefined>(undefined)
+type Thumbnail = { state: "loading" } | { state: "ok"; url: string } | { state: "miss" }
+
+function useThumb(path: string, max: number): Thumbnail {
+  const [thumb, setThumb] = useState<Thumbnail>({ state: "loading" })
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni
     if (bridge === undefined) return undefined
     let live = true
+    setThumb({ state: "loading" })
     void bridge.thumb(path, max).then((data) => {
       // 换了图之后回来的那次响应不能再往界面上写
-      if (live) setUrl(data)
+      if (live) setThumb(data === undefined ? { state: "miss" } : { state: "ok", url: data })
     })
     return () => {
       live = false
     }
   }, [path, max])
-  return url
+  return thumb
 }
 
 /** 文件名。路径又长又是自动生成的，摆出来占满一行还什么都没说。 */
@@ -57,7 +64,7 @@ export function Thumb({
   /** 给了就画一个角标的 ×。历史消息里的图删不掉，所以那边不给。 */
   onRemove?: (path: string) => void
 }): React.JSX.Element {
-  const url = useThumb(path, THUMB_PX)
+  const thumb = useThumb(path, THUMB_PX)
   const [open, setOpen] = useState(false)
   return (
     <span className="thumb" title={nameOf(path)}>
@@ -69,7 +76,11 @@ export function Thumb({
           setOpen(true)
         }}
       >
-        {url === undefined ? <span className="thumb__name">{nameOf(path)}</span> : <img src={url} alt="" />}
+        {/* 占位块的尺寸和最终那张图**逐字一致**：不一致的话图一到位，
+            整排附件连同下面的对话一起往下顶 */}
+        {thumb.state === "loading" ? <span className="thumb__skel" aria-hidden="true" /> : null}
+        {thumb.state === "miss" ? <span className="thumb__name">{nameOf(path)}</span> : null}
+        {thumb.state === "ok" ? <img src={thumb.url} alt="" /> : null}
       </button>
       {onRemove === undefined ? null : (
         <button
@@ -102,7 +113,7 @@ export function Thumb({
  * 挂在节点上的话按 Esc 根本收不到。
  */
 function Lightbox({ path, onClose }: { path: string; onClose: () => void }): React.JSX.Element {
-  const url = useThumb(path, FULL_PX)
+  const full = useThumb(path, FULL_PX)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== "Escape") return
@@ -124,11 +135,9 @@ function Lightbox({ path, onClose }: { path: string; onClose: () => void }): Rea
         onClose()
       }}
     >
-      {url === undefined ? (
-        <span className="lightbox__miss">这张图打不开了：{path}</span>
-      ) : (
-        <img src={url} alt={nameOf(path)} />
-      )}
+      {full.state === "loading" ? <span className="lightbox__miss">正在打开…</span> : null}
+      {full.state === "miss" ? <span className="lightbox__miss">这张图打不开了：{path}</span> : null}
+      {full.state === "ok" ? <img src={full.url} alt={nameOf(path)} /> : null}
     </div>
   )
 }

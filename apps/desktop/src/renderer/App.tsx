@@ -3,6 +3,7 @@ import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
+import { useScrollbars } from "./useScrollbars.js"
 
 /**
  * 选哪一屏。
@@ -20,7 +21,8 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
   const { shell, prefs, thread } = app
   return (
 <SidebarPane
-      rows={app.rows}
+      // **临时会话不在这份里**：点一下「+」就多一行是错的（见 `AppApi.sidebarRows`）
+      rows={app.sidebarRows}
       thread={thread}
       focusFilter={shell.focusFilter}
       askRename={shell.askRename}
@@ -39,7 +41,9 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       onDropProject={prefs.dropProject}
       pinnedThreads={prefs.settings.pinnedThreads}
       threadOrder={prefs.settings.threadOrder}
+      projectOrder={prefs.settings.projectOrder}
       onReorder={prefs.setOrder}
+      onReorderProjects={prefs.setProjectOrder}
       onPinThread={prefs.pinThread}
       foreign={app.foreign}
       onAdopt={app.adopt}
@@ -53,6 +57,8 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
 }
 
 export function App(): React.JSX.Element {
+  // 滚动条：平时看不见，滚动或悬停才淡进来（只在系统本来就是经典条那一档生效）
+  useScrollbars()
   const app = useApp()
   const { shell, prefs, state, thread } = app
 
@@ -120,10 +126,14 @@ export function App(): React.JSX.Element {
         onCompare={() => {
           shell.setComparing(true)
         }}
+        rows={app.rows}
+        onSelect={shell.select}
         items={app.itemsOf(thread.id)}
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}
-        models={modelsOf(state, thread.id)}
+        /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
+           否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
+        models={modelsOf(state, thread.id, thread.engine)}
         engines={state.engines}
         notices={app.notices}
         onDismiss={shell.dismiss}

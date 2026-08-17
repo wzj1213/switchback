@@ -1,31 +1,27 @@
 import type { Event } from "@omni/protocol"
+import type { Replay, Sealed } from "./types.js"
 
 /**
- * 增量流的游标与补洞。
+ * 接收端的游标与补洞。
  *
- * ## 为什么不写在 hook 里
+ * ## 为什么是纯函数
  *
- * 这是整个渲染层唯一一段「顺序错一步，界面就安静地显示错误内容」的逻辑。
- * 它必须能脱离 React、脱离 IPC 单独测——所以做成纯函数：进状态与输入，
+ * 这是整条链路上唯一一段「顺序错一步，界面就安静地显示错误内容」的逻辑。
+ * 它必须能脱离 React、脱离传输单独测——所以做成纯函数：进状态与输入，
  * 出新状态和「要应用什么、要补什么」。
  *
  * ## 三种输入，一条规则
  *
  * | 输入 | 什么时候 |
  * | --- | --- |
- * | `replayed` | 窗口（重）加载，主进程发来全量 + `resumeAt` |
+ * | `replayed` | （重）连接，宿主发来全量 + `resumeAt` |
  * | `received` | 常态增量，带序号 |
- * | `resynced` | 我们发现漏了，主进程补回来的那一段 |
+ * | `resynced` | 我们发现漏了，宿主补回来的那一段 |
  *
  * 规则只有一条：**只应用连得上的**。连不上就攒着并去补，绝不跳过缺口硬着头皮往下应用——
  * 漏一条 `item.started`，后面所有对这条 item 的 delta 全都无处可去；
  * 漏一条 `turn.completed`，界面就永远停在「进行中」。而这些都不会报错。
  */
-
-export interface Sealed {
-  seq: number
-  event: Event
-}
 
 export interface Stream {
   /** 收到的最后一个序号。`undefined` = 还没收到全量，什么都不能应用。 */
@@ -42,7 +38,7 @@ export interface Step {
   stream: Stream
   /** 交给归约器的事件，已经按序排好。 */
   apply: readonly Event[]
-  /** 有值就去问主进程要这个序号之后的。 */
+  /** 有值就去问宿主要这个序号之后的。 */
   resyncFrom?: number
 }
 
@@ -85,10 +81,10 @@ function drain(lastSeq: number, queue: readonly Sealed[]): Step {
  * 全量到了。
  *
  * `resumeAt` 之前的增量一律丢：它们要么已经在这份全量里，要么发生在
- * 我们还没订阅的时候（也就在全量里）。这个判据由主进程保证——
- * 它是**读完 journal 之后**才取的 `resumeAt`，见 `main/host.ts` 的 `rebuild`。
+ * 我们还没订阅的时候（也就在全量里）。这个判据由宿主保证——
+ * 它是**读完历史之后**才取的 `resumeAt`。
  */
-export function replayed(stream: Stream, replay: { events: readonly Event[]; resumeAt: number }): Step {
+export function replayed(stream: Stream, replay: Replay): Step {
   const queue = stream.pending.filter((s) => s.seq > replay.resumeAt)
   const next = drain(replay.resumeAt, queue)
   return { ...next, apply: [...replay.events, ...next.apply] }
@@ -111,10 +107,10 @@ export function resynced(stream: Stream, sealed: readonly Sealed[]): Step {
 }
 
 /**
- * 主进程说补不了（缺口比它的缓冲还老）。
+ * 宿主说补不了（缺口比它的保留缓冲还老）。
  *
  * 回到「还没收到全量」的状态并**把攒着的全部丢掉**——它们连不上任何东西了。
- * 调用方接下来要重新加载页面，好触发一次全量重建。
+ * 调用方接下来要重新握手，好触发一次全量重建。
  * 留着旧的 pending 只会在下一次全量之后被 `resumeAt` 判据滤掉，白占内存。
  */
 export function reset(): Stream {

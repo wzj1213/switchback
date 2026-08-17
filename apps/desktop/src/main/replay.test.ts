@@ -99,3 +99,35 @@ describe("空壳会话不进侧栏", () => {
     expect(threadRowsOf(state)).toHaveLength(1)
   })
 })
+
+/**
+ * 临时会话（`Thread.provisional`）**一个字都不落盘**，所以这份全量拼不出它。
+ * 不补的话，⌘R 之后那个窗口整个消失，而它背后的引擎进程还活着。
+ */
+describe("活着但磁盘上什么都没有的会话", () => {
+  const temp: Thread = { ...thread("临时", "临时"), provisional: true }
+
+  it("**补出来**，⌘R 之后那个窗口还在", () => {
+    const alive = new Map<ThreadId, Thread>([["临时", temp]])
+    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, alive, 1))
+    expect(threadRowsOf(state).map((r) => r.thread.id)).toContain("临时")
+  })
+
+  it("补在最上面——它正是你刚才在用的那个", () => {
+    const alive = new Map<ThreadId, Thread>([["临时", temp]])
+    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, alive, 1))
+    expect(threadRowsOf(state)[0]?.thread.id).toBe("临时")
+  })
+
+  it("不标 detached：引擎进程还活着，输入框该是能用的", () => {
+    const alive = new Map<ThreadId, Thread>([["临时", temp]])
+    const state = reduceAll(initial(), replayEvents([], [], alive, 1))
+    expect(threadRowsOf(state)[0]?.thread.detached).toBeUndefined()
+  })
+
+  it("**磁盘上有记录的不重复补**——那条已经在全量里了", () => {
+    const alive = new Map<ThreadId, Thread>([["t1", thread("t1", "最旧")]])
+    const events = replayEvents([], NEWEST_FIRST, alive, 1)
+    expect(events.filter((e) => e.type === "thread.started" && e.thread.id === "t1")).toHaveLength(1)
+  })
+})

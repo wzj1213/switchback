@@ -1,8 +1,9 @@
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer, webUtils } from "electron"
 import type { Command, Event } from "@omni/protocol"
 import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
+import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 
 /** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
 export interface Sealed {
@@ -54,6 +55,18 @@ const api = {
     return (await ipcRenderer.invoke("omni:updateEngine", engine)) as UpdateResult
   },
 
+  /**
+   * omni 自己要不要更新——**从本机源码重建**，不是查远端（见 `main/selfupdate.ts`）。
+   * 这台机器上没有源码时 `can` 是 false，界面据此什么都不画。
+   */
+  async selfUpdateStatus(): Promise<SelfUpdate> {
+    return (await ipcRenderer.invoke("omni:selfUpdateStatus")) as SelfUpdate
+  },
+  /** 真的去重建 + 换包 + 重开。成功的话应用会自己退出，这个 Promise 的结果只在失败时有意义。 */
+  async selfUpdate(): Promise<SelfUpdateRun> {
+    return (await ipcRenderer.invoke("omni:selfUpdate")) as SelfUpdateRun
+  },
+
   /** 这个项目的说明文件在不在、两家是不是读的同一份。 */
   async projectDoc(cwd: string): Promise<ProjectDoc> {
     return (await ipcRenderer.invoke("omni:projectDoc", cwd)) as ProjectDoc
@@ -79,6 +92,19 @@ const api = {
    */
   async stashImage(mime: string, bytes: ArrayBuffer): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:stashImage", { mime, bytes })) as string | undefined
+  },
+  /**
+   * 拖进来的这个 `File` 在盘上的真实路径。
+   *
+   * **Electron 32 起 `File.path` 那个增补被移除了**（类型定义里的原话：
+   * `getPathForFile` superseded 了它），而 omni 用的是 43——于是拖放收附件那条路
+   * 一直是死的：读到 undefined，`add()` 根本不被调用，界面没反应也不报错。
+   * 粘贴那条走的是另一套（`stashImage`），一直好着，正好把这个洞盖住了。
+   *
+   * 这条通道**只回一个路径，不读内容**：渲染层拿不到任何遍历文件系统的能力。
+   */
+  pathForFile(file: File): string {
+    return webUtils.getPathForFile(file)
   },
   /**
    * 把盘上的一张图缩到边长 `max` 以内，取回 data URL。取不到（文件没了、
@@ -124,6 +150,17 @@ const api = {
   /** 工作区在哪个分支、脏不脏。不是 git 仓库时返回空对象。 */
   async worksite(cwd: string): Promise<{ branch?: string; dirty?: boolean }> {
     return (await ipcRenderer.invoke("omni:worksite", cwd)) as { branch?: string; dirty?: boolean }
+  },
+  /**
+   * 工作区里现在和 HEAD 不一样的文件（绝对真实路径）。不是 git 仓库时返回 undefined。
+   *
+   * 变更汇总卡拿它补编辑工具看不见的那块盲区（引擎用 shell 改的文件）。
+   * **只回路径，不回内容**。
+   */
+  async workChanges(cwd: string): Promise<{ root: string; paths: readonly string[] } | undefined> {
+    return (await ipcRenderer.invoke("omni:workChanges", cwd)) as
+      | { root: string; paths: readonly string[] }
+      | undefined
   },
   /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
   async settings(patch?: Partial<Settings>): Promise<Settings> {

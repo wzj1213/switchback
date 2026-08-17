@@ -8,6 +8,7 @@ function setup(): { ctx: UpdateContext; state: UpdateState; events: Event[] } {
   let seq = 0
   const ctx: UpdateContext = {
     threadId: "t1",
+    engine: "acp:fake",
     emit: (e) => events.push(e),
     turnId: () => "turn-1",
     inflight: new Map<string, AcpToolCall>(),
@@ -241,5 +242,57 @@ describe("引擎自己认的斜杠命令", () => {
     expect(s.events).toHaveLength(0)
     handleUpdate(s.ctx, s.state, update([]))
     expect(s.events).toMatchObject([{ type: "commands.updated", commands: [] }])
+  })
+})
+
+/**
+ * agent 自己把可选项换了。
+ *
+ * **强度的词表是跟着模型走的**：实测 ZCode 的 GLM-5.3 有 low/high/max，
+ * 换到 GLM-5-Turbo 之后一个都没有——照旧摆着那三档的话，点下去引擎直接报错。
+ */
+describe("config_option_update：换完模型，可选项跟着换", () => {
+  const optionsUpdate = (models: readonly string[], thought: readonly string[]): AcpUpdate => ({
+    sessionUpdate: "config_option_update",
+    configOptions: [
+      {
+        id: "model",
+        category: "model",
+        currentValue: models[0],
+        options: models.map((value) => ({ value, name: value })),
+      },
+      ...(thought.length === 0
+        ? []
+        : [
+            {
+              id: "thought",
+              category: "thought_level",
+              currentValue: thought[0],
+              options: thought.map((value) => ({ value })),
+            },
+          ]),
+    ],
+  })
+
+  it("清单翻好了交给驱动——**由它落状态、由它转发**，这里不越界", () => {
+    const { ctx, state } = setup()
+    const seen: { models: readonly { id: string; efforts?: readonly string[] }[] }[] = []
+    handleUpdate({ ...ctx, onCatalog: (c) => seen.push(c) }, state, optionsUpdate(["GLM-5.3"], ["low", "high", "max"]))
+    expect(seen[0]?.models.map((m) => m.id)).toEqual(["GLM-5.3"])
+    expect(seen[0]?.models[0]?.efforts).toEqual(["low", "high", "max"])
+  })
+
+  it("**新模型没有强度档时，那一节就该没了**", () => {
+    const { ctx, state } = setup()
+    const seen: { models: readonly { efforts?: readonly string[] }[] }[] = []
+    handleUpdate({ ...ctx, onCatalog: (c) => seen.push(c) }, state, optionsUpdate(["GLM-5-Turbo"], []))
+    expect(seen[0]?.models[0]?.efforts).toBeUndefined()
+  })
+
+  it("没人接也不崩——老驱动没挂这个回调", () => {
+    const { ctx, state } = setup()
+    expect(() => {
+      handleUpdate(ctx, state, optionsUpdate(["a"], []))
+    }).not.toThrow()
   })
 })

@@ -1,16 +1,17 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow, type WebContents } from "electron"
+import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron"
 import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
+import { createLedger, type Ledger, type Sealed } from "@omni/wire"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
-import { createAttention } from "./attention.js"
+import { createAttention, type Attention } from "./attention.js"
 import { buildRegistry } from "./registry.js"
-import { createSequencer, type Sealed } from "./sequence.js"
+import type { Sink, Sinks } from "./sink.js"
 import type { Logger } from "./log.js"
 
 export interface Attached {
@@ -26,8 +27,10 @@ export interface Attached {
   engines: () => Promise<readonly EngineInfo[]>
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
-  /** 事件流的序号与补发缓冲。窗口重载时的全量重建要用它对齐游标。 */
-  sequencer: ReturnType<typeof createSequencer>
+  /** 事件流的序号与保留缓冲。（重）连接时的全量重建要用它对齐游标。 */
+  ledger: Ledger
+  /** 客户端注册表。远程服务端把连接注册进来，就自动收到广播。 */
+  sinks: Sinks
   /**
    * 把一次失败翻成界面看得见的东西。
    *
@@ -39,54 +42,51 @@ export interface Attached {
 }
 
 /**
- * 把 `@omni/host` 接到窗口上。
+ * 事件出口：合帧 → 编号 → 广播给**每一个客户端** → 顺带记日志。
  *
- * 事件只往**当前活着的窗口**广播；窗口没了就丢弃——渲染层重开时会重新拉状态
- * （持久化接上之前，重开等于新会话）。
- */
-/**
- * 事件出口：合帧 → 编号 → 广播 → 顺带记日志。
- *
- * 合帧的理由见 `batch.ts`，编号与补发的理由见 `sequence.ts`；
+ * 合帧的理由见 `batch.ts`，编号与保留的理由见 `@omni/wire`；
  * 记日志只挑 `engine.status`，因为那是唯一**用户看不见却必须留痕**的一类——
  * 其余事件在界面上都有对应的呈现。
+ *
+ * 「客户端」不再等于「窗口」（见 `sink.ts`）：桌面窗口和浏览器端拿的是
+ * **同一份编号、同一条流**，所以「我收到第几号」在哪一端说的都是同一件事。
  */
-function createOutlet(
-  windows: () => readonly BrowserWindow[],
-  log: Logger,
-  seen: { thread: ThreadId | undefined },
-): { emit: (event: Event) => void; sequencer: ReturnType<typeof createSequencer> } {
-  const sequencer = createSequencer()
-  const attention = createAttention(windows)
+interface OutletDeps {
+  sinks: Sinks
+  attention: Attention
+  log: Logger
+  seen: { thread: ThreadId | undefined }
+}
+
+function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; ledger: Ledger } {
+  const ledger = createLedger()
   const batcher = createBatcher((events) => {
-    // 每条出去的事件顺带过一遍「要不要叫人」。放在发 IPC 的同一处，
+    // 每条出去的事件顺带过一遍「要不要叫人」。放在发出去的同一处，
     // 免得将来多一条出口就漏一处
-    for (const event of events) attention.note(event)
+    for (const event of events) deps.attention.note(event)
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
-    const sealed = sequencer.seal(events)
-    for (const win of windows()) {
-      if (!win.isDestroyed()) win.webContents.send("omni:events", sealed)
-    }
+    const sealed = ledger.seal(events)
+    for (const sink of deps.sinks.list()) sink.send({ channel: "omni:events", sealed })
   })
   return {
     emit: (event) => {
-      if (event.type === "thread.started") seen.thread = event.thread.id
+      if (event.type === "thread.started") deps.seen.thread = event.thread.id
       // detail 里可能带 stderr，长度约束在 log.ts 那一层
       if (event.type === "engine.status" && event.status !== "ready") {
         const level = event.status === "crashed" ? "error" : "info"
-        log.write(level, "engine", `${event.status} ${event.detail ?? ""}`)
+        deps.log.write(level, "engine", `${event.status} ${event.detail ?? ""}`)
       }
       batcher.push(event)
     },
-    sequencer,
+    ledger,
   }
 }
 
 interface Channels {
   host: Host
   log: Logger
-  sequencer: ReturnType<typeof createSequencer>
+  ledger: Ledger
   report: (error: unknown, threadId?: ThreadId) => void
 }
 
@@ -128,7 +128,7 @@ function installBridgeChannels(deps: Channels): void {
   // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
   // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
   ipcMain.handle("omni:resync", (_e, after: number): { events: readonly Sealed[] } | { reset: true } => {
-    const missed = deps.sequencer.since(after)
+    const missed = deps.ledger.since(after)
     if (missed === undefined) {
       deps.log.write("warn", "ipc", `补发失败：渲染层停在 ${String(after)}，缓冲已覆盖不到，转全量重建`)
       return { reset: true }
@@ -144,13 +144,13 @@ function installBridgeChannels(deps: Channels): void {
   })
 }
 
-export function attachHost(
-  windows: () => readonly BrowserWindow[],
-  log: Logger,
-): Attached {
+export function attachHost(sinks: Sinks, windows: () => readonly BrowserWindow[], log: Logger): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
+  // 叫人这件事仍然认窗口：`isFocused` / `show` / `focus` 是窗口才有的动作。
+  // 远程客户端的通知走另一条路（推送），不从这个出口出去
+  const attention = createAttention(windows)
 
-  const { emit, sequencer } = createOutlet(windows, log, seen)
+  const { emit, ledger } = createOutlet({ sinks, attention, log, seen })
 
   // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
   // 用户换机器迁移、清理应用数据时才找得到、才带得走
@@ -198,14 +198,15 @@ export function attachHost(
     })
   }
 
-  installBridgeChannels({ host, log, sequencer, report })
+  installBridgeChannels({ host, log, ledger, report })
 
   return {
     host,
     journal,
     engines: probeEngines(drivers, labels, log),
     lastThreadId: () => seen.thread,
-    sequencer,
+    ledger,
+    sinks,
     report,
   }
 }
@@ -325,7 +326,30 @@ export function replayEvents(
     // 一个能打字却答非所问的输入框比没有输入框糟得多
     events.push({ type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } })
   }
+  events.push(...unlogged(threads, alive, now))
   return events
+}
+
+/**
+ * **活着、但磁盘上一个字都没有的会话**——也就是临时会话（见 `Thread.provisional`）。
+ *
+ * 它不落盘是有意的（`Ctx.uncommitted`），代价是这份全量拼不出它：全量是从
+ * journal 拼的。不补的话，⌘R 之后那个临时窗口整个消失，而它背后的引擎进程
+ * 还活着——`rebuild` 甚至会把它的 id 当成「重载后该选中的那个」返回，
+ * 于是界面落在一条它自己都不知道存在的会话上。
+ *
+ * 排在最后：归约器往前插，所以最后进去的落在侧栏最上面——临时会话本来就是
+ * 你正在用的那个。（它不会真的出现在侧栏里，那是渲染层按 `provisional` 过滤的。）
+ */
+function unlogged(
+  threads: readonly ThreadHistory[],
+  alive: ReadonlyMap<ThreadId, Thread>,
+  now: number,
+): readonly Event[] {
+  const logged = new Set(threads.filter((t) => t.events.length > 0).map((t) => t.id))
+  return [...alive.values()]
+    .filter((thread) => !logged.has(thread.id))
+    .map((thread) => ({ type: "thread.started" as const, at: now, thread }))
 }
 
 /**
@@ -353,7 +377,7 @@ export function replayEvents(
  * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
  * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
  */
-export async function rebuild(attached: Attached, target: WebContents): Promise<ThreadId | undefined> {
+export async function rebuild(attached: Attached, target: Sink): Promise<ThreadId | undefined> {
   // **活着的会话不能标 detached。** 它们和历史在 journal 里长得一模一样，
   // 但背后还有引擎进程。混为一谈的话，重载之后整个应用变成只读，
   // 而引擎其实还在跑——重载验证第一次跑出来的就是这个
@@ -377,8 +401,8 @@ export async function rebuild(attached: Attached, target: WebContents): Promise<
     // 22 条技能一条不剩，只剩 omni 自己那 8 条
     ...attached.host.liveState(),
   ]
-  const resumeAt = attached.sequencer.latest()
-  if (!target.isDestroyed()) target.send("omni:replay", { events, resumeAt })
+  const resumeAt = attached.ledger.latest()
+  if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt } })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
   return [...alive.keys()][0] ?? ids[0]
 }

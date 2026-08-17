@@ -25,10 +25,34 @@ describe("工具形态", () => {
     expect(detailOf(call)).toEqual({
       kind: "file_edit",
       path: "/tmp/x/hello.txt",
-      files: [{ path: "/tmp/x/hello.txt", kind: "update", diff: "已改\n", added: 1, removed: 1 }],
+      // 两份全文进来，出去的是**合成的真 diff**（带 `+`/`-` 前缀），不是整份新文件
+      files: [{ path: "/tmp/x/hello.txt", kind: "update", diff: "-原始内容\n+已改", added: 1, removed: 1 }],
       added: 1,
       removed: 1,
     })
+  })
+
+  /**
+   * 这条是上一版漏掉的那种：单行文件恰好 +1 −1，怎么算都对，
+   * 于是「按整份文件的行数算」这个 bug 一直没被测试拦住。
+   */
+  it("**多行文件里只改一行，就该是 +1 −1**——不是整份文件的行数", () => {
+    const before = Array.from({ length: 40 }, (_, i) => `第 ${String(i)} 行`).join("\n")
+    const after = before.replace("第 20 行", "第 20 行（改过）")
+    const call: AcpToolCall = {
+      toolCallId: "c",
+      kind: "edit",
+      content: [{ type: "diff", oldText: `${before}\n`, newText: `${after}\n`, path: "/w/long.ts" }],
+    }
+    const detail = detailOf(call)
+    expect(detail?.kind === "file_edit" ? { added: detail.added, removed: detail.removed } : {}).toEqual({
+      added: 1,
+      removed: 1,
+    })
+    // 而且 diff 里只带改动附近几行，不是整份文件——journal 也跟着瘦下来
+    const diff = detail?.kind === "file_edit" ? (detail.files[0]?.diff ?? "") : ""
+    expect(diff.split("\n").length).toBeLessThan(10)
+    expect(diff).toContain("+第 20 行（改过）")
   })
 
   it("oldText 为 null 是新建文件，删除数记 0 而不是「旧内容是空串」", () => {

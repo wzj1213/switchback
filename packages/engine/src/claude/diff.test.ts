@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { fileChangesOf, synthDiff } from "./diff.js"
+import { fileChangesOf } from "./diff.js"
+import { synthDiff } from "../synth.js"
 
 describe("synthDiff", () => {
   it("掐掉首尾相同的行，只把真正变了的那段标出来", () => {

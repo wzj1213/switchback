@@ -51,14 +51,16 @@ export function useAttachments(enabled: boolean): Attachments {
 
   const drop = useCallback(
     (files: FileList | null) => {
-      if (!enabled || files === null) return
+      if (!enabled || files === null || bridge === undefined) return
       for (const file of Array.from(files)) {
-        // 拖进来的文件在 Electron 里带真实路径，不用再落一次盘
-        const path = (file as File & { path?: string }).path
-        if (typeof path === "string" && path !== "") add(path)
+        // 拖进来的文件在盘上本来就有路径，不用再落一次盘。
+        // **路径要问主进程要**：`File.path` 那个增补 Electron 32 起就没了
+        //（见 preload 的 `pathForFile`），照旧读它的话这条路整个是哑的
+        const path = bridge.pathForFile(file)
+        if (path !== "") add(path)
       }
     },
-    [enabled, add],
+    [enabled, add, bridge],
   )
 
   return {

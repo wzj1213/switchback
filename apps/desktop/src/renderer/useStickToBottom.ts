@@ -87,7 +87,11 @@ export function useStickToBottom<T extends HTMLElement, I extends HTMLElement>()
       if (el === null) return
       stuck.current = true
       setAtBottom(true)
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+      // **每次现读，不缓存**：用户中途改「减少动态效果」要立刻生效。
+      // CSSOM View 里只有 `behavior: "auto"` 才去查 CSS 的 `scroll-behavior`，
+      // 显式传 smooth 的话任何媒体查询都拦不住——而这是全应用位移最大的一段动画
+      const gentle = !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      el.scrollTo({ top: el.scrollHeight, behavior: gentle ? "smooth" : "instant" })
     },
   }
 }

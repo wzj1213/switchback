@@ -2,15 +2,11 @@ import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import type { EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
-import { reorder, sectionsOf, type Sections } from "../sidebar.js"
-import { rowDragOf, useThreadDrag, type ThreadDrag } from "../useThreadDrag.js"
-import { GearIcon } from "./icons.js"
-import { AccountRow, type AccountLine } from "./AccountRow.js"
-import { SIDEBAR_ICON } from "./icon-base.js"
+import { sectionsOf } from "../sidebar.js"
+import { useSidebarDrag } from "../sidebarDrag.js"
+import { SidebarFoot, type AccountLine } from "./SidebarFoot.js"
 import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
-import type { RowDrag } from "./SidebarRows.js"
-import type { GroupHandlers } from "./SidebarSections.js"
 import { Head } from "./SidebarHead.js"
 import { Hits } from "./SidebarHits.js"
 import { useRenaming } from "./RowName.js"
@@ -64,6 +60,10 @@ interface Props {
   pinnedThreads: readonly string[]
   /** 各项目内会话的手动顺序：路径 → 会话 id。 */
   threadOrder: Readonly<Record<string, readonly string[]>>
+  /** 项目之间的手动顺序（路径数组）。空 = 还没拖过，按活跃度排。 */
+  projectOrder: readonly string[]
+  /** 拖完项目之后把整段新顺序存下来。 */
+  onReorderProjects: (order: readonly string[]) => void
   /** 拖完之后把这个项目的新顺序整段存下来。 */
   onReorder: (cwd: string, ids: readonly string[]) => void
   /** 把一条会话置顶 / 取消置顶。 */
@@ -94,71 +94,6 @@ interface Props {
 }
 
 
-/**
- * 这条会话属于哪一组、那组现在什么顺序。放下时要拿它算新顺序。
- *
- * **只在置顶和项目两段里找**：「对话」段的会话不属于任何项目，
- * 而手动顺序是按项目存的（`Settings.threadOrder` 的键就是项目路径）。
- */
-function groupOf(sections: Sections, id: string): { cwd: string; ids: readonly string[] } | undefined {
-  const group = [...sections.pinned, ...sections.projects].find((g) =>
-    g.rows.some((r) => r.thread.id === id),
-  )
-  return group === undefined ? undefined : { cwd: group.cwd, ids: group.rows.map((r) => r.thread.id) }
-}
-
-/**
- * 拖放相关的那几个接线。
- *
- * **筛选结果里整套不给**：那时看到的顺序本来就不是真实顺序（命中的几条散在各组里），
- * 拖出来的结果没法解释，所以连拖都不让拖。
- */
-function pinHandlers(o: {
-  filtering: boolean
-  drag: ThreadDrag
-  rowDrag: RowDrag
-  onPinThread: (id: string, pin: boolean) => void
-}): Partial<GroupHandlers> {
-  return {
-    ...(o.filtering ? {} : { drag: o.rowDrag, overPinned: o.drag.overPinned }),
-    onDropPinned: () => {
-      const id = o.drag.dragging
-      o.drag.end()
-      if (id !== undefined) o.onPinThread(id, true)
-    },
-    onUnpinThread: (id) => {
-      o.onPinThread(id, false)
-    },
-  }
-}
-
-/**
- * 侧栏最底下两行：账号、设置。
- *
- * 账号在设置**上面**：它是「你是谁」，设置是「去改点什么」。
- * 最底下那一行是手最容易够到的位置，留给天天点的那个。
- */
-function Foot({
-  account,
-  onOpenSettings,
-}: {
-  account: AccountLine | undefined
-  onOpenSettings: () => void
-}): React.JSX.Element {
-  return (
-    <>
-      {account === undefined ? null : <AccountRow account={account} />}
-      <button type="button" className="row row--foot" onClick={onOpenSettings}>
-        <span className="row__slot">
-          <GearIcon size={SIDEBAR_ICON} />
-        </span>
-        <span className="row__label">设置</span>
-        <span className="row__aside">⌘,</span>
-      </button>
-    </>
-  )
-}
-
 export function Sidebar({
   rows,
   selectedId,
@@ -175,7 +110,9 @@ export function Sidebar({
   onDropProject,
   pinnedThreads,
   threadOrder,
+  projectOrder,
   onReorder,
+  onReorderProjects,
   onPinThread,
   icons,
   onSetIcon,
@@ -212,19 +149,12 @@ export function Sidebar({
 
   const { open: openMenu, menu } = useContextMenu()
   const acts: Acts = { pinned, pinnedThreads, onPinThread, onDropProject, onNewIn, onTogglePin, onReveal, onCopy }
-  const shown = filterRows(rows, query)
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
-  const sections = sectionsOf(shown, {
-    projects: pinned,
-    threads: pinnedThreads,
-    order: threadOrder,
-    known: knownProjects,
-  })
-  const drag = useThreadDrag()
-  // 放下时**存整段**而不是存一个「谁在谁前面」的增量：增量要和自动排序合并，
-  // 而那正是「一半手动一半自动」——没人说得清新会话该落在哪
-  const rowDrag = rowDragOf(drag, (id) => groupOf(sections, id), onReorder, reorder)
+  const pins = { projects: pinned, threads: pinnedThreads, order: threadOrder, known: knownProjects, projectOrder }
+  const sections = sectionsOf(filterRows(rows, query), pins)
+  // 拖放整套在 `sidebarDrag.ts`：谁能拖、拖到哪儿会发生什么，都在那儿
+  const dragging = useSidebarDrag({ filtering, sections, onReorder, onReorderProjects, onPinThread, onTogglePin })
 
   const toggle = (cwd: string): void => {
     setChoice((prev) => {
@@ -258,7 +188,7 @@ export function Sidebar({
 
       <div className="sidebar__list">
         {filtering ? (
-          <Hits rows={shown} total={rows.length} selectedId={selectedId} on={{ onSelect, onDelete, rowMenu, rename }} />
+          <Hits rows={filterRows(rows, query)} total={rows.length} selectedId={selectedId} on={{ onSelect, onDelete, rowMenu, rename }} />
         ) : (
           <SectionList
             sections={sections}
@@ -277,12 +207,12 @@ export function Sidebar({
               onGroupMenu: groupMenu,
               foreign,
               onAdopt,
-              ...pinHandlers({ filtering, drag, rowDrag, onPinThread }),
+              ...dragging,
             }}
           />
         )}
       </div>
-      <Foot account={account} onOpenSettings={onOpenSettings} />
+      <SidebarFoot account={account} onOpenSettings={onOpenSettings} />
       {menu}
     </aside>
   )

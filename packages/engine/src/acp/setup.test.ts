@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest"
-import { capabilitiesOf, canList, contextWindows, effortsOf, modelsOf, sessionsOf } from "./setup.js"
+import {
+  capabilitiesOf,
+  canList,
+  contextWindows,
+  effortsOf,
+  modelCall,
+  modelCatalogOf,
+  modelsOf,
+  sayWhy,
+  sessionsOf,
+} from "./setup.js"
 
 /**
  * ACP 的形状全部来自**实测的 kimi 响应**（`kimi acp`，0.36.1），不是照着协议文档编的。
@@ -56,7 +66,28 @@ describe("推理强度：有的适配器用一个 configOption 表达它", () =>
   }
 
   it("**实测的 kimi 形状**：low / high / max，当前 high", () => {
-    expect(effortsOf(thinking)).toEqual({ efforts: ["low", "high", "max"], current: "high" })
+    expect(effortsOf(thinking)).toEqual({ id: "thinking", efforts: ["low", "high", "max"], current: "high" })
+  })
+
+  /**
+   * **`id` 必须带出来。** 设回去时报的正是它，而各家起的名字不一样：
+   * kimi 叫 `thinking`，**ZCode 叫 `thought`**（它自己的注释写着：category 用
+   * `thought_level` 是为了让客户端认得出来，`id` 保持 `thought` 因为那是
+   * `session/set_config_option` 寻址用的）。写死一个名字的下场是在另一家
+   * 选了强度**什么都没发生**，而界面照样把新档位显示出来。
+   */
+  it("**实测的 ZCode 形状**：id 是 thought，不是 thinking", () => {
+    const zcode = {
+      configOptions: [
+        {
+          id: "thought",
+          category: "thought_level",
+          currentValue: "max",
+          options: [{ value: "low" }, { value: "high" }, { value: "max" }],
+        },
+      ],
+    }
+    expect(effortsOf(zcode)?.id).toBe("thought")
   })
 
   it("认 category 优先于认 id——id 是各家自己起的名字", () => {
@@ -171,5 +202,94 @@ describe("上下文窗口大小", () => {
 
   it("一个模型都没有也不抛", () => {
     expect(contextWindows({})).toEqual({})
+  })
+})
+
+/**
+ * **清单从哪儿读的，就设回哪儿。**
+ *
+ * 这条是拿一条红色故障换来的：ZCode 的桥（zcode-acp-server）只实现了
+ * `session/set_config_option`，规范拼写的 `session/set_model` 在它那儿是
+ * `Method not found`。于是点一下模型下拉，界面上弹「引擎故障」——
+ * 而用户什么都没做错。
+ */
+describe("换模型往哪儿发", () => {
+  it("新版报 models.availableModels：走规范的 session/set_model", () => {
+    const session = { models: { availableModels: [{ modelId: "a", name: "A" }], currentModelId: "a" } }
+    expect(modelCatalogOf(session).configId).toBeUndefined()
+  })
+
+  it("**只有 configOptions（ZCode / 旧版 codex-acp）：设回那个 configId**", () => {
+    const session = {
+      configOptions: [
+        { id: "model", category: "model", currentValue: "GLM-5.3", options: [{ value: "GLM-5.3", name: "GLM-5.3" }] },
+      ],
+    }
+    expect(modelCatalogOf(session).configId).toBe("model")
+    expect(modelCatalogOf(session).models.map((m) => m.id)).toEqual(["GLM-5.3"])
+  })
+
+  /** 这一条钉的就是炸过的那一发：发给谁、带什么字段。 */
+  it("**ZCode 那条真的发成 set_config_option**，不是 set_model", () => {
+    expect(modelCall("model", "s1", "GLM-5.3")).toEqual({
+      method: "session/set_config_option",
+      params: { sessionId: "s1", configId: "model", value: "GLM-5.3" },
+    })
+  })
+
+  it("新版那条发 set_model，字段名是 modelId", () => {
+    expect(modelCall(undefined, "s1", "gpt-5.6")).toEqual({
+      method: "session/set_model",
+      params: { sessionId: "s1", modelId: "gpt-5.6" },
+    })
+  })
+
+  it("一个模型都没有时不留路由——没得选就没得设", () => {
+    expect(modelCatalogOf({ sessionId: "x" }).configId).toBeUndefined()
+    expect(modelCatalogOf({ configOptions: [{ id: "model", options: [] }] }).configId).toBeUndefined()
+  })
+})
+
+/**
+ * 实测 ZCode：会话当前用的模型来自一个没启用的 provider 时，桥把它原样补进清单
+ * （`anthropic\GLM-5.3`），名字却还是 `GLM-5.3`——下拉里于是两行一模一样，
+ * 而其中一行点下去必然失败。
+ */
+describe("重名的模型要分得开", () => {
+  it("**同名就把 id 带上**", () => {
+    const session = {
+      configOptions: [
+        {
+          id: "model",
+          currentValue: "anthropic\\GLM-5.3",
+          options: [
+            { value: "anthropic\\GLM-5.3", name: "GLM-5.3" },
+            { value: "GLM-5.3", name: "GLM-5.3" },
+            { value: "GLM-5-Turbo", name: "GLM-5-Turbo" },
+          ],
+        },
+      ],
+    }
+    const labels = modelCatalogOf(session).models.map((m) => m.label)
+    expect(labels).toEqual(["GLM-5.3（anthropic\\GLM-5.3）", "GLM-5.3（GLM-5.3）", "GLM-5-Turbo"])
+  })
+
+  it("不重名的一个字都不动", () => {
+    const session = { models: { availableModels: [{ modelId: "a", name: "A" }, { modelId: "b", name: "B" }] } }
+    expect(modelCatalogOf(session).models.map((m) => m.label)).toEqual(["A", "B"])
+  })
+})
+
+describe("失败要说人话", () => {
+  it("Method not found 翻成「这家不支持」，并说下一步怎么办", () => {
+    const said = sayWhy("acp:zcode", "换模型", new Error('"Method not found": session/set_model'))
+    expect(said).toContain("不支持")
+    expect(said).toContain("新开一条会话")
+    // **不把协议原文摆给用户**：他看不出那是什么，也做不了什么
+    expect(said).not.toContain("session/set_model")
+  })
+
+  it("**其余错误原样带出去**——编不出更好的话时，原文比编的话有用", () => {
+    expect(sayWhy("kimi", "换模型", new Error("connection closed"))).toContain("connection closed")
   })
 })
