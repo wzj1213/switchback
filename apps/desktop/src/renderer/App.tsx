@@ -1,6 +1,7 @@
 import { commandsOf, forkPeerOf, limitsOf, modelsOf, turnOf, usageOf } from "@omni/store"
 import { Workspace } from "./components/Workspace.js"
-import { CompareScreen, EmptyScreen, SettingsScreen, SidebarPane } from "./screens.js"
+import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
+import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
 
 /**
@@ -34,6 +35,8 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       icons={prefs.settings.projectIcons}
       onSetIcon={prefs.setIcon}
       onTogglePin={prefs.togglePin}
+      knownProjects={prefs.settings.projects}
+      onDropProject={prefs.dropProject}
       pinnedThreads={prefs.settings.pinnedThreads}
       threadOrder={prefs.settings.threadOrder}
       onReorder={prefs.setOrder}

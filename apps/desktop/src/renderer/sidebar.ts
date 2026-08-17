@@ -114,6 +114,11 @@ export interface Sections {
 export interface Pins {
   /** 置顶的项目路径，按置顶先后。 */
   projects: readonly string[]
+  /**
+   * 打开过的项目。**没有会话的也要出现在侧栏里**——
+   * 一个项目不必有会话，你可能只是先把它放进来，明天再开工。
+   */
+  known?: readonly string[]
   /** 置顶的会话 id，按置顶先后。 */
   threads: readonly string[]
   /** 项目内会话的手动顺序：路径 → 会话 id。只有拖过的项目才有。 */
@@ -131,7 +136,10 @@ export function sectionsOf(rows: readonly ThreadRow[], pins: Pins): Sections {
   const rest = rows.filter((r) => !pinnedIds.has(r.thread.id))
   const chats = rest.filter((r) => r.thread.workspaceKind === "chat")
   const inProjects = rest.filter((r) => r.thread.workspaceKind !== "chat")
-  const groups = groupByWorkspace(inProjects).map((g) => ({ ...g, rows: ordered(g.rows, pins.order[g.cwd]) }))
+  const groups = withKnown(
+    groupByWorkspace(inProjects).map((g) => ({ ...g, rows: ordered(g.rows, pins.order[g.cwd]) })),
+    pins.known ?? [],
+  )
   const isPinned = new Set(pins.projects)
   return {
     pinnedThreads,
@@ -141,6 +149,20 @@ export function sectionsOf(rows: readonly ThreadRow[], pins: Pins): Sections {
     projects: groups.filter((g) => !isPinned.has(g.cwd)),
     chats: [...chats].sort((a, b) => b.thread.updatedAt - a.thread.updatedAt),
   }
+}
+
+/**
+ * 把「打开过但还没有会话」的项目也摆出来。
+ *
+ * 空组排在**有会话的那些后面**：手上正在做的事优先，刚放进来还没动的靠后。
+ * 已经有会话的项目不会被重复添加（它已经从会话里推出来了）。
+ */
+function withKnown(groups: readonly Group[], known: readonly string[]): readonly Group[] {
+  const seen = new Set(groups.map((g) => g.cwd))
+  const empty = known
+    .filter((cwd) => !seen.has(cwd))
+    .map((cwd) => ({ cwd, label: baseNameOf(cwd), rows: [] as readonly ThreadRow[] }))
+  return [...groups, ...empty]
 }
 
 /**

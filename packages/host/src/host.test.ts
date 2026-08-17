@@ -619,13 +619,18 @@ describe("跨引擎接力", () => {
     expect(sessions[1]?.disposed).toBe(false)
   })
 
-  it("交接包作为第一条消息发给接手的那一家，并且带着目标", async () => {
+  it("**交接包挂成草稿，不替用户发出去**——换了引擎之后第一句说什么，最该让人看一眼", async () => {
     const { host, events, sessions } = setupTwo()
     await host.dispatch(create)
-    await handoffTo(host, events, "other")
-    const first = sessions[1]?.prompts[0]?.text ?? ""
-    expect(first).toContain("接手")
-    expect(first).toContain("把 X 改成 Y")
+    const threadId = await handoffTo(host, events, "other")
+    // 接手的那一家一句话都没收到：要不要发、发什么，由人决定
+    expect(sessions[1]?.prompts ?? []).toEqual([])
+    const draft = events
+      .filter((e) => e.type === "thread.updated")
+      .filter((e) => e.thread.id === threadId)
+      .at(-1)?.thread.draft
+    expect(draft).toContain("接手")
+    expect(draft).toContain("把 X 改成 Y")
   })
 
   it("会话 id 不变，引擎历史往后接一手", async () => {
@@ -688,10 +693,16 @@ describe("L3 分叉", () => {
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
     await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
     await host.dispatch({ type: "thread.fork", threadId, to: "other" })
-    const first = sessions[1]?.prompts[0]?.text ?? ""
-    expect(first).toContain("把 X 改成 Y")
-    expect(first).not.toContain("已改动的文件")
-    expect(first).not.toContain("接手")
+    // 分叉出来的那条**一句都没发**（见「交接包挂成草稿」），所以看草稿
+    expect(sessions[1]?.prompts ?? []).toEqual([])
+    const forked = events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+    const draft = events
+      .filter((e) => e.type === "thread.updated")
+      .filter((e) => e.thread.id === forked)
+      .at(-1)?.thread.draft ?? ""
+    expect(draft).toContain("把 X 改成 Y")
+    expect(draft).not.toContain("已改动的文件")
+    expect(draft).not.toContain("接手")
   })
 
   it("标题带上引擎名，否则侧栏里两个会话长得一模一样", async () => {

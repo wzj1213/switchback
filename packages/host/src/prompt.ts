@@ -100,6 +100,17 @@ export async function prompt(
     return
   }
   const at = ctx.deps.now()
+  // **发出去了就不再是草稿。** 不清的话，用户改了内容发出去之后，
+  // 下次开这条会话输入框里又冒出那段原始交接包
+  if (entry.thread.draft !== undefined) {
+    const cleared = { ...entry.thread }
+    delete cleared.draft
+    entry.thread = { ...cleared, updatedAt: at }
+    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  }
+  // **有实际对话才记这一段。** 切过去没说话就切走，不该在时间线上
+  // 留一条什么都没发生的记录——那样时间线会被「我点错了」填满
+  void recordSegment(ctx, entry)
   const turnId = ctx.deps.newId("tn")
   entry.turn = turnId
   const turn = {
@@ -127,4 +138,39 @@ export async function prompt(
     },
   })
   await entry.session.prompt(cmd.text, turnId, cmd.attachments)
+}
+
+/**
+ * 记下「这条会话在当前这家引擎那边的一段」。
+ *
+ * 调用时机有两个，缺一不可：
+ *
+ * - **第一轮开始时**（而不是切引擎时——切过去没说话不算一段）：那时段就该出现，
+ *   哪怕还不知道记录在哪。
+ * - **每轮收工后**：`logPath` 那时才拿得到。实测 codex 的 `thread/list`
+ *   只列**已经落了 rollout 文件**的会话，而第一轮开始时它还没落——
+ *   只在开头记一次的话，路径永远是空的（这个坑是拿真机跑出来的）。
+ * 已经有这一家的段就只补 `logPath`（句柄不变：切回来续的就是它）。
+ *
+ * `logPath` 是异步问引擎的，所以整件事不 await：**它慢一点不该拖着这一轮发不出去**。
+ * 拿不到就只有句柄，界面照样能显示时间线，只是少一行「记录在哪」。
+ */
+export async function recordSegment(ctx: Ctx, entry: Live): Promise<void> {
+  const handle = entry.thread.engineHandle
+  if (handle === undefined) return
+  const engine = entry.thread.engine
+  const path = await entry.session.logPath?.().catch(() => undefined)
+  const live = ctx.live.get(entry.thread.id)
+  // 等 logPath 的这一会儿会话可能已经没了
+  if (live === undefined) return
+  const had = live.thread.segments ?? []
+  const mine = had.find((seg) => seg.engine === engine && seg.handle === handle)
+  if (mine !== undefined && (path === undefined || mine.logPath === path)) return
+  const at = ctx.deps.now()
+  const next =
+    mine === undefined
+      ? [...had, { engine, handle, startedAt: at, ...(path === undefined ? {} : { logPath: path }) }]
+      : had.map((seg) => (seg === mine ? { ...seg, ...(path === undefined ? {} : { logPath: path }) } : seg))
+  live.thread = { ...live.thread, segments: next, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: live.thread })
 }

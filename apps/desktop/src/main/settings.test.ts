@@ -33,12 +33,14 @@ describe("偏好", () => {
   it("没有文件时用默认值，不报错——第一次启动是常态", () => {
     expect(createSettings(log).get()).toEqual({
       theme: "system",
+      projects: [],
       pinned: [],
       pinnedThreads: [],
       threadOrder: {},
       defaultEngine: "",
       defaultTrust: "auto-edit",
       projectIcons: {},
+      lastUsed: { engine: "", byEngine: {} },
     })
   })
 
@@ -143,5 +145,36 @@ describe("拖动排序存下来的那两项", () => {
   it("整项不是对象就当没有，不崩", () => {
     write({ threadOrder: "乱写的" })
     expect(createSettings(log).get().threadOrder).toEqual({})
+  })
+
+  /**
+   * 这一段是**用户手改得到**的文件，而里面存的是「新会话开成什么样」。
+   * 塞进去的脏东西如果被原样吃下，下一条新会话就开在一个不存在的模型上。
+   */
+  it("上次开工那一套：坏形状逐项丢掉，不是整份作废", () => {
+    writeFileSync(
+      file(),
+      JSON.stringify({
+        lastUsed: {
+          engine: "codex",
+          byEngine: {
+            codex: { model: "gpt-5.3-codex", effort: "high" },
+            claude: { model: 42 },
+            kimi: "不是对象",
+            空壳: {},
+          },
+        },
+      }),
+      "utf8",
+    )
+    expect(createSettings(log).get().lastUsed).toEqual({
+      engine: "codex",
+      byEngine: { codex: { model: "gpt-5.3-codex", effort: "high" } },
+    })
+  })
+
+  it("lastUsed 整个是垃圾时回落到默认", () => {
+    writeFileSync(file(), JSON.stringify({ lastUsed: "什么鬼" }), "utf8")
+    expect(createSettings(log).get().lastUsed).toEqual({ engine: "", byEngine: {} })
   })
 })

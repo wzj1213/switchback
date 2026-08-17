@@ -7,6 +7,7 @@ import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
 import type { AccountLine } from "./components/AccountRow.js"
 import { useWorkspaceActions } from "./useWorkspaceActions.js"
+import { learnFrom, openWith } from "./newThreadPrefs.js"
 
 /**
  * 把 `App` 需要的一切收在一处。
@@ -92,6 +93,25 @@ export function useApp(): AppApi {
   const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
 
+  /**
+   * 命令的出口，顺路记下**下次新会话开成什么样**。
+   *
+   * 挂在发消息这一刻，是因为「挑好了引擎和模型，然后真的发出去」才是一次表态；
+   * 光点开下拉看看不算——那可能只是在翻有哪些模型。剩下那半条规则
+   *（同一条会话第二次发就不再记）在 `learnFrom` 里，两边共用同一份判断。
+   *
+   * 包在这里而不是输入框里：排队补发、`/` 面板、快捷键都从这条路出去，
+   * 挂在输入框上会漏掉其余几条。
+   */
+  const send = (command: Command): void => {
+    if (command.type === "thread.prompt") {
+      const target = rows.find((r) => r.thread.id === command.threadId)?.thread
+      const next = target === undefined ? undefined : learnFrom(prefs.settings.lastUsed, target)
+      if (next !== undefined) prefs.patch({ lastUsed: next })
+    }
+    omni.send(command)
+  }
+
   const { open, openChat, openPicker } = useWorkspaceActions({
     state: omni.state,
     thread,
@@ -105,7 +125,16 @@ export function useApp(): AppApi {
     onCreating: () => {
       awaited.current = omni.lastStarted?.seq ?? 0
     },
-    defaultEngine: prefs.settings.defaultEngine,
+    onOpenProject: (cwd) => {
+      prefs.addProject(cwd)
+    },
+    opened: openWith(
+      prefs.settings.lastUsed,
+      prefs.settings.defaultEngine,
+      // 兜底：**沿用当前会话的引擎**——换个工作区不该顺带把内核也换了。
+      // 一条会话都没有时退到探到的第一家
+      thread?.engine ?? omni.state.engines[0]?.id ?? "claude",
+    ),
     defaultTrust: prefs.settings.defaultTrust,
     onFind: () => {
       shell.setFinding(true)
@@ -127,7 +156,7 @@ export function useApp(): AppApi {
     shell,
     prefs,
     bridgeMissing: omni.bridgeMissing,
-    send: omni.send,
+    send,
     copy: omni.copy,
     reveal: omni.reveal,
     find: omni.find,

@@ -56,6 +56,14 @@ export interface AcpDriverConfig {
   args?: readonly string[]
   env?: Readonly<Record<string, string>>
   reclaim?: Partial<ReclaimConfig>
+  /**
+   * 这家把会话记录写到哪。**注入进来而不是驱动自己认**：
+   * ACP 协议里根本没有「记录在哪」这个概念，各家各写各的
+   * （kimi 的在 `kimi.ts`），驱动这一层不该认识任何一家的目录结构。
+   *
+   * 不给就是拿不到——换引擎时退回交接包，那条路一直留着。
+   */
+  logPath?: (home: string, sessionId: string) => Promise<string | undefined>
 }
 
 interface SessionState extends OpenState {
@@ -358,6 +366,18 @@ class AcpSession implements EngineSession {
     if (!this.state.canList) return []
     const raw = await this.rpc.call("session/list", { cwd: this.req.cwd }).catch(() => undefined)
     return sessionsOf(raw, HISTORY_MAX)
+  }
+
+  /**
+   * 这条会话的原始记录在磁盘上的哪儿——换引擎时交接的就是这个路径。
+   *
+   * 协议问不出来，只能按引擎认（见 `AcpDriverConfig.logPath`）。
+   * 认不出来的那些给 undefined，宿主据此退回交接包。
+   */
+  async logPath(): Promise<string | undefined> {
+    const sessionId = this.state.acpSession
+    if (sessionId === undefined || this.config.logPath === undefined) return undefined
+    return this.config.logPath(this.req.home, sessionId).catch(() => undefined)
   }
 
   /**

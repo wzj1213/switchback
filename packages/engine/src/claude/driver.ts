@@ -13,7 +13,7 @@ import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
-import { listSessions, readAccount, readTranscript } from "./history.js"
+import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 
 /**
@@ -56,7 +56,9 @@ class ClaudeSession implements EngineSession {
   private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map() }
   private readonly owner: ProcessOwner
   private loop: Promise<void> | undefined
-  private handle: ReturnType<typeof query> | undefined
+  /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
+  private handle: string | undefined
+  private query: ReturnType<typeof query> | undefined
 
   constructor(
     private readonly req: StartRequest,
@@ -81,8 +83,20 @@ class ClaudeSession implements EngineSession {
       ...(this.req.resume === undefined ? {} : { resume: this.req.resume }),
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
     }
-    this.handle = query({ prompt: this.input, options })
-    this.loop = runMessageLoop(this.handle, this.req, this.turn)
+    this.query = query({ prompt: this.input, options })
+    // 截一道记下 session id：`logPath` 要靠它找到那个 jsonl，
+    // 而 `onHandle` 本身是发出去就不留的
+    this.loop = runMessageLoop(
+      this.query,
+      {
+        ...this.req,
+        onHandle: (id) => {
+          this.handle = id
+          this.req.onHandle?.(id)
+        },
+      },
+      this.turn,
+    )
   }
 
   /**
@@ -139,7 +153,7 @@ class ClaudeSession implements EngineSession {
    * 时给，运行期没有 setter。报上去界面就会画一个改了不生效的控件。
    */
   async models(): Promise<readonly ModelOption[]> {
-    const list = await this.handle?.supportedModels().catch(() => undefined)
+    const list = await this.query?.supportedModels().catch(() => undefined)
     return (list ?? []).map((m) => ({
       id: m.value,
       label: m.displayName,
@@ -156,7 +170,7 @@ class ClaudeSession implements EngineSession {
    * 又会在 Claude 加减命令时过期，而且过期了不报错。
    */
   async commands(): Promise<readonly SlashCommand[]> {
-    const list = await this.handle?.supportedCommands().catch(() => undefined)
+    const list = await this.query?.supportedCommands().catch(() => undefined)
     return (list ?? []).map((c) => ({
       name: c.name,
       description: c.description,
@@ -187,6 +201,16 @@ class ClaudeSession implements EngineSession {
     return listSessions(this.req.home)
   }
 
+  /**
+   * 这条会话的 jsonl 在哪。Claude Code 把每次对话原样写在
+   * `~/.claude/projects/<项目>/<sessionId>.jsonl`，**文件名就是 session id**。
+   */
+  async logPath(): Promise<string | undefined> {
+    const id = this.handle ?? this.req.resume
+    if (id === undefined) return undefined
+    return findSession(this.req.home, id)
+  }
+
   /** 登录的是哪个账号。读 `~/.claude.json` 的身份字段，**不碰凭据**。 */
   async account(): Promise<EngineAccount | undefined> {
     return readAccount(this.req.home)
@@ -211,11 +235,11 @@ class ClaudeSession implements EngineSession {
   }
 
   async setModel(model: string): Promise<void> {
-    await this.handle?.setModel(model)
+    await this.query?.setModel(model)
   }
 
   async interrupt(): Promise<void> {
-    await this.handle?.interrupt()
+    await this.query?.interrupt()
   }
 
   async setTrust(trust: Trust): Promise<void> {

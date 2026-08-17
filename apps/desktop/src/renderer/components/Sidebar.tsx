@@ -56,6 +56,10 @@ interface Props {
   onCopy: (text: string) => void
   /** 已置顶的工作区路径。 */
   pinned: readonly string[]
+  /** 打开过的项目。没有会话的也要出现在侧栏里。 */
+  knownProjects: readonly string[]
+  /** 把一个空项目移出侧栏。 */
+  onDropProject: (cwd: string) => void
   /** 已置顶的会话 id。 */
   pinnedThreads: readonly string[]
   /** 各项目内会话的手动顺序：路径 → 会话 id。 */
@@ -167,6 +171,8 @@ export function Sidebar({
   onReveal,
   onCopy,
   pinned,
+  knownProjects,
+  onDropProject,
   pinnedThreads,
   threadOrder,
   onReorder,
@@ -205,11 +211,16 @@ export function Sidebar({
   }, [focusFilter])
 
   const { open: openMenu, menu } = useContextMenu()
-  const acts: Acts = { pinned, pinnedThreads, onPinThread, onNewIn, onTogglePin, onReveal, onCopy }
+  const acts: Acts = { pinned, pinnedThreads, onPinThread, onDropProject, onNewIn, onTogglePin, onReveal, onCopy }
   const shown = filterRows(rows, query)
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
-  const sections = sectionsOf(shown, { projects: pinned, threads: pinnedThreads, order: threadOrder })
+  const sections = sectionsOf(shown, {
+    projects: pinned,
+    threads: pinnedThreads,
+    order: threadOrder,
+    known: knownProjects,
+  })
   const drag = useThreadDrag()
   // 放下时**存整段**而不是存一个「谁在谁前面」的增量：增量要和自动排序合并，
   // 而那正是「一半手动一半自动」——没人说得清新会话该落在哪

@@ -18,6 +18,8 @@ export interface Acts {
   pinnedThreads: readonly string[]
   /** 置顶 / 取消置顶一条会话。 */
   onPinThread: (id: string, pin: boolean) => void
+  /** 把一个**空**项目移出侧栏。会话和磁盘上的东西都不动。 */
+  onDropProject: (cwd: string) => void
   onNewIn: (cwd: string) => void
   onTogglePin: (cwd: string) => void
   onReveal: (path: string) => void
@@ -104,7 +106,23 @@ export function useSidebarMenus(
     groupMenu: (event, group) => {
       openMenu(
         event,
-        [...workspaceCommands(group.cwd, acts), ...iconCommands(group.cwd, acts)],
+        [
+          ...workspaceCommands(group.cwd, acts),
+          ...iconCommands(group.cwd, acts),
+          // **只有空项目才给这一条。** 有会话的项目是从会话推出来的，
+          // 移不走——摆一个点了没反应的菜单项比没有更糟
+          ...(group.rows.length === 0
+            ? [
+                {
+                  label: "移出侧栏",
+                  icon: <TrashIcon />,
+                  run: () => {
+                    acts.onDropProject(group.cwd)
+                  },
+                },
+              ]
+            : []),
+        ],
         <ProjectHead group={group} />,
       )
     },

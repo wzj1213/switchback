@@ -4,7 +4,7 @@ import { clearQueue, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { adopt, create, remove, rename, resume, setModel, setTrust } from "./session.js"
 import { fork, handoff, rewind } from "./branch.js"
-import { prompt } from "./prompt.js"
+import { prompt, recordSegment } from "./prompt.js"
 
 export type { HostDeps } from "./deps.js"
 
@@ -158,6 +158,10 @@ export function createHost(deps: HostDeps): Host {
    * 一口气全推给引擎是错的——那等于把「我看着它跑、随时补一句」
    * 变成「我一次性交代五件事」，而后者本来就该写在同一句话里。
    */
+  ctx.afterTurn = (threadId) => {
+    const entry = ctx.live.get(threadId)
+    if (entry !== undefined) void recordSegment(ctx, entry)
+  }
   ctx.drain = (threadId) => {
     const entry = ctx.live.get(threadId)
     const next = entry?.queued.shift()

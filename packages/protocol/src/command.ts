@@ -19,6 +19,18 @@ export type Command =
       title?: string
       /** 不给就是项目会话。见 `Thread.workspaceKind`。 */
       workspaceKind?: "project" | "chat"
+      /**
+       * 开出来就用这个模型/思维档，而不是引擎的默认。
+       *
+       * **在建的时候给，而不是建完再 `thread.setModel`**：后者中间有一个窗口,
+       * 那期间会话已经能发消息了，抢在里面发出去的第一句会跑在默认模型上——
+       * 而用户明明在新建之前就把模型挑好了。
+       *
+       * 引擎不认这个模型的话由引擎报错，omni 不预先过滤（见 `main/settings.ts`
+       * 里 `lastUsed` 那段：白名单在引擎那边，抄一份必然过期）。
+       */
+      model?: string
+      effort?: string
     }
   | { type: "thread.prompt"; threadId: ThreadId; text: string; attachments?: readonly string[] }
   | { type: "thread.interrupt"; threadId: ThreadId }

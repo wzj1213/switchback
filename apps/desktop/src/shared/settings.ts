@@ -16,6 +16,17 @@ export type ThemeChoice = "system" | "light" | "dark"
 
 export interface Settings {
   theme: ThemeChoice
+  /**
+   * 打开过的项目，按打开的先后。
+   *
+   * ## 为什么项目要单独记一份
+   *
+   * 侧栏的项目本来是**从会话推出来的**（`groupByWorkspace`），于是「打开一个文件夹」
+   * 必须顺手建一条会话，否则那个项目在界面上根本不存在。而那是本末倒置：
+   * **一个项目不必有会话**——你可能只是想先把它放进侧栏，明天再开工。
+   * 顺带还修掉一个隐性后果：把一个项目里的会话全删掉，那个项目就整个消失了。
+   */
+  projects: readonly string[]
   /** 置顶的工作区路径，按用户置顶的先后。 */
   pinned: readonly string[]
   /**
@@ -34,7 +45,7 @@ export interface Settings {
    * 而说不清的排序等于随机。新建的会话排在最前（它最新，也最可能是你要用的）。
    */
   threadOrder: Readonly<Record<string, readonly string[]>>
-  /** 新会话默认用哪家引擎。空 = 沿用当前会话的。 */
+  /** 新会话默认用哪家引擎。空 = 按 `lastUsed` 走（见那边）。 */
   defaultEngine: string
   /** 新会话默认的信任档。 */
   defaultTrust: Trust
@@ -51,14 +62,50 @@ export interface Settings {
    * 存路径不存项目名：同名目录太常见，而路径是这里唯一稳定的身份。
    */
   projectIcons: Readonly<Record<string, string>>
+  /**
+   * **上次开工时用的那一套**：引擎 + 各家各自的模型/思维档。
+   *
+   * ## 记的时刻是「发出第一句话」，不是「点了选择器」
+   *
+   * 新开一条会话、挑好引擎和模型、**把话发出去**——这一下才算数。
+   * 光点开下拉看看不算：那可能只是在翻有哪些模型。
+   *
+   * ## 之后同一条会话里怎么改都不再刷新
+   *
+   * 一条会话跑到一半换个模型，是**针对这段活**的临时决定
+   *（「这段太绕了，换个强的想想」），不是「我以后都这么开」。
+   * 把它记成偏好的话，你为了一个难题临时开的 high，会跟着你到之后每一条新会话。
+   *
+   * 判据是 `Thread.segments` 空不空——空的就是「还没跑过任何一轮」。
+   *
+   * ## 为什么模型要按引擎分开记
+   *
+   * 模型 id 是**引擎私有的**：`gpt-5.3-codex-spark` 拿给 Claude 是个不存在的名字。
+   * 只记一个全局模型，换家引擎就成了一条起不来的会话。
+   */
+  lastUsed: LastUsed
+}
+
+export interface LastUsed {
+  /** 上次开工用的引擎。空 = 还没记过。 */
+  engine: string
+  /** 引擎 id → 那家上次用的模型/思维档。 */
+  byEngine: Readonly<Record<string, EnginePick>>
+}
+
+export interface EnginePick {
+  model?: string
+  effort?: string
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
   theme: "system",
+  projects: [],
   pinned: [],
   pinnedThreads: [],
   threadOrder: {},
   defaultEngine: "",
   defaultTrust: "auto-edit",
   projectIcons: {},
+  lastUsed: { engine: "", byEngine: {} },
 }

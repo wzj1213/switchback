@@ -3,6 +3,7 @@ import type { EngineInfo, Thread, Usage } from "@omni/protocol"
 import { CaretIcon, CompareIcon, ForkIcon } from "./icons.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { EnvCard } from "./EnvCard.js"
+import { TimelineCard } from "./TimelineCard.js"
 import { labelOf } from "./Composer.js"
 import { nextEngine } from "../engines.js"
 import type { LimitNotice } from "../limits.js"
@@ -20,6 +21,52 @@ import type { LimitNotice } from "../limits.js"
  * 动作用图标按钮而不是文字胶囊：和旁边那些纯展示的胶囊长得一样的话，
  * 「可点」这件事就没有任何视觉线索了。
  */
+/**
+ * 挂在标题上的两张卡片：环境信息、引擎时间线。
+ *
+ * 合成一个组件是行数闸门逼的，但也顺：两张都锚在同一个按钮上、
+ * 都默认不显示、都是「回看用」的东西。**同时只开一张**——
+ * 两张浮层叠在一起时，后面那张既读不了也关不掉。
+ */
+function Cards({
+  thread,
+  engines,
+  anchor,
+  env,
+  timeline,
+  onCopy,
+  onReveal,
+  onClose,
+}: {
+  thread: Thread
+  engines: readonly EngineInfo[]
+  anchor: HTMLElement | null
+  env: boolean
+  timeline: boolean
+  onCopy: (text: string) => void
+  onReveal: (path: string) => void
+  onClose: () => void
+}): React.JSX.Element | null {
+  if (timeline) {
+    return (
+      <TimelineCard thread={thread} anchor={anchor} onCopy={onCopy} onReveal={onReveal} onClose={onClose} />
+    )
+  }
+  if (env) {
+    return (
+      <EnvCard
+        thread={thread}
+        engines={engines}
+        anchor={anchor}
+        onReveal={onReveal}
+        onCopy={onCopy}
+        onClose={onClose}
+      />
+    )
+  }
+  return null
+}
+
 export function TopBar({
   thread,
   usage,
@@ -30,6 +77,8 @@ export function TopBar({
   onReveal,
   onCopy,
   env,
+  timeline,
+  setTimeline,
   setEnv,
   limits,
 }: {
@@ -44,6 +93,9 @@ export function TopBar({
   onCopy: (text: string) => void
   /** 环境卡片开着没有。**状态在 `Workspace` 那层**——`/env` 命令也要能开它。 */
   env: boolean
+  /** 引擎时间线开着没有。同理，`/timeline` 也要能开它。 */
+  timeline: boolean
+  setTimeline: (open: boolean) => void
   setEnv: (open: boolean) => void
   /** 账号额度提示。平时是 undefined（用得不多就不出声）。 */
   limits: LimitNotice | undefined
@@ -68,18 +120,19 @@ export function TopBar({
         {thread.title}
         <CaretIcon size={11} />
       </button>
-      {env ? (
-        <EnvCard
-          thread={thread}
-          engines={engines}
-          anchor={envAnchor.current}
-          onReveal={onReveal}
-          onCopy={onCopy}
-          onClose={() => {
-            setEnv(false)
-          }}
-        />
-      ) : null}
+      <Cards
+        thread={thread}
+        engines={engines}
+        anchor={envAnchor.current}
+        env={env}
+        timeline={timeline}
+        onCopy={onCopy}
+        onReveal={onReveal}
+        onClose={() => {
+          setEnv(false)
+          setTimeline(false)
+        }}
+      />
       {thread.detached === true ? <span className="badge badge--muted">历史记录</span> : null}
       {handedOff ? (
         <span className="badge" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>

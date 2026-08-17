@@ -338,6 +338,20 @@ class CodexSession implements EngineSession {
     return toEngineThreads(raw)
   }
 
+  /**
+   * 这条会话的 rollout 文件在哪。`thread/list` 每条都带 `path`（实测）。
+   *
+   * 没有更直接的接口，所以是**在清单里找自己**。清单默认按最近排序，
+   * 而我们要找的通常就是刚跑过的那条，代价可以接受。
+   */
+  async logPath(): Promise<string | undefined> {
+    const { codexThread } = this.state
+    if (codexThread === undefined) return undefined
+    const raw = await this.rpc.call("thread/list", {}).catch(() => undefined)
+    const rows = (raw as { data?: readonly { id?: string; path?: string }[] } | undefined)?.data ?? []
+    return rows.find((r) => r.id === codexThread)?.path
+  }
+
   /** 登录的是哪个账号。额度算在谁头上，看这个。 */
   async account(): Promise<EngineAccount | undefined> {
     const raw = await this.rpc.call("account/read", {}).catch(() => undefined)

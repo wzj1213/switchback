@@ -3,6 +3,7 @@ import { itemsOf, type ViewState } from "@omni/store"
 import { labelOf } from "./components/Composer.js"
 import { toMarkdown } from "./export.js"
 import { useMenuActions } from "./useMenuActions.js"
+import type { Opened } from "./newThreadPrefs.js"
 
 /**
  * 「新建会话 / 换工作区 / 菜单动作」这一坨。
@@ -28,6 +29,8 @@ export function useWorkspaceActions(deps: {
   pickFolder: () => Promise<string | undefined>
   /** 给对话要一个自动生成的目录。 */
   chatDir: () => Promise<string>
+  /** 把一个文件夹记进侧栏（不建会话）。 */
+  onOpenProject: (cwd: string) => void
   onMenu: (handler: (action: string) => void) => () => void
   onSelect: (id: string | undefined) => void
   /** 刚发出「新建」。调用方据此等下一个 `thread.started`。 */
@@ -36,8 +39,11 @@ export function useWorkspaceActions(deps: {
   onCompare: () => void
   onFilterThreads: () => void
   onSettings: () => void
-  /** 偏好里设的默认引擎；空串表示「沿用当前会话的」。 */
-  defaultEngine: string
+  /**
+   * 新会话开成什么样：引擎 + 模型 + 思维档。**已经按优先级算好了**
+   *（见 `newThreadPrefs.ts` 的 `openWith`）——这里只负责发出去。
+   */
+  opened: Opened
   defaultTrust: Trust
 }): WorkspaceActions {
   const { state, thread, send } = deps
@@ -45,23 +51,25 @@ export function useWorkspaceActions(deps: {
   /**
    * 开新会话。
    *
-   * 优先级：**偏好里设的默认 > 当前会话的 > 兜底**。
-   * 沿用当前会话是为了「换工作区不该顺带把内核也换了」；
-   * 但用户如果在设置里明确指定了默认，那句话就该压过前者——
-   * 他设它就是为了不再每次手改。
+   * 引擎/模型/思维档由 `deps.opened` 定（优先级见 `newThreadPrefs.ts`），
+   * **模型在建的时候就给**，不是建完再设——中间那个窗口里发出去的第一句
+   * 会跑在引擎默认模型上，而用户明明在新建之前就挑好了。
    */
   const open = (cwd: string, kind: "project" | "chat" = "project"): void => {
     send({
       type: "thread.create",
       cwd,
       ...(kind === "chat" ? { workspaceKind: "chat" as const, title: "新对话" } : {}),
-      engine: deps.defaultEngine !== "" ? deps.defaultEngine : (thread?.engine ?? state.engines[0]?.id ?? "claude"),
+      ...deps.opened,
       trust: deps.defaultTrust,
       title: cwd.split("/").filter(Boolean).pop() ?? cwd,
     })
     // 记下「我在等下一个新会话」。**不再用 `onSelect(undefined)` 兼职这个信号**——
     // 那个信号删会话时也会发，于是删完之后下一个冒出来的会话会被错认成我等的那个
     deps.onCreating()
+    // 在哪儿开过会话，那儿就是个项目。**不记的话，把它的会话全删掉之后
+    // 那个项目会整个从侧栏消失**——而用户只是清了几条对话，没打算移走项目
+    if (kind !== "chat") deps.onOpenProject(cwd)
   }
 
   /**
@@ -76,9 +84,17 @@ export function useWorkspaceActions(deps: {
     })
   }
 
+  /**
+   * 挑一个文件夹放进侧栏。**不建会话。**
+   *
+   * 上一版是顺手建一条的——因为侧栏的项目是从会话推出来的，不建就看不见。
+   * 但那是本末倒置：**一个项目不必有会话**，你可能只是想先把它放进来，
+   * 明天再开工；而每打开一个文件夹就多一条空会话，跑一周下来侧栏全是空壳。
+   * 现在项目自己记一份（`Settings.projects`），要开会话点那一行的 `+`。
+   */
   const openPicker = (): void => {
     void deps.pickFolder().then((cwd) => {
-      if (cwd !== undefined) open(cwd)
+      if (cwd !== undefined) deps.onOpenProject(cwd)
     })
   }
 

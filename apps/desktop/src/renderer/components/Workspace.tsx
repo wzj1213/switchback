@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice } from "@omni/store"
@@ -51,19 +51,59 @@ export interface WorkspaceProps {
  * 从 `App` 拆出来纯粹是因为 `App` 撑过了行数闸门——但拆完读起来确实更顺：
  * `App` 只管「选哪个会话、怎么新建」，这里只管「一个会话长什么样」。
  */
+/**
+ * 输入框里的待发文本。两个来源：
+ *
+ * - **「改一改再发」**：点 transcript 里某条消息，把它塞回输入框
+ * - **换引擎时的那句话**：告诉新的一家「上一段的记录在这儿」
+ *
+ * 带一个递增序号：连着点同一条两次，文本一样但序号变了——
+ * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
+ */
+function useDraft(draft: string | undefined): {
+  prefill: { text: string; at: number }
+  reuse: (text: string) => void
+} {
+  const [prefill, setPrefill] = useState<{ text: string; at: number }>({ text: "", at: 0 })
+  /**
+   * **必须是 effect，不能只在初始化时读一次**：换引擎不会换 thread id，
+   * 于是 `Workspace` 根本不重挂载——草稿是在挂载之后才到的，
+   * 只在初始化读的话它永远进不来（真机跑出来的：切过去输入框是空的）。
+   *
+   * 用 ref 记住上次填过哪一份：不记的话每次渲染都覆盖一遍，
+   * 你在输入框里打的字会被反复冲掉。
+   */
+  const filled = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (draft === undefined || draft === filled.current) return
+    filled.current = draft
+    setPrefill((prev) => ({ text: draft, at: prev.at + 1 }))
+  }, [draft])
+  return {
+    prefill,
+    reuse: (text) => {
+      setPrefill((prev) => ({ text, at: prev.at + 1 }))
+    },
+  }
+}
+
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
   const [env, setEnv] = useState(false)
+  const [timeline, setTimeline] = useState(false)
   /**
    * 「改一改再发」塞回输入框的文本。
    *
    * 带一个递增序号：连着点同一条两次，文本一样但序号变了——
    * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
    */
-  const [prefill, setPrefill] = useState<{ text: string; at: number }>({ text: "", at: 0 })
+  const { prefill, reuse } = useDraft(props.thread.draft)
   const actions = useOmniActions(props, {
     onEnv: () => {
       setEnv(true)
+    },
+    onTimeline: () => {
+      setTimeline(true)
     },
   })
   return (
@@ -71,6 +111,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <TopBar
         env={env}
         setEnv={setEnv}
+        timeline={timeline}
+        setTimeline={setTimeline}
         limits={limitNotice(props.limits)}
         thread={thread}
         usage={props.usage}
@@ -91,9 +133,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         turn={props.turn}
         send={send}
         onCopy={props.onCopy}
-        onReuse={(text) => {
-          setPrefill((prev) => ({ text, at: prev.at + 1 }))
-        }}
+        onReuse={reuse}
       />
       <Changed items={props.items} />
       <Queued
@@ -135,7 +175,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         trust={thread.trust}
         onEngineChange={(next) => {
           // **中途接力**：同一个会话换一家引擎接着做，不是另开一个。
-          // 历史留在原地，交接包会作为第一条消息发给接手的那一家。
+          // 历史留在原地；**切回去会续上那一家自己的那条 session**（见 `Thread.segments`），
+          // 而不是每次都新开——codex 跑了一半、去 Claude 看一眼再回来，
+          // 它该还记得自己做过什么。
           send({ type: "thread.handoff", threadId: thread.id, to: next })
         }}
         onTrustChange={(next) => {

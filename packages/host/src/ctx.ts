@@ -63,6 +63,13 @@ export interface Ctx {
    * ctx → session → ctx 的循环。这里只留一个洞，谁能干这活谁来填。
    */
   drain?: (threadId: ThreadId) => void
+  /**
+   * 一轮收工之后做点什么。**和 `drain` 同一个理由**留成洞：
+   * 直接 import `prompt.ts` 会绕成 ctx → prompt → ctx 的循环。
+   *
+   * 现在只有一件事：把这一段的 `logPath` 补上——引擎要跑完一轮才把记录落盘。
+   */
+  afterTurn?: (threadId: ThreadId) => void
 }
 
 /**
@@ -222,6 +229,9 @@ export function observe(ctx: Ctx, event: Event): void {
     setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
     // **只有正常跑完才接上队列。** 中断/失败之后接着发排队的话是错的：
     // 人按停止就是要它停下，而不是"停完这句再跑下一句"
+    // **不管跑成没跑成都补一次**：失败的那一轮照样在引擎那边留了记录，
+    // 而「上一段跑砸了、记录在哪」恰恰是你最想去读的
+    ctx.afterTurn?.(entry.thread.id)
     if (event.status === "completed") ctx.drain?.(entry.thread.id)
     else if (entry.queued.length > 0) clearQueue(ctx, entry)
     return

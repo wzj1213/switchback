@@ -1,6 +1,7 @@
 export { createClaudeDriver } from "./claude/driver.js"
 export { createCodexDriver } from "./codex/driver.js"
 export { createAcpDriver } from "./acp/driver.js"
+export { kimiLogPath, findInIndex as findKimiSession } from "./acp/kimi.js"
 export { modelsOf, modesOf, currentModeOf, startupMessage as acpStartupMessage } from "./acp/setup.js"
 export { handlePermission, respond as respondPermission } from "./acp/permission.js"
 export type { PermissionContext as AcpPermissionContext } from "./acp/permission.js"

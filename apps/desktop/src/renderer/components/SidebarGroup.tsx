@@ -51,9 +51,12 @@ export function GroupBlock({
         onNewIn={onNewIn}
         onGroupMenu={onGroupMenu}
       />
-      {collapsed
-        ? null
-        : group.rows.map((row) => (
+      {collapsed ? null : group.rows.length === 0 ? (
+        // **空项目也要说句话。** 打开一个文件夹之后它就在这儿了，但还没有会话——
+        // 什么都不显示的话，人会以为「打开」这个动作失败了
+        <p className="sidebar__empty">还没有会话。点这一行右边的 + 开一条。</p>
+      ) : (
+        group.rows.map((row) => (
             <Row
               key={row.thread.id}
               row={row}
@@ -70,7 +73,8 @@ export function GroupBlock({
                 onRowMenu(e, row, arm, ren)
               }}
             />
-          ))}
+        ))
+      )}
     </div>
   )
 }

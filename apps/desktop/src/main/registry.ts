@@ -1,4 +1,4 @@
-import { createAcpDriver, createClaudeDriver, createCodexDriver, type EngineDriver } from "@omni/engine"
+import { createAcpDriver, createClaudeDriver, createCodexDriver, kimiLogPath, type EngineDriver } from "@omni/engine"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
 import type { Logger } from "./log.js"
 
@@ -18,7 +18,8 @@ import type { Logger } from "./log.js"
  * - `claude` / `codex`：各有一个专门的驱动。
  * - `kimi`：走通用 ACP 驱动。`kimi acp` 是它自己 `--help` 里列着的子命令
  *   （不是我们猜的参数），协议实测跑通到能答话、能读图（发一张写着
- *   `KIMI-4417` 的图，它把那串字念了回来）。
+ *   `KIMI-4417` 的图，它把那串字念了回来）。**记录路径也认得**——
+ *   换引擎时交接的就是它（见 `acp/kimi.ts`）。
  *
  * 三家都有 `probe()`，没装就在下拉里标成「未安装」并给一句能照着做的话。
  * `engines.ts` 反对的是「列出没装的东西」和「把别人的参数抄进代码」——
@@ -36,7 +37,7 @@ export function buildRegistry(
     drivers: {
       claude: createClaudeDriver(),
       codex: createCodexDriver(),
-      kimi: createAcpDriver({ id: "kimi", command: "kimi", args: ["acp"] }),
+      kimi: createAcpDriver({ id: "kimi", command: "kimi", args: ["acp"], logPath: kimiLogPath }),
       ...acp.drivers,
     },
     labels: {

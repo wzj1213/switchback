@@ -29,7 +29,7 @@ export function useOmniActions(
     onSettings: () => void
     send: (command: Command) => void
   },
-  extra: { onEnv: () => void },
+  extra: { onEnv: () => void; onTimeline: () => void },
 ): readonly OmniAction[] {
   const { thread, send } = props
   const next = nextEngine(props.engines, thread.engine)
@@ -42,6 +42,7 @@ export function useOmniActions(
     onRename: props.onRename,
     onSettings: props.onSettings,
     onEnv: extra.onEnv,
+    onTimeline: extra.onTimeline,
     onExport: () => {
       props.onCopy(toMarkdown(thread, props.items, labelOf(props.engines, thread.engine)))
     },

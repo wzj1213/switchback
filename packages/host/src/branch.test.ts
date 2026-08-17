@@ -186,14 +186,28 @@ describe("同一家引擎：让它自己复制会话", () => {
   })
 })
 
+/** 一条会话现在挂着的草稿。交接包不再发出去，而是摆进输入框等你改。 */
+const draftOf = (events: Event[], id: string): string | undefined =>
+  events
+    .filter((e) => e.type === "thread.updated")
+    .filter((e) => e.thread.id === id)
+    .at(-1)?.thread.draft
+
+/** 分叉/接力之后新建的那条会话。 */
+const newThreadId = (events: Event[]): string =>
+  events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+
 describe("退回交接包的两种情况", () => {
-  it("换一家引擎：会话格式不通，只能递交接包", async () => {
+  it("换一家引擎：会话格式不通，只能递交接包——**但挂成草稿，不发出去**", async () => {
     const r = rig({ canFork: true })
     const { id } = await withTurns(r)
     r.prompts.length = 0
     await r.host.dispatch({ type: "thread.fork", threadId: id, to: "other" })
     expect(r.forks).toHaveLength(0)
-    expect(r.prompts).toHaveLength(1)
+    // **一条都不发。** 上一版是直接发出去的，于是「分叉一份」变成了
+    // 「分叉一份并且立刻开跑」，而那段话还是 omni 替用户写的
+    expect(r.prompts).toEqual([])
+    expect(draftOf(r.events, newThreadId(r.events))).toBeDefined()
   })
 
   it("**引擎不肯分就退回交接包，不报错**——把能用的功能变成会报错的，是把好的换成差的", async () => {
@@ -202,7 +216,8 @@ describe("退回交接包的两种情况", () => {
     r.fail.now = true
     r.prompts.length = 0
     await expect(r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })).resolves.toBeUndefined()
-    expect(r.prompts).toHaveLength(1)
+    expect(r.prompts).toEqual([])
+    expect(draftOf(r.events, newThreadId(r.events))).toBeDefined()
   })
 
   it("引擎报了 fork:false 就直接走交接包，不去试", async () => {
@@ -211,6 +226,14 @@ describe("退回交接包的两种情况", () => {
     r.prompts.length = 0
     await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
     expect(r.forks).toHaveLength(0)
-    expect(r.prompts).toHaveLength(1)
+    expect(r.prompts).toEqual([])
+    expect(draftOf(r.events, newThreadId(r.events))).toBeDefined()
+  })
+
+  it("**草稿里带着目标**：接手的一家要被告知做什么，只是由你按下回车", async () => {
+    const r = rig({ canFork: false })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(draftOf(r.events, newThreadId(r.events))).toContain("第一句")
   })
 })

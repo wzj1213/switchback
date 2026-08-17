@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app, ipcMain, nativeTheme } from "electron"
-import { SETTINGS_DEFAULTS, type Settings, type ThemeChoice } from "../shared/settings.js"
+import { SETTINGS_DEFAULTS, type EnginePick, type Settings, type ThemeChoice } from "../shared/settings.js"
 import type { Trust } from "@omni/protocol"
 import type { Logger } from "./log.js"
 
@@ -43,6 +43,7 @@ function parse(raw: unknown): Settings {
   const it = raw as Partial<Record<keyof Settings, unknown>>
   return {
     theme: typeof it.theme === "string" && THEMES.has(it.theme) ? (it.theme as ThemeChoice) : DEFAULTS.theme,
+    projects: strings(it.projects) ?? DEFAULTS.projects,
     pinned: strings(it.pinned) ?? DEFAULTS.pinned,
     pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
     threadOrder: order(it.threadOrder),
@@ -52,6 +53,7 @@ function parse(raw: unknown): Settings {
         ? (it.defaultTrust as Trust)
         : DEFAULTS.defaultTrust,
     projectIcons: icons(it.projectIcons),
+    lastUsed: lastUsed(it.lastUsed),
   }
 }
 
@@ -93,6 +95,36 @@ function icons(raw: unknown): Record<string, string> {
     out[cwd] = icon
   }
   return out
+}
+
+/**
+ * 上次开工用的那一套。
+ *
+ * **模型/思维档只做「是不是字符串」的校验，不做白名单**：那份名单在引擎那边，
+ * 而且随版本变。写死一份的下场是引擎升级出了新模型，omni 这边把它当脏数据丢掉。
+ * 认不出来的模型引擎自己会拒，那时用户看到的是引擎的原话——比我们编一句准。
+ */
+function lastUsed(raw: unknown): Settings["lastUsed"] {
+  if (typeof raw !== "object" || raw === null) return DEFAULTS.lastUsed
+  const it = raw as Record<string, unknown>
+  const byEngine: Record<string, EnginePick> = {}
+  if (typeof it.byEngine === "object" && it.byEngine !== null) {
+    for (const [engine, raw2] of Object.entries(it.byEngine as Record<string, unknown>)) {
+      const pick = enginePick(raw2)
+      if (pick !== undefined) byEngine[engine] = pick
+    }
+  }
+  return { engine: typeof it.engine === "string" ? it.engine : "", byEngine }
+}
+
+/** 一家引擎上次选的模型/思维档。**两项都没有的空壳不留**——留着只会让读的一方多判一次。 */
+function enginePick(raw: unknown): EnginePick | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined
+  const it = raw as Record<string, unknown>
+  const model = typeof it.model === "string" ? it.model : undefined
+  const effort = typeof it.effort === "string" ? it.effort : undefined
+  if (model === undefined && effort === undefined) return undefined
+  return { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) }
 }
 
 export interface Store {

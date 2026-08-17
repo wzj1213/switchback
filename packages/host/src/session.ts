@@ -26,6 +26,8 @@ function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadI
     createdAt: at,
     updatedAt: at,
     engineHistory: [cmd.engine],
+    ...(cmd.model === undefined ? {} : { model: cmd.model }),
+    ...(cmd.effort === undefined ? {} : { effort: cmd.effort }),
   }
 }
 
@@ -234,6 +236,11 @@ export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.cre
   } catch (error) {
     emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
     throw error
+  }
+  // 挑好的模型要在**第一句话发出去之前**落到引擎上（见 `thread.create` 的 `model`）。
+  // 起不来就算了：模型没设上是个可以接着用的会话，为它把整条会话撤掉不成比例
+  if (cmd.model !== undefined) {
+    await ctx.live.get(thread.id)?.session.setModel(cmd.model, cmd.effort).catch(() => undefined)
   }
   // **发 `live` 里那一份，不是这个局部变量**——`launch` 期间会往上面挂东西
   //（现在是引擎能力）。发局部的那份等于把它们原地丢掉，而且一声不响

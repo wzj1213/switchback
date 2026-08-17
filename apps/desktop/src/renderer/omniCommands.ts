@@ -27,6 +27,7 @@ export function omniCommands(acts: {
   onHandoff?: () => void
   onCompare?: () => void
   onEnv: () => void
+  onTimeline: () => void
   onExport: () => void
   onSettings: () => void
   onStop?: () => void
@@ -37,6 +38,7 @@ export function omniCommands(acts: {
     make("new", "新建会话", "在当前工作区另开一个", acts.onNew),
     make("rename", "重命名", "给这个会话改个名字", acts.onRename),
     make("env", "环境信息", "看这个会话跑在什么环境里", acts.onEnv),
+    make("timeline", "引擎时间线", "这条会话都被哪几家引擎跑过、记录在哪", acts.onTimeline),
     make("export", "导出对话", "整段复制成 Markdown", acts.onExport),
     // 下面这几条**没有对象就不给**：一个点了没反应的命令比没有这条命令更糟
     make("fork", "分叉", "用另一家引擎另起一个跑同一件事", acts.onFork),

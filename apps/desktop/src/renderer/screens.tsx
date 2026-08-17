@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
-import type { Command, EngineInfo, EngineThread, Thread } from "@omni/protocol"
-import { itemsOf, turnOf, type Notice as StoreNotice, type ThreadRow, type ViewState } from "@omni/store"
-import { Sidebar } from "./components/Sidebar.js"
-import type { AccountLine } from "./components/AccountRow.js"
+import type { Command, EngineInfo, Thread } from "@omni/protocol"
+import { itemsOf, turnOf, type Notice as StoreNotice, type ViewState } from "@omni/store"
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
@@ -57,103 +55,6 @@ export function EmptyScreen({
   )
 }
 
-/** 侧栏接线。从 `App` 拆出来是行数闸门逼的，但它确实自成一块。 */
-export function SidebarPane({
-  rows,
-  thread,
-  focusFilter,
-  askRename,
-  onNewChat,
-  onSelect,
-  onNew,
-  onNewIn,
-  onOpenFolder,
-  onReveal,
-  onCopy,
-  pinned,
-  pinnedThreads,
-  threadOrder,
-  onReorder,
-  onPinThread,
-  icons,
-  onSetIcon,
-  onTogglePin,
-  onOpenSettings,
-  foreign,
-  onAdopt,
-  account,
-  send,
-}: {
-  rows: readonly ThreadRow[]
-  thread: Thread | undefined
-  focusFilter: number
-  askRename: number
-  onNewChat: () => void
-  onSelect: (id: string | undefined) => void
-  onNew: () => void
-  onNewIn: (cwd: string) => void
-  onOpenFolder: () => void
-  onReveal: (path: string) => void
-  onCopy: (text: string) => void
-  pinned: readonly string[]
-  /** 已置顶的会话 id。 */
-  pinnedThreads: readonly string[]
-  /** 各项目内会话的手动顺序。 */
-  threadOrder: Readonly<Record<string, readonly string[]>>
-  onReorder: (cwd: string, ids: readonly string[]) => void
-  onPinThread: (id: string, pin: boolean) => void
-  icons: Readonly<Record<string, string>>
-  onSetIcon: (cwd: string, icon: string) => void
-  onTogglePin: (cwd: string) => void
-  onOpenSettings: () => void
-  /** 报过历史的每一家，各一段。 */
-  foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
-  onAdopt: (engine: string, item: EngineThread) => void
-  /** 底部那一行：登录的是谁、还剩多少额度。 */
-  account?: AccountLine
-  send: (command: Command) => void
-}): React.JSX.Element {
-  return (
-    <Sidebar
-      rows={rows}
-      foreign={foreign}
-      onAdopt={onAdopt}
-      pinnedThreads={pinnedThreads}
-      threadOrder={threadOrder}
-      onReorder={onReorder}
-      onPinThread={onPinThread}
-      {...(account === undefined ? {} : { account })}
-      selectedId={thread?.id ?? ""}
-      onSelect={onSelect}
-      onNew={onNew}
-      onOpenFolder={onOpenFolder}
-      onNewIn={onNewIn}
-      onReveal={onReveal}
-      onCopy={onCopy}
-      pinned={pinned}
-      icons={icons}
-      onSetIcon={onSetIcon}
-      onTogglePin={onTogglePin}
-      onOpenSettings={onOpenSettings}
-      focusFilter={focusFilter}
-      askRename={askRename}
-      onNewChat={onNewChat}
-      onDelete={(id: string) => {
-        // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
-        if (id === thread?.id) onSelect(undefined)
-        send({ type: "thread.delete", threadId: id })
-      }}
-      onRename={(id: string, title: string) => {
-        send({ type: "thread.rename", threadId: id, title })
-      }}
-    />
-  )
-}
-
-/**
- * 对比屏。从 `App` 拆出来是行数闸门逼的，但拆完确实更清楚：
- * 「谁在左边」这个决定有它自己的理由，值得单独一段。
- */
 export function CompareScreen({
   state,
   thread,

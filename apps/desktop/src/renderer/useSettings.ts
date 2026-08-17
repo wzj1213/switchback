@@ -17,6 +17,10 @@ export interface SettingsApi {
   isPinned: (cwd: string) => boolean
   /** 给项目设图标；空字符串 = 清掉（键一并删掉，不留空值）。 */
   setIcon: (cwd: string, icon: string) => void
+  /** 把一个文件夹记进侧栏（不建会话）。 */
+  addProject: (cwd: string) => void
+  /** 从侧栏移走一个项目。**只是不再显示**，会话和磁盘上的东西都不动。 */
+  dropProject: (cwd: string) => void
   /** 置顶 / 取消置顶一条会话。 */
   pinThread: (id: string, pin: boolean) => void
   /** 存下某个项目内会话的手动顺序（整段）。 */
@@ -52,6 +56,22 @@ export function useSettings(): SettingsApi {
     [settings.pinned, patch],
   )
 
+  const addProject = useCallback(
+    (cwd: string) => {
+      // 已经在里面就不动：重复打开同一个文件夹不该把它挪到末尾
+      if (settings.projects.includes(cwd)) return
+      patch({ projects: [...settings.projects, cwd] })
+    },
+    [settings.projects, patch],
+  )
+
+  const dropProject = useCallback(
+    (cwd: string) => {
+      patch({ projects: settings.projects.filter((x) => x !== cwd) })
+    },
+    [settings.projects, patch],
+  )
+
   const pinThread = useCallback(
     (id: string, pin: boolean) => {
       // 和置顶项目同一条规矩：追加到**末尾**，先钉的排前面
@@ -84,6 +104,8 @@ export function useSettings(): SettingsApi {
     settings,
     patch,
     togglePin,
+    addProject,
+    dropProject,
     pinThread,
     setOrder,
     setIcon,

@@ -133,9 +133,14 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         </Group>
 
         <Group title="新会话的默认">
-          <Field label="引擎" hint="留空则沿用当前会话用的那家">
+          {/*
+            「跟上次」是默认，也是绝大多数人要的：挑一次引擎和模型，之后新会话就这么开。
+            钉死一家是给「不管上次用了什么，我新会话永远从这家起」的人留的。
+            记的时刻是**发出第一句话**那一下，中途换模型不算——见 `newThreadPrefs.ts`。
+          */}
+          <Field label="引擎" hint="留空则跟着上次开工用的那家走（连模型和思维档一起）">
             <Segmented
-              options={[{ id: "", label: "沿用当前" }, ...props.engines.map((e) => ({ id: e.id, label: e.label }))]}
+              options={[{ id: "", label: "跟上次" }, ...props.engines.map((e) => ({ id: e.id, label: e.label }))]}
               value={settings.defaultEngine}
               onPick={(defaultEngine) => {
                 onPatch({ defaultEngine })
