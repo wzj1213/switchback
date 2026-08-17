@@ -1,6 +1,8 @@
 import { commandsOf, forkPeerOf, limitsOf, modelsOf, turnOf, usageOf } from "@omni/store"
+import { stampOf } from "./stamp.js"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
+import { Review } from "./components/Review.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
 import { useScrollbars } from "./useScrollbars.js"
@@ -56,14 +58,18 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
   )
 }
 
-export function App(): React.JSX.Element {
-  // 滚动条：平时看不见，滚动或悬停才淡进来（只在系统本来就是经典条那一档生效）
-  useScrollbars()
-  const app = useApp()
+/**
+ * 盖在界面上的那两块面板：设置、审核。
+ *
+ * 它们和「渲染哪一屏」是两件事——三条 return 路径里每一条都要带上它们，
+ * 所以算一次、三处共用。**不是组件而是取值函数**：写成组件的话
+ * 每条 return 里都要多一层，而它俩本来就各自决定自己出不出现。
+ */
+function Layers({ app }: { app: ReturnType<typeof useApp> }): {
+  settings: React.JSX.Element | null
+  review: React.JSX.Element | null
+} {
   const { shell, prefs, state, thread } = app
-
-  const sidebar = <Rail app={app} />
-
   const settings = shell.settingsOpen ? (
     <SettingsScreen
       prefs={prefs}
@@ -75,6 +81,31 @@ export function App(): React.JSX.Element {
       }}
     />
   ) : null
+  // 审核面板。**和设置同层**：都是盖住界面的一块，Esc 关。
+  // 没有会话时不给——它审的是「这条会话的工作区」，没有会话就没有那个目录
+  const review =
+    shell.reviewOpen && thread !== undefined ? (
+      <Review
+        cwd={thread.cwd}
+        stamp={stampOf(turnOf(state, thread.id))}
+        onCopy={app.copy}
+        onClose={() => {
+          shell.setReviewOpen(false)
+        }}
+      />
+    ) : null
+  return { settings, review }
+}
+
+export function App(): React.JSX.Element {
+  // 滚动条：平时看不见，滚动或悬停才淡进来（只在系统本来就是经典条那一档生效）
+  useScrollbars()
+  const app = useApp()
+  const { shell, state, thread } = app
+
+  const sidebar = <Rail app={app} />
+
+  const { settings, review } = Layers({ app })
 
   if (thread === undefined) {
     return (
@@ -108,6 +139,7 @@ export function App(): React.JSX.Element {
           send={app.send}
         />
         {settings}
+        {review}
       </div>
     )
   }
@@ -153,9 +185,13 @@ export function App(): React.JSX.Element {
           shell.setSettingsOpen(true)
         }}
         searchFiles={app.searchFiles}
+        onReview={() => {
+          shell.setReviewOpen(true)
+        }}
         send={app.send}
       />
       {settings}
+      {review}
     </div>
   )
 }

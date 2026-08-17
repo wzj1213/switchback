@@ -45,7 +45,9 @@ const noIoInPurePackages = {
 }
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/out/**", "**/node_modules/**", "**/*.tsbuildinfo"] },
+  // `.claude/` 是 Claude Code 的工作副本（含临时 worktree），已经不进版本库，
+  // 也不该被这套闸门管——那里的东西不是这个产品的代码
+  { ignores: ["**/dist/**", "**/out/**", "**/node_modules/**", "**/*.tsbuildinfo", ".claude/**"] },
 
   js.configs.recommended,
   ...tseslint.configs.strict,

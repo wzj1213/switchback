@@ -154,6 +154,9 @@ export function useApp(): AppApi {
     onCompare: () => {
       shell.setComparing(true)
     },
+    onReview: () => {
+      shell.setReviewOpen(true)
+    },
     onFilterThreads: shell.askFocusFilter,
     onSettings: () => {
       shell.setSettingsOpen(true)

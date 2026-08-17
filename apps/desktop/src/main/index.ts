@@ -18,6 +18,7 @@ import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
+import { installReviewChannel } from "./workdiff.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
 import { quitNow, shouldStayOpen } from "./quit.js"
@@ -250,19 +251,31 @@ if (!claimSingleInstance()) {
   void bootstrap()
 }
 
+/**
+ * 渲染层要用、而只有主进程做得到的那些通道，一次挂完。
+ *
+ * 挂在一处不是整洁癖：**漏挂一条不会报错**，只会让界面上某个按钮点了没反应，
+ * 而这类沉默的失效最难查。挤在 `bootstrap` 里时它们混在窗口生命周期中间，
+ * 加第十条的时候没人看得出这一段是同一类事。
+ */
+function installChannels(): void {
+  installSettingsChannel(settings)
+  installAppChannels()
+  installWorksiteChannel()
+  installReviewChannel()
+  installChatDirChannel()
+  installAttachChannel()
+  installProjectDocChannel()
+  installEngineVersionChannel(log)
+  installSelfUpdateChannel(log)
+}
+
 function bootstrap(): Promise<void> {
   return app.whenReady().then(async () => {
     // **第一件事**：把 PATH 补成登录 shell 那一份。探测引擎、spawn 引擎都要用，
     // 而从 Dock 启动时它默认只有 `/usr/bin:/bin:/usr/sbin:/sbin`
     await fixPath(log)
-    installSettingsChannel(settings)
-    installAppChannels()
-    installWorksiteChannel()
-    installChatDirChannel()
-    installAttachChannel()
-    installProjectDocChannel()
-    installEngineVersionChannel(log)
-    installSelfUpdateChannel(log)
+    installChannels()
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     installMenu(

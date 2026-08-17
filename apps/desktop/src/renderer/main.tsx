@@ -8,6 +8,7 @@ import "./styles/markdown.css"
 import "./styles/status.css"
 import "./styles/diff.css"
 import "./styles/compare.css"
+import "./styles/review.css"
 import "./styles/popover.css"
 import "./styles/settings.css"
 

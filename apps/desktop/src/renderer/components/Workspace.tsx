@@ -11,6 +11,7 @@ import { Changed } from "./Changed.js"
 import { Queued } from "./Queued.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
+import { stampOf } from "../stamp.js"
 
 
 
@@ -43,6 +44,8 @@ export interface WorkspaceProps {
   /** 这家引擎的账号额度。 */
   limits: RateLimits | undefined
   onSettings: () => void
+  /** 打开审核面板。变更汇总卡上那颗按钮走这条。 */
+  onReview: () => void
   /** 让侧栏把当前会话切进改名态。 */
   onRename: () => void
   onNew: () => void
@@ -91,6 +94,40 @@ function useDraft(draft: string | undefined): {
   }
 }
 
+/**
+ * 转录区和输入框之间那两块：变更汇总卡、排队中的话。
+ *
+ * 单独拎出来只为行数闸门，但边界不难受：它们的共同点是**都在描述「还没落定的东西」**
+ *（工作区里已经改了什么、你已经打了但还没轮到发的话）。
+ */
+function Between({ props, thread, stamp, send }: {
+  props: WorkspaceProps
+  thread: Thread
+  stamp: string
+  send: (command: Command) => void
+}): React.JSX.Element {
+  return (
+    <>
+      <Changed
+        items={props.items}
+        cwd={thread.cwd}
+        stamp={stamp}
+        onReveal={props.onReveal}
+        onCopy={props.onCopy}
+        onReview={props.onReview}
+      />
+      <Queued
+        texts={thread.queued ?? []}
+        onDrop={() => {
+          // 撤回 = 打断队列。宿主那边中断会把队列一并清掉，
+          // 但这里不该顺带把**正在跑的那一轮**也停了——所以走一条专门的命令
+          send({ type: "thread.unqueue", threadId: thread.id })
+        }}
+      />
+    </>
+  )
+}
+
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
   const [env, setEnv] = useState(false)
@@ -103,7 +140,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
    */
   const { prefill, reuse } = useDraft(props.thread.draft)
   // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
-  const stamp = props.turn === undefined ? "idle" : `${props.turn.id}:${props.turn.status}`
+  const stamp = stampOf(props.turn)
   const actions = useOmniActions(props, {
     onEnv: () => {
       setEnv(true)
@@ -141,15 +178,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onCopy={props.onCopy}
         onReuse={reuse}
       />
-      <Changed items={props.items} cwd={thread.cwd} stamp={stamp} onReveal={props.onReveal} onCopy={props.onCopy} />
-      <Queued
-        texts={thread.queued ?? []}
-        onDrop={() => {
-          // 撤回 = 打断队列。宿主那边中断会把队列一并清掉，
-          // 但这里不该顺带把**正在跑的那一轮**也停了——所以走一条专门的命令
-          send({ type: "thread.unqueue", threadId: thread.id })
-        }}
-      />
+      <Between props={props} thread={thread} stamp={stamp} send={send} />
       <Composer
         detached={thread.detached === true}
         /*

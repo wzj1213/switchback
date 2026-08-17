@@ -814,6 +814,32 @@
   color: var(--text-muted);
 }
 
+/* 胶囊 + 「审核」并排。**审核在右边**：左边那枚是「刚才动了多少」（读），
+   右边这颗是「逐个过一遍」（做）——读在前、做在后，和视线方向一致 */
+.changed__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 比胶囊低一档：它是可选动作，不该抢走「有几个文件变了」那条信息的注意力 */
+.changed__review {
+  padding: 3px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.changed__review:hover {
+  border-color: var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+}
+
 .changed__pill {
   display: inline-flex;
   align-items: center;

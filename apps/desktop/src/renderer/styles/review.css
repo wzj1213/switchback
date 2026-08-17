@@ -1,0 +1,447 @@
+/*
+ * 审核面板。
+ *
+ * 比设置面板宽得多，也高得多：设置是几组选择，审核是**一屏一屏读代码**。
+ * 代码要宽——一份 diff 折行之后，缩进层级就没了，而缩进正是读代码的骨架。
+ *
+ * 两列：左边固定 260px（够放 `src/renderer/components/…` 的尾段），
+ * 右边吃掉剩下的全部。窄窗口下右边优先——文件名再挤也认得出，代码挤了就没法读。
+ */
+
+.rv__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5) var(--sp-4);
+  background: var(--scrim);
+}
+
+.rv {
+  display: flex;
+  flex-direction: column;
+  width: min(1240px, 100%);
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-pop);
+}
+
+.rv:focus {
+  outline: none;
+}
+
+.rv__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: none;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
+}
+
+.rv__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.rv__count {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 工具栏推到右边，但**留在关闭按钮左侧**：关闭永远在最右角，那是肌肉记忆 */
+.rv__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.rv__gap {
+  width: var(--sp-3);
+}
+
+.rv__seg {
+  padding: 3px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.rv__seg:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rv__seg--on {
+  border-color: var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+}
+
+.rv__close {
+  flex: none;
+  padding: 2px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.rv__close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rv__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ── 左列：文件清单 ───────────────────────────────────────────── */
+
+.rvl {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 260px;
+  min-height: 0;
+  border-right: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
+}
+
+.rvl__filter {
+  flex: none;
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.rvl__input {
+  width: 100%;
+  padding: 4px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.rvl__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.rvl__rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-1) 0;
+}
+
+.rvl__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 3px var(--sp-2) 3px var(--sp-3);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rvl__row:hover {
+  background: var(--bg-hover);
+}
+
+.rvl__row--on {
+  background: var(--bg-active);
+}
+
+/* 状态用一个小色块，不用文字：五种状态各占两个汉字的话，
+   一列里最该被读到的文件名就被挤没了。图例在这一列底下 */
+.rvl__kind {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--text-faint);
+  transform: translateY(-1px);
+}
+
+.rvl__kind--add,
+.rvl__kind--untracked {
+  background: var(--ok);
+}
+
+.rvl__kind--delete {
+  background: var(--danger);
+}
+
+.rvl__kind--update {
+  background: var(--accent);
+}
+
+.rvl__kind--rename {
+  background: var(--warn);
+}
+
+.rvl__kind--untracked {
+  /* 未跟踪的是空心的：它和「新建」在 git 眼里不是一回事 */
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ok);
+}
+
+.rvl__name {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+
+/*
+ * 目录**从左边截断**（`…components/`），不是从右边（`src/renderer/co…`）。
+ * 这一列只有 260px，而路径深的时候最靠近文件名的那一段信息量最大。
+ *
+ * `direction: rtl` 是让省略号落在开头的唯一办法，代价是双向算法会把结尾那个
+ * `/` 搬到最前面——组件那边补了一个 LRM 挡住它，两处一起看才成立。
+ */
+.rvl__dir {
+  overflow: hidden;
+  color: var(--text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.rvl__base {
+  flex: none;
+  white-space: nowrap;
+}
+
+.rvl__staged {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: var(--text-xs);
+}
+
+.rvl__stat {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.rvl__none {
+  margin: var(--sp-3) var(--sp-3) 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.rvl__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  flex: none;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.rvl__key {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── 右列：补丁 ───────────────────────────────────────────────── */
+
+.rv__pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rv__file {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+}
+
+.rv__kindtext {
+  color: var(--text-muted);
+}
+
+.rv__path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv__act {
+  flex: none;
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.rv__act:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rvd {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 换文件时旧的先压淡留着，不闪白——切一次闪一下比等半秒更难受 */
+.rvd--stale {
+  opacity: 0.55;
+}
+
+.rvd__note {
+  margin: 0;
+  padding: var(--sp-5) var(--sp-4);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.rvd__body {
+  min-width: min-content;
+  padding: var(--sp-1) 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.55;
+}
+
+.rvd__line {
+  display: flex;
+  white-space: pre;
+}
+
+/* 行号：等宽、不可选（复制一段 diff 时不该把行号也带走）、比正文淡两档 */
+.rvd__n {
+  flex: none;
+  width: 3.6em;
+  padding-right: var(--sp-2);
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.rvd__sign {
+  flex: none;
+  width: 1.4em;
+  color: var(--text-faint);
+  text-align: center;
+  user-select: none;
+}
+
+.rvd__text {
+  min-width: 0;
+  padding-right: var(--sp-3);
+}
+
+.rvd__line--add {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.rvd__line--add .rvd__sign {
+  color: var(--ok);
+}
+
+.rvd__line--del {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.rvd__line--del .rvd__sign {
+  color: var(--danger);
+}
+
+.rvd__line--hunk,
+.rvd__line--meta {
+  color: var(--text-faint);
+}
+
+.rvd__line--hunk {
+  background: var(--bg-sunken);
+}
+
+/* ── 并排 ─────────────────────────────────────────────────────── */
+
+.rvd__body--split {
+  display: flex;
+  flex-direction: column;
+}
+
+.rvd__row {
+  display: flex;
+  white-space: pre;
+}
+
+.rvd__cell {
+  display: flex;
+  width: 50%;
+  min-width: 0;
+  flex: none;
+}
+
+/* 两列中间一条分界线：没有它，右列的行号会被读成左列代码的一部分 */
+.rvd__cell:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.rvd__cell--void {
+  width: 50%;
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--border);
+}
+
+.rvd__row--full {
+  padding-left: var(--sp-2);
+  background: var(--bg-sunken);
+  color: var(--text-faint);
+}

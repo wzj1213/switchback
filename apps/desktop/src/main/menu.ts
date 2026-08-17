@@ -7,7 +7,16 @@ import { quitNow } from "./quit.js"
  * 新建会话、打开文件夹这些要落到当前选中的会话上下文里，主进程不知道那是什么。
  * 所以菜单只发一个意图，怎么做由渲染层决定。
  */
-export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown" | "compare" | "filter-threads" | "settings"
+export type MenuAction =
+  | "new-thread"
+  | "open-folder"
+  | "interrupt"
+  | "find"
+  | "copy-markdown"
+  | "compare"
+  | "review"
+  | "filter-threads"
+  | "settings"
 
 const isMac = process.platform === "darwin"
 
@@ -100,6 +109,15 @@ function threadMenu(): MenuItemConstructorOptions {
         accelerator: "Shift+CmdOrCtrl+D",
         click: (_i, focused) => {
           send("compare", focused)
+        },
+      },
+      {
+        // 和「对比分叉」一样：主进程不知道当前选中的是谁，所以菜单项没法按状态禁用。
+        // 不是仓库时点它会开出一块面板，上面照实说「这个工作区不是 git 仓库」
+        label: "审核改动",
+        accelerator: "Shift+CmdOrCtrl+R",
+        click: (_i, focused) => {
+          send("review", focused)
         },
       },
       {

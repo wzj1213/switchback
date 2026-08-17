@@ -78,26 +78,39 @@ export interface WorkChanges {
   paths: readonly string[]
 }
 
-/** `XY <path>` → 路径。重命名那种是 `R  新\0旧`，`-z` 下旧名单独占一段，跳过即可。 */
-export function parseStatus(raw: string): readonly string[] {
-  const out: string[] = []
+/**
+ * `XY <path>` → 状态码 + 路径。重命名那种是 `R  新\0旧`，`-z` 下旧名单独占一段，
+ * 跳过即可（不跳会多算一个文件）。
+ *
+ * 状态码留着不扔：审核面板要靠它分「新建/删除/改名/修改」，
+ * 以及第一位判「进没进暂存区」。
+ */
+export function codesOf(raw: string): readonly { code: string; rel: string }[] {
+  const out: { code: string; rel: string }[] = []
   const parts = raw.split("\0")
   for (let i = 0; i < parts.length; i += 1) {
     const entry = parts[i]
     if (entry === undefined || entry.length < 4) continue
     const code = entry.slice(0, 2)
-    out.push(entry.slice(3))
+    out.push({ code, rel: entry.slice(3) })
     // 重命名/复制：下一段是旧名，不是另一个改动
     if (code.startsWith("R") || code.startsWith("C")) i += 1
   }
   return out
 }
 
+export function parseStatus(raw: string): readonly string[] {
+  return codesOf(raw).map((e) => e.rel)
+}
+
 export async function workChanges(cwd: string): Promise<WorkChanges | undefined> {
   const top = await run("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: TIMEOUT }).catch(() => undefined)
   if (top === undefined) return undefined
   const root = await realpath(top.stdout.trim()).catch(() => top.stdout.trim())
-  const status = await run("git", ["status", "--porcelain", "-z"], { cwd, timeout: TIMEOUT }).catch(() => undefined)
+  // `-uall`：不加的话未跟踪的**目录**折成一条 `sub/`，界面上看起来像一个文件
+  const status = await run("git", ["status", "--porcelain", "-z", "-uall"], { cwd, timeout: TIMEOUT }).catch(
+    () => undefined,
+  )
   if (status === undefined) return { root, paths: [] }
   return { root, paths: parseStatus(status.stdout).map((rel) => join(root, rel)) }
 }
