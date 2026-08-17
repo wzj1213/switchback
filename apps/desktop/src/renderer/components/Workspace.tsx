@@ -181,6 +181,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       <Between props={props} thread={thread} stamp={stamp} send={send} />
       <Composer
         detached={thread.detached === true}
+        /* **和当前轮次比一比才算数**：`passTurn` 存的是轮次 id，
+           所以「过期」不需要谁记得来清一次——下一轮的 id 不一样，这里自然就是 false */
+        passing={thread.passTurn !== undefined && thread.passTurn === props.turn?.id}
         /*
          * **启动期和「上一轮还在跑」是两回事**，上一版把它们并成一个 `busy`，
          * 于是引擎还没起来时屏幕上写着「它还在跑——现在打的会排在后面」，

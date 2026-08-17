@@ -166,8 +166,8 @@ export function Transcript({
   // **必须是 useCallback。** 写成行内箭头函数的话每次 render 换一个身份，
   // `ItemView` 的 memo 会全部落空——而且是静默落空：功能全对，只是每帧白干一遍
   const onResolve = useCallback<ResolveApproval>(
-    (itemId, allow, remember) => {
-      send({ type: "approval.resolve", itemId, allow, remember })
+    (itemId, allow, remember, passTurn) => {
+      send({ type: "approval.resolve", itemId, allow, remember, ...(passTurn === true ? { passTurn } : {}) })
     },
     [send],
   )

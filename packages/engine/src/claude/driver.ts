@@ -125,6 +125,7 @@ class ClaudeSession implements EngineSession {
       tool,
       summary: summarize(tool, meta),
       reason: verdict.reason,
+      ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
       ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
     })
     // `once` 只放行这一次；其余范围回传 SDK 的 suggestions，走它原生的「本会话不再问」

@@ -26,11 +26,19 @@ export function Chips({
   cwd,
   project,
   stamp,
+  passing,
 }: {
   cwd: string
   project: string
   /** 变一次就重新问一遍。调用方把轮次状态传进来。 */
   stamp: string
+  /**
+   * 这一轮已经点过「本轮剩下的都放行」。
+   *
+   * **一个「接下来不再问你」的开关必须看得见。** 只活在宿主内存里的话，
+   * 屏幕上没有任何痕迹——而这恰恰是最不该沉默的一类状态。
+   */
+  passing: boolean
 }): React.JSX.Element {
   const [git, setGit] = useState<{ branch?: string; dirty?: boolean }>({})
   const bridge = typeof window === "undefined" ? undefined : window.omni
@@ -53,6 +61,11 @@ export function Chips({
         <FolderIcon />
         {project}
       </span>
+      {passing ? (
+        <span className="chip chip--warn" title="这一轮剩下的审批都自动放行了（红线除外）。要收回：⌘. 中断这一轮">
+          本轮已放行
+        </span>
+      ) : null}
       {git.branch === undefined ? null : (
         <span
           className={`chip${git.dirty === true ? " chip--warn" : ""}`}

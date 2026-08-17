@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react"
 import type { ApprovalItem, ItemId, RememberScope } from "@omni/protocol"
 
 /** 用户对一张审批卡的裁决。 */
-export type ResolveApproval = (itemId: ItemId, allow: boolean, remember: RememberScope) => void
+export type ResolveApproval = (
+  itemId: ItemId,
+  allow: boolean,
+  remember: RememberScope,
+  /** 「这一轮剩下的都别再问了」。不是记忆规则——轮次结束就没了。 */
+  passTurn?: boolean,
+) => void
 
 /**
  * 焦点是不是正在某个输入框里。
@@ -35,6 +41,32 @@ function Kbd({ children }: { children: React.ReactNode }): React.JSX.Element {
  */
 /** 当前持有 ⌘⏎ / ⌘⌫ 的那张卡。见下面 effect 里的说明。 */
 const holder: { id: string | undefined } = { id: undefined }
+
+/**
+ * 「允许一次」旁边那个下拉里的两项。
+ *
+ * 「允许此对话」是**按模式**记的（记住的是这条规则），挡不住下一件不一样的事；
+ * 而一轮里 agent 常常为八件各不相同的事各问一次——「本轮剩下的都放行」治的是那个。
+ *
+ * 副标题不是装饰：它说清两条边界（红线照问、下一轮恢复），
+ * 否则用户会以为自己点了一个「永久全放行」，而那正是这个按钮**不是**的东西。
+ */
+function More({ hint, onPick }: {
+  hint: string | undefined
+  onPick: (allow: boolean, scope: RememberScope, passTurn?: boolean) => void
+}): React.JSX.Element {
+  return (
+    <div className="menu">
+      <button className="menu__item" type="button" onClick={() => { onPick(true, "session") }}>
+        允许此对话{hint === undefined ? "" : `：${hint}`}
+      </button>
+      <button className="menu__item" type="button" onClick={() => { onPick(true, "once", true) }}>
+        本轮剩下的都放行
+        <span className="menu__note">红线仍会逐条问；下一轮恢复</span>
+      </button>
+    </div>
+  )
+}
 
 export function Approval({
   item,
@@ -80,9 +112,9 @@ export function Approval({
     }
   }, [settled, item.id, onResolve])
 
-  const decide = (allow: boolean, scope: RememberScope): void => {
+  const decide = (allow: boolean, scope: RememberScope, passTurn?: boolean): void => {
     setOpen(false)
-    onResolve(item.id, allow, scope)
+    onResolve(item.id, allow, scope, passTurn)
   }
 
   return (
@@ -137,13 +169,7 @@ export function Approval({
           >
             ⌄
           </button>
-          {open ? (
-            <div className="menu">
-              <button className="menu__item" type="button" onClick={() => { decide(true, "session") }}>
-                允许此对话{item.rememberHint === undefined ? "" : `：${item.rememberHint}`}
-              </button>
-            </div>
-          ) : null}
+          {open ? <More hint={item.rememberHint} onPick={decide} /> : null}
         </div>
       </div>
     </div>

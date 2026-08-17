@@ -80,7 +80,17 @@ export type Command =
   | { type: "thread.setModel"; threadId: ThreadId; model: string; effort?: string }
   /** L2 接力：换引擎继续同一个 thread，宿主负责生成交接包。 */
   | { type: "thread.handoff"; threadId: ThreadId; to: EngineId }
-  | { type: "approval.resolve"; itemId: ItemId; allow: boolean; remember: RememberScope }
+  /**
+   * 落定一张审批卡。
+   *
+   * `passTurn` 是**这一轮剩下的都别再问了**（只在 `allow` 时有意义）。
+   * 它不是一条记忆规则——没有模式、不落盘、轮次一结束就没了。
+   * 之所以要有它：一轮里 agent 会为八件**各不相同**的事各问一次，
+   * 而「允许此对话」是按模式记的，挡不住下一件不一样的事。
+   *
+   * **红线不受它影响**，照旧一条条问（见 `host/approval.ts`）。
+   */
+  | { type: "approval.resolve"; itemId: ItemId; allow: boolean; remember: RememberScope; passTurn?: boolean }
 
 /** 记忆范围。`project` 级会落盘并跨会话生效；红线项不允许 `project`。 */
 export type RememberScope = "once" | "session" | "project"
