@@ -19,6 +19,7 @@ import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { installReviewChannel } from "./workdiff.js"
+import { installSearchChannel } from "./search.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevReview, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
 import { quitNow, shouldStayOpen } from "./quit.js"
@@ -264,6 +265,7 @@ function installChannels(): void {
   installAppChannels()
   installWorksiteChannel()
   installReviewChannel()
+  installSearchChannel()
   installChatDirChannel()
   installAttachChannel()
   installProjectDocChannel()

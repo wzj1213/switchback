@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import type { EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
+import { useDeepSearch } from "../useDeepSearch.js"
+import { Deep } from "./SidebarDeep.js"
 import { sectionsOf } from "../sidebar.js"
 import { useSidebarDrag } from "../sidebarDrag.js"
 import { SidebarFoot, type AccountLine } from "./SidebarFoot.js"
@@ -9,7 +11,7 @@ import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
 import { Head } from "./SidebarHead.js"
 import { Hits } from "./SidebarHits.js"
-import { useRenaming } from "./RowName.js"
+import { useRenaming, type RenameCtl } from "./RowName.js"
 import { SectionList } from "./SidebarSections.js"
 
 /**
@@ -94,6 +96,40 @@ interface Props {
 }
 
 
+/**
+ * 筛选时的两段结果：标题/首句/目录命中的（即时），正文里提到的（慢半拍）。
+ *
+ * 拆出来是行数闸门逼的，但边界对：`Sidebar` 管「侧栏长什么样」，
+ * 这里管「搜出来的东西怎么摆」。
+ */
+function Found({ rows, found, deep, selectedId, on }: {
+  rows: readonly ThreadRow[]
+  found: readonly ThreadRow[]
+  deep: ReturnType<typeof useDeepSearch>
+  selectedId: string
+  on: {
+    onSelect: (id: string) => void
+    onDelete: (id: string) => void
+    rowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
+    rename: RenameCtl
+  }
+}): React.JSX.Element {
+  return (
+    <>
+      <Hits rows={found} total={rows.length} selectedId={selectedId} on={on} />
+      <Deep
+        hits={deep.hits}
+        rows={rows}
+        shown={new Set(found.map((r) => r.thread.id))}
+        selectedId={selectedId}
+        busy={deep.busy}
+        skipped={deep.skipped}
+        onSelect={on.onSelect}
+      />
+    </>
+  )
+}
+
 export function Sidebar({
   rows,
   selectedId,
@@ -152,7 +188,10 @@ export function Sidebar({
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
   const pins = { projects: pinned, threads: pinnedThreads, order: threadOrder, known: knownProjects, projectOrder }
-  const sections = sectionsOf(filterRows(rows, query), pins)
+  const found = filterRows(rows, query)
+  const sections = sectionsOf(found, pins)
+  // 正文搜索**跟在后面出现**：它要翻磁盘，而上面那份必须逐字即时
+  const deep = useDeepSearch(query)
   // 拖放整套在 `sidebarDrag.ts`：谁能拖、拖到哪儿会发生什么，都在那儿
   const dragging = useSidebarDrag({ filtering, sections, onReorder, onReorderProjects, onPinThread, onTogglePin })
 
@@ -188,7 +227,7 @@ export function Sidebar({
 
       <div className="sidebar__list">
         {filtering ? (
-          <Hits rows={filterRows(rows, query)} total={rows.length} selectedId={selectedId} on={{ onSelect, onDelete, rowMenu, rename }} />
+          <Found rows={rows} found={found} deep={deep} selectedId={selectedId} on={{ onSelect, onDelete, rowMenu, rename }} />
         ) : (
           <SectionList
             sections={sections}

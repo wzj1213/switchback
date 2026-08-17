@@ -621,6 +621,65 @@ body {
   color: var(--text-faint);
 }
 
+/* ── 正文命中 ────────────────────────────────────────
+ * 「标题里没有，但正文里提过」的那几条。**两行**：标题 + 以命中词为中心的摘要。
+ * 只给标题的话你还是得逐个点开确认，那这一段就白做了。见 components/SidebarDeep.tsx。
+ */
+.deep__row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: var(--sp-1) calc(var(--sb-pad) + var(--sb-slot));
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deep__row:hover {
+  background: var(--bg-hover);
+}
+
+.deep__row--on {
+  background: var(--bg-active);
+}
+
+.deep__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.deep__title {
+  overflow: hidden;
+  flex: 1;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deep__count {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 摘要压两行：一行常常正好断在关键词前面，三行就把列表撑成一堵墙 */
+.deep__snip {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
 .sidebar__list {
   flex: 1;
   min-height: 0;

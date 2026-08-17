@@ -5,6 +5,7 @@ import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { ReviewFile, ReviewPatch } from "../shared/review.js"
+import type { ContentHit } from "../shared/search.js"
 
 /** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
 export interface Sealed {
@@ -186,6 +187,17 @@ const api = {
    */
   async workPatch(cwd: string, rel: string, context?: number): Promise<ReviewPatch> {
     return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, context })) as ReviewPatch
+  },
+  /**
+   * 在所有会话的**正文**里找一句话。侧栏那个筛选框只搜标题/首句/目录，
+   * 而人记得住的往往是中间某一句。**只搜说过的话，不搜工具调用**——
+   * 把命令原文算进来的话，搜什么都会命中跑过命令的那几条（见 `main/search.ts`）。
+   */
+  async searchThreads(query: string): Promise<{ hits: readonly ContentHit[]; skipped: number }> {
+    return (await ipcRenderer.invoke("omni:searchThreads", query)) as {
+      hits: readonly ContentHit[]
+      skipped: number
+    }
   },
   /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
   async settings(patch?: Partial<Settings>): Promise<Settings> {
