@@ -197,43 +197,42 @@ const draftOf = (events: Event[], id: string): string | undefined =>
 const newThreadId = (events: Event[]): string =>
   events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
 
-describe("退回交接包的两种情况", () => {
-  it("换一家引擎：会话格式不通，只能递交接包——**但挂成草稿，不发出去**", async () => {
-    const r = rig({ canFork: true })
-    const { id } = await withTurns(r)
-    r.prompts.length = 0
-    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "other" })
-    expect(r.forks).toHaveLength(0)
-    // **一条都不发。** 上一版是直接发出去的，于是「分叉一份」变成了
-    // 「分叉一份并且立刻开跑」，而那段话还是 omni 替用户写的
-    expect(r.prompts).toEqual([])
-    expect(draftOf(r.events, newThreadId(r.events))).toBeDefined()
-  })
-
-  it("**引擎不肯分就退回交接包，不报错**——把能用的功能变成会报错的，是把好的换成差的", async () => {
+/**
+ * 分不了原生 fork 时**什么都不做**，不再退回交接包。
+ *
+ * 交接包是 omni 从 transcript 里提炼的一段话，塞进输入框等用户按回车。
+ * 用户否掉了这条路：那段话是**他没打过的**，而历史对话新的引擎自己会读——
+ * omni 已经把上一段记录的磁盘路径存在 `Thread.segments` 里（`/timeline` 看得见）。
+ * 所以现在分叉只做分叉：新会话开出来，一个字都不替他写。
+ */
+describe("分不了就只是分不了", () => {
+  it("分不了：新会话照样开出来，**输入框里一个字都没有**", async () => {
     const r = rig({ canFork: true })
     const { id } = await withTurns(r)
     r.fail.now = true
     r.prompts.length = 0
     await expect(r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })).resolves.toBeUndefined()
     expect(r.prompts).toEqual([])
-    expect(draftOf(r.events, newThreadId(r.events))).toBeDefined()
+    expect(draftOf(r.events, newThreadId(r.events))).toBeUndefined()
   })
 
-  it("引擎报了 fork:false 就直接走交接包，不去试", async () => {
+  it("引擎报了 fork:false 就不去试，也不塞文本", async () => {
     const r = rig({ canFork: false })
     const { id } = await withTurns(r)
     r.prompts.length = 0
     await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
     expect(r.forks).toHaveLength(0)
     expect(r.prompts).toEqual([])
-    expect(draftOf(r.events, newThreadId(r.events))).toBeDefined()
+    expect(draftOf(r.events, newThreadId(r.events))).toBeUndefined()
   })
 
-  it("**草稿里带着目标**：接手的一家要被告知做什么，只是由你按下回车", async () => {
-    const r = rig({ canFork: false })
+  // 原生分叉成功那条路本来就不该有文本（引擎自己什么都记得），这里一并钉住
+  it("原生分叉成功也一样：不发、不塞", async () => {
+    const r = rig({ canFork: true })
     const { id } = await withTurns(r)
-    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
-    expect(draftOf(r.events, newThreadId(r.events))).toContain("第一句")
+    r.prompts.length = 0
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "other" })
+    expect(r.prompts).toEqual([])
+    expect(draftOf(r.events, newThreadId(r.events))).toBeUndefined()
   })
 })

@@ -163,15 +163,25 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onOmni={(name: string) => {
           actions.find((a) => a.command.name === name)?.run()
         }}
-        models={props.models}
-        model={thread.model}
-        effort={thread.effort}
+        /*
+         * 有待切换的引擎时**不给模型选择器**：手上这份清单是**旧那家**报的，
+         * 而它的模型 id 在新的一家那里通常根本不存在。摆一个选了会出错的控件
+         * 比不摆糟。清单空着界面自己就不画（见 `EngineSession.models` 的约定）。
+         * 发出第一句话、引擎真的换过去之后，新那家的清单就来了。
+         */
+        models={thread.nextEngine === undefined ? props.models : []}
+        model={thread.nextEngine === undefined ? thread.model : undefined}
+        effort={thread.nextEngine === undefined ? thread.effort : undefined}
         onModelChange={(model, effort) => {
           send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })
         }}
         // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
         // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
-        engine={thread.engine}
+        //
+        // `nextEngine` 优先：切引擎现在是「下一句用它」，真正的切换发生在
+        // 发出第一句话的时候（见 `Thread.nextEngine`）。选择器要显示**你选的那家**
+        // ——显示旧的那家等于告诉他「没选上」。
+        engine={thread.nextEngine ?? thread.engine}
         trust={thread.trust}
         onEngineChange={(next) => {
           // **中途接力**：同一个会话换一家引擎接着做，不是另开一个。

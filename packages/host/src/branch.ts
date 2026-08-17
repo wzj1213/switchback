@@ -1,5 +1,4 @@
 import type { Command, Item, Thread, ThreadId } from "@omni/protocol"
-import { buildHandoff, renderHandoff } from "@omni/handoff"
 import { initial, itemsOf, reduceAll } from "@omni/store"
 import { emit, type Ctx, type Live } from "./ctx.js"
 import { copyTranscript } from "./transcript.js"
@@ -51,7 +50,6 @@ async function branch(
   const events = (await ctx.deps.journal?.read(entry.thread.id)) ?? []
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
   const items = opts.upTo === undefined ? all : until(all, opts.upTo)
-  const packet = buildHandoff(entry.thread, items)
   const plan = forkPlan(entry, opts.to, all, items)
 
   const at = ctx.deps.now()
@@ -80,17 +78,9 @@ async function branch(
   emit(ctx, { type: "thread.started", at, thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 
-  if (forked !== undefined) {
-    // **引擎那边已经什么都知道了**，不用再发交接包——发了反而是把它已经
-    // 亲历过的事再复述一遍。只要把 transcript 抄过来，人看到的和它记得的就对上了
-    copyTranscript(ctx, thread, items)
-    return
-  }
-
-  // **不替用户发出去。** 交接包是 omni 替他写的一段话——直接发等于
-  // 「分叉一份」变成「分叉一份并且立刻开跑」，而且那条他没打过的话
-  // 会以他的名义进 transcript、立刻花掉一轮额度。挂成草稿，他看得见、能改
-  draftInto(ctx, thread.id, handoffText(packet))
+  // 原生分叉成功时把 transcript 抄过来：**引擎那边已经什么都知道了**，
+  // 人看到的和它记得的就对上了
+  if (forked !== undefined) copyTranscript(ctx, thread, items)
 }
 
 /**
@@ -174,15 +164,40 @@ function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
  * **这正是「事件流是真源、归约器是纯函数」这条设计换来的**：
  * 不需要为宿主再维护一份 transcript 副本，也就不会出现两份对不上。
  */
-export async function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
+export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  if (entry.thread.engine === cmd.to) return
   if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
 
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const from = entry.thread.engine
-  const packet = buildHandoff(entry.thread, itemsOf(reduceAll(initial(), events), cmd.threadId))
+  const at = ctx.deps.now()
+  const next = { ...entry.thread, updatedAt: at }
+  // 选回当前这家 = 取消待切换
+  if (cmd.to === entry.thread.engine) delete next.nextEngine
+  else next.nextEngine = cmd.to
+  entry.thread = next
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  // **记一笔意向而已，没有 IO**。签名是 Promise 只为了对上 `host.ts` 的分派表
+  return Promise.resolve()
+}
+
+/**
+ * 真正把引擎换掉。**由 `prompt` 在发出第一句话时调用**，不是用户点下拉的那一刻
+ * ——理由见 `Thread.nextEngine`。
+ *
+ * 换过去之后：停旧进程、起新的、清掉模型与强度（上一家的模型 id 在新的一家
+ * 那里通常根本不存在）、`nextEngine` 清空。
+ *
+ * **不传原始上下文，也不塞任何文本。** 各家 session 格式不通，硬翻既做不对也
+ * 维护不起；而 omni 替用户编一段摘要塞进输入框更糟——那是他没打过的话。
+ * 上一家的原始记录路径 omni 已经存在 `Thread.segments` 里（`/timeline` 看得见），
+ * 新的一家自己有文件工具，要读的时候读全量原文。
+ */
+export async function switchEngine(ctx: Ctx, threadId: ThreadId, to: string): Promise<void> {
+  const entry = ctx.live.get(threadId)
+  if (entry === undefined) throw new Error(`会话不存在：${threadId}`)
+  if (entry.thread.engine === to) return
+  if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
+  const cmd = { threadId, to }
 
   // 先停旧的再起新的：两个引擎同时对着一个工作区写，是最难查的一类冲突
   entry.gate.settleAll()
@@ -201,6 +216,7 @@ export async function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.ha
     ...entry.thread,
     engine: cmd.to,
     engineHistory: [...entry.thread.engineHistory, cmd.to],
+    nextEngine: undefined,
     ...(back === undefined ? { engineHandle: undefined } : { engineHandle: back.handle }),
     // 模型和强度是**跟着引擎走**的，换一家就得重新问——上一家的模型 id
     // 在新的一家那里通常根本不存在
@@ -212,47 +228,7 @@ export async function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.ha
   const early = await launch(ctx, thread, back?.handle)
   emit(ctx, { type: "thread.updated", at, thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
-
-  // **不替用户发，也不再替他编一段摘要。** 给的是上一家的原始记录在哪——
-  // 新的一家自己有文件工具，你让它 review 它就去读，读到的是全量原文。
-  // 拿不到路径时（比如 ACP 那类协议里没这个概念）才退回交接包
-  draftInto(ctx, cmd.threadId, pointerOr(entry.thread, from, cmd.to, () => renderHandoff(packet, from, cmd.to)))
 }
 
-/**
- * 换引擎时放进输入框的那句话。
- *
- * **优先给路径，不给摘要。** 上一家的原始记录就在磁盘上，而这些引擎都会读文件——
- * 与其由 omni 提炼一份必然丢东西的摘要塞给新的一家，不如告诉它记录在哪：
- * 你让它 review 时它自己去读**全量原文**，不问就不读，一个 token 都不浪费。
- *
- * 只有在**一条路径都拿不到**时才退回交接包（`fallback`）——那时没有别的办法
- * 把上下文带过去。
- */
-function pointerOr(thread: Thread, from: string, to: string, fallback: () => string): string {
-  const logs = (thread.segments ?? []).filter((seg) => seg.logPath !== undefined)
-  if (logs.length === 0) return fallback()
-  const lines = logs.map((seg) => `- ${seg.engine}：${seg.logPath ?? ""}`).join("\n")
-  return `（这条会话之前由 ${from} 跑过，现在换成了 ${to}。上一段的完整记录在本地：\n${lines}\n需要的话你可以直接读它，比如让我 review 前面的改动。）\n\n`
-}
 
-/** 交接包的正文。目标 + 过程中追加过的要求。 */
-function handoffText(packet: { goal: string; asks: readonly string[] }): string {
-  const asks =
-    packet.asks.length === 0 ? "" : `\n\n过程中追加过的要求：\n${packet.asks.map((a) => `- ${a}`).join("\n")}`
-  return `${packet.goal}${asks}`
-}
 
-/**
- * 把一段话挂成这条会话的草稿。**不发出去**。
- *
- * 走 `thread.updated` 而不是另开一种事件：草稿要跟着会话一起落盘——
- * 一段没发出去的交接包，重启之后还该在输入框里等着。
- */
-function draftInto(ctx: Ctx, threadId: ThreadId, text: string): void {
-  const entry = ctx.live.get(threadId)
-  if (entry === undefined || text.trim() === "") return
-  const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, draft: text, updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-}

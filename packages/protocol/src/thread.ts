@@ -23,6 +23,22 @@ export interface Thread {
   cwd: string
   engine: EngineId
   trust: Trust
+  /**
+   * 下一句话用哪家引擎。**只是意向，还没生效。**
+   *
+   * ## 为什么切引擎不当场切
+   *
+   * 当场切要停掉旧进程、起新进程、清掉模型与强度、往 `engineHistory` 里加一笔
+   * ——而用户可能只是点开下拉看看有哪几家，或者点错了。那一串副作用发生在
+   * 「他还什么都没说」的时候，看起来就是**莫名其妙地变了**。
+   *
+   * 和「新会话发出第一句话才落盘」是同一条原则：**选了不等于开始用**。
+   * 真正的切换在 `prompt` 里发生（见 `branch.ts` 的 `switchEngine`），
+   * 那时才停旧的、起新的、记一段。
+   *
+   * 与 `engine` 相同或缺席都表示「没有待切换的」。
+   */
+  nextEngine?: EngineId
   status: ThreadStatus
   createdAt: number
   updatedAt: number

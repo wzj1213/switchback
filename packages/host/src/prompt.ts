@@ -1,4 +1,5 @@
 import type { Command } from "@omni/protocol"
+import { switchEngine } from "./branch.js"
 import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
 
 /**
@@ -67,15 +68,7 @@ async function steerInto(
   return true
 }
 
-/**
- * @param origin 这条不是人打的时候标一下（目前只有接力包）。引擎侧照旧当成
- *   用户消息发过去——**要改的只是界面怎么呈现**，不是引擎怎么理解。
- */
-export async function prompt(
-  ctx: Ctx,
-  cmd: Extract<Command, { type: "thread.prompt" }>,
-  origin?: "handoff",
-): Promise<void> {
+export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
   /**
@@ -98,6 +91,21 @@ export async function prompt(
     if (await steerInto(ctx, entry, cmd)) return
     enqueue(ctx, entry, cmd.text)
     return
+  }
+  /**
+   * **待切换的引擎在这一刻才真正切。**
+   *
+   * 用户点下拉只是说「下一句用它」（`Thread.nextEngine`）——那时停旧进程、
+   * 起新进程、清模型，全都发生在他还什么都没说的时候，看起来就是莫名其妙地变了。
+   *
+   * 放在这里而不是更前面：上面那条「上一轮还没跑完」的路要么改向要么排队，
+   * **都不该顺手把引擎换掉**；排进队的那句话之后由 `drain` 再走一遍这里，
+   * 那时才切。切完 `ctx.live` 里换成了新的一条，所以递归重走一遍。
+   */
+  const pending = entry.thread.nextEngine
+  if (pending !== undefined && pending !== entry.thread.engine) {
+    await switchEngine(ctx, cmd.threadId, pending)
+    return prompt(ctx, cmd)
   }
   const at = ctx.deps.now()
   // **发出去了就不再是草稿。** 不清的话，用户改了内容发出去之后，
@@ -134,7 +142,6 @@ export async function prompt(
       ...(cmd.attachments === undefined || cmd.attachments.length === 0
         ? {}
         : { attachments: cmd.attachments }),
-      ...(origin === undefined ? {} : { origin }),
     },
   })
   await entry.session.prompt(cmd.text, turnId, cmd.attachments)

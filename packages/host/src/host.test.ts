@@ -633,44 +633,89 @@ const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; sto
 describe("跨引擎接力", () => {
   const setupTwo = setupTwoEngines
 
-  const handoffTo = async (
-    host: Host,
-    events: Event[],
-    to: string,
-  ): Promise<string> => {
+  /**
+   * 切引擎 + 发出下一句。两件事在新设计里是分开的：
+   *
+   * - 点下拉只记一笔 `nextEngine`（见 `Thread.nextEngine`），什么都不动；
+   * - **真正的切换发生在下一句话发出去的那一刻**。
+   *
+   * 中间那条 `turn.completed` 不是凑数：**上一轮还没跑完时不切引擎**——
+   * 那时新说的话会排队，切换要等队列被 drain 才发生。
+   */
+  const handoffTo = async (rig: ReturnType<typeof setupTwoEngines>, to: string): Promise<string> => {
+    const { host, events, sessions } = rig
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
     await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
+    const first = sessions[0]
+    first?.emit({ type: "turn.completed", at: 0, turnId: first.prompts[0]?.turnId ?? "", status: "completed" })
     await host.dispatch({ type: "thread.handoff", threadId, to })
+    await host.dispatch({ type: "thread.prompt", threadId, text: "接着弄" })
     return threadId
   }
 
   it("先停旧的再起新的——两个引擎同时对着一个工作区写是最难查的冲突", async () => {
-    const { host, events, sessions } = setupTwo()
+    const rig = setupTwo()
+    const { host, sessions } = rig
     await host.dispatch(create)
-    await handoffTo(host, events, "other")
+    await handoffTo(rig, "other")
     expect(sessions).toHaveLength(2)
     expect(sessions[0]?.disposed).toBe(true)
     expect(sessions[1]?.disposed).toBe(false)
   })
 
-  it("**交接包挂成草稿，不替用户发出去**——换了引擎之后第一句说什么，最该让人看一眼", async () => {
-    const { host, events, sessions } = setupTwo()
+  /**
+   * **不塞任何文本。** 上一版把 omni 提炼的一段话挂成草稿等用户按回车——
+   * 用户否掉了：那是他没打过的话，而历史对话新的引擎自己会读
+   *（路径在 `Thread.segments` 里，`/timeline` 看得见）。
+   */
+  it("**输入框里一个字都不塞**——用户自己那句话直接进新引擎", async () => {
+    const rig = setupTwo()
+    const { host, events, sessions } = rig
     await host.dispatch(create)
-    const threadId = await handoffTo(host, events, "other")
-    // 接手的那一家一句话都没收到：要不要发、发什么，由人决定
-    expect(sessions[1]?.prompts ?? []).toEqual([])
-    const draft = events
+    const threadId = await handoffTo(rig, "other")
+    const drafts = events
       .filter((e) => e.type === "thread.updated")
       .filter((e) => e.thread.id === threadId)
-      .at(-1)?.thread.draft
-    expect(draft).toContain("接手")
-    expect(draft).toContain("把 X 改成 Y")
+      .map((e) => e.thread.draft)
+    expect(drafts.every((d) => d === undefined)).toBe(true)
+    // 换过去之后他说的那句话原样送到新那家，没有任何 omni 编的前言
+    expect((sessions[1]?.prompts ?? []).map((x) => x.text)).toEqual(["接着弄"])
+  })
+
+  /**
+   * **选了不等于开始用。** 点下拉只记一笔 `nextEngine`：旧进程不停、
+   * 新进程不起、模型不清——那一串副作用发生在用户还什么都没说的时候，
+   * 看起来就是莫名其妙地变了。
+   */
+  it("只点下拉不说话：什么都没变，旧引擎还活着", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]?.disposed).toBe(false)
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    const thread = last?.type === "thread.updated" ? last.thread : undefined
+    expect(thread?.engine).toBe("fake")
+    expect(thread?.nextEngine).toBe("other")
+    expect(thread?.engineHistory).toEqual(["fake"])
+  })
+
+  it("选回当前那家 = 取消待切换", async () => {
+    const { host, events } = setupTwo()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    await host.dispatch({ type: "thread.handoff", threadId, to: "fake" })
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.nextEngine : "x").toBeUndefined()
   })
 
   it("会话 id 不变，引擎历史往后接一手", async () => {
-    const { host, events } = setupTwo()
+    const rig = setupTwo()
+    const { host, events } = rig
     await host.dispatch(create)
-    const threadId = await handoffTo(host, events, "other")
+    const threadId = await handoffTo(rig, "other")
     const last = events.filter((e) => e.type === "thread.updated").at(-1)
     const thread = last?.type === "thread.updated" ? last.thread : undefined
     expect(thread?.id).toBe(threadId)
@@ -678,10 +723,11 @@ describe("跨引擎接力", () => {
   })
 
   it("**旧引擎的会话句柄要清掉**——留着的话续跑会拿它去问新的一家", async () => {
-    const { host, events, sessions } = setupTwo()
+    const rig = setupTwo()
+    const { host, events, sessions } = rig
     await host.dispatch(create)
     sessions[0]?.report("old-handle")
-    await handoffTo(host, events, "other")
+    await handoffTo(rig, "other")
     const updates = events.filter((e) => e.type === "thread.updated")
     const afterHandoff = updates.at(-1)
     const thread = afterHandoff?.type === "thread.updated" ? afterHandoff.thread : undefined
@@ -689,9 +735,10 @@ describe("跨引擎接力", () => {
   })
 
   it("接力到自己是无操作——不该白白重启一次引擎", async () => {
-    const { host, events, sessions } = setupTwo()
+    const rig = setupTwo()
+    const { host, sessions } = rig
     await host.dispatch(create)
-    await handoffTo(host, events, "fake")
+    await handoffTo(rig, "fake")
     expect(sessions).toHaveLength(1)
     expect(sessions[0]?.disposed).toBe(false)
   })
@@ -721,22 +768,19 @@ describe("L3 分叉", () => {
     expect(forked?.engineHistory).toEqual(["other"])
   })
 
-  it("只交目标，**不带「已改动的文件」**——那会让第二家以为活干了一半", async () => {
+  it("分叉出来的那条**一句都没发、一个字都没塞**", async () => {
     const { host, events, sessions } = setupTwoEngines()
     await host.dispatch(create)
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
     await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
     await host.dispatch({ type: "thread.fork", threadId, to: "other" })
-    // 分叉出来的那条**一句都没发**（见「交接包挂成草稿」），所以看草稿
     expect(sessions[1]?.prompts ?? []).toEqual([])
     const forked = events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
-    const draft = events
+    const drafts = events
       .filter((e) => e.type === "thread.updated")
       .filter((e) => e.thread.id === forked)
-      .at(-1)?.thread.draft ?? ""
-    expect(draft).toContain("把 X 改成 Y")
-    expect(draft).not.toContain("已改动的文件")
-    expect(draft).not.toContain("接手")
+      .map((e) => e.thread.draft)
+    expect(drafts.every((d) => d === undefined)).toBe(true)
   })
 
   it("标题带上引擎名，否则侧栏里两个会话长得一模一样", async () => {

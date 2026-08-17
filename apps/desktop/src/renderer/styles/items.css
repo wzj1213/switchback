@@ -662,62 +662,6 @@
   overflow-wrap: anywhere;
 }
 
-/* ── 接力的交接包 ─────────────────────────────────
- * 机器生成的简报，不是人打的字。**默认折起来**——它有几百字，
- * 而人只有在怀疑「接手那家是不是漏了什么」时才需要看全文。
- * 见 components/HandoffNote.tsx。
- */
-.handoff {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-sunken);
-}
-
-.handoff__row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  width: 100%;
-  padding: 6px var(--sp-3);
-  border: 0;
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-.handoff__row:hover {
-  color: var(--text);
-}
-
-.handoff__icon {
-  display: flex;
-  flex: none;
-  color: var(--text-faint);
-}
-
-.handoff__label {
-  font-weight: 500;
-}
-
-/* 「已告知接手的引擎」占满中间：它是这一行的说明，而箭头要贴到最右 */
-.handoff__hint {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-faint);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.handoff__body {
-  padding: 0 var(--sp-3) var(--sp-3);
-  border-top: 1px solid var(--border);
-}
-
 /* 分界线那一行：左边是「已处理 X」，右边挂「从这里重来」 */
 .turnmark__row {
   display: flex;

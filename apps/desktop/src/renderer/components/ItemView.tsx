@@ -1,7 +1,6 @@
 import { Markdown } from "./Markdown.js"
 import { Reasoning } from "./Reasoning.js"
 import { Failure } from "./Failure.js"
-import { HandoffNote } from "./HandoffNote.js"
 import { Thumb } from "./ImageThumb.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
@@ -47,11 +46,9 @@ export const ItemView = memo(function ItemView({
 }): React.JSX.Element {
   switch (item.kind) {
     case "user_message":
-      // 接力的交接包不是人打的，别顶着右对齐气泡出现——**右对齐在这套界面里
-      // 只有一个意思：这句是你说的**
-      return item.origin === "handoff" ? (
-        <HandoffNote text={item.text} />
-      ) : (
+      // **右对齐在这套界面里只有一个意思：这句是你说的。** 所以这里只有一种形态
+      // ——omni 不再替用户往对话里塞任何东西（交接文本那条路已经删掉）
+      return (
         <div className="msg--user">
           {item.text}
           {/* 附件要在记录里留痕：三天后回来看「当时贴的是哪张图」，靠的就是这一行。

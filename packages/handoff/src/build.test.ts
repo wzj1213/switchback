@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Item, Thread } from "@omni/protocol"
 import { buildHandoff } from "./build.js"
-import { renderHandoff } from "./render.js"
 
 const thread: Thread = {
   id: "th",
@@ -82,32 +81,3 @@ describe("buildHandoff", () => {
   })
 })
 
-describe("renderHandoff", () => {
-  const full = buildHandoff(thread, [
-    user("a", "把 X 改成 Y"),
-    edit("e", "/w/x.ts", 5, 2),
-    shell("s", "pnpm test", "ok"),
-    plan("p", [{ text: "补文档", status: "pending" }]),
-  ])
-
-  it("开头就说清「你是接手的」——不说的话模型会把它当成普通陈述复述一遍", () => {
-    expect(renderHandoff(full, "Codex", "Claude Code")).toContain("接手")
-  })
-
-  it("明确「改动已经落盘，不要重做」", () => {
-    expect(renderHandoff(full, "a", "b")).toContain("不要重做")
-  })
-
-  it("明确「已裁决的不要重问」——人工裁决成本最高，重来一遍最劝退", () => {
-    expect(renderHandoff(full, "a", "b")).toContain("不要重新征求同意")
-  })
-
-  it("空的段落不出现，不留一堆空标题", () => {
-    const bare = buildHandoff(thread, [user("a", "只有一个目标")])
-    const text = renderHandoff(bare, "a", "b")
-    // 查的是**小节标题**：「尚未完成」四个字在结尾那句叮嘱里也会出现
-    expect(text).not.toContain("## 已改动的文件")
-    expect(text).not.toContain("## 尚未完成")
-    expect(text).toContain("只有一个目标")
-  })
-})
