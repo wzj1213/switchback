@@ -86,9 +86,12 @@ export function EnvSection({ cwd }: { cwd: string | undefined }): React.JSX.Elem
           />
         ))
       )}
+      {/* **没读到的要说出来。** 一页写着「没有钩子」的界面，和一页写着
+          「这几处我没查」的界面，给人的判断完全不同——前者会让他停止排查 */}
       <p className="hk__foot">
-        这里不含：插件带来的钩子（那些由引擎在运行时加载，配置文件里看不到）、以及 engines.json
-        里挂的第三方 ACP 引擎——omni 只知道怎么把它们拉起来，不知道它们的配置在哪，编一个路径去查比不查更糟。
+        这里不含三样：各家<strong>插件</strong>在运行时加载的钩子（配置文件里看不到）；codex 的
+        <strong>管理员配置</strong>那一层（它自己的界面会列，但那份不在用户能读到的位置）；以及 engines.json
+        里挂的第三方 ACP 引擎——omni 只知道怎么把它们拉起来，不知道配置在哪，编一个路径去查比不查更糟。
       </p>
     </div>
   )
