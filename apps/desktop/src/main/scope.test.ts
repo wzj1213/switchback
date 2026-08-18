@@ -72,6 +72,23 @@ describe("只发头", () => {
     expect(header[0]).toMatchObject({ type: "thread.updated", thread: { title: "改过名" } })
   })
 
+  it("**基底之后的改名要跟着走**——只发基底的话，手机上显示的是旧标题", () => {
+    const events: Event[] = [
+      ...thread("a", 3).events,
+      { type: "thread.renamed", at: 9, threadId: "a", title: "改过名" },
+    ]
+    const header = headerOf({ id: "a", events })
+    expect(header.map((e) => e.type)).toEqual(["thread.started", "thread.renamed"])
+  })
+
+  it("基底**之前**的改名不带——那一份已经被基底那张快照吸收了", () => {
+    const events: Event[] = [
+      { type: "thread.renamed", at: 0, threadId: "a", title: "更早的名字" },
+      ...thread("a", 1).events,
+    ]
+    expect(headerOf({ id: "a", events }).map((e) => e.type)).toEqual(["thread.started"])
+  })
+
   it("**记录里没有 thread 事件就什么都不发**——一行没有名字的空壳比不出现更糟", () => {
     expect(headerOf({ id: "a", events: [{ type: "item.started", at: 0, item: msg("i") }] })).toEqual([])
   })

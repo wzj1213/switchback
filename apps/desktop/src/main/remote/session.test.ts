@@ -6,10 +6,15 @@ import type { Sink } from "../sink.js"
 
 const RUN = "run-a"
 
-/** 让 `load()` 那条不等的 promise 链跑完。 */
+/**
+ * 让 `load()` 那条不等的 promise 链跑完。
+ *
+ * 用宏任务而不是数几个微任务：那条链现在要先等基线（`State.baseline`），
+ * 中间隔着 `replay()` 自己的 promise，数微任务的写法会随实现改动而碎。
+ */
 const settle = async (): Promise<void> => {
-  await Promise.resolve()
-  await Promise.resolve()
+  await new Promise((resume) => setTimeout(resume, 0))
+  await new Promise((resume) => setTimeout(resume, 0))
 }
 
 const ev = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: String(n) })
@@ -34,6 +39,8 @@ interface Options {
   threadTrust?: Trust
   history?: readonly Event[]
   historyFails?: boolean
+  /** 全量里带了正文的会话。 */
+  bodies?: readonly string[]
 }
 
 function harness(options: Options = {}): Harness {
@@ -52,9 +59,11 @@ function harness(options: Options = {}): Harness {
     buffered: () => state.buffered,
     ledger,
     dispatch: (command) => dispatched.push(command),
-    replay: async (_sink: Sink) => {
+    replay: async (sink: Sink) => {
       state.replays += 1
       if (options.replayFails === true) throw new Error("磁盘炸了")
+      // 真宿主是读完磁盘才发；这里照样走一遍 sink，`bodies` 的语义才对得上
+      sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: options.bodies ?? [] } })
     },
     ceiling: () => options.ceiling ?? "full",
     trustOf: () => options.threadTrust,
@@ -187,9 +196,12 @@ describe("确认与观察", () => {
 
   it("**打开一条正文不在全量里的会话，补一份 thread 帧**——分级 replay 的另一半", async () => {
     const h = harness({ history: [ev(1), ev(2)] })
+    send(h, { type: "hello" })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
-    expect(h.frames()).toEqual([{ type: "thread", threadId: "t-1", events: [ev(1), ev(2)] }])
+    expect(h.frames().filter((f) => f.type === "thread")).toEqual([
+      { type: "thread", threadId: "t-1", events: [ev(1), ev(2)] },
+    ])
   })
 
   it("**全量里已经带了正文的那些不再补**——否则你打开的第一条必然多读一次磁盘", async () => {
@@ -210,6 +222,7 @@ describe("确认与观察", () => {
 
   it("**同一条只补一次**——来回切会话不该每次都读一遍磁盘", async () => {
     const h = harness({ history: [ev(1)] })
+    send(h, { type: "hello" })
     send(h, { type: "watch", threadId: "t-1" })
     send(h, { type: "watch", threadId: "t-2" })
     send(h, { type: "watch", threadId: "t-1" })
@@ -219,13 +232,15 @@ describe("确认与观察", () => {
 
   it("记录是空的就不发帧——一条空的 thread 帧只会让客户端白跑一次归约", async () => {
     const h = harness({ history: [] })
+    send(h, { type: "hello" })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
-    expect(h.frames()).toEqual([])
+    expect(h.frames().some((f) => f.type === "thread")).toBe(false)
   })
 
   it("**读磁盘炸了不断连接，而且标记要撤掉**——退出去再进来还能再试一次", async () => {
     const h = harness({ historyFails: true })
+    send(h, { type: "hello" })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
     expect(h.closed()).toBeUndefined()
@@ -237,9 +252,65 @@ describe("确认与观察", () => {
 
   it("watch null 不去读磁盘", async () => {
     const h = harness({ history: [ev(1)] })
+    send(h, { type: "hello" })
     send(h, { type: "watch", threadId: null })
     await settle()
     expect(h.reads()).toEqual([])
+  })
+
+  it("**`watch` 抢在全量前面时，补正文要等**——先到的 thread 帧会被随后的全量抹掉", async () => {
+    const h = harness({ history: [ev(1)] })
+    // 客户端重连的真实顺序：hello 和 watch 几乎同时，而两条在宿主这侧都要读磁盘
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.frames()).toEqual([])
+    // 全量出门之后才轮到它
+    send(h, { type: "hello" })
+    await settle()
+    const kinds = h.frames().map((f) => f.type)
+    expect(kinds).toEqual(["replay", "thread"])
+  })
+
+  it("**续上的那条路没有全量，闸也要开**——否则补正文永远等一份不会来的东西", async () => {
+    const h = harness({ history: [ev(1)] })
+    h.ledger.seal([ev(1)])
+    send(h, { type: "watch", threadId: "t-1" })
+    send(h, { type: "hello", after: 1, epoch: RUN })
+    await settle()
+    expect(h.frames().some((f) => f.type === "thread")).toBe(true)
+  })
+
+  it("全量重建失败也要开闸，别把补正文永久卡住", async () => {
+    const h = harness({ replayFails: true, history: [ev(1)] })
+    send(h, { type: "watch", threadId: "t-1" })
+    send(h, { type: "hello" })
+    await settle()
+    await settle()
+    expect(h.frames().some((f) => f.type === "reset")).toBe(true)
+    expect(h.frames().some((f) => f.type === "thread")).toBe(true)
+  })
+
+  it("**换一份全量要把已发过的勾清掉**——新那份的 bodies 可能换了人", async () => {
+    const h = harness({ history: [ev(1)], bodies: ["t-1"] })
+    send(h, { type: "hello" })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.reads()).toEqual([])
+    // 第二份全量不再带 t-1 的正文
+    h.session.sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: [] } })
+    send(h, { type: "watch", threadId: "t-2" })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.reads()).toEqual(["t-2", "t-1"])
+  })
+
+  it("等基线那会儿连接断了就别写了", async () => {
+    const h = harness({ history: [ev(1)] })
+    send(h, { type: "watch", threadId: "t-1" })
+    h.session.stop()
+    send(h, { type: "hello" })
+    await settle()
+    expect(h.frames().some((f) => f.type === "thread")).toBe(false)
   })
 
   it("ping 回 pong", () => {

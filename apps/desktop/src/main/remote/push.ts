@@ -77,6 +77,18 @@ export function generateVapid(subject: string): Vapid {
 const RECORD_SIZE = 4096
 
 /**
+ * 一条记录装得下多少明文。
+ *
+ * `rs` 是**密文加上分隔符**的上限：减掉 16 字节 GCM tag 和 1 字节分隔符
+ * 才是明文的空间。这里只发一条记录，所以超了不是「分成两条」，
+ * 而是**发出去一条对端解不开的东西**——表现是通知一声不响，
+ * 而那恰恰发生在正文最长的时候（一条长命令要你批）。
+ *
+ * 另外推送服务自己也有上限（多数是 4 KB），所以这条闸不只是编码问题。
+ */
+const MAX_PAYLOAD = RECORD_SIZE - 16 - 1
+
+/**
  * 按 RFC 8291 加密一条消息。
  *
  * @param salt 只在对官方向量时传；生产里省略，用随机的。
@@ -105,7 +117,13 @@ export function encrypt(
   const nonce = hkdf(salt, ikm, Buffer.from("Content-Encoding: nonce\0", "utf8"), 12)
 
   // RFC 8188：明文后面跟一个 0x02 的分隔符（表示这是最后一条记录）
-  const plaintext = Buffer.concat([Buffer.from(payload, "utf8"), Buffer.from([2])])
+  const raw = Buffer.from(payload, "utf8")
+  // **越界就抛，不裁。** 这里拿到的是一整份 JSON，从中间截断只会让
+  // service worker 那侧 `JSON.parse` 抛——通知同样不响，而排查时
+  // 看到的是「推送服务返回 201」，一切正常的样子。裁要在**组 JSON 之前**裁文字
+  //（见 `relay.ts`），这一条是最后一道明确的失败
+  if (raw.length > MAX_PAYLOAD) throw new Error(`推送载荷 ${String(raw.length)} 字节，超过一条记录的 ${String(MAX_PAYLOAD)}`)
+  const plaintext = Buffer.concat([raw, Buffer.from([2])])
   const cipher = createCipheriv("aes-128-gcm", cek, nonce)
   const body = Buffer.concat([cipher.update(plaintext), cipher.final(), cipher.getAuthTag()])
 
@@ -170,6 +188,8 @@ export interface PushResult {
    * 留着它只会每次都白发一次请求，而且日志里一直是同一条错误。
    */
   gone: boolean
+  /** 失败时的人话。**别丢**：`status: 0` 既可能是网断了，也可能是载荷超长。 */
+  reason?: string
 }
 
 export interface SendRequest {
@@ -197,8 +217,9 @@ export async function send({ vapid, sub, payload, now, ttl = 3600 }: SendRequest
       body: new Uint8Array(body),
     })
     return { ok: res.ok, status: res.status, gone: res.status === 404 || res.status === 410 }
-  } catch {
-    // 网络不通、endpoint 解析不了——都当一次普通失败，下次再说
-    return { ok: false, status: 0, gone: false }
+  } catch (error) {
+    // 网络不通、endpoint 解析不了、载荷超长——都当一次普通失败，下次再说。
+    // **原因要带出去**：`status: 0` 光看数字分不出「网断了」和「这条永远发不出去」
+    return { ok: false, status: 0, gone: false, reason: String(error) }
   }
 }

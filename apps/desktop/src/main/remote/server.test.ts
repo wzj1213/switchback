@@ -34,7 +34,16 @@ interface Harness {
 
 const running: RemoteServer[] = []
 
-async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[]; threadTrust?: Trust; history?: readonly Event[] } = {}): Promise<Harness> {
+interface BootOptions {
+  maxTrust?: Trust
+  trustedHosts?: readonly string[]
+  threadTrust?: Trust
+  history?: readonly Event[]
+  /** 把死连接的判定拨快，别让一条测试跑将近一分钟。 */
+  heartbeat?: { everyMs: number; deadAfterMs: number }
+}
+
+async function boot(options: BootOptions = {}): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), "omni-remote-"))
   const file = join(dir, "devices.json")
   writeFileSync(file, "[]", "utf8")
@@ -73,6 +82,7 @@ async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[
     dispatch: (command) => dispatched.push(command),
     trustOf: () => options.threadTrust,
     history: async () => options.history ?? [],
+    ...(options.heartbeat === undefined ? {} : { heartbeat: options.heartbeat }),
     replay: async (sink) => {
       state.replays += 1
       sink.send({ channel: "omni:replay", replay: { events: [ev(0)], resumeAt: ledger.latest(), epoch: RUN } })
@@ -287,6 +297,31 @@ describe("WebSocket", () => {
     await settle(120)
     expect(Object.keys(h.ledger.stats().acked)).toHaveLength(0)
     expect(h.sinks).toHaveLength(0)
+  })
+})
+
+describe("半开的连接", () => {
+  it("**没动静就判死**——手机进电梯之后那条 socket 会以「还连着」的样子挂很久", async () => {
+    const h = await boot({ heartbeat: { everyMs: 20, deadAfterMs: 60 } })
+    const token = await pairUp(h)
+    const { socket } = await connect(h, token)
+    expect(h.sinks).toHaveLength(1)
+    await settle(300)
+    expect(h.sinks).toHaveLength(0)
+    expect(Object.keys(h.ledger.stats().acked)).toHaveLength(0)
+    expect(socket.readyState).not.toBe(WebSocket.OPEN)
+  })
+
+  it("**还在发帧的就别动它**——判早了会把一条活连接踢掉，而它重连要走一次全量", async () => {
+    const h = await boot({ heartbeat: { everyMs: 20, deadAfterMs: 200 } })
+    const token = await pairUp(h)
+    const { socket } = await connect(h, token)
+    for (let i = 0; i < 6; i += 1) {
+      socket.send(JSON.stringify({ type: "ping" }))
+      await settle(40)
+    }
+    expect(h.sinks).toHaveLength(1)
+    socket.close()
   })
 })
 

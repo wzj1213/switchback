@@ -65,8 +65,23 @@ interface State {
    *
    * **要记**：客户端在会话之间来回切时，第二次打开不该再传一遍几百 KB。
    * 记在连接上而不是设备上——重连之后客户端走的是全量，那一份自带最近几条的正文。
+   *
+   * **每来一份新的全量就清空**：新的那份可能带着不一样的 `bodies`
+   *（会话的新旧次序变了、预算内装得下的那几条换了人），
+   * 旧的勾会把「这条要补」永久挡掉——表现是那条会话在这条连接上一直空白。
    */
   loaded: Set<ThreadId>
+  /**
+   * 全量发出去了没有。**补正文必须排在它后面。**
+   *
+   * 客户端重连时先发 `hello` 再发 `watch`，但两条在宿主这侧都要读磁盘，
+   * 谁先读完谁先出门——`thread` 帧完全可能跑在全量前面。而客户端收到全量时
+   * 是**从零重建**的，先到的那份正文当场被抹掉；宿主这边却已经把
+   * `loaded` 打了勾，于是那条会话在这条连接的余生里一直是空的。
+   *
+   * 所以这里挂一个闸：全量真正写出去之前，补正文一律等着。
+   */
+  baseline: { done: boolean; waiting: (() => void)[] }
 }
 
 interface Ctx {
@@ -120,12 +135,18 @@ function hello(ctx: Ctx, after: number | undefined, epoch: string | undefined): 
   if (missed !== undefined) {
     ctx.deps.log("info", `${ctx.deps.id} 从 ${String(after)} 续上，补 ${String(missed.length)} 条`)
     if (missed.length > 0) ctx.write({ type: "events", sealed: missed })
+    // **续上的这条路没有全量**，客户端手上那份基线是它自己保着的。
+    // 闸得在这儿开，否则补正文会永远等一份不会来的全量
+    release(ctx.state)
     return
   }
   if (resumable) ctx.deps.log("info", `${ctx.deps.id} 停在 ${String(after)}，续不上，转全量重建`)
   void ctx.deps.replay(ctx.sink).catch((error: unknown) => {
     ctx.deps.log("error", `${ctx.deps.id} 全量重建失败：${String(error)}`)
     ctx.write({ type: "reset", reason: "全量重建失败，请重连" })
+    // 全量没出去，但也别把补正文永久卡在闸后面——客户端接到 reset 会重连，
+    // 而在那之前挂着的那些 promise 该有个了结
+    release(ctx.state)
   })
 }
 
@@ -182,19 +203,37 @@ function cursor(ctx: Ctx, after: unknown, epoch: unknown): void {
   if (at !== undefined && run !== undefined) resync(ctx, at, run)
 }
 
+/** 全量出门了，放行等在闸后面的那些补正文。 */
+function release(state: State): void {
+  state.baseline.done = true
+  const waiting = state.baseline.waiting.splice(0)
+  for (const resume of waiting) resume()
+}
+
+/** 等基线。已经到位就立刻继续，否则排队。 */
+function awaitBaseline(state: State): Promise<void> {
+  if (state.baseline.done) return Promise.resolve()
+  return new Promise((resume) => state.baseline.waiting.push(resume))
+}
+
 /**
  * 客户端打开了一条会话。它的正文在全量里吗？不在就补一份。
  *
- * **不等**：补正文要读磁盘，而 `watch` 是一条即发即忘的帧。
- * 读失败就算了——用户看到的是一条空会话，退出去再进来会再试一次。
+ * **不等 `watch` 那一帧**：补正文要读磁盘，而 `watch` 是即发即忘的。
+ * 但**要等全量**（见 `State.baseline`）——先到的 `thread` 帧会被随后的全量抹掉。
+ *
+ * 读失败就把标记撤掉，退出去再进来还能再试一次。
  */
 function load(ctx: Ctx, threadId: ThreadId | undefined): void {
   if (threadId === undefined || ctx.state.loaded.has(threadId)) return
   ctx.state.loaded.add(threadId)
-  void ctx.deps
-    .history(threadId)
+  void awaitBaseline(ctx.state)
+    .then(() => ctx.deps.history(threadId))
     .then((events) => {
-      if (events.length > 0) ctx.write({ type: "thread", threadId, events })
+      // 等的这段时间里连接可能已经没了；也可能已经换了一份全量、
+      // 而那一份正好带上了这条的正文（`loaded` 被清空后重新预置）
+      if (!ctx.state.alive || events.length === 0) return
+      ctx.write({ type: "thread", threadId, events })
     })
     .catch((error: unknown) => {
       // 补不上就把标记撤掉，下次再打开时还能再试一次
@@ -234,7 +273,13 @@ function handle(ctx: Ctx, frame: ClientFrame): void {
 }
 
 export function createSession(deps: SessionDeps): RemoteSession {
-  const state: State = { frameId: 0, alive: true, watching: undefined, loaded: new Set() }
+  const state: State = {
+    frameId: 0,
+    alive: true,
+    watching: undefined,
+    loaded: new Set(),
+    baseline: { done: false, waiting: [] },
+  }
   const write = writer(deps, state)
 
   const sink: Sink = {
@@ -244,10 +289,13 @@ export function createSession(deps: SessionDeps): RemoteSession {
         write({ type: "events", sealed: message.sealed })
         return
       }
+      // **先清空再按这一份预置**：换一份全量就是换一套「哪些带了正文」
+      state.loaded.clear()
       // 全量里已经带了正文的那些，`watch` 时不用再读一次磁盘。
       // **缺省 = 全都带**，那是同机 IPC 那条路的语义
       for (const id of message.replay.bodies ?? []) state.loaded.add(id)
       write({ type: "replay", replay: message.replay })
+      release(state)
     },
     alive: () => state.alive,
     watching: () => state.watching,

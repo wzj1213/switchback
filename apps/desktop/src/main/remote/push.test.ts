@@ -129,3 +129,13 @@ describe("VAPID", () => {
     expect(generateVapid("mailto:a@b.c").publicKey).not.toBe(generateVapid("mailto:a@b.c").publicKey)
   })
 })
+
+describe("载荷长度", () => {
+  it("**一条记录装不下就抛，绝不截断**——截断的 JSON 在对端 parse 直接抛，而推送服务回的是 201", () => {
+    expect(() => encrypt(sub(), "x".repeat(4080))).toThrow(/超过一条记录/u)
+  })
+
+  it("刚好装得下的照常加密", () => {
+    expect(() => encrypt(sub(), "x".repeat(4079))).not.toThrow()
+  })
+})

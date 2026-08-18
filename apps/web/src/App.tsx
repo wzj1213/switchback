@@ -60,9 +60,15 @@ export function App(): React.JSX.Element {
       setSelected(id)
       watch(id)
     }
-    navigator.serviceWorker.addEventListener("message", onMessage)
+    // **必须判存在。** 非安全上下文（明文 http，而且不是 localhost）里
+    // `navigator.serviceWorker` 整个是 undefined——不判的话这里当场抛，
+    // React 把整棵树卸掉，**用户看到的是一片白屏**，而这恰好是
+    // 「先在局域网上用 IP 试一下」这条最常见的第一步路径
+    const worker = navigator.serviceWorker as ServiceWorkerContainer | undefined
+    if (worker === undefined) return undefined
+    worker.addEventListener("message", onMessage)
     return () => {
-      navigator.serviceWorker.removeEventListener("message", onMessage)
+      worker.removeEventListener("message", onMessage)
     }
   }, [watch])
 

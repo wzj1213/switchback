@@ -55,16 +55,26 @@ export function scopeReplay(threads: readonly ThreadHistory[], budget?: number):
   return { bodies, deferred }
 }
 
+/** 一条会话的「头」都有哪些事件：能凭空造出这一行、或者改这一行的那些。 */
+const BASE = new Set(["thread.started", "thread.updated"])
+const PATCH = new Set(["thread.renamed", "thread.removed"])
+
 /**
- * 一条会话只发头：最后那一条 `thread.started` / `thread.updated`。
+ * 一条会话只发头。
  *
- * **不是发空数组**——列表要靠这一条画出标题、状态、引擎。
- * 找不到（那条会话的记录里压根没有 thread 事件）就什么都不发，
- * 让它在列表里干脆不出现，而不是出现一行没有名字的空壳。
+ * 基底是最后那一条 `thread.started` / `thread.updated`——列表要靠它画出
+ * 标题、状态、引擎。**不是发空数组**：找不到基底（那条记录里压根没有 thread 事件）
+ * 就什么都不发，让它在列表里干脆不出现，而不是出现一行没有名字的空壳。
+ *
+ * **基底之后的改动要跟着走。** 改名走的是 `thread.renamed`（只带 id 和标题，
+ * 不带整个 `Thread`），它不会更新基底那一份快照——只发基底的话，
+ * 一条改过名的会话在手机上显示的是**旧标题**，而你在桌面上明明改过了。
+ * 这类「看起来正常、内容是错的」比空白更难发现。
  */
 export function headerOf(thread: ThreadHistory): readonly Event[] {
-  const last = [...thread.events]
-    .reverse()
-    .find((e) => e.type === "thread.started" || e.type === "thread.updated")
-  return last === undefined ? [] : [last]
+  const at = thread.events.findLastIndex((e) => BASE.has(e.type))
+  if (at === -1) return []
+  const base = thread.events[at]
+  if (base === undefined) return []
+  return [base, ...thread.events.slice(at + 1).filter((e) => PATCH.has(e.type))]
 }

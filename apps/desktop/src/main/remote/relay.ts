@@ -78,6 +78,11 @@ export function loadVapid(log: Logger): Vapid {
   return fresh
 }
 
+/** 裁到 `max` 个字符，裁过就加省略号。**按字符不按字节**：这里裁的是给人看的文字。 */
+function clip(text: string, max: number): string {
+  return [...text].length <= max ? text : `${[...text].slice(0, max - 1).join("")}…`
+}
+
 export function createRelay(deps: RelayDeps): Relay {
   const vapid = deps.vapid
 
@@ -91,18 +96,28 @@ export function createRelay(deps: RelayDeps): Relay {
       if (watched(threadId)) return
       const targets = deps.tokens.pushable()
       if (targets.length === 0) return
-      const payload = JSON.stringify({ threadId, title, body })
+      // **先把文字裁短再组 JSON。** 一条记录装得下的明文不到 4 KB，
+      // 而这一端的正文可能带着一整条命令原文。裁 JSON 是不行的——
+      // 从中间截断的 JSON 在 service worker 那侧 `JSON.parse` 直接抛，
+      // 表现是通知一声不响，而推送服务那边回的是 201。
+      // 数字取得比上限小得多：系统通知栏本来就只显示两三行，剩下的谁也看不到
+      const payload = JSON.stringify({ threadId, title: clip(title, 120), body: clip(body, 600) })
       for (const target of targets) {
         void send({ vapid, sub: target.push, payload, now: Date.now() }).then((result) => {
           if (result.ok) return
           if (result.gone) {
             // 订阅死了（卸了 PWA、清了站点数据、服务端过期）。**删掉**——
-            // 留着只会每次都白发一次请求，日志里一直是同一条错误
-            deps.tokens.setPush(target.id, undefined)
-            deps.log.write("info", "remote", `${target.name} 的推送订阅已失效，摘掉`)
+            // 留着只会每次都白发一次请求，日志里一直是同一条错误。
+            //
+            // **按 endpoint 删**：这一来一回之间那台设备可能已经重新订阅过，
+            // 无条件删会把刚存进来的新订阅删掉，而日志上看不出区别
+            const dropped = deps.tokens.dropPush(target.id, target.push.endpoint)
+            if (dropped) deps.log.write("info", "remote", `${target.name} 的推送订阅已失效，摘掉`)
+            else deps.log.write("info", "remote", `${target.name} 的旧订阅失效，但它已经换过一条新的，留着`)
             return
           }
-          deps.log.write("warn", "remote", `推给 ${target.name} 失败：HTTP ${String(result.status)}`)
+          const why = result.reason === undefined ? "" : `（${result.reason}）`
+          deps.log.write("warn", "remote", `推给 ${target.name} 失败：HTTP ${String(result.status)}${why}`)
         })
       }
     },

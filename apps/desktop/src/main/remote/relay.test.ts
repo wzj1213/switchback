@@ -106,8 +106,18 @@ function tokensWith(devices: { id: string; name: string; push: PushSubscription 
     verify: () => undefined,
     list: () => [] as readonly Device[],
     setPush: (id, push) => {
-      if (push === undefined) state.devices = state.devices.filter((d) => d.id !== id)
+      if (push === undefined) {
+        state.devices = state.devices.filter((d) => d.id !== id)
+        return true
+      }
+      // **真的换上去**：这个桩以前只认「清掉」，于是「换了一条新订阅」根本演不出来
+      state.devices = state.devices.map((d) => (d.id === id ? { ...d, push } : d))
       return true
+    },
+    dropPush: (id, endpoint) => {
+      const before = state.devices.length
+      state.devices = state.devices.filter((d) => !(d.id === id && d.push.endpoint === endpoint))
+      return state.devices.length !== before
     },
     pushable: () => state.devices,
     revoke: () => false,
@@ -244,6 +254,20 @@ describe("订阅死了就摘掉", () => {
     relay.notify("t-1", "标题", "正文")
     await settle()
     expect(fake.seen).toHaveLength(1)
+  })
+
+  it("**410 回来时它已经换过一条新订阅了，就别摘**——摘掉的会是刚存进来的那条", async () => {
+    const fake = await fakePush(410)
+    servers.push(fake)
+    const { sub } = subscriber(fake.url)
+    const tokens = tokensWith([{ id: "d1", name: "手机", push: sub }])
+    const relay = createRelay({ tokens, sinks: noSinks, log: quiet, vapid: generateVapid("https://example.com") })
+    relay.notify("t-1", "标题", "正文")
+    // 推出去了、410 还没回来的这个窗口里，那台设备重新订阅了一次
+    const fresh = subscriber(`${fake.url}-新的`).sub
+    tokens.setPush("d1", fresh)
+    await settle()
+    expect(tokens.pushable().map((d) => d.push.endpoint)).toEqual([fresh.endpoint])
   })
 
   it("普通失败（500）不摘——那可能只是对面抖了一下", async () => {

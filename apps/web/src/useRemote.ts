@@ -185,9 +185,15 @@ function useConnection(deps: {
       },
     })
     refs.current.transport = transport
-    // 页面从后台回到前台时立刻探一次。手机上这是最常见的「看起来连着、其实早断了」
+    // 页面从后台回到前台时立刻探一次。手机上这是最常见的「看起来连着、其实早断了」。
+    //
+    // **切到后台时还要把「我在看这条」撤掉。** 宿主拿这个当「有人正看着」的判据，
+    // 用来抑制推送——而你把手机锁屏揣兜里之后，这条连接往往还开着。
+    // 不撤的话，你最需要的那条「等你确认」恰恰被自己静音了。
     const wake = (): void => {
-      if (document.visibilityState === "visible") transport.poke()
+      const visible = document.visibilityState === "visible"
+      if (visible) transport.poke()
+      transport.send({ type: "watch", threadId: visible ? refs.current.watching : null })
     }
     document.addEventListener("visibilitychange", wake)
     window.addEventListener("online", wake)

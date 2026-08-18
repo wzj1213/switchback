@@ -205,7 +205,14 @@ function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>)
     },
     // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档
     trustOf: (threadId) => attached.host.live().find((t) => t.id === threadId)?.trust,
-    history: (threadId) => attached.journal.read(threadId),
+    // **先把在途写入落完再读。** 宿主发事件不等落盘，所以「发出去了」和
+    // 「在文件里了」之间有个窗口；在窗口里读到的是缺一截的一份，而客户端
+    // 收到它之后只会按 item id 去重——缺的那几条不会再补回来。
+    // `rebuild` 早就这么做了，这条路当时漏了
+    history: async (threadId) => {
+      await attached.journal.flush().catch(() => undefined)
+      return attached.journal.read(threadId)
+    },
     log,
   })
 }

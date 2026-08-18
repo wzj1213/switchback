@@ -70,6 +70,15 @@ export interface TokenStore {
   list: () => readonly Device[]
   /** 记下（或换掉）一台设备的推送订阅。设备不存在时什么都不做，返回 false。 */
   setPush: (id: string, push: PushSubscription | undefined) => boolean
+  /**
+   * 摘掉一条**已经死了**的订阅，但只在它还是当前那条时才摘。
+   *
+   * `endpoint` 不是可有可无的：推送是异步的，而「推给旧地址 → 对端回 410」
+   * 这一来一回之间，那台设备完全可能已经重新订阅过一次（换手机、重装 PWA、
+   * 浏览器自己轮换）。无条件删的话删掉的是**刚存进来的新订阅**，
+   * 而日志里只会写「订阅已失效，摘掉」——推送从此静默不响，看起来像功能坏了。
+   */
+  dropPush: (id: string, endpoint: string) => boolean
   /** 现在能推给谁。只回有订阅的那些。 */
   pushable: () => readonly { id: string; name: string; push: PushSubscription }[]
   /** 吊销一台。返回有没有真的删掉一条。 */
@@ -129,6 +138,15 @@ function setPush(state: State, id: string, push: PushSubscription | undefined, f
   if (device === undefined) return false
   if (push === undefined) delete device.push
   else device.push = push
+  flush()
+  return true
+}
+
+/** 摘掉一条死订阅，前提是它还是当前那条。 */
+function dropPush(state: State, id: string, endpoint: string, flush: () => void): boolean {
+  const device = state.devices.find((d) => d.id === id)
+  if (device?.push?.endpoint !== endpoint) return false
+  delete device.push
   flush()
   return true
 }
@@ -196,6 +214,7 @@ export function createTokenStore(deps: TokenDeps): TokenStore {
     verify: (token) => verify(state, token, deps.now(), flush),
     list: () => state.devices.map((d) => ({ ...d })),
     setPush: (id, push) => setPush(state, id, push, flush),
+    dropPush: (id, endpoint) => dropPush(state, id, endpoint, flush),
     pushable: () => pushable(state),
     revoke: (id) => {
       const before = state.devices.length

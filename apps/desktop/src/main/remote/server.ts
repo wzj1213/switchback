@@ -51,6 +51,13 @@ export interface RemoteDeps {
   trustOf: (threadId: string) => Trust | undefined
   /** 一条会话的历史。分级 replay 的另一半——客户端打开哪条就补哪条。 */
   history: (threadId: string) => Promise<readonly Event[]>
+  /**
+   * 死连接的判定节奏。**只有测试会传**——真跑时用下面那两个常量。
+   *
+   * 不做成常量直接读，是因为默认值是 20 秒 / 50 秒：照原速测一次要将近一分钟，
+   * 而那样的测试没人会跑第二遍，最后就变成没有测试。
+   */
+  heartbeat?: { everyMs: number; deadAfterMs: number }
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -225,6 +232,16 @@ function reject(socket: Duplex, code: number, text: string): void {
   )
 }
 
+/**
+ * 多久扫一次死连接，以及多久没动静算死。
+ *
+ * 客户端每 15 秒 ping 一次，所以 50 秒 = 连丢三轮。给得比 3×15 松一点，
+ * 是因为手机在弱网下 ping 会挤在一起到——判早了会把一条还活着的连接踢掉，
+ * 而它重连时要走一次全量。
+ */
+const HEARTBEAT_MS = 20_000
+const DEAD_AFTER_MS = 50_000
+
 /** 一条刚握完手的连接要接上的东西。 */
 interface Attach {
   deps: RemoteDeps
@@ -258,10 +275,27 @@ function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
   const bucket = live.get(deviceId) ?? new Set<WebSocket>()
   bucket.add(ws)
   live.set(deviceId, bucket)
+  const seen = { at: Date.now() }
   ws.on("message", (data) => {
+    seen.at = Date.now()
     session.receive(String(data))
   })
+  // **半开的连接必须自己发现。** 手机进电梯、切飞行模式，TCP 那侧不会立刻断——
+  // 这条 socket 会以「还连着」的样子挂上几十分钟，而那期间：
+  // ① 它 `watching` 的那条会话的推送**全被当成「有人正看着」抑制掉**，
+  //    也就是你最需要的那条通知恰好不会响；
+  // ② 账本的保留下限被它钉住，别的客户端的补洞缓冲跟着涨；
+  // ③ 每条事件照样往它的发送缓冲里塞，直到 8 MB 那道背压闸。
+  // 判据用「多久没收到任何一帧」：客户端本来就每 15 秒 ping 一次（`web/transport.ts`），
+  // 所以静默超过三轮就是真没了，不用另发探测帧
+  const beat = deps.heartbeat ?? { everyMs: HEARTBEAT_MS, deadAfterMs: DEAD_AFTER_MS }
+  const heartbeat = setInterval(() => {
+    if (Date.now() - seen.at < beat.deadAfterMs) return
+    deps.log("info", `${id} 超过 ${String(Math.round(beat.deadAfterMs / 1000))} 秒没动静，判死`)
+    ws.terminate()
+  }, beat.everyMs)
   const bye = (): void => {
+    clearInterval(heartbeat)
     // **第一句就置死。** 后面那些摘除都可以晚一点，而 `alive()` 判错的代价
     // 是往一个已经关掉的连接上同步序列化几十 MB
     session.stop()
