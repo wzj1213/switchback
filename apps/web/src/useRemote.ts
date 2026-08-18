@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Command, Event, ThreadId } from "@omni/protocol"
-import { clearNotices, initial, itemsOf, reduceAll, type ViewState } from "@omni/store"
+import type { Command, ThreadId } from "@omni/protocol"
+import { clearNotices, initial, reduceAll, reduceHistory, type ViewState } from "@omni/store"
 import {
   initialStream,
   received,
@@ -108,7 +108,7 @@ export function useRemote(token: string): Remote {
         // 无条件应用的话，一条正在流的消息会被这份旧快照盖回去——
         // 用户看到的是正文突然倒退几百个字，然后再也不动
         //（那条 item 的后续 delta 仍然落在同一个 id 上，但内容已经错位）。
-        setState((prev) => reduceAll(prev, freshOnly(prev, frame.threadId, frame.events)))
+        setState((prev) => reduceHistory(prev, frame.threadId, frame.events))
         return
       }
       if (frame.type === "notice") {
@@ -208,23 +208,6 @@ function useConnection(deps: {
       refs.current.stream = initialStream
     }
   }, [token, onFrame, refs, setConn, setMe])
-}
-
-/**
- * 把这份历史里「我已经有的」滤掉。
- *
- * 判据是 item id：`item.started` 是唯一会长出新东西的那一类，
- * 其余（`delta` / `updated`）在归约器里都是就地改，重放一遍旧的
- * 同样会把内容改回去，所以一并滤掉。
- */
-export function freshOnly(state: ViewState, threadId: ThreadId, events: readonly Event[]): readonly Event[] {
-  const known = new Set(itemsOf(state, threadId).map((item) => item.id))
-  if (known.size === 0) return events
-  return events.filter((event) => {
-    if (event.type === "item.started" || event.type === "item.updated") return !known.has(event.item.id)
-    if (event.type === "item.delta") return !known.has(event.itemId)
-    return true
-  })
 }
 
 /**

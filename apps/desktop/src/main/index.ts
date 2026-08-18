@@ -10,7 +10,7 @@ import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
-import { REMOTE_ITEM_BUDGET } from "./scope.js"
+import { REMOTE_ITEM_BUDGET, withCurrent } from "./scope.js"
 import { installRemote } from "./remote/index.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
@@ -211,7 +211,10 @@ function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>)
     // `rebuild` 早就这么做了，这条路当时漏了
     history: async (threadId) => {
       await attached.journal.flush().catch(() => undefined)
-      return attached.journal.read(threadId)
+      const events = await attached.journal.read(threadId)
+      // **结尾用当前状态收口**，规则和全量那条路一样：磁盘上那份是上次落盘的样子，
+      // 客户端照着它重建这条会话，会把一条正在跑的改回 idle、把改过的名字改回去
+      return withCurrent(events, attached.host.live().find((t) => t.id === threadId), Date.now())
     },
     log,
   })

@@ -324,6 +324,30 @@ export function coalesce(events: readonly Event[]): readonly Event[] {
   return out
 }
 
+/**
+ * 把一条会话**补来的历史**灌进去。
+ *
+ * ## 为什么不能直接 `reduceAll`
+ *
+ * 补历史的场景是「这条会话的正文没进全量，现在单独补一份」。
+ * 而这期间它完全可能已经在直播——你人在列表页，它照样在跑，
+ * `item.started` 一条条从事件流上过来了。这时候再 `reduceAll` 一份历史：
+ * 已经有的那几条被就地替换（`appendItem` 按 id 幂等），
+ * **而更早的那些被追加在它们后面**——转录区于是变成「最新的排在最前」，
+ * 中间还夹着旧的。看起来不像坏了，只是读起来完全不对。
+ *
+ * 所以这里的做法是**先把这条会话的条目清空，再按历史的顺序重建**。
+ * 历史是宿主 flush 过磁盘之后读的，本来就是那一刻的全量；
+ * 读完之后新产生的那些会照常从事件流上过来，追加在后面——顺序自然是对的。
+ *
+ * **只清这一条的条目**：别的会话、以及这条会话的轮次/额度那些不动，
+ * 它们的当前值比历史里那一份新。
+ */
+export function reduceHistory(state: ViewState, threadId: ThreadId, events: readonly Event[]): ViewState {
+  const cleared: ViewState = { ...state, items: { ...state.items, [threadId]: [] } }
+  return reduceAll(cleared, events)
+}
+
 export function reduceAll(state: ViewState, events: readonly Event[]): ViewState {
   const list = coalesce(events)
   // 一条的时候不值得开累加器：多一次整表复制，反而更慢

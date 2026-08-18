@@ -1,4 +1,4 @@
-import type { Event, ThreadId } from "@omni/protocol"
+import type { Event, Thread, ThreadId } from "@omni/protocol"
 import type { ThreadHistory } from "./host.js"
 
 /**
@@ -77,4 +77,23 @@ export function headerOf(thread: ThreadHistory): readonly Event[] {
   const base = thread.events[at]
   if (base === undefined) return []
   return [base, ...thread.events.slice(at + 1).filter((e) => PATCH.has(e.type))]
+}
+
+/**
+ * 单独补一条会话的正文时，**结尾要拿宿主手上那份当前状态收口**。
+ *
+ * 磁盘上那份是「上次落盘时的样子」，而客户端拿到它之后会照着重建这条会话——
+ * 于是一条正在跑的会话会被改回 `idle`，一条已经改过名的会显示旧标题。
+ * 界面看起来完全正常，只是内容是旧的，这比空白难发现得多。
+ *
+ * 规则和全量那条路（`replayEvents`）是同一条，故意长得一样：
+ * 活着的就补它的当前记录；不活着的补一条 `detached`，让界面关掉输入框——
+ * **一个能打字却答非所问的输入框比没有输入框糟得多**。
+ */
+export function withCurrent(events: readonly Event[], live: Thread | undefined, now: number): readonly Event[] {
+  if (events.length === 0) return events
+  if (live !== undefined) return [...events, { type: "thread.updated", at: now, thread: live }]
+  const last = [...events].reverse().find((e) => e.type === "thread.started" || e.type === "thread.updated")
+  if (last === undefined) return events
+  return [...events, { type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } }]
 }

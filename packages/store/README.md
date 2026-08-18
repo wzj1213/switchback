@@ -10,6 +10,9 @@
 
 - `ViewState` —— 会话表、顺序、每个会话的 item 列表与当前轮次
 - `reduce(state, event)` —— 唯一入口，纯函数，不可变更新
+- `reduceHistory(state, threadId, events)` —— **单独补一条会话的历史**。
+  先清掉这条的条目再按历史铺开：直接 `reduceAll` 的话，已经在直播的那几条
+  会把更早的历史挤到后面去，转录区变成「最新的排在最前」
 - `initial()` —— 空状态
 
 ## 不拥有什么

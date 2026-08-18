@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread, ToolCallItem } from "@omni/protocol"
 import { initial, itemsOf, threadsOf, threadRowsOf } from "./state.js"
-import { reduce, reduceAll } from "./reduce.js"
+import { reduce, reduceAll, reduceHistory } from "./reduce.js"
 
 const thread = (id: string): Thread => ({
   id,
@@ -348,5 +348,51 @@ describe("重复的 item.started 不长出两条", () => {
     const items = itemsOf(s, "a")
     expect(items).toHaveLength(1)
     expect(items[0]).toMatchObject({ text: "起步" })
+  })
+})
+
+describe("补一条会话的历史", () => {
+  /** 一条会话，历史里三条消息。 */
+  const history: Event[] = [
+    started("a"),
+    turnStarted("a", "u1"),
+    { type: "item.started", at: 1, item: msg("i1", "u1", "第一条") },
+    { type: "item.started", at: 2, item: msg("i2", "u1", "第二条") },
+    { type: "item.started", at: 3, item: msg("i3", "u1", "第三条") },
+  ]
+
+  it("空状态下就是照着历史铺开", () => {
+    const s = reduceHistory(initial(), "a", history)
+    expect(itemsOf(s, "a").map((i) => i.id)).toEqual(["i1", "i2", "i3"])
+  })
+
+  it("**已经在直播的那几条不会把历史挤到后面去**——这是补历史最容易出的错", () => {
+    // 人在列表页，这条会话照样在跑：最新那条先从事件流上过来了
+    const live = reduceAll(initial(), [
+      started("a"),
+      turnStarted("a", "u1"),
+      { type: "item.started", at: 3, item: msg("i3", "u1", "第三条") },
+    ])
+    expect(itemsOf(live, "a").map((i) => i.id)).toEqual(["i3"])
+    // 现在打开它，宿主把整份历史补过来
+    const s = reduceHistory(live, "a", history)
+    expect(itemsOf(s, "a").map((i) => i.id)).toEqual(["i1", "i2", "i3"])
+  })
+
+  it("**只清这一条的条目**，别的会话不受影响", () => {
+    const both = reduceAll(initial(), [
+      started("b"),
+      turnStarted("b", "u2"),
+      { type: "item.started", at: 1, item: msg("x1", "u2", "别条的") },
+      ...history,
+    ])
+    const s = reduceHistory(both, "a", history)
+    expect(itemsOf(s, "b").map((i) => i.id)).toEqual(["x1"])
+  })
+
+  it("补完之后新来的照常追加在后面", () => {
+    const s = reduceHistory(initial(), "a", history)
+    const later = reduceAll(s, [{ type: "item.started", at: 4, item: msg("i4", "u1", "第四条") }])
+    expect(itemsOf(later, "a").map((i) => i.id)).toEqual(["i1", "i2", "i3", "i4"])
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread } from "@omni/protocol"
-import { headerOf, scopeReplay } from "./scope.js"
+import { headerOf, scopeReplay, withCurrent } from "./scope.js"
 import type { ThreadHistory } from "./host.js"
 
 const msg = (id: string): Item => ({ id, turnId: "u", kind: "user_message", at: 0, text: "hi" })
@@ -91,5 +91,27 @@ describe("只发头", () => {
 
   it("**记录里没有 thread 事件就什么都不发**——一行没有名字的空壳比不出现更糟", () => {
     expect(headerOf({ id: "a", events: [{ type: "item.started", at: 0, item: msg("i") }] })).toEqual([])
+  })
+})
+
+describe("补正文时用当前状态收口", () => {
+  it("**活着的会话补它现在那份记录**——磁盘上那份可能停在轮次中间", () => {
+    const live = { ...record("a"), title: "现在的名字", status: "running" as const }
+    const out = withCurrent(thread("a", 2).events, live, 99)
+    expect(out.at(-1)).toEqual({ type: "thread.updated", at: 99, thread: live })
+  })
+
+  it("**背后没有引擎进程的补 detached**——能打字却答非所问的输入框比没有更糟", () => {
+    const out = withCurrent(thread("a", 2).events, undefined, 99)
+    expect(out.at(-1)).toMatchObject({ type: "thread.updated", thread: { detached: true, status: "idle" } })
+  })
+
+  it("空历史不收口——那会凭空造出一条会话", () => {
+    expect(withCurrent([], undefined, 99)).toEqual([])
+  })
+
+  it("记录里没有 thread 事件时也不硬造一条", () => {
+    const events: Event[] = [{ type: "item.started", at: 0, item: msg("i") }]
+    expect(withCurrent(events, undefined, 99)).toEqual(events)
   })
 })
