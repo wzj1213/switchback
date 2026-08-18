@@ -34,11 +34,11 @@ export function Queued({ texts, onDrop, onInsert }: {
         {texts[0]}
       </span>
       {onInsert === undefined ? null : (
-        <button type="button" className="queued__act" title="不等这一轮跑完，现在就递进去" onClick={onInsert}>
+        <button type="button" className="act queued__act" title="不等这一轮跑完，现在就递进去" onClick={onInsert}>
           立刻插入
         </button>
       )}
-      <button type="button" className="queued__drop" onClick={onDrop}>
+      <button type="button" className="act act--danger queued__drop" onClick={onDrop}>
         撤回
       </button>
     </div>

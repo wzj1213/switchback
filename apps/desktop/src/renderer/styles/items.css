@@ -474,6 +474,68 @@
   align-items: flex-end;
 }
 
+/* ── 行内动作：转录区里那几颗「顺手能做的事」 ──────────────
+ *
+ * 「从这里重来」「复制」「改一改再发」「立刻插入」「撤回」——它们是同一类东西：
+ * **不是这一屏的主操作，但要点得到**。所以给一套共同的样子，而不是各写各的
+ *（上一版就是各写各的，其中一颗还因为共用选择器被误删，直接退化成
+ * 一颗带边框、会折行的浏览器默认按钮）。
+ *
+ * 形制是**药丸**，和芯片、匹配标签同族：平时只有文字，悬停才浮出一圈描边和底色。
+ * 不用下划线——下划线是链接的语义，一颗会执行动作的东西不该长成链接；
+ * 而且下划线在 11.5px 上和文字挤在一起，看起来是「没做完」而不是「克制」。
+ *
+ * `white-space: nowrap` 不是装饰：这几颗都住在会被压窄的行里
+ *（轮次分界线那一行右端只剩几十像素），能折行的按钮迟早会折成两行。
+ */
+.act {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  white-space: nowrap;
+  cursor: default;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.act:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/*
+ * **一露头就带着描边。**
+ *
+ * 这几颗平时是藏着的（父行悬停才出现）。只在「悬停到它自己身上」才显形的话，
+ * 它出现的那一刻是一行光秃秃的灰字——看起来像说明文字，不像能点的东西，
+ * 而人要先猜它能点、再移过去才得到反馈。既然已经决定把它显示出来，
+ * 就该在那一刻就说清「这是一颗按钮」。
+ */
+.turnmark__row:hover .act,
+.copyable:hover .act {
+  border-color: var(--border);
+  background: var(--bg-raised);
+}
+
+.act:active {
+  background: var(--bg-active);
+}
+
+/* 撤回是**收回一句话**，不是危险操作，所以只在悬停时染色，平时和别的一样安静 */
+.act--danger:hover {
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
 /*
  * 消息底下那排动作（复制 / 改一改再发）。
  *
@@ -487,8 +549,9 @@
  */
 .msgacts {
   display: flex;
-  gap: var(--sp-3);
-  margin-top: 3px;
+  gap: var(--sp-1);
+  /* 药丸自带内边距，所以这里贴着消息更近一点，视觉上仍是「挂在它下面」 */
+  margin-top: 1px;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
@@ -503,20 +566,7 @@
   opacity: 1;
 }
 
-.msgacts__btn {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-faint);
-  font: inherit;
-  font-size: var(--text-xs);
-  cursor: default;
-}
 
-.msgacts__btn:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
 
 /* ── 输入区上方的芯片：这句话会发到哪儿去 ───────────────
  * 见 components/Chips.tsx。分支这一条不是装饰——
@@ -985,14 +1035,11 @@
 }
 
 /* 平时不显形——它是个岔路口，不该一直待在手边 */
-.turnmark__act,
-.turnmark__row:hover .turnmark__act,
-.turnmark__act:focus-visible,
-.turnmark__act:focus-visible {
-  opacity: 1;
+.turnmark__act {
+  opacity: 0;
 }
 
-.turnmark__act:hover {
-  color: var(--text);
-  text-decoration: underline;
+.turnmark__row:hover .turnmark__act,
+.turnmark__act:focus-visible {
+  opacity: 1;
 }

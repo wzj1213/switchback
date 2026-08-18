@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react"
 import type { Item } from "@omni/protocol"
 import { textOf } from "../export.js"
+import { CopyIcon } from "./icons.js"
 
 /** 复制成功后的提示时长。够看见，又不至于让人等它消失。 */
 const FLASH_MS = 1200
@@ -36,7 +37,7 @@ export function Copyable({
       */}
       <div className="msgacts">
         <button
-          className="msgacts__btn"
+          className="act"
           type="button"
           title="复制这条内容"
           onClick={() => {
@@ -47,6 +48,7 @@ export function Copyable({
             }, FLASH_MS)
           }}
         >
+          <CopyIcon size={11} />
           {done ? "已复制" : "复制"}
         </button>
         {extra}

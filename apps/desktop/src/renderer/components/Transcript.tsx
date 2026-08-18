@@ -10,6 +10,7 @@ import { TerminalIcon } from "./icons-activity.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ArrowDownIcon, ChevronIcon } from "./icons.js"
+import { PencilIcon, ResetIcon } from "./icons-activity.js"
 
 /**
  * 一个字都还没说的会话。
@@ -98,12 +99,13 @@ function RowView({
           否则只能把整个会话丢掉重开——而那会连前面对的部分一起丢 */}
       <button
         type="button"
-        className="turnmark__act"
+        className="act turnmark__act"
         title="新开一个会话，只带这一轮之前的内容（原会话保留）"
         onClick={() => {
           onRewind(row.turnId)
         }}
       >
+        <ResetIcon size={11} />
         从这里重来
       </button>
       </div>
@@ -122,11 +124,12 @@ function RowView({
             extra: (
               <button
                 type="button"
-                className="msgacts__btn"
+                className="act"
                 onClick={() => {
                   onReuse(row.item.kind === "user_message" ? row.item.text : "")
                 }}
               >
+                <PencilIcon size={11} />
                 改一改再发
               </button>
             ),
