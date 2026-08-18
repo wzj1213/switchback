@@ -47,7 +47,11 @@ const noIoInPurePackages = {
 export default tseslint.config(
   // `.claude/` 是 Claude Code 的工作副本（含临时 worktree），已经不进版本库，
   // 也不该被这套闸门管——那里的东西不是这个产品的代码
-  { ignores: ["**/dist/**", "**/out/**", "**/node_modules/**", "**/*.tsbuildinfo", ".claude/**"] },
+  // `release/` 是打包产物（`.gitignore` 里也有它）。**以前不用写**：那儿只有
+  // `app.asar` 一个二进制块，eslint 根本没有 .js 可扫；浏览器端进包之后那里多了
+  // 散装的 `assets/*.js` 和 `sw.js`，于是 `pnpm check` 在**刚打过包的机器上**才会红，
+  // 干净 checkout 上照样绿——这种「只在某些机器上红」的闸门最消耗信任
+  { ignores: ["**/dist/**", "**/out/**", "**/release/**", "**/node_modules/**", "**/*.tsbuildinfo", ".claude/**"] },
 
   js.configs.recommended,
   ...tseslint.configs.strict,
