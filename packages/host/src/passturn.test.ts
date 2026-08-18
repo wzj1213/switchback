@@ -37,7 +37,7 @@ function setup(): { host: Host; events: Event[]; session: () => Fake } {
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
         capabilities: () => NO_CAPABILITIES,
-        setModel: () => Promise.resolve(),
+        setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
       }
       return Promise.resolve(session)

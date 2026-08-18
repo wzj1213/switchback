@@ -143,8 +143,16 @@ export interface EngineSession {
   setTrust: (trust: Trust) => Promise<void>
   /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */
   models: () => Promise<readonly ModelOption[]>
-  /** 换模型。`effort` 只有报了 `efforts` 的引擎会用。 */
-  setModel: (model: string, effort?: string) => Promise<void>
+  /**
+   * 换模型。`effort` 只有报了 `efforts` 的引擎会用。
+   *
+   * **返回的是引擎那边真正生效的强度**，不是你传进去的那个。
+   * 两者会不一样：实测 ZCode 的桥把 `thought` 报成「可选 low/high/max」，
+   * 而设进去必然 `Internal error`——那一步失败不算换模型失败（模型确实换了），
+   * 于是上一版把请求的值原样记进了会话记录，**界面显示「轻度」而引擎在 max**。
+   * 界面照着记录画，所以记录必须是真的。
+   */
+  setModel: (model: string, effort?: string) => Promise<{ effort?: string }>
   /**
    * 这个引擎认哪些斜杠命令。**拿不到就给空数组**——界面据此少画一段，不报错。
    *

@@ -343,7 +343,11 @@ export function rename(ctx: Ctx, cmd: Extract<Command, { type: "thread.rename" }
 export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.setModel" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) return
-  await entry.session.setModel(cmd.model, cmd.effort)
+  // **记引擎回报的那一档，不是请求的那个。** 两者会不一样：ZCode 的桥把
+  // `thought` 报成「可选 low/high/max」而设进去必然报错，那一步失败不算换模型失败
+  //（模型确实换了）——上一版把请求值原样记了下来，于是**界面显示「轻度」而引擎在 max**。
+  // 界面照着这条记录画，所以这条记录必须是真的
+  const applied = await entry.session.setModel(cmd.model, cmd.effort)
   const at = ctx.deps.now()
   // **强度要能被清掉。** 上一版是 `...(effort === undefined ? {} : {effort})`，
   // 于是换到一个不报强度的模型之后，旧模型的 `high` 永远留在记录上——
@@ -353,7 +357,7 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
   entry.thread = {
     ...rest,
     model: cmd.model,
-    ...(cmd.effort === undefined ? {} : { effort: cmd.effort }),
+    ...(applied.effort === undefined ? {} : { effort: applied.effort }),
     updatedAt: at,
   }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })

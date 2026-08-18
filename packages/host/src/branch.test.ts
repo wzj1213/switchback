@@ -53,7 +53,7 @@ const rig = (opts: { canFork: boolean }): Rig => {
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
         capabilities: () => ({ compact: false, attachments: false, steer: false, fork: opts.canFork }),
-        setModel: () => Promise.resolve(),
+        setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
       } as unknown as EngineSession)
     },

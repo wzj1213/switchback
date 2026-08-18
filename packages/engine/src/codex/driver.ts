@@ -398,11 +398,11 @@ class CodexSession implements EngineSession {
    * 而错误里提的那个值用户根本没选过。所以这里按模型自己报的默认补齐。
    * 清单拿不到时不补——那时传什么都是猜。
    */
-  async setModel(model: string, effort?: string): Promise<void> {
+  async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     this.state.model = model
     this.state.effort = effort ?? this.state.options.find((m) => m.id === model)?.defaultEffort
     // 不用单独发请求：`turn/start` 的 model/effort 覆盖「这一轮及后续」
-    return Promise.resolve()
+    return Promise.resolve(this.state.effort === undefined ? {} : { effort: this.state.effort })
   }
 
   async interrupt(): Promise<void> {

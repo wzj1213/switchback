@@ -235,8 +235,10 @@ class ClaudeSession implements EngineSession {
     return { compact: false, attachments: true, steer: false, fork: false }
   }
 
-  async setModel(model: string): Promise<void> {
+  async setModel(model: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
+    // Claude 不报强度，也就没有「生效的那一档」
+    return {}
   }
 
   async interrupt(): Promise<void> {

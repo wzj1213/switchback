@@ -40,9 +40,9 @@ export interface ModelCtx {
  * 那时没有独立选项，跳过即可；有的把它做成独立的会话选项（kimi 的 `thinking`、
  * ZCode 的 `thought`），那时要单独发一次。**两条都走**，因为同一个驱动要接这两种。
  */
-export async function applyModel(ctx: ModelCtx, model: string, effort?: string): Promise<void> {
+export async function applyModel(ctx: ModelCtx, model: string, effort?: string): Promise<{ effort?: string }> {
   const sessionId = ctx.state.acpSession
-  if (sessionId === undefined) return
+  if (sessionId === undefined) return {}
   const { method, params } = modelCall(ctx.state.modelConfig, sessionId, model)
   await ctx.call(method, params).catch((error: unknown) => {
     throw new Error(sayWhy(ctx.id, "换模型", error))
@@ -50,6 +50,9 @@ export async function applyModel(ctx: ModelCtx, model: string, effort?: string):
   // 分母跟着换：同一家的两个模型窗口可以不一样，不换的话比例条会按旧分母画
   ctx.state.contextWindow = ctx.state.windowOf[model] ?? ctx.state.contextWindow
   await applyEffort(ctx, sessionId, effort)
+  // **回报的是引擎那边真正生效的那一档**，不是请求的那个：
+  // 设不上时 `applyEffort` 只发 degraded，`ctx.state.effort` 停在旧值
+  return ctx.state.effort === undefined ? {} : { effort: ctx.state.effort }
 }
 
 /**

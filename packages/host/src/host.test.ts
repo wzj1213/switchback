@@ -20,7 +20,10 @@ interface Fake {
   memory: () => readonly Rule[]
 }
 
-function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
+/** 引擎回报的强度怎么算。缺省 = 照单全收；传进来就是「它其实用的是这个」。 */
+type EffortOf = (effort?: string) => { effort?: string }
+
+function fakeDriver(effortOf?: EffortOf): { driver: EngineDriver; session: () => Fake } {
   const holder: { fake: Fake | undefined } = { fake: undefined }
   const driver: EngineDriver = {
     id: "fake",
@@ -45,7 +48,9 @@ function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
         capabilities: () => NO_CAPABILITIES,
-        setModel: () => Promise.resolve(),
+        // 一个**认强度**的引擎：回报的就是收到的那个。设不上的那家靠 `effortOf` 演
+        setModel: (_model: string, effort?: string) =>
+          Promise.resolve(effortOf === undefined ? (effort === undefined ? {} : { effort }) : effortOf(effort)),
         dispose: () => {
           fake.disposed = true
           return Promise.resolve()
@@ -64,8 +69,8 @@ function fakeDriver(): { driver: EngineDriver; session: () => Fake } {
   }
 }
 
-function setup(): { host: Host; events: Event[]; session: () => Fake } {
-  const { driver, session } = fakeDriver()
+function setup(options: { effort?: EffortOf } = {}): { host: Host; events: Event[]; session: () => Fake } {
+  const { driver, session } = fakeDriver(options.effort)
   const events: Event[] = []
   const counter = { n: 0 }
   const host = createHost({
@@ -309,7 +314,7 @@ describe("续跑", () => {
           setTrust: () => Promise.resolve(),
           models: () => Promise.resolve([]),
         capabilities: () => NO_CAPABILITIES,
-          setModel: () => Promise.resolve(),
+          setModel: () => Promise.resolve({}),
           dispose: () => Promise.resolve(),
         })
       },
@@ -599,7 +604,7 @@ const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; sto
           setTrust: () => Promise.resolve(),
           models: () => Promise.resolve([]),
         capabilities: () => NO_CAPABILITIES,
-          setModel: () => Promise.resolve(),
+          setModel: () => Promise.resolve({}),
           dispose: () => {
             fake.disposed = true
             return Promise.resolve()
@@ -686,7 +691,7 @@ describe("跨引擎接力", () => {
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([{ id: `${id}-model`, label: id }]),
         capabilities: () => ({ ...NO_CAPABILITIES, ...caps }),
-        setModel: () => Promise.resolve(),
+        setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
       } as unknown as EngineSession),
   })
@@ -986,7 +991,7 @@ function slowDriver(delayMs: number, fail = false): EngineDriver {
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
         capabilities: () => NO_CAPABILITIES,
-        setModel: () => Promise.resolve(),
+        setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
       }
     },
@@ -1256,7 +1261,7 @@ describe("跑着的时候补一句话：默认排队，插入是明确动作", (
               setTrust: () => Promise.resolve(),
               models: () => Promise.resolve([]),
               capabilities: () => ({ compact: false, attachments: true, steer: true }),
-              setModel: () => Promise.resolve(),
+              setModel: () => Promise.resolve({}),
               dispose: () => Promise.resolve(),
             } as unknown as EngineSession),
         },
@@ -1398,6 +1403,17 @@ describe("换模型时的推理强度", () => {
     expect(effortOf(events)).toBe("high")
   })
 
+  it("**引擎拒了那一档时，记下的是引擎还在用的那个**——不是你点的那个", async () => {
+    // 实测 ZCode：桥把 `thought` 报成可选，设进去必然 Internal error。
+    // 那一步失败不算换模型失败（模型确实换了），但记录里要是请求值的话，
+    // 输入区会显示「轻度」而引擎在 max——**界面在说一件没发生的事**
+    const { host, events } = setup({ effort: () => ({ effort: "max" }) })
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.setModel", threadId: id, model: "a", effort: "low" })
+    expect(effortOf(events)).toBe("max")
+  })
+
   it("**换到不报强度的模型时要清掉**——留着的话界面会画一个引擎根本没在用的档位", async () => {
     const { host, events, id } = await pick()
     await host.dispatch({ type: "thread.setModel", threadId: id, model: "b" })
@@ -1432,7 +1448,7 @@ describe("活会话上限：闲着的先收掉", () => {
               setTrust: () => Promise.resolve(),
               models: () => Promise.resolve([]),
               capabilities: () => NO_CAPABILITIES,
-              setModel: () => Promise.resolve(),
+              setModel: () => Promise.resolve({}),
               dispose: () => {
                 disposed.push(req.threadId)
                 return Promise.resolve()

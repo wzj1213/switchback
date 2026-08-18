@@ -394,7 +394,7 @@ class AcpSession implements EngineSession {
    * 换模型（可能连带换强度）。**发哪一发由 agent 报清单的方式决定**——
    * 那一段连同「发不出去怎么向用户交代」都在 `model.ts`，和 `mode.ts` 同一个边界。
    */
-  setModel(model: string, effort?: string): Promise<void> {
+  setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     return applyModel(this.knobs(), model, effort)
   }
 
