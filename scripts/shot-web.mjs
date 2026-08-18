@@ -25,7 +25,8 @@ import { homedir } from "node:os"
 import WebSocket from "ws"
 
 const OUT = process.argv[2] ?? join(process.cwd(), "release", "web-shots")
-const BASE = "http://127.0.0.1:17801"
+// 和 harness 的 `OMNI_HARNESS_PORT` 对上：隧道验证时它跑在 17800
+const BASE = `http://127.0.0.1:${process.env["OMNI_HARNESS_PORT"] ?? "17801"}`
 const TOKEN = "harness-dev-token-not-a-secret"
 const PORT = 9333
 /** 墙钟看门狗：`--virtual-time-budget` 说好 4 秒，跑过这个数就是卡死了。 */

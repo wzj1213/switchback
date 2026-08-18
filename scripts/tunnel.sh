@@ -67,23 +67,69 @@ status)
   fi
   ;;
 rotate)
-  # 换一把新钥匙，装上去，**再把旧的删掉**——顺序反了会在中间那一刻把自己关在门外
-  echo "生成新密钥…"
-  ssh-keygen -t ed25519 -N '' -C "omni-tunnel-$(date +%Y%m%d)" -f "$KEY.new" >/dev/null
+  # 换钥匙。**顺序是「装上新的 → 验它真的能用 → 才删旧的」**，
+  # 中间任何一步失败，旧钥匙都还在服务器上，隧道照样起得来。
+  #
+  # 原来这里是「先 grep -v 删掉旧行、再追加新行」——那一步里
+  # 新旧同时不成立，而且没有任何东西验过新的那把能不能用。
+  # 这是一次性的、动别人服务器的操作，失败的代价是「人在外面、门开不了」。
+  tag="omni-tunnel-$(date +%Y%m%d-%H%M%S)"
+  echo "1/5 生成新密钥（${tag}）…"
+  ssh-keygen -t ed25519 -N '' -C "$tag" -f "$KEY.new" >/dev/null
   pub="$(cat "$KEY.new.pub")"
-  echo "装到服务器上…"
-  # 这一步要用**你自己的主密钥**登进去（受限的那把跑不了命令）
+
+  echo "2/5 备份 authorized_keys 并装上新钥匙（旧的先留着）…"
+  # 用**你自己的主密钥**登进去：受限的那把跑不了命令
   ssh "${OMNI_ADMIN_HOST:-kr}" "
-    grep -v 'omni-tunnel' ~/.ssh/authorized_keys > /tmp/ak.new 2>/dev/null || true
-    mv /tmp/ak.new ~/.ssh/authorized_keys
-    echo 'restrict,port-forwarding,command=\"/bin/false\",permitlisten=\"127.0.0.1:$PORT\" $pub' >> ~/.ssh/authorized_keys
-    chmod 600 ~/.ssh/authorized_keys
+    set -e
+    cd ~/.ssh
+    test -s authorized_keys
+    cp authorized_keys authorized_keys.bak-\$(date +%Y%m%d-%H%M%S)
+    echo 'restrict,port-forwarding,command=\"/bin/false\",permitlisten=\"127.0.0.1:$PORT\" $pub' >> authorized_keys
+    chmod 600 authorized_keys
   "
+
+  echo "3/5 停掉旧隧道，用新钥匙起一条验一下…"
+  # **不能写成 `[ -n "$pid" ] && kill …`**：没在跑的时候那一串返回 1，
+  # 配上开头的 `set -e` 就是「刚装完新钥匙、脚本当场退出」
+  pid="$(find_pid)"
+  if [ -n "$pid" ]; then
+    kill ${pid}
+    sleep 1
+  fi
+  if ! ssh -f -N \
+    -o ExitOnForwardFailure=yes \
+    -o ServerAliveInterval=30 \
+    -o ServerAliveCountMax=3 \
+    -o BatchMode=yes \
+    -o IdentitiesOnly=yes \
+    -i "$KEY.new" \
+    -o "SetEnv=OMNI_TAG=$TAG" \
+    -R "127.0.0.1:$PORT:127.0.0.1:$LOCAL" \
+    "$HOST"; then
+    echo "新钥匙起不来。**旧的还在服务器上，什么都没删** —— $0 start 就能回到原样。" >&2
+    rm -f "$KEY.new" "$KEY.new.pub"
+    exit 1
+  fi
+  sleep 1
+
+  echo "4/5 新的能用，把旧的从服务器上删掉…"
+  ssh "${OMNI_ADMIN_HOST:-kr}" "
+    set -e
+    cd ~/.ssh
+    grep -v 'omni-tunnel' authorized_keys > authorized_keys.tmp || true
+    grep '$tag' authorized_keys >> authorized_keys.tmp
+    test -s authorized_keys.tmp
+    mv authorized_keys.tmp authorized_keys
+    chmod 600 authorized_keys
+  "
+
+  echo "5/5 换掉本机这一份…"
   mv "$KEY.new" "$KEY"
   mv "$KEY.new.pub" "$KEY.pub"
   chmod 600 "$KEY"
-  echo "换好了。旧钥匙已从服务器上删掉。"
-  echo "重启隧道：$0 stop && $0 start"
+  echo "换好了。隧道已经用新钥匙在跑（pid $(find_pid) ），旧钥匙服务器上已删。"
+  echo "服务器上留了一份 ~/.ssh/authorized_keys.bak-*，确认没问题之后可以自己清掉。"
   ;;
 *)
   echo "用法：$0 start|stop|status|rotate" >&2
