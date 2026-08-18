@@ -176,6 +176,46 @@ export function threadRowsOf(state: ViewState): readonly ThreadRow[] {
   })
 }
 
+/** 目录名当项目名。整条绝对路径在一行里放不下，而尾段正是人叫它的那个名字。 */
+export function baseNameOf(cwd: string): string {
+  return cwd.split("/").filter(Boolean).pop() ?? "/"
+}
+
+/** 一个项目：一个工作区目录，底下挂着它的会话。 */
+export interface Project {
+  cwd: string
+  /** 目录名。同名的不同目录靠 `cwd` 区分，界面上要不要展开写路径自己决定。 */
+  name: string
+  rows: readonly ThreadRow[]
+}
+
+/**
+ * 按工作区把会话归堆。
+ *
+ * ## 为什么放在这里而不是各端各写一份
+ *
+ * 桌面侧栏早就这么分了（`renderer/sidebar.ts`），而浏览器端是一条平列表——
+ * 于是**同一台机器上的同一批会话，在两端长得完全不一样**：一边分着项目，
+ * 一边十几条混在一起，谁属于哪个仓库全靠标题猜。
+ *
+ * 这里只做「怎么归堆」这一件事，不管置顶、折叠、手动排序——那些是桌面侧栏
+ * 自己的东西，摊到手机上没有意义。**组内顺序沿用传进来的顺序**（调用方已经排过），
+ * 组间按各自最新那条的时间排：你回头找的是「刚才在弄的那个项目」。
+ */
+export function projectsOf(rows: readonly ThreadRow[]): readonly Project[] {
+  const groups = new Map<string, ThreadRow[]>()
+  for (const row of rows) {
+    const found = groups.get(row.thread.cwd)
+    if (found === undefined) groups.set(row.thread.cwd, [row])
+    else found.push(row)
+  }
+  const newest = (list: readonly ThreadRow[]): number =>
+    list.reduce((max, r) => Math.max(max, r.thread.updatedAt), 0)
+  return [...groups.entries()]
+    .map(([cwd, list]) => ({ cwd, name: baseNameOf(cwd), rows: list }))
+    .sort((a, b) => newest(b.rows) - newest(a.rows))
+}
+
 /**
  * 把横幅清空。**全量重建之后必须调一次。**
  *

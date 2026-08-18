@@ -175,7 +175,7 @@ function checkReplay(frames, chunkCount) {
  * 手机上一片空白。所以这里的样本必须是「事件不多但每条很大」的那种形状。
  */
 async function stepScoped(send, token) {
-  console.log("8. 分级 replay：大小预算、只发头、watch → thread 帧")
+  console.log("9. 分级 replay：大小预算、只发头、watch → thread 帧")
   const info = await evaluate(send, "window.omni.appInfo().then(s => JSON.stringify(s))")
   const dir = join(info.dataDir, "threads")
   await mkdir(dir, { recursive: true })
@@ -251,7 +251,27 @@ async function stepCommands({ ws, frames, target }) {
     .at(-1)
   ok("要 full 被钳成 auto-edit", updated?.thread?.trust === "auto-edit", `实际 ${updated?.thread?.trust}`)
 
-  console.log("7. 坏输入不掀翻连接")
+  // **这一条是用户最早提的要求原话**：「并且能继续开新对话进行开发」。
+  // 上一版整个没做（界面上没有入口），理由是「新建要选目录」——
+  // 而手机根本不需要文件浏览器：已经在用的那些项目就是清单。
+  //
+  // **排在档位那一步之后**：新建会把那条没人用过的临时会话回收掉
+  //（`host` 的「没用过就不留痕」），排在前面的话后面那步就没有目标了
+  console.log("7. 从远程开一条新会话")
+  const before = new Set(events().filter((e) => e.type === "thread.started").map((e) => e.thread.id))
+  ws.send(
+    JSON.stringify({
+      type: "command",
+      command: { type: "thread.create", cwd: process.cwd(), engine: "codex", trust: "auto-edit" },
+    }),
+  )
+  await pause(2500)
+  const born = events().filter((e) => e.type === "thread.started" && !before.has(e.thread.id))
+  ok("**手机开得出新会话**", born.length === 1, born[0]?.thread.title ?? "(一条都没建出来)")
+  ok("开在指定的工作区", born[0]?.thread.cwd === process.cwd(), born[0]?.thread.cwd)
+  ok("档位是远程上限那一档", born[0]?.thread.trust === "auto-edit", born[0]?.thread.trust)
+
+  console.log("8. 坏输入不掀翻连接")
   ws.send("{不是 JSON")
   ws.send(JSON.stringify({ type: "command", command: { type: "rm -rf", threadId: target } }))
   ws.send(JSON.stringify({ type: "从未来来的帧" }))
@@ -272,7 +292,7 @@ async function stepCommands({ ws, frames, target }) {
  * 继续能替你放行 agent 要跑的每一条命令。而按下那颗按钮的场景恰恰是「手机丢了」。
  */
 async function stepRevoke(send) {
-  console.log("12. 吊销当场断开正连着的那条")
+  console.log("13. 吊销当场断开正连着的那条")
   const status = await evaluate(send, "window.omni.remote.pair().then(s => JSON.stringify(s))")
   const paired = await (
     await fetch(`${BASE}/api/pair`, {
@@ -302,7 +322,7 @@ async function stepRevoke(send) {
 
 /** 推送的两个端点。真发一条要有个活的推送服务，那条在 `relay.test.ts` 里验。 */
 async function stepPush(token) {
-  console.log("9. 推送端点")
+  console.log("10. 推送端点")
   const key = await (await fetch(`${BASE}/api/push/key`)).json()
   ok("公钥拿得到，且是 65 字节的未压缩点", Buffer.from(key.key ?? "", "base64url").length === 65)
   const noAuth = await fetch(`${BASE}/api/push/subscribe`, {
@@ -326,7 +346,7 @@ async function stepPush(token) {
 }
 
 async function stepStatic() {
-  console.log("10. 静态页面与安全响应头")
+  console.log("11. 静态页面与安全响应头")
   const home = await fetch(`${BASE}/`)
   ok("首页 200", home.status === 200, home.headers.get("content-type"))
   ok("带了 CSP", (home.headers.get("content-security-policy") ?? "").includes("default-src 'self'"))
@@ -348,7 +368,7 @@ async function main() {
   await stepPush(token)
   await stepStatic()
 
-  console.log("11. 断开之后设备仍在表里（吊销才该消失）")
+  console.log("12. 断开之后设备仍在表里（吊销才该消失）")
   conn.ws.close()
   await pause(800)
   const after = await evaluate(send, "window.omni.remote.status().then(s => JSON.stringify(s))")

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react"
 import type { ThreadId } from "@omni/protocol"
+import { projectsOf, threadRowsOf } from "@omni/store"
 import { forgetToken, tokenOf } from "./auth.js"
 import { useRemote } from "./useRemote.js"
 import { Pair } from "./screens/Pair.js"
 import { Threads } from "./screens/Threads.js"
 import { Thread } from "./screens/Thread.js"
+import { NewThread } from "./screens/NewThread.js"
 import { ConnBar } from "./components/ConnBar.js"
 
 /**
@@ -23,29 +25,50 @@ import { ConnBar } from "./components/ConnBar.js"
  * 2. **`popstate` 必须读 `event.state`**，不能一律当成「回到列表」。
  *    不读的话前进键落回正文那一项时，界面恢复不了。
  */
-export function App(): React.JSX.Element {
-  const [token, setToken] = useState(tokenOf)
-  const [selected, setSelected] = useState<ThreadId | undefined>(undefined)
-  const remote = useRemote(token)
-
-  const { watch } = remote
-
-  const open = useCallback(
-    (id: ThreadId | undefined) => {
-      setSelected((prev) => {
-        // 从列表进正文压一层；正文里换一条只替换——否则返回键要按满 N 次
-        if (id === undefined) window.history.back()
-        else if (prev === undefined) window.history.pushState({ omni: id }, "")
-        else window.history.replaceState({ omni: id }, "")
-        return id
-      })
-      watch(id ?? null)
-    },
-    [watch],
+/**
+ * 新建那一屏。**单独一个组件**：`App` 已经贴着行数闸门，
+ * 而这一屏和「列表 + 正文」那两栏没有任何共用的布局。
+ */
+function Creating({
+  remote,
+  onDone,
+}: {
+  remote: ReturnType<typeof useRemote>
+  onDone: () => void
+}): React.JSX.Element {
+  return (
+    <div className="app">
+      <ConnBar conn={remote.conn} onRetry={remote.retry} />
+      <NewThread
+        projects={projectsOf(threadRowsOf(remote.state))}
+        engines={remote.state.engines}
+        maxTrust={remote.me?.maxTrust ?? "auto-edit"}
+        onCreate={(command) => {
+          const sent = remote.send(command)
+          // **发不出去就留在这一屏。** 宿主建好会推一条 `thread.started` 进列表；
+          // 而断线时 `send` 返回 false，那时候切回列表等于让人以为开成了
+          if (sent) onDone()
+          return sent
+        }}
+        onCancel={onDone}
+      />
+    </div>
   )
+}
 
-  // 从通知点进来的：`?thread=` 是新开窗口那条路，`postMessage` 是
-  // 已经开着一扇窗那条路（service worker 优先找已开的那扇，见 `public/sw.js`）
+/**
+ * 和浏览器/系统打交道的那几根线：通知点进来的深链、前进后退。
+ *
+ * **单独一个 hook**：`App` 已经贴着行数闸门，而这两件事和「渲染哪一屏」
+ * 是两回事——它们回答的是「外面发生了什么，该选中谁」。
+ *
+ * 手机上返回键就是「返回列表」——不接的话，人按返回直接退出应用，
+ * 而他只是想回到上一屏。
+ */
+function useHistory(
+  setSelected: (id: ThreadId | undefined) => void,
+  watch: (id: ThreadId | null) => void,
+): void {
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get("thread")
     if (wanted !== null && wanted !== "") {
@@ -71,7 +94,6 @@ export function App(): React.JSX.Element {
       worker.removeEventListener("message", onMessage)
     }
   }, [watch])
-
   useEffect(() => {
     // 打好基底：首屏那一项也带上 state，前进/后退才对得起来
     window.history.replaceState({ omni: undefined }, "")
@@ -85,6 +107,33 @@ export function App(): React.JSX.Element {
       window.removeEventListener("popstate", onPop)
     }
   }, [watch])
+}
+
+export function App(): React.JSX.Element {
+  const [token, setToken] = useState(tokenOf)
+  const [selected, setSelected] = useState<ThreadId | undefined>(undefined)
+  const [creating, setCreating] = useState(false)
+  const remote = useRemote(token)
+
+  const { watch } = remote
+
+  const open = useCallback(
+    (id: ThreadId | undefined) => {
+      setSelected((prev) => {
+        // 从列表进正文压一层；正文里换一条只替换——否则返回键要按满 N 次
+        if (id === undefined) window.history.back()
+        else if (prev === undefined) window.history.pushState({ omni: id }, "")
+        else window.history.replaceState({ omni: id }, "")
+        return id
+      })
+      watch(id ?? null)
+    },
+    [watch],
+  )
+
+  // 从通知点进来的：`?thread=` 是新开窗口那条路，`postMessage` 是
+  // 已经开着一扇窗那条路（service worker 优先找已开的那扇，见 `public/sw.js`）
+  useHistory(setSelected, watch)
 
   const paired = useCallback((next: string) => {
     setToken(next)
@@ -101,6 +150,17 @@ export function App(): React.JSX.Element {
 
   const thread = selected === undefined ? undefined : remote.state.threads[selected]
 
+  if (creating) {
+    return (
+      <Creating
+        remote={remote}
+        onDone={() => {
+          setCreating(false)
+        }}
+      />
+    )
+  }
+
   return (
     <div className="app" data-detail={thread === undefined ? "no" : "yes"}>
       <ConnBar conn={remote.conn} onRetry={remote.retry} />
@@ -114,11 +174,20 @@ export function App(): React.JSX.Element {
       )}
       <div className="app__panes">
         <aside className="pane pane--list">
-          <Threads remote={remote} selected={selected} onOpen={open} onUnpair={unpair} token={token} />
+          <Threads
+            remote={remote}
+            selected={selected}
+            onOpen={open}
+            onUnpair={unpair}
+            token={token}
+            onNew={() => {
+              setCreating(true)
+            }}
+          />
         </aside>
         <main className="pane pane--detail">
           {thread === undefined ? (
-            <p className="empty">选一条会话，或者在桌面上新建一条。</p>
+            <p className="empty">选一条会话，或者点右上角开一条新的。</p>
           ) : (
             <Thread
               remote={remote}

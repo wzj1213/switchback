@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Thread } from "@omni/protocol"
-import { foreignByEngine, forkPeerOf, initial, modelsOf, threadRowsOf, type ViewState } from "./state.js"
+import { baseNameOf, foreignByEngine, forkPeerOf, initial, modelsOf, projectsOf, threadRowsOf, type ViewState } from "./state.js"
 import { reduceAll } from "./reduce.js"
 
 const thread = (id: string, at: number, forkedFrom?: string): Thread => ({
@@ -118,5 +118,47 @@ describe("模型清单认引擎", () => {
 
   it("没报过就是空的", () => {
     expect(modelsOf(initial(), "th-1", "codex")).toEqual([])
+  })
+})
+
+describe("按项目归堆", () => {
+  const at = (id: string, cwd: string, when: number): Thread => ({ ...thread(id, when), cwd })
+  const rows = (...list: Thread[]) => threadRowsOf(stateWith(...list))
+
+  it("同一个工作区的会话归到一堆", () => {
+    const out = projectsOf(rows(at("a", "/w/omni", 1), at("b", "/w/omni", 2), at("c", "/w/别的", 3)))
+    expect(out.map((p) => p.name)).toEqual(["别的", "omni"])
+    expect(out.find((p) => p.name === "omni")?.rows).toHaveLength(2)
+  })
+
+  it("**组间按各自最新那条排**——你回头找的是「刚才在弄的那个项目」", () => {
+    const out = projectsOf(rows(at("旧", "/w/老项目", 1), at("新", "/w/新项目", 99)))
+    expect(out.map((p) => p.name)).toEqual(["新项目", "老项目"])
+  })
+
+  it("组内沿用传进来的顺序——调用方已经排过一次，这里再排一次只会打架", () => {
+    // **直接构造入参**：走 `threadRowsOf` 的话顺序由归约器决定，
+    // 那验的就不是这个函数了
+    const given = [
+      { thread: at("先", "/w/omni", 5), preview: undefined },
+      { thread: at("后", "/w/omni", 1), preview: undefined },
+    ]
+    expect(projectsOf(given)[0]?.rows.map((r) => r.thread.id)).toEqual(["先", "后"])
+  })
+
+  it("目录名当项目名；根目录不至于变成空字符串", () => {
+    expect(baseNameOf("/Users/you/work/omni")).toBe("omni")
+    expect(baseNameOf("/Users/you/work/omni/")).toBe("omni")
+    expect(baseNameOf("/")).toBe("/")
+  })
+
+  it("**同名不同路径不合并**——两个都叫 web 的目录是两个项目", () => {
+    const out = projectsOf(rows(at("a", "/w/一/web", 1), at("b", "/w/二/web", 2)))
+    expect(out).toHaveLength(2)
+    expect(out.map((p) => p.cwd)).toEqual(["/w/二/web", "/w/一/web"])
+  })
+
+  it("一条都没有时给空数组", () => {
+    expect(projectsOf([])).toEqual([])
   })
 })
