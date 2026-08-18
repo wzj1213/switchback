@@ -4,6 +4,15 @@
  * 做成**居中的一块**而不是又一个浮层：浮层适合「选一个然后关掉」，
  * 设置是几组互不相干的选择，用户会来回看、来回改——
  * 浮层一点外面就没了，改到一半手滑就得重来。见 components/SettingsPanel.tsx。
+ *
+ * ## 两列，尺寸固定
+ *
+ * 上一版是一根 560px 的长条，所有组从上到下排，于是「引擎」那行五个并排的按钮
+ * 把左边那句说明压成了每行两三个字的竖条——**挤是宽度不够的结果，不是间距的问题**。
+ * 现在左边一列分页、右边一页内容，和审核面板同一套骨架（review.css）。
+ *
+ * 高度也钉死：内容后到不会再把面板撑高一截。那一跳在用户眼里和「卡了一下」
+ * 是同一件事，而这块面板恰好有两页要等异步（引擎版本、环境配置）。
  */
 
 .set__scrim {
@@ -11,32 +20,36 @@
   inset: 0;
   z-index: 60;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 8vh var(--sp-4) var(--sp-4);
+  padding: var(--sp-5) var(--sp-4);
   background: var(--scrim);
 }
 
 .set {
-  width: min(560px, 100%);
-  /* **要滚就滚卡片自己。** 让遮罩滚的话，滚动条画在整扇窗口的最右边缘——
-     和「窗口自己永远不滚」（app.css 开头那段）在用户眼里是同一件事。
-     百分比解析的是遮罩的内容盒高度，所以 8vh 只写在遮罩那一处 */
-  max-height: 100%;
-  overflow-y: auto;
-  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  height: min(660px, 100%);
+  overflow: hidden;
   border: 1px solid var(--border-pop);
   border-radius: var(--radius-lg);
   background: var(--bg);
   box-shadow: var(--shadow-pop);
 }
 
+.set:focus {
+  outline: none;
+}
+
 .set__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--sp-3);
-  padding-bottom: var(--sp-3);
-  border-bottom: 1px solid var(--border);
+  flex: none;
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
 }
 
 .set__heading {
@@ -52,8 +65,77 @@
   color: var(--text-faint);
 }
 
-.set__group {
-  padding-top: var(--sp-4);
+.set__body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ── 左列：分页 ───────────────────────────────────────────────
+ * 宽度按最长的一项（「数据与排查」六个字 + 图标）定死。窄一点就会折行，
+ * 而一列会折行的导航看起来永远像没做完。
+ */
+.set__nav {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  gap: 2px;
+  width: 172px;
+  padding: var(--sp-2);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
+}
+
+.set__tab {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.set__tab:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.set__tab--on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+/* 图标比文字淡一档：它是路标不是内容。选中那条跟着文字一起提亮 */
+.set__tabicon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.set__tab--on .set__tabicon,
+.set__tab:hover .set__tabicon {
+  color: var(--text-muted);
+}
+
+/* ── 右列：一页内容 ─────────────────────────────────────────── */
+
+.set__pane {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-5);
+  overflow-y: auto;
+}
+
+.set__group + .set__group {
+  margin-top: var(--sp-5);
 }
 
 .set__title {
@@ -63,17 +145,41 @@
   color: var(--text-faint);
 }
 
+/* 一组整体要交代的一句话。也给正文里那些独立的说明句用 */
+.set__note {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+/* 一组设置项收在一张卡片里，分节线画在卡片内部。
+   卡片这一层不只是好看：它让「这几行是一组」在**没有标题的时候也成立** */
+.set__rows {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
 /* 一行一件事：左边说明，右边控件。**说明必须写全**——
    设置项的名字（「信任档」）说不出改了会怎样，而那正是用户在这里想知道的 */
 .set__field {
   display: flex;
   align-items: flex-start;
   gap: var(--sp-4);
-  padding: var(--sp-2) 0;
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .set__field + .set__field {
   border-top: 1px solid var(--border);
+}
+
+/* 宽控件（五家引擎并排的那个开关）自己占一整行，说明写在上面。
+   **判据是控件宽不宽，不是这一项重不重要** */
+.set__field--stack {
+  flex-direction: column;
+  gap: var(--sp-2);
 }
 
 .set__text {
@@ -81,7 +187,7 @@
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .set__label {
@@ -91,7 +197,7 @@
 
 .set__hint {
   font-size: var(--text-xs);
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text-faint);
   overflow-wrap: anywhere;
 }
@@ -100,12 +206,33 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--sp-1);
-  padding-top: 2px;
+  gap: var(--sp-2);
+  padding-top: 1px;
+}
+
+.set__field--stack .set__control {
+  flex-wrap: wrap;
+}
+
+/* 卡片底下那一条页脚（「重新检查」）。**画成页脚而不是又一行设置项**：
+   它不改任何东西，只是重跑一次探测 */
+.set__act {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+/* 卡片里「还没有内容」的那句话。和设置项共用左右内边距，不然它会贴着边框 */
+.set__blank {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
 }
 
 /* ── 三段式开关 ─────────────────────────────────────
- * 选项少且互斥时比下拉好：三个都看得见，不用点开才知道有什么。
+ * 选项少且互斥时比下拉好：几个都看得见，不用点开才知道有什么。
  *
  * **叫 `.switch` 不叫 `.seg`**：`.seg` 被引擎时间线卡片用着（app.css 末尾那段），
  * 而这个文件加载在后面、权重又相同——撞名的结果是那张卡片里的 uuid 句柄
@@ -120,14 +247,14 @@
 }
 
 .switch__item {
-  padding: 3px var(--sp-2);
+  padding: 5px var(--sp-3);
   border: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   white-space: nowrap;
   cursor: default;
 }
@@ -145,7 +272,7 @@
 /* 更新失败时 npm 的原文。**要能看见**——「更新失败」四个字排查不了任何东西 */
 .set__log {
   max-height: 180px;
-  margin: var(--sp-2) 0 0;
+  margin: var(--sp-2) var(--sp-4);
   padding: var(--sp-2);
   overflow: auto;
   border-radius: var(--radius-sm);
@@ -156,4 +283,202 @@
   font-family: var(--font-mono);
   font-size: var(--text-code);
   white-space: pre-wrap;
+}
+
+/* ── 环境：钩子 ───────────────────────────────────────────────
+ * 「我配的钩子到底跑没跑」——这一页答这个。见 components/SettingsEnv.tsx。
+ *
+ * 用 `.hk` 前缀不用 `.env`：后者被输入框上方那张环境卡片占着（popover.css），
+ * 而这两块东西将来只会各走各的。
+ */
+
+.hk__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.hk__lead .set__note {
+  flex: 1;
+  margin: 0;
+}
+
+.hk__cwd {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+/* 「这些一条都不会跑」这类话。**要显眼**：它推翻的是这一页其余全部内容 */
+.hk__alarm {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  color: var(--warn);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.hk__alarm code {
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+}
+
+.hk__engine + .hk__engine {
+  margin-top: var(--sp-5);
+}
+
+/* 一家引擎的标题**整条是开关**：没配钩子的那几家默认折起来。
+   折起来也要看得见「待审核几项」——那正是「配了但不跑」的答案 */
+.hk__name {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2) 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-align: left;
+  cursor: default;
+}
+
+.hk__name:hover {
+  color: var(--accent);
+}
+
+.hk__total {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+/* 「omni 到底加不加载这些」——整页最要紧的一句，所以它在每家标题正下方 */
+.hk__why {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.hk__src {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+/* 还没有这份文件的那一格。**照样摆出来**——「这儿可以配」本身是信息，
+   但它得看起来是空的，不能和真有内容的那几格一样重 */
+.hk__src--none {
+  border-style: dashed;
+  background: transparent;
+}
+
+.hk__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.hk__scope {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+/* 路径。家目录缩成 `~`（渲染层用 `shortPath`），实在太长才省略尾部——
+   「是哪一份」由左边那个名字回答，省略号砍掉的不是识别它的依据。
+   一度试过 `direction: rtl` 来「砍前面留后面」，那会把开头的 `/` 挪到行尾 */
+.hk__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hk__sum {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hk__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.hk__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.hk__event {
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  color: var(--text);
+}
+
+.hk__when,
+.hk__match {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.hk__match {
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+/* 审过没有。**待审核那档要扎眼**：它就是「配了但不跑」的那个答案 */
+.hk__trust {
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ok);
+  font-size: var(--text-xs);
+}
+
+.hk__trust--wait {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* 命令原文。**一定要摆出来**——「有 3 个钩子」回答不了「它会干什么」 */
+.hk__cmd {
+  display: block;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.hk__foot {
+  margin: var(--sp-5) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
 }

@@ -28,6 +28,16 @@ import type { Logger } from "./log.js"
  *
  * 查最新版要连 npm。**失败就静默**——用户没有要求过这件事，
  * 为它弹一条错误是打扰。
+ *
+ * ## 为什么要缓存
+ *
+ * 这件事原来挂在「设置面板挂载」上：每打开一次设置，就 spawn 一次 `codex --version`
+ * 再 spawn 一次 `npm view`——**后者是一个完整的 node 进程加一趟网络往返**。
+ * 于是每次进设置都顿一下，而顿的原因和用户当时想做的事（改个主题）毫无关系。
+ *
+ * 现在：结果缓存 6 小时，应用起来之后**预热一次**，面板打开时是现成的。
+ * 6 小时不是随手定的——引擎的版本只会因为「你自己去更新了」而变，
+ * 而那条路（下面那颗按钮）会顺手把缓存改掉。真想立刻重查的话，面板上有「重新检查」。
  */
 export interface EngineVersion {
   engine: string
@@ -54,7 +64,65 @@ export interface UpdateResult {
   output: string
 }
 
-export function installEngineVersionChannel(log: Logger): void {
+/** 缓存多久。见文件头「为什么要缓存」。 */
+const TTL_MS = 6 * 60 * 60 * 1000
+
+export interface EngineVersionStore {
+  /** 拿一份。缓存还新鲜就直接给，`refresh` 为真时无视缓存重探。 */
+  get: (refresh?: boolean) => Promise<readonly EngineVersion[]>
+  /** 预热。应用起来之后跑一次，让设置面板**打开就有**。失败不出声。 */
+  warm: () => void
+}
+
+/**
+ * 探测结果的缓存。
+ *
+ * **状态显式装在这个对象里**，不挂模块级变量（见 AGENTS.md 反模式 2）。
+ * `inflight` 是必须的：预热和用户手动打开可能撞在一起，
+ * 没有它就会同时跑两遍 `npm view`。
+ */
+export function createEngineVersions(log: Logger): EngineVersionStore {
+  let cached: { at: number; list: readonly EngineVersion[] } | undefined
+  let inflight: Promise<readonly EngineVersion[]> | undefined
+
+  const probeAll = async (): Promise<readonly EngineVersion[]> => {
+    const out: EngineVersion[] = []
+    for (const [engine, how] of Object.entries(KNOWN)) {
+      const installed = await versionOf(how.bin)
+      if (installed === undefined) continue
+      const latest = await latestOf(how.pkg)
+      const stale = latest !== undefined && compare(installed, latest) < 0
+      if (stale) log.write("info", "engines", `${engine} 有新版：${installed} → ${latest}`)
+      out.push({
+        engine,
+        installed,
+        ...(latest === undefined ? {} : { latest }),
+        stale,
+        ...(stale ? { update: `npm i -g ${how.pkg}@latest` } : {}),
+      })
+    }
+    cached = { at: Date.now(), list: out }
+    return out
+  }
+
+  const get = async (refresh = false): Promise<readonly EngineVersion[]> => {
+    const at = cached
+    if (!refresh && at !== undefined && Date.now() - at.at < TTL_MS) return at.list
+    inflight ??= probeAll().finally(() => {
+      inflight = undefined
+    })
+    return inflight
+  }
+
+  return {
+    get,
+    warm: () => {
+      void get().catch(() => undefined)
+    },
+  }
+}
+
+export function installEngineVersionChannel(log: Logger, versions: EngineVersionStore): void {
   /**
    * 真的去更新。
    *
@@ -71,6 +139,8 @@ export function installEngineVersionChannel(log: Logger): void {
     const after = await versionOf(how.bin)
     const ok = after !== undefined && (before === undefined || compare(after, before) > 0)
     log.write(ok ? "info" : "error", "engines", `更新 ${engine}：${before ?? "?"} → ${after ?? "?"}`)
+    // 缓存里还写着「有新版」，不刷的话下次打开设置又劝你更新一遍
+    if (ok) versions.warm()
     return {
       ok,
       ...(before === undefined ? {} : { before }),
@@ -79,24 +149,7 @@ export function installEngineVersionChannel(log: Logger): void {
     }
   })
 
-  ipcMain.handle("omni:engineVersions", async () => {
-    const out: EngineVersion[] = []
-    for (const [engine, how] of Object.entries(KNOWN)) {
-      const installed = await versionOf(how.bin)
-      if (installed === undefined) continue
-      const latest = await latestOf(how.pkg)
-      const stale = latest !== undefined && compare(installed, latest) < 0
-      if (stale) log.write("info", "engines", `${engine} 有新版：${installed} → ${latest}`)
-      out.push({
-        engine,
-        installed,
-        ...(latest === undefined ? {} : { latest }),
-        stale,
-        ...(stale ? { update: `npm i -g ${how.pkg}@latest` } : {}),
-      })
-    }
-    return out
-  })
+  ipcMain.handle("omni:engineVersions", (_e, refresh?: boolean) => versions.get(refresh === true))
 }
 
 /** `codex --version` 打出来是 `codex-cli 0.145.0`，只取那串数字。 */

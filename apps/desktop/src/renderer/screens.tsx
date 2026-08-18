@@ -132,12 +132,15 @@ export function CompareScreen({
 export function SettingsScreen({
   prefs,
   engines,
+  cwd,
   onReveal,
   onCopy,
   onClose,
 }: {
   prefs: SettingsApi
   engines: readonly EngineInfo[]
+  /** 当前会话的工作区。「环境」那页要按它算项目级的钩子；没有会话时是 undefined。 */
+  cwd: string | undefined
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   onClose: () => void
@@ -154,6 +157,7 @@ export function SettingsScreen({
       engines={engines}
       version={info.version}
       dataDir={info.dataDir}
+      cwd={cwd}
       onPatch={prefs.patch}
       onClose={onClose}
       onReveal={onReveal}

@@ -4,7 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electro
 import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
 import { installProjectDocChannel } from "./projectdoc.js"
-import { installEngineVersionChannel } from "./enginever.js"
+import { createEngineVersions, installEngineVersionChannel } from "./enginever.js"
 import { installSelfUpdateChannel } from "./selfupdate.js"
 import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
@@ -20,6 +20,7 @@ import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { installReviewChannel } from "./workdiff.js"
 import { installSearchChannel } from "./search.js"
+import { installEnvChannel } from "./envconfig.js"
 import { loadBounds, trackBounds } from "./window-state.js"
 import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevReview, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
 import { quitNow, shouldStayOpen } from "./quit.js"
@@ -45,6 +46,12 @@ const crash = installCrashReporter(log)
  * 否则窗口会先按系统色画一下再跳成用户选的那套。
  */
 const settings = createSettings(log)
+
+/**
+ * 引擎版本的探测结果。**在这里建、显式传下去**，理由和 `settings` 一样：
+ * 它有状态（缓存），而这个仓库不允许状态挂在模块上。
+ */
+const engineVersions = createEngineVersions(log)
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
@@ -269,7 +276,8 @@ function installChannels(): void {
   installChatDirChannel()
   installAttachChannel()
   installProjectDocChannel()
-  installEngineVersionChannel(log)
+  installEngineVersionChannel(log, engineVersions)
+  installEnvChannel(log)
   installSelfUpdateChannel(log)
 }
 
@@ -292,6 +300,16 @@ function bootstrap(): Promise<void> {
     )
     // 背景检查只在配了 feed 时跑，而且**只在有新版本时才出声**
     if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)
+    /**
+     * 引擎版本预热。**为的是设置面板打开时不用等**——它原来是打开那一刻才去
+     * spawn `codex --version` + `npm view`，于是每次进设置都顿一下（见 `enginever.ts`）。
+     *
+     * 8 秒之后再跑：启动那几秒里主进程要探引擎、起宿主、重建全量，
+     * 这件事一点都不急。
+     */
+    setTimeout(() => {
+      engineVersions.warm()
+    }, 8000)
     installFind(() => BrowserWindow.getAllWindows())
     watchProcesses(log, () => BrowserWindow.getAllWindows())
     const attached = attachHost(() => BrowserWindow.getAllWindows(), log)

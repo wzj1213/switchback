@@ -74,6 +74,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
     <SettingsScreen
       prefs={prefs}
       engines={state.engines}
+      cwd={thread?.cwd}
       onReveal={app.reveal}
       onCopy={app.copy}
       onClose={() => {
@@ -160,7 +161,9 @@ export function App(): React.JSX.Element {
         }}
         rows={app.rows}
         onSelect={shell.select}
-        items={app.itemsOf(thread.id)}
+        /* **`app.items` 不是 `app.itemsOf(thread.id)`**：后者在空会话时每次
+           渲染都造一个新数组，而 `Transcript` 的 memo 认引用（见 `AppApi.items`） */
+        items={app.items}
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，

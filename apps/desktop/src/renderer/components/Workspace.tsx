@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice, ThreadRow } from "@omni/store"
@@ -86,12 +86,12 @@ function useDraft(draft: string | undefined): {
     filled.current = draft
     setPrefill((prev) => ({ text: draft, at: prev.at + 1 }))
   }, [draft])
-  return {
-    prefill,
-    reuse: (text) => {
-      setPrefill((prev) => ({ text, at: prev.at + 1 }))
-    },
-  }
+  // **必须 useCallback**：它一路传到 `Transcript`，而那块是 memo 的。
+  // 行内箭头每次渲染换身份，memo 立刻静默失效——和 `onResolve` 同一条理由
+  const reuse = useCallback((text: string) => {
+    setPrefill((prev) => ({ text, at: prev.at + 1 }))
+  }, [])
+  return { prefill, reuse }
 }
 
 /**

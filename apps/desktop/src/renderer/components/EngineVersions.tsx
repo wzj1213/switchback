@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import type { EngineVersion, UpdateResult } from "../../main/enginever.js"
-import { Field } from "./SettingsPanel.js"
+import { Field } from "./SettingsBits.js"
 
 /**
  * 各家引擎装的是哪版、有没有新版。
@@ -13,9 +13,19 @@ import { Field } from "./SettingsPanel.js"
  * 所以做到「主动检测 + 把命令给他 + 一键复制」为止。
  * 少按一次键换来的是「某天早上打开发现引擎自己换了版本、而且不认之前的登录」，
  * 那不是省事，是把一个他能控制的问题变成不能控制的。
+ *
+ * ## 版本是**问缓存**要的
+ *
+ * 主进程那边缓存 6 小时、启动后预热一次（见 `main/enginever.ts`）。原来这里
+ * 每挂载一次就 spawn 一次 `codex --version` 加一次 `npm view`——**每打开一次
+ * 设置面板顿一下**，而顿的原因和用户当时想做的事毫无关系。
+ * 想立刻重查的话，下面那颗「重新检查」会无视缓存。
  */
 export function EngineVersions(): React.JSX.Element {
-  const [list, setList] = useState<readonly EngineVersion[]>([])
+  // `undefined` = 还没回来；空数组 = 真的一个都没探到。**这两件事说的话不一样**——
+  // 原来共用一个空数组，于是「一个引擎都没装」的机器上永远停在「正在看…」
+  const [list, setList] = useState<readonly EngineVersion[] | undefined>(undefined)
+  const [checking, setChecking] = useState(false)
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
   useEffect(() => {
@@ -28,18 +38,38 @@ export function EngineVersions(): React.JSX.Element {
     }
   }, [bridge])
 
-  if (list.length === 0) return <p className="set__hint">正在看各家引擎的版本…</p>
   return (
     <>
-      {list.map((v) => (
+      {list === undefined ? <p className="set__blank">正在看各家引擎的版本…</p> : null}
+      {list?.length === 0 ? (
+        <p className="set__blank">没探到 omni 认得的引擎。这份清单只收验过更新路径的那几家（现在是 codex）。</p>
+      ) : null}
+      {(list ?? []).map((v) => (
         <EngineRow
           key={v.engine}
           v={v}
           onDone={(next) => {
-            setList((prev) => prev.map((x) => (x.engine === next.engine ? next : x)))
+            setList((prev) => (prev ?? []).map((x) => (x.engine === next.engine ? next : x)))
           }}
         />
       ))}
+      <div className="set__act">
+        <button
+          type="button"
+          className="tbtn"
+          disabled={checking}
+          title="无视缓存，重新问一遍 npm"
+          onClick={() => {
+            setChecking(true)
+            void bridge?.engineVersions(true).then((v) => {
+              setList(v)
+              setChecking(false)
+            })
+          }}
+        >
+          {checking ? "正在查…" : "重新检查"}
+        </button>
+      </div>
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { accountOf, foreignByEngine, itemsOf, limitsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
 import type { Item } from "@omni/protocol"
 import type { Command, EngineThread, RateLimits, Thread } from "@omni/protocol"
@@ -7,7 +7,8 @@ import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
 import { useWorkspaceActions } from "./useWorkspaceActions.js"
-import { learnFrom, openWith } from "./newThreadPrefs.js"
+import { openWith } from "./newThreadPrefs.js"
+import { useSend } from "./useSend.js"
 
 /**
  * 把 `App` 需要的一切收在一处。
@@ -53,6 +54,14 @@ export interface AppApi {
   /** 侧栏「新建会话」：有当前会话就用它的目录，没有就先问路径。 */
   newHere: () => void
   itemsOf: (threadId: string) => readonly Item[]
+  /**
+   * 当前会话的条目。**和 `itemsOf(thread.id)` 的区别只有一个：引用稳定。**
+   *
+   * `itemsOf` 在没有条目时回的是现造的 `[]`，每次渲染都是新的一个——
+   * 而 `Transcript` 的 memo 认引用。空会话正是最常打开设置的那一刻（刚开一条新的），
+   * 所以这一处不能将就。
+   */
+  items: readonly Item[]
   /** 报过历史的每一家，各一段。 */
   foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
   /** 把某一家那边的一条会话接过来，接完跳过去。 */
@@ -60,6 +69,9 @@ export interface AppApi {
   /** 底部那一行：登录的是谁、还剩多少额度。 */
   account: AccountLine | undefined
 }
+
+/** 没有会话时那份空条目。**同一个引用**，理由见 `AppApi.items`。 */
+const EMPTY_ITEMS: readonly Item[] = []
 
 export function useApp(): AppApi {
   const omni = useOmni()
@@ -104,25 +116,14 @@ export function useApp(): AppApi {
   // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
   const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
+  const items = useMemo(
+    () => (thread === undefined ? EMPTY_ITEMS : itemsOf(omni.state, thread.id)),
+    [omni.state, thread],
+  )
 
-  /**
-   * 命令的出口，顺路记下**下次新会话开成什么样**。
-   *
-   * 挂在发消息这一刻，是因为「挑好了引擎和模型，然后真的发出去」才是一次表态；
-   * 光点开下拉看看不算——那可能只是在翻有哪些模型。剩下那半条规则
-   *（同一条会话第二次发就不再记）在 `learnFrom` 里，两边共用同一份判断。
-   *
-   * 包在这里而不是输入框里：排队补发、`/` 面板、快捷键都从这条路出去，
-   * 挂在输入框上会漏掉其余几条。
-   */
-  const send = (command: Command): void => {
-    if (command.type === "thread.prompt") {
-      const target = rows.find((r) => r.thread.id === command.threadId)?.thread
-      const next = target === undefined ? undefined : learnFrom(prefs.settings.lastUsed, target)
-      if (next !== undefined) prefs.patch({ lastUsed: next })
-    }
-    omni.send(command)
-  }
+  // 出口收在 `useSend` 里：它必须引用稳定，而**那条约束不属于「接线」这件事**——
+  // 理由（以及它曾经怎么静默地废掉一整条 memo 链）写在那个文件开头
+  const send = useSend(omni.send, { rows, lastUsed: prefs.settings.lastUsed, patch: prefs.patch })
 
   const { open, openChat, openPicker } = useWorkspaceActions({
     state: omni.state,
@@ -188,6 +189,7 @@ export function useApp(): AppApi {
       else open(thread.cwd)
     },
     itemsOf: (threadId) => itemsOf(omni.state, threadId),
+    items,
     foreign: foreignByEngine(omni.state),
     adopt: (engine, item) => {
       // 和新建走同一条「记下序号、等 thread.started」的路（见上面那段注释），
