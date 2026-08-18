@@ -130,6 +130,11 @@ export default tseslint.config(
         self: "readonly",
         URL: "readonly",
         console: "readonly",
+        // 外壳缓存要用的那几样（`sw.js` 的 `install` / `fetch`）
+        caches: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        Promise: "readonly",
       },
     },
   },

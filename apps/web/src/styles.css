@@ -378,6 +378,50 @@ textarea {
   white-space: nowrap;
 }
 
+/*
+ * 基线在路上时占的位。
+ *
+ * **和真实行同高**（`.row` 的 `min-height` + 同一份 padding），
+ * 所以全量到达那一刻列表不会整块往下跳——那一跳本身就像「卡了一下」。
+ * 呼吸动画只是说明「在动」，不表示进度：进度我们并不知道。
+ */
+.row--skeleton {
+  cursor: default;
+}
+
+.dot--skeleton,
+.skel {
+  background: var(--line);
+  border-radius: var(--radius-sm);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+.skel {
+  display: block;
+  height: 12px;
+}
+
+.skel--title {
+  width: 45%;
+  margin-top: 3px;
+}
+
+.skel--sub {
+  width: 28%;
+  height: 10px;
+  margin-top: 6px;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .row__count {
   color: var(--text-faint);
   font-size: var(--text-sm);

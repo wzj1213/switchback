@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { memo, useMemo, useState } from "react"
 import type { ToolCallItem, ToolDetail } from "@omni/protocol"
 
 /**
@@ -33,6 +33,20 @@ function titleOf(detail: ToolDetail): string {
   }
 }
 
+/**
+ * 展开之后**有没有**东西可看。
+ *
+ * 和 `bodyOf` 分开是因为这一问每次渲染都要答（它决定那个箭头给不给按），
+ * 而 `bodyOf` 对一次多文件编辑要把所有 diff 拼成一个字符串——
+ * **折叠着也拼**。一条工具行不展开时，那份字符串没有任何人看。
+ */
+function hasBody(detail: ToolDetail): boolean {
+  if (detail.kind === "shell") return detail.output !== undefined
+  if (detail.kind === "file_edit") return detail.files.length > 0
+  if (detail.kind === "other") return detail.output !== undefined
+  return false
+}
+
 /** 展开之后有什么可看。没有就不给「展开」这个动作——**一个点了没反应的箭头比没有箭头糟**。 */
 function bodyOf(detail: ToolDetail): string | undefined {
   if (detail.kind === "shell") return detail.output
@@ -44,9 +58,18 @@ function bodyOf(detail: ToolDetail): string | undefined {
   return undefined
 }
 
-export function ToolRow({ item }: { item: ToolCallItem }): React.JSX.Element {
+/**
+ * **包了 `memo` 且正文按需算。** 工具行是手机上数量最多的一类 item，
+ * 而它绝大多数时候是折叠的——上一版每一帧都把所有 diff 拼一遍字符串给
+ * 一个没人看的折叠行。流式期间那是每秒六十次。
+ */
+export const ToolRow = memo(function ToolRow({ item }: { item: ToolCallItem }): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const body = bodyOf(item.detail)
+  const detail = item.detail
+  const can = hasBody(detail)
+  // **只有真的展开了才拼。** 折叠着的时候 `body` 是 undefined，而箭头给不给按
+  // 由上面那个便宜的 `can` 决定
+  const body = useMemo(() => (open ? bodyOf(detail) : undefined), [open, detail])
   const title = titleOf(item.detail)
 
   return (
@@ -54,8 +77,8 @@ export function ToolRow({ item }: { item: ToolCallItem }): React.JSX.Element {
       <button
         className="tool__head"
         type="button"
-        disabled={body === undefined}
-        aria-expanded={body === undefined ? undefined : open}
+        disabled={!can}
+        aria-expanded={can ? open : undefined}
         onClick={() => {
           setOpen(!open)
         }}
@@ -74,4 +97,4 @@ export function ToolRow({ item }: { item: ToolCallItem }): React.JSX.Element {
       {open && body !== undefined ? <pre className="tool__body">{body}</pre> : null}
     </div>
   )
-}
+})

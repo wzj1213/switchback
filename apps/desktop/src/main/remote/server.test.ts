@@ -52,6 +52,7 @@ async function boot(options: BootOptions = {}): Promise<Harness> {
   if (options.webRoot === true) {
     mkdirSync(join(dir, "assets"), { recursive: true })
     // 够大才压得到（阈值 1024）
+    writeFileSync(join(dir, "index.html"), "<!doctype html><title>omni</title>", "utf8")
     writeFileSync(join(dir, "assets", "big.js"), `// 巨大\n${"x".repeat(5000)}`, "utf8")
     writeFileSync(join(dir, "small.txt"), "短", "utf8")
     writeFileSync(join(dir, "pic.png"), Buffer.alloc(5000, 7))
@@ -358,6 +359,20 @@ describe("半开的连接", () => {
     }
     expect(h.sinks).toHaveLength(1)
     socket.close()
+  })
+})
+
+describe("找不到时怎么兜", () => {
+  it("**未知路径给 index.html**——单页应用的深链要能直接打开", async () => {
+    const h = await boot({ webRoot: true })
+    const res = await fetch(`${h.base}/thread/abc`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toContain("text/html")
+  })
+
+  it("**`/assets/` 下找不到就 404，绝不兜给 index.html**——兜的后果是一份 content-type 是 js 的 HTML：语法错误、整个应用白屏，而状态码是 200", async () => {
+    const h = await boot({ webRoot: true })
+    expect((await fetch(`${h.base}/assets/index-旧版本.js`)).status).toBe(404)
   })
 })
 

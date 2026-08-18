@@ -55,7 +55,12 @@ export function Thread({
       </header>
       <div className="thread__body" ref={scroller}>
         <div className="thread__inner" ref={inner}>
-          {items.length === 0 ? (
+          {items.length === 0 && !remote.loaded.has(thread.id) ? (
+            // **正文没到 ≠ 这条会话是空的。** 分级 replay 之后「正文晚一拍到」
+            // 是常态（全量只带最近几条的正文，其余打开时才补），
+            // 而说「还没有内容」是一句会让人以为记录丢了的假话
+            <p className="empty">正在取这条会话的内容…</p>
+          ) : items.length === 0 ? (
             <p className="empty">这条会话还没有内容。</p>
           ) : (
             items.map((item) => <ItemView key={item.id} item={item} send={remote.send} offline={offline} />)

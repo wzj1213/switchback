@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { memo, useState } from "react"
 import type { Command, Item, ToolCallItem } from "@omni/protocol"
 import { Markdown } from "./Markdown.js"
 import { Approval } from "./Approval.js"
@@ -28,7 +28,17 @@ function Reasoning({ text, complete }: { text: string; complete: boolean }): Rea
   )
 }
 
-export function ItemView({
+/**
+ * **包了 `memo`。** 流式期间宿主每 16ms 推一批，每批一次 `setState`——
+ * 不包的话，一条 80 条 item 的会话每帧都要把所有长回答重新过一遍
+ * react-markdown。桌面端那侧有实测数字：20 条消息一帧 30ms，帧预算的两倍；
+ * 而手机的单核大约是那台机器的三分之一。
+ *
+ * 它能生效靠的是归约器那边的引用稳定性：`patchItem` 只 `[...list]` 换掉命中
+ * 那一格，没变的 `Item` 保持同一个对象。所以**不需要自定义比较器**——
+ * 而自定义比较器一旦写错就是「界面停在旧内容上」，那比慢难查得多。
+ */
+export const ItemView = memo(function ItemView({
   item,
   send,
   offline,
@@ -71,4 +81,4 @@ export function ItemView({
       {item.message}
     </div>
   )
-}
+})

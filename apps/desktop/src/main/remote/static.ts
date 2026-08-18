@@ -134,7 +134,7 @@ export async function serveStatic(
     res.writeHead(400).end("bad path")
     return { ok: false, reason: `路径越界：${urlPath}` }
   }
-  const file = (await isFile(target)) ? target : await fallback(root)
+  const file = (await isFile(target)) ? target : await fallback(root, urlPath)
   if (file === undefined) {
     res.writeHead(404).end("not found")
     return { ok: false, reason: `找不到：${urlPath}` }
@@ -196,7 +196,18 @@ async function statOf(path: string): Promise<{ size: number; mtimeMs: number } |
   }
 }
 
-async function fallback(root: string): Promise<string | undefined> {
+/**
+ * 找不到时退回 `index.html`——**只对导航路由，不对资源**。
+ *
+ * 单页应用的深链（`/?thread=xxx` 那种）要能直接打开，所以未知路径给 index.html。
+ * 但 `/assets/` 下的东西**不能这么兜**：那里的文件名带内容哈希，
+ * 一次没命中就说明它真的不在了（换了包，而某个客户端手上还是旧的 index.html）。
+ * 兜给 index.html 的后果是浏览器拿到一份 `content-type: text/javascript` 的 HTML——
+ * **语法错误、整个应用白屏**，而 HTTP 状态码是 200，排查时一眼看不出问题在哪。
+ * 老老实实 404，浏览器才会去重新拉一份 index.html。
+ */
+async function fallback(root: string, urlPath: string): Promise<string | undefined> {
+  if (urlPath.startsWith("/assets/")) return undefined
   const index = join(root, "index.html")
   return (await isFile(index)) ? index : undefined
 }

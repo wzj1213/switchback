@@ -30,6 +30,21 @@ const ACK_EVERY_MS = 1000
 export interface Remote {
   state: ViewState
   conn: ConnState
+  /**
+   * 基线到了没有。
+   *
+   * **「还没到」和「真的是空的」必须分得开。** 分不开的代价是界面在基线
+   * 还在路上时说一句确定的假话（「还没有会话。到桌面上新建一条」），
+   * 而用户的反应是退出重开——重开会打断正在传的那份全量，回到起点。
+   */
+  hydrated: boolean
+  /**
+   * 这些会话的正文到手了。其余的要么还没打开过，要么正在路上。
+   *
+   * 来源两处：全量帧里的 `bodies`（宿主报的「这一份带了谁的正文」），
+   * 以及事后单独补的 `thread` 帧。
+   */
+  loaded: ReadonlySet<ThreadId>
   me: Me | undefined
   /**
    * 发一条命令。**返回有没有真的发出去。**
@@ -57,6 +72,8 @@ interface Refs {
 export function useRemote(token: string): Remote {
   const [state, setState] = useState<ViewState>(initial)
   const [conn, setConn] = useState<ConnState>({ kind: "connecting" })
+  const [hydrated, setHydrated] = useState(false)
+  const [loaded, setLoaded] = useState<ReadonlySet<ThreadId>>(() => new Set())
   const [me, setMe] = useState<Me | undefined>(undefined)
   const [notice, setNotice] = useState<string | undefined>(undefined)
   const refs = useRef<Refs>({ stream: initialStream, transport: undefined, ackTimer: undefined, watching: null })
@@ -81,10 +98,13 @@ export function useRemote(token: string): Remote {
   const onFrame = useCallback(
     (frame: ServerFrame): void => {
       if (frame.type === "events") {
+        // 能收增量说明宿主认了我手上的游标——也就是基线本来就在
+        setHydrated(true)
         advance(received(refs.current.stream, frame.sealed))
         return
       }
       if (frame.type === "catchup") {
+        setHydrated(true)
         // **补发要走 `resynced` 而不是 `received`**：后者在 catching 状态下
         // 只攒不应用，于是补回来的那一段也被攒起来，catching 永远解不开
         advance(resynced(refs.current.stream, frame.sealed))
@@ -95,20 +115,23 @@ export function useRemote(token: string): Remote {
         // 否则重连之后新旧两份历史会叠在一起
         setState(initial)
         advance(replayed({ ...refs.current.stream, lastSeq: undefined }, frame.replay))
+        setHydrated(true)
+        // **每来一份新全量就换一套**：新那份带的正文可能是另外几条
+        setLoaded(new Set(frame.replay.bodies ?? []))
         // 横幅说的是「刚刚发生了一件事」，那是时刻不是状态；重放会把历史上
         // 每一次引擎崩溃重新弹一遍
         setState(clearNotices)
         return
       }
       if (frame.type === "thread") {
-        // **只补自己没有的那些 item。**
+        // **把这条会话的正文整段换掉**（`reduceHistory` 是清空重建，不是「只补没有的」）。
         //
-        // 这是一份**历史快照**，不是「刚刚发生的一件事」。而在它读磁盘、
-        // 过隧道的这段时间里，同一条会话的 delta 照样在走常态那条路。
-        // 无条件应用的话，一条正在流的消息会被这份旧快照盖回去——
-        // 用户看到的是正文突然倒退几百个字，然后再也不动
-        //（那条 item 的后续 delta 仍然落在同一个 id 上，但内容已经错位）。
+        // 这是一份**历史快照**，而宿主发它之前已经 flush 过磁盘，所以它就是那一刻的全量；
+        // 读完之后新产生的照常从事件流上来，追加在后面，顺序自然是对的。
+        // 换而不是合，是因为合会把更早的历史追加在已经流过来的那几条**后面**——
+        // 转录区于是变成「最新的排在最前」，中间还夹着旧的。
         setState((prev) => reduceHistory(prev, frame.threadId, frame.events))
+        setLoaded((prev) => new Set(prev).add(frame.threadId))
         return
       }
       if (frame.type === "notice") {
@@ -148,7 +171,7 @@ export function useRemote(token: string): Remote {
     setNotice(undefined)
   }, [])
 
-  return { state, conn, me, send, watch, retry, notice, dismissNotice }
+  return { state, conn, hydrated, loaded, me, send, watch, retry, notice, dismissNotice }
 }
 
 /** 连接的生老病死。**单独一个 hook**：`useRemote` 已经贴着行数闸门。 */

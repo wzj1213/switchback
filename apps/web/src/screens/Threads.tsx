@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import type { Thread, ThreadId } from "@omni/protocol"
 import { itemsOf, threadRowsOf } from "@omni/store"
 import type { Remote } from "../useRemote.js"
@@ -28,6 +29,25 @@ function lastAt(items: readonly { at: number }[]): number {
   return items[items.length - 1]?.at ?? 0
 }
 
+/** 基线在路上时占的位。三行，和真实行同高——到货时不跳。 */
+function Skeleton(): React.JSX.Element {
+  return (
+    <ul className="threads__list" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <li key={i}>
+          <span className="row row--skeleton">
+            <span className="dot dot--skeleton" />
+            <span className="row__body">
+              <span className="skel skel--title" />
+              <span className="skel skel--sub" />
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function Threads({
   remote,
   selected,
@@ -41,12 +61,18 @@ export function Threads({
   onUnpair: () => void
   token: string
 }): React.JSX.Element {
-  const rows = [...threadRowsOf(remote.state)]
-    .filter((row) => row.thread.provisional !== true)
-    .sort((a, b) => {
-      const byRank = rank(a.thread) - rank(b.thread)
-      return byRank === 0 ? b.thread.updatedAt - a.thread.updatedAt : byRank
-    })
+  // **挂在 state 上算一次。** 不挂的话，后台某条会话刷屏时（宿主每 16ms 推一批，
+  // 每批一次 setState），前台这份列表跟着每帧重新过滤 + 重排一遍
+  const rows = useMemo(
+    () =>
+      [...threadRowsOf(remote.state)]
+        .filter((row) => row.thread.provisional !== true)
+        .sort((a, b) => {
+          const byRank = rank(a.thread) - rank(b.thread)
+          return byRank === 0 ? b.thread.updatedAt - a.thread.updatedAt : byRank
+        }),
+    [remote.state],
+  )
 
   return (
     <div className="threads">
@@ -56,7 +82,12 @@ export function Threads({
           解除配对
         </button>
       </header>
-      {rows.length === 0 ? (
+      {rows.length === 0 && !remote.hydrated ? (
+        // **基线还没到 ≠ 真的没有会话。** 说后者是一句确定的假话，
+        // 而用户的反应是退出重开——重开会打断正在传的那份全量，回到起点。
+        // 骨架还顺带给出高度，全量到达时列表不会整块跳一下
+        <Skeleton />
+      ) : rows.length === 0 ? (
         <p className="empty">还没有会话。到桌面上新建一条，这里就会出现。</p>
       ) : (
         <ul className="threads__list">
