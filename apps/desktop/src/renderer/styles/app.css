@@ -1077,6 +1077,14 @@ body {
 }
 
 /* ── 崩溃兜底 ─────────────────────────────────────── */
+/* 崩溃屏那两颗按钮。**不给间距的话它们会贴在一起**——而这一屏正是最不该
+   再多一处「看起来也坏了」的地方 */
+.crash__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
 .crash {
   display: flex;
   align-items: center;

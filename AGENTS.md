@@ -13,6 +13,7 @@
 | 模块级可变状态 | **禁止**（不得有顶层 `let` / `var`） | `eslint no-restricted-syntax` |
 | 跨包深引用 | **禁止**（只能 import 包的入口） | `eslint no-restricted-imports` + 包边界 |
 | 未声明依赖 | 禁止 | pnpm workspace + `pnpm arch` |
+| 组件用到的 class 没有任何 CSS 规则 | 禁止 | `pnpm check:css` |
 
 提交前 `pnpm check` 必须全绿（typecheck + lint + arch + test）。
 
