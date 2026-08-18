@@ -16,7 +16,7 @@ import type { Logger } from "./log.js"
  *
  * | 引擎 | 位置 | 形状 |
  * | --- | --- | --- |
- * | codex | `~/.codex/config.toml`、`<项目>/.codex/config.toml` | `[[hooks.事件]]` 套 `[[hooks.事件.hooks]]` |
+ * | codex | `~/.codex/{config.toml,hooks.json}`、`<项目>/.codex/{config.toml,hooks.json}` | toml 是 `[[hooks.事件]]` 套 `[[hooks.事件.hooks]]`；json 同 Claude |
  * | Kimi Code | `~/.kimi-code/config.toml` | **平表** `[[hooks]]`，事件写在条目上 |
  * | Grok | `~/.grok/{managed_config,config}.toml`、`<项目>/.grok/config.toml`、`<项目>/.grok/hooks/*.json` | 同 codex；JSON 那几份同 Claude |
  *
@@ -39,15 +39,32 @@ function homeOf(env: string, fallback: string): string {
 
 /* ── codex ───────────────────────────────────────────────────── */
 
+/**
+ * codex 的钩子**有两个窝**，缺一不可：
+ *
+ * - `config.toml` 里的 `[[hooks.事件]]`（项目里那份常用这个）
+ * - **`hooks.json` 一份独立的文件**（家目录那份常用这个，形状和 Claude 一样）
+ *
+ * 只读前者的下场实测过：codex 自己的界面显示「用户配置 6 个钩子」，
+ * omni 这边一个都没有——那 6 条全写在 `~/.codex/hooks.json` 里。
+ * 「配了没生效」本来就是这一页要回答的问题，而它自己漏看了一半。
+ */
 export async function codexSources(cwd: string | undefined, log: Logger): Promise<readonly HookSource[]> {
-  const userPath = join(homeOf("CODEX_HOME", ".codex"), "config.toml")
-  const user = await readToml(userPath, log)
-  // 审过的那些记在**用户那一份**里，项目那份的信任状态也要问它
+  const home = homeOf("CODEX_HOME", ".codex")
+  const userToml = join(home, "config.toml")
+  const user = await readToml(userToml, log)
+  // 审过的那些记在**用户的 config.toml** 里（`[hooks.state]`），
+  // 另外三份的信任状态也都要问它
   const trusted = trustedKeys(user.value)
-  const out = [codexSource("user", userPath, user, trusted)]
+  const out = [
+    codexSource("user", userToml, user, trusted),
+    codexSource("user", join(home, "hooks.json"), await readJson(join(home, "hooks.json")), trusted),
+  ]
   if (cwd !== undefined) {
-    const path = join(cwd, ".codex", "config.toml")
-    out.push(codexSource("project", path, await readToml(path, log), trusted))
+    const toml = join(cwd, ".codex", "config.toml")
+    const json = join(cwd, ".codex", "hooks.json")
+    out.push(codexSource("project", toml, await readToml(toml, log), trusted))
+    out.push(codexSource("project", json, await readJson(json), trusted))
   }
   return out
 }
@@ -58,7 +75,9 @@ function codexSource(scope: HookScope, path: string, read: Read, trusted: Readon
     scope,
     path,
     exists: read.exists,
-    hooks: hookLines(hooksOf(read.value), (event, group, index) =>
+    // `hooks.json` 整份就是 `{ "hooks": {...} }`，config.toml 是 `[hooks]` 那一节，
+    // 两者取出来是同一个形状；再兜一层「整份就是那张表」的写法
+    hooks: hookLines(hooksOf(read.value) ?? read.value, (event, group, index) =>
       trusted.has(trustKeyOf(path, event, group, index)) ? "trusted" : "pending",
     ),
     ...(read.error === undefined ? {} : { error: read.error }),

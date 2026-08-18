@@ -57,7 +57,7 @@ export function installEnvChannel(log: Logger): void {
       ...(await kimiSources(log)),
       ...(await grokSources(cwd, log)),
     ]
-    const sources = [...claude.sources, ...rest].sort(order)
+    const sources = dedupe([...claude.sources, ...rest].sort(order))
     shown.clear()
     for (const s of sources) shown.add(s.path)
     return {
@@ -71,6 +71,24 @@ export function installEnvChannel(log: Logger): void {
   ipcMain.on("omni:openEnvFile", (_e, path: string) => {
     // 用系统默认编辑器打开，不自己做一个配置界面——理由和 `engines.json` 那条一样
     if (shown.has(path)) void shell.openPath(path)
+  })
+}
+
+/**
+ * 同一份文件只留一条。
+ *
+ * **在家目录里开会话时，「项目配置」和「用户配置」指的是同一个文件**
+ *（`~/.codex/config.toml` 既是家目录那份、又是 `<cwd>/.codex/config.toml`）。
+ * 不去重的话那一份会被列两遍、钩子也数两遍——实测在 `/Users/you` 里开的会话上
+ * Claude 那一栏因此翻了一倍。排序在前的（层级更靠上的）留下。
+ */
+function dedupe(sources: readonly HookSource[]): readonly HookSource[] {
+  const seen = new Set<string>()
+  return sources.filter((s) => {
+    const key = `${s.engine}\u0000${s.path}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
   })
 }
 

@@ -190,6 +190,45 @@ describe("环境配置", () => {
     expect(dir?.exists).toBe(false)
   })
 
+
+  it("codex 的钩子还有另一个窝：~/.codex/hooks.json——只读 config.toml 会漏掉全部", async () => {
+    write(
+      join(state.home, "hooks.json"),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [{ hooks: [{ type: "command", command: "python3 report.py", timeout: 10 }] }],
+          PreToolUse: [{ matcher: "Bash", hooks: [{ command: "python3 guard.py" }] }],
+        },
+      }),
+    )
+    // 只审过 SessionStart 那条，PreToolUse 还没——**键是蛇形的**
+    write(
+      join(state.home, "config.toml"),
+      `[hooks.state]\n[hooks.state."${join(state.home, "hooks.json")}:session_start:0:0"]\n` +
+        `trusted_hash = "sha256:abc"\n`,
+    )
+    const env = await ask(state.cwd)
+    const source = env.sources.find((s) => s.path.endsWith(".codex-home/hooks.json") || s.path === join(state.home, "hooks.json"))
+    expect(source?.hooks).toEqual([
+      { event: "SessionStart", command: "python3 report.py", timeout: 10, trust: "trusted" },
+      { event: "PreToolUse", command: "python3 guard.py", matcher: "Bash", trust: "pending" },
+    ])
+  })
+
+  it("在家目录里开的会话：同一份文件不该被列两遍", async () => {
+    // 家目录里开会话时 `<cwd>/.codex/config.toml` 就是 `~/.codex/config.toml` 本身
+    process.env["CODEX_HOME"] = join(state.cwd, ".codex")
+    write(
+      join(state.cwd, ".codex", "config.toml"),
+      `[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ncommand = "sh x.sh"\n`,
+    )
+    const env = await ask(state.cwd)
+    const codex = env.sources.filter((s) => s.engine === "codex")
+    const paths = codex.map((s) => s.path)
+    expect(new Set(paths).size).toBe(paths.length)
+    expect(codex.filter((s) => s.hooks.length > 0)).toHaveLength(1)
+  })
+
   it("打开配置文件只认这一页发出去的路径——渲染层拿不到一个能打开任意文件的口子", async () => {
     const env = await ask(state.cwd)
     const known = env.sources[0]?.path ?? ""

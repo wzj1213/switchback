@@ -109,11 +109,27 @@ describe("hookLinesFlat", () => {
 })
 
 describe("trustKeyOf", () => {
-  it("和 codex 自己写下的那份 [hooks.state] 逐字对得上（事件名小写）", () => {
-    expect(trustKeyOf("/Users/w/p/.codex/config.toml", "Stop", 0, 0)).toBe(
-      "/Users/w/p/.codex/config.toml:stop:0:0",
-    )
-    expect(trustKeyOf("/a/config.toml", "PreToolUse", 2, 3)).toBe("/a/config.toml:pretooluse:2:3")
+  /**
+   * 键要和 codex 自己写下的那份 `[hooks.state]` **逐字**对得上。
+   * 事件名是**蛇形小写**——`Stop` 这个样本两种写法一样，正是它让
+   * 最初那版 `toLowerCase()` 看起来是对的（见 `trustKeyOf` 的注释）。
+   */
+  const table: readonly [string, string, string][] = [
+    ["Stop", "/a/.codex/config.toml", "/a/.codex/config.toml:stop:0:0"],
+    ["PreToolUse", "/a/.codex/hooks.json", "/a/.codex/hooks.json:pre_tool_use:0:0"],
+    ["PostToolUse", "/a/h.json", "/a/h.json:post_tool_use:0:0"],
+    ["UserPromptSubmit", "/a/h.json", "/a/h.json:user_prompt_submit:0:0"],
+    ["SessionEnd", "/a/h.json", "/a/h.json:session_end:0:0"],
+    // 已经是蛇形的原样留着，别再切一刀
+    ["session_start", "/a/h.json", "/a/h.json:session_start:0:0"],
+  ]
+  for (const [event, path, want] of table) {
+    it(`${event} → ${want.split(":")[1] ?? ""}`, () => {
+      expect(trustKeyOf(path, event, 0, 0)).toBe(want)
+    })
+  }
+  it("组下标与条目下标照原样带上", () => {
+    expect(trustKeyOf("/a/h.json", "PreToolUse", 2, 3)).toBe("/a/h.json:pre_tool_use:2:3")
   })
 })
 

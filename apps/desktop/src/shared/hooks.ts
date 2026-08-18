@@ -163,11 +163,21 @@ export function hookLinesFlat(raw: unknown): readonly HookLine[] {
 /**
  * codex 信任表里的键。
  *
- * 形如 `/path/.codex/config.toml:stop:0:0`——文件路径、**小写**事件名、
- * 组下标、条目下标。这是从 codex 自己写下的那份 `[hooks.state]` 里反出来的格式。
+ * 形如 `/path/.codex/hooks.json:pre_tool_use:0:0`——文件路径、**蛇形小写**的事件名、
+ * 组下标、条目下标。格式是从 codex 自己写下的那份 `[hooks.state]` 反出来的。
+ *
+ * **蛇形这一步不能省。** 一开始写的是 `toLowerCase()`，样本恰好是 `Stop`
+ *（单个词，两种写法一样），于是它看起来是对的；直到遇上 `PreToolUse` 才露馅——
+ * `pretooluse` 在信任表里永远查不到，界面会把一条早就审过的钩子标成「待审核」。
+ * 「用一个正好分不出对错的样本验收」是这类 bug 的标准出场方式。
  */
 export function trustKeyOf(path: string, event: string, group: number, index: number): string {
-  return `${path}:${event.toLowerCase()}:${String(group)}:${String(index)}`
+  return `${path}:${snake(event)}:${String(group)}:${String(index)}`
+}
+
+/** `PreToolUse` → `pre_tool_use`。已经是蛇形/单词的原样小写。 */
+function snake(event: string): string {
+  return event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()
 }
 
 /**
