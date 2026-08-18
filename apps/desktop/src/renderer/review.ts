@@ -108,10 +108,28 @@ export function splitRows(lines: readonly NumberedLine[]): readonly SplitRow[] {
  * 文件清单的过滤。**匹配整条相对路径**，不只是文件名——
  * 输入 `src/main` 要能筛出一个目录下的全部改动，那是审核时最常做的动作。
  */
-export function filterFiles(files: readonly ReviewFile[], query: string): readonly ReviewFile[] {
+export function filterFiles(
+  files: readonly ReviewFile[],
+  query: string,
+  untracked = true,
+): readonly ReviewFile[] {
   const q = query.trim().toLowerCase()
-  if (q === "") return files
-  return files.filter((f) => f.rel.toLowerCase().includes(q))
+  const kept = untracked ? files : files.filter((f) => f.kind !== "untracked")
+  if (q === "") return kept
+  return kept.filter((f) => f.rel.toLowerCase().includes(q))
+}
+
+/**
+ * 未跟踪的有几个。
+ *
+ * **单独给一个数**，因为它常常是这份清单里最不需要看的那一大坨：
+ * 生成出来的图、导出的产物、还没进 .gitignore 的中间文件——它们确实是
+ * 「工作区里变了的东西」，但和「我这次要不要提交」基本无关。
+ * 而它们又不能默认藏起来：agent 新建的源文件也是未跟踪的，那正是最该看的。
+ * 所以给一个能关的开关，而不是替他决定。
+ */
+export function untrackedCount(files: readonly ReviewFile[]): number {
+  return files.filter((f) => f.kind === "untracked").length
 }
 
 export function tallyReview(files: readonly ReviewFile[]): { added: number; removed: number } {

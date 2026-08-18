@@ -46,5 +46,36 @@ export const LOOSENESS: Readonly<Record<WireSandbox, number>> = {
   "danger-full-access": 2,
 }
 
-/** `untrusted` 把最多的请求路由给客户端，和 Claude 钉死 `default` 是同一个用意。 */
-export const POLICY: WireApprovalPolicy = "untrusted"
+/**
+ * ## 审批策略：**除了只读档，都让 codex 自己判**
+ *
+ * 原来这里钉死 `untrusted`——「把最多的请求路由给客户端」，也就是让 codex
+ * 什么都问上来、再由 omni 的判定器裁决。听起来更安全，实际是这样：
+ *
+ * - 你在终端里跑 codex，同一条命令它自己就过了；在 omni 里却被拦下来问你。
+ *   **同一个引擎、同一条命令、两种行为**，而 omni 的产品前提是「引擎原生」。
+ * - 「引擎自动」这一档的界面原话是「**什么算安全由引擎自己判**」——
+ *   而实现是 omni 判。界面说的话和代码做的事对不上，这本身就是 bug。
+ * - 后果不是更安全，是更不安全：`zsh -lc '… | python3 -c …'` 这种日常命令
+ *   每条都弹一张卡（静态判不出 → `unparseable-command` 红线），人一天点几十次，
+ *   点到最后是**闭着眼睛点**——那时候真正该拦的那一张也一起过去了。
+ *
+ * 现在的分法，判据是「谁有资格决定问不问」：
+ *
+ * | 档位        | policy       | 谁在判                                              |
+ * | ----------- | ------------ | --------------------------------------------------- |
+ * | `read-only` | `untrusted`  | **omni**。只读是 omni 的承诺，它必须看见每一次动作才拒得住 |
+ * | `auto-edit` | `on-request` | **引擎**。它想升权时才问；问上来的那些再过 omni 的判定与红线 |
+ * | `full`      | `on-request` | 同上，但 omni 的 `full` 判定几乎都放行，所以你基本看不到卡  |
+ *
+ * `full` **不用 `never`**：那样 codex 连问都不问，一条被沙箱挡住的操作
+ * 就只能直接失败，而不是「问一句然后放行」。少弹一张卡换来一次说不清的失败，不划算。
+ *
+ * 代价说明白：omni 看不见的动作，omni 的红线也管不住它。这一档的纵深从
+ *「沙箱 + 引擎 + omni」变成「沙箱 + 引擎」——这是「引擎原生」这个前提的必然代价。
+ */
+export const POLICY: Readonly<Record<Trust, WireApprovalPolicy>> = {
+  "read-only": "untrusted",
+  "auto-edit": "on-request",
+  full: "on-request",
+}

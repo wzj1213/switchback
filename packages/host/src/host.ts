@@ -4,7 +4,7 @@ import { clearQueue, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { adopt, create, remove, rename, resume, setModel, setTrust } from "./session.js"
 import { fork, handoff, rewind } from "./branch.js"
-import { prompt, recordSegment } from "./prompt.js"
+import { prompt, recordSegment, steerQueued } from "./prompt.js"
 
 export type { HostDeps } from "./deps.js"
 
@@ -63,6 +63,7 @@ const HANDLERS: Handlers = {
     if (entry?.session.compact === undefined) return
     await entry.session.compact()
   },
+  "thread.steerQueued": steerQueued,
   "thread.unqueue": (ctx, command) => {
     const entry = ctx.live.get(command.threadId)
     if (entry !== undefined && entry.queued.length > 0) clearQueue(ctx, entry)

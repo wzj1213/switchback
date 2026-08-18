@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { reviewLabel, type ReviewFile } from "../../shared/review.js"
-import { filterFiles, tallyReview, useReview, usePatch } from "../review.js"
+import { filterFiles, tallyReview, untrackedCount, useReview, usePatch } from "../review.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { reveal, revealable } from "../reveal.js"
 import { ReviewList } from "./ReviewList.js"
 import { ReviewDiff } from "./ReviewDiff.js"
+import { Tools } from "./ReviewTools.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 
 /**
@@ -26,12 +27,6 @@ import { CopyIcon, RevealIcon } from "./icons.js"
  * **不交给另一家引擎去审。** 那要为 agent 之间发明一套自制协议，是个无底洞
  *（见 `AGENTS.md` 的边界）。要另一双眼睛的话，把路径给它、让它自己读就行。
  */
-
-const CONTEXT = [
-  { n: 3, label: "3 行" },
-  { n: 12, label: "12 行" },
-  { n: 9999, label: "整个文件" },
-] as const
 
 /** 头上那行字。**「没有改动」和「不是 git 仓库」要说不同的话**——后者不是干净，是没法比。 */
 function summary(noRepo: boolean, count: number, added: number, removed: number): React.JSX.Element {
@@ -72,49 +67,6 @@ function useArrows(rels: readonly string[], active: string | undefined, onPick: 
       window.removeEventListener("keydown", onKey)
     }
   }, [rels, active, onPick])
-}
-
-/** 头上那排开关。抽出来是行数闸门，但它本来就是一组独立的东西。 */
-function Tools({ split, onSplit, context, onContext, onReload }: {
-  split: boolean
-  onSplit: (on: boolean) => void
-  context: number
-  onContext: (n: number) => void
-  onReload: () => void
-}): React.JSX.Element {
-  return (
-    <div className="rv__tools">
-      {([true, false] as const).map((on) => (
-        <button
-          key={String(on)}
-          type="button"
-          className={`rv__seg${split === on ? " rv__seg--on" : ""}`}
-          onClick={() => {
-            onSplit(on)
-          }}
-        >
-          {on ? "并排" : "单栏"}
-        </button>
-      ))}
-      <span className="rv__gap" />
-      {CONTEXT.map((c) => (
-        <button
-          key={c.n}
-          type="button"
-          className={`rv__seg${context === c.n ? " rv__seg--on" : ""}`}
-          title="上下文行数"
-          onClick={() => {
-            onContext(c.n)
-          }}
-        >
-          {c.label}
-        </button>
-      ))}
-      <button type="button" className="rv__seg" onClick={onReload} title="重新问一遍 git">
-        刷新
-      </button>
-    </div>
-  )
 }
 
 /**
@@ -161,7 +113,9 @@ export function Review({ cwd, stamp, onClose, onCopy }: {
   const [picked, setPicked] = useState<string | undefined>(undefined)
   const [split, setSplit] = useState(true)
   const [context, setContext] = useState<number>(3)
-  const files = useMemo(() => filterFiles(data.files, query), [data.files, query])
+  const [untracked, setUntracked] = useState(true)
+  const files = useMemo(() => filterFiles(data.files, query, untracked), [data.files, query, untracked])
+  const untrackedN = untrackedCount(data.files)
   // 选中的那个被筛掉了（或者上一轮把它改回去了）就退回第一个——
   // 停在一个列表里已经没有的文件上，右边会一直是空的
   const active = files.some((f) => f.rel === picked) ? picked : files[0]?.rel
@@ -176,7 +130,14 @@ export function Review({ cwd, stamp, onClose, onCopy }: {
         <header className="rv__head">
           <h2 className="rv__title">审核</h2>
           {summary(data.noRepo, data.files.length, added, removed)}
-          <Tools split={split} onSplit={setSplit} context={context} onContext={setContext} onReload={data.reload} />
+          <Tools
+            split={split}
+            onSplit={setSplit}
+            context={context}
+            onContext={setContext}
+            onReload={data.reload}
+            {...(untrackedN === 0 ? {} : { untracked: { on: untracked, count: untrackedN, onToggle: setUntracked } })}
+          />
           <button type="button" className="rv__close" onClick={onClose} aria-label="关闭">
             ✕
           </button>

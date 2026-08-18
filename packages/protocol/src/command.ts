@@ -32,13 +32,42 @@ export type Command =
       model?: string
       effort?: string
     }
-  | { type: "thread.prompt"; threadId: ThreadId; text: string; attachments?: readonly string[] }
+  | {
+      type: "thread.prompt"
+      threadId: ThreadId
+      text: string
+      attachments?: readonly string[]
+      /**
+       * 上一轮还在跑时，**这句话要不要当场插进去**。
+       *
+       * 不给（默认）＝ 排队，等这一轮停了再发。给 `true` ＝ 递进正在跑的那一轮，
+       * 立刻生效（引擎得支持 `capabilities.steer`，不支持就退回排队）。
+       *
+       * ## 为什么默认是排队，而不是「能插就插」
+       *
+       * 上一版默认当场插——**和 codex 自己的行为正好相反**：你在它的界面里
+       * 打字回车，那句是排着的，要再点一下「调整方向」才插进去。
+       * 两边不一致的代价不是别扭，是**你以为在排队的那句话已经改变了它正在做的事**。
+       *
+       * 所以对齐：默认排队，插入是一个明确的动作（⌘⏎ 直接发，或者点排队条上的「立刻插入」）。
+       */
+      steer?: boolean
+    }
   | { type: "thread.interrupt"; threadId: ThreadId }
   /**
    * 撤回排着队还没发出去的话。**不动正在跑的那一轮**——
    * 「我改主意了，那句不用发了」和「停下」是两件事。
    */
   | { type: "thread.unqueue"; threadId: ThreadId }
+  /**
+   * 把排着队的话**现在就插进正在跑的那一轮**。
+   *
+   * 和「等这一轮跑完再发」是两条不同的路，而它们的差别恰恰在最要紧的场合上：
+   * 排着的那句往往是「别再往下走了」——等它跑完再说等于白说。
+   *
+   * 引擎不支持改向、或者那一轮刚好收工时，队列原样留着（下一轮自然会发）。
+   */
+  | { type: "thread.steerQueued"; threadId: ThreadId }
   /**
    * 压缩上下文：让引擎把前面的对话总结掉，腾出窗口继续。
    *

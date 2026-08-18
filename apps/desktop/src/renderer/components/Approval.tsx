@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { ApprovalItem, ItemId, RememberScope } from "@omni/protocol"
+import { ShieldIcon } from "./icons.js"
 
 /** 用户对一张审批卡的裁决。 */
 export type ResolveApproval = (
@@ -68,6 +69,37 @@ function More({ hint, onPick }: {
   )
 }
 
+/**
+ * 批完之后的那一行。
+ *
+ * ## 为什么终态不能继续长成一张卡
+ *
+ * 卡片的重量是给「**你现在要做个决定**」用的：带边框、带底色、带一颗近黑的主按钮。
+ * 而批完之后它变成了**历史**——和它上下那些工具行是同一类东西（发生过的事），
+ * 却比它们重一个数量级。一轮里批过三四次，整屏就成了一摞盒子加几团黑，
+ * 而真正需要你看的那张待批卡混在里面反而不显眼了。
+ *
+ * 所以终态退回和 `.step` 一样的语言：一行、无边框、灰字、命令截断。
+ * **「已拒绝」标红，「已允许」不标绿**——放行是常态，把常态染成彩色只是噪声；
+ * 拒绝少见且值得一眼看到（这条和「可恢复的错误只给一行灰字」是同一把尺）。
+ *
+ * 拦下来的理由挂在 `title` 上：它在做决定时是主角，事后是脚注。
+ */
+function Settled({ item }: { item: ApprovalItem }): React.JSX.Element {
+  const denied = item.status === "denied"
+  return (
+    <div className="approval--done" title={item.reason}>
+      <span className="approval__mark" aria-hidden="true">
+        <ShieldIcon size={13} />
+      </span>
+      <span className={`approval__verdict${denied ? " approval__verdict--no" : ""}`}>
+        {denied ? "已拒绝" : "已允许"}
+      </span>
+      <code className="approval__done-cmd">{item.summary}</code>
+    </div>
+  )
+}
+
 export function Approval({
   item,
   onResolve,
@@ -117,19 +149,25 @@ export function Approval({
     onResolve(item.id, allow, scope, passTurn)
   }
 
+  // 批完了就不再是一张卡。理由见 `Settled`
+  if (settled) return <Settled item={item} />
+
   return (
     <div className="approval">
       <div className="approval__body">
-        {/* 命令原文走等宽：**它是要被读准的东西**，比例字体下 l/1/I 分不清——
-            同一条道理在工具行的路径上已经写过一遍 */}
-        <div className="approval__title">
-          <span className="approval__label">需要确认</span>
-          <code className="approval__cmd">{item.summary}</code>
+        {/* 抬头只说「轮到你了」，一行小字。**要做的那件事不写在这里**——
+            它是命令原文，值得自己一块地方（下面那块），混在标签后面会被读漏 */}
+        <div className="approval__head">
+          <span className="approval__mark" aria-hidden="true">
+            <ShieldIcon size={13} />
+          </span>
+          需要你确认
         </div>
-        <div className="approval__detail">
-          <span className="approval__label">原因</span>
-          <span className="approval__reason">{item.reason}</span>
-        </div>
+        {/* 命令原文走等宽、单独一块底色：**它是要被读准的东西**，比例字体下
+            l/1/I 分不清；和界面文字挤在一行时，人会顺着句子读过去而不是逐字读它。
+            同一条道理在工具行的路径、环境页的钩子命令上都写过一遍 */}
+        <code className="approval__cmd">{item.summary}</code>
+        <div className="approval__reason">{item.reason}</div>
       </div>
       <div className="approval__actions">
         {/* 「始终允许」只在判定器给得出可记忆规则时出现——给不出的时候

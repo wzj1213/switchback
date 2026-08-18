@@ -84,7 +84,8 @@ interface Props {
   prefill?: { text: string; at: number }
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
-  onSend: (text: string, attachments: readonly string[]) => void
+  /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */
+  onSend: (text: string, attachments: readonly string[], steer: boolean) => void
   /** 让这个历史会话重新接上引擎 */
   onResume: () => void
 }
@@ -106,7 +107,11 @@ function stateOf(o: { detached: boolean; starting: boolean; busy: boolean; canSt
     // 以及**引擎还没起来**——后者不禁的话，回车会先清空输入框、
     // 再撞上宿主那句「会话不存在」，打好的一句话就这么没了
     blocked: o.detached || o.starting,
-    queueing: running && !o.canSteer,
+    // **默认排队，不管引擎会不会 steer。** 上一版是「能插就插」，
+    // 和 codex 自己的行为正好相反（那边打字回车也是排着的）。
+    // `steering` 现在的意思变成「这一条会话**能**当场插入」——
+    // 它决定的是提示语和「立刻插入」那颗按钮出不出现，不是默认走哪条路
+    queueing: running,
     steering: running && o.canSteer,
   }
 }
@@ -156,12 +161,13 @@ export function Composer({
   }, [prefill])
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
   const { blocked, queueing, steering } = stateOf({ detached, starting, busy, canSteer })
-  const submit = (): void => {
+  const submit = (steer = false): void => {
     const trimmed = text.trim()
     // **只有附件、没有文字也该能发**：贴一张报错截图问「这是怎么回事」，
     // 那句话经常就在图里
     if ((trimmed === "" && attach.paths.length === 0) || blocked) return
-    onSend(trimmed, attach.paths)
+    // 没在跑的时候 `steer` 没有意义（下面那层会照常开新轮次），传过去也无害
+    onSend(trimmed, attach.paths, steer && steering)
     setText("")
     attach.clear()
   }

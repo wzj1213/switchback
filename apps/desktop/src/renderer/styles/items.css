@@ -181,10 +181,23 @@
   opacity: 0.85;
 }
 
-/* ── 审批卡：整个产品的关键界面 ──────────────────────────── */
+/* ── 审批卡：整个产品的关键界面 ────────────────────────────
+ *
+ * 上一版是一个四边同重的方盒子（`--border-strong` 一圈 + 抬起的底色），
+ * 于是它在转录区里像**一块贴上去的补丁**：周围全是无边框的行，只有它带框。
+ * 现在换成「左侧一道琥珀色轨」的告示形制——
+ *
+ * - **左轨才是那句「轮到你了」**：颜色只出现在一条 3px 的边上，
+ *   比整圈描边安静，但因为是这一屏唯一的暖色，反而更抓得住眼。
+ *   同一个 `--warn` 在环境页标「待审核」，两处说的是同一件事。
+ * - 其余三边退到 `--border`（分节线那一档），不再和区块边界抢。
+ *
+ * 待批的这张仍然是全屏最重的东西；批完之后整张退成一行（见 `.approval--done`）。
+ */
 .approval {
   container-type: inline-size;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
   border-radius: var(--radius);
   background: var(--bg-raised);
 }
@@ -197,44 +210,41 @@
 .approval__body {
   max-height: 220px;
   overflow-y: auto;
-  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) 0;
 }
 
-.approval__title {
+/* 抬头：一行小字 + 一枚盾。**不带感叹号也不加粗**——左轨已经在喊了 */
+.approval__head {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
+  align-items: center;
+  gap: 6px;
   margin-bottom: var(--sp-2);
-  /* 写死字号：不写的话「需要确认」在这里是 14px、在下面那行「原因」是 13px，
-     同一张卡上同一个标签两个号 */
-  font-size: var(--text-sm);
+  color: var(--warn);
+  font-size: var(--text-xs);
 }
 
-/* 字重 500 不是 600：等宽 + 满色已经说清了这是主语，
-   600 的等宽在这个字号上偏糊 */
+/* 命令原文自成一块。字重回到常规：**底色已经把它和界面文字分开了**，
+   再加粗只是把同一件事说两遍（上一版是 500 + 无底色） */
 .approval__cmd {
+  display: block;
   min-width: 0;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: var(--text-base);
-  font-weight: 500;
+  font-size: var(--text-code);
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
-.approval__detail {
-  display: flex;
-  gap: var(--sp-2);
-  font-size: var(--text-sm);
-}
-
-/* 「原因」带标签：让人一眼分得清哪句是引擎要做的事、哪句是 omni 拦下来的理由 */
-.approval__label {
-  flex: none;
-  color: var(--text-faint);
-}
-
+/* 拦下来的理由。**去掉了「原因」那个标签**：它每张卡都出现、每张卡都说同一句，
+   而位置本身已经说清了这是脚注——省下的那半行让命令块喘得开 */
 .approval__reason {
-  color: var(--text-muted);
+  margin-top: 6px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
@@ -269,6 +279,49 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   border-left-color: color-mix(in srgb, var(--text-inverse) 30%, transparent);
+}
+
+/* ── 批完之后：退回和工具行一样的一行 ────────────────────
+ * 卡片的重量是给「你现在要做个决定」用的。批完它就是历史，和上下那些
+ * `.step` 是同一类东西；继续摆一张带边框、带黑按钮的卡，一轮批三四次
+ * 整屏就是一摞盒子——而真正待批的那张反而被埋在里面。见 Approval.tsx 的 `Settled`。
+ */
+.approval--done {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 4px 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.approval__mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* 「已允许」**不染绿**：放行是常态，把常态染成彩色只是噪声。
+   「已拒绝」少见、且值得一眼看到，所以只有它带色 */
+.approval__verdict {
+  flex: none;
+}
+
+.approval__verdict--no {
+  color: var(--danger);
+}
+
+/* 命令截断而不是折行：这一行是索引，不是正文（和工具行同一条规矩） */
+.approval__done-cmd {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*
@@ -421,30 +474,48 @@
   align-items: flex-end;
 }
 
-.copyable__btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-raised);
-  color: var(--text-faint);
-  font: inherit;
-  font-size: var(--text-xs);
-  cursor: default;
+/*
+ * 消息底下那排动作（复制 / 改一改再发）。
+ *
+ * **在消息下面，不压在它身上。** 上一版那颗「复制」是
+ * `position: absolute; top: 0; right: 0`，正好盖住气泡右上角的第一行字——
+ * 而用户消息是右对齐的，第一行的末尾就在那个位置。悬停才出现救不了它：
+ * 你要复制的那条，正是鼠标停着的那条。
+ *
+ * 做成**纯文字**、不带框：它是「顺手能做的事」，不是这一屏的操作。
+ * 一带框就成了两颗小按钮挂在每条消息屁股后面，一屏十条就是二十个框。
+ */
+.msgacts {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: 3px;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
 
-.copyable:hover .copyable__btn,
-.copyable__btn:focus-visible {
+/* 用户消息靠右，它的动作栏也靠右——和气泡同一侧才不会看起来像下一条的抬头 */
+.copyable:has(> .msg--user) .msgacts {
+  justify-content: flex-end;
+}
+
+.copyable:hover .msgacts,
+.msgacts:focus-within {
   opacity: 1;
 }
 
-.copyable__btn:hover {
+.msgacts__btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: default;
+}
+
+.msgacts__btn:hover {
   color: var(--text);
-  background: var(--bg-hover);
+  text-decoration: underline;
 }
 
 /* ── 输入区上方的芯片：这句话会发到哪儿去 ───────────────
@@ -915,34 +986,13 @@
 
 /* 平时不显形——它是个岔路口，不该一直待在手边 */
 .turnmark__act,
-.msg__reuse {
-  flex: none;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-faint);
-  font: inherit;
-  font-size: var(--text-xs);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--dur) var(--ease);
-}
-
 .turnmark__row:hover .turnmark__act,
-.copyable:hover .msg__reuse,
 .turnmark__act:focus-visible,
-.msg__reuse:focus-visible {
+.turnmark__act:focus-visible {
   opacity: 1;
 }
 
-.turnmark__act:hover,
-.msg__reuse:hover {
+.turnmark__act:hover {
   color: var(--text);
   text-decoration: underline;
-}
-
-/* 「改一改再发」跟在自己那条消息下面，右对齐——和气泡同一侧 */
-.msg__reuse {
-  display: block;
-  margin: 2px 0 0 auto;
 }

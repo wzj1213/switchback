@@ -50,7 +50,8 @@ export function Prompt({
   /** 选中了一条。omni 自己的就地执行，引擎的填进输入框等着按回车。 */
   onCommand: (command: SlashCommand) => void
   onChange: (text: string) => void
-  onSubmit: () => void
+  /** 参数是「别排队，现在就插进去」（⌘⏎）。 */
+  onSubmit: (steer: boolean) => void
 }): React.JSX.Element {
   const input = useRef<HTMLTextAreaElement>(null)
   const mentions = useMentions(cwd, searchFiles)
@@ -87,7 +88,7 @@ export function Prompt({
           starting
             ? "引擎正在启动，起来就能发。"
             : steering
-            ? "它还在跑——现在打的会直接插进去，立刻生效。"
+            ? "它还在跑——回车先排队，⌘⏎ 直接插进去。"
             : queueing
             ? "它还在跑——现在打的会排在后面，这一轮停了就发出去。"
             : detached
@@ -118,6 +119,11 @@ export function Prompt({
   )
 }
 
+/** 按着修饰键回车 = 「别排队，现在就插进去」。抽出来是复杂度闸门。 */
+function insistsNow(e: React.KeyboardEvent<HTMLTextAreaElement>): boolean {
+  return e.metaKey || e.ctrlKey
+}
+
 /**
  * 输入框的按键分派。
  *
@@ -132,7 +138,7 @@ function onPromptKey(
     slash: ReturnType<typeof useSlash>
     choose: (path: string) => void
     pickCommand: (command: SlashCommand) => void
-    onSubmit: () => void
+    onSubmit: (steer: boolean) => void
   },
 ): void {
   if (on.slash.onKeyDown(e)) {
@@ -151,11 +157,13 @@ function onPromptKey(
     }
     return
   }
-  // Enter 发送，Shift+Enter 换行；IME 组字期间不拦（否则中文输入会被吞）
+  // Enter 发送，Shift+Enter 换行；IME 组字期间不拦（否则中文输入会被吞）。
+  // **⌘⏎ 是「别排队，现在就插进去」**——和 codex 一致（它那边也是加一个修饰键
+  // 就不排队）。这个组合在输入框里是空的：审批卡那套 ⌘⏎ 见到焦点在输入框就装作没看见
   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
     e.preventDefault()
     on.mentions.close()
     on.slash.close()
-    on.onSubmit()
+    on.onSubmit(insistsNow(e))
   }
 }

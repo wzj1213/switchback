@@ -88,6 +88,33 @@ function commit(ctx: Ctx, entry: Live, at: number): void {
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
+/**
+ * 把排着的话现在就插进正在跑的那一轮。
+ *
+ * **成功才清队列。** 反过来（先清再插）的话，插失败那几句就凭空没了——
+ * 而它们往往正是「别再往下走了」，是这条路上最不能丢的东西。
+ *
+ * 插不进去（引擎不支持、或那一轮刚好收工）就原样留着：下一轮 `drain` 会发它。
+ */
+export async function steerQueued(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.steerQueued" }>,
+): Promise<void> {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  const waiting = entry.queued
+  if (entry.turn === undefined || waiting.length === 0) return
+  // 多句合成一段递进去：分几次 steer 的话，中间那几句可能落在不同的工具调用之间，
+  // 而用户写它们时是当成一段话写的
+  const text = waiting.join("\n")
+  const ok = await steerInto(ctx, entry, { type: "thread.prompt", threadId: cmd.threadId, text })
+  if (!ok) return
+  const at = ctx.deps.now()
+  entry.queued = []
+  entry.thread = { ...entry.thread, queued: [], updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
 export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
@@ -102,13 +129,17 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
    *    补一句（「不对，用另一个文件」），逼他先中断等于丢掉已经做完的一半。
    * 2. **排队**：记下来，这一轮停了再发。不丢东西，但那句话要等几十秒才起作用
    *    ——而它往往正是「别再往下走了」，等它跑完再说等于白说。
-   * 3. **能改向的就当场改向**（现在）：codex 的 `turn/steer` 把话直接递进正在跑的
-   *    那一轮。递不进去（引擎不支持、或那一轮刚好收工）才退回排队。
+   * 3. **能改向的就当场改向**：codex 的 `turn/steer` 把话直接递进正在跑的那一轮。
+   * 4. **默认排队，插入变成一个明确动作**（现在）：第 3 版和 **codex 自己的行为
+   *    正好相反**——在它的界面里打字回车那句是排着的，要再点一下「调整方向」
+   *    才插进去。两边不一致的代价不是别扭，是「你以为在排队的那句话，
+   *    其实已经改变了它正在做的事」。所以现在只有 `cmd.steer` 为真才插，
+   *    路径有两条：⌘⏎ 直接发，或者点排队条上的「立刻插入」（`thread.steerQueued`）。
    *
-   * 三版都守住了那条硬约束：steer 和队列**都不碰 `entry.turn`**。
+   * 四版都守住了那条硬约束：steer 和队列**都不碰 `entry.turn`**。
    */
   if (entry.turn !== undefined) {
-    if (await steerInto(ctx, entry, cmd)) return
+    if (cmd.steer === true && (await steerInto(ctx, entry, cmd))) return
     enqueue(ctx, entry, cmd.text)
     return
   }

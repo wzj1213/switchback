@@ -14,31 +14,43 @@ export function Copyable({
   item,
   onCopy,
   children,
+  extra,
 }: {
   item: Item
   onCopy: (text: string) => void
   children: ReactNode
+  /** 同一条动作栏里再挂几颗（「改一改再发」走这里）。 */
+  extra?: ReactNode
 }): React.JSX.Element {
   const [done, setDone] = useState(false)
   if (item.kind === "approval") return <>{children}</>
   return (
     <div className="copyable">
       {children}
-      <button
-        className="copyable__btn"
-        type="button"
-        aria-label="复制"
-        title="复制这条内容"
-        onClick={() => {
-          onCopy(textOf(item))
-          setDone(true)
-          setTimeout(() => {
-            setDone(false)
-          }, FLASH_MS)
-        }}
-      >
-        {done ? "已复制" : "复制"}
-      </button>
+      {/*
+        动作栏在消息**下面**，不是压在它身上。
+        上一版是 `position: absolute; top: 0; right: 0`——于是那颗「复制」
+        正好盖住气泡右上角的第一行文字，而用户消息恰恰是右对齐的，
+        第一行的末尾就在那儿。悬停才出现也救不了：**你要复制的那条，
+        正是鼠标停在上面的那条**。
+      */}
+      <div className="msgacts">
+        <button
+          className="msgacts__btn"
+          type="button"
+          title="复制这条内容"
+          onClick={() => {
+            onCopy(textOf(item))
+            setDone(true)
+            setTimeout(() => {
+              setDone(false)
+            }, FLASH_MS)
+          }}
+        >
+          {done ? "已复制" : "复制"}
+        </button>
+        {extra}
+      </div>
     </div>
   )
 }

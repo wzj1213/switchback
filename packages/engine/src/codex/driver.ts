@@ -192,7 +192,8 @@ class CodexSession implements EngineSession {
    * 上下文还在，实际模型什么都不记得。宁可把失败摆出来。
    */
   private async openThread(): Promise<unknown> {
-    const shared = { approvalPolicy: POLICY, sandbox: this.state.sandbox, cwd: this.req.cwd }
+    // 策略和沙箱一样，在 `thread/start` 这一刻定死、之后改不了（见 `setTrust`）
+    const shared = { approvalPolicy: POLICY[this.req.trust], sandbox: this.state.sandbox, cwd: this.req.cwd }
     if (this.req.forkOf !== undefined) return this.forkThread(this.req.forkOf)
     if (this.req.resume === undefined) return this.rpc.call("thread/start", shared)
     return this.rpc.call("thread/resume", { threadId: this.req.resume, ...shared })

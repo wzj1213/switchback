@@ -12,8 +12,20 @@
  * 排队的那句是**还没发生的事**，而人改主意的窗口恰恰在这段时间里
  *（看着 agent 跑，发现它其实做对了，那句纠正就不必发了）。
  * 撤回不是额外功能，是排队这件事成立的前提。
+ *
+ * ## 为什么还要「立刻插入」
+ *
+ * 排着的那句**往往正是「别再往下走了」**——等这一轮跑完再说等于白说。
+ * codex 自己的界面就是这么做的（排队条上一颗「调整方向」），omni 跟它对齐：
+ * 默认排队，插入是一个明确的动作。引擎不支持当场插话时这颗不出现——
+ * 一个点了没反应的按钮比没有它更糟。
  */
-export function Queued({ texts, onDrop }: { texts: readonly string[]; onDrop: () => void }): React.JSX.Element | null {
+export function Queued({ texts, onDrop, onInsert }: {
+  texts: readonly string[]
+  onDrop: () => void
+  /** 引擎支持当场插话时才给。 */
+  onInsert?: () => void
+}): React.JSX.Element | null {
   if (texts.length === 0) return null
   return (
     <div className="queued">
@@ -21,6 +33,11 @@ export function Queued({ texts, onDrop }: { texts: readonly string[]; onDrop: ()
       <span className="queued__text" title={texts.join("\n")}>
         {texts[0]}
       </span>
+      {onInsert === undefined ? null : (
+        <button type="button" className="queued__act" title="不等这一轮跑完，现在就递进去" onClick={onInsert}>
+          立刻插入
+        </button>
+      )}
       <button type="button" className="queued__drop" onClick={onDrop}>
         撤回
       </button>

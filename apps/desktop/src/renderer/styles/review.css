@@ -233,8 +233,19 @@
   text-align: left;
 }
 
+/*
+ * 文件名**也要能缩**。原来是 `flex: none`：目录段缩到底之后它继续按内容撑，
+ * 于是一个长文件名（`05-request-sequence.excalidraw`）直接压到右边的 `+963` 上，
+ * 两行字叠在一起——260px 的列里这不是边角情况，是常态。
+ *
+ * 缩的顺序仍然是「先目录、后文件名」：目录那段 `flex-shrink` 默认是 1 且更长，
+ * 会先被压掉；这里只是给文件名留一条最后的退路。
+ */
 .rvl__base {
-  flex: none;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

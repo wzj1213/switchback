@@ -1629,6 +1629,24 @@ body {
   white-space: nowrap;
 }
 
+/* 「立刻插入」：**不是危险动作，所以不红**；它和「撤回」并排，
+   一个把话往前推、一个把话收回来，视觉上同一档重量 */
+.queued__act {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.queued__act:hover {
+  color: var(--text);
+}
+
 .queued__drop {
   flex: none;
   padding: 0;

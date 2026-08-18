@@ -118,6 +118,13 @@ function Between({ props, thread, stamp, send }: {
       />
       <Queued
         texts={thread.queued ?? []}
+        {...(thread.capabilities?.steer === true
+          ? {
+              onInsert: () => {
+                send({ type: "thread.steerQueued", threadId: thread.id })
+              },
+            }
+          : {})}
         onDrop={() => {
           // 撤回 = 打断队列。宿主那边中断会把队列一并清掉，
           // 但这里不该顺带把**正在跑的那一轮**也停了——所以走一条专门的命令
@@ -240,12 +247,14 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onTrustChange={(next) => {
           send({ type: "thread.setTrust", threadId: thread.id, trust: next })
         }}
-        onSend={(text, attachments) => {
+        onSend={(text, attachments, steer) => {
           send({
             type: "thread.prompt",
             threadId: thread.id,
             text,
             ...(attachments.length === 0 ? {} : { attachments }),
+            // 只在真要插的时候带这一项：不带 = 排队（见 protocol 的 `steer`）
+            ...(steer ? { steer: true } : {}),
           })
         }}
         onResume={() => {

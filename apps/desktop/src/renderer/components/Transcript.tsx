@@ -110,22 +110,30 @@ function RowView({
     )
   }
   if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
+  /* **只有自己发过的话能改。** agent 说的话改了再发没有意义——
+     那不是你的话，改完发出去等于替它编一句 */
+  const mine = onReuse !== undefined && row.item.kind === "user_message" && row.item.origin === undefined
   return (
-    <Copyable item={row.item} onCopy={onCopy}>
+    <Copyable
+      item={row.item}
+      onCopy={onCopy}
+      {...(mine
+        ? {
+            extra: (
+              <button
+                type="button"
+                className="msgacts__btn"
+                onClick={() => {
+                  onReuse(row.item.kind === "user_message" ? row.item.text : "")
+                }}
+              >
+                改一改再发
+              </button>
+            ),
+          }
+        : {})}
+    >
       <ItemView item={row.item} onResolve={onResolve} />
-      {/* **只有自己发过的话能「改一改再发」。** agent 说的话改了再发没有意义——
-          那不是你的话，改完发出去等于替它编一句 */}
-      {onReuse !== undefined && row.item.kind === "user_message" && row.item.origin === undefined ? (
-        <button
-          type="button"
-          className="msg__reuse"
-          onClick={() => {
-            onReuse(row.item.kind === "user_message" ? row.item.text : "")
-          }}
-        >
-          改一改再发
-        </button>
-      ) : null}
     </Copyable>
   )
 }

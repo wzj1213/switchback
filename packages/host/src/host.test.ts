@@ -1190,7 +1190,7 @@ describe("跑着的时候补一句话：排队，不是拒绝", () => {
   })
 })
 
-describe("跑着的时候补一句话：能改向的当场递进去", () => {
+describe("跑着的时候补一句话：默认排队，插入是明确动作", () => {
   /**
    * 会 steer 的假引擎。**和上面那个共用不了**：它要能记下 steer 收到了什么、
    * 还要能让 steer 主动失败（那条竞态分支只有这样才测得到）。
@@ -1250,12 +1250,50 @@ describe("跑着的时候补一句话：能改向的当场递进去", () => {
     return id
   }
 
-  it("**不进队列，直接递进正在跑的那一轮**", async () => {
+  /**
+   * **默认排队，哪怕引擎会 steer。** 这一条是和 codex 自己的行为对齐：
+   * 在它的界面里打字回车那句是排着的，要再点一下才插进去。
+   * 反过来（能插就插）的后果不是别扭，是「你以为在排队的那句，
+   * 其实已经改变了它正在做的事」。
+   */
+  it("默认**进队列**，不碰正在跑的那一轮——即使引擎支持 steer", async () => {
     const h = steerable()
     const id = await running(h)
     await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "不对，用另一个文件" })
+    expect(h.steered).toHaveLength(0)
+    expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual([
+      "不对，用另一个文件",
+    ])
+  })
+
+  it("带 `steer` 才当场递进去（⌘⏎ 那条路）", async () => {
+    const h = steerable()
+    const id = await running(h)
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "不对，用另一个文件", steer: true })
     expect(h.steered.map((s) => s.text)).toEqual(["不对，用另一个文件"])
     expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued ?? []).toEqual([])
+  })
+
+  it("排队条上的「立刻插入」：把排着的几句合成一段递进去，**成功之后才清队列**", async () => {
+    const h = steerable()
+    const id = await running(h)
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "先别写" })
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "改用另一个文件" })
+    await h.host.dispatch({ type: "thread.steerQueued", threadId: id })
+    expect(h.steered.map((s) => s.text)).toEqual(["先别写\n改用另一个文件"])
+    expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual([])
+  })
+
+  it("「立刻插入」失败时**队列原样留着**——那几句往往正是「别再往下走了」，丢不得", async () => {
+    const h = steerable()
+    const id = await running(h)
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "别再往下走了" })
+    h.fail.now = true
+    await h.host.dispatch({ type: "thread.steerQueued", threadId: id })
+    expect(h.steered).toHaveLength(0)
+    expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual([
+      "别再往下走了",
+    ])
   })
 
   it("**不开新轮次**——开了的话引擎还在往旧 turnId 上发 item，正在流的回答会整个消失", async () => {
@@ -1265,11 +1303,11 @@ describe("跑着的时候补一句话：能改向的当场递进去", () => {
     expect(h.events.filter((e) => e.type === "turn.started")).toHaveLength(1)
   })
 
-  it("那句话挂在**当前这一轮**上：transcript 里就该出现在它实际插话的位置", async () => {
+  it("插进去的那句挂在**当前这一轮**上：transcript 里就该出现在它实际插话的位置", async () => {
     const h = steerable()
     const id = await running(h)
     const turnId = h.events.find((e) => e.type === "turn.started")?.turn.id
-    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句", steer: true })
     const said = items(h.events).filter((i) => i.kind === "user_message")
     expect(said.map((i) => i.text)).toEqual(["第一句", "补一句"])
     expect(said[1]?.turnId).toBe(turnId)
@@ -1278,7 +1316,13 @@ describe("跑着的时候补一句话：能改向的当场递进去", () => {
   it("附件跟着一起递过去", async () => {
     const h = steerable()
     const id = await running(h)
-    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "看这张", attachments: ["/tmp/a.png"] })
+    await h.host.dispatch({
+      type: "thread.prompt",
+      threadId: id,
+      text: "看这张",
+      attachments: ["/tmp/a.png"],
+      steer: true,
+    })
     expect(h.steered[0]?.attachments).toEqual(["/tmp/a.png"])
   })
 
@@ -1286,7 +1330,7 @@ describe("跑着的时候补一句话：能改向的当场递进去", () => {
     const h = steerable()
     const id = await running(h)
     h.fail.now = true
-    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句" })
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "补一句", steer: true })
     expect(h.steered).toHaveLength(0)
     expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual(["补一句"])
   })
@@ -1295,7 +1339,7 @@ describe("跑着的时候补一句话：能改向的当场递进去", () => {
     const h = steerable()
     const id = await running(h)
     h.fail.now = true
-    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "没送出去的那句" })
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "没送出去的那句", steer: true })
     expect(items(h.events).filter((i) => i.kind === "user_message").map((i) => i.text)).toEqual(["第一句"])
   })
 
