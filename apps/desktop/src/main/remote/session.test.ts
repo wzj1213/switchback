@@ -313,6 +313,34 @@ describe("确认与观察", () => {
     expect(h.frames().some((f) => f.type === "thread")).toBe(false)
   })
 
+  it("**补发太大就让它走全量**——反复要同一帧是个不会自己好的死循环", () => {
+    const h = harness()
+    // **少而大**：这个 harness 的账本只留 100 条，条数超了会先撞上「缺口太老」那条路。
+    // 50 条 × 8K 码元 ≈ 400K，超过补发那道 192K 的闸
+    const fat = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: "验收".repeat(4000) })
+    for (let i = 1; i <= 50; i += 1) h.ledger.seal([fat(i)])
+    send(h, { type: "resync", after: 1, epoch: RUN })
+    const kinds = h.frames().map((f) => f.type)
+    expect(kinds).toEqual(["reset"])
+    expect(h.logs().some((l) => l.includes("太大补不动"))).toBe(true)
+  })
+
+  it("补得动的照常补", () => {
+    const h = harness()
+    h.ledger.seal([ev(1), ev(2), ev(3)])
+    send(h, { type: "resync", after: 1, epoch: RUN })
+    expect(h.frames().map((f) => f.type)).toEqual(["catchup"])
+  })
+
+  it("**握手时那条续上的路也要有同一道闸**——两条路补的是同一段东西", () => {
+    const h = harness()
+    const fat = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: "验收".repeat(4000) })
+    for (let i = 1; i <= 50; i += 1) h.ledger.seal([fat(i)])
+    send(h, { type: "hello", after: 1, epoch: RUN })
+    // 补不动 → 转全量重建，而全量那条已经按大小封了顶
+    expect(h.replays()).toBe(1)
+  })
+
   it("ping 回 pong", () => {
     const h = harness()
     send(h, { type: "ping" })

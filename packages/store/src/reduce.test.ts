@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread, ToolCallItem } from "@omni/protocol"
 import { initial, itemsOf, threadsOf, threadRowsOf } from "./state.js"
-import { reduce, reduceAll, reduceHistory } from "./reduce.js"
+import { coalesce, reduce, reduceAll, reduceHistory } from "./reduce.js"
 
 const thread = (id: string): Thread => ({
   id,
@@ -394,5 +394,36 @@ describe("补一条会话的历史", () => {
     const s = reduceHistory(initial(), "a", history)
     const later = reduceAll(s, [{ type: "item.started", at: 4, item: msg("i4", "u1", "第四条") }])
     expect(itemsOf(later, "a").map((i) => i.id)).toEqual(["i1", "i2", "i3", "i4"])
+  })
+})
+
+describe("出口合并：省的是账本的保留窗口，不是字节", () => {
+  const delta = (id: string, s: string): Event => ({ type: "item.delta", at: 0, itemId: id, append: s })
+
+  it("**一次构建的输出合成一条**——`rpc.ts` 的 feed 把一个 stdout chunk 按行在同一个 tick 里全派发", () => {
+    const batch = Array.from({ length: 500 }, (_, i) => delta("cmd", `第 ${String(i)} 行\n`))
+    const merged = coalesce(batch)
+    expect(merged).toHaveLength(1)
+    // 内容一个字都不能少——账本里少一段就是界面上少一段
+    const all = (merged[0] as { append: string }).append
+    expect(all.startsWith("第 0 行")).toBe(true)
+    expect(all.endsWith("第 499 行\n")).toBe(true)
+  })
+
+  it("**合并前后归约结果完全一样**——这是它敢合的全部依据", () => {
+    const batch = [delta("i", "一"), delta("i", "二"), delta("i", "三")]
+    const base = reduceAll(initial(), [started("a"), turnStarted("a", "u"), { type: "item.started", at: 0, item: msg("i", "u", "") }])
+    const one = reduceAll(base, batch)
+    const other = reduceAll(base, coalesce(batch))
+    expect(itemsOf(other, "a")).toEqual(itemsOf(one, "a"))
+  })
+
+  it("**中间夹了别的就断开**——跨过去合并会改变先后关系，而顺序是这套东西唯一的正确性来源", () => {
+    const batch = [delta("i", "一"), delta("别的", "x"), delta("i", "二")]
+    expect(coalesce(batch)).toHaveLength(3)
+  })
+
+  it("两条不同 item 的 delta 不会互相吞掉", () => {
+    expect(coalesce([delta("a", "1"), delta("b", "2")])).toHaveLength(2)
   })
 })

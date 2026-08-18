@@ -5,6 +5,7 @@ import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow } from "elec
 import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
 import { createLedger, type Ledger, type Sealed } from "@omni/wire"
 import { createHost, type Host } from "@omni/host"
+import { coalesce } from "@omni/store"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
@@ -79,14 +80,30 @@ function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; ledger:
   const ledger = createLedger(randomUUID())
   const batcher = createBatcher((events) => {
     // 每条出去的事件顺带过一遍「要不要叫人」。放在发出去的同一处，
-    // 免得将来多一条出口就漏一处
+    // 免得将来多一条出口就漏一处。
+    // **用的是合并前那份**：叫人和挡休眠认的是「发生了什么」，不是「发了几帧」
     for (const event of events) deps.attention.note(event)
     // 同一处顺带重算一次「现在还有没有活在跑」——**每次都重算，不记计数器**：
     // 漏一条 `turn.completed` 的代价从「永远不睡」降成「这一帧算错了」
     deps.awake.sync(deps.live())
+    // **相邻的同 id delta 合成一条再编号。**
+    //
+    // 省的不是模型吐字那一路（按 token 出，一个 16ms 窗口里往往就一条，合不动），
+    // 而是**命令输出**：`rpc.ts` 的 feed 把一次 stdout chunk 按行在同一个 tick 里
+    // 全派发，于是 `pnpm build` 的输出是几百条同 id delta 落进同一批——
+    // `MAX_BATCH` 那个 500 正是为它存在的。
+    //
+    // 真正的收益也不在字节上，在**账本的保留窗口**：一次构建就能刷满 5000 条，
+    // 而那正是 `@omni/wire` 自己写下的失败模式——出隧道时缺口已经被自己的
+    // 构建日志挤出缓冲，只能在信号最差的时候做最贵的那件事（全量重建）。
+    // 合并之后同样 5000 条覆盖的墙钟时间长一到两个数量级。
+    //
+    // 安全性来自 `coalesce` 自己那段论证：只合挨着的同 id delta，
+    // 字符串拼接满足结合律，语义和逐条应用完全等价。
+    //
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
-    const sealed = ledger.seal(events)
+    const sealed = ledger.seal(coalesce(events))
     for (const sink of deps.sinks.list()) sink.send({ channel: "omni:events", sealed })
   })
   return {

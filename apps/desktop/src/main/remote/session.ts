@@ -132,7 +132,7 @@ function hello(ctx: Ctx, after: number | undefined, epoch: string | undefined): 
   ctx.deps.ledger.join(ctx.deps.id)
   const resumable = after !== undefined && epoch !== undefined
   const missed = resumable ? ctx.deps.ledger.since(after, epoch) : undefined
-  if (missed !== undefined) {
+  if (missed !== undefined && !tooMuch(missed)) {
     ctx.deps.log("info", `${ctx.deps.id} 从 ${String(after)} 续上，补 ${String(missed.length)} 条`)
     if (missed.length > 0) ctx.write({ type: "events", sealed: missed })
     // **续上的这条路没有全量**，客户端手上那份基线是它自己保着的。
@@ -140,7 +140,7 @@ function hello(ctx: Ctx, after: number | undefined, epoch: string | undefined): 
     release(ctx.state)
     return
   }
-  if (resumable) ctx.deps.log("info", `${ctx.deps.id} 停在 ${String(after)}，续不上，转全量重建`)
+  if (resumable) ctx.deps.log("info", `${ctx.deps.id} 停在 ${String(after)}，续不上或补不动，转全量重建`)
   void ctx.deps.replay(ctx.sink).catch((error: unknown) => {
     ctx.deps.log("error", `${ctx.deps.id} 全量重建失败：${String(error)}`)
     ctx.write({ type: "reset", reason: "全量重建失败，请重连" })
@@ -161,6 +161,13 @@ function resync(ctx: Ctx, after: number, epoch: string): void {
   if (missed === undefined) {
     ctx.deps.log("warn", `${ctx.deps.id} 停在 ${String(after)}，补不了，让它重新握手`)
     ctx.write({ type: "reset", reason: "缺口太老，补不回来了" })
+    return
+  }
+  // **补得动才补。** 见 `TOO_MUCH_TO_CATCH_UP`：补不动时反复要同一帧
+  // 是个不会自己好的死循环，而走全量那条路已经封了顶
+  if (tooMuch(missed)) {
+    ctx.deps.log("warn", `${ctx.deps.id} 停在 ${String(after)}，这一段太大补不动，让它走全量`)
+    ctx.write({ type: "reset", reason: "断开太久了，重新拉一份" })
     return
   }
   ctx.write({ type: "catchup", sealed: missed })
@@ -201,6 +208,33 @@ function cursor(ctx: Ctx, after: unknown, epoch: unknown): void {
   const at = numberOr(after)
   const run = stringOr(epoch)
   if (at !== undefined && run !== undefined) resync(ctx, at, run)
+}
+
+/**
+ * 一段补发大到该放弃了吗。
+ *
+ * ## 为什么补差量也要有闸
+ *
+ * 全量那条路已经按大小收窄了（`scope.ts`），而**补差量这条路原样留着**：
+ * 账本最多留 5000 条事件，一条 1.5 KB 的话就是 7.5 MB 一帧——正好在
+ * `encodeFrame` 那个 16M 的「太大」线以下，所以一个警告都不会有。
+ *
+ * 更糟的是它**不会自己好**：客户端拿同一个游标反复要同一帧，
+ * 收不完就再要一次，两边都只看到「又断了」。这和真机上栽的那个死循环
+ * 是同一族——那个是全量太大，这个是补发太大。
+ *
+ * 补不动就当补不上：回 `reset`，让它走全量（那条已经封了顶）。
+ * **宁可让它重来一次，也不要卡在一个永远发不完的帧上。**
+ */
+const TOO_MUCH_TO_CATCH_UP = 192 * 1024
+
+function tooMuch(sealed: readonly { event: unknown }[]): boolean {
+  let chars = 0
+  for (const one of sealed) {
+    chars += JSON.stringify(one.event).length
+    if (chars > TOO_MUCH_TO_CATCH_UP) return true
+  }
+  return false
 }
 
 /** 全量出门了，放行等在闸后面的那些补正文。 */
