@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import type { Trust } from "@omni/protocol"
 import type { RemoteStatus } from "../../main/remote/install.js"
 import type { Settings } from "../../shared/settings.js"
-import { Field } from "./SettingsPanel.js"
+import { Field } from "./SettingsBits.js"
 import { RemoteDevices } from "./RemoteDevices.js"
 
 /**

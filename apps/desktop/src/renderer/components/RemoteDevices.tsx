@@ -1,5 +1,5 @@
 import type { RemoteStatus } from "../../main/remote/install.js"
-import { Field } from "./SettingsPanel.js"
+import { Field } from "./SettingsBits.js"
 
 /**
  * 已配对的设备。

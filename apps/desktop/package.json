@@ -4,10 +4,10 @@
   "omni": {
     "_updateFeed": "发布时填一个 https 地址，返回 {version,url,notes}。留空 = 更新检查整个关闭，不发任何请求。",
     "updateFeed": "",
-    "build": "1ac809d-dirty",
+    "build": "2cf0c5e",
     "repo": "/Users/you/work/omni"
   },
-  "version": "0.0.131",
+  "version": "0.0.137",
   "private": true,
   "type": "module",
   "description": "omni 桌面端：Electron 壳 + React 渲染层",
@@ -55,6 +55,7 @@
     "lowlight": "^3.3.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "smol-toml": "^1.8.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {

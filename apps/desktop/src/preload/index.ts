@@ -8,6 +8,7 @@ import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { RemoteStatus } from "../main/remote/install.js"
 import type { ReviewFile, ReviewPatch } from "../shared/review.js"
 import type { ContentHit } from "../shared/search.js"
+import type { EnvConfig } from "../shared/hooks.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -48,9 +49,33 @@ const api = {
   async pickFolder(): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:pickFolder")) as string | undefined
   },
-  /** 各家引擎装的是哪版、有没有新版。查不到就返回空数组（不打扰）。 */
-  async engineVersions(): Promise<readonly EngineVersion[]> {
-    return (await ipcRenderer.invoke("omni:engineVersions")) as readonly EngineVersion[]
+  /**
+   * 各家引擎装的是哪版、有没有新版。查不到就返回空数组（不打扰）。
+   *
+   * 主进程那边**缓存 6 小时、启动时预热**：这件事原来挂在设置面板挂载上，
+   * 每开一次设置就 spawn 一次 `npm view`（见 `main/enginever.ts`）。
+   * `refresh` 是面板上那颗「重新检查」，无视缓存重探一遍。
+   */
+  async engineVersions(refresh?: boolean): Promise<readonly EngineVersion[]> {
+    return (await ipcRenderer.invoke("omni:engineVersions", refresh)) as readonly EngineVersion[]
+  },
+
+  /**
+   * 「环境」那一页：**各家引擎自己读的配置里，钩子有哪些、生效没有。**
+   *
+   * 传当前会话的工作区——钩子是按项目叠加的，不传就只有用户级那几份。
+   */
+  async envConfig(cwd?: string): Promise<EnvConfig> {
+    return (await ipcRenderer.invoke("omni:envConfig", cwd)) as EnvConfig
+  },
+  /**
+   * 用系统默认编辑器打开一份配置文件。
+   *
+   * **只认这一页刚发出去的那几个路径**（主进程那边核对，见 `main/envconfig.ts`）——
+   * 渲染层拿不到一个能打开任意文件的口子。
+   */
+  openEnvFile(path: string): void {
+    ipcRenderer.send("omni:openEnvFile", path)
   },
 
   /** 真的去更新一家引擎。跑的命令和界面上摆出来的那条逐字相同。 */

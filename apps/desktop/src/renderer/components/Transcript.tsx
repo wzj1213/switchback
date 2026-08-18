@@ -1,5 +1,5 @@
 import type { Command, Item, Thread, Turn } from "@omni/protocol"
-import { useCallback, useMemo, useState } from "react"
+import { memo, useCallback, useMemo, useState } from "react"
 import { ItemView } from "./ItemView.js"
 import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
@@ -136,7 +136,18 @@ function RowView({
  * 滚动跟随的计数把状态行也算进去——它出现时也该把视图顶到底，
  * 否则一轮刚开始就已经被顶出可视区了。
  */
-export function Transcript({
+/**
+ * 转录区。**整块 memo**。
+ *
+ * 六个 props 全都是引用稳定的：`thread` / `items` / `turn` 直接来自 store
+ *（同一批增量之间不换对象，空会话那份见 `AppApi.items`），`send` / `onCopy`
+ * 是 `useCallback`，`onReuse` 在 `Workspace` 的 `useDraft` 里也是。
+ *
+ * 挡的是**外壳状态引起的重渲染**：打开设置、开关审核面板、侧栏筛选拿焦点——
+ * 这些都会让 `App` 整棵树重跑一遍，而它们和转录区里的内容没有半点关系。
+ * 一屏几百条的会话上，那一次白跑正是「点开设置顿一下」里剩下的那部分。
+ */
+export const Transcript = memo(function Transcript({
   thread,
   items,
   turn,
@@ -203,4 +214,4 @@ export function Transcript({
       )}
     </div>
   )
-}
+})
