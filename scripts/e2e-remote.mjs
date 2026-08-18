@@ -212,6 +212,31 @@ async function stepRevoke(send) {
   ok("令牌之后也认不出", me.status === 401)
 }
 
+/** 推送的两个端点。真发一条要有个活的推送服务，那条在 `relay.test.ts` 里验。 */
+async function stepPush(token) {
+  console.log("11. 推送端点")
+  const key = await (await fetch(`${BASE}/api/push/key`)).json()
+  ok("公钥拿得到，且是 65 字节的未压缩点", Buffer.from(key.key ?? "", "base64url").length === 65)
+  const noAuth = await fetch(`${BASE}/api/push/subscribe`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ endpoint: "https://x/y", p256dh: "a", auth: "b" }),
+  })
+  ok("**订阅要带令牌**——谁都能写的话，别人能让 omni 把你的会话标题推到他手机上", noAuth.status === 401)
+  const saved = await fetch(`${BASE}/api/push/subscribe`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ endpoint: "https://push.example.com/x", p256dh: "aaaa", auth: "bbbb" }),
+  })
+  ok("带了令牌就存下来", saved.status === 200)
+  const bad = await fetch(`${BASE}/api/push/subscribe`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ endpoint: "https://push.example.com/x" }),
+  })
+  ok("缺字段的订阅回 400——半个订阅推不出去", bad.status === 400)
+}
+
 async function stepStatic() {
   console.log("8. 静态页面与安全响应头")
   const home = await fetch(`${BASE}/`)
@@ -231,6 +256,7 @@ async function main() {
   const token = await stepPair(send)
   const conn = await stepConnect(token)
   await stepCommands(conn)
+  await stepPush(token)
   await stepStatic()
 
   console.log("9. 断开之后设备仍在表里（吊销才该消失）")

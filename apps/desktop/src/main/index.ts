@@ -346,8 +346,15 @@ function bootstrap(): Promise<void> {
     installFind(() => BrowserWindow.getAllWindows())
     watchProcesses(log, () => BrowserWindow.getAllWindows())
     const sinks = createSinks(() => BrowserWindow.getAllWindows())
-    const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log)
+    // **后绑**：推送要用设备表，而设备表在 `installRemote` 里；而 `attachHost`
+    // 又必须先跑（`installRemote` 要它的账本）。用一个可变的槽把环解开——
+    // 这一格在 `attachRemote` 之前是空的，那期间也确实没有客户端可推
+    const relay: { notify?: (threadId: string, title: string, body: string) => void } = {}
+    const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, (id, title, body) => {
+      relay.notify?.(id, title, body)
+    })
     const remote = attachRemote(attached, sinks)
+    relay.notify = remote.relay.notify
     await remote.sync()
     const bounds = await loadBounds()
     const win = createWindow(bounds)

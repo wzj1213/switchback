@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto"
+import type { PushSubscription } from "./push.js"
 
 /**
  * 设备令牌与配对码。「你是谁」这一层。
@@ -24,6 +25,11 @@ export interface Device {
   hash: string
   createdAt: number
   lastSeenAt: number
+  /**
+   * 这台设备的推送订阅。**挂在设备记录上，不另开一张表**——
+   * 吊销一台设备就该连带停止推给它，一条记录一个生命周期，没有第二处要记得清。
+   */
+  push?: PushSubscription
 }
 
 export interface TokenDeps {
@@ -62,6 +68,10 @@ export interface TokenStore {
   /** 校验令牌，顺带记一次「最后见到」。认不出返回 undefined。 */
   verify: (token: string) => Device | undefined
   list: () => readonly Device[]
+  /** 记下（或换掉）一台设备的推送订阅。设备不存在时什么都不做，返回 false。 */
+  setPush: (id: string, push: PushSubscription | undefined) => boolean
+  /** 现在能推给谁。只回有订阅的那些。 */
+  pushable: () => readonly { id: string; name: string; push: PushSubscription }[]
   /** 吊销一台。返回有没有真的删掉一条。 */
   revoke: (id: string) => boolean
   revokeAll: () => void
@@ -113,6 +123,34 @@ function mint(state: State, name: string, now: number, flush: () => void): Claim
   return { ok: true, token, device }
 }
 
+/** 记下（或清掉）一台设备的推送订阅。**提到外面**：`createTokenStore` 已经贴着行数闸门。 */
+function setPush(state: State, id: string, push: PushSubscription | undefined, flush: () => void): boolean {
+  const device = state.devices.find((d) => d.id === id)
+  if (device === undefined) return false
+  if (push === undefined) delete device.push
+  else device.push = push
+  flush()
+  return true
+}
+
+/** 现在能推给谁。 */
+function pushable(state: State): readonly { id: string; name: string; push: PushSubscription }[] {
+  return state.devices
+    .filter((d): d is Device & { push: PushSubscription } => d.push !== undefined)
+    .map((d) => ({ id: d.id, name: d.name, push: d.push }))
+}
+
+/** 认一个令牌，顺带记一次「最后见到」。**提到外面**：`createTokenStore` 贴着行数闸门。 */
+function verify(state: State, token: string, now: number, flush: () => void): Device | undefined {
+  if (token === "") return undefined
+  const hash = hashOf(token)
+  const device = state.devices.find((d) => sameHash(d.hash, hash))
+  if (device === undefined) return undefined
+  device.lastSeenAt = now
+  flush()
+  return device
+}
+
 export function createTokenStore(deps: TokenDeps): TokenStore {
   const state: State = { devices: [...deps.load()], pairing: undefined, failures: 0, lockedUntil: 0 }
 
@@ -155,16 +193,10 @@ export function createTokenStore(deps: TokenDeps): TokenStore {
       state.pairing = undefined
     },
     claim,
-    verify: (token) => {
-      if (token === "") return undefined
-      const hash = hashOf(token)
-      const device = state.devices.find((d) => sameHash(d.hash, hash))
-      if (device === undefined) return undefined
-      device.lastSeenAt = deps.now()
-      flush()
-      return device
-    },
+    verify: (token) => verify(state, token, deps.now(), flush),
     list: () => state.devices.map((d) => ({ ...d })),
+    setPush: (id, push) => setPush(state, id, push, flush),
+    pushable: () => pushable(state),
     revoke: (id) => {
       const before = state.devices.length
       state.devices = state.devices.filter((d) => d.id !== id)

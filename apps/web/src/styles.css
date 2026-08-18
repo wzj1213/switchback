@@ -937,3 +937,35 @@ textarea {
   color: var(--warn);
   font-size: var(--text-sm);
 }
+
+/* ── 推送开关 ────────────────────────────────────────── */
+
+.threads__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  align-items: flex-start;
+}
+
+.threads__who {
+  color: var(--text-faint);
+}
+
+.push {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* 「这个环境为什么开不了」——**说清是哪一条**，不是一句「不支持」 */
+.push--why {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.push__error {
+  color: var(--warn);
+  font-size: var(--text-sm);
+}

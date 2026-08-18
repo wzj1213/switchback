@@ -128,6 +128,7 @@ function main(): void {
   void startRemote({
     config: () => ({ port: PORT, trustedHosts: TRUSTED, maxTrust: "auto-edit" }),
     webRoot: join(ROOT, "apps/web/dist"),
+    pushKey: () => "harness 不推送",
     tokens,
     ledger,
     sinks: {

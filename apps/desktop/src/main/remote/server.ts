@@ -38,6 +38,8 @@ export interface RemoteConfig {
 
 export interface RemoteDeps {
   config: () => RemoteConfig
+  /** 推送用的公钥（base64url 的未压缩点）。前端拿它做 `applicationServerKey`。 */
+  pushKey: () => string
   /** 浏览器端构建产物所在目录。目录不在就只有 API，没有页面——**不假装有**。 */
   webRoot: string
   tokens: TokenStore
@@ -122,6 +124,43 @@ async function handlePair(deps: RemoteDeps, req: IncomingMessage, res: ServerRes
   json(res, 200, { token: claimed.token, device: { id: claimed.device.id, name: claimed.device.name } })
 }
 
+/**
+ * 记下一台设备的推送订阅。
+ *
+ * **要带令牌**：订阅是「往这台设备推」的凭据，谁都能写的话，
+ * 任何人都能让 omni 把你的会话标题推到他自己的手机上。
+ */
+async function handleSubscribe(deps: RemoteDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const device = deps.tokens.verify(bearer(req))
+  if (device === undefined) {
+    json(res, 401, { error: "unauthorized" })
+    return
+  }
+  const body = await readBody(req)
+  if (body === undefined) {
+    json(res, 413, { error: "请求体过大" })
+    return
+  }
+  const parsed = safeParse(body ?? "")
+  // 传 null 表示退订。三个字段缺一不可——半个订阅推不出去，留着只会每次白发一次请求
+  if (parsed?.["endpoint"] === undefined) {
+    deps.tokens.setPush(device.id, undefined)
+    deps.log("info", `${device.name} 取消了推送`)
+    json(res, 200, { ok: true })
+    return
+  }
+  const endpoint = parsed["endpoint"]
+  const p256dh = parsed["p256dh"]
+  const auth = parsed["auth"]
+  if (typeof endpoint !== "string" || typeof p256dh !== "string" || typeof auth !== "string") {
+    json(res, 400, { error: "订阅的形状不对" })
+    return
+  }
+  deps.tokens.setPush(device.id, { endpoint, p256dh, auth })
+  deps.log("info", `${device.name} 开了推送`)
+  json(res, 200, { ok: true })
+}
+
 function safeParse(text: string): Record<string, unknown> | undefined {
   try {
     const value: unknown = JSON.parse(text)
@@ -151,6 +190,19 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
       const device = deps.tokens.verify(bearer(req))
       if (device === undefined) json(res, 401, { error: "unauthorized" })
       else json(res, 200, { id: device.id, name: device.name, maxTrust: deps.config().maxTrust })
+      return
+    }
+    if (path === "/api/push/key") {
+      // **公钥不需要令牌**：它本来就是要发给客户端的东西，
+      // 而 `PushManager.subscribe()` 得先拿到它才能生成订阅
+      json(res, 200, { key: deps.pushKey() })
+      return
+    }
+    if (path === "/api/push/subscribe" && req.method === "POST") {
+      void handleSubscribe(deps, req, res).catch((error: unknown) => {
+        deps.log("error", `处理推送订阅失败：${String(error)}`)
+        json(res, 500, { error: "internal" })
+      })
       return
     }
     if (path === WS_PATH) {

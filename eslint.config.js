@@ -120,6 +120,18 @@ export default tseslint.config(
     },
   },
 
+  // ── service worker：另一套全局，也没有 window ─────────────────
+  {
+    files: ["apps/web/public/*.js"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        URL: "readonly",
+        console: "readonly",
+      },
+    },
+  },
+
   // ── main 进程与脚本：允许 IO 与 console ─────────────────────────
   {
     files: [

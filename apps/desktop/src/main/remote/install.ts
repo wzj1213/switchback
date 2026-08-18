@@ -9,6 +9,7 @@ import type { Settings } from "../../shared/settings.js"
 import { assertTrustedAuthority } from "./fence.js"
 import { createTokenStore, type Device } from "./tokens.js"
 import { startRemote, type RemoteServer } from "./server.js"
+import { createRelay, loadVapid, type Relay } from "./relay.js"
 
 /**
  * 把远程服务端接到应用上：设备表落盘、按设置起停、给设置面板开几条窄通道。
@@ -43,6 +44,13 @@ export interface RemoteInstallDeps {
 }
 
 export interface RemoteInstall {
+  /**
+   * 「有人在等你」往手机上送的那条路。
+   *
+   * **在 `attachHost` 之前拿不到**（它要设备表），所以 `index.ts` 用一个
+   * 后绑的引用把它接给 `attention`。少了这一步，推送就只是一个没人调的函数。
+   */
+  relay: Relay
   status: () => RemoteStatus
   /** 设置改了之后调一次：该起的起、该停的停。 */
   sync: () => Promise<void>
@@ -114,6 +122,7 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
     server: undefined,
     error: undefined,
   }
+  const relay = createRelay({ tokens, sinks: deps.sinks, log: deps.log, vapid: loadVapid(deps.log) })
 
   const status = (): RemoteStatus => {
     const remote = deps.settings().remote
@@ -128,7 +137,7 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
   }
 
   const sync = async (): Promise<void> => {
-    await syncOnce(deps, tokens, state)
+    await syncOnce(deps, tokens, state, relay)
   }
   /**
    * 吊销一台设备：先删记录，**再把它现在连着的那些连接掐掉**。
@@ -144,7 +153,7 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
   }
 
   installChannels({ status, sync, revoke, pair: () => { tokens.startPairing() } })
-  return { status, sync, close: () => stop(state, deps.log) }
+  return { relay, status, sync, close: () => stop(state, deps.log) }
 }
 
 
@@ -153,6 +162,7 @@ async function syncOnce(
   deps: RemoteInstallDeps,
   tokens: ReturnType<typeof createTokenStore>,
   state: { server: RemoteServer | undefined; error: string | undefined },
+  relay: Relay,
 ): Promise<void> {
   const remote = deps.settings().remote
     // **形状校验放在最前，不管服务端在不在跑。**
@@ -179,6 +189,7 @@ async function syncOnce(
       state.server = await startRemote({
         config: () => deps.settings().remote,
         webRoot: webRoot(),
+        pushKey: relay.key,
         tokens,
         ledger: deps.ledger,
         sinks: deps.sinks,

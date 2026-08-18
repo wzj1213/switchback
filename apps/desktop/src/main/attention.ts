@@ -48,7 +48,16 @@ interface Running {
 /** 多久以内跑完的不出声。和转录区那块秒表共用一个阈值与理由。 */
 const QUIET_MS = 15_000
 
-export function createAttention(windows: () => readonly BrowserWindow[]): Attention {
+/**
+ * 除了系统通知之外再送一份的地方（远程推送）。
+ *
+ * **和系统通知共用同一个判据**（窗口在前台就不出声），但**不共用抑制的理由**：
+ * 「一次挂起只响一次」那条对推送同样成立，而「有人正看着这条会话」
+ * 是推送独有的一条，判在 `remote/relay.ts` 里——那一层才知道谁在看什么。
+ */
+export type Relay = (threadId: ThreadId, title: string, body: string) => void
+
+export function createAttention(windows: () => readonly BrowserWindow[], relay?: Relay): Attention {
   const pending = new Set<string>()
   const announced = new Set<string>()
   /** 会话标题：通知要说清是哪一条。从 thread 那几条事件顺手记，不加协议字段。 */
@@ -74,7 +83,11 @@ export function createAttention(windows: () => readonly BrowserWindow[]): Attent
   /** 通知的正文：会话名打头——你可能同时开着四条，不说是哪条等于没说。 */
   const tell = (threadId: ThreadId, body: string): void => {
     if (focused()) return
-    new Notification({ title: titles.get(threadId) ?? "omni", body, silent: false }).on("click", raise).show()
+    const title = titles.get(threadId) ?? "omni"
+    new Notification({ title, body, silent: false }).on("click", raise).show()
+    // 同一个出口再送一份到手机上。**不在这里判「要不要推」**——
+    // 那要知道谁正看着哪条会话，而那是远程那一层才有的信息
+    relay?.(threadId, title, body)
   }
   const turns = watchTurns(tell)
 
@@ -85,7 +98,7 @@ export function createAttention(windows: () => readonly BrowserWindow[]): Attent
       }
       if (event.type === "thread.renamed") titles.set(event.threadId, event.title)
       turns.note(event)
-      const seen = approvalOf(event)
+      const seen = approvalOf(event, turns.threadOf)
       if (seen === undefined) return
       if (seen.pending) {
         if (pending.has(seen.id)) return
@@ -100,6 +113,9 @@ export function createAttention(windows: () => readonly BrowserWindow[]): Attent
         })
           .on("click", raise)
           .show()
+        // **审批是最该推的那一件**：agent 停在那儿无超时地等，而人多半不在电脑前。
+        // 正文用 `summary`（工具名 + 一句概述），不放命令原文——通知会显示在锁屏上
+        relay?.(seen.threadId, titles.get(seen.threadId) ?? "omni 在等你确认", seen.summary)
         return
       }
       pending.delete(seen.id)
@@ -122,7 +138,7 @@ export function createAttention(windows: () => readonly BrowserWindow[]): Attent
 export function watchTurns(
   tell: (threadId: ThreadId, body: string) => void,
   now: () => number = Date.now,
-): { note: (event: Event) => void } {
+): { note: (event: Event) => void; threadOf: (turnId: TurnId) => ThreadId | undefined } {
   const running = new Map<TurnId, Running>()
   const note = (event: Event): void => {
     if (event.type === "turn.started") {
@@ -142,7 +158,8 @@ export function watchTurns(
     if (now() - was.startedAt < QUIET_MS) return
     tell(was.threadId, `跑完了，用了 ${spent(now() - was.startedAt)}`)
   }
-  return { note }
+  // 审批卡上只有 `turnId`，而推送要能直达那条会话。这张表本来就在，顺手开一个口
+  return { note, threadOf: (turnId) => running.get(turnId)?.threadId }
 }
 
 /**
@@ -161,10 +178,24 @@ function spent(ms: number): string {
   return seconds === 0 ? `${String(minutes)} 分` : `${String(minutes)} 分 ${String(seconds)} 秒`
 }
 
-/** 这条事件是不是在说「某张审批卡的状态变了」。 */
-function approvalOf(event: Event): { id: string; pending: boolean; summary: string } | undefined {
+/**
+ * 这条事件是不是在说「某张审批卡的状态变了」。
+ *
+ * `threadId` 是推送要用的——通知点开之后得能直达那条会话，
+ * 而 item 上没有会话 id，只能从 `turnId` 反查。这里用 `turns` 那张表
+ * （`watchTurns` 已经在维护它），所以要把它传进来。
+ */
+function approvalOf(
+  event: Event,
+  threadOf: (turnId: TurnId) => ThreadId | undefined,
+): { id: string; pending: boolean; summary: string; threadId: ThreadId } | undefined {
   if (event.type !== "item.started" && event.type !== "item.updated") return undefined
   const item = event.item
   if (item.kind !== "approval") return undefined
-  return { id: item.id, pending: item.status === "pending", summary: item.summary }
+  return {
+    id: item.id,
+    pending: item.status === "pending",
+    summary: item.summary,
+    threadId: threadOf(item.turnId) ?? "",
+  }
 }

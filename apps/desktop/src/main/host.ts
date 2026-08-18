@@ -9,7 +9,7 @@ import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
-import { createAttention, type Attention } from "./attention.js"
+import { createAttention, type Attention, type Relay } from "./attention.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
 import type { Logger } from "./log.js"
@@ -148,11 +148,18 @@ function installBridgeChannels(deps: Channels): void {
   })
 }
 
-export function attachHost(sinks: Sinks, windows: () => readonly BrowserWindow[], log: Logger): Attached {
+export function attachHost(
+  sinks: Sinks,
+  windows: () => readonly BrowserWindow[],
+  log: Logger,
+  relay?: Relay,
+): Attached {
   const seen = { thread: undefined as ThreadId | undefined }
-  // 叫人这件事仍然认窗口：`isFocused` / `show` / `focus` 是窗口才有的动作。
-  // 远程客户端的通知走另一条路（推送），不从这个出口出去
-  const attention = createAttention(windows)
+  // 叫人这件事认窗口（`isFocused` / `show` / `focus` 是窗口才有的动作），
+  // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
+  // 「窗口在前台就不出声」这条判据两边共用；「有人正看着这条会话」
+  // 那条判在远程那一层，因为只有它知道谁在看什么
+  const attention = createAttention(windows, relay)
 
   const { emit, ledger } = createOutlet({ sinks, attention, log, seen })
 

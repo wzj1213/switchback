@@ -44,6 +44,28 @@ export function App(): React.JSX.Element {
     [watch],
   )
 
+  // 从通知点进来的：`?thread=` 是新开窗口那条路，`postMessage` 是
+  // 已经开着一扇窗那条路（service worker 优先找已开的那扇，见 `public/sw.js`）
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("thread")
+    if (wanted !== null && wanted !== "") {
+      setSelected(wanted)
+      watch(wanted)
+      window.history.replaceState({ omni: wanted }, "", "/")
+    }
+    const onMessage = (event: MessageEvent<{ type?: string; threadId?: string }>): void => {
+      if (event.data.type !== "open-thread") return
+      const id = event.data.threadId
+      if (id === undefined || id === "") return
+      setSelected(id)
+      watch(id)
+    }
+    navigator.serviceWorker.addEventListener("message", onMessage)
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage)
+    }
+  }, [watch])
+
   useEffect(() => {
     // 打好基底：首屏那一项也带上 state，前进/后退才对得起来
     window.history.replaceState({ omni: undefined }, "")
@@ -86,7 +108,7 @@ export function App(): React.JSX.Element {
       )}
       <div className="app__panes">
         <aside className="pane pane--list">
-          <Threads remote={remote} selected={selected} onOpen={open} onUnpair={unpair} />
+          <Threads remote={remote} selected={selected} onOpen={open} onUnpair={unpair} token={token} />
         </aside>
         <main className="pane pane--detail">
           {thread === undefined ? (

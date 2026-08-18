@@ -1,6 +1,7 @@
 import type { Thread, ThreadId } from "@omni/protocol"
 import { itemsOf, threadRowsOf } from "@omni/store"
 import type { Remote } from "../useRemote.js"
+import { PushToggle } from "../components/PushToggle.js"
 
 /**
  * 会话列表。
@@ -32,11 +33,13 @@ export function Threads({
   selected,
   onOpen,
   onUnpair,
+  token,
 }: {
   remote: Remote
   selected: ThreadId | undefined
   onOpen: (id: ThreadId) => void
   onUnpair: () => void
+  token: string
 }): React.JSX.Element {
   const rows = [...threadRowsOf(remote.state)]
     .filter((row) => row.thread.provisional !== true)
@@ -82,11 +85,14 @@ export function Threads({
           ))}
         </ul>
       )}
-      {remote.me === undefined ? null : (
-        <footer className="threads__foot">
-          {remote.me.name} · 远程上限 {remote.me.maxTrust}
-        </footer>
-      )}
+      <footer className="threads__foot">
+        <PushToggle token={token} />
+        {remote.me === undefined ? null : (
+          <span className="threads__who">
+            {remote.me.name} · 远程上限 {remote.me.maxTrust}
+          </span>
+        )}
+      </footer>
     </div>
   )
 }

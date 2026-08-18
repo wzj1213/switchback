@@ -58,6 +58,7 @@ async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[
       maxTrust: options.maxTrust ?? "full",
     }),
     webRoot: dir,
+    pushKey: () => "测试用的假公钥",
     tokens,
     ledger,
     sinks: {
