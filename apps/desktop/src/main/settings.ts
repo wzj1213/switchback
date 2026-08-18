@@ -77,10 +77,26 @@ function remote(raw: unknown): Settings["remote"] {
   return {
     enabled: it.enabled === true,
     port,
-    trustedHosts: strings(it.trustedHosts) ?? DEFAULTS.remote.trustedHosts,
+    trustedHosts: (strings(it.trustedHosts) ?? DEFAULTS.remote.trustedHosts).map(authorityOf),
     maxTrust:
       typeof it.maxTrust === "string" && TRUSTS.has(it.maxTrust) ? (it.maxTrust as Trust) : DEFAULTS.remote.maxTrust,
   }
+}
+
+/**
+ * 把 `https://host:port` 收成 `host:port`。
+ *
+ * **这一条是踩出来的。** 那一栏要填的是隧道那头的域名，而人手上现成的那一串
+ * 恰恰是**手机上打开的完整地址**——粘进去带着 `https://` 是最自然的动作，
+ * 不是打错。而闸门比的是 `Host` 头，那里面从来没有 scheme，于是一路 403。
+ *
+ * 只脱 scheme，**别的一概不动**：带路径的（`host/path`）仍然要大声失败，
+ * 因为那说明人理解错了这一栏是什么——`host/path` 会把整个主机名授权出去，
+ * 而他以为自己只授权了那条路径。**能猜准的替他做，猜不准的当面说。**
+ */
+function authorityOf(entry: string): string {
+  const m = /^https?:\/\/([^/?#]+)\/?$/iu.exec(entry.trim())
+  return m?.[1] ?? entry.trim()
 }
 
 /** 一串字符串。不是数组、或者混进了别的类型，就当没有。 */

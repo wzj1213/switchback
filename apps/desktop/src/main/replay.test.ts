@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { Thread, ThreadId } from "@omni/protocol"
 import { initial, reduceAll, threadRowsOf } from "@omni/store"
-import { replayEvents, type ThreadHistory } from "./host.js"
+import type { ThreadHistory } from "./host.js"
+import { replayEvents } from "./scope.js"
 
 const thread = (id: string, title: string): Thread => ({
   id,

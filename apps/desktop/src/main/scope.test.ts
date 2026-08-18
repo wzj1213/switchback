@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread } from "@omni/protocol"
-import { headerOf, scopeReplay, withCurrent } from "./scope.js"
+import { REMOTE_THREAD_CHARS, bodyOf, headerOf, scopeReplay, withCurrent } from "./scope.js"
 import type { ThreadHistory } from "./host.js"
 
-const msg = (id: string): Item => ({ id, turnId: "u", kind: "user_message", at: 0, text: "hi" })
+const msg = (id: string, text = "hi"): Item => ({ id, turnId: "u", kind: "user_message", at: 0, text })
 
 const record = (id: string, title = id): Thread => ({
   id,
@@ -25,39 +25,101 @@ const thread = (id: string, items: number): ThreadHistory => ({
   ],
 })
 
-describe("按预算挑哪些会话带正文", () => {
+/**
+ * 一条大约 `bytes` 字节的会话，摊成很多条**正常大小**的事件。
+ *
+ * 真机上那两条就是这个形状：1549 条事件、2.5 MB，平均一条 1.6 KB
+ *（工具输出撑的）。**不是一条巨大的事件**——那种会被 `bodyOf` 整条丢掉，
+ * 演不出「条数看着小、字节大两个数量级」这件事。
+ */
+const fat = (id: string, bytes: number): ThreadHistory => {
+  const per = 1600
+  const n = Math.max(1, Math.round(bytes / per))
+  return {
+    id,
+    events: [
+      { type: "thread.started", at: 0, thread: record(id) },
+      ...Array.from({ length: n }, (_, i): Event => ({
+        type: "item.started",
+        at: i,
+        item: msg(`${id}-${String(i)}`, "x".repeat(per - 120)),
+      })),
+    ],
+  }
+}
+
+const sizeOf = (t: { events: readonly Event[] }): number =>
+  t.events.reduce((n, e) => n + JSON.stringify(e).length, 0)
+
+describe("按大小挑哪些会话带正文", () => {
   it("不给预算 = 全带（桌面窗口那条路，同机 IPC 不心疼）", () => {
-    const scoped = scopeReplay([thread("a", 100), thread("b", 100)])
+    const scoped = scopeReplay([fat("a", 9_000_000), fat("b", 9_000_000)])
     expect(scoped.bodies.size).toBe(2)
     expect(scoped.deferred).toBe(0)
   })
 
   it("装得下就都带", () => {
-    const scoped = scopeReplay([thread("a", 5), thread("b", 5)], 100)
+    const scoped = scopeReplay([fat("a", 100), fat("b", 100)], 100_000)
     expect([...scoped.bodies]).toEqual(["a", "b"])
     expect(scoped.deferred).toBe(0)
   })
 
+  it("**判据是大小不是条数**——真机上就是栽在这里：九条会话才 3291 条事件，合起来 5.2 MB", () => {
+    // 两条「事件不多但很大」的会话：按条数算怎么都装得下，按大小算装不下。
+    // 单条封顶之后各占 REMOTE_THREAD_CHARS，两条就超过下面这个预算
+    const scoped = scopeReplay([fat("巨", 300_000), fat("也巨", 300_000)], REMOTE_THREAD_CHARS + 1000)
+    expect([...scoped.bodies]).toEqual(["巨"])
+    expect(scoped.deferred).toBe(1)
+  })
+
   it("**最近写过的优先**——`journal.list()` 本来就是这个顺序，人回头找的也是刚才那条", () => {
-    const scoped = scopeReplay([thread("最近", 50), thread("上周", 50), thread("上个月", 50)], 60)
+    const scoped = scopeReplay([fat("最近", 60_000), fat("上周", 60_000), fat("上个月", 60_000)], 70_000)
     expect([...scoped.bodies]).toEqual(["最近"])
     expect(scoped.deferred).toBe(2)
   })
 
-  it("**第一条永远带正文，哪怕它自己就超预算**——打开看到空白是这一端最没用的状态", () => {
-    const scoped = scopeReplay([thread("巨大", 9999), thread("小的", 1)], 10)
+  it("**第一条永远带正文**——打开看到空白是这一端最没用的状态", () => {
+    const scoped = scopeReplay([fat("巨大", 5_000_000), fat("小的", 10)], 1000)
     expect(scoped.bodies.has("巨大")).toBe(true)
-    expect(scoped.bodies.has("小的")).toBe(false)
   })
 
-  it("超预算的那条之后，装得下的还能接着装——判据是逐条累加不是一刀切", () => {
-    const scoped = scopeReplay([thread("a", 5), thread("巨大", 999), thread("c", 5)], 20)
-    expect([...scoped.bodies]).toEqual(["a", "c"])
-    expect(scoped.deferred).toBe(1)
+  it("**但第一条也封了顶**——否则一条 2.5 MB 的会话就能把整份预算架空", () => {
+    const scoped = scopeReplay([fat("巨大", 5_000_000)], 1_000_000)
+    expect(scoped.trimmed).toBe(1)
   })
 
   it("一条会话都没有时不报错", () => {
-    expect(scopeReplay([], 100)).toEqual({ bodies: new Set(), deferred: 0 })
+    expect(scopeReplay([], 100_000)).toEqual({ bodies: new Set(), deferred: 0, trimmed: 0 })
+  })
+})
+
+describe("单条正文封顶：丢开头留尾巴", () => {
+  const many = (id: string, n: number): ThreadHistory => ({
+    id,
+    events: [
+      { type: "thread.started", at: 0, thread: record(id) },
+      ...Array.from({ length: n }, (_, i): Event => ({ type: "item.started", at: i, item: msg(`${id}-${String(i)}`) })),
+    ],
+  })
+
+  it("装得下就原样不动", () => {
+    const out = bodyOf(many("a", 3), 100_000)
+    expect(out.trimmed).toBe(false)
+    expect(out.events).toHaveLength(4)
+  })
+
+  it("**留的是尾巴不是开头**——你回头找的是刚才那几句，不是三小时前那句", () => {
+    const out = bodyOf(many("a", 200), 2000)
+    expect(out.trimmed).toBe(true)
+    const ids = out.events.filter((e) => e.type === "item.started").map((e) => e.item.id)
+    expect(ids.at(-1)).toBe("a-199")
+    expect(ids).not.toContain("a-0")
+  })
+
+  it("**头一条不丢**——丢了这条会话在归约器里就无处安放", () => {
+    const out = bodyOf(many("a", 200), 10)
+    expect(out.events[0]).toMatchObject({ type: "thread.started" })
+    expect(sizeOf(out)).toBeGreaterThan(0)
   })
 })
 

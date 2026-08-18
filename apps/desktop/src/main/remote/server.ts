@@ -179,12 +179,19 @@ function safeParse(text: string): Record<string, unknown> | undefined {
   }
 }
 
+/** 被闸门拦下时给人的那句话。**指向要改的那一栏**，而不是只说「被拒了」。 */
+const FENCE_HINT = "在那台 Mac 上打开 omni → 设置 → 远程访问，把「隧道那头的域名」填成你现在地址栏里的 host[:端口]（不要带 https://）"
+
 function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) => void {
   return (req, res) => {
     const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts)
     if (!verdict.ok) {
       deps.log("warn", `拦下一个请求：${verdict.reason}`)
-      json(res, 403, { error: "forbidden" })
+      // **把理由说出来。** 之前这里只回一个 `{"error":"forbidden"}`——
+      // 而人在手机上看到的就是「Forbidden」四个字母，没有任何线索指向
+      // 「桌面那台上域名那一栏填错了」。这段话不泄露任何东西：
+      // 对面已经知道自己被拦了，也已经知道自己用的是哪个 Host
+      json(res, 403, { error: "forbidden", reason: verdict.reason, hint: FENCE_HINT })
       return
     }
     const path = (req.url ?? "/").split("?")[0] ?? "/"

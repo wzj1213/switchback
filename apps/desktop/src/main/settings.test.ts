@@ -62,6 +62,28 @@ describe("偏好", () => {
       expect(createSettings(log).get().remote.enabled).toBe(true)
     })
 
+    /** 归一之后的 trustedHosts。 */
+    const hosts = (raw: unknown): readonly string[] => {
+      write({ enabled: true, trustedHosts: raw })
+      return createSettings(log).get().remote.trustedHosts
+    }
+
+    it("**粘一整个 `https://host:port` 也认**——那一串正是人在手机上打开的地址，粘进来带 scheme 是最自然的动作，不是打错", () => {
+      expect(hosts(["https://omni.example.com:8443"])).toEqual(["omni.example.com:8443"])
+    })
+
+    it("http 的、末尾带斜杠的、前后带空格的，一样收", () => {
+      expect(hosts(["http://omni.example.com/", "  https://a.b:1  "])).toEqual(["omni.example.com", "a.b:1"])
+    })
+
+    it("裸的原样不动", () => {
+      expect(hosts(["omni.example.com:8443"])).toEqual(["omni.example.com:8443"])
+    })
+
+    it("**带路径的不猜**——`host/path` 会把整个主机名授权出去，而人以为只授权了那条路径。留给启动时大声失败", () => {
+      expect(hosts(["https://omni.example.com/path"])).toEqual(["https://omni.example.com/path"])
+    })
+
     it("**档位认不出就回默认，绝不落到最宽的那一档**", () => {
       write({ maxTrust: "sudo" })
       expect(createSettings(log).get().remote.maxTrust).toBe("auto-edit")

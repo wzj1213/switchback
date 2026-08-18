@@ -10,7 +10,7 @@ import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
-import { REMOTE_ITEM_BUDGET, withCurrent } from "./scope.js"
+import { REMOTE_REPLAY_CHARS, REMOTE_THREAD_CHARS, bodyOf, withCurrent } from "./scope.js"
 import { installRemote } from "./remote/index.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
@@ -211,7 +211,7 @@ function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>)
     replay: async (sink) => {
       // **远程那条给预算**：同机 IPC 上一份几 MB 的全量只是一次结构化克隆，
       // 而在蜂窝网上那是十几秒的「正在连接…」
-      await rebuild(attached, sink, REMOTE_ITEM_BUDGET)
+      await rebuild(attached, sink, REMOTE_REPLAY_CHARS)
     },
     // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档
     trustOf: (threadId) => attached.host.live().find((t) => t.id === threadId)?.trust,
@@ -222,9 +222,13 @@ function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>)
     history: async (threadId) => {
       await attached.journal.flush().catch(() => undefined)
       const events = await attached.journal.read(threadId)
+      // **单独补也要封顶。** 一条 2.5 MB 的会话单发一份同样是几百个分片，
+      // 手机上同样收不完——分级省下来的会在这一步原样还回去
+      const body = bodyOf({ id: threadId, events }, REMOTE_THREAD_CHARS)
+      if (body.trimmed) log.write("info", "remote", `${threadId} 的正文太长，只补了尾巴`)
       // **结尾用当前状态收口**，规则和全量那条路一样：磁盘上那份是上次落盘的样子，
       // 客户端照着它重建这条会话，会把一条正在跑的改回 idle、把改过的名字改回去
-      return withCurrent(events, attached.host.live().find((t) => t.id === threadId), Date.now())
+      return withCurrent(body.events, attached.host.live().find((t) => t.id === threadId), Date.now())
     },
     log,
   })

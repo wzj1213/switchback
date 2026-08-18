@@ -161,6 +161,22 @@ function raw(port: number, path: string, headers: Record<string, string> = {}): 
   })
 }
 
+/** 同上，但要正文——403 说不说得出理由是靠正文验的。 */
+function rawBody(port: number, path: string, headers: Record<string, string> = {}): Promise<string> {
+  return new Promise((done, fail) => {
+    const req = request({ host: "127.0.0.1", port, path, method: "GET", headers }, (res) => {
+      let body = ""
+      res.setEncoding("utf8")
+      res.on("data", (chunk: string) => (body += chunk))
+      res.on("end", () => {
+        done(body)
+      })
+    })
+    req.on("error", fail)
+    req.end()
+  })
+}
+
 describe("配对", () => {
   it("码对了就换到令牌，`/api/me` 认得出它", async () => {
     const h = await boot()
@@ -297,6 +313,17 @@ describe("WebSocket", () => {
     await settle(120)
     expect(Object.keys(h.ledger.stats().acked)).toHaveLength(0)
     expect(h.sinks).toHaveLength(0)
+  })
+})
+
+describe("被闸门拦下时说得出为什么", () => {
+  it("**403 的正文要指向要改的那一栏**——手机上只看到「Forbidden」四个字母时，没有任何线索指向桌面那台", async () => {
+    const h = await boot({ trustedHosts: ["omni.example.com"] })
+    // `fetch` 改不了 Host，走裸 http
+    const body = await rawBody(h.server.port(), "/api/me", { host: "someone-else.example.com" })
+    expect(body).toContain("trustedHosts")
+    expect(body).toContain("远程访问")
+    expect(body).toContain("不要带 https://")
   })
 })
 

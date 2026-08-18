@@ -13,7 +13,7 @@ import { createAttention, type Attention, type Relay } from "./attention.js"
 import { createAwake, type Awake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
-import { headerOf, scopeReplay } from "./scope.js"
+import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
 
 export interface Attached {
@@ -322,88 +322,6 @@ export interface ThreadHistory {
   events: readonly Event[]
 }
 
-/**
- * 把「历史 + 活着的会话 + 引擎清单」拼成一份全量。
- *
- * 单独一个纯函数是因为顺序在这里**是正确性问题**，而它不该只能靠起 Electron 来验。
- *
- * ## 为什么要反着喂
- *
- * `journal.list()` 给的是**最近写过的在前**（那是一个列表 API 该有的样子），
- * 而归约器 `reduce.ts` 是 `order: [id, ...order]`——**往前插**。
- * 顺着喂，最新的那个会被后来的旧会话一路顶到底下，侧栏变成最旧在前。
- *
- * 这个 bug 一直都在，只是以前看不见：启动时最后总会新建一个会话，
- * 它往前一插就盖住了顺序不对这件事。重载时不新建会话，才露出来。
- */
-export interface ReplayInput {
-  engines: readonly EngineInfo[]
-  /** 磁盘上的历史，最近写过的在前。 */
-  threads: readonly ThreadHistory[]
-  alive: ReadonlyMap<ThreadId, Thread>
-  now: number
-  /**
-   * 哪些会话带正文。不给 = 全带（桌面窗口那条路，同机 IPC 不心疼）。
-   * 远程那条给一个预算，超出的只发头——见 `scope.ts`。
-   */
-  bodies?: ReadonlySet<ThreadId>
-}
-
-export function replayEvents({ engines, threads, alive, now, bodies }: ReplayInput): readonly Event[] {
-  const events: Event[] = [{ type: "engines.available", at: now, engines }]
-  // 反着喂：归约器往前插，所以最旧的先进去，最新的才会落在侧栏顶上
-  for (const thread of [...threads].reverse()) {
-    if (thread.events.length === 0) continue
-    // **一句话都没说过的会话不算历史。**
-    //
-    // omni 每次启动都会开一个默认会话，用不用它是另一回事——于是每启动一次
-    // 侧栏就多一行「新会话」。跑一周下来那一列全是空壳，把真正的历史挤没了。
-    //
-    // 这种会话也确实没有可续的东西：续跑要靠引擎侧的句柄接上一段对话，
-    // 而它压根没有对话。活着的那个例外——它正开着，用户随时会在里面打字。
-    if (alive.get(thread.id) === undefined && !thread.events.some((e) => e.type === "item.started" && e.item.kind === "user_message")) {
-      continue
-    }
-    events.push(...(bodies === undefined || bodies.has(thread.id) ? thread.events : headerOf(thread)))
-    const live = alive.get(thread.id)
-    if (live !== undefined) {
-      // 用宿主手上那份当前状态收尾：journal 里最后一条可能停在轮次中间
-      events.push({ type: "thread.updated", at: now, thread: live })
-      continue
-    }
-    const last = [...thread.events]
-      .reverse()
-      .find((e) => e.type === "thread.started" || e.type === "thread.updated")
-    if (last === undefined || (last.type !== "thread.started" && last.type !== "thread.updated")) continue
-    // 回放出来的会话背后没有引擎进程，补一条 `detached` 让界面关掉输入框——
-    // 一个能打字却答非所问的输入框比没有输入框糟得多
-    events.push({ type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } })
-  }
-  events.push(...unlogged(threads, alive, now))
-  return events
-}
-
-/**
- * **活着、但磁盘上一个字都没有的会话**——也就是临时会话（见 `Thread.provisional`）。
- *
- * 它不落盘是有意的（`Ctx.uncommitted`），代价是这份全量拼不出它：全量是从
- * journal 拼的。不补的话，⌘R 之后那个临时窗口整个消失，而它背后的引擎进程
- * 还活着——`rebuild` 甚至会把它的 id 当成「重载后该选中的那个」返回，
- * 于是界面落在一条它自己都不知道存在的会话上。
- *
- * 排在最后：归约器往前插，所以最后进去的落在侧栏最上面——临时会话本来就是
- * 你正在用的那个。（它不会真的出现在侧栏里，那是渲染层按 `provisional` 过滤的。）
- */
-function unlogged(
-  threads: readonly ThreadHistory[],
-  alive: ReadonlyMap<ThreadId, Thread>,
-  now: number,
-): readonly Event[] {
-  const logged = new Set(threads.filter((t) => t.events.length > 0).map((t) => t.id))
-  return [...alive.values()]
-    .filter((thread) => !logged.has(thread.id))
-    .map((thread) => ({ type: "thread.started" as const, at: now, thread }))
-}
 
 /**
  * 把磁盘上的历史 + 当前引擎清单凑成一份「世界现在长什么样」，直接发给某一个窗口。
@@ -467,8 +385,12 @@ export async function rebuild(
   // 判它需要给每条事件一个身份，那是把复杂度推给每一个产生事件的地方。
   const missed = attached.ledger.since(before, attached.ledger.epoch) ?? []
   const scoped = scopeReplay(threads, budget)
-  if (scoped.deferred > 0) {
-    attached.log.write("info", "remote", `全量只带了最近几条的正文，另外 ${String(scoped.deferred)} 条先发头`)
+  if (scoped.deferred > 0 || scoped.trimmed > 0) {
+    const parts = [
+      scoped.deferred > 0 ? `${String(scoped.deferred)} 条先发头` : "",
+      scoped.trimmed > 0 ? `${String(scoped.trimmed)} 条只带了尾巴` : "",
+    ].filter((s) => s !== "")
+    attached.log.write("info", "remote", `全量按大小收窄了：${parts.join("，")}`)
   }
   const events = [
     ...replayEvents({
@@ -476,7 +398,7 @@ export async function rebuild(
       threads,
       alive,
       now: Date.now(),
-      ...(budget === undefined ? {} : { bodies: scoped.bodies }),
+      ...(budget === undefined ? {} : { bodies: scoped.bodies, cap: REMOTE_THREAD_CHARS }),
     }),
     // **不落盘的那些现状要补在最后。** 斜杠命令和额度都不进 journal
     //（现问引擎的东西落盘只会在重放时塞回一份过期的），于是全量里没有它们；

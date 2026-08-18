@@ -23,7 +23,13 @@ const TRUSTS: readonly { id: Trust; label: string }[] = [
 ]
 
 function statusText(status: RemoteStatus): string {
-  if (status.error !== undefined) return `起不来：${status.error}`
+  // **配置有问题和起不来是两回事。** 之前这里一律说「起不来」——
+  // 而最常见的那种（域名那栏填错）恰恰是**服务端好好地在听**，
+  // 只是每个从隧道进来的请求都被闸门拦掉。写「起不来」会把人支到
+  // 完全错误的方向上去查（端口？防火墙？），而真正要改的是下面那一栏
+  if (status.error !== undefined) {
+    return status.listening ? `在听，但配置有问题：${status.error}` : `起不来：${status.error}`
+  }
   if (!status.enabled) return "关着"
   return status.listening ? `在听 127.0.0.1:${String(status.port)}` : "开着，但没在听"
 }
@@ -113,7 +119,7 @@ export function RemotePanel({
           >
             <code className="set__code">ssh -R 127.0.0.1:{settings.remote.port}:127.0.0.1:{settings.remote.port} 你的服务器</code>
           </Field>
-          <Field label="隧道那头的域名" hint="留空 = 只认回环。写成裸 host[:port]；带路径或 scheme 会在启动时报错">
+          <Field label="隧道那头的域名" hint="留空 = 只认回环。把手机上要打开的地址粘进来就行（`https://` 会自动去掉）；带路径的会报错">
             <input
               className="set__input"
               value={settings.remote.trustedHosts.join(" ")}

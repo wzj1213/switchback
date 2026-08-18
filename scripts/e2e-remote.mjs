@@ -29,6 +29,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import WebSocket from "ws"
+import { fixture } from "./e2e-fixture.mjs"
 
 const CDP = process.env["OMNI_E2E_CDP"] ?? "http://127.0.0.1:9222"
 const BASE = process.env["OMNI_E2E_BASE"] ?? "http://127.0.0.1:17802"
@@ -142,8 +143,13 @@ function checkReplay(frames, chunkCount) {
   const engines = events.find((e) => e.type === "engines.available")
   const names = engines === undefined ? "" : engines.engines.map((e) => `${e.id}=${e.state}`).join(" ")
   ok("全量里带着引擎清单", engines !== undefined, names)
+  // **按 id 数，别只数 `thread.started`。** 只发头的那些出的是 `headerOf`——
+  // 最后一条 thread 事件，很可能是 `thread.updated`。归约器两者都走
+  // `withThread`（照样建出那一行），所以只数 started 会**少报**，
+  // 看起来像「分级把会话弄丢了」，而其实一条没少
+  const rows = new Set(events.filter((e) => e.type === "thread.started" || e.type === "thread.updated").map((e) => e.thread.id))
   const started = events.filter((e) => e.type === "thread.started")
-  ok("全量里带着会话", started.length > 0, `${started.length} 条`)
+  ok("全量里带着会话", rows.size > 0, `${rows.size} 条（其中 ${started.length} 条带 started）`)
   // 分级 replay：宿主要说清楚这一份里**哪些会话带了正文**，
   // 会话侧照着它记「这条不用再补」。缺省（同机 IPC）才是「全都带」。
   // 这一份里它多半是空的——刚开的会话还没落盘；带内容的那份在第 12 步验
@@ -153,7 +159,7 @@ function checkReplay(frames, chunkCount) {
 }
 
 /**
- * 分级 replay 的另一半：预算、只发头、`watch` → `thread` 帧。
+ * 分级 replay：字节预算、只发头、`watch` → `thread` 帧。
  *
  * ## 为什么要往盘上放东西
  *
@@ -161,21 +167,25 @@ function checkReplay(frames, chunkCount) {
  * 而这条脚本不会去真跑一轮引擎。于是照原样连过去，磁盘上一条历史都没有，
  * `bodies` 必然是空的——那时候「它是不是数组」这一条等于什么都没验。
  *
- * 所以这里直接往 journal 目录里放两条历史。**这不是造假**：那是一份公开的
- * 落盘格式（一个会话一个 jsonl，一行一条事件），而「这台机器上攒了很多旧会话」
- * 正是分级 replay 唯一要处理的前提。目录路径也不猜——问应用自己要
- *（`window.omni.appInfo()`）。
+ * ## 为什么样本要按**字节**造
+ *
+ * 第一版这里造的是「5000 条极小的事件」，因为当时预算卡的是条数。
+ * 而真机上栽的恰恰是另一头：**九条会话才 3291 条事件，合起来 5.2 MB**——
+ * 条数远低于阈值，字节大两个数量级，于是九条全带正文、切成 271 个分片、
+ * 手机上一片空白。所以这里的样本必须是「事件不多但每条很大」的那种形状。
  */
 async function stepScoped(send, token) {
-  console.log("8. 分级 replay：预算、只发头、watch → thread 帧")
+  console.log("8. 分级 replay：大小预算、只发头、watch → thread 帧")
   const info = await evaluate(send, "window.omni.appInfo().then(s => JSON.stringify(s))")
   const dir = join(info.dataDir, "threads")
   await mkdir(dir, { recursive: true })
-  // 大的先写、小的后写：`list()` 按 mtime 倒序，于是「最近写过的」是小的那条。
-  // 预算 4000，大的 5000 条——它必然被留下只发头
-  await writeFile(join(dir, "e2e-big.jsonl"), fixture("e2e-big", 5000), "utf8")
-  await pause(50)
-  await writeFile(join(dir, "e2e-small.jsonl"), fixture("e2e-small", 3), "utf8")
+  // 六条各约 10 万码元。单条封顶 64K、整份预算 192K，所以最近那两三条带
+  //（裁过的）正文，更早的必然只发头。**先写的 mtime 早**，于是 t6 最新
+  const ids = ["e2e-t1", "e2e-t2", "e2e-t3", "e2e-t4", "e2e-t5", "e2e-t6"]
+  for (const id of ids) {
+    await writeFile(join(dir, `${id}.jsonl`), fixture(id, 100_000), "utf8")
+    await pause(30)
+  }
 
   const { ws, frames } = await connect(token)
   ws.send(JSON.stringify({ type: "hello" }))
@@ -183,20 +193,29 @@ async function stepScoped(send, token) {
   const replay = frames.find((f) => f.type === "replay")
   const bodies = replay?.replay.bodies ?? []
   const events = replay?.replay.events ?? []
-  ok("**装得下的那条带了正文**", bodies.includes("e2e-small"), bodies.join(" "))
-  ok("**超预算的那条只发头**", !bodies.includes("e2e-big"))
-  const itemsOf = (id) => events.filter((e) => e.type === "item.started" && e.item.id.startsWith(id)).length
-  ok("只发头的那条在全量里真的没有正文", itemsOf("e2e-big") === 0, `big=${itemsOf("e2e-big")} small=${itemsOf("e2e-small")}`)
-  ok("但它还在列表里——头是一条不少的", events.some((e) => e.type === "thread.started" && e.thread.id === "e2e-big"))
+  const mine = ids.filter((id) => bodies.includes(id))
+  const deferred = ids.filter((id) => !bodies.includes(id))
+  ok("**最近那几条带正文**", mine.includes("e2e-t6"), mine.join(" "))
+  ok("**更早的只发头**——判据是大小，不是条数", deferred.length > 0, `留下 ${deferred.length} 条`)
+
+  const itemsOf = (id) => events.filter((e) => e.type === "item.started" && e.item.id.startsWith(`${id}-`)).length
+  const cold = deferred[0]
+  ok("只发头的那条在全量里真的没有正文", itemsOf(cold) === 0, `${cold} → ${itemsOf(cold)} 条`)
+  ok("但它还在列表里——头是一条不少的", events.some((e) => (e.type === "thread.started" || e.type === "thread.updated") && e.thread.id === cold))
+  ok(
+    "**带正文的那条也被裁过**——一条 2.5 MB 的会话足以把整份预算架空",
+    itemsOf("e2e-t6") > 0 && itemsOf("e2e-t6") < 100_000 / 1600,
+    `e2e-t6 → ${itemsOf("e2e-t6")} 条`,
+  )
 
   const count = () => frames.filter((f) => f.type === "thread").length
-  ws.send(JSON.stringify({ type: "watch", threadId: "e2e-small" }))
+  ws.send(JSON.stringify({ type: "watch", threadId: "e2e-t6" }))
   await pause(900)
   ok("**已经带了正文的那条不重复补**——这正是分级要省掉的东西", count() === 0)
-  ws.send(JSON.stringify({ type: "watch", threadId: "e2e-big" }))
+  ws.send(JSON.stringify({ type: "watch", threadId: cold }))
   await pause(2500)
   const patch = frames.find((f) => f.type === "thread")
-  ok("**打开只发头的那条，正文补上来了**", patch?.threadId === "e2e-big", `${patch?.events.length ?? 0} 条`)
+  ok("**打开只发头的那条，正文补上来了**", patch?.threadId === cold, `${patch?.events.length ?? 0} 条`)
   ws.send(JSON.stringify({ type: "watch", threadId: "根本没有这条" }))
   await pause(900)
   ok("要一条不存在的会话，不发空帧也不断连接", count() === 1)
@@ -205,36 +224,9 @@ async function stepScoped(send, token) {
   ok("连接还活着", frames.some((f) => f.type === "pong"))
 
   ws.close()
-  await rm(join(dir, "e2e-big.jsonl"), { force: true })
-  await rm(join(dir, "e2e-small.jsonl"), { force: true })
+  for (const id of ids) await rm(join(dir, `${id}.jsonl`), { force: true })
 }
 
-/** 一条会话的落盘历史。格式就是 journal 的：一行一条事件。 */
-function fixture(id, items) {
-  const thread = {
-    id,
-    title: id,
-    cwd: "/tmp",
-    engine: "codex",
-    trust: "auto-edit",
-    status: "idle",
-    createdAt: 1,
-    updatedAt: 1,
-    engineHistory: ["codex"],
-  }
-  const lines = [
-    { type: "thread.started", at: 1, thread },
-    { type: "turn.started", at: 1, turn: { id: `${id}-u`, threadId: id, engine: "codex", status: "running", startedAt: 1 } },
-  ]
-  for (let i = 0; i < items; i += 1) {
-    lines.push({
-      type: "item.started",
-      at: 1,
-      item: { id: `${id}-i${i}`, turnId: `${id}-u`, kind: "user_message", at: 1, text: "端到端验收" },
-    })
-  }
-  return lines.map((e) => JSON.stringify(e)).join("\n") + "\n"
-}
 
 async function stepCommands({ ws, frames, target }) {
   const events = () =>
