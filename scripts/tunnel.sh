@@ -10,9 +10,19 @@
 #
 # ## 这把钥匙能做什么
 #
-# 只有一件事：开 `127.0.0.1:17800` 这一个反向端口。服务器上的 authorized_keys
-# 写死了 `command="/bin/false"`（连一条命令都跑不了）和 `permitlisten`
-# （开不了别的端口）。泄漏出去的最坏后果是有人能占用那个端口，**不是拿到你的服务器**。
+# 只有一件事：开 `127.0.0.1:17800` 这一个反向端口。
+#
+# **`permitopen` 这一条是补上去的，原来漏了。** `restrict` 确实关掉了全部转发，
+# 但紧跟着的 `port-forwarding` 又把**本地转发和反向转发一起**打开了，而 `permitlisten`
+# 只管反向那一半。实测过：拿这把「受限」的钥匙跑
+# `ssh -L 19998:127.0.0.1:22 <用户>@服务器`，当场读到了 sshd 的版本横幅——
+# 也就是说它能把服务器当成任意 TCP 代理，包括内网和云厂商的元数据地址。
+#
+# **值是 `127.0.0.1:1` 而不是 `none`。** `none` 只在 sshd_config 的 `PermitOpen` 里有效；
+# 写进 authorized_keys 的 `permitopen` 要求 `host:port`，`none` 解析不出端口，
+# sshd 会把**整行判成无效**——表现是这把钥匙连认证都过不了（`Permission denied (publickey)`），
+# 而不是「转发被拒」。这一条是实测踩出来的：写 `none` 之后隧道当场起不来。
+# `127.0.0.1:1` 是个语法合法、实际上永远连不通的目标，效果等价于「本地转发全禁」。
 set -euo pipefail
 
 HOST="${OMNI_TUNNEL_HOST:-kr-omni}"
@@ -73,8 +83,18 @@ rotate)
   # 原来这里是「先 grep -v 删掉旧行、再追加新行」——那一步里
   # 新旧同时不成立，而且没有任何东西验过新的那把能不能用。
   # 这是一次性的、动别人服务器的操作，失败的代价是「人在外面、门开不了」。
+  # 端口要先验成纯数字：下面它会被拼进服务器上执行的那段 shell
+  case "$PORT" in
+  '' | *[!0-9]*)
+    echo "端口不合法：$PORT" >&2
+    exit 2
+    ;;
+  esac
   tag="omni-tunnel-$(date +%Y%m%d-%H%M%S)"
   echo "1/5 生成新密钥（${tag}）…"
+  # **先清掉上一次失败留下的半成品**：`ssh-keygen` 遇到已存在的文件会停在
+  # 一个 y/n 确认上，而它的输出被 `>/dev/null` 吞掉了——看起来就是卡死
+  rm -f "$KEY.new" "$KEY.new.pub"
   ssh-keygen -t ed25519 -N '' -C "$tag" -f "$KEY.new" >/dev/null
   pub="$(cat "$KEY.new.pub")"
 
@@ -85,7 +105,7 @@ rotate)
     cd ~/.ssh
     test -s authorized_keys
     cp authorized_keys authorized_keys.bak-\$(date +%Y%m%d-%H%M%S)
-    echo 'restrict,port-forwarding,command=\"/bin/false\",permitlisten=\"127.0.0.1:$PORT\" $pub' >> authorized_keys
+    echo 'restrict,port-forwarding,permitopen=\"127.0.0.1:1\",command=\"/bin/false\",permitlisten=\"127.0.0.1:$PORT\" $pub' >> authorized_keys
     chmod 600 authorized_keys
   "
 
@@ -114,15 +134,23 @@ rotate)
   sleep 1
 
   echo "4/5 新的能用，把旧的从服务器上删掉…"
-  ssh "${OMNI_ADMIN_HOST:-kr}" "
-    set -e
-    cd ~/.ssh
-    grep -v 'omni-tunnel' authorized_keys > authorized_keys.tmp || true
-    grep '$tag' authorized_keys >> authorized_keys.tmp
-    test -s authorized_keys.tmp
-    mv authorized_keys.tmp authorized_keys
-    chmod 600 authorized_keys
-  "
+  # **按密钥本体删，不按注释里的字符串。** 注释是自由文本：
+  # 另一台机器的隧道钥匙注释里同样写着 omni-tunnel，按子串删会把它一起删掉
+  #（那台机器于是在你毫不知情的情况下断了）；反过来，注释被人改过的旧钥匙又删不掉。
+  # 密钥本体是唯一能认准「就是这一把」的东西
+  old_key="$(awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^AAAA/) { print $i; exit } }' "$KEY.pub")"
+  if [ -z "$old_key" ]; then
+    echo "读不出旧公钥的本体（$KEY.pub），旧钥匙留在服务器上没删。手动清一下。" >&2
+  else
+    ssh "${OMNI_ADMIN_HOST:-kr}" "
+      set -e
+      cd ~/.ssh
+      grep -vF '$old_key' authorized_keys > authorized_keys.tmp
+      test -s authorized_keys.tmp
+      mv authorized_keys.tmp authorized_keys
+      chmod 600 authorized_keys
+    "
+  fi
 
   echo "5/5 换掉本机这一份…"
   mv "$KEY.new" "$KEY"
