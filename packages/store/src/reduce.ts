@@ -30,9 +30,26 @@ function withThread(state: ViewState, thread: ViewState["threads"][string]): Vie
 function appendItem(state: ViewState, threadId: ThreadId, item: Item, draft?: Draft): ViewState {
   const owner = draft?.owner ?? { ...state.owner }
   owner[item.id] = threadId
+  const list = state.items[threadId] ?? []
+  // **同一条 item 来两次就替换，不追加。**
+  //
+  // 全量重建拼的是两份来源：磁盘上的历史，加上「读磁盘期间又发生的那些」
+  //（见 `apps/desktop/src/main/host.ts` 的 `rebuild`）。两份**必然有重叠**——
+  // 一条事件既可能已经落进 journal，又还在保留缓冲里，而没有任何办法在
+  // 拼装时判断它进没进磁盘那一份。
+  //
+  // 于是这里把「应用两次」变成无害的：`item.started` 重复不再长出两条一样的
+  // item。反过来（拼装时去重）要求给每条事件一个身份，那是把复杂度推给
+  // **每一个**产生事件的地方，而这里只需要一次比较。
+  const at = list.findIndex((existing) => existing.id === item.id)
+  if (at !== -1) {
+    const updated = [...list]
+    updated[at] = item
+    return { ...state, items: { ...state.items, [threadId]: updated }, owner }
+  }
   return {
     ...state,
-    items: { ...state.items, [threadId]: [...(state.items[threadId] ?? []), item] },
+    items: { ...state.items, [threadId]: [...list, item] },
     owner,
   }
 }

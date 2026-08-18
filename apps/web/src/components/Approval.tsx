@@ -4,9 +4,13 @@ import type { ApprovalItem, Command, RememberScope } from "@omni/protocol"
 /**
  * 审批卡。**这一端最要紧的一屏。**
  *
- * 一条设计规矩：**命令原文必须看得见、看得准**。等宽字体、可横向滚动、
- * 不换行不截断——要被读准的正是那半截路径和那个参数。桌面端为此改过一次
- * （「审批卡上的命令原文改用等宽字体」），这里从一开始就照那条来。
+ * 一条设计规矩：**命令原文必须整条看得见、看得准**。等宽字体、**折行显示**、
+ * 不截断——要被读准的正是那半截路径和那个参数。
+ *
+ * 折行而不是横滚，是出图之后改的：横滚意味着「屏幕外还有半条命令，
+ * 你得先想到去划一下」，而这一屏的全部意义正是**你在按「允许」之前读全了它**。
+ * 命令没有列要对齐，所以折行不损失任何东西；`pre` 留给真的有列的东西
+ *（工具输出、diff）。样式在 `styles.css` 的 `.approval__cmd--block`。
  *
  * 记忆范围三档在手机上收成两档：**「就这次」和「本会话」**。
  * `project` 级规则会落盘、跨会话生效，那是在一块小屏幕上做一个长期决定——
@@ -22,9 +26,12 @@ const SCOPES: readonly { id: RememberScope; label: string }[] = [
 export function Approval({
   item,
   send,
+  offline,
 }: {
   item: ApprovalItem
-  send: (command: Command) => void
+  send: (command: Command) => boolean
+  /** 没连上时两颗按钮都禁掉。**点了没反应比点不了糟得多**——agent 那头在无超时地等。 */
+  offline: boolean
 }): React.JSX.Element {
   const [scope, setScope] = useState<RememberScope>("once")
 
@@ -66,6 +73,7 @@ export function Approval({
         <button
           className="btn btn--deny"
           type="button"
+          disabled={offline}
           onClick={() => {
             resolve(false)
           }}
@@ -75,6 +83,7 @@ export function Approval({
         <button
           className="btn btn--primary"
           type="button"
+          disabled={offline}
           onClick={() => {
             resolve(true)
           }}
@@ -82,6 +91,7 @@ export function Approval({
           允许
         </button>
       </div>
+      {offline ? <p className="approval__offline">没连上 omni，先等重连——它那头还在等你。</p> : null}
     </div>
   )
 }

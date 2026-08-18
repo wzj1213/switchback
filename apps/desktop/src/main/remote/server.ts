@@ -45,12 +45,25 @@ export interface RemoteDeps {
   sinks: Sinks
   dispatch: (command: Command) => void
   replay: (sink: Sink) => Promise<void>
+  /** 某条会话现在是哪一档。档位上限靠它才管得住已经开着的会话。 */
+  trustOf: (threadId: string) => Trust | undefined
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
 export interface RemoteServer {
   /** 实际监听的端口（配 0 时由系统分配）。 */
   port: () => number
+  /**
+   * 把某台设备**现在连着的**那些连接掐掉，返回掐了几条。
+   *
+   * ## 为什么吊销必须做这一步
+   *
+   * `tokens.revoke()` 只是把记录从表里删掉——已经握手完成的 WebSocket
+   * **不会因此断开**：它照旧收全部事件、照旧能发 `approval.resolve`。
+   * 而按下那颗「吊销」按钮的场景恰恰是「手机丢了」，此时那台设备很可能
+   * 正连着。只删记录等于**按了没用**，而界面上写着已经吊销。
+   */
+  disconnect: (deviceId: string) => number
   close: () => Promise<void>
 }
 
@@ -145,7 +158,7 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
       json(res, 426, { error: "这条路径只接受 WebSocket 升级" })
       return
     }
-    void serveStatic(deps.webRoot, path, res).then((result) => {
+    void serveStatic(deps.webRoot, path, res, req).then((result) => {
       if (!result.ok && result.reason !== undefined) deps.log("info", `静态：${result.reason}`)
     })
   }
@@ -158,7 +171,18 @@ function reject(socket: Duplex, code: number, text: string): void {
   )
 }
 
-function attachSocket(deps: RemoteDeps, ws: WebSocket, id: string): void {
+/** 一条刚握完手的连接要接上的东西。 */
+interface Attach {
+  deps: RemoteDeps
+  ws: WebSocket
+  /** 会话身份（账本按它记确认位）。 */
+  id: string
+  /** 设备 id → 它现在连着的那些 socket。吊销时要按它掐。 */
+  live: Map<string, Set<WebSocket>>
+  deviceId: string
+}
+
+function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
   const session = createSession({
     id,
     send: (text) => {
@@ -172,14 +196,23 @@ function attachSocket(deps: RemoteDeps, ws: WebSocket, id: string): void {
     dispatch: deps.dispatch,
     replay: deps.replay,
     ceiling: () => deps.config().maxTrust,
+    trustOf: deps.trustOf,
     log: deps.log,
   })
   const detach = deps.sinks.add(session.sink)
+  const bucket = live.get(deviceId) ?? new Set<WebSocket>()
+  bucket.add(ws)
+  live.set(deviceId, bucket)
   ws.on("message", (data) => {
     session.receive(String(data))
   })
   const bye = (): void => {
+    // **第一句就置死。** 后面那些摘除都可以晚一点，而 `alive()` 判错的代价
+    // 是往一个已经关掉的连接上同步序列化几十 MB
+    session.stop()
     detach()
+    bucket.delete(ws)
+    if (bucket.size === 0) live.delete(deviceId)
     // **必须摘掉**，否则一个断开的客户端会永久钉住账本的保留下限
     deps.ledger.leave(id)
   }
@@ -190,7 +223,7 @@ function attachSocket(deps: RemoteDeps, ws: WebSocket, id: string): void {
   })
 }
 
-function upgrade(deps: RemoteDeps, wss: WebSocketServer, counter: { n: number }) {
+function upgrade(deps: RemoteDeps, wss: WebSocketServer, counter: { n: number }, live: Map<string, Set<WebSocket>>) {
   return (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
     const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts)
     if (!verdict.ok) {
@@ -212,7 +245,7 @@ function upgrade(deps: RemoteDeps, wss: WebSocketServer, counter: { n: number })
     const id = `remote-${device.id}-${String(counter.n)}`
     wss.handleUpgrade(req, socket, head, (ws) => {
       deps.log("info", `${device.name} 连上了（${id}）`)
-      attachSocket(deps, ws, id)
+      attachSocket({ deps, ws, id, live, deviceId: device.id })
     })
   }
 }
@@ -220,7 +253,9 @@ function upgrade(deps: RemoteDeps, wss: WebSocketServer, counter: { n: number })
 export function startRemote(deps: RemoteDeps): Promise<RemoteServer> {
   const wss = new WebSocketServer({ noServer: true, handleProtocols: () => WS_PROTOCOL })
   const server: Server = createServer(route(deps))
-  server.on("upgrade", upgrade(deps, wss, { n: 0 }))
+  /** 设备 id → 它现在连着的那些 socket。吊销时要按它掐。 */
+  const live = new Map<string, Set<WebSocket>>()
+  server.on("upgrade", upgrade(deps, wss, { n: 0 }, live))
   return new Promise((done, fail) => {
     server.once("error", fail)
     // **只绑回环。** 这里没有可配的 host——一个能被改成 0.0.0.0 的开关，
@@ -231,8 +266,21 @@ export function startRemote(deps: RemoteDeps): Promise<RemoteServer> {
       deps.log("info", `远程服务端已监听 127.0.0.1:${String(port)}`)
       done({
         port: () => port,
+        disconnect: (deviceId) => {
+          const sockets = live.get(deviceId)
+          if (sockets === undefined) return 0
+          const n = sockets.size
+          for (const socket of sockets) socket.close(4003, "revoked")
+          return n
+        },
         close: async () => {
           for (const client of wss.clients) client.terminate()
+          // **`close()` 只是不再收新连接，它会一直等已有连接自己结束。**
+          // 而「已有连接」可能是一个正在往隧道里推 200 KB 前端产物、
+          // 对端却卡在电梯里的 socket——那条永远不会自己结束。
+          // 退出时 `shutdown` 是串行的：卡在这里就轮不到 `host.dispose()`，
+          // 8 秒兜底一到直接 `app.exit(0)`，**整棵引擎进程树就漏了**。
+          server.closeAllConnections()
           await new Promise<void>((resolve) => {
             server.close(() => {
               resolve()

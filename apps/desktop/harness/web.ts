@@ -32,6 +32,8 @@ const TRUSTED = (process.env["OMNI_HARNESS_HOSTS"] ?? "").split(/\s+/).filter((s
 const DEV_TOKEN = "harness-dev-token-not-a-secret"
 
 const at = 1_760_000_000_000
+/** 这次 harness 运行的代号。真宿主用 randomUUID，这里固定一个便于重跑。 */
+const EPOCH = "harness"
 
 const thread = (id: string, title: string, status: Thread["status"]): Thread => ({
   id,
@@ -112,7 +114,7 @@ const seed: readonly Event[] = [
 ]
 
 function main(): void {
-  const ledger = createLedger()
+  const ledger = createLedger(EPOCH)
   const sinks: Sink[] = []
   const device: Device = {
     id: "harness",
@@ -147,9 +149,10 @@ function main(): void {
       }
     },
     replay: async (sink) => {
-      sink.send({ channel: "omni:replay", replay: { events: seed, resumeAt: ledger.latest() } })
+      sink.send({ channel: "omni:replay", replay: { events: seed, resumeAt: ledger.latest(), epoch: EPOCH } })
       await Promise.resolve()
     },
+    trustOf: (threadId) => (threadId === "t-1" || threadId === "t-2" || threadId === "t-3" ? "auto-edit" : undefined),
     log: (level, message) => {
       console.log(`[${level}] ${message}`)
     },

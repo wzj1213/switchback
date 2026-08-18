@@ -43,6 +43,12 @@ export interface LedgerStats {
 }
 
 export interface Ledger {
+  /**
+   * 这一次运行的代号。序号只在同一个代号内可比。
+   *
+   * 由调用方给（本包不读随机源），宿主每次起来换一个。
+   */
+  epoch: string
   /** 给一批事件编号并记进缓冲。 */
   seal: (events: readonly Event[]) => readonly Sealed[]
   /** 一个客户端连上来了。它从这一刻起参与保留下限的计算。 */
@@ -54,40 +60,53 @@ export interface Ledger {
   /**
    * 取 `after` 之后的所有事件。
    *
-   * 返回 `undefined` 表示**补不了**（缺口太老，或者对方报的序号根本不在本次运行里），
-   * 调用方必须走全量重建。绝不返回一个不完整的片段。
+   * 返回 `undefined` 表示**补不了**，调用方必须走全量重建。
+   * 绝不返回一个不完整的片段。三种补不了：
+   *
+   * 1. **代号对不上** —— 那个游标属于宿主的上一次运行，和现在这串号毫无关系。
+   *    这一条必须放在最前：`after` 的大小在跨运行时根本没有意义。
+   * 2. 报的序号比发出去的还大（同一次运行内不可能，只能是算错了）
+   * 3. 缺口的第一条已经被挤出缓冲
+   *
+   * @param epoch 客户端手上那份基线的运行代号。**必填**——设成可选的话，
+   *   忘了传的那一处就会悄悄退回到「只比大小」，而那正是这条判据存在的原因。
    */
-  since: (after: number) => readonly Sealed[] | undefined
+  since: (after: number, epoch: string) => readonly Sealed[] | undefined
   /** 当前发到第几号。 */
   latest: () => number
   stats: () => LedgerStats
 }
 
-export function createLedger(maxEntries = MAX_ENTRIES): Ledger {
+/** 所有 join 进来的客户端都确认过的位置。没人 join 时不设下限。 */
+function floorOf(acked: ReadonlyMap<string, number>): number {
+  if (acked.size === 0) return 0
+  let low = Number.POSITIVE_INFINITY
+  for (const seq of acked.values()) low = Math.min(low, seq)
+  return low
+}
+
+/** 先按确认丢，再按条数丢。**顺序有意义**：条数上限压过确认下限。 */
+function trimBuffer(buffer: Sealed[], acked: ReadonlyMap<string, number>, maxEntries: number): void {
+  const safe = floorOf(acked)
+  // 这一段所有人都收到了，留着没有意义
+  if (safe > 0) {
+    const keep = buffer.findIndex((entry) => entry.seq > safe)
+    buffer.splice(0, keep === -1 ? buffer.length : keep)
+  }
+  // **不能让一个连着却不确认的客户端拖垮内存**
+  if (buffer.length > maxEntries) buffer.splice(0, buffer.length - maxEntries)
+}
+
+export function createLedger(epoch: string, maxEntries = MAX_ENTRIES): Ledger {
   const buffer: Sealed[] = []
   const acked = new Map<string, number>()
   const state = { next: 0 }
-
-  /** 所有 join 进来的客户端都确认过的位置。没人 join 时不设下限。 */
-  const floor = (): number => {
-    if (acked.size === 0) return 0
-    let low = Number.POSITIVE_INFINITY
-    for (const seq of acked.values()) low = Math.min(low, seq)
-    return low
-  }
-
   const trim = (): void => {
-    const safe = floor()
-    // 先按确认丢：这一段所有人都收到了，留着没有意义
-    if (safe > 0) {
-      const keep = buffer.findIndex((entry) => entry.seq > safe)
-      buffer.splice(0, keep === -1 ? buffer.length : keep)
-    }
-    // 再按条数丢。**这一步压过确认下限**——不能让一个不确认的客户端拖垮内存
-    if (buffer.length > maxEntries) buffer.splice(0, buffer.length - maxEntries)
+    trimBuffer(buffer, acked, maxEntries)
   }
 
   return {
+    epoch,
     seal: (events) => {
       const sealed = events.map((event) => {
         state.next += 1
@@ -114,9 +133,11 @@ export function createLedger(maxEntries = MAX_ENTRIES): Ledger {
       acked.set(client, Math.min(seq, state.next))
       trim()
     },
-    since: (after) => {
-      // 对方报的序号比我们发出去的还大：它来自上一次运行（宿主重启过），
-      // 或者它自己算错了。无论哪种，本次运行的缓冲都对不上，只能全量
+    since: (after, seen) => {
+      // **代号对不上，一切免谈。** 那个游标属于上一次运行，和现在这串号
+      // 毫无关系——比大小只会得出一个看起来合理的错误答案
+      if (seen !== epoch) return undefined
+      // 报的序号比我们发出去的还大：同一次运行内不可能，只能是它自己算错了
       if (after > state.next) return undefined
       if (after === state.next) return []
       const oldest = buffer[0]?.seq

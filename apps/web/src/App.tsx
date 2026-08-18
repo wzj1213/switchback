@@ -12,34 +12,51 @@ import { ConnBar } from "./components/ConnBar.js"
  *
  * **没有路由库**。这一端只有三个状态（没配对 / 看列表 / 看某一条），
  * 引一个路由器进来换不到任何东西，却要多背一份 history 的心智模型。
- * 用 `history.pushState` 只为了让**手机上的返回手势**能回到列表——
- * 那是这块屏幕上最常用的一个动作，缺了它整个界面就像个坏掉的网页。
+ * 用 `history` 只为了让**返回**能回到列表——手机上那是返回手势，
+ * 桌面上那是浏览器的返回键（两栏并排时 `.thread__back` 是隐藏的，
+ * 返回键是唯一入口）。
+ *
+ * ## 两条容易写错的
+ *
+ * 1. **从列表进正文才 push，正文里换一条要 replace。** 否则点开五条会话
+ *    就压了五层，返回键要按满五次才离得开这一页。
+ * 2. **`popstate` 必须读 `event.state`**，不能一律当成「回到列表」。
+ *    不读的话前进键落回正文那一项时，界面恢复不了。
  */
 export function App(): React.JSX.Element {
   const [token, setToken] = useState(tokenOf)
   const [selected, setSelected] = useState<ThreadId | undefined>(undefined)
   const remote = useRemote(token)
 
+  const { watch } = remote
+
   const open = useCallback(
     (id: ThreadId | undefined) => {
-      setSelected(id)
-      remote.watch(id ?? null)
-      // 进正文时压一个历史项，返回手势就回得到列表
-      if (id !== undefined) window.history.pushState({ omni: id }, "")
+      setSelected((prev) => {
+        // 从列表进正文压一层；正文里换一条只替换——否则返回键要按满 N 次
+        if (id === undefined) window.history.back()
+        else if (prev === undefined) window.history.pushState({ omni: id }, "")
+        else window.history.replaceState({ omni: id }, "")
+        return id
+      })
+      watch(id ?? null)
     },
-    [remote],
+    [watch],
   )
 
   useEffect(() => {
-    const back = (): void => {
-      setSelected(undefined)
-      remote.watch(null)
+    // 打好基底：首屏那一项也带上 state，前进/后退才对得起来
+    window.history.replaceState({ omni: undefined }, "")
+    const onPop = (event: PopStateEvent): void => {
+      const id = (event.state as { omni?: ThreadId } | null)?.omni
+      setSelected(id)
+      watch(id ?? null)
     }
-    window.addEventListener("popstate", back)
+    window.addEventListener("popstate", onPop)
     return () => {
-      window.removeEventListener("popstate", back)
+      window.removeEventListener("popstate", onPop)
     }
-  }, [remote])
+  }, [watch])
 
   const paired = useCallback((next: string) => {
     setToken(next)
@@ -59,6 +76,14 @@ export function App(): React.JSX.Element {
   return (
     <div className="app" data-detail={thread === undefined ? "no" : "yes"}>
       <ConnBar conn={remote.conn} onRetry={remote.retry} />
+      {remote.notice === undefined ? null : (
+        <div className="notice" role="alert">
+          <span className="notice__text">{remote.notice}</span>
+          <button className="btn btn--ghost" type="button" onClick={remote.dismissNotice} aria-label="知道了">
+            ✕
+          </button>
+        </div>
+      )}
       <div className="app__panes">
         <aside className="pane pane--list">
           <Threads remote={remote} selected={selected} onOpen={open} onUnpair={unpair} />
@@ -67,7 +92,13 @@ export function App(): React.JSX.Element {
           {thread === undefined ? (
             <p className="empty">选一条会话，或者在桌面上新建一条。</p>
           ) : (
-            <Thread remote={remote} thread={thread} onBack={() => { window.history.back() }} />
+            <Thread
+              remote={remote}
+              thread={thread}
+              onBack={() => {
+                window.history.back()
+              }}
+            />
           )}
         </main>
       </div>

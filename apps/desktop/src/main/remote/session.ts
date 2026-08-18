@@ -27,6 +27,11 @@ export interface SessionDeps {
   replay: (sink: Sink) => Promise<void>
   /** 这条连接的档位上限，现读现算（设置可能中途改）。 */
   ceiling: () => Trust
+  /**
+   * 某条会话现在是哪一档。**上限要靠它才管得住已有的会话**——
+   * 光钳「新建」和「切档」的话，桌面上一条完全档会话对远程是完全敞开的。
+   */
+  trustOf: (threadId: string) => Trust | undefined
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -34,6 +39,16 @@ export interface RemoteSession {
   sink: Sink
   /** 客户端发来一帧。**任何解析失败都不许抛**——一条坏帧不该掐掉连接以外的任何东西。 */
   receive: (text: string) => void
+  /**
+   * 连接没了。**必须调**，否则 `sink.alive()` 永远返回 true。
+   *
+   * 那一句在 `rebuild` 里是唯一的「对方还在吗」判据，而远程客户端正是唯一一类
+   * 会在 rebuild 跑到一半真的消失的客户端——读几十 MB journal 要几百毫秒到数秒，
+   * 隧道在那期间断掉太常见了。判不出来的话，整份全量照样在主线程上
+   * 同步序列化 + 切片，喂给一个已经关掉的 socket：**约一秒的界面冻结，
+   * 还顺带卡住引擎 stdio 的抽取**，而弱网重连风暴时每断一次就再来一遍。
+   */
+  stop: () => void
 }
 
 interface State {
@@ -50,7 +65,7 @@ interface Ctx {
 }
 
 function writer(deps: SessionDeps, state: State): (frame: ServerFrame) => void {
-  return (frame) => {
+  const write = (frame: ServerFrame): void => {
     if (!state.alive) return
     if (deps.buffered() > MAX_BUFFERED) {
       // 跟不上就断，别在内存里替它攒。它重连时走全量，那条路本来就设计好了
@@ -60,54 +75,120 @@ function writer(deps: SessionDeps, state: State): (frame: ServerFrame) => void {
       return
     }
     state.frameId += 1
-    for (const text of encodeFrame(frame, state.frameId)) deps.send(text)
+    const encoded = encodeFrame(frame, state.frameId)
+    if (encoded.kind === "too-big") {
+      // **说出来，别发一串对端注定拒收的片。** 这一条现在只可能发生在全量重建上
+      //（它把所有会话的完整历史拼成一份），而那正是掉进去之后最难查的场景：
+      // 每次重连都从第一片被拒，两边都只看到「又断了」
+      deps.log(
+        "error",
+        `${deps.id} 的 ${frame.type} 帧有 ${String(encoded.chars)} 个码元，超过 ${String(encoded.limit)}，发不出去`,
+      )
+      if (frame.type !== "reset") {
+        write({ type: "reset", reason: "这台机器上的历史太长，手机端暂时装不下——先在桌面上删掉几条旧会话" })
+      }
+      return
+    }
+    for (const text of encoded.parts) deps.send(text)
   }
+  return write
 }
 
 /**
- * 「我准备好了」。带 `after` 就先试着只补差量——**这正是隧道和地铁的意义所在**：
- * 补得上就别把整段历史重发一遍。补不上再走全量。
+ * 「我准备好了」。带 `after` + `epoch` 就先试着只补差量——
+ * **这正是隧道和地铁的意义所在**：补得上就别把整段历史重发一遍。补不上再走全量。
+ *
+ * 两个字段必须成对：只报序号不报代号的话，宿主分不出这个游标是不是
+ * 上一次运行留下的（见 `@omni/wire` 的 `Replay.epoch`），于是干脆当没带。
  */
-function hello(ctx: Ctx, after: number | undefined): void {
+function hello(ctx: Ctx, after: number | undefined, epoch: string | undefined): void {
   ctx.deps.ledger.join(ctx.deps.id)
-  const missed = after === undefined ? undefined : ctx.deps.ledger.since(after)
-  if (after !== undefined && missed !== undefined) {
+  const resumable = after !== undefined && epoch !== undefined
+  const missed = resumable ? ctx.deps.ledger.since(after, epoch) : undefined
+  if (missed !== undefined) {
     ctx.deps.log("info", `${ctx.deps.id} 从 ${String(after)} 续上，补 ${String(missed.length)} 条`)
     if (missed.length > 0) ctx.write({ type: "events", sealed: missed })
     return
   }
-  if (after !== undefined) {
-    ctx.deps.log("info", `${ctx.deps.id} 停在 ${String(after)}，缓冲覆盖不到，转全量重建`)
-  }
+  if (resumable) ctx.deps.log("info", `${ctx.deps.id} 停在 ${String(after)}，续不上，转全量重建`)
   void ctx.deps.replay(ctx.sink).catch((error: unknown) => {
     ctx.deps.log("error", `${ctx.deps.id} 全量重建失败：${String(error)}`)
     ctx.write({ type: "reset", reason: "全量重建失败，请重连" })
   })
 }
 
+/**
+ * 「我这儿从 `after` 之后断了一截。」
+ *
+ * 和 `hello` 分开的理由在 `ClientFrame` 上：这条**不重新 join 账本**。
+ * 补不了就明说 `reset`——绝不发一个不完整的片段，那会让界面安静地显示错误内容。
+ */
+function resync(ctx: Ctx, after: number, epoch: string): void {
+  const missed = ctx.deps.ledger.since(after, epoch)
+  if (missed === undefined) {
+    ctx.deps.log("warn", `${ctx.deps.id} 停在 ${String(after)}，补不了，让它重新握手`)
+    ctx.write({ type: "reset", reason: "缺口太老，补不回来了" })
+    return
+  }
+  ctx.write({ type: "catchup", sealed: missed })
+}
+
+/**
+ * 一条命令。
+ *
+ * **凡是没照着做的，都要说一声。** 认不出、被拒、被钳——三种都往回发一条
+ * `notice`。少了这一步，用户在手机上点了「允许」而工具被拒，
+ * 界面上不会有任何东西说这里出过事。
+ */
 function command(ctx: Ctx, raw: unknown): void {
   if (!isCommand(raw)) {
     ctx.deps.log("warn", `${ctx.deps.id} 发来一条认不出的命令，已丢弃`)
+    ctx.write({ type: "notice", text: "这条命令的形状 omni 认不出来，没有执行" })
     return
   }
-  const { command: clamped, note } = clamp(raw, ctx.deps.ceiling())
-  if (note !== undefined) ctx.deps.log("info", `${ctx.deps.id} ${note}`)
-  ctx.deps.dispatch(clamped)
+  const verdict = clamp(raw, ctx.deps.ceiling(), ctx.deps.trustOf)
+  if (verdict.command === undefined) {
+    ctx.deps.log("warn", `${ctx.deps.id} 被拒：${verdict.note}`)
+    ctx.write({ type: "notice", text: verdict.note })
+    return
+  }
+  if (verdict.note !== undefined) {
+    ctx.deps.log("info", `${ctx.deps.id} ${verdict.note}`)
+    ctx.write({ type: "notice", text: verdict.note })
+  }
+  ctx.deps.dispatch(verdict.command)
+}
+
+/** 线上来的字段类型不作数，逐个收窄。 */
+const numberOr = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined)
+const stringOr = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
+
+/** `resync` 的两个字段必须成对，缺一个就当没发过。 */
+function cursor(ctx: Ctx, after: unknown, epoch: unknown): void {
+  const at = numberOr(after)
+  const run = stringOr(epoch)
+  if (at !== undefined && run !== undefined) resync(ctx, at, run)
 }
 
 function handle(ctx: Ctx, frame: ClientFrame): void {
   switch (frame.type) {
     case "hello":
-      hello(ctx, typeof frame.after === "number" ? frame.after : undefined)
+      hello(ctx, numberOr(frame.after), stringOr(frame.epoch))
+      return
+    case "resync":
+      cursor(ctx, frame.after, frame.epoch)
       return
     case "command":
       command(ctx, frame.command)
       return
     case "ack":
-      if (typeof frame.seq === "number") ctx.deps.ledger.ack(ctx.deps.id, frame.seq)
+      {
+        const seq = numberOr(frame.seq)
+        if (seq !== undefined) ctx.deps.ledger.ack(ctx.deps.id, seq)
+      }
       return
     case "watch":
-      ctx.state.watching = typeof frame.threadId === "string" ? frame.threadId : undefined
+      ctx.state.watching = stringOr(frame.threadId)
       return
     case "ping":
       ctx.write({ type: "pong" })
@@ -139,6 +220,9 @@ export function createSession(deps: SessionDeps): RemoteSession {
 
   return {
     sink,
+    stop: () => {
+      state.alive = false
+    },
     receive: (text) => {
       let frame: ClientFrame
       try {

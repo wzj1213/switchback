@@ -6,6 +6,7 @@ import {
   received,
   replayed,
   reset as resetStream,
+  resynced,
   type ClientFrame,
   type ServerFrame,
   type Step,
@@ -18,8 +19,9 @@ import { tokenOf, whoAmI, type Me } from "./auth.js"
  * 事件流 → 视图状态。**和桌面端跑的是同一个归约器**（`@omni/store`），
  * 所以两端不会漂移：手机上看到的「正在跑」和桌面上那条是同一次判断。
  *
- * 补洞那套（`@omni/wire` 的 `received` / `replayed`）也是同一份。
- * 唯一多出来的是**确认**：桌面那条 IPC 不会丢，这条会。
+ * 补洞那套（`@omni/wire` 的 `received` / `replayed` / `resynced`）也是同一份。
+ * 这一端多出来的只有两件事：**确认**（桌面那条 IPC 不会丢，这条会）
+ * 和**去补**（发现序号跳了要主动要那一段）。
  */
 
 /** 攒多久发一次 ack。太密是白发（一次 `pnpm build` 能刷上千条），太疏则保留缓冲白留。 */
@@ -29,11 +31,20 @@ export interface Remote {
   state: ViewState
   conn: ConnState
   me: Me | undefined
-  send: (command: Command) => void
+  /**
+   * 发一条命令。**返回有没有真的发出去。**
+   *
+   * 断线时返回 false，调用方必须让用户看见——用户点了「允许」而什么都没发生，
+   * 是这一端最坏的失败方式。
+   */
+  send: (command: Command) => boolean
   /** 告诉宿主「我正在看这条」。宿主据此决定发不发正文、要不要为它响。 */
   watch: (threadId: ThreadId | null) => void
   /** 用户点了「重试」。 */
   retry: () => void
+  /** 宿主捎回来的话（命令被拒、被钳…）。最新一条，用户看完可以关掉。 */
+  notice: string | undefined
+  dismissNotice: () => void
 }
 
 interface Refs {
@@ -47,19 +58,36 @@ export function useRemote(token: string): Remote {
   const [state, setState] = useState<ViewState>(initial)
   const [conn, setConn] = useState<ConnState>({ kind: "connecting" })
   const [me, setMe] = useState<Me | undefined>(undefined)
+  const [notice, setNotice] = useState<string | undefined>(undefined)
   const refs = useRef<Refs>({ stream: initialStream, transport: undefined, ackTimer: undefined, watching: null })
 
-  /** 应用一步，并安排一次确认。 */
+  /**
+   * 应用一步：落状态、安排一次确认、**缺了就去补**。
+   *
+   * 最后那一句是必须的：`drain` 走不动时会把 `catching` 置上并给出 `resyncFrom`，
+   * 而在此之后来的增量一律只攒不应用。没人去补的话，界面就从那一刻起
+   * **永久静默冻结**——事件照收、什么都不显示、一行错误都没有。
+   */
   const advance = useCallback((step: Step): void => {
     refs.current.stream = step.stream
     if (step.apply.length > 0) setState((prev) => reduceAll(prev, step.apply))
     scheduleAck(refs)
+    if (step.resyncFrom === undefined) return
+    const epoch = refs.current.stream.epoch
+    if (epoch === undefined) return
+    refs.current.transport?.send({ type: "resync", after: step.resyncFrom, epoch })
   }, [])
 
   const onFrame = useCallback(
     (frame: ServerFrame): void => {
       if (frame.type === "events") {
         advance(received(refs.current.stream, frame.sealed))
+        return
+      }
+      if (frame.type === "catchup") {
+        // **补发要走 `resynced` 而不是 `received`**：后者在 catching 状态下
+        // 只攒不应用，于是补回来的那一段也被攒起来，catching 永远解不开
+        advance(resynced(refs.current.stream, frame.sealed))
         return
       }
       if (frame.type === "replay") {
@@ -72,8 +100,13 @@ export function useRemote(token: string): Remote {
         setState(clearNotices)
         return
       }
+      if (frame.type === "notice") {
+        setNotice(frame.text)
+        return
+      }
       if (frame.type === "reset") {
         refs.current.stream = resetStream()
+        setNotice(frame.reason)
         refs.current.transport?.send({ type: "hello" })
       }
     },
@@ -86,18 +119,22 @@ export function useRemote(token: string): Remote {
       token,
       authorize: async () => {
         const seen = await whoAmI(token)
-        setMe(seen)
-        return seen !== undefined
+        if (seen.kind === "ok") setMe(seen.me)
+        return seen.kind
       },
       onFrame,
       onState: setConn,
       hello: () => {
-        const after = refs.current.stream.lastSeq
+        const { lastSeq, epoch } = refs.current.stream
         // 重连时把观察目标一并重报：宿主那边的会话是新的，它不知道我在看谁
         queueMicrotask(() => {
           refs.current.transport?.send({ type: "watch", threadId: refs.current.watching })
         })
-        return after === undefined ? { type: "hello" } : { type: "hello", after }
+        // **两个字段成对才有意义**：只报序号不报代号，宿主分不出这个游标
+        // 是不是上一次运行留下的，只能当没带
+        return lastSeq === undefined || epoch === undefined
+          ? { type: "hello" }
+          : { type: "hello", after: lastSeq, epoch }
       },
     })
     refs.current.transport = transport
@@ -112,14 +149,23 @@ export function useRemote(token: string): Remote {
       window.removeEventListener("online", wake)
       transport.close()
       refs.current.transport = undefined
+      // **定时器要跟着连接一起收**，否则换令牌时它还会往一个已经关掉的连接上发
+      if (refs.current.ackTimer !== undefined) clearTimeout(refs.current.ackTimer)
+      refs.current.ackTimer = undefined
+      refs.current.stream = initialStream
     }
   }, [token, onFrame])
 
-  const send = useCallback((command: Command): void => {
-    refs.current.transport?.send({ type: "command", command })
+  const send = useCallback((command: Command): boolean => {
+    const sent = refs.current.transport?.send({ type: "command", command }) ?? false
+    if (!sent) setNotice("现在没连上 omni，这一下没有发出去。等连上再点一次。")
+    return sent
   }, [])
 
   const watch = useCallback((threadId: ThreadId | null): void => {
+    // **相同就不发。** 这条帧本来就该只在「换了一条会话」时出现一次；
+    // 调用方那侧只要有一个不稳定的依赖，它就会变成一秒几十帧的上行
+    if (refs.current.watching === threadId) return
     refs.current.watching = threadId
     refs.current.transport?.send({ type: "watch", threadId })
   }, [])
@@ -128,7 +174,11 @@ export function useRemote(token: string): Remote {
     refs.current.transport?.poke()
   }, [])
 
-  return { state, conn, me, send, watch, retry }
+  const dismissNotice = useCallback((): void => {
+    setNotice(undefined)
+  }, [])
+
+  return { state, conn, me, send, watch, retry, notice, dismissNotice }
 }
 
 /**

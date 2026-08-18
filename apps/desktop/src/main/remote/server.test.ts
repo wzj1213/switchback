@@ -18,6 +18,8 @@ import type { Sink } from "../sink.js"
  * 而那正是只有集成测试逮得到的一类。
  */
 
+const RUN = "run-a"
+
 const ev = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: String(n) })
 
 interface Harness {
@@ -32,7 +34,7 @@ interface Harness {
 
 const running: RemoteServer[] = []
 
-async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[] } = {}): Promise<Harness> {
+async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[]; threadTrust?: Trust } = {}): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), "omni-remote-"))
   const file = join(dir, "devices.json")
   writeFileSync(file, "[]", "utf8")
@@ -44,7 +46,7 @@ async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[
     },
     now: () => Date.now(),
   })
-  const ledger = createLedger(100)
+  const ledger = createLedger(RUN, 100)
   const dispatched: Command[] = []
   const sinks: Sink[] = []
   const state = { replays: 0, pairing: "" }
@@ -68,9 +70,10 @@ async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[
       },
     },
     dispatch: (command) => dispatched.push(command),
+    trustOf: () => options.threadTrust,
     replay: async (sink) => {
       state.replays += 1
-      sink.send({ channel: "omni:replay", replay: { events: [ev(0)], resumeAt: ledger.latest() } })
+      sink.send({ channel: "omni:replay", replay: { events: [ev(0)], resumeAt: ledger.latest(), epoch: RUN } })
       await Promise.resolve()
     },
     log: () => undefined,

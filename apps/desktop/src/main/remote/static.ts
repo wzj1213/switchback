@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs"
 import { stat } from "node:fs/promises"
 import { join, normalize, resolve, sep } from "node:path"
-import type { ServerResponse } from "node:http"
+import type { IncomingMessage, ServerResponse } from "node:http"
 
 /**
  * 浏览器端那几个静态文件。
@@ -65,9 +65,20 @@ export function safeJoin(root: string, urlPath: string): string | undefined {
  *
  * 反过来（入口页也缓存）的下场是换了版本的客户端还在跑旧的 JS，
  * 而旧 JS 讲的可能是旧协议——那种错会表现成「界面在，但什么都不动」。
+ *
+ * ## 判据为什么是「在 /assets 下」+ base64url 字母表
+ *
+ * 上一版写的是 `[0-9a-f]{8,}`——**十六进制**。而 vite 8 / rolldown 出的哈希是
+ * base64url：`index-DRd54R9P.js`、`vendor-BwP_2TDL.js`。六个产物一个都匹配不上，
+ * 于是全部落 `no-cache`，vendor 分包在传输上收益为零，手机每次冷启动
+ * 在蜂窝网上重下整份。
+ *
+ * 只放宽字符集不行：那会把 `my-component.js` 也判成永久缓存。所以加一条
+ * 「必须在 `/assets/` 下」——那个目录里的东西**按定义**都是带哈希的构建产物。
  */
-function cacheFor(path: string): string {
-  return /-[0-9a-f]{8,}\.(js|css|woff2)$/i.test(path) ? "public, max-age=31536000, immutable" : "no-cache"
+function cacheFor(urlPath: string, file: string): string {
+  const hashed = urlPath.startsWith("/assets/") && /-[A-Za-z0-9_-]{8,}\.(js|css|woff2)$/.test(file)
+  return hashed ? "public, max-age=31536000, immutable" : "no-cache"
 }
 
 export interface StaticResult {
@@ -80,7 +91,12 @@ export interface StaticResult {
  * 送一个文件。找不到就退回 `index.html`（单页应用的深链要能直接打开）。
  * @param root 站点根目录。不存在时一律 404——**别假装有**。
  */
-export async function serveStatic(root: string, urlPath: string, res: ServerResponse): Promise<StaticResult> {
+export async function serveStatic(
+  root: string,
+  urlPath: string,
+  res: ServerResponse,
+  req?: IncomingMessage,
+): Promise<StaticResult> {
   const target = safeJoin(root, urlPath === "/" ? "/index.html" : urlPath)
   if (target === undefined) {
     res.writeHead(400).end("bad path")
@@ -91,9 +107,18 @@ export async function serveStatic(root: string, urlPath: string, res: ServerResp
     res.writeHead(404).end("not found")
     return { ok: false, reason: `找不到：${urlPath}` }
   }
+  // **ETag 是兜底。** 上面那条判据再漏一类，最坏也只是退化成 304 而不是全量重传。
+  // 用 mtime+size 而不是内容哈希：`stat` 已经拿到了，不必为此把文件读一遍
+  const info = await statOf(file)
+  const etag = info === undefined ? undefined : `W/"${info.size.toString(16)}-${info.mtimeMs.toString(16)}"`
+  if (etag !== undefined && req?.headers["if-none-match"] === etag) {
+    res.writeHead(304, { etag, "cache-control": cacheFor(urlPath, file) }).end()
+    return { ok: true }
+  }
   res.writeHead(200, {
     "content-type": typeOf(file),
-    "cache-control": cacheFor(file),
+    "cache-control": cacheFor(urlPath, file),
+    ...(etag === undefined ? {} : { etag }),
     // 页面里不加载任何外部资源；写死这条比事后发现某个依赖偷偷发了请求便宜
     "content-security-policy":
       "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -109,6 +134,16 @@ async function isFile(path: string): Promise<boolean> {
     return (await stat(path)).isFile()
   } catch {
     return false
+  }
+}
+
+/** 文件的大小与修改时间，用来拼 ETag。取不到就不发 ETag（而不是发一个假的）。 */
+async function statOf(path: string): Promise<{ size: number; mtimeMs: number } | undefined> {
+  try {
+    const info = await stat(path)
+    return { size: info.size, mtimeMs: Math.floor(info.mtimeMs) }
+  } catch {
+    return undefined
   }
 }
 

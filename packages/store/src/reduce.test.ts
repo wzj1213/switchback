@@ -311,3 +311,42 @@ describe("engines.available", () => {
     expect(second.engines).toEqual([{ id: "b", label: "B" }])
   })
 })
+
+describe("重复的 item.started 不长出两条", () => {
+  it("**全量重建拼的是两份来源，重叠是必然的**——同一条 item 来两次要替换而不是追加", () => {
+    const first = msg("i1", "t1", "第一次")
+    const again = { ...msg("i1", "t1", "补回来的那一份"), complete: true }
+    const s = reduceAll(initial(), [
+      started("a"),
+      turnStarted("a", "t1"),
+      { type: "item.started", at: 0, item: first },
+      { type: "item.started", at: 1, item: again },
+    ])
+    const items = itemsOf(s, "a")
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ id: "i1", text: "补回来的那一份", complete: true })
+  })
+
+  it("不同 id 照常各占一条", () => {
+    const s = reduceAll(initial(), [
+      started("a"),
+      turnStarted("a", "t1"),
+      { type: "item.started", at: 0, item: msg("i1", "t1", "一") },
+      { type: "item.started", at: 0, item: msg("i2", "t1", "二") },
+    ])
+    expect(itemsOf(s, "a")).toHaveLength(2)
+  })
+
+  it("重复之后 delta 仍然落在同一条上", () => {
+    const s = reduceAll(initial(), [
+      started("a"),
+      turnStarted("a", "t1"),
+      { type: "item.started", at: 0, item: msg("i1", "t1", "起") },
+      { type: "item.started", at: 0, item: msg("i1", "t1", "起") },
+      { type: "item.delta", at: 0, itemId: "i1", append: "步" },
+    ])
+    const items = itemsOf(s, "a")
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ text: "起步" })
+  })
+})

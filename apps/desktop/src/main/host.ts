@@ -59,7 +59,10 @@ interface OutletDeps {
 }
 
 function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; ledger: Ledger } {
-  const ledger = createLedger()
+  // **每次运行换一个代号。** 序号是「本次运行内」的计数，而远程客户端
+  // 活得比宿主久——它停在 50 号，宿主重启之后新一轮的 51 号和它手上那 50 条
+  // 根本不是同一串事件。代号让「补得上吗」这个判断第一步就问对问题
+  const ledger = createLedger(randomUUID())
   const batcher = createBatcher((events) => {
     // 每条出去的事件顺带过一遍「要不要叫人」。放在发出去的同一处，
     // 免得将来多一条出口就漏一处
@@ -127,8 +130,9 @@ function installBridgeChannels(deps: Channels): void {
 
   // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
   // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
-  ipcMain.handle("omni:resync", (_e, after: number): { events: readonly Sealed[] } | { reset: true } => {
-    const missed = deps.ledger.since(after)
+  ipcMain.handle("omni:resync", (_e, req: { after: number; epoch: string }): { events: readonly Sealed[] } | { reset: true } => {
+    const after = typeof req?.after === "number" ? req.after : Number.NaN
+    const missed = Number.isNaN(after) ? undefined : deps.ledger.since(after, req.epoch)
     if (missed === undefined) {
       deps.log.write("warn", "ipc", `补发失败：渲染层停在 ${String(after)}，缓冲已覆盖不到，转全量重建`)
       return { reset: true }
@@ -381,6 +385,14 @@ export async function rebuild(attached: Attached, target: Sink): Promise<ThreadI
   // **活着的会话不能标 detached。** 它们和历史在 journal 里长得一模一样，
   // 但背后还有引擎进程。混为一谈的话，重载之后整个应用变成只读，
   // 而引擎其实还在跑——重载验证第一次跑出来的就是这个
+  // **先记下游标，再读磁盘。** 读 journal 是一串跨多次 I/O 的异步操作
+  //（实测 20 个大文件、页缓存已热也要 147ms），而引擎在这期间照样产出事件。
+  // 那些事件会落进两头都不留的缝里：`readFile` 一开始就按当时的大小定好缓冲区，
+  // 所以「读开始之后追加的」进不了这一份；而它们的序号又 `<= resumeAt`，
+  // 于是客户端把增量那份也丢掉。表现最狠的是 `item.started`——归约器的
+  // `patchItem` 在 owner 缺失时原样返回，于是这条 item 之后所有 delta 全成空操作，
+  // **一张在这个窗口里诞生的审批卡在手机上压根不会出现**。
+  const before = attached.ledger.latest()
   const alive = new Map(attached.host.live().map((thread) => [thread.id, thread]))
   // **先把在途写入落完再读。** 宿主发事件不等落盘，所以「发出去了」和
   // 「在文件里了」之间有个窗口；在窗口里读到的是残缺的一份，而回放会按
@@ -392,6 +404,11 @@ export async function rebuild(attached: Attached, target: Sink): Promise<ThreadI
   const threads = await Promise.all(
     ids.map(async (id) => ({ id, events: await attached.journal.read(id).catch((): readonly Event[] => []) })),
   )
+  // 读磁盘期间被封号的那些。它们保证**晚于快照、且还在保留缓冲里**，
+  // 所以拼在最后就补上了那条缝。和磁盘那份的重叠是必然的，靠归约器的
+  // 幂等去重（`@omni/store` 的 `appendItem`），不在这里判——
+  // 判它需要给每条事件一个身份，那是把复杂度推给每一个产生事件的地方。
+  const missed = attached.ledger.since(before, attached.ledger.epoch) ?? []
   const events = [
     ...replayEvents(await attached.engines(), threads, alive, Date.now()),
     // **不落盘的那些现状要补在最后。** 斜杠命令和额度都不进 journal
@@ -400,9 +417,11 @@ export async function rebuild(attached: Attached, target: Sink): Promise<ThreadI
     // 两头都不留，就永久没了——实测去掉这一行，重载之后 `/` 面板里
     // 22 条技能一条不剩，只剩 omni 自己那 8 条
     ...attached.host.liveState(),
+    ...missed.map((sealed) => sealed.event),
   ]
   const resumeAt = attached.ledger.latest()
-  if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt } })
+  const epoch = attached.ledger.epoch
+  if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch } })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
   return [...alive.keys()][0] ?? ids[0]
 }

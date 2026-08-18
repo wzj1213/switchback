@@ -9,9 +9,16 @@ const frameOf = (text: string): ServerFrame => ({
   reason: text,
 })
 
+/** 编出来的那几条线上字符串。测试里从不喂超限的帧，所以这里断言 `frames`。 */
+function partsOf(frame: ServerFrame, id: number, maxChars?: number): readonly string[] {
+  const encoded = maxChars === undefined ? encodeFrame(frame, id) : encodeFrame(frame, id, maxChars)
+  if (encoded.kind !== "frames") throw new Error(`意外的超限：${JSON.stringify(encoded)}`)
+  return encoded.parts
+}
+
 /** 把一条帧编出来再原样喂回去，返回重组结果。 */
 function roundTrip(frame: ServerFrame, maxChars: number): ServerFrame | string {
-  const wire = encodeFrame(frame, 1, maxChars)
+  const wire = partsOf(frame, 1, maxChars)
   const reassembler = createReassembler()
   let last: ServerFrame | string = "没有产出"
   for (const text of wire) {
@@ -24,7 +31,7 @@ function roundTrip(frame: ServerFrame, maxChars: number): ServerFrame | string {
 
 describe("小帧不套壳", () => {
   it("装得下就原样发一条，省掉一次解析", () => {
-    const wire = encodeFrame(pong, 1)
+    const wire = partsOf(pong, 1)
     expect(wire).toHaveLength(1)
     expect(JSON.parse(wire[0] ?? "")).toEqual(pong)
   })
@@ -49,7 +56,7 @@ describe("切分与重组", () => {
   it("**代理对不会被劈开**——半个代理对不是合法 UTF-8，发不出去", () => {
     // 每个 emoji 两个码元；切点必须避开中间
     const text = "🐳".repeat(50)
-    const wire = encodeFrame(frameOf(text), 1, 21)
+    const wire = partsOf(frameOf(text), 1, 21)
     expect(wire.length).toBeGreaterThan(1)
     // 孤立代理（前面没有高位的低位，或后面没有低位的高位）编不成合法 UTF-8
     const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u
@@ -61,7 +68,7 @@ describe("切分与重组", () => {
   })
 
   it("多片时每一片都带得齐 id/index/count", () => {
-    const wire = encodeFrame(frameOf("x".repeat(500)), 7, 100)
+    const wire = partsOf(frameOf("x".repeat(500)), 7, 100)
     const chunks = wire.map((t) => JSON.parse(t) as ChunkFrame)
     expect(chunks.every((c) => c.type === "chunk" && c.id === 7)).toBe(true)
     expect(chunks.map((c) => c.index)).toEqual(chunks.map((_, i) => i))
@@ -130,5 +137,24 @@ describe("坏输入一律丢掉并说清楚", () => {
     const seen = reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 1, count: 2, body: "的}" }))
     expect(seen.kind).toBe("dropped")
     expect(seen.kind === "dropped" ? seen.reason : "").toContain("不是合法 JSON")
+  })
+})
+
+describe("超限", () => {
+  it("**帧太大时明说，不发一串对端注定拒收的片**", () => {
+    // 16 M 码元以上：切成 1024 片也装不下，接收端会从第一片就拒
+    const encoded = encodeFrame(frameOf("x".repeat(17_000_000)), 1)
+    expect(encoded.kind).toBe("too-big")
+    expect(encoded.kind === "too-big" ? encoded.chars : 0).toBeGreaterThan(16_777_216)
+  })
+
+  it("**片数永远不超上限**——超了的话接收端一片都不收", () => {
+    // 用一个刚好会切出很多片的大帧：固定片长会切出 ~610 片，仍在上限内；
+    // 关键是验「片长会自己长大」这条规则成立
+    const big = frameOf("y".repeat(10_000_000))
+    const parts = partsOf(big, 1)
+    expect(parts.length).toBeLessThanOrEqual(1024)
+    const first = JSON.parse(parts[0] ?? "{}") as { count: number }
+    expect(first.count).toBe(parts.length)
   })
 })

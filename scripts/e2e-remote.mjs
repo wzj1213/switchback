@@ -177,6 +177,41 @@ async function stepCommands({ ws, frames, target }) {
   )
 }
 
+/**
+ * **吊销要当场掐断正连着的那条。**
+ *
+ * 只删记录的话，一台没断线的设备永远等不到「下一次连接」——它继续收全部事件、
+ * 继续能替你放行 agent 要跑的每一条命令。而按下那颗按钮的场景恰恰是「手机丢了」。
+ */
+async function stepRevoke(send) {
+  console.log("10. 吊销当场断开正连着的那条")
+  const status = await evaluate(send, "window.omni.remote.pair().then(s => JSON.stringify(s))")
+  const paired = await (
+    await fetch(`${BASE}/api/pair`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: status.pairing.code, name: "要被吊销的" }),
+    })
+  ).json()
+  const ws = new WebSocket(`${BASE.replace("http", "ws")}/api/stream`, ["omni.v1", paired.token])
+  const closed = { code: 0 }
+  ws.on("close", (code) => {
+    closed.code = code
+  })
+  await new Promise((r, j) => {
+    ws.once("open", r)
+    ws.once("error", j)
+  })
+  ok("连上了", ws.readyState === WebSocket.OPEN)
+  const list = await evaluate(send, "window.omni.remote.status().then(s => JSON.stringify(s))")
+  const victim = list.devices.find((d) => d.name === "要被吊销的")
+  await evaluate(send, `window.omni.remote.revoke(${JSON.stringify(victim.id)}).then(s => JSON.stringify(s))`)
+  await pause(800)
+  ok("**那条连接当场断了**", ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING, `code ${String(closed.code)}`)
+  const me = await fetch(`${BASE}/api/me`, { headers: { authorization: `Bearer ${paired.token}` } })
+  ok("令牌之后也认不出", me.status === 401)
+}
+
 async function stepStatic() {
   console.log("8. 静态页面与安全响应头")
   const home = await fetch(`${BASE}/`)
@@ -206,6 +241,8 @@ async function main() {
     "设备表里有这一台",
     after.devices.some((d) => d.name === "端到端验收"),
   )
+
+  await stepRevoke(send)
 
   cdp.close()
   console.log(state.failed === 0 ? "\n全部通过" : `\n有 ${state.failed} 项失败`)

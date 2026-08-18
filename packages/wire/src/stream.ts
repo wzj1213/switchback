@@ -26,13 +26,23 @@ import type { Replay, Sealed } from "./types.js"
 export interface Stream {
   /** 收到的最后一个序号。`undefined` = 还没收到全量，什么都不能应用。 */
   lastSeq: number | undefined
+  /**
+   * 手上这份基线属于宿主的哪一次运行。**去要补发时必须一起报**——
+   * 只报序号的话，宿主分不出这个游标是不是上一次运行留下的（见 `Replay.epoch`）。
+   */
+  epoch: string | undefined
   /** 连不上的增量先攒在这，按序号排好、去过重。 */
   pending: readonly Sealed[]
   /** 正在等补发。这期间来的增量继续攒，不应用。 */
   catching: boolean
 }
 
-export const initialStream: Stream = { lastSeq: undefined, pending: [], catching: false }
+export const initialStream: Stream = {
+  lastSeq: undefined,
+  epoch: undefined,
+  pending: [],
+  catching: false,
+}
 
 export interface Step {
   stream: Stream
@@ -54,7 +64,7 @@ function merge(pending: readonly Sealed[], incoming: readonly Sealed[]): Sealed[
  * 走不动（下一个不是 `lastSeq + 1`）就停下来去补。已经见过的（`seq <= lastSeq`）
  * 直接丢——重复应用比丢弃危险，`item.started` 应用两次会长出两条一样的 item。
  */
-function drain(lastSeq: number, queue: readonly Sealed[]): Step {
+function drain(lastSeq: number, epoch: string | undefined, queue: readonly Sealed[]): Step {
   const apply: Event[] = []
   let cursor = lastSeq
   let index = 0
@@ -68,10 +78,10 @@ function drain(lastSeq: number, queue: readonly Sealed[]): Step {
   }
   const rest = queue.slice(index).filter((s) => s.seq > cursor)
   if (rest.length === 0) {
-    return { stream: { lastSeq: cursor, pending: [], catching: false }, apply }
+    return { stream: { lastSeq: cursor, epoch, pending: [], catching: false }, apply }
   }
   return {
-    stream: { lastSeq: cursor, pending: rest, catching: true },
+    stream: { lastSeq: cursor, epoch, pending: rest, catching: true },
     apply,
     resyncFrom: cursor,
   }
@@ -86,7 +96,7 @@ function drain(lastSeq: number, queue: readonly Sealed[]): Step {
  */
 export function replayed(stream: Stream, replay: Replay): Step {
   const queue = stream.pending.filter((s) => s.seq > replay.resumeAt)
-  const next = drain(replay.resumeAt, queue)
+  const next = drain(replay.resumeAt, replay.epoch, queue)
   return { ...next, apply: [...replay.events, ...next.apply] }
 }
 
@@ -95,7 +105,7 @@ export function received(stream: Stream, sealed: readonly Sealed[]): Step {
   if (stream.lastSeq === undefined || stream.catching) {
     return { stream: { ...stream, pending: merge(stream.pending, sealed) }, apply: [] }
   }
-  return drain(stream.lastSeq, merge(stream.pending, sealed))
+  return drain(stream.lastSeq, stream.epoch, merge(stream.pending, sealed))
 }
 
 /** 补发回来了。 */
@@ -103,7 +113,7 @@ export function resynced(stream: Stream, sealed: readonly Sealed[]): Step {
   if (stream.lastSeq === undefined) {
     return { stream: { ...stream, pending: merge(stream.pending, sealed) }, apply: [] }
   }
-  return drain(stream.lastSeq, merge(stream.pending, sealed))
+  return drain(stream.lastSeq, stream.epoch, merge(stream.pending, sealed))
 }
 
 /**

@@ -128,3 +128,60 @@ describe("线上来的东西必须先验形状", () => {
     })
   }
 })
+
+describe("上限管得住已经开着的会话", () => {
+  const full = (): Trust => "full"
+
+  it("**往一条完全档会话发提问，在自动编辑上限下要被拒**——这是最容易发生的那条绕过", () => {
+    const verdict = clamp({ type: "thread.prompt", threadId: "t", text: "跑一下" }, "auto-edit", full)
+    expect(verdict.command).toBeUndefined()
+    expect(verdict.note).toContain("full")
+  })
+
+  it("**fork 会继承源会话的档**，所以同样要拦——不然远程凭空得到一条完全档会话", () => {
+    const verdict = clamp({ type: "thread.fork", threadId: "t", to: "claude" }, "auto-edit", full)
+    expect(verdict.command).toBeUndefined()
+  })
+
+  it("resume 与 rewind 同理", () => {
+    expect(clamp({ type: "thread.resume", threadId: "t" }, "read-only", full).command).toBeUndefined()
+    expect(clamp({ type: "thread.rewind", threadId: "t", turnId: "u" }, "read-only", full).command).toBeUndefined()
+  })
+
+  it("**不让引擎动起来的那些照旧放行**：停下、改名、删掉、换模型", () => {
+    for (const command of [
+      { type: "thread.interrupt", threadId: "t" },
+      { type: "thread.rename", threadId: "t", title: "x" },
+      { type: "thread.delete", threadId: "t" },
+      { type: "thread.setModel", threadId: "t", model: "m" },
+    ] as const) {
+      expect(clamp(command, "read-only", full).command).toEqual(command)
+    }
+  })
+
+  it("**批准从不拦**——「在外面把卡住的那一轮放行」正是这个功能存在的理由", () => {
+    const resolve = { type: "approval.resolve", itemId: "i", allow: true, remember: "once" } as const
+    expect(clamp(resolve, "read-only", full).command).toEqual(resolve)
+  })
+
+  it("**切低是允许的**：这是用户在手机上把会话拉回上限之内的唯一办法", () => {
+    const verdict = clamp({ type: "thread.setTrust", threadId: "t", trust: "auto-edit" }, "auto-edit", full)
+    expect(verdict.command).toMatchObject({ trust: "auto-edit" })
+  })
+
+  it("目标会话不高过上限就什么都不做", () => {
+    const prompt = { type: "thread.prompt", threadId: "t", text: "hi" } as const
+    expect(clamp(prompt, "full", () => "auto-edit").command).toEqual(prompt)
+  })
+
+  it("查不到会话时不拦——宿主自己会拒一条指向不存在会话的命令", () => {
+    const prompt = { type: "thread.prompt", threadId: "没有这条", text: "hi" } as const
+    expect(clamp(prompt, "read-only", () => undefined).command).toEqual(prompt)
+  })
+
+  it("只读上限下 adopt 被拒（它的档位是写死的，钳不动）", () => {
+    const adopt = { type: "thread.adopt", engine: "codex", handle: "h", cwd: "/w", title: "x" } as const
+    expect(clamp(adopt, "read-only").command).toBeUndefined()
+    expect(clamp(adopt, "auto-edit").command).toEqual(adopt)
+  })
+})

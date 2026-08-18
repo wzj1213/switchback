@@ -179,8 +179,19 @@ export function createTokenStore(deps: TokenDeps): TokenStore {
   }
 }
 
-/** 配对码的定长比较。长度不同直接判否——这一步本来就藏不住。 */
+/**
+ * 配对码的定长比较。
+ *
+ * **先编码再比长度。** 反过来（比 UTF-16 码元长度、再按 UTF-8 编码交给
+ * `timingSafeEqual`）有一个能被利用的洞：`ÀÀÀÀÀÀÀÀ` 是 8 个码元但 16 个字节，
+ * 长度检查放行、`timingSafeEqual` 因两边字节数不等**抛异常**。而这一句
+ * 只在「正在配对」时才求值（`claim` 里那个短路），于是异常一路冒到
+ * HTTP 层变成 500——没配对时是 403。两个状态码就成了「桌面上现在有没有
+ * 挂着一个五分钟有效的码」的判别器，正好推翻本文件刻意维持的那条不变量。
+ * 更糟的是它抛在计数之前，探测本身不算失败次数，可以无限轮询。
+ */
 function constantEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"))
+  const left = Buffer.from(a, "utf8")
+  const right = Buffer.from(b, "utf8")
+  return left.length === right.length && timingSafeEqual(left, right)
 }

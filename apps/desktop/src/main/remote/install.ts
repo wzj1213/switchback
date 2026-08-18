@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { app, ipcMain } from "electron"
-import type { Command } from "@omni/protocol"
+import type { Command, Trust } from "@omni/protocol"
 import type { Ledger } from "@omni/wire"
 import type { Sink, Sinks } from "../sink.js"
 import type { Logger } from "./../log.js"
 import type { Settings } from "../../shared/settings.js"
 import { assertTrustedAuthority } from "./fence.js"
-import { createTokenStore, type Device, type TokenStore } from "./tokens.js"
+import { createTokenStore, type Device } from "./tokens.js"
 import { startRemote, type RemoteServer } from "./server.js"
 
 /**
@@ -37,6 +37,8 @@ export interface RemoteInstallDeps {
   sinks: Sinks
   dispatch: (command: Command) => void
   replay: (sink: Sink) => Promise<void>
+  /** 某条会话现在是哪一档。见 `remote/policy.ts` 的 `RUNS_IN_THREAD`。 */
+  trustOf: (threadId: string) => Trust | undefined
   log: Logger
 }
 
@@ -126,15 +128,54 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
   }
 
   const sync = async (): Promise<void> => {
-    const remote = deps.settings().remote
+    await syncOnce(deps, tokens, state)
+  }
+  /**
+   * 吊销一台设备：先删记录，**再把它现在连着的那些连接掐掉**。
+   *
+   * 顺序无所谓（两步都做完才算数），但**第二步不能省**：
+   * 只删记录的话，那台已经握手完成的设备照旧收全部事件、照旧能发命令——
+   * 而按下这颗按钮的场景恰恰是「手机丢了，它多半正连着」。
+   */
+  const revoke = (id: string): void => {
+    const had = tokens.revoke(id)
+    const cut = state.server?.disconnect(id) ?? 0
+    if (had) deps.log.write("info", "remote", `吊销设备 ${id}，顺带掐掉 ${String(cut)} 条正连着的连接`)
+  }
+
+  installChannels({ status, sync, revoke, pair: () => { tokens.startPairing() } })
+  return { status, sync, close: () => stop(state, deps.log) }
+}
+
+
+/** 按当前设置起停服务端。**不在 `installRemote` 里内联**：那个函数已经贴着行数闸门。 */
+async function syncOnce(
+  deps: RemoteInstallDeps,
+  tokens: ReturnType<typeof createTokenStore>,
+  state: { server: RemoteServer | undefined; error: string | undefined },
+): Promise<void> {
+  const remote = deps.settings().remote
+    // **形状校验放在最前，不管服务端在不在跑。**
+    //
+    // 「隧道那头的域名」这一栏只在开关打开之后才出现，所以用户的实际顺序
+    // 必然是「先开 → 再填」——校验排在「已经在跑就早退」后面的话，
+    // 它**永远跑不到用户真正走的那条路**。而 `checkRequest` 读的是实时配置，
+    // 坏值当场生效：粘一个 `https://…` 进去，解析出的 hostname 是 `"https"`，
+    // 手机上全部 403，而面板上写着「在听 127.0.0.1:17800」，一个红字都没有。
+    state.error = undefined
+    try {
+      for (const entry of remote.trustedHosts) assertTrustedAuthority(entry)
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : String(error)
+      deps.log.write("error", "remote", `trustedHosts 配置有问题：${state.error}`)
+      return
+    }
     if (!remote.enabled) {
       await stop(state, deps.log)
       return
     }
     if (state.server !== undefined) return
-    state.error = undefined
     try {
-      for (const entry of remote.trustedHosts) assertTrustedAuthority(entry)
       state.server = await startRemote({
         config: () => deps.settings().remote,
         webRoot: webRoot(),
@@ -143,6 +184,7 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
         sinks: deps.sinks,
         dispatch: deps.dispatch,
         replay: deps.replay,
+        trustOf: deps.trustOf,
         log: (level, message) => {
           deps.log.write(level, "remote", message)
         },
@@ -153,10 +195,6 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
       state.error = error instanceof Error ? error.message : String(error)
       deps.log.write("error", "remote", `远程服务端起不来：${state.error}`)
     }
-  }
-
-  installChannels(tokens, status, sync)
-  return { status, sync, close: () => stop(state, deps.log) }
 }
 
 async function stop(state: { server: RemoteServer | undefined }, log: Logger): Promise<void> {
@@ -168,19 +206,26 @@ async function stop(state: { server: RemoteServer | undefined }, log: Logger): P
   })
 }
 
-/** 设置面板要用的四条窄通道。 */
-function installChannels(tokens: TokenStore, status: () => RemoteStatus, sync: () => Promise<void>): void {
-  ipcMain.handle("omni:remote/status", () => status())
+interface Channels {
+  status: () => RemoteStatus
+  sync: () => Promise<void>
+  revoke: (id: string) => void
+  pair: () => void
+}
+
+/** 设置面板要用的四条窄通道。**每一条都回一份完整状态**，理由见 preload。 */
+function installChannels(ch: Channels): void {
+  ipcMain.handle("omni:remote/status", () => ch.status())
   ipcMain.handle("omni:remote/sync", async () => {
-    await sync()
-    return status()
+    await ch.sync()
+    return ch.status()
   })
   ipcMain.handle("omni:remote/pair", () => {
-    tokens.startPairing()
-    return status()
+    ch.pair()
+    return ch.status()
   })
   ipcMain.handle("omni:remote/revoke", (_e, id: unknown) => {
-    if (typeof id === "string") tokens.revoke(id)
-    return status()
+    if (typeof id === "string") ch.revoke(id)
+    return ch.status()
   })
 }

@@ -141,7 +141,7 @@ textarea {
  * 边框会跟着缩进去，看起来像被缩排了。
  */
 @media (min-width: 900px) {
-  .thread__body > * {
+  .thread__inner > * {
     width: 100%;
     max-width: 78ch;
     align-self: center;
@@ -473,9 +473,6 @@ textarea {
   min-height: 0;
   overflow-y: auto;
   padding: var(--sp-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
   -webkit-overflow-scrolling: touch;
   /* 滚动容器有自己的边界，别把整页一起拖动 */
   overscroll-behavior: contain;
@@ -490,7 +487,7 @@ textarea {
  * 于是压缩直接变成裁切），而且**不报错、不留痕**，只是那一行读不全。
  * 这是出图才看出来的，肉眼在开发机上很容易当成「字体渲染问题」。
  */
-.thread__body > * {
+.thread__inner > * {
   flex: none;
 }
 
@@ -884,4 +881,59 @@ textarea {
   flex: none;
   font-size: 18px;
   line-height: 1;
+}
+
+/* ── 宿主捎回来的话 ─────────────────────────────────────── */
+
+/*
+ * 命令被拒、被钳、或者没发出去时的一句话。
+ * **静默丢弃是这条通道上最坏的失败方式**，所以这块必须显眼且要人手动关。
+ */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: color-mix(in srgb, var(--warn) 16%, var(--bg));
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.notice__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 正文的内容盒。**尺寸变化由它触发贴底**（见 useStickToBottom） */
+.thread__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* 只在离开底部时出现的那颗。平时不画——一个常驻的「回到底部」是纯噪声 */
+.tobottom {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 12%);
+}
+
+.thread {
+  position: relative;
+}
+
+.approval__offline {
+  margin: var(--sp-2) 0 0;
+  color: var(--warn);
+  font-size: var(--text-sm);
 }

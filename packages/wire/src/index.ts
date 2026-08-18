@@ -9,4 +9,4 @@ export {
   type Step,
   type Stream,
 } from "./stream.js"
-export { createReassembler, encodeFrame, type Assembled, type Reassembler } from "./segment.js"
+export { createReassembler, encodeFrame, type Assembled, type Encoded, type Reassembler } from "./segment.js"

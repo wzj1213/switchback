@@ -21,6 +21,21 @@ export interface Sealed {
 export interface Replay {
   events: readonly Event[]
   resumeAt: number
+  /**
+   * 这份基线属于宿主的**哪一次运行**。
+   *
+   * ## 为什么非有不可
+   *
+   * 序号是「本次运行内」的计数，重启从头数。没有这个字段的话，
+   * 一个停在 50 号的客户端在宿主重启之后重连，会拿到新一轮的 51 号往后——
+   * 而那些和它手上的 1..50 根本不是同一串事件。它会**安静地**把两轮的
+   * 状态拼在一起：新一轮前 50 条里的 `item.started` 全都不在，
+   * 后面所有对那些 item 的 delta 无处可去，界面就那么错着。
+   *
+   * 「对方报的号比我发过的还大」那条判据只挡住一半——宿主重启后只要
+   * 已经发出的事件超过旧游标（一次流式回答就够），它就不成立了。
+   */
+  epoch: string
 }
 
 /**
@@ -35,11 +50,22 @@ export type ClientFrame =
    * 接得上就只补差量，接不上宿主发全量。
    *
    * **全量必须由客户端来要，不能由宿主猜时机**：连接建立那一刻页面可能还没挂上监听。
+   *
+   * `epoch` 是上一份全量里带回来的运行代号。**它和 `after` 必须成对出现**：
+   * 只报序号不报代号，宿主没法判断这个游标是不是上一次运行留下的。
    */
-  | { type: "hello"; after?: number }
+  | { type: "hello"; after?: number; epoch?: string }
   | { type: "command"; command: Command }
   /** 累积确认：`seq` 及以前的都收到了。宿主据此释放保留缓冲。 */
   | { type: "ack"; seq: number }
+  /**
+   * 「我这儿从 `after` 之后断了一截，补给我。」
+   *
+   * 和 `hello` 分开是因为**语义不同**：`hello` 是「我刚连上，给我基线」，
+   * 而这条是「我一直连着，但发现序号跳了」。混用会让宿主在每次补洞时
+   * 重新 `join` 一遍账本，把那个客户端的确认位打回 0。
+   */
+  | { type: "resync"; after: number; epoch: string }
   /**
    * 我正在看哪条会话。`null` = 列表页，谁的正文都不看。
    *
@@ -54,12 +80,28 @@ export type ServerFrame =
   | { type: "replay"; replay: Replay }
   | { type: "events"; sealed: readonly Sealed[] }
   /**
+   * 补发回来的那一段。**必须和常态增量分开**。
+   *
+   * 接收端在等补发时是 `catching` 状态，而 `received()` 在那个状态下只攒不应用
+   *（它假设自己收到的是又一批可能带缺口的活事件）。补发的回包如果也走
+   * `received`，就永远解不开 catching——界面从缺口那一刻起静默冻住，
+   * 事件照收、什么都不显示、一行错误都没有。
+   */
+  | { type: "catchup"; sealed: readonly Sealed[] }
+  /**
    * 补不了（缺口比保留缓冲还老，或者序号来自上一次宿主运行）。
    *
    * **绝不返回一个不完整的片段**——补一半比不补危险，因为界面看起来是好的。
    * 客户端收到这条必须重新 `hello`（不带 `after`）。
    */
   | { type: "reset"; reason: string }
+  /**
+   * 一句要让人看见的话：命令被拒了、被钳了、或者别的「你以为做了其实没做」。
+   *
+   * **静默丢弃是这条通道上最坏的失败方式**——用户在手机上点了「允许」，
+   * 工具被拒，而界面上没有任何东西说这里出过事。
+   */
+  | { type: "notice"; text: string }
   | { type: "pong" }
 
 /**

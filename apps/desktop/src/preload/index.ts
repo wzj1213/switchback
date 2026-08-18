@@ -1,27 +1,20 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron"
-import type { Command, Event } from "@omni/protocol"
+import type { Command } from "@omni/protocol"
+import type { Replay, Sealed } from "@omni/wire"
 import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { RemoteStatus } from "../main/remote/install.js"
 
-/** 带序号的增量。序号是**本次主进程运行内**的传输层计数，见 main/sequence.ts。 */
-export interface Sealed {
-  seq: number
-  event: Event
-}
-
 /**
- * 全量重建。窗口（重）加载时来一次。
+ * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
  *
- * `resumeAt` 之后的增量才需要应用——之前的要么已经在 `events` 里，
- * 要么发生在还没订阅的时候。这条规则是防重的关键。
+ * 这个文件曾经手写过一份 `Sealed` / `Replay`，于是它们可以和真正发出去的东西
+ * 对不上而编译器一言不发——`env.d.ts` 顶上那段记的就是同一类事故。
+ * 现在少一个字段会在**用它的地方**编译不过。
  */
-export interface Replay {
-  events: readonly Event[]
-  resumeAt: number
-}
+export type { Replay, Sealed }
 
 /**
  * 渲染层与主进程之间**唯一**的通道：
@@ -190,7 +183,7 @@ const api = {
     async pair(): Promise<RemoteStatus> {
       return (await ipcRenderer.invoke("omni:remote/pair")) as RemoteStatus
     },
-    /** 吊销一台设备。它下一次连接（以及正在跑的那条）立刻失效。 */
+    /** 吊销一台设备。**正连着的那条会当场断开**，之后也认不出它的令牌。 */
     async revoke(id: string): Promise<RemoteStatus> {
       return (await ipcRenderer.invoke("omni:remote/revoke", id)) as RemoteStatus
     },
@@ -245,9 +238,14 @@ const api = {
     ipcRenderer.send("omni:hello")
   },
 
-  /** 补 `after` 之后漏掉的。补不了返回 `{reset:true}`，调用方必须等下一次全量。 */
-  async resync(after: number): Promise<{ events: readonly Sealed[] } | { reset: true }> {
-    return (await ipcRenderer.invoke("omni:resync", after)) as
+  /**
+   * 补 `after` 之后漏掉的。补不了返回 `{reset:true}`，调用方必须等下一次全量。
+   *
+   * **`epoch` 必须一起报**：序号是「本次主进程运行内」的计数，只报数字的话
+   * 主进程分不出这个游标是不是上一次运行留下的（见 `@omni/wire` 的 `Replay.epoch`）。
+   */
+  async resync(after: number, epoch: string): Promise<{ events: readonly Sealed[] } | { reset: true }> {
+    return (await ipcRenderer.invoke("omni:resync", { after, epoch })) as
       | { events: readonly Sealed[] }
       | { reset: true }
   },

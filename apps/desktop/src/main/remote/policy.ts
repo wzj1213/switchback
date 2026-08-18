@@ -26,12 +26,16 @@ export function lower(a: Trust, b: Trust): Trust {
   return RANK[a] <= RANK[b] ? a : b
 }
 
-/** 钳过之后的命令，以及**哪里被钳了**——界面要能说清「为什么我选的是完全档，它却是只读」。 */
-export interface Clamped {
-  command: Command
-  /** 有值就说明这条命令被改过。写给人看。 */
-  note?: string
-}
+/**
+ * 钳过之后的命令，以及**哪里被钳了**——界面要能说清「为什么我选的是完全档，它却是只读」。
+ *
+ * `refused` 是第三种结局：有些命令**没法钳**，只能整条挡下。
+ * 那时 `command` 是 undefined，调用方必须把 `note` 送回给用户看——
+ * 静默丢弃是这条通道上最坏的失败方式。
+ */
+export type Clamped =
+  | { command: Command; note?: string }
+  | { command?: undefined; refused: true; note: string }
 
 function clampScope(scope: RememberScope, ceiling: Trust): { scope: RememberScope; note?: string } {
   if (ceiling === "full" || scope !== "project") return { scope }
@@ -39,10 +43,58 @@ function clampScope(scope: RememberScope, ceiling: Trust): { scope: RememberScop
 }
 
 /**
+ * 这条命令会不会让引擎在一条**高过上限**的会话里动起来。
+ *
+ * ## 为什么光钳「新建」和「切档」不够
+ *
+ * 上限的承诺是「远程能改文件，但每条命令仍然要你点一次」。而一条**桌面上
+ * 已经开着的完全档会话**从来不经过 `thread.create`——远程只要往它发一句
+ * `thread.prompt`，引擎就按那条会话自己的完全档跑，一次审批都不弹。
+ * `thread.fork` 更直接：`@omni/host` 的 branch 里是 `{...entry.thread}`，
+ * 新会话**继承源会话的档**，于是远程凭空得到一条完全档会话。
+ *
+ * 所以判据从「这条命令要开哪一档」改成「这条命令作用在哪条会话上」。
+ *
+ * 挡的是会让引擎动起来的那几条；`interrupt` / `rename` / `delete` /
+ * `setModel` / `approval.resolve` 不在内——**批准尤其不能拦**，
+ * 那是这个功能存在的理由。
+ */
+const RUNS_IN_THREAD: ReadonlySet<string> = new Set([
+  "thread.prompt",
+  "thread.resume",
+  "thread.rewind",
+  "thread.fork",
+])
+
+/**
  * 把一条远程发来的命令钳到上限之内。
  * @param ceiling 远程连接的档位上限，来自 `Settings.remote.maxTrust`。
+ * @param trustOf 目标会话现在是哪一档。查不到（比如会话不存在）就当没有约束——
+ *   宿主自己会拒一条指向不存在会话的命令，这里不重复那份判断。
  */
-export function clamp(command: Command, ceiling: Trust): Clamped {
+export function clamp(command: Command, ceiling: Trust, trustOf?: (id: string) => Trust | undefined): Clamped {
+  const target = "threadId" in command ? trustOf?.(command.threadId) : undefined
+  if (target !== undefined && RUNS_IN_THREAD.has(command.type) && RANK[target] > RANK[ceiling]) {
+    return {
+      refused: true,
+      note: `这条会话开在 ${target} 档，高过远程上限 ${ceiling}。先在手机上把它切到 ${ceiling}（切低是允许的），或者在桌面上调高远程上限。`,
+    }
+  }
+  return clampTrust(command, ceiling)
+}
+
+function clampTrust(command: Command, ceiling: Trust): Clamped {
+  if (command.type === "thread.adopt") {
+    // **接管没有档位可钳。** `@omni/host` 的 `adopt` 把 trust 写死成 `auto-edit`
+    //（它不猜那条会话原本在引擎里是什么档，猜错的方向如果是放宽就麻烦了）。
+    // 于是只读上限对它完全无效：远程白拿一条能改文件的会话。
+    // 命令里也没有 trust 字段可改，所以只能整条挡下——
+    // **钳不动的东西必须拒，不能放过去**。
+    if (ceiling === "read-only") {
+      return { refused: true, note: "远程上限是只读，而接管过来的会话固定开在自动编辑档，所以这一步只能在桌面上做" }
+    }
+    return { command }
+  }
   if (command.type === "thread.create") {
     const trust = lower(command.trust, ceiling)
     return trust === command.trust

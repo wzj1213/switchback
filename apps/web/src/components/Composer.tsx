@@ -25,7 +25,8 @@ export function Composer({
   disabled: boolean
   running: boolean
   hint: string
-  onSend: (text: string) => void
+  /** 返回有没有真的发出去。**发不出去就不能清空输入框**。 */
+  onSend: (text: string) => boolean
   onStop: () => void
 }): React.JSX.Element {
   const [text, setText] = useState("")
@@ -42,7 +43,9 @@ export function Composer({
   const submit = (): void => {
     const value = text.trim()
     if (value === "" || disabled) return
-    onSend(value)
+    // **没发出去就把字留着。** 断线时清空输入框等于把用户刚打的一段话
+    // 扔了，而界面上没有任何东西说这里出过事——那是这一端最坏的失败方式
+    if (!onSend(value)) return
     setText("")
     // 高度要跟着回到一行，否则清空之后留着一个六行高的空框
     queueMicrotask(grow)

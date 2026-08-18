@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import type { Thread as ThreadModel } from "@omni/protocol"
 import { itemsOf, turnOf, usageOf } from "@omni/store"
 import type { Remote } from "../useRemote.js"
@@ -29,15 +29,20 @@ export function Thread({
   const items = itemsOf(remote.state, thread.id)
   const turn = turnOf(remote.state, thread.id)
   const usage = usageOf(remote.state, thread.id)
-  const scroller = useRef<HTMLDivElement>(null)
-  useStickToBottom(scroller, items.length)
+  const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
 
-  // 打开一条会话就把它标成「我在看」，让宿主别为它再响一次
+  // 打开一条会话就把它标成「我在看」，让宿主别为它再响一次。
+  //
+  // **依赖里只放 `remote.watch`（`useCallback(…, [])`，稳定），不放整个 `remote`。**
+  // 后者每次渲染都是一个新对象字面量，等于没有依赖数组——而流式输出期间
+  // 每收一帧都会重渲染，于是这个 effect 变成一秒几十帧的上行。
+  const { watch } = remote
   useEffect(() => {
-    remote.watch(thread.id)
-  }, [remote, thread.id])
+    watch(thread.id)
+  }, [watch, thread.id])
 
   const running = thread.status === "running" || turn?.status === "running"
+  const offline = remote.conn.kind !== "open"
 
   return (
     <section className="thread">
@@ -49,24 +54,36 @@ export function Thread({
         <Usage used={usage?.contextUsed ?? 0} window={usage?.contextWindow} />
       </header>
       <div className="thread__body" ref={scroller}>
-        {items.length === 0 ? (
-          <p className="empty">这条会话还没有内容。</p>
-        ) : (
-          items.map((item) => <ItemView key={item.id} item={item} send={remote.send} />)
-        )}
-        {running ? <p className="thread__running">正在跑…</p> : null}
+        <div className="thread__inner" ref={inner}>
+          {items.length === 0 ? (
+            <p className="empty">这条会话还没有内容。</p>
+          ) : (
+            items.map((item) => <ItemView key={item.id} item={item} send={remote.send} offline={offline} />)
+          )}
+          {running ? <p className="thread__running">正在跑…</p> : null}
+        </div>
       </div>
+      {atBottom ? null : (
+        <button className="tobottom" type="button" onClick={toBottom}>
+          ↓ 回到底部
+        </button>
+      )}
       <Composer
-        disabled={thread.detached === true}
+        disabled={thread.detached === true || offline}
         running={running}
-        hint={thread.detached === true ? "这条会话没接引擎，去桌面上点「继续」" : `${thread.engine} · ${thread.trust}`}
-        onSend={(text) => {
-          remote.send({ type: "thread.prompt", threadId: thread.id, text })
-        }}
+        hint={hintOf(thread, offline)}
+        onSend={(text) => remote.send({ type: "thread.prompt", threadId: thread.id, text })}
         onStop={() => {
           remote.send({ type: "thread.interrupt", threadId: thread.id })
         }}
       />
     </section>
   )
+}
+
+/** 输入框上面那行小字。**说清现在为什么不能发**，而不是只报引擎和档位。 */
+function hintOf(thread: ThreadModel, offline: boolean): string {
+  if (offline) return "没连上 omni，先等重连"
+  if (thread.detached === true) return "这条会话没接引擎，去桌面上点「继续」"
+  return `${thread.engine} · ${thread.trust}`
 }

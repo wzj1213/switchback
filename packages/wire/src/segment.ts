@@ -26,7 +26,13 @@ const MAX_CHUNK_CHARS = 16_384
 /** 最多切多少片。超过说明这条帧根本不该走这条路。 */
 const MAX_CHUNKS = 1024
 
-/** 重组出来的字符串上限。防的是「一个恶意的对端报 1024 片、每片撑满」。 */
+/**
+ * 一条逻辑帧最大能有多少码元。超过就**传不了**，而不是「传得慢一点」。
+ *
+ * 这个数同时是两边的约束：发送端切不出更多片（`MAX_CHUNKS`），
+ * 接收端也不肯为一条帧攒更多内存。手机上 16 M 码元已经是 32~48 MB 的字符串，
+ * 再往上 Safari 会直接把页面杀掉——**那种失败连一行错误都不会留下**。
+ */
 const MAX_ASSEMBLED_CHARS = MAX_CHUNK_CHARS * MAX_CHUNKS
 
 /**
@@ -42,24 +48,49 @@ function cut(text: string, at: number): number {
 }
 
 /**
+ * 编码的结果。
+ *
+ * **「太大了」必须是一个调用方看得见的值，不能是一串发出去就石沉大海的片。**
+ * 超限时如果照旧切片发出去，接收端从第一片就拒收（片数越界），
+ * 于是每次重连都这样——那个客户端永远连不上，而两边都只看到「又断了」。
+ */
+export type Encoded =
+  | { kind: "frames"; parts: readonly string[] }
+  /** 这条帧超过了能传的上限。`chars` 是它的实际大小，给日志用。 */
+  | { kind: "too-big"; chars: number; limit: number }
+
+/**
  * 把一条帧编成线上要发的一条或多条字符串。
  *
  * 小帧原样发（不套壳，省掉一次解析）；大帧切片，每片自带 `id/index/count`。
  * @param id 这条逻辑帧的编号，由调用方递增。只有切片时才用得到。
  */
-export function encodeFrame(frame: ServerFrame, id: number, maxChars = MAX_CHUNK_CHARS): readonly string[] {
+export function encodeFrame(frame: ServerFrame, id: number, maxChars = MAX_CHUNK_CHARS): Encoded {
   const text = JSON.stringify(frame)
-  if (text.length <= maxChars) return [text]
+  if (text.length > MAX_ASSEMBLED_CHARS) {
+    return { kind: "too-big", chars: text.length, limit: MAX_ASSEMBLED_CHARS }
+  }
+  if (text.length <= maxChars) return { kind: "frames", parts: [text] }
+  // **片数不能超上限，否则接收端从第一片就拒收。**
+  // 一份全量重建是所有会话的完整历史拼起来的，用一阵子之后过 16 MB 很正常；
+  // 按固定片长切会切出上千片，而接收端的 `malformed` 判据一见 `count > 1024`
+  // 就整条丢掉——**每一次重连都这样**，于是那个客户端永远连不上，
+  // 且两边都只看到「又断了」。宁可让单片变大也不能超片数：
+  // 片大只是多占一点内存，片数超限是彻底连不上。
+  const span = Math.max(maxChars, Math.ceil(text.length / MAX_CHUNKS))
   const parts: string[] = []
   let at = 0
   while (at < text.length) {
-    const end = cut(text, Math.min(at + maxChars, text.length))
+    const end = cut(text, Math.min(at + span, text.length))
     parts.push(text.slice(at, end))
     at = end
   }
-  return parts.map((body, index) =>
-    JSON.stringify({ type: "chunk", id, index, count: parts.length, body } satisfies ChunkFrame),
-  )
+  return {
+    kind: "frames",
+    parts: parts.map((body, index) =>
+      JSON.stringify({ type: "chunk", id, index, count: parts.length, body } satisfies ChunkFrame),
+    ),
+  }
 }
 
 /** 一次观察的结果。**「还没凑齐」和「丢掉了」必须分得开**——后者要报出去。 */

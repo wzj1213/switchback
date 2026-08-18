@@ -91,7 +91,9 @@ export function useOmni(): Omni {
         setLastStarted((prev) => ({ id, seq: (prev?.seq ?? 0) + 1 }))
       }
       if (step.resyncFrom === undefined) return
-      void bridge.resync(step.resyncFrom).then((answer) => {
+      const epoch = stream.current.epoch
+      if (epoch === undefined) return
+      void bridge.resync(step.resyncFrom, epoch).then((answer) => {
         if ("reset" in answer) {
           stream.current = reset()
           window.location.reload()

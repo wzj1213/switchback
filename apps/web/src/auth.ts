@@ -61,12 +61,34 @@ export function guessName(): string {
   return "浏览器"
 }
 
-/** 令牌还认吗。顺带拿回这条连接的上限档位。认不出返回 undefined。 */
-export async function whoAmI(token: string): Promise<Me | undefined> {
-  if (token === "") return undefined
-  const res = await fetch("/api/me", { headers: { authorization: `Bearer ${token}` } })
-  if (!res.ok) return undefined
-  return (await res.json()) as Me
+/**
+ * 令牌还认吗。三态，**不能压成两态**：
+ *
+ * - `ok` —— 认得出，顺带拿回这条连接的上限档位
+ * - `denied` —— 401/403，令牌真的不认了（被吊销、或者换了机器）
+ * - `unknown` —— 网络错了、或者中间的反向代理回了 502/504
+ *
+ * 把第三种也当成「被吊销」的代价很具体：隧道那头的 nginx 在 ssh 重连的
+ * 十几秒里回 502，用户就被踢回配对屏，还以为自己的设备被谁删了。
+ * 而它其实只需要再等十秒。
+ */
+export type WhoAmI = { kind: "ok"; me: Me } | { kind: "denied" } | { kind: "unknown"; reason: string }
+
+export async function whoAmI(token: string): Promise<WhoAmI> {
+  if (token === "") return { kind: "denied" }
+  let res: Response
+  try {
+    res = await fetch("/api/me", { headers: { authorization: `Bearer ${token}` } })
+  } catch (error) {
+    return { kind: "unknown", reason: error instanceof Error ? error.message : "连不上" }
+  }
+  if (res.status === 401 || res.status === 403) return { kind: "denied" }
+  if (!res.ok) return { kind: "unknown", reason: `HTTP ${String(res.status)}` }
+  try {
+    return { kind: "ok", me: (await res.json()) as Me }
+  } catch (error) {
+    return { kind: "unknown", reason: error instanceof Error ? error.message : "回的不是 JSON" }
+  }
 }
 
 export type PairResult = { ok: true; token: string; name: string } | { ok: false; reason: string }

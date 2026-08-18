@@ -200,6 +200,8 @@ function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>)
     replay: async (sink) => {
       await rebuild(attached, sink)
     },
+    // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档
+    trustOf: (threadId) => attached.host.live().find((t) => t.id === threadId)?.trust,
     log,
   })
 }
@@ -390,14 +392,23 @@ function bootstrap(): Promise<void> {
  * 审批落定），那些也要落盘。
  */
 async function shutdown(attached: Attached, logger: Logger, closeRemote: () => Promise<void>): Promise<void> {
-  // 先断远程：让还连着的客户端立刻收到关闭，而不是对着一个正在收摊的宿主发命令
-  await closeRemote().catch((error: unknown) => {
-    logger.write("warn", "remote", `关闭远程服务端失败：${String(error)}`)
-  })
+  // **引擎先回收，远程后关。**
+  //
+  // 反过来（先 await closeRemote）曾经是这里的写法，而它的上界由第三方库和
+  // 网络共同决定：一条正在往隧道里推前端产物、对端却卡在电梯里的连接，
+  // 能让 `server.close()` 撑过外层那 8 秒的兜底——一到点就 `app.exit(0)`，
+  // `host.dispose()` **一次都没跑**，于是漏掉整棵引擎进程树
+  //（子进程是 detached 的，父死不连坐）。那正是这段代码本来要挡的事。
+  //
+  // 远程客户端收不到优雅关闭，最多是多等一次重连；漏一棵有写和执行权限的
+  // 进程树没有「最多」。
   await attached.host.dispose().catch((error: unknown) => {
     logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
   })
   await attached.journal.flush().catch(() => undefined)
+  await closeRemote().catch((error: unknown) => {
+    logger.write("warn", "remote", `关闭远程服务端失败：${String(error)}`)
+  })
 }
 
 /**

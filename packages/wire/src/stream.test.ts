@@ -3,6 +3,8 @@ import type { Event } from "@omni/protocol"
 import { initialStream, received, replayed, reset, resynced, type Step } from "./stream.js"
 import type { Sealed } from "./types.js"
 
+const RUN = "run-a"
+
 const ev = (tag: string): Event => ({ type: "item.delta", at: 0, itemId: "i", append: tag })
 const sealed = (...seqs: number[]): Sealed[] => seqs.map((seq) => ({ seq, event: ev(`#${String(seq)}`) }))
 const tags = (step: Step): string[] =>
@@ -20,33 +22,33 @@ describe("全量之前", () => {
 describe("全量到达", () => {
   it("先应用全量，再接上攒着的增量", () => {
     const buffered = received(initialStream, sealed(6, 7))
-    const step = replayed(buffered.stream, { events: [ev("全量")], resumeAt: 5 })
+    const step = replayed(buffered.stream, { events: [ev("全量")], resumeAt: 5, epoch: RUN })
     expect(tags(step)).toEqual(["全量", "#6", "#7"])
     expect(step.stream.lastSeq).toBe(7)
   })
 
   it("**resumeAt 之前的增量一律丢**——它们已经在全量里了，再应用一遍会长出重复的 item", () => {
     const buffered = received(initialStream, sealed(3, 4, 5, 6))
-    const step = replayed(buffered.stream, { events: [ev("全量")], resumeAt: 5 })
+    const step = replayed(buffered.stream, { events: [ev("全量")], resumeAt: 5, epoch: RUN })
     expect(tags(step)).toEqual(["全量", "#6"])
   })
 
   it("攒着的和 resumeAt 之间有缺口就去补，不硬着头皮往下应用", () => {
     const buffered = received(initialStream, sealed(9, 10))
-    const step = replayed(buffered.stream, { events: [], resumeAt: 5 })
+    const step = replayed(buffered.stream, { events: [], resumeAt: 5, epoch: RUN })
     expect(step.apply).toEqual([])
     expect(step.resyncFrom).toBe(5)
     expect(step.stream.catching).toBe(true)
   })
 
   it("全量之后没有攒着的东西时，游标就是 resumeAt", () => {
-    const step = replayed(initialStream, { events: [ev("全量")], resumeAt: 12 })
-    expect(step.stream).toEqual({ lastSeq: 12, pending: [], catching: false })
+    const step = replayed(initialStream, { events: [ev("全量")], resumeAt: 12, epoch: RUN })
+    expect(step.stream).toEqual({ lastSeq: 12, epoch: RUN, pending: [], catching: false })
   })
 })
 
 describe("常态增量", () => {
-  const base = replayed(initialStream, { events: [], resumeAt: 0 }).stream
+  const base = replayed(initialStream, { events: [], resumeAt: 0, epoch: RUN }).stream
 
   it("连得上就应用", () => {
     const step = received(base, sealed(1, 2, 3))
@@ -84,14 +86,14 @@ describe("常态增量", () => {
 
 describe("补发回来", () => {
   it("补上缺口之后，攒着的那些自动接上", () => {
-    const gapped = received(replayed(initialStream, { events: [], resumeAt: 0 }).stream, sealed(1, 5, 6))
+    const gapped = received(replayed(initialStream, { events: [], resumeAt: 0, epoch: RUN }).stream, sealed(1, 5, 6))
     const step = resynced(gapped.stream, sealed(2, 3, 4))
     expect(tags(step)).toEqual(["#2", "#3", "#4", "#5", "#6"])
-    expect(step.stream).toEqual({ lastSeq: 6, pending: [], catching: false })
+    expect(step.stream).toEqual({ lastSeq: 6, epoch: RUN, pending: [], catching: false })
   })
 
   it("补回来的还是不全就再补一次——不会卡死在 catching 上", () => {
-    const gapped = received(replayed(initialStream, { events: [], resumeAt: 0 }).stream, sealed(1, 9))
+    const gapped = received(replayed(initialStream, { events: [], resumeAt: 0, epoch: RUN }).stream, sealed(1, 9))
     const step = resynced(gapped.stream, sealed(2, 3))
     expect(tags(step)).toEqual(["#2", "#3"])
     expect(step.resyncFrom).toBe(3)
@@ -102,5 +104,26 @@ describe("补发回来", () => {
 describe("补不了", () => {
   it("回到没有基线的状态，攒着的全丢——它们连不上任何东西了", () => {
     expect(reset()).toEqual(initialStream)
+  })
+})
+
+describe("运行代号", () => {
+  it("**全量带来的代号要一路带下去**——去要补发时得报得出来", () => {
+    const base = replayed(initialStream, { events: [], resumeAt: 0, epoch: RUN }).stream
+    expect(base.epoch).toBe(RUN)
+    const gapped = received(base, sealed(1, 5))
+    expect(gapped.stream.epoch).toBe(RUN)
+    expect(resynced(gapped.stream, sealed(2, 3, 4)).stream.epoch).toBe(RUN)
+  })
+
+  it("换了一次运行，新的全量把代号换掉", () => {
+    const first = replayed(initialStream, { events: [], resumeAt: 30, epoch: RUN }).stream
+    const second = replayed(first, { events: [], resumeAt: 0, epoch: "run-b" }).stream
+    expect(second.epoch).toBe("run-b")
+    expect(second.lastSeq).toBe(0)
+  })
+
+  it("重置之后代号也没了——它属于那份被丢掉的基线", () => {
+    expect(reset().epoch).toBeUndefined()
   })
 })

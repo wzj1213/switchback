@@ -7,6 +7,10 @@ import { Field } from "./SettingsPanel.js"
  * **吊销要摆在能一眼找到的地方**：需要用到它的时刻是「手机丢了」，
  * 而那时人不会有耐心翻菜单。所以每一行右边直接是那颗按钮，没有二级菜单。
  *
+ * 它**当场断开那台设备正连着的连接**，不只是删掉记录——只删记录的话，
+ * 一台没断线的设备永远等不到「下一次连接」，于是它继续收全部事件、
+ * 继续能替你放行 agent 要跑的每一条命令。见 `remote/server.ts` 的 `disconnect`。
+ *
  * 不做二次确认：吊销是**可逆的**（重新配一次就回来了），而多一次确认
  * 会在真正紧急的那一刻多挡一下。
  */
@@ -34,7 +38,7 @@ export function RemoteDevices({
   }
   const now = Date.now()
   return (
-    <Field label="已配对的设备" hint="丢了设备就在这里吊销它——它下一次连接立刻失效">
+    <Field label="已配对的设备" hint="丢了设备就在这里吊销它——它正连着的那条连接会当场断开">
       <ul className="devices">
         {devices.map((device) => (
           <li key={device.id} className="devices__row">

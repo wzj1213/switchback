@@ -28,7 +28,15 @@ function Reasoning({ text, complete }: { text: string; complete: boolean }): Rea
   )
 }
 
-export function ItemView({ item, send }: { item: Item; send: (command: Command) => void }): React.JSX.Element | null {
+export function ItemView({
+  item,
+  send,
+  offline,
+}: {
+  item: Item
+  send: (command: Command) => boolean
+  offline: boolean
+}): React.JSX.Element | null {
   if (item.kind === "user_message") {
     return (
       <div className="item item--user">
@@ -46,7 +54,7 @@ export function ItemView({ item, send }: { item: Item; send: (command: Command) 
   }
   if (item.kind === "reasoning") return <Reasoning text={item.text} complete={item.complete} />
   if (item.kind === "tool_call") return <ToolRow item={item satisfies ToolCallItem} />
-  if (item.kind === "approval") return <Approval item={item} send={send} />
+  if (item.kind === "approval") return <Approval item={item} send={send} offline={offline} />
   if (item.kind === "plan") {
     return (
       <ol className="item item--plan">
