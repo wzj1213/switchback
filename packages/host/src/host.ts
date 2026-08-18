@@ -3,7 +3,7 @@ import { resolveApproval } from "./approval.js"
 import { clearQueue, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { adopt, create, remove, rename, resume, setModel, setTrust } from "./session.js"
-import { fork, handoff, rewind } from "./branch.js"
+import { fork, handoff, rewind, switchEngine } from "./branch.js"
 import { prompt, recordSegment, steerQueued } from "./prompt.js"
 
 export type { HostDeps } from "./deps.js"
@@ -62,6 +62,17 @@ const HANDLERS: Handlers = {
     const entry = ctx.live.get(command.threadId)
     if (entry?.session.compact === undefined) return
     await entry.session.compact()
+  },
+  /**
+   * 现在就切引擎（模型选择器上那颗按钮）。**没有待切换的就什么都不做**——
+   * 这条命令表达的是「把已经记下的那个意向立刻兑现」，不是「切到某一家」，
+   * 所以它不带目标：目标早就在 `thread.nextEngine` 上了，另传一个只会多一处能对不上的地方。
+   */
+  "thread.switchNow": async (ctx, command) => {
+    const entry = ctx.live.get(command.threadId)
+    const to = entry?.thread.nextEngine
+    if (entry === undefined || to === undefined || to === entry.thread.engine) return
+    await switchEngine(ctx, command.threadId, to)
   },
   "thread.steerQueued": steerQueued,
   "thread.unqueue": (ctx, command) => {

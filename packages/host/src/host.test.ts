@@ -749,6 +749,35 @@ describe("跨引擎接力", () => {
     expect(thread?.engineHistory).toEqual(["fake"])
   })
 
+  /**
+   * 「下一句生效」的那个副作用：**换过去之前挑不了新那家的模型**——
+   * 清单是引擎起来之后自己报的。所以给一条显式的路，不改默认。
+   */
+  it("`switchNow`：把已经记下的那笔意向**立刻兑现**", async () => {
+    const rig = setupTwo()
+    const { host, events, sessions } = rig
+    await host.dispatch(create)
+    const threadId = await worked(rig)
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    await host.dispatch({ type: "thread.switchNow", threadId })
+    expect(sessions).toHaveLength(2)
+    expect(sessions[0]?.disposed).toBe(true)
+    const last = events.filter((e) => e.type === "thread.updated").at(-1)
+    const thread = last?.type === "thread.updated" ? last.thread : undefined
+    expect(thread?.engine).toBe("other")
+    expect(thread?.nextEngine).toBeUndefined()
+  })
+
+  it("没有待切换的时候 `switchNow` 什么都不做——它兑现意向，不制造意向", async () => {
+    const rig = setupTwo()
+    const { host, sessions } = rig
+    await host.dispatch(create)
+    const threadId = await worked(rig)
+    await host.dispatch({ type: "thread.switchNow", threadId })
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]?.disposed).toBe(false)
+  })
+
   it("选回当前那家 = 取消待切换", async () => {
     const rig = setupTwo()
     const { host, events } = rig

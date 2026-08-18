@@ -90,6 +90,18 @@ export type Command =
    * 而不是一个假装什么都没发生过的会话。
    */
   | { type: "thread.rewind"; threadId: ThreadId; turnId: TurnId }
+  /**
+   * **现在就把待切换的引擎换过去**，不等下一句话。
+   *
+   * 「下一句生效」（`Thread.nextEngine`）是对的默认：点一下下拉不该当场停掉一个
+   * 跑着上下文的引擎。但它有个说不过去的副作用——**换过去之前挑不了新那家的模型**，
+   * 因为模型清单是引擎起来之后自己报的，而它还没起来。于是界面上只能摆一句
+   * 「切到 Grok 后可选」，而用户明明已经选了 Grok。
+   *
+   * 所以给一条显式的路：他要现在挑模型，就现在切。**不改默认，只是把
+   * 「我确实要现在切」这句话变得说得出口。**
+   */
+  | { type: "thread.switchNow"; threadId: ThreadId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
   /**
    * 改名。**历史会话也能改**——恰恰是历史会话最需要，

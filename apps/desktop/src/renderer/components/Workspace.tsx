@@ -135,6 +135,30 @@ function Between({ props, thread, stamp, send }: {
   )
 }
 
+/**
+ * 待切换的引擎那一项。
+ *
+ * 「下一句生效」是对的默认（见 `Thread.nextEngine`），但它有个说不过去的副作用：
+ * **换过去之前挑不了新那家的模型**——清单是引擎起来之后自己报的。所以这里除了
+ * 名字，还带上「现在就兑现」那条路，由模型选择器画成一颗能点的按钮。
+ */
+function pendingEngine(
+  thread: Thread,
+  engines: readonly EngineInfo[],
+  send: (command: Command) => void,
+): { pending?: { label: string; onSwitchNow: () => void } } {
+  const to = thread.nextEngine
+  if (to === undefined) return {}
+  return {
+    pending: {
+      label: labelOf(engines, to),
+      onSwitchNow: () => {
+        send({ type: "thread.switchNow", threadId: thread.id })
+      },
+    },
+  }
+}
+
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
   const [env, setEnv] = useState(false)
@@ -225,7 +249,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         models={props.models}
         model={thread.model}
         effort={thread.effort}
-        {...(thread.nextEngine === undefined ? {} : { pending: labelOf(props.engines, thread.nextEngine) })}
+        {...pendingEngine(thread, props.engines, send)}
         onModelChange={(model, effort) => {
           send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })
         }}

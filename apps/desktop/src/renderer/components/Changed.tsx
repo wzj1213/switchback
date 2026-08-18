@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import { changesOf, type ChangedFile } from "../tool.js"
 import { FileDiff } from "./Diff.js"
@@ -187,10 +187,25 @@ function Row({ file, onReveal, onCopy }: {
  *
  * **不合进主数字**：那份可以追溯到具体某一条工具行，这一份不能——它分不出
  * 是引擎跑的命令改的，还是你自己在编辑器里改的。所以文案也照实说这句话。
- * 要分得出，得在会话开始时留一份基线快照，那是另一件事（见 README 的已知限制）。
+ *
+ * ## 必须先取一份基线
+ *
+ * 上一版拿的是 **git 的全量脏状态**，于是「这条会话动过什么」和「这个仓库本来
+ * 就脏」被算成了同一件事：在一个有 124 个未跟踪文件的仓库里开一条新会话，
+ * 你**一句话都还没说**，输入框上方就顶着「124 个文件变了」。那不是它干的。
+ *
+ * 现在第一次问到的那份就是基线（也就是你打开这条会话时工作区的样子），
+ * 之后只报**比基线多出来的**。基线跟着 `Workspace` 的挂载走，而它按会话隔离
+ *（`key={thread.id}`），所以每条会话各有各的起点。
+ *
+ * **抓不到的那种**：基线里本来就脏的文件，被引擎用命令又改了一次——路径没变，
+ * 这里就看不出来。要抓那种得存内容哈希而不是路径清单。编辑工具报上来的那份
+ * 不受影响（它是逐条记录的），所以漏的只是「用 shell 改一个本来就脏的文件」。
  */
 function useOthers(cwd: string, stamp: string, known: readonly ChangedFile[]): readonly string[] {
   const [paths, setPaths] = useState<readonly string[]>([])
+  /** 开工之前工作区就已经脏的那些。**不是这条会话的账。** */
+  const baseline = useRef<ReadonlySet<string> | undefined>(undefined)
   const mine = known.map((f) => f.path).join("\n")
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni
@@ -201,11 +216,15 @@ function useOthers(cwd: string, stamp: string, known: readonly ChangedFile[]): r
     let live = true
     void bridge.workChanges(cwd).then((out) => {
       if (!live) return
+      const all = out?.paths ?? []
+      // 第一次问到的那份就是基线。**不能等到第一轮跑完再取**——那时引擎已经改过东西了
+      baseline.current ??= new Set(all)
+      const before = baseline.current
       // 引擎报的路径可能是 `/tmp/...` 而 git 给的是 `/private/tmp/...`：
       // 只比末尾一段对不上的风险太大，所以两边都用「谁是谁的后缀」判同一个文件
       const same = (a: string, b: string): boolean => a === b || a.endsWith(b) || b.endsWith(a)
       const ours = mine === "" ? [] : mine.split("\n")
-      setPaths((out?.paths ?? []).filter((p) => !ours.some((o) => same(o, p))))
+      setPaths(all.filter((p) => !before.has(p) && !ours.some((o) => same(o, p))))
     })
     return () => {
       live = false

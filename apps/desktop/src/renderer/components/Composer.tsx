@@ -57,7 +57,8 @@ interface Props {
    * 有待切换的引擎时它的名字。**模型选择器据此变成一句说明**——
    * 手上这份清单是旧那家报的，不能让人挑，但也不该凭空消失。
    */
-  pending?: string
+  /** 待切换的引擎：名字 + 「现在就兑现」。见 `ModelPicker`。 */
+  pending?: { label: string; onSwitchNow: () => void }
   onModelChange: (model: string, effort?: string) => void
   /** 工作区绝对路径，`@` 文件引用要用 */
   cwd: string

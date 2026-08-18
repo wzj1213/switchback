@@ -43,7 +43,8 @@ export function Bar({
   model?: string
   effort?: string
   /** 有待切换的引擎时它的名字；模型选择器据此说明自己在等什么。 */
-  pending?: string
+  /** 待切换的引擎：名字 + 「现在就兑现」。两者总是一起出现，所以是一项不是两项。 */
+  pending?: { label: string; onSwitchNow: () => void }
   onEngineChange: (next: EngineId) => void
   onTrustChange: (next: Trust) => void
   onModelChange: (model: string, effort?: string) => void

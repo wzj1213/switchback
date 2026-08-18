@@ -113,27 +113,38 @@ export function ModelPicker({
   model: string | undefined
   effort: string | undefined
   disabled: boolean
-  /** 有待切换的引擎时，它的名字。见下面那段。 */
-  pending?: string
+  /** 有待切换的引擎：它的名字，以及「现在就兑现」那条路。见下面那段。 */
+  pending?: { label: string; onSwitchNow: () => void }
   onChange: (model: string, effort?: string) => void
 }): React.JSX.Element | null {
   /**
-   * **有待切换的引擎时，控件留在原地但点不动**，并且说清楚在等什么。
+   * **有待切换的引擎时，这颗控件变成一条出路，而不是一句解释。**
    *
    * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常不存在，
-   * 所以确实不能让人挑。但上一版的做法是把整个控件**藏起来**——
-   * 一个凭空消失的控件读起来就是「坏了」，用户的原话是「一个模型都不显示」。
-   * 留着并写明原因，比消失和撒谎都强。
+   * 所以确实不能直接让人挑。上上版把整个控件藏起来——一个凭空消失的控件
+   * 读起来就是「坏了」；上一版留着但点不动，写着「切到 Grok 后可选」——
+   * 而用户明明**已经选了 Grok**，被告知「你还没切」只会更困惑。
+   *
+   * 现在它是一颗能点的按钮：点一下就把引擎换过去，换完这里显示的是
+   * **新那家自己报的**清单，不是我们猜的。
+   *
+   * 为什么不干脆摆一份「上次记得的」清单让他先挑：那是在猜。模型会下架、
+   * 会改名、会因为账号权限而不同，而猜错的代价是「挑好了、切过去发现没有这个模型」。
    */
   if (pending !== undefined) {
     return (
-      <Select
-        label={`切到 ${pending} 后可选`}
-        icon={<SparkIcon />}
-        title={`下一句话会换到 ${pending}，模型清单由它自己报——发出去就能挑了`}
-        disabled
-        sections={[]}
-      />
+      <button
+        type="button"
+        className="trigger"
+        title={`现在就把引擎换成 ${pending.label}（会重启引擎并交接上下文）。换完就能挑它自己报的模型`}
+        disabled={disabled}
+        onClick={pending.onSwitchNow}
+      >
+        <span className="trigger__icon">
+          <SparkIcon />
+        </span>
+        <span className="trigger__label">切到 {pending.label} 再选模型</span>
+      </button>
     )
   }
   // 用户选过就用他选的；没选过**优先引擎自己报的当前值**，最后才退回第一个。
