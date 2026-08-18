@@ -347,7 +347,24 @@ function upgrade(deps: RemoteDeps, wss: WebSocketServer, counter: { n: number },
 }
 
 export function startRemote(deps: RemoteDeps): Promise<RemoteServer> {
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => WS_PROTOCOL })
+  const wss = new WebSocketServer({
+    noServer: true,
+    handleProtocols: () => WS_PROTOCOL,
+    // **压缩。** `ws` 默认是关的（它担心的是几万条连接时每条一份 zlib 上下文的内存），
+    // 而这一端同时连着的是「你的几台设备」，那个担心不成立。
+    // 事件流是高度重复的 JSON，实测压缩比 3.8×——一份全量从 14 个分片降到 4 个左右。
+    //
+    // `threshold` 是关键：一条 `item.delta` 只有几十字节，压它纯是烧 CPU，
+    // 还会因为 deflate 的固定开销变大。只压值得压的。
+    perMessageDeflate: {
+      threshold: 1024,
+      // 别把上下文留在连接上（`clientNoContextTakeover`）：跨消息的字典能再省一点，
+      // 但代价是每条连接常驻一份滑动窗口。这一端的大头是**一次性的那份全量**，
+      // 它自己就够大到压得动，不需要靠跨消息字典
+      clientNoContextTakeover: true,
+      serverNoContextTakeover: true,
+    },
+  })
   const server: Server = createServer(route(deps))
   /** 设备 id → 它现在连着的那些 socket。吊销时要按它掐。 */
   const live = new Map<string, Set<WebSocket>>()

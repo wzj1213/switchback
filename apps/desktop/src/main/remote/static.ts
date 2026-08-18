@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs"
 import { stat } from "node:fs/promises"
 import { join, normalize, resolve, sep } from "node:path"
+import { createGzip } from "node:zlib"
 import type { IncomingMessage, ServerResponse } from "node:http"
 
 /**
@@ -23,6 +24,37 @@ const TYPES: Readonly<Record<string, string>> = {
   ".woff2": "font/woff2",
   ".map": "application/json; charset=utf-8",
   ".webmanifest": "application/manifest+json",
+}
+
+/**
+ * 这类内容压不压得动。
+ *
+ * 只压文本。图片、字体（woff2 自带 brotli）、压缩过的东西再压一遍
+ * 是纯烧 CPU，还可能变大。
+ */
+const COMPRESSIBLE = /^(text\/|application\/(javascript|json|manifest\+json)|image\/svg)/u
+
+/**
+ * 小于这个数的不压。
+ *
+ * 一个包头 + zlib 的固定开销就有几十字节，压一个 300 字节的图标省不了什么，
+ * 而每压一次都要多一次内存分配和一次 CPU。
+ */
+const COMPRESS_ABOVE = 1024
+
+/**
+ * 这一发要不要压。
+ *
+ * 这一端的产物实测 377 KB（首屏 JS + CSS），gzip 之后 115 KB——
+ * 在蜂窝网上隔着一条隧道，那是「一秒」和「三秒」的差别。
+ *
+ * 三个条件缺一不可：对端认（**只认 gzip**——br 要 `createBrotliCompress`，
+ * 慢一个量级，静态文件用不上）、这类内容压得动、而且大到值得压。
+ */
+function shouldGzip(req: IncomingMessage | undefined, type: string, size: number): boolean {
+  const raw = req?.headers["accept-encoding"]
+  const text = Array.isArray(raw) ? raw.join(",") : (raw ?? "")
+  return /\bgzip\b/u.test(text) && COMPRESSIBLE.test(type) && size > COMPRESS_ABOVE
 }
 
 function typeOf(path: string): string {
@@ -115,18 +147,35 @@ export async function serveStatic(
     res.writeHead(304, { etag, "cache-control": cacheFor(urlPath, file) }).end()
     return { ok: true }
   }
+  send(res, { file, urlPath, etag, gzip: shouldGzip(req, typeOf(file), info?.size ?? 0) })
+  return { ok: true }
+}
+
+/**
+ * 真正把文件发出去那一段。
+ *
+ * 从 `serveStatic` 里拆出来是复杂度闸门逼的，但边界也讲得通：
+ * 上面那半是**判定**（能不能给、要不要给、给哪个），这半是**投递**。
+ */
+function send(res: ServerResponse, o: { file: string; urlPath: string; etag?: string; gzip: boolean }): void {
   res.writeHead(200, {
-    "content-type": typeOf(file),
-    "cache-control": cacheFor(urlPath, file),
-    ...(etag === undefined ? {} : { etag }),
+    "content-type": typeOf(o.file),
+    "cache-control": cacheFor(o.urlPath, o.file),
+    // **压过的要声明 `vary`**，否则中间任何一层缓存都可能把压过的那份
+    // 喂给一个不认 gzip 的客户端
+    ...(o.gzip ? { "content-encoding": "gzip", vary: "accept-encoding" } : {}),
+    ...(o.etag === undefined ? {} : { etag: o.etag }),
     // 页面里不加载任何外部资源；写死这条比事后发现某个依赖偷偷发了请求便宜
     "content-security-policy":
       "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",
   })
-  createReadStream(file).pipe(res)
-  return { ok: true }
+  const stream = createReadStream(o.file)
+  // **边压边发**，不落盘、不缓存：这些文件一个版本只发几次，
+  // 为它们建一层缓存的复杂度换不来什么
+  if (o.gzip) stream.pipe(createGzip()).pipe(res)
+  else stream.pipe(res)
 }
 
 async function isFile(path: string): Promise<boolean> {

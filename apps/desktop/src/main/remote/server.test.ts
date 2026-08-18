@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest"
-import { mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { request } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -41,12 +41,21 @@ interface BootOptions {
   history?: readonly Event[]
   /** 把死连接的判定拨快，别让一条测试跑将近一分钟。 */
   heartbeat?: { everyMs: number; deadAfterMs: number }
+  /** 在 webRoot 下铺几个文件，用来验压缩与缓存头。 */
+  webRoot?: boolean
 }
 
 async function boot(options: BootOptions = {}): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), "omni-remote-"))
   const file = join(dir, "devices.json")
   writeFileSync(file, "[]", "utf8")
+  if (options.webRoot === true) {
+    mkdirSync(join(dir, "assets"), { recursive: true })
+    // 够大才压得到（阈值 1024）
+    writeFileSync(join(dir, "assets", "big.js"), `// 巨大\n${"x".repeat(5000)}`, "utf8")
+    writeFileSync(join(dir, "small.txt"), "短", "utf8")
+    writeFileSync(join(dir, "pic.png"), Buffer.alloc(5000, 7))
+  }
   const disk: { devices: readonly Device[] } = { devices: [] }
   const tokens = createTokenStore({
     load: () => disk.devices,
@@ -349,6 +358,34 @@ describe("半开的连接", () => {
     }
     expect(h.sinks).toHaveLength(1)
     socket.close()
+  })
+})
+
+describe("压缩", () => {
+  it("**认 gzip 的对端拿到压过的那份**——这一端的产物 377 KB，压完 115 KB，隔着隧道是一秒和三秒的差别", async () => {
+    const h = await boot({ webRoot: true })
+    const res = await fetch(`${h.base}/assets/big.js`, { headers: { "accept-encoding": "gzip" } })
+    expect(res.headers.get("content-encoding")).toBe("gzip")
+    // **`vary` 少了的话**，中间任何一层缓存都可能把压过的那份喂给不认 gzip 的客户端
+    expect(res.headers.get("vary")).toBe("accept-encoding")
+  })
+
+  it("不认 gzip 的照样拿得到，只是没压", async () => {
+    const h = await boot({ webRoot: true })
+    const body = await rawBody(h.server.port(), "/assets/big.js", { "accept-encoding": "identity" })
+    expect(body).toContain("巨大")
+  })
+
+  it("**小文件不压**——包头加 zlib 的固定开销比省下来的还多", async () => {
+    const h = await boot({ webRoot: true })
+    const res = await fetch(`${h.base}/small.txt`, { headers: { "accept-encoding": "gzip" } })
+    expect(res.headers.get("content-encoding")).toBeNull()
+  })
+
+  it("**图片不压**——已经压过的再压一遍是纯烧 CPU，还可能变大", async () => {
+    const h = await boot({ webRoot: true })
+    const res = await fetch(`${h.base}/pic.png`, { headers: { "accept-encoding": "gzip" } })
+    expect(res.headers.get("content-encoding")).toBeNull()
   })
 })
 
