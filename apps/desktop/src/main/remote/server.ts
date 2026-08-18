@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type WebSocket } from "ws"
-import type { Command, Trust } from "@omni/protocol"
+import type { Command, Event, Trust } from "@omni/protocol"
 import type { Ledger } from "@omni/wire"
 import type { Sink, Sinks } from "../sink.js"
 import { checkRequest, headersOf } from "./fence.js"
@@ -49,6 +49,8 @@ export interface RemoteDeps {
   replay: (sink: Sink) => Promise<void>
   /** 某条会话现在是哪一档。档位上限靠它才管得住已经开着的会话。 */
   trustOf: (threadId: string) => Trust | undefined
+  /** 一条会话的历史。分级 replay 的另一半——客户端打开哪条就补哪条。 */
+  history: (threadId: string) => Promise<readonly Event[]>
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -249,6 +251,7 @@ function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
     replay: deps.replay,
     ceiling: () => deps.config().maxTrust,
     trustOf: deps.trustOf,
+    history: deps.history,
     log: deps.log,
   })
   const detach = deps.sinks.add(session.sink)

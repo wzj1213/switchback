@@ -6,6 +6,12 @@ import type { Sink } from "../sink.js"
 
 const RUN = "run-a"
 
+/** 让 `load()` 那条不等的 promise 链跑完。 */
+const settle = async (): Promise<void> => {
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
 const ev = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: String(n) })
 
 interface Harness {
@@ -14,17 +20,28 @@ interface Harness {
   /** 客户端那侧收到的帧（已经过重组）。 */
   frames: () => readonly ServerFrame[]
   dispatched: () => readonly Command[]
+  /** 补正文时读过哪几条会话的记录。 */
+  reads: () => readonly string[]
   replays: () => number
   closed: () => { code: number; reason: string } | undefined
   logs: () => readonly string[]
   buffer: (bytes: number) => void
 }
 
-function harness(options: { ceiling?: Trust; replayFails?: boolean; threadTrust?: Trust } = {}): Harness {
+interface Options {
+  ceiling?: Trust
+  replayFails?: boolean
+  threadTrust?: Trust
+  history?: readonly Event[]
+  historyFails?: boolean
+}
+
+function harness(options: Options = {}): Harness {
   const ledger = createLedger(RUN, 100)
   const wire: string[] = []
   const dispatched: Command[] = []
   const logs: string[] = []
+  const reads: string[] = []
   const state = { replays: 0, closed: undefined as { code: number; reason: string } | undefined, buffered: 0 }
   const session = createSession({
     id: "c1",
@@ -41,6 +58,11 @@ function harness(options: { ceiling?: Trust; replayFails?: boolean; threadTrust?
     },
     ceiling: () => options.ceiling ?? "full",
     trustOf: () => options.threadTrust,
+    history: async (threadId) => {
+      reads.push(threadId)
+      if (options.historyFails === true) throw new Error("磁盘炸了")
+      return options.history ?? []
+    },
     log: (_level, message) => logs.push(message),
   })
   return {
@@ -56,6 +78,7 @@ function harness(options: { ceiling?: Trust; replayFails?: boolean; threadTrust?
       return out
     },
     dispatched: () => dispatched,
+    reads: () => reads,
     replays: () => state.replays,
     closed: () => state.closed,
     logs: () => logs,
@@ -160,6 +183,63 @@ describe("确认与观察", () => {
     expect(h.session.sink.watching?.()).toBe("t-1")
     send(h, { type: "watch", threadId: null })
     expect(h.session.sink.watching?.()).toBeUndefined()
+  })
+
+  it("**打开一条正文不在全量里的会话，补一份 thread 帧**——分级 replay 的另一半", async () => {
+    const h = harness({ history: [ev(1), ev(2)] })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.frames()).toEqual([{ type: "thread", threadId: "t-1", events: [ev(1), ev(2)] }])
+  })
+
+  it("**全量里已经带了正文的那些不再补**——否则你打开的第一条必然多读一次磁盘", async () => {
+    const h = harness({ history: [ev(1)] })
+    h.session.sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: ["t-1"] } })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.reads()).toEqual([])
+  })
+
+  it("`bodies` 缺省 = 全都带，一条都不补——那是同机 IPC 那条路的语义", async () => {
+    const h = harness({ history: [ev(1)] })
+    h.session.sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN } })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.reads()).toEqual(["t-1"])
+  })
+
+  it("**同一条只补一次**——来回切会话不该每次都读一遍磁盘", async () => {
+    const h = harness({ history: [ev(1)] })
+    send(h, { type: "watch", threadId: "t-1" })
+    send(h, { type: "watch", threadId: "t-2" })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.reads()).toEqual(["t-1", "t-2"])
+  })
+
+  it("记录是空的就不发帧——一条空的 thread 帧只会让客户端白跑一次归约", async () => {
+    const h = harness({ history: [] })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.frames()).toEqual([])
+  })
+
+  it("**读磁盘炸了不断连接，而且标记要撤掉**——退出去再进来还能再试一次", async () => {
+    const h = harness({ historyFails: true })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.closed()).toBeUndefined()
+    expect(h.logs().some((l) => l.includes("补 t-1 的正文失败"))).toBe(true)
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.reads()).toEqual(["t-1", "t-1"])
+  })
+
+  it("watch null 不去读磁盘", async () => {
+    const h = harness({ history: [ev(1)] })
+    send(h, { type: "watch", threadId: null })
+    await settle()
+    expect(h.reads()).toEqual([])
   })
 
   it("ping 回 pong", () => {

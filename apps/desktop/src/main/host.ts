@@ -12,6 +12,8 @@ import { createBatcher } from "./batch.js"
 import { createAttention, type Attention, type Relay } from "./attention.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
+import { createAwake, type Awake } from "./remote/awake.js"
+import { headerOf, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
 
 export interface Attached {
@@ -31,6 +33,10 @@ export interface Attached {
   ledger: Ledger
   /** 客户端注册表。远程服务端把连接注册进来，就自动收到广播。 */
   sinks: Sinks
+  /** 退出前放开休眠锁。 */
+  awake: Awake
+  /** 记一行。分级 replay 要说出「省了多少」。 */
+  log: Logger
   /**
    * 把一次失败翻成界面看得见的东西。
    *
@@ -54,6 +60,8 @@ export interface Attached {
 interface OutletDeps {
   sinks: Sinks
   attention: Attention
+  /** 有活在跑的时候别让机器空闲休眠。**远程的全部前提是这台机器还醒着。** */
+  awake: Awake
   log: Logger
   seen: { thread: ThreadId | undefined }
 }
@@ -66,7 +74,10 @@ function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; ledger:
   const batcher = createBatcher((events) => {
     // 每条出去的事件顺带过一遍「要不要叫人」。放在发出去的同一处，
     // 免得将来多一条出口就漏一处
-    for (const event of events) deps.attention.note(event)
+    for (const event of events) {
+      deps.attention.note(event)
+      deps.awake.note(event)
+    }
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
     const sealed = ledger.seal(events)
@@ -148,24 +159,14 @@ function installBridgeChannels(deps: Channels): void {
   })
 }
 
-export function attachHost(
-  sinks: Sinks,
-  windows: () => readonly BrowserWindow[],
-  log: Logger,
-  relay?: Relay,
-): Attached {
-  const seen = { thread: undefined as ThreadId | undefined }
-  // 叫人这件事认窗口（`isFocused` / `show` / `focus` 是窗口才有的动作），
-  // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
-  // 「窗口在前台就不出声」这条判据两边共用；「有人正看着这条会话」
-  // 那条判在远程那一层，因为只有它知道谁在看什么
-  const attention = createAttention(windows, relay)
-
-  const { emit, ledger } = createOutlet({ sinks, attention, log, seen })
-
-  // userData 而不是自己拼 ~/.omni：这是系统给应用的位置，
-  // 用户换机器迁移、清理应用数据时才找得到、才带得走
-  const journal = createJournal({
+/**
+ * 落盘。
+ *
+ * userData 而不是自己拼 `~/.omni`：这是系统给应用的位置，
+ * 用户换机器迁移、清理应用数据时才找得到、才带得走。
+ */
+function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<typeof createJournal> {
+  return createJournal({
     dir: join(app.getPath("userData"), "threads"),
     // **写满了要说出来。** 停笔本身是对的（无声地把磁盘写满更糟），
     // 但停得一声不响就成了「你以为还在记，其实早就不记了」——
@@ -183,6 +184,29 @@ export function attachHost(
       })
     },
   })
+}
+
+export function attachHost(
+  sinks: Sinks,
+  windows: () => readonly BrowserWindow[],
+  log: Logger,
+  ports?: { relay?: Relay; awakeWhen?: () => boolean },
+): Attached {
+  const relay = ports?.relay
+  const awakeWhen = ports?.awakeWhen
+  const seen = { thread: undefined as ThreadId | undefined }
+  // 叫人这件事认窗口（`isFocused` / `show` / `focus` 是窗口才有的动作），
+  // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
+  // 「窗口在前台就不出声」这条判据两边共用；「有人正看着这条会话」
+  // 那条判在远程那一层，因为只有它知道谁在看什么
+  const attention = createAttention(windows, relay)
+  // 只在远程开着时才挡休眠：在桌前用的时候机器睡了是你自己走开了，
+  // 而远程那一端一片空白时你完全不知道发生了什么
+  const awake = createAwake(log, awakeWhen ?? (() => false))
+
+  const { emit, ledger } = createOutlet({ sinks, attention, awake, log, seen })
+
+  const journal = openJournal(log, emit)
   // 规则和事件分开存：删会话不该把「始终允许」一起删了
   const rules = createRuleStore(join(app.getPath("userData"), "rules"))
 
@@ -218,6 +242,8 @@ export function attachHost(
     lastThreadId: () => seen.thread,
     ledger,
     sinks,
+    awake,
+    log,
     report,
   }
 }
@@ -302,12 +328,20 @@ export interface ThreadHistory {
  * 这个 bug 一直都在，只是以前看不见：启动时最后总会新建一个会话，
  * 它往前一插就盖住了顺序不对这件事。重载时不新建会话，才露出来。
  */
-export function replayEvents(
-  engines: readonly EngineInfo[],
-  threads: readonly ThreadHistory[],
-  alive: ReadonlyMap<ThreadId, Thread>,
-  now: number,
-): readonly Event[] {
+export interface ReplayInput {
+  engines: readonly EngineInfo[]
+  /** 磁盘上的历史，最近写过的在前。 */
+  threads: readonly ThreadHistory[]
+  alive: ReadonlyMap<ThreadId, Thread>
+  now: number
+  /**
+   * 哪些会话带正文。不给 = 全带（桌面窗口那条路，同机 IPC 不心疼）。
+   * 远程那条给一个预算，超出的只发头——见 `scope.ts`。
+   */
+  bodies?: ReadonlySet<ThreadId>
+}
+
+export function replayEvents({ engines, threads, alive, now, bodies }: ReplayInput): readonly Event[] {
   const events: Event[] = [{ type: "engines.available", at: now, engines }]
   // 反着喂：归约器往前插，所以最旧的先进去，最新的才会落在侧栏顶上
   for (const thread of [...threads].reverse()) {
@@ -322,7 +356,7 @@ export function replayEvents(
     if (alive.get(thread.id) === undefined && !thread.events.some((e) => e.type === "item.started" && e.item.kind === "user_message")) {
       continue
     }
-    events.push(...thread.events)
+    events.push(...(bodies === undefined || bodies.has(thread.id) ? thread.events : headerOf(thread)))
     const live = alive.get(thread.id)
     if (live !== undefined) {
       // 用宿主手上那份当前状态收尾：journal 里最后一条可能停在轮次中间
@@ -388,7 +422,15 @@ function unlogged(
  * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
  * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
  */
-export async function rebuild(attached: Attached, target: Sink): Promise<ThreadId | undefined> {
+export async function rebuild(
+  attached: Attached,
+  target: Sink,
+  /**
+   * 正文的总条数预算。**只有远程那条路会给**——同机 IPC 上一份几 MB 的全量
+   * 只是一次结构化克隆，而在蜂窝网上那是十几秒的「正在连接…」。
+   */
+  budget?: number,
+): Promise<ThreadId | undefined> {
   // **活着的会话不能标 detached。** 它们和历史在 journal 里长得一模一样，
   // 但背后还有引擎进程。混为一谈的话，重载之后整个应用变成只读，
   // 而引擎其实还在跑——重载验证第一次跑出来的就是这个
@@ -416,8 +458,18 @@ export async function rebuild(attached: Attached, target: Sink): Promise<ThreadI
   // 幂等去重（`@omni/store` 的 `appendItem`），不在这里判——
   // 判它需要给每条事件一个身份，那是把复杂度推给每一个产生事件的地方。
   const missed = attached.ledger.since(before, attached.ledger.epoch) ?? []
+  const scoped = scopeReplay(threads, budget)
+  if (scoped.deferred > 0) {
+    attached.log.write("info", "remote", `全量只带了最近几条的正文，另外 ${String(scoped.deferred)} 条先发头`)
+  }
   const events = [
-    ...replayEvents(await attached.engines(), threads, alive, Date.now()),
+    ...replayEvents({
+      engines: await attached.engines(),
+      threads,
+      alive,
+      now: Date.now(),
+      ...(budget === undefined ? {} : { bodies: scoped.bodies }),
+    }),
     // **不落盘的那些现状要补在最后。** 斜杠命令和额度都不进 journal
     //（现问引擎的东西落盘只会在重放时塞回一份过期的），于是全量里没有它们；
     // 而它们作为增量发出去的那一次又 `seq <= resumeAt`，被渲染层当旧消息丢掉。
@@ -428,7 +480,9 @@ export async function rebuild(attached: Attached, target: Sink): Promise<ThreadI
   ]
   const resumeAt = attached.ledger.latest()
   const epoch = attached.ledger.epoch
-  if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch } })
+  // `bodies` 只在分级时带：缺省的含义是「全都带」，而那正是同机 IPC 那条路
+  const bodies = budget === undefined ? {} : { bodies: [...scoped.bodies] }
+  if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch, ...bodies } })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
   return [...alive.keys()][0] ?? ids[0]
 }

@@ -34,7 +34,7 @@ interface Harness {
 
 const running: RemoteServer[] = []
 
-async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[]; threadTrust?: Trust } = {}): Promise<Harness> {
+async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[]; threadTrust?: Trust; history?: readonly Event[] } = {}): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), "omni-remote-"))
   const file = join(dir, "devices.json")
   writeFileSync(file, "[]", "utf8")
@@ -72,6 +72,7 @@ async function boot(options: { maxTrust?: Trust; trustedHosts?: readonly string[
     },
     dispatch: (command) => dispatched.push(command),
     trustOf: () => options.threadTrust,
+    history: async () => options.history ?? [],
     replay: async (sink) => {
       state.replays += 1
       sink.send({ channel: "omni:replay", replay: { events: [ev(0)], resumeAt: ledger.latest(), epoch: RUN } })

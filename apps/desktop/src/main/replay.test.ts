@@ -45,17 +45,17 @@ const none = new Map<ThreadId, Thread>()
 
 describe("全量重建", () => {
   it("引擎清单排在最前——界面要靠它渲染选择器", () => {
-    const events = replayEvents([{ id: "codex", label: "Codex" }], [], none, 1)
+    const events = replayEvents({ engines: [{ id: "codex", label: "Codex" }], threads: [], alive: none, now: 1 })
     expect(events[0]).toMatchObject({ type: "engines.available" })
   })
 
   it("**跑一遍归约器，侧栏顺序必须是最新在前**——这才是真正要保证的东西", () => {
-    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, none, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: NEWEST_FIRST, alive: none, now: 1 }))
     expect(threadRowsOf(state).map((r) => r.thread.title)).toEqual(["最新", "中间", "最旧"])
   })
 
   it("空历史的会话跳过，不留一条只有 id 的空行", () => {
-    const events = replayEvents([], [{ id: "empty", events: [] }], none, 1)
+    const events = replayEvents({ engines: [], threads: [{ id: "empty", events: [] }], alive: none, now: 1 })
     expect(events).toHaveLength(1)
   })
 })
@@ -63,39 +63,39 @@ describe("全量重建", () => {
 describe("活着的和历史要分开", () => {
   it("**活着的会话不标 detached**——标了的话重载之后整个应用变成只读，而引擎还在跑", () => {
     const alive = new Map<ThreadId, Thread>([["t2", { ...thread("t2", "中间"), status: "running" }]])
-    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, alive, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: NEWEST_FIRST, alive: alive, now: 1 }))
     const rows = threadRowsOf(state)
     expect(rows.find((r) => r.thread.id === "t2")?.thread.detached).toBeUndefined()
     expect(rows.find((r) => r.thread.id === "t2")?.thread.status).toBe("running")
   })
 
   it("没有引擎进程的一律标 detached，输入框关掉", () => {
-    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, none, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: NEWEST_FIRST, alive: none, now: 1 }))
     for (const row of threadRowsOf(state)) expect(row.thread.detached).toBe(true)
   })
 
   it("活着的那份用宿主手上的当前状态收尾——journal 最后一条可能停在轮次中间", () => {
     const running: Thread = { ...thread("t1", "改过名了"), status: "running" }
     const alive = new Map<ThreadId, Thread>([["t1", running]])
-    const state = reduceAll(initial(), replayEvents([], [history("t1", "旧名字")], alive, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: [history("t1", "旧名字")], alive: alive, now: 1 }))
     expect(threadRowsOf(state)[0]?.thread.title).toBe("改过名了")
   })
 })
 
 describe("空壳会话不进侧栏", () => {
   it("**一句话都没说过的不算历史**——omni 每次启动都开一个默认会话，不滤掉的话跑一周侧栏全是空壳", () => {
-    const state = reduceAll(initial(), replayEvents([], [emptyHistory("空", "空")], none, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: [emptyHistory("空", "空")], alive: none, now: 1 }))
     expect(threadRowsOf(state)).toEqual([])
   })
 
   it("说过话的照常留着", () => {
-    const state = reduceAll(initial(), replayEvents([], [history("有话", "有话")], none, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: [history("有话", "有话")], alive: none, now: 1 }))
     expect(threadRowsOf(state)).toHaveLength(1)
   })
 
   it("**活着的空会话是例外**——它正开着，用户随时会在里面打字", () => {
     const alive = new Map<ThreadId, Thread>([["空", thread("空", "空")]])
-    const state = reduceAll(initial(), replayEvents([], [emptyHistory("空", "空")], alive, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: [emptyHistory("空", "空")], alive: alive, now: 1 }))
     expect(threadRowsOf(state)).toHaveLength(1)
   })
 })
@@ -109,25 +109,25 @@ describe("活着但磁盘上什么都没有的会话", () => {
 
   it("**补出来**，⌘R 之后那个窗口还在", () => {
     const alive = new Map<ThreadId, Thread>([["临时", temp]])
-    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, alive, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: NEWEST_FIRST, alive: alive, now: 1 }))
     expect(threadRowsOf(state).map((r) => r.thread.id)).toContain("临时")
   })
 
   it("补在最上面——它正是你刚才在用的那个", () => {
     const alive = new Map<ThreadId, Thread>([["临时", temp]])
-    const state = reduceAll(initial(), replayEvents([], NEWEST_FIRST, alive, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: NEWEST_FIRST, alive: alive, now: 1 }))
     expect(threadRowsOf(state)[0]?.thread.id).toBe("临时")
   })
 
   it("不标 detached：引擎进程还活着，输入框该是能用的", () => {
     const alive = new Map<ThreadId, Thread>([["临时", temp]])
-    const state = reduceAll(initial(), replayEvents([], [], alive, 1))
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: [], alive: alive, now: 1 }))
     expect(threadRowsOf(state)[0]?.thread.detached).toBeUndefined()
   })
 
   it("**磁盘上有记录的不重复补**——那条已经在全量里了", () => {
     const alive = new Map<ThreadId, Thread>([["t1", thread("t1", "最旧")]])
-    const events = replayEvents([], NEWEST_FIRST, alive, 1)
+    const events = replayEvents({ engines: [], threads: NEWEST_FIRST, alive: alive, now: 1 })
     expect(events.filter((e) => e.type === "thread.started" && e.thread.id === "t1")).toHaveLength(1)
   })
 })

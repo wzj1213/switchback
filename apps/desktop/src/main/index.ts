@@ -10,6 +10,7 @@ import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
+import { REMOTE_ITEM_BUDGET } from "./scope.js"
 import { installRemote } from "./remote/index.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
@@ -198,10 +199,13 @@ function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>)
       })
     },
     replay: async (sink) => {
-      await rebuild(attached, sink)
+      // **远程那条给预算**：同机 IPC 上一份几 MB 的全量只是一次结构化克隆，
+      // 而在蜂窝网上那是十几秒的「正在连接…」
+      await rebuild(attached, sink, REMOTE_ITEM_BUDGET)
     },
     // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档
     trustOf: (threadId) => attached.host.live().find((t) => t.id === threadId)?.trust,
+    history: (threadId) => attached.journal.read(threadId),
     log,
   })
 }
@@ -350,8 +354,11 @@ function bootstrap(): Promise<void> {
     // 又必须先跑（`installRemote` 要它的账本）。用一个可变的槽把环解开——
     // 这一格在 `attachRemote` 之前是空的，那期间也确实没有客户端可推
     const relay: { notify?: (threadId: string, title: string, body: string) => void } = {}
-    const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, (id, title, body) => {
-      relay.notify?.(id, title, body)
+    const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
+      relay: (id, title, body) => {
+        relay.notify?.(id, title, body)
+      },
+      awakeWhen: () => settings.get().remote.enabled,
     })
     const remote = attachRemote(attached, sinks)
     relay.notify = remote.relay.notify
@@ -409,6 +416,7 @@ async function shutdown(attached: Attached, logger: Logger, closeRemote: () => P
   //
   // 远程客户端收不到优雅关闭，最多是多等一次重连；漏一棵有写和执行权限的
   // 进程树没有「最多」。
+  attached.awake.release()
   await attached.host.dispose().catch((error: unknown) => {
     logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
   })

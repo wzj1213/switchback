@@ -154,6 +154,7 @@ function main(): void {
       await Promise.resolve()
     },
     trustOf: (threadId) => (threadId === "t-1" || threadId === "t-2" || threadId === "t-3" ? "auto-edit" : undefined),
+    history: async () => [],
     log: (level, message) => {
       console.log(`[${level}] ${message}`)
     },

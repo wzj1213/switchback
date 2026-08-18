@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { app, ipcMain } from "electron"
-import type { Command, Trust } from "@omni/protocol"
+import type { Command, Event, Trust } from "@omni/protocol"
 import type { Ledger } from "@omni/wire"
 import type { Sink, Sinks } from "../sink.js"
 import type { Logger } from "./../log.js"
@@ -40,6 +40,8 @@ export interface RemoteInstallDeps {
   replay: (sink: Sink) => Promise<void>
   /** 某条会话现在是哪一档。见 `remote/policy.ts` 的 `RUNS_IN_THREAD`。 */
   trustOf: (threadId: string) => Trust | undefined
+  /** 一条会话的历史。分级 replay 的另一半。 */
+  history: (threadId: string) => Promise<readonly Event[]>
   log: Logger
 }
 
@@ -196,6 +198,7 @@ async function syncOnce(
         dispatch: deps.dispatch,
         replay: deps.replay,
         trustOf: deps.trustOf,
+        history: deps.history,
         log: (level, message) => {
           deps.log.write(level, "remote", message)
         },

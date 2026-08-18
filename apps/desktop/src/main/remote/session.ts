@@ -1,4 +1,4 @@
-import type { Command, ThreadId, Trust } from "@omni/protocol"
+import type { Command, Event, ThreadId, Trust } from "@omni/protocol"
 import { encodeFrame, type ClientFrame, type Ledger, type ServerFrame } from "@omni/wire"
 import type { Sink, SinkMessage } from "../sink.js"
 import { clamp, isCommand } from "./policy.js"
@@ -25,6 +25,11 @@ export interface SessionDeps {
   dispatch: (command: Command) => void
   /** 给这条连接发一份全量。**只发给它一个**——广播出去别的客户端会把历史再应用一遍。 */
   replay: (sink: Sink) => Promise<void>
+  /**
+   * 一条会话的历史。**分级 replay 的另一半**：全量只带最近几条的正文，
+   * 客户端打开别的会话时用这个把它补上。
+   */
+  history: (threadId: ThreadId) => Promise<readonly Event[]>
   /** 这条连接的档位上限，现读现算（设置可能中途改）。 */
   ceiling: () => Trust
   /**
@@ -55,6 +60,13 @@ interface State {
   frameId: number
   alive: boolean
   watching: ThreadId | undefined
+  /**
+   * 已经把正文发过的会话。
+   *
+   * **要记**：客户端在会话之间来回切时，第二次打开不该再传一遍几百 KB。
+   * 记在连接上而不是设备上——重连之后客户端走的是全量，那一份自带最近几条的正文。
+   */
+  loaded: Set<ThreadId>
 }
 
 interface Ctx {
@@ -170,6 +182,27 @@ function cursor(ctx: Ctx, after: unknown, epoch: unknown): void {
   if (at !== undefined && run !== undefined) resync(ctx, at, run)
 }
 
+/**
+ * 客户端打开了一条会话。它的正文在全量里吗？不在就补一份。
+ *
+ * **不等**：补正文要读磁盘，而 `watch` 是一条即发即忘的帧。
+ * 读失败就算了——用户看到的是一条空会话，退出去再进来会再试一次。
+ */
+function load(ctx: Ctx, threadId: ThreadId | undefined): void {
+  if (threadId === undefined || ctx.state.loaded.has(threadId)) return
+  ctx.state.loaded.add(threadId)
+  void ctx.deps
+    .history(threadId)
+    .then((events) => {
+      if (events.length > 0) ctx.write({ type: "thread", threadId, events })
+    })
+    .catch((error: unknown) => {
+      // 补不上就把标记撤掉，下次再打开时还能再试一次
+      ctx.state.loaded.delete(threadId)
+      ctx.deps.log("warn", `${ctx.deps.id} 补 ${threadId} 的正文失败：${String(error)}`)
+    })
+}
+
 function handle(ctx: Ctx, frame: ClientFrame): void {
   switch (frame.type) {
     case "hello":
@@ -189,6 +222,7 @@ function handle(ctx: Ctx, frame: ClientFrame): void {
       return
     case "watch":
       ctx.state.watching = stringOr(frame.threadId)
+      load(ctx, ctx.state.watching)
       return
     case "ping":
       ctx.write({ type: "pong" })
@@ -200,17 +234,20 @@ function handle(ctx: Ctx, frame: ClientFrame): void {
 }
 
 export function createSession(deps: SessionDeps): RemoteSession {
-  const state: State = { frameId: 0, alive: true, watching: undefined }
+  const state: State = { frameId: 0, alive: true, watching: undefined, loaded: new Set() }
   const write = writer(deps, state)
 
   const sink: Sink = {
     id: deps.id,
     send: (message: SinkMessage) => {
-      write(
-        message.channel === "omni:events"
-          ? { type: "events", sealed: message.sealed }
-          : { type: "replay", replay: message.replay },
-      )
+      if (message.channel === "omni:events") {
+        write({ type: "events", sealed: message.sealed })
+        return
+      }
+      // 全量里已经带了正文的那些，`watch` 时不用再读一次磁盘。
+      // **缺省 = 全都带**，那是同机 IPC 那条路的语义
+      for (const id of message.replay.bodies ?? []) state.loaded.add(id)
+      write({ type: "replay", replay: message.replay })
     },
     alive: () => state.alive,
     watching: () => state.watching,

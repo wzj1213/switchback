@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Command, ThreadId } from "@omni/protocol"
-import { clearNotices, initial, reduceAll, type ViewState } from "@omni/store"
+import type { Command, Event, ThreadId } from "@omni/protocol"
+import { clearNotices, initial, itemsOf, reduceAll, type ViewState } from "@omni/store"
 import {
   initialStream,
   received,
@@ -100,6 +100,17 @@ export function useRemote(token: string): Remote {
         setState(clearNotices)
         return
       }
+      if (frame.type === "thread") {
+        // **只补自己没有的那些 item。**
+        //
+        // 这是一份**历史快照**，不是「刚刚发生的一件事」。而在它读磁盘、
+        // 过隧道的这段时间里，同一条会话的 delta 照样在走常态那条路。
+        // 无条件应用的话，一条正在流的消息会被这份旧快照盖回去——
+        // 用户看到的是正文突然倒退几百个字，然后再也不动
+        //（那条 item 的后续 delta 仍然落在同一个 id 上，但内容已经错位）。
+        setState((prev) => reduceAll(prev, freshOnly(prev, frame.threadId, frame.events)))
+        return
+      }
       if (frame.type === "notice") {
         setNotice(frame.text)
         return
@@ -113,6 +124,42 @@ export function useRemote(token: string): Remote {
     [advance],
   )
 
+  useConnection({ token, refs, onFrame, setConn, setMe })
+
+  const send = useCallback((command: Command): boolean => {
+    const sent = refs.current.transport?.send({ type: "command", command }) ?? false
+    if (!sent) setNotice("现在没连上 omni，这一下没有发出去。等连上再点一次。")
+    return sent
+  }, [])
+
+  const watch = useCallback((threadId: ThreadId | null): void => {
+    // **相同就不发。** 这条帧本来就该只在「换了一条会话」时出现一次；
+    // 调用方那侧只要有一个不稳定的依赖，它就会变成一秒几十帧的上行
+    if (refs.current.watching === threadId) return
+    refs.current.watching = threadId
+    refs.current.transport?.send({ type: "watch", threadId })
+  }, [])
+
+  const retry = useCallback((): void => {
+    refs.current.transport?.poke()
+  }, [])
+
+  const dismissNotice = useCallback((): void => {
+    setNotice(undefined)
+  }, [])
+
+  return { state, conn, me, send, watch, retry, notice, dismissNotice }
+}
+
+/** 连接的生老病死。**单独一个 hook**：`useRemote` 已经贴着行数闸门。 */
+function useConnection(deps: {
+  token: string
+  refs: { current: Refs }
+  onFrame: (frame: ServerFrame) => void
+  setConn: (state: ConnState) => void
+  setMe: (me: Me) => void
+}): void {
+  const { token, refs, onFrame, setConn, setMe } = deps
   useEffect(() => {
     if (token === "") return undefined
     const transport = createTransport({
@@ -154,31 +201,24 @@ export function useRemote(token: string): Remote {
       refs.current.ackTimer = undefined
       refs.current.stream = initialStream
     }
-  }, [token, onFrame])
+  }, [token, onFrame, refs, setConn, setMe])
+}
 
-  const send = useCallback((command: Command): boolean => {
-    const sent = refs.current.transport?.send({ type: "command", command }) ?? false
-    if (!sent) setNotice("现在没连上 omni，这一下没有发出去。等连上再点一次。")
-    return sent
-  }, [])
-
-  const watch = useCallback((threadId: ThreadId | null): void => {
-    // **相同就不发。** 这条帧本来就该只在「换了一条会话」时出现一次；
-    // 调用方那侧只要有一个不稳定的依赖，它就会变成一秒几十帧的上行
-    if (refs.current.watching === threadId) return
-    refs.current.watching = threadId
-    refs.current.transport?.send({ type: "watch", threadId })
-  }, [])
-
-  const retry = useCallback((): void => {
-    refs.current.transport?.poke()
-  }, [])
-
-  const dismissNotice = useCallback((): void => {
-    setNotice(undefined)
-  }, [])
-
-  return { state, conn, me, send, watch, retry, notice, dismissNotice }
+/**
+ * 把这份历史里「我已经有的」滤掉。
+ *
+ * 判据是 item id：`item.started` 是唯一会长出新东西的那一类，
+ * 其余（`delta` / `updated`）在归约器里都是就地改，重放一遍旧的
+ * 同样会把内容改回去，所以一并滤掉。
+ */
+export function freshOnly(state: ViewState, threadId: ThreadId, events: readonly Event[]): readonly Event[] {
+  const known = new Set(itemsOf(state, threadId).map((item) => item.id))
+  if (known.size === 0) return events
+  return events.filter((event) => {
+    if (event.type === "item.started" || event.type === "item.updated") return !known.has(event.item.id)
+    if (event.type === "item.delta") return !known.has(event.itemId)
+    return true
+  })
 }
 
 /**
