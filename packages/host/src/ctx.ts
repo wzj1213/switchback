@@ -208,7 +208,7 @@ export function emit(ctx: Ctx, event: Event): void {
 /**
  * 落盘。**没发过第一句话的会话先攒着**（见 `Ctx.uncommitted`）。
  *
- * 提交的判据是 `turn.started`：那一刻用户真的说了话。
+ * 提交的判据是 `commits()`：那条会话**不再是临时的**。
  * 攒下的连同这一条按原序写完，键从表里摘掉，之后走正常路径。
  *
  * 顺序必须原样：`thread.started` 得排在它自己的 `thread.updated` 前面，
@@ -220,12 +220,30 @@ function persist(ctx: Ctx, owner: ThreadId, event: Event): void {
     void ctx.deps.journal?.append(owner, event)
     return
   }
-  if (event.type !== "turn.started") {
+  if (!commits(event)) {
     buffered.push(event)
     return
   }
   ctx.uncommitted.delete(owner)
   for (const pending of [...buffered, event]) void ctx.deps.journal?.append(owner, pending)
+}
+
+/**
+ * 「这条会话算数了」的信号：**它不再是临时的**（`commit()` 摘掉 `provisional`
+ * 时发的那条 `thread.updated`）。
+ *
+ * ## 为什么不能拿 `turn.started` 当信号
+ *
+ * 上一版就是那么写的，而 `copyTranscript` 会为抄过来的每一轮补发一条
+ * `turn.started`——于是**分叉一下就把整条会话落了盘**：临时会话的全部意义
+ * （没用过就不留痕）当场作废，而且是静默的。分叉出来的那条是这个问题的
+ * 唯一受害者，因为只有它既在待提交表里、又会被抄进一段历史。
+ *
+ * 换成这个判据之后，「算不算数」在整个系统里只有一个来源：
+ * 侧栏看它、磁盘也看它，两边不可能再说不同的话。
+ */
+function commits(event: Event): boolean {
+  return event.type === "thread.updated" && event.thread.provisional !== true
 }
 
 /**

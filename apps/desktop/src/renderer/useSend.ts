@@ -38,6 +38,14 @@ export interface SendContext {
   rows: readonly ThreadRow[]
   lastUsed: LastUsed
   patch: (next: Partial<Settings>) => void
+  /**
+   * 「我刚要了一条新会话，等它出来就跳过去」。
+   *
+   * **分叉和重来必须跳**：它们生出来的那条现在是临时的（不进侧栏，见
+   * `Thread.provisional`），不跳的话用户点完什么都看不到——界面上没有那一行，
+   * 主区还停在原来那条，看起来就是「点了没反应」。
+   */
+  onBranch: () => void
 }
 
 export function useSend(base: (command: Command) => void, context: SendContext): (command: Command) => void {
@@ -51,6 +59,8 @@ export function useSend(base: (command: Command) => void, context: SendContext):
         const next = target === undefined ? undefined : learnFrom(lastUsed, target)
         if (next !== undefined) patch({ lastUsed: next })
       }
+      // 分叉 / 重来会生出一条新会话，等它到了就跳过去（理由见 `SendContext.onBranch`）
+      if (command.type === "thread.fork" || command.type === "thread.rewind") latest.current.onBranch()
       base(command)
     },
     [base],

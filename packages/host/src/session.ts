@@ -222,6 +222,10 @@ function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
 /**
  * 建新的临时会话时，把上一条临时会话收掉。**一次只留一条。**
  *
+ * 「新建」和「分叉 / 重来」都走这条：三者产出的都是**没说过话的会话**，
+ * 而没说过话的会话随时可以再来一个（再分一次得到的东西一模一样），
+ * 所以留着上一条没有价值，代价却是实打实的一个引擎进程。
+ *
  * 临时会话不进侧栏（见 `Thread.provisional`），所以你一旦又点了一次「+」、
  * 或者切去别的会话，它就**再也点不回来**了——而它背后那个引擎进程还活着
  *（实测一条 codex 会话 260 MB）。看不见又回不去的东西不该继续占着进程。
@@ -230,9 +234,9 @@ function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
  * 没有任何东西会丢。收不掉也不拦着新会话：一个停不掉的旧进程不该让你连
  * 新会话都开不出来。
  */
-async function dropTemps(ctx: Ctx, keep: ThreadId): Promise<void> {
+export async function dropTemps(ctx: Ctx, keep: readonly ThreadId[]): Promise<void> {
   for (const entry of [...ctx.live.values()]) {
-    if (entry.thread.provisional !== true || entry.thread.id === keep) continue
+    if (entry.thread.provisional !== true || keep.includes(entry.thread.id)) continue
     await remove(ctx, { type: "thread.delete", threadId: entry.thread.id }).catch(() => undefined)
   }
 }
@@ -258,7 +262,7 @@ export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.cre
   ctx.uncommitted.set(thread.id, [])
   emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
   // 先腾地方再占地方：上一条临时会话这时已经点不回来了（见 `dropTemps`）
-  await dropTemps(ctx, thread.id)
+  await dropTemps(ctx, [thread.id])
   let early: string | undefined
   try {
     early = await launch(ctx, thread)

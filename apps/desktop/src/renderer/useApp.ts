@@ -123,7 +123,15 @@ export function useApp(): AppApi {
 
   // 出口收在 `useSend` 里：它必须引用稳定，而**那条约束不属于「接线」这件事**——
   // 理由（以及它曾经怎么静默地废掉一整条 memo 链）写在那个文件开头
-  const send = useSend(omni.send, { rows, lastUsed: prefs.settings.lastUsed, patch: prefs.patch })
+  const send = useSend(omni.send, {
+    rows,
+    lastUsed: prefs.settings.lastUsed,
+    patch: prefs.patch,
+    // 分叉 / 重来出来的那条是临时的（侧栏里没有它），**不跳过去就等于点了没反应**
+    onBranch: () => {
+      awaited.current = omni.lastStarted?.seq ?? 0
+    },
+  })
 
   const { open, openChat, openPicker } = useWorkspaceActions({
     state: omni.state,

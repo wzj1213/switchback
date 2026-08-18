@@ -20,6 +20,8 @@ interface Rig {
   fail: { now: boolean }
   /** 冒充引擎报一轮收工。走驱动的 emit，所以会落进 journal。 */
   complete: (turnId: string) => void
+  /** 内存里的「磁盘」。用来钉「没说话就不落盘」。 */
+  disk: Map<string, Event[]>
 }
 
 const rig = (opts: { canFork: boolean }): Rig => {
@@ -88,6 +90,7 @@ const rig = (opts: { canFork: boolean }): Rig => {
     prompts,
     resumed,
     fail,
+    disk: files,
     complete: (turnId) => {
       emitters[0]?.({ type: "turn.completed", at: 0, turnId, status: "completed" })
     },
@@ -234,5 +237,92 @@ describe("分不了就只是分不了", () => {
     await r.host.dispatch({ type: "thread.fork", threadId: id, to: "other" })
     expect(r.prompts).toEqual([])
     expect(draftOf(r.events, newThreadId(r.events))).toBeUndefined()
+  })
+})
+
+/**
+ * 派生出来的会话先算**临时的**——和「+ 新建」同一条规矩（`Thread.provisional`）。
+ *
+ * 钉的是「取消不留痕」这件事的三个面：不进侧栏的那个标记、不落盘、以及
+ * **没用过就被回收**。三条里漏掉任何一条，「点一下看看」的代价就又变成
+ * 一条永久的历史（或者一个看不见却还活着的引擎进程）。
+ */
+describe("分叉与重来：没用过的那条不该留下痕迹", () => {
+  const forkOf = (r: Rig, parent: string): string => {
+    const started = r.events.filter((e) => e.type === "thread.started").map((e) => e.thread)
+    return started.find((t) => t.forkedFrom === parent)?.id ?? ""
+  }
+
+  it("分出来那条带着 `provisional`——它还没干过任何事", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    const born = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread
+    expect(born?.forkedFrom).toBe(id)
+    expect(born?.provisional).toBe(true)
+  })
+
+  it("「从这里重来」也一样——它同样是探索性的动作", async () => {
+    const r = rig({ canFork: true })
+    const { id, turns } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" })
+    expect(r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.provisional).toBe(true)
+  })
+
+  it("**没说话就不落盘**：磁盘上一个字都没有", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(r.disk.get(forkOf(r, id))).toBeUndefined()
+  })
+
+  it("说了第一句就转正，**抄过来的 transcript 跟着一起落盘、而且排在轮次前面**", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    const forked = forkOf(r, id)
+    await r.host.dispatch({ type: "thread.prompt", threadId: forked, text: "接着这个方向" })
+    const written = r.disk.get(forked) ?? []
+    // 出生那条排最前：顺序反了的话，重放出来是「先被改过、后才出生」的会话
+    expect(written[0]?.type).toBe("thread.started")
+    // 用户新开的那一轮是最后一条 `turn.started`；**抄过来的历史整段在它之前**
+    // ——反过来的话，重放出来是「先说了新的一句，历史才补上」，读不懂
+    const userTurn = written.map((e, i) => (e.type === "turn.started" ? i : -1)).filter((i) => i >= 0).at(-1) ?? -1
+    const copiedBefore = written.slice(0, userTurn).filter((e) => e.type === "item.started")
+    expect(userTurn).toBeGreaterThan(0)
+    expect(copiedBefore.length).toBeGreaterThan(0)
+    // 转正之后 `provisional` 就没了——侧栏和磁盘看的是同一个信号
+    const live = r.events
+      .filter((e) => e.type === "thread.updated")
+      .filter((e) => e.thread.id === forked)
+      .at(-1)
+    expect(live?.thread.provisional).toBeUndefined()
+  })
+
+  it("再分一次，把上一条**没用过的**收掉——不然它看不见却还占着一个引擎进程", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    const first = forkOf(r, id)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(r.events.filter((e) => e.type === "thread.removed").map((e) => e.threadId)).toContain(first)
+  })
+
+  it("**来路那条不动**：从一个临时会话上分叉是合法的，收掉来路等于抽走脚下的地板", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(r.events.filter((e) => e.type === "thread.removed").map((e) => e.threadId)).not.toContain(id)
+  })
+
+  it("已经说过话的那条不会被收走——它不再是临时的", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    const used = forkOf(r, id)
+    await r.host.dispatch({ type: "thread.prompt", threadId: used, text: "用起来了" })
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(r.events.filter((e) => e.type === "thread.removed").map((e) => e.threadId)).not.toContain(used)
   })
 })

@@ -2,7 +2,7 @@ import type { Command, EngineSegment, Item, Thread, ThreadId } from "@omni/proto
 import { initial, itemsOf, reduceAll } from "@omni/store"
 import { emit, type Ctx, type Live } from "./ctx.js"
 import { copyTranscript } from "./transcript.js"
-import { launch, rememberHandle } from "./session.js"
+import { dropTemps, launch, rememberHandle } from "./session.js"
 
 /**
  * 从一条会话岔出另一条：分叉（换引擎）、重来（砍掉后面几轮）、接力（换引擎但不留旧的）。
@@ -72,7 +72,23 @@ async function branch(
     createdAt: at,
     updatedAt: at,
     queued: [],
+    /**
+     * **派生出来的先算临时的**（和「+ 新建」同一条规矩，见 `Thread.provisional`）。
+     *
+     * 分叉与重来都是**探索性**动作：你想看看「换一家会怎么做」「回到那一轮重走一遍」。
+     * 而上一版它一生出来就是一条正式记录——进侧栏、落盘、删不掉自己。于是
+     * 「点一下看看，不满意」的代价是永久多一条历史，人为了不脏历史反而不敢点。
+     *
+     * 现在判据和别处完全一致：**跑过新的一轮才算数**（`prompt` 里 `commit()` 那一下）。
+     * 抄过来的 transcript 不算——那是抄来的历史，不是这条会话干过的事。
+     * 没用过就切走的话它被回收（`dropTemps`），磁盘上一个字都没有。
+     * 想要回来？从同一个点再分一次，得到的东西一模一样。
+     */
+    provisional: true,
   }
+  // **先挂进待提交表再发事件**，理由同 `session.ts` 的新建：没说过话就不落盘。
+  // 抄过来的 transcript 也在这份缓冲里，第一句话一发就按原序一起写下去
+  ctx.uncommitted.set(thread.id, [])
   const forked = plan === undefined ? undefined : await tryFork(ctx, thread, plan)
   const early = forked?.early ?? (forked === undefined ? await launch(ctx, thread) : undefined)
   emit(ctx, { type: "thread.started", at, thread })
@@ -81,6 +97,14 @@ async function branch(
   // 原生分叉成功时把 transcript 抄过来：**引擎那边已经什么都知道了**，
   // 人看到的和它记得的就对上了
   if (forked !== undefined) copyTranscript(ctx, thread, items)
+  /**
+   * 把**别的**没用过的临时会话收掉。两个都不能收：
+   *
+   * - 刚分出来的这条（`thread.id`）——它正是用户要去的地方
+   * - **来路那条**（`entry.thread.id`）——从一个临时会话分叉是合法的
+   *   （比如刚开的空会话上点「换一家试试」），把来路收掉等于把人脚下的地板抽走
+   */
+  await dropTemps(ctx, [thread.id, entry.thread.id])
 }
 
 /**
