@@ -45,6 +45,14 @@ export interface Replay {
    * 而那正是分级 replay 要省掉的东西。
    */
   bodies?: readonly ThreadId[]
+  /**
+   * 这些会话的正文**被裁掉了开头**，只带了尾巴。
+   *
+   * 客户端要拿它画一条「更早的内容没有加载」。少了这个字段，
+   * 一条三小时的会话在手机上看起来就是「从中间开始的」——
+   * 而界面上没有任何东西说上面还有，**用户会以为记录丢了**。
+   */
+  trimmed?: readonly ThreadId[]
 }
 
 /**
@@ -107,7 +115,7 @@ export type ServerFrame =
    * **不走序号**：它是历史，不是「刚刚发生的一件事」。接收端按 item id
    * 过滤掉自己已经有的那些——否则一条正在流的消息会被这份旧快照盖回去。
    */
-  | { type: "thread"; threadId: ThreadId; events: readonly Event[] }
+  | { type: "thread"; threadId: ThreadId; events: readonly Event[]; trimmed?: boolean }
   /**
    * 补不了（缺口比保留缓冲还老，或者序号来自上一次宿主运行）。
    *

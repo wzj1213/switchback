@@ -428,7 +428,8 @@ export async function rebuild(
   const resumeAt = attached.ledger.latest()
   const epoch = attached.ledger.epoch
   // `bodies` 只在分级时带：缺省的含义是「全都带」，而那正是同机 IPC 那条路
-  const bodies = budget === undefined ? {} : { bodies: [...scoped.bodies] }
+  const bodies =
+    budget === undefined ? {} : { bodies: [...scoped.bodies], trimmed: [...scoped.trimmedIds] }
   if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch, ...bodies } })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
   return [...alive.keys()][0] ?? ids[0]

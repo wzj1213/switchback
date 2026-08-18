@@ -39,6 +39,8 @@ interface BootOptions {
   trustedHosts?: readonly string[]
   threadTrust?: Trust
   history?: readonly Event[]
+  /** 这条会话的正文是不是被裁过。 */
+  trimmed?: boolean
   /** 把死连接的判定拨快，别让一条测试跑将近一分钟。 */
   heartbeat?: { everyMs: number; deadAfterMs: number }
   /** 在 webRoot 下铺几个文件，用来验压缩与缓存头。 */
@@ -91,7 +93,7 @@ async function boot(options: BootOptions = {}): Promise<Harness> {
     },
     dispatch: (command) => dispatched.push(command),
     trustOf: () => options.threadTrust,
-    history: async () => options.history ?? [],
+    history: async () => ({ events: options.history ?? [], trimmed: options.trimmed === true }),
     ...(options.heartbeat === undefined ? {} : { heartbeat: options.heartbeat }),
     replay: async (sink) => {
       state.replays += 1

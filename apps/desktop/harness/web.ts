@@ -103,8 +103,24 @@ const items: readonly Item[] = [
   },
 ]
 
+/**
+ * 一条**很长**的会话，用来验「先挂 80 条 + 显示更早的」那条路。
+ *
+ * 加进来是因为原来那三条都只有几条 item，那颗按钮根本不出现——
+ * **验不了的东西等于没做**。条数取 200：比首屏那 80 多得明显，
+ * 又不至于让 harness 自己慢下来。
+ */
+const LONG: readonly Item[] = Array.from({ length: 200 }, (_, i): Item =>
+  i % 2 === 0
+    ? { id: `long-${String(i)}`, turnId: "u-长", kind: "user_message", at: at + i, text: `第 ${String(i + 1)} 条：验长列表。` }
+    : { id: `long-${String(i)}`, turnId: "u-长", kind: "agent_message", at: at + i, text: `第 ${String(i + 1)} 条：验长列表。`, complete: true },
+)
+
 const seed: readonly Event[] = [
   { type: "engines.available", at, engines: [{ id: "codex", label: "Codex", state: "ok" }] },
+  { type: "thread.started", at, thread: thread("t-长", "一条很长的会话（200 条）", "idle") },
+  { type: "turn.started", at, turn: { id: "u-长", threadId: "t-长", engine: "codex", status: "completed", startedAt: at } },
+  ...LONG.map((item): Event => ({ type: "item.started", at: item.at, item })),
   { type: "thread.started", at, thread: thread("t-3", "更新日志的措辞", "idle") },
   { type: "thread.started", at, thread: thread("t-2", "ACP 换模型那条红条", "running") },
   { type: "thread.started", at, thread: thread("t-1", "浏览器端的审批屏", "waiting_approval") },
@@ -154,7 +170,7 @@ function main(): void {
       await Promise.resolve()
     },
     trustOf: (threadId) => (threadId === "t-1" || threadId === "t-2" || threadId === "t-3" ? "auto-edit" : undefined),
-    history: async () => [],
+    history: async () => ({ events: [], trimmed: false }),
     log: (level, message) => {
       console.log(`[${level}] ${message}`)
     },

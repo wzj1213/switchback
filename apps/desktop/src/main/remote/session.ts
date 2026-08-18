@@ -29,7 +29,7 @@ export interface SessionDeps {
    * 一条会话的历史。**分级 replay 的另一半**：全量只带最近几条的正文，
    * 客户端打开别的会话时用这个把它补上。
    */
-  history: (threadId: ThreadId) => Promise<readonly Event[]>
+  history: (threadId: ThreadId) => Promise<{ events: readonly Event[]; trimmed: boolean }>
   /** 这条连接的档位上限，现读现算（设置可能中途改）。 */
   ceiling: () => Trust
   /**
@@ -263,11 +263,11 @@ function load(ctx: Ctx, threadId: ThreadId | undefined): void {
   ctx.state.loaded.add(threadId)
   void awaitBaseline(ctx.state)
     .then(() => ctx.deps.history(threadId))
-    .then((events) => {
+    .then((body) => {
       // 等的这段时间里连接可能已经没了；也可能已经换了一份全量、
       // 而那一份正好带上了这条的正文（`loaded` 被清空后重新预置）
-      if (!ctx.state.alive || events.length === 0) return
-      ctx.write({ type: "thread", threadId, events })
+      if (!ctx.state.alive || body.events.length === 0) return
+      ctx.write({ type: "thread", threadId, events: body.events, ...(body.trimmed ? { trimmed: true } : {}) })
     })
     .catch((error: unknown) => {
       // 补不上就把标记撤掉，下次再打开时还能再试一次

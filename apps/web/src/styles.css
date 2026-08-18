@@ -422,6 +422,35 @@ textarea {
   }
 }
 
+/*
+ * 「更早的内容没有加载」。
+ *
+ * 做得**像一条分隔线而不是一条警告**：它不是出事了，是这一端的正常取舍。
+ * 用警告的颜色会让人以为哪里坏了。
+ */
+.thread__earlier {
+  margin: 0 0 var(--sp-3);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px dashed var(--line);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* 「显示更早的 N 条」。和上面那条分隔线同一个样子——它们出现在同一个位置。 */
+.thread__earlier--btn {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  min-height: 44px;
+}
+
 .row__count {
   color: var(--text-faint);
   font-size: var(--text-sm);

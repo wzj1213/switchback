@@ -5,3 +5,4 @@ export { createSession, type RemoteSession, type SessionDeps } from "./session.j
 export { safeJoin, serveStatic } from "./static.js"
 export { startRemote, WS_PATH, WS_PROTOCOL, type RemoteConfig, type RemoteDeps, type RemoteServer } from "./server.js"
 export { installRemote, webRoot, type RemoteInstall, type RemoteInstallDeps, type RemoteStatus } from "./install.js"
+export { attachRemote } from "./attach.js"

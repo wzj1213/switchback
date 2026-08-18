@@ -86,10 +86,12 @@ describe("按大小挑哪些会话带正文", () => {
   it("**但第一条也封了顶**——否则一条 2.5 MB 的会话就能把整份预算架空", () => {
     const scoped = scopeReplay([fat("巨大", 5_000_000)], 1_000_000)
     expect(scoped.trimmed).toBe(1)
+    // **要报出是哪一条**：客户端拿它画「更早的内容没有加载」
+    expect([...scoped.trimmedIds]).toEqual(["巨大"])
   })
 
   it("一条会话都没有时不报错", () => {
-    expect(scopeReplay([], 100_000)).toEqual({ bodies: new Set(), deferred: 0, trimmed: 0 })
+    expect(scopeReplay([], 100_000)).toEqual({ bodies: new Set(), deferred: 0, trimmed: 0, trimmedIds: new Set() })
   })
 })
 

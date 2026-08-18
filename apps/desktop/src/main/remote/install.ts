@@ -41,7 +41,7 @@ export interface RemoteInstallDeps {
   /** 某条会话现在是哪一档。见 `remote/policy.ts` 的 `RUNS_IN_THREAD`。 */
   trustOf: (threadId: string) => Trust | undefined
   /** 一条会话的历史。分级 replay 的另一半。 */
-  history: (threadId: string) => Promise<readonly Event[]>
+  history: (threadId: string) => Promise<{ events: readonly Event[]; trimmed: boolean }>
   log: Logger
 }
 

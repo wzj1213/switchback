@@ -50,7 +50,7 @@ export interface RemoteDeps {
   /** 某条会话现在是哪一档。档位上限靠它才管得住已经开着的会话。 */
   trustOf: (threadId: string) => Trust | undefined
   /** 一条会话的历史。分级 replay 的另一半——客户端打开哪条就补哪条。 */
-  history: (threadId: string) => Promise<readonly Event[]>
+  history: (threadId: string) => Promise<{ events: readonly Event[]; trimmed: boolean }>
   /**
    * 死连接的判定节奏。**只有测试会传**——真跑时用下面那两个常量。
    *

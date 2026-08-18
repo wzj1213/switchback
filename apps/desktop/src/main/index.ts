@@ -10,8 +10,7 @@ import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
-import { REMOTE_REPLAY_CHARS, REMOTE_THREAD_CHARS, bodyOf, withCurrent } from "./scope.js"
-import { installRemote } from "./remote/index.js"
+import { attachRemote } from "./remote/index.js"
 import { installMenu } from "./menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
@@ -192,49 +191,6 @@ function readBuild(): string {
 }
 
 /**
- * 浏览器端的服务端。**默认关着**，开关在设置里；开了也只 listen 回环，
- * 要从外面进来得自己开隧道（见 `docs/手机端远程方案.md`）。
- *
- * 命令走的是**和 IPC 完全同一条路**（`host.dispatch` + 同一个 `report`）——
- * 摆两份实现的下场是其中一份迟早不更新，而那份正好是用户在外面用的那份。
- */
-function attachRemote(attached: Attached, sinks: ReturnType<typeof createSinks>): ReturnType<typeof installRemote> {
-  return installRemote({
-    settings: settings.get,
-    ledger: attached.ledger,
-    sinks,
-    dispatch: (command) => {
-      void attached.host.dispatch(command).catch((error: unknown) => {
-        attached.report(error, "threadId" in command ? command.threadId : undefined)
-      })
-    },
-    replay: async (sink) => {
-      // **远程那条给预算**：同机 IPC 上一份几 MB 的全量只是一次结构化克隆，
-      // 而在蜂窝网上那是十几秒的「正在连接…」
-      await rebuild(attached, sink, REMOTE_REPLAY_CHARS)
-    },
-    // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档
-    trustOf: (threadId) => attached.host.live().find((t) => t.id === threadId)?.trust,
-    // **先把在途写入落完再读。** 宿主发事件不等落盘，所以「发出去了」和
-    // 「在文件里了」之间有个窗口；在窗口里读到的是缺一截的一份，而客户端
-    // 收到它之后只会按 item id 去重——缺的那几条不会再补回来。
-    // `rebuild` 早就这么做了，这条路当时漏了
-    history: async (threadId) => {
-      await attached.journal.flush().catch(() => undefined)
-      const events = await attached.journal.read(threadId)
-      // **单独补也要封顶。** 一条 2.5 MB 的会话单发一份同样是几百个分片，
-      // 手机上同样收不完——分级省下来的会在这一步原样还回去
-      const body = bodyOf({ id: threadId, events }, REMOTE_THREAD_CHARS)
-      if (body.trimmed) log.write("info", "remote", `${threadId} 的正文太长，只补了尾巴`)
-      // **结尾用当前状态收口**，规则和全量那条路一样：磁盘上那份是上次落盘的样子，
-      // 客户端照着它重建这条会话，会把一条正在跑的改回 idle、把改过的名字改回去
-      return withCurrent(body.events, attached.host.live().find((t) => t.id === threadId), Date.now())
-    },
-    log,
-  })
-}
-
-/**
  * 「我准备好了，把世界给我。」
  *
  * **每次加载都重建**，不只是第一次。渲染层重载（开发期热更、崩溃恢复、
@@ -408,7 +364,7 @@ function bootstrap(): Promise<void> {
         relay.notify?.(id, title, body)
       },
     })
-    const remote = attachRemote(attached, sinks)
+    const remote = attachRemote({ attached, sinks, settings: settings.get, log })
     relay.notify = remote.relay.notify
     await remote.sync()
     const bounds = await loadBounds()

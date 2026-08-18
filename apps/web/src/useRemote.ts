@@ -45,6 +45,14 @@ export interface Remote {
    * 以及事后单独补的 `thread` 帧。
    */
   loaded: ReadonlySet<ThreadId>
+  /**
+   * 这些会话**只带了尾巴**，开头被裁掉了。
+   *
+   * 转录区据此在最上面画一条「更早的内容没有加载」。少了这一条，
+   * 一条三小时的会话看起来就是「从中间开始的」，而没有任何东西说上面还有——
+   * **用户会以为记录丢了**。
+   */
+  trimmed: ReadonlySet<ThreadId>
   me: Me | undefined
   /**
    * 发一条命令。**返回有没有真的发出去。**
@@ -74,6 +82,7 @@ export function useRemote(token: string): Remote {
   const [conn, setConn] = useState<ConnState>({ kind: "connecting" })
   const [hydrated, setHydrated] = useState(false)
   const [loaded, setLoaded] = useState<ReadonlySet<ThreadId>>(() => new Set())
+  const [trimmed, setTrimmed] = useState<ReadonlySet<ThreadId>>(() => new Set())
   const [me, setMe] = useState<Me | undefined>(undefined)
   const [notice, setNotice] = useState<string | undefined>(undefined)
   const refs = useRef<Refs>({ stream: initialStream, transport: undefined, ackTimer: undefined, watching: null })
@@ -118,6 +127,7 @@ export function useRemote(token: string): Remote {
         setHydrated(true)
         // **每来一份新全量就换一套**：新那份带的正文可能是另外几条
         setLoaded(new Set(frame.replay.bodies ?? []))
+        setTrimmed(new Set(frame.replay.trimmed ?? []))
         // 横幅说的是「刚刚发生了一件事」，那是时刻不是状态；重放会把历史上
         // 每一次引擎崩溃重新弹一遍
         setState(clearNotices)
@@ -132,6 +142,13 @@ export function useRemote(token: string): Remote {
         // 转录区于是变成「最新的排在最前」，中间还夹着旧的。
         setState((prev) => reduceHistory(prev, frame.threadId, frame.events))
         setLoaded((prev) => new Set(prev).add(frame.threadId))
+        setTrimmed((prev) => {
+          const next = new Set(prev)
+          // 补来的那一份可能是完整的（这次没超限），那就把旧的标记撤掉
+          if (frame.trimmed === true) next.add(frame.threadId)
+          else next.delete(frame.threadId)
+          return next
+        })
         return
       }
       if (frame.type === "notice") {
@@ -171,7 +188,7 @@ export function useRemote(token: string): Remote {
     setNotice(undefined)
   }, [])
 
-  return { state, conn, hydrated, loaded, me, send, watch, retry, notice, dismissNotice }
+  return { state, conn, hydrated, loaded, trimmed, me, send, watch, retry, notice, dismissNotice }
 }
 
 /** 连接的生老病死。**单独一个 hook**：`useRemote` 已经贴着行数闸门。 */

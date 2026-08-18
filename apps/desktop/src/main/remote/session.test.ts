@@ -39,6 +39,8 @@ interface Options {
   threadTrust?: Trust
   history?: readonly Event[]
   historyFails?: boolean
+  /** 这条会话的正文被裁过。 */
+  trimmed?: boolean
   /** 全量里带了正文的会话。 */
   bodies?: readonly string[]
 }
@@ -70,7 +72,7 @@ function harness(options: Options = {}): Harness {
     history: async (threadId) => {
       reads.push(threadId)
       if (options.historyFails === true) throw new Error("磁盘炸了")
-      return options.history ?? []
+      return { events: options.history ?? [], trimmed: options.trimmed === true }
     },
     log: (_level, message) => logs.push(message),
   })
@@ -339,6 +341,22 @@ describe("确认与观察", () => {
     send(h, { type: "hello", after: 1, epoch: RUN })
     // 补不动 → 转全量重建，而全量那条已经按大小封了顶
     expect(h.replays()).toBe(1)
+  })
+
+  it("**正文被裁了要说出来**——不说的话那条会话看起来是从中间开始的，而人会以为记录丢了", async () => {
+    const h = harness({ history: [ev(1)], trimmed: true })
+    send(h, { type: "hello" })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.frames().find((f) => f.type === "thread")).toMatchObject({ trimmed: true })
+  })
+
+  it("没裁就不带这个字段——省得客户端画一条不该有的分隔线", async () => {
+    const h = harness({ history: [ev(1)] })
+    send(h, { type: "hello" })
+    send(h, { type: "watch", threadId: "t-1" })
+    await settle()
+    expect(h.frames().find((f) => f.type === "thread")).not.toHaveProperty("trimmed")
   })
 
   it("ping 回 pong", () => {

@@ -60,6 +60,8 @@ export interface Scoped {
   deferred: number
   /** 正文被裁掉过头的会话数。**要让人知道**：看不见开头而没有任何提示，比空白更糟。 */
   trimmed: number
+  /** 具体是哪几条被裁了。客户端拿它画「更早的内容没有加载」。 */
+  trimmedIds: ReadonlySet<ThreadId>
 }
 
 /** 一条事件在线上占多少码元。`JSON.stringify` 一次，别猜。 */
@@ -93,8 +95,11 @@ export function bodyOf(thread: ThreadHistory, cap: number): { events: readonly E
  * @param budget 正文的总**码元**上限。`undefined` = 不限（桌面窗口那条路）。
  */
 export function scopeReplay(threads: readonly ThreadHistory[], budget?: number): Scoped {
-  if (budget === undefined) return { bodies: new Set(threads.map((t) => t.id)), deferred: 0, trimmed: 0 }
+  if (budget === undefined) {
+    return { bodies: new Set(threads.map((t) => t.id)), deferred: 0, trimmed: 0, trimmedIds: new Set() }
+  }
   const bodies = new Set<ThreadId>()
+  const trimmedIds = new Set<ThreadId>()
   let spent = 0
   let deferred = 0
   let trimmed = 0
@@ -107,12 +112,15 @@ export function scopeReplay(threads: readonly ThreadHistory[], budget?: number):
     if (bodies.size === 0 || spent + cost <= budget) {
       bodies.add(thread.id)
       spent += cost
-      if (body.trimmed) trimmed += 1
+      if (body.trimmed) {
+        trimmed += 1
+        trimmedIds.add(thread.id)
+      }
       continue
     }
     deferred += 1
   }
-  return { bodies, deferred, trimmed }
+  return { bodies, deferred, trimmed, trimmedIds }
 }
 
 /** 一条会话的「头」都有哪些事件：能凭空造出这一行、或者改这一行的那些。 */
