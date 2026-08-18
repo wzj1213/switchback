@@ -63,6 +63,8 @@ interface Props {
   cwd: string
   /** 轮次状态。变一次芯片就重新问一遍 git——引擎改完文件之后「脏不脏」就变了。 */
   stamp: string
+  /** 这一轮点过「本轮剩下的都放行」。芯片要说出来。 */
+  passing: boolean
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   /** 能用的斜杠命令：引擎报的 ＋ omni 自己的，`Workspace` 拼好再给。 */
   commands: readonly SlashCommand[]
@@ -109,6 +111,11 @@ function stateOf(o: { detached: boolean; starting: boolean; busy: boolean; canSt
   }
 }
 
+/** 目录名当项目名。整条绝对路径在芯片里放不下，而尾段正是人叫它的那个名字。 */
+function projectOf(cwd: string): string {
+  return cwd.split("/").filter(Boolean).pop() ?? cwd
+}
+
 export function Composer({
   detached = false,
   engine,
@@ -125,6 +132,7 @@ export function Composer({
   onModelChange,
   cwd,
   stamp,
+  passing,
   busy = false,
   starting = false,
   onInterrupt,
@@ -171,7 +179,7 @@ export function Composer({
           attach.drop(e.dataTransfer.files)
         }}
       >
-        {detached ? null : <Chips cwd={cwd} project={cwd.split("/").filter(Boolean).pop() ?? cwd} stamp={stamp} />}
+        {detached ? null : <Chips cwd={cwd} project={projectOf(cwd)} stamp={stamp} passing={passing} />}
         {/* 附件排在芯片**下面**、正文上面。芯片说的是「这句话会发到哪儿去」，
             是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
             反过来放的话，贴一张图就把抬头顶下去 72 像素 */}

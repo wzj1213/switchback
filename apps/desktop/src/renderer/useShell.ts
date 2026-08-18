@@ -26,6 +26,9 @@ export interface Shell {
   setComparing: (on: boolean) => void
   settingsOpen: boolean
   setSettingsOpen: (on: boolean) => void
+  /** 审核面板开着没有。和设置同层：一块盖住界面的面板，Esc 关。 */
+  reviewOpen: boolean
+  setReviewOpen: (on: boolean) => void
   /**
    * 焦点信号。
    *
@@ -50,6 +53,7 @@ export function useShell(): Shell {
   const [finding, setFinding] = useState(false)
   const [comparing, setComparing] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [focusFilter, setFocusFilter] = useState(0)
   const [askRename, setAskRename] = useState(0)
   return {
@@ -65,6 +69,8 @@ export function useShell(): Shell {
     setComparing,
     settingsOpen,
     setSettingsOpen,
+    reviewOpen,
+    setReviewOpen,
     askRename,
     requestRename: () => {
       setAskRename((n) => n + 1)

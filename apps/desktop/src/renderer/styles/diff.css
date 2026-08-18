@@ -61,6 +61,25 @@
   font-family: var(--font-mono);
 }
 
+/* 可点的路径。**平时和静态的一模一样**，悬停才显出来能点——
+   一条工具行里最重要的是「它对哪个文件做了什么」，不是「这里有个链接」。
+   同一套也给工具行的「读文件」用（`.step__target--go`，在 items.css 里） */
+.dfile__path--go {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.dfile__path--go:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .dfile__dir {
   min-width: 0;
   overflow: hidden;

@@ -6,6 +6,8 @@ import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { RemoteStatus } from "../main/remote/install.js"
+import type { ReviewFile, ReviewPatch } from "../shared/review.js"
+import type { ContentHit } from "../shared/search.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -31,6 +33,13 @@ export type { Replay, Sealed }
  * 加一个**窄到只能做一件事**的方法——它只回一个用户亲手选的路径，
  * 渲染层拿不到任何遍历文件系统的能力。
  */
+interface Review {
+  root: string
+  files: readonly ReviewFile[]
+  /** 被截掉了多少个。列表有上限，不说等于假装那是全部。 */
+  more?: number
+}
+
 const api = {
   send(command: Command): void {
     ipcRenderer.send("omni:command", command)
@@ -155,6 +164,34 @@ const api = {
     return (await ipcRenderer.invoke("omni:workChanges", cwd)) as
       | { root: string; paths: readonly string[] }
       | undefined
+  },
+  /**
+   * 审核面板的文件清单：工作区里所有变了的文件 + 各自的增删数与状态。
+   *
+   * 和 `workChanges` 的区别是**它带着足够审核的信息**（新建/删除/改名、进没进
+   * 暂存区、增删数），而那个只回路径。两条并存是有意的：变更汇总卡只需要路径，
+   * 让它去付这份代价不划算。
+   */
+  async workReview(cwd: string): Promise<Review | undefined> {
+    return (await ipcRenderer.invoke("omni:workReview", cwd)) as Review | undefined
+  },
+  /**
+   * 一个文件的补丁。**按需取**——一个 200 文件的改动全量取可能是几十 MB，
+   * 而人一次只看得了一个。
+   */
+  async workPatch(cwd: string, rel: string, context?: number): Promise<ReviewPatch> {
+    return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, context })) as ReviewPatch
+  },
+  /**
+   * 在所有会话的**正文**里找一句话。侧栏那个筛选框只搜标题/首句/目录，
+   * 而人记得住的往往是中间某一句。**只搜说过的话，不搜工具调用**——
+   * 把命令原文算进来的话，搜什么都会命中跑过命令的那几条（见 `main/search.ts`）。
+   */
+  async searchThreads(query: string): Promise<{ hits: readonly ContentHit[]; skipped: number }> {
+    return (await ipcRenderer.invoke("omni:searchThreads", query)) as {
+      hits: readonly ContentHit[]
+      skipped: number
+    }
   },
   /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
   async settings(patch?: Partial<Settings>): Promise<Settings> {

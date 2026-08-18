@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { FileChange } from "@omni/protocol"
 import { kindLabel, parseDiff, splitPath, type DiffLine } from "../diff.js"
+import { reveal, revealable } from "../reveal.js"
 
 /** 默认展示的行数。超过就折叠——一个 800 行的补丁摊在 transcript 里没人会读。 */
 const FOLD_AT = 40
@@ -50,10 +51,26 @@ export function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
     <div className="dfile">
       <div className="dfile__head">
         <span className={`dfile__kind dfile__kind--${file.kind}`}>{kindLabel(file.kind)}</span>
-        <span className="dfile__path" title={file.path}>
-          <span className="dfile__dir">{dir}</span>
-          <span className="dfile__name">{name}</span>
-        </span>
+        {/* 路径点一下在访达里定位。**删掉的那种不做成链接**：文件已经不在了，
+            点了什么都不会发生——那正是这个仓库一直在避免的那种元素 */}
+        {file.kind === "delete" || !revealable(file.path) ? (
+          <span className="dfile__path" title={file.path}>
+            <span className="dfile__dir">{dir}</span>
+            <span className="dfile__name">{name}</span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="dfile__path dfile__path--go"
+            title={`在访达中显示\n${file.path}`}
+            onClick={() => {
+              reveal(file.path)
+            }}
+          >
+            <span className="dfile__dir">{dir}</span>
+            <span className="dfile__name">{name}</span>
+          </button>
+        )}
         <Stat added={file.added} removed={file.removed} />
       </div>
       {lines.length === 0 ? null : (

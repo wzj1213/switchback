@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { app, ipcMain } from "electron"
 import type { Logger } from "./log.js"
+import { quitNow } from "./quit.js"
 
 /**
  * 从**本机源码**把自己重装一遍。
@@ -181,7 +182,9 @@ function handoff(log: Logger, from: string, to: string): void {
   log.write("info", "update", `构建好了，交给换包脚本：${file}（日志 ${logFile}）`)
   // 等一下再退：这条命令的回包还要发回渲染层，让它把按钮切成「正在重启」
   setTimeout(() => {
-    app.quit()
+    // 走 `quitNow`：换包脚本已经在外面等着这个进程消失了，
+    // 这时候弹一个「还有活在跑，确定退出吗」只会把它卡在那儿等一个永远不来的点击
+    quitNow()
   }, 300)
 }
 

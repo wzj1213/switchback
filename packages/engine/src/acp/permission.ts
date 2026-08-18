@@ -125,6 +125,7 @@ export async function handlePermission(ctx: PermissionContext, call: ServerCall)
     tool: request.tool,
     summary: request.summary ?? request.tool,
     reason: verdict.reason,
+    ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
     ...(verdict.suggest === undefined
       ? {}
       : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),

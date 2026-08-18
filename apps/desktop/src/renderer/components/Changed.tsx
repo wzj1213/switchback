@@ -32,7 +32,7 @@ import { RevealIcon, CopyIcon } from "./icons.js"
  */
 const FOLD_AT = 5
 
-export function Changed({ items, cwd, stamp, onReveal, onCopy }: {
+export function Changed({ items, cwd, stamp, onReveal, onCopy, onReview }: {
   items: readonly Item[]
   /** 工作区。展开时要问它一次 git。 */
   cwd: string
@@ -41,6 +41,14 @@ export function Changed({ items, cwd, stamp, onReveal, onCopy }: {
   /** 在访达里定位。 */
   onReveal: (path: string) => void
   onCopy: (text: string) => void
+  /**
+   * 打开审核面板（⇧⌘R 也走同一条）。
+   *
+   * **入口放在这枚胶囊旁边**：这里正是「跑完一轮之后眼睛落的地方」，
+   * 而「看了总数之后想逐个过一遍」是紧接着的下一个动作。埋进菜单里的话，
+   * 多数人一年也发现不了它。
+   */
+  onReview: () => void
 }): React.JSX.Element | null {
   const { files, added, removed, list } = changesOf(items)
   const [open, setOpen] = useState(false)
@@ -71,6 +79,7 @@ export function Changed({ items, cwd, stamp, onReveal, onCopy }: {
           )}
         </div>
       ) : null}
+      <div className="changed__bar">
       <button
         type="button"
         className={`changed__pill${open ? " changed__pill--open" : ""}`}
@@ -83,6 +92,10 @@ export function Changed({ items, cwd, stamp, onReveal, onCopy }: {
         {label(files, others.length)}
         <Stat added={added} removed={removed} />
       </button>
+      <button type="button" className="changed__review" title="逐个看一遍（⇧⌘R）" onClick={onReview}>
+        审核
+      </button>
+      </div>
     </div>
   )
 }

@@ -9,3 +9,6 @@ release/
 *.log
 apps/web/dist
 release/web-shots
+
+# Claude Code 的工作副本与本地状态，不属于这个仓库
+.claude/

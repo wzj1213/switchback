@@ -10,9 +10,9 @@ import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createBatcher } from "./batch.js"
 import { createAttention, type Attention, type Relay } from "./attention.js"
+import { createAwake, type Awake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
-import { createAwake, type Awake } from "./remote/awake.js"
 import { headerOf, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
 
@@ -33,7 +33,7 @@ export interface Attached {
   ledger: Ledger
   /** 客户端注册表。远程服务端把连接注册进来，就自动收到广播。 */
   sinks: Sinks
-  /** 退出前放开休眠锁。 */
+  /** 有活在跑时挡住闲置待机。退出前要 `release()`，否则断言留在系统里。 */
   awake: Awake
   /** 记一行。分级 replay 要说出「省了多少」。 */
   log: Logger
@@ -60,8 +60,14 @@ export interface Attached {
 interface OutletDeps {
   sinks: Sinks
   attention: Attention
-  /** 有活在跑的时候别让机器空闲休眠。**远程的全部前提是这台机器还醒着。** */
+  /**
+   * 有活在跑的时候别让机器空闲待机。**远程的全部前提是这台机器还醒着。**
+   *
+   * 判据不是计数器而是「现在还有没有活着的活」——见 `awake.ts`。
+   */
   awake: Awake
+  /** 现在有哪些会话活着。**传函数不传值**：outlet 比 host 先建。 */
+  live: () => readonly Thread[]
   log: Logger
   seen: { thread: ThreadId | undefined }
 }
@@ -74,10 +80,10 @@ function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; ledger:
   const batcher = createBatcher((events) => {
     // 每条出去的事件顺带过一遍「要不要叫人」。放在发出去的同一处，
     // 免得将来多一条出口就漏一处
-    for (const event of events) {
-      deps.attention.note(event)
-      deps.awake.note(event)
-    }
+    for (const event of events) deps.attention.note(event)
+    // 同一处顺带重算一次「现在还有没有活在跑」——**每次都重算，不记计数器**：
+    // 漏一条 `turn.completed` 的代价从「永远不睡」降成「这一帧算错了」
+    deps.awake.sync(deps.live())
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
     const sealed = ledger.seal(events)
@@ -190,21 +196,22 @@ export function attachHost(
   sinks: Sinks,
   windows: () => readonly BrowserWindow[],
   log: Logger,
-  ports?: { relay?: Relay; awakeWhen?: () => boolean },
+  ports?: { relay?: Relay },
 ): Attached {
   const relay = ports?.relay
-  const awakeWhen = ports?.awakeWhen
   const seen = { thread: undefined as ThreadId | undefined }
   // 叫人这件事认窗口（`isFocused` / `show` / `focus` 是窗口才有的动作），
   // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
   // 「窗口在前台就不出声」这条判据两边共用；「有人正看着这条会话」
   // 那条判在远程那一层，因为只有它知道谁在看什么
   const attention = createAttention(windows, relay)
-  // 只在远程开着时才挡休眠：在桌前用的时候机器睡了是你自己走开了，
-  // 而远程那一端一片空白时你完全不知道发生了什么
-  const awake = createAwake(log, awakeWhen ?? (() => false))
+  const awake = createAwake()
+  // **迟绑定**：outlet 比 host 先建，而它要问 host「现在有几条在跑」。
+  // 传函数而不是值，读到的才是当下那一份
+  const holder: { host: Host | undefined } = { host: undefined }
+  const live = (): readonly Thread[] => holder.host?.live() ?? []
 
-  const { emit, ledger } = createOutlet({ sinks, attention, awake, log, seen })
+  const { emit, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
 
   const journal = openJournal(log, emit)
   // 规则和事件分开存：删会话不该把「始终允许」一起删了
@@ -233,16 +240,17 @@ export function attachHost(
     })
   }
 
+  holder.host = host
   installBridgeChannels({ host, log, ledger, report })
 
   return {
     host,
+    awake,
     journal,
     engines: probeEngines(drivers, labels, log),
     lastThreadId: () => seen.thread,
     ledger,
     sinks,
-    awake,
     log,
     report,
   }

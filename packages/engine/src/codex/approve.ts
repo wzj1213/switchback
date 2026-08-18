@@ -142,6 +142,7 @@ export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promis
       tool: toolOf(call.method),
       summary: request.summary ?? toolOf(call.method),
       reason: verdict.reason,
+      ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
       ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
     })
     call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })

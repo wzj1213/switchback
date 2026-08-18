@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises"
-import { app, nativeTheme, type BrowserWindow } from "electron"
+import { nativeTheme, type BrowserWindow } from "electron"
 import type { Trust } from "@omni/protocol"
+import { quitNow } from "./quit.js"
 
 /**
  * 开发期用的自动化钩子，**全部由环境变量开关，默认完全不生效**。
@@ -17,6 +18,7 @@ import type { Trust } from "@omni/protocol"
  * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
  * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
  * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
+ * | `OMNI_DEV_REVIEW` | 过这么多毫秒之后打开审核面板 |
  * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
  * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
  * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
@@ -267,6 +269,15 @@ export function scheduleDevCompare(win: BrowserWindow): void {
   }, at)
 }
 
+/** 到点打开审核面板。同上，走菜单那条通道——验的是「⇧⌘R 真的能开出来」。 */
+export function scheduleDevReview(win: BrowserWindow): void {
+  const at = Number(process.env["OMNI_DEV_REVIEW"] ?? "0")
+  if (!Number.isFinite(at) || at <= 0) return
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.send("omni:menu", "review")
+  }, at)
+}
+
 /** 到点自动接力或分叉。这两个动作只能靠点界面触发，自动化验证需要一个口子。 */
 export function scheduleDevSwitch(
   win: BrowserWindow,
@@ -328,11 +339,11 @@ export function scheduleDevShot(win: BrowserWindow): void {
       .capturePage()
       .then((image) => writeFile(target, image.toPNG()))
       .then(() => {
-        app.quit()
+        quitNow()
       })
       .catch((error: unknown) => {
         console.error("dev shot failed:", error)
-        app.quit()
+        quitNow()
       })
   }, delay)
 }

@@ -1,7 +1,7 @@
 import type { Command, RememberScope, ThreadId } from "@omni/protocol"
 import type { ApprovalAnswer, ApprovalAsk } from "@omni/engine"
 import type { Rule } from "@omni/approval"
-import { setStatus, type Ctx, type Live } from "./ctx.js"
+import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
 
 /**
  * 审批：问人、记住答案、落定。
@@ -12,10 +12,26 @@ import { setStatus, type Ctx, type Live } from "./ctx.js"
 
 const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
 
+const PASSED: ApprovalAnswer = { allow: true, remember: "once" }
+
+/**
+ * 这次要不要直接放行（用户点过「本轮剩下的都放行」）。
+ *
+ * **红线不受它影响。** 那 8 条（凭据读取、越界删除、往工作区外写…）正是最不该
+ * 被一次点击盖掉的；一个能盖掉红线的按钮，等于把档位机制整个绕过去了。
+ * 界面上也照这句话写，免得用户以为点完就再也不会被打断。
+ */
+function passes(entry: Live, ask: ApprovalAsk): boolean {
+  return entry.passTurn !== undefined && entry.passTurn === entry.turn && ask.redline === undefined
+}
+
 export async function askUser(ctx: Ctx, id: ThreadId, ask: ApprovalAsk): Promise<ApprovalAnswer> {
   const entry = ctx.live.get(id)
   // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
   if (entry === undefined || entry.turn === undefined) return DENIED
+  // **不发卡、不改状态**：armed 之后再弹一张「已自动允许」的卡，
+  // 等于把用户刚才想省掉的那些打断又原样还回去。做了什么在工具行里照样看得见
+  if (passes(entry, ask)) return PASSED
   setStatus(ctx, entry, "waiting_approval")
   const itemId = ctx.deps.newId("ap")
   // 记下建议规则：用户勾了记忆之后，要存的是**规则本身**，
@@ -57,6 +73,14 @@ export function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approva
     // 「这一次」和「这轮对话」了
     const hit = entry.gate.resolve(cmd.itemId, { allow: cmd.allow, remember: cmd.remember })
     if (!hit) continue
+    // **只在放行时 arm**：「拒绝并且本轮都放行」不是一个说得通的意图。
+    // 记的是当前轮次 id，下一轮自然失效
+    if (cmd.allow && cmd.passTurn === true) {
+      entry.passTurn = entry.turn
+      // 也写进 thread 发出去：这个状态必须在界面上看得见（见 `Thread.passTurn`）
+      entry.thread = { ...entry.thread, ...(entry.turn === undefined ? {} : { passTurn: entry.turn }) }
+      emit(ctx, { type: "thread.updated", at: ctx.deps.now(), thread: entry.thread })
+    }
     // 只有**放行**才记忆。记住一次拒绝没有意义——下次同样的请求还是该问
     if (cmd.allow && suggest !== undefined) remember(ctx, entry, suggest, cmd.remember)
     return

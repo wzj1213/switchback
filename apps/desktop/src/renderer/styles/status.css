@@ -149,6 +149,16 @@
   cursor: default;
 }
 
+/* 菜单项底下那行小字。**只给会让人误解的那几项加**——
+   每项都配一句副标题的话，菜单就成了一段说明文，人反而不读了 */
+.menu__note {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
 .menu__item:hover {
   background: var(--bg-hover);
 }

@@ -21,8 +21,11 @@ import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings, installSettingsChannel } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
+import { installReviewChannel } from "./workdiff.js"
+import { installSearchChannel } from "./search.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
+import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevReview, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
+import { quitNow, shouldStayOpen } from "./quit.js"
 
 /**
  * Electron 主进程。
@@ -266,6 +269,7 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
   scheduleDevInterrupt(win)
   scheduleDevReload(win)
   scheduleDevCompare(win)
+  scheduleDevReview(win)
   scheduleDevFilter(win)
   scheduleDevOpenSelect(win)
   scheduleDevRowMenu(win)
@@ -319,7 +323,7 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
  */
 function claimSingleInstance(): boolean {
   if (app.requestSingleInstanceLock()) return true
-  app.quit()
+  quitNow()
   return false
 }
 
@@ -331,19 +335,32 @@ if (!claimSingleInstance()) {
   void bootstrap()
 }
 
+/**
+ * 渲染层要用、而只有主进程做得到的那些通道，一次挂完。
+ *
+ * 挂在一处不是整洁癖：**漏挂一条不会报错**，只会让界面上某个按钮点了没反应，
+ * 而这类沉默的失效最难查。挤在 `bootstrap` 里时它们混在窗口生命周期中间，
+ * 加第十条的时候没人看得出这一段是同一类事。
+ */
+function installChannels(): void {
+  installSettingsChannel(settings)
+  installAppChannels()
+  installWorksiteChannel()
+  installReviewChannel()
+  installSearchChannel()
+  installChatDirChannel()
+  installAttachChannel()
+  installProjectDocChannel()
+  installEngineVersionChannel(log)
+  installSelfUpdateChannel(log)
+}
+
 function bootstrap(): Promise<void> {
   return app.whenReady().then(async () => {
     // **第一件事**：把 PATH 补成登录 shell 那一份。探测引擎、spawn 引擎都要用，
     // 而从 Dock 启动时它默认只有 `/usr/bin:/bin:/usr/sbin:/sbin`
     await fixPath(log)
-    installSettingsChannel(settings)
-    installAppChannels()
-    installWorksiteChannel()
-    installChatDirChannel()
-    installAttachChannel()
-    installProjectDocChannel()
-    installEngineVersionChannel(log)
-    installSelfUpdateChannel(log)
+    installChannels()
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     installMenu(
@@ -368,7 +385,6 @@ function bootstrap(): Promise<void> {
       relay: (id, title, body) => {
         relay.notify?.(id, title, body)
       },
-      awakeWhen: () => settings.get().remote.enabled,
     })
     const remote = attachRemote(attached, sinks)
     relay.notify = remote.relay.notify
@@ -398,8 +414,14 @@ function bootstrap(): Promise<void> {
     let quitting = false
     app.on("before-quit", (event) => {
       if (quitting) return
-      quitting = true
+      // **先拦下来再问**：`preventDefault` 必须在这一拍同步调用，
+      // 弹框是同步的所以顺序上没问题
       event.preventDefault()
+      // **`quitting` 要在问完之后才置。** 置早了、人又点了「取消」，
+      // 这个标志就永久地把确认框关掉了——第二次 ⌘Q 直接杀，
+      // 而那正是这个框想拦住的事
+      if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined)) return
+      quitting = true
       const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))
       void Promise.race([shutdown(attached, log, remote.close), deadline]).then(() => {
         clearMarker()
@@ -416,7 +438,9 @@ function bootstrap(): Promise<void> {
  * 审批落定），那些也要落盘。
  */
 async function shutdown(attached: Attached, logger: Logger, closeRemote: () => Promise<void>): Promise<void> {
-  // **引擎先回收，远程后关。**
+  // 电源断言先放开：进程马上就没了，但留一个没停的断言给系统是脏活。
+  //
+  // **然后是引擎先回收、远程后关。**
   //
   // 反过来（先 await closeRemote）曾经是这里的写法，而它的上界由第三方库和
   // 网络共同决定：一条正在往隧道里推前端产物、对端却卡在电梯里的连接，
@@ -451,5 +475,8 @@ app.on("second-instance", () => {
 })
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit()
+  // **这条路不问。** 非 mac 上关掉最后一扇窗就是退出，而这时已经没有窗口了：
+  // 弹出来的框要是被点了「取消」，应用就变成一个没有窗、没有托盘图标、
+  // 只能去任务管理器里找的东西——那比静默退出更难收场
+  if (process.platform !== "darwin") quitNow()
 })

@@ -37,6 +37,8 @@ export function useWorkspaceActions(deps: {
   onCreating: () => void
   onFind: () => void
   onCompare: () => void
+  /** 打开审核面板。 */
+  onReview: () => void
   onFilterThreads: () => void
   onSettings: () => void
   /**
@@ -111,6 +113,7 @@ export function useWorkspaceActions(deps: {
       },
       find: deps.onFind,
       compare: deps.onCompare,
+      review: deps.onReview,
       settings: deps.onSettings,
       filterThreads: deps.onFilterThreads,
       copyMarkdown: () => {

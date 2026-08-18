@@ -1,4 +1,5 @@
 import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOptions } from "electron"
+import { quitNow } from "./quit.js"
 
 /**
  * 菜单里那些**只有渲染层做得到**的动作。
@@ -6,7 +7,16 @@ import { BrowserWindow, Menu, app, type BaseWindow, type MenuItemConstructorOpti
  * 新建会话、打开文件夹这些要落到当前选中的会话上下文里，主进程不知道那是什么。
  * 所以菜单只发一个意图，怎么做由渲染层决定。
  */
-export type MenuAction = "new-thread" | "open-folder" | "interrupt" | "find" | "copy-markdown" | "compare" | "filter-threads" | "settings"
+export type MenuAction =
+  | "new-thread"
+  | "open-folder"
+  | "interrupt"
+  | "find"
+  | "copy-markdown"
+  | "compare"
+  | "review"
+  | "filter-threads"
+  | "settings"
 
 const isMac = process.platform === "darwin"
 
@@ -102,6 +112,15 @@ function threadMenu(): MenuItemConstructorOptions {
         },
       },
       {
+        // 和「对比分叉」一样：主进程不知道当前选中的是谁，所以菜单项没法按状态禁用。
+        // 不是仓库时点它会开出一块面板，上面照实说「这个工作区不是 git 仓库」
+        label: "审核改动",
+        accelerator: "Shift+CmdOrCtrl+R",
+        click: (_i, focused) => {
+          send("review", focused)
+        },
+      },
+      {
         label: "中断当前轮次",
         accelerator: "CmdOrCtrl+.",
         click: (_i, focused) => {
@@ -171,5 +190,6 @@ export function installMenu(
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   // 非 mac 上没有 appMenu 角色，退出项挂在「文件」里，这里不再重复
-  if (!isMac) app.on("window-all-closed", () => app.quit())
+  // 不问确认，理由和 `index.ts` 里那条同名处理器一样：这时已经没有窗口可以取消回去了
+  if (!isMac) app.on("window-all-closed", () => { quitNow() })
 }
