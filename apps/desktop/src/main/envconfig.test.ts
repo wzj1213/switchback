@@ -161,8 +161,15 @@ describe("环境配置", () => {
     )
     const env = await ask(state.cwd)
     const grok = env.sources.filter((s) => s.engine === "grok")
-    // 管理员那份没有、项目 config.toml 没有，但两者都要占位摆出来
-    expect(grok.map((s) => s.scope)).toEqual(["managed", "user", "project", "project"])
+    // 管理员那份没有、项目 config.toml 没有，但两者都要占位摆出来；
+    // 钩子文件目录家目录/项目各占一条（家目录那条这里是空占位）
+    expect(grok.map((s) => `${s.scope}:${s.path.replace(state.grok, "~").replace(state.cwd, ".")}`)).toEqual([
+      "managed:~/managed_config.toml",
+      "user:~/config.toml",
+      "user:~/hooks",
+      "project:./.grok/config.toml",
+      "project:./.grok/hooks/audit.json",
+    ])
     expect(grok.find((s) => s.scope === "user")?.hooks).toEqual([
       { event: "PreToolUse", command: "/opt/guard.sh", matcher: "Bash" },
     ])
@@ -171,6 +178,17 @@ describe("环境配置", () => {
     ])
     // 这家不标信任：那份记录 omni 读不到，标了就是编
     expect(grok.every((s) => s.hooks.every((h) => h.trust === undefined))).toBe(true)
+  })
+
+  it("Grok 的钩子文件家目录那份也要读——只找项目里那份会整条漏掉", async () => {
+    write(
+      join(state.grok, "hooks", "audit.json"),
+      JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: "./audit.sh" }] }] } }),
+    )
+    const env = await ask(state.cwd)
+    const found = env.sources.find((s) => s.engine === "grok" && s.path.endsWith("hooks/audit.json"))
+    expect(found?.scope).toBe("user")
+    expect(found?.hooks).toEqual([{ event: "Stop", command: "./audit.sh" }])
   })
 
   it("Grok 的钩子文件也可以整份就是那张表（不包 hooks 那一层）", async () => {

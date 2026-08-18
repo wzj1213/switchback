@@ -132,7 +132,12 @@ export async function grokSources(cwd: string | undefined, log: Logger): Promise
       ...(read.error === undefined ? {} : { error: read.error }),
     })
   }
-  if (cwd !== undefined) out.push(...(await grokHookFiles(join(cwd, ".grok", "hooks"))))
+  // 钩子文件目录**两头都有**：家目录那份和项目那份。
+  // grok 自己的文档只写了项目级，但实测家目录里就躺着一个（别的工具装进去的），
+  // 而它显然是生效的——**照读**。只在项目级找的话，除非你恰好在家目录里开会话，
+  // 那条钩子在这一页上根本不存在
+  out.push(...(await grokHookFiles(join(home, "hooks"), "user")))
+  if (cwd !== undefined) out.push(...(await grokHookFiles(join(cwd, ".grok", "hooks"), "project")))
   return out
 }
 
@@ -142,17 +147,17 @@ export async function grokSources(cwd: string | undefined, log: Logger): Promise
  * 目录不在（或者一个 json 都没有）时回一条空的占位——「这儿可以放」本身是信息，
  * 而这是 grok 官方文档里给的那个位置。
  */
-async function grokHookFiles(dir: string): Promise<readonly HookSource[]> {
+async function grokHookFiles(dir: string, scope: HookScope): Promise<readonly HookSource[]> {
   const names = await readdir(dir).catch(() => undefined)
   const files = (names ?? []).filter((n) => n.endsWith(".json")).sort()
-  if (files.length === 0) return [{ engine: "grok", scope: "project", path: dir, exists: false, hooks: [] }]
+  if (files.length === 0) return [{ engine: "grok", scope, path: dir, exists: false, hooks: [] }]
   const out: HookSource[] = []
   for (const name of files) {
     const path = join(dir, name)
     const read = await readJson(path)
     out.push({
       engine: "grok",
-      scope: "project",
+      scope,
       path,
       exists: read.exists,
       // 钩子文件既可能整份就是那张表，也可能包一层 `hooks`——两种都收
