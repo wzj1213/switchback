@@ -317,10 +317,22 @@ export function capabilitiesOf(info: AcpInitialize | undefined, modeReadback = f
   const agent = info?.agentCapabilities
   const session = agent?.sessionCapabilities ?? {}
   return {
-    // ACP 没有压缩上下文的方法（实测 kimi：`session/compact` → Method not found）
+    // **这两位是「omni 还没接」，不是「ACP 没有」。** 分清楚很重要：
+    // 前者该有人来修，后者只能换引擎。
+    //
+    // 上一版的注释写着「ACP 没有压缩上下文的方法（实测 kimi → Method not found）」——
+    // **一家的实测被写成了全家族的结论**。实测 zcode 的桥
+    //（`zcode-acp-server/dist/index.js`）`session/compact` 与 `session/steer`
+    // **两个都实现了**，README 还写明自动压缩就是调前者。
+    //
+    // 那为什么现在仍然报 false？因为 `acp/driver.ts` **这两个方法一个都没实现**——
+    // 翻成 true 就是给一个点了没反应的入口，比不给更糟。要修得三样一起：
+    // 驱动实现这两个方法、按引擎注入谁支持（`AcpDriverConfig`，形状照 `modeReadback`）、
+    // 以及给 `engines.json` 进来的第三方引擎一条递补充项的路（那条现在还没有）。
     compact: false,
     attachments: agent?.promptCapabilities?.image === true,
-    // ACP 没有「往正在跑的那一轮里插一句」的入口
+    // 同上：zcode 的桥有 `session/steer`，grok 有它自己的插话通道。
+    // 驱动没实现，所以照旧 false——**不给入口，而不是给一个假的**
     steer: false,
     fork: "fork" in session,
     // **协议里没有「我会不会报档位变化」这种声明**，推不出来，只能由各家自己说
