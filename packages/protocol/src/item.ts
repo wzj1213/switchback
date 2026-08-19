@@ -103,6 +103,14 @@ export interface PlanStep {
 export interface PlanItem extends ItemBase {
   kind: "plan"
   steps: readonly PlanStep[]
+  /**
+   * 引擎给这次计划更新写的一句话理由。**只有报了才有**——
+   * 目前实测只有 codex 会带（`turn/plan/updated` 的 `explanation`），
+   * ACP 那一路和 claude 的待办工具都没有这个概念。
+   *
+   * 各家能报的东西本来就不一样，omni 不替没报的那几家编一句。
+   */
+  explanation?: string
 }
 
 export type ApprovalStatus = "pending" | "allowed" | "denied"

@@ -197,3 +197,26 @@ export interface WireMcpStatus {
   error?: unknown
   failureReason?: unknown
 }
+
+/**
+ * `turn/plan/updated` 推上来的形状。**每次都是整份快照**，不是增量——
+ * 所以翻译端直接整份替换，不用维护「第几条改了」。
+ *
+ * ## status 的大小写有两份，别拿错
+ *
+ * 同一个枚举在 codex 仓库里序列化了两遍：
+ *
+ * - `codex-rs/protocol/src/plan_tool.rs` 的 `StepStatus` 是 **snake_case**（`in_progress`）
+ * - `codex-rs/app-server-protocol/.../v2/turn.rs` 的 `TurnPlanStepStatus` 是
+ *   **camelCase**（`inProgress`）——`#[serde(rename_all = "camelCase")]`
+ *
+ * 线上这条走的是 **v2 那份**，所以是 `inProgress`。这正是之前 `SandboxPolicy`
+ * 咬过一次的同一个坑（同名类型在一个仓库里存在多份）。两种都认是因为**证据摆着**
+ * 有两份序列化，不是因为猜——猜的话就该只写实测到的那一种。
+ */
+export interface WirePlanUpdate {
+  threadId?: string
+  turnId?: string
+  explanation?: string | null
+  plan?: readonly { step?: string; status?: string }[]
+}

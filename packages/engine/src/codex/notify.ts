@@ -1,7 +1,8 @@
 import type { Event, ItemId, RateLimits, RateWindow, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
 import { readSettings, type CodexSettings } from "./settings.js"
-import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireMcpStatus, WireRateLimits, WireRateWindow, WireTokenUsage, WireTurnLifecycle } from "./wire.js"
+import { onPlanUpdate } from "./plan.js"
+import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireMcpStatus, WirePlanUpdate, WireRateLimits, WireRateWindow, WireTokenUsage, WireTurnLifecycle } from "./wire.js"
 
 /**
  * codex 通知 → omni 事件。
@@ -260,6 +261,10 @@ const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) =>
   // **codex 唯一会主动说「我现在是什么档」的通知**，藏在实验面后面（见 `claims.ts`）
   "thread/settings/updated": (ctx, p) => {
     ctx.onSettings?.(readSettings(p))
+  },
+  // 整份计划快照。这条**没有**实验面，见 `plan.ts`
+  "turn/plan/updated": (ctx, p) => {
+    onPlanUpdate(ctx, p as WirePlanUpdate)
   },
 }
 

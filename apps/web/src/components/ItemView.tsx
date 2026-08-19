@@ -67,13 +67,17 @@ export const ItemView = memo(function ItemView({
   if (item.kind === "approval") return <Approval item={item} send={send} offline={offline} />
   if (item.kind === "plan") {
     return (
-      <ol className="item item--plan">
-        {item.steps.map((step, i) => (
-          <li key={`${String(i)}-${step.text}`} data-status={step.status}>
-            {step.text}
-          </li>
-        ))}
-      </ol>
+      <div className="item">
+        {/* 引擎自己写的一句理由，报了才有（目前只有 codex 报） */}
+        {item.explanation === undefined ? null : <p className="plan__note">{item.explanation}</p>}
+        <ol className="item--plan">
+          {item.steps.map((step, i) => (
+            <li key={`${String(i)}-${step.text}`} data-status={step.status}>
+              {step.text}
+            </li>
+          ))}
+        </ol>
+      </div>
     )
   }
   return (

@@ -6,7 +6,13 @@ import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
 
-function Plan({ steps }: { steps: readonly { text: string; status: string }[] }): React.JSX.Element {
+function Plan({
+  steps,
+  explanation,
+}: {
+  steps: readonly { text: string; status: string }[]
+  explanation?: string
+}): React.JSX.Element {
   const mark: Record<string, string> = {
     done: "✓",
     in_progress: "→",
@@ -17,6 +23,8 @@ function Plan({ steps }: { steps: readonly { text: string; status: string }[] })
     <div className="run">
       <div className="step">
         <span className="step__verb">计划</span>
+        {/* 引擎自己写的一句理由。没报就没有——不替它编（目前只有 codex 报） */}
+        {explanation === undefined ? null : <span className="step__note">{explanation}</span>}
       </div>
       <pre className="step__out">
         {steps.map((s) => `${mark[s.status] ?? "·"} ${s.text}`).join("\n")}
@@ -73,7 +81,7 @@ export const ItemView = memo(function ItemView({
     case "reasoning":
       return <Reasoning text={item.text} running={!item.complete} />
     case "plan":
-      return <Plan steps={item.steps} />
+      return <Plan steps={item.steps} explanation={item.explanation} />
     case "approval":
       return <Approval item={item} onResolve={onResolve} />
     // **可恢复的错误不画成红框。** 实测 codex 断线重连会连发十条

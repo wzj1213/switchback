@@ -1011,6 +1011,13 @@ textarea {
 
 /* ── 计划 ────────────────────────────────────────────── */
 
+/* 计划前面那一句引擎写的理由。弱色小字——旁注，不跟步骤抢注意力 */
+.plan__note {
+  margin: 0 0 var(--sp-1);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
 .item--plan {
   margin: 0;
   padding-left: 1.4em;

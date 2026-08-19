@@ -147,6 +147,20 @@
   color: var(--text-muted);
 }
 
+/* 计划卡上那一句引擎自己写的理由。跟「计划」二字同一行，
+   压成弱色小字——它是旁注，不该跟下面的步骤抢注意力。
+   会很长，所以单行截断，不让它把标题行撑成一段 */
+.step__note {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--sp-2);
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .step__out {
   margin: 2px 0 var(--sp-2);
   margin-left: var(--step-slot);
