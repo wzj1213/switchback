@@ -1,7 +1,8 @@
 import type { Command, EngineInfo, Thread } from "@omni/protocol"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import { Composer, TRUSTS, labelOf } from "./Composer.js"
-import { trustHint } from "../trustHint.js"
+import { trustBlind, trustHint } from "../trustHint.js"
+import { Asides } from "./Asides.js"
 import type { OmniAction } from "../omniCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 
@@ -78,6 +79,16 @@ export function WorkspaceComposer({
        * 用 `nextEngine ?? engine` 与下拉保持一致：有待切换的引擎时，两个控件说的得是同一家。
        */
       hint={trustHint(thread, labelOf(props.engines, thread.nextEngine ?? thread.engine), labelOf(TRUSTS, thread.trust))}
+      blind={trustBlind(thread, labelOf(props.engines, thread.nextEngine ?? thread.engine))}
+      /* 侧问和引擎/档位/模型是同一类东西——「这条会话能怎么用」，所以摆在同一排 */
+      aside={
+        <Asides
+          thread={thread}
+          onAsk={(text) => {
+            send({ type: "thread.sideQuestion", threadId: thread.id, text })
+          }}
+        />
+      }
       /*
        * 有待切换的引擎时，模型选择器变成**一句点不动的说明**（「切到 Codex 后可选」）。
        * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常根本不存在，

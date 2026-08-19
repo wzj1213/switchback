@@ -463,15 +463,21 @@
  * 放在那一排里而不是另起一行：它说的就是旁边那个下拉的事，
  * 隔开的话读的人要自己把两者连起来。
  */
+/** 整排 + 它下面那行说明。说明自己一行，不挤在两个选择器中间。 */
+.composer__barwrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
 .composer__hint {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--text-muted);
 }
 
@@ -1094,6 +1100,7 @@
  * 侧问。**能力位报 false 时整个不存在**，所以这里不写「禁用」态——
  * 没有那个状态。
  */
+/** 侧问：和引擎/档位/模型同一排，同一种视觉重量——它们回答的是同一个问题。 */
 .composer__aside {
   flex: none;
   border: 1px solid var(--border);

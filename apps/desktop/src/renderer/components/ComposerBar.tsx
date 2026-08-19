@@ -34,6 +34,45 @@ function Hint({ hint, onReapply }: { hint?: TrustHint; onReapply: () => void }):
   )
 }
 
+/**
+ * 信任档选择器。
+ *
+ * 单拎出来不只是行数：**「这家不报自己的档」那句话挂在它的悬停上**，
+ * 而那是一句永不改变的静态说明（claude 的 `modeReadback` 恒为 false）。
+ * 上一版把它常驻在输入区那一排里，等于每条 claude 会话上永久挂一行噪音，
+ * 还把模型选择器顶到了一边。**该主动说的是「此刻发生了什么」，
+ * 「这家引擎是什么样」放在你去看它的时候说。**
+ */
+function TrustSelect({
+  trust,
+  blind,
+  disabled,
+  onPick,
+}: {
+  trust: Trust
+  blind?: string
+  disabled: boolean
+  onPick: (next: Trust) => void
+}): React.JSX.Element {
+  return (
+    <Select
+      label={labelOf(TRUSTS, trust)}
+      icon={<ShieldIcon />}
+      title={blind ?? "信任档"}
+      disabled={disabled}
+      sections={[
+        {
+          value: trust,
+          onPick: (id) => {
+            onPick(id as Trust)
+          },
+          choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
+        },
+      ]}
+    />
+  )
+}
+
 export function Bar({
   detached,
   busy,
@@ -43,6 +82,8 @@ export function Bar({
   engines,
   trust,
   hint,
+  blind,
+  aside,
   models,
   model,
   effort,
@@ -63,6 +104,10 @@ export function Bar({
   engines: readonly EngineInfo[]
   trust: Trust
   hint?: TrustHint
+  /** 「这家不会把自己改的档告诉 omni」那句。**挂在档位选择器的悬停上，不常驻。** */
+  blind?: string
+  /** 侧问入口。由上层给，`Bar` 只负责摆在哪儿。 */
+  aside?: React.ReactNode
   models: readonly ModelOption[]
   model?: string
   effort?: string
@@ -77,7 +122,8 @@ export function Bar({
   onSend: () => void
 }): React.JSX.Element {
   return (
-  <div className="composer__bar">
+  <div className="composer__barwrap">
+          <div className="composer__bar">
             <Select
               label={labelOf(engines, engine)}
               icon={<EngineIcon />}
@@ -98,22 +144,7 @@ export function Bar({
                 },
               ]}
             />
-            <Select
-              label={labelOf(TRUSTS, trust)}
-              icon={<ShieldIcon />}
-              title="信任档"
-              disabled={detached}
-              sections={[
-                {
-                  value: trust,
-                  onPick: (id) => {
-                    onTrustChange(id as Trust)
-                  },
-                  choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
-                },
-              ]}
-            />
-            <Hint hint={hint} onReapply={() => { onTrustChange(trust) }} />
+            <TrustSelect trust={trust} blind={blind} disabled={detached} onPick={onTrustChange} />
             <ModelPicker
               models={models}
               model={model}
@@ -122,6 +153,7 @@ export function Bar({
               pending={pending}
               onChange={onModelChange}
             />
+            {aside}
             <span style={{ flex: 1 }} />
             <Action
               detached={detached}
@@ -133,5 +165,13 @@ export function Bar({
               onSend={onSend}
             />
           </div>
+          {/* **自己一行**：挤在两个选择器中间时它把模型选择器顶到一边，而且被截断 */}
+          <Hint
+            hint={hint}
+            onReapply={() => {
+              onTrustChange(trust)
+            }}
+          />
+        </div>
   )
 }

@@ -12,11 +12,14 @@ import type { Thread } from "@omni/protocol"
  *
  * ## 为什么是纯函数
  *
- * 这四种情形的措辞是这批的核心产出，每一句都在回答「用户看到之后该干什么」。
- * 放在组件里就只能靠肉眼 review；单拎出来，一张 case 表就能把四种都钉住。
+ * 这三种情形的措辞是这批的核心产出，每一句都在回答「用户看到之后该干什么」。
+ * 放在组件里就只能靠肉眼 review；单拎出来，一张 case 表就能把三种都钉住。
+ *
+ * **「这家根本不报」不在这里**，它描述的是引擎是什么样、不是此刻发生了什么，
+ * 而且永不改变——见文末的 `trustBlind`。
  */
 export interface TrustHint {
-  kind: "diverged" | "fixed" | "unmapped" | "blind"
+  kind: "diverged" | "fixed" | "unmapped"
   text: string
   /** 有动作可做时给一个。没有动作就别给按钮——一个点了没用的按钮比没有更糟。 */
   action?: { label: string; kind: "reapply" }
@@ -53,14 +56,6 @@ function applyHint(thread: Thread, engineLabel: string): TrustHint | undefined {
   if (apply?.result === "unmapped") {
     return { kind: "unmapped", text: apply.detail ?? `这一档在 ${engineLabel} 上只在 omni 本机判定层生效。` }
   }
-  // **读不回来**和「读得回来、现在恰好对齐」必须分得开，否则界面上长得一模一样。
-  // 只在引擎从没报过任何一维时说这句：报过就说明它会报，那就以观测值为准
-  if (thread.capabilities?.modeReadback === false && thread.engineState === undefined) {
-    return {
-      kind: "blind",
-      text: `${engineLabel} 不会把它自己改的档位告诉 omni；这里显示的是 omni 让它去的那一档。`,
-    }
-  }
   return undefined
 }
 
@@ -71,4 +66,23 @@ function applyHint(thread: Thread, engineLabel: string): TrustHint | undefined {
  */
 export function trustHint(thread: Thread, engineLabel: string, trustLabel: string): TrustHint | undefined {
   return divergedHint(thread, engineLabel, trustLabel) ?? applyHint(thread, engineLabel)
+}
+
+/**
+ * 「这家不会把它自己改的档位告诉 omni」那句话。
+ *
+ * ## 为什么它不进 `trustHint`
+ *
+ * 因为它**永不改变**：claude 的 `modeReadback` 恒为 false，于是这句话会在每一条
+ * claude 会话上常驻。一句永远不变的静态说明不是提示，是噪音——而它占的还是输入区
+ * 最显眼的那块地方。
+ *
+ * 上一版把它和「分家 / 设不上」并列成第四种 hint，是判错了：那三种描述的是
+ * **此刻发生了什么**，这一种描述的是**这家引擎是什么样**。前者该主动说，
+ * 后者该在你去看档位时能查到——所以它挂在档位选择器的悬停上。
+ */
+export function trustBlind(thread: Thread, engineLabel: string): string | undefined {
+  if (thread.capabilities?.modeReadback !== false) return undefined
+  if (thread.engineState !== undefined) return undefined
+  return `${engineLabel} 不会把它自己改的档位告诉 omni；这里显示的是 omni 让它去的那一档。`
 }

@@ -30,6 +30,10 @@ export function Asides({
   // **能力位报 false 就整个不存在**，不是给一个灰的：
   // 这是「给不给入口」那一类，不是「这条信息可信到什么程度」那一类
   if (thread.capabilities?.sideQuestion !== true) return null
+  // **还没说过一句话的会话上不给这个入口**：侧问的定义是「不打断主线」，
+  // 而这时根本没有主线——那一屏还写着「在 xxx 里做点什么？」。
+  // `provisional` 正是「发出第一句话之前」（见 `Thread.provisional`）
+  if (thread.provisional === true) return null
   const asides = thread.asides ?? []
   const submit = (): void => {
     const trimmed = text.trim()

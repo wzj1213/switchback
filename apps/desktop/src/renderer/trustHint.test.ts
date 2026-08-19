@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { EngineAxis, Thread, TrustApply } from "@omni/protocol"
-import { trustHint } from "./trustHint.js"
+import { trustBlind, trustHint } from "./trustHint.js"
 
 const BASE = {
   id: "t1",
@@ -38,11 +38,6 @@ describe("档位说明：四种情形各说一句，其余一个字都不说", (
     ],
     ["开会话时定死的，说清楚要重开一条", with_({ trustApply: apply("fixed", "定死了") }), "fixed"],
     ["匹配不上，说清楚只在本机生效", with_({ trustApply: apply("unmapped", "对不上") }), "unmapped"],
-    [
-      "**读不回来**要和「读得回来、恰好对齐」分开",
-      with_({ capabilities: { modeReadback: false } as never }),
-      "blind",
-    ],
   ]
 
   for (const [name, thread, kind] of CASES) {
@@ -90,11 +85,32 @@ describe("档位说明：四种情形各说一句，其余一个字都不说", (
     expect(trustHint(with_({ trustApply: apply("unmapped") }), "G", "自动编辑")?.action).toBeUndefined()
   })
 
-  it("引擎报过状态之后就不再说「读不回来」——它显然会报", () => {
+  /**
+   * 「这家根本不报」**不进 hint**：它描述的是引擎是什么样、不是此刻发生了什么，
+   * 而且永不改变（claude 恒为 false）。常驻就是每条会话上永久挂一行噪音。
+   */
+  it("读不回来那句不再是常驻提示", () => {
+    expect(trustHint(with_({ capabilities: { modeReadback: false } as never }), "G", "自动编辑")).toBeUndefined()
+  })
+})
+
+describe("「这家不报自己的档」那句话", () => {
+  it("这家不报时给得出来——挂在档位选择器的悬停上", () => {
+    expect(trustBlind(with_({ capabilities: { modeReadback: false } as never }), "Claude Code")).toContain(
+      "Claude Code",
+    )
+  })
+
+  it("这家会报就不说", () => {
+    expect(trustBlind(with_({ capabilities: { modeReadback: true } as never }), "Grok")).toBeUndefined()
+    expect(trustBlind(with_({}), "Grok")).toBeUndefined()
+  })
+
+  it("**引擎报过状态之后就不再说**——它显然会报，说了就是自相矛盾", () => {
     const thread = with_({
       capabilities: { modeReadback: false } as never,
       engineState: { axes: [axis("aligned")], at: 1 },
     })
-    expect(trustHint(thread, "G", "自动编辑")).toBeUndefined()
+    expect(trustBlind(thread, "G")).toBeUndefined()
   })
 })

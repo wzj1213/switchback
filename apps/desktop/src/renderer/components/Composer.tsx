@@ -39,6 +39,10 @@ const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
 interface Props {
   /** 档位下面那行说明。**内容由 `trustHint` 算，这一层只往下递、不解释。** */
   hint?: TrustHint
+  /** 「这家不报自己的档」那句，挂在档位选择器的悬停上。 */
+  blind?: string
+  /** 侧问入口。这一层只往下递。 */
+  aside?: React.ReactNode
   /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
   detached?: boolean
   /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
@@ -148,6 +152,8 @@ export function Composer({
   onEngineChange,
   onTrustChange,
   hint,
+  blind,
+  aside,
   onSend,
   onResume,
   models,
@@ -234,6 +240,8 @@ export function Composer({
           onEngineChange={onEngineChange}
           onTrustChange={onTrustChange}
           hint={hint}
+          blind={blind}
+          aside={aside}
           onModelChange={onModelChange}
           onResume={onResume}
           onInterrupt={onInterrupt}
