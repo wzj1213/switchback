@@ -9,6 +9,8 @@ import { sessionsOf, type Catalog } from "./setup.js"
 import type { AcpDriverConfig } from "./caps.js"
 import { adoptCatalog, startSession, type OpenState, type StartCtx } from "./open.js"
 import { applyTrust, modeAxis, warnNativeFixed, type TrustCtx } from "./mode.js"
+import { createTerminalHost, type TerminalHost } from "./terminal.js"
+import { answerCall } from "./serve.js"
 import {
   cancelTurn,
   compactSession,
@@ -18,7 +20,7 @@ import {
   type EndCtx,
 } from "./turn.js"
 import { applyModel, type ModelCtx } from "./model.js"
-import { handlePermission } from "./permission.js"
+import type { PermissionContext } from "./permission.js"
 import { imageBlocks } from "./attach.js"
 import { closeText, createUpdateState, handleUpdate, type UpdateContext, type UpdateState } from "./update.js"
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
@@ -31,15 +33,24 @@ import { mine, onForeign } from "./route.js"
  * ## 客户端能力：什么都不认领，这是有意的
  *
  * ACP 允许客户端认领 `fs/*`（代 agent 读写文件）和 `terminal/*`（代 agent 开终端）。
- * omni 一个都不认领：
  *
- * - `fs` 的用处是让 agent 看见编辑器里**没存盘的缓冲区**。omni 没有编辑器，
- *   认领了只是把 agent 自己就能做的事绕一圈回到我们这儿，还多一份出错的可能。
- * - `terminal` 认领了就等于「命令跑在 omni 进程里」，这和「引擎跑自己的原生进程、
- *   用自己的沙箱」这个产品前提直接冲突——那层 OS 沙箱正是判定错了之后的兜底。
+ * - `fs` **一律不认领**。它的用处是让 agent 看见编辑器里**没存盘的缓冲区**。
+ *   omni 没有编辑器，认领了只是把 agent 自己就能做的事绕一圈回到我们这儿。
+ * - `terminal` **按引擎注入**（`AcpDriverConfig.terminal`），默认不认领。
  *
- * 实测确认这不影响拿输出：不认领 `terminal` 时 codex-acp 照样自己跑命令，
- * 输出从 `rawOutput.formatted_output` 回来（见 `translate.ts` 的 `execDetail`）。
+ * ## `terminal` 这一位曾经写死成 false，那是个 bug
+ *
+ * 原来的注释写着「实测确认这不影响拿输出：不认领 `terminal` 时 **codex-acp**
+ * 照样自己跑命令」——那句话对 codex-acp 成立，**对 kimi 不成立**。
+ * 一家的实测被写成了全家族的结论（和 `compact` 那次一模一样的错误形状）。
+ *
+ * kimi 的 ACP 运行时把起进程整个交给客户端，**没有本地兜底**：不认领它一条命令都跑不了，
+ * 而表现是**静默的能力损失**——照样读写文件、看起来一切正常，只是测试、构建、git 全废。
+ * A/B 实测与修法见 `terminal.ts`，哨兵在 `kimi-shell.live.test.ts`。
+ *
+ * 拒绝认领的原本理由（「命令跑在 omni 进程里，和引擎自己的沙箱冲突」）对**有**沙箱的
+ * 那几家仍然成立，所以它们维持 false；对 kimi 不成立，因为它根本没有那层沙箱——
+ * 真实的取舍是「omni 的进程 vs 完全没有 shell」。
  *
  * ## 同一个代价：审批的可见性由 agent 决定
  *
@@ -70,6 +81,8 @@ class AcpSession implements EngineSession {
   private readonly inflight = new Map<string, AcpToolCall>()
   private readonly updates: UpdateState = createUpdateState()
   private readonly trust: { current: Trust }
+  /** 认领了 `terminal/*` 才有。**没认领就是 undefined**，请求照旧回 -32601。 */
+  private readonly terminal: TerminalHost | undefined
   private readonly state: SessionState
   private seq = 0
 
@@ -78,6 +91,7 @@ class AcpSession implements EngineSession {
     private readonly config: AcpDriverConfig,
   ) {
     this.trust = { current: req.trust }
+    this.terminal = config.terminal === true ? createTerminalHost(req.cwd) : undefined
     this.owner = createProcessOwner(config.reclaim)
     this.state = {
       child: undefined,
@@ -244,22 +258,19 @@ class AcpSession implements EngineSession {
    * 说明对方没看能力表。回一个空对象会让它以为办成了，回错误码它才知道没有。
    */
   private async answer(call: ServerCall): Promise<void> {
-    if (call.method !== "session/request_permission") {
-      call.respond({ error: { code: -32601, message: `omni 未认领 ${call.method}` } })
-      return
+    await answerCall({ terminal: this.terminal, permission: () => this.permissionCtx() }, call)
+  }
+
+  private permissionCtx(): PermissionContext {
+    return {
+      engine: this.config.id,
+      cwd: this.req.cwd,
+      home: this.req.home,
+      trust: () => this.trust.current,
+      memory: this.req.memory,
+      inflight: this.inflight,
+      askUser: this.req.askUser,
     }
-    await handlePermission(
-      {
-        engine: this.config.id,
-        cwd: this.req.cwd,
-        home: this.req.home,
-        trust: () => this.trust.current,
-        memory: this.req.memory,
-        inflight: this.inflight,
-        askUser: this.req.askUser,
-      },
-      call,
-    )
   }
 
   get threadId(): StartRequest["threadId"] {
@@ -395,6 +406,9 @@ class AcpSession implements EngineSession {
   async dispose(): Promise<void> {
     // 有在途文本就先收口，否则最后一条消息会永远停在「正在输入」
     closeText(this.updateContext(), this.updates)
+    // **替 agent 起的那些进程要一起收掉**：它们的父进程是 omni，不是引擎，
+    // 所以引擎那边的回收管不着它们——不杀就会活过整个应用
+    this.terminal?.disposeAll()
     this.state.child?.stdin?.end()
     this.rpc.close("会话正在关闭")
     const report = await this.owner.reclaim()

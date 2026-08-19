@@ -73,6 +73,14 @@ export interface AcpDriverConfig {
   compact?: boolean
   steer?: boolean
   /**
+   * 认不认领 `terminal/*`（替 agent 起进程）。
+   *
+   * **只给真需要的那家开。** kimi 的 ACP 运行时没有本地兜底，不认领它一条命令都跑不了
+   *（实测，见 `terminal.ts`）；而 codex-acp / grok / zcode 自己起进程，
+   * 认领了反而是把命令从**它们自己的沙箱里拽出来**——那层沙箱正是判定错了之后的兜底。
+   */
+  terminal?: boolean
+  /**
    * 这家用**私有通知**报「模型 / 强度换了」时，怎么把它认出来。
    *
    * 和 `contextUsed` 同一条路、同一个理由：协议里没有这件事，各家各报各的，

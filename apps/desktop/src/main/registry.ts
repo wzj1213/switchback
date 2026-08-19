@@ -50,7 +50,17 @@ export function buildRegistry(
     drivers: {
       claude: createClaudeDriver(),
       codex: createCodexDriver(),
-      kimi: createAcpDriver({ id: "kimi", command: "kimi", args: ["acp"], logPath: kimiLogPath }),
+      kimi: createAcpDriver({
+        id: "kimi",
+        command: "kimi",
+        args: ["acp"],
+        logPath: kimiLogPath,
+        // **不认领这一位它一条命令都跑不了**：kimi 的 ACP 运行时把起进程整个交给客户端，
+        // 没有本地兜底（`AcpProcessService.spawn` 第一行就抛）。A/B 实测见 `acp/terminal.ts`。
+        // 这不是「多给一点能力」，是补一处**静默的能力损失**——不给的话它照样读写文件、
+        // 看起来一切正常，只是测试、构建、git 全废，而没有任何东西报错
+        terminal: true,
+      }),
       grok: createAcpDriver({
         id: "grok",
         command: "grok",

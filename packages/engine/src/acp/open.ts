@@ -124,6 +124,7 @@ export interface OpenCtx {
     modeReadback?: boolean
     compact?: boolean
     steer?: boolean
+    terminal?: boolean
     nativeApproval?: (trust: Trust) => Native
   }
   req: StartRequest
@@ -139,7 +140,12 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
   const result = await Promise.race([
     ctx.rpc.call("initialize", {
       protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      // `terminal` **按引擎注入**：kimi 不认领就一条命令都跑不了（它没有本地兜底），
+      // 而别家自己起进程，认领了反而把命令从它们的沙箱里拽出来。见 `terminal.ts`
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: ctx.config.terminal === true,
+      },
       clientInfo: CLIENT_INFO,
     }),
     ctx.owner.died().then((error) => ({ died: error })),
