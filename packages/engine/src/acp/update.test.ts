@@ -189,6 +189,32 @@ describe("计划与用量", () => {
     expect(s.events.at(-1)).toMatchObject({ type: "engine.status", status: "ready" })
   })
 
+  it("**引擎自己切档要落回驱动的状态**——不落回去，那个字段记的只是 omni 一厢情愿设过什么", () => {
+    const s = setup()
+    const seen: string[] = []
+    handleUpdate(
+      { ...s.ctx, onMode: (id) => seen.push(id) },
+      s.state,
+      { sessionUpdate: "current_mode_update", currentModeId: "plan" },
+    )
+    expect(seen).toEqual(["plan"])
+  })
+
+  it("没带 currentModeId 的那条不回调——「没报」不是「切成了 undefined」", () => {
+    const s = setup()
+    const seen: string[] = []
+    handleUpdate({ ...s.ctx, onMode: (id) => seen.push(id) }, s.state, { sessionUpdate: "current_mode_update" })
+    expect(seen).toEqual([])
+  })
+
+  it("认不出的更新静默丢弃，不掀翻会话——协议一直在加新类型", () => {
+    const s = setup()
+    expect(() => {
+      handleUpdate(s.ctx, s.state, { sessionUpdate: "some_future_update" })
+      handleUpdate(s.ctx, s.state, {})
+    }).not.toThrow()
+  })
+
   it("认不出的更新静默丢弃——协议一直在加新类型", () => {
     const s = setup()
     handleUpdate(s.ctx, s.state, { sessionUpdate: "session_info_update" })

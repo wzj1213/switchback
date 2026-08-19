@@ -49,16 +49,15 @@ export interface OpenState {
   acpSession: string | undefined
   modes: readonly { id?: string; name?: string }[]
   /**
-   * **omni 最后一次设过的档**——不是引擎此刻真正在用的那一档。
+   * 引擎此刻在哪一档——**开场时由回包认领，之后由 `current_mode_update` 跟着更新**。
    *
-   * 两者会分家：agent 能自己切（`current_mode_update`），而那条通知只到
-   * `update.ts` 的 `onModeChanged`，落不回这里。所以这个字段**现在只写不读**：
-   * `applyTrust` 曾经拿它做「已经是这一档就不发」的短路，正因为它不是引擎的
-   * 真实状态，那个短路会把切档变成空操作（详见 `mode.ts:129` 那段注释），已经拿掉。
+   * ACP 的 mode 是双向的：客户端能设，agent 也能自己切。两条来源都要落到这里，
+   * 否则它记的就只是「omni 一厢情愿设过什么」。上一版正是那样，而 `applyTrust`
+   * 曾拿它做「已经是这一档就不发」的短路——于是 agent 自己切走之后，
+   * 用户再切回来是个**空操作**（见 `mode.ts` 里那段注释，短路已经拿掉）。
    *
-   * 留着它是因为「omni 让它去的那一档」本身有用——引擎档位回读那一批
-   *（见 `docs/侧栏与引擎状态方案.md`）要把它和引擎自报的那一档并排显示，
-   * 对不上时如实说出来。**在那之前，不要再拿它当引擎状态用。**
+   * 短路拿掉之后这个字段没有读者了，但它必须继续记真话：档位回读那一批
+   *（见 `docs/侧栏与引擎状态方案.md`）要把它和引擎自报的那档并排显示，对不上时如实说。
    */
   mode: string | undefined
   models: readonly ModelOption[]

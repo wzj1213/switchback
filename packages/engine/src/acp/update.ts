@@ -35,6 +35,15 @@ export interface UpdateContext {
    * 这里只负责认出这条通知、把它翻成一份清单。
    */
   onCatalog?: (catalog: Catalog) => void
+  /**
+   * agent 自己把档位切了。**同样由驱动落到自己的状态上**——这里只负责认出这条通知。
+   *
+   * 为什么必须落回去：`OpenState.mode` 记的是「omni 最后一次设过哪一档」，
+   * 而 ACP 的 mode 是**双向**的（agent 能自己切）。不落回去，那个字段就永远只是
+   * omni 的一厢情愿——档位回读那一批要拿它和引擎自报的那档并排显示，
+   * 对不上时如实说出来，而这要求它至少记的是真话。
+   */
+  onMode?: (modeId: string) => void
   /** 宿主铸造的当前轮次 id。没有轮次就说明这条更新来得不是时候，丢弃。 */
   turnId: () => TurnId | undefined
   /**
@@ -237,6 +246,7 @@ function onCommands(ctx: UpdateContext, update: AcpUpdate): void {
  */
 function onModeChanged(ctx: UpdateContext, update: AcpUpdate): void {
   if (update.currentModeId === undefined) return
+  ctx.onMode?.(update.currentModeId)
   ctx.emit({
     type: "engine.status",
     at: ctx.now(),
@@ -282,32 +292,46 @@ export function sweep(ctx: UpdateContext, state: UpdateState, ending: ToolStatus
   ctx.inflight.clear()
 }
 
+/**
+ * `sessionUpdate` → 处理函数。
+ *
+ * 用表不用 `switch` 的理由不是好看：`switch` 版实测圈复杂度 **11**，而闸门是 12——
+ * **再加一种更新类型就会红**，而协议一直在加新类型。换成表之后实测 **3**
+ *（`??` 与 `?.` 各占一点），此后加一行就只是加一行。
+ *
+ * 签名统一成 `(ctx, state, update)`：一半的处理函数用不到 `state`，
+ * 但让它们形状一致，表里才不需要为每一条记「这个要几个参数」。
+ */
+type Handler = (ctx: UpdateContext, state: UpdateState, update: AcpUpdate) => void
+
+const HANDLERS: Readonly<Record<string, Handler>> = {
+  agent_message_chunk: (ctx, state, update) => {
+    onTextChunk(ctx, state, update, "agent_message")
+  },
+  agent_thought_chunk: (ctx, state, update) => {
+    onTextChunk(ctx, state, update, "reasoning")
+  },
+  // 用户消息宿主在发 prompt 时已经自己发过了，引擎回声的这条丢掉，
+  // 否则界面上会出现两条一模一样的用户消息
+  user_message_chunk: () => undefined,
+  tool_call: onToolCall,
+  tool_call_update: onToolUpdate,
+  plan: onPlan,
+  usage_update: (ctx, _state, update) => {
+    onUsage(ctx, update)
+  },
+  available_commands_update: (ctx, _state, update) => {
+    onCommands(ctx, update)
+  },
+  current_mode_update: (ctx, _state, update) => {
+    onModeChanged(ctx, update)
+  },
+  config_option_update: (ctx, _state, update) => {
+    onConfigOptions(ctx, update)
+  },
+}
+
 /** 认不出的更新静默丢弃——协议一直在加新类型，多一种不该掀翻会话。 */
 export function handleUpdate(ctx: UpdateContext, state: UpdateState, update: AcpUpdate): void {
-  switch (update.sessionUpdate) {
-    case "agent_message_chunk":
-      return onTextChunk(ctx, state, update, "agent_message")
-    case "agent_thought_chunk":
-      return onTextChunk(ctx, state, update, "reasoning")
-    // 用户消息宿主在发 prompt 时已经自己发过了，引擎回声的这条丢掉，
-    // 否则界面上会出现两条一模一样的用户消息
-    case "user_message_chunk":
-      return
-    case "tool_call":
-      return onToolCall(ctx, state, update)
-    case "tool_call_update":
-      return onToolUpdate(ctx, state, update)
-    case "plan":
-      return onPlan(ctx, state, update)
-    case "usage_update":
-      return onUsage(ctx, update)
-    case "available_commands_update":
-      return onCommands(ctx, update)
-    case "current_mode_update":
-      return onModeChanged(ctx, update)
-    case "config_option_update":
-      return onConfigOptions(ctx, update)
-    default:
-      return
-  }
+  HANDLERS[update.sessionUpdate ?? ""]?.(ctx, state, update)
 }

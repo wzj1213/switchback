@@ -118,6 +118,9 @@ class AcpSession implements EngineSession {
       onCatalog: (catalog) => {
         this.recatalog(catalog)
       },
+      onMode: (modeId) => {
+        this.state.mode = modeId
+      },
       turnId: () => this.state.turn,
       inflight: this.inflight,
       newId: (prefix) => {
