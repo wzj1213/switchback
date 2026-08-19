@@ -4,6 +4,7 @@ import {
   createCodexDriver,
   grokContextUsed,
   grokLogPath,
+  grokModelChanged,
   grokNativeApproval,
   kimiLogPath,
   type EngineDriver,
@@ -65,6 +66,8 @@ export function buildRegistry(
         //（grok-build `app/acp_handler/session_notification.rs`）。
         // kimi / zcode 没查到同样的实据，就按默认的 false——不知道别声称
         modeReadback: true,
+        // 你在 grok 自己的界面里改了模型或强度，omni 靠这条跟上（见 `acp/grok.ts`）
+        modelChanged: grokModelChanged,
       }),
       ...acp.drivers,
     },

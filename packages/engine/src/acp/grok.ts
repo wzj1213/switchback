@@ -161,3 +161,35 @@ export async function grokLogPath(home: string, sessionId: string, cwd: string):
   }
   return undefined
 }
+
+/**
+ * grok 报「模型 / 强度换了」的那条私有通知。**实测原文**：
+ *
+ * ```json
+ * { "method": "_x.ai/session_notification",
+ *   "params": { "update": { "sessionUpdate": "model_changed",
+ *                           "model_id": "grok-4.6", "reasoning_effort": "xhigh" } } }
+ * ```
+ *
+ * 为什么要接：**你在 grok 自己的界面里改了强度，omni 靠这条才跟得上**。
+ * 不接的话选择器停在旧值——和今天修掉的那一族「界面显示的和引擎在跑的分家」是同一件事。
+ *
+ * 顺带：omni 自己发 `session/set_model` 之后 grok 也会回这一条（实测），
+ * 所以它同时是一次「真的设进去了」的确认。
+ */
+export function grokModelChanged(
+  method: string,
+  params: unknown,
+): { model?: string; effort?: string } | undefined {
+  if (method !== "_x.ai/session_notification") return undefined
+  const update = (params as { update?: Record<string, unknown> } | undefined)?.update
+  if (update?.["sessionUpdate"] !== "model_changed") return undefined
+  const model = update["model_id"]
+  const effort = update["reasoning_effort"]
+  const out = {
+    ...(typeof model === "string" && model !== "" ? { model } : {}),
+    ...(typeof effort === "string" && effort !== "" ? { effort } : {}),
+  }
+  // 两样都没认出来就当这条与模型无关——**不报一个空的变更**
+  return Object.keys(out).length === 0 ? undefined : out
+}

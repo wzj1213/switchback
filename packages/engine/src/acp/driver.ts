@@ -199,9 +199,18 @@ class AcpSession implements EngineSession {
    * 分母用当前模型的窗口大小，拿不到就不给，界面据此只显示数字不画比例条。
    */
   private onForeignNotification(method: string, params: unknown): void {
+    const changed = this.config.modelChanged?.(method, params)
+    if (changed !== undefined) this.adoptModelChange(changed)
     const used = this.config.contextUsed?.(method, params)
     if (used === undefined) return
     emitUsage(this.updateContext(), used, this.state.contextWindow)
+  }
+
+  /** 引擎自己换了模型 / 强度：落到状态上，并沿两条既有的路报上去。 */
+  private adoptModelChange(changed: { model?: string; effort?: string }): void {
+    if (changed.effort !== undefined) this.state.effort = changed.effort
+    this.req.onModel?.(changed.model, changed.effort)
+    if (changed.model !== undefined) this.req.onEngineState?.({ modelId: changed.model })
   }
 
   private wire(child: ChildProcess): void {

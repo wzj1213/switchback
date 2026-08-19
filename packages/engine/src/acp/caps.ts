@@ -63,4 +63,16 @@ export interface AcpDriverConfig {
    *「引擎侧：X」永远停在开场那一刻，而它长得像实时的。
    */
   modeReadback?: boolean
+  /**
+   * 这家用**私有通知**报「模型 / 强度换了」时，怎么把它认出来。
+   *
+   * 和 `contextUsed` 同一条路、同一个理由：协议里没有这件事，各家各报各的，
+   * 驱动这一层不该认识任何一家的私有方法名。
+   *
+   * 实测 grok：在自己的 `_x.ai/session_notification` 里推
+   * `{sessionUpdate:"model_changed", model_id, reasoning_effort}`——
+   * **你在它自己的界面里改了强度，omni 靠这条才跟得上**。
+   * 返回 undefined = 这条通知与模型无关。
+   */
+  modelChanged?: (method: string, params: unknown) => { model?: string; effort?: string } | undefined
 }

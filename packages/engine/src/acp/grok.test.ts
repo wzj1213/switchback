@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { grokChatPath, grokContextUsed, grokLogPath, grokNativeApproval, grokWorkspaceDir } from "./grok.js"
+import { grokChatPath, grokContextUsed, grokLogPath, grokModelChanged, grokNativeApproval, grokWorkspaceDir } from "./grok.js"
 
 /**
  * 目录名的编码规则是从真机上已有的目录反解出来的，所以这张表里的
@@ -123,5 +123,44 @@ describe("grok 的原生审批开关", () => {
   // 只读档不需要那句话：那一档下 omni 的判定确实在起作用
   it("只读档不带说明", () => {
     expect(grokNativeApproval("read-only").note).toBeUndefined()
+  })
+})
+
+/**
+ * **实测原文**：omni 发完 `session/set_model` 之后 grok 回的那一条，
+ * 以及你在它自己的界面里改档时它推的那一条，是同一个形状。
+ */
+describe("grok 报「模型 / 强度换了」", () => {
+  const REAL = {
+    sessionId: "01a01b0f",
+    update: { sessionUpdate: "model_changed", model_id: "grok-4.6", reasoning_effort: "xhigh" },
+  }
+
+  it("认出实测的那一条", () => {
+    expect(grokModelChanged("_x.ai/session_notification", REAL)).toEqual({
+      model: "grok-4.6",
+      effort: "xhigh",
+    })
+  })
+
+  it("**别的方法名一律不认**——驱动这一层不该认识任何一家的私有方法名，认错了会乱改状态", () => {
+    expect(grokModelChanged("session/update", REAL)).toBeUndefined()
+    expect(grokModelChanged("_x.ai/mcp_initialized", REAL)).toBeUndefined()
+  })
+
+  it("同一条通道上的别种更新不认", () => {
+    const other = { update: { sessionUpdate: "turn_completed", usage: { totalTokens: 1 } } }
+    expect(grokModelChanged("_x.ai/session_notification", other)).toBeUndefined()
+  })
+
+  it("只报了一样就只带一样——**没认出来的不编一个**", () => {
+    const onlyEffort = { update: { sessionUpdate: "model_changed", reasoning_effort: "low" } }
+    expect(grokModelChanged("_x.ai/session_notification", onlyEffort)).toEqual({ effort: "low" })
+  })
+
+  it("两样都认不出就当这条与模型无关，**不报一个空的变更**", () => {
+    const empty = { update: { sessionUpdate: "model_changed", model_id: 42 } }
+    expect(grokModelChanged("_x.ai/session_notification", empty)).toBeUndefined()
+    expect(grokModelChanged("_x.ai/session_notification", undefined)).toBeUndefined()
   })
 })
