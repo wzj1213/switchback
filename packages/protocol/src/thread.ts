@@ -60,6 +60,22 @@ export interface TrustApply {
   at: number
 }
 
+/**
+ * 一次**侧问**：问一句不打断主线的问题，问答都不进 transcript。
+ *
+ * ## 为什么挂在 `Thread` 上，而不是做成一种 `Item`
+ *
+ * `Item` 是 transcript 的构成单位——做成 Item 就得再发明一维「这条属不属于主线」，
+ * 而那一维要让五个驱动和两端界面都跟着表态。侧问是**一问一答的纯文本**
+ *（claude 的 `askSideQuestion` 返回一个字符串，不是流），没有工具调用、没有轮次，
+ * 用不上 Item 的任何东西。挂在 `Thread` 上白捡三样：落盘、⌘R 还在、手机端也能读。
+ */
+export interface Aside {
+  at: number
+  question: string
+  answer: string
+}
+
 /** 会话的信任档。语义与 `@omni/approval` 的 `Trust` 一致，此处只做承载。 */
 export type Trust = "read-only" | "auto-edit" | "full"
 
@@ -86,6 +102,8 @@ export interface Thread {
   engineState?: EngineState
   /** omni 最后一次设档的结果。 */
   trustApply?: TrustApply
+  /** 侧问的问答，最早在前。**不进 transcript**，见 `Aside`。 */
+  asides?: readonly Aside[]
   /**
    * 下一句话用哪家引擎。**只是意向，还没生效。**
    *

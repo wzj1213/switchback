@@ -11,6 +11,7 @@ import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
+import { askAside, canAside } from "./aside.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
@@ -236,7 +237,19 @@ class ClaudeSession implements EngineSession {
     // SDK 的 `system` 消息带着 permissionMode，而 `loop.ts` 的 `case "system"`
     // 只放行 `subtype === "init"`。接上之前如实报 false——
     // 报 true 而界面上那行永远不动，比不给那行糟
-    return { compact: false, attachments: true, steer: false, fork: false, modeReadback: false }
+    // **运行时探测，不嗅版本**：0.3.231 的公开类型还没声明它
+    return {
+      compact: false,
+      attachments: true,
+      steer: false,
+      fork: false,
+      modeReadback: false,
+      sideQuestion: canAside(this.query),
+    }
+  }
+
+  askAside(text: string): Promise<string> {
+    return askAside(this.query, text)
   }
 
   async setModel(model: string): Promise<{ effort?: string }> {

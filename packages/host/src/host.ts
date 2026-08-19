@@ -4,6 +4,7 @@ import { clearQueue, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { adopt, create, remove, rename, resume, setModel, setTrust } from "./session.js"
 import { fork, handoff, rewind, switchEngine } from "./branch.js"
+import { sideQuestion } from "./engine-state.js"
 import { prompt, recordSegment, steerQueued } from "./prompt.js"
 
 export type { HostDeps } from "./deps.js"
@@ -48,6 +49,7 @@ type Handlers = {
 
 const HANDLERS: Handlers = {
   "thread.create": create,
+  "thread.sideQuestion": sideQuestion,
   "thread.adopt": adopt,
   "thread.prompt": prompt,
   "thread.setTrust": setTrust,

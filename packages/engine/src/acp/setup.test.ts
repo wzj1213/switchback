@@ -26,7 +26,14 @@ describe("能力由 agent 自报，不写死", () => {
   }
 
   it("**实测的 kimi 握手**：能贴图、能原生分叉", () => {
-    expect(capabilitiesOf(kimi)).toEqual({ compact: false, attachments: true, steer: false, fork: true, modeReadback: false })
+    expect(capabilitiesOf(kimi)).toEqual({
+      compact: false,
+      attachments: true,
+      steer: false,
+      fork: true,
+      modeReadback: false,
+      sideQuestion: false,
+    })
   })
 
   it("**空对象就是「支持」**——ACP 拿它当标记，判据是键在不在，不是值是不是 true", () => {

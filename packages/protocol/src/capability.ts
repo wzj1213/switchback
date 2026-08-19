@@ -64,6 +64,15 @@ export interface EngineCapabilities {
    * 当成「不给入口」那一类处理、因为读不回来就不让人改档，那是另一个 bug。
    */
   modeReadback: boolean
+  /**
+   * 能**问一句不打断主线的问题**——问答不进这条会话的 transcript，也不进模型的后续上下文。
+   *
+   * 只认引擎**自己把它当功能暴露出来**的那种（claude 的 SDK 有
+   * `askSideQuestion`，发的是 `subtype:"side_question"` 控制请求）。
+   * 拿底层原语替它攒一个（fork 一条临时会话 + 自己塞一段边界提示词）**不算**——
+   * 那撞 `AGENTS.md` 的总纲：omni 与引擎是共建者，不是上下级。
+   */
+  sideQuestion: boolean
 }
 
 /** 什么都不支持。驱动没表态时的兜底——**默认不给入口**，而不是默认给。 */
@@ -73,4 +82,5 @@ export const NO_CAPABILITIES: EngineCapabilities = {
   steer: false,
   fork: false,
   modeReadback: false,
+  sideQuestion: false,
 }

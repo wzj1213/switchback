@@ -1,4 +1,4 @@
-import type { EngineAxis, ThreadId, TrustApply } from "@omni/protocol"
+import type { Command, EngineAxis, ThreadId, TrustApply } from "@omni/protocol"
 import { emit, type Ctx } from "./ctx.js"
 
 /**
@@ -84,5 +84,30 @@ export function rememberTrustApply(ctx: Ctx, id: ThreadId, result: TrustApply): 
   if (entry === undefined) return
   const at = ctx.deps.now()
   entry.thread = { ...entry.thread, trustApply: result, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/**
+ * 问一句不打断主线的问题。
+ *
+ * **答案落进 `Thread.asides`，不进 transcript**——那是「侧问」的定义。
+ * 走 `thread.updated` 因此白捡三样：落盘、⌘R 之后还在、手机端也读得到。
+ *
+ * 引擎不实现就直接抛：界面本来就不该给这个入口（能力位报 false），
+ * 走到这里说明有别的地方在乱发命令，**静默吞掉会让那个 bug 一直藏着**。
+ */
+export async function sideQuestion(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.sideQuestion" }>,
+): Promise<void> {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  const ask = entry.session.askAside
+  if (ask === undefined) throw new Error(`${entry.thread.engine} 不支持侧问`)
+  const question = cmd.text.trim()
+  if (question === "") return
+  const answer = await ask.call(entry.session, question)
+  const at = ctx.deps.now()
+  entry.thread = { ...entry.thread, asides: [...(entry.thread.asides ?? []), { at, question, answer }], updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }

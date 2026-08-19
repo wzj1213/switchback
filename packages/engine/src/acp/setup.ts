@@ -327,6 +327,9 @@ export function capabilitiesOf(info: AcpInitialize | undefined, modeReadback = f
     //（见 `AcpDriverConfig.modeReadback`）。没人说就是不知道——**不知道一律报 false**：
     // 报 true 的代价是界面上那行「引擎侧：X」永远停在开场那一刻，而它看起来是实时的
     modeReadback,
+    // ACP 协议里没有侧问。kimi 的 `/btw` 实现得很完整，但它没从 ACP 那扇门出来——
+    // 不是 kimi 弱，是这条路不通（见 `docs/侧栏与引擎状态方案.md` §6.3）
+    sideQuestion: false,
   }
 }
 

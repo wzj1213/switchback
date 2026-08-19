@@ -10,6 +10,11 @@ export type Command =
    * 这条是「omni 从来不知道它存在」的会话——你在终端里、在别的界面里跑的。
    * 所以工作区、标题都得由调用方从引擎的列表里带过来。
    */
+  /**
+   * 问一句不打断主线的问题。**能力位报 false 的引擎上界面不给这个入口**，
+   * 所以这条命令只会对报 true 的那家发出（见 `EngineCapabilities.sideQuestion`）。
+   */
+  | { type: "thread.sideQuestion"; threadId: ThreadId; text: string }
   | { type: "thread.adopt"; engine: EngineId; handle: string; cwd: string; title: string }
   | {
       type: "thread.create"

@@ -1089,3 +1089,69 @@
 .turnmark__act:focus-visible {
   opacity: 1;
 }
+
+/**
+ * 侧问。**能力位报 false 时整个不存在**，所以这里不写「禁用」态——
+ * 没有那个状态。
+ */
+.composer__aside {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px var(--sp-2);
+  cursor: pointer;
+}
+
+.composer__aside:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.aside__empty {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.aside__pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+/** 问句压暗、答句正常：一屏里问答交替，靠明暗区分比靠标签省地方。 */
+.aside__q {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.aside__a {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.aside__input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: var(--sp-2);
+  resize: vertical;
+}

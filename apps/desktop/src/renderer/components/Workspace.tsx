@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice, ThreadRow } from "@omni/store"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
+import { Asides } from "./Asides.js"
 import { useOmniActions } from "../useOmniActions.js"
 import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
@@ -192,6 +193,12 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onReuse={reuse}
       />
       <Between props={props} thread={thread} stamp={stamp} send={send} />
+      <Asides
+        thread={thread}
+        onAsk={(text) => {
+          send({ type: "thread.sideQuestion", threadId: thread.id, text })
+        }}
+      />
       <WorkspaceComposer props={props} thread={thread} stamp={stamp} prefill={prefill} actions={actions} />
     </main>
   )

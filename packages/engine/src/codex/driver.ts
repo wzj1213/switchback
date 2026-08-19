@@ -274,7 +274,10 @@ class CodexSession implements EngineSession {
     // `modeReadback`：`thread/settings/updated` 要在 `initialize` 里声明
     // `capabilities:{experimentalApi:true}`，而声明它的前置（一张「omni 认领了哪些
     // 实验面」的常量表 + CI 双向断言）还没建，见索引 §5-2。同样是「还没接」不是「没有」
-    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: false }
+    // `sideQuestion`：codex 的侧问只活在它自己的 TUI 里（`tui/src/app/side.rs`），
+    // **没从 app-server 那扇门出来**。照着拼要 omni 抄一份它的边界提示词进来维护，
+    // 撞 AGENTS.md 的总纲——见 `docs/侧栏与引擎状态方案.md` §0
+    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: false, sideQuestion: false }
   }
 
   /**

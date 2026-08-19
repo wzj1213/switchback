@@ -177,6 +177,13 @@ export interface EngineSession {
    * 在 `dispose()` **之前**调用——进程都没了就发不出去了。
    */
   discard?: () => Promise<void>
+  /**
+   * 问一句不打断主线的问题。**不支持就别实现**（`capabilities().sideQuestion` 报 false），
+   * 界面据此不给这个入口。
+   *
+   * 返回的是答案原文。**问答都不进 transcript**——那正是「侧问」的定义。
+   */
+  askAside?: (text: string) => Promise<string>
   interrupt: () => Promise<void>
   setTrust: (trust: Trust) => Promise<void>
   /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */

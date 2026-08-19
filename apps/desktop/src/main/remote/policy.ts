@@ -66,6 +66,10 @@ const RUNS_IN_THREAD: ReadonlySet<string> = new Set([
   "thread.fork",
   // 它让引擎在那条会话里**立刻动起来**（换引擎并重开一轮），所以和上面几条同一档
   "thread.switchNow",
+  // **侧问也算「让引擎动起来」**：它照样把话递进那条会话所在的引擎进程。
+  // 不进这一档的话，一条开在 `full` 档、高过远程上限的会话可以被手机侧问——
+  // 而侧问用的是同一个进程、同一份工作区权限
+  "thread.sideQuestion",
 ])
 
 /**
@@ -176,6 +180,7 @@ const SHAPES: Readonly<Record<string, Shape>> = {
   "thread.adopt": { strings: ["engine", "handle", "cwd", "title"] },
   "thread.create": { strings: ["cwd", "engine"], enums: { trust: TRUSTS } },
   "thread.prompt": { strings: ["threadId", "text"] },
+  "thread.sideQuestion": { strings: ["threadId", "text"] },
   "thread.interrupt": { strings: ["threadId"] },
   "thread.unqueue": { strings: ["threadId"] },
   // **这两条是补上的，原来漏了。** 漏掉的后果不是放行而是整条拒掉

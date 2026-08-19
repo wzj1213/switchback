@@ -28,7 +28,7 @@ interface Fake {
 /** 引擎回报的强度怎么算。缺省 = 照单全收；传进来就是「它其实用的是这个」。 */
 type EffortOf = (effort?: string) => { effort?: string }
 
-function fakeDriver(effortOf?: EffortOf): { driver: EngineDriver; session: () => Fake } {
+function fakeDriver(effortOf?: EffortOf, aside = true): { driver: EngineDriver; session: () => Fake } {
   const holder: { fake: Fake | undefined } = { fake: undefined }
   const driver: EngineDriver = {
     id: "fake",
@@ -54,6 +54,8 @@ function fakeDriver(effortOf?: EffortOf): { driver: EngineDriver; session: () =>
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
+        // `aside: false` 演一家**不实现**侧问的引擎——它该抛，不该静默吞
+        ...(aside ? { askAside: (text: string) => Promise.resolve(`答：${text}`) } : {}),
         capabilities: () => NO_CAPABILITIES,
         // 一个**认强度**的引擎：回报的就是收到的那个。设不上的那家靠 `effortOf` 演
         setModel: (_model: string, effort?: string) =>
@@ -76,8 +78,8 @@ function fakeDriver(effortOf?: EffortOf): { driver: EngineDriver; session: () =>
   }
 }
 
-function setup(options: { effort?: EffortOf } = {}): { host: Host; events: Event[]; session: () => Fake } {
-  const { driver, session } = fakeDriver(options.effort)
+function setup(options: { effort?: EffortOf; aside?: boolean } = {}): { host: Host; events: Event[]; session: () => Fake } {
+  const { driver, session } = fakeDriver(options.effort, options.aside ?? true)
   const events: Event[] = []
   const counter = { n: 0 }
   const host = createHost({
@@ -999,6 +1001,7 @@ function slowDriver(delayMs: number, fail = false): EngineDriver {
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve(),
         models: () => Promise.resolve([]),
+        askAside: (text: string) => Promise.resolve(`答：${text}`),
         capabilities: () => NO_CAPABILITIES,
         setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
@@ -1693,5 +1696,49 @@ describe("引擎自报的状态", () => {
     const { events, session } = await start()
     session().report({ axes: [{ axis: "mode", id: "yolo", match: "diverged" }] })
     expect(last(events)?.trust).toBe("auto-edit")
+  })
+})
+
+/**
+ * 侧问：问答落进 `Thread.asides`，**不进 transcript**——那是这件事的全部定义。
+ * 进了 transcript 它就在正文里，而正文正是模型下一轮要读的东西。
+ */
+describe("侧问", () => {
+  const start = async (): Promise<{ host: Host; events: Event[]; id: string }> => {
+    const { host, events } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    return { host, events, id }
+  }
+  const last = (events: Event[]) => events.filter((e) => e.type === "thread.updated").at(-1)?.thread
+
+  it("问答落进 Thread.asides，按先后排", async () => {
+    const { host, events, id } = await start()
+    await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "这个函数干嘛的" })
+    await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "那这个呢" })
+    expect(last(events)?.asides?.map((a) => a.question)).toEqual(["这个函数干嘛的", "那这个呢"])
+    expect(last(events)?.asides?.[0]?.answer).toBe("答：这个函数干嘛的")
+  })
+
+  it("**一条 item 都不产生**——进了 transcript 就不叫侧问了", async () => {
+    const { host, events, id } = await start()
+    const before = events.filter((e) => e.type === "item.started").length
+    await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "问一句" })
+    expect(events.filter((e) => e.type === "item.started").length).toBe(before)
+  })
+
+  it("空问题直接不发——省一次真实调用", async () => {
+    const { host, events, id } = await start()
+    await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "   " })
+    expect(last(events)?.asides).toBeUndefined()
+  })
+
+  it("**引擎不支持就抛，不静默吞**——界面本来就不该给这个入口，走到这里说明别处有 bug", async () => {
+    const { host, events } = setup({ aside: false })
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await expect(host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "问" })).rejects.toThrow(
+      /不支持侧问/,
+    )
   })
 })
