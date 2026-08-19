@@ -58,16 +58,23 @@ export function readSettings(params: unknown): CodexSettings {
 /**
  * 比对用的规范形。**显示仍然用引擎报的原文**——omni 不翻译它的值。
  *
- * ## 为什么非要有这一步
+ * ## 为什么需要它：**omni 发的和收的是两个类型，不是同一个值两种拼写**
  *
- * 实测（`codex app-server`，2026-08-19）：omni 在 `thread/start` 发出去的是
- * `sandbox: "workspace-write"`，而 `thread/settings/updated` 报回来的是
- * `{"type":"workspaceWrite"}`——**同一个值，两种拼写**。
- *（源码上标的是 `rename_all = "kebab-case"`，线上却是驼峰，所以这一条只能靠实跑发现。）
+ * codex 的 app-server 在这件事上分了两个概念（`app-server-protocol/src/protocol/v2/`）：
  *
- * 直接比字符串的话两边永远不等，界面上会给每一条 codex 会话常亮一句
- *「引擎那边现在是 workspaceWrite（不是 omni 切的）」——而它就是 omni 切的。
- * 那是这一批要消灭的那类谎，只是反过来。
+ * | 方向 | 类型 | 线上长相 |
+ * | --- | --- | --- |
+ * | omni 发（`thread/start` 的 `sandbox`） | `SandboxMode` | `"workspace-write"` |
+ * | 引擎报（`thread/settings/updated`） | `SandboxPolicy`（`thread.rs` → `permissions.rs:538`，`rename_all = "camelCase"`） | `{"type":"workspaceWrite", …}` |
+ *
+ * 前者是**你要的档**，后者是**生效的策略**——两个标签一一对应，但既不同名也不同形。
+ * 直接比字符串永远不等，界面上会给每条 codex 会话常亮一句「引擎那边现在是
+ * workspaceWrite（不是 omni 切的）」，而它就是 omni 切的。
+ *
+ * 顺带记一笔踩过的坑：`codex-rs/protocol/src/protocol.rs` 里**另有**一个同名的
+ * `SandboxPolicy`，那份是 kebab-case。**同一个仓库里同名类型有多份，
+ * 读的时候必须确认读的是这条线上真正用的那一份**——照着另一份写，
+ * 编译器一个字都不会说。
  */
 export function canonical(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "")
