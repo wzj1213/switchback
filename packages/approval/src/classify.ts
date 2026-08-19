@@ -32,6 +32,10 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   // 顺带记一笔实测：这一版的 `Agent` **不经过 `canUseTool`**（同一轮里只有 `Bash` 经过），
   // 所以这条今天并不构成 bug——它修的是「哪天它开始走这条路」的默认值。
   Task: "meta", Agent: "meta", TodoWrite: "meta", ExitPlanMode: "meta",
+  // 待办那一族。**实测（2026-08-19）模型真调的是 `TaskCreate` / `TaskUpdate`**，
+  // 而不是 `TodoWrite`——后者仍在 SDK 的声明里，但这台机器上没被调过。
+  // 同样**不经过 `canUseTool`**，所以今天不构成 bug；补上修的是「哪天它开始走这条路」
+  TaskCreate: "meta", TaskUpdate: "meta", TaskList: "meta", TaskGet: "meta",
   // codex app-server
   shell: "exec", apply_patch: "write", read_file: "read", update_plan: "meta",
   // ACP：客户端侧方法（agent 反过来请我们代劳时用）

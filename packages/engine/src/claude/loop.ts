@@ -2,6 +2,7 @@ import type { query } from "@anthropic-ai/claude-agent-sdk"
 import type { ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import { clearTasks, onTaskProgress, type TaskState } from "./tasks.js"
+import { emitPlan, feedPlan, isPlanTool, resetPlan, type PlanState } from "./plan.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
@@ -59,6 +60,8 @@ export interface TurnRef {
   tools: Map<ItemId, ToolCallItem>
   /** 这一轮里子 agent 报的进度。**活状态，轮次收工就清**（见 `tasks.ts`）。 */
   tasks: TaskState
+  /** 这一轮的待办清单。**轮次收工就重置**——下一轮是新的一份，见 `plan.ts`。 */
+  plan: PlanState
 }
 
 function makeIdMinter(ref: TurnRef, turnId: TurnId): () => ItemId {
@@ -74,7 +77,12 @@ function onAssistant(msg: RawMessage, ref: TurnRef, req: StartRequest, at: numbe
   if (turnId === undefined) return
   const content = msg.message?.content
   if (!Array.isArray(content)) return
-  for (const item of assistantItems(content, { turnId, at, nextId: makeIdMinter(ref, turnId) })) {
+  const nextId = makeIdMinter(ref, turnId)
+  // **待办工具不画成工具行**：计划卡已经在说同一件事，画两遍是噪声（见 `plan.ts`）
+  let changed = false
+  for (const block of content) if (isPlanTool(block)) changed = feedPlan(ref.plan, block) || changed
+  if (changed) emitPlan(ref.plan, turnId, at, { threadId: req.threadId, emit: req.emit, nextId })
+  for (const item of assistantItems(content.filter((b) => !isPlanTool(b)), { turnId, at, nextId })) {
     if (item.kind === "tool_call") ref.tools.set(item.id, item)
     req.emit({ type: "item.started", at, item })
   }
@@ -121,6 +129,7 @@ function endTurn(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus
   sweepTools(ref, req, at, status)
   // 子 agent 跟着轮次一起收：一轮结束还留着，界面上就是一串早就跑完了却还在转的任务
   clearTasks(ref.tasks, at, req)
+  resetPlan(ref.plan)
   req.emit({ type: "turn.completed", at, turnId, status })
 }
 
@@ -128,6 +137,7 @@ function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
   const turnId = ref.current
   ref.current = undefined
   clearTasks(ref.tasks, at, req)
+  resetPlan(ref.plan)
   if (msg.usage !== undefined) {
     req.emit({ type: "usage.updated", at, threadId: req.threadId, usage: usageOf(msg.usage) })
   }
