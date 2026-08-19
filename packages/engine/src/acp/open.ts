@@ -173,11 +173,19 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
     if (!ctx.state.loadSession) {
       throw new Error(`${ctx.config.id} 不支持续跑（没有 loadSession 能力），这个会话没法接着上次跑。`)
     }
-    await ctx.rpc.call("session/load", { sessionId: ctx.req.resume, ...shared })
+    // **回包要接住。** 上一版把它整个丢了，于是续跑的会话上目录全空：
+    // 强度设不上（`effortConfig` 空 → `applyEffort` 静默 return）、
+    // **信任档落不到引擎上**（`modes` 空 → `applyTrust` 直接返回）、
+    // 上下文比例条不画（分母未知）、模型清单空。
+    // 其中「换模型还能用」纯属巧合——清单空时 `modelCall` 退回发规范的
+    // `session/set_model`，而那一发恰好几家都实现了。**最显眼的那样被巧合救了，
+    // 正是这个洞一直没被发现的原因。**
+    const loaded = ((await ctx.rpc.call("session/load", { sessionId: ctx.req.resume, ...shared })) ??
+      {}) as AcpNewSession
     ctx.state.acpSession = ctx.req.resume
     ctx.req.onHandle?.(ctx.req.resume)
-    // 档位由调用方在开场之后统一施加（见驱动里的 openSession）
-    void (ctx.state.trust, [])
+    // 只认领目录，**不碰 sessionId**——`session/load` 的回包里没有它，见 `adoptCatalogue`
+    adoptCatalogue(ctx, loaded)
     return
   }
   const created = (await ctx.rpc.call("session/new", shared)) as AcpNewSession
@@ -214,17 +222,41 @@ export function adoptCatalog(state: OpenState, catalog: Catalog): void {
   state.effort = catalog.effort
 }
 
-/** 认领一个刚开出来（或分出来）的会话：记下 id、模型、档位、强度。 */
+/**
+ * 认领回包里的**目录**那一半：模型、强度、档位、窗口。**不碰 sessionId。**
+ *
+ * ## 为什么必须和 `adopt()` 分开，而不是让续跑复用它
+ *
+ * 因为 `session/load` 的回包里**就是没有 sessionId**。实测 grok（`grok agent stdio`）：
+ *
+ * ```
+ * session/new  → { sessionId, models, _meta }
+ * session/load → {            models, _meta }      ← 形状一样，只少这一个字段
+ * ```
+ *
+ * 而 `adopt()` 开头那句是「没有返回 sessionId 就抛」。让续跑复用它，等于把今天这个
+ * **静默降级**换成**续跑当场抛错**——后者更坏。续跑路径上的 id 本来也不需要从回包里取，
+ * 它就是调用方传进来的 `req.resume`。
+ *
+ * 分出来之后，三条开场路径（新建 / 分叉 / 续跑）**认领的目录是同一份逻辑**，
+ * 这正是上一版漏掉续跑那条的原因：目录认领本来就藏在 `adopt()` 里，
+ * 而续跑不调 `adopt()`。
+ */
+function adoptCatalogue(ctx: OpenCtx, session: AcpNewSession): void {
+  // 模型、强度、以及**它们各自设回哪儿**：一次算齐（见 `catalogOf`）
+  adoptCatalog(ctx.state, catalogOf(session))
+  ctx.state.modes = modesOf(session)
+  ctx.state.mode = currentModeOf(session)
+  ctx.state.windowOf = contextWindows(session)
+  const current = session.models?.currentModelId
+  ctx.state.contextWindow = current === undefined ? undefined : ctx.state.windowOf[current]
+}
+
+/** 认领一个刚开出来（或分出来）的会话：记下 id，再认领目录。 */
 function adopt(ctx: OpenCtx, created: AcpNewSession): void {
   const id = created.sessionId
   if (id === undefined) throw new Error(`${ctx.config.id} 没有返回 sessionId，无法继续`)
   ctx.state.acpSession = id
   ctx.req.onHandle?.(id)
-  // 模型、强度、以及**它们各自设回哪儿**：一次算齐（见 `catalogOf`）
-  adoptCatalog(ctx.state, catalogOf(created))
-  ctx.state.modes = modesOf(created)
-  ctx.state.mode = currentModeOf(created)
-  ctx.state.windowOf = contextWindows(created)
-  const current = created.models?.currentModelId
-  ctx.state.contextWindow = current === undefined ? undefined : ctx.state.windowOf[current]
+  adoptCatalogue(ctx, created)
 }
