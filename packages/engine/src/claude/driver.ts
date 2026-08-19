@@ -13,6 +13,7 @@ import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { askAside, canAside } from "./aside.js"
 import { createTaskState } from "./tasks.js"
+import { applyEffort, withEfforts } from "./effort.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
@@ -152,16 +153,21 @@ class ClaudeSession implements EngineSession {
   /**
    * 可选模型。
    *
-   * **不上报 `efforts`**：SDK 的 `effort` 是 `Options` 字段，只能在 `query()`
-   * 时给，运行期没有 setter。报上去界面就会画一个改了不生效的控件。
+   * **强度按模型报**：每个模型自己声明 `supportsEffort` / `supportedEffortLevels`，
+   * 不支持的那些一档都不给（见 `effort.ts`——那里也记了上一版为什么写着「没有」）。
    */
   async models(): Promise<readonly ModelOption[]> {
     const list = await this.query?.supportedModels().catch(() => undefined)
-    return (list ?? []).map((m) => ({
-      id: m.value,
-      label: m.displayName,
-      ...(m.description === "" ? {} : { description: m.description }),
-    }))
+    return (list ?? []).map((m) =>
+      withEfforts(
+        {
+          id: m.value,
+          label: m.displayName,
+          ...(m.description === "" ? {} : { description: m.description }),
+        },
+        m,
+      ),
+    )
   }
 
   /**
@@ -253,10 +259,20 @@ class ClaudeSession implements EngineSession {
     return askAside(this.query, text)
   }
 
-  async setModel(model: string): Promise<{ effort?: string }> {
+  async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
-    // Claude 不报强度，也就没有「生效的那一档」
-    return {}
+    // **设不上就回空**，调用方据此保持旧值——界面照着记录画，记录必须是真的
+    const applied = await applyEffort(this.query, effort).catch((error: unknown) => {
+      this.req.emit({
+        type: "engine.status",
+        at: Date.now(),
+        threadId: this.req.threadId,
+        status: "degraded",
+        detail: `Claude 设推理强度失败：${error instanceof Error ? error.message : String(error)}`,
+      })
+      return undefined
+    })
+    return applied === undefined ? {} : { effort: applied }
   }
 
   async interrupt(): Promise<void> {

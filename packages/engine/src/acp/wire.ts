@@ -152,7 +152,19 @@ export interface AcpModel {
    * 而实测 grok 每个模型都报 `_meta.totalContextTokens`（grok 4.6 = 500000）。
    * 拿不到就没有分母，界面上只显示占用数字、不画比例条。
    */
-  _meta?: { totalContextTokens?: number } | null
+  /**
+   * 扩展位。**omni 只读它认得的那几个键**，其余原样不管。
+   *
+   * `totalContextTokens`：窗口大小（实测 grok 4.6 = 500000）。
+   * `reasoningEffort*`：有的 agent 把强度放在这儿而不是 `configOptions`——
+   * 实测 grok 就是（见 `setup.ts` 的 `withMetaEfforts`）。
+   */
+  _meta?: {
+    totalContextTokens?: number
+    supportsReasoningEffort?: boolean
+    reasoningEffort?: string
+    reasoningEfforts?: readonly { id?: string; value?: string; label?: string }[]
+  } | null
 }
 
 export interface AcpConfigOption {

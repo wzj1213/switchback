@@ -18,10 +18,38 @@ import type { AcpConfigOption, AcpInitialize, AcpModel, AcpNewSession, AcpSessio
  */
 function toModelOption(raw: AcpModel): ModelOption {
   const id = raw.modelId ?? ""
-  return {
+  const base: ModelOption = {
     id,
     label: raw.name ?? id,
     ...(raw.description === undefined || raw.description === null ? {} : { description: raw.description }),
+  }
+  return withMetaEfforts(base, raw)
+}
+
+/**
+ * 有的 agent 把强度放在**模型清单的扩展位**里，而不是 `configOptions`。
+ *
+ * 实测 grok：`configOptions` 整个 `undefined`，而每个模型报
+ * `_meta.supportsReasoningEffort` / `_meta.reasoningEffort`（当前）/
+ * `_meta.reasoningEfforts`（可选清单）。omni 的 `effortsOf` 只翻 `configOptions`，
+ * 于是**grok 上一档都看不见**——而它明明支持四档。
+ *
+ * **上线的是 `value` 不是 `id`。** grok 自己的类型注释写得很清楚：
+ *「`id`/`label` are presentation and input; `value` is the canonical value sent on the wire」。
+ * 拿 `id` 发出去在它当前的取值上恰好也对（两者同值），但那是巧合，下一版就可能不是。
+ */
+function withMetaEfforts(option: ModelOption, raw: AcpModel): ModelOption {
+  const meta = raw._meta as { reasoningEfforts?: unknown; reasoningEffort?: unknown } | undefined
+  const list = Array.isArray(meta?.reasoningEfforts) ? meta.reasoningEfforts : []
+  const efforts = list
+    .map((e) => (e as { value?: unknown }).value)
+    .filter((v): v is string => typeof v === "string" && v !== "")
+  if (efforts.length === 0) return option
+  const current = meta?.reasoningEffort
+  return {
+    ...option,
+    efforts,
+    ...(typeof current === "string" && current !== "" ? { defaultEffort: current } : {}),
   }
 }
 

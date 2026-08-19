@@ -1,4 +1,4 @@
-import type { EngineStatus } from "@omni/protocol"
+import type { EngineStatus, ModelOption } from "@omni/protocol"
 import { modelCall, sayWhy } from "./setup.js"
 
 /**
@@ -27,6 +27,8 @@ export interface ModelCtx {
     modelConfig: string | undefined
     /** 换强度要报的 configId（kimi `thinking`、ZCode `thought`）。 */
     effortConfig: string | undefined
+    /** 当前模型清单。**判「强度走哪条路」要看它**：见 `metaRoute`。 */
+    models: readonly ModelOption[]
     effort: string | undefined
     windowOf: Readonly<Record<string, number>>
     contextWindow: number | undefined
@@ -34,19 +36,44 @@ export interface ModelCtx {
 }
 
 /**
+ * 强度走**模型扩展位**那条路吗。
+ *
+ * 两条路互斥，判据是「清单从哪儿读来的，就设回哪儿」——和 `modelCall` 同一条原则：
+ *
+ * - 有 `effortConfig` = 强度是个独立的 `configOption`（kimi 的 `thinking`、ZCode 的 `thought`），
+ *   单独发一次 `session/set_config_option`。
+ * - 没有、而目标模型自己带着 `efforts` = 它来自 `_meta.reasoningEfforts`（实测 grok），
+ *   **那就折进同一发 `session/set_model` 的 `_meta` 里**——grok 自己的客户端正是这么发的
+ *  （`SetSessionModelRequest…meta(REASONING_EFFORT_META_KEY)`）。
+ */
+function metaRoute(ctx: ModelCtx, model: string): boolean {
+  if (ctx.state.effortConfig !== undefined) return false
+  return (ctx.state.models.find((m) => m.id === model)?.efforts ?? []).length > 0
+}
+
+/**
  * 换模型（可能连带换强度）。
  *
- * 强度有两种表达：有的适配器把它编进 modelId（codex 适配器的 `gpt-5.6-sol[low]`），
- * 那时没有独立选项，跳过即可；有的把它做成独立的会话选项（kimi 的 `thinking`、
- * ZCode 的 `thought`），那时要单独发一次。**两条都走**，因为同一个驱动要接这两种。
+ * **强度有三种表达，同一个驱动要同时装下**：
+ *
+ * 1. 编进 modelId（codex 适配器的 `gpt-5.6-sol[low]`）——没有独立选项，跳过即可。
+ * 2. 独立的会话选项（kimi 的 `thinking`、ZCode 的 `thought`）——单独发一次
+ *    `session/set_config_option`，见 `applyEffort`。
+ * 3. **模型清单的扩展位**（实测 grok 的 `_meta.reasoningEfforts`）——折进同一发
+ *    `session/set_model` 的 `_meta`，见 `metaRoute`。
+ *
+ * 这正是「一个抽象要同时装下几种形状，靠的不是求同，是把差异显式建模」。
  */
 export async function applyModel(ctx: ModelCtx, model: string, effort?: string): Promise<{ effort?: string }> {
   const sessionId = ctx.state.acpSession
   if (sessionId === undefined) return {}
   const { method, params } = modelCall(ctx.state.modelConfig, sessionId, model)
-  await ctx.call(method, params).catch((error: unknown) => {
+  // 走扩展位那条路时，强度和模型是**同一发**——分两发的话中间那一刻模型换了、强度还是旧的
+  const meta = effort !== undefined && metaRoute(ctx, model) ? { _meta: { reasoningEffort: effort } } : undefined
+  await ctx.call(method, { ...params, ...meta }).catch((error: unknown) => {
     throw new Error(sayWhy(ctx.id, "换模型", error))
   })
+  if (meta !== undefined) ctx.state.effort = effort
   // 分母跟着换：同一家的两个模型窗口可以不一样，不换的话比例条会按旧分母画
   ctx.state.contextWindow = ctx.state.windowOf[model] ?? ctx.state.contextWindow
   await applyEffort(ctx, sessionId, effort)

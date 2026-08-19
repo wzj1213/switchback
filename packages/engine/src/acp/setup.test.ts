@@ -328,3 +328,54 @@ describe("失败要说人话", () => {
     expect(sayWhy("kimi", "换模型", new Error("connection closed"))).toContain("connection closed")
   })
 })
+
+/**
+ * **有的 agent 把强度放在模型清单的扩展位里**，而不是 `configOptions`。
+ * 下面这份是实测 grok 的原文（`grok agent stdio` 的 `session/new` 回包）。
+ * omni 原来只翻 `configOptions`，于是 grok 上一档都看不见——而它明明支持四档。
+ */
+describe("强度也可能在模型的扩展位里", () => {
+  const grok = {
+    models: {
+      currentModelId: "grok-4.6",
+      availableModels: [
+        {
+          modelId: "grok-4.6",
+          name: "Grok 4.6",
+          _meta: {
+            totalContextTokens: 500000,
+            supportsReasoningEffort: true,
+            reasoningEffort: "high",
+            reasoningEfforts: [
+              { id: "deep", value: "xhigh", label: "Extra High Effort" },
+              { id: "high", value: "high", label: "High Effort", default: true },
+              { id: "low", value: "low", label: "Low Effort" },
+            ],
+          },
+        },
+      ],
+    },
+  }
+
+  it("**上线的是 `value` 不是 `id`**——grok 自己的注释写着 id/label 只是展示", () => {
+    expect(modelsOf(grok)[0]?.efforts).toEqual(["xhigh", "high", "low"])
+  })
+
+  it("当前那一档也带出来", () => {
+    expect(modelsOf(grok)[0]?.defaultEffort).toBe("high")
+  })
+
+  it("**没有这个扩展位的模型不挂强度**——挂了就是一个点开是空的选择器", () => {
+    expect(modelsOf({ models: { availableModels: [{ modelId: "a" }] } })[0]?.efforts).toBeUndefined()
+    expect(
+      modelsOf({ models: { availableModels: [{ modelId: "a", _meta: { reasoningEfforts: [] } }] } })[0]?.efforts,
+    ).toBeUndefined()
+  })
+
+  it("清单里的项缺 `value` 就跳过那一项，不拿 `id` 顶替", () => {
+    const odd = {
+      models: { availableModels: [{ modelId: "a", _meta: { reasoningEfforts: [{ id: "x" }, { value: "low" }] } }] },
+    }
+    expect(modelsOf(odd)[0]?.efforts).toEqual(["low"])
+  })
+})

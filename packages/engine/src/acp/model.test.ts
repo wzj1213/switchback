@@ -10,6 +10,7 @@ function ctxWith(options: { effortFails?: boolean; effort?: string } = {}) {
     acpSession: "s-1",
     modelConfig: "model",
     effortConfig: "thought",
+    models: [] as { id: string; label: string; efforts?: readonly string[] }[],
     effort: options.effort,
     windowOf: {} as Record<string, number>,
     contextWindow: undefined as number | undefined,
@@ -75,5 +76,65 @@ describe("换模型顺带换强度", () => {
     h.state.acpSession = undefined as unknown as string
     expect(await applyModel(h.ctx, "GLM-5-Turbo", "low")).toEqual({})
     expect(h.calls).toEqual([])
+  })
+})
+
+/**
+ * 第三条路：**强度在模型清单的扩展位里**（实测 grok 的 `_meta.reasoningEfforts`）。
+ * 判据是「清单从哪儿读来的，就设回哪儿」——和换模型那条路同一条原则。
+ */
+describe("强度折进 set_model 的 _meta（grok 那条路）", () => {
+  function metaCtx() {
+    const calls: { method: string; params: unknown }[] = []
+    const state = {
+      acpSession: "s-1",
+      modelConfig: undefined as string | undefined,
+      // **没有 effortConfig**：这家不把强度做成独立选项
+      effortConfig: undefined as string | undefined,
+      models: [{ id: "grok-4.6", label: "Grok 4.6", efforts: ["xhigh", "high", "low"] }],
+      effort: undefined as string | undefined,
+      windowOf: {} as Record<string, number>,
+      contextWindow: undefined as number | undefined,
+    }
+    const ctx = {
+      id: "acp:grok",
+      state,
+      call: (method: string, params: unknown) => {
+        calls.push({ method, params })
+        return Promise.resolve({})
+      },
+      status: () => undefined,
+    }
+    return { ctx, calls, state }
+  }
+
+  it("**同一发发出去**，不是两发——分两发的话中间那一刻模型换了、强度还是旧的", async () => {
+    const h = metaCtx()
+    await applyModel(h.ctx, "grok-4.6", "xhigh")
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0]?.method).toBe("session/set_model")
+    expect(h.calls[0]?.params).toEqual({
+      sessionId: "s-1",
+      modelId: "grok-4.6",
+      _meta: { reasoningEffort: "xhigh" },
+    })
+  })
+
+  it("回报生效的那一档", async () => {
+    const h = metaCtx()
+    expect(await applyModel(h.ctx, "grok-4.6", "low")).toEqual({ effort: "low" })
+  })
+
+  it("没给强度就不带 `_meta`——不塞一个引擎没要的字段", async () => {
+    const h = metaCtx()
+    await applyModel(h.ctx, "grok-4.6")
+    expect(h.calls[0]?.params).toEqual({ sessionId: "s-1", modelId: "grok-4.6" })
+  })
+
+  it("**目标模型不带 efforts 就不走这条路**——那说明这家的强度不在这儿", async () => {
+    const h = metaCtx()
+    h.state.models = [{ id: "grok-4.6", label: "Grok 4.6", efforts: [] }]
+    await applyModel(h.ctx, "grok-4.6", "high")
+    expect(h.calls[0]?.params).toEqual({ sessionId: "s-1", modelId: "grok-4.6" })
   })
 })
