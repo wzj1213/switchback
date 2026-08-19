@@ -184,16 +184,18 @@ export function warnNativeFixed(ctx: TrustCtx, trust: Trust): void {
  * 对应它」是一对多的反向问题；这里有档位表和当前信任档，重算一次 `pickMode`
  * 就知道 omni 想要的是哪个，比一比即可。
  *
- * `pickMode` 返回 undefined（这家的档位表里压根没有对得上的）时算 `diverged`：
- * omni 的档和引擎这一维**确实**不对应。至于「为什么不对应」由 `trustApply`
- * 的 `unmapped` 那条说明去讲，不塞进这一个字段里。
+ * `pickMode` 返回 undefined 时算 **`unknown` 而不是 `diverged`**：那种情况下
+ * omni 压根没发过 `session/set_mode`（见 `applyTrust`），**没有可比的基准**。
+ * 报 `diverged` 会在实测的 grok 上常亮一条假警告——它不报档位表、却推当前档。
+ * 「为什么没有基准」由 `trustApply` 的 `unmapped` 那条去讲，不塞进这一个字段。
  */
 export function modeAxis(modes: readonly AcpMode[], trust: Trust, modeId: string): EngineAxis {
   const label = modes.find((m) => m.id === modeId)?.name
+  const want = pickMode(modes, trust)
   return {
     axis: "mode",
     id: modeId,
     ...(label === undefined || label === "" ? {} : { label }),
-    match: pickMode(modes, trust) === modeId ? "aligned" : "diverged",
+    match: want === undefined ? "unknown" : want === modeId ? "aligned" : "diverged",
   }
 }

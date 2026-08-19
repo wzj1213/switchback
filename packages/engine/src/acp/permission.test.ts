@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { EngineStatus, Trust } from "@omni/protocol"
 import type { ServerCall } from "../rpc.js"
 import { pickOption, summarize } from "./approve.js"
-import { applyTrust, pickMode } from "./mode.js"
+import { applyTrust, modeAxis, pickMode } from "./mode.js"
 import { handlePermission, type PermissionContext } from "./permission.js"
 import type { AcpPermissionOption, AcpToolCall } from "./wire.js"
 
@@ -361,5 +361,34 @@ describe("等在途表把命令补齐", () => {
     // kind 保住了 → exec + 命令看得见 → 自动编辑档直接放行，不打扰
     expect(asked).toEqual([])
     expect(got.result).toEqual({ outcome: { outcome: "selected", optionId: "allow_once" } })
+  })
+})
+
+/**
+ * 引擎报的当前档 → 一条轴。`match` 三态里 **`unknown` 是这次补的**：
+ * 二元装不下「omni 压根没设过」，而实测 grok 正是那种——不报档位表、却推当前档。
+ */
+describe("引擎报的当前档怎么变成一条轴", () => {
+  const REAL = [
+    { id: "read-only", name: "Read-only" },
+    { id: "agent", name: "Agent" },
+  ]
+
+  it("引擎报的正是 omni 想要的那一档 → aligned", () => {
+    expect(modeAxis(REAL, "auto-edit", "agent").match).toBe("aligned")
+  })
+
+  it("引擎跑到别的档上去了 → diverged", () => {
+    expect(modeAxis(REAL, "auto-edit", "read-only").match).toBe("diverged")
+  })
+
+  it("**omni 匹配不出任何目标时是 unknown，不是 diverged**——没设过就谈不上分家", () => {
+    expect(modeAxis([], "auto-edit", "default").match).toBe("unknown")
+    expect(modeAxis([{ id: "alpha" }], "auto-edit", "alpha").match).toBe("unknown")
+  })
+
+  it("人话名原样带出来；引擎没给就不给——界面不自己编一个中文名", () => {
+    expect(modeAxis(REAL, "auto-edit", "agent").label).toBe("Agent")
+    expect(modeAxis([{ id: "x" }], "auto-edit", "x").label).toBeUndefined()
   })
 })

@@ -22,7 +22,13 @@ export interface TrustHint {
   action?: { label: string; kind: "reapply" }
 }
 
-/** 分家：**此刻正在发生的事实**，优先于「上次设档的结果」。 */
+/**
+ * 分家：**此刻正在发生的事实**，优先于「上次设档的结果」。
+ *
+ * **只认 `diverged`，不认 `unknown`。** 后者的意思是「引擎报了它在哪一档，
+ * 但 omni 压根没设过、没有可比的基准」——那不是分家，说成分家就是一条常亮的假警告
+ *（实测 grok：不报档位表、却推当前档）。`unknown` 该走下面的 `unmapped` 那条说明。
+ */
 function divergedHint(thread: Thread, engineLabel: string, trustLabel: string): TrustHint | undefined {
   const diverged = thread.engineState?.axes.find((a) => a.match === "diverged")
   if (diverged === undefined) return undefined

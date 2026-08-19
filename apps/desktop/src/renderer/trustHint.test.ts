@@ -51,6 +51,20 @@ describe("档位说明：四种情形各说一句，其余一个字都不说", (
     })
   }
 
+  it("**`unknown` 不算分家**——引擎报了它在哪一档，但 omni 压根没设过，那不是分家", () => {
+    const thread = with_({
+      engineState: { axes: [{ axis: "mode", id: "default", match: "unknown" }], at: 1 },
+      trustApply: apply("unmapped", "对不上"),
+    })
+    // 落到 unmapped 那句说明上，而不是常亮一条「引擎那边现在是 X（不是 omni 切的）」
+    expect(trustHint(thread, "Grok", "自动编辑")?.kind).toBe("unmapped")
+  })
+
+  it("只有 unknown、连 trustApply 都没有时，什么都不说", () => {
+    const thread = with_({ engineState: { axes: [{ axis: "mode", id: "default", match: "unknown" }], at: 1 } })
+    expect(trustHint(thread, "Grok", "自动编辑")).toBeUndefined()
+  })
+
   it("分家优先于设档结果——前者是此刻正在发生的事实", () => {
     const thread = with_({
       engineState: { axes: [axis("diverged")], at: 1 },

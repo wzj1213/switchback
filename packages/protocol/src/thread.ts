@@ -44,8 +44,19 @@ export interface EngineAxis {
    *
    * 反推做不到：`pickMode` 是 Trust→modeId 的打分匹配，有损、多对一，反过来是一对多。
    * 而驱动知道它自己发过什么、引擎回了什么，它答得起。
+   *
+   * ## 为什么必须有第三种 `unknown`
+   *
+   * 二元装不下「**omni 压根没设过**」。实测 grok：`session/new` 不报 `availableModes`，
+   * 但它**会推 `current_mode_update`**（源码原话：进出每一档都通知）。
+   * 于是 omni 手上没有档位表、匹配不出任何目标，却收得到引擎的当前档——
+   * 这时报 `diverged` 会让界面上**常亮一条「引擎那边现在是 X（不是 omni 切的）」**，
+   * 而 omni 从没设过任何档，谈不上分家。那是这一批要消灭的那类谎，只是反过来。
+   *
+   * `unknown` 的意思是「引擎报了它在哪一档，但**没有可比的基准**」——
+   * 为什么没有基准，由 `Thread.trustApply` 的 `unmapped` 那条去讲，不塞进这一个字段。
    */
-  match: "aligned" | "diverged"
+  match: "aligned" | "diverged" | "unknown"
 }
 
 /** omni 最后一次设档的结果。**设不上要说出来**，而不是像以前那样发一条被过滤掉的状态。 */
