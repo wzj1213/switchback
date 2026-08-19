@@ -1,6 +1,7 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
 import type { ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
+import { clearTasks, onTaskProgress, type TaskState } from "./tasks.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
@@ -56,6 +57,8 @@ export interface TurnRef {
    * `item.updated` 要带整条 item，所以必须把它留着。
    */
   tools: Map<ItemId, ToolCallItem>
+  /** 这一轮里子 agent 报的进度。**活状态，轮次收工就清**（见 `tasks.ts`）。 */
+  tasks: TaskState
 }
 
 function makeIdMinter(ref: TurnRef, turnId: TurnId): () => ItemId {
@@ -116,12 +119,15 @@ function endTurn(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus
   if (turnId === undefined) return
   ref.current = undefined
   sweepTools(ref, req, at, status)
+  // 子 agent 跟着轮次一起收：一轮结束还留着，界面上就是一串早就跑完了却还在转的任务
+  clearTasks(ref.tasks, at, req)
   req.emit({ type: "turn.completed", at, turnId, status })
 }
 
 function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
   const turnId = ref.current
   ref.current = undefined
+  clearTasks(ref.tasks, at, req)
   if (msg.usage !== undefined) {
     req.emit({ type: "usage.updated", at, threadId: req.threadId, usage: usageOf(msg.usage) })
   }
@@ -147,6 +153,10 @@ function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
         if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
         req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
       }
+      // **只接 `task_progress` 一种**：同族还有 task_started / task_updated /
+      // task_notification，但只有这一种我抓到过完整形状。照名字猜字段不会报错，
+      // 只会让界面显示一条编出来的进度（见 `tasks.ts`）
+      if (msg.subtype === "task_progress") onTaskProgress(ref.tasks, msg, at, req)
       return
     default:
       // 其余 30+ 种 SDKMessage 暂不进 transcript，见 README「已知限制」

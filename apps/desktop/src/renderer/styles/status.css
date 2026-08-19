@@ -162,3 +162,25 @@
 .menu__item:hover {
   background: var(--bg-hover);
 }
+
+/**
+ * 子 agent 各占一行，缩进一格挂在「正在…」下面——它们是**那一轮里面**的事，
+ * 不是并列的另一件事。
+ */
+.turnstatus__task {
+  display: block;
+  margin-left: var(--sp-4);
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/** 最近用的那个工具压得更暗：它是佐证，不是主语。 */
+.turnstatus__tool {
+  margin-left: var(--sp-2);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

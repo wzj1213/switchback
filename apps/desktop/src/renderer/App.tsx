@@ -1,4 +1,4 @@
-import { commandsOf, forkPeerOf, limitsOf, modelsOf, turnOf, usageOf } from "@omni/store"
+import { commandsOf, forkPeerOf, limitsOf, modelsOf, tasksOf, turnOf, usageOf } from "@omni/store"
 import { stampOf } from "./stamp.js"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
@@ -166,6 +166,7 @@ export function App(): React.JSX.Element {
         items={app.items}
         turn={turnOf(state, thread.id)}
         usage={usageOf(state, thread.id)}
+        tasks={tasksOf(state, thread.id)}
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
         models={modelsOf(state, thread.id, thread.engine)}

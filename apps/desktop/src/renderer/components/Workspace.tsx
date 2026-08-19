@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
+import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage , TaskRun } from "@omni/protocol"
 import type { Notice, ThreadRow } from "@omni/store"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
 import { Asides } from "./Asides.js"
@@ -23,6 +23,8 @@ export interface WorkspaceProps {
   items: readonly Item[]
   turn: Turn | undefined
   usage: Usage | undefined
+  /** 此刻在跑的子 agent。引擎报了才有，没有就是空数组。 */
+  tasks: readonly TaskRun[]
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
   notices: readonly Notice[]
@@ -188,6 +190,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         thread={thread}
         items={props.items}
         turn={props.turn}
+        tasks={props.tasks}
         send={send}
         onCopy={props.onCopy}
         onReuse={reuse}

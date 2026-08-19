@@ -1,4 +1,4 @@
-import type { EngineAccount, EngineInfo, EngineThread, Item, ItemId, ModelOption, RateLimits, SlashCommand, Thread, ThreadId, Turn, TurnId, Usage } from "@omni/protocol"
+import type { EngineAccount, EngineInfo, EngineThread, Item, ItemId, ModelOption, RateLimits, SlashCommand, Thread, ThreadId, TaskRun, Turn, TurnId, Usage } from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -15,6 +15,12 @@ export interface ViewState {
   turnOwner: Readonly<Record<TurnId, ThreadId>>
   /** 每个会话的上下文用量。引擎不报就没有这一项。 */
   usage: Readonly<Record<ThreadId, Usage>>
+  /**
+   * 每个会话此刻有哪些子 agent 在跑。**活状态，不落盘**——和 `usage` 同一类。
+   *
+   * 轮次一结束就清空：重放一串早就跑完的任务比不显示更糟。
+   */
+  tasks: Readonly<Record<ThreadId, readonly TaskRun[]>>
   /**
    * 每个会话可选的模型，**连同报它的那家引擎**。引擎报了才有。
    *
@@ -75,6 +81,7 @@ export function initial(): ViewState {
     owner: {},
     turnOwner: {},
     usage: {},
+    tasks: {},
     models: {},
     commands: {},
     limits: {},
@@ -98,6 +105,18 @@ export function turnOf(state: ViewState, threadId: ThreadId): Turn | undefined {
 
 export function usageOf(state: ViewState, threadId: ThreadId): Usage | undefined {
   return state.usage[threadId]
+}
+
+/**
+ * 这条会话此刻有哪些子 agent 在跑。
+ *
+ * **空的时候返回同一个常量数组**：`Transcript` 那条链上的 memo 认引用，
+ * 每次现造一个 `[]` 会让它每渲染一次都判定「变了」（`AppApi.items` 那条注释是同一个坑）。
+ */
+const NONE: readonly TaskRun[] = []
+
+export function tasksOf(state: ViewState, threadId: ThreadId): readonly TaskRun[] {
+  return state.tasks[threadId] ?? NONE
 }
 
 /**

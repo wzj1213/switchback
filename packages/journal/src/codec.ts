@@ -16,7 +16,9 @@ import type { Event } from "@omni/protocol"
  * `engine.status` 也不落：它描述的是**那一次进程**的状态，
  * 重启之后再放一遍「引擎已就绪」只会误导人。
  */
-const SKIP = new Set(["item.delta", "engine.status"])
+// `tasks.updated` 同理：它描述的是**此刻**谁在跑，落盘之后重放出来是一串早就跑完了
+// 却还显示在跑的任务。一次长子 agent 还会写几十条进去，而它们一条都没有回放价值
+const SKIP = new Set(["item.delta", "engine.status", "tasks.updated"])
 
 export function shouldPersist(event: Event): boolean {
   return !SKIP.has(event.type)

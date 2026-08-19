@@ -27,6 +27,33 @@ export interface Usage {
  * `Options` 字段，改它要重启会话——所以它不填，界面上也就不会出现一个
  * 点了没用的控件。
  */
+/**
+ * 一个正在跑的**子 agent / 后台任务**。
+ *
+ * ## 为什么是活状态，不落盘
+ *
+ * 和 `usage` 同一类：它描述的是「此刻」，而不是「发生过什么」。落盘之后重放出来
+ * 是一串**早就跑完了的任务还显示在跑**——比没有更糟。轮次一结束就清掉。
+ *
+ * ## 每个字段都是引擎给的，omni 一个字都不编
+ *
+ * 实测 claude 的 `system/task_progress` 一帧：
+ * `{description:"Reading b.txt", subagent_type:"general-purpose",
+ *   last_tool_name:"Read", usage:{tool_uses:3, duration_ms:4186}}`。
+ * `description` 是**它自己写的一句人话**——omni 拿现成的，不从工具名拼一句出来。
+ */
+export interface TaskRun {
+  id: string
+  /** 引擎写的一句人话。没有就不显示这一条——**不拿工具名拼一句顶替**。 */
+  description: string
+  /** 子 agent 的类型名（claude 的 `general-purpose` 之类）。报不上来就缺席。 */
+  agentType?: string
+  /** 它最近用的那个工具。 */
+  lastTool?: string
+  toolUses: number
+  ms: number
+}
+
 export interface ModelOption {
   id: string
   label: string
@@ -111,6 +138,13 @@ export type Event =
   | { type: "account.updated"; at: number; engine: EngineId; account: EngineAccount }
   /** 上下文与消耗。引擎给什么报什么，给不出的字段就缺席。 */
   | { type: "usage.updated"; at: number; threadId: ThreadId; usage: Usage }
+  /**
+   * 这条会话此刻有哪些子 agent 在跑。**整份替换**，空数组 = 一个都没有。
+   *
+   * 全量而不是增量：一次只报一条的话，「它跑完了」就得再发明一种「删除」事件，
+   * 而漏发一次的后果是界面上留一条**永远在跑**的任务。全量替换没有这个失败模式。
+   */
+  | { type: "tasks.updated"; at: number; threadId: ThreadId; tasks: readonly TaskRun[] }
   /**
    * 账号额度用到哪儿了。引擎每轮推一次。
    *

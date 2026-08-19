@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { Item, Thread, Turn } from "@omni/protocol"
+import type { Item, TaskRun, Thread, Turn } from "@omni/protocol"
 import { Shimmer } from "./Shimmer.js"
 import { elapsed, statusLabel } from "../status.js"
 
@@ -30,10 +30,13 @@ export function TurnStatus({
   thread,
   turn,
   items,
+  tasks,
 }: {
   thread: Thread
   turn: Turn | undefined
   items: readonly Item[]
+  /** 此刻在跑的子 agent。**每条都是引擎自己写的一句人话**，omni 不拼。 */
+  tasks: readonly TaskRun[]
 }): React.JSX.Element | null {
   const [now, setNow] = useState(() => Date.now())
   const running = turn !== undefined
@@ -56,6 +59,18 @@ export function TurnStatus({
     <div className="turnstatus" role="status" aria-live="polite">
       <Shimmer text={label} />
       {showClock ? <span className="turnstatus__clock">{elapsed(turn.startedAt, now)}</span> : null}
+      {/*
+       * 子 agent 各占一行。**这一段只在引擎真报了的时候才存在**——
+       * 一个没有子 agent 的轮次不该多出一块空的「任务」区。
+       * 每条显示的都是引擎自己写的那句 `description`（实测 claude：「Reading b.txt」），
+       * omni 既不翻译也不从工具名拼一句顶替。
+       */}
+      {tasks.map((task) => (
+        <span key={task.id} className="turnstatus__task">
+          {task.description}
+          {task.lastTool === undefined ? null : <span className="turnstatus__tool">{task.lastTool}</span>}
+        </span>
+      ))}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import type { Command, Item, Thread, Turn } from "@omni/protocol"
+import type { Command, Item, TaskRun, Thread, Turn } from "@omni/protocol"
 import { memo, useCallback, useMemo, useState } from "react"
 import { ItemView } from "./ItemView.js"
 import type { ResolveApproval } from "./Approval.js"
@@ -162,6 +162,7 @@ export const Transcript = memo(function Transcript({
   thread,
   items,
   turn,
+  tasks,
   send,
   onCopy,
   onReuse,
@@ -169,6 +170,8 @@ export const Transcript = memo(function Transcript({
   thread: Thread
   items: readonly Item[]
   turn: Turn | undefined
+  /** 此刻在跑的子 agent。**引擎报了才有**，一个都没有时是空数组。 */
+  tasks: readonly TaskRun[]
   send: (command: Command) => void
   onCopy: (text: string) => void
   /** 把一句话填回输入框。对比视图不给（那边没有输入框）。 */
@@ -214,7 +217,7 @@ export const Transcript = memo(function Transcript({
         ))}
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
-        <TurnStatus thread={thread} turn={turn} items={items} />
+        <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} />
       </div>
       {/* 往回翻的时候给一条回去的路。**这才是「逃生口不该滚走」的正确解法**——
           不是把状态行钉住，而是给一个「回到底部」 */}

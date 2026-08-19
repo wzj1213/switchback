@@ -12,6 +12,7 @@ import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { askAside, canAside } from "./aside.js"
+import { createTaskState } from "./tasks.js"
 import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
@@ -54,7 +55,7 @@ class ClaudeSession implements EngineSession {
   private readonly input = createQueue<SDKUserMessage>()
   private readonly abort = new AbortController()
   private readonly trust: { current: Trust }
-  private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map() }
+  private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map(), tasks: createTaskState() }
   private readonly owner: ProcessOwner
   private loop: Promise<void> | undefined
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */

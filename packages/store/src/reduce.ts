@@ -118,7 +118,9 @@ function onTurnCompleted(
 ): ViewState {
   const threadId = state.turnOwner[event.turnId]
   if (threadId === undefined) return state
-  return { ...state, turns: omit(state.turns, threadId) }
+  // **子 agent 跟着轮次一起清。** 它们是活状态：一轮结束还留着，界面上就是一串
+  // 早就跑完了、却还显示在跑的任务——比不显示更糟
+  return { ...state, turns: omit(state.turns, threadId), tasks: omit(state.tasks, threadId) }
 }
 
 /**
@@ -141,6 +143,7 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
     items: omit(state.items, threadId),
     turns: omit(state.turns, threadId),
     usage: omit(state.usage, threadId),
+    tasks: omit(state.tasks, threadId),
     models: omit(state.models, threadId),
     owner: keepOwner,
     turnOwner: keepTurnOwner,
@@ -238,6 +241,11 @@ const HANDLERS: Handlers = {
   "item.delta": reduceItem,
   "item.updated": reduceItem,
   "usage.updated": reduceCatalog,
+  // **整份替换**：全量的好处是没有「漏发一次删除」这个失败模式（见事件定义）
+  "tasks.updated": (state, event) => ({
+    ...state,
+    tasks: { ...state.tasks, [event.threadId]: event.tasks },
+  }),
   "commands.updated": (state, event) => ({
     ...state,
     commands: { ...state.commands, [event.threadId]: event.commands },

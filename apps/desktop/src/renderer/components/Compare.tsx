@@ -174,7 +174,9 @@ export function Compare({
             <Transcript
               thread={side.thread}
               items={side.items}
-              turn={side.turn}
+              /* 对比看的是**已经跑完的两条**，没有实时任务可显示 */
+        tasks={[]}
+        turn={side.turn}
               send={send}
               onCopy={onCopy}
             />
