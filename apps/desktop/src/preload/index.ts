@@ -4,6 +4,7 @@ import type { Replay, Sealed } from "@omni/wire"
 import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
+import type { EngineDoor } from "../main/enginedoors.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { RemoteStatus } from "../main/remote/install.js"
 import type { ReviewFile, ReviewPatch } from "../shared/review.js"
@@ -58,6 +59,10 @@ const api = {
    */
   async engineVersions(refresh?: boolean): Promise<readonly EngineVersion[]> {
     return (await ipcRenderer.invoke("omni:engineVersions", refresh)) as readonly EngineVersion[]
+  },
+  /** 各家引擎自己的设置在哪儿。**omni 只把门指出来**，见 `main/enginedoors.ts`。 */
+  async engineDoors(cwd?: string): Promise<readonly EngineDoor[]> {
+    return (await ipcRenderer.invoke("omni:engineDoors", cwd)) as readonly EngineDoor[]
   },
 
   /**

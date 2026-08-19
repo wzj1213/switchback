@@ -31,8 +31,8 @@ export interface Read {
   error?: string
 }
 
-/** 家目录：环境变量优先。 */
-function homeOf(env: string, fallback: string): string {
+/** 家目录：环境变量优先。**跟着它们走，不写死 `~/.x`**——改过家目录的人正是最需要这些页的。 */
+export function homeOf(env: string, fallback: string): string {
   const set = process.env[env]
   return set === undefined || set === "" ? join(homedir(), fallback) : set
 }

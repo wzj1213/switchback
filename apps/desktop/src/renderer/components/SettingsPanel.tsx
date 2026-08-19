@@ -68,7 +68,8 @@ function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
   const { settings, onPatch } = props
   if (tab === "look") return <LookSection settings={settings} onPatch={onPatch} />
   if (tab === "new") return <NewThreadSection settings={settings} engines={props.engines} onPatch={onPatch} />
-  if (tab === "engines") return <EnginesSection onOpenEngines={props.onOpenEngines} />
+  if (tab === "engines")
+    return <EnginesSection cwd={props.cwd} onOpenEngines={props.onOpenEngines} onReveal={props.onReveal} />
   if (tab === "env") return <EnvSection cwd={props.cwd} />
   if (tab === "remote") return <RemotePanel settings={settings} onPatch={onPatch} />
   return (

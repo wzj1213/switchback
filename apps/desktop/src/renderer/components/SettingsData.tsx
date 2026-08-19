@@ -1,4 +1,5 @@
 import { EngineVersions } from "./EngineVersions.js"
+import { EngineDoors } from "./EngineDoors.js"
 import { Field, Group } from "./SettingsBits.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 
@@ -9,13 +10,26 @@ import { CopyIcon, RevealIcon } from "./icons.js"
  * 这里不复制第二份。摆两份实现的下场是其中一份迟早不更新，而那份正好是用户用的那份。
  */
 
-export function EnginesSection({ onOpenEngines }: { onOpenEngines: () => void }): React.JSX.Element {
+export function EnginesSection({
+  cwd,
+  onOpenEngines,
+  onReveal,
+}: {
+  cwd: string | undefined
+  onOpenEngines: () => void
+  onReveal: (path: string) => void
+}): React.JSX.Element {
   return (
     <>
       {/* 两张卡，不是一张：版本那张底下带一颗「重新检查」，
           而注册表和「装的哪版」不是一回事——挤在一张卡里，那颗按钮看起来像在管注册表 */}
       <Group title="引擎版本" hint="更新会动你的全局环境（一条 npm i -g），所以只做到「把命令摆出来，你自己点」。">
         <EngineVersions />
+      </Group>
+      {/* **只摆路径，不做表单**：那些设置是各家自己的，omni 抄一份进来就得跟着它们改，
+          而它们改的时候不会通知我们。见 `EngineDoors` 的注释 */}
+      <Group title="各家自己的设置" hint="omni 只把门指出来——格式、默认值、什么时候生效，都是各家自己的事。">
+        <EngineDoors cwd={cwd} onReveal={onReveal} />
       </Group>
       <Group title="引擎注册表">
         <Field label="engines.json" hint="挂第三方 ACP 引擎，改完要重启 omni">

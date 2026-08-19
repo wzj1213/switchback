@@ -5,6 +5,7 @@ import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
 import { installProjectDocChannel } from "./projectdoc.js"
 import { createEngineVersions, installEngineVersionChannel } from "./enginever.js"
+import { installEngineDoorChannel } from "./enginedoors.js"
 import { installSelfUpdateChannel } from "./selfupdate.js"
 import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
@@ -319,6 +320,7 @@ function installChannels(): void {
   installAttachChannel()
   installProjectDocChannel()
   installEngineVersionChannel(log, engineVersions)
+  installEngineDoorChannel()
   installEnvChannel(log)
   installSelfUpdateChannel(log)
 }
