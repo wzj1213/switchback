@@ -1,5 +1,6 @@
 import type { Event, ItemId, RateLimits, RateWindow, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
+import { readSettings, type CodexSettings } from "./settings.js"
 import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireMcpStatus, WireRateLimits, WireRateWindow, WireTokenUsage, WireTurnLifecycle } from "./wire.js"
 
 /**
@@ -18,6 +19,11 @@ export interface NotifyContext {
    * 而 `NotifyContext` 在那之前就造好了。
    */
   codexThread: () => string | undefined
+  /**
+   * 引擎报了一份设置快照。**这一层只翻译，怎么落由驱动定**——
+   * 「omni 设的和它报的对不对得上」要知道 omni 当前是哪一档，那是驱动才有的上下文。
+   */
+  onSettings?: (settings: CodexSettings) => void
   emit: (event: Event) => void
   /** 宿主铸造的当前轮次 id。codex 自己的 turnId 只用来判断是不是当前轮。 */
   turnId: () => TurnId | undefined
@@ -250,6 +256,10 @@ const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) =>
   },
   error: (ctx, p) => {
     onError(ctx, p as WireError)
+  },
+  // **codex 唯一会主动说「我现在是什么档」的通知**，藏在实验面后面（见 `claims.ts`）
+  "thread/settings/updated": (ctx, p) => {
+    ctx.onSettings?.(readSettings(p))
   },
 }
 

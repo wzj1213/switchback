@@ -6,6 +6,7 @@ import { resolveCommand } from "../probe.js"
 import type { RpcPeer } from "../rpc.js"
 import { POLICY } from "./sandbox.js"
 import { reportAccount } from "./account.js"
+import { claimedCapabilities } from "./claims.js"
 import type { WireSandbox } from "./wire.js"
 
 /**
@@ -158,7 +159,11 @@ async function forkThread(ctx: OpenCtx, of: { handle: string; dropTurns?: number
 async function handshake(ctx: OpenCtx): Promise<void> {
   const command = ctx.config.command ?? "codex"
   const result = await Promise.race([
-    ctx.rpc.call("initialize", { clientInfo: CLIENT_INFO, capabilities: null }).then(() => "ok" as const),
+    // **认领什么只有一个来源**（`claims.ts`），代码里不另写一份——
+    // 写两份的下场是那张表变成一份没人对照的文档
+    ctx.rpc
+      .call("initialize", { clientInfo: CLIENT_INFO, capabilities: claimedCapabilities() })
+      .then(() => "ok" as const),
     ctx.owner.died().then((error) => ({ died: error })),
     sleep(HANDSHAKE_MS).then(() => "timeout" as const),
   ])

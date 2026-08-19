@@ -1,14 +1,15 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineAccount, EngineCapabilities, EngineStatus, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
+import type { EngineAccount, EngineAxis, EngineCapabilities, EngineStatus, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { skillsToCommands, toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
-import { LOOSENESS, SANDBOX } from "./sandbox.js"
+import { LOOSENESS, POLICY, SANDBOX } from "./sandbox.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { answerApproval } from "./approve.js"
 import type { WireItem } from "./wire.js"
+import { canonical, type CodexSettings } from "./settings.js"
 import { openSession, type OpenCtx, type SessionState } from "./open.js"
 
 /**
@@ -18,6 +19,17 @@ import { openSession, type OpenCtx, type SessionState } from "./open.js"
  * 单独写在 `sandbox.ts`——那不是一张查找表，是接第二家引擎时最大的发现。
  */
 const STDERR_KEEP = 2000
+
+/**
+ * 引擎报的一维 → 一条轴。**引擎没报这一维就不造一条**——
+ * 一条 id 是空串的轴在界面上就是一行没有内容的说明。
+ */
+function axisOf(axis: string, got: string | undefined, want: string): EngineAxis | undefined {
+  if (got === undefined) return undefined
+  // **比的是规范形，显示的是原文**：同一个值两边拼写不同（实测 `workspace-write`
+  // vs `workspaceWrite`），直接比字符串会给每条会话常亮一句假警告。见 `canonical`
+  return { axis, id: got, match: canonical(got) === canonical(want) ? "aligned" : "diverged" }
+}
 
 export interface CodexDriverConfig {
   /** 可执行文件。默认走 PATH 上的 `codex`。 */
@@ -68,6 +80,9 @@ class CodexSession implements EngineSession {
     return {
       threadId: this.req.threadId,
       codexThread: () => this.state.codexThread,
+      onSettings: (settings) => {
+        this.adoptSettings(settings)
+      },
       emit: this.req.emit,
       turnId: () => this.state.turn,
       inflight: this.inflight,
@@ -81,6 +96,29 @@ class CodexSession implements EngineSession {
    * 把还挂着的轮次落成终态。**幂等**——`state.turn` 已经清了就什么都不做，
    * 否则正常收工路径发过一条之后这里再发一条，journal 里多一行。
    */
+  /**
+   * 引擎报了一份设置快照。
+   *
+   * **`match` 在这里判**：omni 自己设的是 `POLICY[trust]` 与 `SANDBOX[trust]`
+   *（见 `sandbox.ts`），拿它和引擎报的比一比就行——不像 ACP 那边要打分匹配，
+   * 这里两边都是固定枚举，对不对得上是**确定**的。
+   *
+   * 两条轴分开报：codex 的档同时落在这两个旋钮上，压成一个值就得现编一个合成 id。
+   */
+  private adoptSettings(settings: CodexSettings): void {
+    const want = { approval: POLICY[this.trust.current], sandbox: SANDBOX[this.trust.current] }
+    const axes = [
+      axisOf("approval", settings.approval, want.approval),
+      axisOf("sandbox", settings.sandbox, want.sandbox),
+    ].filter((a) => a !== undefined)
+    if (axes.length > 0 || settings.model !== undefined) {
+      this.req.onEngineState?.({ axes, ...(settings.model === undefined ? {} : { modelId: settings.model }) })
+    }
+    if (settings.model !== undefined || settings.effort !== undefined) {
+      this.req.onModel?.(settings.model, settings.effort)
+    }
+  }
+
   private endTurn(status: TurnStatus): void {
     const turnId = this.state.turn
     if (turnId === undefined) return
