@@ -10,6 +10,14 @@ import type { WireDelta, WireError, WireItem, WireItemLifecycle, WireMcpStatus, 
  */
 export interface NotifyContext {
   threadId: ThreadId
+  /**
+   * **codex 自己的** thread id——和上面那个 `threadId` 不是一个命名空间：
+   * 那个是 omni 的会话 id，这个是引擎的。线上的通知带的是后者。
+   *
+   * 取值函数而不是值：它在握手之后才知道（`thread/start` 的回包），
+   * 而 `NotifyContext` 在那之前就造好了。
+   */
+  codexThread: () => string | undefined
   emit: (event: Event) => void
   /** 宿主铸造的当前轮次 id。codex 自己的 turnId 只用来判断是不是当前轮。 */
   turnId: () => TurnId | undefined
@@ -177,31 +185,78 @@ function onError(ctx: NotifyContext, params: WireError): void {
 }
 
 /** 认不出的通知静默丢弃——codex 有 74 种通知，我们只消费其中一小撮。 */
+/**
+ * 这条通知说的是**我这条会话**吗。
+ *
+ * ## 为什么必须判，即使今天判不出区别
+ *
+ * omni 现在一个 codex 进程只开一条 thread，所以同一条 stdio 上不该出现别的 threadId。
+ * 但「不该」不等于「不会」：app-server 一条连接**本来就能带多条 thread**，
+ * 而分叉（`thread/fork`）、子 agent、后台轮次都会往这个方向走。
+ * 到那时串了**不会报错**——只会把别的会话的正文画进这一条。
+ *
+ * 线上的字段早就在（`WireItemLifecycle.threadId` 等），只是没人读。
+ *
+ * **报不上来就放行**：有几条通知的 `threadId` 是可选的（`WireTokenUsage` / `WireError`），
+ * 一律拦掉的话用量和错误就都收不到了。和 `acp/route.ts` 的 `mine` 同一条取舍。
+ */
+function ours(ctx: NotifyContext, params: unknown): boolean {
+  const from = (params as { threadId?: unknown } | undefined)?.threadId
+  if (typeof from !== "string" || from === "") return true
+  const ours = ctx.codexThread()
+  return ours === undefined || from === ours
+}
+
+/**
+ * 方法名 → 处理函数。
+ *
+ * 用表不用 `switch` 的理由和 `acp/update.ts` 那边一样：`switch` 版加上会话归属那一判
+ * 之后实测圈复杂度 **13**，而闸门是 12——**再加一种通知就会红**，而 app-server
+ * 一直在加新的。表是加一行就只是加一行。
+ *
+ * 参数一律 `unknown` 进、各自 as 成自己那个形状：线上的东西本来就不可信，
+ * 在表里统一断言反而会把「这条其实是另一种形状」藏起来。
+ */
+const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) => void>> = {
+  "item/started": (ctx, p) => {
+    onItemStarted(ctx, p as WireItemLifecycle)
+  },
+  "item/completed": (ctx, p) => {
+    onItemCompleted(ctx, p as WireItemLifecycle)
+  },
+  "item/agentMessage/delta": (ctx, p) => {
+    onDelta(ctx, p as WireDelta)
+  },
+  "item/reasoning/summaryTextDelta": (ctx, p) => {
+    onDelta(ctx, p as WireDelta)
+  },
+  "item/reasoning/textDelta": (ctx, p) => {
+    onDelta(ctx, p as WireDelta)
+  },
+  "item/commandExecution/outputDelta": (ctx, p) => {
+    onOutputDelta(ctx, p as WireDelta)
+  },
+  "thread/tokenUsage/updated": (ctx, p) => {
+    onUsage(ctx, p as WireTokenUsage)
+  },
+  "turn/completed": (ctx, p) => {
+    onTurnCompleted(ctx, p as WireTurnLifecycle)
+  },
+  "account/rateLimits/updated": (ctx, p) => {
+    onLimits(ctx, p as { rateLimits?: WireRateLimits })
+  },
+  "mcpServer/startupStatus/updated": (ctx, p) => {
+    onMcpStatus(ctx, p as WireMcpStatus)
+  },
+  error: (ctx, p) => {
+    onError(ctx, p as WireError)
+  },
+}
+
+/** 认不出的通知静默丢弃——协议一直在加新类型，多一种不该掀翻会话。 */
 export function handleNotification(ctx: NotifyContext, method: string, params: unknown): void {
-  switch (method) {
-    case "item/started":
-      return onItemStarted(ctx, params as WireItemLifecycle)
-    case "item/completed":
-      return onItemCompleted(ctx, params as WireItemLifecycle)
-    case "item/agentMessage/delta":
-    case "item/reasoning/summaryTextDelta":
-    case "item/reasoning/textDelta":
-      return onDelta(ctx, params as WireDelta)
-    case "item/commandExecution/outputDelta":
-      return onOutputDelta(ctx, params as WireDelta)
-    case "thread/tokenUsage/updated":
-      return onUsage(ctx, params as WireTokenUsage)
-    case "turn/completed":
-      return onTurnCompleted(ctx, params as WireTurnLifecycle)
-    case "account/rateLimits/updated":
-      return onLimits(ctx, params as { rateLimits?: WireRateLimits })
-    case "mcpServer/startupStatus/updated":
-      return onMcpStatus(ctx, params as WireMcpStatus)
-    case "error":
-      return onError(ctx, params as WireError)
-    default:
-      return
-  }
+  if (!ours(ctx, params)) return
+  HANDLERS[method]?.(ctx, params)
 }
 
 /**

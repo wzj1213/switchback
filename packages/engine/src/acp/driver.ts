@@ -16,13 +16,13 @@ import { imageBlocks } from "./attach.js"
 import {
   closeText,
   createUpdateState,
-  emitUsage,
   handleUpdate,
   sweep,
   type UpdateContext,
   type UpdateState,
 } from "./update.js"
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
+import { mine, onForeign } from "./route.js"
 
 /**
  * 通用 ACP 驱动。**一个驱动接所有讲 ACP 的引擎**——这是接第三家协议的全部意义：
@@ -185,32 +185,18 @@ class AcpSession implements EngineSession {
       this.onForeignNotification(method, params)
       return
     }
-    const update = (params as AcpNotification | undefined)?.update
-    if (update === undefined) return
-    handleUpdate(this.updateContext(), this.updates, update)
+    const note = params as AcpNotification | undefined
+    if (note?.update === undefined || !mine(note.sessionId, this.state.acpSession)) return
+    handleUpdate(this.updateContext(), this.updates, note.update)
   }
 
-  /**
-   * 协议之外的通知。只有一件事要从这里捞：**用量**。
-   *
-   * grok 一条 `usage_update` 都不发（实测），它把 token 数放在自己的
-   * `_x.ai/session_notification` 里。哪个方法名、什么形状由各家的模块认
-   *（见 `AcpDriverConfig.contextUsed`），驱动只负责把它拼成事件——
-   * 分母用当前模型的窗口大小，拿不到就不给，界面据此只显示数字不画比例条。
-   */
+  /** 协议之外的通知怎么处理，全在 `route.ts`——这里只把上下文递过去。 */
   private onForeignNotification(method: string, params: unknown): void {
-    const changed = this.config.modelChanged?.(method, params)
-    if (changed !== undefined) this.adoptModelChange(changed)
-    const used = this.config.contextUsed?.(method, params)
-    if (used === undefined) return
-    emitUsage(this.updateContext(), used, this.state.contextWindow)
-  }
-
-  /** 引擎自己换了模型 / 强度：落到状态上，并沿两条既有的路报上去。 */
-  private adoptModelChange(changed: { model?: string; effort?: string }): void {
-    if (changed.effort !== undefined) this.state.effort = changed.effort
-    this.req.onModel?.(changed.model, changed.effort)
-    if (changed.model !== undefined) this.req.onEngineState?.({ modelId: changed.model })
+    onForeign(
+      { config: this.config, state: this.state, req: this.req, update: () => this.updateContext() },
+      method,
+      params,
+    )
   }
 
   private wire(child: ChildProcess): void {

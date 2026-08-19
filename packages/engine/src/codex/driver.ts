@@ -67,6 +67,7 @@ class CodexSession implements EngineSession {
   private notifyContext(): NotifyContext {
     return {
       threadId: this.req.threadId,
+      codexThread: () => this.state.codexThread,
       emit: this.req.emit,
       turnId: () => this.state.turn,
       inflight: this.inflight,

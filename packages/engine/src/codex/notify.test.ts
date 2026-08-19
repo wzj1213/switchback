@@ -7,6 +7,9 @@ const setup = (): { ctx: NotifyContext; events: Event[] } => {
   const events: Event[] = []
   const ctx: NotifyContext = {
     threadId: "th-1",
+    // 还没握手完就不知道自己的 id——那时一律放行（见 `ours`）。
+    // 归属判定另有专门的用例
+    codexThread: () => undefined,
     emit: (e) => events.push(e),
     turnId: () => "tn-1",
     inflight: new Map<string, WireItem>(),
@@ -112,6 +115,7 @@ describe("轮次与错误", () => {
     const events: Event[] = []
     const ctx: NotifyContext = {
       threadId: "th",
+      codexThread: () => undefined,
       emit: (e) => events.push(e),
       turnId: () => undefined,
       inflight: new Map(),
@@ -182,6 +186,7 @@ describe("用量", () => {
     const events: Event[] = []
     const ctx: NotifyContext = {
       threadId: "th-1",
+      codexThread: () => undefined,
       emit: (e) => events.push(e),
       turnId: () => undefined,
       inflight: new Map(),
@@ -324,5 +329,59 @@ describe("MCP 服务器起不来：静默的能力损失必须出声", () => {
 
   it("没有名字的一律不管——说不出是哪台服务器的警报没有用", () => {
     expect(report({ status: "boom" })).toEqual([])
+  })
+})
+
+/**
+ * **同一条 stdio 上可能跑多条 thread。** 今天 omni 一个进程只开一条，所以判不出区别；
+ * 但 app-server 一条连接本来就能带多条，而分叉、子 agent、后台轮次都会往那儿走。
+ * 到那时串了不会报错——只会把别的会话的正文画进这一条。
+ */
+describe("通知的会话归属", () => {
+  function ctxOf(mine: string | undefined) {
+    const events: Event[] = []
+    return {
+      events,
+      ctx: {
+        threadId: "th-1",
+        codexThread: () => mine,
+        emit: (e: Event) => events.push(e),
+        turnId: () => "t-1",
+        inflight: new Map(),
+        materialized: new Set<string>(),
+        mcpSeen: new Map(),
+        now: () => 0,
+      } as unknown as NotifyContext,
+    }
+  }
+
+  const note = (threadId: string): unknown => ({
+    item: { id: "i1", item_type: "agentMessage", text: "喂" },
+    threadId,
+    turnId: "tn",
+  })
+
+  it("是我这条 thread 的才处理", () => {
+    const h = ctxOf("cx-1")
+    handleNotification(h.ctx, "item/completed", note("cx-1"))
+    expect(h.events.length).toBeGreaterThan(0)
+  })
+
+  it("**别条 thread 的整条丢掉**——不然它的正文会画进这条会话", () => {
+    const h = ctxOf("cx-1")
+    handleNotification(h.ctx, "item/completed", note("cx-2"))
+    expect(h.events).toEqual([])
+  })
+
+  it("自己还不知道 id 时放行——握手完成之前就有通知到，拦掉等于丢开场", () => {
+    const h = ctxOf(undefined)
+    handleNotification(h.ctx, "item/completed", note("cx-9"))
+    expect(h.events.length).toBeGreaterThan(0)
+  })
+
+  it("**通知不带 threadId 也放行**：用量和错误那两条它是可选的，拦掉就再也收不到", () => {
+    const h = ctxOf("cx-1")
+    handleNotification(h.ctx, "thread/tokenUsage/updated", { tokenUsage: { last: { totalTokens: 7 } } })
+    expect(h.events.filter((e) => e.type === "usage.updated")).toHaveLength(1)
   })
 })
