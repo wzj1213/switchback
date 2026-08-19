@@ -1,6 +1,8 @@
-import type { EngineCapabilities, ModelOption, Trust } from "@omni/protocol"
+import type { ChildProcess } from "node:child_process"
+import type { EngineCapabilities, EngineStatus, ModelOption, Trust } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
+import { resolveCommand } from "../probe.js"
 import type { RpcPeer } from "../rpc.js"
 import {
   canList,
@@ -100,6 +102,18 @@ export interface OpenState {
   stderr: string
 }
 
+/** `startSession` 要的东西：`OpenCtx` 再加三件驱动才知道怎么做的事。 */
+export interface StartCtx extends OpenCtx {
+  config: OpenCtx["config"] & { args?: readonly string[]; env?: Readonly<Record<string, string>> }
+  /** 子进程句柄由开场填上；`OpenState` 不含它，那是驱动 `SessionState` 的字段。 */
+  state: OpenState & { child: ChildProcess | undefined }
+  status: (status: EngineStatus, detail?: string) => void
+  /** 把子进程的 stdout/stderr/exit 接到 rpc 上。留在驱动里，见 `codex/open.ts` 的同名字段。 */
+  wire: (child: ChildProcess) => void
+  /** 把信任档落到引擎上。它要的 `TrustCtx` 是另一份上下文，所以由驱动包一层递进来。 */
+  applyTrust: () => Promise<void>
+}
+
 export interface OpenCtx {
   rpc: RpcPeer
   owner: ProcessOwner
@@ -146,6 +160,33 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
   // 所以这里留 undefined，由 `history()` 问一次再定（见那边的注释）
   ctx.state.canList = canList(info) ? true : undefined
   return capabilitiesOf(info)
+}
+
+/**
+ * 从起进程到能收发的**整条开场序列**：spawn → 接线 → 握手 → 开/续/分会话 → 落信任档。
+ *
+ * 和 `codex/open.ts` 的 `openSession` 对称。**两个驱动的开场应当长得一样**——
+ * 它们失败的方式是同一类（起不来、握手超时、续跑的会话没了），
+ * 而每一种都要说出人能照着做的下一句话；分头写两份，迟早只有一份说得清楚。
+ */
+export async function startSession(ctx: StartCtx): Promise<void> {
+  ctx.status("starting")
+  // **spawn 真正能跑的那个绝对路径，不是裸名字**：裸名字由 PATH 再解析一次，
+  // 而那次可能落到另一个同名文件上（真机上遇到过一个不存在的空壳排在前面）——
+  // 那样「探测说好、真跑的是另一个」，是最难查的一类故障。见 `resolveCommand`
+  const child = ctx.owner.spawn({
+    command: await resolveCommand(ctx.config.command),
+    args: ctx.config.args ?? [],
+    cwd: ctx.req.cwd,
+    env: { ...process.env, ...(ctx.config.env ?? {}) },
+  })
+  ctx.state.child = child
+  ctx.wire(child)
+  ctx.state.caps = await handshake(ctx)
+  await openSession(ctx)
+  // 档位在开会话之后统一施加：`session/new` 才拿得到 agent 报的档位表
+  await ctx.applyTrust()
+  ctx.status("ready")
 }
 
 /**

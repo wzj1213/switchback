@@ -62,7 +62,7 @@ export type { AcpToolCall, AcpUpdate, AcpNewSession, AcpPermissionOption } from 
 export type { EngineDriver, EngineSession, StartRequest, ApprovalAsk, ApprovalAnswer } from "./contract.js"
 export type { ClaudeDriverConfig } from "./claude/driver.js"
 export type { CodexDriverConfig } from "./codex/driver.js"
-export type { AcpDriverConfig } from "./acp/driver.js"
+export type { AcpDriverConfig } from "./acp/caps.js"
 export type { AskMeta, RequestContext } from "./claude/permission.js"
 export type { PushQueue } from "./queue.js"
 export type { ProcessOwner, ReclaimConfig, ReclaimReport, Rung, SpawnRequest } from "./subprocess.js"

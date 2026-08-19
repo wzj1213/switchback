@@ -2,7 +2,8 @@ import type { Command, EngineSegment, Item, Thread, ThreadId } from "@omni/proto
 import { initial, itemsOf, reduceAll } from "@omni/store"
 import { emit, type Ctx, type Live } from "./ctx.js"
 import { copyTranscript } from "./transcript.js"
-import { dropTemps, launch, rememberHandle } from "./session.js"
+import { dropTemps, launch } from "./session.js"
+import { rememberHandle } from "./engine-state.js"
 
 /**
  * 从一条会话岔出另一条：分叉（换引擎）、重来（砍掉后面几轮）、接力（换引擎但不留旧的）。

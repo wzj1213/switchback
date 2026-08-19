@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage } from "@omni/protocol"
 import type { Notice, ThreadRow } from "@omni/store"
-import { Composer, labelOf } from "./Composer.js"
+import { WorkspaceComposer } from "./WorkspaceComposer.js"
 import { useOmniActions } from "../useOmniActions.js"
 import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
@@ -142,23 +141,6 @@ function Between({ props, thread, stamp, send }: {
  * **换过去之前挑不了新那家的模型**——清单是引擎起来之后自己报的。所以这里除了
  * 名字，还带上「现在就兑现」那条路，由模型选择器画成一颗能点的按钮。
  */
-function pendingEngine(
-  thread: Thread,
-  engines: readonly EngineInfo[],
-  send: (command: Command) => void,
-): { pending?: { label: string; onSwitchNow: () => void } } {
-  const to = thread.nextEngine
-  if (to === undefined) return {}
-  return {
-    pending: {
-      label: labelOf(engines, to),
-      onSwitchNow: () => {
-        send({ type: "thread.switchNow", threadId: thread.id })
-      },
-    },
-  }
-}
-
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
   const [env, setEnv] = useState(false)
@@ -210,81 +192,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onReuse={reuse}
       />
       <Between props={props} thread={thread} stamp={stamp} send={send} />
-      <Composer
-        detached={thread.detached === true}
-        /* **和当前轮次比一比才算数**：`passTurn` 存的是轮次 id，
-           所以「过期」不需要谁记得来清一次——下一轮的 id 不一样，这里自然就是 false */
-        passing={thread.passTurn !== undefined && thread.passTurn === props.turn?.id}
-        /*
-         * **启动期和「上一轮还在跑」是两回事**，上一版把它们并成一个 `busy`，
-         * 于是引擎还没起来时屏幕上写着「它还在跑——现在打的会排在后面」，
-         * 而其实什么都没在跑；更糟的是输入框没被禁，回车会先清空文本、
-         * 再撞上宿主那句「会话不存在」——**那条消息就这么没了**。
-         */
-        starting={thread.status === "starting"}
-        busy={props.turn !== undefined}
-        onInterrupt={() => {
-          send({ type: "thread.interrupt", threadId: thread.id })
-        }}
-        engines={props.engines}
-        cwd={thread.cwd}
-        stamp={stamp}
-        searchFiles={props.searchFiles}
-        prefill={prefill}
-        canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments}
-        canSteer={(thread.capabilities ?? NO_CAPABILITIES).steer}
-        commands={[...actions.map((a) => a.command), ...props.commands]}
-        onOmni={(name: string) => {
-          actions.find((a) => a.command.name === name)?.run()
-        }}
-        /*
-         * 有待切换的引擎时，模型选择器变成**一句点不动的说明**（「切到 Codex 后可选」）。
-         * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常根本不存在，
-         * 所以确实不能挑；但上一版是把整个控件藏起来，而一个凭空消失的控件
-         * 读起来就是坏了——用户的原话是「切换别的引擎一个模型都不显示」。
-         *
-         * 只有**开过工的会话**会走到这里：还没说过话的临时会话切引擎是当场切的
-         *（见 `Thread.provisional`），那时新那家的清单直接就来了。
-         */
-        models={props.models}
-        model={thread.model}
-        effort={thread.effort}
-        {...pendingEngine(thread, props.engines, send)}
-        onModelChange={(model, effort) => {
-          send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })
-        }}
-        // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
-        // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
-        //
-        // `nextEngine` 优先：切引擎现在是「下一句用它」，真正的切换发生在
-        // 发出第一句话的时候（见 `Thread.nextEngine`）。选择器要显示**你选的那家**
-        // ——显示旧的那家等于告诉他「没选上」。
-        engine={thread.nextEngine ?? thread.engine}
-        trust={thread.trust}
-        onEngineChange={(next) => {
-          // **中途接力**：同一个会话换一家引擎接着做，不是另开一个。
-          // 历史留在原地；**切回去会续上那一家自己的那条 session**（见 `Thread.segments`），
-          // 而不是每次都新开——codex 跑了一半、去 Claude 看一眼再回来，
-          // 它该还记得自己做过什么。
-          send({ type: "thread.handoff", threadId: thread.id, to: next })
-        }}
-        onTrustChange={(next) => {
-          send({ type: "thread.setTrust", threadId: thread.id, trust: next })
-        }}
-        onSend={(text, attachments, steer) => {
-          send({
-            type: "thread.prompt",
-            threadId: thread.id,
-            text,
-            ...(attachments.length === 0 ? {} : { attachments }),
-            // 只在真要插的时候带这一项：不带 = 排队（见 protocol 的 `steer`）
-            ...(steer ? { steer: true } : {}),
-          })
-        }}
-        onResume={() => {
-          send({ type: "thread.resume", threadId: thread.id })
-        }}
-      />
+      <WorkspaceComposer props={props} thread={thread} stamp={stamp} prefill={prefill} actions={actions} />
     </main>
   )
 }

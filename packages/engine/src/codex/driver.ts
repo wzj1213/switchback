@@ -2,14 +2,14 @@ import type { ChildProcess } from "node:child_process"
 import type { EngineAccount, EngineCapabilities, EngineStatus, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
-import { probeCommand, resolveCommand } from "../probe.js"
+import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { skillsToCommands, toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
-import { LOOSENESS, POLICY, SANDBOX } from "./sandbox.js"
+import { LOOSENESS, SANDBOX } from "./sandbox.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
-import { reportAccount } from "./account.js"
 import { answerApproval } from "./approve.js"
-import type { WireItem, WireSandbox } from "./wire.js"
+import type { WireItem } from "./wire.js"
+import { openSession, type OpenCtx, type SessionState } from "./open.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -17,44 +17,7 @@ import type { WireItem, WireSandbox } from "./wire.js"
  * 信任档怎么落到 codex 的**操作系统沙箱**上，是这个驱动最重要的一个决定，
  * 单独写在 `sandbox.ts`——那不是一张查找表，是接第二家引擎时最大的发现。
  */
-const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
-
 const STDERR_KEEP = 2000
-
-/** 握手上限。超过这个还没回 `initialize`，就当它起不来了。 */
-const HANDSHAKE_MS = 20_000
-
-/**
- * 把起进程的失败翻成人能照着做的一句话。
- *
- * `Error: spawn codex ENOENT` 对用户毫无意义——他要知道的是「装了没」「装哪了」。
- * 这是生产可用与否的分界线之一：报错必须说得出下一步该干什么。
- */
-function startupMessage(command: string, error: Error): string {
-  const code = (error as NodeJS.ErrnoException).code
-  if (code === "ENOENT") {
-    return `找不到可执行文件 \`${command}\`。请确认已安装 codex CLI，且它在 PATH 上（终端里跑 \`which codex\` 验证）。`
-  }
-  if (code === "EACCES") return `没有权限执行 \`${command}\`。`
-  return `启动 \`${command}\` 失败：${error.message}`
-}
-
-interface SessionState {
-  child: ChildProcess | undefined
-  codexThread: string | undefined
-  codexTurn: string | undefined
-  turn: TurnId | undefined
-  stderr: string
-  sandbox: WireSandbox
-  /** 用户选的模型与强度。`turn/start` 时带上，codex 说它对后续轮次也生效。 */
-  model: string | undefined
-  effort: string | undefined
-  /**
-   * 上次问到的模型清单。**留着是为了补强度**——见 `setModel`。
-   * 只在 `models()` 被调用时更新，拿不到就是空的，那时不补。
-   */
-  options: readonly ModelOption[]
-}
 
 export interface CodexDriverConfig {
   /** 可执行文件。默认走 PATH 上的 `codex`。 */
@@ -62,8 +25,6 @@ export interface CodexDriverConfig {
   args?: readonly string[]
   reclaim?: Partial<ReclaimConfig>
 }
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 class CodexSession implements EngineSession {
   private readonly owner: ProcessOwner
@@ -159,97 +120,25 @@ class CodexSession implements EngineSession {
     })
   }
 
-  async start(): Promise<void> {
-    this.status("starting")
-    // 继承父环境：codex 的登录态、PATH、代理设置全在里面。
-    // 凭据擦洗是 EngineDescriptor 描述的以后的事，现在擦了就登录不上。
-    // **spawn 真正能跑的那个绝对路径，不是裸名字**：裸名字由 PATH 再解析一次，
-    // 而那次可能落到另一个同名文件上（真机上遇到过一个不存在的空壳排在前面）——
-    // 那样「探测说好、真跑的是另一个」，是最难查的一类故障。见 `resolveCommand`
-    const child = this.owner.spawn({
-      command: await resolveCommand(this.config.command ?? "codex"),
-      args: this.config.args ?? ["app-server", "--stdio"],
-      cwd: this.req.cwd,
-      env: process.env,
-    })
-    this.state.child = child
-    this.wire(child)
-
-    await this.handshake()
-    const started = await this.openThread()
-    const id = (started as { thread?: { id?: string } } | undefined)?.thread?.id
-    if (id === undefined) throw new Error("codex 没有返回 thread id，无法继续")
-    this.state.codexThread = id
-    // codex 的 thread id 就是它的会话句柄——落盘之后下次能凭它续跑
-    this.req.onHandle?.(id)
-    this.status("ready")
+  start(): Promise<void> {
+    return openSession(this.openCtx())
   }
 
-  /**
-   * 开会话。带句柄就续跑，不带就新开。
-   *
-   * 续跑失败（历史被清、版本不兼容）**不能静默降级成新会话**——那样用户会以为
-   * 上下文还在，实际模型什么都不记得。宁可把失败摆出来。
-   */
-  private async openThread(): Promise<unknown> {
-    // 策略和沙箱一样，在 `thread/start` 这一刻定死、之后改不了（见 `setTrust`）
-    const shared = { approvalPolicy: POLICY[this.req.trust], sandbox: this.state.sandbox, cwd: this.req.cwd }
-    if (this.req.forkOf !== undefined) return this.forkThread(this.req.forkOf)
-    if (this.req.resume === undefined) return this.rpc.call("thread/start", shared)
-    return this.rpc.call("thread/resume", { threadId: this.req.resume, ...shared })
-  }
-
-  /**
-   * 以分叉开场。`thread/fork` 复制的是**真的会话**——分出来那条记得原会话
-   * 读过哪些文件、写过什么、撞过什么错，而不是只拿到一句提炼过的目标。
-   *
-   * **必须由这个进程自己 fork。** 让原会话那个进程分好再交给这边去 `thread/resume`，
-   * 真机上直接失败：`thread ... already has an active writer`——
-   * 分出来的那条归创建它的进程管，而 omni 一个会话一个进程。
-   * `thread/unsubscribe` 也不放锁（都实测过）。
-   *
-   * `dropTurns` 走 `thread/rollback`，**只作用在分出来的那条上**：
-   * 原会话是用户还要用的，「从这一轮重来」不该把它自己截短。
-   * rollback 失败不算整体失败——上下文完整的分叉已经比交接包强得多，
-   * 为了少砍几轮而把整件事退回「只剩一句目标」是把好的换成差的。
-   *
-   * 分不出来就抛：宿主要靠这个失败退回交接包。默默起一条空会话是最坏的，
-   * 那看起来分叉成功了、其实什么都不记得。
-   */
-  private async forkThread(of: { handle: string; dropTurns?: number }): Promise<unknown> {
-    const forked = await this.rpc.call("thread/fork", { threadId: of.handle })
-    const id = (forked as { thread?: { id?: string } } | undefined)?.thread?.id
-    if (id === undefined || id === "") throw new Error("codex 没有返回分叉出来的会话 id")
-    if (of.dropTurns !== undefined && of.dropTurns > 0) {
-      await this.rpc.call("thread/rollback", { threadId: id, numTurns: of.dropTurns }).catch(() => undefined)
+  /** 开场那一组要的东西。形状与 `acp/open.ts` 的 `OpenCtx` 对齐。 */
+  private openCtx(): OpenCtx {
+    return {
+      rpc: this.rpc,
+      owner: this.owner,
+      config: this.config,
+      req: this.req,
+      state: this.state,
+      status: (status, detail) => {
+        this.status(status, detail)
+      },
+      wire: (child) => {
+        this.wire(child)
+      },
     }
-    return forked
-  }
-
-  /**
-   * 握手。**必须有超时，也必须看 spawn 本身是否失败**。
-   *
-   * 起不来的进程不会产出任何 stdout，`rpc.call("initialize")` 于是永远不 resolve，
-   * 界面就一直停在「正在打开工作区…」——没有报错、没有超时、什么都没有，
-   * 这是最难查的一类故障。
-   */
-  private async handshake(): Promise<void> {
-    const command = this.config.command ?? "codex"
-    const result = await Promise.race([
-      this.rpc.call("initialize", { clientInfo: CLIENT_INFO, capabilities: null }).then(() => "ok" as const),
-      this.owner.died().then((error) => ({ died: error })),
-      sleep(HANDSHAKE_MS).then(() => "timeout" as const),
-    ])
-    if (typeof result === "object") throw new Error(startupMessage(command, result.died))
-    if (result === "timeout") {
-      const tail = this.state.stderr === "" ? "" : `\n${this.state.stderr}`
-      throw new Error(`codex 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
-    }
-    this.rpc.notify("initialized")
-    // 账号侧的现状（额度、登录）——**在动手之前问**，见 `account.ts`
-    reportAccount(this.rpc, (status, detail) => {
-      this.status(status, detail)
-    }, this.req.emit)
   }
 
   /**

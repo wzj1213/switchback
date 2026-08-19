@@ -1,0 +1,66 @@
+import type { ThreadId } from "@omni/protocol"
+import { emit, type Ctx, type Live } from "./ctx.js"
+
+/**
+ * **同时活着几条引擎会话，谁该被收掉。**
+ *
+ * 和「命令怎么执行」是两件事：这里管的是资源压力，判据只有内存与可回收性，
+ * 与用户点了什么无关。混在 `session.ts` 里读起来像是新建会话的一个步骤，
+ * 而它其实是每次开会话都要交的一笔房租。
+ */
+/**
+ * 同时活着的引擎会话上限。
+ *
+ * 4 是这么定的：一个 codex 会话实测 260 MB / 4 个进程，4 条约 1 GB——
+ * 到此为止。取 4 而不是 2 是给对比视图留余地（分叉出来的两条要同时活着），
+ * 再加上当前这条和一条刚用过的。
+ */
+const DEFAULT_MAX_LIVE = 4
+
+/**
+ * 腾地方：超过上限就把**最久没动的空闲会话**收掉。
+ *
+ * ## 为什么在 launch 时做，而不是挂个定时器
+ *
+ * 资源压力恰好在这一刻产生。定时器要多一个时钟依赖、多一条测不准的路径，
+ * 而它能做的事这里都能做——**在需要腾地方的那一刻腾**，是最简单的正确做法。
+ *
+ * ## 三种绝不收
+ *
+ * - **正在跑的**：收掉等于中断用户的活
+ * - **等着审批的**：那张卡片还挂在界面上，收掉之后它永远等不到答复
+ * - **没有引擎句柄的**：那种收掉就**回不来了**（`resume` 认句柄），
+ *   而回不来的不叫「收起来」，叫「弄丢了」
+ */
+export async function evict(ctx: Ctx, keep: ThreadId): Promise<void> {
+  const cap = ctx.deps.maxLive ?? DEFAULT_MAX_LIVE
+  const idle = [...ctx.live.values()]
+    .filter(
+      (e) =>
+        e.thread.id !== keep &&
+        e.turn === undefined &&
+        e.thread.status !== "waiting_approval" &&
+        e.thread.engineHandle !== undefined,
+    )
+    // 最久没动的先走
+    .sort((a, b) => a.thread.updatedAt - b.thread.updatedAt)
+  while (ctx.live.size >= cap && idle.length > 0) {
+    const victim = idle.shift()
+    if (victim === undefined) break
+    await detach(ctx, victim)
+  }
+}
+
+/**
+ * 把一个会话从引擎上摘下来，但**记录全留着**。
+ *
+ * 界面上它变成「这是历史记录，点继续接回引擎」——那条路本来就有，
+ * 用户也已经认识它（重启之后所有会话都是这个样子）。
+ */
+async function detach(ctx: Ctx, entry: Live): Promise<void> {
+  entry.gate.settleAll()
+  await entry.session.dispose().catch(() => undefined)
+  ctx.live.delete(entry.thread.id)
+  const at = ctx.deps.now()
+  emit(ctx, { type: "thread.updated", at, thread: { ...entry.thread, detached: true, status: "idle", updatedAt: at } })
+}
