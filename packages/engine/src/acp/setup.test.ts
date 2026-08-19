@@ -161,6 +161,71 @@ describe("当前模型要标出来", () => {
   })
 })
 
+/**
+ * 强度词表**跟着模型走**，两家实测：ZCode 的 GLM-5-Turbo 一档都没有，
+ * kimi 的 K2.7 Coding 只有 `on`、K3 才有 low/high/max（2026-08-19 活体探测）。
+ *
+ * 这一组钉的是：那份词表只属于**引擎说的当前模型**。挂给全部不是「多给一点」，
+ * 是会发错值——`ModelPicker` 换模型时读的正是目标模型的 `defaultEffort`。
+ */
+describe("强度词表挂给谁", () => {
+  const kimi = {
+    configOptions: [
+      {
+        id: "model",
+        currentValue: "kimi-code/k3",
+        options: [{ value: "kimi-code/kimi-for-coding" }, { value: "kimi-code/k3" }],
+      },
+      {
+        id: "thinking",
+        category: "thought_level",
+        currentValue: "high",
+        options: [{ value: "low" }, { value: "high" }, { value: "max" }, { value: "on" }],
+      },
+    ],
+  }
+
+  it("只挂到引擎说的当前模型上", () => {
+    const models = catalogOf(kimi).models
+    expect(models.find((m) => m.id === "kimi-code/k3")?.efforts).toEqual(["low", "high", "max", "on"])
+  })
+
+  it("**别的模型一档都不挂**——挂了就会在换过去时把它不支持的强度一起发出去", () => {
+    const models = catalogOf(kimi).models
+    const other = models.find((m) => m.id === "kimi-code/kimi-for-coding")
+    expect(other?.efforts).toBeUndefined()
+    expect(other?.defaultEffort).toBeUndefined()
+  })
+
+  // 这条分支只在引擎连当前模型都没报时才走到：那时分不出词表属于谁，
+  // 而一个都不挂会让强度那一节整个消失——已知不精确好过已知缺席
+  it("引擎没报当前模型时退回挂给全部", () => {
+    const blind = {
+      configOptions: [
+        { id: "model", options: [{ value: "a" }, { value: "b" }] },
+        { id: "thinking", category: "thought_level", options: [{ value: "low" }, { value: "high" }] },
+      ],
+    }
+    expect(catalogOf(blind).models.every((m) => m.efforts?.length === 2)).toBe(true)
+  })
+
+  // grok 那条路（`_meta.reasoningEfforts`，每个模型自带）不受这次改动影响
+  it("模型自带的强度不受影响——grok 走的是模型扩展位那条路", () => {
+    const grok = {
+      models: {
+        availableModels: [
+          { modelId: "a", _meta: { reasoningEfforts: [{ value: "low" }, { value: "high" }] } },
+          { modelId: "b", _meta: { reasoningEfforts: [{ value: "max" }] } },
+        ],
+        currentModelId: "a",
+      },
+    }
+    const models = catalogOf(grok).models
+    expect(models.find((m) => m.id === "a")?.efforts).toEqual(["low", "high"])
+    expect(models.find((m) => m.id === "b")?.efforts).toEqual(["max"])
+  })
+})
+
 describe("历史会话清单", () => {
   const raw = {
     sessions: [

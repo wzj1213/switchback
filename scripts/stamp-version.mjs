@@ -27,6 +27,9 @@ import { fileURLToPath } from "node:url"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
+/** 这个脚本自己写的那个文件（仓库相对路径，`git status` 里就是这个写法）。 */
+const STAMPED = "apps/desktop/package.json"
+
 function git(...args) {
   try {
     return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim()
@@ -41,12 +44,62 @@ function lastTag() {
   return /^v\d+\.\d+\.\d+$/.test(tag) ? tag : undefined
 }
 
+/**
+ * 工作区有没有**这个脚本自己写的之外**的改动。
+ *
+ * ## 为什么不能直接看 `git status --porcelain`
+ *
+ * 因为这个脚本**每次打包都会改 `apps/desktop/package.json`**（版本号 + 构建戳），
+ * 而那个改动是不提交的。于是从第二次打包起，`git status` 永远非空——
+ * **`-dirty` 就恒为真，再也分辨不出任何东西**。两台机器上的包都挂着 `-dirty`，
+ * 而其中一份可能真的对应一次干净的提交，另一份可能真有未提交的源码改动，
+ * 标记却一模一样。一个永远亮着的告警等于没有告警。
+ *
+ * 判据：把这个文件从清单里摘掉，**但只在它的差异确实只有这个脚本写的那几样时**——
+ * 有人手改了依赖或脚本，那仍然是真的脏。
+ *
+ * 造了个临时仓库把四种情况都真跑过（2026-08-19）：干净 → 干净；
+ * 第二次打包（上次的戳还在文件里）→ **干净**（这条就是修的那个）；
+ * 多一个未跟踪文件 → 脏；手改 `package.json` 的真实字段 → 脏。
+ */
+function isDirty() {
+  const lines = git("status", "--porcelain").split("\n").filter((l) => l.trim() !== "")
+  const others = lines.filter((l) => !l.endsWith(STAMPED))
+  if (others.length > 0) return true
+  return lines.length > 0 && !onlyStampDiffers()
+}
+
+/**
+ * 那个文件此刻与 HEAD 的差异，是不是**只有这个脚本自己写的那三样**。
+ *
+ * 三样必须和下面 `pkg.version` / `pkg.omni` 那两行完全对应——漏一个就会
+ * 把一次干净的构建判成脏（`repo` 就漏过一次：换一台机器打包它必然不同）。
+ */
+function onlyStampDiffers() {
+  const head = git("show", `HEAD:${STAMPED}`)
+  if (head === "") return false
+  try {
+    const bare = (text) => {
+      const o = JSON.parse(text)
+      delete o.version
+      if (o.omni !== undefined) {
+        delete o.omni.build
+        delete o.omni.repo
+      }
+      return JSON.stringify(o)
+    }
+    return bare(head) === bare(readFileSync(join(ROOT, STAMPED), "utf8"))
+  } catch {
+    return false
+  }
+}
+
 function compute() {
   const tag = lastTag()
   const range = tag === undefined ? "HEAD" : `${tag}..HEAD`
   const count = Number(git("rev-list", "--count", range) || "0")
   const sha = git("rev-parse", "--short", "HEAD") || "unknown"
-  const dirty = git("status", "--porcelain") !== ""
+  const dirty = isDirty()
   const [major, minor] = tag === undefined ? [0, 0] : tag.slice(1).split(".").map(Number)
   // 工作区脏的时候标出来：那份产物不对应任何一次提交，装到别人机器上时
   // 「哪一版」这个问题会永远问不清

@@ -115,6 +115,27 @@ export interface ModelCatalog {
   current?: string
 }
 
+/**
+ * 把强度词表挂到**它真正属于的那个模型**上。
+ *
+ * `current === undefined` 时退回「挂给全部」：那时 omni 分不出这份词表属于谁，
+ * 而一个都不挂会让强度那一节整个消失——**已知不精确**好过**已知缺席**，
+ * 何况这条分支只在引擎连当前模型都没报时才走到。
+ */
+function withLevels(
+  model: ModelOption,
+  levels: { id: string; efforts: readonly string[]; current?: string } | undefined,
+  current: string | undefined,
+): ModelOption {
+  if (levels === undefined) return model
+  if (current !== undefined && model.id !== current) return model
+  return {
+    ...model,
+    efforts: levels.efforts,
+    ...(levels.current === undefined ? {} : { defaultEffort: levels.current }),
+  }
+}
+
 export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
   const direct = session.models?.availableModels
   if (direct !== undefined && direct.length > 0) {
@@ -167,8 +188,9 @@ export function modelsOf(session: AcpNewSession): readonly ModelOption[] {
  * ## 为什么合成一个
  *
  * 这四样必须同时算出来、同时换掉：清单从哪儿读的决定了设回哪儿（`configId`），
- * 而**强度的词表是跟着模型走的**——实测 ZCode：GLM-5.3 有 low/high/max，
- * 换到 GLM-5-Turbo 之后一个都没有（发过去引擎直接报错）。
+ * 而**强度的词表是跟着模型走的**——两家都实测过：ZCode 的 GLM-5.3 有 low/high/max，
+ * 换到 GLM-5-Turbo 之后一个都没有（发过去引擎直接报错）；kimi 的 K2.7 Coding
+ * 只有 `on`，换到 K3 才长出 low/high/max（2026-08-19 活体探测）。
  *
  * 算它的地方有两处（开会话时、agent 中途报 `config_option_update` 时），
  * 分成两份实现的下场是其中一份迟早漏掉一样，而漏掉不会报错，只会让界面撒谎。
@@ -195,16 +217,23 @@ export function catalogOf(session: AcpNewSession): Catalog {
   const { models, configId, current } = modelCatalogOf(session)
   const levels = effortsOf(session)
   return {
-    // 强度是**会话级**的（kimi 的 thinking 换模型不换档），所以挂到每个模型上
-    // 都是同一份。界面那套「模型 → 强度」的形状正好装得下
-    models:
-      levels === undefined
-        ? models
-        : models.map((m) => ({
-            ...m,
-            efforts: levels.efforts,
-            ...(levels.current === undefined ? {} : { defaultEffort: levels.current }),
-          })),
+    // **只挂到引擎说的那个当前模型上**，不是每个模型都挂一份。
+    //
+    // 上一版挂给全部，注释写着「强度是会话级的（kimi 的 thinking 换模型不换档）」——
+    // **2026-08-19 实测证伪**：kimi 的 `thinking` 恰恰跟着模型换。
+    // 默认的 K2.7 Coding 只有 `on` 一个值；`session/set_model` 换到 K3 之后，
+    // 它推来的 `config_option_update` 里变成 `low / high / max / on`。
+    //
+    // 挂给全部不是「多给一点」，是**会发错值**：`ModelPicker` 换模型时读的正是
+    // 目标模型的 `defaultEffort`（它那行注释写着「旧模型的 high 在新模型上可能
+    // 根本不存在」——意图对，数据把它架空了）。于是从 K3 切回 K2.7 Coding 会带上
+    // `high`，而那个模型只认 `on`。ZCode 上同类情形实测是引擎直接报错。
+    //
+    // 改成只挂当前模型之后，切到别的模型时 `defaultEffort` 是 `undefined`，
+    // 于是**不带强度**发过去——引擎用它自己对那个模型的默认，然后推一条
+    // `config_option_update` 把真实词表告诉 omni。这正是总纲第三条：
+    // 引擎报得出来的，不叠 omni 的猜测。
+    models: models.map((m) => withLevels(m, levels, current)),
     ...(configId === undefined ? {} : { modelConfig: configId }),
     ...(current === undefined ? {} : { model: current }),
     ...(levels === undefined ? {} : { effortConfig: levels.id }),
