@@ -310,13 +310,15 @@ class CodexSession implements EngineSession {
 
   /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
   capabilities(): EngineCapabilities {
-    // `modeReadback`：`thread/settings/updated` 要在 `initialize` 里声明
-    // `capabilities:{experimentalApi:true}`，而声明它的前置（一张「omni 认领了哪些
-    // 实验面」的常量表 + CI 双向断言）还没建，见索引 §5-2。同样是「还没接」不是「没有」
+    // `modeReadback`：**五家里唯一一个真的**。前置（`claims.ts` 那张认领表 + 双向
+    // CI 断言）已经建好，`thread/settings/updated` 也真有人接（`notify.ts` →
+    // `adoptSettings`）。这一位曾经落在 false 上没跟着翻——那次提交的说明里写着
+    // 「从 false 翻成 true」，而 diff 里这一行根本没动，于是界面上照旧挂着
+    // 「这家不会把它自己改的档告诉 omni」，而它明明会。
     // `sideQuestion`：codex 的侧问只活在它自己的 TUI 里（`tui/src/app/side.rs`），
     // **没从 app-server 那扇门出来**。照着拼要 omni 抄一份它的边界提示词进来维护，
     // 撞 AGENTS.md 的总纲——见 `docs/侧栏与引擎状态方案.md` §0
-    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: false, sideQuestion: false }
+    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: true, sideQuestion: false }
   }
 
   /**

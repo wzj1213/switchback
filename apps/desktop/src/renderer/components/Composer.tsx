@@ -144,6 +144,32 @@ function usePrefill(prefill: { text: string; at: number } | undefined, setText: 
   }, [prefill, setText])
 }
 
+/**
+ * 「发出去」这一下具体做什么。
+ *
+ * 抽成 hook 是行数闸门逼的，但边界也对：上面那个组件管「长什么样」，
+ * 这里管「按下去发生什么」——和 `Prompt` / `onPromptKey` 同一刀。
+ */
+function useSubmit(o: {
+  text: string
+  attach: ReturnType<typeof useAttachments>
+  blocked: boolean
+  steering: boolean
+  setText: (text: string) => void
+  onSend: Props["onSend"]
+}): (steer?: boolean) => void {
+  return (steer = false): void => {
+    const trimmed = o.text.trim()
+    // **只有附件、没有文字也该能发**：贴一张报错截图问「这是怎么回事」，
+    // 那句话经常就在图里
+    if ((trimmed === "" && o.attach.paths.length === 0) || o.blocked) return
+    // 没在跑的时候 `steer` 没有意义（下面那层会照常开新轮次），传过去也无害
+    o.onSend(trimmed, o.attach.paths, steer && o.steering)
+    o.setText("")
+    o.attach.clear()
+  }
+}
+
 export function Composer({
   detached = false,
   engine,
@@ -180,16 +206,7 @@ export function Composer({
   usePrefill(prefill, setText)
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
   const { blocked, queueing, steering } = stateOf({ detached, starting, busy, canSteer })
-  const submit = (steer = false): void => {
-    const trimmed = text.trim()
-    // **只有附件、没有文字也该能发**：贴一张报错截图问「这是怎么回事」，
-    // 那句话经常就在图里
-    if ((trimmed === "" && attach.paths.length === 0) || blocked) return
-    // 没在跑的时候 `steer` 没有意义（下面那层会照常开新轮次），传过去也无害
-    onSend(trimmed, attach.paths, steer && steering)
-    setText("")
-    attach.clear()
-  }
+  const submit = useSubmit({ text, attach, blocked, steering, setText, onSend })
 
   return (
     <div className="composer">
@@ -228,6 +245,7 @@ export function Composer({
         <Bar
           detached={detached}
           busy={busy}
+          canSteer={steering}
           starting={starting}
           empty={text.trim() === ""}
           engine={engine}

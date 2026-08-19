@@ -9,18 +9,18 @@ import { sessionsOf, type Catalog } from "./setup.js"
 import type { AcpDriverConfig } from "./caps.js"
 import { adoptCatalog, startSession, type OpenState, type StartCtx } from "./open.js"
 import { applyTrust, modeAxis, warnNativeFixed, type TrustCtx } from "./mode.js"
+import {
+  cancelTurn,
+  compactSession,
+  failTurn,
+  finishTurn,
+  steerSession,
+  type EndCtx,
+} from "./turn.js"
 import { applyModel, type ModelCtx } from "./model.js"
 import { handlePermission } from "./permission.js"
-import { stopStatus } from "./translate.js"
 import { imageBlocks } from "./attach.js"
-import {
-  closeText,
-  createUpdateState,
-  handleUpdate,
-  sweep,
-  type UpdateContext,
-  type UpdateState,
-} from "./update.js"
+import { closeText, createUpdateState, handleUpdate, type UpdateContext, type UpdateState } from "./update.js"
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
 import { mine, onForeign } from "./route.js"
 
@@ -291,30 +291,25 @@ class AcpSession implements EngineSession {
     return Promise.resolve()
   }
 
-  private finishTurn(turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
-    if (this.state.turn !== turnId) return
-    const { status, error } = stopStatus(reason)
-    sweep(this.updateContext(), this.updates, status === "interrupted" ? "interrupted" : "failed")
-    this.state.turn = undefined
-    this.req.emit({
-      type: "turn.completed",
-      at: Date.now(),
-      turnId,
-      status,
-      ...(error === undefined ? {} : { error }),
-    })
+  /** 三条落终态的路全在 `turn.ts`——它们和 compact/steer 是同一类。 */
+  private endCtx(): EndCtx {
+    return {
+      state: this.state,
+      update: () => this.updateContext(),
+      updates: this.updates,
+      emit: this.req.emit,
+      notify: (method, params) => {
+        this.rpc.notify(method, params)
+      },
+    }
   }
 
-  /**
-   * 一轮直接报错。实测过：适配器版本比配置的模型旧时，`session/prompt`
-   * 回的是 JSON-RPC error 而不是 `stopReason`，两条路都要走通，
-   * 否则那一轮会永远停在「进行中」。
-   */
+  private finishTurn(turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
+    finishTurn(this.endCtx(), turnId, reason)
+  }
+
   private failTurn(turnId: TurnId, message: string): void {
-    if (this.state.turn !== turnId) return
-    sweep(this.updateContext(), this.updates, "failed")
-    this.state.turn = undefined
-    this.req.emit({ type: "turn.completed", at: Date.now(), turnId, status: "failed", error: message })
+    failTurn(this.endCtx(), turnId, message)
   }
 
   models(): Promise<readonly ModelOption[]> {
@@ -375,16 +370,18 @@ class AcpSession implements EngineSession {
     return this.config.logPath(this.req.home, sessionId, this.req.cwd).catch(() => undefined)
   }
 
-  /**
-   * 中断。`session/cancel` 是**通知不是请求**——发完不等回应，
-   * 在途的 `session/prompt` 会以 `stopReason: "cancelled"` 收尾。
-   * 当成请求发会永远等不到应答。
-   */
   interrupt(): Promise<void> {
-    const sessionId = this.state.acpSession
-    if (sessionId === undefined) return Promise.resolve()
-    this.rpc.notify("session/cancel", { sessionId })
+    cancelTurn(this.endCtx())
     return Promise.resolve()
+  }
+
+  /** 见 `turn.ts`：谁支持由各家自己说，不支持时抛一句人话而不是 `-32601`。 */
+  compact(): Promise<void> {
+    return compactSession({ ...this.knobs(), can: this.config })
+  }
+
+  steer(text: string, attachments?: readonly string[]): Promise<void> {
+    return steerSession({ ...this.knobs(), can: this.config }, text, attachments)
   }
 
   async setTrust(trust: Trust): Promise<void> {

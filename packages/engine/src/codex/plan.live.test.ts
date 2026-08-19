@@ -46,6 +46,9 @@ describe("codex 的计划（真跑）", () => {
       askUser: () => Promise.resolve({ allow: true, remember: "once" as const }),
     })
     try {
+      // **钉死模型**：默认那个额度可能是打满的（写这条测试时就是），
+      // 而这条验的是通知形状，用哪个模型都一样
+      await session.setModel("gpt-5.3-codex-spark", "low")
       await session.prompt(
         "多步任务，先用 update_plan 把步骤记下来：1) 读 a.txt 2) 读 b.txt。然后各用一个词总结。",
         "turn-1",

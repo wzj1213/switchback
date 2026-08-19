@@ -370,32 +370,33 @@ export function effortsOf(
  * `sessionCapabilities` 用**空对象当标记**（实测 kimi 报 `{fork:{}}`），
  * 所以判据是键在不在，不是值是不是 true。
  */
-export function capabilitiesOf(info: AcpInitialize | undefined, modeReadback = false): EngineCapabilities {
+/** 各家自己说的那几位。协议里推不出来，见 `AcpDriverConfig`。 */
+export interface AcpSaid {
+  modeReadback?: boolean
+  compact?: boolean
+  steer?: boolean
+}
+
+export function capabilitiesOf(info: AcpInitialize | undefined, said: AcpSaid = {}): EngineCapabilities {
   const agent = info?.agentCapabilities
   const session = agent?.sessionCapabilities ?? {}
   return {
-    // **这两位是「omni 还没接」，不是「ACP 没有」。** 分清楚很重要：
-    // 前者该有人来修，后者只能换引擎。
+    // **这两位协议里推不出来，只能各家自己说。** 上一版一律报 false，理由是
+    // 「驱动一个都没实现，翻成 true 就是给一个点了没反应的入口」——那是对的，
+    // 现在 `turn.ts` 把账还了，于是判据回到「这家认不认那个方法」。
     //
-    // 上一版的注释写着「ACP 没有压缩上下文的方法（实测 kimi → Method not found）」——
-    // **一家的实测被写成了全家族的结论**。实测 zcode 的桥
-    //（`zcode-acp-server/dist/index.js`）`session/compact` 与 `session/steer`
-    // **两个都实现了**，README 还写明自动压缩就是调前者。
-    //
-    // 那为什么现在仍然报 false？因为 `acp/driver.ts` **这两个方法一个都没实现**——
-    // 翻成 true 就是给一个点了没反应的入口，比不给更糟。要修得三样一起：
-    // 驱动实现这两个方法、按引擎注入谁支持（`AcpDriverConfig`，形状照 `modeReadback`）、
-    // 以及给 `engines.json` 进来的第三方引擎一条递补充项的路（那条现在还没有）。
-    compact: false,
+    // 三家各起一次真进程实测（表在 `turn.ts` 头部）：kimi 与 grok 两个方法
+    // **都是 `-32601 Method not found`**，只有 zcode 有。所以这里绝不能从
+    // `agentCapabilities` 里推——那上面根本没有这两位，而**推不出来就报 false**
+    // 会把 zcode 一起冤枉掉，反过来一律报 true 就是给三家里的两家一个假入口。
+    compact: said.compact === true,
     attachments: agent?.promptCapabilities?.image === true,
-    // 同上：zcode 的桥有 `session/steer`，grok 有它自己的插话通道。
-    // 驱动没实现，所以照旧 false——**不给入口，而不是给一个假的**
-    steer: false,
+    steer: said.steer === true,
     fork: "fork" in session,
     // **协议里没有「我会不会报档位变化」这种声明**，推不出来，只能由各家自己说
     //（见 `AcpDriverConfig.modeReadback`）。没人说就是不知道——**不知道一律报 false**：
     // 报 true 的代价是界面上那行「引擎侧：X」永远停在开场那一刻，而它看起来是实时的
-    modeReadback,
+    modeReadback: said.modeReadback === true,
     // ACP 协议里没有侧问。kimi 的 `/btw` 实现得很完整，但它没从 ACP 那扇门出来——
     // 不是 kimi 弱，是这条路不通（见 `docs/侧栏与引擎状态方案.md` §6.3）
     sideQuestion: false,

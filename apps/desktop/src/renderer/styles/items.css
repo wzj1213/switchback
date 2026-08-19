@@ -147,6 +147,20 @@
   color: var(--text-muted);
 }
 
+/* 跑着的时候输入框下面那一行：这句回车下去会怎么样。
+   常驻是有意的——上一版写在 placeholder 里，一打字就没了，
+   而那正是你要按回车的那一刻 */
+.composer__queuenote {
+  padding: 2px var(--sp-1) 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.composer__queuenote b {
+  color: var(--text-muted);
+  font-weight: 550;
+}
+
 /* 计划卡上那一句引擎自己写的理由。跟「计划」二字同一行，
    压成弱色小字——它是旁注，不该跟下面的步骤抢注意力。
    会很长，所以单行截断，不让它把标题行撑成一段 */

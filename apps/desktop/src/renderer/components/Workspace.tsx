@@ -101,11 +101,13 @@ function useDraft(draft: string | undefined): {
  * 单独拎出来只为行数闸门，但边界不难受：它们的共同点是**都在描述「还没落定的东西」**
  *（工作区里已经改了什么、你已经打了但还没轮到发的话）。
  */
-function Between({ props, thread, stamp, send }: {
+function Between({ props, thread, stamp, send, onReuse }: {
   props: WorkspaceProps
   thread: Thread
   stamp: string
   send: (command: Command) => void
+  /** 把文字放回输入框。撤回排队时要用——见下面 `onDrop`。 */
+  onReuse: (text: string) => void
 }): React.JSX.Element {
   return (
     <>
@@ -127,8 +129,13 @@ function Between({ props, thread, stamp, send }: {
             }
           : {})}
         onDrop={() => {
-          // 撤回 = 打断队列。宿主那边中断会把队列一并清掉，
-          // 但这里不该顺带把**正在跑的那一轮**也停了——所以走一条专门的命令
+          // **先放回输入框，再撤。** 撤回的意思是「这句先别发」，不是「这句不要了」——
+          // 上一版直接丢掉，打好的一段话就这么没了，而人撤回往往正是为了改两个字再发。
+          // 拼法和 `steerQueued` 那边一致（`\n` 连起来）：用户写它们时是当成一段话写的
+          const waiting = thread.queued ?? []
+          if (waiting.length > 0) onReuse(waiting.join("\n"))
+          // 撤回不动**正在跑的那一轮**——「这句先别发」和「停下」是两件事，
+          // 所以走专门的命令而不是 interrupt
           send({ type: "thread.unqueue", threadId: thread.id })
         }}
       />
@@ -196,7 +203,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onCopy={props.onCopy}
         onReuse={reuse}
       />
-      <Between props={props} thread={thread} stamp={stamp} send={send} />
+      <Between props={props} thread={thread} stamp={stamp} send={send} onReuse={reuse} />
       <WorkspaceComposer props={props} thread={thread} stamp={stamp} prefill={prefill} actions={actions} />
     </main>
   )

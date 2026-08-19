@@ -75,3 +75,66 @@ describe("ZCode · live", () => {
     120_000,
   )
 })
+
+/**
+ * 压缩上下文这一位以前一律报 false，理由是「驱动没实现，翻成 true 就是给一个
+ * 点了没反应的入口」。`turn.ts` 把账还了之后，这条钉的是**它真的落下去了**。
+ *
+ * 三家实测只有 zcode 有这个方法（kimi、grok 都是 `-32601 Method not found`），
+ * 所以这条只能在这儿验——也正因为如此它必须存在：别家给不了这个证据。
+ */
+describe("ZCode · live · 压缩上下文", () => {
+  it(
+    "能力位报 true，而且 `session/compact` 真的调得通",
+    async () => {
+      const driver = createAcpDriver({
+        id: "acp:zcode",
+        command: "zcode-acp-server",
+        args: [],
+        env: { ZCODE_BIN: "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs" },
+        compact: true,
+      })
+      const session = await driver.start({
+        threadId: "th-live-compact",
+        cwd: mkdtempSync(join(tmpdir(), "omni-zcode-c-")),
+        trust: "read-only",
+        home: process.env["HOME"] ?? "",
+        memory: () => [],
+        emit: () => undefined,
+        askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      })
+      try {
+        expect(session.capabilities?.().compact).toBe(true)
+        // 空会话上压缩也该成功（实测回一份空 snapshot）——**不抛就是通了**
+        await session.compact?.()
+      } finally {
+        await session.dispose()
+      }
+    },
+    120_000,
+  )
+
+  it("**没说支持的那家不给入口，也不发那一发 RPC**——不填就是没有", async () => {
+    const driver = createAcpDriver({
+      id: "acp:zcode",
+      command: "zcode-acp-server",
+      args: [],
+      env: { ZCODE_BIN: "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs" },
+    })
+    const session = await driver.start({
+      threadId: "th-live-nocompact",
+      cwd: mkdtempSync(join(tmpdir(), "omni-zcode-n-")),
+      trust: "read-only",
+      home: process.env["HOME"] ?? "",
+      memory: () => [],
+      emit: () => undefined,
+      askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+    })
+    try {
+      expect(session.capabilities?.().compact).toBe(false)
+      await expect(session.compact?.()).rejects.toThrow(/不支持压缩上下文/)
+    } finally {
+      await session.dispose()
+    }
+  }, 120_000)
+})

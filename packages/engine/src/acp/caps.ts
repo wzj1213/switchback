@@ -64,6 +64,15 @@ export interface AcpDriverConfig {
    */
   modeReadback?: boolean
   /**
+   * 这家认不认 `session/compact` / `session/steer`。
+   *
+   * **协议里推不出来，只能各家自己说**——三家实测的结果见 `turn.ts` 头部那张表
+   *（kimi、grok 两个都是 `Method not found`，只有 zcode 有）。
+   * 不填就是没有：给一个点了没反应的入口，比不给更糟。
+   */
+  compact?: boolean
+  steer?: boolean
+  /**
    * 这家用**私有通知**报「模型 / 强度换了」时，怎么把它认出来。
    *
    * 和 `contextUsed` 同一条路、同一个理由：协议里没有这件事，各家各报各的，

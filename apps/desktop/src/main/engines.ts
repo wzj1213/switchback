@@ -32,6 +32,17 @@ export interface EngineEntry {
   args?: readonly string[]
   /** 覆盖在父环境之上的变量。放 API key 之类的东西。 */
   env?: Readonly<Record<string, string>>
+  /**
+   * 这家认不认 `session/compact` / `session/steer`。
+   *
+   * **ACP 的握手里没有这两位**，协议上推不出来（实测三家：kimi 与 grok 两个都是
+   * `Method not found`，只有 zcode 有）。内置的两家由 `registry.ts` 直接写死，
+   * 第三方只能从这里说——**这就是那条一直欠着的「递补充项的路」**。
+   *
+   * 不填就是没有：多给一颗点了报错的按钮，比不给更糟。
+   */
+  compact?: boolean
+  steer?: boolean
 }
 
 export type EngineFile = Readonly<Record<string, EngineEntry>>
@@ -50,6 +61,10 @@ const TEMPLATE = {
     label: "示例（把这条删掉）",
     command: "codex-acp",
     args: [] as readonly string[],
+    // 这两位 ACP 握手里问不出来，只能你告诉 omni；不填就是没有。
+    // 实测：zcode-acp-server 两个都有，kimi 与 grok 两个都没有
+    compact: false,
+    steer: false,
   },
 } as const
 
@@ -75,6 +90,22 @@ export function readEngineFile(dir: string, log: Logger): EngineFile {
   }
 }
 
+/**
+ * 「这家认不认 compact / steer」那两位。
+ *
+ * **只认真正的 `true`**：手写的 JSON 里 `"true"`、`1` 都会出现，而这两位决定的是
+ * 「给不给一颗按钮」——含糊地放行就是给一颗点了报错的。
+ *
+ * 单拎出来是复杂度闸门逼的（`entryOf` 加上这两条实测 13/12），但边界也对：
+ * 上面那个函数管「这条能不能注册」，这里管「注册成什么能力」。
+ */
+function saidBy(entry: Partial<EngineEntry>): { compact?: true; steer?: true } {
+  return {
+    ...(entry.compact === true ? { compact: true } : {}),
+    ...(entry.steer === true ? { steer: true } : {}),
+  }
+}
+
 /** 下划线开头的键是说明文字，跳过。字段不全的条目一并跳过，别半残地注册。 */
 function entryOf([id, value]: [string, unknown]): (readonly [string, EngineEntry])[] {
   if (id.startsWith("_") || typeof value !== "object" || value === null) return []
@@ -88,6 +119,7 @@ function entryOf([id, value]: [string, unknown]): (readonly [string, EngineEntry
         command: entry.command,
         ...(Array.isArray(entry.args) ? { args: entry.args.filter((a) => typeof a === "string") } : {}),
         ...(typeof entry.env === "object" && entry.env !== null ? { env: entry.env } : {}),
+        ...saidBy(entry),
       },
     ],
   ]
@@ -129,6 +161,8 @@ export function registerAcpEngines(file: EngineFile): Registered {
       command: entry.command,
       ...(entry.args === undefined ? {} : { args: entry.args }),
       ...(entry.env === undefined ? {} : { env: entry.env }),
+      ...(entry.compact === true ? { compact: true } : {}),
+      ...(entry.steer === true ? { steer: true } : {}),
     })
     labels[id] = entry.label
   }

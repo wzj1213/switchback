@@ -118,7 +118,14 @@ export interface OpenCtx {
   owner: ProcessOwner
   /** 只声明开场用得到的那几项。**不直接引 `AcpDriverConfig`**：那会绕成
       driver → open → driver 的循环 import。 */
-  config: { id: string; command: string; modeReadback?: boolean; nativeApproval?: (trust: Trust) => Native }
+  config: {
+    id: string
+    command: string
+    modeReadback?: boolean
+    compact?: boolean
+    steer?: boolean
+    nativeApproval?: (trust: Trust) => Native
+  }
   req: StartRequest
   state: OpenState
 }
@@ -158,7 +165,11 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
   // 但「没声明」只是没声明——实测 grok 的能力表是空的，`session/list` 却能答，
   // 所以这里留 undefined，由 `history()` 问一次再定（见那边的注释）
   ctx.state.canList = canList(info) ? true : undefined
-  return capabilitiesOf(info, ctx.config.modeReadback)
+  // **只挑「各家自己说」的那几位往下递**，不是把整份 config 传进去：
+  // `capabilitiesOf` 的其余各位都从握手结果推，混在一起会让「哪些能推、哪些得问」
+  // 这条界线糊掉——而那条界线正是这个函数存在的理由
+  const { modeReadback, compact, steer } = ctx.config
+  return capabilitiesOf(info, { modeReadback, compact, steer })
 }
 
 /**
