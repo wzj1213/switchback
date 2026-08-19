@@ -5,7 +5,7 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
 
 三级原语借自 codex `app-server`（见 `agent-learn/codex/codex/codex-rs/app-server/README.md`
 §Core Primitives），因为它是目前把「一次对话 / 一轮 / 一条产物」拆得最干净的现成模型。
-厂商特有的东西一律进 `meta`，借 ACP 的 `_meta` 约定，不污染核心模型。
+厂商特有的东西**目前一律丢弃**，不污染核心模型。曾经有过 `Item.meta` / `Turn.meta` / `Thread.meta` 三个出口，但从加上到删掉**没有一处写过、没有一处读过**——一个空的扩展位比没有更糟：读代码的人会以为「这里有机制」，而实际上数据到不了界面。真需要时再加，那时它会带着第一个使用者一起来。
 
 ## 拥有什么
 
@@ -28,8 +28,7 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
   「把 threadId 传进要 turnId 的位置」这类错误，但会在每个构造点引入转换仪式。
   当前选简单，**若真的被这类 bug 咬过就换 branded**。
 - `Item` 联合目前 7 种。新增一种就要动所有渲染分支——这是有意的摩擦，
-  逼迫优先考虑「能不能塞进 `ToolDetail.other` + `meta`」。
-- `meta` 是 `Record<string, unknown>`，不做 schema 校验。跨引擎读 `meta` 前必须自己判类型。
+  逼迫优先考虑「能不能塞进 `ToolDetail.other`」。
 - 事件流假设**有序且不丢**。传输层（宿主 → 渲染层 IPC）必须保证这一点，本包不做序号与重放——
   序号是传输层的事，落盘的事件里没有它。桌面端那侧的实现见
   `apps/desktop/src/main/sequence.ts`（编号与补发缓冲）与

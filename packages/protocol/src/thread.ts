@@ -180,7 +180,6 @@ export interface Thread {
    * 谁也说不清它们本来是一件事。对比视图（`Compare.tsx`）认这个字段。
    */
   forkedFrom?: ThreadId
-  meta?: Record<string, unknown>
   /**
    * 用户**亲自起过名**。
    *
@@ -289,7 +288,6 @@ export interface Turn {
   endedAt?: number
   /** 失败原因，`status === "failed"` 时必填。 */
   error?: string
-  meta?: Record<string, unknown>
 }
 
 /**

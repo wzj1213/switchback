@@ -83,7 +83,7 @@
 ## 已知限制
 
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
-  驱动只翻译 assistant / stream_event / result / system 四类，其余落 `meta` 或丢弃。
+  驱动只翻译 assistant / stream_event / result / system 四类，**其余丢弃**（曾经写着「或落 `meta`」，而那个字段从来没被写过，已删）。
   新增覆盖时先确认它是否真的需要进 transcript。
 - **ACP 侧的能力由 agent 自报**（`capabilitiesOf`），不再一律 `NO_CAPABILITIES`。
   实测 kimi（`kimi acp`，0.36.1）报的是：能贴图、能原生分叉、能列历史、能续跑，

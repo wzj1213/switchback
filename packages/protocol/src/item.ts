@@ -14,8 +14,6 @@ interface ItemBase {
   turnId: TurnId
   kind: ItemKind
   at: number
-  /** 厂商特有字段的出口，借 ACP `_meta` 约定。读之前自己判类型。 */
-  meta?: Record<string, unknown>
 }
 
 export interface UserMessageItem extends ItemBase {

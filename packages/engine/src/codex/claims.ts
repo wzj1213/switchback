@@ -36,7 +36,7 @@ export const CLAIMS: Readonly<Record<string, Claim>> = {
   experimentalApi: {
     why: "换 `thread/settings/updated`——codex 唯一会主动报「我现在是什么档」的通知。不认领它，档位回读那一格就永远空着，而空着看起来就像 codex 不支持。",
     buys: ["thread/settings/updated"],
-    checked: "openai/codex @ f5a3dc554（2026-08-19）：ThreadSettingsUpdated 标着 #[experimental(\"thread/settings/updated\")]",
+    checked: "openai/codex @ 3b45c2906（2026-08-19）：ThreadSettingsUpdated 标着 #[experimental(\"thread/settings/updated\")]；另有 A/B 实跑——不认领时 thread/settings/update 直接回 requires experimentalApi capability",
   },
 }
 
