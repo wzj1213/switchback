@@ -5,6 +5,7 @@ import { BranchIcon, CopyIcon, EngineIcon, FolderIcon, RevealIcon, ShieldIcon } 
 import { FileIcon } from "./icons-activity.js"
 import type { ProjectDoc } from "../../main/projectdoc.js"
 import { labelOf } from "./Composer.js"
+import { branchLabel, useWorksite } from "../useWorksite.js"
 
 /**
  * 「这个会话跑在什么环境里」——一张卡片答完。
@@ -38,18 +39,16 @@ export function EnvCard({
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const [git, setGit] = useState<{ branch?: string; dirty?: boolean }>({})
+  // 每次打开都重新问一次（这张卡随浮层挂载）。取数时机与「换工作区清旧值」
+  // 都在 `useWorksite` 里，和 `Chips` 共用一份——两份会分头走偏
+  const git = useWorksite(thread.cwd, "open")
+  const branch = branchLabel(git)
   const [doc, setDoc] = useState<ProjectDoc | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
-  // 每次打开都重新问一次。分支会被用户在终端里改掉，而一个过期的分支名
-  // 比不显示更危险——这条和 `Chips.tsx` 是同一个道理
   useEffect(() => {
     if (bridge === undefined) return undefined
     let live = true
-    void bridge.worksite(thread.cwd).then((info) => {
-      if (live) setGit(info)
-    })
     void bridge.projectDoc(thread.cwd).then((info) => {
       if (live) setDoc(info)
     })
@@ -65,10 +64,12 @@ export function EnvCard({
         <Line icon={<FolderIcon />} label="工作区">
           <bdi>{thread.cwd}</bdi>
         </Line>
-        {git.branch === undefined ? null : (
+        {branch === undefined ? null : (
           <Line icon={<BranchIcon />} label="分支">
-            {git.branch}
-            {git.dirty === true ? <span className="env__warn">有未提交的改动</span> : null}
+            {branch}
+            {git.dirtyCount === undefined || git.dirtyCount === 0 ? null : (
+              <span className="env__warn">{git.dirtyCount} 个文件未提交</span>
+            )}
           </Line>
         )}
         <Line icon={<EngineIcon />} label="引擎">

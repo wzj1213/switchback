@@ -27,24 +27,68 @@ const run = promisify(execFile)
  */
 
 export interface WorksiteInfo {
-  /** 不是 git 仓库时缺席。 */
+  /**
+   * 分支名。**游离时这里是短 sha**（配合 `detached`），不是分支名。
+   * 不是 git 仓库时缺席。
+   */
   branch?: string
+  /** HEAD 没有指向任何分支（`git checkout <sha>` 之后）。 */
+  detached?: boolean
   /** 有未提交的改动（含未跟踪文件）。 */
   dirty?: boolean
+  /**
+   * 未提交的文件数。**一个点说不出「三个」还是「三百个」**——
+   * 而这两种情况下你该不该让引擎接着动手，答案是不一样的。
+   *
+   * 没 gitignore 的 `node_modules` 会让这个数上万，所以芯片上显示时要截断
+   * （见 `Chips.tsx`）；这里给准确值，环境卡照原样显示。
+   */
+  dirtyCount?: number
 }
 
 const TIMEOUT = 3000
 
-export async function worksiteInfo(cwd: string): Promise<WorksiteInfo> {
-  const head = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd, timeout: TIMEOUT }).catch(
+/**
+ * HEAD 在哪儿。**不用 `rev-parse --abbrev-ref HEAD`**——它在两种真实情况下说假话：
+ *
+ * | 情况 | `rev-parse --abbrev-ref HEAD` | 界面上的表现 |
+ * |---|---|---|
+ * | 刚 `git init`，还没有提交 | `fatal: ambiguous argument 'HEAD'` | **分支芯片整枚消失**，看起来像「这不是个仓库」 |
+ * | `git checkout <sha>` 之后 | 字面量 `HEAD` | 显示成**一个叫 `HEAD` 的分支**，纯属编造 |
+ *
+ * 两条都实测过（2026-08-19）。改成两步：
+ *
+ * 1. `symbolic-ref --short HEAD` —— 空仓库上照样回 `main`（它读的是 HEAD 这个**引用**
+ *    指向哪儿，不需要那个 commit 真的存在）。成功就是在分支上。
+ * 2. 失败说明 HEAD 不是符号引用，也就是游离——再问 `rev-parse --short HEAD` 拿 sha。
+ *    这一步**同时**兜住「压根不是 git 仓库」：那时两条都失败，返回 undefined。
+ */
+async function headOf(cwd: string): Promise<{ branch: string; detached: boolean } | undefined> {
+  const ref = await run("git", ["symbolic-ref", "--short", "HEAD"], { cwd, timeout: TIMEOUT }).catch(
     () => undefined,
   )
+  if (ref !== undefined) return { branch: ref.stdout.trim(), detached: false }
+  const sha = await run("git", ["rev-parse", "--short", "HEAD"], { cwd, timeout: TIMEOUT }).catch(() => undefined)
   // 不是仓库、或者 git 没装——两种都只是「没有分支可显示」，不是错误
+  if (sha === undefined) return undefined
+  return { branch: sha.stdout.trim(), detached: true }
+}
+
+export async function worksiteInfo(cwd: string): Promise<WorksiteInfo> {
+  const head = await headOf(cwd)
   if (head === undefined) return {}
-  const status = await run("git", ["status", "--porcelain"], { cwd, timeout: TIMEOUT }).catch(() => undefined)
+  const status = await run("git", ["status", "--porcelain", "-z", "-uall"], { cwd, timeout: TIMEOUT }).catch(
+    () => undefined,
+  )
+  if (status === undefined) return { branch: head.branch, ...(head.detached ? { detached: true } : {}) }
+  // 和 `workChanges` 用同一个解析：两处对「几个文件变了」必须给同一个答案，
+  // 各写一份的话芯片说 3 个、变更卡说 4 个，而它们指的是同一件事
+  const count = parseStatus(status.stdout).length
   return {
-    branch: head.stdout.trim(),
-    ...(status === undefined ? {} : { dirty: status.stdout.trim() !== "" }),
+    branch: head.branch,
+    ...(head.detached ? { detached: true } : {}),
+    dirty: count > 0,
+    dirtyCount: count,
   }
 }
 

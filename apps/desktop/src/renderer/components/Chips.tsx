@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
 import { BranchIcon, FolderIcon } from "./icons.js"
+import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
 
 /**
  * 输入区上方那一条：**这句话会发到哪儿去**。
@@ -16,10 +16,9 @@ import { BranchIcon, FolderIcon } from "./icons.js"
  *
  * ## 什么时候重新问
  *
- * 切会话时，**以及每一轮开始和结束时**。分支会被用户在终端里改掉，
- * 而「脏不脏」更是引擎自己每改一个文件就变一次——第一版只在切会话时问一遍，
- * 于是它跑完一轮改了三个文件，芯片还显示着「干净」。
- * 一个过期的状态比不显示更危险，这条对分支和脏都成立。
+ * 取数与时机全在 `useWorksite`——那里也解释了为什么焦点回来时要重问一次，
+ * 以及为什么换工作区要清旧值、同一个工作区重问则不清。
+ * 抽出去的直接原因是 `EnvCard` 抄了一份一模一样的，两份会分头走偏。
  */
 
 export function Chips({
@@ -40,20 +39,8 @@ export function Chips({
    */
   passing: boolean
 }): React.JSX.Element {
-  const [git, setGit] = useState<{ branch?: string; dirty?: boolean }>({})
-  const bridge = typeof window === "undefined" ? undefined : window.omni
-
-  useEffect(() => {
-    if (bridge === undefined) return undefined
-    let live = true
-    // 切走之后回来的那次响应不能再往界面上写：那时显示的已经是另一个工作区了
-    void bridge.worksite(cwd).then((info) => {
-      if (live) setGit(info)
-    })
-    return () => {
-      live = false
-    }
-  }, [bridge, cwd, stamp])
+  const git = useWorksite(cwd, stamp)
+  const branch = branchLabel(git)
 
   return (
     <div className="chips">
@@ -66,16 +53,29 @@ export function Chips({
           本轮已放行
         </span>
       ) : null}
-      {git.branch === undefined ? null : (
+      {branch === undefined ? null : (
         <span
           className={`chip${git.dirty === true ? " chip--warn" : ""}`}
-          title={git.dirty === true ? "工作区有未提交的改动——引擎会在这些改动之上继续动手" : "当前分支"}
+          title={branchTitle(git.detached === true, git.dirtyCount)}
         >
           <BranchIcon />
-          {git.branch}
-          {git.dirty === true ? " ·" : ""}
+          {branch}
+          {dirtyMark(git)}
         </span>
       )}
     </div>
   )
+}
+
+/**
+ * 悬停说明。游离那句要说**后果**，不是复述状态——
+ * 「游离 HEAD」四个字对不熟 git 的人等于没说，而这里真正要紧的是
+ * 「在这上面提交的东西不属于任何分支，切走就找不着了」。
+ */
+function branchTitle(detached: boolean, dirtyCount: number | undefined): string {
+  const head = detached
+    ? "HEAD 没指向任何分支（游离）——在这上面产生的提交不属于任何分支，切走之后就很难找回来了"
+    : "当前分支"
+  if (dirtyCount === undefined || dirtyCount === 0) return head
+  return `${head}；${String(dirtyCount)} 个文件有未提交的改动——引擎会在这些改动之上继续动手`
 }

@@ -181,8 +181,15 @@ const api = {
     ipcRenderer.send("omni:diagnose")
   },
   /** 工作区在哪个分支、脏不脏。不是 git 仓库时返回空对象。 */
-  async worksite(cwd: string): Promise<{ branch?: string; dirty?: boolean }> {
-    return (await ipcRenderer.invoke("omni:worksite", cwd)) as { branch?: string; dirty?: boolean }
+  async worksite(
+    cwd: string,
+  ): Promise<{ branch?: string; detached?: boolean; dirty?: boolean; dirtyCount?: number }> {
+    return (await ipcRenderer.invoke("omni:worksite", cwd)) as {
+      branch?: string
+      detached?: boolean
+      dirty?: boolean
+      dirtyCount?: number
+    }
   },
   /**
    * 工作区里现在和 HEAD 不一样的文件（绝对真实路径）。不是 git 仓库时返回 undefined。

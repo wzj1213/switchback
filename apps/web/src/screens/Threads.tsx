@@ -209,7 +209,10 @@ export function Threads({
         <PushToggle token={token} />
         {remote.me === undefined ? null : (
           <span className="threads__who">
-            {remote.me.name} · 远程上限 {remote.me.maxTrust}
+            {remote.me.name}
+            {/* 老桌面不报 host，那时这一截整个不显示——不编一个「本机」出来 */}
+            {remote.me.host === undefined || remote.me.host === "" ? null : ` · 在 ${remote.me.host} 上跑`} · 远程上限{" "}
+            {remote.me.maxTrust}
           </span>
         )}
       </footer>

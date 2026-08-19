@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
+import { hostname } from "node:os"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type WebSocket } from "ws"
 import type { Command, Event, Trust } from "@omni/protocol"
@@ -205,7 +206,11 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
     if (path === "/api/me") {
       const device = deps.tokens.verify(bearer(req))
       if (device === undefined) json(res, 401, { error: "unauthorized" })
-      else json(res, 200, { id: device.id, name: device.name, maxTrust: deps.config().maxTrust })
+      // `host` 是**连接级常量**，不是事件流里刚发生的一件事——所以走这条路由，
+      // 不新增一种帧（那样每次全量重建都要重发一遍，还要顾 `scopeReplay` 的字节预算）。
+      // 手机上「引擎跑在那台 Mac 上」解释了一大堆事：为什么没有「在访达中显示」、
+      // 为什么信任档被钳住、为什么关掉手机它照样在跑
+      else json(res, 200, { id: device.id, name: device.name, maxTrust: deps.config().maxTrust, host: hostname() })
       return
     }
     if (path === "/api/push/key") {

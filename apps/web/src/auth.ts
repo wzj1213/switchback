@@ -14,6 +14,11 @@ export interface Me {
   name: string
   /** 这条连接的信任档上限。界面据此说明「远程最高能到哪一档」。 */
   maxTrust: string
+  /**
+   * 引擎实际跑在哪台机器上。**老桌面不报这个字段**，那时整行不显示——
+   * 不编一个「本机」出来（在手机上那三个字是错的）。
+   */
+  host?: string
 }
 
 export function tokenOf(): string {

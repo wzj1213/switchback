@@ -1,4 +1,4 @@
-import { commandsOf, forkPeerOf, limitsOf, modelsOf, tasksOf, turnOf, usageOf } from "@omni/store"
+import { commandsOf, forkPeerOf, itemsOf, limitsOf, modelsOf, tasksOf, turnOf, usageOf } from "@omni/store"
 import { stampOf } from "./stamp.js"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
@@ -88,7 +88,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
     shell.reviewOpen && thread !== undefined ? (
       <Review
         cwd={thread.cwd}
-        stamp={stampOf(turnOf(state, thread.id))}
+        stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
         onCopy={app.copy}
         onClose={() => {
           shell.setReviewOpen(false)

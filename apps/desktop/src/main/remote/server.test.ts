@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { request } from "node:http"
-import { tmpdir } from "node:os"
+import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 import WebSocket from "ws"
 import type { Command, Event, Trust } from "@omni/protocol"
@@ -197,6 +197,18 @@ describe("配对", () => {
     const me = await fetch(`${h.base}/api/me`, { headers: { authorization: `Bearer ${token}` } })
     expect(me.status).toBe(200)
     expect(await me.json()).toMatchObject({ name: "iPhone", maxTrust: "full" })
+  })
+
+  // 手机上「引擎跑在那台 Mac 上」解释了一大堆事，而这是连接级常量，
+  // 不该塞进事件流（每次全量重建都要重发一遍）
+  it("`/api/me` 带上引擎实际跑在哪台机器上", async () => {
+    const h = await boot()
+    const token = await pairUp(h, "iPhone")
+    const me = (await (
+      await fetch(`${h.base}/api/me`, { headers: { authorization: `Bearer ${token}` } })
+    ).json()) as { host?: string }
+    expect(me.host).toBe(hostname())
+    expect(me.host).not.toBe("")
   })
 
   it("码不对回 403，且不吐令牌", async () => {

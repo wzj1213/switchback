@@ -154,8 +154,10 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
    * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
    */
   const { prefill, reuse } = useDraft(props.thread.draft)
-  // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了
-  const stamp = stampOf(props.turn)
+  // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了。
+  // 带上 items 是为了**每条 shell 命令收工时也问一次**——只有它能把分支换掉，
+  // 而那件事在此之前界面上完全沉默（见 `stamp.ts`）
+  const stamp = stampOf(props.turn, props.items)
   const actions = useOmniActions(props, {
     onEnv: () => {
       setEnv(true)

@@ -31,8 +31,17 @@ describe("工作区状态", () => {
     expect((await worksiteInfo(repo())).branch).toBe("试验分支")
   })
 
-  it("干净的仓库 dirty 为 false", async () => {
-    expect((await worksiteInfo(repo())).dirty).toBe(false)
+  it("干净的仓库 dirty 为 false，计数为 0", async () => {
+    const info = await worksiteInfo(repo())
+    expect(info.dirty).toBe(false)
+    expect(info.dirtyCount).toBe(0)
+  })
+
+  it("**报得出几个文件**——一个点说不出三个还是三百个", async () => {
+    const dir = repo()
+    writeFileSync(join(dir, "a.txt"), "2\n")
+    writeFileSync(join(dir, "新 文件.txt"), "x\n")
+    expect((await worksiteInfo(dir)).dirtyCount).toBe(2)
   })
 
   it("有改动就是 dirty——agent 在别人的改动上面动手，出问题时两拨改动混在一个 diff 里", async () => {
@@ -53,6 +62,26 @@ describe("工作区状态", () => {
 
   it("目录不存在也不抛——界面不该因为一个失效的路径炸掉", async () => {
     expect(await worksiteInfo("/根本没有这个目录/xyz")).toEqual({})
+  })
+
+  // 下面两条是 `rev-parse --abbrev-ref HEAD` 实测会说假话的两种情况。
+  // 都真跑 git——mock 掉之后就只剩「我写的 if 分支还在」了
+  it("**刚 git init、还没有提交，照样报得出分支**——它以前整枚消失，看起来像「这不是个仓库」", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-git-empty-"))
+    execFileSync("git", ["init", "-q", "-b", "初始分支"], { cwd: dir })
+    const info = await worksiteInfo(dir)
+    expect(info.branch).toBe("初始分支")
+    expect(info.detached).toBeUndefined()
+  })
+
+  it("**游离 HEAD 报短 sha 加一个标记，不是一个叫 `HEAD` 的分支**——后者纯属编造", async () => {
+    const dir = repo()
+    const sha = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: dir, encoding: "utf8" }).trim()
+    execFileSync("git", ["checkout", "-q", sha], { cwd: dir })
+    const info = await worksiteInfo(dir)
+    expect(info.detached).toBe(true)
+    expect(info.branch).toBe(sha)
+    expect(info.branch).not.toBe("HEAD")
   })
 })
 
