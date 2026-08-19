@@ -126,7 +126,20 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
     ctx.status("ready", `omni 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`)
     return
   }
-  if (target === ctx.state.mode) return
+  // **不因为「看起来已经是这一档」而跳过。**
+  //
+  // 上一版这里有一句 `if (target === ctx.state.mode) return`，省一次 RPC。
+  // 它成立的前提是 `state.mode` 一直等于引擎真正在用的档——而这个前提是假的：
+  // ACP 的 mode 是**双向**的，agent 能自己切（`current_mode_update`，见 `update.ts`
+  // 的 `onModeChanged`），而那条通知落不到这里——`UpdateContext` 里根本没有驱动的
+  // state，它只发了一条 `engine.status`，还是 `ready` 那一档，被 `store` 的 `LOUD`
+  // 过滤掉了。
+  //
+  // 于是：agent 自己从 X 切到 Y 之后，用户在界面上再切回 X，这里比对的是
+  // `state.mode`（还记着 X）→ 判定「已经是了」→ **一发不发**。引擎停在 Y，
+  // 界面显示 X，而且没有任何地方出声。**切档变成了空操作。**
+  //
+  // 多发一次 `session/set_mode` 只是一次幂等 RPC；上面那个谎要靠用户自己撞见。
   await ctx.call("session/set_mode", { sessionId: ctx.state.acpSession, modeId: target })
   ctx.state.mode = target
 }

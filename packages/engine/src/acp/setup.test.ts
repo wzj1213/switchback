@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   capabilitiesOf,
   canList,
+  catalogOf,
   contextWindows,
   effortsOf,
   modelCall,
@@ -123,6 +124,33 @@ describe("当前模型要标出来", () => {
       },
     }
     expect(modelsOf(session).find((m) => m.isDefault === true)?.label).toBe("B")
+  })
+
+  /**
+   * 光在清单里打个标记不够：界面画的是**选中项**（`Thread.model`），不是清单里谁带标记。
+   * agent 中途自己换模型时，走 `config_option_update` 重算这份清单——
+   * 不把当前模型一起报出来的话，选中项就没人改，面板上会写着一个引擎已经不在跑的模型。
+   */
+  it("清单要连**当前是哪个**一起报出来，两条路都要", () => {
+    const byOption = {
+      configOptions: [
+        {
+          id: "model",
+          currentValue: "kimi-code/k3",
+          options: [{ value: "kimi-code/kimi-for-coding" }, { value: "kimi-code/k3" }],
+        },
+      ],
+    }
+    expect(catalogOf(byOption).model).toBe("kimi-code/k3")
+    const byModels = {
+      models: { availableModels: [{ modelId: "a" }, { modelId: "b" }], currentModelId: "b" },
+    }
+    expect(catalogOf(byModels).model).toBe("b")
+  })
+
+  it("引擎没报当前是哪个就缺席——不猜一个出来顶替", () => {
+    const session = { models: { availableModels: [{ modelId: "a" }, { modelId: "b" }] } }
+    expect(catalogOf(session).model).toBeUndefined()
   })
 })
 

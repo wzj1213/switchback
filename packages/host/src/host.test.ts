@@ -16,6 +16,8 @@ interface Fake {
   resume: string | undefined
   /** 驱动上报自己的会话句柄 */
   report: (handle: string) => void
+  /** 引擎**自己**换了模型 / 强度（ACP 的 `config_option_update` 那条路） */
+  drift: (model?: string, effort?: string) => void
   /** 当前生效的记忆规则。取值函数——中途加的规则要立刻能读到。 */
   memory: () => readonly Rule[]
 }
@@ -35,6 +37,7 @@ function fakeDriver(effortOf?: EffortOf): { driver: EngineDriver; session: () =>
         emit: req.emit,
         resume: req.resume,
         report: (handle) => req.onHandle?.(handle),
+        drift: (model, effort) => req.onModel?.(model, effort),
         memory: req.memory,
       }
       holder.fake = fake
@@ -591,6 +594,7 @@ const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; sto
           emit: req.emit,
           resume: req.resume,
           report: (h) => req.onHandle?.(h),
+          drift: (model, effort) => req.onModel?.(model, effort),
           memory: req.memory,
         }
         sessions.push(fake)
@@ -1418,6 +1422,44 @@ describe("换模型时的推理强度", () => {
     const { host, events, id } = await pick()
     await host.dispatch({ type: "thread.setModel", threadId: id, model: "b" })
     expect(effortOf(events)).toBeUndefined()
+  })
+})
+
+/**
+ * 换模型有两个发起方：用户点下拉，和 **agent 自己换**。
+ * 后者以前只走到 `models.updated`——那条换的是**清单**，不是**选中项**，
+ * 于是清单更新了而 `Thread.model` 还是旧值，输入区照着它画一个引擎已经不在跑的模型。
+ */
+describe("agent 自己换了模型", () => {
+  const start = async (): Promise<{ events: Event[]; session: () => Fake; id: string }> => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.setModel", threadId: id, model: "a", effort: "high" })
+    return { events, session, id }
+  }
+  const last = (events: Event[]) => events.filter((e) => e.type === "thread.updated").at(-1)?.thread
+
+  it("引擎报上来的新模型要落到会话记录上", async () => {
+    const { events, session } = await start()
+    session().drift("b", "low")
+    expect(last(events)?.model).toBe("b")
+    expect(last(events)?.effort).toBe("low")
+  })
+
+  it("**没报的那一项不动原值**——「引擎没报」不等于「引擎报了个空」", async () => {
+    const { events, session } = await start()
+    session().drift("b", undefined)
+    expect(last(events)?.model).toBe("b")
+    // 用户选过的 high 不该被这条只带模型的通知悄悄清掉
+    expect(last(events)?.effort).toBe("high")
+  })
+
+  it("跟原值一样就不发事件——一条什么都没变的 `thread.updated` 只会让界面白重画", async () => {
+    const { events, session } = await start()
+    const before = events.filter((e) => e.type === "thread.updated").length
+    session().drift("a", "high")
+    expect(events.filter((e) => e.type === "thread.updated").length).toBe(before)
   })
 })
 

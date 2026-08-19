@@ -46,6 +46,18 @@ export interface Native {
 export interface OpenState {
   acpSession: string | undefined
   modes: readonly { id?: string; name?: string }[]
+  /**
+   * **omni 最后一次设过的档**——不是引擎此刻真正在用的那一档。
+   *
+   * 两者会分家：agent 能自己切（`current_mode_update`），而那条通知只到
+   * `update.ts` 的 `onModeChanged`，落不回这里。所以这个字段**现在只写不读**：
+   * `applyTrust` 曾经拿它做「已经是这一档就不发」的短路，正因为它不是引擎的
+   * 真实状态，那个短路会把切档变成空操作（详见 `mode.ts:129` 那段注释），已经拿掉。
+   *
+   * 留着它是因为「omni 让它去的那一档」本身有用——引擎档位回读那一批
+   *（见 `docs/侧栏与引擎状态方案.md`）要把它和引擎自报的那一档并排显示，
+   * 对不上时如实说出来。**在那之前，不要再拿它当引擎状态用。**
+   */
   mode: string | undefined
   models: readonly ModelOption[]
   loadSession: boolean

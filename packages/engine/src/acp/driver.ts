@@ -199,6 +199,7 @@ class AcpSession implements EngineSession {
    */
   private recatalog(catalog: Catalog): void {
     adoptCatalog(this.state, catalog)
+    this.req.onModel?.(catalog.model, catalog.effort)
     this.req.emit({
       type: "models.updated",
       at: Date.now(),

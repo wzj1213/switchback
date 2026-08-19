@@ -93,6 +93,24 @@ export interface StartRequest {
    * `system/init` 消息里到达的，比 `start()` 返回晚。
    */
   onHandle?: (handle: string) => void
+  /**
+   * 引擎**自己**换了模型或推理强度时回调。
+   *
+   * ## 为什么非要有这条路
+   *
+   * 换模型有两个发起方。用户点下拉走 `setModel`，宿主自己就知道结果；
+   * 而 **agent 也会自己换**（ACP 的 `config_option_update`——实测换完模型之后
+   * 强度的词表也跟着变）。第二种以前只走到 `models.updated`，而那条事件换的是
+   * **清单**，不是**选中项**：清单更新了，`Thread.model` 还是旧值，
+   * 界面照着 `Thread.model` 画，于是面板上写着一个引擎已经不在跑的模型。
+   * 没有任何地方报错——和 `fromConfigOption` 注释里说的是同一个「安静的谎」。
+   *
+   * 形状照抄 `onHandle`，理由也一样：**驱动手上只有 `emit`，碰不到 `Thread`。**
+   *
+   * 每一项 `undefined` 都表示「这一项引擎没报」，宿主据此**不动**原值。
+   * 「没报」和「报了个空」必须分开：后者会把用户选过的档悄悄清掉。
+   */
+  onModel?: (model: string | undefined, effort: string | undefined) => void
 }
 
 export interface EngineSession {

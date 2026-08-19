@@ -50,6 +50,26 @@ export function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
 }
 
 /**
+ * 引擎**自己**换了模型 / 强度：记下来并广播。
+ *
+ * 和上面那条同一个模子，也同一个理由——**都是引擎那边先发生、omni 后知道**，
+ * 而驱动碰不到 `Thread`，只能把结果递上来由这里落（见 `StartRequest.onModel`）。
+ *
+ * 没变就不发。`undefined` 的那一项一律**不动原值**：「引擎没报这一项」和
+ * 「引擎报了个空」必须分开，把前者当后者会悄悄清掉用户选过的档。
+ */
+export function rememberModel(ctx: Ctx, id: ThreadId, model?: string, effort?: string): void {
+  const entry = ctx.live.get(id)
+  if (entry === undefined) return
+  const kept = entry.thread
+  if ((model ?? kept.model) === kept.model && (effort ?? kept.effort) === kept.effort) return
+  const at = ctx.deps.now()
+  const patch = { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) }
+  entry.thread = { ...kept, ...patch, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/**
  * 起一个引擎会话并登记。`resume` 有值就是续跑。
  *
  * 返回**在登记完成之前就到达的句柄**。codex 在 `start()` 里就知道自己的 thread id，
@@ -148,6 +168,10 @@ export async function launch(
     onHandle: (handle) => {
       if (ctx.live.has(thread.id)) rememberHandle(ctx, thread.id, handle)
       else early.handle = handle
+    },
+    // 不像句柄那样要处理「登记完成前就到达」：这条只可能在开完会话之后到
+    onModel: (model, effort) => {
+      rememberModel(ctx, thread.id, model, effort)
     },
     ...(resume === undefined ? {} : { resume }),
     ...(forkOf === undefined ? {} : { forkOf }),

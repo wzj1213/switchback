@@ -25,8 +25,18 @@ function toModelOption(raw: AcpModel): ModelOption {
   }
 }
 
+/**
+ * 这个 configOption 上 agent 当前选中的值。**不是字符串就当没有**——不猜。
+ *
+ * 单拎出来是因为它有两个读者（下面的清单标注、`modelCatalogOf` 报当前模型），
+ * 而这类「判据抄了两份」的地方，代码库里已经吃过亏：见 `modelCatalogOf` 的注释。
+ */
+function currentOf(option: AcpConfigOption | undefined): string | undefined {
+  return typeof option?.currentValue === "string" ? option.currentValue : undefined
+}
+
 function fromConfigOption(option: AcpConfigOption | undefined): readonly ModelOption[] {
-  const current = typeof option?.currentValue === "string" ? option.currentValue : undefined
+  const current = currentOf(option)
   return (option?.options ?? [])
     .filter((o): o is { value: string; name?: string; description?: string | null } => typeof o.value === "string")
     .map((o) => ({
@@ -65,6 +75,16 @@ export interface ModelCatalog {
    * **`undefined` 表示走规范的 `session/set_model`**。
    */
   configId?: string
+  /**
+   * agent **此刻正在用**的那个模型 id。
+   *
+   * 两条路都能报出来（`models.currentModelId` / `configOptions` 的 `currentValue`），
+   * 而现在只被用来在清单里打一个 `isDefault` 标记。**光有标记不够**：
+   * 界面画的是选中项（`Thread.model`），不是清单里谁带标记——
+   * agent 中途自己换了模型时，清单会更新，选中项不会，于是面板上写着
+   * 一个引擎已经不在跑的模型。这一条就是给那条回写用的，见 `Catalog.model`。
+   */
+  current?: string
 }
 
 export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
@@ -78,11 +98,17 @@ export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
           return option.id === current ? { ...option, isDefault: true } : option
         }),
       ),
+      ...(current === undefined ? {} : { current }),
     }
   }
   const option = session.configOptions?.find((o) => o.id === "model")
   const models = distinct(fromConfigOption(option))
-  return { models, ...(option?.id === undefined || models.length === 0 ? {} : { configId: option.id }) }
+  const current = currentOf(option)
+  return {
+    models,
+    ...(option?.id === undefined || models.length === 0 ? {} : { configId: option.id }),
+    ...(current === undefined ? {} : { current }),
+  }
 }
 
 /**
@@ -123,6 +149,14 @@ export interface Catalog {
   models: readonly ModelOption[]
   /** 换模型的 configId；`undefined` = 走 `session/set_model`。 */
   modelConfig?: string
+  /**
+   * agent 此刻在用的模型 id（见 `ModelCatalog.current`）。
+   *
+   * 算这份清单的两处里，**只有 `config_option_update` 那处需要它**——
+   * 开会话时宿主自己就知道要用哪个模型，中途换掉才是它单方面做的事。
+   * 但两处共用一个 `catalogOf`（那正是它存在的理由），所以两处都带上。
+   */
+  model?: string
   /** 换强度的 configId；没有强度这一项时缺席。 */
   effortConfig?: string
   /** 当前强度。 */
@@ -130,7 +164,7 @@ export interface Catalog {
 }
 
 export function catalogOf(session: AcpNewSession): Catalog {
-  const { models, configId } = modelCatalogOf(session)
+  const { models, configId, current } = modelCatalogOf(session)
   const levels = effortsOf(session)
   return {
     // 强度是**会话级**的（kimi 的 thinking 换模型不换档），所以挂到每个模型上
@@ -144,6 +178,7 @@ export function catalogOf(session: AcpNewSession): Catalog {
             ...(levels.current === undefined ? {} : { defaultEffort: levels.current }),
           })),
     ...(configId === undefined ? {} : { modelConfig: configId }),
+    ...(current === undefined ? {} : { model: current }),
     ...(levels === undefined ? {} : { effortConfig: levels.id }),
     ...(levels?.current === undefined ? {} : { effort: levels.current }),
   }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
-import type { Trust } from "@omni/protocol"
+import type { EngineStatus, Trust } from "@omni/protocol"
 import type { ServerCall } from "../rpc.js"
 import { pickOption, summarize } from "./approve.js"
-import { pickMode } from "./mode.js"
+import { applyTrust, pickMode } from "./mode.js"
 import { handlePermission, type PermissionContext } from "./permission.js"
 import type { AcpPermissionOption, AcpToolCall } from "./wire.js"
 
@@ -207,6 +207,42 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
     expect(pickMode(other, "read-only")).toBe("plan")
     expect(pickMode(other, "auto-edit")).toBe("edit")
     expect(pickMode(other, "full")).toBe("yolo")
+  })
+
+  /** 只记账的会话：发出去的 RPC 和说出去的话都收下来。 */
+  function trustCtx(mode: string | undefined) {
+    const calls: { method: string; params: unknown }[] = []
+    const said: { status: EngineStatus; detail?: string }[] = []
+    const ctx = {
+      id: "acp:kimi",
+      state: { acpSession: "s-1", mode, native: undefined },
+      call: (method: string, params: unknown) => {
+        calls.push({ method, params })
+        return Promise.resolve({})
+      },
+      status: (status: EngineStatus, detail?: string) => {
+        said.push({ status, ...(detail === undefined ? {} : { detail }) })
+      },
+    }
+    return { ctx, calls, said }
+  }
+
+  it("**agent 自己切走之后再切回来，必须真的发出去**——不然切档是个空操作", async () => {
+    // omni 设过 `agent`，随后 agent 自己切到了别处（`current_mode_update` 落不到
+    // 驱动的 state 上，omni 无从得知）。用户在界面上切回 auto-edit ——
+    // 上一版在这里比对 `state.mode` 判定「已经是 agent 了」，一发不发：
+    // 引擎停在它自己那一档，界面显示切成功了，而且没有任何地方出声
+    const h = trustCtx("agent")
+    await applyTrust(h.ctx, "auto-edit", REAL)
+    expect(h.calls.map((c) => c.method)).toEqual(["session/set_mode"])
+    expect((h.calls[0]?.params as { modeId: string }).modeId).toBe("agent")
+  })
+
+  it("档位表里认不出对应项时什么都不发，并说明保持了引擎自己的默认档", async () => {
+    const h = trustCtx(undefined)
+    await applyTrust(h.ctx, "auto-edit", [{ id: "alpha" }, { id: "beta" }])
+    expect(h.calls).toEqual([])
+    expect(h.said[0]?.detail).toContain("已保持引擎自己的默认档")
   })
 })
 
