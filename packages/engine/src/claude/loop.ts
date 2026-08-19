@@ -164,8 +164,8 @@ function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
         req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
       }
       // **只接 `task_progress` 一种**：同族还有 task_started / task_updated /
-      // task_notification，但只有这一种我抓到过完整形状。照名字猜字段不会报错，
-      // 只会让界面显示一条编出来的进度（见 `tasks.ts`）
+      // task_notification，形状已在 workflow 那一路抓到，但这里只服务 Task 子 agent，
+      // 那一路还没抓——拿一次实测盖两条路径就是在编字段（见 `tasks.ts`）
       if (msg.subtype === "task_progress") onTaskProgress(ref.tasks, msg, at, req)
       return
     default:

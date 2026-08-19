@@ -15,14 +15,40 @@ import type { Event, TaskRun, ThreadId } from "@omni/protocol"
  * ```
  *
  * 同一族还有 `task_started` / `task_updated` / `task_notification`——
- * **这一版只接 `task_progress` 一种**：它是唯一一个我真抓到过完整形状的。
- * 另外三种照着名字猜字段，猜错了不会报错，只会让界面显示一条编出来的进度。
+ * **这一版仍然只接 `task_progress` 一种**。另三种的形状 2026-08-19 在 **workflow
+ * 那一路**抓到了（`task_started` 带 `task_type:"local_workflow"` / `workflow_name` /
+ * 完整脚本源码；`task_updated` 是 `patch{status,end_time}`；`task_notification` 带
+ * `output_file` / `summary` / `usage`），但 **Task 工具那一路还没抓**。这里现在只服务
+ * Task 子 agent，拿 workflow 的形状去接另一路，是拿一次实测盖两条不同的路径。
  *
- * ## 为什么不接 `workflow_progress`
+ * ## `workflow_progress`：上一版判它不存在，判据用错了形状
  *
- * 方案里把它当旗舰数据源，实测**SDK 里根本没有这个东西**（`sdk.d.ts` 与
- * `sdk.mjs` 各 0 处）——那条依据不在公开 SDK 里，
- * 而 SDK 是 omni 通向 claude 的唯一通道。
+ * 它**不是一种 subtype，是 `task_progress` 帧上的一个字段**。上一版按 subtype 名去 grep
+ *（`sdk.d.ts` 与 `sdk.mjs` 各 0 处）就判它不存在——0 处是真的，**公开类型至今没声明它**，
+ * 但它就搭在这个函数已经在解析的那一帧上。2026-08-19 活体抓到（10 帧里 4 帧带）：
+ *
+ * ```json
+ * { "subtype": "task_progress", "task_id": "w4zk4icbn",
+ *   "description": "Read: read:alpha.txt", "last_tool_name": "read:alpha.txt",
+ *   "workflow_progress": [
+ *     { "type": "workflow_phase", "index": 1, "title": "Read" },
+ *     { "type": "workflow_agent", "index": 1, "label": "read:alpha.txt",
+ *       "phaseIndex": 1, "phaseTitle": "Read", "agentId": "a5403b31…", "state": "done",
+ *       "tokens": 11031, "toolCalls": 2, "durationMs": 4673,
+ *       "lastToolName": "StructuredOutput", "lastToolSummary": "红" }] }
+ * ```
+ *
+ * 一整个 workflow 共用**一个 `task_id`**：`description` 取的是这一批里最后一个报进度的
+ * agent，`last_tool_name` 填的是那个 agent 的 `label`（**不是工具名**，所以和 `description`
+ * 后半段重复）。每-agent 明细全在这个被丢掉的字段里。带数组的帧都是状态变化帧；
+ * 纯进度帧按 10s 节流，那条分支还没跑到（那一跑全程只有 6.7s）。
+ *
+ * ## 但先别急着接：workflow 现在**整个不显示**
+ *
+ * `Workflow` 工具**立刻返回**（`Workflow launched in background`），workflow 在后台跑，
+ * 主循环几秒就收工。于是 `onResult` 清空任务并发 `turn.completed` → `TurnStatus` 因
+ * `turn === undefined` 整块不渲染；后面那些 `task_progress` 照常到、照常进 store，
+ * **没有任何东西渲染它**。接这个字段之前要先解决这个——见 `docs/工程时间线.md` 同日那条。
  */
 
 /** 这一轮里每个任务最后一次报的进度。键是引擎给的 `task_id`。 */
