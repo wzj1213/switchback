@@ -313,7 +313,7 @@ export function effortsOf(
  * `sessionCapabilities` 用**空对象当标记**（实测 kimi 报 `{fork:{}}`），
  * 所以判据是键在不在，不是值是不是 true。
  */
-export function capabilitiesOf(info: AcpInitialize | undefined): EngineCapabilities {
+export function capabilitiesOf(info: AcpInitialize | undefined, modeReadback = false): EngineCapabilities {
   const agent = info?.agentCapabilities
   const session = agent?.sessionCapabilities ?? {}
   return {
@@ -323,6 +323,10 @@ export function capabilitiesOf(info: AcpInitialize | undefined): EngineCapabilit
     // ACP 没有「往正在跑的那一轮里插一句」的入口
     steer: false,
     fork: "fork" in session,
+    // **协议里没有「我会不会报档位变化」这种声明**，推不出来，只能由各家自己说
+    //（见 `AcpDriverConfig.modeReadback`）。没人说就是不知道——**不知道一律报 false**：
+    // 报 true 的代价是界面上那行「引擎侧：X」永远停在开场那一刻，而它看起来是实时的
+    modeReadback,
   }
 }
 

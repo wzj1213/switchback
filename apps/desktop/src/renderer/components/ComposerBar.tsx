@@ -4,6 +4,7 @@ import { ModelPicker } from "./ModelPicker.js"
 import { Select } from "./Select.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
 import { TRUSTS, labelOf } from "./Composer.js"
+import type { TrustHint } from "../trustHint.js"
 
 /**
  * 输入框下面那一排：引擎 / 信任档 / 模型 ＋ 右下角那颗键。
@@ -12,6 +13,27 @@ import { TRUSTS, labelOf } from "./Composer.js"
  * 这一排是「这句话由谁、以什么权限、用哪个模型去跑」——
  * 四件事都不改文本，只改**这句话的去向**。
  */
+/**
+ * 档位下面那行说明。**默认不出现**——内容由 `trustHint` 算（见那边的注释）。
+ *
+ * 拆成一个组件不只是为了 `Bar` 的行数：这一行是唯一一处「界面替引擎说话」的地方，
+ * 而**它说的每一句都必须是引擎自己报的**——所以它只渲染算好的文本，
+ * 一个字都不在这里拼。
+ */
+function Hint({ hint, onReapply }: { hint?: TrustHint; onReapply: () => void }): React.JSX.Element | null {
+  if (hint === undefined) return null
+  return (
+    <span className={`composer__hint composer__hint--${hint.kind}`} title={hint.text}>
+      {hint.text}
+      {hint.action === undefined ? null : (
+        <button type="button" className="composer__hintact" onClick={onReapply}>
+          {hint.action.label}
+        </button>
+      )}
+    </span>
+  )
+}
+
 export function Bar({
   detached,
   busy,
@@ -20,6 +42,7 @@ export function Bar({
   engine,
   engines,
   trust,
+  hint,
   models,
   model,
   effort,
@@ -39,6 +62,7 @@ export function Bar({
   engine: EngineId
   engines: readonly EngineInfo[]
   trust: Trust
+  hint?: TrustHint
   models: readonly ModelOption[]
   model?: string
   effort?: string
@@ -89,6 +113,7 @@ export function Bar({
                 },
               ]}
             />
+            <Hint hint={hint} onReapply={() => { onTrustChange(trust) }} />
             <ModelPicker
               models={models}
               model={model}

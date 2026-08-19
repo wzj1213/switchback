@@ -48,6 +48,22 @@ export interface EngineCapabilities {
    * 交接包只有一句目标——「重来」出来的那条会话，其实是从零开始的。
    */
   fork: boolean
+  /**
+   * 引擎会不会**主动告诉 omni 它自己改了档**。
+   *
+   * ## 为什么这一位不能省
+   *
+   * `Thread.engineState` 缺席有两种截然不同的含义：「这家从不报，omni 不知道」，
+   * 和「这家会报，现在恰好是对齐的」。不区分的话，界面上这两种长得一模一样。
+   *
+   * ## 这一位和上面四位不是同一类，别混
+   *
+   * `compact` / `attachments` / `steer` / `fork` 管的是**给不给入口**——报 false 就不画那个按钮。
+   * `modeReadback` 管的是**这条信息可信到什么程度**：报 false 时档位下拉**照给**
+   *（omni 设得动，只是读不回来），只是下面多一行灰字。
+   * 当成「不给入口」那一类处理、因为读不回来就不让人改档，那是另一个 bug。
+   */
+  modeReadback: boolean
 }
 
 /** 什么都不支持。驱动没表态时的兜底——**默认不给入口**，而不是默认给。 */
@@ -56,4 +72,5 @@ export const NO_CAPABILITIES: EngineCapabilities = {
   attachments: false,
   steer: false,
   fork: false,
+  modeReadback: false,
 }

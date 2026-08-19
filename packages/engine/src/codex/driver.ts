@@ -271,7 +271,10 @@ class CodexSession implements EngineSession {
 
   /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
   capabilities(): EngineCapabilities {
-    return { compact: true, attachments: true, steer: true, fork: true }
+    // `modeReadback`：`thread/settings/updated` 要在 `initialize` 里声明
+    // `capabilities:{experimentalApi:true}`，而声明它的前置（一张「omni 认领了哪些
+    // 实验面」的常量表 + CI 双向断言）还没建，见索引 §5-2。同样是「还没接」不是「没有」
+    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: false }
   }
 
   /**

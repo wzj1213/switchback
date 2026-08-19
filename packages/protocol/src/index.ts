@@ -1,5 +1,5 @@
 export type { ThreadId, TurnId, ItemId, EngineId, EngineTransport, EngineDescriptor } from "./ids.js"
-export type { EngineAccount, EngineSegment, EngineThread, SlashCommand, Thread, ThreadStatus, Trust, Turn, TurnStatus } from "./thread.js"
+export type { EngineAccount, EngineAxis, EngineSegment, EngineState, EngineThread, SlashCommand, Thread, ThreadStatus, Trust, TrustApply, Turn, TurnStatus } from "./thread.js"
 export type {
   Item,
   ItemKind,

@@ -232,7 +232,11 @@ class ClaudeSession implements EngineSession {
     // 宿主据此退回排队——**不是假装支持再偷偷排队**，
     // 那样界面就没法如实告诉用户「这句得等」
     // fork 也报 false：SDK 没有复制会话的入口，只能走交接包
-    return { compact: false, attachments: true, steer: false, fork: false }
+    // **`modeReadback` 报 false 是「omni 还没接」，不是「claude 没有」**：
+    // SDK 的 `system` 消息带着 permissionMode，而 `loop.ts` 的 `case "system"`
+    // 只放行 `subtype === "init"`。接上之前如实报 false——
+    // 报 true 而界面上那行永远不动，比不给那行糟
+    return { compact: false, attachments: true, steer: false, fork: false, modeReadback: false }
   }
 
   async setModel(model: string): Promise<{ effort?: string }> {

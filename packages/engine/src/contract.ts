@@ -1,4 +1,4 @@
-import type { EngineAccount, EngineCapabilities, EngineId, EngineThread, Event, Item, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TurnId } from "@omni/protocol"
+import type { EngineAccount, EngineAxis, EngineCapabilities, EngineId, EngineThread, Event, Item, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TrustApply, TurnId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
 
@@ -111,6 +111,26 @@ export interface StartRequest {
    * 「没报」和「报了个空」必须分开：后者会把用户选过的档悄悄清掉。
    */
   onModel?: (model: string | undefined, effort: string | undefined) => void
+  /**
+   * 驱动发现**引擎自己当前处于什么状态**时回调。
+   *
+   * 传部分字段，宿主做合并——引擎往往一次只报一样。
+   * 和 `onHandle` / `onModel` 同一条路（走 `thread.updated` 落盘），
+   * 理由也一样：驱动手上只有 `emit`，碰不到 `Thread`。
+   *
+   * **`match` 由驱动判，不由界面反推。** 反推做不到：档位匹配是 Trust → modeId 的
+   * 打分，有损、多对一，反过来是一对多。而驱动知道自己发过什么、引擎回了什么。
+   */
+  onEngineState?: (patch: { axes?: readonly EngineAxis[]; modelId?: string }) => void
+  /**
+   * omni 设档的**结果**。
+   *
+   * 存在的理由很具体：`acp/mode.ts` 里那两句「找不到对应项，已保持引擎自己的默认档」
+   * 和「没有报告可选档位」以前走 `engine.status` 的 `ready` 档，而 `store` 的 `LOUD`
+   * 只收 crashed/timeout/degraded——**代码里写着，用户一次都没看见过**。
+   * 改走这里，落进 `Thread` 就能落盘、能补发、⌘R 之后还在。
+   */
+  onTrustApply?: (result: TrustApply) => void
 }
 
 export interface EngineSession {

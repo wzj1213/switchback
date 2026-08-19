@@ -213,7 +213,11 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
   function trustCtx(mode: string | undefined) {
     const calls: { method: string; params: unknown }[] = []
     const said: { status: EngineStatus; detail?: string }[] = []
+    const applied: { result: string; detail?: string }[] = []
     const ctx = {
+      apply: (result: { result: string; detail?: string }) => {
+        applied.push(result)
+      },
       id: "acp:kimi",
       state: { acpSession: "s-1", mode, native: undefined },
       call: (method: string, params: unknown) => {
@@ -224,7 +228,7 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
         said.push({ status, ...(detail === undefined ? {} : { detail }) })
       },
     }
-    return { ctx, calls, said }
+    return { ctx, calls, said, applied }
   }
 
   it("**agent 自己切走之后再切回来，必须真的发出去**——不然切档是个空操作", async () => {
@@ -242,7 +246,27 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
     const h = trustCtx(undefined)
     await applyTrust(h.ctx, "auto-edit", [{ id: "alpha" }, { id: "beta" }])
     expect(h.calls).toEqual([])
-    expect(h.said[0]?.detail).toContain("已保持引擎自己的默认档")
+    expect(h.applied[0]?.result).toBe("unmapped")
+    expect(h.applied[0]?.detail).toContain("已保持引擎自己的默认档")
+  })
+
+  /**
+   * **这句话以前一个用户都没看见过。** 它走的是 `engine.status` 的 `ready` 档，
+   * 而 `store` 的 `LOUD` 只收 crashed/timeout/degraded——代码里写着，界面上没有。
+   * 钉住「不再走 status」，免得哪天有人顺手改回去。
+   */
+  it("设档结果不再走 engine.status——那条路会被 LOUD 静默丢掉", async () => {
+    const h = trustCtx(undefined)
+    await applyTrust(h.ctx, "auto-edit", [{ id: "alpha" }])
+    await applyTrust(h.ctx, "auto-edit", [])
+    expect(h.said).toEqual([])
+    expect(h.applied.map((a) => a.result)).toEqual(["unmapped", "unmapped"])
+  })
+
+  it("真设上了要报 applied——界面据此知道「这一档是真的落下去了」", async () => {
+    const h = trustCtx(undefined)
+    await applyTrust(h.ctx, "auto-edit", REAL)
+    expect(h.applied.map((a) => a.result)).toEqual(["applied"])
   })
 })
 

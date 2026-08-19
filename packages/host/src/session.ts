@@ -5,7 +5,7 @@ import { askUser } from "./approval.js"
 import type { EngineSession } from "@omni/engine"
 import { emit, type Ctx, type Live } from "./ctx.js"
 import { evict } from "./live.js"
-import { rememberHandle, rememberModel } from "./engine-state.js"
+import { rememberEngineState, rememberHandle, rememberModel, rememberTrustApply } from "./engine-state.js"
 import { copyTranscript } from "./transcript.js"
 import type { Gate } from "./gate.js"
 
@@ -79,9 +79,15 @@ export async function launch(
       if (ctx.live.has(thread.id)) rememberHandle(ctx, thread.id, handle)
       else early.handle = handle
     },
-    // 不像句柄那样要处理「登记完成前就到达」：这条只可能在开完会话之后到
+    // 不像句柄那样要处理「登记完成前就到达」：这几条只可能在开完会话之后到
     onModel: (model, effort) => {
       rememberModel(ctx, thread.id, model, effort)
+    },
+    onEngineState: (patch) => {
+      rememberEngineState(ctx, thread.id, patch)
+    },
+    onTrustApply: (result) => {
+      rememberTrustApply(ctx, thread.id, result)
     },
     ...(resume === undefined ? {} : { resume }),
     ...(forkOf === undefined ? {} : { forkOf }),

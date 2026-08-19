@@ -1,6 +1,7 @@
 import type { Command, EngineInfo, Thread } from "@omni/protocol"
 import { NO_CAPABILITIES } from "@omni/protocol"
-import { Composer, labelOf } from "./Composer.js"
+import { Composer, TRUSTS, labelOf } from "./Composer.js"
+import { trustHint } from "../trustHint.js"
 import type { OmniAction } from "../omniCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 
@@ -72,6 +73,11 @@ export function WorkspaceComposer({
       onOmni={(name: string) => {
         actions.find((a) => a.command.name === name)?.run()
       }}
+      /*
+       * 档位下面那行说明。**引擎名与档位名都是插值**——写死的话换一家引擎那句就在撒谎。
+       * 用 `nextEngine ?? engine` 与下拉保持一致：有待切换的引擎时，两个控件说的得是同一家。
+       */
+      hint={trustHint(thread, labelOf(props.engines, thread.nextEngine ?? thread.engine), labelOf(TRUSTS, thread.trust))}
       /*
        * 有待切换的引擎时，模型选择器变成**一句点不动的说明**（「切到 Codex 后可选」）。
        * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常根本不存在，

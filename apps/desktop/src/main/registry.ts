@@ -60,6 +60,11 @@ export function buildRegistry(
         // **不传这一条它的会话默认就是 yolo**：实测只读档下照样改文件，
         // 一次审批都不发。它唯一的开关是 `session/new` 的 `_meta.yoloMode`
         nativeApproval: grokNativeApproval,
+        // **它确实会主动报档位变化**，所以这一位敢报 true：源码原话是
+        // 「The agent emits `CurrentModeUpdate` on every entry and exit」
+        //（grok-build `app/acp_handler/session_notification.rs`）。
+        // kimi / zcode 没查到同样的实据，就按默认的 false——不知道别声称
+        modeReadback: true,
       }),
       ...acp.drivers,
     },

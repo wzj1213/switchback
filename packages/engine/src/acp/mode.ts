@@ -1,4 +1,5 @@
-import type { EngineStatus, Trust } from "@omni/protocol"
+import type { EngineStatus, Trust, TrustApply } from "@omni/protocol"
+import type { EngineAxis } from "@omni/protocol"
 import type { AcpMode } from "./wire.js"
 
 /**
@@ -25,7 +26,7 @@ import type { AcpMode } from "./wire.js"
  * 「能改工作区外的文件、能联网」的模式悄悄打开了。
  *
  * 匹配不上时驱动**不发** `session/set_mode`，保持 agent 自己的默认档，
- * 并报一条 `engine.status` 说明——见 `driver.ts`。让人知道「omni 的档位
+ * 并经 `TrustCtx.apply` 报一条 `unmapped` 说明。让人知道「omni 的档位
  * 在这家引擎上没接上」，比让他以为接上了强得多。
  */
 
@@ -100,6 +101,13 @@ export interface TrustCtx {
   id: string
   call: (method: string, params: unknown) => Promise<unknown>
   status: (status: EngineStatus, detail?: string) => void
+  /**
+   * 设档的结果往哪儿报。**时间戳由驱动盖**——这一层不读时钟。
+   *
+   * 以前这三种结果全走 `ctx.status("ready", …)`，而 `store` 的 `LOUD` 只收
+   * crashed/timeout/degraded：**代码里写着，用户一次都没看见过**。
+   */
+  apply?: (result: Omit<TrustApply, "at">) => void
   state: {
     acpSession: string | undefined
     mode: string | undefined
@@ -117,13 +125,19 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
   if (ctx.state.acpSession === undefined) return
   if (modes.length === 0) {
     // 这家有自己的审批开关时，说它那句更准（见 `nativeApproval` 的 `note`）
-    ctx.status("ready", ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`)
+    ctx.apply?.({
+      result: "unmapped",
+      detail: ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`,
+    })
     return
   }
   const target = pickMode(modes, trust)
   if (target === undefined) {
     const names = modes.map((m) => m.id ?? "?").join("、")
-    ctx.status("ready", `omni 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`)
+    ctx.apply?.({
+      result: "unmapped",
+      detail: `omni 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`,
+    })
     return
   }
   // **不因为「看起来已经是这一档」而跳过。**
@@ -142,6 +156,7 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
   // 多发一次 `session/set_mode` 只是一次幂等 RPC；上面那个谎要靠用户自己撞见。
   await ctx.call("session/set_mode", { sessionId: ctx.state.acpSession, modeId: target })
   ctx.state.mode = target
+  ctx.apply?.({ result: "applied" })
 }
 
 /**
@@ -154,8 +169,31 @@ export function warnNativeFixed(ctx: TrustCtx, trust: Trust): void {
   const want = ctx.nativeApproval?.(trust)
   if (want === undefined || ctx.state.native === undefined) return
   if (JSON.stringify(want.meta ?? {}) === JSON.stringify(ctx.state.native.meta ?? {})) return
-  ctx.status(
-    "degraded",
-    `${ctx.id} 的原生审批开关在开会话时就定死了，换档要重开一条会话才生效。这条会话仍然按开场时那一档在跑。`,
-  )
+  // **改走 `apply` 而不是发 `degraded`**：后者是一条转瞬即逝、刷新就没的通知，
+  // 而这句话描述的是这条会话**持续存在**的一个事实。同一句话报两遍更糟
+  ctx.apply?.({
+    result: "fixed",
+    detail: `${ctx.id} 的原生审批开关在开会话时就定死了，换档要重开一条会话才生效。这条会话仍然按开场时那一档在跑。`,
+  })
+}
+
+/**
+ * 引擎报了一个当前档位 → 一条 `EngineAxis`。
+ *
+ * **`match` 在这里判，不在界面判**：界面手上只有一个 modeId，而「omni 的哪一档
+ * 对应它」是一对多的反向问题；这里有档位表和当前信任档，重算一次 `pickMode`
+ * 就知道 omni 想要的是哪个，比一比即可。
+ *
+ * `pickMode` 返回 undefined（这家的档位表里压根没有对得上的）时算 `diverged`：
+ * omni 的档和引擎这一维**确实**不对应。至于「为什么不对应」由 `trustApply`
+ * 的 `unmapped` 那条说明去讲，不塞进这一个字段里。
+ */
+export function modeAxis(modes: readonly AcpMode[], trust: Trust, modeId: string): EngineAxis {
+  const label = modes.find((m) => m.id === modeId)?.name
+  return {
+    axis: "mode",
+    id: modeId,
+    ...(label === undefined || label === "" ? {} : { label }),
+    match: pickMode(modes, trust) === modeId ? "aligned" : "diverged",
+  }
 }

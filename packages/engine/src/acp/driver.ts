@@ -8,7 +8,7 @@ import { probeCommand } from "../probe.js"
 import { sessionsOf, type Catalog } from "./setup.js"
 import type { AcpDriverConfig } from "./caps.js"
 import { adoptCatalog, startSession, type OpenState, type StartCtx } from "./open.js"
-import { applyTrust, warnNativeFixed, type TrustCtx } from "./mode.js"
+import { applyTrust, modeAxis, warnNativeFixed, type TrustCtx } from "./mode.js"
 import { applyModel, type ModelCtx } from "./model.js"
 import { handlePermission } from "./permission.js"
 import { stopStatus } from "./translate.js"
@@ -120,6 +120,7 @@ class AcpSession implements EngineSession {
       },
       onMode: (modeId) => {
         this.state.mode = modeId
+        this.req.onEngineState?.({ axes: [modeAxis(this.state.modes, this.trust.current, modeId)] })
       },
       turnId: () => this.state.turn,
       inflight: this.inflight,
@@ -143,6 +144,10 @@ class AcpSession implements EngineSession {
       status: (status, detail) => {
         this.status(status, detail)
       },
+      // 时间戳在这儿盖：`mode.ts` 那一层不读时钟
+      apply: (result) => {
+        this.req.onTrustApply?.({ ...result, at: Date.now() })
+      },
       state: this.state,
       ...(this.config.nativeApproval === undefined ? {} : { nativeApproval: this.config.nativeApproval }),
     }
@@ -155,6 +160,7 @@ class AcpSession implements EngineSession {
   private recatalog(catalog: Catalog): void {
     adoptCatalog(this.state, catalog)
     this.req.onModel?.(catalog.model, catalog.effort)
+    if (catalog.model !== undefined) this.req.onEngineState?.({ modelId: catalog.model })
     this.req.emit({
       type: "models.updated",
       at: Date.now(),

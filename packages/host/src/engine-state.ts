@@ -1,4 +1,4 @@
-import type { ThreadId } from "@omni/protocol"
+import type { EngineAxis, ThreadId, TrustApply } from "@omni/protocol"
 import { emit, type Ctx } from "./ctx.js"
 
 /**
@@ -41,5 +41,48 @@ export function rememberModel(ctx: Ctx, id: ThreadId, model?: string, effort?: s
   const at = ctx.deps.now()
   const patch = { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) }
   entry.thread = { ...kept, ...patch, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/**
+ * 引擎自报的状态：**合并进 `Thread.engineState`，绝不碰 `Thread.trust`。**
+ *
+ * 合并而不是覆盖，因为引擎往往一次只报一样（一条 `current_mode_update` 只带档位，
+ * 一条 `config_option_update` 只带模型）。整份覆盖的话，后到的那条会把先到的抹掉。
+ *
+ * 轴按 `axis` 去重、后到的赢：codex 的 approval 与 sandbox 是两条独立的轴，
+ * 各自更新各自的，不该互相清空。
+ */
+export function rememberEngineState(
+  ctx: Ctx,
+  id: ThreadId,
+  patch: { axes?: readonly EngineAxis[]; modelId?: string },
+): void {
+  const entry = ctx.live.get(id)
+  if (entry === undefined) return
+  const prev = entry.thread.engineState
+  const byAxis = new Map((prev?.axes ?? []).map((a) => [a.axis, a]))
+  for (const axis of patch.axes ?? []) byAxis.set(axis.axis, axis)
+  // **合并，不是覆盖**：`undefined` 一律当「这次没报」，沿用上一次的值
+  const modelId = patch.modelId ?? prev?.modelId
+  const at = ctx.deps.now()
+  entry.thread = {
+    ...entry.thread,
+    engineState: {
+      axes: [...byAxis.values()],
+      ...(modelId === undefined ? {} : { modelId }),
+      at,
+    },
+    updatedAt: at,
+  }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/** omni 设档的结果。同一个模子，只是这一条是「omni 做了什么」而不是「引擎报了什么」。 */
+export function rememberTrustApply(ctx: Ctx, id: ThreadId, result: TrustApply): void {
+  const entry = ctx.live.get(id)
+  if (entry === undefined) return
+  const at = ctx.deps.now()
+  entry.thread = { ...entry.thread, trustApply: result, updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }

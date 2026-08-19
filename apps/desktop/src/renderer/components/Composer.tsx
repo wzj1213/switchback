@@ -6,6 +6,7 @@ import { Attachments } from "./Attachments.js"
 import { Bar } from "./ComposerBar.js"
 import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust } from "@omni/protocol"
+import type { TrustHint } from "../trustHint.js"
 
 /**
  * 信任档。
@@ -36,6 +37,8 @@ const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
 ]
 
 interface Props {
+  /** 档位下面那行说明。**内容由 `trustHint` 算，这一层只往下递、不解释。** */
+  hint?: TrustHint
   /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
   detached?: boolean
   /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
@@ -122,6 +125,21 @@ function projectOf(cwd: string): string {
   return cwd.split("/").filter(Boolean).pop() ?? cwd
 }
 
+/**
+ * 把「改一改再发」塞回来的文本填进输入框。
+ *
+ * **只认序号变化，不认文本变化。** 依赖文本的话，用户在输入框里把它改回原样，
+ * 这个 effect 会再跑一次、把光标弹到末尾。
+ */
+function usePrefill(prefill: { text: string; at: number } | undefined, setText: (text: string) => void): void {
+  const seen = useRef(prefill?.at ?? 0)
+  useEffect(() => {
+    if (prefill === undefined || prefill.at === seen.current) return
+    seen.current = prefill.at
+    setText(prefill.text)
+  }, [prefill, setText])
+}
+
 export function Composer({
   detached = false,
   engine,
@@ -129,6 +147,7 @@ export function Composer({
   trust,
   onEngineChange,
   onTrustChange,
+  hint,
   onSend,
   onResume,
   models,
@@ -152,14 +171,7 @@ export function Composer({
   const [text, setText] = useState("")
   // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
   const attach = useAttachments(canAttach)
-  // **只认序号变化，不认文本变化。** 依赖文本的话，用户在输入框里把它改回原样，
-  // 这个 effect 会再跑一次、把光标弹到末尾
-  const seen = useRef(prefill?.at ?? 0)
-  useEffect(() => {
-    if (prefill === undefined || prefill.at === seen.current) return
-    seen.current = prefill.at
-    setText(prefill.text)
-  }, [prefill])
+  usePrefill(prefill, setText)
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
   const { blocked, queueing, steering } = stateOf({ detached, starting, busy, canSteer })
   const submit = (steer = false): void => {
@@ -221,6 +233,7 @@ export function Composer({
           pending={pending}
           onEngineChange={onEngineChange}
           onTrustChange={onTrustChange}
+          hint={hint}
           onModelChange={onModelChange}
           onResume={onResume}
           onInterrupt={onInterrupt}

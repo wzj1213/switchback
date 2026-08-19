@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { Event, Item } from "@omni/protocol"
 import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
+import type { EngineAxis } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { StoredRule } from "@omni/journal"
 import { createHost, type Host } from "./host.js"
@@ -15,9 +16,11 @@ interface Fake {
   /** 宿主传下来的续跑句柄。没传就是新会话。 */
   resume: string | undefined
   /** 驱动上报自己的会话句柄 */
-  report: (handle: string) => void
+  handle: (handle: string) => void
   /** 引擎**自己**换了模型 / 强度（ACP 的 `config_option_update` 那条路） */
   drift: (model?: string, effort?: string) => void
+  /** 引擎自报当前状态（`current_mode_update` 那条路） */
+  report: (patch: { axes?: readonly EngineAxis[]; modelId?: string }) => void
   /** 当前生效的记忆规则。取值函数——中途加的规则要立刻能读到。 */
   memory: () => readonly Rule[]
 }
@@ -36,8 +39,9 @@ function fakeDriver(effortOf?: EffortOf): { driver: EngineDriver; session: () =>
         ask: req.askUser,
         emit: req.emit,
         resume: req.resume,
-        report: (handle) => req.onHandle?.(handle),
+        handle: (handle) => req.onHandle?.(handle),
         drift: (model, effort) => req.onModel?.(model, effort),
+        report: (patch) => req.onEngineState?.(patch),
         memory: req.memory,
       }
       holder.fake = fake
@@ -265,7 +269,7 @@ describe("续跑", () => {
   it("驱动上报的句柄走 thread.updated 落盘——续跑要的东西必须和历史存在同一个地方", async () => {
     const { host, events, session, stored } = setupWithJournal()
     await host.dispatch(create)
-    session().report("codex-thread-abc")
+    session().handle("codex-thread-abc")
     const last = events.filter((e) => e.type === "thread.updated").at(-1)
     expect(last?.type === "thread.updated" ? last.thread.engineHandle : "").toBe("codex-thread-abc")
     // 第一句话之前：事件发出去了，磁盘上还没有
@@ -357,8 +361,8 @@ describe("续跑", () => {
     await host.dispatch(create)
     // 开会话自带一条 `starting → idle` 的 updated，从这里起算
     const base = events.filter((e) => e.type === "thread.updated").length
-    session().report("h")
-    session().report("h")
+    session().handle("h")
+    session().handle("h")
     expect(events.filter((e) => e.type === "thread.updated")).toHaveLength(base + 1)
   })
 
@@ -366,7 +370,7 @@ describe("续跑", () => {
     const { host, events, session } = setupWithJournal()
     await host.dispatch(create)
     const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    session().report("h-1")
+    session().handle("h-1")
     await host.dispose()
 
     const revived = setupWithJournal()
@@ -593,8 +597,9 @@ const setupTwoEngines = (): { host: Host; events: Event[]; sessions: Fake[]; sto
           ask: req.askUser,
           emit: req.emit,
           resume: req.resume,
-          report: (h) => req.onHandle?.(h),
+          handle: (h) => req.onHandle?.(h),
           drift: (model, effort) => req.onModel?.(model, effort),
+          report: (patch) => req.onEngineState?.(patch),
           memory: req.memory,
         }
         sessions.push(fake)
@@ -909,7 +914,7 @@ describe("跨引擎接力", () => {
     const rig = setupTwo()
     const { host, events, sessions } = rig
     await host.dispatch(create)
-    sessions[0]?.report("old-handle")
+    sessions[0]?.handle("old-handle")
     await handoffTo(rig, "other")
     const updates = events.filter((e) => e.type === "thread.updated")
     const afterHandoff = updates.at(-1)
@@ -1636,5 +1641,57 @@ describe("临时会话：发出第一句话才算数", () => {
     await host.dispatch(create)
     expect(sessions[0]?.disposed).toBe(false)
     expect(events.some((e) => e.type === "thread.removed" && e.threadId === first)).toBe(false)
+  })
+})
+
+/**
+ * 引擎自报的状态**合并进 `Thread.engineState`，绝不碰 `Thread.trust`**。
+ *
+ * 「绝不碰 trust」那条不是洁癖：`trust` 同时是 omni 本机审批判定器的输入，
+ * 引擎报 yolo 就把它写成 full，等于顺手把 omni 自己那层审批也关掉——
+ * 一次用户从没点过的放权，而且没有任何地方会报错。
+ */
+describe("引擎自报的状态", () => {
+  const start = async (): Promise<{ events: Event[]; session: () => Fake; id: string }> => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    return { events, session, id }
+  }
+  const last = (events: Event[]) => events.filter((e) => e.type === "thread.updated").at(-1)?.thread
+
+  const axis = (a: string, id: string): EngineAxis => ({ axis: a, id, match: "diverged" })
+
+  it("落进 Thread，走 thread.updated——**那样它才跟着事件流落盘，⌘R 之后还在**", async () => {
+    const { events, session } = await start()
+    session().report({ axes: [axis("mode", "plan")] })
+    expect(last(events)?.engineState?.axes).toEqual([axis("mode", "plan")])
+  })
+
+  it("**多条轴各自更新各自的**——codex 的 approval 与 sandbox 是两个独立旋钮，不该互相清空", async () => {
+    const { events, session } = await start()
+    session().report({ axes: [axis("approval", "on-request")] })
+    session().report({ axes: [axis("sandbox", "workspace-write")] })
+    expect(last(events)?.engineState?.axes.map((a) => a.axis).sort()).toEqual(["approval", "sandbox"])
+  })
+
+  it("同一条轴后到的赢", async () => {
+    const { events, session } = await start()
+    session().report({ axes: [axis("mode", "plan")] })
+    session().report({ axes: [axis("mode", "default")] })
+    expect(last(events)?.engineState?.axes).toEqual([axis("mode", "default")])
+  })
+
+  it("**这次没报的那一样沿用上一次**——引擎往往一次只报一件事", async () => {
+    const { events, session } = await start()
+    session().report({ modelId: "grok-4.6" })
+    session().report({ axes: [axis("mode", "plan")] })
+    expect(last(events)?.engineState?.modelId).toBe("grok-4.6")
+  })
+
+  it("**绝不碰 trust**——那是审批判定器的输入，写进去就是一次静默提权", async () => {
+    const { events, session } = await start()
+    session().report({ axes: [{ axis: "mode", id: "yolo", match: "diverged" }] })
+    expect(last(events)?.trust).toBe("auto-edit")
   })
 })

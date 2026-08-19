@@ -55,4 +55,12 @@ export interface AcpDriverConfig {
    * 改不了就发 `degraded`，不假装改成了。
    */
   nativeApproval?: (trust: Trust) => { meta?: Readonly<Record<string, unknown>>; note?: string }
+  /**
+   * 这家会不会主动推 `current_mode_update`（见 `EngineCapabilities.modeReadback`）。
+   *
+   * **协议里没有对应的声明**，握手推不出来，所以只能一家一家给。
+   * **默认 false**：不知道就别声称——报 true 而实际不推的代价是界面上那行
+   *「引擎侧：X」永远停在开场那一刻，而它长得像实时的。
+   */
+  modeReadback?: boolean
 }

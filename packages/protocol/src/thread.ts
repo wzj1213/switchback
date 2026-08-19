@@ -1,6 +1,65 @@
 import type { EngineCapabilities } from "./capability.js"
 import type { EngineId, ThreadId, TurnId } from "./ids.js"
 
+/**
+ * 引擎自己那边的状态。**只读的镜像，不参与任何判定。**
+ *
+ * 与 `Thread.trust` / `Thread.model` 的关系：那两个是 **omni 设的**，这一份是**引擎报的**。
+ * 两者可以不一致，而**不一致本身正是要显示给用户看的东西**。
+ *
+ * ## 为什么绝不能写进 `Thread.trust`
+ *
+ * `trust` 有双重身份：它既是「omni 想让引擎处于哪一档」，也是 **omni 本机审批判定器的输入**
+ *（`@omni/approval` 的 `decide()` 吃的就是它）。引擎报 yolo 就把它写成 `full`，
+ * 等于**顺手把 omni 自己那层审批也关掉**——那是用户从没点过的一次放权，
+ * 而且没有任何地方会报错。任何把引擎自报状态直接写进 `Trust` 的做法都是一个静默提权口。
+ */
+export interface EngineState {
+  /**
+   * 引擎自报的**每一维**当前值。一维一条，缺席 = 这一维读不回来。
+   *
+   * 为什么是数组不是一个字段：codex 的档同时落在 `approvalPolicy` 与 `sandboxPolicy`
+   * 两个旋钮上，grok 的 mode 轴与审批轴互相独立且后者没有入站信号。
+   * 压成一个值就得由驱动现编一个合成 id——那正是「界面显示一个引擎从没说过的东西」。
+   */
+  axes: readonly EngineAxis[]
+  /** 引擎当前实际在用的模型 id。和 `Thread.model`（omni 设的）分开存。 */
+  modelId?: string
+  /** 这份镜像什么时候报的。**陈旧的镜像比没有更糟**，界面据此判断还显不显示。 */
+  at: number
+}
+
+export interface EngineAxis {
+  /**
+   * 这是哪一维。ACP 家填 `"mode"`；codex 填 `"approval"` 与 `"sandbox"` 两条。
+   * **omni 不解释这个字符串**，只用它做去重和排序。
+   */
+  axis: string
+  /** 引擎侧原样的值（`"yolo"` / `"bypassPermissions"` / `"dangerFullAccess"`）。**omni 不翻译它。** */
+  id: string
+  /** 引擎给的人话名。没有就显示 `id`。**界面永远不自己编一个中文名。** */
+  label?: string
+  /**
+   * omni 设的档和这一维**对不对得上**——由**驱动**判定，界面不反推。
+   *
+   * 反推做不到：`pickMode` 是 Trust→modeId 的打分匹配，有损、多对一，反过来是一对多。
+   * 而驱动知道它自己发过什么、引擎回了什么，它答得起。
+   */
+  match: "aligned" | "diverged"
+}
+
+/** omni 最后一次设档的结果。**设不上要说出来**，而不是像以前那样发一条被过滤掉的状态。 */
+export interface TrustApply {
+  /**
+   * `applied` = 发出去了；`unmapped` = 这家的档位表里找不到对应项，保持了它自己的默认档；
+   * `fixed` = 这家的开关在开会话时就定死，换档要重开一条会话才生效。
+   */
+  result: "applied" | "unmapped" | "fixed"
+  /** `result !== "applied"` 时给人看的一句话，由驱动给，**必须说得出下一步**。 */
+  detail?: string
+  at: number
+}
+
 /** 会话的信任档。语义与 `@omni/approval` 的 `Trust` 一致，此处只做承载。 */
 export type Trust = "read-only" | "auto-edit" | "full"
 
@@ -23,6 +82,10 @@ export interface Thread {
   cwd: string
   engine: EngineId
   trust: Trust
+  /** 引擎自报的状态。**只有驱动写得动，不参与任何判定**（见 `EngineState`）。 */
+  engineState?: EngineState
+  /** omni 最后一次设档的结果。 */
+  trustApply?: TrustApply
   /**
    * 下一句话用哪家引擎。**只是意向，还没生效。**
    *
