@@ -163,7 +163,11 @@ export function Thread({
         />
       ) : (
         <Composer
-          disabled={offline}
+          // **引擎还在起的时候也不能发。** 不禁的话回车会先清空输入框、
+          // 再撞上宿主那句「会话不存在」——而那句话走的是另一条通道，
+          // 手机上以前一个字都看不到（现在 `Notices` 画了，但**最好是别发生**）。
+          // 桌面端早就是这条判据（`renderer/components/Composer.tsx` 的 `blocked`）
+          disabled={offline || thread.status === "starting"}
           running={running}
           hint={hintOf(thread, offline)}
           onSend={(text) => remote.send({ type: "thread.prompt", threadId: thread.id, text })}
@@ -179,5 +183,6 @@ export function Thread({
 /** 输入框上面那行小字。**说清现在为什么不能发**，而不是只报引擎和档位。 */
 function hintOf(thread: ThreadModel, offline: boolean): string {
   if (offline) return "没连上 omni，先等重连"
+  if (thread.status === "starting") return "引擎正在启动，马上就能说话"
   return `${thread.engine} · ${thread.trust}`
 }

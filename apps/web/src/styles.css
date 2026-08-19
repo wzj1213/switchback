@@ -191,8 +191,33 @@ textarea {
 .btn--ghost {
   background: transparent;
   color: var(--text-muted);
-  min-height: 36px;
+  /*
+   * **44 点，和别处一样。** 上一版是 36——低于这个项目自己定的下限，
+   * 而顶栏那一排恰恰是最容易点偏的地方：「＋ 开一条」旁边就是「解除配对」。
+   * 视觉上仍然轻（透明底 + 小字号），只是**可点区域**够大。
+   */
+  min-height: 44px;
   font-size: var(--text-sm);
+}
+
+/* 解除配对的二次确认。挤在顶栏里，所以字号更小、间距更紧 */
+.unpair {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.unpair__ask {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.unpair__yes {
+  color: var(--danger);
+}
+
+.unpair__no {
+  color: var(--text-muted);
 }
 
 .btn--stop {
@@ -607,6 +632,21 @@ textarea {
 .reattach__go {
   width: 100%;
   min-height: 44px;
+}
+
+/* 横幅的抬头。`degraded` 和 `crashed` 是两件事，颜色也不该一样 */
+.notice__kind {
+  flex: none;
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.notice[data-kind="crashed"] .notice__kind {
+  color: var(--danger);
+}
+
+.notice[data-kind="degraded"] .notice__kind {
+  color: var(--warn);
 }
 
 .row__count {

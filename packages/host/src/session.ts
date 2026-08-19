@@ -308,13 +308,41 @@ export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.res
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 
+/**
+ * 改一条会话的信任档。
+ *
+ * ## 不活着的也要能改（和 `rename` 同一条道理）
+ *
+ * 上一版第一句就是「不在 `ctx.live` 里就 return」，于是对着一条 detached 的会话
+ * 调它是**一个静默的空操作**：不报错、不发事件、什么都没发生。
+ *
+ * 那条路真有人走：手机上要把一条开在完全档的老会话接回来，必须先把它切到
+ * 远程上限之内（`remote/policy.ts` 的注释里就写着「先在手机上把它切到 auto-edit」）——
+ * 而它此刻正好不活。切不动的后果不是报错，是**接回来之后每一句话都被拒**，
+ * 而用户在手机上遍寻不到任何能切档的地方。
+ *
+ * 所以照 `rename` 的样子办：活着就顺手告诉引擎一声，不活着也照样把这条记录改掉
+ *（它会落盘，下次 `resume` 从日志里读回来的就是新档位）。
+ */
 export async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) return
-  await entry.session.setTrust(cmd.trust)
   const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, trust: cmd.trust, updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry !== undefined) {
+    await entry.session.setTrust(cmd.trust)
+    entry.thread = { ...entry.thread, trust: cmd.trust, updatedAt: at }
+    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+    return
+  }
+  // 不活着：从磁盘上那份记录改。**读不到就什么都不做**——
+  // 凭空造一条只有档位的会话，比改不动糟得多
+  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
+  const record = [...events]
+    .reverse()
+    .find((e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
+      e.type === "thread.started" || e.type === "thread.updated",
+    )
+  if (record === undefined) return
+  emit(ctx, { type: "thread.updated", at, thread: { ...record.thread, trust: cmd.trust, updatedAt: at } })
 }
 
 /**

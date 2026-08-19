@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { Command, EngineInfo, ThreadId } from "@omni/protocol"
+import type { Command, EngineInfo, ThreadId, Trust } from "@omni/protocol"
 import type { Project } from "@omni/store"
 
 /**
@@ -26,6 +26,8 @@ export function NewThread({
   projects,
   engines,
   maxTrust,
+  hydrated,
+  offline,
   onCreate,
   onCancel,
 }: {
@@ -33,6 +35,9 @@ export function NewThread({
   engines: readonly EngineInfo[]
   /** 远程档位上限。开出来的会话就是这一档，屏幕上要说明白。 */
   maxTrust: string
+  /** 基线到了没有。**没到 ≠ 一个项目都没有**。 */
+  hydrated: boolean
+  offline: boolean
   onCreate: (command: Extract<Command, { type: "thread.create" }>) => boolean
   onCancel: () => void
 }): React.JSX.Element {
@@ -41,12 +46,17 @@ export function NewThread({
   const [engine, setEngine] = useState(usable[0]?.id ?? "")
 
   if (projects.length === 0) {
-    // **一个项目都没有时不假装能建。** 那说明这台机器上还没开过任何会话，
-    // 而这一端拿不出一个可信的目录——那时候该去桌面上开第一条
+    // **「还没到」和「真的没有」必须分开。** 从锁屏点通知进来的第一秒，
+    // 全量还在路上，`projects` 必然是空的——这时候说「还没有可用的项目」
+    // 是一句确定的假话，而人看完就退出了，以为手机上开不了。
+    // 这和列表那边用骨架修掉的是同一类错误
+    const why = hydrated
+      ? "还没有可用的项目。到桌面上开第一条会话，这里就能接着开了。"
+      : "正在取项目清单…"
     return (
       <section className="newthread">
         <Head onCancel={onCancel} />
-        <p className="empty">还没有可用的项目。到桌面上开第一条会话，这里就能接着开了。</p>
+        <p className="empty">{why}</p>
       </section>
     )
   }
@@ -84,15 +94,17 @@ export function NewThread({
         </p>
       </div>
       <footer className="newthread__foot">
+        {/* **断线时禁掉并改文案。** 亮着的话按下去毫无反应（`send` 返回 false），
+            人只会连按四次——和 `Reattach` 那边同一个做法 */}
         <button
           className="btn btn--primary newthread__go"
           type="button"
-          disabled={cwd === "" || engine === ""}
+          disabled={offline || cwd === "" || engine === ""}
           onClick={() => {
-            onCreate({ type: "thread.create", cwd, engine, trust: "auto-edit" })
+            onCreate({ type: "thread.create", cwd, engine, trust: maxTrust as Trust })
           }}
         >
-          开一条
+          {offline ? "等重连…" : "开一条"}
         </button>
       </footer>
     </section>

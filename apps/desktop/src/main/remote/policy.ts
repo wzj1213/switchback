@@ -64,6 +64,8 @@ const RUNS_IN_THREAD: ReadonlySet<string> = new Set([
   "thread.resume",
   "thread.rewind",
   "thread.fork",
+  // 它让引擎在那条会话里**立刻动起来**（换引擎并重开一轮），所以和上面几条同一档
+  "thread.switchNow",
 ])
 
 /**
@@ -176,6 +178,11 @@ const SHAPES: Readonly<Record<string, Shape>> = {
   "thread.prompt": { strings: ["threadId", "text"] },
   "thread.interrupt": { strings: ["threadId"] },
   "thread.unqueue": { strings: ["threadId"] },
+  // **这两条是补上的，原来漏了。** 漏掉的后果不是放行而是整条拒掉
+  //（回一句「形状认不出来」），而 `steerQueued` 恰恰是最赶时间的那个动作：
+  // 排着的那句往往是「别再往下走了」
+  "thread.steerQueued": { strings: ["threadId"] },
+  "thread.switchNow": { strings: ["threadId"] },
   "thread.compact": { strings: ["threadId"] },
   "thread.rewind": { strings: ["threadId", "turnId"] },
   "thread.setTrust": { strings: ["threadId"], enums: { trust: TRUSTS } },

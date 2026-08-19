@@ -8,6 +8,7 @@ import { Threads } from "./screens/Threads.js"
 import { Thread } from "./screens/Thread.js"
 import { NewThread } from "./screens/NewThread.js"
 import { ConnBar } from "./components/ConnBar.js"
+import { Notices } from "./components/Notices.js"
 
 /**
  * 两屏一栏：手机上一次只看一屏（列表 ↔ 正文），桌面浏览器上并排。
@@ -39,10 +40,15 @@ function Creating({
   return (
     <div className="app">
       <ConnBar conn={remote.conn} onRetry={remote.retry} />
+      {/* **建失败就发生在这一屏**：引擎没装、登录过期、目录不在了。
+          不画的话按钮按下去毫无反应，人只会连按四次 */}
+      <Notices notices={remote.state.notices} wire={remote.notice} onDismissWire={remote.dismissNotice} />
       <NewThread
         projects={projectsOf(threadRowsOf(remote.state))}
         engines={remote.state.engines}
         maxTrust={remote.me?.maxTrust ?? "auto-edit"}
+        hydrated={remote.hydrated}
+        offline={remote.conn.kind !== "open"}
         onCreate={(command) => {
           const sent = remote.send(command)
           // **发不出去就留在这一屏。** 宿主建好会推一条 `thread.started` 进列表；
@@ -67,6 +73,7 @@ function Creating({
  */
 function useHistory(
   setSelected: (id: ThreadId | undefined) => void,
+  setCreating: (on: boolean) => void,
   watch: (id: ThreadId | null) => void,
 ): void {
   useEffect(() => {
@@ -98,7 +105,11 @@ function useHistory(
     // 打好基底：首屏那一项也带上 state，前进/后退才对得起来
     window.history.replaceState({ omni: undefined }, "")
     const onPop = (event: PopStateEvent): void => {
-      const id = (event.state as { omni?: ThreadId } | null)?.omni
+      const at = event.state as { omni?: ThreadId; creating?: boolean } | null
+      // **新建屏也是一层。** 不压进历史的话，人在那一屏上做返回手势
+      // 会直接退出整个应用——而他只是想回列表
+      setCreating(at?.creating === true)
+      const id = at?.omni
       setSelected(id)
       watch(id ?? null)
     }
@@ -133,7 +144,7 @@ export function App(): React.JSX.Element {
 
   // 从通知点进来的：`?thread=` 是新开窗口那条路，`postMessage` 是
   // 已经开着一扇窗那条路（service worker 优先找已开的那扇，见 `public/sw.js`）
-  useHistory(setSelected, watch)
+  useHistory(setSelected, setCreating, watch)
 
   const paired = useCallback((next: string) => {
     setToken(next)
@@ -155,7 +166,9 @@ export function App(): React.JSX.Element {
       <Creating
         remote={remote}
         onDone={() => {
-          setCreating(false)
+          // 走 `back()` 而不是直接 setState：这样返回键和界面上的「‹」
+          // 走的是同一条路，历史里也不会留下一层回不去的
+          window.history.back()
         }}
       />
     )
@@ -164,14 +177,7 @@ export function App(): React.JSX.Element {
   return (
     <div className="app" data-detail={thread === undefined ? "no" : "yes"}>
       <ConnBar conn={remote.conn} onRetry={remote.retry} />
-      {remote.notice === undefined ? null : (
-        <div className="notice" role="alert">
-          <span className="notice__text">{remote.notice}</span>
-          <button className="btn btn--ghost" type="button" onClick={remote.dismissNotice} aria-label="知道了">
-            ✕
-          </button>
-        </div>
-      )}
+      <Notices notices={remote.state.notices} wire={remote.notice} onDismissWire={remote.dismissNotice} />
       <div className="app__panes">
         <aside className="pane pane--list">
           <Threads
@@ -181,6 +187,7 @@ export function App(): React.JSX.Element {
             onUnpair={unpair}
             token={token}
             onNew={() => {
+              window.history.pushState({ creating: true }, "")
               setCreating(true)
             }}
           />

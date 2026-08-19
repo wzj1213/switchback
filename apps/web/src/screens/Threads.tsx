@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { Thread, ThreadId } from "@omni/protocol"
 import { itemsOf, projectsOf, threadRowsOf } from "@omni/store"
 import type { Remote } from "../useRemote.js"
@@ -27,6 +27,45 @@ function rank(thread: Thread): number {
 
 function lastAt(items: readonly { at: number }[]): number {
   return items[items.length - 1]?.at ?? 0
+}
+
+/**
+ * 解除配对。**要问一次。**
+ *
+ * 它和「＋ 开一条」在同一排，而拇指在走路时会偏。点错的代价不是小麻烦：
+ * 配对一解除，重新配要在**桌面上**取一个八位码——人不在电脑前就是彻底进不去，
+ * 既看不了正在跑的会话，也放行不了等审批的那一轮。
+ * **那一下把整个「人不在电脑前」的用途清零了**，而它没有撤销。
+ *
+ * 别的地方（吊销设备）不加二次确认，是因为那件事可逆——重新配一次就回来了；
+ * 这件事在手机上不可逆，所以判据不同。
+ */
+function Unpair({ onUnpair }: { onUnpair: () => void }): React.JSX.Element {
+  const [asking, setAsking] = useState(false)
+  if (!asking) {
+    return (
+      <button
+        className="btn btn--ghost"
+        type="button"
+        onClick={() => {
+          setAsking(true)
+        }}
+      >
+        解除配对
+      </button>
+    )
+  }
+  return (
+    <span className="unpair">
+      <span className="unpair__ask">解除后要在桌面上重新取码</span>
+      <button className="btn btn--ghost unpair__no" type="button" onClick={() => { setAsking(false) }}>
+        取消
+      </button>
+      <button className="btn btn--ghost unpair__yes" type="button" onClick={onUnpair}>
+        解除
+      </button>
+    </span>
+  )
 }
 
 /** 一行会话。抽出来是因为它现在挂在分组底下，而分组本身还要能复用它。 */
@@ -127,9 +166,7 @@ export function Threads({
         <button className="btn btn--ghost" type="button" onClick={onNew}>
           ＋ 开一条
         </button>
-        <button className="btn btn--ghost" type="button" onClick={onUnpair}>
-          解除配对
-        </button>
+        <Unpair onUnpair={onUnpair} />
       </header>
       {rows.length === 0 && !remote.hydrated ? (
         // **基线还没到 ≠ 真的没有会话。** 说后者是一句确定的假话，
