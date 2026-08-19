@@ -25,7 +25,13 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   Write: "write", Edit: "write", MultiEdit: "write", NotebookEdit: "write",
   Bash: "exec", KillShell: "exec",
   WebFetch: "net", WebSearch: "net",
-  Task: "meta", TodoWrite: "meta", ExitPlanMode: "meta",
+  // `Agent` 是**实测**（2026-08-19）模型起子 agent 时真正调的名字；`Task` 是它的旧名，
+  // 两个都留着——引擎改名不会通知我们，而漏掉的那个会落 `unknown`，
+  // 在只读档上被直接拒。**纯记账的工具被拒，模型只会反复重试**。
+  //
+  // 顺带记一笔实测：这一版的 `Agent` **不经过 `canUseTool`**（同一轮里只有 `Bash` 经过），
+  // 所以这条今天并不构成 bug——它修的是「哪天它开始走这条路」的默认值。
+  Task: "meta", Agent: "meta", TodoWrite: "meta", ExitPlanMode: "meta",
   // codex app-server
   shell: "exec", apply_patch: "write", read_file: "read", update_plan: "meta",
   // ACP：客户端侧方法（agent 反过来请我们代劳时用）
