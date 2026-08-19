@@ -578,6 +578,37 @@ textarea {
   min-height: 44px;
 }
 
+/* ── 接回引擎 ───────────────────────────────────────────── */
+
+/*
+ * 摆在输入框的位置上，因为它就是输入框的替身——**同一个位置只该有一件事**。
+ * 底部留安全区：这一块常在 home indicator 上面。
+ */
+.reattach {
+  flex: none;
+  padding: var(--sp-3);
+  padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.reattach__why {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.reattach__hint {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.reattach__go {
+  width: 100%;
+  min-height: 44px;
+}
+
 .row__count {
   color: var(--text-faint);
   font-size: var(--text-sm);

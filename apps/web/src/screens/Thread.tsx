@@ -4,6 +4,7 @@ import { itemsOf, turnOf, usageOf } from "@omni/store"
 import type { Remote } from "../useRemote.js"
 import { ItemView } from "../components/ItemView.js"
 import { Composer } from "../components/Composer.js"
+import { Reattach } from "../components/Reattach.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 
 /** 上下文用量的条。引擎没报就整个不画——**没有数据时不要画一个空进度条**。 */
@@ -150,15 +151,27 @@ export function Thread({
           ↓ 回到底部
         </button>
       )}
-      <Composer
-        disabled={thread.detached === true || offline}
-        running={running}
-        hint={hintOf(thread, offline)}
-        onSend={(text) => remote.send({ type: "thread.prompt", threadId: thread.id, text })}
-        onStop={() => {
-          remote.send({ type: "thread.interrupt", threadId: thread.id })
-        }}
-      />
+      {thread.detached === true ? (
+        // **没接引擎时给的是一个动作，不是一句「去桌面上点」。**
+        // 手机上绝大多数会话都是 detached 的（宿主只留少数几条活的），
+        // 摆一个禁用的输入框等于把这一端做成只读
+        <Reattach
+          thread={thread}
+          ceiling={remote.me?.maxTrust ?? "auto-edit"}
+          offline={offline}
+          send={remote.send}
+        />
+      ) : (
+        <Composer
+          disabled={offline}
+          running={running}
+          hint={hintOf(thread, offline)}
+          onSend={(text) => remote.send({ type: "thread.prompt", threadId: thread.id, text })}
+          onStop={() => {
+            remote.send({ type: "thread.interrupt", threadId: thread.id })
+          }}
+        />
+      )}
     </section>
   )
 }
@@ -166,6 +179,5 @@ export function Thread({
 /** 输入框上面那行小字。**说清现在为什么不能发**，而不是只报引擎和档位。 */
 function hintOf(thread: ThreadModel, offline: boolean): string {
   if (offline) return "没连上 omni，先等重连"
-  if (thread.detached === true) return "这条会话没接引擎，去桌面上点「继续」"
   return `${thread.engine} · ${thread.trust}`
 }

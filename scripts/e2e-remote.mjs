@@ -14,7 +14,9 @@
  * pnpm --filter @omni/desktop exec electron-vite build
  * # 用一份**独立的 userData**，别碰你自己那份。里面的 settings.json 要写：
  * #   "remote": { "enabled": true, "port": 17802, "trustedHosts": [], "maxTrust": "auto-edit" }
- * cd apps/desktop && npx electron . --user-data-dir=/tmp/omni-e2e --remote-debugging-port=9222 &
+ * # `OMNI_DEV_MAXLIVE=1` 是为了造出一条 detached 的会话：新建第二条会把第一条挤下来，
+ * # 而它带着**真的引擎句柄**——「接回老会话」那一步验的就是它
+ * cd apps/desktop && OMNI_DEV_MAXLIVE=1 npx electron . --user-data-dir=/tmp/omni-e2e --remote-debugging-port=9222 &
  * node scripts/e2e-remote.mjs
  * ```
  *
@@ -30,6 +32,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import WebSocket from "ws"
 import { fixture } from "./e2e-fixture.mjs"
+import { stepScoped } from "./e2e-scoped.mjs"
 
 const CDP = process.env["OMNI_E2E_CDP"] ?? "http://127.0.0.1:9222"
 const BASE = process.env["OMNI_E2E_BASE"] ?? "http://127.0.0.1:17802"
@@ -158,77 +161,46 @@ function checkReplay(frames, chunkCount) {
   return last === undefined ? undefined : last.thread.id
 }
 
+
+
 /**
- * 分级 replay：字节预算、只发头、`watch` → `thread` 帧。
+ * **老会话接得回来吗。** 手机上绝大多数会话是 detached 的（宿主只留少数几条活的），
+ * 而上一版对着它们只把输入框禁掉、写一句「去桌面上点继续」——
+ * 那等于把这一端做成只读，而用户原话是「老会话也能继续 work」。
  *
- * ## 为什么要往盘上放东西
- *
- * 这个应用**没发过第一句话的会话不落盘**（见 `host/ctx.ts` 的 `uncommitted`），
- * 而这条脚本不会去真跑一轮引擎。于是照原样连过去，磁盘上一条历史都没有，
- * `bodies` 必然是空的——那时候「它是不是数组」这一条等于什么都没验。
- *
- * ## 为什么样本要按**字节**造
- *
- * 第一版这里造的是「5000 条极小的事件」，因为当时预算卡的是条数。
- * 而真机上栽的恰恰是另一头：**九条会话才 3291 条事件，合起来 5.2 MB**——
- * 条数远低于阈值，字节大两个数量级，于是九条全带正文、切成 271 个分片、
- * 手机上一片空白。所以这里的样本必须是「事件不多但每条很大」的那种形状。
+ * **这里验的是确定性的那一半**：命令过得了远程策略、并且**失败时说得出人话**。
+ * 「接回来之后真的能接着跑」需要一条带真引擎句柄的会话，而那要真跑一轮引擎
+ *（没发过话的会话不落盘、也没有句柄），这条脚本不做那件事。
+ * 这条 fixture 没有引擎句柄，所以宿主必然接不回来——**要紧的是它说出来了**。
+ * 点了「接回来」而屏幕上什么都不发生，是这一端最坏的失败方式
  */
-async function stepScoped(send, token) {
-  console.log("9. 分级 replay：大小预算、只发头、watch → thread 帧")
-  const info = await evaluate(send, "window.omni.appInfo().then(s => JSON.stringify(s))")
-  const dir = join(info.dataDir, "threads")
+async function stepResume(send, token) {
+  console.log("8. 老会话接回引擎")
+  const dir = join((await evaluate(send, "window.omni.appInfo().then(s => JSON.stringify(s))")).dataDir, "threads")
   await mkdir(dir, { recursive: true })
-  // 六条各约 10 万码元。单条封顶 64K、整份预算 192K，所以最近那两三条带
-  //（裁过的）正文，更早的必然只发头。**先写的 mtime 早**，于是 t6 最新
-  const ids = ["e2e-t1", "e2e-t2", "e2e-t3", "e2e-t4", "e2e-t5", "e2e-t6"]
-  for (const id of ids) {
-    await writeFile(join(dir, `${id}.jsonl`), fixture(id, 100_000), "utf8")
-    await pause(30)
-  }
-
-  const { ws, frames } = await connect(token)
-  ws.send(JSON.stringify({ type: "hello" }))
-  await pause(3500)
-  const replay = frames.find((f) => f.type === "replay")
-  const bodies = replay?.replay.bodies ?? []
-  const events = replay?.replay.events ?? []
-  const mine = ids.filter((id) => bodies.includes(id))
-  const deferred = ids.filter((id) => !bodies.includes(id))
-  ok("**最近那几条带正文**", mine.includes("e2e-t6"), mine.join(" "))
-  ok("**更早的只发头**——判据是大小，不是条数", deferred.length > 0, `留下 ${deferred.length} 条`)
-
-  const itemsOf = (id) => events.filter((e) => e.type === "item.started" && e.item.id.startsWith(`${id}-`)).length
-  const cold = deferred[0]
-  ok("只发头的那条在全量里真的没有正文", itemsOf(cold) === 0, `${cold} → ${itemsOf(cold)} 条`)
-  ok("但它还在列表里——头是一条不少的", events.some((e) => (e.type === "thread.started" || e.type === "thread.updated") && e.thread.id === cold))
-  ok(
-    "**带正文的那条也被裁过**——一条 2.5 MB 的会话足以把整份预算架空",
-    itemsOf("e2e-t6") > 0 && itemsOf("e2e-t6") < 100_000 / 1600,
-    `e2e-t6 → ${itemsOf("e2e-t6")} 条`,
-  )
-
-  const count = () => frames.filter((f) => f.type === "thread").length
-  ws.send(JSON.stringify({ type: "watch", threadId: "e2e-t6" }))
-  await pause(900)
-  ok("**已经带了正文的那条不重复补**——这正是分级要省掉的东西", count() === 0)
-  ws.send(JSON.stringify({ type: "watch", threadId: cold }))
+  await writeFile(join(dir, "e2e-old.jsonl"), fixture("e2e-old", 2000), "utf8")
+  const { ws: ws2, frames: f2 } = await connect(token)
+  ws2.send(JSON.stringify({ type: "hello" }))
   await pause(2500)
-  const patch = frames.find((f) => f.type === "thread")
-  ok("**打开只发头的那条，正文补上来了**", patch?.threadId === cold, `${patch?.events.length ?? 0} 条`)
-  ws.send(JSON.stringify({ type: "watch", threadId: "根本没有这条" }))
-  await pause(900)
-  ok("要一条不存在的会话，不发空帧也不断连接", count() === 1)
-  ws.send(JSON.stringify({ type: "ping" }))
-  await pause(400)
-  ok("连接还活着", frames.some((f) => f.type === "pong"))
+  const seen = f2.find((f) => f.type === "replay")?.replay.events ?? []
+  const old = seen.filter((e) => e.type === "thread.updated" && e.thread.id === "e2e-old").at(-1)?.thread
+  ok("**磁盘上的老会话进得了列表，并且标着 detached**", old?.detached === true, `detached=${String(old?.detached)}`)
 
-  ws.close()
-  for (const id of ids) await rm(join(dir, `${id}.jsonl`), { force: true })
+  ws2.send(JSON.stringify({ type: "command", command: { type: "thread.resume", threadId: "e2e-old" } }))
+  await pause(2500)
+  const said = f2
+    .filter((f) => f.type === "events")
+    .flatMap((f) => f.sealed.map((s) => s.event))
+    .concat(f2.filter((f) => f.type === "notice").map((f) => ({ type: "notice", detail: f.text })))
+  const spoke = said.find((e) => (e.type === "engine.status" && e.status === "crashed") || e.type === "notice")
+  ok("**这条命令没被策略挡下**（挡下会回一条 notice 说被拒）", said.length > 0, `收到 ${String(said.length)} 条`)
+  ok("**接不回来时说得出为什么**，而不是点了没反应", spoke !== undefined, String(spoke?.detail ?? "").slice(0, 60))
+  ws2.close()
+  await rm(join(dir, "e2e-old.jsonl"), { force: true })
+
 }
 
-
-async function stepCommands({ ws, frames, target }) {
+async function stepCommands({ ws, frames, target }, send, token) {
   const events = () =>
     frames
       .filter((f) => f.type === "events")
@@ -271,7 +243,9 @@ async function stepCommands({ ws, frames, target }) {
   ok("开在指定的工作区", born[0]?.thread.cwd === process.cwd(), born[0]?.thread.cwd)
   ok("档位是远程上限那一档", born[0]?.thread.trust === "auto-edit", born[0]?.thread.trust)
 
-  console.log("8. 坏输入不掀翻连接")
+  await stepResume(send, token)
+
+  console.log("9. 坏输入不掀翻连接")
   ws.send("{不是 JSON")
   ws.send(JSON.stringify({ type: "command", command: { type: "rm -rf", threadId: target } }))
   ws.send(JSON.stringify({ type: "从未来来的帧" }))
@@ -292,7 +266,7 @@ async function stepCommands({ ws, frames, target }) {
  * 继续能替你放行 agent 要跑的每一条命令。而按下那颗按钮的场景恰恰是「手机丢了」。
  */
 async function stepRevoke(send) {
-  console.log("13. 吊销当场断开正连着的那条")
+  console.log("14. 吊销当场断开正连着的那条")
   const status = await evaluate(send, "window.omni.remote.pair().then(s => JSON.stringify(s))")
   const paired = await (
     await fetch(`${BASE}/api/pair`, {
@@ -322,7 +296,7 @@ async function stepRevoke(send) {
 
 /** 推送的两个端点。真发一条要有个活的推送服务，那条在 `relay.test.ts` 里验。 */
 async function stepPush(token) {
-  console.log("10. 推送端点")
+  console.log("11. 推送端点")
   const key = await (await fetch(`${BASE}/api/push/key`)).json()
   ok("公钥拿得到，且是 65 字节的未压缩点", Buffer.from(key.key ?? "", "base64url").length === 65)
   const noAuth = await fetch(`${BASE}/api/push/subscribe`, {
@@ -346,7 +320,7 @@ async function stepPush(token) {
 }
 
 async function stepStatic() {
-  console.log("11. 静态页面与安全响应头")
+  console.log("12. 静态页面与安全响应头")
   const home = await fetch(`${BASE}/`)
   ok("首页 200", home.status === 200, home.headers.get("content-type"))
   ok("带了 CSP", (home.headers.get("content-security-policy") ?? "").includes("default-src 'self'"))
@@ -363,12 +337,12 @@ async function main() {
 
   const token = await stepPair(send)
   const conn = await stepConnect(token)
-  await stepCommands(conn)
-  await stepScoped(send, token)
+  await stepCommands(conn, send, token)
+  await stepScoped(send, token, { evaluate, connect, ok, pause })
   await stepPush(token)
   await stepStatic()
 
-  console.log("12. 断开之后设备仍在表里（吊销才该消失）")
+  console.log("13. 断开之后设备仍在表里（吊销才该消失）")
   conn.ws.close()
   await pause(800)
   const after = await evaluate(send, "window.omni.remote.status().then(s => JSON.stringify(s))")
