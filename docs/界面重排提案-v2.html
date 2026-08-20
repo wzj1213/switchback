@@ -265,6 +265,16 @@ table.plan tr:last-child td{border-bottom:0}
 
 <style>
 /* ── v2 追加 ─────────────────────────────────── */
+.src--dead{border-color:var(--danger);color:var(--danger)}
+.pt--dead .pt__h{text-decoration:line-through;text-decoration-thickness:1.5px;
+  text-decoration-color:color-mix(in srgb,var(--danger) 55%,transparent);color:var(--text-muted)}
+.banner{max-width:1000px;margin:0 0 30px;padding:16px 18px;border:1px solid var(--border);
+  border-left:3px solid var(--ok);border-radius:var(--radius);background:var(--bg-raised)}
+.banner h4{margin:0 0 6px;font-size:14px;font-weight:600}
+.banner p{margin:0;font-size:14px;line-height:1.75;color:var(--text-muted)}
+.banner code{font-size:.88em}
+.shipped{display:inline-block;font-size:11px;font-family:var(--font-mono);padding:1px 6px;
+  border-radius:999px;border:1px solid var(--ok);color:var(--ok);margin-left:8px;vertical-align:2px}
 .tag--old{color:var(--warn)}
 .tag--old::before{background:var(--warn)}
 
@@ -374,6 +384,14 @@ table.verdict tr:last-child td{border-bottom:0}
   </div>
 </header>
 
+<div class="banner">
+  <h4>这份稿子已经落地了 · 提交 <code>302fd38</code></h4>
+  <p><strong>十四条里做了十一条，三条在动手时被驳回</strong>——而驳回它们的不是我，是仓库里早就写下的注释。
+  被驳的那三条（<strong>A3 的引擎徽章 · A4 的空态 · B8 的变更胶囊</strong>）在下面各自的位置上原样留着，
+  只在标题上划一道、把理由补在后面：<strong>提案错在哪，比提案对在哪更值得留。</strong>
+  完整的落地记录见最后一节 F。</p>
+</div>
+
 <h2 class="sec">全景 · 排版 + 布局，一起改完</h2>
 <div class="pano">
   <div>
@@ -437,7 +455,7 @@ table.verdict tr:last-child td{border-bottom:0}
   </main>
 </div>
     </div>
-    <p class="cap">顶部三行入口 96px · 置顶说明 78px · 会话行右边是空的 · 顶栏不说谁在答 · 输入框被一条通栏线切开</p>
+    <p class="cap">顶部三行入口 96px · 置顶说明 78px · 会话行右边是空的 · 输入框被一条通栏线切开 · 谁在答只有最底下那颗下拉说</p>
   </div>
   <div>
     <p class="tag tag--next">合并后</p>
@@ -474,7 +492,6 @@ table.verdict tr:last-child td{border-bottom:0}
   <main class="um">
     <div class="um__top um__top--slim">
       <div class="um__title">项目的UI我想整体优化一版 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
-      <span class="ubadge"><svg class="ubadge__g gl gl--kimi" width="12" height="12" viewBox="0 0 16 16"><use href="#g-kimi"/></svg>Kimi Code</span>
       <div class="um__sp"></div>
       <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
       <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
@@ -488,6 +505,11 @@ table.verdict tr:last-child td{border-bottom:0}
       <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">That doc is detail-level; the ask is layout-level</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
       <div class="urun"><div class="ustep"><span class="ustep__i" style="color:var(--danger)"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">ls node_modules/.pnpm 2&gt;/dev/null | grep -iE 'playwright|puppeteer' | head; ls scr…</span><span class="ustep__s ustep__s--fail">失败</span></div></div>
     </div></div>
+    <div class="dock" style="padding:0 22px">
+      <span class="pet2 run gl gl--kimi" style="opacity:1"><i class="st on top"></i><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg></span>
+      <span class="pet2 still gl gl--claude" style="opacity:.6"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--pet-eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg></span>
+      <span class="pet2 still gl gl--grok" style="opacity:.6"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg></span>
+    </div>
     <div class="uch"><span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span><span class="upill">审核</span></div>
     <div class="ucomp ucomp--flush"><div class="ucomp__in">
       <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
@@ -503,7 +525,7 @@ table.verdict tr:last-child td{border-bottom:0}
   </main>
 </div>
     </div>
-    <p class="cap">顶部两行 64px · 会话行右边有时间 · 顶栏 44px 且写着谁在答 · <strong>输入框上面那条通栏线没了</strong> · 转录区三档节奏、两条左缘</p>
+    <p class="cap">顶部两行 64px · 会话行右边有时间 · 顶栏 44px · <strong>输入框上面那条通栏线没了</strong> · 转录区三档节奏、两条左缘 · 三只蹲在输入框上沿，亮着且在跳的那只就是当值的引擎</p>
   </div>
 </div>
 
@@ -603,7 +625,7 @@ table.verdict tr:last-child td{border-bottom:0}
 
 <!-- ── A3 ─────────────────────────────────────── -->
 <section class="pt">
-  <p class="pt__no">A3 / 顶栏<span class="src src--take">那份稿子的第 3 条 · 一半采纳，一半驳回</span></p>
+  <p class="pt__no">A3 / 顶栏<span class="src src--dead">徽章那半条 · 落地时被驳回</span></p>
   <h3 class="pt__h">顶栏不说「谁在答我」</h3>
   <p class="pt__sub">omni 的整个立意是「一个界面统一驱动各家引擎」。而<strong>「此刻是谁在答」这件事，界面上唯一说出口的地方是输入框最底下那颗下拉</strong>——离你正在读的回答 600px 远。</p>
 
@@ -622,12 +644,24 @@ LimitPill         <b>额度 87% · 本周</b> <i>快用完时才出现</i>
   </div>
 
   <div class="fix">
-    <p><strong>采纳：加一枚引擎徽章。</strong>这是那份稿子里最值钱的一条。放在标题右边——「我在哪个会话里」和「这个会话由谁在跑」是同一个问题的两半，和标题挂环境卡是同一条理由。</p>
+    <div class="banner" style="border-left-color:var(--danger);margin:0 0 18px">
+      <h4>这一条动手时被驳回了 —— 驳回它的是 <code>TopBar.tsx</code> 自己的头注释</h4>
+      <p>我提「加一枚引擎徽章」的时候，只读了样式表和截图。而那个组件顶上写着：</p>
+      <pre class="code" style="margin:10px 0"><i>/* ## 只放「说明状态」的东西，不放「能改状态」的东西
+ *
+ * 上一版这里摆着引擎和信任档两枚胶囊，而输入区里也有同样两枚——
+ * <b>一样的文字出现在两个地方，其中一个还点不动</b>。用户会去点那个点不动的，
+ * 然后以为界面坏了。 */</i></pre>
+      <p><strong>这一条上一版就在顶栏，是被特意拿掉的。</strong>我提的是把它再放回去。截图看不出「这个位置试过、被拿掉了」——那种事只写在组件的头注释里。
+      而且我说的那个信息缺口（界面上没地方写「谁在答」），<strong>被 A5 的吉祥物自己补上了</strong>：三只蹲在输入框上沿，亮着的那只就是当值的。</p>
+    </div>
+    <p style="color:var(--text-muted);font-size:14px">下面这段原样留着，是当时的提案。<strong>它的推理不算错，错在没去读那个组件。</strong></p>
+    <p><strong>（已驳回）加一枚引擎徽章。</strong>放在标题右边——「我在哪个会话里」和「这个会话由谁在跑」是同一个问题的两半，和标题挂环境卡是同一条理由。</p>
     <ul>
       <li>形制用已有的 <code>.badge</code>：描边胶囊、<code>--text-muted</code>、11.5px、<strong>永远不可点</strong>。items/app.css 已经立过这条规矩——「徽章只说明状态；可点的是 <code>.iconbtn</code> 或 <code>.trigger</code>，两者长得一样的话『能不能点』就没有任何视觉线索了」。换引擎仍然只在输入框那颗下拉里。</li>
       <li><strong>驳回它的 <code>--accent-soft</code> 蓝底胶囊。</strong>tokens.css：强调色只用于焦点与链接。而且蓝底会让引擎徽章比旁边的「接力 3 手」重一档，那两枚是同类。</li>
     </ul>
-    <p><strong>采纳：52 → 44px。</strong>但理由和它写的不一样——不是「从装饰变成工具」（它本来就装着东西），是 52px 给一排 26px 控件留了上下各 13px，对一条工具栏偏松；44 留 9px，仍然舒服，还给正文 8px。<strong>这条是全篇价值最低的一条，排在最后做。</strong></p>
+    <p><strong>采纳：52 → 44px。</strong><span class="shipped">已落地</span>但理由和它写的不一样——不是「从装饰变成工具」（它本来就装着东西），是 52px 给一排 26px 控件留了上下各 13px，对一条工具栏偏松；44 留 9px，仍然舒服，还给正文 8px。<strong>这条是全篇价值最低的一条，排在最后做。</strong></p>
     <p><strong>驳回：加「时间线 / 环境 / 设置」三颗键。</strong>三个都已经有入口，而且都是有意放在别处的：</p>
     <pre class="code">环境   → <b>标题本身</b>就是（TopBar.tsx:114 <code>title="环境信息"</code>）
 设置   → <b>侧栏底部那一行</b>（SidebarFoot.tsx 的注释专门论证过为什么在那儿）
@@ -654,22 +688,33 @@ omni 独有的真按钮，埋进一排同质图标里。</em></pre>
       <div class="frame"><div class="frame__in" style="padding:0"><div class="um" style="background:var(--bg)">
         <div class="um__top um__top--slim" style="border-bottom:1px solid var(--border-strong)">
           <div class="um__title">项目的UI我想整体优化一版 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
-          <span class="ubadge"><svg class="ubadge__g gl gl--kimi" width="12" height="12" viewBox="0 0 16 16"><use href="#g-kimi"/></svg>Kimi Code</span>
           <span class="ubadge">接力 2 手</span>
           <div class="um__sp"></div>
           <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
           <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
         </div>
       </div></div></div>
-      <p class="cap">谁在答，和它答的东西在同一根横线上。</p>
+      <p class="cap"><strong>真正落地的只有高度这一档</strong>——那枚 Kimi Code 徽章原图里有，这里撤掉了。「谁在答」交给输入框上沿那三只。</p>
     </div>
   </div>
 </section>
 
 <!-- ── A4 ─────────────────────────────────────── -->
 <section class="pt">
-  <p class="pt__no">A4 / 空态<span class="src src--take">那份稿子的第 4 条 · 形制采纳，内容全换</span></p>
+  <p class="pt__no">A4 / 空态<span class="src src--dead">整条 · 落地时被驳回</span></p>
   <h3 class="pt__h">空屏该能干活，但不该把侧栏抄一遍</h3>
+  <div class="banner" style="border-left-color:var(--danger)">
+    <h4>这一条整条撤了 —— 驳回它的是我自己在上面那段话</h4>
+    <p>我批评它那三张快捷卡「两张半是侧栏的复制品」，然后提了一行「开工条件」：
+    <code>Kimi Code · K3-256k 高 · 引擎自动 · main · 工作区干净</code>。
+    <strong>真去写的时候才发现，这五样全在 60px 外的输入框里摆着</strong>——引擎、模型、档位在底栏那三颗下拉上，
+    分支和工作区脏不脏在芯片行上。<strong>我犯的是同一个错，只是换了个位置。</strong></p>
+    <p style="margin-top:8px">而且现在这版空态本来就没毛病：27px 大标题（<code>--text-xl</code> 那一档就是为它留的）+ 等宽 cwd
+    + 接管会话那段说明。四样各有各的活，一样不重复。</p>
+    <p style="margin-top:8px">唯一站得住的是<strong>起手式那三条</strong>——点了填进输入框、不直接发。它是全篇唯一不重复的东西，
+    但它是**新行为**不是重排，该单独一轮想清楚（比如那三句从哪来：编死的？还是取你在这个项目里最近发过的？）。</p>
+  </div>
+  <p class="pt__sub" style="color:var(--text-faint)">下面整段原样留着，是当时的提案。它对参考稿的批评仍然成立，<strong>但同一把尺子量到我自己头上时我没量。</strong></p>
   <p class="pt__sub">它的判断对：<strong>一句话加一个大图标，是把一整屏拿去说「这里没东西」。</strong>但它填进去的内容，有三分之二是 100px 外就有的东西。</p>
 
   <div class="block">
@@ -727,7 +772,7 @@ omni 独有的真按钮，埋进一排同质图标里。</em></pre>
 </section>
 
 <style>
-/* ── 引擎标识：四枚我自己画的 ─────────────────────── */
+/* ── 引擎标识：原设计稿那三只，配色照抄，只有 grok 补了深色值 ────── */
 :root{--eng-kimi:#5b83d6;--eng-kimi-eye:#1d2f57;
   --eng-claude:#da7756;--eng-claude-eye:#a84e30;
   --eng-grok:#16161a;--eng-grok-eye:#ffffff}
@@ -780,6 +825,18 @@ omni 独有的真按钮，埋进一排同质图标里。</em></pre>
 .pet2:nth-child(3){animation:v2-wander 12s ease-in-out infinite -5s}
 .pet2:nth-child(3) > svg{animation-duration:2.1s;animation-delay:-1.1s}
 .pet2.fast > svg{animation-duration:.9s}
+/* 落地那版：静止是常态。只有真在跑的那只才按微光的节拍跳 */
+.pet2.still,.pet2.still > svg{animation:none}
+.pet2.run > svg{animation:pet-hop2 4s linear 600ms infinite}
+@keyframes pet-hop2{
+  0%{transform:translateY(0) scale(1,1)}
+  3%{transform:translateY(0) scale(1.12,.86)}
+  8%{transform:translateY(-9px) scale(.94,1.08)}
+  14%{transform:translateY(0) scale(1.1,.88)}
+  19%{transform:translateY(0) scale(.97,1.04)}
+  24%,100%{transform:translateY(0) scale(1,1)}}
+.pet2 > i.top{margin:0 0 2px}
+@media (prefers-reduced-motion: reduce){.pet2.run > svg{animation:none}}
 
 /* 跑着的时候：4 秒一跳，和微光同一个节拍 */
 @keyframes glyph-hop{
@@ -861,7 +918,8 @@ omni 独有的真按钮，埋进一排同质图标里。</em></pre>
   <div class="fix">
     <p><strong>改法：同一件事，换个位置，换个节拍。</strong></p>
     <ul>
-      <li><strong>位置</strong> —— 挪进 A3 那枚引擎徽章。输入框上沿是你打字时视线停的地方，那里放动的东西成本最高；而「谁在答」本来就该和答案在一根线上。</li>
+      <li><strong>位置</strong> —— <s style="color:var(--text-faint)">挪进 A3 那枚引擎徽章。</s>
+      <strong style="color:var(--danger)">（这条作废）</strong>A3 的徽章后来被驳回了，没地方可挪；而且摆正原案之后我得说句公道话，<strong>贴着输入框上沿站是有道理的</strong>——真正的毛病是「它一直在动」，那个下面第二条已经解决。落地留在原位。</li>
       <li><strong>节拍</strong> —— 静止是常态。<strong>只有这一轮真在跑</strong>的时候它跳一下，<code>4s 一次、600ms 起、每次约 1s</code>，和 <code>shimmer</code> 逐字对齐。<strong>「一轮一跳」不是「一秒三跳」</strong>——蹦还是那个蹦，压扁、弹起、砸扁、回弹一个不少，只是频率降到十三分之一，而且它现在有意思了：<strong>它在动 = 它在干活。</strong></li>
       <li><strong>减少动态效果</strong> —— <code>prefers-reduced-motion</code> 下完全静止，照 <code>.row__dot--running</code> 那条写。</li>
     </ul>
@@ -978,7 +1036,21 @@ omni 独有的真按钮，埋进一排同质图标里。</em></pre>
         </div></div></div>
         <p class="cap">「谁在答」和它答的东西在同一根横线上；一枚 15px 的桌宠，跟着微光的节拍跳。</p></div>
     </div>
-    <p style="margin-top:14px"><strong>我倾向甲</strong>——原案那个位置是有出处的，而且三只并排能一眼看出「有三家可选、现在是这家」，徽章只能显示一只。<strong>乙的好处是省一整行高度</strong>，屏幕小的时候值。两种都只依赖前面那三处改动，随时能换。</p>
+    <p style="margin-top:14px"><strong>落地选的是甲</strong><span class="shipped">已落地</span>——原案那个位置是有出处的，而且三只并排能一眼看出「有三家可选、现在是这家」，徽章只能显示一只。乙那条后来自己作废了：A3 的徽章被驳回，没地方放。</p>
+  </div>
+
+  <div class="block">
+    <p class="block__h">落地时多出来的：能拿在手里</p>
+    <p>上面那四条只解决了「它什么时候动」。真做出来才发现还缺一半——<strong>它得能被摸。</strong>最后落地的那版比提案多了这些：</p>
+    <ul style="margin:10px 0 0;padding-left:1.3em;font-size:14px;color:var(--text-muted);line-height:1.8">
+      <li><strong>能拖能扔</strong>。松手带走你最后一小段的速度（取整段的话，「拖过去停一会儿再松手」会被算成一次猛甩）。撞墙和地面会弹，怎么扔都出不去活动区——<strong>它永远回得来</strong>。</li>
+      <li><strong>步态分家</strong>：螃蟹横着走回窝，两只史莱姆一路弹回去。它们本来就不是一种走法。最后一跳的横速按剩余距离反算，正好落进窝里，不会在窝口来回蹦过头。</li>
+      <li><strong>脚下有影子</strong>，飞得越高越小越淡。这是手感里最要紧的一条：没有影子，飞在半空的史莱姆和站在地上的史莱姆<strong>在屏幕上是同一张图</strong>。</li>
+      <li><strong>捏起来会被指头压扁一下，砸到地上会瘪一下</strong>（瘪的深浅按落地速度定）。按下去有回应了。</li>
+      <li><strong>状态点挪到头顶。</strong>原案挂在脚下，它垫在身子和地面之间，三只看起来全都悬空——而它们本来是站在输入框上沿的，那条边就是地面。</li>
+    </ul>
+    <p style="margin-top:12px">为此渲染拆成三层：<code>.pet</code> 位置 · <code>.pet__lean</code> 倾斜抻长 · <code>.pet__body</code> 蹦与那几下形变。
+    <strong>一层都不能省</strong>——<code>transform</code> 只有一个，合并就互相盖掉。物理是纯函数（<code>pets.ts</code>），13 个测试钉的是行为不是数值。</p>
   </div>
 </section>
 
@@ -1268,8 +1340,8 @@ SidebarSections.tsx:216
       <td>判断对，而且正是 <code>SidebarFoot.tsx</code> 已经对底部做过的那件事。实现改了两处：行高回 <code>--sb-row-h</code>(32)，「omni」目标提示留下。见 A1。</td></tr>
     <tr><td class="i">3</td><td class="t">顶栏 52→40 + 引擎徽标 + 三颗键</td><td><span class="vd vd--fix">采纳一半</span></td>
       <td><strong>引擎徽章是全篇最值钱的一条</strong>，采纳。52→44 也采纳（它写 40，太紧）。<strong>驳回三颗键</strong>：环境是标题本身、设置在侧栏底、时间线走 <code>/timeline</code>。另：「原来整根栏只有一个 omni ⌄」这个前提是错的。见 A3。</td></tr>
-    <tr><td class="i">4</td><td class="t">空态 → 行动型首屏</td><td><span class="vd vd--fix">形制采纳 · 内容全换</span></td>
-      <td>形制对。但三张快捷卡里两张半是侧栏的复制品，「最近会话」整个就是侧栏。换成开工条件 + 起手式，并把接管会话那段说明救回来。见 A4。</td></tr>
+    <tr><td class="i">4</td><td class="t">空态 → 行动型首屏</td><td><span class="vd vd--no">整条驳回</span></td>
+      <td>我批它的快捷卡是侧栏复制品，然后自己提了一行「开工条件」——<strong>那五样全在 60px 外的输入框里</strong>。同一个错换了个位置。现在这版空态没毛病，不动。见 A4。</td></tr>
     <tr><td class="i">5</td><td class="t">输入区整合成一张浮卡</td><td><span class="vd vd--fix">一半已有 · 一半采纳</span></td>
       <td><code>.composer__inner</code> 本来就是卡：<code>1px --border-strong</code> + <code>--radius-lg</code> + <code>--bg-raised</code>，芯片也已经在卡里。<strong>但它真正做对的是卡<em>外面</em>那条线——它的 <code>.composer</code> 没有 <code>border-top</code>，而 omni 有一条横穿整扇窗的 <code>--border-strong</code>。这条我第一版看漏了，见 A6。</strong></td></tr>
     <tr><td class="i">6</td><td class="t">新增 26px 底部状态栏</td><td><span class="vd vd--no">驳回</span></td>
@@ -1298,7 +1370,8 @@ SidebarSections.tsx:216
 v0.0.128    → <em>属于设置页</em>，不值一条常驻栏</pre></div>
 </div>
 <div class="fix" style="max-width:1000px;margin-top:18px">
-  <p><strong>但它的内核有一条是真的：「引擎那边断没断」今天确实没有常驻的说法。</strong>那个内核不该长成状态栏，该长在它描述的那个东西旁边——<strong>A3 那枚引擎徽章上</strong>。<code>thread.detached</code>（「从磁盘回放出来、背后没有活着的引擎进程」）已经在渲染一枚 <code>badge--muted</code> 的「历史记录」了，把它和引擎徽章并成一枚就行：<strong>零新增像素。</strong></p>
+  <p><strong>但它的内核有一条是真的：「引擎那边断没断」该有个常驻的说法。</strong>我当时想把它挂在 A3 那枚引擎徽章上——<strong>而那枚徽章后来被驳回了</strong>（见 A3）。</p>
+  <p style="margin-top:10px">重新看了一遍，这个内核其实<strong>已经有人管了</strong>：<code>thread.detached</code>（「从磁盘回放出来、背后没有活着的引擎进程」）一直在渲染一枚 <code>badge--muted</code> 的「历史记录」。那正是「这条会话背后没有活引擎」最要紧的那种断线，而且只在真断了的时候才出现。<strong>所以不是缺一个说法，是我没找到它。</strong>底部状态栏那条驳回不变，内核这一半也不用补。</p>
 </div>
 
 <h2 class="sec">C2 · 为什么不要那套色板</h2>
@@ -1321,26 +1394,26 @@ v0.0.128    → <em>属于设置页</em>，不值一条常驻栏</pre></div>
   <p><strong>色板一个字节不动。</strong>它想要的「净」，现有色板已经给了；缺的从来不是颜色，是 B 那八条的层级。</p>
 </div>
 
-<h2 class="sec">D · 落地顺序 · 十四条</h2>
-<p class="col" style="color:var(--text-muted);margin:0 0 20px">分三批。<strong>第一批七条全是改数值和选择器</strong>，加起来不到 80 行，一次改完出图比稿；第二批动组件但都很浅；第三批两条要写新东西，各自单独一轮。</p>
+<h2 class="sec">D · 落地记录 · 提交 302fd38</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 20px">原来这里排的是<strong>动手顺序</strong>；已经动完了，所以换成<strong>结果</strong>。十四条里落地十一条、驳回三条。全绿：<code>typecheck / lint / arch / check:tokens / check:css / check:docs / test</code>（1559 cases，新增 13）。</p>
 <table class="plan">
-  <thead><tr><th></th><th>改动</th><th>动哪儿</th><th>量</th><th>风险</th></tr></thead>
+  <thead><tr><th></th><th>改动</th><th>动哪儿</th><th>结果</th><th>落地时的实情</th></tr></thead>
   <tbody>
-    <tr><td class="n">B4</td><td>失败染色</td><td class="w">items.css</td><td class="w">2 行</td><td>无。执行一条已经写下的注释</td></tr>
-    <tr><td class="n">A6</td><td>输入框去掉通栏线</td><td class="w">items.css · app.css</td><td class="w">~8 行</td><td>无。删一条边、加一道渐隐、补一道 <code>--shadow-1</code></td></tr>
-    <tr><td class="n">B1</td><td>节奏三档</td><td class="w">items.css · app.css</td><td class="w">~12 行</td><td>低。顺带删掉一条负边距</td></tr>
-    <tr><td class="n">B2</td><td>统一那条文字列</td><td class="w">items.css</td><td class="w">~20 行</td><td>低。审批卡和嵌套 run 要跟着对一遍</td></tr>
-    <tr><td class="n">B7</td><td>侧栏空态</td><td class="w">SidebarPinned · SidebarSections · app.css</td><td class="w">~15 行</td><td>中。置顶那段要接 <code>dragover</code></td></tr>
-    <tr><td class="n">A1</td><td>侧栏顶部收两行</td><td class="w">SidebarHead · app.css</td><td class="w">~20 行</td><td>低。<code>.btn--primary</code> 是现成的</td></tr>
-    <tr><td class="n">A3a</td><td>顶栏加引擎徽章</td><td class="w">TopBar.tsx</td><td class="w">~6 行</td><td>无。<code>thread.engine</code> 和 <code>.badge</code> 都现成</td></tr>
-    <tr><td class="n">B3</td><td>正文一档 + 气泡去框</td><td class="w">tokens.css · items.css · markdown.css</td><td class="w">~10 行 + 3 token</td><td>中。<code>--text-prose</code> 影响所有 <code>.md</code>，代码块和表格要复看</td></tr>
-    <tr><td class="n">B8</td><td>变更胶囊加增删</td><td class="w">Changed.tsx</td><td class="w">~6 行</td><td>无</td></tr>
-    <tr><td class="n">B5</td><td>折叠思考用 headingOf</td><td class="w">Reasoning.tsx · items.css</td><td class="w">~4 行</td><td>无。取不到就退回今天的行为</td></tr>
-    <tr><td class="n">A2</td><td>会话行右列时间</td><td class="w">SidebarRows.tsx · app.css</td><td class="w">~25 行</td><td>低。<code>updatedAt</code> 现成，要写个相对时间格式化 + 一个每分钟的重算</td></tr>
-    <tr><td class="n">A5</td><td>引擎字形 + 呼吸节拍</td><td class="w">TopBar.tsx · status.css · engines.ts</td><td class="w">~30 行</td><td>低。四枚字形这版画好了，直接抄 SVG</td></tr>
-    <tr><td class="n">A3b</td><td>顶栏 52 → 44</td><td class="w">app.css</td><td class="w">1 行</td><td>低，但价值也最低。<strong>放最后</strong>，跟别的一起出图看</td></tr>
-    <tr><td class="n">B6</td><td>输出按行夹断</td><td class="w">ToolRun.tsx · items.css</td><td class="w">~30 行</td><td>中。要数行数、要记展开态</td></tr>
-    <tr><td class="n">A4</td><td>空态重做</td><td class="w">Transcript.tsx（Blank）· app.css</td><td class="w">~60 行</td><td>中。<strong>起手式那三条是全篇唯一的新行为</strong>，值得单独想清楚</td></tr>
+    <tr><td class="n">B4</td><td>失败染色</td><td class="w">items.css</td><td><span class="vd vd--yes">已落地</span></td><td>执行一条已经写下的注释。顺带给失败的图标也染了色</td></tr>
+    <tr><td class="n">A6</td><td>输入框去掉通栏线</td><td class="w">items.css · app.css</td><td><span class="vd vd--yes">已落地</span></td><td>渐隐必须是 <code>.transcript</code> 的<strong>兄弟</strong>——滚动容器里的绝对定位参照的是可滚动内容，挂进去会跟着滚走</td></tr>
+    <tr><td class="n">B1</td><td>节奏三档</td><td class="w">items.css · app.css</td><td><span class="vd vd--yes">已落地</span></td><td>负边距是两条不是一条（<code>.copyable:has(&gt; .think)</code> 和 <code>.turnmark__row</code>），都删了</td></tr>
+    <tr><td class="n">B2</td><td>统一那条文字列</td><td class="w">items.css</td><td><span class="vd vd--yes">已落地</span></td><td>顺带删掉死样式 <code>.reasoning</code>——桌面端没有任何组件在用它</td></tr>
+    <tr><td class="n">B7</td><td>侧栏空态</td><td class="w">SidebarPinned · SidebarSections · app.css</td><td><span class="vd vd--yes">已落地</span></td><td><code>on.dragKind</code> 现成的，接上就是一个三元</td></tr>
+    <tr><td class="n">A1</td><td>侧栏顶部收两行</td><td class="w">SidebarHead · app.css</td><td><span class="vd vd--yes">已落地</span></td><td><code>.sidebar__nav</code> / <code>.row--nav</code> 随之成为死样式，一并删了</td></tr>
+    <tr><td class="n">A3a</td><td>顶栏加引擎徽章</td><td class="w">TopBar.tsx</td><td><span class="vd vd--no">驳回</span></td><td><code>TopBar.tsx</code> 的头注释：这枚胶囊上一版就在顶栏、被特意拿掉过</td></tr>
+    <tr><td class="n">B3</td><td>正文一档 + 气泡去框</td><td class="w">tokens.css · items.css · markdown.css</td><td><span class="vd vd--yes">已落地</span></td><td>字号挂在 <code>.msg--agent</code> / <code>.msg--user</code> 上而不是 <code>.md</code>——不然展开的思考也跟着变大</td></tr>
+    <tr><td class="n">B8</td><td>变更胶囊加增删</td><td class="w">Changed.tsx</td><td><span class="vd vd--no">前提错了</span></td><td><code>&lt;Stat&gt;</code> 早就在画 <code>+A −B</code>；截图拍到的是 git 兜底那条路</td></tr>
+    <tr><td class="n">B5</td><td>折叠思考用 headingOf</td><td class="w">Reasoning.tsx · items.css</td><td><span class="vd vd--yes">已落地</span></td><td>渐隐按 px 从右起算，短标题够不到，不会被无谓地淡掉</td></tr>
+    <tr><td class="n">A2</td><td>会话行右列时间</td><td class="w">SidebarRows.tsx · app.css</td><td><span class="vd vd--yes">已落地</span></td><td>「每分钟重算」被禁模块级 <code>let</code> 拦了，改成各行对齐墙钟整分——反而更同步</td></tr>
+    <tr><td class="n">A5</td><td>引擎字形 + 呼吸节拍</td><td class="w">TopBar.tsx · status.css · engines.ts</td><td><span class="vd vd--yes">已落地</span></td><td>用回原设计稿那三只，SVG 一根路径没动；另加拖拽物理与手感，见 A5</td></tr>
+    <tr><td class="n">A3b</td><td>顶栏 52 → 44</td><td class="w">app.css</td><td><span class="vd vd--yes">已落地</span></td><td>A3 只剩这一档</td></tr>
+    <tr><td class="n">B6</td><td>输出按行夹断</td><td class="w">ToolRun.tsx · items.css</td><td><span class="vd vd--yes">已落地</span></td><td>拆进 <code>ToolOutput.tsx</code>——行数闸门拦的</td></tr>
+    <tr><td class="n">A4</td><td>空态重做</td><td class="w">Transcript.tsx（Blank）· app.css</td><td><span class="vd vd--no">驳回</span></td><td>「开工条件」那五样全在 60px 外的输入框里。起手式仍然值得做，单独一轮</td></tr>
   </tbody>
 </table>
 
@@ -1354,14 +1427,16 @@ v0.0.128    → <em>属于设置页</em>，不值一条常驻栏</pre></div>
   <p>「51.9k / 262k」——条本身编的是百分比，数字给的是绝对值。改成「20%」更直接，但 262k 这个上限本身有用（换引擎会变）。那份稿子写的是「12% · 30k」，两个都留——这个折中比我原来的想法好，但两个数并排还是有点挤，等做窗口告警时一起定。</p>
 </div>
 <div class="note">
-  <h4>引擎字形的第五家、第六家</h4>
-  <p>A5 画了四枚。引擎注册表是开放的（<code>apps/desktop/src/main/engines.ts</code> 读用户自己的 json），所以迟早会有没画过的那一家。<strong>兜底得先定</strong>：没有专属字形时用首字母方块 + <code>--text-faint</code>，别留一个空位。</p>
+  <h4>第四家、第五家长什么样</h4>
+  <p>吉祥物只有三只，而引擎注册表是开放的（<code>apps/desktop/src/main/engines.ts</code> 读用户自己写的 json），所以「没见过的那一家」不是异常而是常态。
+  落地时的兜底是<strong>素色史莱姆</strong>（<code>lookOf</code> 里认不出前缀就走它）——<strong>不临时编配色</strong>，编出来迟早和某一家撞。
+  真要给新的一家画，那是画画不是写代码，单独一件事。</p>
 </div>
 
 <h2 class="sec">考虑过，否掉了</h2>
 <div class="note">
   <h4>给回答加头像或名字栏</h4>
-  <p>右对齐已经把「谁说的」说清楚了，这是这套界面里最省的一个信号。再加一列身份只会把 760 的正文压窄，而且每一屏都要付这笔宽度。A3 那枚引擎徽章已经在顶栏答了「谁在答」，不用在每条消息上再答一遍。</p>
+  <p>右对齐已经把「谁说的」说清楚了，这是这套界面里最省的一个信号。再加一列身份只会把 760 的正文压窄，而且每一屏都要付这笔宽度。而「谁在答」已经由输入框上沿那三只答了（亮着的就是当值的），不用在每条消息上再答一遍。</p>
 </div>
 <div class="note">
   <h4>正文列收窄到 68ch</h4>
@@ -1372,9 +1447,50 @@ v0.0.128    → <em>属于设置页</em>，不值一条常驻栏</pre></div>
   <p>推过一遍：那条线一变重，整条流就被切成一段一段的卡片，而对话本来是连续的。分界应该靠<strong>留白</strong>（B1 的 28px）和<strong>标签本身</strong>（字重 400→500、颜色 faint→muted）来立，不靠加粗一根线。</p>
 </div>
 
+<h2 class="sec">F · 落地之后：稿子错在哪</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 24px">十四条动完，<strong>三条被驳回</strong>。三条的失败方式是同一种，值得单独记一笔——因为下一版提案还会这么错。</p>
+
+<div class="note">
+  <h4>一句话：提案是照着截图和样式表提的，而驳回它们的依据写在组件的头注释里</h4>
+  <p>样式表告诉你「现在长什么样」，截图告诉你「现在有什么」。<strong>两样都答不了「这个位置试过没有」。</strong>
+  omni 这个仓库把「为什么不那样做」写得比「怎么做的」还多，而那些话住在 <code>.tsx</code> 的文件头注释里——
+  我提这三条的时候，一个都没打开过。</p>
+</div>
+
+<table class="verdict" style="margin-top:20px">
+  <thead><tr><th></th><th>提案</th><th>驳回它的东西</th><th>属于哪一类错</th></tr></thead>
+  <tbody>
+    <tr><td class="i">A3</td><td class="t">顶栏加引擎徽章</td>
+      <td><code>TopBar.tsx</code> 的头注释：「上一版这里摆着引擎和信任档两枚胶囊…<strong>一样的文字出现在两个地方，其中一个还点不动</strong>。用户会去点那个点不动的，然后以为界面坏了。」</td>
+      <td><strong>把拆掉的东西又提议装回去。</strong>截图看不出「这里试过、被拿掉了」</td></tr>
+    <tr><td class="i">B8</td><td class="t">变更胶囊加增删</td>
+      <td><code>Changed.tsx</code> 里的 <code>&lt;Stat&gt;</code>：「增删两个数。零的那个不画——『+0』不是信息。」<strong>早就实现了。</strong>截图拍到的是 git 兜底那条分支</td>
+      <td><strong>「界面上没有」当成了「代码里没有」。</strong>断言缺失之前该先 grep</td></tr>
+    <tr><td class="i">A4</td><td class="t">空态加一行「开工条件」</td>
+      <td>我自己在上面那段话——批参考稿的快捷卡「两张半是侧栏的复制品」。而我提的那五样（引擎 / 模型 / 档位 / 分支 / 脏不脏）<strong>全在 60px 外的输入框里</strong></td>
+      <td><strong>同一把尺子没量到自己头上。</strong>提议加东西之前该先数一遍它在别处出现过几次</td></tr>
+  </tbody>
+</table>
+
+<div class="note" style="margin-top:22px">
+  <h4>顺带清掉的三条死样式</h4>
+  <p><code>.reasoning</code>（推理走的是 <code>.think</code>）、<code>.sidebar__nav</code> / <code>.row--nav</code>（A1 换掉了它们唯一的用户）。
+  <code>check-css</code> 只查「用了没样式」，查不出<strong>「有样式没人用」</strong>，所以它们一直留着。
+  反向的守卫暂时不加——它会把「先写样式再接组件」这条正常路径判红。</p>
+</div>
+
+<div class="note">
+  <h4>守卫拦下的四次，其中一次让方案变好了</h4>
+  <p><code>max-lines</code>（三个文件）、<code>max-lines-per-function</code>、<code>max-params</code>（<code>step</code> 五个参数 → 折成一个 <code>World</code>），
+  以及 <code>no-restricted-syntax</code> <strong>禁模块级 <code>let</code></strong>。</p>
+  <p style="margin-top:8px">最后这条最有意思：我本来要用一个模块级共享定时器，让侧栏那一列相对时间同步刷新。被拦之后改成
+  <strong>各行各起定时器、但都对齐墙钟的整分</strong>——不需要任何共享状态，结果反而更同步。
+  <strong>一条限制逼出了更好的解法</strong>，这种事不多。</p>
+</div>
+
 <hr class="rule" style="margin:56px 0 20px">
 <p class="col" style="font-size:13px;color:var(--text-faint);margin:0">
-v2 在 v1 的八条排版之外，合进了那份稿子的布局判断：直接采纳 1 条、改造后采纳 5 条、驳回 2 条，另有 1 条仓库里已经实现。A5 那四枚引擎标识是这一版新画的，SVG 直接可以抄走。对比度数字是按 WCAG 相对亮度算的；「已经是这样」那几条都给了文件名和行号，可以直接翻。所有小样用的是仓库里同一套 token 值，浅色深色都跟着系统走。
+这份稿子已经落地（提交 <code>302fd38</code>）：十四条里做了十一条，驳回三条——A3 的引擎徽章、A4 的空态、B8 的变更胶囊，逐条见 F 节。被驳的那三条在正文里原样留着、只在标题上划了一道：<strong>提案错在哪，比提案对在哪更值得留。</strong>吉祥物用的是最初那版设计稿的三只，SVG 一根路径没动。对比度数字是按 WCAG 相对亮度算的；「已经是这样」那几条都给了文件名和行号，可以直接翻。所有小样用的是仓库里同一套 token 值，浅色深色都跟着系统走。
 </p>
 
 </div>
