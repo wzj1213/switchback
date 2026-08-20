@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from "react"
 import type { EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
 import { useDeepSearch } from "../useDeepSearch.js"
-import { Deep } from "./SidebarDeep.js"
 import { sectionsOf, type SidebarRow } from "../sidebar.js"
 import { useSidebarDrag } from "../sidebarDrag.js"
+import { useSidebarOpen } from "../useSidebarOpen.js"
 import { SidebarFoot, type AccountLine } from "./SidebarFoot.js"
 import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
 import { Head } from "./SidebarHead.js"
-import { Hits } from "./SidebarHits.js"
-import { useRenaming, type RenameCtl } from "./RowName.js"
+import { useRenaming } from "./RowName.js"
 import { SectionList } from "./SidebarSections.js"
+import { sidebarMoves } from "../sidebarMove.js"
+import { SidebarFound } from "./SidebarFound.js"
 
 /**
  * 侧栏。
@@ -66,6 +67,9 @@ interface Props {
   projectOrder: readonly string[]
   /** 拖完项目之后把整段新顺序存下来。 */
   onReorderProjects: (order: readonly string[]) => void
+  /** 置顶区内的项目与会话顺序。 */
+  onReorderPinnedProjects: (order: readonly string[]) => void
+  onReorderPinnedThreads: (order: readonly string[]) => void
   /** 拖完之后把这个项目的新顺序整段存下来。 */
   onReorder: (cwd: string, ids: readonly string[]) => void
   /** 把一条会话置顶 / 取消置顶。 */
@@ -95,131 +99,66 @@ interface Props {
   focusFilter: number
 }
 
-
-/**
- * 筛选时的两段结果：标题/首句/目录命中的（即时），正文里提到的（慢半拍）。
- *
- * 拆出来是行数闸门逼的，但边界对：`Sidebar` 管「侧栏长什么样」，
- * 这里管「搜出来的东西怎么摆」。
- */
-function Found({ rows, found, deep, selectedId, on }: {
-  rows: readonly SidebarRow[]
-  found: readonly SidebarRow[]
-  deep: ReturnType<typeof useDeepSearch>
-  selectedId: string
-  on: {
-    onSelect: (id: string) => void
-    onDelete: (id: string) => void
-    rowMenu: (event: React.MouseEvent, row: SidebarRow, arm: () => void, ren: () => void) => void
-    rename: RenameCtl
-  }
-}): React.JSX.Element {
-  return (
-    <>
-      <Hits rows={found} total={rows.length} selectedId={selectedId} on={on} />
-      <Deep
-        hits={deep.hits}
-        rows={rows}
-        shown={new Set(found.map((r) => r.thread.id))}
-        selectedId={selectedId}
-        busy={deep.busy}
-        skipped={deep.skipped}
-        onSelect={on.onSelect}
-      />
-    </>
-  )
-}
-
-export function Sidebar({
-  rows,
-  selectedId,
-  onSelect,
-  onNew,
-  onOpenFolder,
-  onDelete,
-  onRename,
-  onNewIn,
-  onReveal,
-  onCopy,
-  pinned,
-  knownProjects,
-  onDropProject,
-  pinnedThreads,
-  threadOrder,
-  projectOrder,
-  onReorder,
-  onReorderProjects,
-  onPinThread,
-  icons,
-  onSetIcon,
-  foreign,
-  onAdopt,
-  account,
-  onTogglePin,
-  onOpenSettings,
-  onNewChat,
-  askRename,
-  focusFilter,
-}: Props): React.JSX.Element {
+export function Sidebar(props: Props): React.JSX.Element {
   const [query, setQuery] = useState("")
-  /**
-   * **手动展开过的项目**（不是「折叠过的」）。
-   *
-   * 默认全折叠，只有当前会话所在的那个自动展开。上一版反过来——默认全展开——
-   * 于是一个有八个会话的项目自己就占满了整列，而「最近」那一段被顶到屏幕外面，
-   * 等于白做。codex 的项目段也只列文件夹，不把聊天铺开。
-   */
-  /**
-   * 用户**明确点过**的项目：true = 他要展开，false = 他要收起。
-   *
-   * 没点过的项目按默认走（当前会话所在的那个默认展开，其余默认收起）。
-   * 原来这里只存「手动展开过的」，而当前会话所在的项目是**强制展开**的——
-   * 于是点它的箭头毫无反应：`toggle` 把它从集合里拿掉了，
-   * 但 `cwd === here` 又把它扳回展开。**一个按了没反应的控件比没有更糟。**
-   */
-  const [choice, setChoice] = useState<ReadonlyMap<string, boolean>>(new Map())
   const box = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (focusFilter > 0) box.current?.select()
-  }, [focusFilter])
+    if (props.focusFilter > 0) box.current?.select()
+  }, [props.focusFilter])
 
   const { open: openMenu, menu } = useContextMenu()
-  const acts: Acts = { pinned, pinnedThreads, onPinThread, onDropProject, onNewIn, onTogglePin, onReveal, onCopy }
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
-  const pins = { projects: pinned, threads: pinnedThreads, order: threadOrder, known: knownProjects, projectOrder }
-  const found = filterRows(rows, query)
+  const pins = {
+    projects: props.pinned,
+    threads: props.pinnedThreads,
+    order: props.threadOrder,
+    known: props.knownProjects,
+    projectOrder: props.projectOrder,
+  }
+  const found = filterRows(props.rows, query)
   const sections = sectionsOf(found, pins)
+  const moves = sidebarMoves({
+    sections,
+    onThreads: props.onReorderPinnedThreads,
+    onGroupThreads: props.onReorder,
+    onPinnedProjects: props.onReorderPinnedProjects,
+    onProjects: props.onReorderProjects,
+  })
+  const acts: Acts = {
+    pinned: props.pinned,
+    pinnedThreads: props.pinnedThreads,
+    onPinThread: props.onPinThread,
+    onDropProject: props.onDropProject,
+    onNewIn: props.onNewIn,
+    onTogglePin: props.onTogglePin,
+    onReveal: props.onReveal,
+    onCopy: props.onCopy,
+    ...moves,
+  }
   // 正文搜索**跟在后面出现**：它要翻磁盘，而上面那份必须逐字即时
   const deep = useDeepSearch(query)
   // 拖放整套在 `sidebarDrag.ts`：谁能拖、拖到哪儿会发生什么，都在那儿
-  const dragging = useSidebarDrag({ filtering, sections, onReorder, onReorderProjects, onPinThread, onTogglePin })
-
-  const toggle = (cwd: string): void => {
-    setChoice((prev) => {
-      const next = new Map(prev)
-      next.set(cwd, !isOpen(cwd))
-      return next
-    })
-  }
-
-  // 当前会话所在的项目**默认**展开：选中的那一行该看得见，
-  // 否则点了侧栏别处再回来，它就藏进一个折叠组里了。
-  // 但这只是默认——用户明确收起来就听他的
-  const here = rows.find((r) => r.thread.id === selectedId)?.thread.cwd
-  const isOpen = (cwd: string): boolean => choice.get(cwd) ?? cwd === here
-
-  const rename = useRenaming(onRename, { at: askRename, id: selectedId })
-  const { rowMenu, groupMenu } = useSidebarMenus({ ...acts, onSetIcon }, openMenu)
-
+  const dragging = useSidebarDrag({
+    filtering,
+    sections,
+    onReorder: props.onReorder,
+    onReorderProjects: props.onReorderProjects,
+    onPinThread: props.onPinThread,
+    onTogglePin: props.onTogglePin,
+  })
+  const selected = props.rows.find((row) => row.thread.id === props.selectedId)?.thread
+  const { isOpen, toggle } = useSidebarOpen(selected?.cwd)
+  const rename = useRenaming(props.onRename, { at: props.askRename, id: props.selectedId })
+  const { rowMenu, groupMenu } = useSidebarMenus({ ...acts, onSetIcon: props.onSetIcon }, openMenu)
 
   return (
     <aside className="sidebar">
       <Head
-        onNew={onNew}
-        onOpenFolder={onOpenFolder}
-        here={here}
-        hereKind={rows.find((r) => r.thread.id === selectedId)?.thread.workspaceKind}
+        onNew={props.onNew}
+        onOpenFolder={props.onOpenFolder}
+        here={selected?.cwd}
+        hereKind={selected?.workspaceKind}
         box={box}
         query={query}
         onQuery={setQuery}
@@ -227,33 +166,39 @@ export function Sidebar({
 
       <div className="sidebar__list">
         {filtering ? (
-          <Found rows={rows} found={found} deep={deep} selectedId={selectedId} on={{ onSelect, onDelete, rowMenu, rename }} />
+          <SidebarFound
+            rows={props.rows}
+            found={found}
+            deep={deep}
+            selectedId={props.selectedId}
+            on={{ onSelect: props.onSelect, onDelete: props.onDelete, rowMenu, rename }}
+          />
         ) : (
           <SectionList
             sections={sections}
             on={{
-              selectedId,
+              selectedId: props.selectedId,
               isOpen,
               onToggle: toggle,
-              onSelect,
-              onDelete,
+              onSelect: props.onSelect,
+              onDelete: props.onDelete,
               onRowMenu: rowMenu,
-              onOpenFolder,
-              onNewChat,
-              onNewIn,
-              icons,
+              onOpenFolder: props.onOpenFolder,
+              onNewChat: props.onNewChat,
+              onNewIn: props.onNewIn,
+              icons: props.icons,
               rename,
               onGroupMenu: groupMenu,
-              foreign,
-              onAdopt,
+              foreign: props.foreign,
+              onAdopt: props.onAdopt,
               ...dragging,
+              ...moves,
             }}
           />
         )}
       </div>
-      <SidebarFoot account={account} onOpenSettings={onOpenSettings} />
+      <SidebarFoot account={props.account} onOpenSettings={props.onOpenSettings} />
       {menu}
     </aside>
   )
 }
-

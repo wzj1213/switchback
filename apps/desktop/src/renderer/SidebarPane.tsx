@@ -3,37 +3,7 @@ import { Sidebar } from "./components/Sidebar.js"
 import type { SidebarRow } from "./sidebar.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
 
-/** 侧栏接线。从 `App` 拆出来是行数闸门逼的，但它确实自成一块。 */
-export function SidebarPane({
-  rows,
-  thread,
-  focusFilter,
-  askRename,
-  onNewChat,
-  onSelect,
-  onNew,
-  onNewIn,
-  onOpenFolder,
-  onReveal,
-  onCopy,
-  pinned,
-  knownProjects,
-  onDropProject,
-  pinnedThreads,
-  threadOrder,
-  projectOrder,
-  onReorder,
-  onReorderProjects,
-  onPinThread,
-  icons,
-  onSetIcon,
-  onTogglePin,
-  onOpenSettings,
-  foreign,
-  onAdopt,
-  account,
-  send,
-}: {
+interface SidebarPaneProps {
   rows: readonly SidebarRow[]
   thread: Thread | undefined
   focusFilter: number
@@ -57,6 +27,8 @@ export function SidebarPane({
   /** 项目之间的手动顺序。 */
   projectOrder: readonly string[]
   onReorderProjects: (order: readonly string[]) => void
+  onReorderPinnedProjects: (order: readonly string[]) => void
+  onReorderPinnedThreads: (order: readonly string[]) => void
   onPinThread: (id: string, pin: boolean) => void
   icons: Readonly<Record<string, string>>
   onSetIcon: (cwd: string, icon: string) => void
@@ -68,36 +40,16 @@ export function SidebarPane({
   /** 底部那一行：登录的是谁、还剩多少额度。 */
   account?: AccountLine
   send: (command: Command) => void
-}): React.JSX.Element {
+}
+
+/** 侧栏接线。从 `App` 拆出来是行数闸门逼的，但它确实自成一块。 */
+export function SidebarPane(props: SidebarPaneProps): React.JSX.Element {
+  const { thread, onSelect, send, ...sidebar } = props
   return (
     <Sidebar
-      rows={rows}
-      foreign={foreign}
-      onAdopt={onAdopt}
-      knownProjects={knownProjects}
-      onDropProject={onDropProject}
-      pinnedThreads={pinnedThreads}
-      threadOrder={threadOrder}
-      projectOrder={projectOrder}
-      onReorder={onReorder}
-      onReorderProjects={onReorderProjects}
-      onPinThread={onPinThread}
-      {...(account === undefined ? {} : { account })}
+      {...sidebar}
       selectedId={thread?.id ?? ""}
       onSelect={onSelect}
-      onNew={onNew}
-      onOpenFolder={onOpenFolder}
-      onNewIn={onNewIn}
-      onReveal={onReveal}
-      onCopy={onCopy}
-      pinned={pinned}
-      icons={icons}
-      onSetIcon={onSetIcon}
-      onTogglePin={onTogglePin}
-      onOpenSettings={onOpenSettings}
-      focusFilter={focusFilter}
-      askRename={askRename}
-      onNewChat={onNewChat}
       onDelete={(id: string) => {
         // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
         if (id === thread?.id) onSelect(undefined)

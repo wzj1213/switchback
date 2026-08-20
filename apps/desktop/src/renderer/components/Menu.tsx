@@ -33,6 +33,7 @@ export interface Command {
 
 export interface MenuState {
   at: { x: number; y: number }
+  anchor: HTMLElement
   commands: readonly Command[]
   /** 菜单顶上的一小块说明。**只读**，不是菜单项——见 `open` 的注释。 */
   head?: React.ReactNode
@@ -61,7 +62,16 @@ export function useContextMenu(): {
       event.preventDefault()
       // 空菜单不弹：一个打开就是空的菜单比没有菜单更让人困惑
       if (commands.length === 0) return
-      setState({ at: { x: event.clientX, y: event.clientY }, commands, head })
+      setState({
+        at: { x: event.clientX, y: event.clientY },
+        anchor:
+          event.target instanceof HTMLElement
+            ? (event.target.closest<HTMLElement>("button, a[href], [tabindex]") ??
+              (event.currentTarget as HTMLElement))
+            : (event.currentTarget as HTMLElement),
+        commands,
+        head,
+      })
     },
     [],
   )
@@ -72,8 +82,8 @@ export function useContextMenu(): {
 
   const menu =
     state === undefined ? null : (
-      <Popover open anchor={null} at={state.at} minWidth={170} onClose={close}>
-        <div role="menu">
+      <Popover open anchor={state.anchor} at={state.at} minWidth={170} onClose={close}>
+        <div role="menu" aria-label="操作">
           {state.head === undefined ? null : <div className="pop__head">{state.head}</div>}
           {state.commands.map((command) =>
             command.pick === undefined ? (
@@ -91,7 +101,12 @@ export function useContextMenu(): {
                 <span>{command.label}</span>
               </button>
             ) : (
-              <div key={command.label} className="pop__pick">
+              <div
+                key={command.label}
+                className="pop__pick"
+                role="group"
+                aria-label={command.label}
+              >
                 <span className="pop__cmd-icon">{command.icon}</span>
                 <span className="pop__pick-label">{command.label}</span>
                 {command.pick.map((option) => (
@@ -99,6 +114,8 @@ export function useContextMenu(): {
                     type="button"
                     key={option.icon}
                     className="pop__pick-one"
+                    role="menuitem"
+                    aria-label={`${command.label} ${option.icon}`}
                     onClick={() => {
                       close()
                       option.run()
@@ -111,6 +128,8 @@ export function useContextMenu(): {
                 <button
                   type="button"
                   className="pop__pick-one pop__pick-clear"
+                  role="menuitem"
+                  aria-label={`清除${command.label}`}
                   title="不要图标"
                   onClick={() => {
                     close()

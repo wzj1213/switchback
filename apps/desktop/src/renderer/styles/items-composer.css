@@ -1,0 +1,285 @@
+/* ── composer ─────────────────────────────────────────
+ * **没有 `border-top`。** 输入框本身已经是一张卡（描边 + 圆角 + 抬起的底色），
+ * 卡外面再画一条横穿整扇窗的线，是同一件事说了两遍、而且第二遍说得更重——
+ * `--border-strong` 的口径是「把窗口切成区块的那几条」，可对话和你正在打的
+ * 那句话不是两个区块，**它是同一条流的下一步**。
+ *
+ * 那条线原本在干一件正经事：标出滚动区到哪儿为止。这件事交给 `.hem`
+ * 那道渐隐（见 app.css）——内容溶进去，而不是被齐着切断。
+ */
+.composer {
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+}
+
+.composer__inner {
+  /* `@` 候选列表要贴着这个盒子的上边缘弹出来 */
+  position: relative;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  /* 通栏线拿掉之后卡片得自己站住。2px、6% 是最轻的一道；
+     深色下 `--shadow-1` 本来就是 `none`，那边由描边接手 */
+  box-shadow: var(--shadow-1);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.composer__inner:focus-within {
+  border-color: var(--accent);
+}
+
+/* 文本框和它的灰字预览共用这一个盒子——**预览必须和文本框同一个原点**，
+   所以定位挂在这里，两边各自 `inset: 0` / `width: 100%` 对齐 */
+.composer__field {
+  position: relative;
+}
+
+/*
+ * 光标后面那截灰字：按下 Tab 或回车会补上的东西。
+ *
+ * 一层贴在文本框上的镜像：你已经打的那部分画成透明的**占住位置**，
+ * 后面那截灰字才落在光标正后方。所以它的字体、字号、内边距、换行规则
+ * 必须和 `.composer__input` 一模一样——两边都靠 `font: inherit` 从同一处取，
+ * 谁也不许单独调一格。
+ *
+ * `pointer-events: none`：它盖在文本框上面，不接管点击也不夺焦点。
+ */
+.composer__ghost {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+
+/* 已经打进去的那部分：**只占位，不显形**。真正显示它的是下面那个文本框 */
+.composer__ghost-typed {
+  color: transparent;
+}
+
+.composer__input {
+  width: 100%;
+  /* UA 给 textarea 的 2px 内边距要清掉：不清的话，打的字比上面的芯片行
+     和下面那排控件各偏 2px——同一个框里三条左边缘 */
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  min-height: 42px;
+  max-height: 180px;
+}
+
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* 触发器自己带 8px 内边距 + 1px 透明描边，往回拉一格，
+     图标才和上面的字对在同一条线上（写法照顶栏标题那颗按钮） */
+  margin-left: calc(-1 * (var(--sp-2) + 1px));
+  padding-top: var(--sp-1);
+}
+
+/**
+ * 档位下面那行说明。**默认不出现**——只在 omni 的档和引擎那边分家、
+ * 或者 omni 明确没设上时才有内容（见 `renderer/trustHint.ts`）。
+ *
+ * 放在那一排里而不是另起一行：它说的就是旁边那个下拉的事，
+ * 隔开的话读的人要自己把两者连起来。
+ */
+/** 整排 + 它下面那行说明。说明自己一行，不挤在两个选择器中间。 */
+.composer__barwrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.composer__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/** 分家是唯一一种「此刻正在发生」的，给它一点颜色；其余三种是说明，保持安静。 */
+.composer__hint--diverged {
+  color: var(--warn);
+}
+
+.composer__hint--fixed,
+.composer__hint--unmapped,
+.composer__hint--blind {
+  color: var(--text-faint);
+}
+
+.composer__hintact {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 12px;
+  padding: 0 var(--sp-2);
+  cursor: pointer;
+}
+
+.composer__hintact:hover {
+  background: var(--bg-hover);
+}
+
+
+
+
+/* ── 复制按钮 ─────────────────────────────────────────
+ * 悬停才出现，贴在消息右上。常驻的话每条消息右上角都挂一个小按钮，
+ * 一屏下来全是噪声。
+ */
+.copyable {
+  position: relative;
+}
+
+/* 让「靠右」传得下去：`.msg--user` 的 `align-self` 挂在这一层上才有意义，
+   因为它才是 `.transcript__inner` 那个 flex 列的直接子节点 */
+.copyable:has(> .msg--user) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* ── 行内动作：转录区里那几颗「顺手能做的事」 ──────────────
+ *
+ * 「从这里重来」「复制」「改一改再发」「立刻插入」「撤回」——它们是同一类东西：
+ * **不是这一屏的主操作，但要点得到**。所以给一套共同的样子，而不是各写各的
+ *（上一版就是各写各的，其中一颗还因为共用选择器被误删，直接退化成
+ * 一颗带边框、会折行的浏览器默认按钮）。
+ *
+ * 形制是**药丸**，和芯片、匹配标签同族：平时只有文字，悬停才浮出一圈描边和底色。
+ * 不用下划线——下划线是链接的语义，一颗会执行动作的东西不该长成链接；
+ * 而且下划线在 11.5px 上和文字挤在一起，看起来是「没做完」而不是「克制」。
+ *
+ * `white-space: nowrap` 不是装饰：这几颗都住在会被压窄的行里
+ *（轮次分界线那一行右端只剩几十像素），能折行的按钮迟早会折成两行。
+ */
+.act {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  white-space: nowrap;
+  cursor: default;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.act:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/*
+ * **一露头就带着描边。**
+ *
+ * 这几颗平时是藏着的（父行悬停才出现）。只在「悬停到它自己身上」才显形的话，
+ * 它出现的那一刻是一行光秃秃的灰字——看起来像说明文字，不像能点的东西，
+ * 而人要先猜它能点、再移过去才得到反馈。既然已经决定把它显示出来，
+ * 就该在那一刻就说清「这是一颗按钮」。
+ */
+.turnmark__row:hover .act,
+.copyable:hover .act {
+  border-color: var(--border);
+  background: var(--bg-raised);
+}
+
+.act:active {
+  background: var(--bg-active);
+}
+
+/* 撤回是**收回一句话**，不是危险操作，所以只在悬停时染色，平时和别的一样安静 */
+.act--danger:hover {
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+/*
+ * 消息底下那排动作（复制 / 改一改再发）。
+ *
+ * **在消息下面，不压在它身上。** 上一版那颗「复制」是
+ * `position: absolute; top: 0; right: 0`，正好盖住气泡右上角的第一行字——
+ * 而用户消息是右对齐的，第一行的末尾就在那个位置。悬停才出现救不了它：
+ * 你要复制的那条，正是鼠标停着的那条。
+ *
+ * 做成**纯文字**、不带框：它是「顺手能做的事」，不是这一屏的操作。
+ * 一带框就成了两颗小按钮挂在每条消息屁股后面，一屏十条就是二十个框。
+ */
+.msgacts {
+  display: flex;
+  gap: var(--sp-1);
+  /* 药丸自带内边距，所以这里贴着消息更近一点，视觉上仍是「挂在它下面」 */
+  margin-top: 1px;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+/* 用户消息靠右，它的动作栏也靠右——和气泡同一侧才不会看起来像下一条的抬头 */
+.copyable:has(> .msg--user) .msgacts {
+  justify-content: flex-end;
+}
+
+.copyable:hover .msgacts,
+.msgacts:focus-within {
+  opacity: 1;
+}
+
+
+
+/* ── 输入区上方的芯片：这句话会发到哪儿去 ───────────────
+ * 见 components/Chips.tsx。分支这一条不是装饰——
+ * 「引擎会改到哪个分支」以前界面上一个字都没有。
+ */
+.chips {
+  display: flex;
+  align-items: center;
+  /* 芯片自己没有底色也没有描边，横向内边距只是把它们推离对齐列——
+     去掉之后 `gap` 说的话才是实话（上一版写 4，视觉间隙实测 20） */
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.chip svg {
+  flex: none;
+}
+
+/* 脏工作区标黄。**不是报错，是提醒**：在别人的改动上面继续动手是合法的，
+   只是出问题时两拨改动会混在一个 diff 里 */
+.chip--warn {
+  color: var(--warn);
+}

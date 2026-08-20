@@ -27,6 +27,9 @@ export interface SettingsApi {
   setOrder: (cwd: string, ids: readonly string[]) => void
   /** 项目之间的手动顺序。 */
   setProjectOrder: (order: readonly string[]) => void
+  /** 置顶区里的项目与会话顺序。 */
+  setPinnedProjects: (order: readonly string[]) => void
+  setPinnedThreads: (order: readonly string[]) => void
 }
 
 export function useSettings(): SettingsApi {
@@ -98,6 +101,20 @@ export function useSettings(): SettingsApi {
     [patch],
   )
 
+  const setPinnedProjects = useCallback(
+    (order: readonly string[]) => {
+      patch({ pinned: order })
+    },
+    [patch],
+  )
+
+  const setPinnedThreads = useCallback(
+    (order: readonly string[]) => {
+      patch({ pinnedThreads: order })
+    },
+    [patch],
+  )
+
   const setIcon = useCallback(
     (cwd: string, icon: string) => {
       // 清掉时**把键去掉**，不是存一个空串：留着空值的话，
@@ -119,6 +136,8 @@ export function useSettings(): SettingsApi {
     pinThread,
     setOrder,
     setProjectOrder,
+    setPinnedProjects,
+    setPinnedThreads,
     setIcon,
     isPinned: (cwd) => settings.pinned.includes(cwd),
   }

@@ -46,10 +46,8 @@
   /* 文字 */
   --text: #16161a;
   --text-muted: #6a6a73;
-  /* 3.66:1 on 白。上一版 #9a9aa4 是 2.79:1，而深色那侧是 3.50——
-     同一个角色两套主题差 25%。**不再往上推到 4.5**：那会把它和 --text-muted
-     的 ΔL* 从 18.7 压到 10.6，三档文字层级当场变平（见 UI 计划第 35 条） */
-  --text-faint: #85858f;
+  /* 最淡的一档仍承载可读文字，因此以最常见的凹面底色为准守住 AA 对比度。 */
+  --text-faint: #6f6f78;
   --text-inverse: #ffffff;
 
   /* 语义 */
@@ -184,7 +182,7 @@
 
     --text: #ececef;
     --text-muted: #9d9da8;
-    --text-faint: #6d6d78;
+    --text-faint: #95959f;
     --text-inverse: #17171a;
 
     --hl-keyword: #c792ea;

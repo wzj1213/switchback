@@ -1,0 +1,686 @@
+/* ── 主区 ───────────────────────────────────────────── */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* flex 子项默认 min-height:auto，内容会把容器撑出视口、把 composer 顶出屏幕。
+     这条是必需的，不是洁癖。 */
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* 52 → 44。52px 给一排 26px 的控件留了上下各 13px，对一条工具栏偏松；
+   44 留 9px，仍然舒服，还给正文 8px。这是一条纯度量改动——顶栏该装什么
+   由 TopBar.tsx 顶上那段管，那边的结论是「引擎名不进顶栏」 */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 44px;
+  padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--border-strong);
+  -webkit-app-region: drag;
+}
+
+/* 标题现在可点（点开环境信息）。**平时看不出是按钮**——它首先是标题，
+   悬停才浮出一层底色。做成一直带框的胶囊会把顶栏最重的那个字变成一个控件 */
+.topbar__title {
+  /* **必须 no-drag**：Electron 的拖拽区里元素收不到点击，而这颗按钮是
+     环境卡片唯一的入口——「`/timeline` 能开、环境卡片开不出来」就是它 */
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 40%;
+  margin-left: -6px;
+  padding: 2px 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-base);
+  /* 550 在 mac 上是半句谎话：PingFang SC 没有 550 面（落到 600），
+     而 -apple-system 的拉丁部分能真渲染 550——中英混排的标题里一行两个字重 */
+  font-weight: 600;
+  /* `white-space` 留着：`.cmp__title` 复用同一个类且没有子 span。
+     `text-overflow` 挪到 `.topbar__title-text`——它在 flex 容器上从来没执行过 */
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 截断必须写在**子元素**上：flex 项默认 `min-width: auto` 不肯缩，
+   于是标题被齐着字形硬切，排在它后面的箭头整个落在裁切区外 */
+.topbar__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__title:hover {
+  background: var(--bg-hover);
+}
+
+/* 那个小箭头平时淡到几乎看不见——它是「还有更多」的暗示，不是招牌 */
+.topbar__title > svg {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+/* 徽章：**只说明状态，永远不可点**。可点的东西是 `.iconbtn` 或 `.trigger`。
+   两者长得一样的话，「能不能点」就没有任何视觉线索了 */
+.badge {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 图标按钮。顶栏里的动作用它，不用文字胶囊 */
+.iconbtn {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.iconbtn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.iconbtn:active {
+  background: var(--bg-press);
+}
+
+/*
+ * 转录区**只上下滚，绝不左右滚**。
+ *
+ * `overflow-y: auto` 单写一条是不够的：CSS 里两轴只有一个是 `visible` 时，
+ * 那个 `visible` 会被**计算成 `auto`**。也就是说这里其实一直是「横向也能滚」，
+ * 只要有一个子元素宽了一点点，输入框上面就会冒出一条横向滚动条。
+ *
+ * 宽内容自己滚是既定设计（`.md pre` 有 `overflow-x`，宽表格套 `.md__scroll`），
+ * 所以这一层直接钉死。`hidden` 而不是 `clip`：hidden 仍然能被程序滚动，
+ * 万一真有东西被裁掉，它还够得着。
+ */
+/* 对话区。吉祥物的活动区就是它，那道下摆渐隐也挂在它上面——
+   见 `Workspace.tsx` 里那一层 `.stage` 的注释 */
+.stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.transcript {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* 和侧栏同一个理由：外接鼠标 = 经典条，会话长过一屏那一刻滚动条冒出来，
+     居中的正文列会向左跳 7.5px——而那一刻正是首条长回复流到一半的时候 */
+  scrollbar-gutter: stable;
+  padding: var(--sp-5) var(--sp-4) var(--sp-6);
+}
+
+.transcript__inner {
+  /*
+   * 工具行的图标列。**展开出来的东西都对着这一条槽**——
+   * 上一版是 0（输出）/ 22（diff）/ 24（思考），三条左边缘各写各的，
+   * 而「差不多齐」比明显不齐更难看。照侧栏挂 `--sb-*` 的先例挂在这里。
+   */
+  --step-icon: 16px;
+  --step-slot: calc(var(--step-icon) + var(--sp-2));
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  /*
+   * **8 是基数，不是全部。** 上一版是一个 16 管住全部七种相邻关系
+   *（提问接分界、思考接回答、回答接工具组、上一轮接下一轮…），
+   * 于是间距不表达任何关系，结构只能靠线和框去补。
+   *
+   * 症状很明显：`.copyable:has(> .think)` 曾经要一条 -8 的负边距、
+   * `.turnmark__row` 曾经要一条 -8——**需要负边距去减，说明基数选在了错的一档**。
+   *
+   * 现在三档：8 = 它连着干的几件事；16 = 换人说话、或者从「做」回到「说」；
+   * 28 = 轮次分界（8 + `.turnmark__row` 的 20，见 items.css）。
+   */
+  gap: var(--sp-2);
+}
+
+/* 换人说话，或者从「做」回到「说」。审批卡也算——那是要你停下来做决定的东西 */
+.transcript__inner > .copyable:has(> .msg--agent),
+.transcript__inner > .copyable:has(> .msg--user),
+.transcript__inner > .copyable:has(> .approval) {
+  margin-top: var(--sp-2);
+}
+
+/* 第一条不吃这份额外留白：`.transcript` 自己已经有 `--sp-5` 的上边距 */
+.transcript__inner > :first-child {
+  margin-top: 0;
+}
+
+/*
+ * 滚动区的下摆：一道 28px 的渐隐，接替原来输入区那条通栏线（见 items.css 的 `.composer`）。
+ *
+ * **必须是 `.transcript` 的兄弟，不能是它的孩子。** 滚动容器里的
+ * `position: absolute` 参照的是**可滚动内容的**内边距盒，不是可视区——
+ * 挂进去的话这道渐隐会跟着内容滚走，只在滚到底时才出现在正确的位置。
+ *（同一个坑的另一半是 `.tobottom`，它用的是 `position: sticky`。）
+ *
+ * 自身高度为 0，靠伪元素向上盖住转录区最后 28px：这样它不占布局，
+ * 输入区上不上移一个像素都不受影响。
+ */
+.hem {
+  position: relative;
+  z-index: 1;
+  height: 0;
+}
+
+.hem::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+
+/* ── 上下文用量表 ─────────────────────────────────────
+ * 顶栏右侧一个窄条 + 数字。平时是中性灰，逼近窗口上限时才变色——
+ * 一直是彩色的话，真到危险区就没有升级空间了。
+ */
+.meter {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.meter__track {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+
+.meter__fill {
+  display: block;
+  height: 100%;
+  background: var(--text-faint);
+  transition: width var(--dur-slow) var(--ease);
+}
+
+.meter--warn {
+  color: var(--warn);
+}
+
+.meter--warn .meter__fill {
+  background: var(--warn);
+}
+
+.meter--danger {
+  color: var(--danger);
+}
+
+.meter--danger .meter__fill {
+  background: var(--danger);
+}
+
+/* ── 引擎故障横幅 ─────────────────────────────────────
+ * 贴在顶栏下方，不遮挡对话。用 danger 色的极淡底 + 左侧竖条，
+ * 而不是整块红——整块红会让人条件反射地关掉它，连读都不读。
+ */
+.notice {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex: none;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  font-size: var(--text-sm);
+}
+
+.notice__badge {
+  flex: none;
+  color: var(--danger);
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+
+/* 「能力受限」不用红：引擎好好的，只是掉了点东西。
+   和真故障用同一个红，两件严重程度差很远的事看起来一样，
+   而看多了红的人会连真的那次也一起无视 */
+.notice__badge--soft {
+  color: var(--warn);
+}
+
+.notice:has(.notice__badge--soft) {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
+}
+
+.notice__text {
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.notice__close {
+  margin-left: auto;
+  flex: none;
+  padding: 0 var(--sp-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-base);
+  cursor: default;
+}
+
+.notice__close:hover {
+  color: var(--text);
+}
+
+/* 历史会话的标记：比引擎/档位那两枚更淡，它是状态不是配置 */
+.badge--muted {
+  color: var(--text-faint);
+  border-style: dashed;
+}
+
+.composer__input:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* ── 崩溃兜底 ─────────────────────────────────────── */
+/* 崩溃屏那两颗按钮。**不给间距的话它们会贴在一起**——而这一屏正是最不该
+   再多一处「看起来也坏了」的地方 */
+.crash__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.crash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--sp-6);
+  background: var(--bg);
+}
+
+.crash__box {
+  max-width: 620px;
+  width: 100%;
+}
+
+.crash__title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.crash__msg {
+  margin-top: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.crash__hint {
+  margin: var(--sp-3) 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 栈默认可见但压得很淡：它是给能读它的人看的，不该吓住其他人 */
+.crash__stack {
+  margin-top: var(--sp-4);
+  max-height: 240px;
+  overflow: auto;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}
+
+/* ── 会话内查找 ───────────────────────────────────────
+ * 贴在顶栏下方、transcript 上方，不浮在内容上——浮层会挡住你正在找的东西。
+ */
+.findbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  padding: 6px var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sunken);
+}
+
+.findbar__input {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+  padding: 4px var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.findbar__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 一个都没找到时把输入框本身标红：比在旁边加一行字更快被看见 */
+.findbar__input--empty {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.findbar__count {
+  min-width: 52px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.findbar__btn {
+  padding: 2px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: default;
+}
+
+.findbar__btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ── @ 文件引用的候选列表 ─────────────────────────────
+ * 悬在输入框**上方**：输入框已经贴着窗口底边，往下弹会被裁掉。
+ */
+.mentions {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(460px, 100%);
+  max-height: 260px;
+  /* 和 `.slash` 同一条：一张选择列表横着滚是没有道理的 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--sp-1);
+  /* 和别的浮层用同一套 token。写死一份的话，深色下这一个的阴影
+     只有 14% 而别的是 55%——`@` 列表会是唯一一个和背景糊在一起的浮层 */
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.mentions__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 4px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.mentions__row--active {
+  background: var(--bg-active);
+}
+
+.mentions__name {
+  flex: none;
+  font-weight: 500;
+}
+
+/* 目录压成次级信息并允许被挤掉——找的是文件名 */
+.mentions__dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+
+/* 次要按钮：文字的、轻的。对比视图的「退出对比」「接着用这边」用它。
+   顶栏那种一眼就懂的动作用 `.iconbtn`，这里的需要文字说清楚 */
+.tbtn {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  cursor: default;
+}
+
+.tbtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* ── 空会话 ───────────────────────────────────────────
+ * 空白的正文区技术上没错，但它分不出「新会话 / 正在加载 / 坏了」三种情况。
+ * 见 components/Transcript.tsx 的 Blank。
+ */
+.blank {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 55vh;
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+}
+
+/* 冷启动时那一圈在转。**不复用 `.row__spin`**——那条带着行内的外边距，
+   落到这个 62px 的圆里会把图标推偏 */
+.blank__glyph--spin svg {
+  animation: row-spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blank__glyph--spin svg {
+    animation: none;
+  }
+}
+
+.blank__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-faint);
+}
+
+/* 整个界面的视觉锚点。**必须够大**——15px 的一句话摆在一片空白中间，
+   那块地方就只是空着，没有重量 */
+.blank__title {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.blank__title strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 路径用等宽：它是要被读准的东西，比例字体下 l/1/I 分不清 */
+.blank__path {
+  margin: var(--sp-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+}
+
+/* ── 回到底部 ─────────────────────────────────────────
+ * 只在没贴底时出现。这才是「逃生口不该跟着内容滚走」的正确解法——
+ * 不是把状态行钉在底部（那会让「它在想什么」离对话十万八千里），
+ * 而是给一条回去的路。抄 dsh 的 `toBottom`。
+ */
+.tobottom {
+  position: sticky;
+  bottom: var(--sp-3);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+
+.tobottom:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* 侧栏行里的转圈：那个会话还在跑 */
+/* 转圈。
+ *
+ * **内边距绝不能加在被旋转的元素上。** 原来这里写了 `padding-right: 4px`，
+ * 而 `transform: rotate()` 绕的是**边框盒中心**——非对称内边距把图形的视觉中心
+ * 推离旋转中心 2px，于是它不是在原地转，是**绕着一个偏心点画圈**。
+ * 一眼看上去就是「这个加载图标是歪的」。
+ *
+ * 间距全部改用外边距：外边距不进变换盒。
+ *
+ * `align-items: center` 也不能少：flex 容器默认 `stretch`，会把 svg 拉到行高，
+ * 而 svg 保持宽高比——**宽度跟着变**，于是给定 12 实际渲染 13，
+ * 笔画补偿按 12 算就对不上了（实测视觉笔画 1.35，而全场是 1.25）。 */
+.row__spin {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin: 0 4px 0 var(--sp-2);
+  color: var(--text-faint);
+  animation: row-spin 900ms linear infinite;
+}
+
+@keyframes row-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 展开箭头。**转动写在这里而不是行内 style**：行内的那条
+   `prefers-reduced-motion` 盖不住，而它是这套界面里唯一一条规则体系之外的过渡 */
+.chev {
+  transition: transform var(--dur) var(--ease);
+}
+
+.chev--open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}
+
+/* 展开箭头。**转动写在这里而不是行内 style**：行内那条
+   `prefers-reduced-motion` 盖不住，而它曾是这套界面里唯一一条规则体系之外的过渡 */
+.chev {
+  transition: transform var(--dur) var(--ease);
+}
+
+.chev--open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row__spin {
+    animation: none;
+  }
+}

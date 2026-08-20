@@ -1,5 +1,40 @@
 import { useEffect, useRef } from "react"
 
+const FOCUSABLE = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",")
+
+function focusable(box: HTMLElement): readonly HTMLElement[] {
+  return [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (node) => node.getAttribute("aria-hidden") !== "true" && !node.hasAttribute("inert"),
+  )
+}
+
+function trapTab(event: KeyboardEvent, box: HTMLElement): void {
+  if (event.key !== "Tab") return
+  const nodes = focusable(box)
+  if (nodes.length === 0) {
+    event.preventDefault()
+    box.focus()
+    return
+  }
+  const first = nodes[0]
+  const last = nodes[nodes.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !box.contains(active))) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first?.focus()
+  }
+}
+
 /**
  * 模态的键盘契约：**Esc 关掉，打开时焦点落进来**。
  *
@@ -15,26 +50,32 @@ import { useEffect, useRef } from "react"
  * **设置面板会抢在里层浮层之前把自己关掉**：你想关的是刚点开的那个下拉。
  * 「谁先注册谁先收到」只在同一个节点上成立。
  *
- * ## 不做焦点陷阱
- *
- * Tab 仍然会走出面板。做陷阱要接管一整套焦点顺序，而这个面板背后是个静止的界面，
- * 走出去的代价远小于一套自己维护的焦点环——真需要时单独做，不夹在这里。
+ * `aria-modal` 的行为也在这里兑现：Tab 留在面板里，卸载时焦点回到触发器。
  */
 export function useModalKeys(onClose: () => void): React.RefObject<HTMLDivElement | null> {
   const box = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose)
+  close.current = onClose
   useEffect(() => {
-    // 打开就把焦点收进来：不收的话焦点还留在触发它的那颗按钮上，
-    // Esc 之外的键（Tab）会从界面另一头开始走
+    const origin =
+      document.activeElement instanceof HTMLElement ? document.activeElement : undefined
     box.current?.focus()
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") return
-      event.stopPropagation()
-      onClose()
+      const current = box.current
+      if (current === null) return
+      if (event.key === "Escape") {
+        event.preventDefault()
+        event.stopPropagation()
+        close.current()
+        return
+      }
+      trapTab(event, current)
     }
     window.addEventListener("keydown", onKey)
     return () => {
       window.removeEventListener("keydown", onKey)
+      if (origin?.isConnected === true) origin.focus()
     }
-  }, [onClose])
+  }, [])
   return box
 }

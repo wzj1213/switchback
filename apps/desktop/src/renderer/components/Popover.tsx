@@ -38,6 +38,8 @@ export interface PopoverProps {
   children: React.ReactNode
   /** 面板最小宽度；不给就跟着内容。 */
   minWidth?: number
+  /** 非菜单浮层必须给名字；有值时外壳按非模态 dialog 暴露。 */
+  ariaLabel?: string
 }
 
 interface Placement {
@@ -47,6 +49,40 @@ interface Placement {
 
 const GAP = 6
 const MARGIN = 8
+const MENU_ITEM = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
+const FOCUSABLE = `button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])`
+
+function menuItems(panel: HTMLElement): readonly HTMLElement[] {
+  return [...panel.querySelectorAll<HTMLElement>(MENU_ITEM)].filter(
+    (item) => !item.hasAttribute("disabled"),
+  )
+}
+
+function focusPanel(panel: HTMLElement): void {
+  const items = menuItems(panel)
+  const selected = items.find((item) => item.getAttribute("aria-checked") === "true")
+  ;(selected ?? items[0] ?? panel.querySelector<HTMLElement>(FOCUSABLE) ?? panel).focus()
+  selected?.scrollIntoView({ block: "nearest" })
+}
+
+function moveMenuFocus(panel: HTMLElement, key: string): boolean {
+  const items = menuItems(panel)
+  if (items.length === 0) return false
+  const current = items.indexOf(document.activeElement as HTMLElement)
+  const last = items.length - 1
+  const next =
+    key === "Home"
+      ? 0
+      : key === "End"
+        ? last
+        : key === "ArrowDown"
+          ? (current + 1) % items.length
+          : current <= 0
+            ? last
+            : current - 1
+  items[next]?.focus()
+  return true
+}
 
 /** 贴着鼠标点弹。**默认往右下**，装不下才翻——右下是光标的自然去向。 */
 function placeAtPoint(point: { x: number; y: number }, panel: HTMLElement): Placement {
@@ -68,7 +104,15 @@ function place(anchor: HTMLElement, panel: HTMLElement): Placement {
   return { left, top }
 }
 
-export function Popover({ open, onClose, anchor, at: point, children, minWidth }: PopoverProps): React.JSX.Element | null {
+export function Popover({
+  open,
+  onClose,
+  anchor,
+  at: point,
+  children,
+  minWidth,
+  ariaLabel,
+}: PopoverProps): React.JSX.Element | null {
   const panel = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState<Placement | undefined>(undefined)
 
@@ -87,16 +131,9 @@ export function Popover({ open, onClose, anchor, at: point, children, minWidth }
     setAt(place(anchor, panel.current))
   }, [open, anchor, point, children])
 
-  /**
-   * 打开时把选中项滚进视野。
-   *
-   * 三十几个模型的面板打开时停在顶部，当前用的那个可能在第 20 行——
-   * 用户要先滚一遍才知道自己现在用的是什么。**一个要先找才看得见当前值的
-   * 选择器，等于没有当前值。**
-   */
   useEffect(() => {
-    if (!open) return
-    panel.current?.querySelector('[aria-checked="true"]')?.scrollIntoView({ block: "nearest" })
+    if (!open || at === undefined || panel.current === null) return
+    focusPanel(panel.current)
   }, [open, at])
 
   useEffect(() => {
@@ -108,10 +145,18 @@ export function Popover({ open, onClose, anchor, at: point, children, minWidth }
       onClose()
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") return
+      if (event.key === "Escape") {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+        anchor?.focus()
+        return
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return
+      if (panel.current === null || !panel.current.contains(event.target as Node | null)) return
+      if (!moveMenuFocus(panel.current, event.key)) return
+      event.preventDefault()
       event.stopPropagation()
-      onClose()
-      anchor?.focus()
     }
     // capture：浮层要在别人处理之前先决定关不关
     document.addEventListener("pointerdown", onPointer, true)
@@ -132,7 +177,9 @@ export function Popover({ open, onClose, anchor, at: point, children, minWidth }
          挂在类上今天碰巧不出事，但哪天有人把它改成 `useEffect`，
          动画就在看不见的那一帧里跑完了——而且不报错 */
       data-placed={at === undefined ? "false" : "true"}
-      role="dialog"
+      {...(ariaLabel === undefined
+        ? {}
+        : { role: "dialog" as const, "aria-label": ariaLabel, tabIndex: -1 })}
       style={{
         // 位置没算出来之前先藏着，别让它在左上角闪一下
         visibility: at === undefined ? "hidden" : "visible",

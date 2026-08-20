@@ -1,0 +1,397 @@
+/* 输入区右下角那颗圆键：闲着是「发送」，跑着是「停止」。
+   同一个位置换形状而不是换文字——手已经知道往哪儿点了，别让它重新找 */
+.send {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  /* **近黑不是主色。** tokens.css 开头那条「强调色只用于焦点与链接；
+     主按钮用近黑，不用彩色」写在那儿，而这颗键一直是蓝的——
+     同一个组件里第三态（「继续」）走的 `.btn--primary` 又是近黑，一个控件两套规矩。
+     对比度 17.96:1（浅）/ 15.16:1（深），和 `.btn--primary` 完全一致 */
+  background: var(--text);
+  color: var(--text-inverse);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+.send:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.send:disabled {
+  background: var(--bg-hover);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+/* 停止不用主键那份重量：主键是「往前走」，而停止是打断 */
+.send--stop {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.send--stop:hover:not(:disabled) {
+  background: var(--bg-active);
+}
+
+/* ── `/` 命令面板 ────────────────────────────────────
+ * 形制照 codex 那张：一列图标锚住左边、一列人话名字、说明右对齐。
+ *
+ * 上一版三处不对，对着截图一条条改的：
+ * 1. 名字用了小号等宽——技术感、发挤。codex 那列是**正常字号的正文字体**，
+ *    因为人扫的是「哪件事」，不是在认标识符。
+ * 2. 每行挂一个 `omni` 灰角标。十行十个角标，说的还是同一件事。改用图标区分。
+ * 3. **横向滚动条**：命令名 `flex:none` 不肯缩，遇到 `/__remote-workflow`
+ *    这种长名字就把整行撑破。现在名字也能缩，而且面板 `overflow-x: hidden`
+ *    ——一张选择列表横着滚是没有道理的。
+ */
+.slash {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(680px, 100%);
+  max-height: 320px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--sp-2);
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.slash__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-width: 0;
+  padding: 6px var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 键盘光标和鼠标 hover **不是一回事**，撞在同一档上时，深色下键盘高亮
+   相对面板底只有 ΔL*=2.9——等于看不见自己选到哪儿了。`@` 列表本来就是分开写的 */
+.slash__row:hover {
+  background: var(--bg-hover);
+}
+
+.slash__row:active {
+  background: var(--bg-press);
+}
+
+.slash__row--active {
+  background: var(--bg-active);
+}
+
+.slash__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  color: var(--text-muted);
+}
+
+.slash__row--active .slash__icon {
+  color: var(--text);
+}
+
+/* 名字这一列：**可以缩，而且有上限**。
+   不能缩的话，`/__remote-workflow` 这种长名字会把整行撑出横向滚动条；
+   不封顶的话，`/auto-mode-setup [--request-id <uuid>] {--wizard posture=…}`
+   这种带一长串参数提示的会把说明挤成零宽——那一行等于只剩半句参数。 */
+.slash__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 名字里被你打中的那几个字。**只加重，不换颜色也不加底色**：
+   一行里已经有三种深浅（名字、参数提示、说明），再来一种颜色就成了圣诞树；
+   而「这几个字是我打的」用字重说最省——眼睛本来就先看到重的那一处 */
+.slash__hit {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 引擎技能的真名（`/berth-adopt`），跟在中文名后面。
+   淡一档、小一号：它是「打进去会变成什么」，不是这一行的主语 */
+.slash__slug {
+  margin-left: 6px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 分节抬头。照 codex 那张：小字、灰、贴在这一节第一条上面。
+   上一版是在交界处画一道横线——线只说「这儿变了」，说不出变成了什么 */
+.slash__head {
+  padding: 5px var(--sp-2) 3px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.slash__head:not(:first-child) {
+  margin-top: 5px;
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
+}
+
+/* 「个人 / 系统」贴最右。**不许缩**——它只有两个字，
+   一旦参与压缩就会被截成「个…」，那还不如不画 */
+.slash__scope {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 参数提示比命令名淡：它是「还要填什么」，不是命令本身 */
+.slash__args {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 说明贴右，一行为限。**它是次要的**——先扫左边那列，扫到了才往右看一眼。
+   `flex: 1 1 0` 让它优先被压缩：宁可说明截断，也别让名字先没 */
+.slash__desc {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 排队中的那句话 ──────────────────────────────────
+ * 打完回车就消失的话，人会以为发出去了——而它还躺在队列里。
+ * 摆在输入框正上方（和「N 个文件已更改」同一条带子上），它属于「还没发生的事」。
+ */
+.queued {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: min(760px, 100%);
+  margin: 0 auto var(--sp-2);
+  padding: 4px var(--sp-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.queued__badge {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.queued__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「立刻插入」和「撤回」都走 `.act`（items.css）：一个把话往前推、
+   一个把话收回来，视觉上同一档重量。这里只补它们在排队条里的位置 */
+.queued__act,
+.queued__drop {
+  flex: none;
+}
+
+/* 额度提示。**只在快用完时出现**，所以不需要"平时不打扰"的低调处理——
+   它出现本身就是信息 */
+.limit {
+  -webkit-app-region: no-drag;
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 打满了是**另一件事**：不是「快了」，是「现在发不出去」 */
+.limit--blocked {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+
+/* 输入框上方那排附件。贴完图什么都不变的话，人不知道它收没收到——
+   而这件事出错的方式恰好是「静默地没收到」 */
+.attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  /* 上边留出 6px：删除按钮压在缩略图右上角**外面**，
+     不留的话它会顶到上一行去，被输入框的圆角切掉半个 */
+  margin: 6px 0 var(--sp-2);
+}
+
+/* 缩略图。× 压在右上角**外面一点**——压在图里会盖住内容，
+   而被盖住的往往正是你想确认的那一角 */
+.thumb {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.thumb__hit {
+  display: block;
+  overflow: hidden;
+  max-width: 72px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  cursor: zoom-in;
+}
+
+.thumb__hit img {
+  display: block;
+  /* 盒子固定 72 见方（排出来是整齐的一行），但图**完整装进去**不裁。
+     裁成方块的话，一张宽截图只剩中间那一块——而你要确认的
+     恰恰是「这张是不是我想发的那张」，被裁掉的部分往往正是判据 */
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+/* 打不开时的退路：显示文件名，而不是一个破图框 */
+/* 还没取到时的占位。**尺寸和最终那张图逐字一致**——差一点，图一到位
+   整排附件就往下顶（实测 37.6px）。不加扫光动画：两百毫秒就结束了，
+   一块静态灰底够用，而一刻不停的动画会持续抢注意力 */
+.thumb__skel {
+  display: block;
+  width: 72px;
+  height: 72px;
+  background: var(--bg-sunken);
+}
+
+.thumb__name {
+  display: block;
+  overflow: hidden;
+  max-width: 72px;
+  padding: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 深色实心圆 + 白叉，压在右上角。
+   **不能用描边浅色**：缩略图底下什么颜色都有，浅色的叉在浅色截图上直接消失
+   ——实测白底截图上那颗几乎看不见 */
+.thumb__drop {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  /* 一圈底色的描边：贴着别的缩略图时也分得开 */
+  border: 2px solid var(--bg-raised);
+  border-radius: 999px;
+  background: rgb(24 24 27 / 88%);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.thumb__drop:hover {
+  background: var(--danger);
+}
+
+/* 全屏看图。点哪儿都能关，所以整块都是 zoom-out */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  background: rgb(0 0 0 / 72%);
+  cursor: zoom-out;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius);
+  object-fit: contain;
+}
+
+.lightbox__miss {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 记录里的附件：跟在那句话下面 */
+.msg__attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: 5px;
+}
+
+/* 头像。底部那一行左边那枚——**它是这一行唯一的图形**，
+ * 所以尺寸和字重都得压住：再大一点就成了侧栏里最抢眼的东西，
+ * 而它说的只是「你是谁」。
+ */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 剩余额度贴右。快见底时标黄——**不标红**：红是「已经出事了」，
+   而这只是「快了」，顶栏那枚警报才是出事时的那一个 */
+.row__aside--warn {
+  color: var(--warn);
+}
+
+/* 接过来的会话，空态里那句说明。**比标题窄**：它是一段要读的话，
+   不是一行标语，太宽了眼睛要横跳 */
+.blank__note {
+  max-width: 30em;
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: left;
+}

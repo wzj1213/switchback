@@ -1,9 +1,11 @@
 import type { ThreadRow } from "@omni/store"
 import { tallyOf, type Group } from "../sidebar.js"
-import { ChevronIcon, EllipsisIcon, FolderIcon, PlusIcon, SpinnerIcon } from "./icons.js"
+import { ChevronIcon, FolderIcon, SpinnerIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
+import { moveKeyProps } from "../moveKey.js"
+import { GroupActions } from "./SidebarGroupActions.js"
 
 /*
  * 一个项目：标题行 + 它底下的会话。
@@ -26,6 +28,8 @@ export function GroupBlock({
   drag,
   pinned,
   onDropOnProject,
+  onMove,
+  onMoveThread,
 }: {
   group: Group
   /** 拖动接线。传下去这一组的会话就能互相排序；项目行自己也能拖。 */
@@ -34,6 +38,8 @@ export function GroupBlock({
   pinned?: boolean
   /** 另一个项目落在这一行上：排序。 */
   onDropOnProject?: (cwd: string) => void
+  onMove?: (direction: -1 | 1) => void
+  onMoveThread?: (id: string, direction: -1 | 1) => void
   collapsed: boolean
   selectedId: string
   onToggle: () => void
@@ -59,6 +65,7 @@ export function GroupBlock({
         onToggle={onToggle}
         onNewIn={onNewIn}
         onGroupMenu={onGroupMenu}
+        {...(onMove === undefined ? {} : { onMove })}
       />
       {collapsed ? null : group.rows.length === 0 ? (
         // **空项目也要说句话。** 打开一个文件夹之后它就在这儿了，但还没有会话——
@@ -66,22 +73,25 @@ export function GroupBlock({
         <p className="sidebar__empty">还没有会话。点这一行右边的 + 开一条。</p>
       ) : (
         group.rows.map((row) => (
-            <Row
-              key={row.thread.id}
-              row={row}
-              selected={row.thread.id === selectedId}
-              onSelect={() => {
-                onSelect(row.thread.id)
-              }}
-              onDelete={() => {
-                onDelete(row.thread.id)
-              }}
-              rename={rename}
-              {...(drag === undefined ? {} : { drag })}
-              onMenu={(e, arm, ren) => {
-                onRowMenu(e, row, arm, ren)
-              }}
-            />
+          <Row
+            key={row.thread.id}
+            row={row}
+            selected={row.thread.id === selectedId}
+            onSelect={() => {
+              onSelect(row.thread.id)
+            }}
+            onDelete={() => {
+              onDelete(row.thread.id)
+            }}
+            rename={rename}
+            {...(onMoveThread === undefined
+              ? {}
+              : { onMove: (direction: -1 | 1) => onMoveThread(row.thread.id, direction) })}
+            {...(drag === undefined ? {} : { drag })}
+            onMenu={(e, arm, ren) => {
+              onRowMenu(e, row, arm, ren)
+            }}
+          />
         ))
       )}
     </div>
@@ -140,6 +150,7 @@ function GroupHead({
   onToggle,
   onNewIn,
   onGroupMenu,
+  onMove,
 }: {
   group: Group
   /** 拖动接线。项目行自己也能拖——见 `useThreadDrag` 那张表。 */
@@ -153,73 +164,58 @@ function GroupHead({
   onToggle: () => void
   onNewIn: (cwd: string) => void
   onGroupMenu: (event: React.MouseEvent, group: Group) => void
+  onMove?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const { running, waiting, unread } = tallyOf(group)
   const unreadLabel = `${String(unread)} 条跑完了还没看`
   return (
-        <div
-          className={`row row--group${drag?.over === group.cwd ? " row--dropping" : ""}`}
-          title={group.cwd}
-          {...projectDrag(group.cwd, pinned === true, drag, onDropOnProject)}
-          onContextMenu={(e) => {
-            onGroupMenu(e, group)
-          }}
-        >
-          <button type="button" className="row__main" onClick={onToggle}>
-            <span className="row__slot">
-              <ChevronIcon open={!collapsed} size={SIDEBAR_ICON} />
-            </span>
-            <span className="row__lead">
-              {/* 设过图标就用它——**一列长得一样的文件夹图标里，
+    <div
+      className={`row row--group${drag?.over === group.cwd ? " row--dropping" : ""}`}
+      title={group.cwd}
+      {...projectDrag(group.cwd, pinned === true, drag, onDropOnProject)}
+      onContextMenu={(e) => {
+        onGroupMenu(e, group)
+      }}
+    >
+      <button type="button" className="row__main" {...moveKeyProps(onMove)} onClick={onToggle}>
+        <span className="row__slot">
+          <ChevronIcon open={!collapsed} size={SIDEBAR_ICON} />
+        </span>
+        <span className="row__lead">
+          {/* 设过图标就用它——**一列长得一样的文件夹图标里，
                   一眼认出哪个是哪个**，这就是它要解决的全部问题 */}
-              {icon === undefined ? <FolderIcon size={SIDEBAR_ICON} /> : <span className="row__emoji">{icon}</span>}
-            </span>
-            <span className="row__label">{group.label}</span>
-            {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
+          {icon === undefined ? (
+            <FolderIcon size={SIDEBAR_ICON} />
+          ) : (
+            <span className="row__emoji">{icon}</span>
+          )}
+        </span>
+        <span className="row__label">{group.label}</span>
+        {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
                 展开时每行自己会转圈，这里就不重复了 */}
-            {collapsed && waiting > 0 ? (
-              <span className="row__wait" aria-label={`${String(waiting)} 个等你批`}>
-                待批
-              </span>
-            ) : null}
-            {collapsed && running > 0 ? (
-              <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
-                <SpinnerIcon />
-              </span>
-            ) : null}
-            {/* 跑完了还没看的。**不摆数字**：右边已经有一个数（会话条数），
+        {collapsed && waiting > 0 ? (
+          <span className="row__wait" aria-label={`${String(waiting)} 个等你批`}>
+            待批
+          </span>
+        ) : null}
+        {collapsed && running > 0 ? (
+          <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
+            <SpinnerIcon />
+          </span>
+        ) : null}
+        {/* 跑完了还没看的。**不摆数字**：右边已经有一个数（会话条数），
                 两个数字挨着谁也说不清哪个是哪个——一颗点说「里面有新东西」就够 */}
-            {collapsed && unread > 0 ? (
-              <span className="row__dot row__dot--unread" role="img" aria-label={unreadLabel} title={unreadLabel} />
-            ) : null}
-            <span className="row__count">{group.rows.length}</span>
-          </button>
-          {/* **在这个项目里新建**——直达。原来只能走「右键 → 在此新建会话」，
-              而右键是看不见的路 */}
-          <button
-            type="button"
-            className="row__act"
-            aria-label={`在 ${group.label} 新建会话`}
-            title={`在 ${group.cwd} 新建会话`}
-            onClick={() => {
-              onNewIn(group.cwd)
-            }}
-          >
-            <PlusIcon size={SIDEBAR_ICON} />
-          </button>
-          {/* 项目这一行也给一个「更多」。右键菜单一直都有，但**看不见的功能等于没有**——
-              没人会去右键一个看起来只是分组标题的东西 */}
-          <button
-            type="button"
-            className="row__act"
-            aria-label="项目操作"
-            title="项目操作"
-            onClick={(e) => {
-              onGroupMenu(e, group)
-            }}
-          >
-            <EllipsisIcon size={SIDEBAR_ICON} />
-          </button>
-        </div>
+        {collapsed && unread > 0 ? (
+          <span
+            className="row__dot row__dot--unread"
+            role="img"
+            aria-label={unreadLabel}
+            title={unreadLabel}
+          />
+        ) : null}
+        <span className="row__count">{group.rows.length}</span>
+      </button>
+      <GroupActions group={group} onNewIn={onNewIn} onMenu={onGroupMenu} />
+    </div>
   )
 }

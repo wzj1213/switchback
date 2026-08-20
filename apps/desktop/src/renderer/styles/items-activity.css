@@ -1,0 +1,262 @@
+/* transcript 内各类 item 的呈现。所有颜色走 token，不得出现字面量。 */
+
+/*
+ * 用户消息靠右。
+ *
+ * 上一版写了 `align-self: flex-end` 但**从来没生效过**——它的父节点是
+ * `Copyable` 那层 div，不是 flex 容器，所以那行声明落在了一个没人看的地方，
+ * 屏幕上一直是一块左对齐的 82% 宽色块。
+ *
+ * 现在让 `Copyable` 自己也参与列排布（`app.css` 的 `.copyable`），
+ * 靠右这件事才真的成立。codex 也是靠右的——提问和回答分列两侧，
+ * 一眼就能扫出「这段是我说的」。
+ */
+/*
+ * 82% → 72%，去掉描边，底色深一档，字号进正文那一档。见 tokens 的 `--bg-said`。
+ * 窄一点不是为了好看：82% 的气泡和满宽的回答几乎一样宽，**「靠右」这个
+ * 唯一的身份信号就被稀释了**——右边只剩不到 140px 的空隙在说这件事。
+ */
+.msg--user {
+  max-width: 72%;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background: var(--bg-said);
+  font-size: var(--text-prose);
+  line-height: var(--lh-prose);
+  white-space: pre-wrap;
+}
+
+/* 注意：这里**不能**有 white-space: pre-wrap。内容是 Markdown 渲染出的元素树，
+   pre-wrap 会把标签之间的换行符当成真实换行，每个块级元素之间凭空多出一整行。
+   字面量文本只剩用户消息（.msg--user），pre-wrap 留在那里。 */
+/* 回答是这一屏最该被读完的东西，给它自己那一档字号（见 tokens 的 `--text-prose`）。
+   `.md` 自己不设字号，所以整棵 Markdown 树跟着继承；`pre code` 和表格
+   各有各的 token，不受影响。 */
+.msg--agent {
+  min-width: 0;
+  font-size: var(--text-prose);
+  line-height: var(--lh-prose);
+}
+
+/* ── 工具活动：扁平行 + 左轨，不是一摞卡片 ──────────────── */
+/*
+ * **整组不缩进。** 上一版是 `padding-left: 12 + border-left: 1`，于是工具行的
+ * 图标从 13 起、文字从 37 起，而同样是「它在干活」的思考行图标在 0、文字在 24。
+ * 两条边差 13px，`--step-slot` 那条注释说的「展开出来的东西都对着这一条槽」
+ * 只在 `.run` 内部成立——因为 `.run` 自己被推开了。
+ *
+ * 现在整个转录区横向只有两个值：**0**（正文与所有行的图标列）
+ * 和 **`--step-slot`（24，一切文字）**。轨线改到展开出来的内容上（见 `.step__out`
+ * 的邻居们），落在图标中线 8 上——那才是它该挂的地方。
+ */
+.run {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.step {
+  display: flex;
+  /* **不能是 baseline**：图标是 svg，没有基线，会掉到文字基线以下。
+     换 center 之后图标和文字在同一条中线上 */
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  text-align: left;
+}
+
+.step--open {
+  cursor: default;
+}
+
+.step--open:hover {
+  color: var(--text);
+}
+
+/* 图标槽。**固定宽度**——五种图标画的东西不一样宽，靠居中把它们对到同一列 */
+.step__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--step-icon);
+  color: var(--text-faint);
+}
+
+.step--open:hover .step__icon {
+  color: var(--text-muted);
+}
+
+.step__target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 展开提示。**右侧沟槽留给它**，所以状态不能再用 margin-left:auto 甩过去 */
+/* 「读文件」那种行的路径可点。样式和 diff 文件头那份是同一套（见 diff.css） */
+.step__target--go {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.step__target--go:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.step__chev {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.step--open:hover .step__chev {
+  color: var(--text-muted);
+}
+
+/* 状态紧跟在命令后面。
+   上一版是 `margin-left: auto`，把它甩到离命令三百多像素的地方——
+   读起来像另一张表的一列，而它说的是这一行的事 */
+.step__state {
+  flex: none;
+  margin-left: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/*
+ * 上一版这两个挂在同一条规则上、值是 `--text-faint`——**而基础样式本来就是
+ * 那个值**，也就是说这条规则一个像素都没改过。下面那句注释只替「中断」辩护，
+ * 「失败」是被顺手扫进同一个选择器组的。
+ *
+ * 结果：一条 40 行的工具日志里第 17 行崩了，屏幕上没有任何东西标它。
+ */
+.step__state--failed {
+  color: var(--danger);
+}
+
+/* 一行里只有两个字变色，扫的时候还是容易漏，图标一起染 */
+.step:has(.step__state--failed) .step__icon {
+  color: var(--danger);
+}
+
+/* 中断不是失败：用中性色，别让「你自己按了停止」看着像出错 */
+.step__state--interrupted {
+  color: var(--text-faint);
+}
+
+.step__state--denied {
+  color: var(--danger);
+}
+
+/* **不用 `--warn`**：那个颜色留给「需要你做点什么」（侧栏的 waiting 点、
+   额度告急、更新失败）。也不能用 `--ok`——同一格里绿色已经是「新增行数」的意思 */
+.step__state--running {
+  color: var(--text-muted);
+}
+
+/* 计划卡上那一句引擎自己写的理由。跟「计划」二字同一行，
+   压成弱色小字——它是旁注，不该跟下面的步骤抢注意力。
+   会很长，所以单行截断，不让它把标题行撑成一段 */
+.step__note {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--sp-2);
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 挂在轨上：盒子从图标中线（8）起，左边一道 1px，内边距把文字送到 24 那条列。
+   左侧圆角去掉——它贴着轨，圆角会让轨和盒之间露出一道月牙 */
+.step__out {
+  margin: 2px 0 var(--sp-2);
+  margin-left: calc(var(--step-icon) / 2 - 1px);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--step-slot) - var(--step-icon) / 2);
+  border-left: 1px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  /* 任意处折行，不要让人横着读报错。横滚的白名单在 app.css 那条注释里
+     （`.md pre` 和 `.md__scroll`），工具输出不在上面 */
+  overflow-wrap: anywhere;
+  /* **必须显式写**：两轴只有一个非 visible 时另一轴按 auto 算，
+     光删 overflow-x 会让这个盒子直接溢出压住下面的对话。
+     这条防御和上一版一样必要，换掉的是它旁边那句 `overflow-y: auto`——
+     **内滚这个决定本身**（见 ToolRun.tsx 的 `Output`） */
+  overflow: hidden;
+}
+
+/* 夹断态：12 行，底下渐隐收口。渐变收到 `--bg-code` 而不是 `--bg`——
+   它盖的是这个盒子自己的底色，收错了会在末尾露出一道浅边 */
+.step__out--clip {
+  position: relative;
+  max-height: calc(12 * 1.55 * var(--text-code));
+}
+
+.step__out--clip::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--bg-code));
+  pointer-events: none;
+}
+
+/* 「展开全部（还有 N 行）」。对着 24 那条文字列，和上面那段输出同一条边 */
+.step__more {
+  margin: 0 0 var(--sp-2) var(--step-slot);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: default;
+}
+
+.step__more:hover {
+  color: var(--text);
+}
+
+.diffstat__add {
+  color: var(--ok);
+}
+
+.diffstat__del {
+  color: var(--danger);
+}
+
+/* 运行中的实时尾部：比展开态更淡，暗示"这是正在发生的事，不是最终结果" */
+.step__out--live {
+  color: var(--text-muted);
+  opacity: 0.85;
+}

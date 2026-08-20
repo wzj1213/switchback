@@ -78,7 +78,9 @@ function Item({
       <span className="pop__check">{selected ? <CheckIcon /> : null}</span>
       <span className="pop__text">
         <span className="pop__label">{choice.label}</span>
-        {choice.description === undefined ? null : <span className="pop__desc">{choice.description}</span>}
+        {choice.description === undefined ? null : (
+          <span className="pop__desc">{choice.description}</span>
+        )}
       </span>
       {choice.note === undefined ? null : <span className="pop__note">{choice.note}</span>}
     </button>
@@ -127,13 +129,19 @@ export function Select({
         <CaretIcon />
       </button>
       <Popover open={open} anchor={trigger.current} minWidth={220} onClose={close}>
-        <div role="menu">
+        <div role="menu" aria-label={title ?? label}>
           {shown === undefined ? (
             <Top sections={sections} reset={reset} onOpen={setPage} onClose={close} />
           ) : (
             <Page
               section={sections[shown]}
-              onBack={many ? () => { setPage(undefined) } : undefined}
+              onBack={
+                many
+                  ? () => {
+                      setPage(undefined)
+                    }
+                  : undefined
+              }
               onClose={close}
             />
           )}
@@ -215,7 +223,7 @@ function Page({
   return (
     <>
       {onBack === undefined ? null : (
-        <button type="button" className="pop__back" onClick={onBack}>
+        <button type="button" className="pop__back" role="menuitem" onClick={onBack}>
           <span className="pop__back-arrow" aria-hidden="true">
             ‹
           </span>

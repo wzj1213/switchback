@@ -152,6 +152,7 @@ function main(): void {
     lastSeenAt: at,
   }
   const tokens = createTokenStore({ load: () => [device], save: () => undefined, now: () => Date.now() })
+  const pairing = tokens.startPairing()
 
   void startRemote({
     config: () => ({ port: PORT, trustedHosts: TRUSTED, maxTrust: "auto-edit" }),
@@ -189,6 +190,7 @@ function main(): void {
   }).then(() => {
     console.log(`\nomni web harness: http://127.0.0.1:${String(PORT)}`)
     console.log(`令牌：${DEV_TOKEN}`)
+    console.log(`配对码：${pairing.code}`)
     console.log(`跳过配对：localStorage.setItem("omni.token", ${JSON.stringify(DEV_TOKEN)})\n`)
     if (process.argv.includes("--live")) live(ledger, sinks)
   })

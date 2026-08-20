@@ -5,6 +5,7 @@ import { Dot, RowEnd } from "./RowEnd.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
+import { moveKeyProps } from "../moveKey.js"
 
 /** 一行需要的拖放接线。状态在 `useThreadDrag`，这里只是把它接到 DOM 事件上。 */
 export interface RowDrag {
@@ -157,6 +158,7 @@ export function Row({
   onMenu,
   rename,
   drag,
+  onMove,
 }: {
   row: SidebarRow
   selected: boolean
@@ -178,6 +180,8 @@ export function Row({
    * 那时看到的顺序本来就不是真实顺序，拖出来的结果没法解释）。
    */
   drag?: RowDrag
+  /** `Alt+↑/↓` 与右键菜单共用的排序动作。 */
+  onMove?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const { thread } = row
   // 后台跑完、还没打开过的那条要**亮着**：整行提亮 + 状态点点起来（见 `RowEnd`）。
@@ -211,7 +215,13 @@ export function Row({
   }, [confirming])
   return (
     <div
-      className={rowClass({ flat, selected, unread, dragging: drag?.dragging === thread.id, dropping })}
+      className={rowClass({
+        flat,
+        selected,
+        unread,
+        dragging: drag?.dragging === thread.id,
+        dropping,
+      })}
       title={thread.cwd}
       {...dragProps(thread.id, thread.cwd, pinned, drag)}
       onContextMenu={(e) => {
@@ -221,7 +231,13 @@ export function Row({
       // 而知道的人不该为一个高频小动作绕一趟菜单
       onDoubleClick={startRename}
     >
-      <button type="button" className="row__main" aria-selected={selected} onClick={onSelect}>
+      <button
+        type="button"
+        className="row__main"
+        aria-selected={selected}
+        {...moveKeyProps(onMove)}
+        onClick={onSelect}
+      >
         <span className="row__slot">
           <Dot status={thread.status} unread={unread} />
         </span>

@@ -58,7 +58,7 @@ export function EnvCard({
   }, [bridge, thread.cwd])
 
   return (
-    <Popover open anchor={anchor} minWidth={260} onClose={onClose}>
+    <Popover open anchor={anchor} minWidth={260} ariaLabel="环境信息" onClose={onClose}>
       <div className="env">
         <div className="env__title">环境信息</div>
         <Line icon={<FolderIcon />} label="工作区">

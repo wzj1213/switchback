@@ -1,0 +1,151 @@
+/* ── 报错：人话在上，原文折在「详情」里 ──────────────
+ * 引擎原样吐出来的是一堵墙，但原文一个字都不能少——用户拿它去搜、
+ * 去开 issue，那时要的恰恰是我们觉得没用的那部分。见 components/Failure.tsx。
+ */
+.error__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.error__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.error__more {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  align-items: center;
+  opacity: 0.7;
+  font-size: var(--text-xs);
+}
+
+/*
+ * 引擎自己补的那句原因（codex 的 `additionalDetails`），跟在抬头下面。
+ *
+ * **压一档但不压到看不见**：它和上面那句是「为什么」和「怎么了」的关系，
+ * 不是同一句话的两种写法。重连那条的抬头是 `Reconnecting... 1/5`——
+ * 真正有信息的是这一行，把它压成背景噪声就等于白取了。
+ */
+.error__why {
+  margin: 2px 0 0;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+/* 原文可能很长、可能一行到底。**任意处折行**，不要让人横着读报错——
+   `pre-wrap` + `anywhere` 之下 min-content 被压到一个字符宽，
+   原来那条 `overflow-x: auto` 永远不会触发，是句空话 */
+.error__raw {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  overflow-y: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 分界线那一行：左边是「已处理 X」，右边挂「从这里重来」。
+   **负边距必须挂在这里**（`.transcript__inner` 的直接子节点），不能挂在
+   `.turnmark` 上——那是本行的一个 flex 项，`align-items: center` 对的是
+   外边距盒，值压的不是行距而是它自己在行内的位置：实测同一行的两样东西差 4px。
+
+   **上重下轻**：8（基数）+ 20 = 28 在上面，下面只有基数的 8。
+   分界线属于**它下面那一轮**，是表头不是页脚——上一版这里是 `-8`，
+   那是在跟一个 16px 的均匀 gap 较劲（见 `.transcript__inner`）*/
+.turnmark__row {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* 平时不显形——它是个岔路口，不该一直待在手边 */
+.turnmark__act {
+  opacity: 0;
+}
+
+.turnmark__row:hover .turnmark__act,
+.turnmark__act:focus-visible {
+  opacity: 1;
+}
+
+/**
+ * 侧问。**能力位报 false 时整个不存在**，所以这里不写「禁用」态——
+ * 没有那个状态。
+ */
+/** 侧问：和引擎/档位/模型同一排，同一种视觉重量——它们回答的是同一个问题。 */
+.composer__aside {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px var(--sp-2);
+  cursor: pointer;
+}
+
+.composer__aside:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.aside__empty {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.aside__pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+/** 问句压暗、答句正常：一屏里问答交替，靠明暗区分比靠标签省地方。 */
+.aside__q {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.aside__a {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.aside__input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: var(--sp-2);
+  resize: vertical;
+}

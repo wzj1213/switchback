@@ -40,12 +40,14 @@ export function TimelineCard({
 }): React.JSX.Element {
   const segments = thread.segments ?? []
   return (
-    <Popover open anchor={anchor} minWidth={420} onClose={onClose}>
+    <Popover open anchor={anchor} minWidth={420} ariaLabel="引擎时间线" onClose={onClose}>
       <div className="card">
         <div className="card__head">引擎时间线</div>
         {segments.length === 0 ? (
           // **说清为什么空**，别只写「暂无」：人会以为功能坏了
-          <p className="card__empty">还没有跑过。说一句话之后，这里会记下是哪家引擎跑的、记录在哪。</p>
+          <p className="card__empty">
+            还没有跑过。说一句话之后，这里会记下是哪家引擎跑的、记录在哪。
+          </p>
         ) : (
           segments.map((seg, i) => (
             <Segment

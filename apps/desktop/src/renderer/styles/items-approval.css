@@ -1,0 +1,228 @@
+/* ── 审批卡：整个产品的关键界面 ────────────────────────────
+ *
+ * 上一版是一个四边同重的方盒子（`--border-strong` 一圈 + 抬起的底色），
+ * 于是它在转录区里像**一块贴上去的补丁**：周围全是无边框的行，只有它带框。
+ * 现在换成「左侧一道琥珀色轨」的告示形制——
+ *
+ * - **左轨才是那句「轮到你了」**：颜色只出现在一条 3px 的边上，
+ *   比整圈描边安静，但因为是这一屏唯一的暖色，反而更抓得住眼。
+ *   同一个 `--warn` 在环境页标「待审核」，两处说的是同一件事。
+ * - 其余三边退到 `--border`（分节线那一档），不再和区块边界抢。
+ *
+ * 待批的这张仍然是全屏最重的东西；批完之后整张退成一行（见 `.approval--done`）。
+ */
+.approval {
+  container-type: inline-size;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+/*
+ * 正文可滚，**操作行在滚动区之外**。
+ * 模型给的命令和 diff 长度不受我们控制；不封顶的话，一条 200 行的补丁
+ * 会把「允许 / 拒绝」顶到屏幕外面去——那时候这张卡就没法用了。
+ */
+.approval__body {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-3) 0;
+}
+
+/* 抬头：一行小字 + 一枚盾。**不带感叹号也不加粗**——左轨已经在喊了 */
+.approval__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--sp-2);
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+
+/* 命令原文自成一块。字重回到常规：**底色已经把它和界面文字分开了**，
+   再加粗只是把同一件事说两遍（上一版是 500 + 无底色） */
+.approval__cmd {
+  display: block;
+  min-width: 0;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* 拦下来的理由。**去掉了「原因」那个标签**：它每张卡都出现、每张卡都说同一句，
+   而位置本身已经说清了这是脚注——省下的那半行让命令块喘得开 */
+.approval__reason {
+  margin-top: 6px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.approval__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+
+/* 「始终允许」推到最左：它是三档里影响最大的一个，
+   不该和「允许一次」挨在一起让人手滑 */
+.approval__always {
+  margin-right: auto;
+}
+
+.approval__split {
+  position: relative;
+  display: flex;
+}
+
+/* 分体按钮：主操作与下拉共用一个外轮廓，中间一道分隔线 */
+.approval__split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.approval__split-more {
+  margin-left: -1px;
+  padding-inline: 7px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-color: color-mix(in srgb, var(--text-inverse) 30%, transparent);
+}
+
+/* ── 批完之后：退回和工具行一样的一行 ────────────────────
+ * 卡片的重量是给「你现在要做个决定」用的。批完它就是历史，和上下那些
+ * `.step` 是同一类东西；继续摆一张带边框、带黑按钮的卡，一轮批三四次
+ * 整屏就是一摞盒子——而真正待批的那张反而被埋在里面。见 Approval.tsx 的 `Settled`。
+ */
+.approval--done {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 4px 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.approval__mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* 「已允许」**不染绿**：放行是常态，把常态染成彩色只是噪声。
+   「已拒绝」少见、且值得一眼看到，所以只有它带色 */
+.approval__verdict {
+  flex: none;
+}
+
+.approval__verdict--no {
+  color: var(--danger);
+}
+
+/* 命令截断而不是折行：这一行是索引，不是正文（和工具行同一条规矩） */
+.approval__done-cmd {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * 卡片自己变窄时（不是视口变窄）按钮改成竖排并拉满。
+ * 用容器查询而不是媒体查询：这张卡活在一个宽度会变的栏里，
+ * 跟视口宽度没关系。
+ */
+@container (max-width: 380px) {
+  .approval__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .approval__split {
+    width: 100%;
+  }
+
+  .approval__split-main {
+    flex: 1;
+  }
+
+  .kbd {
+    display: none;
+  }
+}
+
+/* ── 按钮 ───────────────────────────────────────────── */
+.btn {
+  padding: 5px var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  cursor: default;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+}
+
+/* 用 `--bg-active` 而不是 `--bg-press`：后者和这颗按钮自己的
+   `--border-strong` 描边只差 1.05:1，按下去边框会消失 */
+.btn:active {
+  background: var(--bg-active);
+}
+
+.btn--primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--text-inverse);
+  font-weight: 500;
+}
+
+.btn--primary:hover {
+  opacity: 0.88;
+  background: var(--text);
+}
+
+/* 近黑的主按钮没有「更深一档」可走，压透明度 */
+.btn--primary:active {
+  opacity: 0.78;
+}
+
+/* 终态错误：这一轮完了，值得一张卡 */
+.error {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/*
+ * 可恢复的错误：一行灰字。
+ *
+ * 实测 codex 断线时连发十条 `Reconnecting... N/5`，上一版每条都是一张整宽红卡，
+ * 十张叠起来把正文整个挤出屏幕——**而它们的意思是「还在试，你不用做什么」**。
+ * 视觉权重要配得上信息的分量。
+ */
+.error--soft {
+  padding: 2px 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}

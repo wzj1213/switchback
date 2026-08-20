@@ -1,0 +1,125 @@
+/* ── 拖动会话 ─────────────────────────────────────────
+ * 三条规则：同项目内随便排、不能跨项目、可以拖到置顶。
+ * 视觉上只需要说清两件事：**我拖的是哪一条**、**会落在哪儿**。
+ */
+.row--dragging {
+  opacity: 0.4;
+}
+
+/* 落点画在**上边缘**，因为放下的语义是「插到这一条前面」。
+   画成整行高亮的话，「前面」还是「后面」就说不清了 */
+.row--dropping {
+  box-shadow: inset 0 2px 0 0 var(--accent, var(--text));
+}
+
+/* 「置顶」整段都是落点——只让段头能放的话，那是一条 24 像素高的线，
+   而拖动时鼠标下面还压着一行，那种精度不该由用户来凑 */
+.sidebar__droppin {
+  border-radius: var(--radius-sm);
+}
+
+/* 一条都没置顶时这一段只剩一行段头，落点薄得没法瞄。垫一小截——
+   **而且必须常驻**：拖起来才垫的话，下面每一行都会往下挪，
+   而拖拽开始那一帧只要被拖的那一行动了，Chromium 就取消整次拖拽
+   （见 `SectionHead` 的 `hint`）。这也是它只垫 14px 的原因：
+   常驻的东西要付常驻的代价，够得着就行 */
+.sidebar__droppin--empty {
+  padding-bottom: 14px;
+}
+
+.sidebar__droppin--over {
+  background: color-mix(in srgb, var(--accent, var(--text)) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, var(--text)) 35%, transparent);
+}
+
+/* 「项目」那一段也是落点：**从置顶里拖出来的东西落在这儿就是取消置顶**。
+   和上面那一段同一套高亮——两段互为反向，视觉上就该长得一样 */
+.sidebar__dropproj {
+  border-radius: var(--radius-sm);
+}
+
+.sidebar__dropproj--over {
+  background: color-mix(in srgb, var(--accent, var(--text)) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, var(--text)) 35%, transparent);
+}
+
+/* 项目行自己也能拖（排序、进出置顶）。拖起来时淡一点，和会话行同一个手法 */
+.row--group[draggable="true"] {
+  cursor: default;
+}
+
+/* ── 引擎时间线 ─────────────────────────────────────
+ * 一条会话可能被好几家引擎跑过，每家在自己那边留一条独立记录。
+ * 这张卡片把它们摆出来：谁、句柄、原始记录在哪。
+ */
+.seg + .seg {
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+}
+
+.seg__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+/* 第几段。**编号是这张卡片的骨架**——「先 codex 后 claude 再 codex」
+   这件事靠顺序说清楚，而顺序要有个看得见的锚 */
+.seg__no {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.seg__engine {
+  font-weight: 500;
+}
+
+.seg__when {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.seg__line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.seg__label {
+  flex: none;
+  width: 4.5em;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 句柄和路径都长。**允许换行、等宽**——看全比排得齐要紧，
+   截断的路径复制不了、也认不出是哪条 */
+.seg__value {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.seg__none,
+.card__empty {
+  margin: 5px 0 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}

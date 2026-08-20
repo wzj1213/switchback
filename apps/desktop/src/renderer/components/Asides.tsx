@@ -58,6 +58,7 @@ export function Asides({
         open={open}
         anchor={anchor.current}
         minWidth={360}
+        ariaLabel="侧问"
         onClose={() => {
           setOpen(false)
         }}

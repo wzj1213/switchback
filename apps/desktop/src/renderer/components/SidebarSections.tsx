@@ -9,6 +9,7 @@ import { ForeignSection } from "./ForeignRow.js"
 import { PinnedSection } from "./SidebarPinned.js"
 import { ProjectsSection } from "./SidebarProjects.js"
 import type { RenameCtl } from "./RowName.js"
+import type { SidebarMoveActions } from "../sidebarMove.js"
 
 /**
  * 侧栏的三段：置顶 / 项目 / 最近。
@@ -75,7 +76,7 @@ export function SectionHead({
   )
 }
 
-export interface GroupHandlers {
+export interface GroupHandlers extends SidebarMoveActions {
   selectedId: string
   /** 这个项目现在是展开的吗。默认全折叠，见 `Sidebar.tsx`。 */
   isOpen: (cwd: string) => boolean
@@ -138,7 +139,13 @@ export interface GroupHandlers {
  * 这里**不挂项目名**（上一版挂了，因为那段是跨项目的）：
  * 这一段里的会话本来就没有项目。
  */
-function Chats({ rows, on }: { rows: readonly SidebarRow[]; on: GroupHandlers }): React.JSX.Element {
+function Chats({
+  rows,
+  on,
+}: {
+  rows: readonly SidebarRow[]
+  on: GroupHandlers
+}): React.JSX.Element {
   return (
     <>
       {rows.map((row) => (
@@ -177,8 +184,13 @@ function defaultOpen(key: string): boolean {
   return !key.startsWith("hist:")
 }
 
-
-export function SectionList({ sections, on }: { sections: Sections; on: GroupHandlers }): React.JSX.Element {
+export function SectionList({
+  sections,
+  on,
+}: {
+  sections: Sections
+  on: GroupHandlers
+}): React.JSX.Element {
   // 记的是「被人扳过的段」，不是「收起来的段」——默认值由 `defaultOpen` 说了算
   const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
   const toggle = (key: string): void => {
@@ -221,7 +233,11 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
         onToggle={() => {
           toggle("chat")
         }}
-        action={{ label: "新开一条对话", icon: <PlusIcon size={SIDEBAR_ICON} />, run: on.onNewChat }}
+        action={{
+          label: "新开一条对话",
+          icon: <PlusIcon size={SIDEBAR_ICON} />,
+          run: on.onNewChat,
+        }}
       />
       {open("chat") ? (
         sections.chats.length === 0 ? (

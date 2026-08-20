@@ -53,7 +53,9 @@ export function SidebarFoot({
         className={`foot__who${open ? " foot__who--open" : ""}`}
         // 没有账号时这一行**就是**设置，点了直接开——不弹一个只有一项的菜单
         title={account === undefined ? "设置" : hoverOf(account)}
-        {...(account === undefined ? {} : { "aria-haspopup": "menu" as const, "aria-expanded": open })}
+        {...(account === undefined
+          ? {}
+          : { "aria-haspopup": "menu" as const, "aria-expanded": open })}
         onClick={() => {
           if (account === undefined) onOpenSettings()
           else setOpen((was) => !was)
@@ -75,12 +77,14 @@ export function SidebarFoot({
       <UpdateButton />
       {account === undefined ? null : (
         <Popover open={open} anchor={trigger.current} minWidth={210} onClose={close}>
-          <div role="menu">
+          <div role="menu" aria-label="账号操作">
             {/* 身份再说一遍，连着额度——**「剩余 12%」单独摆出来是有歧义的**：
                 一台机器上换过号的人，第一个问题是「谁的 12%」 */}
             <div className="pop__head">
               <div className="pop__head-title">{account.label}</div>
-              {metaOf(account) === undefined ? null : <div className="pop__head-meta">{metaOf(account)}</div>}
+              {metaOf(account) === undefined ? null : (
+                <div className="pop__head-meta">{metaOf(account)}</div>
+              )}
             </div>
             <button
               type="button"
@@ -127,7 +131,10 @@ function initialOf(label: string): string {
 
 /** 菜单抬头第二行：套餐 · 还剩多少。两样都没有就不摆这一行。 */
 function metaOf(account: AccountLine): string | undefined {
-  const parts = [account.plan, account.remain === undefined ? undefined : `剩余 ${String(account.remain)}%`]
+  const parts = [
+    account.plan,
+    account.remain === undefined ? undefined : `剩余 ${String(account.remain)}%`,
+  ]
   const text = parts.filter((p) => p !== undefined && p !== "").join(" · ")
   return text === "" ? undefined : text
 }

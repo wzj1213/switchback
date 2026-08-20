@@ -1,0 +1,318 @@
+/*
+ * omni 浏览器端的样式。**手机优先**，768px 以上并排两栏。
+ *
+ * 三条贯穿全篇的决定：
+ *
+ * 1. **色板跟随系统**，不做手动切换。这一端是「在外面看一眼」的工具，
+ *    多一个开关不如少一个。
+ * 2. **点得到的东西不小于 44×44**（Apple HIG 的最小命中区）。
+ *    审批那两颗按钮尤其——点错的代价是让一条 agent 命令跑起来。
+ * 3. **`env(safe-area-inset-*)`**：iPhone 上底部的 home 条会压住输入框，
+ *    而那正好是这一端最常用的控件。
+ */
+
+:root {
+  --bg: #ffffff;
+  --bg-sunken: #f4f4f6;
+  --bg-raised: #ffffff;
+  --bg-hover: #f0f0f2;
+  --text: #16161a;
+  --text-muted: #5c5c66;
+  --text-faint: #6f6f78;
+  --line: #e3e3e8;
+  --accent: #16161a;
+  --accent-ink: #ffffff;
+  --danger: #b3261e;
+  --ok: #1a7f4b;
+  --warn: #9a6700;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --lh: 1.55;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111113;
+    --bg-sunken: #17171a;
+    --bg-raised: #1c1c20;
+    --bg-hover: #232328;
+    --text: #ececf0;
+    --text-muted: #a0a0aa;
+    --text-faint: #95959f;
+    --line: #2c2c33;
+    --accent: #ececf0;
+    --accent-ink: #111113;
+    --danger: #f2705f;
+    --ok: #5fd39a;
+    --warn: #e0b341;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-md);
+  line-height: var(--lh);
+  -webkit-font-smoothing: antialiased;
+  /* 手机上左右滑动应该翻页，不该把整个界面拖走 */
+  overscroll-behavior-y: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── 骨架 ───────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app__panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* 手机：一次只看一屏。选中了就把列表整个换掉，而不是压成一条窄边 */
+@media (max-width: 767px) {
+  .app[data-detail="yes"] .pane--list {
+    display: none;
+  }
+  .app[data-detail="no"] .pane--detail {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .pane--list {
+    flex: 0 0 320px;
+    border-right: 1px solid var(--line);
+  }
+  .thread__back {
+    display: none;
+  }
+}
+
+/*
+ * 宽屏上给正文一条阅读宽度上限。
+ *
+ * 手机上不需要（屏幕本来就窄），桌面浏览器上不加就是**一行拉满整屏**——
+ * 眼睛从行尾扫回行首会丢行。上限落在 `.thread__body` 的直接子项上，
+ * 因为它们才是「一条内容」；给容器加 padding 的话，工具行和审批卡的
+ * 边框会跟着缩进去，看起来像被缩排了。
+ */
+@media (min-width: 900px) {
+  .thread__inner > * {
+    width: 100%;
+    max-width: 78ch;
+    align-self: center;
+  }
+}
+
+.empty {
+  margin: auto;
+  padding: var(--sp-4);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* ── 通用控件 ────────────────────────────────────────── */
+
+.btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--bg-hover);
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+.btn:active:not(:disabled) {
+  opacity: 0.7;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn--deny {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--danger);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  /*
+   * **44 点，和别处一样。** 上一版是 36——低于这个项目自己定的下限，
+   * 而顶栏那一排恰恰是最容易点偏的地方：「＋ 开一条」旁边就是「解除配对」。
+   * 视觉上仍然轻（透明底 + 小字号），只是**可点区域**够大。
+   */
+  min-height: 44px;
+  font-size: var(--text-sm);
+}
+
+/* 解除配对的二次确认。挤在顶栏里，所以字号更小、间距更紧 */
+.unpair {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.unpair__ask {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.unpair__yes {
+  color: var(--danger);
+}
+
+.unpair__no {
+  color: var(--text-muted);
+}
+
+.btn--stop {
+  background: var(--bg-hover);
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.chip[data-on="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ── 连接条 ──────────────────────────────────────────── */
+
+.connbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.connbar[data-kind="retrying"],
+.connbar[data-kind="closed"] {
+  color: var(--warn);
+}
+
+/* ── 配对屏 ──────────────────────────────────────────── */
+
+.pair {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: calc(var(--sp-4) + env(safe-area-inset-top)) var(--sp-4) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.pair__title {
+  margin: 12vh 0 0;
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.pair__hint,
+.pair__note {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--sp-2);
+}
+
+.pair__label {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.pair__code,
+.pair__name {
+  /* **不小于 16px**：小于这个数 iOS Safari 会自动放大整个页面，且不会缩回去 */
+  font-size: 17px;
+  min-height: 48px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.pair__code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.28em;
+  text-align: center;
+}
+
+.pair__error {
+  color: var(--danger);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.pair__go {
+  margin-top: var(--sp-2);
+}

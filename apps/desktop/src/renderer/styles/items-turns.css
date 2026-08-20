@@ -1,0 +1,377 @@
+/* ── 一轮的分界 ───────────────────────────────────────
+ * codex 在提问和回答之间放一条「已处理 2 分 11 秒」加一道细线。
+ * 没有它，连着问三轮的 transcript 是一条看不出接缝的长流——
+ * 而「这一轮花了多久」恰恰是回头看时最想知道的一件事。
+ */
+.turnmark {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 点它折起这一轮的回答。整条线都是热区——只把 11px 的小箭头做成按钮
+   等于让人瞄准，而这是个高频动作（回头翻历史时一路往下折） */
+.turnmark:hover {
+  color: var(--text-muted);
+}
+
+/* 折起来之后线变虚：**光靠一个转了向的箭头不够**，
+   往回翻的时候要一眼扫出「这里我藏了东西」 */
+.turnmark[data-folded="true"]::after {
+  background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px);
+}
+
+/* 线画在文字右边，不是上下各一条：上下夹的那种像分节标题，
+   而这只是一个时间戳 */
+.turnmark::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── 推理：一行 ticker，不是一整段 ─────────────────────
+ * 跑的时候只画最后一行，**高度恒定**——它长它的，下面的东西一动不动。
+ * 上一版把它当正文铺开，一条长思考会把你正在读的回答顶出屏幕。
+ * 见 components/Reasoning.tsx。
+ */
+.think {
+  display: flex;
+  flex-direction: column;
+}
+
+.think__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: default;
+  /* 扫光要在这一层里裁掉 */
+  position: relative;
+  overflow: hidden;
+}
+
+.think__row:hover {
+  color: var(--text);
+}
+
+.think__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--text-faint);
+}
+
+.think__label {
+  flex: none;
+}
+
+/* 标题和内容之间的一个点。比竖线轻，比空格明确 */
+.think__dot {
+  flex: none;
+  width: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-faint);
+}
+
+/* **这一行是定高的**，整个组件的价值全在这里：
+   `nowrap` + `overflow:hidden`，内容再长也只占一行。
+
+   右缘用渐隐收尾，不用硬切：**硬切看起来像「没渲染完」，渐隐才是「还有」**，
+   这两种感觉差别很大——前者让人以为界面坏了。
+   渐变按 px 从右边起算而不是按百分比：这一行 `flex: 1` 恒满宽，
+   短标题（收工态取 `headingOf`）根本够不到这 28px，不会被无谓地淡掉。 */
+.think__line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  mask-image: linear-gradient(to left, transparent 0, #000 28px);
+}
+
+.think__chev {
+  display: flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* 跑着的时候扫一道光。抄 dsh 的 reasoning-row-sweep：
+   隔几秒扫一次，比一刻不停地转圈省注意力 */
+.think[data-state="running"] .think__row::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 220px;
+  background: linear-gradient(90deg, transparent 0%, var(--bg-hover) 55%, transparent 100%);
+  animation: think-sweep 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes think-sweep {
+  0% {
+    left: -220px;
+  }
+  90%,
+  100% {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .think[data-state="running"] .think__row::after {
+    animation: none;
+  }
+}
+
+/* 和 `.step__out` 同一条轨、同一条文字列 */
+.think__body {
+  margin-left: calc(var(--step-icon) / 2 - 1px);
+  padding: var(--sp-2) 0 var(--sp-2) calc(var(--step-slot) - var(--step-icon) / 2);
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 折叠摘要那一行：「编辑了文件 · 读取了文件 · 运行了命令」 */
+.step__folded {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.step__count {
+  flex: none;
+  margin-left: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.changed__pill:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 打开时保持高亮：不然那一列浮在上面、胶囊却是常态，看不出是从哪儿出来的 */
+.changed__pill--open {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+/* 摊开之后的那几条缩进一级，看得出是从上面那行展开来的。
+   和 `.step__out` / `.think__body` 用同一个算式：盒子从图标中线起，
+   内边距把里面那些行的图标列送到 24 —— 三处展开物一条轨、一条列 */
+.run__nested {
+  margin-left: calc(var(--step-icon) / 2 - 1px);
+  padding-left: calc(var(--step-slot) - var(--step-icon) / 2);
+  border-left: 1px solid var(--border);
+}
+
+/* ── 变更汇总 ─────────────────────────────────────────
+ * 挂在输入框上方的一枚。它回答的是「我可以走了吗」——见 components/Changed.tsx。
+ */
+.changed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: var(--sp-2);
+}
+
+/* 点开之后那一列文件。**长在胶囊上面**：胶囊贴着输入框，
+   而展开的内容往上长才不会把输入框顶走 */
+.changed__list {
+  width: 100%;
+  max-height: 45vh;
+  overflow-y: auto;
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.changed__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-1);
+  border-radius: var(--radius-sm);
+}
+
+.changed__row:hover {
+  background: var(--bg-hover);
+}
+
+.changed__name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: var(--lh-sm);
+  text-align: left;
+  cursor: default;
+}
+
+/* 目录压成次级信息**并允许被挤掉**——找的是文件名 */
+.changed__dir {
+  overflow: hidden;
+  color: var(--text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changed__base {
+  flex: none;
+}
+
+.changed__stat {
+  flex: none;
+  display: flex;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行尾那两颗：**悬停才出现**。常驻的话每一行右边都挂着两个记号，
+   而这一列本来是拿来扫的 */
+.changed__act {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+  opacity: 0;
+}
+
+.changed__row:hover .changed__act,
+.changed__act:focus-visible {
+  opacity: 1;
+}
+
+.changed__act:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+/* 盲区那一节：**和上面那份分开画**。上面是「它报告它改了这些」（可追溯到某一条
+   工具行），这里是「工作区里还变了这些」（分不出是它跑的命令还是你自己改的）。
+   置信度不同的两份东西挤在一起，就再也分不开了 */
+.changed__others {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--border);
+}
+
+.changed__note {
+  margin: 0;
+  padding: 3px var(--sp-1) 5px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+/* 这一节的行点不开（没有补丁可看），所以不做成按钮的样子 */
+.changed__name--flat {
+  cursor: default;
+}
+
+.changed__more {
+  width: 100%;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: default;
+}
+
+.changed__more:hover {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+/* 胶囊 + 「审核」并排。**审核在右边**：左边那枚是「刚才动了多少」（读），
+   右边这颗是「逐个过一遍」（做）——读在前、做在后，和视线方向一致 */
+.changed__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 比胶囊低一档：它是可选动作，不该抢走「有几个文件变了」那条信息的注意力 */
+.changed__review {
+  padding: 3px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.changed__review:hover {
+  border-color: var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+}
+
+.changed__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  /* 等宽数字：这枚胶囊是居中的，而三个数每轮都在变——
+     不定宽的话文件数从 9 跳到 10，整枚胶囊左右各挪半格 */
+  font-variant-numeric: tabular-nums;
+}

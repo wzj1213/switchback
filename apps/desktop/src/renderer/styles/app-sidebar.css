@@ -1,0 +1,238 @@
+/* ── 正文命中 ────────────────────────────────────────
+ * 「标题里没有，但正文里提过」的那几条。**两行**：标题 + 以命中词为中心的摘要。
+ * 只给标题的话你还是得逐个点开确认，那这一段就白做了。见 components/SidebarDeep.tsx。
+ */
+.deep__row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: var(--sp-1) calc(var(--sb-pad) + var(--sb-slot));
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deep__row:hover {
+  background: var(--bg-hover);
+}
+
+.deep__row--on {
+  background: var(--bg-active);
+}
+
+.deep__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.deep__title {
+  overflow: hidden;
+  flex: 1;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deep__count {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 摘要压两行：一行常常正好断在关键词前面，三行就把列表撑成一堵墙 */
+.deep__snip {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.sidebar__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--sp-4);
+  /* 滚动条压在行上会盖住计数和 `···`。留出槽位，
+     顺带避免「有滚动条时整列文字横向抖一下」。
+     **只在经典条下有效**：overlay 条不占空间，这一行恒为零宽。
+     macOS「自动根据鼠标或触控板」那一档，插鼠标就是经典条 */
+  scrollbar-gutter: stable;
+}
+
+.group + .group {
+  margin-top: 2px;
+}
+
+/* 行内操作平时不显形，悬停才出来。
+   **`cursor` 必须是 pointer**：它是按钮，长成默认箭头等于告诉人「这儿点不动」 */
+/* 照 codex 的做法：**等大的方形点击区，内边距归零，图标靠 flex 居中**。
+ *
+ * 两件事各自都会让这一行看起来歪，所以两件都得改：
+ *
+ * 1. inline 的 `<svg>` 是**贴基线**放的，底下还留着字体下伸部的空间，
+ *    而文字按钮（「确认」）按基线排——同一行里图标偏高、文字偏低。
+ * 2. `padding: 2px 5px` 是**不对称**的：盒子高 19、宽 25，两颗按钮各自的
+ *    视觉重心因此不在同一条水平线上，也不在等距的位置上。
+ *
+ * 方形盒子 + `padding: 0` 之后，图标中心 = 盒子中心 = 行中线，
+ * 两颗之间的间距也只由 `margin-right` 一个数决定。 */
+.row__act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--sb-act);
+  height: var(--sb-act);
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  opacity: 0;
+}
+
+/* **选择器原来只写了 `.row--thread:hover`**，于是项目行（`.row--group`）
+   和分段标题上的按钮永远是 `opacity: 0`——它们在 DOM 里、能被读屏读到、
+   点得中，但对鼠标用户根本不存在。
+   `SidebarRows.tsx` 里那句「看不见的功能等于没有」被这行 CSS 字面兑现了。 */
+.row:hover .row__act,
+.sidebar__section:hover .row__act,
+.row__act:focus-visible,
+.row__act--danger {
+  opacity: 1;
+}
+
+/* 悬停变红是**删除**的语义，不能所有行内按钮都红——
+   现在这一列里还有「在此新建」和「更多操作」，它们不危险 */
+.row__act:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.row__act--danger:hover {
+  color: var(--danger);
+}
+
+/* 确认态就要显眼——这一步之后没有回头路。
+   **它装的是文字不是图标**，所以放开方形约束，否则「确认」两个字会被裁掉 */
+.row__act--danger {
+  width: auto;
+  padding: 2px 6px;
+  background: var(--danger);
+  color: var(--text-inverse);
+}
+
+.row__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+/* 运行中的点会呼吸——侧栏是唯一能一眼看出「哪个会话还在跑」的地方 */
+.row__dot--running {
+  background: var(--ok);
+  animation: dot-breathe 1.8s ease-in-out infinite;
+}
+
+.row__dot--waiting {
+  background: var(--warn);
+}
+
+.row__dot--failed {
+  background: var(--danger);
+}
+
+/*
+ * 「它在你没看的时候跑完了。」
+ *
+ * 用 `--accent` 而不是 `--ok`：绿色在这一列已经是「正在跑」的意思（那颗还在呼吸），
+ * 同色不同动画只能靠盯着看才分得出。**也不给它动画**——动的东西说的是
+ * 「此刻还在发生」，而这件事已经结束了，它只是在等你。
+ */
+.row__dot--unread {
+  background: var(--accent);
+}
+
+/*
+ * 未读那一行整行提亮：字色回到 `--text`、字重加一档。
+ *
+ * 光靠 6px 的点不够——侧栏一列扫下来，先看见的是字。而这两样都**不占位置**，
+ * 所以时间那一列照旧答「多久以前」（见 `RowEnd`）。
+ * 权重压在选中态之下：选中说的是「你正在看这条」，那仍然是最强的一条。
+ */
+.row--unread {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* 行尾那截时间跟着提一档。整行的 `color` 到不了它——它自己写死了 `--text-faint` */
+.row__time--bright {
+  color: var(--text-muted);
+}
+
+@keyframes dot-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row__dot--running {
+    animation: none;
+  }
+
+  .meter__fill {
+    transition: none;
+  }
+}
+
+/*
+ * 会话行右边那一列。**一条规矩：默认答「多久以前」，有更要紧的事就顶掉它。**
+ *
+ * 那一格以前是空的（只有置顶段拿去写项目名）。而会话标题彼此都长得差不多，
+ * 一列排下来唯一能把它们区分开的就是新旧——`Thread.updatedAt` 一直有，
+ * 只是从来没显示过。
+ *
+ * `tabular-nums` 不是洁癖：这一列会同时出现「3 分钟前」和「12 分钟前」，
+ * 比例数字会让它们的「分钟前」三个字错开，一列灰字就成了锯齿。
+ */
+.row__time {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 4px;
+  max-width: 68px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 等待批准的会话在侧栏直接写出来：状态点的颜色说不清「要你去做什么」 */
+.row__note {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 4px;
+  color: var(--warn);
+  font-size: var(--text-xs);
+}

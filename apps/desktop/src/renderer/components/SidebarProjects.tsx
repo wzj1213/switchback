@@ -51,7 +51,11 @@ export function ProjectsSection({
         onToggle={onToggle}
         // **图标不能和「对话」段那颗 `+` 一样**：这颗是「加一个项目（选文件夹）」，
         // 那颗是「开一条对话」。同形不同义比没有图标更误导
-        action={{ label: "打开一个文件夹", icon: <FolderIcon size={SIDEBAR_ICON} />, run: on.onOpenFolder }}
+        action={{
+          label: "打开一个文件夹",
+          icon: <FolderIcon size={SIDEBAR_ICON} />,
+          run: on.onOpenFolder,
+        }}
         // 拖着一个置顶过的东西时才说：落在这一段上是**取消置顶**。
         // 「只进不出的落点是陷阱」那条规矩得有人说出口，而这是唯一说得起的位置——
         // 它绝对定位、不占位（拖起来时挪动任何一行都会让 Chromium 取消拖拽）
@@ -68,7 +72,13 @@ export function ProjectsSection({
  * 不做无限滚动也不做分页：项目数量是几十的量级，一行「展开显示」就够，
  * 多一套机制只会多一处出错的地方。
  */
-function Projects({ groups, on }: { groups: readonly Group[]; on: GroupHandlers }): React.JSX.Element {
+function Projects({
+  groups,
+  on,
+}: {
+  groups: readonly Group[]
+  on: GroupHandlers
+}): React.JSX.Element {
   const [all, setAll] = useState(false)
   const shown = all ? groups : groups.slice(0, PROJECT_MAX)
   return (
@@ -91,6 +101,10 @@ function Projects({ groups, on }: { groups: readonly Group[]; on: GroupHandlers 
           icon={on.icons[group.cwd]}
           rename={on.rename}
           onGroupMenu={on.onGroupMenu}
+          onMove={(direction) => {
+            on.moveProject(group.cwd, direction)
+          }}
+          onMoveThread={on.moveThread}
         />
       ))}
       {groups.length <= PROJECT_MAX ? null : (

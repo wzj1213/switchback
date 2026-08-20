@@ -3,6 +3,7 @@ import type { Group } from "../sidebar.js"
 import type { ThreadRow } from "@omni/store"
 import { CopyIcon, PinIcon, PlusIcon, RevealIcon, SparkIcon, TrashIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
+import type { MoveDirection, SidebarMoveActions } from "../sidebarMove.js"
 
 /*
  * 侧栏右键菜单的内容：能做什么（`workspaceCommands`）、点的是什么（`ProjectHead`）。
@@ -10,7 +11,7 @@ import { PencilIcon } from "./icons-activity.js"
  * （分区、筛选、展开态），这边管的是**菜单里放什么**。
  */
 
-export interface Acts {
+export interface Acts extends SidebarMoveActions {
   /** 给项目设图标。空字符串 = 清掉。 */
   onSetIcon?: (cwd: string, icon: string) => void
   pinned: readonly string[]
@@ -26,6 +27,17 @@ export interface Acts {
   onCopy: (text: string) => void
 }
 
+function moveCommands(
+  id: string,
+  canMove: (id: string, direction: MoveDirection) => boolean,
+  move: (id: string, direction: MoveDirection) => void,
+): readonly Command[] {
+  return [
+    ...(canMove(id, -1) ? [{ label: "上移", run: () => move(id, -1) }] : []),
+    ...(canMove(id, 1) ? [{ label: "下移", run: () => move(id, 1) }] : []),
+  ]
+}
+
 /**
  * 项目和会话共用的那几条菜单命令。
  *
@@ -34,14 +46,34 @@ export interface Acts {
  */
 export function workspaceCommands(cwd: string, acts: Acts): readonly Command[] {
   return [
-    { label: "在此新建会话", icon: <PlusIcon />, run: () => { acts.onNewIn(cwd) } },
+    {
+      label: "在此新建会话",
+      icon: <PlusIcon />,
+      run: () => {
+        acts.onNewIn(cwd)
+      },
+    },
     {
       label: acts.pinned.includes(cwd) ? "取消置顶" : "置顶项目",
       icon: <PinIcon />,
-      run: () => { acts.onTogglePin(cwd) },
+      run: () => {
+        acts.onTogglePin(cwd)
+      },
     },
-    { label: "在访达中显示", icon: <RevealIcon />, run: () => { acts.onReveal(cwd) } },
-    { label: "复制路径", icon: <CopyIcon />, run: () => { acts.onCopy(cwd) } },
+    {
+      label: "在访达中显示",
+      icon: <RevealIcon />,
+      run: () => {
+        acts.onReveal(cwd)
+      },
+    },
+    {
+      label: "复制路径",
+      icon: <CopyIcon />,
+      run: () => {
+        acts.onCopy(cwd)
+      },
+    },
   ]
 }
 
@@ -99,6 +131,7 @@ export function useSidebarMenus(
           },
         },
         { label: "重命名", icon: <PencilIcon />, run: ren },
+        ...moveCommands(row.thread.id, acts.canMoveThread, acts.moveThread),
         ...workspaceCommands(row.thread.cwd, acts),
         { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm },
       ])
@@ -108,6 +141,7 @@ export function useSidebarMenus(
         event,
         [
           ...workspaceCommands(group.cwd, acts),
+          ...moveCommands(group.cwd, acts.canMoveProject, acts.moveProject),
           ...iconCommands(group.cwd, acts),
           // **只有空项目才给这一条。** 有会话的项目是从会话推出来的，
           // 移不走——摆一个点了没反应的菜单项比没有更糟

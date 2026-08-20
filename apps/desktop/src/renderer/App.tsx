@@ -1,4 +1,13 @@
-import { commandsOf, forkPeerOf, itemsOf, limitsOf, modelsOf, tasksOf, turnOf, usageOf } from "@omni/store"
+import {
+  commandsOf,
+  forkPeerOf,
+  itemsOf,
+  limitsOf,
+  modelsOf,
+  tasksOf,
+  turnOf,
+  usageOf,
+} from "@omni/store"
 import { stampOf } from "./stamp.js"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
@@ -22,7 +31,7 @@ import { useScrollbars } from "./useScrollbars.js"
 function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
   const { shell, prefs, thread } = app
   return (
-<SidebarPane
+    <SidebarPane
       // **临时会话不在这份里**：点一下「+」就多一行是错的（见 `AppApi.sidebarRows`）
       rows={app.sidebarRows}
       thread={thread}
@@ -46,6 +55,8 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       projectOrder={prefs.settings.projectOrder}
       onReorder={prefs.setOrder}
       onReorderProjects={prefs.setProjectOrder}
+      onReorderPinnedProjects={prefs.setPinnedProjects}
+      onReorderPinnedThreads={prefs.setPinnedThreads}
       onPinThread={prefs.pinThread}
       foreign={app.foreign}
       onAdopt={app.adopt}
@@ -112,7 +123,11 @@ export function App(): React.JSX.Element {
     return (
       <div className="shell">
         {sidebar}
-        <EmptyScreen notices={app.notices} onDismiss={shell.dismiss} bridgeMissing={app.bridgeMissing} />
+        <EmptyScreen
+          notices={app.notices}
+          onDismiss={shell.dismiss}
+          bridgeMissing={app.bridgeMissing}
+        />
         {settings}
       </div>
     )
