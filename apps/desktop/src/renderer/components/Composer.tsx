@@ -247,7 +247,6 @@ export function Composer({
         <Bar
           detached={detached}
           busy={busy}
-          canSteer={steering}
           starting={starting}
           empty={text.trim() === ""}
           engine={engine}
