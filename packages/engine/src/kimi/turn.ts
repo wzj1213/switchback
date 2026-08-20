@@ -1,6 +1,7 @@
 import type { Event, ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import { planSteps } from "./plan.js"
 import { finishTool, startTool, sweepTool } from "./tool.js"
+import { kimiMessage, kimiTurnStatus, snapshotCanFinish, snapshotMatches } from "./turn-state.js"
 import type { KimiPayload, KimiSnapshot } from "./wire.js"
 
 interface TextState {
@@ -25,24 +26,13 @@ interface Active {
   openText?: TextState["kind"]
   tools: Map<string, ToolCallItem>
   planStarted: boolean
+  retryStarted: boolean
+  noticeSeq: number
 }
 
 export interface TurnTrackerDeps {
   emit: (event: Event) => void
   now: () => number
-}
-
-function messageOf(raw: unknown): string | undefined {
-  if (typeof raw === "string") return raw
-  if (typeof raw !== "object" || raw === null) return undefined
-  const message = (raw as { message?: unknown }).message
-  return typeof message === "string" ? message : undefined
-}
-
-function turnStatus(reason: string | undefined): TurnStatus {
-  if (reason === "cancelled") return "interrupted"
-  if (reason === "failed" || reason === "blocked") return "failed"
-  return "completed"
 }
 
 function textState(turnId: TurnId, kind: TextState["kind"], part = 1, total = ""): TextState {
@@ -68,6 +58,8 @@ export class KimiTurnTracker {
       reasoning: textState(turnId, "reasoning"),
       tools: new Map(),
       planStarted: false,
+      retryStarted: false,
+      noticeSeq: 0,
     }
     return generation
   }
@@ -184,6 +176,10 @@ export class KimiTurnTracker {
     const item = active?.tools.get(payload.toolCallId ?? "")
     const text = payload.update?.text
     if (item?.detail.kind !== "shell" || text === undefined || text === "") return
+    active?.tools.set(item.id, {
+      ...item,
+      detail: { ...item.detail, output: `${item.detail.output ?? ""}${text}` },
+    })
     this.deps.emit({ type: "item.delta", at, itemId: item.id, append: text })
   }
 
@@ -198,10 +194,11 @@ export class KimiTurnTracker {
 
   notice(payload: KimiPayload, at: number): void {
     const active = this.bind(payload.turnId)
-    const message = payload.message ?? messageOf(payload.error)
+    const message = payload.message ?? kimiMessage(payload.error)
     if (active === undefined || message === undefined) return
     this.closeText(active, at)
-    const id = `kimi-error-${active.turnId}-${String(at)}`
+    active.noticeSeq += 1
+    const id = `kimi-error-${active.turnId}-${String(at)}-${String(active.noticeSeq)}`
     this.deps.emit({
       type: "item.started",
       at,
@@ -216,16 +213,17 @@ export class KimiTurnTracker {
     const message = typeof payload.errorMessage === "string" ? payload.errorMessage : "Kimi 正在重试这一轮"
     const id = `kimi-retry-${active.turnId}`
     this.deps.emit({
-      type: "item.started",
+      type: active.retryStarted ? "item.updated" : "item.started",
       at,
       item: { id, turnId: active.turnId, at, kind: "error", message, fatal: false },
     })
+    active.retryStarted = true
   }
 
   ended(payload: KimiPayload, at: number): void {
     const active = this.bind(payload.turnId)
     if (active === undefined) return
-    this.complete(active, turnStatus(payload.reason), at, messageOf(payload.error))
+    this.complete(active, kimiTurnStatus(payload.reason), at, kimiMessage(payload.error))
   }
 
   private finishText(state: TextState, active: Active, at: number): void {
@@ -240,12 +238,13 @@ export class KimiTurnTracker {
   private complete(active: Active, status: TurnStatus, at: number, error?: string): void {
     this.finishText(active.reasoning, active, at)
     this.finishText(active.assistant, active, at)
-    if (status !== "completed") {
-      const ending = status === "interrupted" ? "interrupted" : "failed"
-      for (const item of active.tools.values()) {
-        const swept = sweepTool(item, ending)
-        if (swept !== item) this.deps.emit({ type: "item.updated", at, item: swept })
-      }
+    const ending = status === "interrupted" ? "interrupted" : "failed"
+    for (const item of active.tools.values()) {
+      const missing = status === "completed" && (item.status === "running" || item.status === "pending")
+      const swept = missing
+        ? { ...item, status: "failed" as const, error: "Kimi 在轮次结束前没有报告这次工具调用的结果。" }
+        : sweepTool(item, ending)
+      if (swept !== item) this.deps.emit({ type: "item.updated", at, item: swept })
     }
     this.active = undefined
     this.deps.emit({
@@ -261,6 +260,10 @@ export class KimiTurnTracker {
     const active = this.active
     if (active === undefined) return
     this.complete(active, "failed", this.deps.now(), message)
+  }
+
+  failGeneration(generation: number, message: string): void {
+    if (this.isActive(generation)) this.fail(message)
   }
 
   private syncText(state: TextState, active: Active, text: string, at: number): void {
@@ -287,9 +290,13 @@ export class KimiTurnTracker {
     const at = this.deps.now()
     const flight = snapshot.in_flight_turn
     if (flight === null) {
-      this.complete(active, turnStatus(snapshot.session.last_turn_reason), at)
+      // `begin()` 发生在图片编码与 POST 之前；这段窗口里的空闲快照说的是旧状态，
+      // 不能拿它把刚创建、甚至还没送到服务端的新轮次提前收掉。
+      if (!snapshotCanFinish(active.promptId, snapshot)) return
+      this.complete(active, kimiTurnStatus(snapshot.session.last_turn_reason), at)
       return
     }
+    if (!snapshotMatches(active.native, active.promptId, snapshot)) return
     if (this.bind(flight.turn_id) === undefined) return
     active.promptId ??= flight.current_prompt_id
     this.syncText(active.reasoning, active, flight.thinking_text, at)

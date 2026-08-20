@@ -146,4 +146,138 @@ describe("Kimi 轮次事件", () => {
       { type: "item.updated", item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "done" }] } },
     ])
   })
+
+  it("同一轮多次 retry 原地更新一条提示，不重复 started", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    tracker.begin("omni-turn", "做事")
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
+    handleTurnEvent(tracker, { type: "turn.step.retrying", turnId: 1, errorMessage: "第一次" }, 2)
+    handleTurnEvent(tracker, { type: "turn.step.retrying", turnId: 1, errorMessage: "第二次" }, 3)
+    expect(events.map((event) => event.type)).toEqual(["item.started", "item.updated"])
+    expect(events[1]).toMatchObject({ item: { id: "kimi-retry-omni-turn", message: "第二次" } })
+  })
+
+  it("busy 快照尚未出现 in-flight turn 时不提前收工", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    const generation = tracker.begin("omni-turn", "做事")
+    tracker.promptAccepted(generation, "prompt-1")
+    const snapshot = runningSnapshot("")
+    tracker.reconcile({
+      ...snapshot,
+      session: { ...snapshot.session, busy: true, current_prompt_id: "prompt-1" },
+      in_flight_turn: null,
+    })
+    expect(tracker.hasActive()).toBe(true)
+    expect(events).toEqual([])
+  })
+
+  it("提示词还没被 HTTP 接受时，旧的空闲快照也不能收掉新轮次", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    tracker.begin("omni-turn", "带图提问")
+    const snapshot = runningSnapshot("")
+    tracker.reconcile({
+      ...snapshot,
+      session: { ...snapshot.session, busy: false, last_turn_reason: "completed" },
+      in_flight_turn: null,
+    })
+    expect(tracker.hasActive()).toBe(true)
+    expect(events).toEqual([])
+  })
+
+  it("HTTP 已接受后的空闲快照能补回丢失的 turn.ended", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    const generation = tracker.begin("omni-turn", "这轮的问题")
+    tracker.promptAccepted(generation, "prompt-new")
+    const snapshot = runningSnapshot("")
+    tracker.reconcile({
+      ...snapshot,
+      session: {
+        ...snapshot.session,
+        busy: false,
+        last_turn_reason: "completed",
+      },
+      in_flight_turn: null,
+    })
+    expect(tracker.hasActive()).toBe(false)
+    expect(events).toEqual([{ type: "turn.completed", at: 0, turnId: "omni-turn", status: "completed" }])
+  })
+
+  it("POST 前的外来 in-flight 快照不能抢先绑定宿主新轮次", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    tracker.begin("omni-turn", "这轮的新问题")
+    tracker.reconcile({
+      ...runningSnapshot("上一轮还在输出"),
+      session: { ...runningSnapshot("").session, last_prompt: "上一轮的问题" },
+    })
+    expect(events).toEqual([])
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 8, prompt: "这轮的新问题" }, 1)
+    handleTurnEvent(tracker, { type: "assistant.delta", turnId: 8, delta: "新回答" }, 2)
+    expect(events).toMatchObject([{ type: "item.started", item: { text: "新回答" } }])
+  })
+
+  it("POST 后也只接 prompt id 对得上的 in-flight 快照", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    const generation = tracker.begin("omni-turn", "新问题")
+    tracker.promptAccepted(generation, "prompt-new")
+    const snapshot = runningSnapshot("旧回答")
+    const flight = snapshot.in_flight_turn
+    if (flight === null) throw new Error("测试快照必须有在途轮次")
+    tracker.reconcile({
+      ...snapshot,
+      in_flight_turn: { ...flight, current_prompt_id: "prompt-old" },
+    })
+    expect(events).toEqual([])
+  })
+
+  it("旧 prompt 的 HTTP 失败迟到时，不会误杀已经接替它的新轮", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 9 })
+    const old = tracker.begin("turn-old", "旧问题")
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "旧问题" }, 1)
+    handleTurnEvent(tracker, { type: "turn.ended", turnId: 1, reason: "completed" }, 2)
+    tracker.begin("turn-new", "新问题")
+    tracker.failGeneration(old, "旧请求断线")
+    expect(tracker.hasActive()).toBe(true)
+    expect(events.filter((event) => event.type === "turn.completed")).toEqual([
+      { type: "turn.completed", at: 2, turnId: "turn-old", status: "completed" },
+    ])
+  })
+
+  it("中断工具时保留已经流出来的命令输出", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    tracker.begin("omni-turn", "做事")
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
+    handleTurnEvent(
+      tracker,
+      { type: "tool.call.started", turnId: 1, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "x" } },
+      2,
+    )
+    handleTurnEvent(tracker, { type: "tool.progress", turnId: 1, toolCallId: "tc", update: { text: "半截输出" } }, 3)
+    handleTurnEvent(tracker, { type: "turn.ended", turnId: 1, reason: "cancelled" }, 4)
+    const closed = events.findLast((event) => event.type === "item.updated" && event.item.kind === "tool_call")
+    expect(closed).toMatchObject({ item: { status: "interrupted", detail: { output: "半截输出" } } })
+  })
+
+  it("正常收工仍缺工具结果时明确失败，不留下 running", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    tracker.begin("omni-turn", "做事")
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
+    handleTurnEvent(
+      tracker,
+      { type: "tool.call.started", turnId: 1, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "x" } },
+      2,
+    )
+    handleTurnEvent(tracker, { type: "turn.ended", turnId: 1, reason: "completed" }, 3)
+    expect(events.find((event) => event.type === "item.updated")).toMatchObject({
+      item: { status: "failed", error: expect.stringContaining("没有报告") },
+    })
+  })
 })

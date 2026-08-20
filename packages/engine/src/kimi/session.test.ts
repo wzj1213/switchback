@@ -103,3 +103,70 @@ describe("Kimi 会话插话", () => {
     await session.dispose()
   })
 })
+
+describe("Kimi 写操作后的状态读回", () => {
+  it("默认配置读不到时仍保留服务端已经给出的模型清单", async () => {
+    const events: Event[] = []
+    const api: KimiApi = {
+      get: <T>(path: string) => {
+        if (path === "models") return Promise.resolve({ items: [{ provider: "moonshot", model: "k3" }] } as T)
+        if (path === "config") return Promise.reject(new Error("config timeout"))
+        return Promise.resolve({ busy: false, model: "k3" } as T)
+      },
+      post: <T>() => Promise.resolve({} as T),
+    }
+    const session = new KimiSession(request(events), lease(api), {
+      id: "s1",
+      status: { busy: false, model: "k2" },
+      snapshot: snapshot(),
+    })
+
+    await expect(session.models()).resolves.toMatchObject([{ id: "k3" }])
+    await session.dispose()
+  })
+
+  it("权限 POST 已成功但 status 暂时失败时，保留成功结果并明确降级", async () => {
+    const events: Event[] = []
+    const api: KimiApi = {
+      get: () => Promise.reject(new Error("status timeout")),
+      post: <T>() => Promise.resolve({} as T),
+    }
+    const session = new KimiSession(request(events), lease(api), {
+      id: "s1",
+      status: { busy: false, model: "k2" },
+      snapshot: snapshot(),
+    })
+
+    await expect(session.setTrust("auto-edit")).resolves.toEqual({ restart: false })
+    expect(events.find((event) => event.type === "engine.status")).toMatchObject({
+      status: "degraded",
+      detail: expect.stringContaining("状态读回失败"),
+    })
+    await session.dispose()
+  })
+
+  it("模型 POST 成功但读回失败时仍落模型，只是不冒充强度已确认", async () => {
+    const events: Event[] = []
+    const api: KimiApi = {
+      get: <T>(path: string) => {
+        if (path === "models") {
+          return Promise.resolve({
+            items: [{ provider: "moonshot", model: "k3", support_efforts: ["low"], default_effort: "low" }],
+          } as T)
+        }
+        if (path === "config") return Promise.resolve({ default_model: "k3" } as T)
+        return Promise.reject(new Error("status timeout"))
+      },
+      post: <T>() => Promise.resolve({} as T),
+    }
+    const session = new KimiSession(request(events), lease(api), {
+      id: "s1",
+      status: { busy: false, model: "k2" },
+      snapshot: snapshot(),
+    })
+
+    await expect(session.setModel("k3", "low")).resolves.toEqual({})
+    expect(events.filter((event) => event.type === "engine.status")).not.toHaveLength(0)
+    await session.dispose()
+  })
+})

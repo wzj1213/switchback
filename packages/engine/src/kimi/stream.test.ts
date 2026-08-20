@@ -72,6 +72,8 @@ describe("Kimi WebSocket", () => {
     await connecting
     sockets[0]?.frame({ type: "ping", payload: { nonce: "n1" } })
     sockets[0]?.frame({ type: "session_event", session_id: "s1", seq: 9, payload: { type: "turn.started" } })
+    sockets[0]?.frame({ type: "session_event", session_id: "s1", seq: 9, payload: { type: "turn.started" } })
+    sockets[0]?.frame({ type: "session_event", session_id: "s1", seq: 8, payload: { type: "turn.started" } })
 
     expect(protocols).toEqual([["kimi-code.bearer.secret"]])
     expect(JSON.parse(sockets[0]?.sent[1] ?? "null")).toEqual({ type: "pong", payload: { nonce: "n1" } })

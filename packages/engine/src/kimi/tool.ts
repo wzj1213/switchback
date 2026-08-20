@@ -116,7 +116,7 @@ export function transcriptTool(frame: Extract<KimiTranscriptFrame, { kind: "tool
     detail: displayDetail(frame.display, frame.name, frame.input),
   }
   if (frame.state === "running") return base
-  return finishTool(base, frame.output, frame.state === "error")
+  return finishTool(base, frame.output ?? frame.error, frame.state === "error")
 }
 
 export function sweepTool(item: ToolCallItem, status: "failed" | "interrupted"): ToolCallItem {

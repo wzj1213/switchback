@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { finishTool, startTool } from "./tool.js"
+import { finishTool, startTool, transcriptTool } from "./tool.js"
 
 describe("Kimi 工具翻译", () => {
   it("命令保留原文、cwd、输出与退出码", () => {
@@ -27,5 +27,22 @@ describe("Kimi 工具翻译", () => {
       1,
     )
     expect(item?.detail).toMatchObject({ kind: "file_edit", path: "a.ts", added: 1, removed: 1 })
+  })
+
+  it("历史工具失败时使用独立 error 字段，不把原因丢掉", () => {
+    const item = transcriptTool(
+      {
+        kind: "tool",
+        frameId: "f1",
+        toolCallId: "tc3",
+        name: "Shell",
+        state: "error",
+        display: { kind: "command", command: "false" },
+        error: "exit 1",
+      },
+      "turn-1",
+      1,
+    )
+    expect(item).toMatchObject({ status: "failed", error: "exit 1", detail: { output: "exit 1" } })
   })
 })

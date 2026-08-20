@@ -80,16 +80,18 @@ export class KimiStream {
     return true
   }
 
-  private advance(frame: KimiFrame): void {
-    if (frame.volatile === true || frame.seq === undefined || frame.seq < this.cursor.seq) return
+  private advance(frame: KimiFrame): boolean {
+    if (frame.volatile === true || frame.seq === undefined) return true
+    if (frame.seq <= this.cursor.seq) return false
     this.cursor = { seq: frame.seq, ...(frame.epoch === undefined ? {} : { epoch: frame.epoch }) }
+    return true
   }
 
   private takeEvent(frame: KimiFrame): void {
     if (this.pong(frame)) return
     if (frame.type === "resync_required") throw new ResyncError("Kimi WebSocket 要求重新同步")
     if (frame.session_id !== this.deps.sessionId || frame.payload === undefined) return
-    this.advance(frame)
+    if (!this.advance(frame)) return
     this.deps.onFrame(frame)
   }
 

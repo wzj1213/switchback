@@ -98,6 +98,18 @@ export class KimiSession implements EngineSession {
     })
   }
 
+  /** 主操作完成后的状态读回是校验，不该反过来把已经拿到的结果报成失败。 */
+  private async refreshStatus(action: string): Promise<KimiStatus | undefined> {
+    try {
+      const status = await this.lease.api.get<KimiStatus>(sessionPath(this.init.id, "/status"))
+      this.reporter.status(status)
+      return status
+    } catch (error) {
+      this.status("degraded", `Kimi ${action}已完成，但状态读回失败：${errorText(error)}`)
+      return undefined
+    }
+  }
+
   private unsupportedQuestion(message: string): void {
     this.status(
       "degraded",
@@ -149,7 +161,7 @@ export class KimiSession implements EngineSession {
       }
       this.turn.promptAccepted(generation, prompt.prompt_id)
     } catch (error) {
-      this.turn.fail(errorText(error))
+      this.turn.failGeneration(generation, errorText(error))
       throw error
     }
   }
@@ -203,7 +215,7 @@ export class KimiSession implements EngineSession {
     const target = KIMI_TRUST[trust]
     await this.lease.api.post(sessionPath(this.init.id, "/profile"), { agent_config: target })
     this.trust.current = trust
-    this.reporter.status(await this.lease.api.get<KimiStatus>(sessionPath(this.init.id, "/status")))
+    await this.refreshStatus("权限切换")
     this.req.onTrustApply?.({ result: "applied", at: Date.now() })
     return { restart: false }
   }
@@ -211,11 +223,11 @@ export class KimiSession implements EngineSession {
   async models(): Promise<readonly ModelOption[]> {
     const [catalog, config] = await Promise.all([
       this.lease.api.get<{ items: readonly KimiModel[] }>("models"),
-      this.lease.api.get<ConfigResponse>("config"),
+      this.lease.api.get<ConfigResponse>("config").catch((): ConfigResponse => ({})),
     ])
     this.options = toModels(catalog.items, config.default_model)
     this.reporter.setOptions(this.options)
-    this.reporter.status(await this.lease.api.get<KimiStatus>(sessionPath(this.init.id, "/status")))
+    await this.refreshStatus("模型清单加载")
     return this.options
   }
 
@@ -226,9 +238,8 @@ export class KimiSession implements EngineSession {
     await this.lease.api.post(sessionPath(this.init.id, "/profile"), {
       agent_config: { model, ...(wanted === undefined ? {} : { thinking: wanted }) },
     })
-    const status = await this.lease.api.get<KimiStatus>(sessionPath(this.init.id, "/status"))
-    this.reporter.status(status)
-    const applied = status.thinking_level
+    const status = await this.refreshStatus("模型切换")
+    const applied = status?.thinking_level
     return option?.efforts?.includes(applied ?? "") === true ? { effort: applied } : {}
   }
 
