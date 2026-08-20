@@ -1,4 +1,4 @@
-import { SIZE, type Pet } from "./pets.js"
+import { SIZE, type Bounds, type Pet } from "./pets.js"
 
 /*
  * **两只之间**的事：撞、推、掀翻。
@@ -36,10 +36,10 @@ import { SIZE, type Pet } from "./pets.js"
  * **这一帧里被推过的仍然算数**（`shoved`）：不然拿手里那只去犁一排，
  * 第一只被推开、第二只不认它，一排全叠成一坨。这个标记只活在这一帧。
  */
-export function bump(pets: readonly Pet[]): readonly Pet[] {
+export function bump(pets: readonly Pet[], bounds: Bounds): readonly Pet[] {
   const shoved = new Set<number>()
   let out: readonly Pet[] = pets
-  for (let pass = 0; pass < PASSES; pass += 1) out = sweep(out, shoved)
+  for (let pass = 0; pass < PASSES; pass += 1) out = sweep(out, shoved, bounds)
   return out
 }
 
@@ -52,7 +52,7 @@ export function bump(pets: readonly Pet[]): readonly Pet[] {
  */
 const PASSES = 3
 
-function sweep(pets: readonly Pet[], shoved: Set<number>): readonly Pet[] {
+function sweep(pets: readonly Pet[], shoved: Set<number>, bounds: Bounds): readonly Pet[] {
   const next = [...pets]
   for (let i = 0; i < next.length; i += 1) {
     for (let j = i + 1; j < next.length; j += 1) {
@@ -62,7 +62,7 @@ function sweep(pets: readonly Pet[], shoved: Set<number>): readonly Pet[] {
       if (!meets(a, b) && !shoved.has(i) && !shoved.has(j)) continue
       const touch = contactOf(a, b)
       if (touch === undefined) continue
-      const [na, nb] = resolve(a, b, touch)
+      const [na, nb] = resolve(a, b, touch, bounds)
       next[i] = na
       next[j] = nb
       shoved.add(i)
@@ -122,7 +122,7 @@ const HIT_UP = 200
 /** 沿法向的分量。两条轴各取各的，别的分量原样留着（不是全弹性球，是两个方盒）。 */
 const along = (p: Pet, axis: Contact["axis"]): number => (axis === "x" ? p.vx : p.vy)
 
-function resolve(a: Pet, b: Pet, touch: Contact): readonly [Pet, Pet] {
+function resolve(a: Pet, b: Pet, touch: Contact, bounds: Bounds): readonly [Pet, Pet] {
   // 关速：两只**正在互相靠近**的速度。已经在分开就不再给冲量，
   // 否则同一次接触会在连续几帧里反复加速，两只粘在一起抽搐
   const closing = (along(a, touch.axis) - along(b, touch.axis)) * touch.sign
@@ -132,7 +132,7 @@ function resolve(a: Pet, b: Pet, touch: Contact): readonly [Pet, Pet] {
   const moved = (p: Pet, other: Pet, dir: number): Pet => {
     if (stone(p)) return p
     const k = part(p, other)
-    return wake(shove(nudge(p, touch, dir * k), touch, -dir * kick * k * (1 + REST)), closing)
+    return wake(shove(nudge(p, touch, dir * k, bounds), touch, -dir * kick * k * (1 + REST)), closing)
   }
   return [moved(a, b, 1), moved(b, a, -1)]
 }
@@ -142,10 +142,16 @@ function resolve(a: Pet, b: Pet, touch: Contact): readonly [Pet, Pet] {
  *（法线由 `touch.sign` 定，从 a 指向 b）。
  *
  * **必须乘 `sign`**：不乘的话「b 在 a 左边」时两只会朝着彼此推，越推越进去。
+ *
+ * **推不进地里，也推不出墙外。** 一只从天上砸到另一只头上时，两边各让一半——
+ * 而下面那只脚下就是地，那一半没处让，于是它被按进地下几个像素，
+ * 屏幕上就是「摔进去了」。地面是硬的：让不动就是让不动，剩下的重叠由下一遍
+ * 扫描去推上面那只（它才是能动的那个）。
  */
-function nudge(p: Pet, touch: Contact, share: number): Pet {
+function nudge(p: Pet, touch: Contact, share: number, bounds: Bounds): Pet {
   const by = share * touch.sign * touch.depth
-  return touch.axis === "x" ? { ...p, x: p.x - by } : { ...p, y: p.y - by }
+  if (touch.axis === "x") return { ...p, x: Math.min(Math.max(p.x - by, 0), bounds.right) }
+  return { ...p, y: Math.min(p.y - by, bounds.floor) }
 }
 
 /** 沿法向加一份速度。 */

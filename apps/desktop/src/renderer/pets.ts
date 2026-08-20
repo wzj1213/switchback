@@ -216,6 +216,12 @@ function arrive(spot: { x: number; y: number; spin: number }, homeX: number, gai
   return { x, y, vx, vy: -HOP_VY, spin, mode: "hop" }
 }
 
+/** 活动区的两条硬边：地面（左上角能到的最大 y）和右墙。 */
+export interface Bounds {
+  floor: number
+  right: number
+}
+
 /**
  * 挨了一下：多快、朝哪条轴。**界面拿它演挤压**——从天上砸下来是压扁，
  * 横着挨一记是压瘦，两者用同一个形的话，撞击就没了方向。
@@ -240,12 +246,7 @@ const HIT_PUSH = 200
  *   「落在窝的另一侧、掉头往回蹦」也算成撞墙；
  * - 撞同伴：`bump` 把速度改了（`stepped` 是撞之前、`now` 是撞之后）。
  */
-export function hitOf(
-  was: Pet,
-  stepped: Pet,
-  now: Pet,
-  bounds: { floor: number; right: number },
-): Hit | undefined {
+export function hitOf(was: Pet, stepped: Pet, now: Pet, bounds: Bounds): Hit | undefined {
   if (was.y < bounds.floor && now.y >= bounds.floor && was.vy > HIT_LAND) {
     return { speed: was.vy, axis: "y" }
   }

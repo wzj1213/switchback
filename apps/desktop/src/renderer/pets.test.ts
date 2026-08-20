@@ -16,6 +16,8 @@ import {
 
 const stage: Stage = { width: 600, height: 300 }
 const floor = stage.height - SIZE
+/** 活动区的两条硬边。**互相推的时候地面和墙一样是硬的**，所以 `bump` 也要知道。 */
+const bounds = { floor, right: stage.width - SIZE }
 
 const air = (over: Partial<Pet> = {}): Pet => ({
   x: 100,
@@ -189,7 +191,7 @@ describe("翻滚与互撞", () => {
   it("飞过来的会把窝里那只撞飞", () => {
     const hitter: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
     const victim: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const [a, b] = bump([hitter, victim])
+    const [a, b] = bump([hitter, victim], bounds)
     expect(b?.mode).toBe("air")
     expect(b?.vx).toBeGreaterThan(0)
     expect(b?.vy).toBeLessThan(0) // 被顶起来一点，不是贴地平推
@@ -199,13 +201,13 @@ describe("翻滚与互撞", () => {
   it("离得远就不算碰上", () => {
     const fast: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
     const far: Pet = { x: 400, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    expect(bump([fast, far])[1]?.mode).toBe("rest")
+    expect(bump([fast, far], bounds)[1]?.mode).toBe("rest")
   })
 
   it("蹭一下只是把它推开，不顶起来——一脚踹飞的反应配不上一次擦肩", () => {
     const slow: Pet = { x: 100, y: floor, vx: 40, vy: 0, spin: 0, mode: "air" }
     const near: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const [, b] = bump([slow, near])
+    const [, b] = bump([slow, near], bounds)
     expect(b?.vy).toBe(0) // 没被顶起来
     expect(b?.x).toBeGreaterThan(near.x) // 但确实被推开了，不再叠在一起
   })
@@ -213,7 +215,7 @@ describe("翻滚与互撞", () => {
   it("被推开的那只按自己的步态回窝：史莱姆是蹦回去的，不是贴地滑回去", () => {
     const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
     const slime: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const pushed = bump([rock, slime])[1]
+    const pushed = bump([rock, slime], bounds)[1]
     expect(pushed?.mode).toBe("air") // 交给落地那一段去挑走还是蹦
     const next = step(pushed ?? slime, 1 / 60, { stage, homeX: 400, gait: "hop" })
     expect(next.mode).toBe("hop")
@@ -222,29 +224,29 @@ describe("翻滚与互撞", () => {
   it("撞完两只不再重叠——叠在一起看起来是一只长了两个头", () => {
     const a: Pet = { x: 100, y: floor, vx: 700, vy: 0, spin: 0, mode: "air" }
     const b: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const [na, nb] = bump([a, b])
+    const [na, nb] = bump([a, b], bounds)
     expect(Math.abs((nb?.x ?? 0) - (na?.x ?? 0))).toBeGreaterThanOrEqual(SIZE)
   })
 
   it("两只都在飞也会撞：同时甩出去的不该互相穿过去", () => {
     const l: Pet = { x: 100, y: 40, vx: 600, vy: 0, spin: 0, mode: "air" }
     const r: Pet = { x: 118, y: 40, vx: -600, vy: 0, spin: 0, mode: "air" }
-    const [na, nb] = bump([l, r])
+    const [na, nb] = bump([l, r], bounds)
     expect(na?.vx).toBeLessThan(0) // 撞完各自往回弹
     expect(nb?.vx).toBeGreaterThan(0)
   })
 
   it("撞得越狠飞得越远——快慢的差别由速度说，不由常数说", () => {
     const victim = (): Pet => ({ x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" })
-    const soft = bump([{ x: 100, y: floor, vx: 300, vy: 0, spin: 0, mode: "air" }, victim()])
-    const hard = bump([{ x: 100, y: floor, vx: 900, vy: 0, spin: 0, mode: "air" }, victim()])
+    const soft = bump([{ x: 100, y: floor, vx: 300, vy: 0, spin: 0, mode: "air" }, victim()], bounds)
+    const hard = bump([{ x: 100, y: floor, vx: 900, vy: 0, spin: 0, mode: "air" }, victim()], bounds)
     expect(hard[1]?.vx ?? 0).toBeGreaterThan((soft[1]?.vx ?? 0) * 2)
   })
 
   it("捏在手里那只推不动、也不吃速度——它是块石头，可以当推土机", () => {
     const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
     const there: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const [na, nb] = bump([rock, there])
+    const [na, nb] = bump([rock, there], bounds)
     expect(na).toEqual(rock)
     expect(nb?.x).toBeGreaterThan(there.x)
   })
@@ -252,7 +254,7 @@ describe("翻滚与互撞", () => {
   it("从右往左撞也得推对方向——法线漏乘符号时，两只会朝着彼此推，越推越进去", () => {
     const hitter: Pet = { x: 120, y: floor, vx: -800, vy: 0, spin: 0, mode: "air" }
     const victim: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const [a, b] = bump([hitter, victim])
+    const [a, b] = bump([hitter, victim], bounds)
     expect(b?.vx).toBeLessThan(0) // 被打的往左飞
     expect(a?.x).toBeGreaterThan(hitter.x) // 打人的往右退，不是继续往左钻
     expect((a?.x ?? 0) - (b?.x ?? 0)).toBeGreaterThanOrEqual(SIZE)
@@ -262,15 +264,15 @@ describe("翻滚与互撞", () => {
     const there = (): Pet => ({ x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" })
     const swung: Pet = { x: 100, y: floor, vx: 900, vy: 0, spin: 0, mode: "held" }
     const crept: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
-    expect(bump([swung, there()])[1]?.vy).toBeLessThan(0) // 被掀起来
-    expect(bump([crept, there()])[1]?.vy).toBe(0) // 只是被推开
+    expect(bump([swung, there()], bounds)[1]?.vy).toBeLessThan(0) // 被掀起来
+    expect(bump([crept, there()], bounds)[1]?.vy).toBe(0) // 只是被推开
   })
 
   it("推土机能一路犁开一排：第一只被推开，它再推第二只", () => {
     const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
     const one: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
     const two: Pet = { x: 124, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    const [, a, b] = bump([rock, one, two])
+    const [, a, b] = bump([rock, one, two], bounds)
     expect(a?.x).toBeGreaterThan(one.x)
     // 第二只也得让开，否则一排全叠在第一只身上，看着是一坨
     expect(b?.x).toBeGreaterThan(two.x)
@@ -279,25 +281,39 @@ describe("翻滚与互撞", () => {
   it("两只都在地上蹭的时候互相穿过去——互相推的话谁也走不回窝，rAF 也就停不掉", () => {
     const l: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "walk" }
     const r: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "walk" }
-    expect(bump([l, r])).toEqual([l, r])
+    expect(bump([l, r], bounds)).toEqual([l, r])
+  })
+
+  it("砸到别人头上时，下面那只不会被按进地里——地面是硬的", () => {
+    const dropped: Pet = { x: 100, y: floor - 22, vx: 0, vy: 900, spin: 0, mode: "air" }
+    const under: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [top, low] = bump([dropped, under], bounds)
+    expect(low?.y).toBe(floor) // 一个像素都不许陷下去
+    expect(top?.y).toBeLessThan(dropped.y) // 让不动的那一半由上面那只来让
+  })
+
+  it("也推不出墙外去", () => {
+    const rock: Pet = { x: bounds.right - 4, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
+    const edge: Pet = { x: bounds.right, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    expect(bump([rock, edge], bounds)[1]?.x).toBeLessThanOrEqual(bounds.right)
   })
 
   it("回窝路上没有碰撞体积：蹦回去的那只不会一路把窝里的撞开", () => {
     const back: Pet = { x: 100, y: floor - 20, vx: 300, vy: 0, spin: 0, mode: "hop" }
     const home: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    expect(bump([back, home])).toEqual([back, home])
+    expect(bump([back, home], bounds)).toEqual([back, home])
   })
 
   it("在飞的也撞不着正在回窝的那只——它已经在让路了", () => {
     const thrown: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
     const going: Pet = { x: 112, y: floor, vx: -50, vy: 0, spin: 0, mode: "walk" }
-    expect(bump([thrown, going])).toEqual([thrown, going])
+    expect(bump([thrown, going], bounds)).toEqual([thrown, going])
   })
 
   it("但你手里那只照样推得动正在回窝的——你的手是实的", () => {
     const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
     const going: Pet = { x: 112, y: floor, vx: -50, vy: 0, spin: 0, mode: "walk" }
-    expect(bump([rock, going])[1]?.x).toBeGreaterThan(going.x)
+    expect(bump([rock, going], bounds)[1]?.x).toBeGreaterThan(going.x)
   })
 })
 

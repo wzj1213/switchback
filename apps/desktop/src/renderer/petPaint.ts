@@ -34,7 +34,7 @@ export function paintPets(view: PetView, pets: readonly Pet[], stage: Stage): vo
   const floor = stage.height - SIZE
   for (const [i, pet] of pets.entries()) {
     place(view.nodes[i], pet)
-    lean(view.leans[i], pet)
+    lean(view.leans[i], pet, floor)
     shade(view.shades[i], pet, floor)
   }
 }
@@ -48,7 +48,7 @@ function place(node: HTMLButtonElement | null | undefined, pet: Pet): void {
   node.classList.toggle("pet--air", pet.mode === "air" || pet.mode === "hop")
 }
 
-function lean(node: HTMLSpanElement | null | undefined, pet: Pet): void {
+function lean(node: HTMLSpanElement | null | undefined, pet: Pet, floor: number): void {
   if (node === null || node === undefined) return
   if (pet.mode === "rest") {
     // 清空，把这一层还给 CSS（`.pet--held` 那档放大是写在样式表里的）
@@ -58,7 +58,42 @@ function lean(node: HTMLSpanElement | null | undefined, pet: Pet): void {
   // 翻滚优先：真被甩出去时姿态角是累积的（会转好几圈），慢的时候只是顺着走势歪一点
   const angle = Math.abs(pet.spin) > 0.5 ? pet.spin : clamp(pet.vx * 0.022, -15, 15)
   const pull = clamp(Math.abs(pet.vy) / 2600, 0, 0.16)
-  node.style.transform = `rotate(${angle.toFixed(2)}deg) scale(${(1 - pull).toFixed(3)}, ${(1 + pull).toFixed(3)})`
+  const rise = riseOf(pet, angle, pull, floor)
+  node.style.transform = `translateY(${(-rise).toFixed(2)}px) rotate(${angle.toFixed(2)}deg) scale(${(1 - pull).toFixed(3)}, ${(1 + pull).toFixed(3)})`
+}
+
+/** 离地多高以内开始托。40 大约是一个身位半：再远就看得出它在「浮」。 */
+const RISE_FADE = 40
+
+/**
+ * 翻着落地时要把身子托起来多少。
+ *
+ * ## 为什么非托不可
+ *
+ * 转轴在**脚下**（`transform-origin: bottom center`，因为压扁拉长都得踩着地演），
+ * 而物理只把它当一个 30×30 的正方盒。一转起来，身子就伸到盒子外面去了——
+ * 翻到头朝下时**整整一个身位在盒子底下**。实测一次乱摔最深 27px：
+ * 小半只宠物埋进输入框里。
+ *
+ * 这里算的就是「转成这个角度之后，最低的那个角比脚线低多少」：
+ * 底边两个角贡献 `sin`，翻过头（`cos < 0`）时整个身子还要再吊下去一截。
+ *
+ * ## 只在贴地时托
+ *
+ * 空中不托——那时候它**本来就该翻得满天飞**，托起来反而像被线吊着。
+ * 越接近地面托得越足，两个量都是连续的，所以中间没有跳变。
+ */
+function riseOf(pet: Pet, angle: number, pull: number, floor: number): number {
+  const rad = (angle * Math.PI) / 180
+  // 抻长那一档也要算进去：竖着被拉长 16% 的时候，倒栽葱的那一截也长 16%。
+  // **再留一成半余量**：身体那一层同时还在演砸扁（最多横着撑开 30%，见 `Pets.tsx`
+  // 的 `squash`），而这一层看不见那个动画的实时值。宁可多托两像素——
+  // 那看起来只是「还在翻」，少托两像素看起来是「埋进去了」
+  const half = (SIZE / 2) * (1 - pull) * 1.25
+  const tall = SIZE * (1 + pull)
+  const dip = half * Math.abs(Math.sin(rad)) - tall * Math.min(0, Math.cos(rad))
+  const near = clamp(1 - (floor - pet.y) / RISE_FADE, 0, 1)
+  return dip * near
 }
 
 function shade(node: HTMLSpanElement | null | undefined, pet: Pet, floor: number): void {

@@ -94,10 +94,12 @@ export function usePets(
           gait: gaits[i] ?? "walk",
         }),
       )
-      pets.current = [...bump(moved)]
+      const bounds = { floor: stage.current.height - SIZE, right: stage.current.width - SIZE }
+      // **边界要传进去**：互相推的时候地面和墙一样是硬的，
+      // 不给的话下面那只会被按进地里（`nudge`）
+      pets.current = [...bump(moved, bounds)]
       // 挨了一下就要有反应。判据在 `hitOf`——**比较前后**是唯一能认出
       // 「刚刚撞到了」的地方，物理函数是纯的，它不知道自己是第几帧
-      const bounds = { floor: stage.current.height - SIZE, right: stage.current.width - SIZE }
       for (const [i, now] of pets.current.entries()) {
         const before = was[i]
         const pushed = moved[i]

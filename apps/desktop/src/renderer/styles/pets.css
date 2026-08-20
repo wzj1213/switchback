@@ -248,7 +248,13 @@
   animation: pet-stretch 900ms ease-in-out;
 }
 
-/* 抖两下，像甩掉身上的水。**幅度递减**，一样大的三下是机器在摆 */
+/*
+ * 抖两下，像甩掉身上的水。**幅度递减**，一样大的三下是机器在摆。
+ *
+ * 每一档都配一小截 `translateY`：转轴在脚下（见 `.pet__body` 的 `transform-origin`），
+ * 一转起来底边那个角就低于脚线——歪 6° 就有 1.6px 埋进输入框里。
+ * 抬起来的量就是 `半宽 × sin(角度)`，和 `petPaint` 里那条 `riseOf` 同一笔账。
+ */
 @keyframes pet-wiggle {
   0%,
   100% {
@@ -256,15 +262,15 @@
   }
 
   20% {
-    transform: rotate(-6deg);
+    transform: translateY(-1.6px) rotate(-6deg);
   }
 
   45% {
-    transform: rotate(5deg);
+    transform: translateY(-1.3px) rotate(5deg);
   }
 
   70% {
-    transform: rotate(-2.5deg);
+    transform: translateY(-0.7px) rotate(-2.5deg);
   }
 }
 
@@ -368,7 +374,8 @@
 @keyframes pet-scuttle {
   0%,
   100% {
-    transform: translateY(0) rotate(-2.5deg);
+    /* 那 0.7px 是转轴在脚下的找补——不抬的话底边那个角会蹭进输入框里 */
+    transform: translateY(-0.7px) rotate(-2.5deg);
   }
 
   50% {
