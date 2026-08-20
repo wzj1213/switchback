@@ -217,39 +217,157 @@ function arrive(spot: { x: number; y: number; spin: number }, homeX: number, gai
 }
 
 /**
- * 互相撞。**飞过来的那只会把窝里的撞开。**
- *
- * 这是唯一一处 pet 与 pet 之间有关系的地方，所以它没法写进 `step`——
+ * 互相撞。**这是唯一一处 pet 与 pet 之间有关系的地方**，所以它没法写进 `step`——
  * 那个函数一次只看得见一只。放在每帧 `step` 之后跑一遍。
  *
- * 只处理「动的撞静的」，不做两只都在飞时的弹性碰撞：那需要正经的动量交换，
- * 而这里要的只是**你把一只扔过去、另一只会被撞飞**这个反应。
+ * ## 上一版只做了「动的撞静的」，缺了三样
+ *
+ * 1. **两只都在飞时互不理睬**：同时甩出去的两只会从对方身上穿过去。
+ * 2. **没有分开这一步**：撞上之后两个方盒可以叠在一起，看起来是一只两个头。
+ * 3. **速度是按系数发的，不是换的**：撞人的固定剩 45%、被撞的固定拿 70%，
+ *    于是轻轻碰一下和用力砸过去，被撞那只飞出去的样子差不多。
+ *
+ * 现在是正经的等质量碰撞：**沿重叠浅的那条轴交换法向速度**（带恢复系数），
+ * 再把两只推开到不重叠。轻轻蹭一下就是蹭一下，用力砸就真能把对方打飞——
+ * 差别由速度自己说，不由常数说。
+ *
+ * ## 两只都在地上蹭的时候，让它们互相穿过去
+ *
+ * 不是偷懒：两只走回窝的路上互相推，**谁也走不到自己的窝**，
+ * 而 `busy` 会因此永远是真——rAF 就再也停不下来了。有一只在飞（或者被你捏着）
+ * 才算数，那时候能量是会衰减的，撞几下总会停。
+ *
+ * **但这一帧里被推过的那只算「动着」**（`shoved`）：不然拿手里那只去犁一排，
+ * 第一只被推开、第二只不认它，一排全叠在一起变成一坨。
+ * 这个标记只活在这一帧、也只从「飞的/被捏着的」那里传下去，
+ * 所以上面那条「走路的互相穿过去」仍然成立，不会推回去。
  */
 export function bump(pets: readonly Pet[]): readonly Pet[] {
+  const shoved = new Set<number>()
+  let out: readonly Pet[] = pets
+  for (let pass = 0; pass < PASSES; pass += 1) out = sweep(out, shoved)
+  return out
+}
+
+/**
+ * 扫几遍。**一遍扫不干净**：把 A 从 B 里推出来，可能正好把它推进 C，
+ * 而 C 那一对这一帧已经算过了——三只挤在一起时就会出现「越推越进去」。
+ *
+ * 冲量不会因此发几次：它只在两只**正在互相靠近**时给（`closing > 0`），
+ * 而第一遍就把相对速度反过来了，后面几遍剩下的只有「把重叠推开」这一件事。
+ */
+const PASSES = 3
+
+function sweep(pets: readonly Pet[], shoved: Set<number>): readonly Pet[] {
   const next = [...pets]
-  for (const [i, hitter] of next.entries()) {
-    if (hitter.mode !== "air" || Math.abs(hitter.vx) < HIT_MIN) continue
-    for (const [j, victim] of next.entries()) {
-      if (i === j || victim.mode === "held" || victim.mode === "air") continue
-      if (Math.abs(hitter.x - victim.x) >= SIZE || Math.abs(hitter.y - victim.y) >= SIZE) continue
-      next[j] = { ...victim, vx: hitter.vx * HIT_PASS, vy: -HIT_UP, mode: "air" }
-      // 撞完自己也慢下来。**不设成零**：那样它会当场掉下去，看着像撞在墙上
-      next[i] = { ...hitter, vx: hitter.vx * HIT_KEEP }
+  for (let i = 0; i < next.length; i += 1) {
+    for (let j = i + 1; j < next.length; j += 1) {
+      const a = next[i]
+      const b = next[j]
+      if (a === undefined || b === undefined) continue
+      if (!quick(a) && !quick(b) && !shoved.has(i) && !shoved.has(j)) continue
+      const touch = contactOf(a, b)
+      if (touch === undefined) continue
+      const [na, nb] = resolve(a, b, touch)
+      next[i] = na
+      next[j] = nb
+      shoved.add(i)
+      shoved.add(j)
     }
   }
   return next
 }
 
-/** 慢过这个速度就只是蹭一下，不算撞 */
-const HIT_MIN = 260
-/** 撞出去的那只接过多少横速 */
-const HIT_PASS = 0.7
-/** 被撞的会被顶起来一点——纯平的横飞看着像冰壶 */
-const HIT_UP = 210
-/** 撞人的自己还剩多少 */
-const HIT_KEEP = 0.45
+/** 被你捏着的那只是块**石头**：推不动、也不吃速度。于是它能当推土机使。 */
+const stone = (p: Pet): boolean => p.mode === "held"
 
-/** 还有东西在动吗。**没有就停掉 rAF**——一个天天开着的窗口不该为三只静止的史莱姆每秒醒 60 次。 */
+/** 快的那几档。两只都不在这几档里就互相穿过去，理由见 `bump`。 */
+const quick = (p: Pet): boolean => p.mode === "air" || p.mode === "hop" || p.mode === "held"
+
+/** 撞在哪条轴上、陷进去多深、谁在谁那一侧（`sign` = 1 表示 b 在 a 的正方向）。 */
+interface Contact {
+  axis: "x" | "y"
+  depth: number
+  sign: number
+}
+
+/**
+ * 两个方盒重叠没有。**从重叠浅的那条轴推开**——按深的那条推会把它径直
+ * 顶到另一边去，看起来像瞬移。
+ */
+function contactOf(a: Pet, b: Pet): Contact | undefined {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const ox = SIZE - Math.abs(dx)
+  const oy = SIZE - Math.abs(dy)
+  if (ox <= 0 || oy <= 0) return undefined
+  // 正好重合时 `Math.sign` 给 0，会让两只谁也推不开——退化成「b 在正方向」
+  if (ox <= oy) return { axis: "x", depth: ox, sign: Math.sign(dx) || 1 }
+  return { axis: "y", depth: oy, sign: Math.sign(dy) || 1 }
+}
+
+/** 恢复系数。1 = 完全弹开（撞球），0 = 粘住。0.75 是「弹得动，但不会没完」 */
+const REST = 0.75
+/** 关速小于这个就只是蹭一下：分开就行，不掀翻对方 */
+const HIT_MIN = 150
+/** 被掀翻的那只顺带被顶起来一点——纯平的横飞看着像冰壶 */
+const HIT_UP = 200
+
+/** 沿法向的分量。两条轴各取各的，别的分量原样留着（不是全弹性球，是两个方盒）。 */
+const along = (p: Pet, axis: Contact["axis"]): number => (axis === "x" ? p.vx : p.vy)
+
+function resolve(a: Pet, b: Pet, touch: Contact): readonly [Pet, Pet] {
+  // 关速：两只**正在互相靠近**的速度。已经在分开就不再给冲量，
+  // 否则同一次接触会在连续几帧里反复加速，两只粘在一起抽搐
+  const closing = (along(a, touch.axis) - along(b, touch.axis)) * touch.sign
+  const kick = closing > 0 ? closing * touch.sign : 0
+  /** 这一只承担多少：**都能动就各让一半，撞上石头的自己全担**（等于撞墙）。 */
+  const part = (me: Pet, other: Pet): number => (stone(me) ? 0 : stone(other) ? 1 : 0.5)
+  const moved = (p: Pet, other: Pet, dir: number): Pet => {
+    if (stone(p)) return p
+    const k = part(p, other)
+    return wake(shove(nudge(p, touch, dir * k), touch, -dir * kick * k * (1 + REST)), closing)
+  }
+  return [moved(a, b, 1), moved(b, a, -1)]
+}
+
+/**
+ * 把陷进去的那点推出来。`share` 是**带符号的份额**：正的往法线的反方向让
+ *（法线由 `touch.sign` 定，从 a 指向 b）。
+ *
+ * **必须乘 `sign`**：不乘的话「b 在 a 左边」时两只会朝着彼此推，越推越进去。
+ */
+function nudge(p: Pet, touch: Contact, share: number): Pet {
+  const by = share * touch.sign * touch.depth
+  return touch.axis === "x" ? { ...p, x: p.x - by } : { ...p, y: p.y - by }
+}
+
+/** 沿法向加一份速度。 */
+function shove(p: Pet, touch: Contact, dv: number): Pet {
+  return touch.axis === "x" ? { ...p, vx: p.vx + dv } : { ...p, vy: p.vy + dv }
+}
+
+/**
+ * 撞到在地上待着的那只：**把它掀起来**。
+ *
+ * 蹭一下（关速小）就只把它推开，不改状态——那时候它还站在地上，
+ * 一脚踹飞的反应配不上一次擦肩。
+ */
+function wake(p: Pet, closing: number): Pet {
+  if (p.mode !== "rest" && p.mode !== "walk") return p
+  if (closing < HIT_MIN) return { ...p, mode: "walk" }
+  return { ...p, vy: p.vy - HIT_UP, mode: "air" }
+}
+
+/**
+ * 还有东西在动吗。**没有就停掉 rAF**——一个天天开着的窗口不该为三只静止的
+ * 史莱姆每秒醒 60 次。
+ *
+ * **被你捏着的那只也算在动。** 上一版把 `held` 判成不忙，于是捏着一只不放的时候
+ * 整个帧循环是停的，而 `bump` 只在帧循环里跑——**拿它去推另外几只不会发生任何事**。
+ * 现在捏着就转：你可以拿手里这只当推土机，把窝里那几只一路犁开。
+ * 松手那一刻它变成 `air` 或 `rest`，循环照常自己停。
+ */
 export function busy(pets: readonly Pet[]): boolean {
-  return pets.some((p) => p.mode !== "rest" && p.mode !== "held")
+  return pets.some((p) => p.mode !== "rest")
 }

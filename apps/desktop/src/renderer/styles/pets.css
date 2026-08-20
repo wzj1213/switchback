@@ -211,6 +211,116 @@
 }
 
 /*
+ * ── 闲着时的小动作 ────────────────────────────────────
+ *
+ * 一次一只、一次一个，间隔随机（排班在 `usePetMood.ts`）。**全都是一次性的**，
+ * 没有一条 `infinite`——常驻动画会持续抢注意力，而它们就蹲在你打字时视线停的
+ * 那个点上（同一条规矩写在 `status.css` 的微光那儿）。
+ *
+ * **摆在 `.pet--run` / `.pet--walk` 前面**：那两条是状态（在干活、在走回窝），
+ * 同为 `.pet__body` 的动画时后写的赢，状态必须压过装饰。
+ */
+
+/* 伸个懒腰：先蹲一下蓄力，再抻上去。最慢的一个，所以排班里也最少 */
+@keyframes pet-stretch {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+
+  25% {
+    transform: translateY(1px) scale(1.09, 0.91);
+  }
+
+  55% {
+    transform: translateY(-4px) scale(0.9, 1.13);
+  }
+
+  80% {
+    transform: translateY(0) scale(1.05, 0.95);
+  }
+
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+.pet--stretch .pet__body {
+  animation: pet-stretch 900ms ease-in-out;
+}
+
+/* 抖两下，像甩掉身上的水。**幅度递减**，一样大的三下是机器在摆 */
+@keyframes pet-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  20% {
+    transform: rotate(-6deg);
+  }
+
+  45% {
+    transform: rotate(5deg);
+  }
+
+  70% {
+    transform: rotate(-2.5deg);
+  }
+}
+
+.pet--wiggle .pet__body {
+  animation: pet-wiggle 520ms ease-in-out;
+}
+
+/* 原地颠一下。比点它那一下（`BOOP`）轻得多——那是被戳，这是自己想动 */
+@keyframes pet-bounce {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+
+  20% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+
+  55% {
+    transform: translateY(-7px) scale(0.94, 1.08);
+  }
+
+  85% {
+    transform: translateY(0) scale(1.06, 0.94);
+  }
+
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+.pet--bounce .pet__body {
+  animation: pet-bounce 460ms ease-out;
+}
+
+/* 打个盹：眼睛闭上，身子慢慢起伏两下。**排班里最少的一个**——
+   它最长（2.6s），撞见的次数一多就不像打盹像坏了 */
+@keyframes pet-doze {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+
+  50% {
+    transform: scale(1.03, 0.97);
+  }
+}
+
+.pet--doze .pet__eyes {
+  transform: scaleY(0.1);
+}
+
+.pet--doze .pet__body {
+  animation: pet-doze 1300ms ease-in-out 2;
+}
+
+/*
  * 跑着的时候跳。**关键帧和最初那版的 `hop` 逐帧相同**——压扁蓄力、弹起拉长、
  * 落地砸扁、回弹，一个不少；变的只有频率：从 `1.8s infinite` 改成
  * `4s 一次、600ms 起、每次约 1s`，和 `status.css` 那道微光逐字对齐。
@@ -275,8 +385,18 @@
   （松手之后的抛物线由 `Pets.tsx` 自己跳过，直接回窝） */
 @media (prefers-reduced-motion: reduce) {
   .pet--run .pet__body,
-  .pet--walk .pet__body {
+  .pet--walk .pet__body,
+  .pet--stretch .pet__body,
+  .pet--wiggle .pet__body,
+  .pet--bounce .pet__body,
+  .pet--doze .pet__body {
     animation: none;
+  }
+
+  /* 闲着那几个动作整个不排班（`usePetMood` 在这一档下压根不开表），
+     这里再堵一道：眯着眼那一档不能因为漏网就一直挂着 */
+  .pet--doze .pet__eyes {
+    transform: none;
   }
 
   /* 瞟眼那几条整个不发生：`useMood` 在这一档下压根不排班，

@@ -195,13 +195,81 @@ describe("翻滚与互撞", () => {
     expect(a?.vx).toBeLessThan(hitter.vx) // 撞人的自己也慢下来
   })
 
-  it("离得远、或者太慢，都不算撞", () => {
-    const slow: Pet = { x: 100, y: floor, vx: 40, vy: 0, spin: 0, mode: "air" }
-    const near: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
-    expect(bump([slow, near])[1]?.mode).toBe("rest")
+  it("离得远就不算碰上", () => {
     const fast: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
     const far: Pet = { x: 400, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
     expect(bump([fast, far])[1]?.mode).toBe("rest")
+  })
+
+  it("蹭一下只是把它推开，不掀翻——一脚踹飞的反应配不上一次擦肩", () => {
+    const slow: Pet = { x: 100, y: floor, vx: 40, vy: 0, spin: 0, mode: "air" }
+    const near: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [, b] = bump([slow, near])
+    expect(b?.mode).not.toBe("air")
+    expect(b?.x).toBeGreaterThan(near.x) // 但确实被推开了，不再叠在一起
+  })
+
+  it("撞完两只不再重叠——叠在一起看起来是一只长了两个头", () => {
+    const a: Pet = { x: 100, y: floor, vx: 700, vy: 0, spin: 0, mode: "air" }
+    const b: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [na, nb] = bump([a, b])
+    expect(Math.abs((nb?.x ?? 0) - (na?.x ?? 0))).toBeGreaterThanOrEqual(SIZE)
+  })
+
+  it("两只都在飞也会撞：同时甩出去的不该互相穿过去", () => {
+    const l: Pet = { x: 100, y: 40, vx: 600, vy: 0, spin: 0, mode: "air" }
+    const r: Pet = { x: 118, y: 40, vx: -600, vy: 0, spin: 0, mode: "air" }
+    const [na, nb] = bump([l, r])
+    expect(na?.vx).toBeLessThan(0) // 撞完各自往回弹
+    expect(nb?.vx).toBeGreaterThan(0)
+  })
+
+  it("撞得越狠飞得越远——快慢的差别由速度说，不由常数说", () => {
+    const victim = (): Pet => ({ x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" })
+    const soft = bump([{ x: 100, y: floor, vx: 300, vy: 0, spin: 0, mode: "air" }, victim()])
+    const hard = bump([{ x: 100, y: floor, vx: 900, vy: 0, spin: 0, mode: "air" }, victim()])
+    expect(hard[1]?.vx ?? 0).toBeGreaterThan((soft[1]?.vx ?? 0) * 2)
+  })
+
+  it("捏在手里那只推不动、也不吃速度——它是块石头，可以当推土机", () => {
+    const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
+    const there: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [na, nb] = bump([rock, there])
+    expect(na).toEqual(rock)
+    expect(nb?.x).toBeGreaterThan(there.x)
+  })
+
+  it("从右往左撞也得推对方向——法线漏乘符号时，两只会朝着彼此推，越推越进去", () => {
+    const hitter: Pet = { x: 120, y: floor, vx: -800, vy: 0, spin: 0, mode: "air" }
+    const victim: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [a, b] = bump([hitter, victim])
+    expect(b?.vx).toBeLessThan(0) // 被打的往左飞
+    expect(a?.x).toBeGreaterThan(hitter.x) // 打人的往右退，不是继续往左钻
+    expect((a?.x ?? 0) - (b?.x ?? 0)).toBeGreaterThanOrEqual(SIZE)
+  })
+
+  it("抡着一只去砸：手里那只带着速度，砸中的会被掀飞（贴着慢慢蹭则不会）", () => {
+    const there = (): Pet => ({ x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" })
+    const swung: Pet = { x: 100, y: floor, vx: 900, vy: 0, spin: 0, mode: "held" }
+    const crept: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
+    expect(bump([swung, there()])[1]?.mode).toBe("air")
+    expect(bump([crept, there()])[1]?.mode).toBe("walk")
+  })
+
+  it("推土机能一路犁开一排：第一只被推开，它再推第二只", () => {
+    const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
+    const one: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const two: Pet = { x: 124, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [, a, b] = bump([rock, one, two])
+    expect(a?.x).toBeGreaterThan(one.x)
+    // 第二只也得让开，否则一排全叠在第一只身上，看着是一坨
+    expect(b?.x).toBeGreaterThan(two.x)
+  })
+
+  it("两只都在地上蹭的时候互相穿过去——互相推的话谁也走不回窝，rAF 也就停不掉", () => {
+    const l: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "walk" }
+    const r: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "walk" }
+    expect(bump([l, r])).toEqual([l, r])
   })
 })
 
@@ -209,7 +277,8 @@ describe("busy", () => {
   // 三只静止的史莱姆不该让窗口每秒醒 60 次
   it("全在窝里就是不忙", () => {
     expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "rest" }])).toBe(false)
-    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "held" }])).toBe(false)
+    // 捏着的那只**算在动**：碰撞只在帧循环里算，循环停了就推不动别人
+    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "held" }])).toBe(true)
     expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "walk" }])).toBe(true)
     expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "hop" }])).toBe(true)
   })

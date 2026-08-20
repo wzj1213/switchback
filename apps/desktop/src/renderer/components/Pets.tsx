@@ -2,7 +2,8 @@ import { useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
 import { Crab, Slime } from "./pets-art.js"
 import { gaitOf, lookOf, type Pet, type PetLook } from "../pets.js"
-import { useMood, usePets, useReduced } from "../usePets.js"
+import { usePets, useReduced } from "../usePets.js"
+import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
 
 /**
@@ -61,6 +62,7 @@ export function Pets({
   const reduced = useReduced()
   // 砸到地上要有分量：**按落地速度定砸扁的深浅**，轻轻放下几乎看不出，
   // 从对话框顶上摔下来会实实在在瘪一下
+  // 撞到同伴也走这一下（`usePets` 里判的）：**撞地和撞同伴在眼睛看来是同一件事**
   const onLand = useCallback(
     (index: number, speed: number) => {
       if (reduced) return
@@ -83,7 +85,8 @@ export function Pets({
     [reduced],
   )
   const ctl = usePets(count, gaits, onLand)
-  useMood(ctl.nodes, count, reduced)
+  // **只给待在窝里、又不是正在跑的那几只排班**——理由在 `usePetMood` 开头
+  useMood(ctl.nodes, ctl.pets, count, reduced)
   const drag = usePetDrag(ctl, bodies, reduced)
 
   if (count === 0) return null

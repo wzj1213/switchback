@@ -104,6 +104,10 @@ export function usePetDrag(
       // 这一下——先被指头压扁一瞬，再弹起来托在手里，那才是抓起一个软东西的样子
       e.currentTarget.classList.add("pet--held")
       if (!reduced) bodies.current[index]?.animate(LIFT, { duration: 260, easing: "ease-out" })
+      // **捏起来就得把帧循环拉起来。** 互相撞只在循环里算（`bump`），
+      // 不拉的话手里这只从别人身上推过去毫无反应——它是块能推人的石头，
+      // 前提是有人在算
+      ctl.kick()
       watch(index)
       const p = at(e)
       const now = performance.now()
@@ -141,6 +145,10 @@ export function usePetDrag(
     if (Math.abs(x - pet.x) + Math.abs(y - pet.y) > TAP_PX) g.moved = true
     pet.x = x
     pet.y = y
+    // **手里这只也带着速度。** 物理层不会拿它推进位置（`step` 见了 `held` 直接返回），
+    // 但碰撞要看它：不带的话，抡着一只去砸另一只和贴着它慢慢蹭是同一个结果
+    pet.vx = g.vx
+    pet.vy = g.vy
     watch(g.index)
     ctl.paint()
   }
