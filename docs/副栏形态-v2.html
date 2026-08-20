@@ -1,0 +1,1155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>omni · 副栏形态 v2 · 前沿稿</title>
+<style>
+/* ============================================================
+   基础 token —— 抄自 apps/desktop/src/renderer/styles/tokens.css
+   ============================================================ */
+:root{
+  color-scheme: light dark;
+  --bg:#fff; --bg-sunken:#f7f7f8; --bg-raised:#fff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-press:#e0e0e5; --bg-code:#f6f6f7;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#85858f;
+  --accent:#3b6fd4; --danger:#c2412d; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --dur:120ms; --dur-slow:240ms; --ease:ease;
+  --lh-xs:16px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --text-xs:11.5px; --text-code:12.5px; --text-sm:13px; --text-base:14px; --text-lg:16px;
+  --sidebar-w:250px;
+  --shadow-pop:0 1px 2px rgb(0 0 0/6%),0 8px 28px rgb(0 0 0/12%);
+  --shadow-1:0 1px 2px rgb(0 0 0/6%);
+  --hl-keyword:#8250df; --hl-string:#0a6640; --hl-number:#b35900; --hl-title:#1f5fbf;
+  /* 一个紫，只说一句话：「这里还活着」 */
+  --flow:#6d4aff; --flow-deep:#4a2fd0; --flow-soft:#a78bfa;
+  --flow-tint:color-mix(in srgb, var(--flow) 9%, var(--bg));
+  --flow-line:color-mix(in srgb, var(--flow) 28%, var(--bg));
+  --flow-glow:color-mix(in srgb, var(--flow) 22%, transparent);
+  --flow-wash:color-mix(in srgb, var(--flow) 14%, var(--bg));
+  /* 时间线几何：行网格是 [10px dot][86px 名][1fr 道][34px 时]，间隙 6 */
+  --tl-l:108px; --tl-r:40px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+    --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024;
+    --border:#2a2a30; --border-strong:#3a3a42;
+    --text:#ececef; --text-muted:#9d9da8; --text-faint:#6d6d78;
+    --accent:#7aa2f7; --danger:#e0705c; --ok:#6cc48d;
+    --shadow-pop:0 10px 32px rgb(0 0 0/55%); --shadow-1:none;
+    --hl-keyword:#c792ea; --hl-string:#7fd3a2; --hl-number:#f0a868; --hl-title:#82aaff;
+    --flow:#a78bfa; --flow-deep:#6d4aff; --flow-soft:#c4b5fd;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#6d6d78;
+  --accent:#7aa2f7; --danger:#e0705c; --ok:#6cc48d;
+  --shadow-pop:0 10px 32px rgb(0 0 0/55%); --shadow-1:none;
+  --hl-keyword:#c792ea; --hl-string:#7fd3a2; --hl-number:#f0a868; --hl-title:#82aaff;
+  --flow:#a78bfa; --flow-deep:#6d4aff; --flow-soft:#c4b5fd;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font:var(--text-sm)/1.6 var(--font);background:var(--bg-sunken);color:var(--text);
+  padding:var(--sp-6) var(--sp-5) 64px;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1260px;margin:0 auto}
+.head{display:flex;align-items:flex-start;gap:var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-4)}
+.head h1{font-size:var(--text-lg);font-weight:640;letter-spacing:-.01em}
+.head p{color:var(--text-muted);font-size:var(--text-sm);max-width:64ch;margin-top:var(--sp-1)}
+.head__spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:var(--radius);overflow:hidden;background:var(--bg-raised)}
+.seg button{
+  font:var(--text-xs)/1 var(--font);color:var(--text-muted);background:transparent;border:0;
+  padding:7px 10px;cursor:pointer;transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button:hover{background:var(--bg-hover);color:var(--text)}
+.seg button[aria-pressed="true"]{background:var(--bg-active);color:var(--text);font-weight:600}
+
+h2.sec{
+  font-size:var(--text-xs);font-weight:660;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-faint);margin:var(--sp-6) 0 var(--sp-3);display:flex;align-items:center;gap:var(--sp-3);
+}
+h2.sec::after{content:"";flex:1;height:1px;background:var(--border)}
+.note{color:var(--text-muted);font-size:var(--text-xs);line-height:var(--lh-xs);margin:calc(-1*var(--sp-2)) 0 var(--sp-3);max-width:86ch}
+.note b{color:var(--text);font-weight:620}
+code{font:var(--text-code)/1.5 var(--font-mono);background:var(--bg-code);padding:1px 5px;border-radius:5px}
+
+/* ============================================================ 窗口 */
+.win{
+  display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr) auto;height:720px;
+  background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  overflow:hidden;box-shadow:var(--shadow-pop);
+}
+.pane{min-width:0;display:flex;flex-direction:column}
+.pane+.pane{border-left:1px solid var(--border-strong)}
+.sb{background:var(--bg-sunken)}
+.sb__head{height:44px;display:flex;align-items:center;padding:0 var(--sp-3);border-bottom:1px solid var(--border)}
+.sb__dots{display:flex;gap:6px}
+.sb__dots i{width:11px;height:11px;border-radius:50%;background:var(--bg-active)}
+.sb__body{padding:var(--sp-3) var(--sp-2);display:flex;flex-direction:column;gap:2px}
+.sb__cap{font-size:var(--text-xs);color:var(--text-faint);padding:var(--sp-2) var(--sp-2) var(--sp-1)}
+.sb__row{
+  height:30px;display:flex;align-items:center;gap:var(--sp-2);padding:0 var(--sp-2);
+  border-radius:var(--radius-sm);font-size:var(--text-base);color:var(--text-muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sb__row.is-on{background:var(--bg-active);color:var(--text);font-weight:560}
+.sb__row i{width:6px;height:6px;border-radius:50%;background:var(--border-strong);flex:none}
+
+.mid{background:var(--bg)}
+.mid__head{
+  height:44px;display:flex;align-items:center;gap:var(--sp-2);padding:0 var(--sp-4);
+  border-bottom:1px solid var(--border-strong);font-size:var(--text-sm);color:var(--text-muted);
+}
+.mid__title{color:var(--text);font-weight:600}
+.mid__spacer{flex:1}
+.mid__aside{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:999px;
+  border:1px solid var(--border-strong);background:var(--bg-raised);color:var(--text-muted);
+  font-size:var(--text-xs);cursor:pointer;font-family:var(--font);
+}
+.mid__aside:hover{background:var(--bg-hover);color:var(--text)}
+.mid__aside[hidden]{display:none}
+.livedot{width:6px;height:6px;border-radius:50%;background:var(--flow);animation:breath 1.8s ease-in-out infinite}
+@keyframes breath{0%,100%{opacity:1}50%{opacity:.3}}
+.mid__body{flex:1;overflow:hidden;padding:var(--sp-4) var(--sp-4) 0;display:flex;flex-direction:column;gap:var(--sp-4)}
+.msg--user{
+  align-self:flex-end;max-width:74%;background:var(--bg-sunken);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:var(--sp-2) var(--sp-3);font-size:var(--text-base);
+}
+.msg--claude{font-size:var(--text-base);line-height:1.65;max-width:64ch}
+
+/* flowbar：钉在输入框上方。mini 不是格子带，是副栏那条时间线的**等比缩影** */
+.flowbar{border-top:1px solid var(--border);background:var(--bg-sunken);padding:4px var(--sp-3);display:flex;flex-direction:column}
+.flowbar[hidden]{display:none}
+.flowbar__row{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto 108px auto;
+  align-items:center;gap:10px;min-height:28px;padding:2px 7px;
+  border-radius:var(--radius-sm);cursor:pointer;transition:background var(--dur) var(--ease);
+}
+.flowbar__row:hover{background:var(--bg-hover)}
+.flowbar__bolt{color:var(--flow);display:flex;flex:none}
+.flowbar__row--done .flowbar__bolt{color:var(--ok)}
+.flowbar__name{font-size:var(--text-xs);font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flowbar__row--done .flowbar__name{color:var(--text-muted);font-weight:560}
+.flowbar__meta{
+  font:var(--text-xs)/1 var(--font-mono);color:var(--text-muted);
+  font-variant-numeric:tabular-nums;white-space:nowrap;display:flex;gap:7px;
+}
+.flowbar__meta b{color:var(--text);font-weight:620}
+.flowbar__meta s{color:var(--border-strong);text-decoration:none}
+.flowbar__go{color:var(--text-faint);display:flex;opacity:0;transition:opacity var(--dur) var(--ease)}
+.flowbar__row:hover .flowbar__go{opacity:1}
+/* 缩影：一个 agent 一条 2px 道，几何和副栏时间线完全一致 */
+.fb__mini{width:108px;display:flex;flex-direction:column;justify-content:center}
+.fb__lane{position:relative;height:2px;margin:1px 0;border-radius:1px}
+.fb__q{position:absolute;top:0;bottom:0;border-radius:1px;background:var(--bg-press)}
+.fb__b{position:absolute;top:0;bottom:0;border-radius:1px;transition:left var(--dur-slow) linear,width var(--dur-slow) linear}
+.fb__b--done{background:var(--border-strong)}
+.fb__b--run{background:var(--flow);animation:breath 1.8s ease-in-out infinite}
+.fb__b--fail{background:var(--danger)}
+.fb__mini--wide{width:100%}
+
+.composer{border-top:1px solid var(--border-strong);padding:var(--sp-3) var(--sp-4) var(--sp-4);background:var(--bg)}
+.composer__box{border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--bg-raised);padding:var(--sp-3);box-shadow:var(--shadow-1)}
+.composer__ph{color:var(--text-faint);font-size:var(--text-base);padding:2px 2px 14px}
+.composer__bar{display:flex;align-items:center;gap:var(--sp-2)}
+.composer__spacer{flex:1}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;
+  border:1px solid var(--border-strong);border-radius:999px;background:var(--bg-raised);
+  font-size:var(--text-xs);color:var(--text-muted);cursor:pointer;white-space:nowrap;font-family:var(--font);
+}
+.chip:hover{background:var(--bg-hover)}
+.send{width:28px;height:28px;border-radius:50%;border:1px solid var(--border-strong);background:var(--bg-raised);display:grid;place-items:center;color:var(--text-muted);cursor:pointer}
+
+/* ============================================================
+   推理强度 —— 特效属于「切换的那一瞬间」
+   五档是静态的蓝（借 --accent 加浓）；Ultracode 是独立开关，锁在极高。
+   变身 = clip-path 圆从旋钮漫开这一次，到位后就是一条静止的紫。
+   不漂移、不抖动、不叠马赛克——它是设置，不是进行中的任务。
+   ============================================================ */
+.chip--effort{transition:color var(--dur-slow) var(--ease),background var(--dur-slow) var(--ease),border-color var(--dur-slow) var(--ease)}
+.chip--effort[data-ultra="1"]{background:var(--flow-tint);border-color:var(--flow-line);color:var(--flow)}
+.chip__spark{display:flex}
+.chip__lv{font-weight:640}
+.pop{
+  position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);width:290px;
+  background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-pop);padding:var(--sp-3) var(--sp-3) 14px;z-index:20;
+  transition:border-color var(--dur-slow) var(--ease);
+}
+.pop[data-ultra="1"]{border-color:var(--flow-line)}
+.pop__head{display:flex;align-items:baseline;gap:7px;margin-bottom:2px}
+.pop__k{font-size:var(--text-base);color:var(--text-muted)}
+.pop__v{font-size:var(--text-base);font-weight:660;color:var(--text);transition:color var(--dur-slow) var(--ease)}
+.pop[data-ultra="1"] .pop__v{color:var(--flow)}
+.pop__hint{font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-xs);min-height:32px;margin-bottom:var(--sp-2)}
+.eff{padding:var(--sp-1) 2px 0}
+.eff__ends{display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-muted);margin-bottom:7px}
+.eff__track{position:relative;height:24px;cursor:pointer}
+.eff__track[data-locked="1"]{cursor:not-allowed}
+.eff__rail{position:absolute;inset:0;border-radius:999px;background:var(--bg-active);overflow:hidden}
+.eff__fill{
+  position:absolute;top:0;bottom:0;left:0;border-radius:999px;
+  transition:width .3s cubic-bezier(.32,.72,0,1),background .3s var(--ease);
+}
+/* 漫开的圆心 = 旋钮此刻的位置。不注册 @property、不玩 mask 羽化——
+   clip-path: circle 的 transition 三家浏览器都认 */
+.eff__ultra{
+  position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--flow-deep) 0%,var(--flow) 55%,var(--flow-soft) 100%);
+  clip-path:circle(0% at var(--kx,50%) 50%);
+  transition:clip-path 620ms cubic-bezier(.3,.7,.2,1);
+}
+.eff__track[data-ultra="1"] .eff__ultra{clip-path:circle(150% at var(--kx,50%) 50%)}
+.eff__ticks{
+  position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center;
+  padding:0 8px;pointer-events:none;
+}
+.eff__ticks i{width:2px;height:2px;border-radius:50%;background:var(--bg-raised);opacity:.8}
+.eff__knob{
+  position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgb(0 0 0/26%),0 0 0 .5px rgb(0 0 0/10%);transform:translate(-50%,-50%);
+  transition:left .3s cubic-bezier(.32,.72,0,1),box-shadow var(--dur) var(--ease);
+}
+.eff__track:not([data-locked="1"]):hover .eff__knob{box-shadow:0 1px 3px rgb(0 0 0/26%),0 0 0 5px var(--flow-glow)}
+/* Ultracode：独立开关，不是第六格。摆成轴末端等于宣称「比最高还高」，那是假的 */
+.uc{display:flex;align-items:center;gap:10px;margin-top:13px;padding-top:12px;border-top:1px solid var(--border);cursor:pointer}
+.uc__ico{color:var(--text-faint);display:flex;flex:none;transition:color var(--dur-slow) var(--ease)}
+.uc[data-on="1"] .uc__ico{color:var(--flow)}
+.uc__txt{flex:1;min-width:0}
+.uc__t{display:block;font-size:var(--text-sm);font-weight:640;transition:color var(--dur-slow) var(--ease)}
+.uc[data-on="1"] .uc__t{color:var(--flow)}
+.uc__d{display:block;font-size:var(--text-xs);color:var(--text-faint);line-height:var(--lh-xs)}
+.uc__sw{width:34px;height:20px;border-radius:999px;background:var(--bg-active);position:relative;flex:none;transition:background 420ms var(--ease)}
+.uc[data-on="1"] .uc__sw{background:linear-gradient(90deg,var(--flow-deep),var(--flow))}
+.uc__sw i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/25%);transition:left 420ms cubic-bezier(.32,.72,0,1)}
+.uc[data-on="1"] .uc__sw i{left:16px}
+.pop__foot{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:var(--sp-3);padding-top:var(--sp-2);border-top:1px solid var(--border)}
+.tag{font-size:var(--text-xs);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:2px 7px}
+.tag--flow{color:var(--flow);border-color:var(--flow-line);background:var(--flow-tint);font-weight:620}
+
+/* ============================================================ 副栏 */
+.aside{background:var(--bg-sunken);width:352px;position:relative}
+.aside[hidden]{display:none}
+.aside__head{height:44px;display:flex;align-items:center;gap:2px;padding:0 var(--sp-2) 0 6px;border-bottom:1px solid var(--border)}
+.tab{
+  position:relative;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;
+  border:0;background:transparent;border-radius:var(--radius-sm);cursor:pointer;
+  font:var(--text-xs)/1 var(--font);color:var(--text-muted);
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.tab:hover{background:var(--bg-hover);color:var(--text)}
+.tab[aria-selected="true"]{background:var(--bg-active);color:var(--text);font-weight:620}
+.tab svg{flex:none}
+.tab__badge{font:600 10px/1 var(--font-mono);color:#fff;background:var(--flow);border-radius:999px;padding:2px 5px;min-width:16px;text-align:center}
+.tab__live{width:5px;height:5px;border-radius:50%;background:var(--flow);animation:breath 1.8s ease-in-out infinite}
+.aside__spacer{flex:1}
+.aside__close{color:var(--text-faint);background:none;border:0;cursor:pointer;display:flex;padding:4px;border-radius:5px;transition:color var(--dur) var(--ease),background var(--dur) var(--ease)}
+.aside__close:hover{background:var(--bg-hover);color:var(--text-muted)}
+.aside__close.is-pinned{color:var(--flow)}
+.aside__close.is-pinned:hover{background:var(--flow-tint)}
+.aside__body{flex:1;overflow-y:auto;min-height:0}
+.aside__toast{
+  position:absolute;left:50%;transform:translate(-50%,-6px);bottom:14px;background:var(--text);color:var(--bg);
+  font-size:var(--text-xs);padding:7px 11px;border-radius:var(--radius-sm);box-shadow:var(--shadow-pop);
+  white-space:nowrap;opacity:0;pointer-events:none;max-width:320px;text-overflow:ellipsis;overflow:hidden;
+  transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);z-index:40;
+}
+.aside__toast.on{opacity:1;transform:translate(-50%,0)}
+
+.grp{padding:var(--sp-3) var(--sp-2) 0}
+.grp__cap{display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--text-faint);padding:0 var(--sp-2) 6px}
+.grp__cap b{color:var(--text-muted);font-weight:620}
+.grp__form{margin-left:auto;display:flex;gap:2px}
+.grp__form button{font:10.5px/1 var(--font);color:var(--text-faint);background:none;border:1px solid transparent;border-radius:4px;padding:3px 6px;cursor:pointer}
+.grp__form button:hover{color:var(--text-muted);background:var(--bg-hover)}
+.grp__form button[aria-pressed="true"]{color:var(--text);border-color:var(--border);background:var(--bg-raised)}
+
+.card2{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:6px}
+.card2__name{display:flex;align-items:center;gap:7px;padding:9px var(--sp-3) 6px;font-size:var(--text-sm);font-weight:600;cursor:pointer}
+.card2__name:hover{background:var(--bg-hover)}
+.card2__tri{color:var(--text-faint);display:flex;margin-left:auto;transition:transform var(--dur) var(--ease)}
+.card2.is-folded .card2__tri{transform:rotate(-90deg)}
+.card2__stats{display:flex;gap:var(--sp-3);padding:0 var(--sp-3) 8px;font:var(--text-xs)/1 var(--font-mono);color:var(--text-muted);font-variant-numeric:tabular-nums}
+.card2__stats b{color:var(--text);font-weight:620}
+.card2.is-folded .card2__inner{display:none}
+.card2__inner{padding:2px var(--sp-2) var(--sp-2)}
+.card2--done .card2__name{color:var(--text-muted)}
+
+/* ============================================================
+   时间线 —— 本稿的主角
+   颜色即状态：紫=在跑，灰=完成，斜纹=排队，红=失败。
+   会动的只有三样：now 竖线在推进、在跑条的前沿在呼吸、活着的 dot 在泛圈。
+   它们说的是同一句话：「这里还活着」。完成的一律静止。
+   ============================================================ */
+.tl{position:relative;padding-top:2px}
+/* 覆盖层：只有 now 游标，浮在条之上，不挡 hover */
+.tl__ov{position:absolute;top:0;bottom:16px;left:var(--tl-l);right:var(--tl-r);pointer-events:none;z-index:2}
+/* 竖线只留 now 一条。刻度收成底部的尺——满高的竖线是在和条抢戏 */
+.tl__now{position:absolute;top:-1px;bottom:-1px;width:1px;background:var(--flow);opacity:.5;transition:left var(--dur-slow) linear}
+.tl__now s{position:absolute;top:-2px;left:-2.5px;width:6px;height:6px;border-radius:50%;background:var(--flow);text-decoration:none}
+.tl__phase{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-faint);padding:7px var(--sp-1) 3px;letter-spacing:.04em}
+.tl__phase b{color:var(--text-muted);font-weight:660;font-size:var(--text-xs);letter-spacing:0}
+.tl__phase i{flex:1;height:1px;background:var(--border);font-style:normal}
+.tl__row{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:10px 86px minmax(0,1fr) 34px;align-items:center;column-gap:6px;
+  height:22px;padding:0 var(--sp-1);border-radius:4px;
+}
+.tl__row:hover{background:var(--bg-hover)}
+.tl__name{font-size:var(--text-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted)}
+.tl__row[data-state="running"] .tl__name{color:var(--text);font-weight:600}
+.tl__row[data-state="pending"] .tl__name{color:var(--text-faint)}
+.tl__row[data-state="failed"] .tl__name{color:var(--danger)}
+.tl__lane{position:relative;height:16px}
+/* 排队：斜纹，静止。排队就是「什么都没发生」，动了等于谎报进展 */
+.tl__q{
+  position:absolute;top:0;bottom:0;border-radius:3px;
+  background-image:repeating-linear-gradient(115deg,var(--border-strong) 0 1px,transparent 1px 4px);
+  opacity:.8;
+}
+.tl__bar{position:absolute;top:0;bottom:0;border-radius:3px;transition:left var(--dur-slow) linear,width var(--dur-slow) linear}
+/* 完成：中性灰，沉下去，不再要注意力 */
+.tl__bar--done{background:var(--bg-active);box-shadow:inset 0 0 0 1px var(--border-strong)}
+/* 刚完成：落定那一下亮一次，就一次 */
+.tl__bar--done.is-fresh{animation:settle .8s ease-out 1}
+@keyframes settle{
+  0%{background:var(--flow-wash);box-shadow:inset 0 0 0 1px var(--flow-line),0 0 0 3px var(--flow-glow)}
+  100%{background:var(--bg-active);box-shadow:inset 0 0 0 1px var(--border-strong),0 0 0 0 transparent}
+}
+/* 在跑：浅紫道 + **右端一道 4px 的前沿**，只有它在呼吸。
+   工作发生在最右端那一寸，不在整条上——所以光只给前沿。 */
+.tl__bar--run{background:linear-gradient(90deg,var(--flow-wash),var(--flow-tint));box-shadow:inset 0 0 0 1px var(--flow-line)}
+.tl__bar--run::after{
+  content:"";position:absolute;top:0;bottom:0;right:0;width:4px;border-radius:2px;
+  background:var(--flow);box-shadow:0 0 6px var(--flow-glow);
+  animation:front 1.6s ease-in-out infinite;
+}
+@keyframes front{0%,100%{opacity:1}50%{opacity:.3}}
+.tl__bar--failed{background:color-mix(in srgb,var(--danger) 14%,var(--bg));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--danger) 34%,var(--bg))}
+.tl__bar--failed::after{content:"";position:absolute;top:0;bottom:0;right:0;width:3px;border-radius:2px;background:var(--danger)}
+.tl__tool{
+  position:absolute;top:50%;transform:translateY(-50%);font:9.5px/1 var(--font-mono);
+  color:var(--flow);background:var(--bg-raised);border:1px solid var(--flow-line);
+  border-radius:3px;padding:2px 3px;white-space:nowrap;pointer-events:none;
+}
+.tl__t{font:10.5px/1 var(--font-mono);color:var(--text-faint);text-align:right;font-variant-numeric:tabular-nums}
+.tl__axis{position:relative;height:16px;margin:2px var(--tl-r) 0 var(--tl-l);font:10px/1 var(--font-mono);color:var(--text-faint)}
+.tl__axis i{position:absolute;top:0;width:1px;height:4px;background:var(--border-strong)}
+.tl__axis span{position:absolute;top:7px;transform:translateX(-50%);font-variant-numeric:tabular-nums}
+.tl__axis span.first{transform:none}
+.tl__axis span.last{transform:translateX(-100%)}
+
+.dot{width:9px;height:9px;border-radius:50%;position:relative;justify-self:center}
+.dot--pending{background:transparent;box-shadow:inset 0 0 0 1.5px var(--border-strong)}
+.dot--running{background:var(--bg-raised);box-shadow:inset 0 0 0 2.5px var(--flow)}
+.dot--running::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--flow);animation:ring 1.4s cubic-bezier(.22,.61,.36,1) infinite}
+@keyframes ring{0%{transform:scale(.6);opacity:.8}100%{transform:scale(1.5);opacity:0}}
+.dot--done{background:var(--border-strong)}
+.dot--failed{background:var(--danger)}
+
+/* ---------- 列表形态（对照用） ---------- */
+.ag{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:var(--sp-2);padding:5px var(--sp-2);border-radius:var(--radius-sm)}
+.ag:hover{background:var(--bg-hover)}
+.ag__label{font-size:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ag__num{font:var(--text-xs)/1 var(--font-mono);color:var(--text-faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ag__sub{grid-column:2/4;display:flex;align-items:center;gap:6px;margin-top:1px;font-size:var(--text-xs);color:var(--text-muted);min-width:0}
+.ag__tool{font:var(--text-xs)/1 var(--font-mono);color:var(--text-muted);background:var(--bg-sunken);border:1px solid var(--border);padding:2px 5px;border-radius:5px;white-space:nowrap}
+.ag__res{font:var(--text-xs)/1.4 var(--font-mono);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag[data-state="pending"] .ag__label{color:var(--text-faint)}
+.ag[data-state="running"] .ag__label{font-weight:600}
+.ag[data-state="failed"] .ag__label{color:var(--danger)}
+
+/* ---------- 其余租户 ---------- */
+.prev__files{padding:var(--sp-3) var(--sp-2) 0;display:flex;flex-direction:column;gap:1px}
+.prev__f{display:flex;align-items:center;gap:7px;padding:5px var(--sp-2);border-radius:var(--radius-sm);font:var(--text-xs)/1 var(--font-mono);color:var(--text-muted);cursor:pointer}
+.prev__f:hover{background:var(--bg-hover);color:var(--text)}
+.prev__f.is-on{background:var(--bg-active);color:var(--text)}
+.prev__f .add{color:var(--ok)} .prev__f .del{color:var(--danger)}
+.prev__head{display:flex;align-items:center;gap:6px;padding:var(--sp-3) var(--sp-3) var(--sp-2);font-size:var(--text-xs);color:var(--text-muted)}
+.prev__path{font:var(--text-xs)/1 var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prev__code{margin:0 var(--sp-2);background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-2);font:var(--text-code)/1.6 var(--font-mono);overflow-x:auto}
+.prev__code .ln{color:var(--text-faint);user-select:none;display:inline-block;width:2ch;text-align:right;margin-right:10px}
+.k{color:var(--hl-keyword)} .s{color:var(--hl-string)} .n{color:var(--hl-number)} .t{color:var(--hl-title)}
+.btw{padding:var(--sp-3) var(--sp-2) 0;display:flex;flex-direction:column;gap:var(--sp-3)}
+.btw__q{background:var(--bg-active);border-radius:var(--radius);padding:7px var(--sp-3);font-size:var(--text-sm);align-self:flex-end;max-width:88%}
+.btw__a{font-size:var(--text-sm);color:var(--text-muted);line-height:1.6;padding:0 var(--sp-2)}
+.btw__box{margin:var(--sp-3) var(--sp-2);border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg-raised);display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2)}
+.btw__box input{flex:1;border:0;background:none;font:var(--text-sm)/1.4 var(--font);color:var(--text);outline:none;min-width:0}
+.btw__box input::placeholder{color:var(--text-faint)}
+.btw__send{width:24px;height:24px;border-radius:50%;border:1px solid var(--border-strong);background:var(--bg-raised);display:grid;place-items:center;color:var(--text-muted);cursor:pointer;flex:none}
+.btw__hint{font-size:var(--text-xs);color:var(--text-faint);padding:0 var(--sp-3) var(--sp-3);line-height:var(--lh-xs)}
+.br{padding:var(--sp-3) var(--sp-2) 0;display:flex;flex-direction:column;gap:1px}
+.br__row{display:flex;align-items:center;gap:7px;padding:6px var(--sp-2);border-radius:var(--radius-sm);font-size:var(--text-sm);color:var(--text-muted);cursor:pointer}
+.br__row:hover{background:var(--bg-hover);color:var(--text)}
+.br__row .ag__num{margin-left:auto}
+
+.row-actions{display:flex;gap:var(--sp-2);margin-top:var(--sp-4);flex-wrap:wrap;align-items:center}
+.btn{font:var(--text-xs)/1 var(--font);border:1px solid var(--border-strong);background:var(--bg-raised);color:var(--text);border-radius:var(--radius-sm);padding:8px 12px;cursor:pointer}
+.btn:hover{background:var(--bg-hover)}
+.btn--flow{border-color:transparent;background:linear-gradient(90deg,var(--flow-deep),var(--flow));color:#fff;font-weight:600}
+.hintline{font-size:var(--text-xs);color:var(--text-faint)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--sp-3)}
+.card{background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-3);box-shadow:var(--shadow-1)}
+.card h3{font-size:var(--text-xs);color:var(--text-faint);font-weight:660;letter-spacing:.06em;margin-bottom:var(--sp-2)}
+.card p.cap{font-size:var(--text-xs);color:var(--text-muted);line-height:var(--lh-xs);margin-top:var(--sp-2)}
+.demo{background:var(--bg-sunken);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-3)}
+
+/* 新旧对比：同一条在跑的 bar，左边扫光，右边只亮前沿 */
+.cmp{display:flex;flex-direction:column;gap:10px}
+.cmp__row{display:grid;grid-template-columns:88px minmax(0,1fr);align-items:center;gap:8px}
+.cmp__row>span{font-size:10.5px;color:var(--text-faint)}
+.cmp__lane{position:relative;height:16px}
+.cmp__bar{position:absolute;top:0;bottom:0;left:0;width:64%;border-radius:3px;overflow:hidden;
+  background:linear-gradient(90deg,var(--flow-wash),var(--flow-tint));box-shadow:inset 0 0 0 1px var(--flow-line)}
+.cmp__bar--old::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,var(--flow-glow),transparent);
+  animation:crawl 1.8s linear infinite;
+}
+@keyframes crawl{from{transform:translateX(-60%)}to{transform:translateX(160%)}}
+.cmp__bar--new::after{
+  content:"";position:absolute;top:0;bottom:0;right:0;width:4px;border-radius:2px;
+  background:var(--flow);box-shadow:0 0 6px var(--flow-glow);animation:front 1.6s ease-in-out infinite;
+}
+
+/* 卡片⑤：上一版的 Ultracode 特效（永远漂移 + 3px 抖动马赛克） vs 这版（静止） */
+.utr{position:absolute;top:0;bottom:0;left:0;width:75%;border-radius:999px;overflow:hidden}
+.utr--old{
+  background:linear-gradient(90deg,var(--flow-deep) 0%,var(--flow) 58%,var(--flow-soft) 100%);
+  background-size:165% 100%;animation:drift 9s ease-in-out infinite alternate;
+}
+.utr--old::after{
+  content:"";position:absolute;inset:0;
+  background-image:repeating-conic-gradient(rgb(255 255 255/.55) 0 25%,transparent 0 50%);
+  background-size:3px 3px;
+  -webkit-mask-image:linear-gradient(90deg,transparent 4%,#000 44%,transparent 94%);
+  mask-image:linear-gradient(90deg,transparent 4%,#000 44%,transparent 94%);
+}
+.utr--new{background:linear-gradient(90deg,var(--flow-deep) 0%,var(--flow) 55%,var(--flow-soft) 100%)}
+@keyframes drift{from{background-position:0% 0}to{background-position:100% 0}}
+
+@media (max-width:1180px){
+  .win{grid-template-columns:1fr;height:auto}
+  .pane+.pane{border-left:0;border-top:1px solid var(--border-strong)}
+  .sb{display:none}
+  .aside{width:auto;min-height:460px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="head">
+  <div>
+    <h1>omni · 副栏形态 v2 <span style="color:var(--text-faint);font-weight:400">前沿稿</span></h1>
+    <p>上一稿的问题不是动效少，是<b>动效说错了话</b>：整条扫光暗示「整条都在工作」，不是——工作只发生在最右端那一寸；Ultra 的渐变永远漂移，可「设置」是静止状态，它一直动，读的人以为它还没完。这稿立四条规矩：<b>① 颜色即状态</b>（紫=在跑，灰=完成，斜纹=排队，红=失败）；<b>② 只有「还活着」的东西才动</b>（now 竖线推进、前沿呼吸、活点泛圈，完成的一律静止）；<b>③ 竖线只有 now 一条</b>——刻度收成底部的尺，满高的竖线是在和条抢戏；<b>④ 特效属于瞬间，不属于状态</b>——Ultracode 的紫从旋钮漫开这一次，到位即静止。</p>
+  </div>
+  <div class="head__spacer"></div>
+  <div class="seg" id="theme">
+    <button data-t="light" aria-pressed="true">浅色</button>
+    <button data-t="dark" aria-pressed="false">深色</button>
+    <button data-t="system" aria-pressed="false">跟随系统</button>
+  </div>
+</div>
+
+<h2 class="sec">主视图 · 可交互</h2>
+<p class="note">能点的：<b>点 flowbar 那行</b>打开副栏对应的卡、副栏里<b>切标签</b>、<b>时间线/列表</b>切换、<b>点卡标题</b>折叠、副栏右上角<b>✕</b>（有 agent 在跑时收不起，图钉态）、<b>底部按钮</b>：重播 / 制造失败 / 直接跑完。<br><b>点 composer 里的 Opus 5 芯片</b>开推理强度浮层：拖滑杆换五档（蓝=单线想多深）；<b>开 Ultracode</b>——滑杆自己滑到「极高」并锁住，紫从旋钮圆心漫开，到位即静止（紫=拆成多少 agent 并行）。锁着时拖滑杆，会说为什么拖不动。<br>盯着一个在跑的条看三秒：<b>条在跟着 now 竖线匀速往前爬</b>，不是到点才跳。</p>
+
+<div class="win" id="win">
+  <div class="pane sb">
+    <div class="sb__head"><div class="sb__dots"><i></i><i></i><i></i></div></div>
+    <div class="sb__body">
+      <div class="sb__cap">omni</div>
+      <div class="sb__row is-on"><i></i>适配 claude 的工作流</div>
+      <div class="sb__row"><i></i>侧栏与引擎状态</div>
+      <div class="sb__row"><i></i>待办清单翻译</div>
+      <div class="sb__cap">doc-manager</div>
+      <div class="sb__row"><i></i>标注层重构</div>
+    </div>
+  </div>
+
+  <div class="pane mid">
+    <div class="mid__head">
+      <span class="mid__title">适配 claude 的工作流</span><span>·</span><span>Claude Code</span>
+      <span class="mid__spacer"></span>
+      <button class="mid__aside" id="reopen" hidden><span class="livedot"></span>副栏</button>
+    </div>
+    <div class="mid__body">
+      <div class="msg--user">用 workflow 把 packages/ 下每个包的 README 对一遍代码，看有没有过期的</div>
+      <div class="msg--claude">起了一个 workflow，两阶段：先每个包一个 agent 读 README 对代码，再对每条差异做一次对抗验证。</div>
+      <div class="msg--user" style="margin-top:auto">顺便看一下 wire 那个包的 README 是不是也过期了</div>
+      <div class="msg--claude">正在跑的那个 workflow 已经覆盖到 wire 了，等它出结果。</div>
+    </div>
+    <div class="flowbar" id="flowbar"></div>
+    <div class="composer">
+      <div class="composer__box">
+        <div class="composer__ph">交代任务…（@ 引用文件，/ 用命令）</div>
+        <div class="composer__bar">
+          <button class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4"/></svg>Claude Code</button>
+          <button class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3Z"/></svg>引擎自动</button>
+          <div style="position:relative">
+            <button class="chip chip--effort" id="chip" data-ultra="0">
+              <span class="chip__spark"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 2.2 5.8L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.2L12 2Z"/></svg></span>
+              <span>Opus 5 ·</span><span class="chip__lv" id="chip-lv">极高</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="pop" id="pop" data-ultra="0">
+              <div class="pop__head"><span class="pop__k">推理强度</span><span class="pop__v" id="pop-v">极高</span></div>
+              <div class="pop__hint" id="pop-hint"></div>
+              <div class="eff">
+                <div class="eff__ends"><span>Faster</span><span>Smarter</span></div>
+                <div class="eff__track" id="track" data-ultra="0" data-locked="0">
+                  <div class="eff__rail">
+                    <div class="eff__fill" id="fill"></div>
+                    <div class="eff__ultra" id="ultra"></div>
+                  </div>
+                  <div class="eff__ticks"><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="eff__knob" id="knob"></div>
+                </div>
+              </div>
+              <div class="uc" id="uc" data-on="0">
+                <span class="uc__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg></span>
+                <span class="uc__txt">
+                  <span class="uc__t">Ultracode</span>
+                  <span class="uc__d" id="uc-d"></span>
+                </span>
+                <span class="uc__sw"><i></i></span>
+              </div>
+              <div class="pop__foot"><span class="tag">Opus 5</span><span class="tag" id="foot-lv">极高</span></div>
+            </div>
+          </div>
+          <div class="composer__spacer"></div>
+          <button class="send"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane aside" id="aside">
+    <div class="aside__head" id="tabs" role="tablist"></div>
+    <div class="aside__body" id="asideBody"></div>
+    <div class="aside__toast" id="toast"></div>
+  </div>
+</div>
+
+<div class="row-actions">
+  <button class="btn btn--flow" id="replay">▸ 重播（三个 workflow 各按自己的节奏）</button>
+  <button class="btn" id="tofail">让一个正在跑的 agent 失败</button>
+  <button class="btn" id="finish">直接跑完</button>
+  <span class="hintline" id="state"></span>
+</div>
+
+<h2 class="sec">这稿改掉的五件事</h2>
+<div class="grid">
+  <div class="card">
+    <h3>① 前沿，不是扫光</h3>
+    <div class="demo cmp">
+      <div class="cmp__row"><span>旧 · 整条扫光</span><div class="cmp__lane"><div class="cmp__bar cmp__bar--old"></div></div></div>
+      <div class="cmp__row"><span>新 · 只有前沿</span><div class="cmp__lane"><div class="cmp__bar cmp__bar--new"></div></div></div>
+    </div>
+    <p class="cap">扫光说「整条都在工作」——谎话。工作只发生在最右端那一寸，所以光只给那 4px。动效要对准事实发生的位置，否则就是进度条装饰品。</p>
+  </div>
+  <div class="card">
+    <h3>② now 竖线 + 真实刻度</h3>
+    <div class="demo" id="d2"></div>
+    <p class="cap">谁和谁是<b>同时</b>在跑、Verify 是不是齐刷刷等齐了才起跳——眼睛靠竖线读，不靠脑补。竖线只留 now 一条；刻度收成底部的尺（0s…到当前），不再拉满高度和条抢戏。</p>
+  </div>
+  <div class="card">
+    <h3>③ 排队不演动画</h3>
+    <div class="demo" id="d3"></div>
+    <p class="cap">斜纹段是「派发了但还没轮上」，<b>静止</b>——排队本来就没有进展可演，动了就是谎报。后三个 agent 的起跑线整齐错开，并发上限 3 不用解释。</p>
+  </div>
+  <div class="card">
+    <h3>④ flowbar ＝ 等比缩影</h3>
+    <div class="demo" id="d4"></div>
+    <p class="cap">收起副栏后剩下的那条，不是另一套图形——是<b>同一条时间线压到 108px</b>，排队段、在跑段、失败段语义一个不变。两套图形就要学两遍。</p>
+  </div>
+  <div class="card">
+    <h3>⑤ 特效属于瞬间，不属于状态</h3>
+    <div class="demo cmp">
+      <div class="cmp__row"><span>旧 · 到位还在动</span><div class="cmp__lane"><div class="utr utr--old"></div></div></div>
+      <div class="cmp__row"><span>新 · 到位即静止</span><div class="cmp__lane"><div class="utr utr--new"></div></div></div>
+    </div>
+    <p class="cap">上一版让渐变永远漂移、还叠一层 3px 抖动马赛克——可「设置」是静止状态，不是进行中的任务；它一直动，读的人以为它还没完。而且靠 <code>@property</code> 注册自定义属性做 mask 羽化，是 Chromium 独占的写法。这版变身只演切换那 0.6s：<code>clip-path: circle</code> 从旋钮圆心漫开，三家浏览器都认，到位后就是一条安静的紫。</p>
+  </div>
+</div>
+
+</div>
+<script>
+/* ---------------- 主题 ---------------- */
+const q = new URLSearchParams(location.search);
+if (q.get("theme") === "dark" || q.get("theme") === "light") document.documentElement.setAttribute("data-theme", q.get("theme"));
+document.getElementById("theme").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  [...e.currentTarget.children].forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  if (b.dataset.t === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", b.dataset.t);
+});
+if (q.get("theme")) [...document.getElementById("theme").children].forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.t === q.get("theme"))));
+
+/* ============================================================
+   推理强度 —— 五档，`max` 在里面
+   （`EffortLevel = 'low'|'medium'|'high'|'xhigh'|'max'`，sdk.d.ts:553）。
+   Ultracode 不在数组里：SDK 原话是「xhigh effort plus standing
+   dynamic-workflow orchestration」——它把强度锁在极高，不是最高，
+   所以是独立开关，打开时滑杆自己滑到极高并锁住。
+   ============================================================ */
+const LEVELS = [
+  { id: "low", label: "轻度", mix: 22, hint: "最快。改字、跑命令这类不用想的活。" },
+  { id: "medium", label: "中", mix: 40, hint: "默认档。多数改动都在这一档上跑。" },
+  { id: "high", label: "高", mix: 58, hint: "会多想一会儿，适合牵扯多个文件的改动。" },
+  { id: "xhigh", label: "极高", mix: 76, hint: "很深的单线思考。慢，也更费额度。" },
+  { id: "max", label: "最高", mix: 94, hint: "最深的单线思考。会话级，不写进配置文件。" },
+];
+const XHIGH = 3;
+let cur = XHIGH;
+let ultra = false;
+
+const track = document.getElementById("track");
+const ucEl = document.getElementById("uc");
+const popEl = document.getElementById("pop");
+
+/* 几何全用 calc + 百分比，不量 clientWidth，也就不需要 resize 监听 */
+const knobPos = () => `calc(9px + (100% - 18px) * ${cur / (LEVELS.length - 1)})`;
+
+function renderEffort() {
+  const pos = knobPos();
+  const fill = document.getElementById("fill");
+  fill.style.width = pos;
+  fill.style.background = `color-mix(in srgb, var(--accent) ${LEVELS[cur].mix}%, var(--border-strong))`;
+  document.getElementById("knob").style.left = pos;
+  document.getElementById("ultra").style.setProperty("--kx", pos);
+  track.dataset.ultra = ultra ? "1" : "0";
+  track.dataset.locked = ultra ? "1" : "0";
+  ucEl.dataset.on = ultra ? "1" : "0";
+  popEl.dataset.ultra = ultra ? "1" : "0";
+  document.getElementById("chip").dataset.ultra = ultra ? "1" : "0";
+
+  const l = LEVELS[cur];
+  document.getElementById("pop-v").textContent = ultra ? "Ultracode" : l.label;
+  document.getElementById("pop-hint").textContent = ultra
+    ? "引擎会自己决定什么时候把一轮拆成多个 agent 并行——右边那一栏就是它拆出来的东西。"
+    : l.hint;
+  document.getElementById("uc-d").textContent = ultra
+    ? "强度锁在「极高」，滑杆停用"
+    : "打开后强度锁到极高，并常驻开启工作流编排";
+  document.getElementById("chip-lv").textContent = ultra ? "Ultracode" : l.label;
+  const foot = document.getElementById("foot-lv");
+  foot.textContent = ultra ? "Ultracode" : l.label;
+  foot.className = "tag" + (ultra ? " tag--flow" : "");
+}
+function setFromX(x) {
+  const r = track.getBoundingClientRect();
+  cur = Math.round(Math.min(1, Math.max(0, (x - r.left - 9) / (r.width - 18))) * (LEVELS.length - 1));
+  renderEffort();
+}
+track.addEventListener("pointerdown", (e) => {
+  if (ultra) { toast("Ultracode 开着时强度锁在「极高」——关掉开关才能拖"); return; }
+  track.setPointerCapture(e.pointerId);
+  setFromX(e.clientX);
+});
+track.addEventListener("pointermove", (e) => { if (e.buttons && !ultra) setFromX(e.clientX); });
+ucEl.addEventListener("click", () => {
+  ultra = !ultra;
+  if (ultra) cur = XHIGH;
+  renderEffort();
+});
+document.getElementById("chip").addEventListener("click", () => { popEl.hidden = !popEl.hidden; });
+document.addEventListener("click", (e) => {
+  if (popEl.hidden) return;
+  if (e.target.closest("#pop") || e.target.closest("#chip")) return;
+  popEl.hidden = true;
+});
+if (q.get("pop") === "0") popEl.hidden = true;
+renderEffort();
+
+/* ============================================================
+   数据 —— q(排队起) / s(真跑起) / e(结束，null=还在跑)，
+   单位是「这个 workflow 开始后的毫秒」。
+   ============================================================ */
+const WORKFLOWS = [
+  { id: "w1", name: "readme-drift-audit", now: 18400, tok: 41.2, phases: [
+    { title: "Read", agents: [
+      { label: "read:protocol", q: 0, s: 10, e: 4610, tok: 11.0, res: '{"drift":false}' },
+      { label: "read:approval", q: 0, s: 12, e: 5112, tok: 9.8, res: '{"drift":true,"n":2}' },
+      { label: "read:engine", q: 0, s: 15, e: 8215, tok: 12.4, res: '{"drift":true,"n":1}' },
+      { label: "read:host", q: 0, s: 18, e: 6418, tok: 8.0, res: '{"drift":false}' },
+    ] },
+    { title: "Verify", agents: [
+      { label: "verify:approval#1", q: 8215, s: 8220, e: null, tok: 4.1, tool: "Grep" },
+      { label: "verify:approval#2", q: 8215, s: 8225, e: null, tok: 3.4, tool: "Read" },
+      { label: "verify:engine#1", q: 8215, s: 8230, e: null, tok: 2.2, tool: "Glob" },
+    ] },
+    { title: "Synthesize", agents: [{ label: "synthesize", q: null, s: null, e: null, tok: 0 }] },
+  ] },
+  { id: "w2", name: "api-contract-sweep", now: 8100, tok: 12.6, phases: [
+    { title: "Scan", agents: [
+      { label: "scan:wire", q: 0, s: 8, e: 3408, tok: 6.2, res: '{"routes":11}' },
+      { label: "scan:host", q: 0, s: 10, e: null, tok: 3.9, tool: "Grep" },
+      { label: "scan:desktop", q: 0, s: 12, e: null, tok: 2.5, tool: "Read" },
+    ] },
+    { title: "Diff", agents: [
+      { label: "diff:wire↔host", q: null, s: null, e: null, tok: 0 },
+      { label: "diff:host↔desktop", q: null, s: null, e: null, tok: 0 },
+    ] },
+  ] },
+  { id: "w3", name: "dead-code-scan", now: 22100, tok: 88.4, phases: [
+    { title: "Sweep", agents: [
+      { label: "sweep:protocol", q: 0, s: 5, e: 9105, tok: 14.1, res: "0 处" },
+      { label: "sweep:approval", q: 0, s: 7, e: 10407, tok: 15.8, res: "2 处" },
+      { label: "sweep:engine", q: 0, s: 9, e: 12809, tok: 18.2, res: "1 处" },
+      { label: "sweep:worksite", q: 0, s: 9105, e: 17805, tok: 12.9, res: "0 处" },
+      { label: "sweep:journal", q: 0, s: 10407, e: 20007, tok: 13.6, res: "0 处" },
+      { label: "sweep:handoff", q: 0, s: 12809, e: 22009, tok: 13.8, res: "3 处" },
+    ] },
+  ] },
+];
+
+const AG = (w) => w.phases.flatMap((p) => p.agents);
+const stateOf = (a) => (a.s === null ? "pending" : a.failed === true ? "failed" : a.e === null ? "running" : "done");
+const runningOf = (w) => AG(w).filter((a) => stateOf(a) === "running").length;
+const doneOf = (w) => AG(w).filter((a) => stateOf(a) === "done").length;
+const runningTotal = () => WORKFLOWS.reduce((n, w) => n + runningOf(w), 0);
+const ordered = () => [...WORKFLOWS].sort((a, b) => (runningOf(b) > 0) - (runningOf(a) > 0));
+const isPinned = () => runningTotal() > 0;
+
+const fmtMs = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : Math.round(ms) + "ms");
+const fmtTick = (ms) => { const s = ms / 1000; return (Number.isInteger(s) ? s : s.toFixed(1)) + "s"; };
+const pct = (v, scale) => Math.min(100, (v / scale) * 100);
+
+/* 真实刻度：挑出 2–5 格的最粗好看步长，scale 吸到它的整数倍。
+   now 往前走时 scale 很少换锚，格子不漂。 */
+function axisOf(w) {
+  const max = Math.max(w.now, ...AG(w).map((a) => a.e ?? 0), 1000);
+  const steps = [1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000];
+  for (const s of steps) {
+    const n = Math.ceil(max / s);
+    if (n >= 2 && n <= 5) return { scale: n * s, step: s };
+  }
+  return { scale: 600000, step: 120000 };
+}
+
+/* ---------------- 时间线 ---------------- */
+function laneHtml(a, w, scale) {
+  const st = stateOf(a);
+  if (st === "pending") return `<div class="tl__lane"></div>`;
+  const end = a.e === null ? w.now : a.e;
+  const bl = pct(a.s, scale);
+  const bw = Math.max(1.2, pct(end - a.s, scale));
+  const right = bl + bw;
+  const qw = a.q === null ? 0 : pct(a.s - a.q, scale);
+  const tool = st === "running" && a.tool
+    ? `<i class="tl__tool" style="${right > 60 ? `right:${100 - right}%` : `left:calc(${right}% + 4px)`}">${a.tool}</i>`
+    : "";
+  const fresh = a._fresh === true;
+  a._fresh = false;
+  return `<div class="tl__lane">
+    ${qw > 0.6 ? `<div class="tl__q" style="left:${pct(a.q, scale)}%;width:${qw}%"></div>` : ""}
+    <div class="tl__bar tl__bar--${st}${fresh ? " is-fresh" : ""}" style="left:${bl}%;width:${bw}%"></div>
+    ${tool}
+  </div>`;
+}
+
+function axisLabels(scale, step) {
+  let out = "";
+  for (let t = 0; t <= scale; t += step) {
+    const cls = t === 0 ? "first" : t === scale ? "last" : "";
+    out += `<i style="left:${pct(t, scale)}%"></i><span class="${cls}" style="left:${pct(t, scale)}%">${fmtTick(t)}</span>`;
+  }
+  return out;
+}
+
+function timelineHtml(w) {
+  const { scale, step } = axisOf(w);
+  const live = runningOf(w) > 0;
+  const rows = w.phases.map((ph) => {
+    const inner = ph.agents.map((a) => {
+      const st = stateOf(a);
+      const t = st === "pending" ? "" : fmtMs((a.e === null ? w.now : a.e) - a.s);
+      return `<div class="tl__row" data-state="${st}" title="${a.label}${st === "pending" ? " · 排队中" : ` · ${a.tok.toFixed(1)}k`}">
+        <span class="dot dot--${st}"></span><span class="tl__name">${a.label}</span>${laneHtml(a, w, scale)}<span class="tl__t">${t}</span>
+      </div>`;
+    }).join("");
+    const d = ph.agents.filter((a) => stateOf(a) === "done").length;
+    return `<div class="tl__phase"><b>${ph.title}</b><i></i>${d}/${ph.agents.length}${d === ph.agents.length ? " ✓" : ""}</div>${inner}`;
+  }).join("");
+  return `<div class="tl" data-scale="${scale}" data-step="${step}">
+    <div class="tl__ov">${live ? `<i class="tl__now" style="left:${pct(w.now, scale)}%"><s></s></i>` : ""}</div>
+    ${rows}
+    <div class="tl__axis">${axisLabels(scale, step)}</div>
+  </div>`;
+}
+
+/* tick 里只改几何，不重建 DOM —— 条宽有 linear transition，所以是匀速爬，不是跳 */
+function positionCard(card, w) {
+  const tl = card.querySelector(".tl");
+  if (!tl) return;
+  const { scale, step } = axisOf(w);
+  if (tl.dataset.scale !== String(scale)) {
+    /* 换锚：只重排底部的尺，条本身靠 transition 滑过去 */
+    tl.dataset.scale = String(scale);
+    tl.dataset.step = String(step);
+    tl.querySelector(".tl__axis").innerHTML = axisLabels(scale, step);
+  }
+  const nowEl = tl.querySelector(".tl__now");
+  if (nowEl) nowEl.style.left = pct(w.now, scale) + "%";
+  const rows = tl.querySelectorAll(".tl__row");
+  AG(w).forEach((a, i) => {
+    const row = rows[i];
+    if (!row) return;
+    const st = stateOf(a);
+    if (st === "pending") return;
+    const end = a.e === null ? w.now : a.e;
+    const qEl = row.querySelector(".tl__q");
+    if (qEl) { qEl.style.left = pct(a.q, scale) + "%"; qEl.style.width = pct(a.s - a.q, scale) + "%"; }
+    const bar = row.querySelector(".tl__bar");
+    if (bar) { bar.style.left = pct(a.s, scale) + "%"; bar.style.width = Math.max(1.2, pct(end - a.s, scale)) + "%"; }
+    const tool = row.querySelector(".tl__tool");
+    if (tool) {
+      const right = pct(a.s, scale) + Math.max(1.2, pct(end - a.s, scale));
+      if (right > 60) { tool.style.right = (100 - right) + "%"; tool.style.left = "auto"; }
+      else { tool.style.left = `calc(${right}% + 4px)`; tool.style.right = "auto"; }
+    }
+    const tEl = row.querySelector(".tl__t");
+    if (tEl) tEl.textContent = fmtMs(end - a.s);
+  });
+  const t = card.querySelector(".js-t");
+  if (t) t.textContent = (w.now / 1000).toFixed(1) + "s";
+  const k = card.querySelector(".js-k");
+  if (k) k.textContent = w.tok.toFixed(1) + "k";
+}
+
+/* ---------------- 列表形态（对照） ---------------- */
+function listHtml(w) {
+  return w.phases.map((ph) => {
+    const rows = ph.agents.map((a) => {
+      const st = stateOf(a);
+      const num = st === "pending" ? "排队中" : `${fmtMs((a.e === null ? w.now : a.e) - a.s)} · ${a.tok.toFixed(1)}k`;
+      let sub = "";
+      if (st === "running" && a.tool) sub = `<span class="ag__sub"><span class="ag__tool">${a.tool}</span></span>`;
+      else if (st === "done" && a.res) sub = `<span class="ag__sub"><span class="ag__res">→ ${a.res}</span></span>`;
+      return `<div class="ag" data-state="${st}"><span class="dot dot--${st}"></span><span class="ag__label">${a.label}</span><span class="ag__num">${num}</span>${sub}</div>`;
+    }).join("");
+    const d = ph.agents.filter((a) => stateOf(a) === "done").length;
+    return `<div class="tl__phase"><b>${ph.title}</b><i></i>${d}/${ph.agents.length}</div>${rows}`;
+  }).join("");
+}
+
+/* ---------------- 卡片 / 活动页 ---------------- */
+const S = {
+  open: true, tab: q.get("tab") || "act", file: 0,
+  form: q.get("form") || "tl",
+  collapsed: new Set(["w2", "w3"]),
+};
+
+function cardHtml(w) {
+  const live = runningOf(w) > 0;
+  const collapsed = S.collapsed.has(w.id);
+  const n = AG(w).length;
+  const d = doneOf(w);
+  return `<div class="card2${collapsed ? " is-folded" : ""}${live ? "" : " card2--done"}" data-wf="${w.id}">
+    <div class="card2__name" data-card="${w.id}">
+      <span class="dot dot--${live ? "running" : "done"}"></span>${w.name}
+      <span class="card2__tri"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="m7 10 5 6 5-6H7Z"/></svg></span>
+    </div>
+    <div class="card2__stats">
+      <span><b>${d}/${n}</b></span><span>⏱ <b class="js-t">${(w.now / 1000).toFixed(1)}s</b></span>
+      <span>◈ <b class="js-k">${w.tok.toFixed(1)}k</b></span><span>⇉ <b>${runningOf(w)}</b></span>
+    </div>
+    <div class="card2__inner">${S.form === "tl" ? timelineHtml(w) : listHtml(w)}</div>
+  </div>`;
+}
+
+function actPage() {
+  const runs = WORKFLOWS.filter((w) => runningOf(w) > 0).length;
+  return `<div class="grp">
+      <div class="grp__cap"><b>workflow</b> · ${runs > 0 ? `${runs} 个在跑` : "都跑完了"}
+        <span class="grp__form">
+          <button data-form="tl" aria-pressed="${S.form === "tl"}">时间线</button>
+          <button data-form="list" aria-pressed="${S.form === "list"}">列表</button>
+        </span>
+      </div>
+      ${ordered().map(cardHtml).join("")}
+    </div>
+    <div class="grp">
+      <div class="grp__cap"><b>后台任务</b></div>
+      <div class="ag" data-state="running"><span class="dot dot--running"></span><span class="ag__label">pnpm test --watch</span><span class="ag__num">4m12s</span></div>
+      <div class="ag" data-state="done"><span class="dot dot--done"></span><span class="ag__label">tsc --build</span><span class="ag__num">18.7s</span></div>
+    </div>`;
+}
+
+/* ---------------- 其余租户 ---------------- */
+const FILES = [
+  { p: "packages/approval/README.md", add: 12, del: 3, code: [
+    '<span class="t">## 拥有什么</span>', "",
+    '信任档与红线表。判定器是<span class="k">纯函数</span>：', "不读文件、不发网络、不读时钟。" ] },
+  { p: "packages/engine/README.md", add: 4, del: 18, code: [
+    '<span class="t">## 已知限制</span>', "",
+    'claude 只接一种 <span class="s">task_progress</span>。', '<span class="k">workflow_progress</span> <span class="n">2026-08-19</span> 活体抓到，待接。' ] },
+];
+function prevPage() {
+  const f = FILES[S.file];
+  return `<div class="prev__files">${FILES.map((x, i) =>
+      `<div class="prev__f${i === S.file ? " is-on" : ""}" data-file="${i}">${x.p.split("/").pop()}<span style="margin-left:auto"><span class="add">+${x.add}</span> <span class="del">−${x.del}</span></span></div>`).join("")}</div>
+    <div class="prev__head"><span class="prev__path">${f.p}</span></div>
+    <pre class="prev__code">${f.code.map((l, i) => `<span class="ln">${i + 1}</span>${l}`).join("\n")}</pre>
+    <div class="btw__hint">用户点开的 → <b style="color:var(--text-muted)">随时能关</b>。钉的是<b style="color:var(--text-muted)">栏</b>不是标签，跑着时照样能切进来看。</div>`;
+}
+const QA = [{ q: "这个 workflow 大概要花多少额度？", a: "8 个 agent，按目前 41.2k 的速度估，跑完大约 90–110k。Verify 那一阶段最重。" }];
+function btwPage() {
+  return `<div class="btw">${QA.map((x) => `<div class="btw__q">${x.q}</div><div class="btw__a">${x.a}</div>`).join("")}</div>
+    <div class="btw__box"><input id="btwInput" placeholder="问一句不打断主线的…"><button class="btw__send" id="btwSend"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+    <div class="btw__hint">一问一答，<b style="color:var(--text-muted)">不进 transcript</b>——进了正文，模型下一轮就会读到，那就不叫侧问了。</div>`;
+}
+function brPage() {
+  return `<div class="br">
+      <div class="br__row">📁 工作区变更<span class="ag__num">14 个文件</span></div>
+      <div class="br__row">🕘 会话时间线<span class="ag__num">119 条</span></div>
+      <div class="br__row">🧩 可用子 agent<span class="ag__num">6 种</span></div>
+      <div class="br__row">🖥 终端<span class="ag__num">2 个</span></div>
+    </div><div class="btw__hint">占位——用来说明<b style="color:var(--text-muted)">副栏能长租户</b>，不是给 workflow 一个人开的。</div>`;
+}
+
+/* ---------------- 框架：标签 / 钉住 / 收起 ---------------- */
+const TABS = [
+  { id: "act", label: "活动", icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg>' },
+  { id: "prev", label: "预览", icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>' },
+  { id: "btw", label: "侧问", icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>' },
+  { id: "br", label: "浏览", icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' },
+];
+
+const aside = document.getElementById("aside");
+const tabsEl = document.getElementById("tabs");
+const bodyEl = document.getElementById("asideBody");
+const toastEl = document.getElementById("toast");
+const reopen = document.getElementById("reopen");
+const flowbarEl = document.getElementById("flowbar");
+
+let toastTimer;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("on"), 2600);
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = TABS.map((t) => {
+    const on = S.tab === t.id;
+    let extra = "";
+    if (t.id === "act" && runningTotal() > 0) {
+      extra = on ? `<span class="tab__badge">${runningTotal()}</span>` : `<span class="tab__live"></span>`;
+    }
+    return `<button class="tab" role="tab" data-id="${t.id}" aria-selected="${on}">${t.icon}${t.label}${extra}</button>`;
+  }).join("")
+    + `<span class="aside__spacer"></span>`
+    + (isPinned()
+      ? `<button class="aside__close is-pinned" id="closeBtn" title="有 ${runningTotal()} 个 agent 在跑，跑完才能收起"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2 22 10l-2 2-1.5-1.5-4 4 .5 5.5-2 2-4-4L3 22l-1-1 5.5-6 -4-4 2-2 5.5.5 4-4L13.5 4 14 2Z"/></svg></button>`
+      : `<button class="aside__close" id="closeBtn" title="收起副栏"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`);
+}
+
+tabsEl.addEventListener("click", (e) => {
+  const t = e.target.closest(".tab");
+  if (t) { S.tab = t.dataset.id; render(); return; }
+  const c = e.target.closest("#closeBtn");
+  if (!c) return;
+  if (isPinned()) {
+    /* 上一稿在这里抖图标。抖是游戏化反馈，和工具气质不符——
+       安静说清为什么关不掉就够了。 */
+    toast(`${runningTotal()} 个 agent 还在跑 · 主线已收工，收起就看不到了`);
+    return;
+  }
+  S.open = false; render();
+});
+reopen.addEventListener("click", () => { S.open = true; S.tab = "act"; render(); });
+
+bodyEl.addEventListener("click", (e) => {
+  const fm = e.target.closest("[data-form]");
+  if (fm) { S.form = fm.dataset.form; render(); return; }
+  const card = e.target.closest(".card2__name");
+  if (card) {
+    const id = card.dataset.card;
+    if (S.collapsed.has(id)) S.collapsed.delete(id); else S.collapsed.add(id);
+    render(); return;
+  }
+  const f = e.target.closest(".prev__f");
+  if (f) { S.file = +f.dataset.file; render(); return; }
+  if (e.target.closest("#btwSend")) {
+    const input = document.getElementById("btwInput");
+    if (input.value.trim() !== "") { QA.push({ q: input.value.trim(), a: "（示意稿不接引擎，占位回答。真实现走 askSideQuestion。）" }); render(); }
+  }
+});
+bodyEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "btwInput") document.getElementById("btwSend").click(); });
+flowbarEl.addEventListener("click", (e) => {
+  const r = e.target.closest("[data-open]");
+  if (!r) return;
+  S.open = true; S.tab = "act"; S.collapsed.delete(r.dataset.open); render();
+});
+
+/* ---------------- flowbar：副栏时间线的等比缩影 ---------------- */
+function miniLanes(w) {
+  const { scale } = axisOf(w);
+  return AG(w).map((a) => {
+    const st = stateOf(a);
+    if (st === "pending") return `<span class="fb__lane"></span>`;
+    const end = a.e === null ? w.now : a.e;
+    const qw = a.q === null ? 0 : pct(a.s - a.q, scale);
+    const qq = qw > 0.6 ? `<i class="fb__q" style="left:${pct(a.q, scale)}%;width:${qw}%"></i>` : "";
+    return `<span class="fb__lane">${qq}<i class="fb__b fb__b--${st === "failed" ? "fail" : st === "running" ? "run" : "done"}" style="left:${pct(a.s, scale)}%;width:${Math.max(1.5, pct(end - a.s, scale))}%"></i></span>`;
+  }).join("");
+}
+
+const BOLT = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg>';
+const CHECK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m4 12 6 6L20 6"/></svg>';
+const GO = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg>';
+
+function flowbarHtml() {
+  return WORKFLOWS.map((w) => {
+    const n = AG(w).length;
+    const d = doneOf(w);
+    const r = runningOf(w);
+    const fin = d === n;
+    const meta = fin
+      ? `<b>${n}/${n}</b><s>·</s><b class="js-ft">${(w.now / 1000).toFixed(1)}s</b><s>·</s><b class="js-fk">${w.tok.toFixed(1)}k</b>`
+      : `<b>${d}/${n}</b><s>·</s>${r} 并行<s>·</s><b class="js-ft">${(w.now / 1000).toFixed(1)}s</b><s>·</s><b class="js-fk">${w.tok.toFixed(1)}k</b>`;
+    return `<div class="flowbar__row${fin ? " flowbar__row--done" : ""}" data-open="${w.id}" title="点开副栏看这条的时间线">
+      <span class="flowbar__bolt">${fin ? CHECK : BOLT}</span>
+      <span class="flowbar__name">${w.name}</span>
+      <span class="flowbar__meta">${meta}</span>
+      <span class="fb__mini" data-mini="${w.id}">${miniLanes(w)}</span>
+      <span class="flowbar__go">${GO}</span>
+    </div>`;
+  }).join("");
+}
+
+function positionFlowbar() {
+  WORKFLOWS.forEach((w) => {
+    const mini = flowbarEl.querySelector(`[data-mini="${w.id}"]`);
+    if (!mini) return;
+    const { scale } = axisOf(w);
+    const lanes = mini.children;
+    AG(w).forEach((a, i) => {
+      const lane = lanes[i];
+      if (!lane) return;
+      const st = stateOf(a);
+      if (st === "pending") return;
+      const end = a.e === null ? w.now : a.e;
+      const qEl = lane.querySelector(".fb__q");
+      if (qEl) { qEl.style.left = pct(a.q, scale) + "%"; qEl.style.width = pct(a.s - a.q, scale) + "%"; }
+      const b = lane.querySelector(".fb__b");
+      if (b) { b.style.left = pct(a.s, scale) + "%"; b.style.width = Math.max(1.5, pct(end - a.s, scale)) + "%"; }
+    });
+    const row = flowbarEl.querySelector(`[data-open="${w.id}"]`);
+    if (row) {
+      const ft = row.querySelector(".js-ft");
+      if (ft) ft.textContent = (w.now / 1000).toFixed(1) + "s";
+      const fk = row.querySelector(".js-fk");
+      if (fk) fk.textContent = w.tok.toFixed(1) + "k";
+    }
+  });
+}
+
+/* ---------------- 渲染 ---------------- */
+function render() {
+  aside.hidden = !S.open;
+  reopen.hidden = S.open;
+  if (S.open) {
+    renderTabs();
+    bodyEl.innerHTML = S.tab === "act" ? actPage() : S.tab === "prev" ? prevPage() : S.tab === "btw" ? btwPage() : brPage();
+  }
+  flowbarEl.innerHTML = flowbarHtml();
+  const runs = WORKFLOWS.filter((w) => runningOf(w) > 0).length;
+  document.getElementById("state").textContent = isPinned()
+    ? `状态：${runs} 个 workflow / ${runningTotal()} 个 agent 在跑 → 副栏钉住`
+    : "状态：没有活动 → 副栏可关（试试右上角的 ✕）";
+}
+
+/* 走时钟：只推进「在跑」那些 workflow 的墙钟，然后只改几何，不整页重渲染 */
+setInterval(() => {
+  let moved = false;
+  WORKFLOWS.forEach((w) => {
+    if (runningOf(w) === 0) return;
+    const rate = w._rate || 1;
+    w.now += 240 * rate; w.tok += 0.04 * rate; moved = true;
+  });
+  if (!moved) return;
+  if (S.open && S.tab === "act" && S.form === "tl") {
+    WORKFLOWS.forEach((w) => {
+      const card = bodyEl.querySelector(`[data-wf="${w.id}"]`);
+      if (card) positionCard(card, w);
+    });
+  }
+  positionFlowbar();
+}, 240);
+
+/* ---------------- 按钮 ---------------- */
+let timers = [];
+const SNAPSHOT = JSON.parse(JSON.stringify(WORKFLOWS));
+document.getElementById("replay").addEventListener("click", () => {
+  timers.forEach(clearTimeout); timers = [];
+  WORKFLOWS.forEach((w, wi) => {
+    const src = SNAPSHOT[wi];
+    const k = 0.55 + wi * 0.16;
+    /* 重播把 ~22s 压进 ~13s：墙钟跟着压缩比走，条和调度才同步 */
+    w.now = 0; w.tok = 0; w._rate = 1 / k;
+    AG(w).forEach((a, i) => {
+      const o = AG(src)[i];
+      a.q = o.q; a.s = null; a.e = null; a.failed = false;
+      if (o.s === null) return;
+      timers.push(setTimeout(() => { a.s = o.s; a.e = null; render(); }, 260 + o.s * k));
+      if (o.e !== null) timers.push(setTimeout(() => { a.e = o.e; a._fresh = true; render(); }, 260 + o.e * k));
+    });
+    const total = Math.max(...AG(src).map((a) => a.e ?? a.s ?? 0));
+    timers.push(setTimeout(() => { w._rate = null; w.now = total; w.tok = src.tok; render(); }, 300 + total * k));
+  });
+  render();
+});
+document.getElementById("finish").addEventListener("click", () => {
+  timers.forEach(clearTimeout); timers = [];
+  WORKFLOWS.forEach((w, wi) => {
+    const src = SNAPSHOT[wi];
+    AG(w).forEach((a, i) => {
+      const o = AG(src)[i];
+      const wasLive = a.e === null && a.s !== null;
+      a.q = o.q ?? 0; a.s = o.s ?? 0; a.e = o.e ?? (o.s ?? 0) + 3000; a.failed = false;
+      if (wasLive) a._fresh = true;
+    });
+    w.now = Math.max(...AG(w).map((a) => a.e));
+    w.tok = src.tok;
+    w._rate = null;
+  });
+  render();
+});
+document.getElementById("tofail").addEventListener("click", () => {
+  const a = AG(WORKFLOWS[0]).find((x) => stateOf(x) === "running");
+  if (!a) { toast("readme-drift-audit 现在没有在跑的 agent —— 先重播"); return; }
+  a.failed = true; a.e = WORKFLOWS[0].now;
+  render();
+});
+
+/* ---------------- 底部三张说明图 + 缩影 ---------------- */
+document.getElementById("d2").innerHTML = timelineHtml(SNAPSHOT[0]);
+document.getElementById("d3").innerHTML = timelineHtml(SNAPSHOT[2]);
+document.getElementById("d4").innerHTML = `<span class="fb__mini fb__mini--wide">${miniLanes(SNAPSHOT[0])}</span>`;
+
+render();
+</script>
+</body>
+</html>

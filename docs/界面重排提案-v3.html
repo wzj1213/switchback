@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>omni 界面重排 · v3 · 一条流，改成一张格</title>
+<style>
+/* ============================================================
+   v3 色板 —— 黑白灰。
+   四档文字（前三档处处 AA）、四层面、两个彩色（只在出事时出现）。
+   每个数都在 C 节里有实测，不是「看起来干净」。
+   ============================================================ */
+:root{
+  color-scheme: light dark;
+
+  /* 面：四层，相邻 ΔL* ≈ 3.2–3.9。够分层，所以线可以少画 */
+  --surface:#ffffff;      /* 抬起面：正文区、卡片、浮层 */
+  --paper:#f4f4f1;        /* 窗底：侧栏、工作台、输入区外圈 */
+  --said:#eaeae6;         /* 沉一档：用户消息、代码块 */
+  --sunk:#e1e1dc;         /* 再沉一档：选中行、按下态 */
+
+  /* 线：两档，只有两个角色。structural 切窗口，hair 切区块内部 */
+  --hair:#e4e4df;
+  --rule:#d0d0c9;
+
+  /* 字：四档，前三档承载文字且处处 ≥4.5:1；第四档只给非文字 */
+  --ink:#111110;          /* 18.89:1 on 纸 */
+  --ink-2:#494946;        /*  9.03:1 */
+  --ink-3:#6a6a67;        /*  5.43:1（气泡上仍有 4.50） */
+  --ink-4:#a8a8a3;        /*  刻度、图标发丝、占位点——不写字 */
+  --ink-on:#ffffff;       /* 反白：写在 --ink 上，18.89:1 */
+
+  /* 彩色只有两个。默认零彩色，出事才亮 */
+  --danger:#9d3324;       /* 7.16:1 */
+  --warn:#8a6410;         /* 5.37:1 */
+
+  /* 圆角：四档 + 一档全圆。同心规则见 B 节 */
+  --r1:6px; --r2:10px; --r3:14px; --r4:20px; --rf:999px;
+
+  /* 间距：4 的倍数 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+
+  /* 分级段距：这一版最要紧的三个数（A5） */
+  --gap-in:8px;     /* 同一轮内部 */
+  --gap-mid:20px;   /* 工序块 ↔ 回答 */
+  --gap-turn:36px;  /* 轮 ↔ 轮 */
+
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --t-xs:11.5px; --t-code:12.5px; --t-sm:13px; --t-base:14px; --t-prose:15px; --t-lg:16px; --t-xl:27px;
+
+  --dur:120ms; --dur-slow:240ms;
+
+  --shadow-1:0 1px 2px rgb(0 0 0 / 5%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 10px 30px rgb(0 0 0 / 10%);
+  --scrim:rgb(17 17 16 / 28%);
+
+  /* 两条轨（A4） */
+  --track-prose:660px;
+  --track-wide:940px;
+  --spine:40px;
+}
+
+/* 深色是全套的，不是把灰翻过来了事 */
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --surface:#17171a; --paper:#0e0e10; --said:#212125; --sunk:#2a2a2f;
+  --hair:#26262a; --rule:#3a3a40;
+  --ink:#f2f2ef; --ink-2:#b2b2af; --ink-3:#8a8a88; --ink-4:#5b5b5e; --ink-on:#0e0e10;
+  --danger:#e08b7d; --warn:#d3ab63;
+  --shadow-1:none; --shadow-pop:0 12px 34px rgb(0 0 0 / 55%);
+  --scrim:rgb(0 0 0 / 60%);
+}}
+:root[data-theme="dark"]{
+  --surface:#17171a; --paper:#0e0e10; --said:#212125; --sunk:#2a2a2f;
+  --hair:#26262a; --rule:#3a3a40;
+  --ink:#f2f2ef; --ink-2:#b2b2af; --ink-3:#8a8a88; --ink-4:#5b5b5e; --ink-on:#0e0e10;
+  --danger:#e08b7d; --warn:#d3ab63;
+  --shadow-1:none; --shadow-pop:0 12px 34px rgb(0 0 0 / 55%);
+  --scrim:rgb(0 0 0 / 60%);
+}
+
+/* ============================================================
+   文档骨架
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--font); font-size:15px; line-height:1.75;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  padding:0 24px 120px;
+}
+svg{flex:none}
+.ic{stroke:currentColor;fill:none;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ic--f{fill:currentColor;stroke:none}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+.wrap{max-width:1360px;margin:0 auto}
+.col{max-width:780px}
+.doc-head{padding:96px 0 44px}
+.kicker{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:0 0 20px;font-family:var(--mono)}
+h1{font-size:46px;line-height:1.14;font-weight:600;letter-spacing:-.022em;margin:0 0 22px}
+.lede{font-size:17px;line-height:1.8;color:var(--ink-2);margin:0 0 18px}
+.lede strong{color:var(--ink);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:6px;font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-top:26px}
+.meta span{padding:3px 9px;border:1px solid var(--hair);border-radius:var(--rf);background:var(--surface)}
+
+h2.sec{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;margin:76px 0 6px;font-family:var(--mono)}
+h2.sec + .sub{font-size:19px;font-weight:600;letter-spacing:-.012em;margin:0 0 26px;max-width:820px;line-height:1.5}
+.rule{height:1px;background:var(--rule);border:0;margin:0}
+
+/* 条目卡 */
+.pt{padding:40px 0;border-top:1px solid var(--hair)}
+.pt:first-of-type{border-top:0}
+.pt__no{font-family:var(--mono);font-size:12px;color:var(--ink-4);letter-spacing:.1em;margin:0 0 10px}
+.pt__h{font-size:25px;line-height:1.34;font-weight:600;letter-spacing:-.014em;margin:0 0 10px}
+.pt__sub{font-size:15px;color:var(--ink-2);margin:0 0 24px;max-width:780px;line-height:1.8}
+.pt__sub strong{color:var(--ink);font-weight:600}
+.pt p{max-width:780px;color:var(--ink-2);margin:0 0 14px}
+.pt p strong{color:var(--ink);font-weight:600}
+.pt ul{max-width:780px;color:var(--ink-2);margin:0 0 14px;padding-left:1.25em}
+.pt li{margin:6px 0}
+.pt li strong{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.87em;background:var(--said);padding:1px 5px;border-radius:var(--r1);color:var(--ink)}
+
+/* 数字盒：所有「实测」都长这样 */
+.nums{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}
+.num{flex:1 1 190px;min-width:170px;padding:12px 14px;border:1px solid var(--hair);border-radius:var(--r2);
+  background:var(--surface)}
+.num b{display:block;font-size:11.5px;font-family:var(--mono);color:var(--ink-3);font-weight:400;letter-spacing:.04em}
+.num u{text-decoration:none;display:block;margin-top:5px;font-size:20px;font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;font-weight:600}
+.num u.bad{color:var(--danger)}
+.num .was{color:var(--ink-4)}
+.num s{text-decoration:none;display:block;margin-top:2px;font-size:11.5px;color:var(--ink-4)}
+
+/* 便签 */
+.note{max-width:780px;padding:16px 18px;border:1px solid var(--hair);border-left:2px solid var(--rule);
+  border-radius:0 var(--r2) var(--r2) 0;background:var(--surface);margin:0 0 18px}
+.note h4{margin:0 0 6px;font-size:13.5px;font-weight:600}
+.note p{margin:0;font-size:14px;color:var(--ink-2);line-height:1.75;max-width:none}
+.note--warn{border-left-color:var(--warn)}
+.note--dead{border-left-color:var(--danger)}
+
+/* 表 */
+table.t{border-collapse:collapse;font-size:13.5px;width:100%;max-width:1000px;margin:0 0 18px}
+table.t th,table.t td{padding:10px 12px;border-bottom:1px solid var(--hair);text-align:left;vertical-align:top}
+table.t th{font-size:11px;letter-spacing:.09em;color:var(--ink-3);text-transform:uppercase;font-weight:600;
+  border-bottom:1px solid var(--rule);font-family:var(--mono)}
+table.t td.n{font-family:var(--mono);color:var(--ink-4);width:32px}
+table.t td.m{font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap}
+table.t td.qty,table.t th.qty{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+table.t tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:var(--rf);white-space:nowrap;
+  border:1px solid var(--hair);color:var(--ink-3);background:var(--surface);font-family:var(--font)}
+.pill--go{border-color:var(--ink);color:var(--ink);font-weight:500}
+.pill--no{border-color:var(--danger);color:var(--danger)}
+
+/* 全景 */
+.tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 20px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:var(--r2);overflow:hidden;background:var(--surface)}
+.seg button{font:500 var(--t-xs)/1 var(--font);color:var(--ink-3);background:transparent;border:0;
+  padding:8px 12px;cursor:pointer;transition:background var(--dur) ease,color var(--dur) ease}
+.seg button + button{border-left:1px solid var(--hair)}
+.seg button:hover{background:var(--said);color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ink-on)}
+.tools__hint{font-size:12px;color:var(--ink-4)}
+
+.pano{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+@media (max-width:1180px){.pano{grid-template-columns:1fr}}
+.tag{display:flex;align-items:center;gap:7px;font-size:11.5px;font-family:var(--mono);color:var(--ink-3);
+  margin:0 0 10px;letter-spacing:.06em}
+.tag::before{content:"";width:6px;height:6px;border-radius:var(--rf);background:var(--ink-4)}
+.tag--next{color:var(--ink)}
+.tag--next::before{background:var(--ink)}
+.cap{margin:12px 0 0;font-size:12px;line-height:1.7;color:var(--ink-3);max-width:640px}
+.cap b{color:var(--ink-2);font-weight:500}
+
+.scaler{position:relative;width:100%;padding-top:76.92%;overflow:hidden;
+  border:1px solid var(--rule);border-radius:var(--r3);background:var(--surface);box-shadow:var(--shadow-pop)}
+.scaler > .ui{position:absolute;top:0;left:0;transform-origin:top left}
+.scaler--wide{padding-top:54.28%}
+
+/* 对齐尺：把左边缘量出来 */
+.ui{position:relative}
+.edge{position:absolute;top:0;bottom:0;width:1px;background:var(--danger);opacity:0;pointer-events:none;
+  transition:opacity var(--dur-slow) ease;z-index:40}
+.edge::after{content:attr(data-n);position:absolute;top:6px;left:3px;font:600 10px/1 var(--mono);
+  color:var(--ink-on);background:var(--danger);padding:2px 4px;border-radius:3px}
+.edge--ok{background:var(--ink)}
+.edge--ok::after{background:var(--ink)}
+.edge--low::after{top:26px}
+body[data-edges="on"] .edge{opacity:1}
+</style>
+</head>
+<body>
+
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></symbol>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.6a1 1 0 0 1 1-1h2.8l1.2 1.4H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4"/><path d="M10.1 10.1L13.5 13.5"/></symbol>
+<symbol id="i-chev-r" viewBox="0 0 16 16"><path d="M6.2 3.8L10.4 8l-4.2 4.2"/></symbol>
+<symbol id="i-chev-d" viewBox="0 0 16 16"><path d="M3.8 6.2L8 10.4l4.2-4.2"/></symbol>
+<symbol id="i-chev-l" viewBox="0 0 16 16"><path d="M9.8 3.8L5.6 8l4.2 4.2"/></symbol>
+<symbol id="i-term" viewBox="0 0 16 16"><path d="M3.2 4.6L6.4 8l-3.2 3.4M8.4 11.6h4.4"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.6h4.6L12.2 6.2v7.2H4z"/><path d="M8.4 2.6v3.8h3.8"/></symbol>
+<symbol id="i-think" viewBox="0 0 16 16"><path d="M8 2.4l1.35 3.25L12.6 7l-3.25 1.35L8 11.6 6.65 8.35 3.4 7l3.25-1.35z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.4l4.4 1.7v3.3c0 2.6-1.85 4.35-4.4 5.2-2.55-.85-4.4-2.6-4.4-5.2V4.1z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.6" cy="3.6" r="1.5"/><circle cx="4.6" cy="12.4" r="1.5"/><circle cx="11.4" cy="4.8" r="1.5"/><path d="M4.6 5.1v5.8M11.4 6.3c0 2.2-1.6 2.9-3.4 3.2"/></symbol>
+<symbol id="i-reset" viewBox="0 0 16 16"><path d="M3.1 8a4.9 4.9 0 1 0 1.5-3.5"/><path d="M2.8 2.9v3.1h3.1"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><path d="M3.4 8.4l3 3 6.2-6.8"/></symbol>
+<symbol id="i-up" viewBox="0 0 16 16"><path d="M8 12.6V3.4M4.2 7.2L8 3.4l3.8 3.8"/></symbol>
+<symbol id="i-side" viewBox="0 0 16 16"><rect x="2.2" y="3.2" width="11.6" height="9.6" rx="1.6"/><path d="M10.2 3.2v9.6"/></symbol>
+<symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.1"/><path d="M8 1.9v1.6M8 12.5v1.6M13.1 8h-1.6M4.5 8H2.9M11.6 4.4l-1.1 1.1M5.5 10.5l-1.1 1.1M11.6 11.6l-1.1-1.1M5.5 5.5L4.4 4.4"/></symbol>
+<symbol id="i-dots" viewBox="0 0 16 16"><circle cx="3.6" cy="8" r=".9" class="ic--f"/><circle cx="8" cy="8" r=".9" class="ic--f"/><circle cx="12.4" cy="8" r=".9" class="ic--f"/></symbol>
+<symbol id="i-pen" viewBox="0 0 16 16"><path d="M11.2 2.6l2.2 2.2-8 8-3 .8.8-3z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.6 8S3.8 4.2 8 4.2 14.4 8 14.4 8 12.2 11.8 8 11.8 1.6 8 1.6 8z"/><circle cx="8" cy="8" r="1.7"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+<header class="doc-head col">
+  <p class="kicker">omni · 同文 &nbsp;/&nbsp; 界面重排 · v3</p>
+  <h1>一条流，<br>改成一张格</h1>
+  <p class="lede">v1 改排版，v2 改布局，两版都落地了——但主区读起来仍然像一条<strong>流</strong>：内容一直在动，眼睛没有可以回来的地方。这一版不再挪盒子，它换的是<strong>结构规则</strong>。</p>
+  <p class="lede">三件事，各自有实测：<strong>① 均匀间距换成分级间距</strong>（流之所以是流，是因为每两块之间都一样远）；<strong>② 四个左边缘并成一个</strong>，靠一条脊；<strong>③ 色板换成黑白灰</strong>——不是因为好看，是因为现在的六个语义色<em>全落在同一档明度</em>，颜色其实没在分层。</p>
+  <div class="meta">
+    <span>tokens.css</span><span>app-main.css</span><span>items-turns.css</span><span>app-composer.css</span>
+    <span>Transcript.tsx</span><span>Workspace.tsx</span><span>Between.tsx</span><span>group.ts</span>
+  </div>
+</header>
+
+<style>
+/* ══════════════════════════════════════════════════════════
+   omni 界面小样 —— 两套。
+   `.ui--now` 用现在的 tokens 逐字画现在的样子；`.ui--next` 用 v3 的。
+   ══════════════════════════════════════════════════════════ */
+.ui{width:1040px;height:800px;display:grid;grid-template-columns:258px 1fr;
+  grid-template-rows:minmax(0,1fr);overflow:hidden;flex:none;
+  font-family:var(--font);font-size:14px;line-height:1.6;background:var(--bg,var(--surface));color:var(--text,var(--ink))}
+@media (min-width:1181px){.scaler > .ui{transform:scale(.6404)}}
+@media (max-width:1180px){.scaler > .ui{transform:scale(.86)}}
+@media (max-width:900px){.scaler > .ui{transform:scale(.62)}}
+
+/* ── 现在：把 tokens.css 的值原样搬过来，好让「前」是真的前 ── */
+.ui > *{min-height:0;min-width:0}
+.ui--now{
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-code:#f6f6f7; --bg-said:#f0f0f2;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#6f6f78; --text-inverse:#fff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .ui--now{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+}}
+:root[data-theme="dark"] .ui--now{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+}
+
+/* 侧栏（两套共用骨架，颜色各走各的 token） */
+.us{display:flex;flex-direction:column;background:var(--bg-sunken);
+  border-right:1px solid var(--border-strong);overflow:hidden}
+.us__head{padding:14px 8px 12px}
+.us__lights{display:flex;gap:8px;padding:0 4px 16px}
+.us__lights i{width:11px;height:11px;border-radius:6px;background:var(--bg-active);display:block}
+.us__brand{padding-left:24px;font-size:16px;font-weight:600;letter-spacing:.01em}
+.us__brand span{color:var(--text-faint);font-weight:400;margin-left:4px;font-size:13px}
+.usact{display:flex;gap:8px;padding:0 8px 8px}
+.usbtn{flex:1;min-width:0;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:0;border-radius:var(--radius-sm);background:var(--text);color:var(--text-inverse);
+  font:inherit;font-size:13px;font-weight:500}
+.usbtn .g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.usbtn .w{flex:none;font-size:11.5px;font-weight:400;opacity:.55}
+.usicon{flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-raised);color:var(--text-muted)}
+.ussearch{margin:0 8px 4px;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-raised);
+  color:var(--text-faint);font-size:13px}
+.us__list{flex:1;min-height:0;overflow:hidden;padding-bottom:16px}
+.ur{display:flex;align-items:center;min-height:32px;width:calc(100% - 16px);margin:0 8px;
+  border-radius:var(--radius-sm);color:var(--text-muted);font-size:14px}
+.ur__slot{display:flex;flex:none;align-items:center;justify-content:center;width:24px;color:var(--text-faint)}
+.ur__lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ur__end,.ur__time{flex:none;padding-right:8px;font-size:11.5px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.ur__time{margin-left:8px;white-space:nowrap}
+.ur--sel{background:var(--bg-active);color:var(--text)}
+.ur--thread{padding-left:24px}
+.udot{width:6px;height:6px;border-radius:3px;background:var(--text-faint);display:block}
+.udot--run{background:var(--accent)}
+.us__sec{display:flex;align-items:center;width:calc(100% - 16px);margin:0 8px;
+  padding:14px 0 4px 24px;min-height:34px;color:var(--text-faint);font-size:13px;gap:3px}
+.us__empty{margin:0;padding:2px 8px 6px 32px;font-size:11.5px;color:var(--text-faint);line-height:1.5}
+.us__foot{display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid var(--border)}
+.us__ava{width:20px;height:20px;border-radius:4px;background:var(--bg-active);display:flex;
+  align-items:center;justify-content:center;font-size:10px;color:var(--text-muted)}
+
+/* ── 现在 · 主区（流式） ─────────────────────── */
+.um{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.um__top{display:flex;align-items:center;gap:12px;height:44px;padding:0 16px;border-bottom:1px solid var(--border-strong)}
+.um__title{display:flex;align-items:center;gap:4px;font-weight:600;font-size:14px}
+.um__title svg{color:var(--text-faint)}
+.um__sp{flex:1}
+.umeter{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.umeter__t{width:44px;height:4px;border-radius:2px;background:var(--bg-active);overflow:hidden}
+.umeter__f{display:block;height:100%;width:20%;background:var(--text-faint)}
+.utr{flex:1;min-height:0;overflow:hidden;padding:24px 16px 24px;display:flex;flex-direction:column;justify-content:flex-end}
+.utr__in{max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.uuser{max-width:72%;align-self:flex-end;padding:8px 12px;
+  border-radius:var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background:var(--bg-said);white-space:pre-wrap;margin-top:8px;font-size:15px;line-height:26px}
+.uagent{min-width:0;font-size:15px;line-height:26px;margin-top:8px}
+.umark{display:flex;align-items:center;gap:12px;padding:2px 0;margin-top:20px;font-size:11.5px;
+  color:var(--text-muted);font-weight:500;font-variant-numeric:tabular-nums}
+.umark::after{content:"";flex:1;height:1px;background:var(--border)}
+.uthink{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text-muted);font-size:13px}
+.uthink__i{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--text-faint)}
+.uthink__l{flex:1;min-width:0;overflow:hidden;white-space:nowrap;color:var(--text-muted);font-size:11.5px}
+.urun{display:flex;flex-direction:column;gap:1px}
+.ustep{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text-muted);font-size:13px;line-height:20px}
+.ustep__i{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--text-faint)}
+.ustep__t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);
+  font-family:var(--mono);font-size:12.5px}
+.ustep__s{flex:none;margin-left:8px;color:var(--text-faint);font-size:11.5px}
+.ustep__s--fail{color:var(--danger)}
+.uout{margin:2px 0 8px 24px;padding:8px 12px;border-left:1px solid var(--border);
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;background:var(--bg-code);color:var(--text-muted);
+  font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre-wrap;overflow:hidden}
+.uch{display:flex;justify-content:center;gap:8px;padding-bottom:8px}
+.upill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  border:1px solid var(--border);background:var(--bg-raised);font-size:11.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums}
+.uplan{display:flex;align-items:center;gap:8px;max-width:760px;margin:0 auto 8px;padding:5px 10px;
+  border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-raised);
+  font-size:12px;color:var(--text-muted)}
+.uplan b{font-weight:400;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.uplan span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.ucomp{border-top:1px solid var(--border-strong);padding:12px 16px 16px}
+.ucomp__in{max-width:760px;margin:0 auto;border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);padding:8px 12px}
+.uchips{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--text-muted);padding-bottom:6px}
+.uchips span{display:inline-flex;align-items:center;gap:5px}
+.uta{min-height:42px;color:var(--text-faint);font-size:14px;line-height:1.6}
+.ubar{display:flex;align-items:center;gap:8px;padding-top:4px;font-size:13px;color:var(--text-muted)}
+.utrig{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:var(--radius-sm)}
+.usend{margin-left:auto;width:26px;height:26px;border-radius:999px;background:var(--text);
+  color:var(--text-inverse);display:flex;align-items:center;justify-content:center;flex:none}
+</style>
+
+<style>
+/* ══════════════════════════════════════════════════════════
+   这一版 · 小样
+   命名前缀 n-，和上面那套 u- 完全隔开，好让两张图能并排活着
+   ══════════════════════════════════════════════════════════ */
+.ui--next{background:var(--surface);color:var(--ink);grid-template-columns:264px 1fr}
+.ui--next.ui--desk{grid-template-columns:264px 1fr 328px;width:1400px;height:760px}
+.ui--desk .ntr{justify-content:flex-start}
+
+/* ── 侧栏 ─────────────────────────────────── */
+.ns{display:flex;flex-direction:column;background:var(--paper);overflow:hidden;
+  border-right:1px solid var(--hair)}
+.ns__head{padding:14px 10px 10px}
+.ns__lights{display:flex;gap:8px;padding:0 4px 18px}
+.ns__lights i{width:11px;height:11px;border-radius:var(--rf);background:var(--sunk);display:block}
+.ns__brand{padding-left:22px;font-size:16px;font-weight:600;letter-spacing:-.006em;color:var(--ink)}
+.ns__brand span{color:var(--ink-4);font-weight:400;margin-left:5px;font-size:12.5px;letter-spacing:.02em}
+.ns__act{display:flex;gap:6px;padding:0 10px 6px}
+.nbtn{flex:1;min-width:0;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:0;border-radius:var(--r2);background:var(--ink);color:var(--ink-on);
+  font:500 13px/1 var(--font)}
+.nbtn .g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.nbtn .w{flex:none;font-size:11px;font-weight:400;opacity:.5;font-family:var(--mono)}
+.nicon{flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r2);background:var(--said);color:var(--ink-2)}
+.nsearch{margin:0 10px 10px;height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border-radius:var(--r2);background:var(--said);color:var(--ink-3);font-size:12.5px}
+.ns__list{flex:1;min-height:0;overflow:hidden;padding:0 0 12px}
+.nsec{display:flex;align-items:center;gap:8px;margin:15px 10px 3px;padding:0 8px;height:20px;
+  color:var(--ink-3);font:600 11px/1 var(--font);letter-spacing:.08em}
+.nsec i{flex:1;height:1px;background:var(--hair);display:block}
+.nr{display:flex;align-items:center;gap:8px;height:30px;margin:0 10px;padding:0 8px;
+  border-radius:var(--r2);color:var(--ink-2);font-size:13.5px}
+.nr__ic{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--ink-4)}
+.nr__l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nr__e{flex:none;font-size:11px;color:var(--ink-4);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.nr--sel{background:var(--sunk);color:var(--ink);font-weight:500}
+.nr--sub{margin-left:26px;margin-right:10px}
+.nr--hush{color:var(--ink-3)}
+.ndot{width:6px;height:6px;border-radius:var(--rf);background:var(--ink-4);display:block}
+.ndot--run{background:var(--ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--ink) 16%,transparent)}
+.ndot--fail{background:var(--danger)}
+.ns__empty{margin:0;padding:1px 18px 4px 44px;font-size:11px;color:var(--ink-4);line-height:1.55}
+.ns__foot{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:auto;
+  border-top:1px solid var(--hair)}
+.ns__ava{width:22px;height:22px;border-radius:var(--r1);background:var(--sunk);display:flex;
+  align-items:center;justify-content:center;font:500 10px/1 var(--font);color:var(--ink-2)}
+
+/* ── 主区 ─────────────────────────────────── */
+.nm{display:flex;flex-direction:column;min-width:0;background:var(--surface)}
+.nm__top{display:flex;align-items:center;gap:10px;height:48px;padding:0 16px 0 18px;
+  border-bottom:1px solid var(--hair)}
+.nm__title{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:600;
+  letter-spacing:-.004em;color:var(--ink);min-width:0}
+.nm__title svg{color:var(--ink-4)}
+.nm__sp{flex:1}
+.nmeter{display:flex;align-items:center;gap:7px;font:11px/1 var(--mono);color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.nmeter i{width:38px;height:3px;border-radius:var(--rf);background:var(--said);overflow:hidden;display:block}
+.nmeter i b{display:block;height:100%;width:20%;background:var(--ink-3);border-radius:var(--rf)}
+.nib{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex:none;
+  border-radius:var(--r2);color:var(--ink-3)}
+.nib--on{background:var(--said);color:var(--ink)}
+
+/* ── 转录 · 脊 + 两条轨 ───────────────────── */
+.ntr{flex:1;min-height:0;overflow:hidden;padding:26px 24px 22px;position:relative;
+  display:flex;flex-direction:column;justify-content:flex-end}
+.ntr__in{max-width:980px;width:100%;margin:0 auto}
+.nturn{position:relative;padding:0 0 36px}          /* --gap-turn */
+.nturn:last-child{padding-bottom:0}
+/* 轮与轮之间：一条横线穿过脊，把上一轮结掉。竖脊 + 横线 = 一张格 */
+.nturn + .nturn{border-top:1px solid var(--hair);padding-top:30px;margin-top:6px}
+.nturn + .nturn::before{top:40px}
+.nturn::before{content:"";position:absolute;left:12px;top:10px;bottom:40px;width:1px;background:var(--rule)}
+.nturn--live::before{background:linear-gradient(var(--rule) 0 62%,var(--ink-4))}
+.nblk{display:grid;grid-template-columns:36px 1fr;align-items:start}
+.nblk + .nblk{margin-top:8px}                       /* --gap-in */
+.nblk--mid{margin-top:20px}                         /* --gap-mid */
+.nmk{position:relative;height:22px;display:flex;align-items:center;justify-content:flex-start;padding-left:6px}
+.nmk i{display:block;position:relative;z-index:2}
+.nmk--said i{width:7px;height:7px;border-radius:1.5px;background:var(--ink-2);
+  outline:3px solid var(--surface)}
+.nmk--work i{width:9px;height:9px;border-radius:var(--rf);border:1.5px solid var(--ink-4);
+  background:var(--surface);outline:3px solid var(--surface)}
+.nmk--live i{border-color:var(--ink);background:var(--ink);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ink) 15%,transparent);outline:3px solid var(--surface)}
+.nmk--say i{width:7px;height:7px;border-radius:var(--rf);background:var(--ink);outline:3px solid var(--surface)}
+.nbd{min-width:0}
+.nlab{display:flex;align-items:center;gap:8px;height:22px;font:11px/1 var(--mono);color:var(--ink-3);
+  letter-spacing:.04em}
+.nlab b{color:var(--ink-2);font-weight:600;letter-spacing:.06em}
+.nlab em{font-style:normal;color:var(--ink-4)}
+.nlab .nlab__sp{flex:1}
+.nlab__act{display:inline-flex;align-items:center;gap:4px;color:var(--ink-4);font-size:10.5px}
+
+/* 轨一：正文 660。轨二：宽 940，同一个左边缘 */
+.nprose{max-width:660px;font-size:15px;line-height:26px;color:var(--ink);margin-top:2px}
+.nprose p{margin:0 0 12px}
+.nprose p:last-child{margin:0}
+.nsaid{width:fit-content;max-width:660px;margin-top:2px;padding:10px 14px;border-radius:var(--r3);
+  background:var(--said);color:var(--ink);font-size:15px;line-height:26px;white-space:pre-wrap}
+.nthumb{width:64px;height:44px;margin-top:8px;border-radius:var(--r1);background:var(--surface);
+  border:1px solid var(--hair);display:block}
+
+/* 工序块：连着的机器活动收成一个盒子 */
+.nwork{max-width:940px;margin-top:4px;border:1px solid var(--hair);border-radius:var(--r3);
+  background:var(--surface);overflow:hidden;box-shadow:var(--shadow-1)}
+.nwork__b{padding:4px 0}
+.nstep{display:grid;grid-template-columns:34px 18px 1fr auto;align-items:center;gap:8px;
+  height:26px;padding:0 12px 0 0;color:var(--ink-2);font-size:12.5px}
+.nstep__n{font:11px/1 var(--mono);color:var(--ink-4);text-align:right;font-variant-numeric:tabular-nums}
+.nstep__i{display:flex;align-items:center;justify-content:center;color:var(--ink-4)}
+.nstep__t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--mono);font-size:12px;color:var(--ink)}
+.nstep__t em{font-style:normal;color:var(--ink-3)}
+.nstep__s{font:11px/1 var(--mono);color:var(--ink-4);font-variant-numeric:tabular-nums}
+.nstep__s.fail{color:var(--danger)}
+.nstep__s.plus{color:var(--ink-3)}
+.nstep--out{height:auto;display:block;padding:2px 12px 8px 52px}
+.nout{padding:8px 11px;border-radius:var(--r2);background:var(--said);color:var(--ink-2);
+  font-family:var(--mono);font-size:12px;line-height:1.6;white-space:pre-wrap;overflow:hidden}
+.nthink{display:grid;grid-template-columns:34px 18px 1fr;align-items:center;gap:8px;height:26px;
+  padding-right:12px;color:var(--ink-3);font-size:12px}
+.nthink__t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-3)}
+.nwork__f{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 52px;
+  border-top:1px solid var(--hair);font:11px/1 var(--mono);color:var(--ink-4)}
+
+/* 折起来的一轮：一行就够 */
+.nfold{max-width:940px;display:flex;align-items:center;gap:10px;height:30px;margin-top:4px;padding:0 12px;
+  border:1px solid var(--hair);border-radius:var(--r2);background:var(--paper);
+  font:11.5px/1 var(--mono);color:var(--ink-3)}
+.nfold b{color:var(--ink-2);font-weight:500}
+.nfold span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--font);font-size:12.5px;color:var(--ink-3)}
+
+/* 宽轨：代码 */
+.ncode{max-width:940px;margin-top:10px;padding:10px 13px;border-radius:var(--r2);background:var(--said);
+  font-family:var(--mono);font-size:12px;line-height:1.65;color:var(--ink-2);white-space:pre;overflow:hidden}
+.ncode b{color:var(--ink);font-weight:400}
+
+/* ── 输入区：一个盒子，不是三条带 ───────────── */
+.ncomp{background:var(--paper);border-top:1px solid var(--hair);padding:12px 24px 16px}
+.ncomp__in{max-width:980px;margin:0 auto}
+.nbox{max-width:672px;margin-left:24px;border:1px solid var(--rule);border-radius:var(--r3);
+  background:var(--surface);box-shadow:var(--shadow-1);overflow:hidden}
+.nplan{display:flex;align-items:center;gap:9px;height:30px;padding:0 12px;border-bottom:1px solid var(--hair);
+  background:var(--paper);font-size:12px;color:var(--ink-2)}
+.nplan__m{width:9px;height:9px;flex:none;border-radius:var(--rf);border:1.5px solid var(--ink-3);
+  background:conic-gradient(var(--ink-3) 0 50%,transparent 0)}
+.nplan__n{font:11px/1 var(--mono);color:var(--ink-4);font-variant-numeric:tabular-nums;flex:none}
+.nplan__t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.nchips{display:flex;align-items:center;gap:0;height:26px;padding:0 12px;font:11px/1 var(--mono);
+  color:var(--ink-3);border-bottom:1px solid var(--hair)}
+.nchips b{display:inline-flex;align-items:center;gap:5px;font-weight:400;color:var(--ink-3)}
+.nchips u{text-decoration:none;color:var(--ink-4);margin:0 8px}
+.nchips .plus{color:var(--ink-2)}
+.nchips__sp{flex:1}
+.nchips__act{display:inline-flex;align-items:center;gap:4px;color:var(--ink-2);font-family:var(--font);
+  font-size:11.5px;padding:2px 6px;border-radius:var(--r1);background:var(--said)}
+.nta{padding:10px 12px 4px;min-height:46px;color:var(--ink-3);font-size:14px;line-height:1.6}
+.nbar{display:flex;align-items:center;gap:4px;padding:2px 8px 8px 8px}
+.ntrig{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;border-radius:var(--r1);
+  color:var(--ink-2);font-size:12.5px;background:transparent}
+.ntrig svg{color:var(--ink-4)}
+.ntrig--key{background:var(--said);color:var(--ink);font-weight:500}
+.nsend{margin-left:auto;width:30px;height:30px;border-radius:var(--rf);background:var(--ink);
+  color:var(--ink-on);display:flex;align-items:center;justify-content:center;flex:none}
+
+/* ── 工作台（右） ─────────────────────────── */
+.nd{display:flex;flex-direction:column;background:var(--paper);border-left:1px solid var(--hair);overflow:hidden}
+.nd__top{display:flex;align-items:center;gap:2px;height:48px;padding:0 8px 0 12px;border-bottom:1px solid var(--hair)}
+.ntab{height:26px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;border-radius:var(--r1);
+  color:var(--ink-3);font-size:12.5px}
+.ntab b{font:10.5px/1 var(--mono);color:var(--ink-4);font-weight:400}
+.ntab--on{background:var(--sunk);color:var(--ink);font-weight:500}
+.ntab--on b{color:var(--ink-2)}
+.nd__sp{flex:1}
+.nd__sum{display:flex;align-items:baseline;gap:8px;padding:16px 14px 12px}
+.nd__sum u{text-decoration:none;font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.nd__sum s{text-decoration:none;font:11.5px/1 var(--mono);color:var(--ink-3)}
+.nd__sum em{font-style:normal;font-size:12.5px;color:var(--ink-3);margin-left:-2px}
+.nfile{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;height:30px;
+  margin:0 8px;padding:0 6px;border-radius:var(--r1);color:var(--ink-2)}
+.nfile--sel{background:var(--sunk)}
+.nfile__p{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+.nfile__p em{font-style:normal;color:var(--ink-4)}
+.nfile__d{font:11px/1 var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.nd__act{margin:12px 12px 0;display:flex;gap:6px}
+.nact{flex:1;height:30px;display:flex;align-items:center;justify-content:center;gap:6px;
+  border-radius:var(--r2);background:var(--ink);color:var(--ink-on);font:500 12.5px/1 var(--font)}
+.nact--2{background:var(--said);color:var(--ink-2);font-weight:400}
+.nd__note{margin:12px 14px 0;padding-left:9px;border-left:2px solid var(--hair);
+  font-size:11.5px;line-height:1.65;color:var(--ink-4)}
+.nd__foot{margin-top:auto;display:flex;align-items:center;gap:7px;height:32px;padding:0 14px;
+  border-top:1px solid var(--hair);font:11px/1 var(--mono);color:var(--ink-4)}
+</style>
+
+<h2 class="sec">全景 · 同样的内容，两种结构</h2>
+<p class="sub">左边是现在（tokens.css 的值逐字搬过来的，不是印象）。右边是这一版。内容一个字都没换——换的只有间距等级、左边缘、块的边界和色板。</p>
+
+<div class="tools">
+  <div class="seg" role="group" aria-label="主题">
+    <button type="button" data-theme-set="light" aria-pressed="false">浅色</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">深色</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">跟随系统</button>
+  </div>
+  <div class="seg" role="group" aria-label="对齐尺">
+    <button type="button" id="edgeToggle" aria-pressed="false">显示左边缘尺</button>
+  </div>
+  <span class="tools__hint">尺量的是<b>块级</b>左边缘——每一块话从哪儿开始。块内部的分栏不算。</span>
+</div>
+
+<div class="pano">
+  <div>
+    <p class="tag">现在</p>
+    <div class="scaler">
+<div class="ui ui--now">
+  <div class="edge" style="left:274px" data-n="1"></div>
+  <div class="edge" style="left:286px" data-n="2"></div>
+  <div class="edge" style="left:298px" data-n="3"></div>
+  <div class="edge" style="left:506px" data-n="4"></div>
+  <aside class="us">
+    <div class="us__head">
+      <div class="us__lights"><i></i><i></i><i></i></div>
+      <div class="us__brand">omni <span>同文</span></div>
+    </div>
+    <div class="usact">
+      <div class="usbtn"><svg class="ic" width="14" height="14"><use href="#i-plus"/></svg><span class="g">新建会话</span><span class="w">omni</span></div>
+      <div class="usicon"><svg class="ic" width="15" height="15"><use href="#i-folder"/></svg></div>
+    </div>
+    <div class="ussearch"><svg class="ic" width="13" height="13"><use href="#i-search"/></svg>筛选会话…</div>
+    <div class="us__list">
+      <div class="us__sec">置顶 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty">把会话或项目拖到这里就置顶了。</p>
+      <div class="us__sec">项目 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+      <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">UI 布局流式还是不太好…</span><span class="ur__time">跑了 2:56</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">把侧栏那三行入口收一下</span><span class="ur__time">14:02</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">计划常驻的那一版</span><span class="ur__time">昨天</span></div>
+      <div class="us__sec">对话 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty">还没有对话。点右边的 + 开一条。</p>
+    </div>
+    <div class="us__foot">
+      <span class="us__ava">A</span><span class="ur__lbl" style="font-size:13px;color:var(--text-muted)">alice</span>
+      <svg class="ic" width="14" height="14" style="color:var(--text-faint)"><use href="#i-gear"/></svg>
+    </div>
+  </aside>
+  <main class="um">
+    <div class="um__top">
+      <div class="um__title">UI 布局流式还是不太好 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></div>
+      <div class="um__sp"></div>
+      <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+      <svg class="ic" width="15" height="15" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+    </div>
+    <div class="utr"><div class="utr__in">
+      <div class="uuser">把侧栏那三行入口收一下，太占地方了</div>
+      <div class="umark"><span>已处理 41 秒</span></div>
+      <div class="uagent">收好了：主按钮 + 图标键一行，搜索独占一行，一共省下 32px。</div>
+      <div class="uuser">UI 我觉得布局流式还是不太好，你按最佳工程美学优化一版，色板走黑白灰<span class="uthumb" style="width:60px;height:42px;margin-top:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-raised);display:block"></span></div>
+      <div class="umark"><span>已处理 2 分 56 秒</span></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13"><use href="#i-think"/></svg></span>思考<span class="uthink__l">现在的转录区是一条均匀流，先量一下段距和左边缘…</span><svg class="ic" width="12" height="12" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="urun">
+        <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg></span><span class="ustep__t">styles/tokens.css</span></div>
+        <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg></span><span class="ustep__t">styles/app-main.css</span></div>
+        <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13"><use href="#i-term"/></svg></span><span class="ustep__t">node scripts/contrast.mjs</span><span class="ustep__s ustep__s--fail">失败</span></div>
+      </div>
+      <div class="uout">ΔL* muted↔faint = 2.02
+warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13"><use href="#i-think"/></svg></span>思考<span class="uthink__l">六个语义色明度几乎一样，说明颜色没在做分层的活…</span><svg class="ic" width="12" height="12" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="urun">
+        <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13"><use href="#i-pen"/></svg></span><span class="ustep__t">styles/tokens.css</span><span class="ustep__s">+42 −18</span></div>
+      </div>
+      <div class="uagent">先说结论：它读起来像流，不是因为间距不够，是因为</div>
+    </div></div>
+    <div class="uch"><span class="upill">5 个文件已更改 +214 −38</span><span class="upill">审核</span></div>
+    <div class="uplan"><b>第 3 / 7 步</b><span>把 tokens.css 换成黑白灰四档</span><svg class="ic" width="11" height="11" style="color:var(--text-faint)"><use href="#i-chev-d"/></svg></div>
+    <div class="ucomp"><div class="ucomp__in">
+      <div class="uchips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main ·</span></div>
+      <div class="uta">它还在跑——现在打的会排在后面。</div>
+      <div class="ubar">
+        <span class="utrig">Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
+        <span class="usend"><svg class="ic" width="13" height="13"><use href="#i-up"/></svg></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+    </div>
+    <p class="cap"><b>四个块级左边缘</b>，其中一个（你自己说的话）还随字数左右浮动 · <b>段距全是 8</b>，所以「一轮结束」和「下一句思考」看起来一样远 · 底部三条带（变更 / 计划 / 输入）各带一条通栏线 · 六个语义色落在同一档明度</p>
+  </div>
+
+  <div>
+    <p class="tag tag--next">这一版</p>
+    <div class="scaler">
+<div class="ui ui--next">
+  <div class="edge edge--ok" style="left:300px" data-n="脊"></div>
+  <div class="edge edge--ok edge--low" style="left:324px" data-n="1"></div>
+  <aside class="ns">
+    <div class="ns__head">
+      <div class="ns__lights"><i></i><i></i><i></i></div>
+      <div class="ns__brand">omni <span>同文</span></div>
+    </div>
+    <div class="ns__act">
+      <div class="nbtn"><svg class="ic" width="14" height="14"><use href="#i-plus"/></svg><span class="g">新建会话</span><span class="w">omni</span></div>
+      <div class="nicon"><svg class="ic" width="15" height="15"><use href="#i-folder"/></svg></div>
+    </div>
+    <div class="nsearch"><svg class="ic" width="13" height="13"><use href="#i-search"/></svg>筛选会话…</div>
+    <div class="ns__list">
+      <div class="nsec">置顶 <i></i></div>
+      <p class="ns__empty">拖一条会话进来就置顶。</p>
+      <div class="nsec">项目 <i></i></div>
+      <div class="nr"><span class="nr__ic"><svg class="ic" width="11" height="11"><use href="#i-chev-r"/></svg></span><span class="nr__l">router</span><span class="nr__e">1</span></div>
+      <div class="nr"><span class="nr__ic"><svg class="ic" width="11" height="11"><use href="#i-chev-r"/></svg></span><span class="nr__l">agent-learn</span><span class="nr__e">2</span></div>
+      <div class="nr"><span class="nr__ic"><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span><span class="nr__l">omni</span><span class="nr__e">3</span></div>
+      <div class="nr nr--sub nr--sel"><span class="nr__ic"><i class="ndot ndot--run"></i></span><span class="nr__l">UI 布局流式还是不太好</span><span class="nr__e">2:56</span></div>
+      <div class="nr nr--sub"><span class="nr__ic"><i class="ndot"></i></span><span class="nr__l">把侧栏那三行入口收一下</span><span class="nr__e">14:02</span></div>
+      <div class="nr nr--sub"><span class="nr__ic"><i class="ndot"></i></span><span class="nr__l">计划常驻的那一版</span><span class="nr__e">昨天</span></div>
+      <div class="nsec">对话 <i></i></div>
+      <p class="ns__empty">还没有对话。</p>
+    </div>
+    <div class="ns__foot">
+      <span class="ns__ava">A</span><span class="nr__l" style="font-size:12.5px;color:var(--ink-2)">alice</span>
+      <svg class="ic" width="14" height="14" style="color:var(--ink-4)"><use href="#i-gear"/></svg>
+    </div>
+  </aside>
+  <main class="nm">
+    <div class="nm__top">
+      <div class="nm__title">UI 布局流式还是不太好 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></div>
+      <div class="nm__sp"></div>
+      <div class="nmeter"><i><b></b></i>51.9k / 262k</div>
+      <span class="nib"><svg class="ic" width="15" height="15"><use href="#i-side"/></svg></span>
+      <span class="nib"><svg class="ic" width="15" height="15"><use href="#i-dots"/></svg></span>
+    </div>
+    <div class="ntr"><div class="ntr__in">
+
+      <div class="nturn">
+        <div class="nblk">
+          <div class="nmk nmk--said"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>你</b><em>14:02</em></div>
+            <div class="nsaid">把侧栏那三行入口收一下，太占地方了</div>
+          </div>
+        </div>
+        <div class="nblk nblk--mid">
+          <div class="nmk nmk--work"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>工序</b><em>3 步 · 41 秒 · 1 个文件</em><span class="nlab__sp"></span><span class="nlab__act"><svg class="ic" width="10" height="10"><use href="#i-chev-r"/></svg>展开</span></div>
+            <div class="nfold"><b>3 步</b><span>读 app-sidebar.css · 改 SidebarHead.tsx · 跑 pnpm check:css</span><i style="font-style:normal;color:var(--ink-4)">+18 −6</i></div>
+          </div>
+        </div>
+        <div class="nblk nblk--mid">
+          <div class="nmk nmk--say"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>Kimi Code</b><em>回答</em></div>
+            <div class="nprose">收好了：主按钮 + 图标键一行，搜索独占一行，一共省下 32px。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nturn nturn--live">
+        <div class="nblk">
+          <div class="nmk nmk--said"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>你</b><em>14:39</em></div>
+            <div class="nsaid">UI 我觉得布局流式还是不太好，你按最佳工程美学优化一版，色板走黑白灰<span class="nthumb"></span></div>
+          </div>
+        </div>
+        <div class="nblk nblk--mid">
+          <div class="nmk nmk--work nmk--live"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>工序</b><em>7 步 · 2 分 56 秒 · 5 个文件</em><span class="nlab__sp"></span><span class="nlab__act"><svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg>收起</span></div>
+            <div class="nwork">
+              <div class="nwork__b">
+                <div class="nthink"><span class="nstep__n"></span><span class="nstep__i"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg></span><span class="nthink__t">现在的转录区是一条均匀流，先量一下段距和左边缘…</span></div>
+                <div class="nstep"><span class="nstep__n">01</span><span class="nstep__i"><svg class="ic" width="12" height="12"><use href="#i-file"/></svg></span><span class="nstep__t"><em>styles/</em>tokens.css</span><span class="nstep__s">12ms</span></div>
+                <div class="nstep"><span class="nstep__n">02</span><span class="nstep__i"><svg class="ic" width="12" height="12"><use href="#i-file"/></svg></span><span class="nstep__t"><em>styles/</em>app-main.css</span><span class="nstep__s">9ms</span></div>
+                <div class="nstep"><span class="nstep__n">03</span><span class="nstep__i"><svg class="ic" width="12" height="12"><use href="#i-term"/></svg></span><span class="nstep__t">node scripts/contrast.mjs</span><span class="nstep__s fail">失败</span></div>
+                <div class="nstep nstep--out"><div class="nout">ΔL* muted↔faint = 2.02
+warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div></div>
+                <div class="nthink"><span class="nstep__n"></span><span class="nstep__i"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg></span><span class="nthink__t">六个语义色明度几乎一样，说明颜色没在做分层的活…</span></div>
+                <div class="nstep"><span class="nstep__n">04</span><span class="nstep__i"><svg class="ic" width="12" height="12"><use href="#i-pen"/></svg></span><span class="nstep__t"><em>styles/</em>tokens.css</span><span class="nstep__s plus">+42 −18</span></div>
+              </div>
+              <div class="nwork__f">还在跑 · 第 5 步 04:12</div>
+            </div>
+          </div>
+        </div>
+        <div class="nblk nblk--mid">
+          <div class="nmk nmk--say"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>Kimi Code</b><em>正在回答</em></div>
+            <div class="nprose">先说结论：它读起来像流，不是因为间距不够，是因为</div>
+          </div>
+        </div>
+      </div>
+
+    </div></div>
+    <div class="ncomp"><div class="ncomp__in">
+      <div class="nbox">
+        <div class="nplan"><span class="nplan__m"></span><span class="nplan__n">3/7</span><span class="nplan__t">把 tokens.css 换成黑白灰四档</span><svg class="ic" width="11" height="11" style="color:var(--ink-4)"><use href="#i-chev-d"/></svg></div>
+        <div class="nchips">
+          <b><svg class="ic" width="11" height="11"><use href="#i-folder"/></svg>omni</b><u>/</u>
+          <b><svg class="ic" width="11" height="11"><use href="#i-branch"/></svg>main</b><u>·</u>
+          <b class="plus">5 改 +214 −38</b>
+          <span class="nchips__sp"></span>
+          <span class="nchips__act"><svg class="ic" width="11" height="11"><use href="#i-eye"/></svg>审核</span>
+        </div>
+        <div class="nta">它还在跑——现在打的会排在后面。</div>
+        <div class="nbar">
+          <span class="ntrig ntrig--key">Kimi Code <svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg></span>
+          <span class="ntrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg></span>
+          <span class="ntrig"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg></span>
+          <span class="nsend"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></span>
+        </div>
+      </div>
+    </div></div>
+  </main>
+</div>
+    </div>
+    <p class="cap"><b>一个块级左边缘</b>，外加一条只放标记的脊 · <b>段距分三档</b>（8 / 20 / 36），一眼看得出哪儿是一轮的接缝 · 底部只剩<b>一个盒子</b>，计划、变更、审核都在它身上 · 默认零彩色，那条「失败」是全屏唯一的颜色</p>
+  </div>
+</div>
+
+<style>
+/* 节奏尺：把「均匀」和「分级」并排摆出来 */
+.rhy{display:flex;gap:28px;flex-wrap:wrap;margin:0 0 20px}
+.rhy__c{flex:1 1 280px;min-width:260px}
+.rhy__t{font:11px/1 var(--mono);color:var(--ink-3);letter-spacing:.08em;margin:0 0 12px}
+.rh{display:flex;flex-direction:column;width:100%;max-width:300px}
+.rh i{display:block;border-radius:var(--r1);background:var(--said);position:relative}
+.rh i::after{content:attr(data-l);position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  font:11px/1 var(--font);color:var(--ink-3)}
+.rh b{display:block;position:relative;font-weight:400}
+.rh b::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--hair)}
+.rh b::after{content:attr(data-g);position:absolute;right:0;top:50%;transform:translateY(-50%);
+  background:var(--paper);padding:0 0 0 6px;white-space:nowrap;font:10.5px/1 var(--mono);color:var(--ink-4)}
+.rh--next b::after{color:var(--ink-2)}
+.rh--next b.big::before{background:var(--rule)}
+
+/* 左边缘图 */
+.edges{position:relative;max-width:560px;margin:0 0 12px;padding:44px 0 16px;
+  border:1px solid var(--hair);border-radius:var(--r2);background:var(--surface);overflow:hidden}
+.eg{position:relative;height:20px;margin:4px 0}
+.eg i{position:absolute;top:3px;height:14px;border-radius:3px;background:var(--said);display:block}
+.eg i.hot{background:var(--ink-4)}
+.eg i.mk{background:var(--ink-2)}
+.eg i.mk--ring{background:transparent;border:1.5px solid var(--ink-2)}
+.egl{position:absolute;top:0;bottom:0;width:1px;background:var(--danger);opacity:.45}
+.egl b{position:absolute;left:3px;display:block;font:600 9px/1 var(--mono);color:#fff;
+  background:var(--danger);padding:3px 5px;border-radius:3px;white-space:nowrap}
+.egl--ok{background:var(--ink);opacity:.75}
+.egl--ok b{background:var(--ink)}
+.eglg{display:flex;flex-wrap:wrap;gap:6px 18px;max-width:560px;margin:0 0 22px;
+  font-size:12px;color:var(--ink-3)}
+.eglg span{display:inline-flex;align-items:center;gap:6px}
+.eglg i{width:15px;height:15px;flex:none;border-radius:3px;background:var(--danger);color:#fff;
+  display:flex;align-items:center;justify-content:center;font:600 9px/1 var(--mono);font-style:normal}
+.eglg--ok i{background:var(--ink)}
+
+/* 圆角阶梯 */
+.rads{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:0 0 20px}
+.rad{width:104px;text-align:center}
+.rad i{display:flex;align-items:center;justify-content:center;height:64px;background:var(--said);
+  color:var(--ink-3);font:600 13px/1 var(--mono);margin-bottom:7px}
+.rad p{margin:0;font:10.5px/1.5 var(--mono);color:var(--ink-4);max-width:none}
+.rad b{color:var(--ink-2);font-weight:400}
+
+/* 同心圆角 */
+.conc{display:flex;align-items:center;gap:16px;margin:0 0 18px;padding:14px;border-radius:var(--r3);
+  background:var(--said);width:fit-content}
+.conc__o{padding:8px;border-radius:14px;background:var(--surface);display:flex;gap:6px;
+  border:1px solid var(--hair)}
+.conc__i{width:56px;height:28px;border-radius:6px;background:var(--said)}
+.conc__i--k{background:var(--ink)}
+.conc__f{font:11px/1.7 var(--mono);color:var(--ink-3)}
+.conc__f b{color:var(--ink);font-weight:400}
+
+/* 色板 */
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px;margin:0 0 8px;max-width:1000px}
+.swc{border:1px solid var(--hair);border-radius:var(--r2);overflow:hidden;background:var(--surface)}
+.swc i{display:block;height:52px}
+.swc div{padding:7px 9px 9px}
+.swc b{display:block;font:11px/1.4 var(--mono);color:var(--ink);font-weight:500}
+.swc s{display:block;text-decoration:none;font:10.5px/1.5 var(--mono);color:var(--ink-4);margin-top:1px}
+.swc u{display:block;text-decoration:none;font:10.5px/1.5 var(--font);color:var(--ink-3);margin-top:3px}
+.swrow{display:flex;align-items:center;gap:10px;margin:22px 0 10px}
+.swrow h4{margin:0;font-size:12px;font-family:var(--mono);letter-spacing:.1em;color:var(--ink-3);font-weight:600}
+.swrow i{flex:1;height:1px;background:var(--hair)}
+</style>
+
+<h2 class="sec">诊断 · 它为什么读起来像一条流</h2>
+<p class="sub">不是「间距不够」。四条，都能量。</p>
+
+<div class="pt">
+  <p class="pt__no">诊断 01</p>
+  <h3 class="pt__h">段距只有一档，所以「一轮结束」和「下一句思考」看起来一样远</h3>
+  <p class="pt__sub">转录区所有块之间都是 <code>gap: 8px</code>（<code>app-main.css</code> 里 <code>.transcript</code> 那一列）。<strong>层级不是靠间距大小体现的，间距一样就等于没有层级</strong>——眼睛只能靠读内容来判断自己在哪一轮，而那正是「流」的定义。</p>
+  <div class="rhy">
+    <div class="rhy__c">
+      <p class="rhy__t">现在 · 一档</p>
+      <div class="rh">
+        <i style="height:34px" data-l="你说的话"></i><b style="height:8px" data-g="8"></b>
+        <i style="height:26px" data-l="已处理 41 秒"></i><b style="height:8px" data-g="8"></b>
+        <i style="height:44px" data-l="回答"></i><b style="height:8px" data-g="8"></b>
+        <i style="height:34px" data-l="你说的话"></i><b style="height:8px" data-g="8"></b>
+        <i style="height:26px" data-l="思考"></i><b style="height:8px" data-g="8"></b>
+        <i style="height:30px" data-l="工具行"></i>
+      </div>
+    </div>
+    <div class="rhy__c">
+      <p class="rhy__t">这一版 · 三档 8 / 20 / 36</p>
+      <div class="rh rh--next">
+        <i style="height:34px" data-l="你说的话"></i><b style="height:20px" data-g="20"></b>
+        <i style="height:26px" data-l="工序（一块）"></i><b style="height:20px" data-g="20"></b>
+        <i style="height:44px" data-l="回答"></i><b class="big" style="height:36px" data-g="36 ＋ 一条横线"></b>
+        <i style="height:34px" data-l="你说的话"></i><b style="height:20px" data-g="20"></b>
+        <i style="height:30px" data-l="工序（一块）"></i>
+      </div>
+    </div>
+  </div>
+  <p><strong>8 留给块内部</strong>（标签到内容）、<strong>20 给一轮内部的换角色</strong>（你 → 工序 → 回答）、<strong>36 加一条横线给换轮</strong>。三个数拉开到 2.5 倍以上才分得清——1.5 倍以内人眼当成同一档。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">诊断 02</p>
+  <h3 class="pt__h">四个块级左边缘，其中一个还随字数左右浮动</h3>
+  <p class="pt__sub">正文列宽 760，但块并不都从 760 的左边开始：回答和分界线在 <code>x</code>，工具行和思考行在 <code>x+24</code>（图标槽 16 ＋ 间隙 8），输入框里的字在 <code>x+12</code>，而<strong>你自己说的话右对齐——它的左边缘由这句话有多长决定</strong>。</p>
+  <div class="edges">
+    <div class="egl" style="left:16px"><b style="top:4px">1</b></div>
+    <div class="egl" style="left:28px"><b style="top:21px">2</b></div>
+    <div class="egl" style="left:40px"><b style="top:4px;left:14px">3</b></div>
+    <div class="egl" style="left:300px"><b style="top:4px">4</b></div>
+    <div class="egl" style="left:376px"><b style="top:21px">4</b></div>
+    <div class="eg"><i class="hot" style="left:300px;width:210px"></i></div>
+    <div class="eg"><i style="left:16px;width:180px"></i></div>
+    <div class="eg"><i style="left:40px;width:300px"></i></div>
+    <div class="eg"><i style="left:40px;width:250px"></i></div>
+    <div class="eg"><i class="hot" style="left:376px;width:134px"></i></div>
+    <div class="eg"><i style="left:16px;width:440px"></i></div>
+    <div class="eg"><i style="left:28px;width:340px"></i></div>
+  </div>
+  <p class="eglg"><span><i>1</i>回答 · 换轮分界线</span><span><i>2</i>输入框里的字</span><span><i>3</i>工具行 · 思考行</span><span><i>4</i>你说的话（左边缘随字数浮动）</span></p>
+  <p>每换一块，眼睛就要重新找一次「这行从哪儿开始」。这个动作单次只有几十毫秒，但一屏有二十来块，<strong>而它的代价不是时间，是「没有一条可以顺着往下走的线」</strong>——顺不下去，就只剩「流」。</p>
+  <div class="note">
+    <h4>右对齐的气泡，代价比看起来大</h4>
+    <p>它带来的好处是「一眼看出这句是我说的」。但同一件事，<strong>一个沉一档的底色 ＋ 脊上一个方点 ＋ 一行「你 · 14:39」</strong>也能做到，而且不用把左边缘交出去。聊天软件里右对齐是对的——那儿两个人轮流说，块都很短。这里一句提问经常是六行需求，右对齐等于让最需要逐字读的那段每行都从不同的地方开始。</p>
+  </div>
+</div>
+
+<div class="pt">
+  <p class="pt__no">诊断 03</p>
+  <h3 class="pt__h">机器干的活没有边界，于是它和「话」抢同一条流</h3>
+  <p class="pt__sub">思考行、工具行、工具输出、计划快照——现在它们各自是流里的一块，和你说的话、它的回答<strong>平级排在一起</strong>。一轮里有七步，转录区就多七块。而这七块合起来只回答一个问题：<strong>它刚才干了什么</strong>。</p>
+  <p>合成一块之后，一轮固定读成三样东西：<strong>你说的 → 它做的（一块）→ 它的回答</strong>。跑完自动收起来，只留一行摘要；想看再点开。这也是 <code>group.ts</code> 里 <code>Row.run</code> 已经在做的事——它把连续的工具调用合成一组了，<strong>差的是把思考行和输出也收进同一个盒子，并且给这个盒子画一条边</strong>。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">诊断 04</p>
+  <h3 class="pt__h">六个语义色落在同一档明度，所以颜色并没有在分层</h3>
+  <p class="pt__sub">把 <code>tokens.css</code> 的值跑一遍 WCAG 就看得见：<code>--text-muted</code> 45.10、<code>--text-faint</code> 47.11、<code>--warn</code> 48.80、<code>--danger</code> 46.23、<code>--ok</code> 45.72、<code>--accent</code> 48.33——<strong>L* 全部落在 45–49 这 4 个单位里</strong>。</p>
+  <div class="nums">
+    <div class="num"><b>ΔL* muted ↔ faint</b><u class="bad">2.02</u><s>注释里写的目标是 18.7。三档文字实际只有两档</s></div>
+    <div class="num"><b>六个语义色的 L* 跨度</b><u class="bad">3.70</u><s>眯起眼睛，它们是同一个灰</s></div>
+    <div class="num"><b>--bg ↔ --bg-sunken</b><u>2.74</u><s>面的层次一直是靠描边框出来的</s></div>
+  </div>
+  <p>结论不是「颜色选得不好」，是<strong>颜色在这套界面里承担的其实是「这是哪一类」，而不是「这有多重要」</strong>。而「哪一类」用形状、位置、图标就够——那些手段在灰度下、在色盲眼里、在眯着眼扫一屏的时候都还在。所以这一版把颜色收掉，<strong>留下的两个只说一件事：出事了</strong>。</p>
+</div>
+
+<h2 class="sec">A · 布局六条</h2>
+<p class="sub">每一条都只做一件事，而且都能单独落地、单独回退。</p>
+
+<div class="pt">
+  <p class="pt__no">A1</p>
+  <h3 class="pt__h">先钉三个不动点，剩下的才准动</h3>
+  <p class="pt__sub">一个 agent 界面里，<strong>内容天生是动的</strong>——它一直在流字、一直在插工具行。既然内容不能不动，那就得有几块地方<strong>永远不动</strong>，让眼睛有地方回来。这一版钉死三个：</p>
+  <ul>
+    <li><strong>左上 · 去哪儿</strong>：新建、切换、筛选。位置和尺寸不随状态变。</li>
+    <li><strong>右上 · 现在怎么样</strong>：上下文余量、工作台开关、更多。<strong>不放引擎名</strong>——那件事 v2 已经论证过一次（顶栏是「这条会话是什么」，不是「它由谁在跑」），这一版照旧不放。</li>
+    <li><strong>正下 · 说什么</strong>：计划、变更、档位、输入、发送，全在一个盒子里（A5）。</li>
+  </ul>
+  <p>这三个点圈出来的中间那块，才是允许流动的区域。<strong>「流」不是问题，「全都在流」才是。</strong></p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">A2</p>
+  <h3 class="pt__h">一条脊：36px 宽，只放标记，把四个左边缘并成一个</h3>
+  <p class="pt__sub">转录区改成两列——左列 36px 是<strong>脊</strong>，只放一个标记和一条竖线；右列从 <code>x+36</code> 开始，<strong>这一轮里所有块，一个不例外，都从这里起</strong>。你说的话、工序块、回答、代码块、折叠条，左边缘完全对齐。</p>
+  <div class="edges">
+    <div class="egl egl--ok" style="left:16px"><b style="top:4px">脊</b></div>
+    <div class="egl egl--ok" style="left:52px"><b style="top:21px">1</b></div>
+    <div class="eg"><i class="mk" style="left:13px;width:7px;top:6px;height:7px;border-radius:2px"></i><i style="left:52px;width:230px"></i></div>
+    <div class="eg"><i style="left:52px;width:400px"></i></div>
+    <div class="eg"><i class="mk mk--ring" style="left:12px;width:9px;top:5px;height:9px;border-radius:5px"></i><i style="left:52px;width:300px"></i></div>
+    <div class="eg"><i style="left:52px;width:460px"></i></div>
+    <div class="eg"><i style="left:52px;width:440px"></i></div>
+    <div class="eg"><i class="mk" style="left:13px;width:7px;top:6px;height:7px;border-radius:4px"></i><i style="left:52px;width:180px"></i></div>
+    <div class="eg"><i style="left:52px;width:380px"></i></div>
+  </div>
+  <p class="eglg eglg--ok"><span><i>脊</i>方点＝你说的 · 圆环＝工序 · 实心圆＝回答</span><span><i>1</i>所有块，一个不例外，都从这里起</span></p>
+  <p><strong>脊上的竖线一轮一段。</strong>轮与轮之间断开，再补一条横线——竖线负责「这些是连着的」，横线负责「这一轮到此为止」。两条线加起来就是一张格，而<strong>格是流的反面</strong>：流只有一个方向，格有坐标。</p>
+  <p>标记有三种，都不带颜色：<strong>方点＝你说的</strong>、<strong>圆环＝工序</strong>（在跑的时候实心并带一圈呼吸）、<strong>实心圆＝回答</strong>。形状承担分类，明度承担轻重，颜色一个不用。</p>
+  <div class="note">
+    <h4>为什么是 36 而不是 24 或 48</h4>
+    <p>标记占 9px，居中放在 12px 处，右边留 24px 到正文——24 正好是这套界面里「图标到文字」的标准间隙（<code>--sp-5</code>）。24 会让标记贴着字，48 会让脊变成一条空走廊、正文被推到偏右。<strong>36 = 12（标记中心）+ 24（标准间隙）</strong>，不是凑出来的整数。</p>
+  </div>
+</div>
+
+<div class="pt">
+  <p class="pt__no">A3</p>
+  <h3 class="pt__h">工序块：连着的机器活动收成一个盒子，跑完自动折成一行</h3>
+  <p class="pt__sub">两段话之间的所有思考行、工具行、工具输出、计划快照，收进<strong>一个带边的盒子</strong>，配一行表头：<code>工序 · 7 步 · 2 分 56 秒 · 5 个文件</code>。盒子里是一张表，四列固定：<strong>序号 · 类型图标 · 目标 · 结果</strong>。</p>
+  <div class="nums">
+    <div class="num"><b>一轮在转录区占几块</b><u>3</u><s>你说的 / 工序 / 回答。现在是 2 + 步数</s></div>
+    <div class="num"><b>七步一轮折起来后的高度</b><u>30px</u><s>展开时 ≈ 260px</s></div>
+    <div class="num"><b>需要改的文件</b><u>2</u><s>group.ts 收拢范围 · ToolRun.tsx 画盒子</s></div>
+  </div>
+  <p>序号列是这块最容易被略过、但最有用的一列：<strong>它把「一堆事」变成「第几件事」</strong>。有了序号，「刚才那步失败了」才有一个可以指的东西；没有序号，只能说「上面那个红字」。</p>
+  <p><strong>跑完自动折起来。</strong>正在跑的那一块永远展开——那时候你要盯的就是它；跑完了折成一行摘要——那时候你要读的是回答。这条规则不需要设置项：<strong>「此刻重要」和「事后重要」本来就不是同一块内容。</strong></p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">A4</p>
+  <h3 class="pt__h">两条轨：正文 660、宽轨 940，共用同一个左边缘</h3>
+  <p class="pt__sub">现在正文和代码块共用一个 760 的列宽。这对两边都不合适：<strong>760 对中文正文太宽</strong>（15px 一行 50 个字，舒适区是 35–45），<strong>对代码又太窄</strong>（12.5px 等宽一行约 98 列，一条长命令照样要截断）。</p>
+  <div class="nums">
+    <div class="num"><b>正文轨</b><u>660px</u><s>15px 中文 ≈ 44 字/行<br><span class="was">现在 760 ≈ 50 字</span></s></div>
+    <div class="num"><b>宽轨</b><u>940px</u><s>12.5px 等宽 ≈ 120 列<br><span class="was">现在 760 ≈ 98 列</span></s></div>
+    <div class="num"><b>左边缘</b><u>同一个</u><s>宽轨只往右长，不往左越</s></div>
+  </div>
+  <p>正文、你说的话、输入框走正文轨；工序块、代码块、diff、表格走宽轨。<strong>两条轨只在右边分开，左边永远对齐</strong>——所以它读起来是「这块内容更宽」，而不是「这块内容跑偏了」。窗口不够宽的时候宽轨自己缩，正文轨不动：<strong>该先牺牲的是扫读的东西，不是逐字读的东西。</strong></p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">A5</p>
+  <h3 class="pt__h">底部三条带并成一个盒子</h3>
+  <p class="pt__sub">现在输入框上面依次是：<strong>变更胶囊行</strong>（居中两枚）、<strong>计划常驻条</strong>（一条带边的横条）、<strong>输入框</strong>（自己一圈边）。三个盒子、三条分界线、三种对齐方式，占掉 <strong>112px</strong>，而它们说的是同一件事：<strong>你按下回车之前该知道的东西。</strong></p>
+  <div class="nums">
+    <div class="num"><b>底部盒子数</b><u>1</u><s><span class="was">现在 3（外加 2 条通栏线）</span></s></div>
+    <div class="num"><b>底部占高</b><u>96px</u><s><span class="was">现在 112px</span></s></div>
+    <div class="num"><b>「审核」的入口深度</b><u>1 次点击</u><s>从居中胶囊挪到芯片行右端，位置固定</s></div>
+  </div>
+  <p>盒子从上到下四层，<strong>越往下越是「马上要发生的」</strong>：计划当前步 → 工作区芯片（目录 · 分支 · 本轮改动 · 审核）→ 输入 → 引擎/档位/模型 ＋ 发送。这个顺序不是排版，是<strong>因果链</strong>：它在按计划走 → 走到了这个工作区的这个状态 → 你现在要说的话 → 这句话由谁怎么跑。</p>
+  <div class="note">
+    <h4>不是「底部状态栏」</h4>
+    <p>v2 的 C1 驳回过一条常驻状态栏，理由是它<strong>永远占一行去说 99.9% 时间为真的话</strong>。这一条不一样：芯片行里的每一项都是<strong>会变的、且直接决定下一句话去哪儿</strong>的——目录变了、分支被引擎切了、这一轮已经改了 5 个文件。它也不新增高度，是把已经存在的三条带合并。</p>
+  </div>
+</div>
+
+<div class="pt">
+  <p class="pt__no">A6</p>
+  <h3 class="pt__h">工作台：产物有了自己的地方，不再挤在对话里</h3>
+  <p class="pt__sub">变更清单、计划全文、环境信息、审核 diff——这四样现在分别是<strong>一枚可展开胶囊</strong>、<strong>一条可展开横条</strong>、<strong>一张顶栏弹出的卡片</strong>、<strong>一整块盖住界面的面板</strong>。四种打开方式，四种关闭方式，而它们是同一类东西：<strong>不是对话，是这条会话的产物。</strong></p>
+  <p>合成右边一栏，三个页签。<strong>窗口 ≥ 1360 才常驻</strong>；窄于此点开就是盖在正文上的抽屉，Esc 关——因为 264 ＋ 328 ＝ 592 是固定开销，1040 的窗口只剩 448 给正文，那比不开还糟。<strong>这条阈值必须写在代码里，不是「注意一下」。</strong></p>
+</div>
+
+<div class="tools" style="margin-top:26px">
+  <span class="tools__hint">下面这张是 <b>1400 × 760</b>：工作台常驻的样子。窄窗口下它是抽屉。</span>
+</div>
+<div class="scaler scaler--wide">
+<div class="ui ui--next ui--desk">
+  <aside class="ns">
+    <div class="ns__head">
+      <div class="ns__lights"><i></i><i></i><i></i></div>
+      <div class="ns__brand">omni <span>同文</span></div>
+    </div>
+    <div class="ns__act">
+      <div class="nbtn"><svg class="ic" width="14" height="14"><use href="#i-plus"/></svg><span class="g">新建会话</span><span class="w">omni</span></div>
+      <div class="nicon"><svg class="ic" width="15" height="15"><use href="#i-folder"/></svg></div>
+    </div>
+    <div class="nsearch"><svg class="ic" width="13" height="13"><use href="#i-search"/></svg>筛选会话…</div>
+    <div class="ns__list">
+      <div class="nsec">置顶 <i></i></div>
+      <div class="nr nr--sub"><span class="nr__ic"><i class="ndot"></i></span><span class="nr__l">引擎适配三份方案</span><span class="nr__e">周一</span></div>
+      <div class="nsec">项目 <i></i></div>
+      <div class="nr"><span class="nr__ic"><svg class="ic" width="11" height="11"><use href="#i-chev-r"/></svg></span><span class="nr__l">router</span><span class="nr__e">1</span></div>
+      <div class="nr"><span class="nr__ic"><svg class="ic" width="11" height="11"><use href="#i-chev-r"/></svg></span><span class="nr__l">agent-learn</span><span class="nr__e">2</span></div>
+      <div class="nr"><span class="nr__ic"><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span><span class="nr__l">omni</span><span class="nr__e">3</span></div>
+      <div class="nr nr--sub nr--sel"><span class="nr__ic"><i class="ndot ndot--run"></i></span><span class="nr__l">UI 布局流式还是不太好</span><span class="nr__e">2:56</span></div>
+      <div class="nr nr--sub"><span class="nr__ic"><i class="ndot"></i></span><span class="nr__l">把侧栏那三行入口收一下</span><span class="nr__e">14:02</span></div>
+      <div class="nr nr--sub"><span class="nr__ic"><i class="ndot ndot--fail"></i></span><span class="nr__l">远程端首屏性能</span><span class="nr__e">昨天</span></div>
+      <div class="nsec">对话 <i></i></div>
+      <div class="nr nr--sub nr--hush"><span class="nr__ic"><i class="ndot"></i></span><span class="nr__l">随手问的那条</span><span class="nr__e">周日</span></div>
+    </div>
+    <div class="ns__foot">
+      <span class="ns__ava">A</span><span class="nr__l" style="font-size:12.5px;color:var(--ink-2)">alice</span>
+      <svg class="ic" width="14" height="14" style="color:var(--ink-4)"><use href="#i-gear"/></svg>
+    </div>
+  </aside>
+  <main class="nm">
+    <div class="nm__top">
+      <div class="nm__title">UI 布局流式还是不太好 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></div>
+      <div class="nm__sp"></div>
+      <div class="nmeter"><i><b></b></i>51.9k / 262k</div>
+      <span class="nib nib--on"><svg class="ic" width="15" height="15"><use href="#i-side"/></svg></span>
+      <span class="nib"><svg class="ic" width="15" height="15"><use href="#i-dots"/></svg></span>
+    </div>
+    <div class="ntr"><div class="ntr__in">
+      <div class="nturn">
+        <div class="nblk">
+          <div class="nmk nmk--said"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>你</b><em>14:39</em></div>
+            <div class="nsaid">UI 我觉得布局流式还是不太好，你按最佳工程美学优化一版，色板走黑白灰</div>
+          </div>
+        </div>
+        <div class="nblk nblk--mid">
+          <div class="nmk nmk--work"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>工序</b><em>4 步 · 1 分 12 秒 · 2 个文件</em><span class="nlab__sp"></span><span class="nlab__act"><svg class="ic" width="10" height="10"><use href="#i-chev-r"/></svg>展开</span></div>
+            <div class="nfold"><b>4 步</b><span>读 tokens.css · 跑 contrast.mjs · 改 tokens.css · 跑 pnpm check:css</span><i style="font-style:normal;color:var(--ink-4)">+42 −18</i></div>
+          </div>
+        </div>
+        <div class="nblk nblk--mid">
+          <div class="nmk nmk--say"><i></i></div>
+          <div class="nbd">
+            <div class="nlab"><b>Kimi Code</b><em>回答</em></div>
+            <div class="nprose"><p>先说结论：它读起来像流，不是因为间距不够，是因为<strong>所有间距一样大</strong>。把段距拉成三档，再给转录区一条脊，四个左边缘并成一个——这两件事加起来就够了。</p>
+            <p>色板那边我先量了一遍，六个语义色的 L* 全落在 45–49：</p></div>
+            <div class="ncode">--text-muted   #6a6a73   L* <b>45.10</b>   5.35:1
+--text-faint   #6f6f78   L* <b>47.11</b>   4.98:1   ΔL* 仅 <b>2.02</b>
+--warn         #9a6b12   L* <b>48.80</b>   4.68:1
+--danger       #c2412d   L* <b>46.23</b>   5.14:1
+--ok           #2f7a4d   L* <b>45.72</b>   5.23:1</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="ncomp"><div class="ncomp__in">
+      <div class="nbox">
+        <div class="nplan"><span class="nplan__m"></span><span class="nplan__n">5/7</span><span class="nplan__t">给转录区加一条脊，四个左边缘并成一个</span><svg class="ic" width="11" height="11" style="color:var(--ink-4)"><use href="#i-chev-d"/></svg></div>
+        <div class="nchips">
+          <b><svg class="ic" width="11" height="11"><use href="#i-folder"/></svg>omni</b><u>/</u>
+          <b><svg class="ic" width="11" height="11"><use href="#i-branch"/></svg>main</b><u>·</u>
+          <b class="plus">5 改 +214 −38</b>
+          <span class="nchips__sp"></span>
+          <span class="nchips__act"><svg class="ic" width="11" height="11"><use href="#i-eye"/></svg>审核</span>
+        </div>
+        <div class="nta">接着做 A4 那条两轨，正文先按 660 试。</div>
+        <div class="nbar">
+          <span class="ntrig ntrig--key">Kimi Code <svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg></span>
+          <span class="ntrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg></span>
+          <span class="ntrig"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="10" height="10"><use href="#i-chev-d"/></svg></span>
+          <span class="nsend"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></span>
+        </div>
+      </div>
+    </div></div>
+  </main>
+  <aside class="nd">
+    <div class="nd__top">
+      <span class="ntab ntab--on">变更 <b>5</b></span>
+      <span class="ntab">计划 <b>7</b></span>
+      <span class="ntab">环境</span>
+      <span class="nd__sp"></span>
+      <span class="nib"><svg class="ic" width="14" height="14"><use href="#i-chev-r"/></svg></span>
+    </div>
+    <div class="nd__sum"><u>5</u><em>个文件</em><s>+214 −38</s></div>
+    <div class="nfile nfile--sel"><span class="nfile__p"><em>styles/</em>tokens.css</span><span class="nfile__d">+42 −18</span></div>
+    <div class="nfile"><span class="nfile__p"><em>styles/</em>app-main.css</span><span class="nfile__d">+96 −11</span></div>
+    <div class="nfile"><span class="nfile__p"><em>styles/</em>items-turns.css</span><span class="nfile__d">+38 −4</span></div>
+    <div class="nfile"><span class="nfile__p"><em>components/</em>ToolRun.tsx</span><span class="nfile__d">+27 −5</span></div>
+    <div class="nfile"><span class="nfile__p"><em>renderer/</em>group.ts</span><span class="nfile__d">+11 −0</span></div>
+    <div class="nd__act">
+      <span class="nact"><svg class="ic" width="12" height="12"><use href="#i-eye"/></svg>逐个审核</span>
+      <span class="nact nact--2"><svg class="ic" width="12" height="12"><use href="#i-file"/></svg>复制清单</span>
+    </div>
+    <p class="nd__note">这张账只认编辑类工具报上来的改动。引擎用 shell 直接写的文件（<code style="background:none;padding:0;color:inherit">sed -i</code>、重定向、跑生成脚本）它看不见——那要问 git，在「环境」页。</p>
+    <div class="nd__foot"><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main · 工作区干净以外还有 3 个未跟踪</div>
+  </aside>
+</div>
+</div>
+<p class="cap">工作台常驻时，正文轨仍然是 660——<b>它不吃正文的宽度，吃的是右边本来就空着的那块</b>。页签只有三个，因为这条会话的产物只有三类：改了什么、打算做什么、在哪儿干活。</p>
+
+<h2 class="sec">B · 圆角、面、线</h2>
+<p class="sub">「圆角好看」不是理由。圆角是<strong>尺寸的函数</strong>，面和线是<strong>层级的两套手段</strong>，这一版把三件事各自定死一条规则。</p>
+
+<div class="pt">
+  <p class="pt__no">B1</p>
+  <h3 class="pt__h">圆角四档，按控件高度取，不按心情取</h3>
+  <p class="pt__sub">现在是 6 / 9 / 13 三档，但用法散着：用户气泡是 <code>13 13 6 13</code> 的不对称组合，工具输出是 <code>0 6 6 0</code>，胶囊 999，按钮 6。同一屏上出现七种圆角，<strong>而它们之间没有可推导的关系</strong>。</p>
+  <div class="rads">
+    <div class="rad"><i style="border-radius:6px;height:28px">6</i><p><b>--r1</b><br>≤ 28px 的控件<br>芯片 · 图标键</p></div>
+    <div class="rad"><i style="border-radius:10px;height:36px">10</i><p><b>--r2</b><br>行、小卡<br>侧栏行 · 主按钮</p></div>
+    <div class="rad"><i style="border-radius:14px;height:56px">14</i><p><b>--r3</b><br>块、面板<br>工序块 · 输入盒</p></div>
+    <div class="rad"><i style="border-radius:20px;height:72px">20</i><p><b>--r4</b><br>窗口级<br>抽屉 · 大浮层</p></div>
+    <div class="rad"><i style="border-radius:999px;height:28px">999</i><p><b>--rf</b><br>点、环、发送键<br>只给正圆</p></div>
+  </div>
+  <p><strong>取值规则：圆角 ≈ 高度 ÷ 4，就近取档。</strong>28 → 7 → 取 6；36 → 9 → 取 10；56 → 14；72 → 18 → 取 20。一个数说了算，不用每次现想。</p>
+  <p><strong>不对称圆角只在一种情况下允许</strong>：这一块贴着某条边缘（抽屉贴右、代码块贴左轨）。「气泡右下角削一刀表示这是我说的」属于装饰，而这一版<strong>不再靠气泡形状表达身份</strong>——身份由脊上的标记说（A2）。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">B2</p>
+  <h3 class="pt__h">同心圆角：外圆角 = 内圆角 + 内边距</h3>
+  <p class="pt__sub">一个圆角矩形套着另一个的时候，两个圆角必须<strong>同心</strong>，否则内外两条弧的间距在拐角处会突然收紧——这是「看着别扭但说不出哪儿别扭」最常见的一种。</p>
+  <div class="conc">
+    <div class="conc__o"><div class="conc__i conc__i--k"></div><div class="conc__i"></div></div>
+    <div class="conc__f">内：发送键 <b>r 6</b>，内边距 <b>8</b><br>外：输入盒 <b>r 14</b> ＝ 6 ＋ 8<br><span style="color:var(--ink-4)">拐角处内外弧的间距，处处等于 8</span></div>
+  </div>
+  <p>这条规则一旦立起来，圆角就不再需要「设计判断」：<strong>内层定了、边距定了，外层是算出来的。</strong>四档圆角配 4 / 8 / 12 三档内边距，够覆盖整个界面。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">B3</p>
+  <h3 class="pt__h">分层优先用面，线只在两种地方出现</h3>
+  <p class="pt__sub">现在 <code>--bg</code> 和 <code>--bg-sunken</code> 只差 <strong>2.74 L*</strong>，所以区块之间的分界全靠 <code>--border-strong</code> 那条线扛。结果就是一屏上有七八条通栏横线，<strong>每一条都在说「这里到头了」，说得太多就没人听</strong>。</p>
+  <p>这一版把四层面拉开到<strong>相邻 3.2–3.9 L*</strong>（见 C 节），层级先由面承担，线只留两个角色：</p>
+  <ul>
+    <li><strong><code>--rule</code></strong>：把窗口切成区块的那几条（侧栏 ↔ 正文、正文 ↔ 输入区、工作台 ↔ 正文），以及需要轮廓的控件。<strong>全屏不超过四条。</strong></li>
+    <li><strong><code>--hair</code></strong>：区块内部的分节线、卡片描边、脊线、换轮那条横线。</li>
+  </ul>
+  <p>顺带省掉的：用户消息不再描边（沉一档的底色够了）、变更胶囊不再描边（并进芯片行了）、计划条不再描边（并进输入盒了）。<strong>一屏少了五条线和三个盒子，内容一个字没少。</strong></p>
+</div>
+
+<h2 class="sec">C · 黑白灰色板</h2>
+<p class="sub">v2 的 C2 驳回过一套色板，理由是三条：<strong>灰太浅读不清</strong>（faint 2.79:1）、<strong>warn 连 3:1 都不到</strong>（2.74:1）、<strong>整份稿子没有深色模式</strong>。这一版逐条对上——下面每个数都是拿 WCAG 公式跑出来的，不是眼估的。</p>
+<div class="nums">
+<div class="num"><b>最淡那档真文字 · 对白</b><u>5.43:1</u><s>驳回那版 2.79 · 现在 4.98</s></div>
+<div class="num"><b>warn · 对白</b><u>5.37:1</u><s>驳回那版 2.74 · 现在 4.68</s></div>
+<div class="num"><b>ΔL* 次要 ↔ 最淡</b><u>13.80</u><s>现在 2.02——三档其实只有两档</s></div>
+<div class="num"><b>深色模式</b><u>全套</u><s>四层面 / 四档字 / 两个彩色，各一份</s></div>
+</div>
+<div class="swrow"><h4>面 · 四层</h4><i></i></div>
+<div class="sw">
+<div class="swc"><i style="background:#ffffff"></i><div><b>--surface</b><s>#ffffff</s><s>L* 100.0</s><u>抬起面：正文区、卡片、浮层</u></div></div>
+<div class="swc"><i style="background:#f4f4f1"></i><div><b>--paper</b><s>#f4f4f1</s><s>L* 96.1</s><u>窗底：侧栏、工作台、输入区</u></div></div>
+<div class="swc"><i style="background:#eaeae6"></i><div><b>--said</b><s>#eaeae6</s><s>L* 92.6</s><u>沉一档：你说的话、代码块</u></div></div>
+<div class="swc"><i style="background:#e1e1dc"></i><div><b>--sunk</b><s>#e1e1dc</s><s>L* 89.4</s><u>再沉一档：选中行、按下态</u></div></div>
+</div>
+<div class="swrow"><h4>字 · 四档，前三档处处 AA</h4><i></i></div>
+<div class="sw">
+<div class="swc"><i style="background:#111110"></i><div><b>--ink</b><s>#111110</s><s>白 18.89:1 · 纸 17.15:1 · L* 5.0</s><u>正文、标题、主按钮的字</u></div></div>
+<div class="swc"><i style="background:#494946"></i><div><b>--ink-2</b><s>#494946</s><s>白 9.03:1 · 纸 8.20:1 · L* 30.9</s><u>次要文字、图标</u></div></div>
+<div class="swc"><i style="background:#6a6a67"></i><div><b>--ink-3</b><s>#6a6a67</s><s>白 5.43:1 · 纸 4.92:1 · L* 44.7</s><u>时间、计数、说明——最小的那档真文字</u></div></div>
+<div class="swc"><i style="background:#a8a8a3"></i><div><b>--ink-4</b><s>#a8a8a3</s><s>白 2.39:1 · 纸 2.17:1 · L* 68.7</s><u>刻度、发丝、占位点。<b>不写字</b></u></div></div>
+</div>
+<div class="swrow"><h4>彩色 · 只有两个</h4><i></i></div>
+<div class="sw">
+<div class="swc"><i style="background:#9d3324"></i><div><b>--danger</b><s>#9d3324</s><s>白 7.16:1 · 纸 6.50:1 · L* 37.2</s><u>失败。全屏唯一常见的颜色</u></div></div>
+<div class="swc"><i style="background:#8a6410"></i><div><b>--warn</b><s>#8a6410</s><s>白 5.37:1 · 纸 4.87:1 · L* 45.0</s><u>额度告急一类的软警告</u></div></div>
+</div>
+<div class="swrow"><h4>线 · 两个角色</h4><i></i></div>
+<div class="sw">
+<div class="swc"><i style="background:#d0d0c9"></i><div><b>--rule</b><s>#d0d0c9</s><s>L* 83.3</s><u>切窗口的那几条，全屏 ≤ 4</u></div></div>
+<div class="swc"><i style="background:#e4e4df"></i><div><b>--hair</b><s>#e4e4df</s><s>L* 90.5</s><u>区块内部的分节线、脊线</u></div></div>
+</div>
+<p style="max-width:780px;color:var(--ink-2);margin:20px 0 6px">「前三档处处 AA」不是随口说的——最难的一处是<strong>最淡那档写在「你说的话」那块沉色底上</strong>（<code>--ink-3</code> on <code>--said</code>）：
+<strong>4.50:1</strong>，正好压住线。第四档 <code>--ink-4</code> 对白只有 2.39:1，所以它<strong>被规定不许写字</strong>——只画刻度、发丝、占位点。
+这就是把「一档灰又要读得清、又要够淡」这个死结拆开的办法：<strong>拆成两个角色，各自达标。</strong></p>
+<div class="swrow"><h4>深色 · 同一套角色，另一组数</h4><i></i></div>
+<div class="sw">
+<div class="swc"><i style="background:#17171a"></i><div><b>--surface</b><s>#17171a</s><s>L* 7.9</s></div></div>
+<div class="swc"><i style="background:#0e0e10"></i><div><b>--paper</b><s>#0e0e10</s><s>L* 4.0</s></div></div>
+<div class="swc"><i style="background:#212125"></i><div><b>--said</b><s>#212125</s><s>L* 12.9</s></div></div>
+<div class="swc"><i style="background:#2a2a2f"></i><div><b>--sunk</b><s>#2a2a2f</s><s>L* 17.2</s></div></div>
+<div class="swc"><i style="background:#f2f2ef"></i><div><b>--ink</b><s>#f2f2ef</s><s>面 15.95:1 · 底 17.19:1 · L* 95.4</s></div></div>
+<div class="swc"><i style="background:#b2b2af"></i><div><b>--ink-2</b><s>#b2b2af</s><s>面 8.42:1 · 底 9.07:1 · L* 72.5</s></div></div>
+<div class="swc"><i style="background:#8a8a88"></i><div><b>--ink-3</b><s>#8a8a88</s><s>面 5.17:1 · 底 5.58:1 · L* 57.4</s></div></div>
+<div class="swc"><i style="background:#5b5b5e"></i><div><b>--ink-4</b><s>#5b5b5e</s><s>面 2.64:1 · 底 2.85:1 · L* 38.8</s></div></div>
+<div class="swc"><i style="background:#e08b7d"></i><div><b>--danger</b><s>#e08b7d</s><s>面 6.95:1 · 底 7.49:1 · L* 66.4</s></div></div>
+<div class="swc"><i style="background:#d3ab63"></i><div><b>--warn</b><s>#d3ab63</s><s>面 8.33:1 · 底 8.98:1 · L* 72.1</s></div></div>
+<div class="swc"><i style="background:#3a3a40"></i><div><b>--rule</b><s>#3a3a40</s><s>L* 24.6</s></div></div>
+<div class="swc"><i style="background:#26262a"></i><div><b>--hair</b><s>#26262a</s><s>L* 15.3</s></div></div>
+</div>
+
+<div class="pt" style="margin-top:34px">
+  <p class="pt__no">C1</p>
+  <h3 class="pt__h">「待批准」不给颜色，给反白</h3>
+  <p class="pt__sub">全 app 最需要被看见的四个字，现在靠 <code>--warn</code> 那个黄。但一屏上同时还有蓝的链接、绿的成功、红的失败，<strong>黄要在这三个里抢注意力，只能越调越艳，而越艳越不像这套界面里的东西。</strong></p>
+  <p>黑白灰系统里有一件比任何颜色都响的事：<strong>反白</strong>。近黑的底 ＋ 白字，对比 18.89:1，是全屏最高的一档——它天然就是「这里最重要」。而且它<strong>不依赖色觉</strong>，在灰度截图里、在色盲眼里、在眯着眼扫一屏的时候都一样响。</p>
+  <p>于是状态的表达法定成四条，一条颜色都不用到：<strong>要你决定 → 反白块</strong>；<strong>正在跑 → 实心点 ＋ 一圈呼吸</strong>（动，而不是彩）；<strong>成功 → 一个勾</strong>（形状，不是绿）；<strong>失败 → 那唯一的红</strong>。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">C2</p>
+  <h3 class="pt__h">灰要带一点暖，否则会掉进「廉价蓝灰」</h3>
+  <p class="pt__sub">现在的中性色是往紫蓝偏的（<code>#6a6a73</code> 的 b 通道比 r 高 9）。这是屏幕上最常见的一种灰，也是最没有记忆点的一种——<strong>它看起来像「没选颜色」，而不是「选了灰」。</strong></p>
+  <p>这一版浅色侧的灰全部往<strong>暖中性</strong>挪一点点（<code>#6a6a67</code>，b 比 r 低 3）：纸面像纸，不像屏幕。深色侧反过来走<strong>中性偏冷</strong>——暖的深灰会发浑，看着像蒙了一层。<strong>两侧不追求同一个色相，追求各自那一侧「看着是对的」。</strong></p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">C3</p>
+  <h3 class="pt__h">语法高亮怎么办</h3>
+  <p class="pt__sub">这是黑白灰唯一真正付出的代价，得说清楚：<strong>代码块里的五个高亮色留着，不动。</strong></p>
+  <p>理由是它们和界面色不是一回事。界面色说的是「这个控件处于什么状态」，那件事可以用形状和位置替代；<strong>语法色说的是「这个词是什么词」，那是代码本身的结构</strong>，没有非颜色的替代物。把它也去掉，等于让 diff 和代码块退回纯文本——那不是克制，是能力倒退。</p>
+  <p>边界写死：<strong>颜色只允许出现在两个地方</strong>——代码块内部（语法高亮），和那唯一的失败红。其余全屏，黑白灰。</p>
+</div>
+
+
+<h2 class="sec">D · 人体工学的账</h2>
+<p class="sub">「布局舒服」不是形容词。下面每一条都是一个可以量的量，左边是现在，右边是这一版。</p>
+
+<table class="t">
+  <thead><tr><th>量的是什么</th><th class="qty">现在</th><th class="qty">这一版</th><th>依据</th></tr></thead>
+  <tbody>
+    <tr><td><strong>块级左边缘的个数</strong></td><td class="qty">4</td><td class="qty">1</td>
+      <td>每换一块就要重新定位行首。眼跳本身很便宜，<strong>贵的是「没有一条能顺下去的线」</strong></td></tr>
+    <tr><td><strong>正文行长</strong>（15px 中文）</td><td class="qty">50.7 字</td><td class="qty">44 字</td>
+      <td>中文舒适区 35–45 字。超过之后回行容易串行，长段落尤其明显</td></tr>
+    <tr><td><strong>等宽行长</strong>（12.5px）</td><td class="qty">98 列</td><td class="qty">120 列</td>
+      <td>代码是扫读不是逐字读，宽一点反而少截断。<strong>两条轨的意义就在这一行和上一行的方向相反</strong></td></tr>
+    <tr><td><strong>段距档数</strong></td><td class="qty">1（全 8）</td><td class="qty">3（8/20/36）</td>
+      <td>相邻两档差 2.5 倍以上才分得清；1.5 倍以内人眼归成同一档</td></tr>
+    <tr><td><strong>一轮在转录区占几块</strong></td><td class="qty">2 + 步数</td><td class="qty">3</td>
+      <td>七步的一轮从 9 块降到 3 块；折起来之后是 2 块</td></tr>
+    <tr><td><strong>底部盒子数 / 占高</strong></td><td class="qty">3 / 112px</td><td class="qty">1 / 96px</td>
+      <td>三个盒子三种对齐；合并后省下的 16px 全给转录区</td></tr>
+    <tr><td><strong>「审核」入口的位置</strong></td><td class="qty">居中浮动</td><td class="qty">固定</td>
+      <td><strong>位置会变的目标学不会肌肉记忆</strong>——居中胶囊的 x 由文案长度决定，改一个字它就挪</td></tr>
+    <tr><td><strong>图标按钮点击区</strong></td><td class="qty">26 × 26</td><td class="qty">28 × 28</td>
+      <td>指针设备的舒适下限。26 能点中，但连点两下容易滑出去</td></tr>
+    <tr><td><strong>全屏通栏横线</strong></td><td class="qty">4 条 + 每轮 1 条</td><td class="qty">2 条 + 每轮 1 条</td>
+      <td>线说的是「到此为止」。说太多次就没人听（B3）</td></tr>
+    <tr><td><strong>非彩色可用性</strong></td><td class="qty">否</td><td class="qty">是</td>
+      <td>状态全部由形状 / 明度 / 动效承担，灰度打印和色觉障碍下不丢信息</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <h4>有一条我没法用数字说服你，只能说清代价</h4>
+  <p>把你说的话从右边挪到左边，<strong>会失去「一眼扫过去，右边那几坨都是我说的」这个能力</strong>。换来的是一个固定的左边缘。我认为在这个界面里后者更值——因为这里一句提问经常是六行需求，是要<strong>逐字读</strong>的东西；而聊天软件里右对齐之所以对，是因为那儿的消息短，扫比读重要。<strong>但这条是判断，不是实测。</strong>如果试了一周还是别扭，单独回退它不影响其他五条。</p>
+</div>
+
+<h2 class="sec">E · 落地顺序</h2>
+<p class="sub">八步，从纯 CSS 到要动组件。<strong>每一步都能单独上、单独回退</strong>——顺序是按「收益 ÷ 风险」排的，不是按逻辑顺序。</p>
+
+<table class="t">
+  <thead><tr><th style="width:26px">#</th><th style="width:210px">做什么</th><th>动哪儿</th><th class="qty">量级</th><th>能不能单独回退</th></tr></thead>
+  <tbody>
+    <tr><td class="n">1</td><td><strong>分级段距</strong> 8 / 20 / 36 ＋ 换轮横线</td><td class="m">app-main.css · items-turns.css</td><td class="qty">半天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
+    <tr><td class="n">2</td><td><strong>圆角四档</strong>，同心规则</td><td class="m">tokens.css ＋ 各处 radius</td><td class="qty">半天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
+    <tr><td class="n">3</td><td><strong>两条轨</strong>：<code>--content-max</code> 拆成 prose / wide</td><td class="m">tokens.css · app-main.css · markdown.css</td><td class="qty">半天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
+    <tr><td class="n">4</td><td><strong>色板</strong>换黑白灰四档 ＋ 深色一份</td><td class="m">tokens.css（＋全屏走查）</td><td class="qty">1 天</td><td><span class="pill pill--go">纯 token</span></td></tr>
+    <tr><td class="n">5</td><td><strong>脊</strong>：转录区改两列，一个左边缘</td><td class="m">Transcript.tsx · items-turns.css</td><td class="qty">1 天</td><td><span class="pill">改结构</span></td></tr>
+    <tr><td class="n">6</td><td><strong>工序块</strong>：思考 ＋ 工具 ＋ 输出收进一个盒，跑完自动折</td><td class="m">group.ts · ToolRun.tsx · Reasoning.tsx</td><td class="qty">2 天</td><td><span class="pill">改结构</span></td></tr>
+    <tr><td class="n">7</td><td><strong>底部合成一个盒子</strong>：计划 ＋ 芯片 ＋ 审核 ＋ 输入</td><td class="m">Between.tsx · Composer.tsx · ComposerBar.tsx</td><td class="qty">1.5 天</td><td><span class="pill">改结构</span></td></tr>
+    <tr><td class="n">8</td><td><strong>工作台</strong>：变更 / 计划 / 环境三合一，≥1360 常驻</td><td class="m">新组件 ＋ Workspace.tsx ＋ Review 挪进去</td><td class="qty">3 天</td><td><span class="pill">最大的一步</span></td></tr>
+  </tbody>
+</table>
+<p style="max-width:780px;color:var(--ink-2)">前四步全是 token 和 CSS，加起来两天半，<strong>而全景图里那种「不像流了」的感觉，主要就是它们给的</strong>。第 5、6 两步是这一版真正的骨架改动。第 8 步单独一轮做，它值不值得取决于你平时开多宽的窗口。</p>
+
+<h2 class="sec">F · 想到了，这版没放进来</h2>
+
+<div class="pt">
+  <p class="pt__no">F1 · 照旧不要</p>
+  <h3 class="pt__h">底部状态栏、顶栏引擎徽章</h3>
+  <p class="pt__sub">v2 的 C1 和 A3 各自驳回过一次，理由现在仍然成立：<strong>状态栏永远占一行去说 99.9% 时间为真的话</strong>；<strong>顶栏回答的是「这条会话是什么」，不是「它由谁在跑」</strong>。这一版把「谁在跑」放在输入盒那一排——它本来就该和「这句话去哪儿」在一起。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">F2 · 删掉了 --accent，代价在这</p>
+  <h3 class="pt__h">焦点环和链接改用近黑，不用蓝</h3>
+  <p class="pt__sub">这一版整个色板里没有强调色。受影响的是两处：</p>
+  <ul>
+    <li><strong>焦点环</strong>：改成 <code>2px --ink</code> 加 2px 偏移。对白底 18.89:1，远超 WCAG 对非文字的 3:1，<strong>而且深浅两套都不用换值</strong>——蓝色焦点环在深色下必须换一个更亮的蓝，这是它一直要维护两份的原因。</li>
+    <li><strong>链接</strong>：改成 <code>--ink</code> ＋ 下划线。下划线本来就是链接<strong>唯一不依赖色觉的标识</strong>，去掉蓝之后它必须回来。</li>
+  </ul>
+  <p>真正的损失只有一个：<strong>「这是可点的」在扫视阶段弱了一档。</strong>补偿手段是悬停态更明显（底色抬一档 ＋ 光标变化），但那要等到指针移过去才发生。<strong>这条我认，写在这里。</strong></p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">F3 · 想做但不能做</p>
+  <h3 class="pt__h">工序块表头里的「进度」</h3>
+  <p class="pt__sub">工序块的表头如果能写「第 5 步 / 共 9 步」，那一行的信息量会翻倍。但<strong>总步数只有引擎自己知道，而它不报</strong>——报的是「计划里有几条」，那是另一件事（计划可以改，工具调用不按计划走）。</p>
+  <p>拿计划步数冒充工序进度，就是 <code>AGENTS.md</code> 里写死的那条：<strong>不给引擎自报的状态叠 omni 的猜测。</strong>所以表头只写已经发生的——<strong>7 步 · 2 分 56 秒 · 5 个文件</strong>，一个字都不预测。</p>
+</div>
+
+<div class="pt">
+  <p class="pt__no">F4 · 下一轮</p>
+  <h3 class="pt__h">脊上的时间刻度</h3>
+  <p class="pt__sub">脊现在只放标记。它本来还能放<strong>时间</strong>——每一块旁边标上「+0:12」「+1:04」，长会话滚起来就有了纵坐标。<code>docs/副栏形态-v2.html</code> 里那套真实刻度的做法可以直接搬。</p>
+  <p>这版没放，因为它和 A2 那条会打架：脊一旦开始放文字，36px 就不够了，得加宽到 56–64，而那是把正文往右推。<strong>先把「一个左边缘」这件事坐实，再谈要不要在脊上加东西。</strong></p>
+</div>
+
+<hr class="rule" style="margin:64px 0 28px">
+<p class="col" style="color:var(--ink-3);font-size:13.5px;line-height:1.8">
+所有对比数由同一段 WCAG 公式跑出（相对亮度 → 对比度，4.5:1 判定），L* 用 CIE 标准式。
+色卡上每个角色报两个底：浅色是<code>白 #ffffff</code> 与 <code>纸 #f4f4f1</code>，深色是
+<code>面 #17171a</code> 与 <code>底 #0e0e10</code>。两侧最难的一处——最淡那档写在「你说的话」
+那块沉色底上——单独验过（4.50:1 / 4.64:1）。<br>
+小样里的「现在」用的是 <code>tokens.css</code> 当前的值，逐字搬过来的——它不是印象，是当前状态。
+</p>
+
+</div><!-- /wrap -->
+
+<script>
+(function(){
+  // 小样按容器宽度实时缩放：媒体查询猜不准，量一次比猜三档准
+  function fit(){
+    document.querySelectorAll('.scaler').forEach(function(s){
+      var ui=s.querySelector('.ui'); if(!ui) return;
+      var cs=getComputedStyle(ui);
+      var w=parseFloat(cs.width), h=parseFloat(cs.height);
+      if(!w||!h) return;
+      var k=s.clientWidth/w;
+      ui.style.transform='scale('+k+')';
+      s.style.paddingTop='0';
+      s.style.height=Math.round(h*k)+'px';
+    });
+  }
+  // 主题：三档，跟随系统时不写 data-theme
+  var themeBtns=document.querySelectorAll('[data-theme-set]');
+  function setTheme(v){
+    if(v==='system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme',v);
+    themeBtns.forEach(function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-theme-set')===v));
+    });
+  }
+  themeBtns.forEach(function(b){
+    b.addEventListener('click',function(){ setTheme(b.getAttribute('data-theme-set')); });
+  });
+  // 对齐尺
+  var eb=document.getElementById('edgeToggle');
+  if(eb) eb.addEventListener('click',function(){
+    var on=document.body.getAttribute('data-edges')==='on';
+    document.body.setAttribute('data-edges', on?'off':'on');
+    eb.setAttribute('aria-pressed', String(!on));
+    eb.textContent = on ? '显示左边缘尺' : '收起左边缘尺';
+  });
+  fit();
+  window.addEventListener('resize',fit);
+  window.addEventListener('load',fit);
+})();
+</script>
+</body>
+</html>
