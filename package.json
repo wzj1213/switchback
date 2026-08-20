@@ -3,9 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.18.0",
   "description": "omni · 同文 —— 一个界面，统一驱动各家原生 coding agent",
   "engines": {
-    "node": ">=22"
+    "node": "22.23.2",
+    "pnpm": "11.18.0"
   },
   "scripts": {
     "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run check:tokens && pnpm run check:css && pnpm run check:docs && pnpm run test",
@@ -16,20 +18,26 @@
     "arch": "node scripts/check-arch.mjs",
     "check:tokens": "node scripts/check-tokens.mjs",
     "test": "vitest run",
+    "test:smoke": "pnpm --filter @omni/desktop test:smoke",
     "test:watch": "vitest",
     "dev": "pnpm --filter @omni/desktop dev",
     "dev:web": "pnpm --filter @omni/web dev",
     "build:web": "pnpm --filter @omni/web build",
+    "build": "pnpm run build:web && pnpm --filter @omni/desktop build",
     "harness:web": "node --import jiti/register apps/desktop/harness/web.ts",
     "test:live": "vitest run --config vitest.live.config.ts",
     "check:docs": "node scripts/check-changelog.mjs",
     "dist": "pnpm --filter @omni/desktop dist",
+    "dist:thin": "pnpm --filter @omni/desktop dist:thin",
+    "dist:all": "pnpm --filter @omni/desktop dist:all",
     "dist:signed": "pnpm --filter @omni/desktop dist:signed",
+    "release:prune": "node scripts/prune-release.mjs",
     "图标": "node scripts/make-icon.mjs",
-    "check:css": "node scripts/check-css.mjs"
+    "check:css": "node scripts/check-css.mjs && node scripts/check-style-size.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "axe-core": "4.13.0",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
     "jiti": "^2.7.0",

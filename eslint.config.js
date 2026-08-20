@@ -51,7 +51,18 @@ export default tseslint.config(
   // `app.asar` 一个二进制块，eslint 根本没有 .js 可扫；浏览器端进包之后那里多了
   // 散装的 `assets/*.js` 和 `sw.js`，于是 `pnpm check` 在**刚打过包的机器上**才会红，
   // 干净 checkout 上照样绿——这种「只在某些机器上红」的闸门最消耗信任
-  { ignores: ["**/dist/**", "**/out/**", "**/release/**", "**/node_modules/**", "**/*.tsbuildinfo", ".claude/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/out/**",
+      "**/release/**",
+      "**/node_modules/**",
+      "**/*.tsbuildinfo",
+      ".claude/**",
+      ".tmp-*",
+      ".tmp-*/**",
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.strict,

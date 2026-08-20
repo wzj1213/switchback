@@ -35,11 +35,11 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.18.0
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: pnpm
 
       # --frozen-lockfile：CI 里 lockfile 对不上必须是失败，不是「顺手更新一下」
@@ -53,7 +53,11 @@ jobs:
       # 真踩过——highlight.js 是 lowlight 的传递依赖，类型检查全绿，
       # 打包时才报 "failed to resolve import"。
       - if: matrix.os == 'macos-latest'
-        run: pnpm --filter @omni/desktop build
+        run: pnpm build
+
+      # 真起一遍 Electron：同时兜住 renderer sandbox、preload、焦点契约与实际 DOM 无障碍。
+      - if: matrix.os == 'macos-latest'
+        run: pnpm test:smoke
 
       # 另外两个平台**只跑类型检查与引擎包**，这是有意的窄化：
       #

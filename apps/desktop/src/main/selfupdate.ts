@@ -1,10 +1,11 @@
 import { execFile, spawn } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { app, ipcMain } from "electron"
 import type { Logger } from "./log.js"
 import { quitNow } from "./quit.js"
+import { readBuildInfo } from "./build-info.js"
 
 /**
  * 从**本机源码**把自己重装一遍。
@@ -21,7 +22,7 @@ import { quitNow } from "./quit.js"
  *
  * ## 边界：只在「这台机器上有源码」时存在
  *
- * 源码路径是打包时烤进去的（`scripts/stamp-version.mjs` 写 `omni.repo`）。
+ * 源码路径是打包时烤进去的（`scripts/dist.mjs` 的临时元数据写 `omni.repo`）。
  * 把这个包拷到别人机器上，那个路径不存在，入口整个不出现——**不是灰掉，是不画**。
  * 一个在别人机器上永远点不动的按钮只是噪声。
  *
@@ -95,20 +96,6 @@ export function swapScript(o: { pid: number; from: string; to: string; log: stri
   ].join("\n")
 }
 
-/** 打包时烤进去的那两项（`omni.repo` / `omni.build`）。读不到就当没有。 */
-function stamped(): { repo?: string; build?: string } {
-  try {
-    const raw: unknown = JSON.parse(readFileSync(join(app.getAppPath(), "package.json"), "utf8"))
-    const omni = (raw as { omni?: { repo?: unknown; build?: unknown } }).omni
-    return {
-      ...(typeof omni?.repo === "string" ? { repo: omni.repo } : {}),
-      ...(typeof omni?.build === "string" ? { build: omni.build } : {}),
-    }
-  } catch {
-    return {}
-  }
-}
-
 /**
  * 有没有源码比这份包新。返回那个文件（相对路径），没有就是 undefined。
  *
@@ -117,27 +104,52 @@ function stamped(): { repo?: string; build?: string } {
  * 不剪的话它们必然比包新，判据就恒为「有新代码」，等于没判。
  */
 async function newerThan(repo: string, stamp: string): Promise<string | undefined> {
-  const prune = ["node_modules", ".git", "release", "out", "dist"].flatMap((name) => ["-name", name, "-prune", "-o"])
-  const out = await run("/usr/bin/find", [repo, ...prune, "-newer", stamp, "-type", "f", "-print", "-quit"], repo, 20_000)
+  const prune = ["node_modules", ".git", "release", "out", "dist"].flatMap((name) => [
+    "-name",
+    name,
+    "-prune",
+    "-o",
+  ])
+  const out = await run(
+    "/usr/bin/find",
+    [repo, ...prune, "-newer", stamp, "-type", "f", "-print", "-quit"],
+    repo,
+    20_000,
+  )
   const first = out.output.split("\n").find((line) => line.trim() !== "")
   return first === undefined ? undefined : relative(repo, first.trim())
 }
 
 /** 现在是什么情况。**界面和更新动作读的是同一份判断**，不各算各的。 */
 export async function statusOf(): Promise<SelfUpdate> {
-  const { repo, build } = stamped()
+  const { repo, build } = readBuildInfo(app.getAppPath())
   const bundle = bundleOf(process.execPath)
   const built = build === undefined ? {} : { built: build }
   if (!app.isPackaged || bundle === undefined) {
-    return { can: false, why: "不是从 .app 跑的（开发模式下改完存盘就生效，用不着这个）", stale: false, ...built }
+    return {
+      can: false,
+      why: "不是从 .app 跑的（开发模式下改完存盘就生效，用不着这个）",
+      stale: false,
+      ...built,
+    }
   }
   if (repo === undefined || !existsSync(repo)) {
-    return { can: false, why: `这个包烤进去的源码路径不在这台机器上：${repo ?? "（没烤）"}`, stale: false, ...built }
+    return {
+      can: false,
+      why: `这个包烤进去的源码路径不在这台机器上：${repo ?? "（没烤）"}`,
+      stale: false,
+      ...built,
+    }
   }
   const stamp = join(bundle, "Contents/Resources/app.asar")
   if (!existsSync(stamp)) return { can: false, why: `找不到 ${stamp}`, stale: false, ...built }
   const newest = await newerThan(repo, stamp)
-  return { can: true, stale: newest !== undefined, ...(newest === undefined ? {} : { newest }), ...built }
+  return {
+    can: true,
+    stale: newest !== undefined,
+    ...(newest === undefined ? {} : { newest }),
+    ...built,
+  }
 }
 
 /**
@@ -151,7 +163,7 @@ export async function statusOf(): Promise<SelfUpdate> {
  */
 async function runUpdate(log: Logger): Promise<SelfUpdateRun> {
   const state = await statusOf()
-  const { repo } = stamped()
+  const { repo } = readBuildInfo(app.getAppPath())
   const bundle = bundleOf(process.execPath)
   if (!state.can || repo === undefined || bundle === undefined) {
     return { ok: false, output: state.why ?? "这台机器上不能自更新" }
@@ -191,14 +203,20 @@ function handoff(log: Logger, from: string, to: string): void {
 export function installSelfUpdateChannel(log: Logger): void {
   ipcMain.handle("omni:selfUpdateStatus", async (): Promise<SelfUpdate> => {
     const state = await statusOf()
-    if (!state.can && state.why !== undefined) log.write("info", "update", `自更新不可用：${state.why}`)
+    if (!state.can && state.why !== undefined)
+      log.write("info", "update", `自更新不可用：${state.why}`)
     return state
   })
   ipcMain.handle("omni:selfUpdate", () => runUpdate(log))
 }
 
 /** 跑一条命令，把输出（含 stderr）原样带回来。**失败不抛**——调用方要那段原文。 */
-function run(cmd: string, args: readonly string[], cwd: string, timeoutMs: number): Promise<SelfUpdateRun> {
+function run(
+  cmd: string,
+  args: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<SelfUpdateRun> {
   return new Promise((resolve) => {
     execFile(
       cmd,
@@ -206,7 +224,10 @@ function run(cmd: string, args: readonly string[], cwd: string, timeoutMs: numbe
       { cwd, timeout: timeoutMs, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
       (error, stdout, stderr) => {
         const output = `${stdout}${stderr}`
-        resolve({ ok: error === null, output: error === null ? output : `${output}\n${String(error)}` })
+        resolve({
+          ok: error === null,
+          output: error === null ? output : `${output}\n${String(error)}`,
+        })
       },
     )
   })

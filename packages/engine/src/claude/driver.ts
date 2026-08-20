@@ -7,19 +7,35 @@ import {
   type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
-import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
+import type {
+  EngineAccount,
+  EngineCapabilities,
+  EngineThread,
+  Item,
+  ModelOption,
+  SlashCommand,
+  Trust,
+  TurnId,
+} from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
-import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { askAside, canAside } from "./aside.js"
 import { createTaskState } from "./tasks.js"
 import { createPlanState } from "./plan.js"
 import { applyEffort, withEfforts } from "./effort.js"
-import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
+import {
+  buildRequest,
+  forcesHumanPrompt,
+  summarize,
+  toAllow,
+  toDeny,
+  type AskMeta,
+} from "./permission.js"
 import { runMessageLoop, type TurnRef } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { CLAUDE_TRUST, needsPermissionRestart, permissionOptions } from "./trust.js"
+import { claudePath, probeClaude, type ClaudeExecutable } from "./executable.js"
 
 /**
  * Claude Code 2.1.83 起正式暴露 `auto`：由另一只模型分类器审批工具调用。
@@ -34,6 +50,8 @@ const GRACEFUL_WAIT_MS = 4000
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 export interface ClaudeDriverConfig {
+  /** 完整版让 SDK 使用内置 CLI；轻量版把 PATH 上解析出的原生 Claude 交给 SDK。 */
+  executable?: ClaudeExecutable
   /**
    * 是否隔离宿主的 Claude 设置。
    *
@@ -54,7 +72,13 @@ class ClaudeSession implements EngineSession {
   private readonly input = createQueue<SDKUserMessage>()
   private readonly abort = new AbortController()
   private readonly trust: { current: Trust }
-  private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map(), tasks: createTaskState(), plan: createPlanState() }
+  private readonly turn: TurnRef = {
+    current: undefined,
+    seq: 0,
+    tools: new Map(),
+    tasks: createTaskState(),
+    plan: createPlanState(),
+  }
   private readonly owner: ProcessOwner
   private readonly bypassEnabled: boolean
   private loop: Promise<void> | undefined
@@ -65,6 +89,7 @@ class ClaudeSession implements EngineSession {
   constructor(
     private readonly req: StartRequest,
     private readonly config: ClaudeDriverConfig,
+    private readonly executable: string | undefined,
   ) {
     this.trust = { current: req.trust }
     this.bypassEnabled = req.trust === "full"
@@ -85,6 +110,7 @@ class ClaudeSession implements EngineSession {
       // 带句柄就接着上次的会话跑；SDK 会把那次的历史加载回来
       ...(this.req.resume === undefined ? {} : { resume: this.req.resume }),
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
+      ...(this.executable === undefined ? {} : { pathToClaudeCodeExecutable: this.executable }),
     }
     this.query = query({ prompt: this.input, options })
     // 截一道记下 session id：`logPath` 要靠它找到那个 jsonl，
@@ -134,7 +160,9 @@ class ClaudeSession implements EngineSession {
       summary: summarize(tool, meta),
       reason: verdict.reason,
       ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
-      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
+      ...(verdict.suggest === undefined
+        ? {}
+        : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
     })
     // `once` 只放行这一次；其余范围回传 SDK 的 suggestions，走它原生的「本会话不再问」
     return answer.allow ? toAllow(answer.remember !== "once", meta) : toDeny("用户拒绝了这次调用")
@@ -331,31 +359,15 @@ class ClaudeSession implements EngineSession {
   }
 }
 
-/**
- * Claude 的「装了没」比别家难答一档。
- *
- * SDK 自己解析 CLI 的位置（内部走 `which`，也接受 `pathToClaudeCodeExecutable`），
- * 所以 **`which claude` 查不到不代表跑不起来**。
- * 把这种情况报成 `missing` 会灰掉一个能用的引擎，比不检查更糟——
- * 于是查不到时降成 `unknown`：界面照常显示，不做任何标注。
- */
-async function probeClaude(): Promise<Probe> {
-  const found = await probeCommand("claude")
-  if (found.state === "ok") return found
-  return {
-    state: "unknown",
-    detail: "PATH 上没有 `claude`，但 SDK 会自己找——真起不来的话，开会话时会报出来。",
-  }
-}
-
 export function createClaudeDriver(config: ClaudeDriverConfig = {}): EngineDriver {
+  const mode = config.executable ?? "bundled"
   return {
     id: "claude",
-    probe: probeClaude,
-    start: (req: StartRequest): Promise<EngineSession> => {
-      const session = new ClaudeSession(req, config)
+    probe: () => probeClaude(mode),
+    start: async (req: StartRequest): Promise<EngineSession> => {
+      const session = new ClaudeSession(req, config, await claudePath(mode))
       session.start()
-      return Promise.resolve(session)
+      return session
     },
   }
 }

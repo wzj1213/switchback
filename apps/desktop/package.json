@@ -3,11 +3,9 @@
   "productName": "omni",
   "omni": {
     "_updateFeed": "发布时填一个 https 地址，返回 {version,url,notes}。留空 = 更新检查整个关闭，不发任何请求。",
-    "updateFeed": "",
-    "build": "e9dc8b1",
-    "repo": "/Users/you/work/omni"
+    "updateFeed": ""
   },
-  "version": "0.0.188",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "description": "omni 桌面端：Electron 壳 + React 渲染层",
@@ -16,13 +14,16 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "test:smoke": "node ../../scripts/e2e-smoke.mjs",
     "preview": "electron-vite preview",
     "//dist": "默认**关掉钥匙串自动发现**。不关的话 electron-builder 会拿钥匙串里任何一张证书去签——本机那张自签的会让 codesign 卡在逐个文件签名上（实测卡死，要手动 kill）。要签名走 dist:signed。",
-    "dist": "node ../../scripts/stamp-version.mjs && pnpm --filter @omni/web run build && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "dist": "node ../../scripts/dist.mjs full",
+    "dist:thin": "node ../../scripts/dist.mjs thin",
+    "dist:all": "node ../../scripts/dist.mjs all",
     "//dist:signed": "有 Developer ID 时用。需要 CSC_NAME 或 CSC_LINK，公证还要 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID。",
-    "dist:signed": "node ../../scripts/stamp-version.mjs && pnpm --filter @omni/web run build && electron-vite build && electron-builder --mac",
+    "dist:signed": "node ../../scripts/dist.mjs full --signed",
     "//dist:local": "只出 release/mac-arm64/omni.app，不打 DMG——本机自更新（应用里那颗「更新到最新代码」）跑的就是这条。DMG 那 208 MB 是给别人装的，自己换一份包用不着，省下的是大头。",
-    "dist:local": "node ../../scripts/stamp-version.mjs && pnpm --filter @omni/web run build && electron-vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --dir"
+    "dist:local": "node ../../scripts/dist.mjs full --dir"
   },
   "//optionalDependencies": [
     "Claude Agent SDK 各平台的原生二进制。**必须在这里显式列出**——",
@@ -42,7 +43,6 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.231",
-    "@omni/approval": "workspace:*",
     "@omni/engine": "workspace:*",
     "@omni/handoff": "workspace:*",
     "@omni/host": "workspace:*",

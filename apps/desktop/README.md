@@ -32,6 +32,20 @@ engine 的运行时依赖，而 Node 从产物所在目录往上找 `node_module
 所以这些依赖必须出现在 app 根目录，否则运行时报 `ERR_MODULE_NOT_FOUND`。
 每新增一个引擎驱动，它的运行时依赖都要在这里跟着加一条。
 
+## 完整版与轻量版
+
+两种包都使用 Claude Agent SDK 与用户原生登录态，差别只在 CLI 从哪里来：
+
+```sh
+pnpm dist        # 完整版：带 SDK 对应平台的 Claude 可执行文件
+pnpm dist:thin   # 轻量版：排除平台二进制，要求 PATH 上已有 claude
+pnpm dist:all    # 构建一次前端，再依次生成两种 DMG
+```
+
+版本、短 SHA、源码路径和 `claudeExecutable` 只写进 electron-builder 的临时配置，
+不会改动源码 `package.json`；它保留 `0.0.0` 是有意的。每次成功生成安装包后，
+`prune-release.mjs` 自动只留最新三组产物，blockmap 跟着对应安装包一起清理。
+
 ## 签名与公证
 
 配置已经就位（`electron-builder.yml` + `build/entitlements.mac.plist`），
@@ -89,7 +103,7 @@ ditto → 换掉 /Applications/omni.app → open   # 由一个独立脚本在应
 - **判据是文件时间，不是版本号。** 版本号来自 git 提交数，而开发时的改动
   大多还没提交——按版本号比，改完它会说「已经是最新」。所以直接问文件系统：
   有没有源码文件比装着的这份包新（`find -newer`，剪掉 node_modules/.git/release/out/dist）。
-- **源码路径是打包时烤进去的**（`omni.repo`，见 `scripts/stamp-version.mjs`）。
+- **源码路径是打包时烤进去的**（`omni.repo`，见 `scripts/dist.mjs` 的临时元数据）。
   包拷到别人机器上时那个路径不存在，这一行**整个不出现**——不是灰掉，是不画。
 - **换包在应用退出之后由独立进程做**：等旧进程真的退出 → `ditto` 到旁边 →
   同目录两次 `mv`（同盘原子）→ 失败就把旧的挪回来。这一步没有界面能报错，
@@ -218,7 +232,7 @@ Dock 角标只算**挂起的审批**，不算在跑的轮次：角标是「有�
 - **补发缓冲只有 5000 条。** 超过这个的缺口补不回来，渲染层会重载页面走全量重建。
   这不是静默降级：主进程会记一条 `补发失败` 到日志里。
 - 主题只做了浅色 + 跟随系统的深色 token，**没有手动切换**。
-- 应用 576 MB / DMG 208 MB。大头是 Electron 运行时与 Claude SDK 自带的 CLI。
+- 完整版的大头是 Electron 运行时与 Claude SDK 平台 CLI；轻量版去掉后者，但要求本机安装 Claude。
 - **变更汇总卡分不出「谁改的」。** 上半节是引擎自己报的编辑，可追溯到某一条工具行；
   下半节是问 git 得来的，**它分不出是引擎跑的命令改的、还是你自己在编辑器里改的**，
   文案也就照实这么写。要分得出，得在会话开始时留一份基线快照并跟着落盘——

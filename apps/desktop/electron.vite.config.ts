@@ -80,7 +80,14 @@ export default defineConfig({
     build: { rollupOptions: { input: resolve(here, "src/main/index.ts"), external } },
   },
   preload: {
-    build: { rollupOptions: { input: resolve(here, "src/preload/index.ts"), external } },
+    // sandbox preload 由 Electron 当普通脚本加载，没有 ESM loader；显式产出 CJS。
+    build: {
+      rollupOptions: {
+        input: resolve(here, "src/preload/index.ts"),
+        external,
+        output: { format: "cjs" },
+      },
+    },
   },
   renderer: {
     root: resolve(here, "src/renderer"),

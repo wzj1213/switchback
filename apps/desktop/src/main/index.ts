@@ -1,5 +1,4 @@
 import { join } from "node:path"
-import { readFileSync } from "node:fs"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron"
 import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
@@ -25,8 +24,26 @@ import { installReviewChannel } from "./workdiff.js"
 import { installSearchChannel } from "./search.js"
 import { installEnvChannel } from "./envconfig.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import { applyDevTheme, defaultWorksite, devPrompt, scheduleDevCompare, scheduleDevFilter, scheduleDevFind, scheduleDevInterrupt, scheduleDevOpenSelect, scheduleDevProbe, scheduleDevReload, scheduleDevReview, scheduleDevRowMenu, scheduleDevShot, scheduleDevSwitch, scheduleDevThreadOps } from "./devtools.js"
+import {
+  applyDevTheme,
+  defaultWorksite,
+  devPrompt,
+  scheduleDevCompare,
+  scheduleDevFilter,
+  scheduleDevFind,
+  scheduleDevInterrupt,
+  scheduleDevOpenSelect,
+  scheduleDevProbe,
+  scheduleDevReload,
+  scheduleDevReview,
+  scheduleDevRowMenu,
+  scheduleDevShot,
+  scheduleDevSwitch,
+  scheduleDevThreadOps,
+} from "./devtools.js"
 import { quitNow, shouldStayOpen } from "./quit.js"
+import { openExternalSafely } from "./external-url.js"
+import { readBuildInfo } from "./build-info.js"
 
 /**
  * Electron 主进程。
@@ -37,6 +54,7 @@ import { quitNow, shouldStayOpen } from "./quit.js"
  */
 
 const isDev = process.env["ELECTRON_RENDERER_URL"] !== undefined
+const buildInfo = readBuildInfo(app.getAppPath())
 
 const log = createLogger(join(app.getPath("userData"), "logs"))
 
@@ -61,16 +79,7 @@ const engineVersions = createEngineVersions(log)
  * 只查不装的理由见 `update.ts`：没签名的应用装不了更新。
  */
 const feed = feedOf(
-  // 打包之后 package.json 在 asar 里，`app.getAppPath()` 指得到它
-  (() => {
-    try {
-      return JSON.parse(readFileSync(join(app.getAppPath(), "package.json"), "utf8")) as {
-        omni?: { updateFeed?: unknown }
-      }
-    } catch {
-      return undefined
-    }
-  })(),
+  buildInfo.updateFeed === undefined ? undefined : { omni: { updateFeed: buildInfo.updateFeed } },
 )
 
 const runUpdateCheck = async (manual: boolean): Promise<void> => {
@@ -80,7 +89,7 @@ const runUpdateCheck = async (manual: boolean): Promise<void> => {
     {
       ask: async (options) => (await dialog.showMessageBox({ type: "info", ...options })).response,
       open: (url) => {
-        void shell.openExternal(url)
+        void openExternal(url)
       },
       log: (level, message) => {
         log.write(level, "update", message)
@@ -88,6 +97,13 @@ const runUpdateCheck = async (manual: boolean): Promise<void> => {
     },
     manual,
   )
+}
+
+function openExternal(url: string): Promise<boolean> {
+  return openExternalSafely(url, {
+    open: (safe) => shell.openExternal(safe),
+    report: (message) => log.write("warn", "external", message),
+  })
 }
 
 /**
@@ -98,10 +114,19 @@ process.on("uncaughtException", (error: Error) => {
   log.write("error", "main", `未捕获异常：${error.stack ?? error.message}`)
 })
 process.on("unhandledRejection", (reason: unknown) => {
-  log.write("error", "main", `未处理拒绝：${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`)
+  log.write(
+    "error",
+    "main",
+    `未处理拒绝：${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`,
+  )
 })
 
-function createWindow(bounds: { x: number; y: number; width: number; height: number }): BrowserWindow {
+function createWindow(bounds: {
+  x: number
+  y: number
+  width: number
+  height: number
+}): BrowserWindow {
   const win = new BrowserWindow({
     ...bounds,
     minWidth: 860,
@@ -110,8 +135,8 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
     titleBarStyle: "hiddenInset",
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#111113" : "#ffffff",
     webPreferences: {
-      preload: join(import.meta.dirname, "../preload/index.js"),
-      sandbox: false,
+      preload: join(import.meta.dirname, "../preload/index.cjs"),
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -131,7 +156,7 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    void openExternal(url)
     return { action: "deny" }
   })
 
@@ -141,7 +166,7 @@ function createWindow(bounds: { x: number; y: number; width: number; height: num
   win.webContents.on("will-navigate", (event, url) => {
     if (url === win.webContents.getURL()) return
     event.preventDefault()
-    void shell.openExternal(url)
+    void openExternal(url)
   })
 
   const devUrl = process.env["ELECTRON_RENDERER_URL"]
@@ -162,7 +187,7 @@ function installAppChannels(): void {
     version: app.getVersion(),
     // 构建标识（短 sha）。**版本号本身回答不了「你装的是哪一次构建」**——
     // 同一个版本号可能对应好几次重打，而 bug 报告要的正是那个精确的点
-    build: buildStamp(),
+    build: buildInfo.build ?? "开发版",
     dataDir: app.getPath("userData"),
   }))
   ipcMain.on("omni:openEngines", () => {
@@ -171,24 +196,6 @@ function installAppChannels(): void {
   ipcMain.on("omni:diagnose", () => {
     void exportReport(log, crash)
   })
-}
-
-/**
- * 打包时由 `scripts/stamp-version.mjs` 写进 package.json 的短 sha。
- * 开发模式下没有这一项，那时说「开发版」——**别编一个假的出来**。
- */
-function buildStamp(): string {
-  const pkg = (app as unknown as { omni?: { build?: string } }).omni
-  return pkg?.build ?? readBuild()
-}
-
-function readBuild(): string {
-  try {
-    const raw = readFileSync(join(app.getAppPath(), "package.json"), "utf8")
-    return (JSON.parse(raw) as { omni?: { build?: string } }).omni?.build ?? "开发版"
-  } catch {
-    return "开发版"
-  }
 }
 
 /**
@@ -248,7 +255,11 @@ function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger)
     const threadId = attached.lastThreadId()
     if (threadId === undefined) return
     void attached.host
-      .dispatch(kind === "fork" ? { type: "thread.fork", threadId, to } : { type: "thread.handoff", threadId, to })
+      .dispatch(
+        kind === "fork"
+          ? { type: "thread.fork", threadId, to }
+          : { type: "thread.handoff", threadId, to },
+      )
       .catch((error: unknown) => {
         attached.report(error, threadId)
       })
@@ -400,7 +411,8 @@ function bootstrap(): Promise<void> {
       // **`quitting` 要在问完之后才置。** 置早了、人又点了「取消」，
       // 这个标志就永久地把确认框关掉了——第二次 ⌘Q 直接杀，
       // 而那正是这个框想拦住的事
-      if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined)) return
+      if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined))
+        return
       quitting = true
       const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))
       void Promise.race([shutdown(attached, log, remote.close), deadline]).then(() => {
@@ -417,7 +429,11 @@ function bootstrap(): Promise<void> {
  * **顺序不能反**：`dispose` 里还会 emit 事件（`gate.settleAll()` 把挂着的
  * 审批落定），那些也要落盘。
  */
-async function shutdown(attached: Attached, logger: Logger, closeRemote: () => Promise<void>): Promise<void> {
+async function shutdown(
+  attached: Attached,
+  logger: Logger,
+  closeRemote: () => Promise<void>,
+): Promise<void> {
   // 电源断言先放开：进程马上就没了，但留一个没停的断言给系统是脏活。
   //
   // **然后是引擎先回收、远程后关。**

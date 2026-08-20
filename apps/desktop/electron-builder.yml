@@ -32,8 +32,9 @@ extraResources:
     filter:
       - "**/*"
 
-# Claude Agent SDK 要 spawn 自带的 CLI，不能进 asar——
+# 完整版里的 Claude Agent SDK 要 spawn 自带的 CLI，不能进 asar——
 # asar 里的文件没有真实路径，它找不到自己的资源。
+# 轻量版由 `scripts/dist.mjs` 排除平台二进制，并把系统 `claude` 的绝对路径交给 SDK。
 asarUnpack:
   - node_modules/@anthropic-ai/claude-agent-sdk/**
 
@@ -60,17 +61,17 @@ mac:
   gatekeeperAssess: false
   # **这里有意不写 `identity`**，签不签由脚本决定：
   #
-  #   pnpm dist          → `CSC_IDENTITY_AUTO_DISCOVERY=false`，明确不签
-  #   pnpm dist:signed   → 放开，用 CSC_NAME / CSC_LINK 指定的证书
-  #
-  # 两个坑都是实测踩出来的：
-  #
-  # 1. `identity: ${env.CSC_NAME}` 不行——electron-builder 不对这个字段做变量
-  #    展开，拿到的是字面量，然后报「钥匙串里没有这个证书」。
-  # 2. **什么都不写也不行**：那样 electron-builder 会去翻钥匙串，
-  #    抓到任何一张证书就开始签。本机那张自签的会让 `codesign` 卡在
-  #    逐个文件签名上——`pnpm dist` 跑了 400 秒还停在 `locale.pak`，
-  #    最后要手动 kill。所以默认那条脚本必须显式关掉自动发现。
+#   pnpm dist / dist:thin → `CSC_IDENTITY_AUTO_DISCOVERY=false`，明确不签
+#   pnpm dist:signed   → 放开，用 CSC_NAME / CSC_LINK 指定的证书
+#
+# 两个坑都是实测踩出来的：
+#
+# 1. `identity: ${env.CSC_NAME}` 不行——electron-builder 不对这个字段做变量
+#    展开，拿到的是字面量，然后报「钥匙串里没有这个证书」。
+# 2. **什么都不写也不行**：那样 electron-builder 会去翻钥匙串，
+#    抓到任何一张证书就开始签。本机那张自签的会让 `codesign` 卡在
+#    逐个文件签名上——`pnpm dist` 跑了 400 秒还停在 `locale.pak`，
+#    最后要手动 kill。所以默认那条脚本必须显式关掉自动发现。
 
 # 产物文件名。**必须显式写。**
 #

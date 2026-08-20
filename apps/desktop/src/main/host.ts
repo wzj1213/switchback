@@ -16,6 +16,7 @@ import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
 import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
+import { readBuildInfo } from "./build-info.js"
 
 export interface Attached {
   host: Host
@@ -164,15 +165,25 @@ function installBridgeChannels(deps: Channels): void {
 
   // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
   // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
-  ipcMain.handle("omni:resync", (_e, req: { after: number; epoch: string }): { events: readonly Sealed[] } | { reset: true } => {
-    const after = typeof req?.after === "number" ? req.after : Number.NaN
-    const missed = Number.isNaN(after) ? undefined : deps.ledger.since(after, req.epoch)
-    if (missed === undefined) {
-      deps.log.write("warn", "ipc", `补发失败：渲染层停在 ${String(after)}，缓冲已覆盖不到，转全量重建`)
-      return { reset: true }
-    }
-    return { events: missed }
-  })
+  ipcMain.handle(
+    "omni:resync",
+    (
+      _e,
+      req: { after: number; epoch: string },
+    ): { events: readonly Sealed[] } | { reset: true } => {
+      const after = typeof req?.after === "number" ? req.after : Number.NaN
+      const missed = Number.isNaN(after) ? undefined : deps.ledger.since(after, req.epoch)
+      if (missed === undefined) {
+        deps.log.write(
+          "warn",
+          "ipc",
+          `补发失败：渲染层停在 ${String(after)}，缓冲已覆盖不到，转全量重建`,
+        )
+        return { reset: true }
+      }
+      return { events: missed }
+    },
+  )
 
   ipcMain.on("omni:command", (_e, command: Command) => {
     // 命令失败不能掐掉主进程：翻成一条状态事件送回界面
@@ -234,7 +245,11 @@ export function attachHost(
   // 规则和事件分开存：删会话不该把「始终允许」一起删了
   const rules = createRuleStore(join(app.getPath("userData"), "rules"))
 
-  const { drivers, labels } = buildRegistry(app.getPath("userData"), log)
+  const { drivers, labels } = buildRegistry(
+    app.getPath("userData"),
+    log,
+    readBuildInfo(app.getAppPath()).claudeExecutable,
+  )
 
   const host = createHost({
     drivers,
@@ -328,7 +343,8 @@ function probeEngines(
     // 「这台机器上装了什么」是支持渠道的第一个问题，日志里必须留一行
     log.write("info", "engines", cached.map((e) => `${e.id}=${e.state ?? "?"}`).join(" "))
     for (const engine of cached) {
-      if (engine.state === "missing") log.write("warn", "engines", `${engine.id}：${engine.detail ?? ""}`)
+      if (engine.state === "missing")
+        log.write("warn", "engines", `${engine.id}：${engine.detail ?? ""}`)
     }
     return cached
   }
@@ -338,7 +354,6 @@ export interface ThreadHistory {
   id: ThreadId
   events: readonly Event[]
 }
-
 
 /**
  * 把磁盘上的历史 + 当前引擎清单凑成一份「世界现在长什么样」，直接发给某一个窗口。
@@ -394,7 +409,10 @@ export async function rebuild(
   await attached.journal.flush().catch(() => undefined)
   const ids = await attached.journal.list().catch((): readonly ThreadId[] => [])
   const threads = await Promise.all(
-    ids.map(async (id) => ({ id, events: await attached.journal.read(id).catch((): readonly Event[] => []) })),
+    ids.map(async (id) => ({
+      id,
+      events: await attached.journal.read(id).catch((): readonly Event[] => []),
+    })),
   )
   // 读磁盘期间被封号的那些。它们保证**晚于快照、且还在保留缓冲里**，
   // 所以拼在最后就补上了那条缝。和磁盘那份的重叠是必然的，靠归约器的
@@ -430,7 +448,8 @@ export async function rebuild(
   // `bodies` 只在分级时带：缺省的含义是「全都带」，而那正是同机 IPC 那条路
   const bodies =
     budget === undefined ? {} : { bodies: [...scoped.bodies], trimmed: [...scoped.trimmedIds] }
-  if (target.alive()) target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch, ...bodies } })
+  if (target.alive())
+    target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch, ...bodies } })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
   return [...alive.keys()][0] ?? ids[0]
 }
@@ -458,7 +477,8 @@ export async function seedDefaultThread(
 /** 开发钩子：续跑磁盘上最近那个会话，再往里发一句话。 */
 async function resumeInto(attached: Attached, threadId: ThreadId, prompt?: string): Promise<void> {
   await attached.host.dispatch({ type: "thread.resume", threadId })
-  if (prompt !== undefined) await attached.host.dispatch({ type: "thread.prompt", threadId, text: prompt })
+  if (prompt !== undefined)
+    await attached.host.dispatch({ type: "thread.prompt", threadId, text: prompt })
 }
 
 async function seed(attached: Attached, cwd: string, prompt?: string): Promise<void> {

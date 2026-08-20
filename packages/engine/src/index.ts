@@ -1,4 +1,5 @@
 export { createClaudeDriver } from "./claude/driver.js"
+export type { ClaudeExecutable } from "./claude/executable.js"
 export { createCodexDriver } from "./codex/driver.js"
 export { createAcpDriver } from "./acp/driver.js"
 export { createKimiDriver } from "./kimi/driver.js"

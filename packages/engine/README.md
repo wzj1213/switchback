@@ -15,6 +15,7 @@
   - `permission.ts` 把 SDK 的 `canUseTool` 请求翻成 `@omni/approval` 的 `Request`，
     再把 `Verdict` 翻回 SDK 的 `PermissionResult`
   - `trust.ts` 把三档落到 Claude 原生 Plan / Auto / Bypass；进入 Bypass 时显式带 SDK 安全开关
+  - `executable.ts` 区分完整版的 SDK 内置 CLI 与轻量版的系统 `claude`，并保持各自探测语义
   - `translate.ts` 把 `SDKMessage` 翻成 `Event`
   - `driver.ts` 会话生命周期与进程回收
 - `codex/` —— `codex app-server --stdio` 驱动（JSON-RPC 2.0）
@@ -92,6 +93,8 @@
   新增覆盖时先确认它是否真的需要进 transcript。
 - **Claude Auto 受账号、模型、提供方与管理员策略约束。** SDK 类型公开了该档，
   但运行环境不满足时 Claude 会明确拒绝；驱动保留这个原生失败，不静默退回 `default` 冒充自动审批。
+- **Claude 轻量版要求 PATH 上的 `claude` 可运行。** 完整版仍由 SDK 解析内置平台二进制；
+  两者都走同一个 SDK 驱动、原生鉴权与设置，不是两套行为实现。
 - **内置 Kimi 要求带 `web` 子命令与公开 API 的 Kimi Code。** 当前验收版本是 0.37.2；
   启动后还会读 `/meta` 确认 WebSocket 与 bearer 鉴权，缺能力就明确失败，不回退 ACP。
 - **Kimi 的 steer 在同一原生 turn 的下一模型 step 前生效。** 它不会掐断已经发出的单次

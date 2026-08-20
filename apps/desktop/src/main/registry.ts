@@ -8,6 +8,7 @@ import {
   grokModelChanged,
   grokNativeApproval,
   type EngineDriver,
+  type ClaudeExecutable,
 } from "@omni/engine"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
 import type { Logger } from "./log.js"
@@ -43,11 +44,12 @@ import type { Logger } from "./log.js"
 export function buildRegistry(
   userData: string,
   log: Logger,
+  claudeExecutable: ClaudeExecutable = "bundled",
 ): { drivers: Readonly<Record<string, EngineDriver>>; labels: Readonly<Record<string, string>> } {
   const acp = registerAcpEngines(readEngineFile(userData, log))
   return {
     drivers: {
-      claude: createClaudeDriver(),
+      claude: createClaudeDriver({ executable: claudeExecutable }),
       codex: createCodexDriver(),
       kimi: createKimiDriver(),
       grok: createAcpDriver({
