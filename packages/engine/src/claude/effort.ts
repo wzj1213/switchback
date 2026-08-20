@@ -49,8 +49,8 @@ function settable(query: unknown): query is EffortSettable {
 /**
  * 把强度设下去，**回报真正生效的那一档**。
  *
- * 设不上时回 `undefined` 而不是回请求值：调用方据此保持旧值。理由和 ACP 那边一样——
- * 界面照着这条记录画，所以记录必须是真的（见 `contract.ts` 的 `setModel`）。
+ * 设不上时回 `undefined` 而不是回请求值：调用方据此清掉未经确认的档位。理由和 ACP 那边一样——
+ * 界面照着这条记录画，不能把上一模型的旧档或本次请求值冒充成结果。
  *
  * `applyFlagSettings` 没有返回值，所以「生效了」的判据是**它没有抛**。
  * 这比回报请求值强：那条路上失败是静默的。

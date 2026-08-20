@@ -175,12 +175,24 @@ class ClaudeSession implements EngineSession {
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
     // 轮次由宿主铸造；引擎只在这里认领它，收工时由消息循环清空
     this.turn.current = turnId
-    this.input.push({
+    const accepted = this.input.push({
       type: "user",
       message: { role: "user", content: await toContent(text, attachments) },
       parent_tool_use_id: null,
       session_id: this.req.threadId,
     } as SDKUserMessage)
+    if (accepted) return
+    if (this.turn.current === turnId) {
+      this.turn.current = undefined
+      this.req.emit({
+        type: "turn.completed",
+        at: Date.now(),
+        turnId,
+        status: "failed",
+        error: "Claude 输入流已经关闭，这句话没有送达。请重新连接会话后再试。",
+      })
+    }
+    throw new Error("Claude 输入流已经关闭")
   }
 
   /**
@@ -291,7 +303,7 @@ class ClaudeSession implements EngineSession {
 
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
-    // **设不上就回空**，调用方据此保持旧值——界面照着记录画，记录必须是真的
+    // **设不上就回空**，调用方据此不把上一模型的旧档冒充成新模型状态
     const applied = await applyEffort(this.query, effort).catch((error: unknown) => {
       this.req.emit({
         type: "engine.status",

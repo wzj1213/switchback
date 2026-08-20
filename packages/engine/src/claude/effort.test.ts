@@ -47,7 +47,7 @@ describe("把强度设下去", () => {
     expect(await applyEffort(undefined, "high")).toBeUndefined()
   })
 
-  it("**设失败要抛出去**，由调用方翻成 degraded 并保持旧值——不能静默当成功", async () => {
+  it("**设失败要抛出去**，由调用方翻成 degraded 并拒绝记录请求值——不能静默当成功", async () => {
     const query = { applyFlagSettings: () => Promise.reject(new Error("nope")) }
     await expect(applyEffort(query, "high")).rejects.toThrow("nope")
   })

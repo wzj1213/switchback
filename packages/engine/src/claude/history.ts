@@ -272,19 +272,37 @@ interface Cursor {
  */
 function takeUser(out: Item[], byId: Map<string, number>, content: unknown, cur: Cursor): void {
   if (Array.isArray(content)) {
-    applyResults(out, byId, toolResults(content))
-    return
+    const results = toolResults(content)
+    if (results.length > 0) {
+      applyResults(out, byId, results)
+      return
+    }
   }
-  if (typeof content !== "string" || content.trim() === "") return
+  const text = userText(content)
+  if (text === undefined) return
   cur.turn.id = `h-t${String(++cur.seq.n)}`
   out.push({
     id: cur.nextId(),
     turnId: cur.turn.id,
     kind: "user_message",
     at: cur.at,
-    text: content,
+    text,
     complete: true,
   } as Item)
+}
+
+/** 图片提问落盘后是 `[image, text]`；只取其中的人话，不把图片元数据拼进正文。 */
+function userText(content: unknown): string | undefined {
+  if (typeof content === "string") return content.trim() === "" ? undefined : content
+  if (!Array.isArray(content)) return undefined
+  const text = content
+    .flatMap((block) => {
+      if (typeof block !== "object" || block === null) return []
+      const raw = block as { type?: unknown; text?: unknown }
+      return raw.type === "text" && typeof raw.text === "string" ? [raw.text] : []
+    })
+    .join("\n")
+  return text.trim() === "" ? undefined : text
 }
 
 /** 一条 assistant 记录。工具调用要记下位置，等它的结果回来时并进去。 */

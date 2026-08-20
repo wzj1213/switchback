@@ -65,6 +65,23 @@ describe("正文：存盘记录 → transcript", () => {
     expect(items.map((i) => i.kind)).toEqual(["user_message", "agent_message"])
   })
 
+  it("带图片的提问从 `[image, text]` 内容块里保住人话", () => {
+    const entry = {
+      type: "user",
+      message: {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/png", data: "..." } },
+          { type: "text", text: "看看这张图" },
+        ],
+      },
+    }
+    const items = toItems([entry, assistant([{ type: "text", text: "看到了" }])], 0)
+    expect(items.map((item) => item.kind)).toEqual(["user_message", "agent_message"])
+    expect(items[0]).toMatchObject({ text: "看看这张图" })
+    expect(items[0]?.turnId).toBe(items[1]?.turnId)
+  })
+
   it("**每句人话开一轮**——不然整段历史挤成一轮，界面上一条分界线都没有", () => {
     const items = toItems([user("第一句"), assistant([{ type: "text", text: "a" }]), user("第二句")], 0)
     expect(new Set(items.map((i) => i.turnId)).size).toBe(2)

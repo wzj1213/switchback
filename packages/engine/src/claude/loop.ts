@@ -112,10 +112,16 @@ function onToolResults(msg: RawMessage, ref: TurnRef, req: StartRequest, at: num
  * codex 驱动上踩到过一模一样的坑，两边都要扫。
  */
 function sweepTools(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus): void {
-  if (status === "completed") return
   const ending = status === "interrupted" ? "interrupted" : "failed"
   for (const item of ref.tools.values()) {
-    req.emit({ type: "item.updated", at, item: { ...item, status: ending } })
+    req.emit({
+      type: "item.updated",
+      at,
+      item:
+        status === "completed"
+          ? { ...item, status: "failed", error: "Claude 在轮次结束前没有报告这次工具调用的结果。" }
+          : { ...item, status: ending },
+    })
   }
   ref.tools.clear()
 }

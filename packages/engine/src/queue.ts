@@ -3,8 +3,9 @@
  * 但我们要在会话存活期间随时追加提示词——标准库没有现成的。
  */
 export interface PushQueue<T> extends AsyncIterable<T> {
-  push: (value: T) => void
-  /** 关闭后迭代器结束；再 push 会被忽略。幂等。 */
+  /** 关闭后返回 false，调用方据此不能把消息误当成已经送达。 */
+  push: (value: T) => boolean
+  /** 关闭后迭代器结束。幂等。 */
   close: () => void
 }
 
@@ -17,11 +18,12 @@ export function createQueue<T>(): PushQueue<T> {
   const waiters: Waiter<T>[] = []
   const state = { closed: false }
 
-  const push = (value: T): void => {
-    if (state.closed) return
+  const push = (value: T): boolean => {
+    if (state.closed) return false
     const waiter = waiters.shift()
     if (waiter === undefined) buffer.push(value)
     else waiter.resolve({ value, done: false })
+    return true
   }
 
   const close = (): void => {
