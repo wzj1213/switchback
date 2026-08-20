@@ -14,3 +14,29 @@ release/web-shots
 
 # Claude Code 的工作副本与本地状态，不属于这个仓库
 .claude/
+
+# ── 开源前补充 ──────────────────────────────
+# 凭证与本地环境：永不入库
+.env
+.env.*
+*.local.env
+*.pem
+*.key
+*.p12
+*.keystore
+
+# 发行产物（release/ 已忽略，这几个是散落在别处时的兜底）
+*.dmg
+*.zip
+*.blockmap
+*.app/
+
+# 编辑器与缓存
+.idea/
+.vscode/
+.eslintcache
+.turbo/
+*.tsbuildinfo
+
+# 设计稿截图（本地打磨用；想公开就删掉这一行）
+docs/设计稿/
