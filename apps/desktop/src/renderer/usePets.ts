@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { busy, homeXOf, SIZE, step, type Gait, type Pet, type Stage } from "./pets.js"
+import { bump, busy, homeXOf, SIZE, step, type Gait, type Pet, type Stage } from "./pets.js"
 import { paintPets } from "./petPaint.js"
 
 /**
@@ -69,13 +69,18 @@ export function usePets(
       const dt = Math.min(MAX_DT, (at - clock.current) / 1000)
       clock.current = at
       const was = pets.current
-      pets.current = was.map((pet, i) =>
-        step(pet, dt, {
-          stage: stage.current,
-          homeX: homeXOf(i, count, stage.current.width),
-          gait: gaits[i] ?? "walk",
-        }),
-      )
+      // 先各走各的，再统一处理互相撞——`step` 一次只看得见一只
+      pets.current = [
+        ...bump(
+          was.map((pet, i) =>
+            step(pet, dt, {
+              stage: stage.current,
+              homeX: homeXOf(i, count, stage.current.width),
+              gait: gaits[i] ?? "walk",
+            }),
+          ),
+        ),
+      ]
       // 砸到地上那一下要有反应。**比较前后两帧**是唯一能认出「刚落地」的地方——
       // 物理函数是纯的，它不知道自己是第几帧
       const floor = stage.current.height - SIZE
@@ -132,28 +137,43 @@ export function usePets(
 }
 
 /** 窝外的初值。第一次 `layout` 会把它摆进窝——在那之前先待在画面外，别闪一下。 */
-export const resting = (): Pet => ({ x: -999, y: -999, vx: 0, vy: 0, mode: "rest" })
+export const resting = (): Pet => ({ x: -999, y: -999, vx: 0, vy: 0, spin: 0, mode: "rest" })
+
+/** 一次小动作。眨眼占多数——瞟眼是「有事发生」的动作，太频繁就成了神经质。 */
+const MOODS = ["blink", "blink", "blink", "look-l", "look-r"] as const
 
 /**
- * 随机眨眼。返回正在眨的那一只的序号，没有就是 -1。
+ * 随机的小动作：眨眼、往左右瞟一眼。
  *
- * **间隔本身也是随机的**：固定周期的眨眼比不眨还假——人会认出那个节拍。
+ * **直接往 DOM 上写类，不走 state。** 眨一次眼要是触发一次 React 重渲染，
+ * 这几只每分钟就得把自己重画二三十遍——而它们每帧还在被 rAF 写 transform，
+ * 两套更新撞在一起纯属自找。
+ *
+ * **间隔本身也是随机的**：固定周期的眨眼比不眨还假，人会认出那个节拍。
  */
-export function useBlink(count: number, reduced: boolean): number {
-  const [who, setWho] = useState(-1)
+export function useMood(
+  nodes: React.RefObject<(HTMLButtonElement | null)[]>,
+  count: number,
+  reduced: boolean,
+): void {
   useEffect(() => {
     if (reduced || count === 0) return undefined
     let alive = true
     let next: ReturnType<typeof setTimeout>
-    let shut: ReturnType<typeof setTimeout>
+    let done: ReturnType<typeof setTimeout>
     const again = (): void => {
       next = setTimeout(
         () => {
           if (!alive) return
-          setWho(Math.floor(Math.random() * count))
-          shut = setTimeout(() => {
-            if (alive) setWho(-1)
-          }, 130)
+          const mood = MOODS[Math.floor(Math.random() * MOODS.length)] ?? "blink"
+          const node = nodes.current[Math.floor(Math.random() * count)]
+          node?.classList.add(`pet--${mood}`)
+          done = setTimeout(
+            () => {
+              if (alive) node?.classList.remove(`pet--${mood}`)
+            },
+            mood === "blink" ? 130 : 640,
+          )
           again()
         },
         2200 + Math.random() * 4200,
@@ -163,10 +183,9 @@ export function useBlink(count: number, reduced: boolean): number {
     return () => {
       alive = false
       clearTimeout(next)
-      clearTimeout(shut)
+      clearTimeout(done)
     }
-  }, [count, reduced])
-  return who
+  }, [nodes, count, reduced])
 }
 
 /** 系统是不是要求少动。**不是读一次就算**：这个开关用户随时会改。 */

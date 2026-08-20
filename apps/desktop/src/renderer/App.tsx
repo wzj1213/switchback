@@ -171,6 +171,7 @@ export function App(): React.JSX.Element {
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
         models={modelsOf(state, thread.id, thread.engine)}
         engines={state.engines}
+        pets={app.prefs.settings.pets}
         notices={app.notices}
         onDismiss={shell.dismiss}
         finding={shell.finding}

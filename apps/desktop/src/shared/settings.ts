@@ -51,6 +51,16 @@ export interface Settings {
    * 和 `threadOrder` 是同一条规矩的两个尺度：**拖过一次，整段就归你排**。
    */
   projectOrder: readonly string[]
+  /**
+   * 输入框上沿那几只要不要出现。
+   *
+   * **默认开。** 它不是功能而是性格，而性格该是默认的那一面；
+   * 真嫌它碍事的人会自己去关，而一个默认关着的彩蛋等于没做。
+   *
+   * 关掉是整块不渲染（连那层活动区都不挂），不是把它藏起来——
+   * 藏起来的话它照样占着指针事件的那一层。
+   */
+  pets: boolean
   /** 新会话默认用哪家引擎。空 = 按 `lastUsed` 走（见那边）。 */
   defaultEngine: string
   /** 新会话默认的信任档。 */
@@ -143,6 +153,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   pinnedThreads: [],
   projectOrder: [],
   threadOrder: {},
+  pets: true,
   defaultEngine: "",
   defaultTrust: "auto-edit",
   projectIcons: {},

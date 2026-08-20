@@ -48,6 +48,9 @@ function parse(raw: unknown): Settings {
     pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
     threadOrder: order(it.threadOrder),
     projectOrder: strings(it.projectOrder) ?? DEFAULTS.projectOrder,
+    // **只认字面的 `false`**：默认是开着的，所以「读不出来」要落到开，
+    // 而不是像 `remote.enabled` 那样落到关——那边关掉是安全的一侧，这边不是
+    pets: it.pets !== false,
     defaultEngine: typeof it.defaultEngine === "string" ? it.defaultEngine : DEFAULTS.defaultEngine,
     defaultTrust:
       typeof it.defaultTrust === "string" && TRUSTS.has(it.defaultTrust)

@@ -64,6 +64,24 @@ export function usePetDrag(
 ): PetDrag {
   const grab = useRef<Grab | null>(null)
 
+  /**
+   * 你捏起一只时，另外几只**转头看它**——而且跟着看，你把它拖到哪边它们就看哪边。
+   * 松手（`index` 给 undefined）清掉。
+   *
+   * 这是这几只之间唯一一处「互相知道对方在」的地方，也是最便宜的一处：
+   * 两个类名，没有新元素、没有新状态。
+   */
+  const watch = (index?: number): void => {
+    const held = index === undefined ? undefined : ctl.pets.current[index]
+    for (const [j, node] of ctl.nodes.current.entries()) {
+      if (node === null) continue
+      node.classList.remove("pet--look-l", "pet--look-r")
+      const me = ctl.pets.current[j]
+      if (held === undefined || me === undefined || j === index) continue
+      node.classList.add(held.x > me.x ? "pet--look-r" : "pet--look-l")
+    }
+  }
+
   const at = (e: React.PointerEvent): { x: number; y: number } => {
     const box = ctl.area.current?.getBoundingClientRect()
     return { x: e.clientX - (box?.left ?? 0), y: e.clientY - (box?.top ?? 0) }
@@ -86,6 +104,7 @@ export function usePetDrag(
       // 这一下——先被指头压扁一瞬，再弹起来托在手里，那才是抓起一个软东西的样子
       e.currentTarget.classList.add("pet--held")
       if (!reduced) bodies.current[index]?.animate(LIFT, { duration: 260, easing: "ease-out" })
+      watch(index)
       const p = at(e)
       const now = performance.now()
       grab.current = {
@@ -122,6 +141,7 @@ export function usePetDrag(
     if (Math.abs(x - pet.x) + Math.abs(y - pet.y) > TAP_PX) g.moved = true
     pet.x = x
     pet.y = y
+    watch(g.index)
     ctl.paint()
   }
 
@@ -131,6 +151,7 @@ export function usePetDrag(
     if (g === undefined || pet === undefined) return
     grab.current = null
     e.currentTarget.classList.remove("pet--held")
+    watch()
     if (!g.moved && performance.now() - g.downAt < TAP_MS) {
       // **点它纯粹是玩**：被点的蹦一下，左右邻居探个头。不换引擎——
       // 换引擎在输入框那颗下拉里，一个玩的动作不该有副作用

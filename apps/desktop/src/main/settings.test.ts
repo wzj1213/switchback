@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { SETTINGS_DEFAULTS } from "../shared/settings.js"
 
 const dir = { path: mkdtempSync(join(tmpdir(), "omni-settings-")) }
 const theme = { source: "system" }
@@ -30,21 +31,21 @@ describe("偏好", () => {
     theme.source = "system"
   })
 
+  // **比的是 `SETTINGS_DEFAULTS` 本身，不再手抄一份。** 手抄那份每加一个偏好就红一次，
+  // 而它红的时候什么也没说明——「新字段没抄进测试」不是 bug。真正要钉的那一条在下面
   it("没有文件时用默认值，不报错——第一次启动是常态", () => {
-    expect(createSettings(log).get()).toEqual({
-      theme: "system",
-      projects: [],
-      pinned: [],
-      pinnedThreads: [],
-      threadOrder: {},
-      projectOrder: [],
-      defaultEngine: "",
-      defaultTrust: "auto-edit",
-      projectIcons: {},
-      lastUsed: { engine: "", byEngine: {} },
-      // **远程默认整个关着。** 这一条要写死在断言里：它是一个把服务端打开的开关，
-      // 哪天默认值被改成 true 而没人注意到，用户升级一次就凭空多了一个监听端口
-      remote: { enabled: false, port: 17800, trustedHosts: [], maxTrust: "auto-edit" },
+    expect(createSettings(log).get()).toEqual(SETTINGS_DEFAULTS)
+  })
+
+  // **远程默认整个关着。** 这一条单独写死：它是一个把服务端打开的开关，
+  // 哪天默认值被改成 true 而没人注意到，用户升级一次就凭空多了一个监听端口。
+  // 和上面那条分开是有意的——上面比「读出来的 == 默认值」，这里比「默认值本身是什么」
+  it("远程默认整个关着——这一条不能跟着默认值一起变", () => {
+    expect(SETTINGS_DEFAULTS.remote).toEqual({
+      enabled: false,
+      port: 17800,
+      trustedHosts: [],
+      maxTrust: "auto-edit",
     })
   })
 
@@ -73,7 +74,10 @@ describe("偏好", () => {
     })
 
     it("http 的、末尾带斜杠的、前后带空格的，一样收", () => {
-      expect(hosts(["http://omni.example.com/", "  https://a.b:1  "])).toEqual(["omni.example.com", "a.b:1"])
+      expect(hosts(["http://omni.example.com/", "  https://a.b:1  "])).toEqual([
+        "omni.example.com",
+        "a.b:1",
+      ])
     })
 
     it("裸的原样不动", () => {
@@ -102,7 +106,10 @@ describe("偏好", () => {
 
     it("trustedHosts 只留字符串", () => {
       write({ trustedHosts: ["a.example.com", 3, null, "b.example.com"] })
-      expect(createSettings(log).get().remote.trustedHosts).toEqual(["a.example.com", "b.example.com"])
+      expect(createSettings(log).get().remote.trustedHosts).toEqual([
+        "a.example.com",
+        "b.example.com",
+      ])
     })
 
     it("整个 remote 段是坏的就回默认，不掀翻别的偏好", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  bump,
   busy,
   gaitOf,
   homeXOf,
@@ -14,7 +15,15 @@ import {
 const stage: Stage = { width: 600, height: 300 }
 const floor = stage.height - SIZE
 
-const air = (over: Partial<Pet> = {}): Pet => ({ x: 100, y: 0, vx: 0, vy: 0, mode: "air", ...over })
+const air = (over: Partial<Pet> = {}): Pet => ({
+  x: 100,
+  y: 0,
+  vx: 0,
+  vy: 0,
+  spin: 0,
+  mode: "air",
+  ...over,
+})
 
 /** 跑到不动为止。返回最后的状态和用了多少帧——**帧数上限是防呆**，跑不完就是有 bug。 */
 function settle(
@@ -66,7 +75,7 @@ describe("homeXOf", () => {
 
 describe("step", () => {
   it("窝里和被捏着的时候一动不动", () => {
-    const rest: Pet = { x: 10, y: 20, vx: 999, vy: 999, mode: "rest" }
+    const rest: Pet = { x: 10, y: 20, vx: 999, vy: 999, spin: 0, mode: "rest" }
     expect(step(rest, 1 / 60, { stage, homeX: 0, gait: "walk" })).toBe(rest)
     const held: Pet = { ...rest, mode: "held" }
     expect(step(held, 1 / 60, { stage, homeX: 0, gait: "walk" })).toBe(held)
@@ -130,18 +139,57 @@ describe("步态", () => {
   // 自己蹦的那一下落地不该再颠一下——颠了看起来就是摔的不是跳的
   it("自己蹦的一跳落地不弹", () => {
     // 正落在窝口上方：横速给 0，落点就是窝，于是「弹不弹」是这一步唯一的变量
-    const landing: Pet = { x: 100, y: floor - 1, vx: 0, vy: 600, mode: "hop" }
+    const landing: Pet = { x: 100, y: floor - 1, vx: 0, vy: 600, spin: 0, mode: "hop" }
     const next = step(landing, 1 / 60, { stage, homeX: 100, gait: "hop" })
     expect(next.mode).toBe("rest")
+  })
+})
+
+describe("翻滚与互撞", () => {
+  // 用力甩出去要看得出在翻，轻轻放下不该歪
+  it("甩得快才翻，慢速下落姿态不变", () => {
+    const fast = step(air({ x: 200, y: 40, vx: 900 }), 1 / 60, { stage, homeX: 200, gait: "hop" })
+    expect(Math.abs(fast.spin)).toBeGreaterThan(1)
+    const slow = step(air({ x: 200, y: 40, vx: 60 }), 1 / 60, { stage, homeX: 200, gait: "hop" })
+    expect(slow.spin).toBe(0)
+  })
+
+  // 翻着落地不能就那么歪着待在窝里
+  it("落地会把姿态转正，转正之前不歇", () => {
+    let pet: Pet = { x: 200, y: floor, vx: 0, vy: 0, spin: 140, mode: "walk" }
+    for (let i = 0; i < 200 && pet.mode !== "rest"; i += 1) {
+      pet = step(pet, 1 / 60, { stage, homeX: 200, gait: "walk" })
+    }
+    expect(pet.mode).toBe("rest")
+    expect(pet.spin).toBe(0)
+  })
+
+  it("飞过来的会把窝里那只撞飞", () => {
+    const hitter: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
+    const victim: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const [a, b] = bump([hitter, victim])
+    expect(b?.mode).toBe("air")
+    expect(b?.vx).toBeGreaterThan(0)
+    expect(b?.vy).toBeLessThan(0) // 被顶起来一点，不是贴地平推
+    expect(a?.vx).toBeLessThan(hitter.vx) // 撞人的自己也慢下来
+  })
+
+  it("离得远、或者太慢，都不算撞", () => {
+    const slow: Pet = { x: 100, y: floor, vx: 40, vy: 0, spin: 0, mode: "air" }
+    const near: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    expect(bump([slow, near])[1]?.mode).toBe("rest")
+    const fast: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
+    const far: Pet = { x: 400, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    expect(bump([fast, far])[1]?.mode).toBe("rest")
   })
 })
 
 describe("busy", () => {
   // 三只静止的史莱姆不该让窗口每秒醒 60 次
   it("全在窝里就是不忙", () => {
-    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, mode: "rest" }])).toBe(false)
-    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, mode: "held" }])).toBe(false)
-    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, mode: "walk" }])).toBe(true)
-    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, mode: "hop" }])).toBe(true)
+    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "rest" }])).toBe(false)
+    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "held" }])).toBe(false)
+    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "walk" }])).toBe(true)
+    expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "hop" }])).toBe(true)
   })
 })

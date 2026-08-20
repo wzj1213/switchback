@@ -10,6 +10,11 @@ import { Field, Group, Segmented } from "./SettingsBits.js"
  * 而在此之前只能每开一个会话手动改一次。
  */
 
+const PETS = [
+  { id: "on", label: "显示" },
+  { id: "off", label: "隐藏" },
+] as const
+
 const THEMES = [
   { id: "system", label: "跟随系统" },
   { id: "light", label: "浅色" },
@@ -31,6 +36,16 @@ export function LookSection({
           value={settings.theme}
           onPick={(theme) => {
             onPatch({ theme })
+          }}
+        />
+      </Field>
+      {/* 关掉是整块不渲染，不是藏起来——藏起来它照样占着指针事件那一层 */}
+      <Field label="桌宠" hint="蹲在输入框上沿的那几只，一家引擎一只。能拖能扔，松手它自己回窝">
+        <Segmented
+          options={PETS}
+          value={settings.pets ? "on" : "off"}
+          onPick={(id) => {
+            onPatch({ pets: id === "on" })
           }}
         />
       </Field>

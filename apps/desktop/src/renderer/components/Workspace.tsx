@@ -27,6 +27,8 @@ export interface WorkspaceProps {
   tasks: readonly TaskRun[]
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
+  /** 输入框上沿那几只要不要出现。关掉是整块不渲染，见 `shared/settings.ts`。 */
+  pets: boolean
   notices: readonly Notice[]
   /** 全部会话。故障横幅要靠它说清「出事的是哪一条」。 */
   rows: readonly ThreadRow[]
@@ -211,7 +213,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         {/* 滚动区的下摆。**必须在 `Transcript` 外面**——滚动容器里的绝对定位参照的是
             可滚动内容而不是可视区，挂进去那道渐隐会跟着内容滚走。见 app.css 的 `.hem` */}
         <div className="hem" aria-hidden="true" />
-        <Pets engines={props.engines} engine={thread.engine} running={props.turn?.status === "running"} />
+        {props.pets ? (
+          <Pets engines={props.engines} engine={thread.engine} running={props.turn?.status === "running"} />
+        ) : null}
       </div>
       <Between props={props} thread={thread} stamp={stamp} send={send} onReuse={reuse} />
       <WorkspaceComposer props={props} thread={thread} stamp={stamp} prefill={prefill} actions={actions} />

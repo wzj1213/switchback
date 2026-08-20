@@ -187,6 +187,30 @@
 }
 
 /*
+ * 往左右瞟一眼。两种时候会发生：**随机的小动作**（`useMood`），
+ * 以及**你捏起一只时其余几只转头看它**（`usePetDrag` 的 `watch`）。
+ *
+ * 位移写成 svg 用户单位，所以两种形要各给各的：史莱姆的画布是 24（一格 1.25px），
+ * 螃蟹是 12（一格 2.5px）——同一个数字在螃蟹身上是史莱姆的两倍，
+ * 而螃蟹的眼睛只有一格宽，挪一格就整只挪出脸了。
+ */
+.pet--slime.pet--look-l .pet__eyes {
+  transform: translateX(-1.3px);
+}
+
+.pet--slime.pet--look-r .pet__eyes {
+  transform: translateX(1.3px);
+}
+
+.pet--crab.pet--look-l .pet__eyes {
+  transform: translateX(-0.5px);
+}
+
+.pet--crab.pet--look-r .pet__eyes {
+  transform: translateX(0.5px);
+}
+
+/*
  * 跑着的时候跳。**关键帧和最初那版的 `hop` 逐帧相同**——压扁蓄力、弹起拉长、
  * 落地砸扁、回弹，一个不少；变的只有频率：从 `1.8s infinite` 改成
  * `4s 一次、600ms 起、每次约 1s`，和 `status.css` 那道微光逐字对齐。
@@ -253,6 +277,13 @@
   .pet--run .pet__body,
   .pet--walk .pet__body {
     animation: none;
+  }
+
+  /* 瞟眼那几条整个不发生：`useMood` 在这一档下压根不排班，
+     但捏起来时的「转头看」是走 classList 的，这里再堵一道 */
+  .pet--look-l .pet__eyes,
+  .pet--look-r .pet__eyes {
+    transform: none;
   }
 
   .pet__lean {

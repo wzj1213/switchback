@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
 import { Crab, Slime } from "./pets-art.js"
-import { gaitOf, lookOf, type Pet } from "../pets.js"
-import { useBlink, usePets, useReduced } from "../usePets.js"
+import { gaitOf, lookOf, type Pet, type PetLook } from "../pets.js"
+import { useMood, usePets, useReduced } from "../usePets.js"
 import { usePetDrag } from "../usePetDrag.js"
 
 /**
@@ -31,6 +31,17 @@ import { usePetDrag } from "../usePetDrag.js"
 
 /** 最多画几只。引擎注册表是开放的，六只排一排就不是点缀是仪仗队了。 */
 const MAX = 4
+
+/** 旁边那只被震一下：往上一弹再落回去。比「探头」短促——那是好奇，这是被吓到 */
+const JOLT: Keyframe[] = [
+  { transform: "translateY(0) scale(1, 1)" },
+  { transform: "translateY(-3px) scale(0.97, 1.04)", offset: 0.35 },
+  { transform: "translateY(0) scale(1.04, 0.97)", offset: 0.7 },
+  { transform: "translateY(0) scale(1, 1)" },
+]
+
+/** 砸得比这轻就不惊动旁边的——轻轻放下不该让全场抖一下 */
+const JOLT_AT = 900
 export function Pets({
   engines,
   engine,
@@ -62,11 +73,17 @@ export function Pets({
         ],
         { duration: 300, easing: "ease-out" },
       )
+      // 砸得够重时，旁边站着的会被**震一下**。物理上不成立（它们又没连在一起），
+      // 但这是整套里最便宜的一处「它们在同一个世界里」——而那正是想要的
+      if (speed < JOLT_AT) return
+      for (const [j, body] of bodies.current.entries()) {
+        if (j !== index) body?.animate(JOLT, { duration: 260, easing: "ease-out" })
+      }
     },
     [reduced],
   )
   const ctl = usePets(count, gaits, onLand)
-  const blink = useBlink(count, reduced)
+  useMood(ctl.nodes, count, reduced)
   const drag = usePetDrag(ctl, bodies, reduced)
 
   if (count === 0) return null
@@ -91,7 +108,7 @@ export function Pets({
           ref={(n) => {
             ctl.nodes.current[i] = n
           }}
-          className={classOf(info.id === engine, running, blink === i, lookOf(info.id).tone)}
+          className={classOf(info.id === engine, running, lookOf(info.id))}
           title={titleOf(info.label, info.id === engine, running)}
           onPointerDown={drag.down(i)}
           onPointerMove={drag.move}
@@ -122,13 +139,15 @@ export function Pets({
   )
 }
 
-function classOf(on: boolean, running: boolean, blinking: boolean, tone: string): string {
+/** 眨眼、瞟眼、被捏着、走路那几个类**不在这儿**——它们每秒都可能变，
+    由 `useMood` / `usePetDrag` / `petPaint` 直接写 `classList`，不换一次重渲染。 */
+function classOf(on: boolean, running: boolean, look: PetLook): string {
   return [
     "pet",
-    `pet--${tone}`,
+    `pet--${look.tone}`,
+    `pet--${look.shape}`,
     on ? "pet--on" : "",
     on && running ? "pet--run" : "",
-    blinking ? "pet--blink" : "",
   ]
     .filter((c) => c !== "")
     .join(" ")

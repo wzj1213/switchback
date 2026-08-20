@@ -72,6 +72,8 @@ export interface Pet {
   y: number
   vx: number
   vy: number
+  /** 姿态角（度）。被甩出去时跟着横速累积，落地之后转回来。 */
+  spin: number
   /**
    * - `rest` 待在窝里
    * - `held` 你正捏着
@@ -114,6 +116,13 @@ const HOP_VY = 330
 const HOP_VX = 165
 /** 离窝这么近就算到了。比一跳的距离小得多，所以最后一跳一定落在窝里 */
 const NEAR = 1.5
+/** 横速换成转速的系数。0.55 大约是「用力甩一下转一圈半」——够看出在翻，又不至于晕 */
+const SPIN_K = 0.55
+/** 转得比这慢就别转了：轻轻放下不该歪着落地 */
+const SPIN_MIN = 240
+/** 落地之后每帧留多少姿态角。0.8 大约 150ms 转正，比弹跳停得快一点——
+ **先站直，再走回去**，反过来看着像瘸了 */
+const SPIN_DECAY = 0.8
 
 /**
  * 推进一帧。**纯函数**：给同样的输入永远给同样的输出，不碰 DOM、不读时钟。
@@ -123,59 +132,108 @@ const NEAR = 1.5
  */
 export function step(pet: Pet, dt: number, world: World): Pet {
   if (pet.mode === "rest" || pet.mode === "held") return pet
-  const { stage, homeX, gait } = world
-  const floor = stage.height - SIZE
-  const right = stage.width - SIZE
+  const floor = world.stage.height - SIZE
+  return pet.mode === "walk" ? stroll(pet, dt, world.homeX, floor) : fly(pet, dt, world, floor)
+}
 
-  if (pet.mode === "walk") {
-    const gap = homeX - pet.x
-    const move = WALK * dt
-    if (Math.abs(gap) <= move) return { x: homeX, y: floor, vx: 0, vy: 0, mode: "rest" }
-    return { ...pet, x: pet.x + Math.sign(gap) * move, y: floor }
+/**
+ * 横着走回窝。**螃蟹专用**——史莱姆是一路弹回去的（见 `gaitOf`）。
+ *
+ * 姿态没转正就先别歇：到家了也在原地把自己转直，那几帧看着像站稳。
+ */
+function stroll(pet: Pet, dt: number, homeX: number, floor: number): Pet {
+  const spin = Math.abs(pet.spin) < 1 ? 0 : pet.spin * SPIN_DECAY
+  const gap = homeX - pet.x
+  const move = WALK * dt
+  if (Math.abs(gap) <= move) {
+    return { x: homeX, y: floor, vx: 0, vy: 0, spin, mode: spin === 0 ? "rest" : "walk" }
   }
+  return { ...pet, x: pet.x + Math.sign(gap) * move, y: floor, spin }
+}
 
-  // air / hop
-  let vx = pet.vx
-  let vy = pet.vy + G * dt
-  let x = pet.x + vx * dt
-  let y = pet.y + vy * dt
+/** 在空中：重力、两面墙、天花板，然后看落没落地。 */
+function fly(pet: Pet, dt: number, world: World, floor: number): Pet {
+  // 翻滚只在真被甩出去时发生：慢速下落不转，不然轻轻放一下它也歪
+  const spin = Math.abs(pet.vx) < SPIN_MIN ? pet.spin * SPIN_DECAY : pet.spin + pet.vx * SPIN_K * dt
+  const vy0 = pet.vy + G * dt
+  const hit = contain(
+    { x: pet.x + pet.vx * dt, y: pet.y + vy0 * dt, vx: pet.vx, vy: vy0 },
+    world.stage.width - SIZE,
+  )
 
-  // 两面墙。**先夹再反弹**，顺序反过来会让它嵌在墙里抖
-  if (x < 0) {
-    x = 0
-    vx = Math.abs(vx) * WALL
-  } else if (x > right) {
-    x = right
-    vx = -Math.abs(vx) * WALL
-  }
-  // 顶：拖上去松手时可能带着向上的速度，别让它飞出活动区
-  if (y < 0) {
-    y = 0
-    vy = Math.abs(vy) * WALL
-  }
-
-  if (y < floor) return { x, y, vx, vy, mode: pet.mode }
-
-  // 落地
-  y = floor
+  if (hit.y < floor) return { ...hit, spin, mode: pet.mode }
   // **只有被甩出去的才弹。** 它自己蹦的那一下落地就该停——一个自己起跳的东西
   // 落地还颠一下，看起来是摔的不是跳的
-  if (pet.mode === "air" && vy >= SETTLE)
-    return { x, y, vx: vx * SKID, vy: -vy * BOUNCE, mode: "air" }
-  return arrive(x, y, homeX, gait)
+  if (pet.mode === "air" && hit.vy >= SETTLE) {
+    return { x: hit.x, y: floor, vx: hit.vx * SKID, vy: -hit.vy * BOUNCE, spin, mode: "air" }
+  }
+  return arrive({ x: hit.x, y: floor, spin }, world.homeX, world.gait)
+}
+
+/** 一只在飞的样子：位置加速度。`contain` 收进来的也是这个形状。 */
+interface Flight {
+  x: number
+  y: number
+  vx: number
+  vy: number
+}
+
+/** 关在活动区里。**先夹再反弹**，顺序反过来会让它嵌在墙里抖。 */
+function contain(f: Flight, right: number): Flight {
+  // 顶：拖上去松手时可能带着向上的速度，别让它飞出活动区
+  const up = f.y < 0 ? { y: 0, vy: Math.abs(f.vy) * WALL } : { y: f.y, vy: f.vy }
+  if (f.x < 0) return { ...up, x: 0, vx: Math.abs(f.vx) * WALL }
+  if (f.x > right) return { ...up, x: right, vx: -Math.abs(f.vx) * WALL }
+  return { ...up, x: f.x, vx: f.vx }
 }
 
 /** 停稳在地面上的那一刻：到家就歇着，没到家就按自己的步态继续。 */
-function arrive(x: number, y: number, homeX: number, gait: Gait): Pet {
-  if (Math.abs(homeX - x) <= NEAR) return { x: homeX, y, vx: 0, vy: 0, mode: "rest" }
-  if (gait === "walk") return { x, y, vx: 0, vy: 0, mode: "walk" }
+function arrive(spot: { x: number; y: number; spin: number }, homeX: number, gait: Gait): Pet {
+  const { x, y, spin } = spot
+  const home = Math.abs(homeX - x) <= NEAR
+  // 到家但还歪着：交给 `walk` 那一支，它会在原地把姿态转正再歇
+  if (home && Math.abs(spin) < 1) return { x: homeX, y, vx: 0, vy: 0, spin: 0, mode: "rest" }
+  if (home || gait === "walk") return { x, y, vx: 0, vy: 0, spin, mode: "walk" }
   // 一跳的滞空时间是固定的，所以**最后一跳按剩下的距离算横速**，
   // 正好落在窝里——不然它会在窝口来回蹦过头
   const air = (2 * HOP_VY) / G
   const gap = homeX - x
   const vx = Math.abs(gap) / air < HOP_VX ? gap / air : Math.sign(gap) * HOP_VX
-  return { x, y, vx, vy: -HOP_VY, mode: "hop" }
+  return { x, y, vx, vy: -HOP_VY, spin, mode: "hop" }
 }
+
+/**
+ * 互相撞。**飞过来的那只会把窝里的撞开。**
+ *
+ * 这是唯一一处 pet 与 pet 之间有关系的地方，所以它没法写进 `step`——
+ * 那个函数一次只看得见一只。放在每帧 `step` 之后跑一遍。
+ *
+ * 只处理「动的撞静的」，不做两只都在飞时的弹性碰撞：那需要正经的动量交换，
+ * 而这里要的只是**你把一只扔过去、另一只会被撞飞**这个反应。
+ */
+export function bump(pets: readonly Pet[]): readonly Pet[] {
+  const next = [...pets]
+  for (const [i, hitter] of next.entries()) {
+    if (hitter.mode !== "air" || Math.abs(hitter.vx) < HIT_MIN) continue
+    for (const [j, victim] of next.entries()) {
+      if (i === j || victim.mode === "held" || victim.mode === "air") continue
+      if (Math.abs(hitter.x - victim.x) >= SIZE || Math.abs(hitter.y - victim.y) >= SIZE) continue
+      next[j] = { ...victim, vx: hitter.vx * HIT_PASS, vy: -HIT_UP, mode: "air" }
+      // 撞完自己也慢下来。**不设成零**：那样它会当场掉下去，看着像撞在墙上
+      next[i] = { ...hitter, vx: hitter.vx * HIT_KEEP }
+    }
+  }
+  return next
+}
+
+/** 慢过这个速度就只是蹭一下，不算撞 */
+const HIT_MIN = 260
+/** 撞出去的那只接过多少横速 */
+const HIT_PASS = 0.7
+/** 被撞的会被顶起来一点——纯平的横飞看着像冰壶 */
+const HIT_UP = 210
+/** 撞人的自己还剩多少 */
+const HIT_KEEP = 0.45
 
 /** 还有东西在动吗。**没有就停掉 rAF**——一个天天开着的窗口不该为三只静止的史莱姆每秒醒 60 次。 */
 export function busy(pets: readonly Pet[]): boolean {

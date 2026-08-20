@@ -55,9 +55,10 @@ function lean(node: HTMLSpanElement | null | undefined, pet: Pet): void {
     node.style.transform = ""
     return
   }
-  const tilt = clamp(pet.vx * 0.022, -15, 15)
+  // 翻滚优先：真被甩出去时姿态角是累积的（会转好几圈），慢的时候只是顺着走势歪一点
+  const angle = Math.abs(pet.spin) > 0.5 ? pet.spin : clamp(pet.vx * 0.022, -15, 15)
   const pull = clamp(Math.abs(pet.vy) / 2600, 0, 0.16)
-  node.style.transform = `rotate(${tilt.toFixed(2)}deg) scale(${(1 - pull).toFixed(3)}, ${(1 + pull).toFixed(3)})`
+  node.style.transform = `rotate(${angle.toFixed(2)}deg) scale(${(1 - pull).toFixed(3)}, ${(1 + pull).toFixed(3)})`
 }
 
 function shade(node: HTMLSpanElement | null | undefined, pet: Pet, floor: number): void {
