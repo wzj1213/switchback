@@ -61,9 +61,23 @@ export const SLOT = 44
 /** 最右边那只离右墙多远。 */
 export const EDGE = 26
 
-/** 第 index 只的窝在哪。窝在右下角，从右往左排，顺序和引擎清单一致。 */
-export function homeXOf(index: number, count: number, width: number): number {
-  return width - EDGE - (count - index) * SLOT + (SLOT - SIZE) / 2
+/**
+ * 内容列的右缘。**窝挂在这条边上，不是活动区的右墙。**
+ *
+ * 转录区和输入框都是 `--content-max`（760）居中的，而活动区是整个主栏。
+ * 窗口窄的时候两条边重合，看不出区别；一拉宽，**输入框还在中间 760，
+ * 而窝跟着右墙跑到了卡片外面**——那几只就站到了空气里。
+ *
+ * `pad` 是输入区的横向内边距（`.composer` 的 `--sp-4`）：内容列最宽也只能
+ * 占到活动区减掉这两边。
+ */
+export function columnRightOf(width: number, max: number, pad: number): number {
+  return (width + Math.min(max, width - pad * 2)) / 2
+}
+
+/** 第 index 只的窝在哪。从内容列的右缘往左排，顺序和引擎清单一致。 */
+export function homeXOf(index: number, count: number, right: number): number {
+  return right - EDGE - (count - index) * SLOT + (SLOT - SIZE) / 2
 }
 
 /** 一只的运动状态。坐标是**左上角**，相对活动区。 */

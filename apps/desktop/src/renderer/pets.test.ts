@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   bump,
   busy,
+  columnRightOf,
   gaitOf,
   homeXOf,
   lookOf,
@@ -62,14 +63,34 @@ describe("lookOf", () => {
   })
 })
 
+describe("columnRightOf", () => {
+  // 这一条是从真机上看出来的：窗口一拉宽，输入框还在中间 760 居中，
+  // 而窝跟着活动区的右墙跑到了卡片外面——那几只就站到了空气里
+  it("窗口比内容列宽时，右缘在中间那一列上，不在右墙上", () => {
+    const right = columnRightOf(1174, 760, 16)
+    expect(right).toBeCloseTo((1174 + 760) / 2, 5)
+    expect(right).toBeLessThan(1174)
+  })
+
+  it("窗口比内容列窄时，内容列就是整块地减掉两边内边距", () => {
+    expect(columnRightOf(600, 760, 16)).toBeCloseTo(600 - 16, 5)
+  })
+
+  // 正好等宽那一刻不能跳一下
+  it("两条边重合时接得上", () => {
+    expect(columnRightOf(760 + 32, 760, 16)).toBeCloseTo(760 + 32 - 16, 5)
+  })
+})
+
 describe("homeXOf", () => {
   it("窝在右下角，从右往左排，顺序和清单一致", () => {
-    const a = homeXOf(0, 3, stage.width)
-    const b = homeXOf(1, 3, stage.width)
-    const c = homeXOf(2, 3, stage.width)
+    const right = columnRightOf(stage.width, 760, 16)
+    const a = homeXOf(0, 3, right)
+    const b = homeXOf(1, 3, right)
+    const c = homeXOf(2, 3, right)
     expect(a).toBeLessThan(b)
     expect(b).toBeLessThan(c)
-    expect(c + SIZE).toBeLessThan(stage.width)
+    expect(c + SIZE).toBeLessThan(right)
   })
 })
 

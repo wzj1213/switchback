@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { bump, busy, homeXOf, SIZE, step, type Gait, type Pet, type Stage } from "./pets.js"
+import {
+  bump,
+  busy,
+  columnRightOf,
+  homeXOf,
+  SIZE,
+  step,
+  type Gait,
+  type Pet,
+  type Stage,
+} from "./pets.js"
 import { paintPets } from "./petPaint.js"
 
 /**
@@ -14,6 +24,10 @@ import { paintPets } from "./petPaint.js"
 const MAX_DT = 0.05
 /** 落地速度低于这个就不演砸扁了——轻轻放下不该抖一下。 */
 const LAND_AT = 260
+/** 读不到 `--content-max` / `--sp-4` 时的兜底。**和 tokens.css 一致**，
+    但真走到这儿说明样式没加载，那时位置对不对已经不是最要紧的事了 */
+const FALLBACK_MAX = 760
+const FALLBACK_PAD = 16
 
 export interface PetsCtl {
   /** 活动区。地面 = 它的底边，也就是输入框的上沿。 */
@@ -48,6 +62,8 @@ export function usePets(
   const land = useRef(onLand)
   land.current = onLand
   const stage = useRef<Stage>({ width: 0, height: 0 })
+  /** 内容列的右缘。**窝挂在这儿**，而不是活动区的右墙——见 `columnRightOf` */
+  const col = useRef(0)
   const frame = useRef<number | undefined>(undefined)
   const clock = useRef(0)
 
@@ -75,7 +91,7 @@ export function usePets(
           was.map((pet, i) =>
             step(pet, dt, {
               stage: stage.current,
-              homeX: homeXOf(i, count, stage.current.width),
+              homeX: homeXOf(i, count, col.current),
               gait: gaits[i] ?? "walk",
             }),
           ),
@@ -107,9 +123,14 @@ export function usePets(
     const el = area.current
     if (el === null) return
     stage.current = { width: el.clientWidth, height: el.clientHeight }
+    // 从样式里读，不写死：`--content-max` 改了这边要跟着改，而那正是最容易忘的一处
+    const style = getComputedStyle(el)
+    const max = Number.parseFloat(style.getPropertyValue("--content-max")) || FALLBACK_MAX
+    const pad = Number.parseFloat(style.getPropertyValue("--sp-4")) || FALLBACK_PAD
+    col.current = columnRightOf(stage.current.width, max, pad)
     for (const [i, pet] of pets.current.entries()) {
       if (pet.mode !== "rest") continue
-      pet.x = homeXOf(i, count, stage.current.width)
+      pet.x = homeXOf(i, count, col.current)
       pet.y = stage.current.height - SIZE
     }
     paint()
