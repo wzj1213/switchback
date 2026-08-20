@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
-import type { ThreadStatus } from "@omni/protocol"
 import type { ThreadRow } from "@omni/store"
 import { rowLabelOf } from "../sidebar.js"
-import { EllipsisIcon, SpinnerIcon } from "./icons.js"
+import { EllipsisIcon } from "./icons.js"
+import { DOT_CLASS, RowEnd } from "./RowEnd.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
@@ -23,7 +23,6 @@ export interface RowDrag {
   drop: (beforeId: string) => void
 }
 
-
 /**
  * 侧栏里的行。
  *
@@ -31,19 +30,6 @@ export interface RowDrag {
  * 那边管「侧栏由哪几块组成」，这边管「一行长什么样」。
  * 两边共用 `app.css` 里那套 `.row` —— 对齐靠的是它，不是各自的 padding。
  */
-
-const DOT_CLASS: Record<ThreadStatus, string> = {
-  // 起引擎那几百毫秒：和「跑着」用同一个呼吸动画，因为**对用户来说就是同一件事**
-  //（有东西在动、还不能输入），没必要为它发明第三种视觉语言
-  starting: " row__dot--running",
-  idle: "",
-  running: " row__dot--running",
-  waiting_approval: " row__dot--waiting",
-  failed: " row__dot--failed",
-}
-
-/** 光靠颜色说不清「要你去做什么」，等待批准这一档补一句字。 */
-const NOTE: Partial<Record<ThreadStatus, string>> = { waiting_approval: "待批", starting: "启动中" }
 
 /**
  * 一行的拖放事件。
@@ -118,14 +104,25 @@ function RowActions({
     )
   }
   return (
-    <button type="button" className="row__act" aria-label="更多操作" title="更多操作" onClick={onMenu}>
+    <button
+      type="button"
+      className="row__act"
+      aria-label="更多操作"
+      title="更多操作"
+      onClick={onMenu}
+    >
       <EllipsisIcon size={SIDEBAR_ICON} />
     </button>
   )
 }
 
 /** 一行的 class。拼在 JSX 里的话那一行会长到看不出是在拼什么。 */
-function rowClass(o: { flat: boolean; selected: boolean; dragging: boolean; dropping: boolean }): string {
+function rowClass(o: {
+  flat: boolean
+  selected: boolean
+  dragging: boolean
+  dropping: boolean
+}): string {
   return [
     "row row--thread",
     o.flat ? "row--flat" : "",
@@ -223,15 +220,7 @@ export function Row({
             rename?.done()
           }}
         />
-        {aside === undefined ? null : <span className="row__aside">{aside}</span>}
-        {/* 跑着的时候右侧转一个圈。**这是唯一能在不切会话的情况下看出「那边还在忙」
-            的地方**——状态点太小、又和「有未读」这类含义抢同一个位置 */}
-        {thread.status === "running" ? (
-          <span className="row__spin" aria-label="正在运行">
-            <SpinnerIcon />
-          </span>
-        ) : null}
-        {NOTE[thread.status] === undefined ? null : <span className="row__note">{NOTE[thread.status]}</span>}
+        <RowEnd thread={thread} {...(aside === undefined ? {} : { aside })} />
       </button>
       <RowActions
         confirming={confirming}
@@ -246,5 +235,3 @@ export function Row({
     </div>
   )
 }
-
-

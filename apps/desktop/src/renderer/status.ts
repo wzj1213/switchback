@@ -46,6 +46,39 @@ export function spent(ms: number): string {
   return seconds === 0 ? `${String(minutes)} 分` : `${String(minutes)} 分 ${String(seconds)} 秒`
 }
 
+/**
+ * 「多久以前」。侧栏会话行右边那一列。
+ *
+ * ## 为什么侧栏需要它
+ *
+ * 会话标题彼此都长得差不多（「omni」「接着上面…」「修一下那个 bug」），
+ * 一列排下来**唯一能把它们区分开的是新旧**——而这件事 `Thread.updatedAt`
+ * 一直握在手里，从来没显示过。那一格今天是空的。
+ *
+ * ## 为什么这几档
+ *
+ * 越近越要精确，越远越不需要：十分钟前和十二分钟前是两回事，
+ * 三十天前和三十二天前不是。所以一小时内报分钟、一天内报小时，
+ * 再往前只报天，超过一周直接报日期——那时你找的是「哪一天那条」。
+ *
+ * 「昨天」单独一档：它比「1 天前」好读，而且这是人回忆时真正用的词。
+ */
+export function sinceOf(at: number, now: number): string {
+  const ms = now - at
+  // 时钟回拨、或者引擎报了一个未来的时间戳：不显示负数，当成刚刚
+  if (ms < MINUTE) return "现在"
+  if (ms < HOUR) return `${String(Math.floor(ms / MINUTE))} 分钟前`
+  if (ms < DAY) return `${String(Math.floor(ms / HOUR))} 小时前`
+  if (ms < DAY * 2) return "昨天"
+  if (ms < DAY * 7) return `${String(Math.floor(ms / DAY))} 天前`
+  const day = new Date(at)
+  return `${String(day.getMonth() + 1)} 月 ${String(day.getDate())} 日`
+}
+
+const MINUTE = 60_000
+const HOUR = MINUTE * 60
+const DAY = HOUR * 24
+
 /** 经过的秒数，向下取整。计时器只显示秒，不显示毫秒——抖动没有信息量。 */
 export function elapsed(startedAt: number, now: number): string {
   const total = Math.max(0, Math.floor((now - startedAt) / 1000))

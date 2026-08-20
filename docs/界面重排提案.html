@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>omni 界面重排提案</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-press:#e0e0e5; --bg-code:#f6f6f7;
+  --bg-said:#f0f0f2;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#85858f; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --hl-keyword:#8250df; --hl-string:#0a6640; --hl-number:#b35900;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 8px 28px rgb(0 0 0 / 12%);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+    --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024;
+    --bg-said:#232328;
+    --border:#2a2a30; --border-strong:#3a3a42;
+    --text:#ececef; --text-muted:#9d9da8; --text-faint:#6d6d78; --text-inverse:#17171a;
+    --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+    --hl-keyword:#c792ea; --hl-string:#7fd3a2; --hl-number:#f0a868;
+    --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg-sunken); color:var(--text);
+  font-family:var(--font); font-size:15px; line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  padding:0 24px 96px;
+}
+svg{flex:none; align-self:center}
+.ic{stroke:currentColor;fill:none;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;display:block}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ── 文档骨架 ───────────────────────────────── */
+.wrap{max-width:1288px;margin:0 auto}
+.col{max-width:760px}
+.doc-head{padding:88px 0 48px}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);margin:0 0 18px}
+h1{font-size:40px;line-height:1.2;font-weight:600;letter-spacing:-.015em;margin:0 0 20px}
+.lede{font-size:17px;line-height:1.8;color:var(--text-muted);margin:0 0 28px}
+.lede strong{color:var(--text);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text-faint);font-family:var(--font-mono)}
+.meta span{padding:3px 8px;border:1px solid var(--border);border-radius:999px;background:var(--bg-raised)}
+
+.rule{height:1px;background:var(--border-strong);border:0;margin:0}
+
+h2.sec{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);
+  font-weight:600;margin:64px 0 20px}
+
+/* ── 优化点卡 ───────────────────────────────── */
+.pt{padding:44px 0;border-top:1px solid var(--border)}
+.pt:first-of-type{border-top:0}
+.pt__no{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);letter-spacing:.08em;margin:0 0 10px}
+.pt__h{font-size:25px;line-height:1.35;font-weight:600;letter-spacing:-.01em;margin:0 0 8px}
+.pt__sub{font-size:15px;color:var(--text-muted);margin:0 0 26px;max-width:720px}
+.pt__sub strong{color:var(--text);font-weight:600}
+
+.block{max-width:760px;margin:0 0 22px}
+.block__h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+  letter-spacing:.06em;color:var(--text-faint);margin:0 0 10px}
+.block__h::after{content:"";flex:1;height:1px;background:var(--border)}
+.block p{margin:0 0 12px}
+.block p:last-child{margin-bottom:0}
+.block ul{margin:0 0 12px;padding-left:1.3em}
+.block li{margin:5px 0}
+
+pre.code{margin:0 0 14px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--bg-code);border-left:2px solid var(--border-strong);
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.65;
+  color:var(--text-muted);overflow-x:auto;white-space:pre}
+pre.code b{color:var(--text);font-weight:600}
+pre.code i{color:var(--text-faint);font-style:normal}
+pre.code em{color:var(--danger);font-style:normal;font-weight:600}
+pre.code u{color:var(--ok);text-decoration:none;font-weight:600}
+code{font-family:var(--font-mono);font-size:.9em;background:var(--bg-code);
+  padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+
+.fix{border-left:2px solid var(--accent);padding:2px 0 2px 16px;margin:0 0 22px;max-width:760px}
+.fix p:first-child{margin-top:0}
+
+.num{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}
+.num div{flex:1;min-width:150px;padding:12px 14px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--bg-raised)}
+.num b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;line-height:1.2}
+.num span{display:block;font-size:12px;color:var(--text-faint);margin-top:3px}
+
+/* ── 前后对照 ───────────────────────────────── */
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:0 0 8px;align-items:start}
+@media (max-width:900px){.ab{grid-template-columns:1fr}}
+.ab__cell{min-width:0}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  letter-spacing:.08em;color:var(--text-faint);margin:0 0 8px;text-transform:uppercase;
+  font-family:var(--font-mono)}
+.tag::before{content:"";width:6px;height:6px;border-radius:3px;background:var(--text-faint)}
+.tag--next{color:var(--accent)}
+.tag--next::before{background:var(--accent)}
+.frame{border:1px solid var(--border-strong);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;box-shadow:var(--shadow-1)}
+.frame__in{padding:16px}
+.cap{font-size:12px;color:var(--text-faint);margin:8px 0 0;line-height:1.6}
+
+/* ── 全景 ───────────────────────────────────── */
+.pano{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+@media (max-width:1240px){.pano{grid-template-columns:1fr}}
+.scaler{position:relative;width:100%;padding-top:71.154%;overflow:hidden;
+  border:1px solid var(--border-strong);border-radius:10px;background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.scaler > .ui{position:absolute;top:0;left:0;transform-origin:top left}
+@media (min-width:1240px){.scaler > .ui{transform:scale(.6077)}}
+@media (max-width:1239px){.scaler > .ui{transform:scale(.72)}}
+@media (max-width:820px){.scaler > .ui{transform:scale(.5)}}
+
+/* ── 落地表 ─────────────────────────────────── */
+table.plan{border-collapse:collapse;font-size:13.5px;width:100%;max-width:900px}
+table.plan th,table.plan td{padding:9px 12px;border-bottom:1px solid var(--border);
+  text-align:left;vertical-align:top}
+table.plan th{font-size:11.5px;letter-spacing:.06em;color:var(--text-faint);
+  text-transform:uppercase;font-weight:600;border-bottom:1px solid var(--border-strong)}
+table.plan td.n{font-family:var(--font-mono);color:var(--text-faint);width:34px}
+table.plan td.w{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);white-space:nowrap}
+table.plan tr:last-child td{border-bottom:0}
+
+.note{max-width:760px;padding:16px 18px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--bg-raised);margin:0 0 16px}
+.note h4{margin:0 0 6px;font-size:14px;font-weight:600}
+.note p{margin:0;font-size:14px;color:var(--text-muted);line-height:1.7}
+
+/* ══ omni 界面小样 ═══════════════════════════ */
+.ui{width:1040px;height:740px;display:grid;grid-template-columns:258px 1fr;
+  font-family:var(--font);font-size:14px;line-height:1.6;background:var(--bg);
+  color:var(--text);flex:none}
+.ui--flat{width:auto;height:auto;display:block;background:transparent}
+
+.us{display:flex;flex-direction:column;background:var(--bg-sunken);
+  border-right:1px solid var(--border-strong);overflow:hidden}
+.us__head{padding:14px 8px 12px}
+.us__lights{display:flex;gap:8px;padding:0 4px 16px}
+.us__lights i{width:11px;height:11px;border-radius:6px;background:var(--bg-active);display:block}
+.us__brand{padding-left:24px;font-size:16px;font-weight:600;letter-spacing:.01em}
+.us__brand span{color:var(--text-faint);font-weight:400;margin-left:4px;font-size:13px}
+.us__list{flex:1;min-height:0;overflow:hidden;padding-bottom:16px}
+.ur{display:flex;align-items:center;min-height:32px;width:calc(100% - 16px);margin:0 8px;
+  border-radius:var(--radius-sm);color:var(--text-muted);font-size:14px}
+.ur__slot{display:flex;flex:none;align-items:center;justify-content:center;width:24px;
+  color:var(--text-faint)}
+.ur__lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ur__end{flex:none;padding-right:8px;font-size:11.5px;color:var(--text-faint);
+  font-variant-numeric:tabular-nums}
+.ur--sel{background:var(--bg-active);color:var(--text)}
+.ur--search{border:1px solid var(--border-strong);background:var(--bg-raised);
+  width:calc(100% - 16px);color:var(--text-faint)}
+.ur--thread .ur__slot{width:24px}
+.ur--thread{padding-left:24px;width:calc(100% - 16px)}
+.udot{width:6px;height:6px;border-radius:3px;background:var(--text-faint);display:block}
+.udot--run{background:var(--accent)}
+.us__sec{display:flex;align-items:center;width:calc(100% - 16px);margin:0 8px;
+  padding:16px 0 4px 24px;min-height:42px;color:var(--text-faint);font-size:13px;gap:3px}
+.us__sec--tight{min-height:30px;padding-top:12px}
+.us__empty{margin:0;padding:8px 8px 8px 32px;font-size:13px;color:var(--text-faint);line-height:1.6}
+.us__empty--one{padding:2px 8px 6px 32px;font-size:11.5px;line-height:1.5}
+.us__foot{display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid var(--border)}
+.us__ava{width:20px;height:20px;border-radius:4px;background:var(--bg-active);
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted)}
+.us__gain{margin:auto 8px 8px;padding:6px 8px;border:1px dashed var(--accent);
+  border-radius:var(--radius-sm);font-size:11.5px;color:var(--accent);text-align:center}
+
+.um{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.um__top{display:flex;align-items:center;gap:12px;height:52px;padding:0 16px;
+  border-bottom:1px solid var(--border-strong)}
+.um__title{display:flex;align-items:center;gap:4px;font-weight:600;font-size:14px}
+.um__title svg{color:var(--text-faint)}
+.um__sp{flex:1}
+.umeter{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-faint);
+  font-variant-numeric:tabular-nums}
+.umeter__t{width:44px;height:4px;border-radius:2px;background:var(--bg-active);overflow:hidden}
+.umeter__f{display:block;height:100%;width:20%;background:var(--text-faint)}
+.utr{flex:1;min-height:0;overflow:hidden;padding:24px 16px 32px}
+.utr__in{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+.uuser{max-width:82%;align-self:flex-end;padding:8px 12px;
+  border-radius:var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background:var(--bg-sunken);border:1px solid var(--border);white-space:pre-wrap}
+.uthumb{width:60px;height:44px;margin-top:6px;border:1px solid var(--border);
+  border-radius:4px;background:var(--bg-raised);display:block}
+.uagent{min-width:0}
+.umark{display:flex;align-items:center;gap:12px;padding:2px 0;font-size:11.5px;
+  color:var(--text-faint);font-variant-numeric:tabular-nums}
+.umark::after{content:"";flex:1;height:1px;background:var(--border)}
+.uthink{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text-muted);font-size:13px}
+.uthink__i{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--text-faint)}
+.uthink__d{flex:none;width:2px;height:2px;border-radius:1px;background:var(--text-faint)}
+.uthink__l{flex:1;min-width:0;overflow:hidden;white-space:nowrap;color:var(--text-faint);font-size:11.5px}
+.urun{display:flex;flex-direction:column;gap:1px;padding-left:12px;border-left:1px solid var(--border)}
+.ustep{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text-muted);
+  font-size:13px;line-height:20px}
+.ustep__i{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--text-faint)}
+.ustep__t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--text);font-family:var(--font-mono);font-size:12.5px}
+.ustep__s{flex:none;margin-left:8px;color:var(--text-faint);font-size:11.5px}
+.ustep__s--fail{color:var(--danger)}
+.uout{margin:2px 0 8px 24px;padding:8px 12px;border-radius:var(--radius-sm);
+  background:var(--bg-code);color:var(--text-muted);font-family:var(--font-mono);
+  font-size:12.5px;line-height:1.55;white-space:pre-wrap;overflow:hidden}
+
+.uch{display:flex;justify-content:center;gap:8px;padding-bottom:8px}
+.upill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  border:1px solid var(--border);background:var(--bg-raised);font-size:11.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums}
+.upill b{font-weight:400;color:var(--ok)}
+.upill i{font-style:normal;color:var(--danger)}
+.ucomp{border-top:1px solid var(--border-strong);padding:12px 16px 16px}
+.ucomp__in{max-width:760px;margin:0 auto;border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);padding:8px 12px}
+.uchips{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--text-muted);
+  padding-bottom:6px}
+.uchips span{display:inline-flex;align-items:center;gap:5px}
+.uta{min-height:42px;color:var(--text);font-size:14px;line-height:1.6}
+.ubar{display:flex;align-items:center;gap:8px;padding-top:4px;font-size:13px;color:var(--text-muted)}
+.utrig{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:var(--radius-sm)}
+.usep{width:1px;height:14px;background:var(--border);flex:none}
+.usend{margin-left:auto;width:26px;height:26px;border-radius:999px;background:var(--text);
+  color:var(--text-inverse);display:flex;align-items:center;justify-content:center;flex:none}
+.usend i{width:8px;height:8px;background:currentColor;border-radius:1px;display:block}
+
+/* ── 「改后」的覆盖 ─────────────────────────── */
+.ui--next .utr__in{gap:8px}
+.ui--next .uuser{max-width:72%;border:0;background:var(--bg-said);margin-top:8px}
+.ui--next .uagent{font-size:15px;line-height:26px;margin-top:8px}
+.ui--next .umark{margin-top:20px;color:var(--text-muted);font-weight:500}
+.ui--next .urun{padding-left:0;border-left:0}
+.ui--next .uout{margin-left:24px;border-left:1px solid var(--border);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.ui--next .uthink__l{color:var(--text-muted)}
+</style>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></symbol>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.6a1 1 0 0 1 1-1h2.8l1.2 1.4H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4"/><path d="M10.1 10.1L13.5 13.5"/></symbol>
+<symbol id="i-chev-r" viewBox="0 0 16 16"><path d="M6.2 3.8L10.4 8l-4.2 4.2"/></symbol>
+<symbol id="i-chev-d" viewBox="0 0 16 16"><path d="M3.8 6.2L8 10.4l4.2-4.2"/></symbol>
+<symbol id="i-term" viewBox="0 0 16 16"><path d="M3.2 4.6L6.4 8l-3.2 3.4M8.4 11.6h4.4"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.6h4.6L12.2 6.2v7.2H4z"/><path d="M8.4 2.6v3.8h3.8"/></symbol>
+<symbol id="i-think" viewBox="0 0 16 16"><path d="M8 2.4l1.35 3.25L12.6 7l-3.25 1.35L8 11.6 6.65 8.35 3.4 7l3.25-1.35z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.4l4.4 1.7v3.3c0 2.6-1.85 4.35-4.4 5.2-2.55-.85-4.4-2.6-4.4-5.2V4.1z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.6" cy="3.6" r="1.5"/><circle cx="4.6" cy="12.4" r="1.5"/><circle cx="11.4" cy="4.8" r="1.5"/><path d="M4.6 5.1v5.8M11.4 6.3c0 2.2-1.6 2.9-3.4 3.2"/></symbol>
+<symbol id="i-reset" viewBox="0 0 16 16"><path d="M3.1 8a4.9 4.9 0 1 0 1.5-3.5"/><path d="M2.8 2.9v3.1h3.1"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><path d="M3.4 8.4l3 3 6.2-6.8"/></symbol>
+<symbol id="i-down" viewBox="0 0 16 16"><path d="M8 3.4v9.2M4.2 8.8L8 12.6l3.8-3.8"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+<header class="doc-head col">
+  <p class="kicker">omni · 同文 &nbsp;/&nbsp; 排版重排</p>
+  <h1>一条对话流里，<br>所有东西的分量都一样重</h1>
+  <p class="lede">这套界面的问题不在「哪里丑」——颜色、圆角、描边这一层已经很干净了，token 那份注释比大多数设计系统的文档都严。问题在<strong>层级</strong>：一个 16px 的等距间隔管着相邻行之间全部七种关系，13/14px 的灰字管着思考、工具、状态和回答。于是回头翻一段会话时眼睛没有落点，只能逐行读。</p>
+  <p class="lede">下面八条只做一件事：<strong>把「你读的东西」和「它干的活」在视觉上分开。</strong>不加新控件、不加新颜色、不加插画——六条是改数值和选择器，两条要动组件。</p>
+  <div class="meta">
+    <span>tokens.css</span><span>app.css</span><span>items.css</span><span>markdown.css</span>
+    <span>Transcript.tsx</span><span>ToolRun.tsx</span><span>Reasoning.tsx</span><span>Changed.tsx</span>
+  </div>
+</header>
+
+<h2 class="sec">全景 · 同样的内容，同样的色板</h2>
+<div class="pano">
+  <div>
+    <p class="tag">现在</p>
+    <div class="scaler">
+<div class="ui">
+  <aside class="us">
+    <div class="us__head">
+      <div class="us__lights"><i></i><i></i><i></i></div>
+      <div class="us__brand">omni <span>同文</span></div>
+    </div>
+    <div class="us__list">
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-plus"/></svg></span><span class="ur__lbl">新建会话</span><span class="ur__end">omni</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">打开文件夹…</span></div>
+      <div class="ur ur--search"><span class="ur__slot"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-search"/></svg></span><span class="ur__lbl">筛选会话…</span></div>
+      <div class="us__sec">置顶 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty">把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。</p>
+      <div class="us__sec">项目 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">you</span><span class="ur__end">4</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+      <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span></div>
+      <div class="us__sec">对话 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty">还没有对话。点右边的 + 开一条，不用先选项目。</p>
+    </div>
+    <div class="us__foot">
+      <span class="us__ava">A</span><span class="ur__lbl" style="font-size:13px;color:var(--text-muted)">alice</span>
+      <svg class="ic" width="14" height="14" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-reset"/></svg>
+    </div>
+  </aside>
+  <main class="um">
+    <div class="um__top">
+      <div class="um__title">omni <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="um__sp"></div>
+      <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+      <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+    </div>
+    <div class="utr"><div class="utr__in">
+      <div class="uuser">项目的UI我想整体优化一版，就是这个排版界面，你优化一下，给我个你想的优化点的html图<span class="uthumb"></span></div>
+      <div class="umark">已处理 2 分 56 秒 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The user wants UI optimization suggestions for the omni app. They show a screenshot of the current UI: sidebar with</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="uagent">我先看一下现有的 UI 优化计划文档，再出 HTML 效果图。</div>
+      <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">docs/UI细节优化计划.md</span></div></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The doc is about detail-level optimizations, already landed. Now the user wants an overall layout redesign</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">ls node_modules/.pnpm 2&gt;/dev/null | grep -iE 'playwright|puppeteer' | head; ls scr…</span><span class="ustep__s">失败</span></div></div>
+    </div></div>
+    <div class="uch"><span class="upill">5 个文件变了</span><span class="upill">审核</span></div>
+    <div class="ucomp"><div class="ucomp__in">
+      <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
+      <div class="uta">它还在跑——现在打的会排在后面，这一轮停了就发出去。</div>
+      <div class="ubar">
+        <span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="usend"><i></i></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+    </div>
+    <p class="cap">16px 均匀间隔 · 四条左缘 · 提问带框、回答不带 · 「失败」和别的状态同一个灰</p>
+  </div>
+  <div>
+    <p class="tag tag--next">改后</p>
+    <div class="scaler">
+<div class="ui ui--next">
+  <aside class="us">
+    <div class="us__head">
+      <div class="us__lights"><i></i><i></i><i></i></div>
+      <div class="us__brand">omni <span>同文</span></div>
+    </div>
+    <div class="us__list">
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-plus"/></svg></span><span class="ur__lbl">新建会话</span><span class="ur__end">omni</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">打开文件夹…</span></div>
+      <div class="ur ur--search"><span class="ur__slot"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-search"/></svg></span><span class="ur__lbl">筛选会话…</span></div>
+      <div class="us__sec us__sec--tight">置顶 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="us__sec">项目 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">you</span><span class="ur__end">4</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+      <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span></div>
+      <div class="us__sec">对话 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty us__empty--one">还没有独立对话</p>
+    </div>
+    <div class="us__foot">
+      <span class="us__ava">A</span><span class="ur__lbl" style="font-size:13px;color:var(--text-muted)">alice</span>
+      <svg class="ic" width="14" height="14" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-reset"/></svg>
+    </div>
+  </aside>
+  <main class="um">
+    <div class="um__top">
+      <div class="um__title">omni <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="um__sp"></div>
+      <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+      <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+    </div>
+    <div class="utr"><div class="utr__in">
+      <div class="uuser">项目的UI我想整体优化一版，就是这个排版界面，你优化一下，给我个你想的优化点的html图<span class="uthumb"></span></div>
+      <div class="umark">已处理 2 分 56 秒 · 7 步 · 5 个文件 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">Read the real CSS first, not the docs</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="uagent">我先看一下现有的 UI 优化计划文档，再出 HTML 效果图。</div>
+      <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">docs/UI细节优化计划.md</span></div></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">That doc is detail-level; the ask is layout-level</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="urun"><div class="ustep"><span class="ustep__i" style="color:var(--danger)"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">ls node_modules/.pnpm 2&gt;/dev/null | grep -iE 'playwright|puppeteer' | head; ls scr…</span><span class="ustep__s ustep__s--fail">失败</span></div></div>
+    </div></div>
+    <div class="uch"><span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span><span class="upill">审核</span></div>
+    <div class="ucomp"><div class="ucomp__in">
+      <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
+      <div class="uta">它还在跑——现在打的会排在后面，这一轮停了就发出去。</div>
+      <div class="ubar">
+        <span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig">K3-256k · 高 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="usep"></span>
+        <span class="utrig"><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="usend"><i></i></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+    </div>
+    <p class="cap">三档节奏 · 两条左缘（0 和 24）· 回答 15/26、提问去框 · 失败染色 · 侧栏省下 ≈110px</p>
+  </div>
+</div>
+
+<style>
+.mini{display:flex;flex-direction:column;font-family:var(--font);font-size:14px;line-height:1.6;color:var(--text)}
+.gap{position:relative;display:flex;align-items:center}
+.gap::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--border-strong)}
+.gap span{position:relative;background:var(--bg);padding:0 6px;font-size:10px;
+  font-family:var(--font-mono);color:var(--text-faint);line-height:1}
+.gap--hi span{color:var(--accent)}
+.guide{position:relative;padding-top:30px}
+.guide > i{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--accent)}
+.guide > i > b{position:absolute;top:1px;left:3px;font:400 10px/1 var(--font-mono);color:var(--accent);white-space:nowrap}
+.guide > i.lo > b{top:15px}
+.guide > i.bad{border-left-color:var(--danger)}
+.guide > i.bad > b{color:var(--danger)}
+.fade{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent 100%);
+  mask-image:linear-gradient(90deg,#000 78%,transparent 100%)}
+.uout--tall{max-height:143px;overflow:hidden;position:relative;padding-right:18px}
+.uout--tall::after{content:"";position:absolute;right:6px;top:8px;bottom:8px;width:4px;
+  border-radius:2px;background:var(--text-faint);opacity:.45}
+.uout--clamp{position:relative;max-height:112px;overflow:hidden}
+.uout--clamp::after{content:"";position:absolute;left:0;right:0;bottom:0;height:36px;
+  background:linear-gradient(to bottom,transparent,var(--bg-code))}
+.more{display:block;margin:5px 0 0 24px;font-size:11.5px;color:var(--text-muted)}
+.swatch{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted)}
+.swatch i{width:22px;height:14px;border-radius:3px;display:block;border:1px solid var(--border)}
+.sw-row{display:flex;flex-wrap:wrap;gap:18px;margin:0 0 14px}
+</style>
+
+<h2 class="sec">八条</h2>
+
+<!-- ── 1 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">01 / 节奏</p>
+  <h3 class="pt__h">一个 16px 管住了全部七种相邻关系</h3>
+  <p class="pt__sub">用户提问接轮次分界、思考行接回答、回答接工具组、上一轮结束接下一轮开始——这七种关系在结构上完全不同，现在它们的间距是同一个数。<strong>间距不表达关系，结构就只能靠线和框去补。</strong></p>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <pre class="code">/* app.css:951 */
+.transcript__inner { <b>gap: var(--sp-4)</b>; }        <i>/* 16px，管所有相邻 */</i>
+
+/* items.css:723 —— 有人在用负边距把这个 16 掰回来 */
+.copyable:has(&gt; .think) { <em>margin: calc(var(--sp-2) * -1) 0</em>; }</pre>
+    <p>那条负边距是症状：<strong>基数选在了错的一档，才需要挑个别行去减。</strong>思考行不是特例，它只是最先撞上的那一个。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>基数降到 8px（同一轮里连着发生的事），另外两档用相邻选择器加出来，一共三个值：</p>
+    <pre class="code">.transcript__inner { <u>gap: var(--sp-2)</u>; }              <i>/* 8 · 它连着干的几件事 */</i>
+
+<i>/* 说话人换了，或者从「做」回到「说」 */</i>
+.copyable:has(&gt; .msg--agent),
+.copyable:has(&gt; .msg--user) { <u>margin-top: var(--sp-2)</u>; }   <i>/* → 16 */</i>
+
+<i>/* 轮次分界。上重下轻——它是下一轮的表头，不是上一轮的页脚 */</i>
+.turnmark__row { <u>margin-top: 20px</u>; }                      <i>/* → 28 */</i>
+
+<i>/* 删掉 .copyable:has(&gt; .think) 那条负边距，不再需要 */</i></pre>
+    <p>一根线、一块底色都不用加，结构自己就浮出来了。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在 · 16 / 16 / 16 / 16</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uuser" style="align-self:flex-end">这个排版界面你优化一下</div>
+        <div class="gap" style="height:16px"><span>16</span></div>
+        <div class="umark">已处理 2 分 56 秒</div>
+        <div class="gap" style="height:16px"><span>16</span></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The user wants UI optimization…</span></div>
+        <div class="gap" style="height:16px"><span>16</span></div>
+        <div class="uagent">我先看一下现有的排版是怎么出来的。</div>
+        <div class="gap" style="height:16px"><span>16</span></div>
+        <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">items.css</span></div>
+        <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">tokens.css</span></div></div>
+      </div></div></div>
+      <p class="cap">四个一样的间隔。哪两行是一伙的，看不出来。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后 · 28 / 16 / 8 / 8</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uuser" style="align-self:flex-end;border:0;background:var(--bg-said);max-width:72%">这个排版界面你优化一下</div>
+        <div class="gap gap--hi" style="height:28px"><span>28 · 轮次</span></div>
+        <div class="umark" style="color:var(--text-muted);font-weight:500">已处理 2 分 56 秒 · 7 步 · 5 个文件</div>
+        <div class="gap gap--hi" style="height:16px"><span>16 · 换人说话</span></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">Read the real CSS first</span></div>
+        <div class="gap gap--hi" style="height:8px"><span>8</span></div>
+        <div class="uagent" style="font-size:15px;line-height:26px">我先看一下现有的排版是怎么出来的。</div>
+        <div class="gap gap--hi" style="height:8px"><span>8</span></div>
+        <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">items.css</span></div>
+        <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">tokens.css</span></div></div>
+      </div></div></div>
+      <p class="cap">思考、回答、两条工具行抱成一团；上面那道 28px 是「这一轮从这儿开始」。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 2 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">02 / 对齐</p>
+  <h3 class="pt__h">同一类东西的左缘差 13px</h3>
+  <p class="pt__sub">items.css 里那条 <code>--step-slot</code> 的注释说得很对：「展开出来的东西都对着这一条槽」。<strong>但这条槽只在 <code>.run</code> 里面成立，而 <code>.run</code> 自己被推开了 13px。</strong>于是它想对齐的两样东西——展开的思考和展开的工具输出——在屏幕上仍然差 13px。</p>
+
+  <div class="block">
+    <p class="block__h">现在 · 绝对左缘</p>
+    <pre class="code">.msg--agent / .md          图标 —      文字 <b>0</b>     <i>正文</i>
+.think__row                图标 <b>0</b>       文字 <b>24</b>    <i>思考行</i>
+.think__body               —           文字 <b>24</b>    <i>展开的思考 ✓</i>
+
+.run { padding-left: 12px; border-left: 1px }
+  └ .step                  图标 <em>13</em>      文字 <em>37</em>    <i>工具行 ← 差 13</i>
+  └ .step__out             —           文字 <em>37</em>    <i>展开的输出 ← 差 13</i>
+  └ .step__verb（计划）     —           文字 <em>13</em>    <i>同一个 .run 里的第三条边</i></pre>
+    <p>思考行和工具行说的是同一件事——「它在干活」。它们的图标一个在 0、一个在 13，轨线一条有一条没有。「差不多齐」比明显不齐更难看，这句是 app.css 自己写的。</p>
+    <p style="color:var(--text-muted);font-size:14px">顺带：<code>items.css</code> 里还有一条 <code>.reasoning</code>（<code>padding-left:12</code> + <code>border-left:2px</code>），桌面端<strong>没有任何组件在用它</strong>——推理走的是 <code>.think</code>。<code>check-css</code> 只查「用了没样式」，查不出「有样式没人用」，所以它一直留着。第四条左缘，只存在于样式表里。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>把 <code>--step-slot</code>（已经有了，16 + 8 = 24）从「<code>.run</code> 内部的槽」升成「整个转录区唯一的一条文字列」。横向只留两个值：</p>
+    <ul>
+      <li><strong>0</strong> —— 正文（用户、回答）。它是主体，不缩进；一缩进就看起来附属于上一条工具行。</li>
+      <li><strong>24</strong> —— 一切「活动」的文字：思考、工具、计划、审批。图标统一占 0–16。</li>
+    </ul>
+    <pre class="code">.run { <em>padding-left: var(--sp-3)</em>; <em>border-left: 1px solid var(--border)</em>; }
+  ↓
+.run { <u>padding-left: 0</u>; <u>border: 0</u>; }              <i>/* 行本身不缩进 */</i>
+.step__out,
+.think__body,
+.run__nested { <u>margin-left: var(--step-slot)</u>;      <i>/* 一律 24 */</i>
+               <u>border-left: 1px solid var(--border)</u>; }
+<i>/* 轨线只画在「展开出来的内容」上，一律 1px，左缘落在图标中线 */</i>
+.step__verb { <u>padding-left: var(--step-slot)</u>; }     <i>/* 计划行补上那一格 */</i></pre>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在 · 0 / 13 / 24 / 37</p>
+      <div class="frame"><div class="frame__in"><div class="mini guide">
+        <i style="left:0"><b>0</b></i><i class="bad lo" style="left:13px"><b>13</b></i>
+        <i style="left:24px"><b>24</b></i><i class="bad lo" style="left:37px"><b>37</b></i>
+        <div class="uagent" style="margin-bottom:12px">我先看一下现有的排版。</div>
+        <div class="uthink" style="margin-bottom:12px"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">Read the CSS first</span></div>
+        <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">wc -l styles/*.css</span></div>
+        <pre class="uout" style="margin-bottom:0">1941 app.css
+1178 items.css</pre></div>
+      </div></div></div>
+      <p class="cap">四条边。眼睛沿着哪一条往下扫都会掉出去。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后 · 0 / 24</p>
+      <div class="frame"><div class="frame__in"><div class="mini guide">
+        <i style="left:0"><b>0</b></i><i style="left:24px"><b>24</b></i>
+        <div class="uagent" style="margin-bottom:8px;font-size:15px;line-height:26px">我先看一下现有的排版。</div>
+        <div class="uthink" style="margin-bottom:8px"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">Read the CSS first</span></div>
+        <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">wc -l styles/*.css</span></div>
+        <pre class="uout" style="margin-bottom:0;margin-left:24px;border-left:1px solid var(--border);border-radius:0 6px 6px 0">1941 app.css
+1178 items.css</pre></div>
+      </div></div></div>
+      <p class="cap">两条。图标一列、文字一列，展开的内容挂在同一道轨上。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">03 / 主次</p>
+  <h3 class="pt__h">提问比回答重</h3>
+  <p class="pt__sub">提问有三重容器：底色、描边、大圆角。回答一样都没有，字号 14px，跟旁边 13px 的工具行只差 1px。<strong>屏幕上分量最大的是你自己说过的话，而你回头翻会话是为了找它说了什么。</strong></p>
+
+  <div class="num">
+    <div><b>615px</b><span>提问气泡最宽（82% × 750）</span></div>
+    <div><b>ΔL* 2.8</b><span>气泡底色离正文底色的距离</span></div>
+    <div><b>1px</b><span>回答字号减工具行字号</span></div>
+  </div>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <pre class="code">.msg--user  { max-width: <b>82%</b>; background: <b>var(--bg-sunken)</b>;
+              border: <b>1px solid var(--border)</b>; border-radius: <b>13px…</b>; }
+.msg--agent { min-width: 0; }                     <i>/* 没有任何排版 */</i>
+body        { font-size: <b>14px</b>; line-height: <b>1.6</b>; }</pre>
+    <p>底色其实没在出力。<code>--bg-sunken</code> 对 <code>--bg</code> 只差 <strong>2.76 L*</strong>（这个数是 tokens.css 自己为侧栏那条骨架线写的），真正把气泡框出来的是那圈描边——而描边在这套系统里是「卡片」的语义，卡片留给了审批，那才是要你做决定的东西。一个提问不该长得像一张待办卡。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。提问轻一点，回答重一点。</strong>两边各动一档，不引入任何新装置。</p>
+    <div class="sw-row">
+      <span class="swatch"><i style="background:#f7f7f8"></i>现在 #f7f7f8 · ΔL* 2.8</span>
+      <span class="swatch"><i style="background:#f0f0f2"></i>改后 #f0f0f2 · ΔL* 5.2</span>
+      <span class="swatch"><i style="background:#101012"></i>暗 现在 #101012 · ΔL* 3.7</span>
+      <span class="swatch"><i style="background:#232328"></i>暗 改后 #232328 · ΔL* 6.0</span>
+    </div>
+    <pre class="code"><i>/* tokens.css —— 新开一个名字。别直接借 --bg-hover：那是交互态的语义，
+   把它当表面色用，下次调 hover 就会连着改到消息气泡 */</i>
+--bg-said: <u>#f0f0f2</u>;   <i>/* 深色 #232328 */</i>
+<i>/* 正文自己一档。控件那五档一个字节不动——tokens.css 里
+   「正文继续走 body 的 1.6」是对的，这里只是把正文从 body 手里拿出来 */</i>
+--text-prose: <u>15px</u>;
+--lh-prose:   <u>26px</u>;   <i>/* 1.733 */</i>
+
+.msg--user { max-width: <u>72%</u>; background: <u>var(--bg-said)</u>; <u>border: 0</u>; }
+.md, .msg--user { font-size: <u>var(--text-prose)</u>; line-height: <u>var(--lh-prose)</u>; }</pre>
+    <p>去掉描边之后气泡只剩一个装置，而那个装置比原来强了一倍。760px 列宽下 15px 是每行约 50 个汉字，正落在舒服的区间里。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uuser" style="align-self:flex-end">这个排版界面你优化一下，给我个你想的优化点的 html 图；doc 区已有的是别的模型写的，你不能看</div>
+        <div style="height:16px"></div>
+        <div class="uagent">先说结论：问题不在颜色和圆角，在于一条流里所有东西的分量都一样重。下面八条只做一件事，把「你读的」和「它干的」分开。</div>
+      </div></div></div>
+      <p class="cap">14 / 1.6。回答和它上面那块带框的提问比，明显更轻。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uuser" style="align-self:flex-end;border:0;background:var(--bg-said);max-width:72%">这个排版界面你优化一下，给我个你想的优化点的 html 图；doc 区已有的是别的模型写的，你不能看</div>
+        <div style="height:16px"></div>
+        <div class="uagent" style="font-size:15px;line-height:26px">先说结论：问题不在颜色和圆角，在于一条流里所有东西的分量都一样重。下面八条只做一件事，把「你读的」和「它干的」分开。</div>
+      </div></div></div>
+      <p class="cap">15 / 26。提问退成一块软底色，回答成了这一屏最重的东西。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 4 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">04 / 状态</p>
+  <h3 class="pt__h">「失败」和「已中断」是同一个灰——那条 CSS 什么也没改</h3>
+  <p class="pt__sub">这一条不是审美问题，是一条<strong>写了、跑了、但一个像素都没改变</strong>的规则。</p>
+
+  <div class="block">
+    <p class="block__h">现在 · items.css:127–138</p>
+    <pre class="code">.step__state { … color: <b>var(--text-faint)</b>; font-size: var(--text-xs); }
+
+.step__state--failed,
+<i>/* 中断不是失败：用中性色，别让「你自己按了停止」看着像出错 */</i>
+.step__state--interrupted { color: <em>var(--text-faint)</em>; }   <i>← 它本来就是这个值</i></pre>
+    <p>那句注释是对的，但它只替「中断」辩护；「失败」是被顺手扫进同一个选择器组的。结果是 <code>失败</code>、<code>已中断</code> 和别的状态在屏幕上都是 <code>#85858f</code>，而且是整行最小、最淡的一处字。</p>
+    <p>场景很具体：一条 40 行的工具日志里第 17 行崩了。现在没有任何东西标它——你得逐行读到那两个字。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>把注释里已经想清楚的事执行掉，顺带把图标一起染——一行里只有两个字变色，扫的时候还是容易漏。</p>
+    <pre class="code">.step__state--failed { color: <u>var(--danger)</u>; }
+.step:has(.step__state--failed) .step__icon { color: <u>var(--danger)</u>; }
+.step__state--interrupted { color: var(--text-faint); }   <i>/* 注释是对的，保留 */</i></pre>
+    <p><code>--denied</code> 已经是 <code>--danger</code> 了。「被拒」和「失败」本来就该同一档：两者都是「这一步没干成」。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="urun">
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm run typecheck</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">packages/engine/src/codex/wire.ts</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm vitest run codex</span><span class="ustep__s">失败</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">node scripts/check-css.mjs</span><span class="ustep__s">已中断</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/items.css</span></div>
+        </div>
+      </div></div></div>
+      <p class="cap">崩掉的是第三行。这句话是我说的，不是你看出来的。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="urun" style="padding-left:0;border:0">
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm run typecheck</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">packages/engine/src/codex/wire.ts</span></div>
+          <div class="ustep"><span class="ustep__i" style="color:var(--danger)"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm vitest run codex</span><span class="ustep__s ustep__s--fail">失败</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">node scripts/check-css.mjs</span><span class="ustep__s">已中断</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/items.css</span></div>
+        </div>
+      </div></div></div>
+      <p class="cap">中断仍然是中性色——注释说得对，只是原来没执行。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">05 / 思考行</p>
+  <h3 class="pt__h">收工之后，思考行是半句读不完的英文</h3>
+  <p class="pt__sub">跑着的时候这一行是对的：定高、只画最后一行、它长它的，下面纹丝不动。<strong>跑完之后它变成一段被齐着列宽切断的正文</strong>——占满一整行，信息量接近零，而且大概率是英文。</p>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <pre class="code"><i>// reasoning.ts</i>
+summaryOf(text, running=false) → <b>取第一行</b>
+<i>// items.css</i>
+.think__line { white-space: <b>nowrap</b>; overflow: <b>hidden</b>; }   <i>/* 齐着列宽硬切 */</i></pre>
+    <p>仓库里其实已经有更合适的东西：<code>reasoning.ts</code> 的 <code>headingOf()</code>——模型自己给这一段起的 <code>**小标题**</code>。它现在只喂给状态行，折叠行没用上。</p>
+    <p>另外，硬切看起来像<strong>没渲染完</strong>，不像「还有」。这两种感觉差别很大：前者让人以为界面坏了。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>三行代码，一条 CSS。</p>
+    <pre class="code"><i>// Reasoning.tsx —— 收工态先问模型自己怎么叫这一段</i>
+const summary = running ? summaryOf(text, true)
+                        : (<u>headingOf(text)</u> ?? summaryOf(text, false))
+
+<i>/* items.css —— 右缘渐隐代替硬切 */</i>
+.think__line { <u>mask-image: linear-gradient(90deg, #000 78%, transparent)</u>; }</pre>
+    <p>短标题撑不满一行，这一行就从「一段被切断的正文」变回「一个标签」。跑动态完全不动——那部分本来就是对的。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在 · 收工态</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The user wants UI optimization suggestions for the omni app. They show a screenshot of the current UI</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+        <div style="height:8px"></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The doc is about detail-level optimizations, already landed. Now the user wants an overall layout</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      </div></div></div>
+      <p class="cap">两整行，两个断在半路的句子。齐着列宽切开，像没画完。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后 · 收工态</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l" style="color:var(--text-muted)">Read the real CSS first, not the docs</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+        <div style="height:8px"></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l" style="color:var(--text-muted)">That doc is detail-level; the ask is layout-level</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+        <div style="height:16px"></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l fade">跑着的时候这一行完全不动：仍然只画最后一行、横向跟到末尾，只是右缘从硬切换成渐隐</span></div>
+      </div></div></div>
+      <p class="cap">上两条是收工态的标签；第三条演示渐隐——「还有」，不是「坏了」。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 6 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">06 / 工具输出</p>
+  <h3 class="pt__h">滚动区里套了个 320px 的滚动区</h3>
+  <p class="pt__sub">指针停在工具输出上滚轮，先被框内那 320px 吃掉，到底了才传给外面的转录区。<strong>而工具输出恰恰是你最常一路划过去的东西。</strong></p>
+
+  <div class="block">
+    <p class="block__h">现在 · items.css:164</p>
+    <pre class="code">.step__out { … <b>overflow-y: auto</b>; <b>max-height: 320px</b>; }</pre>
+    <p>这条注释解释的是「为什么必须显式写 <code>overflow-y</code>」（两轴只有一个非 <code>visible</code> 时另一轴按 <code>auto</code> 算），那部分完全正确。要换掉的是<strong>「内滚」这个决定本身</strong>，不是那条防御。</p>
+    <p>还有一件小事：320 是个定高，跟内容没关系。一个高度写死的框摆在 760 的列里像块补丁，而按行夹断的边缘是内容自己的边缘。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>内滚换成按行夹断 + 渐隐 + 一行「展开全部」。展开之后不封顶，直接长在流里——转录区本来就会滚。</p>
+    <pre class="code">.step__out {
+  <em>overflow-y: auto;  max-height: 320px;</em>
+  ↓
+  <u>max-height: calc(12 * 1.55 * var(--text-code))</u>;   <i>/* 12 行 ≈ 232px */</i>
+  <u>overflow: hidden</u>;
+}
+.step__out--clipped::after { <u>/* 底部 36px 渐隐到 --bg-code */</u> }
+.step__more { <u>/* 「展开全部（还有 N 行）」，对着 24 那条列 */</u> }</pre>
+    <p>要动 <code>ToolRun.tsx</code>：数一下行数，超过 12 才挂 <code>--clipped</code> 和那一行按钮。八条里唯一要写新交互的一条。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm vitest run codex</span><span class="ustep__s">失败</span></div>
+        <pre class="uout uout--tall" style="margin-bottom:0">FAIL  packages/engine/src/codex/wire.test.ts
+  × 认领清单：档位回读 (12ms)
+    → expected 'engine-auto' to be 'auto'
+
+  ❯ packages/engine/src/codex/wire.test.ts:88:5
+     86|   const gate = readGate(session)
+     87|
+     88|   expect(gate).toBe("auto")
+       |                ^
+     89| })
+
+Test Files  1 failed (14)
+     Tests  1 failed | 212 passed (213)</pre></div>
+      </div></div></div>
+      <p class="cap">右边那根就是第二根滚动条。它和转录区抢同一次滚轮。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i" style="color:var(--danger)"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm vitest run codex</span><span class="ustep__s ustep__s--fail">失败</span></div>
+        <pre class="uout uout--clamp" style="margin-bottom:0;margin-left:24px;border-left:1px solid var(--border);border-radius:0 6px 6px 0">FAIL  packages/engine/src/codex/wire.test.ts
+  × 认领清单：档位回读 (12ms)
+    → expected 'engine-auto' to be 'auto'
+
+  ❯ packages/engine/src/codex/wire.test.ts:88:5
+     86|   const gate = readGate(session)</pre>
+        <span class="more">展开全部（还有 9 行）</span></div>
+      </div></div></div>
+      <p class="cap">滚轮从头到尾只有一个去处。渐隐的下缘也不再是一条硬边。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 7 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">07 / 侧栏</p>
+  <h3 class="pt__h">两段说明，比它们说明的东西还高</h3>
+  <p class="pt__sub">侧栏的职责是导航。现在它上半截有 136px 是<strong>读一次就够、之后永远是噪声</strong>的说明文字，而整个「项目」段一共才 128px。</p>
+
+  <div class="num">
+    <div><b>78px</b><span>「拖到这里就置顶」3 行 + 内边距</span></div>
+    <div><b>58px</b><span>「还没有对话…」2 行 + 内边距</span></div>
+    <div><b>128px</b><span>项目段全部四行</span></div>
+    <div><b>≈110px</b><span>能省下的 = 多 3 行会话</span></div>
+  </div>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <pre class="code">SidebarPinned.tsx:59   &lt;p class="sidebar__empty"&gt;把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。&lt;/p&gt;
+SidebarSections.tsx:216 &lt;p class="sidebar__empty"&gt;还没有对话。点右边的 + 开一条，不用先选项目。&lt;/p&gt;
+
+.sidebar__empty { padding: <b>8px 32px</b>; font-size: <b>13px</b>; }   <i>/* 194px 可用宽 → 每行 13 字 */</i></pre>
+    <p>置顶那句说的是一个<strong>拖拽</strong>动作。它现在一直挂在那儿；而人需要它的那一刻，是手里正拖着东西的那一刻。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。要教的时候才教。</strong></p>
+    <ul>
+      <li><strong>置顶</strong>：段落删掉，只留段头。<code>dragover</code> 时（<code>sidebarDrag.ts</code> 里已经有了）那一段才展开成投放区，并在那时显示这句话。</li>
+      <li><strong>对话</strong>：压成一行 11.5px「还没有独立对话」。那颗 <code>+</code> 就在段头右边，「点右边的 +」这半句本来就是多余的。</li>
+    </ul>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame" style="max-width:274px"><div class="frame__in" style="padding:0;background:var(--bg-sunken)"><div class="us" style="border:0;background:transparent;width:258px">
+        <div class="us__list" style="padding:8px 0 12px">
+          <div class="us__sec">置顶 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <p class="us__empty">把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。</p>
+          <div class="us__sec">项目 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">you</span><span class="ur__end">4</span></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+          <div class="us__sec">对话 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <p class="us__empty">还没有对话。点右边的 + 开一条，不用先选项目。</p>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后</p>
+      <div class="frame" style="max-width:274px"><div class="frame__in" style="padding:0;background:var(--bg-sunken)"><div class="us" style="border:0;background:transparent;width:258px">
+        <div class="us__list" style="padding:8px 0 12px">
+          <div class="us__sec us__sec--tight">置顶 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <div class="us__sec">项目 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">you</span><span class="ur__end">4</span></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+          <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+          <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span></div>
+          <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span></div>
+          <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span></div>
+          <div class="us__sec">对话 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <p class="us__empty us__empty--one">还没有独立对话</p>
+        </div>
+      </div></div></div>
+      <p class="cap">同样的高度，多出来的地方装下了 omni 展开的三条会话。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 8 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">08 / 变更汇总</p>
+  <h3 class="pt__h">「5 个文件变了」没说动静有多大</h3>
+  <p class="pt__sub">这枚胶囊回答的是「我可以走了吗」——它是你按下一次发送之前唯一能看到的规模信号，而它只报了个数。<strong>改了 5 个文件 12 行，和改了 5 个文件 800 行，是两件事。</strong></p>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <p><code>--ok</code> / <code>--danger</code> 和 <code>.diffstat__add</code> / <code>.diffstat__del</code> 都已经定义好了，diff 那边在用。这里只是没接上。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>多两个数，把「改了几处」变成「改了多大」。<code>Changed.tsx</code> 里已经拿得到每个文件的增删，加起来就行。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in" style="display:flex;justify-content:center;gap:8px;padding:22px 16px">
+        <span class="upill">5 个文件变了</span><span class="upill">审核</span>
+      </div></div>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">改后</p>
+      <div class="frame"><div class="frame__in" style="display:flex;justify-content:center;gap:8px;padding:22px 16px">
+        <span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span><span class="upill">审核</span>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<h2 class="sec">落地顺序</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 20px">按「先见效、后费事」排。前四条加起来不到 50 行 CSS，可以一次改完出图比稿；第 6 条要写新交互，单独一轮。</p>
+<table class="plan">
+  <thead><tr><th></th><th>改动</th><th>动哪儿</th><th>量</th><th>风险</th></tr></thead>
+  <tbody>
+    <tr><td class="n">04</td><td>失败染色</td><td class="w">items.css</td><td class="w">2 行</td><td>无。执行一条已经写下的注释</td></tr>
+    <tr><td class="n">01</td><td>节奏三档</td><td class="w">items.css · app.css</td><td class="w">~12 行</td><td>低。顺带删掉一条负边距</td></tr>
+    <tr><td class="n">02</td><td>统一那条文字列</td><td class="w">items.css</td><td class="w">~20 行</td><td>低。审批卡和嵌套 run 要跟着对一遍</td></tr>
+    <tr><td class="n">03</td><td>正文一档 + 气泡去框</td><td class="w">tokens.css · items.css · markdown.css</td><td class="w">~10 行 + 3 个 token</td><td>中。<code>--text-prose</code> 会影响所有 <code>.md</code>，代码块和表格要复看</td></tr>
+    <tr><td class="n">08</td><td>变更胶囊加增删</td><td class="w">Changed.tsx</td><td class="w">~6 行</td><td>无</td></tr>
+    <tr><td class="n">05</td><td>折叠思考用 headingOf</td><td class="w">Reasoning.tsx · items.css</td><td class="w">~4 行</td><td>无。取不到就退回今天的行为</td></tr>
+    <tr><td class="n">07</td><td>侧栏空态</td><td class="w">SidebarPinned · SidebarSections · app.css</td><td class="w">~15 行</td><td>中。置顶那段要接 <code>dragover</code></td></tr>
+    <tr><td class="n">06</td><td>输出按行夹断</td><td class="w">ToolRun.tsx · items.css</td><td class="w">~30 行</td><td>中。唯一一条新交互，要数行数、要记展开态</td></tr>
+  </tbody>
+</table>
+
+<h2 class="sec">想到了，这版没放进来</h2>
+<div class="note">
+  <h4>轮次分界只报时间，不报内容</h4>
+  <p>「已处理 2 分 56 秒 · 7 步 · 5 个文件」——全景里我按这个画了，但它要动 <code>group.ts</code> 的统计，比纯排版重。折起来的那一轮再补一句回答首句，会更值。这条单独一轮做。</p>
+</div>
+<div class="note">
+  <h4>上下文表要心算</h4>
+  <p>「51.9k / 262k」——条本身编的是百分比，数字给的是绝对值，两者不是一件事。改成「20%」更直接，但 262k 这个上限本身有用（换引擎会变），删了会丢信息。暂时留着，等做窗口告警时一起想。</p>
+</div>
+<div class="note">
+  <h4>顶栏 52px 只装了一个词</h4>
+  <p>压到 44 能换 8px 给正文。但那是窗口拖拽区，动它得连 <code>-webkit-app-region</code> 一起验，收益配不上风险，不动。</p>
+</div>
+
+<h2 class="sec">考虑过，否掉了</h2>
+<div class="note">
+  <h4>给回答加头像或名字栏</h4>
+  <p>右对齐已经把「谁说的」说清楚了，这是这套界面里最省的一个信号。再加一列身份只会把 760 的正文压窄，而且每一屏都要付这笔宽度。</p>
+</div>
+<div class="note">
+  <h4>正文列收窄到 68ch</h4>
+  <p>拉丁文本在 760px / 14px 下每行约 100 个字符，确实偏长（理想 65–75）。但这个界面里中文是主体，760 / 15 ≈ 每行 50 字，正好；而收窄会同时把代码块和 diff 压小——tokens.css 里为 <code>--text-code</code> 算过的那笔账（760px 下 12.5px 是 98 列）会当场亏掉。<code>--content-max</code> 不动。</p>
+</div>
+<div class="note">
+  <h4>把轮次分界线换成 --border-strong</h4>
+  <p>推过一遍：那条线一变重，整条流就被切成一段一段的卡片，而对话本来是连续的。分界应该靠<strong>留白</strong>（第 1 条的 28px）和<strong>标签本身</strong>（字重从 400 到 500、颜色从 faint 到 muted）来立，不靠加粗一根线。</p>
+</div>
+
+<hr class="rule" style="margin:56px 0 20px">
+<p class="col" style="font-size:13px;color:var(--text-faint);margin:0">
+读的是 <code>tokens.css</code> / <code>app.css</code> / <code>items.css</code> / <code>markdown.css</code> / <code>status.css</code> 和 <code>Transcript</code> · <code>ToolRun</code> · <code>Reasoning</code> · <code>ItemView</code> · <code>SidebarSections</code> · <code>SidebarPinned</code> 这几个组件。所有小样用的是仓库里同一套 token 值，浅色深色都跟着系统走——把这份文件切到深色模式再看一遍，第 3 条那个 ΔL* 的账在那边才更明显。
+</p>
+
+</div>
+</body>
+</html>

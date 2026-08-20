@@ -160,6 +160,66 @@ body {
   font-size: var(--text-sm);
 }
 
+/* ── 顶上那一行：一颗主按钮 + 一颗图标键 ─────────────────
+ * 见 `SidebarHead.tsx` 的注释。**行高仍然是 `--sb-row-h`**：
+ * 侧栏所有的量都挂在那三个变量上，多写一个 30 就是本文件开头说的「第三个 padding」。
+ */
+.sidebar__act {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0 var(--sb-pad) var(--sp-2);
+}
+
+.sidebar__new {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: var(--sb-row-h);
+  /* 左边比右边多 2：图标的视觉重心比它的盒子偏右一点点 */
+  padding: 0 var(--sp-2) 0 10px;
+}
+
+.sidebar__new-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「开在哪」。近黑底上压到 55% 仍然读得出（对底色约 4.6:1），
+   而且一眼看得出它是副的——不压的话它会和按钮正文抢 */
+.sidebar__new-where {
+  flex: none;
+  max-width: 84px;
+  overflow: hidden;
+  opacity: 0.55;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 方的：宽高都是 `--sb-row-h`，内边距归零、图标靠 flex 居中——
+   和 `--sb-act` 那颗同一个理由，不对称的内边距会让它看起来是歪的 */
+.sidebar__folder {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-row-h);
+  height: var(--sb-row-h);
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.sidebar__folder:hover {
+  color: var(--text);
+}
+
 /* ── 行：侧栏里所有可点的东西都是这个形状 ───────────────── */
 .row {
   display: flex;
@@ -226,10 +286,6 @@ body {
 .row:hover .row__slot,
 .row:hover .row__lead {
   color: var(--text-muted);
-}
-
-.row--nav {
-  color: var(--text);
 }
 
 /* 组标题：字号小一档、字重重一档。**左边距和普通行一样**，
@@ -356,13 +412,6 @@ body {
 
 .sidebar__filter::placeholder {
   color: var(--text-faint);
-}
-
-.sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding-bottom: var(--sp-2);
 }
 
 /* 分节标题：整个侧栏里唯一不带图标的一行，所以它对着**文字列**，
@@ -570,6 +619,12 @@ body {
   font-size: var(--text-xs);
 }
 
+/* 失败不是「等你批」。`--warn` 那个颜色留给「需要你做点什么」，
+   崩掉的会话是既成事实，走 `--danger`——和工具行的失败状态同一档 */
+.row__note--fail {
+  color: var(--danger);
+}
+
 /* 横幅上那个会话名：点它跳过去。**它是链接不是按钮**——按钮该长得像能按，
    而这一条的分量必须低于旁边那句故障本身 */
 .notice__go {
@@ -619,6 +674,13 @@ body {
   padding: var(--sp-2) calc(var(--sb-pad) + var(--sb-slot));
   font-size: var(--text-sm);
   color: var(--text-faint);
+}
+
+/* 一行版：说明性的空态压到最小。见 `SidebarSections` 的「还没有独立对话」 */
+.sidebar__empty--one {
+  padding-top: 2px;
+  padding-bottom: var(--sp-2);
+  font-size: var(--text-xs);
 }
 
 /* ── 正文命中 ────────────────────────────────────────
@@ -801,6 +863,28 @@ body {
   }
 }
 
+/*
+ * 会话行右边那一列。**一条规矩：默认答「多久以前」，有更要紧的事就顶掉它。**
+ *
+ * 那一格以前是空的（只有置顶段拿去写项目名）。而会话标题彼此都长得差不多，
+ * 一列排下来唯一能把它们区分开的就是新旧——`Thread.updatedAt` 一直有，
+ * 只是从来没显示过。
+ *
+ * `tabular-nums` 不是洁癖：这一列会同时出现「3 分钟前」和「12 分钟前」，
+ * 比例数字会让它们的「分钟前」三个字错开，一列灰字就成了锯齿。
+ */
+.row__time {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 4px;
+  max-width: 68px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* 等待批准的会话在侧栏直接写出来：状态点的颜色说不清「要你去做什么」 */
 .row__note {
   flex: none;
@@ -821,11 +905,14 @@ body {
   background: var(--bg);
 }
 
+/* 52 → 44。52px 给一排 26px 的控件留了上下各 13px，对一条工具栏偏松；
+   44 留 9px，仍然舒服，还给正文 8px。这是一条纯度量改动——顶栏该装什么
+   由 TopBar.tsx 顶上那段管，那边的结论是「引擎名不进顶栏」 */
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  height: 52px;
+  height: 44px;
   padding: 0 var(--sp-4);
   border-bottom: 1px solid var(--border-strong);
   -webkit-app-region: drag;
@@ -936,6 +1023,16 @@ body {
  * 所以这一层直接钉死。`hidden` 而不是 `clip`：hidden 仍然能被程序滚动，
  * 万一真有东西被裁掉，它还够得着。
  */
+/* 对话区。吉祥物的活动区就是它，那道下摆渐隐也挂在它上面——
+   见 `Workspace.tsx` 里那一层 `.stage` 的注释 */
+.stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .transcript {
   position: relative;
   flex: 1;
@@ -960,7 +1057,58 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  /*
+   * **8 是基数，不是全部。** 上一版是一个 16 管住全部七种相邻关系
+   *（提问接分界、思考接回答、回答接工具组、上一轮接下一轮…），
+   * 于是间距不表达任何关系，结构只能靠线和框去补。
+   *
+   * 症状很明显：`.copyable:has(> .think)` 曾经要一条 -8 的负边距、
+   * `.turnmark__row` 曾经要一条 -8——**需要负边距去减，说明基数选在了错的一档**。
+   *
+   * 现在三档：8 = 它连着干的几件事；16 = 换人说话、或者从「做」回到「说」；
+   * 28 = 轮次分界（8 + `.turnmark__row` 的 20，见 items.css）。
+   */
+  gap: var(--sp-2);
+}
+
+/* 换人说话，或者从「做」回到「说」。审批卡也算——那是要你停下来做决定的东西 */
+.transcript__inner > .copyable:has(> .msg--agent),
+.transcript__inner > .copyable:has(> .msg--user),
+.transcript__inner > .copyable:has(> .approval) {
+  margin-top: var(--sp-2);
+}
+
+/* 第一条不吃这份额外留白：`.transcript` 自己已经有 `--sp-5` 的上边距 */
+.transcript__inner > :first-child {
+  margin-top: 0;
+}
+
+/*
+ * 滚动区的下摆：一道 28px 的渐隐，接替原来输入区那条通栏线（见 items.css 的 `.composer`）。
+ *
+ * **必须是 `.transcript` 的兄弟，不能是它的孩子。** 滚动容器里的
+ * `position: absolute` 参照的是**可滚动内容的**内边距盒，不是可视区——
+ * 挂进去的话这道渐隐会跟着内容滚走，只在滚到底时才出现在正确的位置。
+ *（同一个坑的另一半是 `.tobottom`，它用的是 `position: sticky`。）
+ *
+ * 自身高度为 0，靠伪元素向上盖住转录区最后 28px：这样它不占布局，
+ * 输入区上不上移一个像素都不受影响。
+ */
+.hem {
+  position: relative;
+  z-index: 1;
+  height: 0;
+}
+
+.hem::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
 }
 
 /* ── 上下文用量表 ─────────────────────────────────────

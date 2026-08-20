@@ -8,7 +8,17 @@ import { baseNameOf } from "../sidebar.js"
  * 那边管「有哪些会话、怎么分段」，这边管「怎么开始一件新的」。
  */
 
-/** 侧栏顶部：品牌、两个动作、筛选框。三块都是同一套 `.row`，所以天然对齐。 */
+/**
+ * 侧栏顶部：品牌、一颗主按钮 + 一颗图标键、筛选框。
+ *
+ * **上一版是三条一模一样的 `.row`**（新建 / 打开文件夹 / 筛选，96px 一摞）。
+ * 这三样的性质完全不同：新建是全 app 最高频的动作，打开文件夹一天点不了一次。
+ * `SidebarFoot.tsx` 那段注释批评过同一个形状——「三行等重、等宽、等间距，
+ * 你要找的那一行和你不找的那两行长得一模一样」。底部照着改过了，顶部一直没有。
+ *
+ * 现在两行 64px：主按钮吃掉整条宽度（tokens.css：主按钮用近黑，不用彩色），
+ * 打开文件夹退成一颗方图标键。省下的 32px 归列表。
+ */
 export function Head({
   onNew,
   onOpenFolder,
@@ -41,30 +51,33 @@ export function Head({
         </div>
       </div>
 
-      <nav className="sidebar__nav">
+      <div className="sidebar__act">
         <button
           type="button"
-          className="row row--nav"
+          className="btn btn--primary sidebar__new"
           onClick={onNew}
           title={here === undefined ? "还没有会话，会先让你选一个文件夹" : `在 ${here} 新建`}
         >
-          <span className="row__slot">
-            <PlusIcon size={SIDEBAR_ICON} />
-          </span>
-          <span className="row__label">新建会话</span>
+          <PlusIcon size={SIDEBAR_ICON} />
+          <span className="sidebar__new-label">新建会话</span>
           {/* 落点写在右边，和底部「设置 ⌘,」同一套排版。
-              **不写进按钮文字里**——中文按钮跟着目录名忽长忽短，读起来更差 */}
-          <span className="row__aside">
+              **不写进按钮文字里**——中文按钮跟着目录名忽长忽短，读起来更差。
+              也**不能省**：它是这颗按钮唯一说不清的事（点下去开在哪个项目里） */}
+          <span className="sidebar__new-where">
             {here === undefined ? "选文件夹…" : hereKind === "chat" ? "对话" : baseNameOf(here)}
           </span>
         </button>
-        <button type="button" className="row row--nav" onClick={onOpenFolder}>
-          <span className="row__slot">
-            <FolderIcon size={SIDEBAR_ICON} />
-          </span>
-          <span className="row__label">打开文件夹…</span>
+        {/* 低频动作让位给高频动作，这一条就是这次改动的全部意思 */}
+        <button
+          type="button"
+          className="btn sidebar__folder"
+          onClick={onOpenFolder}
+          title="打开文件夹…"
+          aria-label="打开文件夹…"
+        >
+          <FolderIcon size={SIDEBAR_ICON} />
         </button>
-      </nav>
+      </div>
 
       <div className="row row--search">
         <span className="row__slot">

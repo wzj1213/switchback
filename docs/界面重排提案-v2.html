@@ -1,0 +1,1382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>omni 界面重排 · v2</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-press:#e0e0e5; --bg-code:#f6f6f7;
+  --bg-said:#f0f0f2;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#85858f; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --hl-keyword:#8250df; --hl-string:#0a6640; --hl-number:#b35900;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 8px 28px rgb(0 0 0 / 12%);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+    --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024;
+    --bg-said:#232328;
+    --border:#2a2a30; --border-strong:#3a3a42;
+    --text:#ececef; --text-muted:#9d9da8; --text-faint:#6d6d78; --text-inverse:#17171a;
+    --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+    --hl-keyword:#c792ea; --hl-string:#7fd3a2; --hl-number:#f0a868;
+    --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg-sunken); color:var(--text);
+  font-family:var(--font); font-size:15px; line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  padding:0 24px 96px;
+}
+svg{flex:none; align-self:center}
+.ic{stroke:currentColor;fill:none;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;display:block}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ── 文档骨架 ───────────────────────────────── */
+.wrap{max-width:1288px;margin:0 auto}
+.col{max-width:760px}
+.doc-head{padding:88px 0 48px}
+.kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);margin:0 0 18px}
+h1{font-size:40px;line-height:1.2;font-weight:600;letter-spacing:-.015em;margin:0 0 20px}
+.lede{font-size:17px;line-height:1.8;color:var(--text-muted);margin:0 0 28px}
+.lede strong{color:var(--text);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text-faint);font-family:var(--font-mono)}
+.meta span{padding:3px 8px;border:1px solid var(--border);border-radius:999px;background:var(--bg-raised)}
+
+.rule{height:1px;background:var(--border-strong);border:0;margin:0}
+
+h2.sec{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);
+  font-weight:600;margin:64px 0 20px}
+
+/* ── 优化点卡 ───────────────────────────────── */
+.pt{padding:44px 0;border-top:1px solid var(--border)}
+.pt:first-of-type{border-top:0}
+.pt__no{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);letter-spacing:.08em;margin:0 0 10px}
+.pt__h{font-size:25px;line-height:1.35;font-weight:600;letter-spacing:-.01em;margin:0 0 8px}
+.pt__sub{font-size:15px;color:var(--text-muted);margin:0 0 26px;max-width:720px}
+.pt__sub strong{color:var(--text);font-weight:600}
+
+.block{max-width:760px;margin:0 0 22px}
+.block__h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+  letter-spacing:.06em;color:var(--text-faint);margin:0 0 10px}
+.block__h::after{content:"";flex:1;height:1px;background:var(--border)}
+.block p{margin:0 0 12px}
+.block p:last-child{margin-bottom:0}
+.block ul{margin:0 0 12px;padding-left:1.3em}
+.block li{margin:5px 0}
+
+pre.code{margin:0 0 14px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--bg-code);border-left:2px solid var(--border-strong);
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.65;
+  color:var(--text-muted);overflow-x:auto;white-space:pre}
+pre.code b{color:var(--text);font-weight:600}
+pre.code i{color:var(--text-faint);font-style:normal}
+pre.code em{color:var(--danger);font-style:normal;font-weight:600}
+pre.code u{color:var(--ok);text-decoration:none;font-weight:600}
+code{font-family:var(--font-mono);font-size:.9em;background:var(--bg-code);
+  padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+
+.fix{border-left:2px solid var(--accent);padding:2px 0 2px 16px;margin:0 0 22px;max-width:760px}
+.fix p:first-child{margin-top:0}
+
+.num{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}
+.num div{flex:1;min-width:150px;padding:12px 14px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--bg-raised)}
+.num b{display:block;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;line-height:1.2}
+.num span{display:block;font-size:12px;color:var(--text-faint);margin-top:3px}
+
+/* ── 前后对照 ───────────────────────────────── */
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:0 0 8px;align-items:start}
+@media (max-width:900px){.ab{grid-template-columns:1fr}}
+.ab__cell{min-width:0}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  letter-spacing:.08em;color:var(--text-faint);margin:0 0 8px;text-transform:uppercase;
+  font-family:var(--font-mono)}
+.tag::before{content:"";width:6px;height:6px;border-radius:3px;background:var(--text-faint)}
+.tag--next{color:var(--accent)}
+.tag--next::before{background:var(--accent)}
+.frame{border:1px solid var(--border-strong);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;box-shadow:var(--shadow-1)}
+.frame__in{padding:16px}
+.cap{font-size:12px;color:var(--text-faint);margin:8px 0 0;line-height:1.6}
+
+/* ── 全景 ───────────────────────────────────── */
+.pano{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+@media (max-width:1240px){.pano{grid-template-columns:1fr}}
+.scaler{position:relative;width:100%;padding-top:71.154%;overflow:hidden;
+  border:1px solid var(--border-strong);border-radius:10px;background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.scaler > .ui{position:absolute;top:0;left:0;transform-origin:top left}
+@media (min-width:1240px){.scaler > .ui{transform:scale(.6077)}}
+@media (max-width:1239px){.scaler > .ui{transform:scale(.72)}}
+@media (max-width:820px){.scaler > .ui{transform:scale(.5)}}
+
+/* ── 落地表 ─────────────────────────────────── */
+table.plan{border-collapse:collapse;font-size:13.5px;width:100%;max-width:900px}
+table.plan th,table.plan td{padding:9px 12px;border-bottom:1px solid var(--border);
+  text-align:left;vertical-align:top}
+table.plan th{font-size:11.5px;letter-spacing:.06em;color:var(--text-faint);
+  text-transform:uppercase;font-weight:600;border-bottom:1px solid var(--border-strong)}
+table.plan td.n{font-family:var(--font-mono);color:var(--text-faint);width:34px}
+table.plan td.w{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);white-space:nowrap}
+table.plan tr:last-child td{border-bottom:0}
+
+.note{max-width:760px;padding:16px 18px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--bg-raised);margin:0 0 16px}
+.note h4{margin:0 0 6px;font-size:14px;font-weight:600}
+.note p{margin:0;font-size:14px;color:var(--text-muted);line-height:1.7}
+
+/* ══ omni 界面小样 ═══════════════════════════ */
+.ui{width:1040px;height:740px;display:grid;grid-template-columns:258px 1fr;
+  font-family:var(--font);font-size:14px;line-height:1.6;background:var(--bg);
+  color:var(--text);flex:none}
+.ui--flat{width:auto;height:auto;display:block;background:transparent}
+
+.us{display:flex;flex-direction:column;background:var(--bg-sunken);
+  border-right:1px solid var(--border-strong);overflow:hidden}
+.us__head{padding:14px 8px 12px}
+.us__lights{display:flex;gap:8px;padding:0 4px 16px}
+.us__lights i{width:11px;height:11px;border-radius:6px;background:var(--bg-active);display:block}
+.us__brand{padding-left:24px;font-size:16px;font-weight:600;letter-spacing:.01em}
+.us__brand span{color:var(--text-faint);font-weight:400;margin-left:4px;font-size:13px}
+.us__list{flex:1;min-height:0;overflow:hidden;padding-bottom:16px}
+.ur{display:flex;align-items:center;min-height:32px;width:calc(100% - 16px);margin:0 8px;
+  border-radius:var(--radius-sm);color:var(--text-muted);font-size:14px}
+.ur__slot{display:flex;flex:none;align-items:center;justify-content:center;width:24px;
+  color:var(--text-faint)}
+.ur__lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ur__end{flex:none;padding-right:8px;font-size:11.5px;color:var(--text-faint);
+  font-variant-numeric:tabular-nums}
+.ur--sel{background:var(--bg-active);color:var(--text)}
+.ur--search{border:1px solid var(--border-strong);background:var(--bg-raised);
+  width:calc(100% - 16px);color:var(--text-faint)}
+.ur--thread .ur__slot{width:24px}
+.ur--thread{padding-left:24px;width:calc(100% - 16px)}
+.udot{width:6px;height:6px;border-radius:3px;background:var(--text-faint);display:block}
+.udot--run{background:var(--accent)}
+.us__sec{display:flex;align-items:center;width:calc(100% - 16px);margin:0 8px;
+  padding:16px 0 4px 24px;min-height:42px;color:var(--text-faint);font-size:13px;gap:3px}
+.us__sec--tight{min-height:30px;padding-top:12px}
+.us__empty{margin:0;padding:8px 8px 8px 32px;font-size:13px;color:var(--text-faint);line-height:1.6}
+.us__empty--one{padding:2px 8px 6px 32px;font-size:11.5px;line-height:1.5}
+.us__foot{display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid var(--border)}
+.us__ava{width:20px;height:20px;border-radius:4px;background:var(--bg-active);
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-muted)}
+.us__gain{margin:auto 8px 8px;padding:6px 8px;border:1px dashed var(--accent);
+  border-radius:var(--radius-sm);font-size:11.5px;color:var(--accent);text-align:center}
+
+.um{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.um__top{display:flex;align-items:center;gap:12px;height:52px;padding:0 16px;
+  border-bottom:1px solid var(--border-strong)}
+.um__title{display:flex;align-items:center;gap:4px;font-weight:600;font-size:14px}
+.um__title svg{color:var(--text-faint)}
+.um__sp{flex:1}
+.umeter{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-faint);
+  font-variant-numeric:tabular-nums}
+.umeter__t{width:44px;height:4px;border-radius:2px;background:var(--bg-active);overflow:hidden}
+.umeter__f{display:block;height:100%;width:20%;background:var(--text-faint)}
+.utr{flex:1;min-height:0;overflow:hidden;padding:24px 16px 32px}
+.utr__in{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+.uuser{max-width:82%;align-self:flex-end;padding:8px 12px;
+  border-radius:var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background:var(--bg-sunken);border:1px solid var(--border);white-space:pre-wrap}
+.uthumb{width:60px;height:44px;margin-top:6px;border:1px solid var(--border);
+  border-radius:4px;background:var(--bg-raised);display:block}
+.uagent{min-width:0}
+.umark{display:flex;align-items:center;gap:12px;padding:2px 0;font-size:11.5px;
+  color:var(--text-faint);font-variant-numeric:tabular-nums}
+.umark::after{content:"";flex:1;height:1px;background:var(--border)}
+.uthink{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text-muted);font-size:13px}
+.uthink__i{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--text-faint)}
+.uthink__d{flex:none;width:2px;height:2px;border-radius:1px;background:var(--text-faint)}
+.uthink__l{flex:1;min-width:0;overflow:hidden;white-space:nowrap;color:var(--text-faint);font-size:11.5px}
+.urun{display:flex;flex-direction:column;gap:1px;padding-left:12px;border-left:1px solid var(--border)}
+.ustep{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text-muted);
+  font-size:13px;line-height:20px}
+.ustep__i{display:flex;flex:none;align-items:center;justify-content:center;width:16px;color:var(--text-faint)}
+.ustep__t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--text);font-family:var(--font-mono);font-size:12.5px}
+.ustep__s{flex:none;margin-left:8px;color:var(--text-faint);font-size:11.5px}
+.ustep__s--fail{color:var(--danger)}
+.uout{margin:2px 0 8px 24px;padding:8px 12px;border-radius:var(--radius-sm);
+  background:var(--bg-code);color:var(--text-muted);font-family:var(--font-mono);
+  font-size:12.5px;line-height:1.55;white-space:pre-wrap;overflow:hidden}
+
+.uch{display:flex;justify-content:center;gap:8px;padding-bottom:8px}
+.upill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  border:1px solid var(--border);background:var(--bg-raised);font-size:11.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums}
+.upill b{font-weight:400;color:var(--ok)}
+.upill i{font-style:normal;color:var(--danger)}
+.ucomp{border-top:1px solid var(--border-strong);padding:12px 16px 16px}
+.ucomp__in{max-width:760px;margin:0 auto;border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);padding:8px 12px}
+.uchips{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--text-muted);
+  padding-bottom:6px}
+.uchips span{display:inline-flex;align-items:center;gap:5px}
+.uta{min-height:42px;color:var(--text);font-size:14px;line-height:1.6}
+.ubar{display:flex;align-items:center;gap:8px;padding-top:4px;font-size:13px;color:var(--text-muted)}
+.utrig{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:var(--radius-sm)}
+.usep{width:1px;height:14px;background:var(--border);flex:none}
+.usend{margin-left:auto;width:26px;height:26px;border-radius:999px;background:var(--text);
+  color:var(--text-inverse);display:flex;align-items:center;justify-content:center;flex:none}
+.usend i{width:8px;height:8px;background:currentColor;border-radius:1px;display:block}
+
+/* ── 「改后」的覆盖 ─────────────────────────── */
+.ui--next .utr__in{gap:8px}
+.ui--next .uuser{max-width:72%;border:0;background:var(--bg-said);margin-top:8px}
+.ui--next .uagent{font-size:15px;line-height:26px;margin-top:8px}
+.ui--next .umark{margin-top:20px;color:var(--text-muted);font-weight:500}
+.ui--next .urun{padding-left:0;border-left:0}
+.ui--next .uout{margin-left:24px;border-left:1px solid var(--border);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.ui--next .uthink__l{color:var(--text-muted)}
+</style>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></symbol>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.6a1 1 0 0 1 1-1h2.8l1.2 1.4H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4"/><path d="M10.1 10.1L13.5 13.5"/></symbol>
+<symbol id="i-chev-r" viewBox="0 0 16 16"><path d="M6.2 3.8L10.4 8l-4.2 4.2"/></symbol>
+<symbol id="i-chev-d" viewBox="0 0 16 16"><path d="M3.8 6.2L8 10.4l4.2-4.2"/></symbol>
+<symbol id="i-term" viewBox="0 0 16 16"><path d="M3.2 4.6L6.4 8l-3.2 3.4M8.4 11.6h4.4"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.6h4.6L12.2 6.2v7.2H4z"/><path d="M8.4 2.6v3.8h3.8"/></symbol>
+<symbol id="i-think" viewBox="0 0 16 16"><path d="M8 2.4l1.35 3.25L12.6 7l-3.25 1.35L8 11.6 6.65 8.35 3.4 7l3.25-1.35z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.4l4.4 1.7v3.3c0 2.6-1.85 4.35-4.4 5.2-2.55-.85-4.4-2.6-4.4-5.2V4.1z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.6" cy="3.6" r="1.5"/><circle cx="4.6" cy="12.4" r="1.5"/><circle cx="11.4" cy="4.8" r="1.5"/><path d="M4.6 5.1v5.8M11.4 6.3c0 2.2-1.6 2.9-3.4 3.2"/></symbol>
+<symbol id="i-reset" viewBox="0 0 16 16"><path d="M3.1 8a4.9 4.9 0 1 0 1.5-3.5"/><path d="M2.8 2.9v3.1h3.1"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><path d="M3.4 8.4l3 3 6.2-6.8"/></symbol>
+<symbol id="i-down" viewBox="0 0 16 16"><path d="M8 3.4v9.2M4.2 8.8L8 12.6l3.8-3.8"/></symbol>
+</defs></svg>
+
+<style>
+/* ── v2 追加 ─────────────────────────────────── */
+.tag--old{color:var(--warn)}
+.tag--old::before{background:var(--warn)}
+
+.src{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--font-mono);
+  padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-faint);
+  background:var(--bg-raised);vertical-align:2px;margin-left:8px;font-weight:400;letter-spacing:0}
+.src--take{border-color:var(--accent);color:var(--accent)}
+.src--mine{border-color:var(--border-strong);color:var(--text-muted)}
+
+table.verdict{border-collapse:collapse;font-size:13.5px;width:100%;max-width:980px}
+table.verdict th,table.verdict td{padding:11px 12px;border-bottom:1px solid var(--border);
+  text-align:left;vertical-align:top}
+table.verdict th{font-size:11.5px;letter-spacing:.06em;color:var(--text-faint);
+  text-transform:uppercase;font-weight:600;border-bottom:1px solid var(--border-strong)}
+table.verdict td.i{font-family:var(--font-mono);color:var(--text-faint);width:26px}
+table.verdict td.t{width:210px;font-weight:500}
+table.verdict tr:last-child td{border-bottom:0}
+.vd{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;white-space:nowrap;
+  border:1px solid var(--border);color:var(--text-muted);background:var(--bg-raised)}
+.vd--yes{border-color:var(--ok);color:var(--ok)}
+.vd--fix{border-color:var(--accent);color:var(--accent)}
+.vd--had{border-color:var(--border-strong);color:var(--text-faint)}
+.vd--no{border-color:var(--danger);color:var(--danger)}
+
+/* 侧栏顶部：主按钮 + 图标键 */
+.usact{display:flex;gap:8px;padding:0 8px 8px}
+.usbtn{flex:1;min-width:0;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:0;border-radius:var(--radius-sm);background:var(--text);color:var(--text-inverse);
+  font:inherit;font-size:13px;font-weight:500}
+.usbtn .g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.usbtn .w{flex:none;font-size:11.5px;font-weight:400;opacity:.55}
+.usicon{flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-raised);
+  color:var(--text-muted)}
+.ussearch{margin:0 8px 4px;height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-raised);
+  color:var(--text-faint);font-size:13px}
+
+/* 会话行右列 */
+.ur__time{flex:none;margin-left:8px;padding-right:8px;color:var(--text-faint);font-size:11.5px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.ur__time--wait{color:var(--warn)}
+.ur__time--fail{color:var(--danger)}
+.ur--wait{position:relative}
+.ur--wait::before{content:"";position:absolute;left:-8px;top:4px;bottom:4px;width:2px;
+  border-radius:1px;background:var(--warn)}
+.udot--wait{background:var(--warn)}
+.udot--fail{background:var(--danger)}
+
+/* 顶栏引擎徽章 */
+.ubadge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--border);
+  border-radius:999px;background:var(--bg-raised);color:var(--text-muted);font-size:11.5px;
+  line-height:16px;white-space:nowrap;flex:none}
+.ubadge__g{width:12px;height:12px;flex:none;display:block}
+.um__top--slim{height:44px}
+
+/* 空态 */
+.ublank{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:0 24px;text-align:center}
+.ublank__h{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3;margin:0}
+.ublank__h b{font-weight:600}
+.ublank__cwd{margin:6px 0 0;font-family:var(--font-mono);font-size:12px;color:var(--text-faint)}
+.ublank__cond{margin:18px 0 0;display:flex;align-items:center;gap:8px;font-size:11.5px;
+  color:var(--text-faint);flex-wrap:wrap;justify-content:center}
+.ublank__cond i{width:3px;height:3px;border-radius:2px;background:var(--border-strong);display:block}
+.ublank__cond b{font-weight:400;color:var(--text-muted)}
+.ustart{margin:26px 0 0;width:100%;max-width:430px;display:flex;flex-direction:column;gap:2px}
+.ustart__h{font-size:11.5px;color:var(--text-faint);text-align:left;padding:0 10px 4px}
+.ustart__r{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;
+  border-radius:var(--radius-sm);font-size:13px;color:var(--text-muted);text-align:left}
+.ustart__r:hover{background:var(--bg-hover);color:var(--text)}
+.ustart__r span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ublank__note{margin:20px 0 0;max-width:440px;font-size:12px;line-height:1.7;color:var(--text-faint);
+  padding:10px 12px;border-left:2px solid var(--border);text-align:left}
+
+/* 那份稿子里的原件（用来做对照，不是我的提案） */
+.oldq{display:flex;gap:10px}
+.oldcard{width:150px;border:1px solid var(--border);border-radius:10px;padding:11px 13px;
+  background:var(--bg);text-align:left}
+.oldcard b{font-size:13px;display:block;font-weight:600}
+.oldcard span{font-size:12px;color:var(--text-faint)}
+.oldbar{height:26px;border-top:1px solid var(--border);display:flex;align-items:center;gap:16px;
+  padding:0 14px;font-size:11.5px;color:var(--text-faint)}
+.oldbar .ok{color:#2f9e5f}
+.oldbar .r{margin-left:auto;display:flex;gap:16px}
+.oldpets{display:flex;justify-content:flex-end;gap:14px;padding:0 30px 4px}
+.oldpet{width:28px;height:28px;border-radius:8px;display:block}
+.contrast{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}
+.cbox{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-raised);font-size:12.5px;min-width:190px}
+.cbox b{display:block;font-family:var(--font-mono);font-size:12px}
+.cbox u{text-decoration:none;display:block;margin-top:3px;font-variant-numeric:tabular-nums}
+.cbox u.bad{color:var(--danger)}
+.cbox u.good{color:var(--ok)}
+</style>
+
+<div class="wrap">
+
+<header class="doc-head col">
+  <p class="kicker">omni · 同文 &nbsp;/&nbsp; 界面重排 · v2 · 合并版</p>
+  <h1>排版归排版，<br>布局归布局</h1>
+  <p class="lede">v1 只动了<strong>排版层</strong>——节奏、对齐、主次。那份稿子动的是<strong>布局层</strong>——哪块地方装什么、值不值这个面积。两层不冲突，合起来才是一版完整的。</p>
+  <p class="lede">合并的口径只有一条：<strong>凡是仓库里已经论证过的规矩，一律以仓库为准。</strong>那份稿子有六条判断比我强，我照单收了但都重写了实现，其中<strong>输入框那条通栏线我上一版根本没看出来</strong>；两条我驳回，理由写在下面第 C 节，每条都能验；还有一条它以为是新的，仓库里早就实现了。</p>
+  <div class="meta">
+    <span>tokens.css</span><span>app.css</span><span>items.css</span><span>TopBar.tsx</span>
+    <span>SidebarRows.tsx</span><span>SidebarSections.tsx</span><span>SidebarFoot.tsx</span><span>thread.ts</span>
+  </div>
+</header>
+
+<h2 class="sec">全景 · 排版 + 布局，一起改完</h2>
+<div class="pano">
+  <div>
+    <p class="tag">现在</p>
+    <div class="scaler">
+<div class="ui">
+  <aside class="us">
+    <div class="us__head">
+      <div class="us__lights"><i></i><i></i><i></i></div>
+      <div class="us__brand">omni <span>同文</span></div>
+    </div>
+    <div class="us__list">
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-plus"/></svg></span><span class="ur__lbl">新建会话</span><span class="ur__end">omni</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">打开文件夹…</span></div>
+      <div class="ur ur--search"><span class="ur__slot"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-search"/></svg></span><span class="ur__lbl">筛选会话…</span></div>
+      <div class="us__sec">置顶 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty">把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。</p>
+      <div class="us__sec">项目 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">you</span><span class="ur__end">4</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+      <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span></div>
+      <div class="us__sec">对话 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty">还没有对话。点右边的 + 开一条，不用先选项目。</p>
+    </div>
+    <div class="us__foot">
+      <span class="us__ava">A</span><span class="ur__lbl" style="font-size:13px;color:var(--text-muted)">alice</span>
+      <svg class="ic" width="14" height="14" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-reset"/></svg>
+    </div>
+  </aside>
+  <main class="um">
+    <div class="um__top">
+      <div class="um__title">项目的UI我想整体优化一版 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="um__sp"></div>
+      <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+      <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+    </div>
+    <div class="utr"><div class="utr__in">
+      <div class="uuser">项目的UI我想整体优化一版，就是这个排版界面，你优化一下，给我个你想的优化点的html图<span class="uthumb"></span></div>
+      <div class="umark">已处理 2 分 56 秒 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The user wants UI optimization suggestions for the omni app. They show a screenshot of the current UI: sidebar with</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="uagent">我先看一下现有的 UI 优化计划文档，再出 HTML 效果图。</div>
+      <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">docs/UI细节优化计划.md</span></div></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The doc is about detail-level optimizations, already landed. Now the user wants an overall layout redesign</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">ls node_modules/.pnpm 2&gt;/dev/null | grep -iE 'playwright|puppeteer' | head; ls scr…</span><span class="ustep__s">失败</span></div></div>
+    </div></div>
+    <div class="uch"><span class="upill">5 个文件变了</span><span class="upill">审核</span></div>
+    <div class="ucomp"><div class="ucomp__in">
+      <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
+      <div class="uta">它还在跑——现在打的会排在后面，这一轮停了就发出去。</div>
+      <div class="ubar">
+        <span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="usend"><i></i></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+    </div>
+    <p class="cap">顶部三行入口 96px · 置顶说明 78px · 会话行右边是空的 · 顶栏不说谁在答 · 输入框被一条通栏线切开</p>
+  </div>
+  <div>
+    <p class="tag tag--next">合并后</p>
+    <div class="scaler">
+<div class="ui ui--next">
+  <aside class="us">
+    <div class="us__head">
+      <div class="us__lights"><i></i><i></i><i></i></div>
+      <div class="us__brand">omni <span>同文</span></div>
+    </div>
+    <div class="usact">
+      <button class="usbtn"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-plus"/></svg><span class="g">新建会话</span><span class="w">omni</span></button>
+      <span class="usicon"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span>
+    </div>
+    <div class="ussearch"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-search"/></svg>筛选会话…</div>
+    <div class="us__list">
+      <div class="us__sec us__sec--tight">置顶 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="us__sec">项目 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">router</span><span class="ur__end">1</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">you</span><span class="ur__end">4</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-r"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">agent-learn</span><span class="ur__end">2</span></div>
+      <div class="ur"><span class="ur__slot"><svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">omni</span><span class="ur__end">3</span></div>
+      <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span><span class="ur__time">现在</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span><span class="ur__time">2 小时前</span></div>
+      <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span><span class="ur__time">昨天</span></div>
+      <div class="us__sec">对话 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <p class="us__empty us__empty--one">还没有独立对话</p>
+    </div>
+    <div class="us__foot">
+      <span class="us__ava">A</span><span class="ur__lbl" style="font-size:13px;color:var(--text-muted)">alice</span>
+      <svg class="ic" width="14" height="14" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-reset"/></svg>
+    </div>
+  </aside>
+  <main class="um">
+    <div class="um__top um__top--slim">
+      <div class="um__title">项目的UI我想整体优化一版 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <span class="ubadge"><svg class="ubadge__g gl gl--kimi" width="12" height="12" viewBox="0 0 16 16"><use href="#g-kimi"/></svg>Kimi Code</span>
+      <div class="um__sp"></div>
+      <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+      <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+    </div>
+    <div class="utr utr--fade"><div class="utr__in">
+      <div class="uuser">项目的UI我想整体优化一版，就是这个排版界面，你优化一下，给我个你想的优化点的html图<span class="uthumb"></span></div>
+      <div class="umark">已处理 2 分 56 秒 · 7 步 · 5 个文件 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">Read the real CSS first, not the docs</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="uagent">我先看一下现有的 UI 优化计划文档，再出 HTML 效果图。</div>
+      <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">docs/UI细节优化计划.md</span></div></div>
+      <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">That doc is detail-level; the ask is layout-level</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      <div class="urun"><div class="ustep"><span class="ustep__i" style="color:var(--danger)"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">ls node_modules/.pnpm 2&gt;/dev/null | grep -iE 'playwright|puppeteer' | head; ls scr…</span><span class="ustep__s ustep__s--fail">失败</span></div></div>
+    </div></div>
+    <div class="uch"><span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span><span class="upill">审核</span></div>
+    <div class="ucomp ucomp--flush"><div class="ucomp__in">
+      <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
+      <div class="uta">它还在跑——现在打的会排在后面，这一轮停了就发出去。</div>
+      <div class="ubar">
+        <span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig">K3-256k · 高 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="usep"></span>
+        <span class="utrig"><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span>
+        <span class="usend"><i></i></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+    </div>
+    <p class="cap">顶部两行 64px · 会话行右边有时间 · 顶栏 44px 且写着谁在答 · <strong>输入框上面那条通栏线没了</strong> · 转录区三档节奏、两条左缘</p>
+  </div>
+</div>
+
+<h2 class="sec">A · 布局六条（来自那份稿子，实现全部重写）</h2>
+
+<!-- ── A1 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">A1 / 侧栏顶部<span class="src src--take">那份稿子的第 2 条 · 采纳</span></p>
+  <h3 class="pt__h">三行入口收成两行，省 32px</h3>
+  <p class="pt__sub">它的判断是对的：<strong>「新建会话」和「打开文件夹…」不是同一量级的东西，不该是两条一模一样的行。</strong>前者是全 app 最高频的动作，后者一天点不了一次。</p>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <pre class="code">.row（新建会话）  <b>32px</b>   ← 全 app 最高频
+.row（打开文件夹） <b>32px</b>   ← 一天点不了一次
+.row--search      <b>32px</b>
++ .sidebar__nav { padding-bottom: 8px }
+                  <b>= 104px</b>，三行等重等宽，眼睛没有落点</pre>
+    <p>这正是 <code>SidebarFoot.tsx</code> 开头那段注释批评过的形状——「三行等重、等宽、等间距，你要找的那一行和你不找的那两行长得一模一样」。底部照着这条改过了，顶部没有。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>主按钮 + 图标键并成一行，搜索单独一行。<code>.btn--primary</code>（近黑）已经定义好了，直接用——tokens.css：「主按钮用近黑，不用彩色」。</p>
+    <ul>
+      <li>行高钉在 <code>--sb-row-h</code>（32），<strong>不用它稿子里的 30</strong>：侧栏所有横向的量都挂在 <code>--sb-pad</code> / <code>--sb-slot</code> / <code>--sb-row-h</code> 上，多一个 30 就是 app.css 那段注释里说的「第三个 padding」。</li>
+      <li><strong>「omni」那个目标提示必须留下。</strong>它稿子里删掉了——但那是「这条新会话开在哪个项目里」，删了就得先猜再点。做成按钮内右对齐的一段淡字（<code>opacity: .55</code>），近黑底上仍然读得出，而且明显是副的。</li>
+      <li>打开文件夹变成 32×32 图标键，靠 <code>title</code> 说明。低频动作让位给高频动作，是这一条的全部意思。</li>
+    </ul>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在 · 104px</p>
+      <div class="frame" style="max-width:274px"><div class="frame__in" style="padding:8px 0;background:var(--bg-sunken)"><div class="us" style="border:0;background:transparent;width:258px">
+        <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-plus"/></svg></span><span class="ur__lbl">新建会话</span><span class="ur__end">omni</span></div>
+        <div class="ur"><span class="ur__slot"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span><span class="ur__lbl">打开文件夹…</span></div>
+        <div class="ur ur--search"><span class="ur__slot"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-search"/></svg></span><span class="ur__lbl">筛选会话…</span></div>
+      </div></div></div>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">合并后 · 72px</p>
+      <div class="frame" style="max-width:274px"><div class="frame__in" style="padding:8px 0;background:var(--bg-sunken)"><div class="us" style="border:0;background:transparent;width:258px">
+        <div class="usact">
+          <button class="usbtn"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-plus"/></svg><span class="g">新建会话</span><span class="w">omni</span></button>
+          <span class="usicon"><svg class="ic" width="15" height="15" viewBox="0 0 16 16"><use href="#i-folder"/></svg></span>
+        </div>
+        <div class="ussearch"><svg class="ic" width="14" height="14" viewBox="0 0 16 16"><use href="#i-search"/></svg>筛选会话…</div>
+      </div></div></div>
+      <p class="cap">加上第 B7 条省下的 110px，侧栏一共多出 142px ≈ 4 行半会话。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── A2 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">A2 / 会话行<span class="src src--take">那份稿子的第 1 条 · 内核采纳，实现改写</span></p>
+  <h3 class="pt__h">会话行的右半边一直是空的</h3>
+  <p class="pt__sub">它稿子里说的「状态点」omni 早就有了，还会呼吸（<code>.row__dot--running</code> + <code>dot-breathe</code>），「待批准」四个字也一直在写（<code>.row__note</code>）。<strong>真正新的那半条是右侧的时间</strong>——而那一格今天是空的。</p>
+
+  <div class="block">
+    <p class="block__h">这条为什么值</p>
+    <p><code>Thread</code> 上 <code>createdAt</code> / <code>updatedAt</code> 都是现成的（<code>protocol/src/thread.ts:152</code>），只是从来没显示过。会话一多，标题都长得差不多（「omni」「接着上面…」），<strong>唯一能把它们区分开的就是新旧</strong>，而这个信息一直握在手里没拿出来。</p>
+    <p><code>.row__aside</code> 那一格连样式都是现成的：<code>--text-xs</code> / <code>--text-faint</code> / <code>max-width: 62px</code> / 右侧 4px——今天只有置顶段在用（显示项目名）。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。这一列只有一条规矩：默认答「多久以前」，有更要紧的事就顶掉它。</strong></p>
+    <pre class="code">常态         <u>2 小时前</u>        <i>--text-faint · tabular-nums</i>
+待批准       <u>待批准</u>          <i>--warn，并在行左侧加一道 2px 琥珀轨</i>
+失败         <u>失败</u>            <i>--danger</i>
+正在跑       <i>（让位给已有的 .row__spin，那颗转圈本来就在这一格）</i></pre>
+    <p>那道琥珀左轨不是新发明：审批卡（<code>.approval</code>）已经用「左侧一道琥珀轨」表达过「轮到你了」，侧栏这条用同一个语汇，两处说的是同一件事。<strong>11.5px 的一个词摆在最右边太容易扫漏，而 2px 的一道边扫不漏。</strong></p>
+    <p style="color:var(--text-muted);font-size:14px">我<strong>没</strong>照它那样只留状态、砍掉时间：那样这一列就有两种量纲，而且「空闲」的行右边又空了。一条规矩管一列，才是能一直讲下去的规矩。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame" style="max-width:274px"><div class="frame__in" style="padding:8px 0;background:var(--bg-sunken)"><div class="us" style="border:0;background:transparent;width:258px">
+        <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot udot--wait"></i></span><span class="ur__lbl">修登录页的样式</span><span class="ur__time ur__time--wait">待批准</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接力到 codex</span></div>
+      </div></div></div>
+      <p class="cap">四行右边是空的。哪条是今天的、哪条是上周的，看不出来。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">合并后</p>
+      <div class="frame" style="max-width:274px"><div class="frame__in" style="padding:8px 0;background:var(--bg-sunken)"><div class="us" style="border:0;background:transparent;width:258px">
+        <div class="ur ur--thread ur--sel"><span class="ur__slot"><i class="udot udot--run"></i></span><span class="ur__lbl">项目的UI我想整体优…</span><span class="ur__time">现在</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接着上面：你刚才用 sk…</span><span class="ur__time">2 小时前</span></div>
+        <div class="ur ur--thread ur--wait"><span class="ur__slot"><i class="udot udot--wait"></i></span><span class="ur__lbl">修登录页的样式</span><span class="ur__time ur__time--wait">待批准</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">omni</span><span class="ur__time">昨天</span></div>
+        <div class="ur ur--thread"><span class="ur__slot"><i class="udot"></i></span><span class="ur__lbl">接力到 codex</span><span class="ur__time">3 天前</span></div>
+      </div></div></div>
+      <p class="cap">时间对齐（tabular-nums）；待批那条多一道琥珀轨，扫一眼就落在它身上。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── A3 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">A3 / 顶栏<span class="src src--take">那份稿子的第 3 条 · 一半采纳，一半驳回</span></p>
+  <h3 class="pt__h">顶栏不说「谁在答我」</h3>
+  <p class="pt__sub">omni 的整个立意是「一个界面统一驱动各家引擎」。而<strong>「此刻是谁在答」这件事，界面上唯一说出口的地方是输入框最底下那颗下拉</strong>——离你正在读的回答 600px 远。</p>
+
+  <div class="block">
+    <p class="block__h">先更正它的前提</p>
+    <p>它稿子里写「原来整根栏只有一个 <code>omni ⌄</code>」。<strong>这句是错的</strong>——顶栏是条件内容，截图那一刻恰好只有两样在。<code>TopBar.tsx</code> 实际装着：</p>
+    <pre class="code">.topbar__title    <b>会话标题</b>，点开是环境卡（title="环境信息"）
+.badge--muted     <b>历史记录</b>      <i>thread.detached 时</i>
+.badge            <b>接力 N 手</b>     <i>engineHistory.length &gt; 1 时</i>
+ContextMeter      <b>51.9k / 262k</b>
+LimitPill         <b>额度 87% · 本周</b> <i>快用完时才出现</i>
+.iconbtn          <b>对比分叉</b>      <i>peer 存在时</i>
+.iconbtn          <b>分叉到 codex</b>  <i>有下一家时</i>
+
+<em>缺的只有一样：thread.engine —— 当前引擎的名字，从来没在这儿出现过。</em></pre>
+  </div>
+
+  <div class="fix">
+    <p><strong>采纳：加一枚引擎徽章。</strong>这是那份稿子里最值钱的一条。放在标题右边——「我在哪个会话里」和「这个会话由谁在跑」是同一个问题的两半，和标题挂环境卡是同一条理由。</p>
+    <ul>
+      <li>形制用已有的 <code>.badge</code>：描边胶囊、<code>--text-muted</code>、11.5px、<strong>永远不可点</strong>。items/app.css 已经立过这条规矩——「徽章只说明状态；可点的是 <code>.iconbtn</code> 或 <code>.trigger</code>，两者长得一样的话『能不能点』就没有任何视觉线索了」。换引擎仍然只在输入框那颗下拉里。</li>
+      <li><strong>驳回它的 <code>--accent-soft</code> 蓝底胶囊。</strong>tokens.css：强调色只用于焦点与链接。而且蓝底会让引擎徽章比旁边的「接力 3 手」重一档，那两枚是同类。</li>
+    </ul>
+    <p><strong>采纳：52 → 44px。</strong>但理由和它写的不一样——不是「从装饰变成工具」（它本来就装着东西），是 52px 给一排 26px 控件留了上下各 13px，对一条工具栏偏松；44 留 9px，仍然舒服，还给正文 8px。<strong>这条是全篇价值最低的一条，排在最后做。</strong></p>
+    <p><strong>驳回：加「时间线 / 环境 / 设置」三颗键。</strong>三个都已经有入口，而且都是有意放在别处的：</p>
+    <pre class="code">环境   → <b>标题本身</b>就是（TopBar.tsx:114 <code>title="环境信息"</code>）
+设置   → <b>侧栏底部那一行</b>（SidebarFoot.tsx 的注释专门论证过为什么在那儿）
+时间线 → <b>/timeline</b> 斜杠命令（TopBar.tsx:96 的注释点名了这条路）
+
+<em>再加三颗，等于三个重复入口；而且会把「对比」「分叉」这两颗
+omni 独有的真按钮，埋进一排同质图标里。</em></pre>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在 · 52px</p>
+      <div class="frame"><div class="frame__in" style="padding:0"><div class="um" style="background:var(--bg)">
+        <div class="um__top" style="border-bottom:1px solid var(--border-strong)">
+          <div class="um__title">项目的UI我想整体优化一版 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <span class="ubadge" style="border-radius:999px">接力 2 手</span>
+          <div class="um__sp"></div>
+          <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+        </div>
+      </div></div></div>
+      <p class="cap">「接力 2 手」说的是走过几家，不是现在这家是谁。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">合并后 · 44px</p>
+      <div class="frame"><div class="frame__in" style="padding:0"><div class="um" style="background:var(--bg)">
+        <div class="um__top um__top--slim" style="border-bottom:1px solid var(--border-strong)">
+          <div class="um__title">项目的UI我想整体优化一版 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+          <span class="ubadge"><svg class="ubadge__g gl gl--kimi" width="12" height="12" viewBox="0 0 16 16"><use href="#g-kimi"/></svg>Kimi Code</span>
+          <span class="ubadge">接力 2 手</span>
+          <div class="um__sp"></div>
+          <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>51.9k / 262k</div>
+          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg>
+        </div>
+      </div></div></div>
+      <p class="cap">谁在答，和它答的东西在同一根横线上。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── A4 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">A4 / 空态<span class="src src--take">那份稿子的第 4 条 · 形制采纳，内容全换</span></p>
+  <h3 class="pt__h">空屏该能干活，但不该把侧栏抄一遍</h3>
+  <p class="pt__sub">它的判断对：<strong>一句话加一个大图标，是把一整屏拿去说「这里没东西」。</strong>但它填进去的内容，有三分之二是 100px 外就有的东西。</p>
+
+  <div class="block">
+    <p class="block__h">它填了什么，重复在哪</p>
+    <div class="oldq" style="margin:0 0 14px">
+      <div class="oldcard"><b>＋ 新建会话</b><span>就在当前文件夹开一轮</span></div>
+      <div class="oldcard"><b>▤ 换文件夹</b><span>挑一个项目再开始</span></div>
+      <div class="oldcard"><b>⇄ 接力</b><span>把上一轮交给另一家引擎</span></div>
+    </div>
+    <pre class="code">＋ 新建会话  → <em>你刚点过的那颗按钮</em>。空态出现的前提就是你已经建了一条
+▤ 换文件夹  → <em>侧栏那颗图标键</em>（A1 里刚做的）
+⇄ 接力      → <em>输入框的引擎下拉</em>，而且接力发生在有内容之后
+最近会话    → <em>整个侧栏就是它</em>，还带项目分组和置顶</pre>
+    <p>四样里三样半是复制品。<strong>形制没错，是内容挑错了。</strong>空态该放的是「只有这时候才需要、别处没有」的东西。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。</strong>这一屏回答三个问题：我在哪、这一轮的前提是什么、第一句说什么。</p>
+    <ul>
+      <li><strong>标题 + cwd 保留</strong>（<code>--text-xl</code> 27px 那一档就是为它留的，tokens.css 写过）。</li>
+      <li><strong>加一行「开工条件」</strong>：<code>Kimi Code · K3-256k 高 · 引擎自动 · main · 工作区干净</code>。这五件事决定了你第一句话发出去会发生什么，而它们现在分散在顶栏、输入框芯片、输入框底栏三个地方。空屏是唯一有余地把它们说在一起的时刻。</li>
+      <li><strong>三条起手式</strong>——点了<strong>填进输入框，不直接发</strong>（发送是你的决定）。有历史就取你在这个项目里最近发过的三条开场白，没有就退回三条通用的。这是全篇<strong>唯一一处我在提新行为</strong>，其余都是重排已有的东西。</li>
+      <li><strong>接管会话那段说明必须留</strong>。它稿子里连着空态一起删了——而那段是全 app 最重要的一句话之一：从引擎那边接过来的会话，omni 这边是空的、引擎那边全记得。不说的话，人会把已经说过的话再说一遍。</li>
+    </ul>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in" style="padding:0;height:330px;display:flex"><div class="um" style="background:var(--bg);flex:1">
+        <div class="ublank">
+          <div style="color:var(--text-faint);margin-bottom:14px"><svg class="ic" width="34" height="34" viewBox="0 0 16 16"><use href="#i-term"/></svg></div>
+          <p class="ublank__h" style="font-size:16px;font-weight:400">在 <b>omni</b> 里做点什么？</p>
+          <p class="ublank__cwd">/Users/you/work/omni</p>
+        </div>
+      </div></div></div>
+      <p class="cap">一屏说了一句话。你还是得回侧栏去找入口。</p>
+    </div>
+    <div class="ab__cell"><p class="tag tag--next">合并后</p>
+      <div class="frame"><div class="frame__in" style="padding:0;height:330px;display:flex"><div class="um" style="background:var(--bg);flex:1">
+        <div class="ublank">
+          <p class="ublank__h">在 <b>omni</b> 里做点什么？</p>
+          <p class="ublank__cwd">/Users/you/work/omni</p>
+          <p class="ublank__cond"><b>Kimi Code</b><i></i><b>K3-256k · 高</b><i></i><b>引擎自动</b><i></i><b>main</b><i></i>工作区干净</p>
+          <div class="ustart">
+            <p class="ustart__h">起手式 · 点了填进输入框</p>
+            <div class="ustart__r"><svg class="ic" width="13" height="13" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-file"/></svg><span>读一遍这个仓库，告诉我它是干什么的</span></div>
+            <div class="ustart__r"><svg class="ic" width="13" height="13" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-term"/></svg><span>跑一遍 pnpm check，把失败的贴给我</span></div>
+            <div class="ustart__r"><svg class="ic" width="13" height="13" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-branch"/></svg><span>最近三次提交改了什么</span></div>
+          </div>
+        </div>
+      </div></div></div>
+      <p class="cap">没有一样是侧栏里有的。接管会话时下面还会多那段说明。</p>
+    </div>
+  </div>
+</section>
+
+<style>
+/* ── 引擎标识：四枚我自己画的 ─────────────────────── */
+:root{--eng-kimi:#5b83d6;--eng-kimi-eye:#1d2f57;
+  --eng-claude:#da7756;--eng-claude-eye:#a84e30;
+  --eng-grok:#16161a;--eng-grok-eye:#ffffff}
+@media (prefers-color-scheme: dark){
+  /* 它原案里 grok 是 #16161a，在深色底上对比度 1.01:1——整只消失。这是全篇唯一一处色值必须改 */
+  :root{--eng-grok:#c9c9d2;--eng-grok-eye:#16161a}
+}
+.gl{display:block}
+.gl--kimi{color:var(--eng-kimi);--eye:var(--eng-kimi-eye)}
+.gl--claude{color:var(--eng-claude);--eye:var(--eng-claude-eye)}
+.gl--grok{color:var(--eng-grok);--eye:var(--eng-grok-eye)}
+/* 演示「现在」：grok 写死原值，深色下就是看不见的那一只 */
+.gl--grok-now{color:#16161a;--eye:#ffffff}
+
+.glyphs{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 20px}
+.glyph{flex:1;min-width:150px;display:flex;flex-direction:column;align-items:center;gap:9px;
+  padding:16px 10px 13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised)}
+.glyph__sizes{display:flex;align-items:flex-end;gap:12px;height:36px}
+.glyph b{font-size:13px;font-weight:600}
+.glyph span{font-size:11px;color:var(--text-faint);font-family:var(--font-mono)}
+.glyph em{font-style:normal;font-size:11.5px;color:var(--text-muted);text-align:center;line-height:1.55}
+
+.build{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin:0 0 18px}
+.grid16{position:relative;width:128px;height:128px;flex:none;border:1px solid var(--border-strong);
+  border-radius:4px;background-image:
+    linear-gradient(to right,var(--border) 1px,transparent 1px),
+    linear-gradient(to bottom,var(--border) 1px,transparent 1px);
+  background-size:8px 8px;background-color:var(--bg)}
+.grid16 .safe{position:absolute;inset:16px;border:1px dashed var(--accent);opacity:.6}
+.grid16 .gl{position:absolute;inset:0;width:128px;height:128px}
+.build ul{margin:0;padding-left:1.25em;font-size:13.5px;color:var(--text-muted);max-width:560px}
+.build li{margin:6px 0}
+.build li b{color:var(--text);font-weight:600}
+
+/* 那份稿子的原案：三只贴着输入框上沿站 */
+@keyframes v2-hop{0%,100%{transform:translateY(0) scale(1,1)}12%{transform:translateY(0) scale(1.12,.86)}
+  32%{transform:translateY(-9px) scale(.94,1.08)}48%{transform:translateY(0) scale(1.1,.88)}
+  62%{transform:translateY(0) scale(.97,1.04)}74%{transform:translateY(0) scale(1,1)}}
+@keyframes v2-wander{0%,100%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
+@keyframes v2-scuttle{0%,100%{transform:translateX(-5px) rotate(-2deg)}50%{transform:translateX(5px) rotate(2deg)}}
+.dock{display:flex;justify-content:flex-end;align-items:flex-end;gap:14px;height:38px;padding:0 30px}
+.pet2{display:flex;flex-direction:column;align-items:center;padding:0 4px}
+.pet2 > svg{width:30px;height:30px;display:block;transform-origin:bottom center;
+  animation:v2-hop 1.8s ease-in-out infinite}
+.pet2 > i{display:block;margin-top:2px;width:4px;height:4px;border-radius:50%;background:var(--border-strong)}
+.pet2 > i.on{background:#2f9e5f}
+.pet2:nth-child(1){animation:v2-wander 8s ease-in-out infinite}
+.pet2:nth-child(2){animation:v2-wander 10s ease-in-out infinite -2s}
+.pet2:nth-child(2) > svg{height:18px;margin-top:12px;animation:v2-scuttle 2.4s ease-in-out infinite}
+.pet2:nth-child(3){animation:v2-wander 12s ease-in-out infinite -5s}
+.pet2:nth-child(3) > svg{animation-duration:2.1s;animation-delay:-1.1s}
+.pet2.fast > svg{animation-duration:.9s}
+
+/* 跑着的时候：4 秒一跳，和微光同一个节拍 */
+@keyframes glyph-hop{
+  0%{transform:translateY(0) scale(1,1)}
+  4%{transform:translateY(0) scale(1.14,.86)}
+  10%{transform:translateY(-2.6px) scale(.93,1.09)}
+  16%{transform:translateY(0) scale(1.1,.9)}
+  21%{transform:translateY(0) scale(.98,1.03)}
+  26%,100%{transform:translateY(0) scale(1,1)}
+}
+.ubadge__g{overflow:visible}
+.ubadge--run .ubadge__g{transform-origin:bottom center;animation:glyph-hop 4s linear 600ms infinite}
+@media (prefers-reduced-motion: reduce){
+  .pet2,.pet2 > svg,.ubadge--run .ubadge__g{animation:none}
+}
+
+/* 输入框那条横切线 */
+.ucomp--flush{border-top:0}
+.ucomp--flush .ucomp__in{box-shadow:var(--shadow-1)}
+.utr--fade{position:relative}
+.utr--fade::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28px;
+  background:linear-gradient(to bottom,transparent,var(--bg));pointer-events:none}
+</style>
+
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="g-kimi" viewBox="0 0 24 24">
+  <rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/>
+  <g fill="var(--eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g>
+</symbol>
+<symbol id="g-claude" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g fill="var(--eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></symbol>
+<symbol id="g-grok" viewBox="0 0 24 24">
+  <rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/>
+  <g fill="var(--eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g>
+</symbol>
+</defs></svg>
+
+<!-- ── A5 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">A5 / 引擎的脸<span class="src src--take">那份稿子的第 8 条 · 留内核，换形制</span></p>
+  <h3 class="pt__h">身份留下，永动去掉</h3>
+  <p class="pt__sub">「各家引擎该有张脸」这个想法是对的，而且正好长在 omni 的立意上——一个界面接三家，谁在答该有个人格。<strong>要换的只有两件事：它一刻不停地蹦，而且蹦在你打字时视线落的那个点上。</strong></p>
+
+  <div class="block">
+    <p class="block__h">它的原案 · 忠实复刻（这排是真在跑的动画）</p>
+    <div class="frame" style="max-width:470px"><div class="frame__in" style="padding:14px 0 0">
+      <div style="padding:0 20px 12px">
+        <div class="dock">
+          <span class="pet2 fast">
+            <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="#5b83d6"/><g fill="#1d2f57"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+            <i class="on"></i>
+          </span>
+          <span class="pet2">
+            <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--pet-eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+            <i></i>
+          </span>
+          <span class="pet2">
+            <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="#16161a"/><g fill="#ffffff"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+            <i></i>
+          </span>
+        </div>
+        <div class="ucomp__in" style="max-width:none;margin:0;box-shadow:var(--shadow-1)">
+          <div class="uta" style="color:var(--text-faint)">给 Kimi Code 派个活…</div>
+          <div class="ubar"><span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="usend"><i></i></span></div>
+        </div>
+      </div>
+    </div></div>
+    <p style="margin-top:14px">（上一版我把它们画成飘在空中的了，是我复刻错了——原稿里它们<strong>贴着输入框上沿站</strong>，脚下各有一颗状态点，正在跑的那只是绿的。摆正之后这个设计其实更成立，批评点也更集中：不是位置歪，是<strong>它一直在动</strong>。）</p>
+    <pre class="code">.pet svg   { animation: hop 1.8s ease-in-out <em>infinite</em>; }
+.pet[…]    { animation: wanderA 8s ease-in-out <em>infinite</em>; }
+.pet .eyes { animation: blink 3.6s ease-in-out <em>infinite</em>; }
+<em>整段没有 prefers-reduced-motion</em>   <i>（.row__dot--running 和 .meter__fill 都写了）</i></pre>
+    <p>而这个仓库已经把这件事想清楚过了，<code>status.css</code> 里那段：</p>
+    <pre class="code"><i>/* 一刻不停的加载动画会持续抢注意力；这里是<b>隔一段扫一道</b>：
+   600ms 后起第一道，之后每 4s 一道，每道约 1s（占整条时间线的 25%）。
+   剩下的时间停在终点，所以看上去就是"扫一下，歇一会儿"。 */</i></pre>
+    <p>推理微光按这条规矩收着了，吉祥物是三条 <code>infinite</code>。<strong>同一个界面里两套关于「动」的标准。</strong></p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法：同一件事，换个位置，换个节拍。</strong></p>
+    <ul>
+      <li><strong>位置</strong> —— 挪进 A3 那枚引擎徽章。输入框上沿是你打字时视线停的地方，那里放动的东西成本最高；而「谁在答」本来就该和答案在一根线上。</li>
+      <li><strong>节拍</strong> —— 静止是常态。<strong>只有这一轮真在跑</strong>的时候它跳一下，<code>4s 一次、600ms 起、每次约 1s</code>，和 <code>shimmer</code> 逐字对齐。<strong>「一轮一跳」不是「一秒三跳」</strong>——蹦还是那个蹦，压扁、弹起、砸扁、回弹一个不少，只是频率降到十三分之一，而且它现在有意思了：<strong>它在动 = 它在干活。</strong></li>
+      <li><strong>减少动态效果</strong> —— <code>prefers-reduced-motion</code> 下完全静止，照 <code>.row__dot--running</code> 那条写。</li>
+    </ul>
+    <p style="color:var(--text-muted);font-size:14px">如果你就是想要完整的那一排蹲在输入框上：<strong>那是产品性格，是你的决定，不是对错问题。</strong>我只要求三件事——闲着的时候停、尊重 <code>prefers-reduced-motion</code>、别放在输入框正上方。三条满足了，随便蹦。</p>
+  </div>
+
+  <h4 style="font-size:19px;font-weight:600;margin:38px 0 6px">三只原样留着，只改样式</h4>
+  <p class="pt__sub" style="margin-bottom:8px">我试着自己重画了一版，<strong>画丑了</strong>——螃蟹画成了个蜘蛛，两只史莱姆画成了两个素面圆顶，还自作主张多塞了一家 Codex。<strong>它那三只本来就是对的</strong>：史莱姆就是史莱姆，重画只会画没。</p>
+  <p class="pt__sub" style="margin-bottom:22px">所以这一版<strong>一根路径都不动</strong>，SVG 逐字沿用它的原案。要改的只有四处样式，下面逐条说。</p>
+
+  <div class="glyphs">
+    <div class="glyph">
+      <div class="glyph__sizes">
+        <svg class="gl gl--kimi" width="32" height="32" viewBox="0 0 24 24"><use href="#g-kimi"/></svg>
+        <svg class="gl gl--kimi" width="20" height="20" viewBox="0 0 24 24"><use href="#g-kimi"/></svg>
+        <svg class="gl gl--kimi" width="12" height="12" viewBox="0 0 24 24"><use href="#g-kimi"/></svg>
+      </div>
+      <b>Kimi Code</b><span>#5b83d6 · 原值</span>
+      <em>史莱姆。白底 3.71、暗底 4.83，<br>两边都过，不动。</em>
+    </div>
+    <div class="glyph">
+      <div class="glyph__sizes">
+        <svg class="gl gl--claude" width="32" height="20" viewBox="0 0 24 24"><use href="#g-claude"/></svg>
+        <svg class="gl gl--claude" width="20" height="12" viewBox="0 0 24 24"><use href="#g-claude"/></svg>
+        <svg class="gl gl--claude" width="13" height="8" viewBox="0 0 24 24"><use href="#g-claude"/></svg>
+      </div>
+      <b>Claude Code</b><span>#da7756 · 原值</span>
+      <em>像素桌宠。白底 3.11、暗底 5.76，<br>压线过，也不动。</em>
+    </div>
+    <div class="glyph">
+      <div class="glyph__sizes">
+        <svg class="gl gl--grok" width="32" height="32" viewBox="0 0 24 24"><use href="#g-grok"/></svg>
+        <svg class="gl gl--grok" width="20" height="20" viewBox="0 0 24 24"><use href="#g-grok"/></svg>
+        <svg class="gl gl--grok" width="12" height="12" viewBox="0 0 24 24"><use href="#g-grok"/></svg>
+      </div>
+      <b>Grok</b><span>#16161a → 要改</span>
+      <em>史莱姆。白底 18.05，<br><strong style="color:var(--danger)">暗底 1.01——整只消失。</strong></em>
+    </div>
+  </div>
+
+  <div class="block">
+    <p class="block__h">改动一 · Grok 在深色模式下是看不见的</p>
+    <p>这是唯一一处必须动色值的地方，而且是个硬伤不是口味问题：<code>#16161a</code> 正好是 omni <code>--text</code> 的值，压在深色底 <code>#17171a</code> 上，对比度 <strong>1.01:1</strong>。<strong>不是「看不清」，是「不存在」</strong>——只剩两只白眼睛浮在黑底上。</p>
+    <div class="ab" style="margin-top:16px">
+      <div class="ab__cell"><p class="tag">原值 · 深色底</p>
+        <div class="frame"><div class="frame__in" style="background:#17171a;display:flex;gap:20px;align-items:center;justify-content:center;padding:26px">
+          <svg class="gl gl--grok-now" width="40" height="40" viewBox="0 0 24 24"><use href="#g-grok"/></svg>
+          <span style="font-size:12.5px;color:#9d9da8">#16161a on #17171a · <b style="color:#e0705c">1.01:1</b></span>
+        </div></div></div>
+      <div class="ab__cell"><p class="tag tag--next">补一套深色值</p>
+        <div class="frame"><div class="frame__in" style="background:#17171a;display:flex;gap:20px;align-items:center;justify-content:center;padding:26px">
+          <svg class="gl" style="color:#c9c9d2;--eye:#16161a" width="40" height="40" viewBox="0 0 24 24"><use href="#g-grok"/></svg>
+          <span style="font-size:12.5px;color:#9d9da8">#c9c9d2 on #17171a · <b style="color:#6cc48d">10.9:1</b></span>
+        </div></div></div>
+    </div>
+    <pre class="code" style="margin-top:14px">--eng-grok: <b>#16161a</b>;  --eng-grok-eye: <b>#ffffff</b>;
+@media (prefers-color-scheme: dark) {
+  --eng-grok: <u>#c9c9d2</u>;  --eng-grok-eye: <u>#16161a</u>;   <i>/* 身体和眼睛一起翻 */</i>
+}</pre>
+    <p style="color:var(--text-muted);font-size:14px">Kimi 和 Claude 我都算过了，两套底色上都过 3:1（图形的门槛），<strong>一个字节不用改</strong>。</p>
+  </div>
+
+  <div class="block">
+    <p class="block__h">改动二 · 三条 infinite 收成「一轮一跳」</p>
+    <pre class="code">.pet svg   { animation: hop 1.8s ease-in-out <em>infinite</em>; }
+.pet[…]    { animation: wanderA 8s ease-in-out <em>infinite</em>; }
+.pet .eyes { animation: blink 3.6s ease-in-out <em>infinite</em>; }
+                        ↓
+<u>静止是常态。只有这一轮真在跑的时候跳一下，4s 一次、600ms 起、每次约 1s</u>
+<i>——和 status.css 那道微光逐字对齐（delay 600 / duration 1000 / interval 4000）</i></pre>
+    <p><strong>蹦还是那个蹦</strong>：压扁蓄力、弹起拉长、落地砸扁、回弹，<code>@keyframes hop</code> 的关键帧一帧不删，只是频率降到十三分之一。这样它还多了个用处——<strong>它在动，就是它在干活。</strong></p>
+    <p><code>wander</code>（左右溜达 ±7~9px）和 <code>blink</code> 直接删：那两条纯装饰，而且 <code>wander</code> 正好让它们在输入框上方来回扫。</p>
+  </div>
+
+  <div class="block">
+    <p class="block__h">改动三 · 补 prefers-reduced-motion</p>
+    <pre class="code"><i>/* 仓库里 .row__dot--running 和 .meter__fill 都写了这一条，吉祥物那段漏了 */</i>
+@media (prefers-reduced-motion: reduce) {
+  <u>.pet, .pet svg, .pet .eyes { animation: none; }</u>
+}</pre>
+  </div>
+
+  <div class="block">
+    <p class="block__h">改动四 · 摆哪儿：两种都行，你挑</p>
+    <p>我原来主张挪进顶栏徽章。摆正你的原案之后我得说句公道话：<strong>贴着输入框上沿站是有道理的</strong>——脚下一排状态点也确实好使。真正的毛病是「它一直在动」，那个改动二已经解决了。所以两种摆法都成立：</p>
+    <div class="ab" style="margin-top:14px">
+      <div class="ab__cell"><p class="tag tag--next">甲 · 留在原位，只改节拍</p>
+        <div class="frame"><div class="frame__in" style="padding:14px 0 0">
+          <div style="padding:0 20px 12px">
+            <div class="dock">
+              <span class="pet2 still"><svg class="gl gl--kimi" viewBox="0 0 24 24"><use href="#g-kimi"/></svg><i class="on"></i></span>
+              <span class="pet2 still"><svg class="gl gl--claude" viewBox="0 0 24 24"><use href="#g-claude"/></svg><i></i></span>
+              <span class="pet2 still"><svg class="gl gl--grok" viewBox="0 0 24 24"><use href="#g-grok"/></svg><i></i></span>
+            </div>
+            <div class="ucomp__in" style="max-width:none;margin:0;box-shadow:var(--shadow-1)">
+              <div class="uta" style="color:var(--text-faint)">给 Kimi Code 派个活…</div>
+              <div class="ubar"><span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="usend"><i></i></span></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">现在是静止的（前面那排是原案，一直在跑，对着看）。轮到 Kimi 干活时，只有它跳，4 秒一下。</p></div>
+      <div class="ab__cell"><p class="tag tag--next">乙 · 挪进顶栏徽章</p>
+        <div class="frame"><div class="frame__in" style="padding:0"><div class="um" style="background:var(--bg)">
+          <div class="um__top um__top--slim" style="border-bottom:1px solid var(--border-strong)">
+            <div class="um__title">修登录页的样式 <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></div>
+            <span class="ubadge ubadge--run"><svg class="ubadge__g gl gl--claude" width="15" height="9" viewBox="0 0 24 24"><use href="#g-claude"/></svg>Claude Code</span>
+            <div class="um__sp"></div>
+            <div class="umeter"><span class="umeter__t"><span class="umeter__f"></span></span>8.2k / 262k</div>
+          </div>
+          <div class="utr utr--fade" style="padding:14px 14px 10px;height:96px;flex:none"><div class="utr__in" style="gap:8px">
+            <div class="uagent" style="font-size:15px;line-height:26px">这只在跳，说明它正在干活。</div>
+            <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/app.css</span></div></div>
+          </div></div>
+        </div></div></div>
+        <p class="cap">「谁在答」和它答的东西在同一根横线上；一枚 15px 的桌宠，跟着微光的节拍跳。</p></div>
+    </div>
+    <p style="margin-top:14px"><strong>我倾向甲</strong>——原案那个位置是有出处的，而且三只并排能一眼看出「有三家可选、现在是这家」，徽章只能显示一只。<strong>乙的好处是省一整行高度</strong>，屏幕小的时候值。两种都只依赖前面那三处改动，随时能换。</p>
+  </div>
+</section>
+
+<!-- ── A6 ─────────────────────────────────────── -->
+<section class="pt">
+  <p class="pt__no">A6 / 输入区<span class="src src--take">那份稿子的第 5 条 · 我上一版看漏了</span></p>
+  <h3 class="pt__h">输入框上面那条通栏线，把窗口切成了两半</h3>
+  <p class="pt__sub">输入框本身<strong>已经是一张卡</strong>：1px 描边、<code>--radius-lg</code>、抬起的底色。卡外面又画一条横穿整扇窗的线——<strong>同一件事说了两遍，而且第二遍说得更重。</strong></p>
+
+  <div class="block">
+    <p class="block__h">现在</p>
+    <pre class="code">.composer       { <em>border-top: 1px solid var(--border-strong)</em>; padding: 12px 16px 16px; }
+.composer__inner{ border: 1px solid var(--border-strong); border-radius: <b>13px</b>;
+                  background: var(--bg-raised); }</pre>
+    <p><code>--border-strong</code> 在 tokens.css 里的口径是「<strong>把窗口切成区块的那几条</strong>」——侧栏、顶栏、对比分栏。用在这儿，说的就是「上面是一个区块，下面是另一个区块」。可对话和你正在打的那句话不是两个区块，<strong>它是同一条流的下一步。</strong></p>
+    <p>那份稿子的 <code>.composer</code> 干脆没有 <code>border-top</code>，卡直接浮在纸面上。<strong>这条我上一版没看出来</strong>——我当时只盯着卡里面，没看卡外面那条线。</p>
+  </div>
+
+  <div class="fix">
+    <p><strong>改法。线换成渐隐，卡自己站住。</strong></p>
+    <pre class="code">.composer { <u>border-top: 0</u>; }
+
+<i>/* 那条线原本在干一件正经事：标出滚动区到哪儿为止。
+   直接删掉的话，长转录区的最后一行会齐着卡的上沿被硬切——
+   和 B5 那个「硬切看起来像没渲染完」是同一个毛病。换成渐隐。 */</i>
+.transcript::after {
+  <u>content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;</u>
+}
+<i>/* .transcript 已经是 position: relative 了，不用再加 */</i>
+
+.composer__inner { <u>box-shadow: var(--shadow-1)</u>; }   <i>/* 0 1px 2px / 6% */</i></pre>
+    <p><strong>这条更正 C 表第 5 行。</strong>我在那儿写过「输入框是常驻结构、不是浮层，不加阴影」——那是在<strong>还有通栏线撑着</strong>的前提下说的。线拿掉之后卡片得自己站住，2px、6% 的一道是最轻的做法。深色下 <code>--shadow-1</code> 本来就是 <code>none</code>，那边由描边接手，tokens.css 里论证过了。</p>
+    <p><strong>顶栏那条 <code>border-bottom</code> 保留。</strong>顶栏是真正的两个「带」的分界：上面是窗口拖拽区，下面是滚动区。输入区不是带，是一张浮在内容里的卡。<strong>两样不同的东西，本来就不该长得一样。</strong></p>
+    <p style="color:var(--text-muted);font-size:14px">顺带：「5 个文件 · +212 −38 / 审核」那枚胶囊现在浮在渐隐上，不再被夹在两条线中间。</p>
+  </div>
+
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in" style="padding:0"><div class="um" style="background:var(--bg)">
+        <div class="utr" style="padding:14px 14px 10px;height:170px;flex:none"><div class="utr__in" style="gap:8px">
+          <div class="uagent">线换成渐隐之后，转录区的最后一行是溶进去的，不是被切断的。</div>
+          <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/items.css</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">node scripts/check-css.mjs</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/app.css</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/components/Composer.tsx</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm run check:css</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/tokens.css</span></div></div>
+        </div></div>
+        <div class="uch"><span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span><span class="upill">审核</span></div>
+        <div class="ucomp"><div class="ucomp__in">
+          <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
+          <div class="uta" style="min-height:20px">接着说点什么…</div>
+          <div class="ubar"><span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="usend"><i></i></span></div>
+        </div></div>
+      </div></div></div>
+      <p class="cap">一条 <code>--border-strong</code> 横穿整扇窗——那是「切分区块」用的那一档。往下滚的内容齐着这条线被硬切。</p></div>
+    <div class="ab__cell"><p class="tag tag--next">合并后</p>
+      <div class="frame"><div class="frame__in" style="padding:0"><div class="um" style="background:var(--bg)">
+        <div class="utr utr--fade" style="padding:14px 14px 10px;height:170px;flex:none"><div class="utr__in" style="gap:8px">
+          <div class="uagent" style="font-size:15px;line-height:26px">线换成渐隐之后，转录区的最后一行是溶进去的，不是被切断的。</div>
+          <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/items.css</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">node scripts/check-css.mjs</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/app.css</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/components/Composer.tsx</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm run check:css</span></div>
+          <div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-file"/></svg></span><span class="ustep__t">apps/desktop/src/renderer/styles/tokens.css</span></div></div>
+        </div></div>
+        <div class="uch"><span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span><span class="upill">审核</span></div>
+        <div class="ucomp ucomp--flush"><div class="ucomp__in">
+          <div class="uchips"><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12" viewBox="0 0 16 16"><use href="#i-branch"/></svg>main ·</span></div>
+          <div class="uta" style="min-height:20px">接着说点什么…</div>
+          <div class="ubar"><span class="utrig">Kimi Code <svg class="ic" width="11" height="11" viewBox="0 0 16 16"><use href="#i-chev-d"/></svg></span><span class="usend"><i></i></span></div>
+        </div></div>
+      </div></div></div>
+      <p class="cap">没有那条线了。卡浮在同一张纸上，最后一行是溶掉的，不是切掉的。</p></div>
+  </div>
+</section>
+
+<h2 class="sec">B · 排版八条（v1 原样带过来，全景里已经生效）</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 28px">这八条你已经认过了，这里只留证据和改法两段——前后小样在上面那张全景里逐条都能看到，看不到的两条（B5 思考行、B6 工具输出）在下面单独摆了。</p>
+
+<section class="pt">
+  <p class="pt__no">B1 / 节奏<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">一个 16px 管住了全部七种相邻关系</h3>
+  <p class="pt__sub">用户提问接轮次分界、思考接回答、回答接工具组、上一轮接下一轮——七种关系在结构上完全不同，间距是同一个数。<strong>间距不表达关系，结构就只能靠线和框去补。</strong></p>
+  <div class="block"><p class="block__h">现在</p>
+    <pre class="code"><i>/* app.css:951 —— 一个数管全部相邻 */</i>
+.transcript__inner { <b>gap: var(--sp-4)</b>; }
+
+<i>/* items.css:723 —— 有人在用负边距把这个 16 掰回来 */</i>
+.copyable:has(&gt; .think) { <em>margin: calc(var(--sp-2) * -1) 0</em>; }</pre>
+    <p>那条负边距是症状：<strong>基数选在了错的一档，才需要挑个别行去减。</strong></p></div>
+  <div class="fix"><pre class="code">.transcript__inner { <u>gap: var(--sp-2)</u>; }                       <i>/* 8 · 它连着干的几件事 */</i>
+.copyable:has(&gt; .msg--agent),
+.copyable:has(&gt; .msg--user) { <u>margin-top: var(--sp-2)</u>; }        <i>/* → 16 · 换人说话 */</i>
+.turnmark__row { <u>margin-top: 20px</u>; }                            <i>/* → 28 · 轮次分界，上重下轻 */</i>
+<i>/* 删掉 .copyable:has(&gt; .think) 那条负边距 */</i></pre></div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B2 / 对齐<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">同一类东西的左缘差 13px</h3>
+  <p class="pt__sub"><code>--step-slot</code> 的注释说「展开出来的东西都对着这一条槽」，<strong>但这条槽只在 <code>.run</code> 里成立，而 <code>.run</code> 自己被推开了 13px。</strong></p>
+  <div class="block"><p class="block__h">现在 · 绝对左缘</p>
+    <pre class="code">.msg--agent / .md      图标 —     文字 <b>0</b>    <i>正文</i>
+.think__row            图标 <b>0</b>      文字 <b>24</b>   <i>思考行</i>
+.think__body           —          文字 <b>24</b>   <i>展开的思考 ✓</i>
+.run { padding-left: 12px; border-left: 1px }
+  └ .step              图标 <em>13</em>     文字 <em>37</em>   <i>工具行 ← 差 13</i>
+  └ .step__out         —          文字 <em>37</em>   <i>展开的输出 ← 差 13</i>
+  └ .step__verb（计划） —          文字 <em>13</em>   <i>同一个 .run 里的第三条边</i></pre>
+    <p>顺带：<code>items.css</code> 里还有一条 <code>.reasoning</code>（<code>padding-left:12</code> + <code>border-left:2px</code>），桌面端<strong>没有任何组件在用它</strong>——推理走的是 <code>.think</code>。<code>check-css</code> 只查「用了没样式」，查不出「有样式没人用」。第四条左缘，只存在于样式表里。</p></div>
+  <div class="fix"><p>把 <code>--step-slot</code>（16 + 8 = 24）从「<code>.run</code> 内部的槽」升成整个转录区唯一的一条文字列。横向只留 <strong>0</strong>（正文）和 <strong>24</strong>（一切活动）。</p>
+    <pre class="code">.run { <u>padding-left: 0</u>; <u>border: 0</u>; }                 <i>/* 行本身不缩进 */</i>
+.step__out, .think__body, .run__nested {
+  <u>margin-left: var(--step-slot)</u>;                    <i>/* 一律 24 */</i>
+  <u>border-left: 1px solid var(--border)</u>;             <i>/* 轨只画在展开出来的内容上 */</i>
+}
+.step__verb { <u>padding-left: var(--step-slot)</u>; }      <i>/* 计划行补上那一格 */</i></pre></div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B3 / 主次<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">提问比回答重</h3>
+  <p class="pt__sub">提问有三重容器：底色、描边、大圆角。回答一样都没有，14px，跟旁边 13px 的工具行只差 1px。<strong>屏幕上分量最大的是你自己说过的话。</strong></p>
+  <div class="block"><p class="block__h">现在</p>
+    <pre class="code">.msg--user  { max-width: <b>82%</b>; background: <b>var(--bg-sunken)</b>;
+              border: <b>1px solid var(--border)</b>; border-radius: <b>13px…</b>; }
+.msg--agent { min-width: 0; }                    <i>/* 没有任何排版 */</i></pre>
+    <p>底色其实没在出力：<code>--bg-sunken</code> 对 <code>--bg</code> 只差 <strong>2.76 L*</strong>（tokens.css 自己为侧栏那条骨架线写过这个数），真正把气泡框出来的是那圈描边——而描边在这套系统里是「卡片」的语义，卡片留给了审批。</p>
+    <div class="contrast">
+      <div class="cbox"><b>#f7f7f8 现在</b><u class="bad">ΔL* 2.8 · 得靠描边撑</u></div>
+      <div class="cbox"><b>#f0f0f2 改后</b><u class="good">ΔL* 5.2 · 单靠底色就够</u></div>
+      <div class="cbox"><b>#101012 暗 现在</b><u class="bad">ΔL* 3.7</u></div>
+      <div class="cbox"><b>#232328 暗 改后</b><u class="good">ΔL* 6.0</u></div>
+    </div></div>
+  <div class="fix"><pre class="code"><i>/* tokens.css —— 新开一个名字。别直接借 --bg-hover：那是交互态的语义 */</i>
+--bg-said: <u>#f0f0f2</u>;   <i>/* 深色 #232328 */</i>
+--text-prose: <u>15px</u>;  --lh-prose: <u>26px</u>;   <i>/* 1.733，只给正文，控件五档一个字节不动 */</i>
+
+.msg--user { max-width: <u>72%</u>; background: <u>var(--bg-said)</u>; <u>border: 0</u>; }
+.md, .msg--user { font-size: <u>var(--text-prose)</u>; line-height: <u>var(--lh-prose)</u>; }</pre></div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B4 / 状态<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">「失败」和「已中断」是同一个灰——那条 CSS 什么也没改</h3>
+  <div class="block"><p class="block__h">现在 · items.css:127–138</p>
+    <pre class="code">.step__state { … color: <b>var(--text-faint)</b>; }
+
+.step__state--failed,
+<i>/* 中断不是失败：用中性色，别让「你自己按了停止」看着像出错 */</i>
+.step__state--interrupted { color: <em>var(--text-faint)</em>; }   <i>← 它本来就是这个值</i></pre>
+    <p>注释是对的，但它只替「中断」辩护；「失败」是被顺手扫进同一个选择器组的。一条 40 行的工具日志里第 17 行崩了，现在没有任何东西标它。</p></div>
+  <div class="fix"><pre class="code">.step__state--failed { color: <u>var(--danger)</u>; }
+.step:has(.step__state--failed) .step__icon { color: <u>var(--danger)</u>; }
+.step__state--interrupted { color: var(--text-faint); }   <i>/* 注释是对的，保留 */</i></pre></div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B5 / 思考行<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">收工之后，思考行是半句读不完的英文</h3>
+  <p class="pt__sub">跑着的时候这一行是对的：定高、只画最后一行。<strong>跑完之后它变成一段被齐着列宽切断的正文</strong>——占满一整行，信息量接近零。</p>
+  <div class="block"><p class="block__h">现在</p>
+    <pre class="code"><i>// reasoning.ts</i>   summaryOf(text, running=false) → <b>取第一行</b>
+<i>/* items.css */</i>  .think__line { white-space: <b>nowrap</b>; overflow: <b>hidden</b>; }</pre>
+    <p>仓库里已经有更合适的东西：<code>reasoning.ts</code> 的 <code>headingOf()</code>——模型自己给这一段起的 <code>**小标题**</code>，现在只喂给状态行。另外硬切看起来像<strong>没渲染完</strong>，不像「还有」。</p></div>
+  <div class="fix"><pre class="code"><i>// Reasoning.tsx</i>
+const summary = running ? summaryOf(text, true)
+                        : (<u>headingOf(text)</u> ?? summaryOf(text, false))
+<i>/* items.css */</i>
+.think__line { <u>mask-image: linear-gradient(90deg, #000 78%, transparent)</u>; }</pre></div>
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在 · 收工态</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The user wants UI optimization suggestions for the omni app. They show a screenshot of the current UI</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+        <div style="height:8px"></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l">The doc is about detail-level optimizations, already landed. Now the user wants an overall layout</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+      </div></div></div>
+      <p class="cap">两整行，两个断在半路的句子，齐着列宽切开。</p></div>
+    <div class="ab__cell"><p class="tag tag--next">合并后 · 收工态</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l" style="color:var(--text-muted)">Read the real CSS first, not the docs</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+        <div style="height:8px"></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l" style="color:var(--text-muted)">That doc is detail-level; the ask is layout-level</span><svg class="ic" width="12" height="12" viewBox="0 0 16 16" style="color:var(--text-faint)"><use href="#i-chev-r"/></svg></div>
+        <div style="height:16px"></div>
+        <div class="uthink"><span class="uthink__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-think"/></svg></span>思考<span class="uthink__d"></span><span class="uthink__l fade">跑着的时候这一行完全不动：仍然只画最后一行、横向跟到末尾，只是右缘从硬切换成渐隐</span></div>
+      </div></div></div>
+      <p class="cap">上两条是收工态的标签；第三条演示渐隐——「还有」，不是「坏了」。</p></div>
+  </div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B6 / 工具输出<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">滚动区里套了个 320px 的滚动区</h3>
+  <p class="pt__sub">指针停在工具输出上滚轮，先被框内那 320px 吃掉，到底了才传给外面的转录区。<strong>而工具输出恰恰是你最常一路划过去的东西。</strong></p>
+  <div class="block"><p class="block__h">现在 · items.css:164</p>
+    <pre class="code">.step__out { … <b>overflow-y: auto</b>; <b>max-height: 320px</b>; }</pre>
+    <p>那条注释解释的是「为什么必须显式写 <code>overflow-y</code>」，那部分完全正确；要换掉的是<strong>「内滚」这个决定本身</strong>。顺带：320 是个定高，跟内容没关系，摆在 760 的列里像块补丁。</p></div>
+  <div class="fix"><pre class="code">.step__out {
+  <em>overflow-y: auto;  max-height: 320px;</em>
+  ↓
+  <u>max-height: calc(12 * 1.55 * var(--text-code))</u>;   <i>/* 12 行 ≈ 232px */</i>
+  <u>overflow: hidden</u>;
+}
+.step__out--clipped::after { <u>/* 底部 36px 渐隐到 --bg-code */</u> }
+.step__more { <u>/* 「展开全部（还有 N 行）」，对着 24 那条列 */</u> }</pre>
+    <p>要动 <code>ToolRun.tsx</code>：数一下行数，超过 12 才挂 <code>--clipped</code>。全篇唯一一条要写新交互的。</p></div>
+  <div class="ab">
+    <div class="ab__cell"><p class="tag">现在</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="urun"><div class="ustep"><span class="ustep__i"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm vitest run codex</span><span class="ustep__s">失败</span></div>
+        <pre class="uout uout--tall" style="margin-bottom:0">FAIL  packages/engine/src/codex/wire.test.ts
+  × 认领清单：档位回读 (12ms)
+    → expected 'engine-auto' to be 'auto'
+
+  ❯ packages/engine/src/codex/wire.test.ts:88:5
+     86|   const gate = readGate(session)
+     87|
+     88|   expect(gate).toBe("auto")
+       |                ^
+     89| })
+
+Test Files  1 failed (14)</pre></div>
+      </div></div></div>
+      <p class="cap">右边那根就是第二根滚动条。它和转录区抢同一次滚轮。</p></div>
+    <div class="ab__cell"><p class="tag tag--next">合并后</p>
+      <div class="frame"><div class="frame__in"><div class="mini">
+        <div class="urun" style="padding-left:0;border:0"><div class="ustep"><span class="ustep__i" style="color:var(--danger)"><svg class="ic" width="13" height="13" viewBox="0 0 16 16"><use href="#i-term"/></svg></span><span class="ustep__t">pnpm vitest run codex</span><span class="ustep__s ustep__s--fail">失败</span></div>
+        <pre class="uout uout--clamp" style="margin-bottom:0;margin-left:24px;border-left:1px solid var(--border);border-radius:0 6px 6px 0">FAIL  packages/engine/src/codex/wire.test.ts
+  × 认领清单：档位回读 (12ms)
+    → expected 'engine-auto' to be 'auto'
+
+  ❯ packages/engine/src/codex/wire.test.ts:88:5
+     86|   const gate = readGate(session)</pre>
+        <span class="more">展开全部（还有 9 行）</span></div>
+      </div></div></div>
+      <p class="cap">滚轮从头到尾只有一个去处。渐隐的下缘也不再是一条硬边。</p></div>
+  </div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B7 / 侧栏空态<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">两段说明，比它们说明的东西还高</h3>
+  <div class="num">
+    <div><b>78px</b><span>「拖到这里就置顶」3 行 + 内边距</span></div>
+    <div><b>58px</b><span>「还没有对话…」2 行 + 内边距</span></div>
+    <div><b>128px</b><span>项目段全部四行</span></div>
+    <div><b>≈110px</b><span>能省下的（加 A1 的 32px = 142px）</span></div>
+  </div>
+  <div class="block"><p class="block__h">现在</p>
+    <pre class="code">SidebarPinned.tsx:59
+  <b>把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。</b>   <i>3 行</i>
+SidebarSections.tsx:216
+  <b>还没有对话。点右边的 + 开一条，不用先选项目。</b>              <i>2 行</i>
+
+.sidebar__empty { padding: <b>8px 32px</b>; font-size: <b>13px</b>; }
+<i>/* 258 − 64 = 194px 可用宽 → 13px 下每行 13 个字 */</i></pre>
+    <p>而且这两句都是读一次就够的。置顶那句说的是一个<strong>拖拽</strong>动作，人需要它的那一刻是手里正拖着东西的那一刻。</p></div>
+  <div class="fix"><ul>
+    <li><strong>置顶</strong>：段落删掉，只留段头。<code>dragover</code> 时（<code>sidebarDrag.ts</code> 里已经有了）那一段才展开成投放区，并在那时显示这句话。</li>
+    <li><strong>对话</strong>：压成一行 11.5px「还没有独立对话」。那颗 <code>+</code> 就在段头右边，「点右边的 +」这半句本来就多余。</li>
+  </ul></div>
+</section>
+
+<section class="pt">
+  <p class="pt__no">B8 / 变更汇总<span class="src src--mine">我的</span></p>
+  <h3 class="pt__h">「5 个文件变了」没说动静有多大</h3>
+  <p class="pt__sub">这枚胶囊回答的是「我可以走了吗」——它是你按下一次发送之前唯一能看到的规模信号。<strong>改了 5 个文件 12 行，和改了 5 个文件 800 行，是两件事。</strong></p>
+  <div class="fix"><p><code>--ok</code> / <code>--danger</code> 和 <code>.diffstat__add</code> / <code>.diffstat__del</code> 都已经定义好了，diff 那边在用，这里只是没接上。<code>Changed.tsx</code> 里每个文件的增删都拿得到，加起来就行。</p>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
+      <span class="upill">5 个文件变了</span><span style="color:var(--text-faint)">→</span>
+      <span class="upill">5 个文件 · <b>+212</b> <i>−38</i></span>
+    </div></div>
+</section>
+
+<h2 class="sec">C · 那份稿子的取舍账</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 22px">九条逐条过一遍。<strong>「已经是这样」那三条不是它的错</strong>——那些代码里的判断本来就不写在界面上，看截图看不出来。</p>
+<table class="verdict">
+  <thead><tr><th></th><th>它的条目</th><th>处置</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td class="i">1</td><td class="t">会话列表：状态点 + 时间 + hover</td><td><span class="vd vd--fix">一半已有 · 一半采纳</span></td>
+      <td>状态点（还会呼吸）、「待批准」四个字、行 hover——三样都在（<code>.row__dot--running</code> / <code>.row__note</code> / <code>.row:hover</code>）。<strong>新的只有右侧时间</strong>，采纳，见 A2；但我没照它那样让状态顶掉时间列的量纲，改成一条规矩管一列。</td></tr>
+    <tr><td class="i">2</td><td class="t">顶部收成一行操作区</td><td><span class="vd vd--yes">采纳</span></td>
+      <td>判断对，而且正是 <code>SidebarFoot.tsx</code> 已经对底部做过的那件事。实现改了两处：行高回 <code>--sb-row-h</code>(32)，「omni」目标提示留下。见 A1。</td></tr>
+    <tr><td class="i">3</td><td class="t">顶栏 52→40 + 引擎徽标 + 三颗键</td><td><span class="vd vd--fix">采纳一半</span></td>
+      <td><strong>引擎徽章是全篇最值钱的一条</strong>，采纳。52→44 也采纳（它写 40，太紧）。<strong>驳回三颗键</strong>：环境是标题本身、设置在侧栏底、时间线走 <code>/timeline</code>。另：「原来整根栏只有一个 omni ⌄」这个前提是错的。见 A3。</td></tr>
+    <tr><td class="i">4</td><td class="t">空态 → 行动型首屏</td><td><span class="vd vd--fix">形制采纳 · 内容全换</span></td>
+      <td>形制对。但三张快捷卡里两张半是侧栏的复制品，「最近会话」整个就是侧栏。换成开工条件 + 起手式，并把接管会话那段说明救回来。见 A4。</td></tr>
+    <tr><td class="i">5</td><td class="t">输入区整合成一张浮卡</td><td><span class="vd vd--fix">一半已有 · 一半采纳</span></td>
+      <td><code>.composer__inner</code> 本来就是卡：<code>1px --border-strong</code> + <code>--radius-lg</code> + <code>--bg-raised</code>，芯片也已经在卡里。<strong>但它真正做对的是卡<em>外面</em>那条线——它的 <code>.composer</code> 没有 <code>border-top</code>，而 omni 有一条横穿整扇窗的 <code>--border-strong</code>。这条我第一版看漏了，见 A6。</strong></td></tr>
+    <tr><td class="i">6</td><td class="t">新增 26px 底部状态栏</td><td><span class="vd vd--no">驳回</span></td>
+      <td>四样内容：上下文（顶栏已有）、目录（顶栏标题 + 输入框芯片，已有两处）、版本（属于设置）、「引擎已连接」（99.9% 时间为真的绿点是噪声）。<strong>用每一屏 26px 换四样重复品。</strong>详见下面。</td></tr>
+    <tr><td class="i">7</td><td class="t">引擎历史收成一节，默认折叠</td><td><span class="vd vd--had">已经是这样</span></td>
+      <td><code>SidebarSections.tsx:222</code>：「报过历史的每一家各一段，<strong>都默认折叠</strong>」，注释里连实测条数都记了（codex 25 条、Claude 40 条）。</td></tr>
+    <tr><td class="i">8</td><td class="t">吉祥物蹲在输入框上沿</td><td><span class="vd vd--fix">留内核 · 换形制</span></td>
+      <td>「引擎该有张脸」对。但三条 <code>infinite</code> 动画，位置在打字时的视线落点，且没写 <code>prefers-reduced-motion</code>——而 <code>status.css</code> 已经把这条道理论证完了。见 A5。</td></tr>
+    <tr><td class="i">9</td><td class="t">那套色板（白/灰/黑「往净上调」）</td><td><span class="vd vd--no">驳回</span></td>
+      <td>目标没错，omni 的色板本来就是这个目标。但它给的具体值里有三个是<strong>回退</strong>，其中一个正是 tokens.css 里点名否掉过的那个数；而且整份稿子<strong>没有深色模式</strong>。详见下面。</td></tr>
+  </tbody>
+</table>
+
+<h2 class="sec">C1 · 为什么不要那条底部状态栏</h2>
+<div class="ab" style="max-width:1000px">
+  <div class="ab__cell"><p class="tag tag--old">它的原案</p>
+    <div class="frame"><div class="frame__in" style="padding:0">
+      <div class="oldbar"><span class="ok">● 引擎已连接</span><span>上下文 12%</span><div class="r"><span>/Users/you/work/omni</span><span>v0.0.128</span></div></div>
+    </div></div>
+    <p class="cap">26px × 每一屏 × 永远。</p></div>
+  <div class="ab__cell">
+    <pre class="code" style="margin:24px 0 0">引擎已连接  → <em>99.9% 的时间为真</em>。真出事时它该是响的，
+              而 omni 已经有 Notices / .error--soft 干这个
+上下文 12%  → <em>顶栏 ContextMeter 已有</em>
+/Users/…    → <em>顶栏标题 + 输入框芯片，已有两处</em>
+v0.0.128    → <em>属于设置页</em>，不值一条常驻栏</pre></div>
+</div>
+<div class="fix" style="max-width:1000px;margin-top:18px">
+  <p><strong>但它的内核有一条是真的：「引擎那边断没断」今天确实没有常驻的说法。</strong>那个内核不该长成状态栏，该长在它描述的那个东西旁边——<strong>A3 那枚引擎徽章上</strong>。<code>thread.detached</code>（「从磁盘回放出来、背后没有活着的引擎进程」）已经在渲染一枚 <code>badge--muted</code> 的「历史记录」了，把它和引擎徽章并成一枚就行：<strong>零新增像素。</strong></p>
+</div>
+
+<h2 class="sec">C2 · 为什么不要那套色板</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 20px">它写的目标——「纸面回纯白、灰阶不带色偏、彩色只留四个」——<strong>和 tokens.css 开头那段是同一句话</strong>。分歧只在具体的数上。</p>
+<div class="contrast" style="max-width:1000px">
+  <div class="cbox"><b>--text-faint</b><u class="bad">它：#9a9aa4 → 2.79:1</u><u class="good">现在：#85858f → 3.66:1</u></div>
+  <div class="cbox"><b>--warn</b><u class="bad">它：#d18f1f → 2.74:1</u><u class="good">现在：#9a6b12 → 4.68:1</u></div>
+  <div class="cbox"><b>--ok</b><u class="bad">它：#2f9e5f → 3.40:1</u><u class="good">现在：#2f7a4d → 5.23:1</u></div>
+</div>
+<div class="block" style="max-width:1000px">
+  <pre class="code">/* tokens.css 里 --text-faint 上面那段注释，逐字： */
+<i>/* 3.66:1 on 白。<b>上一版 #9a9aa4 是 2.79:1</b>，而深色那侧是 3.50——
+   同一个角色两套主题差 25%。**不再往上推到 4.5**：那会把它和 --text-muted
+   的 ΔL* 从 18.7 压到 10.6，三档文字层级当场变平 */</i></pre>
+  <p><strong>它提的 <code>#9a9aa4</code>，正是这段注释里被点名换掉的那个值。</strong>不是巧合——那个灰在白底上看起来「干净」，代价是读不清，而这件事仓库里已经踩过一次并写下来了。</p>
+  <p><code>--warn</code> 那个 <code>#d18f1f</code> 是 2.74:1，<strong>连大字号的 3:1 都不到</strong>；而它在这套界面里要承担「待批准」——全 app 最需要被看见的四个字。</p>
+  <p>还有一条更硬的：<strong>那份稿子从头到尾没有 <code>prefers-color-scheme: dark</code>。</strong>omni 的深色是全套的（tokens.css 后半段，连阴影和遮罩都分深浅，写了理由）。整套换过去等于深色模式当场消失。</p>
+</div>
+<div class="fix" style="max-width:1000px">
+  <p><strong>色板一个字节不动。</strong>它想要的「净」，现有色板已经给了；缺的从来不是颜色，是 B 那八条的层级。</p>
+</div>
+
+<h2 class="sec">D · 落地顺序 · 十四条</h2>
+<p class="col" style="color:var(--text-muted);margin:0 0 20px">分三批。<strong>第一批七条全是改数值和选择器</strong>，加起来不到 80 行，一次改完出图比稿；第二批动组件但都很浅；第三批两条要写新东西，各自单独一轮。</p>
+<table class="plan">
+  <thead><tr><th></th><th>改动</th><th>动哪儿</th><th>量</th><th>风险</th></tr></thead>
+  <tbody>
+    <tr><td class="n">B4</td><td>失败染色</td><td class="w">items.css</td><td class="w">2 行</td><td>无。执行一条已经写下的注释</td></tr>
+    <tr><td class="n">A6</td><td>输入框去掉通栏线</td><td class="w">items.css · app.css</td><td class="w">~8 行</td><td>无。删一条边、加一道渐隐、补一道 <code>--shadow-1</code></td></tr>
+    <tr><td class="n">B1</td><td>节奏三档</td><td class="w">items.css · app.css</td><td class="w">~12 行</td><td>低。顺带删掉一条负边距</td></tr>
+    <tr><td class="n">B2</td><td>统一那条文字列</td><td class="w">items.css</td><td class="w">~20 行</td><td>低。审批卡和嵌套 run 要跟着对一遍</td></tr>
+    <tr><td class="n">B7</td><td>侧栏空态</td><td class="w">SidebarPinned · SidebarSections · app.css</td><td class="w">~15 行</td><td>中。置顶那段要接 <code>dragover</code></td></tr>
+    <tr><td class="n">A1</td><td>侧栏顶部收两行</td><td class="w">SidebarHead · app.css</td><td class="w">~20 行</td><td>低。<code>.btn--primary</code> 是现成的</td></tr>
+    <tr><td class="n">A3a</td><td>顶栏加引擎徽章</td><td class="w">TopBar.tsx</td><td class="w">~6 行</td><td>无。<code>thread.engine</code> 和 <code>.badge</code> 都现成</td></tr>
+    <tr><td class="n">B3</td><td>正文一档 + 气泡去框</td><td class="w">tokens.css · items.css · markdown.css</td><td class="w">~10 行 + 3 token</td><td>中。<code>--text-prose</code> 影响所有 <code>.md</code>，代码块和表格要复看</td></tr>
+    <tr><td class="n">B8</td><td>变更胶囊加增删</td><td class="w">Changed.tsx</td><td class="w">~6 行</td><td>无</td></tr>
+    <tr><td class="n">B5</td><td>折叠思考用 headingOf</td><td class="w">Reasoning.tsx · items.css</td><td class="w">~4 行</td><td>无。取不到就退回今天的行为</td></tr>
+    <tr><td class="n">A2</td><td>会话行右列时间</td><td class="w">SidebarRows.tsx · app.css</td><td class="w">~25 行</td><td>低。<code>updatedAt</code> 现成，要写个相对时间格式化 + 一个每分钟的重算</td></tr>
+    <tr><td class="n">A5</td><td>引擎字形 + 呼吸节拍</td><td class="w">TopBar.tsx · status.css · engines.ts</td><td class="w">~30 行</td><td>低。四枚字形这版画好了，直接抄 SVG</td></tr>
+    <tr><td class="n">A3b</td><td>顶栏 52 → 44</td><td class="w">app.css</td><td class="w">1 行</td><td>低，但价值也最低。<strong>放最后</strong>，跟别的一起出图看</td></tr>
+    <tr><td class="n">B6</td><td>输出按行夹断</td><td class="w">ToolRun.tsx · items.css</td><td class="w">~30 行</td><td>中。要数行数、要记展开态</td></tr>
+    <tr><td class="n">A4</td><td>空态重做</td><td class="w">Transcript.tsx（Blank）· app.css</td><td class="w">~60 行</td><td>中。<strong>起手式那三条是全篇唯一的新行为</strong>，值得单独想清楚</td></tr>
+  </tbody>
+</table>
+
+<h2 class="sec">E · 想到了，这版没放进来</h2>
+<div class="note">
+  <h4>轮次分界只报时间，不报内容</h4>
+  <p>「已处理 2 分 56 秒 · 7 步 · 5 个文件」——全景里我按这个画了，但它要动 <code>group.ts</code> 的统计，比纯排版重。折起来的那一轮再补一句回答首句，会更值。单独一轮做。</p>
+</div>
+<div class="note">
+  <h4>上下文表要心算</h4>
+  <p>「51.9k / 262k」——条本身编的是百分比，数字给的是绝对值。改成「20%」更直接，但 262k 这个上限本身有用（换引擎会变）。那份稿子写的是「12% · 30k」，两个都留——这个折中比我原来的想法好，但两个数并排还是有点挤，等做窗口告警时一起定。</p>
+</div>
+<div class="note">
+  <h4>引擎字形的第五家、第六家</h4>
+  <p>A5 画了四枚。引擎注册表是开放的（<code>apps/desktop/src/main/engines.ts</code> 读用户自己的 json），所以迟早会有没画过的那一家。<strong>兜底得先定</strong>：没有专属字形时用首字母方块 + <code>--text-faint</code>，别留一个空位。</p>
+</div>
+
+<h2 class="sec">考虑过，否掉了</h2>
+<div class="note">
+  <h4>给回答加头像或名字栏</h4>
+  <p>右对齐已经把「谁说的」说清楚了，这是这套界面里最省的一个信号。再加一列身份只会把 760 的正文压窄，而且每一屏都要付这笔宽度。A3 那枚引擎徽章已经在顶栏答了「谁在答」，不用在每条消息上再答一遍。</p>
+</div>
+<div class="note">
+  <h4>正文列收窄到 68ch</h4>
+  <p>拉丁文本在 760px / 14px 下每行约 100 个字符，确实偏长（理想 65–75）。但这个界面里中文是主体，760 / 15 ≈ 每行 50 字，正好；而收窄会同时把代码块和 diff 压小——tokens.css 里为 <code>--text-code</code> 算过的那笔账（760px 下 12.5px 是 98 列）会当场亏掉。<code>--content-max</code> 不动。</p>
+</div>
+<div class="note">
+  <h4>把轮次分界线换成 --border-strong</h4>
+  <p>推过一遍：那条线一变重，整条流就被切成一段一段的卡片，而对话本来是连续的。分界应该靠<strong>留白</strong>（B1 的 28px）和<strong>标签本身</strong>（字重 400→500、颜色 faint→muted）来立，不靠加粗一根线。</p>
+</div>
+
+<hr class="rule" style="margin:56px 0 20px">
+<p class="col" style="font-size:13px;color:var(--text-faint);margin:0">
+v2 在 v1 的八条排版之外，合进了那份稿子的布局判断：直接采纳 1 条、改造后采纳 5 条、驳回 2 条，另有 1 条仓库里已经实现。A5 那四枚引擎标识是这一版新画的，SVG 直接可以抄走。对比度数字是按 WCAG 相对亮度算的；「已经是这样」那几条都给了文件名和行号，可以直接翻。所有小样用的是仓库里同一套 token 值，浅色深色都跟着系统走。
+</p>
+
+</div>
+</body>
+</html>

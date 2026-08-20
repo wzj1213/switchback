@@ -14,6 +14,7 @@ const GLYPH: Readonly<Record<ToolCallItem["detail"]["kind"], React.JSX.Element>>
   other: <DotBoxIcon />,
 }
 import { Diff } from "./Diff.js"
+import { Output } from "./ToolOutput.js"
 
 /** 运行期间实时显示的尾部行数。够看清在干什么，又不至于把整屏占满。 */
 const LIVE_LINES = 8
@@ -146,12 +147,13 @@ function Step({ item, cwd }: { item: ToolCallItem; cwd: string }): React.JSX.Ele
       {open && changed.length > 0 ? <Diff files={changed} /> : null}
       {/* **改动和错误一起显示。** 上一版是 if/else：有 diff 就只画 diff，
           于是一次失败的编辑，它失败的原因永远看不见——而那正是你要看的东西 */}
-      {open && hasOutput ? <pre className="step__out">{content}</pre> : null}
-      {!open && live ? <pre className="step__out step__out--live">{lastLines(content, LIVE_LINES)}</pre> : null}
+      {open && hasOutput ? <Output text={content} /> : null}
+      {!open && live ? (
+        <pre className="step__out step__out--live">{lastLines(content, LIVE_LINES)}</pre>
+      ) : null}
     </>
   )
 }
-
 
 /** 这一条要不要单独占一行：**没干完的、出问题的**都要。 */
 function needsOwnRow(item: ToolCallItem): boolean {
@@ -167,7 +169,13 @@ function needsOwnRow(item: ToolCallItem): boolean {
  * **只折成功的。** 失败、被拒、中断的必须自己占一行——那正是你要找的东西，
  * 把它藏进一句「运行了命令」里，等于把出问题的地方藏起来。
  */
-function Folded({ items, cwd }: { items: readonly ToolCallItem[]; cwd: string }): React.JSX.Element {
+function Folded({
+  items,
+  cwd,
+}: {
+  items: readonly ToolCallItem[]
+  cwd: string
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   if (items.length === 1) {
     const only = items[0]
@@ -208,7 +216,13 @@ function Folded({ items, cwd }: { items: readonly ToolCallItem[]; cwd: string })
  * 做完的**连着折成一行**，没做完和出问题的各占一行——
  * 一屏里最该被看见的是后者。
  */
-export function ToolRun({ items, cwd }: { items: readonly ToolCallItem[]; cwd: string }): React.JSX.Element {
+export function ToolRun({
+  items,
+  cwd,
+}: {
+  items: readonly ToolCallItem[]
+  cwd: string
+}): React.JSX.Element {
   // 按「要不要单独一行」切成若干段，段内顺序不变
   const groups: { folded: boolean; items: ToolCallItem[] }[] = []
   for (const item of items) {

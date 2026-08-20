@@ -11,36 +11,48 @@
  * 靠右这件事才真的成立。codex 也是靠右的——提问和回答分列两侧，
  * 一眼就能扫出「这段是我说的」。
  */
+/*
+ * 82% → 72%，去掉描边，底色深一档，字号进正文那一档。见 tokens 的 `--bg-said`。
+ * 窄一点不是为了好看：82% 的气泡和满宽的回答几乎一样宽，**「靠右」这个
+ * 唯一的身份信号就被稀释了**——右边只剩不到 140px 的空隙在说这件事。
+ */
 .msg--user {
-  max-width: 82%;
+  max-width: 72%;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
+  background: var(--bg-said);
+  font-size: var(--text-prose);
+  line-height: var(--lh-prose);
   white-space: pre-wrap;
 }
 
 /* 注意：这里**不能**有 white-space: pre-wrap。内容是 Markdown 渲染出的元素树，
    pre-wrap 会把标签之间的换行符当成真实换行，每个块级元素之间凭空多出一整行。
    字面量文本只剩用户消息（.msg--user），pre-wrap 留在那里。 */
+/* 回答是这一屏最该被读完的东西，给它自己那一档字号（见 tokens 的 `--text-prose`）。
+   `.md` 自己不设字号，所以整棵 Markdown 树跟着继承；`pre code` 和表格
+   各有各的 token，不受影响。 */
 .msg--agent {
   min-width: 0;
-}
-
-.reasoning {
-  padding-left: var(--sp-3);
-  border-left: 2px solid var(--border);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-prose);
+  line-height: var(--lh-prose);
 }
 
 /* ── 工具活动：扁平行 + 左轨，不是一摞卡片 ──────────────── */
+/*
+ * **整组不缩进。** 上一版是 `padding-left: 12 + border-left: 1`，于是工具行的
+ * 图标从 13 起、文字从 37 起，而同样是「它在干活」的思考行图标在 0、文字在 24。
+ * 两条边差 13px，`--step-slot` 那条注释说的「展开出来的东西都对着这一条槽」
+ * 只在 `.run` 内部成立——因为 `.run` 自己被推开了。
+ *
+ * 现在整个转录区横向只有两个值：**0**（正文与所有行的图标列）
+ * 和 **`--step-slot`（24，一切文字）**。轨线改到展开出来的内容上（见 `.step__out`
+ * 的邻居们），落在图标中线 8 上——那才是它该挂的地方。
+ */
 .run {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding-left: var(--sp-3);
-  border-left: 1px solid var(--border);
 }
 
 .step {
@@ -131,7 +143,22 @@
   font-size: var(--text-xs);
 }
 
-.step__state--failed,
+/*
+ * 上一版这两个挂在同一条规则上、值是 `--text-faint`——**而基础样式本来就是
+ * 那个值**，也就是说这条规则一个像素都没改过。下面那句注释只替「中断」辩护，
+ * 「失败」是被顺手扫进同一个选择器组的。
+ *
+ * 结果：一条 40 行的工具日志里第 17 行崩了，屏幕上没有任何东西标它。
+ */
+.step__state--failed {
+  color: var(--danger);
+}
+
+/* 一行里只有两个字变色，扫的时候还是容易漏，图标一起染 */
+.step:has(.step__state--failed) .step__icon {
+  color: var(--danger);
+}
+
 /* 中断不是失败：用中性色，别让「你自己按了停止」看着像出错 */
 .step__state--interrupted {
   color: var(--text-faint);
@@ -175,11 +202,14 @@
   white-space: nowrap;
 }
 
+/* 挂在轨上：盒子从图标中线（8）起，左边一道 1px，内边距把文字送到 24 那条列。
+   左侧圆角去掉——它贴着轨，圆角会让轨和盒之间露出一道月牙 */
 .step__out {
   margin: 2px 0 var(--sp-2);
-  margin-left: var(--step-slot);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius-sm);
+  margin-left: calc(var(--step-icon) / 2 - 1px);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--step-slot) - var(--step-icon) / 2);
+  border-left: 1px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: var(--bg-code);
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -190,9 +220,45 @@
      （`.md pre` 和 `.md__scroll`），工具输出不在上面 */
   overflow-wrap: anywhere;
   /* **必须显式写**：两轴只有一个非 visible 时另一轴按 auto 算，
-     光删 overflow-x 会让这个 320px 的盒子直接溢出压住下面的对话 */
-  overflow-y: auto;
-  max-height: 320px;
+     光删 overflow-x 会让这个盒子直接溢出压住下面的对话。
+     这条防御和上一版一样必要，换掉的是它旁边那句 `overflow-y: auto`——
+     **内滚这个决定本身**（见 ToolRun.tsx 的 `Output`） */
+  overflow: hidden;
+}
+
+/* 夹断态：12 行，底下渐隐收口。渐变收到 `--bg-code` 而不是 `--bg`——
+   它盖的是这个盒子自己的底色，收错了会在末尾露出一道浅边 */
+.step__out--clip {
+  position: relative;
+  max-height: calc(12 * 1.55 * var(--text-code));
+}
+
+.step__out--clip::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--bg-code));
+  pointer-events: none;
+}
+
+/* 「展开全部（还有 N 行）」。对着 24 那条文字列，和上面那段输出同一条边 */
+.step__more {
+  margin: 0 0 var(--sp-2) var(--step-slot);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: default;
+}
+
+.step__more:hover {
+  color: var(--text);
 }
 
 .diffstat__add {
@@ -438,9 +504,16 @@
   font-size: var(--text-xs);
 }
 
-/* ── composer ───────────────────────────────────────── */
+/* ── composer ─────────────────────────────────────────
+ * **没有 `border-top`。** 输入框本身已经是一张卡（描边 + 圆角 + 抬起的底色），
+ * 卡外面再画一条横穿整扇窗的线，是同一件事说了两遍、而且第二遍说得更重——
+ * `--border-strong` 的口径是「把窗口切成区块的那几条」，可对话和你正在打的
+ * 那句话不是两个区块，**它是同一条流的下一步**。
+ *
+ * 那条线原本在干一件正经事：标出滚动区到哪儿为止。这件事交给 `.hem`
+ * 那道渐隐（见 app.css）——内容溶进去，而不是被齐着切断。
+ */
 .composer {
-  border-top: 1px solid var(--border-strong);
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
 }
 
@@ -452,6 +525,9 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--bg-raised);
+  /* 通栏线拿掉之后卡片得自己站住。2px、6% 是最轻的一道；
+     深色下 `--shadow-1` 本来就是 `none`，那边由描边接手 */
+  box-shadow: var(--shadow-1);
   padding: var(--sp-2) var(--sp-3);
 }
 
@@ -733,11 +809,6 @@
   flex-direction: column;
 }
 
-/* 同上：负边距挂在 `.transcript__inner` 的直接子节点上，写法照 `.copyable:has(> .msg--user)` */
-.copyable:has(> .think) {
-  margin: calc(var(--sp-2) * -1) 0;
-}
-
 .think__row {
   display: flex;
   align-items: center;
@@ -783,7 +854,12 @@
 }
 
 /* **这一行是定高的**，整个组件的价值全在这里：
-   `nowrap` + `overflow:hidden`，内容再长也只占一行 */
+   `nowrap` + `overflow:hidden`，内容再长也只占一行。
+
+   右缘用渐隐收尾，不用硬切：**硬切看起来像「没渲染完」，渐隐才是「还有」**，
+   这两种感觉差别很大——前者让人以为界面坏了。
+   渐变按 px 从右边起算而不是按百分比：这一行 `flex: 1` 恒满宽，
+   短标题（收工态取 `headingOf`）根本够不到这 28px，不会被无谓地淡掉。 */
 .think__line {
   flex: 1;
   min-width: 0;
@@ -791,6 +867,7 @@
   white-space: nowrap;
   color: var(--text-faint);
   font-size: var(--text-xs);
+  mask-image: linear-gradient(to left, transparent 0, #000 28px);
 }
 
 .think__chev {
@@ -828,9 +905,11 @@
   }
 }
 
+/* 和 `.step__out` 同一条轨、同一条文字列 */
 .think__body {
-  padding: var(--sp-2) 0;
-  padding-left: var(--step-slot);
+  margin-left: calc(var(--step-icon) / 2 - 1px);
+  padding: var(--sp-2) 0 var(--sp-2) calc(var(--step-slot) - var(--step-icon) / 2);
+  border-left: 1px solid var(--border);
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
@@ -866,12 +945,13 @@
   color: var(--text);
 }
 
-/* 摊开之后的那几条缩进一级，看得出是从上面那行展开来的 */
+/* 摊开之后的那几条缩进一级，看得出是从上面那行展开来的。
+   和 `.step__out` / `.think__body` 用同一个算式：盒子从图标中线起，
+   内边距把里面那些行的图标列送到 24 —— 三处展开物一条轨、一条列 */
 .run__nested {
-  padding-left: var(--sp-3);
+  margin-left: calc(var(--step-icon) / 2 - 1px);
+  padding-left: calc(var(--step-slot) - var(--step-icon) / 2);
   border-left: 1px solid var(--border);
-  /* 轨线右边缘正好压在父图标的中线 8 上，那 1px 是描边自己 */
-  margin-left: calc(var(--sp-2) - 1px);
 }
 
 /* ── 变更汇总 ─────────────────────────────────────────
@@ -1106,9 +1186,13 @@
 /* 分界线那一行：左边是「已处理 X」，右边挂「从这里重来」。
    **负边距必须挂在这里**（`.transcript__inner` 的直接子节点），不能挂在
    `.turnmark` 上——那是本行的一个 flex 项，`align-items: center` 对的是
-   外边距盒，负值压的不是行距而是它自己在行内的位置：实测同一行的两样东西差 4px */
+   外边距盒，值压的不是行距而是它自己在行内的位置：实测同一行的两样东西差 4px。
+
+   **上重下轻**：8（基数）+ 20 = 28 在上面，下面只有基数的 8。
+   分界线属于**它下面那一轮**，是表头不是页脚——上一版这里是 `-8`，
+   那是在跟一个 16px 的均匀 gap 较劲（见 `.transcript__inner`）*/
 .turnmark__row {
-  margin-top: calc(var(--sp-2) * -1);
+  margin-top: 20px;
   display: flex;
   align-items: center;
   gap: var(--sp-3);

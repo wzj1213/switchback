@@ -56,7 +56,13 @@ export function PinnedSection({
       />
       {open ? (
         sections.pinnedThreads.length === 0 && sections.pinned.length === 0 ? (
-          <p className="sidebar__empty">把会话或项目拖到这里就置顶了；拖回「项目」那一段就取消。</p>
+          /* **平时不说这句话。** 它讲的是一个拖拽动作，而人需要它的那一刻
+             正是手里已经拖着东西的那一刻。常驻的话它是 3 行 13px（连内边距 78px，
+             比整个「项目」段的四行还高一半），而且读一次就够——之后永远是噪声。
+             `dragKind` 一有值就现出来：要教的时候才教。 */
+          on.dragKind === undefined ? null : (
+            <p className="sidebar__empty">松手就置顶了；拖回「项目」那一段取消。</p>
+          )
         ) : (
           <>
             {sections.pinnedThreads.map((row) => (

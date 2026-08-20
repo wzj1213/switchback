@@ -213,7 +213,9 @@ export function SectionList({ sections, on }: { sections: Sections; on: GroupHan
       />
       {open("chat") ? (
         sections.chats.length === 0 ? (
-          <p className="sidebar__empty">还没有对话。点右边的 + 开一条，不用先选项目。</p>
+          /* 压成一行：那颗 `+` 就在段头右边，「点右边的 +」这半句是在说一个
+             你已经看得见的东西；「不用先选项目」也只有在你以为必须先选时才有意义 */
+          <p className="sidebar__empty sidebar__empty--one">还没有独立对话</p>
         ) : (
           <Chats rows={sections.chats} on={on} />
         )

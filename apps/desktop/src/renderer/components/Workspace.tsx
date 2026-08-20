@@ -6,6 +6,7 @@ import { useOmniActions } from "../useOmniActions.js"
 import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
 import { Transcript } from "./Transcript.js"
+import { Pets } from "./Pets.js"
 import { Changed } from "./Changed.js"
 import { Queued } from "./Queued.js"
 import { Notices } from "./Notices.js"
@@ -194,15 +195,24 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
       />
       <Notices notices={props.notices} rows={props.rows} onDismiss={props.onDismiss} onSelect={props.onSelect} />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
-      <Transcript
-        thread={thread}
-        items={props.items}
-        turn={props.turn}
-        tasks={props.tasks}
-        send={send}
-        onCopy={props.onCopy}
-        onReuse={reuse}
-      />
+      {/* 对话区。**多这一层是为了给吉祥物一块有边界的地**——
+          它们要能被拖到任何地方，也要知道「地面」在哪（就是这一块的底边，
+          也就是输入框的上沿）。顺带它也是那道下摆渐隐的定位参照 */}
+      <div className="stage">
+        <Transcript
+          thread={thread}
+          items={props.items}
+          turn={props.turn}
+          tasks={props.tasks}
+          send={send}
+          onCopy={props.onCopy}
+          onReuse={reuse}
+        />
+        {/* 滚动区的下摆。**必须在 `Transcript` 外面**——滚动容器里的绝对定位参照的是
+            可滚动内容而不是可视区，挂进去那道渐隐会跟着内容滚走。见 app.css 的 `.hem` */}
+        <div className="hem" aria-hidden="true" />
+        <Pets engines={props.engines} engine={thread.engine} running={props.turn?.status === "running"} />
+      </div>
       <Between props={props} thread={thread} stamp={stamp} send={send} onReuse={reuse} />
       <WorkspaceComposer props={props} thread={thread} stamp={stamp} prefill={prefill} actions={actions} />
     </main>

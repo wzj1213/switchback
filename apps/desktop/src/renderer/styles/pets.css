@@ -1,0 +1,266 @@
+/*
+ * 输入框上沿那几只。手感与物理在 `renderer/pets.ts`，组件在 `components/Pets.tsx`。
+ *
+ * ## 引擎的配色为什么写在这儿，不写进 tokens.css
+ *
+ * tokens 是**这套界面**的调色板；引擎是界面外面的东西，多接一家就得改一次
+ * 主题文件是说不通的。它们仍然是 token（都叫 `--pet-*`），只是住在自己这一层——
+ * `check-tokens.mjs` 扫的是全部 css 文件，所以照样受守卫管。
+ *
+ * ## 只有 grok 那只要分深浅
+ *
+ * 原案给它的是 `#16161a`——**正好是 omni `--text` 的值**。压在深色底 `#17171a` 上
+ * 对比度 **1.01:1**：不是「看不清」，是「不存在」，屏幕上只剩两只白眼睛浮在黑底上。
+ * 另外两只两套底色上都过 3:1（kimi 3.71 / 4.83，claude 3.11 / 5.76），原值一个字节不动。
+ */
+
+:root {
+  --pet-kimi: #5b83d6;
+  --pet-kimi-eye: #1d2f57;
+  --pet-claude: #da7756;
+  --pet-claude-eye: #a84e30;
+  --pet-grok: #16161a;
+  --pet-grok-eye: #ffffff;
+  /* 没见过的那一家。**不编配色**——编出来迟早和某一家撞 */
+  --pet-plain: #8f8f9a;
+  --pet-plain-eye: #ffffff;
+  /* 影子。深浅两套的浓度不一样：浅色地面上 26% 的黑就够，
+     深色地面本来就黑，同样的浓度什么都看不出来——而影子是「离地多高」唯一的说法 */
+  --pet-shade: #000000;
+  --pet-shade-a: 0.26;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pet-grok: #c9c9d2;
+    --pet-grok-eye: #16161a;
+    --pet-shade-a: 0.5;
+  }
+}
+
+/*
+ * 活动区：顶栏底下、输入框上面那一整块（`.stage`）。
+ *
+ * **层本身不吃指针事件**，只有三只自己吃——否则它会盖住整块转录区，
+ * 选不中文字、点不开工具行，而这三只只占右下角 100 来个像素。
+ */
+.pets {
+  position: absolute;
+  /* 底边往下探 6px，探进输入区的内边距里：地面 = 这一层的底边，
+     不探的话它们的脚离输入框上沿还差一截，看起来是浮在半空而不是站着。
+     这一层自己 `overflow: hidden`，所以探出去的部分不会漏到别处 */
+  inset: 0 0 -6px;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.pet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  /* 拖的时候别选中底下的文字，也别让触控板的滚动把它抢走 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  /* 不是当前引擎的那几只压暗。**这是「谁在答」的信号**，比再挂一枚徽章省。
+     0.6 是试出来的：再低一档螃蟹那身陶土色会淡成粉的，看起来像「禁用」
+     而不是「不是这一位」——而它们三个都是能用的 */
+  opacity: 0.6;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.pet:active,
+.pet--held {
+  cursor: grabbing;
+}
+
+/* 拿在手里的、和飞在空中的，都该压在待着的那几只上面 */
+.pet--held,
+.pet--air {
+  z-index: 1;
+}
+
+.pet--on {
+  opacity: 1;
+}
+
+.pet--kimi {
+  color: var(--pet-kimi);
+  --pet-eye: var(--pet-kimi-eye);
+}
+
+.pet--claude {
+  color: var(--pet-claude);
+  --pet-eye: var(--pet-claude-eye);
+}
+
+.pet--grok {
+  color: var(--pet-grok);
+  --pet-eye: var(--pet-grok-eye);
+}
+
+.pet--plain {
+  color: var(--pet-plain);
+  --pet-eye: var(--pet-plain-eye);
+}
+
+/*
+ * 三层各管各的，**一层都不能省**——`transform` 只有一个，合并就互相盖掉：
+ * `.pet` 位置（JS 每帧写）· `.pet__lean` 倾斜与抻长（JS 每帧写）·
+ * `.pet__body` 蹦的动画（CSS）与蹦一下 / 砸扁 / 捏起来（WAAPI）。
+ */
+.pet__lean {
+  display: block;
+  transform-origin: bottom center;
+  transition: transform var(--dur) var(--ease);
+}
+
+/* 拖动时每帧都在写 transform，再叠一层过渡就成了橡皮筋，跟不上手 */
+.pet--held .pet__lean,
+.pet--air .pet__lean {
+  transition: none;
+}
+
+.pet__body {
+  display: block;
+  transform-origin: bottom center;
+}
+
+/*
+ * 影子。**钉在地面上，不跟着抬**：没有它的话，飞在半空的史莱姆和站在地上的
+ * 史莱姆在屏幕上是同一张图，整个拖着玩的手感全靠这个高度差。
+ * 大小和浓度由 JS 按离地高度写（见 `petPaint.ts`）。
+ */
+.pet__shade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 26px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pet-shade);
+  opacity: 0;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.pet__body svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+
+/* 状态点在**头顶**。挂在脚下时它垫在身子和地面之间，三只看起来全都悬空——
+   而它们本来是站在输入框上沿的，那条边就是地面 */
+.pet__dot {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+/* 眨眼：把眼睛压扁。`transform-box: fill-box` 不能少——
+   不写的话变换的参照是整个 svg 的视口，眼睛会飞到别处去 */
+.pet__eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 70ms var(--ease);
+}
+
+.pet--blink .pet__eyes {
+  transform: scaleY(0.12);
+}
+
+/*
+ * 跑着的时候跳。**关键帧和最初那版的 `hop` 逐帧相同**——压扁蓄力、弹起拉长、
+ * 落地砸扁、回弹，一个不少；变的只有频率：从 `1.8s infinite` 改成
+ * `4s 一次、600ms 起、每次约 1s`，和 `status.css` 那道微光逐字对齐。
+ *
+ * 于是它不再只是装饰，它是个状态指示：**它在动 = 它在干活。**
+ */
+@keyframes pet-hop {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+
+  3% {
+    transform: translateY(0) scale(1.12, 0.86);
+  }
+
+  8% {
+    transform: translateY(-9px) scale(0.94, 1.08);
+  }
+
+  14% {
+    transform: translateY(0) scale(1.1, 0.88);
+  }
+
+  19% {
+    transform: translateY(0) scale(0.97, 1.04);
+  }
+
+  24%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+.pet--run .pet__body {
+  animation: pet-hop 4s linear 600ms infinite;
+}
+
+/*
+ * 横着走回窝的那几步。**只有螃蟹会走**（史莱姆是一路弹回去的，见 `gaitOf`），
+ * 所以这条实际上是螃蟹专用：一点点上下颠加左右摆，不然它是贴着地平移过去的，
+ * 看起来像被谁拖着走，而不是自己爬。
+ *
+ * 排在 `.pet--run` 后面：走回窝是临时状态，这几步里它盖住那个 4 秒一次的跳。
+ */
+@keyframes pet-scuttle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2.5deg);
+  }
+
+  50% {
+    transform: translateY(-1.5px) rotate(2.5deg);
+  }
+}
+
+.pet--walk .pet__body {
+  animation: pet-scuttle 260ms ease-in-out infinite;
+}
+
+/* `.row__dot--running` 和 `.meter__fill` 都写了这一条，这里也得有。
+   拖和落地不关掉——那是你自己动手的直接反馈，不是自作主张的动效
+  （松手之后的抛物线由 `Pets.tsx` 自己跳过，直接回窝） */
+@media (prefers-reduced-motion: reduce) {
+  .pet--run .pet__body,
+  .pet--walk .pet__body {
+    animation: none;
+  }
+
+  .pet__lean {
+    transition: none;
+  }
+
+  .pet__eyes {
+    transition: none;
+  }
+
+  .pet {
+    transition: none;
+  }
+}
