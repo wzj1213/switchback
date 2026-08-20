@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { bump } from "./petBump.js"
 import {
-  bump,
   busy,
   columnRightOf,
+  hitOf,
   homeXOf,
   SIZE,
   step,
   type Gait,
+  type Hit,
   type Pet,
   type Stage,
 } from "./pets.js"
@@ -22,11 +24,6 @@ import { paintPets } from "./petPaint.js"
 /** 一帧最多推进多少秒。切后台再切回来时浏览器会攒出几秒的 dt，
     不夹住的话这一帧的位移能把它送出去好几屏。 */
 const MAX_DT = 0.05
-/** 落地速度低于这个就不演砸扁了——轻轻放下不该抖一下。 */
-const LAND_AT = 260
-/** 互撞时速度变了这么多才演砸扁。**和落地共用那一下**：撞到地和撞到同伴，
-    在眼睛看来是同一件事——挨了一下。低于这个是擦肩，不该有反应 */
-const BUMP_AT = 200
 /** 读不到 `--content-max` / `--sp-4` 时的兜底。**和 tokens.css 一致**，
     但真走到这儿说明样式没加载，那时位置对不对已经不是最要紧的事了 */
 const FALLBACK_MAX = 760
@@ -54,16 +51,17 @@ export function usePets(
   count: number,
   /** 每只怎么回窝。**按序号对齐** `count`，缺的按走路算。 */
   gaits: readonly Gait[],
-  onLand: (index: number, speed: number) => void,
+  /** 挨了一下（砸地、撞墙、撞同伴都算，判据在 `hitOf`）。 */
+  onHit: (index: number, hit: Hit) => void,
 ): PetsCtl {
   const area = useRef<HTMLDivElement>(null)
   const nodes = useRef<(HTMLButtonElement | null)[]>([])
   const leans = useRef<(HTMLSpanElement | null)[]>([])
   const shades = useRef<(HTMLSpanElement | null)[]>([])
   const pets = useRef<Pet[]>([])
-  // 落地回调放进 ref：它每次渲染都换身份，而 `tick` 不该因此重建
-  const land = useRef(onLand)
-  land.current = onLand
+  // 回调放进 ref：它每次渲染都换身份，而 `tick` 不该因此重建
+  const land = useRef(onHit)
+  land.current = onHit
   const stage = useRef<Stage>({ width: 0, height: 0 })
   /** 内容列的右缘。**窝挂在这儿**，而不是活动区的右墙——见 `columnRightOf` */
   const col = useRef(0)
@@ -97,16 +95,15 @@ export function usePets(
         }),
       )
       pets.current = [...bump(moved)]
-      // 挨了一下就要有反应。**比较前后两帧**是唯一能认出「刚刚撞到了」的地方——
-      // 物理函数是纯的，它不知道自己是第几帧：撞地看纵向穿没穿过地面，
-      // 撞同伴看这一帧的速度被 `bump` 改了多少
-      const floor = stage.current.height - SIZE
+      // 挨了一下就要有反应。判据在 `hitOf`——**比较前后**是唯一能认出
+      // 「刚刚撞到了」的地方，物理函数是纯的，它不知道自己是第几帧
+      const bounds = { floor: stage.current.height - SIZE, right: stage.current.width - SIZE }
       for (const [i, now] of pets.current.entries()) {
         const before = was[i]
-        const pushed = Math.abs(now.vx - (moved[i]?.vx ?? now.vx))
-        if (before !== undefined && before.y < floor && now.y >= floor && before.vy > LAND_AT) {
-          land.current(i, before.vy)
-        } else if (pushed > BUMP_AT) land.current(i, pushed)
+        const pushed = moved[i]
+        if (before === undefined || pushed === undefined) continue
+        const hit = hitOf(before, pushed, now, bounds)
+        if (hit !== undefined) land.current(i, hit)
       }
       paint()
       // **没东西在动就停**：一个天天开着的窗口不该为三只静止的史莱姆每秒醒 60 次

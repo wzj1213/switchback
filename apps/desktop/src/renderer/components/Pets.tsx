@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
 import { Crab, Slime } from "./pets-art.js"
-import { gaitOf, lookOf, type Pet, type PetLook } from "../pets.js"
+import { gaitOf, lookOf, type Hit, type Pet, type PetLook } from "../pets.js"
 import { usePets, useReduced } from "../usePets.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
@@ -43,6 +43,36 @@ const JOLT: Keyframe[] = [
 
 /** 砸得比这轻就不惊动旁边的——轻轻放下不该让全场抖一下 */
 const JOLT_AT = 900
+
+/** 挨得够狠才眯一下眼（一记「哎哟」）。**不能每次落地都眯**——
+    蹦回窝的每一跳都算落地，每跳眯一次就成了抽搐 */
+const WINCE_AT = 700
+const WINCE_MS = 220
+
+/** 眯一下眼。复用眨眼那一档：**它本来就是「眼睛闭上」这一件事**，没必要再发明一个。 */
+function wince(node: HTMLButtonElement | null | undefined): void {
+  if (node === null || node === undefined) return
+  node.classList.add("pet--blink")
+  setTimeout(() => {
+    node.classList.remove("pet--blink")
+  }, WINCE_MS)
+}
+
+/**
+ * 挨了一下的那三帧：**顺着挨打的方向压，再反弹回来**。
+ *
+ * 从天上砸下来是压扁（矮胖），横着挨一记是压瘦（细高）——同一个形演两种撞击，
+ * 撞击就没了方向；而方向恰恰是「刚才发生了什么」的全部内容。
+ */
+function squash(k: number, axis: Hit["axis"]): Keyframe[] {
+  const hit = axis === "y" ? [1 + k, 1 - k] : [1 - k, 1 + k]
+  const back = axis === "y" ? [1 - k * 0.4, 1 + k * 0.4] : [1 + k * 0.4, 1 - k * 0.4]
+  return [
+    { transform: `scale(${String(hit[0])}, ${String(hit[1])})` },
+    { transform: `scale(${String(back[0])}, ${String(back[1])})`, offset: 0.45 },
+    { transform: "scale(1, 1)" },
+  ]
+}
 export function Pets({
   engines,
   engine,
@@ -62,29 +92,24 @@ export function Pets({
   const reduced = useReduced()
   // 砸到地上要有分量：**按落地速度定砸扁的深浅**，轻轻放下几乎看不出，
   // 从对话框顶上摔下来会实实在在瘪一下
-  // 撞到同伴也走这一下（`usePets` 里判的）：**撞地和撞同伴在眼睛看来是同一件事**
-  const onLand = useCallback(
-    (index: number, speed: number) => {
+  // 砸到地、撞到墙、撞到同伴走的都是这一下（判据在 `hitOf`）：
+  // **在眼睛看来它们是同一件事——挨了一下**，区别只在朝哪个方向挨的
+  const onHit = useCallback(
+    (index: number, hit: Hit) => {
       if (reduced) return
-      const k = Math.min(0.3, speed / 2600)
-      bodies.current[index]?.animate(
-        [
-          { transform: `scale(${String(1 + k)}, ${String(1 - k)})` },
-          { transform: `scale(${String(1 - k * 0.4)}, ${String(1 + k * 0.4)})`, offset: 0.45 },
-          { transform: "scale(1, 1)" },
-        ],
-        { duration: 300, easing: "ease-out" },
-      )
+      const k = Math.min(0.3, hit.speed / 2600)
+      bodies.current[index]?.animate(squash(k, hit.axis), { duration: 300, easing: "ease-out" })
+      if (hit.speed >= WINCE_AT) wince(ctl.nodes.current[index])
       // 砸得够重时，旁边站着的会被**震一下**。物理上不成立（它们又没连在一起），
       // 但这是整套里最便宜的一处「它们在同一个世界里」——而那正是想要的
-      if (speed < JOLT_AT) return
+      if (hit.speed < JOLT_AT) return
       for (const [j, body] of bodies.current.entries()) {
         if (j !== index) body?.animate(JOLT, { duration: 260, easing: "ease-out" })
       }
     },
     [reduced],
   )
-  const ctl = usePets(count, gaits, onLand)
+  const ctl = usePets(count, gaits, onHit)
   // **只给待在窝里、又不是正在跑的那几只排班**——理由在 `usePetMood` 开头
   useMood(ctl.nodes, ctl.pets, count, reduced)
   const drag = usePetDrag(ctl, bodies, reduced)

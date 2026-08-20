@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
+import { bump } from "./petBump.js"
 import {
-  bump,
   busy,
+  hitOf,
   columnRightOf,
   gaitOf,
   homeXOf,
@@ -201,12 +202,21 @@ describe("翻滚与互撞", () => {
     expect(bump([fast, far])[1]?.mode).toBe("rest")
   })
 
-  it("蹭一下只是把它推开，不掀翻——一脚踹飞的反应配不上一次擦肩", () => {
+  it("蹭一下只是把它推开，不顶起来——一脚踹飞的反应配不上一次擦肩", () => {
     const slow: Pet = { x: 100, y: floor, vx: 40, vy: 0, spin: 0, mode: "air" }
     const near: Pet = { x: 110, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
     const [, b] = bump([slow, near])
-    expect(b?.mode).not.toBe("air")
+    expect(b?.vy).toBe(0) // 没被顶起来
     expect(b?.x).toBeGreaterThan(near.x) // 但确实被推开了，不再叠在一起
+  })
+
+  it("被推开的那只按自己的步态回窝：史莱姆是蹦回去的，不是贴地滑回去", () => {
+    const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
+    const slime: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    const pushed = bump([rock, slime])[1]
+    expect(pushed?.mode).toBe("air") // 交给落地那一段去挑走还是蹦
+    const next = step(pushed ?? slime, 1 / 60, { stage, homeX: 400, gait: "hop" })
+    expect(next.mode).toBe("hop")
   })
 
   it("撞完两只不再重叠——叠在一起看起来是一只长了两个头", () => {
@@ -252,8 +262,8 @@ describe("翻滚与互撞", () => {
     const there = (): Pet => ({ x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" })
     const swung: Pet = { x: 100, y: floor, vx: 900, vy: 0, spin: 0, mode: "held" }
     const crept: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
-    expect(bump([swung, there()])[1]?.mode).toBe("air")
-    expect(bump([crept, there()])[1]?.mode).toBe("walk")
+    expect(bump([swung, there()])[1]?.vy).toBeLessThan(0) // 被掀起来
+    expect(bump([crept, there()])[1]?.vy).toBe(0) // 只是被推开
   })
 
   it("推土机能一路犁开一排：第一只被推开，它再推第二只", () => {
@@ -271,6 +281,24 @@ describe("翻滚与互撞", () => {
     const r: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "walk" }
     expect(bump([l, r])).toEqual([l, r])
   })
+
+  it("回窝路上没有碰撞体积：蹦回去的那只不会一路把窝里的撞开", () => {
+    const back: Pet = { x: 100, y: floor - 20, vx: 300, vy: 0, spin: 0, mode: "hop" }
+    const home: Pet = { x: 112, y: floor, vx: 0, vy: 0, spin: 0, mode: "rest" }
+    expect(bump([back, home])).toEqual([back, home])
+  })
+
+  it("在飞的也撞不着正在回窝的那只——它已经在让路了", () => {
+    const thrown: Pet = { x: 100, y: floor, vx: 800, vy: 0, spin: 0, mode: "air" }
+    const going: Pet = { x: 112, y: floor, vx: -50, vy: 0, spin: 0, mode: "walk" }
+    expect(bump([thrown, going])).toEqual([thrown, going])
+  })
+
+  it("但你手里那只照样推得动正在回窝的——你的手是实的", () => {
+    const rock: Pet = { x: 100, y: floor, vx: 0, vy: 0, spin: 0, mode: "held" }
+    const going: Pet = { x: 112, y: floor, vx: -50, vy: 0, spin: 0, mode: "walk" }
+    expect(bump([rock, going])[1]?.x).toBeGreaterThan(going.x)
+  })
 })
 
 describe("busy", () => {
@@ -281,5 +309,41 @@ describe("busy", () => {
     expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "held" }])).toBe(true)
     expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "walk" }])).toBe(true)
     expect(busy([{ x: 0, y: 0, vx: 0, vy: 0, spin: 0, mode: "hop" }])).toBe(true)
+  })
+})
+
+describe("这一帧挨了哪一下", () => {
+  const bounds = { floor, right: stage.width - SIZE }
+  const p = (over: Partial<Pet>): Pet => ({ x: 200, y: floor, vx: 0, vy: 0, spin: 0, mode: "air", ...over })
+
+  it("砸到地上：算的是砸下来那一刻的速度，方向是竖的", () => {
+    const was = p({ y: floor - 5, vy: 900 })
+    const now = p({ y: floor, vy: 0 })
+    expect(hitOf(was, now, now, bounds)).toEqual({ speed: 900, axis: "y" })
+  })
+
+  it("轻轻放下不算挨了一下", () => {
+    const was = p({ y: floor - 1, vy: 80 })
+    const now = p({ y: floor, vy: 0 })
+    expect(hitOf(was, now, now, bounds)).toBeUndefined()
+  })
+
+  it("撞到墙：横速被翻了向，而且人确实贴着墙", () => {
+    const was = p({ x: 4, vx: -600 })
+    const now = p({ x: 0, vx: 250 })
+    expect(hitOf(was, now, now, bounds)).toEqual({ speed: 600, axis: "x" })
+  })
+
+  it("落在窝那边掉头往回蹦，不算撞墙——只看翻向会把它误判成撞墙", () => {
+    const was = p({ x: 300, vx: -600 })
+    const now = p({ x: 300, vx: 250 })
+    expect(hitOf(was, now, now, bounds)).toBeUndefined()
+  })
+
+  it("撞到同伴：看 `bump` 把速度改了多少，方向取变得多的那条轴", () => {
+    const was = p({ vx: 500 })
+    const stepped = p({ vx: 500 })
+    const now = p({ vx: 60 })
+    expect(hitOf(was, stepped, now, bounds)).toEqual({ speed: 440, axis: "x" })
   })
 })
