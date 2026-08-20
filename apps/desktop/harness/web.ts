@@ -101,6 +101,18 @@ const items: readonly Item[] = [
     reason: "这条命令里有 `rm -rf`，解析不出它最终会删到哪儿——按红线表必须问你一次。",
     rememberHint: "本会话内的构建命令",
   },
+  {
+    id: "i-plan",
+    turnId: "u-1",
+    kind: "plan",
+    at: at + 6,
+    explanation: "先把窄屏主路径跑通，再补交互态。",
+    steps: [
+      { text: "核对审批卡在窄屏上的信息层级", status: "done" },
+      { text: "验证输入框上方的常驻计划进度", status: "in_progress" },
+      { text: "检查断线与重新接入状态", status: "pending" },
+    ],
+  },
 ]
 
 /**

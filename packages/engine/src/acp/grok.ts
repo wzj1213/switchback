@@ -31,49 +31,22 @@ import type { Trust } from "@omni/protocol"
  */
 
 /**
- * grok 的原生审批开关。
+ * Grok 1.0.5 的 ACP 原生审批档。
  *
- * ## 不传它 = 一路放行，而且一声不响
+ * 当前官方 Agent Mode 文档公开了两枚 `session/new` 扩展位：`autoMode` 启用
+ * 分类器评审，`yoloMode` 启用 Always-approve，且后者优先。真机 debug 也明确记录
+ * `Wired live LLM permission auto-mode classifier` 与 `auto permission mode set to: true`。
+ * 旧实现只认识 yolo，于是把中间档和最高档都接成了一路放行。
  *
- * 实测两组对照（同一个提示词，让它改一个文件）：
- *
- * | `session/new` 的 `_meta` | 会话的 yolo 标记 | 审批请求 | 文件 |
- * | --- | --- | --- | --- |
- * | 不给 | **true** | **0 次** | 被改了 |
- * | `{yoloMode:false}` | false | 1 次（带 `kind` 和完整命令） | 拒掉后没变 |
- *
- * 也就是说 **grok 的 ACP 会话默认就是 yolo**：不传这一条，omni 的三档对它
- * 完全没有发言权——用户选「只读」，它照样改文件。这不是体验问题，是安全洞。
- *
- * ## 为什么只能是两档
- *
- * grok 的 TUI 有六个档（`acceptEdits`/`auto`/`dontAsk`/`bypassPermissions`…），
- * 但**ACP 上一个都没暴露**：`session/set_mode` 是空壳（连不存在的档位也回 `{}`），
- * 唯一的开关就是这个 `yoloMode`。所以它没有 kimi 那种「安全操作自动放行」的中间档，
- * 只有「全问」和「全不问」。
- *
- * 映射：**只读档要真只读**，所以关掉 yolo，让它来问、由 omni 按只读档拒；
- * 自动编辑与完全档保持它原生的不打扰，并且**把这件事说出来**——
- * 那一档下 omni 的判定与红线对它确实不生效，闷着不说才是骗人。
- *
- * ## 只在开会话时生效
- *
- * 它在 `session/new` 里，和 codex 的 OS 沙箱一样**开完就定死**。
- * 中途换档改不了，那时驱动发一条 `degraded`——不假装改成了。
+ * 两枚值都显式传，避免继承一个与用户所选档位相反的会话默认值。它们也被
+ * `session/load` 接收，所以换档时宿主可以保留同一个原生句柄续接重启。
  */
 export function grokNativeApproval(trust: Trust): {
   meta: Readonly<Record<string, unknown>>
-  note?: string
 } {
-  const yolo = trust !== "read-only"
-  if (!yolo) return { meta: { yoloMode: false } }
-  return {
-    meta: { yoloMode: true },
-    note:
-      "Grok 在这一档下自动放行一切工具调用——它的 ACP 只有「全问 / 全不问」两档，" +
-      "没有「安全操作自动放行」。omni 的判定与红线对它因此不生效；" +
-      "要真正限制它，用只读档，或者 grok 自己的沙箱（`grok --sandbox` / `~/.grok/config.toml`）。",
-  }
+  if (trust === "read-only") return { meta: { yoloMode: false, autoMode: false } }
+  if (trust === "auto-edit") return { meta: { yoloMode: false, autoMode: true } }
+  return { meta: { yoloMode: true, autoMode: false } }
 }
 
 /** grok 把「和模型之间的全部往来」原样写在这个文件里。 */

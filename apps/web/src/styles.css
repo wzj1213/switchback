@@ -1126,6 +1126,46 @@ textarea {
 
 /* ── 输入框 ──────────────────────────────────────────── */
 
+.planbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 7px var(--sp-3);
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.planbar__mark {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.planbar__mark[data-status="in_progress"] {
+  color: var(--accent);
+}
+
+.planbar__progress {
+  flex: none;
+  padding: 1px var(--sp-2);
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.planbar__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composer {
   border-top: 1px solid var(--line);
   padding: var(--sp-2) var(--sp-3);

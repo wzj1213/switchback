@@ -5,7 +5,12 @@ import { askUser } from "./approval.js"
 import type { EngineSession } from "@omni/engine"
 import { emit, type Ctx, type Live } from "./ctx.js"
 import { evict } from "./live.js"
-import { rememberEngineState, rememberHandle, rememberModel, rememberTrustApply } from "./engine-state.js"
+import {
+  rememberEngineState,
+  rememberHandle,
+  rememberModel,
+  rememberTrustApply,
+} from "./engine-state.js"
 import { copyTranscript } from "./transcript.js"
 import type { Gate } from "./gate.js"
 
@@ -16,7 +21,11 @@ import type { Gate } from "./gate.js"
  * `host.ts` 只剩「事件怎么出去、命令怎么分派」，这里是「一个会话怎么活」。
  */
 
-function newThread(cmd: Extract<Command, { type: "thread.create" }>, id: ThreadId, at: number): Thread {
+function newThread(
+  cmd: Extract<Command, { type: "thread.create" }>,
+  id: ThreadId,
+  at: number,
+): Thread {
   return {
     id,
     // **临时的**：引擎照起（模型清单、斜杠命令要它才有），但在发出第一句话之前
@@ -125,7 +134,13 @@ function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
       if (models.length > 0) {
         // **带上是谁报的**：一条会话中途会换引擎，而渲染层要认得出手上这份
         // 是不是当前这家的（见 store 的 `modelsOf`）
-        emit(ctx, { type: "models.updated", at: ctx.deps.now(), threadId: thread.id, engine: thread.engine, models })
+        emit(ctx, {
+          type: "models.updated",
+          at: ctx.deps.now(),
+          threadId: thread.id,
+          engine: thread.engine,
+          models,
+        })
       }
     })
     .catch(() => undefined)
@@ -193,7 +208,10 @@ export async function dropTemps(ctx: Ctx, keep: readonly ThreadId[]): Promise<vo
  * 引擎起好再补一条 `idle`。**起不来就把它撤掉**——留一个永远 starting 的
  * 空壳比没有更糟，而错误由调用方翻成横幅。
  */
-export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.create" }>): Promise<void> {
+export async function create(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.create" }>,
+): Promise<void> {
   const at = ctx.deps.now()
   const thread = newThread(cmd, ctx.deps.newId("th"), at)
   // **先挂进待提交表再发事件**：新会话在发出第一句话之前不落盘，
@@ -213,11 +231,18 @@ export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.cre
   // 挑好的模型要在**第一句话发出去之前**落到引擎上（见 `thread.create` 的 `model`）。
   // 起不来就算了：模型没设上是个可以接着用的会话，为它把整条会话撤掉不成比例
   if (cmd.model !== undefined) {
-    await ctx.live.get(thread.id)?.session.setModel(cmd.model, cmd.effort).catch(() => undefined)
+    await ctx.live
+      .get(thread.id)
+      ?.session.setModel(cmd.model, cmd.effort)
+      .catch(() => undefined)
   }
   // **发 `live` 里那一份，不是这个局部变量**——`launch` 期间会往上面挂东西
   //（现在是引擎能力）。发局部的那份等于把它们原地丢掉，而且一声不响
-  emit(ctx, { type: "thread.updated", at: ctx.deps.now(), thread: ctx.live.get(thread.id)?.thread ?? thread })
+  emit(ctx, {
+    type: "thread.updated",
+    at: ctx.deps.now(),
+    thread: ctx.live.get(thread.id)?.thread ?? thread,
+  })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 
@@ -228,13 +253,17 @@ export async function create(ctx: Ctx, cmd: Extract<Command, { type: "thread.cre
  * 没有句柄就不给续——那种情况下起的是个全新会话，模型对上面那段对话一无所知，
  * 而界面看起来像是接上了。**宁可报错也不要制造这种错觉。**
  */
-export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.resume" }>): Promise<void> {
+export async function resume(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.resume" }>,
+): Promise<void> {
   if (ctx.live.has(cmd.threadId)) return
   const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
   const record = [...events]
     .reverse()
-    .find((e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
-      e.type === "thread.started" || e.type === "thread.updated",
+    .find(
+      (e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
+        e.type === "thread.started" || e.type === "thread.updated",
     )
   if (record === undefined) throw new Error(`找不到会话 ${cmd.threadId} 的历史，无法续跑`)
   const handle = record.thread.engineHandle
@@ -246,43 +275,6 @@ export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.res
   const early = await launch(ctx, thread, handle)
   emit(ctx, { type: "thread.updated", at, thread })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
-}
-
-/**
- * 改一条会话的信任档。
- *
- * ## 不活着的也要能改（和 `rename` 同一条道理）
- *
- * 上一版第一句就是「不在 `ctx.live` 里就 return」，于是对着一条 detached 的会话
- * 调它是**一个静默的空操作**：不报错、不发事件、什么都没发生。
- *
- * 那条路真有人走：手机上要把一条开在完全档的老会话接回来，必须先把它切到
- * 远程上限之内（`remote/policy.ts` 的注释里就写着「先在手机上把它切到 auto-edit」）——
- * 而它此刻正好不活。切不动的后果不是报错，是**接回来之后每一句话都被拒**，
- * 而用户在手机上遍寻不到任何能切档的地方。
- *
- * 所以照 `rename` 的样子办：活着就顺手告诉引擎一声，不活着也照样把这条记录改掉
- *（它会落盘，下次 `resume` 从日志里读回来的就是新档位）。
- */
-export async function setTrust(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust" }>): Promise<void> {
-  const at = ctx.deps.now()
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry !== undefined) {
-    await entry.session.setTrust(cmd.trust)
-    entry.thread = { ...entry.thread, trust: cmd.trust, updatedAt: at }
-    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-    return
-  }
-  // 不活着：从磁盘上那份记录改。**读不到就什么都不做**——
-  // 凭空造一条只有档位的会话，比改不动糟得多
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const record = [...events]
-    .reverse()
-    .find((e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
-      e.type === "thread.started" || e.type === "thread.updated",
-    )
-  if (record === undefined) return
-  emit(ctx, { type: "thread.updated", at, thread: { ...record.thread, trust: cmd.trust, updatedAt: at } })
 }
 
 /**
@@ -308,7 +300,10 @@ export function rename(ctx: Ctx, cmd: Extract<Command, { type: "thread.rename" }
   return Promise.resolve()
 }
 
-export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.setModel" }>): Promise<void> {
+export async function setModel(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.setModel" }>,
+): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) return
   // **记引擎回报的那一档，不是请求的那个。** 两者会不一样：ZCode 的桥把
@@ -361,7 +356,10 @@ export async function setModel(ctx: Ctx, cmd: Extract<Command, { type: "thread.s
  *
  * 对回放出来的会话（宿主这边没有登记）同样有效：直接删文件即可。
  */
-export async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.delete" }>): Promise<void> {
+export async function remove(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.delete" }>,
+): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry !== undefined) {
     entry.gate.settleAll()
@@ -392,7 +390,10 @@ export async function remove(ctx: Ctx, cmd: Extract<Command, { type: "thread.del
  * 这次抄不了，就只能在界面上讲清楚（`adopted` 标记，空态里说明）。
  * 假装什么都没发生是最坏的选择。
  */
-export async function adopt(ctx: Ctx, cmd: Extract<Command, { type: "thread.adopt" }>): Promise<void> {
+export async function adopt(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.adopt" }>,
+): Promise<void> {
   const at = ctx.deps.now()
   const thread: Thread = {
     id: ctx.deps.newId("th"),

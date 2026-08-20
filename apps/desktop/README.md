@@ -13,7 +13,7 @@ Electron 壳 + React 渲染层。**这是 omni 唯一的用户界面**——没�
 ## 拥有什么
 
 - 窗口生命周期、菜单、主题
-- 渲染层：会话列表、transcript、审批卡、composer
+- 渲染层：会话列表、transcript、审批卡、计划快照与常驻进度、composer
 - `Command` / `Event` 的 IPC 传输
 - **远程服务端**（`main/remote/`）：配对、设备令牌、WebSocket、静态页面、Web Push。
   浏览器端本身是另一个包（`apps/web`），这里只负责把它送出去、并把它接进事件流

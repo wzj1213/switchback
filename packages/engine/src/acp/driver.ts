@@ -1,14 +1,14 @@
 import type { ChildProcess } from "node:child_process"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust, TurnId } from "@omni/protocol"
-import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
+import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { sessionsOf, type Catalog } from "./setup.js"
 import type { AcpDriverConfig } from "./caps.js"
 import { adoptCatalog, startSession, type OpenState, type StartCtx } from "./open.js"
-import { applyTrust, modeAxis, warnNativeFixed, type TrustCtx } from "./mode.js"
+import { applyTrust, modeAxis, needsNativeRestart, type TrustCtx } from "./mode.js"
 import { createTerminalHost, type TerminalHost } from "./terminal.js"
 import { answerCall } from "./serve.js"
 import {
@@ -111,7 +111,6 @@ class AcpSession implements EngineSession {
       // 两条路由都等开会话时由 agent 自己报的形状决定（见 `open.ts` 的 `adopt`）
       modelConfig: undefined,
       effortConfig: undefined,
-      trust: req.trust,
     }
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
@@ -395,11 +394,14 @@ class AcpSession implements EngineSession {
     return steerSession({ ...this.knobs(), can: this.config }, text, attachments)
   }
 
-  async setTrust(trust: Trust): Promise<void> {
-    this.state.trust = trust
+  async setTrust(trust: Trust): Promise<TrustChange> {
+    if (trust === this.trust.current) return { restart: false }
+    if (needsNativeRestart(this.state.native, this.config.nativeApproval?.(trust))) {
+      return { restart: true, detail: `${this.config.id} 的原生审批档要在开场设置；请等当前轮结束后续接重启。` }
+    }
     this.trust.current = trust
-    warnNativeFixed(this.knobs(), trust)
     await applyTrust(this.knobs(), trust, this.state.modes)
+    return { restart: false }
   }
 
 

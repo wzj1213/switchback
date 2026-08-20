@@ -37,7 +37,6 @@ function stateWith(): OpenState {
     windowOf: {},
     contextWindow: undefined,
     caps: NO_CAPABILITIES,
-    trust: "auto-edit",
     native: undefined,
     stderr: "",
   }

@@ -1,5 +1,5 @@
 import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
-import type { EngineSession, StartRequest } from "../contract.js"
+import type { EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { promptContent } from "./attach.js"
 import { KimiAsides } from "./aside.js"
 import { toAccount, toCommands, toHistory, toLimits, toModels, type OAuthUsage } from "./catalog.js"
@@ -199,12 +199,13 @@ export class KimiSession implements EngineSession {
     await this.lease.api.post(sessionPath(this.init.id, ":abort"), {})
   }
 
-  async setTrust(trust: Trust): Promise<void> {
+  async setTrust(trust: Trust): Promise<TrustChange> {
     const target = KIMI_TRUST[trust]
     await this.lease.api.post(sessionPath(this.init.id, "/profile"), { agent_config: target })
     this.trust.current = trust
     this.reporter.status(await this.lease.api.get<KimiStatus>(sessionPath(this.init.id, "/status")))
     this.req.onTrustApply?.({ result: "applied", at: Date.now() })
+    return { restart: false }
   }
 
   async models(): Promise<readonly ModelOption[]> {

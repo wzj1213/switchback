@@ -142,8 +142,11 @@ export type WireDecision = "accept" | "acceptForSession" | "decline"
 
 export type WireSandbox = "read-only" | "workspace-write" | "danger-full-access"
 
-/** `untrusted` 把最多的请求路由给客户端；见 driver.ts 的 POLICY 注释。 */
+/** app-server 接受的三种传统审批策略；自动评审是旁边独立的 reviewer 旋钮。 */
 export type WireApprovalPolicy = "untrusted" | "on-request" | "never"
+
+/** `auto_review` 就是 Codex 权限菜单里的 “Approve for me”。 */
+export type WireApprovalsReviewer = "user" | "auto_review"
 
 /**
  * `skills/list` 回来的一条技能。

@@ -1,9 +1,10 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
-import type { ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
+import type { ItemId, ToolCallItem, Trust, TurnId, TurnStatus } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
 import { clearTasks, onTaskProgress, type TaskState } from "./tasks.js"
 import { emitPlan, feedPlan, isPlanTool, resetPlan, type PlanState } from "./plan.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
+import { modeAxis } from "./trust.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
 interface RawUsage {
@@ -21,6 +22,7 @@ interface RawMessage {
   usage?: RawUsage
   /** SDK 的会话 id。续跑要靠它，而它**只在 `system/init` 里到达**，比 start() 晚。 */
   session_id?: string
+  permissionMode?: string
 }
 
 const num = (v: unknown): number => (typeof v === "number" ? v : 0)
@@ -147,7 +149,13 @@ function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
   req.emit({ type: "turn.completed", at, turnId, status })
 }
 
-function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+interface DispatchContext {
+  req: StartRequest
+  trust: () => Trust
+}
+
+function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: number): void {
+  const { req } = ctx
   switch (msg.type) {
     case "assistant":
       onAssistant(msg, ref, req, at)
@@ -159,6 +167,9 @@ function dispatch(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
       onResult(msg, ref, req, at)
       return
     case "system":
+      if (msg.permissionMode !== undefined) {
+        req.onEngineState?.({ axes: [modeAxis(msg.permissionMode, ctx.trust())] })
+      }
       if (msg.subtype === "init") {
         if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
         req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
@@ -184,10 +195,12 @@ export async function runMessageLoop(
   handle: ReturnType<typeof query>,
   req: StartRequest,
   ref: TurnRef,
+  trust: () => Trust,
 ): Promise<void> {
+  const ctx = { req, trust }
   try {
     for await (const msg of handle) {
-      dispatch(msg as RawMessage, ref, req, Date.now())
+      dispatch(msg as RawMessage, ref, ctx, Date.now())
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)

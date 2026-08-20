@@ -11,7 +11,7 @@ describe("codex 报的设置快照", () => {
     threadSettings: {
       cwd: "/w",
       approvalPolicy: "on-request",
-      approvalsReviewer: "client",
+      approvalsReviewer: "auto_review",
       // **标签联合**，不是裸串：Rust 侧 #[serde(tag = "type", rename_all = "kebab-case")]
       sandboxPolicy: { type: "workspaceWrite", writableRoots: [], networkAccess: true },
       activePermissionProfile: null,
@@ -22,9 +22,10 @@ describe("codex 报的设置快照", () => {
     },
   }
 
-  it("取出 omni 关心的那四样", () => {
+  it("取出 omni 关心的五样", () => {
     expect(readSettings(REAL)).toEqual({
       approval: "on-request",
+      reviewer: "auto_review",
       sandbox: "workspaceWrite",
       model: "gpt-5.6-sol",
       effort: "high",

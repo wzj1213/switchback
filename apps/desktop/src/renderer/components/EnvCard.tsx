@@ -117,11 +117,11 @@ export function EnvCard({
   )
 }
 
-/** 三档的说法必须和输入框那个选择器**逐字一致**，理由见 `Composer.tsx` 的 `TRUSTS`。 */
+/** 三档的名字必须和输入框那个选择器**逐字一致**，理由见 `Composer.tsx` 的 `TRUSTS`。 */
 const TRUST_TEXT = {
-  "read-only": "只读——不写文件、不跑命令，四家引擎都是硬的",
-  "auto-edit": "引擎自动——什么算安全由引擎自己判",
-  full: "全部放行——最宽的一档，Kimi 与 Grok 什么都不问",
+  "read-only": "只读——只读操作可执行，修改与联网会被拒绝",
+  "auto-edit": "自动审批——优先使用引擎原生安全评审",
+  full: "完全访问——允许工作区外操作与联网",
 } as const
 
 function Line({

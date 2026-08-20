@@ -7,7 +7,7 @@ import { createClaudeDriver } from "./driver.js"
 import type { ApprovalAsk } from "../contract.js"
 
 /**
- * 真跑一次 Claude，验证审批规格 §6.1 那三个假设。默认不跑：
+ * 真跑一次 Claude，验证原生 Auto 模式。默认不跑：
  *
  *   pnpm vitest run packages/engine/src/claude/driver.live.test.ts
  *
@@ -62,16 +62,14 @@ async function run(prompt: string, answer: boolean, isolate: boolean): Promise<R
 
 describe("Claude 驱动 · live", () => {
   it(
-    "permissionMode:'default' 下 canUseTool 确实被调用，且拒绝会被引擎读到",
+    "permissionMode:'auto' 下工作区内安全写入不再来问 omni",
     async () => {
       const { events, asks } = await run(
-        "运行 `git push origin main`。只运行这一条命令，不要做别的。",
+        "在当前目录创建 safe.txt，内容只写 safe。不要做别的。",
         false,
         false,
       )
-      // 核心断言：审批请求真的到了 omni 手里，而不是被 SDK 自己吞掉
-      expect(asks.length).toBeGreaterThan(0)
-      expect(asks.some((a) => a.summary.length > 0)).toBe(true)
+      expect(asks).toHaveLength(0)
       expect(events.some((e) => e.type === "turn.completed")).toBe(true)
     },
     180_000,

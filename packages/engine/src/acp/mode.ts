@@ -124,7 +124,12 @@ export interface TrustCtx {
 export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly AcpMode[]): Promise<void> {
   if (ctx.state.acpSession === undefined) return
   if (modes.length === 0) {
-    // 这家有自己的审批开关时，说它那句更准（见 `nativeApproval` 的 `note`）
+    // Grok 这类 agent 不走 ACP mode 表，而在 session/new 的私有扩展位接原生档。
+    // 开会话那一发已经成功才会走到这里，所以不能反过来报「没设上」。
+    if (ctx.state.native?.meta !== undefined) {
+      ctx.apply?.({ result: "applied" })
+      return
+    }
     ctx.apply?.({
       result: "unmapped",
       detail: ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`,
@@ -159,22 +164,17 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
   ctx.apply?.({ result: "applied" })
 }
 
-/**
- * 原生审批开关**开会话时就定死了**（grok 的 `yoloMode` 在 `session/new` 里）。
- *
- * 改不了就说出来，和 codex 的沙箱同一条原则：一个「界面上换了、引擎那边没换」
- * 的档位比不给换糟得多——尤其是往严的方向换，用户会以为自己已经收紧了。
- */
-export function warnNativeFixed(ctx: TrustCtx, trust: Trust): void {
-  const want = ctx.nativeApproval?.(trust)
-  if (want === undefined || ctx.state.native === undefined) return
-  if (JSON.stringify(want.meta ?? {}) === JSON.stringify(ctx.state.native.meta ?? {})) return
-  // **改走 `apply` 而不是发 `degraded`**：后者是一条转瞬即逝、刷新就没的通知，
-  // 而这句话描述的是这条会话**持续存在**的一个事实。同一句话报两遍更糟
-  ctx.apply?.({
-    result: "fixed",
-    detail: `${ctx.id} 的原生审批开关在开会话时就定死了，换档要重开一条会话才生效。这条会话仍然按开场时那一档在跑。`,
-  })
+interface NativeApproval {
+  meta?: Readonly<Record<string, unknown>>
+}
+
+/** 私有开场扩展位不同就必须续接重启，不能先把界面改成一个尚未生效的档位。 */
+export function needsNativeRestart(
+  current: NativeApproval | undefined,
+  target: NativeApproval | undefined,
+): boolean {
+  if (current === undefined || target === undefined) return false
+  return JSON.stringify(current.meta ?? {}) !== JSON.stringify(target.meta ?? {})
 }
 
 /**

@@ -14,6 +14,7 @@
 - `claude/` —— Claude Agent SDK 驱动（`@anthropic-ai/claude-agent-sdk`）
   - `permission.ts` 把 SDK 的 `canUseTool` 请求翻成 `@omni/approval` 的 `Request`，
     再把 `Verdict` 翻回 SDK 的 `PermissionResult`
+  - `trust.ts` 把三档落到 Claude 原生 Plan / Auto / Bypass；进入 Bypass 时显式带 SDK 安全开关
   - `translate.ts` 把 `SDKMessage` 翻成 `Event`
   - `driver.ts` 会话生命周期与进程回收
 - `codex/` —— `codex app-server --stdio` 驱动（JSON-RPC 2.0）
@@ -22,6 +23,7 @@
   - `wire.ts` 线上类型的窄声明（权威定义用 `codex app-server generate-ts` 自己生成）
   - `translate.ts` / `notify.ts` 通知 → 事件
   - `approve.ts` 审批请求 ↔ `@omni/approval`
+  - 任意信任档切换时返回“需重启”，由宿主续接同一 native thread 重建原生沙箱与评审器
 - `kimi/` —— `kimi web` 驱动（本机 bearer REST + WebSocket）
   - `server.ts` 只接 loopback 地址，一份私有服务由活跃 Kimi 会话共享，最后一条释放时回收
   - `http.ts` / `stream.ts` 负责原生 envelope、游标补发、断线快照恢复
@@ -54,7 +56,7 @@
 | --- | --- | --- | --- | --- |
 | 审批载荷 | `canUseTool` 带**完整**工具名与参数 | 只带 `itemId`，命令和 diff 在此前的 item 里 | 请求前就带工具名、action 与完整 display | 只带 `toolCallId` + kind + status，同样要查在途表 |
 | 怎么回审批 | allow / deny | `accept` / `decline` / `acceptForSession` | `approved` / `rejected`，可记到 session | **agent 自己给的一张选项表**，按不透明 `optionId` 回 |
-| 档位落点 | `permissionMode` 只是路由开关，档位全在 omni | `sandbox` 是真的 OS 沙箱，也决定问不问 | `permission_mode` + `plan_mode`，可写也可读回 | `session/set_mode`，mode 是 agent 自定义字符串，只能打分匹配 |
+| 档位落点 | `permissionMode`：`plan` / `auto` / `bypassPermissions`；未被原生模式结算的请求才走 `canUseTool` | `sandbox` + `approvalPolicy` + `approvalsReviewer`；`auto_review` 才是 “Approve for me” | `permission_mode` + `plan_mode`，可写也可读回 | 通用路径是 `session/set_mode`；Grok 1.0.5 的审批另走 `_meta.autoMode` / `yoloMode` |
 | 文本身份 | 整块消息 | item 生命周期 + delta | 原生 turn / step / frame + delta | **一串裸 chunk，没有 id、没有开始、没有结束** |
 | 工具身份 | 工具名 | item `type` + `commandActions` | `toolCallId` + 名字 + args + display | 只有短枚举 `kind`，**没有工具名字段** |
 | 推理强度 | `Options` 字段，改不了运行期 | 独立 `reasoningEffort` | 每模型 `support_efforts`，运行期改 profile | 常被编进 modelId，没有统一独立字段 |
@@ -88,6 +90,8 @@
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
   驱动只翻译 assistant / stream_event / result / system 四类，**其余丢弃**（曾经写着「或落 `meta`」，而那个字段从来没被写过，已删）。
   新增覆盖时先确认它是否真的需要进 transcript。
+- **Claude Auto 受账号、模型、提供方与管理员策略约束。** SDK 类型公开了该档，
+  但运行环境不满足时 Claude 会明确拒绝；驱动保留这个原生失败，不静默退回 `default` 冒充自动审批。
 - **内置 Kimi 要求带 `web` 子命令与公开 API 的 Kimi Code。** 当前验收版本是 0.37.2；
   启动后还会读 `/meta` 确认 WebSocket 与 bearer 鉴权，缺能力就明确失败，不回退 ACP。
 - **Kimi 的 steer 在同一原生 turn 的下一模型 step 前生效。** 它不会掐断已经发出的单次
@@ -128,28 +132,23 @@
   `_x.ai/session_notification` 的 `turn_completed` 里，窗口大小在
   `models[]._meta.totalContextTokens`。私有通知的解析按引擎注入
   （`AcpDriverConfig.contextUsed`），驱动这一层不认识任何一家的私有方法名。
-- **grok 的 ACP 会话默认 yolo，必须显式关掉。** 实测对照：不传 `_meta` 时它
-  一次审批都不发、read-only 档下照样改文件（omni 从来没拿到过发言权）；
-  传 `_meta.yoloMode:false` 之后它就来问，请求里还带着 `kind` 和完整命令。
-  所以 `nativeApproval` 按档位给这个开关：**只读档关掉 yolo**（它来问、omni 按
-  只读档直接 deny，真机验过文件没变，而且因为是 deny 不是 escalate，
-  **用户根本不会被打扰**）；自动编辑与完全档保持它原生的不打扰。
-- **grok 没有「安全操作自动放行」这一档。** 它的 TUI 有六个档
-  （`acceptEdits`/`auto`/`dontAsk`/`bypassPermissions`…），**ACP 上一个都没暴露**，
-  只有 `yoloMode` 这个二值开关。所以自动编辑档下 omni 的判定与红线对它不生效，
-  驱动会为此发一条 `engine.status` 说明——闷着不说才是骗人。
-- **原生审批开关开会话时定死**（和 codex 的沙箱同一条）：`yoloMode` 在
-  `session/new` 里，`setTrust` 改不了。改不了就发 `degraded`，不假装改成了。
+- **Grok 1.0.5 的 ACP 已公开原生 Auto。** `session/new` 的 `_meta.autoMode:true`
+  会接上它自己的分类器；`_meta.yoloMode:true` 是更宽的 Always-approve，而且优先于 Auto。
+  三档现在分别显式传 `{false,false}` / `{false,true}` / `{true,false}`，不再把自动审批
+  与完全访问都压成 yolo。真机 debug 已看到分类器接线与 `auto permission mode set to: true`。
+- **Grok 的审批档仍只在会话开场设置。** `session/load` 会接收同样两枚扩展位，所以
+  空闲时换档会保留原生 session id 续接重启；运行中不打断，也不先显示一个尚未生效的档位。
+  Auto 还受 Grok 自己的 feature gate 与管理员策略约束；ACP 回包没有独立的审批档读回字段，
+  omni 不从普通 `current_mode_update` 猜它是否启用。
 - **codex 侧只消费 74 种通知里的一小撮**：item 生命周期、文本与命令输出的 delta、
   用量、`turn/completed`、`error`。其余（MCP 进度、审批复核、实时语音…）一律丢弃。
-- **codex 的 OS 沙箱在 `thread/start` 时定死，`setTrust` 改不了它。** 往低调没问题
-  （omni 拒得更多），往高调会出现「omni 说可以、写下去却被系统拦住」。
+- **codex 的 OS 沙箱与审批评审器在 `thread/start` 时定死，`setTrust` 改不了它们。**
   **实测证实改不了**：拿 `approvalPolicy: "never"`（完全不问客户端，写没写成纯由沙箱决定）验过，
   read-only 会话写文件被拦；同连接 `thread/resume` 换成 `workspace-write` 之后**照样被拦**；
   而全新的 workspace-write 会话写得成。所以判据有区分力，结论是沙箱确实定死。
   `thread/settings/update` 也不行——它什么都收、回 `{}`、不发任何确认，效果验不了。
-  往上调档时驱动会发一条 `degraded`（**以前发的是 `ready`，而横幅只认 crashed/timeout/degraded，
-  于是那句警告从来没显示过**）。往下调不出声：omni 自己拒得更多，宽出来的沙箱权限用不到。
+  宿主现在只在空闲时释放旧进程，用同一个 native handle resume 并传入新三元组；运行中拒绝换档，
+  不会为了权限切换打断当前轮，也不会先写一个并未生效的新档位。
 - **各家自己的放行表都在 omni 之前生效**：Claude 是用户写的 allow 规则，
   codex 是内置可信命令表（`ls`、`sed`、`cat` 这类根本不会送到客户端）。
   这是「引擎原生」这个前提的必然代价——用户的原生配置压过宿主的自动策略。

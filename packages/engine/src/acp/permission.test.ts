@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { EngineStatus, Trust } from "@omni/protocol"
 import type { ServerCall } from "../rpc.js"
 import { pickOption, summarize } from "./approve.js"
-import { applyTrust, modeAxis, pickMode } from "./mode.js"
+import { applyTrust, modeAxis, needsNativeRestart, pickMode } from "./mode.js"
 import { handlePermission, type PermissionContext } from "./permission.js"
 import type { AcpPermissionOption, AcpToolCall } from "./wire.js"
 
@@ -210,7 +210,7 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
   })
 
   /** 只记账的会话：发出去的 RPC 和说出去的话都收下来。 */
-  function trustCtx(mode: string | undefined) {
+  function trustCtx(mode: string | undefined, native?: { meta: Readonly<Record<string, unknown>> }) {
     const calls: { method: string; params: unknown }[] = []
     const said: { status: EngineStatus; detail?: string }[] = []
     const applied: { result: string; detail?: string }[] = []
@@ -219,7 +219,7 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
         applied.push(result)
       },
       id: "acp:kimi",
-      state: { acpSession: "s-1", mode, native: undefined },
+      state: { acpSession: "s-1", mode, native },
       call: (method: string, params: unknown) => {
         calls.push({ method, params })
         return Promise.resolve({})
@@ -267,6 +267,24 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
     const h = trustCtx(undefined)
     await applyTrust(h.ctx, "auto-edit", REAL)
     expect(h.applied.map((a) => a.result)).toEqual(["applied"])
+  })
+
+  it("没有 mode 表但原生开场扩展位已落下时同样报 applied", async () => {
+    const h = trustCtx(undefined, { meta: { yoloMode: false, autoMode: true } })
+    await applyTrust(h.ctx, "auto-edit", [])
+    expect(h.applied).toEqual([{ result: "applied" }])
+  })
+
+  it.each([
+    ["同一原生档不用重启", { autoMode: true }, { autoMode: true }, false],
+    ["Auto 切 Always-approve 要重启", { autoMode: true }, { yoloMode: true }, true],
+    ["没有私有开关的通用 ACP 不重启", undefined, { autoMode: true }, false],
+  ] as const)("%s", (_name, current, target, expected) => {
+    const wrap = (
+      meta: Readonly<Record<string, unknown>> | undefined,
+    ): { meta: Readonly<Record<string, unknown>> } | undefined =>
+      meta === undefined ? undefined : { meta }
+    expect(needsNativeRestart(wrap(current), wrap(target))).toBe(expected)
   })
 })
 

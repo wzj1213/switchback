@@ -4,10 +4,9 @@ import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
 import { resolveCommand } from "../probe.js"
 import type { RpcPeer } from "../rpc.js"
-import { POLICY } from "./sandbox.js"
 import { reportAccount } from "./account.js"
 import { claimedCapabilities } from "./claims.js"
-import type { WireSandbox } from "./wire.js"
+import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./wire.js"
 
 /**
  * 这条会话**怎么开场**：起进程 → 握手 → 开/续/分一条 codex thread。
@@ -30,6 +29,8 @@ export interface SessionState {
   turn: TurnId | undefined
   stderr: string
   sandbox: WireSandbox
+  approval: WireApprovalPolicy
+  reviewer: WireApprovalsReviewer
   /** 用户选的模型与强度。`turn/start` 时带上，codex 说它对后续轮次也生效。 */
   model: string | undefined
   effort: string | undefined
@@ -115,8 +116,13 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
  * 上下文还在，实际模型什么都不记得。宁可把失败摆出来。
  */
 function openThread(ctx: OpenCtx): Promise<unknown> {
-  // 策略和沙箱一样，在 `thread/start` 这一刻定死、之后改不了（见 `setTrust`）
-  const shared = { approvalPolicy: POLICY[ctx.req.trust], sandbox: ctx.state.sandbox, cwd: ctx.req.cwd }
+  // 策略和沙箱一样按 app-server 进程固定；改档时宿主会续接同一 thread 重启进程
+  const shared = {
+    approvalPolicy: ctx.state.approval,
+    approvalsReviewer: ctx.state.reviewer,
+    sandbox: ctx.state.sandbox,
+    cwd: ctx.req.cwd,
+  }
   if (ctx.req.forkOf !== undefined) return forkThread(ctx, ctx.req.forkOf)
   if (ctx.req.resume === undefined) return ctx.rpc.call("thread/start", shared)
   return ctx.rpc.call("thread/resume", { threadId: ctx.req.resume, ...shared })
@@ -139,12 +145,17 @@ function openThread(ctx: OpenCtx): Promise<unknown> {
  * 分不出来就抛：宿主要靠这个失败退回交接包。默默起一条空会话是最坏的，
  * 那看起来分叉成功了、其实什么都不记得。
  */
-async function forkThread(ctx: OpenCtx, of: { handle: string; dropTurns?: number }): Promise<unknown> {
+async function forkThread(
+  ctx: OpenCtx,
+  of: { handle: string; dropTurns?: number },
+): Promise<unknown> {
   const forked = await ctx.rpc.call("thread/fork", { threadId: of.handle })
   const id = (forked as { thread?: { id?: string } } | undefined)?.thread?.id
   if (id === undefined || id === "") throw new Error("codex 没有返回分叉出来的会话 id")
   if (of.dropTurns !== undefined && of.dropTurns > 0) {
-    await ctx.rpc.call("thread/rollback", { threadId: id, numTurns: of.dropTurns }).catch(() => undefined)
+    await ctx.rpc
+      .call("thread/rollback", { threadId: id, numTurns: of.dropTurns })
+      .catch(() => undefined)
   }
   return forked
 }

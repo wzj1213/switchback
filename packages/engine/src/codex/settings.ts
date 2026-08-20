@@ -16,8 +16,10 @@
 
 /** omni 关心的那几样。其余字段（personality、serviceTier…）一概不看。 */
 export interface CodexSettings {
-  /** 审批策略。omni 自己设的是 `untrusted` / `on-request`（见 `sandbox.ts` 的 `POLICY`）。 */
+  /** 审批策略。 */
   approval?: string
+  /** `auto_review` 就是权限菜单里的 “Approve for me”。 */
+  reviewer?: string
   /** 沙箱。**线上是标签联合**（`{type:"read-only"}`），不是裸串——omni 发出去的那一份才是裸串。 */
   sandbox?: string
   model?: string
@@ -44,11 +46,13 @@ export function readSettings(params: unknown): CodexSettings {
   const s = (params as { threadSettings?: Record<string, unknown> } | undefined)?.threadSettings
   if (s === undefined) return {}
   const approval = str(s["approvalPolicy"])
+  const reviewer = str(s["approvalsReviewer"])
   const sandbox = sandboxOf(s["sandboxPolicy"])
   const model = str(s["model"])
   const effort = str(s["effort"])
   return {
     ...(approval === undefined ? {} : { approval }),
+    ...(reviewer === undefined ? {} : { reviewer }),
     ...(sandbox === undefined ? {} : { sandbox }),
     ...(model === undefined ? {} : { model }),
     ...(effort === undefined ? {} : { effort }),

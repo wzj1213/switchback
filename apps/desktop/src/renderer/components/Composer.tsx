@@ -14,26 +14,23 @@ import type { TrustHint } from "../trustHint.js"
  * `hint` 不是可有可无的：这三个词说得出**档位叫什么**，说不出
  * **它到底会不会问我**。而这正是用户在改这个控件时唯一关心的事。
  *
- * ## 为什么中间那档不再叫「自动编辑」
+ * ## 为什么现在叫「自动审批 / 完全访问」
  *
- * 它原来的说明是「工作区内的改动直接放行，越界才问」。那句话对 codex
- *（真的 OS 沙箱）和 Claude（每次工具调用都经过 omni）成立，对讲 ACP 的那两家
- * **根本不成立**：这一档落到 Kimi 是它自己的 Auto 档、落到 Grok 是 yolo，
- * **「什么算安全」由引擎自己判**。实测 Kimi 认为 `cat .env` 属于安全操作，
- * 直接跑了，omni 全程没被问过——而界面上写着「越界才问」。
+ * 用户要的中间档就是 Codex 的 “Approve for me”：越界时先交给引擎自己的评审器，
+ * 只有它判成潜在不安全才问人。Claude、Kimi 与 Grok 都对应各自的原生 Auto，
+ * 由引擎自己的分类器做后台安全检查。最高档才是 Full Access / YOLO / Bypass 这类最宽权限。
  *
- * 选择是「保持原生」：不把引擎切到每次都问 omni 的档位（那会丢掉它自己那套
- * 判断，也丢掉它的速度），而是**把名字改成实话**。档位 id 不动
- *（`auto-edit` 落在 journal 里，改 id 等于让历史会话读不回来）。
- *
- * 只读那一档反过来是**四家都硬**的：Kimi 的 plan 压根不执行工具、
- * Grok 会来问而 omni 直接拒、codex 是只读沙箱、Claude 走 omni 的判定。
- * 所以它值得被说成「硬的」——现在只有它当得起这句话。
+ * 档位 id 不动（历史 journal 仍然读得回来）；各家底层不完全同型，具体行为仍由
+ * 它们正式暴露的权限入口决定，omni 不拿自己的静态判断冒充引擎原生自动审批。
  */
 const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
-  { id: "read-only", label: "只读", hint: "不写文件、不跑命令。四家引擎在这一档上都是硬的" },
-  { id: "auto-edit", label: "引擎自动", hint: "什么算安全由引擎自己判（Kimi 的 Auto、Codex 的工作区沙箱）" },
-  { id: "full", label: "全部放行", hint: "最宽的一档。Kimi 与 Grok 在这一档下什么都不问" },
+  { id: "read-only", label: "只读", hint: "只允许读取和只读命令；修改与联网会被拒绝" },
+  {
+    id: "auto-edit",
+    label: "自动审批",
+    hint: "优先使用引擎原生安全评审；需要人工决定时才询问",
+  },
+  { id: "full", label: "完全访问", hint: "最宽权限；允许工作区外操作与联网，通常不再询问" },
 ]
 
 interface Props {
@@ -135,7 +132,10 @@ function projectOf(cwd: string): string {
  * **只认序号变化，不认文本变化。** 依赖文本的话，用户在输入框里把它改回原样，
  * 这个 effect 会再跑一次、把光标弹到末尾。
  */
-function usePrefill(prefill: { text: string; at: number } | undefined, setText: (text: string) => void): void {
+function usePrefill(
+  prefill: { text: string; at: number } | undefined,
+  setText: (text: string) => void,
+): void {
   const seen = useRef(prefill?.at ?? 0)
   useEffect(() => {
     if (prefill === undefined || prefill.at === seen.current) return
@@ -221,7 +221,9 @@ export function Composer({
           attach.drop(e.dataTransfer.files)
         }}
       >
-        {detached ? null : <Chips cwd={cwd} project={projectOf(cwd)} stamp={stamp} passing={passing} />}
+        {detached ? null : (
+          <Chips cwd={cwd} project={projectOf(cwd)} stamp={stamp} passing={passing} />
+        )}
         {/* 附件排在芯片**下面**、正文上面。芯片说的是「这句话会发到哪儿去」，
             是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
             反过来放的话，贴一张图就把抬头顶下去 72 像素 */}
@@ -271,9 +273,11 @@ export function Composer({
 }
 
 /** 引擎/档位 id → 展示名。顶栏、导出、菜单都要用同一套措辞。 */
-export function labelOf<T extends { id: string; label: string }>(list: readonly T[], id: string): string {
+export function labelOf<T extends { id: string; label: string }>(
+  list: readonly T[],
+  id: string,
+): string {
   return list.find((x) => x.id === id)?.label ?? id
 }
 
 export { TRUSTS }
-

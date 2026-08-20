@@ -5,10 +5,17 @@ import type { Remote } from "../useRemote.js"
 import { ItemView } from "../components/ItemView.js"
 import { Composer } from "../components/Composer.js"
 import { Reattach } from "../components/Reattach.js"
+import { PlanBar } from "../components/PlanBar.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 
 /** 上下文用量的条。引擎没报就整个不画——**没有数据时不要画一个空进度条**。 */
-function Usage({ used, window: total }: { used: number; window: number | undefined }): React.JSX.Element | null {
+function Usage({
+  used,
+  window: total,
+}: {
+  used: number
+  window: number | undefined
+}): React.JSX.Element | null {
   if (total === undefined || total === 0) return null
   const pct = Math.min(100, Math.round((used / total) * 100))
   return (
@@ -134,7 +141,12 @@ export function Thread({
   return (
     <section className="thread">
       <header className="thread__head">
-        <button className="btn btn--ghost thread__back" type="button" onClick={onBack} aria-label="返回列表">
+        <button
+          className="btn btn--ghost thread__back"
+          type="button"
+          onClick={onBack}
+          aria-label="返回列表"
+        >
           ‹
         </button>
         <span className="thread__title">{thread.title}</span>
@@ -151,6 +163,7 @@ export function Thread({
           ↓ 回到底部
         </button>
       )}
+      <PlanBar items={itemsOf(remote.state, thread.id)} />
       {thread.detached === true ? (
         // **没接引擎时给的是一个动作，不是一句「去桌面上点」。**
         // 手机上绝大多数会话都是 detached 的（宿主只留少数几条活的），

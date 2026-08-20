@@ -88,8 +88,6 @@ export interface OpenState {
   contextWindow: number | undefined
   /** 握手时 agent 自报的能力。**能力位由它推导，不写死**——见 `capabilitiesOf`。 */
   caps: EngineCapabilities
-  /** 当前信任档。开场时要按它挑 mode。 */
-  trust: string
   /**
    * 开会话时按信任档算出来的原生审批开关。
    *
@@ -212,7 +210,7 @@ export async function startSession(ctx: StartCtx): Promise<void> {
  * 实际模型什么都不记得。宁可把失败摆出来（和 codex 驱动同一条原则）。
  */
 export async function openSession(ctx: OpenCtx): Promise<void> {
-  // **原生审批开关只在开会话时能设**（grok 的 `yoloMode` 在 `session/new` 里），
+  // **原生审批开关只在开会话时能设**（grok 的 `autoMode` / `yoloMode` 在 `_meta` 里），
   // 所以它必须在这儿算好，而且续跑/分叉那两条路也要带上——
   // 只给新会话带的话，接着跑的那条会话会悄悄退回引擎自己的默认档
   const native = ctx.config.nativeApproval?.(ctx.req.trust as Trust)

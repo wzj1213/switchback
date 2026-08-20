@@ -1,15 +1,31 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineAccount, EngineAxis, EngineCapabilities, EngineStatus, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus } from "@omni/protocol"
-import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
+import type {
+  EngineAccount,
+  EngineCapabilities,
+  EngineStatus,
+  EngineThread,
+  ModelOption,
+  SlashCommand,
+  Trust,
+  TurnId,
+  TurnStatus,
+} from "@omni/protocol"
+import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
-import { skillsToCommands, toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
-import { LOOSENESS, POLICY, SANDBOX } from "./sandbox.js"
+import {
+  skillsToCommands,
+  toAccount,
+  toEngineThreads,
+  toModelOption,
+  type WireModel,
+} from "./catalog.js"
+import { nativeAxes, nativeTrustDiffers, POLICY, REVIEWER, SANDBOX } from "./sandbox.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import { answerApproval } from "./approve.js"
 import type { WireItem } from "./wire.js"
-import { canonical, type CodexSettings } from "./settings.js"
+import type { CodexSettings } from "./settings.js"
 import { openSession, type OpenCtx, type SessionState } from "./open.js"
 
 /**
@@ -19,17 +35,6 @@ import { openSession, type OpenCtx, type SessionState } from "./open.js"
  * 单独写在 `sandbox.ts`——那不是一张查找表，是接第二家引擎时最大的发现。
  */
 const STDERR_KEEP = 2000
-
-/**
- * 引擎报的一维 → 一条轴。**引擎没报这一维就不造一条**——
- * 一条 id 是空串的轴在界面上就是一行没有内容的说明。
- */
-function axisOf(axis: string, got: string | undefined, want: string): EngineAxis | undefined {
-  if (got === undefined) return undefined
-  // **比的是规范形，显示的是原文**：同一个值两边拼写不同（实测 `workspace-write`
-  // vs `workspaceWrite`），直接比字符串会给每条会话常亮一句假警告。见 `canonical`
-  return { axis, id: got, match: canonical(got) === canonical(want) ? "aligned" : "diverged" }
-}
 
 export interface CodexDriverConfig {
   /** 可执行文件。默认走 PATH 上的 `codex`。 */
@@ -61,6 +66,8 @@ class CodexSession implements EngineSession {
       turn: undefined,
       stderr: "",
       sandbox: SANDBOX[req.trust],
+      approval: POLICY[req.trust],
+      reviewer: REVIEWER[req.trust],
       model: undefined,
       effort: undefined,
       options: [],
@@ -99,20 +106,19 @@ class CodexSession implements EngineSession {
   /**
    * 引擎报了一份设置快照。
    *
-   * **`match` 在这里判**：omni 自己设的是 `POLICY[trust]` 与 `SANDBOX[trust]`
+   * **`match` 在这里判**：omni 自己设的是三张原生映射表
    *（见 `sandbox.ts`），拿它和引擎报的比一比就行——不像 ACP 那边要打分匹配，
    * 这里两边都是固定枚举，对不对得上是**确定**的。
    *
-   * 两条轴分开报：codex 的档同时落在这两个旋钮上，压成一个值就得现编一个合成 id。
+   * 三条轴分开报：codex 的档同时落在三个旋钮上，压成一个值就得现编一个合成 id。
    */
   private adoptSettings(settings: CodexSettings): void {
-    const want = { approval: POLICY[this.trust.current], sandbox: SANDBOX[this.trust.current] }
-    const axes = [
-      axisOf("approval", settings.approval, want.approval),
-      axisOf("sandbox", settings.sandbox, want.sandbox),
-    ].filter((a) => a !== undefined)
+    const axes = nativeAxes(settings, this.trust.current)
     if (axes.length > 0 || settings.model !== undefined) {
-      this.req.onEngineState?.({ axes, ...(settings.model === undefined ? {} : { modelId: settings.model }) })
+      this.req.onEngineState?.({
+        axes,
+        ...(settings.model === undefined ? {} : { modelId: settings.model }),
+      })
     }
     if (settings.model !== undefined || settings.effort !== undefined) {
       this.req.onModel?.(settings.model, settings.effort)
@@ -280,7 +286,8 @@ class CodexSession implements EngineSession {
     const { codexThread } = this.state
     if (codexThread === undefined) return undefined
     const raw = await this.rpc.call("thread/list", {}).catch(() => undefined)
-    const rows = (raw as { data?: readonly { id?: string; path?: string }[] } | undefined)?.data ?? []
+    const rows =
+      (raw as { data?: readonly { id?: string; path?: string }[] } | undefined)?.data ?? []
     return rows.find((r) => r.id === codexThread)?.path
   }
 
@@ -318,7 +325,14 @@ class CodexSession implements EngineSession {
     // `sideQuestion`：codex 的侧问只活在它自己的 TUI 里（`tui/src/app/side.rs`），
     // **没从 app-server 那扇门出来**。照着拼要 omni 抄一份它的边界提示词进来维护，
     // 撞 AGENTS.md 的总纲——见 `docs/侧栏与引擎状态方案.md` §0
-    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: true, sideQuestion: false }
+    return {
+      compact: true,
+      attachments: true,
+      steer: true,
+      fork: true,
+      modeReadback: true,
+      sideQuestion: false,
+    }
   }
 
   /**
@@ -347,25 +361,17 @@ class CodexSession implements EngineSession {
     await this.rpc.call("turn/interrupt", { threadId: codexThread, turnId: codexTurn })
   }
 
-  /**
-   * 改档只改 omni 侧的判定。**OS 沙箱在 `thread/start` 时就定死了，改不了**——
-   * 往低了调没问题（omni 拒得更多），往高了调则会出现「omni 说可以、写下去却被
-   * 系统拦住」的怪事。所以这种情况明确报一条状态，别让人对着一个没有报错的失败发呆。
-   */
-  async setTrust(trust: Trust): Promise<void> {
+  /** 原生旋钮定在开场；需要换旋钮时让宿主续接同一条会话重启进程。 */
+  async setTrust(trust: Trust): Promise<TrustChange> {
     this.trust.current = trust
-    const want = SANDBOX[trust]
-    // **只有往上调才要出声。** 往下调是安全的：omni 自己的判定会拒得更多，
-    // 而沙箱比新档位更宽这件事永远不会被用到。往上调才有害——
-    // omni 说可以、写下去却被系统拦住，报错还看不出是沙箱干的
-    if (LOOSENESS[want] > LOOSENESS[this.state.sandbox]) {
-      this.status(
-        "degraded",
-        `信任档改成了「${trust}」，但**这个会话的系统沙箱改不了**（codex 在开会话时把它定死在 ${this.state.sandbox}）。` +
-          `结果是 omni 这边放行、系统那边照样拦，报错还看不出是沙箱干的。要让新档位真正生效，请新开一个会话。`,
-      )
+    if (!nativeTrustDiffers(this.state.sandbox, this.state.approval, this.state.reviewer, trust)) {
+      return { restart: false }
     }
-    return Promise.resolve()
+    return {
+      restart: true,
+      detail:
+        "Codex 的原生沙箱在会话开场时固定。请等当前轮结束；omni 会续接同一条会话后重启，让新档位真正生效。",
+    }
   }
 
   /**

@@ -22,7 +22,7 @@ describe("档位比较", () => {
 describe("新建会话被钳到上限", () => {
   const create = (trust: Trust): Command => ({ type: "thread.create", cwd: "/w", engine: "codex", trust })
 
-  it("要完全档、上限是自动编辑 → 开出来是自动编辑，并说清楚", () => {
+  it("要完全档、上限是自动审批 → 开出来是自动审批，并说清楚", () => {
     const { command, note } = clamp(create("full"), "auto-edit")
     expect(command).toMatchObject({ trust: "auto-edit" })
     expect(note).toContain("上限")
@@ -133,7 +133,7 @@ describe("线上来的东西必须先验形状", () => {
 describe("上限管得住已经开着的会话", () => {
   const full = (): Trust => "full"
 
-  it("**往一条完全档会话发提问，在自动编辑上限下要被拒**——这是最容易发生的那条绕过", () => {
+  it("**往一条完全档会话发提问，在自动审批上限下要被拒**——这是最容易发生的那条绕过", () => {
     const verdict = clamp({ type: "thread.prompt", threadId: "t", text: "跑一下" }, "auto-edit", full)
     expect(verdict.command).toBeUndefined()
     expect(verdict.note).toContain("full")

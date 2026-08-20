@@ -44,15 +44,13 @@ export interface AcpDriverConfig {
    * 这家的**原生审批开关**怎么按信任档设。
    *
    * ACP 的标准做法是 mode（`session/set_mode`），但不是每家都实现：
-   * **grok 的 `set_mode` 是空壳，而它的会话默认 yolo**——实测不传任何 `_meta` 时
-   * 它一次审批都不发，只读档下照样改文件。它唯一的开关是 `session/new` 的
-   * `_meta.yoloMode`（见 `grok.ts` 的实测对照表）。
+   * Grok 1.0.5 的审批不在 mode 表里，而在 `session/new` / `session/load` 的
+   * `_meta.autoMode` 与 `_meta.yoloMode`。前者接分类器 Auto，后者接 Always-approve。
    *
-   * `meta` 并进 `session/new` 的 `_meta`；`note` 是要对用户说的一句话
-   * （「这一档下 omni 的判定对它不生效」），替掉「没报告可选档位」那句通用文案。
+   * `meta` 并进会话开场的 `_meta`；`note` 可替掉「没报告可选档位」那句通用文案。
    *
-   * **只在开会话时生效**：和 codex 的沙箱一样定死，`setTrust` 改不了它——
-   * 改不了就发 `degraded`，不假装改成了。
+   * **只在开会话时生效**：不同值由 `setTrust` 请求续接同一个原生会话重启，
+   * 不先写一个尚未生效的新档位。
    */
   nativeApproval?: (trust: Trust) => { meta?: Readonly<Record<string, unknown>>; note?: string }
   /**

@@ -101,28 +101,14 @@ describe("grok 的上下文用量", () => {
   })
 })
 
-/**
- * 实测：不给 `_meta` 时 grok 的 ACP 会话默认 yolo=true——只读档下它照样改文件，
- * 一次审批都不发。所以这一条不是可选优化，是补一个安全洞。
- */
+/** 三档都显式占住两枚布尔位，Auto 与 Always-approve 不能再塌成同一档。 */
 describe("grok 的原生审批开关", () => {
-  it("只读档关掉 yolo——它来问，omni 才拒得掉", () => {
-    expect(grokNativeApproval("read-only")).toEqual({ meta: { yoloMode: false } })
-  })
-
-  // 它的 ACP 只有「全问 / 全不问」，没有 kimi 那种「安全操作自动放行」，
-  // 所以自动编辑档只能选不吵——但必须把「omni 判定对它不生效」说出来
-  it("自动编辑与完全档保持它原生的不打扰，并且带一句说明", () => {
-    for (const trust of ["auto-edit", "full"] as const) {
-      const native = grokNativeApproval(trust)
-      expect(native.meta).toEqual({ yoloMode: true })
-      expect(native.note).toContain("不生效")
-    }
-  })
-
-  // 只读档不需要那句话：那一档下 omni 的判定确实在起作用
-  it("只读档不带说明", () => {
-    expect(grokNativeApproval("read-only").note).toBeUndefined()
+  it.each([
+    ["只读", "read-only", { yoloMode: false, autoMode: false }],
+    ["自动审批", "auto-edit", { yoloMode: false, autoMode: true }],
+    ["完全访问", "full", { yoloMode: true, autoMode: false }],
+  ] as const)("%s 对齐 Grok 原生档", (_name, trust, expected) => {
+    expect(grokNativeApproval(trust)).toEqual({ meta: expected })
   })
 })
 

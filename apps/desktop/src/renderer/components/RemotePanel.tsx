@@ -18,8 +18,8 @@ import { RemoteDevices } from "./RemoteDevices.js"
 
 const TRUSTS: readonly { id: Trust; label: string }[] = [
   { id: "read-only", label: "只读" },
-  { id: "auto-edit", label: "自动编辑" },
-  { id: "full", label: "完全" },
+  { id: "auto-edit", label: "自动审批" },
+  { id: "full", label: "完全访问" },
 ]
 
 function statusText(status: RemoteStatus): string {
@@ -129,7 +129,7 @@ export function RemotePanel({
               }}
             />
           </Field>
-          <Field label="远程档位上限" hint="手机丢了不该等于在你的仓库里任意执行代码。默认「自动编辑」：能改文件，但每条命令仍要你点一次">
+          <Field label="远程档位上限" hint="手机丢了不该等于完全访问你的电脑。默认「自动审批」：优先使用引擎原生安全评审，需要人工决定时才询问">
             <div className="switch" role="radiogroup">
               {TRUSTS.map((t) => (
                 <button

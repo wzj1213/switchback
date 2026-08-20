@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Command, EngineInfo, Item, ModelOption, RateLimits, SlashCommand, Thread, Turn, Usage , TaskRun } from "@omni/protocol"
+import type {
+  Command,
+  EngineInfo,
+  Item,
+  ModelOption,
+  RateLimits,
+  SlashCommand,
+  Thread,
+  Turn,
+  Usage,
+  TaskRun,
+} from "@omni/protocol"
 import type { Notice, ThreadRow } from "@omni/store"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
 import { useOmniActions } from "../useOmniActions.js"
@@ -7,13 +18,10 @@ import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
 import { Transcript } from "./Transcript.js"
 import { Pets } from "./Pets.js"
-import { Changed } from "./Changed.js"
-import { Queued } from "./Queued.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
 import { stampOf } from "../stamp.js"
-
-
+import { Between } from "./Between.js"
 
 export interface WorkspaceProps {
   thread: Thread
@@ -99,54 +107,6 @@ function useDraft(draft: string | undefined): {
 }
 
 /**
- * 转录区和输入框之间那两块：变更汇总卡、排队中的话。
- *
- * 单独拎出来只为行数闸门，但边界不难受：它们的共同点是**都在描述「还没落定的东西」**
- *（工作区里已经改了什么、你已经打了但还没轮到发的话）。
- */
-function Between({ props, thread, stamp, send, onReuse }: {
-  props: WorkspaceProps
-  thread: Thread
-  stamp: string
-  send: (command: Command) => void
-  /** 把文字放回输入框。撤回排队时要用——见下面 `onDrop`。 */
-  onReuse: (text: string) => void
-}): React.JSX.Element {
-  return (
-    <>
-      <Changed
-        items={props.items}
-        cwd={thread.cwd}
-        stamp={stamp}
-        onReveal={props.onReveal}
-        onCopy={props.onCopy}
-        onReview={props.onReview}
-      />
-      <Queued
-        texts={thread.queued ?? []}
-        {...(thread.capabilities?.steer === true
-          ? {
-              onInsert: () => {
-                send({ type: "thread.steerQueued", threadId: thread.id })
-              },
-            }
-          : {})}
-        onDrop={() => {
-          // **先放回输入框，再撤。** 撤回的意思是「这句先别发」，不是「这句不要了」——
-          // 上一版直接丢掉，打好的一段话就这么没了，而人撤回往往正是为了改两个字再发。
-          // 拼法和 `steerQueued` 那边一致（`\n` 连起来）：用户写它们时是当成一段话写的
-          const waiting = thread.queued ?? []
-          if (waiting.length > 0) onReuse(waiting.join("\n"))
-          // 撤回不动**正在跑的那一轮**——「这句先别发」和「停下」是两件事，
-          // 所以走专门的命令而不是 interrupt
-          send({ type: "thread.unqueue", threadId: thread.id })
-        }}
-      />
-    </>
-  )
-}
-
-/**
  * 待切换的引擎那一项。
  *
  * 「下一句生效」是对的默认（见 `Thread.nextEngine`），但它有个说不过去的副作用：
@@ -195,7 +155,12 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onReveal={props.onReveal}
         onCopy={props.onCopy}
       />
-      <Notices notices={props.notices} rows={props.rows} onDismiss={props.onDismiss} onSelect={props.onSelect} />
+      <Notices
+        notices={props.notices}
+        rows={props.rows}
+        onDismiss={props.onDismiss}
+        onSelect={props.onSelect}
+      />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
       {/* 对话区。**多这一层是为了给吉祥物一块有边界的地**——
           它们要能被拖到任何地方，也要知道「地面」在哪（就是这一块的底边，
@@ -214,11 +179,30 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
             可滚动内容而不是可视区，挂进去那道渐隐会跟着内容滚走。见 app.css 的 `.hem` */}
         <div className="hem" aria-hidden="true" />
         {props.pets ? (
-          <Pets engines={props.engines} engine={thread.engine} running={props.turn?.status === "running"} />
+          <Pets
+            engines={props.engines}
+            engine={thread.engine}
+            running={props.turn?.status === "running"}
+          />
         ) : null}
       </div>
-      <Between props={props} thread={thread} stamp={stamp} send={send} onReuse={reuse} />
-      <WorkspaceComposer props={props} thread={thread} stamp={stamp} prefill={prefill} actions={actions} />
+      <Between
+        thread={thread}
+        items={props.items}
+        stamp={stamp}
+        onReveal={props.onReveal}
+        onCopy={props.onCopy}
+        onReview={props.onReview}
+        send={send}
+        onReuse={reuse}
+      />
+      <WorkspaceComposer
+        props={props}
+        thread={thread}
+        stamp={stamp}
+        prefill={prefill}
+        actions={actions}
+      />
     </main>
   )
 }

@@ -14,6 +14,8 @@
   先清掉这条的条目再按历史铺开：直接 `reduceAll` 的话，已经在直播的那几条
   会把更早的历史挤到后面去，转录区变成「最新的排在最前」
 - `initial()` —— 空状态
+- `latestPlan` / `openPlan` / `stepProgressOf` / `visibleSteps` —— 两端共用的计划派生；
+  只返回计划与进度数据，不返回任何展示文案
 
 ## 不拥有什么
 

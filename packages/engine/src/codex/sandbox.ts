@@ -1,5 +1,6 @@
-import type { Trust } from "@omni/protocol"
-import type { WireApprovalPolicy, WireSandbox } from "./wire.js"
+import type { EngineAxis, Trust } from "@omni/protocol"
+import { canonical, type CodexSettings } from "./settings.js"
+import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./wire.js"
 
 /**
  * ## 沙箱不是标签，是真的沙箱——而且它就是「问不问」的开关
@@ -15,67 +16,61 @@ import type { WireApprovalPolicy, WireSandbox } from "./wire.js"
  * codex 没有理由问；换成 `read-only`，同一次写就变成一条
  * `item/fileChange/requestApproval` 送到我们手上。
  *
- * 所以信任档**必须**落在 sandbox 上，落在 approvalPolicy 上是没用的：
+ * 所以三个旋钮必须一起设，少一个都会把 Codex 原生档位改成另一件事：
  *
- * | 档位        | sandbox           | 结果                                             |
+ * | omni 档位   | Codex 原生档      | sandbox / approval / reviewer                    |
  * | ----------- | ----------------- | ------------------------------------------------ |
- * | `read-only` | `read-only`       | 任何写都来问 omni，omni 拒——档位真正生效         |
- * | `auto-edit` | `workspace-write` | 工作区内的写直接过；越界才问——正是这档的语义     |
- * | `full`      | `workspace-write` | 同上，越界时由 omni 的 `full` 判定放行           |
+ * | `read-only` | Read Only         | `read-only` / `on-request` / `user`               |
+ * | `auto-edit` | Approve for me    | `workspace-write` / `on-request` / `auto_review`  |
+ * | `full`      | Full Access       | `danger-full-access` / `never` / `user`           |
  *
- * `full` **不**升到 `danger-full-access`：那会把 OS 沙箱整个关掉。
- * `full` 的意思是「别拿日常操作烦我」，不是「把安全网撤了」——
- * 判定错了还有沙箱兜底，这层纵深不该为省一次弹窗而放弃。
+ * 关键是中间那一列：只有 `on-request` 仍是 “Ask for approval”；再把 reviewer
+ * 设成 `auto_review`，才是用户在 Codex 权限菜单里选的 “Approve for me”。
+ * omni 不再用自己的静态规则冒充这位原生评审器。
  */
 export const SANDBOX: Readonly<Record<Trust, WireSandbox>> = {
   "read-only": "read-only",
   "auto-edit": "workspace-write",
-  full: "workspace-write",
+  full: "danger-full-access",
 }
 
-/**
- * 沙箱谁更宽。数字大的放得更开。
- *
- * 用来判断改档位要不要出声：**往下调不用**（omni 自己拒得更多，
- * 多出来的那点沙箱权限永远用不到），往上调必须说——那时 omni 说可以、
- * 系统照样拦，而报错里看不出是沙箱干的。
- */
-export const LOOSENESS: Readonly<Record<WireSandbox, number>> = {
-  "read-only": 0,
-  "workspace-write": 1,
-  "danger-full-access": 2,
-}
-
-/**
- * ## 审批策略：**除了只读档，都让 codex 自己判**
- *
- * 原来这里钉死 `untrusted`——「把最多的请求路由给客户端」，也就是让 codex
- * 什么都问上来、再由 omni 的判定器裁决。听起来更安全，实际是这样：
- *
- * - 你在终端里跑 codex，同一条命令它自己就过了；在 omni 里却被拦下来问你。
- *   **同一个引擎、同一条命令、两种行为**，而 omni 的产品前提是「引擎原生」。
- * - 「引擎自动」这一档的界面原话是「**什么算安全由引擎自己判**」——
- *   而实现是 omni 判。界面说的话和代码做的事对不上，这本身就是 bug。
- * - 后果不是更安全，是更不安全：`zsh -lc '… | python3 -c …'` 这种日常命令
- *   每条都弹一张卡（静态判不出 → `unparseable-command` 红线），人一天点几十次，
- *   点到最后是**闭着眼睛点**——那时候真正该拦的那一张也一起过去了。
- *
- * 现在的分法，判据是「谁有资格决定问不问」：
- *
- * | 档位        | policy       | 谁在判                                              |
- * | ----------- | ------------ | --------------------------------------------------- |
- * | `read-only` | `untrusted`  | **omni**。只读是 omni 的承诺，它必须看见每一次动作才拒得住 |
- * | `auto-edit` | `on-request` | **引擎**。它想升权时才问；问上来的那些再过 omni 的判定与红线 |
- * | `full`      | `on-request` | 同上，但 omni 的 `full` 判定几乎都放行，所以你基本看不到卡  |
- *
- * `full` **不用 `never`**：那样 codex 连问都不问，一条被沙箱挡住的操作
- * 就只能直接失败，而不是「问一句然后放行」。少弹一张卡换来一次说不清的失败，不划算。
- *
- * 代价说明白：omni 看不见的动作，omni 的红线也管不住它。这一档的纵深从
- *「沙箱 + 引擎 + omni」变成「沙箱 + 引擎」——这是「引擎原生」这个前提的必然代价。
- */
 export const POLICY: Readonly<Record<Trust, WireApprovalPolicy>> = {
-  "read-only": "untrusted",
+  "read-only": "on-request",
   "auto-edit": "on-request",
-  full: "on-request",
+  full: "never",
+}
+
+export const REVIEWER: Readonly<Record<Trust, WireApprovalsReviewer>> = {
+  "read-only": "user",
+  "auto-edit": "auto_review",
+  full: "user",
+}
+
+function axisOf(axis: string, got: string | undefined, want: string): EngineAxis | undefined {
+  if (got === undefined) return undefined
+  return { axis, id: got, match: canonical(got) === canonical(want) ? "aligned" : "diverged" }
+}
+
+/** 把 Codex 回报的三个原生旋钮逐项和用户所选档位对齐。 */
+export function nativeAxes(settings: CodexSettings, trust: Trust): EngineAxis[] {
+  return [
+    axisOf("approval", settings.approval, POLICY[trust]),
+    axisOf("reviewer", settings.reviewer, REVIEWER[trust]),
+    axisOf("sandbox", settings.sandbox, SANDBOX[trust]),
+  ].filter((axis) => axis !== undefined)
+}
+
+/**
+ * 三档的原生旋钮都不同，跨档必须重开 app-server 才能真的生效。
+ * reviewer 也算原生旋钮：漏比它，就会把 “Ask for approval” 假报成 “Approve for me”。
+ */
+export function nativeTrustDiffers(
+  sandbox: WireSandbox,
+  approval: WireApprovalPolicy,
+  reviewer: WireApprovalsReviewer,
+  trust: Trust,
+): boolean {
+  return (
+    SANDBOX[trust] !== sandbox || POLICY[trust] !== approval || REVIEWER[trust] !== reviewer
+  )
 }

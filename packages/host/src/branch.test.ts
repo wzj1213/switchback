@@ -50,7 +50,7 @@ const rig = (opts: { canFork: boolean }): Rig => {
           return Promise.resolve()
         },
         interrupt: () => Promise.resolve(),
-        setTrust: () => Promise.resolve(),
+        setTrust: () => Promise.resolve({ restart: false }),
         models: () => Promise.resolve([]),
         capabilities: () => ({ compact: false, attachments: false, steer: false, fork: opts.canFork }),
         setModel: () => Promise.resolve({}),

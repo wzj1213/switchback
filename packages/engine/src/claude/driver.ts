@@ -8,7 +8,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
 import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
-import type { EngineDriver, EngineSession, StartRequest } from "../contract.js"
+import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createQueue } from "../queue.js"
 import { askAside, canAside } from "./aside.js"
@@ -19,18 +19,15 @@ import { buildRequest, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMe
 import { runMessageLoop, type TurnRef } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
+import { CLAUDE_TRUST, needsPermissionRestart, permissionOptions } from "./trust.js"
 
 /**
- * `permissionMode` 固定为 `'default'`，三个信任档都不变。
+ * Claude Code 2.1.83 起正式暴露 `auto`：由另一只模型分类器审批工具调用。
  *
- * 依据（SDK 的 `SDKPermissionDeniedMessage` 文档）：只有走到 **'ask'** 的决定才会
- * 经 `can_use_tool` 请求交给宿主。其余模式都会绕过回调——
- * `acceptEdits` / `bypassPermissions` 预先放行，`dontAsk` / `auto` 预先拒绝
- * （`auto` 用模型分类器判，omni 完全看不到）。
- * 所以档位必须表达在 `@omni/approval` 的判定里，不能表达在 SDK 模式里。
+ * 三档因此直接落到它公开的 Plan / Auto / Bypass。`canUseTool` 仍保留：用户原生
+ * ask 规则、需要交互的工具，以及 Auto 多次阻断后的人工回退都会从这扇门出来。
+ * 只有走到这里时 omni 才负责呈现或应答，不再拿自己的静态判定冒充原生 Auto。
  */
-const PERMISSION_MODE = "default" as const
-
 /** 等消息循环自然收尾的上限；超过就进入信号阶梯。 */
 const GRACEFUL_WAIT_MS = 4000
 
@@ -59,6 +56,7 @@ class ClaudeSession implements EngineSession {
   private readonly trust: { current: Trust }
   private readonly turn: TurnRef = { current: undefined, seq: 0, tools: new Map(), tasks: createTaskState(), plan: createPlanState() }
   private readonly owner: ProcessOwner
+  private readonly bypassEnabled: boolean
   private loop: Promise<void> | undefined
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
@@ -69,6 +67,7 @@ class ClaudeSession implements EngineSession {
     private readonly config: ClaudeDriverConfig,
   ) {
     this.trust = { current: req.trust }
+    this.bypassEnabled = req.trust === "full"
     // 字段初始化器里读不到构造参数属性，只能在这里建
     this.owner = createProcessOwner(config.reclaim)
   }
@@ -76,7 +75,7 @@ class ClaudeSession implements EngineSession {
   start(): void {
     const options: Options = {
       cwd: this.req.cwd,
-      permissionMode: PERMISSION_MODE,
+      ...permissionOptions(this.req.trust),
       canUseTool: (tool, input, meta) => this.judge(tool, input, meta as AskMeta),
       abortController: this.abort,
       // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言。
@@ -100,6 +99,7 @@ class ClaudeSession implements EngineSession {
         },
       },
       this.turn,
+      () => this.trust.current,
     )
   }
 
@@ -114,6 +114,10 @@ class ClaudeSession implements EngineSession {
     input: Record<string, unknown>,
     meta: AskMeta,
   ): Promise<PermissionResult> {
+    // Plan 的退出本身就是放宽权限。只读档不能把它当普通 meta 工具自动放行。
+    if (this.trust.current === "read-only" && tool === "ExitPlanMode") {
+      return toDeny("当前会话是只读档，不能退出 Claude Plan mode；请先由用户切换权限档")
+    }
     const request = buildRequest(tool, input, meta, { engine: "claude", cwd: this.req.cwd })
     const verdict = decide(request, {
       trust: this.trust.current,
@@ -241,17 +245,14 @@ class ClaudeSession implements EngineSession {
     // 宿主据此退回排队——**不是假装支持再偷偷排队**，
     // 那样界面就没法如实告诉用户「这句得等」
     // fork 也报 false：SDK 没有复制会话的入口，只能走交接包
-    // **`modeReadback` 报 false 是「omni 还没接」，不是「claude 没有」**：
-    // SDK 的 `system` 消息带着 permissionMode，而 `loop.ts` 的 `case "system"`
-    // 只放行 `subtype === "init"`。接上之前如实报 false——
-    // 报 true 而界面上那行永远不动，比不给那行糟
+    // modeReadback 来自 system/init 与 system/status 的 permissionMode，见 loop.ts。
     // **运行时探测，不嗅版本**：0.3.231 的公开类型还没声明它
     return {
       compact: false,
       attachments: true,
       steer: false,
       fork: false,
-      modeReadback: false,
+      modeReadback: true,
       sideQuestion: canAside(this.query),
     }
   }
@@ -280,10 +281,26 @@ class ClaudeSession implements EngineSession {
     await this.query?.interrupt()
   }
 
-  async setTrust(trust: Trust): Promise<void> {
-    // 只改 omni 侧的档位；SDK 的 permissionMode 故意不动（见 PERMISSION_MODE 注释）。
+  async setTrust(trust: Trust): Promise<TrustChange> {
+    if (trust === this.trust.current) return { restart: false }
+    if (needsPermissionRestart(this.bypassEnabled, trust)) {
+      return {
+        restart: true,
+        detail:
+          "Claude 的完全访问需要在会话启动时显式允许 Bypass。请等当前轮结束；omni 会续接同一条会话后重启。",
+      }
+    }
+    const handle = this.query
+    if (handle === undefined) throw new Error("Claude 会话尚未就绪，无法切换权限档")
+    const previous = this.trust.current
     this.trust.current = trust
-    return Promise.resolve()
+    try {
+      await handle.setPermissionMode(CLAUDE_TRUST[trust])
+    } catch (error) {
+      this.trust.current = previous
+      throw error
+    }
+    return { restart: false }
   }
 
   /**

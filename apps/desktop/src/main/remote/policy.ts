@@ -97,7 +97,7 @@ function clampTrust(command: Command, ceiling: Trust): Clamped {
     // 命令里也没有 trust 字段可改，所以只能整条挡下——
     // **钳不动的东西必须拒，不能放过去**。
     if (ceiling === "read-only") {
-      return { refused: true, note: "远程上限是只读，而接管过来的会话固定开在自动编辑档，所以这一步只能在桌面上做" }
+      return { refused: true, note: "远程上限是只读，而接管过来的会话固定开在自动审批档，所以这一步只能在桌面上做" }
     }
     return { command }
   }

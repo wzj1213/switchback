@@ -1,4 +1,20 @@
-import type { EngineAccount, EngineAxis, EngineCapabilities, EngineId, EngineThread, Event, Item, ItemId, ModelOption, RememberScope, SlashCommand, ThreadId, Trust, TrustApply, TurnId } from "@omni/protocol"
+import type {
+  EngineAccount,
+  EngineAxis,
+  EngineCapabilities,
+  EngineId,
+  EngineThread,
+  Event,
+  Item,
+  ItemId,
+  ModelOption,
+  RememberScope,
+  SlashCommand,
+  ThreadId,
+  Trust,
+  TrustApply,
+  TurnId,
+} from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
 
@@ -43,6 +59,15 @@ export interface ApprovalAnswer {
    */
   remember: RememberScope
 }
+
+/** 引擎的原生权限若只能在开场设置，宿主据此续接同一条会话后重启进程。 */
+export type TrustChange =
+  | { restart: false }
+  | {
+      restart: true
+      /** 无法立刻重启（例如仍在跑）时给人的原因与下一步。 */
+      detail: string
+    }
 
 export interface StartRequest {
   threadId: ThreadId
@@ -185,7 +210,7 @@ export interface EngineSession {
    */
   askAside?: (text: string) => Promise<string>
   interrupt: () => Promise<void>
-  setTrust: (trust: Trust) => Promise<void>
+  setTrust: (trust: Trust) => Promise<TrustChange>
   /** 这个引擎能选哪些模型。拿不到就给空数组，界面据此不显示选择器。 */
   models: () => Promise<readonly ModelOption[]>
   /**

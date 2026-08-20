@@ -20,7 +20,13 @@ import type { TrustHint } from "../trustHint.js"
  * 而**它说的每一句都必须是引擎自己报的**——所以它只渲染算好的文本，
  * 一个字都不在这里拼。
  */
-function Hint({ hint, onReapply }: { hint?: TrustHint; onReapply: () => void }): React.JSX.Element | null {
+function Hint({
+  hint,
+  onReapply,
+}: {
+  hint?: TrustHint
+  onReapply: () => void
+}): React.JSX.Element | null {
   if (hint === undefined) return null
   return (
     <span className={`composer__hint composer__hint--${hint.kind}`} title={hint.text}>
@@ -66,7 +72,11 @@ function TrustSelect({
           onPick: (id) => {
             onPick(id as Trust)
           },
-          choices: TRUSTS.map((item) => ({ id: item.id, label: item.label, description: item.hint })),
+          choices: TRUSTS.map((item) => ({
+            id: item.id,
+            label: item.label,
+            description: item.hint,
+          })),
         },
       ]}
     />
@@ -85,11 +95,17 @@ function TrustSelect({
  * ## 两种情况都要说，而且要说得不一样
  *
  * 能插话的（codex / zcode）：告诉你多按一个键就不排队。
- * 不能插话的（kimi / grok 实测两个方法都是 `Method not found`，claude 的 SDK 没有这个入口）：
+ * 不能插话的（grok 实测方法是 `Method not found`，claude 的 SDK 没有这个入口）：
  * **说清楚是这家引擎没有这个能力**，而不是含糊地不提——否则「为什么这儿能那儿不能」
  * 会被当成 omni 时好时坏。
  */
-function QueueNote({ busy, canSteer }: { busy: boolean; canSteer: boolean }): React.JSX.Element | null {
+function QueueNote({
+  busy,
+  canSteer,
+}: {
+  busy: boolean
+  canSteer: boolean
+}): React.JSX.Element | null {
   if (!busy) return null
   return (
     <div className="composer__queuenote">
@@ -156,58 +172,58 @@ export function Bar({
   onSend: () => void
 }): React.JSX.Element {
   return (
-  <div className="composer__barwrap">
-          <div className="composer__bar">
-            <Select
-              label={labelOf(engines, engine)}
-              icon={<EngineIcon />}
-              title="引擎"
-              disabled={detached}
-              sections={[
-                {
-                  value: engine,
-                  onPick: onEngineChange,
-                  // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
-                  // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
-                  choices: engines.map((item) => ({
-                    id: item.id,
-                    label: item.label,
-                    ...(item.state === "missing" ? { note: "未安装" } : {}),
-                    ...(item.detail === undefined ? {} : { description: item.detail }),
-                  })),
-                },
-              ]}
-            />
-            <TrustSelect trust={trust} blind={blind} disabled={detached} onPick={onTrustChange} />
-            <ModelPicker
-              models={models}
-              model={model}
-              effort={effort}
-              disabled={detached}
-              pending={pending}
-              onChange={onModelChange}
-            />
-            {aside}
-            <span style={{ flex: 1 }} />
-            <Action
-              detached={detached}
-              busy={busy}
-              starting={starting}
-              empty={empty}
-              onResume={onResume}
-              onInterrupt={onInterrupt}
-              onSend={onSend}
-            />
-          </div>
-          {/* `busy && !detached`：历史会话背后没有引擎，那儿不存在「排队」这回事 */}
-          <QueueNote busy={busy && !detached} canSteer={canSteer} />
-          {/* **自己一行**：挤在两个选择器中间时它把模型选择器顶到一边，而且被截断 */}
-          <Hint
-            hint={hint}
-            onReapply={() => {
-              onTrustChange(trust)
-            }}
-          />
-        </div>
+    <div className="composer__barwrap">
+      <div className="composer__bar">
+        <Select
+          label={labelOf(engines, engine)}
+          icon={<EngineIcon />}
+          title="引擎"
+          disabled={detached}
+          sections={[
+            {
+              value: engine,
+              onPick: onEngineChange,
+              // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
+              // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
+              choices: engines.map((item) => ({
+                id: item.id,
+                label: item.label,
+                ...(item.state === "missing" ? { note: "未安装" } : {}),
+                ...(item.detail === undefined ? {} : { description: item.detail }),
+              })),
+            },
+          ]}
+        />
+        <TrustSelect trust={trust} blind={blind} disabled={detached || busy || starting} onPick={onTrustChange} />
+        <ModelPicker
+          models={models}
+          model={model}
+          effort={effort}
+          disabled={detached}
+          pending={pending}
+          onChange={onModelChange}
+        />
+        {aside}
+        <span style={{ flex: 1 }} />
+        <Action
+          detached={detached}
+          busy={busy}
+          starting={starting}
+          empty={empty}
+          onResume={onResume}
+          onInterrupt={onInterrupt}
+          onSend={onSend}
+        />
+      </div>
+      {/* `busy && !detached`：历史会话背后没有引擎，那儿不存在「排队」这回事 */}
+      <QueueNote busy={busy && !detached} canSteer={canSteer} />
+      {/* **自己一行**：挤在两个选择器中间时它把模型选择器顶到一边，而且被截断 */}
+      <Hint
+        hint={hint}
+        onReapply={() => {
+          onTrustChange(trust)
+        }}
+      />
+    </div>
   )
 }
