@@ -13,6 +13,7 @@ const setup = (): { ctx: NotifyContext; events: Event[] } => {
     emit: (e) => events.push(e),
     turnId: () => "tn-1",
     inflight: new Map<string, WireItem>(),
+    streamed: new Map<string, string>(),
     materialized: new Set<string>(),
     mcpSeen: new Map<string, string>(),
     now: () => 100,
@@ -154,6 +155,7 @@ describe("轮次与错误", () => {
       emit: (e) => events.push(e),
       turnId: () => undefined,
       inflight: new Map(),
+      streamed: new Map(),
       materialized: new Set(),
       mcpSeen: new Map(),
       now: () => 0,
@@ -225,6 +227,7 @@ describe("用量", () => {
       emit: (e) => events.push(e),
       turnId: () => undefined,
       inflight: new Map(),
+      streamed: new Map(),
       materialized: new Set(),
       mcpSeen: new Map(),
       now: () => 100,
@@ -257,11 +260,43 @@ describe("轮次异常收工时清扫在途工具", () => {
     expect(events[0]).toMatchObject({ item: { status: "failed" } })
   })
 
-  it("正常收工不扫——那时候每条工具都已经有自己的 item/completed 了", () => {
+  it("正常收工仍有 running 工具时明确收成 failed——不能把协议缺口留成永远旋转", () => {
     const { ctx, events } = withRunning()
     handleNotification(ctx, "turn/completed", { threadId: "c", turn: { id: "t", status: "completed" } })
-    expect(events).toHaveLength(1)
-    expect(events[0]?.type).toBe("turn.completed")
+    expect(events[0]).toMatchObject({
+      type: "item.updated",
+      item: { id: "e1", status: "failed", error: expect.stringContaining("没有报告") },
+    })
+    expect(events[1]?.type).toBe("turn.completed")
+  })
+
+  it("命令输出流到一半被中断，收尾更新保留已经显示的输出", () => {
+    const { ctx, events } = withRunning()
+    handleNotification(ctx, "item/commandExecution/outputDelta", {
+      threadId: "cx",
+      turnId: "native",
+      itemId: "e1",
+      delta: "已经跑到这里\n",
+    })
+    handleNotification(ctx, "turn/completed", { threadId: "cx", turn: { id: "native", status: "interrupted" } })
+    const closed = events.findLast((event) => event.type === "item.updated")
+    expect(closed).toMatchObject({ item: { detail: { kind: "shell", output: "已经跑到这里\n" } } })
+  })
+
+  it("流式正文没有 item/completed 就失败时，也要收口并保住文字", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "item/started", lifecycle({ type: "agentMessage", id: "m-live", text: "" }))
+    handleNotification(ctx, "item/agentMessage/delta", {
+      threadId: "cx",
+      turnId: "native",
+      itemId: "m-live",
+      delta: "半句话",
+    })
+    handleNotification(ctx, "turn/completed", { threadId: "cx", turn: { id: "native", status: "failed" } })
+    const closed = events.findLast(
+      (event) => event.type === "item.updated" && event.item.kind === "agent_message",
+    )
+    expect(closed).toMatchObject({ item: { text: "半句话", complete: true } })
   })
 
   it("没落地过的 item 不补事件——补了就凭空多一条界面上从来没出现过的工具行", () => {
@@ -383,6 +418,7 @@ describe("通知的会话归属", () => {
         emit: (e: Event) => events.push(e),
         turnId: () => "t-1",
         inflight: new Map(),
+        streamed: new Map(),
         materialized: new Set<string>(),
         mcpSeen: new Map(),
         now: () => 0,
@@ -418,5 +454,64 @@ describe("通知的会话归属", () => {
     const h = ctxOf("cx-1")
     handleNotification(h.ctx, "thread/tokenUsage/updated", { tokenUsage: { last: { totalTokens: 7 } } })
     expect(h.events.filter((e) => e.type === "usage.updated")).toHaveLength(1)
+  })
+
+  it("上一轮迟到的通知不会挂到当前轮", () => {
+    const h = ctxOf("cx-1")
+    h.ctx.codexTurn = () => "native-current"
+    handleNotification(h.ctx, "item/completed", {
+      threadId: "cx-1",
+      turnId: "native-old",
+      item: { type: "agentMessage", id: "late", text: "迟到" },
+    })
+    expect(h.events).toEqual([])
+  })
+
+  it("新轮 start 尚未回包时，已结算旧轮的重复通知也不会收掉新轮", () => {
+    const h = ctxOf("cx-1")
+    h.ctx.codexTurn = () => undefined
+    h.ctx.settledTurns = new Set(["native-old"])
+    handleNotification(h.ctx, "turn/completed", {
+      threadId: "cx-1",
+      turn: { id: "native-old", status: "completed" },
+    })
+    expect(h.events).toEqual([])
+  })
+
+  it("本轮通知先于 start 回包时先认领 native id，随后拒绝别轮事件", () => {
+    const h = ctxOf("cx-1")
+    let native: string | undefined
+    h.ctx.codexTurn = () => native
+    h.ctx.adoptCodexTurn = (turnId) => {
+      native = turnId
+    }
+    handleNotification(h.ctx, "item/started", {
+      threadId: "cx-1",
+      turnId: "native",
+      item: { type: "agentMessage", id: "m1", text: "" },
+    })
+    expect(native).toBe("native")
+    handleNotification(h.ctx, "item/completed", {
+      threadId: "cx-1",
+      turnId: "other",
+      item: { type: "agentMessage", id: "m2", text: "不该出现" },
+    })
+    expect(h.events).toEqual([])
+  })
+
+  it("正常收工先清内部轮次，重复的 turn/completed 不会再终结一次", () => {
+    const h = ctxOf("cx-1")
+    let turn: string | undefined = "t-1"
+    let native: string | undefined = "native-1"
+    h.ctx.turnId = () => turn
+    h.ctx.codexTurn = () => native
+    h.ctx.settleTurn = () => {
+      turn = undefined
+      native = undefined
+    }
+    const ended = { threadId: "cx-1", turn: { id: "native-1", status: "completed" } }
+    handleNotification(h.ctx, "turn/completed", ended)
+    handleNotification(h.ctx, "turn/completed", ended)
+    expect(h.events.filter((event) => event.type === "turn.completed")).toHaveLength(1)
   })
 })

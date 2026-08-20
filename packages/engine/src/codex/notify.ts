@@ -1,4 +1,4 @@
-import type { Event, ItemId, ThreadId, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
+import type { Event, ItemId, ThreadId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
 import { readSettings, type CodexSettings } from "./settings.js"
 import { onPlanUpdate } from "./plan.js"
@@ -39,11 +39,21 @@ export interface NotifyContext {
   emit: (event: Event) => void
   /** 宿主铸造的当前轮次 id。codex 自己的 turnId 只用来判断是不是当前轮。 */
   turnId: () => TurnId | undefined
+  /** codex 铸造的当前轮次 id；用于拦住上一轮迟到的通知。 */
+  codexTurn?: () => string | undefined
+  /** 已结算的原生轮次；新一轮等 start 回包时也不能让它们钻空子。 */
+  settledTurns?: ReadonlySet<string>
+  /** 通知可能先于 turn/start 回包，用首个可信通知补上原生 id。 */
+  adoptCodexTurn?: (turnId: string) => void
+  /** 正常通知收工时同步清掉驱动内部的两枚轮次 id。 */
+  settleTurn?: () => void
   /**
    * 在途 item。审批请求只带 itemId 回来，要靠这张表说清楚在批准什么——
    * 见 `approve.ts` 开头。
    */
   inflight: Map<string, WireItem>
+  /** 流式文本/命令输出的累计值；异常收尾时用它重建完整 item，避免覆盖掉已显示内容。 */
+  streamed: Map<ItemId, string>
   /** 已经发过 `item.started` 的 id。文本流式 item 有内容才落地，见下。 */
   materialized: Set<ItemId>
   /**
@@ -69,6 +79,8 @@ function onItemStarted(ctx: NotifyContext, params: WireItemLifecycle): void {
   const turnId = ctx.turnId()
   if (turnId === undefined) return
   ctx.inflight.set(params.item.id, params.item)
+  const output = params.item.aggregatedOutput
+  if (typeof output === "string" && output !== "") ctx.streamed.set(params.item.id, output)
   if (isStreamingText(params.item.type)) return
   const omni = itemToOmni(params.item, { turnId, at: ctx.now() }, false)
   if (omni === undefined) return
@@ -79,6 +91,7 @@ function onItemStarted(ctx: NotifyContext, params: WireItemLifecycle): void {
 function onItemCompleted(ctx: NotifyContext, params: WireItemLifecycle): void {
   const turnId = ctx.turnId()
   ctx.inflight.delete(params.item.id)
+  ctx.streamed.delete(params.item.id)
   if (turnId === undefined) return
   // 空的流式 item 从来没落地过，到这里也不该落地——直接丢
   if (isStreamingText(params.item.type) && !ctx.materialized.has(params.item.id)) {
@@ -96,12 +109,14 @@ function onDelta(ctx: NotifyContext, params: WireDelta): void {
   const item = ctx.inflight.get(params.itemId)
   if (turnId === undefined || item === undefined) return
   if (!materialize(ctx, item, turnId)) return
+  ctx.streamed.set(params.itemId, `${ctx.streamed.get(params.itemId) ?? ""}${params.delta}`)
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
 }
 
 /** 工具在 started 时已落地；增量直接追加，completed 再用聚合输出收口。 */
 function onOutputDelta(ctx: NotifyContext, params: WireDelta): void {
   if (ctx.turnId() === undefined || !ctx.materialized.has(params.itemId)) return
+  ctx.streamed.set(params.itemId, `${ctx.streamed.get(params.itemId) ?? ""}${params.delta}`)
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
 }
 
@@ -126,15 +141,32 @@ function onUsage(ctx: NotifyContext, params: WireTokenUsage): void {
 
 /** 轮次非正常收工时补齐在途工具终态；中断与失败不能混为一谈。 */
 export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnStatus): void {
-  if (status === "completed") return
-  const ending: ToolStatus = status === "interrupted" ? "interrupted" : "failed"
   for (const [id, item] of ctx.inflight) {
     if (!ctx.materialized.has(id)) continue
-    const omni = itemToOmni(item, { turnId, at: ctx.now() }, true)
-    if (omni?.kind !== "tool_call") continue
-    ctx.emit({ type: "item.updated", at: ctx.now(), item: { ...omni, status: ending } })
+    const streamed = ctx.streamed.get(id)
+    const recovered = recoverStream(item, streamed)
+    const omni = itemToOmni(recovered, { turnId, at: ctx.now() }, true)
+    const closed = omni?.kind === "tool_call" ? closeTool(omni, status) : omni
+    if (closed !== undefined) ctx.emit({ type: "item.updated", at: ctx.now(), item: closed })
   }
   ctx.inflight.clear()
+  ctx.streamed.clear()
+}
+
+function closeTool(item: ToolCallItem, status: TurnStatus): ToolCallItem {
+  if (status !== "completed") {
+    return { ...item, status: status === "interrupted" ? "interrupted" : "failed" }
+  }
+  if (item.status !== "running" && item.status !== "pending") return item
+  return { ...item, status: "failed", error: "Codex 在轮次结束前没有报告这次工具调用的结果。" }
+}
+
+function recoverStream(item: WireItem, streamed: string | undefined): WireItem {
+  if (streamed === undefined) return item
+  if (item.type === "agentMessage") return { ...item, text: streamed }
+  if (item.type === "reasoning") return { ...item, summary: [streamed], content: [] }
+  if (item.type === "commandExecution") return { ...item, aggregatedOutput: streamed }
+  return item
 }
 
 function onTurnCompleted(ctx: NotifyContext, params: WireTurnLifecycle): void {
@@ -143,6 +175,7 @@ function onTurnCompleted(ctx: NotifyContext, params: WireTurnLifecycle): void {
   const message = params.turn.error?.message
   const status = turnStatus(params.turn.status)
   sweepInflight(ctx, turnId, status)
+  ctx.settleTurn?.()
   ctx.emit({
     type: "turn.completed",
     at: ctx.now(),
@@ -185,9 +218,21 @@ function onError(ctx: NotifyContext, params: WireError): void {
  */
 function ours(ctx: NotifyContext, params: unknown): boolean {
   const from = (params as { threadId?: unknown } | undefined)?.threadId
-  if (typeof from !== "string" || from === "") return true
   const ours = ctx.codexThread()
-  return ours === undefined || from === ours
+  if (typeof from === "string" && from !== "" && ours !== undefined && from !== ours) return false
+  const nativeTurn = turnOf(params)
+  const current = ctx.codexTurn?.()
+  if (nativeTurn === undefined) return true
+  if (ctx.settledTurns?.has(nativeTurn) === true) return false
+  if (current !== undefined) return nativeTurn === current
+  ctx.adoptCodexTurn?.(nativeTurn)
+  return true
+}
+
+function turnOf(params: unknown): string | undefined {
+  const raw = params as { turnId?: unknown; turn?: { id?: unknown } } | undefined
+  const turn = raw?.turnId ?? raw?.turn?.id
+  return typeof turn === "string" && turn !== "" ? turn : undefined
 }
 
 /** 方法表让新增通知保持平坦；线上参数先以 unknown 进入各自边界。 */

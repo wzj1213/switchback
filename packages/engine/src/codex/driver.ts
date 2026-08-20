@@ -27,6 +27,7 @@ import { answerApproval } from "./approve.js"
 import type { WireItem } from "./wire.js"
 import type { CodexSettings } from "./settings.js"
 import { openSession, type OpenCtx, type SessionState } from "./open.js"
+import { inputItems, startTurn } from "./turn.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -47,7 +48,9 @@ class CodexSession implements EngineSession {
   private readonly owner: ProcessOwner
   private readonly rpc: RpcPeer
   private readonly inflight = new Map<string, WireItem>()
+  private readonly streamed = new Map<string, string>()
   private readonly materialized = new Set<string>()
+  private readonly settledTurns = new Set<string>()
   /** MCP 服务器上次报的状态。只在翻面时出声——一次启动实测 17 条通知。 */
   private readonly mcpSeen = new Map<string, string>()
   private readonly trust: { current: Trust }
@@ -87,22 +90,25 @@ class CodexSession implements EngineSession {
     return {
       threadId: this.req.threadId,
       codexThread: () => this.state.codexThread,
-      onSettings: (settings) => {
-        this.adoptSettings(settings)
-      },
+      onSettings: (settings) => this.adoptSettings(settings),
       emit: this.req.emit,
       turnId: () => this.state.turn,
+      codexTurn: () => this.state.codexTurn,
+      settledTurns: this.settledTurns,
+      adoptCodexTurn: (turnId) => (this.state.codexTurn ??= turnId),
+      settleTurn: () => {
+        if (this.state.codexTurn !== undefined) this.settledTurns.add(this.state.codexTurn)
+        this.state.turn = undefined
+        this.state.codexTurn = undefined
+      },
       inflight: this.inflight,
+      streamed: this.streamed,
       materialized: this.materialized,
       mcpSeen: this.mcpSeen,
       now: () => Date.now(),
     }
   }
 
-  /**
-   * 把还挂着的轮次落成终态。**幂等**——`state.turn` 已经清了就什么都不做，
-   * 否则正常收工路径发过一条之后这里再发一条，journal 里多一行。
-   */
   /**
    * 引擎报了一份设置快照。
    *
@@ -125,13 +131,22 @@ class CodexSession implements EngineSession {
     }
   }
 
-  private endTurn(status: TurnStatus): void {
+  /** 还挂着的轮次落终态；`state.turn` 已清时幂等无操作。 */
+  private endTurn(status: TurnStatus, error?: string): void {
     const turnId = this.state.turn
     if (turnId === undefined) return
     // 在途的工具行一起扫掉，不然它们永远停在 running
     sweepInflight(this.notifyContext(), turnId, status)
     this.state.turn = undefined
-    this.req.emit({ type: "turn.completed", at: Date.now(), turnId, status })
+    if (this.state.codexTurn !== undefined) this.settledTurns.add(this.state.codexTurn)
+    this.state.codexTurn = undefined
+    this.req.emit({
+      type: "turn.completed",
+      at: Date.now(),
+      turnId,
+      status,
+      ...(error === undefined ? {} : { error }),
+    })
   }
 
   private status(status: EngineStatus, detail?: string): void {
@@ -177,12 +192,8 @@ class CodexSession implements EngineSession {
       config: this.config,
       req: this.req,
       state: this.state,
-      status: (status, detail) => {
-        this.status(status, detail)
-      },
-      wire: (child) => {
-        this.wire(child)
-      },
+      status: (status, detail) => this.status(status, detail),
+      wire: (child) => this.wire(child),
     }
   }
 
@@ -206,17 +217,19 @@ class CodexSession implements EngineSession {
   }
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
-    if (this.state.codexThread === undefined) throw new Error("codex 会话尚未就绪")
-    this.state.turn = turnId
     // `turn/start` 在轮次**开始**时就回（status: inProgress），不等收工——
     // 所以这里 await 它是安全的，还能顺手拿到 codex 侧的 turnId 供中断使用。
-    const started = await this.rpc.call("turn/start", {
-      threadId: this.state.codexThread,
-      input: inputItems(text, attachments),
-      ...(this.state.model === undefined ? {} : { model: this.state.model }),
-      ...(this.state.effort === undefined ? {} : { effort: this.state.effort }),
-    })
-    this.state.codexTurn = (started as { turn?: { id?: string } } | undefined)?.turn?.id
+    await startTurn(
+      {
+        state: this.state,
+        call: (method, params) => this.rpc.call(method, params),
+        fail: (message) => this.endTurn("failed", message),
+        discard: (native) => this.settledTurns.add(native),
+      },
+      text,
+      turnId,
+      attachments,
+    )
   }
 
   /**
@@ -412,23 +425,4 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
       return session
     },
   }
-}
-
-/**
- * 一次 `turn/start` 或 `turn/steer` 的输入项。
- *
- * codex 的 input item 认这几种（探出来的）：text / image / localImage /
- * audio / localAudio / skill / mention。**用 localImage 而不是 image**：
- * 前者只给路径，后者要把整张图塞进 JSON-RPC——一张截图几 MB，
- * 走管道既慢又会把日志撑爆。
- *
- * 抽出来是因为**开一轮和中途改向必须送同一种形状**。两处各写一份的话，
- * 哪天 codex 改了输入格式，只会有一处被改到——而没被改到的那处
- * 恰恰是更少被测到的那处。
- */
-function inputItems(text: string, attachments?: readonly string[]): readonly unknown[] {
-  return [
-    { type: "text", text, text_elements: [] },
-    ...(attachments ?? []).map((path) => ({ type: "localImage", path })),
-  ]
 }

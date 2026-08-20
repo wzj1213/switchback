@@ -19,6 +19,7 @@ describe("omni 认领了 codex 的哪些实验面", () => {
           emit: () => undefined,
           turnId: () => undefined,
           inflight: new Map(),
+          streamed: new Map(),
           materialized: new Set<string>(),
           mcpSeen: new Map(),
           now: () => 0,

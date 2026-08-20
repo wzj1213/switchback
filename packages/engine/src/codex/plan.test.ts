@@ -11,6 +11,7 @@ const setup = (turn = "tn-1"): { ctx: NotifyContext; events: Event[] } => {
     emit: (e) => events.push(e),
     turnId: () => turn,
     inflight: new Map<string, WireItem>(),
+    streamed: new Map<string, string>(),
     materialized: new Set<string>(),
     mcpSeen: new Map<string, string>(),
     now: () => 100,
