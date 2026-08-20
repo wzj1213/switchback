@@ -17,8 +17,11 @@
 :root {
   --pet-kimi: #5b83d6;
   --pet-kimi-eye: #1d2f57;
-  --pet-claude: #da7756;
-  --pet-claude-eye: #a84e30;
+  /* 身体是这个值，眼睛是**纯黑**。
+     最初那份设计稿写的是 #da7756 / #a84e30，两个都偏了一点。
+     白底 3.16:1、深底 5.68:1，两边都过图形那道 3:1 的门槛 */
+  --pet-claude: #cc7d5b;
+  --pet-claude-eye: #000000;
   --pet-grok: #16161a;
   --pet-grok-eye: #ffffff;
   /* 没见过的那一家。**不编配色**——编出来迟早和某一家撞 */
