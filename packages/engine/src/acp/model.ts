@@ -74,8 +74,9 @@ export async function applyModel(ctx: ModelCtx, model: string, effort?: string):
     throw new Error(sayWhy(ctx.id, "换模型", error))
   })
   if (meta !== undefined) ctx.state.effort = effort
+  else if (effort === undefined || ctx.state.effortConfig === undefined) ctx.state.effort = undefined
   // 分母跟着换：同一家的两个模型窗口可以不一样，不换的话比例条会按旧分母画
-  ctx.state.contextWindow = ctx.state.windowOf[model] ?? ctx.state.contextWindow
+  ctx.state.contextWindow = ctx.state.windowOf[model]
   await applyEffort(ctx, sessionId, effort)
   // **回报的是引擎那边真正生效的那一档**，不是请求的那个：
   // 设不上时 `applyEffort` 只发 degraded，`ctx.state.effort` 停在旧值

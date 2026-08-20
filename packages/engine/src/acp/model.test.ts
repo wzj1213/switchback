@@ -71,6 +71,24 @@ describe("换模型顺带换强度", () => {
     expect(applied).toEqual({})
   })
 
+  it("换到没有强度的模型时清掉上一模型的旧档，不拿旧值冒充新模型状态", async () => {
+    const h = ctxWith({ effort: "max" })
+    h.state.effortConfig = undefined as unknown as string
+    h.state.models = [{ id: "plain", label: "Plain" }]
+    expect(await applyModel(h.ctx, "plain")).toEqual({})
+    expect(h.state.effort).toBeUndefined()
+  })
+
+  it("目标模型没报告窗口时清掉旧分母；报告了才换成新值", async () => {
+    const h = ctxWith()
+    h.state.contextWindow = 500_000
+    await applyModel(h.ctx, "unknown")
+    expect(h.state.contextWindow).toBeUndefined()
+    h.state.windowOf.known = 200_000
+    await applyModel(h.ctx, "known")
+    expect(h.state.contextWindow).toBe(200_000)
+  })
+
   it("会话还没开就什么都不做", async () => {
     const h = ctxWith()
     h.state.acpSession = undefined as unknown as string

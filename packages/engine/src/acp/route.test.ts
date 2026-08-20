@@ -23,7 +23,11 @@ describe("协议之外的私有通知", () => {
     const events: Event[] = []
     const models: { model?: string; effort?: string }[] = []
     const states: unknown[] = []
-    const state = { effort: undefined as string | undefined, contextWindow: 1000 }
+    const state = {
+      effort: undefined as string | undefined,
+      windowOf: { "grok-4.6": 2000 } as Record<string, number>,
+      contextWindow: 1000 as number | undefined,
+    }
     const ctx = {
       config,
       state,
@@ -42,8 +46,15 @@ describe("协议之外的私有通知", () => {
     const h = ctxWith({ modelChanged: () => ({ model: "grok-4.6", effort: "xhigh" }) })
     onForeign(h.ctx, "_x.ai/session_notification", {})
     expect(h.state.effort).toBe("xhigh")
+    expect(h.state.contextWindow).toBe(2000)
     expect(h.models).toEqual([{ model: "grok-4.6", effort: "xhigh" }])
     expect(h.states).toEqual([{ modelId: "grok-4.6" }])
+  })
+
+  it("引擎自己换到没报告窗口的模型时也清掉旧分母", () => {
+    const h = ctxWith({ modelChanged: () => ({ model: "unknown" }) })
+    onForeign(h.ctx, "_x.ai/session_notification", {})
+    expect(h.state.contextWindow).toBeUndefined()
   })
 
   it("只报了强度就不报模型状态——**没认出来的不编一个**", () => {

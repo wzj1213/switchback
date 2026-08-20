@@ -40,7 +40,11 @@ export function mine(from: string | undefined, ours: string | undefined): boolea
  */
 export interface ForeignCtx {
   config: Pick<AcpDriverConfig, "contextUsed" | "modelChanged">
-  state: { effort: string | undefined; contextWindow: number | undefined }
+  state: {
+    effort: string | undefined
+    windowOf: Readonly<Record<string, number>>
+    contextWindow: number | undefined
+  }
   req: StartRequest
   update: () => UpdateContext
 }
@@ -56,6 +60,7 @@ export function onForeign(ctx: ForeignCtx, method: string, params: unknown): voi
 /** 引擎自己换了模型 / 强度：落到状态上，并沿两条既有的路报上去。 */
 function adoptModelChange(ctx: ForeignCtx, changed: { model?: string; effort?: string }): void {
   if (changed.effort !== undefined) ctx.state.effort = changed.effort
+  if (changed.model !== undefined) ctx.state.contextWindow = ctx.state.windowOf[changed.model]
   ctx.req.onModel?.(changed.model, changed.effort)
   if (changed.model !== undefined) ctx.req.onEngineState?.({ modelId: changed.model })
 }

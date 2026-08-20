@@ -399,8 +399,8 @@ class AcpSession implements EngineSession {
     if (needsNativeRestart(this.state.native, this.config.nativeApproval?.(trust))) {
       return { restart: true, detail: `${this.config.id} 的原生审批档要在开场设置；请等当前轮结束后续接重启。` }
     }
-    this.trust.current = trust
     await applyTrust(this.knobs(), trust, this.state.modes)
+    this.trust.current = trust
     return { restart: false }
   }
 
