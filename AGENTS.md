@@ -33,18 +33,23 @@
 
 写不出「不拥有什么」的包，就是边界没划对——先别写代码。
 
-**依赖方向**（`pnpm arch` 校验，不允许成环）：
+**精确依赖边**（`pnpm arch` 校验；依赖增删必须同步改 `scripts/package-graph.mjs`）：
 
+<!-- package-graph:start -->
+```text
+protocol ← ∅
+approval ← protocol
+store ← protocol
+wire ← protocol
+worksite ← ∅
+journal ← protocol
+handoff ← protocol
+engine ← protocol + approval
+host ← protocol + approval + engine + store + journal + handoff
+desktop ← protocol + engine + handoff + host + journal + store + wire + worksite
+web ← protocol + store + wire
 ```
-protocol  ← 零依赖，纯类型
-approval  ← 只依赖 protocol，纯函数、零 IO
-engine    ← 依赖 protocol + approval
-worksite  ← 只依赖 protocol
-journal   ← 只依赖 protocol
-handoff   ← 依赖 protocol
-host      ← 依赖以上全部（唯一允许做编排的地方）
-desktop   ← 只依赖 host + protocol
-```
+<!-- package-graph:end -->
 
 **纯逻辑包（`protocol` / `approval`）零运行时依赖、零 IO**：不读文件、不发网络、不起进程、
 不读时钟（时间由调用方传入）。这是它们能被表驱动测试穷举的前提。

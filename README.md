@@ -17,11 +17,14 @@ Kimi Code（`kimi web` REST + WebSocket）与 Grok（ACP）。其他讲 ACP 的�
 pnpm install
 pnpm dev          # 开发模式
 pnpm check        # typecheck / lint / 架构守卫 / 日志守卫 / 测试
-pnpm dist         # 打成可安装的 .dmg（产物在 release/）
+pnpm dist         # 完整版 .dmg：内置 Claude 平台可执行文件
+pnpm dist:thin    # 轻量版 .dmg：使用 PATH 上的 claude
+pnpm dist:all     # 一次生成两种
 ```
 
-前置条件：机器上装好要用的原生 agent（`codex` / `claude` / `kimi` / `grok`）并**登录过**。
-omni 直接用它们的原生登录态，不另外配密钥。
+前置条件：机器上装好要用的原生 agent（`codex` / `kimi` / `grok`）并**登录过**；Claude 完整版
+内置平台可执行文件，轻量版要求本机 `claude --version` 可运行。omni 直接用各家的原生登录态，
+不另外配密钥。
 
 打出来的包**没有签名**（`identity: null`）。首次打开要在
 「系统设置 → 隐私与安全性」里放行，或者 `xattr -dr com.apple.quarantine /Applications/omni.app`。
@@ -57,6 +60,8 @@ L2 不传原始上下文（各家 session 格式不通），传**交接包**：�
 packages/
   protocol/   领域模型 thread / turn / item（零依赖，纯类型）
   approval/   信任档 + 红线表 + 判定器（纯函数，零 IO）
+  store/      事件流到视图状态的纯归约器
+  wire/       序号、重放、分片与补洞
   engine/     引擎驱动契约与实现：acp / codex / claude / kimi
   worksite/   工作区安全：git guard、写范围
   journal/    持久化、断点、恢复
@@ -64,9 +69,26 @@ packages/
   host/       会话编制与进程生命周期（唯一允许做编排的地方）
 apps/
   desktop/    Electron 壳 + React 渲染层
+  web/        远程浏览器端
 ```
 
-依赖方向由 `pnpm arch` 强制，不允许回流或成环。
+精确依赖边由 `pnpm arch` 强制，依赖增删必须同步改真源：
+
+<!-- package-graph:start -->
+```text
+protocol ← ∅
+approval ← protocol
+store ← protocol
+wire ← protocol
+worksite ← ∅
+journal ← protocol
+handoff ← protocol
+engine ← protocol + approval
+host ← protocol + approval + engine + store + journal + handoff
+desktop ← protocol + engine + handoff + host + journal + store + wire + worksite
+web ← protocol + store + wire
+```
+<!-- package-graph:end -->
 
 ## 开发
 

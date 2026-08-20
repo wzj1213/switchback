@@ -11,23 +11,9 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { PACKAGE_GRAPH, renderPackageGraph } from "./package-graph.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
-
-/** 层级：数字小的不得依赖数字大的。同层之间也不得互相依赖。 */
-const LAYER = {
-  "@omni/protocol": 0,
-  "@omni/approval": 1,
-  "@omni/store": 1,
-  "@omni/wire": 1,
-  "@omni/worksite": 1,
-  "@omni/journal": 1,
-  "@omni/handoff": 1,
-  "@omni/engine": 2,
-  "@omni/host": 3,
-  "@omni/desktop": 4,
-  "@omni/web": 4,
-}
 
 /** 这些包不得有任何运行时依赖（devDependencies 不限）。 */
 const PURE = new Set(["@omni/protocol", "@omni/approval"])
@@ -67,21 +53,35 @@ function checkReadme({ dir, json }) {
   }
 }
 
-function checkLayer({ json }) {
-  const self = LAYER[json.name]
-  if (self === undefined) {
-    fail(`${json.name}: 未在 scripts/check-arch.mjs 的 LAYER 表中登记`)
+function checkDependencies({ json }) {
+  const allowed = PACKAGE_GRAPH[json.name]
+  if (allowed === undefined) {
+    fail(`${json.name}: 未在 scripts/package-graph.mjs 登记`)
     return
   }
-  for (const dep of Object.keys(json.dependencies ?? {})) {
-    if (!dep.startsWith("@omni/")) continue
-    const other = LAYER[dep]
-    if (other === undefined) {
-      fail(`${json.name} → ${dep}: 目标未在 LAYER 表中登记`)
-    } else if (other >= self) {
-      fail(`${json.name}(L${self}) → ${dep}(L${other}): 依赖方向回流或同层互依`)
-    }
+  const actual = Object.keys(json.dependencies ?? {}).filter((dep) => dep.startsWith("@omni/"))
+  for (const dep of actual) {
+    if (PACKAGE_GRAPH[dep] === undefined) fail(`${json.name} → ${dep}: 目标未在精确依赖图登记`)
+    else if (!allowed.includes(dep)) fail(`${json.name} → ${dep}: 精确依赖图中没有这条边`)
   }
+  for (const dep of allowed)
+    if (!actual.includes(dep)) fail(`${json.name} → ${dep}: 图中有边但 package.json 已缺失`)
+}
+
+function checkGraphPackages(pkgs) {
+  const discovered = new Set(pkgs.map((pkg) => pkg.json.name))
+  for (const name of Object.keys(PACKAGE_GRAPH)) {
+    if (!discovered.has(name)) fail(`${name}: 依赖图登记了包，但工作区里没有发现它`)
+  }
+}
+
+function checkGraphDocs(file) {
+  const text = readFileSync(join(ROOT, file), "utf8")
+  const match = text.match(
+    /<!-- package-graph:start -->\n```text\n([\s\S]*?)\n```\n<!-- package-graph:end -->/,
+  )
+  if (match?.[1] !== renderPackageGraph())
+    fail(`${file}: 包依赖图与 scripts/package-graph.mjs 不一致`)
 }
 
 function checkPure({ json }) {
@@ -95,9 +95,12 @@ function checkPure({ json }) {
 function main() {
   const pkgs = discover()
   if (pkgs.length === 0) fail("没有发现任何工作区包")
+  checkGraphPackages(pkgs)
+  checkGraphDocs("AGENTS.md")
+  checkGraphDocs("README.md")
   for (const pkg of pkgs) {
     checkReadme(pkg)
-    checkLayer(pkg)
+    checkDependencies(pkg)
     checkPure(pkg)
   }
 
@@ -107,7 +110,7 @@ function main() {
     console.error("")
     process.exit(1)
   }
-  console.log(`架构守卫通过：${pkgs.length} 个包，依赖方向与文档契约全绿`)
+  console.log(`架构守卫通过：${pkgs.length} 个包，精确依赖边与文档契约全绿`)
 }
 
 main()
