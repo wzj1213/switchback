@@ -133,6 +133,20 @@ describe("toMarkdown", () => {
 })
 
 describe("textOf", () => {
+  it("报错连引擎补的那句原因一起复制——拿去搜、拿去开 issue 的正是那一句", () => {
+    expect(
+      textOf({
+        id: "er",
+        turnId: "t",
+        kind: "error",
+        at: 0,
+        message: "Reconnecting... 1/5",
+        fatal: false,
+        detail: "上游过载",
+      }),
+    ).toBe("Reconnecting... 1/5\n上游过载")
+  })
+
   it("消息复制正文", () => {
     expect(textOf(agent("正文"))).toBe("正文")
   })

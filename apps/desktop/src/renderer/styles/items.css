@@ -535,6 +535,38 @@
   border-color: var(--accent);
 }
 
+/* 文本框和它的灰字预览共用这一个盒子——**预览必须和文本框同一个原点**，
+   所以定位挂在这里，两边各自 `inset: 0` / `width: 100%` 对齐 */
+.composer__field {
+  position: relative;
+}
+
+/*
+ * 光标后面那截灰字：按下 Tab 或回车会补上的东西。
+ *
+ * 一层贴在文本框上的镜像：你已经打的那部分画成透明的**占住位置**，
+ * 后面那截灰字才落在光标正后方。所以它的字体、字号、内边距、换行规则
+ * 必须和 `.composer__input` 一模一样——两边都靠 `font: inherit` 从同一处取，
+ * 谁也不许单独调一格。
+ *
+ * `pointer-events: none`：它盖在文本框上面，不接管点击也不夺焦点。
+ */
+.composer__ghost {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+
+/* 已经打进去的那部分：**只占位，不显形**。真正显示它的是下面那个文本框 */
+.composer__ghost-typed {
+  color: transparent;
+}
+
 .composer__input {
   width: 100%;
   /* UA 给 textarea 的 2px 内边距要清掉：不清的话，打的字比上面的芯片行
@@ -1166,6 +1198,19 @@
   align-items: center;
   opacity: 0.7;
   font-size: var(--text-xs);
+}
+
+/*
+ * 引擎自己补的那句原因（codex 的 `additionalDetails`），跟在抬头下面。
+ *
+ * **压一档但不压到看不见**：它和上面那句是「为什么」和「怎么了」的关系，
+ * 不是同一句话的两种写法。重连那条的抬头是 `Reconnecting... 1/5`——
+ * 真正有信息的是这一行，把它压成背景噪声就等于白取了。
+ */
+.error__why {
+  margin: 2px 0 0;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
 
 /* 原文可能很长、可能一行到底。**任意处折行**，不要让人横着读报错——

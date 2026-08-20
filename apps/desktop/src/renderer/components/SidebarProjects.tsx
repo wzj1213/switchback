@@ -52,6 +52,10 @@ export function ProjectsSection({
         // **图标不能和「对话」段那颗 `+` 一样**：这颗是「加一个项目（选文件夹）」，
         // 那颗是「开一条对话」。同形不同义比没有图标更误导
         action={{ label: "打开一个文件夹", icon: <FolderIcon size={SIDEBAR_ICON} />, run: on.onOpenFolder }}
+        // 拖着一个置顶过的东西时才说：落在这一段上是**取消置顶**。
+        // 「只进不出的落点是陷阱」那条规矩得有人说出口，而这是唯一说得起的位置——
+        // 它绝对定位、不占位（拖起来时挪动任何一行都会让 Chromium 取消拖拽）
+        {...(on.draggingPinned === true ? { hint: "松手取消置顶" } : {})}
       />
       {open ? <Projects groups={sections.projects} on={on} /> : null}
     </div>

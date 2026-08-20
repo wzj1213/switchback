@@ -3,6 +3,7 @@ import type { SlashCommand } from "@omni/protocol"
 import { MentionList } from "./MentionList.js"
 import { useMentions } from "../useMentions.js"
 import { useSlash } from "../useSlash.js"
+import { ghostOf } from "../slash.js"
 import { SlashList } from "./SlashList.js"
 
 /**
@@ -78,7 +79,13 @@ export function Prompt({
   return (
     <>
       <MentionList paths={mentions.paths} active={mentions.active} onPick={choose} />
-      <SlashList commands={slash.hits} active={slash.active} onPick={pickCommand} />
+      <SlashList commands={slash.hits} query={slash.query} active={slash.active} onPick={pickCommand} />
+      {/* **灰字预览和输入框必须共用一个原点。** 它是一层贴在文本框上的镜像：
+          你打的字画成透明的占住位置，后面那截灰字才落在光标正后方。
+          差一个像素的内边距或字体，这层就露馅——所以两者都写 `font: inherit`、
+          `padding: 0`，谁也不许单独调 */}
+      <div className="composer__field">
+      <Ghost typed={value} rest={ghostOf(slash.hits[slash.active], slash.query)} />
       <textarea
         ref={input}
         className="composer__input"
@@ -115,7 +122,24 @@ export function Prompt({
           onPromptKey(e, { mentions, slash, choose, pickCommand, onSubmit })
         }}
       />
+      </div>
     </>
+  )
+}
+
+/**
+ * 光标后面那截灰字：**按下 Tab 或回车会补上的东西**。
+ *
+ * `aria-hidden`：读屏用户听到的应该是候选列表（那是个 `listbox`，
+ * 高亮的那一条会被念出来），而不是一段和输入框里的字重复的幽灵文本。
+ */
+function Ghost({ typed, rest }: { typed: string; rest: string }): React.JSX.Element | null {
+  if (rest === "") return null
+  return (
+    <div className="composer__ghost" aria-hidden="true">
+      <span className="composer__ghost-typed">{typed}</span>
+      {rest}
+    </div>
   )
 }
 

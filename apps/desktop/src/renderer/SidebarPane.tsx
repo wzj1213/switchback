@@ -1,6 +1,6 @@
 import type { Command, EngineThread, Thread } from "@omni/protocol"
-import type { ThreadRow } from "@omni/store"
 import { Sidebar } from "./components/Sidebar.js"
+import type { SidebarRow } from "./sidebar.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
 
 /** 侧栏接线。从 `App` 拆出来是行数闸门逼的，但它确实自成一块。 */
@@ -34,7 +34,7 @@ export function SidebarPane({
   account,
   send,
 }: {
-  rows: readonly ThreadRow[]
+  rows: readonly SidebarRow[]
   thread: Thread | undefined
   focusFilter: number
   askRename: number

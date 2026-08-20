@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react"
-import type { ThreadRow } from "@omni/store"
-import { rowLabelOf } from "../sidebar.js"
+import { rowLabelOf, type SidebarRow } from "../sidebar.js"
 import { EllipsisIcon } from "./icons.js"
-import { DOT_CLASS, RowEnd } from "./RowEnd.js"
+import { Dot, RowEnd } from "./RowEnd.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
@@ -38,6 +37,17 @@ export interface RowDrag {
  * `onDragOver` 不调 `preventDefault` 就等于「这儿不能放」，
  * 于是鼠标上是禁止标，用户在松手之前就知道不行。**用平台原生的方式说不，
  * 比放下之后弹一句「不能跨项目」好得多。**
+ *
+ * ## 一条不写下来就会再犯的约束
+ *
+ * `onDragStart` 里的 `drag.start()` 会当场 setState、当场重渲染整条侧栏。
+ * **那一次重渲染不许让这一行的位置变。** 只要它上面多出（或少掉）任何占位的东西，
+ * Chromium 会**直接取消这次拖拽**：`dragstart` 照常触发、谁也没 `preventDefault`、
+ * 节点也还连着，就是拖不动，而且一声不吭。
+ *
+ * 实测（0.0.206 的包，CDP 量的）：拖项目行 → 「置顶」段插进一句「松手就置顶了…」
+ * → 这一行从 y=333 掉到 391 → 拖拽没起来。绝对定位的东西不算数（它不占位），
+ * 换底色、改透明度也不算数——**只有「占位的东西变了」才致命**。
  */
 function dragProps(
   id: string,
@@ -122,11 +132,13 @@ function rowClass(o: {
   selected: boolean
   dragging: boolean
   dropping: boolean
+  unread: boolean
 }): string {
   return [
     "row row--thread",
     o.flat ? "row--flat" : "",
     o.selected ? "row--selected" : "",
+    o.unread ? "row--unread" : "",
     o.dragging ? "row--dragging" : "",
     o.dropping ? "row--dropping" : "",
   ]
@@ -146,7 +158,7 @@ export function Row({
   rename,
   drag,
 }: {
-  row: ThreadRow
+  row: SidebarRow
   selected: boolean
   /** 不在项目组里（筛选结果、最近段）：不缩进那一级。 */
   flat?: boolean
@@ -168,6 +180,9 @@ export function Row({
   drag?: RowDrag
 }): React.JSX.Element {
   const { thread } = row
+  // 后台跑完、还没打开过的那条要**亮着**：整行提亮 + 状态点点起来（见 `RowEnd`）。
+  // 选中的那条不算——你正看着它
+  const unread = row.unread === true && !selected
   const dropping = drag?.over === thread.id && drag.dragging !== thread.id
   // 二次确认做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
   // 但也不能点一下就没。照 codex 的 confirmArchiveTask。
@@ -196,7 +211,7 @@ export function Row({
   }, [confirming])
   return (
     <div
-      className={rowClass({ flat, selected, dragging: drag?.dragging === thread.id, dropping })}
+      className={rowClass({ flat, selected, unread, dragging: drag?.dragging === thread.id, dropping })}
       title={thread.cwd}
       {...dragProps(thread.id, thread.cwd, pinned, drag)}
       onContextMenu={(e) => {
@@ -208,7 +223,7 @@ export function Row({
     >
       <button type="button" className="row__main" aria-selected={selected} onClick={onSelect}>
         <span className="row__slot">
-          <span className={`row__dot${DOT_CLASS[thread.status]}`} />
+          <Dot status={thread.status} unread={unread} />
         </span>
         <RowName
           value={rowLabelOf(row)}
@@ -220,7 +235,7 @@ export function Row({
             rename?.done()
           }}
         />
-        <RowEnd thread={thread} {...(aside === undefined ? {} : { aside })} />
+        <RowEnd thread={thread} unread={unread} {...(aside === undefined ? {} : { aside })} />
       </button>
       <RowActions
         confirming={confirming}

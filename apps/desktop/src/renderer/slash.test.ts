@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { SlashCommand } from "@omni/protocol"
-import { applyCommand, matchCommands, slashAt } from "./slash.js"
+import { applyCommand, ghostOf, markOf, matchCommands, slashAt } from "./slash.js"
 
 const cmd = (name: string, description = "", source: SlashCommand["source"] = "engine"): SlashCommand => ({
   name,
@@ -124,4 +124,41 @@ describe("不该出现在面板里的", () => {
     const c: SlashCommand = { name: "new", label: "新建会话", description: "在当前工作区另开一个", source: "omni" }
     expect(matchCommands([c], "新建").map((x) => x.name)).toEqual(["new"])
   })
+})
+
+describe("名字里打中的那几个字", () => {
+  const cases: { name: string; text: string; query: string; want: readonly [string, string, string] | undefined }[] = [
+    { name: "打头的那几个字", text: "/deck", query: "de", want: ["/", "de", "ck"] },
+    { name: "中间也算——`/model` 里的 `de`", text: "/model", query: "de", want: ["/mo", "de", "l"] },
+    { name: "大小写不敏感，但切出来的是原文", text: "/DBQuery", query: "dbq", want: ["/", "DBQ", "uery"] },
+    { name: "没打中就不指", text: "/deck", query: "zz", want: undefined },
+    { name: "还没打字就不指——一进来全表加粗等于没加粗", text: "/deck", query: "", want: undefined },
+    { name: "中文名一样能打中", text: "新建会话", query: "会话", want: ["新建", "会话", ""] },
+  ]
+  for (const c of cases) {
+    it(c.name, () => {
+      expect(markOf(c.text, c.query)).toEqual(c.want)
+    })
+  }
+})
+
+describe("光标后面那截灰字", () => {
+  const cases: { name: string; command: SlashCommand | undefined; query: string; want: string }[] = [
+    { name: "补上剩下那半截", command: cmd("deck"), query: "de", want: "ck" },
+    { name: "整条打完了就没得补", command: cmd("deck"), query: "deck", want: "" },
+    { name: "还没打字不猜——那时排第一的只是字母序的巧合", command: cmd("deck"), query: "", want: "" },
+    { name: "一条候选都没有", command: undefined, query: "de", want: "" },
+    {
+      name: "大小写对不上就不补：拼出来的 `/dbQuery` 不是任何一条命令",
+      command: cmd("DBQuery"),
+      query: "db",
+      want: "",
+    },
+    { name: "命中在中间的（`/model` 配 `de`）也不补——灰字只能接在后面", command: cmd("model"), query: "de", want: "" },
+  ]
+  for (const c of cases) {
+    it(c.name, () => {
+      expect(ghostOf(c.command, c.query)).toBe(c.want)
+    })
+  }
 })

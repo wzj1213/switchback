@@ -18,7 +18,12 @@ import type { ThreadRow } from "@omni/store"
  * 「omni JSDoc」应该找到「在 omni 目录里问 JSDoc 的那个」。
  * 按或处理的话，词加得越多结果越多，与人的直觉正好相反。
  */
-export function filterRows(rows: readonly ThreadRow[], query: string): readonly ThreadRow[] {
+/**
+ * 泛型是为了**别把行上的旗子筛掉**：侧栏那份行比 `ThreadRow` 多一个未读标记
+ *（见 `sidebar.ts` 的 `SidebarRow`），签名写死 `ThreadRow` 的话，
+ * 筛完的那几条在类型上就不带它了——搜索结果里那行永远不亮，而且不报错。
+ */
+export function filterRows<R extends ThreadRow>(rows: readonly R[], query: string): readonly R[] {
   const terms = query.toLowerCase().split(/\s+/).filter((t) => t !== "")
   if (terms.length === 0) return rows
   return rows.filter((row) => {

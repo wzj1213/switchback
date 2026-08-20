@@ -1,5 +1,5 @@
 import type { ThreadRow } from "@omni/store"
-import type { Group } from "../sidebar.js"
+import { tallyOf, type Group } from "../sidebar.js"
 import { ChevronIcon, EllipsisIcon, FolderIcon, PlusIcon, SpinnerIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
@@ -94,20 +94,6 @@ export function GroupBlock({
  * 那边管「这个项目底下有哪些会话」，这边管「这个项目自己长什么样」。
  */
 /**
- * 折叠起来时这一组要说什么。
- *
- * **等你批和在跑不是一回事**：转圈说「它在忙，你可以走开」，
- * 待批说「它停下来等你，你不回来它就一直停着」。上一版只数了前者，
- * 于是折叠的项目里有人等你批，侧栏一点痕迹都没有。
- */
-function tally(group: Group): { running: number; waiting: number } {
-  return {
-    running: group.rows.filter((r) => r.thread.status === "running").length,
-    waiting: group.rows.filter((r) => r.thread.status === "waiting_approval").length,
-  }
-}
-
-/**
  * 项目行的拖放接线：**它自己能被拖**（进出置顶、和别的项目换位置），
  * 也**只认另一个项目**落在自己身上——会话落在项目行上没有定义，
  * 它要么排序（落在会话行上），要么跨项目（不给）。
@@ -168,7 +154,8 @@ function GroupHead({
   onNewIn: (cwd: string) => void
   onGroupMenu: (event: React.MouseEvent, group: Group) => void
 }): React.JSX.Element {
-  const { running, waiting } = tally(group)
+  const { running, waiting, unread } = tallyOf(group)
+  const unreadLabel = `${String(unread)} 条跑完了还没看`
   return (
         <div
           className={`row row--group${drag?.over === group.cwd ? " row--dropping" : ""}`}
@@ -199,6 +186,11 @@ function GroupHead({
               <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
                 <SpinnerIcon />
               </span>
+            ) : null}
+            {/* 跑完了还没看的。**不摆数字**：右边已经有一个数（会话条数），
+                两个数字挨着谁也说不清哪个是哪个——一颗点说「里面有新东西」就够 */}
+            {collapsed && unread > 0 ? (
+              <span className="row__dot row__dot--unread" role="img" aria-label={unreadLabel} title={unreadLabel} />
             ) : null}
             <span className="row__count">{group.rows.length}</span>
           </button>

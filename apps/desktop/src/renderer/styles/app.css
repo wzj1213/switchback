@@ -453,6 +453,30 @@ body {
   color: var(--text-muted);
 }
 
+/*
+ * 拖着东西时段头右边现出来的那半句（「松手就置顶」）。
+ *
+ * **绝对定位是硬约束，不是排版偏好。** 这句话只在拖拽期间出现，而拖拽开始那一帧
+ * 只要**被拖的那一行位置变了**，Chromium 会把这次拖拽整个取消——
+ * `dragstart` 照常触发、也没人 preventDefault，就是拖不动。
+ * 上一版把它做成段里的一段正文（占 58px），于是**这句教你怎么拖的话本身让拖拽失效了**。
+ *
+ * 右边留出一颗行内按钮的位置：「项目」段头右上角那颗文件夹键悬停时会现出来。
+ */
+.sidebar__section-hint {
+  position: absolute;
+  right: calc(var(--sb-act) + var(--sp-2));
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* 筛选时那一行只是个计数，点不动 */
 .sidebar__section--static {
   cursor: default;
@@ -841,6 +865,34 @@ body {
 
 .row__dot--failed {
   background: var(--danger);
+}
+
+/*
+ * 「它在你没看的时候跑完了。」
+ *
+ * 用 `--accent` 而不是 `--ok`：绿色在这一列已经是「正在跑」的意思（那颗还在呼吸），
+ * 同色不同动画只能靠盯着看才分得出。**也不给它动画**——动的东西说的是
+ * 「此刻还在发生」，而这件事已经结束了，它只是在等你。
+ */
+.row__dot--unread {
+  background: var(--accent);
+}
+
+/*
+ * 未读那一行整行提亮：字色回到 `--text`、字重加一档。
+ *
+ * 光靠 6px 的点不够——侧栏一列扫下来，先看见的是字。而这两样都**不占位置**，
+ * 所以时间那一列照旧答「多久以前」（见 `RowEnd`）。
+ * 权重压在选中态之下：选中说的是「你正在看这条」，那仍然是最强的一条。
+ */
+.row--unread {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* 行尾那截时间跟着提一档。整行的 `color` 到不了它——它自己写死了 `--text-faint` */
+.row__time--bright {
+  color: var(--text-muted);
 }
 
 @keyframes dot-breathe {
@@ -1706,6 +1758,14 @@ body {
   white-space: nowrap;
 }
 
+/* 名字里被你打中的那几个字。**只加重，不换颜色也不加底色**：
+   一行里已经有三种深浅（名字、参数提示、说明），再来一种颜色就成了圣诞树；
+   而「这几个字是我打的」用字重说最省——眼睛本来就先看到重的那一处 */
+.slash__hit {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* 引擎技能的真名（`/berth-adopt`），跟在中文名后面。
    淡一档、小一号：它是「打进去会变成什么」，不是这一行的主语 */
 .slash__slug {
@@ -1989,6 +2049,15 @@ body {
    而拖动时鼠标下面还压着一行，那种精度不该由用户来凑 */
 .sidebar__droppin {
   border-radius: var(--radius-sm);
+}
+
+/* 一条都没置顶时这一段只剩一行段头，落点薄得没法瞄。垫一小截——
+   **而且必须常驻**：拖起来才垫的话，下面每一行都会往下挪，
+   而拖拽开始那一帧只要被拖的那一行动了，Chromium 就取消整次拖拽
+   （见 `SectionHead` 的 `hint`）。这也是它只垫 14px 的原因：
+   常驻的东西要付常驻的代价，够得着就行 */
+.sidebar__droppin--empty {
+  padding-bottom: 14px;
 }
 
 .sidebar__droppin--over {

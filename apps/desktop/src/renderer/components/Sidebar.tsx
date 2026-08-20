@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react"
-import type { ThreadRow } from "@omni/store"
 import type { EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
 import { useDeepSearch } from "../useDeepSearch.js"
 import { Deep } from "./SidebarDeep.js"
-import { sectionsOf } from "../sidebar.js"
+import { sectionsOf, type SidebarRow } from "../sidebar.js"
 import { useSidebarDrag } from "../sidebarDrag.js"
 import { SidebarFoot, type AccountLine } from "./SidebarFoot.js"
 import { useContextMenu } from "./Menu.js"
@@ -35,7 +34,8 @@ import { SectionList } from "./SidebarSections.js"
  */
 
 interface Props {
-  rows: readonly ThreadRow[]
+  /** **带着未读旗子的那一份**（见 `SidebarRow`）——旗子由 `useUnread` 挂上。 */
+  rows: readonly SidebarRow[]
   selectedId: string
   onSelect: (id: string) => void
   /** 在当前工作区另开一个会话 */
@@ -103,14 +103,14 @@ interface Props {
  * 这里管「搜出来的东西怎么摆」。
  */
 function Found({ rows, found, deep, selectedId, on }: {
-  rows: readonly ThreadRow[]
-  found: readonly ThreadRow[]
+  rows: readonly SidebarRow[]
+  found: readonly SidebarRow[]
   deep: ReturnType<typeof useDeepSearch>
   selectedId: string
   on: {
     onSelect: (id: string) => void
     onDelete: (id: string) => void
-    rowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
+    rowMenu: (event: React.MouseEvent, row: SidebarRow, arm: () => void, ren: () => void) => void
     rename: RenameCtl
   }
 }): React.JSX.Element {

@@ -172,21 +172,42 @@ function onTurnCompleted(ctx: NotifyContext, params: WireTurnLifecycle): void {
 /**
  * `willRetry` 为真时不算终态——codex 会自己重试，这时候在界面上画一条
  * 红色的失败会误导人。降成一条非致命提示。
+ *
+ * ## 一次重连只占一行
+ *
+ * 一次断线实测连发五条 `Reconnecting... N/5`，各自成一条 item 的话，
+ * 转录区里就是五行只差一个数字的灰字。它们说的是**同一件事的第几次**，
+ * 所以同一轮里合成一条、原地更新——codex 自己的界面也是这么摆的。
+ *
+ * 合并的键是轮次：跨轮次不合（那是两件事），而一轮里的两次断线合成一条
+ * 只会丢掉「断过两回」这个事实——原始事件在 journal 里一条不少。
+ *
+ * ## 为什么非带上 `additionalDetails` 不可
+ *
+ * `Reconnecting... 1/5` 这句话**一个字都没说为什么**。原因在那个字段里
+ *（实测 `We're currently experiencing high demand…`），codex 自己的界面
+ * 抬头写第几次、底下写这一句。omni 只显示前半句，等于把唯一的线索吞了。
  */
 function onError(ctx: NotifyContext, params: WireError): void {
   const turnId = ctx.turnId()
   if (turnId === undefined) return
   const at = ctx.now()
+  const retry = params.willRetry === true
+  const id = retry ? `err-retry-${turnId}` : `err-${String(at)}`
+  const again = ctx.materialized.has(id)
+  ctx.materialized.add(id)
+  const detail = params.error?.additionalDetails
   ctx.emit({
-    type: "item.started",
+    type: again ? "item.updated" : "item.started",
     at,
     item: {
-      id: `err-${String(at)}`,
+      id,
       turnId,
       at,
       kind: "error",
       message: params.error?.message ?? "codex 报了一个没有描述的错误",
-      fatal: params.willRetry !== true,
+      fatal: !retry,
+      ...(detail === undefined || detail === null || detail === "" ? {} : { detail }),
     },
   })
 }

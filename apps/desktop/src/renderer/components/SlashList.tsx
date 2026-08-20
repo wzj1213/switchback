@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef } from "react"
 import type { SlashCommand } from "@omni/protocol"
+import { markOf } from "../slash.js"
 import {
   CommandIcon,
   CompareIcon,
@@ -49,10 +50,13 @@ const GLYPH: Readonly<Record<string, React.ReactNode>> = {
  */
 export function SlashList({
   commands,
+  query,
   active,
   onPick,
 }: {
   commands: readonly SlashCommand[]
+  /** 斜杠后面已经打了什么。用来把名字里命中的那几个字加粗，见 `Marked`。 */
+  query: string
   active: number
   onPick: (command: SlashCommand) => void
 }): React.JSX.Element | null {
@@ -72,7 +76,7 @@ export function SlashList({
           {command.source === commands[i - 1]?.source ? null : (
             <div className="slash__head">{SECTION[command.source]}</div>
           )}
-          <Row command={command} active={i === active} onPick={onPick} />
+          <Row command={command} query={query} active={i === active} onPick={onPick} />
         </Fragment>
       ))}
     </div>
@@ -97,12 +101,34 @@ const SCOPE: Readonly<Record<NonNullable<SlashCommand["scope"]>, string>> = {
   system: "系统",
 }
 
+/**
+ * 名字里被打中的那几个字加粗。
+ *
+ * **一张 46 行的表和一次补全的差别就在这儿**：打了 `/de` 之后，
+ * 「它们都以 de 开头」这条规律得你自己看出来；而加粗是这张表在回答
+ * 「我按你打的字在跟」。判据在 `slash.ts` 的 `markOf`——
+ * 只在名字里找，说明命中时不去名字里瞎指一处。
+ */
+function Marked({ text, query }: { text: string; query: string }): React.JSX.Element {
+  const mark = markOf(text, query)
+  if (mark === undefined) return <>{text}</>
+  return (
+    <>
+      {mark[0]}
+      <span className="slash__hit">{mark[1]}</span>
+      {mark[2]}
+    </>
+  )
+}
+
 function Row({
   command,
+  query,
   active,
   onPick,
 }: {
   command: SlashCommand
+  query: string
   active: boolean
   onPick: (command: SlashCommand) => void
 }): React.JSX.Element {
@@ -128,11 +154,15 @@ function Row({
         {(command.source === "omni" ? GLYPH[command.name] : undefined) ?? <CommandIcon />}
       </span>
       <span className="slash__name">
-        {command.label ?? `/${command.name}`}
+        <Marked text={command.label ?? `/${command.name}`} query={query} />
         {command.argumentHint === undefined ? null : (
           <span className="slash__args"> {command.argumentHint}</span>
         )}
-        {named ? <span className="slash__slug">/{command.name}</span> : null}
+        {named ? (
+          <span className="slash__slug">
+            /<Marked text={command.name} query={query} />
+          </span>
+        ) : null}
       </span>
       <span className="slash__desc">{command.description}</span>
       {command.scope === undefined ? null : <span className="slash__scope">{SCOPE[command.scope]}</span>}

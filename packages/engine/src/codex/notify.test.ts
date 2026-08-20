@@ -111,6 +111,41 @@ describe("轮次与错误", () => {
     expect(events[0]).toMatchObject({ item: { kind: "error", fatal: false } })
   })
 
+  it("带上引擎补的那句原因——`Reconnecting... 1/5` 一个字都没说为什么", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "error", {
+      error: { message: "Reconnecting... 1/5", additionalDetails: "上游过载" },
+      willRetry: true,
+    })
+    expect(events[0]).toMatchObject({ item: { message: "Reconnecting... 1/5", detail: "上游过载" } })
+  })
+
+  it("没报原因就不带这个字段——不替它编一句", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "error", { error: { message: "炸了", additionalDetails: null } })
+    expect(events[0]).toMatchObject({ item: { kind: "error" } })
+    expect(events[0]?.type === "item.started" && "detail" in events[0].item).toBe(false)
+  })
+
+  it("一次重连的五条只占一行：第一条起、后面原地更新", () => {
+    const { ctx, events } = setup()
+    for (const n of [1, 2, 3]) {
+      handleNotification(ctx, "error", { error: { message: `Reconnecting... ${String(n)}/5` }, willRetry: true })
+    }
+    expect(events.map((e) => e.type)).toEqual(["item.started", "item.updated", "item.updated"])
+    const ids = new Set(events.map((e) => (e.type === "item.started" || e.type === "item.updated" ? e.item.id : "")))
+    expect(ids.size).toBe(1)
+    expect(events[2]).toMatchObject({ item: { message: "Reconnecting... 3/5" } })
+  })
+
+  it("终态的错误各占一条——它们不是同一件事的第几次", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "error", { error: { message: "Reconnecting... 1/5" }, willRetry: true })
+    handleNotification(ctx, "error", { error: { message: "上游 500" } })
+    expect(events.map((e) => e.type)).toEqual(["item.started", "item.started"])
+    expect(events[1]).toMatchObject({ item: { fatal: true } })
+  })
+
   it("没有轮次时一律不发事件——事件没有归属会被 store 丢掉", () => {
     const events: Event[] = []
     const ctx: NotifyContext = {

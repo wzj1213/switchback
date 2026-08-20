@@ -134,6 +134,13 @@ export interface ErrorItem extends ItemBase {
   message: string
   /** 可恢复的错误渲染成提示，不可恢复的渲染成终态。 */
   fatal: boolean
+  /**
+   * 引擎自己给这条报错补的一句原因。**报了才有，omni 不替它编。**
+   *
+   * 重试类的报错尤其需要它：`message` 那句只说「还在试」（codex 实测发的是
+   * `Reconnecting... 1/5`），为什么断了全在这一句里。
+   */
+  detail?: string
 }
 
 export type Item =

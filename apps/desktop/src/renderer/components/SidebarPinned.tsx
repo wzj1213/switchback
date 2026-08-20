@@ -23,12 +23,16 @@ export function PinnedSection({
   open: boolean
   onToggle: () => void
 }): React.JSX.Element {
+  const empty = sections.pinnedThreads.length === 0 && sections.pinned.length === 0
   return (
     <>
     {/* **整段都是落点。** 只让段头能放的话，落点是一条 24 像素高的线，
-        而拖动时鼠标下面还压着一行——那种精度不该由用户来凑 */}
+        而拖动时鼠标下面还压着一行——那种精度不该由用户来凑。
+        一条都没置顶时这一段只剩段头，所以**常驻**垫一小截（`--empty`）：
+        必须常驻，拖起来才垫的话，被拖的那一行会跟着往下挪——而那一挪
+        会让 Chromium 取消整次拖拽（见 `SectionHead` 的 `hint`） */}
     <div
-      className={`sidebar__droppin${on.overPinned === true ? " sidebar__droppin--over" : ""}`}
+      className={`sidebar__droppin${empty ? " sidebar__droppin--empty" : ""}${on.overPinned === true ? " sidebar__droppin--over" : ""}`}
       onDragOver={(e) => {
         // 会话和项目都能往这儿放
         if (on.dragKind === undefined) return
@@ -53,17 +57,10 @@ export function PinnedSection({
         onToggle={() => {
           onToggle()
         }}
+        {...(on.dragKind !== undefined && on.draggingPinned !== true ? { hint: "松手就置顶" } : {})}
       />
       {open ? (
-        sections.pinnedThreads.length === 0 && sections.pinned.length === 0 ? (
-          /* **平时不说这句话。** 它讲的是一个拖拽动作，而人需要它的那一刻
-             正是手里已经拖着东西的那一刻。常驻的话它是 3 行 13px（连内边距 78px，
-             比整个「项目」段的四行还高一半），而且读一次就够——之后永远是噪声。
-             `dragKind` 一有值就现出来：要教的时候才教。 */
-          on.dragKind === undefined ? null : (
-            <p className="sidebar__empty">松手就置顶了；拖回「项目」那一段取消。</p>
-          )
-        ) : (
+        empty ? null : (
           <>
             {sections.pinnedThreads.map((row) => (
               <Row

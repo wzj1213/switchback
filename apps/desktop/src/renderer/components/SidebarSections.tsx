@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import type { EngineThread } from "@omni/protocol"
-import { type Group, type Sections } from "../sidebar.js"
+import { type Group, type Sections, type SidebarRow } from "../sidebar.js"
 import { ChevronIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
@@ -35,12 +35,23 @@ export function SectionHead({
   open,
   onToggle,
   action,
+  hint,
 }: {
   title: string
   open: boolean
   onToggle: () => void
   /** 悬停时右边露出来的那颗。 */
   action?: { label: string; icon: React.ReactNode; run: () => void }
+  /**
+   * 拖着东西时这一段要说的那半句（「松手就置顶」）。
+   *
+   * **绝对定位，不占位**——这不是排版洁癖，是一条硬约束：
+   * 拖拽开始的那一帧只要**被拖的那一行动了位置**，Chromium 就把这次拖拽整个取消
+   * （实测：往上面插一块 60px 的提示，行从 y=333 掉到 391，`dragstart` 照常触发、
+   * 也没人 `preventDefault`，但拖拽再也起不来）。上一版正是把这句提示做成
+   * 「拖起来才出现的一段正文」，于是**这句教你怎么拖的话，让拖拽本身失效了**。
+   */
+  hint?: string
 }): React.JSX.Element {
   return (
     <div className="sidebar__section">
@@ -48,6 +59,7 @@ export function SectionHead({
         <span>{title}</span>
         <ChevronIcon open={open} size={SIDEBAR_ICON_SMALL} />
       </button>
+      {hint === undefined ? null : <span className="sidebar__section-hint">{hint}</span>}
       {action === undefined ? null : (
         <button
           type="button"
@@ -126,7 +138,7 @@ export interface GroupHandlers {
  * 这里**不挂项目名**（上一版挂了，因为那段是跨项目的）：
  * 这一段里的会话本来就没有项目。
  */
-function Chats({ rows, on }: { rows: readonly ThreadRow[]; on: GroupHandlers }): React.JSX.Element {
+function Chats({ rows, on }: { rows: readonly SidebarRow[]; on: GroupHandlers }): React.JSX.Element {
   return (
     <>
       {rows.map((row) => (

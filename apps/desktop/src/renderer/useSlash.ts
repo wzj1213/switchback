@@ -5,6 +5,8 @@ import { matchCommands, slashAt } from "./slash.js"
 export interface Slash {
   /** 当前候选。空数组 = 面板不显示。 */
   hits: readonly SlashCommand[]
+  /** 斜杠后面已经打了什么。面板拿它把命中的那几个字加粗。 */
+  query: string
   active: number
   refresh: (text: string, caret: number) => void
   /** 键盘导航。返回 true 表示这次按键被面板吃掉了。 */
@@ -22,10 +24,12 @@ export interface Slash {
  */
 export function useSlash(commands: readonly SlashCommand[]): Slash {
   const [hits, setHits] = useState<readonly SlashCommand[]>([])
+  const [query, setQuery] = useState("")
   const [active, setActive] = useState(0)
 
   const close = useCallback(() => {
     setHits([])
+    setQuery("")
     setActive(0)
   }, [])
 
@@ -37,6 +41,7 @@ export function useSlash(commands: readonly SlashCommand[]): Slash {
         return
       }
       setHits(matchCommands(commands, slash.query))
+      setQuery(slash.query)
       setActive(0)
     },
     [commands, close],
@@ -66,5 +71,5 @@ export function useSlash(commands: readonly SlashCommand[]): Slash {
     [hits, close],
   )
 
-  return { hits, active, refresh, onKeyDown, close }
+  return { hits, query, active, refresh, onKeyDown, close }
 }

@@ -89,6 +89,12 @@ export const ItemView = memo(function ItemView({
     // 而它们说的是「还在试，你不用做什么」。压成一行灰字，
     // 真正的终态错误才配那张红卡
     case "error":
-      return <Failure text={item.message} soft={item.fatal !== true} />
+      return (
+        <Failure
+          text={item.message}
+          soft={item.fatal !== true}
+          {...(item.detail === undefined ? {} : { detail: item.detail })}
+        />
+      )
   }
 })

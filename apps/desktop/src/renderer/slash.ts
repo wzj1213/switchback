@@ -64,6 +64,48 @@ function score(command: SlashCommand, query: string): number | undefined {
   return undefined
 }
 
+/**
+ * 名字里被打中的那一段：`[前, 命中, 后]`。没打中就 undefined。
+ *
+ * **这是「补全」和「一张长列表」的区别。** 打了 `/de` 之后眼前是 46 行，
+ * 光靠「它们都以 de 开头」这条**你自己推出来的**规律去扫，和一眼看见
+ * 每行加粗的那两个字母，不是一件事——后者才让人相信这张表在跟着你打的字走。
+ *
+ * 大小写不敏感地找，但**切出来的是原文**：显示的必须是命令自己的写法
+ *（`/DBQuery` 不能因为你打的是小写就变成小写）。
+ *
+ * 只在名字里找，不去说明里找：说明命中时高亮名字里碰巧同字母的那一处，
+ * 是在**指错地方**——而指错比不指更糟。
+ */
+export function markOf(text: string, query: string): readonly [string, string, string] | undefined {
+  if (query === "") return undefined
+  const at = text.toLowerCase().indexOf(query.toLowerCase())
+  if (at < 0) return undefined
+  return [text.slice(0, at), text.slice(at, at + query.length), text.slice(at + query.length)]
+}
+
+/**
+ * 输入框里那截**灰字预览**：选中这一条的话，`/` 后面还会补上什么。
+ *
+ * ## 为什么它值得存在
+ *
+ * `Tab` / `回车` 早就能补全了——但那件事**在界面上没有任何痕迹**：
+ * 面板里高亮的那一行和输入框里的字是两个地方，人得自己把它们连起来。
+ * 灰字把它连上了：你打的字后面直接长出剩下那半截，按下去就是它。
+ *
+ * ## 只补真前缀，大小写也得对上
+ *
+ * 灰字是**接在你打的字后面**显示的，所以它必须能和前面拼成命令的原名。
+ * `/db` 对上 `DBQuery` 时补 `Query` 会拼出 `/dbQuery`——那不是任何一条命令，
+ * 而按下去真正插进去的是 `/DBQuery`。**看到的和拿到的不一样，比没有预览更糟**，
+ * 所以这一档宁可不补：面板里那一行仍然高亮着，回车照样选得中。
+ */
+export function ghostOf(command: SlashCommand | undefined, query: string): string {
+  // 还没打字就不猜：那时候「排第一的那条」只是字母序的巧合，不是你的意图
+  if (command === undefined || query === "") return ""
+  return command.name.startsWith(query) ? command.name.slice(query.length) : ""
+}
+
 /** 每一节的保底条数。两节都放不下时，谁也不许把对方挤成零。 */
 const SECTION_MIN = 4
 

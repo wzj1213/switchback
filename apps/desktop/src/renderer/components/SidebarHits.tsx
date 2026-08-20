@@ -1,4 +1,5 @@
 import type { ThreadRow } from "@omni/store"
+import type { SidebarRow } from "../sidebar.js"
 import { Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
 
@@ -15,7 +16,8 @@ export function Hits({
   selectedId,
   on,
 }: {
-  rows: readonly ThreadRow[]
+  /** 带着未读旗子的那一份：搜出来的那一行照样该亮（见 `SidebarRow`）。 */
+  rows: readonly SidebarRow[]
   total: number
   selectedId: string
   on: {

@@ -103,7 +103,18 @@ export interface WireTokenUsage {
 }
 
 export interface WireError {
-  error?: { message?: string }
+  error?: {
+    message?: string
+    /**
+     * 引擎给这条报错补的**原因**。
+     *
+     * 重试期间 `message` 只是一句「Reconnecting... 1/5」——它说的是「还在试」，
+     * 一个字都没说为什么。真正的原因（实测 `We're currently experiencing high demand…`、
+     * `stream disconnected before completion: …`）在这个字段里，
+     * codex 自己的界面也是这么摆的：抬头是第几次重连，底下是这一句。
+     */
+    additionalDetails?: string | null
+  }
   willRetry?: boolean
   threadId?: string
   turnId?: string

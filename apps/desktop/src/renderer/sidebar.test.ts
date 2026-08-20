@@ -9,8 +9,10 @@ import {
   reorder,
   rowLabelOf,
   sectionsOf,
+  tallyOf,
   type Group,
   type Pins,
+  type SidebarRow,
 } from "./sidebar.js"
 import { canDrop } from "./useThreadDrag.js"
 
@@ -39,6 +41,33 @@ const row = (o: {
     engineHistory: ["codex"],
   } satisfies Thread,
   preview: o.preview,
+})
+
+describe("折叠起来的项目行要说什么", () => {
+  const at = (status: Thread["status"], unread?: boolean): SidebarRow => {
+    const base = row({ id: `t-${status}`, cwd: "/w", title: "x" })
+    return { ...base, thread: { ...base.thread, status }, ...(unread === undefined ? {} : { unread }) }
+  }
+  const group = (rows: readonly SidebarRow[]): Group => ({ cwd: "/w", label: "w", rows })
+
+  const cases: { name: string; rows: readonly SidebarRow[]; want: ReturnType<typeof tallyOf> }[] = [
+    { name: "空项目三个都是零", rows: [], want: { running: 0, waiting: 0, unread: 0 } },
+    {
+      name: "在跑的、等你批的、跑完没看的，各数各的",
+      rows: [at("running"), at("waiting_approval"), at("idle", true), at("idle")],
+      want: { running: 1, waiting: 1, unread: 1 },
+    },
+    {
+      name: "跑完没看的那条又跑起来了：两边都算——它确实在跑，结果也确实还没看",
+      rows: [at("running", true)],
+      want: { running: 1, waiting: 0, unread: 1 },
+    },
+  ]
+  for (const c of cases) {
+    it(c.name, () => {
+      expect(tallyOf(group(c.rows))).toEqual(c.want)
+    })
+  }
 })
 
 describe("目录名", () => {

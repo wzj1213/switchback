@@ -47,7 +47,9 @@ function block(item: Item, engineLabel: string): string | undefined {
     case "approval":
       return `> **需要确认**：${item.summary}（${item.status}）\n> ${item.reason}`
     case "error":
-      return `> ⚠️ ${item.message}`
+      // 引擎补的那句原因一并带走。**报错是最要靠原文的东西**——
+      // 导出的那份是拿去开 issue、拿去搜的，少一句就少一条线索
+      return `> ⚠️ ${item.message}${item.detail === undefined ? "" : `\n> ${item.detail}`}`
     // 模型的内部草稿不导出——那不是给第三个人看的东西
     case "reasoning":
       return undefined
@@ -68,7 +70,7 @@ export function textOf(item: Item): string {
     return item.text
   }
   if (item.kind === "tool_call") return target(item.detail)
-  if (item.kind === "error") return item.message
+  if (item.kind === "error") return item.detail === undefined ? item.message : `${item.message}\n${item.detail}`
   if (item.kind === "approval") return `${item.summary}\n${item.reason}`
   return item.steps.map((s) => s.text).join("\n")
 }

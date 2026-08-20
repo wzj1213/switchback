@@ -83,6 +83,9 @@ export const ItemView = memo(function ItemView({
   return (
     <div className="item item--error" role="alert">
       {item.message}
+      {/* 引擎自己补的那句原因（codex 的 `additionalDetails`）。重连那条只有它说得清
+          「为什么断了」——抬头那句 `Reconnecting... 1/5` 一个字都没说 */}
+      {item.detail === undefined ? null : <p className="item__why">{item.detail}</p>}
     </div>
   )
 })

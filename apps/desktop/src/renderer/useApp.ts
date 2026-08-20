@@ -9,6 +9,8 @@ import type { AccountLine } from "./components/SidebarFoot.js"
 import { useWorkspaceActions } from "./useWorkspaceActions.js"
 import { openWith } from "./newThreadPrefs.js"
 import { useSend } from "./useSend.js"
+import { useUnread } from "./useUnread.js"
+import type { SidebarRow } from "./sidebar.js"
 
 /**
  * 把 `App` 需要的一切收在一处。
@@ -31,8 +33,15 @@ export interface AppApi {
    *
    * 不这么做的话，你以为自己只是点开看看，结果攒出一串「新会话」还得一条条删；
    * 而每次启动都自动开一条，跑一周下来侧栏那一列全是空壳。
+   *
+   * 判据由宿主给（`provisional`），不在这里猜——猜的话（比如「没有 item 就算临时」）
+   * 会把跨引擎分叉出来的空会话一起藏掉。
+   *
+   * 每一行还带着「它在你没看的时候跑完了没有」（`useUnread`）。**认的是
+   * `thread?.id` 而不是 `shell.selectedId`**：没手动选过的时候界面显示的是最近那条，
+   * 那条才是「你正看着的」。
    */
-  sidebarRows: readonly ThreadRow[]
+  sidebarRows: readonly SidebarRow[]
   /** 当前选中的会话；一个都没有时是 undefined。 */
   thread: Thread | undefined
   notices: readonly Notice[]
@@ -113,13 +122,12 @@ export function useApp(): AppApi {
     awaited.current = undefined
     shell.select(started.id)
   }, [omni.lastStarted, shell])
-  // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
-  const notices = omni.state.notices.filter((n) => !shell.dismissed.has(n.id))
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
   const items = useMemo(
     () => (thread === undefined ? EMPTY_ITEMS : itemsOf(omni.state, thread.id)),
     [omni.state, thread],
   )
+  const sidebarRows = useUnread(rows.filter((r) => r.thread.provisional !== true), thread?.id)
 
   // 出口收在 `useSend` 里：它必须引用稳定，而**那条约束不属于「接线」这件事**——
   // 理由（以及它曾经怎么静默地废掉一整条 memo 链）写在那个文件开头
@@ -175,11 +183,10 @@ export function useApp(): AppApi {
   return {
     state: omni.state,
     rows,
-    // 侧栏只看「已经算数」的那些。判据由宿主给（`provisional`），不在这里猜——
-    // 猜的话（比如「没有 item 就算临时」）会把跨引擎分叉出来的空会话一起藏掉
-    sidebarRows: rows.filter((r) => r.thread.provisional !== true),
+    sidebarRows,
     thread,
-    notices,
+    // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
+    notices: omni.state.notices.filter((n) => !shell.dismissed.has(n.id)),
     shell,
     prefs,
     bridgeMissing: omni.bridgeMissing,

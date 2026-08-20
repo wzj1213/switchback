@@ -13,12 +13,40 @@ import type { ThreadRow } from "@omni/store"
  * 每行说自己是干什么的。这也正是 codex 侧栏的结构（项目 → 聊天）。
  */
 
+/**
+ * 侧栏那份行：`ThreadRow` 加一个**渲染层自己的**旗子。
+ *
+ * 未读不属于 `@omni/store`——那份状态是「世界现在长什么样」，两端共用一个归约器，
+ * 而「你看没看过」只有这扇窗知道（它甚至不知道另一台机器上你看没看过）。
+ * 旗子挂在行上而不是另开一个集合往下传：它描述的就是这一行，
+ * 而侧栏从段到组到行有五层，多传一个集合就是五处都要接一遍。
+ */
+export interface SidebarRow extends ThreadRow {
+  /** 后台跑完了、你还没打开过。判据在 `unread.ts`。 */
+  unread?: boolean
+}
+
 export interface Group {
   /** 工作区绝对路径。折叠状态按它记。 */
   cwd: string
   /** 组标题：目录名。 */
   label: string
-  rows: readonly ThreadRow[]
+  rows: readonly SidebarRow[]
+}
+
+/**
+ * 折叠起来的项目行要说什么。**三件事各说各的**：转圈说「它在忙，你可以走开」，
+ * 待批说「它停下来等你，你不回来它就一直停着」，未读说「它跑完了，结果在里面等你看」。
+ *
+ * 上一版只数了前两个——而**折叠是默认状态**，于是「后台那条跑完了」
+ * 在最常见的情形下一点痕迹都没有。
+ */
+export function tallyOf(group: Group): { running: number; waiting: number; unread: number } {
+  return {
+    running: group.rows.filter((r) => r.thread.status === "running").length,
+    waiting: group.rows.filter((r) => r.thread.status === "waiting_approval").length,
+    unread: group.rows.filter((r) => r.unread === true).length,
+  }
 }
 
 /** 目录名。根目录退化成 `/`，不要显示成空字符串。 */
@@ -49,7 +77,7 @@ export function rowLabelOf(row: ThreadRow): string {
  * 所以按首次出现的顺序收集即可，不用再排一次。再排一次的风险是
  * 和侧栏「最近的在上面」这条规则打架，而那条规则刚修好过一次。
  */
-export function groupByWorkspace(rows: readonly ThreadRow[]): readonly Group[] {
+export function groupByWorkspace(rows: readonly SidebarRow[]): readonly Group[] {
   const groups = new Map<string, Group>()
   for (const row of rows) {
     const cwd = row.thread.cwd
@@ -78,11 +106,11 @@ export interface Sections {
    * 置顶的**会话**。和置顶的项目同处「置顶」那一段，但排在项目前面——
    * 一条被单独钉住的对话，比一整个文件夹更具体，也更可能是你现在要点的。
    */
-  pinnedThreads: readonly ThreadRow[]
+  pinnedThreads: readonly SidebarRow[]
   pinned: readonly Group[]
   projects: readonly Group[]
   /** 不属于任何项目的对话，扁平，最近动过的在前。 */
-  chats: readonly ThreadRow[]
+  chats: readonly SidebarRow[]
 }
 
 /**
@@ -132,14 +160,14 @@ export interface Pins {
   order: Readonly<Record<string, readonly string[]>>
 }
 
-export function sectionsOf(rows: readonly ThreadRow[], pins: Pins): Sections {
+export function sectionsOf(rows: readonly SidebarRow[], pins: Pins): Sections {
   // **置顶的会话从别处摘掉。** 一条会话只出现一次是这套界面的硬约束——
   // 同时出现在两段里的后果是「一个会话同时亮两行、双击改名两个框一起进编辑态」，
   // 上一版的「最近」段就是这么翻的车
   const pinnedIds = new Set(pins.threads)
   const pinnedThreads = pins.threads
     .map((id) => rows.find((r) => r.thread.id === id))
-    .filter((r): r is ThreadRow => r !== undefined)
+    .filter((r): r is SidebarRow => r !== undefined)
   const rest = rows.filter((r) => !pinnedIds.has(r.thread.id))
   const chats = rest.filter((r) => r.thread.workspaceKind === "chat")
   const inProjects = rest.filter((r) => r.thread.workspaceKind !== "chat")
@@ -169,7 +197,7 @@ function withKnown(groups: readonly Group[], known: readonly string[]): readonly
   const seen = new Set(groups.map((g) => g.cwd))
   const empty = known
     .filter((cwd) => !seen.has(cwd))
-    .map((cwd) => ({ cwd, label: baseNameOf(cwd), rows: [] as readonly ThreadRow[] }))
+    .map((cwd) => ({ cwd, label: baseNameOf(cwd), rows: [] as readonly SidebarRow[] }))
   return [...groups, ...empty]
 }
 
@@ -195,7 +223,7 @@ export function orderedGroups(groups: readonly Group[], order: readonly string[]
  * 顺序表里没提到的（拖过之后新建的、或者从别处移进来的）排在**最前**：
  * 它最新，也最可能是你现在要点的。顺序表里有、但会话已经删了的，自然被跳过。
  */
-export function ordered(rows: readonly ThreadRow[], order: readonly string[] | undefined): readonly ThreadRow[] {
+export function ordered(rows: readonly SidebarRow[], order: readonly string[] | undefined): readonly SidebarRow[] {
   if (order === undefined || order.length === 0) return rows
   const rank = new Map(order.map((id, i) => [id, i]))
   const known = rows.filter((r) => rank.has(r.thread.id))
