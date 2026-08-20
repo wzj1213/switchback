@@ -32,8 +32,8 @@ export interface EngineCapabilities {
    * 这一轮停了再发。不丢东西，但那句话要等上几十秒才起作用——
    * 而它往往正是「别再往下走了」，等它跑完再说等于白说。
    *
-   * codex 的 app-server 有 `turn/steer`，能把话直接递进正在跑的那一轮。
-   * Claude 那边 SDK 没有对应入口，报 false，继续排队。
+   * codex 的 app-server 有 `turn/steer`；Kimi Web 有 `prompts:steer`，两家都能把话
+   * 递进正在跑的原生轮次。Claude SDK 没有对应入口，报 false，继续排队。
    */
   steer: boolean
   /**
@@ -67,8 +67,8 @@ export interface EngineCapabilities {
   /**
    * 能**问一句不打断主线的问题**——问答不进这条会话的 transcript，也不进模型的后续上下文。
    *
-   * 只认引擎**自己把它当功能暴露出来**的那种（claude 的 SDK 有
-   * `askSideQuestion`，发的是 `subtype:"side_question"` 控制请求）。
+   * 只认引擎**自己把它当功能暴露出来**的那种（Claude SDK 的
+   * `askSideQuestion`，或 Kimi Web 的原生 `:btw` agent）。
    * 拿底层原语替它攒一个（fork 一条临时会话 + 自己塞一段边界提示词）**不算**——
    * 那撞 `AGENTS.md` 的总纲：omni 与引擎是共建者，不是上下级。
    */

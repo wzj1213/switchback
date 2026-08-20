@@ -152,8 +152,8 @@ export interface EngineSession {
    *
    * **不支持就别实现**（`capabilities().steer` 报 false），宿主会退回排队。
    *
-   * 实现方要自己守住「递进去的是不是同一轮」：codex 的 `turn/steer` 收一个
-   * `expectedTurnId`，对不上就拒绝——那道护栏必须传下去。
+   * 实现方要自己守住「递进去的是不是同一轮」：codex 传 `expectedTurnId`；
+   * Kimi 则先把第二句排成 queued，再由原生 `prompts:steer` 原子校验仍有同一条 active turn。
    * 「用户按下回车」和「RPC 到达引擎」之间那一轮刚好收工，是个真实存在的窗口；
    * 不校验的话这句话会被塞进**下一轮**，而用户以为它改的是上一轮。
    */

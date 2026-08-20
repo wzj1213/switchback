@@ -5,7 +5,7 @@
  *
  * - **Claude**：`Edit` 递过来的是 `old_string` / `new_string`，`Write` 递的是整份
  *   `content`——都不是 diff。不合成的话，Claude 会话里的文件改动在界面上是一片空白。
- * - **ACP 三家**（kimi / grok / zcode）：`session/update` 的 diff 内容块给的同样是
+ * - **ACP 样本**（旧 Kimi / Grok / ZCode）：`session/update` 的 diff 内容块给的同样是
  *   `oldText` / `newText` 两份**全文**。上一版直接把 `newText` 当 diff 塞进去、
  *   增删数按「整份文件有多少行」算——于是 500 行的文件里改一行，界面上写着 **+500 −500**，
  *   而那份「diff」逐行过渡染色器之后，正文里以 `-` 或 `+` 开头的行（Markdown 列表、

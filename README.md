@@ -7,9 +7,9 @@ omni 只负责把它们呈现成同一套交互，并让你**随时在它们之�
 
 名字取自「书同文」——多家写法，一个标准。
 
-**目前接了两家**：Codex（`codex app-server`）与 Claude Code（Claude Agent SDK）。
-ZCode / Kimi 走通用 ACP 接入，还没做——**界面上的引擎清单由宿主给**，
-没注册的不会出现在下拉里。
+**目前内置四家**：Codex（`codex app-server`）、Claude Code（Agent SDK）、
+Kimi Code（`kimi web` REST + WebSocket）与 Grok（ACP）。其他讲 ACP 的引擎仍可由
+`engines.json` 注册；**界面上的引擎清单由宿主给**，没注册的不会凭空出现。
 
 ## 跑起来
 
@@ -20,7 +20,7 @@ pnpm check        # typecheck / lint / 架构守卫 / 日志守卫 / 测试
 pnpm dist         # 打成可安装的 .dmg（产物在 release/）
 ```
 
-前置条件：机器上装好 `codex` 和/或 `claude` 并**登录过**。
+前置条件：机器上装好要用的原生 agent（`codex` / `claude` / `kimi` / `grok`）并**登录过**。
 omni 直接用它们的原生登录态，不另外配密钥。
 
 打出来的包**没有签名**（`identity: null`）。首次打开要在
@@ -57,7 +57,7 @@ L2 不传原始上下文（各家 session 格式不通），传**交接包**：�
 packages/
   protocol/   领域模型 thread / turn / item（零依赖，纯类型）
   approval/   信任档 + 红线表 + 判定器（纯函数，零 IO）
-  engine/     引擎驱动契约与实现：acp / codex / claude
+  engine/     引擎驱动契约与实现：acp / codex / claude / kimi
   worksite/   工作区安全：git guard、写范围
   journal/    持久化、断点、恢复
   handoff/    跨引擎交接包

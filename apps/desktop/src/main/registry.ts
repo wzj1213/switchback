@@ -2,11 +2,11 @@ import {
   createAcpDriver,
   createClaudeDriver,
   createCodexDriver,
+  createKimiDriver,
   grokContextUsed,
   grokLogPath,
   grokModelChanged,
   grokNativeApproval,
-  kimiLogPath,
   type EngineDriver,
 } from "@omni/engine"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
@@ -26,10 +26,9 @@ import type { Logger } from "./log.js"
  * 内置四家。**内置的判据是「验过」，不是「听说过」**：
  *
  * - `claude` / `codex`：各有一个专门的驱动。
- * - `kimi`：走通用 ACP 驱动。`kimi acp` 是它自己 `--help` 里列着的子命令
- *   （不是我们猜的参数），协议实测跑通到能答话、能读图（发一张写着
- *   `KIMI-4417` 的图，它把那串字念了回来）。**记录路径也认得**——
- *   换引擎时交接的就是它（见 `acp/kimi.ts`）。
+ * - `kimi`：走它自带的 `kimi web` REST + WebSocket API。
+ *   会话、插话、审批、模型、历史都从同一扇公开入口出来；不再借 ACP 的
+ *   `terminal/*` 让命令改由 omni 代跑。
  * - `grok`：同一个 ACP 驱动。它的子命令**不叫 acp**，叫 `grok agent stdio`
  *   ——这是它自带文档里写明的「Agent Mode (ACP) and IDE Integration」，
  *   同样不是猜的。记录路径见 `acp/grok.ts`。
@@ -50,17 +49,7 @@ export function buildRegistry(
     drivers: {
       claude: createClaudeDriver(),
       codex: createCodexDriver(),
-      kimi: createAcpDriver({
-        id: "kimi",
-        command: "kimi",
-        args: ["acp"],
-        logPath: kimiLogPath,
-        // **不认领这一位它一条命令都跑不了**：kimi 的 ACP 运行时把起进程整个交给客户端，
-        // 没有本地兜底（`AcpProcessService.spawn` 第一行就抛）。A/B 实测见 `acp/terminal.ts`。
-        // 这不是「多给一点能力」，是补一处**静默的能力损失**——不给的话它照样读写文件、
-        // 看起来一切正常，只是测试、构建、git 全废，而没有任何东西报错
-        terminal: true,
-      }),
+      kimi: createKimiDriver(),
       grok: createAcpDriver({
         id: "grok",
         command: "grok",

@@ -6,6 +6,9 @@ import type { Event } from "@omni/protocol"
 import { createAcpDriver } from "./driver.js"
 
 /**
+ * @deprecated 这不是内置 Kimi 的验收路径。内置链路已经改走 `kimi web`；
+ * 这里只保留作通用 ACP `terminal/*` 兼容性的真机考古样本。
+ *
  * 让真的 kimi 跑一条 shell 命令，看输出有没有回来。
  *
  *   pnpm vitest run --mode live packages/engine/src/acp/kimi-shell.live.test.ts
@@ -27,7 +30,7 @@ import { createAcpDriver } from "./driver.js"
 
 const MARK = "OMNI_SHELL_OK_9317"
 
-describe("kimi · live · shell", () => {
+describe("kimi ACP（废弃链路）· live · shell", () => {
   it(
     "认领 `terminal/*` 之后，命令真的跑起来并且输出回到了正文里",
     async () => {

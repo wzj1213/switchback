@@ -22,18 +22,22 @@
   - `wire.ts` 线上类型的窄声明（权威定义用 `codex app-server generate-ts` 自己生成）
   - `translate.ts` / `notify.ts` 通知 → 事件
   - `approve.ts` 审批请求 ↔ `@omni/approval`
+- `kimi/` —— `kimi web` 驱动（本机 bearer REST + WebSocket）
+  - `server.ts` 只接 loopback 地址，一份私有服务由活跃 Kimi 会话共享，最后一条释放时回收
+  - `http.ts` / `stream.ts` 负责原生 envelope、游标补发、断线快照恢复
+  - `session.ts` 接会话、插话、审批、模型、档位、历史、侧问与归档
+  - `wire.ts` 是 Kimi 服务自己公开的 OpenAPI / AsyncAPI 的窄声明
+  - `log.ts` 只负责定位 Kimi 保存的全量 `wire.jsonl`，供跨引擎接力引用
 - `acp/` —— 通用 ACP over stdio 驱动（Agent Client Protocol）
-  - **一个驱动接所有讲 ACP 的引擎**。前两家各写一个驱动，第 N 家不该再写第 N 个
+  - **一个驱动接所有只从 ACP 出线的引擎**；Grok 与用户自配引擎共用
   - `wire.ts` 线上类型的窄声明（权威定义：`npm pack @agentclientprotocol/sdk`）
   - `update.ts` `session/update` → 事件，含**文本块划分**（见下）
   - `translate.ts` 工具形态与停止原因
   - `setup.ts` 从 `session/new` 里挖模型与档位（两代适配器字段名不同）
   - `mode.ts` 信任档 → agent 自己定义的 mode，**打分匹配**
   - `permission.ts` / `approve.ts` 审批判定与选项挑选
-  - `kimi.ts` / `grok.ts` 各家的会话记录落在磁盘的哪儿（换引擎时交接的就是这个路径）。
-    **一家一个文件，不做进驱动**：协议里根本没有「记录在哪」这个概念。
-    kimi 只能查它自己的索引（工作区目录名是它算的哈希），grok 算得出来
-    （`sessions/<工作区 URL 编码>/<sessionId>/chat_history.jsonl`）
+  - `grok.ts` 负责它的会话记录路径；`kimi.ts` 仅是废弃 ACP 链路的兼容重导出。
+    内置 Kimi 不再注册 `kimi acp`，Kimi 的日志定位归 `kimi/log.ts`
 
 ## 不拥有什么
 
@@ -42,19 +46,18 @@
 - 不拥有持久化。事件流往外发，落盘是 `@omni/journal` 的事。
 - 不拥有引擎的安装、登录、模型选择——用宿主上已有的原生配置。
 
-## 三家的结构差别
+## 四条链路的结构差别
 
-接第二家、第三家才看清的东西，写下来免得下次又当成一样的：
+接到第四条协议链才看清的东西，写下来免得下次又当成一样的：
 
-| | Claude Agent SDK | codex app-server | ACP |
-| --- | --- | --- | --- |
-| 审批载荷 | `canUseTool` 带**完整**工具名与参数 | 只带一个 `itemId`，命令和 diff 在此前的 `item/started` 里 | 只带 `toolCallId` + kind + status，同样要查在途表 |
-| 怎么回审批 | allow / deny | 固定枚举 `accept` / `decline` / `acceptForSession` | **agent 自己给的一张选项表**，按不透明的 `optionId` 回 |
-| 档位落点 | `permissionMode` 只是路由开关，钉死 `default`，档位全在 omni 里 | `sandbox` 是**真的 OS 沙箱**，它同时就是「问不问」的开关 | `session/set_mode`，但 mode 是 **agent 自定义字符串**，只能打分匹配 |
-| 谁先放行 | 用户自己写的 allow 规则先于 `canUseTool` | codex 内置的可信命令表先于客户端 | 同 codex（多数 ACP agent 就是包了一层原生 CLI） |
-| 文本身份 | 整块消息，一条就是一条 | `item/started` 铸 id → delta → `item/completed` | **一串裸 chunk，没有 id、没有开始、没有结束** |
-| 工具身份 | 工具名 | item 的 `type` + `commandActions` | 只有 `kind`（`read`/`edit`/`execute`/…），**没有工具名这个字段** |
-| 推理强度 | `Options` 字段，改不了运行期 | 独立的 `reasoningEffort` | **编在 modelId 里**（`gpt-5.6-sol[low]`），没有独立字段 |
+| | Claude Agent SDK | codex app-server | Kimi Web | ACP |
+| --- | --- | --- | --- | --- |
+| 审批载荷 | `canUseTool` 带**完整**工具名与参数 | 只带 `itemId`，命令和 diff 在此前的 item 里 | 请求前就带工具名、action 与完整 display | 只带 `toolCallId` + kind + status，同样要查在途表 |
+| 怎么回审批 | allow / deny | `accept` / `decline` / `acceptForSession` | `approved` / `rejected`，可记到 session | **agent 自己给的一张选项表**，按不透明 `optionId` 回 |
+| 档位落点 | `permissionMode` 只是路由开关，档位全在 omni | `sandbox` 是真的 OS 沙箱，也决定问不问 | `permission_mode` + `plan_mode`，可写也可读回 | `session/set_mode`，mode 是 agent 自定义字符串，只能打分匹配 |
+| 文本身份 | 整块消息 | item 生命周期 + delta | 原生 turn / step / frame + delta | **一串裸 chunk，没有 id、没有开始、没有结束** |
+| 工具身份 | 工具名 | item `type` + `commandActions` | `toolCallId` + 名字 + args + display | 只有短枚举 `kind`，**没有工具名字段** |
+| 推理强度 | `Options` 字段，改不了运行期 | 独立 `reasoningEffort` | 每模型 `support_efforts`，运行期改 profile | 常被编进 modelId，没有统一独立字段 |
 
 三条被实测证伪的直觉，都写在各自的 `driver.ts` 顶上：
 
@@ -85,10 +88,18 @@
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
   驱动只翻译 assistant / stream_event / result / system 四类，**其余丢弃**（曾经写着「或落 `meta`」，而那个字段从来没被写过，已删）。
   新增覆盖时先确认它是否真的需要进 transcript。
+- **内置 Kimi 要求带 `web` 子命令与公开 API 的 Kimi Code。** 当前验收版本是 0.37.2；
+  启动后还会读 `/meta` 确认 WebSocket 与 bearer 鉴权，缺能力就明确失败，不回退 ACP。
+- **Kimi 的 steer 在同一原生 turn 的下一模型 step 前生效。** 它不会掐断已经发出的单次
+  模型请求，也不会杀掉正在执行的工具；工具或当前生成结束后，插话才进入下一 step。
+- **Kimi 的结构化多选问题还没有对应的 omni UI 契约。** 驱动会明确报出问题摘要并调用
+  Kimi 原生 dismiss，绝不替用户猜一个选项。普通工具审批不受影响。
+- **Kimi 只能从会话末尾原生分叉。** 宿主要从更早轮次分叉时，驱动明确拒绝，交给
+  现有的跨引擎/降级路径；不会把“复制整条会话”冒充成“从指定轮次分叉”。
 - **ACP 侧的能力由 agent 自报**（`capabilitiesOf`），不再一律 `NO_CAPABILITIES`。
-  实测 kimi（`kimi acp`，0.36.1）报的是：能贴图、能原生分叉、能列历史、能续跑，
+  旧 Kimi ACP（`kimi acp`，0.36.1）的实测仍作为通用驱动样本保留：能贴图、能原生分叉、能列历史、能续跑，
   **不能压缩**（`session/compact` → Method not found）、不能改向（ACP 没这个入口）。
-  `sessionCapabilities` 用空对象当标记，所以判据是「键在不在」不是「值是不是 true」。
+  这不再描述内置 Kimi；`sessionCapabilities` 用空对象当标记，所以判据仍是「键在不在」。
 - **但「没声明」不等于「不支持」。** 实测 grok（`grok agent stdio`，0.2.106）的
   `sessionCapabilities` 是个**空对象**，一条能力都不报，而 `session/list` 答得好好的。
   只认声明的话它的历史区永远是空的——**那是「替引擎回答」的另一种写法**，
@@ -100,14 +111,14 @@
   对照组是 `session/set_model`——假 id 回 `-32602 unknown model id`，真 id 落盘。
   报了强度就是给用户一个点了没用的控件。
 - **ACP 的审批请求里没有命令原文，所以命令红线对 ACP 的 shell 命令是失明的。**
-  真机时序（kimi）：`tool_call`（带 kind、无命令）→ `session/request_permission`
+  旧 Kimi ACP 的真机时序：`tool_call`（带 kind、无命令）→ `session/request_permission`
   （无 kind、无命令）→ **批准之后**才来 `tool_call_update {rawInput:{command}}`。
   于是判定器拿到的 `args.command` 是标题那个占位串（`"Bash"`），
   `rm -rf`、凭据读取这类**基于命令文本**的红线一条都匹配不上。
   协议里没有「批准前告诉我要跑什么」，这一层修不了——档位与路径红线仍然生效，
-  命令红线只对 Claude / codex 那两家有效。
+  内置 Kimi Web 在审批前会给完整 command display，因此不受这个 ACP 限制。
 - **各家往 ACP 的 `kind` 枚举上映射是有损的，所以判定器还看一眼工具名字。**
-  实测 kimi 只映射十个名字（`Read`/`Glob`/`Grep`/`Write`/`Edit`/`Bash`/`Terminal`/
+  旧 Kimi ACP 实测只映射十个名字（`Read`/`Glob`/`Grep`/`Write`/`Edit`/`Bash`/`Terminal`/
   `WebFetch`/`WebSearch`/`Think`），**其余一律 `other`**——它 k3 那套工具叫
   `Shell`、`ReadFile`，全部落成 `acp:other` → `unknown` → 自动编辑档下每条都弹窗。
   驱动因此把 `title` 原文放进 `Request.toolLabel`，判定器在 `tool` 认不出来时
