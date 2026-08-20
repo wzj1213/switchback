@@ -1,6 +1,6 @@
 import type { EngineStatus, Event } from "@omni/protocol"
 import type { RpcPeer } from "../rpc.js"
-import { emitLimits } from "./notify.js"
+import { emitLimits } from "./limits.js"
 import type { WireRateLimits } from "./wire.js"
 
 /**

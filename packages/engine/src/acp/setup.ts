@@ -1,43 +1,28 @@
 import type { EngineCapabilities, EngineThread, ModelOption } from "@omni/protocol"
-import type { AcpConfigOption, AcpInitialize, AcpModel, AcpNewSession, AcpSessionRow } from "./wire.js"
+import type {
+  AcpConfigOption,
+  AcpInitialize,
+  AcpModel,
+  AcpNewSession,
+  AcpSessionRow,
+} from "./wire.js"
 
-/**
- * 开会话时要从 `session/new` 的结果里挖出来的东西。
- *
- * 单独一个文件的理由：这些全是纯函数，**不用起进程就能测**，
- * 而它们要处理的恰恰是最容易出错的一块——同一个适配器不同版本报的字段名不一样。
- */
+/** `session/new` 的兼容翻译；保持纯函数，所有协议分支都可直接单测。 */
 
-/**
- * 有的 ACP 适配器把推理强度**编进 modelId 里**（实测 codex 适配器：
- * `gpt-5.6-sol[low]`、`…[xhigh]`），那时没有独立的 effort 字段，
- * 这里也就不报 `efforts`——报了界面上会多出一个点了没用的强度选择器。
- *
- * 但**不是所有家都这样**：kimi 有一个独立的 `configOptions[id="thinking"]`
- *（low / high / max）。那种情况由 `effortsOf` 补上，见下。
- */
+/** 模型条目只翻模型；独立强度由 `effortsOf` 从 agent 报告里补。 */
 function toModelOption(raw: AcpModel): ModelOption {
   const id = raw.modelId ?? ""
   const base: ModelOption = {
     id,
     label: raw.name ?? id,
-    ...(raw.description === undefined || raw.description === null ? {} : { description: raw.description }),
+    ...(raw.description === undefined || raw.description === null
+      ? {}
+      : { description: raw.description }),
   }
   return withMetaEfforts(base, raw)
 }
 
-/**
- * 有的 agent 把强度放在**模型清单的扩展位**里，而不是 `configOptions`。
- *
- * 实测 grok：`configOptions` 整个 `undefined`，而每个模型报
- * `_meta.supportsReasoningEffort` / `_meta.reasoningEffort`（当前）/
- * `_meta.reasoningEfforts`（可选清单）。omni 的 `effortsOf` 只翻 `configOptions`，
- * 于是**grok 上一档都看不见**——而它明明支持四档。
- *
- * **上线的是 `value` 不是 `id`。** grok 自己的类型注释写得很清楚：
- *「`id`/`label` are presentation and input; `value` is the canonical value sent on the wire」。
- * 拿 `id` 发出去在它当前的取值上恰好也对（两者同值），但那是巧合，下一版就可能不是。
- */
+/** 模型扩展位里的强度清单；线上的规范值是 `value`，不拿展示用的 `id` 代替。 */
 function withMetaEfforts(option: ModelOption, raw: AcpModel): ModelOption {
   const meta = raw._meta as { reasoningEfforts?: unknown; reasoningEffort?: unknown } | undefined
   const list = Array.isArray(meta?.reasoningEfforts) ? meta.reasoningEfforts : []
@@ -53,12 +38,7 @@ function withMetaEfforts(option: ModelOption, raw: AcpModel): ModelOption {
   }
 }
 
-/**
- * 这个 configOption 上 agent 当前选中的值。**不是字符串就当没有**——不猜。
- *
- * 单拎出来是因为它有两个读者（下面的清单标注、`modelCatalogOf` 报当前模型），
- * 而这类「判据抄了两份」的地方，代码库里已经吃过亏：见 `modelCatalogOf` 的注释。
- */
+/** config option 当前值；不是字符串就当没报告。 */
 function currentOf(option: AcpConfigOption | undefined): string | undefined {
   return typeof option?.currentValue === "string" ? option.currentValue : undefined
 }
@@ -66,11 +46,16 @@ function currentOf(option: AcpConfigOption | undefined): string | undefined {
 function fromConfigOption(option: AcpConfigOption | undefined): readonly ModelOption[] {
   const current = currentOf(option)
   return (option?.options ?? [])
-    .filter((o): o is { value: string; name?: string; description?: string | null } => typeof o.value === "string")
+    .filter(
+      (o): o is { value: string; name?: string; description?: string | null } =>
+        typeof o.value === "string",
+    )
     .map((o) => ({
       id: o.value,
       label: o.name ?? o.value,
-      ...(o.description === undefined || o.description === null ? {} : { description: o.description }),
+      ...(o.description === undefined || o.description === null
+        ? {}
+        : { description: o.description }),
       // **agent 当前用的那个要标出来。** 不标的话界面退回列表第一个，
       // 于是面板上写着「K2.7 Coding」而引擎其实在跑 K3——一个安静的谎
       ...(o.value === current ? { isDefault: true } : {}),
@@ -78,23 +63,8 @@ function fromConfigOption(option: AcpConfigOption | undefined): readonly ModelOp
 }
 
 /**
- * 模型清单，**外加「换模型该往哪儿发」**。
- *
- * ## 两条路都要走
- *
- * 实测同一个 codex 适配器的两个版本：1.3.0 报 `models.availableModels`，
- * 0.16.0 报 `configOptions[id="model"]`。只认一条，另一个版本的用户
- * 一个模型都选不出来。
- *
- * ## 为什么「从哪儿读的」必须一起带出来
- *
- * 因为**换模型要设回同一个地方**。清单从 `configOptions` 读、却拿
- * `session/set_model` 去设，是实测炸过的：ZCode 的桥（zcode-acp-server）
- * 只实现了 `session/set_config_option`，规范拼写的 `session/set_model`
- * 在它那儿是 `Method not found`——界面上于是弹一条红色的「引擎故障」，
- * 而用户只是点了一下模型下拉。
- *
- * 分成两个函数就会漂移：判断走哪条路的条件必须只有一处。
+ * 模型清单与设置路由必须一起算：从 `configOptions` 读到的模型要设回同一个
+ * config id；直接模型清单才走 `session/set_model`。兼容证据移到工程时间线。
  */
 export interface ModelCatalog {
   models: readonly ModelOption[]
@@ -103,25 +73,11 @@ export interface ModelCatalog {
    * **`undefined` 表示走规范的 `session/set_model`**。
    */
   configId?: string
-  /**
-   * agent **此刻正在用**的那个模型 id。
-   *
-   * 两条路都能报出来（`models.currentModelId` / `configOptions` 的 `currentValue`），
-   * 而现在只被用来在清单里打一个 `isDefault` 标记。**光有标记不够**：
-   * 界面画的是选中项（`Thread.model`），不是清单里谁带标记——
-   * agent 中途自己换了模型时，清单会更新，选中项不会，于是面板上写着
-   * 一个引擎已经不在跑的模型。这一条就是给那条回写用的，见 `Catalog.model`。
-   */
+  /** agent 当前模型；既标默认项，也供中途变更回写 `Thread.model`。 */
   current?: string
 }
 
-/**
- * 把强度词表挂到**它真正属于的那个模型**上。
- *
- * `current === undefined` 时退回「挂给全部」：那时 omni 分不出这份词表属于谁，
- * 而一个都不挂会让强度那一节整个消失——**已知不精确**好过**已知缺席**，
- * 何况这条分支只在引擎连当前模型都没报时才走到。
- */
+/** 强度只挂当前模型；agent 未报当前模型时才退回全挂，避免整段能力消失。 */
 function withLevels(
   model: ModelOption,
   levels: { id: string; efforts: readonly string[]; current?: string } | undefined,
@@ -160,21 +116,13 @@ export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
   }
 }
 
-/**
- * 重名的两条要在下拉里分得开。
- *
- * 实测 ZCode：会话当前用的模型来自一个**没启用的 provider** 时，桥会把它原样
- * 补进清单（`anthropic\GLM-5.3`），而它报的名字就是 `GLM-5.3`——于是下拉里出现
- * **两行一模一样的「GLM-5.3」，其中一行点下去必然失败**（那个 provider 在
- * ZCode 自己的配置里是坏的）。
- *
- * omni 不替引擎判断哪一条能用（那是它自己的事），但两行长得一模一样是界面的事：
- * 重名就把 id 带上，让人看得出自己在选哪一个。
- */
+/** 不替 agent 判可用性；只给重名项补 id，让用户能区分线上身份。 */
 function distinct(models: readonly ModelOption[]): readonly ModelOption[] {
   const count = new Map<string, number>()
   for (const m of models) count.set(m.label, (count.get(m.label) ?? 0) + 1)
-  return models.map((m) => ((count.get(m.label) ?? 0) > 1 ? { ...m, label: `${m.label}（${m.id}）` } : m))
+  return models.map((m) =>
+    (count.get(m.label) ?? 0) > 1 ? { ...m, label: `${m.label}（${m.id}）` } : m,
+  )
 }
 
 /** 只要清单的那一半。换模型要连「设回哪儿」一起看，用 `modelCatalogOf`。 */
@@ -182,30 +130,12 @@ export function modelsOf(session: AcpNewSession): readonly ModelOption[] {
   return modelCatalogOf(session).models
 }
 
-/**
- * 一份**能直接用**的模型清单：模型 ＋ 强度 ＋ 两条设置路由。
- *
- * ## 为什么合成一个
- *
- * 这四样必须同时算出来、同时换掉：清单从哪儿读的决定了设回哪儿（`configId`），
- * 而**强度的词表是跟着模型走的**——两家都实测过：ZCode 的 GLM-5.3 有 low/high/max，
- * 换到 GLM-5-Turbo 之后一个都没有（发过去引擎直接报错）；kimi 的 K2.7 Coding
- * 只有 `on`，换到 K3 才长出 low/high/max（2026-08-19 活体探测）。
- *
- * 算它的地方有两处（开会话时、agent 中途报 `config_option_update` 时），
- * 分成两份实现的下场是其中一份迟早漏掉一样，而漏掉不会报错，只会让界面撒谎。
- */
+/** 模型、强度和两条设置路由的一致快照，开场与配置更新共用。 */
 export interface Catalog {
   models: readonly ModelOption[]
   /** 换模型的 configId；`undefined` = 走 `session/set_model`。 */
   modelConfig?: string
-  /**
-   * agent 此刻在用的模型 id（见 `ModelCatalog.current`）。
-   *
-   * 算这份清单的两处里，**只有 `config_option_update` 那处需要它**——
-   * 开会话时宿主自己就知道要用哪个模型，中途换掉才是它单方面做的事。
-   * 但两处共用一个 `catalogOf`（那正是它存在的理由），所以两处都带上。
-   */
+  /** agent 当前模型；配置更新时用它同步宿主记录。 */
   model?: string
   /** 换强度的 configId；没有强度这一项时缺席。 */
   effortConfig?: string
@@ -217,22 +147,7 @@ export function catalogOf(session: AcpNewSession): Catalog {
   const { models, configId, current } = modelCatalogOf(session)
   const levels = effortsOf(session)
   return {
-    // **只挂到引擎说的那个当前模型上**，不是每个模型都挂一份。
-    //
-    // 上一版挂给全部，注释写着「强度是会话级的（kimi 的 thinking 换模型不换档）」——
-    // **2026-08-19 实测证伪**：kimi 的 `thinking` 恰恰跟着模型换。
-    // 默认的 K2.7 Coding 只有 `on` 一个值；`session/set_model` 换到 K3 之后，
-    // 它推来的 `config_option_update` 里变成 `low / high / max / on`。
-    //
-    // 挂给全部不是「多给一点」，是**会发错值**：`ModelPicker` 换模型时读的正是
-    // 目标模型的 `defaultEffort`（它那行注释写着「旧模型的 high 在新模型上可能
-    // 根本不存在」——意图对，数据把它架空了）。于是从 K3 切回 K2.7 Coding 会带上
-    // `high`，而那个模型只认 `on`。ZCode 上同类情形实测是引擎直接报错。
-    //
-    // 改成只挂当前模型之后，切到别的模型时 `defaultEffort` 是 `undefined`，
-    // 于是**不带强度**发过去——引擎用它自己对那个模型的默认，然后推一条
-    // `config_option_update` 把真实词表告诉 omni。这正是总纲第三条：
-    // 引擎报得出来的，不叠 omni 的猜测。
+    // 不把当前模型的强度猜成别的模型也支持；目标模型未报告时让 agent 用原生默认。
     models: models.map((m) => withLevels(m, levels, current)),
     ...(configId === undefined ? {} : { modelConfig: configId }),
     ...(current === undefined ? {} : { model: current }),
@@ -241,12 +156,7 @@ export function catalogOf(session: AcpNewSession): Catalog {
   }
 }
 
-/**
- * 换模型这一发**发给谁、带什么**。
- *
- * 单拎出来是为了能钉住：坏掉的就是这一个选择（一律发 `session/set_model`），
- * 而它藏在驱动的一行三元里，谁都测不到。
- */
+/** 换模型的协议路由，单独导出以钉住两种线上形状。 */
 export function modelCall(
   configId: string | undefined,
   sessionId: string,
@@ -275,18 +185,7 @@ export function currentModeOf(session: AcpNewSession): string | undefined {
   return typeof value === "string" ? value : undefined
 }
 
-/**
- * 每个模型的上下文窗口有多大。
- *
- * ACP **没有为窗口大小定字段**，但它在扩展位里：实测 grok 每个模型都报
- * `_meta.totalContextTokens`（4.6 与 4.5 都是 500000）。
- *
- * 为什么要按模型存一张表、而不是只记当前那个：换模型时窗口是会变的
- *（同一家的两个模型一个 256k 一个 1M），只记一个数的话换完之后分母就是错的，
- * 而界面上那条比例条会一本正经地按错分母画。
- *
- * 报不上来的模型不入表——**没有分母就不画比例**，而不是猜一个。
- */
+/** 模型 → agent 扩展位报告的窗口；没报告就不画比例，不猜分母。 */
 export function contextWindows(session: AcpNewSession): Readonly<Record<string, number>> {
   const out: Record<string, number> = {}
   for (const model of session.models?.availableModels ?? []) {
@@ -297,25 +196,14 @@ export function contextWindows(session: AcpNewSession): Readonly<Record<string, 
   return out
 }
 
-/**
- * 把一次 RPC 失败翻成人能照着做的一句话。
- *
- * `"Method not found": session/set_model` 是**协议实现的事实**，不是用户看得懂的话——
- * 它真正说的是「这家适配器没实现这件事」。那就直接这么说，并且说清楚现在能怎么办。
- *
- * 其余错误**原样带出去**：编不出更好的话时，原文比编出来的话有用。
- */
+/** 只翻译明确的未实现错误；其余保留 agent 原文。 */
 export function sayWhy(engine: string, what: string, error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
   if (!/method not found|-32601/i.test(text)) return `${engine} ${what}失败：${text}`
   return `${engine} 这个适配器不支持在会话里${what}（对应的 ACP 方法它没实现）。要改就去它自己的界面或配置里改，改完新开一条会话。`
 }
 
-/**
- * 把起进程的失败翻成人能照着做的一句话。
- *
- * `Error: spawn zcode ENOENT` 对用户毫无意义——他要知道的是「装了没」「装哪了」。
- */
+/** 把明确的 spawn 失败补成可执行的安装/权限提示。 */
 export function startupMessage(command: string, error: Error): string {
   const code = (error as NodeJS.ErrnoException).code
   if (code === "ENOENT") {
@@ -326,24 +214,8 @@ export function startupMessage(command: string, error: Error): string {
 }
 
 /**
- * 推理强度。
- *
- * ACP 没有为它定字段，但**有的适配器用一个 `configOptions` 表达它**——
- * 实测 kimi 是 `id="thinking"` / `category="thought_level"`，三档 low/high/max。
- *
- * 认 `category` 优先于认 `id`：`id` 是各家自己起的名字（谁都可能叫 `reasoning`），
- * 而 `category` 是 ACP 那边约定的语义位。
- *
- * **是会话级的、不是每个模型一份**，所以挂到每个模型上都是同一份——
- * 这不是偷懒：kimi 那边确实是「换模型不换 thinking 档」。
- *
- * ## `id` 必须带出来，不能事后猜
- *
- * 设回去的时候要报的正是这个 `id`，而各家起的名字不一样：kimi 是 `thinking`，
- * **ZCode 是 `thought`**（它的注释里写得很清楚：category 用 `thought_level`
- * 好让客户端认出来，而 `id` 保持 `thought`，因为那是 `set_config_option`
- * 寻址用的）。上一版把 `thinking` 写死在设置那一步，于是在 ZCode 上
- * 选了强度**什么都没发生**——而界面照样把新档位显示出来。
+ * agent 用 config option 报的强度。优先认协议语义 `category=thought_level`，
+ * 同时保留原始 config id 作为设置地址；强度最终只挂当前模型。
  */
 export function effortsOf(
   session: AcpNewSession,
@@ -359,17 +231,7 @@ export function effortsOf(
   return { id: option.id, efforts, ...(current === undefined ? {} : { current }) }
 }
 
-/**
- * agent 自己声明的能力 → omni 的能力位。
- *
- * **绝不写死。** 上一版整个 ACP 驱动一律报 `NO_CAPABILITIES`，于是就算 agent
- * 支持贴图、支持原生分叉，界面上那些入口一个都不给。ACP 的全部意义是
- * 「一个驱动接所有讲这个协议的引擎」，而各家能力本来就不一样——
- * 那就只能一家一家问，不能替它们回答。
- *
- * `sessionCapabilities` 用**空对象当标记**（实测 kimi 报 `{fork:{}}`），
- * 所以判据是键在不在，不是值是不是 true。
- */
+/** agent 声明的能力直接翻译；空对象也是已声明，所以按键存在判断。 */
 /** 各家自己说的那几位。协议里推不出来，见 `AcpDriverConfig`。 */
 export interface AcpSaid {
   modeReadback?: boolean
@@ -377,28 +239,21 @@ export interface AcpSaid {
   steer?: boolean
 }
 
-export function capabilitiesOf(info: AcpInitialize | undefined, said: AcpSaid = {}): EngineCapabilities {
+export function capabilitiesOf(
+  info: AcpInitialize | undefined,
+  said: AcpSaid = {},
+): EngineCapabilities {
   const agent = info?.agentCapabilities
   const session = agent?.sessionCapabilities ?? {}
   return {
-    // **这两位协议里推不出来，只能各家自己说。** 上一版一律报 false，理由是
-    // 「驱动一个都没实现，翻成 true 就是给一个点了没反应的入口」——那是对的，
-    // 现在 `turn.ts` 把账还了，于是判据回到「这家认不认那个方法」。
-    //
-    // 三家各起一次真进程实测（表在 `turn.ts` 头部）：kimi 与 grok 两个方法
-    // **都是 `-32601 Method not found`**，只有 zcode 有。所以这里绝不能从
-    // `agentCapabilities` 里推——那上面根本没有这两位，而**推不出来就报 false**
-    // 会把 zcode 一起冤枉掉，反过来一律报 true 就是给三家里的两家一个假入口。
+    // 协议没有 compact/steer 声明位；只能由已验证的适配配置显式提供。
     compact: said.compact === true,
     attachments: agent?.promptCapabilities?.image === true,
     steer: said.steer === true,
     fork: "fork" in session,
-    // **协议里没有「我会不会报档位变化」这种声明**，推不出来，只能由各家自己说
-    //（见 `AcpDriverConfig.modeReadback`）。没人说就是不知道——**不知道一律报 false**：
-    // 报 true 的代价是界面上那行「引擎侧：X」永远停在开场那一刻，而它看起来是实时的
+    // 没有 mode readback 声明位；未知不能冒充实时状态。
     modeReadback: said.modeReadback === true,
-    // ACP 协议里没有侧问。kimi 的 `/btw` 实现得很完整，但它没从 ACP 那扇门出来——
-    // 不是 kimi 弱，是这条路不通（见 `docs/侧栏与引擎状态方案.md` §6.3）
+    // ACP 没暴露侧问；不拿某家私有能力替协议补洞。
     sideQuestion: false,
   }
 }
@@ -408,13 +263,7 @@ export function canList(info: AcpInitialize | undefined): boolean {
   return "list" in (info?.agentCapabilities?.sessionCapabilities ?? {})
 }
 
-/**
- * `session/list` 的结果 → omni 的形状。
- *
- * 和 codex / Claude 那两条一样的规矩：**没有句柄或没有工作区的不给列**。
- * 句柄缺了接不过来，工作区缺了工作区边界就错了——实测 kimi 的清单里
- * 确实有 `cwd: ""` 的历史条目（更早版本留下的）。
- */
+/** `session/list` 翻译；缺句柄无法续跑，缺 cwd 无法守住工作区边界，均丢弃。 */
 export function sessionsOf(raw: unknown, max: number): readonly EngineThread[] {
   const rows = (raw as { sessions?: readonly AcpSessionRow[] } | undefined)?.sessions ?? []
   return rows
