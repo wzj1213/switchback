@@ -7,7 +7,10 @@ interface TextState {
   id: ItemId
   kind: "agent_message" | "reasoning"
   text: string
+  /** Kimi 快照给的是整轮累计文本；分段后仍靠它只补缺失的后缀。 */
+  total: string
   started: boolean
+  part: number
 }
 
 interface Active {
@@ -18,6 +21,8 @@ interface Active {
   native?: number
   assistant: TextState
   reasoning: TextState
+  /** 当前连续文本的类型。换类型或插入工具时，旧片段就地收口。 */
+  openText?: TextState["kind"]
   tools: Map<string, ToolCallItem>
   planStarted: boolean
 }
@@ -40,6 +45,12 @@ function turnStatus(reason: string | undefined): TurnStatus {
   return "completed"
 }
 
+function textState(turnId: TurnId, kind: TextState["kind"], part = 1, total = ""): TextState {
+  const prefix = kind === "agent_message" ? "kimi-answer" : "kimi-thinking"
+  const id = part === 1 ? `${prefix}-${turnId}` : `${prefix}-${turnId}-${String(part)}`
+  return { id, kind, text: "", total, started: false, part }
+}
+
 export class KimiTurnTracker {
   private active: Active | undefined
   private serial = 0
@@ -53,8 +64,8 @@ export class KimiTurnTracker {
       generation,
       turnId,
       prompt,
-      assistant: { id: `kimi-answer-${turnId}`, kind: "agent_message", text: "", started: false },
-      reasoning: { id: `kimi-thinking-${turnId}`, kind: "reasoning", text: "", started: false },
+      assistant: textState(turnId, "agent_message"),
+      reasoning: textState(turnId, "reasoning"),
       tools: new Map(),
       planStarted: false,
     }
@@ -99,6 +110,7 @@ export class KimiTurnTracker {
     if (!state.started) {
       state.started = true
       state.text = delta
+      state.total = delta
       this.deps.emit({
         type: "item.started",
         at,
@@ -107,13 +119,41 @@ export class KimiTurnTracker {
       return
     }
     state.text += delta
+    state.total += delta
     this.deps.emit({ type: "item.delta", at, itemId: state.id, append: delta })
+  }
+
+  private stateOf(active: Active, kind: TextState["kind"]): TextState {
+    return kind === "reasoning" ? active.reasoning : active.assistant
+  }
+
+  private rotateText(state: TextState, active: Active, at: number): void {
+    if (!state.started) return
+    this.finishText(state, active, at)
+    const next = textState(active.turnId, state.kind, state.part + 1, state.total)
+    if (state.kind === "reasoning") active.reasoning = next
+    else active.assistant = next
+  }
+
+  private selectText(active: Active, kind: TextState["kind"], at: number): TextState {
+    if (active.openText !== undefined && active.openText !== kind) {
+      this.rotateText(this.stateOf(active, active.openText), active, at)
+    }
+    active.openText = kind
+    return this.stateOf(active, kind)
+  }
+
+  /** 任何真正插进 transcript 的非文本 item 都会切断连续文本。 */
+  private closeText(active: Active, at: number): void {
+    this.rotateText(active.reasoning, active, at)
+    this.rotateText(active.assistant, active, at)
+    active.openText = undefined
   }
 
   delta(payload: KimiPayload, kind: TextState["kind"], at: number): void {
     const active = this.bind(payload.turnId)
     if (active === undefined || payload.delta === undefined) return
-    this.append(kind === "reasoning" ? active.reasoning : active.assistant, active, payload.delta, at)
+    this.append(this.selectText(active, kind, at), active, payload.delta, at)
   }
 
   toolStarted(payload: KimiPayload, at: number): void {
@@ -122,6 +162,7 @@ export class KimiTurnTracker {
     const steps = planSteps(payload.display)
     if (steps !== undefined) {
       if (steps.length > 0) {
+        this.closeText(active, at)
         this.deps.emit({
           type: active.planStarted ? "item.updated" : "item.started",
           at,
@@ -133,6 +174,7 @@ export class KimiTurnTracker {
     }
     const item = startTool(payload, active.turnId, at)
     if (item === undefined || active.tools.has(item.id)) return
+    this.closeText(active, at)
     active.tools.set(item.id, item)
     this.deps.emit({ type: "item.started", at, item })
   }
@@ -158,6 +200,7 @@ export class KimiTurnTracker {
     const active = this.bind(payload.turnId)
     const message = payload.message ?? messageOf(payload.error)
     if (active === undefined || message === undefined) return
+    this.closeText(active, at)
     const id = `kimi-error-${active.turnId}-${String(at)}`
     this.deps.emit({
       type: "item.started",
@@ -169,6 +212,7 @@ export class KimiTurnTracker {
   retry(payload: KimiPayload, at: number): void {
     const active = this.bind(payload.turnId)
     if (active === undefined) return
+    this.closeText(active, at)
     const message = typeof payload.errorMessage === "string" ? payload.errorMessage : "Kimi 正在重试这一轮"
     const id = `kimi-retry-${active.turnId}`
     this.deps.emit({
@@ -220,11 +264,17 @@ export class KimiTurnTracker {
   }
 
   private syncText(state: TextState, active: Active, text: string, at: number): void {
-    if (text === "" || text === state.text) return
-    state.text = text
-    const item = { id: state.id, turnId: active.turnId, at, kind: state.kind, text, complete: false } as const
-    if (!state.started) {
-      state.started = true
+    if (text === "" || text === state.total) return
+    const closedLength = state.total.length - state.text.length
+    const segment = text.slice(Math.min(closedLength, text.length))
+    state.total = text
+    if (segment === "" && !state.started) return
+    const selected = this.selectText(active, state.kind, at)
+    selected.text = segment
+    selected.total = text
+    const item = { id: selected.id, turnId: active.turnId, at, kind: selected.kind, text: segment, complete: false } as const
+    if (!selected.started) {
+      selected.started = true
       this.deps.emit({ type: "item.started", at, item })
       return
     }
@@ -242,8 +292,8 @@ export class KimiTurnTracker {
     }
     if (this.bind(flight.turn_id) === undefined) return
     active.promptId ??= flight.current_prompt_id
-    this.syncText(active.assistant, active, flight.assistant_text, at)
     this.syncText(active.reasoning, active, flight.thinking_text, at)
+    this.syncText(active.assistant, active, flight.assistant_text, at)
     for (const tool of flight.running_tools) {
       this.toolStarted(
         { turnId: flight.turn_id, toolCallId: tool.tool_call_id, name: tool.name, args: tool.args, display: tool.display },
