@@ -1,186 +1,157 @@
-import { execFile } from "node:child_process"
+import type { ClaudeExecutable } from "@omni/engine"
 import { ipcMain } from "electron"
+import {
+  compare,
+  npmGlobalState,
+  runCommand,
+  versionOf,
+  type EngineCommandResult,
+  type EngineCommandRunner,
+} from "./enginever-command.js"
+import {
+  specs,
+  type EngineSpec,
+  type EngineVersion,
+  type InspectContext,
+} from "./enginever-sources.js"
 import type { Logger } from "./log.js"
 
-/**
- * 引擎有没有新版。
- *
- * ## 为什么这件事该 omni 管
- *
- * 引擎是**别人装的、别人更新的**——omni 只是把它们拉起来。于是很常见的一幕是：
- * 你用着半年前装的 codex，新协议字段解析不了、新能力用不上，
- * 而界面上一个字都不说。omni 是唯一同时知道「装的是哪版」和
- * 「现在最新是哪版」的地方。
- *
- * ## 更新这件事怎么做
- *
- * 一开始只给了「复制命令」——那等于把活推回给用户。改成真按钮，
- * 但**把谨慎换个地方落实**：
- *
- * - 按之前把要执行的命令原样摆出来（不是「更新」两个字背后藏一条命令）
- * - 跑完报「从哪版到哪版」，**用重新探测的结果**，不是用我们以为的
- * - 失败时把 npm 的原文吐出来，而不是「更新失败」四个字
- *
- * 这样出了问题你知道发生过什么。靠不给按钮来回避风险，
- * 只是把风险转成了「用户自己去终端跑，而且没人告诉他跑完是什么状态」。
- *
- * ## 网络
- *
- * 查最新版要连 npm。**失败就静默**——用户没有要求过这件事，
- * 为它弹一条错误是打扰。
- *
- * ## 为什么要缓存
- *
- * 这件事原来挂在「设置面板挂载」上：每打开一次设置，就 spawn 一次 `codex --version`
- * 再 spawn 一次 `npm view`——**后者是一个完整的 node 进程加一趟网络往返**。
- * 于是每次进设置都顿一下，而顿的原因和用户当时想做的事（改个主题）毫无关系。
- *
- * 现在：结果缓存 6 小时，应用起来之后**预热一次**，面板打开时是现成的。
- * 6 小时不是随手定的——引擎的版本只会因为「你自己去更新了」而变，
- * 而那条路（下面那颗按钮）会顺手把缓存改掉。真想立刻重查的话，面板上有「重新检查」。
- */
-export interface EngineVersion {
-  engine: string
-  installed?: string
-  latest?: string
-  /** 落后了。界面据此提示。 */
-  stale: boolean
-  /** 更新命令，给用户看，也给「一键更新」用。 */
-  update?: string
-}
-
-/** 各家怎么查版本、怎么更新。**只写确实验证过的那几家。** */
-const KNOWN: Readonly<Record<string, { bin: string; pkg: string }>> = {
-  codex: { bin: "codex", pkg: "@openai/codex" },
-}
+export type { EngineCommandResult, EngineCommandRunner, EngineVersion }
 
 export interface UpdateResult {
   ok: boolean
-  /** 更新前装的是哪版。 */
+  changed: boolean
   before?: string
-  /** 更新后重新探到的版本。**重新探，不是用 npm 说的那个** */
   after?: string
-  /** npm 的原文。失败时全靠它排查。 */
+  /** 引擎更新器或包管理器的原文；失败时直接给用户排查。 */
   output: string
 }
 
-/** 缓存多久。见文件头「为什么要缓存」。 */
-const TTL_MS = 6 * 60 * 60 * 1000
+export interface EngineVersionOptions {
+  claudeExecutable?: ClaudeExecutable
+  run?: EngineCommandRunner
+  now?: () => number
+}
 
 export interface EngineVersionStore {
-  /** 拿一份。缓存还新鲜就直接给，`refresh` 为真时无视缓存重探。 */
   get: (refresh?: boolean) => Promise<readonly EngineVersion[]>
-  /** 预热。应用起来之后跑一次，让设置面板**打开就有**。失败不出声。 */
+  update: (engine: string) => Promise<UpdateResult>
   warm: () => void
 }
 
+const TTL_MS = 6 * 60 * 60 * 1000
+const UPDATE_MS = 180_000
+
 /**
- * 探测结果的缓存。
- *
- * **状态显式装在这个对象里**，不挂模块级变量（见 AGENTS.md 反模式 2）。
- * `inflight` 是必须的：预热和用户手动打开可能撞在一起，
- * 没有它就会同时跑两遍 `npm view`。
+ * 探测结果缓存在这个对象里，不挂模块级可变状态。
+ * `inflight` 让启动预热和设置页手动检查不会同时跑两遍网络请求。
  */
-export function createEngineVersions(log: Logger): EngineVersionStore {
+export function createEngineVersions(
+  log: Logger,
+  options: EngineVersionOptions = {},
+): EngineVersionStore {
   let cached: { at: number; list: readonly EngineVersion[] } | undefined
   let inflight: Promise<readonly EngineVersion[]> | undefined
+  const run = options.run ?? runCommand
+  const now = options.now ?? Date.now
+  const known = specs(options.claudeExecutable ?? "bundled")
+
+  const inspectContext = (): InspectContext => ({ run, npmGlobal: npmGlobalState(run) })
 
   const probeAll = async (): Promise<readonly EngineVersion[]> => {
-    const out: EngineVersion[] = []
-    for (const [engine, how] of Object.entries(KNOWN)) {
-      const installed = await versionOf(how.bin)
-      if (installed === undefined) continue
-      const latest = await latestOf(how.pkg)
-      const stale = latest !== undefined && compare(installed, latest) < 0
-      if (stale) log.write("info", "engines", `${engine} 有新版：${installed} → ${latest}`)
-      out.push({
-        engine,
-        installed,
-        ...(latest === undefined ? {} : { latest }),
-        stale,
-        ...(stale ? { update: `npm i -g ${how.pkg}@latest` } : {}),
-      })
+    const context = inspectContext()
+    const list = (await Promise.all(known.map((spec) => spec.inspect(context)))).filter(isPresent)
+    for (const version of list) {
+      if (version.stale) {
+        log.write(
+          "info",
+          "engines",
+          `${version.engine} 有新版：${version.installed ?? "?"} → ${version.latest ?? "?"}`,
+        )
+      }
     }
-    cached = { at: Date.now(), list: out }
-    return out
+    cached = { at: now(), list }
+    return list
   }
 
   const get = async (refresh = false): Promise<readonly EngineVersion[]> => {
-    const at = cached
-    if (!refresh && at !== undefined && Date.now() - at.at < TTL_MS) return at.list
+    if (!refresh && cached !== undefined && now() - cached.at < TTL_MS) return cached.list
     inflight ??= probeAll().finally(() => {
       inflight = undefined
     })
     return inflight
   }
 
-  return {
-    get,
-    warm: () => {
-      void get().catch(() => undefined)
-    },
-  }
-}
-
-export function installEngineVersionChannel(log: Logger, versions: EngineVersionStore): void {
-  /**
-   * 真的去更新。
-   *
-   * 用 `npm i -g <pkg>@latest`，和界面上摆出来的那条命令**逐字相同**——
-   * 按钮背后藏一条不一样的命令是最不该有的事。
-   */
-  ipcMain.handle("omni:updateEngine", async (_e, engine: string): Promise<UpdateResult> => {
-    const how = KNOWN[engine]
-    if (how === undefined) return { ok: false, output: `不认识的引擎：${engine}` }
-    const before = await versionOf(how.bin)
+  const update = async (engine: string): Promise<UpdateResult> => {
+    const spec = known.find((candidate) => candidate.engine === engine)
+    if (spec?.update === undefined) return unavailable(engine)
+    const before = await versionOf(spec.bin, run)
     log.write("info", "engines", `开始更新 ${engine}（当前 ${before ?? "未知"}）`)
-    // 给足时间：全局安装要下载、要编译原生依赖，十几秒到一两分钟都正常
-    const output = await run("npm", ["i", "-g", `${how.pkg}@latest`], 180_000)
-    const after = await versionOf(how.bin)
-    const ok = after !== undefined && (before === undefined || compare(after, before) > 0)
-    log.write(ok ? "info" : "error", "engines", `更新 ${engine}：${before ?? "?"} → ${after ?? "?"}`)
-    // 缓存里还写着「有新版」，不刷的话下次打开设置又劝你更新一遍
-    if (ok) versions.warm()
+    const command = await run(spec.update.command, spec.update.args, UPDATE_MS)
+    const after = await versionOf(spec.bin, run)
+    const current = await spec.inspect(inspectContext())
+    const changed = after !== undefined && (before === undefined || compare(after, before) > 0)
+    const ok = updateSucceeded({ spec, command, current, after, changed })
+    cached = undefined
+    void get().catch(() => undefined)
+    log.write(
+      ok ? "info" : "error",
+      "engines",
+      `更新 ${engine}：${before ?? "?"} → ${after ?? "?"}`,
+    )
     return {
       ok,
+      changed,
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
-      output: output ?? "npm 没有任何输出——多半是它自己没跑起来（PATH？）",
+      output: updateOutput(command.output, ok, before, after),
     }
-  })
-
-  ipcMain.handle("omni:engineVersions", (_e, refresh?: boolean) => versions.get(refresh === true))
-}
-
-/** `codex --version` 打出来是 `codex-cli 0.145.0`，只取那串数字。 */
-async function versionOf(bin: string): Promise<string | undefined> {
-  const out = await run(bin, ["--version"], 5000)
-  return out === undefined ? undefined : /(\d+\.\d+\.\d+)/.exec(out)?.[1]
-}
-
-async function latestOf(pkg: string): Promise<string | undefined> {
-  const out = await run("npm", ["view", pkg, "version"], 12000)
-  return out === undefined ? undefined : /(\d+\.\d+\.\d+)/.exec(out)?.[1]
-}
-
-/** 语义化版本比大小。**按数字比，不按字符串**——不然 `0.9.0` 会大于 `0.10.0`。 */
-function compare(a: string, b: string): number {
-  const pa = a.split(".").map(Number)
-  const pb = b.split(".").map(Number)
-  for (let i = 0; i < 3; i += 1) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0)
-    if (d !== 0) return d
   }
-  return 0
+
+  return { get, update, warm: () => void get().catch(() => undefined) }
 }
 
-function run(cmd: string, args: readonly string[], timeoutMs: number): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    const child = execFile(cmd, [...args], { timeout: timeoutMs, encoding: "utf8" }, (error, stdout) => {
-      resolve(error !== null && stdout === "" ? undefined : stdout)
-    })
-    child.on("error", () => {
-      resolve(undefined)
-    })
-  })
+export function installEngineVersionChannel(_log: Logger, versions: EngineVersionStore): void {
+  ipcMain.handle("omni:updateEngine", (_event, engine: string) => versions.update(engine))
+  ipcMain.handle("omni:engineVersions", (_event, refresh?: boolean) =>
+    versions.get(refresh === true),
+  )
+}
+
+interface UpdateVerification {
+  spec: EngineSpec
+  command: EngineCommandResult
+  current: EngineVersion | undefined
+  after: string | undefined
+  changed: boolean
+}
+
+function updateSucceeded(check: UpdateVerification): boolean {
+  const { spec, command, current, after, changed } = check
+  const currentEnough = current?.latest === undefined || current.stale === false
+  return (
+    command.ok &&
+    after !== undefined &&
+    currentEnough &&
+    (changed || spec.update?.unchangedOk === true)
+  )
+}
+
+function unavailable(engine: string): UpdateResult {
+  return { ok: false, changed: false, output: `${engine} 当前没有可由 omni 执行的更新入口` }
+}
+
+function updateOutput(
+  output: string,
+  ok: boolean,
+  before: string | undefined,
+  after: string | undefined,
+): string {
+  if (ok) return output === "" ? "更新器正常结束，没有额外输出。" : output
+  const checked = `omni 复查版本：${before ?? "?"} → ${after ?? "?"}`
+  return [output === "" ? "更新命令没有输出。" : output, checked].join("\n\n")
+}
+
+function isPresent<T>(value: T | undefined): value is T {
+  return value !== undefined
 }

@@ -23,12 +23,18 @@ export function EnginesSection({
     <>
       {/* 两张卡，不是一张：版本那张底下带一颗「重新检查」，
           而注册表和「装的哪版」不是一回事——挤在一张卡里，那颗按钮看起来像在管注册表 */}
-      <Group title="引擎版本" hint="更新会动你的全局环境（一条 npm i -g），所以只做到「把命令摆出来，你自己点」。">
+      <Group
+        title="引擎版本"
+        hint="更新会动全局环境；omni 会把各家实际执行的命令摆出来，只在你点下按钮后运行。"
+      >
         <EngineVersions />
       </Group>
       {/* **只摆路径，不做表单**：那些设置是各家自己的，omni 抄一份进来就得跟着它们改，
           而它们改的时候不会通知我们。见 `EngineDoors` 的注释 */}
-      <Group title="各家自己的设置" hint="omni 只把门指出来——格式、默认值、什么时候生效，都是各家自己的事。">
+      <Group
+        title="各家自己的设置"
+        hint="omni 只把门指出来——格式、默认值、什么时候生效，都是各家自己的事。"
+      >
         <EngineDoors cwd={cwd} onReveal={onReveal} />
       </Group>
       <Group title="引擎注册表">

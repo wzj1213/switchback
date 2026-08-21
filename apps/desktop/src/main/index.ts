@@ -72,7 +72,7 @@ const settings = createSettings(log)
  * 引擎版本的探测结果。**在这里建、显式传下去**，理由和 `settings` 一样：
  * 它有状态（缓存），而这个仓库不允许状态挂在模块上。
  */
-const engineVersions = createEngineVersions(log)
+const engineVersions = createEngineVersions(log, { claudeExecutable: buildInfo.claudeExecutable })
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。

@@ -3,36 +3,28 @@ import type { EngineVersion, UpdateResult } from "../../main/enginever.js"
 import { Field } from "./SettingsBits.js"
 
 /**
- * 各家引擎装的是哪版、有没有新版。
- *
- * ## 为什么不自动更新
- *
- * 更新引擎是往**用户全局环境**里写东西（`npm i -g` 会动 `/opt/homebrew/lib`），
- * 而且新版可能带 breaking change、可能要求重新登录。**这类事得他自己点头。**
- *
- * 所以做到「主动检测 + 把命令给他 + 一键复制」为止。
- * 少按一次键换来的是「某天早上打开发现引擎自己换了版本、而且不认之前的登录」，
- * 那不是省事，是把一个他能控制的问题变成不能控制的。
- *
- * ## 版本是**问缓存**要的
- *
- * 主进程那边缓存 6 小时、启动后预热一次（见 `main/enginever.ts`）。原来这里
- * 每挂载一次就 spawn 一次 `codex --version` 加一次 `npm view`——**每打开一次
- * 设置面板顿一下**，而顿的原因和用户当时想做的事毫无关系。
- * 想立刻重查的话，下面那颗「重新检查」会无视缓存。
+ * 各家引擎的版本与人工更新入口。主进程缓存探测结果六小时；这里还负责保证
+ * 同一时间只跑一个全局安装，并让失败的 Promise 一定退出 loading 状态。
  */
 export function EngineVersions(): React.JSX.Element {
-  // `undefined` = 还没回来；空数组 = 真的一个都没探到。**这两件事说的话不一样**——
-  // 原来共用一个空数组，于是「一个引擎都没装」的机器上永远停在「正在看…」
   const [list, setList] = useState<readonly EngineVersion[] | undefined>(undefined)
   const [checking, setChecking] = useState(false)
+  const [updating, setUpdating] = useState<string | undefined>(undefined)
+  const [checkError, setCheckError] = useState<string | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
   useEffect(() => {
     let live = true
-    void bridge?.engineVersions().then((v) => {
-      if (live) setList(v)
-    })
+    const request = bridge?.engineVersions()
+    void request
+      ?.then((versions) => {
+        if (live) setList(versions)
+      })
+      .catch((error: unknown) => {
+        if (!live) return
+        setList([])
+        setCheckError(`版本探测失败：${messageOf(error)}`)
+      })
     return () => {
       live = false
     }
@@ -41,15 +33,23 @@ export function EngineVersions(): React.JSX.Element {
   return (
     <>
       {list === undefined ? <p className="set__blank">正在看各家引擎的版本…</p> : null}
-      {list?.length === 0 ? (
-        <p className="set__blank">没探到 omni 认得的引擎。这份清单只收验过更新路径的那几家（现在是 codex）。</p>
-      ) : null}
-      {(list ?? []).map((v) => (
+      {list?.length === 0 ? <p className="set__blank">没探到可检查版本的引擎。</p> : null}
+      {checkError === undefined ? null : (
+        <p className="set__blank set__blank--error" role="alert">
+          {checkError}
+        </p>
+      )}
+      {(list ?? []).map((version) => (
         <EngineRow
-          key={v.engine}
-          v={v}
+          key={version.engine}
+          version={version}
+          active={updating}
+          checking={checking}
+          onActive={setUpdating}
           onDone={(next) => {
-            setList((prev) => (prev ?? []).map((x) => (x.engine === next.engine ? next : x)))
+            setList((previous) =>
+              (previous ?? []).map((item) => (item.engine === next.engine ? next : item)),
+            )
           }}
         />
       ))}
@@ -57,14 +57,17 @@ export function EngineVersions(): React.JSX.Element {
         <button
           type="button"
           className="tbtn"
-          disabled={checking}
-          title="无视缓存，重新问一遍 npm"
+          disabled={checking || updating !== undefined}
+          title="无视缓存，重新询问 npm 与各家原生更新器"
           onClick={() => {
+            const request = bridge?.engineVersions(true)
+            if (request === undefined) return
             setChecking(true)
-            void bridge?.engineVersions(true).then((v) => {
-              setList(v)
-              setChecking(false)
-            })
+            setCheckError(undefined)
+            void request
+              .then(setList)
+              .catch((error: unknown) => setCheckError(`重新检查失败：${messageOf(error)}`))
+              .finally(() => setChecking(false))
           }}
         >
           {checking ? "正在查…" : "重新检查"}
@@ -74,63 +77,102 @@ export function EngineVersions(): React.JSX.Element {
   )
 }
 
-/**
- * 一家引擎一行：装的哪版、要不要更新、更新中、更新完了。
- *
- * ## 命令是摆出来的，不是藏起来的
- *
- * 按钮的 `title` 就是**将要逐字执行的那条命令**。「更新」两个字背后
- * 藏一条你没看过的命令，是这类按钮最不该有的样子——尤其它动的是全局环境。
- *
- * ## 结果用重新探测得出，不用 npm 说的
- *
- * npm 说装成功了不等于 `codex --version` 就变了（装到别的前缀、
- * PATH 里还有另一个旧的）。**只信重新探到的那个数。**
- */
-function EngineRow({ v, onDone }: { v: EngineVersion; onDone: (next: EngineVersion) => void }): React.JSX.Element {
-  const [state, setState] = useState<"idle" | "running">("idle")
+interface EngineRowProps {
+  version: EngineVersion
+  active: string | undefined
+  checking: boolean
+  onActive: (engine: string | undefined) => void
+  onDone: (next: EngineVersion) => void
+}
+
+function EngineRow({
+  version,
+  active,
+  checking,
+  onActive,
+  onDone,
+}: EngineRowProps): React.JSX.Element {
   const [result, setResult] = useState<UpdateResult | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.omni
-
-  const hint = hintOf(v, state, result)
+  const running = active === version.engine
+  const actionable = version.update !== undefined && (version.stale || version.latest === undefined)
 
   return (
     <>
-      <Field label={v.engine} hint={hint}>
-        {v.stale && result === undefined ? (
+      <Field label={version.label} hint={hintOf(version, running, result)}>
+        {actionable ? (
           <button
             type="button"
             className="tbtn"
-            disabled={state === "running"}
-            // **把将要执行的命令原样摆出来**
-            title={`将执行：${v.update ?? ""}`}
+            disabled={checking || active !== undefined}
+            aria-busy={running}
+            title={`将执行：${version.update ?? ""}`}
             onClick={() => {
-              setState("running")
-              void bridge?.updateEngine(v.engine).then((r) => {
-                setState("idle")
-                setResult(r)
-                if (r.ok) onDone({ ...v, installed: r.after ?? v.installed, stale: false })
-              })
+              const request = bridge?.updateEngine(version.engine)
+              if (request === undefined) return
+              onActive(version.engine)
+              setResult(undefined)
+              void request
+                .then((next) => {
+                  setResult(next)
+                  if (next.ok)
+                    onDone({ ...version, installed: next.after ?? version.installed, stale: false })
+                })
+                .catch((error: unknown) => setResult(failedResult(error)))
+                .finally(() => onActive(undefined))
             }}
           >
-            {state === "running" ? "更新中…" : `更新到 ${v.latest ?? "最新"}`}
+            {running ? "更新中…" : actionOf(version)}
           </button>
         ) : (
           <span className="set__hint">—</span>
         )}
       </Field>
-      {/* 失败时把 npm 的原文摊出来。「更新失败」四个字排查不了任何东西 */}
-      {result !== undefined && !result.ok ? <pre className="set__log">{result.output.slice(-1200)}</pre> : null}
+      {result !== undefined && (!result.ok || !result.changed) ? (
+        <pre className="set__log" {...(result.ok ? {} : { role: "alert" })}>
+          {result.output.slice(-1200)}
+        </pre>
+      ) : null}
     </>
   )
 }
 
-/** 那一行右边说什么。抽出来纯粹是分支太多撞了复杂度闸门。 */
-function hintOf(v: EngineVersion, state: "idle" | "running", result: UpdateResult | undefined): string {
-  if (result !== undefined) {
-    return result.ok ? `已更新到 ${result.after ?? "?"}` : `没更新成（还是 ${result.after ?? v.installed ?? "?"}）`
-  }
-  if (state === "running") return "正在更新，别关窗口…"
-  if (v.stale) return `装的是 ${v.installed ?? "?"}，最新 ${v.latest ?? "?"}`
-  return `${v.installed ?? "?"}（已是最新）`
+function actionOf(version: EngineVersion): string {
+  return version.stale ? `更新到 ${version.latest ?? "最新"}` : "检查并更新"
+}
+
+function hintOf(
+  version: EngineVersion,
+  running: boolean,
+  result: UpdateResult | undefined,
+): string {
+  if (result !== undefined) return resultHint(version, result)
+  if (running) return "正在更新，别关窗口…"
+  if (version.stale) return `装的是 ${shown(version.installed)}，最新 ${shown(version.latest)}`
+  if (version.detail !== undefined) return detailHint(version)
+  return `${shown(version.installed)}（已是最新）`
+}
+
+function resultHint(version: EngineVersion, result: UpdateResult): string {
+  const after = shown(result.after === undefined ? version.installed : result.after)
+  if (!result.ok) return `没更新成（还是 ${after}）`
+  if (result.changed) return `已更新到 ${after}`
+  return `更新器已检查（仍是 ${after}）`
+}
+
+function detailHint(version: EngineVersion): string {
+  if (version.installed === undefined) return shown(version.detail)
+  return `${version.installed} · ${shown(version.detail)}`
+}
+
+function shown(value: string | undefined): string {
+  return value === undefined ? "?" : value
+}
+
+function failedResult(error: unknown): UpdateResult {
+  return { ok: false, changed: false, output: `更新请求失败：${messageOf(error)}` }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
