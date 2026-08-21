@@ -170,13 +170,13 @@ export function Approval({
         <div className="approval__reason">{item.reason}</div>
       </div>
       <div className="approval__actions">
-        {/* 「始终允许」只在判定器给得出可记忆规则时出现——给不出的时候
-            摆一个按钮，用户点了却什么也没记住，比没有这个选项糟得多 */}
+        {/* 「始终允许」只在这一条审批明确提供持久化语义时出现：可能是 omni
+            的可记忆规则，也可能是引擎自己的原生授权（例如 Computer Use）。 */}
         {item.rememberHint === undefined || settled ? null : (
           <button
             className="btn approval__always"
             type="button"
-            title={`以后在本工作区自动允许：${item.rememberHint}`}
+            title={`始终允许：${item.rememberHint}`}
             onClick={() => { decide(true, "project") }}
           >
             始终允许

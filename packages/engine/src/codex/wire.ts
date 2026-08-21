@@ -140,6 +140,45 @@ export interface WireApprovalRequest {
 /** 命令审批与文件审批的决定枚举不同，但我们只用两端的这几个值。 */
 export type WireDecision = "accept" | "acceptForSession" | "decline"
 
+/**
+ * MCP server 主动向客户端发起的表单请求。
+ *
+ * Computer Use 的「允许使用这个应用吗」走的不是上面的 requestApproval，
+ * 而是 `mcpServer/elicitation/request`。这里只接它用到的窄字段；完整形状仍以
+ * `codex app-server generate-ts` 生成的协议为准。
+ */
+export interface WireElicitationMeta {
+  codex_approval_kind?: string
+  connector_id?: string
+  connector_name?: string
+  persist?: readonly unknown[]
+  riskLevel?: string
+  subtitle?: string
+  tool_call_id?: string
+  tool_name?: string
+  tool_params_display?: readonly {
+    name?: string
+    display_name?: string
+    value?: unknown
+  }[]
+}
+
+export interface WireMcpElicitation {
+  threadId?: string
+  turnId?: string | null
+  serverName?: string
+  mode?: string
+  _meta?: WireElicitationMeta | null
+  message?: string
+  requestedSchema?: unknown
+}
+
+export interface WireMcpElicitationResponse {
+  action: "accept" | "decline" | "cancel"
+  content: Record<string, unknown> | null
+  _meta: { persist: "session" | "always" } | null
+}
+
 export type WireSandbox = "read-only" | "workspace-write" | "danger-full-access"
 
 /** app-server 接受的三种传统审批策略；自动评审是旁边独立的 reviewer 旋钮。 */

@@ -1,0 +1,111 @@
+import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
+import type { ServerCall } from "../rpc.js"
+import { sanitize } from "../claude/permission.js"
+import type {
+  WireElicitationMeta,
+  WireMcpElicitation,
+  WireMcpElicitationResponse,
+} from "./wire.js"
+
+export const MCP_ELICITATION = "mcpServer/elicitation/request"
+
+export interface ElicitationDeps {
+  askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+/** omni 目前只有二元审批卡；需要用户填写字段的表单不能假装已经填好。 */
+function isBinaryApproval(params: WireMcpElicitation): boolean {
+  if (params._meta?.codex_approval_kind !== "mcp_tool_call") return false
+  if (params.mode !== "form" && params.mode !== "openai/form") return false
+  if (!isRecord(params.requestedSchema) || params.requestedSchema["type"] !== "object") return false
+  const required = params.requestedSchema["required"]
+  if (Array.isArray(required) && required.length > 0) return false
+  const properties = params.requestedSchema["properties"]
+  return properties === undefined || (isRecord(properties) && Object.keys(properties).length === 0)
+}
+
+function textOf(value: unknown): string | undefined {
+  if (typeof value === "string") return sanitize(value)
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return undefined
+}
+
+function detailsOf(meta: WireElicitationMeta | null | undefined): string {
+  const rows = meta?.tool_params_display ?? []
+  return rows
+    .map((row) => {
+      const name = textOf(row.display_name) ?? textOf(row.name)
+      const value = textOf(row.value)
+      return name === undefined || value === undefined ? undefined : `${name}：${value}`
+    })
+    .filter((row): row is string => row !== undefined)
+    .join("，")
+}
+
+function supports(meta: WireElicitationMeta | null | undefined, scope: string): boolean {
+  return meta?.persist?.includes(scope) === true
+}
+
+function connectorOf(params: WireMcpElicitation): string {
+  return textOf(params._meta?.connector_name) ?? textOf(params.serverName) ?? "MCP"
+}
+
+function reasonOf(params: WireMcpElicitation, connector: string, details: string): string {
+  const subtitle = textOf(params._meta?.subtitle)
+  if (subtitle !== undefined) return subtitle
+  const operation = textOf(params._meta?.tool_name) ?? "工具调用"
+  return `${connector} 请求调用 ${operation}${details === "" ? "" : `（${details}）`}`
+}
+
+function rememberHintOf(meta: WireElicitationMeta | null | undefined, connector: string, details: string): string | undefined {
+  if (!supports(meta, "always")) return undefined
+  return `${connector}${details === "" ? "" : ` · ${details}`}`
+}
+
+function requestFor(call: ServerCall, params: WireMcpElicitation): ApprovalAsk {
+  const meta = params._meta
+  const connector = connectorOf(params)
+  const details = detailsOf(meta)
+  const rememberHint = rememberHintOf(meta, connector, details)
+  return {
+    toolCallId: textOf(meta?.tool_call_id) ?? `mcp-elicitation-${String(call.id)}`,
+    tool: connector,
+    summary: textOf(params.message) ?? `${connector} 请求授权`,
+    reason: reasonOf(params, connector, details),
+    // 引擎明确发的是人工授权请求，不能被「本轮剩下的都放行」吞掉。
+    redline: "引擎要求逐项确认这次 MCP 工具授权",
+    ...(rememberHint === undefined ? {} : { rememberHint }),
+  }
+}
+
+/** 用户选的范围 → app-server 的原生持久化字段。 */
+export function elicitationResponse(
+  answer: ApprovalAnswer,
+  meta: WireElicitationMeta | null | undefined,
+): WireMcpElicitationResponse {
+  if (!answer.allow) return { action: "decline", content: null, _meta: null }
+  if (answer.remember === "project" && supports(meta, "always")) {
+    return { action: "accept", content: {}, _meta: { persist: "always" } }
+  }
+  if (answer.remember === "session" && supports(meta, "session")) {
+    return { action: "accept", content: {}, _meta: { persist: "session" } }
+  }
+  return { action: "accept", content: {}, _meta: null }
+}
+
+/**
+ * Computer Use 的应用授权从这条路进来。无法表达的表单明确 cancel，
+ * 不能回 `{}`：那既不是协议里的动作，也会让工具把它误解成莫名其妙的拒绝。
+ */
+export async function answerElicitation(call: ServerCall, deps: ElicitationDeps): Promise<void> {
+  const params = call.params as WireMcpElicitation
+  if (!isBinaryApproval(params)) {
+    call.respond({ action: "cancel", content: null, _meta: null } satisfies WireMcpElicitationResponse)
+    return
+  }
+  const answer = await deps.askUser(requestFor(call, params))
+  call.respond(elicitationResponse(answer, params._meta))
+}

@@ -64,6 +64,7 @@ describe("createRpc 请求应答", () => {
     const { rpc, h } = harness()
     rpc.feed('{"jsonrpc":"2.0","id":7,"method":"item/fileChange/requestApproval","params":{"itemId":"a"}}\n')
     expect(h.requests).toHaveLength(1)
+    expect(h.requests[0]?.id).toBe(7)
     expect(h.requests[0]?.method).toBe("item/fileChange/requestApproval")
   })
 

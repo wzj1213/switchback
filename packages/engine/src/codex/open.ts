@@ -6,6 +6,7 @@ import { resolveCommand } from "../probe.js"
 import type { RpcPeer } from "../rpc.js"
 import { reportAccount } from "./account.js"
 import { claimedCapabilities } from "./claims.js"
+import { raceStartup } from "./startup-deadline.js"
 import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./wire.js"
 
 /**
@@ -65,8 +66,8 @@ const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
 
 /** 握手上限。超过这个还没回 `initialize`，就当它起不来了。 */
 const HANDSHAKE_MS = 20_000
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+/** initialize 已回、开原生 thread 还没回，也不能让界面永远停在 starting。 */
+const OPEN_THREAD_MS = 20_000
 
 /**
  * 把起进程的失败翻成人能照着做的一句话。
@@ -100,7 +101,7 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
   ctx.wire(child)
 
   await handshake(ctx)
-  const started = await openThread(ctx)
+  const started = await openingThread(ctx)
   const id = (started as { thread?: { id?: string } } | undefined)?.thread?.id
   if (id === undefined) throw new Error("codex 没有返回 thread id，无法继续")
   ctx.state.codexThread = id
@@ -126,6 +127,27 @@ function openThread(ctx: OpenCtx): Promise<unknown> {
   if (ctx.req.forkOf !== undefined) return forkThread(ctx, ctx.req.forkOf)
   if (ctx.req.resume === undefined) return ctx.rpc.call("thread/start", shared)
   return ctx.rpc.call("thread/resume", { threadId: ctx.req.resume, ...shared })
+}
+
+function openingLabel(ctx: OpenCtx): string {
+  if (ctx.req.forkOf !== undefined) return "分叉会话（thread/fork）"
+  if (ctx.req.resume !== undefined) return "续接会话（thread/resume）"
+  return "新建会话（thread/start）"
+}
+
+function stderrTail(ctx: OpenCtx): string {
+  return ctx.state.stderr === "" ? "" : `\n${ctx.state.stderr}`
+}
+
+/** 第二段开场也要有和握手同样的退出、超时护栏。 */
+async function openingThread(ctx: OpenCtx): Promise<unknown> {
+  const command = ctx.config.command ?? "codex"
+  const result = await raceStartup(openThread(ctx), ctx.owner.died(), OPEN_THREAD_MS)
+  if (result.kind === "ready") return result.value
+  if (result.kind === "died") throw new Error(startupMessage(command, result.error))
+  throw new Error(
+    `codex 在 ${String(OPEN_THREAD_MS / 1000)} 秒内没有完成${openingLabel(ctx)}，已停止并回收进程。${stderrTail(ctx)}`,
+  )
 }
 
 /**
@@ -169,19 +191,20 @@ async function forkThread(
  */
 async function handshake(ctx: OpenCtx): Promise<void> {
   const command = ctx.config.command ?? "codex"
-  const result = await Promise.race([
+  const result = await raceStartup(
     // **认领什么只有一个来源**（`claims.ts`），代码里不另写一份——
     // 写两份的下场是那张表变成一份没人对照的文档
     ctx.rpc
       .call("initialize", { clientInfo: CLIENT_INFO, capabilities: claimedCapabilities() })
-      .then(() => "ok" as const),
-    ctx.owner.died().then((error) => ({ died: error })),
-    sleep(HANDSHAKE_MS).then(() => "timeout" as const),
-  ])
-  if (typeof result === "object") throw new Error(startupMessage(command, result.died))
-  if (result === "timeout") {
-    const tail = ctx.state.stderr === "" ? "" : `\n${ctx.state.stderr}`
-    throw new Error(`codex 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
+      .then(() => undefined),
+    ctx.owner.died(),
+    HANDSHAKE_MS,
+  )
+  if (result.kind === "died") throw new Error(startupMessage(command, result.error))
+  if (result.kind === "timeout") {
+    throw new Error(
+      `codex 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已停止并回收进程。${stderrTail(ctx)}`,
+    )
   }
   ctx.rpc.notify("initialized")
   // 账号侧的现状（额度、登录）——**在动手之前问**，见 `account.ts`

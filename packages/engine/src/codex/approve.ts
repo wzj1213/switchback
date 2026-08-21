@@ -3,6 +3,7 @@ import type { Trust } from "@omni/protocol"
 import { sanitize } from "../claude/permission.js"
 import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
+import { answerElicitation, MCP_ELICITATION } from "./elicitation.js"
 import type { WireApprovalRequest, WireDecision, WireItem } from "./wire.js"
 
 /**
@@ -116,34 +117,38 @@ export interface AnswerDeps {
 /**
  * **必须每一条都答**——不答 codex 会一直等，整轮就此挂住。
  *
- * 认不出的请求一律回空对象：宁可让 codex 拿到一个它看不懂的应答，
- * 也不能让它无限期等下去。审批类的认不出就拒——默认拒是唯一安全的默认。
+ * MCP elicitation 另走它自己的标准响应；其余认不出的请求回空对象，
+ * 也不能让 codex 无限期等下去。审批类的认不出就拒——默认拒是唯一安全的默认。
  */
 export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promise<void> {
-    if (!call.method.endsWith("requestApproval")) {
-      call.respond({})
-      return
-    }
-    const params = call.params as WireApprovalRequest
-    const item = deps.inflight.get(params.itemId)
-    const request = buildRequest(call.method, params, item, deps.cwd)
-    const verdict = decide(request, {
-      trust: deps.trust(),
-      worksite: deps.cwd,
-      home: deps.home,
-      memory: deps.memory(),
-    })
-    if (verdict.action !== "escalate") {
-      call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })
-      return
-    }
-    const answer = await deps.askUser({
-      toolCallId: params.itemId,
-      tool: toolOf(call.method),
-      summary: request.summary ?? toolOf(call.method),
-      reason: verdict.reason,
-      ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
-      ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
-    })
-    call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
+  if (call.method === MCP_ELICITATION) {
+    await answerElicitation(call, deps)
+    return
+  }
+  if (!call.method.endsWith("requestApproval")) {
+    call.respond({})
+    return
+  }
+  const params = call.params as WireApprovalRequest
+  const item = deps.inflight.get(params.itemId)
+  const request = buildRequest(call.method, params, item, deps.cwd)
+  const verdict = decide(request, {
+    trust: deps.trust(),
+    worksite: deps.cwd,
+    home: deps.home,
+    memory: deps.memory(),
+  })
+  if (verdict.action !== "escalate") {
+    call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })
+    return
+  }
+  const answer = await deps.askUser({
+    toolCallId: params.itemId,
+    tool: toolOf(call.method),
+    summary: request.summary ?? toolOf(call.method),
+    reason: verdict.reason,
+    ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
+    ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
+  })
+  call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
 }

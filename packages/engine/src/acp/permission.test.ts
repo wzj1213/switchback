@@ -55,6 +55,7 @@ function capture(): { call: ServerCall; got: { result: unknown } } {
   return {
     got,
     call: {
+      id: 1,
       method: "session/request_permission",
       params: {
         toolCall: { toolCallId: "c1", kind: "edit", status: "pending" },
@@ -302,6 +303,7 @@ describe("等在途表把命令补齐", () => {
       got,
       // kimi 的审批请求就是这个形状：只有 id 和 title，没有 kind、没有命令
       call: {
+        id: 1,
         method: "session/request_permission",
         params: { toolCall: { toolCallId: "c9", title: "Bash" }, options: REAL_OPTIONS },
         respond: (result: unknown) => {

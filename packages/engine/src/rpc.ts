@@ -14,6 +14,8 @@ export type RequestId = string | number
 
 /** 服务端发来的请求。必须应答——不答 codex 会一直等着，整轮卡死。 */
 export interface ServerCall {
+  /** 对端这次请求的 JSON-RPC id；翻译成宿主 item id 时可作稳定后备。 */
+  id: RequestId
   method: string
   params: unknown
   /** 幂等：重复调用只有第一次生效。 */
@@ -112,6 +114,7 @@ function detailOf(data: unknown): string | undefined {
 function toServerCall(write: Write, id: RequestId, method: string, params: unknown): ServerCall {
   const answered = { done: false }
   return {
+    id,
     method,
     params,
     respond: (result: unknown): void => {

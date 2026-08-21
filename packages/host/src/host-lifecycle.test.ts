@@ -110,6 +110,20 @@ describe("在途去重", () => {
     expect(starts()).toBe(2)
   })
 
+  it("同一条原生会话连点接管只起一个进程——两个 writer 会把其中一条永久卡住", async () => {
+    const { host, starts, events } = slowSetup(60)
+    const adopt = {
+      type: "thread.adopt",
+      engine: "slow",
+      handle: "native-thread-1",
+      cwd: "/w",
+      title: "原生会话",
+    } as const
+    await Promise.all([host.dispatch(adopt), host.dispatch(adopt), host.dispatch(adopt)])
+    expect(starts()).toBe(1)
+    expect(events.filter((event) => event.type === "thread.started")).toHaveLength(1)
+  })
+
   it("**失败也要放行**，否则一次失败就把这个键永久锁死", async () => {
     const { host, starts } = slowSetup(10, true)
     await expect(host.dispatch(slowCreate)).rejects.toThrow()
