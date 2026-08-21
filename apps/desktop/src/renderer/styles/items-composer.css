@@ -35,6 +35,54 @@
   position: relative;
 }
 
+.composer__field--command {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+.composer__field--command .composer__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+/** 已选命令像一枚行内引用，不画成另一张卡；点击或空参数时 Backspace 都能移除。 */
+.command-token {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
+  max-width: 48%;
+  margin: 0;
+  padding: 1px 4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 500;
+  line-height: var(--lh-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.command-token:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.command-token:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.command-token__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /*
  * 光标后面那截灰字：按下 Tab 或回车会补上的东西。
  *
@@ -137,9 +185,6 @@
   background: var(--bg-hover);
 }
 
-
-
-
 /* ── 复制按钮 ─────────────────────────────────────────
  * 悬停才出现，贴在消息右上。常驻的话每条消息右上角都挂一个小按钮，
  * 一屏下来全是噪声。
@@ -185,7 +230,10 @@
   line-height: var(--lh-xs);
   white-space: nowrap;
   cursor: default;
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
 }
 
 .act:hover {
@@ -247,8 +295,6 @@
 .msgacts:focus-within {
   opacity: 1;
 }
-
-
 
 /* ── 输入区上方的芯片：这句话会发到哪儿去 ───────────────
  * 见 components/Chips.tsx。分支这一条不是装饰——

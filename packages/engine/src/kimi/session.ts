@@ -1,18 +1,18 @@
 import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
 import type { EngineSession, StartRequest, TrustChange } from "../contract.js"
-import { promptContent } from "./attach.js"
 import { KimiAsides } from "./aside.js"
-import { toAccount, toCommands, toHistory, toLimits, toModels, type OAuthUsage } from "./catalog.js"
+import { toAccount, toHistory, toLimits, toModels, type OAuthUsage } from "./catalog.js"
 import { sessionPath } from "./http.js"
 import { readKimiTranscript } from "./history.js"
 import { KimiInteractions } from "./interactions.js"
 import { kimiLogPath } from "./log.js"
+import { KimiPrompter } from "./prompt.js"
 import type { KimiLease } from "./server.js"
 import { KimiStateReporter } from "./state.js"
 import { KimiStream, type KimiCursor } from "./stream.js"
 import { KIMI_TRUST } from "./trust.js"
 import { handleTurnEvent, KimiTurnTracker } from "./turn.js"
-import type { KimiFrame, KimiModel, KimiPrompt, KimiSessionRow, KimiSkill, KimiSnapshot, KimiStatus } from "./wire.js"
+import type { KimiFrame, KimiModel, KimiSessionRow, KimiSnapshot, KimiStatus } from "./wire.js"
 
 interface ConfigResponse {
   default_model?: string
@@ -37,6 +37,7 @@ export class KimiSession implements EngineSession {
   private readonly trust: { current: Trust }
   private readonly turn: KimiTurnTracker
   private readonly reporter: KimiStateReporter
+  private readonly prompter: KimiPrompter
   private readonly interactions: KimiInteractions
   private readonly asides: KimiAsides
   private readonly stream: KimiStream
@@ -51,6 +52,7 @@ export class KimiSession implements EngineSession {
   ) {
     this.trust = { current: req.trust }
     this.turn = new KimiTurnTracker({ emit: req.emit, now: () => Date.now() })
+    this.prompter = new KimiPrompter(lease.api, init.id, this.turn)
     this.reporter = new KimiStateReporter(req, () => this.trust.current)
     this.interactions = new KimiInteractions({
       api: lease.api,
@@ -151,48 +153,11 @@ export class KimiSession implements EngineSession {
   }
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
-    const generation = this.turn.begin(turnId, text)
-    try {
-      const content = await promptContent(text, attachments)
-      const prompt = await this.lease.api.post<KimiPrompt>(sessionPath(this.init.id, "/prompts"), { content })
-      if (prompt.status !== "running") {
-        await this.cancelPrompt(prompt.prompt_id)
-        throw new Error(`Kimi 没有开始这一轮（状态：${prompt.status}）`)
-      }
-      this.turn.promptAccepted(generation, prompt.prompt_id)
-    } catch (error) {
-      this.turn.failGeneration(generation, errorText(error))
-      throw error
-    }
+    await this.prompter.prompt(text, turnId, attachments)
   }
 
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
-    const generation = this.turn.currentGeneration()
-    if (generation === undefined) throw new Error("Kimi 没有正在运行的轮次，无法改向")
-    const content = await promptContent(text, attachments)
-    const prompt = await this.lease.api.post<KimiPrompt>(sessionPath(this.init.id, "/prompts"), { content })
-    if (prompt.status !== "queued" || !this.turn.isActive(generation)) {
-      await this.cancelPrompt(prompt.prompt_id)
-      throw new Error("Kimi 的上一轮刚好已经结束，这句话改为排队发送")
-    }
-    try {
-      await this.lease.api.post(sessionPath(this.init.id, "/prompts:steer"), { prompt_ids: [prompt.prompt_id] })
-    } catch (error) {
-      await this.cancelPrompt(prompt.prompt_id)
-      throw error
-    }
-  }
-
-  private async cancelPrompt(promptId: string): Promise<void> {
-    try {
-      await this.lease.api.post(sessionPath(this.init.id, `/prompts/${encodeURIComponent(promptId)}:abort`))
-    } catch (error) {
-      try {
-        await this.lease.api.post(sessionPath(this.init.id, ":abort"), {})
-      } catch {
-        throw error
-      }
-    }
+    await this.prompter.steer(text, attachments)
   }
 
   async setTitle(title: string): Promise<void> {
@@ -244,8 +209,7 @@ export class KimiSession implements EngineSession {
   }
 
   async commands(): Promise<readonly SlashCommand[]> {
-    const raw = await this.lease.api.get<{ skills: readonly KimiSkill[] }>(sessionPath(this.init.id, "/skills"))
-    return toCommands(raw.skills)
+    return this.prompter.commands()
   }
 
   async compact(): Promise<void> {

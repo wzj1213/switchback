@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { toCommands, toHistory, toLimits, toModels } from "./catalog.js"
+import { toHistory, toLimits, toModels } from "./catalog.js"
 
 describe("Kimi 清单翻译", () => {
   it("模型保留原生强度并标出 Kimi 的默认项", () => {
@@ -16,7 +16,7 @@ describe("Kimi 清单翻译", () => {
     ])
   })
 
-  it("历史缺句柄或 cwd 就不列，技能来源翻成 scope", () => {
+  it("历史缺句柄或 cwd 就不列", () => {
     const base = { title: "", busy: false, agent_config: {}, usage: undefined }
     expect(
       toHistory([
@@ -24,9 +24,6 @@ describe("Kimi 清单翻译", () => {
         { ...base, id: "", metadata: { cwd: "/w" } },
       ]),
     ).toEqual([{ handle: "s1", title: "第一句", cwd: "/w", updatedAt: 1787184000000 }])
-    expect(toCommands([{ name: "review", description: "审查", source: "user" }])).toEqual([
-      { name: "review", description: "审查", source: "engine", scope: "user" },
-    ])
   })
 
   it("账号周期换成协议使用的分钟和百分比", () => {

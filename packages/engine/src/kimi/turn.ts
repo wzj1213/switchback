@@ -19,6 +19,7 @@ interface Active {
   turnId: TurnId
   prompt: string
   promptId?: string
+  activationAccepted: boolean
   native?: number
   assistant: TextState
   reasoning: TextState
@@ -54,6 +55,7 @@ export class KimiTurnTracker {
       generation,
       turnId,
       prompt,
+      activationAccepted: false,
       assistant: textState(turnId, "agent_message"),
       reasoning: textState(turnId, "reasoning"),
       tools: new Map(),
@@ -66,6 +68,10 @@ export class KimiTurnTracker {
 
   promptAccepted(generation: number, promptId: string): void {
     if (this.active?.generation === generation) this.active.promptId = promptId
+  }
+
+  activationAccepted(generation: number): void {
+    if (this.active?.generation === generation) this.active.activationAccepted = true
   }
 
   isActive(generation: number): boolean {
@@ -292,11 +298,11 @@ export class KimiTurnTracker {
     if (flight === null) {
       // `begin()` 发生在图片编码与 POST 之前；这段窗口里的空闲快照说的是旧状态，
       // 不能拿它把刚创建、甚至还没送到服务端的新轮次提前收掉。
-      if (!snapshotCanFinish(active.promptId, snapshot)) return
+      if (!snapshotCanFinish(active.promptId !== undefined || active.activationAccepted, snapshot)) return
       this.complete(active, kimiTurnStatus(snapshot.session.last_turn_reason), at)
       return
     }
-    if (!snapshotMatches(active.native, active.promptId, snapshot)) return
+    if (!snapshotMatches(active.native, active.promptId, active.activationAccepted, snapshot)) return
     if (this.bind(flight.turn_id) === undefined) return
     active.promptId ??= flight.current_prompt_id
     this.syncText(active.reasoning, active, flight.thinking_text, at)

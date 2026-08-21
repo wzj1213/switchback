@@ -53,6 +53,7 @@ export interface KimiSkill {
   name: string
   description?: string
   source?: string
+  type?: string
   disable_model_invocation?: boolean
 }
 
@@ -61,9 +62,12 @@ export interface KimiPrompt {
   status: "running" | "queued" | "completed" | "aborted"
 }
 
-export type KimiContent =
-  | { type: "text"; text: string }
-  | { type: "image"; source: { kind: "base64"; media_type: string; data: string } }
+export interface KimiImageContent {
+  type: "image"
+  source: { kind: "base64"; media_type: string; data: string }
+}
+
+export type KimiContent = { type: "text"; text: string } | KimiImageContent
 
 export type KimiToolDisplay =
   | { kind: "command"; command: string; cwd?: string; description?: string }

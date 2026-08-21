@@ -14,21 +14,22 @@ export function kimiTurnStatus(reason: string | undefined): TurnStatus {
   return "failed"
 }
 
-/** 空闲快照只有在 POST 已被接受后，才足以证明当前轮真的结束了。 */
-export function snapshotCanFinish(promptId: string | undefined, snapshot: KimiSnapshot): boolean {
-  return !snapshot.session.busy && promptId !== undefined
+/** 空闲快照只有在普通 prompt 或 skill activation 已被接受后，才足以证明当前轮真的结束了。 */
+export function snapshotCanFinish(accepted: boolean, snapshot: KimiSnapshot): boolean {
+  return accepted && !snapshot.session.busy
 }
 
 /** 原生 turn id 优先；尚未见到它时才用初始 prompt id 防串轮。 */
 export function snapshotMatches(
   native: number | undefined,
   promptId: string | undefined,
+  activationAccepted: boolean,
   snapshot: KimiSnapshot,
 ): boolean {
   const flight = snapshot.in_flight_turn
   if (flight === null) return false
   if (native !== undefined) return native === flight.turn_id
-  if (promptId === undefined) return false
+  if (promptId === undefined) return activationAccepted
   const current = flight.current_prompt_id ?? snapshot.session.current_prompt_id ?? undefined
   return current === promptId
 }

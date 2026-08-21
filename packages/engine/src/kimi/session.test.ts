@@ -104,6 +104,73 @@ describe("Kimi 会话插话", () => {
   })
 })
 
+describe("Kimi skill 命令", () => {
+  it("内置与外部 skill 都走原生 activate，不再作为普通提示词发送", async () => {
+    const cases = [
+      {
+        skill: { name: "write-goal", description: "写目标", source: "builtin" },
+        command: "write-goal",
+        prompt: "/write-goal 发布稳定版",
+        path: "sessions/s1/skills/write-goal:activate",
+        body: { args: "发布稳定版" },
+      },
+      {
+        skill: { name: "review", description: "审查", source: "user" },
+        command: "skill:review",
+        prompt: "/skill:review --fix",
+        path: "sessions/s1/skills/review:activate",
+        body: { args: "--fix" },
+      },
+    ] as const
+
+    for (const row of cases) {
+      const posts: { path: string; body: unknown }[] = []
+      const api: KimiApi = {
+        get: <T>() => Promise.resolve({ skills: [row.skill] } as T),
+        post: <T>(path: string, body?: unknown) => {
+          posts.push({ path, body })
+          return Promise.resolve({ activated: true, skill_name: row.skill.name } as T)
+        },
+      }
+      const session = new KimiSession(request([]), lease(api), {
+        id: "s1",
+        status: { busy: false, model: "k2" },
+        snapshot: snapshot(),
+      })
+
+      await expect(session.commands()).resolves.toMatchObject([{ name: row.command }])
+      await session.prompt(row.prompt, "turn-skill")
+      expect(posts[0]).toEqual({ path: row.path, body: row.body })
+      expect(posts.some((post) => post.path === "sessions/s1/prompts")).toBe(false)
+      await session.dispose()
+    }
+  })
+
+  it("Kimi Web UI 自己的控制命令不冒充引擎上报 skill", async () => {
+    const posts: { path: string; body: unknown }[] = []
+    const api: KimiApi = {
+      get: <T>() => Promise.resolve({ skills: [{ name: "write-goal", source: "builtin" }] } as T),
+      post: <T>(path: string, body?: unknown) => {
+        posts.push({ path, body })
+        return Promise.resolve({ prompt_id: "p1", status: "running" } as T)
+      },
+    }
+    const session = new KimiSession(request([]), lease(api), {
+      id: "s1",
+      status: { busy: false, model: "k2" },
+      snapshot: snapshot(),
+    })
+
+    await session.commands()
+    await session.prompt("/goal status", "turn-goal")
+    expect(posts[0]).toEqual({
+      path: "sessions/s1/prompts",
+      body: { content: [{ type: "text", text: "/goal status" }] },
+    })
+    await session.dispose()
+  })
+})
+
 describe("Kimi 写操作后的状态读回", () => {
   it("默认配置读不到时仍保留服务端已经给出的模型清单", async () => {
     const events: Event[] = []

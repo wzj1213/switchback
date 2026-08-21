@@ -206,6 +206,25 @@ describe("Kimi 轮次事件", () => {
     expect(events).toEqual([{ type: "turn.completed", at: 0, turnId: "omni-turn", status: "completed" }])
   })
 
+  it("skill activation 没有 prompt id 时，接受后的快照仍能绑定并收工", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    const generation = tracker.begin("omni-turn", "/write-goal 新目标")
+    tracker.activationAccepted(generation)
+    tracker.reconcile(runningSnapshot("skill 回答"))
+    const snapshot = runningSnapshot("")
+    tracker.reconcile({
+      ...snapshot,
+      session: { ...snapshot.session, busy: false, last_turn_reason: "completed" },
+      in_flight_turn: null,
+    })
+    expect(events).toMatchObject([
+      { type: "item.started", item: { kind: "agent_message", text: "skill 回答" } },
+      { type: "item.updated", item: { kind: "agent_message", text: "skill 回答", complete: true } },
+      { type: "turn.completed", turnId: "omni-turn", status: "completed" },
+    ])
+  })
+
   it("POST 前的外来 in-flight 快照不能抢先绑定宿主新轮次", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })

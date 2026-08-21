@@ -1,7 +1,6 @@
 import { useState } from "react"
 import type { SlashCommand } from "@omni/protocol"
 import { SendIcon, StopIcon } from "./icons.js"
-import { applyCommand } from "../slash.js"
 
 /*
  * 输入区右下角那颗键，以及「选中一条命令之后往哪走」。
@@ -58,7 +57,14 @@ export function Action({
     )
   }
   return (
-    <button className="send" type="button" title="发送（⌘↵）" aria-label="发送" onClick={onSend} disabled={empty}>
+    <button
+      className="send"
+      type="button"
+      title="发送（⌘↵）"
+      aria-label="发送"
+      onClick={onSend}
+      disabled={empty}
+    >
       <SendIcon />
     </button>
   )
@@ -104,12 +110,15 @@ function Resume({ onResume }: { onResume?: () => void }): React.JSX.Element {
 export function takeCommand(
   command: SlashCommand,
   setText: (text: string) => void,
+  setCommand: (command: SlashCommand | undefined) => void,
   onOmni: (name: string) => void,
 ): void {
   if (command.source === "omni") {
     setText("")
+    setCommand(undefined)
     onOmni(command.name)
     return
   }
-  setText(applyCommand(command).text)
+  setText("")
+  setCommand(command)
 }

@@ -28,7 +28,8 @@
 - `kimi/` —— `kimi web` 驱动（本机 bearer REST + WebSocket）
   - `server.ts` 只接 loopback 地址，一份私有服务由活跃 Kimi 会话共享，最后一条释放时回收
   - `http.ts` / `stream.ts` 负责原生 envelope、游标补发、断线快照恢复
-  - `session.ts` 接会话、插话、审批、模型、档位、历史、侧问与归档
+  - `session.ts` 接会话、审批、模型、档位、历史、侧问与归档；`prompt.ts` 接普通提示与插话
+  - `skill.ts` 只投影 Kimi 上报的可激活 skill，并通过公开 `:activate` 入口执行
   - `wire.ts` 是 Kimi 服务自己公开的 OpenAPI / AsyncAPI 的窄声明
   - `log.ts` 只负责定位 Kimi 保存的全量 `wire.jsonl`，供跨引擎接力引用
 - `acp/` —— 通用 ACP over stdio 驱动（Agent Client Protocol）
@@ -97,6 +98,10 @@
   两者都走同一个 SDK 驱动、原生鉴权与设置，不是两套行为实现。
 - **内置 Kimi 要求带 `web` 子命令与公开 API 的 Kimi Code。** 当前验收版本是 0.37.2；
   启动后还会读 `/meta` 确认 WebSocket 与 bearer 鉴权，缺能力就明确失败，不回退 ACP。
+- **Kimi Web API 只列 skills，不列它自己 Web/TUI 的完整控制命令。** 0.38.0 的公开 OpenAPI 仍只有
+  `GET /skills` 与 `POST /skills/{name}:activate`，没有 commands list/run；`/goal`、`/plan`、`/login`
+  等是 Kimi Web 客户端自己合并的本地菜单。驱动不复制这份私有静态表，只展示并原生激活服务端上报的
+  skills；计划档、压缩、侧问等已有公开能力由各自的 omni 界面入口承载。
 - **Kimi 的 steer 在同一原生 turn 的下一模型 step 前生效。** 它不会掐断已经发出的单次
   模型请求，也不会杀掉正在执行的工具；工具或当前生成结束后，插话才进入下一 step。
 - **Kimi 的结构化多选问题还没有对应的 omni UI 契约。** 驱动会明确报出问题摘要并调用

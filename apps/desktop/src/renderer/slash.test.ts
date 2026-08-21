@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest"
 import type { SlashCommand } from "@omni/protocol"
-import { applyCommand, ghostOf, markOf, matchCommands, slashAt } from "./slash.js"
+import {
+  applyCommand,
+  commandLabel,
+  commandText,
+  ghostOf,
+  markOf,
+  matchCommands,
+  slashAt,
+} from "./slash.js"
 
-const cmd = (name: string, description = "", source: SlashCommand["source"] = "engine"): SlashCommand => ({
+const cmd = (
+  name: string,
+  description = "",
+  source: SlashCommand["source"] = "engine",
+): SlashCommand => ({
   name,
   description,
   source,
@@ -105,6 +117,19 @@ describe("选中之后输入框里是什么", () => {
   it("补一个空格，光标停在后面——**不直接发出去**，带参数的还等着填", () => {
     expect(applyCommand(cmd("code-review"))).toEqual({ text: "/code-review ", caret: 13 })
   })
+
+  it("token 显示人话名称，发送时仍还原成引擎原文", () => {
+    const skill = cmd("skill:log-analyzer")
+    expect(commandLabel(skill)).toBe("Log Analyzer")
+    expect(commandText(skill, "  --tail 50 ")).toBe("/skill:log-analyzer --tail 50")
+    expect(commandText(skill, "")).toBe("/skill:log-analyzer")
+  })
+
+  it("引擎给了 label 就不擅自改写", () => {
+    const command = { ...cmd("review"), label: "代码审查" }
+    expect(commandLabel(command)).toBe("代码审查")
+    expect(commandText(undefined, " 普通消息 ")).toBe("普通消息")
+  })
 })
 
 describe("不该出现在面板里的", () => {
@@ -121,16 +146,31 @@ describe("不该出现在面板里的", () => {
   })
 
   it("中文名也能筛：面板上写的是「新建会话」，人自然按它打", () => {
-    const c: SlashCommand = { name: "new", label: "新建会话", description: "在当前工作区另开一个", source: "omni" }
+    const c: SlashCommand = {
+      name: "new",
+      label: "新建会话",
+      description: "在当前工作区另开一个",
+      source: "omni",
+    }
     expect(matchCommands([c], "新建").map((x) => x.name)).toEqual(["new"])
   })
 })
 
 describe("名字里打中的那几个字", () => {
-  const cases: { name: string; text: string; query: string; want: readonly [string, string, string] | undefined }[] = [
+  const cases: {
+    name: string
+    text: string
+    query: string
+    want: readonly [string, string, string] | undefined
+  }[] = [
     { name: "打头的那几个字", text: "/deck", query: "de", want: ["/", "de", "ck"] },
     { name: "中间也算——`/model` 里的 `de`", text: "/model", query: "de", want: ["/mo", "de", "l"] },
-    { name: "大小写不敏感，但切出来的是原文", text: "/DBQuery", query: "dbq", want: ["/", "DBQ", "uery"] },
+    {
+      name: "大小写不敏感，但切出来的是原文",
+      text: "/DBQuery",
+      query: "dbq",
+      want: ["/", "DBQ", "uery"],
+    },
     { name: "没打中就不指", text: "/deck", query: "zz", want: undefined },
     { name: "还没打字就不指——一进来全表加粗等于没加粗", text: "/deck", query: "", want: undefined },
     { name: "中文名一样能打中", text: "新建会话", query: "会话", want: ["新建", "会话", ""] },
@@ -143,19 +183,30 @@ describe("名字里打中的那几个字", () => {
 })
 
 describe("光标后面那截灰字", () => {
-  const cases: { name: string; command: SlashCommand | undefined; query: string; want: string }[] = [
-    { name: "补上剩下那半截", command: cmd("deck"), query: "de", want: "ck" },
-    { name: "整条打完了就没得补", command: cmd("deck"), query: "deck", want: "" },
-    { name: "还没打字不猜——那时排第一的只是字母序的巧合", command: cmd("deck"), query: "", want: "" },
-    { name: "一条候选都没有", command: undefined, query: "de", want: "" },
-    {
-      name: "大小写对不上就不补：拼出来的 `/dbQuery` 不是任何一条命令",
-      command: cmd("DBQuery"),
-      query: "db",
-      want: "",
-    },
-    { name: "命中在中间的（`/model` 配 `de`）也不补——灰字只能接在后面", command: cmd("model"), query: "de", want: "" },
-  ]
+  const cases: { name: string; command: SlashCommand | undefined; query: string; want: string }[] =
+    [
+      { name: "补上剩下那半截", command: cmd("deck"), query: "de", want: "ck" },
+      { name: "整条打完了就没得补", command: cmd("deck"), query: "deck", want: "" },
+      {
+        name: "还没打字不猜——那时排第一的只是字母序的巧合",
+        command: cmd("deck"),
+        query: "",
+        want: "",
+      },
+      { name: "一条候选都没有", command: undefined, query: "de", want: "" },
+      {
+        name: "大小写对不上就不补：拼出来的 `/dbQuery` 不是任何一条命令",
+        command: cmd("DBQuery"),
+        query: "db",
+        want: "",
+      },
+      {
+        name: "命中在中间的（`/model` 配 `de`）也不补——灰字只能接在后面",
+        command: cmd("model"),
+        query: "de",
+        want: "",
+      },
+    ]
   for (const c of cases) {
     it(c.name, () => {
       expect(ghostOf(c.command, c.query)).toBe(c.want)

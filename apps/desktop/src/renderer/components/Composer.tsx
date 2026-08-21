@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react"
 import { Prompt } from "./Prompt.js"
 import { takeCommand } from "./ComposerAction.js"
 import { Chips } from "./Chips.js"
@@ -7,6 +6,7 @@ import { Bar } from "./ComposerBar.js"
 import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
+import { useComposerDraft } from "../use-composer-draft.js"
 
 /**
  * 信任档。
@@ -126,145 +126,89 @@ function projectOf(cwd: string): string {
   return cwd.split("/").filter(Boolean).pop() ?? cwd
 }
 
-/**
- * 把「改一改再发」塞回来的文本填进输入框。
- *
- * **只认序号变化，不认文本变化。** 依赖文本的话，用户在输入框里把它改回原样，
- * 这个 effect 会再跑一次、把光标弹到末尾。
- */
-function usePrefill(
-  prefill: { text: string; at: number } | undefined,
-  setText: (text: string) => void,
-): void {
-  const seen = useRef(prefill?.at ?? 0)
-  useEffect(() => {
-    if (prefill === undefined || prefill.at === seen.current) return
-    seen.current = prefill.at
-    setText(prefill.text)
-  }, [prefill, setText])
-}
-
-/**
- * 「发出去」这一下具体做什么。
- *
- * 抽成 hook 是行数闸门逼的，但边界也对：上面那个组件管「长什么样」，
- * 这里管「按下去发生什么」——和 `Prompt` / `onPromptKey` 同一刀。
- */
-function useSubmit(o: {
-  text: string
-  attach: ReturnType<typeof useAttachments>
-  blocked: boolean
-  steering: boolean
-  setText: (text: string) => void
-  onSend: Props["onSend"]
-}): (steer?: boolean) => void {
-  return (steer = false): void => {
-    const trimmed = o.text.trim()
-    // **只有附件、没有文字也该能发**：贴一张报错截图问「这是怎么回事」，
-    // 那句话经常就在图里
-    if ((trimmed === "" && o.attach.paths.length === 0) || o.blocked) return
-    // 没在跑的时候 `steer` 没有意义（下面那层会照常开新轮次），传过去也无害
-    o.onSend(trimmed, o.attach.paths, steer && o.steering)
-    o.setText("")
-    o.attach.clear()
-  }
-}
-
-export function Composer({
-  detached = false,
-  engine,
-  engines,
-  trust,
-  onEngineChange,
-  onTrustChange,
-  hint,
-  blind,
-  aside,
-  onSend,
-  onResume,
-  models,
-  model,
-  effort,
-  pending,
-  onModelChange,
-  cwd,
-  stamp,
-  passing,
-  busy = false,
-  starting = false,
-  onInterrupt,
-  searchFiles,
-  commands,
-  onOmni,
-  canAttach,
-  canSteer,
-  prefill,
-}: Props): React.JSX.Element {
-  const [text, setText] = useState("")
+export function Composer(props: Props): React.JSX.Element {
+  const detached = props.detached ?? false
+  const busy = props.busy ?? false
+  const starting = props.starting ?? false
   // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
-  const attach = useAttachments(canAttach)
-  usePrefill(prefill, setText)
+  const attach = useAttachments(props.canAttach)
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
-  const { blocked, queueing, steering } = stateOf({ detached, starting, busy, canSteer })
-  const submit = useSubmit({ text, attach, blocked, steering, setText, onSend })
+  const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
+  const draft = useComposerDraft({
+    prefill: props.prefill,
+    engine: props.engine,
+    attach,
+    blocked: mode.blocked,
+    steering: mode.steering,
+    onSend: props.onSend,
+  })
 
   return (
     <div className="composer">
       <div
         className="composer__inner"
         onDragOver={(e) => {
-          if (canAttach) e.preventDefault()
+          if (props.canAttach) e.preventDefault()
         }}
         onDrop={(e) => {
-          if (!canAttach) return
+          if (!props.canAttach) return
           e.preventDefault()
           attach.drop(e.dataTransfer.files)
         }}
       >
         {detached ? null : (
-          <Chips cwd={cwd} project={projectOf(cwd)} stamp={stamp} passing={passing} />
+          <Chips
+            cwd={props.cwd}
+            project={projectOf(props.cwd)}
+            stamp={props.stamp}
+            passing={props.passing}
+          />
         )}
         {/* 附件排在芯片**下面**、正文上面。芯片说的是「这句话会发到哪儿去」，
             是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
             反过来放的话，贴一张图就把抬头顶下去 72 像素 */}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
         <Prompt
-          value={text}
+          value={draft.text}
           detached={detached}
           starting={starting}
-          queueing={queueing}
-          steering={steering}
-          cwd={cwd}
+          queueing={mode.queueing}
+          steering={mode.steering}
+          cwd={props.cwd}
           onPaste={attach.paste}
-          commands={commands}
+          commands={props.commands}
+          command={draft.command}
+          onClearCommand={() => draft.setCommand(undefined)}
           onCommand={(command) => {
-            takeCommand(command, setText, onOmni)
+            takeCommand(command, draft.setText, draft.setCommand, props.onOmni)
           }}
-          searchFiles={searchFiles}
-          onChange={setText}
-          onSubmit={submit}
+          searchFiles={props.searchFiles}
+          onChange={draft.setText}
+          onSubmit={draft.submit}
         />
         <Bar
           detached={detached}
           busy={busy}
           starting={starting}
-          empty={text.trim() === ""}
-          engine={engine}
-          engines={engines}
-          trust={trust}
-          models={models}
-          model={model}
-          effort={effort}
-          pending={pending}
-          onEngineChange={onEngineChange}
-          onTrustChange={onTrustChange}
-          hint={hint}
-          blind={blind}
-          aside={aside}
-          onModelChange={onModelChange}
-          onResume={onResume}
-          onInterrupt={onInterrupt}
-          onSend={submit}
+          empty={
+            draft.text.trim() === "" && draft.command === undefined && attach.paths.length === 0
+          }
+          engine={props.engine}
+          engines={props.engines}
+          trust={props.trust}
+          models={props.models}
+          model={props.model}
+          effort={props.effort}
+          pending={props.pending}
+          onEngineChange={props.onEngineChange}
+          onTrustChange={props.onTrustChange}
+          hint={props.hint}
+          blind={props.blind}
+          aside={props.aside}
+          onModelChange={props.onModelChange}
+          onResume={props.onResume}
+          onInterrupt={props.onInterrupt}
+          onSend={draft.submit}
         />
       </div>
     </div>

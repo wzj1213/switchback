@@ -1,5 +1,5 @@
-import type { EngineAccount, EngineThread, ModelOption, RateLimits, SlashCommand } from "@omni/protocol"
-import type { KimiModel, KimiSessionRow, KimiSkill } from "./wire.js"
+import type { EngineAccount, EngineThread, ModelOption, RateLimits } from "@omni/protocol"
+import type { KimiModel, KimiSessionRow } from "./wire.js"
 
 const HISTORY_MAX = 40
 const TITLE_MAX = 60
@@ -33,22 +33,6 @@ export function toModels(rows: readonly KimiModel[], defaultModel: string | unde
     ...(row.support_efforts === undefined || row.support_efforts.length === 0 ? {} : { efforts: row.support_efforts }),
     ...(row.default_effort === undefined ? {} : { defaultEffort: row.default_effort }),
     ...(row.model === defaultModel ? { isDefault: true } : {}),
-  }))
-}
-
-function skillScope(source: string | undefined): SlashCommand["scope"] {
-  if (source === "user") return "user"
-  if (source === "workspace" || source === "project") return "project"
-  if (source === "builtin" || source === "system") return "system"
-  return undefined
-}
-
-export function toCommands(rows: readonly KimiSkill[]): readonly SlashCommand[] {
-  return rows.map((row) => ({
-    name: row.name,
-    description: row.description ?? "",
-    source: "engine" as const,
-    ...(skillScope(row.source) === undefined ? {} : { scope: skillScope(row.source) }),
   }))
 }
 

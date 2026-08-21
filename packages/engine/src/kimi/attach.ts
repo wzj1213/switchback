@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises"
-import type { KimiContent } from "./wire.js"
+import type { KimiContent, KimiImageContent } from "./wire.js"
 
 const MIME: Readonly<Record<string, string>> = {
   jpg: "image/jpeg",
@@ -14,9 +14,9 @@ export function imageMime(path: string): string {
   return MIME[ext] ?? "image/png"
 }
 
-/** Kimi 的公开 prompt schema 接受 base64 image source；读失败必须明确抛错，不能假装图片送到了。 */
-export async function promptContent(text: string, attachments?: readonly string[]): Promise<readonly KimiContent[]> {
-  const content: KimiContent[] = text === "" ? [] : [{ type: "text", text }]
+/** prompt 与 skill activation 共用 Kimi 公开的 base64 image source。 */
+export async function attachmentContent(attachments?: readonly string[]): Promise<readonly KimiImageContent[]> {
+  const content: KimiImageContent[] = []
   for (const path of attachments ?? []) {
     const data = await readFile(path)
     content.push({
@@ -24,6 +24,13 @@ export async function promptContent(text: string, attachments?: readonly string[
       source: { kind: "base64", media_type: imageMime(path), data: data.toString("base64") },
     })
   }
+  return content
+}
+
+/** Kimi 的公开 prompt schema 接受 base64 image source；读失败必须明确抛错，不能假装图片送到了。 */
+export async function promptContent(text: string, attachments?: readonly string[]): Promise<readonly KimiContent[]> {
+  const content: KimiContent[] = text === "" ? [] : [{ type: "text", text }]
+  content.push(...(await attachmentContent(attachments)))
   if (content.length === 0) throw new Error("Kimi 的提示内容不能为空")
   return content
 }

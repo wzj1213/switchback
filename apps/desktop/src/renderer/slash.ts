@@ -53,7 +53,8 @@ function score(command: SlashCommand, query: string): number | undefined {
   const q = query.toLowerCase()
   const name = command.name.toLowerCase()
   // 中文名也参与前缀匹配：面板上显示的是「新建会话」，人自然会按它去筛
-  if (command.label !== undefined && command.label.toLowerCase().startsWith(q)) return 100 - name.length
+  if (command.label !== undefined && command.label.toLowerCase().startsWith(q))
+    return 100 - name.length
   // 前缀最像：打 `/re` 时 `/review` 该排在 `/code-review` 前面
   if (name.startsWith(q)) return 100 - name.length
   if (name.includes(q)) return 50 - name.length
@@ -178,4 +179,23 @@ export function matchCommands(
 export function applyCommand(command: SlashCommand): { text: string; caret: number } {
   const text = `/${command.name} `
   return { text, caret: text.length }
+}
+
+/** token 给人读的名字；底层 `name` 始终原样保留给引擎。 */
+export function commandLabel(command: SlashCommand): string {
+  const explicit = command.label?.trim()
+  if (explicit !== undefined && explicit !== "") return explicit
+  const raw = command.name.replace(/^skill:/, "").replace(/([a-z\d])([A-Z])/g, "$1 $2")
+  return raw
+    .split(/[-_.]+/)
+    .filter((part) => part !== "")
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ")
+}
+
+/** rich token + 参数重新合成引擎真正接收的斜杠文本。 */
+export function commandText(command: SlashCommand | undefined, args: string): string {
+  const suffix = args.trim()
+  if (command === undefined) return suffix
+  return suffix === "" ? `/${command.name}` : `/${command.name} ${suffix}`
 }
