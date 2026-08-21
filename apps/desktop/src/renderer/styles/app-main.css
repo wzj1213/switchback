@@ -522,10 +522,14 @@
   cursor: default;
 }
 
-.tbtn:hover {
+.tbtn:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--border-strong);
   color: var(--text);
+}
+
+.tbtn:disabled {
+  opacity: 0.55;
 }
 
 /* ── 空会话 ───────────────────────────────────────────

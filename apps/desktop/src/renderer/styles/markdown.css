@@ -63,13 +63,31 @@
   margin: 0;
 }
 
-.md a {
+.outlink {
   color: var(--accent);
   text-decoration: none;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
-.md a:hover {
+.outlink__icon {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
+.outlink:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.outlink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .md strong {

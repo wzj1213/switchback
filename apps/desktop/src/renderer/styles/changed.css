@@ -1,0 +1,229 @@
+/* 会话截至当前的变更账。它是对话结果的一部分，跟着正文滚动。 */
+.changed {
+  margin-top: var(--sp-1);
+}
+
+.changed__card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.changed__head {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: var(--sp-1) var(--sp-2);
+}
+
+.changed__summary {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.changed__summary:hover {
+  background: var(--bg-hover);
+}
+
+.changed__summary:active {
+  background: var(--bg-press);
+}
+
+.changed__glyph {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+}
+
+.changed__copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.changed__title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--lh-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changed__total {
+  display: flex;
+  gap: 5px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.changed__chev {
+  display: flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+.changed__review {
+  flex: none;
+  padding: 4px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.changed__review:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.changed__list {
+  max-height: 36vh;
+  overflow-y: auto;
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.changed__file > .diff {
+  margin: 0 var(--sp-1) var(--sp-2);
+}
+
+.changed__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 28px;
+  padding: 2px var(--sp-1);
+  border-radius: var(--radius-sm);
+}
+
+.changed__row:hover {
+  background: var(--bg-hover);
+}
+
+.changed__name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: var(--lh-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.changed__dir {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changed__base {
+  flex: none;
+  font-weight: 500;
+}
+
+.changed__stat {
+  display: flex;
+  flex: none;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.changed__act {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.changed__row:hover .changed__act,
+.changed__act:focus-visible {
+  opacity: 1;
+}
+
+.changed__act:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.changed__others {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: 1px solid var(--border);
+}
+
+.changed__note {
+  margin: 0;
+  padding: 3px var(--sp-1) 5px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.changed__name--flat {
+  cursor: default;
+}
+
+.changed__more {
+  width: 100%;
+  padding: 5px var(--sp-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.changed__more:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}

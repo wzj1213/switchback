@@ -1,114 +1,106 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import type { Item } from "@omni/protocol"
-import { changesOf, type ChangedFile } from "../tool.js"
-import { FileDiff } from "./Diff.js"
+import { changesOf, relPath, type ChangedFile } from "../tool.js"
 import { splitPath } from "../diff.js"
-import { RevealIcon, CopyIcon } from "./icons.js"
+import { FileDiff } from "./Diff.js"
+import { ChevronIcon, CopyIcon, RevealIcon } from "./icons.js"
+import { PencilIcon } from "./icons-activity.js"
+import { ChangedOthers, CHANGED_PREVIEW, useOtherChanges } from "./changed-others.js"
 
-/**
- * 「N 个文件已更改 +A −B」，挂在输入框上方。**点得开。**
- *
- * ## 它回答的是「我可以走了吗」
- *
- * agent 跑了十分钟，你要提交之前想知道它总共动了多少。这件事在 transcript 里是散的
- * （分布在十几条编辑行上），没人加起来的话只能自己往回翻着数。
- *
- * ## 为什么上一版那枚胶囊不够
- *
- * 它只有一个总数，而且**点不动**——`changesOf` 把逐个文件的账算出来之后当场扔掉。
- * 于是「4 个文件」这句话之后，你还是得自己往回翻去找是哪四个。
- * 现在点开就是那四行：路径、各自的增删、点一行看它最后被改成什么样。
- *
- * ## 排序按「首次出现」，不按字母
- *
- * 你回头找的是「它刚才动的那个」，那多半在后面（见 `changesOf`）。
- *
- * ## 一个必须说出来的边界
- *
- * 这里的账**只认编辑类工具报上来的改动**。引擎用 shell 直接写文件
- *（`sed -i`、`>` 重定向、跑一个生成脚本）一个都不算——那类改动 omni 看不见，
- * 它只看见「跑了一条命令」。所以这枚胶囊说的是「**它报告它改了这些**」，
- * 不是「工作区里变了这些」。后者要问 git，那是另一件事。
- */
-const FOLD_AT = 5
-
-export function Changed({ items, cwd, stamp, onReveal, onCopy, onReview }: {
+interface Props {
   items: readonly Item[]
-  /** 工作区。展开时要问它一次 git。 */
   cwd: string
-  /** 轮次戳：变一次就重问一遍 git——引擎跑完一轮，工作区就不一样了。 */
   stamp: string
-  /** 在访达里定位。 */
   onReveal: (path: string) => void
   onCopy: (text: string) => void
-  /**
-   * 打开审核面板（⇧⌘R 也走同一条）。
-   *
-   * **入口放在这枚胶囊旁边**：这里正是「跑完一轮之后眼睛落的地方」，
-   * 而「看了总数之后想逐个过一遍」是紧接着的下一个动作。埋进菜单里的话，
-   * 多数人一年也发现不了它。
-   */
   onReview: () => void
-}): React.JSX.Element | null {
+}
+
+/** 会话截至当前的变更账：总数 → 文件清单 → 单文件最后一份补丁。 */
+export function Changed({
+  items,
+  cwd,
+  stamp,
+  onReveal,
+  onCopy,
+  onReview,
+}: Props): React.JSX.Element | null {
   const { files, added, removed, list } = changesOf(items)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [all, setAll] = useState(false)
-  // **不等展开才问 git**：引擎跑完 `pnpm build` 改了三十个文件却一条编辑都没报时，
-  // 胶囊本身会是隐藏的——那时最该出声的恰恰是这一节。一轮问一次，和芯片同一个节奏
-  const others = useOthers(cwd, stamp, list)
+  const others = useOtherChanges(cwd, stamp, list)
   if (files === 0 && others.length === 0) return null
-  const shown = all ? list : list.slice(0, FOLD_AT)
+  const shown = all ? list : list.slice(0, CHANGED_PREVIEW)
   return (
-    <div className="changed">
-      {open ? (
-        <div className="changed__list">
-          {shown.map((file) => (
-            <Row key={file.path} file={file} onReveal={onReveal} onCopy={onCopy} />
-          ))}
-          {others.length === 0 ? null : <Others paths={others} onReveal={onReveal} />}
-          {list.length <= FOLD_AT ? null : (
-            <button
-              type="button"
-              className="changed__more"
-              onClick={() => {
-                setAll((was) => !was)
-              }}
-            >
-              {all ? "收起" : `再显示 ${String(list.length - FOLD_AT)} 个`}
-            </button>
-          )}
+    <section className="changed" aria-label="文件改动摘要">
+      <div className="changed__card">
+        <div className="changed__head">
+          <button
+            type="button"
+            className="changed__summary"
+            aria-expanded={open}
+            onClick={() => {
+              setOpen((was) => !was)
+            }}
+          >
+            <span className="changed__glyph">
+              <PencilIcon size={14} />
+            </span>
+            <span className="changed__copy">
+              <span className="changed__title">{label(files, others.length)}</span>
+              <span className="changed__total">
+                {files > 0 && (added > 0 || removed > 0) ? (
+                  <Stat added={added} removed={removed} />
+                ) : (
+                  "展开查看路径"
+                )}
+              </span>
+            </span>
+            <span className="changed__chev">
+              <ChevronIcon open={open} size={12} />
+            </span>
+          </button>
+          <button
+            type="button"
+            className="changed__review"
+            title="逐个看一遍（⇧⌘R）"
+            onClick={onReview}
+          >
+            审核
+          </button>
         </div>
-      ) : null}
-      <div className="changed__bar">
-      <button
-        type="button"
-        className={`changed__pill${open ? " changed__pill--open" : ""}`}
-        aria-expanded={open}
-        title={open ? "收起" : "看看是哪些文件"}
-        onClick={() => {
-          setOpen((was) => !was)
-        }}
-      >
-        {label(files, others.length)}
-        <Stat added={added} removed={removed} />
-      </button>
-      <button type="button" className="changed__review" title="逐个看一遍（⇧⌘R）" onClick={onReview}>
-        审核
-      </button>
+        {open ? (
+          <div className="changed__list">
+            {shown.map((file) => (
+              <Row key={file.path} file={file} cwd={cwd} onReveal={onReveal} onCopy={onCopy} />
+            ))}
+            {others.length === 0 ? null : (
+              <ChangedOthers paths={others} cwd={cwd} onReveal={onReveal} />
+            )}
+            {list.length <= CHANGED_PREVIEW ? null : (
+              <button
+                type="button"
+                className="changed__more"
+                onClick={() => {
+                  setAll((was) => !was)
+                }}
+              >
+                {all
+                  ? `只显示前 ${String(CHANGED_PREVIEW)} 个文件`
+                  : `再显示 ${String(list.length - CHANGED_PREVIEW)} 个文件`}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
-    </div>
+    </section>
   )
 }
 
-/**
- * 胶囊上那句话。**编辑工具报的优先**：它是可追溯的那一份；
- * 一条都没报、而工作区确实变了时才退到后者（多半是引擎用命令改的）。
- */
 function label(files: number, others: number): string {
-  return files > 0 ? `${String(files)} 个文件已更改` : `${String(others)} 个文件变了`
+  return files > 0 ? `已编辑 ${String(files)} 个文件` : `检测到 ${String(others)} 个额外变动`
 }
 
-/** 增删两个数。零的那个不画——「+0」不是信息。 */
 function Stat({ added, removed }: { added: number; removed: number }): React.JSX.Element {
   return (
     <>
@@ -118,20 +110,19 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
   )
 }
 
-/**
- * 一个文件一行。点行展开它**最后一次**被改成什么样。
- *
- * 行尾两颗按钮：在访达里定位、复制这一份 diff。**不做「打开文件」**——
- * 那要决定用哪个编辑器打开，而 `showItemInFolder` 只是定位，
- * 最坏的后果就是访达里跳出一个窗口（见 preload 里那段安全论证）。
- */
-function Row({ file, onReveal, onCopy }: {
+function Row({
+  file,
+  cwd,
+  onReveal,
+  onCopy,
+}: {
   file: ChangedFile
+  cwd: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const { dir, name } = splitPath(file.path)
+  const shown = splitPath(relPath(file.path, cwd))
   return (
     <div className="changed__file">
       <div className="changed__row">
@@ -144,8 +135,8 @@ function Row({ file, onReveal, onCopy }: {
             setOpen((was) => !was)
           }}
         >
-          <span className="changed__dir">{dir}</span>
-          <span className="changed__base">{name}</span>
+          <span className="changed__dir">{shown.dir}</span>
+          <span className="changed__base">{shown.name}</span>
         </button>
         <span className="changed__stat">
           <Stat added={file.added} removed={file.removed} />
@@ -174,93 +165,6 @@ function Row({ file, onReveal, onCopy }: {
         </button>
       </div>
       {open ? <FileDiff file={file.last} /> : null}
-    </div>
-  )
-}
-
-/**
- * 工作区里**变了、但不是编辑工具报上来的**那些文件。
- *
- * 引擎用 shell 改文件（`sed -i`、`>` 重定向、跑一个生成脚本）omni 一个都看不见，
- * 它只看见「跑了一条命令」。跑完 `pnpm build` 改了三十个文件，卡上写着 0——
- * 问一次 git 就能把这块盲区摊开。
- *
- * **不合进主数字**：那份可以追溯到具体某一条工具行，这一份不能——它分不出
- * 是引擎跑的命令改的，还是你自己在编辑器里改的。所以文案也照实说这句话。
- *
- * ## 必须先取一份基线
- *
- * 上一版拿的是 **git 的全量脏状态**，于是「这条会话动过什么」和「这个仓库本来
- * 就脏」被算成了同一件事：在一个有 124 个未跟踪文件的仓库里开一条新会话，
- * 你**一句话都还没说**，输入框上方就顶着「124 个文件变了」。那不是它干的。
- *
- * 现在第一次问到的那份就是基线（也就是你打开这条会话时工作区的样子），
- * 之后只报**比基线多出来的**。基线跟着 `Workspace` 的挂载走，而它按会话隔离
- *（`key={thread.id}`），所以每条会话各有各的起点。
- *
- * **抓不到的那种**：基线里本来就脏的文件，被引擎用命令又改了一次——路径没变，
- * 这里就看不出来。要抓那种得存内容哈希而不是路径清单。编辑工具报上来的那份
- * 不受影响（它是逐条记录的），所以漏的只是「用 shell 改一个本来就脏的文件」。
- */
-function useOthers(cwd: string, stamp: string, known: readonly ChangedFile[]): readonly string[] {
-  const [paths, setPaths] = useState<readonly string[]>([])
-  /** 开工之前工作区就已经脏的那些。**不是这条会话的账。** */
-  const baseline = useRef<ReadonlySet<string> | undefined>(undefined)
-  const mine = known.map((f) => f.path).join("\n")
-  useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.omni
-    if (cwd === "" || bridge === undefined) {
-      setPaths([])
-      return undefined
-    }
-    let live = true
-    void bridge.workChanges(cwd).then((out) => {
-      if (!live) return
-      const all = out?.paths ?? []
-      // 第一次问到的那份就是基线。**不能等到第一轮跑完再取**——那时引擎已经改过东西了
-      baseline.current ??= new Set(all)
-      const before = baseline.current
-      // 引擎报的路径可能是 `/tmp/...` 而 git 给的是 `/private/tmp/...`：
-      // 只比末尾一段对不上的风险太大，所以两边都用「谁是谁的后缀」判同一个文件
-      const same = (a: string, b: string): boolean => a === b || a.endsWith(b) || b.endsWith(a)
-      const ours = mine === "" ? [] : mine.split("\n")
-      setPaths(all.filter((p) => !before.has(p) && !ours.some((o) => same(o, p))))
-    })
-    return () => {
-      live = false
-    }
-  }, [cwd, stamp, mine])
-  return paths
-}
-
-/** 盲区那一节。**标题就是它的置信度**，别写成「它还改了这些」。 */
-function Others({ paths, onReveal }: { paths: readonly string[]; onReveal: (path: string) => void }): React.JSX.Element {
-  return (
-    <div className="changed__others">
-      <p className="changed__note">
-        另有 {paths.length} 个文件与 git 不同，<strong>不是</strong>通过编辑工具改的——
-        可能是它跑的命令，也可能是你自己改的
-      </p>
-      {paths.slice(0, FOLD_AT).map((path) => (
-        <div className="changed__row" key={path}>
-          <span className="changed__name changed__name--flat" title={path}>
-            <span className="changed__dir">{splitPath(path).dir}</span>
-            <span className="changed__base">{splitPath(path).name}</span>
-          </span>
-          <button
-            type="button"
-            className="changed__act"
-            aria-label="在访达中显示"
-            title="在访达中显示"
-            onClick={() => {
-              onReveal(path)
-            }}
-          >
-            <RevealIcon size={12} />
-          </button>
-        </div>
-      ))}
-      {paths.length <= FOLD_AT ? null : <p className="changed__note">…还有 {paths.length - FOLD_AT} 个</p>}
     </div>
   )
 }

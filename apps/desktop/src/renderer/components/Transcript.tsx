@@ -6,45 +6,12 @@ import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
 import { foldTurns, groupRows, type Row } from "../group.js"
 import { spent } from "../status.js"
-import { TerminalIcon } from "./icons-activity.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ArrowDownIcon, ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
-
-/**
- * 一个字都还没说的会话。
- *
- * 空白的正文区技术上没错，但它什么都没告诉人：**这是新会话、还是在加载、
- * 还是坏了？** 一句话就能把三者区分开，顺带说清「你现在在哪个目录里干活」——
- * 那是每一句提问的隐含上下文，而它平时只在顶栏的标题里出现一次。
- */
-function Blank({ thread }: { thread: Thread }): React.JSX.Element {
-  return (
-    <div className="blank">
-      {/* 走 `Svg` 的口子，不自己写 `<svg>`：自己写就拿不到那套按尺寸反算的笔画补偿，
-          34px 上手写 1.3 会渲染成 2.76px——全场标准的 2.2 倍，还正好摆在首屏唯一的图形位 */}
-      <div className="blank__glyph" aria-hidden="true">
-        <TerminalIcon size={34} />
-      </div>
-      <p className="blank__title">
-        {thread.adopted === true ? "接着聊就行" : <>在 <strong>{thread.title}</strong> 里做点什么？</>}
-      </p>
-      <p className="blank__path">{thread.cwd}</p>
-      {/* **这条必须说清楚。** 接过来的会话在 omni 这边是空的，而引擎那边
-          什么都记得（codex 的 `thread/items/list` 目前回 not supported yet，
-          历史内容取不回来）。不说的话，人打开看到一片空白会以为上下文丢了，
-          于是把已经说过的话再说一遍——「看起来丢了但其实没丢」比真丢了更难受 */}
-      {thread.adopted === true ? (
-        <p className="blank__note">
-          这条是从引擎那边接过来的。<strong>前面聊过什么它都记得</strong>，
-          只是那些内容存在引擎那边、omni 这里搬不过来，所以上面是空的。
-          （Claude 的历史能搬，codex 目前不行——它还没开放读取历史内容的接口。）
-        </p>
-      ) : null}
-    </div>
-  )
-}
+import { Changed } from "./Changed.js"
+import { TranscriptBlank } from "./transcript-blank.js"
 
 /** 一行的 key。三种行各有各的身份来源，抽出来免得写在 JSX 里看不清。 */
 function keyOf(row: Row): string {
@@ -83,38 +50,39 @@ function RowView({
     // 只把小箭头做成热区的话，那是个 12px 的目标，得瞄准才点得中
     return (
       <div className="turnmark__row">
-      <button
-        type="button"
-        className="turnmark"
-        data-folded={folded}
-        aria-expanded={!folded}
-        onClick={() => {
-          onFold(row.turnId)
-        }}
-      >
-        <span>已处理 {spent(row.ms)}</span>
-        <ChevronIcon open={!folded} size={11} />
-      </button>
-      {/* **回到还没发生这一轮的时候。** 走错方向时唯一的出路，
+        <button
+          type="button"
+          className="turnmark"
+          data-folded={folded}
+          aria-expanded={!folded}
+          onClick={() => {
+            onFold(row.turnId)
+          }}
+        >
+          <span>已处理 {spent(row.ms)}</span>
+          <ChevronIcon open={!folded} size={11} />
+        </button>
+        {/* **回到还没发生这一轮的时候。** 走错方向时唯一的出路，
           否则只能把整个会话丢掉重开——而那会连前面对的部分一起丢 */}
-      <button
-        type="button"
-        className="act turnmark__act"
-        title="新开一个会话，只带这一轮之前的内容（原会话保留）"
-        onClick={() => {
-          onRewind(row.turnId)
-        }}
-      >
-        <ResetIcon size={11} />
-        从这里重来
-      </button>
+        <button
+          type="button"
+          className="act turnmark__act"
+          title="新开一个会话，只带这一轮之前的内容（原会话保留）"
+          onClick={() => {
+            onRewind(row.turnId)
+          }}
+        >
+          <ResetIcon size={11} />
+          从这里重来
+        </button>
       </div>
     )
   }
   if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
   /* **只有自己发过的话能改。** agent 说的话改了再发没有意义——
      那不是你的话，改完发出去等于替它编一句 */
-  const mine = onReuse !== undefined && row.item.kind === "user_message" && row.item.origin === undefined
+  const mine =
+    onReuse !== undefined && row.item.kind === "user_message" && row.item.origin === undefined
   return (
     <Copyable
       item={row.item}
@@ -166,6 +134,9 @@ export const Transcript = memo(function Transcript({
   send,
   onCopy,
   onReuse,
+  stamp,
+  onReveal,
+  onReview,
 }: {
   thread: Thread
   items: readonly Item[]
@@ -176,6 +147,10 @@ export const Transcript = memo(function Transcript({
   onCopy: (text: string) => void
   /** 把一句话填回输入框。对比视图不给（那边没有输入框）。 */
   onReuse?: (text: string) => void
+  /** 工作区变更卡只在正常工作区显示；对比视图不传这三项。 */
+  stamp?: string
+  onReveal?: (path: string) => void
+  onReview?: () => void
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
   /** 折起来的那几轮。**按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管 */
@@ -187,18 +162,27 @@ export const Transcript = memo(function Transcript({
       return next
     })
   }, [])
-  const rows = useMemo(() => foldTurns(groupRows(items, turn?.id), folded), [items, turn?.id, folded])
+  const rows = useMemo(
+    () => foldTurns(groupRows(items, turn?.id), folded),
+    [items, turn?.id, folded],
+  )
   // **必须是 useCallback。** 写成行内箭头函数的话每次 render 换一个身份，
   // `ItemView` 的 memo 会全部落空——而且是静默落空：功能全对，只是每帧白干一遍
   const onResolve = useCallback<ResolveApproval>(
     (itemId, allow, remember, passTurn) => {
-      send({ type: "approval.resolve", itemId, allow, remember, ...(passTurn === true ? { passTurn } : {}) })
+      send({
+        type: "approval.resolve",
+        itemId,
+        allow,
+        remember,
+        ...(passTurn === true ? { passTurn } : {}),
+      })
     },
     [send],
   )
   return (
     <div className="transcript" ref={scroller}>
-      {items.length === 0 && turn === undefined ? <Blank thread={thread} /> : null}
+      {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
       <div className="transcript__inner" ref={inner}>
         {rows.map((row) => (
           <RowView
@@ -218,6 +202,16 @@ export const Transcript = memo(function Transcript({
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
         <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} />
+        {stamp === undefined || onReveal === undefined || onReview === undefined ? null : (
+          <Changed
+            items={items}
+            cwd={thread.cwd}
+            stamp={stamp}
+            onReveal={onReveal}
+            onCopy={onCopy}
+            onReview={onReview}
+          />
+        )}
       </div>
       {/* 往回翻的时候给一条回去的路。**这才是「逃生口不该滚走」的正确解法**——
           不是把状态行钉住，而是给一个「回到底部」 */}

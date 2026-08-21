@@ -31,7 +31,10 @@ export function PencilIcon({ size = 13 }: { size?: number }): React.JSX.Element 
 export function FileIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M9 2.2H4.4A1.2 1.2 0 0 0 3.2 3.4v9.2a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2V5.9z" {...LINE} />
+      <path
+        d="M9 2.2H4.4A1.2 1.2 0 0 0 3.2 3.4v9.2a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2V5.9z"
+        {...LINE}
+      />
       <path d="M9 2.2v3.7h3.8" {...LINE} />
     </Svg>
   )
@@ -42,7 +45,23 @@ export function GlobeIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
       <circle cx="8" cy="8" r="5.4" {...LINE} />
-      <path d="M2.6 8h10.8M8 2.6c1.5 1.5 2.2 3.4 2.2 5.4S9.5 11.9 8 13.4C6.5 11.9 5.8 10 5.8 8s.7-3.9 2.2-5.4z" {...LINE} />
+      <path
+        d="M2.6 8h10.8M8 2.6c1.5 1.5 2.2 3.4 2.2 5.4S9.5 11.9 8 13.4C6.5 11.9 5.8 10 5.8 8s.7-3.9 2.2-5.4z"
+        {...LINE}
+      />
+    </Svg>
+  )
+}
+
+/** GitHub 外链的站点标记。品牌图形用填充，和表达操作的描边图标不混淆。 */
+export function GitHubIcon({ size = 13 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path
+        fill="currentColor"
+        stroke="none"
+        d="M8 2.1a6 6 0 0 0-1.9 11.7v-1.3c-1.5.3-1.8-.6-1.8-.6-.3-.7-.7-.9-.7-.9-.6-.4 0-.4 0-.4.7 0 1 .7 1 .7.6 1 1.5.7 1.8.5.1-.4.2-.7.5-.9-1.2-.1-2.5-.6-2.5-2.7 0-.6.2-1.1.6-1.5-.1-.2-.3-.8.1-1.5 0 0 .5-.2 1.6.6a5.4 5.4 0 0 1 2.9 0c1.1-.8 1.6-.6 1.6-.6.4.7.2 1.3.1 1.5.4.4.6.9.6 1.5 0 2.1-1.3 2.6-2.5 2.7.3.3.5.7.5 1.2v1.8A6 6 0 0 0 8 2.1Z"
+      />
     </Svg>
   )
 }
@@ -61,7 +80,10 @@ export function DotBoxIcon({ size = 13 }: { size?: number }): React.JSX.Element 
 export function ThinkIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M12.25 11.2H7.05L4.25 13.3v-2.1H3.75a1.4 1.4 0 0 1-1.4-1.4V4.1a1.4 1.4 0 0 1 1.4-1.4h8.5a1.4 1.4 0 0 1 1.4 1.4v5.7a1.4 1.4 0 0 1-1.4 1.4z" {...LINE} />
+      <path
+        d="M12.25 11.2H7.05L4.25 13.3v-2.1H3.75a1.4 1.4 0 0 1-1.4-1.4V4.1a1.4 1.4 0 0 1 1.4-1.4h8.5a1.4 1.4 0 0 1 1.4 1.4v5.7a1.4 1.4 0 0 1-1.4 1.4z"
+        {...LINE}
+      />
       <path d="M6 6.9h.01M8 6.9h.01M10 6.9h.01" {...LINE} />
     </Svg>
   )

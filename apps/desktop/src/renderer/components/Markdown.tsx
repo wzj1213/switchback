@@ -2,6 +2,7 @@ import { memo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { rehypeHighlight } from "../highlight.js"
+import { ExternalLink } from "./external-link.js"
 
 /**
  * 渲染模型产出的 Markdown。
@@ -18,15 +19,6 @@ import { rehypeHighlight } from "../highlight.js"
  * hljs 自己会转义，那条路"实际上"也安全——但它把安全性重新变成
  * 「某个环节做对了」，而不是「结构上不可能」。
  */
-
-/** 链接必须走外部浏览器：留在渲染层里点一下就把整个应用导航走了。 */
-function Anchor({ href, children }: { href?: string; children?: React.ReactNode }): React.JSX.Element {
-  return (
-    <a href={href} target="_blank" rel="noreferrer noopener">
-      {children}
-    </a>
-  )
-}
 
 /** 宽表格由外层容器滚动——给 table 自己加 overflow 会拆散 thead/tbody。 */
 function Table({ children }: { children?: React.ReactNode }): React.JSX.Element {
@@ -49,7 +41,7 @@ const REMARK = [remarkGfm]
 // 所以加它不违反上面那条红线：结构上仍然不存在注入面。见 `highlight.ts`。
 const REHYPE = [rehypeHighlight]
 const REHYPE_NONE: [] = []
-const COMPONENTS = { a: Anchor, table: Table }
+const COMPONENTS = { a: ExternalLink, table: Table }
 
 /**
  * @param streaming 这段文字还在流。**流式期间不跑语法高亮**，两个原因：

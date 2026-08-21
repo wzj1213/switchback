@@ -6,6 +6,7 @@ import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
 import type { Item, ToolCallItem } from "@omni/protocol"
 import { PlanCard } from "./PlanCard.js"
+import { LinkifiedText } from "./linkified-text.js"
 
 /**
  * 除工具调用之外的 item。工具调用由 `ToolRun` 成组渲染——
@@ -32,7 +33,7 @@ export const ItemView = memo(function ItemView({
       // ——omni 不再替用户往对话里塞任何东西（交接文本那条路已经删掉）
       return (
         <div className="msg--user">
-          {item.text}
+          <LinkifiedText text={item.text} />
           {/* 附件要在记录里留痕：三天后回来看「当时贴的是哪张图」，靠的就是这一行。
               画的是图本身而不是文件名——文件名是落盘时生成的时间戳，
               回答不了「当时贴的是哪张」这个唯一要问的问题 */}
