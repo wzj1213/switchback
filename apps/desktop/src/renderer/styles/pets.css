@@ -23,11 +23,11 @@
   --pet-claude-eye: #000000;
   --pet-grok: #16161a;
   --pet-grok-eye: #ffffff;
-  /* DSH 尚未接入：浅色主题用纯黑，深色主题在下方切成蓝色。 */
+  /* DSH 浅色主题用纯黑，深色主题在下方切成蓝色。 */
   --pet-dsh: #000000;
   --pet-dsh-eye: #ffffff;
-  --pet-dsh-detail: #ffffff;
-  --pet-dsh-shadow: #000000;
+  /* 肚子不能和浅色画布融成一片；只压一档灰，仍保留原型的浅色腹部。 */
+  --pet-dsh-belly: #d8dae0;
   /* 没见过的那一家。**不编配色**——编出来迟早和某一家撞 */
   --pet-plain: #8f8f9a;
   --pet-plain-eye: #ffffff;
@@ -116,7 +116,7 @@
   opacity: 1;
 }
 
-/* 原型里的 DSH 是纯黑。它不是可切换引擎，没有「当前 / 非当前」状态，不跟真引擎一起压暗。 */
+/* 尚未配置 profile 时的 DSH 不是可切换引擎，不跟真引擎一起压暗。 */
 .pet--placeholder {
   opacity: 1;
 }
@@ -192,8 +192,8 @@
   height: 30px;
 }
 
-/* DSH 直接承载原图的完整裁区（含原影子），不再把它硬塞进 30px 正方形。
-   40×36 与 110×99 同比例；负边距只负责让它仍以 30px 物理盒的底部和中心为锚。 */
+/* DSH 按位图的完整比例，但只画 85px 高的身体；底下 14px 留白把身体与
+   独立地面影子拉开。40×36 与 110×99 同比例，负边距让它仍以 30px 物理盒为锚。 */
 .pet--dsh-mark .pet__body svg {
   width: 40px;
   height: 36px;
@@ -206,11 +206,6 @@
   width: 34px;
   height: 30px;
   margin-left: -2px;
-}
-
-/* DSH 原图已经有软影子；Claude 按确认结果继续使用通用落地阴影。 */
-.pet__shade--hidden {
-  display: none;
 }
 
 /* 状态点在**头顶**。挂在脚下时它垫在身子和地面之间，三只看起来全都悬空——

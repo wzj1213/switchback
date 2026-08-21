@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef } from "react"
-import { accountOf, foreignByEngine, itemsOf, limitsOf, threadRowsOf, type Notice, type ThreadRow, type ViewState } from "@omni/store"
+import {
+  accountOf,
+  foreignByEngine,
+  itemsOf,
+  limitsOf,
+  threadRowsOf,
+  type Notice,
+  type ThreadRow,
+  type ViewState,
+} from "@omni/store"
 import type { Item } from "@omni/protocol"
 import type { Command, EngineThread, RateLimits, Thread } from "@omni/protocol"
 import { useOmni } from "./useOmni.js"
@@ -7,10 +16,11 @@ import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
 import { useWorkspaceActions } from "./useWorkspaceActions.js"
-import { openWith } from "./newThreadPrefs.js"
+import { openWithEngines } from "./newThreadPrefs.js"
 import { useSend } from "./useSend.js"
 import { useUnread } from "./useUnread.js"
 import type { SidebarRow } from "./sidebar.js"
+import { enabledEngines } from "../shared/engine-access.js"
 
 /**
  * 把 `App` 需要的一切收在一处。
@@ -22,6 +32,8 @@ import type { SidebarRow } from "./sidebar.js"
  */
 export interface AppApi {
   state: ViewState
+  /** 设置允许出现在新会话、换引擎与远程端里的引擎。 */
+  engines: ViewState["engines"]
   /** 全部会话，**含临时的**。选中判定、当前会话都从这份里找。 */
   rows: readonly ThreadRow[]
   /**
@@ -51,7 +63,11 @@ export interface AppApi {
   send: (command: Command) => void
   copy: (text: string) => void
   reveal: (path: string) => void
-  find: (query: string, next: boolean, forward: boolean) => Promise<{ active: number; total: number }>
+  find: (
+    query: string,
+    next: boolean,
+    forward: boolean,
+  ) => Promise<{ active: number; total: number }>
   stopFind: () => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   /** 在指定目录开新会话。 */
@@ -86,6 +102,7 @@ export function useApp(): AppApi {
   const omni = useOmni()
   const shell = useShell()
   const prefs = useSettings()
+  const engines = useEnabledEngines(prefs.settings, omni.state.engines)
 
   const rows = threadRowsOf(omni.state)
   /**
@@ -123,11 +140,11 @@ export function useApp(): AppApi {
     shell.select(started.id)
   }, [omni.lastStarted, shell])
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
-  const items = useMemo(
-    () => (thread === undefined ? EMPTY_ITEMS : itemsOf(omni.state, thread.id)),
-    [omni.state, thread],
+  const items = useThreadItems(omni.state, thread)
+  const sidebarRows = useUnread(
+    rows.filter((r) => r.thread.provisional !== true),
+    thread?.id,
   )
-  const sidebarRows = useUnread(rows.filter((r) => r.thread.provisional !== true), thread?.id)
 
   // 出口收在 `useSend` 里：它必须引用稳定，而**那条约束不属于「接线」这件事**——
   // 理由（以及它曾经怎么静默地废掉一整条 memo 链）写在那个文件开头
@@ -157,13 +174,8 @@ export function useApp(): AppApi {
     onOpenProject: (cwd) => {
       prefs.addProject(cwd)
     },
-    opened: openWith(
-      prefs.settings.lastUsed,
-      prefs.settings.defaultEngine,
-      // 兜底：**沿用当前会话的引擎**——换个工作区不该顺带把内核也换了。
-      // 一条会话都没有时退到探到的第一家
-      thread?.engine ?? omni.state.engines[0]?.id ?? "claude",
-    ),
+    // 兜底沿用当前会话；它被设置隐藏时才退到第一家，见纯函数里的表驱动测试。
+    opened: openWithEngines(prefs.settings, thread?.engine, engines),
     defaultTrust: prefs.settings.defaultTrust,
     onFind: () => {
       shell.setFinding(true)
@@ -182,6 +194,7 @@ export function useApp(): AppApi {
 
   return {
     state: omni.state,
+    engines,
     rows,
     sidebarRows,
     thread,
@@ -223,6 +236,20 @@ export function useApp(): AppApi {
     // 而你现在用的是哪一家由选中的会话决定。没选会话时退回唯一报过的那家
     account: accountLineOf(omni.state, thread?.engine),
   }
+}
+
+function useEnabledEngines(
+  settings: SettingsApi["settings"],
+  engines: ViewState["engines"],
+): ViewState["engines"] {
+  return useMemo(() => enabledEngines(settings, engines), [engines, settings])
+}
+
+function useThreadItems(state: ViewState, thread: Thread | undefined): readonly Item[] {
+  return useMemo(
+    () => (thread === undefined ? EMPTY_ITEMS : itemsOf(state, thread.id)),
+    [state, thread],
+  )
 }
 
 /**

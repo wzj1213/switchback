@@ -4,14 +4,14 @@
 
 **一家卡住，换一家接着干。**
 
-在 Claude Code、Codex、Kimi Code 与 Grok 之间延续同一件工作。omni 会把目标、
+在 Claude Code、Codex、Kimi Code、Grok 与 DSH 之间延续同一件工作。omni 会把目标、
 已改文件、执行过的命令、人工裁决和未完成项交给下一家；每一家仍运行自己的原生进程，
 使用自己的登录、模型、配置和工具。
 
 接力之后也可以切回来——上一家自己的原生会话句柄仍然保留。omni 管的是一条工作的连续性，
 不是把多家 agent 编成一支自动协作的队伍。
 
-目前内置四家：Codex、Claude Code、Kimi Code 与 Grok；其他讲 ACP 的引擎也可以注册。
+目前内置五家：Codex、Claude Code、Kimi Code、Grok 与 DSH；其他讲 ACP 的引擎也可以注册。
 
 ## 为什么需要接力
 
@@ -97,9 +97,11 @@ omni 唯一的用户界面是 GUI；命令行只用于开发和打包。
 | Claude Code | Agent SDK | 内置 |
 | Kimi Code | `kimi web` REST + WebSocket | 内置 |
 | Grok | ACP | 内置 |
+| DSH | `dsh --profile acp`（ACP） | 内置；原生配置完成后在设置中确认接入 |
 | 其他 ACP 引擎 | `engines.json` 注册 | 按引擎自报能力接入 |
 
-界面上的引擎清单由宿主提供；没安装、没注册的引擎不会凭空出现。
+内置引擎会显示真实探测状态；DSH 在设置中确认原生配置完成后才进入清单，
+用户自配的 ACP 引擎则只有注册后才会出现。
 
 ## 跑起来
 
@@ -112,8 +114,10 @@ pnpm dist:thin    # 轻量版 .dmg：使用 PATH 上的 claude
 pnpm dist:all     # 一次生成两种
 ```
 
-前置条件：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok`）并登录过；
+前置条件：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh`）并按各家方式完成登录；
 Claude 完整版内置 SDK 对应的平台可执行文件，轻量版要求 `claude --version` 可运行。
+DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让 `dsh --profile acp`
+能完成 ACP 握手；之后在 omni 的设置 → 引擎中确认接入。profile、凭证与插件版本仍由 DSH 自己管理。
 omni 直接使用各家的原生登录态，不另外配置密钥。
 
 当前打出来的包没有签名（`identity: null`）。首次打开要在

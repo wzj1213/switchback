@@ -2,6 +2,13 @@ export { createClaudeDriver } from "./claude/driver.js"
 export type { ClaudeExecutable } from "./claude/executable.js"
 export { createCodexDriver } from "./codex/driver.js"
 export { createAcpDriver } from "./acp/driver.js"
+export { createDshDriver, probeDshAcp } from "./acp/dsh.js"
+export type {
+  DshDriverOptions,
+  DshCommandProbe,
+  DshProfileCheck,
+  DshProfileStatus,
+} from "./acp/dsh.js"
 export { createKimiDriver } from "./kimi/driver.js"
 export { kimiLogPath, findInIndex as findKimiSession } from "./kimi/log.js"
 export {

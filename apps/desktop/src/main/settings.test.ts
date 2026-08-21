@@ -49,6 +49,25 @@ describe("偏好", () => {
     })
   })
 
+  describe("DSH 接入确认", () => {
+    const write = (dsh: unknown): void => {
+      writeFileSync(file(), JSON.stringify({ dsh }), "utf8")
+    }
+
+    it("默认不接入——没有配置时 DSH 不能凭一次 ACP 握手出现在引擎清单", () => {
+      expect(SETTINGS_DEFAULTS.dsh).toEqual({ configured: false })
+    })
+
+    it("只认字面的 true，坏值与旧设置都落回未配置", () => {
+      for (const bad of ["true", 1, "yes", {}, null]) {
+        write({ configured: bad })
+        expect(createSettings(log).get().dsh.configured).toBe(false)
+      }
+      write({ configured: true })
+      expect(createSettings(log).get().dsh.configured).toBe(true)
+    })
+  })
+
   describe("远程那几项", () => {
     const write = (remote: unknown): void => {
       writeFileSync(file(), JSON.stringify({ remote }), "utf8")

@@ -33,7 +33,8 @@ import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
  *
  * ## 里面只放真的能改的东西
  *
- * 引擎注册表、诊断报告这些**已经在菜单里**，这里只放链接过去的入口，不复制实现。
+ * DSH 接入确认是 omni 自己的偏好；引擎注册表、诊断报告这些**已经在菜单里**，
+ * 这里只放链接过去的入口，不复制实现。DSH 的 provider/model/API Key 仍不在这里另造表单。
  */
 
 const TABS = [
@@ -67,9 +68,18 @@ export interface SettingsPanelProps {
 function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
   const { settings, onPatch } = props
   if (tab === "look") return <LookSection settings={settings} onPatch={onPatch} />
-  if (tab === "new") return <NewThreadSection settings={settings} engines={props.engines} onPatch={onPatch} />
+  if (tab === "new")
+    return <NewThreadSection settings={settings} engines={props.engines} onPatch={onPatch} />
   if (tab === "engines")
-    return <EnginesSection cwd={props.cwd} onOpenEngines={props.onOpenEngines} onReveal={props.onReveal} />
+    return (
+      <EnginesSection
+        settings={settings}
+        cwd={props.cwd}
+        onPatch={onPatch}
+        onOpenEngines={props.onOpenEngines}
+        onReveal={props.onReveal}
+      />
+    )
   if (tab === "env") return <EnvSection cwd={props.cwd} />
   if (tab === "remote") return <RemotePanel settings={settings} onPatch={onPatch} />
   return (
@@ -96,7 +106,14 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         if (e.target === e.currentTarget) props.onClose()
       }}
     >
-      <div className="set" ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-label="设置">
+      <div
+        className="set"
+        ref={box}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="设置"
+      >
         <header className="set__head">
           <span className="set__heading">设置</span>
           <span className="set__ver">omni {props.version}</span>

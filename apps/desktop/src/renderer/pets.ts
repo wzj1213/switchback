@@ -16,7 +16,7 @@ import type { EngineId } from "@omni/protocol"
  * 一个天天开着的工具有一处不办正事的地方，不是浪费。
  */
 
-/** 一只的形。`dsh-mark` 是 DSH 尚未接入时先留在窝里的原型轮廓。 */
+/** 一只的形。`dsh-mark` 是 DSH 鲸鱼的原型轮廓。 */
 export type PetShape = "slime" | "crab" | "dsh-mark"
 
 /** 怎么回窝。**螃蟹走，其余蹦**——它们本来就不是一种走法。 */

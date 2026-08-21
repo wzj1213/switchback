@@ -11,8 +11,14 @@ describe("各家自己的设置在哪儿", () => {
   it("**没有工作区时不列项目级的那几份**——那时它们无处可指", async () => {
     const doors = await engineDoors(undefined)
     expect(doors.every((d) => d.scope !== "project")).toBe(true)
-    // 四家的用户级配置都要在
-    expect([...new Set(doors.map((d) => d.id))].sort()).toEqual(["claude", "codex", "grok", "kimi"])
+    // 五家的用户级配置都要在
+    expect([...new Set(doors.map((d) => d.id))].sort()).toEqual([
+      "claude",
+      "codex",
+      "dsh",
+      "grok",
+      "kimi",
+    ])
   })
 
   it("有工作区时补上项目级的那几份，路径落在工作区里", async () => {
@@ -33,6 +39,23 @@ describe("各家自己的设置在哪儿", () => {
     } finally {
       if (before === undefined) delete process.env["CODEX_HOME"]
       else process.env["CODEX_HOME"] = before
+    }
+  })
+
+  it("DSH 的设置与 ACP profile 都跟着 DSH_HOME", async () => {
+    const before = process.env["DSH_HOME"]
+    process.env["DSH_HOME"] = "/tmp/dsh-elsewhere"
+    try {
+      const paths = (await engineDoors(undefined))
+        .filter((door) => door.id === "dsh")
+        .map((door) => door.path)
+      expect(paths).toEqual([
+        "/tmp/dsh-elsewhere/settings.yaml",
+        "/tmp/dsh-elsewhere/profiles/acp/cordis.patch.yml",
+      ])
+    } finally {
+      if (before === undefined) delete process.env["DSH_HOME"]
+      else process.env["DSH_HOME"] = before
     }
   })
 

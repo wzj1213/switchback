@@ -1,7 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app, ipcMain, nativeTheme } from "electron"
-import { SETTINGS_DEFAULTS, type EnginePick, type Settings, type ThemeChoice } from "../shared/settings.js"
+import {
+  SETTINGS_DEFAULTS,
+  type EnginePick,
+  type Settings,
+  type ThemeChoice,
+} from "../shared/settings.js"
 import type { Trust } from "@omni/protocol"
 import type { Logger } from "./log.js"
 
@@ -42,7 +47,10 @@ function parse(raw: unknown): Settings {
   if (typeof raw !== "object" || raw === null) return DEFAULTS
   const it = raw as Partial<Record<keyof Settings, unknown>>
   return {
-    theme: typeof it.theme === "string" && THEMES.has(it.theme) ? (it.theme as ThemeChoice) : DEFAULTS.theme,
+    theme:
+      typeof it.theme === "string" && THEMES.has(it.theme)
+        ? (it.theme as ThemeChoice)
+        : DEFAULTS.theme,
     projects: strings(it.projects) ?? DEFAULTS.projects,
     pinned: strings(it.pinned) ?? DEFAULTS.pinned,
     pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
@@ -51,6 +59,7 @@ function parse(raw: unknown): Settings {
     // **只认字面的 `false`**：默认是开着的，所以「读不出来」要落到开，
     // 而不是像 `remote.enabled` 那样落到关——那边关掉是安全的一侧，这边不是
     pets: it.pets !== false,
+    dsh: dsh(it.dsh),
     defaultEngine: typeof it.defaultEngine === "string" ? it.defaultEngine : DEFAULTS.defaultEngine,
     defaultTrust:
       typeof it.defaultTrust === "string" && TRUSTS.has(it.defaultTrust)
@@ -60,6 +69,17 @@ function parse(raw: unknown): Settings {
     lastUsed: lastUsed(it.lastUsed),
     remote: remote(it.remote),
   }
+}
+
+/**
+ * DSH 只有用户明确确认后才进入引擎清单。
+ *
+ * **只认字面的 `true`**：这项会让一个能执行工具的引擎出现在新会话入口里；
+ * 旧文件没有它、字段写坏了，都应该落回「尚未接入」。
+ */
+function dsh(raw: unknown): Settings["dsh"] {
+  if (typeof raw !== "object" || raw === null) return DEFAULTS.dsh
+  return { configured: (raw as Record<string, unknown>).configured === true }
 }
 
 /**
@@ -76,13 +96,18 @@ function parse(raw: unknown): Settings {
 function remote(raw: unknown): Settings["remote"] {
   if (typeof raw !== "object" || raw === null) return DEFAULTS.remote
   const it = raw as Record<string, unknown>
-  const port = typeof it.port === "number" && Number.isInteger(it.port) && it.port >= 0 && it.port <= 65535 ? it.port : DEFAULTS.remote.port
+  const port =
+    typeof it.port === "number" && Number.isInteger(it.port) && it.port >= 0 && it.port <= 65535
+      ? it.port
+      : DEFAULTS.remote.port
   return {
     enabled: it.enabled === true,
     port,
     trustedHosts: (strings(it.trustedHosts) ?? DEFAULTS.remote.trustedHosts).map(authorityOf),
     maxTrust:
-      typeof it.maxTrust === "string" && TRUSTS.has(it.maxTrust) ? (it.maxTrust as Trust) : DEFAULTS.remote.maxTrust,
+      typeof it.maxTrust === "string" && TRUSTS.has(it.maxTrust)
+        ? (it.maxTrust as Trust)
+        : DEFAULTS.remote.maxTrust,
   }
 }
 
@@ -209,10 +234,17 @@ export function createSettings(log: Logger): Store {
 }
 
 /** 渲染层读写偏好的通道。 */
-export function installSettingsChannel(store: Store): void {
-  ipcMain.handle("omni:settings", (_e, patch?: Partial<Settings>) =>
-    patch === undefined ? store.get() : store.patch(patch),
-  )
+export function installSettingsChannel(
+  store: Store,
+  onPatch?: (before: Settings, after: Settings) => void,
+): void {
+  ipcMain.handle("omni:settings", (_e, patch?: Partial<Settings>) => {
+    if (patch === undefined) return store.get()
+    const before = store.get()
+    const after = store.patch(patch)
+    onPatch?.(before, after)
+    return after
+  })
 }
 
 // 主进程别处（主题、菜单）还按老路径引，这里再导出一次，避免一次性大改

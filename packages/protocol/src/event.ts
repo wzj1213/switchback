@@ -100,7 +100,7 @@ export interface EngineInfo {
  * 事件流假设有序且不丢，序号与重放由传输层负责，不在本模型内。
  */
 export type Event =
-  /** 宿主启动时报一次：这台机器上装了哪些引擎。 */
+  /** 全量重建必带；用户改变引擎接入范围时再增量更新。 */
   | { type: "engines.available"; at: number; engines: readonly EngineInfo[] }
   | { type: "thread.started"; at: number; thread: Thread }
   | { type: "thread.updated"; at: number; thread: Thread }

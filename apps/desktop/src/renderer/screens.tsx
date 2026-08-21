@@ -37,7 +37,15 @@ function emptyText(bridgeMissing: boolean, failed: boolean): string {
  * 转圈只在「真的在等」那一支画：有故障横幅时它永远不会转完，
  * 而一个会等到天亮的加载提示比一句直白的失败更糟。
  */
-function Notice({ text, fatal, waiting }: { text: string; fatal: boolean; waiting: boolean }): React.JSX.Element {
+function Notice({
+  text,
+  fatal,
+  waiting,
+}: {
+  text: string
+  fatal: boolean
+  waiting: boolean
+}): React.JSX.Element {
   if (fatal) {
     return (
       <div className="transcript">
@@ -88,6 +96,7 @@ export function EmptyScreen({
 
 export function CompareScreen({
   state,
+  engines,
   thread,
   peer,
   onCopy,
@@ -96,6 +105,7 @@ export function CompareScreen({
   send,
 }: {
   state: ViewState
+  engines: readonly EngineInfo[]
   thread: Thread
   peer: Thread
   onCopy: (text: string) => void
@@ -115,7 +125,7 @@ export function CompareScreen({
     <Compare
       a={paneOf(older)}
       b={paneOf(newer)}
-      engines={state.engines}
+      engines={engines}
       onCopy={onCopy}
       onPick={onPick}
       onClose={onClose}
@@ -123,7 +133,6 @@ export function CompareScreen({
     />
   )
 }
-
 
 /**
  * 设置屏。把「版本/数据目录」这两样异步拿到的东西留在这里，

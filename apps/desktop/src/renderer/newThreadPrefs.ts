@@ -1,5 +1,5 @@
-import type { Thread } from "@omni/protocol"
-import type { EnginePick, LastUsed } from "../shared/settings.js"
+import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EnginePick, LastUsed, Settings } from "../shared/settings.js"
 
 /**
  * 「下一条新会话开成什么样」——记下来，也用回去。
@@ -32,14 +32,41 @@ export interface Opened {
  * 设置里钉死了 claude、上次开工用的是 codex 时，
  * 拿 codex 的模型 id 去开 claude 会开出一条起不来的会话。
  */
-export function openWith(last: LastUsed, defaultEngine: string, fallback: string): Opened {
-  const engine = defaultEngine !== "" ? defaultEngine : last.engine !== "" ? last.engine : fallback
+export function openWith(
+  last: LastUsed,
+  defaultEngine: string,
+  fallback: string,
+  available?: readonly string[],
+): Opened {
+  const candidates = [defaultEngine, last.engine, fallback].filter((id) => id !== "")
+  const engine =
+    candidates.find((id) => available === undefined || available.includes(id)) ?? fallback
   const pick: EnginePick = last.byEngine[engine] ?? {}
   return {
     engine,
     ...(pick.model === undefined ? {} : { model: pick.model }),
     ...(pick.effort === undefined ? {} : { effort: pick.effort }),
   }
+}
+
+/**
+ * 把设置、当前会话与真正可见的引擎清单收成一份新会话参数。
+ * 关闭 DSH 后，旧的 defaultEngine / lastUsed 不能绕过清单把它重新起起来。
+ */
+export function openWithEngines(
+  settings: Pick<Settings, "lastUsed" | "defaultEngine">,
+  current: string | undefined,
+  engines: readonly EngineInfo[],
+): Opened {
+  const fallback = engines.some((engine) => engine.id === current)
+    ? (current ?? "claude")
+    : (engines[0]?.id ?? "claude")
+  return openWith(
+    settings.lastUsed,
+    settings.defaultEngine,
+    fallback,
+    engines.map((engine) => engine.id),
+  )
 }
 
 /**

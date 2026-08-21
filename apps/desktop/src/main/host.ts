@@ -17,6 +17,7 @@ import type { Sink, Sinks } from "./sink.js"
 import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
 import { readBuildInfo } from "./build-info.js"
+import { createEngineCatalog } from "./engine-catalog.js"
 
 export interface Attached {
   host: Host
@@ -29,6 +30,8 @@ export interface Attached {
    * 结果缓存：探测在启动时做一次就够，用户装引擎的频率远低于开窗的频率。
    */
   engines: () => Promise<readonly EngineInfo[]>
+  /** 设置改变引擎接入范围后，把新清单推给所有桌面与远程客户端。 */
+  refreshEngines: () => Promise<void>
   /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
   lastThreadId: () => ThreadId | undefined
   /** 事件流的序号与保留缓冲。（重）连接时的全量重建要用它对齐游标。 */
@@ -224,7 +227,7 @@ export function attachHost(
   sinks: Sinks,
   windows: () => readonly BrowserWindow[],
   log: Logger,
-  ports?: { relay?: Relay },
+  ports?: { relay?: Relay; engineVisible?: (id: string) => boolean },
 ): Attached {
   const relay = ports?.relay
   const seen = { thread: undefined as ThreadId | undefined }
@@ -275,11 +278,17 @@ export function attachHost(
   holder.host = host
   installBridgeChannels({ host, log, ledger, report })
 
+  const engines = createEngineCatalog(drivers, labels, log, ports?.engineVisible)
+  const refreshEngines = async (): Promise<void> => {
+    emit({ type: "engines.available", at: Date.now(), engines: await engines() })
+  }
+
   return {
     host,
     awake,
     journal,
-    engines: probeEngines(drivers, labels, log),
+    engines,
+    refreshEngines,
     lastThreadId: () => seen.thread,
     ledger,
     sinks,
@@ -309,47 +318,10 @@ export function attachHost(
  * 反过来先取 `resumeAt` 再读 journal，中间那段就会既在全量里又在增量里，
  * 被应用两次。顺序就是正确性本身。
  *
- * `engines.available` 也放在这份里，不走增量：它描述的是「现在有哪些引擎」，
- * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
- * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
+ * `engines.available` 一定放在全量里：它描述的是「现在有哪些引擎」。DSH 接入开关变化时
+ * 也会增量推一份让所有客户端立即收敛，但不能**只**靠那次增量——重载窗口会把
+ * `resumeAt` 之前的消息丢掉，清单必须从全量重建回来。
  */
-/**
- * 问每一家「装了吗」，只问一次。
- *
- * 缓存放在闭包里而不是每次重算：`which` + `--version` 要起真的子进程，
- * 而窗口每次重载都会来要一遍引擎清单。
- *
- * 没实现 `probe` 的驱动落 `unknown`——不是 `ok`。**猜不出来就别猜**。
- */
-function probeEngines(
-  drivers: Readonly<Record<string, { probe?: () => Promise<{ state: string; detail: string }> }>>,
-  labels: Readonly<Record<string, string>>,
-  log: Logger,
-): () => Promise<readonly EngineInfo[]> {
-  let cached: readonly EngineInfo[] | undefined
-  return async () => {
-    if (cached !== undefined) return cached
-    cached = await Promise.all(
-      Object.entries(drivers).map(async ([id, driver]) => {
-        const probe = await driver.probe?.().catch(() => undefined)
-        return {
-          id,
-          label: labels[id] ?? id,
-          state: (probe?.state ?? "unknown") as EngineInfo["state"],
-          ...(probe?.detail === undefined ? {} : { detail: probe.detail }),
-        }
-      }),
-    )
-    // 「这台机器上装了什么」是支持渠道的第一个问题，日志里必须留一行
-    log.write("info", "engines", cached.map((e) => `${e.id}=${e.state ?? "?"}`).join(" "))
-    for (const engine of cached) {
-      if (engine.state === "missing")
-        log.write("warn", "engines", `${engine.id}：${engine.detail ?? ""}`)
-    }
-    return cached
-  }
-}
-
 export interface ThreadHistory {
   id: ThreadId
   events: readonly Event[]
@@ -376,9 +348,9 @@ export interface ThreadHistory {
  * 反过来先取 `resumeAt` 再读 journal，中间那段就会既在全量里又在增量里，
  * 被应用两次。顺序就是正确性本身。
  *
- * `engines.available` 也放在这份里，不走增量：它描述的是「现在有哪些引擎」，
- * 属于世界的样子，不是一次变化。走增量的话，重载后的窗口会把它当成
- * `resumeAt` 之前的旧消息丢掉，然后引擎选择器就空了。
+ * `engines.available` 一定放在全量里：它描述的是「现在有哪些引擎」。DSH 接入开关变化时
+ * 也会增量推一份让所有客户端立即收敛，但不能**只**靠那次增量——重载窗口会把
+ * `resumeAt` 之前的消息丢掉，清单必须从全量重建回来。
  */
 export async function rebuild(
   attached: Attached,

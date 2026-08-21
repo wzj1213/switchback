@@ -2,6 +2,7 @@ import {
   createAcpDriver,
   createClaudeDriver,
   createCodexDriver,
+  createDshDriver,
   createKimiDriver,
   grokContextUsed,
   grokLogPath,
@@ -24,7 +25,7 @@ import type { Logger } from "./log.js"
  */
 
 /**
- * 内置四家。**内置的判据是「验过」，不是「听说过」**：
+ * 内置五家。**内置的判据是「验过」，不是「听说过」**：
  *
  * - `claude` / `codex`：各有一个专门的驱动。
  * - `kimi`：走它自带的 `kimi web` REST + WebSocket API。
@@ -33,10 +34,14 @@ import type { Logger } from "./log.js"
  * - `grok`：同一个 ACP 驱动。它的子命令**不叫 acp**，叫 `grok agent stdio`
  *   ——这是它自带文档里写明的「Agent Mode (ACP) and IDE Integration」，
  *   同样不是猜的。记录路径见 `acp/grok.ts`。
+ * - `dsh`：仍走通用 ACP 驱动，只启动 DSH 自己公开的 `--profile acp`。
+ *   profile 由 DSH 管理；omni 不替它安装插件，也不拿 Web 内部控制面拼一条私有链路。
  *
- * 四家都有 `probe()`，没装就在下拉里标成「未安装」并给一句能照着做的话。
+ * 五家都有 `probe()`。前四家随宿主启动探测，没装就在下拉里标成「未安装」；
+ * DSH 要先在设置中确认原生 provider、model 与凭证已经配好，确认前既不进清单也不起探测进程。
  * `engines.ts` 反对的是「列出没装的东西」和「把别人的参数抄进代码」——
- * 前者由 probe 挡掉，后者在 kimi / grok 这里不成立（那都是它们自己文档里的用法）。
+ * 前者由 probe / 接入开关挡掉，后者在 kimi / grok / dsh 这里不成立
+ *（那都是它们自己文档里的用法）。
  *
  * 其余 ACP 引擎（ZCode 之类）仍然只从 `engines.json` 读：
  * **这台机器上没装 zcode**，内置一条猜出来的命令行只会让人点了就崩。
@@ -70,6 +75,7 @@ export function buildRegistry(
         // 你在 grok 自己的界面里改了模型或强度，omni 靠这条跟上（见 `acp/grok.ts`）
         modelChanged: grokModelChanged,
       }),
+      dsh: createDshDriver(),
       ...acp.drivers,
     },
     labels: {
@@ -77,6 +83,7 @@ export function buildRegistry(
       codex: "Codex",
       kimi: "Kimi Code",
       grok: "Grok",
+      dsh: "DSH",
       ...acp.labels,
     },
   }

@@ -84,7 +84,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
   const settings = shell.settingsOpen ? (
     <SettingsScreen
       prefs={prefs}
-      engines={state.engines}
+      engines={app.engines}
       cwd={thread?.cwd}
       onReveal={app.reveal}
       onCopy={app.copy}
@@ -142,6 +142,7 @@ export function App(): React.JSX.Element {
         {sidebar}
         <CompareScreen
           state={state}
+          engines={app.engines}
           thread={thread}
           peer={peer}
           onCopy={app.copy}
@@ -185,7 +186,7 @@ export function App(): React.JSX.Element {
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
         models={modelsOf(state, thread.id, thread.engine)}
-        engines={state.engines}
+        engines={app.engines}
         pets={app.prefs.settings.pets}
         notices={app.notices}
         onDismiss={shell.dismiss}

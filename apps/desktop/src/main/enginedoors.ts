@@ -34,10 +34,32 @@ export interface EngineDoor {
   note: string
 }
 
+type Door = Omit<EngineDoor, "exists">
+
+function dshDoors(): readonly Door[] {
+  const home = homeOf("DSH_HOME", ".dsh")
+  return [
+    {
+      id: "dsh",
+      label: "DSH",
+      scope: "user",
+      path: join(home, "settings.yaml"),
+      note: "模型、权限与通用偏好",
+    },
+    {
+      id: "dsh",
+      label: "DSH",
+      scope: "user",
+      path: join(home, "profiles", "acp", "cordis.patch.yml"),
+      note: "omni 使用的 ACP profile；增删请走 dsh plugin",
+    },
+  ]
+}
+
 /** 各家的配置文件在哪。**家目录认各自的环境变量**，改过家目录的人正是最需要这一页的。 */
-function layout(cwd: string | undefined): readonly Omit<EngineDoor, "exists">[] {
+function layout(cwd: string | undefined): readonly Door[] {
   const project = (rest: string): readonly string[] => (cwd === undefined ? [] : [join(cwd, rest)])
-  const rows: Omit<EngineDoor, "exists">[] = [
+  const rows: Door[] = [
     {
       id: "claude",
       label: "Claude Code",
@@ -73,6 +95,7 @@ function layout(cwd: string | undefined): readonly Omit<EngineDoor, "exists">[] 
       path: join(homeOf("GROK_HOME", ".grok"), "config.toml"),
       note: "你自己的那份",
     },
+    ...dshDoors(),
   ]
   for (const [id, label, rest, note] of [
     ["claude", "Claude Code", join(".claude", "settings.json"), "只对这个项目生效"],

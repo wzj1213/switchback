@@ -33,7 +33,7 @@
   - `wire.ts` 是 Kimi 服务自己公开的 OpenAPI / AsyncAPI 的窄声明
   - `log.ts` 只负责定位 Kimi 保存的全量 `wire.jsonl`，供跨引擎接力引用
 - `acp/` —— 通用 ACP over stdio 驱动（Agent Client Protocol）
-  - **一个驱动接所有只从 ACP 出线的引擎**；Grok 与用户自配引擎共用
+  - **一个驱动接所有只从 ACP 出线的引擎**；Grok、DSH 与用户自配引擎共用
   - `wire.ts` 线上类型的窄声明（权威定义：`npm pack @agentclientprotocol/sdk`）
   - `update.ts` `session/update` → 事件，含**文本块划分**（见下）
   - `translate.ts` 工具形态与停止原因
@@ -89,6 +89,13 @@
 
 ## 已知限制
 
+- **内置 DSH 只启动它公开的 `dsh --profile acp`。** profile 与插件仍由 DSH 自己管理，
+  omni 不代装、不代升级；兼容性探测会真的发送一次 ACP `initialize`，因此缺 profile、插件依赖错配与
+  协议版本不合都会按原始启动结果报告，而不是看见配置文件就猜成可握手。该入口没有公开凭证就绪状态，
+  所以握手成功不等于 provider/model/API 已可用；桌面层只在用户确认 DSH 原生配置完成后才探测并列出它。
+- **DSH 0.1.0-rc.6 的 automation-only ACP 基线只认领新建文本会话、取消与权限决策。**
+  本机握手没有上报模型清单、续跑、分叉、压缩、插话或档位回读；通用驱动因此不显示这些控件，
+  后续能力只随 DSH 自己的 ACP 回包增加，omni 不补一套私有控制面。
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
   驱动只翻译 assistant / stream_event / result / system 四类，**其余丢弃**（曾经写着「或落 `meta`」，而那个字段从来没被写过，已删）。
   新增覆盖时先确认它是否真的需要进 transcript。

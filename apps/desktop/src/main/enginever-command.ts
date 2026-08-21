@@ -81,17 +81,46 @@ export async function grokCheck(run: EngineCommandRunner): Promise<GrokUpdateChe
 }
 
 function semver(value: unknown): string | undefined {
-  return typeof value === "string" ? /(\d+\.\d+\.\d+)/.exec(value)?.[1] : undefined
+  return typeof value === "string"
+    ? /(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)/.exec(value)?.[1]
+    : undefined
 }
 
 export function compare(a: string, b: string): number {
-  const left = a.split(".").map(Number)
-  const right = b.split(".").map(Number)
+  const left = parts(a)
+  const right = parts(b)
   for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0)
+    const difference = (left.core[index] ?? 0) - (right.core[index] ?? 0)
+    if (difference !== 0) return difference
+  }
+  if (left.pre === undefined) return right.pre === undefined ? 0 : 1
+  if (right.pre === undefined) return -1
+  for (let index = 0; index < Math.max(left.pre.length, right.pre.length); index += 1) {
+    const difference = identifierOrder(left.pre[index], right.pre[index])
     if (difference !== 0) return difference
   }
   return 0
+}
+
+function parts(value: string): { core: readonly number[]; pre?: readonly string[] } {
+  const cut = value.indexOf("-")
+  const core = cut === -1 ? value : value.slice(0, cut)
+  const pre = cut === -1 ? undefined : value.slice(cut + 1).split(".")
+  return {
+    core: core.split(".").map(Number),
+    ...(pre === undefined ? {} : { pre }),
+  }
+}
+
+function identifierOrder(left: string | undefined, right: string | undefined): number {
+  if (left === undefined) return right === undefined ? 0 : -1
+  if (right === undefined) return 1
+  const a = /^\d+$/.test(left) ? Number(left) : undefined
+  const b = /^\d+$/.test(right) ? Number(right) : undefined
+  if (a !== undefined && b !== undefined) return a - b
+  if (a !== undefined) return -1
+  if (b !== undefined) return 1
+  return left.localeCompare(right)
 }
 
 export function runCommand(

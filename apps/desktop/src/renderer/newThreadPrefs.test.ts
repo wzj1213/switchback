@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Thread } from "@omni/protocol"
 import type { LastUsed } from "../shared/settings.js"
-import { learnFrom, openWith } from "./newThreadPrefs.js"
+import { learnFrom, openWith, openWithEngines } from "./newThreadPrefs.js"
 
 const EMPTY: LastUsed = { engine: "", byEngine: {} }
 
@@ -26,8 +26,15 @@ describe("下次新会话开成什么样：用回去", () => {
   })
 
   it("记过就用上次那一套", () => {
-    const last: LastUsed = { engine: "codex", byEngine: { codex: { model: "gpt-5.3", effort: "high" } } }
-    expect(openWith(last, "", "claude")).toEqual({ engine: "codex", model: "gpt-5.3", effort: "high" })
+    const last: LastUsed = {
+      engine: "codex",
+      byEngine: { codex: { model: "gpt-5.3", effort: "high" } },
+    }
+    expect(openWith(last, "", "claude")).toEqual({
+      engine: "codex",
+      model: "gpt-5.3",
+      effort: "high",
+    })
   })
 
   // 用户去设置里明写默认引擎，就是为了不再每次手挑——那句话该压过「上次用的」
@@ -52,14 +59,35 @@ describe("下次新会话开成什么样：用回去", () => {
     const last: LastUsed = { engine: "codex", byEngine: { codex: { model: "gpt-5.3" } } }
     expect(openWith(last, "kimi", "claude")).toEqual({ engine: "kimi" })
   })
+
+  it("设置与上次都指向未接入引擎时，退到第一家可见引擎", () => {
+    const last: LastUsed = { engine: "dsh", byEngine: { dsh: { model: "deepseek-v4" } } }
+    expect(openWith(last, "dsh", "claude", ["claude", "codex"])).toEqual({ engine: "claude" })
+  })
+
+  it("设置指向未接入引擎时，仍优先使用可见的上次引擎", () => {
+    const last: LastUsed = { engine: "codex", byEngine: { codex: { model: "gpt-5.3" } } }
+    expect(openWith(last, "dsh", "claude", ["claude", "codex"])).toEqual({
+      engine: "codex",
+      model: "gpt-5.3",
+    })
+  })
+
+  it("当前会话正是被隐藏的 DSH 时，新会话也退回可见引擎", () => {
+    const settings = { defaultEngine: "", lastUsed: { engine: "dsh", byEngine: {} } }
+    const engines = [{ id: "claude", label: "Claude", state: "ok" as const }]
+    expect(openWithEngines(settings, "dsh", engines)).toEqual({ engine: "claude" })
+  })
 })
 
 describe("下次新会话开成什么样：记下来", () => {
   it("第一句话时把这一套记下", () => {
-    expect(learnFrom(EMPTY, thread({ engine: "codex", model: "gpt-5.3", effort: "high" }))).toEqual({
-      engine: "codex",
-      byEngine: { codex: { model: "gpt-5.3", effort: "high" } },
-    })
+    expect(learnFrom(EMPTY, thread({ engine: "codex", model: "gpt-5.3", effort: "high" }))).toEqual(
+      {
+        engine: "codex",
+        byEngine: { codex: { model: "gpt-5.3", effort: "high" } },
+      },
+    )
   })
 
   /**
@@ -78,7 +106,10 @@ describe("下次新会话开成什么样：记下来", () => {
 
   // 退回引擎默认也是一次表态，不然下一条新会话又被拉回上上次那个模型
   it("这次没挑模型 = 用引擎默认，把那家原先记的删掉", () => {
-    const last: LastUsed = { engine: "codex", byEngine: { codex: { model: "gpt-5.3" }, claude: { model: "opus" } } }
+    const last: LastUsed = {
+      engine: "codex",
+      byEngine: { codex: { model: "gpt-5.3" }, claude: { model: "opus" } },
+    }
     expect(learnFrom(last, thread({ engine: "codex" }))).toEqual({
       engine: "codex",
       byEngine: { claude: { model: "opus" } },
@@ -121,8 +152,13 @@ describe("下次新会话开成什么样：记下来", () => {
   })
 
   it("同一家只换了思维档也算变化", () => {
-    const last: LastUsed = { engine: "codex", byEngine: { codex: { model: "gpt-5.3", effort: "low" } } }
-    expect(learnFrom(last, thread({ engine: "codex", model: "gpt-5.3", effort: "high" }))?.byEngine).toEqual({
+    const last: LastUsed = {
+      engine: "codex",
+      byEngine: { codex: { model: "gpt-5.3", effort: "low" } },
+    }
+    expect(
+      learnFrom(last, thread({ engine: "codex", model: "gpt-5.3", effort: "high" }))?.byEngine,
+    ).toEqual({
       codex: { model: "gpt-5.3", effort: "high" },
     })
   })

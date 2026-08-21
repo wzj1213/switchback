@@ -62,6 +62,9 @@ export function NewThreadSection({
   engines: readonly EngineInfo[]
   onPatch: (next: Partial<Settings>) => void
 }): React.JSX.Element {
+  const selected = engines.some((engine) => engine.id === settings.defaultEngine)
+    ? settings.defaultEngine
+    : ""
   return (
     <Group title="新会话的默认" hint="只影响之后新开的会话，正开着的那些一个都不动。">
       {/*
@@ -71,14 +74,21 @@ export function NewThreadSection({
       */}
       <Field label="引擎" hint="留空则跟着上次开工用的那家走（连模型和思维档一起）" stack>
         <Segmented
-          options={[{ id: "", label: "跟上次" }, ...engines.map((e) => ({ id: e.id, label: e.label }))]}
-          value={settings.defaultEngine}
+          options={[
+            { id: "", label: "跟上次" },
+            ...engines.map((e) => ({ id: e.id, label: e.label })),
+          ]}
+          value={selected}
           onPick={(defaultEngine) => {
             onPatch({ defaultEngine })
           }}
         />
       </Field>
-      <Field label="信任档" hint="决定新会话开在哪一档上。这是安全相关的默认值，改高之前想清楚" stack>
+      <Field
+        label="信任档"
+        hint="决定新会话开在哪一档上。这是安全相关的默认值，改高之前想清楚"
+        stack
+      >
         <Segmented
           options={TRUSTS.map((t) => ({ id: t.id, label: t.label }))}
           value={settings.defaultTrust}

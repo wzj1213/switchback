@@ -78,7 +78,7 @@ export function Pets({
 }: {
   /** 注册了哪几家。**由宿主给**，不在这里写死。 */
   engines: readonly EngineInfo[]
-  /** 这个会话现在归谁跑。真引擎里只有它亮；DSH 占位按原型保持纯黑。 */
+  /** 这个会话现在归谁跑。真引擎里只有它亮；无 profile 的 DSH 占位不冒充当前引擎。 */
   engine: EngineId
   /** 这一轮正在跑。只有这时候当前那只才跳。 */
   running: boolean
@@ -121,9 +121,7 @@ export function Pets({
       {shown.map((info, i) => (
         <span
           key={`shade-${info.key}`}
-          className={
-            info.look.shape === "dsh-mark" ? "pet__shade pet__shade--hidden" : "pet__shade"
-          }
+          className="pet__shade"
           ref={(n) => {
             ctl.shades.current[i] = n
           }}

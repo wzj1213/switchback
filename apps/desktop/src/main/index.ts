@@ -18,7 +18,7 @@ import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
-import { createSettings, installSettingsChannel } from "./settings.js"
+import { createSettings } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { installReviewChannel } from "./workdiff.js"
 import { installSearchChannel } from "./search.js"
@@ -44,6 +44,8 @@ import {
 import { quitNow, shouldStayOpen } from "./quit.js"
 import { openExternalSafely } from "./external-url.js"
 import { readBuildInfo } from "./build-info.js"
+import { engineEnabled } from "../shared/engine-access.js"
+import { installEngineSettings } from "./engine-settings.js"
 
 /**
  * Electron 主进程。
@@ -322,7 +324,6 @@ if (!claimSingleInstance()) {
  * 加第十条的时候没人看得出这一段是同一类事。
  */
 function installChannels(): void {
-  installSettingsChannel(settings)
   installAppChannels()
   installWorksiteChannel()
   installReviewChannel()
@@ -373,10 +374,11 @@ function bootstrap(): Promise<void> {
     // 这一格在 `attachRemote` 之前是空的，那期间也确实没有客户端可推
     const relay: { notify?: (threadId: string, title: string, body: string) => void } = {}
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
-      relay: (id, title, body) => {
-        relay.notify?.(id, title, body)
-      },
+      relay: (id, title, body) => relay.notify?.(id, title, body),
+      engineVisible: (id) => engineEnabled(settings.get(), id),
     })
+    // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
+    installEngineSettings(settings, attached, log)
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })
     relay.notify = remote.relay.notify
     await remote.sync()

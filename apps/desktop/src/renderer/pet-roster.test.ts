@@ -19,10 +19,10 @@ describe("petRoster", () => {
       "codex",
       "kimi",
       "grok",
-      "placeholder:dsh",
+      "dsh",
     ])
     expect(roster.at(-1)?.engine).toBeUndefined()
-    expect(roster.at(-1)?.label).toBe("DSH · 暂未接入")
+    expect(roster.at(-1)?.label).toBe("DSH · 去设置中接入")
   })
 
   it("当前引擎排在第五位时仍会进入四个真位置", () => {
@@ -34,7 +34,7 @@ describe("petRoster", () => {
     expect(roster).toHaveLength(5)
   })
 
-  it("将来真的注册 DSH 后不再叠一只假占位", () => {
+  it("DSH 注册并就绪后不再叠一只假占位", () => {
     const roster = petRoster(
       [engine("claude"), engine("codex"), engine("kimi"), engine("grok"), engine("dsh")],
       "claude",
@@ -42,5 +42,12 @@ describe("petRoster", () => {
     expect(roster).toHaveLength(5)
     expect(roster.filter((slot) => slot.look.tone === "dsh")).toHaveLength(1)
     expect(roster.at(-1)).toMatchObject({ engine: "dsh", label: "DSH" })
+  })
+
+  it("占位与真 DSH 共用 DOM key，设置里实时接入时鲸鱼不会跳到左上角", () => {
+    const before = petRoster([engine("claude")], "claude").at(-1)
+    const after = petRoster([engine("claude"), engine("dsh")], "claude").at(-1)
+    expect(before?.key).toBe("dsh")
+    expect(after?.key).toBe(before?.key)
   })
 })

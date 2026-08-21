@@ -43,13 +43,14 @@ export interface EngineSpec {
   inspect: (context: InspectContext) => Promise<EngineVersion | undefined>
 }
 
-/** 四家各走自己暴露的更新路径：npm 安装、原生更新器或随应用更新。 */
+/** 五家各走自己暴露的路径：npm 安装、原生更新器、随应用更新，或只报版本。 */
 export function specs(claude: ClaudeExecutable): readonly EngineSpec[] {
   return [
     claudeSpec(claude),
     npmSpec("codex", "Codex", "codex", "@openai/codex"),
     npmSpec("kimi", "Kimi Code", "kimi", "@moonshot-ai/kimi-code"),
     grokSpec(),
+    dshSpec(),
   ]
 }
 
@@ -171,6 +172,25 @@ function grokSpec(): EngineSpec {
     bin: "grok",
     update,
     inspect: async ({ run }) => inspectGrok(run, update.display),
+  }
+}
+
+function dshSpec(): EngineSpec {
+  return {
+    engine: "dsh",
+    label: "DSH",
+    bin: "dsh",
+    inspect: async ({ run }) => {
+      const installed = await versionOf("dsh", run)
+      if (installed === undefined) return undefined
+      return {
+        engine: "dsh",
+        label: "DSH",
+        installed,
+        stale: false,
+        detail: "版本与 profiles 由 DSH 自己管理，omni 不代装插件",
+      }
+    },
   }
 }
 

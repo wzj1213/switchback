@@ -4,6 +4,7 @@ import {
   type EngineCommandRunner,
   type EngineVersionOptions,
 } from "./enginever.js"
+import { compare } from "./enginever-command.js"
 import type { Logger } from "./log.js"
 
 interface FakeState {
@@ -22,7 +23,13 @@ function fixture(options: Partial<EngineVersionOptions> = {}): {
 } {
   const state: FakeState = {
     calls: [],
-    versions: { codex: "0.148.0", kimi: "0.37.1", grok: "1.0.4", claude: "2.1.238" },
+    versions: {
+      codex: "0.148.0",
+      kimi: "0.37.1",
+      grok: "1.0.4",
+      claude: "2.1.238",
+      dsh: "0.1.0-rc.6",
+    },
     latest: { "@openai/codex": "0.149.0", "@moonshot-ai/kimi-code": "0.37.2", grok: "1.0.5" },
     globals: { "@openai/codex": "0.148.0", "@moonshot-ai/kimi-code": "0.37.1" },
     paths: { codex: "/opt/homebrew/bin/codex", kimi: "/opt/homebrew/bin/kimi" },
@@ -111,7 +118,19 @@ function installNpm(state: FakeState, target: string): { ok: boolean; output: st
 }
 
 describe("引擎版本入口", () => {
-  it("按实际安装来源给四家展示正确状态与命令", async () => {
+  it("预发布版本按 semver 排序，不把 DSH 的 rc 后缀算成 NaN", () => {
+    const cases = [
+      ["0.1.0-rc.6", "0.1.0-rc.8", -1],
+      ["0.1.0-rc.10", "0.1.0-rc.8", 1],
+      ["0.1.0", "0.1.0-rc.8", 1],
+      ["1.0.0-alpha-beta", "1.0.0-alpha-gamma", -1],
+    ] as const
+    for (const [left, right, direction] of cases) {
+      expect(Math.sign(compare(left, right)), `${left} / ${right}`).toBe(direction)
+    }
+  })
+
+  it("按实际安装来源给五家展示正确状态与命令", async () => {
     const { store } = fixture()
     const versions = await store.get()
     expect(versions).toMatchObject([
@@ -131,6 +150,12 @@ describe("引擎版本入口", () => {
         update: "npm i -g @moonshot-ai/kimi-code@latest",
       },
       { engine: "grok", installed: "1.0.4", latest: "1.0.5", stale: true, update: "grok update" },
+      {
+        engine: "dsh",
+        installed: "0.1.0-rc.6",
+        stale: false,
+        detail: "版本与 profiles 由 DSH 自己管理，omni 不代装插件",
+      },
     ])
     expect(versions[0]?.update).toBeUndefined()
   })

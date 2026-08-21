@@ -61,6 +61,14 @@ export interface Settings {
    * 藏起来的话它照样占着指针事件的那一层。
    */
   pets: boolean
+  /**
+   * DSH 接入确认。
+   *
+   * DSH 的 provider、model 与 API 凭证仍归它自己的设置与凭证服务管理；
+   * omni 只记「用户确认那边已经配好，可以把 DSH 放进引擎清单」。默认不确认，
+   * 因为 ACP 的 initialize 不公开凭证是否就绪，不能拿一次握手冒充可运行。
+   */
+  dsh: DshSettings
   /** 新会话默认用哪家引擎。空 = 按 `lastUsed` 走（见那边）。 */
   defaultEngine: string
   /** 新会话默认的信任档。 */
@@ -134,6 +142,11 @@ export interface RemoteSettings {
   maxTrust: Trust
 }
 
+export interface DshSettings {
+  /** 用户确认 DSH 原生 provider、model 与凭证已经配好。 */
+  configured: boolean
+}
+
 export interface LastUsed {
   /** 上次开工用的引擎。空 = 还没记过。 */
   engine: string
@@ -154,6 +167,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
+  dsh: { configured: false },
   defaultEngine: "",
   defaultTrust: "auto-edit",
   projectIcons: {},
