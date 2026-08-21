@@ -48,10 +48,11 @@ function settle(
 }
 
 describe("lookOf", () => {
-  it("认得出三家，前缀匹配", () => {
+  it("认得出四种真引擎和 DSH 占位，前缀匹配", () => {
     expect(lookOf("kimi").shape).toBe("slime")
     expect(lookOf("claude").shape).toBe("slime")
     expect(lookOf("grok").tone).toBe("grok")
+    expect(lookOf("dsh")).toEqual({ shape: "dsh-mark", tone: "dsh" })
   })
 
   // 同一家常有 claude / claude-code / claude-sdk 几个 id，它们是同一只
@@ -142,9 +143,10 @@ describe("step", () => {
 })
 
 describe("步态", () => {
-  it("螃蟹走，史莱姆蹦", () => {
+  it("螃蟹走，史莱姆和 DSH 蹦", () => {
     expect(gaitOf("crab")).toBe("walk")
     expect(gaitOf("slime")).toBe("hop")
+    expect(gaitOf("dsh-mark")).toBe("hop")
   })
 
   // 用户要的那一条：史莱姆不是滑回去的，是一路弹回去的

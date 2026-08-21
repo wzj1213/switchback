@@ -16,16 +16,16 @@ import type { EngineId } from "@omni/protocol"
  * 一个天天开着的工具有一处不办正事的地方，不是浪费。
  */
 
-/** 一只的形。原案就三种搭配，别再发明第四种。 */
-export type PetShape = "slime" | "crab"
+/** 一只的形。`dsh-mark` 是 DSH 尚未接入时先留在窝里的原型轮廓。 */
+export type PetShape = "slime" | "crab" | "dsh-mark"
 
-/** 怎么回窝。**螃蟹走，史莱姆蹦**——它们本来就不是一种走法。 */
+/** 怎么回窝。**螃蟹走，其余蹦**——它们本来就不是一种走法。 */
 export type Gait = "walk" | "hop"
 
 export interface PetLook {
   shape: PetShape
   /** 配色的名字，落到 CSS 的 `.pet--<tone>`。**颜色不进 tokens.css**，见 pets.css。 */
-  tone: "kimi" | "claude" | "grok" | "plain"
+  tone: "kimi" | "claude" | "grok" | "dsh" | "plain"
 }
 
 /**
@@ -42,9 +42,10 @@ const KNOWN: readonly { prefix: string; look: PetLook }[] = [
   { prefix: "kimi", look: { shape: "slime", tone: "kimi" } },
   { prefix: "claude", look: { shape: "slime", tone: "claude" } },
   { prefix: "grok", look: { shape: "slime", tone: "grok" } },
+  { prefix: "dsh", look: { shape: "dsh-mark", tone: "dsh" } },
 ]
 
-/** 这只怎么回窝。形定的：螃蟹横着蹭回去，史莱姆一路弹回去。 */
+/** 这只怎么回窝。形定的：螃蟹横着蹭回去，其余一路弹回去。 */
 export function gaitOf(shape: PetShape): Gait {
   return shape === "crab" ? "walk" : "hop"
 }

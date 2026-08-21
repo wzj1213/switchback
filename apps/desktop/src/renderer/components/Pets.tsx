@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
-import { Crab, Slime } from "./pets-art.js"
-import { gaitOf, lookOf, type Hit, type Pet, type PetLook } from "../pets.js"
+import { PetArt } from "./pets-art.js"
+import { gaitOf, type Hit, type Pet, type PetLook } from "../pets.js"
+import { petRoster } from "../pet-roster.js"
 import { usePets, useReduced } from "../usePets.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
@@ -29,9 +30,6 @@ import { usePetDrag } from "../usePetDrag.js"
  * 点一下是纯玩：被点的蹦一下，左右邻居探个头。**不换引擎**——换引擎在输入框
  * 那颗下拉里，一个玩的动作不该有副作用。
  */
-
-/** 最多画几只。引擎注册表是开放的，六只排一排就不是点缀是仪仗队了。 */
-const MAX = 4
 
 /** 旁边那只被震一下：往上一弹再落回去。比「探头」短促——那是好奇，这是被吓到 */
 const JOLT: Keyframe[] = [
@@ -80,14 +78,14 @@ export function Pets({
 }: {
   /** 注册了哪几家。**由宿主给**，不在这里写死。 */
   engines: readonly EngineInfo[]
-  /** 这个会话现在归谁跑。只有它是亮的——「谁在答」一眼看得出，不用再挂一枚徽章。 */
+  /** 这个会话现在归谁跑。真引擎里只有它亮；DSH 占位按原型保持纯黑。 */
   engine: EngineId
   /** 这一轮正在跑。只有这时候当前那只才跳。 */
   running: boolean
 }): React.JSX.Element | null {
-  const shown = useMemo(() => pick(engines, engine), [engines, engine])
+  const shown = useMemo(() => petRoster(engines, engine), [engines, engine])
   const count = shown.length
-  const gaits = useMemo(() => shown.map((e) => gaitOf(lookOf(e.id).shape)), [shown])
+  const gaits = useMemo(() => shown.map((slot) => gaitOf(slot.look.shape)), [shown])
   const bodies = useRef<(HTMLSpanElement | null)[]>([])
   const reduced = useReduced()
   // 砸到地上要有分量：**按落地速度定砸扁的深浅**，轻轻放下几乎看不出，
@@ -120,24 +118,26 @@ export function Pets({
     <div className="pets" ref={ctl.area} aria-hidden="true">
       {/* 影子和身体是**分开的两组**：影子钉在地面上不跟着抬，那是「它离地多高」
           唯一的说法（见 petPaint.ts）。摆在前面，所以永远压在身体下面 */}
-      {shown.map((info) => (
+      {shown.map((info, i) => (
         <span
-          key={`shade-${info.id}`}
-          className="pet__shade"
+          key={`shade-${info.key}`}
+          className={
+            info.look.shape === "dsh-mark" ? "pet__shade pet__shade--hidden" : "pet__shade"
+          }
           ref={(n) => {
-            ctl.shades.current[shown.indexOf(info)] = n
+            ctl.shades.current[i] = n
           }}
         />
       ))}
       {shown.map((info, i) => (
         <button
-          key={info.id}
+          key={info.key}
           type="button"
           ref={(n) => {
             ctl.nodes.current[i] = n
           }}
-          className={classOf(info.id === engine, running, lookOf(info.id))}
-          title={titleOf(info.label, info.id === engine, running)}
+          className={classOf(info.engine === engine, running, info.look, info.engine === undefined)}
+          title={titleOf(info.label, info.engine === engine, running)}
           onPointerDown={drag.down(i)}
           onPointerMove={drag.move}
           onPointerUp={drag.up}
@@ -145,7 +145,7 @@ export function Pets({
         >
           {/* 状态点在**头顶**，不在脚下。挂在脚下时它垫在身子和地面之间，
               三只看起来全都悬空——而它们本来是站在输入框上沿的，那条边就是地面 */}
-          {info.id === engine && running ? <span className="pet__dot" /> : null}
+          {info.engine === engine && running ? <span className="pet__dot" /> : null}
           <span
             className="pet__lean"
             ref={(n) => {
@@ -158,7 +158,7 @@ export function Pets({
                 bodies.current[i] = n
               }}
             >
-              {lookOf(info.id).shape === "crab" ? <Crab /> : <Slime />}
+              <PetArt shape={info.look.shape} />
             </span>
           </span>
         </button>
@@ -169,11 +169,12 @@ export function Pets({
 
 /** 眨眼、瞟眼、被捏着、走路那几个类**不在这儿**——它们每秒都可能变，
     由 `useMood` / `usePetDrag` / `petPaint` 直接写 `classList`，不换一次重渲染。 */
-function classOf(on: boolean, running: boolean, look: PetLook): string {
+function classOf(on: boolean, running: boolean, look: PetLook, placeholder: boolean): string {
   return [
     "pet",
     `pet--${look.tone}`,
     `pet--${look.shape}`,
+    placeholder ? "pet--placeholder" : "",
     on ? "pet--on" : "",
     on && running ? "pet--run" : "",
   ]
@@ -184,18 +185,6 @@ function classOf(on: boolean, running: boolean, look: PetLook): string {
 function titleOf(label: string, on: boolean, running: boolean): string {
   if (!on) return label
   return running ? `${label} · 正在跑` : `${label} · 这一轮归它`
-}
-
-/**
- * 画哪几只。装了的优先，最多 `MAX` 只，**当前这家一定在里面**——
- * 它被截掉的话，界面上就没有任何地方画着「谁在答」了。
- */
-function pick(engines: readonly EngineInfo[], engine: EngineId): readonly EngineInfo[] {
-  const usable = engines.filter((e) => e.state !== "missing" || e.id === engine)
-  const capped = usable.slice(0, MAX)
-  if (capped.some((e) => e.id === engine)) return capped
-  const mine = usable.find((e) => e.id === engine)
-  return mine === undefined ? capped : [mine, ...capped.slice(0, MAX - 1)]
 }
 
 export type { Pet }

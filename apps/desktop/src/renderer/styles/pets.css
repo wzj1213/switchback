@@ -7,23 +7,27 @@
  * 主题文件是说不通的。它们仍然是 token（都叫 `--pet-*`），只是住在自己这一层——
  * `check-tokens.mjs` 扫的是全部 css 文件，所以照样受守卫管。
  *
- * ## 只有 grok 那只要分深浅
+ * ## 深色身体要随主题反相
  *
  * 原案给它的是 `#16161a`——**正好是 omni `--text` 的值**。压在深色底 `#17171a` 上
  * 对比度 **1.01:1**：不是「看不清」，是「不存在」，屏幕上只剩两只白眼睛浮在黑底上。
- * 另外两只两套底色上都过 3:1（kimi 3.71 / 4.83，claude 3.11 / 5.76），原值一个字节不动。
+ * DSH 占位也是深色身体，深色主题改用蓝色；否则黑身会直接消失。
+ * kimi / claude 两套底色上都过 3:1，原值一个字节不动。
  */
 
 :root {
   --pet-kimi: #5b83d6;
-  --pet-kimi-eye: #1d2f57;
-  /* 身体是这个值，眼睛是**纯黑**。
-     最初那份设计稿写的是 #da7756 / #a84e30，两个都偏了一点。
-     白底 3.16:1、深底 5.68:1，两边都过图形那道 3:1 的门槛 */
-  --pet-claude: #cc7d5b;
+  --pet-kimi-eye: #ffffff;
+  /* 身体 #d87656，眼睛纯黑。色值一律按 sRGB 写。 */
+  --pet-claude: #d87656;
   --pet-claude-eye: #000000;
   --pet-grok: #16161a;
   --pet-grok-eye: #ffffff;
+  /* DSH 尚未接入：浅色主题用纯黑，深色主题在下方切成蓝色。 */
+  --pet-dsh: #000000;
+  --pet-dsh-eye: #ffffff;
+  --pet-dsh-detail: #ffffff;
+  --pet-dsh-shadow: #000000;
   /* 没见过的那一家。**不编配色**——编出来迟早和某一家撞 */
   --pet-plain: #8f8f9a;
   --pet-plain-eye: #ffffff;
@@ -36,7 +40,10 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --pet-grok: #c9c9d2;
-    --pet-grok-eye: #16161a;
+    --pet-grok-eye: #ffffff;
+    /* 黑身压在深色底上会消失，换成蓝（sRGB）。 */
+    --pet-dsh: #4276e6;
+    --pet-dsh-eye: #ffffff;
     --pet-shade-a: 0.5;
   }
 }
@@ -95,6 +102,25 @@
   opacity: 1;
 }
 
+/* 史莱姆的“非当前”只压暗身体，白眼不跟父级透明度一起变灰；当前那只恢复完整亮度。 */
+.pet--slime {
+  opacity: 1;
+}
+
+.pet--slime .pet__shell {
+  opacity: 0.6;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.pet--slime.pet--on .pet__shell {
+  opacity: 1;
+}
+
+/* 原型里的 DSH 是纯黑。它不是可切换引擎，没有「当前 / 非当前」状态，不跟真引擎一起压暗。 */
+.pet--placeholder {
+  opacity: 1;
+}
+
 .pet--kimi {
   color: var(--pet-kimi);
   --pet-eye: var(--pet-kimi-eye);
@@ -108,6 +134,11 @@
 .pet--grok {
   color: var(--pet-grok);
   --pet-eye: var(--pet-grok-eye);
+}
+
+.pet--dsh {
+  color: var(--pet-dsh);
+  --pet-eye: var(--pet-dsh-eye);
 }
 
 .pet--plain {
@@ -161,6 +192,27 @@
   height: 30px;
 }
 
+/* DSH 直接承载原图的完整裁区（含原影子），不再把它硬塞进 30px 正方形。
+   40×36 与 110×99 同比例；负边距只负责让它仍以 30px 物理盒的底部和中心为锚。 */
+.pet--dsh-mark .pet__body svg {
+  width: 40px;
+  height: 36px;
+  margin: -6px 0 0 -5px;
+}
+
+/* Claude 那只是 34px 宽的 12×8 网格：比通用物理盒横向各探出 2px。
+   30px 高的视口配 12×9 viewBox，实际蟹身正好约 34×23，底部空行继续负责贴地。 */
+.pet--claude .pet__body svg {
+  width: 34px;
+  height: 30px;
+  margin-left: -2px;
+}
+
+/* DSH 原图已经有软影子；Claude 按确认结果继续使用通用落地阴影。 */
+.pet__shade--hidden {
+  display: none;
+}
+
 /* 状态点在**头顶**。挂在脚下时它垫在身子和地面之间，三只看起来全都悬空——
    而它们本来是站在输入框上沿的，那条边就是地面 */
 .pet__dot {
@@ -190,9 +242,7 @@
  * 往左右瞟一眼。两种时候会发生：**随机的小动作**（`useMood`），
  * 以及**你捏起一只时其余几只转头看它**（`usePetDrag` 的 `watch`）。
  *
- * 位移写成 svg 用户单位，所以两种形要各给各的：史莱姆的画布是 24（一格 1.25px），
- * 螃蟹是 12（一格 2.5px）——同一个数字在螃蟹身上是史莱姆的两倍，
- * 而螃蟹的眼睛只有一格宽，挪一格就整只挪出脸了。
+ * 位移写成最终渲染像素。史莱姆眼睛更宽，位移稍大；像素蟹只挪半像素。
  */
 .pet--slime.pet--look-l .pet__eyes {
   transform: translateX(-1.3px);
