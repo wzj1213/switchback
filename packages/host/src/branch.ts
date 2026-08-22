@@ -1,9 +1,10 @@
-import type { Command, EngineSegment, Item, Thread, ThreadId } from "@omni/protocol"
+import type { Command, EngineSegment, Event, Item, Thread, ThreadId } from "@omni/protocol"
 import { initial, itemsOf, reduceAll } from "@omni/store"
-import { emit, type Ctx, type Live } from "./ctx.js"
+import { discardUnstarted, drainQueued, emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
 import { copyTranscript } from "./transcript.js"
 import { dropTemps, launch } from "./session.js"
 import { rememberHandle } from "./engine-state.js"
+import { carryRules } from "./approval.js"
 
 /**
  * 从一条会话岔出另一条：分叉（换引擎）、重来（砍掉后面几轮）、接力（换引擎但不留旧的）。
@@ -11,9 +12,8 @@ import { rememberHandle } from "./engine-state.js"
  * 三者共用一套「把上下文交给下一家」的逻辑，所以住在一个文件里。
  * 交给下一家有两条路，选哪条只看一件事——**是不是同一家引擎**：
  *
- * - 同一家：让它自己复制会话（`session.fork`），上下文一点不少
- * - 换一家：交接包。各家会话格式不通，硬翻既做不对也维护不起，
- *   所以只传从 transcript 提炼出的目标与追加要求
+ * - 同一家且支持原生 fork：让引擎自己复制会话，上下文一点不少
+ * - 换一家或不支持 fork：只开一条同工作区的空白分支，不替用户注入任何文本
  */
 
 /**
@@ -36,6 +36,32 @@ export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork"
   await branch(ctx, entry, { to: cmd.to, label: cmd.to })
 }
 
+async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly Event[]> {
+  if (entry.turn !== undefined) throw new Error("当前轮次尚未结束，不能分叉或从历史轮次重来")
+  if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
+  // 原生分叉在发出第一句前仍是临时会话，它可见的继承转录只在待提交缓冲里。
+  // 此时再分一次若只读 journal，会得到空历史：引擎记得，界面却什么都没有。
+  const pending = ctx.uncommitted.get(entry.thread.id)
+  if (pending !== undefined) return [...pending]
+  // 事件出口不等待 journal；刚收工就分叉时，先把最后几条完整落下再读。
+  await ctx.deps.journal?.flush()
+  return (await ctx.deps.journal?.read(entry.thread.id)) ?? []
+}
+
+function forkBoundary(from: ThreadId, itemCount: number): Pick<Thread, "forkedFrom" | "forkedFromItemCount"> {
+  return { forkedFrom: from, forkedFromItemCount: itemCount }
+}
+
+function finishDerivedTranscript(
+  ctx: Ctx,
+  born: Thread,
+  current: Live | undefined,
+  content: { forked: { early: string | undefined } | undefined; items: readonly Item[] },
+): void {
+  if (content.forked !== undefined) copyTranscript(ctx, born, content.items)
+  drainQueued(ctx, current)
+}
+
 /**
  * 从一个会话岔出一条新的。分叉（换引擎）与重来（砍掉后面几轮）共用这条路。
  *
@@ -46,15 +72,17 @@ async function branch(
   entry: Live,
   opts: { to: string; upTo?: string; label: string },
 ): Promise<void> {
-  if (ctx.deps.drivers[opts.to] === undefined) throw new Error(`未注册的引擎：${opts.to}`)
-
-  const events = (await ctx.deps.journal?.read(entry.thread.id)) ?? []
+  const events = await stableEvents(ctx, entry, opts.to)
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
   const items = opts.upTo === undefined ? all : until(all, opts.upTo)
   const plan = forkPlan(entry, opts.to, all, items)
+  // “从这里重来”承诺保留该轮之前的上下文；做不到就明确失败，不能静默开空会话。
+  if (opts.upTo !== undefined && plan === undefined) {
+    throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
+  }
 
   const at = ctx.deps.now()
-  const thread: Thread = {
+  const thread: Thread = withQueue({
     ...entry.thread,
     id: ctx.deps.newId("th"),
     engine: opts.to,
@@ -64,15 +92,28 @@ async function branch(
     engineHandle: undefined,
     model: undefined,
     effort: undefined,
+    // 新 thread 只继承对话血缘，不继承来源会话的原生身份与瞬时状态。
+    // 否则切回某家时会续到父分支，或者把旧引擎的档位/能力画在新引擎上。
+    segments: [],
+    engineState: undefined,
+    trustApply: undefined,
+    capabilities: undefined,
+    nextEngine: undefined,
+    passTurn: undefined,
+    asides: [],
+    draft: undefined,
+    draftAttachments: undefined,
+    draftRevision: undefined,
+    adopted: undefined,
     // 标题带上来路，否则侧栏里两个会话长得一模一样
     title: `${entry.thread.title}（${opts.label}）`,
     // 留下血缘，事后才对比得起来。**分叉的意义就在于能比**
-    forkedFrom: entry.thread.id,
+    // 来源会话在这里之前都是共同历史；对比时从这个精确边界之后再算来源侧新动作。
+    ...forkBoundary(entry.thread.id, items.length),
     detached: false,
     status: "idle",
     createdAt: at,
     updatedAt: at,
-    queued: [],
     /**
      * **派生出来的先算临时的**（和「+ 新建」同一条规矩，见 `Thread.provisional`）。
      *
@@ -86,18 +127,34 @@ async function branch(
      * 想要回来？从同一个点再分一次，得到的东西一模一样。
      */
     provisional: true,
-  }
+  }, [])
   // **先挂进待提交表再发事件**，理由同 `session.ts` 的新建：没说过话就不落盘。
   // 抄过来的 transcript 也在这份缓冲里，第一句话一发就按原序一起写下去
   ctx.uncommitted.set(thread.id, [])
-  const forked = plan === undefined ? undefined : await tryFork(ctx, thread, plan)
-  const early = forked?.early ?? (forked === undefined ? await launch(ctx, thread) : undefined)
-  emit(ctx, { type: "thread.started", at, thread })
+  // 引擎可能在 start() 内就上报状态；出生事件必须排在所有这类回调前面，
+  // 否则首次提交后的 journal 会变成“先有状态，后有会话”。
+  emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
+  let launched: Awaited<ReturnType<typeof launchDerived>>
+  try {
+    launched = await launchDerived(ctx, thread, plan, opts.upTo === undefined)
+  } catch (error) {
+    // 后一条临时会话已经取代这条尚未出生的分叉，是正常取消，不冒伪失败横幅。
+    if (ctx.removed.has(thread.id)) return
+    emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
+    throw error
+  }
+  const { forked, early } = launched
+  // launch 已经挂上新引擎能力；用更新事件把 starting 壳落成可用会话。
+  const current = ctx.live.get(thread.id)
+  const readyAt = ctx.deps.now()
+  const born = { ...(current?.thread ?? thread), status: "idle" as const, updatedAt: readyAt }
+  if (current !== undefined) current.thread = born
+  emit(ctx, { type: "thread.updated", at: readyAt, thread: born })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 
   // 原生分叉成功时把 transcript 抄过来：**引擎那边已经什么都知道了**，
   // 人看到的和它记得的就对上了
-  if (forked !== undefined) copyTranscript(ctx, thread, items)
+  finishDerivedTranscript(ctx, born, current, { forked, items })
   /**
    * 把**别的**没用过的临时会话收掉。两个都不能收：
    *
@@ -116,34 +173,34 @@ async function branch(
  */
 function until(items: readonly Item[], turnId: string): readonly Item[] {
   const at = items.findIndex((item) => item.turnId === turnId)
-  return at === -1 ? items : items.slice(0, at)
+  if (at === -1) throw new Error(`找不到要重来的历史轮次：${turnId}`)
+  return items.slice(0, at)
 }
 
 /**
- * 试着让引擎自己复制一份会话，返回它那边的新句柄。**不行就返回 undefined**，
- * 调用方退回交接包。
+ * 试着让引擎自己复制一份会话。普通分叉失败时可以退回空白分支；
+ * “从这里重来”不能退，因为它承诺保留指定轮次之前的上下文。
  *
  * ## 为什么值得多这一条路
  *
- * 交接包是从 transcript 里提炼出来的一句目标加几条追加要求。跨引擎时它是
- * **唯一**可能的做法，但同一家引擎内部这么做是自伤：分出来那条会话
- * 对「读过哪些文件、写过什么、撞过什么错」一无所知。
- * 一个叫「重来」的功能，实际是从零开始——而界面上看不出区别。
+ * 同一家引擎内部开空白会话会丢掉「读过哪些文件、写过什么、撞过什么错」。
+ * 对普通分叉，空白分支仍是一个诚实可见的结果；对“重来”，这会违背动作本身。
  *
  * codex 的 `thread/fork` 复制的是真的会话。
  *
  * ## 失败为什么只是退回，不是报错
  *
- * 交接包那条路一直都在，而且一直够用。原生分叉是**更好**，不是**必需**——
- * 为了它把一个能用的功能变成一个会报错的功能，是把好的换成差的。
+ * 跨引擎会话格式不通，omni 不翻译、不摘要，也不替用户发话；只保留工作区与血缘。
  */
+interface NativeForkPlan { handle: string; dropTurns?: number }
+
 function forkPlan(
   entry: Live,
   to: string,
   all: readonly Item[],
   keep: readonly Item[],
-): { handle: string; dropTurns?: number } | undefined {
-  // 跨引擎时会话格式不通，交接包是唯一的路
+): NativeForkPlan | undefined {
+  // 跨引擎时会话格式不通，只能开空白分支；不能冒充原生上下文复制。
   if (to !== entry.thread.engine) return undefined
   if (entry.thread.capabilities?.fork !== true) return undefined
   const handle = entry.thread.engineHandle
@@ -154,7 +211,7 @@ function forkPlan(
 }
 
 /**
- * 以分叉的方式把新会话起起来。**起不来就返回 undefined**，调用方退回交接包。
+ * 以原生分叉方式把新会话起起来。普通分叉允许失败后改开空白分支；重来不允许。
  *
  * 分叉由**新会话自己的引擎进程**做（见 `StartRequest.forkOf`），所以这里
  * 只能整条 launch 一次；失败时 `ctx.live` 里什么都没登记，重来一次是干净的。
@@ -162,12 +219,30 @@ function forkPlan(
 async function tryFork(
   ctx: Ctx,
   thread: Thread,
-  plan: { handle: string; dropTurns?: number },
+  plan: NativeForkPlan,
+  allowBlank: boolean,
 ): Promise<{ early: string | undefined } | undefined> {
   try {
-    return { early: await launch(ctx, thread, undefined, plan) }
-  } catch {
+    return { early: await launch(ctx, thread, { forkOf: plan }) }
+  } catch (error) {
+    if (ctx.closed || ctx.removed.has(thread.id) || !allowBlank) throw error
     return undefined
+  }
+}
+
+async function launchDerived(
+  ctx: Ctx,
+  thread: Thread,
+  plan: NativeForkPlan | undefined,
+  allowBlank: boolean,
+): Promise<{ forked: { early: string | undefined } | undefined; early: string | undefined }> {
+  try {
+    const forked = plan === undefined ? undefined : await tryFork(ctx, thread, plan, allowBlank)
+    const early = forked?.early ?? (forked === undefined ? await launch(ctx, thread) : undefined)
+    return { forked, early }
+  } catch (error) {
+    await discardUnstarted(ctx, thread.id)
+    throw error
   }
 }
 
@@ -181,13 +256,9 @@ function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
 /**
  * L2 跨引擎接力：同一个会话换一家引擎接着做。
  *
- * **不传原始上下文**——各家 session 格式不通，硬翻既做不对也维护不起。
- * 传的是从 transcript 里提炼出来的**交接包**（见 `@omni/handoff`）。
- *
- * transcript 在渲染层的 store 里，宿主手上没有。但宿主有日志——
- * 把事件回放一遍过同一个归约器就得到同一份 items。
- * **这正是「事件流是真源、归约器是纯函数」这条设计换来的**：
- * 不需要为宿主再维护一份 transcript 副本，也就不会出现两份对不上。
+ * **不传原始上下文，也不注入摘要或提示词**——各家 session 格式不通，
+ * omni 不能替用户翻译，更不能以用户身份发一段他没写过的话。
+ * 每一段原生记录的路径保留在 `Thread.segments`，需要时由用户明确让引擎读取。
  */
 export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
@@ -215,6 +286,76 @@ export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff"
   return Promise.resolve()
 }
 
+async function replacement(
+  ctx: Ctx,
+  entry: Live,
+  thread: Thread,
+  previous: Thread,
+): Promise<string | undefined> {
+  try {
+    // 同一 thread 的接力只复用开场基线；缓存若缺失，不能在半途补抓一份冒充开场。
+    return await launch(ctx, thread, {
+      ...(thread.engineHandle === undefined ? {} : { resume: thread.engineHandle }),
+      captureBaseline: false,
+    })
+  } catch (error) {
+    if (ctx.closed || ctx.removed.has(thread.id)) throw error
+    const at = ctx.deps.now()
+    const latest = entry.thread
+    entry.lease.active = true
+    entry.thread = {
+      ...withQueue(previous, entry.queued, at),
+      title: latest.title,
+      draft: latest.draft,
+      draftAttachments: latest.draftAttachments,
+      draftRevision: latest.draftRevision,
+      ...(latest.named === true ? { named: true } : {}),
+      ...(latest.segments === undefined ? {} : { segments: latest.segments }),
+    }
+    ctx.live.set(thread.id, entry)
+    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+    throw error
+  }
+}
+
+function installed(ctx: Ctx, threadId: ThreadId, old: Live): Live {
+  const current = ctx.live.get(threadId)
+  if (current === undefined || current === old) throw new Error("新引擎启动后会话没有接入")
+  current.queued = [...old.queued]
+  current.draining = old.draining
+  carryRules(old, current)
+  current.thread = {
+    ...withQueue(current.thread, current.queued),
+    title: old.thread.title,
+    draft: old.thread.draft,
+    draftAttachments: old.thread.draftAttachments,
+    draftRevision: old.thread.draftRevision,
+    ...(old.thread.named === true ? { named: true } : {}),
+    ...(old.thread.segments === undefined ? {} : { segments: old.thread.segments }),
+  }
+  void current.session.setTitle?.(current.thread.title).catch(() => undefined)
+  return current
+}
+
+async function finishSwitch(
+  ctx: Ctx,
+  old: Live,
+  current: Live,
+  result: { early: string | undefined; intoTurn: boolean },
+): Promise<void> {
+  await old.session.dispose().catch(() => undefined)
+  if (!isCurrent(ctx, current)) return
+  const at = ctx.deps.now()
+  // 握手完成就是 idle；`intoTurn` 只表示紧接着会发一句，不代表引擎仍在启动。
+  // 下一步若因附件能力等前置校验被拒，留下 starting 会让输入区永久不可用。
+  if (current.thread.status === "starting") {
+    current.thread = { ...current.thread, status: "idle", updatedAt: at }
+  }
+  emit(ctx, { type: "thread.updated", at, thread: current.thread })
+  if (result.early !== undefined) rememberHandle(ctx, current.thread.id, result.early)
+  if (!result.intoTurn && current.queued.length > 0) ctx.drain?.(current.thread.id)
+}
+
 /**
  * 真正把引擎换掉。两个调用点，对应两种会话：
  *
@@ -240,6 +381,7 @@ export async function switchEngine(
   if (entry === undefined) throw new Error(`会话不存在：${threadId}`)
   if (entry.thread.engine === to) return
   if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
+  if (entry.turn !== undefined) throw new Error("当前轮次尚未结束，不能立即切换引擎")
 
   const at = ctx.deps.now()
   const previous = entry.thread
@@ -249,7 +391,7 @@ export async function switchEngine(
   // 于是：codex 跑了一半，切去 Claude 看一眼，再切回来时 codex 已经不记得
   // 自己做过什么了。而每一家的句柄本来就各存各的（`segments`），
   // 切回来查一下就有。
-  const back = (previous.segments ?? []).find((seg) => seg.engine === to)
+  const back = latestSegment(previous, to)
   const thread = switched(previous, to, back, {
     at,
     status: intoTurn ? "starting" : "idle",
@@ -257,19 +399,13 @@ export async function switchEngine(
   // 启动新引擎可能要几秒；先把“正在切”发出去，旧改动卡与旧引擎状态立即退出视线。
   entry.thread = { ...previous, status: "starting", updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-  // **先把旧条目摘下来再起新的**：驱动可能在 `start()` 里就回调 `onHandle`，
-  // 那时表里若还留着旧条目，新句柄会写到**旧那条**上，然后被覆盖丢掉
+  // **旧条目留作过渡壳**：新 launch 有独立 lease，握手期句柄留在自己的 early 槽里；
+  // 旧条目暂时留着，
+  // 第二句话才能排队，而不是撞上“会话不存在”后从输入框消失。
   entry.gate.settleAll()
-  ctx.live.delete(threadId)
-  const early = await launch(ctx, thread, back?.handle).catch((error: unknown) => {
-    // **起不来就原样退回。** 旧那条这时还活着（下面那行 dispose 还没跑到），
-    // 挂回去就当无事发生——一条会话不该因为「想试试另一家」而报废
-    const failedAt = ctx.deps.now()
-    entry.thread = { ...previous, updatedAt: failedAt }
-    ctx.live.set(threadId, entry)
-    emit(ctx, { type: "thread.updated", at: failedAt, thread: entry.thread })
-    throw error
-  })
+  entry.lease.active = false
+  const early = await replacement(ctx, entry, thread, previous)
+  const current = installed(ctx, threadId, entry)
   /**
    * **新的起来了才停旧的。**
    *
@@ -282,12 +418,17 @@ export async function switchEngine(
    * 旧进程已经没了、新的又没起来，**那条会话从此发不出任何一句话**，
    * 界面上还看不出为什么。用引擎下拉里那个「未安装」的选项就能复现。
    */
-  await entry.session.dispose().catch(() => undefined)
-  // **发 `live` 里那一份，不是这个局部变量**——`launch` 会往上面挂新那家的
-  // 引擎能力。发局部的那份等于把**旧那家的能力**留在界面上：换过去之后
-  // 贴图入口、改向提示照着上一家画，而且一声不响（`create` 那边踩过同一个坑）
-  emit(ctx, { type: "thread.updated", at, thread: ctx.live.get(threadId)?.thread ?? thread })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
+  // 发 live 里的能力；随后补握手期句柄，并在直接切换时继续排队消息。
+  await finishSwitch(ctx, entry, current, { early, intoTurn })
+}
+
+function latestSegment(thread: Thread, engine: string): EngineSegment | undefined {
+  const segments = thread.segments ?? []
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const segment = segments[index]
+    if (segment?.engine === engine) return segment
+  }
+  return undefined
 }
 
 /**
@@ -316,5 +457,10 @@ function switched(
     updatedAt: transition.at,
   }
   delete next.nextEngine
+  // 这三份都由当前引擎握手/回调重建。沿用上一家的值会在新状态到达前撒谎，
+  // 更糟的是 `rememberEngineState` 会合并轴，最终把两家状态拼成一份不存在的状态。
+  delete next.engineState
+  delete next.trustApply
+  delete next.capabilities
   return next
 }

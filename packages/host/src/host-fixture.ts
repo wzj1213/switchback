@@ -22,7 +22,7 @@ export interface Fake {
 }
 
 /** 引擎回报的强度怎么算。缺省 = 照单全收；传进来就是「它其实用的是这个」。 */
-export type EffortOf = (effort?: string) => { effort?: string }
+export type EffortOf = (effort?: string) => { effort?: string } | Promise<{ effort?: string }>
 
 export function fakeDriver(
   effortOf?: EffortOf,

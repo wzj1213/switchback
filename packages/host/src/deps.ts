@@ -19,6 +19,10 @@ export interface HostDeps {
    * 规则是某个**工作区**的长期设置——删会话不该把规则一起删了。
    */
   rules?: RuleStore
+  /** 对话开场的真实工作树基线；桌面端用它计算“本次对话”的净差异。 */
+  ensureWorktreeBaseline?: (threadId: string, cwd: string) => Promise<void>
+  /** 会话删除时一起回收基线对象。 */
+  removeWorktreeBaseline?: (threadId: string) => Promise<void>
   /**
    * 同时活着的引擎会话上限。超了就把**最久没动的空闲会话**收掉。
    *

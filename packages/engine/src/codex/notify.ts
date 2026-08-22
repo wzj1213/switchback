@@ -129,6 +129,7 @@ function onUsage(ctx: NotifyContext, params: WireTokenUsage): void {
     type: "usage.updated",
     at: ctx.now(),
     threadId: ctx.threadId,
+    engine: "codex",
     usage: {
       contextUsed: used,
       ...(usage.modelContextWindow === undefined

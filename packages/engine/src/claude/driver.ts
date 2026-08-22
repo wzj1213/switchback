@@ -284,7 +284,7 @@ class ClaudeSession implements EngineSession {
     // steer 报 false：SDK 没有「往正在跑的那一轮里插一句」的入口。
     // 宿主据此退回排队——**不是假装支持再偷偷排队**，
     // 那样界面就没法如实告诉用户「这句得等」
-    // fork 也报 false：SDK 没有复制会话的入口，只能走交接包
+    // fork 也报 false：SDK 没有复制会话的入口，只能诚实地开空白分支
     // modeReadback 来自 system/init 与 system/status 的 permissionMode，见 loop.ts。
     // **运行时探测，不嗅版本**：0.3.231 的公开类型还没声明它
     return {

@@ -1,6 +1,7 @@
 import type { Command } from "@omni/protocol"
 import { switchEngine } from "./branch.js"
-import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
+import { emit, isCurrent, setStatus, withQueue, type Ctx, type Live } from "./ctx.js"
+import { recordSegment } from "./segment.js"
 
 /**
  * 一句话怎么送到引擎。
@@ -12,11 +13,77 @@ import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
  */
 
 /** 排进队里等这一轮跑完。**队列不碰 `entry.turn`**——那条硬约束见下。 */
-function enqueue(ctx: Ctx, entry: Live, text: string): void {
+function queuedPrompt(cmd: Extract<Command, { type: "thread.prompt" }>): Live["queued"][number] {
+  return {
+    text: cmd.text,
+    ...(cmd.attachments === undefined || cmd.attachments.length === 0
+      ? {}
+      : { attachments: cmd.attachments }),
+  }
+}
+
+function enqueue(
+  ctx: Ctx,
+  entry: Live,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+): void {
   const at = ctx.deps.now()
-  entry.queued = [...entry.queued, text]
-  entry.thread = { ...entry.thread, queued: [...entry.queued], updatedAt: at }
+  entry.queued = [...entry.queued, queuedPrompt(cmd)]
+  entry.thread = withQueue(consumeDraft(entry.thread, cmd.draftRevision), entry.queued, at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+function waitsForReady(entry: Live): boolean {
+  return !entry.lease.active || entry.thread.status === "starting"
+}
+
+/** 目标引擎没起起来时，触发切换的第一句回到队首；不能静默改发给旧引擎。 */
+function retainFailedSwitch(
+  ctx: Ctx,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+): void {
+  const entry = ctx.live.get(cmd.threadId)
+  if (entry === undefined || !isCurrent(ctx, entry)) return
+  // `drainOne` 送队首时只是在尝试交付，原项一直留在队列里；切换失败不能再插一份。
+  if (entry.draining !== undefined && entry.queued[0] === entry.draining) return
+  const at = ctx.deps.now()
+  entry.queued = [queuedPrompt(cmd), ...entry.queued]
+  entry.thread = withQueue(consumeDraft(entry.thread, cmd.draftRevision), entry.queued, at)
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/** 只消费发起命令时界面真正看见的那版草稿；无身份的旧记录保留兼容行为。 */
+function consumeDraft(thread: Live["thread"], revision: string | undefined): Live["thread"] {
+  const hasDraft = thread.draft !== undefined || thread.draftAttachments !== undefined
+  const matches = thread.draftRevision === undefined
+    ? revision === undefined
+    : revision === thread.draftRevision
+  if (!hasDraft || !matches) return thread
+  const next = { ...thread }
+  delete next.draft
+  delete next.draftAttachments
+  delete next.draftRevision
+  return next
+}
+
+function consumeDraftAt(ctx: Ctx, entry: Live, revision: string | undefined, at: number): void {
+  const consumed = consumeDraft(entry.thread, revision)
+  if (consumed === entry.thread) return
+  entry.thread = { ...consumed, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+function attachmentCount(cmd: Extract<Command, { type: "thread.prompt" }>): number {
+  return cmd.attachments?.length ?? 0
+}
+
+/** 当前这一家明确不收附件时拒绝；待切换的先切完，再由新会话重新判定。 */
+function assertAttachments(entry: Live, cmd: Extract<Command, { type: "thread.prompt" }>): void {
+  if (attachmentCount(cmd) === 0) return
+  const pending = entry.thread.nextEngine
+  if (pending !== undefined && pending !== entry.thread.engine) return
+  if (entry.thread.capabilities?.attachments === true) return
+  throw new Error(`${entry.thread.engine} 不支持附件；附件仍在输入区，请移除或换一个引擎`)
 }
 
 /**
@@ -43,12 +110,16 @@ async function steerInto(
   if (turnId === undefined || steer === undefined || entry.thread.capabilities?.steer !== true) {
     return false
   }
+  if (attachmentCount(cmd) > 0 && entry.thread.capabilities?.attachments !== true) return false
   try {
     await steer.call(entry.session, cmd.text, cmd.attachments)
   } catch {
     return false
   }
+  // 删除或接力期间旧 session 的迟到结果不能重建日志、也不能覆盖新引擎。
+  if (!isCurrent(ctx, entry)) return true
   const at = ctx.deps.now()
+  consumeDraftAt(ctx, entry, cmd.draftRevision, at)
   // **挂在当前这一轮上**，不是新的一轮：它是对这一轮的追加，
   // transcript 里就该出现在它实际插话的那个位置
   emit(ctx, {
@@ -79,11 +150,11 @@ async function steerInto(
  * - `draft`：**发出去了就不再是草稿**。不清的话，用户改了内容发出去之后，
  *   下次开这条会话输入框里又冒出那段原始文本。
  */
-function commit(ctx: Ctx, entry: Live, at: number): void {
-  if (entry.thread.provisional !== true && entry.thread.draft === undefined) return
-  const next = { ...entry.thread }
+function commit(ctx: Ctx, entry: Live, at: number, revision: string | undefined): void {
+  const consumed = consumeDraft(entry.thread, revision)
+  if (entry.thread.provisional !== true && consumed === entry.thread) return
+  const next = { ...consumed }
   delete next.provisional
-  delete next.draft
   entry.thread = { ...next, updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
@@ -106,18 +177,55 @@ export async function steerQueued(
   if (entry.turn === undefined || waiting.length === 0) return
   // 多句合成一段递进去：分几次 steer 的话，中间那几句可能落在不同的工具调用之间，
   // 而用户写它们时是当成一段话写的
-  const text = waiting.join("\n")
-  const ok = await steerInto(ctx, entry, { type: "thread.prompt", threadId: cmd.threadId, text })
-  if (!ok) return
+  const text = waiting.map((prompt) => prompt.text).join("\n")
+  const attachments = waiting.flatMap((prompt) => prompt.attachments ?? [])
+  const ok = await steerInto(ctx, entry, {
+    type: "thread.prompt",
+    threadId: cmd.threadId,
+    text,
+    ...(attachments.length === 0 ? {} : { attachments }),
+  })
+  if (!ok || !isCurrent(ctx, entry)) return
   const at = ctx.deps.now()
   entry.queued = []
-  entry.thread = { ...entry.thread, queued: [], updatedAt: at }
+  entry.thread = withQueue(entry.thread, [], at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+async function sendPrompt(
+  ctx: Ctx,
+  entry: Live,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+  turnId: string,
+): Promise<void> {
+  try {
+    await entry.session.prompt(cmd.text, turnId, cmd.attachments)
+  } catch (error) {
+    // RPC 连“开始”都没送进去时，引擎不会再补 completed；宿主必须把自己开的 Turn 收掉。
+    if (isCurrent(ctx, entry) && entry.turn === turnId) {
+      // 先摘 turn 并自行落状态：让下面的 completed 只收 renderer 那一侧，
+      // 不触发 observe 的“失败轮次清空队列”。这次 RPC 根本没开始，排着的后续消息不能陪葬。
+      entry.turn = undefined
+      setStatus(ctx, entry, "failed")
+      emit(ctx, { type: "turn.completed", at: ctx.deps.now(), turnId, status: "failed", error: String(error) })
+    }
+    throw error
+  }
 }
 
 export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  // 接力握手期间第二句话先排着。旧实现会暂时把 Live 从表里删除，输入框清空后
+  // 才收到“会话不存在”——这是消息丢失，不是普通报错。
+  // 接管原生历史、创建与原生分叉都可能已经握手成功，但仍在收尾 starting。
+  // 这时直接 prompt 会让新消息跑到待复制的旧 transcript 前面；统一排队，
+  // 由各自的 ready 收尾在历史与状态完整落定后再 drain。
+  if (waitsForReady(entry)) {
+    enqueue(ctx, entry, cmd)
+    return
+  }
+  assertAttachments(entry, cmd)
   /**
    * **上一轮没跑完时不开新轮次。** 这条硬约束一直没变：`entry.turn` 绝不能被
    * 新 turnId 覆盖——引擎还在往**旧的** turnId 上发 item，覆盖之后那些 item
@@ -139,8 +247,12 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
    * 四版都守住了那条硬约束：steer 和队列**都不碰 `entry.turn`**。
    */
   if (entry.turn !== undefined) {
-    if (cmd.steer === true && (await steerInto(ctx, entry, cmd))) return
-    enqueue(ctx, entry, cmd.text)
+    if (cmd.steer === true) {
+      if (await steerInto(ctx, entry, cmd)) return
+      // steer 失败的同时若已经换代，交给当前会话重新判定，不能改写旧壳。
+      if (!isCurrent(ctx, entry)) return prompt(ctx, cmd)
+    }
+    enqueue(ctx, entry, cmd)
     return
   }
   /**
@@ -155,11 +267,16 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
    */
   const pending = entry.thread.nextEngine
   if (pending !== undefined && pending !== entry.thread.engine) {
-    await switchEngine(ctx, cmd.threadId, pending, true)
+    try {
+      await switchEngine(ctx, cmd.threadId, pending, true)
+    } catch (error) {
+      retainFailedSwitch(ctx, cmd)
+      throw error
+    }
     return prompt(ctx, cmd)
   }
   const at = ctx.deps.now()
-  commit(ctx, entry, at)
+  commit(ctx, entry, at, cmd.draftRevision)
   // **有实际对话才记这一段。** 切过去没说话就切走，不该在时间线上
   // 留一条什么都没发生的记录——那样时间线会被「我点错了」填满
   void recordSegment(ctx, entry)
@@ -188,40 +305,5 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
         : { attachments: cmd.attachments }),
     },
   })
-  await entry.session.prompt(cmd.text, turnId, cmd.attachments)
-}
-
-/**
- * 记下「这条会话在当前这家引擎那边的一段」。
- *
- * 调用时机有两个，缺一不可：
- *
- * - **第一轮开始时**（而不是切引擎时——切过去没说话不算一段）：那时段就该出现，
- *   哪怕还不知道记录在哪。
- * - **每轮收工后**：`logPath` 那时才拿得到。实测 codex 的 `thread/list`
- *   只列**已经落了 rollout 文件**的会话，而第一轮开始时它还没落——
- *   只在开头记一次的话，路径永远是空的（这个坑是拿真机跑出来的）。
- * 已经有这一家的段就只补 `logPath`（句柄不变：切回来续的就是它）。
- *
- * `logPath` 是异步问引擎的，所以整件事不 await：**它慢一点不该拖着这一轮发不出去**。
- * 拿不到就只有句柄，界面照样能显示时间线，只是少一行「记录在哪」。
- */
-export async function recordSegment(ctx: Ctx, entry: Live): Promise<void> {
-  const handle = entry.thread.engineHandle
-  if (handle === undefined) return
-  const engine = entry.thread.engine
-  const path = await entry.session.logPath?.().catch(() => undefined)
-  const live = ctx.live.get(entry.thread.id)
-  // 等 logPath 的这一会儿会话可能已经没了
-  if (live === undefined) return
-  const had = live.thread.segments ?? []
-  const mine = had.find((seg) => seg.engine === engine && seg.handle === handle)
-  if (mine !== undefined && (path === undefined || mine.logPath === path)) return
-  const at = ctx.deps.now()
-  const next =
-    mine === undefined
-      ? [...had, { engine, handle, startedAt: at, ...(path === undefined ? {} : { logPath: path }) }]
-      : had.map((seg) => (seg === mine ? { ...seg, ...(path === undefined ? {} : { logPath: path }) } : seg))
-  live.thread = { ...live.thread, segments: next, updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: live.thread })
+  await sendPrompt(ctx, entry, cmd, turnId)
 }

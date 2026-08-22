@@ -246,6 +246,7 @@ describe("引擎自己认的斜杠命令", () => {
         type: "commands.updated",
         at: 1000,
         threadId: "t1",
+        engine: "acp:fake",
         commands: [
           { name: "compact", description: "压缩上下文", argumentHint: "要保留什么", source: "engine" },
           { name: "context", description: "看上下文用量", source: "engine" },

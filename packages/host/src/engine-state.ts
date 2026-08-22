@@ -1,5 +1,5 @@
 import type { Command, EngineAxis, ThreadId, TrustApply } from "@omni/protocol"
-import { emit, type Ctx } from "./ctx.js"
+import { emit, isCurrent, type Ctx } from "./ctx.js"
 
 /**
  * **引擎那边先发生、omni 后知道**的那些变化，落到 `Thread` 上并广播。
@@ -102,11 +102,14 @@ export async function sideQuestion(
 ): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  if (!isCurrent(ctx, entry)) throw new Error("会话正在切换或重启，暂时不能侧问")
   const ask = entry.session.askAside
   if (ask === undefined) throw new Error(`${entry.thread.engine} 不支持侧问`)
   const question = cmd.text.trim()
   if (question === "") return
   const answer = await ask.call(entry.session, question)
+  // 侧问期间允许用户去做别的；若已经接力，答案仍属于旧引擎，不能覆盖新 Thread。
+  if (!isCurrent(ctx, entry)) return
   const at = ctx.deps.now()
   entry.thread = { ...entry.thread, asides: [...(entry.thread.asides ?? []), { at, question, answer }], updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })

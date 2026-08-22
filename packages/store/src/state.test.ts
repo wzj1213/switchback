@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest"
-import type { Thread } from "@omni/protocol"
-import { baseNameOf, foreignByEngine, forkPeerOf, initial, modelsOf, projectsOf, threadRowsOf, type ViewState } from "./state.js"
+import type { Event, Thread } from "@omni/protocol"
+import {
+  baseNameOf,
+  commandsOf,
+  foreignByEngine,
+  forkPeerOf,
+  initial,
+  modelsOf,
+  projectsOf,
+  threadRowsOf,
+  usageOf,
+  type ViewState,
+} from "./state.js"
 import { reduceAll } from "./reduce.js"
 
 const thread = (id: string, at: number, forkedFrom?: string): Thread => ({
@@ -118,6 +129,72 @@ describe("模型清单认引擎", () => {
 
   it("没报过就是空的", () => {
     expect(modelsOf(initial(), "th-1", "codex")).toEqual([])
+  })
+
+  it("新引擎上报后仍保留旧引擎那份，失败回滚可直接恢复", () => {
+    const switched = reduceAll(withModels("codex"), [
+      { type: "models.updated", at: 2, threadId: "th-1", engine: "claude", models: [] },
+    ])
+    expect(modelsOf(switched, "th-1", "codex")).toEqual([{ id: "m1", label: "M1" }])
+  })
+})
+
+describe("斜杠命令清单认引擎", () => {
+  const state = reduceAll(initial(), [{
+    type: "commands.updated",
+    at: 1,
+    threadId: "th-1",
+    engine: "codex",
+    commands: [{ name: "review", description: "", source: "engine" }],
+  }])
+
+  it("只把当前引擎自己报的命令交给输入框", () => {
+    expect(commandsOf(state, "th-1", "codex")).toHaveLength(1)
+    expect(commandsOf(state, "th-1", "claude")).toEqual([])
+  })
+
+  it("另一家清空自己的目录不会抹掉旧引擎目录", () => {
+    const switched = reduceAll(state, [
+      { type: "commands.updated", at: 2, threadId: "th-1", engine: "claude", commands: [] },
+    ])
+    expect(commandsOf(switched, "th-1", "codex")).toHaveLength(1)
+  })
+})
+
+describe("上下文用量认引擎", () => {
+  const state = reduceAll(initial(), [{
+    type: "usage.updated",
+    at: 1,
+    threadId: "th-1",
+    engine: "codex",
+    usage: { contextUsed: 42 },
+  }])
+
+  it("接力后不沿用上一家的窗口占用", () => {
+    expect(usageOf(state, "th-1", "codex")?.contextUsed).toBe(42)
+    expect(usageOf(state, "th-1", "claude")).toBeUndefined()
+  })
+
+  it("新引擎用量到达后仍能在回滚时取回旧引擎用量", () => {
+    const switched = reduceAll(state, [{
+      type: "usage.updated", at: 2, threadId: "th-1", engine: "claude", usage: { contextUsed: 9 },
+    }])
+    expect(usageOf(switched, "th-1", "codex")?.contextUsed).toBe(42)
+  })
+
+  it("新原生会话启动会清掉这家上一条会话的陈旧用量", () => {
+    const cleared = reduceAll(state, [
+      { type: "usage.cleared", at: 2, threadId: "th-1", engine: "codex" },
+    ])
+    expect(usageOf(cleared, "th-1", "codex")).toBeUndefined()
+  })
+
+  it("旧 journal 没有来源引擎时按当时的 thread 引擎迁移", () => {
+    const legacy = {
+      type: "usage.updated", at: 1, threadId: "th-1", usage: { contextUsed: 7 },
+    } as unknown as Event
+    const restored = reduceAll(stateWith(thread("th-1", 0)), [legacy])
+    expect(usageOf(restored, "th-1", "codex")?.contextUsed).toBe(7)
   })
 })
 

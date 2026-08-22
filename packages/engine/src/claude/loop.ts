@@ -147,7 +147,7 @@ function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
   clearTasks(ref.tasks, at, req)
   resetPlan(ref.plan)
   if (msg.usage !== undefined) {
-    req.emit({ type: "usage.updated", at, threadId: req.threadId, usage: usageOf(msg.usage) })
+    req.emit({ type: "usage.updated", at, threadId: req.threadId, engine: "claude", usage: usageOf(msg.usage) })
   }
   if (turnId === undefined) return
   const status = turnStatus(msg.subtype ?? "", msg.is_error === true)

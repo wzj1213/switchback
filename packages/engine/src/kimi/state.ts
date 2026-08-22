@@ -44,6 +44,7 @@ export class KimiStateReporter {
         type: "usage.updated",
         at: Date.now(),
         threadId: this.req.threadId,
+        engine: "kimi",
         usage: {
           contextUsed: status.context_tokens,
           ...(status.max_context_tokens === undefined ? {} : { contextWindow: status.max_context_tokens }),
@@ -69,6 +70,7 @@ export class KimiStateReporter {
       type: "usage.updated",
       at: Date.now(),
       threadId: this.req.threadId,
+      engine: "kimi",
       usage: {
         contextUsed: payload.contextTokens,
         ...(payload.maxContextTokens === undefined ? {} : { contextWindow: payload.maxContextTokens }),
@@ -83,6 +85,7 @@ export class KimiStateReporter {
       type: "usage.updated",
       at: Date.now(),
       threadId: this.req.threadId,
+      engine: "kimi",
       usage: {
         contextUsed: usage.context_tokens,
         ...(usage.context_limit <= 0 ? {} : { contextWindow: usage.context_limit }),

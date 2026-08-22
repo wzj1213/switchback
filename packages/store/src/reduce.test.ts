@@ -256,7 +256,14 @@ describe("thread.removed", () => {
       started("b"),
       turnStarted("a", "t1"),
       { type: "item.started", at: 0, item: msg("m1", "t1", "甲的内容") },
-      { type: "usage.updated", at: 0, threadId: "a", usage: { contextUsed: 100 } },
+      { type: "usage.updated", at: 0, threadId: "a", engine: "claude", usage: { contextUsed: 100 } },
+      {
+        type: "commands.updated",
+        at: 0,
+        threadId: "a",
+        engine: "claude",
+        commands: [{ name: "old", description: "", source: "engine" }],
+      },
     ])
 
   it("会话、顺序、item、用量一并摘掉", () => {
@@ -264,6 +271,7 @@ describe("thread.removed", () => {
     expect(threadsOf(s).map((t) => t.id)).toEqual(["b"])
     expect(itemsOf(s, "a")).toEqual([])
     expect(s.usage["a"]).toBeUndefined()
+    expect(s.commands["a"]).toBeUndefined()
   })
 
   it("反查表也要清——留着的话一条迟到的 item.updated 会把数据写回一个不存在的会话", () => {

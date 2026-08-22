@@ -3,6 +3,16 @@ import { type Event } from "@omni/protocol"
 import { type Host } from "./host.js"
 import { setup, create, type Fake } from "./host-fixture.js"
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  const slot: { resolve?: () => void } = {}
+  return {
+    promise: new Promise((resolve) => {
+      slot.resolve = resolve
+    }),
+    resolve: () => slot.resolve?.(),
+  }
+}
+
 describe("换模型时的推理强度", () => {
   const pick = async (): Promise<{ host: Host; events: Event[]; id: string }> => {
     const { host, events } = setup()
@@ -13,6 +23,23 @@ describe("换模型时的推理强度", () => {
   }
   const effortOf = (events: Event[]): string | undefined =>
     events.filter((e) => e.type === "thread.updated").at(-1)?.thread.effort
+
+  it("新建时也记录引擎真正采用的强度", async () => {
+    const { host, events } = setup({ effort: () => ({ effort: "max" }) })
+    await host.dispatch({ ...create, model: "a", effort: "low" })
+    expect(events.filter((e) => e.type === "thread.updated").at(-1)?.thread).toMatchObject({
+      model: "a",
+      effort: "max",
+    })
+  })
+
+  it("新建时模型设置失败就回到默认，不显示一个没设上的选择", async () => {
+    const { host, events } = setup({ effort: () => Promise.reject(new Error("不支持")) })
+    await host.dispatch({ ...create, model: "bad", effort: "high" })
+    const thread = events.filter((e) => e.type === "thread.updated").at(-1)?.thread
+    expect(thread?.model).toBeUndefined()
+    expect(thread?.effort).toBeUndefined()
+  })
 
   it("选了就记下", async () => {
     const { events } = await pick()
@@ -34,6 +61,31 @@ describe("换模型时的推理强度", () => {
     const { host, events, id } = await pick()
     await host.dispatch({ type: "thread.setModel", threadId: id, model: "b" })
     expect(effortOf(events)).toBeUndefined()
+  })
+
+  it("快速连选时按点击顺序设置，慢回包不能反盖最后一次选择", async () => {
+    const slow = deferred()
+    const calls: string[] = []
+    const { host, events } = setup({
+      effort: async (effort) => {
+        calls.push(effort ?? "")
+        if (effort === "slow") await slow.promise
+        return effort === undefined ? {} : { effort }
+      },
+    })
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    const first = host.dispatch({ type: "thread.setModel", threadId: id, model: "a", effort: "slow" })
+    const second = host.dispatch({ type: "thread.setModel", threadId: id, model: "b", effort: "fast" })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(calls).toEqual(["slow"])
+    slow.resolve()
+    await Promise.all([first, second])
+    expect(calls).toEqual(["slow", "fast"])
+    expect(events.filter((e) => e.type === "thread.updated").at(-1)?.thread).toMatchObject({
+      model: "b",
+      effort: "fast",
+    })
   })
 })
 

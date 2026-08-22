@@ -15,6 +15,11 @@ export interface Live {
   thread: Thread
   session: EngineSession
   gate: Gate
+  /**
+   * 一次 `launch` 的身份。thread id 在接力时不变，**对象身份会变**；所有异步回调
+   * 都要同时认这两样，不能只凭 thread id 把上一家迟到的结果写进新会话。
+   */
+  lease: { active: boolean }
   /** 当前未结束的轮次；审批卡要挂在它下面 */
   turn: TurnId | undefined
   /**
@@ -39,12 +44,103 @@ export interface Live {
    * 放在宿主而不是渲染层：渲染层重载一次队列就没了，而用户打完那句话
    * 就当它已经交出去了。放在这里，重载之后队列还在（全量重建带着 thread 一起回来）。
    */
-  queued: string[]
+  queued: QueuedPrompt[]
+  /** 队首已经进入发送流程、尚未收到 prompt RPC 确认；取回时不能再复制这一条。 */
+  draining?: QueuedPrompt
+}
+
+export interface QueuedPrompt {
+  text: string
+  attachments?: readonly string[]
+}
+
+export function queuedTexts(queued: readonly QueuedPrompt[]): string[] {
+  return queued.map((prompt) => prompt.text)
+}
+
+/** 把宿主的完整队列投影到协议 Thread；附件与文字始终按下标对齐。 */
+export function withQueue(thread: Thread, queued: readonly QueuedPrompt[], updatedAt = thread.updatedAt): Thread {
+  const next = { ...thread }
+  delete next.queuedAttachments
+  const attachments = queued.map((prompt) => [...(prompt.attachments ?? [])])
+  return {
+    ...next,
+    queued: queuedTexts(queued),
+    ...(attachments.some((paths) => paths.length > 0) ? { queuedAttachments: attachments } : {}),
+    updatedAt,
+  }
+}
+
+function promptsOf(thread: Thread): QueuedPrompt[] {
+  return (thread.queued ?? []).map((text, index) => {
+    const attachments = thread.queuedAttachments?.[index]
+    return {
+      text,
+      ...(attachments === undefined || attachments.length === 0 ? {} : { attachments }),
+    }
+  })
+}
+
+/** `launch` 握手前的条目；session/gate 会在驱动成功启动后补上。 */
+export function preparingLive(thread: Thread, lease: Live["lease"], rules: Rule[]): Live {
+  return {
+    thread,
+    session: undefined as unknown as EngineSession,
+    gate: undefined as unknown as Gate,
+    lease,
+    turn: undefined,
+    rules,
+    suggests: new Map<ItemId, Rule>(),
+    queued: promptsOf(thread),
+  }
+}
+
+/** 这份 Live 仍是该 thread 此刻登记的那一代。 */
+export function isCurrent(ctx: Ctx, entry: Live): boolean {
+  return !ctx.closed && entry.lease.active && ctx.live.get(entry.thread.id)?.lease === entry.lease
+}
+
+/** ready 收尾共用：只让仍是当前代际、且确有待发消息的会话进入 drain。 */
+export function drainQueued(ctx: Ctx, entry: Live | undefined): void {
+  if (entry === undefined || !isCurrent(ctx, entry) || entry.queued.length === 0) return
+  ctx.drain?.(entry.thread.id)
+}
+
+/** 启动没成功、会话尚未成立时，回收临时事件槽与已取的工作树基线。 */
+export async function discardUnstarted(ctx: Ctx, threadId: ThreadId): Promise<void> {
+  ctx.uncommitted.delete(threadId)
+  await ctx.deps.removeWorktreeBaseline?.(threadId).catch(() => undefined)
+}
+
+/** 基线完成前后都认删除墓碑，确保引擎没有机会在已删除 thread 上启动。 */
+export async function ensureLaunchable(
+  ctx: Ctx,
+  thread: Thread,
+  captureBaseline: boolean,
+): Promise<void> {
+  if (ctx.closed) throw new Error("宿主已经关闭")
+  if (ctx.removed.has(thread.id)) throw new Error(`会话已经删除：${thread.id}`)
+  if (captureBaseline) await ctx.deps.ensureWorktreeBaseline?.(thread.id, thread.cwd)
+  if (ctx.closed) throw new Error("宿主已经关闭")
+  if (ctx.removed.has(thread.id)) throw new Error(`会话已经删除：${thread.id}`)
+}
+
+/** driver.start 与删除撞车时，刚起好的进程在登记前自行回收。 */
+export async function attachStarted(ctx: Ctx, entry: Live, session: EngineSession): Promise<void> {
+  entry.session = session
+  if (!ctx.closed && !ctx.removed.has(entry.thread.id)) return
+  entry.lease.active = false
+  await entry.session.dispose().catch(() => undefined)
+  throw new Error(ctx.closed ? "宿主已经关闭" : `会话已经删除：${entry.thread.id}`)
 }
 
 export interface Ctx {
   deps: HostDeps
+  /** 退出一落定，所有在途启动与迟到回调都只能回收，不能再接入。 */
+  closed: boolean
   live: Map<ThreadId, Live>
+  /** 删除命令先落墓碑；任何仍在启动途中的同 id 会话都不得再接入。 */
+  removed: Set<ThreadId>
   /**
    * turn id → 它属于哪个会话。
    *
@@ -59,6 +155,8 @@ export interface Ctx {
    * 模块级的表会让它们互相拦。
    */
   inflight: Map<string, Promise<void>>
+  /** 同一会话的模型、档位与接力按用户操作顺序执行，避免迟到结果反盖新选择。 */
+  serial: Map<string, Promise<void>>
   /**
    * 不落盘、但描述现状的事件，各留最后一条（见 `LIVE_STATE`）。
    * 窗口重载时靠它补全——否则这些事实会在「没落盘」和「全量只读 journal」
@@ -142,7 +240,7 @@ const LIVE_STATE: ReadonlySet<string> = new Set([
  */
 function liveKey(event: Event): string | undefined {
   if (event.type === "limits.updated") return `limits:${event.engine}`
-  if (event.type === "commands.updated") return `commands:${event.threadId}`
+  if (event.type === "commands.updated") return `commands:${event.threadId}\u0000${event.engine}`
   if (event.type === "engine.history") return `history:${event.engine}`
   if (event.type === "account.updated") return `account:${event.engine}`
   return undefined
@@ -181,7 +279,8 @@ export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
  * 空串当作「不属于任何会话」：引擎级的状态（比如探测结果）会这么报。
  */
 function directOwner(event: Event): ThreadId | undefined {
-  if (event.type !== "usage.updated" && event.type !== "engine.status" && event.type !== "models.updated") {
+  if (event.type !== "usage.updated" && event.type !== "usage.cleared" &&
+    event.type !== "engine.status" && event.type !== "models.updated") {
     return undefined
   }
   return event.threadId === "" ? undefined : event.threadId
@@ -194,12 +293,17 @@ function directOwner(event: Event): ThreadId | undefined {
  * 界面响应不该等磁盘；而 `observe` 会改会话状态并再发事件，放最后免得穿插。
  */
 export function emit(ctx: Ctx, event: Event): void {
+  if (ctx.closed) return
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
   const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
   if (key !== undefined) ctx.liveState.set(key, event)
   ctx.deps.emit(event)
   // 删掉的会话如果还没提交过，攒下的那些一起扔掉——它从来没上过磁盘
-  if (event.type === "thread.removed") ctx.uncommitted.delete(event.threadId)
+  if (event.type === "thread.removed") {
+    ctx.uncommitted.delete(event.threadId)
+    const prefix = `commands:${event.threadId}\u0000`
+    for (const key of ctx.liveState.keys()) if (key.startsWith(prefix)) ctx.liveState.delete(key)
+  }
   const owner = ownerOf(ctx, event)
   if (owner !== undefined) persist(ctx, owner, event)
   observe(ctx, event)
@@ -254,7 +358,13 @@ function commits(event: Event): boolean {
  */
 export function liveStateOf(ctx: Ctx): readonly Event[] {
   return [...ctx.liveState.entries()]
-    .filter(([key]) => !key.startsWith("commands:") || ctx.live.has(key.slice("commands:".length) as ThreadId))
+    .filter(([key]) => {
+      if (!key.startsWith("commands:")) return true
+      const rest = key.slice("commands:".length)
+      const end = rest.indexOf("\u0000")
+      const threadId = (end === -1 ? rest : rest.slice(0, end)) as ThreadId
+      return ctx.live.has(threadId)
+    })
     .map(([, event]) => event)
 }
 
@@ -282,7 +392,7 @@ export function observe(ctx: Ctx, event: Event): void {
   for (const entry of ctx.live.values()) {
     if (entry.turn !== event.turnId) continue
     entry.turn = undefined
-    // **这一轮没跑完就结束的，把还挂着的审批卡一并落定。**
+    // **轮次一结束，就把还挂着的审批卡一并落定。**
     //
     // 中断之后轮次回到 idle，而审批卡会停在「待确认」且三个按钮都还能点。
     // 过一会儿用户点「允许」+「本项目始终允许」，卡片翻成「已允许」——
@@ -291,7 +401,9 @@ export function observe(ctx: Ctx, event: Event): void {
     // 顺带还能在一个已经死掉的上下文里被诱导授出一条永久规则。
     //
     // 工具行那边早有 `sweepInflight` 扫尾，审批卡漏扫了。
-    if (event.status !== "completed") entry.gate.settleAll()
+    // 正常情况下 completed 时不会再有审批；但原生事件可能乱序或提前收工。
+    // 留着一张已经没有调用方等待的卡，只会让用户事后给失效请求授予规则。
+    entry.gate.settleAll()
     setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
     // **只有正常跑完才接上队列。** 中断/失败之后接着发排队的话是错的：
     // 人按停止就是要它停下，而不是"停完这句再跑下一句"
@@ -299,7 +411,9 @@ export function observe(ctx: Ctx, event: Event): void {
     // 而「上一段跑砸了、记录在哪」恰恰是你最想去读的
     ctx.afterTurn?.(entry.thread.id)
     if (event.status === "completed") ctx.drain?.(entry.thread.id)
-    else if (entry.queued.length > 0) clearQueue(ctx, entry)
+    // 失败不是用户取消：后面排好的文字与附件保留成“待发送”，让用户取回确认。
+    // 只有明确中断才清掉，避免停止之后又自动继续。
+    else if (event.status !== "failed" && entry.queued.length > 0) clearQueue(ctx, entry)
     return
   }
 }
@@ -307,7 +421,8 @@ export function observe(ctx: Ctx, event: Event): void {
 /** 清掉待发队列并把变化发出去。中断之后用。 */
 export function clearQueue(ctx: Ctx, entry: Live): void {
   entry.queued = []
+  entry.draining = undefined
   const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, queued: [], updatedAt: at }
+  entry.thread = withQueue(entry.thread, [], at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }

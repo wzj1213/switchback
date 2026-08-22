@@ -112,6 +112,35 @@ function omit<T>(record: Readonly<Record<string, T>>, key: string): Record<strin
   return Object.fromEntries(Object.entries(record).filter(([k]) => k !== key))
 }
 
+function withEngine<T>(
+  record: Readonly<Record<string, Readonly<Record<string, T>>>>,
+  threadId: ThreadId,
+  engine: string,
+  value: T,
+): Record<string, Readonly<Record<string, T>>> {
+  return { ...record, [threadId]: { ...record[threadId], [engine]: value } }
+}
+
+function withoutEngine<T>(
+  record: Readonly<Record<string, Readonly<Record<string, T>>>>,
+  threadId: ThreadId,
+  engine: string,
+): Record<string, Readonly<Record<string, T>>> {
+  const current = record[threadId]
+  if (current === undefined) return { ...record }
+  const next = omit(current, engine)
+  return Object.keys(next).length === 0 ? omit(record, threadId) : { ...record, [threadId]: next }
+}
+
+/** 旧 journal 的用量事件没有 engine；按它前面的 thread 快照迁移到当时引擎。 */
+function usageEngine(
+  state: ViewState,
+  event: Extract<Event, { type: "usage.updated" }>,
+): string | undefined {
+  const legacy = event as typeof event & { engine?: string }
+  return legacy.engine ?? state.threads[event.threadId]?.engine
+}
+
 function onTurnCompleted(
   state: ViewState,
   event: Extract<Event, { type: "turn.completed" }>,
@@ -145,6 +174,7 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
     usage: omit(state.usage, threadId),
     tasks: omit(state.tasks, threadId),
     models: omit(state.models, threadId),
+    commands: omit(state.commands, threadId),
     owner: keepOwner,
     turnOwner: keepTurnOwner,
   }
@@ -187,14 +217,21 @@ function onEngineStatus(
 /** 「整份替换某张表」的几支。和 item 三兄弟一样，拎出来是为了分支数不撞闸门。 */
 function reduceCatalog(
   state: ViewState,
-  event: Extract<Event, { type: "usage.updated" | "models.updated" | "engines.available" }>,
+  event: Extract<Event, { type: "usage.updated" | "usage.cleared" | "models.updated" | "engines.available" }>,
 ): ViewState {
   if (event.type === "engines.available") return { ...state, engines: event.engines }
   if (event.type === "models.updated") {
-    // 连报它的那家引擎一起记下：切引擎之后靠它认出「这份是上一家的」（见 `modelsOf`）
-    return { ...state, models: { ...state.models, [event.threadId]: { engine: event.engine, list: event.models } } }
+    return { ...state, models: withEngine(state.models, event.threadId, event.engine, event.models) }
   }
-  return { ...state, usage: { ...state.usage, [event.threadId]: event.usage } }
+  if (event.type === "usage.cleared") {
+    return { ...state, usage: withoutEngine(state.usage, event.threadId, event.engine) }
+  }
+  const engine = usageEngine(state, event)
+  if (engine === undefined) return state
+  return {
+    ...state,
+    usage: withEngine(state.usage, event.threadId, engine, event.usage),
+  }
 }
 
 /** item 三兄弟单独拎出来，纯粹为了让 `reduce` 的分支数不撞闸门。 */
@@ -241,6 +278,7 @@ const HANDLERS: Handlers = {
   "item.delta": reduceItem,
   "item.updated": reduceItem,
   "usage.updated": reduceCatalog,
+  "usage.cleared": reduceCatalog,
   // **整份替换**：全量的好处是没有「漏发一次删除」这个失败模式（见事件定义）
   "tasks.updated": (state, event) => ({
     ...state,
@@ -248,7 +286,7 @@ const HANDLERS: Handlers = {
   }),
   "commands.updated": (state, event) => ({
     ...state,
-    commands: { ...state.commands, [event.threadId]: event.commands },
+    commands: withEngine(state.commands, event.threadId, event.engine, event.commands),
   }),
   "models.updated": reduceCatalog,
   "engines.available": reduceCatalog,

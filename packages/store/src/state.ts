@@ -1,4 +1,20 @@
-import type { EngineAccount, EngineInfo, EngineThread, Item, ItemId, ModelOption, RateLimits, SlashCommand, Thread, ThreadId, TaskRun, Turn, TurnId, Usage } from "@omni/protocol"
+import type {
+  EngineAccount,
+  EngineId,
+  EngineInfo,
+  EngineThread,
+  Item,
+  ItemId,
+  ModelOption,
+  RateLimits,
+  SlashCommand,
+  TaskRun,
+  Thread,
+  ThreadId,
+  Turn,
+  TurnId,
+  Usage,
+} from "@omni/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -13,8 +29,8 @@ export interface ViewState {
   owner: Readonly<Record<ItemId, ThreadId>>
   /** turn id → 它属于哪个会话。`turn.completed` 同理。 */
   turnOwner: Readonly<Record<TurnId, ThreadId>>
-  /** 每个会话的上下文用量。引擎不报就没有这一项。 */
-  usage: Readonly<Record<ThreadId, Usage>>
+  /** 每个会话的上下文用量与来源引擎。引擎不报就没有这一项。 */
+  usage: Readonly<Record<ThreadId, Readonly<Record<EngineId, Usage>>>>
   /**
    * 每个会话此刻有哪些子 agent 在跑。**活状态，不落盘**——和 `usage` 同一类。
    *
@@ -26,7 +42,7 @@ export interface ViewState {
    *
    * 记着「谁报的」是为了切引擎之后不撒谎：见 `modelsOf`。
    */
-  models: Readonly<Record<ThreadId, { engine: string; list: readonly ModelOption[] }>>
+  models: Readonly<Record<ThreadId, Readonly<Record<EngineId, readonly ModelOption[]>>>>
   /** 这台机器上可用的引擎。宿主启动时报一次。 */
   engines: readonly EngineInfo[]
   /** 引擎层面的故障。最新在后。 */
@@ -43,8 +59,8 @@ export interface ViewState {
   accounts: Readonly<Record<string, EngineAccount>>
   /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
   noticeSeq: number
-  /** 每个会话能用的斜杠命令。引擎报什么就是什么，omni 自己那几条在渲染层拼。 */
-  commands: Readonly<Record<string, readonly SlashCommand[]>>
+  /** 每个会话能用的斜杠命令，连同来源引擎；omni 自己那几条在渲染层拼。 */
+  commands: Readonly<Record<ThreadId, Readonly<Record<EngineId, readonly SlashCommand[]>>>>
   /** 各家引擎的账号额度。**按引擎存不按会话存**——额度是账号级的。 */
   limits: Readonly<Record<string, RateLimits>>
 }
@@ -103,8 +119,8 @@ export function turnOf(state: ViewState, threadId: ThreadId): Turn | undefined {
   return state.turns[threadId]
 }
 
-export function usageOf(state: ViewState, threadId: ThreadId): Usage | undefined {
-  return state.usage[threadId]
+export function usageOf(state: ViewState, threadId: ThreadId, engine: EngineId): Usage | undefined {
+  return state.usage[threadId]?.[engine]
 }
 
 /**
@@ -134,8 +150,7 @@ export function tasksOf(state: ViewState, threadId: ThreadId): readonly TaskRun[
  * 而它不会报错。
  */
 export function modelsOf(state: ViewState, threadId: ThreadId, engine: string): readonly ModelOption[] {
-  const known = state.models[threadId]
-  return known?.engine === engine ? known.list : []
+  return state.models[threadId]?.[engine] ?? []
 }
 
 /** 取一个会话能用的斜杠命令。引擎没报过就是空的，界面据此只显示 omni 自己那几条。 */
@@ -144,8 +159,8 @@ export function limitsOf(state: ViewState, engine: string): RateLimits | undefin
   return state.limits[engine]
 }
 
-export function commandsOf(state: ViewState, threadId: ThreadId): readonly SlashCommand[] {
-  return state.commands[threadId] ?? []
+export function commandsOf(state: ViewState, threadId: ThreadId, engine: EngineId): readonly SlashCommand[] {
+  return state.commands[threadId]?.[engine] ?? []
 }
 
 export function threadsOf(state: ViewState): readonly Thread[] {

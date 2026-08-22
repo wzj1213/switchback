@@ -101,13 +101,15 @@ describe("在途去重", () => {
     expect(starts()).toBe(2)
   })
 
-  it("参数不同的不算重入：换个档位就是另一个请求", async () => {
-    const { host, starts } = slowSetup(60)
+  it("参数不同的新建以最后一次为准：尚未启动的旧配置安静取消", async () => {
+    const { host, starts, events } = slowSetup(60)
     await Promise.all([
       host.dispatch(slowCreate),
       host.dispatch({ ...slowCreate, trust: "read-only" }),
     ])
-    expect(starts()).toBe(2)
+    expect(starts()).toBe(1)
+    expect(events.filter((event) => event.type === "thread.started")).toHaveLength(2)
+    expect(events.filter((event) => event.type === "thread.removed")).toHaveLength(1)
   })
 
   it("同一条原生会话连点接管只起一个进程——两个 writer 会把其中一条永久卡住", async () => {
@@ -221,6 +223,19 @@ describe("中断之后审批卡不能还挂着", () => {
     session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
     await new Promise((r) => setTimeout(r, 0))
     expect(host.live().find((t) => t.id === id)?.status).toBe("idle")
+  })
+
+  it("原生轮次提前报 completed 时，残留审批也按失效拒绝落定", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.prompt", threadId: id, text: "跑一下" })
+    const pending = session().ask(ask)
+    const turnId = events.find((e) => e.type === "turn.started")?.turn.id ?? ""
+    session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
+    await expect(pending).resolves.toMatchObject({ allow: false })
+    const card = items(events).filter((item) => item.kind === "approval").at(-1)
+    expect(card?.kind === "approval" ? card.status : "").toBe("denied")
   })
 })
 

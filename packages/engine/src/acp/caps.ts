@@ -25,7 +25,7 @@ export interface AcpDriverConfig {
    * `sessions/<工作区编码>/<sessionId>/` 下），光有 sessionId 定位不到；
    * 不需要的那家（kimi 查自己的索引）少收一个参数就行。
    *
-   * 不给就是拿不到——换引擎时退回交接包，那条路一直留着。
+   * 不给就是拿不到——时间线据实不提供原始记录入口，不由宿主编摘要补齐。
    */
   logPath?: (home: string, sessionId: string, cwd: string) => Promise<string | undefined>
   /**

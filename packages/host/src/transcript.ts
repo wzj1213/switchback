@@ -43,7 +43,11 @@ export function copyTranscript(ctx: Ctx, thread: Thread, items: readonly Item[])
         turn: { id: turnId, threadId: thread.id, engine: thread.engine, status: "running", startedAt: item.at },
       })
     }
-    emit(ctx, { type: "item.started", at: item.at, item: { ...item, id: ctx.deps.newId("it"), turnId } })
+    emit(ctx, {
+      type: "item.started",
+      at: item.at,
+      item: { ...item, id: ctx.deps.newId("it"), turnId, inherited: true },
+    })
   }
   const last = items[items.length - 1]?.at ?? ctx.deps.now()
   for (const turnId of minted.values()) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Handoff } from "./build.js"
-import { compareRuns } from "./compare.js"
+import type { Item, Thread } from "@omni/protocol"
+import { compareRuns, comparisonItems } from "./compare.js"
 
 const run = (over: Partial<Handoff>): Handoff => ({
   goal: "把 add 补上 JSDoc",
@@ -62,5 +63,29 @@ describe("对比两次跑", () => {
   it("两边都没动过东西时不报错，也不假装有差异", () => {
     const out = compareRuns(run({}), run({}))
     expect(out).toMatchObject({ files: [], commands: [], onlyOneSide: 0 })
+  })
+})
+
+describe("父子分叉的共同历史边界", () => {
+  const parent: Thread = {
+    id: "parent", title: "父", cwd: "/w", engine: "codex", trust: "auto-edit",
+    status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["codex"],
+  }
+  const item = (id: string): Item => ({
+    id, turnId: `turn-${id}`, kind: "user_message", at: 0, text: id,
+  })
+
+  it("父侧只保留分叉点之后的新记录，不把共同前缀冒充成单边工作", () => {
+    const child = { ...parent, id: "child", forkedFrom: parent.id, forkedFromItemCount: 2 }
+    expect(comparisonItems(parent, child, [item("共同一"), item("共同二"), item("父侧新做")]))
+      .toEqual([item("父侧新做")])
+  })
+
+  it("子侧与兄弟侧不切；旧记录没有精确边界时也不猜", () => {
+    const child = { ...parent, id: "child", forkedFrom: parent.id, forkedFromItemCount: 1 }
+    const legacy = { ...child, forkedFromItemCount: undefined }
+    const items = [item("一"), item("二")]
+    expect(comparisonItems(child, parent, items)).toBe(items)
+    expect(comparisonItems(parent, legacy, items)).toBe(items)
   })
 })

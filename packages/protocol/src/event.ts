@@ -130,14 +130,23 @@ export type Event =
   /**
    * 这个会话能用哪些斜杠命令。握手后报一次；
    * Claude 那边技能会**中途变**（agent 走到子目录里发现新技能），所以还会再报。
+   * `engine` 用来挡住接力前一家留下的旧清单，理由同上面的模型事件。
    */
-  | { type: "commands.updated"; at: number; threadId: ThreadId; commands: readonly SlashCommand[] }
+  | {
+      type: "commands.updated"
+      at: number
+      threadId: ThreadId
+      engine: EngineId
+      commands: readonly SlashCommand[]
+    }
   /** 引擎自己存着哪些会话（你在终端、在别的界面里跑过的）。 */
   | { type: "engine.history"; at: number; engine: EngineId; threads: readonly EngineThread[] }
   /** 引擎登录的是哪个账号。额度算在谁头上，看这个。 */
   | { type: "account.updated"; at: number; engine: EngineId; account: EngineAccount }
-  /** 上下文与消耗。引擎给什么报什么，给不出的字段就缺席。 */
-  | { type: "usage.updated"; at: number; threadId: ThreadId; usage: Usage }
+  /** 上下文与消耗。带来源引擎，接力后不会把上一家的窗口数字画到新一家上。 */
+  | { type: "usage.updated"; at: number; threadId: ThreadId; engine: EngineId; usage: Usage }
+  /** 新原生会话尚未上报用量；清掉同引擎上一条已销毁会话留下的数字。 */
+  | { type: "usage.cleared"; at: number; threadId: ThreadId; engine: EngineId }
   /**
    * 这条会话此刻有哪些子 agent 在跑。**整份替换**，空数组 = 一个都没有。
    *

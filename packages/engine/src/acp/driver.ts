@@ -369,10 +369,10 @@ class AcpSession implements EngineSession {
   }
 
   /**
-   * 这条会话的原始记录在磁盘上的哪儿——换引擎时交接的就是这个路径。
+   * 这条会话的原始记录在磁盘上的哪儿——宿主把它记进引擎时间线供用户取用。
    *
    * 协议问不出来，只能按引擎认（见 `AcpDriverConfig.logPath`）。
-   * 认不出来的那些给 undefined，宿主据此退回交接包。
+   * 认不出来的那些给 undefined，时间线据实不显示记录入口。
    */
   async logPath(): Promise<string | undefined> {
     const sessionId = this.state.acpSession

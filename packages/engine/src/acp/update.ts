@@ -189,6 +189,7 @@ export function emitUsage(ctx: UpdateContext, used: number, window: number | und
     type: "usage.updated",
     at: ctx.now(),
     threadId: ctx.threadId,
+    engine: ctx.engine,
     usage: {
       contextUsed: used,
       ...(window === undefined ? {} : { contextWindow: window }),
@@ -234,7 +235,13 @@ function onCommands(ctx: UpdateContext, update: AcpUpdate): void {
   const commands = update.availableCommands
     .map(toCommand)
     .filter((c): c is SlashCommand => c !== undefined)
-  ctx.emit({ type: "commands.updated", at: ctx.now(), threadId: ctx.threadId, commands })
+  ctx.emit({
+    type: "commands.updated",
+    at: ctx.now(),
+    threadId: ctx.threadId,
+    engine: ctx.engine,
+    commands,
+  })
 }
 
 /**

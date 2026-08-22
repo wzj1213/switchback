@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest"
 import { NO_CAPABILITIES, type Event } from "@omni/protocol"
 import type { EngineDriver, EngineSession } from "@omni/engine"
 import { createHost, type Host } from "./host.js"
-import { create, fakeDriver, setupTwoEngines } from "./host-fixture.js"
+import { ask, create, fakeDriver, items, setupTwoEngines } from "./host-fixture.js"
+
+async function workAndComplete(rig: ReturnType<typeof setupTwoEngines>, text: string): Promise<string> {
+  const threadId = rig.events[0]?.type === "thread.started" ? rig.events[0].thread.id : ""
+  await rig.host.dispatch({ type: "thread.prompt", threadId, text })
+  const first = rig.sessions[0]
+  first?.emit({ type: "turn.completed", at: 0,
+    turnId: first.prompts[0]?.turnId ?? "", status: "completed" })
+  return threadId
+}
 
 describe("跨引擎接力", () => {
   const setupTwo = setupTwoEngines
@@ -67,20 +76,10 @@ describe("跨引擎接力", () => {
   })
 
   const worked = async (rig: ReturnType<typeof setupTwoEngines>): Promise<string> => {
-    const { host, events, sessions } = rig
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
-    const first = sessions[0]
-    first?.emit({
-      type: "turn.completed",
-      at: 0,
-      turnId: first.prompts[0]?.turnId ?? "",
-      status: "completed",
-    })
-    return threadId
+    return workAndComplete(rig, "把 X 改成 Y")
   }
 
-  it("先停旧的再起新的——两个引擎同时对着一个工作区写是最难查的冲突", async () => {
+  it("新引擎接入后再停旧的——启动失败时还能原样退回", async () => {
     const rig = setupTwo()
     const { host, sessions } = rig
     await host.dispatch(create)
@@ -194,6 +193,20 @@ describe("跨引擎接力", () => {
     expect(thread?.engineHistory).toEqual(["other"])
   })
 
+  it("临时会话快速连选两家时，最后一次选择不会被在途切换吞掉", async () => {
+    const { host, events, sessions } = setupTwo()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await Promise.all([
+      host.dispatch({ type: "thread.handoff", threadId, to: "other" }),
+      host.dispatch({ type: "thread.handoff", threadId, to: "fake" }),
+    ])
+    const last = events.filter((event) => event.type === "thread.updated").at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.engine : undefined).toBe("fake")
+    expect(sessions).toHaveLength(3)
+    expect(sessions[1]?.disposed).toBe(true)
+  })
+
   /**
    * **起不来就原样退回。** 上一版是先 dispose 旧的再 launch 新的，于是
    * 新那家起不来（没装、没登录、版本不对——引擎下拉里那些标着「未安装」的
@@ -221,9 +234,8 @@ describe("跨引擎接力", () => {
   })
 
   /**
-   * 模型清单**带着报它的那家一起走**。不带的话，切过去而新那家一个模型都报不上来时
-   * （`models()` 失败就是空数组，那时宿主什么都不发），界面上留着的是上一家的清单
-   * ——点一下就拿 claude 的模型 id 去设给 codex。
+   * 模型清单**带着报它的那家一起走**，而且新进程启动前先清空自己那份。
+   * 不这样做，切过去而新那家一个模型都报不上来时，界面会留下上一家的清单。
    */
   it("模型清单报的是哪一家，事件里说得出来", async () => {
     const { host, events } = hostWith({ fake: stub("fake"), other: stub("other") })
@@ -235,7 +247,9 @@ describe("跨引擎接力", () => {
       .filter((e) => e.type === "models.updated")
       .map((e) => (e.type === "models.updated" ? [e.engine, e.models.map((m) => m.id).join()] : []))
     expect(reported).toEqual([
+      ["fake", ""],
       ["fake", "fake-model"],
+      ["other", ""],
       ["other", "other-model"],
     ])
   })
@@ -282,6 +296,35 @@ describe("跨引擎接力", () => {
     expect(thread?.engineHistory).toEqual(["fake", "other"])
   })
 
+  it("“允许此对话”的内存规则在换引擎后仍属于同一条对话", async () => {
+    const rig = setupTwo()
+    const { host, events, sessions } = rig
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "先做一轮" })
+    const answer = sessions[0]?.ask({
+      ...ask,
+      suggest: { id: "sig:test", describe: "允许测试", pattern: {}, scope: "session" },
+    })
+    const card = items(events).find((item) => item.kind === "approval")
+    await host.dispatch({
+      type: "approval.resolve",
+      itemId: card?.id ?? "",
+      allow: true,
+      remember: "session",
+    })
+    await answer
+    sessions[0]?.emit({
+      type: "turn.completed",
+      at: 0,
+      turnId: sessions[0]?.prompts[0]?.turnId ?? "",
+      status: "completed",
+    })
+    await host.dispatch({ type: "thread.handoff", threadId, to: "other" })
+    await host.dispatch({ type: "thread.switchNow", threadId })
+    expect(sessions[1]?.memory().map((rule) => rule.id)).toContain("sig:test")
+  })
+
   it("**旧引擎的会话句柄要清掉**——留着的话续跑会拿它去问新的一家", async () => {
     const rig = setupTwo()
     const { host, events, sessions } = rig
@@ -306,20 +349,20 @@ describe("跨引擎接力", () => {
 
 describe("L3 分叉", () => {
   it("原会话不停——这是分叉和接力唯一的区别", async () => {
-    const { host, events, sessions } = setupTwoEngines()
+    const rig = setupTwoEngines()
+    const { host, sessions } = rig
     await host.dispatch(create)
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
+    const threadId = await workAndComplete(rig, "把 X 改成 Y")
     await host.dispatch({ type: "thread.fork", threadId, to: "other" })
     expect(sessions[0]?.disposed).toBe(false)
     expect(sessions).toHaveLength(2)
   })
 
   it("新会话是新 id、新引擎历史——不是同一个会话换了家", async () => {
-    const { host, events } = setupTwoEngines()
+    const rig = setupTwoEngines()
+    const { host, events } = rig
     await host.dispatch(create)
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    await host.dispatch({ type: "thread.prompt", threadId, text: "目标" })
+    const threadId = await workAndComplete(rig, "目标")
     await host.dispatch({ type: "thread.fork", threadId, to: "other" })
     const started = events.filter((e) => e.type === "thread.started")
     expect(started).toHaveLength(2)
@@ -329,10 +372,10 @@ describe("L3 分叉", () => {
   })
 
   it("分叉出来的那条**一句都没发、一个字都没塞**", async () => {
-    const { host, events, sessions } = setupTwoEngines()
+    const rig = setupTwoEngines()
+    const { host, events, sessions } = rig
     await host.dispatch(create)
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    await host.dispatch({ type: "thread.prompt", threadId, text: "把 X 改成 Y" })
+    const threadId = await workAndComplete(rig, "把 X 改成 Y")
     await host.dispatch({ type: "thread.fork", threadId, to: "other" })
     expect(sessions[1]?.prompts ?? []).toEqual([])
     const forked = events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
@@ -344,10 +387,10 @@ describe("L3 分叉", () => {
   })
 
   it("标题带上引擎名，否则侧栏里两个会话长得一模一样", async () => {
-    const { host, events } = setupTwoEngines()
+    const rig = setupTwoEngines()
+    const { host, events } = rig
     await host.dispatch(create)
-    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
-    await host.dispatch({ type: "thread.prompt", threadId, text: "目标" })
+    const threadId = await workAndComplete(rig, "目标")
     await host.dispatch({ type: "thread.fork", threadId, to: "other" })
     const started = events.filter((e) => e.type === "thread.started")
     const forked = started[1]?.type === "thread.started" ? started[1].thread : undefined

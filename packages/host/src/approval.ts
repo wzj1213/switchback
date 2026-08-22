@@ -65,6 +65,19 @@ export function remember(ctx: Ctx, entry: Live, rule: Rule, scope: RememberScope
   }
 }
 
+/**
+ * 同一条 omni 对话换原生进程时，内存里的审批规则继续生效。
+ *
+ * 新进程已经从磁盘读了最新 project 规则；旧 Live 里还可能有尚未写完的 project 规则，
+ * 以及只属于“此对话”的 session 规则。按 id 合并并让旧 Live 的当前值覆盖，
+ * 才不会让一次换引擎/权限重启偷偷撤销用户刚做的选择。
+ */
+export function carryRules(from: Live, into: Live): void {
+  const merged = new Map(into.rules.map((rule) => [rule.id, rule]))
+  for (const rule of from.rules) merged.set(rule.id, rule)
+  into.rules = [...merged.values()]
+}
+
 /** 审批卡 id 全局唯一，所以挨个会话问一遍即可；命中就停。 */
 export function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resolve" }>): void {
   for (const entry of ctx.live.values()) {

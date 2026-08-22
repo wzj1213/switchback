@@ -5,10 +5,10 @@ import { createHost, type Host } from "./host.js"
 
 /**
  * 分叉的两条路：同一家引擎让它自己复制会话（上下文一点不少），
- * 换一家只能递交接包（各家会话格式不通）。
+ * 换一家只开同工作区的空白分支（各家会话格式不通，omni 不注入文本）。
  *
  * 这里钉的是**选哪条路**以及**选错时会发生什么**——后者更要紧：
- * 原生分叉失败必须退回交接包，而不是把一个能用的功能变成会报错的功能。
+ * 普通分叉可退回空白分支；“从这里重来”承诺上下文，失败必须明说。
  */
 
 interface Rig {
@@ -22,6 +22,7 @@ interface Rig {
   complete: (turnId: string) => void
   /** 内存里的「磁盘」。用来钉「没说话就不落盘」。 */
   disk: Map<string, Event[]>
+  flushes: () => number
 }
 
 const rig = (opts: { canFork: boolean }): Rig => {
@@ -32,6 +33,7 @@ const rig = (opts: { canFork: boolean }): Rig => {
   const fail = { now: false }
   const counter = { n: 0 }
   const emitters: ((e: Event) => void)[] = []
+  let flushes = 0
   const make = (id: string): EngineDriver => ({
     id,
     start: (req) => {
@@ -52,7 +54,7 @@ const rig = (opts: { canFork: boolean }): Rig => {
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve({ restart: false }),
         models: () => Promise.resolve([]),
-        capabilities: () => ({ compact: false, attachments: false, steer: false, fork: opts.canFork }),
+        capabilities: () => ({ compact: false, attachments: id === "other", steer: false, fork: opts.canFork }),
         setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
       } as unknown as EngineSession)
@@ -68,7 +70,10 @@ const rig = (opts: { canFork: boolean }): Rig => {
         files.set(threadId, [...(files.get(threadId) ?? []), e])
         return Promise.resolve()
       },
-      flush: () => Promise.resolve(),
+      flush: () => {
+        flushes += 1
+        return Promise.resolve()
+      },
       read: (threadId) => Promise.resolve(files.get(threadId) ?? []),
       list: () => Promise.resolve([...files.keys()]),
       remove: (threadId) => {
@@ -91,6 +96,7 @@ const rig = (opts: { canFork: boolean }): Rig => {
     resumed,
     fail,
     disk: files,
+    flushes: () => flushes,
     complete: (turnId) => {
       emitters[0]?.({ type: "turn.completed", at: 0, turnId, status: "completed" })
     },
@@ -122,6 +128,28 @@ const itemsOfThread = (events: Event[], threadId: string): Item[] => {
 }
 
 describe("同一家引擎：让它自己复制会话", () => {
+  it("轮次仍在运行时，宿主同时拒绝分叉与历史回退", async () => {
+    const r = rig({ canFork: true })
+    await r.host.dispatch({ type: "thread.create", cwd: "/w", engine: "fake", trust: "auto-edit" })
+    const id = r.events.find((event) => event.type === "thread.started")?.thread.id ?? ""
+    await r.host.dispatch({ type: "thread.prompt", threadId: id, text: "正在处理" })
+    const turnId = r.events.filter((event) => event.type === "turn.started").at(-1)?.turn.id ?? ""
+    const started = r.events.filter((event) => event.type === "thread.started").length
+
+    await expect(r.host.dispatch({ type: "thread.fork", threadId: id, to: "other" }))
+      .rejects.toThrow("当前轮次尚未结束")
+    await expect(r.host.dispatch({ type: "thread.rewind", threadId: id, turnId }))
+      .rejects.toThrow("当前轮次尚未结束")
+    expect(r.events.filter((event) => event.type === "thread.started")).toHaveLength(started)
+  })
+
+  it("读 transcript 前等待在途 journal 写完", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(r.flushes()).toBe(1)
+  })
+
   it("**不发交接包**——引擎已经亲历过了，再复述一遍是多余的", async () => {
     const r = rig({ canFork: true })
     const { id } = await withTurns(r)
@@ -181,6 +209,37 @@ describe("同一家引擎：让它自己复制会话", () => {
     expect(r.forks[0]?.dropTurns).toBe(1)
   })
 
+  it("引擎不支持原生 fork 时不显示成功假象，重来明确失败", async () => {
+    const r = rig({ canFork: false })
+    const { id, turns } = await withTurns(r)
+    const before = r.events.filter((event) => event.type === "thread.started").length
+    await expect(
+      r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" }),
+    ).rejects.toThrow("不能带着原生上下文")
+    expect(r.events.filter((event) => event.type === "thread.started")).toHaveLength(before)
+  })
+
+  it("历史轮次不存在时明确失败，不把完整分叉冒充成重来", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    const before = r.events.filter((event) => event.type === "thread.started").length
+    await expect(
+      r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: "turn-gone" }),
+    ).rejects.toThrow("找不到要重来的历史轮次")
+    expect(r.events.filter((event) => event.type === "thread.started")).toHaveLength(before)
+  })
+
+  it("原生 fork 运行时失败也不静默降级成空白重来", async () => {
+    const r = rig({ canFork: true })
+    const { id, turns } = await withTurns(r)
+    const starts = r.resumed.length
+    r.fail.now = true
+    await expect(
+      r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" }),
+    ).rejects.toThrow("引擎这次不肯分")
+    expect(r.resumed).toHaveLength(starts + 1)
+  })
+
   it("整条复制时不丢任何一轮", async () => {
     const r = rig({ canFork: true })
     const { id } = await withTurns(r)
@@ -189,7 +248,22 @@ describe("同一家引擎：让它自己复制会话", () => {
   })
 })
 
-/** 一条会话现在挂着的草稿。交接包不再发出去，而是摆进输入框等你改。 */
+describe("派生会话的引擎身份", () => {
+  it("不继承父分支句柄段，握手完成事件采用新引擎能力", async () => {
+    const r = rig({ canFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "other" })
+    const born = r.events.filter((event) => event.type === "thread.started").at(-1)?.thread
+    const ready = [...r.events].reverse().find(
+      (event): event is Extract<Event, { type: "thread.updated" }> =>
+        event.type === "thread.updated" && event.thread.id === born?.id,
+    )?.thread
+    expect(born?.segments).toEqual([])
+    expect(ready?.capabilities?.attachments).toBe(true)
+  })
+})
+
+/** 一条会话现在挂着的宿主草稿；分叉不再生成任何草稿文本。 */
 const draftOf = (events: Event[], id: string): string | undefined =>
   events
     .filter((e) => e.type === "thread.updated")
@@ -201,12 +275,10 @@ const newThreadId = (events: Event[]): string =>
   events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
 
 /**
- * 分不了原生 fork 时**什么都不做**，不再退回交接包。
+ * 普通分叉分不了原生 fork 时只开空白分支，不注入文字。
  *
- * 交接包是 omni 从 transcript 里提炼的一段话，塞进输入框等用户按回车。
- * 用户否掉了这条路：那段话是**他没打过的**，而历史对话新的引擎自己会读——
- * omni 已经把上一段记录的磁盘路径存在 `Thread.segments` 里（`/timeline` 看得见）。
- * 所以现在分叉只做分叉：新会话开出来，一个字都不替他写。
+ * 旧实现会从 transcript 提炼一段话塞进输入框；那段话是**用户没打过的**。
+ * 现在分叉只做分叉：新会话开出来，一个字都不替他写。
  */
 describe("分不了就只是分不了", () => {
   it("分不了：新会话照样开出来，**输入框里一个字都没有**", async () => {
@@ -258,7 +330,7 @@ describe("分叉与重来：没用过的那条不该留下痕迹", () => {
     const { id } = await withTurns(r)
     await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
     const born = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread
-    expect(born?.forkedFrom).toBe(id)
+    expect(born).toMatchObject({ forkedFrom: id, forkedFromItemCount: 2 })
     expect(born?.provisional).toBe(true)
   })
 
@@ -266,7 +338,10 @@ describe("分叉与重来：没用过的那条不该留下痕迹", () => {
     const r = rig({ canFork: true })
     const { id, turns } = await withTurns(r)
     await r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" })
-    expect(r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.provisional).toBe(true)
+    expect(r.events.filter((e) => e.type === "thread.started").at(-1)?.thread).toMatchObject({
+      provisional: true,
+      forkedFromItemCount: 1,
+    })
   })
 
   it("**没说话就不落盘**：磁盘上一个字都没有", async () => {
@@ -312,8 +387,12 @@ describe("分叉与重来：没用过的那条不该留下痕迹", () => {
     const r = rig({ canFork: true })
     const { id } = await withTurns(r)
     await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
-    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
-    expect(r.events.filter((e) => e.type === "thread.removed").map((e) => e.threadId)).not.toContain(id)
+    const source = forkOf(r, id)
+    await r.host.dispatch({ type: "thread.fork", threadId: source, to: "fake" })
+    const derived = forkOf(r, source)
+    const copied = itemsOfThread(r.events, derived).filter((item) => item.kind === "user_message")
+    expect(copied.map((item) => item.text)).toEqual(["第一句", "第二句"])
+    expect(r.events.filter((e) => e.type === "thread.removed").map((e) => e.threadId)).not.toContain(source)
   })
 
   it("已经说过话的那条不会被收走——它不再是临时的", async () => {

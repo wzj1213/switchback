@@ -71,6 +71,42 @@ describe("删除会话", () => {
     await host.dispatch({ type: "thread.delete", threadId: "th-from-disk" })
     expect(removed).toEqual(["th-from-disk"])
   })
+
+  it("驱动 dispose 报错也会继续删除本地记录", async () => {
+    const { driver } = fakeDriver()
+    const removed: string[] = []
+    const events: Event[] = []
+    const host = createHost({
+      drivers: {
+        fake: {
+          ...driver,
+          start: async (request) => ({
+            ...(await driver.start(request)),
+            dispose: () => Promise.reject(new Error("cleanup failed")),
+          }),
+        },
+      },
+      home: "/h",
+      emit: (event) => events.push(event),
+      newId: (prefix) => `${prefix}-dispose-error`,
+      now: () => 0,
+      journal: {
+        append: () => Promise.resolve(),
+        read: () => Promise.resolve([]),
+        list: () => Promise.resolve([]),
+        remove: (id) => {
+          removed.push(id)
+          return Promise.resolve()
+        },
+        flush: () => Promise.resolve(),
+      },
+    })
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await expect(host.dispatch({ type: "thread.delete", threadId })).resolves.toBeUndefined()
+    expect(removed).toEqual([threadId])
+    expect(host.live()).toEqual([])
+  })
 })
 
 describe("审批记忆", () => {

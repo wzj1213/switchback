@@ -59,6 +59,7 @@ export async function evict(ctx: Ctx, keep: ThreadId): Promise<void> {
  */
 async function detach(ctx: Ctx, entry: Live): Promise<void> {
   entry.gate.settleAll()
+  entry.lease.active = false
   await entry.session.dispose().catch(() => undefined)
   ctx.live.delete(entry.thread.id)
   const at = ctx.deps.now()

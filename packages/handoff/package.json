@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "跨引擎接力的交接包：从 transcript 里提炼结论，而不是搬运原始上下文。",
+  "description": "从 transcript 生成确定性运行摘要，并比较两次分叉记录。",
   "exports": {
     ".": "./src/index.ts"
   },

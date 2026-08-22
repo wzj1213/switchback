@@ -1,9 +1,8 @@
-import type { Command, Event, ItemId, Thread, ThreadId } from "@omni/protocol"
+import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import { createGate } from "./gate.js"
 import { askUser } from "./approval.js"
-import type { EngineSession } from "@omni/engine"
-import { emit, type Ctx, type Live } from "./ctx.js"
+import { attachStarted, discardUnstarted, drainQueued, emit, ensureLaunchable, isCurrent, preparingLive, type Ctx, type Live } from "./ctx.js"
 import { evict } from "./live.js"
 import {
   rememberEngineState,
@@ -11,9 +10,10 @@ import {
   rememberModel,
   rememberTrustApply,
 } from "./engine-state.js"
-import { copyTranscript } from "./transcript.js"
-import type { Gate } from "./gate.js"
 import { createItemScope } from "./item-scope.js"
+import { withModel, withoutModel } from "./model.js"
+import { dropPendingTemps } from "./pending.js"
+import { applyEarly, captureEngine, captureModel, earlySignals, type EarlySignals } from "./launch-signals.js"
 
 /**
  * 会话的生命周期：建、续跑、接力、发消息、改档、换模型、删。
@@ -54,28 +54,60 @@ function newThread(
  * 这个洞第一次跑真实会话才现形（落盘里根本没有 `engineHandle`）。
  * 交给调用方在发完自己的事件之后补上，顺序才是「started → updated」。
  */
-export async function launch(
+interface LaunchOptions {
+  resume?: string
+  forkOf?: { handle: string; dropTurns?: number }
+  captureBaseline?: boolean
+}
+
+type InstallLease = Live["lease"] & { installing: boolean; early: EarlySignals }
+
+async function installStarted(
   ctx: Ctx,
-  thread: Thread,
-  resume?: string,
-  forkOf?: { handle: string; dropTurns?: number },
-): Promise<string | undefined> {
+  live: Live,
+  session: Live["session"],
+  lease: InstallLease,
+): Promise<void> {
+  await attachStarted(ctx, live, session)
+  try {
+    live.gate = createGate((event) => {
+      if (isCurrent(ctx, live)) emit(ctx, event)
+    })
+    live.thread = { ...live.thread, capabilities: session.capabilities() }
+    live.thread = applyEarly(live.thread, lease.early, ctx.deps.now())
+    ctx.live.set(live.thread.id, live)
+    lease.installing = false
+  } catch (error) {
+    lease.active = false
+    lease.installing = false
+    await session.dispose().catch(() => undefined)
+    throw error
+  }
+}
+
+function clearSessionState(ctx: Ctx, thread: Thread): void {
+  const at = ctx.deps.now()
+  emit(ctx, { type: "models.updated", at, threadId: thread.id, engine: thread.engine, models: [] })
+  emit(ctx, { type: "commands.updated", at, threadId: thread.id, engine: thread.engine, commands: [] })
+  emit(ctx, { type: "usage.cleared", at, threadId: thread.id, engine: thread.engine })
+}
+
+export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = {}): Promise<string | undefined> {
+  const { resume, forkOf, captureBaseline = true } = options
   const driver = ctx.deps.drivers[thread.engine]
   if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
+  // 必须在引擎能动工作区之前取样；接力/权限重启沿用同一个 thread id，自然复用。
+  await ensureLaunchable(ctx, thread, captureBaseline)
+  // 同一个 thread 会接力、续跑和权限重启。新进程尚未报目录时，上一进程的模型与
+  // 斜杠命令都不能继续冒充可用；先发空清单，之后只接受新会话自己的上报。
+  clearSessionState(ctx, thread)
   // 先腾地方再起新的：反过来的话峰值会多占一个会话的量（实测 260 MB）
-  await evict(ctx, thread.id)
-  const early: { handle: string | undefined } = { handle: undefined }
+  if (!ctx.live.has(thread.id)) await evict(ctx, thread.id)
   const itemScope = createItemScope(ctx.deps.newId)
+  const lease = { active: true, installing: true, early: earlySignals() }
   // 先建条目再起引擎：驱动可能在 start() 里就回调，那时得能读到规则表
-  const live: Live = {
-    thread,
-    session: undefined as unknown as EngineSession,
-    gate: undefined as unknown as Gate,
-    turn: undefined,
-    rules: [...((await ctx.deps.rules?.read(thread.cwd)) ?? [])] as Rule[],
-    suggests: new Map<ItemId, Rule>(),
-    queued: [],
-  }
+  const rules = [...((await ctx.deps.rules?.read(thread.cwd)) ?? [])] as Rule[]
+  const live = preparingLive(thread, lease, rules)
   const session = await driver.start({
     threadId: thread.id,
     cwd: thread.cwd,
@@ -83,36 +115,47 @@ export async function launch(
     home: ctx.deps.home,
     memory: () => live.rules,
     emit: (event) => {
-      emit(ctx, itemScope.event(event))
+      if ((lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) || isCurrent(ctx, live)) {
+        emit(ctx, itemScope.event(event))
+      }
     },
-    askUser: (ask) => askUser(ctx, thread.id, itemScope.ask(ask, live.turn)),
+    askUser: (ask) =>
+      isCurrent(ctx, live)
+        ? askUser(ctx, thread.id, itemScope.ask(ask, live.turn))
+        : Promise.resolve({ allow: false, remember: "once" }),
     onHandle: (handle) => {
-      if (ctx.live.has(thread.id)) rememberHandle(ctx, thread.id, handle)
-      else early.handle = handle
+      if (isCurrent(ctx, live)) rememberHandle(ctx, thread.id, handle)
+      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) lease.early.handle = handle
     },
-    // 不像句柄那样要处理「登记完成前就到达」：这几条只可能在开完会话之后到
     onModel: (model, effort) => {
-      rememberModel(ctx, thread.id, model, effort)
+      if (isCurrent(ctx, live)) rememberModel(ctx, thread.id, model, effort)
+      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) {
+        captureModel(lease.early, model, effort)
+      }
     },
     onEngineState: (patch) => {
-      rememberEngineState(ctx, thread.id, patch)
+      if (isCurrent(ctx, live)) rememberEngineState(ctx, thread.id, patch)
+      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) {
+        captureEngine(lease.early, patch)
+      }
     },
     onTrustApply: (result) => {
-      rememberTrustApply(ctx, thread.id, result)
+      if (isCurrent(ctx, live)) rememberTrustApply(ctx, thread.id, result)
+      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) {
+        lease.early.trustApply = result
+      }
     },
     ...(resume === undefined ? {} : { resume }),
     ...(forkOf === undefined ? {} : { forkOf }),
+  }).catch((error: unknown) => {
+    lease.active = false
+    lease.installing = false
+    throw error
   })
-  live.session = session
-  live.gate = createGate((e) => {
-    emit(ctx, e)
-  })
-  // 能力握手时问一次就够——它不随轮次变。挂到 thread 上，
-  // 界面只看它，不看引擎叫什么名字
-  live.thread = { ...live.thread, capabilities: session.capabilities() }
-  ctx.live.set(thread.id, live)
-  askCatalogs(ctx, thread, session)
-  return early.handle
+  // 能力握手时问一次就够；接入前任一步抛错都由这里销毁已经启动的 session。
+  await installStarted(ctx, live, session, lease)
+  askCatalogs(ctx, live)
+  return lease.early.handle
 }
 
 /**
@@ -127,53 +170,62 @@ export async function launch(
  * **绝不写死任何一份**：模型由账号与配置决定，斜杠命令里大半是用户自己装的技能，
  * 会话清单更是随时在变。写死的表第二天就过期，而且过期了不报错。
  */
-function askCatalogs(ctx: Ctx, thread: Thread, session: EngineSession): void {
+function catalog<T>(
+  ctx: Ctx,
+  entry: Live,
+  load: () => Promise<T> | undefined,
+  accept: (value: T) => void,
+): void {
+  void Promise.resolve()
+    .then(load)
+    .then((value) => {
+      if (value !== undefined && isCurrent(ctx, entry)) accept(value)
+    })
+    .catch(() => undefined)
+}
+
+function askCatalogs(ctx: Ctx, entry: Live): void {
+  const { thread, session } = entry
   // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
   // omni 写死一份清单迟早会和实际能用的对不上。
-  void session
-    .models()
-    .then((models) => {
-      if (models.length > 0) {
+  catalog(ctx, entry, () => session.models(), (models) => {
+    if (models.length > 0) {
         // **带上是谁报的**：一条会话中途会换引擎，而渲染层要认得出手上这份
         // 是不是当前这家的（见 store 的 `modelsOf`）
-        emit(ctx, {
-          type: "models.updated",
-          at: ctx.deps.now(),
-          threadId: thread.id,
-          engine: thread.engine,
-          models,
-        })
-      }
-    })
-    .catch(() => undefined)
+      emit(ctx, {
+        type: "models.updated",
+        at: ctx.deps.now(),
+        threadId: thread.id,
+        engine: thread.engine,
+        models,
+      })
+    }
+  })
   // 斜杠命令同理，而且更不能写死：**那里面大半是用户自己装的技能**。
   // 和模型分两次问、各自失败各自算——一家拿不到模型不该连命令也没有
-  void session
-    .commands?.()
-    .then((commands) => {
-      if (commands.length > 0) {
-        emit(ctx, { type: "commands.updated", at: ctx.deps.now(), threadId: thread.id, commands })
-      }
-    })
-    .catch(() => undefined)
+  catalog(ctx, entry, () => session.commands?.(), (commands) => {
+    if (commands.length > 0) {
+      emit(ctx, {
+        type: "commands.updated",
+        at: ctx.deps.now(),
+        threadId: thread.id,
+        engine: thread.engine,
+        commands,
+      })
+    }
+  })
   // 引擎自己存着的会话、以及它登录的账号。**各自失败各自算**——
   // 和模型、命令一样，一样拿不到不该连累另一样
-  void session
-    .history?.()
-    .then((threads) => {
-      if (threads.length > 0) {
-        emit(ctx, { type: "engine.history", at: ctx.deps.now(), engine: thread.engine, threads })
-      }
-    })
-    .catch(() => undefined)
-  void session
-    .account?.()
-    .then((account) => {
-      if (account !== undefined) {
-        emit(ctx, { type: "account.updated", at: ctx.deps.now(), engine: thread.engine, account })
-      }
-    })
-    .catch(() => undefined)
+  catalog(ctx, entry, () => session.history?.(), (threads) => {
+    if (threads.length > 0) {
+      emit(ctx, { type: "engine.history", at: ctx.deps.now(), engine: thread.engine, threads })
+    }
+  })
+  catalog(ctx, entry, () => session.account?.(), (account) => {
+    if (account !== undefined) {
+      emit(ctx, { type: "account.updated", at: ctx.deps.now(), engine: thread.engine, account })
+    }
+  })
 }
 
 /**
@@ -196,6 +248,8 @@ export async function dropTemps(ctx: Ctx, keep: readonly ThreadId[]): Promise<vo
     if (entry.thread.provisional !== true || keep.includes(entry.thread.id)) continue
     await remove(ctx, { type: "thread.delete", threadId: entry.thread.id }).catch(() => undefined)
   }
+  // 还卡在 driver.start 的临时会话不在 live 表里，但同样已经被下一次新建取代。
+  await dropPendingTemps(ctx, keep)
 }
 
 /**
@@ -227,17 +281,27 @@ export async function create(
   try {
     early = await launch(ctx, thread)
   } catch (error) {
+    const superseded = ctx.removed.has(thread.id)
+    await discardUnstarted(ctx, thread.id)
+    // 后一条临时会话已经取代了这一条时，这是正常取消，不该再冒一条错误横幅。
+    if (superseded) return
     emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
     throw error
   }
   // 挑好的模型要在**第一句话发出去之前**落到引擎上（见 `thread.create` 的 `model`）。
   // 起不来就算了：模型没设上是个可以接着用的会话，为它把整条会话撤掉不成比例
   if (cmd.model !== undefined) {
-    await ctx.live
-      .get(thread.id)
-      ?.session.setModel(cmd.model, cmd.effort)
-      .catch(() => undefined)
+    const entry = ctx.live.get(thread.id)
+    if (entry !== undefined) {
+      const applied = await entry.session.setModel(cmd.model, cmd.effort).catch(() => undefined)
+      if (isCurrent(ctx, entry)) {
+        entry.thread = applied === undefined
+          ? withoutModel(entry.thread)
+          : withModel(entry.thread, cmd.model, applied, ctx.deps.now())
+      }
+    }
   }
+  if (ctx.removed.has(thread.id)) return
   // **发 `live` 里那一份，不是这个局部变量**——`launch` 期间会往上面挂东西
   //（现在是引擎能力）。发局部的那份等于把它们原地丢掉，而且一声不响
   emit(ctx, {
@@ -246,6 +310,7 @@ export async function create(
     thread: ctx.live.get(thread.id)?.thread ?? thread,
   })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
+  drainQueued(ctx, ctx.live.get(thread.id))
 }
 
 /**
@@ -274,8 +339,14 @@ export async function resume(
   }
   const at = ctx.deps.now()
   const thread: Thread = { ...record.thread, detached: false, status: "idle", updatedAt: at }
-  const early = await launch(ctx, thread, handle)
-  emit(ctx, { type: "thread.updated", at, thread })
+  // 旧任务没有保存过基线时不能在这里现抓一份，再把“续跑时刻”冒充整段对话开场。
+  // 已有基线由桌面存储直接复用；没有就诚实退回 legacy 工作区差异。
+  const early = await launch(ctx, thread, { resume: handle, captureBaseline: false })
+  emit(ctx, {
+    type: "thread.updated",
+    at: ctx.deps.now(),
+    thread: ctx.live.get(thread.id)?.thread ?? thread,
+  })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 
@@ -307,48 +378,22 @@ export async function setModel(
   cmd: Extract<Command, { type: "thread.setModel" }>,
 ): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) return
+  if (entry === undefined || !isCurrent(ctx, entry)) return
   // **记引擎回报的那一档，不是请求的那个。** 两者会不一样：ZCode 的桥把
   // `thought` 报成「可选 low/high/max」而设进去必然报错，那一步失败不算换模型失败
   //（模型确实换了）——上一版把请求值原样记了下来，于是**界面显示「轻度」而引擎在 max**。
   // 界面照着这条记录画，所以这条记录必须是真的
   const applied = await entry.session.setModel(cmd.model, cmd.effort)
+  // 等引擎回包时可能已经接力到另一家；旧回包不能把新会话重新画成上一家的模型。
+  if (!isCurrent(ctx, entry)) return
   const at = ctx.deps.now()
   // **强度要能被清掉。** 上一版是 `...(effort === undefined ? {} : {effort})`，
   // 于是换到一个不报强度的模型之后，旧模型的 `high` 永远留在记录上——
   // 界面照着它画一个引擎根本没在用的档位
-  const rest = { ...entry.thread }
-  delete rest.effort
-  entry.thread = {
-    ...rest,
-    model: cmd.model,
-    ...(applied.effort === undefined ? {} : { effort: applied.effort }),
-    updatedAt: at,
-  }
+  entry.thread = withModel(entry.thread, cmd.model, applied, at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
-/**
- * L3 分叉：同一个目标，换一家再跑一遍。
- *
- * 和接力（L2）**只差一件事**：原会话不停。所以代码上也只差一件事——
- * 不 dispose 旧的、不复用旧的 thread id。
- *
- * 交的还是那份交接包，但语义不同：接力是「接着做」，分叉是「你也做一遍」。
- * 所以只取**目标**，不带「已改动的文件」——那会让第二家以为活已经干了一半。
- */
-/**
- * 分叉：同一个目标交给另一家，另起一个会话，原会话保留。
- *
- * **两个会话共用同一个工作区。** 所以后跑的那家会看见先跑的改动——
- * 实测过：Codex 先把 JSDoc 补完，Claude 接着跑，如实回答「已经有了，不用补」。
- *
- * 这是当前的语义，不是 bug；但它很容易被读成一次对照实验，
- * 于是得出「Claude 什么都没干」这种完全错误的结论。对比视图
- * （`Compare.tsx`）在 cwd 相同时会把这句话直接写在界面上。
- *
- * 真要做对照，得让两边各拿一份工作区副本（git worktree 之类）——那是另一件事。
- */
 /**
  * 关掉会话并把记录从磁盘上删掉。
  *
@@ -362,92 +407,19 @@ export async function remove(
   ctx: Ctx,
   cmd: Extract<Command, { type: "thread.delete" }>,
 ): Promise<void> {
+  ctx.removed.add(cmd.threadId)
   const entry = ctx.live.get(cmd.threadId)
   if (entry !== undefined) {
     entry.gate.settleAll()
+    entry.lease.active = false
     // **在 dispose 之前**——进程都没了就发不出去了。
     // 归档不是删除：引擎那边的原始记录是用户的，可逆的操作才轮得到我们替他做
     await entry.session.discard?.().catch(() => undefined)
-    await entry.session.dispose()
+    // 驱动清理失败不能阻止本地记录与基线删除；墓碑已经落下，旧回调也无法再复活它。
+    await entry.session.dispose().catch(() => undefined)
     ctx.live.delete(cmd.threadId)
   }
   await ctx.deps.journal?.remove(cmd.threadId)
+  await ctx.deps.removeWorktreeBaseline?.(cmd.threadId)
   emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: cmd.threadId })
-}
-
-/**
- * 把**引擎自己存的**一条会话接过来，在 omni 里接着聊。
- *
- * ## 和 `resume` 的区别
- *
- * `resume` 接的是 omni 建过、日志在自己这儿的会话：内容都在，接上引擎就完事。
- * 这里接的是 omni **从来不知道存在**的会话——你在终端里、在别的界面里跑的。
- * 所以工作区、标题都得从引擎的列表里带过来，omni 这边是从零开一条记录。
- *
- * ## transcript 会是空的，而且必须说出来
- *
- * codex 的 `thread/items/list` 目前明确回 `not supported yet`（实测），
- * 所以历史内容**取不回来**。引擎那边记得一切，omni 这边一片空白。
- * 这正是分叉那次特意避免的「看起来丢了但其实没丢」——那次能抄所以抄了，
- * 这次抄不了，就只能在界面上讲清楚（`adopted` 标记，空态里说明）。
- * 假装什么都没发生是最坏的选择。
- */
-export async function adopt(
-  ctx: Ctx,
-  cmd: Extract<Command, { type: "thread.adopt" }>,
-): Promise<void> {
-  const at = ctx.deps.now()
-  const thread: Thread = {
-    id: ctx.deps.newId("th"),
-    title: cmd.title,
-    cwd: cmd.cwd,
-    engine: cmd.engine,
-    // 接过来的会话沿用默认档，不猜它当初在引擎里是什么档——
-    // 猜错的方向如果是放宽，代价是它在一个你没同意的档位上动手
-    trust: "auto-edit",
-    status: "starting",
-    createdAt: at,
-    updatedAt: at,
-    engineHistory: [cmd.engine],
-    engineHandle: cmd.handle,
-    adopted: true,
-  }
-  emit(ctx, { type: "thread.started", at, thread })
-  try {
-    await launch(ctx, thread, cmd.handle)
-  } catch (error) {
-    // 接不上就撤掉：留一个永远 starting 的空壳比没有更糟
-    emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
-    throw error
-  }
-  emit(ctx, {
-    type: "thread.updated",
-    at: ctx.deps.now(),
-    thread: { ...(ctx.live.get(thread.id)?.thread ?? thread), status: "idle" },
-  })
-  await fillTranscript(ctx, thread)
-}
-
-/**
- * 把引擎那边已有的对话搬进来。**搬不动就什么都不做**——那时界面上是空的，
- * 空态里那句说明会告诉用户内容在引擎那边（codex 走的就是这条路）。
- *
- * 截断了一定要说出来：一段被悄悄砍掉一半的历史，
- * 比一段明说「只搬了最近这些」糟得多。
- */
-async function fillTranscript(ctx: Ctx, thread: Thread): Promise<void> {
-  const entry = ctx.live.get(thread.id)
-  const read = entry?.session.transcript
-  if (entry === undefined || read === undefined) return
-  const got = await read.call(entry.session).catch(() => undefined)
-  if (got === undefined || got.items.length === 0) return
-  copyTranscript(ctx, thread, got.items)
-  if (got.total <= got.items.length) return
-  ctx.deps.emit({
-    type: "engine.status",
-    at: ctx.deps.now(),
-    threadId: thread.id,
-    status: "degraded",
-    detail: `这条会话有 ${String(got.total)} 条记录，只搬了最近 ${String(got.items.length)} 条进来。完整的还在引擎那边，它自己看得见。`,
-  })
 }

@@ -37,7 +37,9 @@ describe("一条事件属于哪个会话（决定落不落盘）", () => {
   })
 
   it("usage / engine.status / models 自己带 threadId", () => {
-    expect(ownerOf(ctx, { type: "usage.updated", at: 0, threadId: "th-1", usage: { contextUsed: 1 } })).toBe("th-1")
+    expect(ownerOf(ctx, {
+      type: "usage.updated", at: 0, threadId: "th-1", engine: "fake", usage: { contextUsed: 1 },
+    })).toBe("th-1")
   })
 
   it("空 threadId 当作「不属于任何会话」——引擎级状态会这么报", () => {
@@ -49,7 +51,7 @@ describe("一条事件属于哪个会话（决定落不落盘）", () => {
   })
 
   it("**斜杠命令不落盘**：每次握手现问引擎，落盘只会在重放时塞回一份过期清单", () => {
-    const event: Event = { type: "commands.updated", at: 0, threadId: "th-1", commands: [] }
+    const event: Event = { type: "commands.updated", at: 0, threadId: "th-1", engine: "fake", commands: [] }
     expect(ownerOf(ctx, event)).toBeUndefined()
   })
 })
@@ -70,6 +72,7 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
     type: "commands.updated",
     at: 0,
     threadId: "th-1",
+    engine: "fake",
     commands: [{ name: "deck", description: "", source: "engine" }],
   }
 
@@ -87,6 +90,14 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
     expect(liveStateOf(ctx)).toEqual([later])
   })
 
+  it("同一会话每家引擎各留一份目录，失败回滚或重载不会丢旧目录", () => {
+    const ctx = fresh()
+    const other: Event = { ...commands, engine: "other", commands: [] }
+    emit(ctx, commands)
+    emit(ctx, other)
+    expect(liveStateOf(ctx)).toEqual([commands, other])
+  })
+
   it("额度按引擎分键——键错了两家引擎只会剩一份", () => {
     const ctx = fresh()
     const a: Event = { type: "limits.updated", at: 0, engine: "codex", limits: {} }
@@ -99,6 +110,13 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
   it("**`thread.removed` 不在这份里**：它是一次变化，补发只会把删掉的东西变回来", () => {
     const ctx = fresh()
     emit(ctx, { type: "thread.removed", at: 0, threadId: "th-1" })
+    expect(liveStateOf(ctx)).toEqual([])
+  })
+
+  it("删除会话会同时回收它的斜杠命令现状", () => {
+    const ctx = fresh()
+    emit(ctx, commands)
+    emit(ctx, { type: "thread.removed", at: 1, threadId: "th-1" })
     expect(liveStateOf(ctx)).toEqual([])
   })
 

@@ -74,6 +74,8 @@ describe("host", () => {
     await host.dispose()
     await expect(answer).resolves.toEqual({ allow: false, remember: "once" })
     expect(session().disposed).toBe(true)
+    const settled = items(events).filter((item) => item.kind === "approval").at(-1)
+    expect(settled?.kind === "approval" ? settled.status : "").toBe("denied")
   })
 
   it("会话状态走完整条链路：running → waiting_approval → running → idle", async () => {
@@ -266,9 +268,15 @@ describe("续跑", () => {
     const last = events.at(-1)
     expect(last?.type === "thread.updated" ? last.thread.engineHandle : "").toBe("early-handle")
     // 顺序必须是 started 打头，反过来落盘里就成了「先更新后创建」。
-    // 中间那条 updated 是 `starting → idle`，末尾那条才是补句柄的
+    // 启动时先清空这家引擎的旧目录，再发 `starting → idle`；末尾才是补句柄。
     expect(events[0]?.type).toBe("thread.started")
-    expect(events.map((e) => e.type).slice(1)).toEqual(["thread.updated", "thread.updated"])
+    expect(events.map((e) => e.type).slice(1)).toEqual([
+      "models.updated",
+      "commands.updated",
+      "usage.cleared",
+      "thread.updated",
+      "thread.updated",
+    ])
   })
 
   it("同一个句柄不重复发事件", async () => {

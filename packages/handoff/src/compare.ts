@@ -1,3 +1,4 @@
+import type { Item, Thread } from "@omni/protocol"
 import type { Handoff } from "./build.js"
 
 /**
@@ -5,18 +6,17 @@ import type { Handoff } from "./build.js"
  *
  * ## 为什么在这个包里
  *
- * 接力要回答「上一家做了什么」，对比要回答「两家各做了什么、差在哪」——
- * **前半句是同一个问题**。`buildHandoff` 已经把一次跑压成了结论
+ * 对比要回答「两家各自上报做了什么、差在哪」。`buildHandoff` 把一次跑压成结论
  * （动过哪些文件、跑过哪些命令、还剩什么），对比只是把两份结论并排放。
  *
  * 另写一套「对比专用的摘要」意味着同一件事有两个定义，迟早对不上：
- * 交接包说改了 3 个文件，对比视图说 4 个，用户不知道该信哪个。
+ * 两套摘要说出不同数字时，用户不知道该信哪个。
  *
  * ## 只比结论，不比过程
  *
  * 不比 token 数、不比耗时、不比谁话多——那些是**代理指标**，
  * 看着客观其实误导：话少的那家可能只是没干活。
- * 比的是「工作区里真的变成了什么样」和「还剩什么没做」。
+ * 文件部分只是编辑工具最后一次成功上报，**不是 Git 净 diff**；真实净差异由审核面板负责。
  */
 
 export type Side = "a" | "b" | "both"
@@ -45,6 +45,18 @@ export interface Comparison {
   last: { a: string | undefined; b: string | undefined }
   /** 只有一边动过的文件数。界面拿它决定要不要把对比条标红。 */
   onlyOneSide: number
+}
+
+/** 父子对比只取分叉点之后的父侧记录；分叉前缀是两边共有的，不是父侧独有。 */
+export function comparisonItems(
+  thread: Thread,
+  peer: Thread,
+  items: readonly Item[],
+): readonly Item[] {
+  if (peer.forkedFrom !== thread.id) return items
+  const count = peer.forkedFromItemCount
+  if (count === undefined || !Number.isInteger(count) || count < 0 || count > items.length) return items
+  return items.slice(count)
 }
 
 function sideOf(inA: boolean, inB: boolean): Side {

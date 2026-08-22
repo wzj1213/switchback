@@ -43,6 +43,13 @@ export type Command =
       text: string
       attachments?: readonly string[]
       /**
+       * 输入区当前承载的宿主草稿身份。只有身份仍相同时，这次发送才消费草稿。
+       *
+       * 这不是幂等键：它专门防止一条更早开始、后来才完成的跨引擎发送，
+       * 把用户在等待期间刚从队列取回的新草稿清掉。
+       */
+      draftRevision?: string
+      /**
        * 上一轮还在跑时，**这句话要不要当场插进去**。
        *
        * 不给（默认）＝ 排队，等这一轮停了再发。给 `true` ＝ 递进正在跑的那一轮，
@@ -90,9 +97,9 @@ export type Command =
    * 那样只会造出一个「界面上看不见、模型却还记得」的分裂状态，
    * 比不给这个功能糟得多。
    *
-   * 所以走一条诚实的路：**开一个新会话，把那一轮之前的内容作为交接包喂进去**，
-   * 原会话原样留着。你得到的是「带着当时的上下文重新开始」，
-   * 而不是一个假装什么都没发生过的会话。
+   * 所以只在引擎暴露原生 fork 时开放：**开一个新会话，让引擎自己复制并回滚
+   * 到那一轮之前**，原会话原样留着。做不到就明确失败，不注入摘要，
+   * 也不拿空白会话冒充「带着上下文重来」。
    */
   | { type: "thread.rewind"; threadId: ThreadId; turnId: TurnId }
   /**
@@ -118,13 +125,13 @@ export type Command =
   /** 关掉会话并把它的记录从磁盘上删掉。**不可撤销**，界面必须二次确认。 */
   | { type: "thread.delete"; threadId: ThreadId }
   /**
-   * L3 分叉：把同一个目标交给另一家引擎**另起一个会话**跑一遍。
-   * 与接力（L2）的区别是原会话**继续存在**，两边可以对着看。
+   * L3 分叉：用目标引擎另开一条同工作区的相关会话，原会话继续存在。
+   * 不自动发送文本；同引擎支持原生 fork 时可复制上下文，否则新分支为空白。
    */
   | { type: "thread.fork"; threadId: ThreadId; to: EngineId }
   /** 换模型 / 改推理强度。`effort` 只对报了 `efforts` 的引擎有意义。 */
   | { type: "thread.setModel"; threadId: ThreadId; model: string; effort?: string }
-  /** L2 接力：换引擎继续同一个 thread，宿主负责生成交接包。 */
+  /** L2 接力：换引擎继续同一个 thread；不翻译上下文，也不替用户注入提示词。 */
   | { type: "thread.handoff"; threadId: ThreadId; to: EngineId }
   /**
    * 落定一张审批卡。

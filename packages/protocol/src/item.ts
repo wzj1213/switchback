@@ -14,6 +14,8 @@ interface ItemBase {
   turnId: TurnId
   kind: ItemKind
   at: number
+  /** 从原生分叉或接管历史抄进来的记录；展示保留，但不算当前会话新发生的编辑。 */
+  inherited?: true
 }
 
 export interface UserMessageItem extends ItemBase {

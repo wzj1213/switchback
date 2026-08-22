@@ -209,6 +209,7 @@ describe("用量", () => {
       type: "usage.updated",
       at: 100,
       threadId: "th-1",
+      engine: "codex",
       usage: { contextUsed: 15748, contextWindow: 258400, totalTokens: 47529 },
     })
   })

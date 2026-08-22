@@ -120,7 +120,7 @@ const readable = (path: string): Promise<boolean> => access(path).then(() => tru
  *
  * 上面那条编码规则是我们用 `encodeURIComponent` 去对 grok（Rust 那边）的编码器，
  * 在实测过的 ASCII 路径上对得上，换一条带中文或空格的路径就未必。
- * 而**算错的代价不是报错，是悄悄退回交接包**——用户不会知道自己本可以拿到全量原文。
+ * 而**算错的代价不是报错，是时间线上悄悄少掉全量原文入口**。
  * 所以算不中就按 sessionId 把 `sessions/` 扫一遍（几十个目录，一次 readdir），
  * 扫不着才给 undefined。
  */
