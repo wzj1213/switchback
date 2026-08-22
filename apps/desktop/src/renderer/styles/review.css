@@ -268,6 +268,7 @@
 
 .rvl__none {
   margin: var(--sp-3) var(--sp-3) 0;
+  overflow-wrap: anywhere;
   color: var(--text-faint);
   font-size: var(--text-xs);
   line-height: var(--lh-xs);

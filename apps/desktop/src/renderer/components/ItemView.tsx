@@ -23,9 +23,18 @@ import { LinkifiedText } from "./linkified-text.js"
 export const ItemView = memo(function ItemView({
   item,
   onResolve,
+  approvalTurn,
+  shortcutApproval,
+  readOnly = false,
 }: {
   item: Exclude<Item, ToolCallItem>
   onResolve: ResolveApproval
+  /** 当前仍可裁决审批的轮次；历史/断开态没有。 */
+  approvalTurn?: string
+  /** 当前轮次最新的 pending 审批，独占全局快捷键。 */
+  shortcutApproval?: string
+  /** 对比页中的待批请求只展示，不可在这里落定。 */
+  readOnly?: boolean
 }): React.JSX.Element {
   switch (item.kind) {
     case "user_message":
@@ -58,7 +67,8 @@ export const ItemView = memo(function ItemView({
     case "plan":
       return <PlanCard item={item} />
     case "approval":
-      return <Approval item={item} onResolve={onResolve} />
+      return <Approval item={item} active={item.turnId === approvalTurn} readOnly={readOnly}
+        shortcut={item.id === shortcutApproval} onResolve={onResolve} />
     // **可恢复的错误不画成红框。** 实测 codex 断线重连会连发十条
     // `Reconnecting... N/5`，每条都撑成一张整宽红卡片，把正文整个挤没了——
     // 而它们说的是「还在试，你不用做什么」。压成一行灰字，

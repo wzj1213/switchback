@@ -136,7 +136,7 @@ export function ModelPicker({
       <button
         type="button"
         className="trigger"
-        title={`现在就把引擎换成 ${pending.label}（会重启引擎并交接上下文）。换完就能挑它自己报的模型`}
+        title={`现在就把原生会话切到 ${pending.label}；不会自动发送内容。换完就能挑它自己报的模型`}
         disabled={disabled}
         onClick={pending.onSwitchNow}
       >

@@ -19,6 +19,8 @@ export interface Attachments {
   paste: (items: DataTransferItemList | null) => Promise<boolean>
   /** 处理一次拖放。 */
   drop: (files: FileList | null) => void
+  /** 用一组已经落盘的路径替换当前附件（取回队列 / 改一改再发）。 */
+  replace: (paths: readonly string[]) => void
   remove: (path: string) => void
   clear: () => void
 }
@@ -53,6 +55,8 @@ export function useAttachments(enabled: boolean): Attachments {
     (files: FileList | null) => {
       if (!enabled || files === null || bridge === undefined) return
       for (const file of Array.from(files)) {
+        // 粘贴与拖拽必须守同一条边界；否则 `.zip` 只是换个入口就能混进附件。
+        if (!file.type.startsWith("image/")) continue
         // 拖进来的文件在盘上本来就有路径，不用再落一次盘。
         // **路径要问主进程要**：`File.path` 那个增补 Electron 32 起就没了
         //（见 preload 的 `pathForFile`），照旧读它的话这条路整个是哑的
@@ -67,6 +71,9 @@ export function useAttachments(enabled: boolean): Attachments {
     paths,
     paste,
     drop,
+    replace: useCallback((next: readonly string[]) => {
+      setPaths([...new Set(next)])
+    }, []),
     remove: useCallback((path: string) => {
       setPaths((prev) => prev.filter((p) => p !== path))
     }, []),

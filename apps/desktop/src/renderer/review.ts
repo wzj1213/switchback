@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
-import type { ReviewFile, ReviewPatch } from "../shared/review.js"
-import { parseDiff, type DiffLine } from "./diff.js"
+import type { ReviewFile } from "../shared/review.js"
+import type { NumberedLine } from "./review-lines.js"
+
+export { numbered, trimMeta, type NumberedLine } from "./review-lines.js"
+export { reviewCopyText, usePatch, type PatchData } from "./review-patch.js"
 
 /**
  * 审核面板的数据与几个纯变换。
@@ -18,48 +21,6 @@ import { parseDiff, type DiffLine } from "./diff.js"
  * 逐行配对，多出来的那几行另一侧留空。**这是个纯函数**，所以它有测试钉着——
  * 配错了不会报错，只会让人对着两列错位的代码看半天。
  */
-
-/** 带行号的一行。`old`/`new` 缺席表示这一侧没有这一行（增行没有旧行号）。 */
-export interface NumberedLine extends DiffLine {
-  old?: number
-  new?: number
-}
-
-const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
-
-/**
- * 给每一行配上行号。
- *
- * 遇到 hunk 头就重置两个游标——**这一步不能省**：一份补丁里有好几个 hunk，
- * 沿用上一个 hunk 的游标会让第二段之后的行号全部偏掉，而偏掉的行号
- * 比没有行号更坏（人会照着它去文件里找，找到的是别的地方）。
- */
-export function numbered(lines: readonly DiffLine[]): readonly NumberedLine[] {
-  const at = { old: 0, new: 0 }
-  return lines.map((line) => {
-    const hunk = line.kind === "hunk" ? HUNK.exec(line.text) : null
-    if (hunk !== null) {
-      at.old = Number(hunk[1])
-      at.new = Number(hunk[2])
-      return line
-    }
-    if (line.kind === "del") return { ...line, old: at.old++ }
-    if (line.kind === "add") return { ...line, new: at.new++ }
-    if (line.kind === "ctx") return { ...line, old: at.old++, new: at.new++ }
-    return line
-  })
-}
-
-/**
- * 丢掉 `diff --git` / `index` / `---` / `+++` 那四行。
- *
- * **它们在这块面板里是纯噪音**：路径就写在正文上方的文件头上，blob 哈希对读代码
- * 没有任何帮助，而每个文件开头都顶着四行灰字，第一处真正的改动就被推下去了。
- * 转录区里那份保留它们是另一回事——那里没有文件头。
- */
-export function trimMeta(lines: readonly NumberedLine[]): readonly NumberedLine[] {
-  return lines.filter((l) => l.kind !== "meta")
-}
 
 export interface SplitRow {
   left?: NumberedLine
@@ -147,12 +108,58 @@ const bridgeOf = (): typeof window.omni | undefined =>
 
 export interface ReviewData {
   root: string
+  cwd: string
   files: readonly ReviewFile[]
   more?: number
+  ignored?: readonly string[]
+  baseline: boolean
+  failed: boolean
   /** 不是 git 仓库。和「没有改动」是两件事，界面上要说不同的话。 */
   noRepo: boolean
   loading: boolean
+  /** 这一轮清单请求的身份；文件补丁跟着它刷新，避免左新右旧。 */
+  revision: string
   reload: () => void
+}
+
+interface ReviewQuery { threadId?: string; wanted?: readonly string[] }
+
+interface LoadedReview extends Omit<ReviewData, "loading" | "reload" | "revision"> {
+  key: string
+  scope: string
+}
+
+function loadedReview(
+  key: string,
+  scope: string,
+  out: Awaited<ReturnType<NonNullable<typeof window.omni>["workReview"]>>,
+): LoadedReview {
+  if (out === undefined) {
+    return { key, scope, root: "", cwd: "", files: [], baseline: false, failed: false, noRepo: true }
+  }
+  return {
+    key,
+    scope,
+    ...out,
+    baseline: out.baseline === true,
+    failed: out.failed === true,
+    noRepo: false,
+  }
+}
+
+function reviewData(
+  data: LoadedReview | undefined,
+  key: string,
+  scope: string,
+  reload: () => void,
+): ReviewData {
+  if (data === undefined || data.scope !== scope) {
+    return {
+      root: "", cwd: "", files: [], noRepo: false, baseline: false, failed: false,
+      loading: true, revision: key, reload,
+    }
+  }
+  return { ...data, loading: data.key !== key, revision: key, reload }
 }
 
 /**
@@ -161,88 +168,49 @@ export interface ReviewData {
  * **重问期间不清空旧的清单**：清空会让面板在每一轮结束时闪一下白，
  * 而多数时候新旧两份是几乎一样的。
  */
-export function useReview(cwd: string, stamp: string): ReviewData {
+export function useReview(
+  cwd: string,
+  stamp: string,
+  query: ReviewQuery = {},
+): ReviewData {
   const [nonce, setNonce] = useState(0)
-  const key = `${cwd}\u0000${stamp}\u0000${String(nonce)}`
-  const [data, setData] = useState<
-    | {
-        key: string
-        root: string
-        files: readonly ReviewFile[]
-        more?: number
-        noRepo: boolean
-      }
-    | undefined
-  >(undefined)
+  const [visit, setVisit] = useState(0)
+  const wanted = query.wanted ?? []
+  const wantedKey = wanted.join("\u0000")
+  const scope = `${cwd}\u0000${query.threadId ?? ""}\u0000${wantedKey}`
+  const key = `${scope}\u0000${stamp}\u0000${String(nonce)}\u0000${String(visit)}`
+  const [data, setData] = useState<LoadedReview | undefined>(undefined)
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined
+    const bump = (): void => {
+      setVisit((n) => n + 1)
+    }
+    window.addEventListener("focus", bump)
+    return () => {
+      window.removeEventListener("focus", bump)
+    }
+  }, [])
   useEffect(() => {
     const bridge = bridgeOf()
     if (cwd === "" || bridge === undefined) return undefined
     let live = true
-    void bridge.workReview(cwd).then((out) => {
-      if (!live) return
-      setData(
-        out === undefined
-          ? { key, root: "", files: [], noRepo: true }
-          : { key, ...out, noRepo: false },
-      )
-    })
+    void bridge
+      .workReview(cwd, query.threadId, wanted)
+      .then((out) => {
+        if (!live) return
+        setData(loadedReview(key, scope, out))
+      })
+      .catch(() => {
+        if (!live) return
+        setData({ key, scope, root: "", cwd, files: [], baseline: false, failed: true, noRepo: false })
+      })
     return () => {
       live = false
     }
-  }, [cwd, key])
+  }, [cwd, key, query.threadId, wantedKey])
   const reload = useCallback(() => {
     setNonce((n) => n + 1)
   }, [])
-  return {
-    root: data?.root ?? "",
-    files: data?.files ?? [],
-    ...(data?.more === undefined ? {} : { more: data.more }),
-    noRepo: data?.noRepo ?? false,
-    // key 在 render 当下就变，旧数据不会在 effect 开始前闪回一帧。
-    loading: data?.key !== key,
-    reload,
-  }
-}
-
-export interface PatchData extends ReviewPatch {
-  lines: readonly NumberedLine[]
-  loading: boolean
-}
-
-const EMPTY = { patch: "", added: 0, removed: 0, lines: [] } as const
-
-/**
- * 一个文件的补丁，点开哪个取哪个。
- *
- * **一律按 `"update"` 解析**：git 给的永远是真正的 unified diff，新建文件也带
- * `@@` 头和 `+` 前缀。工具行那份不是这样（`kind` 决定格式），
- * 两者的解析规则不能互相借用。
- */
-export function usePatch(
-  cwd: string,
-  rel: string | undefined,
-  context: number,
-  stamp: string,
-): PatchData {
-  const key = `${cwd}\u0000${rel ?? ""}\u0000${String(context)}\u0000${stamp}`
-  const [out, setOut] = useState<(Omit<PatchData, "loading"> & { key: string }) | undefined>(
-    undefined,
-  )
-  useEffect(() => {
-    const bridge = bridgeOf()
-    if (cwd === "" || rel === undefined || bridge === undefined) {
-      return undefined
-    }
-    let live = true
-    void bridge.workPatch(cwd, rel, context).then((got) => {
-      if (!live) return
-      setOut({ key, ...got, lines: trimMeta(numbered(parseDiff(got.patch, "update"))) })
-    })
-    return () => {
-      live = false
-    }
-  }, [cwd, rel, context, key])
-  if (rel === undefined) return { ...EMPTY, loading: false }
-  if (out?.key !== key) return { ...EMPTY, loading: true }
-  return { ...out, loading: false }
+  // key 在 render 当下就变，旧数据不会在 effect 开始前闪回一帧。
+  return reviewData(data, key, scope, reload)
 }

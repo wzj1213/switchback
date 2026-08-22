@@ -247,6 +247,13 @@
   margin: 6px 0 var(--sp-2);
 }
 
+.composer__attachwarn {
+  margin: 0 0 var(--sp-2);
+  color: var(--warn);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
 /* 缩略图。× 压在右上角**外面一点**——压在图里会盖住内容，
    而被盖住的往往正是你想确认的那一角 */
 .thumb {

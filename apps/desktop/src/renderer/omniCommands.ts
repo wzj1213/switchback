@@ -41,7 +41,7 @@ export function omniCommands(acts: {
     make("timeline", "引擎时间线", "这条会话都被哪几家引擎跑过、记录在哪", acts.onTimeline),
     make("export", "导出对话", "整段复制成 Markdown", acts.onExport),
     // 下面这几条**没有对象就不给**：一个点了没反应的命令比没有这条命令更糟
-    make("fork", "分叉", "用另一家引擎另起一个跑同一件事", acts.onFork),
+    make("fork", "分叉", "用另一家引擎另开一条同工作区分支", acts.onFork),
     make("handoff", "接力", "换一家引擎接着做这个会话", acts.onHandoff),
     make("compare", "对比", "和分叉出来的那个并排比一比", acts.onCompare),
     make("stop", "停止", "打断正在跑的这一轮", acts.onStop),

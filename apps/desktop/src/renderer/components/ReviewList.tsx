@@ -58,7 +58,7 @@ function Row({ file, active, onPick }: {
   )
 }
 
-export function ReviewList({ files, active, query, onQuery, onPick, more }: {
+export function ReviewList({ files, active, query, onQuery, onPick, more, ignored }: {
   files: readonly ReviewFile[]
   active: string | undefined
   query: string
@@ -66,6 +66,8 @@ export function ReviewList({ files, active, query, onQuery, onPick, more }: {
   onPick: (rel: string) => void
   /** 被截掉的条数。**必须说出来**——「500 个文件」看起来像是全部。 */
   more?: number
+  /** 被 Git ignore 排除、无法生成可信补丁的引擎上报路径。 */
+  ignored: readonly string[]
 }): React.JSX.Element {
   return (
     <div className="rvl">
@@ -85,9 +87,20 @@ export function ReviewList({ files, active, query, onQuery, onPick, more }: {
         {files.map((file) => (
           <Row key={file.rel} file={file} active={file.rel === active} onPick={onPick} />
         ))}
-        {files.length === 0 ? <p className="rvl__none">没有匹配的文件</p> : null}
+        {files.length === 0 ? (
+          <p className="rvl__none">
+            {more === undefined ? "当前筛选条件下没有可显示的文件" : "已列出的文件里没有匹配项"}
+          </p>
+        ) : null}
         {more === undefined ? null : (
           <p className="rvl__none">改动太多，这里只列了前面这些，还有 {more} 个没显示</p>
+        )}
+        {ignored.length === 0 ? null : (
+          <p className="rvl__none">
+            另有 {ignored.length} 个 Git 忽略文件无法核实：
+            {ignored.slice(0, 3).join("、")}
+            {ignored.length > 3 ? ` 等 ${String(ignored.length)} 个` : ""}
+          </p>
         )}
       </div>
       <p className="rvl__legend">

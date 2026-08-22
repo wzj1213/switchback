@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { readFile, realpath, stat } from "node:fs/promises"
-import { isAbsolute, join, relative } from "node:path"
+import { isAbsolute, join, relative, resolve, sep } from "node:path"
 import { promisify } from "node:util"
 import { ipcMain } from "electron"
 import {
@@ -12,6 +12,7 @@ import {
   type ReviewPatch,
 } from "../shared/review.js"
 import { codesOf } from "./worksite.js"
+import type { WorktreeBaselines } from "./worktree-baseline.js"
 
 const run = promisify(execFile)
 
@@ -21,9 +22,9 @@ const run = promisify(execFile)
  * ## 为什么必须问 git
  *
  * 引擎报的那份补丁只覆盖它用编辑工具做的改动。它用 shell 写的文件
- *（`sed -i`、`>` 重定向、跑一个生成脚本）、你自己在编辑器里改的、
- * 上一轮留下的——一个都不在里面。而审核这个动作问的是
- *「**我现在要不要提交这些**」，那个「这些」只能是工作区的真实状态。
+ *（`sed -i`、`>` 重定向、跑一个生成脚本）、你自己在编辑器里改的——
+ * 一个都不在里面。而审核问的是「**这次对话最终留下了什么**」，只能比较
+ * 对话开场工作树与当前工作树；没有 thread 基线的旧入口才退回 HEAD。
  *
  * 顺带解决一个老问题：引擎报 `add`/`delete` 时递的是**文件全文**，不带前缀
  *（见 `renderer/diff.ts`）。git 给的永远是真正的 unified diff，新建文件也带
@@ -42,20 +43,86 @@ const BIG = 400_000
 const READ_CAP = 1_000_000
 /** 列表上限。真到这个量级，人要的是别的工具。 */
 const MAX_FILES = 500
+const LITERAL_PATHS = { ...process.env, GIT_LITERAL_PATHSPECS: "1" }
 
 export interface Review {
   /** 仓库根（真实路径）。 */
   root: string
+  /** 会话工作目录（真实路径）；符号链接入口靠它映射回同一个仓库身份。 */
+  cwd: string
   files: readonly ReviewFile[]
   /** 被截掉了多少个。**不能不说**——「500 个文件」看起来像是全部。 */
   more?: number
+  /** Git ignore 规则让基线无法核实的、由引擎明确报告的相对路径。 */
+  ignored?: readonly string[]
+  /** 这份差异以对话开场工作树为基线，而不是 HEAD。 */
+  baseline?: true
+  /** Git 临时读失败；空清单此时绝不等于“没有改动”。 */
+  failed?: true
 }
 
-async function gitRoot(cwd: string): Promise<string | undefined> {
+interface Repo {
+  root: string
+  cwd: string
+}
+
+async function repoOf(cwd: string): Promise<Repo | undefined> {
   const top = await run("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: TIMEOUT }).catch(() => undefined)
   if (top === undefined) return undefined
   const raw = top.stdout.trim()
-  return realpath(raw).catch(() => raw)
+  const [root, actualCwd] = await Promise.all([
+    realpath(raw).catch(() => raw),
+    realpath(cwd).catch(() => resolve(cwd)),
+  ])
+  return { root, cwd: actualCwd }
+}
+
+function inside(root: string, path: string): string | undefined {
+  const rel = relative(root, path)
+  return rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)
+    ? undefined
+    : rel
+}
+
+function tmpAlias(path: string): string {
+  if (path === "/tmp") return "/private/tmp"
+  return path.startsWith("/tmp/") ? `/private${path}` : path
+}
+
+function wantedRel(path: string, requestedCwd: string, repo: Repo): string | undefined {
+  if (!isAbsolute(path)) return inside(repo.root, resolve(repo.cwd, path))
+  const direct = inside(repo.root, tmpAlias(resolve(path)))
+  if (direct !== undefined) return direct
+  const lexical = inside(tmpAlias(resolve(requestedCwd)), tmpAlias(resolve(path)))
+  return lexical === undefined ? undefined : inside(repo.root, resolve(repo.cwd, lexical))
+}
+
+function selected<T extends { rel: string; from?: string }>(
+  all: readonly T[],
+  wanted: ReadonlySet<string>,
+): readonly T[] {
+  const first = all.slice(0, MAX_FILES)
+  const seen = new Set(first.map((entry) => entry.rel))
+  return [
+    ...first,
+    ...all.filter(
+      (entry) => !seen.has(entry.rel) &&
+        (wanted.has(entry.rel) || (entry.from !== undefined && wanted.has(entry.from))),
+    ),
+  ]
+}
+
+async function baseTree(root: string): Promise<string | undefined> {
+  const head = await run("git", ["rev-parse", "--verify", "HEAD^{tree}"], {
+    cwd: root,
+    timeout: TIMEOUT,
+  }).catch(() => undefined)
+  if (head !== undefined) return head.stdout.trim()
+  const empty = await run("git", ["hash-object", "-t", "tree", "/dev/null"], {
+    cwd: root,
+    timeout: TIMEOUT,
+  }).catch(() => undefined)
+  return empty?.stdout.trim()
 }
 
 /** 未跟踪文件的增删数：读一遍数行。读不动（太大 / 二进制 / 没权限）就报 0。 */
@@ -95,29 +162,56 @@ function entryOf(
   }
 }
 
-export async function workReview(cwd: string): Promise<Review | undefined> {
-  const root = await gitRoot(cwd)
-  if (root === undefined) return undefined
+export interface ReviewSource {
+  baselines?: WorktreeBaselines
+  threadId?: string
+  wanted?: readonly string[]
+}
+
+async function baselineReview(cwd: string, source: ReviewSource): Promise<Review | undefined> {
+  if (source.baselines === undefined || source.threadId === undefined) return undefined
+  return source.baselines.review(source.threadId, cwd, source.wanted)
+}
+
+export async function workReview(cwd: string, source: ReviewSource = {}): Promise<Review | undefined> {
+  try {
+    const baseline = await baselineReview(cwd, source)
+    if (baseline !== undefined) return baseline
+  } catch {
+    const failedRepo = await repoOf(cwd)
+    return failedRepo === undefined
+      ? undefined
+      : { ...failedRepo, files: [], baseline: true, failed: true }
+  }
+  const repo = await repoOf(cwd)
+  if (repo === undefined) return undefined
   // `-uall`：不加的话未跟踪的**目录**会折成一条 `sub/`，界面上看起来像一个文件
-  const status = await run("git", ["status", "--porcelain", "-z", "-uall"], { cwd: root, timeout: TIMEOUT }).catch(
+  const status = await run("git", ["status", "--porcelain", "-z", "-uall"], { cwd: repo.root, timeout: TIMEOUT }).catch(
     () => undefined,
   )
-  if (status === undefined) return { root, files: [] }
-  const num = await run("git", ["diff", "HEAD", "--numstat", "-z", "-M"], { cwd: root, timeout: TIMEOUT }).catch(
+  const base = await baseTree(repo.root)
+  if (status === undefined || base === undefined) return { ...repo, files: [], failed: true }
+  const num = await run("git", ["diff", base, "--numstat", "-z", "-M"], { cwd: repo.root, timeout: TIMEOUT }).catch(
     () => undefined,
   )
-  const stats = parseNumstat(num?.stdout ?? "")
+  if (num === undefined) return { ...repo, files: [], failed: true }
+  const stats = parseNumstat(num.stdout)
   const all = codesOf(status.stdout)
-  const kept = all.slice(0, MAX_FILES)
+  const wanted = new Set(
+    (source.wanted ?? [])
+      .map((path) => wantedRel(path, cwd, repo))
+      .filter((rel): rel is string => rel !== undefined),
+  )
+  const kept = selected(all, wanted)
   const files = await Promise.all(
     kept.map(async (statusEntry) => {
-      const entry = entryOf(statusEntry, root, stats)
+      const entry = entryOf(statusEntry, repo.root, stats)
       if (entry.kind !== "untracked") return entry
       const { added, binary } = await untrackedStat(entry.path)
       return binary ? entry : { ...entry, added }
     }),
   )
-  return { root, files, ...(all.length > kept.length ? { more: all.length - kept.length } : {}) }
+  return { ...repo, files, ...(all.length > kept.length ? { more: all.length - kept.length } : {}) }
 }
 
 /** 数一份补丁的增删。`+++`/`---` 是文件头，算进去每份补丁都会凭空多一红一绿。 */
@@ -140,10 +234,77 @@ function shaped(patch: string): ReviewPatch {
   return { patch, ...tallyPatch(patch) }
 }
 
+const GONE: ReviewPatch = { patch: "", skip: "gone", added: 0, removed: 0 }
+const FAILED: ReviewPatch = { patch: "", skip: "failed", added: 0, removed: 0 }
+
+function safeRel(repo: Repo, rel: string): boolean {
+  if (rel === "" || isAbsolute(rel)) return false
+  const path = relative(repo.root, join(repo.root, rel))
+  return path !== ".." && !path.startsWith(`..${sep}`)
+}
+
+async function baselinePatch(
+  cwd: string,
+  rel: string,
+  context: number,
+  source: ReviewSource,
+): Promise<ReviewPatch | undefined> {
+  if (source.baselines === undefined || source.threadId === undefined) return undefined
+  try {
+    const patch = await source.baselines.patch(source.threadId, cwd, rel, context)
+    return patch === undefined ? undefined : shaped(patch)
+  } catch {
+    return FAILED
+  }
+}
+
+function renameFrom(raw: string, rel: string): string | undefined {
+  const parts = raw.split("\0")
+  for (let index = 0; index < parts.length; index += 1) {
+    const mark = parts[index] ?? ""
+    if (!mark.startsWith("R") && !mark.startsWith("C")) continue
+    if (parts[index + 2] === rel) return parts[index + 1]
+    index += 2
+  }
+  return undefined
+}
+
+async function legacyPatch(repo: Repo, rel: string, unified: string): Promise<ReviewPatch> {
+  const base = await baseTree(repo.root)
+  if (base === undefined) return FAILED
+  const names = await run("git", ["diff", base, "-M", "--name-status", "-z"], {
+    cwd: repo.root,
+    timeout: TIMEOUT,
+    maxBuffer: BIG * 4,
+  }).catch(() => undefined)
+  const from = renameFrom(names?.stdout ?? "", rel)
+  const paths = from === undefined ? [rel] : [from, rel]
+  const tracked = await run("git", ["diff", base, "-M", "--no-color", unified, "--", ...paths], {
+    cwd: repo.root,
+    env: LITERAL_PATHS,
+    timeout: TIMEOUT,
+    maxBuffer: BIG * 4,
+  }).catch(() => undefined)
+  if (tracked !== undefined && tracked.stdout !== "") return shaped(tracked.stdout)
+  const known = await run("git", ["ls-files", "--error-unmatch", "--", rel], {
+    cwd: repo.root,
+    env: LITERAL_PATHS,
+    timeout: TIMEOUT,
+  }).catch(() => undefined)
+  if (known !== undefined) return { patch: "", added: 0, removed: 0 }
+  const fresh = await run(
+    "git",
+    ["diff", "--no-index", "--no-color", unified, "--", "/dev/null", rel],
+    { cwd: repo.root, timeout: TIMEOUT, maxBuffer: BIG * 4 },
+  ).catch((error: unknown) => error as { stdout?: string })
+  return shaped(fresh.stdout ?? "")
+}
+
 /**
  * 一个文件的补丁。
  *
- * **两条路都试**：跟踪中的走 `git diff HEAD`，未跟踪的 git 眼里根本不存在，
+ * 有对话基线时直接比较两个 tree；旧入口则让跟踪中的走 `git diff <base>`，
+ * 未跟踪的文件在 git 眼里根本不存在，
  * 得用 `--no-index` 拿 `/dev/null` 和它比（它的退出码是 1 表示「有差异」，
  * 不是错误，所以那条 catch 要读 stdout 而不是当失败）。
  *
@@ -151,44 +312,38 @@ function shaped(patch: string): ReviewPatch {
  * 一律拒。**不是怕注入**（`execFile` 不过 shell，`--` 也隔开了选项），
  * 是不想让一个界面 bug 变成「把仓库外的任意文件读出来」。
  */
-export async function workPatch(cwd: string, rel: string, context = 3): Promise<ReviewPatch> {
-  const root = await gitRoot(cwd)
-  if (root === undefined || rel === "" || isAbsolute(rel)) return { patch: "", skip: "gone", added: 0, removed: 0 }
-  const abs = join(root, rel)
-  const inside = relative(root, abs)
-  if (inside.startsWith("..")) return { patch: "", skip: "gone", added: 0, removed: 0 }
+export async function workPatch(
+  cwd: string,
+  rel: string,
+  context = 3,
+  source: ReviewSource = {},
+): Promise<ReviewPatch> {
+  const repo = await repoOf(cwd)
+  if (repo === undefined || !safeRel(repo, rel)) return GONE
   // 上下文行数由界面给：默认 3 行，「展开」时给一个大数——这比自己去读原文件
   // 再拼上下文可靠得多，git 知道每个 hunk 真正的行号
   const unified = `--unified=${String(Math.max(0, Math.min(context, 99_999)))}`
-  const tracked = await run("git", ["diff", "HEAD", "-M", "--no-color", unified, "--", rel], {
-    cwd: root,
-    timeout: TIMEOUT,
-    maxBuffer: BIG * 4,
-  }).catch(() => undefined)
-  if (tracked !== undefined && tracked.stdout !== "") return shaped(tracked.stdout)
+  const fromBaseline = await baselinePatch(cwd, rel, context, source)
+  if (fromBaseline !== undefined) return fromBaseline
   // **空补丁不等于「未跟踪」。** 一个跟踪中、但此刻和 HEAD 没差别的文件
   //（清单取回来之后你在编辑器里改回去了）走到下面那条会得到一份
   // 「整个文件都是新增的」补丁——那是**看起来完全可信的错误答案**，
   // 比报错糟得多。所以先问一句 git：它到底认不认识这个文件
-  const known = await run("git", ["ls-files", "--error-unmatch", "--", rel], { cwd: root, timeout: TIMEOUT }).catch(
-    () => undefined,
-  )
-  if (known !== undefined) return { patch: "", added: 0, removed: 0 }
-  const fresh = await run("git", ["diff", "--no-index", "--no-color", unified, "--", "/dev/null", rel], {
-    cwd: root,
-    timeout: TIMEOUT,
-    maxBuffer: BIG * 4,
-  }).catch((error: unknown) => error as { stdout?: string })
-  return shaped(fresh.stdout ?? "")
+  return legacyPatch(repo, rel, unified)
 }
 
-export function installReviewChannel(): void {
-  ipcMain.handle("omni:workReview", async (_e, cwd: string) =>
-    typeof cwd === "string" && cwd !== "" ? workReview(cwd) : undefined,
+export function installReviewChannel(baselines?: WorktreeBaselines): void {
+  ipcMain.handle("omni:workReview", async (_e, req: { cwd: string; threadId?: string; wanted?: readonly string[] }) =>
+    typeof req.cwd === "string" && req.cwd !== ""
+      ? workReview(req.cwd, { baselines, threadId: req.threadId, wanted: req.wanted })
+      : undefined,
   )
-  ipcMain.handle("omni:workPatch", async (_e, req: { cwd: string; rel: string; context?: number }) =>
+  ipcMain.handle("omni:workPatch", async (_e, req: { cwd: string; rel: string; context?: number; threadId?: string }) =>
     typeof req.cwd === "string" && typeof req.rel === "string"
-      ? workPatch(req.cwd, req.rel, typeof req.context === "number" ? req.context : 3)
+      ? workPatch(req.cwd, req.rel, typeof req.context === "number" ? req.context : 3, {
+          baselines,
+          threadId: req.threadId,
+        })
       : { patch: "", skip: "gone" as const, added: 0, removed: 0 },
   )
 }

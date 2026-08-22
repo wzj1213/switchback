@@ -40,9 +40,6 @@ function Kbd({ children }: { children: React.ReactNode }): React.JSX.Element {
  *   最安全的那档占据最好按的位置。
  * - 正文可滚，**操作行在滚动区之外**（这条学 dsh）：命令再长也不能把按钮顶出屏幕。
  */
-/** 当前持有 ⌘⏎ / ⌘⌫ 的那张卡。见下面 effect 里的说明。 */
-const holder: { id: string | undefined } = { id: undefined }
-
 /**
  * 「允许一次」旁边那个下拉里的两项。
  *
@@ -100,12 +97,43 @@ function Settled({ item }: { item: ApprovalItem }): React.JSX.Element {
   )
 }
 
+/** 进程或轮次已经不在时，旧 pending 只是一条历史，不能继续授予权限。 */
+function Expired({ item }: { item: ApprovalItem }): React.JSX.Element {
+  return (
+    <div className="approval--done" title="原生审批请求已经失效，不能再执行">
+      <span className="approval__mark" aria-hidden="true"><ShieldIcon size={13} /></span>
+      <span className="approval__verdict">已失效</span>
+      <code className="approval__done-cmd">{item.summary}</code>
+    </div>
+  )
+}
+
+/** 对比页是只读的；仍有效的请求要回到单栏处理，不能在两栏里误批错边。 */
+function ReadOnly({ item }: { item: ApprovalItem }): React.JSX.Element {
+  return (
+    <div className="approval--done" title="对比视图只读；退出对比后可处理这项请求">
+      <span className="approval__mark" aria-hidden="true"><ShieldIcon size={13} /></span>
+      <span className="approval__verdict">待处理</span>
+      <code className="approval__done-cmd">{item.summary}</code>
+    </div>
+  )
+}
+
 export function Approval({
   item,
   onResolve,
+  active,
+  shortcut,
+  readOnly,
 }: {
   item: ApprovalItem
   onResolve: ResolveApproval
+  /** 只有当前活跃轮次里的 pending 请求仍可裁决。 */
+  active: boolean
+  /** 当前轮次最新的 pending 卡；只有它响应全局快捷键和自动聚焦。 */
+  shortcut: boolean
+  /** 对比页只展示仍有效的请求，不在双栏里执行有副作用的裁决。 */
+  readOnly: boolean
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const primary = useRef<HTMLButtonElement>(null)
@@ -118,17 +146,14 @@ export function Approval({
    * ⌘⏎ 会**把三张一起批了**——而用户以为自己只批了眼前这一张。
    * 审批是这个产品里唯一「按错了就真出事」的地方，不能有这种歧义。
    *
-   * 用一个模块级的持有者做互斥：后挂载的卡抢走持有权（它就是最新那张），
-   * 卸载时只在自己还持有时才归还——否则会把后来者的持有权误清掉。
+   * `Transcript` 从有序 item 中直接选出最新一张，再通过 `shortcut` 指给它。
+   * 仲裁因此是纯派生状态，不需要跨会话共享一个可变的模块级持有者。
    */
   useEffect(() => {
-    if (settled || isTyping()) return undefined
-    holder.id = item.id
-    primary.current?.focus()
+    if (settled || !active || !shortcut || readOnly) return undefined
+    if (!isTyping()) primary.current?.focus()
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey) || isTyping()) return
-      // 不是持有者就装作没看见——同一次按键不该批掉屏幕上所有的卡
-      if (holder.id !== item.id) return
       if (e.key === "Enter") {
         e.preventDefault()
         onResolve(item.id, true, "once")
@@ -140,9 +165,8 @@ export function Approval({
     window.addEventListener("keydown", onKey)
     return () => {
       window.removeEventListener("keydown", onKey)
-      if (holder.id === item.id) holder.id = undefined
     }
-  }, [settled, item.id, onResolve])
+  }, [settled, active, shortcut, readOnly, item.id, onResolve])
 
   const decide = (allow: boolean, scope: RememberScope, passTurn?: boolean): void => {
     setOpen(false)
@@ -151,6 +175,7 @@ export function Approval({
 
   // 批完了就不再是一张卡。理由见 `Settled`
   if (settled) return <Settled item={item} />
+  if (!active || readOnly) return active ? <ReadOnly item={item} /> : <Expired item={item} />
 
   return (
     <div className="approval">

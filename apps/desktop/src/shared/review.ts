@@ -34,7 +34,7 @@ export interface ReviewFile {
 }
 
 /** 不给正文的两种理由。**仍然出现在列表里**——藏起来等于假装它没变。 */
-export type PatchSkip = "binary" | "large" | "gone"
+export type PatchSkip = "binary" | "large" | "gone" | "failed"
 
 export interface ReviewPatch {
   /** 真正的 unified diff。`skip` 有值时是空串。 */

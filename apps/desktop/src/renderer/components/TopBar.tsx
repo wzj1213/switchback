@@ -67,6 +67,9 @@ function Cards({
   return null
 }
 
+const canForkFrom = (thread: Thread): boolean =>
+  thread.detached !== true && (thread.status === "idle" || thread.status === "failed")
+
 export function TopBar({
   thread,
   usage,
@@ -155,11 +158,11 @@ export function TopBar({
           <CompareIcon size={14} />
         </button>
       )}
-      {next === undefined ? null : (
+      {next === undefined || !canForkFrom(thread) ? null : (
         <button
           className="iconbtn"
           type="button"
-          title={`用 ${next.label} 另起一个会话跑同一件事（原会话保留）`}
+          title={`用 ${next.label} 另开一条同工作区分支（原会话保留，不自动发送内容）`}
           aria-label={`分叉到 ${next.label}`}
           onClick={() => {
             onFork(next.id)

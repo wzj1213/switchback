@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import type { Command, EngineInfo, Thread } from "@omni/protocol"
-import { itemsOf, turnOf, type Notice as StoreNotice, type ViewState } from "@omni/store"
+import { itemsOf, tasksOf, turnOf, type Notice as StoreNotice, type ViewState } from "@omni/store"
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
@@ -117,6 +117,7 @@ export function CompareScreen({
     thread: t,
     items: itemsOf(state, t.id),
     turn: turnOf(state, t.id),
+    tasks: tasksOf(state, t.id),
   })
   // 谁在左边由**创建先后**定，不是由「当前选中的是谁」定：
   // 从两边分别点进来看到的应该是同一张图，否则「左边那栏」这句话就没法说

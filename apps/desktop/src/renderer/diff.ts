@@ -18,6 +18,7 @@ function classify(line: string): DiffLineKind {
   if (line.startsWith("@@")) return "hunk"
   if (line.startsWith("+++") || line.startsWith("---")) return "meta"
   if (line.startsWith("diff ") || line.startsWith("index ")) return "meta"
+  if (/^(?:old mode|new mode|deleted file mode|new file mode|copy from|copy to|rename from|rename to|similarity index|dissimilarity index|\\ No newline at end of file)/.test(line)) return "meta"
   if (line.startsWith("+")) return "add"
   if (line.startsWith("-")) return "del"
   return "ctx"

@@ -24,20 +24,31 @@
  * 默认排队，插入是一个明确的动作。引擎不支持当场插话时这颗不出现——
  * 一个点了没反应的按钮比没有它更糟。
  */
-export function Queued({ texts, onDrop, onInsert }: {
+function queuedLine(text: string | undefined, attachments: number): string {
+  const parts = [text ?? ""]
+  if (attachments > 0) parts.push(`${String(attachments)} 张图片`)
+  return parts.filter((part) => part !== "").join(" · ") || "待发送内容"
+}
+
+export function Queued({ texts, attachments, active, onDrop, onInsert }: {
   texts: readonly string[]
+  /** 与 texts 按下标对齐；旧记录没有时为空数组。 */
+  attachments: readonly (readonly string[])[]
+  /** 仍有一轮在跑；缺席表示断开/失败后留下的待发内容。 */
+  active: boolean
   onDrop: () => void
   /** 引擎支持当场插话时才给。 */
   onInsert?: () => void
 }): React.JSX.Element | null {
   if (texts.length === 0) return null
+  const lines = texts.map((text, index) => queuedLine(text, attachments[index]?.length ?? 0))
   return (
     <div className="queued">
-      <span className="queued__badge">排队中 {texts.length}</span>
-      <span className="queued__text" title={texts.join("\n")}>
-        {texts[0]}
+      <span className="queued__badge">{active ? "排队中" : "待发送"} {texts.length}</span>
+      <span className="queued__text" title={lines.join("\n")}>
+        {lines[0]}
       </span>
-      {onInsert === undefined ? null : (
+      {!active || onInsert === undefined ? null : (
         <button type="button" className="act queued__act" title="不等这一轮跑完，现在就递进去" onClick={onInsert}>
           立刻插入
         </button>
@@ -45,7 +56,7 @@ export function Queued({ texts, onDrop, onInsert }: {
       <button
         type="button"
         className="act queued__drop"
-        title="把这几句取回输入框，先不发。正在跑的那一轮不受影响"
+        title="把这些文字和附件取回输入框，先不发。正在跑的那一轮不受影响"
         onClick={onDrop}
       >
         取回

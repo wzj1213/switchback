@@ -122,7 +122,8 @@ export function Thread({
   onBack: () => void
 }): React.JSX.Element {
   const turn = turnOf(remote.state, thread.id)
-  const usage = usageOf(remote.state, thread.id)
+  // nextEngine 只是下一句的去向；真正切换前，用量仍属于当前原生会话。
+  const usage = usageOf(remote.state, thread.id, thread.engine)
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
 
   // 打开一条会话就把它标成「我在看」，让宿主别为它再响一次。

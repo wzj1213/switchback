@@ -5,7 +5,7 @@ import type { useAttachments } from "./useAttachments.js"
 import { useEngineCommand } from "./use-engine-command.js"
 
 interface Options {
-  prefill?: { text: string; at: number }
+  prefill?: { text: string; attachments?: readonly string[]; at: number }
   engine: EngineId
   attach: ReturnType<typeof useAttachments>
   blocked: boolean
@@ -15,6 +15,7 @@ interface Options {
 
 function usePrefill(
   prefill: Options["prefill"],
+  replaceAttachments: (paths: readonly string[]) => void,
   setText: (text: string) => void,
   setCommand: (command: SlashCommand | undefined) => void,
 ): void {
@@ -23,8 +24,9 @@ function usePrefill(
     if (prefill === undefined || prefill.at === seen.current) return
     seen.current = prefill.at
     setCommand(undefined)
+    replaceAttachments(prefill.attachments ?? [])
     setText(prefill.text)
-  }, [prefill, setCommand, setText])
+  }, [prefill, replaceAttachments, setCommand, setText])
 }
 
 export function useComposerDraft(options: Options): {
@@ -36,7 +38,7 @@ export function useComposerDraft(options: Options): {
 } {
   const [text, setText] = useState("")
   const [command, setCommand] = useState<SlashCommand>()
-  usePrefill(options.prefill, setText, setCommand)
+  usePrefill(options.prefill, options.attach.replace, setText, setCommand)
   useEngineCommand(options.engine, command, setCommand, setText)
 
   const submit = (steer = false): void => {

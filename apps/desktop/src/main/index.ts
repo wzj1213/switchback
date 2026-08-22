@@ -326,7 +326,6 @@ if (!claimSingleInstance()) {
 function installChannels(): void {
   installAppChannels()
   installWorksiteChannel()
-  installReviewChannel()
   installSearchChannel()
   installChatDirChannel()
   installAttachChannel()
@@ -377,6 +376,7 @@ function bootstrap(): Promise<void> {
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id),
     })
+    installReviewChannel(attached.baselines)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
     installEngineSettings(settings, attached, log)
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })

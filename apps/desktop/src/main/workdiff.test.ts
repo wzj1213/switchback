@@ -135,6 +135,12 @@ describe("workPatch", () => {
     expect(out.patch).toContain("-del")
   })
 
+  it("改名文件的补丁保留旧路径，不把新路径画成整份新增", async () => {
+    const out = await workPatch(repo.dir, "new.txt")
+    expect(out.patch).toContain("rename from old.txt")
+    expect(out.patch).not.toContain("+x")
+  })
+
   it("二进制文件不给正文，但要说是二进制", async () => {
     writeFileSync(join(repo.dir, "blob.bin"), Buffer.from([0, 1, 2, 0, 255, 0]))
     const out = await workPatch(repo.dir, "blob.bin")
@@ -145,6 +151,31 @@ describe("workPatch", () => {
   it("跳出仓库的路径一律拒", async () => {
     for (const rel of ["../../etc/passwd", "/etc/passwd", ""]) {
       expect((await workPatch(repo.dir, rel)).skip).toBe("gone")
+    }
+  })
+
+  it("名字以两个点开头的仓库内文件不是路径穿越", async () => {
+    writeFileSync(join(repo.dir, "..local"), "inside\n")
+    expect((await workPatch(repo.dir, "..local")).patch).toContain("+inside")
+  })
+
+  it("pathspec 魔法前缀是合法文件名，不会把其他匹配文件混进补丁", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-review-literal-"))
+    try {
+      git(dir, "init", "-q")
+      const magic = ":(glob)*.txt"
+      writeFileSync(join(dir, magic), "magic before\n")
+      writeFileSync(join(dir, "other.txt"), "other before\n")
+      git(dir, "add", "-A")
+      git(dir, "commit", "-qm", "init")
+      writeFileSync(join(dir, magic), "magic after\n")
+      writeFileSync(join(dir, "other.txt"), "other after\n")
+
+      const out = await workPatch(dir, magic)
+      expect(out.patch).toContain("magic after")
+      expect(out.patch).not.toContain("other after")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 })
@@ -228,6 +259,25 @@ describe("多轮编辑看最终净 diff", () => {
 
       writeFileSync(join(dir, "rounds.txt"), "one\ntwo\n")
       expect((await workReview(dir))?.files.some((file) => file.rel === "rounds.txt")).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("还没有 HEAD 的仓库", () => {
+  it("已暂存的新文件仍有行数和补丁", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-review-unborn-"))
+    try {
+      git(dir, "init", "-q")
+      writeFileSync(join(dir, "first.txt"), "one\ntwo\n")
+      git(dir, "add", "first.txt")
+      expect((await workReview(dir))?.files.find((file) => file.rel === "first.txt")).toMatchObject({
+        added: 2,
+        removed: 0,
+        staged: true,
+      })
+      expect((await workPatch(dir, "first.txt")).patch).toContain("+one")
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

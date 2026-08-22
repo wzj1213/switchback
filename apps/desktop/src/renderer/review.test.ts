@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { ReviewFile } from "../shared/review.js"
 import { parseDiff } from "./diff.js"
-import { filterFiles, numbered, splitRows, tallyReview, trimMeta } from "./review.js"
-import { blank } from "./components/Review.js"
+import { filterFiles, numbered, reviewCopyText, splitRows, tallyReview, trimMeta } from "./review.js"
+import { blank } from "./components/review-empty.js"
 
 const PATCH = [
   "diff --git a/x.ts b/x.ts",
@@ -126,21 +126,49 @@ describe("tallyReview", () => {
   })
 })
 
+describe("reviewCopyText", () => {
+  it("有补丁时复制真实补丁，没有正文时复制路径和明确原因", () => {
+    expect(reviewCopyText("src/a.ts", { patch: "@@ -1 +1 @@", added: 1, removed: 1 }))
+      .toBe("@@ -1 +1 @@")
+    expect(reviewCopyText("asset.bin", { patch: "", skip: "binary", added: 0, removed: 0 }))
+      .toBe("asset.bin\n\n（二进制文件不提供文本补丁）")
+    expect(reviewCopyText("gone.ts", { patch: "", skip: "gone", added: 0, removed: 1 }))
+      .toContain("文件已不存在")
+    expect(reviewCopyText("same.ts", { patch: "", added: 0, removed: 0 }))
+      .toContain("没有可复制的净改动")
+  })
+})
+
 /**
  * 三种「右边是空的」原因完全不同，说同一句话等于什么都没说：
  * 不是仓库（没法比）、干净（没得审）、筛没了（改筛选词）。
  */
 describe("空状态的措辞", () => {
   it("四种情况各说各的", () => {
-    expect(blank(false, true, 0, 0)).toContain("正在问")
-    expect(blank(true, false, 0, 0)).toContain("不是 git 仓库")
-    expect(blank(false, false, 0, 0)).toContain("干净")
-    expect(blank(false, false, 5, 0)).toContain("筛选")
-    expect(blank(false, false, 5, 5)).toContain("选一个")
+    expect(blank({ noRepo: false, loading: true, total: 0, shown: 0 })).toContain("正在问")
+    expect(blank({ noRepo: true, total: 0, shown: 0 })).toContain("不是 git 仓库")
+    expect(blank({ noRepo: false, total: 0, shown: 0 })).toContain("干净")
+    expect(blank({ noRepo: false, total: 5, shown: 0 })).toContain("筛选")
+    expect(blank({ noRepo: false, total: 8, shown: 0, more: 3 })).toContain("3 个文件未载入")
+    expect(blank({ noRepo: false, total: 5, shown: 5 })).toContain("选一个")
   })
 
   it("加载中压过其余三种——那时还不知道是哪一种", () => {
-    expect(blank(true, true, 0, 0)).toContain("正在问")
+    expect(blank({ noRepo: true, loading: true, total: 0, shown: 0 })).toContain("正在问")
+  })
+
+  it("只有 Git 忽略文件时不冒充本次对话没有改动", () => {
+    const message = blank({ noRepo: false, baseline: true, total: 0, shown: 0, unverified: 2 })
+    expect(message).toContain("2 个 Git 忽略文件")
+    expect(message).toContain("无法核实")
+    expect(message).not.toContain("没有净改动")
+  })
+
+  it("旧会话缺少开场基线时明确说明只能比较 HEAD", () => {
+    const message = blank({ noRepo: false, baseline: false, total: 0, shown: 0 })
+    expect(message).toContain("没有可用的开场基线")
+    expect(message).toContain("相对 HEAD")
+    expect(message).toContain("无法还原本次对话净改动")
   })
 })
 
@@ -158,5 +186,21 @@ describe("trimMeta", () => {
 
   it("丢完之后行号还是对的——行号在丢之前就算好了", () => {
     expect(trimMeta(lines()).find((l) => l.text === "old line")?.old).toBe(11)
+  })
+
+  it("模式变化与无换行标记保留为无行号元数据，不冒充第 0 行正文", () => {
+    const patch = [
+      "diff --git a/run.sh b/run.sh",
+      "old mode 100644",
+      "new mode 100755",
+      "\\ No newline at end of file",
+    ].join("\n")
+    const out = trimMeta(numbered(parseDiff(patch, "update")))
+    expect(out.map((line) => line.text)).toEqual([
+      "old mode 100644",
+      "new mode 100755",
+      "\\ No newline at end of file",
+    ])
+    expect(out.every((line) => line.kind === "meta" && line.old === undefined && line.new === undefined)).toBe(true)
   })
 })

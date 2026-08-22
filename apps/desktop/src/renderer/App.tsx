@@ -9,6 +9,7 @@ import {
   usageOf,
 } from "@omni/store"
 import { stampOf } from "./stamp.js"
+import { reportedChangesOf } from "./changes.js"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
 import { Review } from "./components/Review.js"
@@ -98,8 +99,12 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
   const review =
     shell.reviewOpen && thread !== undefined ? (
       <Review
+        /* 切任务时整块重挂：筛选词、选中文件和上一任务的缓存都不能跨任务短暂露出来。 */
+        key={thread.id}
         cwd={thread.cwd}
+        threadId={thread.id}
         stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
+        wanted={reportedChangesOf(itemsOf(state, thread.id), thread.cwd).list.map((file) => file.path)}
         onCopy={app.copy}
         onClose={() => {
           shell.setReviewOpen(false)
@@ -181,7 +186,8 @@ export function App(): React.JSX.Element {
            渲染都造一个新数组，而 `Transcript` 的 memo 认引用（见 `AppApi.items`） */
         items={app.items}
         turn={turnOf(state, thread.id)}
-        usage={usageOf(state, thread.id)}
+        /* nextEngine 只是下一句的去向；真正切换前，顶部仍应显示当前原生会话的用量。 */
+        usage={usageOf(state, thread.id, thread.engine)}
         tasks={tasksOf(state, thread.id)}
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
@@ -198,7 +204,8 @@ export function App(): React.JSX.Element {
         }}
         onCopy={app.copy}
         onReveal={app.reveal}
-        commands={commandsOf(state, thread.id)}
+        /* 待切换时不拿旧引擎的命令冒充目标引擎；omni 自己的命令仍由 Workspace 补上。 */
+        commands={thread.nextEngine === undefined ? commandsOf(state, thread.id, thread.engine) : []}
         limits={limitsOf(state, thread.engine)}
         onNew={app.newHere}
         onRename={shell.requestRename}

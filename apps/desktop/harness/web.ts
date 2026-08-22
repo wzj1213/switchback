@@ -138,7 +138,7 @@ const seed: readonly Event[] = [
   { type: "thread.started", at, thread: thread("t-1", "浏览器端的审批屏", "waiting_approval") },
   { type: "turn.started", at, turn: { id: "u-1", threadId: "t-1", engine: "codex", status: "running", startedAt: at } },
   ...items.map((item): Event => ({ type: "item.started", at: item.at, item })),
-  { type: "usage.updated", at, threadId: "t-1", usage: { contextUsed: 42_000, contextWindow: 200_000 } },
+  { type: "usage.updated", at, threadId: "t-1", engine: "codex", usage: { contextUsed: 42_000, contextWindow: 200_000 } },
 ]
 
 function main(): void {

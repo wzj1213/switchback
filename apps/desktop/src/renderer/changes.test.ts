@@ -77,6 +77,11 @@ describe("变更汇总", () => {
     expect(reportedChangesOf([], "/w")).toEqual({ files: 0, added: 0, removed: 0, list: [] })
   })
 
+  it("分叉或接管抄入的历史编辑只展示在 transcript，不冒充本会话改动", () => {
+    const inherited = { ...edit({ id: "old", path: "/w/old.ts", added: 9, removed: 2 }), inherited: true as const }
+    expect(reportedChangesOf([inherited], "/w")).toEqual({ files: 0, added: 0, removed: 0, list: [] })
+  })
+
   it("跨引擎的相对、绝对与 /tmp 别名先归一再去重", () => {
     const out = reportedChangesOf(
       [
@@ -124,6 +129,22 @@ describe("用 git 当前状态校正", () => {
     expect(out.list.map((file) => file.path)).toEqual(["/w/y.ts"])
   })
 
+  it("Git 忽略的上报文件保留最后一次编辑，并明确标成无法核实", () => {
+    const one = reportedChangesOf(
+      [edit({ id: "a", path: "/w/ignored.txt", added: 4, removed: 2 })],
+      "/w",
+    )
+    const out = reconcileChanges(one, [review("/w/ignored.txt", 99, 99)], "/w", {
+      reported: "/w",
+      real: "/w",
+      ignored: ["ignored.txt"],
+    })
+    expect(out.list).toEqual([
+      expect.objectContaining({ path: "/w/ignored.txt", added: 4, removed: 2, unverified: true }),
+    ])
+    expect(out.list[0]?.review).toBeUndefined()
+  })
+
   it("工作区里与本会话无关的脏文件不会混进主数字", () => {
     const out = reconcileChanges(
       reports,
@@ -151,6 +172,28 @@ describe("用 git 当前状态校正", () => {
       "/w",
     )
     expect(out.list).toEqual([])
+  })
+
+  it("即使后缀全仓唯一，也不把别的目录冒充成上报文件", () => {
+    const one = reportedChangesOf(
+      [edit({ id: "a", path: "src/x.ts", added: 1, removed: 0 })],
+      "/repo/app",
+    )
+    const unrelated = { ...review("/repo/other/src/x.ts", 99, 50), rel: "other/src/x.ts" }
+    expect(reconcileChanges(one, [unrelated], "/repo").list).toEqual([])
+  })
+
+  it("cwd 是符号链接时，用主进程给出的真实 cwd 对齐绝对上报路径", () => {
+    const one = reportedChangesOf(
+      [edit({ id: "a", path: "/linked/repo/src/x.ts", added: 8, removed: 8 })],
+      "/linked/repo",
+    )
+    const actual = { ...review("/real/repo/src/x.ts", 2, 1), rel: "src/x.ts" }
+    const out = reconcileChanges(one, [actual], "/real/repo", {
+      reported: "/linked/repo",
+      real: "/real/repo",
+    })
+    expect(out.list).toEqual([expect.objectContaining({ path: "/real/repo/src/x.ts", added: 2 })])
   })
 
   it("另一家把文件改名后，旧路径归属会跟到新路径", () => {

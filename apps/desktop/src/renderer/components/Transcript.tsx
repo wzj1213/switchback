@@ -12,6 +12,7 @@ import { ArrowDownIcon, ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
 import { Changed } from "./Changed.js"
 import { TranscriptBlank } from "./transcript-blank.js"
+import { useApprovalState } from "../use-approval-state.js"
 
 /** 一行的 key。三种行各有各的身份来源，抽出来免得写在 JSX 里看不清。 */
 function keyOf(row: Row): string {
@@ -20,28 +21,32 @@ function keyOf(row: Row): string {
   return row.item.id
 }
 
+function canRewind(thread: Thread, turn: Turn | undefined, readOnly: boolean): boolean {
+  return !readOnly && turn === undefined && thread.detached !== true &&
+    (thread.status === "idle" || thread.status === "failed") &&
+    thread.capabilities?.fork === true && thread.engineHandle !== undefined
+}
+
+const approvalShortcut = (readOnly: boolean, itemId: string | undefined): string | undefined =>
+  readOnly ? undefined : itemId
+
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-function RowView({
-  row,
-  cwd,
-  onRewind,
-  onReuse,
-  folded,
-  onFold,
-  onCopy,
-  onResolve,
-}: {
+function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
+  readOnly }: {
   row: Row
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
   /** 从某一轮之前重来。 */
-  onRewind: (turnId: string) => void
+  onRewind?: (turnId: string) => void
   /** 把某条自己发过的话填回输入框，改完再发。**对比视图里没有输入框，所以可以缺席。** */
-  onReuse?: (text: string) => void
+  onReuse?: (text: string, attachments?: readonly string[]) => void
   folded: boolean
   onFold: (turnId: string) => void
   onCopy: (text: string) => void
   onResolve: ResolveApproval
+  approvalTurn: string | undefined
+  shortcutApproval: string | undefined
+  readOnly: boolean
 }): React.JSX.Element {
   // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
   // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
@@ -64,17 +69,19 @@ function RowView({
         </button>
         {/* **回到还没发生这一轮的时候。** 走错方向时唯一的出路，
           否则只能把整个会话丢掉重开——而那会连前面对的部分一起丢 */}
-        <button
-          type="button"
-          className="act turnmark__act"
-          title="新开一个会话，只带这一轮之前的内容（原会话保留）"
-          onClick={() => {
-            onRewind(row.turnId)
-          }}
-        >
-          <ResetIcon size={11} />
-          从这里重来
-        </button>
+        {onRewind === undefined ? null : (
+          <button
+            type="button"
+            className="act turnmark__act"
+            title="新开一个会话，只带这一轮之前的原生上下文（原会话保留）"
+            onClick={() => {
+              onRewind(row.turnId)
+            }}
+          >
+            <ResetIcon size={11} />
+            从这里重来
+          </button>
+        )}
       </div>
     )
   }
@@ -94,7 +101,10 @@ function RowView({
                 type="button"
                 className="act"
                 onClick={() => {
-                  onReuse(row.item.kind === "user_message" ? row.item.text : "")
+                  onReuse(
+                    row.item.kind === "user_message" ? row.item.text : "",
+                    row.item.kind === "user_message" ? row.item.attachments : undefined,
+                  )
                 }}
               >
                 <PencilIcon size={11} />
@@ -104,7 +114,8 @@ function RowView({
           }
         : {})}
     >
-      <ItemView item={row.item} onResolve={onResolve} />
+      <ItemView item={row.item} approvalTurn={approvalTurn} readOnly={readOnly}
+        shortcutApproval={shortcutApproval} onResolve={onResolve} />
     </Copyable>
   )
 }
@@ -137,6 +148,7 @@ export const Transcript = memo(function Transcript({
   stamp,
   onReveal,
   onReview,
+  readOnly,
 }: {
   thread: Thread
   items: readonly Item[]
@@ -146,11 +158,13 @@ export const Transcript = memo(function Transcript({
   send: (command: Command) => void
   onCopy: (text: string) => void
   /** 把一句话填回输入框。对比视图不给（那边没有输入框）。 */
-  onReuse?: (text: string) => void
+  onReuse?: (text: string, attachments?: readonly string[]) => void
   /** 工作区变更卡只在正常工作区显示；对比视图不传这三项。 */
   stamp?: string
   onReveal?: (path: string) => void
   onReview?: () => void
+  /** 对比页只允许阅读、折叠与复制，不执行审批或创建新分支。 */
+  readOnly?: boolean
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
   /** 折起来的那几轮。**按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管 */
@@ -166,20 +180,8 @@ export const Transcript = memo(function Transcript({
     () => foldTurns(groupRows(items, turn?.id), folded),
     [items, turn?.id, folded],
   )
-  // **必须是 useCallback。** 写成行内箭头函数的话每次 render 换一个身份，
-  // `ItemView` 的 memo 会全部落空——而且是静默落空：功能全对，只是每帧白干一遍
-  const onResolve = useCallback<ResolveApproval>(
-    (itemId, allow, remember, passTurn) => {
-      send({
-        type: "approval.resolve",
-        itemId,
-        allow,
-        remember,
-        ...(passTurn === true ? { passTurn } : {}),
-      })
-    },
-    [send],
-  )
+  // resolve 必须引用稳定，`ItemView` 的 memo 才不会在每帧流式更新时整屏失效。
+  const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)
   return (
     <div className="transcript" ref={scroller}>
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
@@ -189,14 +191,21 @@ export const Transcript = memo(function Transcript({
             key={keyOf(row)}
             row={row}
             cwd={thread.cwd}
-            onRewind={(turnId) => {
-              send({ type: "thread.rewind", threadId: thread.id, turnId })
-            }}
+            {...(canRewind(thread, turn, readOnly === true)
+              ? {
+                  onRewind: (turnId: string) => {
+                    send({ type: "thread.rewind", threadId: thread.id, turnId })
+                  },
+                }
+              : {})}
             onReuse={onReuse}
             folded={row.kind === "turn" && folded.has(row.turnId)}
             onFold={onFold}
             onCopy={onCopy}
-            onResolve={onResolve}
+            onResolve={approval.resolve}
+            approvalTurn={approval.turnId}
+            shortcutApproval={approvalShortcut(readOnly === true, approval.shortcut)}
+            readOnly={readOnly === true}
           />
         ))}
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
@@ -205,9 +214,10 @@ export const Transcript = memo(function Transcript({
         {stamp === undefined || onReveal === undefined || onReview === undefined ? null : (
           <Changed
             items={items}
+            threadId={thread.id}
             cwd={thread.cwd}
             stamp={stamp}
-            hidden={turn !== undefined || thread.status === "starting"}
+            hidden={turn !== undefined || thread.status === "starting" || thread.status === "running"}
             onReveal={onReveal}
             onCopy={onCopy}
             onReview={onReview}

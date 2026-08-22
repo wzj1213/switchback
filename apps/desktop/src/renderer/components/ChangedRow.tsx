@@ -12,6 +12,7 @@ interface Props {
   file: ChangedFile
   cwd: string
   stamp: string
+  threadId: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }
@@ -20,6 +21,7 @@ const SKIP_TEXT: Readonly<Record<PatchSkip, string>> = {
   binary: "（二进制文件不显示补丁）",
   large: "（补丁过大，请在审核面板或外部工具中查看）",
   gone: "（文件已不存在）",
+  failed: "（读取这份净改动失败，请重试）",
 }
 
 function fileKind(kind: ReviewKind): FileChangeKind {
@@ -49,13 +51,14 @@ async function copyFile(
   file: ChangedFile,
   cwd: string,
   onCopy: (text: string) => void,
+  threadId: string,
 ): Promise<void> {
   const bridge = typeof window === "undefined" ? undefined : window.omni
   if (file.review === undefined || bridge === undefined) {
     onCopy(`${file.path}\n\n${file.last.diff ?? "（这次编辑没有带补丁）"}`)
     return
   }
-  const patch = await bridge.workPatch(cwd, file.review.rel, 3).catch(() => undefined)
+  const patch = await bridge.workPatch(cwd, file.review.rel, 3, threadId).catch(() => undefined)
   onCopy(`${file.path}\n\n${patch === undefined ? "（读取当前净补丁失败）" : bodyOf(patch)}`)
 }
 
@@ -68,10 +71,39 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
   )
 }
 
-export function ChangedRow({ file, cwd, stamp, onReveal, onCopy }: Props): React.JSX.Element {
+function RevealFile({ file, onReveal }: { file: ChangedFile; onReveal: (path: string) => void }): React.JSX.Element | null {
+  const review = file.review
+  if (review?.kind === "delete" || (review === undefined && file.last.kind === "delete")) return null
+  return (
+    <button
+      type="button"
+      className="changed__act"
+      aria-label="在访达中显示"
+      title="在访达中显示"
+      onClick={() => {
+        onReveal(file.path)
+      }}
+    >
+      <RevealIcon size={12} />
+    </button>
+  )
+}
+
+export function ChangedRow({
+  file,
+  cwd,
+  stamp,
+  threadId,
+  onReveal,
+  onCopy,
+}: Props): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const review = file.review
-  const patch = usePatch(cwd, open ? review?.rel : undefined, 3, stamp)
+  const patch = usePatch(cwd, open ? review?.rel : undefined, {
+    context: 3,
+    stamp,
+    threadId,
+  })
   const shown = splitPath(relPath(file.path, cwd))
   return (
     <div className="changed__file">
@@ -91,24 +123,14 @@ export function ChangedRow({ file, cwd, stamp, onReveal, onCopy }: Props): React
         <span className="changed__stat">
           <Stat added={file.added} removed={file.removed} />
         </span>
-        <button
-          type="button"
-          className="changed__act"
-          aria-label="在访达中显示"
-          title="在访达中显示"
-          onClick={() => {
-            onReveal(file.path)
-          }}
-        >
-          <RevealIcon size={12} />
-        </button>
+        <RevealFile file={file} onReveal={onReveal} />
         <button
           type="button"
           className="changed__act"
           aria-label="复制这份当前净改动"
           title="复制这份当前净改动"
           onClick={() => {
-            void copyFile(file, cwd, onCopy)
+            void copyFile(file, cwd, onCopy, threadId)
           }}
         >
           <CopyIcon size={12} />

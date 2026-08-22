@@ -86,7 +86,7 @@ interface Props {
    */
   canSteer: boolean
   /** 外面塞进来的文本（「改一改再发」）。`at` 变了才生效。 */
-  prefill?: { text: string; at: number }
+  prefill?: { text: string; attachments?: readonly string[]; at: number }
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */
@@ -126,19 +126,38 @@ function projectOf(cwd: string): string {
   return cwd.split("/").filter(Boolean).pop() ?? cwd
 }
 
+function attachmentWarning(
+  count: number,
+  canAttach: boolean,
+  pending: Props["pending"],
+): string | undefined {
+  if (count === 0) return undefined
+  if (pending !== undefined) return "请先完成引擎切换，再确认新引擎能否接收这些附件；附件会保留"
+  if (!canAttach) return "当前引擎不支持附件；附件已保留，请移除或切回支持附件的引擎"
+  return undefined
+}
+
+function AttachmentWarning({ text }: { text: string | undefined }): React.JSX.Element | null {
+  return text === undefined ? null : (
+    <p className="composer__attachwarn" role="status">{text}</p>
+  )
+}
+
 export function Composer(props: Props): React.JSX.Element {
   const detached = props.detached ?? false
   const busy = props.busy ?? false
   const starting = props.starting ?? false
   // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
   const attach = useAttachments(props.canAttach)
+  const attachWarning = attachmentWarning(attach.paths.length, props.canAttach, props.pending)
+  const attachmentBlocked = attachWarning !== undefined
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
   const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
   const draft = useComposerDraft({
     prefill: props.prefill,
     engine: props.engine,
     attach,
-    blocked: mode.blocked,
+    blocked: mode.blocked || attachmentBlocked,
     steering: mode.steering,
     onSend: props.onSend,
   })
@@ -168,6 +187,7 @@ export function Composer(props: Props): React.JSX.Element {
             是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
             反过来放的话，贴一张图就把抬头顶下去 72 像素 */}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
+        <AttachmentWarning text={attachWarning} />
         <Prompt
           value={draft.text}
           detached={detached}
@@ -191,7 +211,8 @@ export function Composer(props: Props): React.JSX.Element {
           busy={busy}
           starting={starting}
           empty={
-            draft.text.trim() === "" && draft.command === undefined && attach.paths.length === 0
+            attachmentBlocked ||
+            (draft.text.trim() === "" && draft.command === undefined && attach.paths.length === 0)
           }
           engine={props.engine}
           engines={props.engines}

@@ -37,9 +37,13 @@ export type { Replay, Sealed }
  */
 interface Review {
   root: string
+  cwd: string
   files: readonly ReviewFile[]
   /** 被截掉了多少个。列表有上限，不说等于假装那是全部。 */
   more?: number
+  ignored?: readonly string[]
+  baseline?: true
+  failed?: true
 }
 
 const api = {
@@ -209,15 +213,21 @@ const api = {
    * 暂存区、增删数），而那个只回路径。两条并存是有意的：变更汇总卡只需要路径，
    * 让它去付这份代价不划算。
    */
-  async workReview(cwd: string): Promise<Review | undefined> {
-    return (await ipcRenderer.invoke("omni:workReview", cwd)) as Review | undefined
+  async workReview(
+    cwd: string,
+    threadId?: string,
+    wanted?: readonly string[],
+  ): Promise<Review | undefined> {
+    return (await ipcRenderer.invoke("omni:workReview", { cwd, threadId, wanted })) as
+      | Review
+      | undefined
   },
   /**
    * 一个文件的补丁。**按需取**——一个 200 文件的改动全量取可能是几十 MB，
    * 而人一次只看得了一个。
    */
-  async workPatch(cwd: string, rel: string, context?: number): Promise<ReviewPatch> {
-    return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, context })) as ReviewPatch
+  async workPatch(cwd: string, rel: string, context?: number, threadId?: string): Promise<ReviewPatch> {
+    return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, context, threadId })) as ReviewPatch
   },
   /**
    * 在所有会话的**正文**里找一句话。侧栏那个筛选框只搜标题/首句/目录，

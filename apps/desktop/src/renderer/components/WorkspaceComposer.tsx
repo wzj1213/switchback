@@ -42,7 +42,7 @@ export function WorkspaceComposer({
   props: WorkspaceProps
   thread: Thread
   stamp: string
-  prefill: { text: string; at: number }
+  prefill: { text: string; attachments?: readonly string[]; at: number }
   actions: readonly OmniAction[]
 }): React.JSX.Element {
   const send = props.send
@@ -76,14 +76,15 @@ export function WorkspaceComposer({
       }}
       /*
        * 档位下面那行说明。**引擎名与档位名都是插值**——写死的话换一家引擎那句就在撒谎。
-       * 用 `nextEngine ?? engine` 与下拉保持一致：有待切换的引擎时，两个控件说的得是同一家。
+       * 权限描述当前**实际活着**的原生会话；nextEngine 只是下一句意向，切换前不能提前冒充。
        */
-      hint={trustHint(thread, labelOf(props.engines, thread.nextEngine ?? thread.engine), labelOf(TRUSTS, thread.trust))}
-      blind={trustBlind(thread, labelOf(props.engines, thread.nextEngine ?? thread.engine))}
+      hint={trustHint(thread, labelOf(props.engines, thread.engine), labelOf(TRUSTS, thread.trust))}
+      blind={trustBlind(thread, labelOf(props.engines, thread.engine))}
       /* 侧问和引擎/档位/模型是同一类东西——「这条会话能怎么用」，所以摆在同一排 */
       aside={
         <Asides
           thread={thread}
+          disabled={thread.detached === true || thread.status === "starting"}
           onAsk={(text) => {
             send({ type: "thread.sideQuestion", threadId: thread.id, text })
           }}
@@ -129,6 +130,7 @@ export function WorkspaceComposer({
           threadId: thread.id,
           text,
           ...(attachments.length === 0 ? {} : { attachments }),
+          ...(thread.draftRevision === undefined ? {} : { draftRevision: thread.draftRevision }),
           // 只在真要插的时候带这一项：不带 = 排队（见 protocol 的 `steer`）
           ...(steer ? { steer: true } : {}),
         })

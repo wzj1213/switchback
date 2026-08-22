@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Thread } from "@omni/protocol"
 import { Popover } from "./Popover.js"
 
@@ -19,21 +19,26 @@ import { Popover } from "./Popover.js"
  */
 export function Asides({
   thread,
+  disabled = false,
   onAsk,
 }: {
   thread: Thread
+  disabled?: boolean
   onAsk: (text: string) => void
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState("")
   const anchor = useRef<HTMLButtonElement>(null)
+  const available = thread.capabilities?.sideQuestion === true && !disabled && thread.provisional !== true
+  useEffect(() => {
+    if (!available) setOpen(false)
+  }, [available])
   // **能力位报 false 就整个不存在**，不是给一个灰的：
   // 这是「给不给入口」那一类，不是「这条信息可信到什么程度」那一类
-  if (thread.capabilities?.sideQuestion !== true) return null
+  if (!available) return null
   // **还没说过一句话的会话上不给这个入口**：侧问的定义是「不打断主线」，
   // 而这时根本没有主线——那一屏还写着「在 xxx 里做点什么？」。
   // `provisional` 正是「发出第一句话之前」（见 `Thread.provisional`）
-  if (thread.provisional === true) return null
   const asides = thread.asides ?? []
   const submit = (): void => {
     const trimmed = text.trim()
@@ -67,8 +72,8 @@ export function Asides({
           {asides.length === 0 ? (
             <p className="aside__empty">问一句不打断主线的问题。问和答都不进这条会话的正文。</p>
           ) : (
-            asides.map((a) => (
-              <div key={a.at} className="aside__pair">
+            asides.map((a, index) => (
+              <div key={`${String(a.at)}:${String(index)}`} className="aside__pair">
                 <p className="aside__q">{a.question}</p>
                 <p className="aside__a">{a.answer}</p>
               </div>

@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron"
 import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
 import { createLedger, type Ledger, type Sealed } from "@omni/wire"
-import { createHost, type Host } from "@omni/host"
+import { createHost, type Host, type HostDeps } from "@omni/host"
 import { coalesce } from "@omni/store"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { createWorksite, type Worksite } from "@omni/worksite"
@@ -16,11 +16,13 @@ import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
 import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
+import { createWorktreeBaselines, type WorktreeBaselines } from "./worktree-baseline.js"
 import { readBuildInfo } from "./build-info.js"
 import { createEngineCatalog } from "./engine-catalog.js"
 
 export interface Attached {
   host: Host
+  baselines: WorktreeBaselines
   /** 回放磁盘上的历史用得到 */
   journal: ReturnType<typeof createJournal>
   /**
@@ -223,6 +225,36 @@ function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<type
   })
 }
 
+function baselineDeps(
+  log: Logger,
+  baselines: WorktreeBaselines | undefined,
+): Pick<HostDeps, "ensureWorktreeBaseline" | "removeWorktreeBaseline"> {
+  return {
+    ensureWorktreeBaseline: async (threadId, cwd) => {
+      await baselines?.ensure(threadId, cwd).catch((error: unknown) => {
+        log.write("warn", "baseline", `无法记录会话 ${threadId} 的工作区基线：${String(error)}`)
+      })
+    },
+    removeWorktreeBaseline: async (threadId) => {
+      await baselines?.remove(threadId).catch((error: unknown) => {
+        log.write("warn", "baseline", `无法删除会话 ${threadId} 的工作区基线：${String(error)}`)
+      })
+    },
+  }
+}
+
+function openStores(log: Logger, emit: (event: Event) => void): {
+  journal: ReturnType<typeof createJournal>
+  rules: ReturnType<typeof createRuleStore>
+  baselines: WorktreeBaselines
+} {
+  return {
+    journal: openJournal(log, emit),
+    rules: createRuleStore(join(app.getPath("userData"), "rules")),
+    baselines: createWorktreeBaselines(join(app.getPath("userData"), "worktree-baselines")),
+  }
+}
+
 export function attachHost(
   sinks: Sinks,
   windows: () => readonly BrowserWindow[],
@@ -244,9 +276,8 @@ export function attachHost(
 
   const { emit, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
 
-  const journal = openJournal(log, emit)
-  // 规则和事件分开存：删会话不该把「始终允许」一起删了
-  const rules = createRuleStore(join(app.getPath("userData"), "rules"))
+  // 规则和事件分开存；对话基线也有独立生命周期。
+  const { journal, rules, baselines } = openStores(log, emit)
 
   const { drivers, labels } = buildRegistry(
     app.getPath("userData"),
@@ -259,6 +290,7 @@ export function attachHost(
     home: homedir(),
     journal,
     rules,
+    ...baselineDeps(log, baselines),
     ...(devMaxLive() === undefined ? {} : { maxLive: devMaxLive() }),
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
@@ -285,6 +317,7 @@ export function attachHost(
 
   return {
     host,
+    baselines,
     awake,
     journal,
     engines,

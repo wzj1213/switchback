@@ -16,6 +16,8 @@ export interface ChangedFile {
   /** 非 git 工作区的诚实降级：只保留最后一次上报，不把多轮数字相加。 */
   last: FileChange
   review?: ReviewFile
+  /** Git ignore 规则让开场树无法覆盖这条路径，只能保留引擎最后一次上报。 */
+  unverified?: true
 }
 
 function tally(list: readonly ChangedFile[]): Changes {
@@ -83,7 +85,7 @@ export function canonicalPath(path: string, cwd: string): string {
 export function reportedChangesOf(items: readonly Item[], cwd: string): Changes {
   const files = new Map<string, ChangedFile>()
   for (const item of items) {
-    if (item.kind !== "tool_call" || item.detail.kind !== "file_edit" || item.status !== "ok")
+    if (item.inherited === true || item.kind !== "tool_call" || item.detail.kind !== "file_edit" || item.status !== "ok")
       continue
     for (const file of item.detail.files) {
       const path = canonicalPath(file.path, cwd)
@@ -98,34 +100,57 @@ function renamedPath(file: ReviewFile, root: string): string | undefined {
   return file.from === undefined || root === "" ? undefined : canonicalPath(file.from, root)
 }
 
-function segmentSuffix(path: string, suffix: string): boolean {
-  return path === suffix || path.endsWith(`/${suffix}`)
+function beneath(parent: string, child: string): string | undefined {
+  const root = canonicalPath(parent, "").replace(/\/$/, "")
+  const path = canonicalPath(child, "")
+  if (path === root) return ""
+  return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : undefined
 }
 
-/** 精确路径优先；只能靠相对路径时必须唯一，绝不拿 Git 清单里的第一个同名文件猜。 */
+/** 把符号链接入口下的上报路径，映射到主进程给出的真实 cwd。 */
+function aliasesOf(file: ChangedFile, reportedCwd: string, realCwd: string): ReadonlySet<string> {
+  const aliases = new Set([canonicalPath(file.path, "")])
+  const raw = normalizePath(file.last.path)
+  if (!absolute(raw)) aliases.add(canonicalPath(raw, realCwd))
+  else {
+    const rel = beneath(reportedCwd, raw)
+    if (rel !== undefined) aliases.add(canonicalPath(rel, realCwd))
+  }
+  return aliases
+}
+
+/** 只认精确文件身份（含 cwd 的符号链接映射）；不再用路径后缀猜同名文件。 */
 function reviewOf(
   file: ChangedFile,
   current: readonly ReviewFile[],
-  root: string,
+  paths: { root: string; reportedCwd: string; realCwd: string },
 ): ReviewFile | undefined {
+  const aliases = aliasesOf(file, paths.reportedCwd, paths.realCwd)
   const exact = current.filter((candidate) => {
     const path = canonicalPath(candidate.path, "")
-    return path === file.path || renamedPath(candidate, root) === file.path
+    const from = renamedPath(candidate, paths.root)
+    return aliases.has(path) || (from !== undefined && aliases.has(from))
   })
-  if (exact.length === 1) return exact[0]
-  if (exact.length > 1 || absolute(normalizePath(file.last.path))) return undefined
-  const relative = normalizePath(file.last.path)
-  const matches = current.filter((candidate) => {
-    const from = candidate.from === undefined ? undefined : normalizePath(candidate.from)
-    return segmentSuffix(normalizePath(candidate.rel), relative) || from === relative
-  })
-  return matches.length === 1 ? matches[0] : undefined
+  return exact.length === 1 ? exact[0] : undefined
+}
+
+function unverifiedChange(
+  file: ChangedFile,
+  current: readonly ReviewFile[],
+  paths: { root: string; reportedCwd: string; realCwd: string },
+  ignored: ReadonlySet<string>,
+): ChangedFile | undefined {
+  const aliases = aliasesOf(file, paths.reportedCwd, paths.realCwd)
+  if (![...aliases].some((path) => ignored.has(path))) return undefined
+  const currentFile = reviewOf(file, current, paths)
+  const path = canonicalPath(currentFile?.path ?? file.path, "")
+  return { ...file, path, unverified: true }
 }
 
 /**
  * 用当前 git 清单校正会话变更。
  *
- * - 数字来自 `git diff HEAD --numstat`，不是多轮工具统计相加；
+ * - 数字来自“对话开场树 → 当前树”的 Git 差异，不是多轮工具统计相加；
  * - git 清单里已经没有的会话文件说明净改动为零，整行消失；
  * - 先解析到 Git 文件身份再去重，跨引擎路径别名不会重复计算。
  */
@@ -133,10 +158,18 @@ export function reconcileChanges(
   reported: Changes,
   current: readonly ReviewFile[],
   root: string,
+  cwd?: { reported: string; real: string; ignored?: readonly string[] },
 ): Changes {
+  const paths = { root, reportedCwd: cwd?.reported ?? root, realCwd: cwd?.real ?? cwd?.reported ?? root }
+  const ignored = new Set((cwd?.ignored ?? []).map((rel) => canonicalPath(rel, root)))
   const files = new Map<string, ChangedFile>()
   for (const file of reported.list) {
-    const review = reviewOf(file, current, root)
+    const blind = unverifiedChange(file, current, paths, ignored)
+    if (blind !== undefined) {
+      files.set(blind.path, blind)
+      continue
+    }
+    const review = reviewOf(file, current, paths)
     if (review === undefined) continue
     const path = canonicalPath(review.path, "")
     files.set(path, { ...file, path, added: review.added, removed: review.removed, review })

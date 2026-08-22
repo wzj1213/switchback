@@ -1,23 +1,23 @@
-import type { Command, EngineInfo, Item, Thread, Turn } from "@omni/protocol"
-import { buildHandoff, compareRuns, type Comparison, type FileDiff, type Side } from "@omni/handoff"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn } from "@omni/protocol"
+import { buildHandoff, compareRuns, comparisonItems, type Comparison, type FileDiff, type Side } from "@omni/handoff"
 import { Transcript } from "./Transcript.js"
 import { labelOf } from "./Composer.js"
 
 /**
- * 分叉对比。同一个目标交给两家跑，并排看谁做了什么。
+ * 分叉对比。两条有血缘、共用工作区的会话，并排看各自做了什么。
  *
  * ## 差异条为什么排在最上面
  *
  * 两栏 transcript 并排放着好看，但**没什么用**：两边各几十条，人眼没法对齐着读。
  * 真正要回答的问题只有三个——
  *
- * 1. 谁动了对方没动的文件？（最可能是「一家做对了、另一家漏了」）
- * 2. 同一个文件两边改的量差多少？
+ * 1. 哪些文件只有一边的编辑工具上报过？
+ * 2. 同一个文件两边最后一次成功上报的量差多少？
  * 3. 各自还剩什么没做？
  *
  * 所以顶上先给结论，下面才是过程。结论用的是 `@omni/handoff` 的
- * `buildHandoff` + `compareRuns`——和接力包**同一套摘要逻辑**，
- * 不另写一份，免得交接说改了 3 个文件、对比说 4 个。
+ * `buildHandoff` + `compareRuns`——复用既有的运行摘要逻辑，
+ * 不另写一份，免得同一批记录在两处得出不同摘要。
  *
  * ## 只读
  *
@@ -49,7 +49,7 @@ function FileRow({ file }: { file: FileDiff }): React.JSX.Element {
   const mark = file.side === "both" ? (file.differs ? "≠" : "=") : file.side === "a" ? "◀" : "▶"
   return (
     <li className={sideClass(file.side)}>
-      <span className="cmp__mark" title={file.side === "both" ? "两边都动过" : "只有一边动过"}>
+      <span className="cmp__mark" title={file.side === "both" ? "两边都上报过" : "只有一边上报过"}>
         {mark}
       </span>
       {/* `<bdi>` 隔离双向文本：不隔的话 `direction: rtl` 会把开头那个 `/` 甩到行尾，
@@ -83,17 +83,18 @@ function Summary({
   /** 两边是同一个工作区。是的话要明说——见本文件开头。 */
   sharedCwd: boolean
 }): React.JSX.Element {
-  const nothing = diff.files.length === 0 && diff.commands.length === 0
+  // 这一节只画文件；命令存在不该把文件空态变成一块什么都没有的空白。
+  const nothing = diff.files.length === 0
   return (
     <section className="cmp__summary">
       <header className="cmp__head">
-        <span className="cmp__head-label">改了什么</span>
+        <span className="cmp__head-label">编辑工具上报（非 Git 净 diff）</span>
         <span className="cmp__spacer" />
         <span className="cmp__num cmp__num--head">{left}</span>
         <span className="cmp__num cmp__num--head">{right}</span>
       </header>
       {nothing ? (
-        <p className="cmp__empty">两边都还没动过工作区里的东西。</p>
+        <p className="cmp__empty">两边都还没有成功的文件编辑上报。</p>
       ) : (
         <ul className="cmp__list">
           {diff.files.map((f) => (
@@ -103,7 +104,7 @@ function Summary({
       )}
       {diff.onlyOneSide === 0 ? null : (
         <p className="cmp__flag">
-          有 {diff.onlyOneSide} 个文件<strong>只有一边</strong>动过——通常是这里出的分歧。
+          有 {diff.onlyOneSide} 个文件<strong>只有一边</strong>上报过——可从这里检查分歧。
         </p>
       )}
       {sharedCwd ? (
@@ -121,6 +122,7 @@ export interface ComparePane {
   thread: Thread
   items: readonly Item[]
   turn: Turn | undefined
+  tasks: readonly TaskRun[]
 }
 
 export function Compare({
@@ -143,7 +145,10 @@ export function Compare({
 }): React.JSX.Element {
   const left = labelOf(engines, a.thread.engine)
   const right = labelOf(engines, b.thread.engine)
-  const diff = compareRuns(buildHandoff(a.thread, a.items), buildHandoff(b.thread, b.items))
+  const diff = compareRuns(
+    buildHandoff(a.thread, comparisonItems(a.thread, b.thread, a.items)),
+    buildHandoff(b.thread, comparisonItems(b.thread, a.thread, b.items)),
+  )
   return (
     <main className="main">
       <header className="topbar">
@@ -172,11 +177,11 @@ export function Compare({
               </button>
             </header>
             <Transcript
+              readOnly
               thread={side.thread}
               items={side.items}
-              /* 对比看的是**已经跑完的两条**，没有实时任务可显示 */
-        tasks={[]}
-        turn={side.turn}
+              tasks={side.tasks}
+              turn={side.turn}
               send={send}
               onCopy={onCopy}
             />

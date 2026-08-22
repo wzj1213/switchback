@@ -30,6 +30,7 @@ const SKIP: Readonly<Record<PatchSkip, string>> = {
   binary: "二进制文件，不显示内容",
   large: "这份改动太大，画出来会把界面卡住——用 git 看它",
   gone: "取不到这个文件的改动",
+  failed: "读取这份改动失败，请刷新后重试",
 }
 
 function Num({ n }: { n: number | undefined }): React.JSX.Element {
@@ -90,7 +91,7 @@ export function ReviewDiff({ lines, skip, split, loading }: {
   if (skip !== undefined) return <p className="rvd__note">{SKIP[skip]}</p>
   // **加载中不清空正文**：切文件时闪一下白比等半秒更难受。旧的先留着，压淡
   if (lines.length === 0) {
-    return <p className="rvd__note">{loading ? "正在读改动…" : "这个文件和 HEAD 没有差别"}</p>
+    return <p className="rvd__note">{loading ? "正在读改动…" : "当前没有可显示的净改动"}</p>
   }
   const body = split ? (
     <div className="rvd__body rvd__body--split">

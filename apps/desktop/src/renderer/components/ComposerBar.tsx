@@ -22,9 +22,11 @@ import type { TrustHint } from "../trustHint.js"
  */
 function Hint({
   hint,
+  disabled,
   onReapply,
 }: {
   hint?: TrustHint
+  disabled: boolean
   onReapply: () => void
 }): React.JSX.Element | null {
   if (hint === undefined) return null
@@ -32,7 +34,7 @@ function Hint({
     <span className={`composer__hint composer__hint--${hint.kind}`} title={hint.text}>
       {hint.text}
       {hint.action === undefined ? null : (
-        <button type="button" className="composer__hintact" onClick={onReapply}>
+        <button type="button" className="composer__hintact" disabled={disabled} onClick={onReapply}>
           {hint.action.label}
         </button>
       )}
@@ -138,7 +140,7 @@ export function Bar({
           label={labelOf(engines, engine)}
           icon={<EngineIcon />}
           title="引擎"
-          disabled={detached}
+          disabled={detached || starting}
           sections={[
             {
               value: engine,
@@ -154,12 +156,13 @@ export function Bar({
             },
           ]}
         />
-        <TrustSelect trust={trust} blind={blind} disabled={detached || busy || starting} onPick={onTrustChange} />
+        <TrustSelect trust={trust} blind={blind}
+          disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
         <ModelPicker
           models={models}
           model={model}
           effort={effort}
-          disabled={detached}
+          disabled={detached || busy || starting}
           pending={pending}
           onChange={onModelChange}
         />
@@ -178,6 +181,7 @@ export function Bar({
       {/* **自己一行**：挤在两个选择器中间时它把模型选择器顶到一边，而且被截断 */}
       <Hint
         hint={hint}
+        disabled={detached || busy || starting}
         onReapply={() => {
           onTrustChange(trust)
         }}
