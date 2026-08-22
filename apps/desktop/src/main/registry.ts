@@ -13,12 +13,15 @@ import {
 } from "@omni/engine"
 import { readEngineFile, registerAcpEngines } from "./engines.js"
 import type { Logger } from "./log.js"
+import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
 
 /**
  * 这台机器上 omni 认哪些引擎。
  *
- * **这张表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
+ * **驱动表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
  * 写两份的下场是下拉里列着一堆名字，选中直接报「未注册的引擎」——真出过。
+ * 五家稳定的 id / 顺序 / 名字放在 `shared/builtin-engines.ts`，设置页要靠它画出
+ * 尚未进入可见清单的 DSH；这里也复用那份名字，避免同一家在两处改出两个称呼。
  *
  * 从 `host.ts` 拆出来是行数闸门逼的，但边界本来就该有：
  * 那边是「宿主怎么起、事件怎么出去」，这里是「有哪些引擎可选」。
@@ -79,11 +82,7 @@ export function buildRegistry(
       ...acp.drivers,
     },
     labels: {
-      claude: "Claude Code",
-      codex: "Codex",
-      kimi: "Kimi Code",
-      grok: "Grok",
-      dsh: "DSH",
+      ...BUILTIN_ENGINE_LABELS,
       ...acp.labels,
     },
   }

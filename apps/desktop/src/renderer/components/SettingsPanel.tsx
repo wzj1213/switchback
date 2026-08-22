@@ -1,9 +1,10 @@
 import { useState } from "react"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
 import type { Settings } from "../useSettings.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { LookSection, NewThreadSection } from "./SettingsGeneral.js"
-import { DataSection, EnginesSection } from "./SettingsData.js"
+import { DataSection } from "./SettingsData.js"
+import { EnginesSection } from "./EngineSettings.js"
 import { EnvSection } from "./SettingsEnv.js"
 import { RemotePanel } from "./RemotePanel.js"
 import { EngineIcon, FolderIcon, PlusIcon, SparkIcon } from "./icons.js"
@@ -31,10 +32,11 @@ import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
  * 环境那页要读盘、引擎那页要探版本，都只在你真的点进去时才发生。
  * 面板尺寸也就固定了下来——内容后到不会再把面板撑高一截（那一跳同样像「卡了一下」）。
  *
- * ## 里面只放真的能改的东西
+ * ## 引擎页怎么分边界
  *
- * DSH 接入确认是 omni 自己的偏好；引擎注册表、诊断报告这些**已经在菜单里**，
- * 这里只放链接过去的入口，不复制实现。DSH 的 provider/model/API Key 仍不在这里另造表单。
+ * 新会话默认、各家的模型/思考档与 DSH 接入确认由 omni 直接画控件；模型清单只使用
+ * 引擎运行时自己报告的值。认证、Provider、API Key 与厂商高级项继续走原生入口，
+ * 不把密钥读进 renderer，也不复制一份随版本漂移的厂商配置协议。
  */
 
 const TABS = [
@@ -52,6 +54,10 @@ type TabId = (typeof TABS)[number]["id"]
 export interface SettingsPanelProps {
   settings: Settings
   engines: readonly EngineInfo[]
+  /** 未经过接入过滤的宿主清单；设置页要照实显示未安装状态与第三方引擎。 */
+  catalog: readonly EngineInfo[]
+  models: Readonly<Record<string, readonly ModelOption[]>>
+  accounts: Readonly<Record<string, EngineAccount>>
   version: string
   dataDir: string
   /** 当前会话的工作区。「环境」那页要靠它算项目级的配置；没有会话时就只有用户级那几份。 */
@@ -74,8 +80,12 @@ function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
     return (
       <EnginesSection
         settings={settings}
+        catalog={props.catalog}
+        models={props.models}
+        accounts={props.accounts}
         cwd={props.cwd}
         onPatch={onPatch}
+        onCopy={props.onCopy}
         onOpenEngines={props.onOpenEngines}
         onReveal={props.onReveal}
       />

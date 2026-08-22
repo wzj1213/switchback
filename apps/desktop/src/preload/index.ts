@@ -68,6 +68,10 @@ const api = {
   async engineDoors(cwd?: string): Promise<readonly EngineDoor[]> {
     return (await ipcRenderer.invoke("omni:engineDoors", cwd)) as readonly EngineDoor[]
   },
+  /** 用系统编辑器打开设置页刚列出的原生配置；主进程会再次核对路径。 */
+  openEngineFile(path: string): void {
+    ipcRenderer.send("omni:openEngineFile", path)
+  },
 
   /**
    * 「环境」那一页：**各家引擎自己读的配置里，钩子有哪些、生效没有。**

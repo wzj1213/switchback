@@ -8,6 +8,7 @@ import {
   type EngineCommandRunner,
   type NpmGlobalState,
 } from "./enginever-command.js"
+import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
 
 /** 设置页里一家引擎的版本与更新入口。 */
 export interface EngineVersion {
@@ -47,8 +48,8 @@ export interface EngineSpec {
 export function specs(claude: ClaudeExecutable): readonly EngineSpec[] {
   return [
     claudeSpec(claude),
-    npmSpec("codex", "Codex", "codex", "@openai/codex"),
-    npmSpec("kimi", "Kimi Code", "kimi", "@moonshot-ai/kimi-code"),
+    npmSpec("codex", BUILTIN_ENGINE_LABELS.codex, "codex", "@openai/codex"),
+    npmSpec("kimi", BUILTIN_ENGINE_LABELS.kimi, "kimi", "@moonshot-ai/kimi-code"),
     grokSpec(),
     dshSpec(),
   ]
@@ -58,7 +59,7 @@ function claudeSpec(mode: ClaudeExecutable): EngineSpec {
   const update = mode === "system" ? nativeUpdate("claude") : undefined
   return {
     engine: "claude",
-    label: "Claude Code",
+    label: BUILTIN_ENGINE_LABELS.claude,
     bin: "claude",
     ...(update === undefined ? {} : { update }),
     inspect: async ({ run }) => {
@@ -67,7 +68,7 @@ function claudeSpec(mode: ClaudeExecutable): EngineSpec {
       if (installed === undefined) return undefined
       return {
         engine: "claude",
-        label: "Claude Code",
+        label: BUILTIN_ENGINE_LABELS.claude,
         installed,
         stale: false,
         update: "claude update",
@@ -80,7 +81,7 @@ function claudeSpec(mode: ClaudeExecutable): EngineSpec {
 function bundledClaude(): EngineVersion {
   return {
     engine: "claude",
-    label: "Claude Code",
+    label: BUILTIN_ENGINE_LABELS.claude,
     stale: false,
     detail: "完整版使用随 omni 打包的 Claude；更新 omni 才会换掉它",
   }
@@ -168,7 +169,7 @@ function grokSpec(): EngineSpec {
   const update = nativeUpdate("grok")
   return {
     engine: "grok",
-    label: "Grok",
+    label: BUILTIN_ENGINE_LABELS.grok,
     bin: "grok",
     update,
     inspect: async ({ run }) => inspectGrok(run, update.display),
@@ -178,14 +179,14 @@ function grokSpec(): EngineSpec {
 function dshSpec(): EngineSpec {
   return {
     engine: "dsh",
-    label: "DSH",
+    label: BUILTIN_ENGINE_LABELS.dsh,
     bin: "dsh",
     inspect: async ({ run }) => {
       const installed = await versionOf("dsh", run)
       if (installed === undefined) return undefined
       return {
         engine: "dsh",
-        label: "DSH",
+        label: BUILTIN_ENGINE_LABELS.dsh,
         installed,
         stale: false,
         detail: "版本与 profiles 由 DSH 自己管理，omni 不代装插件",
@@ -206,7 +207,7 @@ async function inspectGrok(
   const stale = checked?.available ?? (latest !== undefined && compare(installed, latest) < 0)
   return {
     engine: "grok",
-    label: "Grok",
+    label: BUILTIN_ENGINE_LABELS.grok,
     installed,
     ...(latest === undefined ? {} : { latest }),
     stale,

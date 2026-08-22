@@ -13,6 +13,7 @@ import "./styles/compare.css"
 import "./styles/review.css"
 import "./styles/popover.css"
 import "./styles/settings.css"
+import "./styles/settings-engines.css"
 
 const root = document.getElementById("root")
 if (root === null) throw new Error("找不到 #root 挂载点")

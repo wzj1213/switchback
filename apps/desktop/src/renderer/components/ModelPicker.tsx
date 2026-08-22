@@ -97,7 +97,7 @@ const EFFORT: Readonly<Record<string, { label: string; description?: string }>> 
   ultra: { label: "超高", description: "更快消耗使用额度" },
 }
 
-function effortLabel(id: string): { label: string; description?: string } {
+export function effortLabel(id: string): { label: string; description?: string } {
   return EFFORT[id] ?? { label: id }
 }
 

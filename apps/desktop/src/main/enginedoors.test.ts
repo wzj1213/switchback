@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { engineDoors } from "./enginedoors.js"
+import { editableEngineDoorPaths, engineDoors } from "./enginedoors.js"
 
 /**
  * 这一页只回答一个问题：**各家自己的设置在哪个文件里。**
@@ -67,5 +67,15 @@ describe("各家自己的设置在哪儿", () => {
   it("grok 的厂商维护那份要标出来——它不该被手改", async () => {
     const doors = await engineDoors(undefined)
     expect(doors.some((d) => d.id === "grok" && d.scope === "managed")).toBe(true)
+  })
+
+  it("系统编辑器 allowlist 排除不存在与厂商维护的文件", () => {
+    expect(
+      editableEngineDoorPaths([
+        { id: "a", label: "A", scope: "user", path: "/user", exists: true, note: "" },
+        { id: "a", label: "A", scope: "project", path: "/missing", exists: false, note: "" },
+        { id: "a", label: "A", scope: "managed", path: "/managed", exists: true, note: "" },
+      ]),
+    ).toEqual(["/user"])
   })
 })

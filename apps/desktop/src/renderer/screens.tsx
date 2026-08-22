@@ -6,6 +6,7 @@ import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
 import { SpinnerIcon } from "./components/icons.js"
 import type { SettingsApi } from "./useSettings.js"
+import { engineModelCatalogs } from "./engine-settings-model.js"
 
 /**
  * 除主区之外的几块屏。
@@ -142,6 +143,7 @@ export function CompareScreen({
 export function SettingsScreen({
   prefs,
   engines,
+  state,
   cwd,
   onReveal,
   onCopy,
@@ -149,6 +151,7 @@ export function SettingsScreen({
 }: {
   prefs: SettingsApi
   engines: readonly EngineInfo[]
+  state: ViewState
   /** 当前会话的工作区。「环境」那页要按它算项目级的钩子；没有会话时是 undefined。 */
   cwd: string | undefined
   onReveal: (path: string) => void
@@ -165,6 +168,9 @@ export function SettingsScreen({
     <SettingsPanel
       settings={prefs.settings}
       engines={engines}
+      catalog={state.engines}
+      models={engineModelCatalogs(state)}
+      accounts={state.accounts}
       version={info.version}
       dataDir={info.dataDir}
       cwd={cwd}

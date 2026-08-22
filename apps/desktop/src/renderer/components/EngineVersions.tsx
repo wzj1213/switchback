@@ -6,7 +6,7 @@ import { Field } from "./SettingsBits.js"
  * 各家引擎的版本与人工更新入口。主进程缓存探测结果六小时；这里还负责保证
  * 同一时间只跑一个全局安装，并让失败的 Promise 一定退出 loading 状态。
  */
-export function EngineVersions(): React.JSX.Element {
+export function EngineVersions({ engine }: { engine: string }): React.JSX.Element {
   const [list, setList] = useState<readonly EngineVersion[] | undefined>(undefined)
   const [checking, setChecking] = useState(false)
   const [updating, setUpdating] = useState<string | undefined>(undefined)
@@ -30,19 +30,23 @@ export function EngineVersions(): React.JSX.Element {
     }
   }, [bridge])
 
+  const selected = list?.find((version) => version.engine === engine)
+
   return (
     <>
-      {list === undefined ? <p className="set__blank">正在看各家引擎的版本…</p> : null}
-      {list?.length === 0 ? <p className="set__blank">没探到可检查版本的引擎。</p> : null}
+      {list === undefined ? <p className="set__blank">正在检查安装版本…</p> : null}
+      {list !== undefined && selected === undefined ? (
+        <p className="set__blank">没探到这家的安装版本；它可能尚未安装，或不在当前 PATH 中。</p>
+      ) : null}
       {checkError === undefined ? null : (
         <p className="set__blank set__blank--error" role="alert">
           {checkError}
         </p>
       )}
-      {(list ?? []).map((version) => (
+      {selected === undefined ? null : (
         <EngineRow
-          key={version.engine}
-          version={version}
+          key={selected.engine}
+          version={selected}
           active={updating}
           checking={checking}
           onActive={setUpdating}
@@ -52,7 +56,7 @@ export function EngineVersions(): React.JSX.Element {
             )
           }}
         />
-      ))}
+      )}
       <div className="set__act">
         <button
           type="button"

@@ -1,8 +1,9 @@
 import { stat } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { ipcMain } from "electron"
+import { ipcMain, shell } from "electron"
 import { homeOf } from "./envengines.js"
+import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
 
 /**
  * **各家引擎自己的设置在哪儿。**
@@ -41,14 +42,14 @@ function dshDoors(): readonly Door[] {
   return [
     {
       id: "dsh",
-      label: "DSH",
+      label: BUILTIN_ENGINE_LABELS.dsh,
       scope: "user",
       path: join(home, "settings.yaml"),
       note: "模型、权限与通用偏好",
     },
     {
       id: "dsh",
-      label: "DSH",
+      label: BUILTIN_ENGINE_LABELS.dsh,
       scope: "user",
       path: join(home, "profiles", "acp", "cordis.patch.yml"),
       note: "omni 使用的 ACP profile；增删请走 dsh plugin",
@@ -62,35 +63,35 @@ function layout(cwd: string | undefined): readonly Door[] {
   const rows: Door[] = [
     {
       id: "claude",
-      label: "Claude Code",
+      label: BUILTIN_ENGINE_LABELS.claude,
       scope: "user",
       path: join(homedir(), ".claude", "settings.json"),
       note: "权限、钩子、模型默认值",
     },
     {
       id: "codex",
-      label: "Codex",
+      label: BUILTIN_ENGINE_LABELS.codex,
       scope: "user",
       path: join(homeOf("CODEX_HOME", ".codex"), "config.toml"),
       note: "沙箱、审批策略、模型",
     },
     {
       id: "kimi",
-      label: "Kimi Code",
+      label: BUILTIN_ENGINE_LABELS.kimi,
       scope: "user",
       path: join(homeOf("KIMI_CODE_HOME", ".kimi-code"), "config.toml"),
       note: "思考档、循环控制、后台任务",
     },
     {
       id: "grok",
-      label: "Grok",
+      label: BUILTIN_ENGINE_LABELS.grok,
       scope: "managed",
       path: join(homeOf("GROK_HOME", ".grok"), "managed_config.toml"),
       note: "由 Grok 自己维护，一般不手改",
     },
     {
       id: "grok",
-      label: "Grok",
+      label: BUILTIN_ENGINE_LABELS.grok,
       scope: "user",
       path: join(homeOf("GROK_HOME", ".grok"), "config.toml"),
       note: "你自己的那份",
@@ -98,9 +99,9 @@ function layout(cwd: string | undefined): readonly Door[] {
     ...dshDoors(),
   ]
   for (const [id, label, rest, note] of [
-    ["claude", "Claude Code", join(".claude", "settings.json"), "只对这个项目生效"],
-    ["codex", "Codex", join(".codex", "config.toml"), "只对这个项目生效"],
-    ["grok", "Grok", join(".grok", "config.toml"), "只对这个项目生效"],
+    ["claude", BUILTIN_ENGINE_LABELS.claude, join(".claude", "settings.json"), "只对这个项目生效"],
+    ["codex", BUILTIN_ENGINE_LABELS.codex, join(".codex", "config.toml"), "只对这个项目生效"],
+    ["grok", BUILTIN_ENGINE_LABELS.grok, join(".grok", "config.toml"), "只对这个项目生效"],
   ] as const) {
     for (const path of project(rest)) rows.push({ id, label, scope: "project", path, note })
   }
@@ -120,6 +121,21 @@ export async function engineDoors(cwd: string | undefined): Promise<readonly Eng
   )
 }
 
+/** 系统编辑器只接现有、非厂商维护的来源。 */
+export function editableEngineDoorPaths(doors: readonly EngineDoor[]): readonly string[] {
+  return doors.filter((door) => door.exists && door.scope !== "managed").map((door) => door.path)
+}
+
 export function installEngineDoorChannel(): void {
-  ipcMain.handle("omni:engineDoors", (_e, cwd?: string) => engineDoors(cwd))
+  // 只允许打开刚发给设置页、并且确实存在的那几份。渲染层拿不到通用文件打开口子。
+  const shown = new Set<string>()
+  ipcMain.handle("omni:engineDoors", async (_e, cwd?: string) => {
+    const doors = await engineDoors(cwd)
+    shown.clear()
+    for (const path of editableEngineDoorPaths(doors)) shown.add(path)
+    return doors
+  })
+  ipcMain.on("omni:openEngineFile", (_e, path: string) => {
+    if (shown.has(path)) void shell.openPath(path)
+  })
 }

@@ -1,0 +1,315 @@
+/* 引擎设置页。基础卡片、字段与按钮仍复用 settings.css。 */
+/* ── 引擎配置：上沿切换器固定，下面只展开当前一家。 ─────────── */
+.eng-settings {
+  min-width: 0;
+}
+
+.eng-tabs {
+  position: sticky;
+  top: calc(-1 * var(--sp-5));
+  z-index: 2;
+  display: flex;
+  gap: var(--sp-1);
+  margin: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5)) var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.eng-tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.eng-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.eng-tab--on {
+  border-color: var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-1);
+}
+
+.eng-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.eng-dot--ok {
+  background: var(--ok);
+}
+
+.eng-dot--warn {
+  background: var(--warn);
+}
+
+.eng-dot--muted {
+  opacity: 0.55;
+}
+
+.eng-tab__default {
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+  color: var(--accent);
+  font-size: var(--text-xs);
+}
+
+.eng-panel {
+  min-width: 0;
+}
+
+.eng-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.eng-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.eng-head h2 {
+  margin: 0 0 var(--sp-1);
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.eng-head p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.eng-status,
+.eng-readout {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.eng-status {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.eng-status--ok,
+.eng-readout--ok {
+  color: var(--ok);
+}
+
+.eng-status--warn,
+.eng-readout--warn {
+  color: var(--warn);
+}
+
+.eng-status--muted,
+.eng-readout--muted {
+  color: var(--text-faint);
+}
+
+.eng-pref {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+/* 输入区里的 trigger 是轻量胶囊；放进设置卡后，它要看起来像一个完整字段。 */
+.eng-pref .trigger {
+  max-width: 360px;
+  padding: 5px var(--sp-2);
+  border-color: var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text);
+}
+
+.eng-pref__note {
+  max-width: 270px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  text-align: right;
+}
+
+.eng-command {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.eng-command code {
+  flex: 1;
+  min-width: 0;
+  padding: 5px var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  user-select: all;
+}
+
+.eng-sources {
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.eng-sources:first-child {
+  border-top: 0;
+}
+
+.eng-sources__title {
+  margin-bottom: var(--sp-2);
+  color: var(--text);
+  font-size: var(--text-base);
+}
+
+.eng-registry {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.eng-registry span {
+  flex: 1;
+}
+
+.eng-registry code {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+}
+
+/* 一份原生配置是一张两行小卡：第一行回答层级/状态/动作，第二行保留完整路径。 */
+.doors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.doors__wait {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.doors__row {
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+}
+
+.doors__row--none {
+  border-style: dashed;
+  background: transparent;
+}
+
+.doors__top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.doors__scope,
+.doors__state {
+  flex: none;
+  font-size: var(--text-xs);
+}
+
+.doors__scope {
+  color: var(--text-muted);
+}
+
+/** 厂商维护的那份要看得出“别手改”，但也不必红——它不是错误。 */
+.doors__scope--managed {
+  color: var(--warn);
+}
+
+.doors__state--ready {
+  color: var(--ok);
+}
+
+.doors__state--missing {
+  color: var(--text-faint);
+}
+
+.doors__note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doors__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.doors__path {
+  display: block;
+  min-width: 0;
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .eng-pref,
+  .eng-registry {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .eng-pref__note {
+    max-width: none;
+    text-align: left;
+  }
+}

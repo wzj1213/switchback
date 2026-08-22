@@ -86,6 +86,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
     <SettingsScreen
       prefs={prefs}
       engines={app.engines}
+      state={state}
       cwd={thread?.cwd}
       onReveal={app.reveal}
       onCopy={app.copy}
