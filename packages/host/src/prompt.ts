@@ -155,7 +155,7 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
    */
   const pending = entry.thread.nextEngine
   if (pending !== undefined && pending !== entry.thread.engine) {
-    await switchEngine(ctx, cmd.threadId, pending)
+    await switchEngine(ctx, cmd.threadId, pending, true)
     return prompt(ctx, cmd)
   }
   const at = ctx.deps.now()

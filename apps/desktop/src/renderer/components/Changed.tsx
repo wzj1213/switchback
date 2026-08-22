@@ -28,15 +28,16 @@ export function Changed({
   onCopy,
   onReview,
 }: Props): React.JSX.Element | null {
-  const reported = reportedChangesOf(items)
+  const reported = reportedChangesOf(items, cwd)
   const review = useReview(cwd, stamp)
   const { files, added, removed, list } = review.noRepo
     ? reported
-    : reconcileChanges(reported, review.files)
+    : reconcileChanges(reported, review.files, review.root)
   const [open, setOpen] = useState(true)
   const [all, setAll] = useState(false)
-  // 这里必须用 reported：文件净改动归零后仍属于会话已知路径，不能冒充 shell/用户的额外变动。
-  const others = useOtherChanges(cwd, stamp, reported.list)
+  // 归零文件靠 reported 记住旧路径；改名文件靠 list 记住 Git 解析出的新路径。
+  // 两份都给，才能既不把回滚冒充额外变动，也不把改名后的新路径重复摆一遍。
+  const others = useOtherChanges(cwd, stamp, [...reported.list, ...list])
   if (hidden || review.loading || (files === 0 && others.length === 0)) return null
   return (
     <section className="changed" aria-label="文件改动摘要">

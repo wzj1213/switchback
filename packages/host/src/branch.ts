@@ -230,21 +230,33 @@ export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff"
  * 上一家的原始记录路径 omni 已经存在 `Thread.segments` 里（`/timeline` 看得见），
  * 新的一家自己有文件工具，要读的时候读全量原文。
  */
-export async function switchEngine(ctx: Ctx, threadId: ThreadId, to: string): Promise<void> {
+export async function switchEngine(
+  ctx: Ctx,
+  threadId: ThreadId,
+  to: string,
+  intoTurn = false,
+): Promise<void> {
   const entry = ctx.live.get(threadId)
   if (entry === undefined) throw new Error(`会话不存在：${threadId}`)
   if (entry.thread.engine === to) return
   if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
 
   const at = ctx.deps.now()
+  const previous = entry.thread
   // **切回去要续上那一家自己的那条**，不是新开一条。
   //
   // 上一版把 `engineHandle` 清成 undefined（「换了引擎，上一家的句柄就没用了」），
   // 于是：codex 跑了一半，切去 Claude 看一眼，再切回来时 codex 已经不记得
   // 自己做过什么了。而每一家的句柄本来就各存各的（`segments`），
   // 切回来查一下就有。
-  const back = (entry.thread.segments ?? []).find((seg) => seg.engine === to)
-  const thread = switched(entry.thread, to, back, at)
+  const back = (previous.segments ?? []).find((seg) => seg.engine === to)
+  const thread = switched(previous, to, back, {
+    at,
+    status: intoTurn ? "starting" : "idle",
+  })
+  // 启动新引擎可能要几秒；先把“正在切”发出去，旧改动卡与旧引擎状态立即退出视线。
+  entry.thread = { ...previous, status: "starting", updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
   // **先把旧条目摘下来再起新的**：驱动可能在 `start()` 里就回调 `onHandle`，
   // 那时表里若还留着旧条目，新句柄会写到**旧那条**上，然后被覆盖丢掉
   entry.gate.settleAll()
@@ -252,7 +264,10 @@ export async function switchEngine(ctx: Ctx, threadId: ThreadId, to: string): Pr
   const early = await launch(ctx, thread, back?.handle).catch((error: unknown) => {
     // **起不来就原样退回。** 旧那条这时还活着（下面那行 dispose 还没跑到），
     // 挂回去就当无事发生——一条会话不该因为「想试试另一家」而报废
+    const failedAt = ctx.deps.now()
+    entry.thread = { ...previous, updatedAt: failedAt }
     ctx.live.set(threadId, entry)
+    emit(ctx, { type: "thread.updated", at: failedAt, thread: entry.thread })
     throw error
   })
   /**
@@ -282,7 +297,12 @@ export async function switchEngine(ctx: Ctx, threadId: ThreadId, to: string): Pr
  * 通常根本不存在。清单同理——渲染层认「这份是谁报的」（见 store 的 `modelsOf`），
  * 新那家报上来之前，选择器上什么都不摆。
  */
-function switched(prev: Thread, to: string, back: EngineSegment | undefined, at: number): Thread {
+function switched(
+  prev: Thread,
+  to: string,
+  back: EngineSegment | undefined,
+  transition: { at: number; status: Thread["status"] },
+): Thread {
   const next: Thread = {
     ...prev,
     engine: to,
@@ -292,12 +312,9 @@ function switched(prev: Thread, to: string, back: EngineSegment | undefined, at:
     ...(back === undefined ? { engineHandle: undefined } : { engineHandle: back.handle }),
     model: undefined,
     effort: undefined,
-    status: "idle",
-    updatedAt: at,
+    status: transition.status,
+    updatedAt: transition.at,
   }
   delete next.nextEngine
   return next
 }
-
-
-

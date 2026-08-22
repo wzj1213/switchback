@@ -67,6 +67,7 @@ describe("workReview", () => {
     expect(by.get("keep.txt")?.kind).toBe("update")
     expect(by.get("gone.txt")?.kind).toBe("delete")
     expect(by.get("new.txt")?.kind).toBe("rename")
+    expect(by.get("new.txt")?.from).toBe("old.txt")
     expect(by.get("fresh.txt")?.kind).toBe("untracked")
   })
 

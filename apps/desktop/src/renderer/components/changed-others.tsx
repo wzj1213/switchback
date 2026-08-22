@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { ChangedFile } from "../changes.js"
+import { canonicalPath, type ChangedFile } from "../changes.js"
 import { relPath } from "../tool.js"
 import { splitPath } from "../diff.js"
 import { RevealIcon } from "./icons.js"
@@ -12,30 +12,36 @@ export function useOtherChanges(
   stamp: string,
   known: readonly ChangedFile[],
 ): readonly string[] {
-  const [paths, setPaths] = useState<readonly string[]>([])
-  const baseline = useRef<ReadonlySet<string> | undefined>(undefined)
-  const mine = known.map((file) => file.path).join("\n")
+  const [result, setResult] = useState<{ key: string; paths: readonly string[] } | undefined>()
+  const baseline = useRef<{ cwd: string; paths: ReadonlySet<string> } | undefined>(undefined)
+  const normalizedCwd = canonicalPath(cwd, "")
+  const mine = known.map((file) => canonicalPath(file.path, cwd)).join("\u0000")
+  const key = `${normalizedCwd}\u0000${stamp}\u0000${mine}`
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni
-    if (cwd === "" || bridge === undefined) {
-      setPaths([])
-      return undefined
-    }
+    if (cwd === "" || bridge === undefined) return undefined
     let live = true
     void bridge.workChanges(cwd).then((out) => {
       if (!live) return
       const all = out?.paths ?? []
-      baseline.current ??= new Set(all)
-      const before = baseline.current
-      const same = (a: string, b: string): boolean => a === b || a.endsWith(b) || b.endsWith(a)
-      const ours = mine === "" ? [] : mine.split("\n")
-      setPaths(all.filter((path) => !before.has(path) && !ours.some((our) => same(our, path))))
+      const normalized = all.map((path) => canonicalPath(path, cwd))
+      if (baseline.current?.cwd !== normalizedCwd) {
+        baseline.current = { cwd: normalizedCwd, paths: new Set(normalized) }
+      }
+      const before = baseline.current.paths
+      const ours = new Set(mine === "" ? [] : mine.split("\u0000"))
+      setResult({
+        key,
+        paths: all.filter(
+          (_, index) => !before.has(normalized[index] ?? "") && !ours.has(normalized[index] ?? ""),
+        ),
+      })
     })
     return () => {
       live = false
     }
-  }, [cwd, stamp, mine])
-  return paths
+  }, [cwd, key, mine, normalizedCwd])
+  return result?.key === key ? result.paths : []
 }
 
 /** 置信度较低的 git 盲区单独成节，不混进“已编辑”的主数字。 */

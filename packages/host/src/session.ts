@@ -13,6 +13,7 @@ import {
 } from "./engine-state.js"
 import { copyTranscript } from "./transcript.js"
 import type { Gate } from "./gate.js"
+import { createItemScope } from "./item-scope.js"
 
 /**
  * 会话的生命周期：建、续跑、接力、发消息、改档、换模型、删。
@@ -64,6 +65,7 @@ export async function launch(
   // 先腾地方再起新的：反过来的话峰值会多占一个会话的量（实测 260 MB）
   await evict(ctx, thread.id)
   const early: { handle: string | undefined } = { handle: undefined }
+  const itemScope = createItemScope(ctx.deps.newId)
   // 先建条目再起引擎：驱动可能在 start() 里就回调，那时得能读到规则表
   const live: Live = {
     thread,
@@ -81,9 +83,9 @@ export async function launch(
     home: ctx.deps.home,
     memory: () => live.rules,
     emit: (event) => {
-      emit(ctx, event)
+      emit(ctx, itemScope.event(event))
     },
-    askUser: (ask) => askUser(ctx, thread.id, ask),
+    askUser: (ask) => askUser(ctx, thread.id, itemScope.ask(ask, live.turn)),
     onHandle: (handle) => {
       if (ctx.live.has(thread.id)) rememberHandle(ctx, thread.id, handle)
       else early.handle = handle

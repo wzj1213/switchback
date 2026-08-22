@@ -207,7 +207,7 @@ export const Transcript = memo(function Transcript({
             items={items}
             cwd={thread.cwd}
             stamp={stamp}
-            hidden={turn !== undefined}
+            hidden={turn !== undefined || thread.status === "starting"}
             onReveal={onReveal}
             onCopy={onCopy}
             onReview={onReview}

@@ -123,22 +123,24 @@ export interface WorkChanges {
 }
 
 /**
- * `XY <path>` → 状态码 + 路径。重命名那种是 `R  新\0旧`，`-z` 下旧名单独占一段，
- * 跳过即可（不跳会多算一个文件）。
+ * `XY <path>` → 状态码 + 路径。重命名那种是 `R  新\0旧`，`-z` 下旧名单独占一段；
+ * 它不是第二个文件，但审核与会话归属仍要靠它认出“旧路径现在叫什么”。
  *
  * 状态码留着不扔：审核面板要靠它分「新建/删除/改名/修改」，
  * 以及第一位判「进没进暂存区」。
  */
-export function codesOf(raw: string): readonly { code: string; rel: string }[] {
-  const out: { code: string; rel: string }[] = []
+export function codesOf(raw: string): readonly { code: string; rel: string; from?: string }[] {
+  const out: { code: string; rel: string; from?: string }[] = []
   const parts = raw.split("\0")
   for (let i = 0; i < parts.length; i += 1) {
     const entry = parts[i]
     if (entry === undefined || entry.length < 4) continue
     const code = entry.slice(0, 2)
-    out.push({ code, rel: entry.slice(3) })
-    // 重命名/复制：下一段是旧名，不是另一个改动
-    if (code.startsWith("R") || code.startsWith("C")) i += 1
+    const renamed = code.startsWith("R") || code.startsWith("C")
+    const from = renamed ? parts[i + 1] : undefined
+    out.push({ code, rel: entry.slice(3), ...(from === undefined || from === "" ? {} : { from }) })
+    // 重命名/复制：下一段是旧名，不是另一个改动；审核卡还要留着它做跨轮归属。
+    if (renamed) i += 1
   }
   return out
 }

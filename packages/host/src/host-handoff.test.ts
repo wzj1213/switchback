@@ -212,6 +212,8 @@ describe("跨引擎接力", () => {
       "没装",
     )
     expect(session().disposed).toBe(false)
+    const restored = events.filter((e) => e.type === "thread.updated").at(-1)
+    expect(restored?.type === "thread.updated" ? restored.thread.status : "").toBe("idle")
     await host.dispatch({ type: "thread.prompt", threadId, text: "接着弄" })
     expect(session().prompts.map((p) => p.text)).toEqual(["接着弄"])
     const last = events.filter((e) => e.type === "thread.updated").at(-1)

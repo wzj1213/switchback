@@ -76,7 +76,12 @@ async function untrackedStat(abs: string): Promise<{ added: number; binary: bool
  * 以及**改动进没进暂存区**。后者不显示的话，审核面板会和 `git diff` 一样
  * 漏掉已暂存的那些，而那正是「马上要提交的东西」。
  */
-function entryOf(code: string, rel: string, root: string, stats: ReturnType<typeof parseNumstat>): ReviewFile {
+function entryOf(
+  status: { code: string; rel: string; from?: string },
+  root: string,
+  stats: ReturnType<typeof parseNumstat>,
+): ReviewFile {
+  const { code, rel, from } = status
   const kind = kindOf(code)
   const n = stats.get(rel)
   return {
@@ -85,6 +90,7 @@ function entryOf(code: string, rel: string, root: string, stats: ReturnType<type
     kind,
     added: n?.added ?? 0,
     removed: n?.removed ?? 0,
+    ...(from === undefined ? {} : { from }),
     ...(isStaged(code) ? { staged: true } : {}),
   }
 }
@@ -104,8 +110,8 @@ export async function workReview(cwd: string): Promise<Review | undefined> {
   const all = codesOf(status.stdout)
   const kept = all.slice(0, MAX_FILES)
   const files = await Promise.all(
-    kept.map(async ({ code, rel }) => {
-      const entry = entryOf(code, rel, root, stats)
+    kept.map(async (statusEntry) => {
+      const entry = entryOf(statusEntry, root, stats)
       if (entry.kind !== "untracked") return entry
       const { added, binary } = await untrackedStat(entry.path)
       return binary ? entry : { ...entry, added }
