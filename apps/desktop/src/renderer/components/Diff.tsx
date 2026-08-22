@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { FileChange } from "@omni/protocol"
+import type { FileChange, FileChangeKind } from "@omni/protocol"
 import { kindLabel, parseDiff, splitPath, type DiffLine } from "../diff.js"
 import { reveal, revealable } from "../reveal.js"
 
@@ -41,9 +41,16 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
  * 因为「改了哪些文件」是一眼要看到的，「具体改了什么」才是按需展开的。
  */
 /** 一个文件的改动。变更汇总卡也用它——同一份补丁不该有两种画法。 */
-export function FileDiff({ file }: { file: FileChange }): React.JSX.Element {
+export function FileDiff({
+  file,
+  parseAs = file.kind,
+}: {
+  file: FileChange
+  /** git 补丁无论新建/删除都是真 unified diff，展示类型与解析格式不能混为一谈。 */
+  parseAs?: FileChangeKind
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const lines = parseDiff(file.diff ?? "", file.kind)
+  const lines = parseDiff(file.diff ?? "", parseAs)
   const folded = !open && lines.length > FOLD_AT
   const shown = folded ? lines.slice(0, FOLD_AT) : lines
   const { dir, name } = splitPath(file.path)

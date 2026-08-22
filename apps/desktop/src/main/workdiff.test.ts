@@ -18,7 +18,13 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" },
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "t",
+      GIT_AUTHOR_EMAIL: "t@t",
+      GIT_COMMITTER_NAME: "t",
+      GIT_COMMITTER_EMAIL: "t@t",
+    },
   })
 }
 
@@ -51,7 +57,13 @@ describe("workReview", () => {
     const out = await workReview(repo.dir)
     expect(out).toBeDefined()
     const by = new Map((out?.files ?? []).map((f) => [f.rel, f]))
-    expect([...by.keys()].sort()).toEqual(["fresh.txt", "gone.txt", "keep.txt", "new.txt", "sub/deep.txt"])
+    expect([...by.keys()].sort()).toEqual([
+      "fresh.txt",
+      "gone.txt",
+      "keep.txt",
+      "new.txt",
+      "sub/deep.txt",
+    ])
     expect(by.get("keep.txt")?.kind).toBe("update")
     expect(by.get("gone.txt")?.kind).toBe("delete")
     expect(by.get("new.txt")?.kind).toBe("rename")
@@ -185,5 +197,38 @@ describe("空补丁不等于未跟踪", () => {
   it("真的未跟踪的还是走 --no-index", async () => {
     writeFileSync(join(repo.dir, "brand-new.txt"), "hello\n")
     expect((await workPatch(repo.dir, "brand-new.txt")).patch).toContain("+hello")
+  })
+})
+
+describe("多轮编辑看最终净 diff", () => {
+  it("中间轮次不累加，最后改回原样时清单归零", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omni-review-rounds-"))
+    try {
+      git(dir, "init", "-q")
+      writeFileSync(join(dir, "rounds.txt"), "one\ntwo\n")
+      git(dir, "add", "rounds.txt")
+      git(dir, "commit", "-qm", "base")
+
+      writeFileSync(join(dir, "rounds.txt"), "ONE\ntwo\nthree\n")
+      expect(
+        (await workReview(dir))?.files.find((file) => file.rel === "rounds.txt"),
+      ).toMatchObject({
+        added: 2,
+        removed: 1,
+      })
+
+      writeFileSync(join(dir, "rounds.txt"), "one\ntwo\nfinal\n")
+      expect(
+        (await workReview(dir))?.files.find((file) => file.rel === "rounds.txt"),
+      ).toMatchObject({
+        added: 1,
+        removed: 0,
+      })
+
+      writeFileSync(join(dir, "rounds.txt"), "one\ntwo\n")
+      expect((await workReview(dir))?.files.some((file) => file.rel === "rounds.txt")).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

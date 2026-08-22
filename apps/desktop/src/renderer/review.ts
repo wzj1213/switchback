@@ -82,7 +82,10 @@ export function splitRows(lines: readonly NumberedLine[]): readonly SplitRow[] {
     for (let i = 0; i < Math.max(dels.length, adds.length); i += 1) {
       const left = dels[i]
       const right = adds[i]
-      rows.push({ ...(left === undefined ? {} : { left }), ...(right === undefined ? {} : { right }) })
+      rows.push({
+        ...(left === undefined ? {} : { left }),
+        ...(right === undefined ? {} : { right }),
+      })
     }
     dels.length = 0
     adds.length = 0
@@ -139,7 +142,8 @@ export function tallyReview(files: readonly ReviewFile[]): { added: number; remo
   )
 }
 
-const bridgeOf = (): typeof window.omni | undefined => (typeof window === "undefined" ? undefined : window.omni)
+const bridgeOf = (): typeof window.omni | undefined =>
+  typeof window === "undefined" ? undefined : window.omni
 
 export interface ReviewData {
   root: string
@@ -158,25 +162,34 @@ export interface ReviewData {
  * 而多数时候新旧两份是几乎一样的。
  */
 export function useReview(cwd: string, stamp: string): ReviewData {
-  const [data, setData] = useState<{ root: string; files: readonly ReviewFile[]; more?: number } | undefined>(undefined)
-  const [noRepo, setNoRepo] = useState(false)
-  const [loading, setLoading] = useState(true)
   const [nonce, setNonce] = useState(0)
+  const key = `${cwd}\u0000${stamp}\u0000${String(nonce)}`
+  const [data, setData] = useState<
+    | {
+        key: string
+        root: string
+        files: readonly ReviewFile[]
+        more?: number
+        noRepo: boolean
+      }
+    | undefined
+  >(undefined)
   useEffect(() => {
     const bridge = bridgeOf()
     if (cwd === "" || bridge === undefined) return undefined
     let live = true
-    setLoading(true)
     void bridge.workReview(cwd).then((out) => {
       if (!live) return
-      setNoRepo(out === undefined)
-      if (out !== undefined) setData(out)
-      setLoading(false)
+      setData(
+        out === undefined
+          ? { key, root: "", files: [], noRepo: true }
+          : { key, ...out, noRepo: false },
+      )
     })
     return () => {
       live = false
     }
-  }, [cwd, stamp, nonce])
+  }, [cwd, key])
   const reload = useCallback(() => {
     setNonce((n) => n + 1)
   }, [])
@@ -184,8 +197,9 @@ export function useReview(cwd: string, stamp: string): ReviewData {
     root: data?.root ?? "",
     files: data?.files ?? [],
     ...(data?.more === undefined ? {} : { more: data.more }),
-    noRepo,
-    loading,
+    noRepo: data?.noRepo ?? false,
+    // key 在 render 当下就变，旧数据不会在 effect 开始前闪回一帧。
+    loading: data?.key !== key,
     reload,
   }
 }
@@ -195,7 +209,7 @@ export interface PatchData extends ReviewPatch {
   loading: boolean
 }
 
-const EMPTY: PatchData = { patch: "", added: 0, removed: 0, lines: [], loading: false }
+const EMPTY = { patch: "", added: 0, removed: 0, lines: [] } as const
 
 /**
  * 一个文件的补丁，点开哪个取哪个。
@@ -204,23 +218,31 @@ const EMPTY: PatchData = { patch: "", added: 0, removed: 0, lines: [], loading: 
  * `@@` 头和 `+` 前缀。工具行那份不是这样（`kind` 决定格式），
  * 两者的解析规则不能互相借用。
  */
-export function usePatch(cwd: string, rel: string | undefined, context: number, stamp: string): PatchData {
-  const [out, setOut] = useState<PatchData>(EMPTY)
+export function usePatch(
+  cwd: string,
+  rel: string | undefined,
+  context: number,
+  stamp: string,
+): PatchData {
+  const key = `${cwd}\u0000${rel ?? ""}\u0000${String(context)}\u0000${stamp}`
+  const [out, setOut] = useState<(Omit<PatchData, "loading"> & { key: string }) | undefined>(
+    undefined,
+  )
   useEffect(() => {
     const bridge = bridgeOf()
     if (cwd === "" || rel === undefined || bridge === undefined) {
-      setOut(EMPTY)
       return undefined
     }
     let live = true
-    setOut((was) => ({ ...was, loading: true }))
     void bridge.workPatch(cwd, rel, context).then((got) => {
       if (!live) return
-      setOut({ ...got, lines: trimMeta(numbered(parseDiff(got.patch, "update"))), loading: false })
+      setOut({ key, ...got, lines: trimMeta(numbered(parseDiff(got.patch, "update"))) })
     })
     return () => {
       live = false
     }
-  }, [cwd, rel, context, stamp])
-  return out
+  }, [cwd, rel, context, key])
+  if (rel === undefined) return { ...EMPTY, loading: false }
+  if (out?.key !== key) return { ...EMPTY, loading: true }
+  return { ...out, loading: false }
 }

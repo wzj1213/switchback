@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { ChangedFile } from "../tool.js"
+import type { ChangedFile } from "../changes.js"
 import { relPath } from "../tool.js"
 import { splitPath } from "../diff.js"
 import { RevealIcon } from "./icons.js"

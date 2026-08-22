@@ -1,4 +1,4 @@
-import type { FileChange, Item, ToolDetail } from "@omni/protocol"
+import type { ToolDetail } from "@omni/protocol"
 
 /**
  * 工具形态 → 动词。
@@ -113,58 +113,4 @@ export function summarize(kinds: readonly ToolDetail["kind"][]): string {
     if (!seen.includes(kind)) seen.push(kind)
   }
   return seen.map((k) => DONE_VERB[k]).join(" · ")
-}
-
-export interface Changes {
-  files: number
-  added: number
-  removed: number
-  /** 逐个文件。**上一版算出来就扔了**，于是那枚胶囊点不动——只有一个总数 */
-  list: readonly ChangedFile[]
-}
-
-/** 一个被改过的文件。`last` 是它最后一次编辑的原始 `FileChange`（展开时要用）。 */
-export interface ChangedFile {
-  path: string
-  added: number
-  removed: number
-  last: FileChange
-}
-
-/**
- * 这一整个会话改了多少东西。
- *
- * codex 在输入框上方挂一枚「1 个文件已更改 +43 −5」——**它回答的是
- * 「我可以走了吗」**：agent 跑了十分钟，你要提交之前想知道它动了多少。
- * 这件事在 transcript 里是散的（分布在十几条编辑行上），得有人加起来。
- *
- * **同一个文件改三次算一个文件**，增删行数累加：用户关心的是「有几个文件
- * 要看」，不是「发生过几次编辑」。
- */
-export function changesOf(items: readonly Item[]): Changes {
-  const files = new Map<string, ChangedFile>()
-  for (const item of items) {
-    if (item.kind !== "tool_call" || item.detail.kind !== "file_edit") continue
-    if (item.status !== "ok") continue
-    for (const file of item.detail.files) {
-      const prev = files.get(file.path)
-      files.set(file.path, {
-        path: file.path,
-        added: (prev?.added ?? 0) + file.added,
-        removed: (prev?.removed ?? 0) + file.removed,
-        // **留最后一次那份 diff**：展开时要看的是「它最后把这个文件改成了什么样」，
-        // 而不是中间某一次。合并三次的补丁需要真正的 patch 运算，那是另一件事
-        last: file,
-      })
-    }
-  }
-  const list = [...files.values()]
-  return {
-    files: list.length,
-    added: list.reduce((n, f) => n + f.added, 0),
-    removed: list.reduce((n, f) => n + f.removed, 0),
-    // 按**首次出现**排序（Map 保序），不按路径字母排：
-    // 你回头找的是「它刚才动的那个」，那多半在后面
-    list,
-  }
 }
