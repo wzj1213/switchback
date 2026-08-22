@@ -26,8 +26,9 @@
   /* DSH 浅色主题用纯黑，深色主题在下方切成蓝色。 */
   --pet-dsh: #000000;
   --pet-dsh-eye: #ffffff;
-  /* 肚子不能和浅色画布融成一片；只压一档灰，仍保留原型的浅色腹部。 */
+  /* 固定矢量肚子在两套主题中共用形状与中性灰，只由上方主体 token 换色。 */
   --pet-dsh-belly: #d8dae0;
+  --pet-dsh-belly-mark: #858993;
   /* 没见过的那一家。**不编配色**——编出来迟早和某一家撞 */
   --pet-plain: #8f8f9a;
   --pet-plain-eye: #ffffff;

@@ -61,14 +61,21 @@ export function DshPet(): React.JSX.Element {
         <rect x="37" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
         <rect x="60" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
       </g>
-      <rect
-        x="37"
-        y="78"
-        width="36"
-        height="7"
+      {/* 肚子用固定矢量，不再让原图亮度蒙版与背景共同决定边缘；深浅主题只换身体色。 */}
+      <path
+        d="M36 85 C39 78.5 45.5 76 55 76 C64.5 76 71 78.5 74 85 Z"
         fill="var(--pet-dsh-belly)"
-        mask="url(#dsh-reference-light-mask)"
       />
+      {/* 40px 实际显示下每条约 0.65px；再细会被抗锯齿吃掉，再粗会像污点。 */}
+      <g
+        fill="none"
+        stroke="var(--pet-dsh-belly-mark)"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      >
+        <path d="M49 78.5 L50 84" />
+        <path d="M61 78.5 L60 84" />
+      </g>
     </svg>
   )
 }
