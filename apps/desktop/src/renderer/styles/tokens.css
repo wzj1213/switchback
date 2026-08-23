@@ -2,64 +2,64 @@
  * 设计 token —— 界面里所有颜色、间距、圆角都必须走这里。
  * 组件里出现字面量颜色视为 bug：那是上一版界面失控的起点。
  *
- * 基调：中性灰阶、近白内容区、极细边框、克制的强调色。
- * 强调色只用于焦点与链接；主按钮用近黑，不用彩色。
+ * 基调：白 + 黑——其余一切不是灰，是黑的透明度（同一个黑，不同的量）。
+ * 面不分层（全是白的），结构交给发丝线；强调色只用于焦点与链接；主按钮用纯黑，不用彩色。
  */
 
 :root {
   color-scheme: light dark;
 
-  /* 层次 */
+  /* 层次。面全是白的；填充只用两档：4%（泡、代码块、hover）、8%（选中行） */
   --bg: #ffffff;
-  --bg-sunken: #f7f7f8;
+  --bg-sunken: #ffffff;
   --bg-raised: #ffffff;
-  --bg-hover: #f0f0f2;
-  --bg-active: #e8e8ec;
+  --bg-hover: rgb(0 0 0 / 4%);
+  --bg-active: rgb(0 0 0 / 8%);
   /* 按下去的那一档。**hover 说的是「这儿能点」，按下态说的是「我点了」**——
      macOS 上按下与松开之间那一百毫秒是「系统收到了」的唯一凭据。
-     灰阶步长跟着上面那串走（7-8），再深就撞上 --border-strong 了 */
-  --bg-press: #e0e0e5;
-  --bg-code: #f6f6f7;
+     透明度阶梯跟着上面那串走（4 → 8 → 10），再深就撞上线条那档了 */
+  --bg-press: rgb(0 0 0 / 10%);
+  --bg-code: rgb(0 0 0 / 4%);
   /*
    * 用户消息那块底色。
    *
    * **不借 `--bg-hover`**（值一样）：那是交互态的名字，把它当表面色用，
    * 下次调 hover 会连着改到消息气泡上——一个 token 只该有一个理由改。
    *
-   * 为什么不继续用 `--bg-sunken`：它对 `--bg` 只差 **2.76 L\***（就是上面
-   * `--border-strong` 那段算过的那个数），气泡其实一直是靠那圈描边框出来的。
-   * 而描边在这套系统里是「卡片」的语义，卡片留给了审批——那才是要你做决定的。
-   * 换成离底色 5.2 L* 的这一档，**单靠底色就够，描边可以整个拿掉**：
-   * 一个装置，不是三个。
+   * 黑 4%，单靠底色就够，描边可以整个拿掉：一个装置，不是三个。
    */
-  --bg-said: #f0f0f2;
+  --bg-said: rgb(0 0 0 / 4%);
 
   /*
    * 描边分两个角色，**别混用**：
    * - `--border-strong`：把窗口切成区块的那几条（侧栏/顶栏/输入区/对比分栏），
-   *   以及控件的轮廓。区块两侧的底色只差 2.76 L*，这条边得自己扛住分界。
+   *   以及控件的轮廓。面全是白的，这条边得自己扛住全部分界。
    * - `--border`：区块**内部**的分节线、卡片描边。
    */
-  --border: #e6e6e9;
-  --border-strong: #d6d6da;
+  --border: rgb(0 0 0 / 8%);
+  --border-strong: rgb(0 0 0 / 16%);
 
-  /* 文字 */
-  --text: #16161a;
-  --text-muted: #6a6a73;
-  /* 最淡的一档仍承载可读文字，因此以最常见的凹面底色为准守住 AA 对比度。 */
-  --text-faint: #6f6f78;
+  /* 文字。墨 21:1 天花板；次要 8.45:1；最淡 5.33:1（填充上仍有 4.89:1） */
+  --text: #000000;
+  --text-muted: rgb(0 0 0 / 70%);
+  /* 最淡的一档仍承载可读文字：以填充面（黑 4%）为底守住 AA。 */
+  --text-faint: rgb(0 0 0 / 57%);
   --text-inverse: #ffffff;
 
-  /* 语义 */
-  --accent: #3b6fd4;
+  /* 语义。warn / accent 在填充上没过 AA，加深到合格；danger / ok 本来就够，不动 */
+  --accent: #3568c8;
   --danger: #c2412d;
-  --warn: #9a6b12;
+  --warn: #8a6410;
   --ok: #2f7a4d;
 
-  /* 度量 */
-  --radius-sm: 6px;
-  --radius: 9px;
-  --radius-lg: 13px;
+  /*
+   * 度量。**圆角 ≈ 高 ÷ 4**：22px 的行内按钮是 xs，32px 的行和按钮是 sm，
+   * 装内容的盒子是 radius，装控件的盒子是 lg。同心：外圆角 = 内圆角 + 内边距。
+   */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -153,7 +153,7 @@
     0 8px 28px rgb(0 0 0 / 12%);
   /* 控件用的那道。**浮层那道不能拿来给控件用**：它向下扩散 26px，
      比一个 24px 的胶囊还高，糊到下一条设置项上。深色下直接不要——
-     那边的层次本来就靠底色差（--bg-raised 与 --bg-sunken 差 6.2 L*）*/
+     那边的层次靠白透明度差（--bg-raised 是白 5%，底下是纯黑）*/
   --shadow-1: 0 1px 2px rgb(0 0 0 / 6%);
   --border-pop: var(--border);
 
@@ -167,23 +167,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17171a;
-    --bg-sunken: #101012;
-    --bg-raised: #1d1d21;
-    --bg-hover: #232328;
-    --bg-active: #2c2c33;
-    --bg-press: #35353d;
-    --bg-code: #202024;
-    /* 深色这侧同理：--bg-sunken 只差 3.7 L*，这一档差 6.0 */
-    --bg-said: #232328;
+    /* 深色整张反过来：纸 #000、墨 #fff，其余是白的透明度 */
+    --bg: #000000;
+    --bg-sunken: #000000;
+    --bg-raised: rgb(255 255 255 / 5%);
+    --bg-hover: rgb(255 255 255 / 8%);
+    --bg-active: rgb(255 255 255 / 13%);
+    --bg-press: rgb(255 255 255 / 17%);
+    --bg-code: rgb(255 255 255 / 8%);
+    --bg-said: rgb(255 255 255 / 8%);
 
-    --border: #2a2a30;
-    --border-strong: #3a3a42;
+    --border: rgb(255 255 255 / 10%);
+    --border-strong: rgb(255 255 255 / 20%);
 
-    --text: #ececef;
-    --text-muted: #9d9da8;
-    --text-faint: #95959f;
-    --text-inverse: #17171a;
+    --text: #ffffff;
+    --text-muted: rgb(255 255 255 / 72%);
+    --text-faint: rgb(255 255 255 / 55%);
+    --text-inverse: #000000;
 
     --hl-keyword: #c792ea;
     --hl-string: #7fd3a2;
@@ -199,7 +199,7 @@
     /* 深色下阴影不管用，改用更亮的描边划边界；阴影只留一点点做纵深 */
     --shadow-pop: 0 10px 32px rgb(0 0 0 / 55%);
     --shadow-1: none;
-    --border-pop: #43434d;
+    --border-pop: rgb(255 255 255 / 26%);
     --scrim: rgb(0 0 0 / 60%);
   }
 }

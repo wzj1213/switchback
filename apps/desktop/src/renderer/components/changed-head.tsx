@@ -7,11 +7,13 @@ function label(files: number, others: number, failed: boolean): string {
 }
 
 function Stat({ added, removed }: { added: number; removed: number }): React.JSX.Element {
+  /* 外层定宽：`added === 0` 时整段不渲染、9 → 10 多一个字符，
+     这行的宽度不该跟着内容变（tabular-nums 管得住数字宽度，管不住位数） */
   return (
-    <>
+    <span className="diffstat">
       {added > 0 ? <span className="diffstat__add">+{added}</span> : null}
       {removed > 0 ? <span className="diffstat__del">−{removed}</span> : null}
-    </>
+    </span>
   )
 }
 

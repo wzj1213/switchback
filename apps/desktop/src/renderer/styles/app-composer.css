@@ -188,7 +188,9 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  width: min(760px, 100%);
+  /* 和计划条同一条算式：转录区与输入框由父级 16px 内边距兜住，这条没有父级，
+     得自己把那 32px 留出来——否则窄窗口下它比上下两条都宽出一截 */
+  width: min(var(--content-max), calc(100% - 2 * var(--sp-4)));
   margin: 0 auto var(--sp-2);
   padding: 4px var(--sp-3);
   border: 1px dashed var(--border-strong);

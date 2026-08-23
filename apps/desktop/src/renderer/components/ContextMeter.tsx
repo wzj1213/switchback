@@ -19,6 +19,7 @@ export function ContextMeter({ usage }: { usage: Usage | undefined }): React.JSX
         </span>
       )}
       <span className="meter__label">{meter.label}</span>
+      {meter.total === undefined ? null : <span className="meter__total">{meter.total}</span>}
     </span>
   )
 }

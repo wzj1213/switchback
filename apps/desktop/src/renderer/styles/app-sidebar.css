@@ -96,7 +96,7 @@
   margin-right: 2px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-faint);
   font: inherit;

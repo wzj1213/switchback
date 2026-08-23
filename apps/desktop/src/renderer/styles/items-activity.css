@@ -247,6 +247,14 @@
   color: var(--text);
 }
 
+/* 定宽外壳：两枚数字的位数会变（9 → 10），added 为 0 时整段不渲染——
+   宽度不该跟着内容变。tabular-nums 管得住每个数字一样宽，管不住少一个字符 */
+.diffstat {
+  display: inline-flex;
+  gap: 5px;
+  min-width: 9ch;
+}
+
 .diffstat__add {
   color: var(--ok);
 }

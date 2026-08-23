@@ -29,6 +29,8 @@ export interface Meter {
   label: string
   /** 0–1；引擎没给窗口大小时是 undefined，界面上就不画进度条。 */
   ratio: number | undefined
+  /** 本会话累计——**单独一段**，它是账单，不是「离上限还有多远」。 */
+  total: string | undefined
   level: UsageLevel
   title: string
 }
@@ -38,24 +40,31 @@ export interface Meter {
  *
  * **窗口大小缺席时不画进度条**，只显示数字。照一个猜出来的分母画出来的比例，
  * 比没有比例更糟——它会让人在还早的时候就以为快满了，或者反过来。
+ *
+ * 百分比直接写进 label：分母是恒定的，让眼睛读两个数去得出比例，
+ * 不如直接把比例写出来——那正是这个控件唯一想说的话。
  */
 export function meterOf(usage: Usage | undefined): Meter | undefined {
   if (usage === undefined) return undefined
   const { contextUsed, contextWindow, totalTokens } = usage
-  const cumulative = totalTokens === undefined ? "" : ` · 本会话累计 ${compact(totalTokens)}`
+  const total = totalTokens === undefined ? undefined : `累计 ${compact(totalTokens)}`
+  const bill = totalTokens === undefined ? "" : ` · 本会话累计 ${compact(totalTokens)}`
   if (contextWindow === undefined || contextWindow <= 0) {
     return {
       label: `${compact(contextUsed)} tokens`,
       ratio: undefined,
+      total,
       level: "ok",
-      title: `上下文占用 ${String(contextUsed)} tokens（引擎未提供窗口大小）${cumulative}`,
+      title: `上下文占用 ${String(contextUsed)} tokens（引擎未提供窗口大小）${bill}`,
     }
   }
   const ratio = Math.min(1, contextUsed / contextWindow)
+  const pct = `${String(Math.round(ratio * 100))}%`
   return {
-    label: `${compact(contextUsed)} / ${compact(contextWindow)}`,
+    label: `${compact(contextUsed)} / ${compact(contextWindow)} · ${pct}`,
     ratio,
+    total,
     level: level(ratio),
-    title: `上下文已用 ${String(Math.round(ratio * 100))}%${cumulative}`,
+    title: `上下文已用 ${pct}${bill}`,
   }
 }
