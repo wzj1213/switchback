@@ -35,14 +35,20 @@ const num = (v: unknown): number => (typeof v === "number" ? v : 0)
  *
  * 窗口大小 SDK 不给（它随模型变），所以 `contextWindow` 缺席，
  * 界面上就只显示数字不画进度条。宁可少画一条，也不要照一个猜出来的分母画。
+ *
+ * `cacheRead` 只取 cache_read（命中）；cache_creation 是**写**缓存，不是命中。
+ * 字段缺席就是没报，缺席就整个不进事件——不拿 0 冒充「没命中」。
  */
-function usageOf(raw: RawUsage): { contextUsed: number } {
+function usageOf(raw: RawUsage): { contextUsed: number; cacheRead?: number } {
   return {
     contextUsed:
       num(raw.input_tokens) +
       num(raw.cache_read_input_tokens) +
       num(raw.cache_creation_input_tokens) +
       num(raw.output_tokens),
+    ...(typeof raw.cache_read_input_tokens === "number"
+      ? { cacheRead: raw.cache_read_input_tokens }
+      : {}),
   }
 }
 

@@ -41,6 +41,12 @@ export interface AcpDriverConfig {
    */
   contextUsed?: (method: string, params: unknown) => number | undefined
   /**
+   * 同一条私有通知里的缓存命中（只取 read——creation 是写缓存，不是命中）。
+   * 和 `contextUsed` 同一条路、同一个理由：协议里没有，各家各报各的。
+   * 返回 undefined = 这条通知与用量无关 / 没报——**没报就不显示，不拿 0 冒充没命中**。
+   */
+  cacheRead?: (method: string, params: unknown) => number | undefined
+  /**
    * 这家的**原生审批开关**怎么按信任档设。
    *
    * ACP 的标准做法是 mode（`session/set_mode`），但不是每家都实现：

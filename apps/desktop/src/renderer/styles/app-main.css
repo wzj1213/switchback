@@ -258,6 +258,11 @@
   text-align: right;
 }
 
+.meter__cache {
+  min-width: 8ch;
+  text-align: right;
+}
+
 .meter--warn {
   color: var(--warn);
 }

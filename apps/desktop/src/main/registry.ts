@@ -4,6 +4,7 @@ import {
   createCodexDriver,
   createDshDriver,
   createKimiDriver,
+  grokCacheRead,
   grokContextUsed,
   grokLogPath,
   grokModelChanged,
@@ -67,6 +68,8 @@ export function buildRegistry(
         logPath: grokLogPath,
         // 它不发 ACP 的 `usage_update`，用量在自己的私有通知里（见 `acp/grok.ts`）
         contextUsed: grokContextUsed,
+        // 同一条 `turn_completed` 里的缓存命中（cachedReadTokens 是 inputTokens 的子集）
+        cacheRead: grokCacheRead,
         // Grok 1.0.5 的 ACP 用 `_meta.autoMode` 接分类器 Auto，
         // `_meta.yoloMode` 接 Always-approve；两枚都只在开场时设置。
         nativeApproval: grokNativeApproval,

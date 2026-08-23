@@ -18,6 +18,12 @@ export interface Usage {
   contextWindow?: number
   /** 本会话累计消耗，跨轮累加。 */
   totalTokens?: number
+  /**
+   * 最近一次请求里**命中缓存读到的 token**。它省的是钱不是上下文——
+   * 照样算进 `contextUsed`，这里只是单独再说一遍。
+   * 照 `contextWindow` 的规矩：引擎报了才有，没报就是 undefined，界面上不出现。
+   */
+  cacheRead?: number
 }
 
 /**

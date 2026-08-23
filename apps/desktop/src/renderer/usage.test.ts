@@ -58,4 +58,13 @@ describe("meterOf", () => {
     expect(m?.total).toBe("累计 100k")
     expect(m?.title).toContain("本会话累计 100k")
   })
+
+  it("缓存命中报了才显示，没报整条不出现——不拿 0 冒充没命中", () => {
+    const hit = meterOf({ contextUsed: 100, contextWindow: 1000, cacheRead: 86400 })
+    expect(hit?.cache).toBe("缓存 86.4k")
+    expect(hit?.title).toContain("缓存命中 86.4k")
+    const miss = meterOf({ contextUsed: 100, contextWindow: 1000 })
+    expect(miss?.cache).toBeUndefined()
+    expect(miss?.title).not.toContain("缓存")
+  })
 })

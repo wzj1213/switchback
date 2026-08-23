@@ -184,7 +184,12 @@ function onUsage(ctx: UpdateContext, update: AcpUpdate): void {
  * 没有窗口大小就不带这个字段——界面据此只显示占用数字、不画比例条。
  * **不猜一个分母**：照猜出来的分母画出的比例，比没有比例更糟。
  */
-export function emitUsage(ctx: UpdateContext, used: number, window: number | undefined): void {
+export function emitUsage(
+  ctx: UpdateContext,
+  used: number,
+  window: number | undefined,
+  cacheRead?: number,
+): void {
   ctx.emit({
     type: "usage.updated",
     at: ctx.now(),
@@ -193,6 +198,7 @@ export function emitUsage(ctx: UpdateContext, used: number, window: number | und
     usage: {
       contextUsed: used,
       ...(window === undefined ? {} : { contextWindow: window }),
+      ...(cacheRead === undefined ? {} : { cacheRead }),
     },
   })
 }

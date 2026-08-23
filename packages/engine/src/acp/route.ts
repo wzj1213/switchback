@@ -39,7 +39,7 @@ export function mine(from: string | undefined, ours: string | undefined): boolea
  * 这一层只负责把认出来的东西送到既有的那几条路上，不认识任何一家。
  */
 export interface ForeignCtx {
-  config: Pick<AcpDriverConfig, "contextUsed" | "modelChanged">
+  config: Pick<AcpDriverConfig, "contextUsed" | "cacheRead" | "modelChanged">
   state: {
     effort: string | undefined
     windowOf: Readonly<Record<string, number>>
@@ -54,7 +54,7 @@ export function onForeign(ctx: ForeignCtx, method: string, params: unknown): voi
   if (changed !== undefined) adoptModelChange(ctx, changed)
   const used = ctx.config.contextUsed?.(method, params)
   if (used === undefined) return
-  emitUsage(ctx.update(), used, ctx.state.contextWindow)
+  emitUsage(ctx.update(), used, ctx.state.contextWindow, ctx.config.cacheRead?.(method, params))
 }
 
 /** 引擎自己换了模型 / 强度：落到状态上，并沿两条既有的路报上去。 */

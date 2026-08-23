@@ -31,6 +31,11 @@ export interface Meter {
   ratio: number | undefined
   /** 本会话累计——**单独一段**，它是账单，不是「离上限还有多远」。 */
   total: string | undefined
+  /**
+   * 最近一次请求命中缓存读到的 token——**单独一段**，报了才显示。
+   * 它回答「刚才那下贵不贵」：命中率从九成掉到零，一定是有东西把前缀缓存打掉了。
+   */
+  cache: string | undefined
   level: UsageLevel
   title: string
 }
@@ -46,14 +51,16 @@ export interface Meter {
  */
 export function meterOf(usage: Usage | undefined): Meter | undefined {
   if (usage === undefined) return undefined
-  const { contextUsed, contextWindow, totalTokens } = usage
+  const { contextUsed, contextWindow, totalTokens, cacheRead } = usage
   const total = totalTokens === undefined ? undefined : `累计 ${compact(totalTokens)}`
-  const bill = totalTokens === undefined ? "" : ` · 本会话累计 ${compact(totalTokens)}`
+  const cache = cacheRead === undefined ? undefined : `缓存 ${compact(cacheRead)}`
+  const bill = `${totalTokens === undefined ? "" : ` · 本会话累计 ${compact(totalTokens)}`}${cacheRead === undefined ? "" : ` · 缓存命中 ${compact(cacheRead)}`}`
   if (contextWindow === undefined || contextWindow <= 0) {
     return {
       label: `${compact(contextUsed)} tokens`,
       ratio: undefined,
       total,
+      cache,
       level: "ok",
       title: `上下文占用 ${String(contextUsed)} tokens（引擎未提供窗口大小）${bill}`,
     }
@@ -64,6 +71,7 @@ export function meterOf(usage: Usage | undefined): Meter | undefined {
     label: `${compact(contextUsed)} / ${compact(contextWindow)} · ${pct}`,
     ratio,
     total,
+    cache,
     level: level(ratio),
     title: `上下文已用 ${pct}${bill}`,
   }

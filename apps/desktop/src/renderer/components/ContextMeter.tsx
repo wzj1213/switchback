@@ -20,6 +20,7 @@ export function ContextMeter({ usage }: { usage: Usage | undefined }): React.JSX
       )}
       <span className="meter__label">{meter.label}</span>
       {meter.total === undefined ? null : <span className="meter__total">{meter.total}</span>}
+      {meter.cache === undefined ? null : <span className="meter__cache">{meter.cache}</span>}
     </span>
   )
 }

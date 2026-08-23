@@ -88,6 +88,20 @@ export function grokContextUsed(method: string, params: unknown): number | undef
   return typeof total === "number" && total > 0 ? total : undefined
 }
 
+/**
+ * 同一条 `turn_completed` 里的缓存命中。`cachedReadTokens` 是 `inputTokens` 的子集——
+ * 它省的是钱不是上下文（已含在上面那个 total 里）。字段缺席就是没报，不拿 0 冒充。
+ */
+export function grokCacheRead(method: string, params: unknown): number | undefined {
+  if (method !== "_x.ai/session_notification") return undefined
+  const update = (
+    params as { update?: { sessionUpdate?: string; usage?: { cachedReadTokens?: unknown } } } | undefined
+  )?.update
+  if (update?.sessionUpdate !== "turn_completed") return undefined
+  const hit = update.usage?.cachedReadTokens
+  return typeof hit === "number" && hit > 0 ? hit : undefined
+}
+
 /** 记录根目录。 */
 function root(home: string): string {
   return join(home, ".grok", "sessions")

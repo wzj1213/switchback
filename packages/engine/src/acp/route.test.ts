@@ -76,4 +76,16 @@ describe("协议之外的私有通知", () => {
     onForeign(h.ctx, "_x.ai/session_notification", {})
     expect(h.events.filter((e) => e.type === "usage.updated")).toHaveLength(1)
   })
+
+  it("缓存命中进了 usage 事件；没报就不带这个字段", () => {
+    const withHit = ctxWith({ contextUsed: () => 42, cacheRead: () => 17 })
+    onForeign(withHit.ctx, "_x.ai/session_notification", {})
+    const hit = withHit.events.find((e) => e.type === "usage.updated")
+    expect(hit?.type === "usage.updated" ? hit.usage.cacheRead : undefined).toBe(17)
+
+    const without = ctxWith({ contextUsed: () => 42, cacheRead: () => undefined })
+    onForeign(without.ctx, "_x.ai/session_notification", {})
+    const miss = without.events.find((e) => e.type === "usage.updated")
+    expect(miss?.type === "usage.updated" ? "cacheRead" in miss.usage : true).toBe(false)
+  })
 })

@@ -16,6 +16,7 @@ export {
   grokChatPath,
   grokWorkspaceDir,
   grokContextUsed,
+  grokCacheRead,
   grokModelChanged,
   grokNativeApproval,
 } from "./acp/grok.js"

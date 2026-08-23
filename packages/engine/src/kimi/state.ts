@@ -14,6 +14,11 @@ function persistedTotal(usage: KimiUsage | undefined): number | undefined {
   return usage.input_tokens + usage.output_tokens + usage.cache_read_tokens + usage.cache_creation_tokens
 }
 
+/** 事件负载里的缓存命中。只取 read——creation 是写缓存，不是命中；没报就是 undefined。 */
+function cacheReadOf(usage: KimiEventUsage | undefined): number | undefined {
+  return usage?.total?.inputCacheRead
+}
+
 export class KimiStateReporter {
   private options: readonly ModelOption[] = []
 
@@ -75,6 +80,7 @@ export class KimiStateReporter {
         contextUsed: payload.contextTokens,
         ...(payload.maxContextTokens === undefined ? {} : { contextWindow: payload.maxContextTokens }),
         totalTokens,
+        ...(cacheReadOf(payload.usage) === undefined ? {} : { cacheRead: cacheReadOf(payload.usage) }),
       },
     })
   }
@@ -90,6 +96,8 @@ export class KimiStateReporter {
         contextUsed: usage.context_tokens,
         ...(usage.context_limit <= 0 ? {} : { contextWindow: usage.context_limit }),
         ...(persistedTotal(usage) === undefined ? {} : { totalTokens: persistedTotal(usage) }),
+        // 缓存命中只取 read——creation 是写缓存，不是命中
+        ...(usage.cache_read_tokens <= 0 ? {} : { cacheRead: usage.cache_read_tokens }),
       },
     })
   }
