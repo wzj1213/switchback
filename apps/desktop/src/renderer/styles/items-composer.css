@@ -34,7 +34,7 @@
  * **有 ultra 档的模型才有**——它是 EFFORT 表里唯一带「更快消耗使用额度」
  * 说明的那一档，普通档一个彩色都不长。描边过渡慢半拍：落档是个决定，不是悬停。
  */
-.composer__inner--ultra {
+.composer__inner--costly {
   border-color: #b4409a;
   box-shadow: 0 0 0 3px rgb(180 64 154 / 22%), var(--shadow-1);
   transition: border-color 300ms var(--ease), box-shadow 300ms var(--ease);
@@ -78,7 +78,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .composer__inner--ultra {
+  .composer__inner--costly {
     border-color: #d76ab4;
     box-shadow: 0 0 0 3px rgb(215 106 180 / 26%), var(--shadow-1);
   }

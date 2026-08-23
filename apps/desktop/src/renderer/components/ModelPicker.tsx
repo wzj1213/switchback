@@ -113,18 +113,27 @@ export function currentOf(
 }
 
 /**
- * ultra 落没落档。**有 ultra 档的模型才谈得上**——它是 EFFORT 表里唯一带
- * 「更快消耗使用额度」说明的档；没报 ultra 的模型永远没有，换模型残留的
- * 旧值也不算（清单里得有）。输入框与滑块的深空态都拿它当闸门。
+ * 真正贵的那几档。**只有落在这几档才给深空处理**——high 不在其中：
+ * 它不是「明显改变花销」的那一档。判据看各家自己报的清单的**最后一档**，
+ * 名字随厂商（kimi 叫 ultra、claude 叫 max），所以认 id 不认位置。
  */
-export function ultraOf(
+const COSTLY: ReadonlySet<string> = new Set(["xhigh", "max", "ultra"])
+
+/**
+ * 贵档落没落。模型自己报的清单里**最后一档得是贵的**（三档到 high 的模型
+ * 永远没有），当前强度还得正落在那一档上——换模型残留的旧值不算。
+ * 输入框与滑块的深空态都拿它当闸门。
+ */
+export function costlyOf(
   models: readonly ModelOption[],
   model: string | undefined,
   effort: string | undefined,
 ): boolean {
   const current = currentOf(models, model)
-  if (current === undefined) return false
-  return (current.efforts ?? []).includes("ultra") && (effort ?? current.defaultEffort) === "ultra"
+  const efforts = current?.efforts ?? []
+  const top = efforts[efforts.length - 1]
+  if (current === undefined || top === undefined || !COSTLY.has(top)) return false
+  return (effort ?? current.defaultEffort) === top
 }
 
 export function ModelPicker({

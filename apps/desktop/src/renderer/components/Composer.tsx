@@ -7,7 +7,7 @@ import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
-import { ultraOf } from "./ModelPicker.js"
+import { costlyOf } from "./ModelPicker.js"
 
 /**
  * 信任档。
@@ -165,13 +165,14 @@ export function Composer(props: Props): React.JSX.Element {
     onSend: props.onSend,
   })
 
-  // ultra 落档时整个输入框进深空态（品红描边 + 绕框高光）
-  const ultra = ultraOf(props.models, props.model, props.effort)
+  // 落在最贵那一档时整个输入框进深空态（品红描边 + 绕框高光）。
+  // 「最贵」看各家清单的最后一档：kimi 叫 ultra，claude 叫 max
+  const costly = costlyOf(props.models, props.model, props.effort)
 
   return (
     <div className="composer">
       <div
-        className={`composer__inner${ultra ? " composer__inner--ultra" : ""}`}
+        className={`composer__inner${costly ? " composer__inner--costly" : ""}`}
         onDragOver={(e) => {
           if (props.canAttach) e.preventDefault()
         }}
@@ -181,8 +182,8 @@ export function Composer(props: Props): React.JSX.Element {
           attach.drop(e.dataTransfer.files)
         }}
       >
-        {/* ultra 的绕框高光：pathLength 归一到 100，dasharray 的算术不用量周长 */}
-        {ultra ? (
+        {/* 贵档的绕框高光：pathLength 归一到 100，dasharray 的算术不用量周长 */}
+        {costly ? (
           <svg className="compring" aria-hidden="true">
             <rect className="compring__orbit" pathLength={100} />
           </svg>

@@ -542,6 +542,25 @@
   left: 14px;
 }
 
+/* 刻度在轨道上、填充之下：空着的那几格也看得到，才能数 */
+.effort__stops {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.effort__stops i {
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  height: 8px;
+  border-radius: 1px;
+  background: var(--border-strong);
+  transform: translateY(-50%);
+}
+
+/* 拇指/填充的过渡只留给「收得住」的瞬间（点选落档那一下）；
+   拖动期间是 --live，过渡全关、1:1 跟手——过渡追一个每帧都在跑的目标就是拖尾巴 */
 .effort__fill {
   position: absolute;
   top: 0;
@@ -549,16 +568,64 @@
   left: 0;
   border-radius: 999px 0 0 999px;
   background: var(--bg-active);
+  transition: width 190ms var(--ease);
 }
 
 .effort__thumb {
   position: absolute;
   top: 50%;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
   background: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 22%);
   transform: translate(-50%, -50%);
+  transition: left 190ms var(--ease), scale 110ms var(--ease), box-shadow 300ms var(--ease);
+}
+
+.effort__bar--live .effort__fill {
+  transition: none;
+}
+
+.effort__bar--live .effort__thumb {
+  scale: 1.08;
+  transition: scale 110ms var(--ease);
+}
+
+/* 深空态的星点：四角星（和界面里那颗 ✧ 同一个形状），错落闪烁 */
+.effort__stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.effort__stars i {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  background: #fff;
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+  box-shadow: 0 0 4px rgb(255 255 255 / 80%);
+  transform: translateY(-50%);
+  animation: effort-twinkle 2.4s var(--ease) infinite;
+}
+
+@keyframes effort-twinkle {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effort__stars i {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .effort__value {
@@ -569,48 +636,55 @@
   pointer-events: none;
 }
 
-/* ── ultra 落档的深空处理 ─────────────────────────────
+/* ── 落在最贵档的深空处理 ─────────────────────────────
  * 靛 → 紫 → 品红的坡道。**渐变锚定整条轨道**（background-size 取条子全宽），
  * 填充露出来的是坡道的左段——低档见靛、满档见品红，不是每档都把整条渐变缩一遍。
- * 只在 ultra 落档时出现（`EffortSlider` 里的 `ultra`）：它是唯一明显改变花销的档，
- * 没报 ultra 的模型永远见不到这一套。值是比稿 ⑦ 深空那组，`voidAt` 里是同一组数。
+ * 闸门是 `costlyOf`（清单最后一档得是真贵档：kimi 的 ultra、claude 的 max）。
+ * 值是比稿 ⑦ 深空那组，`voidAt` 里是同一组数。
  */
-.effort--ultra .effort__fill {
+.effort--costly .effort__fill {
   background: linear-gradient(90deg, #2b2d6e, #6d4bc7, #b4409a);
   background-size: calc(var(--effort-w) - 28px) 100%;
 }
 
-.effort--ultra .effort__thumb {
-  background: #b4409a;
-  box-shadow: 0 0 6px rgb(180 64 154 / 45%);
+/* 深空的拇指是白的发光的，不是品红实心 */
+.effort--costly .effort__thumb {
+  background: #fff;
+  box-shadow:
+    0 0 6px rgb(180 64 154 / 60%),
+    0 0 14px rgb(180 64 154 / 35%);
 }
 
-.effort--ultra .effort__value {
+.effort--costly .effort__stops i {
+  background: rgb(255 255 255 / 45%);
+}
+
+.effort--costly .effort__value {
   /* 深空坡道是深底，字沉进去就看不见；档位名回到收起态的触发器上，
      条子上只留渐变和拇指（aria-valuetext 照样报） */
   display: none;
 }
 
-/* ultra 落档时触发器的档位名也要说「这一档更贵」：品红加粗（demo 的 eff__lvl） */
-.effort--ultra .trigger__label {
+/* 贵档落档时触发器的档位名也要说「这一档更贵」：品红加粗（demo 的 eff__lvl） */
+.effort--costly .trigger__label {
   color: #96307c;
   font-weight: 600;
 }
 
 @media (prefers-color-scheme: dark) {
-  .effort--ultra .trigger__label {
+  .effort--costly .trigger__label {
     color: #e094c8;
   }
-}
 
-@media (prefers-color-scheme: dark) {
-  .effort--ultra .effort__fill {
+  .effort--costly .effort__fill {
     background: linear-gradient(90deg, #3a3d8a, #8367dd, #d76ab4);
     background-size: calc(var(--effort-w) - 28px) 100%;
   }
 
-  .effort--ultra .effort__thumb {
-    background: #d76ab4;
-    box-shadow: 0 0 6px rgb(215 106 180 / 45%);
+  .effort--costly .effort__thumb {
+    background: #fff;
+    box-shadow:
+      0 0 6px rgb(215 106 180 / 65%),
+      0 0 14px rgb(215 106 180 / 40%);
   }
 }

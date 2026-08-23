@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import type { ModelOption } from "@omni/protocol"
-import { currentOf, effortLabel, ultraOf } from "./ModelPicker.js"
+import { currentOf, effortLabel, costlyOf } from "./ModelPicker.js"
 import { EffortBar } from "./EffortBar.js"
 
 /**
@@ -84,19 +84,20 @@ export function EffortSlider({
   const value = effort ?? current.defaultEffort ?? efforts[0]
   // 不在清单里的旧值（换过模型）按 0 档画位置、但标签照原文显示——不编一个档位
   const committed = Math.max(0, efforts.indexOf(value ?? ""))
-  // 深空处理只在 ultra 落档时出现——它是这一行里唯一明显改变花销的档
-  //（EFFORT 表里只有它带「更快消耗使用额度」）。没报 ultra 的模型永远没有
-  const ultra = ultraOf([current], current.id, effort)
+  // 深空处理只落在最贵的那一档（kimi 的 ultra、claude 的 max）——
+  // 顶档只是 high 的模型永远没有，见 ModelPicker 的 costlyOf
+  const costly = costlyOf([current], current.id, effort)
   if (efforts.length === 0) return null
   return (
     <span
-      className={`effort${open ? " effort--open" : ""}${ultra ? " effort--ultra" : ""}`}
+      className={`effort${open ? " effort--open" : ""}${costly ? " effort--costly" : ""}`}
       style={{ "--effort-w": `${String(28 + efforts.length * 30)}px` } as React.CSSProperties}
     >
       {open ? (
         <EffortBar
           efforts={efforts}
           committed={committed}
+          costly={costly}
           onCommit={(index) => {
             const next = efforts[index]
             if (next !== undefined && index !== committed) onChange(next)
@@ -126,7 +127,7 @@ export function EffortSlider({
           <Ticks
             count={efforts.length}
             index={committed}
-            color={ultra ? voidAt(1) : undefined}
+            color={costly ? voidAt(1) : undefined}
           />
           <span className="trigger__label">
             {value === undefined ? "默认" : effortLabel(value).label}
