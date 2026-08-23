@@ -178,12 +178,12 @@ export function Bar({
   return (
     <div className="composer__barwrap">
       <div className="composer__bar">
-        {/* 上下文进度环：这排最左端的独立指示——不是模型胶囊的一部分，
-            嵌进去的话悬停全被触发器吃掉，环自己的说明永远出不来 */}
-        <UsageBadge usage={usage} />
         <EngineSelect engine={engine} engines={engines} disabled={detached || starting} onPick={onEngineChange} />
         <TrustSelect trust={trust} blind={blind}
           disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
+        {/* 上下文进度环：贴着模型胶囊的独立指示（它原来的图标位）——
+            不是胶囊的一部分，嵌进去悬停全被触发器吃掉 */}
+        <UsageBadge usage={usage} />
         <ModelPicker
           models={models}
           model={model}
