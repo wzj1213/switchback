@@ -178,6 +178,9 @@ export function Bar({
   return (
     <div className="composer__barwrap">
       <div className="composer__bar">
+        {/* 上下文进度环：这排最左端的独立指示——不是模型胶囊的一部分，
+            嵌进去的话悬停全被触发器吃掉，环自己的说明永远出不来 */}
+        <UsageBadge usage={usage} />
         <EngineSelect engine={engine} engines={engines} disabled={detached || starting} onPick={onEngineChange} />
         <TrustSelect trust={trust} blind={blind}
           disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
@@ -189,9 +192,6 @@ export function Bar({
           pending={pending}
           onChange={onModelChange}
         />
-        {/* 上下文进度环：独立元素，不是模型胶囊的一部分——
-            嵌进去的话悬停全被触发器吃掉，环自己的说明永远出不来 */}
-        <UsageBadge usage={usage} />
         {aside}
         <span style={{ flex: 1 }} />
         {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。

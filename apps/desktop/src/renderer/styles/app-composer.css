@@ -450,8 +450,8 @@
 
 .usage__tip {
   position: absolute;
-  right: -8px;
   bottom: calc(100% + 7px);
+  left: -8px;
   z-index: 40;
   width: max-content;
   max-width: 260px;

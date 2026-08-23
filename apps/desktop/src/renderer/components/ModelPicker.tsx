@@ -168,7 +168,6 @@ export function ModelPicker({
   return (
     <Select
       label={label}
-      icon={<SparkIcon />}
       title={current.description ?? "模型与推理强度"}
       disabled={disabled}
       sections={sectionsOf(models, current, level, onChange)}
