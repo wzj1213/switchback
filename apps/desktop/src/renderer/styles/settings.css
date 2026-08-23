@@ -315,14 +315,15 @@
   overflow-wrap: anywhere;
 }
 
-/* 「这些一条都不会跑」这类话。**要显眼**：它推翻的是这一页其余全部内容 */
+/* 「这些一条都不会跑」这类话。**要显眼**：它推翻的是这一页其余全部内容。
+   要读的话给 13——11.5 是附注的档，这句话不是附注 */
 .hk__alarm {
   margin: 0 0 var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--warn);
   border-radius: var(--radius-sm);
   color: var(--warn);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -364,10 +365,11 @@
   color: var(--text-faint);
 }
 
-/* 「omni 到底加不加载这些」——整页最要紧的一句，所以它在每家标题正下方 */
+/* 「omni 到底加不加载这些」——整页最要紧的一句，所以它在每家标题正下方。
+   要读的话给 13；11.5 是「扫一眼」的档，这句不是 */
 .hk__why {
   margin: 0 0 var(--sp-2);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--text-muted);
 }

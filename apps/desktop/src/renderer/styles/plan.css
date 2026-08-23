@@ -148,7 +148,7 @@
 .plan-panel__mark {
   flex: none;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .plan-panel__mark[data-status="in_progress"] {

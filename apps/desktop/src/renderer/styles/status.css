@@ -171,7 +171,7 @@
   display: block;
   margin-left: var(--sp-4);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -182,5 +182,5 @@
   margin-left: var(--sp-2);
   color: var(--text-faint);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }

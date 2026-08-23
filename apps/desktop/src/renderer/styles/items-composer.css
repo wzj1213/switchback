@@ -154,7 +154,7 @@
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -176,7 +176,7 @@
   border-radius: var(--radius-sm);
   background: var(--bg-raised);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--text-sm);
   padding: 0 var(--sp-2);
   cursor: pointer;
 }
