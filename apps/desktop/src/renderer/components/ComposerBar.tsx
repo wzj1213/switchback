@@ -139,6 +139,8 @@ export function Bar({
   model,
   effort,
   usage,
+  effortVoid,
+  onEffortVoid,
   pending,
   onEngineChange,
   onTrustChange,
@@ -162,6 +164,9 @@ export function Bar({
   aside?: React.ReactNode
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
+  /** 「深空」配色开关的当前值与翻转动作（模型面板顶层那一行）。 */
+  effortVoid: boolean
+  onEffortVoid: (on: boolean) => void
   models: readonly ModelOption[]
   model?: string
   effort?: string
@@ -190,6 +195,7 @@ export function Bar({
           effort={effort}
           disabled={detached || busy || starting}
           pending={pending}
+          voidSwitch={{ on: effortVoid, run: () => { onEffortVoid(!effortVoid) } }}
           onChange={onModelChange}
         />
         {aside}
@@ -201,6 +207,7 @@ export function Bar({
           model={model}
           effort={effort}
           disabled={detached || busy || starting}
+          effortVoid={effortVoid}
           onChange={onModelChange}
         />
         <Action

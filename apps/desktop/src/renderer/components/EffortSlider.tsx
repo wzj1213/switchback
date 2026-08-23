@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import type { ModelOption } from "@omni/protocol"
 import { currentOf, effortLabel } from "./ModelPicker.js"
+import { EffortBar } from "./EffortBar.js"
 
 /**
  * 推理强度的行内滑块。收起时是一段安静的文字加几枚刻度——**不点开也知道
@@ -11,6 +12,8 @@ import { currentOf, effortLabel } from "./ModelPicker.js"
  *
  * 它在发送键左边的空地里：条子往左长，空地（弹性槽）吸收宽度，
  * 发送键的 x 一个像素都不动。
+ *
+ * 展开那条的指针/键盘交互在 `EffortBar.tsx`。
  */
 
 /** 指针位置 → 档位序号。纯函数，好测。 */
@@ -22,150 +25,45 @@ export function indexAt(x: number, width: number, count: number): number {
   return Math.min(count - 1, Math.max(0, i))
 }
 
+/** 深空配色的坡道：靛 → 紫 → 品红。三站线性插值，和 CSS 里那条渐变同一组值。 */
+function voidAt(t: number): string {
+  type Rgb = readonly [number, number, number]
+  const stops: [Rgb, Rgb, Rgb] = [
+    [0x2b, 0x2d, 0x6e],
+    [0x6d, 0x4b, 0xc7],
+    [0xb4, 0x40, 0x9a],
+  ]
+  const x = Math.min(1, Math.max(0, t)) * 2
+  const i = x >= 1 ? 1 : 0
+  const from = i === 0 ? stops[0] : stops[1]
+  const to = i === 0 ? stops[1] : stops[2]
+  const f = x - i
+  return `rgb(${String(Math.round(from[0] + (to[0] - from[0]) * f))} ${String(
+    Math.round(from[1] + (to[1] - from[1]) * f),
+  )} ${String(Math.round(from[2] + (to[2] - from[2]) * f))})`
+}
+
 /** 收起态那几枚小刻度：亮到第几格就是第几档，不点开也知道。 */
-function Ticks({ count, index }: { count: number; index: number }): React.JSX.Element {
+function Ticks({
+  count,
+  index,
+  color,
+}: {
+  count: number
+  index: number
+  /** 深空配色开启时，亮着的刻度染当前档的坡道色。 */
+  color?: string
+}): React.JSX.Element {
   return (
     <span className="effort__ticks" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <i key={i} className={i <= index ? "on" : undefined} />
+        <i
+          key={i}
+          className={i <= index ? "on" : undefined}
+          style={color === undefined || i > index ? undefined : { background: color }}
+        />
       ))}
     </span>
-  )
-}
-
-/**
- * 展开后的那条滑块。
- *
- * **拖动中只动视觉，松手才提交**：`thread.setModel` 是发给引擎的命令，
- * 拖动过程每帧都发就是在刷引擎。
- */
-function EffortBar({
-  efforts,
-  committed,
-  onCommit,
-  onClose,
-}: {
-  efforts: readonly string[]
-  committed: number
-  onCommit: (index: number) => void
-  /** `refocus` = Esc：焦点还回触发器；点别处收起时不还（焦点跟着那一击走）。 */
-  onClose: (refocus: boolean) => void
-}): React.JSX.Element {
-  const bar = useRef<HTMLSpanElement>(null)
-  const [dragIndex, setDragIndex] = useState<number | undefined>(undefined)
-  const shown = dragIndex ?? committed
-
-  // 触发器在展开时已卸载，焦点得主动进条子——不然键盘 ← → 落在 body 上
-  useEffect(() => {
-    bar.current?.focus()
-  }, [])
-
-  // 点别处收起。**pointerdown 不是 click**：先收起的浮层会让那一击落在突然挪位的元素上
-  useEffect(() => {
-    const onPointer = (event: PointerEvent): void => {
-      if (bar.current?.contains(event.target as Node | null) === true) return
-      onClose(false)
-    }
-    document.addEventListener("pointerdown", onPointer, true)
-    return () => {
-      document.removeEventListener("pointerdown", onPointer, true)
-    }
-  }, [onClose])
-
-  const pick = (event: React.PointerEvent<HTMLSpanElement>): number => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    return indexAt(event.clientX - rect.left, rect.width, efforts.length)
-  }
-
-  return (
-    <span
-      ref={bar}
-      className="effort__bar"
-      role="slider"
-      tabIndex={0}
-      aria-label="推理强度"
-      aria-valuemin={0}
-      aria-valuemax={efforts.length - 1}
-      aria-valuenow={shown}
-      aria-valuetext={effortLabel(efforts[shown] ?? "").label}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId)
-        setDragIndex(pick(e))
-      }}
-      onPointerMove={(e) => {
-        if (dragIndex !== undefined) setDragIndex(pick(e))
-      }}
-      onPointerUp={(e) => {
-        const index = pick(e)
-        setDragIndex(undefined)
-        onCommit(index)
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault()
-          onClose(true)
-          return
-        }
-        const delta =
-          e.key === "ArrowLeft" || e.key === "ArrowDown"
-            ? -1
-            : e.key === "ArrowRight" || e.key === "ArrowUp"
-              ? 1
-              : e.key === "Home"
-                ? -committed
-                : e.key === "End"
-                  ? efforts.length - 1 - committed
-                  : 0
-        if (delta !== 0) {
-          e.preventDefault()
-          onCommit(Math.min(efforts.length - 1, Math.max(0, committed + delta)))
-        }
-      }}
-      onBlur={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
-        onClose(false)
-      }}
-    >
-      <span className="effort__range">
-        <span
-          className="effort__fill"
-          style={{ width: `${String((shown / Math.max(1, efforts.length - 1)) * 100)}%` }}
-        />
-        <span
-          className="effort__thumb"
-          style={{ left: `${String((shown / Math.max(1, efforts.length - 1)) * 100)}%` }}
-        />
-      </span>
-      <span className="effort__value">{effortLabel(efforts[shown] ?? "").label}</span>
-    </span>
-  )
-}
-
-/** 接线版：从清单里解出当前模型，没解出来（或没报 efforts）就整块不出现。 */
-export function BarEffort({
-  models,
-  model,
-  effort,
-  disabled,
-  onChange,
-}: {
-  models: readonly ModelOption[]
-  model: string | undefined
-  effort: string | undefined
-  disabled: boolean
-  onChange: (model: string, effort: string) => void
-}): React.JSX.Element | null {
-  const current = currentOf(models, model)
-  if (current === undefined) return null
-  return (
-    <EffortSlider
-      current={current}
-      effort={effort}
-      disabled={disabled}
-      onChange={(next) => {
-        onChange(current.id, next)
-      }}
-    />
   )
 }
 
@@ -173,11 +71,14 @@ export function EffortSlider({
   current,
   effort,
   disabled,
+  effortVoid,
   onChange,
 }: {
   current: ModelOption
   effort: string | undefined
   disabled: boolean
+  /** 「深空」配色（`Settings.effortVoid`）：填充染成靛→紫→品红的坡道。 */
+  effortVoid: boolean
   onChange: (effort: string) => void
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
@@ -189,7 +90,7 @@ export function EffortSlider({
   if (efforts.length === 0) return null
   return (
     <span
-      className={`effort${open ? " effort--open" : ""}`}
+      className={`effort${open ? " effort--open" : ""}${effortVoid ? " effort--void" : ""}`}
       style={{ "--effort-w": `${String(28 + efforts.length * 30)}px` } as React.CSSProperties}
     >
       {open ? (
@@ -222,10 +123,47 @@ export function EffortSlider({
             setOpen(true)
           }}
         >
-          <Ticks count={efforts.length} index={committed} />
-          <span className="trigger__label">{value === undefined ? "默认" : effortLabel(value).label}</span>
+          <Ticks
+            count={efforts.length}
+            index={committed}
+            color={effortVoid ? voidAt(committed / Math.max(1, efforts.length - 1)) : undefined}
+          />
+          <span className="trigger__label">
+            {value === undefined ? "默认" : effortLabel(value).label}
+          </span>
         </button>
       )}
     </span>
+  )
+}
+
+/** 接线版：从清单里解出当前模型，没解出来（或没报 efforts）就整块不出现。 */
+export function BarEffort({
+  models,
+  model,
+  effort,
+  disabled,
+  effortVoid,
+  onChange,
+}: {
+  models: readonly ModelOption[]
+  model: string | undefined
+  effort: string | undefined
+  disabled: boolean
+  effortVoid: boolean
+  onChange: (model: string, effort: string) => void
+}): React.JSX.Element | null {
+  const current = currentOf(models, model)
+  if (current === undefined) return null
+  return (
+    <EffortSlider
+      current={current}
+      effort={effort}
+      disabled={disabled}
+      effortVoid={effortVoid}
+      onChange={(next) => {
+        onChange(current.id, next)
+      }}
+    />
   )
 }

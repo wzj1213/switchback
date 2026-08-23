@@ -118,12 +118,15 @@ export function ModelPicker({
   effort,
   disabled,
   pending,
+  voidSwitch,
   onChange,
 }: {
   models: readonly ModelOption[]
   model: string | undefined
   effort: string | undefined
   disabled: boolean
+  /** 「深空配色」开关：放在面板顶层，翻的是设置（`Settings.effortVoid`）。 */
+  voidSwitch?: { on: boolean; run: () => void }
   /** 有待切换的引擎：它的名字，以及「现在就兑现」那条路。见下面那段。 */
   pending?: { label: string; onSwitchNow: () => void }
   onChange: (model: string, effort?: string) => void
@@ -172,6 +175,9 @@ export function ModelPicker({
       disabled={disabled}
       sections={sectionsOf(models, current, level, onChange)}
       {...(reset === undefined ? {} : { reset })}
+      {...(voidSwitch === undefined
+        ? {}
+        : { toggle: { label: "深空配色", on: voidSwitch.on, run: voidSwitch.run } })}
     />
   )
 }

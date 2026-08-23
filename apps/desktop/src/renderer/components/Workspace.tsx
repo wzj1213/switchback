@@ -37,6 +37,9 @@ export interface WorkspaceProps {
   engines: readonly EngineInfo[]
   /** 输入框上沿那几只要不要出现。关掉是整块不渲染，见 `shared/settings.ts`。 */
   pets: boolean
+  /** 推理强度滑块的「深空」配色（`Settings.effortVoid`）与它的开关。 */
+  effortVoid: boolean
+  onEffortVoid: (on: boolean) => void
   notices: readonly Notice[]
   /** 全部会话。故障横幅要靠它说清「出事的是哪一条」。 */
   rows: readonly ThreadRow[]

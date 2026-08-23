@@ -59,6 +59,8 @@ function parse(raw: unknown): Settings {
     // **只认字面的 `false`**：默认是开着的，所以「读不出来」要落到开，
     // 而不是像 `remote.enabled` 那样落到关——那边关掉是安全的一侧，这边不是
     pets: it.pets !== false,
+    // 深空配色相反：**只认字面的 `true`**，读不出来就落到关（默认那侧）
+    effortVoid: it.effortVoid === true,
     dsh: dsh(it.dsh),
     defaultEngine: typeof it.defaultEngine === "string" ? it.defaultEngine : DEFAULTS.defaultEngine,
     defaultTrust:

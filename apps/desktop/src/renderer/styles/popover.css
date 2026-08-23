@@ -171,6 +171,39 @@
   margin-left: auto;
 }
 
+/* 顶层菜单的开关行：只放偏好（翻的是设置，不是这次的选择）。
+   小开关贴右，开的时候整体染黑——彩色只给内容语义，这是「开」的状态 */
+.pop__switch {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 16px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--bg-active);
+  transition: background var(--dur) var(--ease);
+}
+
+.pop__switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--dur) var(--ease);
+}
+
+.pop__switch--on {
+  background: var(--text);
+}
+
+.pop__switch--on i {
+  transform: translateX(10px);
+}
+
 /* 二级页顶上那行返回。**做成一整行可点**，不是一个小箭头——
    小箭头是这类菜单里最容易点空的东西 */
 .pop__back {

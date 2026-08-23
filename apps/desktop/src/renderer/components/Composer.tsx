@@ -59,6 +59,9 @@ interface Props {
   effort: string | undefined
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
+  /** 「深空」配色（`Settings.effortVoid`）：滑块染成靛→紫→品红。 */
+  effortVoid: boolean
+  onEffortVoid: (on: boolean) => void
   /**
    * 有待切换的引擎时它的名字。**模型选择器据此变成一句说明**——
    * 手上这份清单是旧那家报的，不能让人挑，但也不该凭空消失。
@@ -223,6 +226,8 @@ export function Composer(props: Props): React.JSX.Element {
           model={props.model}
           effort={props.effort}
           usage={props.usage}
+          effortVoid={props.effortVoid}
+          onEffortVoid={props.onEffortVoid}
           pending={props.pending}
           onEngineChange={props.onEngineChange}
           onTrustChange={props.onTrustChange}
