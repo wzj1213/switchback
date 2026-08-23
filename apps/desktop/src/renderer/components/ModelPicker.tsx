@@ -101,6 +101,17 @@ export function effortLabel(id: string): { label: string; description?: string }
   return EFFORT[id] ?? { label: id }
 }
 
+/**
+ * 当前模型：用户选过就用他选的；没选过**优先引擎自己报的当前值**，最后才退回第一个。
+ * 直接退回第一个是在撒谎：kimi 报的当前模型是 K3，而列表第一个是 K2.7。
+ */
+export function currentOf(
+  models: readonly ModelOption[],
+  model: string | undefined,
+): ModelOption | undefined {
+  return models.find((m) => m.id === model) ?? models.find((m) => m.isDefault === true) ?? models[0]
+}
+
 export function ModelPicker({
   models,
   model,
@@ -147,13 +158,12 @@ export function ModelPicker({
       </button>
     )
   }
-  // 用户选过就用他选的；没选过**优先引擎自己报的当前值**，最后才退回第一个。
-  // 直接退回第一个是在撒谎：kimi 报的当前模型是 K3，而列表第一个是 K2.7
-  const current = models.find((m) => m.id === model) ?? models.find((m) => m.isDefault === true) ?? models[0]
+  const current = currentOf(models, model)
   if (current === undefined) return null
   const level = effort ?? current.defaultEffort
-  // 触发器上把两样都写出来：只写模型的话，改了强度之后界面上没有任何变化
-  const label = level === undefined ? current.label : `${current.label} · ${effortLabel(level).label}`
+  // 触发器上只写模型：强度有了自己的控件（`EffortSlider`），再把两样都写出来，
+  // 就是同一个值在一行里写两遍——改一处另一处跟着变，看起来像 bug
+  const label = current.label
   const reset = resetOf(models, current, level, onChange)
   return (
     <Select

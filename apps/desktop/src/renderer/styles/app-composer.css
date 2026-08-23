@@ -404,3 +404,99 @@
   font-size: var(--text-sm);
   text-align: left;
 }
+
+/* ── 推理强度滑块 ─────────────────────────────────────
+ * 收起是一段安静的文字加几枚小刻度——不点开也知道现在在哪一档；
+ * 点开原地长成滑块。它在发送键左边的空地里：max-width 张开时
+ * 弹性槽吸收宽度，条子往左长，发送键的 x 一个像素都不动。
+ * 只给报了 `efforts` 的引擎渲染（ACP 那类把强度编进 modelId 的不报，整块不出现）。
+ */
+.effort {
+  /* 展开宽。行内 style 按档位数覆写它（28 + 档数 × 30）；这里给个兜底，
+     也让 token 守卫有一个能找到的定义 */
+  --effort-w: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  max-width: 96px;
+  transition: max-width var(--dur-slow) var(--ease);
+}
+
+.effort--open {
+  max-width: var(--effort-w);
+}
+
+/* 收起态的小刻度：亮到第几格就是第几档 */
+.effort__ticks {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.effort__ticks i {
+  width: 4px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.effort__ticks i.on {
+  background: currentColor;
+}
+
+/* 条子本体：宽度钉死为展开宽，外壳 overflow:hidden 的裁剪让它「往左长出来」 */
+.effort__bar {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  width: var(--effort-w);
+  height: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.effort__bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 拇指/填充的活动区间：两端各留 14px（和 `EffortSlider.indexAt` 的 pad 是同一个数） */
+.effort__range {
+  position: absolute;
+  top: 0;
+  right: 14px;
+  bottom: 0;
+  left: 14px;
+}
+
+.effort__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--bg-active);
+}
+
+.effort__thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--text);
+  transform: translate(-50%, -50%);
+}
+
+.effort__value {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}

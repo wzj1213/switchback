@@ -1,6 +1,7 @@
 import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
 import { Action } from "./ComposerAction.js"
 import { ModelPicker } from "./ModelPicker.js"
+import { BarEffort } from "./EffortSlider.js"
 import { Select } from "./Select.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
 import { TRUSTS, labelOf } from "./Composer.js"
@@ -85,6 +86,43 @@ function TrustSelect({
   )
 }
 
+/**
+ * 引擎选择器。探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
+ * 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因。
+ */
+function EngineSelect({
+  engine,
+  engines,
+  disabled,
+  onPick,
+}: {
+  engine: EngineId
+  engines: readonly EngineInfo[]
+  disabled: boolean
+  onPick: (next: EngineId) => void
+}): React.JSX.Element {
+  return (
+    <Select
+      label={labelOf(engines, engine)}
+      icon={<EngineIcon />}
+      title="引擎"
+      disabled={disabled}
+      sections={[
+        {
+          value: engine,
+          onPick,
+          choices: engines.map((item) => ({
+            id: item.id,
+            label: item.label,
+            ...(item.state === "missing" ? { note: "未安装" } : {}),
+            ...(item.detail === undefined ? {} : { description: item.detail }),
+          })),
+        },
+      ]}
+    />
+  )
+}
+
 export function Bar({
   detached,
   busy,
@@ -136,26 +174,7 @@ export function Bar({
   return (
     <div className="composer__barwrap">
       <div className="composer__bar">
-        <Select
-          label={labelOf(engines, engine)}
-          icon={<EngineIcon />}
-          title="引擎"
-          disabled={detached || starting}
-          sections={[
-            {
-              value: engine,
-              onPick: onEngineChange,
-              // 探测出「没装」的**仍然可选**，只在右边加个记号：探测也会错，
-              // 硬拦住一个其实能用的引擎比不检查更糟。真起不来时横幅会说原因
-              choices: engines.map((item) => ({
-                id: item.id,
-                label: item.label,
-                ...(item.state === "missing" ? { note: "未安装" } : {}),
-                ...(item.detail === undefined ? {} : { description: item.detail }),
-              })),
-            },
-          ]}
-        />
+        <EngineSelect engine={engine} engines={engines} disabled={detached || starting} onPick={onEngineChange} />
         <TrustSelect trust={trust} blind={blind}
           disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
         <ModelPicker
@@ -168,6 +187,15 @@ export function Bar({
         />
         {aside}
         <span style={{ flex: 1 }} />
+        {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。
+            没报 efforts 的引擎它自己不出来（见 EffortSlider） */}
+        <BarEffort
+          models={models}
+          model={model}
+          effort={effort}
+          disabled={detached || busy || starting}
+          onChange={onModelChange}
+        />
         <Action
           detached={detached}
           busy={busy}
