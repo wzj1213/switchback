@@ -119,11 +119,17 @@ export function currentOf(
  * 它不是「明显改变花销」的那一档。判据看各家自己报的清单的**最后一档**，
  * 名字随厂商（kimi 叫 ultra、claude 叫 max），所以认 id 不认位置。
  */
-const COSTLY: ReadonlySet<string> = new Set(["xhigh", "max", "ultra", "ultracode"])
+/**
+ * 开 workflow 的那一档。**特效只给它**——max、xhigh 都不算：
+ * 它们只是更强的强度，而 ultra / ultracode 是另一个模式
+ *（claude 的原话是「xhigh effort plus standing dynamic-workflow orchestration」）。
+ */
+const COSTLY: ReadonlySet<string> = new Set(["ultra", "ultracode"])
 
 /**
- * 贵档落没落。模型自己报的清单里**最后一档得是贵的**（三档到 high 的模型
- * 永远没有），当前强度还得正落在那一档上——换模型残留的旧值不算。
+ * 贵档落没落。模型自己报的清单里**最后一档得是开 workflow 的那个模式**
+ *（`ultra` / `ultracode`；顶档只是 max / xhigh 的模型永远没有），
+ * 当前强度还得正落在那一档上——换模型残留的旧值不算。
  * 输入框与滑块的深空态都拿它当闸门。
  */
 export function costlyOf(

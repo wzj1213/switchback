@@ -24,7 +24,7 @@ export function barWidth(count: number): number {
 }
 
 /** 拇指直径。`indexAt` 的指针算术和 CSS 的拇指尺寸都从它出。 */
-export const THUMB = 16
+export const THUMB = 20
 
 /**
  * 指针位置 → 档位序号。纯函数，好测。

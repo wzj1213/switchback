@@ -38,19 +38,32 @@ function Stops({ count }: { count: number }): React.JSX.Element {
   )
 }
 
-/** 深空态的星点层。位置固定、不随重绘跳动，相位错落（值见 app-composer.css）。 */
-function Stars(): React.JSX.Element {
+/** 深空态的星点。**位置固定、不随重绘跳动**（种子序列），密度往右加（t² 把点堆到右端）。 */
+function seeded(i: number): number {
+  const x = Math.sin(i * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
+
+/** 星点层。demo 的种子散布：~10 颗，大小 1–2.6px，相位错开。 */
+function Stars({ width }: { width: number }): React.JSX.Element {
   return (
     <span className="effort__stars" aria-hidden="true">
-      {[
-        { left: "16%", delay: "0s" },
-        { left: "34%", delay: ".5s" },
-        { left: "52%", delay: "1.1s" },
-        { left: "68%", delay: ".3s" },
-        { left: "84%", delay: "1.4s" },
-      ].map((star) => (
-        <i key={star.left} style={{ left: star.left, animationDelay: star.delay }} />
-      ))}
+      {Array.from({ length: 10 }, (_, i) => {
+        const t = seeded(i * 4 + 1)
+        const size = 1 + seeded(i * 4 + 2) * 1.6
+        return (
+          <i
+            key={i}
+            style={{
+              left: `${String(Math.round(t * t * width))}px`,
+              top: `${String(3 + Math.round(seeded(i * 4 + 3) * 19))}px`,
+              width: `${size.toFixed(1)}px`,
+              height: `${size.toFixed(1)}px`,
+              animationDelay: `${(seeded(i * 4 + 4) * -2.6).toFixed(2)}s`,
+            }}
+          />
+        )
+      })}
     </span>
   )
 }
@@ -161,7 +174,7 @@ export function EffortBar({
       <span className="effort__fill" style={{ width: `${String(x + THUMB)}px` }}>
         <span className="effort__lay effort__base" />
         <span className="effort__lay effort__hot" />
-        {costly ? <Stars /> : null}
+        {costly ? <Stars width={width} /> : null}
       </span>
       <Stops count={efforts.length} />
       <span
