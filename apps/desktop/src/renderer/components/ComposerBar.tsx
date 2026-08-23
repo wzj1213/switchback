@@ -2,6 +2,7 @@ import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@omni/prot
 import { Action } from "./ComposerAction.js"
 import { ModelPicker } from "./ModelPicker.js"
 import { BarEffort } from "./EffortSlider.js"
+import { UsageBadge } from "./UsageRing.js"
 import { Select } from "./Select.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
 import { TRUSTS, labelOf } from "./Composer.js"
@@ -184,11 +185,13 @@ export function Bar({
           models={models}
           model={model}
           effort={effort}
-          usage={usage}
           disabled={detached || busy || starting}
           pending={pending}
           onChange={onModelChange}
         />
+        {/* 上下文进度环：独立元素，不是模型胶囊的一部分——
+            嵌进去的话悬停全被触发器吃掉，环自己的说明永远出不来 */}
+        <UsageBadge usage={usage} />
         {aside}
         <span style={{ flex: 1 }} />
         {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。

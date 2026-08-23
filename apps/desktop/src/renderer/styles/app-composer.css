@@ -439,6 +439,40 @@
   }
 }
 
+/* 环是独立指示：悬停出数字卡。向上弹——它在窗口底部那一排 */
+.usage {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 4px 2px;
+}
+
+.usage__tip {
+  position: absolute;
+  right: -8px;
+  bottom: calc(100% + 7px);
+  z-index: 40;
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.usage:hover .usage__tip,
+.usage:focus-visible .usage__tip {
+  opacity: 1;
+}
+
 /* ── 推理强度滑块 ─────────────────────────────────────
  * 收起是一段安静的文字加几枚小刻度——不点开也知道现在在哪一档；
  * 点开原地长成滑块。它在发送键左边的空地里：max-width 张开时
