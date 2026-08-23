@@ -1,4 +1,5 @@
 import type { ThreadRow } from "@omni/store"
+import type { EngineInfo } from "@omni/protocol"
 import { tallyOf, type Group } from "../sidebar.js"
 import { ChevronIcon, FolderIcon, SpinnerIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
@@ -17,6 +18,7 @@ export function GroupBlock({
   group,
   collapsed,
   selectedId,
+  engines,
   onToggle,
   onSelect,
   onDelete,
@@ -42,6 +44,8 @@ export function GroupBlock({
   onMoveThread?: (id: string, direction: -1 | 1) => void
   collapsed: boolean
   selectedId: string
+  /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
+  engines: readonly EngineInfo[]
   onToggle: () => void
   onRowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
   rename?: RenameCtl
@@ -77,6 +81,7 @@ export function GroupBlock({
             key={row.thread.id}
             row={row}
             selected={row.thread.id === selectedId}
+            engines={engines}
             onSelect={() => {
               onSelect(row.thread.id)
             }}

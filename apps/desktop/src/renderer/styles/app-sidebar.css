@@ -236,3 +236,67 @@
   color: var(--warn);
   font-size: var(--text-xs);
 }
+
+/*
+ * 行的悬停卡：完整路径、引擎、状态原文——只读预览。
+ *
+ * `pointer-events: none` 是必须的：鼠标穿过去，正下面的行照样接管 hover；
+ * 它也就永远不会把自己悬停在那里不消失。fixed 坐标由 `usePeek` 算好，
+ * 滚动/缩放即收（它不会跟着滚动区走，留着就是指着一条已经挪走的行）。
+ * 行尾的 `title` 已撤——原生 tooltip 和这张卡叠两层，比没有还糟。
+ */
+.peek {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: 256px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}
+
+.peek__title {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.peek__path {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+.peek__meta {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.peek__status {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.peek__status--warn {
+  color: var(--warn);
+}
+
+.peek__status--fail {
+  color: var(--danger);
+}
+
+.peek__foot {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}

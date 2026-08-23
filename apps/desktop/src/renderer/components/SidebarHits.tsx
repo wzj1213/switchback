@@ -1,4 +1,5 @@
 import type { ThreadRow } from "@omni/store"
+import type { EngineInfo } from "@omni/protocol"
 import type { SidebarRow } from "../sidebar.js"
 import { Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
@@ -25,6 +26,8 @@ export function Hits({
     onDelete: (id: string) => void
     rowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
     rename: RenameCtl
+    /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
+    engines: readonly EngineInfo[]
   }
 }): React.JSX.Element {
   return (
@@ -40,6 +43,7 @@ export function Hits({
           row={row}
           selected={row.thread.id === selectedId}
           flat
+          engines={on.engines}
           rename={on.rename}
           onSelect={() => {
             on.onSelect(row.thread.id)

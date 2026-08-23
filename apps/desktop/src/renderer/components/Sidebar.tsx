@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { EngineThread } from "@omni/protocol"
+import type { EngineInfo, EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
 import { useDeepSearch } from "../useDeepSearch.js"
 import { sectionsOf, type SidebarRow } from "../sidebar.js"
@@ -84,6 +84,8 @@ interface Props {
   onAdopt: (engine: string, item: EngineThread) => void
   /** 引擎登录的账号 + 额度，画在底部那一行。没有就不画。 */
   account?: AccountLine
+  /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
+  engines: readonly EngineInfo[]
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
   /** 变一次就把当前会话切进改名态。`/rename` 命令走这条路。 */
@@ -171,13 +173,14 @@ export function Sidebar(props: Props): React.JSX.Element {
             found={found}
             deep={deep}
             selectedId={props.selectedId}
-            on={{ onSelect: props.onSelect, onDelete: props.onDelete, rowMenu, rename }}
+            on={{ onSelect: props.onSelect, onDelete: props.onDelete, rowMenu, rename, engines: props.engines }}
           />
         ) : (
           <SectionList
             sections={sections}
             on={{
               selectedId: props.selectedId,
+              engines: props.engines,
               isOpen,
               onToggle: toggle,
               onSelect: props.onSelect,

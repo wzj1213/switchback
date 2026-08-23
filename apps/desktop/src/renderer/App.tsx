@@ -61,6 +61,7 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       onPinThread={prefs.pinThread}
       foreign={app.foreign}
       onAdopt={app.adopt}
+      engines={app.engines}
       {...(app.account === undefined ? {} : { account: app.account })}
       onOpenSettings={() => {
         shell.setSettingsOpen(true)

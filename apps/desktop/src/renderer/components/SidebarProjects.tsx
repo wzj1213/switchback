@@ -87,6 +87,7 @@ function Projects({
         <GroupBlock
           key={group.cwd}
           group={group}
+          engines={on.engines}
           {...(on.onDropOnProject === undefined ? {} : { onDropOnProject: on.onDropOnProject })}
           collapsed={!on.isOpen(group.cwd)}
           selectedId={on.selectedId}

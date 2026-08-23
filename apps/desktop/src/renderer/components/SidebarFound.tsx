@@ -1,4 +1,5 @@
 import type { useDeepSearch } from "../useDeepSearch.js"
+import type { EngineInfo } from "@omni/protocol"
 import type { SidebarRow } from "../sidebar.js"
 import { Deep } from "./SidebarDeep.js"
 import { Hits } from "./SidebarHits.js"
@@ -9,6 +10,8 @@ interface FoundHandlers {
   onDelete: (id: string) => void
   rowMenu: (event: React.MouseEvent, row: SidebarRow, arm: () => void, rename: () => void) => void
   rename: RenameCtl
+  /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
+  engines: readonly EngineInfo[]
 }
 
 export function SidebarFound({

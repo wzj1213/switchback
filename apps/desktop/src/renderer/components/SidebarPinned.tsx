@@ -83,6 +83,7 @@ function PinnedItems({
           selected={row.thread.id === on.selectedId}
           flat
           pinned
+          engines={on.engines}
           {...(on.drag === undefined ? {} : { drag: on.drag })}
           aside={baseNameOf(row.thread.cwd)}
           onSelect={() => on.onSelect(row.thread.id)}
@@ -97,6 +98,7 @@ function PinnedItems({
           key={group.cwd}
           group={group}
           pinned
+          engines={on.engines}
           {...(on.onDropOnProject === undefined ? {} : { onDropOnProject: on.onDropOnProject })}
           collapsed={!on.isOpen(group.cwd)}
           selectedId={on.selectedId}

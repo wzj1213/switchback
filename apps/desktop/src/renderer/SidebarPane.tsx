@@ -1,4 +1,4 @@
-import type { Command, EngineThread, Thread } from "@omni/protocol"
+import type { Command, EngineInfo, EngineThread, Thread } from "@omni/protocol"
 import { Sidebar } from "./components/Sidebar.js"
 import type { SidebarRow } from "./sidebar.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
@@ -37,6 +37,8 @@ interface SidebarPaneProps {
   /** 报过历史的每一家，各一段。 */
   foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
   onAdopt: (engine: string, item: EngineThread) => void
+  /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
+  engines: readonly EngineInfo[]
   /** 底部那一行：登录的是谁、还剩多少额度。 */
   account?: AccountLine
   send: (command: Command) => void

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
+import type { EngineInfo } from "@omni/protocol"
 import { rowLabelOf, type SidebarRow } from "../sidebar.js"
-import { EllipsisIcon } from "./icons.js"
 import { Dot, RowEnd } from "./RowEnd.js"
-import { SIDEBAR_ICON } from "./icon-base.js"
+import { useRowPeek } from "./RowPeek.js"
+import { RowActions } from "./RowActions.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
 import { moveKeyProps } from "../moveKey.js"
@@ -83,50 +84,6 @@ function dragProps(
   }
 }
 
-/**
- * 行尾那颗按钮：平时是「更多」，武装之后变成「确认」。
- *
- * **二次确认做在同一颗按钮上**而不是弹对话框：删一个会话不值得打断整个界面，
- * 但也不能点一下就没。照 codex 的 confirmArchiveTask。
- */
-function RowActions({
-  confirming,
-  onDelete,
-  onDisarm,
-  onMenu,
-}: {
-  confirming: boolean
-  onDelete: () => void
-  onDisarm: () => void
-  onMenu: (event: React.MouseEvent) => void
-}): React.JSX.Element {
-  if (confirming) {
-    return (
-      <button
-        type="button"
-        className="row__act row__act--danger"
-        aria-label="确认删除"
-        title="再点一次就真的删了，不可撤销"
-        onClick={onDelete}
-        onBlur={onDisarm}
-      >
-        确认
-      </button>
-    )
-  }
-  return (
-    <button
-      type="button"
-      className="row__act"
-      aria-label="更多操作"
-      title="更多操作"
-      onClick={onMenu}
-    >
-      <EllipsisIcon size={SIDEBAR_ICON} />
-    </button>
-  )
-}
-
 /** 一行的 class。拼在 JSX 里的话那一行会长到看不出是在拼什么。 */
 function rowClass(o: {
   flat: boolean
@@ -153,6 +110,7 @@ export function Row({
   pinned = false,
   flat = false,
   aside,
+  engines,
   onSelect,
   onDelete,
   onMenu,
@@ -168,6 +126,8 @@ export function Row({
   aside?: string
   /** 这一行现在挂在「置顶」段里。拖动时要带上，落点据此决定要不要取消置顶。 */
   pinned?: boolean
+  /** 引擎清单：悬停卡要把 engine id 翻成人话（`labelOf` 找不到就退原 id）。 */
+  engines: readonly EngineInfo[]
   onSelect: () => void
   onDelete: () => void
   /** 右键或点 `···`。`arm` 让菜单能把这一行切进删除确认态，`ren` 切进改名态。 */
@@ -213,6 +173,8 @@ export function Row({
       clearTimeout(timer)
     }
   }, [confirming])
+  // 悬停卡：改名时不弹（输入框正在这一行上），拖动中不弹（会盖住落点高亮）
+  const peek = useRowPeek({ drag, disabled: rename?.id === thread.id, row, engines })
   return (
     <div
       className={rowClass({
@@ -222,7 +184,7 @@ export function Row({
         dragging: drag?.dragging === thread.id,
         dropping,
       })}
-      title={thread.cwd}
+      {...peek.handlers}
       {...dragProps(thread.id, thread.cwd, pinned, drag)}
       onContextMenu={(e) => {
         onMenu(e, arm, startRename)
@@ -263,6 +225,7 @@ export function Row({
           onMenu(e, arm, startRename)
         }}
       />
+      {peek.card}
     </div>
   )
 }

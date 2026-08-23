@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { ThreadRow } from "@omni/store"
-import type { EngineThread } from "@omni/protocol"
+import type { EngineInfo, EngineThread } from "@omni/protocol"
 import { type Group, type Sections, type SidebarRow } from "../sidebar.js"
 import { ChevronIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
@@ -78,6 +78,8 @@ export function SectionHead({
 
 export interface GroupHandlers extends SidebarMoveActions {
   selectedId: string
+  /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
+  engines: readonly EngineInfo[]
   /** 这个项目现在是展开的吗。默认全折叠，见 `Sidebar.tsx`。 */
   isOpen: (cwd: string) => boolean
   onToggle: (cwd: string) => void
@@ -154,6 +156,7 @@ function Chats({
           row={row}
           selected={row.thread.id === on.selectedId}
           flat
+          engines={on.engines}
           onSelect={() => {
             on.onSelect(row.thread.id)
           }}
