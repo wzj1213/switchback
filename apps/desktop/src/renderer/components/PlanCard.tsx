@@ -28,7 +28,7 @@ export function PlanCard({ item }: { item: PlanItem }): React.JSX.Element {
           {item.explanation === undefined ? null : (
             <p className="plan-card__note">{item.explanation}</p>
           )}
-          <PlanSteps steps={item.steps} />
+          <PlanSteps steps={item.steps} live={false} />
         </div>
       ) : null}
     </div>

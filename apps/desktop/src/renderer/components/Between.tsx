@@ -14,7 +14,7 @@ export function Between(props: Props): React.JSX.Element {
   const active = props.thread.status === "running" || props.thread.status === "waiting_approval"
   return (
     <>
-      <PlanPanel key={props.thread.id} items={props.items} />
+      <PlanPanel key={props.thread.id} items={props.items} running={props.thread.status === "running"} />
       <Queued
         texts={waiting}
         attachments={props.thread.queuedAttachments ?? []}
