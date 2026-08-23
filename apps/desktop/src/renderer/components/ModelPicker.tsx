@@ -95,6 +95,8 @@ const EFFORT: Readonly<Record<string, { label: string; description?: string }>> 
   xhigh: { label: "极高" },
   max: { label: "最高" },
   ultra: { label: "超高", description: "更快消耗使用额度" },
+  // claude 的顶档模式：不是强度档，是另一个设置键（CLI 滑块最右那档也是这么拼的）
+  ultracode: { label: "Ultracode", description: "xhigh ＋ 工作流编排，更快消耗使用额度" },
 }
 
 export function effortLabel(id: string): { label: string; description?: string } {
@@ -117,7 +119,7 @@ export function currentOf(
  * 它不是「明显改变花销」的那一档。判据看各家自己报的清单的**最后一档**，
  * 名字随厂商（kimi 叫 ultra、claude 叫 max），所以认 id 不认位置。
  */
-const COSTLY: ReadonlySet<string> = new Set(["xhigh", "max", "ultra"])
+const COSTLY: ReadonlySet<string> = new Set(["xhigh", "max", "ultra", "ultracode"])
 
 /**
  * 贵档落没落。模型自己报的清单里**最后一档得是贵的**（三档到 high 的模型

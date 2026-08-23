@@ -30,16 +30,22 @@ interface EffortAware {
 /**
  * 把一条模型的强度档挂上去。**报不出档位就整条不挂**——
  * 一个空的强度选择器比没有更糟：它看起来能选，点开是空的。
+ *
+ * **xhigh 能跑的模型在清单末尾追加一档 `ultracode`**：它不是强度档，
+ * 是另一个设置键（xhigh + 工作流编排，会话级）——Claude Code 自己的 CLI
+ * 就是把它拼在滑块最右那一档。workflows 开没开 SDK 不给探测，
+ * 真设不上时 `applyEffort` 会抛、调用方报 degraded，不冒充成功。
  */
 export function withEfforts(option: ModelOption, raw: EffortAware): ModelOption {
   if (raw.supportsEffort !== true) return option
   const efforts = (raw.supportedEffortLevels ?? []).filter((e) => typeof e === "string" && e !== "")
-  return efforts.length === 0 ? option : { ...option, efforts }
+  if (efforts.length === 0) return option
+  return { ...option, efforts: efforts.includes("xhigh") ? [...efforts, "ultracode"] : efforts }
 }
 
 /** SDK 上那条运行期改强度的路。**公开声明的**，不像侧问那样要运行时探测。 */
 interface EffortSettable {
-  applyFlagSettings: (settings: { effortLevel: string }) => Promise<void>
+  applyFlagSettings: (settings: { effortLevel?: string | null; ultracode?: boolean | null }) => Promise<void>
 }
 
 function settable(query: unknown): query is EffortSettable {
@@ -54,9 +60,16 @@ function settable(query: unknown): query is EffortSettable {
  *
  * `applyFlagSettings` 没有返回值，所以「生效了」的判据是**它没有抛**。
  * 这比回报请求值强：那条路上失败是静默的。
+ *
+ * **最右那档 `ultracode` 写的是另一个键**：`ultracode: true`（xhigh + 工作流编排），
+ * 从它换回普通档时顺手清成 null——不然会话还停在编排模式上。
  */
 export async function applyEffort(query: unknown, effort: string | undefined): Promise<string | undefined> {
   if (effort === undefined || effort === "" || !settable(query)) return undefined
-  await query.applyFlagSettings({ effortLevel: effort })
+  if (effort === "ultracode") {
+    await query.applyFlagSettings({ ultracode: true })
+    return effort
+  }
+  await query.applyFlagSettings({ effortLevel: effort, ultracode: null })
   return effort
 }

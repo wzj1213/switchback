@@ -9,6 +9,14 @@ describe("Claude 的强度档从模型自己那儿来", () => {
     expect(out.efforts).toEqual(["low", "high", "max"])
   })
 
+  it("**xhigh 能跑的模型末尾追加 ultracode**——CLI 滑块最右那一档（xhigh + workflows）", () => {
+    const out = withEfforts(M, { supportsEffort: true, supportedEffortLevels: ["low", "medium", "high", "xhigh"] })
+    expect(out.efforts).toEqual(["low", "medium", "high", "xhigh", "ultracode"])
+    // 没有 xhigh 就没有它：max 顶的模型不追加
+    const plain = withEfforts(M, { supportsEffort: true, supportedEffortLevels: ["low", "high", "max"] })
+    expect(plain.efforts).not.toContain("ultracode")
+  })
+
   it("**不支持强度的模型一档都不给**——给了就是一个改了不生效的控件", () => {
     expect(withEfforts(M, { supportsEffort: false, supportedEffortLevels: ["low"] }).efforts).toBeUndefined()
     expect(withEfforts(M, {}).efforts).toBeUndefined()
@@ -27,11 +35,18 @@ describe("Claude 的强度档从模型自己那儿来", () => {
 })
 
 describe("把强度设下去", () => {
-  it("设成了就回真正生效的那一档", async () => {
+  it("设成了就回真正生效的那一档，普通档顺手清掉 ultracode 开关", async () => {
     const seen: unknown[] = []
     const query = { applyFlagSettings: (s: unknown) => { seen.push(s); return Promise.resolve() } }
     expect(await applyEffort(query, "xhigh")).toBe("xhigh")
-    expect(seen).toEqual([{ effortLevel: "xhigh" }])
+    expect(seen).toEqual([{ effortLevel: "xhigh", ultracode: null }])
+  })
+
+  it("**ultracode 写的是另一个键**，不是 effortLevel", async () => {
+    const seen: unknown[] = []
+    const query = { applyFlagSettings: (s: unknown) => { seen.push(s); return Promise.resolve() } }
+    expect(await applyEffort(query, "ultracode")).toBe("ultracode")
+    expect(seen).toEqual([{ ultracode: true }])
   })
 
   it("没给强度就不发那一发", async () => {

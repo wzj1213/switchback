@@ -67,6 +67,52 @@ function Ticks({
   )
 }
 
+/** 收起态的触发器：几枚小刻度 + 档位名。 */
+function EffortTrigger({
+  count,
+  index,
+  costly,
+  label,
+  disabled,
+  trig,
+  onOpen,
+}: {
+  count: number
+  index: number
+  costly: boolean
+  label: string
+  disabled: boolean
+  trig: React.RefObject<HTMLButtonElement | null>
+  onOpen: () => void
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      ref={trig}
+      className="trigger"
+      title="推理强度"
+      disabled={disabled}
+      aria-expanded={false}
+      onClick={onOpen}
+    >
+      <Ticks count={count} index={index} color={costly ? voidAt(1) : undefined} />
+      <span className="trigger__label">{label}</span>
+    </button>
+  )
+}
+
+/** 提交那一档：没变或序号越界就不发命令。 */
+function committer(
+  efforts: readonly string[],
+  committed: number,
+  onChange: (effort: string) => void,
+): (index: number) => void {
+  return (index) => {
+    const next = efforts[index]
+    if (next !== undefined && index !== committed) onChange(next)
+  }
+}
+
 export function EffortSlider({
   current,
   effort,
@@ -89,51 +135,44 @@ export function EffortSlider({
   const costly = costlyOf([current], current.id, effort)
   if (efforts.length === 0) return null
   return (
-    <span
-      className={`effort${open ? " effort--open" : ""}${costly ? " effort--costly" : ""}`}
-      style={{ "--effort-w": `${String(28 + efforts.length * 30)}px` } as React.CSSProperties}
-    >
-      {open ? (
-        <EffortBar
-          efforts={efforts}
-          committed={committed}
-          costly={costly}
-          onCommit={(index) => {
-            const next = efforts[index]
-            if (next !== undefined && index !== committed) onChange(next)
-          }}
-          onClose={(refocus) => {
-            setOpen(false)
-            // 触发器要等收起重渲染之后才在
-            if (refocus) {
-              requestAnimationFrame(() => {
-                trig.current?.focus()
-              })
-            }
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          ref={trig}
-          className="trigger"
-          title="推理强度"
-          disabled={disabled}
-          aria-expanded={open}
-          onClick={() => {
-            setOpen(true)
-          }}
-        >
-          <Ticks
+    <span className="effortbox">
+      {/* 「更快消耗使用额度」浮在触发器上方——只在贵档落档时出现，
+          平时一行高度都不占（原型图二的那句） */}
+      {costly && !open ? <span className="effort__warn">更快消耗使用额度</span> : null}
+      <span
+        className={`effort${open ? " effort--open" : ""}${costly ? " effort--costly" : ""}`}
+        style={{ "--effort-w": `${String(28 + efforts.length * 30)}px` } as React.CSSProperties}
+      >
+        {open ? (
+          <EffortBar
+            efforts={efforts}
+            committed={committed}
+            costly={costly}
+            onCommit={committer(efforts, committed, onChange)}
+            onClose={(refocus) => {
+              setOpen(false)
+              // 触发器要等收起重渲染之后才在
+              if (refocus) {
+                requestAnimationFrame(() => {
+                  trig.current?.focus()
+                })
+              }
+            }}
+          />
+        ) : (
+          <EffortTrigger
             count={efforts.length}
             index={committed}
-            color={costly ? voidAt(1) : undefined}
+            costly={costly}
+            label={value === undefined ? "默认" : effortLabel(value).label}
+            disabled={disabled}
+            trig={trig}
+            onOpen={() => {
+              setOpen(true)
+            }}
           />
-          <span className="trigger__label">
-            {value === undefined ? "默认" : effortLabel(value).label}
-          </span>
-        </button>
-      )}
+        )}
+      </span>
     </span>
   )
 }
