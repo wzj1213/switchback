@@ -404,6 +404,40 @@
   font-size: var(--text-sm);
   text-align: left;
 }
+/* ── 上下文进度环：模型触发器上那枚图标 ─────────────── */
+.usage-ring {
+  display: block;
+  color: var(--text-faint);
+}
+
+.usage-ring circle {
+  fill: none;
+  stroke-width: 1.6;
+}
+
+.usage-ring__track {
+  stroke: var(--border-strong);
+}
+
+.usage-ring__fill {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--dur-slow) var(--ease);
+}
+
+.usage-ring--warn {
+  color: var(--warn);
+}
+
+.usage-ring--danger {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-ring__fill {
+    transition: none;
+  }
+}
 
 /* ── 推理强度滑块 ─────────────────────────────────────
  * 收起是一段安静的文字加几枚小刻度——不点开也知道现在在哪一档；

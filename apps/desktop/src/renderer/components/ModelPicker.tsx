@@ -1,4 +1,6 @@
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption, Usage } from "@omni/protocol"
+import { meterOf } from "../usage.js"
+import { UsageRing } from "./UsageRing.js"
 import { SparkIcon } from "./icons.js"
 import { Select, type Section } from "./Select.js"
 
@@ -116,6 +118,7 @@ export function ModelPicker({
   models,
   model,
   effort,
+  usage,
   disabled,
   pending,
   onChange,
@@ -123,6 +126,11 @@ export function ModelPicker({
   models: readonly ModelOption[]
   model: string | undefined
   effort: string | undefined
+  /**
+   * 上下文用量。**有分母时触发器那枚图标变成进度环**（见 `UsageRing`）；
+   * 缺席就保持火花——照一个猜出来的分母画的比例，比没有更糟。
+   */
+  usage?: Usage | undefined
   disabled: boolean
   /** 有待切换的引擎：它的名字，以及「现在就兑现」那条路。见下面那段。 */
   pending?: { label: string; onSwitchNow: () => void }
@@ -165,10 +173,20 @@ export function ModelPicker({
   // 就是同一个值在一行里写两遍——改一处另一处跟着变，看起来像 bug
   const label = current.label
   const reset = resetOf(models, current, level, onChange)
+  // 那枚图标同时是「这轮带了多少上去」：有分母就画进度环，没有就保持火花
+  const meter = meterOf(usage)
+  const icon =
+    meter?.ratio === undefined ? (
+      <SparkIcon />
+    ) : (
+      <span title={meter.title}>
+        <UsageRing ratio={meter.ratio} level={meter.level} />
+      </span>
+    )
   return (
     <Select
       label={label}
-      icon={<SparkIcon />}
+      icon={icon}
       title={current.description ?? "模型与推理强度"}
       disabled={disabled}
       sections={sectionsOf(models, current, level, onChange)}

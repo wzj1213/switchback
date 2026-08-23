@@ -102,6 +102,7 @@ export function WorkspaceComposer({
       models={props.models}
       model={thread.model}
       effort={thread.effort}
+      usage={props.usage}
       {...pendingEngine(thread, props.engines, send)}
       onModelChange={(model, effort) => {
         send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })

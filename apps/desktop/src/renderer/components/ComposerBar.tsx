@@ -1,4 +1,4 @@
-import type { EngineId, EngineInfo, ModelOption, Trust } from "@omni/protocol"
+import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@omni/protocol"
 import { Action } from "./ComposerAction.js"
 import { ModelPicker } from "./ModelPicker.js"
 import { BarEffort } from "./EffortSlider.js"
@@ -137,6 +137,7 @@ export function Bar({
   models,
   model,
   effort,
+  usage,
   pending,
   onEngineChange,
   onTrustChange,
@@ -158,6 +159,8 @@ export function Bar({
   blind?: string
   /** 侧问入口。由上层给，`Bar` 只负责摆在哪儿。 */
   aside?: React.ReactNode
+  /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
+  usage?: Usage
   models: readonly ModelOption[]
   model?: string
   effort?: string
@@ -181,6 +184,7 @@ export function Bar({
           models={models}
           model={model}
           effort={effort}
+          usage={usage}
           disabled={detached || busy || starting}
           pending={pending}
           onChange={onModelChange}

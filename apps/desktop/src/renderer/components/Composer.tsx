@@ -4,7 +4,7 @@ import { Chips } from "./Chips.js"
 import { Attachments } from "./Attachments.js"
 import { Bar } from "./ComposerBar.js"
 import { useAttachments } from "../useAttachments.js"
-import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust } from "@omni/protocol"
+import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
 
@@ -57,6 +57,8 @@ interface Props {
   /** 当前模型；undefined 表示用引擎自己的默认 */
   model: string | undefined
   effort: string | undefined
+  /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
+  usage?: Usage
   /**
    * 有待切换的引擎时它的名字。**模型选择器据此变成一句说明**——
    * 手上这份清单是旧那家报的，不能让人挑，但也不该凭空消失。
@@ -220,6 +222,7 @@ export function Composer(props: Props): React.JSX.Element {
           models={props.models}
           model={props.model}
           effort={props.effort}
+          usage={props.usage}
           pending={props.pending}
           onEngineChange={props.onEngineChange}
           onTrustChange={props.onTrustChange}
