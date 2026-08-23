@@ -57,11 +57,6 @@ export interface SelectProps {
    * 平铺的面板里它会和选项挤成一排，看起来像第 N 个选项。
    */
   reset?: { label: string; run: () => void }
-  /**
-   * 顶层菜单里的开关行。**只放偏好**——它翻的是设置，不是这次的选择。
-   * 出现在分节行之后、「恢复默认」之前；切换不收起面板（开了能立刻看到效果）。
-   */
-  toggle?: { label: string; on: boolean; run: () => void }
 }
 
 export function Select({
@@ -71,7 +66,6 @@ export function Select({
   disabled = false,
   sections,
   reset,
-  toggle,
 }: SelectProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   /** 钻进了第几节。`undefined` = 停在顶层。一节的时候没有顶层，恒为 0。 */
@@ -109,7 +103,7 @@ export function Select({
       <Popover open={open} anchor={trigger.current} minWidth={220} onClose={close}>
         <div role="menu" aria-label={title ?? label}>
           {shown === undefined ? (
-            <Top sections={sections} reset={reset} toggle={toggle} onOpen={setPage} onClose={close} />
+            <Top sections={sections} reset={reset} onOpen={setPage} onClose={close} />
           ) : (
             <Page
               section={sections[shown]}
@@ -138,13 +132,11 @@ export function Select({
 function Top({
   sections,
   reset,
-  toggle,
   onOpen,
   onClose,
 }: {
   sections: readonly Section[]
   reset: SelectProps["reset"]
-  toggle: SelectProps["toggle"]
   onOpen: (index: number) => void
   onClose: () => void
 }): React.JSX.Element {
@@ -165,22 +157,6 @@ function Top({
           <ChevronIcon open={false} size={12} />
         </button>
       ))}
-      {toggle === undefined ? null : (
-        <button
-          type="button"
-          className="pop__item pop__item--row"
-          role="menuitemcheckbox"
-          aria-checked={toggle.on}
-          onClick={() => {
-            toggle.run()
-          }}
-        >
-          <span className="pop__label">{toggle.label}</span>
-          <span className={`pop__switch${toggle.on ? " pop__switch--on" : ""}`} aria-hidden="true">
-            <i />
-          </span>
-        </button>
-      )}
       {reset === undefined ? null : (
         <button
           type="button"

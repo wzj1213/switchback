@@ -29,6 +29,66 @@
   border-color: var(--accent);
 }
 
+/*
+ * ultra 落档：品红描边 + 一圈绕框高光（比稿 ⑦ 深空的处理）。
+ * **有 ultra 档的模型才有**——它是 EFFORT 表里唯一带「更快消耗使用额度」
+ * 说明的那一档，普通档一个彩色都不长。描边过渡慢半拍：落档是个决定，不是悬停。
+ */
+.composer__inner--ultra {
+  border-color: #b4409a;
+  box-shadow: 0 0 0 3px rgb(180 64 154 / 22%), var(--shadow-1);
+  transition: border-color 300ms var(--ease), box-shadow 300ms var(--ease);
+}
+
+.compring {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.compring__orbit {
+  x: 2px;
+  y: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  rx: 17px;
+  fill: none;
+  stroke: #b4409a;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-dasharray: 12 88;
+  filter: drop-shadow(0 0 4px rgb(180 64 154 / 35%));
+  animation: comp-orbit 6s linear infinite;
+}
+
+@keyframes comp-orbit {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compring__orbit {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .composer__inner--ultra {
+    border-color: #d76ab4;
+    box-shadow: 0 0 0 3px rgb(215 106 180 / 26%), var(--shadow-1);
+  }
+
+  .compring__orbit {
+    stroke: #d76ab4;
+    filter: drop-shadow(0 0 4px rgb(215 106 180 / 40%));
+  }
+}
+
 /* 文本框和它的灰字预览共用这一个盒子——**预览必须和文本框同一个原点**，
    所以定位挂在这里，两边各自 `inset: 0` / `width: 100%` 对齐 */
 .composer__field {

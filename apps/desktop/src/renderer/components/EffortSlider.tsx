@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import type { ModelOption } from "@omni/protocol"
-import { currentOf, effortLabel } from "./ModelPicker.js"
+import { currentOf, effortLabel, ultraOf } from "./ModelPicker.js"
 import { EffortBar } from "./EffortBar.js"
 
 /**
@@ -71,14 +71,11 @@ export function EffortSlider({
   current,
   effort,
   disabled,
-  effortVoid,
   onChange,
 }: {
   current: ModelOption
   effort: string | undefined
   disabled: boolean
-  /** 「深空」配色（`Settings.effortVoid`）：填充染成靛→紫→品红的坡道。 */
-  effortVoid: boolean
   onChange: (effort: string) => void
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
@@ -87,10 +84,13 @@ export function EffortSlider({
   const value = effort ?? current.defaultEffort ?? efforts[0]
   // 不在清单里的旧值（换过模型）按 0 档画位置、但标签照原文显示——不编一个档位
   const committed = Math.max(0, efforts.indexOf(value ?? ""))
+  // 深空处理只在 ultra 落档时出现——它是这一行里唯一明显改变花销的档
+  //（EFFORT 表里只有它带「更快消耗使用额度」）。没报 ultra 的模型永远没有
+  const ultra = ultraOf([current], current.id, effort)
   if (efforts.length === 0) return null
   return (
     <span
-      className={`effort${open ? " effort--open" : ""}${effortVoid ? " effort--void" : ""}`}
+      className={`effort${open ? " effort--open" : ""}${ultra ? " effort--ultra" : ""}`}
       style={{ "--effort-w": `${String(28 + efforts.length * 30)}px` } as React.CSSProperties}
     >
       {open ? (
@@ -126,7 +126,7 @@ export function EffortSlider({
           <Ticks
             count={efforts.length}
             index={committed}
-            color={effortVoid ? voidAt(committed / Math.max(1, efforts.length - 1)) : undefined}
+            color={ultra ? voidAt(1) : undefined}
           />
           <span className="trigger__label">
             {value === undefined ? "默认" : effortLabel(value).label}
@@ -143,14 +143,12 @@ export function BarEffort({
   model,
   effort,
   disabled,
-  effortVoid,
   onChange,
 }: {
   models: readonly ModelOption[]
   model: string | undefined
   effort: string | undefined
   disabled: boolean
-  effortVoid: boolean
   onChange: (model: string, effort: string) => void
 }): React.JSX.Element | null {
   const current = currentOf(models, model)
@@ -160,7 +158,6 @@ export function BarEffort({
       current={current}
       effort={effort}
       disabled={disabled}
-      effortVoid={effortVoid}
       onChange={(next) => {
         onChange(current.id, next)
       }}

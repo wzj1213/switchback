@@ -7,6 +7,7 @@ import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
+import { ultraOf } from "./ModelPicker.js"
 
 /**
  * 信任档。
@@ -59,9 +60,6 @@ interface Props {
   effort: string | undefined
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
-  /** 「深空」配色（`Settings.effortVoid`）：滑块染成靛→紫→品红。 */
-  effortVoid: boolean
-  onEffortVoid: (on: boolean) => void
   /**
    * 有待切换的引擎时它的名字。**模型选择器据此变成一句说明**——
    * 手上这份清单是旧那家报的，不能让人挑，但也不该凭空消失。
@@ -167,10 +165,13 @@ export function Composer(props: Props): React.JSX.Element {
     onSend: props.onSend,
   })
 
+  // ultra 落档时整个输入框进深空态（品红描边 + 绕框高光）
+  const ultra = ultraOf(props.models, props.model, props.effort)
+
   return (
     <div className="composer">
       <div
-        className="composer__inner"
+        className={`composer__inner${ultra ? " composer__inner--ultra" : ""}`}
         onDragOver={(e) => {
           if (props.canAttach) e.preventDefault()
         }}
@@ -180,6 +181,12 @@ export function Composer(props: Props): React.JSX.Element {
           attach.drop(e.dataTransfer.files)
         }}
       >
+        {/* ultra 的绕框高光：pathLength 归一到 100，dasharray 的算术不用量周长 */}
+        {ultra ? (
+          <svg className="compring" aria-hidden="true">
+            <rect className="compring__orbit" pathLength={100} />
+          </svg>
+        ) : null}
         {detached ? null : (
           <Chips
             cwd={props.cwd}
@@ -226,8 +233,6 @@ export function Composer(props: Props): React.JSX.Element {
           model={props.model}
           effort={props.effort}
           usage={props.usage}
-          effortVoid={props.effortVoid}
-          onEffortVoid={props.onEffortVoid}
           pending={props.pending}
           onEngineChange={props.onEngineChange}
           onTrustChange={props.onTrustChange}

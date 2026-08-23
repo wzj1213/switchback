@@ -196,10 +196,6 @@ export function App(): React.JSX.Element {
         models={modelsOf(state, thread.id, thread.engine)}
         engines={app.engines}
         pets={app.prefs.settings.pets}
-        effortVoid={app.prefs.settings.effortVoid}
-        onEffortVoid={(on) => {
-          app.prefs.patch({ effortVoid: on })
-        }}
         notices={app.notices}
         onDismiss={shell.dismiss}
         finding={shell.finding}

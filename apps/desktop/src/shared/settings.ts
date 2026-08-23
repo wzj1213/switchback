@@ -62,14 +62,6 @@ export interface Settings {
    */
   pets: boolean
   /**
-   * 推理强度滑块的「深空」配色（靛 → 紫 → 品红）。
-   *
-   * **默认关。** 这套界面的底色规矩是「默认零彩色，出事才亮」——深空是
-   * 纯装饰性的一版皮肤，喜欢的人去模型设置里开，不给所有人强加。
-   * 开关在模型选择器的面板顶层（`ModelPicker` 的 `voidSwitch`）。
-   */
-  effortVoid: boolean
-  /**
    * DSH 接入确认。
    *
    * DSH 的 provider、model 与 API 凭证仍归它自己的设置与凭证服务管理；
@@ -176,7 +168,6 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
-  effortVoid: false,
   dsh: { configured: false },
   defaultEngine: "",
   defaultTrust: "auto-edit",

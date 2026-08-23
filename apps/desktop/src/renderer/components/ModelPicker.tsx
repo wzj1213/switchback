@@ -112,21 +112,33 @@ export function currentOf(
   return models.find((m) => m.id === model) ?? models.find((m) => m.isDefault === true) ?? models[0]
 }
 
+/**
+ * ultra 落没落档。**有 ultra 档的模型才谈得上**——它是 EFFORT 表里唯一带
+ * 「更快消耗使用额度」说明的档；没报 ultra 的模型永远没有，换模型残留的
+ * 旧值也不算（清单里得有）。输入框与滑块的深空态都拿它当闸门。
+ */
+export function ultraOf(
+  models: readonly ModelOption[],
+  model: string | undefined,
+  effort: string | undefined,
+): boolean {
+  const current = currentOf(models, model)
+  if (current === undefined) return false
+  return (current.efforts ?? []).includes("ultra") && (effort ?? current.defaultEffort) === "ultra"
+}
+
 export function ModelPicker({
   models,
   model,
   effort,
   disabled,
   pending,
-  voidSwitch,
   onChange,
 }: {
   models: readonly ModelOption[]
   model: string | undefined
   effort: string | undefined
   disabled: boolean
-  /** 「深空配色」开关：放在面板顶层，翻的是设置（`Settings.effortVoid`）。 */
-  voidSwitch?: { on: boolean; run: () => void }
   /** 有待切换的引擎：它的名字，以及「现在就兑现」那条路。见下面那段。 */
   pending?: { label: string; onSwitchNow: () => void }
   onChange: (model: string, effort?: string) => void
@@ -175,9 +187,6 @@ export function ModelPicker({
       disabled={disabled}
       sections={sectionsOf(models, current, level, onChange)}
       {...(reset === undefined ? {} : { reset })}
-      {...(voidSwitch === undefined
-        ? {}
-        : { toggle: { label: "深空配色", on: voidSwitch.on, run: voidSwitch.run } })}
     />
   )
 }
