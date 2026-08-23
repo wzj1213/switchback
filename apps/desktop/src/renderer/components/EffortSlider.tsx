@@ -13,15 +13,27 @@ import { EffortBar } from "./EffortBar.js"
  * 它在发送键左边的空地里：条子往左长，空地（弹性槽）吸收宽度，
  * 发送键的 x 一个像素都不动。
  *
- * 展开那条的指针/键盘交互在 `EffortBar.tsx`。
+ * 条子的布局与全部状态照 `docs/` 比稿那版行内条（gbar）：
+ * 白拇指边走边走、填充盖到拇指右缘、坡道钉在整条坐标上、生长靠
+ * `clip-path` 保持胶囊形、拖动期零过渡。展开那条的交互在 `EffortBar.tsx`。
  */
 
-/** 指针位置 → 档位序号。纯函数，好测。 */
+/** 条子宽：padding 28 + 每档 30。CSS 的 `--effort-w` 与它是同一个数。 */
+export function barWidth(count: number): number {
+  return 28 + count * 30
+}
+
+/** 拇指直径。`indexAt` 的指针算术和 CSS 的拇指尺寸都从它出。 */
+export const THUMB = 16
+
+/**
+ * 指针位置 → 档位序号。纯函数，好测。
+ * 拇指**边走边走**：有效行程是 `width - THUMB`，指针先退半个拇指。
+ */
 export function indexAt(x: number, width: number, count: number): number {
   if (count <= 1) return 0
-  const pad = 14
-  const span = Math.max(1, width - pad * 2)
-  const i = Math.round(((x - pad) / span) * (count - 1))
+  const travel = Math.max(1, width - THUMB)
+  const i = Math.round(((x - THUMB / 2) / travel) * (count - 1))
   return Math.min(count - 1, Math.max(0, i))
 }
 
@@ -51,7 +63,7 @@ function Ticks({
 }: {
   count: number
   index: number
-  /** 深空配色开启时，亮着的刻度染当前档的坡道色。 */
+  /** 贵档落档时，亮着的刻度染坡道尽头的品红。 */
   color?: string
 }): React.JSX.Element {
   return (
@@ -113,6 +125,18 @@ function committer(
   }
 }
 
+/** 外壳的 class。收起比展开快一档——关掉一个东西不需要被欣赏。 */
+function effortClass(open: boolean, closing: boolean, costly: boolean): string {
+  return [
+    "effort",
+    open && !closing ? "effort--open" : "",
+    closing ? "effort--closing" : "",
+    costly ? "effort--costly" : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+}
+
 export function EffortSlider({
   current,
   effort,
@@ -125,14 +149,31 @@ export function EffortSlider({
   onChange: (effort: string) => void
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
   const trig = useRef<HTMLButtonElement>(null)
   const efforts = current.efforts ?? []
   const value = effort ?? current.defaultEffort ?? efforts[0]
   // 不在清单里的旧值（换过模型）按 0 档画位置、但标签照原文显示——不编一个档位
   const committed = Math.max(0, efforts.indexOf(value ?? ""))
-  // 深空处理只落在最贵的那一档（kimi 的 ultra、claude 的 max）——
+  // 深空处理只落在最贵的那一档（kimi 的 ultra、claude 的 max / ultracode）——
   // 顶档只是 high 的模型永远没有，见 ModelPicker 的 costlyOf
   const costly = costlyOf([current], current.id, effort)
+
+  /** 收起走 190ms 的收回动画，条子退场、触发器才回来。 */
+  const close = (refocus: boolean): void => {
+    setClosing(true)
+    window.setTimeout(() => {
+      setOpen(false)
+      setClosing(false)
+      // 触发器要等收起重渲染之后才在
+      if (refocus) {
+        requestAnimationFrame(() => {
+          trig.current?.focus()
+        })
+      }
+    }, 190)
+  }
+
   if (efforts.length === 0) return null
   return (
     <span className="effortbox">
@@ -140,8 +181,8 @@ export function EffortSlider({
           平时一行高度都不占（原型图二的那句） */}
       {costly && !open ? <span className="effort__warn">更快消耗使用额度</span> : null}
       <span
-        className={`effort${open ? " effort--open" : ""}${costly ? " effort--costly" : ""}`}
-        style={{ "--effort-w": `${String(28 + efforts.length * 30)}px` } as React.CSSProperties}
+        className={effortClass(open, closing, costly)}
+        style={{ "--effort-w": `${String(barWidth(efforts.length))}px` } as React.CSSProperties}
       >
         {open ? (
           <EffortBar
@@ -149,15 +190,7 @@ export function EffortSlider({
             committed={committed}
             costly={costly}
             onCommit={committer(efforts, committed, onChange)}
-            onClose={(refocus) => {
-              setOpen(false)
-              // 触发器要等收起重渲染之后才在
-              if (refocus) {
-                requestAnimationFrame(() => {
-                  trig.current?.focus()
-                })
-              }
-            }}
+            onClose={close}
           />
         ) : (
           <EffortTrigger

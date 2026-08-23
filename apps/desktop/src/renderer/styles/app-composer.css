@@ -486,9 +486,10 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  overflow: hidden;
   max-width: 96px;
   transition: max-width var(--dur-slow) var(--ease);
+  /* 生长时的裁剪交给条子自己的 clip-path（保持胶囊形），外壳再裁一刀就是平口 */
+  overflow: visible;
 }
 
 /* 贵档那句「更快消耗使用额度」的容器——让那句话能浮到触发器上方 */
@@ -519,6 +520,11 @@
   max-width: var(--effort-w);
 }
 
+/* 收起比展开快一档：关掉一个东西不需要被欣赏 */
+.effort--closing {
+  transition-duration: 200ms;
+}
+
 /* 收起态的小刻度：亮到第几格就是第几档 */
 .effort__ticks {
   display: inline-flex;
@@ -537,7 +543,10 @@
   background: currentColor;
 }
 
-/* 条子本体：宽度钉死为展开宽，外壳 overflow:hidden 的裁剪让它「往左长出来」 */
+/* ── 条子本体（照比稿的 gbar） ─────────────────────────
+ * 宽度一次给定（--effort-w），露出多少交给 clip-path——
+ * 它切出来的右端自带圆角，**全程都是完整的一枚胶囊，只是短一点**。
+ * 轨道是 4% 的黑，没有描边。 */
 .effort__bar {
   position: relative;
   display: flex;
@@ -545,11 +554,22 @@
   align-items: center;
   width: var(--effort-w);
   height: 22px;
-  border: 1px solid var(--border-strong);
+  border: 0;
   border-radius: 999px;
-  background: var(--bg-raised);
+  background: rgb(0 0 0 / 4%);
   cursor: pointer;
   touch-action: none;
+  clip-path: inset(0 100% 0 0 round 999px);
+  transition: clip-path 300ms var(--ease), box-shadow 420ms var(--ease);
+}
+
+.effort__bar--grown {
+  clip-path: inset(0 0 0 0 round 999px);
+}
+
+.effort--closing .effort__bar {
+  clip-path: inset(0 100% 0 0 round 999px);
+  transition-duration: 200ms;
 }
 
 .effort__bar:focus-visible {
@@ -557,16 +577,48 @@
   outline-offset: 1px;
 }
 
-/* 拇指/填充的活动区间：两端各留 14px（和 `EffortSlider.indexAt` 的 pad 是同一个数） */
-.effort__range {
+/* 填充是裁切层：坡道图层和星点都装在它里面（overflow:hidden）。
+   它自己的宽度盖到拇指右缘——满档时正好铺满整条，两端圆帽严丝合缝 */
+.effort__fill {
   position: absolute;
   top: 0;
-  right: 14px;
   bottom: 0;
-  left: 14px;
+  left: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  transition: width 190ms var(--ease);
 }
 
-/* 刻度在轨道上、填充之下：空着的那几格也看得到，才能数 */
+/* 坡道图层钉在整条的坐标上：宽度取整条宽，不跟着填充缩放——
+   否则拖到一半时右端已经是满色，读起来像「已经到头了」 */
+.effort__lay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--effort-w);
+  background-repeat: no-repeat;
+  background-size: var(--effort-w) 100%;
+}
+
+/* 中性那层：黑 16% → 65% 的灰坡道（普通档就走它） */
+.effort__base {
+  background-image: linear-gradient(90deg, rgb(0 0 0 / 16%), rgb(0 0 0 / 65%));
+}
+
+/* 深空那层靠透明度交叉淡入——CSS 没法在两条 linear-gradient 之间过渡，
+   直接换 background-image 是一帧灰变紫，看着像 bug */
+.effort__hot {
+  background-image: linear-gradient(90deg, #2b2d6e, #6d4bc7 50%, #b4409a);
+  opacity: 0;
+  transition: opacity 420ms var(--ease);
+}
+
+.effort--costly .effort__hot {
+  opacity: 1;
+}
+
+/* 轨道刻度：一档一枚。填充之上才数得清满格，但空格那几格才是要数 */
 .effort__stops {
   position: absolute;
   inset: 0;
@@ -579,32 +631,29 @@
   width: 1px;
   height: 8px;
   border-radius: 1px;
-  background: var(--border-strong);
-  transform: translateY(-50%);
+  background: rgb(0 0 0 / 30%);
+  transform: translate(-50%, -50%);
 }
 
-/* 拇指/填充的过渡只留给「收得住」的瞬间（点选落档那一下）；
-   拖动期间是 --live，过渡全关、1:1 跟手——过渡追一个每帧都在跑的目标就是拖尾巴 */
-.effort__fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: 999px 0 0 999px;
-  background: var(--bg-active);
-  transition: width 190ms var(--ease);
-}
-
+/* 拇指边走边走：位移用 translateX（--tx），不碰 left——合成器的事，不排版。
+   过渡只留给收得住的瞬间（展开、点选落档）；拖动期零过渡，1:1 跟手 */
 .effort__thumb {
   position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
+  top: 3px;
+  left: 0;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
-  background: var(--text);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 22%);
-  transform: translate(-50%, -50%);
-  transition: left 190ms var(--ease), scale 110ms var(--ease), box-shadow 300ms var(--ease);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 22%), 0 0 0 0.5px rgb(0 0 0 / 6%);
+  transform: translateX(var(--tx, 0px));
+  transition: transform 190ms var(--ease), scale 110ms var(--ease), box-shadow 300ms var(--ease);
+}
+
+/* 展开那 300ms：拇指和填充从最左跟着条子一起走——是拇指把条子拽开的 */
+.effort__bar--intro .effort__fill,
+.effort__bar--intro .effort__thumb {
+  transition-duration: 300ms;
 }
 
 .effort__bar--live .effort__fill {
@@ -616,10 +665,14 @@
   transition: scale 110ms var(--ease);
 }
 
-/* 深空态的星点：四角星（和界面里那颗 ✧ 同一个形状），错落闪烁 */
+/* 深空态的星点：四角星（和界面里那颗 ✧ 同一个形状），错落闪烁。
+   装在填充里——星点只铺在坡道上 */
 .effort__stars {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--effort-w);
   pointer-events: none;
 }
 
@@ -650,30 +703,25 @@
     animation: none;
     opacity: 0.6;
   }
-}
 
-.effort__value {
-  position: relative;
-  padding-left: 22px;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  pointer-events: none;
+  .effort__bar {
+    transition: none;
+    clip-path: none;
+  }
 }
 
 /* ── 落在最贵档的深空处理 ─────────────────────────────
- * 靛 → 紫 → 品红的坡道。**渐变锚定整条轨道**（background-size 取条子全宽），
- * 填充露出来的是坡道的左段——低档见靛、满档见品红，不是每档都把整条渐变缩一遍。
  * 闸门是 `costlyOf`（清单最后一档得是真贵档：kimi 的 ultra、claude 的 max）。
- * 值是比稿 ⑦ 深空那组，`voidAt` 里是同一组数。
+ * 热层叠在中性坡道上交叉淡入；值是比稿 ⑦ 深空那组，`voidAt` 里是同一组数。
+ * clip-path 会裁掉外发光，所以那圈柔光挂在外壳上。
  */
-.effort--costly .effort__fill {
-  background: linear-gradient(90deg, #2b2d6e, #6d4bc7, #b4409a);
-  background-size: calc(var(--effort-w) - 28px) 100%;
+.effort--costly.effort--open {
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgb(180 64 154 / 22%);
 }
 
-/* 深空的拇指是白的发光的，不是品红实心 */
+/* 深空的拇指是白的发光的 */
 .effort--costly .effort__thumb {
-  background: #fff;
   box-shadow:
     0 0 6px rgb(180 64 154 / 60%),
     0 0 14px rgb(180 64 154 / 35%);
@@ -683,12 +731,6 @@
   background: rgb(255 255 255 / 45%);
 }
 
-.effort--costly .effort__value {
-  /* 深空坡道是深底，字沉进去就看不见；档位名回到收起态的触发器上，
-     条子上只留渐变和拇指（aria-valuetext 照样报） */
-  display: none;
-}
-
 /* 贵档落档时触发器的档位名也要说「这一档更贵」：品红加粗（demo 的 eff__lvl） */
 .effort--costly .trigger__label {
   color: #96307c;
@@ -696,17 +738,31 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  .effort__bar {
+    background: rgb(255 255 255 / 8%);
+  }
+
+  .effort__base {
+    background-image: linear-gradient(90deg, rgb(255 255 255 / 22%), rgb(255 255 255 / 66%));
+  }
+
+  .effort__hot {
+    background-image: linear-gradient(90deg, #3a3d8a, #8367dd 50%, #d76ab4);
+  }
+
+  .effort__stops i {
+    background: rgb(255 255 255 / 30%);
+  }
+
   .effort--costly .trigger__label {
     color: #e094c8;
   }
 
-  .effort--costly .effort__fill {
-    background: linear-gradient(90deg, #3a3d8a, #8367dd, #d76ab4);
-    background-size: calc(var(--effort-w) - 28px) 100%;
+  .effort--costly.effort--open {
+    box-shadow: 0 0 0 3px rgb(215 106 180 / 26%);
   }
 
   .effort--costly .effort__thumb {
-    background: #fff;
     box-shadow:
       0 0 6px rgb(215 106 180 / 65%),
       0 0 14px rgb(215 106 180 / 40%);
