@@ -2,6 +2,7 @@ import { app, Notification } from "electron"
 import type { BrowserWindow } from "electron"
 import type { Event, ThreadId, TurnId } from "@omni/protocol"
 import { humanize } from "../shared/failure.js"
+import type { NotifyMode } from "../shared/settings.js"
 
 /**
  * 「有人在等你」「它跑完了」「它跑挂了」——出声的三件事，以及 Dock 角标。
@@ -57,7 +58,19 @@ const QUIET_MS = 15_000
  */
 export type Relay = (threadId: ThreadId, title: string, body: string) => void
 
-export function createAttention(windows: () => readonly BrowserWindow[], relay?: Relay): Attention {
+/**
+ * 什么时候出声，**读的是当下那一份设置**（传函数不传值）。
+ *
+ * 传值的话，用户在设置里关掉提醒之后，这一层还拿着启动时那份——直到重启才生效，
+ * 而一个「关了还在响」的开关比没有这个开关更糟。
+ *
+ * 角标不受它管：那一个不出声、不弹窗，只是把「有几张卡等着你」写在图标上。
+ */
+export function createAttention(
+  windows: () => readonly BrowserWindow[],
+  relay?: Relay,
+  mode: () => NotifyMode = () => "all",
+): Attention {
   const pending = new Set<string>()
   const announced = new Set<string>()
   /** 会话标题：通知要说清是哪一条。从 thread 那几条事件顺手记，不加协议字段。 */
@@ -82,7 +95,8 @@ export function createAttention(windows: () => readonly BrowserWindow[], relay?:
 
   /** 通知的正文：会话名打头——你可能同时开着四条，不说是哪条等于没说。 */
   const tell = (threadId: ThreadId, body: string): void => {
-    if (focused()) return
+    // 「跑完了 / 跑挂了」只在全开时说。**审批不走这条路**，见下面那一段
+    if (mode() !== "all" || focused()) return
     const title = titles.get(threadId) ?? "omni"
     new Notification({ title, body, silent: false }).on("click", raise).show()
     // 同一个出口再送一份到手机上。**不在这里判「要不要推」**——
@@ -100,27 +114,20 @@ export function createAttention(windows: () => readonly BrowserWindow[], relay?:
       turns.note(event)
       const seen = approvalOf(event, turns.threadOf)
       if (seen === undefined) return
-      if (seen.pending) {
-        if (pending.has(seen.id)) return
-        pending.add(seen.id)
+      if (!seen.pending) {
+        pending.delete(seen.id)
+        announced.delete(seen.id)
         badge()
-        if (focused() || announced.has(seen.id)) return
-        announced.add(seen.id)
-        new Notification({
-          title: "omni 在等你确认",
-          body: seen.summary,
-          silent: false,
-        })
-          .on("click", raise)
-          .show()
-        // **审批是最该推的那一件**：agent 停在那儿无超时地等，而人多半不在电脑前。
-        // 正文用 `summary`（工具名 + 一句概述），不放命令原文——通知会显示在锁屏上
-        relay?.(seen.threadId, titles.get(seen.threadId) ?? "omni 在等你确认", seen.summary)
         return
       }
-      pending.delete(seen.id)
-      announced.delete(seen.id)
+      if (pending.has(seen.id)) return
+      pending.add(seen.id)
       badge()
+      // **审批不走 `tell`**：那一条在「只有审批」这一档要闭嘴，而这一条不能。
+      // 角标已经挂上了，下面这一步只决定要不要出声
+      if (mode() === "off" || focused() || announced.has(seen.id)) return
+      announced.add(seen.id)
+      askFor(seen, titles.get(seen.threadId) ?? "omni 在等你确认", raise, relay)
     },
     clear: () => {
       pending.clear()
@@ -129,6 +136,25 @@ export function createAttention(windows: () => readonly BrowserWindow[], relay?:
       if (process.platform === "darwin") app.badgeCount = 0
     },
   }
+}
+
+/**
+ * 「它停下来等你了」这一声。
+ *
+ * **正文用 `summary`（工具名 + 一句概述），不放命令原文**——
+ * 通知会显示在锁屏上，而命令里可能带着路径甚至参数。
+ * 同一句话再推一份到手机上：agent 停在那儿无超时地等，而人多半不在电脑前。
+ */
+function askFor(
+  seen: { summary: string; threadId: ThreadId },
+  title: string,
+  raise: () => void,
+  relay: Relay | undefined,
+): void {
+  new Notification({ title: "omni 在等你确认", body: seen.summary, silent: false })
+    .on("click", raise)
+    .show()
+  relay?.(seen.threadId, title, seen.summary)
 }
 
 /**

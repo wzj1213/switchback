@@ -11,6 +11,7 @@ import type { RemoteStatus } from "../main/remote/install.js"
 import type { ReviewFile, ReviewPatch } from "../shared/review.js"
 import type { ContentHit } from "../shared/search.js"
 import type { EnvConfig } from "../shared/hooks.js"
+import type { ActivityDigest } from "../shared/activity.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -248,6 +249,15 @@ const api = {
       hits: readonly ContentHit[]
       skipped: number
     }
+  },
+  /**
+   * 「活动」那一页：**把磁盘上的 journal 整个走一遍**，折成一份按天分桶的统计。
+   *
+   * 只在真的点进那一页时才调——它要读几十 MB（见 `main/activity.ts`）。
+   * `refresh` 无视 30 秒缓存重扫一遍。
+   */
+  async activity(refresh?: boolean): Promise<ActivityDigest> {
+    return (await ipcRenderer.invoke("omni:activity", refresh)) as ActivityDigest
   },
   /** 读偏好；传 patch 就是写（合并），两种都返回合并后的完整值。 */
   async settings(patch?: Partial<Settings>): Promise<Settings> {

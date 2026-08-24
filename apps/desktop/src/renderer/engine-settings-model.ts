@@ -1,7 +1,8 @@
 import type { EngineInfo, ModelOption, Thread } from "@omni/protocol"
 import type { ViewState } from "@omni/store"
 import { BUILTIN_ENGINES } from "../shared/builtin-engines.js"
-import { dshProfileConfirmed, type EnginePick, type LastUsed, type Settings } from "../shared/settings.js"
+import type { EngineAccess } from "../shared/engine-access.js"
+import { dshProfileConfirmed, type EnginePick, type LastUsed } from "../shared/settings.js"
 
 export interface EngineSettingItem extends EngineInfo {
   builtin: boolean
@@ -86,8 +87,17 @@ export function initialEngine(
 
 export function engineSettingState(
   item: EngineSettingItem,
-  settings: Pick<Settings, "dsh">,
+  settings: EngineAccess,
 ): EngineSettingState {
+  // **用户自己关的排在最前面。** 一家被关掉的引擎连探测都不起，那时候还去报
+  // 「未安装」或者「可用」，说的都是一个 omni 此刻根本没去问过的事
+  if (settings.disabledEngines.includes(item.id)) {
+    return {
+      label: "已关掉",
+      tone: "muted",
+      hint: "你在这儿关掉了它：不探测、不出现在引擎选择器里。它自己的命令行照常能用。",
+    }
+  }
   const dsh = dshSettingState(item, settings.dsh)
   if (dsh !== undefined) return dsh
   if (item.state === "ok") {
@@ -108,7 +118,7 @@ export function engineSettingState(
 
 function dshSettingState(
   item: EngineSettingItem,
-  dsh: Settings["dsh"],
+  dsh: EngineAccess["dsh"],
 ): EngineSettingState | undefined {
   if (item.id !== "dsh") return undefined
   if (!dshProfileConfirmed(dsh)) {

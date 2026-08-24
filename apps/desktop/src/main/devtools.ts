@@ -21,6 +21,7 @@ import { quitNow } from "./quit.js"
  * | `OMNI_DEV_REVIEW` | 过这么多毫秒之后打开审核面板 |
  * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
  * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
+ * | `OMNI_DEV_SETTINGS` | 截图前打开设置，并切到左列第 N 页（1 起） |
  * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
  * | `OMNI_DEV_THEME` | `dark` / `light`，强制主题（深色那套平时没人看得见） |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
@@ -203,6 +204,29 @@ export function scheduleDevOpenSelect(win: BrowserWindow): void {
     void win.webContents.executeJavaScript(
       `document.querySelectorAll(".composer__bar .trigger")[${String(nth - 1)}]?.click()`,
     )
+  }, Math.max(0, delay))
+}
+
+/**
+ * 截图前把设置面板打开，并切到左列第 N 页。
+ *
+ * **和 `OMNI_DEV_SELECT` 同一条理由**：这块面板有七页，每一页的内容都要等异步
+ * （探版本、读配置、扫 journal），靠手点去验等于永远不验。分两拍是必须的——
+ * 面板是模态，第一拍还没挂出来，左列那几颗按钮在 DOM 里根本不存在。
+ */
+export function scheduleDevSettings(win: BrowserWindow): void {
+  const nth = Number(process.env["OMNI_DEV_SETTINGS"] ?? "0")
+  if (!Number.isFinite(nth) || nth <= 0) return
+  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 3000
+  setTimeout(() => {
+    if (win.isDestroyed()) return
+    win.webContents.send("omni:menu", "settings")
+    setTimeout(() => {
+      if (win.isDestroyed()) return
+      void win.webContents.executeJavaScript(
+        `document.querySelectorAll(".set__nav .set__tab")[${String(nth - 1)}]?.click()`,
+      )
+    }, 400)
   }, Math.max(0, delay))
 }
 

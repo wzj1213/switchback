@@ -1,0 +1,377 @@
+/*
+ * 「活动」那一页。
+ *
+ * ## 前缀是 `stat` 不是 `act`
+ *
+ * **`.act` 已经被占了**——它是转录区里那几颗行内动作药丸（`items-composer.css`），
+ * `display: inline-flex`。这一页的根一度就叫 `.act`，于是整页的六个区块被排成了
+ * 一行 inline-flex：五个数字宽 6px、热力图宽 216px、卡片宽 12px，
+ * 一屏内容缩成中间一条 2900px 的横带。
+ *
+ * **没有任何东西会报错**：样式守卫问的是「这个类有没有规则」，而它有——
+ * 只是那条规则是给另一个东西写的。这和 `.seg` 撞名那次（见 settings.css 里
+ * `.switch` 那段）是同一类事故，也是同一个教训：**新块起名前先 grep 一遍**。
+ *
+ * ## 三种排版，各有各的理由
+ *
+ * 1. **五个数字并排**（`.stat__tiles`）：它们是同一类东西的不同侧面，谁也不比谁重要，
+ *    所以等宽、同一档字号。数字给 `--text-xl`——这一页整屏的视觉锚点就是它们，
+ *    用 16px 写出来的话这一段会空得没有重量（和空会话那句大标题同一条推理）。
+ * 2. **一张热力图**（`.heat`）：一格一天，横着是周。格子 11px 是算出来的，不是挑的——
+ *    53 周 × (11 + 3) − 3 = 739，而这块面板的内容区约 700，所以 `--heat-cell`
+ *    在窄一档的窗口下要能被媒体查询压到 9。
+ * 3. **两列卡片**（`.stat__grid`）：洞察与排行榜都是「一行一条」的清单，
+ *    单列会拉出一根很长的条，双列正好把 700px 用满。
+ *
+ * ## 深浅四档是同一个颜色的四个透明度
+ *
+ * 不引第二个色相：整套界面的规矩是「其余一切不是灰，是黑的透明度」。
+ * 强调色只在最深那一档露头，于是一眼能看出哪几天最忙，而整张图仍然是安静的。
+ */
+
+.stat {
+  min-width: 0;
+}
+
+.stat__lead {
+  margin-bottom: var(--sp-4);
+}
+
+.stat__lead strong {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ── 五个数字 ─────────────────────────────────────── */
+
+.stat__tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: var(--sp-5);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* 分隔线用**卡片之间的 1px 缝**露出底色画，不给每一格描边：
+     五个挨着的框会在接缝处叠成两倍粗的线 */
+  background: var(--border);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-3);
+  background: var(--bg-raised);
+}
+
+.stat-tile__v {
+  color: var(--text);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+/* 单位与零头都比数字小两档、淡一档：它们是量纲和余数，不是这一格要说的那个数 */
+.stat-tile__v small {
+  margin-left: 3px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 大号数字在窄格子里可能仍然放不下（「111」加单位）。**允许它自己缩**，
+   不许它挤到隔壁去——`nowrap` 加上溢出隐藏才是一对，只写前一半就是那次事故 */
+.stat-tile__v {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-tile__k {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+/* ── 热力图 ───────────────────────────────────────── */
+
+.heat {
+  --heat-cell: 11px;
+  --heat-gap: 3px;
+  margin-bottom: var(--sp-5);
+}
+
+.heat__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.heat__title {
+  margin: 0;
+  flex: none;
+}
+
+/* 悬停读数。**位置固定**——浮动 tooltip 要算位置、要处理贴边、要跟着滚动，
+   而它说的话固定只有一行；摆在这儿眼睛也不用追着指针跑 */
+.heat__readout {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heat__scroll {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.heat__months {
+  display: grid;
+  gap: var(--heat-gap);
+  /* 和格子一样从左边第 18px 起：那一列是星期几的标签 */
+  margin-left: 22px;
+  margin-bottom: 3px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 月份标签只标在它出现的第一列，但字比一格宽——让它溢出到右边，不挤压网格 */
+.heat__month {
+  grid-row: 1;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.heat__body {
+  display: flex;
+  gap: 4px;
+}
+
+.heat__days {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  gap: var(--heat-gap);
+  width: 18px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 七行只标三个（一 / 三 / 五）：七个 11px 的字挤在一起谁也读不清 */
+.heat__weekday {
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.heat__grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  grid-auto-columns: var(--heat-cell);
+  gap: var(--heat-gap);
+}
+
+.heat__cell {
+  width: var(--heat-cell);
+  height: var(--heat-cell);
+  border-radius: 2px;
+  background: var(--bg-hover);
+}
+
+/* 五档写全，包括「这天没动」那一档——它和 `.heat__cell` 的底色一样，
+   但写出来才看得出这是一把完整的刻度，而不是漏了一格 */
+.heat__cell--l0 {
+  background: var(--bg-hover);
+}
+
+/* 其余四档是同一个颜色的四个量。最深那一档才让强调色露头——
+   于是最忙的那几天一眼可见，而整张图仍然是安静的 */
+.heat__cell--l1 {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-hover));
+}
+
+.heat__cell--l2 {
+  background: color-mix(in srgb, var(--accent) 45%, var(--bg-hover));
+}
+
+.heat__cell--l3 {
+  background: color-mix(in srgb, var(--accent) 70%, var(--bg-hover));
+}
+
+.heat__cell--l4 {
+  background: var(--accent);
+}
+
+.heat__cell:hover {
+  outline: 1px solid var(--text-faint);
+  outline-offset: 1px;
+}
+
+/* 图例**贴着网格左对齐**，不推到右边：网格的宽度跟着你用了多久变，
+   只用过三个月的人会看到一条图例孤零零地飘在一屏之外 */
+.heat__legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: var(--sp-2);
+  margin-left: 22px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.heat__legend span:first-child {
+  margin-right: var(--sp-1);
+}
+
+.heat__legend span:last-child {
+  margin-left: var(--sp-1);
+}
+
+/* ── 洞察与排行榜 ────────────────────────────────── */
+
+.stat__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  align-items: start;
+}
+
+.stat-card {
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.stat-card__title {
+  margin: 0 0 var(--sp-2);
+  color: var(--text);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.stat-card__hint {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.stat-card__hint strong {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* 卡片里的空/错状态自己带内边距，进了卡片就该跟着卡片的左右边走 */
+.stat-card .set__blank {
+  padding: 0 0 var(--sp-1);
+}
+
+.stat-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stat-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: 5px 0;
+}
+
+.stat-line + .stat-line {
+  border-top: 1px solid var(--border);
+}
+
+.stat-line__k {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.stat-line__v {
+  flex: none;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-rank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-rank__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.stat-rank__name {
+  flex: none;
+  width: 38%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 条形按**榜首**归一：这张表回答的是「谁占大头」，不是绝对值 */
+.stat-rank__bar {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.stat-rank__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.stat-rank__n {
+  flex: none;
+  min-width: 56px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.stat__foot {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 窄一档的窗口：格子缩到 9px（53 周仍然放得下），卡片改单列 */
+@media (max-width: 860px) {
+  .heat {
+    --heat-cell: 9px;
+  }
+
+  .stat__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stat__tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -24,27 +24,13 @@ import { installReviewChannel } from "./workdiff.js"
 import { installSearchChannel } from "./search.js"
 import { installEnvChannel } from "./envconfig.js"
 import { loadBounds, trackBounds } from "./window-state.js"
-import {
-  applyDevTheme,
-  defaultWorksite,
-  devPrompt,
-  scheduleDevCompare,
-  scheduleDevFilter,
-  scheduleDevFind,
-  scheduleDevInterrupt,
-  scheduleDevOpenSelect,
-  scheduleDevProbe,
-  scheduleDevReload,
-  scheduleDevReview,
-  scheduleDevRowMenu,
-  scheduleDevShot,
-  scheduleDevSwitch,
-  scheduleDevThreadOps,
-} from "./devtools.js"
+import { applyDevTheme, defaultWorksite, devPrompt } from "./devtools.js"
+import { installDevHooks } from "./devhooks.js"
 import { quitNow, shouldStayOpen } from "./quit.js"
 import { openExternalSafely } from "./external-url.js"
 import { readBuildInfo } from "./build-info.js"
 import { engineEnabled } from "../shared/engine-access.js"
+import { installActivity } from "./activity.js"
 import { installEngineSettings } from "./engine-settings.js"
 
 /**
@@ -241,47 +227,6 @@ function installHello(attached: Attached): void {
 }
 
 /** 开发钩子。全挂在这里，`whenReady` 那段只管应用本身怎么起。 */
-function installDevHooks(win: BrowserWindow, attached: Attached, logger: Logger): void {
-  scheduleDevFind(win)
-  scheduleDevInterrupt(win)
-  scheduleDevReload(win)
-  scheduleDevCompare(win)
-  scheduleDevReview(win)
-  scheduleDevFilter(win)
-  scheduleDevOpenSelect(win)
-  scheduleDevRowMenu(win)
-  scheduleDevProbe(win, (m: string) => {
-    logger.write("info", "dev", m)
-  })
-  scheduleDevSwitch(win, (kind, to) => {
-    const threadId = attached.lastThreadId()
-    if (threadId === undefined) return
-    void attached.host
-      .dispatch(
-        kind === "fork"
-          ? { type: "thread.fork", threadId, to }
-          : { type: "thread.handoff", threadId, to },
-      )
-      .catch((error: unknown) => {
-        attached.report(error, threadId)
-      })
-  })
-  scheduleDevThreadOps(win, (op) => {
-    const threadId = attached.lastThreadId()
-    if (threadId === undefined) return
-    void attached.host
-      .dispatch(
-        op.kind === "rename"
-          ? { type: "thread.rename", threadId, title: op.title }
-          : { type: "thread.delete", threadId },
-      )
-      .catch((error: unknown) => {
-        attached.report(error, threadId)
-      })
-  })
-  scheduleDevShot(win)
-}
-
 /**
  * 只允许开一个 omni。
  *
@@ -375,8 +320,11 @@ function bootstrap(): Promise<void> {
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
+      notify: () => settings.get().notify,
     })
     installReviewChannel(attached.baselines)
+    // 设置面板的「活动」那一页。**只在点进去时才扫盘**，所以挂通道不花任何东西
+    installActivity(attached, log)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
     installEngineSettings(settings, attached, log)
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })

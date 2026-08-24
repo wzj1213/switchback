@@ -210,8 +210,12 @@
   padding-top: 1px;
 }
 
+/* 宽控件那一档：控件自己占一整行，**而且是真的占满**。
+   `.set__field` 上那条 `align-items: flex-start` 在竖排时管的是横向——
+   不覆盖的话，一个 `width: 100%` 的输入框只会长成它内容那么宽 */
 .set__field--stack .set__control {
   flex-wrap: wrap;
+  align-self: stretch;
 }
 
 /* 卡片底下那一条页脚（「重新检查」）。**画成页脚而不是又一行设置项**：
@@ -271,6 +275,99 @@
   background: var(--bg-raised);
   color: var(--text);
   box-shadow: var(--shadow-1);
+}
+
+/* ── 二元开关 ────────────────────────────────────────
+ * **开/关这一类一律用它**，不再用「一颗会变色的按钮」。
+ *
+ * 上一版同一件事有三种画法：桌宠是两格的三段式（显示 / 隐藏）、远程访问是一颗
+ * 写着「打开」的按钮（**按钮上的字是动作还是状态？两种读法都说得通**）、
+ * 新会话默认是一颗写着「设为默认」的按钮。三种控件、三种读法，
+ * 而它们回答的是同一个问题。
+ *
+ * 拨块上不写字：**位置就是状态**。宽度 34、块 14——比 macOS 原生那颗小一圈，
+ * 因为它要和 28px 高的行、13px 的字并排，原生尺寸放进来会把每一行都撑开。
+ */
+.toggle {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  cursor: default;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.toggle:hover:not(:disabled) {
+  border-color: var(--text-faint);
+}
+
+.toggle--on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* 变灰的那颗**照样看得出开着还是关着**：一个既点不动、又读不出状态的控件
+   等于界面上的一块噪声。所以只降透明度，不改颜色 */
+.toggle:disabled {
+  opacity: 0.45;
+}
+
+.toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.toggle--on .toggle__knob {
+  background: var(--text-inverse);
+  transform: translateX(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle,
+  .toggle__knob {
+    transition: none;
+  }
+}
+
+/* 「看东西」那一段之前的那条界：上面几页改东西，下面几页只看。
+   **不是分类癖**——打开设置时心里只有两种意图之一，先分两堆比挨个读标题快 */
+.set__tab--cut {
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+/* 数据那一页每一行下面那条真实路径。**要能逐字读准**，所以等宽、可选中 */
+.set__path {
+  display: inline-block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* 页脚里除了按钮之外还可以放一句话（「走完这 17 条用了 154 ms」）。
+   靠左推，按钮仍然贴右 */
+.set__act {
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.set__act .set__hint {
+  flex: 1;
 }
 
 /* 更新失败、或原生更新器检查后版本没变时的原文；结果不能只靠 omni 猜 */

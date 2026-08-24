@@ -67,6 +67,16 @@
   opacity: 0.55;
 }
 
+/* 关掉的那几家**整颗压暗，但不移走**：「这家我关了」和「omni 不知道有这家」
+   在界面上必须分得出来，而移走之后就没有任何地方能把它开回来了 */
+.eng-tab--off {
+  opacity: 0.5;
+}
+
+.eng-tab--off:hover {
+  opacity: 0.8;
+}
+
 .eng-tab__default {
   padding-left: 6px;
   border-left: 1px solid var(--border);

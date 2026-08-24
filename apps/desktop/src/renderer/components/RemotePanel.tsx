@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
-import type { Trust } from "@omni/protocol"
 import type { RemoteStatus } from "../../main/remote/install.js"
 import type { Settings } from "../../shared/settings.js"
-import { Field } from "./SettingsBits.js"
-import { RemoteDevices } from "./RemoteDevices.js"
+import { Field, Group, Input, Toggle } from "./SettingsBits.js"
+import { Access, Tunnel } from "./RemoteAccess.js"
 
 /**
  * 远程访问（浏览器端）。
@@ -14,13 +13,15 @@ import { RemoteDevices } from "./RemoteDevices.js"
  * 2. **开了也只 listen 回环**——从外面进来要自己开隧道。界面上必须写出来，
  *    否则用户会以为打开开关就能在手机上打开它，然后在一个连不上的地址前发呆。
  * 3. **配对码只出现一次，五分钟**。
+ *
+ * ## 为什么这一页要重画
+ *
+ * 它是整块面板里**唯一一页不套 `Group`** 的：几行设置项直接裸挂在页面上，
+ * 没有卡片、没有分组标题，于是它和别的页长得就是不一样，而没有任何东西会报错。
+ * 那颗开关还是一颗写着「打开」的按钮——**按钮上的字是动作还是状态，两种读法都说得通**。
+ * 端口更彻底：`settings.remote.port` 一直存在、一直被校验、一直在决定服务端听哪儿，
+ * 而界面上**根本没有地方能改它**。
  */
-
-const TRUSTS: readonly { id: Trust; label: string }[] = [
-  { id: "read-only", label: "只读" },
-  { id: "auto-edit", label: "自动审批" },
-  { id: "full", label: "完全访问" },
-]
 
 function statusText(status: RemoteStatus): string {
   // **配置有问题和起不来是两回事。** 之前这里一律说「起不来」——
@@ -30,39 +31,41 @@ function statusText(status: RemoteStatus): string {
   if (status.error !== undefined) {
     return status.listening ? `在听，但配置有问题：${status.error}` : `起不来：${status.error}`
   }
-  if (!status.enabled) return "关着"
+  if (!status.enabled) return "关着。打开之后它只听回环，不会凭空暴露到网上"
   return status.listening ? `在听 127.0.0.1:${String(status.port)}` : "开着，但没在听"
 }
 
-/** 配对码那一块。**只有真的在配对时才画**——没有码的时候摆一个空框没有意义。 */
-function Pairing({ status, onPair }: { status: RemoteStatus; onPair: () => void }): React.JSX.Element {
-  const [left, setLeft] = useState(0)
-  const expiresAt = status.pairing?.expiresAt
-  useEffect(() => {
-    if (expiresAt === undefined) return undefined
-    const tick = (): void => {
-      setLeft(Math.max(0, Math.round((expiresAt - Date.now()) / 1000)))
-    }
-    tick()
-    const timer = setInterval(tick, 1000)
-    return () => {
-      clearInterval(timer)
-    }
-  }, [expiresAt])
-
-  if (status.pairing === undefined || left === 0) {
-    return (
-      <button type="button" className="tbtn" onClick={onPair} disabled={!status.listening}>
-        配对新设备…
-      </button>
-    )
-  }
+/** 端口那一栏。**空着或者填了个不是数字的东西时不写回去**——那会把服务端挪到 0 号口上。 */
+function PortField({ port, onPort }: { port: number; onPort: (port: number) => void }): React.JSX.Element {
+  const [draft, setDraft] = useState(String(port))
+  const bad = parsePort(draft) === undefined
   return (
-    <div className="pairing">
-      <code className="pairing__code">{status.pairing.code}</code>
-      <span className="pairing__left">{left} 秒后失效</span>
-    </div>
+    <Field
+      label="端口"
+      hint={
+        bad
+          ? "要一个 0–65535 的整数。改完这一栏服务端会重起一次，正连着的设备要刷新一下。"
+          : "回环上的端口。0 = 让系统挑一个空的。改完服务端会重起一次，隧道命令里的号也要跟着改。"
+      }
+    >
+      <Input
+        label="远程端口"
+        value={draft}
+        inputMode="numeric"
+        placeholder="17800"
+        onChange={(next) => {
+          setDraft(next)
+          const parsed = parsePort(next)
+          if (parsed !== undefined) onPort(parsed)
+        }}
+      />
+    </Field>
   )
+}
+
+function parsePort(raw: string): number | undefined {
+  const n = Number(raw.trim())
+  return raw.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 65535 ? n : undefined
 }
 
 export function RemotePanel({
@@ -99,70 +102,32 @@ export function RemotePanel({
 
   return (
     <>
-      <Field label="远程访问" hint={status === undefined ? "正在读…" : statusText(status)}>
-        <button
-          type="button"
-          className={`tbtn${settings.remote.enabled ? " tbtn--on" : ""}`}
-          onClick={() => {
-            patchRemote({ enabled: !settings.remote.enabled })
-          }}
-        >
-          {settings.remote.enabled ? "关掉" : "打开"}
-        </button>
-      </Field>
-
-      {!settings.remote.enabled ? null : (
-        <>
-          <Field
-            label="怎么从外面连"
-            hint="服务端只听回环，没有绑到公网的开关。要从手机上用，在这台机器上开一条反向隧道，再把隧道那头的域名填进下面那一栏。"
-          >
-            <code className="set__code">ssh -R 127.0.0.1:{settings.remote.port}:127.0.0.1:{settings.remote.port} 你的服务器</code>
-          </Field>
-          <Field label="隧道那头的域名" hint="留空 = 只认回环。把手机上要打开的地址粘进来就行（`https://` 会自动去掉）；带路径的会报错">
-            <input
-              className="set__input"
-              value={settings.remote.trustedHosts.join(" ")}
-              placeholder="omni.example.com:8443"
-              onChange={(e) => {
-                patchRemote({ trustedHosts: e.target.value.split(/\s+/).filter((s) => s !== "") })
-              }}
-            />
-          </Field>
-          <Field label="远程档位上限" hint="手机丢了不该等于完全访问你的电脑。默认「自动审批」：优先使用引擎原生安全评审，需要人工决定时才询问">
-            <div className="switch" role="radiogroup">
-              {TRUSTS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={settings.remote.maxTrust === t.id}
-                  className={`switch__item${settings.remote.maxTrust === t.id ? " switch__item--on" : ""}`}
-                  onClick={() => {
-                    patchRemote({ maxTrust: t.id })
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="配对" hint="在手机上打开那个地址，把码输进去。五分钟有效，用一次作废">
-            {status === undefined ? null : (
-              <Pairing
-                status={status}
-                onPair={() => {
-                  void bridge?.remote.pair().then(setStatus)
-                }}
-              />
-            )}
-          </Field>
-          <RemoteDevices
-            devices={status?.devices ?? []}
-            onRevoke={(id) => {
-              void bridge?.remote.revoke(id).then(setStatus)
+      <Group
+        title="远程访问"
+        hint="在手机或另一台电脑的浏览器里接着用同一批会话。服务端跑在这台机器上，默认整个关着。"
+      >
+        <Field label="开启" hint={status === undefined ? "正在读…" : statusText(status)}>
+          <Toggle
+            label="远程访问"
+            on={settings.remote.enabled}
+            onChange={(enabled) => {
+              patchRemote({ enabled })
             }}
           />
+        </Field>
+        {!settings.remote.enabled ? null : (
+          <PortField
+            port={settings.remote.port}
+            onPort={(port) => {
+              patchRemote({ port })
+            }}
+          />
+        )}
+      </Group>
+      {!settings.remote.enabled ? null : (
+        <>
+          <Tunnel remote={settings.remote} onPatch={patchRemote} />
+          <Access remote={settings.remote} status={status} onPatch={patchRemote} onStatus={setStatus} />
         </>
       )}
     </>
