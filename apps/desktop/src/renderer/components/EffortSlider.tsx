@@ -1,7 +1,8 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { ModelOption } from "@omni/protocol"
 import { currentOf, effortLabel, costlyOf } from "./ModelPicker.js"
 import { EffortBar } from "./EffortBar.js"
+import { barWidth } from "./effort-geometry.js"
 
 /**
  * 推理强度的行内滑块。收起时是一段安静的文字加几枚刻度——**不点开也知道
@@ -17,25 +18,6 @@ import { EffortBar } from "./EffortBar.js"
  * 白拇指边走边走、填充盖到拇指右缘、坡道钉在整条坐标上、生长靠
  * `clip-path` 保持胶囊形、拖动期零过渡。展开那条的交互在 `EffortBar.tsx`。
  */
-
-/** 条子宽：padding 28 + 每档 30。CSS 的 `--effort-w` 与它是同一个数。 */
-export function barWidth(count: number): number {
-  return 28 + count * 30
-}
-
-/** 拇指直径。`indexAt` 的指针算术和 CSS 的拇指尺寸都从它出。 */
-export const THUMB = 20
-
-/**
- * 指针位置 → 档位序号。纯函数，好测。
- * 拇指**边走边走**：有效行程是 `width - THUMB`，指针先退半个拇指。
- */
-export function indexAt(x: number, width: number, count: number): number {
-  if (count <= 1) return 0
-  const travel = Math.max(1, width - THUMB)
-  const i = Math.round(((x - THUMB / 2) / travel) * (count - 1))
-  return Math.min(count - 1, Math.max(0, i))
-}
 
 /** 深空配色的坡道：靛 → 紫 → 品红。三站线性插值，和 CSS 里那条渐变同一组值。 */
 function voidAt(t: number): string {
@@ -79,7 +61,11 @@ function Ticks({
         <i
           key={i}
           className={i <= index ? "on" : undefined}
-          style={costly && i <= index ? { background: voidAt(count < 2 ? 1 : i / (count - 1)) } : undefined}
+          style={
+            costly && i <= index
+              ? { background: voidAt(count < 2 ? 1 : i / (count - 1)) }
+              : undefined
+          }
         />
       ))}
     </span>
@@ -159,6 +145,12 @@ export function EffortSlider({
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
+  /**
+   * 拖动中指着哪一档。**深空那套特效跟着它走，不跟着已落档的值走**——
+   * 拖到 ultra 就该当场看见 ultra 的样子，而不是松手才变。
+   * 命令仍然只在松手那一下发（见 `EffortBar` 的 `commit`）。
+   */
+  const [preview, setPreview] = useState<string>()
   const trig = useRef<HTMLButtonElement>(null)
   const efforts = current.efforts ?? []
   const value = effort ?? current.defaultEffort ?? efforts[0]
@@ -166,7 +158,16 @@ export function EffortSlider({
   const committed = Math.max(0, efforts.indexOf(value ?? ""))
   // 深空处理只落在最贵的那一档（kimi 的 ultra、claude 的 max / ultracode）——
   // 顶档只是 high 的模型永远没有，见 ModelPicker 的 costlyOf
-  const costly = costlyOf([current], current.id, effort)
+  const costly = costlyOf([current], current.id, preview ?? effort)
+
+  /**
+   * 引擎的回声一到（`effort` 变了）就把预览撤掉，交回给真值；收起时也撤。
+   * **不在松手那一下撤**：那时命令刚发出去，`thread.effort` 还是旧的，
+   * 中间那一小段会闪一下灰再亮回来。
+   */
+  useEffect(() => {
+    setPreview(undefined)
+  }, [effort, open])
 
   /** 收起走 190ms 的收回动画，条子退场、触发器才回来。 */
   const close = (refocus: boolean): void => {
@@ -201,6 +202,7 @@ export function EffortSlider({
             committed={committed}
             costly={costly}
             onCommit={committer(efforts, committed, onChange)}
+            onPreview={setPreview}
             onClose={close}
           />
         ) : (

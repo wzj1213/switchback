@@ -8,7 +8,6 @@ import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
-import { costlyOf } from "./ModelPicker.js"
 import { dropzone, nothingToSend, projectOf, stateOf } from "./composer-state.js"
 import { useAsideMode } from "../use-aside-mode.js"
 import { AsideChip } from "./aside-chip.js"
@@ -171,20 +170,20 @@ export function Composer(props: Props): React.JSX.Element {
     onSend: aside.wrapSend(props.onSend),
   })
 
-  // 落在最贵那一档时整个输入框进深空态（品红描边 + 绕框高光）。
-  // 「最贵」看各家清单的最后一档：kimi 叫 ultra，claude 叫 max
-  const costly = costlyOf(props.models, props.model, props.effort)
-
   return (
     <div className="composer">
       <div
-        className={`composer__inner${costly ? " composer__inner--costly" : ""}`}
+        className="composer__inner"
         {...dropzone(props.canAttach === true, attach.drop)}
       >
-        {/* 贵档的绕框高光：pathLength 归一到 100，dasharray 的算术不用量周长 */}
-        {costly ? (
-          <VoidRing />
-        ) : null}
+        {/*
+         * 贵档那圈深空描边。**开关不在这里，在 CSS 里**（`:has(.effort--costly)`）：
+         * 滑块上的那个 class 已经是「此刻这一档贵不贵」的唯一真相——**拖动中它跟着
+         * 手指走**，而框子说的正是同一件事。在这里再算一遍的话，就得把预览态顺着
+         * Bar → BarEffort → EffortSlider 传一遍，传的是同一个值的第二份拷贝，
+         * 而且那一份必然慢一整个拖动：它只认已经落档的 `props.effort`。
+         */}
+        <VoidRing />
         {detached ? null : (
           <Chips
             cwd={props.cwd}

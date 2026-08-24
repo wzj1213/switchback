@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { barWidth, indexAt, THUMB } from "./EffortSlider.js"
+import { barWidth, indexAt, PAD, THUMB, travelOf } from "./effort-geometry.js"
 import { effortLabel } from "./ModelPicker.js"
+import { Stars } from "./effort-stars.js"
 
 /**
  * 推理强度滑块**展开后的那条**——布局照比稿那版行内条（gbar）：
@@ -26,59 +27,84 @@ function deltaOf(key: string, committed: number, total: number): number {
   return 0
 }
 
-/** 轨道刻度：一档一枚，空着的那几格也看得到，才能数。 */
+/** 轨道刻度：一档一枚，空着的那几格也看得到，才能数。落点和拇指中心一致。 */
 function Stops({ count }: { count: number }): React.JSX.Element {
-  const w = barWidth(count)
+  const travel = travelOf(barWidth(count))
   return (
     <span className="effort__stops" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <i key={i} style={{ left: `${String((i / Math.max(1, count - 1)) * (w - THUMB) + THUMB / 2)}px` }} />
+        <i
+          key={i}
+          style={{ left: `${String(PAD + (i / Math.max(1, count - 1)) * travel + THUMB / 2)}px` }}
+        />
       ))}
     </span>
   )
 }
 
-/** 星点位置的种子序列。**位置固定、不随重绘跳动**——跳来跳去会读成「它在闪什么」。 */
-function seeded(i: number): number {
-  const x = Math.sin(i * 12.9898) * 43758.5453
-  return x - Math.floor(x)
+/**
+ * 拖这条的那三个指针事件。
+ *
+ * **拖动中只动视觉，松手才提交**（`onPointerUp` 那一下才 `onCommit`）：
+ * `thread.setModel` 是发给引擎的命令，拖动过程每帧都发就是在刷引擎。
+ */
+function grip(o: {
+  dragging: boolean
+  pick: (event: React.PointerEvent<HTMLSpanElement>) => number
+  onDrag: (index: number | undefined) => void
+  onCommit: (index: number) => void
+}): Pick<React.HTMLAttributes<HTMLSpanElement>, "onPointerDown" | "onPointerMove" | "onPointerUp"> {
+  return {
+    onPointerDown: (event) => {
+      event.currentTarget.setPointerCapture(event.pointerId)
+      o.onDrag(o.pick(event))
+    },
+    onPointerMove: (event) => {
+      if (o.dragging) o.onDrag(o.pick(event))
+    },
+    onPointerUp: (event) => {
+      /* **先退出拖动态再落档。** 顺序反了的话，落档那一下的 190ms 回弹
+         会被「拖动中零过渡」吃掉——松手就没有收得住的那一下了。
+         注意 `onDrag(undefined)` 只清位置预览，颜色那份由 `onCommit` 接着补上。 */
+      const index = o.pick(event)
+      o.onDrag(undefined)
+      o.onCommit(index)
+    },
+  }
 }
 
 /**
- * 星点层。
+ * 跟着拇指走的那枚小牌子：**现在是哪一档**。
  *
- * 上一版三处不对，是对着截图一条条改的：
+ * 展开之后触发器被条子顶掉了，档位名跟着一起没了——拖的时候拇指在动，
+ * 可「调到哪一档」只剩位置在说，没有字。这一枚把那句话补回来。
  *
- * 1. **数量写死 10 颗**，208px 上摊下来每 20px 才一颗——那不是星空，是几粒灰。
- *    现在按宽度给（`w / 15`），三档模型的短条子也不会显得空。
- * 2. **`t²` 把点全堆在了左边**，而原来的注释写的是「密度往右加」——
- *    平方是把均匀分布压向 0，方向正好写反了。左密其实是对的
- *    （靛蓝那头最深，星点只有在深底上才读成星星），所以保留左密，
- *    但换成 `t^1.6`：右边那截也留几颗，不至于半条空着。
- * 3. **1px 的方块套一个 4px 的白光晕**，读出来是脏点不是星。现在光晕跟着
- *    自己的大小走（CSS 里 `calc(var(--s) * 1.4)`），并且只有每第三颗
- *    才是带芒的四角星（`.lit`），其余是圆点——**一屏里芒星是少数才像星空**。
+ * **锚在右边不锚在左边**：外壳的 `max-width` 从收起态张到整条宽要 240ms，
+ * 而条子是 `justify-content: flex-end` 的——**右缘一直不动，左缘在跑**。
+ * 从左边算的话，展开那一下牌子会横着漂一段。
+ *
+ * 它也不能挂在条子里面：条子有 `clip-path`，挂进去会被连牌子一起裁掉。
  */
-function Stars({ width }: { width: number }): React.JSX.Element {
-  const count = Math.max(9, Math.round(width / 15))
+function Now({
+  label,
+  rx,
+  grown,
+  live,
+}: {
+  label: string
+  /** 拇指中心离条子右缘多远。 */
+  rx: number
+  grown: boolean
+  live: boolean
+}): React.JSX.Element {
+  const cls = ["effort__now", grown ? "effort__now--in" : "", live ? "effort__now--live" : ""]
   return (
-    <span className="effort__stars" aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => {
-        const t = seeded(i * 4 + 1)
-        const size = 1.4 + seeded(i * 4 + 2) * 1.8
-        return (
-          <i
-            key={i}
-            className={i % 3 === 1 ? "lit" : undefined}
-            style={{
-              left: `${String(Math.round(Math.pow(t, 1.6) * (width - 6) + 3))}px`,
-              top: `${String(3 + Math.round(seeded(i * 4 + 3) * 19))}px`,
-              "--s": `${size.toFixed(1)}px`,
-              animationDelay: `${(seeded(i * 4 + 4) * -2.6).toFixed(2)}s`,
-            } as React.CSSProperties}
-          />
-        )
-      })}
+    <span
+      className={cls.filter(Boolean).join(" ")}
+      style={{ "--rx": `${rx.toFixed(1)}px` } as React.CSSProperties}
+      aria-hidden="true"
+    >
+      {label}
     </span>
   )
 }
@@ -95,37 +121,33 @@ function barClass(grown: boolean, intro: boolean, live: boolean): string {
     .join(" ")
 }
 
-export function EffortBar({
-  efforts,
-  committed,
-  costly,
-  onCommit,
-  onClose,
-}: {
-  efforts: readonly string[]
-  committed: number
-  /** 落在最贵档：条子进深空态（渐变坡道 + 星点 + 拇指光）。由 `EffortSlider` 算好。 */
-  costly: boolean
-  onCommit: (index: number) => void
-  /** `refocus` = Esc：焦点还回触发器；点别处收起时不还（焦点跟着那一击走）。 */
-  onClose: (refocus: boolean) => void
-}): React.JSX.Element {
-  const bar = useRef<HTMLSpanElement>(null)
-  const [dragIndex, setDragIndex] = useState<number | undefined>(undefined)
-  // grown：挂载时 clip-path 还是收着的，rAF 之后张开——那一下才是「长出来」
+/**
+ * 条子的出场与退场。
+ *
+ * - `grown`：挂载时 `clip-path` 还是收着的，rAF 之后才张开——**那一下才是「长出来」**；
+ * - `intro`：展开那 300ms 里拇指和填充从最左跟着条子一起走；
+ * - 点别处收起用 **`pointerdown` 不是 `click`**：先收起的浮层会让那一击
+ *   落在突然挪位的元素上。
+ */
+function useBarLife(
+  bar: React.RefObject<HTMLSpanElement | null>,
+  onClose: (refocus: boolean) => void,
+): { grown: boolean; intro: boolean } {
   const [grown, setGrown] = useState(false)
-  // intro：展开那 300ms 里拇指和填充从最左跟着条子一起走
   const [intro, setIntro] = useState(true)
-  const shown = dragIndex ?? committed
-
   useEffect(() => {
     bar.current?.focus()
-    const raf = requestAnimationFrame(() => { setGrown(true) })
-    const done = window.setTimeout(() => { setIntro(false) }, 340)
-    return () => { cancelAnimationFrame(raf); window.clearTimeout(done) }
-  }, [])
-
-  // 点别处收起。**pointerdown 不是 click**：先收起的浮层会让那一击落在突然挪位的元素上
+    const raf = requestAnimationFrame(() => {
+      setGrown(true)
+    })
+    const done = window.setTimeout(() => {
+      setIntro(false)
+    }, 340)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(done)
+    }
+  }, [bar])
   useEffect(() => {
     const onPointer = (event: PointerEvent): void => {
       if (bar.current?.contains(event.target as Node | null) === true) return
@@ -135,11 +157,57 @@ export function EffortBar({
     return () => {
       document.removeEventListener("pointerdown", onPointer, true)
     }
-  }, [onClose])
+  }, [bar, onClose])
+  return { grown, intro }
+}
+
+export function EffortBar({
+  efforts,
+  committed,
+  costly,
+  onCommit,
+  onPreview,
+  onClose,
+}: {
+  efforts: readonly string[]
+  committed: number
+  /** 落在最贵档：条子进深空态（渐变坡道 + 星点 + 拇指光）。由 `EffortSlider` 算好。 */
+  costly: boolean
+  onCommit: (index: number) => void
+  /**
+   * 拖动中指着哪一档。**发的是视觉预览，不是命令**——
+   * 深空那套特效得跟着手指走（拖到 ultra 就该看见 ultra 的样子），
+   * 而 `thread.setModel` 仍然只在松手那一下发一次。
+   */
+  onPreview: (effort: string | undefined) => void
+  /** `refocus` = Esc：焦点还回触发器；点别处收起时不还（焦点跟着那一击走）。 */
+  onClose: (refocus: boolean) => void
+}): React.JSX.Element {
+  const bar = useRef<HTMLSpanElement>(null)
+  const [dragIndex, setDragIndex] = useState<number | undefined>(undefined)
+  const { grown, intro } = useBarLife(bar, onClose)
+  // 拖动中画拖到的那一档，松手之后画已落档的那一档
+  const shown = dragIndex ?? committed
 
   const width = barWidth(efforts.length)
   const t = (shown / Math.max(1, efforts.length - 1)) * (grown ? 1 : 0)
-  const x = t * (width - THUMB)
+  const x = PAD + t * travelOf(width)
+
+  /** 拖到哪儿，视觉就跟到哪儿。位置和特效走同一次更新，不会各说各的。 */
+  const drag = (index: number | undefined): void => {
+    setDragIndex(index)
+    onPreview(index === undefined ? undefined : efforts[index])
+  }
+
+  /**
+   * 落档。**预览留在松手那一档，不清空**——`onCommit` 发出去的是命令，
+   * 要等引擎回声才改到 `thread.effort`；中间那一小段里清掉预览的话，
+   * 深空特效会闪一下灰再亮回来。预览由 `EffortSlider` 在回声到达时撤。
+   */
+  const commit = (index: number): void => {
+    onPreview(efforts[index])
+    onCommit(index)
+  }
 
   const pick = (event: React.PointerEvent<HTMLSpanElement>): number => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -147,55 +215,54 @@ export function EffortBar({
   }
 
   return (
-    <span
-      ref={bar}
-      className={barClass(grown, intro, dragIndex !== undefined)}
-      role="slider"
-      tabIndex={0}
-      aria-label="推理强度"
-      aria-valuemin={0}
-      aria-valuemax={efforts.length - 1}
-      aria-valuenow={shown}
-      aria-valuetext={effortLabel(efforts[shown] ?? "").label}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId)
-        setDragIndex(pick(e))
-      }}
-      onPointerMove={(e) => {
-        if (dragIndex !== undefined) setDragIndex(pick(e))
-      }}
-      onPointerUp={(e) => {
-        const index = pick(e)
-        setDragIndex(undefined)
-        onCommit(index)
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault()
-          onClose(true)
-          return
-        }
-        const delta = deltaOf(e.key, committed, efforts.length)
-        if (delta !== 0) {
-          e.preventDefault()
-          onCommit(Math.min(efforts.length - 1, Math.max(0, committed + delta)))
-        }
-      }}
-      onBlur={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
-        onClose(false)
-      }}
-    >
-      <span className="effort__fill" style={{ width: `${String(x + THUMB)}px` }}>
-        <span className="effort__lay effort__base" />
-        <span className="effort__lay effort__hot" />
-        {costly ? <Stars width={width} /> : null}
-      </span>
-      <Stops count={efforts.length} />
-      <span
-        className="effort__thumb"
-        style={{ "--tx": `${String(x)}px` } as React.CSSProperties}
+    <>
+      <Now
+        label={effortLabel(efforts[shown] ?? "").label}
+        rx={width - x - THUMB / 2}
+        grown={grown}
+        live={dragIndex !== undefined}
       />
-    </span>
+      <span
+        ref={bar}
+        className={barClass(grown, intro, dragIndex !== undefined)}
+        role="slider"
+        tabIndex={0}
+        aria-label="推理强度"
+        aria-valuemin={0}
+        aria-valuemax={efforts.length - 1}
+        aria-valuenow={shown}
+        aria-valuetext={effortLabel(efforts[shown] ?? "").label}
+        {...grip({ dragging: dragIndex !== undefined, pick, onDrag: drag, onCommit: commit })}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault()
+            onClose(true)
+            return
+          }
+          const delta = deltaOf(e.key, committed, efforts.length)
+          if (delta !== 0) {
+            e.preventDefault()
+            commit(Math.min(efforts.length - 1, Math.max(0, committed + delta)))
+          }
+        }}
+        onBlur={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+          onClose(false)
+        }}
+      >
+        {/* 填充盖过拇指右缘再多出一个 `PAD`：满档时正好铺满整条。
+          少那 3px 的话最右会剩一条没填上的浅色缝，读起来像没到头 */}
+        <span className="effort__fill" style={{ width: `${String(x + THUMB + PAD)}px` }}>
+          <span className="effort__lay effort__base" />
+          <span className="effort__lay effort__hot" />
+          {costly ? <Stars width={width} /> : null}
+        </span>
+        <Stops count={efforts.length} />
+        <span
+          className="effort__thumb"
+          style={{ "--tx": `${String(x)}px` } as React.CSSProperties}
+        />
+      </span>
+    </>
   )
 }

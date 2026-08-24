@@ -503,6 +503,7 @@
      五枚刻度 28 ＋ 名字 53.5 ＋ 间距内边距 23 = **实测 104.5**——卡在 96 上，
      那颗按钮顶出自己的盒子 8.5px 去压左边的东西。这个数只是个上限，
      短名字（「超高」）照样按内容收窄，不会因此变宽 */
+  position: relative;
   max-width: 140px;
   transition: max-width var(--dur-slow) var(--ease);
   /* 生长时的裁剪交给条子自己的 clip-path（保持胶囊形），外壳再裁一刀就是平口 */
@@ -578,6 +579,61 @@
   background: currentColor;
 }
 
+/* ── 展开后那枚「现在是哪一档」 ─────────────────────────
+ * **展开之后触发器被条子顶掉了**，档位名跟着一起没了——拖的时候拇指在动，
+ * 可「调到哪一档」只剩位置在说，没有字。这一枚跟着拇指走的小牌子补回来。
+ *
+ * 挂在外壳上不挂在条子里：条子有 `clip-path`，挂进去会被连牌子一起裁掉。
+ * 锚右不锚左：外壳的 `max-width` 张开要 240ms，而条子是 `flex-end` 的——
+ * **右缘一直不动，左缘在跑**，从左边算的话展开那一下牌子会横着漂一段。
+ */
+.effort__now {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 7px);
+  z-index: 2;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  /*
+   * **不拖的时候它停在右端**，也就是收起态那个档位名所在的位置——
+   * 收回去时它是直着落进按钮里，而不是从条子中间横着飞过来。
+   * 上一版一直钉在拇指上，最左档收起来要横跨 180px，读起来是两件事在打架。
+   */
+  transition: opacity var(--dur) var(--ease), transform 190ms var(--ease);
+}
+
+/* 条子长到位了牌子才出来：还在长的时候它指的位置是没有意义的 */
+.effort__now--in {
+  opacity: 1;
+}
+
+/*
+ * **拖的时候它跟着拇指走。** 手在拇指上，读数就得在手边——
+ * 隔着 180px 去读「现在是哪一档」，等于把眼睛掰成两半。
+ * 先把自己的右缘挪到锚点上（+50% 自身宽），再退回拇指中心那么远。
+ * 位移零过渡，和拇指同一条规矩：过渡追一个每帧都在跑的目标就是拖尾巴。
+ * 松手之后这一层被撤掉，它顺着上面那条 190ms 滑回右端——和拇指落档同一拍。
+ */
+.effort__now--live {
+  transform: translateX(50%) translateX(calc(-1 * var(--rx, 0px)));
+  transition: opacity var(--dur) var(--ease);
+}
+
+/* 贵档：名字染坡道尽头那个色，和收起态的档位名说同一句话 */
+.effort--costly .effort__now {
+  color: #96307c;
+  font-weight: 600;
+}
+
 /* ── 条子本体（照比稿的 gbar） ─────────────────────────
  * 宽度一次给定（--effort-w），露出多少交给 clip-path——
  * 它切出来的右端自带圆角，**全程都是完整的一枚胶囊，只是短一点**。
@@ -594,16 +650,31 @@
   background: rgb(0 0 0 / 4%);
   cursor: pointer;
   touch-action: none;
-  clip-path: inset(0 100% 0 0 round 999px);
+  /* 收起态：右边裁到底，只剩零宽。上下左三边**先退到 −14px**，
+     这样长出来的过程里只有「右边」这一个数在动——四个数一起动的话，
+     开头那几帧上下还贴着 0，拇指的投影会先被削一下再松开 */
+  clip-path: inset(-14px 100% -14px -14px round 999px);
   transition: clip-path 300ms var(--ease), box-shadow 420ms var(--ease);
 }
 
+/*
+ * 长到位之后**把裁剪框放到条子外面去**（负 inset）。
+ *
+ * 裁剪本来只是为了「往右长」那一下的揭开效果，可它同时把**拇指的投影**也裁了：
+ * 拇指走到最左 / 最右时正好贴着裁剪边界，于是它那圈阴影被切成一条平口——
+ * 看上去像拇指掉出条子外面、或者被端头吞掉一半。中间那几档完全正常，
+ * 因为那时阴影离边界还远。
+ *
+ * 不能改成 `clip-path: none`：收起那 200ms 要从这里插值回 `inset(0 100% …)`，
+ * 而 `none` 和 `inset()` 之间没法插值，收起会变成硬切。负 inset 两头都满足：
+ * 照样是 `inset()`（插得动），又比条子大一圈（裁不到阴影）。
+ */
 .effort__bar--grown {
-  clip-path: inset(0 0 0 0 round 999px);
+  clip-path: inset(-14px round 999px);
 }
 
 .effort--closing .effort__bar {
-  clip-path: inset(0 100% 0 0 round 999px);
+  clip-path: inset(-14px 100% -14px -14px round 999px);
   transition-duration: 200ms;
 }
 
@@ -686,9 +757,21 @@
   height: 20px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 22%), 0 0 0 0.5px rgb(0 0 0 / 6%);
-  transform: translateX(var(--tx, 0px));
-  transition: transform 190ms var(--ease), scale 110ms var(--ease), box-shadow 300ms var(--ease);
+  /* 投影收到 2px：顶格时拇指和端头圆帽同心，判据是「半径 ＋ 往外画的 ≤ 13」。
+     3px 的模糊正好顶到 13，拖动时还要再乘 1.08 —— 等于贴着边界走。
+     2px 留出富余：10.8 ＋ 2 = 12.8 < 13，怎么拖都画不到胶囊外面 */
+  box-shadow: 0 1px 2px rgb(0 0 0 / 22%), 0 0 0 0.5px rgb(0 0 0 / 6%);
+  /*
+   * **位移走 `translate`，不走 `transform`。** 这两个不是同一件事：
+   * 独立属性的合成顺序是 `translate → rotate → scale → transform`，
+   * 也就是说 `transform` 里的位移**会被后面的 `scale` 乘一遍**。
+   * 拖动时拇指要放大到 1.08（`--live`），于是 `translateX(185px)` 变成了
+   * 185 × 1.08 = 199.8 —— 拖到最右那一下，拇指被推出胶囊 15px。
+   * 实测：`--tx: 185px` 而 `thumb.left − bar.left = 199.0`。
+   * 写成独立的 `translate` 就排在 `scale` 前面，位移不再被缩放乘到。
+   */
+  translate: var(--tx, 0px) 0;
+  transition: translate 190ms var(--ease), scale 110ms var(--ease), box-shadow 300ms var(--ease);
 }
 
 /* 展开那 300ms：拇指和填充从最左跟着条子一起走——是拇指把条子拽开的 */
@@ -777,14 +860,24 @@
   transition: max-width var(--dur-slow) var(--ease), box-shadow 260ms var(--ease) 160ms;
 }
 
-/* 深空的拇指：白，外面一圈 1.5px 的品红细边把它从星空里托出来。
-   上一版是 6px + 14px 两层外发光，20px 的圆点上糊成一团光斑，
-   而且**把落点糊没了**——拇指是这条上唯一要看清位置的东西 */
+/*
+ * 深空的拇指：白，外面一圈 1.5px 的品红细边把它从星空里托出来。
+ *
+ * **能画多宽有一条硬约束，别再往外加光了。**
+ *
+ * 走到顶格时拇指的圆心和条子端头那个圆帽**正好同心**（都在离端 13px 处），
+ * 所以判据只有一条：**拇指半径 ＋ 往外画的那一圈 ≤ 13px**。
+ *   · 现在：10 ＋ 1.5 = 11.5 ✓（拖动时缩放 1.08 也才 10.8 ＋ 1.5 = 12.3 ✓）
+ *   · 上一版那圈 `0 0 10px`：10 ＋ 10 = 20 ✗ —— 从胶囊端头漏出去 7px，
+ *     把轮廓撑成一个歪的头。早先条子的 `clip-path` 顺手把它裁掉了，
+ *     裁剪一放开（为了不削投影）它就露了出来。
+ *
+ * 「这一档在发光」这件事由条子自己那圈 3px 柔光说，不用拇指再说一遍。
+ */
 .effort--costly .effort__thumb {
   box-shadow:
     0 0 0 1.5px rgb(180 64 154 / 60%),
-    0 0 10px rgb(180 64 154 / 40%),
-    0 1px 3px rgb(0 0 0 / 22%);
+    0 1px 2px rgb(0 0 0 / 22%);
 }
 
 /* 深空态的刻度退到几乎看不见：**星空不该被切成六段**。
@@ -824,7 +917,8 @@
     box-shadow: 1px 0 0 rgb(0 0 0 / 34%);
   }
 
-  .effort--costly .trigger__label {
+  .effort--costly .trigger__label,
+  .effort--costly .effort__now {
     color: #e094c8;
   }
 
@@ -835,7 +929,6 @@
   .effort--costly .effort__thumb {
     box-shadow:
       0 0 0 1.5px rgb(215 106 180 / 65%),
-      0 0 10px rgb(215 106 180 / 45%),
-      0 1px 3px rgb(0 0 0 / 30%);
+      0 1px 2px rgb(0 0 0 / 30%);
   }
 }

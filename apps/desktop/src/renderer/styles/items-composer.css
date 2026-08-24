@@ -29,26 +29,57 @@
   border-color: var(--accent);
 }
 
+/* 焦点进出都走同一条过渡，深空那圈才不会「淡入、硬切出」 */
+.composer__inner {
+  transition: border-color 220ms var(--ease), box-shadow 220ms var(--ease);
+}
+
 /*
  * ultra 落档：品红描边 + 一圈绕框高光（比稿 ⑦ 深空的处理）。
  * **有 ultra 档的模型才有**——它是 EFFORT 表里唯一带「更快消耗使用额度」
  * 说明的那一档，普通档一个彩色都不长。描边过渡慢半拍：落档是个决定，不是悬停。
  */
-/* 底下这层 1px 边是兜底（SVG 没画出来时至少还有一圈），取坡道中段的紫；
-   真正看到的那圈由 `.compring__edge` 用渐变描出来，盖在它上面 */
-.composer__inner--costly {
+/*
+ * **闸门是 `:has(.effort--costly)`，不是从 JS 传下来的一个 class。**
+ * 滑块上的那个 class 已经是「此刻这一档贵不贵」的唯一真相——拖动中它跟着手指走，
+ * 而框子说的是同一件事。让框子自己去读它，比把同一个值再传一遍可靠：
+ * 传下来的那一份只认已落档的 `thread.effort`，**必然慢一整个拖动**。
+ *
+ * 底下这层 1px 边是兜底（SVG 没画出来时至少还有一圈），取坡道中段的紫；
+ * 真正看到的那圈由 `.compring__edge` 用渐变描出来，盖在它上面。
+ */
+.composer__inner:has(.effort--costly):focus-within {
   border-color: #6d4bc7;
   box-shadow: 0 0 0 3px rgb(122 70 190 / 20%), var(--shadow-1);
-  transition: border-color 300ms var(--ease), box-shadow 300ms var(--ease);
 }
 
+/*
+ * **只在输入框有焦点时才画。** 不在这条输入框里打字的时候，整框描边喊的是一件
+ * 只发生在一颗控件上的事——那是全场最贵的一次表达。失焦就退回普通描边，
+ * 「你开着这一档」交给档位名和那几枚坡道色的刻度说（它们一直都在）。
+ *
+ * `display: none` 而不是 `opacity: 0`：连里面那条无限绕圈动画一起停掉。
+ * 出现时 `ring-in` 让它淡进来，消失是硬切——**关掉一个东西不需要被欣赏**。
+ */
 .compring {
+  display: none;
   position: absolute;
   inset: -2px;
   width: calc(100% + 4px);
   height: calc(100% + 4px);
   overflow: visible;
   pointer-events: none;
+}
+
+.composer__inner:has(.effort--costly):focus-within .compring {
+  display: block;
+  animation: ring-in 220ms var(--ease) both;
+}
+
+@keyframes ring-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* 两条矩形共用一套几何：`rx` 和 `.composer__inner` 的 `--radius-lg` 是同一个数
@@ -105,7 +136,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .composer__inner--costly {
+  .composer__inner:has(.effort--costly):focus-within {
     border-color: #8367dd;
     box-shadow: 0 0 0 3px rgb(140 95 220 / 24%), var(--shadow-1);
   }
