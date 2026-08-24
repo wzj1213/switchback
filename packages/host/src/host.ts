@@ -88,9 +88,22 @@ const HANDLERS: Handlers = {
   "thread.handoff": handoff,
   "thread.fork": fork,
   "thread.rewind": rewind,
+  /**
+   * 压缩上下文。**引擎在跑就明确拒绝，不发一条注定被拒的请求。**
+   *
+   * 实测 mac2 上的 Kimi：轮次没结束时发过去，它自己会拒，而拒绝是**以正文形式**
+   * 回来的——转录区里凭空多出一段「Compacting conversation context…Compaction is
+   * blocked by the current turn; retry when the turn is idle.Compaction cancelled.」，
+   * 三句连在一起、还是英文，看起来像模型自己说了句莫名其妙的话。
+   *
+   * omni 不改引擎的行为、也不去掐它已经说出口的正文（那是它自报的状态）；
+   * 能做也该做的是**不把这条请求发出去**。和分叉、运行中换档同一条规矩
+   *（`branch.ts` 的 `stableEvents`、`trust.ts` 的 restart 分支）。
+   */
   "thread.compact": async (ctx, command) => {
     const entry = ctx.live.get(command.threadId)
     if (entry === undefined || !entry.lease.active || entry.session.compact === undefined) return
+    if (entry.turn !== undefined) throw new Error("这一轮还在跑，压缩要等它停下来")
     await entry.session.compact()
   },
   /**

@@ -19,6 +19,8 @@ export interface Fake {
   report: (patch: { axes?: readonly EngineAxis[]; modelId?: string }) => void
   /** 当前生效的记忆规则。取值函数——中途加的规则要立刻能读到。 */
   memory: () => readonly Rule[]
+  /** 压缩请求发出去过几次。「运行中不该发」靠它验。 */
+  compacted: () => number
 }
 
 /** 引擎回报的强度怎么算。缺省 = 照单全收；传进来就是「它其实用的是这个」。 */
@@ -32,6 +34,7 @@ export function fakeDriver(
   const driver: EngineDriver = {
     id: "fake",
     start: (req) => {
+      const calls = { compacted: 0 }
       const fake: Fake = {
         prompts: [],
         disposed: false,
@@ -42,6 +45,7 @@ export function fakeDriver(
         drift: (model, effort) => req.onModel?.(model, effort),
         report: (patch) => req.onEngineState?.(patch),
         memory: req.memory,
+        compacted: () => calls.compacted,
       }
       holder.fake = fake
       const session: EngineSession = {
@@ -56,6 +60,10 @@ export function fakeDriver(
         // `aside: false` 演一家**不实现**侧问的引擎——它该抛，不该静默吞
         ...(aside ? { askAside: (text: string) => Promise.resolve(`答：${text}`) } : {}),
         capabilities: () => NO_CAPABILITIES,
+        compact: () => {
+          calls.compacted += 1
+          return Promise.resolve()
+        },
         // 一个**认强度**的引擎：回报的就是收到的那个。设不上的那家靠 `effortOf` 演
         setModel: (_model: string, effort?: string) =>
           Promise.resolve(
@@ -125,12 +133,12 @@ interface TwoEngineRig {
   stored: Event[]
 }
 
-export function setupTwoEngines(): TwoEngineRig {
-  const stored: Event[] = []
-  const sessions: Fake[] = []
-  const driver = (id: string): EngineDriver => ({
+/** 两家引擎共用一份驱动壳，只有 id 不同。提出来是行数闸门逼的，边界本来也在这儿。 */
+function twoEngineDriver(id: string, sessions: Fake[]): EngineDriver {
+  return {
     id,
     start: (req) => {
+      const calls = { compacted: 0 }
       const fake: Fake = {
         prompts: [],
         disposed: false,
@@ -141,6 +149,7 @@ export function setupTwoEngines(): TwoEngineRig {
         drift: (model, effort) => req.onModel?.(model, effort),
         report: (patch) => req.onEngineState?.(patch),
         memory: req.memory,
+        compacted: () => calls.compacted,
       }
       sessions.push(fake)
       return Promise.resolve({
@@ -153,6 +162,10 @@ export function setupTwoEngines(): TwoEngineRig {
         setTrust: () => Promise.resolve({ restart: false }),
         models: () => Promise.resolve([]),
         capabilities: () => NO_CAPABILITIES,
+        compact: () => {
+          calls.compacted += 1
+          return Promise.resolve()
+        },
         setModel: () => Promise.resolve({}),
         dispose: () => {
           fake.disposed = true
@@ -160,11 +173,16 @@ export function setupTwoEngines(): TwoEngineRig {
         },
       })
     },
-  })
+  }
+}
+
+export function setupTwoEngines(): TwoEngineRig {
+  const stored: Event[] = []
+  const sessions: Fake[] = []
   const events: Event[] = []
   const counter = { n: 0 }
   const host = createHost({
-    drivers: { fake: driver("fake"), other: driver("other") },
+    drivers: { fake: twoEngineDriver("fake", sessions), other: twoEngineDriver("other", sessions) },
     home: "/h",
     emit: (e) => events.push(e),
     newId: (p) => {

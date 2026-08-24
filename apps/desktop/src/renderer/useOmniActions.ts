@@ -57,7 +57,10 @@ export function useOmniActions(
             send({ type: "thread.handoff", threadId: thread.id, to: next.id })
           },
         }),
-    ...(can.compact
+    // **跑着的时候把入口收起来**：这条命令引擎自己会拒，而拒绝会变成转录区里
+    // 一段像是模型说的英文。宿主那边是权威闸（远程端发的是同一条命令），
+    // 这里只是别让人点一颗注定失败的按钮
+    ...(can.compact && props.turn === undefined
       ? {
           onCompact: () => {
             send({ type: "thread.compact", threadId: thread.id })
