@@ -10,9 +10,13 @@ describe("DshPet", () => {
   it("保留原尺寸眼睛，并把可动眼层盖在补平的眼洞上", () => {
     const markup = renderToStaticMarkup(createElement(DshPet))
     const boxes = [...markup.matchAll(/x="(37|60)" y="42" width="11" height="22"/g)]
+    const eyeStart = markup.indexOf('<g class="pet__eyes"')
+    const eyeLayer = markup.slice(eyeStart, markup.indexOf("</g>", eyeStart))
 
     expect(boxes.map((match) => match[1])).toEqual(["37", "60", "37", "60"])
-    expect(markup).toContain('<g class="pet__eyes" fill="var(--pet-dsh-eye)">')
+    expect(eyeLayer).toContain('fill="var(--pet-dsh-eye)"')
+    expect(eyeLayer).toContain('rx="3"')
+    expect(eyeLayer).not.toContain("mask=")
     expect(markup).toContain('mask="url(#dsh-reference-light-mask)"')
   })
 

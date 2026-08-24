@@ -64,8 +64,8 @@ export function DshPet(): React.JSX.Element {
         <rect x="60" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
       </g>
       <g className="pet__eyes" fill="var(--pet-dsh-eye)">
-        <rect x="37" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
-        <rect x="60" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
+        <rect x="37" y="42" width="11" height="22" rx="3" />
+        <rect x="60" y="42" width="11" height="22" rx="3" />
       </g>
       {/* 肚子用固定矢量，不再让原图亮度蒙版与背景共同决定边缘；深浅主题只换身体色。 */}
       <path
