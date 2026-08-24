@@ -84,13 +84,15 @@ function useDraft(
   draftAttachments: readonly string[] | undefined,
   draftRevision: string | undefined,
 ): {
-  prefill: { text: string; attachments: readonly string[]; at: number }
-  reuse: (text: string, attachments?: readonly string[]) => void
+  prefill: { text: string; attachments: readonly string[]; at: number; aside?: boolean }
+  /** `aside` = 填回去之后**顺手进侧问模式**（选中转录区一段话之后那颗「问一句」）。 */
+  reuse: (text: string, attachments?: readonly string[], aside?: boolean) => void
 } {
   const [prefill, setPrefill] = useState<{
     text: string
     attachments: readonly string[]
     at: number
+    aside?: boolean
   }>({ text: "", attachments: [], at: 0 })
   /**
    * **必须是 effect，不能只在初始化时读一次**：换引擎不会换 thread id，
@@ -115,9 +117,12 @@ function useDraft(
   }, [draft, draftAttachments, draftRevision])
   // **必须 useCallback**：它一路传到 `Transcript`，而那块是 memo 的。
   // 行内箭头每次渲染换身份，memo 立刻静默失效——和 `onResolve` 同一条理由
-  const reuse = useCallback((text: string, attachments: readonly string[] = []) => {
-    setPrefill((prev) => ({ text, attachments, at: prev.at + 1 }))
-  }, [])
+  const reuse = useCallback(
+    (text: string, attachments: readonly string[] = [], aside = false) => {
+      setPrefill((prev) => ({ text, attachments, at: prev.at + 1, aside }))
+    },
+    [],
+  )
   return { prefill, reuse }
 }
 

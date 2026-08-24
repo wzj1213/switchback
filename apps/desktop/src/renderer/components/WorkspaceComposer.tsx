@@ -2,7 +2,6 @@ import type { Command, EngineInfo, Thread } from "@omni/protocol"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import { Composer, TRUSTS, labelOf } from "./Composer.js"
 import { trustBlind, trustHint } from "../trustHint.js"
-import { Asides } from "./Asides.js"
 import type { OmniAction } from "../omniCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 
@@ -42,7 +41,7 @@ export function WorkspaceComposer({
   props: WorkspaceProps
   thread: Thread
   stamp: string
-  prefill: { text: string; attachments?: readonly string[]; at: number }
+  prefill: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
   actions: readonly OmniAction[]
 }): React.JSX.Element {
   const send = props.send
@@ -80,16 +79,19 @@ export function WorkspaceComposer({
        */
       hint={trustHint(thread, labelOf(props.engines, thread.engine), labelOf(TRUSTS, thread.trust))}
       blind={trustBlind(thread, labelOf(props.engines, thread.engine))}
-      /* 侧问和引擎/档位/模型是同一类东西——「这条会话能怎么用」，所以摆在同一排 */
-      aside={
-        <Asides
-          thread={thread}
-          disabled={thread.detached === true || thread.status === "starting"}
-          onAsk={(text) => {
-            send({ type: "thread.sideQuestion", threadId: thread.id, text })
-          }}
-        />
-      }
+      /*
+       * 侧问。**入口不再是那一排里的一颗按钮**——那一排说的是「正文这一句的去向」，
+       * 而一颗打开另一条通道的按钮站在那儿，就成了那排唯一带描边的东西。
+       * 现在是 `/侧问` 或 `⌥⌘↩`（见 `use-aside-mode.ts`）。
+       *
+       * **还没说过一句话的会话不给**：侧问的定义是「不打断主线」，
+       * 而这时根本没有主线——那一屏还写着「在 xxx 里做点什么？」。
+       * `provisional` 正是「发出第一句话之前」（见 `Thread.provisional`）。
+       */
+      canAside={(thread.capabilities ?? NO_CAPABILITIES).sideQuestion && thread.provisional !== true}
+      onAsk={(text) => {
+        send({ type: "thread.sideQuestion", threadId: thread.id, text })
+      }}
       /*
        * 有待切换的引擎时，模型选择器变成**一句点不动的说明**（「切到 Codex 后可选」）。
        * 手上这份清单是**旧那家**报的，它的模型 id 在新的一家那里通常根本不存在，

@@ -28,6 +28,32 @@ describe("promptPlaceholder", () => {
     },
   ]
 
+  it("侧问模式下换成「不进正文」那一句，而且盖过「它还在跑」", () => {
+    expect(
+      promptPlaceholder({
+        command: undefined,
+        starting: false,
+        steering: false,
+        queueing: true,
+        detached: false,
+        aside: true,
+      }),
+    ).toBe("问一句不进正文的话…（Esc 退回普通发送）")
+  })
+
+  it("选了引擎命令时，参数提示仍然优先于侧问", () => {
+    expect(
+      promptPlaceholder({
+        command: command("<service>"),
+        starting: false,
+        steering: false,
+        queueing: false,
+        detached: false,
+        aside: true,
+      }),
+    ).toBe("<service>")
+  })
+
   for (const row of cases) {
     it(row.name, () => {
       expect(
@@ -37,6 +63,7 @@ describe("promptPlaceholder", () => {
           steering: false,
           queueing: false,
           detached: false,
+          aside: false,
         }),
       ).toBe(row.want)
     })

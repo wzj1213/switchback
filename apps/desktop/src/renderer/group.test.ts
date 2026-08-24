@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Item, ToolCallItem } from "@omni/protocol"
-import { groupRows } from "./group.js"
+import { foldTurns, groupRows, withAsides } from "./group.js"
 
 const tool = (id: string): ToolCallItem => ({
   id,
@@ -90,5 +90,41 @@ describe("一轮的分界", () => {
     ])
     const marks = rows.filter((r) => r.kind === "turn")
     expect(marks.map((m) => (m.kind === "turn" ? m.ms : 0))).toEqual([1000, 3000])
+  })
+})
+
+describe("withAsides", () => {
+  const ask = (at: number, q: string) => ({ at, question: q, answer: `${q}——答` })
+
+  it("插在第一条比它晚的行之前：你问那句话时屏幕停在哪儿，它就留在哪儿", () => {
+    const rows = groupRows([user("u1", "t1", 0), reply("a1", "t1", 1000), reply("a2", "t1", 3000)])
+    const out = withAsides(rows, [ask(2000, "这段是什么意思")])
+    // 2000 落在 a1（1000）之后、a2（3000）之前
+    expect(out.map((r) => r.kind)).toEqual(["item", "turn", "item", "aside", "item"])
+  })
+
+  it("问完还没有新内容的落在队尾", () => {
+    const rows = groupRows([user("u1", "t1", 0), reply("a1", "t1", 1000)])
+    const out = withAsides(rows, [ask(9000, "顺便问一句")])
+    expect(out[out.length - 1]?.kind).toBe("aside")
+  })
+
+  it("一条都没有时原样返回，连新数组都不造", () => {
+    const rows = groupRows([user("u1", "t1", 0)])
+    expect(withAsides(rows, [])).toBe(rows)
+  })
+
+  it("乱序进来也按时间排", () => {
+    const rows = groupRows([user("u1", "t1", 0), reply("a1", "t1", 5000)])
+    const out = withAsides(rows, [ask(3000, "后问的"), ask(1000, "先问的")])
+    const asks = out.flatMap((r) => (r.kind === "aside" ? [r.aside.question] : []))
+    expect(asks).toEqual(["先问的", "后问的"])
+  })
+
+  it("**折起某一轮不会把侧问一起折掉**——它不归任何一轮", () => {
+    const rows = groupRows([user("u1", "t1", 0), reply("a1", "t1", 1000), reply("a2", "t1", 3000)])
+    const folded = foldTurns(rows, new Set(["t1"]))
+    const out = withAsides(folded, [ask(2000, "折起来也还在")])
+    expect(out.some((r) => r.kind === "aside")).toBe(true)
   })
 })

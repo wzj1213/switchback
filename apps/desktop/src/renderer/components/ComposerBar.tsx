@@ -135,6 +135,7 @@ export function Bar({
   hint,
   blind,
   aside,
+  asideMode,
   models,
   model,
   effort,
@@ -158,8 +159,10 @@ export function Bar({
   hint?: TrustHint
   /** 「这家不会把自己改的档告诉 omni」那句。**挂在档位选择器的悬停上，不常驻。** */
   blind?: string
-  /** 侧问入口。由上层给，`Bar` 只负责摆在哪儿。 */
+  /** 侧问模式的芯片。由上层给，`Bar` 只负责摆在哪儿。不在这个模式时是 undefined。 */
   aside?: React.ReactNode
+  /** 侧问模式：右下角那颗键换色、换说明。 */
+  asideMode?: boolean
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
   models: readonly ModelOption[]
@@ -208,6 +211,7 @@ export function Bar({
           busy={busy}
           starting={starting}
           empty={empty}
+          aside={asideMode === true}
           onResume={onResume}
           onInterrupt={onInterrupt}
           onSend={onSend}

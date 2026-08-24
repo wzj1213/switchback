@@ -84,68 +84,103 @@
 }
 
 /**
- * 侧问。**能力位报 false 时整个不存在**，所以这里不写「禁用」态——
- * 没有那个状态。
+ * 侧问。
+ *
+ * 上一版是输入区那一排里一颗带描边的胶囊 ＋ 一个浮层：那一排说的是
+ * **正文这一句的去向**（谁跑、什么权限、哪个模型），而侧问是另一条通道，
+ * 挤在同一排里就成了那排唯一带描边的东西——比模型选择器还响。
+ * 现在入口是 `/侧问`（或 `⌥⌘↩` 直接发），落在这里的是**答案**。
  */
-/** 侧问：和引擎/档位/模型同一排，同一种视觉重量——它们回答的是同一个问题。 */
-.composer__aside {
-  flex: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-raised);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  padding: 2px var(--sp-2);
-  cursor: pointer;
+
+/**
+ * 转录区里的一次侧问：虚线、缩进、和正文明显不是一层。
+ *
+ * **卡片本身不上色。** 它要说的是「这不属于正文」，而那件事虚线和缩进就说完了；
+ * 真正需要显眼的是输入区那枚模式芯片（见 `.composer__asidechip`）——
+ * 那里显眼是**安全**：不然你会把一句正经的任务发进侧通道。
+ */
+.asidecard {
+  margin-left: var(--sp-5);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
 }
 
-.composer__aside:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.aside {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.aside__empty {
-  margin: 0;
+/** 「不进正文」这句得常驻：它是这张卡存在的全部理由。 */
+.asidecard__tag {
+  display: block;
+  margin-bottom: 3px;
   color: var(--text-faint);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
-.aside__pair {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-/** 问句压暗、答句正常：一屏里问答交替，靠明暗区分比靠标签省地方。 */
-.aside__q {
+/** 问句压暗、答句正常：靠明暗区分比靠标签省地方。 */
+.asidecard__q {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
 
-.aside__a {
-  margin: 0;
+.asidecard__a {
+  margin: var(--sp-1) 0 0;
   color: var(--text);
   font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   white-space: pre-wrap;
 }
 
-.aside__input {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--text);
+/**
+ * 输入区那枚模式芯片：发之前一眼知道这一句不进正文。
+ *
+ * **这里用强调色是有意的**：`tokens.css` 那条「强调色只用于焦点与链接」挡的是
+ * 拿它当装饰；而这一枚挡的是一次真实的误发——你以为在交代任务，其实发进了侧通道。
+ * 它也**刻意和贵档那套靛紫错开**：那套说的是「这一轮更花钱」，不是「这一句去哪儿」。
+ */
+.composer__asidechip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/** 退出这个模式的那一下也得能点到，不能只有 Esc。 */
+.composer__asideoff {
+  border: 0;
+  padding: 0 0 0 2px;
+  background: transparent;
+  color: inherit;
   font: inherit;
-  font-size: var(--text-sm);
-  padding: var(--sp-2);
-  resize: vertical;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.composer__asideoff:hover {
+  opacity: 1;
+}
+
+/** 选中转录区一段话之后浮出来的那颗。**不选中就完全不存在。** */
+.askfloat {
+  position: fixed;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--text-inverse);
+  font: inherit;
+  font-size: var(--text-xs);
+  box-shadow: var(--shadow-pop);
+  cursor: pointer;
+  transform: translate(-50%, -100%);
 }

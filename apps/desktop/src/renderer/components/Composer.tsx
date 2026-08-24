@@ -9,6 +9,9 @@ import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } fr
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
 import { costlyOf } from "./ModelPicker.js"
+import { dropzone, nothingToSend, projectOf, stateOf } from "./composer-state.js"
+import { useAsideMode } from "../use-aside-mode.js"
+import { AsideChip } from "./aside-chip.js"
 
 /**
  * 信任档。
@@ -40,8 +43,10 @@ interface Props {
   hint?: TrustHint
   /** 「这家不报自己的档」那句，挂在档位选择器的悬停上。 */
   blind?: string
-  /** 侧问入口。这一层只往下递。 */
-  aside?: React.ReactNode
+  /** 这条会话能不能侧问（引擎报了能力、已经开过工）。**报不了就整套不存在**。 */
+  canAside?: boolean
+  /** 把这一句当侧问发出去。`canAside` 为真时必然给。 */
+  onAsk?: (text: string) => void
   /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
   detached?: boolean
   /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
@@ -90,44 +95,13 @@ interface Props {
    */
   canSteer: boolean
   /** 外面塞进来的文本（「改一改再发」）。`at` 变了才生效。 */
-  prefill?: { text: string; attachments?: readonly string[]; at: number }
+  prefill?: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */
   onSend: (text: string, attachments: readonly string[], steer: boolean) => void
   /** 让这个历史会话重新接上引擎 */
   onResume: () => void
-}
-
-/**
- * 输入区现在处在哪一档。**四档互斥**，而且各有各的文案和右下角那颗键：
- * 历史记录 / 引擎还在起 / 跑着但能插话 / 跑着只能排队。
- *
- * 拎出来是复杂度闸门逼的，但边界也对：这是一次判定，不是渲染。
- */
-function stateOf(o: { detached: boolean; starting: boolean; busy: boolean; canSteer: boolean }): {
-  blocked: boolean
-  queueing: boolean
-  steering: boolean
-} {
-  const running = o.busy && !o.detached
-  return {
-    // 真正发不出去的只有两种：这是历史记录（背后没有引擎），
-    // 以及**引擎还没起来**——后者不禁的话，回车会先清空输入框、
-    // 再撞上宿主那句「会话不存在」，打好的一句话就这么没了
-    blocked: o.detached || o.starting,
-    // **默认排队，不管引擎会不会 steer。** 上一版是「能插就插」，
-    // 和 codex 自己的行为正好相反（那边打字回车也是排着的）。
-    // `steering` 现在的意思变成「这一条会话**能**当场插入」——
-    // 它决定的是提示语和「立刻插入」那颗按钮出不出现，不是默认走哪条路
-    queueing: running,
-    steering: running && o.canSteer,
-  }
-}
-
-/** 目录名当项目名。整条绝对路径在芯片里放不下，而尾段正是人叫它的那个名字。 */
-function projectOf(cwd: string): string {
-  return cwd.split("/").filter(Boolean).pop() ?? cwd
 }
 
 function attachmentWarning(
@@ -185,13 +159,16 @@ export function Composer(props: Props): React.JSX.Element {
   const attachmentBlocked = attachWarning !== undefined
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
   const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
+  // 断开和启动期一样发不出去，那时这个模式没有意义
+  const canAside = props.canAside === true && !detached && !starting
+  const aside = useAsideMode({ can: canAside, prefill: props.prefill, onAsk: props.onAsk })
   const draft = useComposerDraft({
     prefill: props.prefill,
     engine: props.engine,
     attach,
     blocked: mode.blocked || attachmentBlocked,
     steering: mode.steering,
-    onSend: props.onSend,
+    onSend: aside.wrapSend(props.onSend),
   })
 
   // 落在最贵那一档时整个输入框进深空态（品红描边 + 绕框高光）。
@@ -202,14 +179,7 @@ export function Composer(props: Props): React.JSX.Element {
     <div className="composer">
       <div
         className={`composer__inner${costly ? " composer__inner--costly" : ""}`}
-        onDragOver={(e) => {
-          if (props.canAttach) e.preventDefault()
-        }}
-        onDrop={(e) => {
-          if (!props.canAttach) return
-          e.preventDefault()
-          attach.drop(e.dataTransfer.files)
-        }}
+        {...dropzone(props.canAttach === true, attach.drop)}
       >
         {/* 贵档的绕框高光：pathLength 归一到 100，dasharray 的算术不用量周长 */}
         {costly ? (
@@ -236,24 +206,32 @@ export function Composer(props: Props): React.JSX.Element {
           steering={mode.steering}
           cwd={props.cwd}
           onPaste={attach.paste}
-          commands={props.commands}
+          commands={aside.commands(props.commands)}
           command={draft.command}
           onClearCommand={() => draft.setCommand(undefined)}
           onCommand={(command) => {
+            if (aside.take(command, () => { draft.setText("") })) return
             takeCommand(command, draft.setText, draft.setCommand, props.onOmni)
           }}
           searchFiles={props.searchFiles}
           onChange={draft.setText}
           onSubmit={draft.submit}
+          onAside={() => {
+            aside.ask(draft.text, draft.command !== undefined, () => { draft.setText("") })
+          }}
+          asideMode={aside.on}
+          onAsideExit={aside.exit}
         />
         <Bar
           detached={detached}
           busy={busy}
           starting={starting}
-          empty={
-            attachmentBlocked ||
-            (draft.text.trim() === "" && draft.command === undefined && attach.paths.length === 0)
-          }
+          empty={nothingToSend({
+            attachmentBlocked,
+            text: draft.text,
+            hasCommand: draft.command !== undefined,
+            attachments: attach.paths.length,
+          })}
           engine={props.engine}
           engines={props.engines}
           trust={props.trust}
@@ -266,7 +244,8 @@ export function Composer(props: Props): React.JSX.Element {
           onTrustChange={props.onTrustChange}
           hint={props.hint}
           blind={props.blind}
-          aside={props.aside}
+          aside={aside.on ? <AsideChip onExit={aside.exit} /> : undefined}
+          asideMode={aside.on}
           onModelChange={props.onModelChange}
           onResume={props.onResume}
           onInterrupt={props.onInterrupt}

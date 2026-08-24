@@ -32,6 +32,9 @@ export function Prompt({
   onCommand,
   onChange,
   onSubmit,
+  onAside,
+  asideMode = false,
+  onAsideExit,
 }: {
   value: string
   detached: boolean
@@ -60,6 +63,11 @@ export function Prompt({
   onChange: (text: string) => void
   /** 参数是「别排队，现在就插进去」（⌘⏎）。 */
   onSubmit: (steer: boolean) => void
+  /** `⌥⌘⏎`：不进模式，直接把这一句当侧问发出去。 */
+  onAside?: () => void
+  /** 已经在侧问模式里：占位符换一句，`Esc` 退出。 */
+  asideMode?: boolean
+  onAsideExit?: () => void
 }): React.JSX.Element {
   const input = useRef<HTMLTextAreaElement>(null)
   const mentions = useMentions(cwd, searchFiles)
@@ -112,7 +120,7 @@ export function Prompt({
           value={value}
           detached={detached}
           command={command}
-          placeholder={promptPlaceholder({ command, starting, steering, queueing, detached })}
+          placeholder={promptPlaceholder({ command, starting, steering, queueing, detached, aside: asideMode })}
           mentions={mentions}
           slash={slash}
           onChange={onChange}
@@ -121,6 +129,9 @@ export function Prompt({
           choose={choose}
           pickCommand={pickCommand}
           onSubmit={onSubmit}
+          onAside={onAside}
+          asideMode={asideMode}
+          onAsideExit={onAsideExit}
         />
       </div>
     </>

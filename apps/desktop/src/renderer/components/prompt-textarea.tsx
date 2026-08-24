@@ -8,8 +8,12 @@ export function promptPlaceholder(state: {
   steering: boolean
   queueing: boolean
   detached: boolean
+  aside: boolean
 }): string {
   if (state.command !== undefined) return state.command.argumentHint ?? "输入参数（可选）"
+  // 侧问模式排在最前：它改的是**这一句去哪儿**，比「它还在跑」更要紧——
+  // 那几句说的都是「什么时候到」，而这一句说的是「到不到正文里」
+  if (state.aside) return "问一句不进正文的话…（Esc 退回普通发送）"
   if (state.starting) return "引擎正在启动，起来就能发。"
   if (state.steering) return "它还在跑——回车排队，⌘⏎ 直接插入当前轮次。"
   if (state.queueing) return "它还在跑——回车排队，这一轮停下后发送。"
@@ -31,6 +35,11 @@ interface Props {
   choose: (path: string) => void
   pickCommand: (command: SlashCommand) => void
   onSubmit: (steer: boolean) => void
+  /** `⌥⌘↩`：**不进模式，直接把这一句当侧问发出去**。没有这个能力时缺席。 */
+  onAside?: () => void
+  /** 已经在侧问模式里：`Esc` 退回普通发送。 */
+  asideMode?: boolean
+  onAsideExit?: () => void
 }
 
 export function PromptTextarea(props: Props): React.JSX.Element {
@@ -63,6 +72,7 @@ export function PromptTextarea(props: Props): React.JSX.Element {
 }
 
 function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props): void {
+  if (asideKeys(event, props)) return
   if (removeCommand(event, props)) return
   if (chooseSlash(event, props)) return
   if (chooseMention(event, props)) return
@@ -72,6 +82,30 @@ function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props
     props.slash.close()
     props.onSubmit(event.metaKey || event.ctrlKey)
   }
+}
+
+/**
+ * 侧问那两个键。**必须排在普通回车之前**：`⌥⌘↩` 的 `metaKey` 也是真的，
+ * 落到下面那一支就成了「插进当前轮次」——正好相反的一件事。
+ */
+function asideKeys(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props): boolean {
+  if (
+    event.key === "Enter" &&
+    event.altKey &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.nativeEvent.isComposing &&
+    props.onAside !== undefined
+  ) {
+    event.preventDefault()
+    props.onAside()
+    return true
+  }
+  if (event.key === "Escape" && props.asideMode === true && props.onAsideExit !== undefined) {
+    event.preventDefault()
+    props.onAsideExit()
+    return true
+  }
+  return false
 }
 
 function removeCommand(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props): boolean {

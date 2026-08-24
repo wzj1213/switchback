@@ -17,6 +17,7 @@ export function Action({
   busy,
   starting,
   empty,
+  aside,
   onResume,
   onInterrupt,
   onSend,
@@ -26,6 +27,8 @@ export function Action({
   /** 引擎还在起。**不是「停止」**：那时没有任何东西可停 */
   starting: boolean
   empty: boolean
+  /** 侧问模式：这一下发出去不进正文。**键要跟着变色**——见下面那段。 */
+  aside?: boolean
   onResume?: () => void
   onInterrupt?: () => void
   onSend: () => void
@@ -56,12 +59,14 @@ export function Action({
       </button>
     )
   }
+  /* **侧问模式下这颗键要看得出不一样。**「跑着的时候换成停止」是同一条道理：
+     这一下按出去会发生什么，得由键自己说，不能只写在别处的芯片上。 */
   return (
     <button
-      className="send"
+      className={`send${aside === true ? " send--aside" : ""}`}
       type="button"
-      title="发送（⌘↵）"
-      aria-label="发送"
+      title={aside === true ? "作为侧问发送（⌥⌘↵）——不进正文" : "发送（⌘↵）"}
+      aria-label={aside === true ? "作为侧问发送" : "发送"}
       onClick={onSend}
       disabled={empty}
     >

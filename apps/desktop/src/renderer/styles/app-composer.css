@@ -28,6 +28,18 @@
   cursor: default;
 }
 
+/*
+ * 侧问模式：这一下发出去**不进正文**。
+ *
+ * 芯片在这一排的另一头，而手指的落点在这儿——**按下去会发生什么，得由键自己说**。
+ * 和「跑着的时候换成停止」是同一条道理。
+ * 用强调色而不是贵档那套靛紫：那套说的是「这一轮更花钱」，不是「这一句去哪儿」。
+ */
+.send--aside {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* 停止不用主键那份重量：主键是「往前走」，而停止是打断 */
 .send--stop {
   background: var(--bg-hover);
@@ -790,6 +802,11 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  /* 深色下的强调色是浅蓝，图标得翻成近黑才看得见 */
+  .send--aside {
+    color: #17171a;
+  }
+
   .effort__bar {
     background: rgb(255 255 255 / 8%);
   }

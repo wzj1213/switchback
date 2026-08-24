@@ -1,4 +1,4 @@
-import type { Item, ToolCallItem } from "@omni/protocol"
+import type { Aside, Item, ToolCallItem } from "@omni/protocol"
 
 /**
  * 连续的工具调用合成一组。
@@ -11,6 +11,11 @@ export type Row =
   | { kind: "run"; items: readonly ToolCallItem[] }
   /** 一轮的分界：跑完之后插在那一轮的提问和回答之间，说这一轮花了多久。 */
   | { kind: "turn"; turnId: string; ms: number }
+  /**
+   * 一次侧问。**它不属于任何一轮**，也不在 `items` 里——挂在 `Thread.asides` 上，
+   * 由 `withAsides` 按时间插进来（见那个函数的注释）。
+   */
+  | { kind: "aside"; aside: Aside }
 
 /**
  * 一轮花了多久，从**这一轮自己的 item** 算。
@@ -50,7 +55,46 @@ function markFor(
 export function turnIdOf(row: Row): string | undefined {
   if (row.kind === "turn") return row.turnId
   if (row.kind === "run") return row.items[0]?.turnId
+  // 侧问**不归任何一轮**：折起某一轮时它不该跟着消失——
+  // 它问的常常正是那一轮里的东西，折起来是为了少看回答，不是为了少看自己问过的话
+  if (row.kind === "aside") return undefined
   return row.item.turnId
+}
+
+/** 这一行发生在什么时候。分界线没有自己的时间（它是上一条提问的表头）。 */
+function atOf(row: Row): number | undefined {
+  if (row.kind === "item") return row.item.at
+  if (row.kind === "run") return row.items[row.items.length - 1]?.at
+  if (row.kind === "aside") return row.aside.at
+  return undefined
+}
+
+/**
+ * 把侧问按时间插进行列里。
+ *
+ * **在折叠之后做**：侧问不归任何一轮，折起某一轮不该把它一起折掉。
+ *
+ * 位置取「第一条比它晚的行之前」——你问那一句的时候屏幕上停在哪儿，
+ * 它就该留在哪儿；滚回去还能对着当时的上下文读。跑在最后的（问完还没有新内容）
+ * 落在队尾。纯函数，好测。
+ */
+export function withAsides(rows: readonly Row[], asides: readonly Aside[]): readonly Row[] {
+  if (asides.length === 0) return rows
+  const queue = [...asides].sort((a, b) => a.at - b.at)
+  const out: Row[] = []
+  let i = 0
+  for (const row of rows) {
+    const at = atOf(row)
+    while (at !== undefined) {
+      const next = queue[i]
+      if (next === undefined || next.at > at) break
+      out.push({ kind: "aside", aside: next })
+      i += 1
+    }
+    out.push(row)
+  }
+  for (const rest of queue.slice(i)) out.push({ kind: "aside", aside: rest })
+  return out
 }
 
 /**
