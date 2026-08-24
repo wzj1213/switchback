@@ -293,6 +293,7 @@ export function createHost(deps: HostDeps): Host {
     serial: new Map<string, Promise<void>>(),
     liveState: new Map<string, Event>(),
     uncommitted: new Map<ThreadId, Event[]>(),
+    echo: new Map<string, string>(),
   }
   /**
    * 一轮跑完就把排队的下一句发出去。

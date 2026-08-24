@@ -178,6 +178,13 @@ export interface Ctx {
    */
   uncommitted: Map<ThreadId, Event[]>
   /**
+   * 「这件事上一次说出去是什么样」——用来挡回声，见 `echoed`。
+   *
+   * 键是 `echoKey`，值是 `shapeOf`。**每轮结束清一次**（`turn.completed`），
+   * 所以驻留量是一轮里的 item 数，不是整条会话的。
+   */
+  echo: Map<string, string>
+  /**
    * 把待发队列里的第一句发出去。**由 `host.ts` 在建 ctx 时填进来。**
    *
    * 不直接 import `session.ts` 的 `prompt`：那会绕成
@@ -287,13 +294,73 @@ function directOwner(event: Event): ThreadId | undefined {
 }
 
 /**
+ * 「说的是同一件事」的键。**只认这三种**。
+ *
+ * 判据是「同一个身份 ＋ 同样的内容 = 没有新信息」。剩下的事件都不满足：
+ * `item.delta` 是**追加**（两条一样的增量是两次真的追加，不是回声，丢了正文就少一截）；
+ * `turn.*` / `thread.started` 描述的是一次发生，不是一份现状；
+ * `usage.updated` / `models.updated` 这些进 `LIVE_STATE`，那条路自己就按键留最后一条。
+ * 实测九种落盘事件里，回声全部集中在这三种上（`item.*` 16.3 MB、`thread.updated` 0.73 MB，
+ * 其余合计不到 0.03 MB）。
+ */
+function echoKey(event: Event): string | undefined {
+  if (event.type === "item.started" || event.type === "item.updated") return `item\u0000${event.item.id}`
+  if (event.type === "thread.updated") return `thread\u0000${event.thread.id}`
+  return undefined
+}
+
+/**
+ * 一条事件除掉时间戳之后的样子。
+ *
+ * 两处 `at` 都抹掉：事件自己的 `at` 和 item 的 `at` 都是发出那一刻的 `now()`，
+ * 每次都不同，而它们变了不代表内容变了。**`Thread.updatedAt` 不抹**——
+ * 那是内容的一部分（真改了才会动），抹掉会把两次真实改动看成同一条。
+ */
+function shapeOf(event: Event): string {
+  const at = { at: 0 }
+  if (event.type === "item.started" || event.type === "item.updated") {
+    return JSON.stringify({ ...event, ...at, item: { ...event.item, ...at } })
+  }
+  return JSON.stringify({ ...event, ...at })
+}
+
+/**
+ * 这条事件和上一条**逐字节相同**吗——是的话整条丢掉。
+ *
+ * ## 为什么这道闸门在宿主，不在某一家驱动里
+ *
+ * 撞上它的是 ACP 那条线：`tool_call_update` 逐块推，而 omni 的投影常常吃不下
+ * 那些块，于是同一份 `{kind:"file_edit",path:"",files:[],added:0,removed:0}`
+ * 被翻译出来 9793 遍，一条工具调用写掉 2.7 MB。但**这不是 ACP 独有的形状**：
+ * `thread.updated` 从宿主自己十几处发出去，其中 837 条（0.73 MB）是原样重发——
+ * 每处各加一次「变了吗」的判断，就是十几个各自会忘的地方。
+ *
+ * 所以挡在这个唯一出口上：一次覆盖四家驱动、宿主自己，以及以后接的每一家。
+ * 这不是节流（那要判断「哪些信息可以丢」，只有驱动知道，见
+ * `docs/侧栏与引擎状态方案.md` 那条 `LaneProgress`），**这里丢掉的字节数是零**——
+ * 除时间戳外逐字节相同的一条，对归约器、渲染层、journal 三边都是空操作。
+ *
+ * 落盘之外还省掉同样数量的渲染帧：那 9793 条每一条都会让工具行重画一次。
+ */
+function echoed(ctx: Ctx, event: Event): boolean {
+  // 一轮收工就清账：键是 item id，跨轮没有比较价值，留着只是占内存
+  if (event.type === "turn.completed") ctx.echo.clear()
+  const key = echoKey(event)
+  if (key === undefined) return false
+  const shape = shapeOf(event)
+  if (ctx.echo.get(key) === shape) return true
+  ctx.echo.set(key, shape)
+  return false
+}
+
+/**
  * **事件的唯一出口。** 所有 `emit` 都必须走这里，落盘才不会漏。
  *
  * 顺序有讲究：先发给渲染层，再落盘，最后才做旁路观察。
  * 界面响应不该等磁盘；而 `observe` 会改会话状态并再发事件，放最后免得穿插。
  */
 export function emit(ctx: Ctx, event: Event): void {
-  if (ctx.closed) return
+  if (ctx.closed || echoed(ctx, event)) return
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
   const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
   if (key !== undefined) ctx.liveState.set(key, event)

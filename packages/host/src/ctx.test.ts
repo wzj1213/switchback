@@ -66,6 +66,7 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
       inflight: new Map(),
       liveState: new Map(),
       uncommitted: new Map(),
+      echo: new Map(),
     }) as unknown as Ctx
 
   const commands: Event = {
@@ -124,5 +125,99 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
     const ctx = fresh()
     emit(ctx, { ...commands, threadId: "th-gone" })
     expect(liveStateOf(ctx)).toEqual([])
+  })
+})
+
+/**
+ * 这一组钉的是**磁盘和渲染帧**，不是界面上看得见的东西。
+ *
+ * 实测：ACP 那条线把同一份工具投影翻译出来 9793 遍（一条调用 2.7 MB），
+ * 而宿主自己十几处发的 `thread.updated` 里有 837 条是原样重发（0.73 MB）。
+ * 单会话 32 MB 的上限就是被这些撞满的——之后那条会话不再落盘。
+ */
+describe("回声挡在唯一出口上", () => {
+  const message = (id: string, text: string): Event => ({
+    type: "item.updated",
+    at: 0,
+    item: { id, turnId: "tu-1", at: 0, kind: "agent_message", text, complete: false },
+  })
+
+  function rig(): { ctx: Ctx; seen: Event[]; written: Event[] } {
+    const seen: Event[] = []
+    const written: Event[] = []
+    const ctx = {
+      deps: {
+        emit: (e: Event) => seen.push(e),
+        now: () => 0,
+        journal: {
+          append: (_owner: string, e: Event) => {
+            written.push(e)
+            return Promise.resolve()
+          },
+        },
+      },
+      live: new Map([["th-1", {}]]),
+      turnOwner: new Map([["tu-1", "th-1"]]),
+      inflight: new Map(),
+      liveState: new Map(),
+      uncommitted: new Map(),
+      echo: new Map(),
+    } as unknown as Ctx
+    return { ctx, seen, written }
+  }
+
+  it("**同一条 item 重发一千遍只算一条**——这就是把会话记录撑到 32 MB 上限的那个洞", () => {
+    const { ctx, seen, written } = rig()
+    for (let i = 0; i < 1000; i += 1) emit(ctx, { ...message("it-1", "一样的"), at: i })
+    expect(written).toHaveLength(1)
+    expect(seen).toHaveLength(1)
+  })
+
+  it("内容真的变了就照发——这道闸门丢掉的字节数是零", () => {
+    const { ctx, written } = rig()
+    emit(ctx, message("it-1", "一"))
+    emit(ctx, message("it-1", "一二"))
+    emit(ctx, message("it-1", "一二"))
+    emit(ctx, message("it-1", "一二三"))
+    expect(written.map((e) => (e.type === "item.updated" && e.item.kind === "agent_message" ? e.item.text : ""))).toEqual([
+      "一",
+      "一二",
+      "一二三",
+    ])
+  })
+
+  it("**`item.delta` 一条都不能挡**——两条一样的增量是两次真的追加，挡了正文就少一截", () => {
+    const { ctx, seen } = rig()
+    const delta: Event = { type: "item.delta", at: 0, itemId: "it-1", append: "啊" }
+    emit(ctx, delta)
+    emit(ctx, delta)
+    emit(ctx, delta)
+    expect(seen).toHaveLength(3)
+  })
+
+  it("**`thread.updated` 也挡**——它不是引擎发的，是宿主自己十几处各发一遍的", () => {
+    const { ctx, written } = rig()
+    const updated: Event = { type: "thread.updated", at: 0, thread }
+    emit(ctx, updated)
+    emit(ctx, { ...updated, at: 9 })
+    expect(written).toHaveLength(1)
+  })
+
+  it("**`updatedAt` 变了就是真的变了**——事件的 `at` 抹掉，会话自己的时间戳不能抹", () => {
+    const { ctx, written } = rig()
+    emit(ctx, { type: "thread.updated", at: 0, thread })
+    emit(ctx, { type: "thread.updated", at: 0, thread: { ...thread, updatedAt: 7 } })
+    expect(written).toHaveLength(2)
+  })
+
+  it("轮次事件从不挡，而且收工时清账——不清的话驻留量是整条会话而不是一轮", () => {
+    const { ctx, written } = rig()
+    const done: Event = { type: "turn.completed", at: 0, turnId: "tu-1", status: "completed" }
+    emit(ctx, message("it-1", "同一句"))
+    emit(ctx, done)
+    emit(ctx, done)
+    emit(ctx, message("it-1", "同一句"))
+    expect(written.filter((e) => e.type === "turn.completed")).toHaveLength(2)
+    expect(written.filter((e) => e.type === "item.updated")).toHaveLength(2)
   })
 })
