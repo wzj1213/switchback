@@ -34,9 +34,11 @@
  * **有 ultra 档的模型才有**——它是 EFFORT 表里唯一带「更快消耗使用额度」
  * 说明的那一档，普通档一个彩色都不长。描边过渡慢半拍：落档是个决定，不是悬停。
  */
+/* 底下这层 1px 边是兜底（SVG 没画出来时至少还有一圈），取坡道中段的紫；
+   真正看到的那圈由 `.compring__edge` 用渐变描出来，盖在它上面 */
 .composer__inner--costly {
-  border-color: #b4409a;
-  box-shadow: 0 0 0 3px rgb(180 64 154 / 22%), var(--shadow-1);
+  border-color: #6d4bc7;
+  box-shadow: 0 0 0 3px rgb(122 70 190 / 20%), var(--shadow-1);
   transition: border-color 300ms var(--ease), box-shadow 300ms var(--ease);
 }
 
@@ -49,18 +51,43 @@
   pointer-events: none;
 }
 
+/* 两条矩形共用一套几何：`rx` 和 `.composer__inner` 的 `--radius-lg` 是同一个数
+   （上一版写 17，比框自己圆一格，四个角上描边和框边**错开一像素**） */
+.compring__edge,
 .compring__orbit {
   x: 2px;
   y: 2px;
   width: calc(100% - 4px);
   height: calc(100% - 4px);
-  rx: 17px;
+  rx: 16px;
   fill: none;
-  stroke: #b4409a;
-  stroke-width: 2px;
+}
+
+/* 停点的颜色写在这儿，深色模式整组换。和滑块那条 `.effort__hot` 同一组值 */
+.compring__s0 {
+  stop-color: #2b2d6e;
+}
+
+.compring__s1 {
+  stop-color: #6d4bc7;
+}
+
+.compring__s2 {
+  stop-color: #b4409a;
+}
+
+/* 常驻的那一圈：整圈渐变，靛在左上、品红在右下——**和条子上的坡道同一个方向** */
+.compring__edge {
+  stroke-width: 1.6px;
+}
+
+/* 绕圈那一段：同一条渐变，所以它转到哪儿就带哪一段的颜色，
+   不是一枚固定颜色的光点在跑 */
+.compring__orbit {
+  stroke-width: 2.4px;
   stroke-linecap: round;
-  stroke-dasharray: 12 88;
-  filter: drop-shadow(0 0 4px rgb(180 64 154 / 35%));
+  stroke-dasharray: 10 90;
+  filter: drop-shadow(0 0 4px rgb(150 60 170 / 45%));
   animation: comp-orbit 6s linear infinite;
 }
 
@@ -79,13 +106,24 @@
 
 @media (prefers-color-scheme: dark) {
   .composer__inner--costly {
-    border-color: #d76ab4;
-    box-shadow: 0 0 0 3px rgb(215 106 180 / 26%), var(--shadow-1);
+    border-color: #8367dd;
+    box-shadow: 0 0 0 3px rgb(140 95 220 / 24%), var(--shadow-1);
+  }
+
+  .compring__s0 {
+    stop-color: #3a3d8a;
+  }
+
+  .compring__s1 {
+    stop-color: #8367dd;
+  }
+
+  .compring__s2 {
+    stop-color: #d76ab4;
   }
 
   .compring__orbit {
-    stroke: #d76ab4;
-    filter: drop-shadow(0 0 4px rgb(215 106 180 / 40%));
+    filter: drop-shadow(0 0 4px rgb(200 110 200 / 45%));
   }
 }
 

@@ -55,16 +55,23 @@ function voidAt(t: number): string {
   )} ${String(Math.round(from[2] + (to[2] - from[2]) * f))})`
 }
 
-/** 收起态那几枚小刻度：亮到第几格就是第几档，不点开也知道。 */
+/**
+ * 收起态那几枚小刻度：亮到第几格就是第几档，不点开也知道。
+ *
+ * **贵档时每一枚各染各的位置色**（`voidAt(i / (count-1))`），不是整排刷成品红：
+ * 那样一排六枚同色，等于把「更贵」这句话在 24px 里说了六遍，
+ * 而且和展开后那条坡道对不上——收起和展开说的得是同一件事，
+ * 收起态就是那条坡道**降采样到几个像素**的样子。
+ */
 function Ticks({
   count,
   index,
-  color,
+  costly,
 }: {
   count: number
   index: number
-  /** 贵档落档时，亮着的刻度染坡道尽头的品红。 */
-  color?: string
+  /** 贵档落档：亮着的那几枚按各自的位置取坡道色。 */
+  costly: boolean
 }): React.JSX.Element {
   return (
     <span className="effort__ticks" aria-hidden="true">
@@ -72,7 +79,7 @@ function Ticks({
         <i
           key={i}
           className={i <= index ? "on" : undefined}
-          style={color === undefined || i > index ? undefined : { background: color }}
+          style={costly && i <= index ? { background: voidAt(count < 2 ? 1 : i / (count - 1)) } : undefined}
         />
       ))}
     </span>
@@ -102,12 +109,14 @@ function EffortTrigger({
       type="button"
       ref={trig}
       className="trigger"
-      title="推理强度"
+      /* 贵档时那句话进 title：**它不再常驻浮在正文上方**（会压住正在打的字），
+         改成停一下才出来的那张小卡（见 `.effort__warn`）。 */
+      title={costly ? "超高：更快消耗使用额度" : "推理强度"}
       disabled={disabled}
       aria-expanded={false}
       onClick={onOpen}
     >
-      <Ticks count={count} index={index} color={costly ? voidAt(1) : undefined} />
+      <Ticks count={count} index={index} costly={costly} />
       <span className="trigger__label">{label}</span>
     </button>
   )
@@ -177,8 +186,10 @@ export function EffortSlider({
   if (efforts.length === 0) return null
   return (
     <span className="effortbox">
-      {/* 「更快消耗使用额度」浮在触发器上方——只在贵档落档时出现，
-          平时一行高度都不占（原型图二的那句） */}
+      {/* 「更快消耗使用额度」那句话。**不常驻**——上一版它常驻浮在触发器正上方，
+          而那块地正是正文的最后一行：打满字就直接压在字上。
+          现在它是停一下（或键盘聚焦）才出来的一张带底的小卡，
+          常驻那句话交给坡道色的刻度和档位名（见 `.effort__warn`）。 */}
       {costly && !open ? <span className="effort__warn">更快消耗使用额度</span> : null}
       <span
         className={effortClass(open, closing, costly)}

@@ -486,7 +486,12 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  max-width: 96px;
+  /* 收起态的上限。**不是 96**：claude 的顶档叫 `Ultracode`
+     （`packages/engine/src/claude/effort.ts` 里给 xhigh 模型追加的那一档），
+     五枚刻度 28 ＋ 名字 53.5 ＋ 间距内边距 23 = **实测 104.5**——卡在 96 上，
+     那颗按钮顶出自己的盒子 8.5px 去压左边的东西。这个数只是个上限，
+     短名字（「超高」）照样按内容收窄，不会因此变宽 */
+  max-width: 140px;
   transition: max-width var(--dur-slow) var(--ease);
   /* 生长时的裁剪交给条子自己的 clip-path（保持胶囊形），外壳再裁一刀就是平口 */
   overflow: visible;
@@ -500,14 +505,32 @@
   align-items: center;
 }
 
+/* 「更快消耗使用额度」。**不常驻。**
+   上一版它无条件浮在触发器正上方，而那块地就是正文的最后一行——
+   打满字就直接压在字上，而且没有底色，两层文字叠在一起谁都读不出来。
+   现在：停一下（或键盘聚焦到触发器）才出来，自带底色和阴影，压得住底下的字。
+   常驻那句话交给坡道色的刻度和档位名——**颜色已经说过一遍了**。 */
 .effort__warn {
   position: absolute;
   right: 0;
   bottom: calc(100% + 6px);
+  z-index: 2;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
   color: #96307c;
   font-size: var(--text-xs);
   white-space: nowrap;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.effortbox:hover .effort__warn,
+.effortbox:focus-within .effort__warn {
+  opacity: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -609,7 +632,10 @@
 /* 深空那层靠透明度交叉淡入——CSS 没法在两条 linear-gradient 之间过渡，
    直接换 background-image 是一帧灰变紫，看着像 bug */
 .effort__hot {
-  background-image: linear-gradient(90deg, #2b2d6e, #6d4bc7 50%, #b4409a);
+  /* 品红那一站停在 **86%**：满档时拇指盖住的正是最后 20px（20 / 208 ≈ 9.6%），
+     停在 100% 的话整条最亮的那一截**永远看不见**。末尾那站是淡尾，
+     让被拇指压住的那一小段也不是死色 */
+  background-image: linear-gradient(90deg, #2b2d6e, #6d4bc7 48%, #b4409a 86%, #c95ab0);
   opacity: 0;
   transition: opacity 420ms var(--ease);
 }
@@ -631,7 +657,10 @@
   width: 1px;
   height: 8px;
   border-radius: 1px;
-  background: rgb(0 0 0 / 30%);
+  /* **一深一浅并排。** 只有一道的话，填充推到哪儿刻度就在哪儿消失——
+     深线压在浅色轨道上看得见，浅线压在深色填充上看得见，一根都不丢 */
+  background: rgb(0 0 0 / 26%);
+  box-shadow: 1px 0 0 rgb(255 255 255 / 34%);
   transform: translate(-50%, -50%);
 }
 
@@ -676,16 +705,29 @@
   pointer-events: none;
 }
 
+/* 圆点是多数。光晕跟着自己的大小走——上一版是 1px 的方块套 4px 的固定光晕，
+   读出来是脏点不是星 */
 .effort__stars i {
   position: absolute;
   top: 50%;
-  width: 5px;
-  height: 5px;
+  width: var(--s, 2px);
+  height: var(--s, 2px);
+  border-radius: 999px;
   background: #fff;
-  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
-  box-shadow: 0 0 4px rgb(255 255 255 / 80%);
+  box-shadow: 0 0 calc(var(--s, 2px) * 1.4) rgb(255 255 255 / 70%);
   transform: translateY(-50%);
   animation: effort-twinkle 2.4s var(--ease) infinite;
+}
+
+/* 带芒的四角星（和界面里那颗 ✧ 同一个形状）。**每第三颗才是**：
+   一屏里芒星是少数才像星空，全是芒星读起来是一排图标。
+   clip-path 会把 box-shadow 一起裁掉，所以这一颗的光走 drop-shadow */
+.effort__stars i.lit {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+  scale: 2;
+  box-shadow: none;
+  filter: drop-shadow(0 0 1.5px rgb(255 255 255 / 85%));
 }
 
 @keyframes effort-twinkle {
@@ -718,17 +760,27 @@
 .effort--costly.effort--open {
   border-radius: 999px;
   box-shadow: 0 0 0 3px rgb(180 64 154 / 22%);
+  /* **柔光比条子慢一步再出来。** 条子是 clip-path 从 0 长到整条，
+     柔光却是围着外壳画的——同时出现的话，先看到的是一个空的品红圈 */
+  transition: max-width var(--dur-slow) var(--ease), box-shadow 260ms var(--ease) 160ms;
 }
 
-/* 深空的拇指是白的发光的 */
+/* 深空的拇指：白，外面一圈 1.5px 的品红细边把它从星空里托出来。
+   上一版是 6px + 14px 两层外发光，20px 的圆点上糊成一团光斑，
+   而且**把落点糊没了**——拇指是这条上唯一要看清位置的东西 */
 .effort--costly .effort__thumb {
   box-shadow:
-    0 0 6px rgb(180 64 154 / 60%),
-    0 0 14px rgb(180 64 154 / 35%);
+    0 0 0 1.5px rgb(180 64 154 / 60%),
+    0 0 10px rgb(180 64 154 / 40%),
+    0 1px 3px rgb(0 0 0 / 22%);
 }
 
+/* 深空态的刻度退到几乎看不见：**星空不该被切成六段**。
+   要数格子时数得出来就够——它不是这一档要说的话 */
 .effort--costly .effort__stops i {
-  background: rgb(255 255 255 / 45%);
+  height: 6px;
+  background: rgb(255 255 255 / 24%);
+  box-shadow: none;
 }
 
 /* 贵档落档时触发器的档位名也要说「这一档更贵」：品红加粗（demo 的 eff__lvl） */
@@ -747,11 +799,12 @@
   }
 
   .effort__hot {
-    background-image: linear-gradient(90deg, #3a3d8a, #8367dd 50%, #d76ab4);
+    background-image: linear-gradient(90deg, #3a3d8a, #8367dd 48%, #d76ab4 86%, #e489c9);
   }
 
   .effort__stops i {
     background: rgb(255 255 255 / 30%);
+    box-shadow: 1px 0 0 rgb(0 0 0 / 34%);
   }
 
   .effort--costly .trigger__label {
@@ -764,7 +817,8 @@
 
   .effort--costly .effort__thumb {
     box-shadow:
-      0 0 6px rgb(215 106 180 / 65%),
-      0 0 14px rgb(215 106 180 / 40%);
+      0 0 0 1.5px rgb(215 106 180 / 65%),
+      0 0 10px rgb(215 106 180 / 45%),
+      0 1px 3px rgb(0 0 0 / 30%);
   }
 }
