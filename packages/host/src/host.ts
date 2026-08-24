@@ -307,6 +307,7 @@ export function createHost(deps: HostDeps): Host {
     liveState: new Map<string, Event>(),
     uncommitted: new Map<ThreadId, Event[]>(),
     echo: new Map<string, string>(),
+    explained: new Map<TurnId, string>(),
   }
   /**
    * 一轮跑完就把排队的下一句发出去。

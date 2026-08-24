@@ -185,6 +185,11 @@ export interface Ctx {
    */
   echo: Map<string, string>
   /**
+   * 这一轮已经摆出去的那句报错。**只为挡重复**：`turn.completed` 带的原因
+   * 和驱动自己发过的 error item 常常是同一句，摆两遍就是同一件事说两次。
+   */
+  explained: Map<TurnId, string>
+  /**
    * 把待发队列里的第一句发出去。**由 `host.ts` 在建 ctx 时填进来。**
    *
    * 不直接 import `session.ts` 的 `prompt`：那会绕成
@@ -354,6 +359,47 @@ function echoed(ctx: Ctx, event: Event): boolean {
 }
 
 /**
+ * 一轮失败了，**把原因摆进转录区**。
+ *
+ * 改这条之前，`turn.completed` 的 `status` 和 `error` **全代码库没有第二个读者**：
+ * 归约器的 `onTurnCompleted` 只清 `turns` / `tasks`，两个字段一起丢；渲染层没有
+ * 任何地方读它；`thread.status === "failed"` 也没有任何一处显示。于是引擎明说了
+ * 为什么，用户看到的是**自己发出去的消息后面一片空白**。
+ *
+ * mac2 实拍（2026-08-24）：Kimi 连着五轮回 `401 k3-256k supports only 256K context.`
+ * ——上下文超了它的窗口，每轮三秒就失败。界面上零提示，人只能以为「这个会话坏了」，
+ * 而真相是「换个模型或者压一下上下文就能继续」。**能不能修，取决于看不看得见。**
+ *
+ * 放在宿主而不是各家驱动：codex 的 `onError` 只覆盖 `error` 通知那条路，
+ * `turn/completed` 上带的 `turn.error.message` 同样没人读；kimi 与 ACP 连那条路都没有。
+ * 四家各补一次就是四个各自会忘的地方——和 `echoed` 同一个理由，而这里是唯一出口，
+ * `turn.completed` 必然经过。
+ *
+ * 三条边界：**中断不算失败**（用户自己按的停止，不需要一条报错）；
+ * **驱动已经说过的同一句不重复摆**；**报错排在 `turn.completed` 之前**发出去，
+ * 这样它落在那一轮里面，而不是掉到下一轮的开头。
+ */
+function explainFailure(ctx: Ctx, event: Event): void {
+  if (event.type === "item.started" || event.type === "item.updated") {
+    if (event.item.kind === "error") ctx.explained.set(event.item.turnId, event.item.message)
+    return
+  }
+  if (event.type !== "turn.completed") return
+  const said = ctx.explained.get(event.turnId)
+  ctx.explained.delete(event.turnId)
+  const message = event.error
+  if (event.status !== "failed" || message === undefined || message === "" || message === said) return
+  // 认不出属于哪条会话就不摆：那条报错落不了盘，只会在界面上飘一条无主的红字
+  if (ctx.turnOwner.get(event.turnId) === undefined) return
+  const at = ctx.deps.now()
+  emit(ctx, {
+    type: "item.started",
+    at,
+    item: { id: ctx.deps.newId("it"), turnId: event.turnId, at, kind: "error", message, fatal: true },
+  })
+}
+
+/**
  * **事件的唯一出口。** 所有 `emit` 都必须走这里，落盘才不会漏。
  *
  * 顺序有讲究：先发给渲染层，再落盘，最后才做旁路观察。
@@ -361,6 +407,7 @@ function echoed(ctx: Ctx, event: Event): boolean {
  */
 export function emit(ctx: Ctx, event: Event): void {
   if (ctx.closed || echoed(ctx, event)) return
+  explainFailure(ctx, event)
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
   const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
   if (key !== undefined) ctx.liveState.set(key, event)

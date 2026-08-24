@@ -67,6 +67,7 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
       liveState: new Map(),
       uncommitted: new Map(),
       echo: new Map(),
+      explained: new Map(),
     }) as unknown as Ctx
 
   const commands: Event = {
@@ -149,6 +150,7 @@ describe("回声挡在唯一出口上", () => {
       deps: {
         emit: (e: Event) => seen.push(e),
         now: () => 0,
+        newId: (prefix: string) => `${prefix}-x`,
         journal: {
           append: (_owner: string, e: Event) => {
             written.push(e)
@@ -162,6 +164,7 @@ describe("回声挡在唯一出口上", () => {
       liveState: new Map(),
       uncommitted: new Map(),
       echo: new Map(),
+      explained: new Map(),
     } as unknown as Ctx
     return { ctx, seen, written }
   }
