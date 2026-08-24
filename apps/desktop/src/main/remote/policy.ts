@@ -147,6 +147,7 @@ export function isCommand(value: unknown): value is Command {
   const shape = shapeOf(record["type"])
   if (shape === undefined) return false
   if (!shape.strings.every((f) => typeof record[f] === "string")) return false
+  if (!(shape.optionalStrings ?? []).every((f) => record[f] === undefined || typeof record[f] === "string")) return false
   if (!(shape.booleans ?? []).every((f) => typeof record[f] === "boolean")) return false
   return Object.entries(shape.enums ?? {}).every(([field, allowed]) => {
     const seen = record[field]
@@ -160,6 +161,8 @@ const SCOPES: readonly string[] = ["once", "session", "project"]
 interface Shape {
   /** 必需的字符串字段。 */
   strings: readonly string[]
+  /** 存在时必须是字符串；缺席合法。 */
+  optionalStrings?: readonly string[]
   /**
    * 必需的**布尔**字段。
    *
@@ -177,7 +180,7 @@ interface Shape {
  * 它们缺席是合法的。
  */
 const SHAPES: Readonly<Record<string, Shape>> = {
-  "thread.adopt": { strings: ["engine", "handle", "cwd", "title"] },
+  "thread.adopt": { strings: ["engine", "handle", "cwd", "title"], optionalStrings: ["profile"] },
   "thread.create": { strings: ["cwd", "engine"], enums: { trust: TRUSTS } },
   "thread.prompt": { strings: ["threadId", "text"] },
   "thread.sideQuestion": { strings: ["threadId", "text"] },

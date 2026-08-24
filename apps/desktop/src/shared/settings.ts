@@ -62,7 +62,7 @@ export interface Settings {
    */
   pets: boolean
   /**
-   * DSH 接入确认。
+   * DSH profile 与接入确认。
    *
    * DSH 的 provider、model 与 API 凭证仍归它自己的设置与凭证服务管理；
    * omni 只记「用户确认那边已经配好，可以把 DSH 放进引擎清单」。默认不确认，
@@ -144,8 +144,20 @@ export interface RemoteSettings {
 }
 
 export interface DshSettings {
-  /** 用户确认 DSH 原生 provider、model 与凭证已经配好。 */
-  configured: boolean
+  /** 新开的 DSH 会话从哪棵插件树启动。 */
+  profile: string
+  /** 用户确认原生 provider、model 与凭证已配好的 profile；确认按 profile 隔离。 */
+  confirmedProfiles: readonly string[]
+}
+
+/** 与 DSH launcher 的公开 profile 名校验保持同形；驱动启动前还会再守一次。 */
+export function isDshProfileName(name: string): boolean {
+  return name !== "" && name !== "." && name !== ".." && name !== "node_modules"
+    && !name.includes("/") && !name.includes("\\")
+}
+
+export function dshProfileConfirmed(dsh: DshSettings): boolean {
+  return dsh.confirmedProfiles.includes(dsh.profile)
 }
 
 export interface LastUsed {
@@ -168,7 +180,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
-  dsh: { configured: false },
+  dsh: { profile: "acp", confirmedProfiles: [] },
   defaultEngine: "",
   defaultTrust: "auto-edit",
   projectIcons: {},

@@ -73,7 +73,11 @@ async function installStarted(
     live.gate = createGate((event) => {
       if (isCurrent(ctx, live)) emit(ctx, event)
     })
-    live.thread = { ...live.thread, capabilities: session.capabilities() }
+    live.thread = {
+      ...live.thread,
+      capabilities: session.capabilities(),
+      ...(session.profile === undefined ? {} : { engineProfile: session.profile }),
+    }
     live.thread = applyEarly(live.thread, lease.early, ctx.deps.now())
     ctx.live.set(live.thread.id, live)
     lease.installing = false
@@ -145,6 +149,7 @@ export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = 
         lease.early.trustApply = result
       }
     },
+    ...(thread.engineProfile === undefined ? {} : { profile: thread.engineProfile }),
     ...(resume === undefined ? {} : { resume }),
     ...(forkOf === undefined ? {} : { forkOf }),
   }).catch((error: unknown) => {

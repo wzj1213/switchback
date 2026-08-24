@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
 import { PetArt } from "./pets-art.js"
-import { gaitOf, type Hit, type Pet, type PetLook } from "../pets.js"
-import { petRoster } from "../pet-roster.js"
+import { gaitOf, type Hit, type Pet } from "../pets.js"
+import { petRoster, type PetSlot } from "../pet-roster.js"
 import { usePets, useReduced } from "../usePets.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
+import { DshPetEffect, useDshPetPhase, type DshPetPhase } from "./DshPetEffect.js"
 
 /**
  * 蹲在输入框上沿的那几只。手感与物理在 `renderer/pets.ts`，机械部分在 `usePets.ts`。
@@ -75,19 +76,23 @@ export function Pets({
   engines,
   engine,
   running,
+  active,
+  failed,
+  profile,
 }: {
-  /** 注册了哪几家。**由宿主给**，不在这里写死。 */
   engines: readonly EngineInfo[]
-  /** 这个会话现在归谁跑。真引擎里只有它亮；无 profile 的 DSH 占位不冒充当前引擎。 */
   engine: EngineId
-  /** 这一轮正在跑。只有这时候当前那只才跳。 */
   running: boolean
+  active: boolean
+  failed: boolean
+  profile?: string
 }): React.JSX.Element | null {
   const shown = useMemo(() => petRoster(engines, engine), [engines, engine])
   const count = shown.length
   const gaits = useMemo(() => shown.map((slot) => gaitOf(slot.look.shape)), [shown])
   const bodies = useRef<(HTMLSpanElement | null)[]>([])
   const reduced = useReduced()
+  const dshPhase = useDshPetPhase(engine === "dsh" && active, failed)
   // 砸到地上要有分量：**按落地速度定砸扁的深浅**，轻轻放下几乎看不出，
   // 从对话框顶上摔下来会实实在在瘪一下
   // 砸到地、撞到墙、撞到同伴走的都是这一下（判据在 `hitOf`）：
@@ -134,13 +139,14 @@ export function Pets({
           ref={(n) => {
             ctl.nodes.current[i] = n
           }}
-          className={classOf(info.engine === engine, running, info.look, info.engine === undefined)}
-          title={titleOf(info.label, info.engine === engine, running)}
+          className={classOf(info, engine, running, dshPhase)}
+          title={titleOf(info.label, info.engine === engine, running, info.engine === "dsh" ? profile : undefined)}
           onPointerDown={drag.down(i)}
           onPointerMove={drag.move}
           onPointerUp={drag.up}
           onPointerCancel={drag.up}
         >
+          {info.engine === "dsh" && info.engine === engine ? <DshPetEffect phase={dshPhase} /> : null}
           {/* 状态点在**头顶**，不在脚下。挂在脚下时它垫在身子和地面之间，
               三只看起来全都悬空——而它们本来是站在输入框上沿的，那条边就是地面 */}
           {info.engine === engine && running ? <span className="pet__dot" /> : null}
@@ -167,22 +173,31 @@ export function Pets({
 
 /** 眨眼、瞟眼、被捏着、走路那几个类**不在这儿**——它们每秒都可能变，
     由 `useMood` / `usePetDrag` / `petPaint` 直接写 `classList`，不换一次重渲染。 */
-function classOf(on: boolean, running: boolean, look: PetLook, placeholder: boolean): string {
+function classOf(
+  info: PetSlot,
+  current: EngineId,
+  running: boolean,
+  dshPhase: DshPetPhase,
+): string {
+  const { look } = info
+  const on = info.engine === current
   return [
     "pet",
     `pet--${look.tone}`,
     `pet--${look.shape}`,
-    placeholder ? "pet--placeholder" : "",
+    info.engine === undefined ? "pet--placeholder" : "",
     on ? "pet--on" : "",
     on && running ? "pet--run" : "",
+    on && look.tone === "dsh" ? `pet--dsh-${dshPhase}` : "",
   ]
     .filter((c) => c !== "")
     .join(" ")
 }
 
-function titleOf(label: string, on: boolean, running: boolean): string {
+function titleOf(label: string, on: boolean, running: boolean, profile?: string): string {
   if (!on) return label
-  return running ? `${label} · 正在跑` : `${label} · 这一轮归它`
+  const routed = profile === undefined ? label : `${label} · ${profile} profile`
+  return running ? `${routed} · 正在跑` : `${routed} · 这一轮归它`
 }
 
 export type { Pet }

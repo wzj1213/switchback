@@ -169,7 +169,7 @@ export function SettingsScreen({
       settings={prefs.settings}
       engines={engines}
       catalog={state.engines}
-      models={engineModelCatalogs(state)}
+      models={engineModelCatalogs(state, prefs.settings.dsh.profile)}
       accounts={state.accounts}
       version={info.version}
       dataDir={info.dataDir}

@@ -55,16 +55,24 @@ describe("偏好", () => {
     }
 
     it("默认不接入——没有配置时 DSH 不能凭一次 ACP 握手出现在引擎清单", () => {
-      expect(SETTINGS_DEFAULTS.dsh).toEqual({ configured: false })
+      expect(SETTINGS_DEFAULTS.dsh).toEqual({ profile: "acp", confirmedProfiles: [] })
     })
 
-    it("只认字面的 true，坏值与旧设置都落回未配置", () => {
-      for (const bad of ["true", 1, "yes", {}, null]) {
-        write({ configured: bad })
-        expect(createSettings(log).get().dsh.configured).toBe(false)
-      }
+    it("把旧版已配置迁到 acp profile，坏值不冒充确认", () => {
       write({ configured: true })
-      expect(createSettings(log).get().dsh.configured).toBe(true)
+      expect(createSettings(log).get().dsh).toEqual({ profile: "acp", confirmedProfiles: ["acp"] })
+      write({ configured: "true" })
+      expect(createSettings(log).get().dsh).toEqual(SETTINGS_DEFAULTS.dsh)
+    })
+
+    it("profile 名与确认清单逐项校验、去重，确认不跨 profile", () => {
+      write({ profile: "team", confirmedProfiles: ["acp", "team", "team", "../bad", 3] })
+      expect(createSettings(log).get().dsh).toEqual({
+        profile: "team",
+        confirmedProfiles: ["acp", "team"],
+      })
+      write({ profile: "../bad", confirmedProfiles: ["team"] })
+      expect(createSettings(log).get().dsh).toEqual({ profile: "acp", confirmedProfiles: ["team"] })
     })
   })
 

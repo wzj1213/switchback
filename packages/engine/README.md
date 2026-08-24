@@ -89,7 +89,8 @@
 
 ## 已知限制
 
-- **内置 DSH 只启动它公开的 `dsh --profile acp`。** profile 与插件仍由 DSH 自己管理，
+- **内置 DSH 只启动它公开的 `dsh --profile <profile>`。** 新会话采用设置中选中的 profile，
+  旧会话按自己保存的 profile 续接；profile 与插件仍由 DSH 自己管理，
   omni 不代装、不代升级；兼容性探测会真的发送一次 ACP `initialize`，因此缺 profile、插件依赖错配与
   协议版本不合都会按原始启动结果报告，而不是看见配置文件就猜成可握手。该入口没有公开凭证就绪状态，
   所以握手成功不等于 provider/model/API 已可用；桌面层只在用户确认 DSH 原生配置完成后才探测并列出它。

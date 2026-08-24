@@ -22,6 +22,7 @@ export async function adopt(
     updatedAt: at,
     engineHistory: [cmd.engine],
     engineHandle: cmd.handle,
+    ...(cmd.profile === undefined ? {} : { engineProfile: cmd.profile }),
     adopted: true,
   }
   emit(ctx, { type: "thread.started", at, thread })

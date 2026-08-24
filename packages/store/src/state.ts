@@ -292,7 +292,9 @@ export function engineThreadsOf(state: ViewState, engine: string): readonly Engi
  * 肌肉记忆就废了。
  */
 export function foreignByEngine(state: ViewState): readonly { engine: string; threads: readonly EngineThread[] }[] {
-  const listed = state.engines.filter((e) => e.state !== "missing").map((e) => e.id)
+  const listed = state.engines
+    .filter((e) => e.state !== "missing" && e.state !== "unavailable")
+    .map((e) => e.id)
   // 报过历史但不在清单里的也带上：清单迟到时不该让已有的一段闪一下才出现
   const extra = Object.keys(state.engineThreads).filter((id) => !listed.includes(id))
   return [...listed, ...extra].map((engine) => ({ engine, threads: state.engineThreads[engine] ?? [] }))

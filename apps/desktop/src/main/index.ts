@@ -4,7 +4,7 @@ import { homedir } from "node:os"
 import { installAttachChannel } from "./attach.js"
 import { installProjectDocChannel } from "./projectdoc.js"
 import { createEngineVersions, installEngineVersionChannel } from "./enginever.js"
-import { installEngineDoorChannel } from "./enginedoors.js"
+import { installEngineDoorChannels } from "./enginedoors.js"
 import { installSelfUpdateChannel } from "./selfupdate.js"
 import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
@@ -331,7 +331,7 @@ function installChannels(): void {
   installAttachChannel()
   installProjectDocChannel()
   installEngineVersionChannel(log, engineVersions)
-  installEngineDoorChannel()
+  installEngineDoorChannels()
   installEnvChannel(log)
   installSelfUpdateChannel(log)
 }
@@ -374,7 +374,7 @@ function bootstrap(): Promise<void> {
     const relay: { notify?: (threadId: string, title: string, body: string) => void } = {}
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
       relay: (id, title, body) => relay.notify?.(id, title, body),
-      engineVisible: (id) => engineEnabled(settings.get(), id),
+      engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
     })
     installReviewChannel(attached.baselines)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。

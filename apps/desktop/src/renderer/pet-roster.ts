@@ -28,7 +28,8 @@ const DSH: PetSlot = {
 export function petRoster(engines: readonly EngineInfo[], current: EngineId): readonly PetSlot[] {
   const dsh = engines.find(
     (engine) =>
-      lookOf(engine.id).tone === "dsh" && (engine.state !== "missing" || engine.id === current),
+      lookOf(engine.id).tone === "dsh" &&
+      ((engine.state !== "missing" && engine.state !== "unavailable") || engine.id === current),
   )
   const others = engines.filter((engine) => lookOf(engine.id).tone !== "dsh")
   return [...pick(others, current).map(slotOf), dsh === undefined ? DSH : slotOf(dsh)]
@@ -46,7 +47,10 @@ const slotOf = (info: EngineInfo): PetSlot => ({
  * 地方画着「谁在答」。DSH 永远单列在第五格，设置确认并探测成功后才把占位换成真引擎。
  */
 function pick(engines: readonly EngineInfo[], current: EngineId): readonly EngineInfo[] {
-  const usable = engines.filter((engine) => engine.state !== "missing" || engine.id === current)
+  const usable = engines.filter(
+    (engine) =>
+      (engine.state !== "missing" && engine.state !== "unavailable") || engine.id === current,
+  )
   const capped = usable.slice(0, REAL_MAX)
   if (capped.some((engine) => engine.id === current)) return capped
   const mine = usable.find((engine) => engine.id === current)

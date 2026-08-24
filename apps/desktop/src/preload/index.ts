@@ -5,6 +5,7 @@ import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
 import type { EngineVersion, UpdateResult } from "../main/enginever.js"
 import type { EngineDoor } from "../main/enginedoors.js"
+import type { DshProfileCatalog } from "../main/dsh-profiles.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { RemoteStatus } from "../main/remote/install.js"
 import type { ReviewFile, ReviewPatch } from "../shared/review.js"
@@ -65,8 +66,12 @@ const api = {
     return (await ipcRenderer.invoke("omni:engineVersions", refresh)) as readonly EngineVersion[]
   },
   /** 各家引擎自己的设置在哪儿。**omni 只把门指出来**，见 `main/enginedoors.ts`。 */
-  async engineDoors(cwd?: string): Promise<readonly EngineDoor[]> {
-    return (await ipcRenderer.invoke("omni:engineDoors", cwd)) as readonly EngineDoor[]
+  async engineDoors(cwd?: string, dshProfile?: string): Promise<readonly EngineDoor[]> {
+    return (await ipcRenderer.invoke("omni:engineDoors", { cwd, dshProfile })) as readonly EngineDoor[]
+  },
+  /** DSH 的 profile 与直接插件清单；只来自各 profile 的 package.json。 */
+  async dshProfiles(): Promise<DshProfileCatalog> {
+    return (await ipcRenderer.invoke("omni:dshProfiles")) as DshProfileCatalog
   },
   /** 用系统编辑器打开设置页刚列出的原生配置；主进程会再次核对路径。 */
   openEngineFile(path: string): void {

@@ -272,9 +272,9 @@ class AcpSession implements EngineSession {
     }
   }
 
-  get threadId(): StartRequest["threadId"] {
-    return this.req.threadId
-  }
+  get threadId(): StartRequest["threadId"] { return this.req.threadId }
+
+  get profile(): string | undefined { return this.req.profile }
 
   /**
    * 发一轮。
@@ -365,7 +365,9 @@ class AcpSession implements EngineSession {
     if (this.state.canList === false) return []
     const raw = await this.rpc.call("session/list", { cwd: this.req.cwd }).catch(() => undefined)
     this.state.canList = raw !== undefined
-    return sessionsOf(raw, HISTORY_MAX)
+    const sessions = sessionsOf(raw, HISTORY_MAX)
+    return this.req.profile === undefined ? sessions
+      : sessions.map((session) => ({ ...session, profile: this.req.profile }))
   }
 
   /**

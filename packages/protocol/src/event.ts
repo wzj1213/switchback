@@ -78,12 +78,13 @@ export interface ModelOption {
 /**
  * 一个可用的引擎。**清单由宿主给**——界面写死一份，迟早和真正注册了的对不上。
  *
- * `state` 回答「这台机器上装了吗」，三态：
+ * `state` 回答「这台机器上的运行入口当前能否用」，四态：
  *
  * | | 界面怎么做 |
  * | --- | --- |
  * | `ok` | 正常显示 |
  * | `missing` | 标出来并说清楚怎么装。**仍然可选**——探测也会错，不能硬拦 |
+ * | `unavailable` | 命令已安装，但当前原生配置/插件组装不能启动 |
  * | `unknown` / 缺席 | 什么都不做。**猜不出来就别猜** |
  *
  * 灰掉一个其实能用的引擎，比不检查更糟：用户会相信自己没装，去装第二遍。
@@ -91,8 +92,10 @@ export interface ModelOption {
 export interface EngineInfo {
   id: EngineId
   label: string
-  state?: "ok" | "missing" | "unknown"
-  /** `missing` 时给人看的一句话，必须说得出下一步做什么。 */
+  /** 这份探测结果属于哪条原生 profile；目前由 DSH 使用。 */
+  profile?: string
+  state?: "ok" | "missing" | "unavailable" | "unknown"
+  /** `missing` / `unavailable` 时给人看的一句话，必须说得出下一步做什么。 */
   detail?: string
 }
 

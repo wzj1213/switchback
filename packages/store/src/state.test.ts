@@ -77,7 +77,7 @@ describe("侧栏行", () => {
 })
 
 describe("历史段：装了的每一家各一段", () => {
-  const withEngines = (engines: { id: string; state?: "ok" | "missing" }[], threads = {}): ViewState => ({
+  const withEngines = (engines: { id: string; state?: "ok" | "missing" | "unavailable" }[], threads = {}): ViewState => ({
     ...initial(),
     engines: engines.map((e) => ({ label: e.id, ...e })) as ViewState["engines"],
     engineThreads: threads,
@@ -89,8 +89,12 @@ describe("历史段：装了的每一家各一段", () => {
     expect(got.every((g) => g.threads.length === 0)).toBe(true)
   })
 
-  it("没装的那家不给段——摆一段永远空的出来只是噪声", () => {
-    const got = foreignByEngine(withEngines([{ id: "codex" }, { id: "kimi", state: "missing" }]))
+  it("没装或当前配置不可用的引擎不给空段", () => {
+    const got = foreignByEngine(withEngines([
+      { id: "codex" },
+      { id: "kimi", state: "missing" },
+      { id: "dsh", state: "unavailable" },
+    ]))
     expect(got.map((g) => g.engine)).toEqual(["codex"])
   })
 

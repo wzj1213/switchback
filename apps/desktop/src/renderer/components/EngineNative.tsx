@@ -6,6 +6,7 @@ import type { EngineSettingsCopy } from "../engine-settings-copy.js"
 
 export function EngineNative({
   engine,
+  dshProfile,
   copy,
   cwd,
   onCopy,
@@ -13,6 +14,7 @@ export function EngineNative({
   onReveal,
 }: {
   engine: string
+  dshProfile?: string
   copy: EngineSettingsCopy
   cwd: string | undefined
   onCopy: (text: string) => void
@@ -43,7 +45,7 @@ export function EngineNative({
         )}
         <div className="eng-sources">
           <div className="eng-sources__title">配置来源</div>
-          <EngineDoors engine={engine} cwd={cwd} onReveal={onReveal} />
+          <EngineDoors engine={engine} cwd={cwd} dshProfile={dshProfile} onReveal={onReveal} />
         </div>
       </Group>
       <Group title="版本与更新" hint="只在你点下更新后才会运行界面写出的那条原生命令。">

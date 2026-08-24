@@ -108,6 +108,13 @@ export interface Thread {
   /** 绝对路径。工作区边界的唯一真源，所有写范围判定都以它为准。 */
   cwd: string
   engine: EngineId
+  /**
+   * 这条会话实际使用的引擎 profile。当前由 DSH 使用；其他引擎缺席。
+   *
+   * 它必须跟会话一起落盘：用户后来切换默认 profile，旧会话仍要回到创建它的
+   * 那棵插件树，而不是拿同一个原生句柄去撞一棵新树。
+   */
+  engineProfile?: string
   trust: Trust
   /** 引擎自报的状态。**只有驱动写得动，不参与任何判定**（见 `EngineState`）。 */
   engineState?: EngineState
@@ -357,6 +364,8 @@ export interface SlashCommand {
 export interface EngineThread {
   /** 引擎侧句柄。omni 靠它把这条会话接过来续跑。 */
   handle: string
+  /** 这条原生会话属于哪个 profile；接管时必须原样带回驱动。 */
+  profile?: string
   title: string
   /** 它当初开在哪个目录。接过来时沿用，不然工作区边界就错了。 */
   cwd: string
@@ -385,6 +394,8 @@ export interface EngineAccount {
  */
 export interface EngineSegment {
   engine: EngineId
+  /** 这一段实际跑在哪个引擎 profile；没有 profile 概念的引擎缺席。 */
+  profile?: string
   /**
    * 引擎侧的会话句柄（codex 的 thread id、Claude 的 session id）。
    * 界面上可复制——你可能想拿它去引擎自己的界面里翻。

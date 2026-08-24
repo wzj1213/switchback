@@ -25,7 +25,7 @@ describe("宿主引擎目录", () => {
       },
       { codex: "Codex", dsh: "DSH" },
       log,
-      (id) => id !== "dsh" || shown.dsh,
+      { visible: (id) => id !== "dsh" || shown.dsh },
     )
 
     expect((await catalog()).map((engine) => engine.id)).toEqual(["codex"])
@@ -50,12 +50,70 @@ describe("宿主引擎目录", () => {
       },
       { dsh: "DSH" },
       log,
-      () => shown.dsh,
+      { visible: () => shown.dsh },
     )
 
     const pending = catalog()
     shown.dsh = false
     gate.finish?.()
     await expect(pending).resolves.toEqual([])
+  })
+
+  it("profile 变更只让 DSH 重新探测，其他引擎仍复用缓存", async () => {
+    const profile = { name: "acp" }
+    const calls = { dsh: 0, codex: 0 }
+    const driver = (id: keyof typeof calls) => ({ probe: async () => {
+      calls[id] += 1
+      return { state: "ok", detail: id === "dsh" ? profile.name : id }
+    } })
+    const catalog = createEngineCatalog(
+      { dsh: driver("dsh"), codex: driver("codex") },
+      { dsh: "DSH", codex: "Codex" },
+      log,
+      { profile: (id) => id === "dsh" ? profile.name : undefined },
+    )
+    await catalog()
+    profile.name = "team"
+    const switched = await catalog()
+    expect(calls).toEqual({ dsh: 2, codex: 1 })
+    expect(switched.find((engine) => engine.id === "dsh")?.profile).toBe("team")
+    catalog.invalidate("dsh")
+    await catalog()
+    expect(calls).toEqual({ dsh: 3, codex: 1 })
+  })
+
+  it("旧 profile 的慢探测回包不会覆盖新 profile", async () => {
+    const profile = { name: "acp" }
+    const gates = new Map<string, (value: { state: string; detail: string }) => void>()
+    const catalog = createEngineCatalog(
+      { dsh: { probe: () => new Promise((resolve) => { gates.set(profile.name, resolve) }) } },
+      { dsh: "DSH" },
+      log,
+      { profile: () => profile.name },
+    )
+    const old = catalog()
+    profile.name = "team"
+    const current = catalog()
+    gates.get("acp")?.({ state: "ok", detail: "acp" })
+    await expect(old).resolves.toEqual([])
+    gates.get("team")?.({ state: "ok", detail: "team" })
+    await expect(current).resolves.toMatchObject([{ id: "dsh", detail: "team", profile: "team" }])
+  })
+
+  it("同一 profile 手动重探后，上一轮慢回包也会作废", async () => {
+    const gates: ((value: { state: string; detail: string }) => void)[] = []
+    const catalog = createEngineCatalog(
+      { dsh: { probe: () => new Promise((resolve) => gates.push(resolve)) } },
+      { dsh: "DSH" },
+      log,
+      { profile: () => "acp" },
+    )
+    const old = catalog()
+    catalog.invalidate("dsh")
+    const current = catalog()
+    gates[0]?.({ state: "ok", detail: "old" })
+    await expect(old).resolves.toEqual([])
+    gates[1]?.({ state: "ok", detail: "current" })
+    await expect(current).resolves.toMatchObject([{ detail: "current", profile: "acp" }])
   })
 })

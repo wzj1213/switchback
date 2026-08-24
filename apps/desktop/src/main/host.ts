@@ -259,7 +259,7 @@ export function attachHost(
   sinks: Sinks,
   windows: () => readonly BrowserWindow[],
   log: Logger,
-  ports?: { relay?: Relay; engineVisible?: (id: string) => boolean },
+  ports?: { relay?: Relay; engineVisible?: (id: string) => boolean; dshProfile?: () => string },
 ): Attached {
   const relay = ports?.relay
   const seen = { thread: undefined as ThreadId | undefined }
@@ -279,11 +279,8 @@ export function attachHost(
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)
 
-  const { drivers, labels } = buildRegistry(
-    app.getPath("userData"),
-    log,
-    readBuildInfo(app.getAppPath()).claudeExecutable,
-  )
+  const { drivers, labels } = buildRegistry(app.getPath("userData"), log,
+    readBuildInfo(app.getAppPath()).claudeExecutable, ports?.dshProfile)
 
   const host = createHost({
     drivers,
@@ -310,8 +307,12 @@ export function attachHost(
   holder.host = host
   installBridgeChannels({ host, log, ledger, report })
 
-  const engines = createEngineCatalog(drivers, labels, log, ports?.engineVisible)
+  const engines = createEngineCatalog(drivers, labels, log, {
+    visible: ports?.engineVisible,
+    profile: (id) => id === "dsh" ? (ports?.dshProfile?.() ?? "acp") : undefined,
+  })
   const refreshEngines = async (): Promise<void> => {
+    engines.invalidate("dsh")
     emit({ type: "engines.available", at: Date.now(), engines: await engines() })
   }
 

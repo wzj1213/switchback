@@ -43,7 +43,7 @@ const COPY: Readonly<Record<BuiltinEngineId, EngineSettingsCopy>> = {
     },
   },
   dsh: {
-    summary: "Provider、模型与 API 凭证仍由 DSH 管；确认配好后，omni 才把它放进引擎清单。",
+    summary: "选择 DSH profile 作为插件组装边界；能力、Provider、模型与凭证仍由这棵插件树自己报告和管理。",
     native: {
       title: "Provider 与模型",
       command: "dsh web",

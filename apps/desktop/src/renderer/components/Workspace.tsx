@@ -210,6 +210,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
             engines={props.engines}
             engine={thread.engine}
             running={props.turn?.status === "running"}
+            active={thread.status === "running" || thread.status === "waiting_approval"}
+            failed={thread.status === "failed"}
+            profile={thread.engineProfile}
           />
         ) : null}
       </div>

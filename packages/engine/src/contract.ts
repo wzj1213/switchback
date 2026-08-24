@@ -94,6 +94,14 @@ export interface StartRequest {
    */
   resume?: string
   /**
+   * 引擎自己的具名组装（例如 DSH profile）。
+   *
+   * 宿主只负责原样保存、续跑时原样传回；怎么解释由驱动决定。没有这一项时，
+   * 驱动可以采用自己当前的默认组装。它和 `resume` 分开，是为了让原生句柄仍然
+   * 保持原样可复制，不把 omni 的路由元数据编码进别人的 id。
+   */
+  profile?: string
+  /**
    * 以**分叉**的方式开场：不是新起一条，也不是续上一条，而是复制一条已有的。
    *
    * ## 为什么在这儿，而不是老会话上的一个方法
@@ -160,6 +168,8 @@ export interface StartRequest {
 
 export interface EngineSession {
   readonly threadId: ThreadId
+  /** 这条会话实际由哪个引擎 profile 创建；宿主只记录，不解释。 */
+  readonly profile?: string
   /**
    * `turnId` 由**宿主**铸造并传入——prompt 是宿主发出的，所以它知道一轮什么时候开始。
    * 引擎只负责给自己产出的 item 铸 id，以及在收工时发 `turn.completed`

@@ -29,7 +29,7 @@ export function ForeignRow({
       <button
         type="button"
         className="row__main"
-        title={`${item.cwd}\n在 omni 里接着聊（前面的内容在引擎那边）`}
+        title={`${item.cwd}${item.profile === undefined ? "" : `\nDSH profile：${item.profile}`}\n在 omni 里接着聊（前面的内容在引擎那边）`}
         onClick={() => {
           onAdopt(item)
         }}
@@ -38,7 +38,7 @@ export function ForeignRow({
           <ForkIcon size={SIDEBAR_ICON_SMALL} />
         </span>
         <span className="row__label">{item.title}</span>
-        <span className="row__aside">{whenOf(item.updatedAt)}</span>
+        <span className="row__aside">{item.profile ?? whenOf(item.updatedAt)}</span>
       </button>
     </div>
   )

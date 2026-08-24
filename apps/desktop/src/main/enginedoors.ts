@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { ipcMain, shell } from "electron"
 import { homeOf } from "./envengines.js"
 import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
+import { isDshProfileName } from "../shared/settings.js"
+import { installDshProfileChannel } from "./dsh-profiles.js"
 
 /**
  * **各家引擎自己的设置在哪儿。**
@@ -37,7 +39,7 @@ export interface EngineDoor {
 
 type Door = Omit<EngineDoor, "exists">
 
-function dshDoors(): readonly Door[] {
+function dshDoors(profile: string): readonly Door[] {
   const home = homeOf("DSH_HOME", ".dsh")
   return [
     {
@@ -51,14 +53,14 @@ function dshDoors(): readonly Door[] {
       id: "dsh",
       label: BUILTIN_ENGINE_LABELS.dsh,
       scope: "user",
-      path: join(home, "profiles", "acp", "cordis.patch.yml"),
-      note: "omni 使用的 ACP profile；增删请走 dsh plugin",
+      path: join(home, "profiles", profile, "cordis.patch.yml"),
+      note: `当前 ${profile} profile 的补丁；增删请走 dsh plugin`,
     },
   ]
 }
 
 /** 各家的配置文件在哪。**家目录认各自的环境变量**，改过家目录的人正是最需要这一页的。 */
-function layout(cwd: string | undefined): readonly Door[] {
+function layout(cwd: string | undefined, dshProfile: string): readonly Door[] {
   const project = (rest: string): readonly string[] => (cwd === undefined ? [] : [join(cwd, rest)])
   const rows: Door[] = [
     {
@@ -96,7 +98,7 @@ function layout(cwd: string | undefined): readonly Door[] {
       path: join(homeOf("GROK_HOME", ".grok"), "config.toml"),
       note: "你自己的那份",
     },
-    ...dshDoors(),
+    ...dshDoors(dshProfile),
   ]
   for (const [id, label, rest, note] of [
     ["claude", BUILTIN_ENGINE_LABELS.claude, join(".claude", "settings.json"), "只对这个项目生效"],
@@ -109,9 +111,13 @@ function layout(cwd: string | undefined): readonly Door[] {
 }
 
 /** 读一遍盘看哪几份真的在。**读不到当不存在**——这一页不该因为权限问题整个空掉。 */
-export async function engineDoors(cwd: string | undefined): Promise<readonly EngineDoor[]> {
+export async function engineDoors(
+  cwd: string | undefined,
+  dshProfile = "acp",
+): Promise<readonly EngineDoor[]> {
+  const profile = isDshProfileName(dshProfile) ? dshProfile : "acp"
   return Promise.all(
-    layout(cwd).map(async (row) => ({
+    layout(cwd, profile).map(async (row) => ({
       ...row,
       exists: await stat(row.path).then(
         (s) => s.isFile(),
@@ -129,8 +135,8 @@ export function editableEngineDoorPaths(doors: readonly EngineDoor[]): readonly 
 export function installEngineDoorChannel(): void {
   // 只允许打开刚发给设置页、并且确实存在的那几份。渲染层拿不到通用文件打开口子。
   const shown = new Set<string>()
-  ipcMain.handle("omni:engineDoors", async (_e, cwd?: string) => {
-    const doors = await engineDoors(cwd)
+  ipcMain.handle("omni:engineDoors", async (_e, req?: { cwd?: string; dshProfile?: string }) => {
+    const doors = await engineDoors(req?.cwd, req?.dshProfile)
     shown.clear()
     for (const path of editableEngineDoorPaths(doors)) shown.add(path)
     return doors
@@ -138,4 +144,9 @@ export function installEngineDoorChannel(): void {
   ipcMain.on("omni:openEngineFile", (_e, path: string) => {
     if (shown.has(path)) void shell.openPath(path)
   })
+}
+
+export function installEngineDoorChannels(): void {
+  installEngineDoorChannel()
+  installDshProfileChannel()
 }

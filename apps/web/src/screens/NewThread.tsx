@@ -41,7 +41,7 @@ export function NewThread({
   onCreate: (command: Extract<Command, { type: "thread.create" }>) => boolean
   onCancel: () => void
 }): React.JSX.Element {
-  const usable = engines.filter((e) => e.state !== "missing")
+  const usable = engines.filter((e) => e.state !== "missing" && e.state !== "unavailable")
   const [cwd, setCwd] = useState(projects[0]?.cwd ?? "")
   const [engine, setEngine] = useState(usable[0]?.id ?? "")
 

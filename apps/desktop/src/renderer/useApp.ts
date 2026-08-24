@@ -230,6 +230,7 @@ export function useApp(): AppApi {
         handle: item.handle,
         cwd: item.cwd,
         title: item.title,
+        ...(item.profile === undefined ? {} : { profile: item.profile }),
       })
     },
     // **跟着当前会话的引擎走**：底下那一行说的是「你现在用的是哪个号」，

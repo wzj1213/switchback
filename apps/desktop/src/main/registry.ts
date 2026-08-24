@@ -54,6 +54,7 @@ export function buildRegistry(
   userData: string,
   log: Logger,
   claudeExecutable: ClaudeExecutable = "bundled",
+  dshProfile: () => string = () => "acp",
 ): { drivers: Readonly<Record<string, EngineDriver>>; labels: Readonly<Record<string, string>> } {
   const acp = registerAcpEngines(readEngineFile(userData, log))
   return {
@@ -81,7 +82,7 @@ export function buildRegistry(
         // 你在 grok 自己的界面里改了模型或强度，omni 靠这条跟上（见 `acp/grok.ts`）
         modelChanged: grokModelChanged,
       }),
-      dsh: createDshDriver(),
+      dsh: createDshDriver({ profile: dshProfile }),
       ...acp.drivers,
     },
     labels: {

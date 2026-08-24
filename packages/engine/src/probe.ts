@@ -14,11 +14,11 @@ const run = promisify(execFile)
  * Claude 就是「查不出来」的现实例子：它的 CLI 由 SDK 自己解析，
  * 不一定在 PATH 上。`which claude` 查不到**不代表**它跑不起来。
  */
-export type ProbeState = "ok" | "missing" | "unknown"
+export type ProbeState = "ok" | "missing" | "unavailable" | "unknown"
 
 export interface Probe {
   state: ProbeState
-  /** 给人看的一句话。`missing` 时必须说得出下一步做什么。 */
+  /** 给人看的一句话。`missing` / `unavailable` 时必须说得出下一步做什么。 */
   detail: string
   /**
    * 真正能跑的那个绝对路径（`state: "ok"` 时才有）。

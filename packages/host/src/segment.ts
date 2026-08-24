@@ -2,6 +2,7 @@ import { emit, isCurrent, type Ctx, type Live } from "./ctx.js"
 
 interface SegmentRef {
   engine: string
+  profile?: string
   handle: string
 }
 
@@ -13,18 +14,19 @@ function rememberSegment(ctx: Ctx, entry: Live): SegmentRef | undefined {
   const handle = entry.thread.engineHandle
   if (handle === undefined || !isCurrent(ctx, entry)) return undefined
   const engine = entry.thread.engine
+  const profile = entry.thread.engineProfile
   const had = entry.thread.segments ?? []
-  if (had.some((seg) => seg.engine === engine && seg.handle === handle)) {
-    return { engine, handle }
+  if (had.some((seg) => seg.engine === engine && seg.profile === profile && seg.handle === handle)) {
+    return { engine, ...(profile === undefined ? {} : { profile }), handle }
   }
   const at = ctx.deps.now()
   entry.thread = {
     ...entry.thread,
-    segments: [...had, { engine, handle, startedAt: at }],
+    segments: [...had, { engine, ...(profile === undefined ? {} : { profile }), handle, startedAt: at }],
     updatedAt: at,
   }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-  return { engine, handle }
+  return { engine, ...(profile === undefined ? {} : { profile }), handle }
 }
 
 /** 当前段先出现，原始记录路径异步查到后只补这一项。 */
@@ -35,7 +37,9 @@ export async function recordSegment(ctx: Ctx, entry: Live): Promise<void> {
   if (path === undefined) return
   const live = ctx.live.get(entry.thread.id)
   const had = live?.thread.segments ?? []
-  const mine = had.find((seg) => seg.engine === ref.engine && seg.handle === ref.handle)
+  const mine = had.find(
+    (seg) => seg.engine === ref.engine && seg.profile === ref.profile && seg.handle === ref.handle,
+  )
   if (live === undefined || mine === undefined || mine.logPath === path) return
   const at = ctx.deps.now()
   live.thread = {

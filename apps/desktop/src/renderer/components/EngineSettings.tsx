@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
-import type { Settings } from "../../shared/settings.js"
+import { dshProfileConfirmed, type Settings } from "../../shared/settings.js"
 import {
   engineSettingState,
   engineSettingItems,
@@ -13,6 +13,7 @@ import { EngineNative } from "./EngineNative.js"
 import { EngineOmniSettings } from "./EngineOmniSettings.js"
 import { EnginePreference } from "./EnginePreference.js"
 import { Field, Group } from "./SettingsBits.js"
+import { DshProfileSettings } from "./DshProfileSettings.js"
 
 export function EnginesSection({
   settings,
@@ -44,7 +45,7 @@ export function EnginesSection({
   if (item === undefined) return <p className="set__blank">还没有可配置的引擎。</p>
   const state = engineSettingState(item, settings)
   const copy = settingsCopyOf(item.id)
-  const connected = item.id !== "dsh" || settings.dsh.configured
+  const connected = item.id !== "dsh" || dshProfileConfirmed(settings.dsh)
   const showEngine = (id: string): void => {
     setSelected(id)
     root.current?.closest<HTMLElement>(".set__pane")?.scrollTo({ top: 0 })
@@ -61,6 +62,9 @@ export function EnginesSection({
           </div>
           <span className={`eng-status eng-status--${state.tone}`}>{state.label}</span>
         </header>
+        {item.id === "dsh" ? (
+          <DshProfileSettings settings={settings} onPatch={onPatch} onReveal={onReveal} />
+        ) : null}
         <EngineOmniSettings
           item={item}
           state={state}
@@ -85,6 +89,7 @@ export function EnginesSection({
         </Group>
         <EngineNative
           engine={item.id}
+          dshProfile={item.id === "dsh" ? settings.dsh.profile : undefined}
           copy={copy}
           cwd={cwd}
           onCopy={onCopy}

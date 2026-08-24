@@ -4,9 +4,10 @@ import { probeCommand, type Probe } from "../probe.js"
 import { createRpc, type RpcPeer } from "../rpc.js"
 import { createProcessOwner } from "../subprocess.js"
 import { createAcpDriver } from "./driver.js"
+import type { AcpInitialize } from "./wire.js"
 
 /** DSH 把 ACP 做成 profile；omni 只启动这扇公开的 stdio 门。 */
-const ACP_ARGS = ["--profile", "acp"] as const
+const DEFAULT_PROFILE = "acp"
 const CHECK_MS = 10_000
 const RECLAIM_MS = 500
 const STDERR_KEEP = 1200
@@ -23,25 +24,71 @@ export type DshCommandProbe = (command: string, hint?: string) => Promise<Probe>
 export interface DshProfileStatus {
   ready: boolean
   detail?: string
+  /** initialize 中 agent 自报的身份。 */
+  agent?: string
+  /** initialize 中能确认的能力；没有能力位时明确写“会话仅新建”。 */
+  capabilities?: readonly string[]
 }
-export type DshProfileCheck = (command: string) => Promise<DshProfileStatus>
+export type DshProfileCheck = (command: string, profile: string) => Promise<DshProfileStatus>
 
 export interface DshDriverOptions {
   command?: string
+  /** 新会话采用的 DSH profile；续跑/分叉始终优先使用请求里保存的 profile。 */
+  profile?: () => string
   commandProbe?: DshCommandProbe
   profileCheck?: DshProfileCheck
 }
 
-function compatible(result: unknown): boolean {
+export function isDshProfileName(name: string): boolean {
+  return name !== "" && name !== "." && name !== ".." && name !== "node_modules"
+    && !name.includes("/") && !name.includes("\\")
+}
+
+function argsOf(profile: string): readonly string[] {
+  return ["--profile", profile]
+}
+
+export function dshProfileOf(requested?: string, current?: () => string): string {
+  const profile = requested ?? current?.() ?? DEFAULT_PROFILE
+  if (!isDshProfileName(profile)) throw new Error(`DSH profile 名称无效：${JSON.stringify(profile)}`)
+  return profile
+}
+
+function compatible(result: unknown): result is AcpInitialize {
   if (typeof result !== "object" || result === null) return false
   const version = (result as { protocolVersion?: unknown }).protocolVersion
   return version === undefined || (typeof version === "number" && version <= 1)
 }
 
-type CheckOutcome = "ready" | "incompatible" | "timeout" | Error
+type CheckOutcome = { kind: "ready"; info: AcpInitialize } | "incompatible" | "timeout" | Error
+
+function capabilitiesOf(info: AcpInitialize): readonly string[] {
+  const session = info.agentCapabilities?.sessionCapabilities ?? {}
+  const sessions = [
+    ...(Object.hasOwn(session, "list") ? ["列表"] : []),
+    ...(info.agentCapabilities?.loadSession === true ? ["续跑"] : []),
+    ...(Object.hasOwn(session, "fork") ? ["分叉"] : []),
+  ]
+  const sessionText = sessions.length === 0 ? "会话仅新建" : `会话：${sessions.join("/")}`
+  return [
+    sessionText,
+    ...(info.agentCapabilities?.promptCapabilities?.image === true ? ["图片提示"] : []),
+  ]
+}
+
+function readyStatus(info: AcpInitialize): DshProfileStatus {
+  const identity = info.agentInfo
+  const name = identity?.title ?? identity?.name
+  const agent = [name, identity?.version].filter((item): item is string => item !== undefined).join(" ")
+  return {
+    ready: true,
+    ...(agent === "" ? {} : { agent }),
+    capabilities: capabilitiesOf(info),
+  }
+}
 
 function statusOf(outcome: CheckOutcome, stderr: string): DshProfileStatus {
-  if (outcome === "ready") return { ready: true }
+  if (typeof outcome === "object" && !(outcome instanceof Error)) return readyStatus(outcome.info)
   const fallback =
     outcome === "timeout"
       ? `DSH 在 ${String(CHECK_MS / 1000)} 秒内没有完成 ACP initialize。`
@@ -62,7 +109,7 @@ function wire(child: ChildProcess, rpc: RpcPeer, output: { stderr: string }): vo
 }
 
 /** 真起公开 profile 并做 initialize；只读配置会漏掉插件依赖不兼容。 */
-const checkProfile: DshProfileCheck = async (command) => {
+const checkProfile: DshProfileCheck = async (command, profile) => {
   const owner = createProcessOwner({
     exitGraceMs: RECLAIM_MS,
     termGraceMs: RECLAIM_MS,
@@ -77,14 +124,14 @@ const checkProfile: DshProfileCheck = async (command) => {
     onRequest: (call) => call.respond({}),
   })
   try {
-    state.child = owner.spawn({ command, args: ACP_ARGS, env: process.env })
+    state.child = owner.spawn({ command, args: argsOf(profile), env: process.env })
     wire(state.child, rpc, output)
     const timeout = new Promise<"timeout">((resolve) => {
       timer = setTimeout(() => resolve("timeout"), CHECK_MS)
     })
     const outcome: CheckOutcome = await Promise.race([
       rpc.call("initialize", INITIALIZE).then(
-        (result) => (compatible(result) ? ("ready" as const) : ("incompatible" as const)),
+        (result) => compatible(result) ? { kind: "ready" as const, info: result } : "incompatible",
         (error: Error) => error,
       ),
       owner.died(),
@@ -103,20 +150,30 @@ const checkProfile: DshProfileCheck = async (command) => {
 
 export async function probeDshAcp(
   command = "dsh",
+  profile = DEFAULT_PROFILE,
   commandProbe: DshCommandProbe = probeCommand,
   profileCheck: DshProfileCheck = checkProfile,
 ): Promise<Probe> {
-  const found = await commandProbe(command, "请先安装 DSH，并配置名为 `acp` 的 ACP profile。")
+  if (!isDshProfileName(profile)) {
+    return { state: "unavailable", detail: `DSH profile 名称无效：${JSON.stringify(profile)}` }
+  }
+  const found = await commandProbe(command, `请先安装 DSH，并配置名为 \`${profile}\` 的 ACP profile。`)
   if (found.state !== "ok" || found.path === undefined) return found
-  const profile = await profileCheck(found.path)
-  if (profile.ready) {
-    return { ...found, detail: `${found.detail} · ACP profile 可握手` }
+  const checked = await profileCheck(found.path, profile)
+  if (checked.ready) {
+    const details = [
+      found.detail,
+      `\`${profile}\` profile 可握手`,
+      checked.agent,
+      ...(checked.capabilities ?? []),
+    ]
+    return { ...found, detail: details.filter(Boolean).join(" · ") }
   }
   return {
-    state: "missing",
+    state: "unavailable",
     detail: [
-      "DSH 已安装，但 `acp` profile 还不能启动。请添加兼容的 ACP profile；也可运行 `dsh --profile acp` 查看原始错误（成功时会等待 ACP 输入，按 Ctrl-C 退出）。",
-      profile.detail,
+      `DSH 已安装，但 \`${profile}\` profile 还不能启动。请给它加入兼容的 ACP 插件；也可运行 \`dsh --profile ${profile}\` 查看原始错误（成功时会等待 ACP 输入，按 Ctrl-C 退出）。`,
+      checked.detail,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -126,12 +183,17 @@ export async function probeDshAcp(
 /** DSH 的协议仍由通用 ACP 驱动承担；这里只认领公开启动命令与 ACP 握手，不猜凭证状态。 */
 export function createDshDriver(options: DshDriverOptions = {}): EngineDriver {
   const command = options.command ?? "dsh"
-  const driver = createAcpDriver({ id: "dsh", command, args: ACP_ARGS })
   return {
-    ...driver,
+    id: "dsh",
+    start: (req) => {
+      const profile = dshProfileOf(req.profile, options.profile)
+      const driver = createAcpDriver({ id: "dsh", command, args: argsOf(profile) })
+      return driver.start({ ...req, profile })
+    },
     probe: () =>
       probeDshAcp(
         command,
+        options.profile?.() ?? DEFAULT_PROFILE,
         options.commandProbe ?? probeCommand,
         options.profileCheck ?? checkProfile,
       ),

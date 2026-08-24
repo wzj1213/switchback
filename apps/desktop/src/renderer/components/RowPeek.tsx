@@ -101,6 +101,7 @@ export function RowPeek({
 }): React.JSX.Element {
   const { thread } = row
   const engine = labelOf(engines, thread.engine)
+  const engineRoute = thread.engineProfile === undefined ? engine : `${engine} · ${thread.engineProfile}`
   const model = thread.model ?? "默认"
   const withEffort = thread.effort === undefined ? model : `${model} · ${effortLabel(thread.effort).label}`
   const status = statusLine(thread)
@@ -115,7 +116,7 @@ export function RowPeek({
       <span className="peek__title">{rowLabelOf(row)}</span>
       <span className="peek__path">{thread.cwd}</span>
       <span className="peek__meta">
-        {engine} · {withEffort} · {labelOf(TRUSTS, thread.trust)}
+        {engineRoute} · {withEffort} · {labelOf(TRUSTS, thread.trust)}
       </span>
       {status === undefined ? null : (
         <span className={`peek__status${status.tone === "" ? "" : ` peek__status--${status.tone}`}`}>

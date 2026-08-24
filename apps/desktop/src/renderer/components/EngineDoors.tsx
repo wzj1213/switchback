@@ -17,10 +17,12 @@ interface DoorState {
 export function EngineDoors({
   engine,
   cwd,
+  dshProfile,
   onReveal,
 }: {
   engine: string
   cwd: string | undefined
+  dshProfile?: string
   onReveal: (path: string) => void
 }): React.JSX.Element {
   const [state, setState] = useState<DoorState>({ failed: false })
@@ -30,7 +32,7 @@ export function EngineDoors({
     let live = true
     setState({ failed: false })
     void bridge
-      ?.engineDoors(cwd)
+      ?.engineDoors(cwd, dshProfile)
       .then((list) => {
         if (live) setState({ list, failed: false })
       })
@@ -40,7 +42,7 @@ export function EngineDoors({
     return () => {
       live = false
     }
-  }, [bridge, cwd])
+  }, [bridge, cwd, dshProfile])
 
   if (state.list === undefined) return <p className="doors__wait">正在确认配置来源…</p>
   if (state.failed) {
@@ -76,7 +78,7 @@ function DoorRow({
       <div className="doors__top">
         <span className={`doors__scope doors__scope--${door.scope}`}>{SCOPE[door.scope]}</span>
         <span className={`doors__state doors__state--${door.exists ? "ready" : "missing"}`}>
-          {door.exists ? "已生效" : "尚未创建"}
+          {door.exists ? "已存在" : "尚未创建"}
         </span>
         <span className="doors__note">{door.note}</span>
         <span className="doors__actions">

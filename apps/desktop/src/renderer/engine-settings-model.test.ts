@@ -52,6 +52,41 @@ describe("引擎设置页的数据", () => {
     expect(engineModelCatalogs(state)).toEqual({ codex: model("new"), kimi: model("k3") })
   })
 
+  it("DSH 模型清单只取当前 profile，旧记录缺 profile 时归到 acp", () => {
+    const model = (id: string): readonly ModelOption[] => [{ id, label: id }]
+    const thread = (id: string, profile?: string): Thread => ({
+      id, title: id, cwd: "/w", engine: "dsh", trust: "auto-edit", status: "idle",
+      createdAt: 0, updatedAt: id === "team" ? 2 : 1, engineHistory: ["dsh"],
+      ...(profile === undefined ? {} : { engineProfile: profile }),
+    })
+    const state = {
+      order: ["legacy", "team"],
+      threads: { legacy: thread("legacy"), team: thread("team", "team") },
+      models: { legacy: { dsh: model("deepseek") }, team: { dsh: model("custom") } },
+    }
+    expect(engineModelCatalogs(state, "team")).toEqual({ dsh: model("custom") })
+    expect(engineModelCatalogs(state, "acp")).toEqual({ dsh: model("deepseek") })
+  })
+
+  it("会话切到别家后仍按最近的 DSH 引擎段识别模型 profile", () => {
+    const models: readonly ModelOption[] = [{ id: "team-model", label: "Team" }]
+    const thread: Thread = {
+      id: "switched", title: "已接力", cwd: "/w", engine: "codex", trust: "auto-edit",
+      status: "idle", createdAt: 0, updatedAt: 2, engineHistory: ["dsh", "codex"],
+      segments: [
+        { engine: "dsh", profile: "team", handle: "dsh-1", startedAt: 1 },
+        { engine: "codex", handle: "codex-1", startedAt: 2 },
+      ],
+    }
+    const state = {
+      order: ["switched"],
+      threads: { switched: thread },
+      models: { switched: { dsh: models } },
+    }
+    expect(engineModelCatalogs(state, "team")).toEqual({ dsh: models })
+    expect(engineModelCatalogs(state, "acp")).toEqual({})
+  })
+
   it("改模型只改这一家，不篡改上次使用的引擎", () => {
     const last = {
       engine: "codex",
@@ -75,20 +110,33 @@ describe("引擎设置页的数据", () => {
   })
 
   it("DSH 未确认与探测 missing 是两种不同状态", () => {
-    const items = engineSettingItems([{ id: "codex", label: "Codex", state: "missing" }])
+    const items = engineSettingItems([
+      { id: "codex", label: "Codex", state: "missing" },
+      { id: "dsh", label: "DSH", profile: "acp", state: "unavailable", detail: "profile 无 ACP" },
+    ])
     const dsh = items.find((item) => item.id === "dsh")
     const codex = items.find((item) => item.id === "codex")
     expect(
-      dsh === undefined ? undefined : engineSettingState(dsh, { dsh: { configured: false } }),
+      dsh === undefined ? undefined : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: [] } }),
     ).toMatchObject({
       label: "未接入",
       tone: "muted",
     })
     expect(
-      codex === undefined ? undefined : engineSettingState(codex, { dsh: { configured: false } }),
+      codex === undefined ? undefined : engineSettingState(codex, { dsh: { profile: "acp", confirmedProfiles: [] } }),
     ).toMatchObject({
       label: "未安装",
       tone: "warn",
     })
+    expect(
+      dsh === undefined
+        ? undefined
+        : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: ["acp"] } }),
+    ).toMatchObject({ label: "配置不可用", hint: "profile 无 ACP", tone: "warn" })
+    expect(
+      dsh === undefined
+        ? undefined
+        : engineSettingState(dsh, { dsh: { profile: "team", confirmedProfiles: ["team"] } }),
+    ).toMatchObject({ label: "等待探测", hint: "正在探测 `team` profile。", tone: "muted" })
   })
 })

@@ -15,7 +15,15 @@ export type Command =
    * 所以这条命令只会对报 true 的那家发出（见 `EngineCapabilities.sideQuestion`）。
    */
   | { type: "thread.sideQuestion"; threadId: ThreadId; text: string }
-  | { type: "thread.adopt"; engine: EngineId; handle: string; cwd: string; title: string }
+  | {
+      type: "thread.adopt"
+      engine: EngineId
+      handle: string
+      cwd: string
+      title: string
+      /** 原生历史属于哪个 profile；宿主不解释，只在续跑时原样带回。 */
+      profile?: string
+    }
   | {
       type: "thread.create"
       cwd: string

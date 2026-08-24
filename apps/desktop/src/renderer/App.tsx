@@ -16,6 +16,7 @@ import { Review } from "./components/Review.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
 import { useScrollbars } from "./useScrollbars.js"
+import { withThreadEngines } from "./engines.js"
 
 /**
  * 选哪一屏。
@@ -142,6 +143,7 @@ export function App(): React.JSX.Element {
 
   // 有血缘关系的另一个会话。没有就不显示「对比」——点了没用的按钮比没有糟
   const peer = forkPeerOf(state, thread.id)
+  const workspaceEngines = withThreadEngines(app.engines, peer === undefined ? [thread] : [thread, peer])
 
   if (shell.comparing && peer !== undefined) {
     return (
@@ -149,7 +151,7 @@ export function App(): React.JSX.Element {
         {sidebar}
         <CompareScreen
           state={state}
-          engines={app.engines}
+          engines={workspaceEngines}
           thread={thread}
           peer={peer}
           onCopy={app.copy}
@@ -194,7 +196,7 @@ export function App(): React.JSX.Element {
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
         models={modelsOf(state, thread.id, thread.engine)}
-        engines={app.engines}
+        engines={workspaceEngines}
         pets={app.prefs.settings.pets}
         notices={app.notices}
         onDismiss={shell.dismiss}

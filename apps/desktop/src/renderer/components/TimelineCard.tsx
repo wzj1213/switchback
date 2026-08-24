@@ -51,7 +51,7 @@ export function TimelineCard({
         ) : (
           segments.map((seg, i) => (
             <Segment
-              key={`${seg.engine}-${seg.handle}`}
+              key={`${seg.engine}-${seg.profile ?? ""}-${seg.handle}`}
               seg={seg}
               index={i + 1}
               onCopy={onCopy}
@@ -80,7 +80,9 @@ function Segment({
       <div className="seg__head">
         <span className="seg__no">{index}</span>
         <EngineIcon />
-        <span className="seg__engine">{seg.engine}</span>
+        <span className="seg__engine">
+          {seg.engine}{seg.profile === undefined ? "" : ` · ${seg.profile}`}
+        </span>
         <span className="seg__when">{whenOf(seg.startedAt)}</span>
       </div>
       <Line label="会话 id" value={seg.handle} onCopy={onCopy} />

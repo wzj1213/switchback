@@ -1,0 +1,116 @@
+.dsh-profile__select {
+  min-width: 180px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.dsh-profile__map {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 91% 8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 38%),
+    var(--bg-sunken);
+}
+
+.dsh-profile__lane {
+  display: grid;
+  gap: 7px;
+}
+
+.dsh-profile__lane-title {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.dsh-profile__plugins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.dsh-profile__plugins em,
+.dsh-profile__empty,
+.dsh-profile__error {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-style: normal;
+}
+
+.dsh-profile__empty,
+.dsh-profile__error {
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.dsh-profile__error {
+  color: var(--warn);
+}
+
+.dsh-plugin {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.dsh-plugin--bundle {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.dsh-plugin b {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.dsh-plugin small {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.dsh-profile__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.dsh-profile__foot code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dsh-profile__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border);
+}

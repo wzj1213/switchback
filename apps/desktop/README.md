@@ -14,6 +14,7 @@ Electron 壳 + React 渲染层。**这是 omni 唯一的用户界面**——没�
 
 - 窗口生命周期、菜单、主题
 - 渲染层：会话列表、transcript、审批卡、计划快照与常驻进度、composer
+- DSH profile 选择与只读 manifest 投影：展示 bundle 顺序、profile 直接依赖和 patch 状态
 - `Command` / `Event` 的 IPC 传输
 - **远程服务端**（`main/remote/`）：配对、设备令牌、WebSocket、静态页面、Web Push。
   浏览器端本身是另一个包（`apps/web`），这里只负责把它送出去、并把它接进事件流
@@ -24,6 +25,7 @@ Electron 壳 + React 渲染层。**这是 omni 唯一的用户界面**——没�
 - 不拥有审批判定。判定在 `@omni/approval`，这里只渲染 `escalate` 出来的卡片。
 - 不拥有持久化。落盘在 `@omni/journal`。
 - 不拥有业务编排。跨会话、跨引擎的编制在 `@omni/host`。
+- 不拥有 DSH 插件生命周期。安装、升级、Provider、模型与凭证仍走 DSH 自己的入口。
 
 ## 为什么 desktop 直接依赖了 Claude 的 SDK
 

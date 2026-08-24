@@ -44,6 +44,14 @@ describe("petRoster", () => {
     expect(roster.at(-1)).toMatchObject({ engine: "dsh", label: "DSH" })
   })
 
+  it("DSH 未安装或当前 profile 不可用时仍画接入占位", () => {
+    for (const state of ["missing", "unavailable"] as const) {
+      const roster = petRoster([engine("claude"), engine("dsh", state)], "claude")
+      expect(roster.at(-1)?.key, state).toBe("dsh")
+      expect(roster.at(-1)?.engine, state).toBeUndefined()
+    }
+  })
+
   it("占位与真 DSH 共用 DOM key，设置里实时接入时鲸鱼不会跳到左上角", () => {
     const before = petRoster([engine("claude")], "claude").at(-1)
     const after = petRoster([engine("claude"), engine("dsh")], "claude").at(-1)

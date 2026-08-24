@@ -59,6 +59,12 @@ describe("各家自己的设置在哪儿", () => {
     }
   })
 
+  it("DSH profile 配置门跟着当前选择，不写死 acp", async () => {
+    const path = (await engineDoors(undefined, "team"))
+      .find((door) => door.id === "dsh" && door.path.endsWith("cordis.patch.yml"))?.path
+    expect(path).toContain("/profiles/team/cordis.patch.yml")
+  })
+
   it("**读不到就当不存在**，这一页不该因为权限或路径怪异整个空掉", async () => {
     const doors = await engineDoors("/一个不存在的目录")
     expect(doors.every((d) => typeof d.exists === "boolean")).toBe(true)

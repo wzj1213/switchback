@@ -1,5 +1,5 @@
 import type { EngineAccount } from "@omni/protocol"
-import type { Settings } from "../../shared/settings.js"
+import { dshProfileConfirmed, type Settings } from "../../shared/settings.js"
 import type { EngineSettingItem, EngineSettingState } from "../engine-settings-model.js"
 import { Field, Group, Segmented } from "./SettingsBits.js"
 
@@ -17,18 +17,23 @@ export function EngineOmniSettings({
   onPatch: (next: Partial<Settings>) => void
 }): React.JSX.Element {
   const isDefault = settings.defaultEngine === item.id
-  const connected = item.id !== "dsh" || settings.dsh.configured
+  const connected = item.id !== "dsh" || dshProfileConfirmed(settings.dsh)
   return (
     <Group title="在 omni 中">
       {item.id === "dsh" ? (
         <Field
           label="接入状态"
-          hint="先在 DSH Web 配好 Provider、模型与凭证；未确认时它不会出现在引擎选择器里。"
+          hint={`确认 ${settings.dsh.profile} 已在 DSH Web 配好 Provider、模型与凭证；确认只对这个 profile 生效。`}
         >
           <Segmented
             options={DSH_STATE}
-            value={settings.dsh.configured ? "ready" : "pending"}
-            onPick={(value) => onPatch({ dsh: { configured: value === "ready" } })}
+            value={connected ? "ready" : "pending"}
+            onPick={(value) => {
+              const confirmed = new Set(settings.dsh.confirmedProfiles)
+              if (value === "ready") confirmed.add(settings.dsh.profile)
+              else confirmed.delete(settings.dsh.profile)
+              onPatch({ dsh: { ...settings.dsh, confirmedProfiles: [...confirmed] } })
+            }}
           />
         </Field>
       ) : null}

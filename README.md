@@ -97,10 +97,12 @@ omni 唯一的用户界面是 GUI；命令行只用于开发和打包。
 | Claude Code | Agent SDK | 内置 |
 | Kimi Code | `kimi web` REST + WebSocket | 内置 |
 | Grok | ACP | 内置 |
-| DSH | `dsh --profile acp`（ACP） | 内置；原生配置完成后在设置中确认接入 |
+| DSH | `dsh --profile <profile>`（ACP） | 内置；按 profile 选择插件组装并确认接入 |
 | 其他 ACP 引擎 | `engines.json` 注册 | 按引擎自报能力接入 |
 
-内置引擎会显示真实探测状态；DSH 在设置中确认原生配置完成后才进入清单，
+内置引擎会显示真实探测状态；DSH 设置页会从各 profile 的 `package.json` 展示 bundle 加载顺序、
+profile 声明的直接依赖与 patch 状态。确认当前 profile 的原生配置后它才进入清单；会话会记住创建时的 profile，
+以后切默认组装也不会把旧句柄送进另一棵插件树。插件通过 ACP 自报的新模型、命令和会话能力会沿用通用驱动，
 用户自配的 ACP 引擎则只有注册后才会出现。
 
 ## 跑起来
@@ -116,8 +118,10 @@ pnpm dist:all     # 一次生成两种
 
 前置条件：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh`）并按各家方式完成登录；
 Claude 完整版内置 SDK 对应的平台可执行文件，轻量版要求 `claude --version` 可运行。
-DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让 `dsh --profile acp`
-能完成 ACP 握手；之后在 omni 的设置 → 引擎中确认接入。profile、凭证与插件版本仍由 DSH 自己管理。
+DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让选中的 profile
+能完成 ACP 握手；之后在 omni 的设置 → 引擎 → DSH 中选择 profile 并确认接入。
+profile、凭证与插件版本仍由 DSH 自己管理；当前官方 automation-only ACP 没有报告续跑能力时，
+omni 会明确拒绝恢复旧会话，不会静默开一条空会话冒充接上。
 omni 直接使用各家的原生登录态，不另外配置密钥。
 
 当前打出来的包没有签名（`identity: null`）。首次打开要在

@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app, ipcMain, nativeTheme } from "electron"
 import {
+  isDshProfileName,
   SETTINGS_DEFAULTS,
   type EnginePick,
   type Settings,
@@ -72,14 +73,21 @@ function parse(raw: unknown): Settings {
 }
 
 /**
- * DSH 只有用户明确确认后才进入引擎清单。
+ * DSH 只有用户明确确认当前 profile 后才进入引擎清单。
  *
- * **只认字面的 `true`**：这项会让一个能执行工具的引擎出现在新会话入口里；
- * 旧文件没有它、字段写坏了，都应该落回「尚未接入」。
+ * 旧版的 `{configured:true}` 迁到默认 `acp`；新版确认按 profile 分开，切换组装
+ * 不继承另一棵插件树的确认。名称校验与 DSH launcher 保持同形。
  */
 function dsh(raw: unknown): Settings["dsh"] {
   if (typeof raw !== "object" || raw === null) return DEFAULTS.dsh
-  return { configured: (raw as Record<string, unknown>).configured === true }
+  const it = raw as Record<string, unknown>
+  const profile = typeof it.profile === "string" && isDshProfileName(it.profile)
+    ? it.profile
+    : DEFAULTS.dsh.profile
+  const listed = strings(it.confirmedProfiles)
+  const migrated = listed === undefined && it.configured === true ? [profile] : []
+  const confirmedProfiles = [...new Set((listed ?? migrated).filter(isDshProfileName))]
+  return { profile, confirmedProfiles }
 }
 
 /**
@@ -236,13 +244,13 @@ export function createSettings(log: Logger): Store {
 /** 渲染层读写偏好的通道。 */
 export function installSettingsChannel(
   store: Store,
-  onPatch?: (before: Settings, after: Settings) => void,
+  onPatch?: (before: Settings, after: Settings, patch: Partial<Settings>) => void,
 ): void {
   ipcMain.handle("omni:settings", (_e, patch?: Partial<Settings>) => {
     if (patch === undefined) return store.get()
     const before = store.get()
     const after = store.patch(patch)
-    onPatch?.(before, after)
+    onPatch?.(before, after, patch)
     return after
   })
 }

@@ -76,20 +76,18 @@ async function branch(
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
   const items = opts.upTo === undefined ? all : until(all, opts.upTo)
   const plan = forkPlan(entry, opts.to, all, items)
-  // “从这里重来”承诺保留该轮之前的上下文；做不到就明确失败，不能静默开空会话。
   if (opts.upTo !== undefined && plan === undefined) {
     throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
   }
-
   const at = ctx.deps.now()
   const thread: Thread = withQueue({
     ...entry.thread,
     id: ctx.deps.newId("th"),
     engine: opts.to,
     engineHistory: [opts.to],
-    // 分叉出来的句柄由驱动在握手时回调上来（`onHandle`），这里先清空：
-    // 留着原会话的句柄，续跑时会拿它去问引擎，接回的是**原会话**
+    // 留着原会话句柄会在续跑时接回**原会话**
     engineHandle: undefined,
+    engineProfile: opts.to === entry.thread.engine ? entry.thread.engineProfile : undefined,
     model: undefined,
     effort: undefined,
     // 新 thread 只继承对话血缘，不继承来源会话的原生身份与瞬时状态。
@@ -146,10 +144,9 @@ async function branch(
   const { forked, early } = launched
   // launch 已经挂上新引擎能力；用更新事件把 starting 壳落成可用会话。
   const current = ctx.live.get(thread.id)
-  const readyAt = ctx.deps.now()
-  const born = { ...(current?.thread ?? thread), status: "idle" as const, updatedAt: readyAt }
+  const born = { ...(current?.thread ?? thread), status: "idle" as const, updatedAt: ctx.deps.now() }
   if (current !== undefined) current.thread = born
-  emit(ctx, { type: "thread.updated", at: readyAt, thread: born })
+  emit(ctx, { type: "thread.updated", at: born.updatedAt, thread: born })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 
   // 原生分叉成功时把 transcript 抄过来：**引擎那边已经什么都知道了**，
@@ -451,6 +448,7 @@ function switched(
     // 点开下拉挑了三次就记三条的话，`/timeline` 会被「我点错了」填满
     engineHistory: prev.provisional === true ? [to] : [...prev.engineHistory, to],
     ...(back === undefined ? { engineHandle: undefined } : { engineHandle: back.handle }),
+    ...(back === undefined ? { engineProfile: undefined } : { engineProfile: back.profile }),
     model: undefined,
     effort: undefined,
     status: transition.status,
