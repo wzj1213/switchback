@@ -1,4 +1,4 @@
-import type { Aside, Item, ToolCallItem } from "@omni/protocol"
+import type { Aside, Item, Lane, ToolCallItem } from "@omni/protocol"
 
 /**
  * 连续的工具调用合成一组。
@@ -16,6 +16,14 @@ export type Row =
    * 由 `withAsides` 按时间插进来（见那个函数的注释）。
    */
   | { kind: "aside"; aside: Aside }
+  /**
+   * 一条旁路（子 agent、编排进度）。**同样不属于任何一轮**，也不在 `items` 里——
+   * 它在 store 的 `lanes` 表上，由 `withLanes` 按时间插进来。
+   *
+   * workflow 恰恰是**主循环收工之后**才跑起来的，所以它一定落在某条分界线之后；
+   * 按 `Lane.at`（出生时刻）插，位置就是「你起这一批的时候屏幕停在哪儿」。
+   */
+  | { kind: "lane"; lane: Lane }
 
 /**
  * 一轮花了多久，从**这一轮自己的 item** 算。
@@ -57,7 +65,9 @@ export function turnIdOf(row: Row): string | undefined {
   if (row.kind === "run") return row.items[0]?.turnId
   // 侧问**不归任何一轮**：折起某一轮时它不该跟着消失——
   // 它问的常常正是那一轮里的东西，折起来是为了少看回答，不是为了少看自己问过的话
-  if (row.kind === "aside") return undefined
+  // 侧问与旁路**都不归任何一轮**：折起某一轮时它们不该跟着消失——侧问问的常常正是
+  // 那一轮里的东西；而 workflow 是主循环收工之后才跑起来的，本来就不在任何一轮里
+  if (row.kind === "aside" || row.kind === "lane") return undefined
   return row.item.turnId
 }
 
@@ -70,17 +80,20 @@ function atOf(row: Row): number | undefined {
 }
 
 /**
- * 把侧问按时间插进行列里。
+ * 把「不归任何一轮」的东西按时间插进行列里。侧问与旁路共用——算法一模一样。
  *
- * **在折叠之后做**：侧问不归任何一轮，折起某一轮不该把它一起折掉。
+ * **在折叠之后做**：它们不归任何一轮，折起某一轮不该把它们一起折掉。
  *
- * 位置取「第一条比它晚的行之前」——你问那一句的时候屏幕上停在哪儿，
- * 它就该留在哪儿；滚回去还能对着当时的上下文读。跑在最后的（问完还没有新内容）
- * 落在队尾。纯函数，好测。
+ * 位置取「第一条比它晚的行之前」——那件事发生的时候屏幕上停在哪儿，它就该留在哪儿；
+ * 滚回去还能对着当时的上下文读。比所有行都晚的（发生完还没有新内容）落在队尾。
  */
-export function withAsides(rows: readonly Row[], asides: readonly Aside[]): readonly Row[] {
-  if (asides.length === 0) return rows
-  const queue = [...asides].sort((a, b) => a.at - b.at)
+function interpose<T extends { at: number }>(
+  rows: readonly Row[],
+  extra: readonly T[],
+  make: (value: T) => Row,
+): readonly Row[] {
+  if (extra.length === 0) return rows
+  const queue = [...extra].sort((a, b) => a.at - b.at)
   const out: Row[] = []
   let i = 0
   for (const row of rows) {
@@ -88,13 +101,23 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
     while (at !== undefined) {
       const next = queue[i]
       if (next === undefined || next.at > at) break
-      out.push({ kind: "aside", aside: next })
+      out.push(make(next))
       i += 1
     }
     out.push(row)
   }
-  for (const rest of queue.slice(i)) out.push({ kind: "aside", aside: rest })
+  for (const rest of queue.slice(i)) out.push(make(rest))
   return out
+}
+
+/** 侧问。 */
+export function withAsides(rows: readonly Row[], asides: readonly Aside[]): readonly Row[] {
+  return interpose(rows, asides, (aside) => ({ kind: "aside", aside }))
+}
+
+/** 旁路。**排在侧问之后插**，两者都不归轮次，谁先谁后只影响同一毫秒时的并列顺序。 */
+export function withLanes(rows: readonly Row[], lanes: readonly Lane[]): readonly Row[] {
+  return interpose(rows, lanes, (lane) => ({ kind: "lane", lane }))
 }
 
 /**

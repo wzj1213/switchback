@@ -305,7 +305,11 @@ const HANDLERS: Handlers = {
   "lane.updated": (state, event) => {
     const before = state.lanes[event.threadId] ?? []
     const at = before.findIndex((l) => l.id === event.lane.id)
-    const after = at < 0 ? [...before, event.lane] : before.map((l) => (l.id === event.lane.id ? event.lane : l))
+    // **出生时刻不跟着更新走**：界面按 `at` 把卡片插进转录区，
+    // 跟着走的话一条跑十分钟的 workflow 会在对话里一路往下爬
+    const born = before[at]?.at
+    const next = born === undefined ? event.lane : { ...event.lane, at: born }
+    const after = at < 0 ? [...before, next] : before.map((l) => (l.id === next.id ? next : l))
     return { ...state, lanes: { ...state.lanes, [event.threadId]: after } }
   },
   "engine.status": onEngineStatus,

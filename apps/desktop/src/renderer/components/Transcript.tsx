@@ -1,6 +1,6 @@
-import type { Command, Item, TaskRun, Thread, Turn } from "@omni/protocol"
+import type { Command, Item, Lane, TaskRun, Thread, Turn } from "@omni/protocol"
 import { memo, useCallback, useMemo, useState } from "react"
-import { foldTurns, groupRows, withAsides } from "../group.js"
+import { foldTurns, groupRows, withAsides, withLanes } from "../group.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ArrowDownIcon } from "./icons.js"
@@ -33,6 +33,7 @@ export const Transcript = memo(function Transcript({
   items,
   turn,
   tasks,
+  lanes,
   send,
   onCopy,
   onReuse,
@@ -46,6 +47,11 @@ export const Transcript = memo(function Transcript({
   turn: Turn | undefined
   /** 此刻在跑的子 agent。**引擎报了才有**，一个都没有时是空数组。 */
   tasks: readonly TaskRun[]
+  /**
+   * 这条会话的旁路。**引擎不报就是空数组**（`capabilities.activity === false` 的那三家），
+   * 空数组时 `withLanes` 原样返回，一行都不多。
+   */
+  lanes: readonly Lane[]
   send: (command: Command) => void
   onCopy: (text: string) => void
   /**
@@ -71,9 +77,9 @@ export const Transcript = memo(function Transcript({
     })
   }, [])
   const rows = useMemo(
-    // **折叠在前、插侧问在后**：侧问不归任何一轮，折起某一轮不该把它一起折掉
-    () => withAsides(foldTurns(groupRows(items, turn?.id), folded), thread.asides ?? []),
-    [items, turn?.id, folded, thread.asides],
+    // **折叠在前、插旁路在后**：侧问与旁路都不归任何一轮，折起某一轮不该把它们一起折掉
+    () => withLanes(withAsides(foldTurns(groupRows(items, turn?.id), folded), thread.asides ?? []), lanes),
+    [items, turn?.id, folded, thread.asides, lanes],
   )
   // resolve 必须引用稳定，`ItemView` 的 memo 才不会在每帧流式更新时整屏失效。
   const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)

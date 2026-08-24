@@ -4,6 +4,7 @@ import {
   itemsOf,
   limitsOf,
   modelsOf,
+  lanesOf,
   tasksOf,
   turnOf,
   usageOf,
@@ -193,6 +194,8 @@ export function App(): React.JSX.Element {
         /* nextEngine 只是下一句的去向；真正切换前，顶部仍应显示当前原生会话的用量。 */
         usage={usageOf(state, thread.id, thread.engine)}
         tasks={tasksOf(state, thread.id)}
+        /* 引擎不报旁路的那三家永远是空数组——`withLanes` 空数组时原样返回，一行都不多 */
+        lanes={lanesOf(state, thread.id)}
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
         models={modelsOf(state, thread.id, thread.engine)}

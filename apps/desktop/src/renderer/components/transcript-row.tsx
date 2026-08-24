@@ -4,6 +4,7 @@ import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
 import { AsideCard } from "./aside-card.js"
+import { LaneCard } from "./LaneCard.js"
 import { ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
 import type { Row } from "../group.js"
@@ -16,11 +17,13 @@ import { spent } from "../status.js"
  * 折了哪几轮、选中之后浮什么」，这边是「一行长什么样」。
  */
 
-/** 一行的 key。三种行各有各的身份来源，抽出来免得写在 JSX 里看不清。 */
+/** 一行的 key。几种行各有各的身份来源，抽出来免得写在 JSX 里看不清。 */
 export function keyOf(row: Row): string {
   if (row.kind === "turn") return `mark-${row.turnId}`
   if (row.kind === "run") return row.items[0]?.id ?? "run"
   if (row.kind === "aside") return `aside-${String(row.aside.at)}`
+  // **拿 lane id 不拿 at**：卡片会就地更新几百次，key 跟着变的话 React 每次都重建整棵子树
+  if (row.kind === "lane") return `lane-${row.lane.id}`
   return row.item.id
 }
 
@@ -95,6 +98,7 @@ export function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, o
   }
   if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
+  if (row.kind === "lane") return <LaneCard lane={row.lane} />
   /* **只有自己发过的话能改。** agent 说的话改了再发没有意义——
      那不是你的话，改完发出去等于替它编一句 */
   const mine =

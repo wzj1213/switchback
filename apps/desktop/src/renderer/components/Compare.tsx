@@ -1,4 +1,5 @@
-import type { Command, EngineInfo, Item, TaskRun, Thread, Turn } from "@omni/protocol"
+import type { Command, EngineInfo, Item,
+  Lane, TaskRun, Thread, Turn } from "@omni/protocol"
 import { buildHandoff, compareRuns, comparisonItems, type Comparison, type FileDiff, type Side } from "@omni/handoff"
 import { Transcript } from "./Transcript.js"
 import { labelOf } from "./Composer.js"
@@ -123,6 +124,7 @@ export interface ComparePane {
   items: readonly Item[]
   turn: Turn | undefined
   tasks: readonly TaskRun[]
+  lanes: readonly Lane[]
 }
 
 export function Compare({
@@ -181,6 +183,7 @@ export function Compare({
               thread={side.thread}
               items={side.items}
               tasks={side.tasks}
+              lanes={side.lanes}
               turn={side.turn}
               send={send}
               onCopy={onCopy}

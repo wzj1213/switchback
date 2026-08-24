@@ -3,6 +3,7 @@ import type {
   Command,
   EngineInfo,
   Item,
+  Lane,
   ModelOption,
   RateLimits,
   SlashCommand,
@@ -33,6 +34,7 @@ export interface WorkspaceProps {
   usage: Usage | undefined
   /** 此刻在跑的子 agent。引擎报了才有，没有就是空数组。 */
   tasks: readonly TaskRun[]
+  lanes: readonly Lane[]
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
   /** 输入框上沿那几只要不要出现。关掉是整块不渲染，见 `shared/settings.ts`。 */
@@ -195,6 +197,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           items={props.items}
           turn={props.turn}
           tasks={props.tasks}
+          lanes={props.lanes}
           send={send}
           onCopy={props.onCopy}
           onReuse={reuse}

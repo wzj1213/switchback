@@ -51,11 +51,12 @@ describe("workflow 进度 → 一条 lane", () => {
     expect(toLane(REAL, "th-1", 0)?.status).toBe("done")
   })
 
-  it("**没有 workflow_progress 就降级成单节点**——结构性探测，不嗅 SDK 版本", () => {
+  it("**没有 workflow_progress 就整个不报 progress**——结构性探测，不嗅 SDK 版本", () => {
     const plain = { task_id: "t1", description: "Reading b.txt", subagent_type: "general-purpose" }
     const lane = toLane(plain, "th-1", 0)
-    expect(lane?.progress?.nodes).toEqual([{ id: "a0", label: "Reading b.txt", state: "running" }])
-    expect(lane?.status).toBe("running")
+    // 造一个「单节点」的话，节点 label 和卡片标题是同一句话，同一张卡上出现两遍
+    expect(lane?.progress).toBeUndefined()
+    expect(lane).toMatchObject({ title: "Reading b.txt", status: "running" })
   })
 
   it("**`description` 缺席就整条不要**——拿工具名拼一句顶替是替引擎说话", () => {

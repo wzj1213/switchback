@@ -3,6 +3,7 @@ import {
   accountOf,
   foreignByEngine,
   itemsOf,
+  mainItems,
   limitsOf,
   threadRowsOf,
   type Notice,
@@ -246,9 +247,19 @@ function useEnabledEngines(
   return useMemo(() => enabledEngines(settings, engines), [engines, settings])
 }
 
+/**
+ * 当前会话的**主线**条目。
+ *
+ * `mainItems` 而不是 `itemsOf`：带 `lane` 的那些属于旁路，由 `LaneCard` 画，
+ * 留在主线里就是同一件事出现两遍。**一条都不带 `lane` 时它原样返回**
+ *（回放老记录就是这种情况），所以这一步在今天是零成本的。
+ *
+ * 稳定化必须在这儿，不能在组件里现场 `.filter()`——`Transcript` 的 memo 认引用，
+ * 现场过滤的表现是「侧栏一开，主区打字就变卡」，而且没有任何地方报错。
+ */
 function useThreadItems(state: ViewState, thread: Thread | undefined): readonly Item[] {
   return useMemo(
-    () => (thread === undefined ? EMPTY_ITEMS : itemsOf(state, thread.id)),
+    () => (thread === undefined ? EMPTY_ITEMS : mainItems(state, thread.id)),
     [state, thread],
   )
 }

@@ -155,17 +155,15 @@ export function toLane(raw: unknown, threadId: ThreadId, at: number): Lane | und
   const description = str(msg.description)
   if (id === undefined || description === undefined) return undefined
   const entries = Array.isArray(msg.workflow_progress) ? (msg.workflow_progress as RawEntry[]) : undefined
-  // 没有 workflow_progress 那一档：一条 lane 一个节点。**不是缺陷是降级**——
-  // Task 子 agent 那一路本来就没有阶段的概念
-  const nodes = entries === undefined ? [{ id: "a0", label: description, state: "running" as const }] : nodesOf(entries)
-  return {
-    id,
-    threadId,
-    kind: "activity",
-    title: description,
-    status: entries === undefined ? "running" : laneStatus(nodes),
-    at,
-    handle: id,
-    progress: { nodes },
-  }
+  const head = { id, threadId, kind: "activity" as const, title: description, at, handle: id }
+  // **没有 `workflow_progress` 那一档整个不报 `progress`。**
+  //
+  // 上一版在这儿造了一个「单节点」，节点的 label 就是 `description`——而卡片的标题
+  // 也是它，于是同一句话在同一张卡上出现两遍，看起来像个 bug。
+  // 缺席才是对的：`LaneProgress` 的契约写着「报不上来就缺席」，界面据此画转圈，
+  // 而不是画一棵只有一个节点、内容还和标题重复的树。**不是缺陷是降级**——
+  // Task 子 agent 那一路本来就没有阶段的概念。
+  if (entries === undefined) return { ...head, status: "running" }
+  const nodes = nodesOf(entries)
+  return { ...head, status: laneStatus(nodes), progress: { nodes } }
 }

@@ -1,0 +1,135 @@
+/*
+ * 旁路卡片：子 agent 与编排进度画在转录区里的那一块。
+ *
+ * 形状跟着 `PlanCard` 走（同为「一块不属于对话正文、但属于这条会话」的东西），
+ * 只是多一层树。标记列用的是 `PlanMark` 那枚共用的环——**别在这儿另画一套**。
+ */
+
+.lane {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: var(--sp-1) 0 var(--sp-3);
+  overflow: hidden;
+}
+
+/* 失败那条描边给一点红，扫一眼就知道哪块出了事；成功不加装饰（一屏里九成是成功） */
+.lane--failed {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+}
+
+.lane__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-sm);
+  min-width: 0;
+}
+
+.lane__mark,
+.lane-node__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.lane--failed .lane__mark {
+  color: var(--danger);
+}
+
+.lane__title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.lane__count,
+.lane__budget {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状态词推到右边；`已完成` 三个字在一屏里重复出现，压到最淡一档 */
+.lane__state {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  flex: none;
+}
+
+.lane--failed .lane__state {
+  color: var(--danger);
+}
+
+.lane__tree {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lane-node {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 24px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+/* 缩进就是树形的全部表达——`LaneNode.parent` 缺席就是挂在根上，不另发明第二种 */
+.lane-node--kid {
+  padding-left: var(--sp-5);
+}
+
+.lane-node__name {
+  flex: none;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 阶段行（没有 parent 的）重一档：它是这棵树的骨架 */
+.lane-node:not(.lane-node--kid) .lane-node__name {
+  color: var(--text);
+  font-weight: 500;
+  max-width: none;
+}
+
+/* 「最近一步在干什么」是扫一眼的东西，不和名字抢注意力；长了就截断 */
+.lane-node__detail {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.lane-node__tokens {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  flex: none;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.lane__summary {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
