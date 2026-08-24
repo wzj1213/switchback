@@ -133,3 +133,159 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
+
+/* ── 第三栏 ─────────────────────────────────────────
+ * 「多窗口的感觉」主要来自标签条，不是来自边框：真正让人觉得「这是另一个窗口」的，
+ * 是它能同时开好几个、能关、能加。所以标签条是这一栏最重的一件零件。
+ */
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+  /* 骨架线用 `--border-strong`：这条把窗口再切一块，口径同侧栏那条右边线 */
+  border-left: 1px solid var(--border-strong);
+}
+
+.aside__tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-1) 0;
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.atab {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  border-radius: var(--radius-xs);
+  color: var(--text-faint);
+  flex: none;
+  max-width: 160px;
+}
+
+.atab:hover {
+  background: var(--bg-hover);
+}
+
+.atab--on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.atab__go {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: none;
+  border: 0;
+  padding: 0 var(--sp-1) 0 var(--sp-2);
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  min-width: 0;
+  height: 100%;
+}
+
+/*
+ * **标签一多就只剩图标。** 六个标签在 380px 里挤成一排读不出的碎字，
+ * 还不如让「有几条在开着」一眼数得出来——真浏览器就是这么干的。
+ * 展开的永远只有当前那个。
+ */
+.atab:not(.atab--on) .atab__name,
+.atab:not(.atab--on) .atab__x {
+  display: none;
+}
+
+.atab__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atab__x {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: var(--sp-1);
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex: none;
+}
+
+.atab__x:hover {
+  background: var(--bg-press);
+  color: var(--text);
+}
+
+.aside__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.aside__kind {
+  color: var(--text-muted);
+}
+
+.aside__meta {
+  font-variant-numeric: tabular-nums;
+}
+
+.aside__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-2);
+}
+
+/* 报不上来就说报不上来，不画一棵空树 */
+.aside__empty,
+.aside__summary {
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.aside__summary {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+/* 卡片上那颗「在旁路查看」。收起态（第三栏正开着它）时文案变「在旁路里看着」 */
+.lane__open {
+  margin: 0 var(--sp-3) var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.lane__open:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}

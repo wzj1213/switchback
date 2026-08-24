@@ -43,7 +43,7 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
 export function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
-  readOnly }: {
+  readOnly, openLane, onOpenLane }: {
   row: Row
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
@@ -58,6 +58,9 @@ export function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, o
   approvalTurn: string | undefined
   shortcutApproval: string | undefined
   readOnly: boolean
+  /** 第三栏正开着哪条旁路。**注意和上面那个 `folded` 不是一回事**：那个是折轮次。 */
+  openLane?: string | undefined
+  onOpenLane?: ((laneId: string) => void) | undefined
 }): React.JSX.Element {
   // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
   // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
@@ -98,7 +101,15 @@ export function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, o
   }
   if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
-  if (row.kind === "lane") return <LaneCard lane={row.lane} />
+  if (row.kind === "lane") {
+    return (
+      <LaneCard
+        lane={row.lane}
+        folded={openLane === row.lane.id}
+        {...(onOpenLane === undefined ? {} : { onOpen: onOpenLane })}
+      />
+    )
+  }
   /* **只有自己发过的话能改。** agent 说的话改了再发没有意义——
      那不是你的话，改完发出去等于替它编一句 */
   const mine =

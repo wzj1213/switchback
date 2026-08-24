@@ -1,5 +1,6 @@
-import type { Lane, LaneNode } from "@omni/protocol"
-import { PlanMark, type MarkState } from "./PlanMark.js"
+import type { Lane } from "@omni/protocol"
+import { LaneTree } from "./LaneTree.js"
+import { PlanMark } from "./PlanMark.js"
 import { compact } from "../usage.js"
 
 /**
@@ -18,67 +19,65 @@ import { compact } from "../usage.js"
  * 排在后面一批。任何一批出问题，前一批都是可用的（见 `docs/侧栏与引擎状态方案.md` §3）。
  */
 
-/** 节点状态 → 那枚共用的环。`failed` 是为旁路加的第五态，见 `PlanMark`。 */
-const MARK: Readonly<Record<LaneNode["state"], MarkState>> = {
-  pending: "pending",
-  running: "in_progress",
-  done: "done",
-  failed: "failed",
-  skipped: "dropped",
-}
-
 const LABEL: Readonly<Record<Lane["status"], string>> = {
   running: "跑着",
   done: "已完成",
   failed: "失败",
 }
 
-/** 阶段行（没有 `parent` 的）比 agent 行重一档：它是这棵树的骨架。 */
-function Node({ node, live }: { node: LaneNode; live: boolean }): React.JSX.Element {
-  const kid = node.parent !== undefined
+/** 抬头拆出来是复杂度闸门逼的，但它确实自成一件事：**这条旁路此刻是什么状态**。 */
+function LaneHead({ lane, live, nodes }: { lane: Lane; live: boolean; nodes: number }): React.JSX.Element {
+  const budget = lane.progress?.budget
   return (
-    <li className={`lane-node${kid ? " lane-node--kid" : ""}`}>
-      <span className="lane-node__mark">
-        <PlanMark status={MARK[node.state]} spinning={live} />
+    <header className="lane__head">
+      <span className="lane__mark">
+        <PlanMark status={live ? "in_progress" : lane.status === "failed" ? "failed" : "done"} spinning={live} />
       </span>
-      <span className="lane-node__name">{node.label}</span>
-      {node.detail === undefined ? null : <span className="lane-node__detail">{node.detail}</span>}
-      {node.tokens === undefined ? null : <span className="lane-node__tokens">{compact(node.tokens)}</span>}
-    </li>
+      <span className="lane__title">{lane.title}</span>
+      {/* 节点数是**数出来的**，不是引擎报的一个总数——报的那个可能和列表对不上，
+          而两个数字并排出现、其中一个是错的，比只有一个数字糟得多 */}
+      {nodes === 0 ? null : <span className="lane__count">{nodes} 个节点</span>}
+      <span className="lane__state">{LABEL[lane.status]}</span>
+      {budget === undefined ? null : (
+        <span className="lane__budget">
+          {compact(budget.used)}
+          {budget.total === undefined ? null : ` / ${compact(budget.total)}`}
+        </span>
+      )}
+    </header>
   )
 }
 
-export function LaneCard({ lane }: { lane: Lane }): React.JSX.Element {
+export function LaneCard({
+  lane,
+  onOpen,
+  folded = false,
+}: {
+  lane: Lane
+  /** 点标题在第三栏里打开。缺席就是没有第三栏那一档（对比视图）。 */
+  onOpen?: (laneId: string) => void
+  /**
+   * 第三栏正开着这条时，主线**收成一行**。
+   *
+   * 不收的话同一棵树在屏幕上出现两遍，而它们还会各自转各自的圈。
+   * 收成一行而不是整个藏掉：藏掉之后主线上什么痕迹都没有，
+   * 滚回来的人不知道这儿曾经起过一批 agent。
+   */
+  folded?: boolean
+}): React.JSX.Element {
   const live = lane.status === "running"
   const nodes = lane.progress?.nodes ?? []
-  const budget = lane.progress?.budget
   return (
     <section className={`lane lane--${lane.status}`} aria-label={lane.title}>
-      <header className="lane__head">
-        <span className="lane__mark">
-          <PlanMark status={live ? "in_progress" : lane.status === "failed" ? "failed" : "done"} spinning={live} />
-        </span>
-        <span className="lane__title">{lane.title}</span>
-        {/* 节点数是**数出来的**，不是引擎报的一个总数——报的那个可能和列表对不上，
-            而两个数字并排出现、其中一个是错的，比只有一个数字糟得多 */}
-        {nodes.length === 0 ? null : <span className="lane__count">{nodes.length} 个节点</span>}
-        <span className="lane__state">{LABEL[lane.status]}</span>
-        {budget === undefined ? null : (
-          <span className="lane__budget">
-            {compact(budget.used)}
-            {budget.total === undefined ? null : ` / ${compact(budget.total)}`}
-          </span>
-        )}
-      </header>
-      {/* **报不上来就画转圈，不画一条永远 0% 的进度条。** 一个假的分母比没有分母更糟 */}
-      {nodes.length === 0 ? null : (
-        <ul className="lane__tree">
-          {nodes.map((node) => (
-            <Node key={node.id} node={node} live={live && node.state === "running"} />
-          ))}
-        </ul>
+      <LaneHead lane={lane} live={live} nodes={nodes.length} />
+      {onOpen === undefined ? null : (
+        <button type="button" className="lane__open" onClick={() => { onOpen(lane.id) }}>
+          {folded ? "在旁路里看着" : "在旁路查看"}
+        </button>
       )}
-      {lane.summary === undefined ? null : <p className="lane__summary">{lane.summary}</p>}
+      {/* **报不上来就画转圈，不画一条永远 0% 的进度条。** 一个假的分母比没有分母更糟 */}
+      {folded || nodes.length === 0 ? null : <LaneTree nodes={nodes} live={live} />}
+      {folded || lane.summary === undefined ? null : <p className="lane__summary">{lane.summary}</p>}
     </section>
   )
 }

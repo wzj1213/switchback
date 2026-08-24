@@ -34,6 +34,7 @@ export const Transcript = memo(function Transcript({
   turn,
   tasks,
   lanes,
+  openLane, onOpenLane,
   send,
   onCopy,
   onReuse,
@@ -52,6 +53,9 @@ export const Transcript = memo(function Transcript({
    * 空数组时 `withLanes` 原样返回，一行都不多。
    */
   lanes: readonly Lane[]
+  /** 第三栏正开着哪条。缺席 = 没有第三栏那一档（对比视图）。 */
+  openLane?: string | undefined
+  onOpenLane?: ((laneId: string) => void) | undefined
   send: (command: Command) => void
   onCopy: (text: string) => void
   /**
@@ -94,6 +98,7 @@ export const Transcript = memo(function Transcript({
             key={keyOf(row)}
             row={row}
             cwd={thread.cwd}
+            openLane={openLane} onOpenLane={onOpenLane}
             {...(canRewind(thread, turn, readOnly === true)
               ? {
                   onRewind: (turnId: string) => {

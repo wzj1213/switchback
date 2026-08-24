@@ -13,6 +13,8 @@ import { stampOf } from "./stamp.js"
 import { reportedChangesOf } from "./changes.js"
 import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
+import { AsidePane } from "./components/AsidePane.js"
+import { pruneTabs } from "./aside-tabs.js"
 import { Review } from "./components/Review.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
@@ -171,8 +173,12 @@ export function App(): React.JSX.Element {
     )
   }
 
+  const lanes = lanesOf(state, thread.id)
+  /* 标签在渲染时对一遍现存的 lane：会话删了、换了引擎、回放到更早的时点之后，
+     留着的是一个点了什么都没有的标签（见 `aside-tabs.ts` 的 `pruneTabs`） */
+  const tabs = pruneTabs(shell.aside, new Set(lanes.map((l) => l.id)))
   return (
-    <div className="shell">
+    <div className={`shell${tabs.active === undefined ? "" : " shell--aside"}`}>
       {sidebar}
       {/* **key 按会话隔离。** 不加的话切会话时 Composer 不重挂，
           上一个会话没发出去的草稿会留在输入框里、被发给新会话——
@@ -195,7 +201,9 @@ export function App(): React.JSX.Element {
         usage={usageOf(state, thread.id, thread.engine)}
         tasks={tasksOf(state, thread.id)}
         /* 引擎不报旁路的那三家永远是空数组——`withLanes` 空数组时原样返回，一行都不多 */
-        lanes={lanesOf(state, thread.id)}
+        lanes={lanes}
+        openLane={tabs.active}
+        onOpenLane={shell.openAside}
         /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
            否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
         models={modelsOf(state, thread.id, thread.engine)}
@@ -225,6 +233,7 @@ export function App(): React.JSX.Element {
         }}
         send={app.send}
       />
+      <AsidePane lanes={lanes} tabs={tabs} onPick={shell.openAside} onClose={shell.closeAside} />
       {settings}
       {review}
     </div>

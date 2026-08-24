@@ -35,6 +35,9 @@ export interface WorkspaceProps {
   /** 此刻在跑的子 agent。引擎报了才有，没有就是空数组。 */
   tasks: readonly TaskRun[]
   lanes: readonly Lane[]
+  /** 第三栏正开着哪条旁路。主线上那条收成一行，同一棵树不画两遍。 */
+  openLane: string | undefined
+  onOpenLane: (laneId: string) => void
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
   /** 输入框上沿那几只要不要出现。关掉是整块不渲染，见 `shared/settings.ts`。 */
@@ -198,6 +201,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           turn={props.turn}
           tasks={props.tasks}
           lanes={props.lanes}
+          openLane={props.openLane}
+          onOpenLane={props.onOpenLane}
           send={send}
           onCopy={props.onCopy}
           onReuse={reuse}

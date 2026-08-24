@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
+import { NO_TABS, closeTab, openTab, type AsideTabs } from "./aside-tabs.js"
 
 /**
  * 外壳自己的那点状态：选中了哪个会话、开着哪个覆盖层。
@@ -45,6 +46,15 @@ export interface Shell {
    */
   askRename: number
   requestRename: () => void
+  /**
+   * 第三栏开着哪几条旁路、正看哪一条。**存 id 不存布尔**——旁路能同时开好几条，
+   * 而「关掉再开应该回到刚才那条」要求记住 active（见 `aside-tabs.ts`）。
+   *
+   * ⚠️ 这里全是「看不看」，**没有一个动作能停掉引擎那边的东西**。
+   */
+  aside: AsideTabs
+  openAside: (laneId: string) => void
+  closeAside: (laneId: string) => void
 }
 
 export function useShell(): Shell {
@@ -56,7 +66,17 @@ export function useShell(): Shell {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [focusFilter, setFocusFilter] = useState(0)
   const [askRename, setAskRename] = useState(0)
+  const [aside, setAside] = useState<AsideTabs>(NO_TABS)
+  const openAside = useCallback((laneId: string) => {
+    setAside((prev) => openTab(prev, laneId))
+  }, [])
+  const closeAside = useCallback((laneId: string) => {
+    setAside((prev) => closeTab(prev, laneId))
+  }, [])
   return {
+    aside,
+    openAside,
+    closeAside,
     selectedId,
     select: setSelectedId,
     dismissed,
