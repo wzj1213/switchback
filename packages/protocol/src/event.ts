@@ -1,5 +1,6 @@
 import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
 import type { Item } from "./item.js"
+import type { Lane } from "./lane.js"
 import type { EngineAccount, EngineThread, SlashCommand, Thread, Turn, TurnStatus } from "./thread.js"
 
 /**
@@ -127,6 +128,19 @@ export type Event =
   | { type: "item.started"; at: number; item: Item }
   | { type: "item.delta"; at: number; itemId: ItemId; append: string }
   | { type: "item.updated"; at: number; item: Item }
+  /**
+   * 一条旁路的当前样子。**upsert，全量替换**，同 id 覆盖。
+   *
+   * 不分 started / updated 两条：各家「起」和「改」的边界不一样
+   *（claude 的 `task_started` 与 `workflow_progress` 是两条消息，
+   * grok 的 `WorkflowUpdated` 第一条就是全量快照），分成两条就要让每个驱动
+   * 自己记「我是不是第一次报这条」——那正是驱动最不该操心的事。
+   * item 那边分三条是因为有流式文本要追加；Lane 没有流式内容
+   *（它的内容以带 `lane` 的 item 形式走 item 那条路）。
+   *
+   * **落盘**（它是内容，不是进程状态），**不进 `LIVE_STATE`**（落了盘，重放能回来）。
+   */
+  | { type: "lane.updated"; at: number; threadId: ThreadId; lane: Lane }
   /**
    * 这个会话能选哪些模型。引擎握手完成后报一次。
    *

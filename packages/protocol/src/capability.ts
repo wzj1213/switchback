@@ -69,6 +69,23 @@ export interface EngineCapabilities {
    * 那撞 `AGENTS.md` 的总纲：omni 与引擎是共建者，不是上下级。
    */
   sideQuestion: boolean
+  /**
+   * 引擎会不会把**主线之外正在跑的东西**报出来：子 agent、后台任务、编排进度。
+   *
+   * 名字和 `Lane.kind` 的 `"activity"` 一一对应，`sideQuestion` 对应 `"aside"`——
+   * 两个能力位、两种 lane，不多不少。
+   *
+   * ## 判据是「实测报得出来」，不是「源码里有」
+   *
+   * 这一位最容易被源码推断骗：四家的仓库里都能 grep 到 workflow / subagent 的结构体。
+   * 但**报 true 的后果是界面上多一个入口**，而入口后面空着比没有入口更糟。
+   * 所以只有活体抓到过帧的才报 true；只在源码里见过的，README 的「已知限制」里
+   * 写清楚「有，但没实测过」，位报 false。
+   *
+   * 和 `modeReadback` 一样，false 不等于「这家没有子 agent」——它等于
+   * **「它跑了什么 omni 看不见」**，界面据此不画那一栏，而不是画一栏空的。
+   */
+  activity: boolean
 }
 
 /** 什么都不支持。驱动没表态时的兜底——**默认不给入口**，而不是默认给。 */
@@ -79,4 +96,5 @@ export const NO_CAPABILITIES: EngineCapabilities = {
   fork: false,
   modeReadback: false,
   sideQuestion: false,
+  activity: false,
 }

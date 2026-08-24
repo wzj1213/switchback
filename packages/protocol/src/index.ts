@@ -17,6 +17,7 @@ export type {
   ApprovalStatus,
   ErrorItem,
 } from "./item.js"
+export type { Lane, LaneNode, LaneProgress, LaneRef } from "./lane.js"
 export type { EngineInfo, EngineStatus, Event, ModelOption, TaskRun, RateLimits, RateWindow, Usage } from "./event.js"
 export type { Command, RememberScope } from "./command.js"
 export { NO_CAPABILITIES } from "./capability.js"

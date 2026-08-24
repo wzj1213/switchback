@@ -14,6 +14,11 @@
   先清掉这条的条目再按历史铺开：直接 `reduceAll` 的话，已经在直播的那几条
   会把更早的历史挤到后面去，转录区变成「最新的排在最前」
 - `initial()` —— 空状态
+- `lanesOf` / `mainItems` / `laneItems` —— **主线与旁路的分流**。item 不拆表：
+  带 `lane` 的照旧进 `items[threadId]`，分流放在选择器里。拆表的代价是 `owner` 的语义
+  要跟着变（`item.delta` / `item.updated` 只带 itemId，拆完还得记「它在哪张表里」），
+  而回放老记录时那批 item 根本没有 `lane`。选择器分流是纯函数、可表驱动测、
+  老记录天然全落主线
 - `latestPlan` / `openPlan` / `stepProgressOf` / `visibleSteps` —— 两端共用的计划派生；
   只返回计划与进度数据，不返回任何展示文案
 
@@ -23,6 +28,10 @@
 - 不拥有命令。`Command` 是渲染层 → 宿主的方向，归约器只吃 `Event`。
 - 不拥有渲染。它只回答「现在是什么状态」，不回答「怎么画」。
 - 不拥有持久化格式。`@omni/journal` 自己决定怎么落盘。
+- **不拥有引用稳定性**。`mainItems` / `laneItems` 每次调用都可能造新数组
+  （`mainItems` 在一条都不带 `lane` 时原样返回，那是特例不是保证）。
+  稳定化是渲染层的活——`App.tsx` 那句「`app.items` 不是 `app.itemsOf(thread.id)`：
+  后者在空会话时每次渲染都造一个新数组，而 `Transcript` 的 memo 认引用」说的就是这个坑。
 
 ## 已知限制
 

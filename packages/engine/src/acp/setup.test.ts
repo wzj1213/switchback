@@ -33,6 +33,8 @@ describe("能力由 agent 自报，不写死", () => {
       fork: true,
       modeReadback: false,
       sideQuestion: false,
+      // ACP 协议里没有「我会报子 agent / 编排进度」这个声明位，所以是 false 而不是"没查"
+      activity: false,
     })
   })
 

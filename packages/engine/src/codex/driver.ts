@@ -345,6 +345,13 @@ class CodexSession implements EngineSession {
       fork: true,
       modeReadback: true,
       sideQuestion: false,
+      // `activity`：**源码里有，但没实测过，所以报 false。**
+      // `CollabAgentToolCall` / `SubAgentActivity` 是稳定的 item 类型，`agent_path`
+      // 是 `/root/worker` 真树路径（openai/codex @ f5a3dc55 `v2/item.rs:349-377`、
+      // `protocol/src/agent_path.rs:15-40`）。但从没在真机上收到过一帧。
+      // 凭源码推断报 true 的后果是界面上多一个**空着的**入口——那比没有入口更糟。
+      // 抓到帧再翻，判据写在 `packages/engine/README.md` 的已知限制里。
+      activity: false,
     }
   }
 

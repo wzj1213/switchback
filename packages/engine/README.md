@@ -17,6 +17,11 @@
   - `trust.ts` 把三档落到 Claude 原生 Plan / Auto / Bypass；进入 Bypass 时显式带 SDK 安全开关
   - `executable.ts` 区分完整版的 SDK 内置 CLI 与轻量版的系统 `claude`，并保持各自探测语义
   - `translate.ts` 把 `SDKMessage` 翻成 `Event`
+  - `caps.ts` 能力表态与它的凭据（摊在驱动里读不动，且证据比代码长）
+  - `workflow.ts` `task_progress.workflow_progress` → 一条 `Lane`。
+    **一个 workflow 一条 lane，不是一个 agent 一条**——整批共用一个 `task_id`，
+    每-agent 的明细进 `LaneProgress.nodes`；30 个 agent 每 tick 产生 30 条落盘事件
+    是不能接受的
   - `driver.ts` 会话生命周期与进程回收
 - `codex/` —— `codex app-server --stdio` 驱动（JSON-RPC 2.0）
   - `rpc.ts` 分帧与请求关联。纯粹字节进字节出，不碰子进程，
@@ -187,3 +192,23 @@
   塞错方向就是悄悄放开了权限。
 - **ACP 的一条消息是我们「划」出来的**。协议只给裸 chunk，连 `messageId` 都没有。
   连续同类算一条，被工具调用或换类打断就收口。这段划分在 `acp/update.ts`。
+- **`activity` 这一位五家里只有 claude 报 true，其余三条线的证据都不够**：
+  - **codex**：`CollabAgentToolCall` / `SubAgentActivity` 是稳定 item 类型，`agent_path`
+    是 `/root/worker` 真树路径（openai/codex @ f5a3dc55 `v2/item.rs:349-377`、
+    `protocol/src/agent_path.rs:15-40`）——**源码里有，但从没在真机上收到过一帧**。
+    判据是「实测报得出来」不是「源码里有」：报 true 的后果是界面上多一个空着的入口，
+    那比没有入口更糟。抓到帧再翻。
+  - **kimi**：查过，确实没有。acp-server 里 `grep -i 'tower|goal|swarm|agent.status'`
+    命中 0；Web API 这条线也没有子 agent / 编排的对外通道。不是「omni 还没接」，
+    是那扇门不存在。
+  - **ACP（grok / zcode / DSH / 自配）**：协议里**没有这个声明位**。grok 的
+    `WorkflowUpdated` 走私有通知 `_x.ai/session_notification`，而 `deep-research` /
+    `workflow` 在它的 BuiltinGate 表里，本机 1.0.5 实测只收到 12 条命令、一帧编排通知都没有；
+    zcode 的前台子 agent 走 `tool_call._meta.subagent`（那是**工具调用**，已经在主线上了），
+    后台子 agent 的正文以裸 `agent_message_chunk` 混进主线、无标记，omni 单方面解不了。
+    所以不给 `AcpSaid` 开这个口子——开了就等于让适配配置替 agent 说一句它没说过的话。
+- **claude 这一路的 lane 终态是算出来的，不是引擎报的。** `workflow_phase` 帧上没有
+  state 字段，`task_progress` 也不报整批的终态，所以阶段与 lane 的状态由子节点
+  `rollUp` 推出来（同 `synthDiff` 拿两份全文算增删行数：只做算术，不引入 omni 的判断）。
+  **没有 `workflow_progress` 的那一档拿不到终态**——一条 lane 一个节点，会停在
+  `running` 直到下一帧。要真终态得接 `task_notification`，那一路还没抓。

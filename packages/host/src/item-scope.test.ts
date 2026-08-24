@@ -44,3 +44,52 @@ describe("引擎 item id 进入宿主后重新定域", () => {
     ]).toEqual(["it-1", "it-1", "it-1", "it-1"])
   })
 })
+
+describe("旁路的身份", () => {
+  const scope = () => {
+    let n = 0
+    return createItemScope((prefix) => `${prefix}-${String((n += 1))}`)
+  }
+  const msg = (id: string, laneId?: string): Event => ({
+    type: "item.started", at: 0,
+    item: { id, turnId: "tu-1", at: 0, kind: "agent_message", text: "", complete: false,
+      ...(laneId === undefined ? {} : { lane: { id: laneId } }) },
+  })
+
+  it("**lane id 也要重铸**——两家引擎都报 `t1` 时，后一条会盖掉前一条", () => {
+    const s = scope()
+    const a = s.event({ type: "lane.updated", at: 0, threadId: "th-1",
+      lane: { id: "t1", threadId: "th-1", kind: "activity", title: "x", status: "running", at: 0 } })
+    expect(a.type === "lane.updated" ? a.lane.id : "").toBe("ln-1")
+  })
+
+  it("同一条 lane 的后续更新拿到同一个 id——**不按轮次分**：workflow 是跨轮的", () => {
+    const s = scope()
+    const one = s.event({ type: "lane.updated", at: 0, threadId: "th-1",
+      lane: { id: "t1", threadId: "th-1", kind: "activity", title: "x", status: "running", at: 0 } })
+    const two = s.event({ type: "lane.updated", at: 1, threadId: "th-1",
+      lane: { id: "t1", threadId: "th-1", kind: "activity", title: "x", status: "done", at: 1 } })
+    const idOf = (e: Event) => (e.type === "lane.updated" ? e.lane.id : "")
+    expect(idOf(two)).toBe(idOf(one))
+  })
+
+  it("item 上的 lane 归属跟着重铸，否则分流选择器按新 id 找不到旧 item", () => {
+    const s = scope()
+    const lane = s.event({ type: "lane.updated", at: 0, threadId: "th-1",
+      lane: { id: "t1", threadId: "th-1", kind: "activity", title: "x", status: "running", at: 0 } })
+    const it1 = s.event(msg("c1", "t1"))
+    const laneId = lane.type === "lane.updated" ? lane.lane.id : ""
+    expect(it1.type === "item.started" ? it1.item.lane?.id : "").toBe(laneId)
+  })
+
+  it("**审批与错误永远留在主线**——侧栏关着时一张等你点的审批卡不能消失", () => {
+    const s = scope()
+    const ask = s.event({ type: "item.started", at: 0,
+      item: { id: "c1", turnId: "tu-1", at: 0, kind: "approval", toolCallId: "c1", tool: "Bash",
+        summary: "git push", reason: "推送不可逆", status: "pending", lane: { id: "t1" } } })
+    const bad = s.event({ type: "item.started", at: 0,
+      item: { id: "c2", turnId: "tu-1", at: 0, kind: "error", message: "炸了", fatal: true, lane: { id: "t1" } } })
+    expect(ask.type === "item.started" ? ask.item.lane : "有").toBeUndefined()
+    expect(bad.type === "item.started" ? bad.item.lane : "有").toBeUndefined()
+  })
+})

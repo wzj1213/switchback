@@ -19,7 +19,8 @@ import type {
 } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createQueue } from "../queue.js"
-import { askAside, canAside } from "./aside.js"
+import { askAside } from "./aside.js"
+import { capabilitiesOf } from "./caps.js"
 import { createTaskState } from "./tasks.js"
 import { createPlanState } from "./plan.js"
 import { applyEffort, withEfforts } from "./effort.js"
@@ -281,20 +282,7 @@ class ClaudeSession implements EngineSession {
   }
 
   capabilities(): EngineCapabilities {
-    // steer 报 false：SDK 没有「往正在跑的那一轮里插一句」的入口。
-    // 宿主据此退回排队——**不是假装支持再偷偷排队**，
-    // 那样界面就没法如实告诉用户「这句得等」
-    // fork 也报 false：SDK 没有复制会话的入口，只能诚实地开空白分支
-    // modeReadback 来自 system/init 与 system/status 的 permissionMode，见 loop.ts。
-    // **运行时探测，不嗅版本**：0.3.231 的公开类型还没声明它
-    return {
-      compact: false,
-      attachments: true,
-      steer: false,
-      fork: false,
-      modeReadback: true,
-      sideQuestion: canAside(this.query),
-    }
+    return capabilitiesOf(this.query)
   }
 
   askAside(text: string): Promise<string> {

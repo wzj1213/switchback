@@ -1,4 +1,5 @@
 import type { Event, TaskRun, ThreadId } from "@omni/protocol"
+import { toLane } from "./workflow.js"
 
 /**
  * 子 agent 在干什么。
@@ -100,6 +101,12 @@ export function onTaskProgress(
     ms: num(msg.usage?.duration_ms),
   })
   out.emit({ type: "tasks.updated", at, threadId: out.threadId, tasks: [...state.values()] })
+  // 同一帧再报一条 lane。**两者不是重复，是两种寿命**：
+  // `tasks.updated` 是活状态（在 journal 的 SKIP 名单里，轮次一结束就清），
+  // 服务的是转录区末尾那行「它在干什么」；`lane.updated` 是**内容**——落盘、⌘R 回得来。
+  // 而 workflow 恰恰是**主循环收工之后**才跑起来的，那时 `tasks` 那条路已经整块不渲染了。
+  const lane = toLane(raw, out.threadId, at)
+  if (lane !== undefined) out.emit({ type: "lane.updated", at, threadId: out.threadId, lane })
 }
 
 /** 轮次收工：清空并报一次空的。**不报的话界面上那几条会一直挂着。** */

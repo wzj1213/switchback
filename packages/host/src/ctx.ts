@@ -276,6 +276,9 @@ export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
     case "item.started":
     case "item.updated":
       return ctx.turnOwner.get(event.item.turnId)
+    // lane 自己带 threadId：它不属于任何一轮（一个 workflow 会跨好几轮）
+    case "lane.updated":
+      return event.threadId
     default:
       return directOwner(event)
   }

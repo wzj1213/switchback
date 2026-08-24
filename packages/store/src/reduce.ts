@@ -173,6 +173,8 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
     turns: omit(state.turns, threadId),
     usage: omit(state.usage, threadId),
     tasks: omit(state.tasks, threadId),
+    // 漏了这张就是内存泄漏：lane 里可能挂着一整棵 30 节点的树
+    lanes: omit(state.lanes, threadId),
     models: omit(state.models, threadId),
     commands: omit(state.commands, threadId),
     owner: keepOwner,
@@ -294,6 +296,18 @@ const HANDLERS: Handlers = {
     ...state,
     limits: { ...state.limits, [event.engine]: event.limits },
   }),
+  /**
+   * **upsert，同 id 整条替换。** 没有「起」和「改」两条事件，所以这里也只有一个分支。
+   *
+   * 追加在末尾而不是排序：lane 的顺序就是它被报出来的顺序，而界面上那排标签
+   * 按这个顺序排正好是「先开的在左边」。重新排会让标签在跑的过程中跳位置。
+   */
+  "lane.updated": (state, event) => {
+    const before = state.lanes[event.threadId] ?? []
+    const at = before.findIndex((l) => l.id === event.lane.id)
+    const after = at < 0 ? [...before, event.lane] : before.map((l) => (l.id === event.lane.id ? event.lane : l))
+    return { ...state, lanes: { ...state.lanes, [event.threadId]: after } }
+  },
   "engine.status": onEngineStatus,
   // 两者都是「整份替换」：引擎报一次就是当前全貌，不是增量
   "engine.history": (state, event) => ({

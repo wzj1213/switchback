@@ -1,4 +1,5 @@
 import type { ItemId, TurnId } from "./ids.js"
+import type { LaneRef } from "./lane.js"
 
 export type ItemKind =
   | "user_message"
@@ -16,6 +17,14 @@ interface ItemBase {
   at: number
   /** 从原生分叉或接管历史抄进来的记录；展示保留，但不算当前会话新发生的编辑。 */
   inherited?: true
+  /**
+   * 不属于主线时，属于哪条旁路。**缺席 = 主线**（见 `lane.ts` 的 `LaneRef`）。
+   *
+   * **`kind: "approval"` 与 `kind: "error"` 一律不打这个字段**，理由见
+   * `protocol/README.md`「不拥有什么」：它们随分流走进侧栏之后，侧栏关着、
+   * 或者用户正在看另一个标签时，一张**正在等他点**的审批卡就消失了。
+   */
+  lane?: LaneRef
 }
 
 export interface UserMessageItem extends ItemBase {

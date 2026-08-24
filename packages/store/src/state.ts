@@ -5,6 +5,7 @@ import type {
   EngineThread,
   Item,
   ItemId,
+  Lane,
   ModelOption,
   RateLimits,
   SlashCommand,
@@ -63,6 +64,19 @@ export interface ViewState {
   commands: Readonly<Record<ThreadId, Readonly<Record<EngineId, readonly SlashCommand[]>>>>
   /** 各家引擎的账号额度。**按引擎存不按会话存**——额度是账号级的。 */
   limits: Readonly<Record<string, RateLimits>>
+  /**
+   * 每个会话有哪些旁路（子 agent、编排进度、侧问）。**落盘，和 `tasks` 不是一类。**
+   *
+   * `tasks` 是活状态：轮次一结束就清，重放一串早就跑完的任务比不显示更糟。
+   * `lanes` 是**内容**：一个 workflow 跑完之后你还要回去看它做了什么，
+   * 所以它落盘、⌘R 回得来、远程全量重建也带着。
+   *
+   * item **不拆表**：带 `lane` 的 item 照旧进 `items[threadId]`，分流放在选择器里
+   *（见 `laneItems`）。拆表的代价是 `owner` 的语义要跟着变——`item.delta` /
+   * `item.updated` 只带 itemId，拆完还得记「它在哪张表里」；而回放老记录时
+   * 那批 item 根本没有 `lane`。选择器分流是纯函数、可表驱动测、老记录天然全落主线。
+   */
+  lanes: Readonly<Record<ThreadId, readonly Lane[]>>
 }
 
 /**
@@ -101,6 +115,7 @@ export function initial(): ViewState {
     models: {},
     commands: {},
     limits: {},
+    lanes: {},
     engines: [],
     notices: [],
     engineThreads: {},
@@ -133,6 +148,35 @@ const NONE: readonly TaskRun[] = []
 
 export function tasksOf(state: ViewState, threadId: ThreadId): readonly TaskRun[] {
   return state.tasks[threadId] ?? NONE
+}
+
+const NO_LANES: readonly Lane[] = []
+
+/** 一个会话有哪些旁路。最近的在后。 */
+export function lanesOf(state: ViewState, threadId: ThreadId): readonly Lane[] {
+  return state.lanes[threadId] ?? NO_LANES
+}
+
+/**
+ * 主线的 item。**缺席 `lane` 的就是主线**——回放老记录时那批全落这儿，不需要迁移。
+ *
+ * 审批与错误**永远**在这儿：它们不许带 `lane`（见 `protocol/lane.ts` 的 `LaneRef`），
+ * 所以侧栏关着、或者用户正在看另一条旁路时，一张等他点的审批卡不会消失。
+ */
+export function mainItems(state: ViewState, threadId: ThreadId): readonly Item[] {
+  const all = itemsOf(state, threadId)
+  return all.some((i) => i.lane !== undefined) ? all.filter((i) => i.lane === undefined) : all
+}
+
+/**
+ * 某条旁路里的 item。
+ *
+ * **调用方必须自己稳定引用**（`useMemo` 或渲染层的 `lanes.ts`）：这里每次都造新数组，
+ * 而 `Transcript` 的 memo 认引用。代码库踩过并留了注释——`App.tsx` 那句
+ * 「`app.items` 不是 `app.itemsOf(thread.id)`：后者在空会话时每次渲染都造一个新数组」。
+ */
+export function laneItems(state: ViewState, threadId: ThreadId, laneId: string): readonly Item[] {
+  return itemsOf(state, threadId).filter((i) => i.lane?.id === laneId)
 }
 
 /**

@@ -242,7 +242,18 @@ export class KimiSession implements EngineSession {
   }
 
   capabilities(): EngineCapabilities {
-    return { compact: true, attachments: true, steer: true, fork: true, modeReadback: true, sideQuestion: true }
+    // `activity` 报 false 是**查过的**，不是没查：acp-server 里
+    // `grep -i 'tower|goal|swarm|agent.status'` 命中 0；Web API 这条线也没有
+    // 子 agent / 编排的对外通道。它不是「omni 还没接」，是那扇门不存在。
+    return {
+      compact: true,
+      attachments: true,
+      steer: true,
+      fork: true,
+      modeReadback: true,
+      sideQuestion: true,
+      activity: false,
+    }
   }
 
   async dispose(): Promise<void> {
