@@ -57,6 +57,12 @@ export function DshPet(): React.JSX.Element {
       {/* 原图 85 行以下只有软影子，身体层有意停在这里；空出的 14 行保留
           原型里的离地距离，真正的影子钉在活动区地面上，不再随鲸鱼一起跳。 */}
       <rect width="110" height="85" fill="currentColor" mask="url(#dsh-reference-mask)" />
+      {/* 原图蒙版会把白眼一起挖空。先以同一份眼睛蒙版补上身体色，眼层移动时
+          才不会在原位留下两个静止的白洞；原尺寸和原轮廓都不变。 */}
+      <g fill="currentColor">
+        <rect x="37" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
+        <rect x="60" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
+      </g>
       <g className="pet__eyes" fill="var(--pet-dsh-eye)">
         <rect x="37" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />
         <rect x="60" y="42" width="11" height="22" mask="url(#dsh-reference-light-mask)" />

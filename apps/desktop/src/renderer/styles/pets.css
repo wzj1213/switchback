@@ -238,7 +238,8 @@
  * 往左右瞟一眼。两种时候会发生：**随机的小动作**（`useMood`），
  * 以及**你捏起一只时其余几只转头看它**（`usePetDrag` 的 `watch`）。
  *
- * 位移写成最终渲染像素。史莱姆眼睛更宽，位移稍大；像素蟹只挪半像素。
+ * 位移写成最终渲染像素。史莱姆眼睛更宽，位移稍大；像素蟹只挪半像素；
+ * DSH 的身体更宽，眼睛要挪两像素才读得出明确方向。
  */
 .pet--slime.pet--look-l .pet__eyes {
   transform: translateX(-1.3px);
@@ -254,6 +255,14 @@
 
 .pet--crab.pet--look-r .pet__eyes {
   transform: translateX(0.5px);
+}
+
+.pet--dsh-mark.pet--look-l .pet__eyes {
+  transform: translateX(-2px);
+}
+
+.pet--dsh-mark.pet--look-r .pet__eyes {
+  transform: translateX(2px);
 }
 
 /*

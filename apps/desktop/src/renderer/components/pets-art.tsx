@@ -2,8 +2,8 @@ import type { PetShape } from "../pets.js"
 import { DshPet } from "./dsh-art.js"
 
 /*
- * 桌宠的形。颜色走 `currentColor` / `var(--pet-eye)`。史莱姆与 Claude 的眼睛
- * 单独挂 `.pet__eyes`；DSH 则直接使用参考图像素形成的眼洞，静止轮廓优先完全对齐原图。
+ * 桌宠的形。颜色走 `currentColor` / `var(--pet-eye)`。每一种眼睛都单独挂
+ * `.pet__eyes`，让眨眼、注视和休眠状态只操作眼层，不牵动身体。
  */
 
 /** 史莱姆。`rx="7"` 的圆角方块——原案就是这个形，别改成真圆顶。 */
