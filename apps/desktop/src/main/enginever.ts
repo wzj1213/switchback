@@ -9,6 +9,7 @@ import {
   type EngineCommandRunner,
 } from "./enginever-command.js"
 import {
+  missingOf,
   specs,
   type EngineSpec,
   type EngineVersion,
@@ -36,6 +37,8 @@ export interface EngineVersionOptions {
 export interface EngineVersionStore {
   get: (refresh?: boolean) => Promise<readonly EngineVersion[]>
   update: (engine: string) => Promise<UpdateResult>
+  /** 装一家还没装的。见 `EngineVersion.install`。 */
+  install: (engine: string) => Promise<UpdateResult>
   warm: () => void
 }
 
@@ -59,17 +62,7 @@ export function createEngineVersions(
   const inspectContext = (): InspectContext => ({ run, npmGlobal: npmGlobalState(run) })
 
   const probeAll = async (): Promise<readonly EngineVersion[]> => {
-    const context = inspectContext()
-    const list = (await Promise.all(known.map((spec) => spec.inspect(context)))).filter(isPresent)
-    for (const version of list) {
-      if (version.stale) {
-        log.write(
-          "info",
-          "engines",
-          `${version.engine} 有新版：${version.installed ?? "?"} → ${version.latest ?? "?"}`,
-        )
-      }
-    }
+    const list = await probe(known, inspectContext(), log)
     cached = { at: now(), list }
     return list
   }
@@ -108,11 +101,84 @@ export function createEngineVersions(
     }
   }
 
-  return { get, update, warm: () => void get().catch(() => undefined) }
+  const install = async (engine: string): Promise<UpdateResult> => {
+    const spec = known.find((candidate) => candidate.engine === engine)
+    if (spec?.install === undefined) return noInstaller(engine)
+    const done = await runInstall(spec, { run, log })
+    cached = undefined
+    void get().catch(() => undefined)
+    return done
+  }
+
+  return { get, update, install, warm: () => void get().catch(() => undefined) }
+}
+
+/**
+ * 装一家还没装的。
+ *
+ * 和 `update` 分开而不是复用：**判据不一样**。更新成功的判据是「版本变新了」，
+ * 而安装成功的判据是「之前压根没有、现在有了」——拿更新那套去判安装，
+ * 一次成功的安装会被报成「没更新成」。
+ */
+async function runInstall(
+  spec: EngineSpec,
+  deps: { run: EngineCommandRunner; log: Logger },
+): Promise<UpdateResult> {
+  const step = spec.install
+  if (step === undefined) return noInstaller(spec.engine)
+  const before = await versionOf(spec.bin, deps.run)
+  deps.log.write("info", "engines", `开始安装 ${spec.engine}`)
+  const command = await deps.run(step.command, step.args, UPDATE_MS)
+  const after = await versionOf(spec.bin, deps.run)
+  const ok = command.ok && after !== undefined
+  deps.log.write(ok ? "info" : "error", "engines", `安装 ${spec.engine}：${after ?? "仍然探不到"}`)
+  return {
+    ok,
+    changed: ok && before === undefined,
+    ...(before === undefined ? {} : { before }),
+    ...(after === undefined ? {} : { after }),
+    output: installOutput(command.output, ok),
+  }
+}
+
+/**
+ * 探一遍。
+ *
+ * **探不到的那一家不丢掉，换成「没装」那一行。** 丢掉等于「omni 不知道有这一家」，
+ * 而事实是它知道得很清楚——它只是没装，而那一行上正好能摆下一条安装命令。
+ */
+async function probe(
+  known: readonly EngineSpec[],
+  context: InspectContext,
+  log: Logger,
+): Promise<readonly EngineVersion[]> {
+  const list = (
+    await Promise.all(known.map(async (spec) => (await spec.inspect(context)) ?? missingOf(spec)))
+  ).filter(isPresent)
+  for (const version of list) {
+    if (!version.stale) continue
+    log.write(
+      "info",
+      "engines",
+      `${version.engine} 有新版：${version.installed ?? "?"} → ${version.latest ?? "?"}`,
+    )
+  }
+  return list
+}
+
+function noInstaller(engine: string): UpdateResult {
+  return { ok: false, changed: false, output: `omni 不知道 ${engine} 的安装来源，这一家要按它自己的方式装` }
+}
+
+function installOutput(output: string, ok: boolean): string {
+  if (ok) return output === "" ? "安装器正常结束，没有额外输出。" : output
+  const checked = "omni 复查：装完之后仍然探不到这个命令。可能装在了不在 PATH 上的位置。"
+  return [output === "" ? "安装命令没有输出。" : output, checked].join("\n\n")
 }
 
 export function installEngineVersionChannel(_log: Logger, versions: EngineVersionStore): void {
   ipcMain.handle("omni:updateEngine", (_event, engine: string) => versions.update(engine))
+  ipcMain.handle("omni:installEngine", (_event, engine: string) => versions.install(engine))
   ipcMain.handle("omni:engineVersions", (_event, refresh?: boolean) =>
     versions.get(refresh === true),
   )

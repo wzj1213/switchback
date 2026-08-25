@@ -23,6 +23,23 @@ import { clamp } from "./pet-gun.js"
 
 export type FoeKind = "slime" | "swarm" | "glut"
 
+/**
+ * 一块碎屑。挨打崩三点、死掉炸十点、被胖子吃掉的字也化成几点。
+ *
+ * **它是「刚才那一下打中了」唯一的即时反馈**：血条要挨过打才出现，
+ * 而崩出来的这几点是打中的那一帧就在的——没有它，低流速下一发一发地打，
+ * 画面上和「没打中」分不出来。
+ */
+export interface Part {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  /** 活了多久 / 能活多久（秒）。 */
+  t: number
+  d: number
+}
+
 export interface Foe {
   kind: FoeKind
   x: number
@@ -41,6 +58,8 @@ export interface Foe {
   age: number
   /** 死了多久。>0 就是在消散，不再前进也不再挨打。 */
   dying: number
+  /** 崩出来的碎屑。**跟着这一只走**，它散完之前这一只不从数组里消失。 */
+  parts: Part[]
 }
 
 interface Kind {
@@ -53,7 +72,7 @@ interface Kind {
 
 const KINDS: Readonly<Record<FoeKind, Kind>> = {
   slime: { hp: 10, speed: 78, fly: 0, pack: 1 },
-  swarm: { hp: 2, speed: 130, fly: 26, pack: 5 },
+  swarm: { hp: 2, speed: 130, fly: 30, pack: 5 },
   glut: { hp: 34, speed: 38, fly: 0, pack: 1 },
 }
 
@@ -118,6 +137,7 @@ export function spawnFoes(
       speed: spec.speed * (0.8 + rand() * 0.42),
       age: rand() * 4,
       dying: 0,
+      parts: [],
     })
   }
 }
@@ -131,14 +151,51 @@ export function nearest(foes: readonly Foe[]): Foe | undefined {
   return best
 }
 
-/** 中一发。**伤害恒为 1**：火力靠射速表达，不靠每发的大小。 */
-export function hitFoe(foe: Foe): void {
+/**
+ * 中一发。**伤害恒为 1**：火力靠射速表达，不靠每发的大小。
+ *
+ * `at` 是弹着点，用来把碎屑崩在对的地方；不给就崩在身体中间——
+ * 测试不关心这个，所以它可选。
+ */
+export function hitFoe(
+  foe: Foe,
+  at?: { x: number; y: number },
+  rand: () => number = Math.random,
+): void {
   if (foe.dying > 0) return
   foe.hp -= 1
   foe.flash = 0.11
   foe.knock += 5.5
-  if (foe.hp <= 0) foe.dying = 0.0001
+  const spot = at ?? { x: foe.x, y: foe.y - 11 }
+  for (let i = 0; i < 3; i++) {
+    foe.parts.push(fleck(spot, { x: 40 + rand() * 90, y: -40 - rand() * 70 }, 0.42))
+  }
+  if (foe.hp > 0) return
+  foe.dying = 0.0001
+  // 死掉那一下炸开一圈。**比挨打那三点大得多**——「打掉了」和「打中了」
+  // 是两件事，而这套东西里没有任何文字会去说哪件发生了
+  for (let i = 0; i < 10; i++) {
+    foe.parts.push(
+      fleck(
+        { x: foe.x + (rand() - 0.5) * 16, y: foe.y - 11 - rand() * 12 },
+        { x: (rand() - 0.5) * 180, y: -70 - rand() * 120 },
+        0.7,
+      ),
+    )
+  }
 }
+
+const fleck = (at: { x: number; y: number }, v: { x: number; y: number }, d: number): Part => ({
+  x: at.x,
+  y: at.y,
+  vx: v.x,
+  vy: v.y,
+  t: 0,
+  d,
+})
+
+/** 碎屑的重力。比本体快——碎屑轻，落得却比整只快，那是它读起来像碎屑的原因。 */
+const PART_G = 620
 
 /**
  * 推进一帧，返回**这一帧有几只咬到了**。
@@ -146,25 +203,64 @@ export function hitFoe(foe: Foe): void {
  * 咬到不掉等级、不影响任何数：它记的是「这一轮零输出被摸到脸上的次数」，
  * 是健康度，不是分数。
  */
-export function stepFoes(foes: Foe[], dt: number, handX: number): number {
+export function stepFoes(foes: Foe[], dt: number, handX: number, eat?: FoeEater): number {
   let bites = 0
   for (let i = foes.length - 1; i >= 0; i--) {
     const f = foes[i]
     if (f === undefined) continue
     f.age += dt
+    stepParts(f.parts, dt)
     if (f.dying > 0) {
       f.dying += dt
-      if (f.dying > FADE) foes.splice(i, 1)
+      // **碎屑没散完就先别删**：整只已经不见了、碎屑却跟着一起消失的话，
+      // 死掉那一下就成了「啪一下没了」，看不出是被打掉的
+      if (f.dying > FADE && f.parts.length === 0) foes.splice(i, 1)
       continue
     }
     f.flash = Math.max(0, f.flash - dt)
     f.knock *= Math.exp(-dt * 9)
     f.x += f.speed * dt
     if (f.kind === "swarm") f.fly = KINDS.swarm.fly * (0.7 + 0.5 * Math.sin(f.age * 4.3))
+    if (f.kind === "glut" && eat !== undefined) gnaw(f, eat)
     if (f.x + f.knock > handX - BITE_AT) {
       f.dying = 0.0001
       bites++
     }
   }
   return bites
+}
+
+/**
+ * 胖子吃字。
+ *
+ * **这是三种怪里最准的一条**：上下文满了，前面产出的东西真的会被压缩掉——
+ * 所以它路过纸带时把字叼走，不是装饰，是那件事的字面画法。
+ *
+ * 回调而不是直接拿纸带：这个模块不认识纸带，认识了就得 import 子弹那一路，
+ * 而两边本来毫无关系。
+ */
+export type FoeEater = (x: number, reach: number) => readonly { x: number; y: number }[]
+
+/** 胖子的嘴有多宽。 */
+const GNAW = 15
+
+function gnaw(f: Foe, eat: FoeEater): void {
+  for (const bit of eat(f.x + f.knock, GNAW)) {
+    f.parts.push(fleck(bit, { x: 12 + Math.random() * 26, y: -24 - Math.random() * 26 }, 0.34))
+  }
+}
+
+export function stepParts(parts: Part[], dt: number): void {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]
+    if (p === undefined) continue
+    p.t += dt
+    if (p.t > p.d) {
+      parts.splice(i, 1)
+      continue
+    }
+    p.x += p.vx * dt
+    p.y += p.vy * dt
+    p.vy += PART_G * dt
+  }
 }

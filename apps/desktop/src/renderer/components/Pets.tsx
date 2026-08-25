@@ -1,16 +1,17 @@
-import { useCallback, useMemo, useRef } from "react"
+import { memo, useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
-import { PetArt } from "./pets-art.js"
+import { PetOne, Shades } from "./PetParts.js"
 import { gaitOf, lookOf, type Hit, type Pet } from "../pets.js"
-import { petRoster, visibleRoster, type PetSlot } from "../pet-roster.js"
-import type { EntryKind } from "../pet-entry.js"
+import { petRoster, visibleRoster } from "../pet-roster.js"
+import type { Seat } from "../pet-seats.js"
 import { usePetEntry } from "../usePetEntry.js"
 import { FireLayer, type FireProps } from "./PetFx.js"
-import { usePets, useReduced } from "../usePets.js"
+import { usePets } from "../usePets.js"
+import { useReduced } from "../use-reduced.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
 import { applyHit } from "../pet-hit-fx.js"
-import { DshPetEffect, useDshPetPhase, type DshPetPhase } from "./DshPetEffect.js"
+import { useDshPetPhase } from "./DshPetEffect.js"
 
 /**
  * 蹲在输入框上沿的那几只。手感与物理在 `renderer/pets.ts`，机械部分在 `usePets.ts`。
@@ -36,7 +37,7 @@ import { DshPetEffect, useDshPetPhase, type DshPetPhase } from "./DshPetEffect.j
  * 那颗下拉里，一个玩的动作不该有副作用。
  */
 
-export function Pets({
+function PetsView({
   engines,
   engine,
   running,
@@ -69,7 +70,15 @@ export function Pets({
     [engines, engine, hidden],
   )
   const count = shown.length
-  const gaits = useMemo(() => shown.map((slot) => gaitOf(slot.look.shape)), [shown])
+  /**
+   * 座位表。**key 和步态打包成一件事**：它们总是一起变，而分成两个 memo 之后
+   * 「换了谁」这件事就得由两个数组各说一遍——`usePets` 里那次按下标对齐的事故
+   * （见 `pet-seats.ts`）正是从「两边各说各的」开始的。
+   */
+  const seats = useMemo<readonly Seat[]>(
+    () => shown.map((slot) => ({ key: slot.key, gait: gaitOf(slot.look.shape) })),
+    [shown],
+  )
   const bodies = useRef<(HTMLSpanElement | null)[]>([])
   const reduced = useReduced()
   const dshPhase = useDshPetPhase(engine === "dsh" && active, failed)
@@ -88,10 +97,10 @@ export function Pets({
     if (at < 0) return
     applyHit({ bodies: bodies.current, nodes: ctl.nodes.current }, at, BITE, reduced)
   }, [reduced, shown, engine])
-  const ctl = usePets(count, gaits, onHit)
+  const ctl = usePets(seats, onHit)
   // **只给待在窝里、又不是正在跑的那几只排班**——理由在 `usePetMood` 开头
   useMood(ctl.nodes, ctl.pets, count, reduced)
-  const drag = usePetDrag(ctl, bodies, reduced)
+  const drag = usePetDrag(ctl, bodies, reduced, seats)
   const entry = usePetEntry(engine, lookOf(engine), entryOn && !reduced)
 
   if (count === 0) return null
@@ -108,99 +117,17 @@ export function Pets({
       />
       <Shades slots={shown} refs={ctl.shades} />
       {shown.map((info, i) => (
-        <button
+        <PetOne
           key={info.key}
-          type="button"
-          ref={(n) => {
-            ctl.nodes.current[i] = n
-          }}
-          className={classOf(info, engine, running, dshPhase) + enterOf(info.engine === engine, entry)}
-          title={titleOf(info.label, info.engine === engine, running, info.engine === "dsh" ? profile : undefined)}
-          onPointerDown={drag.down(i)}
-          onPointerMove={drag.move}
-          onPointerUp={drag.up}
-          onPointerCancel={drag.up}
-        >
-          {info.engine === "dsh" && info.engine === engine ? <DshPetEffect phase={dshPhase} /> : null}
-          <Ripple on={info.engine === engine && entry === "splash"} />
-          {/* 状态点在**头顶**，不在脚下。挂在脚下时它垫在身子和地面之间，
-              三只看起来全都悬空——而它们本来是站在输入框上沿的，那条边就是地面 */}
-          {info.engine === engine && running ? <span className="pet__dot" /> : null}
-          <span
-            className="pet__lean"
-            ref={(n) => {
-              ctl.leans.current[i] = n
-            }}
-          >
-            <Canopy on={info.engine === engine && entry === "chute"} />
-            <span
-              className="pet__body"
-              ref={(n) => {
-                bodies.current[i] = n
-              }}
-            >
-              <PetArt shape={info.look.shape} />
-            </span>
-          </span>
-        </button>
+          info={info}
+          at={i}
+          look={{ engine, running, dshPhase, entry, profile }}
+          refs={{ nodes: ctl.nodes, leans: ctl.leans, bodies }}
+          drag={drag}
+        />
       ))}
     </div>
   )
-}
-
-/**
- * 影子那一组。**和身体分开、且摆在前面**：影子钉在地面上不跟着抬
- *（见 `petPaint.ts`），那是「它离地多高」唯一的说法；摆在前面所以永远压在身体下面。
- */
-function Shades({
-  slots,
-  refs,
-}: {
-  slots: readonly PetSlot[]
-  refs: React.RefObject<(HTMLSpanElement | null)[]>
-}): React.JSX.Element {
-  return (
-    <>
-      {slots.map((info, i) => (
-        <span
-          key={`shade-${info.key}`}
-          className="pet__shade"
-          ref={(n) => {
-            refs.current[i] = n
-          }}
-        />
-      ))}
-    </>
-  )
-}
-
-/**
- * 开火那一层。**它和上面那几只完全不相干**：只读 `pets` 里那只的坐标，
- * 从不改它，也从不被它读（见 `pet-fx.ts` 开头）。关掉它的时候桌宠一切照旧。
- *
- * 单拎成一个组件不只是行数：`useFlow` 要挂在**一直在的地方**——
- * 挂在条件分支里的话，关掉再打开会重订一次桥、重开一个滑窗。
- */
-/**
- * 伞。**挂在 `.pet__lean` 里面**，跟着那只一起往下飘。
- *
- * 挂在外面（`.pet` 的直接子节点）时，蟹被 lean 的位移一路带下来、而伞钉在原地，
- * 于是两者会在半路穿过对方——实测下落到一半时伞正好整个藏在蟹身后。
- * 伞和被它吊着的那只是同一件事，位移只该写一份。
- */
-function Canopy({ on }: { on: boolean }): React.JSX.Element | null {
-  return on ? <span className="pet__chute" /> : null
-}
-
-/**
- * 水花。和伞相反，**必须挂在 lean 外面**：它是地面上炸开的一圈涟漪，
- * 不该跟着鲸一起跃到半空去。
- *
- * 两种都写成字面类名而不是拼出来的：拼的类名**静态查不出来**，
- * 而这个仓库有一道守卫专查「组件用到的 class 有没有规则」（`pnpm check:css`）。
- */
-function Ripple({ on }: { on: boolean }): React.JSX.Element | null {
-  return on ? <span className="pet__splash" /> : null
 }
 
 /**
@@ -210,38 +137,16 @@ function Ripple({ on }: { on: boolean }): React.JSX.Element | null {
  */
 const BITE: Hit = { axis: "x", speed: 1500 }
 
-/** 登场那一拍挂在当前那只身上。空串表示这一刻没有登场在播。 */
-function enterOf(on: boolean, kind: EntryKind | undefined): string {
-  return on && kind !== undefined ? ` pet--enter-${kind}` : ""
-}
-
-/** 眨眼、瞟眼、被捏着、走路那几个类**不在这儿**——它们每秒都可能变，
-    由 `useMood` / `usePetDrag` / `petPaint` 直接写 `classList`，不换一次重渲染。 */
-function classOf(
-  info: PetSlot,
-  current: EngineId,
-  running: boolean,
-  dshPhase: DshPetPhase,
-): string {
-  const { look } = info
-  const on = info.engine === current
-  return [
-    "pet",
-    `pet--${look.tone}`,
-    `pet--${look.shape}`,
-    info.engine === undefined ? "pet--placeholder" : "",
-    on ? "pet--on" : "",
-    on && running ? "pet--run" : "",
-    on && look.tone === "dsh" ? `pet--dsh-${dshPhase}` : "",
-  ]
-    .filter((c) => c !== "")
-    .join(" ")
-}
-
-function titleOf(label: string, on: boolean, running: boolean, profile?: string): string {
-  if (!on) return label
-  const routed = profile === undefined ? label : `${label} · ${profile} profile`
-  return running ? `${routed} · 正在跑` : `${routed} · 这一轮归它`
-}
+/**
+ * **memo 不是优化，是止血。**
+ *
+ * `Workspace` 在流式输出时每一批事件重渲染一次（一秒可以几十次），而这一整块
+ * 在那几十次里没有任何一处该变：位置每帧由 rAF 直接写 DOM，眨眼由 `useMood`
+ * 直接写 classList，开火那层是一张自己转的 canvas。不挡住的话，每一批事件都要
+ * 白白重挂五个按钮的三组 ref（内联箭头 ref 每次渲染都会被 React 先置空再重设）。
+ *
+ * 挡得住的前提是**上游别递新对象**——`fire` 那一包在 `Workspace` 里是 memo 过的。
+ */
+export const Pets = memo(PetsView)
 
 export type { Pet }

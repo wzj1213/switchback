@@ -81,8 +81,18 @@ function petKit(raw: unknown): Settings["petKit"] {
     entry: it.entry !== false,
     fire: it.fire !== false,
     foes: it.foes !== false,
+    // 三档里认不出就回默认那一档（抛出去），**不回落到 off**：
+    // 一个读坏的偏好把画面上的东西悄悄拿掉，用户只会以为是坏了
+    brass: oneOf(it.brass, BRASS, DEFAULTS.petKit.brass),
+    traj: oneOf(it.traj, TRAJ, DEFAULTS.petKit.traj),
+    // 这一项默认关，所以**只认字面的 `true`**：打靶不是产品状态而是评估台，
+    // 读不出来时不该替用户打开一个「引擎不会去做」的东西
+    range: it.range === true,
   }
 }
+
+const BRASS: ReadonlySet<string> = new Set<Settings["petKit"]["brass"]>(["off", "eject", "pile"])
+const TRAJ: ReadonlySet<string> = new Set<Settings["petKit"]["traj"]>(["tape", "shell"])
 
 /**
  * 一个只能取那几个值的字段。**认不出就回默认**，不放行。
