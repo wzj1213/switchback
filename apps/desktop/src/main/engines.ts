@@ -35,8 +35,9 @@ export interface EngineEntry {
   /**
    * 这家认不认 `session/compact` / `session/steer`。
    *
-   * **ACP 的握手里没有这两位**，协议上推不出来（实测三家：kimi 与 grok 两个都是
-   * `Method not found`，只有 zcode 有）。内置的两家由 `registry.ts` 直接写死，
+   * **ACP 的握手里没有这两位**，协议上推不出来。桥接层出现路由也不够：本机
+   * zcode-acp-server 0.5.1 会转发 `session/steer`，但 ZCode 后端 0.16.3 仍回
+   * `Method not found`；Grok 则另有已验证的首方 interject。内置适配由 `registry.ts` 明确提供，
    * 第三方只能从这里说——**这就是那条一直欠着的「递补充项的路」**。
    *
    * 不填就是没有：多给一颗点了报错的按钮，比不给更糟。
@@ -62,7 +63,7 @@ const TEMPLATE = {
     command: "codex-acp",
     args: [] as readonly string[],
     // 这两位 ACP 握手里问不出来，只能你告诉 omni；不填就是没有。
-    // 实测：zcode-acp-server 两个都有，kimi 与 grok 两个都没有
+    // 只写真正对当前后端活体验证过的能力；桥里有路由不等于后端兑现
     compact: false,
     steer: false,
   },

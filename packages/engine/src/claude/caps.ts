@@ -39,6 +39,7 @@ export function capabilitiesOf(query: unknown): EngineCapabilities {
     attachments: true,
     steer: true,
     fork: true,
+    rewind: true,
     modeReadback: true,
     sideQuestion: canAside(query),
     activity: true,

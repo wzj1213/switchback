@@ -27,6 +27,7 @@ export { createGrokActivity } from "./acp/grok-activity.js"
 export { grokHookItems, grokPromptMeta } from "./acp/grok-hooks.js"
 export { grokScheduledTurn } from "./acp/grok-scheduled.js"
 export { grokInteraction, grokInteractionResolved } from "./acp/grok-interaction.js"
+export { grokFork, grokSteer } from "./acp/grok-control.js"
 export {
   modelsOf,
   modesOf,

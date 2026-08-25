@@ -18,9 +18,8 @@ import type { ApprovalAsk } from "../contract.js"
  * OMNI_ACP_COMMAND=grok OMNI_ACP_ARGS="agent stdio" pnpm test:live
  * ```
  *
- * **参数必须能传**：内置的两家 ACP 引擎都不是「一个裸命令就进协议」——
- * kimi 是 `kimi acp`，grok 是 `grok agent stdio`。只认命令名的话，
- * 这套真跑测试恰恰盖不到我们真正内置的那两家。
+ * **参数必须能传**：ACP 引擎经常不是「一个裸命令就进协议」——例如旧 Kimi 是
+ * `kimi acp`，Grok 是 `grok agent stdio`。只认命令名的话，真跑测试盖不到生产入口。
  *
  * 会消耗真实额度、起真实子进程、在临时目录里改文件。
  *

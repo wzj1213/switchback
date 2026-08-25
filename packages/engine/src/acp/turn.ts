@@ -22,6 +22,10 @@
  * | grok 1.0.5 | `-32601 Method not found` | `-32601 Method not found` |
  * | zcode-acp-server 0.5.1 | **成功**，回一份 snapshot | 方法在（空转会话上报 `-32603`，不是「方法不存在」） |
  *
+ * Grok 1.0.5 的**标准拼写仍是不存在**，但首方 Agent Mode 另公开
+ * `_x.ai/interject {sessionId,text}`；它通过 `AcpDriverConfig.steerCall` 接入，不能把
+ * 一家私有形状写成所有 ACP 引擎的默认。
+ *
  * 所以**不能从协议推**，只能各家自己说——和 `modeReadback` 同一条路子
  *（`AcpDriverConfig`）。kimi 有它自己的 `/compact` 斜杠命令，走
  * `available_commands_update` 那条路，omni 早就把它送到界面了：
@@ -32,6 +36,7 @@ import type { Event, TurnId } from "@omni/protocol"
 import { sweep, type UpdateContext, type UpdateState } from "./update.js"
 import { stopStatus } from "./translate.js"
 import type { AcpPromptResult } from "./wire.js"
+import type { ForeignSteer } from "./caps.js"
 
 /**
  * 形状**刻意和 `knobs()` 对齐**（`TrustCtx` / `ModelCtx` 同一个来源），
@@ -43,7 +48,7 @@ export interface TurnCtx {
   call: (method: string, params: unknown) => Promise<unknown>
   state: { acpSession: string | undefined }
   /** 这家认不认这两个方法。由 `AcpDriverConfig` 注入，见文件头那张表。 */
-  can: { compact?: boolean; steer?: boolean }
+  can: { compact?: boolean; steer?: boolean; steerCall?: ForeignSteer }
 }
 
 /**
@@ -114,9 +119,13 @@ export async function compactAndReport(
 export async function steerSession(ctx: TurnCtx, text: string, attachments?: readonly string[]): Promise<void> {
   const sessionId = ctx.state.acpSession
   if (sessionId === undefined) throw new Error("会话还没建立，插不进去")
-  if (ctx.can.steer !== true) throw refuse("中途插话", ctx.id)
+  if (ctx.can.steer !== true && ctx.can.steerCall === undefined) throw refuse("中途插话", ctx.id)
   if (attachments !== undefined && attachments.length > 0) throw refuse("带附件插话", ctx.id)
-  await ctx.call("session/steer", { sessionId, content: text })
+  const request = ctx.can.steerCall?.(sessionId, text) ?? {
+    method: "session/steer",
+    params: { sessionId, content: text },
+  }
+  await ctx.call(request.method, request.params)
 }
 
 

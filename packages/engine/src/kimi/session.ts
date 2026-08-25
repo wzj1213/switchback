@@ -311,6 +311,7 @@ export class KimiSession implements EngineSession {
       attachments: true,
       steer: true,
       fork: true,
+      rewind: false,
       modeReadback: true,
       sideQuestion: true,
       activity: true,

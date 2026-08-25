@@ -25,7 +25,12 @@ interface Rig {
   flushes: () => number
 }
 
-const rig = (opts: { canFork: boolean; nativeOnFork?: boolean; failActivateOnFork?: boolean }): Rig => {
+const rig = (opts: {
+  canFork: boolean
+  canRewind?: boolean
+  nativeOnFork?: boolean
+  failActivateOnFork?: boolean
+}): Rig => {
   const events: Event[] = []
   const forks: { handle: string; dropTurns?: number }[] = []
   const prompts: string[] = []
@@ -69,7 +74,13 @@ const rig = (opts: { canFork: boolean; nativeOnFork?: boolean; failActivateOnFor
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve({ restart: false }),
         models: () => Promise.resolve([]),
-        capabilities: () => ({ compact: false, attachments: id === "other", steer: false, fork: opts.canFork }),
+        capabilities: () => ({
+          compact: false,
+          attachments: id === "other",
+          steer: false,
+          fork: opts.canFork,
+          rewind: opts.canRewind ?? opts.canFork,
+        }),
         setModel: () => Promise.resolve({}),
         dispose: () => Promise.resolve(),
       } as unknown as EngineSession)
@@ -300,6 +311,18 @@ describe("同一家引擎：让它自己复制会话", () => {
     await expect(
       r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" }),
     ).rejects.toThrow("不能带着原生上下文")
+    expect(r.events.filter((event) => event.type === "thread.started")).toHaveLength(before)
+  })
+
+  it("只支持完整 fork 的引擎不能把完整历史冒充成从某轮重来", async () => {
+    const r = rig({ canFork: true, canRewind: false })
+    const { id, turns } = await withTurns(r)
+    const before = r.events.filter((event) => event.type === "thread.started").length
+
+    await expect(
+      r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" }),
+    ).rejects.toThrow("不能带着原生上下文")
+    expect(r.forks).toEqual([])
     expect(r.events.filter((event) => event.type === "thread.started")).toHaveLength(before)
   })
 

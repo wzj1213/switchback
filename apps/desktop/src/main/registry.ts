@@ -18,6 +18,8 @@ import {
   grokScheduledTurn,
   grokModelChanged,
   grokNativeApproval,
+  grokFork,
+  grokSteer,
   type EngineDriver,
   type ClaudeExecutable,
 } from "@omni/engine"
@@ -56,8 +58,8 @@ import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
  * 前者由 probe / 接入开关挡掉，后者在 kimi / grok / dsh 这里不成立
  *（那都是它们自己文档里的用法）。
  *
- * 其余 ACP 引擎（ZCode 之类）仍然只从 `engines.json` 读：
- * **这台机器上没装 zcode**，内置一条猜出来的命令行只会让人点了就崩。
+ * 其余 ACP 引擎（ZCode 之类）仍然只从 `engines.json` 读：安装位置、启动参数和环境变量
+ * 都属于这台机器，内置一条猜出来的命令行只会让另一台机器上的人点了就崩。
  */
 export function buildRegistry(
   userData: string,
@@ -100,6 +102,9 @@ export function buildRegistry(
         // Grok 1.0.5 的 ACP 用 `_meta.autoMode` 接分类器 Auto，
         // `_meta.yoloMode` 接 Always-approve；两枚都只在开场时设置。
         nativeApproval: grokNativeApproval,
+        // 首方 Agent Mode 的 wire 扩展；1.0.5 真机验证过完整 fork→load 与 mid-turn interject。
+        fork: grokFork,
+        steerCall: grokSteer,
         // **它确实会主动报档位变化**，所以这一位敢报 true：源码原话是
         // 「The agent emits `CurrentModeUpdate` on every entry and exit」
         //（grok-build `app/acp_handler/session_notification.rs`）。

@@ -6,13 +6,17 @@ describe("Kimi 清单翻译", () => {
     const models = toModels(
       [
         { provider: "p", model: "k2", display_name: "K2" },
-        { provider: "p", model: "k3", support_efforts: ["low", "high"], default_effort: "high" },
+        { provider: "p", model: "k3", capabilities: ["image_in", "video_in"],
+          support_efforts: ["low", "high"], default_effort: "high" },
+        { provider: "p", model: "text", capabilities: [] },
       ],
       "k3",
     )
     expect(models).toEqual([
       { id: "k2", label: "K2" },
-      { id: "k3", label: "k3", efforts: ["low", "high"], defaultEffort: "high", isDefault: true },
+      { id: "k3", label: "k3", efforts: ["low", "high"], defaultEffort: "high",
+        inputModalities: ["text", "image"], isDefault: true },
+      { id: "text", label: "text", inputModalities: ["text"] },
     ])
   })
 

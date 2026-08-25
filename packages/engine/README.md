@@ -231,22 +231,30 @@
   同时明确要求模型自行决定；omni 保留这项原生行为，不为了让问题卡出现而改档或注入开关。
   只读规划与完全访问档若由 Kimi 发出问题，则走公开 `event.question.requested` / `pending_questions`
   与 `/questions/{id}` 往返，桌面和远程端都能回答或跳过。
-- **Kimi 只能从会话末尾原生分叉。** 宿主要从更早轮次分叉时，驱动明确拒绝，交给
-  现有的跨引擎/降级路径；不会把“复制整条会话”冒充成“从指定轮次分叉”。
+- **Kimi 只能从会话末尾原生分叉。** 普通完整分叉照常开放；「从这里重来」不会出现，
+  驱动也会防御性拒绝带历史截断的请求，不把“复制整条会话”冒充成“从指定轮次分叉”。
 - **ACP 侧的能力由 agent 自报**（`capabilitiesOf`），不再一律 `NO_CAPABILITIES`。
   旧 Kimi ACP（`kimi acp`，0.36.1）的实测仍作为通用驱动样本保留：能贴图、能原生分叉、能列历史、能续跑，
-  **不能压缩**（`session/compact` → Method not found）、不能改向（ACP 没这个入口）。
+  **不能压缩**（`session/compact` → Method not found）、不能通过标准 `session/steer` 改向。
   这不再描述内置 Kimi；`sessionCapabilities` 用空对象当标记，所以判据仍是「键在不在」。
 - **但「没声明」不等于「不支持」。** 实测 grok（`grok agent stdio`，0.2.106）的
   `sessionCapabilities` 是个**空对象**，一条能力都不报，而 `session/list` 答得好好的。
   只认声明的话它的历史区永远是空的——**那是「替引擎回答」的另一种写法**，
   只不过这次替它答的是「不支持」。所以 `canList` 是三态：声明了就用，
   没声明的问一次，问不出来才记成不支持。
-- **grok 的推理强度报得出来、设不了，所以 omni 不上报它。** 四档强度挂在
-  `models.availableModels[]._meta.reasoningEfforts`，但 `session/set_mode` 在这个版本上
-  是个空壳：连**不存在的档位**它也回 `{}`，磁盘上 `reasoning_effort` 纹丝不动。
-  对照组是 `session/set_model`——假 id 回 `-32602 unknown model id`，真 id 落盘。
-  报了强度就是给用户一个点了没用的控件。
+- **Grok 1.0.5 的推理强度已读写闭环。** 四档来自
+  `models.availableModels[]._meta.reasoningEfforts`，设置时按首方客户端形状并入
+  `session/set_model._meta.reasoningEffort`；真机切到非默认档并收到模型回声。旧版把它错发到
+  `session/set_mode`，那条空壳即使传不存在的档也回 `{}`，因此旧结论只描述那条错误接线。
+- **Grok 1.0.5 的插话与完整分叉走首方扩展。** 运行中通过
+  `_x.ai/interject {sessionId,text}` 真正改向；分叉用 `_x.ai/session/fork`，拿到
+  `newSessionId` 后由新进程标准 `session/load` 接住。两条都已真机验证；历史截断仍不开放，
+  因为当前公开 fork 没有 turn/message 边界，不能把完整复制冒充「从这里重来」。
+- **标准 ACP fork 只承诺复制会话末尾。** `fork` 与 `rewind` 是两项能力：ZCode、旧 Kimi ACP
+  以及其他只声明 `sessionCapabilities.fork` 的引擎可以完整分叉，但不会获得历史回退入口。
+- **ZCode 的 steer 目前保持关闭。** zcode-acp-server 0.5.1 虽然公开并转发
+  `session/steer`，本机 ZCode 后端 0.16.3 的活体调用仍回 `Method not found`。因此不能仅凭桥的
+  路由或文档在 `engines.json` 放出按钮；等后端真正兑现并通过 live test 后再显式开启。
 - **ACP 的审批请求里没有命令原文，所以命令红线对 ACP 的 shell 命令是失明的。**
   旧 Kimi ACP 的真机时序：`tool_call`（带 kind、无命令）→ `session/request_permission`
   （无 kind、无命令）→ **批准之后**才来 `tool_call_update {rawInput:{command}}`。

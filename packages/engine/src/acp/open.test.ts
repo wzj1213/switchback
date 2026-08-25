@@ -115,3 +115,33 @@ describe("新建会话仍然认 sessionId", () => {
     expect(h.state.contextWindow).toBe(500_000)
   })
 })
+
+describe("ACP 分叉只承诺复制末尾", () => {
+  it("完整分叉照常交给 session/fork", async () => {
+    const h = ctxWith({ sessionId: "s-fork" }, { forkOf: { handle: "s-old" } })
+    await openSession(h.ctx)
+    expect(h.calls.map((call) => call.method)).toEqual(["session/fork"])
+    expect(h.state.acpSession).toBe("s-fork")
+  })
+
+  it("历史回退在出线前拒绝，不把完整历史冒充成截断结果", async () => {
+    const h = ctxWith({ sessionId: "s-fork" }, { forkOf: { handle: "s-old", dropTurns: 2 } })
+    await expect(openSession(h.ctx)).rejects.toThrow(/不能停在历史轮次/)
+    expect(h.calls).toEqual([])
+  })
+
+  it("厂商分叉扩展回句柄后再用标准 load 接入新会话", async () => {
+    const h = ctxWith({ newSessionId: "s-native", models: MODELS }, { forkOf: { handle: "s-old" } })
+    h.ctx.config.fork = {
+      request: (sourceSessionId, cwd) => ({ method: "vendor/fork", params: { sourceSessionId, cwd } }),
+      handle: (raw) => (raw as { newSessionId?: string }).newSessionId,
+    }
+    await openSession(h.ctx)
+    expect(h.calls).toEqual([
+      { method: "vendor/fork", params: { sourceSessionId: "s-old", cwd: "/w" } },
+      { method: "session/load", params: { sessionId: "s-native", cwd: "/w", mcpServers: [] } },
+    ])
+    expect(h.state.acpSession).toBe("s-native")
+    expect(h.state.models).toHaveLength(2)
+  })
+})

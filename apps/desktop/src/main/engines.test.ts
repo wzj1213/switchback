@@ -50,6 +50,16 @@ describe("读引擎注册表", () => {
     const { dir, log } = dirWith(JSON.stringify({ a: { command: "x", args: ["--acp", 7, null] } }))
     expect(readEngineFile(dir, log)["a"]?.args).toEqual(["--acp"])
   })
+
+  it("只认布尔 true 的扩展能力，字符串和数字不能放出假按钮", () => {
+    const { dir, log } = dirWith(JSON.stringify({
+      good: { command: "vendor-acp", compact: true, steer: true },
+      bad: { command: "other", compact: "true", steer: 1 },
+    }))
+    expect(readEngineFile(dir, log)["good"]).toMatchObject({ compact: true, steer: true })
+    expect(readEngineFile(dir, log)["bad"]).not.toHaveProperty("compact")
+    expect(readEngineFile(dir, log)["bad"]).not.toHaveProperty("steer")
+  })
 })
 
 describe("写样板", () => {
@@ -84,7 +94,7 @@ describe("注册成驱动", () => {
     expect(drivers).not.toHaveProperty("codex")
   })
 
-  it("空表就空表，界面上只剩内置的两家——诚实", () => {
+  it("空表就空表，不凭空注册第三方引擎", () => {
     expect(registerAcpEngines({}).drivers).toEqual({})
   })
 })

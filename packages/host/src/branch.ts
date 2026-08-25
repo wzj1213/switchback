@@ -159,7 +159,7 @@ function derivedPlan(entry: Live, opts: BranchOptions, all: readonly Item[]): De
   // 第一轮之前没有任何上下文可保留，也没有公开协议能表达“在首轮之前 fork”。
   // 这时开同工作区的空白分支就是动作的精确定义，不需要伪造 beforeTurnId。
   const blankRewind = opts.upTo !== undefined && items.length === 0
-  const plan = blankRewind ? undefined : forkPlan(entry, opts.to, all, items)
+  const plan = blankRewind ? undefined : forkPlan(entry, opts, all, items)
   if (opts.upTo !== undefined && !blankRewind && plan === undefined) {
     throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
   }
@@ -187,13 +187,15 @@ async function startDerived(
 
 function forkPlan(
   entry: Live,
-  to: string,
+  opts: BranchOptions,
   all: readonly Item[],
   keep: readonly Item[],
 ): NativeForkPlan | undefined {
   // 跨引擎时会话格式不通，只能开空白分支；不能冒充原生上下文复制。
-  if (to !== entry.thread.engine) return undefined
-  if (entry.thread.capabilities?.fork !== true) return undefined
+  if (opts.to !== entry.thread.engine) return undefined
+  // 完整 fork 和历史截断是两项能力。ACP/Kimi 只有前者，不能让可见转录与模型记忆分叉。
+  if (entry.thread.capabilities?.fork !== true ||
+    (opts.upTo !== undefined && entry.thread.capabilities.rewind !== true)) return undefined
   const handle = entry.thread.engineHandle
   // 还没拿到引擎侧句柄的会话分不了叉——那通常意味着它还没真正跑过任何一轮
   if (handle === undefined) return undefined

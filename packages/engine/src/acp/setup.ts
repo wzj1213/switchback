@@ -237,6 +237,7 @@ export interface AcpSaid {
   modeReadback?: boolean
   compact?: boolean
   steer?: boolean
+  fork?: boolean
   activity?: boolean
 }
 
@@ -251,7 +252,9 @@ export function capabilitiesOf(
     compact: said.compact === true,
     attachments: agent?.promptCapabilities?.image === true,
     steer: said.steer === true,
-    fork: "fork" in session,
+    fork: "fork" in session || said.fork === true,
+    // ACP v1 的 fork 只复制会话末尾；协议没有历史 message/turn 边界参数。
+    rewind: false,
     // 没有 mode readback 声明位；未知不能冒充实时状态。
     modeReadback: said.modeReadback === true,
     // ACP 没暴露侧问；不拿某家私有能力替协议补洞。

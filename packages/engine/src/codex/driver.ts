@@ -230,13 +230,6 @@ class CodexSession implements EngineSession {
     )
   }
 
-  /**
-   * 跑到一半改向：把话递进**正在跑的那一轮**，不新起一轮、也不打断它。
-   *
-   * `expectedTurnId` 是 codex 给的并发护栏，必须传。用户按下回车到这条 RPC
-   * 到达之间，那一轮可能刚好收工——不带它的话这句话会被记到**下一轮**头上，
-   * 而用户以为改的是刚才那一轮。对不上时 codex 拒绝，宿主据此退回排队。
-   */
   /** 标题同步给 codex，它自己的会话列表里才认得出这条。 */
   async setTitle(title: string): Promise<void> {
     const { codexThread } = this.state
@@ -251,6 +244,7 @@ class CodexSession implements EngineSession {
     await this.rpc.call("thread/archive", { threadId: codexThread })
   }
 
+  /** 跑到一半改向；`expectedTurnId` 防止迟到的请求误入下一轮。 */
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const { codexThread, codexTurn } = this.state
     if (codexThread === undefined || codexTurn === undefined) {
@@ -268,9 +262,8 @@ class CodexSession implements EngineSession {
    * 我们没有理由比它更啰嗦。
    */
   async models(): Promise<readonly ModelOption[]> {
-    const options = await readModelCatalog((method, params) => this.rpc.call(method, params)).catch(() => [])
-    this.state.options = options
-    return options
+    this.state.options = await readModelCatalog((method, params) => this.rpc.call(method, params)).catch(() => [])
+    return this.state.options
   }
 
   /** codex 自己存着哪些会话；清单与正文来自两条公开返回，互不猜测。 */
@@ -330,6 +323,7 @@ class CodexSession implements EngineSession {
       attachments: true,
       steer: true,
       fork: true,
+      rewind: true,
       modeReadback: true,
       sideQuestion: false,
       // 0.149.0 的公开 thread/read 已在生产历史抓到 SubAgentActivity，子 thread 的

@@ -3,8 +3,8 @@ import type { Event } from "@omni/protocol"
 import { compactSession, reportCompaction, steerSession, type TurnCtx } from "./turn.js"
 
 /**
- * 真的调得通由 `zcode.live.test.ts` 钉（只有 zcode 有这两个方法）。
- * 这里钉的是**没说支持的时候不发那一发 RPC**，以及拒绝时说的是人话——
+ * `zcode.live.test.ts` 钉 compact 真能调用，`zcode-steer.live.test.ts` 则钉住当前后端
+ * 虽有桥接路由却拒绝 steer。这里钉的是**没说支持的时候不发那一发 RPC**，以及拒绝时说的是人话——
  * 那两件事跟哪家引擎都无关，也不该为它起一个进程。
  */
 // **不用默认参数装 `acpSession`**：显式传 `undefined` 会走默认值，
@@ -81,6 +81,21 @@ describe("中途插话", () => {
     }
     await steerSession(c, "先停一下")
     expect(seen[0]).toEqual({ sessionId: "s-1", content: "先停一下" })
+  })
+
+  it("厂商公开了自己的插话入口时，完整采用它的方法名与参数", async () => {
+    const seen: { method: string; params: unknown }[] = []
+    const c: TurnCtx = {
+      id: "grok",
+      call: (method, params) => {
+        seen.push({ method, params })
+        return Promise.resolve({})
+      },
+      state: { acpSession: "s-1" },
+      can: { steerCall: (sessionId, text) => ({ method: "vendor/interject", params: { sessionId, text } }) },
+    }
+    await steerSession(c, "转向")
+    expect(seen).toEqual([{ method: "vendor/interject", params: { sessionId: "s-1", text: "转向" } }])
   })
 
   it("没说支持就一发都不发", async () => {

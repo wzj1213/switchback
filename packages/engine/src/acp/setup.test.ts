@@ -31,6 +31,7 @@ describe("能力由 agent 自报，不写死", () => {
       attachments: true,
       steer: false,
       fork: true,
+      rewind: false,
       modeReadback: false,
       sideQuestion: false,
       // ACP 协议里没有「我会报子 agent / 编排进度」这个声明位，所以是 false 而不是"没查"
@@ -40,14 +41,19 @@ describe("能力由 agent 自报，不写死", () => {
 
   it("**空对象就是「支持」**——ACP 拿它当标记，判据是键在不在，不是值是不是 true", () => {
     expect(capabilitiesOf({ agentCapabilities: { sessionCapabilities: { fork: {} } } }).fork).toBe(true)
+    expect(capabilitiesOf({ agentCapabilities: { sessionCapabilities: { fork: {} } } }).rewind).toBe(false)
     expect(capabilitiesOf({ agentCapabilities: { sessionCapabilities: {} } }).fork).toBe(false)
+  })
+
+  it("厂商公开的分叉扩展可以补足标准握手，但仍不冒充历史回退", () => {
+    expect(capabilitiesOf(undefined, { fork: true })).toMatchObject({ fork: true, rewind: false })
   })
 
   it("不报图片能力就不给贴图入口——塞过去会被静默丢掉，比不给更糟", () => {
     expect(capabilitiesOf({ agentCapabilities: {} }).attachments).toBe(false)
   })
 
-  it("compact 和 steer 一律 false：ACP 没有这两个入口（实测 session/compact → Method not found）", () => {
+  it("未显式验证 compact / steer 时默认 false，不能拿一家实现替全家回答", () => {
     expect(capabilitiesOf(kimi).compact).toBe(false)
     expect(capabilitiesOf(kimi).steer).toBe(false)
   })

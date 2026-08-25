@@ -40,10 +40,18 @@ export interface EngineCapabilities {
    * 能**带着完整上下文分叉**（原生 fork）。codex 的 `thread/fork` 复制的是真的会话，
    * 分出来那条**记得它读过哪些文件、写过什么、撞过什么错**。
    *
-   * 报 false 时普通分叉只能得到同工作区的空白会话；「从这里重来」不开放，
-   * 因为它承诺保留上下文。omni 不拿摘要提示词伪造这项能力。
+   * 报 false 时普通分叉只能得到同工作区的空白会话。它只回答「能不能完整复制」，
+   * 不回答「能不能停在历史边界」——后者由 `rewind` 单独表态。
    */
   fork: boolean
+  /**
+   * 能把原生上下文**精确截到某一历史轮之前**再分叉。
+   *
+   * ACP 的 `session/fork` 与 Kimi Web 的公开 fork 都只复制会话末尾，不能因为它们
+   * `fork: true` 就顺手开放「从这里重来」；那会让界面少画几轮、模型却仍记得全部历史。
+   * Claude 的 `resumeSessionAt` 与 Codex 的 `thread/fork.lastTurnId` 才能报 true。
+   */
+  rewind: boolean
   /**
    * 引擎会不会**主动告诉 omni 它自己改了档**。
    *
@@ -54,7 +62,8 @@ export interface EngineCapabilities {
    *
    * ## 这一位和上面四位不是同一类，别混
    *
-   * `compact` / `attachments` / `steer` / `fork` 管的是**给不给入口**——报 false 就不画那个按钮。
+   * `compact` / `attachments` / `steer` / `fork` / `rewind` 管的是**给不给入口**——
+   * 报 false 就不画那个按钮。
    * `modeReadback` 管的是**这条信息可信到什么程度**：报 false 时档位下拉**照给**
    *（omni 设得动，只是读不回来），只是下面多一行灰字。
    * 当成「不给入口」那一类处理、因为读不回来就不让人改档，那是另一个 bug。
@@ -94,6 +103,7 @@ export const NO_CAPABILITIES: EngineCapabilities = {
   attachments: false,
   steer: false,
   fork: false,
+  rewind: false,
   modeReadback: false,
   sideQuestion: false,
   activity: false,

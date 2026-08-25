@@ -27,13 +27,26 @@ export function toHistory(rows: readonly KimiSessionRow[]): readonly EngineThrea
 }
 
 export function toModels(rows: readonly KimiModel[], defaultModel: string | undefined): readonly ModelOption[] {
-  return rows.map((row) => ({
-    id: row.model,
-    label: row.display_name ?? row.model,
-    ...(row.support_efforts === undefined || row.support_efforts.length === 0 ? {} : { efforts: row.support_efforts }),
-    ...(row.default_effort === undefined ? {} : { defaultEffort: row.default_effort }),
-    ...(row.model === defaultModel ? { isDefault: true } : {}),
-  }))
+  return rows.map((row) => {
+    const inputModalities = modalitiesOf(row.capabilities)
+    return {
+      id: row.model,
+      label: row.display_name ?? row.model,
+      ...(row.support_efforts === undefined || row.support_efforts.length === 0 ? {} : { efforts: row.support_efforts }),
+      ...(row.default_effort === undefined ? {} : { defaultEffort: row.default_effort }),
+      ...(inputModalities === undefined ? {} : { inputModalities }),
+      ...(row.model === defaultModel ? { isDefault: true } : {}),
+    }
+  })
+}
+
+/** 缺字段是旧服务“不知道”；明确给了能力表则按它收紧，不能让图片看似可发。 */
+function modalitiesOf(capabilities: readonly string[] | undefined): ModelOption["inputModalities"] {
+  if (capabilities === undefined) return undefined
+  const inputs: ("text" | "image" | "audio")[] = ["text"]
+  if (capabilities.includes("image_in")) inputs.push("image")
+  if (capabilities.includes("audio_in")) inputs.push("audio")
+  return inputs
 }
 
 interface UserInfoResponse {

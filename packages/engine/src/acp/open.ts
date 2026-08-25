@@ -14,6 +14,7 @@ import {
   startupMessage,
 } from "./setup.js"
 import type { Catalog } from "./setup.js"
+import type { ForeignFork, ForeignSteer } from "./caps.js"
 import type { AcpInitialize, AcpNewSession } from "./wire.js"
 
 /**
@@ -122,6 +123,8 @@ export interface OpenCtx {
     modeReadback?: boolean
     compact?: boolean
     steer?: boolean
+    steerCall?: ForeignSteer
+    fork?: ForeignFork
     activity?: unknown
     terminal?: boolean
     nativeApproval?: (trust: Trust) => Native
@@ -173,8 +176,14 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
   // **只挑「各家自己说」的那几位往下递**，不是把整份 config 传进去：
   // `capabilitiesOf` 的其余各位都从握手结果推，混在一起会让「哪些能推、哪些得问」
   // 这条界线糊掉——而那条界线正是这个函数存在的理由
-  const { modeReadback, compact, steer, activity } = ctx.config
-  return capabilitiesOf(info, { modeReadback, compact, steer, activity: activity !== undefined })
+  const { modeReadback, compact, steer, steerCall, fork, activity } = ctx.config
+  return capabilitiesOf(info, {
+    modeReadback,
+    compact,
+    steer: steer === true || steerCall !== undefined,
+    fork: fork !== undefined,
+    activity: activity !== undefined,
+  })
 }
 
 /**
@@ -222,6 +231,9 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
     ...(native?.meta === undefined ? {} : { _meta: native.meta }),
   }
   if (ctx.req.forkOf !== undefined) {
+    if ((ctx.req.forkOf.dropTurns ?? 0) > 0) {
+      throw new Error(`${ctx.config.id} 的 ACP 分叉不能停在历史轮次，已拒绝完整历史冒充回退。`)
+    }
     await forkSession(ctx, ctx.req.forkOf.handle, shared)
     return
   }
@@ -256,13 +268,30 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
  * 所以它属于「这条会话怎么开场」（`StartRequest.forkOf`），
  * 不是老会话上的一个方法。
  *
- * ACP 没有「只保留前 N 轮」的入口，所以 `dropTurns` 用不上——
- * **不假装支持**：宿主那边「从这一轮重来」在这家引擎上会带上完整历史。
+ * ACP 没有「只保留前 N 轮」的入口。能力表因此只报 `fork`、不报 `rewind`；
+ * 这里仍做一次防御性拒绝，避免旧宿主或手写请求把完整历史冒充成回退。
  */
 async function forkSession(ctx: OpenCtx, handle: string, shared: Shared): Promise<void> {
+  if (ctx.config.fork !== undefined) {
+    await forkForeign(ctx, ctx.config.fork, handle, shared)
+    return
+  }
   const forked = (await ctx.rpc.call("session/fork", { sessionId: handle, ...shared })) as AcpNewSession
   adopt(ctx, forked)
-  }
+}
+
+/** 厂商扩展只负责复制；新进程再用标准 load 接住，避免 fork 出来却仍连着父会话。 */
+async function forkForeign(ctx: OpenCtx, adapter: ForeignFork, handle: string, shared: Shared): Promise<void> {
+  if (!ctx.state.loadSession) throw new Error(`${ctx.config.id} 的原生分叉需要 loadSession，但它没有声明这项能力。`)
+  const request = adapter.request(handle, shared.cwd)
+  const raw = await ctx.rpc.call(request.method, request.params)
+  const forked = adapter.handle(raw)
+  if (forked === undefined) throw new Error(`${ctx.config.id} 的原生分叉没有返回新会话句柄。`)
+  const loaded = ((await ctx.rpc.call("session/load", { sessionId: forked, ...shared })) ?? {}) as AcpNewSession
+  ctx.state.acpSession = forked
+  ctx.req.onHandle?.(forked)
+  adoptCatalogue(ctx, loaded)
+}
 
 /**
  * 把一份清单落到状态上。

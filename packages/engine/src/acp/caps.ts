@@ -60,6 +60,21 @@ export interface ForeignInteraction {
 export type ForeignInteractionParser = (method: string, params: unknown) => ForeignInteraction | undefined
 export type ForeignInteractionResolvedParser = (method: string, params: unknown) => string | undefined
 
+/** 厂商公开的 ACP 扩展请求；方法名与参数形状都由该厂商适配器负责。 */
+export interface ForeignCall {
+  method: string
+  params: unknown
+}
+
+/** 厂商原生插话入口。标准 `session/steer` 仍由通用驱动自己组装。 */
+export type ForeignSteer = (sessionId: string, text: string) => ForeignCall
+
+/** 厂商原生完整分叉入口。分出句柄后通用驱动会用标准 `session/load` 接入。 */
+export interface ForeignFork {
+  request: (sourceSessionId: string, cwd: string) => ForeignCall
+  handle: (response: unknown) => string | undefined
+}
+
 /**
  * 一家 ACP 引擎的**注入面**：驱动这一层不认识任何一家，各家的特殊之处从这里递进来。
  *
@@ -153,12 +168,17 @@ export interface AcpDriverConfig {
   /**
    * 这家认不认 `session/compact` / `session/steer`。
    *
-   * **协议里推不出来，只能各家自己说**——三家实测的结果见 `turn.ts` 头部那张表
-   *（kimi、grok 两个都是 `Method not found`，只有 zcode 有）。
+   * **协议里推不出来，只能各家自己说**。而且桥有路由不代表后端兑现：本机
+   * zcode-acp-server 0.5.1 会转发 steer，ZCode 后端 0.16.3 仍回 `Method not found`；
+   * Grok 已验证的首方扩展另走 `steerCall`。
    * 不填就是没有：给一个点了没反应的入口，比不给更糟。
    */
   compact?: boolean
   steer?: boolean
+  /** 标准 `session/steer` 之外、由厂商公开的插话请求；存在即认领 steer 能力。 */
+  steerCall?: ForeignSteer
+  /** 标准 `session/fork` 之外、由厂商公开的完整分叉请求；存在即认领 fork 能力。 */
+  fork?: ForeignFork
   /**
    * 认不认领 `terminal/*`（替 agent 起进程）。
    *

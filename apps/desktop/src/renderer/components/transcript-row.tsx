@@ -35,7 +35,7 @@ export function canAsk(thread: Thread, hasComposer: boolean): boolean {
 export function canRewind(thread: Thread, turn: Turn | undefined, readOnly: boolean): boolean {
   return !readOnly && turn === undefined && thread.detached !== true &&
     (thread.status === "idle" || thread.status === "failed") &&
-    thread.capabilities?.fork === true && thread.engineHandle !== undefined
+    thread.capabilities?.rewind === true && thread.engineHandle !== undefined
 }
 
 /**
