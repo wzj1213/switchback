@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { barsOf } from "./useScrollbars.js"
+import { barsOf, withBarFade } from "./useScrollbars.js"
 
 /**
  * 「现在是叠加条还是经典条」**只能量，不能问**：CSS 和 JS 都没有这个查询，
@@ -20,5 +20,12 @@ describe("滚动条是哪一档", () => {
 
   it("量出负数（不该发生）也当叠加条：宁可不画，不要画错", () => {
     expect(barsOf(-1)).toBe("overlay")
+  })
+
+  it("淡出过渡只追加一次，也不覆盖容器自己的过渡", () => {
+    expect(withBarFade("")).toContain("--bar")
+    const once = withBarFade("opacity 100ms linear")
+    expect(once).toContain("opacity 100ms linear, --bar")
+    expect(withBarFade(once)).toBe(once)
   })
 })

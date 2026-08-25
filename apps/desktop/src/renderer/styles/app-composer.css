@@ -15,7 +15,9 @@
   background: var(--text);
   color: var(--text-inverse);
   cursor: pointer;
-  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  transition:
+    background var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
 }
 
 .send:hover:not(:disabled) {
@@ -465,7 +467,9 @@
      这样长出来的过程里只有「右边」这一个数在动——四个数一起动的话，
      开头那几帧上下还贴着 0，拇指的投影会先被削一下再松开 */
   clip-path: inset(-14px 100% -14px -14px round 999px);
-  transition: clip-path 240ms var(--ease), box-shadow 120ms var(--ease);
+  transition:
+    clip-path 240ms var(--ease),
+    box-shadow 120ms var(--ease);
 }
 
 /*
@@ -591,7 +595,10 @@
    * 写成独立的 `translate` 就排在 `scale` 前面，位移不再被缩放乘到。
    */
   translate: var(--tx, 0px) 0;
-  transition: translate 150ms var(--ease), scale 80ms var(--ease), box-shadow 80ms var(--ease);
+  transition:
+    translate 150ms var(--ease),
+    scale 80ms var(--ease),
+    box-shadow 80ms var(--ease);
 }
 
 /* 展开那 300ms：拇指和填充从最左跟着条子一起走——是拇指把条子拽开的 */
@@ -607,7 +614,9 @@
 .effort__bar--live .effort__thumb {
   scale: 0.92;
   box-shadow: 0 1px 1px rgb(0 0 0 / 20%);
-  transition: scale 70ms var(--ease), box-shadow 70ms var(--ease);
+  transition:
+    scale 70ms var(--ease),
+    box-shadow 70ms var(--ease);
 }
 
 /* 深空态的星点：四角星（和界面里那颗 ✧ 同一个形状），错落闪烁。
@@ -662,8 +671,17 @@
     opacity: 0.6;
   }
 
+  .effort,
+  .effort__warn,
+  .effort__now,
+  .effort__fill,
+  .effort__hot,
+  .effort__thumb,
   .effort__bar {
     transition: none;
+  }
+
+  .effort__bar {
     clip-path: none;
   }
 }
@@ -678,7 +696,9 @@
   box-shadow: 0 0 0 3px rgb(180 64 154 / 22%);
   /* **柔光比条子慢一步再出来。** 条子是 clip-path 从 0 长到整条，
      柔光却是围着外壳画的——同时出现的话，先看到的是一个空的品红圈 */
-  transition: max-width var(--dur-slow) var(--ease), box-shadow 260ms var(--ease) 160ms;
+  transition:
+    max-width var(--dur-slow) var(--ease),
+    box-shadow 260ms var(--ease) 160ms;
 }
 
 /*
@@ -754,5 +774,11 @@
     box-shadow:
       0 0 0 1.5px rgb(215 106 180 / 65%),
       0 1px 2px rgb(0 0 0 / 30%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effort--costly.effort--open {
+    transition: none;
   }
 }

@@ -9,12 +9,15 @@ export async function openFixture({ value, waitFor, pause }, cdp) {
     if (!(await value(cdp, `${group}?.querySelector('.chev--open') !== null`))) {
       await value(cdp, `${group}?.querySelector('.row__main')?.click(); true`)
     }
-    selected = await value(cdp, `(() => {
+    selected = await value(
+      cdp,
+      `(() => {
       const row = document.querySelector('.row--thread .row__main')
       if (row === null) return false
       row.click()
       return true
-    })()`)
+    })()`,
+    )
     await pause(120)
   }
   await waitFor(cdp, "document.querySelector('.md') !== null", "转录区正文")
@@ -23,22 +26,53 @@ export async function openFixture({ value, waitFor, pause }, cdp) {
 
 /** 用 CDP 发真鼠标事件，验一次按下捕获、首段拖动与松手落档。 */
 export async function exerciseEffort({ value, pause }, cdp) {
-  const rect = await value(cdp, `(() => {
+  const rect = await value(
+    cdp,
+    `(() => {
     const r = document.querySelector('.effort__bar').getBoundingClientRect()
     return { left: r.left, top: r.top, width: r.width, height: r.height }
-  })()`)
+  })()`,
+  )
+  const viewport = await value(cdp, "window.innerWidth")
+  if (rect.left < 0 || rect.left + rect.width > viewport) {
+    throw new Error(`推理强度滑块越出窗口：${JSON.stringify({ rect, viewport })}`)
+  }
   const y = rect.top + rect.height / 2
   const x0 = rect.left + rect.width * 0.12
   const x1 = rect.left + rect.width * 0.86
-  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: x0, y, button: "left", clickCount: 1 })
+  await cdp.send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: x0,
+    y,
+    button: "left",
+    clickCount: 1,
+  })
   await pause(60)
-  const pressed = await value(cdp, "Number(document.querySelector('.effort__bar').getAttribute('aria-valuenow'))")
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: x1, y, button: "left", buttons: 1 })
+  const pressed = await value(
+    cdp,
+    "Number(document.querySelector('.effort__bar').getAttribute('aria-valuenow'))",
+  )
+  await cdp.send("Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    x: x1,
+    y,
+    button: "left",
+    buttons: 1,
+  })
   await pause(80)
   const live = await value(cdp, "document.querySelector('.effort__bar--live') !== null")
   if (!live) throw new Error("推理强度滑块没有进入拖动态")
-  const moved = await value(cdp, "Number(document.querySelector('.effort__bar').getAttribute('aria-valuenow'))")
+  const moved = await value(
+    cdp,
+    "Number(document.querySelector('.effort__bar').getAttribute('aria-valuenow'))",
+  )
   if (moved <= pressed) throw new Error("推理强度滑块没有跟随真实鼠标移动")
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x1, y, button: "left", clickCount: 1 })
+  await cdp.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: x1,
+    y,
+    button: "left",
+    clickCount: 1,
+  })
   await pause(160)
 }

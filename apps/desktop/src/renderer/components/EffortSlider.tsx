@@ -3,6 +3,8 @@ import type { ModelOption } from "@omni/protocol"
 import { currentOf, effortLabel, costlyOf } from "./ModelPicker.js"
 import { EffortBar } from "./EffortBar.js"
 import { barWidth } from "./effort-geometry.js"
+import { useReduced } from "../use-reduced.js"
+import { useEffortClose } from "./use-effort-close.js"
 
 /**
  * 推理强度的行内滑块。收起时是一段安静的文字加几枚刻度——**不点开也知道
@@ -152,6 +154,7 @@ export function EffortSlider({
    */
   const [preview, setPreview] = useState<string>()
   const trig = useRef<HTMLButtonElement>(null)
+  const reduced = useReduced()
   const efforts = current.efforts ?? []
   const value = effort ?? current.defaultEffort ?? efforts[0]
   // 不在清单里的旧值（换过模型）按 0 档画位置、但标签照原文显示——不编一个档位
@@ -174,19 +177,7 @@ export function EffortSlider({
   }, [open])
 
   /** 收起走 190ms 的收回动画，条子退场、触发器才回来。 */
-  const close = (refocus: boolean): void => {
-    setClosing(true)
-    window.setTimeout(() => {
-      setOpen(false)
-      setClosing(false)
-      // 触发器要等收起重渲染之后才在
-      if (refocus) {
-        requestAnimationFrame(() => {
-          trig.current?.focus()
-        })
-      }
-    }, 190)
-  }
+  const close = useEffortClose({ reduced, trigger: trig, setOpen, setClosing })
 
   if (efforts.length === 0) return null
   return (
@@ -208,6 +199,7 @@ export function EffortSlider({
             onCommit={committer(efforts, committed, onChange)}
             onPreview={setPreview}
             onClose={close}
+            reduced={reduced}
           />
         ) : (
           <EffortTrigger

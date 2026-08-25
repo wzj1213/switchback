@@ -2,7 +2,7 @@
 /**
  * 给桌面端出图。**界面改动的唯一验收方式。**
  *
- * 用法：`node scripts/shot-app.mjs [输出目录] [--dark]`
+ * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min] [--reduce]`
  *
  * ## 为什么不用 `OMNI_DEV_SHOT`
  *
@@ -33,6 +33,7 @@ const electron = createRequire(join(DESKTOP, "package.json"))("electron")
 
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
 const DARK = process.argv.includes("--dark")
+const REDUCED = process.argv.includes("--reduce")
 /** 桌宠靶场改动：用隔离数据目录真跑一轮 Claude，拍到枪、靶与逐字流。 */
 const PET_LIVE = process.argv.includes("--pet-live")
 /**
@@ -202,7 +203,10 @@ async function shoot(cdp, view) {
  * 页名从左列的按钮上现读，不写死——加一页时这里自动跟上。
  */
 async function shootSettings(cdp) {
-  const tabs = await value(cdp, `[...document.querySelectorAll('.set__tab')].map(t => t.textContent.trim())`)
+  const tabs = await value(
+    cdp,
+    `[...document.querySelectorAll('.set__tab')].map(t => t.textContent.trim())`,
+  )
   for (const [i, name] of tabs.entries()) {
     await value(cdp, `document.querySelectorAll('.set__tab')[${i}]?.click(); true`)
     // 异步那两页要等内容到齐，否则拍到的是「正在读…」
@@ -228,7 +232,9 @@ async function seed(dir) {
   await writeFile(
     join(dir, "settings.json"),
     `${JSON.stringify({
-      projects: [ROOT], theme: DARK ? "dark" : "light", pets: true,
+      projects: [ROOT],
+      theme: DARK ? "dark" : "light",
+      pets: true,
       ...(PET_LIVE ? { defaultEngine: "claude", petKit: { range: true } } : {}),
     })}\n`,
   )
@@ -260,6 +266,11 @@ async function main() {
       deviceScaleFactor: 2,
       mobile: false,
     })
+    if (REDUCED) {
+      await cdp.send("Emulation.setEmulatedMedia", {
+        features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+      })
+    }
     await waitFor(cdp, "document.querySelector('.shell') !== null", "外壳")
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
@@ -268,7 +279,9 @@ async function main() {
     cdp.close()
   } catch (error) {
     if (cdp !== undefined) {
-      const shot = await cdp.send("Page.captureScreenshot", { format: "png" }).catch(() => undefined)
+      const shot = await cdp
+        .send("Page.captureScreenshot", { format: "png" })
+        .catch(() => undefined)
       if (shot?.data !== undefined) {
         await writeFile(join(OUT, "00-出图失败现场.png"), Buffer.from(shot.data, "base64"))
       }

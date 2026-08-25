@@ -105,6 +105,10 @@ body,
   height: 10px;
 }
 
+[data-bars="classic"] {
+  --bar-fade: 320ms;
+}
+
 [data-bars="classic"] ::-webkit-scrollbar-track,
 [data-bars="classic"] ::-webkit-scrollbar-corner {
   background: transparent;
@@ -124,8 +128,8 @@ body,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-bars="classic"] ::-webkit-scrollbar-thumb {
-    transition: none;
+  [data-bars="classic"] {
+    --bar-fade: 0ms;
   }
 }
 

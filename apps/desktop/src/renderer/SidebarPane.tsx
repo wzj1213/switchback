@@ -2,6 +2,7 @@ import type { Command, EngineInfo, EngineThread, Thread } from "@omni/protocol"
 import { Sidebar } from "./components/Sidebar.js"
 import type { SidebarRow } from "./sidebar.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
+import { MinuteProvider } from "./useMinute.js"
 
 interface SidebarPaneProps {
   rows: readonly SidebarRow[]
@@ -48,19 +49,21 @@ interface SidebarPaneProps {
 export function SidebarPane(props: SidebarPaneProps): React.JSX.Element {
   const { thread, onSelect, send, ...sidebar } = props
   return (
-    <Sidebar
-      {...sidebar}
-      selectedId={thread?.id ?? ""}
-      onSelect={onSelect}
-      onDelete={(id: string) => {
-        // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
-        if (id === thread?.id) onSelect(undefined)
-        send({ type: "thread.delete", threadId: id })
-      }}
-      onRename={(id: string, title: string) => {
-        send({ type: "thread.rename", threadId: id, title })
-      }}
-    />
+    <MinuteProvider>
+      <Sidebar
+        {...sidebar}
+        selectedId={thread?.id ?? ""}
+        onSelect={onSelect}
+        onDelete={(id: string) => {
+          // 删的正好是当前选中的：把选择交还给「最近那个」，而不是留一个空指针
+          if (id === thread?.id) onSelect(undefined)
+          send({ type: "thread.delete", threadId: id })
+        }}
+        onRename={(id: string, title: string) => {
+          send({ type: "thread.rename", threadId: id, title })
+        }}
+      />
+    </MinuteProvider>
   )
 }
 

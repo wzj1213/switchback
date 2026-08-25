@@ -4,11 +4,37 @@ import { Shimmer } from "./Shimmer.js"
 import { elapsed, statusLabel } from "../status.js"
 import { compact } from "../usage.js"
 
-/** 计时器只需秒级精度，1s 一跳。 */
-const TICK_MS = 1000
-
 /** 多久之后才显示计时器。抄 dsh：**短轮次不需要秒表**，三秒的事摆个计时器只是噪声。 */
 const CLOCK_AFTER_MS = 15_000
+const TICK_MS = 1000
+
+/** 先睡到秒表真的会出现；出现后再对齐到整秒。前 15 秒不做无效重绘。 */
+export function nextClockDelay(now: number, startedAt: number): number {
+  const untilVisible = startedAt + CLOCK_AFTER_MS - now
+  return untilVisible > 0 ? untilVisible + 20 : TICK_MS - (now % TICK_MS) + 20
+}
+
+function useTurnClock(startedAt: number | undefined): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (startedAt === undefined) return undefined
+    let timer: ReturnType<typeof setTimeout>
+    const schedule = (): void => {
+      timer = setTimeout(
+        () => {
+          setNow(Date.now())
+          schedule()
+        },
+        nextClockDelay(Date.now(), startedAt),
+      )
+    }
+    schedule()
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [startedAt])
+  return now
+}
 
 /**
  * 一轮跑起来之后，对话流**末尾**的那行状态。
@@ -42,18 +68,7 @@ export function TurnStatus({
   /** 当前 thinking block 的近似值；频繁变化，不放进 aria-live 的播报内容。 */
   thinkingTokens: number | undefined
 }): React.JSX.Element | null {
-  const [now, setNow] = useState(() => Date.now())
-  const running = turn !== undefined
-
-  useEffect(() => {
-    if (!running) return undefined
-    const id = setInterval(() => {
-      setNow(Date.now())
-    }, TICK_MS)
-    return () => {
-      clearInterval(id)
-    }
-  }, [running])
+  const now = useTurnClock(turn?.startedAt)
 
   const label = statusLabel(thread, items)
   if (turn === undefined || label === undefined) return null
@@ -63,7 +78,11 @@ export function TurnStatus({
     <div className="turnstatus" role="status" aria-live="polite">
       <Shimmer text={label} />
       {thinkingTokens === undefined ? null : (
-        <span className="turnstatus__tokens" aria-hidden="true" title="当前思考块的近似值，不是最终用量">
+        <span
+          className="turnstatus__tokens"
+          aria-hidden="true"
+          title="当前思考块的近似值，不是最终用量"
+        >
           约 {compact(thinkingTokens)} tokens
         </span>
       )}
@@ -77,7 +96,9 @@ export function TurnStatus({
       {tasks.map((task) => (
         <span key={task.id} className="turnstatus__task">
           {task.description}
-          {task.lastTool === undefined ? null : <span className="turnstatus__tool">{task.lastTool}</span>}
+          {task.lastTool === undefined ? null : (
+            <span className="turnstatus__tool">{task.lastTool}</span>
+          )}
         </span>
       ))}
     </div>

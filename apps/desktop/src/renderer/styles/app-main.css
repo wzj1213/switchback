@@ -260,6 +260,12 @@
   transition: width var(--dur-slow) var(--ease);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .meter__fill {
+    transition: none;
+  }
+}
+
 /*
  * 标签的字符数会变（9% → 10% 多一个字符），右边那排按钮跟着整体挪。
  * tabular-nums 管得住每个数字一样宽，管不住多一个字符——min-width 管。
@@ -534,7 +540,6 @@
   font-size: var(--text-xs);
 }
 
-
 /* 次要按钮：文字的、轻的。对比视图的「退出对比」「接着用这边」用它。
    顶栏那种一眼就懂的动作用 `.iconbtn`，这里的需要文字说清楚 */
 .tbtn {
@@ -684,22 +689,6 @@
 
 /* 展开箭头。**转动写在这里而不是行内 style**：行内的那条
    `prefers-reduced-motion` 盖不住，而它是这套界面里唯一一条规则体系之外的过渡 */
-.chev {
-  transition: transform var(--dur) var(--ease);
-}
-
-.chev--open {
-  transform: rotate(90deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chev {
-    transition: none;
-  }
-}
-
-/* 展开箭头。**转动写在这里而不是行内 style**：行内那条
-   `prefers-reduced-motion` 盖不住，而它曾是这套界面里唯一一条规则体系之外的过渡 */
 .chev {
   transition: transform var(--dur) var(--ease);
 }

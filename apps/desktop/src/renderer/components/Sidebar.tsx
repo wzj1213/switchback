@@ -153,6 +153,8 @@ export function Sidebar(props: Props): React.JSX.Element {
   const { isOpen, toggle } = useSidebarOpen(selected?.cwd)
   const rename = useRenaming(props.onRename, { at: props.askRename, id: props.selectedId })
   const { rowMenu, groupMenu } = useSidebarMenus({ ...acts, onSetIcon: props.onSetIcon }, openMenu)
+  const { onSelect, onDelete, engines } = props
+  const foundOn = { onSelect, onDelete, rowMenu, rename, engines }
 
   return (
     <aside className="sidebar">
@@ -173,7 +175,7 @@ export function Sidebar(props: Props): React.JSX.Element {
             found={found}
             deep={deep}
             selectedId={props.selectedId}
-            on={{ onSelect: props.onSelect, onDelete: props.onDelete, rowMenu, rename, engines: props.engines }}
+            on={foundOn}
           />
         ) : (
           <SectionList

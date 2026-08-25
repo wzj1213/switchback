@@ -54,13 +54,7 @@ function Stops({ count }: { count: number }): React.JSX.Element {
  *
  * 它也不能挂在条子里面：条子有 `clip-path`，挂进去会被连牌子一起裁掉。
  */
-function Now({
-  label,
-  grown,
-}: {
-  label: string
-  grown: boolean
-}): React.JSX.Element {
+function Now({ label, grown }: { label: string; grown: boolean }): React.JSX.Element {
   const cls = ["effort__now", grown ? "effort__now--in" : ""]
   return (
     <span className={cls.filter(Boolean).join(" ")} aria-hidden="true">
@@ -92,11 +86,17 @@ function barClass(grown: boolean, intro: boolean, live: boolean): string {
 function useBarLife(
   bar: React.RefObject<HTMLSpanElement | null>,
   onClose: (refocus: boolean) => void,
+  reduced: boolean,
 ): { grown: boolean; intro: boolean } {
-  const [grown, setGrown] = useState(false)
-  const [intro, setIntro] = useState(true)
+  const [grown, setGrown] = useState(reduced)
+  const [intro, setIntro] = useState(!reduced)
   useEffect(() => {
     bar.current?.focus()
+    if (reduced) {
+      setGrown(true)
+      setIntro(false)
+      return undefined
+    }
     const raf = requestAnimationFrame(() => {
       setGrown(true)
     })
@@ -107,7 +107,7 @@ function useBarLife(
       cancelAnimationFrame(raf)
       window.clearTimeout(done)
     }
-  }, [bar])
+  }, [bar, reduced])
   useEffect(() => {
     const onPointer = (event: PointerEvent): void => {
       if (bar.current?.contains(event.target as Node | null) === true) return
@@ -128,6 +128,7 @@ export function EffortBar({
   onCommit,
   onPreview,
   onClose,
+  reduced,
 }: {
   efforts: readonly string[]
   committed: number
@@ -142,13 +143,15 @@ export function EffortBar({
   onPreview: (effort: string | undefined) => void
   /** `refocus` = Esc：焦点还回触发器；点别处收起时不还（焦点跟着那一击走）。 */
   onClose: (refocus: boolean) => void
+  /** 系统减少动效：不排出场计时，收起也不故意等动画。 */
+  reduced: boolean
 }): React.JSX.Element {
   const bar = useRef<HTMLSpanElement>(null)
   const active = useRef<number | undefined>(undefined)
   const [dragIndex, setDragIndex] = useState<number | undefined>(undefined)
   /** 已发给引擎、还没等到最终回声的落点；连续按方向键时下一步从这里算。 */
   const [pendingIndex, setPendingIndex] = useState<number | undefined>(undefined)
-  const { grown, intro } = useBarLife(bar, onClose)
+  const { grown, intro } = useBarLife(bar, onClose, reduced)
   // 拖动中画手指位置，松手后守住本地落点，最终再交给引擎回声。
   const shown = dragIndex ?? pendingIndex ?? committed
 
@@ -185,10 +188,7 @@ export function EffortBar({
 
   return (
     <>
-      <Now
-        label={effortLabel(efforts[shown] ?? "").label}
-        grown={grown}
-      />
+      <Now label={effortLabel(efforts[shown] ?? "").label} grown={grown} />
       <span
         ref={bar}
         className={barClass(grown, intro, dragIndex !== undefined)}

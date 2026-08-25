@@ -3,6 +3,7 @@ import type { BrassMode, TrajMode } from "../../shared/settings.js"
 import { createFx, resetFx, stepFx } from "../pet-fx.js"
 import { createFoeArt } from "../pet-foe-art.js"
 import { drawFx, readPalette, type Palette } from "../pet-fx-draw.js"
+import { createFxLoop } from "../pet-fx-loop.js"
 import type { Flow } from "../useFlow.js"
 import { SIZE, type Pet, type PetShape } from "../pets.js"
 
@@ -37,29 +38,16 @@ export function PetFx(props: FxProps): React.JSX.Element {
     const g = node?.getContext("2d") ?? null
     if (node === null || g === null) return undefined
     const box: Box = { w: 0, h: 0, dpr: 1 }
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect
-      // 尺寸没真变就什么都不做；真变了就等于**画布刚被清空**，得补一帧
-      if (rect === undefined || !fit(node, box, rect)) return
-      clock.drew = true
-      if (clock.slow !== 0) {
-        clearTimeout(clock.slow)
-        clock.slow = 0
-        clock.raf = requestAnimationFrame(frame)
-      }
-    })
-    observer.observe(node)
-
     const world = createFx()
     const art = createFoeArt()
-    const clock = { last: performance.now(), raf: 0, slow: 0, drew: true, bitten: 0 }
+    const clock = { last: performance.now(), drew: true, bitten: 0 }
     // 换会话就把这一层整个清掉。**放在帧里认而不是进 effect 依赖**——
     // 进依赖的话每换一条会话都要重订 ResizeObserver、重挂主题监听，
     // 而要清的只是世界本身
     let seen = live.current.threadId
     const paint = { pal: undefined as Palette | undefined, tone: "", gen: 0 }
 
-    const frame = (now: number): void => {
+    const frame = (now: number): boolean => {
       const dt = (now - clock.last) / 1000
       clock.last = now
       const props2 = live.current
@@ -108,29 +96,49 @@ export function PetFx(props: FxProps): React.JSX.Element {
           g.clearRect(0, 0, box.w, box.h)
           drawFx(g, world, paint.pal, { art, gen: paint.gen, range: props2.range })
         }
+        return world.moving || rate > 1
       }
-      schedule(world.moving || rate > 1)
+      // 台面/宠物还没就绪时没有可见动画，慢拍等布局即可；不能拿初始 moving
+      // 在一张画不了的 canvas 上续一条 60fps 循环。
+      return false
     }
 
-    /** 有东西在动就跟着刷新率，全静下来就退到慢拍。**两条路只留一个句柄。** */
-    const schedule = (awake: boolean): void => {
-      if (awake) clock.raf = requestAnimationFrame(frame)
-      else clock.slow = window.setTimeout(() => frame(performance.now()), IDLE_MS)
-    }
-    clock.raf = requestAnimationFrame(frame)
+    const loop = browserFxLoop(frame)
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect
+      // 尺寸没真变就什么都不做；真变了就等于**画布刚被清空**，得补一帧
+      if (rect === undefined || !fit(node, box, rect)) return
+      clock.drew = true
+      loop.wake()
+    })
+    observer.observe(node)
+    loop.wake()
 
     // 换主题要重读颜色。**监听而不是每帧查**：它一天变不了两次
     const media = window.matchMedia("(prefers-color-scheme: dark)")
     const repaint = (): void => {
       paint.pal = undefined
+      clock.drew = true
+      loop.wake()
     }
     media.addEventListener("change", repaint)
+    const visibility = (): void => {
+      if (document.hidden) {
+        loop.pause()
+        return
+      }
+      // 后台停了多久不属于动画世界的 dt；回来从这一刻继续，避免压力瞬间跳满。
+      clock.last = performance.now()
+      clock.drew = true
+      loop.wake()
+    }
+    document.addEventListener("visibilitychange", visibility)
 
     return () => {
-      cancelAnimationFrame(clock.raf)
-      clearTimeout(clock.slow)
+      loop.stop()
       observer.disconnect()
       media.removeEventListener("change", repaint)
+      document.removeEventListener("visibilitychange", visibility)
     }
   }, [pets, flow])
 
@@ -173,6 +181,21 @@ function fit(node: HTMLCanvasElement, box: Box, rect: DOMRectReadOnly): boolean 
 
 /** 慢拍的间隔。见组件抬头那段。 */
 const IDLE_MS = 120
+
+function browserFxLoop(step: (at: number) => boolean): ReturnType<typeof createFxLoop> {
+  return createFxLoop(
+    {
+      hidden: () => document.hidden,
+      now: () => performance.now(),
+      requestFrame: (run) => requestAnimationFrame(run),
+      cancelFrame: (id) => cancelAnimationFrame(id),
+      setIdle: (run, ms) => window.setTimeout(run, ms),
+      clearIdle: (id) => window.clearTimeout(id),
+    },
+    step,
+    IDLE_MS,
+  )
+}
 
 interface FxProps {
   /** 桌宠本体的物理状态。**只读**——这一层从不改它。 */

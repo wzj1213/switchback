@@ -32,7 +32,13 @@ import { useEffect } from "react"
 const IDLE_MS = 900
 /** 淡入淡出多久。比界面其他过渡慢一档：它是环境，不是反馈。 */
 const FADE_MS = 320
-const FADE = `--bar ${String(FADE_MS)}ms linear`
+const FADE = `--bar var(--bar-fade, ${String(FADE_MS)}ms) linear`
+
+/** 只追加自己的 custom-property 过渡，不覆盖容器原有的 inline transition。 */
+export function withBarFade(current: string): string {
+  if (current.includes("--bar")) return current
+  return current.trim() === "" ? FADE : `${current}, ${FADE}`
+}
 
 /**
  * 量出来的「滚动条占多宽」→ 现在是哪一档。
@@ -76,15 +82,24 @@ export function useScrollbars(): void {
     }
     sync()
     // 插拔鼠标会让系统在两档之间切，而那没有事件可听——回到窗口时重量一次
-    window.addEventListener("focus", sync)
-    window.addEventListener("resize", sync)
+    let frame = 0
+    const scheduleSync = (): void => {
+      if (frame !== 0) return
+      // resize 一帧能来几十次；探针会强制布局，所以一帧最多量一次。
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        sync()
+      })
+    }
+    window.addEventListener("focus", scheduleSync)
+    window.addEventListener("resize", scheduleSync)
 
     const timers = new WeakMap<HTMLElement, number>()
     const onScroll = (event: Event): void => {
       const el = event.target
       if (!(el instanceof HTMLElement) || root.dataset["bars"] !== "classic") return
       // 过渡写一次就够，而且**不会覆盖别人**：滚动容器里没有一个带 CSS 过渡的
-      if (!el.style.transition.includes("--bar")) el.style.transition = FADE
+      el.style.transition = withBarFade(el.style.transition)
       el.style.setProperty("--bar", "1")
       window.clearTimeout(timers.get(el))
       timers.set(
@@ -96,8 +111,9 @@ export function useScrollbars(): void {
     }
     document.addEventListener("scroll", onScroll, true)
     return () => {
-      window.removeEventListener("focus", sync)
-      window.removeEventListener("resize", sync)
+      cancelAnimationFrame(frame)
+      window.removeEventListener("focus", scheduleSync)
+      window.removeEventListener("resize", scheduleSync)
       document.removeEventListener("scroll", onScroll, true)
     }
   }, [])
