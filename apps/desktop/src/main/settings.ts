@@ -79,6 +79,7 @@ function petKit(raw: unknown): Settings["petKit"] {
     hidden: [...new Set(strings(it.hidden) ?? DEFAULTS.petKit.hidden)],
     // 同 `pets`：默认开，所以读不出来要落到开
     entry: it.entry !== false,
+    fire: it.fire !== false,
   }
 }
 

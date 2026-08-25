@@ -213,6 +213,21 @@ export interface PetKit {
    * 系统「减少动效」开着时这一项自动失效，不用用户来关。
    */
   entry: boolean
+  /**
+   * 当前那只要不要**按 token 流速开火**。
+   *
+   * ## 它到底在画什么
+   *
+   * 射速恒等于流速：`item.delta` 估出来多快，就打多快（见 `throughput.ts`）。
+   * 打在一条纸带上，每中一发落一个字——**子弹不是打给谁的，是打出字来的**。
+   * 于是「引擎此刻吐得多快」第一次有了一个不用读数字就能感知的形状。
+   *
+   * **等级、皮肤、设置里的任何一项都不改射速**。一旦它们能改，
+   * 画面上的快慢说的就是你的配置，而不是引擎此刻的表现。
+   *
+   * 默认开。系统「减少动效」开着时自动失效。
+   */
+  fire: boolean
 }
 
 /** 与 DSH launcher 的公开 profile 名校验保持同形；驱动启动前还会再守一次。 */
@@ -245,7 +260,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
-  petKit: { hidden: [], entry: true },
+  petKit: { hidden: [], entry: true, fire: true },
   notify: "all",
   dsh: { profile: "acp", confirmedProfiles: [] },
   disabledEngines: [],
