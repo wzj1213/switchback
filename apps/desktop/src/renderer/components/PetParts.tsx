@@ -45,6 +45,11 @@ export function PetOne({
   return (
     <button
       type="button"
+      // **整层是 `aria-hidden`，那这颗就不能还留在 Tab 序里。**
+      // 它是装饰＋玩具，读屏里不该出现；而 `aria-hidden` 底下挂一个可聚焦元素
+      // 是实打实的 WCAG 违规（axe 的 `aria-hidden-focus`）——键盘用户会 Tab 到
+      // 一个读屏念不出、屏幕上也说不清是什么的东西上。
+      tabIndex={-1}
       ref={(n) => {
         refs.nodes.current[at] = n
       }}

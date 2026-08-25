@@ -69,7 +69,15 @@ export function usePets(
   // 于是换完引擎那几只会走回一个已经不存在的窝
   const land = useRef(onHit)
   land.current = onHit
-  const desk = useRef<readonly Seat[]>(seats)
+  /**
+   * 上一次的座位表。**初值必须是空表，不能是 `seats`。**
+   *
+   * 给 `seats` 的话第一次比对恒等，下面那段重排整个不跑，`pets.current` 就永远
+   * 停在空数组——按钮照常挂进 DOM，而**没有一只拿到过 transform**，
+   * 于是五只全叠在活动区左上角。这正是这一批要修的那个故障，
+   * 我在重写时亲手又造了一遍：`pet-seats` 那几条纯逻辑测试全绿，而应用是坏的。
+   */
+  const desk = useRef<readonly Seat[]>([])
   const stage = useRef<Stage>({ width: 0, height: 0 })
   /** 内容列的右缘。**窝挂在这儿**，而不是活动区的右墙——见 `columnRightOf` */
   const col = useRef(0)
@@ -139,7 +147,10 @@ export function usePets(
 
   // **座位表一变就立刻重排、就位、写进 DOM**——而且必须在 `useLayoutEffect` 里：
   // 新挂的节点身上还没有 transform，等 `useEffect` 就已经被画过一帧了
-  if (!sameSeats(desk.current, seats)) {
+  // 长度那一条是**兜底**：上一版就靠它初始化（`pets.length !== count`），
+  // 而我按 key 对齐时把它删了，于是「第一次渲染」这个情况没有任何东西兜着。
+  // 两条判据一起留着——它们各自漏掉的东西不一样
+  if (pets.current.length !== seats.length || !sameSeats(desk.current, seats)) {
     pets.current = reseat(desk.current, pets.current, seats).map((pet) => pet ?? resting())
     desk.current = seats
     trim(nodes.current, leans.current, shades.current, seats.length)
