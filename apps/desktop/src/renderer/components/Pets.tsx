@@ -5,8 +5,7 @@ import { gaitOf, lookOf, type Hit, type Pet } from "../pets.js"
 import { petRoster, visibleRoster, type PetSlot } from "../pet-roster.js"
 import type { EntryKind } from "../pet-entry.js"
 import { usePetEntry } from "../usePetEntry.js"
-import { useFlow } from "../useFlow.js"
-import { PetFx } from "./PetFx.js"
+import { FireLayer, type FireProps } from "./PetFx.js"
 import { usePets, useReduced } from "../usePets.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
@@ -82,6 +81,13 @@ export function Pets({
     },
     [reduced],
   )
+  // 被摸到脸上：**横着挨一记**（压瘦，不是压扁）。挨打的方向就是刚才发生了什么
+  // 的全部内容，而这一下是从左边来的
+  const onBite = useCallback(() => {
+    const at = shown.findIndex((slot) => slot.engine === engine)
+    if (at < 0) return
+    applyHit({ bodies: bodies.current, nodes: ctl.nodes.current }, at, BITE, reduced)
+  }, [reduced, shown, engine])
   const ctl = usePets(count, gaits, onHit)
   // **只给待在窝里、又不是正在跑的那几只排班**——理由在 `usePetMood` 开头
   useMood(ctl.nodes, ctl.pets, count, reduced)
@@ -92,7 +98,14 @@ export function Pets({
 
   return (
     <div className="pets" ref={ctl.area} aria-hidden="true">
-      <FireLayer pets={ctl.pets} slots={shown} engine={engine} fire={fire} reduced={reduced} />
+      <FireLayer
+        pets={ctl.pets}
+        slots={shown}
+        engine={engine}
+        fire={fire}
+        reduced={reduced}
+        onBite={onBite}
+      />
       <Shades slots={shown} refs={ctl.shades} />
       {shown.map((info, i) => (
         <button
@@ -168,51 +181,6 @@ function Shades({
  * 单拎成一个组件不只是行数：`useFlow` 要挂在**一直在的地方**——
  * 挂在条件分支里的话，关掉再打开会重订一次桥、重开一个滑窗。
  */
-export interface FireProps {
-  /** 要不要开火。 */
-  on: boolean
-  /** 哪条会话。流速只算这一条的——理由见 `flow-scope.ts`。 */
-  threadId: string
-  /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */
-  running: boolean
-  /** 手里有别的东西（在等审批）：这时枪立刻收起来。 */
-  handsBusy: boolean
-  /** 上下文用了多满（0~1）。上下文快满时会来胖子。 */
-  ctxRatio: number
-  /** 让不让压力显形（左边爬过来的那些）。 */
-  foes: boolean
-}
-
-function FireLayer({
-  pets,
-  slots,
-  engine,
-  fire,
-  reduced,
-}: {
-  pets: React.RefObject<Pet[]>
-  slots: readonly PetSlot[]
-  engine: EngineId
-  fire: FireProps
-  reduced: boolean
-}): React.JSX.Element | null {
-  const flow = useFlow(fire.threadId)
-  const mine = slots.findIndex((slot) => slot.engine === engine)
-  if (!fire.on || reduced || mine < 0) return null
-  return (
-    <PetFx
-      pets={pets}
-      index={mine}
-      tone={lookOf(engine).tone}
-      flow={flow}
-      busyHands={fire.handsBusy}
-      running={fire.running}
-      ratio={fire.ctxRatio}
-      foes={fire.foes}
-    />
-  )
-}
-
 /**
  * 伞。**挂在 `.pet__lean` 里面**，跟着那只一起往下飘。
  *
@@ -234,6 +202,13 @@ function Canopy({ on }: { on: boolean }): React.JSX.Element | null {
 function Ripple({ on }: { on: boolean }): React.JSX.Element | null {
   return on ? <span className="pet__splash" /> : null
 }
+
+/**
+ * 被摸到脸上那一下。**横向**：`squash` 会顺着挨打的方向压，
+ * 从天上砸下来是压扁、横着挨一记是压瘦——而方向恰恰是「刚才发生了什么」的全部内容。
+ * 速度定在会眯一下眼那一档之上：这一下该看得出来。
+ */
+const BITE: Hit = { axis: "x", speed: 1500 }
 
 /** 登场那一拍挂在当前那只身上。空串表示这一刻没有登场在播。 */
 function enterOf(on: boolean, kind: EntryKind | undefined): string {

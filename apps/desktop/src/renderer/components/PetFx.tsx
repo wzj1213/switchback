@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react"
+import type { EngineId } from "@omni/protocol"
 import { createFx, stepFx } from "../pet-fx.js"
 import { drawFx, readPalette, type Palette } from "../pet-fx-draw.js"
-import type { Pet } from "../pets.js"
+import { lookOf, type Pet } from "../pets.js"
+import type { PetSlot } from "../pet-roster.js"
+import { useFlow } from "../useFlow.js"
 
 /**
  * 开火那一层的画布。**桌宠本体一无所知**——它和这张 canvas 之间只有一个接口：
@@ -31,6 +34,7 @@ export function PetFx({
   running,
   ratio,
   foes,
+  onBite,
 }: {
   /** 桌宠本体的物理状态。**只读**——这一层从不改它。 */
   pets: React.RefObject<Pet[]>
@@ -48,10 +52,18 @@ export function PetFx({
   ratio: number
   /** 让不让压力显形（左边爬过来的那些）。 */
   foes: boolean
+  /**
+   * 被摸到脸上了。
+   *
+   * **回调而不是让这一层去改桌宠**：那只的身体归 `Pets` 管，
+   * 挨了一下该怎么演也已经有一套现成的（`pet-hit-fx.ts`）。
+   * 这里只负责说「挨了」，怎么演不归它。
+   */
+  onBite: () => void
 }): React.JSX.Element {
   const canvas = useRef<HTMLCanvasElement | null>(null)
-  const live = useRef({ index, tone, busyHands, running, ratio, foes })
-  live.current = { index, tone, busyHands, running, ratio, foes }
+  const live = useRef({ index, tone, busyHands, running, ratio, foes, onBite })
+  live.current = { index, tone, busyHands, running, ratio, foes, onBite }
 
   useEffect(() => {
     const node = canvas.current
@@ -72,6 +84,7 @@ export function PetFx({
     observer.observe(node)
 
     const world = createFx()
+    let bitten = 0
     let palette: Palette | undefined
     let paintedTone = ""
     let last = performance.now()
@@ -94,6 +107,10 @@ export function PetFx({
         foes: live.current.foes,
         rand: Math.random,
       })
+      if (world.bites > bitten) {
+        bitten = world.bites
+        live.current.onBite()
+      }
       // 闲着整帧不画，但「忙→闲」那一帧要画一次收尾，否则最后一颗子弹会留在画面上
       if (!world.moving && !drewLast) return
       drewLast = world.moving
@@ -122,4 +139,52 @@ export function PetFx({
   }, [pets, flow])
 
   return <canvas className="pets__fx" ref={canvas} aria-hidden="true" />
+}
+
+export interface FireProps {
+  /** 要不要开火。 */
+  on: boolean
+  /** 哪条会话。流速只算这一条的——理由见 `flow-scope.ts`。 */
+  threadId: string
+  /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */
+  running: boolean
+  /** 手里有别的东西（在等审批）：这时枪立刻收起来。 */
+  handsBusy: boolean
+  /** 上下文用了多满（0~1）。上下文快满时会来胖子。 */
+  ctxRatio: number
+  /** 让不让压力显形（左边爬过来的那些）。 */
+  foes: boolean
+}
+
+export function FireLayer({
+  pets,
+  slots,
+  engine,
+  fire,
+  reduced,
+  onBite,
+}: {
+  pets: React.RefObject<Pet[]>
+  slots: readonly PetSlot[]
+  engine: EngineId
+  fire: FireProps
+  reduced: boolean
+  onBite: () => void
+}): React.JSX.Element | null {
+  const flow = useFlow(fire.threadId)
+  const mine = slots.findIndex((slot) => slot.engine === engine)
+  if (!fire.on || reduced || mine < 0) return null
+  return (
+    <PetFx
+      pets={pets}
+      index={mine}
+      tone={lookOf(engine).tone}
+      flow={flow}
+      busyHands={fire.handsBusy}
+      running={fire.running}
+      ratio={fire.ctxRatio}
+      foes={fire.foes}
+      onBite={onBite}
+    />
+  )
 }
