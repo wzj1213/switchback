@@ -36,6 +36,17 @@ export interface Gun {
   silent: number
   /** 还没落到手上过。第一帧要直接就位，不然它会从画布左上角飞过来。 */
   placed: boolean
+  /** 弹匣里还剩几发。 */
+  mag: number
+  /**
+   * 换弹还剩多少秒。**大于 0 时一发都不出膛。**
+   *
+   * 加这一档不是为了拟真，是为了**让连发有个尽头**：上一版只要流速够高就
+   * 一直突突，一串弹着连成一条线，既读不出节奏也读不出后坐——而那两样
+   * 恰恰是这套东西要给的（见 `pet-range.ts`）。隔十来发停半秒，
+   * 那一串就自然断成一簇一簇，每簇的起点又都是归零的枪口。
+   */
+  reload: number
 }
 
 export interface Hand {
@@ -59,7 +70,10 @@ export interface GunInput {
 }
 
 export function createGun(): Gun {
-  return { x: 0, y: 0, vx: 0, vy: 0, ang: Math.PI, angV: 0, kick: 0, kickV: 0, arm: 0, silent: 9, placed: false }
+  return {
+    x: 0, y: 0, vx: 0, vy: 0, ang: Math.PI, angV: 0, kick: 0, kickV: 0,
+    arm: 0, silent: 9, placed: false, mag: MAG, reload: 0,
+  }
 }
 
 /**
@@ -86,6 +100,23 @@ const RATE_STOW = 6.5
 /** 安静多久才收枪。给「暂时没输出」留的宽限——不给的话它一秒收一次、一秒抽一次。 */
 const GRACE = 1.5
 /** 后坐的角度分量：回中刚度与阻尼。 */
+/** 一匣多少发。十来发一簇：够看出后坐一路上抬，又不至于长到读不出簇。 */
+export const MAG = 14
+/**
+ * 换一次弹要停掉「几发的工夫」。
+ *
+ * **不是一个固定的秒数，这一点是关键。** 这一层的宪法是「火力恒等于流速」——
+ * 发数就是那一秒吐了多少字。而固定秒数的换弹会**按流速的高低吃掉不同比例**的发数：
+ * 流速越高，同样半秒里丢掉的越多，于是「流速翻倍、发数翻倍」当场不成立
+ *（实测：190 t/s 那条纸带用例直接空了）。
+ *
+ * 按「几发的工夫」算，占空比就和流速无关了：不管快慢都是同样的比例，
+ * 发数照旧正比于流速，而画面上照旧一簇一簇。
+ */
+export const RELOAD_SHOTS = MAG * 0.22
+/** 换弹时枪口垂下来的角度。π 是水平朝左，往 π/2 走就是朝下（canvas 的 +y 朝下）。 */
+export const RELOAD_ANGLE = Math.PI * 0.78
+
 const K_KICK = 190
 const C_KICK = 13
 /**
@@ -112,9 +143,25 @@ export function wrapAngle(d: number): number {
   return x
 }
 
-/** 打一发带来的上跳。`n` 是这一簇的发数——一簇压着一簇，但封顶。 */
+/**
+ * 打一发带来的上跳，顺带扣子弹。`n` 是这一簇的发数——一簇压着一簇，但封顶。
+ *
+ * 打空了就**当场进换弹**：弹匣立刻装满，但 `reload` 那段时间里出不了膛。
+ */
 export function kickOf(gun: Gun, n: number): Gun {
-  return { ...gun, kickV: gun.kickV + 3.4 + Math.min(n, 3) * 0.5 }
+  const kicked = { ...gun, kickV: gun.kickV + 3.4 + Math.min(n, 3) * 0.5 }
+  const left = gun.mag - n
+  return left > 0 ? { ...kicked, mag: left } : { ...kicked, mag: MAG }
+}
+
+/** 这一发打空了弹匣没有。打空了调用方要起一次换弹（见 `pet-fx.ts`）。 */
+export function emptied(gun: Gun, n: number): boolean {
+  return gun.mag - n <= 0
+}
+
+/** 此刻能不能出膛。换弹那半秒不能。 */
+export function loaded(gun: Gun): boolean {
+  return gun.reload <= 0
 }
 
 /**
@@ -137,6 +184,9 @@ export function stepGun(gun: Gun, dt: number, input: GunInput): Gun {
     arm: arm < 0.002 ? 0 : arm,
     silent,
     placed: true,
+    // 收枪时把弹匣补满：下次抽出来是一把满的，而不是接着上次那半匣
+    mag: arm < 0.002 ? MAG : gun.mag,
+    reload: arm < 0.002 ? 0 : Math.max(0, gun.reload - dt),
   }
 }
 

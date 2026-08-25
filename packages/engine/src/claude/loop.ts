@@ -36,19 +36,30 @@ const num = (v: unknown): number => (typeof v === "number" ? v : 0)
  * 上下文占用 = 这次请求送上去的输入（含缓存命中的那部分）+ 产出。
  * **缓存命中必须算进去**——它省的是钱，不是上下文：那些 token 照样占窗口。
  *
- * 窗口大小 SDK 不给（它随模型变），所以 `contextWindow` 缺席，
- * 界面上就只显示数字不画进度条。宁可少画一条，也不要照一个猜出来的分母画。
+ * **窗口大小不在这条消息流里**——它随模型变，SDK 的 usage 只说占了多少。
+ * 上一版就此认定「引擎不给」，于是界面上只有数字、没有比例条，
+ * 而 `getContextUsage()` 这个控制请求一直摆在那儿（`maxTokens`）。现在由会话
+ * 问一次再从这里捎带出去；真问不到才缺席，那时照旧只显示数字不画进度条——
+ * 宁可少画一条，也不要照一个猜出来的分母画。
  *
  * `cacheRead` 只取 cache_read（命中）；cache_creation 是**写**缓存，不是命中。
  * 字段缺席就是没报，缺席就整个不进事件——不拿 0 冒充「没命中」。
  */
-function usageOf(raw: RawUsage): { contextUsed: number; outputTokens?: number; cacheRead?: number } {
+function usageOf(
+  raw: RawUsage,
+  window: number | undefined,
+): { contextUsed: number; contextWindow?: number; outputTokens?: number; cacheRead?: number } {
   return {
     contextUsed:
       num(raw.input_tokens) +
       num(raw.cache_read_input_tokens) +
       num(raw.cache_creation_input_tokens) +
       num(raw.output_tokens),
+    // **窗口大小不在消息流里**：SDK 的 usage 只说占了多少，不说上限是多少。
+    // 上限由会话另外用 `getContextUsage()` 问一次（见 driver 的 `syncWindow`），
+    // 从这儿捎带出去——**必须和占用量同一条事件**：归约器对 usage 是整份替换，
+    // 另发一条只带窗口的会把 `outputTokens` / `cacheRead` 一起抹掉
+    ...(window === undefined ? {} : { contextWindow: window }),
     // **单独再报一次生成量。** 它已经算进 `contextUsed` 了，这里不是重复：
     // 那个数回答「占了多少」，这个数回答「它吐了多少」，而 token/s 的分子只能是后者
     ...(typeof raw.output_tokens === "number" ? { outputTokens: raw.output_tokens } : {}),
@@ -160,13 +171,17 @@ function endTurn(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus
   req.emit({ type: "turn.completed", at, turnId, status })
 }
 
-function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+function onResult(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: number): void {
+  const { req } = ctx
   const turnId = ref.current
   ref.current = undefined
   clearTasks(ref.tasks, at, req)
   resetPlan(ref.plan)
   if (msg.usage !== undefined) {
-    req.emit({ type: "usage.updated", at, threadId: req.threadId, engine: "claude", usage: usageOf(msg.usage) })
+    req.emit({
+      type: "usage.updated", at, threadId: req.threadId, engine: "claude",
+      usage: usageOf(msg.usage, ctx.window()),
+    })
   }
   if (turnId === undefined) return
   const status = turnStatus(msg.subtype ?? "", msg.is_error === true)
@@ -189,6 +204,10 @@ function onStream(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
 interface DispatchContext {
   req: StartRequest
   trust: () => Trust
+  /** 上下文窗口。**claude 的消息流里没有这个数**，由会话另外问，见 `syncWindow`。 */
+  window: () => number | undefined
+  /** 引擎起来了/换了模型。会话据此去问一次窗口——窗口是跟着模型走的。 */
+  onReady: () => void
 }
 
 function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: number): void {
@@ -204,7 +223,7 @@ function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: numbe
       onToolResults(msg, ref, req, at)
       return
     case "result":
-      onResult(msg, ref, req, at)
+      onResult(msg, ref, ctx, at)
       return
     case "system":
       if (msg.permissionMode !== undefined) {
@@ -213,6 +232,8 @@ function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: numbe
       if (msg.subtype === "init") {
         if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
         req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
+        // 这时候才知道跑的是哪个模型，而窗口是跟着模型走的
+        ctx.onReady()
       }
       // **只接 `task_progress` 一种**：同族还有 task_started / task_updated /
       // task_notification，形状已在 workflow 那一路抓到，但这里只服务 Task 子 agent，
@@ -235,12 +256,13 @@ export async function runMessageLoop(
   handle: ReturnType<typeof query>,
   req: StartRequest,
   ref: TurnRef,
-  trust: () => Trust,
+  /** 这一层要问外面的几件事。**打包成一个**——分开传会撞参数表闸门。 */
+  ctx: Omit<DispatchContext, "req">,
 ): Promise<void> {
-  const ctx = { req, trust }
+  const full: DispatchContext = { req, ...ctx }
   try {
     for await (const msg of handle) {
-      dispatch(msg as RawMessage, ref, ctx, Date.now())
+      dispatch(msg as RawMessage, ref, full, Date.now())
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)

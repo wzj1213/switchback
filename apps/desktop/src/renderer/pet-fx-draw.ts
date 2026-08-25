@@ -1,4 +1,4 @@
-import type { Brass } from "./pet-brass.js"
+import { fadeOf, type Brass } from "./pet-brass.js"
 import { drawFoes, type FoeArtSlot } from "./pet-foe-draw.js"
 import { muzzleOf, tapeAt, targetAt, type FxWorld } from "./pet-fx.js"
 import { drawRange } from "./pet-range-draw.js"
@@ -177,7 +177,8 @@ function drawBrass(g: CanvasRenderingContext2D, brass: Brass, pal: Palette): voi
     shell(g, c)
   }
   for (const c of brass.pile) {
-    g.globalAlpha = c.swept === true ? Math.max(0, Math.min(1, (1 - c.t / 0.75) * 1.5)) : 0.92
+    // 淡多少由 `pet-brass` 算：那儿知道寿命是多长，这儿只管画
+    g.globalAlpha = fadeOf(c)
     shell(g, c)
   }
   g.globalAlpha = 1

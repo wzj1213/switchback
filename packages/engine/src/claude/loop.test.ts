@@ -48,7 +48,7 @@ describe("逐字与收尾的身份对齐", () => {
       ]),
       request(events),
       ref,
-      () => "auto-edit",
+      { trust: () => "auto-edit", window: () => undefined, onReady: () => undefined },
     )
     const started = events.filter((e) => e.type === "item.started")
     // 两条 `item.started`：一条开流、一条收尾——**但 id 只有一个**，
@@ -91,7 +91,7 @@ describe("逐字与收尾的身份对齐", () => {
       ]),
       request(events),
       ref,
-      () => "auto-edit",
+      { trust: () => "auto-edit", window: () => undefined, onReady: () => undefined },
     )
     const texts = events
       .filter((e) => e.type === "item.started")
@@ -125,7 +125,7 @@ describe("Claude 消息循环收尾", () => {
       ]),
       request(events),
       ref,
-      () => "auto-edit",
+      { trust: () => "auto-edit", window: () => undefined, onReady: () => undefined },
     )
 
     expect(events.find((event) => event.type === "item.updated")).toMatchObject({

@@ -8,9 +8,14 @@
  *
  * - **抛出去**读的是**节奏**：一发一枚往斜后上方甩，连发时壳连成一串，
  *   一顿一顿时壳也一颗一颗地来。
- * - **堆着**读的是**在途**：壳不消失，落地就停，堆多高就是这一轮吐了多少。
+ * - **堆着**读的是**在途**：落地就停，堆多高就是**最近这一阵**吐了多少。
  *   `Usage` 是一道阶梯、中间那几分钟是空的，而真正连接两级的量就叫在途——
  *   这是整套东西里唯一一处把它画出来的地方。结账那一下整堆扫平。
+ *
+ *   **躺久了会自己淡掉**（`PILE_LIFE`）。上一版是不淡的，于是一轮跑久一点，
+ *   地上就积满七十枚一直躺着——那时它已经不读作「在途」了，只是一地垃圾：
+ *   堆到上限之后再吐多少都是同一个画面，刻度饱和了。给它一个滚动窗口之后，
+ *   堆的高度重新变回一个**当下**的量。
  *
  * 纯逻辑：不读时钟、不碰 DOM，随机由调用方给。
  */
@@ -70,6 +75,15 @@ const HEAVE_MS = 1.05
 const HEAVE_G = 420
 /** 被扫走那一下飞多久。 */
 const SWEEP_MS = 0.75
+/**
+ * 堆着的一枚躺多久开始淡（秒），以及淡多久没干净。
+ *
+ * 12 秒是这么来的：它要长过「连着几轮之间的空档」，短过「一轮跑很久」——
+ * 前者太短的话，两轮之间地上会空掉，而那两轮本该读成连续的一阵；
+ * 后者太长就又回到了积一地的老样子。
+ */
+const PILE_LIFE = 12
+const PILE_FADE = 2.5
 /** 侧面那一枚的重力。比子弹重得多——它该「掉」下去，不是飘。 */
 const G = 560
 
@@ -170,7 +184,13 @@ export function stepBrass(brass: Brass, dt: number): void {
       else fly(c, dt, 520)
       continue
     }
-    if (c.rest === true) continue
+    if (c.rest === true) {
+      // 躺着的开始算寿命。**淡到底就真的删掉**——留着的话上限那一格永远占着，
+      // 新的壳一进来就把最旧的挤掉（`put` 里的 `shift`），刻度照样是饱和的
+      c.t += dt
+      if (c.t > PILE_LIFE + PILE_FADE) brass.pile.splice(i, 1)
+      continue
+    }
     bounce(c, dt, 0.3, 0.55)
     // 弹到几乎不动了就钉住。**不钉的话它会以亚像素的幅度永远抖**——
     // 而「还有东西在动」为真，空闲跳帧那条优化就永远等不到机会
@@ -180,6 +200,8 @@ export function stepBrass(brass: Brass, dt: number): void {
       c.vr = 0
       c.y = c.gy
       c.rest = true
+      // 寿命从**停稳**那一刻起算，不是从出膛：飞的那一段是它自己的戏
+      c.t = 0
     }
   }
 }
@@ -221,4 +243,19 @@ export function sweep(brass: Brass, rand: () => number): void {
 export function brassMoving(brass: Brass): boolean {
   if (brass.flying.length > 0) return true
   return brass.pile.some((c) => c.rest !== true)
+}
+
+/**
+ * 这一枚该画多淡（0~1）。**淡出这件事只有画的那一层看得见**，
+ * 所以算法放在这儿由它调用，而不是把 alpha 存进 `Case`——
+ * 存进去就等于让物理层记住一件纯呈现的事。
+ */
+export function fadeOf(c: Case): number {
+  if (c.swept === true) return clamp01((1 - c.t / SWEEP_MS) * 1.5)
+  if (c.rest !== true) return 0.92
+  return 0.92 * clamp01((PILE_LIFE + PILE_FADE - c.t) / PILE_FADE)
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v))
 }

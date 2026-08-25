@@ -28,6 +28,11 @@ import { canAside } from "./aside.js"
  *   是接线。宿主给的「砍掉最后 N 轮」由驱动去读老会话的 jsonl，翻成一条 chain entry
  *   的 uuid；那次翻译是这条路上唯一会算错的地方（算错了只是少带或多带一轮上下文，
  *   界面上完全看不出来），所以它是纯函数、单独测，另有一条真跑的。
+ * - **上下文窗口不是能力位，但同一类毛病**：`usageOf` 上面原来写着「窗口大小 SDK
+ *   不给（它随模型变）」，于是 claude 会话里顶栏那条比例条、输入框那枚环、
+ *   打靶靶纸上那圈有效区**一个都不出现**。实测 `getContextUsage()` 一直答得出来
+ *   （`maxTokens`，opus-5[1m] 上是 1000000），只是没人问。见 `syncWindow`
+ *   与 `window.live.test.ts`。
  * - `modeReadback` 来自 `system/init` 与 `system/status` 的 `permissionMode`（见 `loop.ts`）。
  * - `sideQuestion` **运行时探测，不嗅版本**：0.3.231 的公开类型没声明它，
  *   所以只能问对象本身。

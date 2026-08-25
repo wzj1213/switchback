@@ -1,5 +1,5 @@
 import { brassMoving, eject, heave, stepBrass, sweep } from "./pet-brass.js"
-import { kickOf, MAX_DT, stepGun, wrapAngle } from "./pet-gun.js"
+import { emptied, kickOf, loaded, MAX_DT, RELOAD_ANGLE, RELOAD_SHOTS, stepGun, wrapAngle } from "./pet-gun.js"
 import { fireStep, GLYPH_W, pushGlyph, rpsOf, spawn, stepShots, stepTape } from "./pet-shots.js"
 import { hitFoe, nearest, nextGap, pressureOf, spawnFoes, stepFoes, type Foe } from "./pet-foes.js"
 import { land, punch, TG_D } from "./pet-range.js"
@@ -105,11 +105,17 @@ function landOne(w: FxWorld, b: Shot, input: FxInput): void {
 function aimAndFire(w: FxWorld, dt: number, input: FxInput, hand: { x: number; y: number }): void {
   const aim = aimOf(w, input, hand)
   const firing = input.rate > 1 && !input.busyHands
-  const want = firing ? wrapAngle(Math.atan2(aim.y - w.gun.y, aim.x - w.gun.x)) : Math.PI * 1.02
+  // 换弹那半秒枪口垂下来——**这个动作就是「换弹」本身**，不另画一套动画：
+  // 一把突然停火又不动的枪看起来是卡住了，垂一下再抬起来才读得出「它在装弹」
+  const want = !loaded(w.gun)
+    ? RELOAD_ANGLE
+    : firing
+      ? wrapAngle(Math.atan2(aim.y - w.gun.y, aim.x - w.gun.x))
+      : Math.PI * 1.02
   w.gun = stepGun(w.gun, dt, { hand, want, armed: firing, hard: input.busyHands })
   const step = fireStep(w.acc, readyRate(w, input), dt)
   w.acc = step.acc
-  fireOut(w, step.shots, aim, input)
+  if (loaded(w.gun)) fireOut(w, step.shots, aim, input)
 }
 
 /**
@@ -153,7 +159,27 @@ function fireOut(w: FxWorld, shots: number, aim: { x: number; y: number }, input
     w.bullets.push(shotOf(w, aim, foe, input))
     eject(w.brass, input.brass, port, input.rand)
   }
+  const empty = emptied(w.gun, shots)
   w.gun = kickOf(w.gun, shots)
+  if (empty) reload(w, input)
+}
+
+/**
+ * 打空一匣，换弹。
+ *
+ * ## 停的是「几发的工夫」，不是几秒
+ *
+ * 从 `acc` 上直接扣掉 `RELOAD_SHOTS` 发——那正好是**几发的工夫**，
+ * 而不是一个固定秒数。占空比于是和流速无关：快慢都是同样的比例，
+ * 「流速翻倍、发数翻倍」照旧成立（理由写在 `RELOAD_SHOTS` 上）。
+ *
+ * 枪口垂下来的那一段用同样的时长——它得和真正停火的那一段严丝合缝，
+ * 早抬起来会看到「举着枪却不打」，晚抬起来会看到「打完了枪还垂着」。
+ */
+function reload(w: FxWorld, input: FxInput): void {
+  w.acc -= RELOAD_SHOTS
+  const rps = rpsOf(readyRate(w, input))
+  w.gun = { ...w.gun, reload: rps > 0 ? RELOAD_SHOTS / rps : 0 }
 }
 
 /** 造一发。打靶那一档先把落点算出来，落到的那一刻才记账（见 `pet-range.ts`）。 */
@@ -217,6 +243,7 @@ function busyOf(w: FxWorld): boolean {
     w.foes.length > 0 ||
     brassMoving(w.brass) ||
     w.gun.arm > 0 ||
+    w.gun.reload > 0 ||
     Math.abs(w.gun.kick) > 0.002
   )
 }

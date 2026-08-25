@@ -36,15 +36,17 @@ export function PetFx(props: FxProps): React.JSX.Element {
     const node = canvas.current
     const g = node?.getContext("2d") ?? null
     if (node === null || g === null) return undefined
-    const box = { w: 0, h: 0, dpr: 1 }
+    const box: Box = { w: 0, h: 0, dpr: 1 }
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
-      if (rect === undefined) return
-      box.dpr = Math.min(2, window.devicePixelRatio)
-      box.w = rect.width
-      box.h = rect.height
-      node.width = Math.round(rect.width * box.dpr)
-      node.height = Math.round(rect.height * box.dpr)
+      // 尺寸没真变就什么都不做；真变了就等于**画布刚被清空**，得补一帧
+      if (rect === undefined || !fit(node, box, rect)) return
+      clock.drew = true
+      if (clock.slow !== 0) {
+        clearTimeout(clock.slow)
+        clock.slow = 0
+        clock.raf = requestAnimationFrame(frame)
+      }
     })
     observer.observe(node)
 
@@ -132,6 +134,40 @@ export function PetFx(props: FxProps): React.JSX.Element {
   }, [pets, flow])
 
   return <canvas className="pets__fx" ref={canvas} aria-hidden="true" />
+}
+
+interface Box {
+  w: number
+  h: number
+  dpr: number
+}
+
+/**
+ * 把画布的像素尺寸对齐到它的 CSS 尺寸。**返回「这一下真的改了」。**
+ *
+ * ## 为什么「改没改」这件事必须答出来
+ *
+ * 给 canvas 写 `width` / `height` 会把画布**整个清空**——哪怕写进去的是同一个数。
+ * 而 `ResizeObserver` 在每次布局里都可能响一声，所以无条件写等于随机清屏。
+ *
+ * 更要命的是这一层闲下来是「真的停」（见组件抬头）：没东西在动时整帧跳过绘制，
+ * 靠画布自己留着上一帧。清空之后**没有任何一帧会来重画**。
+ *
+ * 实测长这样：打开一条还没继续的会话，靶子好好地立在那儿；点一下「继续」，
+ * 输入区变高、活动区跟着变，靶子当场消失，而且再也不回来——看起来像
+ * 「一开始对话靶子就没了」，其实和对话没有半点关系，是画布被清空了没人补。
+ */
+function fit(node: HTMLCanvasElement, box: Box, rect: DOMRectReadOnly): boolean {
+  const dpr = Math.min(2, window.devicePixelRatio)
+  const w = Math.round(rect.width * dpr)
+  const h = Math.round(rect.height * dpr)
+  box.dpr = dpr
+  box.w = rect.width
+  box.h = rect.height
+  if (node.width === w && node.height === h) return false
+  node.width = w
+  node.height = h
+  return true
 }
 
 /** 慢拍的间隔。见组件抬头那段。 */

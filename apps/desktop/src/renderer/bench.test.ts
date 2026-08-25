@@ -163,3 +163,29 @@ describe("边界", () => {
     expect(run.done).toBeUndefined()
   })
 })
+
+describe("靶上那行数不许是负的、也不许是 NaN", () => {
+  it("**首字延迟夹在 0 以上**：印到画面上的数，宁可是 0.00s 也不能是负的", () => {
+    const run = createRun()
+    begin(run, 5000)
+    // 首字的时刻比开轮还早——正常路径下不会发生（同一个 performance.now），
+    // 但只要有一处拿错了钟（比如 `event.at` 那个 Date.now 系）就会
+    feed(run, 1000, 40)
+    settle(run, 6000)
+    expect(run.done?.ttft).toBeGreaterThanOrEqual(0)
+  })
+
+  it("时长非正就不留成绩，保留上一轮那个真数", () => {
+    const run = createRun()
+    begin(run, 1000)
+    feed(run, 1000, 40)
+    report(run, 10)
+    settle(run, 1000)
+    const first = run.done
+    begin(run, 2000)
+    feed(run, 2000, 40)
+    // 首末同刻且 till === from：解码时长和端到端都是 0
+    settle(run, 2000)
+    expect(run.done).toBe(first)
+  })
+})

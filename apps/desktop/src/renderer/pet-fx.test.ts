@@ -266,11 +266,14 @@ describe("换会话", () => {
     // 把清靶那一行删掉照样绿——靶根本没被填过）
     const w = run(createFx(), 3, { rate: 200, running: true, brass: "pile", range: true })
     expect(w.target.shots).toBeGreaterThan(0)
-    run(w, 20, { rate: 0, running: true, foes: true, brass: "pile" })
-    expect(w.foes.length).toBeGreaterThan(0)
     expect(w.brass.pile.length).toBeGreaterThan(0)
+    // 纸带得在没有怪的时候攒：**有怪在场时子弹优先打怪**，纸带上一个字都不落
     run(w, 2, { rate: 200, running: true, brass: "pile" })
     expect(w.tape.length).toBeGreaterThan(0)
+    // 怪直接塞进去，不靠等：等的那几秒里纸带会飘走、弹壳会淡掉
+    //（`PILE_LIFE`），四样根本凑不齐一屏
+    spawnFoes(w.foes, "slime", { from: 0, ground: 150 }, () => 0)
+    expect(w.foes.length).toBeGreaterThan(0)
     resetFx(w)
     expect(w.tape).toHaveLength(0)
     expect(w.foes).toHaveLength(0)
@@ -374,9 +377,13 @@ describe("打靶：靶是钉死的", () => {
   })
 
   it("拖远了打得散：同样的火力，站在窝里那一组更紧", () => {
-    const shots = { range: true, rate: 200, field }
+    // 流速取中档：太高时后坐一路顶到靶纸边缘，两组都被夹在同一圈上，
+    // 量出来的就成了夹钳而不是散布
+    const shots = { range: true, rate: 60, field }
+    // **别拉太远**：弹着夹在靶纸内（`punch` 的 clamp），拉到几百像素之外时
+    // 每一发都顶在边上，散布反而塌成一圈——那时量的是夹钳不是物理
     const home = run(createFx(), 4, { ...shots, pet: at(400, 120) })
-    const away = run(createFx(), 4, { ...shots, pet: at(1100, 120) })
+    const away = run(createFx(), 4, { ...shots, pet: at(560, 120) })
     expect(home.target.shots).toBeGreaterThan(3)
     expect(spreadOf(away.target) ?? 0).toBeGreaterThan(spreadOf(home.target) ?? 9)
   })
@@ -384,5 +391,38 @@ describe("打靶：靶是钉死的", () => {
   it("窄窗口下窝很靠左，靶也不会被推到画布外面去", () => {
     const w = run(createFx(), 1, { range: true, rate: 90, field: { homeX: 60, ground: 150 } })
     expect(w.view.stand.x).toBeGreaterThan(0)
+  })
+})
+
+describe("换弹", () => {
+  it("打满一匣就停一下：那一串弹着断成一簇一簇，不是一条连续的线", () => {
+    const w = run(createFx(), 6, { rate: 160, running: true })
+    // 停火那一段里枪口是垂着的；六秒里必然经历过好几次
+    expect(w.gun.mag).toBeGreaterThan(0)
+    expect(w.gun.mag).toBeLessThanOrEqual(14)
+  })
+
+  it("**换弹不改「火力恒等于流速」**：停的是几发的工夫，不是几秒", () => {
+    // 固定秒数的换弹会按流速高低吃掉不同比例的发数，比值当场就不是 2 了
+    const slow = run(createFx(), 5, { rate: 50 })
+    const fast = run(createFx(), 5, { rate: 100 })
+    const ratio = fast.ch / Math.max(1, slow.ch)
+    expect(ratio).toBeGreaterThan(1.7)
+    expect(ratio).toBeLessThan(2.3)
+  })
+
+  it("高流速下也不会卡死在换弹里——占空比和流速无关", () => {
+    const w = run(createFx(), 5, { rate: 240 })
+    // 真卡死的话一发都出不来
+    expect(w.ch).toBeGreaterThan(50)
+  })
+
+  it("收枪之后弹匣是满的：下次抽出来不该接着上次那半匣", () => {
+    const w = run(createFx(), 4, { rate: 200 })
+    expect(w.gun.mag).toBeLessThanOrEqual(14)
+    run(w, 6, { rate: 0 })
+    expect(w.gun.arm).toBe(0)
+    expect(w.gun.mag).toBe(14)
+    expect(w.gun.reload).toBe(0)
   })
 })

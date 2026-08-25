@@ -76,7 +76,9 @@ export const TAPE_MAX = 72
  */
 export function fireStep(acc: number, rate: number, dt: number): { acc: number; shots: number } {
   const next = acc + rpsOf(rate) * dt
-  const shots = Math.min(Math.floor(next), MAX_PER_FRAME)
+  // **夹在 0 以上**：换弹会把 `acc` 推成负的（见 `pet-fx.ts` 的 `reload`），
+  // 而负的发数会让下面那句把欠账一笔勾销——于是换弹变成了「白送几发」
+  const shots = Math.max(0, Math.min(Math.floor(next), MAX_PER_FRAME))
   return { acc: next - shots, shots }
 }
 

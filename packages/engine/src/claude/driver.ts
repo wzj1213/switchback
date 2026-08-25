@@ -89,6 +89,11 @@ class ClaudeSession implements EngineSession {
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
   private query: ReturnType<typeof query> | undefined
+  /**
+   * 上下文窗口。**消息流里没有这个数**，得单独问一次（`syncWindow`）。
+   * 问不到就一直是 undefined，界面据此只显示占用量、不画比例条。
+   */
+  private window: number | undefined
 
   constructor(
     private readonly req: StartRequest,
@@ -145,8 +150,21 @@ class ClaudeSession implements EngineSession {
         },
       },
       this.turn,
-      () => this.trust.current,
+      {
+        trust: () => this.trust.current,
+        window: () => this.window,
+        onReady: () => {
+          this.syncWindow()
+        },
+      },
     )
+    // **开场就问一次，不等 `system/init`。**
+    //
+    // 实测（2026-08-25）：`system/init` 要等第一次 prompt 之后才来，那时轮次
+    // 已经在跑，而控制请求排在它后面——于是第一轮的 result 先到，
+    // `contextWindow` 还是空的，比例条第一轮永远不出现。
+    // 而这个控制请求在没有轮次时答得又快又准（连模型都报得出来），所以就在这儿问。
+    this.syncWindow()
   }
 
   /**
@@ -213,6 +231,42 @@ class ClaudeSession implements EngineSession {
       })
     }
     throw new Error("Claude 输入流已经关闭")
+  }
+
+  /**
+   * 去问一次上下文窗口有多大。
+   *
+   * ## 为什么非得单独问
+   *
+   * SDK 的 usage 只报「这次占了多少」，不报上限——而没有上限就没有「多满」可言。
+   * `caps.ts` 那句「窗口大小 SDK 不给」于是成了一条自我实现的预言：
+   * 界面上永远只有一个光秃秃的 token 数，顶栏那条比例条、输入框那枚环、
+   * 打靶靶纸上那圈有效区**在 claude 会话里全都不出现**，而用户看到的是
+   * 「别家有、就我这家没有」。
+   *
+   * 实际上 `getContextUsage()` 这个控制请求一直在（`maxTokens` 就是那个上限，
+   * 也正是 `/context` 面板里画的那个数）。
+   *
+   * ## 什么时候问
+   *
+   * **开场就问一次**（`start()` 末尾），另外在 `system/init` 和换模型之后各补一次。
+   *
+   * 只挂 `system/init` 是不够的，实测过：那条消息要等第一次 prompt 之后才来，
+   * 那时轮次已经在跑，控制请求排在它后面——第一轮的 result 先到，
+   * 比例条整整一轮都不出现。而没有轮次在跑时它答得又快又准，连模型都报得出来。
+   *
+   * 换模型之后必须重问：**窗口是跟着模型走的**（`[1m]` 那档是一百万）。
+   *
+   * 失败了就保持 undefined：问不到是常态之一（老 CLI 没有这个控制请求），
+   * 那时界面退回「只显示数字」，而不是拿一个猜出来的分母画一条假的比例条。
+   */
+  private syncWindow(): void {
+    void this.query
+      ?.getContextUsage()
+      .then((out) => {
+        this.window = out.maxTokens > 0 ? out.maxTokens : undefined
+      })
+      .catch(() => undefined)
   }
 
   /**
@@ -310,6 +364,8 @@ class ClaudeSession implements EngineSession {
 
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
+    // **窗口跟着模型走**：换到 1M 那档而不重问，比例条会照着旧分母画
+    this.syncWindow()
     // **设不上就回空**，调用方据此不把上一模型的旧档冒充成新模型状态
     const applied = await applyEffort(this.query, effort).catch((error: unknown) => {
       this.req.emit({

@@ -3,6 +3,7 @@ import {
   brassMoving,
   createBrass,
   eject,
+  fadeOf,
   heave,
   stepBrass,
   sweep,
@@ -111,5 +112,50 @@ describe("heave（抛壳那一档的主角壳）", () => {
     const brass = createBrass()
     heave(brass, false, at, rand)
     expect(brass.flying).toHaveLength(1)
+  })
+})
+
+describe("堆着的壳会自己淡掉", () => {
+  /** 让一枚壳落地停稳。 */
+  function settled(): Brass {
+    const brass = createBrass()
+    eject(brass, "pile", { x: 0, y: 0, angle: 0, ground: 0 }, () => 0.5)
+    for (let t = 0; t < 4; t += 1 / 60) stepBrass(brass, 1 / 60)
+    return brass
+  }
+
+  it("停稳之后还在，而且是满不透明的", () => {
+    const brass = settled()
+    expect(brass.pile).toHaveLength(1)
+    expect(fadeOf(brass.pile[0] as Case)).toBeGreaterThan(0.5)
+  })
+
+  it("**躺久了自己没掉**——上一版是一直躺着，一轮下来积一地", () => {
+    const brass = settled()
+    for (let t = 0; t < 20; t += 1 / 30) stepBrass(brass, 1 / 30)
+    expect(brass.pile).toHaveLength(0)
+  })
+
+  it("没掉之前先淡：同一枚壳越躺越淡", () => {
+    const brass = settled()
+    const early = fadeOf(brass.pile[0] as Case)
+    // 推到「开始淡了但还没没」为止。**按值找而不按秒数写死**：
+    // `settled()` 里那枚是第几帧停稳的不该被这条用例钉住
+    let late = early
+    for (let t = 0; t < 20 && brass.pile.length > 0; t += 1 / 30) {
+      stepBrass(brass, 1 / 30)
+      const now = brass.pile.length > 0 ? fadeOf(brass.pile[0] as Case) : 0
+      if (now < early && now > 0) {
+        late = now
+        break
+      }
+    }
+    expect(late).toBeLessThan(early)
+    expect(late).toBeGreaterThan(0)
+  })
+
+  it("**淡出的不算「在动」**：不然空闲跳帧那条优化永远等不到机会", () => {
+    const brass = settled()
+    expect(brassMoving(brass)).toBe(false)
   })
 })

@@ -175,9 +175,16 @@ function score(run: Run): void {
   // 单批就收工时首末同刻，解码时长是 0、商是无穷。**退回端到端口径**（含 TTFT）
   // 而不是不给数：那种轮次「多久拿到这些字」本来就是唯一说得清的问题
   const span = last > first ? last - first : till - from
-  if (span <= 0) return
+  // 时长非正、或者算出来不是个有限数，就**不留成绩**——
+  // 宁可让靶上继续挂着上一轮那个真数，也不要印一个 Infinity / NaN
+  if (!(span > 0) || !Number.isFinite(tokens)) return
+  // **首字不可能早于开轮**，两个时刻都来自同一个 `performance.now()`。
+  // 夹一道是因为这个数会被直接印到画面上：真出了负的（时钟被改、事件乱序、
+  // 哪天有人拿 `event.at` 来调这条路——那是 `Date.now()` 系，差着一个纪元），
+  // 靶上就会写出「-1787.32s → 87 t/s」这种没人看得懂的东西。
+  // 夹住之后最坏也只是显示 0.00s，那至少还是句人话
   run.done = {
-    ttft: (first - from) / 1000,
+    ttft: Math.max(0, (first - from) / 1000),
     tps: tokens / (span / 1000),
     tokens: Math.round(tokens),
     exact,
