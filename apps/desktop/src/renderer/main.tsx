@@ -17,6 +17,7 @@ import "./styles/popover.css"
 import "./styles/settings.css"
 import "./styles/settings-engines.css"
 import "./styles/settings-dsh.css"
+import "./styles/settings-activity.css"
 
 const root = document.getElementById("root")
 if (root === null) throw new Error("找不到 #root 挂载点")

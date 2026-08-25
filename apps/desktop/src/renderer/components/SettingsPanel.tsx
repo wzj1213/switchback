@@ -6,8 +6,9 @@ import { LookSection, NewThreadSection } from "./SettingsGeneral.js"
 import { DataSection } from "./SettingsData.js"
 import { EnginesSection } from "./EngineSettings.js"
 import { EnvSection } from "./SettingsEnv.js"
+import { ActivitySection } from "./SettingsActivity.js"
 import { RemotePanel } from "./RemotePanel.js"
-import { EngineIcon, FolderIcon, PlusIcon, SparkIcon } from "./icons.js"
+import { ChartIcon, EngineIcon, FolderIcon, PlusIcon, SparkIcon } from "./icons.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 
 /**
@@ -29,27 +30,38 @@ import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
  *    而顿的原因和你当时想做的事（改个主题）毫无关系。
  *
  * 分页把两件事一起解决：宽度够了说明就能写全，而**没点到的那一页根本不挂载**，
- * 环境那页要读盘、引擎那页要探版本，都只在你真的点进去时才发生。
- * 面板尺寸也就固定了下来——内容后到不会再把面板撑高一截（那一跳同样像「卡了一下」）。
+ * 环境那页要读盘、引擎那页要探版本、活动那页要把整份 journal 走一遍，
+ * 都只在你真的点进去时才发生。面板尺寸也就固定了下来——内容后到不会再把面板
+ * 撑高一截（那一跳同样像「卡了一下」）。
+ *
+ * ## 左列为什么分成两段
+ *
+ * 上面那几页**改东西**，下面那几页**看东西**（活动统计、数据与排查）。
+ * 这条界限不是分类癖：一个人打开设置时心里只有两种意图之一，
+ * 而在一列七项里挨个读标题，比先看一眼分成两堆慢。
  *
  * ## 引擎页怎么分边界
  *
- * 新会话默认、各家的模型/思考档与 DSH 接入确认由 omni 直接画控件；模型清单只使用
- * 引擎运行时自己报告的值。认证、Provider、API Key 与厂商高级项继续走原生入口，
+ * 接入开关、新会话默认、各家的模型/思考档与 DSH 接入确认由 omni 直接画控件——
+ * 它们全都只改 omni 自己的行为。认证、Provider、API Key 与厂商高级项继续走原生入口，
  * 不把密钥读进 renderer，也不复制一份随版本漂移的厂商配置协议。
  */
 
 const TABS = [
-  { id: "look", label: "外观", icon: <SparkIcon size={14} /> },
+  { id: "look", label: "通用", icon: <SparkIcon size={14} /> },
   { id: "new", label: "新会话", icon: <PlusIcon size={14} /> },
   { id: "engines", label: "引擎", icon: <EngineIcon size={14} /> },
   { id: "env", label: "环境", icon: <TerminalIcon size={14} /> },
-  // 排在「数据与排查」前面：它是一件要**开**的事，而那一页是出问题时才去的
+  // 排在「看东西」那一段之前：它是一件要**开**的事
   { id: "remote", label: "远程访问", icon: <GlobeIcon size={14} /> },
-  { id: "data", label: "数据与排查", icon: <FolderIcon size={14} /> },
+  { id: "activity", label: "活动", icon: <ChartIcon size={14} />, look: true },
+  { id: "data", label: "数据与排查", icon: <FolderIcon size={14} />, look: true },
 ] as const
 
 type TabId = (typeof TABS)[number]["id"]
+
+/** 「看东西」那一段从第几项起。**算一次**，别在渲染里对着数组回头翻。 */
+const CUT = TABS.findIndex((tab) => "look" in tab)
 
 export interface SettingsPanelProps {
   settings: Settings
@@ -68,6 +80,12 @@ export interface SettingsPanelProps {
   onCopy: (text: string) => void
   onOpenEngines: () => void
   onDiagnose: () => void
+}
+
+/** 引擎 id → 人话名。第三方引擎的名字只有宿主的清单知道，认不出就照实显示 id。 */
+function engineNamer(catalog: readonly EngineInfo[]): (id: string) => string {
+  const names = new Map(catalog.map((engine) => [engine.id, engine.label]))
+  return (id) => names.get(id) ?? id
 }
 
 /** 哪一页画什么。抽成取值函数是行数闸门，但边界也对：面板只管「切哪一页」。 */
@@ -92,13 +110,44 @@ function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
     )
   if (tab === "env") return <EnvSection cwd={props.cwd} />
   if (tab === "remote") return <RemotePanel settings={settings} onPatch={onPatch} />
+  if (tab === "activity")
+    return (
+      <ActivitySection
+        engineName={engineNamer(props.catalog)}
+        dataDir={props.dataDir}
+        now={Date.now()}
+      />
+    )
   return (
     <DataSection
       dataDir={props.dataDir}
       onReveal={props.onReveal}
       onCopy={props.onCopy}
       onDiagnose={props.onDiagnose}
+      onOpenEngines={props.onOpenEngines}
     />
+  )
+}
+
+function Nav({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }): React.JSX.Element {
+  return (
+    <nav className="set__nav" aria-label="设置分类">
+      {TABS.map((t, index) => (
+        <button
+          key={t.id}
+          type="button"
+          aria-current={t.id === tab}
+          // 「看东西」那一段之前画一条分隔：先分两堆，比在七项里挨个读标题快
+          className={`set__tab${t.id === tab ? " set__tab--on" : ""}${index === CUT ? " set__tab--cut" : ""}`}
+          onClick={() => {
+            onPick(t.id)
+          }}
+        >
+          <span className="set__tabicon">{t.icon}</span>
+          {t.label}
+        </button>
+      ))}
+    </nav>
   )
 }
 
@@ -132,22 +181,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           </button>
         </header>
         <div className="set__body">
-          <nav className="set__nav" aria-label="设置分类">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                aria-current={t.id === tab}
-                className={`set__tab${t.id === tab ? " set__tab--on" : ""}`}
-                onClick={() => {
-                  setTab(t.id)
-                }}
-              >
-                <span className="set__tabicon">{t.icon}</span>
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <Nav tab={tab} onPick={setTab} />
           {/* key 按分页隔离：切走再切回来是**重新开始**（环境那页会重新读盘），
               而不是接着上一次的半截状态 */}
           <div className="set__pane" key={tab}>

@@ -14,6 +14,18 @@ import type { Trust } from "@omni/protocol"
  */
 export type ThemeChoice = "system" | "light" | "dark"
 
+/**
+ * 什么时候出声。
+ *
+ * **审批单独成一档，不是随便切的三段。** 它是**唯一一个 agent 会停下来等人**的地方：
+ * 不出声的话，它十分钟前就停在那儿等你，而你以为它还在干活。跑完与跑挂了则是
+ * 「回来看看」级别的——想清静的人该能只留下前者。
+ *
+ * `off` 关掉的是**系统通知与手机推送**，Dock 角标照挂：那一个不出声、不弹窗，
+ * 只是把「有几张卡等着你」写在图标上，而那正是关掉打扰之后唯一还想要的东西。
+ */
+export type NotifyMode = "all" | "approval" | "off"
+
 export interface Settings {
   theme: ThemeChoice
   /**
@@ -61,6 +73,8 @@ export interface Settings {
    * 藏起来的话它照样占着指针事件的那一层。
    */
   pets: boolean
+  /** 什么时候出声。见 `NotifyMode`。 */
+  notify: NotifyMode
   /**
    * DSH profile 与接入确认。
    *
@@ -69,6 +83,23 @@ export interface Settings {
    * 因为 ACP 的 initialize 不公开凭证是否就绪，不能拿一次握手冒充可运行。
    */
   dsh: DshSettings
+  /**
+   * 用户**主动关掉**的引擎 id。
+   *
+   * ## 为什么和 `dsh.confirmedProfiles` 是两件事
+   *
+   * 那一条回答「这家的原生配置就绪了吗」——是**它那边**的事实，omni 只是记下用户
+   * 替它作的证。这一条回答「我要不要用这家」——是**用户**的选择。装了 grok 但
+   * 这台机器上从不用它，和 grok 没配好，在界面上该长得不一样：前者是你关的，
+   * 后者是它坏的。压成一个开关，用户关掉一家之后就再也分不出这两种情况。
+   *
+   * 关掉的那家**连探测都不起**（`engineVisible` 就是拿它过滤的），
+   * 所以这也是唯一能让启动少 spawn 几个进程的开关。
+   *
+   * **omni 不因此改引擎自己的任何行为**：它只是不出现在 omni 的清单里。
+   * 你在终端里跑那家，一切照旧。
+   */
+  disabledEngines: readonly string[]
   /** 新会话默认用哪家引擎。空 = 按 `lastUsed` 走（见那边）。 */
   defaultEngine: string
   /** 新会话默认的信任档。 */
@@ -180,7 +211,9 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
+  notify: "all",
   dsh: { profile: "acp", confirmedProfiles: [] },
+  disabledEngines: [],
   defaultEngine: "",
   defaultTrust: "auto-edit",
   projectIcons: {},

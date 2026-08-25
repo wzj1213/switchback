@@ -1,17 +1,14 @@
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
 import type { EngineDoor } from "../../main/enginedoors.js"
+import { bridge, useAsync } from "../use-async.js"
 import { PencilIcon } from "./icons-activity.js"
 import { RevealIcon } from "./icons.js"
-
-interface DoorState {
-  list?: readonly EngineDoor[]
-  failed: boolean
-}
+import { Blank } from "./SettingsBits.js"
 
 /**
  * 一家引擎实际会读的原生配置来源。
  *
- * 这里把“哪一层、有没有、管什么”直接画出来；能安全打开的现有文件可一键交给系统编辑器。
+ * 这里把「哪一层、有没有、管什么」直接画出来；能安全打开的现有文件可一键交给系统编辑器。
  * 字段本身仍不由 omni 改写：厂商没有稳定写接口时，伪造表单只会把旧格式包装得更像真的。
  */
 export function EngineDoors({
@@ -25,36 +22,18 @@ export function EngineDoors({
   dshProfile?: string
   onReveal: (path: string) => void
 }): React.JSX.Element {
-  const [state, setState] = useState<DoorState>({ failed: false })
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const omni = bridge()
+  const load = useMemo(
+    () => (omni === undefined ? undefined : () => omni.engineDoors(cwd, dshProfile)),
+    [omni, cwd, dshProfile],
+  )
+  const state = useAsync<readonly EngineDoor[]>(load)
 
-  useEffect(() => {
-    let live = true
-    setState({ failed: false })
-    void bridge
-      ?.engineDoors(cwd, dshProfile)
-      .then((list) => {
-        if (live) setState({ list, failed: false })
-      })
-      .catch(() => {
-        if (live) setState({ list: [], failed: true })
-      })
-    return () => {
-      live = false
-    }
-  }, [bridge, cwd, dshProfile])
-
-  if (state.list === undefined) return <p className="doors__wait">正在确认配置来源…</p>
-  if (state.failed) {
-    return (
-      <p className="set__blank set__blank--error" role="alert">
-        没能读取原生配置来源；可以稍后重开设置再试。
-      </p>
-    )
-  }
-  const rows = state.list.filter((door) => door.id === engine)
+  if (state.failed) return <Blank tone="error">没能读取原生配置来源；可以稍后重开设置再试。</Blank>
+  if (state.data === undefined) return <Blank>正在确认配置来源…</Blank>
+  const rows = state.data.filter((door) => door.id === engine)
   if (rows.length === 0) {
-    return <p className="set__blank">这家由 engines.json 接入；omni 不知道它自己的配置放在哪里。</p>
+    return <Blank>这家由 engines.json 接入；omni 不知道它自己的配置放在哪里。</Blank>
   }
   return (
     <div className="doors">

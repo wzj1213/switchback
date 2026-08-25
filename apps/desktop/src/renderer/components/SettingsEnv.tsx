@@ -64,6 +64,9 @@ export function EnvSection({ cwd }: { cwd: string | undefined }): React.JSX.Elem
           按这个工作区算：<bdi>{cwd}</bdi>
         </p>
       )}
+      {env.failed ? (
+        <p className="hk__alarm" role="alert">读不出各家的配置；点上面那颗可以再试一次。</p>
+      ) : null}
       {env.data?.disabledAll === true ? (
         <p className="hk__alarm">
           Claude 的设置里开着 <code>disableAllHooks</code>——下面 Claude 那几条<strong>一条都不会跑</strong>。

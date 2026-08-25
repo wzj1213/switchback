@@ -1,82 +1,59 @@
-import { useEffect, useState } from "react"
+import { useMemo, useState } from "react"
 import type { EngineVersion, UpdateResult } from "../../main/enginever.js"
-import { Field } from "./SettingsBits.js"
+import { bridge, useAsync } from "../use-async.js"
+import { Actions, Blank, Field } from "./SettingsBits.js"
 
 /**
- * 各家引擎的版本与人工更新入口。主进程缓存探测结果六小时；这里还负责保证
- * 同一时间只跑一个全局安装，并让失败的 Promise 一定退出 loading 状态。
+ * 各家引擎的版本与人工更新入口。
+ *
+ * 主进程缓存探测结果六小时；「重新检查」走的是**同一条通道的 `again` 分支**，
+ * 由 `useAsync` 传下去——以前这里自己再发一次强制请求，于是两条请求赛跑，
+ * 赢的那条往往是拿着缓存的那条。
  */
 export function EngineVersions({ engine }: { engine: string }): React.JSX.Element {
-  const [list, setList] = useState<readonly EngineVersion[] | undefined>(undefined)
-  const [checking, setChecking] = useState(false)
+  const omni = bridge()
+  const load = useMemo(
+    () => (omni === undefined ? undefined : (again: boolean) => omni.engineVersions(again)),
+    [omni],
+  )
+  const state = useAsync<readonly EngineVersion[]>(load)
   const [updating, setUpdating] = useState<string | undefined>(undefined)
-  const [checkError, setCheckError] = useState<string | undefined>(undefined)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
-
-  useEffect(() => {
-    let live = true
-    const request = bridge?.engineVersions()
-    void request
-      ?.then((versions) => {
-        if (live) setList(versions)
-      })
-      .catch((error: unknown) => {
-        if (!live) return
-        setList([])
-        setCheckError(`版本探测失败：${messageOf(error)}`)
-      })
-    return () => {
-      live = false
-    }
-  }, [bridge])
-
-  const selected = list?.find((version) => version.engine === engine)
+  const [patched, setPatched] = useState<EngineVersion | undefined>(undefined)
+  const found = state.data?.find((version) => version.engine === engine)
+  // 更新成功之后本地覆盖一份，不用为了看到新版本号再探一次
+  const selected = patched?.engine === engine ? patched : found
 
   return (
     <>
-      {list === undefined ? <p className="set__blank">正在检查安装版本…</p> : null}
-      {list !== undefined && selected === undefined ? (
-        <p className="set__blank">没探到这家的安装版本；它可能尚未安装，或不在当前 PATH 中。</p>
+      {state.data === undefined && !state.failed ? <Blank>正在检查安装版本…</Blank> : null}
+      {state.failed ? <Blank tone="error">版本探测失败；点下面那颗可以再试一次。</Blank> : null}
+      {state.data !== undefined && selected === undefined ? (
+        <Blank>没探到这家的安装版本；它可能尚未安装，或不在当前 PATH 中。</Blank>
       ) : null}
-      {checkError === undefined ? null : (
-        <p className="set__blank set__blank--error" role="alert">
-          {checkError}
-        </p>
-      )}
       {selected === undefined ? null : (
         <EngineRow
           key={selected.engine}
           version={selected}
           active={updating}
-          checking={checking}
+          checking={state.loading}
           onActive={setUpdating}
-          onDone={(next) => {
-            setList((previous) =>
-              (previous ?? []).map((item) => (item.engine === next.engine ? next : item)),
-            )
-          }}
+          onDone={setPatched}
         />
       )}
-      <div className="set__act">
+      <Actions>
         <button
           type="button"
           className="tbtn"
-          disabled={checking || updating !== undefined}
+          disabled={state.loading || updating !== undefined}
           title="无视缓存，重新询问 npm 与各家原生更新器"
           onClick={() => {
-            const request = bridge?.engineVersions(true)
-            if (request === undefined) return
-            setChecking(true)
-            setCheckError(undefined)
-            void request
-              .then(setList)
-              .catch((error: unknown) => setCheckError(`重新检查失败：${messageOf(error)}`))
-              .finally(() => setChecking(false))
+            setPatched(undefined)
+            state.reload()
           }}
         >
-          {checking ? "正在查…" : "重新检查"}
+          {state.loading ? "正在查…" : "重新检查"}
         </button>
-      </div>
+      </Actions>
     </>
   )
 }
@@ -97,7 +74,7 @@ function EngineRow({
   onDone,
 }: EngineRowProps): React.JSX.Element {
   const [result, setResult] = useState<UpdateResult | undefined>(undefined)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const omni = bridge()
   const running = active === version.engine
   const actionable = version.update !== undefined && (version.stale || version.latest === undefined)
 
@@ -112,7 +89,7 @@ function EngineRow({
             aria-busy={running}
             title={`将执行：${version.update ?? ""}`}
             onClick={() => {
-              const request = bridge?.updateEngine(version.engine)
+              const request = omni?.updateEngine(version.engine)
               if (request === undefined) return
               onActive(version.engine)
               setResult(undefined)

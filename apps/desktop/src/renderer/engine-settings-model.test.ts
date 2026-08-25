@@ -117,13 +117,13 @@ describe("引擎设置页的数据", () => {
     const dsh = items.find((item) => item.id === "dsh")
     const codex = items.find((item) => item.id === "codex")
     expect(
-      dsh === undefined ? undefined : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: [] } }),
+      dsh === undefined ? undefined : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: [] }, disabledEngines: [] }),
     ).toMatchObject({
       label: "未接入",
       tone: "muted",
     })
     expect(
-      codex === undefined ? undefined : engineSettingState(codex, { dsh: { profile: "acp", confirmedProfiles: [] } }),
+      codex === undefined ? undefined : engineSettingState(codex, { dsh: { profile: "acp", confirmedProfiles: [] }, disabledEngines: [] }),
     ).toMatchObject({
       label: "未安装",
       tone: "warn",
@@ -131,12 +131,35 @@ describe("引擎设置页的数据", () => {
     expect(
       dsh === undefined
         ? undefined
-        : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: ["acp"] } }),
+        : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: ["acp"] }, disabledEngines: [] }),
     ).toMatchObject({ label: "配置不可用", hint: "profile 无 ACP", tone: "warn" })
     expect(
       dsh === undefined
         ? undefined
-        : engineSettingState(dsh, { dsh: { profile: "team", confirmedProfiles: ["team"] } }),
+        : engineSettingState(dsh, { dsh: { profile: "team", confirmedProfiles: ["team"] }, disabledEngines: [] }),
     ).toMatchObject({ label: "等待探测", hint: "正在探测 `team` profile。", tone: "muted" })
+  })
+
+  // 用户自己关的排在探测结论前面：一家被关掉的引擎连探测都不起，
+  // 那时候还报「未安装」或者「可用」，说的都是一件 omni 此刻根本没去问过的事
+  it("关掉的那家不再报探测结论，只说是你关的", () => {
+    const [codex] = engineSettingItems([{ id: "codex", label: "Codex", state: "ok" }]).filter(
+      (item) => item.id === "codex",
+    )
+    const off = { dsh: { profile: "acp", confirmedProfiles: [] }, disabledEngines: ["codex"] }
+    expect(codex === undefined ? undefined : engineSettingState(codex, off)).toMatchObject({
+      label: "已关掉",
+      tone: "muted",
+    })
+  })
+
+  it("确认过的 DSH 被关掉时也只说是你关的", () => {
+    const [dsh] = engineSettingItems([
+      { id: "dsh", label: "DSH", profile: "acp", state: "ok" },
+    ]).filter((item) => item.id === "dsh")
+    const off = { dsh: { profile: "acp", confirmedProfiles: ["acp"] }, disabledEngines: ["dsh"] }
+    expect(dsh === undefined ? undefined : engineSettingState(dsh, off)).toMatchObject({
+      label: "已关掉",
+    })
   })
 })

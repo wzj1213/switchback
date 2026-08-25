@@ -128,6 +128,18 @@ export function CopyIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   )
 }
 
+/**
+ * 活动。**一排高矮不一的柱子**，不是折线也不是饼：
+ * 这一页画的就是「一格一天、有高有低」，图标照着它自己的样子画最省解释。
+ */
+export function ChartIcon({ size = 13 }: { size?: number } = {}): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <path d="M3.25 13V9.5M6.5 13V4.5M9.75 13v-6M13 13V2.5" {...LINE} />
+    </Svg>
+  )
+}
+
 export function CompareIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>

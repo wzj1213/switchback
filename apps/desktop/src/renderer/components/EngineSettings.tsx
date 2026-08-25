@@ -1,5 +1,6 @@
 import { useRef, useState } from "react"
 import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
+import { lastEnabledEngine } from "../../shared/engine-access.js"
 import { dshProfileConfirmed, type Settings } from "../../shared/settings.js"
 import {
   engineSettingState,
@@ -45,7 +46,9 @@ export function EnginesSection({
   if (item === undefined) return <p className="set__blank">还没有可配置的引擎。</p>
   const state = engineSettingState(item, settings)
   const copy = settingsCopyOf(item.id)
-  const connected = item.id !== "dsh" || dshProfileConfirmed(settings.dsh)
+  const off = settings.disabledEngines.includes(item.id)
+  const connected = !off && (item.id !== "dsh" || dshProfileConfirmed(settings.dsh))
+  const locked = lastEnabledEngine(settings, items.map((entry) => entry.id)) === item.id
   const showEngine = (id: string): void => {
     setSelected(id)
     root.current?.closest<HTMLElement>(".set__pane")?.scrollTo({ top: 0 })
@@ -62,16 +65,17 @@ export function EnginesSection({
           </div>
           <span className={`eng-status eng-status--${state.tone}`}>{state.label}</span>
         </header>
-        {item.id === "dsh" ? (
-          <DshProfileSettings settings={settings} onPatch={onPatch} onReveal={onReveal} />
-        ) : null}
         <EngineOmniSettings
           item={item}
           state={state}
           settings={settings}
           account={accounts[item.id]}
+          locked={locked}
           onPatch={onPatch}
         />
+        {item.id === "dsh" ? (
+          <DshProfileSettings settings={settings} onPatch={onPatch} onReveal={onReveal} />
+        ) : null}
         <Group
           title="新会话的模型与思考档"
           hint="平时会记住这家上一次开工时的选择；这里可以直接改，也可以退回引擎默认。"
@@ -101,6 +105,13 @@ export function EnginesSection({
   )
 }
 
+/**
+ * 上沿那排引擎。
+ *
+ * 每一颗带一个状态点，**关掉的那几家整颗压暗**——不是移走：
+ * 「这家我关了」和「omni 不知道有这家」在界面上必须分得出来，
+ * 而移走之后就没有任何地方能把它开回来了。
+ */
 function EngineTabs({
   items,
   active,
@@ -117,6 +128,7 @@ function EngineTabs({
       {items.map((item) => {
         const state = engineSettingState(item, settings)
         const pinned = settings.defaultEngine === item.id
+        const off = settings.disabledEngines.includes(item.id)
         return (
           <button
             key={item.id}
@@ -125,7 +137,7 @@ function EngineTabs({
             aria-controls="engine-settings-panel"
             aria-label={`${item.label}，${state.label}${pinned ? "，新会话默认" : ""}`}
             title={`${item.label} · ${state.label}`}
-            className={`eng-tab${item.id === active ? " eng-tab--on" : ""}`}
+            className={`eng-tab${item.id === active ? " eng-tab--on" : ""}${off ? " eng-tab--off" : ""}`}
             onClick={() => {
               onSelect(item.id)
             }}

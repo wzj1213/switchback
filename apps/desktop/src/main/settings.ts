@@ -1,14 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app, ipcMain, nativeTheme } from "electron"
-import {
-  isDshProfileName,
-  SETTINGS_DEFAULTS,
-  type EnginePick,
-  type Settings,
-  type ThemeChoice,
-} from "../shared/settings.js"
-import type { Trust } from "@omni/protocol"
+import { isDshProfileName, SETTINGS_DEFAULTS, type EnginePick, type Settings } from "../shared/settings.js"
 import type { Logger } from "./log.js"
 
 /**
@@ -32,6 +25,7 @@ const DEFAULTS: Settings = SETTINGS_DEFAULTS
 const FILE = "settings.json"
 const TRUSTS: ReadonlySet<string> = new Set(["read-only", "auto-edit", "full"])
 const THEMES: ReadonlySet<string> = new Set(["system", "light", "dark"])
+const NOTIFY: ReadonlySet<string> = new Set(["all", "approval", "off"])
 
 function pathOf(): string {
   return join(app.getPath("userData"), FILE)
@@ -48,10 +42,7 @@ function parse(raw: unknown): Settings {
   if (typeof raw !== "object" || raw === null) return DEFAULTS
   const it = raw as Partial<Record<keyof Settings, unknown>>
   return {
-    theme:
-      typeof it.theme === "string" && THEMES.has(it.theme)
-        ? (it.theme as ThemeChoice)
-        : DEFAULTS.theme,
+    theme: oneOf(it.theme, THEMES, DEFAULTS.theme),
     projects: strings(it.projects) ?? DEFAULTS.projects,
     pinned: strings(it.pinned) ?? DEFAULTS.pinned,
     pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
@@ -60,16 +51,30 @@ function parse(raw: unknown): Settings {
     // **只认字面的 `false`**：默认是开着的，所以「读不出来」要落到开，
     // 而不是像 `remote.enabled` 那样落到关——那边关掉是安全的一侧，这边不是
     pets: it.pets !== false,
+    // 认不出就回默认（全都提醒），**不回落到 off**：一个读坏的偏好把审批提醒
+    // 静音掉的话，agent 会停在那儿无声地等，而没有任何地方会报错
+    notify: oneOf(it.notify, NOTIFY, DEFAULTS.notify),
     dsh: dsh(it.dsh),
+    // **不校验 id 存不存在。** 第三方引擎从 `engines.json` 接入，用户可能先关掉
+    // 再去改注册表；把「现在认不出」当脏数据丢掉，等于替他把开关拨回开
+    disabledEngines: [...new Set(strings(it.disabledEngines) ?? DEFAULTS.disabledEngines)],
     defaultEngine: typeof it.defaultEngine === "string" ? it.defaultEngine : DEFAULTS.defaultEngine,
-    defaultTrust:
-      typeof it.defaultTrust === "string" && TRUSTS.has(it.defaultTrust)
-        ? (it.defaultTrust as Trust)
-        : DEFAULTS.defaultTrust,
+    defaultTrust: oneOf(it.defaultTrust, TRUSTS, DEFAULTS.defaultTrust),
     projectIcons: icons(it.projectIcons),
     lastUsed: lastUsed(it.lastUsed),
     remote: remote(it.remote),
   }
+}
+
+/**
+ * 一个只能取那几个值的字段。**认不出就回默认**，不放行。
+ *
+ * 三处（主题、提醒、信任档）本来各写了一遍同样的三元式，而其中一处的默认值
+ * 是安全相关的：信任档判定「查不到就放行」正是最典型的那类洞。
+ * 收成一个出口之后，「认不出怎么办」只有一个答案。
+ */
+function oneOf<T extends string>(raw: unknown, allowed: ReadonlySet<string>, fallback: T): T {
+  return typeof raw === "string" && allowed.has(raw) ? (raw as T) : fallback
 }
 
 /**
@@ -112,10 +117,7 @@ function remote(raw: unknown): Settings["remote"] {
     enabled: it.enabled === true,
     port,
     trustedHosts: (strings(it.trustedHosts) ?? DEFAULTS.remote.trustedHosts).map(authorityOf),
-    maxTrust:
-      typeof it.maxTrust === "string" && TRUSTS.has(it.maxTrust)
-        ? (it.maxTrust as Trust)
-        : DEFAULTS.remote.maxTrust,
+    maxTrust: oneOf(it.maxTrust, TRUSTS, DEFAULTS.remote.maxTrust),
   }
 }
 

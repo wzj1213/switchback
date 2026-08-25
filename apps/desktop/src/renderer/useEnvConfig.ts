@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useMemo } from "react"
 import type { EnvConfig } from "../shared/hooks.js"
+import { bridge, useAsync, type Async } from "./use-async.js"
 
 /**
  * 「环境」那一页的数据。真源在主进程（`main/envconfig.ts`），这里只做**要一次**。
@@ -11,41 +12,17 @@ import type { EnvConfig } from "../shared/hooks.js"
  * 这条和 `EnvCard` 里重新问分支名是同一个道理。
  *
  * 代价是打开这一页要读三五个文件（毫秒级，全在主进程），不值得为它做缓存。
+ *
+ * ## 只剩一层薄壳
+ *
+ * 「读一次 + 能重读 + 分得清读挂了」那套已经收进 `useAsync`（原来面板里有四份手抄的
+ * 副本，每一份都少了一样）。留着这个文件是因为**「传哪个 cwd」是这一页自己的事**。
  */
-export interface EnvConfigApi {
-  data: EnvConfig | undefined
-  loading: boolean
-  /** 手动再读一遍。改完配置不想关窗口重开时用。 */
-  reload: () => void
-}
-
-export function useEnvConfig(cwd: string | undefined): EnvConfigApi {
-  const [data, setData] = useState<EnvConfig | undefined>(undefined)
-  const [loading, setLoading] = useState(true)
-  // 计数而不是布尔：连点两次「重新读」应该真的读两次（和 `useShell` 里
-  // 那几个信号同一条规矩）
-  const [nonce, setNonce] = useState(0)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
-
-  useEffect(() => {
-    if (bridge === undefined) return undefined
-    let live = true
-    setLoading(true)
-    void bridge.envConfig(cwd).then((next) => {
-      if (!live) return
-      setData(next)
-      setLoading(false)
-    })
-    return () => {
-      live = false
-    }
-  }, [bridge, cwd, nonce])
-
-  return {
-    data,
-    loading,
-    reload: useCallback(() => {
-      setNonce((n) => n + 1)
-    }, []),
-  }
+export function useEnvConfig(cwd: string | undefined): Async<EnvConfig> {
+  const omni = bridge()
+  const load = useMemo(
+    () => (omni === undefined ? undefined : () => omni.envConfig(cwd)),
+    [omni, cwd],
+  )
+  return useAsync<EnvConfig>(load)
 }
