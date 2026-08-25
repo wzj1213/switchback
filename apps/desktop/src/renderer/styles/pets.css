@@ -36,6 +36,13 @@
      深色地面本来就黑，同样的浓度什么都看不出来——而影子是「离地多高」唯一的说法 */
   --pet-shade: #000000;
   --pet-shade-a: 0.26;
+
+  /* 开火那一层的三档金属与枪口焰。**和五家的配色分开**：
+     枪是道具不是身份，五家换来换去它都该是同一把（换的是弹丸的颜色）。 */
+  --pet-gun: #6f7078;
+  --pet-gun-hi: #9a9ba4;
+  --pet-gun-dk: #4a4b52;
+  --pet-spark: #f2b23c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +53,10 @@
     --pet-dsh: #4276e6;
     --pet-dsh-eye: #ffffff;
     --pet-shade-a: 0.5;
+    /* 深色下枪要提一档，不然它整个沉进背景里 */
+    --pet-gun: #8d8e97;
+    --pet-gun-hi: #b6b7c0;
+    --pet-gun-dk: #5c5d65;
   }
 }
 
@@ -63,6 +74,20 @@
   inset: 0 0 -6px;
   overflow: hidden;
   z-index: 2;
+  pointer-events: none;
+}
+
+/*
+ * 开火那一层的画布。**铺满整块活动区、压在桌宠底下。**
+ *
+ * 压在底下是对的：枪握在手里，从身子左沿探出去——盖在上面的话它会压住脸。
+ * 子弹和纸带都在那只的左边，本来就不和身体重叠。
+ */
+.pets__fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 

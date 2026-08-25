@@ -5,9 +5,12 @@ import { gaitOf, lookOf, type Hit, type Pet } from "../pets.js"
 import { petRoster, visibleRoster, type PetSlot } from "../pet-roster.js"
 import type { EntryKind } from "../pet-entry.js"
 import { usePetEntry } from "../usePetEntry.js"
+import { useFlow } from "../useFlow.js"
+import { PetFx } from "./PetFx.js"
 import { usePets, useReduced } from "../usePets.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
+import { applyHit } from "../pet-hit-fx.js"
 import { DshPetEffect, useDshPetPhase, type DshPetPhase } from "./DshPetEffect.js"
 
 /**
@@ -34,46 +37,6 @@ import { DshPetEffect, useDshPetPhase, type DshPetPhase } from "./DshPetEffect.j
  * 那颗下拉里，一个玩的动作不该有副作用。
  */
 
-/** 旁边那只被震一下：往上一弹再落回去。比「探头」短促——那是好奇，这是被吓到 */
-const JOLT: Keyframe[] = [
-  { transform: "translateY(0) scale(1, 1)" },
-  { transform: "translateY(-3px) scale(0.97, 1.04)", offset: 0.35 },
-  { transform: "translateY(0) scale(1.04, 0.97)", offset: 0.7 },
-  { transform: "translateY(0) scale(1, 1)" },
-]
-
-/** 砸得比这轻就不惊动旁边的——轻轻放下不该让全场抖一下 */
-const JOLT_AT = 900
-
-/** 挨得够狠才眯一下眼（一记「哎哟」）。**不能每次落地都眯**——
-    蹦回窝的每一跳都算落地，每跳眯一次就成了抽搐 */
-const WINCE_AT = 700
-const WINCE_MS = 220
-
-/** 眯一下眼。复用眨眼那一档：**它本来就是「眼睛闭上」这一件事**，没必要再发明一个。 */
-function wince(node: HTMLButtonElement | null | undefined): void {
-  if (node === null || node === undefined) return
-  node.classList.add("pet--blink")
-  setTimeout(() => {
-    node.classList.remove("pet--blink")
-  }, WINCE_MS)
-}
-
-/**
- * 挨了一下的那三帧：**顺着挨打的方向压，再反弹回来**。
- *
- * 从天上砸下来是压扁（矮胖），横着挨一记是压瘦（细高）——同一个形演两种撞击，
- * 撞击就没了方向；而方向恰恰是「刚才发生了什么」的全部内容。
- */
-function squash(k: number, axis: Hit["axis"]): Keyframe[] {
-  const hit = axis === "y" ? [1 + k, 1 - k] : [1 - k, 1 + k]
-  const back = axis === "y" ? [1 - k * 0.4, 1 + k * 0.4] : [1 + k * 0.4, 1 - k * 0.4]
-  return [
-    { transform: `scale(${String(hit[0])}, ${String(hit[1])})` },
-    { transform: `scale(${String(back[0])}, ${String(back[1])})`, offset: 0.45 },
-    { transform: "scale(1, 1)" },
-  ]
-}
 export function Pets({
   engines,
   engine,
@@ -83,6 +46,9 @@ export function Pets({
   profile,
   hidden,
   entryOn,
+  fireOn,
+  threadId,
+  handsBusy,
 }: {
   engines: readonly EngineInfo[]
   engine: EngineId
@@ -94,6 +60,12 @@ export function Pets({
   hidden: readonly string[]
   /** 换引擎时播不播登场。系统「减少动效」开着时这里再堵一道。 */
   entryOn: boolean
+  /** 当前那只要不要按 token 流速开火。 */
+  fireOn: boolean
+  /** 哪条会话。流速只算这一条的——理由见 `flow-scope.ts`。 */
+  threadId: string
+  /** 手里有别的东西（在等审批）：这时枪立刻收起来。 */
+  handsBusy: boolean
 }): React.JSX.Element | null {
   const shown = useMemo(
     () => visibleRoster(petRoster(engines, engine), engine, hidden),
@@ -104,22 +76,11 @@ export function Pets({
   const bodies = useRef<(HTMLSpanElement | null)[]>([])
   const reduced = useReduced()
   const dshPhase = useDshPetPhase(engine === "dsh" && active, failed)
-  // 砸到地上要有分量：**按落地速度定砸扁的深浅**，轻轻放下几乎看不出，
-  // 从对话框顶上摔下来会实实在在瘪一下
-  // 砸到地、撞到墙、撞到同伴走的都是这一下（判据在 `hitOf`）：
-  // **在眼睛看来它们是同一件事——挨了一下**，区别只在朝哪个方向挨的
+  // 砸到地上要有分量、挨了一下要有方向、砸得够重旁边的要跟着震：
+  // 那一整套写在 `pet-hit-fx.ts` 里，这里只负责把当时的两组节点递过去
   const onHit = useCallback(
     (index: number, hit: Hit) => {
-      if (reduced) return
-      const k = Math.min(0.3, hit.speed / 2600)
-      bodies.current[index]?.animate(squash(k, hit.axis), { duration: 300, easing: "ease-out" })
-      if (hit.speed >= WINCE_AT) wince(ctl.nodes.current[index])
-      // 砸得够重时，旁边站着的会被**震一下**。物理上不成立（它们又没连在一起），
-      // 但这是整套里最便宜的一处「它们在同一个世界里」——而那正是想要的
-      if (hit.speed < JOLT_AT) return
-      for (const [j, body] of bodies.current.entries()) {
-        if (j !== index) body?.animate(JOLT, { duration: 260, easing: "ease-out" })
-      }
+      applyHit({ bodies: bodies.current, nodes: ctl.nodes.current }, index, hit, reduced)
     },
     [reduced],
   )
@@ -133,6 +94,14 @@ export function Pets({
 
   return (
     <div className="pets" ref={ctl.area} aria-hidden="true">
+      <FireLayer
+        pets={ctl.pets}
+        slots={shown}
+        engine={engine}
+        threadId={threadId}
+        on={fireOn && !reduced}
+        handsBusy={handsBusy}
+      />
       <Shades slots={shown} refs={ctl.shades} />
       {shown.map((info, i) => (
         <button
@@ -199,6 +168,34 @@ function Shades({
       ))}
     </>
   )
+}
+
+/**
+ * 开火那一层。**它和上面那几只完全不相干**：只读 `pets` 里那只的坐标，
+ * 从不改它，也从不被它读（见 `pet-fx.ts` 开头）。关掉它的时候桌宠一切照旧。
+ *
+ * 单拎成一个组件不只是行数：`useFlow` 要挂在**一直在的地方**——
+ * 挂在条件分支里的话，关掉再打开会重订一次桥、重开一个滑窗。
+ */
+function FireLayer({
+  pets,
+  slots,
+  engine,
+  threadId,
+  on,
+  handsBusy,
+}: {
+  pets: React.RefObject<Pet[]>
+  slots: readonly PetSlot[]
+  engine: EngineId
+  threadId: string
+  on: boolean
+  handsBusy: boolean
+}): React.JSX.Element | null {
+  const flow = useFlow(threadId)
+  const mine = slots.findIndex((slot) => slot.engine === engine)
+  if (!on || mine < 0) return null
+  return <PetFx pets={pets} index={mine} tone={lookOf(engine).tone} flow={flow} busyHands={handsBusy} />
 }
 
 /**

@@ -230,6 +230,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
             profile={thread.engineProfile}
             hidden={props.pets.hidden}
             entryOn={props.pets.entry}
+            fireOn={props.pets.fire}
+            threadId={thread.id}
+            handsBusy={thread.status === "waiting_approval"}
           />
         ) : null}
       </div>

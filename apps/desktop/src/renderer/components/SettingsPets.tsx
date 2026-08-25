@@ -64,6 +64,22 @@ export function PetsSection({
           </Field>
         ))}
       </Group>
+      <Group title="开火" hint={FIRE_NOTE}>
+        <Field
+          label="按 token 流速开火"
+          hint="只画在当前那只身上，打的是它左边那条纸带。没有输出就没有火力——静默时它会把枪收起来"
+        >
+          <Toggle
+            label="按 token 流速开火"
+            on={kit.fire}
+            disabled={!settings.pets}
+            hint={settings.pets ? undefined : "桌宠整块关着，先把上面那个打开"}
+            onChange={(fire) => {
+              patch({ fire })
+            }}
+          />
+        </Field>
+      </Group>
       <Group title="出场" hint={ENTRY_NOTE}>
         <Field
           label="播放出场动画"
@@ -83,6 +99,12 @@ export function PetsSection({
     </>
   )
 }
+
+const FIRE_NOTE =
+  "当前那只会抽出一把枪，按引擎此刻吐字的速度往左打；每中一发，纸带上落一个字。" +
+  "它估的是 item.delta 的字节量（所以数字永远写作 ~142 t/s，那是流速不是账单），" +
+  "而**射速恒等于流速**：没有任何一项设置能改快慢——一旦能改，画面上的快慢说的就是你的配置，" +
+  "而不是引擎此刻的表现，那这套东西也就没有存在的理由了。系统「减少动效」开着时自动失效。"
 
 const ENTRY_NOTE =
   "开应用、或者换一家引擎的时候，那只不是「啪」地出现，是登场。每家按自己的物性来：" +
