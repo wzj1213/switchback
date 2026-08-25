@@ -179,7 +179,8 @@ body {
   flex-direction: column;
   background: var(--bg-sunken);
   /* **骨架线用 `--border-strong`**：这条把窗口切成两块，而它两侧的底色
-     本来只差 2.76 L*——用装饰线那个 token 的话，三个颜色全挤在一起。
+     只差 2.72 L*（浅色）／2.71 L*（深色）——用装饰线那个 token 的话，
+     三个颜色全挤在一起。分面本身是新的：上一版两侧同色，这条线独扛全部分界。
      口径见 tokens.css：strong = 切分区块与控件轮廓，普通 = 区块内部的分节线 */
   border-right: 1px solid var(--border-strong);
   overflow: hidden;
