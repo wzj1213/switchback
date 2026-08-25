@@ -1,4 +1,4 @@
-import type { Thread, Turn } from "@omni/protocol"
+import type { Command, Thread, Turn } from "@omni/protocol"
 import { ItemView } from "./ItemView.js"
 import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
@@ -38,19 +38,65 @@ export function canRewind(thread: Thread, turn: Turn | undefined, readOnly: bool
     thread.capabilities?.fork === true && thread.engineHandle !== undefined
 }
 
+/**
+ * 最后一句**自己发的话**的 id。「改一改再发」只挂在它身上。
+ *
+ * 从后往前找，`origin` 有值的跳过：那种是接力时从上一家带过来的，
+ * **不是你在这条会话里发的**，重来它没有意义（同上一版那条「只有自己发过的话能改」）。
+ */
+export function lastMine(rows: readonly Row[]): string | undefined {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]
+    if (row?.kind !== "item") continue
+    const item = row.item
+    if (item.kind === "user_message" && item.origin === undefined) return item.id
+  }
+  return undefined
+}
+
+/**
+ * 「改一改再发」那颗按钮的接线。**给不出来就返回空对象**，`RowView` 据此不画。
+ *
+ * 抽出来是行数闸门逼的（`Transcript` 撑到了 116 行），这一刀也顺：
+ * 「这一行该不该有那颗按钮、点了发什么命令」本来就不是「一屏怎么滚」的事。
+ */
+export function retryProps(
+  row: Row,
+  on: { active: boolean; id: string | undefined; threadId: string; send: (command: Command) => void },
+): { onRetry?: () => void } {
+  if (!on.active || row.kind !== "item" || row.item.id !== on.id) return {}
+  const item = row.item
+  if (item.kind !== "user_message") return {}
+  return {
+    onRetry: () => {
+      on.send({
+        type: "thread.rewind",
+        threadId: on.threadId,
+        turnId: item.turnId,
+        // 回到这一句之前，并把这一句原样交还到新会话的输入框
+        draft: item.text,
+        ...(item.attachments === undefined ? {} : { draftAttachments: item.attachments }),
+      })
+    },
+  }
+}
+
 export const approvalShortcut = (readOnly: boolean, itemId: string | undefined): string | undefined =>
   readOnly ? undefined : itemId
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
+export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
   readOnly, openLane, onOpenLane }: {
   row: Row
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
   /** 从某一轮之前重来。 */
   onRewind?: (turnId: string) => void
-  /** 把某条自己发过的话填回输入框，改完再发。**对比视图里没有输入框，所以可以缺席。** */
-  onReuse?: (text: string, attachments?: readonly string[]) => void
+  /**
+   * 「改一改再发」。**只挂在最后一句人话上**，而且它是个 rewind：
+   * 回到那一句之前，再把原话交还到输入框。给了才画那颗按钮。
+   */
+  onRetry?: () => void
   folded: boolean
   onFold: (turnId: string) => void
   onCopy: (text: string) => void
@@ -110,33 +156,38 @@ export function RowView({ row, cwd, onRewind, onReuse, folded, onFold, onCopy, o
       />
     )
   }
-  /* **只有自己发过的话能改。** agent 说的话改了再发没有意义——
-     那不是你的话，改完发出去等于替它编一句 */
-  const mine =
-    onReuse !== undefined && row.item.kind === "user_message" && row.item.origin === undefined
+  /*
+   * 「改一改再发」**只挂在最后一句人话上，而且只在能 rewind 的时候**。
+   *
+   * 上一版是给每一句人话都挂，点了只是把文字复制回输入框——原来那句**原样留在
+   * 转录区里**，你再发一次就成了两条几乎一样的消息。而它既然叫「改一改**再发**」，
+   * 就该是把那一次重来一遍，不是在后面追加一条。
+   *
+   * 重来只对最后一句成立：更早的那些，中间还压着好几轮，
+   * 那是「从这里重来」（轮次分隔线上那颗）该管的事，它自己会说清楚要丢掉什么。
+   *
+   * 能不能 rewind 由 `canRewind` 定（引擎报不报原生 fork、这一轮跑完没有……）。
+   * 不能的时候**不画**——画一颗点了会炸的按钮比没有更糟。
+   */
   return (
     <Copyable
       item={row.item}
       onCopy={onCopy}
-      {...(mine
-        ? {
+      {...(onRetry === undefined
+        ? {}
+        : {
             extra: (
               <button
                 type="button"
                 className="act"
-                onClick={() => {
-                  onReuse(
-                    row.item.kind === "user_message" ? row.item.text : "",
-                    row.item.kind === "user_message" ? row.item.attachments : undefined,
-                  )
-                }}
+                title="回到发这句话之前，把它交还给你改；原会话保留"
+                onClick={onRetry}
               >
                 <PencilIcon size={11} />
                 改一改再发
               </button>
             ),
-          }
-        : {})}
+          })}
     >
       <ItemView item={row.item} approvalTurn={approvalTurn} readOnly={readOnly}
         shortcutApproval={shortcutApproval} onResolve={onResolve} />

@@ -22,6 +22,12 @@ import { canAside } from "./aside.js"
  *   需要的语义兑现它。宿主据此退回排队——**不是假装支持再偷偷排队**，
  *   那样界面就没法如实告诉用户「这句得等」。那条 live 测试同时是哨兵：
  *   哪天 CLI 开始认这个字段，它会红，那时才轮到把这一位翻过来。
+ * - `fork` **报 true 了**（2026-08-25 接上，见 `fork.ts`）。原话是「SDK 没有复制会话的
+ *   入口，只能诚实地开空白分支」，而 0.3.231 上 `resume` + `forkSession` +
+ *   `resumeSessionAt` 三件套齐全，SDK 自己把这套叫 edit-and-retry——缺的从来不是入口，
+ *   是接线。宿主给的「砍掉最后 N 轮」由驱动去读老会话的 jsonl，翻成一条 chain entry
+ *   的 uuid；那次翻译是这条路上唯一会算错的地方（算错了只是少带或多带一轮上下文，
+ *   界面上完全看不出来），所以它是纯函数、单独测，另有一条真跑的。
  * - `modeReadback` 来自 `system/init` 与 `system/status` 的 `permissionMode`（见 `loop.ts`）。
  * - `sideQuestion` **运行时探测，不嗅版本**：0.3.231 的公开类型没声明它，
  *   所以只能问对象本身。
@@ -36,7 +42,7 @@ export function capabilitiesOf(query: unknown): EngineCapabilities {
     compact: false,
     attachments: true,
     steer: false,
-    fork: false,
+    fork: true,
     modeReadback: true,
     sideQuestion: canAside(query),
     activity: true,

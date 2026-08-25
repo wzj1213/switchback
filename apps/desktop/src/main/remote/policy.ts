@@ -192,6 +192,8 @@ const SHAPES: Readonly<Record<string, Shape>> = {
   "thread.steerQueued": { strings: ["threadId"] },
   "thread.switchNow": { strings: ["threadId"] },
   "thread.compact": { strings: ["threadId"] },
+  // `draft` / `draftAttachments` 是可选的，按本表的规矩不列（缺席合法）；
+  // 类型不对时宿主那边照旧当没给——`branch()` 只认字符串
   "thread.rewind": { strings: ["threadId", "turnId"] },
   "thread.setTrust": { strings: ["threadId"], enums: { trust: TRUSTS } },
   "thread.rename": { strings: ["threadId", "title"] },

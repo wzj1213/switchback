@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises"
 import {
   query,
   type Options,
@@ -38,6 +37,8 @@ import { findSession, listSessions, readAccount, readTranscript } from "./histor
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { CLAUDE_TRUST, needsPermissionRestart, permissionOptions } from "./trust.js"
 import { claudePath, probeClaude, type ClaudeExecutable } from "./executable.js"
+import { planFork, type ForkPlan } from "./fork.js"
+import { toContent } from "./attach.js"
 
 /**
  * Claude Code 2.1.83 起正式暴露 `auto`：由另一只模型分类器审批工具调用。
@@ -93,6 +94,8 @@ class ClaudeSession implements EngineSession {
     private readonly req: StartRequest,
     private readonly config: ClaudeDriverConfig,
     private readonly executable: string | undefined,
+    /** 原生分叉的落点。**在构造之前就解好**——解它要读文件，而 `start()` 是同步的。 */
+    private readonly fork: ForkPlan | undefined,
   ) {
     this.trust = { current: req.trust }
     this.bypassEnabled = req.trust === "full"
@@ -116,6 +119,16 @@ class ClaudeSession implements EngineSession {
       spawnClaudeCodeProcess: (o) => this.owner.spawn(o) as unknown as SpawnedProcess,
       // 带句柄就接着上次的会话跑；SDK 会把那次的历史加载回来
       ...(this.req.resume === undefined ? {} : { resume: this.req.resume }),
+      // **原生分叉**：接上老会话、截到分叉点、然后岔成一条新的会话 id。
+      // 摆在 `resume` 后面是有意的——两者都会写 `resume`，而分叉那条必须赢：
+      // 岔出来的是一条新会话，它没有自己的续跑句柄可言（见 `fork.ts`）
+      ...(this.fork === undefined
+        ? {}
+        : {
+            resume: this.fork.resume,
+            forkSession: true,
+            ...(this.fork.at === undefined ? {} : { resumeSessionAt: this.fork.at }),
+          }),
       ...(this.config.isolateSettings === true ? { settingSources: [] } : {}),
       ...(this.executable === undefined ? {} : { pathToClaudeCodeExecutable: this.executable }),
     }
@@ -371,59 +384,11 @@ export function createClaudeDriver(config: ClaudeDriverConfig = {}): EngineDrive
     id: "claude",
     probe: () => probeClaude(mode),
     start: async (req: StartRequest): Promise<EngineSession> => {
-      const session = new ClaudeSession(req, config, await claudePath(mode))
+      // 分叉点要读老会话的 jsonl 才解得出来，所以在构造之前先解
+      const fork = req.forkOf === undefined ? undefined : await planFork(req.home, req.forkOf)
+      const session = new ClaudeSession(req, config, await claudePath(mode), fork)
       session.start()
       return session
     },
   }
-}
-
-/** 认得出的图片类型。**认不出就不送**——把一个 zip 当成图片塞过去，模型那边只会报错。 */
-const IMAGE_MIME: Readonly<Record<string, string>> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-}
-
-/**
- * 文本 ＋ 附件 → SDK 的消息内容。
- *
- * 没有附件时**仍然给字符串**，不是单元素数组：那条路每天走几百次，
- * 形状不变最安全。
- *
- * 图片要读成 base64——SDK 走的是 Anthropic 的内容块，那边只认内联数据，
- * 没有「给个路径你自己读」的形式（codex 有，所以那边用 `localImage`）。
- * 读不出来的（文件没了、权限不对）**跳过并在文本里说一声**，
- * 而不是整条消息发不出去：用户已经按了回车，那句话本身还是该送到。
- */
-async function toContent(
-  text: string,
-  attachments: readonly string[] | undefined,
-): Promise<SDKUserMessage["message"]["content"]> {
-  if (attachments === undefined || attachments.length === 0) return text
-  const blocks: unknown[] = []
-  const failed: string[] = []
-  for (const path of attachments) {
-    const mime = IMAGE_MIME[extOf(path)]
-    if (mime === undefined) {
-      failed.push(`${path}（不是认得出的图片类型）`)
-      continue
-    }
-    const data = await readFile(path, { encoding: "base64" }).catch(() => undefined)
-    if (data === undefined) {
-      failed.push(`${path}（读不出来）`)
-      continue
-    }
-    blocks.push({ type: "image", source: { type: "base64", media_type: mime, data } })
-  }
-  const note = failed.length === 0 ? "" : `\n\n（这些附件没能送达：${failed.join("、")}）`
-  blocks.push({ type: "text", text: text + note })
-  return blocks as SDKUserMessage["message"]["content"]
-}
-
-function extOf(path: string): string {
-  const at = path.lastIndexOf(".")
-  return at === -1 ? "" : path.slice(at).toLowerCase()
 }

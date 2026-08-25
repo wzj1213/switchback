@@ -209,6 +209,34 @@ describe("同一家引擎：让它自己复制会话", () => {
     expect(r.forks[0]?.dropTurns).toBe(1)
   })
 
+  it("**「改一改再发」：那句话交还到新会话的输入框里**，不留在转录区当第二条", async () => {
+    const r = rig({ canFork: true })
+    const { id, turns } = await withTurns(r)
+    await r.host.dispatch({
+      type: "thread.rewind",
+      threadId: id,
+      turnId: turns[1] ?? "",
+      draft: "换个说法再问一次",
+      draftAttachments: ["/tmp/a.png"],
+    })
+    const born = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread
+    expect(born).toMatchObject({
+      draft: "换个说法再问一次",
+      draftAttachments: ["/tmp/a.png"],
+      // **身份必须一起给**：输入框靠它认「这是新的一次要求」，没有的话那段字进不去
+      draftRevision: expect.stringMatching(/^dr/),
+    })
+  })
+
+  it("不带 draft 的重来照旧是干净的——轮次分隔线上那颗「从这里重来」走这条", async () => {
+    const r = rig({ canFork: true })
+    const { id, turns } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" })
+    const born = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread
+    expect(born?.draft).toBeUndefined()
+    expect(born?.draftRevision).toBeUndefined()
+  })
+
   it("引擎不支持原生 fork 时不显示成功假象，重来明确失败", async () => {
     const r = rig({ canFork: false })
     const { id, turns } = await withTurns(r)

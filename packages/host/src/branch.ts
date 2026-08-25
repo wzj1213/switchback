@@ -1,6 +1,7 @@
 import type { Command, EngineSegment, Event, Item, Thread, ThreadId } from "@omni/protocol"
 import { initial, itemsOf, reduceAll } from "@omni/store"
 import { discardUnstarted, drainQueued, emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
+import { bornOf } from "./born.js"
 import { copyTranscript } from "./transcript.js"
 import { dropTemps, launch } from "./session.js"
 import { rememberHandle } from "./engine-state.js"
@@ -27,7 +28,15 @@ import { carryRules } from "./approval.js"
 export async function rewind(ctx: Ctx, cmd: Extract<Command, { type: "thread.rewind" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
   if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  await branch(ctx, entry, { to: entry.thread.engine, upTo: cmd.turnId, label: "重来" })
+  await branch(ctx, entry, {
+    to: entry.thread.engine,
+    upTo: cmd.turnId,
+    label: "重来",
+    // 「改一改再发」：回到那一轮之前，并把原话交还到新会话的输入框里
+    ...(cmd.draft === undefined
+      ? {}
+      : { draft: { text: cmd.draft, attachments: cmd.draftAttachments } }),
+  })
 }
 
 export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork" }>): Promise<void> {
@@ -48,9 +57,6 @@ async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly
   return (await ctx.deps.journal?.read(entry.thread.id)) ?? []
 }
 
-function forkBoundary(from: ThreadId, itemCount: number): Pick<Thread, "forkedFrom" | "forkedFromItemCount"> {
-  return { forkedFrom: from, forkedFromItemCount: itemCount }
-}
 
 function finishDerivedTranscript(
   ctx: Ctx,
@@ -70,7 +76,13 @@ function finishDerivedTranscript(
 async function branch(
   ctx: Ctx,
   entry: Live,
-  opts: { to: string; upTo?: string; label: string },
+  opts: {
+    to: string
+    upTo?: string
+    label: string
+    /** 岔出来之后放进输入框的话。见 `thread.rewind` 的 `draft`。 */
+    draft?: { text: string; attachments?: readonly string[] }
+  },
 ): Promise<void> {
   const events = await stableEvents(ctx, entry, opts.to)
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
@@ -80,52 +92,13 @@ async function branch(
     throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
   }
   const at = ctx.deps.now()
-  const thread: Thread = withQueue({
-    ...entry.thread,
-    id: ctx.deps.newId("th"),
-    engine: opts.to,
-    engineHistory: [opts.to],
-    // 留着原会话句柄会在续跑时接回**原会话**
-    engineHandle: undefined,
-    engineProfile: opts.to === entry.thread.engine ? entry.thread.engineProfile : undefined,
-    model: undefined,
-    effort: undefined,
-    // 新 thread 只继承对话血缘，不继承来源会话的原生身份与瞬时状态。
-    // 否则切回某家时会续到父分支，或者把旧引擎的档位/能力画在新引擎上。
-    segments: [],
-    engineState: undefined,
-    trustApply: undefined,
-    capabilities: undefined,
-    nextEngine: undefined,
-    passTurn: undefined,
-    asides: [],
-    draft: undefined,
-    draftAttachments: undefined,
-    draftRevision: undefined,
-    adopted: undefined,
-    // 标题带上来路，否则侧栏里两个会话长得一模一样
-    title: `${entry.thread.title}（${opts.label}）`,
-    // 留下血缘，事后才对比得起来。**分叉的意义就在于能比**
-    // 来源会话在这里之前都是共同历史；对比时从这个精确边界之后再算来源侧新动作。
-    ...forkBoundary(entry.thread.id, items.length),
-    detached: false,
-    status: "idle",
-    createdAt: at,
-    updatedAt: at,
-    /**
-     * **派生出来的先算临时的**（和「+ 新建」同一条规矩，见 `Thread.provisional`）。
-     *
-     * 分叉与重来都是**探索性**动作：你想看看「换一家会怎么做」「回到那一轮重走一遍」。
-     * 而上一版它一生出来就是一条正式记录——进侧栏、落盘、删不掉自己。于是
-     * 「点一下看看，不满意」的代价是永久多一条历史，人为了不脏历史反而不敢点。
-     *
-     * 现在判据和别处完全一致：**跑过新的一轮才算数**（`prompt` 里 `commit()` 那一下）。
-     * 抄过来的 transcript 不算——那是抄来的历史，不是这条会话干过的事。
-     * 没用过就切走的话它被回收（`dropTemps`），磁盘上一个字都没有。
-     * 想要回来？从同一个点再分一次，得到的东西一模一样。
-     */
-    provisional: true,
-  }, [])
+  const thread = bornOf(ctx, entry, {
+    to: opts.to,
+    label: opts.label,
+    kept: items.length,
+    at,
+    ...(opts.draft === undefined ? {} : { draft: opts.draft }),
+  })
   // **先挂进待提交表再发事件**，理由同 `session.ts` 的新建：没说过话就不落盘。
   // 抄过来的 transcript 也在这份缓冲里，第一句话一发就按原序一起写下去
   ctx.uncommitted.set(thread.id, [])

@@ -7,7 +7,7 @@ import { ArrowDownIcon } from "./icons.js"
 import { Changed } from "./Changed.js"
 import { TranscriptBlank } from "./transcript-blank.js"
 import { useApprovalState } from "../use-approval-state.js"
-import { RowView, canAsk, canRewind, keyOf, approvalShortcut } from "./transcript-row.js"
+import { RowView, canAsk, canRewind, keyOf, lastMine, retryProps, approvalShortcut } from "./transcript-row.js"
 import { useAskSelection } from "../use-ask-selection.js"
 import { AskFloat } from "./ask-float.js"
 
@@ -89,6 +89,8 @@ export const Transcript = memo(function Transcript({
   const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)
   // 选中转录区一段话 → 浮一颗「问一句」。没有输入框的对比视图不给
   const ask = useAskSelection(inner, canAsk(thread, onReuse !== undefined))
+  // 「改一改再发」只挂最后一句人话，而且只在能 rewind 时——见 `transcript-row.tsx`
+  const retry = { id: useMemo(() => lastMine(rows), [rows]), active: canRewind(thread, turn, readOnly === true) }
   return (
     <div className="transcript" ref={scroller}>
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
@@ -106,7 +108,7 @@ export const Transcript = memo(function Transcript({
                   },
                 }
               : {})}
-            onReuse={onReuse}
+            {...retryProps(row, { ...retry, threadId: thread.id, send })}
             folded={row.kind === "turn" && folded.has(row.turnId)}
             onFold={onFold}
             onCopy={onCopy}

@@ -245,6 +245,23 @@ export function toItems(entries: readonly Record<string, unknown>[], now: number
   return out
 }
 
+/**
+ * 这一条是不是**一句人话**——也就是一轮的开头。
+ *
+ * 分叉要按「轮」往回数（`fork.ts`），而「轮」在这个文件格式里没有显式标记，
+ * 唯一的边界就是「用户又说了一句」。所以判据必须和 `toItems` 里开新轮那处**一模一样**，
+ * 两处各写一份的话，分叉点会和界面上看到的轮次对不上——而那种错不会报错，
+ * 只会让你少带或多带一轮上下文。
+ *
+ * `tool_result` 也是 `type: "user"`，但它不是人打的，不开轮。
+ */
+export function humanTurn(entry: Record<string, unknown>): boolean {
+  if (skip(entry) || entry["type"] !== "user") return false
+  const content = contentOf(entry)
+  if (Array.isArray(content) && toolResults(content).length > 0) return false
+  return userText(content) !== undefined
+}
+
 /** 这一条要不要看。三类跳过的理由见 `toItems` 的说明。 */
 function skip(entry: Record<string, unknown>): boolean {
   return entry["isSidechain"] === true || entry["isMeta"] === true || entry["isCompactSummary"] === true
