@@ -79,6 +79,20 @@ export function PetsSection({
             }}
           />
         </Field>
+        <Field
+          label="让压力显形"
+          hint="上下文快满、这一轮卡住不吐字、流速被压到很低时，左边会爬过来一些东西。没有「密度」和「种类」可调——它们各自对着一个真实信号，可调就等于承认它们只是装饰"
+        >
+          <Toggle
+            label="让压力显形"
+            on={kit.foes}
+            disabled={!settings.pets || !kit.fire}
+            hint={foeWhy(settings.pets, kit.fire)}
+            onChange={(foes) => {
+              patch({ foes })
+            }}
+          />
+        </Field>
       </Group>
       <Group title="出场" hint={ENTRY_NOTE}>
         <Field
@@ -104,7 +118,14 @@ const FIRE_NOTE =
   "当前那只会抽出一把枪，按引擎此刻吐字的速度往左打；每中一发，纸带上落一个字。" +
   "它估的是 item.delta 的字节量（所以数字永远写作 ~142 t/s，那是流速不是账单），" +
   "而**射速恒等于流速**：没有任何一项设置能改快慢——一旦能改，画面上的快慢说的就是你的配置，" +
-  "而不是引擎此刻的表现，那这套东西也就没有存在的理由了。系统「减少动效」开着时自动失效。"
+  "而不是引擎此刻的表现，那这套东西也就没有存在的理由了。系统「减少动效」开着时自动失效。" +
+  "打不打得掉也就跟着成了一件有信息量的事：引擎吐得快就清得掉，吐不出来就清不掉——这不是平衡，是事实。"
+
+/** 变灰时必须说清楚为什么——一个点不动又不解释的开关是这套界面里最坏的东西。 */
+function foeWhy(pets: boolean, fire: boolean): string | undefined {
+  if (!pets) return "桌宠整块关着，先把上面那个打开"
+  return fire ? undefined : "要开火才有得打，先把上面那个打开"
+}
 
 const ENTRY_NOTE =
   "开应用、或者换一家引擎的时候，那只不是「啪」地出现，是登场。每家按自己的物性来：" +

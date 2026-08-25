@@ -46,9 +46,7 @@ export function Pets({
   profile,
   hidden,
   entryOn,
-  fireOn,
-  threadId,
-  handsBusy,
+  fire,
 }: {
   engines: readonly EngineInfo[]
   engine: EngineId
@@ -60,12 +58,12 @@ export function Pets({
   hidden: readonly string[]
   /** 换引擎时播不播登场。系统「减少动效」开着时这里再堵一道。 */
   entryOn: boolean
-  /** 当前那只要不要按 token 流速开火。 */
-  fireOn: boolean
-  /** 哪条会话。流速只算这一条的——理由见 `flow-scope.ts`。 */
-  threadId: string
-  /** 手里有别的东西（在等审批）：这时枪立刻收起来。 */
-  handsBusy: boolean
+  /**
+   * 开火那一层要的一切。**打包成一项**：这几个值全都只为 `FireLayer` 存在，
+   * 单独摆在这里等于让桌宠本体去关心一件它根本不参与的事——
+   * 而每加一项，本体的参数表就长一行、行数闸门就近一步（实测两次都是这么撞上的）。
+   */
+  fire: FireProps
 }): React.JSX.Element | null {
   const shown = useMemo(
     () => visibleRoster(petRoster(engines, engine), engine, hidden),
@@ -94,14 +92,7 @@ export function Pets({
 
   return (
     <div className="pets" ref={ctl.area} aria-hidden="true">
-      <FireLayer
-        pets={ctl.pets}
-        slots={shown}
-        engine={engine}
-        threadId={threadId}
-        on={fireOn && !reduced}
-        handsBusy={handsBusy}
-      />
+      <FireLayer pets={ctl.pets} slots={shown} engine={engine} fire={fire} reduced={reduced} />
       <Shades slots={shown} refs={ctl.shades} />
       {shown.map((info, i) => (
         <button
@@ -177,25 +168,49 @@ function Shades({
  * 单拎成一个组件不只是行数：`useFlow` 要挂在**一直在的地方**——
  * 挂在条件分支里的话，关掉再打开会重订一次桥、重开一个滑窗。
  */
+export interface FireProps {
+  /** 要不要开火。 */
+  on: boolean
+  /** 哪条会话。流速只算这一条的——理由见 `flow-scope.ts`。 */
+  threadId: string
+  /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */
+  running: boolean
+  /** 手里有别的东西（在等审批）：这时枪立刻收起来。 */
+  handsBusy: boolean
+  /** 上下文用了多满（0~1）。上下文快满时会来胖子。 */
+  ctxRatio: number
+  /** 让不让压力显形（左边爬过来的那些）。 */
+  foes: boolean
+}
+
 function FireLayer({
   pets,
   slots,
   engine,
-  threadId,
-  on,
-  handsBusy,
+  fire,
+  reduced,
 }: {
   pets: React.RefObject<Pet[]>
   slots: readonly PetSlot[]
   engine: EngineId
-  threadId: string
-  on: boolean
-  handsBusy: boolean
+  fire: FireProps
+  reduced: boolean
 }): React.JSX.Element | null {
-  const flow = useFlow(threadId)
+  const flow = useFlow(fire.threadId)
   const mine = slots.findIndex((slot) => slot.engine === engine)
-  if (!on || mine < 0) return null
-  return <PetFx pets={pets} index={mine} tone={lookOf(engine).tone} flow={flow} busyHands={handsBusy} />
+  if (!fire.on || reduced || mine < 0) return null
+  return (
+    <PetFx
+      pets={pets}
+      index={mine}
+      tone={lookOf(engine).tone}
+      flow={flow}
+      busyHands={fire.handsBusy}
+      running={fire.running}
+      ratio={fire.ctxRatio}
+      foes={fire.foes}
+    />
+  )
 }
 
 /**

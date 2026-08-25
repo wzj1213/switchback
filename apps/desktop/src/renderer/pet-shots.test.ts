@@ -3,6 +3,7 @@ import {
   fireStep,
   posOf,
   rpsOf,
+  pushGlyph,
   spawn,
   stepShots,
   stepTape,
@@ -82,22 +83,34 @@ describe("spawn / posOf", () => {
 describe("stepShots", () => {
   const one = (): Bullet => spawn({ x: 100, y: 50 }, { x: 20, y: 60 }, 7, [0, 0])
 
-  it("落地的那一发变成纸带上的一个字", () => {
+  it("飞够时间才落地，落地时把那一发交出去", () => {
     const bullets = [one()]
-    const tape: Glyph[] = []
-    expect(stepShots(bullets, tape, 0.05)).toBe(0)
-    expect(stepShots(bullets, tape, 0.2)).toBe(1)
+    const landed: Bullet[] = []
+    stepShots(bullets, 0.05, (b) => landed.push(b))
+    expect(landed).toHaveLength(0)
+    stepShots(bullets, 0.2, (b) => landed.push(b))
+    expect(landed).toHaveLength(1)
     expect(bullets).toHaveLength(0)
-    expect(tape[0]?.ch).toBe(7)
+    expect(landed[0]?.ch).toBe(7)
   })
 
+  it("「打中了算什么」由调用方定——这个模块不认识敌人", () => {
+    const bullets = [one()]
+    let mine = 0
+    stepShots(bullets, 1, () => mine++)
+    expect(mine).toBe(1)
+  })
+})
+
+describe("pushGlyph", () => {
   it("纸带有上限，到头丢最旧的——不然它会一直长下去", () => {
     const tape: Glyph[] = []
     for (let i = 0; i < TAPE_MAX + 40; i++) {
-      const bullets = [one()]
-      stepShots(bullets, tape, 1)
+      pushGlyph(tape, spawn({ x: 100, y: 50 }, { x: 20, y: 60 }, i, [0, 0]))
     }
     expect(tape).toHaveLength(TAPE_MAX)
+    // 丢的是最旧的：留下来的应该是后 72 个
+    expect(tape[0]?.ch).toBe(40)
   })
 })
 

@@ -17,6 +17,8 @@ import { posOf } from "./pet-shots.js"
 const CHARS = "模型上下文进度环token流速引擎会话const{}=>();return"
 
 export interface Palette {
+  /** 敌人的底色。**和五家的配色无关**——它们是压力，不是哪一家。 */
+  foe: string
   gun: string
   gunHi: string
   gunDark: string
@@ -32,6 +34,7 @@ export function readPalette(root: HTMLElement, tone: string): Palette {
   const cs = getComputedStyle(root)
   const get = (name: string): string => cs.getPropertyValue(name).trim()
   return {
+    foe: get("--pet-foe"),
     gun: get("--pet-gun"),
     gunHi: get("--pet-gun-hi"),
     gunDark: get("--pet-gun-dk"),
@@ -58,8 +61,35 @@ const BODY: readonly (readonly [number, number, number, number, keyof Palette])[
 
 export function drawFx(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void {
   drawTape(g, w, pal)
+  drawFoes(g, w, pal)
   drawBullets(g, w, pal)
   if (w.gun.arm > 0.01) drawGun(g, w, pal)
+}
+
+/**
+ * 那些爬过来的。
+ *
+ * 三种形只差两笔：**史莱姆是方的、蜂群是小的、胖子是大的**。
+ * 再多的差别没有意义——它们要说的是「哪一种压力」，而那件事靠尺寸和数量
+ * 已经说完了；画得越细，越像在做一个游戏，而这不是游戏。
+ */
+function drawFoes(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void {
+  for (const f of w.foes) {
+    const s = f.kind === "swarm" ? 7 : f.kind === "glut" ? 20 : 13
+    const fade = f.dying > 0 ? Math.max(0, 1 - f.dying / 0.55) : 1
+    g.globalAlpha = fade * 0.9
+    g.fillStyle = f.flash > 0 ? pal.gunHi : pal.foe
+    const x = f.x + f.knock
+    const y = f.y - f.fly - s
+    g.fillRect(x - s / 2, y, s, s)
+    // 血条只在挨过打之后出现：**没挨过打的那只不该先摆一条满血给你看**
+    if (f.hp < f.hp0 && f.dying === 0) {
+      g.globalAlpha = fade * 0.55
+      g.fillStyle = pal.spark
+      g.fillRect(x - s / 2, y - 3, (s * f.hp) / f.hp0, 1.5)
+    }
+  }
+  g.globalAlpha = 1
 }
 
 function drawTape(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void {

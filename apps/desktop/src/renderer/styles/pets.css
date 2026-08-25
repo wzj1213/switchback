@@ -43,6 +43,8 @@
   --pet-gun-hi: #9a9ba4;
   --pet-gun-dk: #4a4b52;
   --pet-spark: #f2b23c;
+  /* 爬过来的那些。**和五家的配色无关**——它们是压力，不是哪一家 */
+  --pet-foe: #7b9c5a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -57,6 +59,7 @@
     --pet-gun: #8d8e97;
     --pet-gun-hi: #b6b7c0;
     --pet-gun-dk: #5c5d65;
+    --pet-foe: #8fb36a;
   }
 }
 

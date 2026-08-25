@@ -118,24 +118,30 @@ export function posOf(b: Bullet): { x: number; y: number } {
 }
 
 /**
- * 推进所有子弹，**落地的那些变成纸带上的字**。
+ * 推进所有子弹，落地的交给 `onLand`。
  *
- * 原地改数组而不是重建：吐字最快时一秒十几发，每帧重建两个数组等于把 GC
+ * **落地意味着什么由调用方定**：打在纸带上是落一个字，打在敌人身上是掉一点血。
+ * 这个模块不认识敌人，所以它不能替谁做这个决定——把回调交出去，
+ * 是让「子弹怎么飞」和「打中了算什么」各归各的唯一办法。
+ *
+ * 原地改数组而不是重建：吐字最快时一秒二十几发，每帧重建数组等于把 GC
  * 拉进热路径，而这个循环每秒要跑六十次。
  */
-export function stepShots(bullets: Bullet[], tape: Glyph[], dt: number): number {
-  let landed = 0
+export function stepShots(bullets: Bullet[], dt: number, onLand: (b: Bullet) => void): void {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i]
     if (b === undefined) continue
     b.t += dt
     if (b.t < b.dur) continue
-    tape.push({ x: b.x1, y: b.y1, ch: b.ch, t: 0 })
     bullets.splice(i, 1)
-    landed++
+    onLand(b)
   }
+}
+
+/** 落一个字。上限在这儿而不在调用方——它是纸带自己的事。 */
+export function pushGlyph(tape: Glyph[], b: Bullet): void {
+  tape.push({ x: b.x1, y: b.y1, ch: b.ch, t: 0 })
   while (tape.length > TAPE_MAX) tape.shift()
-  return landed
 }
 
 /**

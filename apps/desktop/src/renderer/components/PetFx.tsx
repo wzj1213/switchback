@@ -28,6 +28,9 @@ export function PetFx({
   tone,
   flow,
   busyHands,
+  running,
+  ratio,
+  foes,
 }: {
   /** 桌宠本体的物理状态。**只读**——这一层从不改它。 */
   pets: React.RefObject<Pet[]>
@@ -39,10 +42,16 @@ export function PetFx({
   flow: () => number
   /** 手里要不要换别的东西（在跑工具、在等审批）。 */
   busyHands: boolean
+  /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */
+  running: boolean
+  /** 上下文用了多满（0~1）。引擎没报窗口时给 0。**这一层不知道它从哪儿来。** */
+  ratio: number
+  /** 让不让压力显形（左边爬过来的那些）。 */
+  foes: boolean
 }): React.JSX.Element {
   const canvas = useRef<HTMLCanvasElement | null>(null)
-  const live = useRef({ index, tone, busyHands })
-  live.current = { index, tone, busyHands }
+  const live = useRef({ index, tone, busyHands, running, ratio, foes })
+  live.current = { index, tone, busyHands, running, ratio, foes }
 
   useEffect(() => {
     const node = canvas.current
@@ -62,7 +71,7 @@ export function PetFx({
     })
     observer.observe(node)
 
-    let world = createFx()
+    const world = createFx()
     let palette: Palette | undefined
     let paintedTone = ""
     let last = performance.now()
@@ -75,10 +84,14 @@ export function PetFx({
       last = now
       const pet = pets.current[live.current.index]
       if (pet === undefined || box.w < 2) return
-      world = stepFx(world, dt, {
+      stepFx(world, dt, {
         pet,
         rate: flow(),
         busyHands: live.current.busyHands,
+        running: live.current.running,
+        ratio: live.current.ratio,
+        left: -20,
+        foes: live.current.foes,
         rand: Math.random,
       })
       // 闲着整帧不画，但「忙→闲」那一帧要画一次收尾，否则最后一颗子弹会留在画面上

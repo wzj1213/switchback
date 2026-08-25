@@ -1,5 +1,16 @@
 import { createGun, kickOf, MAX_DT, stepGun, wrapAngle, type Gun } from "./pet-gun.js"
-import { fireStep, GLYPH_W, rpsOf, spawn, stepShots, stepTape, type Bullet, type Glyph } from "./pet-shots.js"
+import {
+  fireStep,
+  GLYPH_W,
+  pushGlyph,
+  rpsOf,
+  spawn,
+  stepShots,
+  stepTape,
+  type Bullet,
+  type Glyph,
+} from "./pet-shots.js"
+import { hitFoe, nearest, nextGap, pressureOf, spawnFoes, stepFoes, type Foe } from "./pet-foes.js"
 import { SIZE, type Pet } from "./pets.js"
 
 /**
@@ -20,6 +31,14 @@ import { SIZE, type Pet } from "./pets.js"
  * `stepFx` 只改状态，`drawFx`（另一个文件）只读状态。分开是因为**空闲时要跳过绘制**
  * 而不能跳过推进——跳过推进的话，那些本该在这几帧里飞完的子弹会一直挂着，
  * 于是「不动了」这一刻永远不到，跳帧优化反而永远等不到机会。
+ *
+ * ## `stepFx` 是**原地改**的，而且明说
+ *
+ * 上一版它返回 `{...w}`，看起来像纯函数——**但里面那几个数组是共着的**。
+ * 于是「从同一个世界分出两条支线」这种再自然不过的写法会让两条互相改对方的子弹，
+ * 而且完全不报错（第一次发现是在测试里：火力更猛的那一支反而挨咬更多）。
+ * 装成纯的比明着改更危险，所以现在它就是个原地改的推进器：一帧一个世界，
+ * 要分支就自己另起一个。
  */
 
 /** 纸带离手多远、离地多高。 */
@@ -46,10 +65,25 @@ const HAND_Y = 0.72
 /** 枪管从手心往外探多远。出膛点＝手 + 这一段，按枪的指向旋过去。 */
 const BARREL = 11
 
+/** 一发子弹外加「它打的是谁」。**敌人的身份只存在于这一层**——见 `stepShots`。 */
+interface Shot extends Bullet {
+  foe?: Foe
+}
+
 export interface FxWorld {
   gun: Gun
-  bullets: Bullet[]
+  bullets: Shot[]
   tape: Glyph[]
+  /** 从左边爬过来的那些。 */
+  foes: Foe[]
+  /** 这一层自己的钟（秒）。刷怪的节拍按它走，**不读时钟**。 */
+  clock: number
+  /** 下一只该在什么时候来。 */
+  nextAt: number
+  /** 已经安静了多久（秒）。静默那条压力按它算。 */
+  quiet: number
+  /** 这一轮被摸到脸上几次。**只记账，不影响任何数**——它是健康度不是分数。 */
+  bites: number
   /** 欠着的发数。见 `fireStep`。 */
   acc: number
   /** 下一个要落的字。**顺着来而不是随机**：随机会落出一串看不出是文字的乱码。 */
@@ -59,7 +93,19 @@ export interface FxWorld {
 }
 
 export function createFx(): FxWorld {
-  return { gun: createGun(), bullets: [], tape: [], acc: 0, ch: 0, moving: true }
+  return {
+    gun: createGun(),
+    bullets: [],
+    tape: [],
+    foes: [],
+    clock: 0,
+    nextAt: 3,
+    quiet: 0,
+    bites: 0,
+    acc: 0,
+    ch: 0,
+    moving: true,
+  }
 }
 
 export interface FxInput {
@@ -72,6 +118,14 @@ export interface FxInput {
    * 这时立刻收枪——枪和终端不能同时在手上。
    */
   busyHands: boolean
+  /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */
+  running: boolean
+  /** 上下文用了多满（0~1）。引擎没报窗口时给 0。 */
+  ratio: number
+  /** 画布左边界：怪从那儿爬进来。 */
+  left: number
+  /** 让不让压力显形。关掉之后只剩打纸带那一层。 */
+  foes: boolean
   /** 随机源。**由调用方给**，所以这一层可以被确定性地测。 */
   rand: () => number
 }
@@ -96,30 +150,37 @@ export function tapeAt(hand: { x: number; y: number }): { x: number; y: number; 
  * 推进一帧。`dt` 秒，**调用方不必夹**——这里夹（`MAX_DT`），
  * 因为夹的理由（弹簧的稳定门槛）属于这一层。
  */
-export function stepFx(w: FxWorld, rawDt: number, input: FxInput): FxWorld {
+export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
   const dt = Math.min(rawDt > 0 ? rawDt : 1 / 60, MAX_DT)
   const hand = handOf(input.pet)
   const target = tapeAt(hand)
+  w.quiet = input.rate > 1 ? 0 : w.quiet + dt
+  w.clock += dt
+  spawnDue(w, input, hand)
+  const foe = nearest(w.foes)
+  // **有东西过来就瞄它**，没有才对着纸带打。否则它会一路走到你脸上，
+  // 而你手里正端着一把朝别处的枪
+  const aim = foe === undefined ? target : { x: foe.x + foe.knock, y: foe.y - 11 - foe.fly }
   const firing = input.rate > 1 && !input.busyHands
-  const want = firing ? wrapAngle(Math.atan2(target.y - w.gun.y, target.x - w.gun.x)) : Math.PI * 1.02
-  let gun = stepGun(w.gun, dt, { hand, want, armed: firing, hard: input.busyHands })
+  const want = firing ? wrapAngle(Math.atan2(aim.y - w.gun.y, aim.x - w.gun.x)) : Math.PI * 1.02
+  w.gun = stepGun(w.gun, dt, { hand, want, armed: firing, hard: input.busyHands })
 
   // 抽枪没抽利落之前不开火：**于是「先抽枪、再开打」自然成了一个节拍**
-  const ready = firing && gun.arm > 0.55
+  const ready = firing && w.gun.arm > 0.55
   const step = fireStep(w.acc, ready ? input.rate : 0, dt)
-  let ch = w.ch
-  if (step.shots > 0) {
-    const from = muzzleOf(gun)
-    for (let s = 0; s < step.shots; s++) {
-      w.bullets.push(spawn(from, target, ch++, [input.rand() - 0.5, input.rand() - 0.5]))
-    }
-    gun = kickOf(gun, step.shots)
-  }
+  w.acc = step.acc
+  fireOut(w, { shots: step.shots, aim, ...(foe === undefined ? {} : { foe }) }, input.rand)
 
-  stepShots(w.bullets, w.tape, dt)
+  // 落地算什么由这儿定：打在纸带上是落一个字，打在敌人身上是掉一点血
+  stepShots(w.bullets, dt, (b) => {
+    const hit = (b as Shot).foe
+    if (hit === undefined) pushGlyph(w.tape, b)
+    else hitFoe(hit)
+  })
+  w.bites += stepFoes(w.foes, dt, hand.x)
   const rps = rpsOf(ready ? input.rate : 0)
   stepTape(w.tape, dt, rps > 0 ? rps * GLYPH_W : DRIFT_QUIET, target.left)
-  return { ...w, gun, acc: step.acc, ch, moving: busyOf(w, gun) }
+  w.moving = busyOf(w)
 }
 
 /**
@@ -128,6 +189,55 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): FxWorld {
  * **判据必须囊括每一样会自己变的东西**：漏掉一样，那样东西就会在跳帧之后
  * 冻在半路上（而且不报错——canvas 保留着上一帧，看起来只是「卡了一下」）。
  */
-function busyOf(w: FxWorld, gun: Gun): boolean {
-  return w.bullets.length > 0 || w.tape.length > 0 || gun.arm > 0 || Math.abs(gun.kick) > 0.002
+function busyOf(w: FxWorld): boolean {
+  return (
+    w.bullets.length > 0 ||
+    w.tape.length > 0 ||
+    w.foes.length > 0 ||
+    w.gun.arm > 0 ||
+    Math.abs(w.gun.kick) > 0.002
+  )
+}
+
+/** 这几发打向哪儿、算在谁头上。 */
+interface Volley {
+  shots: number
+  aim: { x: number; y: number }
+  /** 有值时落地是掉血，没有就是在纸带上落一个字。 */
+  foe?: Foe
+}
+
+/** 出膛。 */
+function fireOut(w: FxWorld, volley: Volley, rand: () => number): void {
+  if (volley.shots <= 0) return
+  const from = muzzleOf(w.gun)
+  for (let s = 0; s < volley.shots; s++) {
+    const b: Shot = spawn(from, volley.aim, w.ch++, [rand() - 0.5, rand() - 0.5])
+    if (volley.foe !== undefined) b.foe = volley.foe
+    w.bullets.push(b)
+  }
+  w.gun = kickOf(w.gun, volley.shots)
+}
+
+/**
+ * 到点没到点该放一只。
+ *
+ * 没压力的时候**把下一次也往后推**：不推的话，压力一消失、时钟照走，
+ * 等它再出现时 `clock` 早就越过了 `nextAt`，于是当场蹦一只出来——
+ * 而那一刻恰恰是「刚刚才开始不顺」，不该已经被围了。
+ */
+function spawnDue(w: FxWorld, input: FxInput, hand: { x: number; y: number }): void {
+  const press = pressureOf({
+    running: input.running,
+    rate: input.rate,
+    quiet: w.quiet,
+    ratio: input.ratio,
+  })
+  if (press === undefined || !input.foes) {
+    w.nextAt = Math.max(w.nextAt, w.clock + 3)
+    return
+  }
+  if (w.clock < w.nextAt) return
+  w.nextAt = w.clock + nextGap(press.level)
+  spawnFoes(w.foes, press.kind, { from: input.left, ground: hand.y + 4 }, input.rand)
 }
