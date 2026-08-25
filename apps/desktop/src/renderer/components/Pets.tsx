@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useRef } from "react"
 import type { EngineId, EngineInfo } from "@omni/protocol"
 import { PetArt } from "./pets-art.js"
-import { gaitOf, type Hit, type Pet } from "../pets.js"
-import { petRoster, type PetSlot } from "../pet-roster.js"
+import { gaitOf, lookOf, type Hit, type Pet } from "../pets.js"
+import { petRoster, visibleRoster, type PetSlot } from "../pet-roster.js"
+import type { EntryKind } from "../pet-entry.js"
+import { usePetEntry } from "../usePetEntry.js"
 import { usePets, useReduced } from "../usePets.js"
 import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
@@ -79,6 +81,8 @@ export function Pets({
   active,
   failed,
   profile,
+  hidden,
+  entryOn,
 }: {
   engines: readonly EngineInfo[]
   engine: EngineId
@@ -86,8 +90,15 @@ export function Pets({
   active: boolean
   failed: boolean
   profile?: string
+  /** 用户在设置里藏起来的那几只（花名册的 key）。当前那家藏不掉，见 `visibleRoster`。 */
+  hidden: readonly string[]
+  /** 换引擎时播不播登场。系统「减少动效」开着时这里再堵一道。 */
+  entryOn: boolean
 }): React.JSX.Element | null {
-  const shown = useMemo(() => petRoster(engines, engine), [engines, engine])
+  const shown = useMemo(
+    () => visibleRoster(petRoster(engines, engine), engine, hidden),
+    [engines, engine, hidden],
+  )
   const count = shown.length
   const gaits = useMemo(() => shown.map((slot) => gaitOf(slot.look.shape)), [shown])
   const bodies = useRef<(HTMLSpanElement | null)[]>([])
@@ -116,22 +127,13 @@ export function Pets({
   // **只给待在窝里、又不是正在跑的那几只排班**——理由在 `usePetMood` 开头
   useMood(ctl.nodes, ctl.pets, count, reduced)
   const drag = usePetDrag(ctl, bodies, reduced)
+  const entry = usePetEntry(engine, lookOf(engine), entryOn && !reduced)
 
   if (count === 0) return null
 
   return (
     <div className="pets" ref={ctl.area} aria-hidden="true">
-      {/* 影子和身体是**分开的两组**：影子钉在地面上不跟着抬，那是「它离地多高」
-          唯一的说法（见 petPaint.ts）。摆在前面，所以永远压在身体下面 */}
-      {shown.map((info, i) => (
-        <span
-          key={`shade-${info.key}`}
-          className="pet__shade"
-          ref={(n) => {
-            ctl.shades.current[i] = n
-          }}
-        />
-      ))}
+      <Shades slots={shown} refs={ctl.shades} />
       {shown.map((info, i) => (
         <button
           key={info.key}
@@ -139,7 +141,7 @@ export function Pets({
           ref={(n) => {
             ctl.nodes.current[i] = n
           }}
-          className={classOf(info, engine, running, dshPhase)}
+          className={classOf(info, engine, running, dshPhase) + enterOf(info.engine === engine, entry)}
           title={titleOf(info.label, info.engine === engine, running, info.engine === "dsh" ? profile : undefined)}
           onPointerDown={drag.down(i)}
           onPointerMove={drag.move}
@@ -147,6 +149,7 @@ export function Pets({
           onPointerCancel={drag.up}
         >
           {info.engine === "dsh" && info.engine === engine ? <DshPetEffect phase={dshPhase} /> : null}
+          <Ripple on={info.engine === engine && entry === "splash"} />
           {/* 状态点在**头顶**，不在脚下。挂在脚下时它垫在身子和地面之间，
               三只看起来全都悬空——而它们本来是站在输入框上沿的，那条边就是地面 */}
           {info.engine === engine && running ? <span className="pet__dot" /> : null}
@@ -156,6 +159,7 @@ export function Pets({
               ctl.leans.current[i] = n
             }}
           >
+            <Canopy on={info.engine === engine && entry === "chute"} />
             <span
               className="pet__body"
               ref={(n) => {
@@ -169,6 +173,59 @@ export function Pets({
       ))}
     </div>
   )
+}
+
+/**
+ * 影子那一组。**和身体分开、且摆在前面**：影子钉在地面上不跟着抬
+ *（见 `petPaint.ts`），那是「它离地多高」唯一的说法；摆在前面所以永远压在身体下面。
+ */
+function Shades({
+  slots,
+  refs,
+}: {
+  slots: readonly PetSlot[]
+  refs: React.RefObject<(HTMLSpanElement | null)[]>
+}): React.JSX.Element {
+  return (
+    <>
+      {slots.map((info, i) => (
+        <span
+          key={`shade-${info.key}`}
+          className="pet__shade"
+          ref={(n) => {
+            refs.current[i] = n
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
+/**
+ * 伞。**挂在 `.pet__lean` 里面**，跟着那只一起往下飘。
+ *
+ * 挂在外面（`.pet` 的直接子节点）时，蟹被 lean 的位移一路带下来、而伞钉在原地，
+ * 于是两者会在半路穿过对方——实测下落到一半时伞正好整个藏在蟹身后。
+ * 伞和被它吊着的那只是同一件事，位移只该写一份。
+ */
+function Canopy({ on }: { on: boolean }): React.JSX.Element | null {
+  return on ? <span className="pet__chute" /> : null
+}
+
+/**
+ * 水花。和伞相反，**必须挂在 lean 外面**：它是地面上炸开的一圈涟漪，
+ * 不该跟着鲸一起跃到半空去。
+ *
+ * 两种都写成字面类名而不是拼出来的：拼的类名**静态查不出来**，
+ * 而这个仓库有一道守卫专查「组件用到的 class 有没有规则」（`pnpm check:css`）。
+ */
+function Ripple({ on }: { on: boolean }): React.JSX.Element | null {
+  return on ? <span className="pet__splash" /> : null
+}
+
+/** 登场那一拍挂在当前那只身上。空串表示这一刻没有登场在播。 */
+function enterOf(on: boolean, kind: EntryKind | undefined): string {
+  return on && kind !== undefined ? ` pet--enter-${kind}` : ""
 }
 
 /** 眨眼、瞟眼、被捏着、走路那几个类**不在这儿**——它们每秒都可能变，

@@ -1,7 +1,7 @@
 import type { EngineInfo, Trust } from "@omni/protocol"
 import type { NotifyMode, Settings } from "../../shared/settings.js"
 import { TRUSTS } from "./Composer.js"
-import { Field, Group, Segmented, Toggle } from "./SettingsBits.js"
+import { Field, Group, Segmented } from "./SettingsBits.js"
 
 /**
  * 「通用」与「新会话」两页。
@@ -44,16 +44,6 @@ export function LookSection({
             value={settings.theme}
             onPick={(theme) => {
               onPatch({ theme })
-            }}
-          />
-        </Field>
-        {/* 关掉是整块不渲染，不是藏起来——藏起来它照样占着指针事件那一层 */}
-        <Field label="桌宠" hint="蹲在输入框上沿的那几只，一家引擎一只。能拖能扔，松手它自己回窝">
-          <Toggle
-            label="桌宠"
-            on={settings.pets}
-            onChange={(pets) => {
-              onPatch({ pets })
             }}
           />
         </Field>

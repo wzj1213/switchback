@@ -129,6 +129,20 @@ export function CopyIcon({ size = 13 }: { size?: number }): React.JSX.Element {
 }
 
 /**
+ * 桌宠。**照那只史莱姆自己的样子画**——`pets-art.tsx` 里它就是一个
+ * `rx=7` 的圆角方块加两只竖眼。图标另编一个形（一只脚印、一颗爱心）
+ * 的话，设置页里那一栏和台面上站着的那几只就对不上号了。
+ */
+export function PetIcon({ size = 13 }: { size?: number } = {}): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <rect x="2.75" y="3.25" width="10.5" height="10" rx="3.6" {...LINE} />
+      <path d="M6.4 7v2.4M9.6 7v2.4" {...LINE} />
+    </Svg>
+  )
+}
+
+/**
  * 活动。**一排高矮不一的柱子**，不是折线也不是饼：
  * 这一页画的就是「一格一天、有高有低」，图标照着它自己的样子画最省解释。
  */

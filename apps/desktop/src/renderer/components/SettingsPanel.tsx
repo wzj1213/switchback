@@ -8,7 +8,8 @@ import { EnginesSection } from "./EngineSettings.js"
 import { EnvSection } from "./SettingsEnv.js"
 import { ActivitySection } from "./SettingsActivity.js"
 import { RemotePanel } from "./RemotePanel.js"
-import { ChartIcon, EngineIcon, FolderIcon, PlusIcon, SparkIcon } from "./icons.js"
+import { PetsSection } from "./SettingsPets.js"
+import { ChartIcon, EngineIcon, FolderIcon, PetIcon, PlusIcon, SparkIcon } from "./icons.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 
 /**
@@ -49,6 +50,9 @@ import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 
 const TABS = [
   { id: "look", label: "通用", icon: <SparkIcon size={14} /> },
+  // 排在通用后面：桌宠是**外观**。它既不属于后面那几件「要开的事」，
+  // 也不属于分界线下面「拿来看的东西」
+  { id: "pets", label: "桌宠", icon: <PetIcon size={14} /> },
   { id: "new", label: "新会话", icon: <PlusIcon size={14} /> },
   { id: "engines", label: "引擎", icon: <EngineIcon size={14} /> },
   { id: "env", label: "环境", icon: <TerminalIcon size={14} /> },
@@ -92,6 +96,8 @@ function engineNamer(catalog: readonly EngineInfo[]): (id: string) => string {
 function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
   const { settings, onPatch } = props
   if (tab === "look") return <LookSection settings={settings} onPatch={onPatch} />
+  if (tab === "pets")
+    return <PetsSection settings={settings} engines={props.catalog} onPatch={onPatch} />
   if (tab === "new")
     return <NewThreadSection settings={settings} engines={props.engines} onPatch={onPatch} />
   if (tab === "engines")

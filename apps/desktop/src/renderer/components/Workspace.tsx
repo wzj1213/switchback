@@ -13,6 +13,7 @@ import type {
   TaskRun,
 } from "@omni/protocol"
 import type { Notice, ThreadRow } from "@omni/store"
+import type { PetKit } from "../../shared/settings.js"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
 import { useOmniActions } from "../useOmniActions.js"
 import { limitNotice } from "../limits.js"
@@ -40,8 +41,14 @@ export interface WorkspaceProps {
   onOpenLane: (laneId: string) => void
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
-  /** 输入框上沿那几只要不要出现。关掉是整块不渲染，见 `shared/settings.ts`。 */
-  pets: boolean
+  /**
+   * 输入框上沿那几只。`on` 关掉是**整块不渲染**（不是藏起来——藏起来它照样
+   * 占着指针事件那一层），其余细项见 `PetKit`。
+   *
+   * 合成一项而不是并排两个 prop：它们永远一起变，而分开传会让「关着的时候
+   * 那几项还传不传」变成一个每个调用点各答一遍的问题。
+   */
+  pets: PetKit & { on: boolean }
   notices: readonly Notice[]
   /** 全部会话。故障横幅要靠它说清「出事的是哪一条」。 */
   rows: readonly ThreadRow[]
@@ -213,7 +220,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         {/* 滚动区的下摆。**必须在 `Transcript` 外面**——滚动容器里的绝对定位参照的是
             可滚动内容而不是可视区，挂进去那道渐隐会跟着内容滚走。见 app.css 的 `.hem` */}
         <div className="hem" aria-hidden="true" />
-        {props.pets ? (
+        {props.pets.on ? (
           <Pets
             engines={props.engines}
             engine={thread.engine}
@@ -221,6 +228,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
             active={thread.status === "running" || thread.status === "waiting_approval"}
             failed={thread.status === "failed"}
             profile={thread.engineProfile}
+            hidden={props.pets.hidden}
+            entryOn={props.pets.entry}
           />
         ) : null}
       </div>

@@ -442,6 +442,224 @@
   animation: pet-scuttle 260ms ease-in-out infinite;
 }
 
+/*
+ * ══ 登场 ══════════════════════════════════════════════════════
+ *
+ * 换一家引擎、或者刚开应用，当前那只按自己的物性登场一次（选哪一种见
+ * `pet-entry.ts`，什么时候播见 `usePetEntry.ts`）。
+ *
+ * **排在跳和走那两条后面**：它们同为 `.pet--x .pet__body`，权重一样，
+ * 靠先后定胜负——登场这一拍必须盖住那个 4 秒一次的跳，
+ * 否则一只正在登场的桌宠会一边掉下来一边做待机动作。
+ *
+ * 位移写在 `.pet__lean` 上而不是 `.pet` 上：后者的 transform 由 JS 每帧写
+ * （那是物理位置），在上面挂动画会被下一帧盖掉。
+ */
+
+/* 史莱姆：砸下来，落地摊成一滩再弹回原形。**软体没有别的出场方式** */
+@keyframes pet-enter-drop {
+  0% {
+    transform: translateY(-46px);
+    animation-timing-function: ease-in;
+  }
+
+  34%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pet-enter-splat {
+  0%,
+  33% {
+    /* 下落时被拉长：拉伸挤压，动画里最老的那条规矩 */
+    transform: scale(0.9, 1.12);
+  }
+
+  41% {
+    transform: scale(1.42, 0.62);
+  }
+
+  53% {
+    transform: scale(0.9, 1.14);
+  }
+
+  67% {
+    transform: scale(1.1, 0.92);
+  }
+
+  82% {
+    transform: scale(0.97, 1.03);
+  }
+
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+.pet--enter-drop .pet__lean {
+  animation: pet-enter-drop 780ms linear;
+}
+
+.pet--enter-drop .pet__body {
+  animation: pet-enter-splat 780ms linear;
+}
+
+/* 螃蟹：伞投。**蟹不会飞**，所以它自己到不了空中，必须有东西把它送下来 */
+@keyframes pet-enter-chute {
+  0% {
+    transform: translate(6px, -58px);
+  }
+
+  20% {
+    transform: translate(-5px, -44px);
+  }
+
+  40% {
+    transform: translate(5px, -30px);
+  }
+
+  60% {
+    transform: translate(-4px, -17px);
+  }
+
+  81%,
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* 落地那刻脱钩飘走。**不是淡出**——伞是被丢下的，它得往上走 */
+@keyframes pet-enter-canopy {
+  0%,
+  78% {
+    opacity: 0.95;
+    transform: translate(-50%, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -18px) scale(0.72);
+  }
+}
+
+.pet--enter-chute .pet__lean {
+  animation: pet-enter-chute 1450ms ease-out;
+}
+
+/*
+ * 伞面：半圆 + 三根伞绳。整只伞是**一个元素**——
+ * 伞绳用 border-left/right 那两条斜边省掉两个子元素（它们只是三根一像素的线，
+ * 不值得各占一个节点）。
+ */
+.pet__chute {
+  position: absolute;
+  /* 30px 是那只的头顶。再抬 8px 把伞绳整段让出来——贴着头顶时伞绳被身体挡完，
+     剩下的形状读起来是顶帽子，而不是被什么东西吊着 */
+  bottom: 38px;
+  left: 50%;
+  /* 比它吊着的那只宽（螃蟹 34px 宽）。窄于载荷的伞看着托不住 */
+  width: 32px;
+  height: 15px;
+  border-radius: 16px 16px 0 0;
+  background: currentColor;
+  transform: translate(-50%, 0);
+  transform-origin: bottom center;
+  pointer-events: none;
+  animation: pet-enter-canopy 1450ms ease-out;
+}
+
+.pet__chute::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 5px;
+  width: 22px;
+  height: 8px;
+  border-right: 1px solid currentColor;
+  border-left: 1px solid currentColor;
+  opacity: 0.6;
+}
+
+/* 鲸：先炸一圈水花，再划弧跃出来。**它本来就在水面下**，出场是浮上来 */
+@keyframes pet-enter-splash {
+  0% {
+    transform: translateY(16px);
+  }
+
+  14% {
+    transform: translateY(10px);
+  }
+
+  50% {
+    transform: translateY(-34px);
+  }
+
+  86% {
+    transform: translateY(0);
+  }
+
+  93% {
+    transform: translateY(-4px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pet-enter-ripple {
+  0% {
+    opacity: 0.85;
+    transform: translate(-50%, 0) scale(0.2, 0.4);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(2.6, 1);
+  }
+}
+
+.pet--enter-splash .pet__lean {
+  animation: pet-enter-splash 1000ms ease-out;
+}
+
+.pet__splash {
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 24px;
+  height: 5px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  transform: translate(-50%, 0);
+  pointer-events: none;
+  animation: pet-enter-ripple 620ms ease-out;
+}
+
+/*
+ * 没见过的那一家：只是淡进来。`pets.css` 开头那句「不编花样」管到这儿——
+ * **这个「没有花样」本身就是信号**。
+ *
+ * 透明度写在 `.pet__lean` 上：`.pet` 那一层的 opacity 是「是不是当前这家」
+ * 的说法（0.6 / 1），占用它会让两件事互相盖掉。
+ */
+@keyframes pet-enter-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pet--enter-fade .pet__lean {
+  animation: pet-enter-fade 500ms ease-out;
+}
+
 /* `.row__dot--running` 和 `.meter__fill` 都写了这一条，这里也得有。
    拖和落地不关掉——那是你自己动手的直接反馈，不是自作主张的动效
   （松手之后的抛物线由 `Pets.tsx` 自己跳过，直接回窝） */
@@ -453,6 +671,23 @@
   .pet--bounce .pet__body,
   .pet--doze .pet__body {
     animation: none;
+  }
+
+  /* 登场整段不发生。`usePetEntry` 在这一档下压根不排（`Pets.tsx` 传 false），
+     这里再堵一道：伞和水花是两个真实节点，漏网的话它们会挂在那儿不走 */
+  .pet--enter-drop .pet__lean,
+  .pet--enter-chute .pet__lean,
+  .pet--enter-splash .pet__lean,
+  .pet--enter-fade .pet__lean,
+  .pet--enter-drop .pet__body,
+  .pet__chute,
+  .pet__splash {
+    animation: none;
+  }
+
+  .pet__chute,
+  .pet__splash {
+    display: none;
   }
 
   /* 闲着那几个动作整个不排班（`usePetMood` 在这一档下压根不开表），

@@ -73,6 +73,11 @@ export interface Settings {
    * 藏起来的话它照样占着指针事件的那一层。
    */
   pets: boolean
+  /**
+   * 桌宠的细项。**`pets: false` 时这里的一切都不生效**——那一档是整块不渲染，
+   * 而不渲染的东西没有「显示哪几只」可言。
+   */
+  petKit: PetKit
   /** 什么时候出声。见 `NotifyMode`。 */
   notify: NotifyMode
   /**
@@ -181,6 +186,35 @@ export interface DshSettings {
   confirmedProfiles: readonly string[]
 }
 
+/**
+ * 桌宠里那些「怎么显示」的选择。
+ *
+ * ## 为什么藏起来的记成一张黑名单，而不是记「要显示哪几只」
+ *
+ * 花名册是**跟着宿主的引擎清单变的**（`pet-roster.ts`）：装一家新的、
+ * 在 `engines.json` 里接一家第三方，队伍就多一只。白名单在那一刻会把新来的
+ * 判成「没勾过 ＝ 不显示」，于是新接入的引擎在台面上根本不出现——
+ * 而用户什么都没关过。黑名单反过来：**没说要藏的一律显示**，
+ * 新来的默认在场，这才对得上「默认全显示」这句话。
+ */
+export interface PetKit {
+  /**
+   * 主动藏起来的那几只，按花名册的 `key`（真引擎是引擎 id，DSH 那个占位是 `dsh`）。
+   *
+   * **当前那家永远藏不掉**（过滤在 `petRoster` 里兜住）：藏掉它等于台面上
+   * 没有任何地方画着「谁在答」，而那正是这几只存在的唯一理由。
+   */
+  hidden: readonly string[]
+  /**
+   * 开应用、换引擎时播不播出场动画。
+   *
+   * **默认开。** 它是这一层里唯一能说清「换了一家」的东西——比配色更快，
+   * 因为一只螃蟹被伞吊下来和一团史莱姆砸在地上，是两件事，不是两个色号。
+   * 系统「减少动效」开着时这一项自动失效，不用用户来关。
+   */
+  entry: boolean
+}
+
 /** 与 DSH launcher 的公开 profile 名校验保持同形；驱动启动前还会再守一次。 */
 export function isDshProfileName(name: string): boolean {
   return name !== "" && name !== "." && name !== ".." && name !== "node_modules"
@@ -211,6 +245,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
+  petKit: { hidden: [], entry: true },
   notify: "all",
   dsh: { profile: "acp", confirmedProfiles: [] },
   disabledEngines: [],
