@@ -85,6 +85,18 @@ export interface WireItem {
   server?: string
   tool?: string
   arguments?: unknown
+  result?: unknown
+  /** MCP 进度通知由驱动挂回在途 item；不是 completed item 的原生字段。 */
+  progress?: readonly string[]
+  /** dynamicToolCall */
+  namespace?: string | null
+  contentItems?: readonly unknown[] | null
+  success?: boolean | null
+  /** collabAgentToolCall */
+  receiverThreadIds?: readonly string[]
+  prompt?: string | null
+  model?: string | null
+  reasoningEffort?: string | null
   error?: { message?: string } | null
   /** webSearch */
   query?: string
@@ -103,6 +115,20 @@ export interface WireDelta {
   turnId: string
   itemId: string
   delta: string
+}
+
+export interface WireFilePatch {
+  threadId: string
+  turnId: string
+  itemId: string
+  changes?: readonly WireFileChangeEntry[]
+}
+
+export interface WireMcpProgress {
+  threadId: string
+  turnId: string
+  itemId: string
+  message?: string
 }
 
 /** 统一终端写入成功后的原生通知；空 stdin 表示仍在轮询活着的后台进程。 */
@@ -128,6 +154,14 @@ export interface WireModelVerification {
 export interface WireSafetyBuffering {
   showBufferingUi?: boolean
   fasterModel?: string | null
+}
+
+export interface WireModelRerouted {
+  threadId?: string
+  turnId?: string
+  fromModel?: string
+  toModel?: string
+  reason?: string
 }
 
 export interface WireStrictReview {
@@ -215,6 +249,7 @@ export interface WireApprovalRequest {
   /** 命令审批才有；文件审批的这些字段一律缺席 */
   command?: string | null
   cwd?: string | null
+  networkApprovalContext?: { host?: string; protocol?: string } | null
   /** 文件审批：请求把这个根目录加进可写范围 */
   grantRoot?: string | null
 }
@@ -321,9 +356,8 @@ export interface WireRateLimits {
 /**
  * `mcpServer/startupStatus/updated` 推上来的形状。
  *
- * 实测只见过 `status: "starting" | "ready"`（这台机器 5 个服务器全起来了），
- * 失败态的字面量**没有观察到**，所以判据写成「不是这两个就算失败」——
- * 见 `notify.ts` 的 `onMcpStatus`。
+ * 0.149.0 生成协议明确列出 starting / ready / failed / cancelled；仍保留 string
+ * 是为了升级后未知失败态继续 fail-closed，而不是让能力静默消失。
  */
 export interface WireMcpStatus {
   threadId?: string

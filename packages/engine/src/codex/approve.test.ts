@@ -44,6 +44,11 @@ describe("summarize", () => {
     expect(summarize(FILE, params(), undefined)).toBe("修改文件（详情未送达）")
   })
 
+  it("网络审批按目标主机描述，不拿缺席的 shell 命令冒充详情", () => {
+    const network = params({ networkApprovalContext: { host: "api.example.com", protocol: "https" } })
+    expect(summarize(CMD, network, undefined)).toBe("访问网络 https://api.example.com")
+  })
+
   it("文件审批列出路径，超过三个折叠成计数", () => {
     expect(summarize(FILE, params(), patch)).toBe("修改 /w/a.ts、/outside/b.ts")
   })
@@ -65,6 +70,15 @@ describe("buildRequest", () => {
     const norm = classify(req, "/home/u")
     expect(norm.category).toBe("exec")
     expect(norm.hosts).toEqual(["evil.example.com"])
+  })
+
+  it("原生网络上下文进入 net 分类并保留主机，记忆规则才不会放宽到所有网络", () => {
+    const req = buildRequest(CMD, params({
+      networkApprovalContext: { host: "api.example.com", protocol: "https" },
+    }), undefined, "/w")
+    const norm = classify(req, "/home/u")
+    expect(req.tool).toBe("network")
+    expect(norm).toMatchObject({ category: "net", hosts: ["api.example.com"] })
   })
 })
 

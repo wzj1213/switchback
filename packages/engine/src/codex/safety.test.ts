@@ -22,6 +22,20 @@ function setup(): { ctx: NotifyContext; events: Event[] } {
 }
 
 describe("Codex 原生安全状态", () => {
+  it("模型自动改道同时更新实际选中项并留下原生原因", () => {
+    const { ctx, events } = setup()
+    const settings: unknown[] = []
+    ctx.onSettings = (value) => settings.push(value)
+    handleNotification(ctx, "model/rerouted", {
+      threadId: "codex-thread", turnId: "native-turn",
+      fromModel: "fast", toModel: "safe", reason: "highRiskCyberActivity",
+    })
+    expect(settings).toEqual([{ model: "safe" }])
+    expect(events[0]).toMatchObject({
+      item: { kind: "notice", message: expect.stringContaining("fast 改为 safe") },
+    })
+  })
+
   it("网络安全资质验证只认协议枚举，并在重复通知时原地更新", () => {
     const { ctx, events } = setup()
     handleNotification(ctx, "model/verification", {

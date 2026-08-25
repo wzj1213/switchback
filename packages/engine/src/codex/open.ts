@@ -167,7 +167,7 @@ async function openingThread(ctx: OpenCtx): Promise<unknown> {
  * 分出来的那条归创建它的进程管，而 omni 一个会话一个进程。
  * `thread/unsubscribe` 也不放锁（都实测过）。
  *
- * `dropTurns` 先只读源会话的原生 turn id，再把 `lastTurnId` / `beforeTurnId` 直接交给
+ * `dropTurns` 先只读源会话的原生 turn id，再把 `lastTurnId` 直接交给
  * `thread/fork`：原会话与工作树都不动，新分支从出生起就是目标边界。不能再 fork 后调用
  * `thread/revert`——0.149.0 真机明确拒绝 legacy 历史；更不能吞掉失败冒充剪裁成功。
  *

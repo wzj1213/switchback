@@ -92,6 +92,25 @@ describe("工具类 item", () => {
     expect(events[1]).toMatchObject({ item: { status: "ok" } })
   })
 
+  it("WebSearch 等没有 status 字段的原生工具在 completed 时也会收工", () => {
+    const { ctx, events } = setup()
+    const search: WireItem = { type: "webSearch", id: "web", query: "official docs" }
+    handleNotification(ctx, "item/started", lifecycle(search))
+    handleNotification(ctx, "item/completed", lifecycle(search))
+    expect(events[0]).toMatchObject({ item: { status: "running" } })
+    expect(events[1]).toMatchObject({ item: { status: "ok" } })
+  })
+
+  it("MCP 最终结果进入工具详情，不再只有输入没有产出", () => {
+    const { ctx, events } = setup()
+    const started: WireItem = { type: "mcpToolCall", id: "mcp", server: "docs", tool: "read" }
+    handleNotification(ctx, "item/started", lifecycle(started))
+    handleNotification(ctx, "item/completed", lifecycle({
+      ...started, status: "completed", result: { content: [{ type: "text", text: "done" }] },
+    }))
+    expect(events.at(-1)).toMatchObject({ item: { status: "ok", detail: { output: { content: expect.any(Array) } } } })
+  })
+
   it("在途表在 started 时记下、completed 时清掉——审批要靠它说清批准的是什么", () => {
     const { ctx } = setup()
     handleNotification(ctx, "item/started", lifecycle(exec))
@@ -512,9 +531,14 @@ describe("MCP 服务器起不来：静默的能力损失必须出声", () => {
     expect(report({ name: "doc-manager", status: "starting" })).toEqual([])
   })
 
-  it("**没见过的 status 一律当失败**——失败态的字面量没实测到，猜错了就是永远不报警", () => {
+  it("生成协议里的 failed 明确按能力降级报告", () => {
     const [e] = report({ name: "doc-manager", status: "failed" })
     expect(e).toMatchObject({ type: "engine.status", status: "degraded" })
+  })
+
+  it("授权过期给出可执行的重连提示", () => {
+    const [e] = report({ name: "docs", status: "failed", failureReason: "reauthenticationRequired" })
+    expect(e?.type === "engine.status" ? e.detail : "").toContain("重新连接")
   })
 
   it("**`cancelled` 不算失败**——实测一次启动五台同时报它，而那几台后来都好好的", () => {

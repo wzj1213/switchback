@@ -55,22 +55,28 @@
   - `rpc.ts` 分帧与请求关联。纯粹字节进字节出，不碰子进程，
     所以没装 codex 的机器上也能跑测试
   - `wire.ts` 线上类型的窄声明（权威定义用 `codex app-server generate-ts` 自己生成）
-  - `translate.ts` / `notify.ts` 通知 → 事件
+  - `translate.ts` / `notify.ts` 通知 → 事件；文件 patch 与 MCP progress 原地更新，
+    没有 status 的工具以 completed 生命周期收口，模型安全改道同步当前设置
   - `approve.ts` 精确路由 app-server 反向 RPC；`permissions.ts` 把额外网络/文件 profile
     请求单独翻译成 `@omni/approval`，并按要求回 `{permissions, scope}`
   - `user-input.ts` 把原生选项、备注、自由回答与密文标记翻成宿主问题卡，再按 Codex
-    的 label / `user_note:` 数组回送；非阻塞问题按同版本 TUI 的 120 秒策略自动跳过
+    的 label / `user_note:` 数组回送；非阻塞问题采用原生 `autoResolutionMs`，缺席才回落 120 秒
   - `server-requests.ts` 持有每条反向 RPC 的取消柄；对端 `serverRequest/resolved`、进程退出
     或会话释放时撤销宿主等待，压掉迟到回包
   - `skill-catalog.ts` 以当前工作区读取原生 skill；`skills/changed` 到达后强制重扫并整表替换
     斜杠目录，连续通知只采用最后一份回包
   - `warnings.ts` 保留运行、安全守护、配置与弃用警告原文；轮次内落提示 item，开场落会话横幅
-  - `safety.ts` 显示安全缓冲、严格复核与网络安全资质验证；更快模型建议保留原生型号
+  - `safety.ts` 显示安全缓冲、严格复核、网络安全资质验证与模型安全改道；保留原生型号和原因
   - `hooks.ts` 配对原生 Hook 起止：快速无输出成功保持安静，慢任务与原始结果留在所属轮次
   - `terminal.ts` 把后台终端轮询与 stdin 写入并回原命令；等待态实时显示，输入在终态后仍留痕
   - `goal.ts` 校验并翻译原生长期目标完整快照；清空与恢复快照通过会话回调交给宿主落盘
   - `compaction.ts` 让手动压缩占住宿主轮次；稳定的 contextCompaction item 落原生提示
-  - `fork.ts` 读取原生 turn id，把历史边界直接交给 `thread/fork`；不再二次调用弃用的 rollback
+  - `fork.ts` 用 `thread/read(includeTurns)` 读取原生 turn id，把边界前最后一轮交给
+    `thread/fork.lastTurnId`；公开协议无法表达首轮之前，宿主将其建成诚实的空白分支
+  - `model-catalog.ts` 追完 `model/list` 游标，去重隐藏项并按目标模型校验推理强度；
+    input modalities 随模型目录交给桌面约束附件入口
+  - `account.ts` 用公开 `account/read` 探测登录态；MCP 状态区分 ready / failed / cancelled
+    与 reauthenticationRequired，不把单个服务失败冒充整台引擎失败
   - `history.ts` 消费 `thread/resume` 已返回的完整 turns：恢复用户图片、回答、推理、工具和
     原生失败，过滤空推理与内部活动帧；超长会话留最近 1500 条并把真实总数交给宿主提示
   - 任意信任档切换时返回“需重启”，由宿主续接同一 native thread 重建原生沙箱与评审器

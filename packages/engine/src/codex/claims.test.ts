@@ -47,7 +47,7 @@ describe("omni 认领了 codex 的哪些实验面", () => {
 
   it("握手发出去的就是这张表，不许另写一份", () => {
     expect(claimedCapabilities()).toEqual(
-      Object.fromEntries(Object.keys(CLAIMS).map((k) => [k, true])),
+      { ...Object.fromEntries(Object.keys(CLAIMS).map((k) => [k, true])), requestAttestation: false },
     )
     // 空表要发空对象而不是 null——`null` 和「什么都不认领」在协议上不是一回事
     expect(typeof claimedCapabilities()).toBe("object")

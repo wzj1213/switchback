@@ -45,6 +45,12 @@ export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork"
   await branch(ctx, entry, { to: cmd.to, label: cmd.to })
 }
 
+/** `draft` 是重来后交还给输入框的原话，不会注入引擎上下文。 */
+interface BranchOptions {
+  to: string; upTo?: string; label: string
+  draft?: { text: string; attachments?: readonly string[] }
+}
+
 async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly Event[]> {
   if (entry.turn !== undefined) throw new Error("当前轮次尚未结束，不能分叉或从历史轮次重来")
   if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
@@ -65,26 +71,16 @@ async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly
 async function branch(
   ctx: Ctx,
   entry: Live,
-  opts: {
-    to: string
-    upTo?: string
-    label: string
-    /** 岔出来之后放进输入框的话。见 `thread.rewind` 的 `draft`。 */
-    draft?: { text: string; attachments?: readonly string[] }
-  },
+  opts: BranchOptions,
 ): Promise<void> {
   const events = await stableEvents(ctx, entry, opts.to)
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
-  const items = opts.upTo === undefined ? all : until(all, opts.upTo)
-  const plan = forkPlan(entry, opts.to, all, items)
-  if (opts.upTo !== undefined && plan === undefined) {
-    throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
-  }
+  const launchOptions = derivedPlan(entry, opts, all)
   const at = ctx.deps.now()
   const thread = bornOf(ctx, entry, {
     to: opts.to,
     label: opts.label,
-    kept: items.length,
+    kept: launchOptions.items.length,
     at,
     ...(opts.draft === undefined ? {} : { draft: opts.draft }),
   })
@@ -94,15 +90,8 @@ async function branch(
   // 引擎可能在 start() 内就上报状态；出生事件必须排在所有这类回调前面，
   // 否则首次提交后的 journal 会变成“先有状态，后有会话”。
   emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
-  let launched: Awaited<ReturnType<typeof launchDerived>>
-  try {
-    launched = await launchDerived(ctx, thread, { ...(plan === undefined ? {} : { plan }), allowBlank: opts.upTo === undefined, items })
-  } catch (error) {
-    // 后一条临时会话已经取代这条尚未出生的分叉，是正常取消，不冒伪失败横幅。
-    if (ctx.removed.has(thread.id)) return
-    emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
-    throw error
-  }
+  const launched = await startDerived(ctx, thread, launchOptions)
+  if (launched === undefined) return
   const { early } = launched
   // launch 已经挂上新引擎能力；用更新事件把 starting 壳落成可用会话。
   const current = ctx.live.get(thread.id)
@@ -144,6 +133,7 @@ function until(items: readonly Item[], turnId: string): readonly Item[] {
 /**
  * 试着让引擎自己复制一份会话。普通分叉失败时可以退回空白分支；
  * “从这里重来”不能退，因为它承诺保留指定轮次之前的上下文。
+ * 唯一例外是第一轮之前：那里本来就没有上下文，空白分支就是准确结果。
  *
  * ## 为什么值得多这一条路
  *
@@ -163,6 +153,37 @@ interface DerivedLaunchPlan {
   items: readonly Item[]
 }
 interface NativeDerivedLaunchPlan extends DerivedLaunchPlan { plan: NativeForkPlan }
+
+function derivedPlan(entry: Live, opts: BranchOptions, all: readonly Item[]): DerivedLaunchPlan {
+  const items = opts.upTo === undefined ? all : until(all, opts.upTo)
+  // 第一轮之前没有任何上下文可保留，也没有公开协议能表达“在首轮之前 fork”。
+  // 这时开同工作区的空白分支就是动作的精确定义，不需要伪造 beforeTurnId。
+  const blankRewind = opts.upTo !== undefined && items.length === 0
+  const plan = blankRewind ? undefined : forkPlan(entry, opts.to, all, items)
+  if (opts.upTo !== undefined && !blankRewind && plan === undefined) {
+    throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
+  }
+  return {
+    ...(plan === undefined ? {} : { plan }),
+    allowBlank: opts.upTo === undefined || blankRewind,
+    items,
+  }
+}
+
+async function startDerived(
+  ctx: Ctx,
+  thread: Thread,
+  options: DerivedLaunchPlan,
+): Promise<Awaited<ReturnType<typeof launchDerived>> | undefined> {
+  try {
+    return await launchDerived(ctx, thread, options)
+  } catch (error) {
+    // 后一条临时会话已经取代这条尚未出生的分叉，是正常取消，不冒伪失败横幅。
+    if (ctx.removed.has(thread.id)) return undefined
+    emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
+    throw error
+  }
+}
 
 function forkPlan(
   entry: Live,

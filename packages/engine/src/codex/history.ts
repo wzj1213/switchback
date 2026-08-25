@@ -15,6 +15,7 @@ export interface CodexHistoryTurn {
 
 export interface CodexHistoryThread {
   id?: string
+  path?: string | null
   turns?: readonly CodexHistoryTurn[]
 }
 

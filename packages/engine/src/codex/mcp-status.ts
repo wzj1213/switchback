@@ -16,6 +16,9 @@ function mcpFailure(params: WireMcpStatus): string | undefined {
   const status = params.status ?? ""
   // `cancelled` 常常带着 `failureReason`，所以状态判断要在原因之前
   if (MCP_FINE.has(status)) return undefined
+  if (params.failureReason === "reauthenticationRequired") {
+    return "授权已失效，需要重新连接这台 MCP 服务器"
+  }
   const detail = params.failureReason ?? params.error
   if (detail !== undefined && detail !== null) {
     return typeof detail === "string" ? detail : JSON.stringify(detail)

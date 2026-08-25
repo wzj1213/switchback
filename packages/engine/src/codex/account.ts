@@ -26,13 +26,13 @@ export function reportAccount(
   emit: (event: Event) => void,
 ): void {
   void rpc
-    .call("account/rateLimits/read", {})
+    .call("account/rateLimits/read")
     .then((raw) => {
       emitLimits(emit, (raw as { rateLimits?: WireRateLimits } | undefined)?.rateLimits, "snapshot")
     })
     .catch(() => undefined)
   void rpc
-    .call("getAuthStatus", {})
+    .call("account/read", { refreshToken: false })
     .then((raw) => {
       const why = notSignedIn(raw)
       if (why !== undefined) status("degraded", why)
@@ -43,14 +43,12 @@ export function reportAccount(
 /**
  * 没登录吗。
  *
- * 判据是实测出来的（拿一个空的 `CODEX_HOME` 模拟登出）：
- * 登录时 `authMethod: "chatgpt"`，登出时 `authMethod: null`，
- * 而 `requiresOpenaiAuth` **两种情况都是 true**——所以不能只看后者。
+ * 0.149.0 的公开 v2 形状：登录态在 `account`，登出是 null；
+ * `requiresOpenaiAuth` 只说明这套 provider 是否要求 OpenAI 登录。
  */
 function notSignedIn(raw: unknown): string | undefined {
-  const auth = raw as { authMethod?: string | null; requiresOpenaiAuth?: boolean } | undefined
+  const auth = raw as { account?: unknown; requiresOpenaiAuth?: boolean } | undefined
   if (auth?.requiresOpenaiAuth !== true) return undefined
-  const method = auth.authMethod
-  if (method !== null && method !== undefined && method !== "") return undefined
+  if (auth.account !== null && auth.account !== undefined) return undefined
   return "codex 还没登录，这个会话发什么都会失败。在终端里跑 `codex login`，然后重开一个会话。"
 }

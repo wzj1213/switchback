@@ -129,6 +129,14 @@ export function userInputResponse(response: QuestionResponse): unknown {
   }
 }
 
+function timeoutOf(params: WireUserInputRequest): number | undefined {
+  if (params.isBlocking !== false) return undefined
+  const native = params.autoResolutionMs
+  return typeof native === "number" && Number.isInteger(native) && native >= 0
+    ? native
+    : NON_BLOCKING_TIMEOUT_MS
+}
+
 /** 结构化问题只走原生 RPC 回包，不转成一条新的模型提示。 */
 export async function answerUserInput(call: ServerCall, deps: UserInputDeps): Promise<void> {
   const params = call.params as WireUserInputRequest
@@ -137,7 +145,7 @@ export async function answerUserInput(call: ServerCall, deps: UserInputDeps): Pr
     call.respond({ answers: {} })
     return
   }
-  const timeoutMs = params.isBlocking === false ? NON_BLOCKING_TIMEOUT_MS : undefined
+  const timeoutMs = timeoutOf(params)
   const response = await deps.askQuestion(prompts, {
     ...(deps.signal === undefined ? {} : { signal: deps.signal }),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),

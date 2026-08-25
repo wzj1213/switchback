@@ -76,6 +76,7 @@ export interface WireModel {
   hidden?: boolean
   supportedReasoningEfforts?: readonly (string | { reasoningEffort?: string })[]
   defaultReasoningEffort?: string
+  inputModalities?: readonly string[]
   /** 引擎自己认的默认模型。实测 `gpt-5.6-sol` 上是 true。 */
   isDefault?: boolean
 }
@@ -94,12 +95,16 @@ export function toModelOption(raw: WireModel): ModelOption {
     .map(effortOf)
     .filter((e): e is string => e !== undefined)
   const id = raw.id ?? raw.model ?? ""
+  const inputModalities = (raw.inputModalities ?? [])
+    .filter((entry): entry is "text" | "image" | "audio" =>
+      entry === "text" || entry === "image" || entry === "audio")
   return {
     id,
     label: raw.displayName ?? id,
     ...(raw.description === undefined ? {} : { description: raw.description }),
     ...(efforts.length === 0 ? {} : { efforts }),
     ...(raw.defaultReasoningEffort === undefined ? {} : { defaultEffort: raw.defaultReasoningEffort }),
+    ...(raw.inputModalities === undefined ? {} : { inputModalities }),
     ...(raw.isDefault === true ? { isDefault: true } : {}),
   }
 }
@@ -112,7 +117,7 @@ export function toModelOption(raw: WireModel): ModelOption {
 const TITLE_MAX = 60
 
 /** 最多带回来这么多条。列表有 cursor，但侧栏里的一段不该是无底洞。 */
-const HISTORY_MAX = 40
+export const CODEX_HISTORY_LIMIT = 40
 
 interface WireThreadRow {
   id?: string
@@ -139,7 +144,7 @@ export function toEngineThreads(raw: unknown): readonly EngineThread[] {
       // codex 报的是**秒**（和 rateLimits 的 resetsAt 同一个坑）
       updatedAt: (row.updatedAt ?? row.recencyAt ?? 0) * 1000,
     })
-    if (out.length >= HISTORY_MAX) break
+    if (out.length >= CODEX_HISTORY_LIMIT) break
   }
   return out
 }

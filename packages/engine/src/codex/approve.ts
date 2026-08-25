@@ -33,6 +33,25 @@ function pathsOf(item: WireItem | undefined): readonly string[] {
   return (item?.changes ?? []).map((c) => c.path).filter((p) => p !== "")
 }
 
+function networkArgs(params: WireApprovalRequest): Record<string, unknown> {
+  const network = params.networkApprovalContext
+  return { host: network?.host ?? "", protocol: network?.protocol ?? "" }
+}
+
+function shellArgs(params: WireApprovalRequest, item: WireItem | undefined): Record<string, unknown> {
+  const args: Record<string, unknown> = { command: params.command ?? item?.command ?? "" }
+  if (params.cwd !== undefined && params.cwd !== null) args["cwd"] = params.cwd
+  return args
+}
+
+function fileArgs(params: WireApprovalRequest, item: WireItem | undefined): Record<string, unknown> {
+  const paths = pathsOf(item)
+  const args: Record<string, unknown> = { paths }
+  if (paths[0] !== undefined) args["path"] = paths[0]
+  if (params.grantRoot !== undefined && params.grantRoot !== null) args["grantRoot"] = params.grantRoot
+  return args
+}
+
 /**
  * 判定用的参数。
  *
@@ -40,37 +59,46 @@ function pathsOf(item: WireItem | undefined): readonly string[] {
  * 「写到工作区外」这类红线漏掉后面的路径。`classify` 认这个键。
  */
 function argsOf(method: string, params: WireApprovalRequest, item: WireItem | undefined): Record<string, unknown> {
-  if (toolOf(method) === "shell") {
-    const command = params.command ?? item?.command ?? ""
-    return { command, ...(params.cwd === undefined || params.cwd === null ? {} : { cwd: params.cwd }) }
-  }
-  const paths = pathsOf(item)
-  return {
-    paths,
-    ...(paths[0] === undefined ? {} : { path: paths[0] }),
-    ...(params.grantRoot === undefined || params.grantRoot === null ? {} : { grantRoot: params.grantRoot }),
-  }
+  if (params.networkApprovalContext !== undefined && params.networkApprovalContext !== null) return networkArgs(params)
+  return toolOf(method) === "shell" ? shellArgs(params, item) : fileArgs(params, item)
 }
 
 const MAX_FILES = 3
+
+function reasonOf(reason: string | null | undefined): string {
+  return reason === undefined || reason === null ? "" : ` （${sanitize(reason)}）`
+}
+
+function networkSummary(params: WireApprovalRequest): string {
+  const network = params.networkApprovalContext
+  const target = `${sanitize(network?.protocol ?? "network")}://${sanitize(network?.host ?? "目标未送达")}`
+  return `访问网络 ${target}`
+}
+
+function shellSummary(params: WireApprovalRequest, item: WireItem | undefined): string {
+  const command = params.command ?? item?.command
+  return command === undefined ? "执行命令（详情未送达）" : `执行 ${sanitize(command)}`
+}
+
+function fileSummary(item: WireItem | undefined): string {
+  const paths = pathsOf(item)
+  if (paths.length === 0) return "修改文件（详情未送达）"
+  const shown = paths.slice(0, MAX_FILES).map((path) => sanitize(path)).join("、")
+  const more = paths.length > MAX_FILES ? ` 等 ${String(paths.length)} 个文件` : ""
+  return `修改 ${shown}${more}`
+}
 
 /**
  * 给人看的一句话。**说不清楚就要说自己说不清楚**——
  * 一张写着「批准吗？」却不说批准什么的卡片，比不弹卡片更糟。
  */
 export function summarize(method: string, params: WireApprovalRequest, item: WireItem | undefined): string {
-  const reason = params.reason === undefined || params.reason === null ? "" : ` （${sanitize(params.reason)}）`
-  if (toolOf(method) === "shell") {
-    const command = params.command ?? item?.command
-    return command === undefined
-      ? `执行命令（详情未送达）${reason}`
-      : `执行 ${sanitize(command)}${reason}`
+  const reason = reasonOf(params.reason)
+  if (params.networkApprovalContext !== undefined && params.networkApprovalContext !== null) {
+    return `${networkSummary(params)}${reason}`
   }
-  const paths = pathsOf(item)
-  if (paths.length === 0) return `修改文件（详情未送达）${reason}`
-  const shown = paths.slice(0, MAX_FILES).map((p) => sanitize(p)).join("、")
-  const more = paths.length > MAX_FILES ? ` 等 ${String(paths.length)} 个文件` : ""
-  return `修改 ${shown}${more}${reason}`
+  const summary = toolOf(method) === "shell" ? shellSummary(params, item) : fileSummary(item)
+  return `${summary}${reason}`
 }
 
 export function buildRequest(
@@ -81,7 +109,9 @@ export function buildRequest(
 ): ApprovalRequest {
   return {
     engine: "codex",
-    tool: toolOf(method),
+    tool: params.networkApprovalContext === undefined || params.networkApprovalContext === null
+      ? toolOf(method)
+      : "network",
     args: argsOf(method, params, item),
     cwd,
     summary: summarize(method, params, item),
@@ -164,7 +194,7 @@ export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promis
   }
   const ask = {
     toolCallId: params.itemId,
-    tool: toolOf(call.method),
+    tool: request.tool,
     summary: request.summary ?? toolOf(call.method),
     reason: verdict.reason,
     ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),

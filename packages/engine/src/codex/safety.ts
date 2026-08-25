@@ -1,5 +1,5 @@
 import type { Event, ItemId, NoticeLevel, TurnId, TurnStatus } from "@omni/protocol"
-import type { WireModelVerification, WireSafetyBuffering, WireStrictReview } from "./wire.js"
+import type { WireModelRerouted, WireModelVerification, WireSafetyBuffering, WireStrictReview } from "./wire.js"
 
 export interface SafetyContext {
   emit: (event: Event) => void
@@ -36,6 +36,16 @@ export function onModelVerification(ctx: SafetyContext, params: WireModelVerific
     "这段会话多次触发了可能的网络安全风险标记，因此 Codex 已启用额外安全检查，响应可能更慢。如需进行经授权的安全工作，可申请 Trusted Access for Cyber：https://chatgpt.com/cyber",
     "warning",
   )
+}
+
+/** 引擎明确改道时同步留痕；实际选中模型由通知层回写，不让选择器继续显示旧值。 */
+export function onModelRerouted(ctx: SafetyContext, params: WireModelRerouted): void {
+  const turnId = ctx.turnId()
+  const from = params.fromModel?.trim()
+  const to = params.toModel?.trim()
+  if (turnId === undefined || from === undefined || from === "" || to === undefined || to === "") return
+  const reason = params.reason === "highRiskCyberActivity" ? "（触发网络安全风险检查）" : ""
+  upsert(ctx, `codex-model-rerouted-${turnId}`, `Codex 已将模型从 ${from} 改为 ${to}${reason}。`, "warning")
 }
 
 export function onStrictReview(ctx: SafetyContext, params: WireStrictReview): void {

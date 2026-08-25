@@ -53,6 +53,13 @@ export function createServerRequests(deps: ServerRequestDeps): ServerRequests {
     }
     try {
       await answerApproval(guarded, { ...deps, signal: controller.signal })
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        guarded.reject({
+          code: -32603,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
     } finally {
       if (pending.get(key) === controller) pending.delete(key)
     }

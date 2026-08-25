@@ -20,9 +20,9 @@ import { fakeDriver, create } from "./host-fixture.js"
  * 「⌘R 之后旁路还在」是发布说明里写给用户的一句话，得有东西钉着它。
  */
 describe("旁路从驱动到磁盘再回到界面", () => {
-  const dirs: string[] = []
+  const cleanups: (() => Promise<void>)[] = []
   afterEach(async () => {
-    await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })))
+    await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()))
   })
 
   /** 引擎侧原样的一条：id 是它自己的 `task_id`，形状同 `toLane` 的产物。 */
@@ -44,8 +44,12 @@ describe("旁路从驱动到磁盘再回到界面", () => {
 
   async function rig(): Promise<{ events: Event[]; read: () => Promise<readonly Event[]>; threadId: string; emit: (e: Event) => void }> {
     const dir = await mkdtemp(join(tmpdir(), "omni-lane-"))
-    dirs.push(dir)
     const journal = createJournal({ dir })
+    // 宿主写日志是故意不阻塞事件出口的；清理必须先等队列排空，否则 rm 会和 append 竞速。
+    cleanups.push(async () => {
+      await journal.flush()
+      await rm(dir, { recursive: true, force: true })
+    })
     const { driver, session } = fakeDriver()
     const events: Event[] = []
     const counter = { n: 0 }

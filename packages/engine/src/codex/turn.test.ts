@@ -23,6 +23,11 @@ function setup(call: StartTurnContext["call"]): StartTurnContext & { failures: s
 }
 
 describe("Codex 开轮次", () => {
+  it("纯图片消息不夹一块空文本，纯文本仍带协议要求的 text_elements", () => {
+    expect(inputItems("", ["/tmp/a.png"])).toEqual([{ type: "localImage", path: "/tmp/a.png" }])
+    expect(inputItems("做事")).toEqual([{ type: "text", text: "做事", text_elements: [] }])
+  })
+
   it("turn/start 失败会同步收掉宿主轮次，再把原错误抛回去", async () => {
     const ctx = setup(() => Promise.reject(new Error("上游拒绝")))
     await expect(startTurn(ctx, "做事", "turn-1")).rejects.toThrow("上游拒绝")

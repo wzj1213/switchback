@@ -4,6 +4,7 @@ import { Composer, TRUSTS, labelOf } from "./Composer.js"
 import { trustBlind, trustHint } from "../trustHint.js"
 import type { OmniAction } from "../omniCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
+import { modelAcceptsImages } from "../model-options.js"
 
 /**
  * 把 `Thread` 上十几个字段翻成输入区要的 props。
@@ -67,7 +68,8 @@ export function WorkspaceComposer({
       stamp={stamp}
       searchFiles={props.searchFiles}
       prefill={prefill}
-      canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments}
+      canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments &&
+        modelAcceptsImages(props.models, thread.model)}
       canSteer={(thread.capabilities ?? NO_CAPABILITIES).steer}
       commands={[...actions.map((a) => a.command), ...props.commands]}
       onOmni={(name: string) => {

@@ -51,7 +51,7 @@ export async function startTurn(
 /** 开一轮与中途改向必须发送同一种输入项形状。 */
 export function inputItems(text: string, attachments?: readonly string[]): readonly unknown[] {
   return [
-    { type: "text", text, text_elements: [] },
+    ...(text === "" ? [] : [{ type: "text", text, text_elements: [] }]),
     ...(attachments ?? []).map((path) => ({ type: "localImage", path })),
   ]
 }

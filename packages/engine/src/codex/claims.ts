@@ -38,15 +38,18 @@ export interface Claim {
 
 export const CLAIMS: Readonly<Record<string, Claim>> = {
   experimentalApi: {
-    why: "换 `thread/settings/updated` 的原生档位回读、`item/tool/requestUserInput` 的结构化问题、严格安全复核提示，以及从首轮之前重来所需的 `thread/fork.beforeTurnId` 与分页历史读取。它们都有现成产品落点；不认领才会把引擎能力伪装成空白。",
+    why: "换 `thread/settings/updated` 的原生档位回读、`item/tool/requestUserInput` 的结构化问题与严格安全复核提示。它们都有现成产品落点；不认领才会把引擎能力伪装成空白。",
     buys: ["thread/settings/updated", "autoApprovalReview/strictReviewRequired"],
     requests: ["item/tool/requestUserInput"],
-    methods: ["thread/fork.beforeTurnId", "thread/turns/list"],
-    checked: "openai/codex rust-v0.149.0（2026-08-24）：生成协议与 app-server README 均将 requestUserInput 标为 experimental；原生 TUI 源码确认问答语义。档位通知有 capability A/B 实跑；历史分叉 live 确认 lastTurnId 保留前一轮、排除后一轮，beforeTurnId 与 turns/list 由同版本生成契约和定向回归锁定；严格复核通知由同版本 capability 过滤器、app-server guardian 测试与 TUI 警告用例锁定。",
+    checked: "openai/codex rust-v0.149.0（2026-08-25）：本机 generate-ts 与官方 app-server 文档核对；requestUserInput、档位通知与严格复核均有定向回归。分叉只使用稳定的 thread/read(includeTurns) 与 thread/fork.lastTurnId，不再认领 schema 中不存在的实验字段。",
   },
 }
 
 /** 握手时真正发出去的那个对象。**只有这一个来源**，代码不许另写一份。 */
 export function claimedCapabilities(): Readonly<Record<string, boolean>> {
-  return Object.fromEntries(Object.keys(CLAIMS).map((name) => [name, true]))
+  return {
+    ...Object.fromEntries(Object.keys(CLAIMS).map((name) => [name, true])),
+    // 0.149.0 的 InitializeCapabilities 已把它列为必填；omni 不代管上游凭据证明。
+    requestAttestation: false,
+  }
 }

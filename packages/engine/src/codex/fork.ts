@@ -9,9 +9,8 @@ interface WireTurn {
   id?: unknown
 }
 
-interface WireTurnPage {
-  data?: unknown
-  nextCursor?: unknown
+interface WireThreadRead {
+  thread?: { turns?: unknown }
 }
 
 function turnId(turns: readonly WireTurn[], index: number): string {
@@ -24,21 +23,17 @@ async function boundary(
   call: RpcPeer["call"],
   threadId: string,
   count: number,
-): Promise<{ lastTurnId: string } | { beforeTurnId: string }> {
+): Promise<{ lastTurnId: string }> {
   if (!Number.isInteger(count) || count < 1) throw new Error(`无效的 Codex 历史移除轮数：${String(count)}`)
-  const raw = await call("thread/turns/list", {
-    threadId,
-    limit: count + 1,
-    sortDirection: "desc",
-    itemsView: "notLoaded",
-  }) as WireTurnPage
-  const turns: readonly WireTurn[] = Array.isArray(raw.data) ? raw.data : []
-  if (turns.length < count) {
+  const raw = await call("thread/read", { threadId, includeTurns: true }) as WireThreadRead
+  const turns: readonly WireTurn[] = Array.isArray(raw.thread?.turns) ? raw.thread.turns : []
+  if (turns.length <= count) {
+    if (turns.length === count) {
+      throw new Error("Codex 的公开分叉协议不能从第一轮之前创建空历史分支")
+    }
     throw new Error(`Codex 源会话只有 ${String(turns.length)} 轮，无法从末尾移除 ${String(count)} 轮`)
   }
-  if (turns.length > count) return { lastTurnId: turnId(turns, count) }
-  if (raw.nextCursor !== null) throw new Error("Codex 没有返回待保留轮次的分页边界")
-  return { beforeTurnId: turnId(turns, turns.length - 1) }
+  return { lastTurnId: turnId(turns, turns.length - count - 1) }
 }
 
 function forkId(raw: unknown): string {

@@ -1,6 +1,7 @@
 import type { ModelOption } from "@omni/protocol"
 import { SparkIcon } from "./icons.js"
 import { Select, type Section } from "./Select.js"
+import { currentModel } from "../model-options.js"
 
 /**
  * 模型与推理强度。
@@ -111,7 +112,7 @@ export function currentOf(
   models: readonly ModelOption[],
   model: string | undefined,
 ): ModelOption | undefined {
-  return models.find((m) => m.id === model) ?? models.find((m) => m.isDefault === true) ?? models[0]
+  return currentModel(models, model)
 }
 
 /**

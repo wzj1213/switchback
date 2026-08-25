@@ -83,4 +83,11 @@ describe("Codex 反向 RPC 生命周期", () => {
     await answering
     expect(row.replies).toEqual([])
   })
+
+  it("宿主交互异常会回 JSON-RPC 错误，不留下未处理拒绝并让整轮永远等待", async () => {
+    const row = pendingQuestion()
+    const server = requests(() => Promise.reject(new Error("交互面板失效")))
+    await server.answer(row.call)
+    expect(row.replies).toEqual([{ error: { code: -32603, message: "交互面板失效" } }])
+  })
 })

@@ -5,10 +5,13 @@ import { onPlanUpdate } from "./plan.js"
 import type {
   WireDelta,
   WireError,
+  WireFilePatch,
   WireGoalUpdated,
   WireHookLifecycle,
   WireItem,
   WireItemLifecycle,
+  WireMcpProgress,
+  WireModelRerouted,
   WireModelVerification,
   WirePlanUpdate,
   WireRateLimits,
@@ -22,12 +25,13 @@ import type {
 } from "./wire.js"
 import { emitLimits } from "./limits.js"
 import { emitCodexWarning } from "./warnings.js"
-import { finishSafetyBuffering, onModelVerification, onSafetyBuffering, onStrictReview } from "./safety.js"
+import { finishSafetyBuffering, onModelRerouted, onModelVerification, onSafetyBuffering, onStrictReview } from "./safety.js"
 import type { HookTracker } from "./hooks.js"
 import { onMcpStatus } from "./mcp-status.js"
 import { onTerminalInteraction, retainTerminalInputs } from "./terminal.js"
 import { onUsage } from "./usage.js"
 import { goalOf } from "./goal.js"
+import { onFilePatch, onMcpProgress, retainProgress } from "./item-progress.js"
 
 /**
  * codex 通知 → omni 事件。
@@ -114,7 +118,8 @@ function onItemStarted(ctx: NotifyContext, params: WireItemLifecycle): void {
 
 function onItemCompleted(ctx: NotifyContext, params: WireItemLifecycle): void {
   const turnId = ctx.turnId()
-  const item = retainTerminalInputs(params.item, ctx.inflight.get(params.item.id))
+  const active = ctx.inflight.get(params.item.id)
+  const item = retainProgress(retainTerminalInputs(params.item, active), active)
   ctx.inflight.delete(params.item.id)
   ctx.streamed.delete(params.item.id)
   if (turnId === undefined) return
@@ -166,6 +171,8 @@ export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnSt
   }
   ctx.inflight.clear()
   ctx.streamed.clear()
+  // item id 只需在一轮内去重；跨轮保留会让长会话的集合无界增长。
+  ctx.materialized.clear()
 }
 
 function closeTool(item: ToolCallItem, status: TurnStatus): ToolCallItem {
@@ -264,94 +271,49 @@ function turnOf(params: unknown): string | undefined {
 
 /** 方法表让新增通知保持平坦；线上参数先以 unknown 进入各自边界。 */
 const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) => void>> = {
-  "item/started": (ctx, p) => {
-    onItemStarted(ctx, p as WireItemLifecycle)
-  },
-  "item/completed": (ctx, p) => {
-    onItemCompleted(ctx, p as WireItemLifecycle)
-  },
-  "item/agentMessage/delta": (ctx, p) => {
-    onDelta(ctx, p as WireDelta)
-  },
-  "item/reasoning/summaryTextDelta": (ctx, p) => {
-    onDelta(ctx, p as WireDelta)
-  },
-  "item/reasoning/summaryPartAdded": (ctx, p) => {
-    onReasoningPart(ctx, p as WireReasoningPart)
-  },
-  "item/reasoning/textDelta": (ctx, p) => {
-    onDelta(ctx, p as WireDelta)
-  },
-  "item/commandExecution/outputDelta": (ctx, p) => {
-    onOutputDelta(ctx, p as WireDelta)
-  },
-  "item/commandExecution/terminalInteraction": (ctx, p) => {
-    onTerminalInteraction(ctx, p as WireTerminalInteraction)
-  },
-  "thread/tokenUsage/updated": (ctx, p) => {
-    onUsage(ctx, p as WireTokenUsage)
-  },
-  "turn/completed": (ctx, p) => {
-    onTurnCompleted(ctx, p as WireTurnLifecycle)
-  },
-  "hook/started": (ctx, p) => {
-    ctx.hooks?.started(p as WireHookLifecycle)
-  },
-  "hook/completed": (ctx, p) => {
-    ctx.hooks?.completed(p as WireHookLifecycle)
-  },
-  "account/rateLimits/updated": (ctx, p) => {
-    onLimits(ctx, p as { rateLimits?: WireRateLimits })
-  },
-  "mcpServer/startupStatus/updated": (ctx, p) => {
-    onMcpStatus(ctx, p)
-  },
-  error: (ctx, p) => {
-    onError(ctx, p as WireError)
-  },
+  "item/started": (ctx, p) => onItemStarted(ctx, p as WireItemLifecycle),
+  "item/completed": (ctx, p) => onItemCompleted(ctx, p as WireItemLifecycle),
+  "item/agentMessage/delta": (ctx, p) => onDelta(ctx, p as WireDelta),
+  "item/reasoning/summaryTextDelta": (ctx, p) => onDelta(ctx, p as WireDelta),
+  "item/reasoning/summaryPartAdded": (ctx, p) => onReasoningPart(ctx, p as WireReasoningPart),
+  "item/reasoning/textDelta": (ctx, p) => onDelta(ctx, p as WireDelta),
+  "item/commandExecution/outputDelta": (ctx, p) => onOutputDelta(ctx, p as WireDelta),
+  "item/commandExecution/terminalInteraction": (ctx, p) => onTerminalInteraction(ctx, p as WireTerminalInteraction),
+  "item/fileChange/patchUpdated": (ctx, p) => onFilePatch(ctx, p as WireFilePatch),
+  "item/mcpToolCall/progress": (ctx, p) => onMcpProgress(ctx, p as WireMcpProgress),
+  "thread/tokenUsage/updated": (ctx, p) => onUsage(ctx, p as WireTokenUsage),
+  "turn/completed": (ctx, p) => onTurnCompleted(ctx, p as WireTurnLifecycle),
+  "hook/started": (ctx, p) => ctx.hooks?.started(p as WireHookLifecycle),
+  "hook/completed": (ctx, p) => ctx.hooks?.completed(p as WireHookLifecycle),
+  "account/rateLimits/updated": (ctx, p) => onLimits(ctx, p as { rateLimits?: WireRateLimits }),
+  "mcpServer/startupStatus/updated": (ctx, p) => onMcpStatus(ctx, p),
+  error: (ctx, p) => onError(ctx, p as WireError),
   // **codex 唯一会主动说「我现在是什么档」的通知**，藏在实验面后面（见 `claims.ts`）
-  "thread/settings/updated": (ctx, p) => {
-    ctx.onSettings?.(readSettings(p))
-  },
+  "thread/settings/updated": (ctx, p) => ctx.onSettings?.(readSettings(p)),
   // 整份计划快照。这条**没有**实验面，见 `plan.ts`
-  "turn/plan/updated": (ctx, p) => {
-    onPlanUpdate(ctx, p as WirePlanUpdate)
-  },
+  "turn/plan/updated": (ctx, p) => onPlanUpdate(ctx, p as WirePlanUpdate),
   "serverRequest/resolved": (ctx, p) => {
     const id = (p as { requestId?: unknown } | undefined)?.requestId
     if (typeof id === "string" || typeof id === "number") ctx.onServerRequestResolved?.(id)
   },
-  "skills/changed": (ctx) => {
-    ctx.onSkillsChanged?.()
-  },
+  "skills/changed": (ctx) => ctx.onSkillsChanged?.(),
   "thread/goal/updated": (ctx, p) => {
     const goal = goalOf(p as WireGoalUpdated)
     if (goal !== undefined) ctx.onGoal?.(goal)
   },
-  "thread/goal/cleared": (ctx) => {
-    ctx.onGoal?.(undefined)
+  "thread/goal/cleared": (ctx) => ctx.onGoal?.(undefined),
+  warning: (ctx, p) => emitCodexWarning(ctx, p as WireWarning),
+  guardianWarning: (ctx, p) => emitCodexWarning(ctx, p as WireWarning),
+  "model/verification": (ctx, p) => onModelVerification(ctx, p as WireModelVerification),
+  "model/rerouted": (ctx, p) => {
+    const rerouted = p as WireModelRerouted
+    if (rerouted.toModel !== undefined) ctx.onSettings?.({ model: rerouted.toModel })
+    onModelRerouted(ctx, rerouted)
   },
-  warning: (ctx, p) => {
-    emitCodexWarning(ctx, p as WireWarning)
-  },
-  guardianWarning: (ctx, p) => {
-    emitCodexWarning(ctx, p as WireWarning)
-  },
-  "model/verification": (ctx, p) => {
-    onModelVerification(ctx, p as WireModelVerification)
-  },
-  "model/safetyBuffering/updated": (ctx, p) => {
-    onSafetyBuffering(ctx, p as WireSafetyBuffering)
-  },
-  "autoApprovalReview/strictReviewRequired": (ctx, p) => {
-    onStrictReview(ctx, p as WireStrictReview)
-  },
-  configWarning: (ctx, p) => {
-    emitCodexWarning(ctx, p as WireWarning)
-  },
-  deprecationNotice: (ctx, p) => {
-    emitCodexWarning(ctx, p as WireWarning)
-  },
+  "model/safetyBuffering/updated": (ctx, p) => onSafetyBuffering(ctx, p as WireSafetyBuffering),
+  "autoApprovalReview/strictReviewRequired": (ctx, p) => onStrictReview(ctx, p as WireStrictReview),
+  configWarning: (ctx, p) => emitCodexWarning(ctx, p as WireWarning),
+  deprecationNotice: (ctx, p) => emitCodexWarning(ctx, p as WireWarning),
 }
 
 /** 认不出的通知静默丢弃——协议一直在加新类型，多一种不该掀翻会话。 */

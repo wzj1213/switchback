@@ -86,6 +86,13 @@ describe("Codex 结构化问题", () => {
     expect(row.replies).toEqual([{ answers: {} }])
   })
 
+  it("对端明确给自动收口时刻就原样采用，不把五秒问题拖成两分钟", async () => {
+    const row = serverCall({ ...request, autoResolutionMs: 5_000 })
+    const askQuestion = vi.fn(() => Promise.resolve<QuestionResponse>({ dismissed: true }))
+    await answerUserInput(row.call, { askQuestion })
+    expect(askQuestion).toHaveBeenCalledWith(expect.any(Array), { timeoutMs: 5_000 })
+  })
+
   it("对端先撤销时解开等待且不补发过期回包", async () => {
     const row = serverCall({ ...request, isBlocking: true })
     const controller = new AbortController()

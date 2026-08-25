@@ -5,7 +5,7 @@ import { reportAccount } from "./account.js"
 
 /**
  * 账号侧的现状要在**动手之前**问出来。这里钉的是判据本身——
- * 它是拿一个空的 CODEX_HOME 模拟登出实测出来的，不是猜的。
+ * 形状来自本机 0.149.0 生成协议，并与官方 app-server 文档互相核对。
  */
 const run = async (replies: Record<string, unknown>): Promise<{ said: string[]; events: Event[] }> => {
   const said: string[] = []
@@ -20,24 +20,24 @@ const run = async (replies: Record<string, unknown>): Promise<{ said: string[]; 
 }
 
 describe("登没登录", () => {
-  it("**登出实测形状**：authMethod 是 null，而 requiresOpenaiAuth 照样是 true", async () => {
-    const { said } = await run({ getAuthStatus: { authMethod: null, authToken: null, requiresOpenaiAuth: true } })
+  it("公开 account/read 的登出形状是 account:null", async () => {
+    const { said } = await run({ "account/read": { account: null, requiresOpenaiAuth: true } })
     expect(said[0]).toContain("degraded")
     expect(said[0]).toContain("codex login")
   })
 
   it("登录了就不出声", async () => {
-    const { said } = await run({ getAuthStatus: { authMethod: "chatgpt", requiresOpenaiAuth: true } })
+    const { said } = await run({ "account/read": { account: { type: "chatgpt" }, requiresOpenaiAuth: true } })
     expect(said).toEqual([])
   })
 
-  it("**不能只看 requiresOpenaiAuth**——登录和登出时它都是 true", async () => {
-    const { said } = await run({ getAuthStatus: { authMethod: "apikey", requiresOpenaiAuth: true } })
+  it("API key 账号同样算已登录", async () => {
+    const { said } = await run({ "account/read": { account: { type: "apiKey" }, requiresOpenaiAuth: true } })
     expect(said).toEqual([])
   })
 
   it("不需要 OpenAI 登录的配置一律不管", async () => {
-    const { said } = await run({ getAuthStatus: { authMethod: null, requiresOpenaiAuth: false } })
+    const { said } = await run({ "account/read": { account: null, requiresOpenaiAuth: false } })
     expect(said).toEqual([])
   })
 

@@ -165,6 +165,14 @@ describe("同一家引擎：让它自己复制会话", () => {
     expect(r.flushes()).toBe(1)
   })
 
+  it("普通分叉不因可见 transcript 暂时为空而放弃原生上下文", async () => {
+    const r = rig({ canFork: true })
+    await r.host.dispatch({ type: "thread.create", cwd: "/w", engine: "fake", trust: "auto-edit" })
+    const id = r.events.find((event) => event.type === "thread.started")?.thread.id ?? ""
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    expect(r.forks).toHaveLength(1)
+  })
+
   it("**不发交接包**——引擎已经亲历过了，再复述一遍是多余的", async () => {
     const r = rig({ canFork: true })
     const { id } = await withTurns(r)
@@ -244,6 +252,17 @@ describe("同一家引擎：让它自己复制会话", () => {
     const { id, turns } = await withTurns(r)
     await r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "" })
     expect(r.forks[0]?.dropTurns).toBe(1)
+  })
+
+  it("第一轮之前重来就是空白分支，不调用不存在的 beforeTurnId", async () => {
+    const r = rig({ canFork: true })
+    const { id, turns } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[0] ?? "" })
+    const born = r.events.filter((event) => event.type === "thread.started").at(-1)?.thread
+
+    expect(r.forks).toEqual([])
+    expect(born).toMatchObject({ forkedFrom: id, forkedFromItemCount: 0, provisional: true })
+    expect(itemsOfThread(r.events, born?.id ?? "")).toEqual([])
   })
 
   it("**「改一改再发」：那句话交还到新会话的输入框里**，不留在转录区当第二条", async () => {

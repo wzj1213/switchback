@@ -110,7 +110,7 @@ function attachmentWarning(
 ): string | undefined {
   if (count === 0) return undefined
   if (pending !== undefined) return "请先完成引擎切换，再确认新引擎能否接收这些附件；附件会保留"
-  if (!canAttach) return "当前引擎不支持附件；附件已保留，请移除或切回支持附件的引擎"
+  if (!canAttach) return "当前引擎或模型不支持图片附件；附件已保留，请移除或切换后再发"
   return undefined
 }
 

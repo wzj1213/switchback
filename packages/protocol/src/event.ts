@@ -83,6 +83,8 @@ export interface ModelOption {
   description?: string
   efforts?: readonly string[]
   defaultEffort?: string
+  /** 引擎为这一模型明确公布的输入模态；缺席表示旧目录没有上报，不能据此禁用。 */
+  inputModalities?: readonly ("text" | "image" | "audio")[]
   /**
    * 引擎自己认的默认模型。
    *

@@ -52,7 +52,7 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   // 只补这一条是为了两个方向别一个认得一个不认得
   EnterPlanMode: "meta",
   // codex app-server
-  shell: "exec", apply_patch: "write", read_file: "read", update_plan: "meta",
+  shell: "exec", apply_patch: "write", read_file: "read", update_plan: "meta", network: "net",
   // ACP：客户端侧方法（agent 反过来请我们代劳时用）
   "fs/read_text_file": "read", "fs/write_text_file": "write",
   "terminal/create": "exec", "terminal/output": "read",
@@ -155,6 +155,7 @@ function blindExec(req: Request, category: Category, command: string | undefined
 
 const PATH_ARG_KEYS = ["file_path", "path", "notebook_path", "filePath", "cwd"] as const
 const URL_ARG_KEYS = ["url", "uri"] as const
+const HOST_ARG_KEYS = ["host"] as const
 
 /**
  * 一次请求涉及**多个**路径的情况。
@@ -245,9 +246,11 @@ export function classify(req: Request, home: string): Normalized {
   const scraped = fromCommand(split)
 
   const paths = [...fromArgs, ...scraped.paths].map((p) => resolve(req.cwd, p, home))
-  const hosts = [...urlArgs, ...scraped.urls]
-    .map(hostOf)
-    .filter((h): h is string => h !== undefined)
+  // `host` 已经是主机名，不能再当 URL 解析；只有 url/命令里的完整 URL 需要剥协议。
+  const hosts = [
+    ...stringArg(req.args, HOST_ARG_KEYS),
+    ...[...urlArgs, ...scraped.urls].map(hostOf).filter((h): h is string => h !== undefined),
+  ]
 
   return {
     category,

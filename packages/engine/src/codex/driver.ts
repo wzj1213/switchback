@@ -14,7 +14,7 @@ import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { createRpc, type RpcPeer } from "../rpc.js"
-import { toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
+import { CODEX_HISTORY_LIMIT, toAccount, toEngineThreads } from "./catalog.js"
 import { nativeAxes, nativeTrustDiffers, POLICY, REVIEWER, SANDBOX } from "./sandbox.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
 import type { WireItem } from "./wire.js"
@@ -27,6 +27,7 @@ import { startCompaction } from "./compaction.js"
 import { createCodexObservers, type CodexObservers } from "./observers.js"
 import { emitCodexStatus } from "./status.js"
 import { toCodexTranscript } from "./history.js"
+import { modelSelection, readModelCatalog } from "./model-catalog.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -267,15 +268,13 @@ class CodexSession implements EngineSession {
    * 我们没有理由比它更啰嗦。
    */
   async models(): Promise<readonly ModelOption[]> {
-    const raw = await this.rpc.call("model/list", {}).catch(() => undefined)
-    const list = (raw as { data?: readonly WireModel[] } | undefined)?.data ?? []
-    const options = list.filter((m) => m.hidden !== true).map(toModelOption)
+    const options = await readModelCatalog((method, params) => this.rpc.call(method, params)).catch(() => [])
     this.state.options = options
     return options
   }
 
   /** codex 自己存着哪些会话；清单与正文来自两条公开返回，互不猜测。 */
-  async history(): Promise<readonly EngineThread[]> { return toEngineThreads(await this.rpc.call("thread/list", {}).catch(() => undefined)) }
+  async history(): Promise<readonly EngineThread[]> { return toEngineThreads(await this.rpc.call("thread/list", { limit: CODEX_HISTORY_LIMIT }).catch(() => undefined)) }
 
   /** `thread/resume` 自带完整 turns；接管流程在实时流激活前把它搬进 journal。 */
   transcript(): Promise<{ items: readonly Item[]; total: number }> { return Promise.resolve(toCodexTranscript(this.state.openedThread, Date.now())) }
@@ -287,9 +286,11 @@ class CodexSession implements EngineSession {
    * 而我们要找的通常就是刚跑过的那条，代价可以接受。
    */
   async logPath(): Promise<string | undefined> {
+    const direct = this.state.openedThread?.path
+    if (typeof direct === "string" && direct !== "") return direct
     const { codexThread } = this.state
     if (codexThread === undefined) return undefined
-    const raw = await this.rpc.call("thread/list", {}).catch(() => undefined)
+    const raw = await this.rpc.call("thread/list", { limit: CODEX_HISTORY_LIMIT }).catch(() => undefined)
     const rows =
       (raw as { data?: readonly { id?: string; path?: string }[] } | undefined)?.data ?? []
     return rows.find((r) => r.id === codexThread)?.path
@@ -351,8 +352,9 @@ class CodexSession implements EngineSession {
    * 清单拿不到时不补——那时传什么都是猜。
    */
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
-    this.state.model = model
-    this.state.effort = effort ?? this.state.options.find((m) => m.id === model)?.defaultEffort
+    const selected = modelSelection(this.state.options, model, effort)
+    this.state.model = selected.model
+    this.state.effort = selected.effort
     // 不用单独发请求：`turn/start` 的 model/effort 覆盖「这一轮及后续」
     return Promise.resolve(this.state.effort === undefined ? {} : { effort: this.state.effort })
   }

@@ -46,8 +46,9 @@ const TOOL_STATUS: Readonly<Record<string, ToolStatus>> = {
  * 退出码不为 0 一律算失败，哪怕 codex 说 `completed`——
  * 那个字段说的是「进程跑完了」，不是「事情办成了」。界面要的是后者。
  */
-export function toolStatus(item: WireItem): ToolStatus {
-  const base = TOOL_STATUS[item.status ?? ""] ?? "running"
+export function toolStatus(item: WireItem, complete = false): ToolStatus {
+  const base = TOOL_STATUS[item.status ?? ""] ?? (complete ? "ok" : "running")
+  if (complete && item.error?.message !== undefined) return "failed"
   if (base === "ok" && typeof item.exitCode === "number" && item.exitCode !== 0) return "failed"
   return base
 }
@@ -119,6 +120,38 @@ function fileChangeDetail(item: WireItem): ToolDetail {
   return { kind: "file_edit", path: files[0]?.path ?? "", files, ...tally }
 }
 
+function mcpDetail(item: WireItem): ToolDetail {
+  return {
+    kind: "other",
+    name: `${item.server ?? "mcp"}/${item.tool ?? "?"}`,
+    input: item.arguments,
+    ...outputField(item.result ?? progressOutput(item.progress)),
+  }
+}
+
+function dynamicDetail(item: WireItem): ToolDetail {
+  const name = [item.namespace, item.tool].filter(Boolean).join("/")
+  return {
+    kind: "other",
+    name: name === "" ? "dynamicToolCall" : name,
+    input: item.arguments,
+    ...outputField(item.contentItems ?? item.success),
+  }
+}
+
+function collabDetail(item: WireItem): ToolDetail {
+  return {
+    kind: "other",
+    name: `agent/${item.tool ?? "activity"}`,
+    input: {
+      receivers: item.receiverThreadIds,
+      prompt: item.prompt,
+      model: item.model,
+      effort: item.reasoningEffort,
+    },
+  }
+}
+
 /** 认不出的 item 落 `other`，原始 type 带上，排查时一眼看得出漏了哪类。 */
 function detailOf(item: WireItem): ToolDetail {
   switch (item.type) {
@@ -127,12 +160,24 @@ function detailOf(item: WireItem): ToolDetail {
     case "fileChange":
       return fileChangeDetail(item)
     case "mcpToolCall":
-      return { kind: "other", name: `${item.server ?? "mcp"}/${item.tool ?? "?"}`, input: item.arguments }
+      return mcpDetail(item)
+    case "dynamicToolCall":
+      return dynamicDetail(item)
+    case "collabAgentToolCall":
+      return collabDetail(item)
     case "webSearch":
       return { kind: "other", name: "web_search", input: { query: item.query ?? "" } }
     default:
       return { kind: "other", name: item.type }
   }
+}
+
+function progressOutput(progress: readonly string[] | undefined): string | undefined {
+  return progress === undefined || progress.length === 0 ? undefined : progress.join("\n")
+}
+
+function outputField(output: unknown): { output?: unknown } {
+  return output === undefined || output === null ? {} : { output }
 }
 
 const TOOL_NAME: Readonly<Record<string, string>> = {
@@ -143,11 +188,13 @@ const TOOL_NAME: Readonly<Record<string, string>> = {
 
 function toolName(item: WireItem): string {
   if (item.type === "mcpToolCall") return `${item.server ?? "mcp"}/${item.tool ?? "?"}`
+  if (item.type === "dynamicToolCall") return [item.namespace, item.tool].filter(Boolean).join("/") || item.type
+  if (item.type === "collabAgentToolCall") return `agent/${item.tool ?? "activity"}`
   return TOOL_NAME[item.type] ?? item.type
 }
 
-export function toToolCall(item: WireItem, ctx: CodexContext): ToolCallItem {
-  const status = toolStatus(item)
+export function toToolCall(item: WireItem, ctx: CodexContext, complete = false): ToolCallItem {
+  const status = toolStatus(item, complete)
   return {
     // 直接复用 codex 的 item id：审批请求只带 itemId 回来，靠它把审批卡挂对位置
     id: item.id,
@@ -179,7 +226,7 @@ export function itemToOmni(item: WireItem, ctx: CodexContext, complete: boolean)
   if (item.type === "reasoning") {
     return { ...base, kind: "reasoning", text: textOf(item), complete }
   }
-  return toToolCall(item, ctx)
+  return toToolCall(item, ctx, complete)
 }
 
 const TURN_STATUS: Readonly<Record<string, TurnStatus>> = {
