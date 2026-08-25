@@ -117,6 +117,18 @@ export interface ReviewData {
   /** 不是 git 仓库。和「没有改动」是两件事，界面上要说不同的话。 */
   noRepo: boolean
   loading: boolean
+  /**
+   * 手上有没有**这个 scope 的**答案——哪怕它旧了、正在重问。
+   *
+   * `loading` 一个字段答不了这件事：它同时是「还什么都没有」和「有旧的、正在刷新」，
+   * 而这两种在界面上该长得完全不一样。区分不开的后果实测过——
+   * **切走再切回来时，「已编辑 N 个文件」那张卡会闪一下**：`focus` 触发重问，
+   * `loading` 转真，卡片整张被摘掉，git 答完又装回来。
+   *
+   * 而这个 hook 本来就特意不清空旧清单（见下面那段注释），只是调用方按 `loading`
+   * 判断，把那份用心抵消了。
+   */
+  settled: boolean
   /** 这一轮清单请求的身份；文件补丁跟着它刷新，避免左新右旧。 */
   revision: string
   reload: () => void
@@ -124,7 +136,9 @@ export interface ReviewData {
 
 interface ReviewQuery { threadId?: string; wanted?: readonly string[] }
 
-interface LoadedReview extends Omit<ReviewData, "loading" | "reload" | "revision"> {
+// `settled` 也排除在外：它不是这份载荷的一部分，是「拿它去渲染时手上有没有东西」，
+// 由 `reviewData` 现算
+interface LoadedReview extends Omit<ReviewData, "loading" | "settled" | "reload" | "revision"> {
   key: string
   scope: string
 }
@@ -156,10 +170,12 @@ function reviewData(
   if (data === undefined || data.scope !== scope) {
     return {
       root: "", cwd: "", files: [], noRepo: false, baseline: false, failed: false,
-      loading: true, revision: key, reload,
+      loading: true, settled: false, revision: key, reload,
     }
   }
-  return { ...data, loading: data.key !== key, revision: key, reload }
+  // 有这个 scope 的答案了。**`settled` 不跟着 `loading` 走**：重问期间旧答案仍然算数，
+  // 界面据此接着显示它，而不是先摘掉再装回来
+  return { ...data, loading: data.key !== key, settled: true, revision: key, reload }
 }
 
 /**
@@ -177,8 +193,17 @@ export function useReview(
   const [visit, setVisit] = useState(0)
   const wanted = query.wanted ?? []
   const wantedKey = wanted.join("\u0000")
-  const scope = `${cwd}\u0000${query.threadId ?? ""}\u0000${wantedKey}`
-  const key = `${scope}\u0000${stamp}\u0000${String(nonce)}\u0000${String(visit)}`
+  /**
+   * **换了个问题**：这一份答案不再属于当前这一屏，旧的一个字都不能再画。
+   * 只有工作区和会话算数——`wanted` **有意不在里面**。
+   *
+   * 上一版把 `wanted` 也算进 scope，于是引擎每碰一个新文件，清单就长一项、
+   * scope 就变一次，「已编辑 N 个文件」那张卡当场消失、等 git 答完再装回来。
+   * 而那恰恰是它最该稳稳待着的时候。`wanted` 只是**把同一个问题问得更细**，
+   * 它变了要重问（所以在 `key` 里），但不该让手上那份答案作废。
+   */
+  const scope = `${cwd}\u0000${query.threadId ?? ""}`
+  const key = `${scope}\u0000${wantedKey}\u0000${stamp}\u0000${String(nonce)}\u0000${String(visit)}`
   const [data, setData] = useState<LoadedReview | undefined>(undefined)
   useEffect(() => {
     if (typeof window === "undefined") return undefined

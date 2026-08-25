@@ -20,8 +20,27 @@ interface Props {
   onReview: () => void
 }
 
-function shouldHide(state: { hidden: boolean; loading: boolean; failed: boolean; files: number; others: number }): boolean {
-  return state.hidden || state.loading || (state.files === 0 && state.others === 0 && !state.failed)
+/**
+ * 这张卡这一帧该不该出现。
+ *
+ * **「正在问 git」只在还没有任何答案时才藏**。上一版是 `state.loading` 一真就藏，
+ * 而 `loading` 在**重问**期间也是真的——于是切走再切回来（`window.focus` 触发重问）
+ * 时，这张卡会整张消失再装回来，看起来就是闪了一下。
+ *
+ * 手上有旧答案就接着显示旧的：`useReview` 本来就特意不清空它
+ *（「清空会让面板在每一轮结束时闪一下白」），这里跟上那条。
+ */
+export function shouldHide(state: {
+  hidden: boolean
+  loading: boolean
+  settled: boolean
+  failed: boolean
+  files: number
+  others: number
+}): boolean {
+  if (state.hidden) return true
+  if (state.loading && !state.settled) return true
+  return state.files === 0 && state.others === 0 && !state.failed
 }
 
 /** 会话触达文件的当前净变更：总数 → 文件清单 → git 实时补丁。 */
@@ -56,7 +75,18 @@ export function Changed({
     ? review.files.filter((file) => !mine.has(file.rel) && !minePaths.has(file.path))
     : []
   const othersTotal = others.length + (review.more ?? 0)
-  if (shouldHide({ hidden, loading: review.loading, failed: review.failed, files, others: othersTotal })) return null
+  if (
+    shouldHide({
+      hidden,
+      loading: review.loading,
+      settled: review.settled,
+      failed: review.failed,
+      files,
+      others: othersTotal,
+    })
+  ) {
+    return null
+  }
   return (
     <section className="changed" aria-label="文件改动摘要">
       <div className="changed__card">
