@@ -130,17 +130,31 @@ export function gridOf(
   }
 }
 
-/** 月份标签。**同一个月只标一次**，标在它出现的第一列——重复标签只会糊成一条。 */
+/**
+ * 一个月至少要占这么多列才标得出名字。
+ *
+ * 标签只占一格宽、靠溢出显示（见 `settings-activity.css` 的 `.heat__month`），
+ * 而「10月」三个字比三格还宽。**头尾那两个月几乎必然是残月**——
+ * 起点落在月中，第一个月就只有一两列，于是它的名字直接压在下一个月的名字上。
+ * 实测「8月」和「9月」印成了一团。
+ */
+const MONTH_COLS = 3
+
+/**
+ * 月份标签。**同一个月只标一次**，标在它出现的第一列——重复标签只会糊成一条。
+ * 同理，**占不满三列的月份干脆不标**：糊成一团的两个名字比少一个名字糟得多。
+ */
 function monthsOf(dates: readonly string[], weeks: number): readonly { week: number; label: string }[] {
-  const out: { week: number; label: string }[] = []
+  const all: { week: number; label: string }[] = []
   for (let w = 0; w < weeks; w += 1) {
     const first = dates[w * 7]
     if (first === undefined) continue
     const month = Number(first.slice(5, 7)) - 1
-    if (out.at(-1)?.label === MONTHS[month]) continue
-    out.push({ week: w, label: MONTHS[month] ?? "" })
+    if (all.at(-1)?.label === MONTHS[month]) continue
+    all.push({ week: w, label: MONTHS[month] ?? "" })
   }
-  return out
+  // 宽度按**到下一个标签为止**算，最后一个按到整张图右缘为止
+  return all.filter((one, i) => (all[i + 1]?.week ?? weeks) - one.week >= MONTH_COLS)
 }
 
 /**

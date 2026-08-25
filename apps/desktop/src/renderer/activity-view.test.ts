@@ -101,6 +101,31 @@ describe("月份标签", () => {
     expect(new Set(labels).size).toBe(labels.length)
     expect(labels.at(-1)).toBe("8月")
   })
+
+  /**
+   * **两个标签挨得太近就等于没有标签。** 名字只占一格宽、靠溢出显示，
+   * 而「10月」比三格还宽——头尾那两个残月几乎必然和邻居印成一团。
+   * 实测那一页左端就是「8月」压着「9月」。
+   */
+  it("挨得太近的两个月份标签不会同时出现——糊成一团比少一个名字糟", () => {
+    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now })
+    const gaps = grid.months.slice(1).map((m, i) => m.week - (grid.months[i]?.week ?? 0))
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(3)
+  })
+
+  /**
+   * **尾部那个残月也要按同一条尺子量。** 宽度得按「到整张图右缘为止」算，
+   * 按「到下一个标签为止」算的话它没有下一个，于是无论多窄都会被留下——
+   * 而它恰恰是最容易只占一列的那个（今天是月初时）。
+   */
+  it("最后一个月只占一两列时同样不标", () => {
+    // 2026-09-07 是九月第一个周一，第二天收尾：九月在这张图里**只占最后一列**
+    const early = Date.parse("2026-09-08T15:00:00")
+    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now: early })
+    expect(grid.months.at(-1)?.label).not.toBe("9月")
+    const last = grid.months.at(-1)
+    expect(grid.weeks.length - (last?.week ?? 0)).toBeGreaterThanOrEqual(3)
+  })
 })
 
 describe("说成人话", () => {
