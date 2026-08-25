@@ -51,6 +51,7 @@ function parse(raw: unknown): Settings {
     // **只认字面的 `false`**：默认是开着的，所以「读不出来」要落到开，
     // 而不是像 `remote.enabled` 那样落到关——那边关掉是安全的一侧，这边不是
     pets: it.pets !== false,
+    petKit: petKit(it.petKit),
     // 认不出就回默认（全都提醒），**不回落到 off**：一个读坏的偏好把审批提醒
     // 静音掉的话，agent 会停在那儿无声地等，而没有任何地方会报错
     notify: oneOf(it.notify, NOTIFY, DEFAULTS.notify),
@@ -63,6 +64,21 @@ function parse(raw: unknown): Settings {
     projectIcons: icons(it.projectIcons),
     lastUsed: lastUsed(it.lastUsed),
     remote: remote(it.remote),
+  }
+}
+
+/**
+ * 桌宠那几项。**藏起来的名单不校验 id 存不存在**——同 `disabledEngines`：
+ * 用户可能先藏掉一家再去改 `engines.json`，把「现在认不出」当脏数据丢掉，
+ * 等于替他把那只放回台面上。
+ */
+function petKit(raw: unknown): Settings["petKit"] {
+  if (typeof raw !== "object" || raw === null) return DEFAULTS.petKit
+  const it = raw as Record<string, unknown>
+  return {
+    hidden: [...new Set(strings(it.hidden) ?? DEFAULTS.petKit.hidden)],
+    // 同 `pets`：默认开，所以读不出来要落到开
+    entry: it.entry !== false,
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { EngineInfo } from "@omni/protocol"
-import { petRoster } from "./pet-roster.js"
+import { petRoster, visibleRoster } from "./pet-roster.js"
 
 const engine = (id: string, state: EngineInfo["state"] = "ok"): EngineInfo => ({
   id,
@@ -57,5 +57,48 @@ describe("petRoster", () => {
     const after = petRoster([engine("claude"), engine("dsh")], "claude").at(-1)
     expect(before?.key).toBe("dsh")
     expect(after?.key).toBe(before?.key)
+  })
+})
+
+describe("visibleRoster", () => {
+  const all = petRoster(
+    [engine("claude"), engine("codex"), engine("kimi"), engine("grok")],
+    "kimi",
+  )
+
+  it("没藏过就是全员", () => {
+    expect(visibleRoster(all, "kimi", []).map((s) => s.key)).toEqual([
+      "claude",
+      "codex",
+      "kimi",
+      "grok",
+      "dsh",
+    ])
+  })
+
+  it("藏起来的那几只不出现", () => {
+    const keys = visibleRoster(all, "kimi", ["codex", "dsh"]).map((s) => s.key)
+    expect(keys).toEqual(["claude", "kimi", "grok"])
+  })
+
+  it("当前那家藏不掉——否则台面上没有任何地方画着「谁在答」", () => {
+    const keys = visibleRoster(all, "kimi", ["kimi", "codex"]).map((s) => s.key)
+    expect(keys).toContain("kimi")
+    expect(keys).not.toContain("codex")
+  })
+
+  it("只剩一只时留下的是当前那家，不是勾中的那一只", () => {
+    // 用户只留了 grok，而这一轮归 kimi：台面上该站 kimi
+    const kept = visibleRoster(all, "kimi", ["claude", "codex", "kimi", "dsh"])
+    expect(kept.map((s) => s.key)).toEqual(["kimi"])
+  })
+
+  it("一只都没留时仍然画当前那家", () => {
+    const kept = visibleRoster(all, "grok", ["claude", "codex", "kimi", "grok", "dsh"])
+    expect(kept.map((s) => s.key)).toEqual(["grok"])
+  })
+
+  it("当前那家根本不在花名册里时，至少留一只，不留空台面", () => {
+    expect(visibleRoster(all, "nobody", ["claude", "codex", "kimi", "grok", "dsh"])).toHaveLength(1)
   })
 })
