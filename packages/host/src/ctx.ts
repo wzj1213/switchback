@@ -1,9 +1,11 @@
 import type { Event, ThreadId, Thread, ThreadStatus, TurnId, ItemId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { EngineSession } from "@omni/engine"
-import { mergeRateLimits } from "@omni/store"
 import type { Gate } from "./gate.js"
 import type { HostDeps } from "./deps.js"
+import { clearThreadLiveState, clearTurnLiveState, rememberLiveState } from "./live-state.js"
+
+export { liveStateOf } from "./live-state.js"
 
 /**
  * 宿主的共享状态与**事件的唯一出口**。
@@ -181,8 +183,8 @@ export interface Ctx {
   /**
    * 「这件事上一次说出去是什么样」——用来挡回声，见 `echoed`。
    *
-   * 键是 `echoKey`，值是 `shapeOf`。**每轮结束清一次**（`turn.completed`），
-   * 所以驻留量是一轮里的 item 数，不是整条会话的。
+   * 键是 `echoKey`，值是 `shapeOf`。item 键带 turn id，**只在自己的轮次结束时清**；
+   * 多会话并发时一家的完成不能让另一家的重复快照重新穿透。
    */
   echo: Map<string, string>
   /**
@@ -225,47 +227,26 @@ const UNOWNED: ReadonlySet<string> = new Set([
   "account.updated",
 ])
 
-/**
- * 不落盘、但**描述现状**的事件。重建全量时必须把最后一条补发出去。
- *
- * ## 这条规则是拿一个真 bug 换来的
- *
- * 「不落盘」和「重建只读 journal」两条规则各自都对，合在一起就有个缝：
- * 这类事件既不在全量里，又会因为 `seq <= resumeAt` 被渲染层当旧消息丢掉，
- * **于是永久消失**。实测表现是 `/` 面板里一条技能都没有——codex 明明报了 22 条，
- * `skills/list` 也是通的，事件也确实发出去过，就是没活到界面上。
- *
- * 同病的还有 `limits.updated`（额度条重载后一直空着）。
- *
- * 区别于 `thread.removed`：那是一次**变化**，补发只会把删掉的东西变回来。
- * 收进这里的标准是「它描述的是现在是什么样，重放一遍不会有副作用」。
- */
-const LIVE_STATE: ReadonlySet<string> = new Set([
-  "limits.updated",
-  "commands.updated",
-  "engine.history",
-  "account.updated",
-  // 近似思考 token 不落盘，但窗口在这一段中途重载时仍该看见当前值
-  "thinking.updated",
-])
-
-/**
- * 这类事件按「说的是哪一份」留最后一条：额度按引擎、命令按会话。
- * 键错了的后果是互相覆盖——两家引擎的额度只剩一份。
- */
-function liveKey(event: Event): string | undefined {
-  if (event.type === "limits.updated") return `limits:${event.engine}`
-  if (event.type === "commands.updated") return `commands:${event.threadId}\u0000${event.engine}`
-  if (event.type === "engine.history") return `history:${event.engine}`
-  if (event.type === "account.updated") return `account:${event.engine}`
-  if (event.type === "thinking.updated") return `thinking:${event.threadId}`
-  return undefined
+function forgetRemovedState(ctx: Ctx, event: Event): void {
+  if (event.type !== "thread.removed") return
+  ctx.uncommitted.delete(event.threadId)
+  clearThreadLiveState(ctx, event.threadId)
+  for (const [turnId, threadId] of ctx.turnOwner) {
+    if (threadId !== event.threadId) continue
+    clearTurnEcho(ctx, turnId)
+    ctx.turnOwner.delete(turnId)
+  }
+  ctx.echo.delete(`thread\u0000${event.threadId}`)
 }
 
-/** 重连快照里的额度也要是合并后的现状，不能只记最后一帧稀疏 patch。 */
-function liveEvent(before: Event | undefined, event: Event): Event {
-  if (event.type !== "limits.updated" || before?.type !== "limits.updated") return event
-  return { ...event, limits: mergeRateLimits(before.limits, event.limits) }
+function finishTurnState(ctx: Ctx, event: Event, owner: ThreadId | undefined): void {
+  if (event.type !== "turn.completed" || owner === undefined) return
+  clearTurnLiveState(ctx, owner)
+  // 同一个 stdout chunk 里仍可能跟着终态快照；让它们先借这份归属落盘，再在微任务尾回收。
+  queueMicrotask(() => {
+    clearTurnEcho(ctx, event.turnId)
+    if (ctx.turnOwner.get(event.turnId) === owner) ctx.turnOwner.delete(event.turnId)
+  })
 }
 
 const nonemptyThreadId = (threadId: ThreadId | undefined): ThreadId | undefined =>
@@ -330,10 +311,17 @@ function directOwner(event: Event): ThreadId | undefined {
  * 其余合计不到 0.03 MB）。
  */
 function echoKey(event: Event): string | undefined {
-  if (event.type === "item.started" || event.type === "item.updated") return `item\u0000${event.item.id}`
-  if (event.type === "item.removed") return `item\u0000${event.itemId}`
+  if (event.type === "item.started" || event.type === "item.updated") {
+    return `item\u0000${event.item.turnId}\u0000${event.item.id}`
+  }
+  if (event.type === "item.removed") return `item\u0000${event.turnId}\u0000${event.itemId}`
   if (event.type === "thread.updated") return `thread\u0000${event.thread.id}`
   return undefined
+}
+
+function clearTurnEcho(ctx: Ctx, turnId: TurnId): void {
+  const prefix = `item\u0000${turnId}\u0000`
+  for (const key of ctx.echo.keys()) if (key.startsWith(prefix)) ctx.echo.delete(key)
 }
 
 /**
@@ -370,8 +358,6 @@ function shapeOf(event: Event): string {
  * 落盘之外还省掉同样数量的渲染帧：那 9793 条每一条都会让工具行重画一次。
  */
 function echoed(ctx: Ctx, event: Event): boolean {
-  // 一轮收工就清账：键是 item id，跨轮没有比较价值，留着只是占内存
-  if (event.type === "turn.completed") ctx.echo.clear()
   const key = echoKey(event)
   if (key === undefined) return false
   const shape = shapeOf(event)
@@ -431,23 +417,14 @@ export function emit(ctx: Ctx, event: Event): void {
   if (ctx.closed || echoed(ctx, event)) return
   explainFailure(ctx, event)
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
-  const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
-  if (key !== undefined) {
-    // 清空帧已经实时发给现有窗口；重连从空状态重建，不需要再补一条空进度
-    if (event.type === "thinking.updated" && event.estimatedTokens === undefined) ctx.liveState.delete(key)
-    else ctx.liveState.set(key, liveEvent(ctx.liveState.get(key), event))
-  }
+  rememberLiveState(ctx, event)
   ctx.deps.emit(event)
   // 删掉的会话如果还没提交过，攒下的那些一起扔掉——它从来没上过磁盘
-  if (event.type === "thread.removed") {
-    ctx.uncommitted.delete(event.threadId)
-    const prefix = `commands:${event.threadId}\u0000`
-    for (const key of ctx.liveState.keys()) if (key.startsWith(prefix)) ctx.liveState.delete(key)
-    ctx.liveState.delete(`thinking:${event.threadId}`)
-  }
+  forgetRemovedState(ctx, event)
   const owner = ownerOf(ctx, event)
   if (owner !== undefined) persist(ctx, owner, event)
   observe(ctx, event)
+  finishTurnState(ctx, event, owner)
 }
 
 /**
@@ -490,25 +467,6 @@ function persist(ctx: Ctx, owner: ThreadId, event: Event): void {
 function commits(event: Event): boolean {
   return event.type === "thread.updated" && event.thread.provisional !== true
 }
-
-/**
- * 重建全量时要补发的那些事件（见 `LIVE_STATE`）。
- *
- * 会话已经不在了的就别补了——它对应的那一行界面上都没有，
- * 补一份技能清单过去只会在 store 里留一条永远不会被读到的记录。
- */
-export function liveStateOf(ctx: Ctx): readonly Event[] {
-  return [...ctx.liveState.entries()]
-    .filter(([key]) => {
-      if (!key.startsWith("commands:")) return true
-      const rest = key.slice("commands:".length)
-      const end = rest.indexOf("\u0000")
-      const threadId = (end === -1 ? rest : rest.slice(0, end)) as ThreadId
-      return ctx.live.has(threadId)
-    })
-    .map(([, event]) => event)
-}
-
 
 /**
  * 会话状态的唯一改写口。

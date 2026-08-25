@@ -145,18 +145,46 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
     expect(liveStateOf(ctx)).toEqual([])
   })
 
+  it("重载会补当前子 agent 任务，轮次收工后立即清掉", () => {
+    const ctx = fresh()
+    const tasks: Event = {
+      type: "tasks.updated", at: 1, threadId: "th-1",
+      tasks: [{ id: "task-1", description: "正在检查测试", toolUses: 2, ms: 900 }],
+    }
+    emit(ctx, { type: "turn.started", at: 0, turn: {
+      id: "tu-1", threadId: "th-1", engine: "claude", status: "running", startedAt: 0,
+    } })
+    emit(ctx, tasks)
+    expect(liveStateOf(ctx)).toEqual([tasks])
+    emit(ctx, { type: "turn.completed", at: 2, turnId: "tu-1", status: "completed" })
+    expect(liveStateOf(ctx)).toEqual([])
+  })
+
+  it("轮次归属在终态发完后回收，不随长会话永久增长", async () => {
+    const ctx = fresh()
+    emit(ctx, { type: "turn.started", at: 0, turn: {
+      id: "tu-1", threadId: "th-1", engine: "claude", status: "running", startedAt: 0,
+    } })
+    emit(ctx, { type: "turn.completed", at: 1, turnId: "tu-1", status: "completed" })
+    await Promise.resolve()
+    expect(ctx.turnOwner.has("tu-1")).toBe(false)
+  })
+
   it("**`thread.removed` 不在这份里**：它是一次变化，补发只会把删掉的东西变回来", () => {
     const ctx = fresh()
     emit(ctx, { type: "thread.removed", at: 0, threadId: "th-1" })
     expect(liveStateOf(ctx)).toEqual([])
   })
 
-  it("删除会话会同时回收它的斜杠命令与思考现状", () => {
+  it("删除会话会同时回收它的斜杠命令、思考与子任务现状", () => {
     const ctx = fresh()
     emit(ctx, commands)
     emit(ctx, {
       type: "thinking.updated", at: 0, threadId: "th-1", turnId: "tu-1", estimatedTokens: 9,
     })
+    emit(ctx, { type: "tasks.updated", at: 0, threadId: "th-1", tasks: [
+      { id: "task-1", description: "还在跑", toolUses: 1, ms: 3 },
+    ] })
     emit(ctx, { type: "thread.removed", at: 1, threadId: "th-1" })
     expect(liveStateOf(ctx)).toEqual([])
   })
@@ -164,6 +192,9 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
   it("会话已经不在了就别补了——那一行界面上都没有", () => {
     const ctx = fresh()
     emit(ctx, { ...commands, threadId: "th-gone" })
+    emit(ctx, { type: "tasks.updated", at: 0, threadId: "th-gone", tasks: [
+      { id: "late", description: "迟到任务", toolUses: 1, ms: 2 },
+    ] })
     expect(liveStateOf(ctx)).toEqual([])
   })
 })
@@ -176,7 +207,7 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
  * 单会话 32 MB 的上限就是被这些撞满的——之后那条会话不再落盘。
  */
 describe("回声挡在唯一出口上", () => {
-  const message = (id: string, text: string): Event => ({
+  const message = (id: string, text: string): Extract<Event, { type: "item.updated" }> => ({
     type: "item.updated",
     at: 0,
     item: { id, turnId: "tu-1", at: 0, kind: "agent_message", text, complete: false },
@@ -198,7 +229,7 @@ describe("回声挡在唯一出口上", () => {
         },
       },
       live: new Map([["th-1", {}]]),
-      turnOwner: new Map([["tu-1", "th-1"]]),
+      turnOwner: new Map([["tu-1", "th-1"], ["tu-2", "th-1"]]),
       inflight: new Map(),
       liveState: new Map(),
       uncommitted: new Map(),
@@ -252,14 +283,28 @@ describe("回声挡在唯一出口上", () => {
     expect(written).toHaveLength(2)
   })
 
-  it("轮次事件从不挡，而且收工时清账——不清的话驻留量是整条会话而不是一轮", () => {
-    const { ctx, written } = rig()
+  it("轮次事件从不挡", () => {
+    const { ctx, seen, written } = rig()
     const done: Event = { type: "turn.completed", at: 0, turnId: "tu-1", status: "completed" }
     emit(ctx, message("it-1", "同一句"))
     emit(ctx, done)
     emit(ctx, done)
-    emit(ctx, message("it-1", "同一句"))
     expect(written.filter((e) => e.type === "turn.completed")).toHaveLength(2)
-    expect(written.filter((e) => e.type === "item.updated")).toHaveLength(2)
+    expect(seen.filter((e) => e.type === "turn.completed")).toHaveLength(2)
+  })
+
+  it("一条会话收工只清自己的回声，不能让另一条在途轮次的重复快照穿透", async () => {
+    const { ctx, written } = rig()
+    const other: Event = {
+      ...message("it-2", "另一轮还在跑"),
+      item: { ...message("it-2", "另一轮还在跑").item, turnId: "tu-2" },
+    }
+    emit(ctx, message("it-1", "第一轮"))
+    emit(ctx, other)
+    emit(ctx, { type: "turn.completed", at: 1, turnId: "tu-1", status: "completed" })
+    await Promise.resolve()
+    emit(ctx, { ...other, at: 2 })
+    expect(written.filter((event) => event.type === "item.updated" && event.item.id === "it-2"))
+      .toHaveLength(1)
   })
 })

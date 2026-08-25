@@ -111,6 +111,25 @@ describe("reduce", () => {
       { type: "turn.completed", at: 0, turnId: "t1", status: "completed" },
     ])
     expect(s.turns["a"]).toBeUndefined()
+    expect(s.turnOwner["t1"]).toBeUndefined()
+  })
+
+  it("旧轮次迟到的 completed 不能清掉同会话的新轮次", () => {
+    const running = reduceAll(initial(), [started("a"), turnStarted("a", "old"), turnStarted("a", "new")])
+    const after = reduce(running, { type: "turn.completed", at: 1, turnId: "old", status: "completed" })
+    expect(after.turns["a"]?.id).toBe("new")
+    expect(after.turnOwner["old"]).toBeUndefined()
+    expect(after.turnOwner["new"]).toBe("a")
+  })
+
+  it("长会话跑完上千轮也不保留上千条 turn 反查", () => {
+    const turns = Array.from({ length: 1000 }, (_, index) => {
+      const id = `t-${String(index)}`
+      return [turnStarted("a", id), { type: "turn.completed", at: index, turnId: id, status: "completed" }] as const
+    }).flat()
+    const state = reduceAll(initial(), [started("a"), ...turns])
+    expect(state.turnOwner).toEqual({})
+    expect(state.turns).toEqual({})
   })
 
   it("认不出的事件原样返回旧状态", () => {
@@ -451,6 +470,16 @@ describe("补一条会话的历史", () => {
     const s = reduceHistory(initial(), "a", history)
     const later = reduceAll(s, [{ type: "item.started", at: 4, item: msg("i4", "u1", "第四条") }])
     expect(itemsOf(later, "a").map((i) => i.id)).toEqual(["i1", "i2", "i3", "i4"])
+  })
+
+  it("补历史会同步清掉旧 item 反查，不能留下随会话长度增长的幽灵索引", () => {
+    const live = reduceAll(initial(), [
+      started("a"), turnStarted("a", "u1"),
+      { type: "item.started", at: 4, item: msg("live-only", "u1", "只在旧现场") },
+    ])
+    const rebuilt = reduceHistory(live, "a", history)
+    expect(rebuilt.owner["live-only"]).toBeUndefined()
+    expect(Object.keys(rebuilt.owner).sort()).toEqual(["i1", "i2", "i3"])
   })
 })
 

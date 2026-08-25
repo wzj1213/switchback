@@ -43,7 +43,7 @@ function appendItem(state: ViewState, threadId: ThreadId, item: Item, draft?: Dr
   // 于是这里把「应用两次」变成无害的：`item.started` 重复不再长出两条一样的
   // item。反过来（拼装时去重）要求给每条事件一个身份，那是把复杂度推给
   // **每一个**产生事件的地方，而这里只需要一次比较。
-  const at = list.findIndex((existing) => existing.id === item.id)
+  const at = itemIndex(list, item.id)
   if (at !== -1) {
     const updated = [...list]
     updated[at] = item
@@ -54,6 +54,14 @@ function appendItem(state: ViewState, threadId: ThreadId, item: Item, draft?: Dr
     items: { ...state.items, [threadId]: [...list, item] },
     owner,
   }
+}
+
+/** 活跃 item 通常在尾部；倒着找让长会话的每个流式批次不必从第一条扫起。 */
+function itemIndex(list: readonly Item[], itemId: ItemId): number {
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    if (list[index]?.id === itemId) return index
+  }
+  return -1
 }
 
 /** 批量归约时的可变累加器。**只在 `reduceAll` 内部存在。** */
@@ -79,7 +87,7 @@ function patchItem(state: ViewState, itemId: ItemId, next: (prev: Item) => Item)
   const threadId = state.owner[itemId]
   if (threadId === undefined) return state
   const list = state.items[threadId] ?? []
-  const index = list.findIndex((i) => i.id === itemId)
+  const index = itemIndex(list, itemId)
   if (index === -1) return state
   const prev = list[index]
   if (prev === undefined) return state
@@ -118,7 +126,8 @@ function onTurnStarted(state: ViewState, event: Extract<Event, { type: "turn.sta
   return {
     ...state,
     turns: { ...state.turns, [turn.threadId]: turn },
-    turnOwner: { ...state.turnOwner, [turn.id]: turn.threadId },
+    // 同一会话只留当前轮；否则回放数千轮会把反查表和每次不可变复制一起撑大
+    turnOwner: { ...withoutValue(state.turnOwner, turn.threadId), [turn.id]: turn.threadId },
     // 新一轮出生就清上一轮可能迟到留下的进度；后续事件还要凭 turnId 才能写回来
     thinking: omit(state.thinking, turn.threadId),
   }
@@ -127,6 +136,10 @@ function onTurnStarted(state: ViewState, event: Extract<Event, { type: "turn.sta
 /** 不可变地摘掉一个键。用 rest 而不是 `delete`——后者会改写传入对象。 */
 function omit<T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> {
   return Object.fromEntries(Object.entries(record).filter(([k]) => k !== key))
+}
+
+function withoutValue<T>(record: Readonly<Record<string, T>>, value: T): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).filter(([, found]) => found !== value))
 }
 
 function withEngine<T>(
@@ -164,6 +177,9 @@ function onTurnCompleted(
 ): ViewState {
   const threadId = state.turnOwner[event.turnId]
   if (threadId === undefined) return state
+  const turnOwner = omit(state.turnOwner, event.turnId)
+  // 原生事件迟到时，旧轮的终态不能把同会话已经开始的新轮清掉
+  if (state.turns[threadId]?.id !== event.turnId) return { ...state, turnOwner }
   // **子 agent 跟着轮次一起清。** 它们是活状态：一轮结束还留着，界面上就是一串
   // 早就跑完了、却还显示在跑的任务——比不显示更糟
   return {
@@ -171,6 +187,7 @@ function onTurnCompleted(
     turns: omit(state.turns, threadId),
     tasks: omit(state.tasks, threadId),
     thinking: omit(state.thinking, threadId),
+    turnOwner,
   }
 }
 
@@ -181,12 +198,8 @@ function onTurnCompleted(
  * `item.updated` 会把内容写回一个已经不存在的会话，那份数据从此再也删不掉。
  */
 function removeThread(state: ViewState, threadId: ThreadId): ViewState {
-  const keepOwner = Object.fromEntries(
-    Object.entries(state.owner).filter(([, id]) => id !== threadId),
-  )
-  const keepTurnOwner = Object.fromEntries(
-    Object.entries(state.turnOwner).filter(([, id]) => id !== threadId),
-  )
+  const keepOwner = withoutValue(state.owner, threadId)
+  const keepTurnOwner = withoutValue(state.turnOwner, threadId)
   return {
     ...state,
     threads: omit(state.threads, threadId),
@@ -422,7 +435,11 @@ export function coalesce(events: readonly Event[]): readonly Event[] {
  * 它们的当前值比历史里那一份新。
  */
 export function reduceHistory(state: ViewState, threadId: ThreadId, events: readonly Event[]): ViewState {
-  const cleared: ViewState = { ...state, items: { ...state.items, [threadId]: [] } }
+  const cleared: ViewState = {
+    ...state,
+    items: { ...state.items, [threadId]: [] },
+    owner: withoutValue(state.owner, threadId),
+  }
   return reduceAll(cleared, events)
 }
 
