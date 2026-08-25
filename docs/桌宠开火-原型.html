@@ -1,0 +1,2685 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>桌宠开火 · 打怪与升级</title>
+<style>
+/* ══ 值照 tokens.css / pets.css 搬，好让原型里的样子就是应用里的样子 ══ */
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:rgba(0,0,0,.08); --bg-press:#e0e0e5; --bg-code:#f6f6f7; --bg-said:#f0f0f2;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#6f6f78; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-xs:6px; --radius-sm:8px; --radius:12px; --radius-lg:16px;
+  --dur:120ms; --dur-slow:240ms; --ease:ease;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 8px 28px rgb(0 0 0 / 12%);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+  --pet-kimi:#5b83d6; --pet-kimi-eye:#ffffff;
+  --pet-claude:#d87656; --pet-claude-eye:#000000;
+  --pet-grok:#16161a; --pet-grok-eye:#ffffff;
+  --pet-dsh:#000000; --pet-dsh-eye:#ffffff;
+  --pet-dsh-belly:#d8dae0; --pet-dsh-belly-mark:#858993;
+  --pet-plain:#8f8f9a; --pet-plain-eye:#ffffff;
+  --pet-shade:#000000; --pet-shade-a:0.26;
+  /* 僵尸不是引擎，但按同一套规矩给它一组 token。浅色底上 3:1 靠这个绿， */
+  /* 深色底上得提亮一档，否则它和深色地面糊在一起 */
+  --pet-zomb:#6f8f4c; --pet-zomb-drip:#9db877;
+  --pet-gun:#4a4a52; --pet-gun-hi:#8f8f9a; --pet-gun-dk:#2b2b31; --pet-brass:#b3934f;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:rgba(255,255,255,.13); --bg-press:#35353d; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --pet-grok:#c9c9d2; --pet-dsh:#4276e6; --pet-shade-a:0.5;
+  --pet-zomb:#8fb264; --pet-zomb-drip:#c2d9a0;
+  --pet-gun:#9a9aa6; --pet-gun-hi:#d6d6de; --pet-gun-dk:#5e5e68; --pet-brass:#cdad68;
+}}
+:root[data-theme="dark"]{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:rgba(255,255,255,.13); --bg-press:#35353d; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --pet-grok:#c9c9d2; --pet-dsh:#4276e6; --pet-shade-a:0.5;
+  --pet-zomb:#8fb264; --pet-zomb-drip:#c2d9a0;
+  --pet-gun:#9a9aa6; --pet-gun-hi:#d6d6de; --pet-gun-dk:#5e5e68; --pet-brass:#cdad68;
+}
+
+*{box-sizing:border-box}
+body{margin:0;padding:38px 20px 96px;background:var(--bg-sunken);color:var(--text);
+  font-family:var(--font);font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.page{max-width:980px;margin:0 auto}
+h1{font-size:25px;line-height:1.28;letter-spacing:-.015em;margin:0 0 10px}
+h2{font-size:15px;margin:34px 0 10px;letter-spacing:-.006em}
+.lede{margin:0 0 6px;max-width:64em;color:var(--text-muted);line-height:1.85}
+.lede b{color:var(--text);font-weight:600}
+.lede em{font-style:normal;color:var(--text);border-bottom:1px solid var(--border-strong)}
+code{font-family:var(--font-mono);font-size:.88em;padding:1px 5px;border-radius:4px;background:var(--bg-code)}
+.rule{height:1px;background:var(--border);margin:26px 0 22px}
+
+/* ── 控件条 ─────────────────────────────── */
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 12px;
+  padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised)}
+.ctl__g{display:flex;align-items:center;gap:7px}
+.ctl__l{flex:none;font-size:11.5px;color:var(--text-faint);white-space:nowrap}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);background:var(--bg)}
+.seg button{border:0;background:transparent;color:var(--text-muted);font:inherit;
+  font-size:11.5px;padding:3px 9px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--text-inverse)}
+.seg button:hover:not([aria-pressed="true"]){color:var(--text)}
+.mini{border:1px solid var(--border-strong);background:var(--bg);color:var(--text-muted);
+  font:inherit;font-size:11.5px;padding:4px 10px;border-radius:var(--radius-sm);cursor:pointer}
+.mini:hover{background:var(--bg-hover);color:var(--text)}
+input[type=range]{width:104px;accent-color:var(--accent)}
+.chk{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-muted);cursor:pointer;user-select:none}
+
+/* ══ 窗口小样 ══════════════════════════════ */
+.win{position:relative;border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  background:var(--bg);box-shadow:var(--shadow-pop);overflow:hidden}
+
+/* 顶栏 */
+.top{display:flex;align-items:center;gap:8px;height:42px;padding:0 14px;
+  border-bottom:1px solid var(--border);background:var(--bg-raised)}
+.top__name{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600}
+.top__sp{flex:1}
+.meter{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text-muted);white-space:nowrap}
+.meter__track{width:54px;height:4px;border-radius:2px;background:var(--bg-active);overflow:hidden}
+.meter__fill{display:block;height:100%;border-radius:2px;background:var(--text-faint);
+  transition:width var(--dur-slow) var(--ease)}
+.meter--warn .meter__fill{background:var(--warn)}
+.meter--danger .meter__fill{background:var(--danger)}
+.meter--warn .meter__label{color:var(--warn)}
+.meter--danger .meter__label{color:var(--danger)}
+.meter__total,.meter__cache{color:var(--text-faint)}
+
+/* 主体 */
+.body{position:relative;display:flex;flex-direction:column;height:398px;overflow:hidden}
+.tape{flex:1;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
+  padding:0 18px;font-size:13px;transition:padding-right var(--dur-slow) var(--ease)}
+/* 流速带是真占宽度的：正文、桌宠、输入框都得让位，不能盖在上面 */
+.rowi{display:flex;align-items:center;gap:8px;padding:7px 2px;font-size:12.5px;
+  color:var(--text-muted);border-bottom:1px solid var(--border)}
+.rowi .n{margin-left:auto;color:var(--text-faint);font-size:11.5px}
+.rowi .g{color:var(--text-faint)}
+.rowi .cut{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prose{margin:9px 2px;line-height:1.75}
+.prose ul{margin:5px 0;padding-left:20px}
+.prose li{margin:3px 0}
+.said{max-width:70%;margin:11px 2px 11px auto;padding:9px 13px;border-radius:11px;
+  background:var(--bg-said);font-size:13px;line-height:1.7}
+.think{margin:9px 2px 0;font-size:12.5px;color:var(--text-muted);display:flex;align-items:center;gap:7px}
+.think .t{color:var(--text-faint);font-variant-numeric:tabular-nums}
+
+/* 桌宠活动区。地面 = 输入框上沿，所以宠物 bottom 探进去 6px（同 pets.css） */
+.stage{position:relative;flex:none;height:46px;z-index:3}
+.pet{position:absolute;bottom:-6px;width:30px;height:30px;opacity:.6;
+  transition:opacity var(--dur-slow) var(--ease)}
+.pet--on{opacity:1}
+.pet__lean{display:block;transform-origin:bottom center}
+.pet__body{display:block;transform-origin:bottom center}
+.pet__body svg{display:block;width:30px;height:30px}
+.pet--claude .pet__body svg{width:34px;height:30px;margin-left:-2px}
+.pet--dsh .pet__body svg{width:40px;height:36px;margin:-6px 0 0 -5px}
+.pet__shade{position:absolute;bottom:-6px;width:26px;height:6px;margin-left:2px;border-radius:50%;
+  background:var(--pet-shade);opacity:var(--pet-shade-a);filter:blur(.5px)}
+.pet--claude .pet__shade{width:30px;margin-left:0}
+.pet--dsh .pet__shade{width:28px;margin-left:1px}
+.pet:not(.pet--on) .pet__dot{display:none}
+.pet__dot{position:absolute;bottom:calc(100% + 3px);left:50%;width:6px;height:6px;
+  margin-left:-3px;border-radius:50%;background:var(--ok)}
+.pet--kimi{color:var(--pet-kimi);--pet-eye:var(--pet-kimi-eye)}
+.pet--claude{color:var(--pet-claude);--pet-eye:var(--pet-claude-eye)}
+.pet--grok{color:var(--pet-grok);--pet-eye:var(--pet-grok-eye)}
+.pet--plain{color:var(--pet-plain);--pet-eye:var(--pet-plain-eye)}
+.pet--dsh{color:var(--pet-dsh);--pet-eye:var(--pet-dsh-eye)}
+.pet__eyes{transform-box:fill-box;transform-origin:center;transition:transform 70ms var(--ease)}
+@keyframes pet-hop{
+  0%{transform:translateY(0) scale(1,1)}   3%{transform:translateY(0) scale(1.12,.86)}
+  8%{transform:translateY(-9px) scale(.94,1.08)} 14%{transform:translateY(0) scale(1.1,.88)}
+  19%{transform:translateY(0) scale(.97,1.04)} 24%,100%{transform:translateY(0) scale(1,1)}}
+.pet--run .pet__body{animation:pet-hop 4s linear 600ms infinite}
+
+/* 输入框 */
+.compwrap{position:relative;flex:none;padding:0 18px 14px}
+.comp{position:relative;border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  background:var(--bg-raised);box-shadow:var(--shadow-1);padding:8px 12px}
+.chips{display:flex;align-items:center;gap:12px;padding-bottom:6px;border-bottom:1px solid var(--border);
+  font-size:11.5px;color:var(--text-muted)}
+.chips span{display:inline-flex;align-items:center;gap:5px}
+.ta{padding-top:9px;min-height:38px;font-size:14px;line-height:1.6;color:var(--text)}
+.row{display:flex;align-items:center;gap:8px;padding-top:4px;margin-left:-9px}
+.trig{display:inline-flex;align-items:center;gap:5px;flex:none;height:26px;padding:0 8px;
+  border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;
+  color:var(--text-muted);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
+.trig:hover{background:var(--bg-hover);color:var(--text)}
+.trig svg{color:var(--text-faint)}
+.gapx{flex:1;min-width:8px}
+.eff{display:inline-flex;align-items:center;gap:6px;flex:none;font-size:11.5px;color:var(--text-faint)}
+.eff__b{display:flex;gap:2px;align-items:flex-end}
+.eff__b i{display:block;width:3px;background:var(--text-faint);border-radius:1px}
+.send{flex:none;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;
+  border-radius:999px;background:var(--text);color:var(--text-inverse);cursor:pointer}
+.send i{display:block;width:9px;height:9px;border-radius:1.5px;background:currentColor}
+.ic{stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* 上下文进度环（照 UsageRing.tsx / app-composer.css） */
+.usage{position:relative;display:flex;align-items:center;padding:0 3px;cursor:default}
+.usage-ring{display:block;color:var(--text-faint);overflow:visible}
+.usage-ring circle{fill:none;stroke-width:1.6}
+.usage-ring__track{stroke:var(--border-strong)}
+.usage-ring__fill{stroke:currentColor;stroke-linecap:round}
+.usage-ring--warn{color:var(--warn)}
+.usage-ring--danger{color:var(--danger)}
+.usage__tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);
+  padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--bg-raised);box-shadow:var(--shadow-pop);white-space:nowrap;
+  font-size:11.5px;color:var(--text-muted);opacity:0;pointer-events:none;
+  transition:opacity var(--dur) var(--ease)}
+.usage:hover .usage__tip{opacity:1}
+.usage__tip b{color:var(--text);font-weight:500}
+
+/* ── A/F · 弹道层：盖在整个主体上，包括输入框 ── */
+.fx{position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:none}
+
+
+/* ══ 设置页小样：类名照 settings.css 搬 ══════════ */
+.set{display:flex;flex-direction:column;width:100%;height:592px;overflow:hidden;
+  border:1px solid var(--border-strong);border-radius:var(--radius-lg);
+  background:var(--bg);box-shadow:var(--shadow-pop);margin:22px 0 0}
+.set__head{display:flex;align-items:center;gap:12px;flex:none;padding:12px 12px 12px 16px;
+  border-bottom:1px solid var(--border-strong);background:var(--bg-sunken)}
+.set__heading{font-size:16px;font-weight:600;color:var(--text)}
+.set__ver{flex:1;font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  font-size:11.5px;color:var(--text-faint)}
+.set__body{display:flex;min-height:0;flex:1}
+.set__nav{display:flex;flex-direction:column;flex:none;gap:2px;width:172px;padding:8px;
+  overflow-y:auto;border-right:1px solid var(--border-strong);background:var(--bg-sunken)}
+.set__tab{display:flex;align-items:center;gap:8px;padding:6px 8px;border:0;
+  border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);
+  font:inherit;font-size:13px;text-align:left;white-space:nowrap;cursor:default}
+.set__tab--on{background:var(--bg-active);color:var(--text)}
+/* 「看东西」那一段之前的那条界：上面几页改东西，下面几页只看 */
+.set__tab--cut{margin-top:12px;border-top:1px solid var(--border);padding-top:12px;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm)}
+.set__tabicon{display:inline-flex;color:var(--text-faint)}
+.set__tab--on .set__tabicon{color:var(--text-muted)}
+.set__pane{flex:1;min-width:0;padding:24px;overflow-y:auto}
+.set__group + .set__group{margin-top:24px}
+.set__title{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-faint)}
+.set__note{margin:0 0 12px;font-size:11.5px;line-height:1.6;color:var(--text-faint)}
+.set__note b{color:var(--text-muted);font-weight:500}
+.set__rows{overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-raised)}
+.set__field{display:flex;align-items:flex-start;gap:16px;padding:12px 16px}
+.set__field + .set__field{border-top:1px solid var(--border)}
+.set__field--stack{flex-direction:column;gap:8px}
+.set__text{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.set__label{font-size:14px;color:var(--text)}
+.set__hint{font-size:11.5px;line-height:1.6;color:var(--text-faint)}
+.set__hint b{color:var(--text-muted);font-weight:500}
+.set__control{display:flex;flex:none;align-items:center;gap:8px;padding-top:1px}
+.set__field--stack .set__control{flex-wrap:wrap}
+/* 一只桌宠一格：勾选 + 预览出场 */
+.petpick{display:flex;flex-wrap:wrap;gap:8px}
+.petpick label{display:flex;align-items:center;gap:7px;padding:6px 10px 6px 8px;
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+  background:var(--bg);font-size:12.5px;color:var(--text-muted);cursor:pointer}
+.petpick label:hover{background:var(--bg-hover)}
+.petpick input{margin:0}
+.petpick b{color:var(--text);font-weight:500}
+.petpick i{font-style:normal;color:var(--text-faint);font-size:11px}
+.set__demo{display:block;width:100%;height:74px;border:1px solid var(--border);
+  border-radius:var(--radius-sm);background:var(--bg)}
+
+/* ══ 说明卡 ══════════════════════════════ */
+.say{margin:18px 0 0;display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+@media (max-width:880px){.say{grid-template-columns:1fr}}
+.say__main{border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised);
+  padding:14px 16px}
+.say__h{display:flex;align-items:baseline;gap:9px;margin:0 0 8px}
+.say__h b{font-size:14.5px;letter-spacing:-.006em}
+.say__h span{font-size:11px;font-family:var(--font-mono);color:var(--text-faint)}
+.say dl{margin:0}
+.say dt{margin:9px 0 1px;font-size:11px;font-family:var(--font-mono);letter-spacing:.06em;
+  color:var(--text-faint)}
+.say dt:first-of-type{margin-top:0}
+.say dd{margin:0;font-size:13px;line-height:1.75;color:var(--text-muted)}
+.say dd b{color:var(--text);font-weight:600}
+.say__side{border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised);
+  padding:12px 13px 13px}
+.say__side h3{margin:0 0 8px;font:500 11px/1 var(--font-mono);letter-spacing:.06em;color:var(--text-faint)}
+.zoom{display:block;width:100%;height:104px;border-radius:var(--radius-sm);background:var(--bg-sunken)}
+.zoom__c{margin:8px 0 0;font-size:11.5px;line-height:1.65;color:var(--text-faint)}
+.verd{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.verd span{font-size:10.5px;padding:2px 7px;border-radius:999px;border:1px solid var(--border-strong);
+  color:var(--text-muted)}
+.verd .y{border-color:var(--ok);color:var(--ok)}
+.verd .n{border-color:var(--danger);color:var(--danger)}
+
+/* ══ 结论 ══════════════════════════════ */
+.fin{border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg-raised);
+  padding:16px 18px}
+.fin p{margin:0 0 9px;color:var(--text-muted);line-height:1.85}
+.fin p:last-child{margin-bottom:0}
+.fin b{color:var(--text);font-weight:600}
+.fin .k{display:inline-block;min-width:1.35em;font-weight:600;color:var(--text);font-family:var(--font-mono)}
+.note{max-width:64em;font-size:12.5px;line-height:1.85;color:var(--text-faint)}
+.note b{color:var(--text-muted);font-weight:500}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>桌宠开火：打怪与升级</h1>
+<p class="lede">在前面那套「状态机」上加了完整的一层：<b>打怪</b>（三种怪各对应一个真实压力源）和<b>升级</b>（经验＝这个引擎替你干的活）。切上面的控件挨个看。</p>
+<p class="lede" style="border-left:2px solid var(--danger);padding-left:11px;margin-left:-13px">
+<b>这一层只有一条宪法，它决定了整套东西是不是还诚实：</b><br>
+<b>火力恒等于流速。等级不改射速、不改伤害、不改任何一个能影响「打不打得掉」的数。</b>
+一旦等级能改火力，画面上的胜负说的就是你的存档，而不是引擎此刻的表现——而后者才是这个控件存在的<em>全部</em>理由。
+所以升级换来的只有一样：<b>这把枪看起来更贵</b>。而「更贵」直读作<b>这家引擎我用得多</b>。</p>
+
+<div class="ctl">
+  <div class="ctl__g"><span class="ctl__l">引擎状态</span>
+    <div class="seg" id="segMode">
+      <button data-m="script" aria-pressed="true">剧本</button>
+      <button data-m="think">思考中</button>
+      <button data-m="stream">流式</button>
+      <button data-m="burst">爆发</button>
+      <button data-m="tool">工具</button>
+      <button data-m="throttle">限流</button>
+      <button data-m="stall">卡住</button>
+      <button data-m="approve">审批</button>
+      <button data-m="fail">出错</button>
+      <button data-m="sub">子 agent</button>
+      <button data-m="idle">空闲</button>
+    </div>
+    <button class="mini" id="btnSettle">结一次账</button>
+  </div>
+  <div class="ctl__g"><span class="ctl__l">倍速</span>
+    <input type="range" id="rngSpeed" min="0.25" max="2" step="0.05" value="1">
+    <span class="ctl__l" id="lblSpeed" style="min-width:2.6em">1.0×</span>
+  </div>
+  <div class="ctl__g">
+    <div class="seg" id="segTheme">
+      <button data-t="auto" aria-pressed="true">跟系统</button>
+      <button data-t="light">浅</button>
+      <button data-t="dark">深</button>
+    </div>
+  </div>
+  <label class="chk"><input type="checkbox" id="chkRM"> 减少动效</label>
+</div>
+
+<div class="fire" id="fire">
+  <span class="ctl__l" style="font-weight:600;color:var(--text-muted)">开火形态</span>
+  <div class="ctl__g"><span class="ctl__l">弹道</span>
+    <div class="seg" data-f="traj">
+      <button data-v="tape" aria-pressed="true">打字机</button>
+      <button data-v="pile">弹壳堆</button>
+      <button data-v="air">打空</button>
+      <button data-v="pop">短点射</button>
+      <button data-v="shell">抛壳</button>
+      <button data-v="lob" title="旧：会横穿正文">抛送→环</button>
+    </div></div>
+  <div class="ctl__g"><span class="ctl__l">弹丸</span>
+    <div class="seg" data-f="ammo">
+      <button data-v="px" aria-pressed="true">像素块</button>
+      <button data-v="ch">真字符</button>
+    </div></div>
+  <div class="ctl__g"><span class="ctl__l">工具</span>
+    <div class="seg" data-f="tool">
+      <button data-v="auto" aria-pressed="true">自动</button>
+      <button data-v="term">终端</button>
+      <button data-v="wrench">扳手</button>
+      <button data-v="glass">放大镜</button>
+    </div></div>
+  <div class="ctl__g"><span class="ctl__l">节奏</span>
+    <div class="seg" data-f="beat">
+      <button data-v="even" aria-pressed="true">匀速</button>
+      <button data-v="chunk">按 chunk 成组</button>
+    </div></div>
+  <div class="ctl__g"><span class="ctl__l">拖尾</span>
+    <div class="seg" data-f="trail">
+      <button data-v="none">无</button>
+      <button data-v="ghost" aria-pressed="true">残影</button>
+      <button data-v="rope">光绳</button>
+    </div></div>
+  <label class="chk"><input type="checkbox" id="chkDeliver" checked> 结账空投</label>
+  <span style="width:1px;height:18px;background:var(--border-strong)"></span>
+  <label class="chk"><input type="checkbox" id="chkPlan" checked> 计划旗</label>
+  <label class="chk"><input type="checkbox" id="chkGun" checked> 持枪</label>
+  <div class="ctl__g"><span class="ctl__l">僵尸</span>
+    <div class="seg" data-f="zdens">
+      <button data-v="off">关</button>
+      <button data-v="few">少</button>
+      <button data-v="norm" aria-pressed="true">常</button>
+      <button data-v="horde">围攻</button>
+    </div></div>
+  <button class="mini" id="btnZomb">来一波</button>
+  <span style="width:1px;height:18px;background:var(--border-strong)"></span>
+  <label class="chk"><input type="checkbox" id="chkRange"> 打靶模式</label>
+  <button class="mini" id="btnClr">清靶</button>
+  <div class="ctl__g"><span class="ctl__l">怪</span>
+    <div class="seg" data-f="foe">
+      <button data-v="mix" aria-pressed="true">混合</button>
+      <button data-v="slime">史莱姆</button>
+      <button data-v="swarm">蜂群</button>
+      <button data-v="glut">胖子</button>
+    </div></div>
+  <div class="ctl__g"><span class="ctl__l">引擎</span>
+    <div class="seg" id="segEng">
+      <button data-e="kimi" aria-pressed="true">Kimi</button>
+      <button data-e="claude">Claude</button>
+      <button data-e="grok">Grok</button>
+      <button data-e="dsh">DSH</button>
+      <button data-e="plain">未接入</button>
+    </div>
+    <span class="ctl__l" id="lblEng" style="min-width:3.4em">制式</span>
+  </div>
+  <div class="ctl__g"><span class="ctl__l">上下文</span>
+    <input type="range" id="rngCtx" min="0" max="99" step="1" value="53" style="width:96px">
+    <span class="ctl__l" id="lblCtx" style="min-width:3.2em">53%</span>
+  </div>
+  <div class="ctl__g"><span class="ctl__l">等级</span>
+    <input type="range" id="rngLv" min="0" max="240" step="1" value="14" style="width:130px">
+    <span class="ctl__l" id="lblLv" style="min-width:13em">Lv 14 · 导轨 · 199M</span>
+  </div>
+</div>
+
+<div class="win" id="win">
+  <div class="top">
+    <div class="top__name">omni
+      <svg class="ic" width="11" height="11" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
+    </div>
+    <div class="top__sp"></div>
+    <div class="meter" id="meter">
+      <span class="meter__track"><span class="meter__fill" id="mFill" style="width:53%"></span></span>
+      <span class="meter__label" id="mLabel">560k / 1049k · 53%</span>
+      <span class="meter__total" id="mTotal">累计 198555k</span>
+      <span class="meter__cache" id="mCache">缓存 195709k</span>
+    </div>
+  </div>
+
+  <div class="body" id="body">
+    <div class="tape">
+      <div class="rowi"><svg class="ic" width="13" height="13" viewBox="0 0 14 14"><rect x="2" y="3" width="10" height="8" rx="1.5"/></svg><span class="cut">编辑了文件 · 运行了命令</span><span class="n">2 ›</span></div>
+      <div class="prose">就位了，两笔提交：
+        <ul>
+          <li><code>c8dddcc</code>：模型胶囊的图标<b>彻底去掉</b>；上下文进度环挪到模型原本图标那个位置。</li>
+          <li><code>69cd8ed</code>：更新日志里的位置描述同步改准。</li>
+        </ul>
+      </div>
+      <div class="said">我的意思是圆环放在模型原本图标的那个位置，不是放在最左侧</div>
+      <div class="rowi"><svg class="ic" width="13" height="13" viewBox="0 0 14 14"><path d="M2.5 3.5h9v6h-5l-2.5 2v-2h-1.5z"/></svg><span class="g">思考</span><span class="cut">· 位置说的是「模型图标原来占的那格」，不是这一排的最左端…</span><span class="n">›</span></div>
+      <div class="rowi"><svg class="ic" width="13" height="13" viewBox="0 0 14 14"><rect x="2" y="3" width="10" height="8" rx="1.5"/></svg><span class="cut">编辑了文件 · 运行了命令 · 读取了文件</span><span class="n">4 ›</span></div>
+      <div class="think"><span id="thinkWord">正在思考</span><span class="t" id="thinkT">9m 30s</span></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <span class="pet pet--claude" data-eng="claude" style="right:296px"><span class="pet__dot"></span><span class="pet__shade"></span><span class="pet__lean"><span class="pet__body">
+        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--pet-eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+      </span></span></span>
+      <span class="pet pet--plain" data-eng="plain" style="right:252px"><span class="pet__dot"></span><span class="pet__shade"></span><span class="pet__lean"><span class="pet__body">
+        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--pet-eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+      </span></span></span>
+      <span class="pet pet--kimi pet--on" data-eng="kimi" style="right:208px"><span class="pet__dot"></span><span class="pet__shade"></span><span class="pet__lean"><span class="pet__body">
+        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--pet-eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+      </span></span></span>
+      <span class="pet pet--grok" data-eng="grok" style="right:164px"><span class="pet__dot"></span><span class="pet__shade"></span><span class="pet__lean"><span class="pet__body">
+        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="7" fill="currentColor"/><g class="pet__eyes" fill="var(--pet-eye)"><rect x="8" y="9" width="2.6" height="6" rx="1.3"/><rect x="13.4" y="9" width="2.6" height="6" rx="1.3"/></g></svg>
+      </span></span></span>
+      <span class="pet pet--dsh" data-eng="dsh" style="right:118px"><span class="pet__dot"></span><span class="pet__shade"></span><span class="pet__lean"><span class="pet__body">
+        <svg viewBox="0 0 110 99" preserveAspectRatio="xMidYMax meet">
+          <defs>
+            <filter id="dshA" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  -0.2126 -0.7152 -0.0722 0 1"/><feComponentTransfer><feFuncA type="linear" slope="1.04" intercept="-0.02"/></feComponentTransfer></filter>
+            <filter id="dshL" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.2126 0.7152 0.0722 0 0"/><feComponentTransfer><feFuncA type="linear" slope="1.04" intercept="-0.02"/></feComponentTransfer></filter>
+            <mask id="dshM" maskUnits="userSpaceOnUse" x="0" y="0" width="110" height="99"><image href="data:image/png;base64,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" width="110" height="99" filter="url(#dshA)"/></mask>
+            <mask id="dshML" maskUnits="userSpaceOnUse" x="0" y="0" width="110" height="99"><image href="data:image/png;base64,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" width="110" height="99" filter="url(#dshL)"/></mask>
+          </defs>
+          <rect width="110" height="85" fill="currentColor" mask="url(#dshM)"/>
+          <g class="pet__eyes" fill="var(--pet-eye)"><rect x="37" y="42" width="11" height="22" mask="url(#dshML)"/><rect x="60" y="42" width="11" height="22" mask="url(#dshML)"/></g>
+          <path d="M36 85 C39 78.5 45.5 76 55 76 C64.5 76 71 78.5 74 85 Z" fill="var(--pet-dsh-belly)"/>
+          <g fill="none" stroke="var(--pet-dsh-belly-mark)" stroke-width="1.8" stroke-linecap="round"><path d="M49 78.5 L50 84"/><path d="M61 78.5 L60 84"/></g>
+        </svg>
+      </span></span></span>
+    </div>
+
+    <div class="compwrap">
+      <div class="comp">
+        <div class="chips">
+          <span><svg class="ic" width="12" height="12" viewBox="0 0 14 14"><path d="M1.8 4.2V3a1 1 0 0 1 1-1h2.3l1.1 1.4h4a1 1 0 0 1 1 1v6.2a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z"/></svg>omni</span>
+          <span><svg class="ic" width="12" height="12" viewBox="0 0 14 14"><circle cx="4" cy="3.4" r="1.5"/><circle cx="4" cy="10.6" r="1.5"/><circle cx="10" cy="5.6" r="1.5"/><path d="M4 4.9v4.2M10 7.1c0 2-2 2-3.4 2.4"/></svg>main · 20</span>
+        </div>
+        <div class="ta">继续</div>
+        <div class="row">
+          <button class="trig"><svg class="ic" width="13" height="13" viewBox="0 0 14 14"><rect x="2" y="2.5" width="10" height="9" rx="1.5"/><path d="M5.6 5.6 8.6 7 5.6 8.4z"/></svg>Kimi Code
+            <svg class="ic" width="10" height="10" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5"/></svg></button>
+          <button class="trig"><svg class="ic" width="13" height="13" viewBox="0 0 14 14"><path d="M7 1.8 11.6 3.4v3.4c0 2.6-1.9 4.5-4.6 5.4-2.7-.9-4.6-2.8-4.6-5.4V3.4z"/></svg>自动审批
+            <svg class="ic" width="10" height="10" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5"/></svg></button>
+          <span class="usage" id="usage">
+            <svg class="usage-ring" id="ring" width="12" height="12" viewBox="0 0 16 16">
+              <circle class="usage-ring__track" cx="8" cy="8" r="5.4"/>
+              <circle class="usage-ring__fill" id="ringFill" cx="8" cy="8" r="5.4" transform="rotate(-90 8 8)"/>
+                          </svg>
+            <span class="usage__tip" id="ringTip">上下文已用 53%</span>
+          </span>
+          <button class="trig"><svg class="ic" width="13" height="13" viewBox="0 0 14 14"><path d="M7 2.2 8.2 5.8 11.8 7 8.2 8.2 7 11.8 5.8 8.2 2.2 7 5.8 5.8z"/></svg>K3
+            <svg class="ic" width="10" height="10" viewBox="0 0 12 12"><path d="M3 4.5 6 7.5 9 4.5"/></svg></button>
+          <button class="trig" style="border-color:var(--border-strong);color:var(--text)">侧问</button>
+          <span class="gapx"></span>
+          <span class="eff"><span class="eff__b"><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i></span>最高</span>
+          <button class="send"><i></i></button>
+        </div>
+      </div>
+    </div>
+
+    <canvas class="fx" id="cvFx"></canvas>
+  </div>
+</div>
+
+<div class="say">
+  <div class="say__main">
+    <div class="say__h"><b>手里拿什么，就是它在干什么</b><span>state → prop</span></div>
+    <dl>
+      <dt>怪 · 三种，各对应一个真实压力源</dt>
+      <dd><b>敌人不是随机刷出来的关卡内容，它是某个引擎信号的化身</b>，打不打得掉由那个信号决定。<br>
+      <b>史莱姆</b> ← 静默。走得慢、量大，零输出越久来得越勤。<br>
+      <b>蜂群</b> ← 限流。血薄但一来一簇、飞在半空、走得快。<b>低流速时最难清</b>——不是因为它们厚，是因为你的射速跟不上它们的只数，那正是限流的体感。<br>
+      <b>胖子</b> ← 上下文逼近上限。血厚走得极慢，而且<b>一路把纸带上的字吃掉</b>。这一条是三种里最准的：上下文满了，前面产出的东西真的会被压缩掉。</dd>
+      <dt>子 agent · 放出去的悬浮炮台</dt>
+      <dd><b>不做成小桌宠，做成主桌宠放出去的装备。</b>理由是硬的：<b>桌宠编码的是「哪一家引擎」</b>（五只＝五家，压暗＝不是当前这家）。把子 agent 画成小一号的桌宠，读出来是「又来了几个小引擎」——而子 agent 恰恰不是另一家引擎，<b>它是同一个 agent 伸出去的手</b>。<br>
+      形是<b>磁悬浮小炮</b>：一颗圆核心 + 一截短炮口，底下一圈 accent 磁环——<b>本体和磁环之间那道缝就是「悬浮」本身</b>，缝里两点场弧跟着脉动一起呼吸，中间那颗芯读作「通着电」。<br>
+      三条把「是装备不是角色」钉死：<b>没有眼睛</b>（有眼睛的是角色，没眼睛的是机器）· <b>配色跟枪走不跟身体走</b>（所以它和主桌宠手里那把枪是一套，和桌宠本身不是）· <b>绕着本体转，不是往前铺一排</b>（靠得近＝属于它；铺一排会读成「一行东西」，还跟纸带和计划旗抢地方）。<br>
+      前后遮挡是假的：椭圆下半圈算「近」（原大、不透明），上半圈算「远」（缩到 0.82、压到五成透明）。canvas 在桌宠 DOM 之上、画不到它背后去，但把远的那半圈压暗一档，眼睛会自己把它读成绕到后面去了。<br>
+      关键在于<b>主桌宠这时候自己不开火</b>——产出还在，只是不是它在打。现在的界面里，「主 agent 在等三个子 agent」和「主 agent 卡住了」<b>长得一模一样</b>，而前者恰恰是干得最欢的时候。<br>
+      流速在几只之间<b>平分</b>：三只同时打，每只的射速就是三分之一。这条也不是装饰——它就是 fan-out 的真实代价。</dd>
+      <dt>经验 · 就是累计 token，0–100 级</dt>
+      <dd>不再有别的加分项，连折算这一步都省了：<b>等级是「累计 token」的一个单调函数</b>，顶栏那个 <code>累计</code> 和桌宠的等级说的是同一件事的两种写法。每只桌宠一份，<b>跨会话</b>累计。于是「Kimi 47 级、Claude 12 级」直读作<b>你实际用哪家用得多</b>——<b>它是使用分布，不是成就系统</b>。<br><br>
+      <b>曲线定在 <code>31600 × lv^3.25</code>，满级 100B。</b>上一版定的是 190M，理由是「顶栏那个 198555k 正好落在满级线上」——<b>那是错的，错在锚点</b>：<code>usage.ts</code> 里 <code>totalTokens</code> 的注释写着「本会话累计」，198M 是<b>一次会话</b>烧掉的量，不是这个项目终身的量。按那条曲线，<b>开一次长会话就直接满级</b>，等级从第二天起就是个常数——而一个永远显示 100 的等级和不显示是一回事。<br>
+      重定之后：<code>Lv5 = 6M</code>（头一个小时）· <code>Lv15 = 210M</code>（一次大会话，顶栏那个数现在落在 <b>Lv14</b>，正好差一级要升）· <code>Lv35 = 3.3B</code>（两三周）· <code>Lv65 = 24.6B</code>（几个月）· <code>Lv100 = 100B</code>（约五百次大会话，一年半的重度日用）。<br>
+      <b>这条曲线的形状本身就是一句话：头一天你就能看见它在长，而后面是留给真的把这家引擎用穿了的人的。</b><br><br>
+      <b>没有上限。</b>先前在 100 级封了顶，那是错的，而且错得比数字大小更根本——<b>等级就是「累计 token」的另一种写法，一封顶它就不再是那个数的函数了</b>，而那正是这套设计唯一的立足点。封顶之后界面开始撒谎：数字还在涨，等级不动了。何况会撞到顶的恰恰是把这家引擎用得最狠的那批人，凭什么是他们先没得看。<br>
+      token 每翻一倍等级 ×1.24：<code>Lv100=100B</code> · <code>Lv123=200B</code> · <code>Lv203=1T</code> · <code>Lv412=10T</code> · <code>Lv1701=1000T</code>。它会一直慢慢走，不会停。<br>
+      <b>美术是有限的，数字不是——这两件事分开处理：</b>枪的形制五档，最后一档 Lv65 到顶；再往上换<b>刻痕</b>，Lv65 之后每 20 级在机匣上多刻一道，<b>画到八道封顶</b>。画面到此为止，而数字永远精确，标签里写的一直是真值。</dd>
+      <dt>装备 · 五档形制，逐档焊零件</dt>
+      <dd>Lv0-4 光板（&lt;6M）→ Lv5-14 顶部导轨（6M–210M）→ Lv15-34 消焰器＋加长弹匣（210M–3.3B）→ Lv35-64 瞄准镜（3.3B–24.6B）→ Lv65+ 能量条（24.6B+）。<b>前面密后面疏</b>：早期几轮就能看见变化，后面越来越难换，和 token 曲线本身的加速度一致。<b>叠加不是替换</b>，所以「这把枪走过多远」是看得出层次的。拖上面那个等级滑块挨档看。</dd>
+      <dt>战报 · 一轮＝一场遭遇战</dt>
+      <dd>结账那一下补给箱落地，旁边出一行：<code>本轮 · 出 12.4k · 工具 3 · 子 agent 3 · 挨咬 2 · 卡 1　+12.4k XP</code>。<b>「挨咬」记的是这一轮零输出的次数</b>，「卡」记的是出错次数——两个都不是游戏分数，是这一轮的健康度。</dd>
+      <dt>已发出、还没吐字</dt>
+      <dd><b>在换弹。</b>枪口朝下，弹匣掉在外面。<b>换多久就是首字等了多久</b>（TTFT）——这个数现在界面上完全没有，而它是「卡住了还是只是慢」最直接的分界。第一个字到的那一刻，弹匣「哐」地推进去，枪抬起来才开始打。</dd>
+      <dt>在跑工具</dt>
+      <dd><b>收枪，掏出对应的家伙：</b>运行命令＝一台小终端（光标还在闪），编辑文件＝扳手，读取文件＝放大镜。这一段现在只有一行折叠的「运行了命令」，而它常常占掉整轮时间的一半以上。</dd>
+      <dt>等你审批</dt>
+      <dd><b>它转过来看着你</b>，枪放下，头顶一个问号。<b>这是唯一一个需要你动手的状态，所以给它唯一一个面向你的动作。</b>其余所有状态它都是背对着你朝左边打的。</dd>
+      <dt>出错</dt>
+      <dd><b>卡壳。</b>枪一红，甩两下，枪口崩两点火星，打不出去。错误现在是一条横幅——横幅会被划走，卡壳不会。</dd>
+      <dt>上下文逼近上限</dt>
+      <dd><b>枪管过热。</b>档位和顶栏那枚 meter 同一套（70% 黄 / 90% 红），所以它不是另一个说法，是同一件事换了个地方说——而这个地方你正好在看。</dd>
+      <dt>结账</dt>
+      <dd><b>补给箱空投</b>落地，旁边飘一个 <code>+2.4k</code>。<b>一轮只有一次，所以它才配得上一个动作</b>；也因此这是全场唯一一次碰 UI 之外的东西。</dd>
+      <dt>没有输出 = 没有子弹</dt>
+      <dd>贯穿全部状态的一条：<b>流速就是火力。</b>爆发档僵尸还没走近就散了，限流档勉强够，<b>在换弹、在跑工具、卡住的时候你一发都打不出来</b>——它会走到你面前咬一口。</dd>
+    </dl>
+  </div>
+  <div class="say__side">
+    <h3>最近 3 秒的发射节奏</h3>
+    <canvas class="zoom" id="cvZoom"></canvas>
+    <p class="zoom__c">切「匀速 / 按 chunk 成组」看这条的区别：匀速是均匀点列，成组是一簇一簇——<b>后者才是真实的流</b>（一发＝一个 <code>item.delta</code> 事件）。</p>
+    <div class="verd">
+      <span class="y">✓ 一个 UI 像素都不碰</span>
+      <span class="y">✓ 站位就是「谁在答」</span>
+      <span class="y">✓ 打的字可以是真的</span>
+      <span class="n">✗ 默认得关着</span>
+    </div>
+  </div>
+</div>
+
+
+<div class="set">
+  <div class="set__head">
+    <span class="set__heading">设置</span>
+    <span class="set__ver">omni · 桌宠</span>
+  </div>
+  <div class="set__body">
+    <!-- 页签照 SettingsPanel.tsx 的 TABS 逐项搬，含「看东西」那条分界（set__tab--cut）。
+         桌宠排在通用后面：它是外观，不是「要开的一件事」，也不是拿来看的东西。 -->
+    <nav class="set__nav">
+      <button class="set__tab"><span class="set__tabicon">✦</span>通用</button>
+      <button class="set__tab set__tab--on"><span class="set__tabicon">◉</span>桌宠</button>
+      <button class="set__tab"><span class="set__tabicon">＋</span>新会话</button>
+      <button class="set__tab"><span class="set__tabicon">▣</span>引擎</button>
+      <button class="set__tab"><span class="set__tabicon">▤</span>环境</button>
+      <button class="set__tab"><span class="set__tabicon">◍</span>远程访问</button>
+      <button class="set__tab set__tab--cut"><span class="set__tabicon">▥</span>活动</button>
+      <button class="set__tab"><span class="set__tabicon">▢</span>数据与排查</button>
+    </nav>
+    <div class="set__pane">
+
+      <div class="set__group">
+        <h3 class="set__title">显示</h3>
+        <p class="set__note">输入框上沿站着的那几只。<b>它们不是装饰——站位说的是「谁在答」</b>：当前引擎那只会出列走到最左边，其余压暗留在队里。</p>
+        <div class="set__rows">
+          <div class="set__field set__field--stack">
+            <div class="set__text">
+              <span class="set__label">显示哪几只</span>
+              <span class="set__hint">默认全显示。<b>只勾一只时它跟着当前引擎走</b>——切引擎不换人，只换那只的样子和整场的皮；这适合只用一家、又不想让另外四只占地方的人。</span>
+            </div>
+            <div class="set__control petpick" id="petPick">
+              <label><input type="checkbox" data-p="claude" checked><b>Claude</b><i>螃蟹 · 降落伞</i></label>
+              <label><input type="checkbox" data-p="plain" checked><b>未接入</b><i>史莱姆 · 淡入</i></label>
+              <label><input type="checkbox" data-p="kimi" checked><b>Kimi</b><i>史莱姆 · 砸下来</i></label>
+              <label><input type="checkbox" data-p="grok" checked><b>Grok</b><i>史莱姆 · 砸下来</i></label>
+              <label><input type="checkbox" data-p="dsh" checked><b>DSH</b><i>鲸 · 跃出水面</i></label>
+            </div>
+          </div>
+          <div class="set__field">
+            <div class="set__text">
+              <span class="set__label">当前生效</span>
+              <span class="set__hint" id="pickHint">五只全显示，站位跟着当前引擎变。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set__group">
+        <h3 class="set__title">出场</h3>
+        <p class="set__note">开应用、或者切引擎的时候，那只不是「啪」地出现，是<b>登场</b>。每家按自己的物性来——这一层比配色更能说清「换了一家」。<b>出场没结束不出列、不抽枪</b>：登场是一拍，干活是下一拍。</p>
+        <div class="set__rows">
+          <div class="set__field">
+            <div class="set__text">
+              <span class="set__label">播放出场动画</span>
+              <span class="set__hint">关掉之后切引擎是直接换人。<b>系统「减少动效」开着时这一项自动失效</b>，不用你来关。</span>
+            </div>
+            <div class="set__control"><label class="chk"><input type="checkbox" id="chkEntry" checked> 开</label></div>
+          </div>
+          <div class="set__field set__field--stack">
+            <div class="set__text">
+              <span class="set__label">看一眼</span>
+              <span class="set__hint"><b>史莱姆</b>砸下来，落地摊成一滩再弹回原形——软体没有别的出场方式。<b>螃蟹</b>是降落伞空投的（蟹不会飞），落地那刻伞脱钩飘走。<b>鲸</b>先炸一圈水花再划弧跃出来，溅一地水点。<b>未接入那只只是淡进来</b>：照 <code>pets.css</code> 里那句「没见过的那一家不编花样」，它连出场都不该有花样，这本身是个信号。</span>
+            </div>
+            <div class="set__control" id="entryDemo">
+              <button class="mini" data-e="kimi">Kimi 砸</button>
+              <button class="mini" data-e="claude">Claude 伞</button>
+              <button class="mini" data-e="dsh">DSH 跃</button>
+              <button class="mini" data-e="grok">Grok 砸</button>
+              <button class="mini" data-e="plain">未接入 淡</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set__group">
+        <h3 class="set__title">僵尸</h3>
+        <p class="set__note">左边会爬过来的那些。<b>它们不是随机刷出来的关卡内容，是压力的化身</b>：上下文越满、静默越久来得越勤，而<b>火力恒等于流速</b>——没有输出就没有子弹，那时候它们会走到跟前。</p>
+        <div class="set__rows">
+          <div class="set__field">
+            <div class="set__text">
+              <span class="set__label">密度</span>
+              <span class="set__hint">「常」是八到十五秒一只；压力大时最短会缩到一秒多一只。<b>关掉之后瞄准那套也就没有目标了</b>——枪会一直端平。</span>
+            </div>
+            <div class="set__control"><div class="seg" id="setDens">
+              <button data-v="off">关</button><button data-v="few">少</button>
+              <button data-v="norm" aria-pressed="true">常</button><button data-v="horde">围攻</button>
+            </div></div>
+          </div>
+          <div class="set__field">
+            <div class="set__text">
+              <span class="set__label">种类</span>
+              <span class="set__hint"><b>史莱姆</b>←静默 · <b>蜂群</b>←限流（血薄但一来一簇，低流速时最难清）· <b>胖子</b>←上下文逼近上限（一路把纸带上的字吃掉）。「混合」按当时的压力源自己挑。</span>
+            </div>
+            <div class="set__control"><div class="seg" id="setFoe">
+              <button data-v="mix" aria-pressed="true">混合</button><button data-v="slime">史莱姆</button>
+              <button data-v="swarm">蜂群</button><button data-v="glut">胖子</button>
+            </div></div>
+          </div>
+          <div class="set__field">
+            <div class="set__text">
+              <span class="set__label">被咬的后果</span>
+              <span class="set__hint">桌宠往后弹一下，本轮战报里记一笔「挨咬」。<b>不掉等级、不影响任何数</b>——「挨咬」记的是这一轮零输出被摸到脸上的次数，是健康度，不是分数。</span>
+            </div>
+            <div class="set__control"><span class="set__hint">仅记录</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set__group">
+        <h3 class="set__title">这一套的边界</h3>
+        <p class="set__note"><b>火力恒等于流速。</b>等级、装备、皮肤一律不改射速、不改伤害、不改任何一个能影响「打不打得掉」的数——一旦等级能改火力，画面上的胜负说的就是你的存档，而不是引擎此刻的表现。<br>
+        唯一有资格影响命中率的是<b>上下文</b>：靶上被它吃掉的那圈不算命中，因为上下文变满本来就是真实的能力衰减，不是存档进度。<br>
+        <b>经验就是累计 token</b>，每只一份、跨会话累计，所以「Kimi 47 级、Claude 12 级」直读作你实际用哪家用得多——它是使用分布，不是成就系统。</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="rule"></div>
+
+<h2>先说一件会决定对错的事：这个窗口里有<b>两个时钟</b></h2>
+<p class="note"><b>上下文环、累计、缓存</b>三个数都来自 <code>Usage</code>（<code>packages/protocol/src/event.ts:14</code>），而 <code>Usage</code> <b>每一轮结账时才回来一次</b>——它是一道阶梯，中间那几分钟是空的。<br>
+每一帧都能拿到的只有 <code>item.delta.append</code> 的字节流（<code>event.ts:125</code>）。<b>所以「流速」只能按字节估</b>：中文约 0.7 token/字，英文约 0.27 token/字符。<br>
+两条推论，六个方案都得守：<b>一、界面上写 <code>~142 t/s</code> 的波浪号</b>，或者干脆写「字/秒」——这个窗口里已经有三个是结算过的数字了，别把估出来的那个摆成同一种脸。<b>二、任何「流速平滑地把环推涨」的画法都是假的</b>，环只会在结账那一下跳。真正连接两者的量叫<b>在途</b>：吐出来了、还没结账的那一批。</p>
+<p class="note" style="margin-top:10px">另：<b>演示里结账的步进放大了 8 倍</b>，否则一轮两三千 token 在 1049k 的环上挪不动一个像素。上下文涨到 97% 会自动回到 53%，好让你看全 <span style="color:var(--text-faint)">灰</span> → <span style="color:var(--warn)">黄</span> → <span style="color:var(--danger)">红</span> 三档。</p>
+
+<h2>结论一（第一批）：位置你挑对了，形式挑错了</h2>
+<div class="fin">
+<p><b>桌宠那一片确实是对的地方。</b>九分钟的等待里，眼睛就停在输入框上沿那一带，桌宠是全窗口唯一在动的东西。信号该放在视线已经落着的地方。</p>
+<p><b>但「射击」是错的音量。</b>一秒十几发，头一个小时很爽，第三天你会自己去设置里关掉它——而一个默认会被关掉的默认值，就是选错了。</p>
+<p><b>右侧那条是对的音量、错的地方。</b>安静、有历史、能回答「刚才那半小时是不是被限流了」——但右边缘是等待时眼睛最不会去的地方，它擅长「你去查」，不擅长「它来告诉你」；而且要真花掉 44px 宽度，这个窗口的横向已经不宽裕。</p>
+<p style="margin-top:14px"><span class="k">C</span> <b>默认给「地面波形」。</b>输入框上沿那条 1px 的边——<b>桌宠站的那条地面</b>——变成波形，桌宠踩着浪起伏。零新增控件、零新增宽度、静止时它就是那条本来就在的边框；而「平 / 慢呼吸 / 虚线 / 起伏」四个状态一眼分得开，<code>正在思考 9m 30s</code> 那个秒表一个都分不出来。附带的好处是：<code>pets.css</code> 里已经写下的那句「<b>它在动 = 它在干活</b>」，第一次有了真的数据依据，桌宠不再只是装饰。</p>
+<p><span class="k">E</span> <b>顺手把顶栏尾巴一起做了。</b>半小时的工作量，顶栏那一行本来就是放数字的地方，要精确值的时候有个地方看。</p>
+<p><span class="k">A</span> <b>桌宠开火留成开关。</b>设置里一句「桌宠开火」，默认关。它值得存在——限流到 15 t/s 时你能一颗一颗数出子弹，那种「变慢了」的体感是任何数字都给不了的。</p>
+<p><span class="k">B</span> <b>等到真有人问「刚才是不是被限流了」再说。</b>那时候要的是一条时间轴，不是此刻的数。</p>
+<p><span class="k">D</span> <b>在途弧是唯一诚实处理两个时钟的画法，但 12px 装不下它想说的话。</b>把它的内容写进环的悬停卡里就够了：<code>上下文 560k / 1049k · 53%｜在途 ~1.2k 未结账｜~142 t/s</code>。</p>
+</div>
+
+
+<h2>结论二（第二批）：换个编码，比换个位置值钱</h2>
+<div class="fin">
+<p>第一批六个方案，本质上是同一件东西摆在六个位置。第二批不是——它们编码的<b>根本不是同一个量</b>：G 编码速度、H 编码在途、I 编码这一轮的形状、J 编码钱、K 编码存活、L 编码产出量。<b>问「放哪儿」之前，先想清楚要说的是哪一个。</b></p>
+<p style="margin-top:14px"><span class="k">K</span> <b>如果只做一件事，做这个。</b><code>pets.css</code> 里给已经存在的那颗 6px 绿点加一条按流速驱动的 scale/opacity，别的一个字不用改——<b>这是全场改动量最小的一个</b>，而它把「它是不是还活着」这个九分钟等待里唯一真正要紧的问题答满了。「一下一下＝慢、常亮＝快」这个读法不用教，所有人看硬盘灯都已经会了。</p>
+<p><span class="k">I</span> <b>如果只做一件「有内容」的，做这个。</b>它替换的 <code>正在思考 9m 30s</code> 是全窗口最没用的一行——一个不透明的秒表。拆成本轮时间轴之后，同一行告诉你<b>这九分钟到底花在哪</b>。而且它是十二个里<b>唯一能一眼看出「卡住」的</b>（黄色那一段有宽度，赖不掉）。</p>
+<p><span class="k">J</span> <b>顺手做。</b>它是唯一说「<b>你在花钱</b>」的那个，几乎零成本。它滚的那一位是估出来的，结账时 <code>Usage</code> 回来会把它拨正一下——<b>那个「自我纠正」不要藏起来</b>，它是这套双时钟数据唯一诚实的呈现方式。</p>
+<p><span class="k">G</span> <b>值得和 C 做个 A/B。</b>C 把速度编码成波的振幅和频率，那是要「看」的；G 编码成<b>质地的速度</b>，那是余光就能读的——人眼判断「东西移动得多快」比判断「波多高」快得多。<b>真做的话记住那个坑</b>：地面必须是随机点阵，等距花纹跑快了会出现车轮效应，看起来反而变慢。</p>
+<p><span class="k">H</span> <b>和 A 一组，做成同一个「桌宠戏法」开关。</b>它是最讨喜的一个，也是最玩具的一个；但<b>「东西吃进去了、还在肚子里、还没算账」这件事不需要任何说明文字</b>，它比 D 那道 12px 的弧把「在途」讲得清楚得多。</p>
+<p><span class="k">L</span> <b>留着。</b>横轴按 token 而不是时间，这个视角是对的，但它太像游标卡尺了。等到真有人问「这一轮到底出了多少」再说。</p>
+</div>
+
+<h2>所以我最后会做的是这套</h2>
+<div class="fin">
+<p><b>三个几乎白送的，全做，互不重叠：</b><br>
+<span class="k">K</span> 头顶那颗点跳 → 回答「<b>还活着吗</b>」　·　<span class="k">I</span> 秒表拆成时间轴 → 回答「<b>这九分钟在干嘛</b>」　·　<span class="k">J</span> 累计位滚字 → 回答「<b>花了多少</b>」</p>
+<p><b>速度感那一层，C 和 G 里挑一个</b>（我押 G，但值得实测）。输入框上沿那条边只有一条，C／G／L 三个本来就该是同一个组件的三种皮。</p>
+<p><b>A ＋ H 打包成设置里一句「桌宠戏法」，默认关。</b>它们的价值是第一天的惊喜和长期的陪伴感，不是信息密度——别拿它当默认。</p>
+<p><b>B 和 D 先不做。</b>B 要等到有人问「刚才那半小时是不是被限流了」；D 的内容塞进环的悬停卡就够了。</p>
+</div>
+
+<h2>最后一句，可能比上面全部都重要</h2>
+<p class="note"><b>这十二个方案有一个共同的前提：你正看着这个窗口。</b>而九分钟的等待里，真实情况是<b>你早就切走了</b>——去看文档、去看另一个项目、去泡咖啡。<br>
+那么真正的缺口不在窗口里，在窗口外：<b>Dock 角标</b>（跑着 / 卡住 / 要审批）、<b>系统通知</b>（这一轮结束了、卡住超过 N 分钟了）、<b>菜单栏那颗小点</b>。窗口内这十二个解决的是「你在看着」的那一半；而<b>另一半才是九分钟真正发生的地方</b>。<br>
+所以次序上我会这么排：先做 <span class="k">K</span>（近乎白送），再做<b>窗口外那一路</b>，最后才回来做 <span class="k">I</span> / <span class="k">J</span> 和速度感那一层。</p>
+
+<h2>各自要动哪些文件</h2>
+<p class="note">
+<b>C</b>　新增一张 canvas 贴在 <code>renderer/styles/app-composer.css</code> 的 <code>.composer</code> 上沿；<code>Pets.tsx</code> 每帧多读一次波形写进 y 偏移（<code>petPaint.ts</code> 已经在按帧写 transform 了，加一项而已）；<code>prefers-reduced-motion</code> 下直接画直线。<br>
+<b>E</b>　<code>components/ContextMeter.tsx</code> 里加一段 sparkline，数据源和 C 共用一个 buffer。<br>
+<b>A</b>　<code>Pets.tsx</code> 加一个 <code>fire</code> 状态与后坐力；子弹层是 <code>.pets</code> 同级的一张 canvas；朝向复用已有的 <code>pet--look-l</code>。<br>
+<b>D</b>　<code>components/UsageRing.tsx</code> 加一个 <code>&lt;circle r="7.2"&gt;</code>，<code>usage.ts</code> 的 <code>Meter</code> 多两个字段。<br>
+<b>B</b>　新组件 + 一条常驻列，<code>app-main.css</code> 里正文要让出 44px。<br>
+<b>G/L</b>　和 C 共用那张 canvas，三种皮一个组件。<br>
+<b>H</b>　<code>.pet__body</code> 上写 scale（<code>pets.css</code> 里 <code>pet-bounce</code> 这类关键帧用的是同一个变换轴，得让位）；结账那下复用现成的 <code>pet--bounce</code>。<br>
+<b>I</b>　<code>正在思考</code> 那行加一张 210×15 的 canvas，数据按轮切段。<br>
+<b>J</b>　<code>ContextMeter.tsx</code> 把最后一位换成 10 格滚轮；<code>usage.ts</code> 的 <code>compact()</code> 多给一位小数。<br>
+<b>K</b>　<code>pets.css</code> 给 <code>.pet__dot</code> 加一条按流速驱动的 scale/opacity。<b>就这一条。</b><br>
+<b>设置</b>　设置窗多一个 <code>桌宠</code> 页签（<code>settings.css</code> 的 <code>.set__*</code> 一套现成的，不新增样式词汇）；偏好里存三样：<code>pets.shown[]</code>、<code>pets.entry</code>、<code>pets.zomb.{dens,foe}</code>。<code>Pets.tsx</code> 读 <code>shown</code> 决定渲染哪几只，并<b>从右往左重排</b>——关掉一只不能在队里留个窟窿。<b>只剩一只时那一只的身份恒等于当前引擎</b>，不是你勾的那家：「只留一只」要的是「只看正在答的那个」，固定显示某一家等于台面上永远站着个错的身份。<br>
+<b>出场</b>　<code>pets.css</code> 里加几条 keyframes 是不够的——<b>伞和水花在 DOM 里根本没有对应元素</b>。所以出场横跨两层：身体的位移与拉伸走 <code>petPaint.ts</code> 已有的 transform 通道，伞绳、水点、落地那圈尘走开火那张 canvas。四种登场按物性分：软体只能砸下来（落地摊成一滩再弹回），蟹不会飞所以是伞投的（落地那刻伞脱钩），鲸先炸一圈水花再划弧跃出，<b>没见过的那一家淡进来——照 <code>pets.css</code> 那句「不编花样」，它连出场都不该有花样</b>。<b>出场没结束不出列、不抽枪</b>：登场是一拍，干活是下一拍，两拍搅在一起就都看不清。<br>
+<b>渲染</b>　四条都做了：<b>每帧只读一次布局</b>（<code>fit()</code> 把 rect 挂回元素，<code>handOf()</code> 直接拿，原来一帧要付四次强制样式计算）；<b>僵尸精灵烘到离屏 canvas</b>（被咬的缺口是 <code>destination-out</code>，围攻档十只就是十次合成，而画的是同一张图——现在只剩十次 <code>drawImage</code>，缓存键带主题代数）；<b>字体串与枪的三档混色一帧只算一次</b>（<code>mix()</code> 要解析十六进制，十五块逐块算等于一帧解析四十五次）；<b>闲着整帧不重绘</b>（canvas 保留上一帧，跳过是无损的，只在「忙→闲」那一帧多画一次收尾）。<br>
+<b>公共</b>　一个 <code>useThroughput()</code>：订阅 <code>item.delta</code>，48Hz 采样进环形 buffer，导出 <code>rate</code> / <code>inflight</code> / <code>state</code>。五个方案全接它，<b>先写这个，再挑画法。</b>
+</p>
+
+</div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id)
+/* NaN-safe：`v<a?a:…` 对 NaN 两个比较都假、会把 NaN 原样放行，
+   一旦有一路弹簧发散，NaN 就顺着 GN.x → muzzlePt → 每颗子弹的 x0 传遍全场，且不可恢复 */
+const clamp=(v,a,b)=>!(v>a)?a:(v>b?b:v)
+const lerp=(a,b,t)=>a+(b-a)*t
+const TAU=Math.PI*2
+
+/* ── 调色板：主题一变就重读，别每帧都去查计算样式 ───────── */
+let PAL={}
+function refreshPal(){
+  const cs=getComputedStyle(document.documentElement)
+  const g=n=>cs.getPropertyValue(n).trim()
+  PAL={bg:g('--bg'),raised:g('--bg-raised'),border:g('--border'),bs:g('--border-strong'),
+    zomb:g('--pet-zomb'),drip:g('--pet-zomb-drip'),gun:g('--pet-gun'),
+    gunHi:g('--pet-gun-hi'),gunDk:g('--pet-gun-dk'),brass:g('--pet-brass'),
+    text:g('--text'),muted:g('--text-muted'),faint:g('--text-faint'),
+    accent:g('--accent'),warn:g('--warn'),danger:g('--danger'),ok:g('--ok'),kimi:g('--pet-kimi'),claude:g('--pet-claude'),grok:g('--pet-grok'),
+    dsh:g('--pet-dsh'),plain:g('--pet-plain'),
+    /* 字体也缓存：原来六处逐帧 getComputedStyle，每帧一次强制样式计算 */
+    font:cs.fontFamily,gen:(PAL.gen||0)+1,
+    /* 常用字号预拼好：canvas 的 font 是字符串属性，每帧现拼现设是白扔的 */
+    f9:'500 9px '+cs.fontFamily,f85:'500 8.5px '+cs.fontFamily,
+    f10:'500 10px '+cs.fontFamily,f105:'600 10.5px '+cs.fontFamily,
+    f11:'500 11px '+cs.fontFamily,f125:'700 12.5px '+cs.fontFamily}
+}
+refreshPal()
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',refreshPal)
+
+/* ── 数字写法照 usage.ts 的 compact() ───────────────── */
+function compact(n){n=Math.round(n);if(n<1000)return String(n);const k=n/1000
+  return k<100?k.toFixed(1).replace(/\.0$/,'')+'k':Math.round(k)+'k'}
+/** 累计量的写法。compact() 只做到 k，而等级线要写到 B */
+function bigTok(n){
+  if(n>=1e12)return (n/1e12).toFixed(n>=1e13?0:1).replace(/\.0$/,'')+'T'
+  if(n>=1e9)return (n/1e9).toFixed(n>=1e10?0:1).replace(/\.0$/,'')+'B'
+  if(n>=1e6)return (n/1e6).toFixed(n>=1e8?0:1).replace(/\.0$/,'')+'M'
+  return compact(n)
+}
+function mmss(s){const m=Math.floor(s/60);return m>0?m+'m '+String(Math.floor(s%60))+'s':Math.floor(s)+'s'}
+
+/* ══ 模拟：一路数据，六个方案共用 ════════════════════ */
+const SPEC={
+  idle    :{base:0  ,jit:0 ,alive:false,word:'就绪'          },
+  think   :{base:0  ,jit:0 ,alive:true ,word:'正在思考'      },
+  stream  :{base:82 ,jit:24,alive:true ,word:'正在输出'      },
+  burst   :{base:196,jit:38,alive:true ,word:'正在输出'      },
+  tool    :{base:0  ,jit:0 ,alive:true ,word:'正在运行命令'  },
+  throttle:{base:15 ,jit:11,alive:true ,word:'正在输出（慢）'},
+  settle  :{base:0  ,jit:0 ,alive:true ,word:'结账'          },
+  /* 「卡住」故意还写着「正在输出」——那正是它的坏处：秒表在走，界面在说它在输出，
+     而实际上一个字都没有。这一档是用来检验十二个方案里哪几个能把它认出来的 */
+  stall   :{base:0  ,jit:0 ,alive:true ,word:'正在输出'      },
+  /* 这两个是这一版新加的：它们本来在界面上一个字都没有 */
+  approve :{base:0  ,jit:0 ,alive:true ,word:'等你审批'      },
+  fail    :{base:0  ,jit:0 ,alive:true ,word:'出错了'        },
+  /* 子 agent 在跑：**主 agent 自己不吐字**，产出全来自那几只小的。
+     这一段现在在界面上和「卡住」长得一模一样，而它恰恰是干得最欢的时候 */
+  sub     :{base:96 ,jit:26,alive:true ,word:'子 agent 在跑'},
+}
+/* 剧本的**占比本身就是一个主张**：跑工具 38%、吐字 32%，其余是想/等/卡/错。
+   上一版吐字占了 53%——画面正好在反驳开篇那句话 */
+const PHASES=[['think',3.4],['stream',4.2],['tool',7],['approve',3],['stream',3],
+              ['tool',6],['sub',7],['burst',2.6],['throttle',3.4],['tool',5.5],['stall',3],
+              ['fail',2.2],['stream',2.4],['settle',.4],['idle',2.2]]
+const CYCLE=PHASES.reduce((s,p)=>s+p[1],0)
+function phaseAt(t){let x=t%CYCLE;for(const p of PHASES){if(x<p[1])return p[0];x-=p[1]}return 'idle'}
+const noise=t=>Math.sin(t*3.1)*.5+Math.sin(t*7.7)*.3+Math.sin(t*17.3)*.2
+
+const S={mode:'script',t:0,busy:0,rate:0,alive:false,phase:'',wphase:0,
+  inflight:0,ctx:560000,win:1049000,total:198555000,cache:195709000,
+  speed:1,settleT:-9,fireAcc:0,fastAcc:0,slowAcc:0,flash:0,
+  recoil:0,recoilV:0,bullets:[],ripples:[],zb:[],zbAcc:0,spin:0,rm:false,prime:true,belly:0,
+  shots:[],chunkT:0,pendDeliver:false,crate:null,floats:[],toolN:0,
+  zombs:[],zNext:9,zInit:false,quietT:0,
+  eng:'kimi',entry:null,lv:14,lvFx:0,tgt:null,shotN:0,hitN:0,mx:null,my:null,subs:[],tSubs:0,wasMoving:true,zwas:true,report:null,tTools:0,tBites:0,tJams:0,aim:Math.PI*1.02,mz:{x:0,y:0},
+  marchX:0,marchBase:0,busyT:0,plan:{n:6,cur:0,drop:[]}}
+const SETTLE_GAIN=8
+
+function doSettle(){
+  S.pendDeliver=true;if(S.plan)S.plan.cur=0
+  if(typeof GN!=='undefined'&&GN.pile.length)sweepPile()
+  const add=S.inflight*SETTLE_GAIN
+  S.pendAdd=add
+  S.ctx+=add;S.total+=add*3.2;S.cache+=add*2.7;S.inflight=0;S.settleT=S.t
+  /* 自动压缩：**只把上下文拨回去**。
+     累计和缓存是 usage.ts 里跨会话只增不减的两笔，而等级 = lvOf(S.total)——
+     上一版连它们一起复位，于是每压缩一次等级条就往回走一格，
+     「经验就是累计 token」那句话当场作废。压缩清的是窗口，不是账。 */
+  if(S.ctx/S.win>.97)S.ctx=S.win*.53
+}
+
+/* ── 控件 ────────────────────────────────── */
+$('segMode').onclick=e=>{const b=e.target.closest('button');if(!b)return
+  S.mode=b.dataset.m
+  ;[...$('segMode').children].forEach(x=>x.setAttribute('aria-pressed',String(x===b)))}
+$('btnSettle').onclick=()=>{if(S.inflight<80)S.inflight=1400;doSettle()}
+$('rngSpeed').oninput=e=>{S.speed=+e.target.value;$('lblSpeed').textContent=S.speed.toFixed(2).replace(/0$/,'')+'×'}
+$('segTheme').onclick=e=>{const b=e.target.closest('button');if(!b)return
+  const t=b.dataset.t
+  if(t==='auto')delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme=t
+  ;[...$('segTheme').children].forEach(x=>x.setAttribute('aria-pressed',String(x===b)))
+  refreshPal()}
+$('chkRM').onchange=e=>{S.rm=e.target.checked
+  if(S.rm){S.bullets.length=0;S.zombs.length=0;S.subs.length=0}}
+if(matchMedia('(prefers-reduced-motion: reduce)').matches){$('chkRM').checked=true;S.rm=true}
+
+/* ── canvas 工具 ─────────────────────────── */
+/* 每帧只读一次布局：fit 把量到的 rect 挂回元素上，handOf 直接拿，
+   不再各量各的。强制样式计算是这页最贵的一笔，而它本来一帧要付四次 */
+/* 画布的 rect **在帧首统一量**，量完再写 transform。
+   上一版是反过来的：帧尾写完五只桌宠的 transform，drawFx 里的 fit() 再去 getBoundingClientRect——
+   写完再读就是一次强制同步布局，每帧一次，白付。画布的位置和桌宠的 transform 无关
+   （transform 不参与布局），所以帧首那一次量到的值和帧尾一模一样。 */
+function measureCanvases(){
+  for(const id of ['cvFx','cvZoom']){const cv=$(id);if(cv)cv.__r=cv.getBoundingClientRect()}
+}
+function fit(cv){
+  const r=cv.__r||(cv.__r=cv.getBoundingClientRect())
+  if(r.width<2||r.height<2)return null
+  const d=Math.min(2,window.devicePixelRatio||1)
+  const w=Math.round(r.width*d),h=Math.round(r.height*d)
+  if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
+  const g=cv.getContext('2d');g.setTransform(d,0,0,d,0,0)
+  g.clearRect(0,0,r.width,r.height)
+  return[g,r.width,r.height]
+}
+function rr(g,x,y,w,h,r){g.beginPath()
+  g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r)
+  g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+function chip(g,x,y,txt,anchor){
+  g.font='500 10.5px '+PAL.font
+  const w=g.measureText(txt).width+14,h=19
+  const bx=anchor==='r'?x-w:anchor==='c'?x-w/2:x
+  g.globalAlpha=.95;g.fillStyle=PAL.raised;rr(g,bx,y-h/2,w,h,5);g.fill()
+  g.globalAlpha=1;g.strokeStyle=PAL.border;g.lineWidth=1;g.stroke()
+  g.fillStyle=PAL.muted;g.textBaseline='middle';g.textAlign='left'
+  g.fillText(txt,bx+7,y+.5)
+  return[bx,bx+w]
+}
+
+/* ── 位置测量：弹道两端点由真实 DOM 算，不是估的 ───── */
+const R={m:{x:0,y:0},h:{x:0,y:0},g:{y:0},r:{x:0,y:0},ok:false}
+function measure(){
+  const fx=$('cvFx'),b=fx.getBoundingClientRect()
+  if(b.width<2)return
+  const p=petEl().getBoundingClientRect(),rg=$('ring').getBoundingClientRect()
+  R.m={x:p.left-b.left+3,y:p.top-b.top+14}
+  /* 手在身子的左下角：枪管要从身体左沿探出去，不能压在脸上 */
+  R.h={x:p.left-b.left+6,y:p.top-b.top+22}
+  R.g={y:p.top-b.top+30}
+  R.r={x:rg.left-b.left+rg.width/2,y:rg.top-b.top+rg.height/2}
+  /* 「打向正文」的落点：那一行活的文字的末尾——token 进的是答案，不是账单 */
+  S.mz={x:R.m.x,y:R.m.y}
+  R.ok=true
+}
+addEventListener('resize',()=>{measure();PETS.length=0})
+
+/* ── 桌宠：踩浪 + 后坐力 ───────────────────── */
+const PETS=[]
+const cur='A'
+/** 当前那只。**不再钉在某个 id 上**——切引擎就是换一只，整套皮跟着换 */
+const petEl=()=>document.querySelector('.pet[data-eng="'+S.eng+'"]')||document.querySelector('.pet')
+const petBody=()=>petEl().querySelector('.pet__body')
+const petEyes=()=>petEl().querySelector('.pet__eyes')
+/* 开火的形态是**可组合的**：弹道 × 弹丸 × 节奏 × 拖尾。
+   分开是因为它们各管一件事——弹道管「打到哪」，节奏管「像不像真的流」。 */
+const FIRE={traj:'tape',ammo:'px',beat:'even',trail:'ghost',deliver:true,gun:true,zomb:true,
+  tool:'auto',plan:true,zdens:'norm',foe:'mix',range:false,entry:true}
+const CHARS='模型胶囊图标彻底去掉上下文进度环挪到原本那个位置就位了两笔提交const{}=>();'
+/* 僵尸的密度和种类**有两个控件**：顶栏这排和设置页那栏。
+   上一版的同步是单向的（设置页 → 顶栏），从顶栏改完之后设置页还显示着旧档，
+   而且顶栏切到「关」不清场、设置页切「关」清场——同一个开关两种行为。
+   现在两边都只经过下面这一对 setter。 */
+function segSync(sel,v){document.querySelectorAll(sel+' button').forEach(x=>
+  x.setAttribute('aria-pressed',String(x.dataset.v===v)))}
+function setZdens(v){
+  const was=ZDENS[FIRE.zdens]>0
+  FIRE.zdens=v
+  if(!ZDENS[v])S.zombs.length=0
+  /* 关掉那段时间 S.t 照走，zNext 还停在旧值上——再打开会当场蹦一只出来 */
+  else if(!was)S.zNext=S.t+2.5
+  segSync('#fire .seg[data-f="zdens"]',v);segSync('#setDens',v)
+}
+function setFoe(v){FIRE.foe=v;segSync('#fire .seg[data-f="foe"]',v);segSync('#setFoe',v)}
+$('fire').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return
+  const g=b.parentElement,k=g.dataset.f,v=b.dataset.v
+  if(k==='zdens')setZdens(v)
+  else if(k==='foe')setFoe(v)
+  else{FIRE[k]=v;[...g.children].forEach(x=>x.setAttribute('aria-pressed',String(x===b)))}
+  S.bullets.length=0;S.ripples.length=0;S.prime=true
+})
+$('chkDeliver').onchange=e=>{FIRE.deliver=e.target.checked}
+$('chkGun').onchange=e=>{FIRE.gun=e.target.checked}
+$('chkPlan').onchange=e=>{FIRE.plan=e.target.checked}
+$('chkRange').onchange=e=>{FIRE.range=e.target.checked
+  S.bullets.length=0
+  if(FIRE.range){setupRange();S.zombs.length=0;S.subs.length=0}}
+$('btnClr').onclick=()=>{setupRange()}
+/** 换引擎＝换一整套皮。旧那只身上的变换要清干净，不然它会带着走位残影留在原地 */
+function setEng(k){
+  if(!KIT[k])return
+  const old=petEl()
+  old.style.transform='';old.classList.remove('pet--on')
+  /* 出场没播完就换人时，淡入那档会把 opacity 留在 0.26 这种中间值上——
+     inline 样式压过 .pet--on / .pet 的类选择器，那只从此永久半透明 */
+  old.style.opacity=''
+  old.querySelectorAll('.pet__lean,.pet__body,.pet__eyes').forEach(e=>{e.style.transform=''})
+  old.querySelector('.pet__dot').style.cssText=''
+  S.eng=k;S.marchX=0;S.subs.length=0;S.bullets.length=0;GN.tape.length=0
+  petEl().classList.add('pet--on')
+  PETS.length=0;GN.init=false
+  startEntry()
+  $('lblEng').textContent=KIT[k].note
+  applyPicks()
+  ;[...$('segEng').children].forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.e===k)))
+}
+$('segEng').onclick=e=>{const b=e.target.closest('button');if(b)setEng(b.dataset.e)}
+
+/* ══ 设置页那一栏的接线 ══════════════════════════ */
+const PICK={kimi:1,claude:1,grok:1,dsh:1,plain:1}
+function applyPicks(){
+  const on=Object.keys(PICK).filter(k=>PICK[k])
+  /*
+   * **只勾一只时，显示的永远是当前引擎那只**，不管勾的是哪一个。
+   * 「只留一只」这句话的意思本来就是「我只想看正在答的那个」——
+   * 如果它还固定显示某一家，那切到别家时台面上站着的就是个错的身份。
+   */
+  const solo=on.length===1
+  const vis=solo?[S.eng]:on
+  const els=[...document.querySelectorAll('.pet')]
+  els.forEach(el=>{
+    const k=el.dataset.eng
+    el.style.display=(vis.indexOf(k)>=0||k===S.eng)?'':'none'
+  })
+  /* 关掉一只不能在队里留个窟窿——从右往左重新排。
+     间距 44，鲸那只宽一点给 46（和 pets.css 里那几个 right: 是同一套数）。 */
+  let x=118
+  for(let i=els.length-1;i>=0;i--){
+    const el=els[i]; if(el.style.display==='none')continue
+    el.style.right=x+'px'
+    x+=el.dataset.eng==='dsh'?46:44
+  }
+  PETS.length=0
+  $('pickHint').textContent=solo
+    ?'只留一只：台面上永远是当前引擎（'+kit().n+'）那只，切引擎就换它的样子。'
+    :(on.length?on.length+' 只显示，站位跟着当前引擎变。':'一只都没勾——当前引擎那只仍然会显示，否则台面上没有任何地方画着「谁在答」。')
+}
+$('petPick').onchange=e=>{
+  const b=e.target.closest('input');if(!b)return
+  PICK[b.dataset.p]=b.checked?1:0
+  applyPicks()
+}
+$('entryDemo').onclick=e=>{
+  const b=e.target.closest('button');if(!b)return
+  if(b.dataset.e===S.eng)startEntry();else setEng(b.dataset.e)
+}
+$('chkEntry').onchange=e=>{FIRE.entry=e.target.checked}
+$('setDens').onclick=e=>{const b=e.target.closest('button');if(b)setZdens(b.dataset.v)}
+$('setFoe').onclick=e=>{const b=e.target.closest('button');if(b)setFoe(b.dataset.v)}
+/* 指针位置转成画布坐标。**监听挂在 .win 上而不是给 canvas 开 pointer-events**——
+   那张 canvas 盖在整个窗口上，一开事件就把底下的输入框全挡了 */
+/* 指针一动就置脏。**「空闲跳帧」那条优化会把悬停卡一起跳掉**——
+   全闲下来时 moving 恒假，canvas 保留着上一帧，鼠标压到靶子上一帧都不重画，
+   卡永远出不来（实测 idle+打靶下悬停 30 帧，drawFx 调用数为 0）。
+   置脏只在指针真的动了的那几帧成立，鼠标停住之后照样回到不重绘。 */
+$('win').addEventListener('mousemove',e=>{
+  const r=$('cvFx').__r||$('cvFx').getBoundingClientRect()
+  S.mx=e.clientX-r.left;S.my=e.clientY-r.top;S.dirty=true
+})
+$('win').addEventListener('mouseleave',()=>{S.mx=null;S.my=null;S.dirty=true})
+$('rngCtx').oninput=e=>{S.ctx=S.win*(+e.target.value/100)
+  $('lblCtx').textContent=e.target.value+'%'}
+const TIERNAME=['光板','导轨','消焰器','瞄准镜','能量条']
+$('rngLv').oninput=e=>{
+  const was=S.lv
+  S.lv=+e.target.value
+  /* 拖滑块＝把累计 token 一起拨过去。等级不是独立的存档位，
+     它只是「累计 token」的另一种写法，两个数必须永远一致 */
+  S.total=tokFor(S.lv)+1
+  if(S.lv>was)S.lvFx=1            // 往上拖就放一次升级效果，方便看
+  $('lblLv').textContent=lvLabel()}
+const lvLabel=()=>'Lv '+S.lv+(notchN()?' ·'+'|'.repeat(notchN()):'')+
+  ' · '+TIERNAME[gunTier()]+' · '+bigTok(S.total)
+$('btnZomb').onclick=()=>{if(!S.rm)spawnZomb(ZDENS[FIRE.zdens]>=2?4:2)}
+function petGeom(){
+  PETS.length=0
+  const st=$('stage').getBoundingClientRect()
+  if(st.width<2)return
+  const on=petEl()
+  let minL=1e9,me=null
+  document.querySelectorAll('.pet').forEach(el=>{
+    const r=el.getBoundingClientRect()
+    /* 设置页关掉的那几只是 display:none —— **它们的 rect 全是 0**，
+       照量下去 minL 会被拉到画布外，出列点跟着跑飞。隐藏的直接不算数。 */
+    if(r.width<1)return
+    PETS.push({el,lean:el.querySelector('.pet__lean'),x:r.left-st.left+r.width/2})
+    if(el===on)me={l:r.left-st.left,w:r.width}
+    else minL=Math.min(minL,r.left-st.left)
+  })
+  /* 出列点：站到所有同事左边，留 46px 的间隔。
+     **这才是「往左打」成立的前提**——它原来在队伍第三位，左边杵着另外两只，
+     子弹、纸带、弹壳堆全得绕着它们走。出了列，左边整条台面都是空的。 */
+  /* me.l 是**带着 translateX(marchX) 量出来的**，直接拿去减就成了「当前位置再往左」；
+     marchX 恰好等于 marchTo 时结果为 0——出列点塌成原地，桌宠夹在两只同事中间开火。
+     减掉 marchX 才还原成家位。（不能缓存家位：五只是 right: 定位的，resize 后家位必变。） */
+  /* 设置页里只留一只时**一个同事都没有**，minL 还是初值 1e9，
+     出列点会算到画布外几十万像素去。没同事就拿**最左那个家位**当参照
+     （claude 的 right:296 ＋ 34 宽），这样出列点跟五只在场时是同一个地方——
+     「站到哪儿」不该因为旁边少了几只就变。 */
+  if(minL>1e8)minL=st.width-330
+  if(me)S.marchBase=(minL-46-me.w)-(me.l-S.marchX)
+}
+function hexA(h,a){h=(h||'#888').replace('#','')
+  if(h.length===3)h=h.split('').map(c=>c+c).join('')
+  const n=parseInt(h,16)||0x888888
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'}
+
+/* ── A/F · 弹道 ──────────────────────────── */
+
+/* ══ 僵尸史莱姆与枪 ═══════════════════════════════
+ * 这一段是玩的，但有一条不是玩的：**流速就是火力**。
+ * 190 t/s 时它还没走到就没了；15 t/s 时你勉强够；
+ * 在跑工具或者卡住的时候你一颗子弹都没有，它会走到你面前咬一口。
+ * 换句话说，这只僵尸把「引擎现在有多少输出」演成了一件有后果的事。
+ */
+const Z_SPEED=78, Z_HP=10, Z_R=22
+/* 密度不是口味，是**压力表**：上下文越满、静默越久，来得越勤。
+   这样「打不动了」和「枪管发红」是同一条因果，而不是各说各的。 */
+const ZDENS={off:0,few:.5,norm:1,horde:2.6}
+/*
+ * 三种怪，各对应一个**真实的压力源**——这是「打怪」这层唯一站得住的设计约束：
+ * 敌人不是随机刷出来的关卡内容，它是某个引擎信号的化身，打不打得掉由那个信号决定。
+ *
+ *   史莱姆  ← 静默。走得慢、量大。零输出越久来得越勤。
+ *   蜂群    ← 限流。血薄但一来一簇、飞在半空、走得快。**低流速时最难清**——
+ *             不是因为它们厚，是因为你的射速跟不上它们的只数，那正是限流的体感。
+ *   胖子    ← 上下文逼近上限。血厚走得极慢，而且**一路把纸带上的字吃掉**。
+ *             这一条是三种里最准的：上下文满了，前面产出的东西真的会被压缩掉。
+ */
+const ZK={
+  slime:{hp:10,sp:78, sc:1,   fly:0, n:1, col:'zomb'},
+  swarm:{hp:2, sp:130,sc:.5,  fly:30,n:5, col:'drip'},
+  glut :{hp:34,sp:38, sc:1.5, fly:0, n:1, col:'zomb'},
+}
+function pickKind(){
+  if(FIRE.foe!=='mix')return FIRE.foe
+  if(ratioOf()>=.78&&Math.random()<.55)return 'glut'
+  if(S.rate>1&&S.rate<38&&Math.random()<.6)return 'swarm'
+  return 'slime'
+}
+const zMax=()=>ZDENS[FIRE.zdens]>=2?10:6
+const zAlive=()=>{for(const z of S.zombs)if(!z.dead)return true;return false}
+/** 瞄最近那只（x 最大＝离桌宠最近） */
+function nearestZomb(){
+  let best=null
+  for(const z of S.zombs)if(!z.dead&&(!best||z.x+z.kx>best.x+best.kx))best=z
+  return best
+}
+function spawnZomb(n,kind){
+  if(!R.ok)return
+  for(let w=0;w<(n||1);w++){
+    const k=kind||pickKind(),K=ZK[k]
+    /* 蜂群是**一簇**来的：单只 spawn 也放一窝，不然「限流」那个体感出不来 */
+    for(let i=0;i<K.n;i++){
+      if(S.zombs.length>=zMax()+(k==='swarm'?6:0))return
+      S.zombs.push({kind:k,x:Math.max(16,R.m.x-400-Math.random()*180-w*46-i*26),
+        y:R.g.y,fly:K.fly*(.7+Math.random()*.6),hp:K.hp,hp0:K.hp,sc:K.sc,
+        t:Math.random()*4,flash:0,kx:0,dead:0,chomp:false,parts:[],
+        sp:K.sp*(.80+Math.random()*.42)})   // 各走各的速度，不然像一排复制粘贴
+    }
+  }
+}
+function zombHit(z,x,y){
+  if(!z||z.dead)return
+  z.hp-=1;z.flash=.11;z.kx+=5.5
+  for(let i=0;i<3;i++)z.parts.push({x,y,vx:40+Math.random()*90,vy:-40-Math.random()*70,t:0,d:.42})
+  if(z.hp<=0){z.dead=.0001
+    for(let i=0;i<10;i++)z.parts.push({x:z.x+(Math.random()-.5)*16,y:z.y-11-Math.random()*12,
+      vx:(Math.random()-.5)*180,vy:-70-Math.random()*120,t:0,d:.7})}
+}
+function stepZomb(sdt){
+  for(let i=S.zombs.length-1;i>=0;i--)stepOne(S.zombs[i],sdt,i)
+}
+function stepOne(z,sdt,idx){
+  z.t+=sdt
+  for(let i=z.parts.length-1;i>=0;i--){const p=z.parts[i];p.t+=sdt
+    if(p.t>p.d){z.parts.splice(i,1);continue}
+    p.x+=p.vx*sdt;p.y+=p.vy*sdt;p.vy+=620*sdt}
+  if(z.dead>0){z.dead+=sdt;if(z.dead>.8&&!z.parts.length)S.zombs.splice(idx,1);return}
+  z.flash=Math.max(0,z.flash-sdt)
+  z.kx=lerp(z.kx,0,1-Math.exp(-sdt*9))
+  z.x+=z.sp*sdt
+  if(z.kind==='swarm')z.fly=ZK.swarm.fly*(.7+.5*Math.sin(z.t*4.3))
+  /* 胖子一路把纸带上的字吃掉：上下文满了，前面产出的东西真的会被压缩掉 */
+  if(z.kind==='glut'){
+    for(let i=GN.tape.length-1;i>=0;i--){
+      const c=GN.tape[i]
+      if(Math.abs(c.x-(z.x+z.kx))<15){
+        GN.tape.splice(i,1)
+        z.parts.push({x:c.x,y:c.y,vx:12+Math.random()*26,vy:-24-Math.random()*26,t:0,d:.34})
+      }
+    }
+  }
+  /* 走到跟前：没打死就得挨一口。桌宠往后弹，僵尸得手就散 */
+  if(z.x+z.kx>R.m.x-24){
+    z.chomp=true;z.dead=.0001;S.recoilV+=110;S.tBites++
+    for(let i=0;i<7;i++)z.parts.push({x:z.x,y:z.y-10,vx:(Math.random()-.5)*120,
+      vy:-50-Math.random()*80,t:0,d:.5})
+  }
+}
+/*
+ * 僵尸的身体（含被咬的缺口和眼睛）**烘一次，之后只 drawImage**。
+ * 缺口是拿 destination-out 挖的——那是一次合成操作，围攻档十只就是十次，
+ * 而这十次画的完全是同一张图。烘成离屏精灵后每帧只剩十次 drawImage。
+ * 缓存键带上 PAL.gen：切主题时颜色变了，重烘。
+ */
+const ZSPR={}
+let ZSPRGEN=-1
+function zSprite(kind,flash){
+  /* 键带着 PAL.gen 是对的（换主题得重烘），但**旧代的那几张没人删**——
+     跟随系统主题的机器一天切两次，这张表就一天长六项，且永远不回收。 */
+  if(ZSPRGEN!==PAL.gen){ZSPRGEN=PAL.gen;for(const k in ZSPR)delete ZSPR[k]}
+  const key=kind+'|'+(flash?1:0)+'|'+PAL.gen
+  if(ZSPR[key])return ZSPR[key]
+  const c=document.createElement('canvas'),D=Math.min(2,devicePixelRatio||1)
+  c.width=Math.round(30*D);c.height=Math.round(30*D)
+  const g=c.getContext('2d');g.setTransform(D,0,0,D,0,0);g.translate(15,26)
+  const body=ZK[kind].col==='drip'?PAL.drip:PAL.zomb
+  g.fillStyle=flash?'#ffffff':body
+  rr(g,-Z_R/2,-Z_R,Z_R,Z_R,7.6);g.fill()
+  g.globalCompositeOperation='destination-out'
+  g.beginPath();g.arc(Z_R/2-3.4,-Z_R+4.6,4.7,0,TAU);g.fill()
+  g.beginPath();g.arc(Z_R/2-1.2,-Z_R+10.4,2.5,0,TAU);g.fill()
+  g.globalCompositeOperation='source-over'
+  g.fillStyle=flash?body:'#ffffff'
+  rr(g,-6.8,-14.6,3.0,6.4,1.5);g.fill()
+  rr(g,-0.6,-12.0,2.3,4.3,1.15);g.fill()
+  ZSPR[key]=c;return c
+}
+function drawZomb(g){
+  /* 从左往右画：缺口是往自己右上角挖的，右边那只后画，挖的才是空地 */
+  S.zombs.sort((a,b)=>a.x-b.x)
+  for(const z of S.zombs)drawOne(g,z)
+}
+function drawOne(g,z){
+  const x=z.x+z.kx,y=z.y-(z.fly||0),SC=z.sc||1,ZR=Z_R*SC
+  const body=ZK[z.kind||'slime'].col==='drip'?PAL.drip:PAL.zomb
+  const die=z.dead>0?clamp(z.dead/.34,0,1):0
+  if(die<1){
+    const bob=Math.abs(Math.sin(z.t*5.4))*2.4
+    const tilt=.11+Math.sin(z.t*2.7)*.085
+    g.globalAlpha=(z.fly?.10:.22)*(1-die);g.fillStyle='#000'
+    g.beginPath();g.ellipse(x,z.y+1,11*SC,3*SC,0,0,TAU);g.fill()
+    if(z.kind==='swarm'){                                  // 翅膀，两片，扇得很快
+      g.globalAlpha=.5*(1-die);g.fillStyle=body
+      const w=Math.abs(Math.sin(z.t*22))*3.4+1.6
+      g.fillRect(x-7,y-ZR*.72,-w,1.6);g.fillRect(x+7,y-ZR*.72,w,1.6)
+    }
+    g.save()
+    g.translate(x,y-bob);g.rotate(tilt)
+    g.scale((1+die*.55)*SC,Math.max(.02,1-die*1.15)*SC)
+    g.globalAlpha=1-die*.5
+    g.drawImage(zSprite(z.kind||'slime',z.flash>0),-15,-26,30,30)
+    g.fillStyle=PAL.drip
+    g.fillRect(-2.6,-6.4,1.7,2.6+Math.sin(z.t*3.1)*1.3)
+    g.restore()
+  }
+  g.globalAlpha=1;g.fillStyle=body
+  for(const p of z.parts){g.globalAlpha=clamp(1-p.t/p.d,0,1);g.fillRect(p.x-1,p.y-1,2,2)}
+  g.globalAlpha=1
+}
+
+/*
+ * 枪。14×9 的像素网格，枪管指 -x，握把那格对准手。
+ *
+ * ## 为什么原来那把像贴上去的
+ *
+ * 三件事，一件都不能少：
+ * **一、锚点是开局测一次的固定坐标**——桌宠每 4 秒跳一次（`pet-hop`），
+ * 枪却钉在原地，于是人在动、枪不动。现在每帧从 `.pet__body` 的**实际** rect
+ * 取手的位置，那个 rect 是带着 CSS 动画变换的，跳、歪、鼓肚子全在里面。
+ * **二、跟随是硬跟**。真握着的东西有惯性：人先动，东西后到，还会过冲一点点。
+ * 位置和角度都改成欠阻尼弹簧（ζ≈0.6），跳起来那一下枪会甩一下再跟上。
+ * **三、后坐只有平移**。真枪的后坐是**枪口上跳**——加一路角度冲量，
+ * 打一发弹一下，回落带一点点余振。
+ *
+ * 另外三样是「活着」的部分：静止时枪口有极慢的呼吸摆；没子弹又有东西过来时
+ * 摆幅放大三倍变成发抖；每一发从抛壳口甩一枚弹壳出去，落地弹一下。
+ */
+/*
+ * 枪分五档形制。**这是整套升级里唯一会变的东西——只变样子。**
+ *
+ * 宪法：**火力恒等于流速。** 等级不改射速、不改伤害、不改任何一个能影响
+ * 「打不打得掉」的数。一旦等级能改火力，这套东西就从「演引擎状态」变成
+ * 「演游戏」，前面所有诚实性一起作废——那时候画面上的胜负说的是你的存档，
+ * 不是引擎此刻的表现，而后者才是这个控件存在的全部理由。
+ *
+ * 所以升级换来的是：这把枪看起来更贵。而「更贵」直读作**这家引擎我用得多**。
+ */
+const GUN_BASE_UNUSED=[
+  [2,3,5,2,0],[2,3,5,.9,1],[2,4.5,5,.5,2],       // 枪管：亮顶 + 暗底
+  [7,1,6,5,0],[7,5.4,6,.6,2],                    // 机匣
+  [8,5,1,2,0],[9,6,3,3,0,1],[11.4,6,.6,3,2,1]    // 扳机护圈 + 弹匣（m=1）
+]
+/* 逐档叠加，不是替换：Lv1 是块光板，往上一档一档往上焊零件 */
+const GUN_TIER=[
+  [],                                            // Lv1-4   光板
+  [[8,1,4,1,1]],                                 // Lv5-9   顶部导轨
+  [[0,2,2,4,0],[0,2,2,1,1],[9.6,6,2.4,3.6,0,1]], // Lv10-14 消焰器 + 加长弹匣
+  [[8,-1.4,4,2.2,0],[8.6,-1.4,2.4,.8,1]],        // Lv15-19 瞄准镜
+  [[7,2.1,6,.8,3]]                               // Lv20+   能量条
+]
+/* 五档铺在 0~100 上，前面密后面疏：**早期几轮就能看见变化**，
+   后面越来越难换，和 token 曲线本身的加速度是一致的 */
+const TIER_AT=[0,5,15,35,65]
+function gunTier(){let t=0;for(let i=1;i<5;i++)if(S.lv>=TIER_AT[i])t=i;return t}
+function gunRects(){
+  /* 本体按家族取，配件按等级叠——两件事分开，谁焊在谁身上都对 */
+  const t=gunTier(),out=(GUN_KIT[kit().gun]||GUN_KIT.rifle).slice()
+  for(let i=1;i<=t;i++)for(const r of GUN_TIER[i])out.push(r)
+  return out
+}
+const GU=1.25, GHX=10, GHY=5
+const GTONE=[0,1,2]
+/* 枪自己的一份状态：位置、角度、两路弹簧、上膛程度、弹壳与硝烟 */
+const GN={x:0,y:0,vx:0,vy:0,ang:Math.PI*1.02,angV:0,kick:0,kickV:0,
+  arm:0,silent:99,cases:[],smoke:[],pile:[],tape:[],init:false,
+  reload:0,magOut:false,heat:0,jam:0,mags:[],dust:[]}
+/*
+ * ## 为什么不再往上下文环上打
+ *
+ * 桌宠有自己的台面：输入框上沿那条 46px 的地面，有重力、有影子、有左右边界。
+ * 从那个世界里射出一颗子弹、横穿整块转录区、去撞一枚 12px 的 UI 图标——
+ * **两边的幻觉是一起破的**：世界漏到正文上，UI 挨了一梭子。
+ *
+ * 所以换个思路：**全部留在台面上**，只在结账那一下允许碰一次 UI（一轮一次，
+ * 所以那一次才会被看见）。落点有三种，都在这条台面里：
+ * **打字机**——打在左边的纸带上，一发打出一个字，字往左滚出去；
+ * **弹壳堆**——打空，但壳不消失，堆在地上，堆多高就是这一轮吐了多少（＝在途），结账时扫平；
+ * **打空**——什么都不打，出界即散。
+ */
+/* 纸带的几何：**抬到桌宠头顶上方那一档**（地面往上 36px，正好在这条 46px 台面的
+   顶端），左右只占 300px。贴地画过一版：字压在其余四只脚下、又铺满整个窗口宽，
+   读起来是一团糟。
+   还有一件更要紧的：**滚速＝流速，字距是常数**。上一版让字距去编码流速，
+   结果快档下字与字叠在一起，纸带就不再是「字」而是一条噪声带了。 */
+const TAPE_DX=46, TAPE_DY=11, TAPE_LEN=300, TAPE_MAX=64, PILE_MAX=70
+const tapeBps=()=>clamp(S.rate/8,0,15)
+const tapeGap=()=>clamp(26-(tapeBps()-2)*1.4,8,26)
+/* 没有输出的时候纸带**被风吹走**（90px/s），不是继续以 13px/s 慢慢挪。
+   两个好处：停下来之后台面会真的清空；而「一直有东西在动」这件事本身
+   会把空闲跳帧那条优化整个废掉——canvas 永远脏，就永远得重绘 */
+const tapeDrift=()=>S.rate>1?tapeGap()*tapeBps():90
+const ratioOf=()=>clamp(S.ctx/S.win,0,1)
+function mix(a,b,t){
+  const P=c=>{c=(c||'#888').replace('#','');if(c.length===3)c=c.split('').map(x=>x+x).join('')
+    const n=parseInt(c,16)||0x888888;return[(n>>16)&255,(n>>8)&255,n&255]}
+  const A=P(a),B=P(b)
+  return 'rgb('+Math.round(lerp(A[0],B[0],t))+','+Math.round(lerp(A[1],B[1],t))+','+Math.round(lerp(A[2],B[2],t))+')'
+}
+const wrapA=d=>{while(d>Math.PI)d-=TAU;while(d<-Math.PI)d+=TAU;return d}
+/** 开一发的后果：枪口上跳 + 抛壳。弹壳那一路和「弹壳弹道」互斥，不然一发两枚 */
+function shotKick(n){
+  if(!FIRE.gun)return
+  /* **枪口上跳是角度变大**：canvas 里 +y 朝下，190° 指左上、170° 指左下。
+     上一版这里写的是 `-=`，于是每打一发枪口往下压一点，连发时就一直朝下。 */
+  GN.kickV+=3.4+Math.min(n,3)*.5
+  if(FIRE.traj!=='shell')ejectCase()
+}
+
+/** 手的位置：每帧从桌宠**当前**的盒子算，所以它跟着跳、跟着歪、跟着鼓肚子。 */
+function handOf(){
+  const b=$('cvFx').__r||$('cvFx').getBoundingClientRect(),r=petBody().getBoundingClientRect()
+  if(b.width<2||r.width<2)return {x:R.h.x,y:R.h.y}
+  /* 顺手把枪口的锚点也刷新掉。R.g（地面）不刷——地面不会跟着人走 */
+  R.m={x:r.left-b.left+2, y:r.top-b.top+r.height*.47}
+  R.h={x:r.left-b.left+r.width*.20, y:r.top-b.top+r.height*.73}
+  return R.h
+}
+function updateGun(sdt,wantAng,armed,hard){
+  const hd=handOf()
+  if(!GN.init){GN.init=true;GN.x=hd.x;GN.y=hd.y;GN.ang=wantAng}
+  /* 上膛比收枪快：抽枪要利落，收枪要不舍得 */
+  GN.silent=armed?0:GN.silent+sdt
+  /* 宽限只给「暂时没输出」。**手里要换别的东西时不宽限**——
+     否则切到跑工具的那 1.5 秒里，枪和终端会同时在手上 */
+  const tgt=armed?1:((hard||GN.silent>1.5)?0:1)
+  GN.arm+=(tgt-GN.arm)*(1-Math.exp(-sdt*(tgt>GN.arm?13:6.5)))
+  if(GN.arm<.002)GN.arm=0
+  /* 位置弹簧。欠阻尼——过冲那一点点就是「握在手里」和「焊在身上」的全部区别 */
+  const K=430,C=2*.62*Math.sqrt(K)
+  GN.vx+=((hd.x-GN.x)*K-GN.vx*C)*sdt; GN.x+=GN.vx*sdt
+  GN.vy+=((hd.y-GN.y)*K-GN.vy*C)*sdt; GN.y+=GN.vy*sdt
+  GN.x=clamp(GN.x,hd.x-6,hd.x+6); GN.y=clamp(GN.y,hd.y-7,hd.y+7)
+  /* 角度弹簧 */
+  const KA=250,CA=2*.72*Math.sqrt(KA)
+  GN.angV+=(wrapA(wantAng-GN.ang)*KA-GN.angV*CA)*sdt; GN.ang+=GN.angV*sdt
+  /* 后坐的角度分量：枪口上跳，回落带余振 */
+  GN.kickV+=(-GN.kick*190-GN.kickV*13)*sdt; GN.kick+=GN.kickV*sdt
+  /* 连发时一发压着一发，不封顶的话枪口会一路抬到天上去 */
+  GN.kick=clamp(GN.kick,-.05,.20)
+  for(let i=GN.cases.length-1;i>=0;i--){const c=GN.cases[i];c.t+=sdt
+    if(c.t>1.0){GN.cases.splice(i,1);continue}
+    c.x+=c.vx*sdt;c.y+=c.vy*sdt;c.vy+=560*sdt;c.r+=c.vr*sdt
+    if(c.y>c.gy){c.y=c.gy;c.vy*=-.34;c.vx*=.62;c.vr*=.5}}
+  stepTape(sdt);stepPile(sdt)
+  for(let i=GN.mags.length-1;i>=0;i--){const m=GN.mags[i];m.t+=sdt
+    if(m.t>2.6){GN.mags.splice(i,1);continue}
+    if(m.y<m.gy){m.x+=m.vx*sdt;m.y+=m.vy*sdt;m.vy+=620*sdt;m.r+=m.vr*sdt
+      if(m.y>=m.gy){m.y=m.gy;m.vy*=-.25;m.vx*=.5;m.vr*=.4
+        if(Math.abs(m.vy)<26){m.vy=0;m.vx=0;m.vr=0;m.y=m.gy}}}
+  }
+  for(let i=GN.dust.length-1;i>=0;i--){const d=GN.dust[i];d.t+=sdt
+    if(d.t>d.d){GN.dust.splice(i,1);continue}
+    d.x+=d.vx*sdt;d.y+=d.vy*sdt;d.vy+=34*sdt}
+  for(let i=GN.smoke.length-1;i>=0;i--){const s=GN.smoke[i];s.t+=sdt
+    if(s.t>s.d){GN.smoke.splice(i,1);continue}
+    s.x+=s.vx*sdt;s.y+=s.vy*sdt;s.vy-=9*sdt}
+}
+/** 当前姿态：把「收着」和「端着」之间插值出来。收枪＝转向下、缩小、淡出。 */
+function gunPose(){
+  const e=GN.arm<1?1-Math.pow(1-GN.arm,3):1          // easeOutCubic，抽枪利落
+  const zAl=zAlive()
+  /* 呼吸摆；没子弹又有东西过来的时候放大三倍——那不是呼吸，是手在抖 */
+  const sway=Math.sin(S.t*(zAl&&S.rate<1?7.4:2.6))*(zAl&&S.rate<1?.055:.019)
+  const stow=Math.PI*.46                              // 收着时枪口朝下
+  const ang=GN.ang+GN.kick+sway
+  return{x:lerp(GN.x+2,GN.x,e), y:lerp(GN.y+5,GN.y,e),
+    ang:GN.ang+wrapA(stow-ang)*(1-e)+GN.kick+sway,
+    sc:.82+.18*e, a:clamp(GN.arm*1.7,0,1)}
+}
+function muzzlePt(){
+  const p=gunPose(),u=GU*p.sc
+  const lx=-(GHX+.6)*u,ly=(4-GHY)*u,c=Math.cos(p.ang),s=Math.sin(p.ang)
+  return{x:p.x-S.recoil*.7*c-lx*c+ly*s, y:p.y-S.recoil*.7*s-lx*s-ly*c}
+}
+/** 抛壳口在世界坐标：一发一枚，往斜后上方甩。 */
+/** 换弹：旧弹匣**真的掉下去**。浮在枪外面读不出「掉了」，落地弹一下才读得出 */
+function dropMag(){
+  if(!R.ok)return
+  const p=gunPose(),u=GU*p.sc,c=Math.cos(p.ang),s=Math.sin(p.ang)
+  const lx=(10-GHX)*u,ly=(8-GHY)*u
+  GN.mags.push({x:p.x-lx*c+ly*s,y:p.y-lx*s-ly*c,vx:-18+Math.random()*36,vy:-8,
+    r:0,vr:(Math.random()-.5)*6,t:0,gy:R.g.y-2})
+  if(GN.mags.length>3)GN.mags.shift()
+}
+/** 走路扬尘。**「在移动」这件事，靠脚下比靠身子好读** */
+function puffDust(x,y,dir){
+  GN.dust.push({x,y,vx:dir*24+(Math.random()-.5)*16,vy:-10-Math.random()*14,
+    t:0,d:.42+Math.random()*.2,r:1.3+Math.random()*1.1})
+  if(GN.dust.length>18)GN.dust.shift()
+}
+function ejectCase(){
+  const p=gunPose(),u=GU*p.sc,c=Math.cos(p.ang),s=Math.sin(p.ang)
+  const lx=(9-GHX)*u,ly=(1.4-GHY)*u
+  const x=p.x-lx*c+ly*s, y=p.y-lx*s-ly*c
+  const cs={x,y,vx:-c*70+(Math.random()-.5)*30,vy:-72-Math.random()*42,
+    r:Math.random()*6,vr:9+Math.random()*10,t:0,gy:R.g.y-1-Math.random()*3.2}
+  if(FIRE.traj==='pile'){GN.pile.push(cs);if(GN.pile.length>PILE_MAX)GN.pile.shift()}
+  else{GN.cases.push(cs);if(GN.cases.length>26)GN.cases.shift()}
+  if(GN.smoke.length<9){const m=muzzlePt()
+    GN.smoke.push({x:m.x,y:m.y,vx:c*22,vy:-16,t:0,d:.34+Math.random()*.2,
+      r:1.4+Math.random()*1.2})}
+}
+/** 打字机：一发打出一个字，字往左滚。**滚速是常数**——所以字与字的间距
+ *  就是流速的倒数：慢的时候一个个蹦，快的时候连成一条排字。 */
+function stamp(x,y,ci){
+  GN.tape.push({x,y,ci,t:0})
+  if(GN.tape.length>TAPE_MAX)GN.tape.shift()
+  /* ejectCase 那边压着 9，这边一直是不封顶的——几台子 agent 一起打的时候
+     同一个落点每秒二十多下，全压在这一个数组里 */
+  if(GN.smoke.length<14)
+    GN.smoke.push({x,y,vx:-24-Math.random()*26,vy:-12-Math.random()*14,t:0,d:.18,r:.8})
+}
+function stepTape(sdt){
+  const dr=tapeDrift(),lim=R.ok?R.h.x-TAPE_DX-TAPE_LEN:0
+  for(let i=GN.tape.length-1;i>=0;i--){const c=GN.tape[i]
+    c.t+=sdt;c.x-=dr*sdt
+    if(c.x<lim)GN.tape.splice(i,1)}
+}
+function drawTape(g){
+  if(!GN.tape.length||!R.ok)return
+  const x1=R.h.x-TAPE_DX,x0=x1-TAPE_LEN,y=R.g.y-TAPE_DY
+  g.globalAlpha=.13;g.fillStyle=PAL.bs;g.fillRect(x0,y+6.5,TAPE_LEN,1)
+  g.textAlign='center';g.textBaseline='middle'
+  for(const c of GN.tape){
+    const pop=c.t<.09?1+(1-c.t/.09)*.8:1
+    g.globalAlpha=clamp((c.x-x0)/70,0,1)*.85
+    g.fillStyle=PAL.muted
+    g.font=pop===1?PAL.f85:'500 '+(8.5*pop).toFixed(1)+'px '+PAL.font
+    g.fillText(CHARS[c.ci],c.x,c.y)
+  }
+  g.globalAlpha=1
+}
+/** 弹壳堆：壳不消失，落地就停。**堆多高＝这一轮吐了多少**（也就是在途）；
+ *  结账那一下整堆被扫走——账在世界里结，不用往 UI 上打。 */
+function stepPile(sdt){
+  for(let i=GN.pile.length-1;i>=0;i--){const c=GN.pile[i]
+    if(c.sw){c.t+=sdt
+      if(c.t>.75){GN.pile.splice(i,1);continue}
+      c.x+=c.vx*sdt;c.y+=c.vy*sdt;c.vy+=520*sdt;c.r+=c.vr*sdt;continue}
+    if(c.rest)continue
+    c.x+=c.vx*sdt;c.y+=c.vy*sdt;c.vy+=560*sdt;c.r+=c.vr*sdt
+    if(c.y>c.gy){c.y=c.gy;c.vy*=-.30;c.vx*=.55;c.vr*=.45
+      if(Math.abs(c.vy)<26){c.vy=0;c.vx=0;c.vr=0;c.rest=true}}
+  }
+}
+function sweepPile(){
+  for(const c of GN.pile){c.sw=true;c.t=0
+    c.vx=-(50+Math.random()*105);c.vy=-(20+Math.random()*72);c.vr=(Math.random()-.5)*15}
+}
+function drawPile(g){
+  g.fillStyle=PAL.brass
+  for(const c of GN.pile){
+    g.globalAlpha=c.sw?clamp((1-c.t/.75)*1.5,0,1):.92
+    g.save();g.translate(c.x,c.y);g.rotate(c.r);g.fillRect(-1.6,-1,3.2,2);g.restore()}
+  g.globalAlpha=1
+}
+
+
+
+/*
+ * ══ 子 agent ═══════════════════════════════════
+ *
+ * 子 agent **不做成小桌宠**，做成主桌宠放出去的**悬浮炮台**。
+ *
+ * 理由是硬的：**桌宠编码的是「哪一家引擎」**（五只＝五家，压暗＝不是当前这家）。
+ * 把子 agent 画成小一号的桌宠，读出来是「又来了几个小引擎」——而子 agent 恰恰
+ * 不是另一家引擎，它是**同一个 agent 伸出去的手**。
+ *
+ * 所以它是装备不是角色，三条把这件事钉死：
+ *   **没有眼睛**——有眼睛的是角色，没眼睛的是机器；
+ *   **配色跟枪走，不跟身体走**（gunDk / gunHi / accent 推进器），
+ *     所以它和主桌宠手里那把枪是一套，和桌宠本身不是；
+ *   **绕着本体转，不是往前铺**——一排炮台往左排出去，读成「一行东西」，
+ *     而且跟纸带、计划旗抢同一条横向空间；绕着转则是**靠得近＝属于它**，
+ *     几乎不占地方，而且「谁放的」这件事不用任何说明。
+ * 头顶那根天线是最后一句：它连着本体，不是自己跑来的。
+ *
+ * 前后遮挡是假的：椭圆下半圈算「近」（放大、不透明），上半圈算「远」
+ * （缩到 0.82、压到五成透明）。canvas 在桌宠 DOM 之上，画不到它背后去，
+ * 但把远的那半圈压暗一档，眼睛就会自己把它读成绕到后面去了。
+ *
+ * 关键在于**主桌宠这时候自己不开火**——产出还在，只是不是它在打。
+ * 现在的界面里，「主 agent 在等三个子 agent」和「主 agent 卡住了」长得一模一样，
+ * 而前者恰恰是干得最欢的时候。这一层就是为了把这两件事分开。
+ *
+ * 流速在几只之间**平分**：三只同时打，每只的射速就是三分之一。
+ * 这条也不是装饰——它就是 fan-out 的真实代价。
+ */
+/* 轨道：扁椭圆。台面只有 46px 高，圆轨会把炮台甩出台面外 */
+/* 轨道抬高一档、压扁一点：下半圈要从桌宠**胸口**过，不能压到它手里那把枪上 */
+const SUB_RX=30, SUB_RY=8, SUB_CY=23, SUB_SPIN=.85
+function spawnSubs(n){
+  if(!R.ok)return
+  S.subs.length=0
+  for(let i=0;i<n;i++)S.subs.push({a:i*TAU/n,r:0,st:'out',t:i*.5,acc:0,fl:0})
+  S.tSubs+=n
+}
+/** 第 i 台此刻在轨道上的位置、以及它是绕到前面还是后面 */
+function subPos(s){
+  const cx=R.h.x+4,cy=R.g.y-SUB_CY
+  const dep=Math.sin(s.a)                     // +1 在下＝近，-1 在上＝远
+  return{x:cx+Math.cos(s.a)*SUB_RX*s.r, y:cy+Math.sin(s.a)*SUB_RY*s.r, dep}
+}
+function stepSubs(sdt,active){
+  for(let i=S.subs.length-1;i>=0;i--){
+    const s=S.subs[i];s.t+=sdt
+    s.a+=SUB_SPIN*sdt
+    if(!active&&s.st!=='back')s.st='back'
+    /* 部署＝从本体里旋出去，回收＝旋回去。半径就是这条动作的全部 */
+    const tgt=s.st==='back'?0:1
+    s.r+=(tgt-s.r)*(1-Math.exp(-sdt*(tgt?7:9)))
+    if(s.st==='out'&&s.r>.94)s.st='work'
+    if(s.st==='back'&&s.r<.06){
+      const p=subPos(s)
+      for(let k=0;k<4;k++)puffDust(p.x,p.y+3,(Math.random()-.5)*2)
+      S.subs.splice(i,1);continue
+    }
+    /* 各打各的。合起来才是那条流速——fan-out 不会让它更快，只是分头做 */
+    if(s.st==='work'&&active&&!S.rm&&S.rate>1){
+      s.acc+=clamp(S.rate/8,0,15)/S.subs.length*sdt
+      while(s.acc>=1){s.acc-=1
+        /* 打在纸带上和主桌宠同一个落点——几台一起打，纸带才是连贯的一条 */
+        stamp(R.h.x-TAPE_DX,R.g.y-TAPE_DY+(Math.random()-.5)*2,(CHI++)%CHARS.length)
+        s.fl=.08}
+    }
+    if(s.fl>0)s.fl-=sdt
+  }
+}
+function drawSubs(g){
+  if(!S.subs.length||!R.ok)return
+  /* 远的先画、近的后画。同一条轨道上前后交错，不排一下会互相压错 */
+  const list=S.subs.slice().sort((a,b)=>Math.sin(a.a)-Math.sin(b.a))
+  for(const s of list){
+    const p=subPos(s),d=(p.dep+1)/2            // 0=最远 1=最近
+    const sc=(.82+.18*d)*(.5+.5*s.r)
+    const A=(.55+.45*d)*clamp(s.r*1.6,0,1)
+    const x=p.x,y=p.y+Math.sin(s.t*5.2)*1.1   // 悬浮的抖，比走路快、比走路小
+    g.save();g.translate(x,y);g.scale(sc,sc)
+    /* 磁环 + 场弧：本体和它之间那道缝就是「悬浮」本身 */
+    const pu=.5+.5*Math.sin(s.t*7.4)
+    g.globalAlpha=A*(.34+.3*pu);g.fillStyle=PAL.accent
+    g.beginPath();g.ellipse(0,8.2,5.4+pu*.5,1.5,0,0,TAU);g.fill()
+    g.globalAlpha=A*(.5+.4*pu)
+    g.fillRect(-2.4,5.6,1,1);g.fillRect(1.6,5.6,1,1)
+    g.globalAlpha=A
+    /*
+     * 磁悬浮小炮。比上一版的"步枪盒子"小掉一半，形也换了：
+     * **一颗圆墩墩的核心 + 一截短炮口**，不是长枪管。
+     *
+     * 「磁悬浮」这件事靠三样说，一样都不能省：
+     *   本体和底下那圈磁环之间**留一道空隙**——悬浮就是这道缝；
+     *   磁环是 accent 的扁椭圆，跟着推进脉动一起呼吸；
+     *   缝里两点场弧，浮起来的那一点点抖动也从这儿来。
+     * 中间那颗 accent 芯读作「通着电」，也是它和主桌宠那把枪唯一的同色处。
+     */
+    drawTurBody(g,kit().tur)                                       // 核心：形按家族
+    g.fillStyle=PAL.gun;rr(g,-4.2,-4.4,8,3,1.6);g.fill()           // 顶面
+    g.fillStyle=PAL.gunHi;g.fillRect(-3.4,-4.2,4.6,.9)             // 高光
+    g.fillStyle=PAL.accent;rr(g,-1.5,-1.6,3.2,3.2,1);g.fill()      // 芯：通着电
+    g.fillStyle=PAL.gunDk;g.fillRect(-9.6,-1.7,4.8,3.4)            // 短炮口
+    g.fillStyle=PAL.gun;g.fillRect(-9.6,-1.7,4.8,1)
+    if(s.fl>0){
+      g.globalAlpha=clamp(s.fl/.08,0,1)*A;g.fillStyle=engCol()
+      g.fillRect(-15.5,-.9,5,1.8);g.fillRect(-13.6,-2.6,1.6,5.2)
+    }
+    g.restore()
+  }
+  g.globalAlpha=1
+}
+
+
+
+
+/*
+ * ══ 出场 ═══════════════════════════════════════
+ *
+ * 开应用、或者切引擎的时候，那只不是「啪」地出现在那儿，是**登场**。
+ * 每家按自己的物性来——这一层比配色更能说清「换了一家」：
+ *
+ *   史莱姆   **砸下来**。软体没有别的出场方式：落地摊成一滩，再弹回原形。
+ *            拉伸／压扁那两下用的是 pets.css 里 pet-bounce 同一套形变轴。
+ *   螃蟹     **降落伞**。蟹不会飞，所以它是被空投下来的——伞盖在头顶飘，
+ *            左右摆着下降，落地那一刻伞脱钩、飘走。这是五家里唯一带道具的。
+ *   鲸       **跃出水面**。地面上先炸一圈水花，它划个弧跃出来再落下，溅一地水点。
+ *   未接入   **淡进来**。照 pets.css 那句「没见过的那一家不编花样」——
+ *            它连出场都不该有花样，这本身就是一个信号。
+ *
+ * 出场没结束之前不出列、不抽枪：登场是一拍，干活是下一拍。
+ */
+const ENTRY_KIND={kimi:'drop',grok:'drop',plain:'fade',claude:'chute',dsh:'splash'}
+const ENTRY_T={drop:.78,chute:1.45,splash:1.0,fade:.5}
+function startEntry(){
+  if(S.rm||!FIRE.entry){S.entry=null;return}
+  const k=ENTRY_KIND[S.eng]||'drop'
+  S.entry={k,t:0,T:ENTRY_T[k],parts:[]}
+  if(k==='splash'&&R.ok)
+    for(let i=0;i<11;i++)S.entry.parts.push({x:0,y:0,
+      vx:(Math.random()-.5)*150,vy:-70-Math.random()*110,t:0,d:.6+Math.random()*.3})
+}
+const entryOn=()=>!!S.entry
+function stepEntry(sdt){
+  const e=S.entry;if(!e)return
+  e.t+=sdt
+  for(const p of e.parts){p.t+=sdt;p.x+=p.vx*sdt;p.y+=p.vy*sdt;p.vy+=460*sdt}
+  if(e.t>e.T)S.entry=null
+}
+/** 出场此刻的姿态：竖直位移、拉伸、透明度。横向摆只有降落伞那档有 */
+function entryPose(){
+  const e=S.entry
+  if(!e)return{dy:0,dx:0,sx:1,sy:1,a:1}
+  const t=e.t
+  if(e.k==='fade'){const u=clamp(t/e.T,0,1)
+    return{dy:-8*(1-u),dx:0,sx:1,sy:1,a:u}}
+  if(e.k==='drop'){
+    const tl=.34
+    if(t<tl){const u=t/tl
+      return{dy:-52*(1-u*u),dx:0,sx:.90,sy:1.12,a:1}}      // 落体：拉长
+    const u=(t-tl)/(e.T-tl)
+    const q=Math.sin(u*Math.PI*2.3)*Math.exp(-u*3.6)
+    return{dy:0,dx:0,sx:1+q*.46,sy:1-q*.36,a:1}            // 摊成一滩再弹回来
+  }
+  if(e.k==='chute'){
+    const td=1.18
+    if(t<td){const u=t/td
+      return{dy:-56*(1-u*u*(3-2*u)),dx:Math.sin(t*3.4)*7,sx:1,sy:1,a:1}}
+    const u=(t-td)/(e.T-td)
+    const q=Math.sin(u*Math.PI*2)*Math.exp(-u*4.2)
+    return{dy:0,dx:0,sx:1+q*.24,sy:1-q*.2,a:1}
+  }
+  // splash：划个弧跃出来
+  const ta=.66
+  if(t<ta){const u=t/ta
+    return{dy:-(1-4*(u-.5)*(u-.5))*38,dx:-6*Math.sin(u*Math.PI),sx:1,sy:1,a:1}}
+  const u=(t-ta)/(e.T-ta)
+  const q=Math.sin(u*Math.PI*2)*Math.exp(-u*4)
+  return{dy:0,dx:0,sx:1+q*.3,sy:1-q*.24,a:1}
+}
+/** 出场里画在 canvas 上的那部分：伞盖、水花、水点 */
+function drawEntry(g){
+  const e=S.entry;if(!e||!R.ok)return
+  const p=entryPose(),cx=R.h.x+4+p.dx,gy=R.g.y
+  if(e.k==='chute'&&e.t<1.18){
+    const y=gy+p.dy-30, a=clamp((1.18-e.t)*4,0,1)
+    g.globalAlpha=a*.9
+    g.fillStyle=PAL.claude
+    g.beginPath();g.arc(cx,y,13,Math.PI,0);g.fill()          // 伞盖
+    g.globalAlpha=a*.55;g.strokeStyle=PAL.claude;g.lineWidth=1
+    for(const dx of[-11,0,11]){g.beginPath();g.moveTo(cx+dx,y);g.lineTo(cx,y+16);g.stroke()}
+    g.globalAlpha=1
+  }
+  if(e.k==='splash'){
+    const a=clamp((.5-e.t)*3,0,1)
+    if(a>0){                                                 // 地上那圈水花
+      g.globalAlpha=a*.5;g.strokeStyle=PAL.dsh;g.lineWidth=1.6
+      g.beginPath();g.ellipse(cx,gy-1,10+e.t*34,3+e.t*7,0,0,TAU);g.stroke()
+      g.globalAlpha=1
+    }
+    g.fillStyle=PAL.dsh
+    for(const q of e.parts){
+      if(q.t>q.d)continue
+      g.globalAlpha=clamp(1-q.t/q.d,0,1)*.8
+      g.fillRect(cx+q.x-1,gy-6+q.y-1,2,2)
+    }
+    g.globalAlpha=1
+  }
+  if(e.k==='drop'&&e.t>.34&&e.t<.62){                        // 落地那圈尘
+    const u=(e.t-.34)/.28
+    g.globalAlpha=(1-u)*.32;g.strokeStyle=PAL.faint;g.lineWidth=1
+    g.beginPath();g.ellipse(cx,gy-1,8+u*22,2+u*5,0,0,TAU);g.stroke()
+    g.globalAlpha=1
+  }
+}
+
+/*
+ * ══ 每家一套皮 ═════════════════════════════════
+ *
+ * 桌宠本来就编码「哪一家引擎」（形 + 色）。把这件事扩到整个场景之后，
+ * **切引擎＝换一整套皮**，谁在答从余光就认得出，不用去读那枚模型胶囊。
+ *
+ * 但边界还是那条：**每家不同的是形，不是数。**
+ * 火力恒等于流速、命中率只被上下文影响、等级只加配件——这三条一家都不例外。
+ * 家族决定的是**本体的样子**：武器的轮廓、弹丸的形、炮台的形、靶的纹路。
+ *
+ * 等级那五档配件（导轨 / 消焰器 / 瞄准镜 / 能量条）**是通用的**，焊在谁身上都一样：
+ * 配件说的是「这家我用了多久」，本体说的是「这是哪家」，两件事不该混。
+ */
+const KIT={
+  kimi  :{n:'Kimi',  col:'kimi',  gun:'rifle',bul:'px',  tur:'disc', tgt:'ring', note:'制式'},
+  claude:{n:'Claude',col:'claude',gun:'claw', bul:'bub', tur:'hex',  tgt:'shell',note:'钳形'},
+  grok  :{n:'Grok',  col:'grok',  gun:'coil', bul:'bolt',tur:'dia',  tgt:'sq',   note:'线圈'},
+  dsh   :{n:'DSH',   col:'dsh',   gun:'jet',  bul:'drop',tur:'torus',tgt:'wave', note:'喷流'},
+  plain :{n:'未接入',col:'plain', gun:'stub', bul:'dot', tur:'disc', tgt:'plain',note:'不编花样'},
+}
+const kit=()=>KIT[S.eng]||KIT.kimi
+const engCol=()=>PAL[kit().col]||PAL.kimi
+/* 武器本体，一家一把。栅格还是 14×9、枪管指 -x、手在 (10,5)，
+   末位 1 的那块是弹匣（换弹时整块不画） */
+const GUN_KIT={
+  rifle:[[2,3,5,2,0],[2,3,5,.9,1],[2,4.5,5,.5,2],[7,1,6,5,0],[7,5.4,6,.6,2],
+         [8,5,1,2,0],[9,6,3,3,0,1],[11.4,6,.6,3,2,1]],
+  claw :[[0,1.4,6,1.5,0],[0,1.4,6,.7,1],[0,5.6,6,1.5,0],[0,6.4,6,.7,2],
+         [6,2,6,5,0],[7,2,4,1,1],[6,6.4,6,.6,2],[9,6.6,3,2.6,0,1]],
+  coil :[[0,2.1,9,1.1,0],[0,2.1,9,.6,1],[0,5.7,9,1.1,0],[0,6.4,9,.4,2],
+         [8,1.6,5,5.6,0],[9,1.6,3,1,1],[8,6.6,5,.6,2],[9.4,6.8,2.6,2.4,0,1]],
+  jet  :[[0,1.9,3.4,5.2,0],[0,1.9,3.4,1,1],[3.4,2.9,3.6,3.2,0],
+         [6.6,1.8,6,5.4,0],[7.6,1.8,4,1,1],[6.6,6.6,6,.6,2],[9,6.8,3,2.4,0,1]],
+  stub :[[2,3.6,6,1.8,0],[2,3.6,6,.7,1],[8,2.4,5,4.6,0],[8,6.4,5,.6,2],[9.2,6.6,2.6,2.4,0,1]],
+}
+/** 弹丸：一家一种形。**大小一致**——形是身份，大小是流速（>128 t/s 才涨） */
+function drawBullet(g,x,y,s,col,kind){
+  g.fillStyle=col
+  if(kind==='bolt'){g.fillRect(Math.round(x-s*.28),Math.round(y-s*1.5),Math.max(1,s*.56),s*3);return}
+  if(kind==='drop'){g.beginPath();g.arc(x,y,s*.62,0,TAU);g.fill()
+    g.fillRect(x+s*.5,y-s*.16,s*1.1,s*.32);return}
+  if(kind==='bub'){g.strokeStyle=col;g.lineWidth=Math.max(1,s*.34)
+    g.beginPath();g.arc(x,y,s*.62,0,TAU);g.stroke();return}
+  if(kind==='dot'){g.beginPath();g.arc(x,y,s*.5,0,TAU);g.fill();return}
+  g.fillRect(Math.round(x-s/2),Math.round(y-s/2),s,s)          // px
+}
+/** 靶的纹路：一家一种。**尺寸和有效区算法完全一样**，换的只是画法 */
+function drawTgtFace(g,x,y,Rr,re,lvC,kind){
+  g.fillStyle=PAL.bg
+  if(kind==='sq'){g.fillRect(x-Rr,y-Rr,Rr*2,Rr*2)}
+  else{g.beginPath();g.arc(x,y,Rr,0,TAU);g.fill()}
+  g.globalAlpha=lvC===PAL.faint?.13:.22;g.fillStyle=lvC     // 被上下文吃掉的那圈
+  g.beginPath()
+  if(kind==='sq'){g.rect(x-Rr,y-Rr,Rr*2,Rr*2);g.rect(x-re,y+re,re*2,-re*2)}
+  else{g.arc(x,y,Rr,0,TAU);g.arc(x,y,re,0,TAU,true)}
+  g.fill();g.globalAlpha=1
+  g.lineWidth=1;g.strokeStyle=PAL.bs
+  if(kind==='sq'){g.strokeRect(x-Rr,y-Rr,Rr*2,Rr*2)
+    g.strokeStyle=hexA(PAL.faint,.5);g.strokeRect(x-Rr*.62,y-Rr*.62,Rr*1.24,Rr*1.24)}
+  else if(kind==='shell'){                                   // 贝壳：只画上半圈 + 一条底
+    g.beginPath();g.arc(x,y,Rr,Math.PI,0);g.moveTo(x-Rr,y);g.lineTo(x+Rr,y);g.stroke()
+    g.strokeStyle=hexA(PAL.faint,.5)
+    g.beginPath();g.arc(x,y,Rr*.66,Math.PI,0);g.stroke()
+    g.beginPath();g.arc(x,y,Rr*.36,Math.PI,0);g.stroke()
+  }else if(kind==='wave'){                                   // 波纹：虚线同心
+    g.setLineDash([2.4,2.4])
+    g.beginPath();g.arc(x,y,Rr,0,TAU);g.stroke()
+    g.strokeStyle=hexA(PAL.faint,.5)
+    g.beginPath();g.arc(x,y,Rr*.62,0,TAU);g.stroke()
+    g.setLineDash([])
+  }else if(kind==='plain'){                                  // 素：就一圈
+    g.beginPath();g.arc(x,y,Rr,0,TAU);g.stroke()
+  }else{                                                     // ring
+    g.beginPath();g.arc(x,y,Rr,0,TAU);g.stroke()
+    g.strokeStyle=hexA(PAL.faint,.5)
+    g.beginPath();g.arc(x,y,Rr*.62,0,TAU);g.stroke()
+  }
+  g.strokeStyle=hexA(lvC,.75);g.lineWidth=1
+  if(kind==='sq')g.strokeRect(x-re,y-re,re*2,re*2)
+  else{g.beginPath();g.arc(x,y,re,0,TAU);g.stroke()}
+  g.fillStyle=hexA(PAL.accent,.45)
+  g.beginPath();g.arc(x,y,Math.max(1.4,re*.3),0,TAU);g.fill()
+}
+/** 炮台的形：一家一种。没有眼睛这条对谁都成立 */
+function drawTurBody(g,kind){
+  g.fillStyle=PAL.gunDk
+  if(kind==='hex'){g.beginPath()
+    for(let i=0;i<6;i++){const a=i*TAU/6;const px=Math.cos(a)*5.6,py=Math.sin(a)*5.2
+      i?g.lineTo(px,py):g.moveTo(px,py)}
+    g.closePath();g.fill()}
+  else if(kind==='dia'){g.beginPath();g.moveTo(0,-6);g.lineTo(6,0);g.lineTo(0,6);g.lineTo(-6,0)
+    g.closePath();g.fill()}
+  else if(kind==='torus'){g.beginPath();g.arc(0,0,5.6,0,TAU);g.fill()
+    g.globalCompositeOperation='destination-out'
+    g.beginPath();g.arc(0,0,2.2,0,TAU);g.fill()
+    g.globalCompositeOperation='source-over'}
+  else{rr(g,-5.2,-5.2,10.4,10.4,4.2);g.fill()}
+}
+
+/*
+ * ══ 打靶模式 ═══════════════════════════════════
+ *
+ * **先说清楚：这不是产品状态，是个评估台。**
+ *
+ * 这套东西里每一样都得编码一个真实的引擎信号，而「打靶」编码不了任何东西——
+ * 引擎不会没事去打靶。所以它不进产品，它只是把开火这件事摆到一个
+ * **能量的地方**：三张靶纸立在台面上，弹着留洞、不消失，于是
+ *
+ *   **节奏**（匀速 / 按 chunk 成组）变成弹着在时间上的疏密；
+ *   **后坐**变成弹着在空间上的**上飘**——连发时枪口一路上抬，
+ *     弹着就一路往上串，这是那条 kick 曲线唯一能被直接看见的地方；
+ *   **距离**变成飞行时间：三张靶远近不同，同一发打出去先后到。
+ *
+ * 拉「引擎状态」在限流和爆发之间切，看那一串洞怎么变——
+ * 这是判断手感唯一不靠感觉的办法。
+ */
+const TG_D=205, TG_R=13, TG_MAX=240
+function setupRange(){
+  if(!R.ok)return
+  /* **一张靶就够**。三张的时候注意力被摊开，每张上那个命中数还各说各的；
+     一张之后弹着才聚得起来，散布也才有意义 */
+  S.tgt={holes:[],hits:0,shots:0}
+  S.shotN=0;S.hitN=0
+}
+/* 靶立在桌宠**当前站位**往前 TG_D 处。上一版写成 R.h.x + marchBase，
+   而 R.h.x 本来就已经含了出列量——出列被算了两遍，靶子被推到画布外去了 */
+const tgX=()=>R.h.x-TG_D
+/* 靶心的高度：往下一点，好让靶杆、标签、台账三样都留在这条 46px 的台面里 */
+const tgY=()=>R.g.y-27
+
+/* 有效区：上下文吃掉的那一圈不算数。
+   53% 时还剩 8.1px，90% 时只剩 4.6px——**同样的火力，打进去的越来越少**。
+   这不是给等级开的后门（等级永远不碰任何数），这是上下文本身的代价。 */
+const tgEff=()=>TG_R*(1-ratioOf()*.72)
+function tgtHit(kick){
+  const t=S.tgt;if(!t)return
+  /* 弹着＝瞄准点 + 后坐上飘 + 一点随机。**上飘那一项是连发的代价**，
+     所以爆发档那一串洞会往上串，而限流档是一小团 */
+  const g1=(Math.random()+Math.random()+Math.random()-1.5)*2.0
+  const g2=(Math.random()+Math.random()+Math.random()-1.5)*2.0
+  const ox=g1*1.7, oy=-kick*52+g2*1.7
+  const px=clamp(ox,-TG_R+1,TG_R-1),py=clamp(oy,-TG_R+1,TG_R-1)
+  const inn=Math.hypot(px,py)<=tgEff()
+  t.holes.push({x:px,y:py,in:inn})
+  if(t.holes.length>140)t.holes.shift()
+  t.shots++
+  if(inn){t.hits++;S.hitN++}
+}
+function drawRange(g){
+  if(!FIRE.range||!R.ok||!S.tgt)return
+  const t=S.tgt,x=tgX(),y=tgY()
+  const ratio=ratioOf(),lvl=ratio>=.9?'danger':ratio>=.7?'warn':'ok'
+  const lvC=lvl==='danger'?PAL.danger:lvl==='warn'?PAL.warn:PAL.faint
+  g.globalAlpha=.5;g.fillStyle=PAL.faint
+  g.fillRect(x-.5,y+TG_R,1,R.g.y-y-TG_R)                   // 靶杆
+  g.globalAlpha=1
+  /*
+   * **靶子和上下文条是同一件事的两种写法。**
+   * 两道弧同心：里面那圈是**流速**（此刻吐多快），外面那圈是**上下文占用**
+   * （和顶栏那条、输入框那枚 12px 环取的是同一个数、同一套档位 70/90）。
+   * 里面在动＝在吐字，外面在涨＝快满了——一眼能看出这两件事是不是同时在发生。
+   */
+  const r1=TG_R+4.5, r2=TG_R+9
+  g.lineWidth=2.2;g.lineCap='round'
+  g.strokeStyle=hexA(PAL.bs,.6)
+  g.beginPath();g.arc(x,y,r1,0,TAU);g.stroke()
+  const fr=clamp(S.rate/TG_MAX,0,1)
+  if(fr>.001){g.strokeStyle=PAL.accent
+    g.beginPath();g.arc(x,y,r1,-Math.PI/2,-Math.PI/2+TAU*fr);g.stroke()}
+  g.lineWidth=1.8
+  g.strokeStyle=hexA(PAL.bs,.45)
+  g.beginPath();g.arc(x,y,r2,0,TAU);g.stroke()
+  g.strokeStyle=lvC
+  g.beginPath();g.arc(x,y,r2,-Math.PI/2,-Math.PI/2+TAU*ratio);g.stroke()
+  g.lineCap='butt'
+  /* 靶纸：纹路按家族，尺寸和有效区算法一模一样 */
+  const re=tgEff()
+  drawTgtFace(g,x,y,TG_R,re,lvC,kit().tgt)
+  for(const o of t.holes){                                 // 弹着：进了的实心，脱靶的空心
+    if(o.in){g.fillStyle=PAL.text;g.fillRect(x+o.x-.85,y+o.y-.85,1.8,1.8)}
+    else{g.globalAlpha=.5;g.strokeStyle=PAL.text;g.lineWidth=.8
+      g.strokeRect(x+o.x-1.1,y+o.y-1.1,2.2,2.2);g.globalAlpha=1}
+  }
+  /*
+   * **不悬停就只写一个 tok/s。**
+   * 上下文、缓存、累计、命中率、散布，全都是真数、也全都有用，但它们不是
+   * 同一个层级的东西：**流速是你一直在扫的，其余是你想起来才查的**。
+   * 把想起来才查的那些常驻在这儿，等于让每一帧都替一个偶尔的问题付钱。
+   * 所以默认只留最外那圈（上下文，图形不占字数）和头顶那个数，其余进悬停卡。
+   */
+  g.textAlign='center'
+  g.font=PAL.f11;g.fillStyle=S.rate>1?PAL.accent:PAL.faint;g.textBaseline='bottom'
+  g.fillText((S.rate>1?'~'+Math.round(S.rate):'0')+' t/s',x,y-r2-4)
+  g.textAlign='left';g.textBaseline='alphabetic'
+  if(S.mx!=null&&Math.hypot(S.mx-x,S.my-y)<r2+8)drawTgtCard(g,x,y,t,ratio,lvC)
+}
+/** 悬停卡。里面每一行都是真数——和顶栏那条、输入框那枚环取的是同一份 Usage */
+function drawTgtCard(g,x,y,t,ratio,lvC){
+  let sd='—'
+  if(t.holes.length>3){
+    let mx=0,my=0
+    for(const o of t.holes){mx+=o.x;my+=o.y}
+    mx/=t.holes.length;my/=t.holes.length
+    let v=0;for(const o of t.holes)v+=(o.x-mx)**2+(o.y-my)**2
+    sd='±'+Math.sqrt(v/t.holes.length).toFixed(1)+'px'
+  }
+  const pct=t.shots?Math.round(t.hits/t.shots*100)+'%':'—'
+  const rows=[
+    ['流速',(S.rate>1?'~'+Math.round(S.rate):'0')+' t/s',PAL.accent],
+    ['上下文',compact(S.ctx)+' / '+compact(S.win)+' · '+Math.round(ratio*100)+'%',lvC],
+    ['缓存命中',bigTok(S.cache),PAL.muted],
+    ['累计',bigTok(S.total)+' · Lv '+S.lv,PAL.muted],
+    ['命中',t.hits+'/'+t.shots+' · '+pct+' · 散布 '+sd,PAL.muted],
+    ['发/秒',clamp(S.rate/8,0,15).toFixed(1)+'　靶场 · 评估用',PAL.faint],
+  ]
+  const W=178,H=rows.length*13+11
+  let cx=x+22, cy=y-H-14
+  const cw=$('cvFx').__r?$('cvFx').__r.width:978
+  if(cx+W>cw-6)cx=x-22-W
+  if(cy<4)cy=y+18
+  g.globalAlpha=.97;g.fillStyle=PAL.raised;rr(g,cx,cy,W,H,6);g.fill()
+  g.globalAlpha=1;g.strokeStyle=PAL.border;g.lineWidth=1;g.stroke()
+  g.textBaseline='middle';g.font=PAL.f9
+  rows.forEach((r,i)=>{
+    const ry=cy+9+i*13
+    g.textAlign='left';g.fillStyle=PAL.faint;g.fillText(r[0],cx+9,ry)
+    g.textAlign='right';g.fillStyle=r[2];g.fillText(r[1],cx+W-9,ry)
+  })
+  g.textAlign='left';g.textBaseline='alphabetic'
+}
+
+/*
+ * ══ 计划旗 ═════════════════════════════════════
+ *
+ * 这是补上的那根**第二根轴**。
+ *
+ * 之前十个状态回答的全是「它现在是哪一档」，没有一档回答等待里唯一真正问出口的那句：
+ * **还有多远**。桌宠端着枪打九分钟，第一分钟和第八分钟长得一模一样——它和它要替换掉的
+ * `正在思考 9m 30s` 犯的是同一个错：只有当下，没有位置。
+ *
+ * 而料是现成的：`PlanStep` 四态（`packages/protocol/src/item.ts`）四路引擎都报，
+ * 走位那套加减速 + 扬尘也早写完了，**只是 `marchTo` 是个常数**。
+ * 把它改成计划进度的函数，「出列」就从编码一个布尔变成编码一个进度：
+ * 地面上插一排旗，它一步步往左推进；**左边还剩几面，就是还有多远。**
+ */
+const PLAN_MAX_GAP=30
+function planGap(px){return clamp((px-52)/Math.max(1,S.plan.n-1),11,PLAN_MAX_GAP)}
+/** 第 i 面旗相对家位的偏移；第 0 面就是原来那个「出列点」 */
+function planOff(i,gap){return S.marchBase-i*gap}
+function marchTarget(){
+  /* 打靶时不走计划旗那条：靶场是评估台，站位得是固定的，不然弹着没法比 */
+  if(FIRE.range||!FIRE.plan||!S.plan)return S.marchBase
+  const homeX=R.h.x-S.marchX
+  return planOff(clamp(S.plan.cur,0,S.plan.n-1),planGap(homeX+S.marchBase))
+}
+function drawFlags(g){
+  if(!FIRE.plan||!S.plan||!R.ok)return
+  /* R.g.y 取的是桌宠**盒子**的底边，而盒子按 pets.css 的规矩往下探进输入框内边距 6px，
+     所以它比视觉地面低一截。旗子要种在视觉地面上，得抬回来 */
+  const homeX=R.h.x-S.marchX,gap=planGap(homeX+S.marchBase),y=R.g.y-7
+  for(let i=0;i<S.plan.n;i++){
+    const x=Math.round(homeX+planOff(i,gap))+8
+    const dropped=S.plan.drop.indexOf(i)>=0
+    const done=i<S.plan.cur,now=i===S.plan.cur
+    g.globalAlpha=dropped?.32:(done?.5:(now?1:.62))
+    g.fillStyle=PAL.faint
+    g.fillRect(x,y-9,1,9)                                   // 旗杆
+    if(dropped)continue                                     // 掉了的只剩光杆
+    const my=done?y-4.5:y-9                                 // 做完的降半杆
+    g.fillStyle=now?PAL.accent:PAL.faint
+    if(now&&!S.rm){                                         // 正在做的那面在飘
+      const k=Math.sin(S.t*3.2)*1.6
+      g.beginPath();g.moveTo(x+1,my);g.lineTo(x+7+k,my+1.8);g.lineTo(x+1,my+4.4);g.closePath();g.fill()
+    }else g.fillRect(x+1,my,5.5,4.2)
+  }
+  g.globalAlpha=1
+}
+
+/*
+ * ══ 手里拿什么 ══════════════════════════════════
+ *
+ * 前面几版只演了「在吐字」这一个状态：一有输出就开枪，别的时候站着。
+ * 可九分钟的等待里，「在吐字」恰恰是**占比最小**的那一段。
+ * 所以把整条状态机都演出来——**状态不是靠颜色说的，是靠它手里拿着什么说的**：
+ *
+ *   已发出、还没吐字 → **在换弹**（换多久＝首字等了多久）
+ *   在跑工具         → **收枪，掏出对应的家伙**（终端／扳手／放大镜）
+ *   等你审批         → **转过来看着你**，枪放下，头顶一个问号
+ *   出错             → **卡壳**，枪一红，甩两下
+ *   上下文逼近上限   → **枪管过热**，越红越烫
+ *   结账             → **补给箱空投**落地，一轮一次
+ */
+const TL={arm:0,kind:'term',t:0}
+const TOOLS=['term','wrench','glass']
+/** 三件道具轮着来。选「自动」时跟着轮次走；也能在控件里钉死一件看细节 */
+const toolKind=()=>FIRE.tool==='auto'?(S.toolN%3):TOOLS.indexOf(FIRE.tool)
+function updateTool(sdt,want,kind){
+  if(want&&TL.arm<.02)TL.kind=kind
+  TL.arm+=((want?1:0)-TL.arm)*(1-Math.exp(-sdt*(want?12:8)))
+  if(TL.arm<.002)TL.arm=0
+  TL.t+=sdt
+}
+function drawProp(g){
+  if(TL.arm<=.01||!R.ok)return
+  const e=1-Math.pow(1-TL.arm,3)
+  const wob=Math.sin(TL.t*7)
+  g.save();g.globalAlpha=TL.arm
+  g.translate(R.h.x-7,R.h.y+lerp(9,0,e))
+  g.rotate(wob*(TL.kind==='wrench'?.24:.07))
+  g.scale(.82+.18*e,.82+.18*e)
+  if(TL.kind==='term'){
+    g.fillStyle=PAL.gunDk;g.fillRect(-7.5,-6.5,15,12)
+    g.fillStyle=PAL.gun;g.fillRect(-6.2,-5.2,12.4,9.4)
+    g.fillStyle=PAL.accent
+    g.fillRect(-4.6,-3.4,5.2,1.3);g.fillRect(-4.6,-.8,7.4,1.3)
+    if(Math.sin(TL.t*6)>0)g.fillRect(-4.6,1.8,2.2,1.3)   // 光标
+  }else if(TL.kind==='wrench'){
+    g.fillStyle=PAL.gun;g.fillRect(-7,-1.3,14,2.6)
+    g.fillStyle=PAL.gunHi;g.fillRect(-7,-1.3,14,1)
+    g.fillStyle=PAL.gun;g.fillRect(-11,-3.8,4.4,7.6)
+    g.fillStyle=PAL.bg;g.fillRect(-11.4,-1.5,2.6,3)
+  }else{
+    g.strokeStyle=PAL.gun;g.lineWidth=2.2
+    g.beginPath();g.arc(-4,-3,4.8,0,TAU);g.stroke()
+    g.strokeStyle=PAL.gunHi;g.lineWidth=1
+    g.beginPath();g.arc(-4,-3,4.8,-2.3,-1.2);g.stroke()
+    g.strokeStyle=PAL.gun;g.lineWidth=2.6;g.lineCap='round'
+    g.beginPath();g.moveTo(-.7,.5);g.lineTo(4.6,5.6);g.stroke()
+  }
+  g.restore();g.globalAlpha=1
+}
+/** 等你审批：它转过来看着你。**唯一一个需要你动手的状态，给它唯一一个面向你的动作** */
+function drawAsk(g){
+  if(S.phase!=='approve'||!R.ok)return
+  const b=.5+.5*Math.sin(S.t*2.4)
+  const x=R.h.x+4,y=R.g.y-46-b*2
+  g.globalAlpha=.96;g.fillStyle=PAL.raised
+  rr(g,x-9,y-11,18,18,5);g.fill()
+  g.globalAlpha=1;g.strokeStyle=PAL.warn;g.lineWidth=1.2;g.stroke()
+  g.fillStyle=PAL.warn;g.font='700 12px '+PAL.font
+  g.textAlign='center';g.textBaseline='middle';g.fillText('?',x,y-1.5)
+}
+/*
+ * ══ 升级 ═══════════════════════════════════════
+ *
+ * **经验＝这个引擎替你干的活**，三项都是真数，一项都不是编的：
+ *   出的 token / 1000  ＋  这一轮跑了几个工具 × 2  ＋  完成一轮 5 分
+ * 每只桌宠一份，跨会话累计。于是「Kimi 14 级、Claude 3 级」直读作
+ * **你实际用哪家用得多**——它是使用分布，不是成就系统。
+ *
+ * 升级只换枪的形制（见 GUN_TIER）。**不改射速、不改伤害、不改任何影响胜负的数。**
+ */
+/*
+ * 经验**就是累计 token**，不再有别的加分项。
+ * 这样连「折算」这一步都省了：等级是 `累计 token` 的一个单调函数，
+ * 顶栏那个「累计」和桌宠的等级说的是同一件事的两种写法。
+ *
+ * ## 上一版的曲线错得离谱，错在锚点
+ *
+ * 上一版把满级定在 190M，理由是「顶栏那个 198555k 正好落在满级线上」。
+ * 但 `usage.ts` 里那个 `totalTokens` 的注释写得清清楚楚：**本会话累计**。
+ * 也就是说 198M 是**一次会话**烧掉的量——不是这个项目终身的量。
+ * 按那条曲线，**开一次长会话就直接满级**，等级从第二天起就是个常数，
+ * 而一个永远显示 100 的等级和不显示是一回事。
+ *
+ * 现在按真实量级重定：`31600 × lv^3.25`，**满级 100B**。
+ *   Lv 5   6M     头一个小时
+ *   Lv 15  210M   一次大会话（顶栏那个数现在落在 Lv14，正好差一级要升）
+ *   Lv 35  3.3B   十几次大会话，两三周
+ *   Lv 65  24.6B  一百多次，几个月
+ *   Lv 100 100B   五百次，一年半的重度日用
+ * 前面几级几分钟就能跳，后面越来越慢——**这条曲线的形状本身就是一句话：
+ * 头一天你就能看见它在长，而满级是留给真的把这家引擎用穿了的人的。**
+ */
+/*
+ * ## 不封顶
+ *
+ * 上一版在 100 级封了顶。那是错的，而且错得比数字大小更根本：
+ * **等级就是「累计 token」的另一种写法**——一封顶，它就不再是那个数的函数了，
+ * 而那正是这套设计唯一的立足点。封顶之后界面开始撒谎：数字还在涨，等级不动了。
+ * 何况会撞到顶的恰恰是把这家引擎用得最狠的那批人，凭什么是他们先没得看。
+ *
+ * 所以：**等级无上限**。曲线不变，`31600 × lv^3.25`，token 每翻一倍等级 ×1.24——
+ * Lv100=100B、Lv123=200B、Lv203=1T、Lv412=10T、Lv1701=1000T。它会一直慢慢走，不会停。
+ *
+ * 美术是有限的，数字不是——这两件事分开处理：
+ *   枪的**形制**五档，最后一档 Lv65 到顶（GUN_TIER）；
+ *   再往上换**刻痕**：Lv65 之后每 20 级在机匣上多刻一道，画到八道封顶。
+ * 画面到此为止，而**数字永远精确**，标签和悬停卡里写的一直是真值。
+ */
+const XP_K=31600, XP_P=3.25
+const lvOf=tok=>Math.max(0,Math.floor(Math.pow(Math.max(0,tok)/XP_K,1/XP_P)))
+const tokFor=lv=>Math.round(XP_K*Math.pow(Math.max(0,lv),XP_P))
+/** 本级进度 0~1。没有封顶，所以永远算得出下一级 */
+function lvFrac(){
+  const a=tokFor(S.lv),b=tokFor(S.lv+1)
+  return clamp((S.total-a)/Math.max(1,b-a),0,1)
+}
+/** Lv65 之后每 20 级一道刻痕。**画到八道为止，数字不封顶** */
+const notchN=()=>clamp(Math.floor((S.lv-TIER_AT[4])/20),0,8)
+function gainXp(){
+  const was=S.lv
+  S.lv=lvOf(S.total)
+  const up=S.lv-was
+  if(up>0){S.lvFx=1;syncLv()}
+  return{up}
+}
+function syncLv(){
+  $('rngLv').value=Math.min(240,S.lv)
+  $('lblLv').textContent=lvLabel()
+}
+/** 一轮＝一场遭遇战，结账时出战报。**一轮一次**，和补给箱同一个节拍 */
+function turnReport(add){
+  const g=gainXp()
+  S.report={t:0,out:add,tools:S.tTools,bites:S.tBites,jams:S.tJams,subs:S.tSubs,xp:add,up:g.up}
+  S.tTools=0;S.tBites=0;S.tJams=0;S.tSubs=0
+}
+function drawReport(g){
+  if(!S.report||!R.ok)return
+  const r=S.report,a=clamp((2.8-r.t)*1.4,0,1)*clamp(r.t*6,0,1)
+  if(a<=0)return
+  const x=R.h.x-124,y=R.g.y-34
+  g.textAlign='left';g.textBaseline='middle'
+  g.font=PAL.f11
+  g.globalAlpha=a*.8;g.fillStyle=PAL.muted
+  let s='本轮 · 出 '+compact(r.out)+' · 工具 '+r.tools
+  if(r.bites)s+=' · 挨咬 '+r.bites
+  if(r.jams)s+=' · 卡 '+r.jams
+  if(r.subs)s+=' · 子 agent '+r.subs
+  g.fillText(s,x,y)
+  g.globalAlpha=a;g.fillStyle=PAL.accent
+  g.fillText('+'+compact(r.xp)+' XP',x+g.measureText(s).width+8,y)
+  if(r.up){
+    g.font=PAL.f125
+    g.fillText('Lv '+S.lv,x,y-15-Math.min(10,r.t*22))
+  }
+  g.globalAlpha=1
+}
+/** 结账：补给箱空投。**一轮只有一次**，所以它才配得上一个动作 */
+function dropCrate(){
+  if(!R.ok)return
+  S.crate={x:R.h.x-58,y:R.g.y-150,vy:0,t:0,rest:false}
+  S.floats.push({x:R.h.x-20,y:R.g.y-34,t:0,txt:'+'+compact(S.pendAdd||0)})
+}
+function stepDrops(sdt){
+  if(S.report){S.report.t+=sdt;if(S.report.t>2.9)S.report=null}
+  if(S.lvFx>0)S.lvFx=Math.max(0,S.lvFx-sdt*1.4)
+  const c=S.crate
+  if(c){c.t+=sdt
+    if(!c.rest){c.vy+=900*sdt;c.y+=c.vy*sdt
+      if(c.y>=R.g.y-9){c.y=R.g.y-9;c.vy*=-.28
+        if(Math.abs(c.vy)<40){c.vy=0;c.rest=true}}}
+    if(c.t>1.5)S.crate=null}
+  for(let i=S.floats.length-1;i>=0;i--){const f=S.floats[i];f.t+=sdt
+    if(f.t>1.1){S.floats.splice(i,1);continue}
+    f.y-=26*sdt}
+}
+function drawDrops(g){
+  const c=S.crate
+  if(c){
+    const a=clamp((1.5-c.t)*2,0,1)
+    g.globalAlpha=.2*a;g.fillStyle='#000'
+    g.beginPath();g.ellipse(c.x,R.g.y+1,9,2.6,0,0,TAU);g.fill()
+    g.globalAlpha=a
+    g.fillStyle=PAL.gunDk;rr(g,c.x-9,c.y-9,18,18,2);g.fill()
+    g.fillStyle=PAL.brass;g.fillRect(c.x-9,c.y-2,18,4)
+    g.fillStyle=PAL.brass;g.fillRect(c.x-2,c.y-9,4,18)
+    g.globalAlpha=1
+  }
+  if(S.floats.length){
+    g.font='600 11.5px '+PAL.font
+    g.textAlign='left';g.textBaseline='middle'
+    for(const f of S.floats){
+      g.globalAlpha=clamp((1.1-f.t)*1.6,0,1)*.9
+      g.fillStyle=PAL.accent;g.fillText(f.txt,f.x,f.y)
+    }
+    g.globalAlpha=1
+  }
+}
+
+function drawGun(g){
+  if(!R.ok)return
+  /* 尘和掉在地上的弹匣不归枪管——关了枪它们也该有 */
+  for(const d of GN.dust){const u=d.t/d.d
+    g.globalAlpha=(1-u)*.30;g.fillStyle=PAL.faint
+    g.beginPath();g.arc(d.x,d.y,d.r+u*3.4,0,TAU);g.fill()}
+  g.globalAlpha=1
+  for(const m of GN.mags){
+    g.globalAlpha=clamp((2.6-m.t)*1.2,0,1)
+    g.save();g.translate(m.x,m.y);g.rotate(m.r)
+    g.fillStyle=PAL.gunDk;g.fillRect(-1.9,-3.4,3.8,6.8)
+    g.fillStyle=PAL.gun;g.fillRect(-1.9,-3.4,3.8,1.6)
+    g.restore()}
+  g.globalAlpha=1
+  if(!FIRE.gun)return
+  g.fillStyle=PAL.brass
+  for(const c of GN.cases){g.globalAlpha=clamp((1-c.t)*1.6,0,1)
+    g.save();g.translate(c.x,c.y);g.rotate(c.r);g.fillRect(-1.6,-1,3.2,2);g.restore()}
+  g.globalAlpha=1
+  const p=gunPose()
+  if(p.a<=.01)return
+  g.save()
+  g.globalAlpha=p.a
+  g.translate(p.x-Math.cos(p.ang)*S.recoil*.7,p.y-Math.sin(p.ang)*S.recoil*.7)
+  /* 素材的枪管指 -x，所以整体转 ang+π，枪管才指到 ang 上。
+     **不能用 scale(-1,1) 去翻**：镜像加旋转是个反射，角度的正负会整个反过来 */
+  g.rotate(p.ang+Math.PI+(GN.jam>.02?Math.sin(S.t*58)*.10*GN.jam:0)); g.scale(p.sc,p.sc)
+  /* 枪管过热＝上下文逼近上限。档位跟顶栏那枚 meter 同一套（70% 黄 / 90% 红），
+     所以它不是另一个说法，是同一件事换了个地方说 */
+  const hot=GN.jam>.02?1:GN.heat*.85
+  const hotCol=(GN.jam>.02||ratioOf()>=.9)?PAL.danger:PAL.warn
+  /* 换弹时弹匣掉在枪外面；推弹匣那 0.32 秒它滑回去 */
+  const magD=GN.magOut?6:(GN.reload>0?6*(GN.reload/.32):0)
+  /* 混色一帧只算三次，不是每个矩形算一次：mix() 要解析十六进制字符串，
+     而枪最多十五块，逐块算等于一帧解析四十五次颜色 */
+  const k=GN.jam>.02?.92:hot*.9
+  const C0=hot>0?mix(PAL.gun,hotCol,k):PAL.gun
+  const C1=hot>0?mix(PAL.gunHi,hotCol,k):PAL.gunHi
+  const C2=hot>0?mix(PAL.gunDk,hotCol,k):PAL.gunDk
+  for(const r of gunRects()){
+    /* 换弹时弹匣**整个不画**——弹匣井是空的，实体那枚躺在地上 */
+    if(r[5]===1&&GN.magOut)continue
+    g.fillStyle=r[4]===1?C1:(r[4]===2?C2:(r[4]===3?PAL.accent:C0))
+    g.fillRect((r[0]-GHX)*GU,(r[1]-GHY+(r[5]===1?magD:0))*GU,r[2]*GU,r[3]*GU)
+  }
+  /* 刻痕：机匣上一道一道刻上去。两行四道，八道封顶——**画面到此为止，数字不封顶** */
+  const nn=notchN()
+  if(nn>0){
+    g.fillStyle=C2
+    for(let i=0;i<nn;i++){
+      const c=i%4,rw=i>3?1:0
+      g.fillRect((7.7+c*1.35-GHX)*GU,(2.2+rw*1.5-GHY)*GU,.55*GU,1*GU)
+    }
+  }
+  g.restore()
+  g.globalAlpha=1
+  /* 卡壳：枪一红，甩两下，枪口崩两点火星 */
+  if(GN.jam>.15){
+    const m=muzzlePt()
+    g.globalAlpha=GN.jam*(.5+.5*Math.sin(S.t*22));g.fillStyle=PAL.danger
+    g.fillRect(m.x-4.5,m.y-1,9,2);g.fillRect(m.x-1,m.y-4.5,2,9)
+    g.globalAlpha=1
+  }
+  for(const s of GN.smoke){const u=s.t/s.d
+    g.globalAlpha=(1-u)*.20*p.a;g.fillStyle=PAL.gunHi
+    g.beginPath();g.arc(s.x,s.y,s.r+u*5.5,0,TAU);g.fill()}
+  g.globalAlpha=1
+}
+let CHI=0
+const GRV=210
+function spawnBullet(i){
+  /* 打靶模式：一律直射，三张靶轮着来——同一发打出去先后到，
+     飞行时间就是距离，肉眼能比 */
+  if(FIRE.range&&S.tgt){
+    S.shotN++
+    const b={k:'flat',t:0,delay:0,ci:(CHI++)%CHARS.length,sz:S.rate>128?3.5:3,
+      x0:S.mz.x,y0:S.mz.y+(Math.random()-.5)*3,tg:1,lob:0,
+      x1:tgX(),y1:tgY(),dur:.055+TG_D/1500}
+    S.bullets.push(b)
+    S.shots.push(S.t);if(S.shots.length>420)S.shots.shift()
+    return b
+  }
+  const zo=nearestZomb()
+  /* 有僵尸的时候不管选的是哪种弹道——**朝它直射**。
+     否则选了「短点射」就打不着，那只僵尸会一路走到你脸上 */
+  const K=zo?'flat':FIRE.traj,jt=Math.random()-.5
+  const b={k:K,t:0,delay:0,ci:(CHI++)%CHARS.length,
+    sz:S.rate>128?3.5:3,x0:S.mz.x,y0:S.mz.y+jt*3}
+  if(zo){b.zr=zo;b.lob=0;b.dur=.10+Math.random()*.05
+    b.x1=zo.x+zo.kx;b.y1=zo.y-11;S.bullets.push(b)
+    S.shots.push(S.t);if(S.shots.length>420)S.shots.shift();return b}
+  if(K==='tape'){                      // 打在纸带上：落点固定，所以飞行时间恒定，脆
+    b.x1=R.h.x-TAPE_DX;b.y1=R.g.y-TAPE_DY+jt*2;b.lob=0;b.dur=.075+Math.random()*.025
+  }else if(K==='air'||K==='pile'){     // 往左打出去，出界即散——台面之外什么都不碰
+    b.x1=b.x0-(K==='pile'?190:300)-Math.random()*90;b.y1=b.y0+jt*7
+    b.lob=0;b.dur=(K==='pile'?.30:.44)+Math.random()*.08
+  }else if(K==='pop'){                 // 只在枪口炸开，什么都不横穿
+    const a=Math.PI*(.82+Math.random()*.36),d=12+Math.random()*20
+    b.x1=b.x0+Math.cos(a)*d;b.y1=b.y0+Math.sin(a)*d*.7;b.dur=.26+Math.random()*.12
+  }else if(K==='shell'){               // 弹壳往后抛，落地弹一下——信号其实是后坐力
+    b.vx=45+Math.random()*62;b.vy=-(72+Math.random()*56);b.dur=1.05;b.gy=R.m.y+15
+    const c=b.y0-b.gy
+    b.t1=(-b.vy+Math.sqrt(b.vy*b.vy-4*GRV*c))/(2*GRV)
+    b.vr=-(b.vy+2*GRV*b.t1)*.32
+  }else if(K==='flat'){b.x1=R.r.x+jt*2;b.y1=R.r.y;b.lob=0;b.dur=.17+Math.random()*.05}
+  else{b.x1=R.r.x+jt*2.4;b.y1=R.r.y;b.lob=186+Math.random()*38+i*15
+       b.dur=.60+Math.random()*.14}
+  S.bullets.push(b)
+  S.shots.push(S.t);if(S.shots.length>420)S.shots.shift()
+  return b
+}
+function bez(b,t){const m=1-t
+  const cx=(b.x0+b.x1)/2,cy=Math.min(b.y0,b.y1)-b.lob
+  return[m*m*b.x0+2*m*t*cx+t*t*b.x1, m*m*b.y0+2*m*t*cy+t*t*b.y1]}
+function posOf(b,u){
+  if(b.k==='pop'){const e=1-Math.pow(1-u,2.2)
+    return[b.x0+(b.x1-b.x0)*e,b.y0+(b.y1-b.y0)*e]}
+  if(b.k==='shell'){const t=u*b.dur
+    if(t<=b.t1)return[b.x0+b.vx*t,b.y0+b.vy*t+GRV*t*t]
+    const d=t-b.t1
+    return[b.x0+b.vx*t,Math.min(b.gy,b.gy+b.vr*d+GRV*d*d)]}
+  return bez(b,u)}
+/* 落到「汇」上的才有涟漪：短点射和弹壳没有汇，它们说完就散 */
+const lands=k=>k==='lob'||k==='flat'
+const fades=k=>k==='air'||k==='pile'||k==='pop'||k==='tape'
+function drawFx(sdt){
+  const f=fit($('cvFx'));if(!f)return;const[g,w,h]=f
+  if(FIRE.range)drawRange(g);else drawFlags(g)
+  drawReport(g)
+  if(!S.rm)drawZomb(g)
+  if(!FIRE.range)drawTape(g)
+  drawPile(g);drawDrops(g)
+  /* 切过来的第一帧就把弹道填满，不然要等一秒才看得出节奏 */
+  if(S.prime&&R.ok&&S.rate>1){S.prime=false
+    /* 节奏条也一起预热：切过来就能比「匀速 vs 成组」，不用先盯三秒 */
+    S.shots.length=0
+    const bps=clamp(S.rate/8,0,15)
+    if(FIRE.beat==='chunk'){
+      let t=S.t-3
+      while(t<S.t){const iv=.09+Math.random()*.17
+        const n=clamp(Math.round(S.rate*iv/8),1,7)
+        for(let i=0;i<n;i++)if(t+i*.014<S.t)S.shots.push(t+i*.014)
+        t+=iv}
+    }else{for(let t=S.t-3;t<S.t;t+=1/Math.max(.3,bps))S.shots.push(t)}
+    /* 纸带和壳堆也预热：它们本来就是「攒出来」的东西，
+       空着切过来会让人以为坏了 */
+    if(FIRE.traj==='tape'){GN.tape.length=0
+      const x1=R.h.x-TAPE_DX,gap=tapeGap(),xs=[]
+      for(let x=x1,k=0;x>x1-TAPE_LEN&&k<TAPE_MAX;x-=gap,k++)xs.push(x)
+      xs.reverse().forEach(x=>GN.tape.push(
+        {x,y:R.g.y-TAPE_DY+(Math.random()-.5)*1.6,ci:(CHI++)%CHARS.length,t:.5}))}
+    if(FIRE.traj==='pile'){GN.pile.length=0
+      const cn=clamp(Math.round(S.inflight/40),0,PILE_MAX)
+      for(let i=0;i<cn;i++)GN.pile.push({x:R.h.x-14-Math.random()*84,
+        y:R.g.y-1-Math.random()*3.2,r:Math.random()*6,vx:0,vy:0,vr:0,t:0,rest:true,
+        gy:R.g.y-1})}
+    const n=Math.round(bps*.62)
+    for(let i=0;i<n;i++){const b=spawnBullet(0);b.t=b.dur*(i+.5)/Math.max(1,n)}}
+  /* 光绳：流速高到一定程度，一条条弹道糊成一根绳。它自己会随速度换形态 */
+  if(FIRE.trail==='rope'&&S.bullets.length&&lands(FIRE.traj)){
+    const b=S.bullets[S.bullets.length-1]
+    g.globalAlpha=clamp(S.rate/220,0,1)*.30;g.strokeStyle=PAL.kimi;g.lineWidth=1.2
+    g.beginPath()
+    for(let u=0;u<=1.001;u+=.04){const p=posOf(b,u);u?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])}
+    g.stroke();g.globalAlpha=1
+  }
+  for(let i=S.ripples.length-1;i>=0;i--){
+    const p=S.ripples[i];p.t+=sdt
+    if(p.t>p.d){S.ripples.splice(i,1);continue}
+    const u=p.t/p.d
+    g.globalAlpha=(1-u)*.78;g.strokeStyle=PAL.accent;g.lineWidth=1.2
+    g.beginPath();g.arc(p.x,p.y,5+u*10,0,TAU);g.stroke()
+  }
+  g.globalAlpha=1
+  const ghosts=FIRE.trail==='none'?0:2
+  g.textAlign='center';g.textBaseline='middle'
+  const bodyF=PAL.font
+  for(let i=S.bullets.length-1;i>=0;i--){
+    const b=S.bullets[i]
+    if(b.delay>0){b.delay-=sdt;continue}
+    b.t+=sdt
+    if(b.t>=b.dur){S.bullets.splice(i,1)
+      if(b.tg)tgtHit(GN.kick)
+      else if(b.zr)zombHit(b.zr,b.x1,b.y1)
+      else if(b.k==='tape')stamp(b.x1,b.y1,b.ci)
+      else if(lands(b.k))S.ripples.push({t:0,d:.3,x:b.x1,y:b.y1})
+      continue}
+    if(b.zr&&!b.zr.dead){b.x1=b.zr.x+b.zr.kx;b.y1=b.zr.y-11}
+    const u=b.t/b.dur
+    /* 短点射和弹壳会自己淡出——它们没有落点，靠消失收尾 */
+    const life=b.k==='pop'?1-u*u : b.k==='shell'?clamp((1-u)*2.2,0,1)
+      : (b.k==='air'||b.k==='pile')?clamp((1-u)*2.6,0,1) : 1
+    for(let j=ghosts;j>=0;j--){
+      const uu=u-j*.055;if(uu<0)continue
+      const p=posOf(b,uu)
+      g.globalAlpha=(j===0?1:(j===1?.34:.15))*life
+      if(FIRE.ammo==='ch'&&j===0){
+        g.fillStyle=engCol();g.font=PAL.f105
+        g.fillText(CHARS[b.ci],p[0],p[1])
+      }else drawBullet(g,p[0],p[1],b.sz*(j===0?1:.72),engCol(),kit().bul)
+    }
+  }
+  g.globalAlpha=1
+  drawSubs(g);drawEntry(g);drawGun(g);drawProp(g);drawAsk(g)
+  if(S.lvFx>0&&!S.rm){                                   // 升级：一圈光晕，一轮最多一次
+    const u=1-S.lvFx
+    g.globalAlpha=S.lvFx*.55;g.strokeStyle=PAL.accent;g.lineWidth=1.6
+    g.beginPath();g.arc(R.h.x+4,R.g.y-15,10+u*26,0,TAU);g.stroke()
+    g.globalAlpha=1
+  }
+  if(S.flash>0){
+    S.flash-=sdt
+    const a=clamp(S.flash/.09,0,1)
+    g.save();g.translate(S.mz.x,S.mz.y);g.rotate(FIRE.gun?gunPose().ang:S.aim)
+    g.fillStyle=engCol()
+    g.globalAlpha=a*.45
+    g.beginPath();g.arc(1.2,0,3.2+4.6*a,0,TAU);g.fill()     // 亮核
+    g.globalAlpha=a*.95
+    for(const k of [0,-.62,.62]){                            // 三叉
+      g.save();g.rotate(k)
+      g.fillRect(0,-.9,k?6.2:9.6,1.8)
+      g.restore()
+    }
+    g.restore();g.globalAlpha=1
+  }
+}
+const MONO='ui-monospace,Menlo,monospace'
+function cap(g,w,h,t){g.globalAlpha=1
+  g.font=PAL.f10
+  g.fillStyle=PAL.faint;g.textAlign='center';g.textBaseline='bottom';g.fillText(t,w/2,h-4)}
+/* K 的灯：现场那颗 6px 的点和放大镜里那颗共用同一份状态 */
+function zoomA(g,w,h){
+  const T=3,now=S.t
+  while(S.shots.length&&now-S.shots[0]>T)S.shots.shift()
+  const y=h/2-8
+  g.strokeStyle=hexA(PAL.border,1);g.lineWidth=1
+  g.beginPath();g.moveTo(10,y+14.5);g.lineTo(w-10,y+14.5);g.stroke()
+  for(let i=0;i<S.shots.length;i++){
+    const u=1-(now-S.shots[i])/T,x=10+u*(w-20)
+    g.globalAlpha=.30+.70*u;g.fillStyle=PAL.kimi
+    g.fillRect(x-1,y-9,2,23)
+  }
+  g.globalAlpha=1
+  g.font='500 9.5px '+MONO;g.fillStyle=PAL.faint;g.textBaseline='top'
+  g.textAlign='left';g.fillText('-3s',10,y+19)
+  g.textAlign='right';g.fillText('现在',w-10,y+19)
+  cap(g,w,h,FIRE.beat==='chunk'?'按 chunk 成组：成簇，簇间有空——真实的流长这样'
+                               :'匀速：均匀点列——好看，但不像真的流')
+}
+function drawZoom(sdt){
+  const f=fit($('cvZoom'));if(!f)return;const[g,w,h]=f
+  zoomA(g,w,h)
+}
+
+/* ══ 模拟步进：和渲染分开，好让预热能不画一帧就跑完 ══ */
+function step(sdt){
+  S.t+=sdt
+  const ph=S.mode==='script'?phaseAt(S.t):S.mode
+  if(ph!==S.phase){
+    if(ph==='settle')doSettle()
+    if(ph==='tool'){S.toolN++;S.tTools++}
+    if(ph==='fail')S.tJams++
+    if(ph==='sub')spawnSubs(2+Math.floor(Math.random()*3))
+    /* 一段活推一面旗。真实里这一步该接 PlanStep 的 in_progress 换位 */
+    if(ph==='tool'||ph==='burst')S.plan.cur=Math.min(S.plan.n-1,S.plan.cur+1)
+    S.phase=ph}
+  const sp=SPEC[ph]||SPEC.idle
+  const tgt=Math.max(0,sp.base+noise(S.t)*sp.jit)
+  S.rate=lerp(S.rate,tgt,1-Math.exp(-sdt*(sp.base>0?4.5:3)))
+  if(tgt===0&&S.rate<1)S.rate*=Math.exp(-sdt*6)
+  S.alive=sp.alive
+  S.inflight+=S.rate*sdt
+  S.busy=S.alive?S.busy+sdt:0
+  S.spin=(S.spin+sdt*clamp(S.rate*3.2,0,470))%360
+  return sp
+}
+/* 预热：进页面就有历史可看，波形和时间轴不是从空的开始长 */
+function warm(sec){const d=1/60;for(let i=0;i<sec/d;i++)step(d)}
+
+/* ══ 主循环 ═══════════════════════════════ */
+let last=performance.now()
+function frame(now){
+  measureCanvases()          // 读在写之前——见 measureCanvases 上面那段
+  let dt=(now-last)/1000;last=now
+  if(!(dt>0))dt=.016
+  if(dt>.06)dt=.06
+  /* 弹簧都是显式欧拉，稳定门槛 h<2/C；四条里最低的是位置那条（C=25.7 → 0.078）。
+     dt 封了 0.06、倍速能到 2×，sdt 上限就是 0.12——越线之后速度指数发散，
+     几百帧后溢出成 Infinity，再一步就是 NaN。这里一刀切在全部门槛之下 */
+  const sdt=Math.min(dt*S.speed,.05)
+  const sp=step(sdt)
+
+  /* 顶栏 */
+  const ratio=clamp(S.ctx/S.win,0,1)
+  const lvl=ratio>=.9?'danger':ratio>=.7?'warn':'ok'
+  $('mFill').style.width=(ratio*100).toFixed(1)+'%'
+  $('mLabel').textContent=compact(S.ctx)+' / '+compact(S.win)+' · '+Math.round(ratio*100)+'%'
+  $('mTotal').textContent='累计 '+compact(S.total)
+  $('mCache').textContent='缓存 '+compact(S.cache)
+  $('meter').className='meter meter--'+lvl
+  $('thinkWord').textContent=sp.word
+  $('thinkT').textContent=S.alive?mmss(S.busy+570):''
+
+  /* 环 */
+  const C=TAU*5.4,rf=$('ringFill')
+  rf.setAttribute('stroke-dasharray',C.toFixed(2))
+  rf.setAttribute('stroke-dashoffset',(C*(1-ratio)).toFixed(2))
+  $('ring').setAttribute('class','usage-ring usage-ring--'+lvl)
+  $('ringTip').innerHTML='上下文 '+compact(S.ctx)+' / '+compact(S.win)+' · <b>'+Math.round(ratio*100)+
+    '%</b>｜在途 ~'+compact(S.inflight*SETTLE_GAIN)+' 未结账｜~'+Math.round(S.rate)+' t/s'
+
+  /* 桌宠 */
+  if(!PETS.length)petGeom()
+  /* 枪没抽利落之前不开火——于是「先抽枪、再开打」自然成了一个节拍 */
+  /* 子 agent 在跑的时候主桌宠不开火——产出是那几只小的打的 */
+  const firing=!S.rm&&S.rate>1&&GN.reload<=0&&S.phase!=='fail'&&S.phase!=='sub'&&(!FIRE.gun||GN.arm>.55)
+  const on=petEl()
+  /* ── 出列 / 归队 ─────────────────────────────
+     开跑就走到队伍最左边站定，闲下来再走回窝。宽限 1.8 秒，比收枪的 1.5 秒长一点——
+     于是次序自然成了：**停火 → 收枪 → 归队**，而不是三件事一起发生。 */
+  const inW=true&&!S.rm
+  const rawBusy=inW&&!entryOn()&&(S.alive||zAlive())   // 登场是一拍，干活是下一拍   // 一开跑就出列，不等第一个字
+  S.busyT=rawBusy?0:S.busyT+sdt
+  const mTo=(inW&&(rawBusy||S.busyT<1.8))?marchTarget():0
+  const mDir=Math.sign(mTo-S.marchX)
+  /* 靠近落点时减速——匀速走到头再「啪」地停住，是最假的那一种 */
+  const mRest=Math.abs(mTo-S.marchX)
+  const mSpd=150*sdt*clamp(mRest/38,.26,1)
+  S.marchX+=clamp(mTo-S.marchX,-mSpd,mSpd)
+  /* 收尾吸附。留个渐近尾巴的话 marching 永远不落地、脚下的尘也就一直在冒，
+     「空闲跳帧」那条优化就永远等不到「不动」这一刻 */
+  if(mRest<3)S.marchX=mTo
+  const marching=Math.abs(mTo-S.marchX)>3
+  if(marching&&mRest>8&&R.ok){S.dustT=(S.dustT||0)+sdt
+    if(S.dustT>.11){S.dustT=0;puffDust(R.h.x+2+(mDir>0?-9:9),R.g.y-1,-mDir)}}
+  const atPost=Math.abs(S.marchX-marchTarget())<6
+  on.classList.toggle('pet--run',(S.alive||marching)&&!S.rm&&!entryOn())
+  /* 瞄准与推进必须排在开火**前面**：子弹是从枪口出膛的，
+     算在后面的话第一帧的枪口还是 {0,0}，子弹会从画布左上角飞出来 */
+  if(true&&R.ok){
+    /* 瞄哪儿：有僵尸盯着它，没有就端平。角度差交给弹簧，**必须先绕回 (-π,π]**——
+       atan2 给的是 -179°，静止角是 +190°，不绕的话枪会从 0° 那边转过去 */
+    const ph=S.phase,zn=nearestZomb(),zA=!!zn
+    /* 已发出、还没吐字＝在换弹。**换多久就是首字等了多久** */
+    if(ph==='think'&&S.prevPh!=='think')dropMag()
+    GN.magOut=ph==='think'
+    if(S.prevPh==='think'&&ph!=='think'&&ph!=='idle')GN.reload=.32
+    S.prevPh=ph
+    GN.reload=Math.max(0,GN.reload-sdt)
+    GN.jam=ph==='fail'?Math.min(1,GN.jam+sdt*7):Math.max(0,GN.jam-sdt*3)
+    /* 档位照 usage.ts 的 level()：70% 起黄、90% 起红。上一版写的是 (ratio-.68)/.30，
+       而 doSettle 在 ratio>.97 就把上下文拨回 53%——heat 最高只到 .96、混色系数封在 .65，
+       **满档那个红从来没出现过** */
+    GN.heat=clamp((ratio-.70)/.20,0,1)
+    let want=Math.PI*1.02
+    if(FIRE.range&&S.tgt)want=Math.atan2(tgY()-GN.y,tgX()-GN.x)
+    else if(zA)want=Math.atan2(zn.y-11-GN.y,zn.x+zn.kx-GN.x)
+    else if(GN.magOut)want=Math.PI*1.30                    // 换弹时枪口朝下
+    else if(FIRE.traj==='tape')want=Math.atan2(R.g.y-TAPE_DY-GN.y,R.h.x-TAPE_DX-GN.x)
+    /* 上膛条件：有东西过来，或者正在吐字。两样都没有就是**静默**——收枪。
+       **站定了才抽枪**：走出去 → 站定 → 抽枪 → 开打，四拍，不挤在一帧里。
+       跑工具和等审批的时候枪不在手上——手里是别的东西 */
+    const armed=inW&&!entryOn()&&FIRE.gun&&atPost&&ph!=='tool'&&ph!=='approve'&&
+      ph!=='sub'&&(zA||S.rate>1||GN.magOut||ph==='fail')
+    updateGun(sdt,want,armed,ph==='tool'||ph==='approve'||ph==='sub')
+    updateTool(sdt,inW&&atPost&&ph==='tool',TOOLS[toolKind()])
+    stepDrops(sdt);stepSubs(sdt,ph==='sub')
+    S.aim=GN.ang
+    S.mz=FIRE.gun?muzzlePt():{x:R.m.x,y:R.m.y}
+    /* 减动效不只是「不画」：在场那只必须**当场清掉**。
+       否则它冻在原地，一取消减动效又接着爬——而咬那一下是全场最大的一次运动 */
+    if(S.rm)S.zombs.length=0; else stepZomb(sdt)
+  }
+  /* **出场必须在 R.ok 之外推进**。量不到画布（窗口还没布局、或者被藏起来）时
+     R.ok 是 false，上一版把 stepEntry 关在那个分支里——出场就永远走不完，
+     entryOn() 恒真，于是不出列、不抽枪，整只宠物卡在登场姿势里等一个不会来的 resize。 */
+  stepEntry(sdt)
+  /* **结账的消费不能待在 drawFx 里。**
+     那里的每一句都可能被「空闲跳帧」整帧跳过，而 pendDeliver 不在 moving 的判据里——
+     全闲的时候手点一下「结账」，箱子和战报就一起消失了（跳帧 → 不消费 → 下一帧还是不动）。
+     它本来也不是画，是状态：一轮一次的那笔账。
+     顺带 measure() 同理：量不到画布时 R.ok 是假，而那时通常也没东西在动、
+     drawFx 正好被跳过——补量的那一句就永远等不到执行，页面自己醒不过来。 */
+  if(!R.ok)measure()
+  if(S.pendDeliver){S.pendDeliver=false
+    if(R.ok&&FIRE.deliver)dropCrate()
+    if(R.ok)turnReport(S.pendAdd||0)}
+  const zA2=zAlive()
+  S.quietT=S.rate>1?0:S.quietT+sdt
+  if(!S.rm&&!FIRE.range&&ZDENS[FIRE.zdens]>0){
+    if(!S.zInit){S.zInit=true;S.zNext=S.t+2.5}
+    if(S.t>S.zNext){
+      /* 压力 = 上下文有多满 + 静默了多久。两样都不紧张时 8~15 秒来一只；
+         上下文快满又一直不吐字，最短会缩到一秒多一只，而那时你恰好打不动它们 */
+      const press=1+clamp((ratioOf()-.5)/.45,0,1)*1.7+clamp(S.quietT/7,0,1)*1.3
+      const d=ZDENS[FIRE.zdens]
+      S.zNext=S.t+(8+Math.random()*7)/(d*press)
+      if(S.alive)spawnZomb(Math.random()<.26*d*press?(Math.random()<.35?3:2):1)
+    }
+  }
+  /* 有东西过来的时候，**五只一起往那边看**。这是最便宜的一句「大家都注意到了」 */
+  document.querySelectorAll('.pet__eyes').forEach(e=>{
+    e.style.transform=(zA2||S.marchX<-8||(e===petEyes()&&(firing||GN.arm>.3)))
+      ?'translateX(-1.3px)':''})
+  S.recoilV+=(-S.recoil*340-S.recoilV*17)*sdt
+  S.recoil=clamp(S.recoil+S.recoilV*sdt,-1,3.4)
+  if(firing&&R.ok){
+    if(FIRE.beat==='chunk'){
+      /* 真实的流不是匀速的：一次 item.delta 事件到一批字。
+         一发＝一个事件，一簇的颗数＝这个 delta 里有多少字。
+         于是画面的节奏就是**网络的节奏**——逐字吐的引擎和成段吐的引擎，长得不一样 */
+      S.chunkT-=sdt
+      if(S.chunkT<=0){
+        const iv=.09+Math.random()*.17
+        S.chunkT=iv
+        const n=clamp(Math.round(S.rate*iv/8),1,7)
+        for(let i=0;i<n;i++){const b=spawnBullet(i);b.delay=i*.014}
+        S.recoilV+=18*Math.min(n,3);S.flash=.09;shotKick(n)
+      }
+    }else{
+      S.fireAcc+=clamp(S.rate/8,0,15)*sdt
+      let gd=0
+      while(S.fireAcc>=1&&gd++<6){S.fireAcc-=1
+        const m=S.rate>128?Math.min(3,Math.ceil(S.rate/128)):1
+        for(let i=0;i<m;i++)spawnBullet(i)
+        S.recoilV+=20;S.flash=.09;shotKick(m)}
+    }
+  }
+  /* 走位写在 .pet 根上——头顶那颗状态点和地上的影子是 .pet__lean 的兄弟节点，
+     挂在 lean 上的话人走了、点和影子留在原地 */
+  on.style.transform=S.marchX?'translateX('+S.marchX.toFixed(2)+'px)':''
+  /* G 的迎风倾斜。转轴在脚下，歪了底边那个角就低于地面——
+     抬起来的量是 半宽 × sin(角度)，和 petPaint.ts 里那条 riseOf 同一笔账 */
+  PETS.forEach(p=>{
+    let ty=0,tx=0,rot=0
+    /* **不能只在开火时给位移**：挨咬恰恰发生在零输出的时候（打不动才被摸到脸上），
+       而那一下 recoilV+=110 是全场最大的一次运动。上一版把它锁在 firing 里，
+       于是设置页写的「桌宠往后弹一下」在真正该弹的那一刻永远不弹。 */
+    if(p.el===on&&(firing||Math.abs(S.recoil)>.05))tx=S.recoil
+    if(p.el===on&&entryOn()){const q=entryPose();tx+=q.dx;ty+=q.dy}
+    if(p.el===on&&marching)rot+=mDir*3.4   // 走的时候朝行进方向压一点
+    if(p.el===on&&S.recoil>.05)rot+=S.recoil*.55   // 开一发，人也往后仰一点
+    if(rot)ty-=Math.abs(Math.sin(rot*Math.PI/180))*15
+    p.lean.style.transform=(tx||ty||rot)
+      ?'translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px) rotate('+rot.toFixed(2)+'deg)':''
+  })
+  if(entryOn()){const q=entryPose()
+    petBody().style.transform='scale('+q.sx.toFixed(3)+','+q.sy.toFixed(3)+')'
+    on.style.opacity=q.a<1?q.a.toFixed(2):''
+  }else if(on.style.opacity)on.style.opacity=''
+  /* 闲着的时候整帧不重绘。canvas 会**保留上一帧**，而这一帧本来就该和上一帧一样，
+     所以跳过是无损的——只要在「忙→闲」那一帧多画一次收尾。
+     真实渲染进程里这一条比什么都值钱：一个待机的窗口不该一直在合成 */
+  const moving=S.rate>1||S.zombs.length||S.subs.length||S.bullets.length||S.ripples.length
+    ||GN.cases.length||GN.pile.length||GN.tape.length||GN.dust.length||GN.smoke.length
+    ||GN.mags.length||S.crate||S.report||S.floats.length||GN.arm>0||TL.arm>0
+    ||marching||S.lvFx>0||S.flash>0||GN.jam>.02||entryOn()
+    ||Math.abs(S.recoil)>.02||S.dirty
+  if(moving||S.wasMoving){drawFx(sdt);S.wasMoving=moving}
+  S.dirty=false
+  if(moving||S.shots.length||S.zwas)  {drawZoom(sdt);S.zwas=!!S.shots.length}
+  requestAnimationFrame(frame)
+}
+
+/* 深链：#C 直接开到某个方案，#C@throttle 再把引擎钉在某一档 */
+/* 方案页签没了，所以 hash 的每一段都是选项：#tool@dark@zomb */
+const HP=location.hash.slice(1).split('@').filter(Boolean)
+let WT=0,ZNOW=0
+HP.forEach(a=>{
+  if(/^t[0-9.]+$/.test(a))WT=parseFloat(a.slice(1))
+  if(SPEC[a]){S.mode=a
+    ;[...$('segMode').children].forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===a)))}
+  if(a==='rm0'||a==='rm1'){S.rm=a==='rm1';$('chkRM').checked=S.rm}
+  const fseg=document.querySelector('#fire .seg button[data-v="'+a+'"]')
+  if(fseg){const gp=fseg.parentElement,k=gp.dataset.f
+    /* 僵尸那两项走 setter，否则设置页那栏还显示着旧档——深链和点击得是同一条路 */
+    if(k==='zdens')setZdens(a)
+    else if(k==='foe')setFoe(a)
+    else{FIRE[k]=a;[...gp.children].forEach(x=>x.setAttribute('aria-pressed',String(x===fseg)))}}
+  if(a==='nodeliver'){FIRE.deliver=false;$('chkDeliver').checked=false}
+  if(a==='nogun'){FIRE.gun=false;$('chkGun').checked=false}
+  const lvm=/^lv([0-9]+)$/.exec(a)
+  if(lvm){S.lv=Math.max(0,+lvm[1]);S.total=tokFor(S.lv)+1;syncLv()}
+  if(a==='noplan'){FIRE.plan=false;$('chkPlan').checked=false}
+  const st=/^step([0-9]+)of([0-9]+)$/.exec(a)
+  if(st){S.plan.n=Math.max(1,+st[2]);S.plan.cur=clamp(+st[1],0,S.plan.n-1)}
+  if(a==='nozomb')setZdens('off')
+  if(a==='range'){FIRE.range=true;$('chkRange').checked=true}
+  if(KIT[a])setEng(a)
+  const cm=/^ctx([0-9]+)$/.exec(a)
+  if(cm){S.ctx=S.win*clamp(+cm[1],0,99)/100
+    $('rngCtx').value=+cm[1];$('lblCtx').textContent=cm[1]+'%'}
+  if(a==='zomb')ZNOW=1
+  if(a==='horde'){ZNOW=4;setZdens('horde')}
+  if(a==='dark'||a==='light'){document.documentElement.dataset.theme=a;refreshPal()
+    ;[...$('segTheme').children].forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.t===a)))}
+})
+warm(WT||(HP.length?22:18.4))
+/* 预热期间可能跨过一次结账，而消费点在 drawFx 里——不清掉的话开页第一帧天上掉箱子 */
+S.pendDeliver=false;S.crate=null;S.floats.length=0
+/* 等级不是写死的初值，是从累计量算出来的——两个数必须永远一致 */
+S.lv=lvOf(S.total);syncLv()
+requestAnimationFrame(()=>{measure();petGeom()
+  /* 子 agent 是在 step() 的相位切换里派的，而预热期 R.ok 还是假、派不出来。
+     进页面时如果正处在这一档，补派一次并让它们直接站到位 */
+  if(FIRE.range)setupRange()
+  applyPicks();startEntry()
+  if(S.phase==='sub'&&!S.subs.length){
+    spawnSubs(3);S.subs.forEach(s=>{s.r=1;s.st='work'})
+  }
+  if(ZNOW>0){spawnZomb(ZNOW);S.zombs.forEach((z,i)=>{z.x=R.m.x-190-i*66})}
+  /* 出列也预热：不然截图/首帧看到的是它还在半路上 */
+  if(S.alive||S.zombs.length){
+    S.marchX=marchTarget()
+    petEl().style.transform='translateX('+S.marchX.toFixed(2)+'px)'
+  }
+  /* 枪也预热一下：不然进页面第一秒它正在「抽出来」的半路上 */
+  if(R.ok){
+    const zn=nearestZomb(),zAl=!!zn,ph=S.phase
+    GN.magOut=ph==='think';S.prevPh=ph
+    if(GN.magOut)dropMag()
+    const armed=FIRE.gun&&!S.rm&&ph!=='tool'&&ph!=='approve'&&
+      (zAl||S.rate>1||GN.magOut||ph==='fail')
+    for(let i=0;i<50;i++){
+      const want=zAl?Math.atan2(zn.y-11-GN.y,zn.x+zn.kx-GN.x)
+        :(GN.magOut?Math.PI*1.30:Math.PI*1.02)
+      updateGun(1/60,want,armed,ph==='tool'||ph==='approve')
+      updateTool(1/60,ph==='tool',TOOLS[toolKind()])
+    }
+    if(ph==='fail')GN.jam=1
+    S.aim=GN.ang;S.mz=FIRE.gun?muzzlePt():{x:R.m.x,y:R.m.y}
+  }
+  requestAnimationFrame(frame)})
+</script>
+</body>
+</html>
