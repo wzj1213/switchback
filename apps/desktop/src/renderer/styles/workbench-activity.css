@@ -1,0 +1,120 @@
+.activity-list {
+  width: 100%;
+  overflow-y: auto;
+  padding: var(--sp-2);
+}
+
+.activity-row {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity-row:hover {
+  background: var(--bg-hover);
+}
+
+.activity-row:active {
+  background: var(--bg-press);
+}
+
+.activity-row__mark {
+  display: grid;
+  flex: none;
+  width: 20px;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.activity-row__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.activity-row__title {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-row__meta {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-detail {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.activity-detail > .workbench__back {
+  align-self: flex-start;
+  margin: var(--sp-2) var(--sp-2) 0;
+}
+
+.activity-detail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.activity-detail__scroll {
+  --step-icon: 16px;
+  --step-slot: calc(var(--step-icon) + var(--sp-2));
+
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-4) var(--sp-5);
+}
+
+.activity-detail__summary {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  overflow-wrap: anywhere;
+}
+
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.activity-feed > .workbench__section {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.activity-feed .msg--agent,
+.activity-feed .msg--native,
+.activity-feed .msg--user {
+  max-width: 100%;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}

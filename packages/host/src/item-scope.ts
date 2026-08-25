@@ -69,12 +69,22 @@ export function createItemScope(newId: (prefix: string) => ItemId): ItemScope {
       if (event.type !== "item.started" && event.type !== "item.updated") return event
       const id = idOf(event.item.turnId, event.item.id)
       latest.set(event.item.id, id)
-      // item 上那个 lane 归属也要跟着重铸，否则分流选择器按新 id 找不到旧 item
+      // lane 与它挂住的工具 id 都要重铸；只改 lane 会让“从主线工具进入旁路”指向原生 id。
       const lane = mainlineOnly(event.item)
       // 显式写 `lane: undefined` 而不是「不带这个键」：`{...item}` 已经把原来那个
       // 带进来了，条件展开一个空对象**盖不掉它**。落盘时 `JSON.stringify` 会丢掉
       // undefined，所以磁盘上仍然是干净的
-      const scoped = lane === undefined ? { lane: undefined } : { lane: { ...lane, id: laneOf(lane.id) } }
+      const scoped = lane === undefined
+        ? { lane: undefined }
+        : {
+            lane: {
+              ...lane,
+              id: laneOf(lane.id),
+              ...(lane.originItemId === undefined
+                ? {}
+                : { originItemId: idOf(event.item.turnId, lane.originItemId) }),
+            },
+          }
       return { ...event, item: { ...event.item, id, ...scoped } }
     },
     ask: (ask, turnId) =>

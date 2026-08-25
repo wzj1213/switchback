@@ -127,9 +127,15 @@ export function scopeReplay(threads: readonly ThreadHistory[], budget?: number):
 const BASE = new Set(["thread.started", "thread.updated"])
 const PATCH = new Set(["thread.renamed", "thread.removed"])
 
-/** 历史投影背后没人等答案；把落盘时尚未落定的瞬时卡一起清掉。 */
-function detachedThread(thread: Thread, now: number): Thread {
-  const detached = { ...thread, status: "idle" as const, detached: true, updatedAt: now }
+/**
+ * 历史投影背后没人等答案；把落盘时尚未落定的瞬时卡一起清掉。
+ *
+ * `updatedAt` 必须保留原值：它说的是「这条会话最后一次真的变动」，不是
+ * 「这份投影什么时候重建」。拿重建时刻覆盖它，会让每次启动后所有历史都变成
+ * “刚刚”，侧栏既失去时间，也失去按最近使用排序的依据。
+ */
+function detachedThread(thread: Thread): Thread {
+  const detached = { ...thread, status: "idle" as const, detached: true }
   delete detached.pendingQuestions
   return detached
 }
@@ -170,7 +176,7 @@ export function withCurrent(events: readonly Event[], live: Thread | undefined, 
   if (live !== undefined) return [...events, { type: "thread.updated", at: now, thread: live }]
   const last = [...events].reverse().find((e) => e.type === "thread.started" || e.type === "thread.updated")
   if (last === undefined) return events
-  return [...events, { type: "thread.updated", at: now, thread: detachedThread(last.thread, now) }]
+  return [...events, { type: "thread.updated", at: now, thread: detachedThread(last.thread) }]
 }
 
 /**
@@ -249,7 +255,7 @@ export function replayEvents({ engines, threads, alive, now, bodies, cap }: Repl
     if (last === undefined || (last.type !== "thread.started" && last.type !== "thread.updated")) continue
     // 回放出来的会话背后没有引擎进程，补一条 `detached` 让界面关掉输入框——
     // 一个能打字却答非所问的输入框比没有输入框糟得多
-    events.push({ type: "thread.updated", at: now, thread: detachedThread(last.thread, now) })
+    events.push({ type: "thread.updated", at: now, thread: detachedThread(last.thread) })
   }
   events.push(...unlogged(threads, alive, now))
   return events

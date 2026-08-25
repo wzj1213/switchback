@@ -11,6 +11,7 @@ const rand = (): number => 0.5
 
 const input = (over: Partial<FxInput> = {}): FxInput => ({
   pet,
+  shape: "slime",
   rate: 0,
   busyHands: false,
   // 默认「不在跑、上下文很空」＝**没有压力**，于是这些用例里一只怪都不会来，
@@ -115,7 +116,7 @@ describe("stepFx", () => {
 
 describe("几何", () => {
   it("手在身子左沿外面一点，枪口再从手里往外探", () => {
-    const hand = handOf(pet)
+    const hand = handOf(pet, "slime")
     // **在左沿外面**：画布压在桌宠底下，手搁在身体内侧的话整把枪都被盖住
     expect(hand.x).toBeLessThan(pet.x)
     expect(pet.x - hand.x).toBeLessThan(4)
@@ -126,9 +127,18 @@ describe("几何", () => {
   })
 
   it("纸带在手的左边，左边界更靠左", () => {
-    const t = tapeAt(handOf(pet))
+    const t = tapeAt(handOf(pet, "slime"))
     expect(t.x).toBeLessThan(pet.x)
     expect(t.left).toBeLessThan(t.x)
+  })
+
+  it("螃蟹把枪接在横臂，不沿用会落到腿上的史莱姆挂点", () => {
+    const slime = handOf(pet, "slime")
+    const crab = handOf(pet, "crab")
+    expect(crab.y).toBeLessThan(slime.y - 4)
+    expect(crab.y).toBeGreaterThan(pet.y + 12)
+    expect(crab.y).toBeLessThan(pet.y + 18)
+    expect(crab.x).toBeGreaterThan(pet.x)
   })
 })
 
@@ -367,6 +377,9 @@ describe("打靶：靶是钉死的", () => {
     const home = run(createFx(), 1, { range: true, rate: 90, field })
     const away = run(createFx(), 1, { range: true, rate: 90, field, pet: at(900, 20) })
     expect(away.view.stand).toEqual(home.view.stand)
+    // 靶场留在右侧宠物带，不再跨 200px 压到正文操作区。
+    expect(field.homeX - home.view.stand.x).toBeGreaterThan(130)
+    expect(field.homeX - home.view.stand.x).toBeLessThan(160)
   })
 
   it("把它拖到半空，靶杆照旧立在地面线上；弹壳还是落在它自己脚下", () => {

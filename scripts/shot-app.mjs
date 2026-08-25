@@ -24,6 +24,8 @@ import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import WebSocket from "ws"
 import { mainThread, stubThread } from "./ui-fixture.mjs"
+import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
+import { openPetLive } from "./shot-pet-live.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -31,6 +33,8 @@ const electron = createRequire(join(DESKTOP, "package.json"))("electron")
 
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
 const DARK = process.argv.includes("--dark")
+/** 桌宠靶场改动：用隔离数据目录真跑一轮 Claude，拍到枪、靶与逐字流。 */
+const PET_LIVE = process.argv.includes("--pet-live")
 /**
  * 固定窗口尺寸：前后两张图的像素必须能直接叠着比。
  *
@@ -40,7 +44,7 @@ const DARK = process.argv.includes("--dark")
 const MIN = process.argv.includes("--min")
 const SIZE = MIN ? { width: 860, height: 560 } : { width: 1280, height: 860 }
 /** 样本的时间戳写死。**不能用 `Date.now()`**——侧栏上那些「3 小时前」会每次都不一样。 */
-const AT = 1_756_000_000_000
+const AT = 1_787_659_200_000
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -85,7 +89,9 @@ function createCdp(url) {
       socket.once("open", resolve)
       socket.once("error", reject)
     }),
-    close: () => socket.close(),
+    // `close()` 要等 Electron 回 WebSocket 握手；真跑引擎后它可能已经在退出，
+    // 句柄会把出图脚本永久挂住。CDP 是一次性验收通道，拍完直接终止即可。
+    close: () => socket.terminate(),
     send: (method, params = {}) =>
       new Promise((resolve, reject) => {
         id += 1
@@ -124,12 +130,38 @@ async function waitFor(cdp, expression, label) {
 const VIEWS = [
   { name: "01-转录区", open: null, ready: ".md" },
   {
-    name: "02-新会话",
+    name: "02-后台活动工作台",
+    open: [
+      `document.querySelector('[title="后台活动"]')?.click()`,
+      `document.querySelector('.activity-row')?.click()`,
+    ],
+    ready: ".activity-detail",
+  },
+  {
+    name: "03-HTML预览",
+    open: [
+      `document.querySelector('[title="文件预览"]')?.click()`,
+      `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
+    ],
+    ready: ".html-preview__frame",
+  },
+  {
+    name: "04-新会话",
     open: `document.querySelector('.sidebar__new')?.click()`,
     ready: ".blank__title",
   },
   {
-    name: "03-设置",
+    name: "05-推理强度",
+    before: ".effort .trigger:not(:disabled)",
+    open: [
+      `document.querySelector('.workbench__hide')?.click()`,
+      `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
+    ],
+    ready: ".effort__bar--grown",
+    dragEffort: true,
+  },
+  {
+    name: "06-设置",
     // 侧栏底部那一行**有账号时点开的是菜单**，没账号时才直接进设置
     //（见 `SidebarFoot.tsx`：「一行只做一件事」）。所以这里走两步，
     // 而不是假设它一点就开——本机跑 smoke 时没账号，出图时有，两边不一样
@@ -142,12 +174,16 @@ const VIEWS = [
 ]
 
 async function shoot(cdp, view) {
+  if (view.before !== undefined) {
+    await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
+  }
   if (view.open !== null) {
     for (const step of [view.open].flat()) {
       await value(cdp, `(() => { ${step}; return true })()`)
       await pause(350)
     }
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
+    if (view.dragEffort === true) await exerciseEffort({ value, pause }, cdp)
     await pause(600)
   }
   const shot = await cdp.send("Page.captureScreenshot", {
@@ -156,26 +192,6 @@ async function shoot(cdp, view) {
   })
   await writeFile(join(OUT, `${view.name}.png`), Buffer.from(shot.data, "base64"))
   console.log(`  ✓ ${view.name}.png`)
-}
-
-/**
- * 把样本那条会话点开。
- *
- * 分两步是因为侧栏默认**折着**：项目组先展开，会话行才存在。
- * 这一段每一步都等到「东西真的出现了」再走下一步，不靠 `sleep` 撞运气——
- * 撞出来的图会时好时坏，而出图这条路一旦不可信就等于没有。
- */
-async function openFixture(cdp) {
-  await waitFor(cdp, "document.querySelector('.row--group .row__main') !== null", "项目组")
-  // 点的是 `.row__main` 不是 `.row`——整行是个容器，能点的是里面那块
-  await value(cdp, `document.querySelector('.row--group .row__main')?.click(); true`)
-  await waitFor(cdp, "document.querySelectorAll('.row--thread').length > 0", "会话列表")
-  // 两条都踩过：能点的是 `.row__main`（点 `.row` 不报错也不生效）；
-  // 而**侧栏上写的是首条提问、不是 `thread.title`**，所以别按标题去找——
-  // 找不到时 `?.click()` 一声不响，图照出，只是内容全错
-  await value(cdp, `document.querySelector('.row--thread .row__main')?.click(); true`)
-  await waitFor(cdp, "document.querySelector('.md') !== null", "转录区正文")
-  await pause(900)
 }
 
 /**
@@ -211,7 +227,10 @@ async function seed(dir) {
     await writeFile(join(threads, `${id}.jsonl`), stubThread(id, title, ROOT, at))
   await writeFile(
     join(dir, "settings.json"),
-    `${JSON.stringify({ projects: [ROOT], theme: DARK ? "dark" : "light", pets: true })}\n`,
+    `${JSON.stringify({
+      projects: [ROOT], theme: DARK ? "dark" : "light", pets: true,
+      ...(PET_LIVE ? { defaultEngine: "claude", petKit: { range: true } } : {}),
+    })}\n`,
   )
 }
 
@@ -230,10 +249,11 @@ async function main() {
     },
   )
   const log = []
+  let cdp
   child.stdout.on("data", (c) => log.push(String(c)))
   child.stderr.on("data", (c) => log.push(String(c)))
   try {
-    const cdp = createCdp(await targetOf(port))
+    cdp = createCdp(await targetOf(port))
     await cdp.ready
     await cdp.send("Emulation.setDeviceMetricsOverride", {
       ...SIZE,
@@ -241,11 +261,18 @@ async function main() {
       mobile: false,
     })
     await waitFor(cdp, "document.querySelector('.shell') !== null", "外壳")
-    await openFixture(cdp)
+    await openFixture({ value, waitFor, pause }, cdp)
+    if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
     for (const view of VIEWS) await shoot(cdp, view)
     await shootSettings(cdp)
     cdp.close()
   } catch (error) {
+    if (cdp !== undefined) {
+      const shot = await cdp.send("Page.captureScreenshot", { format: "png" }).catch(() => undefined)
+      if (shot?.data !== undefined) {
+        await writeFile(join(OUT, "00-出图失败现场.png"), Buffer.from(shot.data, "base64"))
+      }
+    }
     console.error(log.join("").slice(-6000))
     throw error
   } finally {

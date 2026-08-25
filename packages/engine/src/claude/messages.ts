@@ -17,6 +17,8 @@ interface RawMessage {
 export interface MessageRef {
   current: TurnId | undefined
   seq: number
+  /** 子 agent 各有一台铸币机；主线缺席时保持既有 `turn:iN` 形状。 */
+  namespace?: string
   tools: Map<ItemId, ToolCallItem>
   notices: Map<string, NoticeItem>
   plan: PlanState
@@ -29,7 +31,8 @@ export interface MessageRef {
 export function makeIdMinter(ref: MessageRef, turnId: TurnId): () => ItemId {
   return () => {
     ref.seq += 1
-    return `${turnId}:i${String(ref.seq)}`
+    const namespace = ref.namespace === undefined ? "" : `:${ref.namespace}`
+    return `${turnId}${namespace}:i${String(ref.seq)}`
   }
 }
 

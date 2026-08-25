@@ -32,6 +32,7 @@ import { readBuildInfo } from "./build-info.js"
 import { engineEnabled } from "../shared/engine-access.js"
 import { installActivity } from "./activity.js"
 import { installEngineSettings } from "./engine-settings.js"
+import { installFilePreviewChannel } from "./file-preview.js"
 
 /**
  * Electron 主进程。
@@ -277,6 +278,7 @@ function installChannels(): void {
   installSearchChannel()
   installChatDirChannel()
   installAttachChannel()
+  installFilePreviewChannel()
   installProjectDocChannel()
   installEngineVersionChannel(log, engineVersions)
   installEngineDoorChannels()

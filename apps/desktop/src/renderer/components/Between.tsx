@@ -1,9 +1,10 @@
-import type { Command, Item, Thread } from "@omni/protocol"
+import type { Command, Item, Lane, Thread } from "@omni/protocol"
 import { PlanPanel } from "./PlanPanel.js"
 import { QuestionStack } from "./QuestionCard.js"
 import { Changed } from "./Changed.js"
 import { Queued } from "./Queued.js"
 import { GoalBar } from "./GoalBar.js"
+import { ActivityDock } from "./ActivityDock.js"
 
 interface Props {
   thread: Thread
@@ -14,6 +15,8 @@ interface Props {
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   onReview: () => void
+  lanes: readonly Lane[]
+  onOpenLane: (laneId: string) => void
 }
 
 /**
@@ -41,6 +44,7 @@ export function Between(props: Props): React.JSX.Element {
     <>
       <GoalBar goal={props.thread.goal} />
       <div className="brief">
+        <ActivityDock lanes={props.lanes} onOpen={props.onOpenLane} />
         <PlanPanel key={props.thread.id} items={props.items} running={props.thread.status === "running"} />
         {props.stamp === undefined ? null : (
           <Changed

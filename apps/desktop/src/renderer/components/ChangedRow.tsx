@@ -5,8 +5,10 @@ import type { ChangedFile } from "../changes.js"
 import { splitPath } from "../diff.js"
 import { usePatch } from "../review.js"
 import { relPath } from "../tool.js"
+import { requestFilePreview } from "../file-preview-request.js"
 import { FileDiff } from "./Diff.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
+import { FileIcon } from "./icons-activity.js"
 
 interface Props {
   file: ChangedFile
@@ -89,6 +91,24 @@ function RevealFile({ file, onReveal }: { file: ChangedFile; onReveal: (path: st
   )
 }
 
+function PreviewFile({ file, cwd }: { file: ChangedFile; cwd: string }): React.JSX.Element | null {
+  const deleted = file.review?.kind === "delete" || (file.review === undefined && file.last.kind === "delete")
+  if (deleted) return null
+  return (
+    <button
+      type="button"
+      className="changed__act"
+      aria-label="预览文件"
+      title="在工作台预览"
+      onClick={() => {
+        requestFilePreview(cwd, file.path)
+      }}
+    >
+      <FileIcon size={12} />
+    </button>
+  )
+}
+
 export function ChangedRow({
   file,
   cwd,
@@ -123,6 +143,7 @@ export function ChangedRow({
         <span className="changed__stat">
           <Stat added={file.added} removed={file.removed} />
         </span>
+        <PreviewFile file={file} cwd={cwd} />
         <RevealFile file={file} onReveal={onReveal} />
         <button
           type="button"

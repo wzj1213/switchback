@@ -1,22 +1,13 @@
 import {
-  commandsOf,
   forkPeerOf,
   itemsOf,
-  limitsOf,
-  modelsOf,
-  lanesOf,
-  tasksOf,
-  thinkingTokensOf,
   turnOf,
-  usageOf,
 } from "@omni/store"
 import { stampOf } from "./stamp.js"
 import { reportedChangesOf } from "./changes.js"
-import { Workspace } from "./components/Workspace.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
-import { AsidePane } from "./components/AsidePane.js"
-import { pruneTabs } from "./aside-tabs.js"
 import { Review } from "./components/Review.js"
+import { ThreadScreen } from "./components/ThreadScreen.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
 import { useWindowChrome } from "./use-window-chrome.js"
@@ -173,64 +164,14 @@ export function App(): React.JSX.Element {
     )
   }
 
-  const lanes = lanesOf(state, thread.id)
-  /* 标签在渲染时对一遍现存的 lane：会话删了、换了引擎、回放到更早的时点之后，
-     留着的是一个点了什么都没有的标签（见 `aside-tabs.ts` 的 `pruneTabs`） */
-  const tabs = pruneTabs(shell.aside, new Set(lanes.map((l) => l.id)))
   return (
-    <div className={`shell${tabs.active === undefined ? "" : " shell--aside"}`}>
-      {sidebar}
-      {/* **key 按会话隔离。** 不加的话切会话时 Composer 不重挂，
-          上一个会话没发出去的草稿会留在输入框里、被发给新会话——
-          顺带把工具行的展开态、diff 的展开态也按会话隔离，
-          它们同样是「属于那个会话」的状态 */}
-      <Workspace
-        key={thread.id}
-        thread={thread}
-        peer={peer}
-        onCompare={() => { shell.setComparing(true) }}
-        rows={app.rows}
-        onSelect={shell.select}
-        /* **`app.items` 不是 `app.itemsOf(thread.id)`**：后者在空会话时每次
-           渲染都造一个新数组，而 `Transcript` 的 memo 认引用（见 `AppApi.items`） */
-        items={app.items}
-        turn={turnOf(state, thread.id)}
-        /* nextEngine 只是下一句的去向；真正切换前，顶部仍应显示当前原生会话的用量。 */
-        usage={usageOf(state, thread.id, thread.engine)}
-        tasks={tasksOf(state, thread.id)}
-        thinkingTokens={thinkingTokensOf(state, thread.id)}
-        /* 引擎不报旁路的那三家永远是空数组——`withLanes` 空数组时原样返回，一行都不多 */
-        lanes={lanes}
-        openLane={tabs.active}
-        onOpenLane={shell.openAside}
-        /* 引擎也要传：这份清单得**正是当前这家报的**才算数，
-           否则切过去之后摆的是上一家的模型（见 store 的 `modelsOf`） */
-        models={modelsOf(state, thread.id, thread.engine)}
-        engines={workspaceEngines}
-        pets={{ on: app.prefs.settings.pets, ...app.prefs.settings.petKit }}
-        notices={app.notices}
-        onDismiss={shell.dismiss}
-        finding={shell.finding}
-        onFind={app.find}
-        onCloseFind={() => {
-          shell.setFinding(false)
-          app.stopFind()
-        }}
-        onCopy={app.copy}
-        onReveal={app.reveal}
-        /* 待切换时不拿旧引擎的命令冒充目标引擎；omni 自己的命令仍由 Workspace 补上。 */
-        commands={thread.nextEngine === undefined ? commandsOf(state, thread.id, thread.engine) : []}
-        limits={limitsOf(state, thread.engine)}
-        onNew={app.newHere}
-        onRename={shell.requestRename}
-        onSettings={() => { shell.setSettingsOpen(true) }}
-        searchFiles={app.searchFiles}
-        onReview={() => { shell.setReviewOpen(true) }}
-        send={app.send}
-      />
-      <AsidePane lanes={lanes} tabs={tabs} onPick={shell.openAside} onClose={shell.closeAside} />
-      {settings}
-      {review}
-    </div>
+    <ThreadScreen
+      app={app}
+      thread={thread}
+      peer={peer}
+      engines={workspaceEngines}
+      sidebar={sidebar}
+      layers={<>{settings}{review}</>}
+    />
   )
 }

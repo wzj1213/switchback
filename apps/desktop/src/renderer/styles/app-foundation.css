@@ -146,29 +146,29 @@ body {
 }
 
 /*
- * 开着第三栏。**关掉时整列不渲染，不是宽度 0**——宽度 0 的列里内容仍然挂着、
- * 仍然在流式输出时触发 memo 比较，那是一份看不见的性能账（见 `AsidePane`）。
+ * 开着工作台。**关掉时整列不渲染，不是宽度 0**——宽度 0 的列里内容仍然挂着、
+ * 仍然在流式输出时触发 memo 比较，那是一份看不见的性能账。
  * 所以这条只管栅格，开不开由 `App` 决定渲不渲染那个元素。
  */
-.shell--aside {
-  grid-template-columns: var(--sidebar-w) 1fr var(--aside-w);
+.shell--workbench {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--workbench-w);
 }
 
 /*
- * 窄屏：第三栏从一列变成从右边压上来的一层。**改 CSS 不改组件结构**——
+ * 窄屏：工作台从一列变成从右边压上来的一层。**改 CSS 不改组件结构**——
  * 换屏要改 JS，那意味着窄宽两套渲染路径，两套都得测（见方案 §7.6）。
  */
-@media (max-width: 1100px) {
-  .shell--aside {
+@media (max-width: 1120px) {
+  .shell--workbench {
     grid-template-columns: var(--sidebar-w) 1fr;
   }
 
-  .aside {
+  .workbench {
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(var(--aside-w), 86vw);
+    width: min(560px, 86vw);
     z-index: 60;
     box-shadow: var(--shadow-pop);
   }

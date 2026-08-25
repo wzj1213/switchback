@@ -1,12 +1,14 @@
 import { useRef } from "react"
 import type { EngineInfo, Thread, Usage } from "@omni/protocol"
-import { CaretIcon, CompareIcon, ForkIcon } from "./icons.js"
+import { CaretIcon } from "./icons.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { EnvCard } from "./EnvCard.js"
 import { TimelineCard } from "./TimelineCard.js"
 import { labelOf } from "./Composer.js"
 import { nextEngine } from "../engines.js"
 import type { LimitNotice } from "../limits.js"
+import type { WorkbenchPage } from "../workbench.js"
+import { TopBarActions } from "./TopBarActions.js"
 
 /**
  * 顶栏。
@@ -67,9 +69,6 @@ function Cards({
   return null
 }
 
-const canForkFrom = (thread: Thread): boolean =>
-  thread.detached !== true && (thread.status === "idle" || thread.status === "failed")
-
 export function TopBar({
   thread,
   usage,
@@ -84,6 +83,11 @@ export function TopBar({
   setTimeline,
   setEnv,
   limits,
+  activityCount,
+  workbenchPage,
+  workbenchVisible,
+  onActivity,
+  onFiles,
 }: {
   thread: Thread
   usage: Usage | undefined
@@ -102,6 +106,11 @@ export function TopBar({
   setEnv: (open: boolean) => void
   /** 账号额度提示。平时是 undefined（用得不多就不出声）。 */
   limits: LimitNotice | undefined
+  activityCount: number
+  workbenchPage: WorkbenchPage
+  workbenchVisible: boolean
+  onActivity: () => void
+  onFiles: () => void
 }): React.JSX.Element {
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
@@ -147,30 +156,18 @@ export function TopBar({
       <span className="topbar__spacer" />
       <ContextMeter usage={usage} />
       <LimitPill limits={limits} />
-      {peer === undefined ? null : (
-        <button
-          className="iconbtn"
-          type="button"
-          title={`和「${peer.title}」并排比一比（⇧⌘D）`}
-          aria-label="对比分叉"
-          onClick={onCompare}
-        >
-          <CompareIcon size={14} />
-        </button>
-      )}
-      {next === undefined || !canForkFrom(thread) ? null : (
-        <button
-          className="iconbtn"
-          type="button"
-          title={`用 ${next.label} 另开一条同工作区分支（原会话保留，不自动发送内容）`}
-          aria-label={`分叉到 ${next.label}`}
-          onClick={() => {
-            onFork(next.id)
-          }}
-        >
-          <ForkIcon size={14} />
-        </button>
-      )}
+      <TopBarActions
+        activityCount={activityCount}
+        page={workbenchPage}
+        visible={workbenchVisible}
+        peer={peer}
+        next={next}
+        thread={thread}
+        onActivity={onActivity}
+        onFiles={onFiles}
+        onCompare={onCompare}
+        onFork={onFork}
+      />
     </header>
   )
 }

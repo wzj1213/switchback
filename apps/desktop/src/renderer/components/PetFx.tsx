@@ -60,13 +60,15 @@ export function FireLayer({
   const flow = useFlow(fire.threadId)
   const mine = slots.findIndex((slot) => slot.engine === engine)
   if (!fire.on || reduced || mine < 0) return null
+  const look = lookOf(engine)
   return (
     <PetFx
       pets={pets}
       homeAt={homeAt}
       index={mine}
       threadId={fire.threadId}
-      tone={lookOf(engine).tone}
+      tone={look.tone}
+      shape={look.shape}
       flow={flow}
       busyHands={fire.handsBusy}
       running={fire.running}

@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react"
 import { barWidth, indexAt, PAD, THUMB, travelOf } from "./effort-geometry.js"
 import { effortLabel } from "./ModelPicker.js"
 import { Stars } from "./effort-stars.js"
+import { grip } from "./effort-pointer.js"
 
 /**
  * 推理强度滑块**展开后的那条**——布局照比稿那版行内条（gbar）：
  *
- * - 白拇指**边走边走**（`--tx` 走 translateX，不碰 left——合成器的事，不排版），
+ * - 白拇指**边拖边走**（`--tx` 走 translateX，不碰 left——合成器的事，不排版），
  *   填充盖到拇指右缘，满档时正好铺满整条；
  * - 坡道图层钉在整条的坐标上（宽度取整条宽），跟着填充宽度缩放的话，
  *   拖到一半右端已经是满色，读起来像「已经到头了」；
@@ -19,11 +20,11 @@ import { Stars } from "./effort-stars.js"
  */
 
 /** 键盘 → 档位位移。0 = 这个键不归滑块管。 */
-function deltaOf(key: string, committed: number, total: number): number {
+function deltaOf(key: string, current: number, total: number): number {
   if (key === "ArrowLeft" || key === "ArrowDown") return -1
   if (key === "ArrowRight" || key === "ArrowUp") return 1
-  if (key === "Home") return -committed
-  if (key === "End") return total - 1 - committed
+  if (key === "Home") return -current
+  if (key === "End") return total - 1 - current
   return 0
 }
 
@@ -43,41 +44,9 @@ function Stops({ count }: { count: number }): React.JSX.Element {
 }
 
 /**
- * 拖这条的那三个指针事件。
+ * 固定在右端的小牌子：**现在是哪一档**。
  *
- * **拖动中只动视觉，松手才提交**（`onPointerUp` 那一下才 `onCommit`）：
- * `thread.setModel` 是发给引擎的命令，拖动过程每帧都发就是在刷引擎。
- */
-function grip(o: {
-  dragging: boolean
-  pick: (event: React.PointerEvent<HTMLSpanElement>) => number
-  onDrag: (index: number | undefined) => void
-  onCommit: (index: number) => void
-}): Pick<React.HTMLAttributes<HTMLSpanElement>, "onPointerDown" | "onPointerMove" | "onPointerUp"> {
-  return {
-    onPointerDown: (event) => {
-      event.currentTarget.setPointerCapture(event.pointerId)
-      o.onDrag(o.pick(event))
-    },
-    onPointerMove: (event) => {
-      if (o.dragging) o.onDrag(o.pick(event))
-    },
-    onPointerUp: (event) => {
-      /* **先退出拖动态再落档。** 顺序反了的话，落档那一下的 190ms 回弹
-         会被「拖动中零过渡」吃掉——松手就没有收得住的那一下了。
-         注意 `onDrag(undefined)` 只清位置预览，颜色那份由 `onCommit` 接着补上。 */
-      const index = o.pick(event)
-      o.onDrag(undefined)
-      o.onCommit(index)
-    },
-  }
-}
-
-/**
- * 跟着拇指走的那枚小牌子：**现在是哪一档**。
- *
- * 展开之后触发器被条子顶掉了，档位名跟着一起没了——拖的时候拇指在动，
- * 可「调到哪一档」只剩位置在说，没有字。这一枚把那句话补回来。
+ * 展开之后触发器被条子顶掉了，档位名也跟着没了；这一枚把那句话补回来。
  *
  * **锚在右边不锚在左边**：外壳的 `max-width` 从收起态张到整条宽要 240ms，
  * 而条子是 `justify-content: flex-end` 的——**右缘一直不动，左缘在跑**。
@@ -87,23 +56,14 @@ function grip(o: {
  */
 function Now({
   label,
-  rx,
   grown,
-  live,
 }: {
   label: string
-  /** 拇指中心离条子右缘多远。 */
-  rx: number
   grown: boolean
-  live: boolean
 }): React.JSX.Element {
-  const cls = ["effort__now", grown ? "effort__now--in" : "", live ? "effort__now--live" : ""]
+  const cls = ["effort__now", grown ? "effort__now--in" : ""]
   return (
-    <span
-      className={cls.filter(Boolean).join(" ")}
-      style={{ "--rx": `${rx.toFixed(1)}px` } as React.CSSProperties}
-      aria-hidden="true"
-    >
+    <span className={cls.filter(Boolean).join(" ")} aria-hidden="true">
       {label}
     </span>
   )
@@ -184,10 +144,18 @@ export function EffortBar({
   onClose: (refocus: boolean) => void
 }): React.JSX.Element {
   const bar = useRef<HTMLSpanElement>(null)
+  const active = useRef<number | undefined>(undefined)
   const [dragIndex, setDragIndex] = useState<number | undefined>(undefined)
+  /** 已发给引擎、还没等到最终回声的落点；连续按方向键时下一步从这里算。 */
+  const [pendingIndex, setPendingIndex] = useState<number | undefined>(undefined)
   const { grown, intro } = useBarLife(bar, onClose)
-  // 拖动中画拖到的那一档，松手之后画已落档的那一档
-  const shown = dragIndex ?? committed
+  // 拖动中画手指位置，松手后守住本地落点，最终再交给引擎回声。
+  const shown = dragIndex ?? pendingIndex ?? committed
+
+  useEffect(() => {
+    // 只在回声追到最终本地落点时撤；较早的一次回声不能把连续点击拉回去。
+    setPendingIndex((pending) => (pending === committed ? undefined : pending))
+  }, [committed])
 
   const width = barWidth(efforts.length)
   const t = (shown / Math.max(1, efforts.length - 1)) * (grown ? 1 : 0)
@@ -205,6 +173,7 @@ export function EffortBar({
    * 深空特效会闪一下灰再亮回来。预览由 `EffortSlider` 在回声到达时撤。
    */
   const commit = (index: number): void => {
+    setPendingIndex(index)
     onPreview(efforts[index])
     onCommit(index)
   }
@@ -218,9 +187,7 @@ export function EffortBar({
     <>
       <Now
         label={effortLabel(efforts[shown] ?? "").label}
-        rx={width - x - THUMB / 2}
         grown={grown}
-        live={dragIndex !== undefined}
       />
       <span
         ref={bar}
@@ -232,17 +199,17 @@ export function EffortBar({
         aria-valuemax={efforts.length - 1}
         aria-valuenow={shown}
         aria-valuetext={effortLabel(efforts[shown] ?? "").label}
-        {...grip({ dragging: dragIndex !== undefined, pick, onDrag: drag, onCommit: commit })}
+        {...grip({ active, pick, onDrag: drag, onCommit: commit })}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.preventDefault()
             onClose(true)
             return
           }
-          const delta = deltaOf(e.key, committed, efforts.length)
+          const delta = deltaOf(e.key, shown, efforts.length)
           if (delta !== 0) {
             e.preventDefault()
-            commit(Math.min(efforts.length - 1, Math.max(0, committed + delta)))
+            commit(Math.min(efforts.length - 1, Math.max(0, shown + delta)))
           }
         }}
         onBlur={(e) => {
@@ -251,7 +218,7 @@ export function EffortBar({
         }}
       >
         {/* 填充盖过拇指右缘再多出一个 `PAD`：满档时正好铺满整条。
-          少那 3px 的话最右会剩一条没填上的浅色缝，读起来像没到头 */}
+          少那 4px 的话最右会剩一条没填上的浅色缝，读起来像没到头 */}
         <span className="effort__fill" style={{ width: `${String(x + THUMB + PAD)}px` }}>
           <span className="effort__lay effort__base" />
           <span className="effort__lay effort__hot" />

@@ -6,7 +6,7 @@ import type { Foe } from "./pet-foes.js"
 import type { Bench } from "./bench.js"
 import type { Field, Stand } from "./pet-fx-geo.js"
 import { createTarget, type Hole, type Target } from "./pet-range.js"
-import type { Pet } from "./pets.js"
+import type { Pet, PetShape } from "./pets.js"
 
 /**
  * 开火那一层的**世界长什么样**、一开始是什么样。
@@ -107,6 +107,8 @@ export function createFx(): FxWorld {
 export interface FxInput {
   /** 当前那只此刻在哪。**枪、弹壳、纸带、怪，全都挂在这一个点上。** */
   pet: Pet
+  /** 当前那只的轮廓。枪的挂点要接到它真实的手/横臂上。 */
+  shape: PetShape
   /** 估出来的流速（token/秒）。见 `throughput.ts`。 */
   rate: number
   /**
@@ -127,7 +129,7 @@ export interface FxInput {
   left: number
   /**
    * 台面：窝在哪、地面线在哪。**靶钉在这上面，不钉在那只身上**——
-   * 这是本层第二个、也是最后一个不走 `pet` 的输入（见 `pet-fx-geo.ts`）。
+   * 这是本层不走 `pet` 坐标的输入（见 `pet-fx-geo.ts`）。
    */
   field: Field
   /** 让不让压力显形。关掉之后只剩打纸带那一层。 */

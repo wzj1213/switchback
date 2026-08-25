@@ -60,7 +60,7 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
   // 不会当场蹦一只」）。1 秒对 120ms 的慢拍有八倍余量，够了。
   const real = Math.min(rawDt > 0 ? rawDt : 1 / 60, WALL_MAX)
   const dt = Math.min(real, MAX_DT)
-  const hand = handOf(input.pet)
+  const hand = handOf(input.pet, input.shape)
   w.quiet = input.rate > 1 ? 0 : w.quiet + real
   w.clock += real
   spawnDue(w, input, hand)
@@ -82,7 +82,7 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
     handX: hand.x,
     handY: hand.y,
     ground: groundOf(input),
-    stand: standOf(input.field),
+    stand: standOf(input.field, input.shape),
     rate: input.rate,
     ratio: input.ratio,
     bench: input.bench,
@@ -130,7 +130,7 @@ function aimOf(
   input: FxInput,
   hand: { x: number; y: number },
 ): { x: number; y: number } {
-  if (input.range) return targetAt(standOf(input.field))
+  if (input.range) return targetAt(standOf(input.field, input.shape))
   const foe = nearest(w.foes)
   if (foe !== undefined) return { x: foe.x + foe.knock, y: foe.y - 11 - foe.fly }
   return tapeAt(hand)

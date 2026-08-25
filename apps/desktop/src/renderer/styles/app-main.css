@@ -116,6 +116,21 @@
   background: var(--bg-press);
 }
 
+.iconbtn--on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.iconbtn--count {
+  width: auto;
+  min-width: 26px;
+  gap: 4px;
+  padding: 0 7px;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /*
  * 转录区**只上下滚，绝不左右滚**。
  *

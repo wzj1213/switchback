@@ -18,13 +18,12 @@ import { WorkspaceComposer } from "./WorkspaceComposer.js"
 import { useOmniActions } from "../useOmniActions.js"
 import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
-import { Transcript } from "./Transcript.js"
-import { Pets } from "./Pets.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
 import { stampOf } from "../stamp.js"
 import { Between } from "./Between.js"
-import { useFireProps } from "../use-fire-props.js"
+import type { WorkbenchPage } from "../workbench.js"
+import { ConversationStage } from "./ConversationStage.js"
 
 export interface WorkspaceProps {
   thread: Thread
@@ -39,9 +38,13 @@ export interface WorkspaceProps {
   /** Claude 原生上报的当前思考块近似 token；没有信号就不显示。 */
   thinkingTokens: number | undefined
   lanes: readonly Lane[]
-  /** 第三栏正开着哪条旁路。主线上那条收成一行，同一棵树不画两遍。 */
+  /** 工作台正开着哪条旁路。主线上那条收成一行，同一棵树不画两遍。 */
   openLane: string | undefined
   onOpenLane: (laneId: string) => void
+  workbenchPage: WorkbenchPage
+  workbenchVisible: boolean
+  onOpenActivity: () => void
+  onOpenFiles: () => void
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
   /**
@@ -150,8 +153,6 @@ function useDraft(
  */
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
-  const running = props.turn?.status === "running"
-  const fire = useFireProps({ pets: props.pets, thread, usage: props.usage, running })
   const [env, setEnv] = useState(false)
   const [timeline, setTimeline] = useState(false)
   /**
@@ -195,6 +196,11 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         }}
         onReveal={props.onReveal}
         onCopy={props.onCopy}
+        activityCount={props.lanes.filter((lane) => lane.status === "running" || lane.status === "paused").length}
+        workbenchPage={props.workbenchPage}
+        workbenchVisible={props.workbenchVisible}
+        onActivity={props.onOpenActivity}
+        onFiles={props.onOpenFiles}
       />
       <Notices
         notices={props.notices}
@@ -203,40 +209,22 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onSelect={props.onSelect}
       />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
-      {/* 对话区。**多这一层是为了给吉祥物一块有边界的地**——
-          它们要能被拖到任何地方，也要知道「地面」在哪（就是这一块的底边，
-          也就是输入框的上沿）。顺带它也是那道下摆渐隐的定位参照 */}
-      <div className="stage">
-        <Transcript
-          thread={thread}
-          items={props.items}
-          turn={props.turn}
-          tasks={props.tasks}
-          thinkingTokens={props.thinkingTokens}
-          lanes={props.lanes}
-          openLane={props.openLane}
-          onOpenLane={props.onOpenLane}
-          send={send}
-          onCopy={props.onCopy}
-          onReuse={reuse}
-        />
-        {/* 滚动区的下摆。**必须在 `Transcript` 外面**——滚动容器里的绝对定位参照的是
-            可滚动内容而不是可视区，挂进去那道渐隐会跟着内容滚走。见 app.css 的 `.hem` */}
-        <div className="hem" aria-hidden="true" />
-        {props.pets.on ? (
-          <Pets
-            engines={props.engines}
-            engine={thread.engine}
-            running={running}
-            active={thread.status === "running" || thread.status === "waiting_approval"}
-            failed={thread.status === "failed"}
-            profile={thread.engineProfile}
-            hidden={props.pets.hidden}
-            entryOn={props.pets.entry}
-            fire={fire}
-          />
-        ) : null}
-      </div>
+      <ConversationStage
+        thread={thread}
+        items={props.items}
+        turn={props.turn}
+        tasks={props.tasks}
+        thinkingTokens={props.thinkingTokens}
+        lanes={props.lanes}
+        openLane={props.openLane}
+        onOpenLane={props.onOpenLane}
+        engines={props.engines}
+        usage={props.usage}
+        pets={props.pets}
+        send={send}
+        onCopy={props.onCopy}
+        onReuse={reuse}
+      />
       <Between
         thread={thread}
         items={props.items}
@@ -245,6 +233,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onReveal={props.onReveal}
         onCopy={props.onCopy}
         onReview={props.onReview}
+        lanes={props.lanes}
+        onOpenLane={props.onOpenLane}
       />
       <WorkspaceComposer
         props={props}

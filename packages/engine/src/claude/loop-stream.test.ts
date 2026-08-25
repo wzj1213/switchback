@@ -22,7 +22,11 @@ function ref(): ReturnType<typeof createTurnRef> {
   return out
 }
 
-const options = { trust: () => "auto-edit" as const, window: () => undefined, onReady: () => undefined }
+const options = {
+  trust: () => "auto-edit" as const,
+  context: () => Promise.resolve(undefined),
+  onReady: () => undefined,
+}
 
 describe("Claude 逐字与收尾的身份对齐", () => {
   it("流式消息与完整收尾复用同一个 item", async () => {

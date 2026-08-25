@@ -53,7 +53,7 @@ export function AsideLaneCard({
       <p className="asidecard__q">{lane.title}</p>
       {onOpen === undefined ? null : (
         <button type="button" className="lane__open" onClick={() => { onOpen(lane.id) }}>
-          {folded ? "在旁路里看着" : "在旁路查看"}
+          {folded ? "已在工作台打开" : "在工作台查看"}
         </button>
       )}
       {running || folded ? null : <p className="asidecard__a">{lane.summary}</p>}

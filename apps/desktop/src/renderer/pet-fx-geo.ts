@@ -1,6 +1,6 @@
 import type { Gun } from "./pet-gun.js"
 import { TG_D, TG_R, TG_UP } from "./pet-range.js"
-import { SIZE, type Pet } from "./pets.js"
+import { SIZE, type Pet, type PetShape } from "./pets.js"
 
 /**
  * 开火那一层的**几何**：手在哪、枪口在哪、抛壳口在哪、纸带和靶立在哪。
@@ -28,13 +28,19 @@ const TAPE_LEN = 190
  */
 export const DRIFT_QUIET = 90
 /**
- * 手在身子的哪个位置（占盒子的比例，不是绝对值——螃蟹和鲸的盒子不一样大）。
+ * 手在身子的哪个位置（占物理盒子的比例）。不能拿一套挂点套所有形：
+ * 螃蟹的 12×9 图形在 30px 方盒里底对齐，横臂实际位于 y≈13–18；通用的 72%
+ * 会把枪接到腿上，看起来像悬在身体旁边。
  *
  * **横向是负的：手在身子左沿外面一点点。** 画布压在桌宠底下，
  * 手心搁在身体内侧的话整把枪都被身子盖住，只剩枪口焰像个悬空的火星。
  */
-const HAND_X = -0.04
-const HAND_Y = 0.72
+const MOUNT: Readonly<Record<PetShape, { x: number; y: number }>> = {
+  slime: { x: -0.04, y: 0.72 },
+  // 机匣压进左臂一小截，枪管仍从身体左侧伸出。
+  crab: { x: 0.04, y: 0.52 },
+  "dsh-mark": { x: -0.04, y: 0.72 },
+}
 /** 枪管从手心往外探多远。出膛点＝手 + 这一段，按枪的指向旋过去。 */
 const BARREL = 11
 /** 抛壳口在枪的局部坐标（素材枪管指 -x，见 `pet-fx-draw.ts`）。 */
@@ -43,8 +49,9 @@ const PORT_Y = -3.6
 
 
 /** 手心在哪（相对活动区）。桌宠本体的坐标是左上角。 */
-export function handOf(pet: Pet): { x: number; y: number } {
-  return { x: pet.x + SIZE * HAND_X, y: pet.y + SIZE * HAND_Y }
+export function handOf(pet: Pet, shape: PetShape): { x: number; y: number } {
+  const mount = MOUNT[shape]
+  return { x: pet.x + SIZE * mount.x, y: pet.y + SIZE * mount.y }
 }
 
 /** 枪口在哪。出膛点必须在这儿算——算在别处的话第一帧子弹会从画布左上角飞出来。 */
@@ -73,8 +80,11 @@ export function tapeAt(hand: { x: number; y: number }): { x: number; y: number; 
  * 往右夹一道：窄窗口下窝本身就很靠左，`homeX - TG_D` 会跑到画布外面去，
  * **而画布外面的靶等于没有靶**——那时宁可近一点打。
  */
-export function standOf(field: Field): Stand {
-  return { x: Math.max(TG_R + 12, field.homeX + SIZE * HAND_X - TG_D), ground: field.ground }
+export function standOf(field: Field, shape: PetShape): Stand {
+  return {
+    x: Math.max(TG_R + 12, field.homeX + SIZE * MOUNT[shape].x - TG_D),
+    ground: field.ground,
+  }
 }
 
 /** 台面：窝在哪、地面线在哪。**两个都和那只此刻的位置无关。** */
@@ -95,4 +105,3 @@ export interface Stand {
 export function targetAt(stand: Stand): { x: number; y: number } {
   return { x: stand.x, y: stand.ground - TG_UP }
 }
-

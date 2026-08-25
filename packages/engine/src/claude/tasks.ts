@@ -1,5 +1,6 @@
 import type { Event, Lane, TaskRun, ThreadId } from "@omni/protocol"
 import { toLane } from "./workflow.js"
+import { createTaskLinks, rememberTaskParent, type TaskLinks } from "./task-links.js"
 
 /**
  * Claude 后台任务的四条公开消息按 `task_id` 汇成一条生命周期：started 给稳定标题，
@@ -17,10 +18,11 @@ export interface TaskState {
   active: Map<string, TaskRun>
   lanes: Map<string, Lane>
   hidden: Set<string>
+  links: TaskLinks
 }
 
 export function createTaskState(): TaskState {
-  return { active: new Map(), lanes: new Map(), hidden: new Set() }
+  return { active: new Map(), lanes: new Map(), hidden: new Set(), links: createTaskLinks() }
 }
 
 interface RawTaskProgress {
@@ -123,6 +125,7 @@ function onTaskStarted(state: TaskState, raw: RawTaskStarted, frame: TaskFrame):
   const id = str(raw.task_id)
   const description = str(raw.description)
   if (id === undefined || description === undefined) return
+  rememberTaskParent(state.links, id, raw)
   if (raw.skip_transcript === true) {
     state.hidden.add(id)
     return
@@ -172,6 +175,7 @@ export function onTaskProgress(
 ): void {
   const task = taskProgressOf(raw)
   if (task === undefined) return
+  rememberTaskParent(state.links, task.id, raw)
   const before = state.lanes.get(task.id)
   if (state.hidden.has(task.id) || terminal(before)) return
   const frame = { at, out }
@@ -260,6 +264,7 @@ function hideFinal(state: TaskState, task: TaskFinal, before: Lane | undefined):
 function onTaskNotification(state: TaskState, raw: RawTaskNotification, frame: TaskFrame): void {
   const task = taskFinalOf(raw)
   if (task === undefined) return
+  rememberTaskParent(state.links, task.id, raw)
   const before = state.lanes.get(task.id)
   const active = updateActive(state, task.id, { status: task.status }, frame)
   if (hideFinal(state, task, before)) {

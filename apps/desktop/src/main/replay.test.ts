@@ -135,6 +135,22 @@ describe("活着的和历史要分开", () => {
     for (const row of threadRowsOf(state)) expect(row.thread.detached).toBe(true)
   })
 
+  it("重建时只更新投影事件时刻，不把所有会话的最后活动时间改成现在", () => {
+    const old = { ...thread("t", "上周的会话"), updatedAt: 123 }
+    const saved: ThreadHistory = {
+      id: "t",
+      events: [
+        { type: "thread.started", at: 123, thread: old },
+        {
+          type: "item.started", at: 124,
+          item: { id: "u", turnId: "turn", at: 124, kind: "user_message", text: "旧消息" },
+        },
+      ],
+    }
+    const state = reduceAll(initial(), replayEvents({ engines: [], threads: [saved], alive: none, now: 999_999 }))
+    expect(threadRowsOf(state)[0]?.thread.updatedAt).toBe(123)
+  })
+
   it("活着的那份用宿主手上的当前状态收尾——journal 最后一条可能停在轮次中间", () => {
     const running: Thread = { ...thread("t1", "改过名了"), status: "running" }
     const alive = new Map<ThreadId, Thread>([["t1", running]])

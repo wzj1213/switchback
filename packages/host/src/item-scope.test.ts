@@ -84,6 +84,18 @@ describe("旁路的身份", () => {
     expect(it1.type === "item.started" ? it1.item.lane?.id : "").toBe(laneId)
   })
 
+  it("lane 的主线工具锚点也跟着 item identity 重铸", () => {
+    const s = scope()
+    const origin = s.event(msg("task-native"))
+    const child = s.event({
+      type: "item.started", at: 1,
+      item: { id: "child", turnId: "tu-1", at: 1, kind: "agent_message", text: "x", complete: true,
+        lane: { id: "task-id", originItemId: "task-native" } },
+    })
+    const originId = origin.type === "item.started" ? origin.item.id : ""
+    expect(child.type === "item.started" ? child.item.lane?.originItemId : "").toBe(originId)
+  })
+
   it("**审批与错误永远留在主线**——侧栏关着时一张等你点的审批卡不能消失", () => {
     const s = scope()
     const ask = s.event({ type: "item.started", at: 0,

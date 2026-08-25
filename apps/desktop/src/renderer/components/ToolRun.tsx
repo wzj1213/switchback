@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { FileChange, ToolCallItem } from "@omni/protocol"
 import { shellTranscript, summarize, target, toolStatusText, VERB } from "../tool.js"
-import { reveal, revealable } from "../reveal.js"
+import { requestFilePreview } from "../file-preview-request.js"
 import { ChevronIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon, GlobeIcon, PencilIcon, TerminalIcon } from "./icons-activity.js"
 
@@ -82,15 +82,14 @@ function StepLine({
       <span className="step__icon" role="img" aria-label={VERB[item.detail.kind]}>
         {GLYPH[item.detail.kind]}
       </span>
-      {/* 读文件那种行本来就是静态的（没东西可展开），路径直接可点；
-          其余的（跑命令、抓网页）不做——`target` 那时是一整条命令，不是路径 */}
-      {item.detail.kind === "file_read" && revealable(item.detail.path) ? (
+      {/* 文件路径进持久工作台预览；访达定位仍留在预览页右上角。 */}
+      {item.detail.kind === "file_read" && item.detail.path.trim() !== "" ? (
         <button
           type="button"
           className="step__target step__target--go"
-          title={`在访达中显示\n${item.detail.path}`}
+          title={`在工作台预览\n${item.detail.path}`}
           onClick={() => {
-            reveal(item.detail.kind === "file_read" ? item.detail.path : "")
+            requestFilePreview(cwd, item.detail.kind === "file_read" ? item.detail.path : "")
           }}
         >
           {target(item.detail, cwd)}

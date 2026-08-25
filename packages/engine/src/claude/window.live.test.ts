@@ -9,7 +9,7 @@ import { createClaudeDriver } from "./driver.js"
  * 真问一次上下文窗口。默认不跑：
  *
  * ```sh
- * pnpm vitest run packages/engine/src/claude/window.live.test.ts
+ * pnpm vitest run --mode live packages/engine/src/claude/window.live.test.ts
  * ```
  *
  * ## 为什么必须真跑

@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -59,8 +59,14 @@ describe("子 agent 进度（真跑）", () => {
       expect(lane).toMatchObject({ status: "done" })
       expect(lane?.summary?.length).toBeGreaterThan(0)
       expect(lane?.progress?.budget?.used).toBeGreaterThan(0)
+      const laneItems = events.flatMap((event) =>
+        event.type === "item.started" || event.type === "item.updated" ? [event.item] : [],
+      ).filter((item) => item.lane?.id === lane?.id)
+      expect(laneItems.some((item) => item.kind === "agent_message" && item.text.length > 0)).toBe(true)
+      expect(laneItems.some((item) => item.kind === "tool_call")).toBe(true)
     } finally {
       await session.dispose()
+      rmSync(cwd, { recursive: true, force: true })
     }
   }, 300_000)
 })

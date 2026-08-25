@@ -3,7 +3,7 @@ import { PlanMark, type MarkState } from "./PlanMark.js"
 import { compact } from "../usage.js"
 
 /**
- * 旁路的进度树。**内联卡片与第三栏共用同一份渲染**——
+ * 旁路的进度树。**内联卡片与工作台共用同一份渲染**——
  * 两处画成两套语言是这个仓库踩过的坑（见 `PlanSteps.tsx` 顶上那句）。
  *
  * 扁平表 ＋ `parent` 缩进就是树形的全部表达，不要再发明第二种：

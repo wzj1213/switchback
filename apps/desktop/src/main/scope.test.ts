@@ -166,8 +166,13 @@ describe("补正文时用当前状态收口", () => {
   })
 
   it("**背后没有引擎进程的补 detached**——能打字却答非所问的输入框比没有更糟", () => {
-    const out = withCurrent(thread("a", 2).events, undefined, 99)
-    expect(out.at(-1)).toMatchObject({ type: "thread.updated", thread: { detached: true, status: "idle" } })
+    const old = { ...record("a"), updatedAt: 17 }
+    const out = withCurrent([{ type: "thread.started", at: 0, thread: old }], undefined, 99)
+    expect(out.at(-1)).toMatchObject({
+      type: "thread.updated",
+      at: 99,
+      thread: { detached: true, status: "idle", updatedAt: 17 },
+    })
   })
 
   it("历史里的待回答卡不复活——背后已经没有引擎在等这份答案", () => {

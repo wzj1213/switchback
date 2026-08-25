@@ -104,7 +104,7 @@ export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, o
   approvalTurn: string | undefined
   shortcutApproval: string | undefined
   readOnly: boolean
-  /** 第三栏正开着哪条旁路。**注意和上面那个 `folded` 不是一回事**：那个是折轮次。 */
+  /** 工作台正开着哪条旁路。**注意和上面那个 `folded` 不是一回事**：那个是折轮次。 */
   openLane?: string | undefined
   onOpenLane?: ((laneId: string) => void) | undefined
   /** 历史线程里的 running 只是最后快照；没接回引擎前不能继续转圈。 */

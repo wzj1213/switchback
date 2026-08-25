@@ -166,8 +166,12 @@ export function EffortSlider({
    * 中间那一小段会闪一下灰再亮回来。
    */
   useEffect(() => {
-    setPreview(undefined)
-  }, [effort, open])
+    // 连续点两档时，第一档的较早回声不能把第二档的本地反馈清掉。
+    setPreview((pending) => (pending === effort ? undefined : pending))
+  }, [effort])
+  useEffect(() => {
+    if (!open) setPreview(undefined)
+  }, [open])
 
   /** 收起走 190ms 的收回动画，条子退场、触发器才回来。 */
   const close = (refocus: boolean): void => {

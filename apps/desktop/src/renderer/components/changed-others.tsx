@@ -2,6 +2,8 @@ import { relPath } from "../tool.js"
 import { splitPath } from "../diff.js"
 import type { ReviewFile } from "../../shared/review.js"
 import { RevealIcon } from "./icons.js"
+import { FileIcon } from "./icons-activity.js"
+import { requestFilePreview } from "../file-preview-request.js"
 
 export const CHANGED_PREVIEW = 3
 
@@ -33,17 +35,30 @@ export function ChangedOthers({
               <span className="changed__base">{shown.name}</span>
             </span>
             {file.kind === "delete" ? null : (
-              <button
-                type="button"
-                className="changed__act"
-                aria-label="在访达中显示"
-                title="在访达中显示"
-                onClick={() => {
-                  onReveal(path)
-                }}
-              >
-                <RevealIcon size={12} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="changed__act"
+                  aria-label="预览文件"
+                  title="在工作台预览"
+                  onClick={() => {
+                    requestFilePreview(cwd, path)
+                  }}
+                >
+                  <FileIcon size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="changed__act"
+                  aria-label="在访达中显示"
+                  title="在访达中显示"
+                  onClick={() => {
+                    onReveal(path)
+                  }}
+                >
+                  <RevealIcon size={12} />
+                </button>
+              </>
             )}
           </div>
         )

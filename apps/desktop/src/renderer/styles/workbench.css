@@ -1,0 +1,191 @@
+/* 持久右侧工作台：后台活动与文件共用一块稳定空间，关闭只隐藏，不丢浏览位置。 */
+.workbench {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--border-strong);
+  background: var(--bg);
+}
+
+.workbench__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--sp-2) 0 var(--sp-3);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
+}
+
+.workbench__tabs {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.workbench__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.workbench__tab:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.workbench__tab:active {
+  background: var(--bg-press);
+}
+
+.workbench__tab--on {
+  background: var(--bg-active);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.workbench__count {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.workbench__hide,
+.workbench__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.workbench__hide:hover,
+.workbench__icon:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.workbench__hide:active,
+.workbench__icon:active {
+  background: var(--bg-press);
+}
+
+.workbench__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workbench__section {
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.workbench__empty {
+  margin: 0;
+  padding: var(--sp-4);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.workbench__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.workbench__back svg {
+  transform: rotate(180deg);
+}
+
+.workbench__back:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 输入框上方只露出“仍在跑”的一条；它是工作台入口，不再展开成半个页面。 */
+.activity-dock {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 280px;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-1);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.activity-dock:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.activity-dock:active {
+  transform: translateY(1px);
+  background: var(--bg-press);
+  box-shadow: none;
+}
+
+.activity-dock__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+}
+
+.activity-dock__count {
+  flex: none;
+  font-weight: 600;
+}
+
+.activity-dock__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-dock:active {
+    transform: none;
+  }
+}

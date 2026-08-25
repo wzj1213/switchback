@@ -12,6 +12,7 @@ import type { ReviewFile, ReviewPatch } from "../shared/review.js"
 import type { ContentHit } from "../shared/search.js"
 import type { EnvConfig } from "../shared/hooks.js"
 import type { ActivityDigest } from "../shared/activity.js"
+import type { FilePreview } from "../shared/file-preview.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -273,6 +274,10 @@ const api = {
   },
   async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
     return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
+  },
+  /** 只读当前工作区内的一份文件；主进程会核对真实路径与符号链接边界。 */
+  async filePreview(cwd: string, path: string): Promise<FilePreview> {
+    return (await ipcRenderer.invoke("omni:filePreview", { cwd, path })) as FilePreview
   },
 
   /**

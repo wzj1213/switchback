@@ -52,6 +52,7 @@ export function mainThread(id, cwd, at) {
     out.push(line({ type: "item.started", at, item: { ...item, id: `${id}-i${++n}`, turnId: turn, at } }))
   }
   fill(push, cwd)
+  fillActivity(out, { threadId: id, turnId: turn, cwd, at })
   out.push(line({ type: "turn.completed", at, turnId: turn, status: "completed" }))
   out.push(
     line({
@@ -63,6 +64,45 @@ export function mainThread(id, cwd, at) {
     }),
   )
   return `${out.join("\n")}\n`
+}
+
+/** 后台工作台样本：生命周期、真实 shell、子 agent 正文与可预览 HTML 同时覆盖。 */
+function fillActivity(out, frame) {
+  const { threadId, turnId, cwd, at } = frame
+  const lane = "lane-research"
+  out.push(line({
+    type: "lane.updated", at, threadId,
+    lane: {
+      id: lane, threadId, kind: "activity", title: "并行检查侧栏与 HTML 预览",
+      status: "running", at,
+      progress: {
+        nodes: [
+          { id: "agent-a", label: "检查交互", state: "done", detail: "拖动与点击" },
+          { id: "agent-b", label: "验证预览", state: "running", detail: "渲染 HTML" },
+        ],
+        budget: { used: 18_420 },
+      },
+    },
+  }))
+  const emit = (id, item) => out.push(line({
+    type: "item.started", at,
+    item: { ...item, id, turnId, at, lane: { id: lane } },
+  }))
+  emit("side-note", {
+    kind: "agent_message", complete: true,
+    text: "我在后台复核文件预览入口，并保留当前 shell 的实时输出。",
+  })
+  emit("side-shell", {
+    kind: "tool_call", tool: "Bash", status: "running",
+    detail: {
+      kind: "shell", cwd, command: "pnpm check:css && pnpm typecheck",
+      output: "样式守卫通过\n正在检查 TypeScript…",
+    },
+  })
+  emit("side-html", {
+    kind: "tool_call", tool: "Read", status: "ok",
+    detail: { kind: "file_read", path: "docs/旁路侧栏-原型.html" },
+  })
 }
 
 /**

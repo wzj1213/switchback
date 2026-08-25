@@ -53,6 +53,22 @@ export async function toContent(
   return blocks as SDKUserMessage["message"]["content"]
 }
 
+/** 普通提示与即时插话共用同一份人类消息封装，只有 priority 不同。 */
+export async function toUserMessage(
+  text: string,
+  attachments: readonly string[] | undefined,
+  sessionId: string,
+  priority?: SDKUserMessage["priority"],
+): Promise<SDKUserMessage> {
+  return {
+    type: "user",
+    message: { role: "user", content: await toContent(text, attachments) },
+    parent_tool_use_id: null,
+    session_id: sessionId,
+    ...(priority === undefined ? {} : { priority }),
+  }
+}
+
 function extOf(path: string): string {
   const at = path.lastIndexOf(".")
   return at === -1 ? "" : path.slice(at).toLowerCase()

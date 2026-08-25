@@ -4,7 +4,7 @@ import { createFx, resetFx, stepFx } from "../pet-fx.js"
 import { createFoeArt } from "../pet-foe-art.js"
 import { drawFx, readPalette, type Palette } from "../pet-fx-draw.js"
 import type { Flow } from "../useFlow.js"
-import { SIZE, type Pet } from "../pets.js"
+import { SIZE, type Pet, type PetShape } from "../pets.js"
 
 /**
  * 开火那一层的画布。**桌宠本体一无所知**——它和这张 canvas 之间只有一个接口：
@@ -78,6 +78,7 @@ export function PetFx(props: FxProps): React.JSX.Element {
       if (pet !== undefined && home !== undefined && box.w >= 2) {
         stepFx(world, dt, {
           pet,
+          shape: props2.shape,
           rate,
           busyHands: props2.busyHands,
           running: props2.running,
@@ -188,6 +189,8 @@ interface FxProps {
   threadId: string
   /** 当前引擎的配色名（`kimi` / `claude` / …）。弹丸用它：**弹是那家打出去的**。 */
   tone: string
+  /** 当前桌宠轮廓。只用于把枪托接到真实的手/横臂上。 */
+  shape: PetShape
   /** 取此刻的流速与上一轮的成绩。见 `useFlow`。 */
   flow: () => Flow
   /** 手里要不要换别的东西（在跑工具、在等审批）。 */

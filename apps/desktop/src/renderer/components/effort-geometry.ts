@@ -1,6 +1,6 @@
 /**
  * 条子的几何。**JS 和 CSS 从同一组数出**——`--effort-w` 是 `barWidth` 的结果，
- * 拇指的 20px 和上下那 3px 也在这儿有名字。分出来是行数闸门逼的，
+ * 拇指的 24px 和上下那 4px 也在这儿有名字。分出来是行数闸门逼的，
  * 但这一刀顺：这里只有算术，没有任何 React。
  */
 
@@ -10,15 +10,15 @@ export function barWidth(count: number): number {
 }
 
 /** 拇指直径。`indexAt` 的指针算术和 CSS 的拇指尺寸都从它出。 */
-export const THUMB = 20
+export const THUMB = 24
 
 /**
- * 拇指到条子两端的余量。**和它上下那 3px 是同一个数**——
- * 条子高 26、拇指 20，上下自然各留 3px；横向要是留 0，
+ * 拇指到条子两端的余量。**和它上下那 4px 是同一个数**——
+ * 条子高 32、拇指 24，上下自然各留 4px；横向要是留 0，
  * 拇指走到最左 / 最右就直接贴死在端头上，看着像卡住了、或者掉出去半个。
- * 四边都留 3px，它才是「嵌在槽里的一颗钮」。
+ * 四边都留 4px，它才是「嵌在槽里的一颗钮」。
  */
-export const PAD = 3
+export const PAD = 4
 
 /** 拇指能走的那一段：两头各让出 `PAD`。几何只在这里算一次，JS 和 CSS 都从它出。 */
 export function travelOf(width: number): number {

@@ -34,7 +34,8 @@ import { claudePath, probeClaude, type ClaudeExecutable } from "./executable.js"
 import { answerElicitation } from "./elicitation.js"
 import { refusalDialogOptions } from "./refusal-dialog.js"
 import { planFork, type ForkPlan } from "./fork.js"
-import { toContent } from "./attach.js"
+import { toUserMessage } from "./attach.js"
+import type { ContextSnapshot } from "./usage.js"
 
 /**
  * Claude Code 2.1.83 起正式暴露 `auto`：由另一只模型分类器审批工具调用。
@@ -45,6 +46,8 @@ import { toContent } from "./attach.js"
  */
 /** 等消息循环自然收尾的上限；超过就进入信号阶梯。 */
 const GRACEFUL_WAIT_MS = 4000
+/** 用量是旁路信息；控制请求卡住时不能连轮次收工一起卡住。 */
+const CONTEXT_WAIT_MS = 800
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
@@ -84,8 +87,8 @@ class ClaudeSession implements EngineSession {
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
   private query: ReturnType<typeof query> | undefined
-  /** 当前模型的上下文窗口；控制请求失败时保持缺席，不猜默认值。 */
-  private window: number | undefined
+  /** 当前模型的原生上下文快照；控制请求失败时沿用上一份，不猜。 */
+  private context: ContextSnapshot | undefined
 
   constructor(
     private readonly req: StartRequest,
@@ -111,6 +114,8 @@ class ClaudeSession implements EngineSession {
       includeHookEvents: true,
       // SDK 只在显式开启后才给逐字增量；收尾消息会复用增量已铸好的 item id。
       includePartialMessages: true,
+      // Claude 原生把子 agent 正文标成 parent_tool_use_id；工作台按这个身份渲染嵌套记录。
+      forwardSubagentText: true,
       abortController: this.abort,
       // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言。
       // 强转放这里而不放 subprocess.ts：`SpawnedProcess` 是 Claude SDK 的要求，
@@ -145,12 +150,12 @@ class ClaudeSession implements EngineSession {
       this.turn,
       {
         trust: () => this.trust.current,
-        window: () => this.window,
-        onReady: () => { this.syncWindow() },
+        context: () => this.syncContext(),
+        onReady: () => { void this.syncContext() },
       },
     )
     // init 要等首条 prompt 后才来；先问一次，第一轮也能拿到正确分母。
-    this.syncWindow()
+    void this.syncContext()
   }
 
   /**
@@ -197,14 +202,13 @@ class ClaudeSession implements EngineSession {
   }
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
+    const message = await toUserMessage(text, attachments, this.req.threadId)
     // 轮次由宿主铸造；引擎只在这里认领它，收工时由消息循环清空
     this.turn.current = turnId
-    const accepted = this.input.push({
-      type: "user",
-      message: { role: "user", content: await toContent(text, attachments) },
-      parent_tool_use_id: null,
-      session_id: this.req.threadId,
-    } as SDKUserMessage)
+    this.turn.pendingSteers = 0
+    this.turn.latestUsage = undefined
+    this.turn.outputTokens = undefined
+    const accepted = this.input.push(message)
     if (accepted) return
     if (this.turn.current === turnId) {
       this.turn.current = undefined
@@ -219,14 +223,31 @@ class ClaudeSession implements EngineSession {
     throw new Error("Claude 输入流已经关闭")
   }
 
-  /** 查询当前模型的原生上下文窗口；旧 CLI 不支持时保持缺席。 */
-  private syncWindow(): void {
-    void this.query
-      ?.getContextUsage()
-      .then((usage) => {
-        this.window = usage.maxTokens > 0 ? usage.maxTokens : undefined
-      })
-      .catch(() => undefined)
+  /**
+   * 查询原生当前上下文。拿它的 `totalTokens`，不从 result 的整轮汇总反推。
+   * 超时只让这一帧沿用旧快照；已经发出的请求稍后回来仍会刷新缓存。
+   */
+  private async syncContext(): Promise<ContextSnapshot | undefined> {
+    const handle = this.query
+    if (handle === undefined) return this.context
+    const read = handle.getContextUsage().then((usage) => {
+      this.context = { totalTokens: usage.totalTokens, maxTokens: usage.maxTokens }
+      return this.context
+    }).catch(() => this.context)
+    return Promise.race([read, sleep(CONTEXT_WAIT_MS).then(() => this.context)])
+  }
+
+  /** 当前原生阶段停下，随后的 `priority: now` 阶段仍挂在同一个 omni turn 上。 */
+  async steer(text: string, attachments?: readonly string[]): Promise<void> {
+    const expected = this.turn.current
+    if (expected === undefined) throw new Error("Claude 当前没有可插入的轮次")
+    const message = await toUserMessage(text, attachments, this.req.threadId, "now")
+    if (this.turn.current !== expected) throw new Error("Claude 原轮次已经结束")
+    this.turn.pendingSteers += 1
+    const accepted = this.input.push(message)
+    if (accepted) return
+    this.turn.pendingSteers -= 1
+    throw new Error("Claude 输入流已经关闭")
   }
 
   /**
@@ -316,8 +337,9 @@ class ClaudeSession implements EngineSession {
 
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
-    // 窗口跟着模型走；换模型后旧分母不能继续沿用。
-    this.syncWindow()
+    // 窗口跟着模型走；换模型后旧分母和旧占用都不能继续沿用。
+    this.context = undefined
+    void this.syncContext()
     // **设不上就回空**，调用方据此不把上一模型的旧档冒充成新模型状态
     const applied = await applyEffort(this.query, effort).catch((error: unknown) => {
       this.req.emit({

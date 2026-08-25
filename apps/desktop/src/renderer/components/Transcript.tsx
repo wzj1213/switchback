@@ -51,7 +51,7 @@ export const Transcript = memo(function Transcript({
    * 空数组时 `withLanes` 原样返回，一行都不多。
    */
   lanes: readonly Lane[]
-  /** 第三栏正开着哪条。缺席 = 没有第三栏那一档（对比视图）。 */
+  /** 工作台正开着哪条。缺席 = 没有工作台那一档（对比视图）。 */
   openLane?: string | undefined
   onOpenLane?: ((laneId: string) => void) | undefined
   send: (command: Command) => void

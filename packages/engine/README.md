@@ -18,7 +18,11 @@
     保留 Claude 原始原因，拒答回退撤销工具时同步清掉结算缓存
   - `trust.ts` 把三档落到 Claude 原生 Plan / Auto / Bypass；进入 Bypass 时显式带 SDK 安全开关
   - `executable.ts` 区分完整版的 SDK 内置 CLI 与轻量版的系统 `claude`，并保持各自探测语义
-  - `translate.ts` 把 `SDKMessage` 翻成 `Event`
+  - `translate.ts` 把 `SDKMessage` 翻成 `Event`；`loop-wire.ts` 区分主线与 sidechain，
+    `sidechain.ts` 用 task 生命周期给 `parent_tool_use_id` 找到原生 lane，再复用正文、流式与工具翻译；
+    找不到权威父级就保持不可见，不把子代理明细冒充主线失败
+  - `result.ts` 把 Claude 原生 steer 前后的多段 result 折回同一个宿主轮次，
+    并以控制请求的当前上下文快照结算用量，不把整轮累计流量冒充窗口占用
   - `conversation.ts` 接住 `/clear` 的原生 reset：保留旧记录作历史、留下上下文分界，
     并由随后 result 的新 session id 开启下一段可续跑记录
   - `messages.ts` / `retraction.ts` 维护 SDK wire uuid 到 transcript item 的映射；拒答切换模型重试时
@@ -36,7 +40,8 @@
     表单值按原始类型回送，URL 只在作答设备经用户显式同意后交给浏览器，服务端完成确认回会话横幅
   - `caps.ts` 能力表态与它的凭据（摊在驱动里读不动，且证据比代码长）
   - `tasks.ts` 把 started / progress / updated / notification 四条公开消息按 task id 合成
-    完整生命周期：活动行只活在当前轮，lane 保留稳定标题、最近进度树、原生终态与总结
+    完整生命周期，并保留启动工具与 task id 的原生对应：活动行只活在当前轮，lane 保留
+    稳定标题、最近进度树、原生终态、总结以及 `forwardSubagentText` 给出的逐句过程
   - `workflow.ts` `task_progress.workflow_progress` → 一条 `Lane`。
     **一个 workflow 一条 lane，不是一个 agent 一条**——整批共用一个 `task_id`，
     每-agent 的明细进 `LaneProgress.nodes`；30 个 agent 每 tick 产生 30 条落盘事件
