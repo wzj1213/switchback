@@ -245,21 +245,11 @@
 }
 
 /*
- * 标签的字符数会变（99.9k → 100k 少一个字符），右边那排按钮跟着整体挪。
- * tabular-nums 管得住每个数字一样宽，管不住少一个字符——min-width 管。
+ * 标签的字符数会变（9% → 10% 多一个字符），右边那排按钮跟着整体挪。
+ * tabular-nums 管得住每个数字一样宽，管不住多一个字符——min-width 管。
  */
 .meter__label {
-  min-width: 18ch;
-  text-align: right;
-}
-
-.meter__total {
-  min-width: 9ch;
-  text-align: right;
-}
-
-.meter__cache {
-  min-width: 8ch;
+  min-width: 4ch;
   text-align: right;
 }
 

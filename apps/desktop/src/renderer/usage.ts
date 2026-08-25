@@ -26,6 +26,20 @@ export function compact(tokens: number): string {
 }
 
 export interface Meter {
+  /**
+   * 顶栏上**唯一**常驻的那个数。
+   *
+   * ## 为什么只留一个
+   *
+   * 上一版这里同时挂着四段：`369k / 1049k · 35%`、`累计 50826k`、`缓存 50115k`。
+   * 三十多个字符的数字压在顶栏右上角，没有分组、没有主次——**眼睛在上面没有落点**，
+   * 于是那一整块既不会被读，又一直在占注意力。
+   *
+   * 它们都是真数，也都有用，但**不是同一个层级的东西**：
+   * 「离上限还有多远」是你一直在扫的，「这一轮花了多少」是你想起来才查的。
+   * 把想起来才查的那些常驻在这儿，等于让每一眼都替一个偶尔的问题付钱。
+   * 所以常驻只留比例，其余进 `title`。
+   */
   label: string
   /** 0–1；引擎没给窗口大小时是 undefined，界面上就不画进度条。 */
   ratio: number | undefined
@@ -68,11 +82,11 @@ export function meterOf(usage: Usage | undefined): Meter | undefined {
   const ratio = Math.min(1, contextUsed / contextWindow)
   const pct = `${String(Math.round(ratio * 100))}%`
   return {
-    label: `${compact(contextUsed)} / ${compact(contextWindow)} · ${pct}`,
+    label: pct,
     ratio,
     total,
     cache,
     level: level(ratio),
-    title: `上下文已用 ${pct}${bill}`,
+    title: `上下文 ${compact(contextUsed)} / ${compact(contextWindow)} · ${pct}${bill}`,
   }
 }

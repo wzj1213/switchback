@@ -76,6 +76,10 @@
   cursor: default;
 }
 
+.step--open:hover .step__target {
+  color: var(--text);
+}
+
 .step--open:hover {
   color: var(--text);
 }
@@ -94,10 +98,18 @@
   color: var(--text-muted);
 }
 
+/*
+ * 命令与路径**默认退后一档**（`--text-muted`），指到这一行上才上来。
+ *
+ * 它们是**过程**，不是结论。上一版给的是满强度的 `--text`，于是一屏里
+ * 「跑了什么」和「答了什么」一样响——而一屏里同时有五六条工具行、
+ * 只有一段回答，读起来就成了「日志倒进了 GUI」。
+ * 退一档之后眼睛先落在回答上，要查过程时再顺着看下去，那一行还在原地。
+ */
 .step__target {
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-code);
   text-overflow: ellipsis;

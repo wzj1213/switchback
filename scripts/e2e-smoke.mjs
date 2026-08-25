@@ -125,6 +125,38 @@ async function auditSchemes(cdp) {
   await scheme(cdp, "light")
 }
 
+/**
+ * 桌宠**站在该站的地方**。
+ *
+ * 这一条只能在真 DOM 里验：它们的位置全靠 `paintPets` 写的 inline transform
+ * （`.pet` 是 `position:absolute; top:0; left:0`），而「一只都没写过」和
+ * 「写错了」在纯逻辑测试里长得一模一样——`pet-seats` 那几条全绿的时候，
+ * 应用上五只正叠在活动区左上角。**2026-08-25 就这么漏过一次。**
+ */
+async function checkPets(cdp) {
+  await waitFor(cdp, "document.querySelectorAll('.pet').length > 0")
+  const pets = await value(
+    cdp,
+    `(() => {
+      const box = document.querySelector('.pets')
+      const list = [...document.querySelectorAll('.pet')]
+      return {
+        floor: box === null ? 0 : box.clientHeight,
+        placed: list.filter((p) => p.style.transform !== "").length,
+        total: list.length,
+        xs: new Set(list.map((p) => p.style.transform)).size,
+        ys: list.map((p) => Math.round(p.getBoundingClientRect().bottom - (box?.getBoundingClientRect().bottom ?? 0))),
+      }
+    })()`,
+  )
+  assert(pets.placed === pets.total, `每一只桌宠都拿到了位置（${pets.placed}/${pets.total}）`)
+  assert(pets.xs === pets.total, "它们各站各的位，没有叠在一起")
+  assert(
+    pets.ys.every((gap) => gap <= 0 && gap > -40),
+    `它们站在活动区底边上，不是飘在半空（离底 ${pets.ys.join(" / ")}）`,
+  )
+}
+
 async function inspect(cdp) {
   await waitFor(cdp, "document.querySelector('.shell') !== null")
   const boot = await value(
@@ -137,6 +169,8 @@ async function inspect(cdp) {
   )
   await value(cdp, axe.source)
   await auditSchemes(cdp)
+
+  await checkPets(cdp)
 
   await waitFor(cdp, "document.querySelector('.row--group .row__main') !== null")
   await value(

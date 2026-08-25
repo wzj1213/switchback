@@ -30,9 +30,10 @@ describe("meterOf", () => {
     expect(meterOf(undefined)).toBeUndefined()
   })
 
-  it("有窗口大小时给出比例与两端数字，百分比直接写进标签", () => {
+  it("**顶栏上只留一个百分比**：两端的绝对值进 title，不常驻", () => {
     const m = meterOf({ contextUsed: 15748, contextWindow: 258400 })
-    expect(m?.label).toBe("15.7k / 258k · 6%")
+    expect(m?.label).toBe("6%")
+    expect(m?.title).toContain("15.7k / 258k")
     expect(m?.ratio).toBeCloseTo(0.061, 3)
     expect(m?.level).toBe("ok")
   })
@@ -54,7 +55,7 @@ describe("meterOf", () => {
 
   it("累计消耗进标签的**独立一段**——它是账单，不和「离上限还有多远」挤在同一组数里", () => {
     const m = meterOf({ contextUsed: 100, contextWindow: 1000, totalTokens: 99999 })
-    expect(m?.label).toBe("100 / 1k · 10%")
+    expect(m?.label).toBe("10%")
     expect(m?.total).toBe("累计 100k")
     expect(m?.title).toContain("本会话累计 100k")
   })

@@ -127,11 +127,28 @@
 
 /* ── 右列：一页内容 ─────────────────────────────────────────── */
 
+/*
+ * 这一列是竖着滚的,而面板高度是钉死的（见文件抬头）——于是内容一多就被
+ * 底边**齐着切在半句话上**。「引擎」那一页实测就是这样：最后一组的说明
+ * 只露出半行,而底下什么提示都没有。用和代码块同一套机件（`edge-scroll`）。
+ */
 .set__pane {
+  --edge-a: 0;
+  --edge-b: 0;
+
   flex: 1;
   min-width: 0;
   padding: var(--sp-5);
   overflow-y: auto;
+  animation: edge-scroll linear;
+  animation-timeline: scroll(self block);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 calc(var(--edge-fade) * var(--edge-a)),
+    #000 calc(100% - var(--edge-fade) * var(--edge-b)),
+    transparent 100%
+  );
 }
 
 .set__group + .set__group {

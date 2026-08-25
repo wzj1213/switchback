@@ -114,12 +114,32 @@
   overflow-wrap: anywhere;
 }
 
+/*
+ * 代码块横着滚是既定设计（见 app.css 的横滚白名单：折行会破坏对齐），
+ * **但它一直没有任何「还有内容」的提示**——窄窗口下一行代码被右边缘齐着切断,
+ * 看起来是渲染坏了。机件与理由在 `app-foundation.css` 的 `edge-scroll`。
+ *
+ * 遮罩打在 `pre` 上而不是里面的 `code`：`100%` 要解析成**可视区**宽度,
+ * 而 `code` 的宽度是内容宽度（比可视区宽）,打在它身上糊的是内容最右端,不是边缘。
+ */
 .md pre {
+  --edge-a: 0;
+  --edge-b: 0;
+
   margin: 0 0 var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-sm);
   background: var(--bg-code);
   overflow-x: auto;
+  animation: edge-scroll linear;
+  animation-timeline: scroll(self inline);
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 calc(var(--edge-fade) * var(--edge-a)),
+    #000 calc(100% - var(--edge-fade) * var(--edge-b)),
+    transparent 100%
+  );
 }
 
 .md pre code {
@@ -133,9 +153,22 @@
  * 不能给 table 本身 display:block —— 那会让 thead/tbody 退化成普通块盒，
  * 表头和表体就此散架成两个独立的框（实测踩过）。
  */
+/* 宽表格同理：它也是横着滚的，也一样没有提示。用同一套。 */
 .md__scroll {
+  --edge-a: 0;
+  --edge-b: 0;
+
   margin: 0 0 var(--sp-3);
   overflow-x: auto;
+  animation: edge-scroll linear;
+  animation-timeline: scroll(self inline);
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 calc(var(--edge-fade) * var(--edge-a)),
+    #000 calc(100% - var(--edge-fade) * var(--edge-b)),
+    transparent 100%
+  );
 }
 
 .md table {
