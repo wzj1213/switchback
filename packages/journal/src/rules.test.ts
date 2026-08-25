@@ -60,6 +60,19 @@ describe("createRuleStore", () => {
     expect(all[0]?.describe).toBe("改过的描述")
   })
 
+  it("同一工作区并发追加不会互相覆盖", async () => {
+    const store = createRuleStore(state.dir)
+    await Promise.all(Array.from({ length: 30 }, (_, index) => store.add("/w", rule(`r-${String(index)}`))))
+    expect(await store.read("/w")).toHaveLength(30)
+  })
+
+  it("同一工作区的增删按调用顺序串行落定", async () => {
+    const store = createRuleStore(state.dir)
+    await store.add("/w", rule("a"))
+    await Promise.all([store.add("/w", rule("b")), store.remove("/w", "a"), store.add("/w", rule("c"))])
+    expect((await store.read("/w")).map((item) => item.id)).toEqual(["b", "c"])
+  })
+
   it("remove 只删指定那条", async () => {
     const store = createRuleStore(state.dir)
     await store.add("/w", rule("a"))
@@ -81,6 +94,17 @@ describe("createRuleStore", () => {
     const store = createRuleStore(state.dir)
     await writeFile(join(state.dir, keyOf("/w")), JSON.stringify([rule("a"), { nope: 1 }]))
     expect(await store.read("/w")).toHaveLength(1)
+  })
+
+  it("拒绝空匹配和非 project 规则，不能把坏文件变成全局放行", async () => {
+    const store = createRuleStore(state.dir)
+    await writeFile(join(state.dir, keyOf("/w")), JSON.stringify([
+      rule("safe"),
+      { id: "wildcard", describe: "危险空规则", pattern: {}, scope: "project" },
+      { ...rule("session"), scope: "session" },
+      { id: "unknown", describe: "旧客户端看不懂", pattern: { future: "x" }, scope: "project" },
+    ]))
+    expect(await store.read("/w")).toEqual([rule("safe")])
   })
 
   it("写出来的是给人读的 JSON——排查时要能直接打开看", async () => {

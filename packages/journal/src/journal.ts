@@ -1,4 +1,5 @@
 import { appendFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
+import { Buffer } from "node:buffer"
 import { join } from "node:path"
 import type { Event, ThreadId } from "@omni/protocol"
 import { decodeAll, encode, fileNameOf, shouldPersist, threadIdOf } from "./codec.js"
@@ -62,22 +63,27 @@ interface WriteCtx {
   /** 目录建好了吗。没建好就整个不写——不然每条事件都要试一次。 */
   ready: Promise<boolean>
   maxBytes: number
+  /** 同一 journal 自己已经写到哪里；缺席时只在首写做一次 stat。 */
+  knownBytes?: number
   /** 写满了叫一声。调用方负责「只叫一次」。 */
   onFull: () => void
 }
 
-async function writeOne(file: string, line: string, ctx: WriteCtx): Promise<void> {
-  const { ready, maxBytes, onFull } = ctx
-  if (!(await ready)) return
-  const size = await stat(file).then(
+async function writeOne(file: string, line: string, ctx: WriteCtx): Promise<number | undefined> {
+  const { ready, maxBytes, knownBytes, onFull } = ctx
+  if (!(await ready)) return knownBytes
+  const size = knownBytes ?? await stat(file).then(
     (info) => info.size,
     () => 0,
   )
-  if (size >= maxBytes) {
+  const payload = `${line}\n`
+  const nextSize = size + Buffer.byteLength(payload)
+  if (nextSize > maxBytes) {
     onFull()
-    return
+    return size
   }
-  await appendFile(file, `${line}\n`, "utf8")
+  await appendFile(file, payload, "utf8")
+  return nextSize
 }
 
 /**
@@ -123,6 +129,8 @@ export function createJournal(config: JournalConfig): Journal {
   )
   /** 每个会话串行写，避免同一文件的并发 append 交错出半行。 */
   const chains = new Map<ThreadId, Promise<void>>()
+  /** 每个文件只在本进程首写 stat 一次，之后沿串行链精确累加 UTF-8 字节。 */
+  const sizes = new Map<ThreadId, number>()
 
   const pathOf = (threadId: ThreadId): string | undefined => {
     const name = fileNameOf(threadId)
@@ -151,19 +159,18 @@ export function createJournal(config: JournalConfig): Journal {
     const prev = chains.get(threadId) ?? Promise.resolve()
     // 排队期间被删掉的也要认墓碑：这条 append 可能等了几百毫秒才轮到自己
     const next = prev
-      .then(() =>
-        removed.has(threadId)
-          ? undefined
-          : writeOne(file, encode(event), {
-              ready,
-              maxBytes,
-              onFull: () => {
-                announce(threadId)
-              },
-            }),
-      )
+      .then(async () => {
+        if (removed.has(threadId)) return
+        const size = await writeOne(file, encode(event), {
+          ready, maxBytes, knownBytes: sizes.get(threadId), onFull: () => announce(threadId),
+        })
+        if (size !== undefined) sizes.set(threadId, size)
+      })
       .catch(() => undefined)
     chains.set(threadId, next)
+    void next.then(() => {
+      if (chains.get(threadId) === next) chains.delete(threadId)
+    })
     return next
   }
 
@@ -174,8 +181,6 @@ export function createJournal(config: JournalConfig): Journal {
     return decodeAll(text)
   }
 
-  const list = (): Promise<readonly ThreadId[]> => listThreads(config.dir)
-
   const remove = async (threadId: ThreadId): Promise<void> => {
     const file = pathOf(threadId)
     if (file === undefined) return
@@ -184,6 +189,7 @@ export function createJournal(config: JournalConfig): Journal {
     removed.add(threadId)
     const inflight = chains.get(threadId)
     chains.delete(threadId)
+    sizes.delete(threadId)
     await inflight?.catch(() => undefined)
     await rm(file, { force: true }).catch(() => undefined)
   }
@@ -191,7 +197,7 @@ export function createJournal(config: JournalConfig): Journal {
   return {
     append,
     read,
-    list,
+    list: () => listThreads(config.dir),
     remove,
     // 取一次快照再等：等待期间新来的写入不该把这次 flush 无限拖下去
     flush: async () => {

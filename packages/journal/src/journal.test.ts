@@ -1,5 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { existsSync, mkdtempSync } from "node:fs"
+import { Buffer } from "node:buffer"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -96,11 +97,16 @@ describe("createJournal", () => {
     for (const line of lines) expect(() => JSON.parse(line) as unknown).not.toThrow()
   })
 
-  it("超过上限就停笔——无声地把磁盘写满是不能接受的", async () => {
-    const j = createJournal({ dir: state.dir, maxBytes: 200 })
-    for (let i = 0; i < 20; i += 1) await j.append("th-1", message("tn", `第${String(i)}条`))
+  it("下一整行放不下就停笔，文件本身不能越过上限", async () => {
+    const event = message("tn", "中文也必须按 UTF-8 字节算")
+    const lineBytes = Buffer.byteLength(`${JSON.stringify(event)}\n`)
+    const maxBytes = lineBytes * 2 - 1
+    const j = createJournal({ dir: state.dir, maxBytes })
+    await j.append("th-1", event)
+    await j.append("th-1", event)
     const text = await readFile(join(state.dir, "th-1.jsonl"), "utf8")
-    expect(text.length).toBeLessThan(500)
+    expect(Buffer.byteLength(text)).toBe(lineBytes)
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(maxBytes)
   })
 
   it("落盘失败不抛——用户宁可丢历史也不愿丢正在进行的工作", async () => {
