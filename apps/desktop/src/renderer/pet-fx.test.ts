@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createFx, handOf, muzzleOf, resetFx, stepFx, tapeAt, type FxInput, type FxWorld } from "./pet-fx.js"
 import { spawnFoes } from "./pet-foes.js"
+import { spreadOf } from "./pet-range.js"
 import type { Pet } from "./pets.js"
 
 const pet: Pet = { x: 400, y: 120, vx: 0, vy: 0, spin: 0, mode: "rest" }
@@ -17,6 +18,11 @@ const input = (over: Partial<FxInput> = {}): FxInput => ({
   running: false,
   ratio: 0,
   left: 0,
+  // 台面：窝就在那只此刻站的地方，脚线就是它的脚线。**靶钉在这上面**——
+  // 于是「不动它」时的读数和靶跟着手走的老版本完全一致，用例里量的还是同一件事
+  field: { homeX: pet.x, ground: pet.y + 30 },
+  // 成绩不参与任何物理，只是要印到靶上的一行字——这一组量的是物理
+  bench: undefined,
   foes: true,
   // 默认不抛壳、打字机、不打靶：这一组量的是火力，多一样在动就多一条会晃的判据
   brass: "off",
@@ -347,5 +353,36 @@ describe("切走很久再回来", () => {
     const w = createFx()
     for (let t = 0; t < 4; t += 0.12) stepFx(w, 0.12, input({ rate: 0, running: true }))
     expect(w.quiet).toBeGreaterThan(3)
+  })
+})
+
+describe("打靶：靶是钉死的", () => {
+  const field = { homeX: 400, ground: 150 }
+  const at = (x: number, y: number): Pet => ({ x, y, vx: 0, vy: 0, spin: 0, mode: "held" })
+
+  it("**桌宠动，靶不动**——这是它能当台子用的全部前提", () => {
+    const home = run(createFx(), 1, { range: true, rate: 90, field })
+    const away = run(createFx(), 1, { range: true, rate: 90, field, pet: at(900, 20) })
+    expect(away.view.stand).toEqual(home.view.stand)
+  })
+
+  it("把它拖到半空，靶杆照旧立在地面线上；弹壳还是落在它自己脚下", () => {
+    const w = run(createFx(), 1, { range: true, rate: 90, field, pet: at(400, 10) })
+    expect(w.view.stand.ground).toBe(field.ground)
+    // 两条线不能合：上一版只有一条，于是把它拖到半空时靶也跟着悬空
+    expect(w.view.ground).not.toBe(field.ground)
+  })
+
+  it("拖远了打得散：同样的火力，站在窝里那一组更紧", () => {
+    const shots = { range: true, rate: 200, field }
+    const home = run(createFx(), 4, { ...shots, pet: at(400, 120) })
+    const away = run(createFx(), 4, { ...shots, pet: at(1100, 120) })
+    expect(home.target.shots).toBeGreaterThan(3)
+    expect(spreadOf(away.target) ?? 0).toBeGreaterThan(spreadOf(home.target) ?? 9)
+  })
+
+  it("窄窗口下窝很靠左，靶也不会被推到画布外面去", () => {
+    const w = run(createFx(), 1, { range: true, rate: 90, field: { homeX: 60, ground: 150 } })
+    expect(w.view.stand.x).toBeGreaterThan(0)
   })
 })

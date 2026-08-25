@@ -51,6 +51,17 @@ export interface PetsCtl {
   kick: () => void
   /** 重新量一次活动区，把还在窝里的摆回位。 */
   layout: () => void
+  /**
+   * 第 index 只的**窝**在哪（左上角）。
+   *
+   * 暴露出来是给打靶用的：**靶钉在台面上，不钉在那只身上**（见 `pet-range.ts`）。
+   * 给的是窝而不是 `col` 本身——`col` 是内部的量法，外面拿到它只能再算一遍
+   * `homeOf`，而那正是「同一份输入在两处各解释一遍」的开头。
+   *
+   * **台面没量准时返回 `undefined`**：那时 `homeOf` 会算出负数（见 `measured`），
+   * 而按负数钉下去的靶在画布外面——宁可这一帧不摆。
+   */
+  homeAt: (index: number) => { x: number; y: number } | undefined
 }
 
 export function usePets(
@@ -102,6 +113,11 @@ export function usePets(
       pet.x = home.x
       pet.y = home.y
     }
+  }, [])
+
+  const homeAt = useCallback((index: number): { x: number; y: number } | undefined => {
+    if (!measured(stage.current)) return undefined
+    return homeOf(index, pets.current.length, col.current, stage.current)
   }, [])
 
   const tick = useCallback(
@@ -184,7 +200,7 @@ export function usePets(
     [],
   )
 
-  return { area, nodes, leans, shades, pets, stage, paint, kick, layout }
+  return { area, nodes, leans, shades, pets, stage, paint, kick, layout, homeAt }
 }
 
 interface Field {

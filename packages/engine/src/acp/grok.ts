@@ -89,6 +89,24 @@ export function grokContextUsed(method: string, params: unknown): number | undef
 }
 
 /**
+ * 同一条 `turn_completed` 里的**生成量**。实测字段就叫 `outputTokens`
+ *（见上面那帧：`{inputTokens:15605, outputTokens:33, totalTokens:15638}`）。
+ *
+ * 它已经含在 `totalTokens` 里了，这里单独再报一次——两个数回答的不是同一个问题：
+ * total 是「占了多少上下文」，这个是「它吐了多少」，而 token/s 的分子只能是后者。
+ * 字段缺席就是没报，不拿 total 减 input 去凑（见 `Usage.outputTokens`）。
+ */
+export function grokOutputTokens(method: string, params: unknown): number | undefined {
+  if (method !== "_x.ai/session_notification") return undefined
+  const update = (
+    params as { update?: { sessionUpdate?: string; usage?: { outputTokens?: unknown } } } | undefined
+  )?.update
+  if (update?.sessionUpdate !== "turn_completed") return undefined
+  const out = update.usage?.outputTokens
+  return typeof out === "number" && out > 0 ? out : undefined
+}
+
+/**
  * 同一条 `turn_completed` 里的缓存命中。`cachedReadTokens` 是 `inputTokens` 的子集——
  * 它省的是钱不是上下文（已含在上面那个 total 里）。字段缺席就是没报，不拿 0 冒充。
  */

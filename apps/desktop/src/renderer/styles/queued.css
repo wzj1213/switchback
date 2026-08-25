@@ -1,0 +1,70 @@
+/* ── 排着队还没发出去的那几句 ──────────────────────────────────
+ *
+ * 打完回车就消失的话，人会以为发出去了——而它还躺在队列里。
+ * 摆在输入框正上方（和「N 个文件已更改」同一条带子上），它属于「还没发生的事」。
+ *
+ * ## 为什么是一条一行，不是一条药丸装下全部
+ *
+ * 上一版不管排了几句都只画**一行**：显示第一句，其余塞进 `title` 悬浮提示，
+ * 底下配一颗「取回」——而那颗取回是**整队一起端走**、还把几句用换行拼成一段草稿。
+ * 于是排到第二句之后，「我改主意了，把刚才那句拿回来」这件事实际上做不到：
+ * 你看不见它们各自是什么，拿回来之后也分不开。
+ *
+ * 现在一条一行、各自有各自的取回。**只排了一句时和上一版长得一模一样**——
+ * 那是绝大多数时候的样子，不该为了多出来的能力而变。
+ *
+ * 从 `app-composer.css` 挪出来单开一个文件：那个文件当时已经 934 行、
+ * 越过了 900 行的闸（`check:style-size`），而这一批还要往里加。
+ */
+.queued {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* 和计划条同一条算式：转录区与输入框由父级 16px 内边距兜住，这条没有父级，
+     得自己把那 32px 留出来——否则窄窗口下它比上下两条都宽出一截 */
+  width: min(var(--content-max), calc(100% - 2 * var(--sp-4)));
+  margin: 0 auto var(--sp-2);
+}
+
+/* 一条排着的话。药丸样式在这一层，**不在 `.queued` 上**——
+   外面那层现在是个纵向容器，边框画在它身上会把整摞圈成一个大圆角块 */
+.queued__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px var(--sp-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* 收尾那行：只在排了两句以上时出现，装「全部插入 / 全部取回」。
+   **不画边框**——它不是一条排着的话，是对上面那几条的总操作 */
+.queued__row--foot {
+  justify-content: flex-end;
+  padding-top: 0;
+  padding-bottom: 0;
+  border: 0;
+}
+
+.queued__badge {
+  flex: none;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.queued__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「立刻插入」和「取回」都走 `.act`（items.css）：一个把话往前推、
+   一个把话收回来，视觉上同一档重量。这里只补它们在排队条里的位置 */
+.queued__act,
+.queued__drop {
+  flex: none;
+}

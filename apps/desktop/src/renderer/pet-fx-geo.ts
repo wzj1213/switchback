@@ -1,5 +1,5 @@
 import type { Gun } from "./pet-gun.js"
-import { TG_D, TG_UP } from "./pet-range.js"
+import { TG_D, TG_R, TG_UP } from "./pet-range.js"
 import { SIZE, type Pet } from "./pets.js"
 
 /**
@@ -9,6 +9,10 @@ import { SIZE, type Pet } from "./pets.js"
  * **它们全都从桌宠此刻的坐标现算，不缓存。** 那只每四秒跳一次、被拖着走、
  * 挨了一下会歪——任何一处存下来的锚点都会在下一帧变成错的，
  * 而错的锚点在画面上表现为「枪飘在人旁边」，看起来像贴上去的。
+ *
+ * **`standOf` 是唯一的例外，而且是故意的**：靶不跟着人走，它从「窝」算。
+ * 窝一天变不了两次（换引擎、拉窗口），所以它照样是现算的——只是算的输入
+ * 换成了台面而不是那只此刻在哪。理由见 `pet-range.ts` 开头。
  */
 
 /** 纸带离手多远、离地多高。 */
@@ -61,8 +65,34 @@ export function tapeAt(hand: { x: number; y: number }): { x: number; y: number; 
   return { x: hand.x - TAPE_DX, y: hand.y - TAPE_DY, left: hand.x - TAPE_DX - TAPE_LEN }
 }
 
-/** 靶心在哪。立在手往左 `TG_D`，比脚线高 `TG_UP`。 */
-export function targetAt(hand: { x: number; y: number }): { x: number; y: number } {
-  return { x: hand.x - TG_D, y: hand.y + SIZE * (1 - HAND_Y) - TG_UP }
+/**
+ * 靶立在哪儿。**这儿是这一层唯一一处不从桌宠此刻的坐标算的东西**——
+ * 它算的是「那只**待在窝里**的时候手在哪」，再往左 `TG_D`。
+ * 于是靶钉死在台面上，桌宠动它不动（理由见 `pet-range.ts` 开头）。
+ *
+ * 往右夹一道：窄窗口下窝本身就很靠左，`homeX - TG_D` 会跑到画布外面去，
+ * **而画布外面的靶等于没有靶**——那时宁可近一点打。
+ */
+export function standOf(field: Field): Stand {
+  return { x: Math.max(TG_R + 12, field.homeX + SIZE * HAND_X - TG_D), ground: field.ground }
+}
+
+/** 台面：窝在哪、地面线在哪。**两个都和那只此刻的位置无关。** */
+export interface Field {
+  /** 当前那只的窝（左上角 x）。 */
+  homeX: number
+  /** 地面线。窝里那只的脚踩在这儿。 */
+  ground: number
+}
+
+/** 靶的立足点。**钉死的**。 */
+export interface Stand {
+  x: number
+  ground: number
+}
+
+/** 靶心在哪。立在 `stand.x`，比地面线高 `TG_UP`。 */
+export function targetAt(stand: Stand): { x: number; y: number } {
+  return { x: stand.x, y: stand.ground - TG_UP }
 }
 

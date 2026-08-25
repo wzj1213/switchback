@@ -109,11 +109,13 @@ export function drawFx(
 
 function drawTarget(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void {
   const { view } = w
-  const at = targetAt({ x: view.handX, y: view.handY })
+  // **靶从 `view.stand` 算，不从手算**：一张跟着枪走的靶量不出任何东西，
+  // 而靶杆也得立在台面的地面线上，不是那只此刻的脚下（见 `pet-range.ts` 开头）
+  const at = targetAt(view.stand)
   drawRange(g, {
     target: w.target,
-    at: { x: at.x, y: at.y, ground: view.ground },
-    live: { rate: view.rate, ratio: view.ratio },
+    at: { x: at.x, y: at.y, ground: view.stand.ground },
+    live: { rate: view.rate, ratio: view.ratio, bench: view.bench },
     pal: {
       line: pal.line,
       faint: pal.glyph,

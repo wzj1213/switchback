@@ -65,10 +65,30 @@ export interface TranslateContext {
   at: number
   /** ID 由宿主铸造——本包不生成，方便测试确定化 */
   nextId: () => ItemId
+  /**
+   * 第 n 个「说出来的」块在流式那一路已经有 id 了吗。
+   *
+   * **有就复用它**，于是这条收尾消息是原地替换掉流式那条，而不是再长一条一样的
+   *（store 的 `item.started` 按 id 幂等，见 `stream.ts` 的头注释）。
+   * 缺席就照旧铸一个新的——没开流式、或者那个块一个字都没吐过。
+   */
+  reuse?: (order: number) => ItemId | undefined
 }
 
-function blockToItem(block: RawBlock, ctx: TranslateContext): Item | undefined {
-  const base = { id: ctx.nextId(), turnId: ctx.turnId, at: ctx.at }
+/**
+ * 这一块用哪个 id。
+ *
+ * 流式那一路已经为它铸过一个就复用（于是收尾是原地替换，不是再长一条），
+ * 否则现铸一个。**抽出来是圈复杂度闸门逼的**，边界也顺：
+ * 「用谁的 id」和「这块翻成什么」本来就是两件事。
+ */
+function idFor(ctx: TranslateContext, order: number | undefined): ItemId {
+  const reused = order === undefined ? undefined : ctx.reuse?.(order)
+  return reused ?? ctx.nextId()
+}
+
+function blockToItem(block: RawBlock, ctx: TranslateContext, order?: number): Item | undefined {
+  const base = { id: idFor(ctx, order), turnId: ctx.turnId, at: ctx.at }
   switch (block.type) {
     // 只带工具调用的 assistant 消息常常附一个空文本块。发出去会得到一条
     // 看不见的 item——它不显示任何内容，却会把连续的工具调用分组打断，
@@ -102,9 +122,15 @@ export function assistantItems(
   ctx: TranslateContext,
 ): readonly Item[] {
   const items: Item[] = []
+  // 「第几个说出来的块」——**空文本块也要数**：流式那边是在 `content_block_start`
+  // 时数的，那时还不知道它最后是不是空的。两边的数法必须一致，否则序号会错开
+  let said = 0
   for (const raw of content) {
     if (typeof raw !== "object" || raw === null) continue
-    const item = blockToItem(raw as RawBlock, ctx)
+    const block = raw as RawBlock
+    const spoken = block.type === "text" || block.type === "thinking"
+    const item = blockToItem(block, ctx, spoken ? said : undefined)
+    if (spoken) said += 1
     if (item !== undefined) items.push(item)
   }
   return items

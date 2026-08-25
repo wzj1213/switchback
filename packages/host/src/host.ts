@@ -50,6 +50,21 @@ type Handlers = {
   [K in Command["type"]]: (ctx: Ctx, command: Extract<Command, { type: K }>) => Promise<void>
 }
 
+/**
+ * 把排着队的话取回输入框。
+ *
+ * ## 一条还是整队
+ *
+ * `cmd.index` 给了就只取那一条，缺席就整队一起取（老行为）。
+ * **两种粒度都得留着**：改主意时想拿回的常常只是最后那句，
+ * 而「算了都不发了」也是个真实的动作。
+ *
+ * ## 队首可能已经在路上了
+ *
+ * `entry.draining` 是已经进了发送流程、还没等到 prompt 确认的那一条。
+ * 它不能被取回——取回它等于把一句**已经交出去的话**再复制一份到输入框，
+ * 而它照样会跑。所以它永远留在队首，`offset` 把它让开。
+ */
 function takeBack(
   ctx: Ctx,
   command: Extract<Command, { type: "thread.unqueue" }>,
@@ -58,14 +73,14 @@ function takeBack(
   if (entry === undefined || entry.queued.length === 0) return Promise.resolve()
   const first = entry.queued[0]
   const offset = first !== undefined && entry.draining === first ? 1 : 0
-  const taken = entry.queued.slice(offset)
-  if (taken.length === 0) return Promise.resolve()
-  entry.queued = entry.queued.slice(0, offset)
-  const attachments = [...new Set(taken.flatMap((prompt) => prompt.attachments ?? []))]
+  const picked = pick(entry.queued, offset, command.index)
+  if (picked === undefined) return Promise.resolve()
+  entry.queued = picked.rest
+  const attachments = [...new Set(picked.taken.flatMap((prompt) => prompt.attachments ?? []))]
   const at = ctx.deps.now()
   const next = {
     ...withQueue(entry.thread, entry.queued, at),
-    draft: taken.map((prompt) => prompt.text).join("\n"),
+    draft: picked.taken.map((prompt) => prompt.text).join("\n"),
     draftRevision: ctx.deps.newId("dr"),
   }
   delete next.draftAttachments
@@ -73,6 +88,28 @@ function takeBack(
   entry.thread = next
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
   return Promise.resolve()
+}
+
+/**
+ * 挑出要取回的那几条，并给出剩下的队列。挑不出来就是 `undefined`（什么都不做）。
+ *
+ * **下标在这里验，不在协议那层验**：这条命令也能从远程来（`remote/policy.ts`
+ * 只校验必需字段的类型），而一个 `1.5` 或者 `-1` 走到 `splice` 会静默地
+ * 剪掉不该剪的那条。宿主是队列的权威，越界的一律当没说过。
+ */
+function pick(
+  queued: readonly QueuedPrompt[],
+  offset: number,
+  index: number | undefined,
+): { taken: QueuedPrompt[]; rest: QueuedPrompt[] } | undefined {
+  if (index === undefined) {
+    const taken = queued.slice(offset)
+    return taken.length === 0 ? undefined : { taken, rest: queued.slice(0, offset) }
+  }
+  if (!Number.isInteger(index) || index < offset || index >= queued.length) return undefined
+  const one = queued[index]
+  if (one === undefined) return undefined
+  return { taken: [one], rest: [...queued.slice(0, index), ...queued.slice(index + 1)] }
 }
 
 const HANDLERS: Handlers = {

@@ -23,6 +23,7 @@ import { askAside } from "./aside.js"
 import { capabilitiesOf } from "./caps.js"
 import { createTaskState } from "./tasks.js"
 import { createPlanState } from "./plan.js"
+import { createStream } from "./stream.js"
 import { applyEffort, withEfforts } from "./effort.js"
 import {
   buildRequest,
@@ -79,6 +80,7 @@ class ClaudeSession implements EngineSession {
     tools: new Map(),
     tasks: createTaskState(),
     plan: createPlanState(),
+    stream: createStream(),
   }
   private readonly owner: ProcessOwner
   private readonly bypassEnabled: boolean
@@ -103,6 +105,10 @@ class ClaudeSession implements EngineSession {
       cwd: this.req.cwd,
       ...permissionOptions(this.req.trust),
       canUseTool: (tool, input, meta) => this.judge(tool, input, meta as AskMeta),
+      // **逐字吐字这一路的总开关。** 不开的话 SDK 只在整条消息说完之后给一次，
+      // omni 收到的就是「一条 item.started，text 里已经是整段答案」——
+      // 转录区没有打字机、桌宠不开火、打靶永远读 0 t/s（实测见 `stream.ts` 头注释）
+      includePartialMessages: true,
       abortController: this.abort,
       // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言。
       // 强转放这里而不放 subprocess.ts：`SpawnedProcess` 是 Claude SDK 的要求，

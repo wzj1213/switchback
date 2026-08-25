@@ -41,6 +41,7 @@ export interface FireProps {
  */
 export function FireLayer({
   pets,
+  homeAt,
   slots,
   engine,
   fire,
@@ -48,6 +49,8 @@ export function FireLayer({
   onBite,
 }: {
   pets: React.RefObject<Pet[]>
+  /** 那只的**窝**在哪。靶钉在这上面，不钉在它身上——见 `pet-range.ts`。 */
+  homeAt: (index: number) => { x: number; y: number } | undefined
   slots: readonly PetSlot[]
   engine: EngineId
   fire: FireProps
@@ -60,6 +63,7 @@ export function FireLayer({
   return (
     <PetFx
       pets={pets}
+      homeAt={homeAt}
       index={mine}
       threadId={fire.threadId}
       tone={lookOf(engine).tone}

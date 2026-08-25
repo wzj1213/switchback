@@ -109,6 +109,7 @@ function PetsView({
     <div className="pets" ref={ctl.area} aria-hidden="true">
       <FireLayer
         pets={ctl.pets}
+        homeAt={ctl.homeAt}
         slots={shown}
         engine={engine}
         fire={fire}

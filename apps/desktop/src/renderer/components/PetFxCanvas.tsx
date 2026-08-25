@@ -3,7 +3,8 @@ import type { BrassMode, TrajMode } from "../../shared/settings.js"
 import { createFx, resetFx, stepFx } from "../pet-fx.js"
 import { createFoeArt } from "../pet-foe-art.js"
 import { drawFx, readPalette, type Palette } from "../pet-fx-draw.js"
-import type { Pet } from "../pets.js"
+import type { Flow } from "../useFlow.js"
+import { SIZE, type Pet } from "../pets.js"
 
 /**
  * 开火那一层的画布。**桌宠本体一无所知**——它和这张 canvas 之间只有一个接口：
@@ -67,8 +68,12 @@ export function PetFx(props: FxProps): React.JSX.Element {
         clock.drew = true
       }
       const pet = props2.pets.current[props2.index]
-      const rate = props2.flow()
-      if (pet !== undefined && box.w >= 2) {
+      const flow = props2.flow()
+      const rate = flow.rate
+      // 台面：靶钉在这上面。**量不准就整帧不推进**——`homeAt` 那时给 undefined，
+      // 硬摆的话靶会钉到画布外面去（同 `pet-seats.ts` 里 `measured` 那条）
+      const home = props2.homeAt(props2.index)
+      if (pet !== undefined && home !== undefined && box.w >= 2) {
         stepFx(world, dt, {
           pet,
           rate,
@@ -76,6 +81,8 @@ export function PetFx(props: FxProps): React.JSX.Element {
           running: props2.running,
           ratio: props2.ratio,
           left: -20,
+          field: { homeX: home.x, ground: home.y + SIZE },
+          bench: flow.last,
           foes: props2.foes,
           brass: props2.brass,
           traj: props2.traj,
@@ -135,12 +142,18 @@ interface FxProps {
   pets: React.RefObject<Pet[]>
   /** 当前那只在 `pets` 里的下标。 */
   index: number
+  /**
+   * 那只的**窝**在哪。**靶钉在这上面，不钉在它身上**——见 `pet-range.ts` 开头。
+   * 每帧现取而不是当 prop 传一个算好的坐标：窝会随窗口宽度和引擎列表变，
+   * 而这一层不走 React，收不到重渲染。
+   */
+  homeAt: (index: number) => { x: number; y: number } | undefined
   /** 哪条会话。**一变就把这一层清空**——上一条的怪、纸带、弹壳、靶都不属于这一条。 */
   threadId: string
   /** 当前引擎的配色名（`kimi` / `claude` / …）。弹丸用它：**弹是那家打出去的**。 */
   tone: string
-  /** 取此刻的流速。见 `useFlow`。 */
-  flow: () => number
+  /** 取此刻的流速与上一轮的成绩。见 `useFlow`。 */
+  flow: () => Flow
   /** 手里要不要换别的东西（在跑工具、在等审批）。 */
   busyHands: boolean
   /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */

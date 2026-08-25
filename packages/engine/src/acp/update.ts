@@ -188,7 +188,8 @@ export function emitUsage(
   ctx: UpdateContext,
   used: number,
   window: number | undefined,
-  cacheRead?: number,
+  /** 报得上来才带的那几项。**一个袋子而不是一串位置参数**：这一串只会继续变长。 */
+  extra: { cacheRead?: number; outputTokens?: number } = {},
 ): void {
   ctx.emit({
     type: "usage.updated",
@@ -198,7 +199,8 @@ export function emitUsage(
     usage: {
       contextUsed: used,
       ...(window === undefined ? {} : { contextWindow: window }),
-      ...(cacheRead === undefined ? {} : { cacheRead }),
+      ...(extra.outputTokens === undefined ? {} : { outputTokens: extra.outputTokens }),
+      ...(extra.cacheRead === undefined ? {} : { cacheRead: extra.cacheRead }),
     },
   })
 }

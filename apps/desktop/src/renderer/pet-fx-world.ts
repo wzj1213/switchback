@@ -3,6 +3,8 @@ import type { TrajMode } from "../shared/settings.js"
 import { createGun, type Gun } from "./pet-gun.js"
 import type { Bullet, Glyph } from "./pet-shots.js"
 import type { Foe } from "./pet-foes.js"
+import type { Bench } from "./bench.js"
+import type { Field, Stand } from "./pet-fx-geo.js"
 import { createTarget, type Hole, type Target } from "./pet-range.js"
 import type { Pet } from "./pets.js"
 
@@ -61,10 +63,17 @@ export interface FxWorld {
 export interface View {
   handX: number
   handY: number
-  /** 脚线。弹壳落在这儿，靶杆也立到这儿。 */
+  /** 那只的脚线。**弹壳落在这儿**——它是从这把枪里飞出来的，跟着人走是对的。 */
   ground: number
+  /**
+   * 靶立在哪儿。**和 `ground` 是两条线，不能合**：弹壳跟着人走，靶不跟。
+   * 上一版只有一条线，于是把桌宠拖到半空时靶也悬空了。
+   */
+  stand: Stand
   rate: number
   ratio: number
+  /** 上一轮的成绩。**靶上那行读数用它**，见 `pet-range-draw.ts`。 */
+  bench: Bench | undefined
 }
 
 export function createFx(): FxWorld {
@@ -83,12 +92,20 @@ export function createFx(): FxWorld {
     ch: 0,
     ran: false,
     moving: true,
-    view: { handX: 0, handY: 0, ground: 0, rate: 0, ratio: 0 },
+    view: {
+      handX: 0,
+      handY: 0,
+      ground: 0,
+      stand: { x: 0, ground: 0 },
+      rate: 0,
+      ratio: 0,
+      bench: undefined,
+    },
   }
 }
 
 export interface FxInput {
-  /** 当前那只此刻在哪。**这是本层和桌宠本体之间唯一的接口。** */
+  /** 当前那只此刻在哪。**枪、弹壳、纸带、怪，全都挂在这一个点上。** */
   pet: Pet
   /** 估出来的流速（token/秒）。见 `throughput.ts`。 */
   rate: number
@@ -101,8 +118,18 @@ export interface FxInput {
   running: boolean
   /** 上下文用了多满（0~1）。引擎没报窗口时给 0。 */
   ratio: number
+  /**
+   * 上一轮的成绩（TTFT 与业界口径的 t/s）。**只有靶那一档读它**——
+   * 它不参与任何物理，纯粹是要印到画面上的一行字。见 `bench.ts`。
+   */
+  bench: Bench | undefined
   /** 画布左边界：怪从那儿爬进来。 */
   left: number
+  /**
+   * 台面：窝在哪、地面线在哪。**靶钉在这上面，不钉在那只身上**——
+   * 这是本层第二个、也是最后一个不走 `pet` 的输入（见 `pet-fx-geo.ts`）。
+   */
+  field: Field
   /** 让不让压力显形。关掉之后只剩打纸带那一层。 */
   foes: boolean
   /** 弹壳归谁。见 `pet-brass.ts`。 */

@@ -1,5 +1,6 @@
 import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
 import type { Sealed } from "@omni/wire"
+import { begin, feed, report, settle, type Run } from "./bench.js"
 import { mark, type Meter } from "./throughput.js"
 
 /**
@@ -20,6 +21,17 @@ import { mark, type Meter } from "./throughput.js"
  *
  * 流速回答的是「此刻」，而「此刻」最多属于一轮。所以换轮就清空——
  * 顺带这也是它不会无限长大的原因：集合里最多装得下一轮里的 item。
+ *
+ * ## 只认**模型自己说的话**
+ *
+ * 上一版把这一轮里**每一条** item 的 delta 都记进去，而工具的输出也走
+ * `item.delta`（codex 的 `onOutputDelta` 就是）。于是跑一次 `pnpm build`
+ * 刷出上万行，桌宠会当成模型在狂吐字：**t/s 飙上天、枪打成加特林，
+ * 而模型此刻一个 token 都没生成**。那不是读数偏差，是在画一件没发生的事。
+ *
+ * 现在只收 `SPOKEN` 那几种。挑这几种还有第二个理由：业界那个 token/s 的分子是
+ * `output_tokens`，而**推理 token 是算在 output 里的**——所以 `reasoning` 必须收，
+ * 收了两边才对得上，`bench.ts` 那条校准才有意义。
  *
  * 纯逻辑：不读时钟、不碰 DOM、不订阅任何东西。
  */
@@ -52,26 +64,66 @@ export function retarget(scope: Scope, thread: ThreadId | undefined): void {
 }
 
 /**
- * 吃一条事件，返回**这条事件贡献了多少字节**（不属于当前会话就是 0）。
+ * 哪几种 item 算「模型自己说的话」。
  *
- * 返回字节而不是布尔，是为了让调用方一句话就能接上流速表：
- * 判断「算不算」和「算多少」本来就是同一次遍历里的事。
+ * `tool_call` 不在里面——那是它**用了个工具**，工具吐回来的东西不是它写的。
+ * `user_message` / `approval` / `error` 同理，那些根本不是模型产的。
+ *
+ * 有一处它天然收不全，而且**只能记下来不能补**：工具调用的参数（那串 JSON）
+ * 也算模型的 output token，但它不以 `item.delta` 的形式过来。于是这里的字节
+ * 相对真 token 数**系统性偏少**——这正好是 `bench.ts` 那条校准要吸收的偏差，
+ * 不该在这儿拿别的东西凑。
  */
-export function absorb(scope: Scope, event: Event): number {
+const SPOKEN: ReadonlySet<string> = new Set(["agent_message", "reasoning"])
+
+/**
+ * 一条事件对这套账意味着什么。**返回一件事而不是一个数**：
+ * 上一版只返回字节数，于是「一轮开了」「一轮完了」「引擎报了生成量」
+ * 这三件同样在这条流里的事没地方说，`bench.ts` 那本账就无从记起。
+ */
+export type Beat =
+  | { kind: "idle" }
+  | { kind: "start" }
+  | { kind: "text"; bytes: number }
+  | { kind: "tokens"; tokens: number }
+  | { kind: "end" }
+
+const IDLE: Beat = { kind: "idle" }
+
+/** 吃一条事件。不属于当前会话的一律 `idle`。 */
+export function absorb(scope: Scope, event: Event): Beat {
   if (event.type === "turn.started") {
-    if (event.turn.threadId !== scope.thread) return 0
+    if (event.turn.threadId !== scope.thread) return IDLE
     scope.turn = event.turn.id
     scope.items.clear()
-    return 0
+    return { kind: "start" }
   }
+  if (event.type === "turn.completed") {
+    if (scope.turn === undefined || event.turnId !== scope.turn) return IDLE
+    scope.turn = undefined
+    scope.items.clear()
+    return { kind: "end" }
+  }
+  if (event.type === "usage.updated") {
+    const out = event.usage.outputTokens
+    if (event.threadId !== scope.thread || out === undefined) return IDLE
+    return { kind: "tokens", tokens: out }
+  }
+  return onItem(scope, event)
+}
+
+/** item 那两条。拆出来是圈复杂度闸门逼的，边界也顺：上面管轮次，这里管 item。 */
+function onItem(scope: Scope, event: Event): Beat {
   if (event.type === "item.started") {
-    if (scope.turn !== undefined && event.item.turnId === scope.turn && scope.items.size < MAX_ITEMS) {
+    const mine = scope.turn !== undefined && event.item.turnId === scope.turn
+    if (mine && SPOKEN.has(event.item.kind) && scope.items.size < MAX_ITEMS) {
       scope.items.add(event.item.id)
     }
-    return 0
+    return IDLE
   }
-  if (event.type !== "item.delta") return 0
-  return scope.items.has(event.itemId) ? byteLength(event.append) : 0
+  if (event.type !== "item.delta") return IDLE
+  if (!scope.items.has(event.itemId)) return IDLE
+  return { kind: "text", bytes: byteLength(event.append) }
 }
 
 /**
@@ -99,18 +151,34 @@ export function byteLength(s: string): number {
 }
 
 /**
- * 吃一批事件，把属于这条会话的字节记进流速表。
+ * 吃一批事件：把字节记进流速表，把轮次记进账本。
  *
  * 抽出来是为了**它能被测**：留在 hook 里的话，这几行——「一批一次、
  * 一个字节都没有就别记、时间戳用收到的时刻」——就只能靠肉眼保证，
  * 而它们恰恰是整条链上最容易错的地方（照仓库里 `usePetMood` 的老规矩：
  * 逻辑抽出来测，hook 只剩订阅）。
  *
- * **一批只记一笔**：主进程已经合过帧（`main/batch.ts`），
+ * **滑窗一批只记一笔**：主进程已经合过帧（`main/batch.ts`），
  * 这里再逐条记等于把一次网络往返拆成十几个样本，滑窗会被同一批字撑出假的峰值。
+ * **账本那边则要逐条按顺序走**：一批里可能同时装着「最后一段字」和「这一轮完了」，
+ * 合并之后就分不出谁先谁后，而生成时长的末端正好卡在这两条之间。
  */
-export function drain(scope: Scope, meter: Meter, sealed: readonly Sealed[], now: number): void {
+export function drain(
+  scope: Scope,
+  into: { meter: Meter; run: Run },
+  sealed: readonly Sealed[],
+  now: number,
+): void {
+  const { meter, run } = into
   let bytes = 0
-  for (const one of sealed) bytes += absorb(scope, one.event)
+  for (const one of sealed) {
+    const beat = absorb(scope, one.event)
+    if (beat.kind === "start") begin(run, now)
+    else if (beat.kind === "text") {
+      bytes += beat.bytes
+      feed(run, now, beat.bytes)
+    } else if (beat.kind === "tokens") report(run, beat.tokens)
+    else if (beat.kind === "end") settle(run, now)
+  }
   if (bytes > 0) mark(meter, now, bytes)
 }

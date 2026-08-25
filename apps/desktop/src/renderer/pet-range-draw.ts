@@ -1,3 +1,4 @@
+import type { Bench } from "./bench.js"
 import { round } from "./pet-foe-art.js"
 import { effOf, spreadOf, TG_R, type Target } from "./pet-range.js"
 
@@ -30,7 +31,7 @@ const RATE_FULL = 240
 export interface RangeShot {
   target: Target
   at: { x: number; y: number; ground: number }
-  live: { rate: number; ratio: number }
+  live: { rate: number; ratio: number; bench: Bench | undefined }
   pal: RangePaint
   /** 上下文那一档对应的颜色。**和顶栏那条 meter 同一套档位**（70% 黄 / 90% 红）。 */
   level: string
@@ -120,10 +121,30 @@ function holes(g: CanvasRenderingContext2D, { target, at, pal }: RangeShot): voi
 }
 
 /**
- * 靶上头那一行。
+ * 靶上头那一行。**一行，两种状态**——而两种状态说的是两个不同口径的数。
  *
- * **只写流速和命中，别的都不写。** 上下文、缓存、累计也都是真数，
- * 但它们不是同一个层级的东西：流速是你一直在扫的，其余是你想起来才查的。
+ * - **在跑**：`~142 t/s`。滑窗估出来的**速度表**，就是驱动开火的那个数。
+ *   波浪号不是谦虚，是说清楚它和账单上的数不是一个东西（见 `throughput.ts`）。
+ * - **跑完**：`0.62s → 87 t/s`。上一轮的**成绩**，业界口径：
+ *   箭头左边是 TTFT，右边是解码速度（真 token ÷ 首字到末字，不含 TTFT）。
+ *   引擎报得出生成量时它是**真数，没有波浪号**；报不出的那几家仍带波浪号。
+ *
+ * 上一版这里只有前一种，于是**一轮跑完之后这行永远写着「0 t/s」**——
+ * 那一刻恰恰是唯一能给出真数的时候，却拿它去印一个零。
+ */
+function headOf(live: RangeShot["live"]): string {
+  if (live.rate > 1) return `~${String(Math.round(live.rate))} t/s`
+  const done = live.bench
+  if (done === undefined) return "0 t/s"
+  const tps = `${done.exact ? "" : "~"}${String(Math.round(done.tps))}`
+  return `${done.ttft.toFixed(2)}s → ${tps} t/s`
+}
+
+/**
+ * 靶上下两行读数。
+ *
+ * **只写速度和命中，别的都不写。** 上下文、缓存、累计也都是真数，
+ * 但它们不是同一个层级的东西：速度是你一直在扫的，其余是你想起来才查的。
  * 把想起来才查的那些常驻在这儿，等于让每一帧都替一个偶尔的问题付钱。
  */
 function readout(g: CanvasRenderingContext2D, { target, at, live, pal }: RangeShot): void {
@@ -132,8 +153,9 @@ function readout(g: CanvasRenderingContext2D, { target, at, live, pal }: RangeSh
   g.font = pal.font
   g.textAlign = "center"
   g.textBaseline = "bottom"
-  g.fillStyle = live.rate > 1 ? pal.accent : pal.faint
-  g.fillText(`${live.rate > 1 ? `~${String(Math.round(live.rate))}` : "0"} t/s`, at.x, at.y - TG_R - 14)
+  // 在跑用强调色，跑完那个真数用正文色——**估出来的那个不配用正文色**
+  g.fillStyle = live.rate > 1 ? pal.accent : live.bench?.exact === true ? pal.text : pal.faint
+  g.fillText(headOf(live), at.x, at.y - TG_R - 14)
   g.fillStyle = pal.faint
   const sd = spread === undefined ? "—" : `±${spread.toFixed(1)}px`
   g.fillText(`${String(target.hits)}/${String(target.shots)} · ${pct} · ${sd}`, at.x, at.y + TG_R + 24)

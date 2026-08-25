@@ -94,6 +94,13 @@
 
 ## 已知限制
 
+- **只有 claude 与 grok 报得出「这一次请求生成了多少 token」（`Usage.outputTokens`）。**
+  claude 取 `result.usage.output_tokens`，grok 取 `_x.ai/session_notification` 的
+  `turn_completed.usage.outputTokens`——两个都是这一轮的量。**kimi、codex、通用 ACP 报不出**：
+  kimi 给的两处（事件的 `usage.total.output`、状态快照的 `output_tokens`）都是**会话累计**，
+  codex 只有 input+output 合一的 `last.totalTokens`，通用 ACP 只有 `used`。
+  那三家这个字段一律缺席，**不拿累计值或减法凑一个**——消费方据此退回按字节估并打上波浪号，
+  而一个填错的「最近一次生成量」会让界面算出荒谬的 t/s，比缺席糟得多。
 - **内置 DSH 只启动它公开的 `dsh --profile <profile>`。** 新会话采用设置中选中的 profile，
   旧会话按自己保存的 profile 续接；profile 与插件仍由 DSH 自己管理，
   omni 不代装、不代升级；兼容性探测会真的发送一次 ACP `initialize`，因此缺 profile、插件依赖错配与
@@ -103,7 +110,10 @@
   本机握手没有上报模型清单、续跑、分叉、压缩、插话或档位回读；通用驱动因此不显示这些控件，
   后续能力只随 DSH 自己的 ACP 回包增加，omni 不补一套私有控制面。
 - **Claude 侧只覆盖 `SDKMessage` 联合的一小部分。** 该联合有 38 个成员，
-  驱动只翻译 assistant / stream_event / result / system 四类，**其余丢弃**（曾经写着「或落 `meta`」，而那个字段从来没被写过，已删）。
+  驱动只翻译 assistant / stream_event / user / result / system 五类，**其余丢弃**（曾经写着「或落 `meta`」，而那个字段从来没被写过，已删）。
+  **`stream_event` 是 2026-08-25 才真的接上的**——在那之前这句话里就写着它，而 `dispatch` 里根本没有那一支、
+  `includePartialMessages` 也从没设过。后果不只是没有打字机：桌宠在 claude 会话上永远不开火、打靶永远读 0 t/s，
+  因为那一层的输入就是 `item.delta`（详见 `claude/stream.ts` 的头注释）。
   新增覆盖时先确认它是否真的需要进 transcript。
 - **Claude Auto 受账号、模型、提供方与管理员策略约束。** SDK 类型公开了该档，
   但运行环境不满足时 Claude 会明确拒绝；驱动保留这个原生失败，不静默退回 `default` 冒充自动审批。

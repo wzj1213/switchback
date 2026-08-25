@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import type { ThreadId } from "@omni/protocol"
 import type { Sealed } from "@omni/wire"
+import { clearRun, createRun, type Bench } from "./bench.js"
 import { createScope, drain, retarget } from "./flow-scope.js"
 import { clearMeter, createMeter, rateOf } from "./throughput.js"
 
@@ -21,6 +22,13 @@ import { clearMeter, createMeter, rateOf } from "./throughput.js"
  * 返回数就得存进 state，存进 state 就是每帧一次重渲染——正是上面要躲的。
  * 返回一个稳定的取值函数，调用方在自己的 rAF 里读。
  *
+ * ## 为什么返回两个数
+ *
+ * `rate` 是**速度表**（此刻多快，估的），`last` 是**成绩**（上一轮的
+ * TTFT 和 t/s，业界口径，引擎报得出真 token 时就是真数）。
+ * 两个都从同一条事件流上来，但回答的是完全不同的问题——**合成一个数就一定会
+ * 有人拿速度表的读数去对账**，所以它们从这儿出去就是分开的。见 `bench.ts`。
+ *
  * ## 时间戳用收到的时刻，不用 `event.at`
  *
  * `event.at` 是**引擎那边发生的时刻**（墙钟），而这里要答的是「此刻到我这儿多快」。
@@ -30,23 +38,38 @@ import { clearMeter, createMeter, rateOf } from "./throughput.js"
  * 也**不订阅 `onReplay`**：全量重放是历史，而历史没有「此刻」。
  * 订了的话每次开窗都会先炸出一波假流速。
  */
-export function useFlow(thread: ThreadId | undefined): () => number {
+/** 此刻的一切。见 `useFlow` 里那段「为什么返回两个数」。 */
+export interface Flow {
+  /** 此刻的流速（token/秒，**估**）。开火节奏按它走。 */
+  rate: number
+  /** 上一轮的成绩。这条会话还没跑完过一轮时缺席。 */
+  last: Bench | undefined
+}
+
+export function useFlow(thread: ThreadId | undefined): () => Flow {
   const meter = useRef(createMeter())
   const scope = useRef(createScope())
+  const run = useRef(createRun())
 
   useEffect(() => {
     retarget(scope.current, thread)
-    // 换会话就把窗口清空：上一条的流速不属于这一条
+    // 换会话就把窗口和账本都清空：上一条的流速和成绩都不属于这一条
     clearMeter(meter.current)
+    clearRun(run.current)
   }, [thread])
 
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni
     if (bridge === undefined) return undefined
     return bridge.subscribe((sealed: readonly Sealed[]) => {
-      drain(scope.current, meter.current, sealed, performance.now())
+      drain(scope.current, { meter: meter.current, run: run.current }, sealed, performance.now())
     })
   }, [])
 
-  return useRef(() => rateOf(meter.current, performance.now())).current
+  return useRef(
+    (): Flow => ({
+      rate: rateOf(meter.current, performance.now(), run.current.bpt),
+      last: run.current.done,
+    }),
+  ).current
 }

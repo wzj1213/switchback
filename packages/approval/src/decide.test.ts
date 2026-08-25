@@ -178,6 +178,26 @@ const CASES: readonly Case[] = [
     action: "escalate",
     redline: "git-push",
   },
+  // **提问不需要批准。** 这个工具除了向用户提一个问题什么都不做，
+  // 三档一律放行——只读档尤其不能拒：提问恰恰是模型能做的最安全的动作
+  {
+    name: "自动审批档下提问不弹窗——「请批准我向你提问」是个笑话",
+    trust: "auto-edit",
+    req: tool("AskUserQuestion", { questions: [{ question: "走哪条？", header: "选型" }] }),
+    action: "allow",
+  },
+  {
+    name: "只读档下也能提问：漏进 unknown 的话这一档会直接把它拒掉",
+    trust: "read-only",
+    req: tool("AskUserQuestion", { questions: [] }),
+    action: "allow",
+  },
+  {
+    name: "进计划模式和退计划模式一个待遇，别一个认得一个不认得",
+    trust: "auto-edit",
+    req: tool("EnterPlanMode"),
+    action: "allow",
+  },
   {
     name: "记忆是全称匹配：夹带一段没记过的命令就不放行",
     trust: "auto-edit",

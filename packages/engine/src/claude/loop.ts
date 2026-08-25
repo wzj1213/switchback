@@ -5,6 +5,7 @@ import { clearTasks, onTaskProgress, type TaskState } from "./tasks.js"
 import { emitPlan, feedPlan, isPlanTool, resetPlan, type PlanState } from "./plan.js"
 import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
 import { modeAxis } from "./trust.js"
+import { onStreamEvent, resetStream, type RawStreamEvent, type StreamState } from "./stream.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
 interface RawUsage {
@@ -16,6 +17,8 @@ interface RawUsage {
 
 interface RawMessage {
   type: string
+  /** `stream_event` 那一支的载荷。形状见 `stream.ts`。 */
+  event?: RawStreamEvent
   subtype?: string
   is_error?: boolean
   message?: { content?: unknown }
@@ -39,13 +42,16 @@ const num = (v: unknown): number => (typeof v === "number" ? v : 0)
  * `cacheRead` 只取 cache_read（命中）；cache_creation 是**写**缓存，不是命中。
  * 字段缺席就是没报，缺席就整个不进事件——不拿 0 冒充「没命中」。
  */
-function usageOf(raw: RawUsage): { contextUsed: number; cacheRead?: number } {
+function usageOf(raw: RawUsage): { contextUsed: number; outputTokens?: number; cacheRead?: number } {
   return {
     contextUsed:
       num(raw.input_tokens) +
       num(raw.cache_read_input_tokens) +
       num(raw.cache_creation_input_tokens) +
       num(raw.output_tokens),
+    // **单独再报一次生成量。** 它已经算进 `contextUsed` 了，这里不是重复：
+    // 那个数回答「占了多少」，这个数回答「它吐了多少」，而 token/s 的分子只能是后者
+    ...(typeof raw.output_tokens === "number" ? { outputTokens: raw.output_tokens } : {}),
     ...(typeof raw.cache_read_input_tokens === "number"
       ? { cacheRead: raw.cache_read_input_tokens }
       : {}),
@@ -70,6 +76,8 @@ export interface TurnRef {
   tasks: TaskState
   /** 这一轮的待办清单。**轮次收工就重置**——下一轮是新的一份，见 `plan.ts`。 */
   plan: PlanState
+  /** 逐字那一路的状态。**跨消息复用一份**，每条消息开头自己清，见 `stream.ts`。 */
+  stream: StreamState
 }
 
 function makeIdMinter(ref: TurnRef, turnId: TurnId): () => ItemId {
@@ -90,10 +98,15 @@ function onAssistant(msg: RawMessage, ref: TurnRef, req: StartRequest, at: numbe
   let changed = false
   for (const block of content) if (isPlanTool(block)) changed = feedPlan(ref.plan, block) || changed
   if (changed) emitPlan(ref.plan, turnId, at, { threadId: req.threadId, emit: req.emit, nextId })
-  for (const item of assistantItems(content.filter((b) => !isPlanTool(b)), { turnId, at, nextId })) {
+  // **复用流式那一路已经铸好的 id**：这条收尾消息于是原地替换掉逐字那条，
+  // 而不是在转录区里再长一条一模一样的（见 `stream.ts` 的头注释）
+  const reuse = (order: number): ItemId | undefined => ref.stream.byOrder.get(order)
+  for (const item of assistantItems(content.filter((b) => !isPlanTool(b)), { turnId, at, nextId, reuse })) {
     if (item.kind === "tool_call") ref.tools.set(item.id, item)
     req.emit({ type: "item.started", at, item })
   }
+  // 这条消息翻完了，流式状态跟着清——**一轮里还会有下一条**（每次工具往返之后）
+  resetStream(ref.stream)
 }
 
 /**
@@ -161,6 +174,18 @@ function onResult(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number):
   req.emit({ type: "turn.completed", at, turnId, status })
 }
 
+/** 逐字那一路。**没有轮次就不接**——同 `onAssistant`：那不属于任何一次请求。 */
+function onStream(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const turnId = ref.current
+  if (turnId === undefined) return
+  onStreamEvent(ref.stream, msg.event, {
+    turnId,
+    at,
+    nextId: makeIdMinter(ref, turnId),
+    emit: req.emit,
+  })
+}
+
 interface DispatchContext {
   req: StartRequest
   trust: () => Trust
@@ -171,6 +196,9 @@ function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: numbe
   switch (msg.type) {
     case "assistant":
       onAssistant(msg, ref, req, at)
+      return
+    case "stream_event":
+      onStream(msg, ref, req, at)
       return
     case "user":
       onToolResults(msg, ref, req, at)

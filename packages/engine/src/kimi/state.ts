@@ -9,6 +9,17 @@ function totalOf(usage: KimiEventUsage | undefined): number | undefined {
   return total.inputOther + total.inputCacheRead + total.inputCacheCreation + total.output
 }
 
+/**
+ * **kimi 报不出「这一次请求生成了多少」**，所以 `Usage.outputTokens` 这一项它一律缺席。
+ *
+ * 它给的两处都是**会话累计**：事件里的 `usage.total.output` 跨轮累加（正是下面
+ * `totalOf` 拿去当 `totalTokens` 的那个），状态快照里的 `output_tokens` 同理。
+ * 拿累计值去填一个写着「最近一次请求」的字段，界面会照着它算出一个荒谬的 t/s——
+ * **缺席比填错好**，界面据此退回按字节估、并打上波浪号（见 `Usage.outputTokens`）。
+ *
+ * 想补的话唯一正当的路是「轮首轮尾各取一次累计值相减」，但那要求这一层记住轮边界，
+ * 而它现在是无状态的；真要做也该在协议里另开一个明说是累计的字段，不是往这个里塞。
+ */
 function persistedTotal(usage: KimiUsage | undefined): number | undefined {
   if (usage === undefined) return undefined
   return usage.input_tokens + usage.output_tokens + usage.cache_read_tokens + usage.cache_creation_tokens

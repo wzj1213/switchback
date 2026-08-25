@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { clearTarget, createTarget, effOf, land, punch, spreadOf, TG_R } from "./pet-range.js"
+import { clearTarget, createTarget, effOf, land, punch, spreadOf, TG_D, TG_R } from "./pet-range.js"
 
 const mid = (): number => 0.5
 
@@ -18,24 +18,46 @@ describe("effOf", () => {
 
 describe("punch", () => {
   it("**后坐让弹着往上串**：连发时枪口一路上抬，这是那条 kick 曲线唯一看得见的地方", () => {
-    const calm = punch(0, 0, mid)
-    const burst = punch(0.18, 0, mid)
+    const calm = punch({ kick: 0, ratio: 0, dist: TG_D }, mid)
+    const burst = punch({ kick: 0.18, ratio: 0, dist: TG_D }, mid)
     expect(burst.y).toBeLessThan(calm.y)
   })
 
   it("不出靶纸：再猛的后坐也夹在靶面内", () => {
     for (const kick of [-1, 0, 5]) {
-      const hole = punch(kick, 0, () => 0.99)
+      const hole = punch({ kick, ratio: 0, dist: TG_D }, () => 0.99)
       expect(Math.abs(hole.x)).toBeLessThanOrEqual(TG_R)
       expect(Math.abs(hole.y)).toBeLessThanOrEqual(TG_R)
     }
   })
 
+  it("**站得远打得散**：距离进了账——上一版它恒等于标称距离，桌宠动多远都不进账", () => {
+    const near = punch({ kick: 0.06, ratio: 0, dist: TG_D }, mid)
+    const far = punch({ kick: 0.06, ratio: 0, dist: TG_D * 2 }, mid)
+    expect(Math.abs(far.y)).toBeGreaterThan(Math.abs(near.y))
+  })
+
+  it("随机那一项也按距离放大，不是只有后坐", () => {
+    const roll = (): number => 0.9
+    const near = punch({ kick: 0, ratio: 0, dist: TG_D }, roll)
+    const far = punch({ kick: 0, ratio: 0, dist: TG_D * 2 }, roll)
+    expect(Math.abs(far.x)).toBeGreaterThan(Math.abs(near.x))
+  })
+
+  it("**贴脸打不是技巧**：距离趋近 0 也不塌成正中央一个点", () => {
+    expect(Math.abs(punch({ kick: 0.3, ratio: 0, dist: 0 }, mid).y)).toBeGreaterThan(0)
+  })
+
+  it("站在窝里（`dist === TG_D`）时和上一版一个数都不差", () => {
+    // 缩放因子此时正好是 1：这条钉住的是「改动只在拖出去之后才生效」
+    expect(punch({ kick: 0.18, ratio: 0, dist: TG_D }, mid).y).toBeCloseTo(-0.18 * 52, 10)
+  })
+
   it("上下文满了，同一个落点从「进了」变成「脱靶」", () => {
     // kick 0.12 → 弹着离靶心 6.2px：满上下文时有效半径只剩 4.1px，正好落在两边
-    const spot = { kick: 0.12, rand: mid }
-    expect(punch(spot.kick, 0, spot.rand).in).toBe(true)
-    expect(punch(spot.kick, 0.95, spot.rand).in).toBe(false)
+    const spot = { kick: 0.12, dist: TG_D }
+    expect(punch({ ...spot, ratio: 0 }, mid).in).toBe(true)
+    expect(punch({ ...spot, ratio: 0.95 }, mid).in).toBe(false)
   })
 })
 

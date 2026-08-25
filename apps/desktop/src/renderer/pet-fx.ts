@@ -2,12 +2,13 @@ import { brassMoving, eject, heave, stepBrass, sweep } from "./pet-brass.js"
 import { kickOf, MAX_DT, stepGun, wrapAngle } from "./pet-gun.js"
 import { fireStep, GLYPH_W, pushGlyph, rpsOf, spawn, stepShots, stepTape } from "./pet-shots.js"
 import { hitFoe, nearest, nextGap, pressureOf, spawnFoes, stepFoes, type Foe } from "./pet-foes.js"
-import { land, punch } from "./pet-range.js"
-import { DRIFT_QUIET, handOf, muzzleOf, portOf, tapeAt, targetAt } from "./pet-fx-geo.js"
+import { land, punch, TG_D } from "./pet-range.js"
+import { DRIFT_QUIET, handOf, muzzleOf, portOf, standOf, tapeAt, targetAt } from "./pet-fx-geo.js"
 import type { FxInput, FxWorld, Shot } from "./pet-fx-world.js"
 import { SIZE } from "./pets.js"
 
-export { handOf, muzzleOf, portOf, tapeAt, targetAt } from "./pet-fx-geo.js"
+export { handOf, muzzleOf, portOf, standOf, tapeAt, targetAt } from "./pet-fx-geo.js"
+export type { Field, Stand } from "./pet-fx-geo.js"
 export { createFx, resetFx } from "./pet-fx-world.js"
 export type { FxInput, FxWorld, View } from "./pet-fx-world.js"
 
@@ -20,7 +21,8 @@ export type { FxInput, FxWorld, View } from "./pet-fx-world.js"
  * 你把它扔到哪儿去了」——那是 DOM 上的三层 transform，和这里没有关系。
  * 这一层回答的是「引擎此刻吐得多快」，画在**一张 canvas** 上。
  *
- * 两层之间只有一个接口：**`Pet` 的坐标**。fx 每帧读一次当前那只的位置算出手在哪，
+ * 两层之间只有两个只读接口：**`Pet` 的坐标**（枪挂在手上）和**台面**
+ *（`FxInput.field`：窝在哪、地面线在哪——靶钉在这上面，不钉在人身上）。
  * 除此之外不碰对方任何东西——不读 DOM、不发事件、不共享可变状态。
  * 所以关掉 fx 时桌宠一切照旧，反过来也一样。
  *
@@ -80,8 +82,10 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
     handX: hand.x,
     handY: hand.y,
     ground: groundOf(input),
+    stand: standOf(input.field),
     rate: input.rate,
     ratio: input.ratio,
+    bench: input.bench,
   }
 }
 
@@ -120,7 +124,7 @@ function aimOf(
   input: FxInput,
   hand: { x: number; y: number },
 ): { x: number; y: number } {
-  if (input.range) return targetAt(hand)
+  if (input.range) return targetAt(standOf(input.field))
   const foe = nearest(w.foes)
   if (foe !== undefined) return { x: foe.x + foe.knock, y: foe.y - 11 - foe.fly }
   return tapeAt(hand)
@@ -159,12 +163,17 @@ function shotOf(
   foe: Foe | undefined,
   input: FxInput,
 ): Shot {
-  const b: Shot = spawn(muzzleOf(w.gun), aim, w.ch++, [input.rand() - 0.5, input.rand() - 0.5])
+  const muzzle = muzzleOf(w.gun)
+  const b: Shot = spawn(muzzle, aim, w.ch++, [input.rand() - 0.5, input.rand() - 0.5])
   if (input.range) {
-    const hole = punch(w.gun.kick, input.ratio, input.rand)
+    // **靶钉死之后距离是个变量**：散布按它放大，飞行时间也按它拉长——
+    // 把桌宠拖远，那一串弹着变散、子弹在空中待得更久，两件事都该看得见
+    const dist = Math.hypot(aim.x - muzzle.x, aim.y - muzzle.y)
+    const hole = punch({ kick: w.gun.kick, ratio: input.ratio, dist }, input.rand)
     b.hole = hole
     b.x1 = aim.x + hole.x
     b.y1 = aim.y + hole.y
+    b.dur *= Math.max(0.35, dist / TG_D)
     return b
   }
   if (foe !== undefined) b.foe = foe

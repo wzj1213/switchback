@@ -26,8 +26,14 @@ export function Between(props: Props): React.JSX.Element {
               },
             }
           : {})}
-        onDrop={() => {
-          props.send({ type: "thread.unqueue", threadId: props.thread.id })
+        onDrop={(index?: number) => {
+          // 下标缺席＝整队一起取回。**两种粒度都留着**：改主意时想拿回的常常
+          // 只是最后那句，而「算了都不发了」也是个真实的动作
+          props.send({
+            type: "thread.unqueue",
+            threadId: props.thread.id,
+            ...(index === undefined ? {} : { index }),
+          })
         }}
       />
     </>

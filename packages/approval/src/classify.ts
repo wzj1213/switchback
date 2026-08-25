@@ -36,6 +36,21 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   // 而不是 `TodoWrite`——后者仍在 SDK 的声明里，但这台机器上没被调过。
   // 同样**不经过 `canUseTool`**，所以今天不构成 bug；补上修的是「哪天它开始走这条路」
   TaskCreate: "meta", TaskUpdate: "meta", TaskList: "meta", TaskGet: "meta",
+  // **`AskUserQuestion` 是实测（2026-08-25）真的走了 `canUseTool` 的那一个**——
+  // 上面 `Agent` 那条留的伏笔（「哪天它开始走这条路，表里得已经有它」）到期了。
+  //
+  // 漏掉它的后果比别的都荒唐：这个工具**除了向用户提一个问题什么都不做**，
+  // 不写文件、不跑命令、不碰网络。落 `unknown` 之后，自动编辑档下它要弹一次窗——
+  // **「请批准我向你提问」**，而用户挑的这一档对应的正是 Claude 自己的 Auto，
+  // 那个档从来不会为提问弹窗（用户报的原话）。只读档更糟：`unknown` 直接拒，
+  // 于是那一档里模型连问都问不了，而提问恰恰是它能做的最安全的动作。
+  //
+  // 它走这条路不是因为危险，是因为**要交互**：SDK 得让宿主去把问题呈现出来。
+  // omni 拿静态判定去审一件本质是交互的事，审出来的只能是一层多余的窗。
+  AskUserQuestion: "meta",
+  // `ExitPlanMode` 的孪生兄弟，纯粹的模式开关。它上面那条已经在表里，
+  // 只补这一条是为了两个方向别一个认得一个不认得
+  EnterPlanMode: "meta",
   // codex app-server
   shell: "exec", apply_patch: "write", read_file: "read", update_plan: "meta",
   // ACP：客户端侧方法（agent 反过来请我们代劳时用）

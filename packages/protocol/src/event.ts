@@ -20,6 +20,22 @@ export interface Usage {
   /** 本会话累计消耗，跨轮累加。 */
   totalTokens?: number
   /**
+   * 最近一次请求里**模型自己生成了多少 token**。
+   *
+   * 和上面每一项都不是一类：那几项回答「占了多少、花了多少钱」，这一项回答
+   * **「它吐了多少」**——业界口径的 token/s，分子只能是它。
+   * 拿字节去估的话，同一个真实速度，答英文和答中文的读数会差出四分之一
+   *（一个 token 在英文里约 4 字节，在中文里约 3 字节却常一字一 token）。
+   *
+   * **报得上来才有**：claude / kimi / grok 报；codex 只给 input+output 合一的
+   * `last.totalTokens`，通用 ACP 只给 `used`——那两家这里缺席，
+   * 界面据此退回按字节估、并在数字前打上波浪号。
+   *
+   * 不拿 `totalTokens` 减去上一次的 input 去凑：一轮里可能有好几次请求、
+   * 历史每次都在变，凑出来的数比没有更糟。
+   */
+  outputTokens?: number
+  /**
    * 最近一次请求里**命中缓存读到的 token**。它省的是钱不是上下文——
    * 照样算进 `contextUsed`，这里只是单独再说一遍。
    * 照 `contextWindow` 的规矩：引擎报了才有，没报就是 undefined，界面上不出现。

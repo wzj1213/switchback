@@ -47,6 +47,11 @@ export interface AcpDriverConfig {
    */
   cacheRead?: (method: string, params: unknown) => number | undefined
   /**
+   * 这一轮**生成了多少 token**。和上面两条同一条路、同一个理由：协议里没有，
+   * 各家各报各的。报得上来界面才敢把 t/s 当真数显示（见 `Usage.outputTokens`）。
+   */
+  outputTokens?: (method: string, params: unknown) => number | undefined
+  /**
    * 这家的**原生审批开关**怎么按信任档设。
    *
    * ACP 的标准做法是 mode（`session/set_mode`），但不是每家都实现：

@@ -495,6 +495,71 @@ describe("失败收口与基线生命周期", () => {
     })
   })
 
+  it("**按下标取回一条**：其余几句原样排着，不会被一起端走", async () => {
+    const rig = rigOf()
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "排队甲" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "排队乙" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "排队丙" })
+    await rig.host.dispatch({ type: "thread.unqueue", threadId: id, index: 1 })
+    expect(rig.host.live()[0]).toMatchObject({
+      queued: ["排队甲", "排队丙"],
+      // **只有那一条进草稿**：上一版会把甲乙丙用换行拼成一段，拼完就分不开了
+      draft: "排队乙",
+    })
+  })
+
+  it("按下标取回只带走那一条的附件", async () => {
+    const rig = rigOf()
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "甲", attachments: ["/tmp/a.png"] })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "乙", attachments: ["/tmp/b.png"] })
+    // 「第一句」当场就跑了，没进队列——所以乙在队列里的下标是 1
+    await rig.host.dispatch({ type: "thread.unqueue", threadId: id, index: 1 })
+    expect(rig.host.live()[0]).toMatchObject({ draft: "乙", draftAttachments: ["/tmp/b.png"] })
+    expect(rig.host.live()[0]?.queued).toEqual(["甲"])
+  })
+
+  it("越界或不是整数的下标一律当没说过——远程也能发这条命令", async () => {
+    const rig = rigOf()
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "排队甲" })
+    for (const index of [-1, 0.5, 9, 99]) {
+      await rig.host.dispatch({ type: "thread.unqueue", threadId: id, index })
+    }
+    expect(rig.host.live()[0]?.queued).toEqual(["排队甲"])
+    expect(rig.host.live()[0]?.draft).toBeUndefined()
+  })
+
+  it("下标缺席仍是整队取回：「算了都不发了」也是个真实的动作", async () => {
+    const rig = rigOf()
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "甲" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "乙" })
+    await rig.host.dispatch({ type: "thread.unqueue", threadId: id })
+    expect(rig.host.live()[0]).toMatchObject({ queued: [], draft: "甲\n乙" })
+  })
+
+  it("正在续发的那一条按下标也取不回——它已经交出去了", async () => {
+    const gate = deferred<undefined>()
+    const rig = rigOf({ promptGate: { "正在续发": gate } })
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "正在续发" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "后面那句" })
+    complete(rig.probes[0] as Probe)
+
+    await rig.host.dispatch({ type: "thread.unqueue", threadId: id, index: 0 })
+    expect(rig.host.live()[0]?.queued).toEqual(["正在续发", "后面那句"])
+    expect(rig.host.live()[0]?.draft).toBeUndefined()
+    gate.resolve(undefined)
+    await tick()
+  })
+
   it("只有带着当前草稿身份的发送会消费取回内容", async () => {
     const rig = rigOf()
     const id = await created(rig)

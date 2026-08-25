@@ -6,6 +6,7 @@ import {
   createKimiDriver,
   grokCacheRead,
   grokContextUsed,
+  grokOutputTokens,
   grokLogPath,
   grokModelChanged,
   grokNativeApproval,
@@ -71,6 +72,8 @@ export function buildRegistry(
         contextUsed: grokContextUsed,
         // 同一条 `turn_completed` 里的缓存命中（cachedReadTokens 是 inputTokens 的子集）
         cacheRead: grokCacheRead,
+        // 同一条里的生成量。**token/s 的分子只能是它**，见 `Usage.outputTokens`
+        outputTokens: grokOutputTokens,
         // Grok 1.0.5 的 ACP 用 `_meta.autoMode` 接分类器 Auto，
         // `_meta.yoloMode` 接 Always-approve；两枚都只在开场时设置。
         nativeApproval: grokNativeApproval,

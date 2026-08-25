@@ -1,24 +1,31 @@
 /**
  * 流速表：**这一刻模型在以多快的速度吐字**。
  *
- * ## 为什么必须自己估，不能拿 `Usage` 里的数
+ * ## 它是速度表，不是业界那个 token/s
  *
- * 这个窗口里有**两个时钟**，而它们的刻度完全不同：
+ * 说清楚这件事比算得准更要紧。业界口径的 token/s 是**一整轮的商**
+ *（真 token 数 ÷ 首字到末字），那个数在 `bench.ts` 里算，靶上单独显示。
+ * 这里量的是**此刻**——最近 `WINDOW_MS` 里到手多少字节——因为开火节奏
+ * 需要一个每帧都能读的数，而一轮结束才有的商喂不了每一帧。
  *
- * - `Usage`（`contextUsed` / `totalTokens` / `cacheRead`）**一轮只来一次**，
- *   在结账那一刻。它回答的是「这一轮花了多少」，是账。
- * - `item.delta` 是**逐帧**的：一次事件到一批字。它回答的是「此刻在发生什么」。
+ * 两个数不是一个东西，所以**画面上也不许长得像**：这儿的读数永远带波浪号。
  *
- * 流速属于后者，所以只能从 `item.delta` 的字节量估。**估出来的数永远写作
- * `~142 t/s`**——那个波浪号不是谦虚，是说清楚它和账单上的数不是同一个东西，
- * 免得有人拿它去对账。
+ * ## 这个窗口里有两个时钟
  *
- * ## 字节怎么换成 token
+ * - `Usage` **一轮只来一次**，在结账那一刻。它回答「这一轮花了多少」，是账。
+ * - `item.delta` 是**逐帧**的。它回答「此刻在发生什么」。
  *
- * 没有通用答案：同一段 UTF-8，英文和代码大约 4 字节一个 token，中文一个字
- * 三字节却往往一个字一个 token 甚至更碎。`BYTES_PER_TOKEN` 取 3.2 是两头之间
- * 的一个折中——**它不需要准，它需要稳定**：画面上要说的是「快了还是慢了」，
- * 而那是个比值，常数取多少都不影响。
+ * 流速属于后者，所以只能从 `item.delta` 的字节量估。
+ *
+ * ## 字节怎么换成 token：**常数由调用方给**
+ *
+ * 上一版把它写死成 3.2，理由是「不需要准，需要稳定」。那句话对了一半：
+ * 拿它去驱动开火确实只要稳定，**但画面上还印着一个 `t/s` 字样**，
+ * 而那个字样是在宣称一个物理量。同一段文字英文约 4 字节一个 token、
+ * 中文约 3 字节却常一字一 token——写死一个数，等于让读数跟着语言漂。
+ *
+ * 现在这里不持有那个常数：`rateOf` 收一个 `bpt` 参数，由 `bench.ts`
+ * **拿每轮结账的真 token 数学出来**。这一层退回它本来的职责：一个滑窗。
  *
  * ## 为什么是滑窗不是瞬时值
  *
@@ -42,9 +49,6 @@ interface Mark {
  * 长于 2s 之后「它卡住了」要过两秒才看得出来，而那正是最该马上看见的一件事。
  */
 const WINDOW_MS = 1200
-
-/** 见文件头。**不需要准，需要稳定。** */
-const BYTES_PER_TOKEN = 3.2
 
 /**
  * 环形缓冲的格数。
@@ -90,11 +94,14 @@ export function mark(meter: Meter, at: number, bytes: number): void {
 /**
  * 此刻的流速（token/秒）。
  *
+ * `bpt` = 字节/token，**由调用方给**（`bench.ts` 从真数学出来的那个）。
+ * 这一层不持有它，理由见文件头。
+ *
  * 窗口里一笔都没有就是 0——**不是「上一次的值」**：静默恰恰是这套东西里
  * 最有意义的状态之一（没有输出就没有火力），把它平滑成一个衰减的尾巴，
  * 等于把「它停了」这件事藏起来。
  */
-export function rateOf(meter: Meter, now: number): number {
+export function rateOf(meter: Meter, now: number, bpt: number): number {
   // 窗口里必然一笔都没有——**绝大多数帧走的是这一条**
   if (meter.last <= now - WINDOW_MS) return 0
   const from = now - WINDOW_MS
@@ -103,7 +110,7 @@ export function rateOf(meter: Meter, now: number): number {
     if (slot.at > from && slot.at <= now) bytes += slot.bytes
   }
   if (bytes === 0) return 0
-  return bytes / BYTES_PER_TOKEN / (WINDOW_MS / 1000)
+  return bytes / Math.max(1, bpt) / (WINDOW_MS / 1000)
 }
 
 /**
