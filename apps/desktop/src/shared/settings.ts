@@ -228,6 +228,22 @@ export interface PetKit {
    * 默认开。系统「减少动效」开着时自动失效。
    */
   fire: boolean
+  /**
+   * 要不要让**压力显形**：上下文快满、这一轮卡住不吐字、流速被压到很低时，
+   * 左边会爬过来一些东西，当前那只得把它们打掉。
+   *
+   * ## 为什么没有「密度」和「种类」这两个旋钮
+   *
+   * 它们不是关卡内容，是**某个真实信号的化身**：史莱姆 ← 静默、
+   * 蜂群 ← 低流速、胖子 ← 上下文逼近上限。密度由那个信号有多严重定。
+   * 一旦这两样能调，它们就退回成装饰了——而装饰是不该占着这块地方的。
+   *
+   * 火力恒等于流速，所以也不需要任何「难度」：引擎吐得快就清得掉，
+   * 吐不出来就清不掉。**这不是平衡，这是事实。**
+   *
+   * 要开火才有得打，所以 `fire` 关着时这一项不生效。
+   */
+  foes: boolean
 }
 
 /** 与 DSH launcher 的公开 profile 名校验保持同形；驱动启动前还会再守一次。 */
@@ -260,7 +276,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectOrder: [],
   threadOrder: {},
   pets: true,
-  petKit: { hidden: [], entry: true, fire: true },
+  petKit: { hidden: [], entry: true, fire: true, foes: true },
   notify: "all",
   dsh: { profile: "acp", confirmedProfiles: [] },
   disabledEngines: [],

@@ -7,12 +7,27 @@ const pet: Pet = { x: 400, y: 120, vx: 0, vy: 0, spin: 0, mode: "rest" }
 /** 固定随机源：这一层不含随机，所以测试完全确定。 */
 const rand = (): number => 0.5
 
-const input = (over: Partial<FxInput> = {}): FxInput => ({ pet, rate: 0, busyHands: false, rand, ...over })
+const input = (over: Partial<FxInput> = {}): FxInput => ({
+  pet,
+  rate: 0,
+  busyHands: false,
+  // 默认「不在跑、上下文很空」＝**没有压力**，于是这些用例里一只怪都不会来，
+  // 火力那几条才量得准。刷怪单独在下面那组里测
+  running: false,
+  ratio: 0,
+  left: 0,
+  foes: true,
+  rand,
+  ...over,
+})
 
+/**
+ * 跑 `secs` 秒。**原地改**，返回的就是传进来那个世界——
+ * `stepFx` 本来就是这样（见它的注释）。要分支就各起一个世界，别从同一个分叉。
+ */
 function run(w: FxWorld, secs: number, over: Partial<FxInput> = {}): FxWorld {
-  let world = w
-  for (let t = 0; t < secs; t += 1 / 60) world = stepFx(world, 1 / 60, input(over))
-  return world
+  for (let t = 0; t < secs; t += 1 / 60) stepFx(w, 1 / 60, input(over))
+  return w
 }
 
 describe("stepFx", () => {
@@ -48,16 +63,18 @@ describe("stepFx", () => {
   })
 
   it("先抽枪再开打——抽枪那一拍里一发都不出", () => {
-    const w = stepFx(createFx(), 1 / 60, input({ rate: 200 }))
+    const w = createFx()
+    stepFx(w, 1 / 60, input({ rate: 200 }))
     expect(w.bullets).toHaveLength(0)
     expect(w.gun.arm).toBeLessThan(0.55)
   })
 
   it("手里要换别的东西时立刻停火并收枪", () => {
-    const armed = run(createFx(), 3, { rate: 120 })
-    const busy = run(armed, 1.5, { rate: 120, busyHands: true })
-    expect(busy.gun.arm).toBeLessThan(armed.gun.arm)
-    expect(busy.bullets).toHaveLength(0)
+    const w = run(createFx(), 3, { rate: 120 })
+    const drawn = w.gun.arm // 先记下来：run 是原地改的，w 就是同一个世界
+    run(w, 1.5, { rate: 120, busyHands: true })
+    expect(w.gun.arm).toBeLessThan(drawn)
+    expect(w.bullets).toHaveLength(0)
   })
 
   it("静默之后纸带会清空——「不动了」这一刻必须到得了", () => {
@@ -69,8 +86,8 @@ describe("stepFx", () => {
   })
 
   it("巨大的 dt 不会一帧发散——切后台再回来是常态", () => {
-    let w = createFx()
-    for (let i = 0; i < 200; i++) w = stepFx(w, 4, input({ rate: 200 }))
+    const w = createFx()
+    for (let i = 0; i < 200; i++) stepFx(w, 4, input({ rate: 200 }))
     for (const v of [w.gun.x, w.gun.y, w.gun.ang, w.gun.kick, w.acc]) {
       expect(Number.isFinite(v)).toBe(true)
     }
@@ -101,5 +118,56 @@ describe("几何", () => {
     const t = tapeAt(handOf(pet))
     expect(t.x).toBeLessThan(pet.x)
     expect(t.left).toBeLessThan(t.x)
+  })
+})
+
+describe("刷怪", () => {
+  it("引擎顺的时候一只都不来", () => {
+    const w = run(createFx(), 20, { rate: 180, running: true })
+    expect(w.foes).toHaveLength(0)
+  })
+
+  it("静默久了会有东西爬过来", () => {
+    const w = run(createFx(), 20, { rate: 0, running: true })
+    expect(w.foes.length).toBeGreaterThan(0)
+    expect(w.foes[0]?.kind).toBe("slime")
+  })
+
+  it("上下文快满时来的是胖子，哪怕这一轮没在跑", () => {
+    const w = run(createFx(), 20, { rate: 0, running: false, ratio: 0.95 })
+    expect(w.foes[0]?.kind).toBe("glut")
+  })
+
+  it("有东西过来就瞄它，不再对着纸带打", () => {
+    const w = run(createFx(), 20, { rate: 0, running: true })
+    expect(w.foes.length).toBeGreaterThan(0)
+    const before = w.tape.length
+    // 只跑一小段：**怪还活着的这段时间里**子弹全打在它身上，纸带不该变长
+    run(w, 0.3, { rate: 180, running: true })
+    expect(w.tape.length).toBeLessThanOrEqual(before)
+  })
+
+  it("火力够就清得掉，火力不够就被摸到脸上——这不是平衡，是事实", () => {
+    // **两条支线各起一个世界**：stepFx 是原地改的，从同一个分叉会互相改对方的数组
+    const fast = run(createFx(), 20, { rate: 0, running: true })
+    const slow = run(createFx(), 20, { rate: 0, running: true })
+    run(fast, 8, { rate: 400, running: true })
+    run(slow, 8, { rate: 0, running: true })
+    expect(fast.bites).toBeLessThan(slow.bites)
+  })
+
+  it("压力消失又出现时不会当场蹦一只——那一刻才刚开始不顺", () => {
+    const w = run(createFx(), 40, { rate: 200, running: true })
+    run(w, 1.5, { rate: 0, running: true })
+    expect(w.foes).toHaveLength(0)
+  })
+})
+
+describe("压力显形的开关", () => {
+  it("关掉之后一只都不刷，但打纸带那一层照常", () => {
+    const w = run(createFx(), 20, { rate: 0, running: true, foes: false })
+    expect(w.foes).toHaveLength(0)
+    run(w, 2, { rate: 180, running: true, foes: false })
+    expect(w.tape.length).toBeGreaterThan(0)
   })
 })

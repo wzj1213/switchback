@@ -80,6 +80,7 @@ function petKit(raw: unknown): Settings["petKit"] {
     // 同 `pets`：默认开，所以读不出来要落到开
     entry: it.entry !== false,
     fire: it.fire !== false,
+    foes: it.foes !== false,
   }
 }
 
