@@ -178,6 +178,26 @@ async function openFixture(cdp) {
   await pause(900)
 }
 
+/**
+ * 设置的每一页各拍一张。
+ *
+ * **七页要一起看**：这块面板有两页要等异步（引擎版本、环境配置），
+ * 高度是钉死的，于是「哪一页撑不满、哪一页溢出」只有并排摆着才看得出来。
+ * 页名从左列的按钮上现读，不写死——加一页时这里自动跟上。
+ */
+async function shootSettings(cdp) {
+  const tabs = await value(cdp, `[...document.querySelectorAll('.set__tab')].map(t => t.textContent.trim())`)
+  for (const [i, name] of tabs.entries()) {
+    await value(cdp, `document.querySelectorAll('.set__tab')[${i}]?.click(); true`)
+    // 异步那两页要等内容到齐，否则拍到的是「正在读…」
+    await pause(1400)
+    const shot = await cdp.send("Page.captureScreenshot", { format: "png" })
+    const file = `设置-${String(i + 1).padStart(2, "0")}-${name}.png`
+    await writeFile(join(OUT, file), Buffer.from(shot.data, "base64"))
+    console.log(`  ✓ ${file}`)
+  }
+}
+
 async function seed(dir) {
   const threads = join(dir, "threads")
   await mkdir(threads, { recursive: true })
@@ -223,6 +243,7 @@ async function main() {
     await waitFor(cdp, "document.querySelector('.shell') !== null", "外壳")
     await openFixture(cdp)
     for (const view of VIEWS) await shoot(cdp, view)
+    await shootSettings(cdp)
     cdp.close()
   } catch (error) {
     console.error(log.join("").slice(-6000))

@@ -115,62 +115,29 @@
 }
 
 /*
- * 代码块横着滚是既定设计（见 app.css 的横滚白名单：折行会破坏对齐）。
- * **但它一直没有任何「还有内容」的提示**——macOS 默认是覆盖式滚动条，
- * 不碰它就不显示，于是窄窗口下一行代码被右边缘齐着切断，
- * 看起来是**渲染坏了**而不是可以滚。最小窗口（860）出图时逮到的。
+ * 代码块横着滚是既定设计（见 app.css 的横滚白名单：折行会破坏对齐），
+ * **但它一直没有任何「还有内容」的提示**——窄窗口下一行代码被右边缘齐着切断,
+ * 看起来是渲染坏了。机件与理由在 `app-foundation.css` 的 `edge-scroll`。
  *
- * ## 为什么用滚动驱动动画而不是常挂一层渐变
- *
- * 常挂的话，一段根本不需要滚的短代码右边也会莫名其妙糊掉一块。
- * `scroll(self inline)` 的时间轴在**元素不可滚动时是不激活的**，
- * 于是那两个变量停在初值 0，遮罩退化成「整块不透明」——一个字节都不影响。
- * 滚到某一头时那一头的渐隐也自动收掉：还能往哪走，边上就在哪糊。
- *
- * 遮罩打在 `pre` 上而不是里面的 `code`：`100%` 要解析成**可视区**宽度，
- * 而 `code` 的宽度是内容宽度（比可视区宽），打在它身上糊的是内容最右端，不是边缘。
- * 顺带把 4% 的底色也一起渐隐掉了——那点浓度肉眼看不出来。
+ * 遮罩打在 `pre` 上而不是里面的 `code`：`100%` 要解析成**可视区**宽度,
+ * 而 `code` 的宽度是内容宽度（比可视区宽）,打在它身上糊的是内容最右端,不是边缘。
  */
-@property --md-edge-l {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-
-@property --md-edge-r {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-
-@keyframes md-edge {
-  from {
-    --md-edge-l: 0;
-    --md-edge-r: 1;
-  }
-
-  to {
-    --md-edge-l: 1;
-    --md-edge-r: 0;
-  }
-}
-
 .md pre {
-  --md-edge-l: 0;
-  --md-edge-r: 0;
+  --edge-a: 0;
+  --edge-b: 0;
 
   margin: 0 0 var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-sm);
   background: var(--bg-code);
   overflow-x: auto;
-  animation: md-edge linear;
+  animation: edge-scroll linear;
   animation-timeline: scroll(self inline);
   mask-image: linear-gradient(
     to right,
     transparent 0,
-    #000 calc(var(--edge-fade) * var(--md-edge-l)),
-    #000 calc(100% - var(--edge-fade) * var(--md-edge-r)),
+    #000 calc(var(--edge-fade) * var(--edge-a)),
+    #000 calc(100% - var(--edge-fade) * var(--edge-b)),
     transparent 100%
   );
 }
@@ -188,18 +155,18 @@
  */
 /* 宽表格同理：它也是横着滚的，也一样没有提示。用同一套。 */
 .md__scroll {
-  --md-edge-l: 0;
-  --md-edge-r: 0;
+  --edge-a: 0;
+  --edge-b: 0;
 
   margin: 0 0 var(--sp-3);
   overflow-x: auto;
-  animation: md-edge linear;
+  animation: edge-scroll linear;
   animation-timeline: scroll(self inline);
   mask-image: linear-gradient(
     to right,
     transparent 0,
-    #000 calc(var(--edge-fade) * var(--md-edge-l)),
-    #000 calc(100% - var(--edge-fade) * var(--md-edge-r)),
+    #000 calc(var(--edge-fade) * var(--edge-a)),
+    #000 calc(100% - var(--edge-fade) * var(--edge-b)),
     transparent 100%
   );
 }
