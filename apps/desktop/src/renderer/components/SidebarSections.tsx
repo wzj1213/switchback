@@ -184,7 +184,7 @@ function Chats({
  * **挂载时还不知道有哪几家**（那要等引擎握手报上来）。
  */
 function defaultOpen(key: string): boolean {
-  return !key.startsWith("hist:")
+  return !key.startsWith("hist")
 }
 
 export function SectionList({
@@ -252,19 +252,40 @@ export function SectionList({
         )
       ) : null}
 
-      {/* 报过历史的每一家各一段，**都默认折叠** */}
-      {on.foreign.map((group) => (
-        <ForeignSection
-          key={group.engine}
-          engine={group.engine}
-          threads={group.threads}
-          open={open(`hist:${group.engine}`)}
-          onToggle={() => {
-            toggle(`hist:${group.engine}`)
-          }}
-          onAdopt={on.onAdopt}
-        />
-      ))}
+      {/*
+        **一家一段，但这几段收在同一个抬头底下。**
+
+        分家的理由没变（找的时候人想的是「我昨天在 Claude 里跑的那个」，
+        引擎本身就是最强的筛选条件），变的是它们**平摊在顶层的代价**：
+        接了几家就是几行段头常驻在侧栏底部，占的地方和它们被点开的频率
+        完全不成比例——实测四家就是四行，而你自己那几条会话被挤到上面去。
+        收进一层之后静息状态只剩一行，点开里面还是一家一段。
+      */}
+      {on.foreign.length === 0 ? null : (
+        <>
+          <SectionHead
+            title="别处的历史"
+            open={open("hist")}
+            onToggle={() => {
+              toggle("hist")
+            }}
+          />
+          {open("hist")
+            ? on.foreign.map((group) => (
+                <ForeignSection
+                  key={group.engine}
+                  engine={group.engine}
+                  threads={group.threads}
+                  open={open(`hist:${group.engine}`)}
+                  onToggle={() => {
+                    toggle(`hist:${group.engine}`)
+                  }}
+                  onAdopt={on.onAdopt}
+                />
+              ))
+            : null}
+        </>
+      )}
     </>
   )
 }

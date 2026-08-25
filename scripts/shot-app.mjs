@@ -90,7 +90,11 @@ function createCdp(url) {
 }
 
 async function value(cdp, expression) {
-  const reply = await cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true })
+  const reply = await cdp.send("Runtime.evaluate", {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+  })
   if (reply.exceptionDetails !== undefined) throw new Error(reply.exceptionDetails.text)
   return reply.result.value
 }
@@ -104,27 +108,48 @@ async function waitFor(cdp, expression, label) {
   throw new Error(`界面没有就绪（${label}）：${expression}`)
 }
 
-/** 一张图。`before` 是拍之前要把界面摆成什么样。 */
+/**
+ * 要拍哪几屏。
+ *
+ * `open` 把界面摆成那一屏，`ready` 是「摆好了」的判据——**两样都不能省**：
+ * 只有 `open` 没有 `ready` 的话，点了没生效也照样出图，四张长得一模一样
+ * 而你以为拍到了四屏（第一版就是这样，02/03/04 三张字节数都相同）。
+ */
 const VIEWS = [
-  { name: "01-转录区", ready: ".md", before: null },
-  { name: "02-侧栏筛选", ready: ".sidebar", before: `document.querySelector('.sidebar input')?.focus()` },
+  { name: "01-转录区", open: null, ready: ".md" },
   {
-    name: "03-模型选择器",
-    ready: ".composer",
-    before: `document.querySelectorAll('.composer button')[0]?.click()`,
+    name: "02-新会话",
+    open: `document.querySelector('.sidebar__new')?.click()`,
+    ready: ".blank__title",
   },
-  { name: "04-设置", ready: ".shell", before: `window.__omniShot?.settings?.()` },
+  {
+    name: "03-设置",
+    // 侧栏底部那一行**有账号时点开的是菜单**，没账号时才直接进设置
+    //（见 `SidebarFoot.tsx`：「一行只做一件事」）。所以这里走两步，
+    // 而不是假设它一点就开——本机跑 smoke 时没账号，出图时有，两边不一样
+    open: [
+      `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,
+      `[...document.querySelectorAll('[role=menuitem]')].find(m => m.textContent.includes('设置'))?.click()`,
+    ],
+    ready: ".set",
+  },
 ]
 
 async function shoot(cdp, view) {
-  if (view.before !== null) {
-    await value(cdp, `(() => { ${view.before}; return true })()`).catch(() => undefined)
-    await pause(700)
+  if (view.open !== null) {
+    for (const step of [view.open].flat()) {
+      await value(cdp, `(() => { ${step}; return true })()`)
+      await pause(350)
+    }
+    await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
+    await pause(600)
   }
-  const shot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false })
+  const shot = await cdp.send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: false,
+  })
   await writeFile(join(OUT, `${view.name}.png`), Buffer.from(shot.data, "base64"))
   console.log(`  ✓ ${view.name}.png`)
-  if (view.before !== null) await value(cdp, `document.body.click(); true`).catch(() => undefined)
 }
 
 /**
@@ -156,7 +181,8 @@ async function seed(dir) {
     ["th-b", "看一下断线重连那条链路", AT - 8 * 3600_000],
     ["th-c", "codex 昨天在 x 上说的那个", AT - 3 * 86_400_000],
   ]
-  for (const [id, title, at] of stubs) await writeFile(join(threads, `${id}.jsonl`), stubThread(id, title, ROOT, at))
+  for (const [id, title, at] of stubs)
+    await writeFile(join(threads, `${id}.jsonl`), stubThread(id, title, ROOT, at))
   await writeFile(
     join(dir, "settings.json"),
     `${JSON.stringify({ projects: [ROOT], theme: DARK ? "dark" : "light", pets: true })}\n`,
@@ -171,7 +197,11 @@ async function main() {
   const child = spawn(
     electron,
     [DESKTOP, `--user-data-dir=${data}`, `--remote-debugging-port=${port}`, "--disable-gpu"],
-    { cwd: ROOT, env: { ...process.env, OMNI_DEV_THEME: DARK ? "dark" : "light" }, stdio: ["ignore", "pipe", "pipe"] },
+    {
+      cwd: ROOT,
+      env: { ...process.env, OMNI_DEV_THEME: DARK ? "dark" : "light" },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   )
   const log = []
   child.stdout.on("data", (c) => log.push(String(c)))
@@ -179,15 +209,14 @@ async function main() {
   try {
     const cdp = createCdp(await targetOf(port))
     await cdp.ready
-    await cdp.send("Emulation.setDeviceMetricsOverride", { ...SIZE, deviceScaleFactor: 2, mobile: false })
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      ...SIZE,
+      deviceScaleFactor: 2,
+      mobile: false,
+    })
     await waitFor(cdp, "document.querySelector('.shell') !== null", "外壳")
     await openFixture(cdp)
-    for (const view of VIEWS) {
-      await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name).catch((e) =>
-        console.log(`  ⚠ ${view.name}：${e.message}`),
-      )
-      await shoot(cdp, view)
-    }
+    for (const view of VIEWS) await shoot(cdp, view)
     cdp.close()
   } catch (error) {
     console.error(log.join("").slice(-6000))
