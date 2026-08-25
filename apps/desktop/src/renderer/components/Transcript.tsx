@@ -4,7 +4,6 @@ import { foldTurns, groupRows, withAsides, withLanes } from "../group.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ArrowDownIcon } from "./icons.js"
-import { Changed } from "./Changed.js"
 import { TranscriptBlank } from "./transcript-blank.js"
 import { useApprovalState } from "../use-approval-state.js"
 import { RowView, canAsk, canRewind, keyOf, lastMine, retryProps, approvalShortcut } from "./transcript-row.js"
@@ -39,9 +38,6 @@ export const Transcript = memo(function Transcript({
   send,
   onCopy,
   onReuse,
-  stamp,
-  onReveal,
-  onReview,
   readOnly,
 }: {
   thread: Thread
@@ -65,10 +61,6 @@ export const Transcript = memo(function Transcript({
    * 第三个参数是「**顺手进侧问模式**」——选中转录区一段话之后那颗「问一句」走这条。
    */
   onReuse?: (text: string, attachments?: readonly string[], aside?: boolean) => void
-  /** 工作区变更卡只在正常工作区显示；对比视图不传这三项。 */
-  stamp?: string
-  onReveal?: (path: string) => void
-  onReview?: () => void
   /** 对比页只允许阅读、折叠与复制，不执行审批或创建新分支。 */
   readOnly?: boolean
 }): React.JSX.Element {
@@ -120,18 +112,6 @@ export const Transcript = memo(function Transcript({
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
         <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} thinkingTokens={thinkingTokens} />
-        {stamp === undefined || onReveal === undefined || onReview === undefined ? null : (
-          <Changed
-            items={items}
-            threadId={thread.id}
-            cwd={thread.cwd}
-            stamp={stamp}
-            hidden={turn !== undefined || thread.status === "starting" || thread.status === "running"}
-            onReveal={onReveal}
-            onCopy={onCopy}
-            onReview={onReview}
-          />
-        )}
       </div>
       {/* 往回翻的时候给一条回去的路。**这才是「逃生口不该滚走」的正确解法**——
           不是把状态行钉住，而是给一个「回到底部」 */}

@@ -13,8 +13,6 @@ interface Props {
   threadId: string
   cwd: string
   stamp: string
-  /** 新一轮运行时保留数据订阅，但整张卡退出视线。 */
-  hidden?: boolean
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   onReview: () => void
@@ -31,14 +29,12 @@ interface Props {
  *（「清空会让面板在每一轮结束时闪一下白」），这里跟上那条。
  */
 export function shouldHide(state: {
-  hidden: boolean
   loading: boolean
   settled: boolean
   failed: boolean
   files: number
   others: number
 }): boolean {
-  if (state.hidden) return true
   if (state.loading && !state.settled) return true
   return state.files === 0 && state.others === 0 && !state.failed
 }
@@ -49,7 +45,6 @@ export function Changed({
   threadId,
   cwd,
   stamp,
-  hidden = false,
   onReveal,
   onCopy,
   onReview,
@@ -67,7 +62,9 @@ export function Changed({
         real: review.cwd,
         ...(review.ignored === undefined ? {} : { ignored: review.ignored }),
       })
-  const [open, setOpen] = useState(true)
+  // **默认收起。** 它现在钉在输入框上方那一行里，和计划那枚药丸并排——
+  // 一进来就摊开一张卡的话，那一行就又变回了上一版那条通栏带子
+  const [open, setOpen] = useState(false)
   const [all, setAll] = useState(false)
   const mine = new Set(list.flatMap((file) => file.review?.rel ?? []))
   const minePaths = new Set(list.map((file) => file.path))
@@ -77,7 +74,6 @@ export function Changed({
   const othersTotal = others.length + (review.more ?? 0)
   if (
     shouldHide({
-      hidden,
       loading: review.loading,
       settled: review.settled,
       failed: review.failed,
@@ -88,7 +84,7 @@ export function Changed({
     return null
   }
   return (
-    <section className="changed" aria-label="文件改动摘要">
+    <section className="changed" data-open={open} aria-label="文件改动摘要">
       <div className="changed__card">
         <ChangedHead
           files={files}

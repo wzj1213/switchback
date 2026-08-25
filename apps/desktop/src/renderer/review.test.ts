@@ -207,7 +207,7 @@ describe("trimMeta", () => {
 })
 
 describe("「已编辑 N 个文件」什么时候藏起来", () => {
-  const base = { hidden: false, loading: false, settled: true, failed: false, files: 3, others: 0 }
+  const base = { loading: false, settled: true, failed: false, files: 3, others: 0 }
 
   it("**重问期间不藏**——这就是切走再切回来那一下的频闪", () => {
     // `window.focus` 会触发重问（`useReview` 里那个 `bump`），于是 `loading` 转真。
@@ -236,7 +236,9 @@ describe("「已编辑 N 个文件」什么时候藏起来", () => {
     expect(shouldHide({ ...base, files: 0, others: 0, failed: true })).toBe(false)
   })
 
-  it("新一轮在跑时整张退出视线，这一条压过一切", () => {
-    expect(shouldHide({ ...base, hidden: true })).toBe(true)
+  it("**跑动时不再整张藏起来**：它并进了输入框上方那一行，那时你更想知道动了什么", () => {
+    // 上一版有个 `hidden`，一开跑整张卡退出视线。并排之后那条没了——
+    // 卡还在转录区里跟着滚时藏得有道理，钉在输入框上方就没道理了
+    expect(shouldHide({ ...base, files: 2 })).toBe(false)
   })
 })

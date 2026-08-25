@@ -1,6 +1,15 @@
-/* 会话触达文件的当前净变更。它是对话结果的一部分，跟着正文滚动。 */
+/*
+ * 会话触达文件的当前净变更。
+ *
+ * **它现在钉在输入框上方那一行里**（`.brief`），不再是转录区最后一个跟着滚的孩子。
+ * 原型（`界面细节打磨-v4.html`「计划并进那一排」）把三条带子并成一条，
+ * 验收数就写在那儿：「输入框上方最多几行：1（现在 3）」。
+ *
+ * 收起来时是一枚**药丸**，和计划那枚并排；展开才长成一张卡。
+ * 上一版不管展不展开都是一张 46px 高的通栏卡，那是三条带子里最占地方的一条。
+ */
 .changed {
-  margin-top: var(--sp-1);
+  min-width: 0;
 }
 
 .changed__card {
@@ -8,12 +17,32 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-raised);
+}
+
+/* 展开了才是一张卡：加阴影、铺满那一行 */
+.changed[data-open="true"] {
+  flex: 1 1 100%;
+}
+
+.changed[data-open="true"] .changed__card {
   box-shadow: var(--shadow-1);
+}
+
+/* 收起来的时候整枚药丸就是那颗按钮，卡的边退掉——两圈边套在一起太吵 */
+.changed[data-open="false"] .changed__card {
+  border: 0;
+  background: transparent;
 }
 
 .changed__head {
   display: flex;
   align-items: center;
+  /* 收起时按药丸的高度走（和 `.plan-pill` 的 24px 同一档），展开才撑到 46 */
+  min-height: 24px;
+  padding: 0;
+}
+
+.changed[data-open="true"] .changed__head {
   min-height: 46px;
   padding: var(--sp-1) var(--sp-2);
 }
@@ -32,6 +61,49 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* 收起时它就是那枚药丸本体：高度、圆角、边都和 `.plan-pill` 同一档 */
+.changed[data-open="false"] .changed__summary {
+  flex: none;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+}
+
+.changed[data-open="false"] .changed__glyph {
+  display: none;
+}
+
+/* 展开时是上下两行（标题 / 统计），收起时压成一行：「已编辑 3 个文件 +12 −4」。
+   **必须显式写 `row`**：默认那条是 `column`，不写方向的话两行会竖着叠进
+   24px 的药丸里，撑出去而且被切掉（出图才看见的） */
+.changed[data-open="false"] .changed__copy {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 收起时两枚药丸之间留一口气；「审核」自己也是一枚 */
+.changed[data-open="false"] .changed__head {
+  gap: var(--sp-2);
+}
+
+.changed[data-open="false"] .changed__review {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+}
+
+.changed[data-open="false"] .changed__title,
+.changed[data-open="false"] .changed__total {
+  font-size: var(--text-xs);
 }
 
 .changed__summary:hover {

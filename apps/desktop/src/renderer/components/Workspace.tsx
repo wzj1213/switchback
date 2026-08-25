@@ -219,9 +219,6 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           send={send}
           onCopy={props.onCopy}
           onReuse={reuse}
-          stamp={stamp}
-          onReveal={props.onReveal}
-          onReview={props.onReview}
         />
         {/* 滚动区的下摆。**必须在 `Transcript` 外面**——滚动容器里的绝对定位参照的是
             可滚动内容而不是可视区，挂进去那道渐隐会跟着内容滚走。见 app.css 的 `.hem` */}
@@ -240,7 +237,15 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           />
         ) : null}
       </div>
-      <Between thread={thread} items={props.items} send={send} />
+      <Between
+        thread={thread}
+        items={props.items}
+        send={send}
+        stamp={stamp}
+        onReveal={props.onReveal}
+        onCopy={props.onCopy}
+        onReview={props.onReview}
+      />
       <WorkspaceComposer
         props={props}
         thread={thread}
