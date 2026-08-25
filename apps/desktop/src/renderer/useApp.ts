@@ -141,6 +141,7 @@ export function useApp(): AppApi {
     shell.select(started.id)
   }, [omni.lastStarted, shell])
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
+  useEffect(() => omni.viewing(thread?.id), [omni.viewing, thread?.id])
   const items = useThreadItems(omni.state, thread)
   const sidebarRows = useUnread(
     rows.filter((r) => r.thread.provisional !== true),

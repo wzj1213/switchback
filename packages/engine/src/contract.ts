@@ -2,6 +2,7 @@ import type {
   EngineAccount,
   EngineAxis,
   EngineCapabilities,
+  EngineGoal,
   EngineId,
   EngineThread,
   Event,
@@ -9,11 +10,14 @@ import type {
   ItemId,
   ModelOption,
   RememberScope,
+  QuestionPrompt,
+  QuestionResponse,
   SlashCommand,
   ThreadId,
   Trust,
   TrustApply,
   TurnId,
+  UserMessageOrigin,
 } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { Probe } from "./probe.js"
@@ -60,6 +64,21 @@ export interface ApprovalAnswer {
   remember: RememberScope
 }
 
+/** 引擎等人的原生请求如何收口；取消时宿主不再留死卡。 */
+export interface InteractionWait {
+  signal?: AbortSignal
+  timeoutMs?: number
+}
+
+/** 引擎在空闲时自行开启、但仍要纳入宿主主线状态机的一轮。 */
+export interface NativeTurnStart {
+  at: number
+  /** 展示给人的原始可见输入；公开来源明确没有正文时为空，不得换成引擎内部提示。 */
+  prompt: string
+  /** 没有结构化来源就是同一引擎另一原生客户端发出的普通用户提示。 */
+  origin?: UserMessageOrigin
+}
+
 /** 引擎的原生权限若只能在开场设置，宿主据此续接同一条会话后重启进程。 */
 export type TrustChange =
   | { restart: false }
@@ -87,7 +106,21 @@ export interface StartRequest {
   /** 事件出口。必须能消费得比引擎产出快——本层不做背压。 */
   emit: (event: Event) => void
   /** 判定为 escalate 时调用，等用户裁决 */
-  askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+  askUser: (ask: ApprovalAsk, wait?: InteractionWait) => Promise<ApprovalAnswer>
+  /** 引擎原生提出结构化问题时调用；回答原样回到该引擎，不转成普通提示词。 */
+  askQuestion: (
+    questions: readonly QuestionPrompt[],
+    wait?: InteractionWait,
+  ) => Promise<QuestionResponse>
+  /**
+   * 引擎通过公开协议报告自己已经开启一轮时，请宿主铸造 turn id 并同步建立主线。
+   *
+   * 目前的使用者是 Kimi 原生 cron、同会话其他客户端，以及断线时直接撞上的目标续轮。
+   * cron 先发 `turn.started`，随后才在 `cron.fired` 给出供人阅读的原任务；驱动拿到这里返回的 id 后，
+   * 才把后续正文与工具挂上去。
+   * 宿主正在跑别的轮、会话已换代或关闭时返回 undefined，驱动不得覆盖现有轮次。
+   */
+  onNativeTurn?: (turn: NativeTurnStart) => TurnId | undefined
   /**
    * 引擎那边的会话句柄，用于续跑。传了就接着上次的对话，不传就是全新会话。
    * 格式由各家自己定，omni 原样存取。
@@ -126,6 +159,8 @@ export interface StartRequest {
    * `system/init` 消息里到达的，比 `start()` 返回晚。
    */
   onHandle?: (handle: string) => void
+  /** 引擎自己生成或更新的会话标题；宿主会保护用户亲自起过的名字。 */
+  onTitle?: (title: string) => void
   /**
    * 引擎**自己**换了模型或推理强度时回调。
    *
@@ -156,6 +191,13 @@ export interface StartRequest {
    */
   onEngineState?: (patch: { axes?: readonly EngineAxis[]; modelId?: string }) => void
   /**
+   * 引擎原生长期目标的完整快照。`undefined` 明确表示引擎已清空，不能与“没上报”混同。
+   *
+   * 目标属于会话而不是某一轮 transcript；宿主据此走 `thread.updated` 落盘，
+   * 界面只读展示，不从计划或轮次状态反推。
+   */
+  onGoal?: (goal: EngineGoal | undefined) => void
+  /**
    * omni 设档的**结果**。
    *
    * 存在的理由很具体：`acp/mode.ts` 里那两句「找不到对应项，已保持引擎自己的默认档」
@@ -170,6 +212,13 @@ export interface EngineSession {
   readonly threadId: ThreadId
   /** 这条会话实际由哪个引擎 profile 创建；宿主只记录，不解释。 */
   readonly profile?: string
+  /**
+   * 需要在宿主登记会话之后才连接实时流的驱动，把最后一步握手放这里。
+   *
+   * `start()` 阶段的同步状态仍可走握手快照；但会主动开轮的事件必须等宿主持有
+   * thread / turn 身份后再接，否则一个很快收工的原生轮会整段无主。
+   */
+  activate?: () => Promise<void>
   /**
    * `turnId` 由**宿主**铸造并传入——prompt 是宿主发出的，所以它知道一轮什么时候开始。
    * 引擎只负责给自己产出的 item 铸 id，以及在收工时发 `turn.completed`
@@ -248,7 +297,12 @@ export interface EngineSession {
    * 再加一条 omni 的就是同一件事出现两次。codex 那边 app-server 有
    * `thread/compact/start`，但它不在 `skills/list` 里，所以必须由这里补。
    */
-  compact?: () => Promise<void>
+  /**
+   * `turnId` 与普通 prompt 一样由宿主铸造。压缩不是一发即忘的按钮：Codex 与
+   * Kimi 都会异步报告开始、完成或取消，驱动必须把这些事件落在这轮上并最终发
+   * `turn.completed`。只在 RPC 回包时才知道结果的引擎，也在成功回包后自行收工。
+   */
+  compact?: (turnId: TurnId) => Promise<void>
   /**
    * 引擎自己存着哪些会话（你在终端、在别的界面里跑过的）。
    *
@@ -276,8 +330,8 @@ export interface EngineSession {
   /**
    * 这条会话在引擎那边已经有的对话内容。**接管时用来把 transcript 补齐。**
    *
-   * 不支持就别实现——那时接过来是一片空白，界面必须自己说清楚
-   *「内容在引擎那边」（codex 就是这种：`thread/items/list` 回 not supported yet）。
+   * 不支持就别实现——那时接过来是一片空白，界面只说明「内容在引擎那边」，
+   * 不按引擎名硬编码谁能搬、谁不能搬；公开出口会随版本变化。
    *
    * `total` 大于 `items.length` 表示截断过，调用方要把这件事说出来：
    * 一段被悄悄砍掉一半的历史，比一段明说「只搬了最近这些」糟得多。

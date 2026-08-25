@@ -8,7 +8,37 @@ export type ItemKind =
   | "tool_call"
   | "plan"
   | "approval"
+  | "notice"
   | "error"
+
+/** 引擎在空闲会话里按自己保存的计划主动触发的一轮。 */
+export interface ScheduledMessageOrigin {
+  kind: "scheduled"
+  taskId: string
+  /** 引擎原样上报的计划表达式，例如 Kimi 的五段 cron。 */
+  schedule: string
+  recurring: boolean
+  /** 休眠期间错过的多次触发被引擎合并成这一轮时，大于 1。 */
+  coalescedCount: number
+  /** 引擎明确说明这是过期计划的最后一次执行。 */
+  stale: boolean
+}
+
+/** 引擎原生终端入口执行的命令；不是模型工具调用，也不是普通聊天提示。 */
+export interface ShellMessageOrigin {
+  kind: "shell"
+}
+
+/** 引擎原生长期目标在一轮完成后自行开启的下一轮；没有一段冒充用户的提示正文。 */
+export interface GoalContinuationOrigin {
+  kind: "goal_continuation"
+}
+
+export type UserMessageOrigin =
+  | "handoff"
+  | ScheduledMessageOrigin
+  | ShellMessageOrigin
+  | GoalContinuationOrigin
 
 interface ItemBase {
   id: ItemId
@@ -33,17 +63,10 @@ export interface UserMessageItem extends ItemBase {
   /** 附件的本地绝对路径。 */
   attachments?: readonly string[]
   /**
-   * 这条不是人打的。**只有旧记录里才有**。
-   *
-   * 曾经的用法：接力时宿主生成一段「交接包」走普通提问那条路发出去，
-   * 界面上标出来免得用户以为那段话是自己发的。这条路已经删掉——
-   * omni 不再替用户往对话里塞任何东西（历史对话新的引擎自己去读
-   * `Thread.segments` 里的记录路径）。
-   *
-   * 字段留着只为**读得回旧日志**：那些事件已经落盘，重放时不该报错。
-   * 没有任何地方再写它，界面也不再据它换形态。
+   * 缺席才表示人亲手发送；存在时必须换形态，不能靠右冒充“你说的”。
+   * `handoff` 只为读回已删除功能留下的旧日志；structured origin 来自引擎公开事件。
    */
-  origin?: "handoff"
+  origin?: UserMessageOrigin
 }
 
 export interface AgentMessageItem extends ItemBase {
@@ -89,7 +112,15 @@ export interface FileChange {
 
 /** 工具调用的渲染形态。五种覆盖各家 95% 的调用，其余落 `other`。 */
 export type ToolDetail =
-  | { kind: "shell"; command: string; cwd?: string; exitCode?: number; output?: string }
+  | {
+      kind: "shell"
+      command: string
+      cwd?: string
+      exitCode?: number
+      output?: string
+      /** 引擎明确上报的后台终端活动；输入原文要留痕，空输入表示它正在轮询等待。 */
+      terminal?: { waiting: boolean; inputs: readonly string[] }
+    }
   /** `path` 是标题用的展示目标（多文件时取第一个）；逐文件明细在 `files`。 */
   | { kind: "file_edit"; path: string; files: readonly FileChange[]; added: number; removed: number }
   | { kind: "file_read"; path: string; range?: readonly [number, number] }
@@ -124,7 +155,7 @@ export interface PlanItem extends ItemBase {
   explanation?: string
 }
 
-export type ApprovalStatus = "pending" | "allowed" | "denied"
+export type ApprovalStatus = "pending" | "allowed" | "denied" | "cancelled"
 
 /** 只有判定结果为 escalate 的请求才会成为 item——自动放行的不进 transcript。 */
 export interface ApprovalItem extends ItemBase {
@@ -138,6 +169,16 @@ export interface ApprovalItem extends ItemBase {
   reason: string
   /** 可选的记忆建议，用户勾选后本会话/本项目不再问。 */
   rememberHint?: string
+}
+
+export type NoticeLevel = "info" | "notice" | "suggestion" | "warning"
+
+/** 引擎自己发给人的纯文本提示；不是模型回答，也不是 omni 推断出的状态。 */
+export interface NoticeItem extends ItemBase {
+  kind: "notice"
+  message: string
+  /** 原生消息自报的视觉级别。渲染层只据此调权重，不改写原文。 */
+  level: NoticeLevel
 }
 
 export interface ErrorItem extends ItemBase {
@@ -161,4 +202,5 @@ export type Item =
   | ToolCallItem
   | PlanItem
   | ApprovalItem
+  | NoticeItem
   | ErrorItem

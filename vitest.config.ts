@@ -14,7 +14,7 @@ import { defineConfig } from "vitest/config"
  */
 export default defineConfig(({ mode }) => ({
   test: {
-    include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts"],
+    include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts", "apps/*/harness/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", ...(mode === "live" ? [] : ["**/*.live.test.ts"])],
   },
 }))

@@ -41,6 +41,7 @@ describe("ZCode · live", () => {
         memory: () => [],
         emit: (event) => events.push(event),
         askUser: () => Promise.resolve({ allow: false, remember: "once" }),
+        askQuestion: () => Promise.resolve({ dismissed: true }),
       })
       try {
         const models = await session.models()
@@ -102,11 +103,12 @@ describe("ZCode · live · 压缩上下文", () => {
         memory: () => [],
         emit: () => undefined,
         askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+        askQuestion: () => Promise.resolve({ dismissed: true }),
       })
       try {
         expect(session.capabilities?.().compact).toBe(true)
         // 空会话上压缩也该成功（实测回一份空 snapshot）——**不抛就是通了**
-        await session.compact?.()
+        await session.compact?.("turn-live-compact")
       } finally {
         await session.dispose()
       }
@@ -129,10 +131,11 @@ describe("ZCode · live · 压缩上下文", () => {
       memory: () => [],
       emit: () => undefined,
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     try {
       expect(session.capabilities?.().compact).toBe(false)
-      await expect(session.compact?.()).rejects.toThrow(/不支持压缩上下文/)
+      await expect(session.compact?.("turn-live-nocompact")).rejects.toThrow(/不支持压缩上下文/)
     } finally {
       await session.dispose()
     }

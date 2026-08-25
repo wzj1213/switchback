@@ -2,32 +2,31 @@ import type { ChildProcess } from "node:child_process"
 import type {
   EngineAccount,
   EngineCapabilities,
-  EngineStatus,
   EngineThread,
   ModelOption,
   SlashCommand,
   Trust,
   TurnId,
   TurnStatus,
+  Item,
 } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
-import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
-import {
-  skillsToCommands,
-  toAccount,
-  toEngineThreads,
-  toModelOption,
-  type WireModel,
-} from "./catalog.js"
+import { createRpc, type RpcPeer } from "../rpc.js"
+import { toAccount, toEngineThreads, toModelOption, type WireModel } from "./catalog.js"
 import { nativeAxes, nativeTrustDiffers, POLICY, REVIEWER, SANDBOX } from "./sandbox.js"
 import { handleNotification, sweepInflight, type NotifyContext } from "./notify.js"
-import { answerApproval } from "./approve.js"
 import type { WireItem } from "./wire.js"
 import type { CodexSettings } from "./settings.js"
 import { openSession, type OpenCtx, type SessionState } from "./open.js"
 import { inputItems, startTurn } from "./turn.js"
+import { createServerRequests, type ServerRequests } from "./server-requests.js"
+import { createSkillCatalog, type SkillCatalog } from "./skill-catalog.js"
+import { startCompaction } from "./compaction.js"
+import { createCodexObservers, type CodexObservers } from "./observers.js"
+import { emitCodexStatus } from "./status.js"
+import { toCodexTranscript } from "./history.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
@@ -50,7 +49,11 @@ class CodexSession implements EngineSession {
   private readonly inflight = new Map<string, WireItem>()
   private readonly streamed = new Map<string, string>()
   private readonly materialized = new Set<string>()
+  private readonly safetyActive = new Set<TurnId>()
   private readonly settledTurns = new Set<string>()
+  private readonly serverRequests: ServerRequests
+  private readonly skills: SkillCatalog
+  private readonly observers: CodexObservers
   /** MCP 服务器上次报的状态。只在翻面时出声——一次启动实测 17 条通知。 */
   private readonly mcpSeen = new Map<string, string>()
   private readonly trust: { current: Trust }
@@ -61,6 +64,11 @@ class CodexSession implements EngineSession {
     private readonly config: CodexDriverConfig,
   ) {
     this.trust = { current: req.trust }
+    this.serverRequests = createServerRequests({
+      inflight: this.inflight, cwd: req.cwd, home: req.home,
+      trust: () => this.trust.current, memory: req.memory,
+      askUser: req.askUser, askQuestion: req.askQuestion,
+    })
     this.owner = createProcessOwner(config.reclaim)
     this.state = {
       child: undefined,
@@ -74,15 +82,21 @@ class CodexSession implements EngineSession {
       model: undefined,
       effort: undefined,
       options: [],
+      openedThread: undefined,
     }
+    this.observers = createCodexObservers({ threadId: req.threadId, nativeThread: () => this.state.codexThread, turnId: () => this.state.turn, emit: req.emit, now: () => Date.now() })
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
       onNotification: (method, params) => {
-        handleNotification(this.notifyContext(), method, params)
+        if (!this.observers.activity.handle(method, params)) handleNotification(this.notifyContext(), method, params)
       },
-      onRequest: (call) => {
-        void this.answer(call)
-      },
+      onRequest: (call) => { void this.serverRequests.answer(call) },
+    })
+    this.skills = createSkillCatalog({
+      call: (method, params) => this.rpc.call(method, params),
+      emit: req.emit,
+      cwd: req.cwd,
+      threadId: req.threadId,
     })
   }
 
@@ -104,7 +118,12 @@ class CodexSession implements EngineSession {
       inflight: this.inflight,
       streamed: this.streamed,
       materialized: this.materialized,
+      safetyActive: this.safetyActive,
       mcpSeen: this.mcpSeen,
+      onServerRequestResolved: this.serverRequests.resolved,
+      onSkillsChanged: this.skills.changed,
+      onGoal: this.req.onGoal,
+      hooks: this.observers.hooks,
       now: () => Date.now(),
     }
   }
@@ -149,16 +168,6 @@ class CodexSession implements EngineSession {
     })
   }
 
-  private status(status: EngineStatus, detail?: string): void {
-    this.req.emit({
-      type: "engine.status",
-      at: Date.now(),
-      threadId: this.req.threadId,
-      status,
-      ...(detail === undefined || detail === "" ? {} : { detail }),
-    })
-  }
-
   private wire(child: ChildProcess): void {
     child.stdout?.setEncoding("utf8")
     child.stdout?.on("data", (chunk: string) => {
@@ -170,13 +179,16 @@ class CodexSession implements EngineSession {
       this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
     })
     child.on("exit", (code) => {
+      this.skills.close()
+      this.serverRequests.abortAll()
       this.rpc.close(`codex 进程已退出（code ${String(code)}）`)
       // **进程没了，在跑的那一轮必须落终态。**
       // 只发 `crashed` 的话宿主那边 `entry.turn` 和 `status: "running"` 永远留着——
       // 界面上是一条横幅 + 一个一直在涨的计时器 + 一个点了没用的「停止」，
       // 而且输入框被那个假的「正在跑」永久锁住
       this.endTurn("failed")
-      if (code !== 0 && code !== null) this.status("crashed", this.state.stderr)
+      this.observers.hooks.close()
+      if (code !== 0 && code !== null) emitCodexStatus(this.req.emit, this.req.threadId, "crashed", this.state.stderr)
     })
   }
 
@@ -192,24 +204,9 @@ class CodexSession implements EngineSession {
       config: this.config,
       req: this.req,
       state: this.state,
-      status: (status, detail) => this.status(status, detail),
+      status: (status, detail) => emitCodexStatus(this.req.emit, this.req.threadId, status, detail),
       wire: (child) => this.wire(child),
     }
-  }
-
-  /**
-   * 服务端请求的应答。判定与措辞在 `approve.ts`——**那个文件就是「codex 的审批
-   * 怎么翻译」**，应答逻辑留在驱动里是错位的：驱动只该管发 RPC 和收通知。
-   */
-  private async answer(call: ServerCall): Promise<void> {
-    await answerApproval(call, {
-      inflight: this.inflight,
-      cwd: this.req.cwd,
-      home: this.req.home,
-      trust: () => this.trust.current,
-      memory: () => this.req.memory(),
-      askUser: (ask) => this.req.askUser(ask),
-    })
   }
 
   get threadId(): StartRequest["threadId"] {
@@ -277,17 +274,11 @@ class CodexSession implements EngineSession {
     return options
   }
 
-  /**
-   * codex 自己存着哪些会话。
-   *
-   * **只取得到列表，取不到内容**：`thread/items/list` 目前明确回
-   * `not supported yet`（实测）。所以这些会话接过来之后 omni 这边是空的，
-   * 而引擎那边记得一切——界面必须把这个落差说出来。
-   */
-  async history(): Promise<readonly EngineThread[]> {
-    const raw = await this.rpc.call("thread/list", {}).catch(() => undefined)
-    return toEngineThreads(raw)
-  }
+  /** codex 自己存着哪些会话；清单与正文来自两条公开返回，互不猜测。 */
+  async history(): Promise<readonly EngineThread[]> { return toEngineThreads(await this.rpc.call("thread/list", {}).catch(() => undefined)) }
+
+  /** `thread/resume` 自带完整 turns；接管流程在实时流激活前把它搬进 journal。 */
+  transcript(): Promise<{ items: readonly Item[]; total: number }> { return Promise.resolve(toCodexTranscript(this.state.openedThread, Date.now())) }
 
   /**
    * 这条会话的 rollout 文件在哪。`thread/list` 每条都带 `path`（实测）。
@@ -312,8 +303,7 @@ class CodexSession implements EngineSession {
 
   /** 能用哪些斜杠命令。翻译在 `catalog.ts`——那是**形状转换**，不是协议调用。 */
   async commands(): Promise<readonly SlashCommand[]> {
-    const raw = await this.rpc.call("skills/list", {}).catch(() => undefined)
-    return skillsToCommands(raw)
+    return this.skills.list()
   }
 
   /**
@@ -322,11 +312,7 @@ class CodexSession implements EngineSession {
    * 它**不在 `skills/list` 里**（那只报用户装的技能），所以 omni 必须自己
    * 提供入口——否则 codex 会话撞满上下文就只能新开一个，两小时的历史全丢。
    */
-  async compact(): Promise<void> {
-    const { codexThread } = this.state
-    if (codexThread === undefined) throw new Error("会话还没起来，没法压缩")
-    await this.rpc.call("thread/compact/start", { threadId: codexThread })
-  }
+  compact(turnId: TurnId): Promise<void> { return startCompaction({ state: this.state, call: (method, params) => this.rpc.call(method, params), fail: (message) => this.endTurn("failed", message) }, turnId) }
 
   /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
   capabilities(): EngineCapabilities {
@@ -345,13 +331,9 @@ class CodexSession implements EngineSession {
       fork: true,
       modeReadback: true,
       sideQuestion: false,
-      // `activity`：**源码里有，但没实测过，所以报 false。**
-      // `CollabAgentToolCall` / `SubAgentActivity` 是稳定的 item 类型，`agent_path`
-      // 是 `/root/worker` 真树路径（openai/codex @ f5a3dc55 `v2/item.rs:349-377`、
-      // `protocol/src/agent_path.rs:15-40`）。但从没在真机上收到过一帧。
-      // 凭源码推断报 true 的后果是界面上多一个**空着的**入口——那比没有入口更糟。
-      // 抓到帧再翻，判据写在 `packages/engine/README.md` 的已知限制里。
-      activity: false,
+      // 0.149.0 的公开 thread/read 已在生产历史抓到 SubAgentActivity，子 thread 的
+      // started/status 通知也有稳定协议；这里只镜像 Codex 自己启动的活动，不做编排。
+      activity: true,
     }
   }
 
@@ -403,10 +385,13 @@ class CodexSession implements EngineSession {
    */
   async dispose(): Promise<void> {
     this.state.child?.stdin?.end()
+    this.skills.close()
+    this.observers.hooks.close()
+    this.serverRequests.abortAll()
     this.rpc.close("会话正在关闭")
     const report = await this.owner.reclaim()
     if (report.rung === "escaped") {
-      this.status("crashed", `codex 进程组未能回收（pid ${String(report.pid)}），可能已泄漏`)
+      emitCodexStatus(this.req.emit, this.req.threadId, "crashed", `codex 进程组未能回收（pid ${String(report.pid)}），可能已泄漏`)
     }
   }
 }

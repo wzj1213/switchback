@@ -33,6 +33,7 @@ function request(events: Event[]): StartRequest {
     memory: () => [],
     emit: (event) => events.push(event),
     askUser: () => Promise.resolve({ allow: true, remember: "once" }),
+    askQuestion: () => Promise.resolve({ dismissed: true }),
   }
 }
 
@@ -46,6 +47,18 @@ function lease(api: KimiApi): KimiLease {
     release: () => Promise.resolve(),
   }
 }
+
+describe("Kimi 会话能力", () => {
+  it("公开 WebSocket 已实报子代理生命周期，因此声明活动面板能力", async () => {
+    const api: KimiApi = { get: <T>() => Promise.resolve(undefined as T), post: <T>() => Promise.resolve({} as T) }
+    const session = new KimiSession(request([]), lease(api), {
+      id: "s1", status: { busy: false, model: "k2" }, snapshot: snapshot(),
+    })
+
+    expect(session.capabilities().activity).toBe(true)
+    await session.dispose()
+  })
+})
 
 describe("Kimi 会话插话", () => {
   it("运行中先排成 queued，再调用原生 prompts:steer", async () => {

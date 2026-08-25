@@ -1,5 +1,64 @@
-import type { Trust } from "@omni/protocol"
+import type {
+  EngineNotificationPriority,
+  Lane,
+  NoticeLevel,
+  QuestionPrompt,
+  QuestionResponse,
+  ToolCallItem,
+  Trust,
+  TurnId,
+  UserMessageOrigin,
+} from "@omni/protocol"
 import type { ReclaimConfig } from "../subprocess.js"
+
+export interface ForeignNotice {
+  message: string
+  level: NoticeLevel
+}
+
+/** 不属于某一轮的原生会话提示；即使开场尚无 turn 也必须让用户看见。 */
+export interface ForeignNotification {
+  key: string
+  message: string
+  priority: EngineNotificationPriority
+  color?: string
+  timeoutMs?: number
+}
+
+export type ForeignActivity = Pick<Lane, "id" | "title" | "status" | "summary" | "progress" | "handle">
+/** 原生活动附带的工具输出增量；item 身份仍由宿主按会话重铸。 */
+export interface ForeignActivityOutput {
+  itemId: string
+  append: string
+}
+export type ForeignActivityUpdate = ForeignActivity | ForeignActivityOutput
+export type ForeignActivityParser = (method: string, params: unknown) => ForeignActivityUpdate | undefined
+export type ForeignTool = Pick<ToolCallItem, "tool" | "status" | "detail" | "error"> & { promptId?: string }
+export type ForeignToolParser = (method: string, params: unknown) => readonly ForeignTool[] | undefined
+
+/** 私有通知明确要求宿主发起的原生轮；正文只能来自引擎，不由宿主补提示词。 */
+export interface ForeignTurn {
+  /** 同一触发仍在排队或运行时的去重键；下一次触发在本轮收工后可以复用。 */
+  key: string
+  prompt: string
+  origin?: UserMessageOrigin
+  /** 引擎公开的轮次关联扩展；只放标识，不进入模型正文。 */
+  promptMeta?: (turnId: TurnId) => Readonly<Record<string, unknown>> | undefined
+}
+
+export type ForeignTurnParser = (method: string, params: unknown) => ForeignTurn | undefined
+
+/** 引擎私有反向请求明确交给宿主呈现的问题；回答仍按该引擎自己的 wire 形状回送。 */
+export interface ForeignInteraction {
+  sessionId: string
+  /** 原生 interaction 身份；用于多客户端 first-answer-wins 撤销宿主卡。 */
+  key: string
+  questions: readonly QuestionPrompt[]
+  reply: (response: QuestionResponse) => unknown
+}
+
+export type ForeignInteractionParser = (method: string, params: unknown) => ForeignInteraction | undefined
+export type ForeignInteractionResolvedParser = (method: string, params: unknown) => string | undefined
 
 /**
  * 一家 ACP 引擎的**注入面**：驱动这一层不认识任何一家，各家的特殊之处从这里递进来。
@@ -15,6 +74,8 @@ export interface AcpDriverConfig {
   args?: readonly string[]
   env?: Readonly<Record<string, string>>
   reclaim?: Partial<ReclaimConfig>
+  /** 引擎公开的 prompt 关联扩展；只放标识，不向模型上下文写宿主文字。 */
+  promptMeta?: (turnId: TurnId) => Readonly<Record<string, unknown>> | undefined
   /**
    * 这家把会话记录写到哪。**注入进来而不是驱动自己认**：
    * ACP 协议里根本没有「记录在哪」这个概念，各家各写各的
@@ -51,6 +112,23 @@ export interface AcpDriverConfig {
    * 各家各报各的。报得上来界面才敢把 t/s 当真数显示（见 `Usage.outputTokens`）。
    */
   outputTokens?: (method: string, params: unknown) => number | undefined
+  /**
+   * 这家用私有通知发给人的原文。只接 agent 明确暴露的提示，不从状态猜文案。
+   * 返回 undefined = 这条通知不该进入 transcript。
+   */
+  notice?: (method: string, params: unknown) => ForeignNotice | undefined
+  /** 私有通道上的会话级提示；与 transcript notice 分开，避免硬挂到错误轮次。 */
+  notification?: (method: string, params: unknown) => ForeignNotification | undefined
+  /** 私有通道上已经收口的工具结果；驱动只补宿主 id / turn，不解释一家字段。 */
+  toolItems?: ForeignToolParser
+  /** 每条原生会话独享的私有活动解析器；同一个 id 的后到快照替换先到状态。 */
+  activity?: () => ForeignActivityParser
+  /** 私有通知明确要求当前客户端驱动的新一轮；忙时由通用驱动排队，同一触发只跑一次。 */
+  nativeTurn?: ForeignTurnParser
+  /** 私有 blocking reverse-request；只有引擎明确公开给客户端的形状才在各自适配器认领。 */
+  interaction?: ForeignInteractionParser
+  /** 同一 interaction 被其他原生客户端先回答时，用原生终态撤销本地等待。 */
+  interactionResolved?: ForeignInteractionResolvedParser
   /**
    * 这家的**原生审批开关**怎么按信任档设。
    *

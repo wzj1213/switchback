@@ -1,4 +1,4 @@
-import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
+import type { ApprovalAnswer, ApprovalAsk, StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
 import { sanitize } from "../claude/permission.js"
 import type {
@@ -10,7 +10,8 @@ import type {
 export const MCP_ELICITATION = "mcpServer/elicitation/request"
 
 export interface ElicitationDeps {
-  askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+  askUser: StartRequest["askUser"]
+  signal?: AbortSignal
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -106,6 +107,9 @@ export async function answerElicitation(call: ServerCall, deps: ElicitationDeps)
     call.respond({ action: "cancel", content: null, _meta: null } satisfies WireMcpElicitationResponse)
     return
   }
-  const answer = await deps.askUser(requestFor(call, params))
+  const ask = requestFor(call, params)
+  const answer = deps.signal === undefined
+    ? await deps.askUser(ask)
+    : await deps.askUser(ask, { signal: deps.signal })
   call.respond(elicitationResponse(answer, params._meta))
 }

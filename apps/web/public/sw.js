@@ -13,11 +13,11 @@
  *
  * ## 新鲜度怎么保证
  *
- * `/assets/` 下的文件名带内容哈希（`static.ts` 给它们发的是
- * `immutable`），所以**只进不出**：改了代码就是新文件名，自然 miss。
- * 而 `index.html` 走 stale-while-revalidate：先把缓存那份给出去（页面立刻有），
- * 同时在后台取一份新的写回缓存，下次打开就是新的。
- * 主进程给它的 `no-cache` 头保留不动——两层各管各的，别打架。
+ * `/assets/` 下的文件名带内容哈希，由 `static.ts` 的 HTTP `immutable` 缓存负责；
+ * service worker 不再另攒一份永不清理的哈希文件。导航本身永远先问网络，
+ * 拿不到才退到一张独立的离线页；不缓存 `index.html`，
+ * 因而不会把旧协议客户端带进一份已经更新的宿主。主进程给入口的 `no-cache`
+ * 与这里说的是同一条契约。
  *
  * ## 为什么必须有它（推送那一半）
  *
@@ -33,15 +33,18 @@
  * 不这么做的话，一个改过结构的旧缓存会一直躺在那儿，
  * 而它出问题的样子是「换了新包但界面还是旧的」——最难查的一类。
  */
-const SHELL = "omni-shell-v1"
+const SHELL = "omni-shell-v2"
+const OFFLINE = "/offline.html"
+const NAVIGATION_TIMEOUT_MS = 4000
 
-/** 外壳的入口。带哈希的资源不在这里列——它们由 `fetch` 拦到时顺手存。 */
-const ENTRY = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"]
+/** 离线兜底必须自包含；正常应用资源继续使用静态服务层的 HTTP 缓存。 */
+const ENTRY = [OFFLINE, "/manifest.webmanifest", "/icon.svg"]
 
 self.addEventListener("install", (event) => {
-  // **立刻接管**：不等下一次冷启动。旧的那个只管推送，没有状态要交接
-  self.skipWaiting()
-  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(ENTRY).catch(() => undefined)))
+  // 三份兜底都落稳之后才接管；少一份就让旧 worker 继续，不能安装半套离线页
+  event.waitUntil(
+    caches.open(SHELL).then((cache) => cache.addAll(ENTRY)).then(() => self.skipWaiting()),
+  )
 })
 
 self.addEventListener("activate", (event) => {
@@ -54,56 +57,45 @@ self.addEventListener("activate", (event) => {
   )
 })
 
-/** 这一发能不能进缓存。**只有外壳**：内容和接口一律不碰。 */
-function cacheable(url) {
-  if (url.origin !== self.location.origin) return false
-  if (url.pathname.startsWith("/api/")) return false
-  return true
+/** 网络真的不可达时给一张稳定的小页面；它不含任何旧会话或旧协议代码。 */
+async function offlineResponse() {
+  const cached = await caches.match(OFFLINE)
+  return cached ?? new Response("omni 暂时连不上那台 Mac。", {
+    status: 503,
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  })
+}
+
+/** 在线导航要拿当前入口；睡眠中的隧道不能让冷启动在浏览器错误页前等几十秒。 */
+async function navigate(req) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), NAVIGATION_TIMEOUT_MS)
+  try {
+    const response = await fetch(req, { signal: controller.signal })
+    // 4xx 往往带着 Host/配置修复提示，应该原样给人；网关 5xx 才算暂时不可达
+    if (response.status < 500) return response
+  } catch {
+    // 断网、隧道睡眠和主动超时统一走离线兜底
+  } finally {
+    clearTimeout(timeout)
+  }
+  return offlineResponse()
 }
 
 self.addEventListener("fetch", (event) => {
   const req = event.request
   if (req.method !== "GET") return
   const url = new URL(req.url)
-  if (!cacheable(url)) return
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return
 
-  // 带哈希的资源：**缓存优先**。文件名变了自然 miss，所以不会拿到旧的
-  if (url.pathname.startsWith("/assets/")) {
-    event.respondWith(
-      caches.match(req).then(
-        (hit) =>
-          hit ??
-          fetch(req).then((res) => {
-            // 只存成功的那些：把一个 502 存进去，等于把「连不上」变成永久的
-            if (res.ok) void caches.open(SHELL).then((c) => c.put(req, res.clone()))
-            return res
-          }),
-      ),
-    )
+  if (req.mode === "navigate") {
+    event.respondWith(navigate(req))
     return
   }
 
-  // 导航和其余外壳：**先给缓存那份，后台再更新**。
-  // 网断时这一条就是「界面还在」和「浏览器错误页」的差别
-  event.respondWith(
-    (async () => {
-      const cache = await caches.open(SHELL)
-      const hit = await cache.match(req, { ignoreSearch: true })
-      const fresh = fetch(req)
-        .then((res) => {
-          if (res.ok) void cache.put(req, res.clone())
-          return res
-        })
-        .catch(() => undefined)
-      // 缓存里有就立刻给，没有就只能等网络；两边都没有才是真的失败
-      const res = hit ?? (await fresh)
-      if (res !== undefined) return res
-      return new Response("omni 还没缓存过界面，而且现在连不上。", {
-        status: 503,
-        headers: { "content-type": "text/plain; charset=utf-8" },
-      })
-    })(),
-  )
+  // 只缓存明确列入外壳的静态文件；普通路径交还浏览器，避免把 SPA 兜底页越攒越多
+  if (!ENTRY.includes(url.pathname)) return
+  event.respondWith(caches.match(req).then((hit) => hit ?? fetch(req)))
 })
 
 self.addEventListener("push", (event) => {

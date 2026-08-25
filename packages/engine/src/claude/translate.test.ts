@@ -55,7 +55,7 @@ describe("applyResult", () => {
   })
 })
 
-import { assistantItems } from "./translate.js"
+import { assistantItems, turnError } from "./translate.js"
 
 describe("assistantItems", () => {
   const ctx = { turnId: "t1", at: 0, nextId: () => "i1" }
@@ -71,5 +71,16 @@ describe("assistantItems", () => {
 
   it("非空文本正常产生 item", () => {
     expect(assistantItems([{ type: "text", text: "hi" }], ctx)).toHaveLength(1)
+  })
+})
+
+describe("turnError", () => {
+  it("保留两种 SDK result 失败形状的原文", () => {
+    const cases = [
+      { raw: { result: "模型不存在" }, want: "模型不存在" },
+      { raw: { errors: ["第一条", " ", "第二条"] }, want: "第一条; 第二条" },
+      { raw: { result: "", errors: [] }, want: undefined },
+    ] as const
+    for (const row of cases) expect(turnError(row.raw)).toBe(row.want)
   })
 })

@@ -12,9 +12,8 @@ import { applyResult, assistantItems, toolResults, type ToolResult } from "./tra
  * ——这台机器上 128 个项目、1484 个文件。SDK 没有「列出历史会话」的接口，
  * 但**文件名就是 session id**，而那正是 `resume` 要的句柄。
  *
- * 比 codex 那边强的地方在于：这些文件里**有完整内容**。
- * codex 的 `thread/items/list` 回 `not supported yet`，所以接过来只能是空的；
- * 这边接过来能把对话真的摆出来（见 `toItems`）。
+ * 这些文件里也有完整内容，所以接管时能把对话真的摆出来（见 `toItems`）。
+ * 这条载体是本地 jsonl；其他引擎可能从 resume 回包或历史 API 给出正文。
  *
  * ## 为什么只读文件头
  *
@@ -207,9 +206,8 @@ export async function readEntries(path: string): Promise<readonly Record<string,
  *
  * ## 为什么这件事值得做
  *
- * codex 那边接过来只能是空的（`thread/items/list` 回 `not supported yet`），
- * 于是界面上要专门写一句「内容在引擎那边」。Claude 这边**文件里就是全文**，
- * 所以能真的摆出来——接过来看到的和你当初在终端里看到的是同一段对话。
+ * Claude 的文件里就是全文，所以能真的摆出来——接过来看到的和你当初在
+ * 终端里看到的是同一段对话。翻译不依赖其他引擎采用哪种历史载体。
  *
  * ## 翻译是复用的，不是另写一份
  *

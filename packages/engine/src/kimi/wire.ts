@@ -1,5 +1,13 @@
 /** Kimi Web API 的窄类型。权威定义来自服务端自己的 OpenAPI / AsyncAPI。 */
 
+export type {
+  KimiTranscriptEntry,
+  KimiTranscriptFrame,
+  KimiTranscriptMarker,
+  KimiTranscriptPage,
+  KimiTranscriptTurn,
+} from "./transcript-wire.js"
+
 export interface KimiMeta {
   server_version: string
   capabilities: { websocket?: boolean; file_upload?: boolean }
@@ -39,6 +47,18 @@ export interface KimiStatus {
   max_context_tokens?: number
 }
 
+export interface KimiGoalSnapshot {
+  goalId: string
+  objective: string
+  completionCriterion?: string
+  status: "active" | "paused" | "blocked" | "complete"
+  turnsUsed: number
+  tokensUsed: number
+  wallClockMs: number
+  budget: { tokenBudget: number | null }
+  terminalReason?: string
+}
+
 export interface KimiModel {
   provider: string
   model: string
@@ -59,7 +79,7 @@ export interface KimiSkill {
 
 export interface KimiPrompt {
   prompt_id: string
-  status: "running" | "queued" | "completed" | "aborted"
+  status: "running" | "queued" | "blocked"
 }
 
 export interface KimiImageContent {
@@ -103,7 +123,13 @@ export interface KimiQuestion {
   questions: readonly {
     id: string
     question: string
+    header?: string
+    body?: string
     options: readonly { id: string; label: string; description?: string }[]
+    multi_select?: boolean
+    allow_other?: boolean
+    other_label?: string
+    other_description?: string
   }[]
 }
 
@@ -114,6 +140,53 @@ export interface KimiRunningTool {
   description?: string
   display?: KimiToolDisplay
   last_progress?: { kind: string; text?: string }
+}
+
+export interface KimiSubagent {
+  id: string
+  session_id: string
+  kind: "subagent" | "bash" | "tool"
+  description?: string
+  status: "running" | "completed" | "failed" | "cancelled"
+  subagent_phase?: "queued" | "working" | "suspended" | "completed" | "failed"
+  subagent_type?: string
+  parent_tool_call_id?: string
+  run_in_background?: boolean
+  model?: string
+  thinking_effort?: string
+  created_at?: string | number
+  started_at?: string | number
+  completed_at?: string | number
+  suspended_reason?: string
+  output_preview?: string
+  error?: string
+}
+
+export interface KimiSessionWarning {
+  code: string
+  message: string
+  severity: "info" | "warning" | "error"
+}
+
+export interface KimiWarningsResponse {
+  warnings: readonly KimiSessionWarning[]
+}
+
+export interface KimiTask {
+  id: string
+  session_id: string
+  kind: "subagent" | "bash" | "tool"
+  description: string
+  status: "running" | "completed" | "failed" | "cancelled"
+  command?: string
+  created_at: string | number
+  started_at?: string | number
+  completed_at?: string | number
+  output_preview?: string
+}
+
+export interface KimiTasksResponse {
+  items: readonly KimiTask[]
 }
 
 export interface KimiSnapshot {
@@ -129,11 +202,13 @@ export interface KimiSnapshot {
   } | null
   pending_approvals: readonly KimiApproval[]
   pending_questions: readonly KimiQuestion[]
+  subagents?: readonly KimiSubagent[]
 }
 
 export interface KimiFrame {
   type: string
   seq?: number
+  offset?: number
   epoch?: string
   volatile?: boolean
   timestamp?: string
@@ -152,12 +227,14 @@ export interface KimiPayload {
   promptId?: string
   prompt?: string
   origin?: unknown
+  step?: number
   reason?: string
   error?: unknown
   interruptReason?: string
   delta?: string
   toolCallId?: string
   name?: string
+  argumentsPart?: string
   args?: unknown
   description?: string
   display?: KimiToolDisplay
@@ -167,6 +244,9 @@ export interface KimiPayload {
   retryable?: boolean
   message?: string
   code?: string
+  trigger?: "manual" | "auto" | "user-slash" | "model-tool" | "nested-skill"
+  instruction?: string
+  result?: KimiCompactionResult
   model?: string
   thinkingEffort?: string
   contextTokens?: number
@@ -174,6 +254,9 @@ export interface KimiPayload {
   permission?: "manual" | "yolo" | "auto"
   planMode?: boolean
   usage?: KimiEventUsage
+  finishReason?: string
+  providerFinishReason?: "completed" | "tool_calls" | "truncated" | "filtered" | "paused" | "other"
+  rawFinishReason?: string
   approval_id?: string
   tool_call_id?: string
   tool_name?: string
@@ -181,43 +264,18 @@ export interface KimiPayload {
   tool_input_display?: unknown
   question_id?: string
   questions?: KimiQuestion["questions"]
+  snapshot?: KimiGoalSnapshot | null
   nonce?: string
   [key: string]: unknown
+}
+
+export interface KimiCompactionResult {
+  summary?: string
+  compactedCount?: number
+  tokensBefore?: number
+  tokensAfter?: number
 }
 
 export interface KimiEventUsage {
   total?: { inputOther: number; output: number; inputCacheRead: number; inputCacheCreation: number }
 }
-
-export interface KimiTranscriptPage {
-  items: readonly KimiTranscriptEntry[]
-  has_more: boolean
-}
-
-export type KimiTranscriptEntry = KimiTranscriptTurn | { kind: string; [key: string]: unknown }
-
-export interface KimiTranscriptTurn {
-  kind: "turn"
-  turnId: string
-  prompt?: string
-  endedAt?: string
-  state: "completed" | "failed" | "cancelled" | "running"
-  error?: string
-  steps: readonly { frames: readonly KimiTranscriptFrame[] }[]
-}
-
-export type KimiTranscriptFrame =
-  | { kind: "text"; frameId: string; role: "assistant" | "user"; text: string }
-  | { kind: "thinking"; frameId: string; text: string }
-  | {
-      kind: "tool"
-      frameId: string
-      toolCallId: string
-      name: string
-      state: "running" | "done" | "error"
-      input?: unknown
-      output?: unknown
-      display?: KimiToolDisplay
-      error?: string
-    }
-  | { kind: "notice"; frameId: string; level: "error" | "warning" | "info"; message: string; detail?: unknown }

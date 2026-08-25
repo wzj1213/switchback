@@ -6,6 +6,7 @@ import {
   modelsOf,
   lanesOf,
   tasksOf,
+  thinkingTokensOf,
   turnOf,
   usageOf,
 } from "@omni/store"
@@ -187,9 +188,7 @@ export function App(): React.JSX.Element {
         key={thread.id}
         thread={thread}
         peer={peer}
-        onCompare={() => {
-          shell.setComparing(true)
-        }}
+        onCompare={() => { shell.setComparing(true) }}
         rows={app.rows}
         onSelect={shell.select}
         /* **`app.items` 不是 `app.itemsOf(thread.id)`**：后者在空会话时每次
@@ -199,6 +198,7 @@ export function App(): React.JSX.Element {
         /* nextEngine 只是下一句的去向；真正切换前，顶部仍应显示当前原生会话的用量。 */
         usage={usageOf(state, thread.id, thread.engine)}
         tasks={tasksOf(state, thread.id)}
+        thinkingTokens={thinkingTokensOf(state, thread.id)}
         /* 引擎不报旁路的那三家永远是空数组——`withLanes` 空数组时原样返回，一行都不多 */
         lanes={lanes}
         openLane={tabs.active}
@@ -223,13 +223,9 @@ export function App(): React.JSX.Element {
         limits={limitsOf(state, thread.engine)}
         onNew={app.newHere}
         onRename={shell.requestRename}
-        onSettings={() => {
-          shell.setSettingsOpen(true)
-        }}
+        onSettings={() => { shell.setSettingsOpen(true) }}
         searchFiles={app.searchFiles}
-        onReview={() => {
-          shell.setReviewOpen(true)
-        }}
+        onReview={() => { shell.setReviewOpen(true) }}
         send={app.send}
       />
       <AsidePane lanes={lanes} tabs={tabs} onPick={shell.openAside} onClose={shell.closeAside} />

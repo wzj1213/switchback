@@ -1,5 +1,5 @@
 import type { Item, Thread } from "@omni/protocol"
-import { VERB, brief } from "./tool.js"
+import { runningToolLabel } from "./tool.js"
 import { headingOf } from "./reasoning.js"
 
 /**
@@ -26,7 +26,7 @@ export function statusLabel(thread: Thread, items: readonly Item[]): string | un
     }
     if (item.kind !== "tool_call") continue
     if (item.status !== "running" && item.status !== "pending") break
-    return `${VERB[item.detail.kind]} ${brief(item.detail)}`
+    return runningToolLabel(item)
   }
   return "正在思考"
 }

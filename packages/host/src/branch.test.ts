@@ -25,7 +25,7 @@ interface Rig {
   flushes: () => number
 }
 
-const rig = (opts: { canFork: boolean }): Rig => {
+const rig = (opts: { canFork: boolean; nativeOnFork?: boolean; failActivateOnFork?: boolean }): Rig => {
   const events: Event[] = []
   const forks: { handle: string; dropTurns?: number }[] = []
   const prompts: string[] = []
@@ -47,6 +47,21 @@ const rig = (opts: { canFork: boolean }): Rig => {
       req.onHandle?.(req.forkOf === undefined ? `cx-${String(++counter.n)}` : "cx-forked")
       return Promise.resolve({
         threadId: req.threadId,
+        activate: () => {
+          if (req.forkOf !== undefined && opts.failActivateOnFork === true) {
+            return Promise.reject(new Error("分叉后的实时连接失败"))
+          }
+          if (req.forkOf !== undefined && opts.nativeOnFork === true) {
+            const turnId = req.onNativeTurn?.({
+              at: 1,
+              prompt: "定时检查",
+              origin: { kind: "scheduled", taskId: "job", schedule: "* * * * *",
+                recurring: true, coalescedCount: 1, stale: false },
+            })
+            if (turnId !== undefined) req.emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
+          }
+          return Promise.resolve()
+        },
         prompt: (text: string) => {
           prompts.push(text)
           return Promise.resolve()
@@ -181,6 +196,28 @@ describe("同一家引擎：让它自己复制会话", () => {
     const forked = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
     const said = itemsOfThread(r.events, forked).filter((i) => i.kind === "user_message")
     expect(said.map((i) => i.text)).toEqual(["第一句", "第二句"])
+  })
+
+  it("原生主动轮在继承记录搬完后才接入，不会跑到父会话历史前面", async () => {
+    const r = rig({ canFork: true, nativeOnFork: true })
+    const { id } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" })
+    const forked = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+    const said = itemsOfThread(r.events, forked).filter((i) => i.kind === "user_message")
+
+    expect(said.map((item) => item.text)).toEqual(["第一句", "第二句", "定时检查"])
+    expect(said.slice(0, 2).every((item) => item.inherited === true)).toBe(true)
+    expect(said[2]?.origin).toMatchObject({ kind: "scheduled", taskId: "job" })
+  })
+
+  it("原生分叉已建立但实时激活失败时不退成空白分支", async () => {
+    const r = rig({ canFork: true, failActivateOnFork: true })
+    const { id } = await withTurns(r)
+    const starts = r.resumed.length
+
+    await expect(r.host.dispatch({ type: "thread.fork", threadId: id, to: "fake" }))
+      .rejects.toThrow("实时连接失败")
+    expect(r.resumed).toHaveLength(starts + 1)
   })
 
   it("**turn id 重新铸**：沿用旧的会把新会话的记录写进原会话的文件里", async () => {

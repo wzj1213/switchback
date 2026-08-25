@@ -1,12 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Thread as ThreadModel } from "@omni/protocol"
-import { itemsOf, turnOf, usageOf } from "@omni/store"
+import { itemsOf, lanesOf, mainItems, thinkingTokensOf, turnOf, usageOf } from "@omni/store"
 import type { Remote } from "../useRemote.js"
 import { ItemView } from "../components/ItemView.js"
 import { Composer } from "../components/Composer.js"
 import { Reattach } from "../components/Reattach.js"
 import { PlanBar } from "../components/PlanBar.js"
+import { QuestionStack } from "../components/QuestionCard.js"
+import { GoalBar } from "../components/GoalBar.js"
 import { useStickToBottom } from "../useStickToBottom.js"
+import { LaneCard, LegacyAside } from "../components/LaneCard.js"
+import { timelineOf } from "../timeline.js"
 
 /** 上下文用量的条。引擎没报就整个不画——**没有数据时不要画一个空进度条**。 */
 function Usage({
@@ -43,6 +47,10 @@ function Usage({
  */
 const FIRST_SCREEN = 80
 
+function runningText(thinkingTokens: number | undefined): string {
+  return thinkingTokens === undefined ? "正在跑…" : `正在思考 · 约 ${String(thinkingTokens)} tokens`
+}
+
 function Body({
   thread,
   remote,
@@ -55,7 +63,11 @@ function Body({
   /** 外面那个滚动容器。点开「更早的」之后要靠它把视口按回原处。 */
   scroller: React.RefObject<HTMLDivElement | null>
 }): React.JSX.Element {
-  const all = itemsOf(remote.state, thread.id)
+  const all = timelineOf(
+    mainItems(remote.state, thread.id),
+    thread.asides ?? [],
+    lanesOf(remote.state, thread.id),
+  )
   const [full, setFull] = useState(false)
   // **换会话时收回去。** 不收的话，上一条会话点开过「更早的」，
   // 下一条会话一进来就把几百条全挂上——而那正是这一条要治的
@@ -105,9 +117,11 @@ function Body({
       {remote.trimmed.has(thread.id) && hidden === 0 ? (
         <p className="thread__earlier">更早的内容没有加载。完整记录在桌面上。</p>
       ) : null}
-      {items.map((item) => (
-        <ItemView key={item.id} item={item} send={remote.send} offline={offline} />
-      ))}
+      {items.map((row) => {
+        if (row.kind === "item") return <ItemView key={row.key} item={row.item} send={remote.send} offline={offline} />
+        if (row.kind === "aside") return <LegacyAside key={row.key} aside={row.aside} />
+        return <LaneCard key={row.key} lane={row.lane} live={!offline && thread.detached !== true} />
+      })}
     </>
   )
 }
@@ -122,6 +136,7 @@ export function Thread({
   onBack: () => void
 }): React.JSX.Element {
   const turn = turnOf(remote.state, thread.id)
+  const thinkingTokens = thinkingTokensOf(remote.state, thread.id)
   // nextEngine 只是下一句的去向；真正切换前，用量仍属于当前原生会话。
   const usage = usageOf(remote.state, thread.id, thread.engine)
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
@@ -156,7 +171,7 @@ export function Thread({
       <div className="thread__body" ref={scroller}>
         <div className="thread__inner" ref={inner}>
           <Body thread={thread} remote={remote} offline={offline} scroller={scroller} />
-          {running ? <p className="thread__running">正在跑…</p> : null}
+          {running ? <p className="thread__running">{runningText(thinkingTokens)}</p> : null}
         </div>
       </div>
       {atBottom ? null : (
@@ -164,7 +179,9 @@ export function Thread({
           ↓ 回到底部
         </button>
       )}
+      <GoalBar goal={thread.goal} />
       <PlanBar items={itemsOf(remote.state, thread.id)} />
+      <QuestionStack threadId={thread.id} groups={thread.pendingQuestions} send={remote.send} offline={offline} />
       {thread.detached === true ? (
         // **没接引擎时给的是一个动作，不是一句「去桌面上点」。**
         // 手机上绝大多数会话都是 detached 的（宿主只留少数几条活的），

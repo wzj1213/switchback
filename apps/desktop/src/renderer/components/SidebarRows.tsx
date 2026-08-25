@@ -196,7 +196,7 @@ export function Row({
       <button
         type="button"
         className="row__main"
-        aria-selected={selected}
+        aria-current={selected ? "page" : undefined}
         {...moveKeyProps(onMove)}
         onClick={onSelect}
       >

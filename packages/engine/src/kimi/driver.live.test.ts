@@ -36,7 +36,9 @@ describe("Kimi Web driver · live", () => {
         memory: () => [],
         emit: (event) => events.push(event),
         askUser: () => Promise.resolve({ allow: true, remember: "once" }),
+        askQuestion: () => Promise.resolve({ dismissed: true }),
       })
+      await session.activate?.()
       try {
         await session.prompt(
           "请立刻使用 Shell 工具执行 `sleep 8; printf KIMI_TOOL_READY`，工具完成后只回复 DONE。",

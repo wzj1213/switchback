@@ -46,6 +46,7 @@ describe("grok 的推理强度（真跑）", () => {
       memory: () => [],
       emit: (e) => events.push(e),
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     try {
       const models = await session.models()

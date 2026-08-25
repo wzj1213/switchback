@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Event } from "@omni/protocol"
 import { coalesce, reduceAll } from "./reduce.js"
-import { clearNotices, initial, itemsOf } from "./state.js"
+import { initial, itemsOf } from "./state.js"
 
 const d = (itemId: string, append: string, at = 0): Event => ({ type: "item.delta", at, itemId, append })
 
@@ -69,34 +69,6 @@ describe("改名归约", () => {
     const s = reduceAll(initial(), [{ type: "thread.renamed", at: 1, threadId: "查无此人", title: "x" }])
     expect(s.threads["查无此人"]).toBeUndefined()
     expect(s.order).toEqual([])
-  })
-})
-
-describe("全量重建之后横幅要清掉", () => {
-  const born: Event = {
-    type: "thread.started",
-    at: 0,
-    thread: { id: "t", title: "t", cwd: "/w", engine: "claude", trust: "auto-edit", status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["claude"] },
-  }
-  const crashed: Event = { type: "engine.status", at: 1, threadId: "t", status: "crashed", detail: "引擎没了" }
-
-  it("崩溃当时会弹一条", () => {
-    expect(reduceAll(initial(), [born, crashed]).notices).toHaveLength(1)
-  })
-
-  it("**重放出来的不该再弹**——不然重启一次迎面几条上周的红条", () => {
-    expect(clearNotices(reduceAll(initial(), [born, crashed])).notices).toHaveLength(0)
-  })
-
-  it("清横幅不动别的——会话状态是从同一条事件还原的，那个必须留着", () => {
-    const after = clearNotices(reduceAll(initial(), [born, crashed]))
-    expect(after.threads["t"]).toBeDefined()
-    expect(after.order).toEqual(["t"])
-  })
-
-  it("本来就没有横幅时原样返回，不制造新对象", () => {
-    const s = reduceAll(initial(), [born])
-    expect(clearNotices(s)).toBe(s)
   })
 })
 

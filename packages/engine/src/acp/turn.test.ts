@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { compactSession, steerSession, type TurnCtx } from "./turn.js"
+import type { Event } from "@omni/protocol"
+import { compactSession, reportCompaction, steerSession, type TurnCtx } from "./turn.js"
 
 /**
  * 真的调得通由 `zcode.live.test.ts` 钉（只有 zcode 有这两个方法）。
@@ -41,6 +42,26 @@ describe("压缩上下文", () => {
     const c = ctx({ compact: true }, { acpSession: undefined })
     await expect(compactSession(c)).rejects.toThrow(/会话还没建立/)
     expect(c.sent).toEqual([])
+  })
+
+  it("成功回包后把压缩结果落在宿主给的轮次并收工", () => {
+    const events: Event[] = []
+    reportCompaction((event) => events.push(event), "compact-turn", 9)
+    expect(events).toEqual([
+      {
+        type: "item.started",
+        at: 9,
+        item: {
+          id: "acp-compaction-compact-turn",
+          turnId: "compact-turn",
+          at: 9,
+          kind: "notice",
+          message: "上下文已压缩。",
+          level: "info",
+        },
+      },
+      { type: "turn.completed", at: 9, turnId: "compact-turn", status: "completed" },
+    ])
   })
 })
 

@@ -70,7 +70,8 @@ export function countDiff(kind: string, diff: string): { added: number; removed:
  */
 function commandDetail(item: WireItem): ToolDetail {
   const first = item.commandActions?.[0]
-  if (first?.type === "read" && typeof first.path === "string") {
+  const terminal = terminalFields(item)
+  if (terminal.terminal === undefined && first?.type === "read" && typeof first.path === "string") {
     return { kind: "file_read", path: first.path }
   }
   return {
@@ -81,7 +82,16 @@ function commandDetail(item: WireItem): ToolDetail {
     ...(item.aggregatedOutput === undefined || item.aggregatedOutput === null
       ? {}
       : { output: item.aggregatedOutput }),
+    ...terminal,
   }
+}
+
+function terminalFields(item: WireItem): {
+  terminal?: { waiting: boolean; inputs: readonly string[] }
+} {
+  const inputs = item.terminalInputs ?? []
+  if (inputs.length === 0 && item.waitingForTerminal !== true) return {}
+  return { terminal: { waiting: item.waitingForTerminal === true, inputs } }
 }
 
 const CHANGE_KIND: Readonly<Record<string, FileChangeKind>> = {
@@ -160,6 +170,9 @@ export function toToolCall(item: WireItem, ctx: CodexContext): ToolCallItem {
 export function itemToOmni(item: WireItem, ctx: CodexContext, complete: boolean): Item | undefined {
   if (item.type === "userMessage") return undefined
   const base = { id: item.id, turnId: ctx.turnId, at: ctx.at }
+  if (item.type === "contextCompaction") {
+    return { ...base, kind: "notice", message: "上下文已压缩。", level: "info" }
+  }
   if (item.type === "agentMessage") {
     return { ...base, kind: "agent_message", text: textOf(item), complete }
   }

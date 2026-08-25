@@ -44,6 +44,7 @@ describe("codex 的计划（真跑）", () => {
       memory: () => [],
       emit: (e) => events.push(e),
       askUser: () => Promise.resolve({ allow: true, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     try {
       // **钉死模型**：默认那个额度可能是打满的（写这条测试时就是），

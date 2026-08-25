@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import type { Item, TaskRun, Thread, Turn } from "@omni/protocol"
 import { Shimmer } from "./Shimmer.js"
 import { elapsed, statusLabel } from "../status.js"
+import { compact } from "../usage.js"
 
 /** 计时器只需秒级精度，1s 一跳。 */
 const TICK_MS = 1000
@@ -31,12 +32,15 @@ export function TurnStatus({
   turn,
   items,
   tasks,
+  thinkingTokens,
 }: {
   thread: Thread
   turn: Turn | undefined
   items: readonly Item[]
   /** 此刻在跑的子 agent。**每条都是引擎自己写的一句人话**，omni 不拼。 */
   tasks: readonly TaskRun[]
+  /** 当前 thinking block 的近似值；频繁变化，不放进 aria-live 的播报内容。 */
+  thinkingTokens: number | undefined
 }): React.JSX.Element | null {
   const [now, setNow] = useState(() => Date.now())
   const running = turn !== undefined
@@ -58,6 +62,11 @@ export function TurnStatus({
   return (
     <div className="turnstatus" role="status" aria-live="polite">
       <Shimmer text={label} />
+      {thinkingTokens === undefined ? null : (
+        <span className="turnstatus__tokens" aria-hidden="true" title="当前思考块的近似值，不是最终用量">
+          约 {compact(thinkingTokens)} tokens
+        </span>
+      )}
       {showClock ? <span className="turnstatus__clock">{elapsed(turn.startedAt, now)}</span> : null}
       {/*
        * 子 agent 各占一行。**这一段只在引擎真报了的时候才存在**——

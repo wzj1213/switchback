@@ -1,11 +1,12 @@
-import { app, Notification } from "electron"
+import { app, ipcMain, Notification } from "electron"
 import type { BrowserWindow } from "electron"
 import type { Event, ThreadId, TurnId } from "@omni/protocol"
 import { humanize } from "../shared/failure.js"
 import type { NotifyMode } from "../shared/settings.js"
+import { watchQuestions, type QuestionChange } from "./attention-questions.js"
 
 /**
- * 「有人在等你」「它跑完了」「它跑挂了」——出声的三件事，以及 Dock 角标。
+ * 「有人在等你批/答」「它跑完了」「它跑挂了」——出声的三类事，以及 Dock 角标。
  *
  * ## 为什么非有不可
  *
@@ -14,28 +15,27 @@ import type { NotifyMode } from "../shared/settings.js"
  * 你只能自己想起来切回去看一眼。**不看着它的时候它什么都不说**，那这个应用
  * 就只能被看着用，等于把它最大的好处丢了。
  *
- * 审批仍然是最要紧的那一件：它是**唯一一个 agent 会停下来等人的地方**，
+ * 审批与结构化问题仍然是最要紧的两件：agent 会停下来等人，
  * 人回来才发现它十分钟前就停在那儿。
  *
  * ## 三条克制
  *
- * - **窗口在前台就不弹通知**：你已经看见了，再弹一次是纯噪声。角标照挂，
- *   因为它可能挂在别的会话上、被折叠着。
+ * - **正在看这条会话就不弹通知**：你已经看见了，再弹一次是纯噪声。窗口虽在前台、
+ *   但人看的是另一条会话时仍然要响；角标照挂，因为审批可能被折叠着。
  * - **一次挂起只响一次**：同一张卡不会因为界面重渲染再响。
  * - **点通知把窗口举到前面**，不是打开一个新窗口。人要的是回到现场。
  * - **短轮次不出声**：15 秒以内跑完的，你八成还盯着屏幕（阈值和转录区那块秒表
  *   共用一个理由：三秒的事摆个计时器只是噪声）。
  * - **自己按停的不出声**：`interrupted` 是你刚做的动作，报告它等于回声。
  *
- * ## 一个已知的洞，写在这儿而不是假装覆盖
- *
- * 「窗口在前台、但你看的是**另一条**会话」时收不到任何信号——主进程不知道
- * 渲染层选中的是谁。老实按「窗口是否前台」抑制，宁可少响一次。
- * 真要补，得让渲染层把当前选中的会话报上来，那是另一条通道。
+ * 渲染层只通过一条窄 IPC 报当前会话 id；没有报上来（启动首帧或 preload 故障）时
+ * 仍按「窗口在前台」抑制，避免应用刚启动就乱响。
  */
 export interface Attention {
-  /** 每条出去的事件都过一遍。挑审批、轮次开始与收工。 */
+  /** 每条出去的事件都过一遍。挑审批、问题、轮次开始与收工。 */
   note: (event: Event) => void
+  /** 渲染层此刻正在看的会话。没有会话时传 undefined。 */
+  viewing: (threadId: ThreadId | undefined) => void
   /** 应用退出前清角标，免得留在 Dock 上。 */
   clear: () => void
 }
@@ -52,20 +52,86 @@ const QUIET_MS = 15_000
 /**
  * 除了系统通知之外再送一份的地方（远程推送）。
  *
- * **和系统通知共用同一个判据**（窗口在前台就不出声），但**不共用抑制的理由**：
+ * **和系统通知共用桌面端判据**（正在看这条会话就不出声），但**不共用全部理由**：
  * 「一次挂起只响一次」那条对推送同样成立，而「有人正看着这条会话」
- * 是推送独有的一条，判在 `remote/relay.ts` 里——那一层才知道谁在看什么。
+ * 还要在 `remote/relay.ts` 再判一次——那一层才知道远程端正在看什么。
  */
 export type Relay = (threadId: ThreadId, title: string, body: string) => void
 
+interface FocusableWindow {
+  isDestroyed: () => boolean
+  isFocused: () => boolean
+}
+
 /**
- * 什么时候出声，**读的是当下那一份设置**（传函数不传值）。
+ * 这件事是不是已经在人眼前。
  *
- * 传值的话，用户在设置里关掉提醒之后，这一层还拿着启动时那份——直到重启才生效，
- * 而一个「关了还在响」的开关比没有这个开关更糟。
- *
- * 角标不受它管：那一个不出声、不弹窗，只是把「有几张卡等着你」写在图标上。
+ * 空 threadId 是审批事件没法从 turn 反查归属的保守兜底；选中会话还没报上来也是。
+ * 两种情况都只在窗口真的有焦点时抑制，不拿未知冒充「人在看另一条」。
  */
+export function isAttending(
+  windows: readonly FocusableWindow[],
+  viewing: ThreadId | undefined,
+  threadId: ThreadId,
+): boolean {
+  const focused = windows.some((window) => !window.isDestroyed() && window.isFocused())
+  return focused && (viewing === undefined || threadId === "" || viewing === threadId)
+}
+
+/** renderer 只报一个会话 id；Electron 能力仍留在主进程。 */
+function connectViewing(attention: Attention): Attention {
+  ipcMain.on("omni:viewing", (_event, threadId: unknown) => {
+    attention.viewing(typeof threadId === "string" && threadId !== "" ? threadId : undefined)
+  })
+  return attention
+}
+
+function updateBadge(size: number): void {
+  // Dock 角标只有 macOS 有；别的平台需要额外 overlay 图标，不在这儿假装做了。
+  if (process.platform === "darwin") app.badgeCount = size
+}
+
+function rememberTitle(titles: Map<ThreadId, string>, event: Event): void {
+  if (event.type === "thread.started" || event.type === "thread.updated") {
+    titles.set(event.thread.id, event.thread.title)
+  }
+  if (event.type === "thread.renamed") titles.set(event.threadId, event.title)
+}
+
+interface QuestionAttention {
+  pending: Set<string>
+  announced: Set<string>
+  badge: () => void
+  attending: (threadId: ThreadId) => boolean
+  enabled: () => boolean
+  tell: (threadId: ThreadId, body: string) => void
+}
+
+function noteQuestion(change: QuestionChange, state: QuestionAttention): void {
+  const key = `question:${change.threadId}:${change.id}`
+  if (!change.pending) {
+    state.pending.delete(key)
+    state.announced.delete(key)
+    state.badge()
+    return
+  }
+  if (state.pending.has(key)) return
+  state.pending.add(key)
+  state.badge()
+  if (!state.enabled() || state.attending(change.threadId) || state.announced.has(key)) return
+  state.announced.add(key)
+  state.tell(change.threadId, `等你回答：${change.summary}`)
+}
+
+function raiseFirst(windows: readonly BrowserWindow[]): void {
+  const win = windows.find((window) => !window.isDestroyed())
+  if (win === undefined) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+/** 设置按函数读取，用户修改后立即生效；角标本身不受通知开关影响。 */
 export function createAttention(
   windows: () => readonly BrowserWindow[],
   relay?: Relay,
@@ -75,43 +141,34 @@ export function createAttention(
   const announced = new Set<string>()
   /** 会话标题：通知要说清是哪一条。从 thread 那几条事件顺手记，不加协议字段。 */
   const titles = new Map<ThreadId, string>()
+  const view = { threadId: undefined as ThreadId | undefined }
+  const attending = (threadId: ThreadId): boolean => isAttending(windows(), view.threadId, threadId)
 
-  const focused = (): boolean => windows().some((w) => !w.isDestroyed() && w.isFocused())
+  const badge = (): void => updateBadge(pending.size)
 
-  const badge = (): void => {
-    // Dock 角标只有 macOS 有；别的平台静默跳过（`app.badgeCount` 在 Windows 上
-    // 需要额外的 overlay 图标，那是另一件事，不在这儿假装做了）
-    if (process.platform !== "darwin") return
-    app.badgeCount = pending.size
-  }
-
-  const raise = (): void => {
-    const win = windows().find((w) => !w.isDestroyed())
-    if (win === undefined) return
-    if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
-  }
+  const raise = (): void => raiseFirst(windows())
 
   /** 通知的正文：会话名打头——你可能同时开着四条，不说是哪条等于没说。 */
   const tell = (threadId: ThreadId, body: string): void => {
-    // 「跑完了 / 跑挂了」只在全开时说。**审批不走这条路**，见下面那一段
-    if (mode() !== "all" || focused()) return
     const title = titles.get(threadId) ?? "omni"
     new Notification({ title, body, silent: false }).on("click", raise).show()
     // 同一个出口再送一份到手机上。**不在这里判「要不要推」**——
     // 那要知道谁正看着哪条会话，而那是远程那一层才有的信息
     relay?.(threadId, title, body)
   }
-  const turns = watchTurns(tell)
+  const turns = watchTurns((threadId, body) => {
+    if (mode() === "all" && !attending(threadId)) tell(threadId, body)
+  })
+  const questionState: QuestionAttention = {
+    pending, announced, badge, attending, enabled: () => mode() !== "off", tell,
+  }
+  const questions = watchQuestions((change) => noteQuestion(change, questionState))
 
-  return {
+  return connectViewing({
     note: (event) => {
-      if (event.type === "thread.started" || event.type === "thread.updated") {
-        titles.set(event.thread.id, event.thread.title)
-      }
-      if (event.type === "thread.renamed") titles.set(event.threadId, event.title)
+      rememberTitle(titles, event)
       turns.note(event)
+      questions.note(event)
       const seen = approvalOf(event, turns.threadOf)
       if (seen === undefined) return
       if (!seen.pending) {
@@ -125,17 +182,22 @@ export function createAttention(
       badge()
       // **审批不走 `tell`**：那一条在「只有审批」这一档要闭嘴，而这一条不能。
       // 角标已经挂上了，下面这一步只决定要不要出声
-      if (mode() === "off" || focused() || announced.has(seen.id)) return
+      if (mode() === "off" || attending(seen.threadId) || announced.has(seen.id)) return
       announced.add(seen.id)
       askFor(seen, titles.get(seen.threadId) ?? "omni 在等你确认", raise, relay)
+    },
+    viewing: (threadId) => {
+      view.threadId = threadId
     },
     clear: () => {
       pending.clear()
       announced.clear()
       titles.clear()
-      if (process.platform === "darwin") app.badgeCount = 0
+      questions.clear()
+      view.threadId = undefined
+      updateBadge(0)
     },
-  }
+  })
 }
 
 /**

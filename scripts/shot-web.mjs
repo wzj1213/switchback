@@ -22,6 +22,7 @@ import { spawn } from "node:child_process"
 import { mkdirSync, writeFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
+import axe from "axe-core"
 import WebSocket from "ws"
 
 const OUT = process.argv[2] ?? join(process.cwd(), "release", "web-shots")
@@ -57,6 +58,60 @@ function rpc(socket, state) {
     })
 }
 
+async function evaluate(send, expression) {
+  const reply = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true })
+  if (reply.exceptionDetails !== undefined) throw new Error(reply.exceptionDetails.text)
+  return reply.result.value
+}
+
+async function audit(send, label) {
+  await evaluate(send, axe.source)
+  const violations = await evaluate(
+    send,
+    `axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] } }).then(r => r.violations.map(v => ({ id: v.id, targets: v.nodes.map(n => n.target) })))`,
+  )
+  if (violations.length > 0) throw new Error(`${label} axe 违规：${JSON.stringify(violations)}`)
+  console.log(`  ✓ ${label} axe A/AA`)
+}
+
+async function exerciseQuestion(send) {
+  const before = await evaluate(
+    send,
+    `(() => { const card=document.querySelector(".question-card"); const acts=card?.querySelector(".question-card__actions"); if (!card || !acts) return null; const c=card.getBoundingClientRect(); const a=acts.getBoundingClientRect(); return { actionsVisible: a.top >= c.top && a.bottom <= c.bottom + 1, targets: [...card.querySelectorAll(".question-option")].map(x => x.getBoundingClientRect().height) } })()`,
+  )
+  if (before === null || !before.actionsVisible) throw new Error("问题卡操作行没有留在首屏")
+  if (before.targets.some((height) => height < 44)) throw new Error("手机问题选项命中区小于 44px")
+  await evaluate(send, `document.querySelector(".question-option__control")?.focus()`)
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown" })
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown" })
+  const radio = await evaluate(
+    send,
+    `(() => { const controls=[...document.querySelectorAll(".question-option__control")]; return { index: controls.indexOf(document.activeElement), checked: document.activeElement?.checked === true } })()`,
+  )
+  if (radio.index !== 1 || !radio.checked) throw new Error("单选题方向键切换失效")
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab" })
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab" })
+  const focused = await evaluate(
+    send,
+    `(() => { const controls=[...document.querySelectorAll(".question-option__control")]; const active=document.activeElement; const ring=active?.closest(".question-option"); return { index: controls.indexOf(active), outline: ring === null ? "none" : getComputedStyle(ring).outlineStyle } })()`,
+  )
+  if (focused.index !== 2 || focused.outline === "none") {
+    throw new Error(`问题选项的 Tab 顺序或焦点环失效：${JSON.stringify(focused)}`)
+  }
+  await evaluate(
+    send,
+    `(() => { const fields=document.querySelectorAll(".question-field"); fields[0]?.querySelector("input")?.click(); fields[1]?.querySelector("input")?.click(); return !document.querySelector(".question-card__actions .btn--primary")?.disabled })()`,
+  ).then((ready) => {
+    if (!ready) throw new Error("逐题选择后回答按钮仍未启用")
+  })
+  await evaluate(send, `document.querySelector(".question-card__actions .btn--primary")?.click()`)
+  await new Promise((resolve) => setTimeout(resolve, 350))
+  if (await evaluate(send, `document.querySelector(".question-card") !== null`)) {
+    throw new Error("结构化回答发出后问题卡没有落定")
+  }
+  console.log("  ✓ 手机问题卡命中区、固定操作行、键盘焦点与真实命令往返")
+}
+
 async function shoot(send, view) {
   await send("Emulation.setDeviceMetricsOverride", {
     width: view.w,
@@ -78,9 +133,11 @@ async function shoot(send, view) {
     await send("Runtime.evaluate", { expression: `document.querySelector(".threads__list .row")?.click()` })
     await new Promise((r) => setTimeout(r, 700))
   }
+  await audit(send, view.name)
   const shot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false })
   writeFileSync(join(OUT, `${view.name}.png`), Buffer.from(shot.data, "base64"))
   console.log(`  ✓ ${view.name}.png`)
+  if (view.name === "phone-thread") await exerciseQuestion(send)
 }
 
 async function main() {

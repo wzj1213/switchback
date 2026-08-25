@@ -34,6 +34,34 @@ describe("commandExecution", () => {
     })
   })
 
+  it("后台终端等待与已写入的 stdin 保留在原命令详情里", () => {
+    expect(
+      toToolCall(
+        exec({
+          status: "inProgress",
+          terminalInputs: ["yes\n"],
+          waitingForTerminal: true,
+        }),
+        ctx,
+      ).detail,
+    ).toMatchObject({
+      kind: "shell",
+      terminal: { waiting: true, inputs: ["yes\n"] },
+    })
+  })
+
+  it("读文件命令一旦出现终端交互就按 shell 展示，不能把等待态藏掉", () => {
+    expect(
+      toToolCall(
+        exec({
+          commandActions: [{ type: "read", path: "log.txt" }],
+          waitingForTerminal: true,
+        }),
+        ctx,
+      ).detail,
+    ).toMatchObject({ kind: "shell", terminal: { waiting: true } })
+  })
+
   it("退出码不为 0 算失败——codex 说的 completed 只是「进程跑完了」", () => {
     expect(toolStatus(exec({ exitCode: 1 }))).toBe("failed")
   })
@@ -126,6 +154,17 @@ describe("itemToOmni", () => {
 
   it("reasoning 把 summary 与 content 拼起来", () => {
     expect(textOf({ type: "reasoning", id: "r", summary: ["一"], content: ["二"] })).toBe("一\n二")
+  })
+
+  it("contextCompaction 是原生状态提示，不冒充未知工具调用", () => {
+    expect(itemToOmni({ type: "contextCompaction", id: "compact-1" }, ctx, true)).toEqual({
+      id: "compact-1",
+      turnId: "tn-1",
+      at: 100,
+      kind: "notice",
+      message: "上下文已压缩。",
+      level: "info",
+    })
   })
 
   it("认不出的类型落 tool_call/other，原始 type 带上便于排查", () => {

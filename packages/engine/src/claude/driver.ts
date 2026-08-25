@@ -1,9 +1,5 @@
 import {
-  query,
-  type Options,
-  type PermissionResult,
-  type SDKUserMessage,
-  type SpawnedProcess,
+  query, type Options, type PermissionResult, type SDKUserMessage, type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
 import { decide } from "@omni/approval"
 import type {
@@ -20,10 +16,8 @@ import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../
 import { createQueue } from "../queue.js"
 import { askAside } from "./aside.js"
 import { capabilitiesOf } from "./caps.js"
-import { createTaskState } from "./tasks.js"
-import { createPlanState } from "./plan.js"
-import { createStream } from "./stream.js"
 import { applyEffort, withEfforts } from "./effort.js"
+import { claudeCommands } from "./commands.js"
 import {
   buildRequest,
   forcesHumanPrompt,
@@ -32,11 +26,13 @@ import {
   toDeny,
   type AskMeta,
 } from "./permission.js"
-import { runMessageLoop, type TurnRef } from "./loop.js"
+import { createTurnRef, runMessageLoop } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { CLAUDE_TRUST, needsPermissionRestart, permissionOptions } from "./trust.js"
 import { claudePath, probeClaude, type ClaudeExecutable } from "./executable.js"
+import { answerElicitation } from "./elicitation.js"
+import { refusalDialogOptions } from "./refusal-dialog.js"
 import { planFork, type ForkPlan } from "./fork.js"
 import { toContent } from "./attach.js"
 
@@ -75,31 +71,27 @@ class ClaudeSession implements EngineSession {
   private readonly input = createQueue<SDKUserMessage>()
   private readonly abort = new AbortController()
   private readonly trust: { current: Trust }
-  private readonly turn: TurnRef = {
-    current: undefined,
-    seq: 0,
-    tools: new Map(),
-    tasks: createTaskState(),
-    plan: createPlanState(),
-    stream: createStream(),
-  }
+  private readonly turn = createTurnRef((at) => {
+    void this.commands().then((commands) => {
+      if (commands.length > 0) {
+        this.req.emit({ type: "commands.updated", at, threadId: this.req.threadId, engine: "claude", commands })
+      }
+    }).catch(() => undefined)
+  })
   private readonly owner: ProcessOwner
   private readonly bypassEnabled: boolean
   private loop: Promise<void> | undefined
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
   private query: ReturnType<typeof query> | undefined
-  /**
-   * 上下文窗口。**消息流里没有这个数**，得单独问一次（`syncWindow`）。
-   * 问不到就一直是 undefined，界面据此只显示占用量、不画比例条。
-   */
+  /** 当前模型的上下文窗口；控制请求失败时保持缺席，不猜默认值。 */
   private window: number | undefined
 
   constructor(
     private readonly req: StartRequest,
     private readonly config: ClaudeDriverConfig,
     private readonly executable: string | undefined,
-    /** 原生分叉的落点。**在构造之前就解好**——解它要读文件，而 `start()` 是同步的。 */
+    /** 原生分叉的落点。构造前先读历史解出，避免在同步 `start()` 里做 IO。 */
     private readonly fork: ForkPlan | undefined,
   ) {
     this.trust = { current: req.trust }
@@ -113,9 +105,11 @@ class ClaudeSession implements EngineSession {
       cwd: this.req.cwd,
       ...permissionOptions(this.req.trust),
       canUseTool: (tool, input, meta) => this.judge(tool, input, meta as AskMeta),
-      // **逐字吐字这一路的总开关。** 不开的话 SDK 只在整条消息说完之后给一次，
-      // omni 收到的就是「一条 item.started，text 里已经是整段答案」——
-      // 转录区没有打字机、桌宠不开火、打靶永远读 0 t/s（实测见 `stream.ts` 头注释）
+      onElicitation: (request, { signal }) => answerElicitation(request, this.req.askQuestion, signal),
+      ...refusalDialogOptions(this.req, this.turn),
+      // 只打开 Claude 已执行 Hook 的公开生命周期；不新增、改写或代审任何 Hook 配置。
+      includeHookEvents: true,
+      // SDK 只在显式开启后才给逐字增量；收尾消息会复用增量已铸好的 item id。
       includePartialMessages: true,
       abortController: this.abort,
       // 自己 spawn 才能拿到进程组所有权，回收阶梯才有整树退出证明可言。
@@ -124,9 +118,7 @@ class ClaudeSession implements EngineSession {
       spawnClaudeCodeProcess: (o) => this.owner.spawn(o) as unknown as SpawnedProcess,
       // 带句柄就接着上次的会话跑；SDK 会把那次的历史加载回来
       ...(this.req.resume === undefined ? {} : { resume: this.req.resume }),
-      // **原生分叉**：接上老会话、截到分叉点、然后岔成一条新的会话 id。
-      // 摆在 `resume` 后面是有意的——两者都会写 `resume`，而分叉那条必须赢：
-      // 岔出来的是一条新会话，它没有自己的续跑句柄可言（见 `fork.ts`）
+      // 原生分叉必须覆盖普通 resume：它会生成新 session，并可截到指定 chain entry。
       ...(this.fork === undefined
         ? {}
         : {
@@ -145,6 +137,7 @@ class ClaudeSession implements EngineSession {
       {
         ...this.req,
         onHandle: (id) => {
+          if (this.handle === id) return
           this.handle = id
           this.req.onHandle?.(id)
         },
@@ -153,17 +146,10 @@ class ClaudeSession implements EngineSession {
       {
         trust: () => this.trust.current,
         window: () => this.window,
-        onReady: () => {
-          this.syncWindow()
-        },
+        onReady: () => { this.syncWindow() },
       },
     )
-    // **开场就问一次，不等 `system/init`。**
-    //
-    // 实测（2026-08-25）：`system/init` 要等第一次 prompt 之后才来，那时轮次
-    // 已经在跑，而控制请求排在它后面——于是第一轮的 result 先到，
-    // `contextWindow` 还是空的，比例条第一轮永远不出现。
-    // 而这个控制请求在没有轮次时答得又快又准（连模型都报得出来），所以就在这儿问。
+    // init 要等首条 prompt 后才来；先问一次，第一轮也能拿到正确分母。
     this.syncWindow()
   }
 
@@ -233,38 +219,12 @@ class ClaudeSession implements EngineSession {
     throw new Error("Claude 输入流已经关闭")
   }
 
-  /**
-   * 去问一次上下文窗口有多大。
-   *
-   * ## 为什么非得单独问
-   *
-   * SDK 的 usage 只报「这次占了多少」，不报上限——而没有上限就没有「多满」可言。
-   * `caps.ts` 那句「窗口大小 SDK 不给」于是成了一条自我实现的预言：
-   * 界面上永远只有一个光秃秃的 token 数，顶栏那条比例条、输入框那枚环、
-   * 打靶靶纸上那圈有效区**在 claude 会话里全都不出现**，而用户看到的是
-   * 「别家有、就我这家没有」。
-   *
-   * 实际上 `getContextUsage()` 这个控制请求一直在（`maxTokens` 就是那个上限，
-   * 也正是 `/context` 面板里画的那个数）。
-   *
-   * ## 什么时候问
-   *
-   * **开场就问一次**（`start()` 末尾），另外在 `system/init` 和换模型之后各补一次。
-   *
-   * 只挂 `system/init` 是不够的，实测过：那条消息要等第一次 prompt 之后才来，
-   * 那时轮次已经在跑，控制请求排在它后面——第一轮的 result 先到，
-   * 比例条整整一轮都不出现。而没有轮次在跑时它答得又快又准，连模型都报得出来。
-   *
-   * 换模型之后必须重问：**窗口是跟着模型走的**（`[1m]` 那档是一百万）。
-   *
-   * 失败了就保持 undefined：问不到是常态之一（老 CLI 没有这个控制请求），
-   * 那时界面退回「只显示数字」，而不是拿一个猜出来的分母画一条假的比例条。
-   */
+  /** 查询当前模型的原生上下文窗口；旧 CLI 不支持时保持缺席。 */
   private syncWindow(): void {
     void this.query
       ?.getContextUsage()
-      .then((out) => {
-        this.window = out.maxTokens > 0 ? out.maxTokens : undefined
+      .then((usage) => {
+        this.window = usage.maxTokens > 0 ? usage.maxTokens : undefined
       })
       .catch(() => undefined)
   }
@@ -299,12 +259,7 @@ class ClaudeSession implements EngineSession {
    */
   async commands(): Promise<readonly SlashCommand[]> {
     const list = await this.query?.supportedCommands().catch(() => undefined)
-    return (list ?? []).map((c) => ({
-      name: c.name,
-      description: c.description,
-      ...(c.argumentHint === "" ? {} : { argumentHint: c.argumentHint }),
-      source: "engine" as const,
-    }))
+    return claudeCommands(list ?? [], this.turn.terminalCommands) ?? []
   }
 
   /**
@@ -344,10 +299,7 @@ class ClaudeSession implements EngineSession {
     return readAccount(this.req.home)
   }
 
-  /**
-   * 这条会话已经聊过什么。**codex 那边做不到这件事**（它的 `thread/items/list`
-   * 回 not supported yet），而这里文件里就是全文，所以接过来能真的摆出来。
-   */
+  /** 这条会话已经聊过什么；Claude 的公开载体是本地 jsonl 全文。 */
   async transcript(): Promise<{ items: readonly Item[]; total: number }> {
     const id = this.req.resume
     if (id === undefined) return { items: [], total: 0 }
@@ -364,7 +316,7 @@ class ClaudeSession implements EngineSession {
 
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
-    // **窗口跟着模型走**：换到 1M 那档而不重问，比例条会照着旧分母画
+    // 窗口跟着模型走；换模型后旧分母不能继续沿用。
     this.syncWindow()
     // **设不上就回空**，调用方据此不把上一模型的旧档冒充成新模型状态
     const applied = await applyEffort(this.query, effort).catch((error: unknown) => {
@@ -440,7 +392,6 @@ export function createClaudeDriver(config: ClaudeDriverConfig = {}): EngineDrive
     id: "claude",
     probe: () => probeClaude(mode),
     start: async (req: StartRequest): Promise<EngineSession> => {
-      // 分叉点要读老会话的 jsonl 才解得出来，所以在构造之前先解
       const fork = req.forkOf === undefined ? undefined : await planFork(req.home, req.forkOf)
       const session = new ClaudeSession(req, config, await claudePath(mode), fork)
       session.start()

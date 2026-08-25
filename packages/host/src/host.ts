@@ -1,5 +1,6 @@
 import type { Command, Event, Thread, ThreadId, TurnId } from "@omni/protocol"
 import { resolveApproval } from "./approval.js"
+import { resolveQuestion } from "./question.js"
 import { clearQueue, discardUnstarted, emit, liveStateOf, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { create, remove, rename, resume, setModel } from "./session.js"
@@ -9,6 +10,7 @@ import { fork, handoff, rewind, switchEngine } from "./branch.js"
 import { sideQuestion } from "./engine-state.js"
 import { prompt, steerQueued } from "./prompt.js"
 import { recordSegment } from "./segment.js"
+import { compact } from "./compact.js"
 
 export type { HostDeps } from "./deps.js"
 
@@ -137,12 +139,7 @@ const HANDLERS: Handlers = {
    * 能做也该做的是**不把这条请求发出去**。和分叉、运行中换档同一条规矩
    *（`branch.ts` 的 `stableEvents`、`trust.ts` 的 restart 分支）。
    */
-  "thread.compact": async (ctx, command) => {
-    const entry = ctx.live.get(command.threadId)
-    if (entry === undefined || !entry.lease.active || entry.session.compact === undefined) return
-    if (entry.turn !== undefined) throw new Error("这一轮还在跑，压缩要等它停下来")
-    await entry.session.compact()
-  },
+  "thread.compact": compact,
   /**
    * 现在就切引擎（模型选择器上那颗按钮）。**没有待切换的就什么都不做**——
    * 这条命令表达的是「把已经记下的那个意向立刻兑现」，不是「切到某一家」，
@@ -165,6 +162,10 @@ const HANDLERS: Handlers = {
   },
   "approval.resolve": (ctx, command) => {
     resolveApproval(ctx, command)
+    return Promise.resolve()
+  },
+  "question.resolve": (ctx, command) => {
+    resolveQuestion(ctx, command)
     return Promise.resolve()
   },
 }

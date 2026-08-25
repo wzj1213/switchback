@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Event } from "@omni/protocol"
-import { handleTurnEvent, KimiTurnTracker } from "./turn.js"
+import { KimiTurnTracker } from "./turn.js"
+import { handleTurnEvent } from "./turn-events.js"
 import type { KimiSnapshot } from "./wire.js"
 
 function runningSnapshot(assistantText: string): KimiSnapshot {
@@ -35,23 +36,39 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "答" }, 3)
     handleTurnEvent(
       tracker,
-      { type: "tool.call.started", turnId: 7, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "echo ok" } },
+      {
+        type: "tool.call.started",
+        turnId: 7,
+        toolCallId: "tc",
+        name: "Shell",
+        display: { kind: "command", command: "echo ok" },
+      },
       4,
     )
-    handleTurnEvent(tracker, { type: "tool.progress", turnId: 7, toolCallId: "tc", update: { kind: "stdout", text: "o" } }, 5)
-    handleTurnEvent(tracker, { type: "tool.result", turnId: 7, toolCallId: "tc", output: "ok", isError: false }, 6)
+    handleTurnEvent(
+      tracker,
+      { type: "tool.progress", turnId: 7, toolCallId: "tc", update: { kind: "stdout", text: "o" } },
+      5,
+    )
+    handleTurnEvent(
+      tracker,
+      { type: "tool.result", turnId: 7, toolCallId: "tc", output: "ok", isError: false },
+      6,
+    )
     handleTurnEvent(tracker, { type: "turn.ended", turnId: 7, reason: "completed" }, 7)
 
     expect(events.filter((event) => event.type === "turn.completed")).toEqual([
       { type: "turn.completed", at: 7, turnId: "omni-turn", status: "completed" },
     ])
-    expect(events.filter((event) => event.type === "item.started").map((event) => event.item.kind)).toEqual([
-      "reasoning",
-      "agent_message",
-      "tool_call",
-    ])
-    const tool = events.findLast((event) => event.type === "item.updated" && event.item.kind === "tool_call")
-    expect(tool?.type === "item.updated" && tool.item.kind === "tool_call" ? tool.item : undefined).toMatchObject({
+    expect(
+      events.filter((event) => event.type === "item.started").map((event) => event.item.kind),
+    ).toEqual(["reasoning", "agent_message", "tool_call"])
+    const tool = events.findLast(
+      (event) => event.type === "item.updated" && event.item.kind === "tool_call",
+    )
+    expect(
+      tool?.type === "item.updated" && tool.item.kind === "tool_call" ? tool.item : undefined,
+    ).toMatchObject({
       id: "tc",
       status: "ok",
       detail: { kind: "shell", output: "ok" },
@@ -75,7 +92,13 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "工具前" }, 2)
     handleTurnEvent(
       tracker,
-      { type: "tool.call.started", turnId: 7, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "pwd" } },
+      {
+        type: "tool.call.started",
+        turnId: 7,
+        toolCallId: "tc",
+        name: "Shell",
+        display: { kind: "command", command: "pwd" },
+      },
       3,
     )
     handleTurnEvent(tracker, { type: "tool.result", turnId: 7, toolCallId: "tc", output: "ok" }, 4)
@@ -83,7 +106,11 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "turn.ended", turnId: 7, reason: "completed" }, 6)
 
     const started = events.flatMap((event) => (event.type === "item.started" ? [event.item] : []))
-    expect(started.map((item) => item.kind)).toEqual(["agent_message", "tool_call", "agent_message"])
+    expect(started.map((item) => item.kind)).toEqual([
+      "agent_message",
+      "tool_call",
+      "agent_message",
+    ])
     expect(started.map((item) => item.id)).toEqual([
       "kimi-answer-omni-turn",
       "tc",
@@ -103,14 +130,65 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "工具前" }, 2)
     handleTurnEvent(
       tracker,
-      { type: "tool.call.started", turnId: 7, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "pwd" } },
+      {
+        type: "tool.call.started",
+        turnId: 7,
+        toolCallId: "tc",
+        name: "Shell",
+        display: { kind: "command", command: "pwd" },
+      },
       3,
     )
     tracker.reconcile(runningSnapshot("工具前工具后"))
 
     const started = events.flatMap((event) => (event.type === "item.started" ? [event.item] : []))
-    expect(started.map((item) => item.kind)).toEqual(["agent_message", "tool_call", "agent_message"])
+    expect(started.map((item) => item.kind)).toEqual([
+      "agent_message",
+      "tool_call",
+      "agent_message",
+    ])
     expect(started[2]).toMatchObject({ text: "工具后" })
+  })
+
+  it("快照文本按 Kimi 的当前 step 边界恢复，不拿上一 step 长度裁前缀", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
+    tracker.begin("omni-turn", "做事")
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
+    handleTurnEvent(tracker, { type: "turn.step.started", turnId: 7, step: 1 }, 2)
+    handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "第一步正文" }, 3)
+    handleTurnEvent(tracker, { type: "turn.step.started", turnId: 7, step: 2 }, 4)
+    tracker.reconcile(runningSnapshot("第二步"))
+
+    const started = events.flatMap((event) => (event.type === "item.started" ? [event.item] : []))
+    expect(started).toMatchObject([
+      { kind: "agent_message", text: "第一步正文" },
+      { kind: "agent_message", text: "第二步" },
+    ])
+  })
+
+  it("offset 重复帧不追加，重叠帧只追加新后缀，缺口要求重同步", () => {
+    const events: Event[] = []
+    const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
+    tracker.begin("omni-turn", "做事")
+    handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
+    handleTurnEvent(tracker, { type: "turn.step.started", turnId: 7, step: 1 }, 2)
+    expect(
+      handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "前后" }, 3, 0),
+    ).toBe(false)
+    expect(
+      handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "前后" }, 4, 0),
+    ).toBe(false)
+    expect(
+      handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "后来" }, 5, 1),
+    ).toBe(false)
+    expect(
+      handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "缺" }, 6, 4),
+    ).toBe(true)
+
+    expect(events.filter((event) => event.type === "item.delta")).toEqual([
+      { type: "item.delta", at: 5, itemId: "kimi-answer-omni-turn", append: "来" },
+    ])
   })
 
   it("todo_list 原地更新成计划卡，不重复画成工具行", () => {
@@ -142,8 +220,14 @@ describe("Kimi 轮次事件", () => {
     )
 
     expect(events).toMatchObject([
-      { type: "item.started", item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "in_progress" }] } },
-      { type: "item.updated", item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "done" }] } },
+      {
+        type: "item.started",
+        item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "in_progress" }] },
+      },
+      {
+        type: "item.updated",
+        item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "done" }] },
+      },
     ])
   })
 
@@ -203,7 +287,9 @@ describe("Kimi 轮次事件", () => {
       in_flight_turn: null,
     })
     expect(tracker.hasActive()).toBe(false)
-    expect(events).toEqual([{ type: "turn.completed", at: 0, turnId: "omni-turn", status: "completed" }])
+    expect(events).toEqual([
+      { type: "turn.completed", at: 0, turnId: "omni-turn", status: "completed" },
+    ])
   })
 
   it("skill activation 没有 prompt id 时，接受后的快照仍能绑定并收工", () => {
@@ -275,13 +361,27 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
     handleTurnEvent(
       tracker,
-      { type: "tool.call.started", turnId: 1, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "x" } },
+      {
+        type: "tool.call.started",
+        turnId: 1,
+        toolCallId: "tc",
+        name: "Shell",
+        display: { kind: "command", command: "x" },
+      },
       2,
     )
-    handleTurnEvent(tracker, { type: "tool.progress", turnId: 1, toolCallId: "tc", update: { text: "半截输出" } }, 3)
+    handleTurnEvent(
+      tracker,
+      { type: "tool.progress", turnId: 1, toolCallId: "tc", update: { text: "半截输出" } },
+      3,
+    )
     handleTurnEvent(tracker, { type: "turn.ended", turnId: 1, reason: "cancelled" }, 4)
-    const closed = events.findLast((event) => event.type === "item.updated" && event.item.kind === "tool_call")
-    expect(closed).toMatchObject({ item: { status: "interrupted", detail: { output: "半截输出" } } })
+    const closed = events.findLast(
+      (event) => event.type === "item.updated" && event.item.kind === "tool_call",
+    )
+    expect(closed).toMatchObject({
+      item: { status: "interrupted", detail: { output: "半截输出" } },
+    })
   })
 
   it("正常收工仍缺工具结果时明确失败，不留下 running", () => {
@@ -291,7 +391,13 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
     handleTurnEvent(
       tracker,
-      { type: "tool.call.started", turnId: 1, toolCallId: "tc", name: "Shell", display: { kind: "command", command: "x" } },
+      {
+        type: "tool.call.started",
+        turnId: 1,
+        toolCallId: "tc",
+        name: "Shell",
+        display: { kind: "command", command: "x" },
+      },
       2,
     )
     handleTurnEvent(tracker, { type: "turn.ended", turnId: 1, reason: "completed" }, 3)

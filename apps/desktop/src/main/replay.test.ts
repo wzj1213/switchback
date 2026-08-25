@@ -1,6 +1,10 @@
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Thread, ThreadId } from "@omni/protocol"
-import { initial, reduceAll, threadRowsOf } from "@omni/store"
+import { createJournal } from "@omni/journal"
+import type { Event, Thread, ThreadId } from "@omni/protocol"
+import { initial, itemsOf, reduceAll, threadRowsOf } from "@omni/store"
 import type { ThreadHistory } from "./host.js"
 import { replayEvents } from "./scope.js"
 
@@ -58,6 +62,62 @@ describe("全量重建", () => {
   it("空历史的会话跳过，不留一条只有 id 的空行", () => {
     const events = replayEvents({ engines: [], threads: [{ id: "empty", events: [] }], alive: none, now: 1 })
     expect(events).toHaveLength(1)
+  })
+
+  it("旧历史里的瞬时横幅不重放，重建之后到达的新提示仍保留", () => {
+    const events: Event[] = [
+      ...history("t", "历史").events,
+      { type: "engine.status", at: 2, threadId: "t", status: "crashed", detail: "旧故障" },
+      {
+        type: "engine.notification", at: 3, threadId: "t", engine: "claude",
+        key: "old", message: "旧提示", priority: "medium",
+      },
+    ]
+    const replayed = replayEvents({ engines: [], threads: [{ id: "t", events }], alive: none, now: 4 })
+    const current: Event = {
+      type: "engine.notification", at: 5, threadId: "t", engine: "claude",
+      key: "new", message: "刚发生", priority: "high",
+    }
+    const state = reduceAll(initial(), [...replayed, current])
+    expect(replayed.some((event) => event.type === "engine.status" || event.type === "engine.notification")).toBe(false)
+    expect(state.notices.map((notice) => notice.text)).toEqual(["刚发生"])
+  })
+
+  it("无终态快照的监控增量经过真实 journal 后仍能重建", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "omni-monitor-replay-"))
+    const journal = createJournal({ dir })
+    const id = "monitor-replay"
+    const turnId = "monitor-turn"
+    const monitor: Event[] = [
+      { type: "thread.started", at: 0, thread: thread(id, "监控") },
+      {
+        type: "turn.started", at: 1,
+        turn: { id: turnId, threadId: id, engine: "grok", status: "running", startedAt: 1 },
+      },
+      {
+        type: "item.started", at: 2,
+        item: { id: "monitor-user", turnId, kind: "user_message", at: 2, text: "开始监控" },
+      },
+      {
+        type: "item.started", at: 3,
+        item: { id: "monitor-item", turnId, kind: "tool_call", at: 3, tool: "acp:monitor", status: "running",
+          detail: { kind: "shell", command: "Monitor" } },
+      },
+      { type: "item.delta", at: 4, threadId: id, itemId: "monitor-item", append: "kept after reload\n" },
+    ]
+    try {
+      for (const event of monitor) await journal.append(id, event)
+      await journal.flush()
+      const saved = await journal.read(id)
+      const state = reduceAll(initial(), replayEvents({
+        engines: [], threads: [{ id, events: saved }], alive: none, now: 5,
+      }))
+      const item = itemsOf(state, id).find((one) => one.id === "monitor-item")
+      expect(item?.kind === "tool_call" && item.detail.kind === "shell" ? item.detail.output : undefined)
+        .toBe("kept after reload\n")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
 

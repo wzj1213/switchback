@@ -34,11 +34,25 @@ describe("一条事件属于哪个会话（决定落不落盘）", () => {
       item: { id: "it-1", kind: "agent_message", turnId: "tu-1", at: 0, text: "", complete: false },
     }
     expect(ownerOf(ctx, event)).toBe("th-1")
+    expect(ownerOf(ctx, { type: "item.removed", at: 1, turnId: "tu-1", itemId: "it-1" })).toBe("th-1")
   })
 
-  it("usage / engine.status / models 自己带 threadId", () => {
+  it("只有明确带会话身份的流式增量落盘；普通增量等终态整条快照", () => {
+    expect(ownerOf(ctx, {
+      type: "item.delta", at: 0, threadId: "th-1", itemId: "it-1", append: "monitor output",
+    })).toBe("th-1")
+    expect(ownerOf(ctx, { type: "item.delta", at: 0, itemId: "it-1", append: "token" })).toBeUndefined()
+    expect(ownerOf(ctx, {
+      type: "item.delta", at: 0, threadId: "", itemId: "it-1", append: "orphan",
+    })).toBeUndefined()
+  })
+
+  it("usage / engine.status / models / thinking 自己带 threadId", () => {
     expect(ownerOf(ctx, {
       type: "usage.updated", at: 0, threadId: "th-1", engine: "fake", usage: { contextUsed: 1 },
+    })).toBe("th-1")
+    expect(ownerOf(ctx, {
+      type: "thinking.updated", at: 0, threadId: "th-1", turnId: "tu-1", estimatedTokens: 1,
     })).toBe("th-1")
   })
 
@@ -100,13 +114,35 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
     expect(liveStateOf(ctx)).toEqual([commands, other])
   })
 
-  it("额度按引擎分键——键错了两家引擎只会剩一份", () => {
+  it("额度按引擎分键，并把同一家稀疏窗口合成可重建的现状", () => {
     const ctx = fresh()
-    const a: Event = { type: "limits.updated", at: 0, engine: "codex", limits: {} }
+    const primary = { usedPercent: 20, windowDurationMins: 10_080 }
+    const secondary = { usedPercent: 80, windowDurationMins: 300 }
+    const a: Event = { type: "limits.updated", at: 0, engine: "codex", limits: { primary } }
+    const patch: Event = { type: "limits.updated", at: 1, engine: "codex", limits: { secondary } }
     const b: Event = { type: "limits.updated", at: 0, engine: "claude", limits: {} }
     emit(ctx, a)
+    emit(ctx, patch)
     emit(ctx, b)
     expect(liveStateOf(ctx)).toHaveLength(2)
+    expect(liveStateOf(ctx).find((event) => event.type === "limits.updated" && event.engine === "codex"))
+      .toMatchObject({ at: 1, limits: { primary, secondary } })
+
+    emit(ctx, { type: "limits.updated", at: 2, engine: "codex", limits: {} })
+    expect(liveStateOf(ctx).find((event) => event.type === "limits.updated" && event.engine === "codex"))
+      .toMatchObject({ at: 2, limits: {} })
+  })
+
+  it("重载只补当前思考进度，清空后不留陈旧值", () => {
+    const ctx = fresh()
+    const progress: Event = {
+      type: "thinking.updated", at: 1, threadId: "th-1", turnId: "tu-1", estimatedTokens: 42,
+    }
+    emit(ctx, progress)
+    expect(liveStateOf(ctx)).toEqual([progress])
+
+    emit(ctx, { type: "thinking.updated", at: 2, threadId: "th-1", turnId: "tu-1" })
+    expect(liveStateOf(ctx)).toEqual([])
   })
 
   it("**`thread.removed` 不在这份里**：它是一次变化，补发只会把删掉的东西变回来", () => {
@@ -115,9 +151,12 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
     expect(liveStateOf(ctx)).toEqual([])
   })
 
-  it("删除会话会同时回收它的斜杠命令现状", () => {
+  it("删除会话会同时回收它的斜杠命令与思考现状", () => {
     const ctx = fresh()
     emit(ctx, commands)
+    emit(ctx, {
+      type: "thinking.updated", at: 0, threadId: "th-1", turnId: "tu-1", estimatedTokens: 9,
+    })
     emit(ctx, { type: "thread.removed", at: 1, threadId: "th-1" })
     expect(liveStateOf(ctx)).toEqual([])
   })

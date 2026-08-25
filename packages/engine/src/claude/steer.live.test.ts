@@ -46,6 +46,7 @@ describe("Claude 当场插话（真跑）", () => {
       memory: () => [],
       emit: (e) => events.push(e),
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     try {
       const turnId = "t-steer-1"

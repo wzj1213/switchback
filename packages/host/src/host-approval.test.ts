@@ -238,4 +238,18 @@ describe("审批记忆", () => {
     expect(saved).toEqual([])
     expect(session().memory()).toEqual([])
   })
+
+  it("引擎撤销审批时解开等待并把卡片标成失效，不冒充用户拒绝", async () => {
+    const { host, events, session } = setupRules()
+    await host.dispatch(create)
+    const threadId = events[0]?.type === "thread.started" ? events[0].thread.id : ""
+    await host.dispatch({ type: "thread.prompt", threadId, text: "hi" })
+    const controller = new AbortController()
+    const answer = session().ask(askWith, { signal: controller.signal })
+    controller.abort()
+    await expect(answer).resolves.toEqual({ allow: false, remember: "once" })
+    const card = items(events).filter((item) => item.kind === "approval").at(-1)
+    expect(card?.kind === "approval" ? card.status : "").toBe("cancelled")
+    await host.dispose()
+  })
 })

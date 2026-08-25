@@ -28,7 +28,7 @@ export function reportAccount(
   void rpc
     .call("account/rateLimits/read", {})
     .then((raw) => {
-      emitLimits(emit, (raw as { rateLimits?: WireRateLimits } | undefined)?.rateLimits)
+      emitLimits(emit, (raw as { rateLimits?: WireRateLimits } | undefined)?.rateLimits, "snapshot")
     })
     .catch(() => undefined)
   void rpc

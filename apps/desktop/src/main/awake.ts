@@ -22,9 +22,14 @@ import type { Thread } from "@omni/protocol"
  *   而是每次事件之后**重新看一遍现在还有没有活着的活**。
  */
 
-/** 这些状态算「有活在跑」。等审批也算——那时引擎进程还在，睡过去照样断。 */
+/** 等审批或原生问题也算——那时引擎进程还在等人，睡过去照样断。 */
 export function busy(threads: readonly Thread[]): boolean {
-  return threads.some((t) => t.status === "running" || t.status === "waiting_approval")
+  return threads.some(
+    (thread) =>
+      thread.status === "running" ||
+      thread.status === "waiting_approval" ||
+      (thread.pendingQuestions?.length ?? 0) > 0,
+  )
 }
 
 export interface Awake {

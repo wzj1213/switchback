@@ -1,7 +1,10 @@
 import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
 import type { EngineSession, StartRequest, TrustChange } from "../contract.js"
+import { KimiActivations } from "./activation.js"
+import { KimiActivityTracker } from "./activity.js"
 import { KimiAsides } from "./aside.js"
 import { toAccount, toHistory, toLimits, toModels, type OAuthUsage } from "./catalog.js"
+import { KimiDiagnostics, type KimiMcpSnapshot } from "./diagnostics.js"
 import { sessionPath } from "./http.js"
 import { readKimiTranscript } from "./history.js"
 import { KimiInteractions } from "./interactions.js"
@@ -11,17 +14,21 @@ import type { KimiLease } from "./server.js"
 import { KimiStateReporter } from "./state.js"
 import { KimiStream, type KimiCursor } from "./stream.js"
 import { KIMI_TRUST } from "./trust.js"
-import { handleTurnEvent, KimiTurnTracker } from "./turn.js"
-import type { KimiFrame, KimiModel, KimiSessionRow, KimiSnapshot, KimiStatus } from "./wire.js"
-
-interface ConfigResponse {
-  default_model?: string
-}
+import { KimiTurnTracker } from "./turn.js"
+import { KimiTurnEvents } from "./turn-events.js"
+import { reconcileKimiTurn } from "./turn-recovery.js"
+import { kimiGoalUpdate, type KimiGoalWire } from "./goal.js"
+import { emitKimiLiveWarning, emitKimiSessionWarnings } from "./warnings.js"
+import type { KimiFrame, KimiModel, KimiPayload, KimiSessionRow, KimiSnapshot, KimiStatus, KimiTasksResponse, KimiWarningsResponse } from "./wire.js"
 
 interface SessionInit {
   id: string
   status: KimiStatus
   snapshot: KimiSnapshot
+  goal?: KimiGoalWire
+  mcp?: KimiMcpSnapshot
+  tasks?: KimiTasksResponse
+  warnings?: KimiWarningsResponse
 }
 
 function eventAt(frame: KimiFrame): number {
@@ -29,20 +36,23 @@ function eventAt(frame: KimiFrame): number {
   return Number.isNaN(at) ? Date.now() : at
 }
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
+function errorText(error: unknown): string { return error instanceof Error ? error.message : String(error) }
 
 export class KimiSession implements EngineSession {
   private readonly trust: { current: Trust }
   private readonly turn: KimiTurnTracker
+  private readonly turnEvents: KimiTurnEvents
   private readonly reporter: KimiStateReporter
   private readonly prompter: KimiPrompter
   private readonly interactions: KimiInteractions
+  private readonly activations: KimiActivations
   private readonly asides: KimiAsides
+  private readonly activity: KimiActivityTracker
+  private readonly diagnostics: KimiDiagnostics
   private readonly stream: KimiStream
   private readonly unlisten: () => void
   private options: readonly ModelOption[] = []
+  private goalActive: boolean
   private disposed = false
 
   constructor(
@@ -50,8 +60,10 @@ export class KimiSession implements EngineSession {
     private readonly lease: KimiLease,
     private readonly init: SessionInit,
   ) {
+    this.goalActive = kimiGoalUpdate(init.goal)?.goal?.status === "active"
     this.trust = { current: req.trust }
     this.turn = new KimiTurnTracker({ emit: req.emit, now: () => Date.now() })
+    this.turnEvents = new KimiTurnEvents(this.turn, req.onNativeTurn, () => this.goalActive)
     this.prompter = new KimiPrompter(lease.api, init.id, this.turn)
     this.reporter = new KimiStateReporter(req, () => this.trust.current)
     this.interactions = new KimiInteractions({
@@ -60,9 +72,11 @@ export class KimiSession implements EngineSession {
       req,
       trust: () => this.trust.current,
       onError: (message) => this.status("degraded", `Kimi 交互请求应答失败：${message}`),
-      onQuestion: (message) => this.unsupportedQuestion(message),
     })
+    this.activations = new KimiActivations({ emit: req.emit, turnId: () => this.turn.currentTurnId() })
     this.asides = new KimiAsides(lease.api, init.id)
+    this.activity = new KimiActivityTracker({ threadId: req.threadId, emit: req.emit })
+    this.diagnostics = new KimiDiagnostics({ threadId: req.threadId, emit: req.emit }, init.mcp)
     this.stream = new KimiStream({
       wsUrl: lease.wsUrl,
       protocol: lease.protocol,
@@ -77,19 +91,25 @@ export class KimiSession implements EngineSession {
     this.unlisten = lease.onCrash((detail) => this.crashed(detail))
   }
 
-  async start(): Promise<void> {
-    this.req.onHandle?.(this.init.id)
-    this.reporter.status(this.init.status)
-    this.reporter.persisted(this.init.snapshot.session.usage)
-    this.takeInteractions(this.init.snapshot)
-    await this.stream.connect()
-    this.status("ready")
+  async activate(): Promise<void> {
+    try {
+      this.req.onHandle?.(this.init.id)
+      this.reporter.status(this.init.status)
+      this.reporter.persisted(this.init.snapshot.session.usage)
+      this.activity.reconcile(this.init.snapshot, Date.now(), this.init.tasks?.items)
+      this.reportWarnings(this.init.warnings)
+      if (this.init.goal !== undefined) this.reportGoal(this.init.goal)
+      this.takeInteractions(this.init.snapshot)
+      await this.reconcileTurn(this.init.snapshot)
+      await this.stream.connect()
+      this.status("ready")
+      this.diagnostics.reportMcpHealth(Date.now())
+    } catch (error) {
+      if (this.req.resume === undefined) await this.discard().catch(() => undefined)
+      throw error
+    }
   }
-
-  get threadId(): StartRequest["threadId"] {
-    return this.req.threadId
-  }
-
+  get threadId(): StartRequest["threadId"] { return this.req.threadId }
   private status(status: "ready" | "degraded" | "crashed", detail?: string): void {
     this.req.emit({
       type: "engine.status",
@@ -112,13 +132,6 @@ export class KimiSession implements EngineSession {
     }
   }
 
-  private unsupportedQuestion(message: string): void {
-    this.status(
-      "degraded",
-      `Kimi 提了一个当前 omni 还不能呈现的结构化问题，已按原生“跳过”处理：${message}`,
-    )
-  }
-
   private crashed(detail: string): void {
     this.turn.fail(detail)
     this.status("crashed", detail)
@@ -130,26 +143,73 @@ export class KimiSession implements EngineSession {
   }
 
   private takeInteractions(snapshot: KimiSnapshot): void {
-    for (const approval of snapshot.pending_approvals) this.interactions.approval(approval)
-    for (const question of snapshot.pending_questions) this.interactions.question(question)
+    this.interactions.reconcile(snapshot.pending_approvals, snapshot.pending_questions)
   }
 
   private async resync(): Promise<KimiCursor> {
-    const snapshot = await this.lease.api.get<KimiSnapshot>(sessionPath(this.init.id, "/snapshot"))
-    this.turn.reconcile(snapshot)
+    const [snapshot, goal, tasks, warnings] = await Promise.all([
+      this.lease.api.get<KimiSnapshot>(sessionPath(this.init.id, "/snapshot")),
+      this.lease.api.get<KimiGoalWire>(sessionPath(this.init.id, "/goal")).catch(() => undefined),
+      this.lease.api.get<KimiTasksResponse>(sessionPath(this.init.id, "/tasks")).catch(() => undefined),
+      this.lease.api.get<KimiWarningsResponse>(sessionPath(this.init.id, "/warnings")).catch(() => undefined),
+    ])
+    if (goal !== undefined) this.reportGoal(goal)
+    await this.reconcileTurn(snapshot)
+    this.activity.reconcile(snapshot, Date.now(), tasks?.items)
     this.reporter.persisted(snapshot.session.usage)
+    this.reportWarnings(warnings)
     this.takeInteractions(snapshot)
     return this.cursorOf(snapshot)
+  }
+
+  private reconcileTurn(snapshot: KimiSnapshot): Promise<void> {
+    return reconcileKimiTurn(
+      {
+        api: this.lease.api,
+        sessionId: this.init.id,
+        events: this.turnEvents,
+        tracker: this.turn,
+        now: () => Date.now(),
+      },
+      snapshot,
+    )
+  }
+
+  private handlesSessionFrame(payload: KimiPayload, at: number, seq: number | undefined): boolean {
+    if (this.activity.handle(payload, at)) return true
+    if (payload.agentId !== undefined && payload.agentId !== "main") return true
+    if (this.activations.handle(payload, at)) return true
+    return this.diagnostics.handle(payload, at, seq)
   }
 
   private onFrame(frame: KimiFrame): void {
     const payload = frame.payload
     if (payload === undefined || this.asides.handle(payload)) return
-    if (payload.agentId !== undefined && payload.agentId !== "main") return
+    const at = eventAt(frame)
+    if (this.interactions.handle(payload)) return
+    if (this.handlesSessionFrame(payload, at, frame.seq)) return
+    if (payload.type === "warning") {
+      if (!this.turn.notice(payload, at)) {
+        emitKimiLiveWarning(payload, { threadId: this.req.threadId, at, emit: this.req.emit })
+      }
+      return
+    }
     if (payload.type === "agent.status.updated") this.reporter.event(payload)
-    if (payload.type === "event.approval.requested") this.interactions.approval(payload)
-    if (payload.type === "event.question.requested") this.interactions.question(payload)
-    handleTurnEvent(this.turn, payload, eventAt(frame))
+    if (payload.type === "goal.updated") this.reportGoal(payload.snapshot)
+    if (this.turnEvents.handle(payload, at, frame.offset)) this.stream.requestResync()
+  }
+
+  private reportGoal(raw: unknown): void {
+    const update = kimiGoalUpdate(raw)
+    if (update === undefined) return
+    this.goalActive = update.goal?.status === "active"
+    this.turnEvents.goalChanged(this.goalActive, Date.now())
+    this.req.onGoal?.(update.goal)
+  }
+
+  private reportWarnings(raw: KimiWarningsResponse | undefined): void {
+    if (raw === undefined) return
+    emitKimiSessionWarnings(raw.warnings, { threadId: this.req.threadId, at: Date.now(), emit: this.req.emit })
   }
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
@@ -188,7 +248,7 @@ export class KimiSession implements EngineSession {
   async models(): Promise<readonly ModelOption[]> {
     const [catalog, config] = await Promise.all([
       this.lease.api.get<{ items: readonly KimiModel[] }>("models"),
-      this.lease.api.get<ConfigResponse>("config").catch((): ConfigResponse => ({})),
+      this.lease.api.get<{ default_model?: string }>("config").catch((): { default_model?: string } => ({})),
     ])
     this.options = toModels(catalog.items, config.default_model)
     this.reporter.setOptions(this.options)
@@ -208,12 +268,16 @@ export class KimiSession implements EngineSession {
     return option?.efforts?.includes(applied ?? "") === true ? { effort: applied } : {}
   }
 
-  async commands(): Promise<readonly SlashCommand[]> {
-    return this.prompter.commands()
-  }
+  async commands(): Promise<readonly SlashCommand[]> { return this.prompter.commands() }
 
-  async compact(): Promise<void> {
-    await this.lease.api.post(sessionPath(this.init.id, ":compact"), {})
+  async compact(turnId: TurnId): Promise<void> {
+    const generation = this.turn.begin(turnId, "", "compact")
+    try {
+      await this.lease.api.post(sessionPath(this.init.id, ":compact"), {})
+    } catch (error) {
+      this.turn.failGeneration(generation, errorText(error))
+      throw error
+    }
   }
 
   async history(): Promise<readonly EngineThread[]> {
@@ -242,9 +306,6 @@ export class KimiSession implements EngineSession {
   }
 
   capabilities(): EngineCapabilities {
-    // `activity` 报 false 是**查过的**，不是没查：acp-server 里
-    // `grep -i 'tower|goal|swarm|agent.status'` 命中 0；Web API 这条线也没有
-    // 子 agent / 编排的对外通道。它不是「omni 还没接」，是那扇门不存在。
     return {
       compact: true,
       attachments: true,
@@ -252,7 +313,7 @@ export class KimiSession implements EngineSession {
       fork: true,
       modeReadback: true,
       sideQuestion: true,
-      activity: false,
+      activity: true,
     }
   }
 
@@ -261,6 +322,7 @@ export class KimiSession implements EngineSession {
     this.disposed = true
     this.unlisten()
     this.asides.dispose()
+    this.interactions.dispose()
     if (this.turn.hasActive()) await this.interrupt().catch(() => undefined)
     await this.stream.dispose()
     await this.lease.release().catch((error) => this.status("crashed", errorText(error)))

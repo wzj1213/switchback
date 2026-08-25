@@ -1,4 +1,4 @@
-import type { ToolDetail } from "@omni/protocol"
+import type { ToolCallItem, ToolDetail } from "@omni/protocol"
 
 /**
  * 工具形态 → 动词。
@@ -13,6 +13,26 @@ export const VERB: Readonly<Record<ToolDetail["kind"], string>> = {
   file_read: "读取",
   fetch: "请求",
   other: "调用",
+}
+
+const TOOL_STATE: Partial<Record<ToolCallItem["status"], string>> = {
+  running: "运行中",
+  pending: "等待",
+  failed: "失败",
+  denied: "已拒绝",
+  interrupted: "已中断",
+}
+
+/** 后台轮询比泛化的「运行中」更具体；其余状态沿用统一中文标签。 */
+export function toolStatusText(item: ToolCallItem): string | undefined {
+  if (
+    item.status === "running" &&
+    item.detail.kind === "shell" &&
+    item.detail.terminal?.waiting === true
+  ) {
+    return "等待后台终端"
+  }
+  return TOOL_STATE[item.status]
 }
 
 /**
@@ -84,6 +104,24 @@ export function brief(detail: ToolDetail): string {
       ? (full.split("/").pop() ?? full)
       : (unwrap(full).split("\n")[0] ?? full)
   return short.length > MAX_BRIEF ? `${short.slice(0, MAX_BRIEF)}…` : short
+}
+
+/** 运行横幅与工具行共用同一事实判断，避免一处说等待、另一处仍说执行。 */
+export function runningToolLabel(item: ToolCallItem): string {
+  const verb = toolStatusText(item) === "等待后台终端" ? "等待后台终端" : VERB[item.detail.kind]
+  return `${verb} ${brief(item.detail)}`
+}
+
+/** 后台输入与 stdout 分区展示，不能把模型写入终端的内容冒充成进程输出。 */
+export function shellTranscript(
+  detail: Extract<ToolDetail, { kind: "shell" }>,
+): string | undefined {
+  const inputs = detail.terminal?.inputs ?? []
+  if (inputs.length === 0) return detail.output
+  const sections = inputs.map((input, index) => `后台终端输入 ${String(index + 1)}：\n${input}`)
+  if (detail.output !== undefined && detail.output !== "")
+    sections.unshift(`终端输出：\n${detail.output}`)
+  return sections.join("\n\n")
 }
 
 /**

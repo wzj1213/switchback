@@ -232,12 +232,14 @@ describe("确认与观察", () => {
     expect(h.reads()).toEqual(["t-1", "t-2"])
   })
 
-  it("记录是空的就不发帧——一条空的 thread 帧只会让客户端白跑一次归约", async () => {
+  it("**记录为空也发 thread 帧**——客户端据此结束加载并明确显示空会话", async () => {
     const h = harness({ history: [] })
     send(h, { type: "hello" })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
-    expect(h.frames().some((f) => f.type === "thread")).toBe(false)
+    expect(h.frames().filter((f) => f.type === "thread")).toEqual([
+      { type: "thread", threadId: "t-1", events: [] },
+    ])
   })
 
   it("**读磁盘炸了不断连接，而且标记要撤掉**——退出去再进来还能再试一次", async () => {

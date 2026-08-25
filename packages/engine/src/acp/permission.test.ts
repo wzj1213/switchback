@@ -64,6 +64,9 @@ function capture(): { call: ServerCall; got: { result: unknown } } {
       respond: (result: unknown) => {
         got.result = result
       },
+      reject: (error) => {
+        got.result = { error }
+      },
     },
   }
 }
@@ -308,6 +311,9 @@ describe("等在途表把命令补齐", () => {
         params: { toolCall: { toolCallId: "c9", title: "Bash" }, options: REAL_OPTIONS },
         respond: (result: unknown) => {
           got.result = result
+        },
+        reject: (error) => {
+          got.result = { error }
         },
       },
     }

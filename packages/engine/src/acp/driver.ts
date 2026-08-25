@@ -6,25 +6,23 @@ import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
 import { sessionsOf, type Catalog } from "./setup.js"
-import type { AcpDriverConfig } from "./caps.js"
+import type { AcpDriverConfig, ForeignActivityParser } from "./caps.js"
 import { adoptCatalog, startSession, type OpenState, type StartCtx } from "./open.js"
 import { applyTrust, modeAxis, needsNativeRestart, type TrustCtx } from "./mode.js"
-import { createTerminalHost, type TerminalHost } from "./terminal.js"
-import { answerCall } from "./serve.js"
+import { createAcpClientCalls, type AcpClientCalls } from "./serve.js"
 import {
   cancelTurn,
-  compactSession,
+  compactAndReport,
   failTurn,
   finishTurn,
   steerSession,
   type EndCtx,
 } from "./turn.js"
 import { applyModel, type ModelCtx } from "./model.js"
-import type { PermissionContext } from "./permission.js"
-import { imageBlocks } from "./attach.js"
 import { closeText, createUpdateState, handleUpdate, type UpdateContext, type UpdateState } from "./update.js"
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
-import { mine, onForeign } from "./route.js"
+import { foreignSessionId, mine, onForeign } from "./route.js"
+import { AcpPromptBridge } from "./prompt.js"
 
 /**
  * 通用 ACP 驱动。**一个驱动接所有讲 ACP 的引擎**——这是接第三家协议的全部意义：
@@ -81,8 +79,9 @@ class AcpSession implements EngineSession {
   private readonly inflight = new Map<string, AcpToolCall>()
   private readonly updates: UpdateState = createUpdateState()
   private readonly trust: { current: Trust }
-  /** 认领了 `terminal/*` 才有。**没认领就是 undefined**，请求照旧回 -32601。 */
-  private readonly terminal: TerminalHost | undefined
+  private readonly activity: ForeignActivityParser | undefined
+  private readonly prompts: AcpPromptBridge
+  private readonly clientCalls: AcpClientCalls
   private readonly state: SessionState
   private seq = 0
 
@@ -91,7 +90,7 @@ class AcpSession implements EngineSession {
     private readonly config: AcpDriverConfig,
   ) {
     this.trust = { current: req.trust }
-    this.terminal = config.terminal === true ? createTerminalHost(req.cwd) : undefined
+    this.activity = config.activity?.()
     this.owner = createProcessOwner(config.reclaim)
     this.state = {
       child: undefined,
@@ -114,12 +113,22 @@ class AcpSession implements EngineSession {
     }
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
-      onNotification: (method, params) => {
-        this.onNotification(method, params)
-      },
-      onRequest: (call) => {
-        void this.answer(call)
-      },
+      onNotification: (method, params) => this.onNotification(method, params),
+      onRequest: (call) => void this.answer(call),
+    })
+    this.clientCalls = createAcpClientCalls({
+      req, config, inflight: this.inflight, trust: () => this.trust.current,
+      sessionId: () => this.state.acpSession,
+    })
+    this.prompts = new AcpPromptBridge({
+      id: config.id,
+      rpc: this.rpc,
+      state: this.state,
+      promptMeta: config.promptMeta,
+      begin: req.onNativeTurn,
+      now: () => Date.now(),
+      complete: (turnId, reason) => this.finishTurn(turnId, reason),
+      fail: (turnId, message) => this.failTurn(turnId, message),
     })
   }
 
@@ -135,6 +144,7 @@ class AcpSession implements EngineSession {
         this.state.mode = modeId
         this.req.onEngineState?.({ axes: [modeAxis(this.state.modes, this.trust.current, modeId)] })
       },
+      onTitle: (title) => this.req.onTitle?.(title),
       turnId: () => this.state.turn,
       inflight: this.inflight,
       newId: (prefix) => {
@@ -205,8 +215,12 @@ class AcpSession implements EngineSession {
 
   /** 协议之外的通知怎么处理，全在 `route.ts`——这里只把上下文递过去。 */
   private onForeignNotification(method: string, params: unknown): void {
+    if (!mine(foreignSessionId(params), this.state.acpSession)) return
+    this.clientCalls.resolved(method, params)
+    const nativeTurn = this.config.nativeTurn?.(method, params)
+    if (nativeTurn !== undefined) this.prompts.enqueue(nativeTurn)
     onForeign(
-      { config: this.config, state: this.state, req: this.req, update: () => this.updateContext() },
+      { config: this.config, activity: this.activity, state: this.state, req: this.req, update: () => this.updateContext() },
       method,
       params,
     )
@@ -222,6 +236,7 @@ class AcpSession implements EngineSession {
       this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
     })
     child.on("exit", (code) => {
+      this.clientCalls.dispose()
       this.rpc.close(`${this.config.id} 进程已退出（code ${String(code)}）`)
       if (code !== 0 && code !== null) this.status("crashed", this.state.stderr)
     })
@@ -257,19 +272,7 @@ class AcpSession implements EngineSession {
    * 说明对方没看能力表。回一个空对象会让它以为办成了，回错误码它才知道没有。
    */
   private async answer(call: ServerCall): Promise<void> {
-    await answerCall({ terminal: this.terminal, permission: () => this.permissionCtx() }, call)
-  }
-
-  private permissionCtx(): PermissionContext {
-    return {
-      engine: this.config.id,
-      cwd: this.req.cwd,
-      home: this.req.home,
-      trust: () => this.trust.current,
-      memory: this.req.memory,
-      inflight: this.inflight,
-      askUser: this.req.askUser,
-    }
+    await this.clientCalls.answer(call)
   }
 
   get threadId(): StartRequest["threadId"] { return this.req.threadId }
@@ -284,21 +287,7 @@ class AcpSession implements EngineSession {
    * 宿主那边的队列会以为这一轮还没发出去。收工事件在 then 里发。
    */
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
-    const sessionId = this.state.acpSession
-    if (sessionId === undefined) throw new Error(`${this.config.id} 会话尚未就绪`)
-    this.state.turn = turnId
-    const prompt = [{ type: "text", text }, ...(await imageBlocks(attachments, this.state.caps.attachments))]
-    this.rpc
-      .call("session/prompt", { sessionId, prompt })
-      .then(
-        (result) => {
-          this.finishTurn(turnId, (result as AcpPromptResult | undefined)?.stopReason)
-        },
-        (error: unknown) => {
-          this.failTurn(turnId, error instanceof Error ? error.message : String(error))
-        },
-      )
-    return Promise.resolve()
+    return this.prompts.prompt(text, turnId, attachments)
   }
 
   /** 三条落终态的路全在 `turn.ts`——它们和 compact/steer 是同一类。 */
@@ -316,10 +305,12 @@ class AcpSession implements EngineSession {
 
   private finishTurn(turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
     finishTurn(this.endCtx(), turnId, reason)
+    this.prompts.settled(turnId)
   }
 
   private failTurn(turnId: TurnId, message: string): void {
     failTurn(this.endCtx(), turnId, message)
+    this.prompts.settled(turnId)
   }
 
   models(): Promise<readonly ModelOption[]> {
@@ -388,9 +379,7 @@ class AcpSession implements EngineSession {
   }
 
   /** 见 `turn.ts`：谁支持由各家自己说，不支持时抛一句人话而不是 `-32601`。 */
-  compact(): Promise<void> {
-    return compactSession({ ...this.knobs(), can: this.config })
-  }
+  compact(turnId: TurnId): Promise<void> { return compactAndReport({ ...this.knobs(), can: this.config, emit: this.req.emit }, turnId) }
 
   steer(text: string, attachments?: readonly string[]): Promise<void> {
     return steerSession({ ...this.knobs(), can: this.config }, text, attachments)
@@ -410,9 +399,9 @@ class AcpSession implements EngineSession {
   async dispose(): Promise<void> {
     // 有在途文本就先收口，否则最后一条消息会永远停在「正在输入」
     closeText(this.updateContext(), this.updates)
+    this.clientCalls.dispose()
     // **替 agent 起的那些进程要一起收掉**：它们的父进程是 omni，不是引擎，
     // 所以引擎那边的回收管不着它们——不杀就会活过整个应用
-    this.terminal?.disposeAll()
     this.state.child?.stdin?.end()
     this.rpc.close("会话正在关闭")
     const report = await this.owner.reclaim()

@@ -1,5 +1,5 @@
 import { memo, useState } from "react"
-import type { Command, Item, ToolCallItem } from "@omni/protocol"
+import type { Command, Item, ToolCallItem, UserMessageItem, UserMessageOrigin } from "@omni/protocol"
 import { Markdown } from "./Markdown.js"
 import { Approval } from "./Approval.js"
 import { ToolRow } from "./ToolRow.js"
@@ -7,7 +7,7 @@ import { ToolRow } from "./ToolRow.js"
 /**
  * 一条 item 怎么画。
  *
- * 七种 item 里，**手机上真正需要读全的只有三种**：模型的话、审批卡、错误。
+ * 八种 item 里，**手机上真正需要读全的只有四种**：模型的话、审批卡、原生提示、错误。
  * 思考默认折起来（它长、且多数时候是过程噪声），工具调用收成一行
  * （要看输出再点开）。这不是偷懒——一块 390 点宽的屏幕上，把七种东西
  * 一样重地摊开，等于什么都读不到。
@@ -24,6 +24,35 @@ function Reasoning({ text, complete }: { text: string; complete: boolean }): Rea
         思考{complete ? "" : "中…"}
       </button>
       {open ? <pre className="reasoning__text">{text}</pre> : null}
+    </div>
+  )
+}
+
+function OriginMeta({ origin }: { origin: UserMessageOrigin }): React.JSX.Element {
+  if (origin === "handoff") return <div className="native__meta">历史交接</div>
+  if (origin.kind === "shell") return <div className="native__meta">终端命令</div>
+  if (origin.kind === "goal_continuation") return <div className="native__meta">长期目标续跑</div>
+  return (
+    <div className="native__meta">
+      <span>定时触发</span>
+      <code>{origin.schedule}</code>
+      {origin.recurring ? null : <span>单次</span>}
+      {origin.coalescedCount > 1 ? <span>合并 {origin.coalescedCount} 次</span> : null}
+      {origin.stale ? <span>最后一次</span> : null}
+    </div>
+  )
+}
+
+function UserMessage({ item }: { item: UserMessageItem }): React.JSX.Element {
+  const native = item.origin !== undefined
+  return (
+    <div className={`item ${native ? "item--native" : "item--user"}`}>
+      <div className={native ? "native-message" : "bubble"}>
+        {item.origin === undefined ? null : <OriginMeta origin={item.origin} />}
+        {item.text === "" ? null : (
+          <div className={native ? "native__text" : "bubble__text"}>{item.text}</div>
+        )}
+      </div>
     </div>
   )
 }
@@ -47,13 +76,7 @@ export const ItemView = memo(function ItemView({
   send: (command: Command) => boolean
   offline: boolean
 }): React.JSX.Element | null {
-  if (item.kind === "user_message") {
-    return (
-      <div className="item item--user">
-        <div className="bubble">{item.text}</div>
-      </div>
-    )
-  }
+  if (item.kind === "user_message") return <UserMessage item={item} />
   if (item.kind === "agent_message") {
     return (
       <div className="item item--agent">
@@ -65,6 +88,16 @@ export const ItemView = memo(function ItemView({
   if (item.kind === "reasoning") return <Reasoning text={item.text} complete={item.complete} />
   if (item.kind === "tool_call") return <ToolRow item={item satisfies ToolCallItem} />
   if (item.kind === "approval") return <Approval item={item} send={send} offline={offline} />
+  if (item.kind === "notice") {
+    return (
+      <div
+        className={`item item--notice item--notice-${item.level}`}
+        role={item.level === "warning" ? "alert" : "status"}
+      >
+        {item.message}
+      </div>
+    )
+  }
   if (item.kind === "plan") {
     return (
       <div className="item">

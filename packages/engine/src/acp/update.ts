@@ -1,4 +1,12 @@
-import type { Event, ItemId, PlanStep, SlashCommand, ThreadId, ToolStatus, TurnId } from "@omni/protocol"
+import type {
+  Event,
+  ItemId,
+  PlanStep,
+  SlashCommand,
+  ThreadId,
+  ToolStatus,
+  TurnId,
+} from "@omni/protocol"
 import { catalogOf, type Catalog } from "./setup.js"
 import { merge, toToolCall } from "./translate.js"
 import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js"
@@ -6,7 +14,7 @@ import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js
 /**
  * `session/update` → omni 事件。
  *
- * ## 这一层存在的理由：ACP 的文本块**没有身份**
+ * ## 这一层存在的理由：ACP 的文本块身份**可能缺席**
  *
  * 接第三家协议才看清的结构差别，三家各不相同：
  *
@@ -14,11 +22,10 @@ import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js
  * | --- | --- |
  * | Claude SDK | 整块消息，一条就是一条 |
  * | codex app-server | `item/started` 铸 id → 若干 delta → `item/completed` |
- * | ACP | **一串裸 chunk，没有 id、没有开始、没有结束** |
+ * | ACP | 新 agent 可带 `messageId`；旧 agent 仍是一串无 id 的裸 chunk |
  *
- * `agent_message_chunk` 里只有 `content`，连个 `messageId` 都没有。
- * 所以「一条消息」这个概念在 ACP 里根本不存在，是由客户端**划**出来的：
- * 连续同类的 chunk 算一条，被工具调用或换类打断就算结束。
+ * 新版 ACP 用 `messageId` 标出消息边界；旧版和一部分 agent 不带，所以客户端
+ * 仍要保留兜底划分：连续同类 chunk 算一条，被工具调用或换类打断就算结束。
  * 这段划分逻辑就是本文件的 `openText` / `closeText`。
  *
  * 划错的后果很具体：不划，每个 chunk 变成一条独立 item，一段回答会碎成
@@ -44,6 +51,8 @@ export interface UpdateContext {
    * 对不上时如实说出来，而这要求它至少记的是真话。
    */
   onMode?: (modeId: string) => void
+  /** agent 自己生成的会话标题；宿主决定它能否覆盖当前标题。 */
+  onTitle?: (title: string) => void
   /** 宿主铸造的当前轮次 id。没有轮次就说明这条更新来得不是时候，丢弃。 */
   turnId: () => TurnId | undefined
   /**
@@ -58,11 +67,12 @@ export interface UpdateContext {
   now: () => number
 }
 
-/** 正在攒的那条文本 item。ACP 不给 id，所以由我们自己铸一个。 */
+/** 正在攒的那条文本 item。界面 id 由我们铸，原生 id 只用于识别边界。 */
 interface OpenText {
   id: ItemId
   kind: "agent_message" | "reasoning"
   text: string
+  nativeId?: string
 }
 
 export interface UpdateState {
@@ -88,20 +98,44 @@ export function closeText(ctx: UpdateContext, state: UpdateState): void {
   })
 }
 
-function onTextChunk(ctx: UpdateContext, state: UpdateState, update: AcpUpdate, kind: OpenText["kind"]): void {
+function nativeIdOf(update: AcpUpdate): string | undefined {
+  if (typeof update.messageId !== "string" || update.messageId === "") return undefined
+  return update.messageId
+}
+
+function startsNewText(
+  open: OpenText,
+  kind: OpenText["kind"],
+  nativeId: string | undefined,
+): boolean {
+  if (open.kind !== kind) return true
+  return nativeId !== undefined && open.nativeId !== undefined && nativeId !== open.nativeId
+}
+
+function onTextChunk(
+  ctx: UpdateContext,
+  state: UpdateState,
+  update: AcpUpdate,
+  kind: OpenText["kind"],
+): void {
   const text = update.content?.text
   const turnId = ctx.turnId()
   if (text === undefined || text === "" || turnId === undefined) return
-  // 换了类型（正文 ↔ 思考）就是换了一条。不收口的话，两种文本会拼进同一条 item
-  if (state.open !== undefined && state.open.kind !== kind) closeText(ctx, state)
+  const nativeId = nativeIdOf(update)
+  const open = state.open
+  // 新版按原生 id，旧版继续按类型划界；二者都不能把两条正文拼成一条
+  if (open !== undefined && startsNewText(open, kind, nativeId)) closeText(ctx, state)
   if (state.open === undefined) {
     const id = ctx.newId(kind === "reasoning" ? "think" : "msg")
-    state.open = { id, kind, text: "" }
+    state.open = { id, kind, text: "", ...(nativeId === undefined ? {} : { nativeId }) }
     ctx.emit({
       type: "item.started",
       at: ctx.now(),
       item: { id, turnId, at: ctx.now(), kind, text: "", complete: false },
     })
+  } else if (state.open.nativeId === undefined && nativeId !== undefined) {
+    // 同一条流从“没带 id”过渡到“开始带 id”时先认领，不武断拆成两条
+    state.open.nativeId = nativeId
   }
   state.open.text += text
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: state.open.id, append: text })
@@ -285,6 +319,13 @@ function onConfigOptions(ctx: UpdateContext, update: AcpUpdate): void {
   ctx.onCatalog?.(catalogOf({ configOptions: update.configOptions }))
 }
 
+/** 原生标题只往宿主报告；是否已被用户亲自命名，只有宿主知道。 */
+function onSessionInfo(ctx: UpdateContext, update: AcpUpdate): void {
+  const title = update.title?.trim()
+  if (title === undefined || title === "") return
+  ctx.onTitle?.(title)
+}
+
 /**
  * 轮次收工时清扫还挂着的工具调用。
  *
@@ -343,6 +384,9 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   },
   config_option_update: (ctx, _state, update) => {
     onConfigOptions(ctx, update)
+  },
+  session_info_update: (ctx, _state, update) => {
+    onSessionInfo(ctx, update)
   },
 }
 

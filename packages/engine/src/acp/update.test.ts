@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import type { Event } from "@omni/protocol"
-import { closeText, createUpdateState, handleUpdate, sweep, type UpdateContext, type UpdateState } from "./update.js"
+import {
+  closeText,
+  createUpdateState,
+  handleUpdate,
+  sweep,
+  type UpdateContext,
+  type UpdateState,
+} from "./update.js"
 import type { AcpToolCall, AcpUpdate } from "./wire.js"
 
 function setup(): { ctx: UpdateContext; state: UpdateState; events: Event[] } {
@@ -21,11 +28,15 @@ function setup(): { ctx: UpdateContext; state: UpdateState; events: Event[] } {
   return { ctx, state: createUpdateState(), events }
 }
 
-function chunk(text: string, kind: "agent_message_chunk" | "agent_thought_chunk" = "agent_message_chunk"): AcpUpdate {
-  return { sessionUpdate: kind, content: { type: "text", text } }
+function chunk(
+  text: string,
+  kind: "agent_message_chunk" | "agent_thought_chunk" = "agent_message_chunk",
+  messageId?: string,
+): AcpUpdate {
+  return { sessionUpdate: kind, content: { type: "text", text }, messageId }
 }
 
-describe("文本块的身份是我们划出来的", () => {
+describe("文本块按原生身份划界，旧 agent 继续兜底", () => {
   let s: ReturnType<typeof setup>
   beforeEach(() => {
     s = setup()
@@ -42,6 +53,20 @@ describe("文本块的身份是我们划出来的", () => {
     expect(new Set(deltas.map((d) => (d.type === "item.delta" ? d.itemId : "")))).toHaveLength(1)
   })
 
+  it("同类 chunk 的原生 messageId 变了就另起一条，后台结果不会粘到上一段正文", () => {
+    handleUpdate(s.ctx, s.state, chunk("第一", "agent_message_chunk", "msg-1"))
+    handleUpdate(s.ctx, s.state, chunk("段", "agent_message_chunk", "msg-1"))
+    handleUpdate(s.ctx, s.state, chunk("后台结果", "agent_message_chunk", "msg-2"))
+    const started = s.events.filter((e) => e.type === "item.started")
+    const closed = s.events.find((e) => e.type === "item.updated")
+    expect(started).toHaveLength(2)
+    expect(
+      closed?.type === "item.updated" && closed.item.kind === "agent_message"
+        ? closed.item.text
+        : "",
+    ).toBe("第一段")
+  })
+
   it("正文与思考各成一条，不会串到一起", () => {
     handleUpdate(s.ctx, s.state, chunk("在想", "agent_thought_chunk"))
     handleUpdate(s.ctx, s.state, chunk("在说", "agent_message_chunk"))
@@ -55,7 +80,12 @@ describe("文本块的身份是我们划出来的", () => {
 
   it("**工具调用打断文本**——不收口的话工具行会插进一条没结束的消息中间", () => {
     handleUpdate(s.ctx, s.state, chunk("先说一句"))
-    handleUpdate(s.ctx, s.state, { sessionUpdate: "tool_call", toolCallId: "c1", title: "跑命令", kind: "execute" })
+    handleUpdate(s.ctx, s.state, {
+      sessionUpdate: "tool_call",
+      toolCallId: "c1",
+      title: "跑命令",
+      kind: "execute",
+    })
     handleUpdate(s.ctx, s.state, chunk("再说一句"))
     const kinds = s.events.map((e) =>
       e.type === "item.started" || e.type === "item.updated" ? `${e.type}:${e.item.kind}` : e.type,
@@ -75,9 +105,9 @@ describe("文本块的身份是我们划出来的", () => {
     handleUpdate(s.ctx, s.state, chunk("下"))
     closeText(s.ctx, s.state)
     const last = s.events.at(-1)
-    expect(last?.type === "item.updated" && last.item.kind === "agent_message" ? last.item : undefined).toMatchObject(
-      { text: "上下", complete: true },
-    )
+    expect(
+      last?.type === "item.updated" && last.item.kind === "agent_message" ? last.item : undefined,
+    ).toMatchObject({ text: "上下", complete: true })
   })
 
   it("收口幂等——扫两次不会多发一条", () => {
@@ -89,7 +119,10 @@ describe("文本块的身份是我们划出来的", () => {
   })
 
   it("用户消息回声丢掉——宿主已经发过一条了", () => {
-    handleUpdate(s.ctx, s.state, { sessionUpdate: "user_message_chunk", content: { type: "text", text: "嗨" } })
+    handleUpdate(s.ctx, s.state, {
+      sessionUpdate: "user_message_chunk",
+      content: { type: "text", text: "嗨" },
+    })
     expect(s.events).toHaveLength(0)
   })
 })
@@ -105,9 +138,14 @@ describe("工具调用更新是补丁不是快照", () => {
       status: "in_progress",
       content: [{ type: "diff", path: "/w/a.ts", oldText: "旧\n", newText: "新\n" }],
     } as AcpUpdate)
-    handleUpdate(s.ctx, s.state, { sessionUpdate: "tool_call_update", toolCallId: "c1", status: "completed" })
+    handleUpdate(s.ctx, s.state, {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "c1",
+      status: "completed",
+    })
     const last = s.events.at(-1)
-    const item = last?.type === "item.updated" && last.item.kind === "tool_call" ? last.item : undefined
+    const item =
+      last?.type === "item.updated" && last.item.kind === "tool_call" ? last.item : undefined
     expect(item?.status).toBe("ok")
     expect(item?.detail).toMatchObject({ kind: "file_edit", path: "/w/a.ts" })
   })
@@ -126,8 +164,17 @@ describe("工具调用更新是补丁不是快照", () => {
 
   it("终态的调用移出在途表——留着会被收工清扫二次改写", () => {
     const s = setup()
-    handleUpdate(s.ctx, s.state, { sessionUpdate: "tool_call", toolCallId: "c1", title: "x", kind: "execute" })
-    handleUpdate(s.ctx, s.state, { sessionUpdate: "tool_call_update", toolCallId: "c1", status: "completed" })
+    handleUpdate(s.ctx, s.state, {
+      sessionUpdate: "tool_call",
+      toolCallId: "c1",
+      title: "x",
+      kind: "execute",
+    })
+    handleUpdate(s.ctx, s.state, {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "c1",
+      status: "completed",
+    })
     expect(s.ctx.inflight.size).toBe(0)
   })
 })
@@ -144,7 +191,9 @@ describe("收工清扫", () => {
     })
     sweep(s.ctx, s.state, "interrupted")
     const last = s.events.at(-1)
-    expect(last?.type === "item.updated" && last.item.kind === "tool_call" ? last.item.status : "").toBe("interrupted")
+    expect(
+      last?.type === "item.updated" && last.item.kind === "tool_call" ? last.item.status : "",
+    ).toBe("interrupted")
     expect(s.ctx.inflight.size).toBe(0)
   })
 
@@ -185,25 +234,29 @@ describe("计划与用量", () => {
 
   it("引擎自己换档要报出来，否则界面显示的档位会和实际悄悄分家", () => {
     const s = setup()
-    handleUpdate(s.ctx, s.state, { sessionUpdate: "current_mode_update", currentModeId: "read-only" })
+    handleUpdate(s.ctx, s.state, {
+      sessionUpdate: "current_mode_update",
+      currentModeId: "read-only",
+    })
     expect(s.events.at(-1)).toMatchObject({ type: "engine.status", status: "ready" })
   })
 
   it("**引擎自己切档要落回驱动的状态**——不落回去，那个字段记的只是 omni 一厢情愿设过什么", () => {
     const s = setup()
     const seen: string[] = []
-    handleUpdate(
-      { ...s.ctx, onMode: (id) => seen.push(id) },
-      s.state,
-      { sessionUpdate: "current_mode_update", currentModeId: "plan" },
-    )
+    handleUpdate({ ...s.ctx, onMode: (id) => seen.push(id) }, s.state, {
+      sessionUpdate: "current_mode_update",
+      currentModeId: "plan",
+    })
     expect(seen).toEqual(["plan"])
   })
 
   it("没带 currentModeId 的那条不回调——「没报」不是「切成了 undefined」", () => {
     const s = setup()
     const seen: string[] = []
-    handleUpdate({ ...s.ctx, onMode: (id) => seen.push(id) }, s.state, { sessionUpdate: "current_mode_update" })
+    handleUpdate({ ...s.ctx, onMode: (id) => seen.push(id) }, s.state, {
+      sessionUpdate: "current_mode_update",
+    })
     expect(seen).toEqual([])
   })
 
@@ -215,11 +268,21 @@ describe("计划与用量", () => {
     }).not.toThrow()
   })
 
-  it("认不出的更新静默丢弃——协议一直在加新类型", () => {
+  it("缺少有效字段的更新保持安静", () => {
     const s = setup()
     handleUpdate(s.ctx, s.state, { sessionUpdate: "session_info_update" })
     handleUpdate(s.ctx, s.state, { sessionUpdate: "config_option_update" })
     expect(s.events).toHaveLength(0)
+  })
+
+  it("原生会话标题交给宿主，空标题不冒充一次改名", () => {
+    const s = setup()
+    const titles: string[] = []
+    const ctx = { ...s.ctx, onTitle: (title: string) => titles.push(title) }
+    handleUpdate(ctx, s.state, { sessionUpdate: "session_info_update", title: "  第一轮标题  " })
+    handleUpdate(ctx, s.state, { sessionUpdate: "session_info_update", title: "   " })
+    handleUpdate(ctx, s.state, { sessionUpdate: "session_info_update", title: null })
+    expect(titles).toEqual(["第一轮标题"])
   })
 })
 
@@ -248,7 +311,12 @@ describe("引擎自己认的斜杠命令", () => {
         threadId: "t1",
         engine: "acp:fake",
         commands: [
-          { name: "compact", description: "压缩上下文", argumentHint: "要保留什么", source: "engine" },
+          {
+            name: "compact",
+            description: "压缩上下文",
+            argumentHint: "要保留什么",
+            source: "engine",
+          },
           { name: "context", description: "看上下文用量", source: "engine" },
         ],
       },
@@ -258,8 +326,14 @@ describe("引擎自己认的斜杠命令", () => {
   // 名字就是要打进输入框的那串字。空的话面板上会多一条点了什么都不发生的命令
   it("没名字的丢掉，剩下的照发", () => {
     const s = setup()
-    handleUpdate(s.ctx, s.state, update([{ name: "  " }, { description: "没名字" }, { name: "afk" }]))
-    expect(s.events).toMatchObject([{ commands: [{ name: "afk", description: "", source: "engine" }] }])
+    handleUpdate(
+      s.ctx,
+      s.state,
+      update([{ name: "  " }, { description: "没名字" }, { name: "afk" }]),
+    )
+    expect(s.events).toMatchObject([
+      { commands: [{ name: "afk", description: "", source: "engine" }] },
+    ])
   })
 
   // 后到的覆盖先到的（宿主按 threadId 只留最后一条），所以空清单也要发出去
@@ -304,7 +378,11 @@ describe("config_option_update：换完模型，可选项跟着换", () => {
   it("清单翻好了交给驱动——**由它落状态、由它转发**，这里不越界", () => {
     const { ctx, state } = setup()
     const seen: { models: readonly { id: string; efforts?: readonly string[] }[] }[] = []
-    handleUpdate({ ...ctx, onCatalog: (c) => seen.push(c) }, state, optionsUpdate(["GLM-5.3"], ["low", "high", "max"]))
+    handleUpdate(
+      { ...ctx, onCatalog: (c) => seen.push(c) },
+      state,
+      optionsUpdate(["GLM-5.3"], ["low", "high", "max"]),
+    )
     expect(seen[0]?.models.map((m) => m.id)).toEqual(["GLM-5.3"])
     expect(seen[0]?.models[0]?.efforts).toEqual(["low", "high", "max"])
   })
@@ -312,7 +390,11 @@ describe("config_option_update：换完模型，可选项跟着换", () => {
   it("**新模型没有强度档时，那一节就该没了**", () => {
     const { ctx, state } = setup()
     const seen: { models: readonly { efforts?: readonly string[] }[] }[] = []
-    handleUpdate({ ...ctx, onCatalog: (c) => seen.push(c) }, state, optionsUpdate(["GLM-5-Turbo"], []))
+    handleUpdate(
+      { ...ctx, onCatalog: (c) => seen.push(c) },
+      state,
+      optionsUpdate(["GLM-5-Turbo"], []),
+    )
     expect(seen[0]?.models[0]?.efforts).toBeUndefined()
   })
 

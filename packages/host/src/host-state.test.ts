@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { type Event, type EngineAxis } from "@omni/protocol"
+import { type EngineGoal, type Event, type EngineAxis } from "@omni/protocol"
 import { type Host } from "./host.js"
 import { setup, create, type Fake } from "./host-fixture.js"
 
@@ -59,10 +59,29 @@ describe("引擎自报的状态", () => {
   })
 })
 
-/**
- * 侧问：问答落进 `Thread.asides`，**不进 transcript**——那是这件事的全部定义。
- * 进了 transcript 它就在正文里，而正文正是模型下一轮要读的东西。
- */
+describe("引擎原生目标", () => {
+  const goal: EngineGoal = {
+    objective: "逐项完成项目审计",
+    status: "active",
+    tokenBudget: 50_000,
+    tokensUsed: 1_200,
+    timeUsedSeconds: 9,
+  }
+
+  it("完整快照落进 Thread，清空也落盘且重复清空不制造事件", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    session().goal(goal)
+    expect(host.live()[0]?.goal).toEqual(goal)
+    const before = events.filter((event) => event.type === "thread.updated").length
+    session().goal(undefined)
+    expect(host.live()[0]?.goal).toBeUndefined()
+    session().goal(undefined)
+    expect(events.filter((event) => event.type === "thread.updated")).toHaveLength(before + 1)
+  })
+})
+
+/** 侧问：走 `kind:aside` 的旁路，**不进 transcript**，且等待与失败都看得见。 */
 describe("侧问", () => {
   const start = async (): Promise<{ host: Host; events: Event[]; id: string }> => {
     const { host, events } = setup()
@@ -70,14 +89,43 @@ describe("侧问", () => {
     const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
     return { host, events, id }
   }
-  const last = (events: Event[]) => events.filter((e) => e.type === "thread.updated").at(-1)?.thread
+  const lanes = (events: Event[]) => events.filter((e) => e.type === "lane.updated").map((e) => e.lane)
 
-  it("问答落进 Thread.asides，按先后排", async () => {
+  it("每一问先落运行卡，随后以同一 id 原位落成原生答案", async () => {
     const { host, events, id } = await start()
     await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "这个函数干嘛的" })
     await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "那这个呢" })
-    expect(last(events)?.asides?.map((a) => a.question)).toEqual(["这个函数干嘛的", "那这个呢"])
-    expect(last(events)?.asides?.[0]?.answer).toBe("答：这个函数干嘛的")
+    expect(lanes(events).map((lane) => [lane.title, lane.status])).toEqual([
+      ["这个函数干嘛的", "running"], ["这个函数干嘛的", "done"],
+      ["那这个呢", "running"], ["那这个呢", "done"],
+    ])
+    expect(lanes(events)[1]?.summary).toBe("答：这个函数干嘛的")
+    expect(lanes(events)[0]?.id).toBe(lanes(events)[1]?.id)
+  })
+
+  it("引擎回答前就看得见问题与等待态", async () => {
+    let answer!: (text: string) => void
+    let entered!: () => void
+    const called = new Promise<void>((resolve) => { entered = resolve })
+    const waiting = new Promise<string>((resolve) => { answer = resolve })
+    const { host, events } = setup({ asideAnswer: () => { entered(); return waiting } })
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    const dispatch = host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "还要多久？" })
+    await called
+    expect(lanes(events).at(-1)).toMatchObject({ title: "还要多久？", status: "running" })
+    answer("马上")
+    await dispatch
+    expect(lanes(events).at(-1)).toMatchObject({ status: "done", summary: "马上" })
+  })
+
+  it("失败原位落下原始错误，不把一次侧问冒充整条引擎崩溃", async () => {
+    const { host, events } = setup({ asideAnswer: () => Promise.reject(new Error("侧问接口超时")) })
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await expect(host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "问一句" })).resolves.toBeUndefined()
+    expect(lanes(events).at(-1)).toMatchObject({ status: "failed", summary: "侧问接口超时" })
+    expect(events.some((event) => event.type === "engine.status" && event.status === "crashed")).toBe(false)
   })
 
   it("**一条 item 都不产生**——进了 transcript 就不叫侧问了", async () => {
@@ -90,7 +138,7 @@ describe("侧问", () => {
   it("空问题直接不发——省一次真实调用", async () => {
     const { host, events, id } = await start()
     await host.dispatch({ type: "thread.sideQuestion", threadId: id, text: "   " })
-    expect(last(events)?.asides).toBeUndefined()
+    expect(lanes(events)).toHaveLength(0)
   })
 
   it("**引擎不支持就抛，不静默吞**——界面本来就不该给这个入口，走到这里说明别处有 bug", async () => {

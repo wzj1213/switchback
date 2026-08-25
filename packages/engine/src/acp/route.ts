@@ -1,6 +1,14 @@
 import type { StartRequest } from "../contract.js"
 import { emitUsage, type UpdateContext } from "./update.js"
-import type { AcpDriverConfig } from "./caps.js"
+import type {
+  AcpDriverConfig,
+  ForeignActivity,
+  ForeignActivityUpdate,
+  ForeignActivityParser,
+  ForeignNotice,
+  ForeignNotification,
+  ForeignTool,
+} from "./caps.js"
 
 /**
  * 通知进来之后**归谁**。
@@ -30,6 +38,14 @@ export function mine(from: string | undefined, ours: string | undefined): boolea
   return from === ours
 }
 
+/** 私有通知也沿用 sessionId；leader 包装会再套一层 params。 */
+export function foreignSessionId(params: unknown): string | undefined {
+  if (typeof params !== "object" || params === null) return undefined
+  const raw = params as { sessionId?: unknown; params?: { sessionId?: unknown } }
+  const value = raw.sessionId ?? raw.params?.sessionId
+  return typeof value === "string" ? value : undefined
+}
+
 /**
  * 协议之外的私有通知怎么处理。
  *
@@ -39,7 +55,11 @@ export function mine(from: string | undefined, ours: string | undefined): boolea
  * 这一层只负责把认出来的东西送到既有的那几条路上，不认识任何一家。
  */
 export interface ForeignCtx {
-  config: Pick<AcpDriverConfig, "contextUsed" | "cacheRead" | "outputTokens" | "modelChanged">
+  config: Pick<
+    AcpDriverConfig,
+    "contextUsed" | "cacheRead" | "outputTokens" | "modelChanged" | "notice" | "notification" | "toolItems"
+  >
+  activity: ForeignActivityParser | undefined
   state: {
     effort: string | undefined
     windowOf: Readonly<Record<string, number>>
@@ -52,11 +72,84 @@ export interface ForeignCtx {
 export function onForeign(ctx: ForeignCtx, method: string, params: unknown): void {
   const changed = ctx.config.modelChanged?.(method, params)
   if (changed !== undefined) adoptModelChange(ctx, changed)
+  emitForeignContent(ctx, method, params)
   const used = ctx.config.contextUsed?.(method, params)
   if (used === undefined) return
   emitUsage(ctx.update(), used, ctx.state.contextWindow, {
     cacheRead: ctx.config.cacheRead?.(method, params),
     outputTokens: ctx.config.outputTokens?.(method, params),
+  })
+}
+
+function emitForeignContent(ctx: ForeignCtx, method: string, params: unknown): void {
+  const notice = ctx.config.notice?.(method, params)
+  if (notice !== undefined) emitNotice(ctx.update(), notice)
+  const notification = ctx.config.notification?.(method, params)
+  if (notification !== undefined) emitNotification(ctx.update(), notification)
+  const tools = ctx.config.toolItems?.(method, params)
+  if (tools !== undefined) emitTools(ctx.update(), tools)
+  const activity = ctx.activity?.(method, params)
+  if (activity !== undefined) emitActivity(ctx.update(), activity)
+}
+
+function emitTools(ctx: UpdateContext, tools: readonly ForeignTool[]): void {
+  for (const tool of tools) {
+    const { promptId, ...item } = tool
+    const current = ctx.turnId()
+    const turnId = promptId === undefined || promptId === current ? current : undefined
+    if (turnId === undefined) {
+      if (item.error !== undefined && item.status !== "ok") {
+        emitNotification(ctx, {
+          key: ctx.newId("foreign-tool"), message: item.error, priority: "high",
+        })
+      }
+      continue
+    }
+    const at = ctx.now()
+    ctx.emit({
+      type: "item.started",
+      at,
+      item: { id: ctx.newId("foreign-tool"), turnId, at, kind: "tool_call", ...item },
+    })
+  }
+}
+
+function emitNotification(ctx: UpdateContext, notification: ForeignNotification): void {
+  ctx.emit({
+    type: "engine.notification",
+    at: ctx.now(),
+    threadId: ctx.threadId,
+    engine: ctx.engine,
+    ...notification,
+  })
+}
+
+function emitActivity(ctx: UpdateContext, update: ForeignActivityUpdate): void {
+  if ("itemId" in update) {
+    ctx.emit({
+      type: "item.delta", at: ctx.now(), threadId: ctx.threadId,
+      itemId: update.itemId, append: update.append,
+    })
+    return
+  }
+  const activity: ForeignActivity = update
+  const at = ctx.now()
+  ctx.emit({
+    type: "lane.updated",
+    at,
+    threadId: ctx.threadId,
+    lane: { ...activity, threadId: ctx.threadId, kind: "activity", at },
+  })
+}
+
+function emitNotice(ctx: UpdateContext, notice: ForeignNotice): void {
+  const turnId = ctx.turnId()
+  if (turnId === undefined) return
+  const at = ctx.now()
+  ctx.emit({
+    type: "item.started",
+    at,
+    item: { id: ctx.newId("notice"), turnId, at, kind: "notice", ...notice },
   })
 }
 

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
 import type { Command, EngineInfo, Thread } from "@omni/protocol"
-import { itemsOf, lanesOf, tasksOf, turnOf, type Notice as StoreNotice, type ViewState } from "@omni/store"
+import {
+  itemsOf, lanesOf, tasksOf, thinkingTokensOf, turnOf,
+  type Notice as StoreNotice, type ViewState,
+} from "@omni/store"
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
@@ -119,6 +122,7 @@ export function CompareScreen({
     items: itemsOf(state, t.id),
     turn: turnOf(state, t.id),
     tasks: tasksOf(state, t.id),
+    thinkingTokens: thinkingTokensOf(state, t.id),
     lanes: lanesOf(state, t.id),
   })
   // 谁在左边由**创建先后**定，不是由「当前选中的是谁」定：

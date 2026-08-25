@@ -56,6 +56,11 @@ describe("能力由 agent 自报，不写死", () => {
     expect(capabilitiesOf(undefined).fork).toBe(false)
   })
 
+  it("只有已接住原生私有活动通知的适配器才声明 activity", () => {
+    expect(capabilitiesOf(undefined, { activity: true }).activity).toBe(true)
+    expect(capabilitiesOf(undefined).activity).toBe(false)
+  })
+
   it("能不能列历史也看它自己说", () => {
     expect(canList(kimi)).toBe(true)
     expect(canList({ agentCapabilities: { sessionCapabilities: {} } })).toBe(false)

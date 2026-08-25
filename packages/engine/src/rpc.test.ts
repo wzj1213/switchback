@@ -76,6 +76,17 @@ describe("createRpc 请求应答", () => {
     expect(h.sent).toHaveLength(1)
     expect(JSON.parse(h.sent[0] ?? "{}")).toEqual({ jsonrpc: "2.0", id: 7, result: { decision: "accept" } })
   })
+
+  it("reject 写成 JSON-RPC 顶层 error，并与 respond 共用幂等闸门", () => {
+    const { rpc, h } = harness()
+    rpc.feed('{"jsonrpc":"2.0","id":8,"method":"future/method","params":{}}\n')
+    h.requests[0]?.reject({ code: -32601, message: "Method not found" })
+    h.requests[0]?.respond({})
+    expect(h.sent).toHaveLength(1)
+    expect(JSON.parse(h.sent[0] ?? "{}")).toEqual({
+      jsonrpc: "2.0", id: 8, error: { code: -32601, message: "Method not found" },
+    })
+  })
 })
 
 describe("createRpc 关闭", () => {

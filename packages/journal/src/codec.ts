@@ -8,19 +8,21 @@ import type { Event } from "@omni/protocol"
 /**
  * 不落盘的事件类型。
  *
- * `item.delta` 是**冗余的**：每一条流式 item 最后都会有一条 `item.updated`
- * 带着完整内容（agentMessage 带全文，shell 带完整 aggregatedOutput）。
- * 回放时只认最终值，结果一模一样，而文件小一个数量级——
- * 一次 `pnpm build` 的输出增量能有几千条。
+ * 普通 `item.delta` 是**冗余的**：流式 item 最后会有一条 `item.updated`
+ * 带着完整内容。只有显式携带 threadId 的 delta 例外——那表示这份原生流
+ * 没有后续完整快照，必须自己落盘才能在刷新后恢复。
  *
  * `engine.status` 也不落：它描述的是**那一次进程**的状态，
  * 重启之后再放一遍「引擎已就绪」只会误导人。
  */
-// `tasks.updated` 同理：它描述的是**此刻**谁在跑，落盘之后重放出来是一串早就跑完了
-// 却还显示在跑的任务。一次长子 agent 还会写几十条进去，而它们一条都没有回放价值
-const SKIP = new Set(["item.delta", "engine.status", "tasks.updated"])
+// `tasks.updated` / `thinking.updated` 同理：它们描述的是**此刻**谁在跑、这一块思考到哪儿，
+// 落盘之后只会重放出陈旧进度。一次长任务还会写几十条进去，而它们一条都没有回放价值
+const SKIP = new Set([
+  "engine.status", "engine.notification", "tasks.updated", "thinking.updated",
+])
 
 export function shouldPersist(event: Event): boolean {
+  if (event.type === "item.delta") return event.threadId !== undefined && event.threadId !== ""
   return !SKIP.has(event.type)
 }
 

@@ -33,16 +33,25 @@ const HANDSHAKE_MS = 15_000
 class ResyncError extends Error {}
 
 function defaultSocket(url: string, protocols: readonly string[]): SocketLike {
-  const Ctor = (globalThis as unknown as { WebSocket?: new (target: string, protocols: readonly string[]) => SocketLike }).WebSocket
-  if (Ctor === undefined) throw new Error("当前 Node 运行时没有 WebSocket，请使用 Node 22 或更新版本")
+  const Ctor = (
+    globalThis as unknown as {
+      WebSocket?: new (target: string, protocols: readonly string[]) => SocketLike
+    }
+  ).WebSocket
+  if (Ctor === undefined)
+    throw new Error("当前 Node 运行时没有 WebSocket，请使用 Node 22 或更新版本")
   return new Ctor(url, protocols)
 }
 
 function frameOf(event: unknown): KimiFrame {
   const data = (event as { data?: unknown }).data
   if (typeof data === "string") return JSON.parse(data) as KimiFrame
-  if (data instanceof ArrayBuffer) return JSON.parse(Buffer.from(data).toString("utf8")) as KimiFrame
-  if (ArrayBuffer.isView(data)) return JSON.parse(Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8")) as KimiFrame
+  if (data instanceof ArrayBuffer)
+    return JSON.parse(Buffer.from(data).toString("utf8")) as KimiFrame
+  if (ArrayBuffer.isView(data))
+    return JSON.parse(
+      Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8"),
+    ) as KimiFrame
   throw new Error("Kimi WebSocket 发来了无法识别的数据帧")
 }
 
@@ -57,6 +66,7 @@ export class KimiStream {
   private cursor: KimiCursor
   private disposed = false
   private recovering: Promise<void> | undefined
+  private forceSnapshot = false
 
   constructor(private readonly deps: KimiStreamDeps) {
     this.cursor = deps.cursor
@@ -68,7 +78,10 @@ export class KimiStream {
       JSON.stringify({
         type: "subscribe",
         id: "omni-subscribe",
-        payload: { session_ids: [this.deps.sessionId], ...(cursor === undefined ? {} : { cursors: cursor }) },
+        payload: {
+          session_ids: [this.deps.sessionId],
+          ...(cursor === undefined ? {} : { cursors: cursor }),
+        },
       }),
     )
   }
@@ -76,7 +89,8 @@ export class KimiStream {
   private pong(frame: KimiFrame): boolean {
     if (frame.type !== "ping") return false
     const nonce = (frame.payload as { nonce?: unknown } | undefined)?.nonce
-    if (typeof nonce === "string") this.socket?.send(JSON.stringify({ type: "pong", payload: { nonce } }))
+    if (typeof nonce === "string")
+      this.socket?.send(JSON.stringify({ type: "pong", payload: { nonce } }))
     return true
   }
 
@@ -144,8 +158,12 @@ export class KimiStream {
       socket.addEventListener("error", () => settle(new Error("Kimi WebSocket 连接失败")))
       socket.addEventListener("close", () => {
         if (this.socket === socket) this.socket = undefined
-        if (!state.settled) settle(new Error("Kimi WebSocket 在订阅完成前断开"))
-        else if (state.ready && !this.disposed) void this.recover()
+        if (!state.settled) {
+          const error = this.forceSnapshot
+            ? new ResyncError("Kimi 流式 offset 要求重新同步")
+            : new Error("Kimi WebSocket 在订阅完成前断开")
+          settle(error)
+        } else if (state.ready && !this.disposed) void this.recover()
       })
     })
   }
@@ -156,6 +174,7 @@ export class KimiStream {
     } catch (error) {
       if (!(error instanceof ResyncError)) throw error
       this.cursor = await this.deps.onResync()
+      this.forceSnapshot = false
       await this.connectOnce()
     }
   }
@@ -180,8 +199,11 @@ export class KimiStream {
       await wait(delay)
       if (this.disposed) return
       try {
+        this.cursor = await this.deps.onResync()
+        this.forceSnapshot = false
         await this.connectWithResync()
         this.adoptCursor(await this.deps.onResync())
+        if (this.forceSnapshot || this.socket === undefined) continue
         this.deps.onRecovered()
         return
       } catch (error) {
@@ -193,7 +215,10 @@ export class KimiStream {
   }
 
   private adoptCursor(next: KimiCursor): void {
-    const changedEpoch = next.epoch !== undefined && this.cursor.epoch !== undefined && next.epoch !== this.cursor.epoch
+    const changedEpoch =
+      next.epoch !== undefined &&
+      this.cursor.epoch !== undefined &&
+      next.epoch !== this.cursor.epoch
     if (changedEpoch || next.seq > this.cursor.seq) this.cursor = next
   }
 
@@ -201,6 +226,13 @@ export class KimiStream {
     const socket = this.socket
     this.socket = undefined
     socket?.close()
+  }
+
+  /** offset 证明流中间有缺口时，先用原子快照重建，再从它的水位重新订阅。 */
+  requestResync(): void {
+    if (this.disposed) return
+    this.forceSnapshot = true
+    this.dropSocket()
   }
 
   dispose(): Promise<void> {

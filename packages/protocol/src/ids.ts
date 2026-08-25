@@ -3,6 +3,7 @@
 export type ThreadId = string
 export type TurnId = string
 export type ItemId = string
+export type QuestionId = string
 
 /**
  * 引擎身份。内置引擎用裸名，ACP 接入的第三方用 `acp:` 前缀。

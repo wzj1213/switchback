@@ -15,6 +15,11 @@ const thread = (id: string, status: ThreadStatus): Thread => ({
   engineHistory: [],
 })
 
+const questioning = (): Thread => ({
+  ...thread("q", "idle"),
+  pendingQuestions: [{ id: "q1", questions: [{ id: "one", question: "选？", options: [] }] }],
+})
+
 /**
  * 「现在还有没有活在跑」是两件事共用的判据：挡不挡待机、⌘Q 问不问。
  * 判错的代价不对称——**多算一次只是多问一句，少算一次是十分钟的活没了**。
@@ -26,6 +31,10 @@ describe("busy", () => {
 
   it("等审批的也算：那时引擎进程还在，睡过去照样断", () => {
     expect(busy([thread("a", "waiting_approval")])).toBe(true)
+  })
+
+  it("状态虽空闲但还有原生问题在等，也不能让机器睡掉或静默退出", () => {
+    expect(busy([questioning()])).toBe(true)
   })
 
   it("闲着、刚起、挂了的都不算——不然断言永远放不开", () => {
@@ -64,6 +73,10 @@ describe("quitBlurb", () => {
 
   it("说出后果，不只是报数", () => {
     expect(quitBlurb([thread("a", "running")])).toContain("结束")
+  })
+
+  it("原生问题单独计数，让人知道退出会丢掉什么", () => {
+    expect(quitBlurb([questioning()])).toContain("1 组等着你回答")
   })
 })
 

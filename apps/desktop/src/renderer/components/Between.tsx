@@ -1,6 +1,8 @@
 import type { Command, Item, Thread } from "@omni/protocol"
 import { PlanPanel } from "./PlanPanel.js"
+import { QuestionStack } from "./QuestionCard.js"
 import { Queued } from "./Queued.js"
+import { GoalBar } from "./GoalBar.js"
 
 interface Props {
   thread: Thread
@@ -14,6 +16,7 @@ export function Between(props: Props): React.JSX.Element {
   const active = props.thread.status === "running" || props.thread.status === "waiting_approval"
   return (
     <>
+      <GoalBar goal={props.thread.goal} />
       <PlanPanel key={props.thread.id} items={props.items} running={props.thread.status === "running"} />
       <Queued
         texts={waiting}
@@ -35,6 +38,11 @@ export function Between(props: Props): React.JSX.Element {
             ...(index === undefined ? {} : { index }),
           })
         }}
+      />
+      <QuestionStack
+        threadId={props.thread.id}
+        groups={props.thread.pendingQuestions ?? []}
+        send={props.send}
       />
     </>
   )

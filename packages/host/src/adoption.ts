@@ -28,7 +28,10 @@ export async function adopt(
   emit(ctx, { type: "thread.started", at, thread })
   let early: string | undefined
   try {
-    early = await launch(ctx, thread, { resume: cmd.handle })
+    early = await launch(ctx, thread, {
+      resume: cmd.handle,
+      beforeActivate: () => fillTranscript(ctx, thread),
+    })
   } catch (error) {
     // adopted 不是临时缓冲：出生事件已经进 journal。失败时必须走完整删除，
     // 只发 removed 会让它重启后从磁盘变成一条幽灵历史。
@@ -39,14 +42,16 @@ export async function adopt(
   }
   if (ctx.removed.has(thread.id)) return
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
-  // 历史必须排在开放输入之前。先报 idle 的话，用户的新消息可能先落下，
-  // transcript 随后才把旧记录追加到它后面，整段对话会倒序。
-  await fillTranscript(ctx, thread)
+  // 历史已在实时流激活前搬完；否则原生主动轮可能抢先插到旧记录前面。
   if (ctx.removed.has(thread.id)) return
   const entry = ctx.live.get(thread.id)
   if (entry === undefined || !isCurrent(ctx, entry)) return
   const readyAt = ctx.deps.now()
-  entry.thread = { ...entry.thread, status: "idle", updatedAt: readyAt }
+  entry.thread = {
+    ...entry.thread,
+    status: entry.turn === undefined ? "idle" : "running",
+    updatedAt: readyAt,
+  }
   emit(ctx, { type: "thread.updated", at: readyAt, thread: entry.thread })
   drainQueued(ctx, entry)
 }

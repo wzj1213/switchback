@@ -84,6 +84,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* SDK 明确称它为 spinner/pill 的近似值；压成附属标签，不和正文争层级。 */
+.turnstatus__tokens {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-xs);
+}
+
 .turnstatus__stop {
   margin-left: auto;
   padding: 2px var(--sp-2);

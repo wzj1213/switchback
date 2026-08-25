@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command, ThreadId } from "@omni/protocol"
-import { clearNotices, initial, reduceAll, reduceHistory, type ViewState } from "@omni/store"
+import { initial, reduceAll, reduceHistory, type ViewState } from "@omni/store"
 import {
   initialStream,
   received,
@@ -128,9 +128,6 @@ export function useRemote(token: string): Remote {
         // **每来一份新全量就换一套**：新那份带的正文可能是另外几条
         setLoaded(new Set(frame.replay.bodies ?? []))
         setTrimmed(new Set(frame.replay.trimmed ?? []))
-        // 横幅说的是「刚刚发生了一件事」，那是时刻不是状态；重放会把历史上
-        // 每一次引擎崩溃重新弹一遍
-        setState(clearNotices)
         return
       }
       if (frame.type === "thread") {

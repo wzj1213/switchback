@@ -71,12 +71,30 @@ describe("Kimi WebSocket", () => {
     })
     await connecting
     sockets[0]?.frame({ type: "ping", payload: { nonce: "n1" } })
-    sockets[0]?.frame({ type: "session_event", session_id: "s1", seq: 9, payload: { type: "turn.started" } })
-    sockets[0]?.frame({ type: "session_event", session_id: "s1", seq: 9, payload: { type: "turn.started" } })
-    sockets[0]?.frame({ type: "session_event", session_id: "s1", seq: 8, payload: { type: "turn.started" } })
+    sockets[0]?.frame({
+      type: "session_event",
+      session_id: "s1",
+      seq: 9,
+      payload: { type: "turn.started" },
+    })
+    sockets[0]?.frame({
+      type: "session_event",
+      session_id: "s1",
+      seq: 9,
+      payload: { type: "turn.started" },
+    })
+    sockets[0]?.frame({
+      type: "session_event",
+      session_id: "s1",
+      seq: 8,
+      payload: { type: "turn.started" },
+    })
 
     expect(protocols).toEqual([["kimi-code.bearer.secret"]])
-    expect(JSON.parse(sockets[0]?.sent[1] ?? "null")).toEqual({ type: "pong", payload: { nonce: "n1" } })
+    expect(JSON.parse(sockets[0]?.sent[1] ?? "null")).toEqual({
+      type: "pong",
+      payload: { nonce: "n1" },
+    })
     expect(frames).toHaveLength(1)
     await stream.dispose()
   })
@@ -133,7 +151,9 @@ describe("Kimi WebSocket", () => {
     sockets[0]?.close()
     await nextTick()
     sockets[1]?.frame({ type: "server_hello" })
-    expect(JSON.parse(sockets[1]?.sent[0] ?? "null").payload.cursors).toEqual({ s1: { seq: 1 } })
+    expect(JSON.parse(sockets[1]?.sent[0] ?? "null").payload.cursors).toEqual({
+      s1: { seq: 11, epoch: "ep2" },
+    })
     sockets[1]?.frame({
       type: "ack",
       id: "omni-subscribe",
@@ -147,7 +167,7 @@ describe("Kimi WebSocket", () => {
     await stream.dispose()
   })
 
-  it("服务端明确要求 resync 时才先跳到快照游标", async () => {
+  it("服务端明确要求 resync 时先跳到快照游标", async () => {
     const sockets: FakeSocket[] = []
     const stream = new KimiStream({
       wsUrl: "ws://127.0.0.1/api/v1/ws",
@@ -171,7 +191,9 @@ describe("Kimi WebSocket", () => {
     sockets[0]?.frame({ type: "resync_required", session_id: "s1" })
     await nextTick()
     sockets[1]?.frame({ type: "server_hello" })
-    expect(JSON.parse(sockets[1]?.sent[0] ?? "null").payload.cursors).toEqual({ s1: { seq: 20, epoch: "new" } })
+    expect(JSON.parse(sockets[1]?.sent[0] ?? "null").payload.cursors).toEqual({
+      s1: { seq: 20, epoch: "new" },
+    })
     sockets[1]?.frame({
       type: "ack",
       id: "omni-subscribe",
@@ -181,6 +203,58 @@ describe("Kimi WebSocket", () => {
     })
 
     await connecting
+    await stream.dispose()
+  })
+
+  it("客户端发现 offset 缺口时先读快照，再用新水位重连", async () => {
+    const sockets: FakeSocket[] = []
+    const resyncs: number[] = []
+    const stream = new KimiStream({
+      wsUrl: "ws://127.0.0.1/api/v1/ws",
+      protocol: "p",
+      sessionId: "s1",
+      cursor: { seq: 2, epoch: "old" },
+      onFrame: () => undefined,
+      onResync: () => {
+        resyncs.push(1)
+        return Promise.resolve({ seq: 20, epoch: "new" })
+      },
+      onDisconnect: () => undefined,
+      onRecovered: () => undefined,
+      onFatal: () => undefined,
+      socket: () => {
+        const socket = new FakeSocket()
+        sockets.push(socket)
+        return socket
+      },
+    })
+
+    const connecting = stream.connect()
+    sockets[0]?.frame({ type: "server_hello" })
+    sockets[0]?.frame({
+      type: "ack",
+      id: "omni-subscribe",
+      code: 0,
+      msg: "",
+      payload: { accepted: ["s1"], resync_required: [] },
+    })
+    await connecting
+    stream.requestResync()
+    await nextTick()
+    sockets[1]?.frame({ type: "server_hello" })
+
+    expect(resyncs).toEqual([1])
+    expect(JSON.parse(sockets[1]?.sent[0] ?? "null").payload.cursors).toEqual({
+      s1: { seq: 20, epoch: "new" },
+    })
+    sockets[1]?.frame({
+      type: "ack",
+      id: "omni-subscribe",
+      code: 0,
+      msg: "",
+      payload: { accepted: ["s1"], resync_required: [] },
+    })
+    await nextTick()
     await stream.dispose()
   })
 })

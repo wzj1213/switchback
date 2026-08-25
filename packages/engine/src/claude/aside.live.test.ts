@@ -38,6 +38,7 @@ describe("侧问（真跑）", () => {
       memory: () => [],
       emit: (e) => events.push(e),
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     try {
       // **先看能力位**：它是运行时探测出来的，报 false 就说明这个 SDK 版本没这个方法了
@@ -45,8 +46,8 @@ describe("侧问（真跑）", () => {
       const answer = await session.askAside?.("用一个词回答：2 加 2 等于几？")
       expect(typeof answer).toBe("string")
       expect((answer ?? "").length).toBeGreaterThan(0)
-      // **一条 item 都不该产生。** 侧问的全部定义就是「不进 transcript」——
-      // 这一条比上面两条更要紧：即使调通了，只要它产出了 item，这个功能就是错的
+      // **一条 item 都不该产生。** 侧问走 lane，不进 transcript——
+      // 即使调通了，只要它产出了主线 item，这个功能就是错的
       expect(events.filter((e) => e.type === "item.started")).toHaveLength(0)
       expect(events.filter((e) => e.type === "turn.started")).toHaveLength(0)
     } finally {

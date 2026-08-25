@@ -46,9 +46,9 @@ export interface Usage {
 /**
  * 一个可选的模型。
  *
- * `efforts` **只有引擎真能在运行期改推理强度时才填**。Claude 的 effort 是
- * `Options` 字段，改它要重启会话——所以它不填，界面上也就不会出现一个
- * 点了没用的控件。
+ * `efforts` **只有引擎真能在运行期改推理强度时才填**。例如当前 Claude SDK
+ * 会按模型报告 `supportedEffortLevels`，并由 `applyFlagSettings` 在运行期应用；
+ * 报不出清单或没有可用 setter 的引擎就不填，界面也不会画一个点了没用的控件。
  */
 /**
  * 一个正在跑的**子 agent / 后台任务**。
@@ -125,6 +125,9 @@ export interface EngineInfo {
  *
  * 事件流假设有序且不丢，序号与重放由传输层负责，不在本模型内。
  */
+/** 引擎原生通知队列的优先级。顺序与名字都由引擎给，宿主不自行改判严重程度。 */
+export type EngineNotificationPriority = "low" | "medium" | "high" | "immediate"
+
 export type Event =
   /** 全量重建必带；用户改变引擎接入范围时再增量更新。 */
   | { type: "engines.available"; at: number; engines: readonly EngineInfo[] }
@@ -142,8 +145,23 @@ export type Event =
   | { type: "turn.started"; at: number; turn: Turn }
   | { type: "turn.completed"; at: number; turnId: TurnId; status: TurnStatus; error?: string }
   | { type: "item.started"; at: number; item: Item }
-  | { type: "item.delta"; at: number; itemId: ItemId; append: string }
+  | {
+      type: "item.delta"
+      at: number
+      itemId: ItemId
+      append: string
+      /**
+       * 通常终态 `item.updated` 会整条落盘，增量只需直播；没有后续整条快照的原生流
+       *（例如 Grok 后台监控输出）带上会话身份，让宿主能把增量写进正确 journal。
+       */
+      threadId?: ThreadId
+    }
   | { type: "item.updated"; at: number; item: Item }
+  /**
+   * 引擎明确撤回一条已发出的 item。带 turnId 让宿主能在重铸 item id 之后仍精确落盘；
+   * 未知或已经移除的 id 是幂等空操作，后续更新也不得把它复活。
+   */
+  | { type: "item.removed"; at: number; turnId: TurnId; itemId: ItemId }
   /**
    * 一条旁路的当前样子。**upsert，全量替换**，同 id 覆盖。
    *
@@ -187,6 +205,13 @@ export type Event =
   /** 新原生会话尚未上报用量；清掉同引擎上一条已销毁会话留下的数字。 */
   | { type: "usage.cleared"; at: number; threadId: ThreadId; engine: EngineId }
   /**
+   * 当前轮的近似思考 token。**只用于运行期进度，不是账单，也不落盘。**
+   *
+   * `estimatedTokens` 缺席表示这一段思考已经结束；带 `turnId` 是为了挡住上一轮
+   * 迟到的进度，不能让它覆盖下一轮的状态。
+   */
+  | { type: "thinking.updated"; at: number; threadId: ThreadId; turnId: TurnId; estimatedTokens?: number }
+  /**
    * 这条会话此刻有哪些子 agent 在跑。**整份替换**，空数组 = 一个都没有。
    *
    * 全量而不是增量：一次只报一条的话，「它跑完了」就得再发明一种「删除」事件，
@@ -198,8 +223,27 @@ export type Event =
    *
    * **不挂在会话上**：额度是账号级的，同一家引擎的所有会话共享一份。
    * 挂到会话上就会出现「这个会话说还剩 20%、那个说还剩 80%」。
+   *
+   * **窗口是稀疏更新**：只带 primary 或 secondary 时仅替换该窗口，另一窗口保留；
+   * 空对象表示引擎明确要求清掉已知额度。Codex 与 Claude 都会逐窗口推送，不能把缺席
+   * 误当删除，否则两种周期会在界面上互相顶掉。
    */
   | { type: "limits.updated"; at: number; engine: EngineId; limits: RateLimits }
+  /**
+   * 引擎要求宿主展示的一次性通知。它不是模型正文，也不代表能力损失，因此不落盘。
+   * `key` 用于原地替换同一条原生通知；`timeoutMs` 缺席时由用户手动关闭。
+   */
+  | {
+      type: "engine.notification"
+      at: number
+      threadId: ThreadId
+      engine: EngineId
+      key: string
+      message: string
+      priority: EngineNotificationPriority
+      color?: string
+      timeoutMs?: number
+    }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */
   | { type: "engine.status"; at: number; threadId: ThreadId; status: EngineStatus; detail?: string }
 

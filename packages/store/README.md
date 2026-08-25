@@ -9,14 +9,18 @@
 ## 拥有什么
 
 - `ViewState` —— 会话表、顺序、每个会话的 item 列表与当前轮次
+- `notices` —— 引擎故障与原生一次性通知；同一会话、引擎和原生 key 的提示只留最新一条
 - `reduce(state, event)` —— 唯一入口，纯函数，不可变更新
 - `reduceHistory(state, threadId, events)` —— **单独补一条会话的历史**。
   先清掉这条的条目再按历史铺开：直接 `reduceAll` 的话，已经在直播的那几条
   会把更早的历史挤到后面去，转录区变成「最新的排在最前」
 - `initial()` —— 空状态
+- `thinkingTokensOf` —— 当前轮的近似思考进度；只随活事件存在，换轮或收工即清
+- `mergeRateLimits` —— 账号额度的逐窗口纯合并；Store 归约和 Host 重连快照共用，
+  空对象保留为明确清理信号
 - `lanesOf` / `mainItems` / `laneItems` —— **主线与旁路的分流**。item 不拆表：
   带 `lane` 的照旧进 `items[threadId]`，分流放在选择器里。拆表的代价是 `owner` 的语义
-  要跟着变（`item.delta` / `item.updated` 只带 itemId，拆完还得记「它在哪张表里」），
+  要跟着变（item 的增量、更新与撤回都要反查「它在哪张表里」），
   而回放老记录时那批 item 根本没有 `lane`。选择器分流是纯函数、可表驱动测、
   老记录天然全落主线
 - `latestPlan` / `openPlan` / `stepProgressOf` / `visibleSteps` —— 两端共用的计划派生；

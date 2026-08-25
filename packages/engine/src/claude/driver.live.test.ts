@@ -41,6 +41,7 @@ async function run(prompt: string, answer: boolean, isolate: boolean): Promise<R
       asks.push(ask)
       return Promise.resolve({ allow: answer, remember: "once" as const })
     },
+    askQuestion: () => Promise.resolve({ dismissed: true }),
   })
   // 轮次由宿主铸造——live test 里我们扮演宿主
   await session.prompt(prompt, "live-turn-1")

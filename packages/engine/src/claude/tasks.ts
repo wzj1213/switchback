@@ -1,62 +1,26 @@
-import type { Event, TaskRun, ThreadId } from "@omni/protocol"
+import type { Event, Lane, TaskRun, ThreadId } from "@omni/protocol"
 import { toLane } from "./workflow.js"
 
 /**
- * 子 agent 在干什么。
+ * Claude 后台任务的四条公开消息按 `task_id` 汇成一条生命周期：started 给稳定标题，
+ * progress 给当前活动，updated 给状态补丁，notification 给权威终态、总结与 usage。
+ * 0.3.231 的公开 `SDKMessage` 已声明四条；2026-08-19 的 Task 与 workflow 活体也都抓到。
  *
- * ## 数据从哪来
- *
- * SDK 的 `{type:"system", subtype:"task_progress"}`。**实测抓到的一帧**
- *（起一个 Task 子 agent 读两个文件）：
- *
- * ```json
- * { "task_id": "ace84…", "description": "Reading b.txt",
- *   "subagent_type": "general-purpose", "last_tool_name": "Read",
- *   "usage": { "tool_uses": 3, "duration_ms": 4186 } }
- * ```
- *
- * 同一族还有 `task_started` / `task_updated` / `task_notification`——
- * **这一版仍然只接 `task_progress` 一种**。另三种的形状 2026-08-19 在 **workflow
- * 那一路**抓到了（`task_started` 带 `task_type:"local_workflow"` / `workflow_name` /
- * 完整脚本源码；`task_updated` 是 `patch{status,end_time}`；`task_notification` 带
- * `output_file` / `summary` / `usage`），但 **Task 工具那一路还没抓**。这里现在只服务
- * Task 子 agent，拿 workflow 的形状去接另一路，是拿一次实测盖两条不同的路径。
- *
- * ## `workflow_progress`：上一版判它不存在，判据用错了形状
- *
- * 它**不是一种 subtype，是 `task_progress` 帧上的一个字段**。上一版按 subtype 名去 grep
- *（`sdk.d.ts` 与 `sdk.mjs` 各 0 处）就判它不存在——0 处是真的，**公开类型至今没声明它**，
- * 但它就搭在这个函数已经在解析的那一帧上。2026-08-19 活体抓到（10 帧里 4 帧带）：
- *
- * ```json
- * { "subtype": "task_progress", "task_id": "w4zk4icbn",
- *   "description": "Read: read:alpha.txt", "last_tool_name": "read:alpha.txt",
- *   "workflow_progress": [
- *     { "type": "workflow_phase", "index": 1, "title": "Read" },
- *     { "type": "workflow_agent", "index": 1, "label": "read:alpha.txt",
- *       "phaseIndex": 1, "phaseTitle": "Read", "agentId": "a5403b31…", "state": "done",
- *       "tokens": 11031, "toolCalls": 2, "durationMs": 4673,
- *       "lastToolName": "StructuredOutput", "lastToolSummary": "红" }] }
- * ```
- *
- * 一整个 workflow 共用**一个 `task_id`**：`description` 取的是这一批里最后一个报进度的
- * agent，`last_tool_name` 填的是那个 agent 的 `label`（**不是工具名**，所以和 `description`
- * 后半段重复）。每-agent 明细全在这个被丢掉的字段里。带数组的帧都是状态变化帧；
- * 纯进度帧按 10s 节流，那条分支还没跑到（那一跑全程只有 6.7s）。
- *
- * ## 但先别急着接：workflow 现在**整个不显示**
- *
- * `Workflow` 工具**立刻返回**（`Workflow launched in background`），workflow 在后台跑，
- * 主循环几秒就收工。于是 `onResult` 清空任务并发 `turn.completed` → `TurnStatus` 因
- * `turn === undefined` 整块不渲染；后面那些 `task_progress` 照常到、照常进 store，
- * **没有任何东西渲染它**。接这个字段之前要先解决这个——见 `docs/工程时间线.md` 同日那条。
+ * workflow 的每-agent 树在 `task_progress.workflow_progress`。这个字段仍未进公开类型，
+ * 但活体状态帧会带完整快照；两帧之间的 10 秒心跳不带它，所以缺席时必须保住上一棵树。
+ * 一整个 workflow 共用一个 id，progress 的 description 是当前 agent；started 的 description
+ * 才是整批稳定标题。原始帧与节点形状见 `workflow.ts`、对应测试和工程时间线。
  */
 
-/** 这一轮里每个任务最后一次报的进度。键是引擎给的 `task_id`。 */
-export type TaskState = Map<string, TaskRun>
+/** 活状态与持久 lane 的最近快照寿命不同，必须分开存。 */
+export interface TaskState {
+  active: Map<string, TaskRun>
+  lanes: Map<string, Lane>
+  hidden: Set<string>
+}
 
 export function createTaskState(): TaskState {
-  return new Map()
+  return { active: new Map(), lanes: new Map(), hidden: new Set() }
 }
 
 interface RawTaskProgress {
@@ -67,8 +31,129 @@ interface RawTaskProgress {
   usage?: { tool_uses?: unknown; duration_ms?: unknown }
 }
 
+interface RawTaskStarted {
+  task_id?: unknown
+  description?: unknown
+  skip_transcript?: unknown
+}
+
+interface RawTaskUpdated {
+  task_id?: unknown
+  patch?: { status?: unknown; description?: unknown; error?: unknown }
+}
+
+interface RawTaskNotification {
+  task_id?: unknown
+  status?: unknown
+  summary?: unknown
+  skip_transcript?: unknown
+  usage?: { total_tokens?: unknown }
+}
+
+interface TaskOut {
+  threadId: ThreadId
+  emit: (event: Event) => void
+}
+
+interface TaskFrame {
+  at: number
+  out: TaskOut
+}
+
+interface LanePatch {
+  id: string
+  title: string
+  status: Lane["status"]
+}
+
+interface TaskPatch {
+  id: string
+  description?: string
+  status?: Lane["status"]
+  error?: string
+}
+
+interface TaskFinal {
+  id: string
+  status: "done" | "failed"
+  summary?: string
+  skipTranscript: boolean
+  used: unknown
+}
+
 const str = (v: unknown): string | undefined => (typeof v === "string" && v !== "" ? v : undefined)
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0)
+const terminal = (lane: Lane | undefined): boolean => lane?.status === "done" || lane?.status === "failed"
+
+const STATUS: Readonly<Record<string, Lane["status"]>> = {
+  pending: "running",
+  running: "running",
+  paused: "paused",
+  completed: "done",
+  failed: "failed",
+  killed: "failed",
+  stopped: "failed",
+}
+
+function emitTasks(state: TaskState, frame: TaskFrame): void {
+  frame.out.emit({
+    type: "tasks.updated", at: frame.at, threadId: frame.out.threadId, tasks: [...state.active.values()],
+  })
+}
+
+function emitLane(state: TaskState, lane: Lane, frame: TaskFrame): void {
+  state.lanes.set(lane.id, lane)
+  frame.out.emit({ type: "lane.updated", at: frame.at, threadId: frame.out.threadId, lane })
+}
+
+function laneWith(before: Lane | undefined, patch: LanePatch, frame: TaskFrame): Lane {
+  return {
+    ...before,
+    id: patch.id,
+    threadId: frame.out.threadId,
+    kind: "activity",
+    title: patch.title,
+    status: patch.status,
+    at: before?.at ?? frame.at,
+    handle: patch.id,
+  }
+}
+
+function onTaskStarted(state: TaskState, raw: RawTaskStarted, frame: TaskFrame): void {
+  const id = str(raw.task_id)
+  const description = str(raw.description)
+  if (id === undefined || description === undefined) return
+  if (raw.skip_transcript === true) {
+    state.hidden.add(id)
+    return
+  }
+  state.hidden.delete(id)
+  const before = state.lanes.get(id)
+  if (terminal(before)) return
+  emitLane(state, laneWith(before, { id, title: description, status: "running" }, frame), frame)
+}
+
+function taskProgressOf(raw: unknown): TaskRun | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined
+  const msg = raw as RawTaskProgress
+  const id = str(msg.task_id)
+  const description = str(msg.description)
+  if (id === undefined || description === undefined) return undefined
+  const agentType = str(msg.subagent_type)
+  const lastTool = str(msg.last_tool_name)
+  return {
+    id, description, toolUses: num(msg.usage?.tool_uses), ms: num(msg.usage?.duration_ms),
+    ...(agentType === undefined ? {} : { agentType }),
+    ...(lastTool === undefined ? {} : { lastTool }),
+  }
+}
+
+function progressLaneOf(raw: unknown, before: Lane | undefined, frame: TaskFrame): Lane | undefined {
+  const translated = toLane(raw, frame.out.threadId, frame.at)
+  if (translated === undefined) return undefined
+  // 纯心跳帧不带树，不代表树被清空；started 的整批标题也比当前 agent 描述稳定。
+  return { ...before, ...translated, title: before?.title ?? translated.title, at: before?.at ?? frame.at }
+}
 
 /**
  * 收一条进度，整份报出去。
@@ -83,39 +168,128 @@ export function onTaskProgress(
   state: TaskState,
   raw: unknown,
   at: number,
-  out: { threadId: ThreadId; emit: (event: Event) => void },
+  out: TaskOut,
 ): void {
-  // **认不出的形状静默丢弃**，和 `acp/update.ts` 的 `handleUpdate` 同一条原则：
-  // 协议一直在加新东西，多一种不该掀翻整轮
-  if (typeof raw !== "object" || raw === null) return
-  const msg = raw as RawTaskProgress
-  const id = str(msg.task_id)
-  const description = str(msg.description)
-  if (id === undefined || description === undefined) return
-  state.set(id, {
-    id,
-    description,
-    ...(str(msg.subagent_type) === undefined ? {} : { agentType: str(msg.subagent_type) as string }),
-    ...(str(msg.last_tool_name) === undefined ? {} : { lastTool: str(msg.last_tool_name) as string }),
-    toolUses: num(msg.usage?.tool_uses),
-    ms: num(msg.usage?.duration_ms),
-  })
-  out.emit({ type: "tasks.updated", at, threadId: out.threadId, tasks: [...state.values()] })
+  const task = taskProgressOf(raw)
+  if (task === undefined) return
+  const before = state.lanes.get(task.id)
+  if (state.hidden.has(task.id) || terminal(before)) return
+  const frame = { at, out }
+  state.active.set(task.id, task)
+  emitTasks(state, frame)
   // 同一帧再报一条 lane。**两者不是重复，是两种寿命**：
   // `tasks.updated` 是活状态（在 journal 的 SKIP 名单里，轮次一结束就清），
   // 服务的是转录区末尾那行「它在干什么」；`lane.updated` 是**内容**——落盘、⌘R 回得来。
   // 而 workflow 恰恰是**主循环收工之后**才跑起来的，那时 `tasks` 那条路已经整块不渲染了。
-  const lane = toLane(raw, out.threadId, at)
-  if (lane !== undefined) out.emit({ type: "lane.updated", at, threadId: out.threadId, lane })
+  const lane = progressLaneOf(raw, before, frame)
+  if (lane === undefined) return
+  emitLane(state, lane, frame)
+  // workflow 的完整树若已自然收口，不等可能丢失的下一条 edge 才撤活动行。
+  updateActive(state, task.id, { status: lane.status }, frame)
+}
+
+function updateActive(
+  state: TaskState,
+  id: string,
+  patch: Pick<TaskPatch, "description" | "status">,
+  frame: TaskFrame,
+): TaskRun | undefined {
+  const active = state.active.get(id)
+  if (active === undefined) return undefined
+  if (patch.status === "done" || patch.status === "failed") state.active.delete(id)
+  else if (patch.description !== undefined) state.active.set(id, { ...active, description: patch.description })
+  else return active
+  emitTasks(state, frame)
+  return active
+}
+
+function patchedStatus(before: Lane | undefined, reported: Lane["status"] | undefined): Lane["status"] {
+  if ((reported === "running" || reported === "paused") && terminal(before)) return before?.status ?? "running"
+  return reported ?? before?.status ?? "running"
+}
+
+function taskPatchOf(raw: RawTaskUpdated): TaskPatch | undefined {
+  const id = str(raw.task_id)
+  if (id === undefined || raw.patch === undefined) return undefined
+  const description = str(raw.patch.description)
+  const status = STATUS[str(raw.patch.status) ?? ""]
+  const error = str(raw.patch.error)
+  if ([description, status, error].every((value) => value === undefined)) return undefined
+  return { id, ...(description === undefined ? {} : { description }), ...(status === undefined ? {} : { status }),
+    ...(error === undefined ? {} : { error }) }
+}
+
+function onTaskUpdated(state: TaskState, raw: RawTaskUpdated, frame: TaskFrame): void {
+  const patch = taskPatchOf(raw)
+  if (patch === undefined || state.hidden.has(patch.id)) return
+  const before = state.lanes.get(patch.id)
+  const status = patchedStatus(before, patch.status)
+  const active = updateActive(state, patch.id, { description: patch.description, status }, frame)
+  const title = patch.description ?? before?.title ?? active?.description
+  if (title === undefined) return
+  const lane = laneWith(before, { id: patch.id, title, status }, frame)
+  const error = status === "failed" ? patch.error : undefined
+  emitLane(state, error === undefined ? lane : { ...lane, summary: error }, frame)
+}
+
+function withUsage(lane: Lane, used: unknown): Lane {
+  if (typeof used !== "number" || !Number.isFinite(used) || used < 0) return lane
+  return {
+    ...lane,
+    progress: { nodes: lane.progress?.nodes ?? [], ...lane.progress, budget: { used } },
+  }
+}
+
+function taskFinalOf(raw: RawTaskNotification): TaskFinal | undefined {
+  const id = str(raw.task_id)
+  const status = STATUS[str(raw.status) ?? ""]
+  if (id === undefined || (status !== "done" && status !== "failed")) return undefined
+  const summary = str(raw.summary)
+  return {
+    id, status, skipTranscript: raw.skip_transcript === true, used: raw.usage?.total_tokens,
+    ...(summary === undefined ? {} : { summary }),
+  }
+}
+
+function hideFinal(state: TaskState, task: TaskFinal, before: Lane | undefined): boolean {
+  if (!state.hidden.has(task.id) && (!task.skipTranscript || before !== undefined)) return false
+  state.hidden.add(task.id)
+  return true
+}
+
+function onTaskNotification(state: TaskState, raw: RawTaskNotification, frame: TaskFrame): void {
+  const task = taskFinalOf(raw)
+  if (task === undefined) return
+  const before = state.lanes.get(task.id)
+  const active = updateActive(state, task.id, { status: task.status }, frame)
+  if (hideFinal(state, task, before)) {
+    return
+  }
+  const title = before?.title ?? active?.description ?? task.summary
+  if (title === undefined) return
+  const lane = laneWith(before, { id: task.id, title, status: task.status }, frame)
+  const summarized = task.summary === undefined ? lane : { ...lane, summary: task.summary }
+  emitLane(state, withUsage(summarized, task.used), frame)
+}
+
+/** 四种公开 system 消息按 task_id 汇成同一条生命周期。 */
+export function onTaskMessage(state: TaskState, raw: unknown, at: number, out: TaskOut): void {
+  if (typeof raw !== "object" || raw === null) return
+  const frame = { at, out }
+  const subtype = str((raw as { subtype?: unknown }).subtype)
+  if (subtype === "task_started") onTaskStarted(state, raw as RawTaskStarted, frame)
+  else if (subtype === "task_progress") onTaskProgress(state, raw, at, out)
+  else if (subtype === "task_updated") onTaskUpdated(state, raw as RawTaskUpdated, frame)
+  else if (subtype === "task_notification") onTaskNotification(state, raw as RawTaskNotification, frame)
 }
 
 /** 轮次收工：清空并报一次空的。**不报的话界面上那几条会一直挂着。** */
 export function clearTasks(
   state: TaskState,
   at: number,
-  out: { threadId: ThreadId; emit: (event: Event) => void },
+  out: TaskOut,
 ): void {
-  if (state.size === 0) return
-  state.clear()
-  out.emit({ type: "tasks.updated", at, threadId: out.threadId, tasks: [] })
+  if (state.active.size === 0) return
+  state.active.clear()
+  emitTasks(state, { at, out })
 }

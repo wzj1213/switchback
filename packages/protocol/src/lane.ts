@@ -18,8 +18,9 @@ import type { ItemId, ThreadId } from "./ids.js"
  */
 export interface Lane {
   /**
-   * 会话内唯一。**由驱动铸**，宿主在 `item-scope` 里重铸成 omni 全局 id——
-   * 理由同 item：一条会话会中途换引擎，两家都报 `t1` 时后一条会覆盖前一条。
+   * 会话内唯一。活动旁路由驱动铸、宿主在 `item-scope` 里重铸成 omni 全局 id；
+   * 侧问由宿主直接铸全局 id——它是用户发给 `EngineSession.askAside` 的控制请求，
+   * 不经过驱动事件流。两条路最终都保证同一会话里不会互相覆盖。
    */
   id: string
   threadId: ThreadId
@@ -32,9 +33,13 @@ export interface Lane {
    * 多分一档，就多一处接第五家时要改的地方（同 `EngineCapabilities` 的理由）。
    */
   kind: "aside" | "activity"
-  /** 给人看的一句话。**引擎自己写的**，omni 不从工具名拼一句顶替。 */
+  /**
+   * 给人看的一句话。活动旁路由**引擎自己写**，omni 不从工具名拼一句顶替；
+   * 侧问则是用户自己输入的问题。两者都不是 omni 代写的模型内容。
+   */
   title: string
-  status: "running" | "done" | "failed"
+  /** 暂停不是失败，也不能继续转圈；保留独立状态才能如实镜像原生 workflow / task。 */
+  status: "running" | "paused" | "done" | "failed"
   /**
    * **这条旁路是什么时候开始的**，不是最后一次更新的时刻。
    *
@@ -44,7 +49,7 @@ export interface Lane {
    */
   at: number
   /**
-   * 一句话结论（子 agent 的最终报告、侧问的答案摘要）。
+   * 一句话结论（子 agent 的最终报告、侧问的原生答案或原始错误）。
    * 远程全量重建时它优先于 items——那边可能还没收到这条 lane 的正文。
    */
   summary?: string

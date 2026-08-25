@@ -1,5 +1,5 @@
 import type { Command, RememberScope, ThreadId } from "@omni/protocol"
-import type { ApprovalAnswer, ApprovalAsk } from "@omni/engine"
+import type { ApprovalAnswer, ApprovalAsk, InteractionWait } from "@omni/engine"
 import type { Rule } from "@omni/approval"
 import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
 
@@ -14,6 +14,8 @@ const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
 
 const PASSED: ApprovalAnswer = { allow: true, remember: "once" }
 
+const aborted = (wait: InteractionWait | undefined): boolean => wait?.signal?.aborted === true
+
 /**
  * 这次要不要直接放行（用户点过「本轮剩下的都放行」）。
  *
@@ -25,10 +27,15 @@ function passes(entry: Live, ask: ApprovalAsk): boolean {
   return entry.passTurn !== undefined && entry.passTurn === entry.turn && ask.redline === undefined
 }
 
-export async function askUser(ctx: Ctx, id: ThreadId, ask: ApprovalAsk): Promise<ApprovalAnswer> {
+export async function askUser(
+  ctx: Ctx,
+  id: ThreadId,
+  ask: ApprovalAsk,
+  wait?: InteractionWait,
+): Promise<ApprovalAnswer> {
   const entry = ctx.live.get(id)
   // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
-  if (entry === undefined || entry.turn === undefined) return DENIED
+  if (entry === undefined || entry.turn === undefined || aborted(wait)) return DENIED
   // **不发卡、不改状态**：armed 之后再弹一张「已自动允许」的卡，
   // 等于把用户刚才想省掉的那些打断又原样还回去。做了什么在工具行里照样看得见
   if (passes(entry, ask)) return PASSED
@@ -37,9 +44,16 @@ export async function askUser(ctx: Ctx, id: ThreadId, ask: ApprovalAsk): Promise
   // 记下建议规则：用户勾了记忆之后，要存的是**规则本身**，
   // 而 `approval.resolve` 命令只带 itemId 回来
   if (ask.suggest !== undefined) entry.suggests.set(itemId, ask.suggest)
+  const abort = (): void => {
+    entry.gate.cancelApproval(itemId)
+  }
+  const pending = entry.gate.open({ ask, turnId: entry.turn, at: ctx.deps.now(), itemId })
+  if (aborted(wait)) abort()
+  else wait?.signal?.addEventListener("abort", abort, { once: true })
   try {
-    return await entry.gate.open({ ask, turnId: entry.turn, at: ctx.deps.now(), itemId })
+    return await pending
   } finally {
+    wait?.signal?.removeEventListener("abort", abort)
     entry.suggests.delete(itemId)
     // 无论批还是拒都回到运行中——轮次还没结束，引擎接着往下跑
     if (entry.thread.status === "waiting_approval") setStatus(ctx, entry, "running")

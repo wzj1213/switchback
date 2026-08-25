@@ -1,19 +1,18 @@
 import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import { createGate } from "./gate.js"
+import { askQuestion } from "./question.js"
 import { askUser } from "./approval.js"
 import { attachStarted, discardUnstarted, drainQueued, emit, ensureLaunchable, isCurrent, preparingLive, type Ctx, type Live } from "./ctx.js"
 import { evict } from "./live.js"
 import {
-  rememberEngineState,
   rememberHandle,
-  rememberModel,
-  rememberTrustApply,
 } from "./engine-state.js"
 import { createItemScope } from "./item-scope.js"
 import { withModel, withoutModel } from "./model.js"
 import { dropPendingTemps } from "./pending.js"
-import { applyEarly, captureEngine, captureModel, earlySignals, type EarlySignals } from "./launch-signals.js"
+import { applyEarly, earlySignals, type EarlySignals } from "./launch-signals.js"
+import { signalCallbacks } from "./session-signals.js"
 
 /**
  * 会话的生命周期：建、续跑、接力、发消息、改档、换模型、删。
@@ -58,32 +57,48 @@ interface LaunchOptions {
   resume?: string
   forkOf?: { handle: string; dropTurns?: number }
   captureBaseline?: boolean
+  beforeActivate?: (entry: Live) => void | Promise<void>
 }
 
 type InstallLease = Live["lease"] & { installing: boolean; early: EarlySignals }
+interface Installation { lease: InstallLease; beforeActivate: LaunchOptions["beforeActivate"] }
+
+function failInstall(lease: InstallLease, error: unknown): never {
+  Object.assign(lease, { active: false, installing: false })
+  throw error
+}
 
 async function installStarted(
   ctx: Ctx,
   live: Live,
   session: Live["session"],
-  lease: InstallLease,
+  installation: Installation,
 ): Promise<void> {
+  const { lease, beforeActivate } = installation
   await attachStarted(ctx, live, session)
+  const readyStatus = live.thread.status
   try {
     live.gate = createGate((event) => {
       if (isCurrent(ctx, live)) emit(ctx, event)
     })
     live.thread = {
       ...live.thread,
+      status: "starting",
       capabilities: session.capabilities(),
       ...(session.profile === undefined ? {} : { engineProfile: session.profile }),
     }
     live.thread = applyEarly(live.thread, lease.early, ctx.deps.now())
     ctx.live.set(live.thread.id, live)
+    await beforeActivate?.(live)
+    await session.activate?.()
+    if (live.thread.status === "starting" && readyStatus !== "starting") {
+      live.thread = { ...live.thread, status: readyStatus }
+    }
     lease.installing = false
   } catch (error) {
     lease.active = false
     lease.installing = false
+    if (ctx.live.get(live.thread.id)?.lease === live.lease) ctx.live.delete(live.thread.id)
     await session.dispose().catch(() => undefined)
     throw error
   }
@@ -97,7 +112,7 @@ function clearSessionState(ctx: Ctx, thread: Thread): void {
 }
 
 export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = {}): Promise<string | undefined> {
-  const { resume, forkOf, captureBaseline = true } = options
+  const { resume, forkOf, captureBaseline = true, beforeActivate } = options
   const driver = ctx.deps.drivers[thread.engine]
   if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
   // 必须在引擎能动工作区之前取样；接力/权限重启沿用同一个 thread id，自然复用。
@@ -123,42 +138,19 @@ export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = 
         emit(ctx, itemScope.event(event))
       }
     },
-    askUser: (ask) =>
+    askUser: (ask, wait) =>
       isCurrent(ctx, live)
-        ? askUser(ctx, thread.id, itemScope.ask(ask, live.turn))
+        ? askUser(ctx, thread.id, itemScope.ask(ask, live.turn), wait)
         : Promise.resolve({ allow: false, remember: "once" }),
-    onHandle: (handle) => {
-      if (isCurrent(ctx, live)) rememberHandle(ctx, thread.id, handle)
-      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) lease.early.handle = handle
-    },
-    onModel: (model, effort) => {
-      if (isCurrent(ctx, live)) rememberModel(ctx, thread.id, model, effort)
-      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) {
-        captureModel(lease.early, model, effort)
-      }
-    },
-    onEngineState: (patch) => {
-      if (isCurrent(ctx, live)) rememberEngineState(ctx, thread.id, patch)
-      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) {
-        captureEngine(lease.early, patch)
-      }
-    },
-    onTrustApply: (result) => {
-      if (isCurrent(ctx, live)) rememberTrustApply(ctx, thread.id, result)
-      else if (lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) {
-        lease.early.trustApply = result
-      }
-    },
+    askQuestion: (questions, wait) =>
+      isCurrent(ctx, live) ? askQuestion(ctx, thread.id, questions, wait) : Promise.resolve({ dismissed: true }),
+    ...signalCallbacks(ctx, live, thread.id, lease),
     ...(thread.engineProfile === undefined ? {} : { profile: thread.engineProfile }),
     ...(resume === undefined ? {} : { resume }),
     ...(forkOf === undefined ? {} : { forkOf }),
-  }).catch((error: unknown) => {
-    lease.active = false
-    lease.installing = false
-    throw error
-  })
+  }).catch((error: unknown) => failInstall(lease, error))
   // 能力握手时问一次就够；接入前任一步抛错都由这里销毁已经启动的 session。
-  await installStarted(ctx, live, session, lease)
+  await installStarted(ctx, live, session, { lease, beforeActivate })
   askCatalogs(ctx, live)
   return lease.early.handle
 }

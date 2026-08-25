@@ -124,6 +124,7 @@ export interface ComparePane {
   items: readonly Item[]
   turn: Turn | undefined
   tasks: readonly TaskRun[]
+  thinkingTokens: number | undefined
   lanes: readonly Lane[]
 }
 
@@ -183,6 +184,7 @@ export function Compare({
               thread={side.thread}
               items={side.items}
               tasks={side.tasks}
+              thinkingTokens={side.thinkingTokens}
               lanes={side.lanes}
               turn={side.turn}
               send={send}

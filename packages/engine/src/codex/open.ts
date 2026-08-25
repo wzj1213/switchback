@@ -6,6 +6,8 @@ import { resolveCommand } from "../probe.js"
 import type { RpcPeer } from "../rpc.js"
 import { reportAccount } from "./account.js"
 import { claimedCapabilities } from "./claims.js"
+import { forkCodexThread } from "./fork.js"
+import type { CodexHistoryThread } from "./history.js"
 import { raceStartup } from "./startup-deadline.js"
 import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./wire.js"
 
@@ -35,6 +37,8 @@ export interface SessionState {
   /** 用户选的模型与强度。`turn/start` 时带上，codex 说它对后续轮次也生效。 */
   model: string | undefined
   effort: string | undefined
+  /** `thread/resume` 已公开返回的完整 turns；接管时由 transcript 消费一次。 */
+  openedThread: CodexHistoryThread | undefined
   /**
    * 上次问到的模型清单。**留着是为了补强度**——见 `setModel`。
    * 只在 `models()` 被调用时更新，拿不到就是空的，那时不补。
@@ -102,8 +106,10 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
 
   await handshake(ctx)
   const started = await openingThread(ctx)
-  const id = (started as { thread?: { id?: string } } | undefined)?.thread?.id
+  const thread = (started as { thread?: CodexHistoryThread } | undefined)?.thread
+  const id = thread?.id
   if (id === undefined) throw new Error("codex 没有返回 thread id，无法继续")
+  ctx.state.openedThread = thread
   ctx.state.codexThread = id
   // codex 的 thread id 就是它的会话句柄——落盘之后下次能凭它续跑
   ctx.req.onHandle?.(id)
@@ -124,7 +130,9 @@ function openThread(ctx: OpenCtx): Promise<unknown> {
     sandbox: ctx.state.sandbox,
     cwd: ctx.req.cwd,
   }
-  if (ctx.req.forkOf !== undefined) return forkThread(ctx, ctx.req.forkOf)
+  if (ctx.req.forkOf !== undefined) {
+    return forkCodexThread((method, params) => ctx.rpc.call(method, params), ctx.req.forkOf)
+  }
   if (ctx.req.resume === undefined) return ctx.rpc.call("thread/start", shared)
   return ctx.rpc.call("thread/resume", { threadId: ctx.req.resume, ...shared })
 }
@@ -159,29 +167,13 @@ async function openingThread(ctx: OpenCtx): Promise<unknown> {
  * 分出来的那条归创建它的进程管，而 omni 一个会话一个进程。
  * `thread/unsubscribe` 也不放锁（都实测过）。
  *
- * `dropTurns` 走 `thread/rollback`，**只作用在分出来的那条上**：
- * 原会话是用户还要用的，「从这一轮重来」不该把它自己截短。
- * rollback 失败不算整体失败——上下文完整的分叉仍然成立，
- * 为了少砍几轮而丢掉整个可用分支不成比例。
+ * `dropTurns` 先只读源会话的原生 turn id，再把 `lastTurnId` / `beforeTurnId` 直接交给
+ * `thread/fork`：原会话与工作树都不动，新分支从出生起就是目标边界。不能再 fork 后调用
+ * `thread/revert`——0.149.0 真机明确拒绝 legacy 历史；更不能吞掉失败冒充剪裁成功。
  *
  * 分不出来就抛：宿主要靠这个失败区分原生复制与空白分支；
  * 对“从这里重来”，默默起空会话尤其会制造成功假象。
  */
-async function forkThread(
-  ctx: OpenCtx,
-  of: { handle: string; dropTurns?: number },
-): Promise<unknown> {
-  const forked = await ctx.rpc.call("thread/fork", { threadId: of.handle })
-  const id = (forked as { thread?: { id?: string } } | undefined)?.thread?.id
-  if (id === undefined || id === "") throw new Error("codex 没有返回分叉出来的会话 id")
-  if (of.dropTurns !== undefined && of.dropTurns > 0) {
-    await ctx.rpc
-      .call("thread/rollback", { threadId: id, numTurns: of.dropTurns })
-      .catch(() => undefined)
-  }
-  return forked
-}
-
 /**
  * 握手。**必须有超时，也必须看 spawn 本身是否失败**。
  *

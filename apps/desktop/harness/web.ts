@@ -18,11 +18,16 @@
 import { createHash } from "node:crypto"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import type { Command, Event, Item, Thread } from "@omni/protocol"
+import type { Command, Event, Item, Lane, Thread } from "@omni/protocol"
 import { createLedger } from "@omni/wire"
 import { createTokenStore, type Device } from "../src/main/remote/tokens.js"
 import { startRemote } from "../src/main/remote/server.js"
 import type { Sink } from "../src/main/sink.js"
+import { WEB_NOTICES } from "./web-notices.js"
+import { WEB_NATIVE_ITEMS } from "./web-native-items.js"
+import { WEB_TERMINALS } from "./web-terminals.js"
+import { WEB_QUESTIONS } from "./web-questions.js"
+import { promptEcho } from "./web-prompt.js"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 /** 端口与可信 Host 都能用环境变量覆盖：隧道那头的域名要填进来才过得了 Host 闸。 */
@@ -35,6 +40,12 @@ const at = 1_760_000_000_000
 /** 这次 harness 运行的代号。真宿主用 randomUUID，这里固定一个便于重跑。 */
 const EPOCH = "harness"
 
+const NATIVE_NOTIFICATION: Event = {
+  type: "engine.notification", at, threadId: "t-2", engine: "claude",
+  key: "fast-mode-overage-rejected", message: "Fast mode is unavailable for this account.",
+  priority: "immediate", color: "error", timeoutMs: 5000,
+}
+
 const thread = (id: string, title: string, status: Thread["status"]): Thread => ({
   id,
   title,
@@ -45,10 +56,38 @@ const thread = (id: string, title: string, status: Thread["status"]): Thread => 
   createdAt: at,
   updatedAt: at + (id === "t-1" ? 300 : 100),
   engineHistory: ["codex"],
+  ...(id === "t-1" ? {
+    pendingQuestions: WEB_QUESTIONS,
+    goal: {
+      objective: "逐项完成项目自检、补齐所有已确认的原生能力，并在每一项通过生产验收后独立提交",
+      status: "active",
+      tokenBudget: 80_000,
+      tokensUsed: 24_600,
+      timeUsedSeconds: 3_661,
+    },
+  } : {}),
+  ...(id === "t-3" ? {
+    asides: [{ at: at + 1, question: "这条旧侧问还能看到吗？", answer: "可以，旧日志继续兼容。" }],
+  } : {}),
 })
 
+const WEB_LANES: readonly Lane[] = [
+  { id: "aside-done", threadId: "t-1", kind: "aside", status: "done", at: at + 20,
+    title: "这个改动会影响手机端吗？", summary: "会，手机端现在也会按原位置显示侧问。" },
+  { id: "aside-running", threadId: "t-1", kind: "aside", status: "running", at: at + 21,
+    title: "当前还在核对哪一步？" },
+  {
+    id: "activity-running", threadId: "t-1", kind: "activity", status: "running", at: at + 22, title: "后台核对两端",
+    progress: { nodes: [
+      { id: "desktop", label: "桌面端", state: "done", detail: "生产构建通过" },
+      { id: "phone", label: "手机端", state: "running", detail: "检查 390px 窄屏" },
+      { id: "docs", label: "更新记录", state: "pending" },
+    ] },
+  },
+]
 const items: readonly Item[] = [
   { id: "i-1", turnId: "u-1", kind: "user_message", at, text: "把审批那一屏在窄屏上过一遍" },
+  ...WEB_NATIVE_ITEMS,
   {
     id: "i-2",
     turnId: "u-1",
@@ -113,6 +152,8 @@ const items: readonly Item[] = [
       { text: "检查断线与重新接入状态", status: "pending" },
     ],
   },
+  ...WEB_TERMINALS,
+  ...WEB_NOTICES,
 ]
 
 /**
@@ -135,11 +176,29 @@ const seed: readonly Event[] = [
   ...LONG.map((item): Event => ({ type: "item.started", at: item.at, item })),
   { type: "thread.started", at, thread: thread("t-3", "更新日志的措辞", "idle") },
   { type: "thread.started", at, thread: thread("t-2", "ACP 换模型那条红条", "running") },
+  { type: "turn.started", at, turn: { id: "u-2", threadId: "t-2", engine: "claude", status: "running", startedAt: at } },
+  { type: "thinking.updated", at, threadId: "t-2", turnId: "u-2", estimatedTokens: 2840 },
   { type: "thread.started", at, thread: thread("t-1", "浏览器端的审批屏", "waiting_approval") },
   { type: "turn.started", at, turn: { id: "u-1", threadId: "t-1", engine: "codex", status: "running", startedAt: at } },
   ...items.map((item): Event => ({ type: "item.started", at: item.at, item })),
+  ...WEB_LANES.map((lane): Event => ({ type: "lane.updated", at: lane.at, threadId: lane.threadId, lane })),
   { type: "usage.updated", at, threadId: "t-1", engine: "codex", usage: { contextUsed: 42_000, contextWindow: 200_000 } },
 ]
+
+async function replayHarness(ledger: ReturnType<typeof createLedger>, sinks: Sink[], sink: Sink): Promise<void> {
+  // t-长 与 t-1 的正文就在这份基线里；其余两条故意留给 watch → thread，
+  // 同生产分级 replay 一样验到「按需补正文」与真正空会话的收口。
+  sink.send({
+    channel: "omni:replay",
+    replay: { events: seed, resumeAt: ledger.latest(), epoch: EPOCH, bodies: ["t-长", "t-1"] },
+  })
+  await Promise.resolve()
+  // replay 收尾会清历史横幅；稍后作为真正的 live event 推，才能验到原生瞬时通知。
+  setTimeout(() => {
+    const sealed = ledger.seal([NATIVE_NOTIFICATION])
+    for (const target of new Set([...sinks, sink])) target.send({ channel: "omni:events", sealed })
+  }, 250)
+}
 
 function main(): void {
   const ledger = createLedger(EPOCH)
@@ -174,14 +233,17 @@ function main(): void {
         broadcast(ledger, sinks, [{ type: "item.updated", at: Date.now(), item: settled }])
       }
       if (command.type === "thread.prompt") {
-        const item: Item = { id: `i-${String(Date.now())}`, turnId: "u-1", kind: "user_message", at: Date.now(), text: command.text }
-        broadcast(ledger, sinks, [{ type: "item.started", at: Date.now(), item }])
+        const now = Date.now()
+        const engine = command.threadId === "t-2" ? "claude" : "codex"
+        broadcast(ledger, sinks, promptEcho(command, engine, now))
+      }
+      if (command.type === "question.resolve") {
+        const settled = thread("t-1", "浏览器端的审批屏", "waiting_approval")
+        delete settled.pendingQuestions
+        broadcast(ledger, sinks, [{ type: "thread.updated", at: Date.now(), thread: settled }])
       }
     },
-    replay: async (sink) => {
-      sink.send({ channel: "omni:replay", replay: { events: seed, resumeAt: ledger.latest(), epoch: EPOCH } })
-      await Promise.resolve()
-    },
+    replay: (sink) => replayHarness(ledger, sinks, sink),
     trustOf: (threadId) => (threadId === "t-1" || threadId === "t-2" || threadId === "t-3" ? "auto-edit" : undefined),
     history: async () => ({ events: [], trimmed: false }),
     log: (level, message) => {

@@ -1,5 +1,21 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Notice } from "@omni/store"
+
+type NoticeTone = "danger" | "warning" | "info"
+
+function toneOf(notice: Notice): NoticeTone {
+  if (notice.kind === "notification") {
+    if (notice.color === "error") return "danger"
+    return notice.priority === "high" || notice.priority === "immediate" ? "warning" : "info"
+  }
+  return notice.kind === "crashed" ? "danger" : "warning"
+}
+
+function labelOf(notice: Notice): string {
+  if (notice.kind === "crashed") return "出错了"
+  if (notice.kind === "degraded") return "能力受限"
+  return "引擎提示"
+}
 
 /**
  * 出事了要让人看见。
@@ -36,6 +52,14 @@ export function Notices({
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set())
   // 只画最新那条：小屏上堆三条横幅等于把正文挤没了，而人要看的是最近发生的事
   const latest = notices.filter((n) => !gone.has(n.id)).at(-1)
+  useEffect(() => {
+    if (latest?.kind !== "notification" || latest.timeoutMs === undefined) return
+    const timer = setTimeout(() => {
+      setGone((prev) => new Set(prev).add(latest.id))
+    // 以本端收到事件的时刻起算；手机与宿主的系统时钟不一定一致。
+    }, latest.timeoutMs)
+    return () => clearTimeout(timer)
+  }, [latest])
 
   if (wire === undefined && latest === undefined) return null
 
@@ -50,10 +74,15 @@ export function Notices({
         </div>
       )}
       {latest === undefined ? null : (
-        <div className="notice" role="alert" data-kind={latest.kind}>
+        <div
+          className="notice"
+          role={toneOf(latest) === "info" ? "status" : "alert"}
+          data-kind={latest.kind}
+          data-tone={toneOf(latest)}
+        >
           {/* 抬头照 `kind` 写：`degraded` 是「引擎好好的、只是掉了能力」，
               顶着「引擎故障」端出去会把排查引到错的方向 */}
-          <span className="notice__kind">{latest.kind === "crashed" ? "出错了" : "能力受限"}</span>
+          <span className="notice__kind">{labelOf(latest)}</span>
           <span className="notice__text">{latest.text}</span>
           <button
             className="btn btn--ghost"

@@ -45,6 +45,7 @@ describe("Claude 原生分叉（真跑）", () => {
       memory: () => [],
       emit: (e) => first.push(e),
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
       onHandle: (id) => {
         handle = id
       },
@@ -69,6 +70,7 @@ describe("Claude 原生分叉（真跑）", () => {
       memory: () => [],
       emit: (e) => forked.push(e),
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
       forkOf: { handle: handle ?? "", dropTurns: 1 },
     })
     try {

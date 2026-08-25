@@ -107,6 +107,18 @@ describe("接管原生会话", () => {
       id: "slow",
       start: (request) => Promise.resolve({
         threadId: request.threadId,
+        activate: () => {
+          const turnId = request.onNativeTurn?.({
+            at: 2,
+            prompt: "定时检查",
+            origin: { kind: "scheduled", taskId: "job", schedule: "* * * * *",
+              recurring: true, coalescedCount: 1, stale: false },
+          })
+          if (turnId !== undefined) {
+            request.emit({ type: "turn.completed", at: 2, turnId, status: "completed" })
+          }
+          return Promise.resolve()
+        },
         prompt: (text: string) => { prompts.push(text); sent.resolve(undefined); return Promise.resolve() },
         interrupt: () => Promise.resolve(),
         setTrust: () => Promise.resolve({ restart: false }), models: () => Promise.resolve([]),
@@ -131,12 +143,15 @@ describe("接管原生会话", () => {
       text: "旧消息" }], total: 1 })
     await opening
     await sent.promise
-    const copied = events.findIndex((event) => event.type === "item.started" && event.item.id !== "old")
+    const copied = events.findIndex((event) => event.type === "item.started" && event.item.inherited === true)
+    const native = events.findIndex((event) => event.type === "item.started" &&
+      event.item.kind === "user_message" && event.item.origin !== undefined)
     const ready = events.findIndex((event) => event.type === "thread.updated" && event.thread.status === "idle")
     const fresh = events.findIndex((event) => event.type === "item.started" &&
       event.item.kind === "user_message" && event.item.text === "历史之后的新消息")
     expect(copied).toBeGreaterThan(-1)
-    expect(ready).toBeGreaterThan(copied)
+    expect(native).toBeGreaterThan(copied)
+    expect(ready).toBeGreaterThan(native)
     expect(fresh).toBeGreaterThan(ready)
     expect(prompts).toEqual(["历史之后的新消息"])
   })

@@ -205,8 +205,8 @@ export function attachHost(
   const seen = { thread: undefined as ThreadId | undefined }
   // 叫人这件事认窗口（`isFocused` / `show` / `focus` 是窗口才有的动作），
   // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
-  // 「窗口在前台就不出声」这条判据两边共用；「有人正看着这条会话」
-  // 那条判在远程那一层，因为只有它知道谁在看什么
+  // 桌面正在看哪条由 `omni:viewing` 报给 attention；远程正在看哪条还要由 relay
+  // 自己再判，因为只有那一层知道每台远程设备停在哪儿。
   const attention = createAttention(windows, relay, ports?.notify)
   const awake = createAwake()
   // **迟绑定**：outlet 比 host 先建，而它要问 host「现在有几条在跑」。

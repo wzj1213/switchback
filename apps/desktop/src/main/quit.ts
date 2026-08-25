@@ -47,9 +47,11 @@ export function forcedQuit(): boolean {
 export function quitBlurb(threads: readonly Thread[]): string {
   const running = threads.filter((t) => t.status === "running").length
   const waiting = threads.filter((t) => t.status === "waiting_approval").length
+  const questions = threads.reduce((count, thread) => count + (thread.pendingQuestions?.length ?? 0), 0)
   const parts: string[] = []
   if (running > 0) parts.push(`${String(running)} 条正在跑`)
   if (waiting > 0) parts.push(`${String(waiting)} 条等着你批`)
+  if (questions > 0) parts.push(`${String(questions)} 组等着你回答`)
   return `${parts.join("、")}。现在退出会结束它们手上的活，改到一半的文件就停在那儿了。`
 }
 

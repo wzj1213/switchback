@@ -43,6 +43,12 @@ function stringField(raw: Record<string, unknown> | undefined, key: string): str
   return typeof value === "string" && value !== "" ? value : undefined
 }
 
+function canonicalToolKind(call: AcpToolCall): string | undefined {
+  const value = call._meta?.["x.ai/tool"]
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
+  return stringField(value as Record<string, unknown>, "kind")
+}
+
 /**
  * ACP 的 diff 内容块 → `FileChange`。
  *
@@ -142,6 +148,9 @@ const DETAIL_BY_KIND: Readonly<Record<string, (call: AcpToolCall) => ToolDetail 
  * （实测："Read file '/tmp/x/hello.txt'"），比裸 kind 有用得多。
  */
 export function detailOf(call: AcpToolCall): ToolDetail {
+  // Grok 把 Monitor 有损映成 ACP other，但同时公开了规范化的 x.ai/tool.kind。
+  // 它的 command 与后续输出都能走既有 shell 形态，无需为单家再造一种 Item。
+  if (canonicalToolKind(call) === "monitor") return execDetail(call)
   return DETAIL_BY_KIND[call.kind ?? "other"]?.(call) ?? otherDetail(call)
 }
 
@@ -152,7 +161,7 @@ export function toToolCall(call: AcpToolCall, turnId: TurnId, at: number): ToolC
     turnId,
     at,
     kind: "tool_call",
-    tool: toolNameOf(call.kind),
+    tool: toolNameOf(canonicalToolKind(call) ?? call.kind),
     status,
     detail: detailOf(call),
   }

@@ -56,6 +56,10 @@
   background: var(--bg-hover);
 }
 
+.row[aria-current="true"] .row__sub {
+  color: var(--text-muted);
+}
+
 .row__body {
   flex: 1;
   min-width: 0;
@@ -330,10 +334,26 @@
   color: var(--warn);
 }
 
+.notice[data-kind="notification"][data-tone="danger"] .notice__kind {
+  color: var(--danger);
+}
+
+.notice[data-kind="notification"][data-tone="warning"] .notice__kind {
+  color: var(--warn);
+}
+
+.notice[data-kind="notification"][data-tone="info"] .notice__kind {
+  color: var(--accent);
+}
+
 .row__count {
   color: var(--text-faint);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
+}
+
+.row[aria-current="true"] .row__count {
+  color: var(--text-muted);
 }
 
 .dot {

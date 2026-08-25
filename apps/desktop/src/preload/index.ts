@@ -29,6 +29,7 @@ export type { Replay, Sealed }
  *   onReplay(cb)   —— 全量重建，窗口每次加载来一次
  *   resync(after)  —— 发现漏了就来补；补不了会回 `{reset:true}`
  *   pickFolder()   —— 借主进程弹一次系统目录选择框
+ *   viewing(id)    —— 只报当前正文会话，给系统通知去噪
  *   onMenu(cb)     —— 菜单里那些只有渲染层做得到的动作
  *   find/stopFind  —— 借 Chromium 原生的页内查找
  *
@@ -51,6 +52,10 @@ interface Review {
 const api = {
   send(command: Command): void {
     ipcRenderer.send("omni:command", command)
+  },
+  /** 当前正文正在看哪条会话；只给系统通知做去噪，不改变会话状态。 */
+  viewing(threadId?: string): void {
+    ipcRenderer.send("omni:viewing", threadId)
   },
   /** 用户取消时返回 undefined。 */
   async pickFolder(): Promise<string | undefined> {
@@ -339,8 +344,10 @@ const api = {
    * 第一轮 effect，`onReplay` 的监听还没挂上，于是那份全量发进了空气里。
    * 首次启动看不出来，因为紧接着的种子会话是走增量到达的；
    * **重载就原形毕露：侧栏空的、正文卡在「正在打开工作区…」，而磁盘上会话都在。**
-   */
+  */
   hello(): void {
+    // 重载期间清掉上一份页面留下的选中项；同一拍的 renderer effect 会再报当前值。
+    ipcRenderer.send("omni:viewing", undefined)
     ipcRenderer.send("omni:hello")
   },
 

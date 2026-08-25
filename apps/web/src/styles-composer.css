@@ -1,5 +1,64 @@
 /* ── 输入框 ──────────────────────────────────────────── */
 
+.goalbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px var(--sp-3);
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.goalbar__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--text);
+}
+
+.goalbar[data-status="paused"] .goalbar__dot {
+  background: var(--text-faint);
+}
+
+.goalbar[data-status="blocked"] .goalbar__dot,
+.goalbar[data-status="usage_limited"] .goalbar__dot,
+.goalbar[data-status="budget_limited"] .goalbar__dot {
+  background: var(--warn);
+}
+
+.goalbar[data-status="complete"] .goalbar__dot {
+  background: var(--ok);
+}
+
+.goalbar__state,
+.goalbar__usage {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.goalbar__state {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.goalbar__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goalbar__usage {
+  color: var(--text-faint);
+}
+
 .planbar {
   display: flex;
   flex: none;
@@ -96,6 +155,14 @@
   background: color-mix(in srgb, var(--warn) 16%, var(--bg));
   border-bottom: 1px solid var(--line);
   font-size: var(--text-sm);
+}
+
+.notice[data-tone="danger"] {
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg));
+}
+
+.notice[data-tone="info"] {
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
 }
 
 .notice__text {

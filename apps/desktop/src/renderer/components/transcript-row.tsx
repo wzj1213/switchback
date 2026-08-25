@@ -86,7 +86,7 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
 export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
-  readOnly, openLane, onOpenLane }: {
+  readOnly, openLane, onOpenLane, laneLive }: {
   row: Row
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
@@ -107,6 +107,8 @@ export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, o
   /** 第三栏正开着哪条旁路。**注意和上面那个 `folded` 不是一回事**：那个是折轮次。 */
   openLane?: string | undefined
   onOpenLane?: ((laneId: string) => void) | undefined
+  /** 历史线程里的 running 只是最后快照；没接回引擎前不能继续转圈。 */
+  laneLive: boolean
 }): React.JSX.Element {
   // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
   // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
@@ -151,6 +153,7 @@ export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, o
     return (
       <LaneCard
         lane={row.lane}
+        live={laneLive}
         folded={openLane === row.lane.id}
         {...(onOpenLane === undefined ? {} : { onOpen: onOpenLane })}
       />

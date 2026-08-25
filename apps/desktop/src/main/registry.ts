@@ -5,9 +5,17 @@ import {
   createDshDriver,
   createKimiDriver,
   grokCacheRead,
+  createGrokActivity,
   grokContextUsed,
   grokOutputTokens,
+  grokHookItems,
+  grokInteraction,
+  grokInteractionResolved,
   grokLogPath,
+  grokNotice,
+  grokNotification,
+  grokPromptMeta,
+  grokScheduledTurn,
   grokModelChanged,
   grokNativeApproval,
   type EngineDriver,
@@ -74,6 +82,21 @@ export function buildRegistry(
         cacheRead: grokCacheRead,
         // 同一条里的生成量。**token/s 的分子只能是它**，见 `Usage.outputTokens`
         outputTokens: grokOutputTokens,
+        activity: createGrokActivity,
+        // 图片被丢弃或压缩降级时，照 Grok 首方 UI 的规则保留原生提示
+        notice: grokNotice,
+        // 模型失效发生在开场或提示阶段，属于会话级警告，不能硬塞进某一轮正文
+        notification: grokNotification,
+        // Grok 已收口的 HookExecution 对齐其他引擎的 hook/* 工具项
+        toolItems: grokHookItems,
+        // 首方公开的回显关联位，防止迟到 stop Hook 串到下一轮；不进入模型上下文
+        promptMeta: grokPromptMeta,
+        // 前台循环到点后由 Grok 明确指定当前 ACP driver 发起下一轮；忙时通用驱动排队。
+        nativeTurn: grokScheduledTurn,
+        // Grok 的提问与计划审批是会阻塞工具的原生 reverse-request；回答只走 RPC 回包。
+        interaction: grokInteraction,
+        // 多个原生客户端共享会话时 first-answer-wins，别处先答就撤掉本地问题卡。
+        interactionResolved: grokInteractionResolved,
         // Grok 1.0.5 的 ACP 用 `_meta.autoMode` 接分类器 Auto，
         // `_meta.yoloMode` 接 Always-approve；两枚都只在开场时设置。
         nativeApproval: grokNativeApproval,

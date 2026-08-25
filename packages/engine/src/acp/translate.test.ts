@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { detailOf, merge, stopStatus, toolNameOf, toolStatusOf } from "./translate.js"
+import { detailOf, merge, stopStatus, toToolCall, toolNameOf, toolStatusOf } from "./translate.js"
 import { currentModeOf, modelsOf, modesOf } from "./setup.js"
 import type { AcpNewSession, AcpToolCall } from "./wire.js"
 
@@ -80,6 +80,18 @@ describe("工具形态", () => {
       cwd: "/tmp/x",
       exitCode: -1,
       output: "被沙箱拦了",
+    })
+  })
+
+  it("Grok Monitor 虽映成 ACP other，仍按公开的原生身份落 shell 工具", () => {
+    const call: AcpToolCall = {
+      toolCallId: "monitor-1", kind: "other", title: "Start monitor: app log",
+      rawInput: { command: "tail -f app.log", description: "app log" },
+      _meta: { "x.ai/tool": { version: 1, kind: "monitor", name: "monitor" } },
+    }
+    expect(toToolCall(call, "turn-1", 1)).toMatchObject({
+      id: "monitor-1", tool: "acp:monitor",
+      detail: { kind: "shell", command: "tail -f app.log" },
     })
   })
 

@@ -1,67 +1,55 @@
-import type { Event, ItemId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
+import type { Event, TurnId } from "@omni/protocol"
 import { planSteps } from "./plan.js"
-import { finishTool, startTool, sweepTool } from "./tool.js"
+import { finishTool, startTool } from "./tool.js"
 import { kimiMessage, kimiTurnStatus, snapshotCanFinish, snapshotMatches } from "./turn-state.js"
 import type { KimiPayload, KimiSnapshot } from "./wire.js"
-
-interface TextState {
-  id: ItemId
-  kind: "agent_message" | "reasoning"
-  text: string
-  /** Kimi 快照给的是整轮累计文本；分段后仍靠它只补缺失的后缀。 */
-  total: string
-  started: boolean
-  part: number
-}
-
-interface Active {
-  generation: number
-  turnId: TurnId
-  prompt: string
-  promptId?: string
-  activationAccepted: boolean
-  native?: number
-  assistant: TextState
-  reasoning: TextState
-  /** 当前连续文本的类型。换类型或插入工具时，旧片段就地收口。 */
-  openText?: TextState["kind"]
-  tools: Map<string, ToolCallItem>
-  planStarted: boolean
-  retryStarted: boolean
-  noticeSeq: number
-}
+import { compactionEvent, compactionUpdate, type KimiOperation } from "./compaction.js"
+import { kimiHookResult } from "./hook-result.js"
+import { kimiNotice } from "./notice.js"
+import { kimiNativePartId } from "./native-part.js"
+import { kimiRetryEvent } from "./retry.js"
+import { alignKimiDelta, kimiTextState, type KimiTextState } from "./text-stream.js"
+import type { KimiActiveTurn } from "./turn-active.js"
+import { KimiTurnFinalizer } from "./turn-finalize.js"
 
 export interface TurnTrackerDeps {
   emit: (event: Event) => void
   now: () => number
 }
 
-function textState(turnId: TurnId, kind: TextState["kind"], part = 1, total = ""): TextState {
-  const prefix = kind === "agent_message" ? "kimi-answer" : "kimi-thinking"
-  const id = part === 1 ? `${prefix}-${turnId}` : `${prefix}-${turnId}-${String(part)}`
-  return { id, kind, text: "", total, started: false, part }
-}
-
 export class KimiTurnTracker {
-  private active: Active | undefined
+  private active: KimiActiveTurn | undefined
+  private readonly finalizer: KimiTurnFinalizer
   private serial = 0
 
-  constructor(private readonly deps: TurnTrackerDeps) {}
+  constructor(private readonly deps: TurnTrackerDeps) {
+    this.finalizer = new KimiTurnFinalizer({
+      ...deps,
+      current: () => this.active,
+      clear: (active) => { if (this.active === active) this.active = undefined },
+    })
+  }
 
-  begin(turnId: TurnId, prompt: string): number {
+  begin(turnId: TurnId, prompt: string, operation: KimiOperation = "prompt"): number {
     if (this.active !== undefined) throw new Error("Kimi 还有一轮正在运行")
     const generation = ++this.serial
     this.active = {
       generation,
+      startedAt: this.deps.now(),
       turnId,
       prompt,
+      operation,
       activationAccepted: false,
-      assistant: textState(turnId, "agent_message"),
-      reasoning: textState(turnId, "reasoning"),
+      nativePart: 1,
+      step: 0,
+      assistant: kimiTextState(turnId, "agent_message"),
+      reasoning: kimiTextState(turnId, "reasoning"),
       tools: new Map(),
       planStarted: false,
       retryStarted: false,
+      compactionStarted: false,
       noticeSeq: 0,
+      awaitingContinuation: false,
     }
     return generation
   }
@@ -82,6 +70,10 @@ export class KimiTurnTracker {
     return this.active !== undefined
   }
 
+  isAwaitingContinuation(): boolean {
+    return this.active?.awaitingContinuation === true
+  }
+
   currentGeneration(): number | undefined {
     return this.active?.generation
   }
@@ -90,7 +82,13 @@ export class KimiTurnTracker {
     return this.active?.promptId
   }
 
-  private bind(native: number | undefined, prompt?: string): Active | undefined {
+  currentNative(): number | undefined { return this.active?.native }
+  currentTurnId(): TurnId | undefined { return this.active?.turnId }
+  currentPrompt(): string | undefined { return this.active?.prompt }
+  currentStartedAt(): number | undefined { return this.active?.startedAt }
+  currentStep(): number { return this.active?.step ?? 0 }
+
+  private bind(native: number | undefined, prompt?: string): KimiActiveTurn | undefined {
     const active = this.active
     if (active === undefined || native === undefined) return undefined
     if (active.native !== undefined) return active.native === native ? active : undefined
@@ -103,12 +101,12 @@ export class KimiTurnTracker {
     this.bind(payload.turnId, payload.prompt)
   }
 
-  private append(state: TextState, active: Active, delta: string, at: number): void {
+  private append(state: KimiTextState, active: KimiActiveTurn, delta: string, at: number): void {
     if (delta === "") return
     if (!state.started) {
       state.started = true
       state.text = delta
-      state.total = delta
+      state.total += delta
       this.deps.emit({
         type: "item.started",
         at,
@@ -121,19 +119,19 @@ export class KimiTurnTracker {
     this.deps.emit({ type: "item.delta", at, itemId: state.id, append: delta })
   }
 
-  private stateOf(active: Active, kind: TextState["kind"]): TextState {
+  private stateOf(active: KimiActiveTurn, kind: KimiTextState["kind"]): KimiTextState {
     return kind === "reasoning" ? active.reasoning : active.assistant
   }
 
-  private rotateText(state: TextState, active: Active, at: number): void {
+  private rotateText(state: KimiTextState, active: KimiActiveTurn, at: number): void {
     if (!state.started) return
-    this.finishText(state, active, at)
-    const next = textState(active.turnId, state.kind, state.part + 1, state.total)
+    this.finalizer.finishText(state, active, at)
+    const next = kimiTextState(active.turnId, state.kind, state.part + 1, state.total)
     if (state.kind === "reasoning") active.reasoning = next
     else active.assistant = next
   }
 
-  private selectText(active: Active, kind: TextState["kind"], at: number): TextState {
+  private selectText(active: KimiActiveTurn, kind: KimiTextState["kind"], at: number): KimiTextState {
     if (active.openText !== undefined && active.openText !== kind) {
       this.rotateText(this.stateOf(active, active.openText), active, at)
     }
@@ -142,16 +140,29 @@ export class KimiTurnTracker {
   }
 
   /** 任何真正插进 transcript 的非文本 item 都会切断连续文本。 */
-  private closeText(active: Active, at: number): void {
+  private closeText(active: KimiActiveTurn, at: number): void {
     this.rotateText(active.reasoning, active, at)
     this.rotateText(active.assistant, active, at)
     active.openText = undefined
   }
 
-  delta(payload: KimiPayload, kind: TextState["kind"], at: number): void {
+  delta(payload: KimiPayload, kind: KimiTextState["kind"], at: number, offset?: number): boolean {
     const active = this.bind(payload.turnId)
-    if (active === undefined || payload.delta === undefined) return
-    this.append(this.selectText(active, kind, at), active, payload.delta, at)
+    if (active === undefined || payload.delta === undefined) return false
+    const state = this.stateOf(active, kind)
+    const placement = alignKimiDelta(state.total, offset, payload.delta)
+    if (placement.gap !== undefined) return true
+    if (placement.append !== undefined) this.append(this.selectText(active, kind, at), active, placement.append, at)
+    return false
+  }
+
+  stepStarted(payload: KimiPayload, at: number): void {
+    const active = this.bind(payload.turnId)
+    if (active === undefined || payload.step === undefined || payload.step <= active.step) return
+    this.closeText(active, at)
+    active.step = payload.step
+    active.assistant.total = ""
+    active.reasoning.total = ""
   }
 
   toolStarted(payload: KimiPayload, at: number): void {
@@ -164,7 +175,13 @@ export class KimiTurnTracker {
         this.deps.emit({
           type: active.planStarted ? "item.updated" : "item.started",
           at,
-          item: { id: `kimi-plan-${active.turnId}`, turnId: active.turnId, at, kind: "plan", steps },
+          item: {
+            id: kimiNativePartId("kimi-plan", active.turnId, active.nativePart),
+            turnId: active.turnId,
+            at,
+            kind: "plan",
+            steps,
+          },
         })
         active.planStarted = true
       }
@@ -192,116 +209,105 @@ export class KimiTurnTracker {
   toolResult(payload: KimiPayload, at: number): void {
     const active = this.bind(payload.turnId)
     const item = active?.tools.get(payload.toolCallId ?? "")
-    if (active === undefined || item === undefined) return
+    if (active === undefined || item === undefined || (item.status !== "running" && item.status !== "pending")) return
     const done = finishTool(item, payload.output, payload.isError === true)
     active.tools.set(done.id, done)
     this.deps.emit({ type: "item.updated", at, item: done })
   }
 
-  notice(payload: KimiPayload, at: number): void {
+  notice(payload: KimiPayload, at: number): boolean {
     const active = this.bind(payload.turnId)
-    const message = payload.message ?? kimiMessage(payload.error)
-    if (active === undefined || message === undefined) return
+    const item = active === undefined ? undefined : kimiNotice(payload, active.turnId, at, active.noticeSeq + 1)
+    if (active === undefined || item === undefined) return false
     this.closeText(active, at)
     active.noticeSeq += 1
-    const id = `kimi-error-${active.turnId}-${String(at)}-${String(active.noticeSeq)}`
-    this.deps.emit({
-      type: "item.started",
-      at,
-      item: { id, turnId: active.turnId, at, kind: "error", message, fatal: payload.retryable !== true },
-    })
+    this.deps.emit({ type: "item.started", at, item })
+    return true
+  }
+
+  hookResult(payload: KimiPayload, at: number): void {
+    // v2 在 prompt admission 阶段发 HookResult，公开 schema 允许没有 turnId；
+    // 此时只可能属于尚未启动 native turn 的当前宿主 prompt。
+    const unbound = this.active?.native === undefined ? this.active : undefined
+    const active = payload.turnId === undefined ? unbound : this.bind(payload.turnId)
+    const item = active === undefined ? undefined : kimiHookResult(payload, active.turnId, at, active.noticeSeq + 1)
+    if (active === undefined || item === undefined) return
+    this.closeText(active, at)
+    active.noticeSeq += 1
+    this.deps.emit({ type: "item.started", at, item })
   }
 
   retry(payload: KimiPayload, at: number): void {
     const active = this.bind(payload.turnId)
     if (active === undefined) return
     this.closeText(active, at)
-    const message = typeof payload.errorMessage === "string" ? payload.errorMessage : "Kimi 正在重试这一轮"
-    const id = `kimi-retry-${active.turnId}`
-    this.deps.emit({
-      type: active.retryStarted ? "item.updated" : "item.started",
-      at,
-      item: { id, turnId: active.turnId, at, kind: "error", message, fatal: false },
-    })
+    this.deps.emit(
+      kimiRetryEvent(
+        payload,
+        active.turnId,
+        { started: active.retryStarted, part: active.nativePart },
+        at,
+      ),
+    )
     active.retryStarted = true
+  }
+
+  compaction(payload: KimiPayload, at: number): void {
+    const active = this.active
+    if (active === undefined) return
+    const update = compactionUpdate(active.operation, payload)
+    if (update === undefined) return
+    this.closeText(active, at)
+    this.deps.emit(
+      compactionEvent(
+        active.turnId,
+        { started: active.compactionStarted, part: active.nativePart },
+        update,
+        at,
+      ),
+    )
+    active.compactionStarted = true
+    if (update.finish !== undefined) this.finalizer.complete(active, update.finish, at)
   }
 
   ended(payload: KimiPayload, at: number): void {
     const active = this.bind(payload.turnId)
     if (active === undefined) return
-    this.complete(active, kimiTurnStatus(payload.reason), at, kimiMessage(payload.error))
+    this.finalizer.complete(active, kimiTurnStatus(payload.reason), at, kimiMessage(payload.error))
   }
 
-  private finishText(state: TextState, active: Active, at: number): void {
-    if (!state.started) return
-    this.deps.emit({
-      type: "item.updated",
-      at,
-      item: { id: state.id, turnId: active.turnId, at, kind: state.kind, text: state.text, complete: true },
-    })
+  /** Kimi 目标仍 active 时，原生 turn 收口但宿主轮不交还控制权。 */
+  holdForContinuation(payload: KimiPayload, at: number): boolean {
+    const active = this.bind(payload.turnId)
+    const continues = payload.reason === "completed" || payload.interruptReason === "max_steps"
+    return this.finalizer.hold(active, continues, at)
   }
 
-  private complete(active: Active, status: TurnStatus, at: number, error?: string): void {
-    this.finishText(active.reasoning, active, at)
-    this.finishText(active.assistant, active, at)
-    const ending = status === "interrupted" ? "interrupted" : "failed"
-    for (const item of active.tools.values()) {
-      const missing = status === "completed" && (item.status === "running" || item.status === "pending")
-      const swept = missing
-        ? { ...item, status: "failed" as const, error: "Kimi 在轮次结束前没有报告这次工具调用的结果。" }
-        : sweepTool(item, ending)
-      if (swept !== item) this.deps.emit({ type: "item.updated", at, item: swept })
-    }
-    this.active = undefined
-    this.deps.emit({
-      type: "turn.completed",
-      at,
-      turnId: active.turnId,
-      status,
-      ...(error === undefined ? {} : { error }),
-    })
+  /** 下一条公开 goal_continuation 接着使用同一宿主轮，并留下不含伪造正文的边界。 */
+  continueNative(native: number, at: number): boolean {
+    return this.finalizer.continue(native, at)
+  }
+
+  finishAwaitingContinuation(at: number): void {
+    this.finalizer.finishAwaiting(at)
   }
 
   fail(message: string): void {
-    const active = this.active
-    if (active === undefined) return
-    this.complete(active, "failed", this.deps.now(), message)
+    this.finalizer.fail(message)
   }
 
   failGeneration(generation: number, message: string): void {
     if (this.isActive(generation)) this.fail(message)
   }
 
-  private syncText(state: TextState, active: Active, text: string, at: number): void {
-    if (text === "" || text === state.total) return
-    const closedLength = state.total.length - state.text.length
-    const segment = text.slice(Math.min(closedLength, text.length))
-    state.total = text
-    if (segment === "" && !state.started) return
-    const selected = this.selectText(active, state.kind, at)
-    selected.text = segment
-    selected.total = text
-    const item = { id: selected.id, turnId: active.turnId, at, kind: selected.kind, text: segment, complete: false } as const
-    if (!selected.started) {
-      selected.started = true
-      this.deps.emit({ type: "item.started", at, item })
-      return
-    }
-    this.deps.emit({ type: "item.updated", at, item })
+  private syncText(state: KimiTextState, active: KimiActiveTurn, text: string, at: number): void {
+    const placement = alignKimiDelta(state.total, 0, text)
+    if (placement.append !== undefined) this.append(this.selectText(active, state.kind, at), active, placement.append, at)
   }
 
-  reconcile(snapshot: KimiSnapshot): void {
-    const active = this.active
-    if (active === undefined) return
-    const at = this.deps.now()
+  private reconcileFlight(active: KimiActiveTurn, snapshot: KimiSnapshot, at: number): void {
     const flight = snapshot.in_flight_turn
-    if (flight === null) {
-      // `begin()` 发生在图片编码与 POST 之前；这段窗口里的空闲快照说的是旧状态，
-      // 不能拿它把刚创建、甚至还没送到服务端的新轮次提前收掉。
-      if (!snapshotCanFinish(active.promptId !== undefined || active.activationAccepted, snapshot)) return
-      this.complete(active, kimiTurnStatus(snapshot.session.last_turn_reason), at)
-      return
-    }
+    if (flight === null) return
     if (!snapshotMatches(active.native, active.promptId, active.activationAccepted, snapshot)) return
     if (this.bind(flight.turn_id) === undefined) return
     active.promptId ??= flight.current_prompt_id
@@ -317,24 +323,19 @@ export class KimiTurnTracker {
       }
     }
   }
-}
 
-type TurnHandler = (tracker: KimiTurnTracker, payload: KimiPayload, at: number) => void
+  private reconcileIdle(active: KimiActiveTurn, snapshot: KimiSnapshot, at: number): void {
+    if (active.awaitingContinuation) return
+    // `begin()` 发生在图片编码与 POST 之前；窗口里的空闲快照说的是旧状态，不能提前收掉新轮。
+    if (!snapshotCanFinish(active.promptId !== undefined || active.activationAccepted, snapshot)) return
+    this.finalizer.complete(active, kimiTurnStatus(snapshot.session.last_turn_reason), at)
+  }
 
-const TURN_HANDLERS: Readonly<Record<string, TurnHandler>> = {
-  "turn.started": (tracker, payload) => tracker.started(payload),
-  "assistant.delta": (tracker, payload, at) => tracker.delta(payload, "agent_message", at),
-  "thinking.delta": (tracker, payload, at) => tracker.delta(payload, "reasoning", at),
-  "tool.call.started": (tracker, payload, at) => tracker.toolStarted(payload, at),
-  "tool.progress": (tracker, payload, at) => tracker.toolProgress(payload, at),
-  "tool.result": (tracker, payload, at) => tracker.toolResult(payload, at),
-  "turn.step.retrying": (tracker, payload, at) => tracker.retry(payload, at),
-  error: (tracker, payload, at) => tracker.notice(payload, at),
-  warning: (tracker, payload, at) => tracker.notice(payload, at),
-  "turn.ended": (tracker, payload, at) => tracker.ended(payload, at),
-}
-
-export function handleTurnEvent(tracker: KimiTurnTracker, payload: KimiPayload, at: number): void {
-  const type = payload.type
-  if (type !== undefined) TURN_HANDLERS[type]?.(tracker, payload, at)
+  reconcile(snapshot: KimiSnapshot): void {
+    const active = this.active
+    if (active === undefined || active.operation === "compact") return
+    const at = this.deps.now()
+    if (snapshot.in_flight_turn === null) this.reconcileIdle(active, snapshot, at)
+    else this.reconcileFlight(active, snapshot, at)
+  }
 }

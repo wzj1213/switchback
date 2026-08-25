@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Event } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
-import { createPlanState } from "./plan.js"
-import { createStream } from "./stream.js"
-import { createTaskState } from "./tasks.js"
-import { runMessageLoop, type TurnRef } from "./loop.js"
+import { createTurnRef, runMessageLoop, type TurnRef } from "./loop.js"
 
 function request(events: Event[]): StartRequest {
   return {
@@ -15,6 +12,7 @@ function request(events: Event[]): StartRequest {
     memory: () => [],
     emit: (event) => events.push(event),
     askUser: () => Promise.resolve({ allow: false, remember: "once" }),
+    askQuestion: () => Promise.resolve({ dismissed: true }),
   }
 }
 
@@ -26,93 +24,249 @@ function stream(messages: readonly unknown[]): never {
   } as never
 }
 
-describe("逐字与收尾的身份对齐", () => {
-  it("**流式那条和收尾那条是同一条 item**，转录区里不会留下两条一样的消息", async () => {
+function turnRef(current: string | undefined): TurnRef {
+  const ref = createTurnRef(() => undefined)
+  ref.current = current
+  return ref
+}
+
+describe("Claude 消息循环收尾", () => {
+  it("把原生近似思考 token 原地更新，并在输出与收工时清空", async () => {
     const events: Event[] = []
-    const ref: TurnRef = {
-      current: "turn-1",
-      seq: 0,
-      tools: new Map(),
-      tasks: createTaskState(),
-      plan: createPlanState(),
-      stream: createStream(),
-    }
+    const ref = turnRef("turn-thinking")
     await runMessageLoop(
       stream([
-        { type: "stream_event", event: { type: "message_start" } },
-        { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "text" } } },
-        { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "你" } } },
-        { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "好" } } },
-        { type: "assistant", message: { content: [{ type: "text", text: "你好" }] } },
+        { type: "system", subtype: "thinking_tokens", estimated_tokens: 41, estimated_tokens_delta: 41 },
+        { type: "system", subtype: "thinking_tokens", estimated_tokens: 41, estimated_tokens_delta: 0 },
+        { type: "system", subtype: "thinking_tokens", estimated_tokens: 80, estimated_tokens_delta: 39 },
+        { type: "assistant", message: { content: [{ type: "text", text: "先看一下" }] } },
+        { type: "system", subtype: "thinking_tokens", estimated_tokens: 12, estimated_tokens_delta: 12 },
         { type: "result", subtype: "success", is_error: false },
       ]),
       request(events),
       ref,
-      { trust: () => "auto-edit", window: () => undefined, onReady: () => undefined },
+      () => "auto-edit",
     )
-    const started = events.filter((e) => e.type === "item.started")
-    // 两条 `item.started`：一条开流、一条收尾——**但 id 只有一个**，
-    // store 的归约器按 id 幂等，于是收尾那条是原地替换（见 `stream.ts`）
-    expect(started).toHaveLength(2)
-    expect(new Set(started.map((e) => (e.type === "item.started" ? e.item.id : "")))).toEqual(new Set(["turn-1:i1"]))
-    expect(started[0]).toMatchObject({ item: { text: "", complete: false } })
-    expect(started[1]).toMatchObject({ item: { text: "你好", complete: true } })
-    expect(events.filter((e) => e.type === "item.delta")).toHaveLength(2)
+
+    expect(events.filter((event) => event.type === "thinking.updated")).toEqual([
+      { type: "thinking.updated", at: expect.any(Number), threadId: "thread-1", turnId: "turn-thinking", estimatedTokens: 41 },
+      { type: "thinking.updated", at: expect.any(Number), threadId: "thread-1", turnId: "turn-thinking", estimatedTokens: 80 },
+      { type: "thinking.updated", at: expect.any(Number), threadId: "thread-1", turnId: "turn-thinking" },
+      { type: "thinking.updated", at: expect.any(Number), threadId: "thread-1", turnId: "turn-thinking", estimatedTokens: 12 },
+      { type: "thinking.updated", at: expect.any(Number), threadId: "thread-1", turnId: "turn-thinking" },
+    ])
+    expect(ref.thinking.estimatedTokens).toBeUndefined()
   })
 
-  it("待办工具夹在中间也不会让序号错位——那一族是被滤掉之后才翻译的", async () => {
+  it("把 hook 阻断的原生提示保留在发起它的轮次里", async () => {
     const events: Event[] = []
-    const ref: TurnRef = {
-      current: "turn-1",
-      seq: 0,
-      tools: new Map(),
-      tasks: createTaskState(),
-      plan: createPlanState(),
-      stream: createStream(),
-    }
+    const ref = turnRef("turn-hook")
     await runMessageLoop(
       stream([
-        { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "text" } } },
-        { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "先说一句" } } },
-        { type: "stream_event", event: { type: "content_block_start", index: 1, content_block: { type: "tool_use" } } },
-        { type: "stream_event", event: { type: "content_block_start", index: 2, content_block: { type: "text" } } },
-        { type: "stream_event", event: { type: "content_block_delta", index: 2, delta: { type: "text_delta", text: "再说一句" } } },
         {
-          type: "assistant",
-          message: {
-            content: [
-              { type: "text", text: "先说一句" },
-              { type: "tool_use", id: "todo-1", name: "TodoWrite", input: { todos: [] } },
-              { type: "text", text: "再说一句" },
-            ],
-          },
+          type: "system",
+          subtype: "informational",
+          content: "Operation stopped by hook",
+          level: "warning",
+          prevent_continuation: true,
         },
         { type: "result", subtype: "success", is_error: false },
       ]),
       request(events),
       ref,
-      { trust: () => "auto-edit", window: () => undefined, onReady: () => undefined },
+      () => "auto-edit",
     )
-    const texts = events
-      .filter((e) => e.type === "item.started")
-      .map((e) => (e.type === "item.started" ? e.item : undefined))
-      .filter((item) => item?.kind === "agent_message")
-    // 两句各自一条 item，一共两个 id——错位的话「再说一句」会另起一条新的
-    expect(new Set(texts.map((item) => item?.id))).toEqual(new Set(["turn-1:i1", "turn-1:i2"]))
-  })
-})
 
-describe("Claude 消息循环收尾", () => {
+    expect(events.find((event) => event.type === "item.started")).toMatchObject({
+      item: {
+        id: "turn-hook:i1",
+        turnId: "turn-hook",
+        kind: "notice",
+        message: "Operation stopped by hook",
+        level: "warning",
+      },
+    })
+  })
+
+  it("同一工具的 informational 进度就地更新，不在 transcript 里堆重复行", async () => {
+    const events: Event[] = []
+    const ref = turnRef("turn-progress")
+    await runMessageLoop(
+      stream([
+        { type: "system", subtype: "informational", content: "准备中", level: "info", tool_use_id: "tool-1" },
+        { type: "system", subtype: "informational", content: "快好了", level: "notice", tool_use_id: "tool-1" },
+        { type: "result", subtype: "success", is_error: false },
+      ]),
+      request(events),
+      ref,
+      () => "auto-edit",
+    )
+
+    expect(events.filter((event) => event.type === "item.started")).toHaveLength(1)
+    expect(events.find((event) => event.type === "item.updated")).toMatchObject({
+      item: { id: "turn-progress:i1", message: "快好了", level: "notice" },
+    })
+    expect(ref.notices.size).toBe(0)
+  })
+
+  it("把结构化订阅告警送进统一限额状态", async () => {
+    const events: Event[] = []
+    const ref = turnRef("turn-limit")
+    await runMessageLoop(
+      stream([
+        {
+          type: "rate_limit_event",
+          rate_limit_info: { status: "allowed_warning", rateLimitType: "five_hour", utilization: 0.91 },
+        },
+        { type: "result", subtype: "success", is_error: false },
+      ]),
+      request(events),
+      ref,
+      () => "auto-edit",
+    )
+
+    expect(events.find((event) => event.type === "limits.updated")).toMatchObject({
+      engine: "claude",
+      limits: { secondary: { usedPercent: 91, windowDurationMins: 300 } },
+    })
+  })
+
+  it("中途把 Claude 发现的新技能命令整份换给宿主", async () => {
+    const events: Event[] = []
+    const ref = turnRef(undefined)
+    await runMessageLoop(
+      stream([
+        { type: "system", subtype: "init", terminal_slash_commands: ["doctor"] },
+        {
+          type: "system",
+          subtype: "commands_changed",
+          commands: [
+            { name: "doctor", description: "Terminal diagnostics", argumentHint: "" },
+            { name: "project-review", description: "Review this project", argumentHint: "<path>" },
+          ],
+        },
+        { type: "system", subtype: "commands_changed", commands: [] },
+      ]),
+      request(events),
+      ref,
+      () => "auto-edit",
+    )
+
+    expect(events.filter((event) => event.type === "commands.updated")).toEqual([
+      {
+        type: "commands.updated",
+        at: expect.any(Number),
+        threadId: "thread-1",
+        engine: "claude",
+        commands: [
+          {
+            name: "project-review",
+            description: "Review this project",
+            argumentHint: "<path>",
+            source: "engine",
+          },
+        ],
+      },
+      {
+        type: "commands.updated",
+        at: expect.any(Number),
+        threadId: "thread-1",
+        engine: "claude",
+        commands: [],
+      },
+    ])
+  })
+
+  it("同一轮 API 重试原地更新一条可恢复错误", async () => {
+    const events: Event[] = []
+    const ref = turnRef("turn-retry")
+    await runMessageLoop(
+      stream([
+        {
+          type: "system", subtype: "api_retry", attempt: 1, max_retries: 5,
+          retry_delay_ms: 500, error_status: 529, error: "overloaded",
+        },
+        {
+          type: "system", subtype: "api_retry", attempt: 2, max_retries: 5,
+          retry_delay_ms: 1000, error_status: null, error: "server_error",
+        },
+        { type: "result", subtype: "success", is_error: false },
+      ]),
+      request(events),
+      ref,
+      () => "auto-edit",
+    )
+
+    const retryEvents = events.filter((event) => event.type === "item.started" || event.type === "item.updated")
+    expect(retryEvents.map((event) => event.type)).toEqual(["item.started", "item.updated"])
+    expect(retryEvents[1]).toMatchObject({
+      item: {
+        id: "turn-retry:claude-api-retry",
+        message: "Claude API 正在重试（2/5，1000ms 后）",
+        detail: "server_error",
+        fatal: false,
+      },
+    })
+    expect(ref.retry).toBeUndefined()
+  })
+
+  it("失败 result 把 Claude 原文交给宿主解释层", async () => {
+    const events: Event[] = []
+    const ref = turnRef("turn-error")
+    await runMessageLoop(
+      stream([
+        {
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          result: "There's an issue with the selected model.",
+        },
+      ]),
+      request(events),
+      ref,
+      () => "auto-edit",
+    )
+
+    expect(events.find((event) => event.type === "turn.completed")).toMatchObject({
+      status: "failed",
+      error: "There's an issue with the selected model.",
+    })
+  })
+
+  it("/clear 留下上下文分界，并从下一条 result 记真正的新 session handle", async () => {
+    const events: Event[] = []
+    const handles: string[] = []
+    const req = request(events)
+    req.onHandle = (handle) => handles.push(handle)
+    await runMessageLoop(
+      stream([
+        {
+          type: "conversation_reset",
+          new_conversation_id: "conversation-2",
+          session_id: "old-session",
+        },
+        { type: "result", subtype: "success", is_error: false, result: "", session_id: "new-session" },
+      ]),
+      req,
+      turnRef("turn-clear"),
+      () => "auto-edit",
+    )
+
+    expect(handles).toEqual(["new-session"])
+    expect(events.find((event) => event.type === "usage.cleared")).toMatchObject({ engine: "claude" })
+    expect(events.find((event) => event.type === "item.started")).toMatchObject({
+      item: {
+        id: "turn-clear:i1",
+        kind: "notice",
+        message: expect.stringContaining("后续回答不会再读取"),
+      },
+    })
+    expect(events.find((event) => event.type === "turn.completed")).toMatchObject({ status: "completed" })
+  })
+
   it("result 成功但漏了 tool_result 时，不留下永远 running 的工具", async () => {
     const events: Event[] = []
-    const ref: TurnRef = {
-      current: "turn-1",
-      seq: 0,
-      tools: new Map(),
-      tasks: createTaskState(),
-      plan: createPlanState(),
-    stream: createStream(),
-    }
+    const ref = turnRef("turn-1")
     await runMessageLoop(
       stream([
         {
@@ -125,7 +279,7 @@ describe("Claude 消息循环收尾", () => {
       ]),
       request(events),
       ref,
-      { trust: () => "auto-edit", window: () => undefined, onReady: () => undefined },
+      () => "auto-edit",
     )
 
     expect(events.find((event) => event.type === "item.updated")).toMatchObject({

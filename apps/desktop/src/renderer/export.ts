@@ -1,5 +1,5 @@
-import type { Item, Thread, ToolCallItem } from "@omni/protocol"
-import { VERB, target } from "./tool.js"
+import type { Item, Thread, ToolCallItem, UserMessageItem } from "@omni/protocol"
+import { shellTranscript, VERB, target } from "./tool.js"
 
 /**
  * 把一段会话导成 Markdown。
@@ -28,16 +28,24 @@ function toolBlock(item: ToolCallItem): string {
       .map((f) => `${f.path}\n${fence(f.diff ?? "", "diff")}`)
     return files.length === 0 ? head : `${head}\n\n${files.join("\n\n")}`
   }
-  if (item.detail.kind === "shell" && item.detail.output !== undefined && item.detail.output !== "") {
-    return `${head}\n\n${fence(item.detail.output)}`
+  if (item.detail.kind === "shell") {
+    const transcript = shellTranscript(item.detail)
+    if (transcript !== undefined && transcript !== "") return `${head}\n\n${fence(transcript)}`
   }
   return head
+}
+
+function userHeading(item: UserMessageItem): string {
+  if (item.origin === undefined) return "你"
+  if (item.origin === "handoff") return "历史交接"
+  if (item.origin.kind === "shell") return "终端命令"
+  return item.origin.kind === "goal_continuation" ? "长期目标续跑" : "定时任务"
 }
 
 function block(item: Item, engineLabel: string): string | undefined {
   switch (item.kind) {
     case "user_message":
-      return `### 你\n\n${item.text}`
+      return `### ${userHeading(item)}${item.text === "" ? "" : `\n\n${item.text}`}`
     case "agent_message":
       return `### ${engineLabel}\n\n${item.text}`
     case "tool_call":
@@ -46,6 +54,8 @@ function block(item: Item, engineLabel: string): string | undefined {
       return `**计划**\n\n${item.steps.map((s) => `- [${s.status === "done" ? "x" : " "}] ${s.text}`).join("\n")}`
     case "approval":
       return `> **需要确认**：${item.summary}（${item.status}）\n> ${item.reason}`
+    case "notice":
+      return `> **引擎提示 · ${item.level}**\n>\n> ${item.message.replace(/\n/g, "\n> ")}`
     case "error":
       // 引擎补的那句原因一并带走。**报错是最要靠原文的东西**——
       // 导出的那份是拿去开 issue、拿去搜的，少一句就少一条线索
@@ -71,6 +81,7 @@ export function textOf(item: Item): string {
   }
   if (item.kind === "tool_call") return target(item.detail)
   if (item.kind === "error") return item.detail === undefined ? item.message : `${item.message}\n${item.detail}`
+  if (item.kind === "notice") return item.message
   if (item.kind === "approval") return `${item.summary}\n${item.reason}`
   return item.steps.map((s) => s.text).join("\n")
 }

@@ -1,7 +1,7 @@
 import type { Thread } from "@omni/protocol"
 import { TerminalIcon } from "./icons-activity.js"
 
-/** 空会话要说明工作区；接管来的空白还要说明历史仍留在引擎侧。 */
+/** 空会话要说明工作区；接管后仍为空才说明历史正文没有搬到 omni。 */
 export function TranscriptBlank({ thread }: { thread: Thread }): React.JSX.Element {
   return (
     <div className="blank">
@@ -21,8 +21,7 @@ export function TranscriptBlank({ thread }: { thread: Thread }): React.JSX.Eleme
       {thread.adopted === true ? (
         <p className="blank__note">
           这条是从引擎那边接过来的。<strong>前面聊过什么它都记得</strong>，
-          只是那些内容存在引擎那边、omni 这里搬不过来，所以上面是空的。 （Claude 的历史能搬，codex
-          目前不行——它还没开放读取历史内容的接口。）
+          只是这次没有拿到可展示的历史正文；接着聊不会丢掉引擎里的上下文。
         </p>
       ) : null}
     </div>

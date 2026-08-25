@@ -1,9 +1,11 @@
 import { decide, type Request as ApprovalRequest, type Rule } from "@omni/approval"
 import type { Trust } from "@omni/protocol"
 import { sanitize } from "../claude/permission.js"
-import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
+import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
 import { answerElicitation, MCP_ELICITATION } from "./elicitation.js"
+import { answerPermissions, PERMISSIONS_APPROVAL } from "./permissions.js"
+import { answerUserInput, USER_INPUT_REQUEST } from "./user-input.js"
 import type { WireApprovalRequest, WireDecision, WireItem } from "./wire.js"
 
 /**
@@ -111,22 +113,40 @@ export interface AnswerDeps {
   trust: () => Trust
   /** 同理，记忆规则中途会加。 */
   memory: () => readonly Rule[]
-  askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+  askUser: StartRequest["askUser"]
+  askQuestion: StartRequest["askQuestion"]
+  signal?: AbortSignal
+}
+
+/** 认领实验面时的 CI 与真正路由共用这个判据。 */
+export function handlesServerRequest(method: string): boolean {
+  return method === MCP_ELICITATION ||
+    method === PERMISSIONS_APPROVAL ||
+    method === USER_INPUT_REQUEST ||
+    TOOL_BY_METHOD[method] !== undefined
 }
 
 /**
  * **必须每一条都答**——不答 codex 会一直等，整轮就此挂住。
  *
- * MCP elicitation 另走它自己的标准响应；其余认不出的请求回空对象，
- * 也不能让 codex 无限期等下去。审批类的认不出就拒——默认拒是唯一安全的默认。
+ * MCP elicitation 另走它自己的标准响应；其余认不出的请求回 JSON-RPC
+ * method-not-found，既不让 codex 无限期等，也不拿空对象冒充成功。
  */
 export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promise<void> {
   if (call.method === MCP_ELICITATION) {
     await answerElicitation(call, deps)
     return
   }
-  if (!call.method.endsWith("requestApproval")) {
-    call.respond({})
+  if (call.method === PERMISSIONS_APPROVAL) {
+    await answerPermissions(call, deps)
+    return
+  }
+  if (call.method === USER_INPUT_REQUEST) {
+    await answerUserInput(call, deps)
+    return
+  }
+  if (TOOL_BY_METHOD[call.method] === undefined) {
+    call.reject({ code: -32601, message: `omni 未认领 ${call.method}` })
     return
   }
   const params = call.params as WireApprovalRequest
@@ -142,13 +162,16 @@ export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promis
     call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })
     return
   }
-  const answer = await deps.askUser({
+  const ask = {
     toolCallId: params.itemId,
     tool: toolOf(call.method),
     summary: request.summary ?? toolOf(call.method),
     reason: verdict.reason,
     ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
     ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
-  })
+  }
+  const answer = deps.signal === undefined
+    ? await deps.askUser(ask)
+    : await deps.askUser(ask, { signal: deps.signal })
   call.respond({ decision: decisionFor(answer.allow, answer.remember !== "once") })
 }

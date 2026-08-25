@@ -4,8 +4,8 @@ import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { scanLines, searchThreads, snippetOf, termsOf } from "./search.js"
 
-const line = (kind: string, text: string, at = 1): string =>
-  JSON.stringify({ type: "item.started", at, item: { id: "i", turnId: "t", kind, at, text } })
+const line = (kind: string, text: string, at = 1, id = `${kind}-${String(at)}`): string =>
+  JSON.stringify({ type: "item.started", at, item: { id, turnId: "t", kind, at, text } })
 
 const tool = (detail: string): string =>
   JSON.stringify({
@@ -120,5 +120,20 @@ describe("scanLines", () => {
   it("坏行跳过，不整个失败——一条写了一半的记录不该让搜索瞎掉", () => {
     const out = scanLines(["{不是 json", line("user_message", "还在这儿")], ["还在"])
     expect(out?.count).toBe(1)
+  })
+
+  it("只认同一 item 的最终快照，旧文本不会重复计数或继续命中", () => {
+    const started = line("agent_message", "旧版里有关键词", 1, "i1")
+    const updated = JSON.stringify({
+      type: "item.updated", at: 2,
+      item: { id: "i1", turnId: "t", kind: "agent_message", at: 1, text: "最终内容" },
+    })
+    expect(scanLines([started, updated], ["关键词"])).toBeUndefined()
+  })
+
+  it("撤回是搜索墓碑，被撤掉的正文不能从旧日志行里复活", () => {
+    const started = line("agent_message", "这段拒答应被撤回", 1, "i1")
+    const removed = JSON.stringify({ type: "item.removed", at: 2, turnId: "t", itemId: "i1" })
+    expect(scanLines([started, removed], ["拒答"])).toBeUndefined()
   })
 })

@@ -33,6 +33,7 @@ export const Transcript = memo(function Transcript({
   items,
   turn,
   tasks,
+  thinkingTokens,
   lanes,
   openLane, onOpenLane,
   send,
@@ -48,6 +49,7 @@ export const Transcript = memo(function Transcript({
   turn: Turn | undefined
   /** 此刻在跑的子 agent。**引擎报了才有**，一个都没有时是空数组。 */
   tasks: readonly TaskRun[]
+  thinkingTokens: number | undefined
   /**
    * 这条会话的旁路。**引擎不报就是空数组**（`capabilities.activity === false` 的那三家），
    * 空数组时 `withLanes` 原样返回，一行都不多。
@@ -102,11 +104,7 @@ export const Transcript = memo(function Transcript({
             cwd={thread.cwd}
             openLane={openLane} onOpenLane={onOpenLane}
             {...(canRewind(thread, turn, readOnly === true)
-              ? {
-                  onRewind: (turnId: string) => {
-                    send({ type: "thread.rewind", threadId: thread.id, turnId })
-                  },
-                }
+              ? { onRewind: (turnId: string) => { send({ type: "thread.rewind", threadId: thread.id, turnId }) } }
               : {})}
             {...retryProps(row, { ...retry, threadId: thread.id, send })}
             folded={row.kind === "turn" && folded.has(row.turnId)}
@@ -116,11 +114,12 @@ export const Transcript = memo(function Transcript({
             approvalTurn={approval.turnId}
             shortcutApproval={approvalShortcut(readOnly === true, approval.shortcut)}
             readOnly={readOnly === true}
+            laneLive={thread.detached !== true}
           />
         ))}
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
-        <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} />
+        <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} thinkingTokens={thinkingTokens} />
         {stamp === undefined || onReveal === undefined || onReview === undefined ? null : (
           <Changed
             items={items}

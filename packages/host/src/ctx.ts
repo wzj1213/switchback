@@ -1,6 +1,7 @@
 import type { Event, ThreadId, Thread, ThreadStatus, TurnId, ItemId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { EngineSession } from "@omni/engine"
+import { mergeRateLimits } from "@omni/store"
 import type { Gate } from "./gate.js"
 import type { HostDeps } from "./deps.js"
 
@@ -244,6 +245,8 @@ const LIVE_STATE: ReadonlySet<string> = new Set([
   "commands.updated",
   "engine.history",
   "account.updated",
+  // 近似思考 token 不落盘，但窗口在这一段中途重载时仍该看见当前值
+  "thinking.updated",
 ])
 
 /**
@@ -255,8 +258,18 @@ function liveKey(event: Event): string | undefined {
   if (event.type === "commands.updated") return `commands:${event.threadId}\u0000${event.engine}`
   if (event.type === "engine.history") return `history:${event.engine}`
   if (event.type === "account.updated") return `account:${event.engine}`
+  if (event.type === "thinking.updated") return `thinking:${event.threadId}`
   return undefined
 }
+
+/** 重连快照里的额度也要是合并后的现状，不能只记最后一帧稀疏 patch。 */
+function liveEvent(before: Event | undefined, event: Event): Event {
+  if (event.type !== "limits.updated" || before?.type !== "limits.updated") return event
+  return { ...event, limits: mergeRateLimits(before.limits, event.limits) }
+}
+
+const nonemptyThreadId = (threadId: ThreadId | undefined): ThreadId | undefined =>
+  threadId === "" ? undefined : threadId
 
 /** 一条事件属于哪个会话。判不出就不落盘——宁可少一条，也不要落到错的文件里。 */
 export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
@@ -276,6 +289,10 @@ export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
     case "item.started":
     case "item.updated":
       return ctx.turnOwner.get(event.item.turnId)
+    case "item.delta":
+      return nonemptyThreadId(event.threadId)
+    case "item.removed":
+      return ctx.turnOwner.get(event.turnId)
     // lane 自己带 threadId：它不属于任何一轮（一个 workflow 会跨好几轮）
     case "lane.updated":
       return event.threadId
@@ -295,14 +312,15 @@ export function ownerOf(ctx: Ctx, event: Event): ThreadId | undefined {
  */
 function directOwner(event: Event): ThreadId | undefined {
   if (event.type !== "usage.updated" && event.type !== "usage.cleared" &&
-    event.type !== "engine.status" && event.type !== "models.updated") {
+    event.type !== "engine.status" && event.type !== "models.updated" &&
+    event.type !== "thinking.updated") {
     return undefined
   }
-  return event.threadId === "" ? undefined : event.threadId
+  return nonemptyThreadId(event.threadId)
 }
 
 /**
- * 「说的是同一件事」的键。**只认这三种**。
+ * 「说的是同一件事」的键。**只认 item 的三种快照变化和 thread.updated**。
  *
  * 判据是「同一个身份 ＋ 同样的内容 = 没有新信息」。剩下的事件都不满足：
  * `item.delta` 是**追加**（两条一样的增量是两次真的追加，不是回声，丢了正文就少一截）；
@@ -313,6 +331,7 @@ function directOwner(event: Event): ThreadId | undefined {
  */
 function echoKey(event: Event): string | undefined {
   if (event.type === "item.started" || event.type === "item.updated") return `item\u0000${event.item.id}`
+  if (event.type === "item.removed") return `item\u0000${event.itemId}`
   if (event.type === "thread.updated") return `thread\u0000${event.thread.id}`
   return undefined
 }
@@ -413,13 +432,18 @@ export function emit(ctx: Ctx, event: Event): void {
   explainFailure(ctx, event)
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
   const key = LIVE_STATE.has(event.type) ? liveKey(event) : undefined
-  if (key !== undefined) ctx.liveState.set(key, event)
+  if (key !== undefined) {
+    // 清空帧已经实时发给现有窗口；重连从空状态重建，不需要再补一条空进度
+    if (event.type === "thinking.updated" && event.estimatedTokens === undefined) ctx.liveState.delete(key)
+    else ctx.liveState.set(key, liveEvent(ctx.liveState.get(key), event))
+  }
   ctx.deps.emit(event)
   // 删掉的会话如果还没提交过，攒下的那些一起扔掉——它从来没上过磁盘
   if (event.type === "thread.removed") {
     ctx.uncommitted.delete(event.threadId)
     const prefix = `commands:${event.threadId}\u0000`
     for (const key of ctx.liveState.keys()) if (key.startsWith(prefix)) ctx.liveState.delete(key)
+    ctx.liveState.delete(`thinking:${event.threadId}`)
   }
   const owner = ownerOf(ctx, event)
   if (owner !== undefined) persist(ctx, owner, event)

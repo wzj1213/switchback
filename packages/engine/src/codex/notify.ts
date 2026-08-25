@@ -1,19 +1,33 @@
-import type { Event, ItemId, ThreadId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
+import type { EngineGoal, Event, ItemId, ThreadId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
 import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
 import { readSettings, type CodexSettings } from "./settings.js"
 import { onPlanUpdate } from "./plan.js"
 import type {
   WireDelta,
   WireError,
+  WireGoalUpdated,
+  WireHookLifecycle,
   WireItem,
   WireItemLifecycle,
-  WireMcpStatus,
+  WireModelVerification,
   WirePlanUpdate,
   WireRateLimits,
+  WireReasoningPart,
+  WireSafetyBuffering,
+  WireStrictReview,
+  WireTerminalInteraction,
   WireTokenUsage,
   WireTurnLifecycle,
+  WireWarning,
 } from "./wire.js"
 import { emitLimits } from "./limits.js"
+import { emitCodexWarning } from "./warnings.js"
+import { finishSafetyBuffering, onModelVerification, onSafetyBuffering, onStrictReview } from "./safety.js"
+import type { HookTracker } from "./hooks.js"
+import { onMcpStatus } from "./mcp-status.js"
+import { onTerminalInteraction, retainTerminalInputs } from "./terminal.js"
+import { onUsage } from "./usage.js"
+import { goalOf } from "./goal.js"
 
 /**
  * codex 通知 → omni 事件。
@@ -56,11 +70,21 @@ export interface NotifyContext {
   streamed: Map<ItemId, string>
   /** 已经发过 `item.started` 的 id。文本流式 item 有内容才落地，见下。 */
   materialized: Set<ItemId>
+  /** 仍在显示等待态的安全缓冲轮次；终态兜底负责清掉。 */
+  safetyActive?: Set<TurnId>
   /**
    * MCP 服务器最近一次报的状态。**只在翻面时出声**——
    * 一次启动实测报 17 条通知，每条都弹一个横幅的话，那就不是提示是刷屏。
    */
   mcpSeen: Map<string, string>
+  /** 对端已自行清理的反向 RPC；解开宿主上还在等人的卡。 */
+  onServerRequestResolved?: (requestId: string | number) => void
+  /** 本地 skill 文件变了；通知本身不带清单，驱动必须重问。 */
+  onSkillsChanged?: () => void
+  /** 目标是会话级完整快照；`undefined` 表示原生明确清空。 */
+  onGoal?: (goal: EngineGoal | undefined) => void
+  /** 原生 hook 有延时显示与跨通知收口，状态必须属于会话实例。 */
+  hooks?: HookTracker
   now: () => number
 }
 
@@ -90,15 +114,16 @@ function onItemStarted(ctx: NotifyContext, params: WireItemLifecycle): void {
 
 function onItemCompleted(ctx: NotifyContext, params: WireItemLifecycle): void {
   const turnId = ctx.turnId()
+  const item = retainTerminalInputs(params.item, ctx.inflight.get(params.item.id))
   ctx.inflight.delete(params.item.id)
   ctx.streamed.delete(params.item.id)
   if (turnId === undefined) return
   // 空的流式 item 从来没落地过，到这里也不该落地——直接丢
-  if (isStreamingText(params.item.type) && !ctx.materialized.has(params.item.id)) {
-    if (textOf(params.item) === "") return
-    materialize(ctx, params.item, turnId)
+  if (isStreamingText(item.type) && !ctx.materialized.has(item.id)) {
+    if (textOf(item) === "") return
+    materialize(ctx, item, turnId)
   }
-  const omni = itemToOmni(params.item, { turnId, at: ctx.now() }, true)
+  const omni = itemToOmni(item, { turnId, at: ctx.now() }, true)
   if (omni === undefined) return
   ctx.materialized.add(omni.id)
   ctx.emit({ type: "item.updated", at: ctx.now(), item: omni })
@@ -113,6 +138,13 @@ function onDelta(ctx: NotifyContext, params: WireDelta): void {
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
 }
 
+/** 新摘要段本身没有文本；按原生下标补一个与 completed 快照一致的段间换行。 */
+function onReasoningPart(ctx: NotifyContext, params: WireReasoningPart): void {
+  const previous = ctx.streamed.get(params.itemId)
+  if (params.summaryIndex <= 0 || previous === undefined || previous === "") return
+  onDelta(ctx, { ...params, delta: "\n" })
+}
+
 /** 工具在 started 时已落地；增量直接追加，completed 再用聚合输出收口。 */
 function onOutputDelta(ctx: NotifyContext, params: WireDelta): void {
   if (ctx.turnId() === undefined || !ctx.materialized.has(params.itemId)) return
@@ -120,28 +152,10 @@ function onOutputDelta(ctx: NotifyContext, params: WireDelta): void {
   ctx.emit({ type: "item.delta", at: ctx.now(), itemId: params.itemId, append: params.delta })
 }
 
-/** 上下文占用取 last；total 是累计账单，只用于总消耗。 */
-function onUsage(ctx: NotifyContext, params: WireTokenUsage): void {
-  const usage = params.tokenUsage
-  const used = usage?.last?.totalTokens
-  if (usage === undefined || used === undefined) return
-  ctx.emit({
-    type: "usage.updated",
-    at: ctx.now(),
-    threadId: ctx.threadId,
-    engine: "codex",
-    usage: {
-      contextUsed: used,
-      ...(usage.modelContextWindow === undefined
-        ? {}
-        : { contextWindow: usage.modelContextWindow }),
-      ...(usage.total?.totalTokens === undefined ? {} : { totalTokens: usage.total.totalTokens }),
-    },
-  })
-}
-
 /** 轮次非正常收工时补齐在途工具终态；中断与失败不能混为一谈。 */
 export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnStatus): void {
+  finishSafetyBuffering(ctx, status)
+  ctx.hooks?.settle(turnId, status)
   for (const [id, item] of ctx.inflight) {
     if (!ctx.materialized.has(id)) continue
     const streamed = ctx.streamed.get(id)
@@ -218,9 +232,7 @@ function onError(ctx: NotifyContext, params: WireError): void {
  * 只收当前 codex thread 的通知，防止未来复用连接时串会话；可选 id 缺席则放行。
  */
 function ours(ctx: NotifyContext, params: unknown): boolean {
-  const from = (params as { threadId?: unknown } | undefined)?.threadId
-  const ours = ctx.codexThread()
-  if (typeof from === "string" && from !== "" && ours !== undefined && from !== ours) return false
+  if (!oursThread(ctx, params)) return false
   const nativeTurn = turnOf(params)
   const current = ctx.codexTurn?.()
   if (nativeTurn === undefined) return true
@@ -228,6 +240,20 @@ function ours(ctx: NotifyContext, params: unknown): boolean {
   if (current !== undefined) return nativeTurn === current
   ctx.adoptCodexTurn?.(nativeTurn)
   return true
+}
+
+function oursThread(ctx: NotifyContext, params: unknown): boolean {
+  const from = (params as { threadId?: unknown } | undefined)?.threadId
+  const ours = ctx.codexThread()
+  if (typeof from === "string" && from !== "" && ours !== undefined && from !== ours) return false
+  return true
+}
+
+/** 异步 hook 可以在原轮次收工后才回；只为这一条放过“已结算轮次”过滤。 */
+function lateHookCompletion(ctx: NotifyContext, method: string, params: unknown): boolean {
+  if (method !== "hook/completed" || !oursThread(ctx, params)) return false
+  const nativeTurn = turnOf(params)
+  return nativeTurn !== undefined && ctx.settledTurns?.has(nativeTurn) === true
 }
 
 function turnOf(params: unknown): string | undefined {
@@ -250,11 +276,17 @@ const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) =>
   "item/reasoning/summaryTextDelta": (ctx, p) => {
     onDelta(ctx, p as WireDelta)
   },
+  "item/reasoning/summaryPartAdded": (ctx, p) => {
+    onReasoningPart(ctx, p as WireReasoningPart)
+  },
   "item/reasoning/textDelta": (ctx, p) => {
     onDelta(ctx, p as WireDelta)
   },
   "item/commandExecution/outputDelta": (ctx, p) => {
     onOutputDelta(ctx, p as WireDelta)
+  },
+  "item/commandExecution/terminalInteraction": (ctx, p) => {
+    onTerminalInteraction(ctx, p as WireTerminalInteraction)
   },
   "thread/tokenUsage/updated": (ctx, p) => {
     onUsage(ctx, p as WireTokenUsage)
@@ -262,11 +294,17 @@ const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) =>
   "turn/completed": (ctx, p) => {
     onTurnCompleted(ctx, p as WireTurnLifecycle)
   },
+  "hook/started": (ctx, p) => {
+    ctx.hooks?.started(p as WireHookLifecycle)
+  },
+  "hook/completed": (ctx, p) => {
+    ctx.hooks?.completed(p as WireHookLifecycle)
+  },
   "account/rateLimits/updated": (ctx, p) => {
     onLimits(ctx, p as { rateLimits?: WireRateLimits })
   },
   "mcpServer/startupStatus/updated": (ctx, p) => {
-    onMcpStatus(ctx, p as WireMcpStatus)
+    onMcpStatus(ctx, p)
   },
   error: (ctx, p) => {
     onError(ctx, p as WireError)
@@ -279,52 +317,51 @@ const HANDLERS: Readonly<Record<string, (ctx: NotifyContext, params: unknown) =>
   "turn/plan/updated": (ctx, p) => {
     onPlanUpdate(ctx, p as WirePlanUpdate)
   },
+  "serverRequest/resolved": (ctx, p) => {
+    const id = (p as { requestId?: unknown } | undefined)?.requestId
+    if (typeof id === "string" || typeof id === "number") ctx.onServerRequestResolved?.(id)
+  },
+  "skills/changed": (ctx) => {
+    ctx.onSkillsChanged?.()
+  },
+  "thread/goal/updated": (ctx, p) => {
+    const goal = goalOf(p as WireGoalUpdated)
+    if (goal !== undefined) ctx.onGoal?.(goal)
+  },
+  "thread/goal/cleared": (ctx) => {
+    ctx.onGoal?.(undefined)
+  },
+  warning: (ctx, p) => {
+    emitCodexWarning(ctx, p as WireWarning)
+  },
+  guardianWarning: (ctx, p) => {
+    emitCodexWarning(ctx, p as WireWarning)
+  },
+  "model/verification": (ctx, p) => {
+    onModelVerification(ctx, p as WireModelVerification)
+  },
+  "model/safetyBuffering/updated": (ctx, p) => {
+    onSafetyBuffering(ctx, p as WireSafetyBuffering)
+  },
+  "autoApprovalReview/strictReviewRequired": (ctx, p) => {
+    onStrictReview(ctx, p as WireStrictReview)
+  },
+  configWarning: (ctx, p) => {
+    emitCodexWarning(ctx, p as WireWarning)
+  },
+  deprecationNotice: (ctx, p) => {
+    emitCodexWarning(ctx, p as WireWarning)
+  },
 }
 
 /** 认不出的通知静默丢弃——协议一直在加新类型，多一种不该掀翻会话。 */
 export function handleNotification(ctx: NotifyContext, method: string, params: unknown): void {
-  if (!ours(ctx, params)) return
+  const goalMethod = method === "thread/goal/updated" || method === "thread/goal/cleared"
+  if (!(goalMethod ? oursThread(ctx, params) : ours(ctx, params)) && !lateHookCompletion(ctx, method, params)) return
   HANDLERS[method]?.(ctx, params)
 }
 
 /** 两个窗口都没报告百分比时不发空额度。 */
 function onLimits(ctx: NotifyContext, params: { rateLimits?: WireRateLimits }): void {
-  emitLimits(ctx.emit, params.rateLimits)
-}
-
-/**
- * MCP 失败是能力降级而非引擎崩溃；只在状态翻面时提示。
- * 未知终态按失败处理，已确认的非失败态集中在 `MCP_FINE`。
- */
-function onMcpStatus(ctx: NotifyContext, params: WireMcpStatus): void {
-  const name = params.name ?? ""
-  if (name === "") return
-  const why = mcpFailure(params)
-  const key = `${params.status ?? ""}:${why === undefined ? "ok" : "bad"}`
-  // 翻面才出声，避免同一启动过程反复刷横幅。
-  if (ctx.mcpSeen.get(name) === key) return
-  ctx.mcpSeen.set(name, key)
-  if (why === undefined) return
-  ctx.emit({
-    type: "engine.status",
-    at: ctx.now(),
-    threadId: ctx.threadId,
-    status: "degraded",
-    detail: `MCP 服务器「${name}」没起来，它提供的工具这一会话都用不了：${why}`,
-  })
-}
-
-/** `cancelled` 是可被后续启动顶替的中间态；未知状态仍按失败暴露。 */
-const MCP_FINE: ReadonlySet<string> = new Set(["starting", "ready", "cancelled"])
-
-/** 起没起来；是的话给一句能读的原因，没失败给 undefined。 */
-function mcpFailure(params: WireMcpStatus): string | undefined {
-  const status = params.status ?? ""
-  // `cancelled` 常常带着 `failureReason`，所以状态判断要在原因之前
-  if (MCP_FINE.has(status)) return undefined
-  const detail = params.failureReason ?? params.error
-  if (detail !== undefined && detail !== null) {
-    return typeof detail === "string" ? detail : JSON.stringify(detail)
-  }
-  return status
+  emitLimits(ctx.emit, params.rateLimits, "patch")
 }

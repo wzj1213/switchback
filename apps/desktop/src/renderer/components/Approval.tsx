@@ -84,13 +84,14 @@ function More({ hint, onPick }: {
  */
 function Settled({ item }: { item: ApprovalItem }): React.JSX.Element {
   const denied = item.status === "denied"
+  const verdict = item.status === "cancelled" ? "已失效" : denied ? "已拒绝" : "已允许"
   return (
     <div className="approval--done" title={item.reason}>
       <span className="approval__mark" aria-hidden="true">
         <ShieldIcon size={13} />
       </span>
       <span className={`approval__verdict${denied ? " approval__verdict--no" : ""}`}>
-        {denied ? "已拒绝" : "已允许"}
+        {verdict}
       </span>
       <code className="approval__done-cmd">{item.summary}</code>
     </div>

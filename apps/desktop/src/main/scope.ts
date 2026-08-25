@@ -127,6 +127,13 @@ export function scopeReplay(threads: readonly ThreadHistory[], budget?: number):
 const BASE = new Set(["thread.started", "thread.updated"])
 const PATCH = new Set(["thread.renamed", "thread.removed"])
 
+/** 历史投影背后没人等答案；把落盘时尚未落定的瞬时卡一起清掉。 */
+function detachedThread(thread: Thread, now: number): Thread {
+  const detached = { ...thread, status: "idle" as const, detached: true, updatedAt: now }
+  delete detached.pendingQuestions
+  return detached
+}
+
 /**
  * 一条会话只发头。
  *
@@ -163,7 +170,7 @@ export function withCurrent(events: readonly Event[], live: Thread | undefined, 
   if (live !== undefined) return [...events, { type: "thread.updated", at: now, thread: live }]
   const last = [...events].reverse().find((e) => e.type === "thread.started" || e.type === "thread.updated")
   if (last === undefined) return events
-  return [...events, { type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } }]
+  return [...events, { type: "thread.updated", at: now, thread: detachedThread(last.thread, now) }]
 }
 
 /**
@@ -206,6 +213,12 @@ export interface ReplayInput {
   cap?: number
 }
 
+/** 旧版本可能落过瞬时横幅；历史全量不重放，重建期间的 live 增量则不走这里。 */
+function historicalContent(events: readonly Event[]): readonly Event[] {
+  return events.filter((event) =>
+    event.type !== "engine.status" && event.type !== "engine.notification")
+}
+
 export function replayEvents({ engines, threads, alive, now, bodies, cap }: ReplayInput): readonly Event[] {
   const events: Event[] = [{ type: "engines.available", at: now, engines }]
   // 反着喂：归约器往前插，所以最旧的先进去，最新的才会落在侧栏顶上
@@ -222,7 +235,8 @@ export function replayEvents({ engines, threads, alive, now, bodies, cap }: Repl
       continue
     }
     // 带正文的也可能是**裁过的尾巴**：一条 2.5 MB 的会话足以把整份预算架空
-    events.push(...(bodies === undefined ? thread.events : partOf(thread, bodies, cap)))
+    const content = bodies === undefined ? thread.events : partOf(thread, bodies, cap)
+    events.push(...historicalContent(content))
     const live = alive.get(thread.id)
     if (live !== undefined) {
       // 用宿主手上那份当前状态收尾：journal 里最后一条可能停在轮次中间
@@ -235,7 +249,7 @@ export function replayEvents({ engines, threads, alive, now, bodies, cap }: Repl
     if (last === undefined || (last.type !== "thread.started" && last.type !== "thread.updated")) continue
     // 回放出来的会话背后没有引擎进程，补一条 `detached` 让界面关掉输入框——
     // 一个能打字却答非所问的输入框比没有输入框糟得多
-    events.push({ type: "thread.updated", at: now, thread: { ...last.thread, status: "idle", detached: true } })
+    events.push({ type: "thread.updated", at: now, thread: detachedThread(last.thread, now) })
   }
   events.push(...unlogged(threads, alive, now))
   return events

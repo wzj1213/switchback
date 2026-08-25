@@ -1,4 +1,5 @@
-import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
+import type { EngineId, ItemId, QuestionId, ThreadId, TurnId } from "./ids.js"
+import type { QuestionResponse } from "./question.js"
 import type { Trust } from "./thread.js"
 
 /** 渲染层 → 宿主的反向指令。宿主是唯一执行者，渲染层不直接碰引擎进程。 */
@@ -174,6 +175,13 @@ export type Command =
    * **红线不受它影响**，照旧一条条问（见 `host/approval.ts`）。
    */
   | { type: "approval.resolve"; itemId: ItemId; allow: boolean; remember: RememberScope; passTurn?: boolean }
+  /** 回答或整组跳过一份引擎原生结构化问题。宿主会按当前挂起契约逐项校验。 */
+  | {
+      type: "question.resolve"
+      threadId: ThreadId
+      questionId: QuestionId
+      response: QuestionResponse
+    }
 
 /** 记忆范围。`project` 级会落盘并跨会话生效；红线项不允许 `project`。 */
 export type RememberScope = "once" | "session" | "project"

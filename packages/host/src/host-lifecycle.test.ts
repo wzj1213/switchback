@@ -160,6 +160,25 @@ describe("在途去重", () => {
 })
 
 describe("改名", () => {
+  it("引擎标题更新自动标题位，但不冒充用户亲自命名", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    session().retitle("  原生标题  ")
+    expect(host.live().find((t) => t.id === id)?.title).toBe("原生标题")
+    expect(host.live().find((t) => t.id === id)?.named).toBeUndefined()
+    expect(events.at(-1)).toMatchObject({ type: "thread.updated", thread: { title: "原生标题" } })
+  })
+
+  it("用户亲自起过名后，迟到的原生标题不能覆盖", async () => {
+    const { host, events, session } = setup()
+    await host.dispatch(create)
+    const id = events.find((e) => e.type === "thread.started")?.thread.id ?? ""
+    await host.dispatch({ type: "thread.rename", threadId: id, title: "我的名字" })
+    session().retitle("引擎标题")
+    expect(host.live().find((t) => t.id === id)?.title).toBe("我的名字")
+  })
+
   it("发出 thread.renamed", async () => {
     const { host, events } = setup()
     await host.dispatch(create)

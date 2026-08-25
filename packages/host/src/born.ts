@@ -62,6 +62,7 @@ export function bornOf(ctx: Ctx, entry: Live, spec: BornSpec): Thread {
       // 否则切回某家时会续到父分支，或者把旧引擎的档位/能力画在新引擎上。
       segments: [],
       engineState: undefined,
+      goal: undefined,
       trustApply: undefined,
       capabilities: undefined,
       nextEngine: undefined,

@@ -237,6 +237,7 @@ export interface AcpSaid {
   modeReadback?: boolean
   compact?: boolean
   steer?: boolean
+  activity?: boolean
 }
 
 export function capabilitiesOf(
@@ -255,15 +256,8 @@ export function capabilitiesOf(
     modeReadback: said.modeReadback === true,
     // ACP 没暴露侧问；不拿某家私有能力替协议补洞。
     sideQuestion: false,
-    // 同理：**ACP 协议里没有「我会报子 agent / 编排进度」这个声明位**。
-    // grok 的 `WorkflowUpdated` 与 `SubagentSpawned/Progress/Finished` 走的是私有通知
-    // `_x.ai/session_notification`，而且 `deep-research` / `workflow` 在它的 BuiltinGate 表里，
-    // 本机 1.0.5 实测只收到 12 条命令、一帧编排通知都没有；zcode 的前台子 agent 走
-    // `tool_call._meta.subagent`（那是**工具调用**，已经在主线上了），后台子 agent 的正文
-    // 以裸 `agent_message_chunk` 混进主线、无标记，omni 单方面解不了。
-    // 两家都够不到「报得出一条 lane」，所以这一位不给 `AcpSaid` 开口子——
-    // 开了就等于让适配配置替 agent 说一句它自己没说过的话。
-    activity: false,
+    // ACP 没有声明位；只有适配器已经接住引擎自己公开的私有活动通知时才敢报 true。
+    activity: said.activity === true,
   }
 }
 

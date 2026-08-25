@@ -70,6 +70,35 @@ export async function compactSession(ctx: TurnCtx): Promise<void> {
   await ctx.call("session/compact", { sessionId })
 }
 
+/** ACP 扩展以成功回包作为终点；不像 Codex/Kimi 另有异步生命周期。 */
+export function reportCompaction(
+  emit: (event: Event) => void,
+  turnId: TurnId,
+  at: number,
+): void {
+  emit({
+    type: "item.started",
+    at,
+    item: {
+      id: `acp-compaction-${turnId}`,
+      turnId,
+      at,
+      kind: "notice",
+      message: "上下文已压缩。",
+      level: "info",
+    },
+  })
+  emit({ type: "turn.completed", at, turnId, status: "completed" })
+}
+
+export async function compactAndReport(
+  ctx: TurnCtx & { emit: (event: Event) => void },
+  turnId: TurnId,
+): Promise<void> {
+  await compactSession(ctx)
+  reportCompaction(ctx.emit, turnId, Date.now())
+}
+
 /**
  * 把话递进正在跑的那一轮。
  *

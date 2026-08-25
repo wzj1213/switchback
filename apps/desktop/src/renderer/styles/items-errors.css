@@ -108,11 +108,17 @@
 
 /** 「不进正文」这句得常驻：它是这张卡存在的全部理由。 */
 .asidecard__tag {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin-bottom: 3px;
   color: var(--text-faint);
   font-size: var(--text-xs);
   font-weight: 600;
+}
+
+.asidecard--failed .asidecard__a {
+  color: var(--danger);
 }
 
 /** 问句压暗、答句正常：靠明暗区分比靠标签省地方。 */

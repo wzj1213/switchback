@@ -266,7 +266,10 @@ function load(ctx: Ctx, threadId: ThreadId | undefined): void {
     .then((body) => {
       // 等的这段时间里连接可能已经没了；也可能已经换了一份全量、
       // 而那一份正好带上了这条的正文（`loaded` 被清空后重新预置）
-      if (!ctx.state.alive || body.events.length === 0) return
+      //
+      // **空也是一份确定的结果，必须发。** 客户端靠 `thread` 帧把这条标成
+      // loaded；不发的话，真正没有正文的会话会永远停在「正在取内容」。
+      if (!ctx.state.alive) return
       ctx.write({ type: "thread", threadId, events: body.events, ...(body.trimmed ? { trimmed: true } : {}) })
     })
     .catch((error: unknown) => {

@@ -18,10 +18,10 @@ const STATUS_MARK: Readonly<Record<ToolCallItem["status"], string>> = {
 }
 
 /** 一行标题：说清「在干什么」，不说「用了哪个工具」。 */
-function titleOf(detail: ToolDetail): string {
+export function titleOf(detail: ToolDetail): string {
   switch (detail.kind) {
     case "shell":
-      return detail.command
+      return detail.terminal?.waiting === true ? `等后台终端 · ${detail.command}` : detail.command
     case "file_edit":
       return `改 ${detail.path}${detail.files.length > 1 ? ` 等 ${String(detail.files.length)} 个文件` : ""}`
     case "file_read":
@@ -40,22 +40,35 @@ function titleOf(detail: ToolDetail): string {
  * 而 `bodyOf` 对一次多文件编辑要把所有 diff 拼成一个字符串——
  * **折叠着也拼**。一条工具行不展开时，那份字符串没有任何人看。
  */
-function hasBody(detail: ToolDetail): boolean {
-  if (detail.kind === "shell") return detail.output !== undefined
+export function hasBody(detail: ToolDetail): boolean {
+  if (detail.kind === "shell") {
+    return detail.output !== undefined || (detail.terminal?.inputs.length ?? 0) > 0
+  }
   if (detail.kind === "file_edit") return detail.files.length > 0
   if (detail.kind === "other") return detail.output !== undefined
   return false
 }
 
 /** 展开之后有什么可看。没有就不给「展开」这个动作——**一个点了没反应的箭头比没有箭头糟**。 */
-function bodyOf(detail: ToolDetail): string | undefined {
-  if (detail.kind === "shell") return detail.output
+export function bodyOf(detail: ToolDetail): string | undefined {
+  if (detail.kind === "shell") return shellBody(detail)
   if (detail.kind === "file_edit") {
     const parts = detail.files.map((f) => `${f.kind} ${f.path}\n${f.diff ?? ""}`)
     return parts.join("\n\n") || undefined
   }
-  if (detail.kind === "other") return detail.output === undefined ? undefined : JSON.stringify(detail.output, null, 2)
+  if (detail.kind === "other" && detail.output !== undefined) {
+    return typeof detail.output === "string" ? detail.output : JSON.stringify(detail.output, null, 2)
+  }
   return undefined
+}
+
+function shellBody(detail: Extract<ToolDetail, { kind: "shell" }>): string | undefined {
+  const inputs = detail.terminal?.inputs ?? []
+  if (inputs.length === 0) return detail.output
+  const sections = inputs.map((input, index) => `后台终端输入 ${String(index + 1)}：\n${input}`)
+  if (detail.output !== undefined && detail.output !== "")
+    sections.unshift(`终端输出：\n${detail.output}`)
+  return sections.join("\n\n")
 }
 
 /**

@@ -61,11 +61,17 @@ describe("createJournal", () => {
     expect(await j.read("th-2")).toHaveLength(1)
   })
 
-  it("item.delta 不落盘", async () => {
+  it("普通 item.delta 不落盘；无终态快照的定向增量会保留", async () => {
     const j = createJournal({ dir: state.dir })
     await j.append("th-1", started("th-1"))
     await j.append("th-1", { type: "item.delta", at: 3, itemId: "x", append: "y" })
-    expect(await j.read("th-1")).toHaveLength(1)
+    await j.append("th-1", {
+      type: "item.delta", at: 4, threadId: "th-1", itemId: "monitor", append: "kept",
+    })
+    expect(await j.read("th-1")).toEqual([
+      started("th-1"),
+      { type: "item.delta", at: 4, threadId: "th-1", itemId: "monitor", append: "kept" },
+    ])
   })
 
   it("没写过的会话读出空数组，不是抛错", async () => {

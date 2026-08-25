@@ -23,7 +23,7 @@ import { quitNow } from "./quit.js"
  * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
  * | `OMNI_DEV_SETTINGS` | 截图前打开设置，并切到左列第 N 页（1 起） |
  * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
- * | `OMNI_DEV_THEME` | `dark` / `light`，强制主题（深色那套平时没人看得见） |
+ * | `OMNI_DEV_THEME` | `dark` / `light`，自动化验收时强制主题，不改用户设置 |
  * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
  * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
  * | `OMNI_DEV_MAXLIVE` | 同时活着的引擎会话上限（默认 4）。设很大等于关掉淘汰 |

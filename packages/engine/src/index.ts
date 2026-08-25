@@ -18,9 +18,15 @@ export {
   grokContextUsed,
   grokCacheRead,
   grokOutputTokens,
+  grokNotice,
+  grokNotification,
   grokModelChanged,
   grokNativeApproval,
 } from "./acp/grok.js"
+export { createGrokActivity } from "./acp/grok-activity.js"
+export { grokHookItems, grokPromptMeta } from "./acp/grok-hooks.js"
+export { grokScheduledTurn } from "./acp/grok-scheduled.js"
+export { grokInteraction, grokInteractionResolved } from "./acp/grok-interaction.js"
 export {
   modelsOf,
   modesOf,
@@ -85,8 +91,10 @@ export type {
   EngineDriver,
   EngineSession,
   StartRequest,
+  NativeTurnStart,
   ApprovalAsk,
   ApprovalAnswer,
+  InteractionWait,
   TrustChange,
 } from "./contract.js"
 export type { ClaudeDriverConfig } from "./claude/driver.js"

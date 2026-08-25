@@ -20,6 +20,8 @@ export interface ServerCall {
   params: unknown
   /** 幂等：重复调用只有第一次生效。 */
   respond: (result: unknown) => void
+  /** JSON-RPC 顶层错误；与 `respond` 共用幂等闸门。 */
+  reject: (error: { code: number; message: string; data?: unknown }) => void
 }
 
 export interface RpcHandlers {
@@ -113,15 +115,17 @@ function detailOf(data: unknown): string | undefined {
 /** `respond` 幂等：重复应答同一个 id 会让对端认不出，只认第一次。 */
 function toServerCall(write: Write, id: RequestId, method: string, params: unknown): ServerCall {
   const answered = { done: false }
+  const reply = (payload: { result: unknown } | { error: unknown }): void => {
+    if (answered.done) return
+    answered.done = true
+    write({ id, ...payload })
+  }
   return {
     id,
     method,
     params,
-    respond: (result: unknown): void => {
-      if (answered.done) return
-      answered.done = true
-      write({ id, result })
-    },
+    respond: (result: unknown): void => reply({ result }),
+    reject: (error): void => reply({ error }),
   }
 }
 

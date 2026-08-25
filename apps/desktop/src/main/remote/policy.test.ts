@@ -85,6 +85,7 @@ describe("其余命令原样通过", () => {
     { type: "thread.interrupt", threadId: "t" },
     { type: "thread.delete", threadId: "t" },
     { type: "thread.handoff", threadId: "t", to: "claude" },
+    { type: "question.resolve", threadId: "t", questionId: "q", response: { dismissed: true } },
   ]
   for (const command of others) {
     it(command.type, () => {
@@ -99,6 +100,7 @@ describe("线上来的东西必须先验形状", () => {
     { type: "thread.prompt", threadId: "t", text: "hi", attachments: ["/a.png"] },
     { type: "thread.create", cwd: "/w", engine: "codex", trust: "full" },
     { type: "approval.resolve", itemId: "i", allow: false, remember: "once" },
+    { type: "question.resolve", threadId: "t", questionId: "q", response: { dismissed: true } },
     { type: "thread.setModel", threadId: "t", model: "gpt-5", effort: "high" },
   ]
   for (const value of good) {
@@ -121,6 +123,8 @@ describe("线上来的东西必须先验形状", () => {
     ["allow 是字符串不是布尔", { type: "approval.resolve", itemId: "i", allow: "true", remember: "once" }],
     ["trust 取值不合法", { type: "thread.create", cwd: "/w", engine: "codex", trust: "sudo" }],
     ["remember 取值不合法", { type: "approval.resolve", itemId: "i", allow: true, remember: "forever" }],
+    ["结构化回答缺 response", { type: "question.resolve", threadId: "t", questionId: "q" }],
+    ["结构化回答不能是数组", { type: "question.resolve", threadId: "t", questionId: "q", response: [] }],
     ["原型污染那一套也只是个认不出的 type", { type: "__proto__" }],
   ]
   for (const [why, value] of bad) {
@@ -225,5 +229,7 @@ function sample(type: string): Record<string, unknown> {
     allow: true,
     model: "m",
     trust: "auto-edit",
+    questionId: "q",
+    response: { dismissed: true },
   }
 }

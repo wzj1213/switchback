@@ -57,17 +57,6 @@ async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly
   return (await ctx.deps.journal?.read(entry.thread.id)) ?? []
 }
 
-
-function finishDerivedTranscript(
-  ctx: Ctx,
-  born: Thread,
-  current: Live | undefined,
-  content: { forked: { early: string | undefined } | undefined; items: readonly Item[] },
-): void {
-  if (content.forked !== undefined) copyTranscript(ctx, born, content.items)
-  drainQueued(ctx, current)
-}
-
 /**
  * 从一个会话岔出一条新的。分叉（换引擎）与重来（砍掉后面几轮）共用这条路。
  *
@@ -107,24 +96,25 @@ async function branch(
   emit(ctx, { type: "thread.started", at, thread: { ...thread, status: "starting" } })
   let launched: Awaited<ReturnType<typeof launchDerived>>
   try {
-    launched = await launchDerived(ctx, thread, plan, opts.upTo === undefined)
+    launched = await launchDerived(ctx, thread, { ...(plan === undefined ? {} : { plan }), allowBlank: opts.upTo === undefined, items })
   } catch (error) {
     // 后一条临时会话已经取代这条尚未出生的分叉，是正常取消，不冒伪失败横幅。
     if (ctx.removed.has(thread.id)) return
     emit(ctx, { type: "thread.removed", at: ctx.deps.now(), threadId: thread.id })
     throw error
   }
-  const { forked, early } = launched
+  const { early } = launched
   // launch 已经挂上新引擎能力；用更新事件把 starting 壳落成可用会话。
   const current = ctx.live.get(thread.id)
-  const born = { ...(current?.thread ?? thread), status: "idle" as const, updatedAt: ctx.deps.now() }
+  const status = derivedStatus(current)
+  const born = { ...(current?.thread ?? thread), status, updatedAt: ctx.deps.now() }
   if (current !== undefined) current.thread = born
   emit(ctx, { type: "thread.updated", at: born.updatedAt, thread: born })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
 
   // 原生分叉成功时把 transcript 抄过来：**引擎那边已经什么都知道了**，
   // 人看到的和它记得的就对上了
-  finishDerivedTranscript(ctx, born, current, { forked, items })
+  drainQueued(ctx, current)
   /**
    * 把**别的**没用过的临时会话收掉。两个都不能收：
    *
@@ -133,6 +123,10 @@ async function branch(
    *   （比如刚开的空会话上点「换一家试试」），把来路收掉等于把人脚下的地板抽走
    */
   await dropTemps(ctx, [thread.id, entry.thread.id])
+}
+
+function derivedStatus(current: Live | undefined): "idle" | "running" {
+  return current?.turn === undefined ? "idle" : "running"
 }
 
 /**
@@ -163,6 +157,12 @@ function until(items: readonly Item[], turnId: string): readonly Item[] {
  * 跨引擎会话格式不通，omni 不翻译、不摘要，也不替用户发话；只保留工作区与血缘。
  */
 interface NativeForkPlan { handle: string; dropTurns?: number }
+interface DerivedLaunchPlan {
+  plan?: NativeForkPlan
+  allowBlank: boolean
+  items: readonly Item[]
+}
+interface NativeDerivedLaunchPlan extends DerivedLaunchPlan { plan: NativeForkPlan }
 
 function forkPlan(
   entry: Live,
@@ -189,13 +189,22 @@ function forkPlan(
 async function tryFork(
   ctx: Ctx,
   thread: Thread,
-  plan: NativeForkPlan,
-  allowBlank: boolean,
+  options: NativeDerivedLaunchPlan,
 ): Promise<{ early: string | undefined } | undefined> {
+  const { plan, allowBlank, items } = options
+  const prepared = { value: false }
   try {
-    return { early: await launch(ctx, thread, { forkOf: plan }) }
+    return {
+      early: await launch(ctx, thread, {
+        forkOf: plan,
+        beforeActivate: () => {
+          prepared.value = true
+          copyTranscript(ctx, thread, items)
+        },
+      }),
+    }
   } catch (error) {
-    if (ctx.closed || ctx.removed.has(thread.id) || !allowBlank) throw error
+    if (prepared.value || ctx.closed || ctx.removed.has(thread.id) || !allowBlank) throw error
     return undefined
   }
 }
@@ -203,11 +212,13 @@ async function tryFork(
 async function launchDerived(
   ctx: Ctx,
   thread: Thread,
-  plan: NativeForkPlan | undefined,
-  allowBlank: boolean,
+  options: DerivedLaunchPlan,
 ): Promise<{ forked: { early: string | undefined } | undefined; early: string | undefined }> {
+  const { plan, allowBlank, items } = options
   try {
-    const forked = plan === undefined ? undefined : await tryFork(ctx, thread, plan, allowBlank)
+    const forked = plan === undefined
+      ? undefined
+      : await tryFork(ctx, thread, { plan, allowBlank, items })
     const early = forked?.early ?? (forked === undefined ? await launch(ctx, thread) : undefined)
     return { forked, early }
   } catch (error) {
@@ -228,7 +239,7 @@ function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
  *
  * **不传原始上下文，也不注入摘要或提示词**——各家 session 格式不通，
  * omni 不能替用户翻译，更不能以用户身份发一段他没写过的话。
- * 每一段原生记录的路径保留在 `Thread.segments`，需要时由用户明确让引擎读取。
+ * 引擎公开可定位的原生记录路径保留在 `Thread.segments`，需要时由用户明确让引擎读取。
  */
 export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
@@ -338,7 +349,7 @@ async function finishSwitch(
  *
  * **不传原始上下文，也不塞任何文本。** 各家 session 格式不通，硬翻既做不对也
  * 维护不起；而 omni 替用户编一段摘要塞进输入框更糟——那是他没打过的话。
- * 上一家的原始记录路径 omni 已经存在 `Thread.segments` 里（`/timeline` 看得见），
+ * 上一家若公开可定位的原始记录路径，omni 已存在 `Thread.segments` 里（`/timeline` 看得见），
  * 新的一家自己有文件工具，要读的时候读全量原文。
  */
 export async function switchEngine(
@@ -428,9 +439,10 @@ function switched(
     updatedAt: transition.at,
   }
   delete next.nextEngine
-  // 这三份都由当前引擎握手/回调重建。沿用上一家的值会在新状态到达前撒谎，
+  // 这四份都由当前引擎握手/回调重建。沿用上一家的值会在新状态到达前撒谎，
   // 更糟的是 `rememberEngineState` 会合并轴，最终把两家状态拼成一份不存在的状态。
   delete next.engineState
+  delete next.goal
   delete next.trustApply
   delete next.capabilities
   return next

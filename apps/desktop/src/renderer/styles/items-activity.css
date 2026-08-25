@@ -26,6 +26,40 @@
   white-space: pre-wrap;
 }
 
+/* 引擎自己触发的 user-role 输入留在左侧；右对齐只保留给人亲手发送的内容。 */
+.msg--native {
+  max-width: 72%;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  font-size: var(--text-prose);
+  line-height: var(--lh-prose);
+  white-space: pre-wrap;
+}
+
+.msg__origin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--sp-2);
+  margin-bottom: var(--sp-1);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.msg__origin code {
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+.msg__native-text,
+.msg__user-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* 注意：这里**不能**有 white-space: pre-wrap。内容是 Markdown 渲染出的元素树，
    pre-wrap 会把标签之间的换行符当成真实换行，每个块级元素之间凭空多出一整行。
    字面量文本只剩用户消息（.msg--user），pre-wrap 留在那里。 */

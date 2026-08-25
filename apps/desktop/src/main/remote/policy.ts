@@ -57,7 +57,8 @@ function clampScope(scope: RememberScope, ceiling: Trust): { scope: RememberScop
  *
  * 挡的是会让引擎动起来的那几条；`interrupt` / `rename` / `delete` /
  * `setModel` / `approval.resolve` 不在内——**批准尤其不能拦**，
- * 那是这个功能存在的理由。
+ * 那是这个功能存在的理由。`question.resolve` 同理：只回答一张已经挂起的卡，
+ * 不会自行让引擎获得更高权限。
  */
 const RUNS_IN_THREAD: ReadonlySet<string> = new Set([
   "thread.prompt",
@@ -149,6 +150,7 @@ export function isCommand(value: unknown): value is Command {
   if (!shape.strings.every((f) => typeof record[f] === "string")) return false
   if (!(shape.optionalStrings ?? []).every((f) => record[f] === undefined || typeof record[f] === "string")) return false
   if (!(shape.booleans ?? []).every((f) => typeof record[f] === "boolean")) return false
+  if (!(shape.objects ?? []).every((f) => typeof record[f] === "object" && record[f] !== null && !Array.isArray(record[f]))) return false
   return Object.entries(shape.enums ?? {}).every(([field, allowed]) => {
     const seen = record[field]
     return typeof seen === "string" && allowed.includes(seen)
@@ -171,6 +173,8 @@ interface Shape {
    * 用户在手机上点了「允许」，工具被拒，界面上没有任何东西说这里出了错。
    */
   booleans?: readonly string[]
+  /** 必需的普通对象；对象内部的语义由宿主按当前现场校验。 */
+  objects?: readonly string[]
   /** 取值受限的字段。挡的是「类型对但值不对」——那种会一路走到引擎才炸。 */
   enums?: Readonly<Record<string, readonly string[]>>
 }
@@ -203,4 +207,5 @@ const SHAPES: Readonly<Record<string, Shape>> = {
   "thread.setModel": { strings: ["threadId", "model"] },
   "thread.handoff": { strings: ["threadId", "to"] },
   "approval.resolve": { strings: ["itemId"], booleans: ["allow"], enums: { remember: SCOPES } },
+  "question.resolve": { strings: ["threadId", "questionId"], objects: ["response"] },
 }

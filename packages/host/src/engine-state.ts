@@ -1,4 +1,4 @@
-import type { Command, EngineAxis, ThreadId, TrustApply } from "@omni/protocol"
+import type { Command, EngineAxis, EngineGoal, Lane, ThreadId, TrustApply } from "@omni/protocol"
 import { emit, isCurrent, type Ctx } from "./ctx.js"
 
 /**
@@ -21,6 +21,16 @@ export function rememberHandle(ctx: Ctx, id: ThreadId, handle: string): void {
   if (entry === undefined || entry.thread.engineHandle === handle) return
   const at = ctx.deps.now()
   entry.thread = { ...entry.thread, engineHandle: handle, updatedAt: at }
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/** 引擎生成的标题只填自动标题位；用户亲自起过名后永远不反向覆盖。 */
+export function rememberTitle(ctx: Ctx, id: ThreadId, raw: string): void {
+  const entry = ctx.live.get(id)
+  const title = raw.trim()
+  if (entry === undefined || entry.thread.named === true || title === "" || entry.thread.title === title) return
+  const at = ctx.deps.now()
+  entry.thread = { ...entry.thread, title, updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
@@ -87,6 +97,24 @@ export function rememberTrustApply(ctx: Ctx, id: ThreadId, result: TrustApply): 
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
+function sameGoal(left: EngineGoal | undefined, right: EngineGoal | undefined): boolean {
+  if (left === undefined || right === undefined) return left === right
+  const keys = ["objective", "status", "tokenBudget", "tokensUsed", "timeUsedSeconds"] as const
+  return keys.every((key) => left[key] === right[key])
+}
+
+/** 引擎原生目标的整份镜像；清空也走完整 `thread.updated`，刷新后不会复活旧值。 */
+export function rememberGoal(ctx: Ctx, id: ThreadId, goal: EngineGoal | undefined): void {
+  const entry = ctx.live.get(id)
+  if (entry === undefined || sameGoal(entry.thread.goal, goal)) return
+  const at = ctx.deps.now()
+  const next = { ...entry.thread, updatedAt: at }
+  if (goal === undefined) delete next.goal
+  else next.goal = goal
+  entry.thread = next
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
 /**
  * 问一句不打断主线的问题。
  *
@@ -107,10 +135,28 @@ export async function sideQuestion(
   if (ask === undefined) throw new Error(`${entry.thread.engine} 不支持侧问`)
   const question = cmd.text.trim()
   if (question === "") return
-  const answer = await ask.call(entry.session, question)
-  // 侧问期间允许用户去做别的；若已经接力，答案仍属于旧引擎，不能覆盖新 Thread。
-  if (!isCurrent(ctx, entry)) return
   const at = ctx.deps.now()
-  entry.thread = { ...entry.thread, asides: [...(entry.thread.asides ?? []), { at, question, answer }], updatedAt: at }
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  const lane: Lane = {
+    id: ctx.deps.newId("aside"), threadId: cmd.threadId, kind: "aside",
+    title: question, status: "running", at,
+  }
+  emit(ctx, { type: "lane.updated", at, threadId: cmd.threadId, lane })
+  try {
+    const answer = await ask.call(entry.session, question)
+    // lane 已在发起时归到这条 omni 会话；即使期间接力，迟到的原生答案也只更新
+    // 自己这张旁路卡，不会覆盖新引擎的 Thread 状态或进入它的上下文。
+    if (!ctx.removed.has(cmd.threadId)) {
+      emit(ctx, {
+        type: "lane.updated", at: ctx.deps.now(), threadId: cmd.threadId,
+        lane: { ...lane, status: "done", summary: answer },
+      })
+    }
+  } catch (error) {
+    if (ctx.removed.has(cmd.threadId)) return
+    const message = error instanceof Error ? error.message : String(error)
+    emit(ctx, {
+      type: "lane.updated", at: ctx.deps.now(), threadId: cmd.threadId,
+      lane: { ...lane, status: "failed", summary: message },
+    })
+  }
 }

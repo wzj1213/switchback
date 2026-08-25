@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES, type EngineAxis, type Event } from "@omni/protocol"
+import { NO_CAPABILITIES, type EngineAxis, type EngineGoal, type Event } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest } from "@omni/engine"
 import { createHost, type Host } from "./host.js"
 
@@ -30,6 +30,7 @@ interface Probe {
   handle: (handle: string) => void
   drift: (model?: string, effort?: string) => void
   report: (patch: { axes?: readonly EngineAxis[]; modelId?: string }) => void
+  goal: (goal: EngineGoal | undefined) => void
 }
 
 interface Rig {
@@ -47,6 +48,20 @@ function emitEarly(req: StartRequest, engine: string, enabled: ReadonlySet<strin
     status: "starting",
     detail: `early-${engine}`,
   })
+}
+
+function probeOf(req: StartRequest, engine: string): Probe {
+  return {
+    engine,
+    ...(req.resume === undefined ? {} : { resume: req.resume }),
+    prompts: [],
+    disposed: false,
+    emit: req.emit,
+    handle: (handle) => req.onHandle?.(handle),
+    drift: (model, effort) => req.onModel?.(model, effort),
+    report: (patch) => req.onEngineState?.(patch),
+    goal: (goal) => req.onGoal?.(goal),
+  }
 }
 
 function rigOf(options: {
@@ -69,16 +84,7 @@ function rigOf(options: {
   const driver = (engine: string): EngineDriver => ({
     id: engine,
     start: async (req) => {
-      const probe: Probe = {
-        engine,
-        ...(req.resume === undefined ? {} : { resume: req.resume }),
-        prompts: [],
-        disposed: false,
-        emit: req.emit,
-        handle: (handle) => req.onHandle?.(handle),
-        drift: (model, effort) => req.onModel?.(model, effort),
-        report: (patch) => req.onEngineState?.(patch),
-      }
+      const probe = probeOf(req, engine)
       probes.push(probe)
       emitEarly(req, engine, options.earlyEvent)
       if (options.earlySignals === true) {
@@ -88,6 +94,12 @@ function rigOf(options: {
           modelId: "startup-native",
         })
         req.onTrustApply?.({ result: "applied", at: 7 })
+        req.onGoal?.({
+          objective: "startup-goal",
+          status: "active",
+          tokensUsed: 3,
+          timeUsedSeconds: 1,
+        })
       }
       await options.startGate?.[engine]?.promise
       if (options.failStart?.has(engine) === true) throw new Error(`${engine} start failed`)
@@ -168,6 +180,7 @@ describe("换引擎的在途竞态", () => {
         modelId: "startup-native",
       },
       trustApply: { result: "applied", at: 7 },
+      goal: { objective: "startup-goal", status: "active", tokensUsed: 3, timeUsedSeconds: 1 },
     })
   })
 
@@ -241,6 +254,15 @@ describe("换引擎的在途竞态", () => {
     expect(rig.host.live()[0]?.engineState?.modelId).toBe("a-native")
     await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "b" })
     expect(rig.host.live()[0]?.engineState).toBeUndefined()
+  })
+
+  it("新引擎不会继承上一家的长期目标", async () => {
+    const rig = rigOf()
+    const id = await created(rig)
+    rig.probes[0]?.goal({ objective: "A 的目标", status: "active", tokensUsed: 2, timeUsedSeconds: 1 })
+    expect(rig.host.live()[0]?.goal?.objective).toBe("A 的目标")
+    await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "b" })
+    expect(rig.host.live()[0]?.goal).toBeUndefined()
   })
 
   it("运行中点立即切换会拒绝，不遗留一个永远 running 的旧 Turn", async () => {
@@ -425,11 +447,13 @@ describe("换引擎的在途竞态", () => {
     current.handle("b-handle")
     current.drift("b-model", "high")
     current.report({ modelId: "b-native" })
+    current.goal({ objective: "B 的目标", status: "active", tokensUsed: 0, timeUsedSeconds: 0 })
     const before = rig.events.length
 
     old.handle("late-a-handle")
     old.drift("late-a-model", "low")
     old.report({ modelId: "late-a-native" })
+    old.goal({ objective: "迟到的 A 目标", status: "active", tokensUsed: 0, timeUsedSeconds: 0 })
     old.emit({ type: "engine.status", at: 3, threadId: id, status: "degraded", detail: "late" })
 
     expect(rig.events).toHaveLength(before)
@@ -439,6 +463,7 @@ describe("换引擎的在途竞态", () => {
       model: "b-model",
       effort: "high",
       engineState: { modelId: "b-native" },
+      goal: { objective: "B 的目标" },
     })
   })
 

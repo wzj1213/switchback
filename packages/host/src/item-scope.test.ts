@@ -27,11 +27,12 @@ describe("引擎 item id 进入宿主后重新定域", () => {
     expect([firstId, secondId]).toEqual(["it-1", "it-2"])
   })
 
-  it("同一调用的 started、updated、delta 与审批引用仍指向同一个宿主 id", () => {
+  it("同一调用的 started、updated、delta、撤回与审批引用仍指向同一个宿主 id", () => {
     const scope = createItemScope(() => "it-1")
     const begin = scope.event(started("turn-a"))
     const update = scope.event({ ...started("turn-a"), type: "item.updated" })
     const delta = scope.event({ type: "item.delta", at: 1, itemId: "c1", append: "x" })
+    const removed = scope.event({ type: "item.removed", at: 2, turnId: "turn-a", itemId: "c1" })
     const ask = scope.ask(
       { toolCallId: "c1", tool: "Edit", summary: "改文件", reason: "测试" },
       "turn-a",
@@ -40,8 +41,9 @@ describe("引擎 item id 进入宿主后重新定域", () => {
       begin.type === "item.started" ? begin.item.id : "",
       update.type === "item.updated" ? update.item.id : "",
       delta.type === "item.delta" ? delta.itemId : "",
+      removed.type === "item.removed" ? removed.itemId : "",
       ask.toolCallId,
-    ]).toEqual(["it-1", "it-1", "it-1", "it-1"])
+    ]).toEqual(["it-1", "it-1", "it-1", "it-1", "it-1"])
   })
 })
 

@@ -41,6 +41,16 @@ describe("statusLabel", () => {
     expect(statusLabel(thread("running"), [tool()])).toBe("执行 pnpm test")
   })
 
+  it("原生空 stdin 轮询明确说正在等后台终端", () => {
+    expect(
+      statusLabel(thread("running"), [
+        tool({
+          detail: { kind: "shell", command: "pnpm test", terminal: { waiting: true, inputs: [] } },
+        }),
+      ]),
+    ).toBe("等待后台终端 pnpm test")
+  })
+
   it("最后一个工具已经跑完，就回到「正在思考」", () => {
     expect(statusLabel(thread("running"), [tool({ status: "ok" })])).toBe("正在思考")
   })

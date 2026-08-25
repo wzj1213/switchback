@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { CLAIMS, claimedCapabilities } from "./claims.js"
+import { handlesServerRequest } from "./approve.js"
 import { handleNotification } from "./notify.js"
 import type { NotifyContext } from "./notify.js"
 
@@ -16,8 +17,8 @@ describe("omni 认领了 codex 的哪些实验面", () => {
         const ctx = {
           threadId: "t",
           codexThread: () => undefined,
-          emit: () => undefined,
-          turnId: () => undefined,
+          emit: () => events.push("hit"),
+          turnId: () => "turn",
           inflight: new Map(),
           streamed: new Map(),
           materialized: new Set<string>(),
@@ -27,6 +28,12 @@ describe("omni 认领了 codex 的哪些实验面", () => {
         } as unknown as NotifyContext
         handleNotification(ctx, method, { threadSettings: { approvalPolicy: "on-request" } })
         expect(events, `${name} 认领的 ${method} 没有人消费`).not.toEqual([])
+      }
+      for (const method of claim.requests ?? []) {
+        expect(handlesServerRequest(method), `${name} 认领的 ${method} 没有人应答`).toBe(true)
+      }
+      for (const method of claim.methods ?? []) {
+        expect(method, `${name} 认领的方法没有留下具体名字`).toMatch(/[/.]/)
       }
     }
   })

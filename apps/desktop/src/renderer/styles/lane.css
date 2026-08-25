@@ -38,6 +38,10 @@
   color: var(--danger);
 }
 
+.lane--paused .lane__mark {
+  color: var(--warn);
+}
+
 .lane__title {
   font-weight: 500;
   overflow: hidden;
@@ -64,6 +68,10 @@
 
 .lane--failed .lane__state {
   color: var(--danger);
+}
+
+.lane--paused .lane__state {
+  color: var(--warn);
 }
 
 .lane__tree {

@@ -28,7 +28,13 @@ const params: WireMcpElicitation = {
 function serverCall(value: WireMcpElicitation): { call: ServerCall; replies: unknown[] } {
   const replies: unknown[] = []
   return {
-    call: { id: 17, method: MCP_ELICITATION, params: value, respond: (reply) => replies.push(reply) },
+    call: {
+      id: 17,
+      method: MCP_ELICITATION,
+      params: value,
+      respond: (reply) => replies.push(reply),
+      reject: (error) => replies.push({ error }),
+    },
     replies,
   }
 }
@@ -44,6 +50,7 @@ describe("Codex MCP elicitation", () => {
       trust: () => "auto-edit",
       memory: () => [],
       askUser,
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     expect(askUser).toHaveBeenCalledWith(expect.objectContaining({
       toolCallId: "mcp-elicitation-17",
@@ -78,6 +85,7 @@ describe("Codex MCP elicitation", () => {
       trust: () => "auto-edit",
       memory: () => [],
       askUser,
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     expect(askUser).not.toHaveBeenCalled()
     expect(replies).toEqual([{ action: "cancel", content: null, _meta: null }])

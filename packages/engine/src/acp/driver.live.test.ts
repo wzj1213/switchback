@@ -60,6 +60,7 @@ async function run(prompt: string, trust: "read-only" | "auto-edit" | "full", al
       asks.push(ask)
       return Promise.resolve({ allow, remember: "once" })
     },
+    askQuestion: () => Promise.resolve({ dismissed: true }),
   })
   await session.prompt(prompt, "turn-1")
   await new Promise<void>((resolve) => {

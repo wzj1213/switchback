@@ -95,7 +95,7 @@ async function restart(ctx: Ctx, entry: Live, trust: Thread["trust"]): Promise<v
   current.thread = {
     ...current.thread,
     trust,
-    status: "idle",
+    status: current.turn === undefined ? "idle" : "running",
     trustApply: { result: "applied", at: readyAt },
     updatedAt: readyAt,
   }

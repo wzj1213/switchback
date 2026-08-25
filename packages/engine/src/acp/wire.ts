@@ -16,7 +16,7 @@
  * 两代 SDK 的 `PROTOCOL_VERSION` **都是 1**，新版只是多了些可选方法与更新类型。
  * 实测同一个 codex 适配器的两个版本：
  *
- * | | 0.16.0（旧命名空间） | 1.3.0（新命名空间） |
+ * | | 0.16.0（旧命名空间） | 1.4.0（新命名空间） |
  * | --- | --- | --- |
  * | `session/new` 报模型 | `configOptions[id="model"]` | `models.availableModels` |
  * | `session/new` 报档位 | 无 | `modes` **和** `configOptions[id="mode"]` |
@@ -62,13 +62,18 @@ export type AcpToolKind = string
  */
 export interface AcpToolCall {
   toolCallId?: string
+  /** `tool_call` 的标题，或 `session_info_update` 的原生会话标题。 */
   title?: string | null
+  /** `session_info_update` 的 agent 时间；宿主不用外部时钟覆盖本机事件顺序。 */
+  updatedAt?: string | null
   kind?: AcpToolKind | null
   status?: AcpToolStatus | null
   content?: readonly AcpDiff[] | null
   locations?: readonly AcpLocation[] | null
   rawInput?: Record<string, unknown>
   rawOutput?: Record<string, unknown>
+  /** Grok 等 agent 的规范化原生工具身份；未知扩展保持不透明。 */
+  _meta?: Readonly<Record<string, unknown>>
 }
 
 export interface AcpPlanEntry {
@@ -94,6 +99,8 @@ export interface AcpCommand {
 export interface AcpUpdate {
   sessionUpdate?: string
   content?: AcpContent
+  /** 新版 ACP 文本块的原生身份；旧 agent 不带，二者都要兼容。 */
+  messageId?: string | null
   entries?: readonly AcpPlanEntry[]
   /** `available_commands_update`：引擎自己认的斜杠命令。 */
   availableCommands?: readonly AcpCommand[]
@@ -211,11 +218,7 @@ export interface AcpSessionRow {
 }
 
 export type AcpStopReason =
-  | "end_turn"
-  | "max_tokens"
-  | "max_turn_requests"
-  | "refusal"
-  | "cancelled"
+  "end_turn" | "max_tokens" | "max_turn_requests" | "refusal" | "cancelled"
 
 export interface AcpPromptResult {
   stopReason?: AcpStopReason

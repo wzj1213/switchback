@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "arch": "node scripts/check-arch.mjs",
     "check:tokens": "node scripts/check-tokens.mjs",
-    "test": "vitest run",
+    "test": "node scripts/ensure-electron.mjs && vitest run",
     "test:smoke": "pnpm --filter @omni/desktop test:smoke",
     "test:watch": "vitest",
     "dev": "pnpm --filter @omni/desktop dev",

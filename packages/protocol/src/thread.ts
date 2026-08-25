@@ -1,5 +1,29 @@
 import type { EngineCapabilities } from "./capability.js"
 import type { EngineId, ThreadId, TurnId } from "./ids.js"
+import type { PendingQuestion } from "./question.js"
+
+/** 引擎原生长期目标的状态。字段只复述引擎，不由 omni 根据轮次结果推断。 */
+export type GoalStatus =
+  | "active"
+  | "paused"
+  | "blocked"
+  | "usage_limited"
+  | "budget_limited"
+  | "complete"
+
+/**
+ * 引擎自己为这条会话维护的长期目标。它跨轮次存在，和一次轮次里的 `PlanItem` 分开。
+ *
+ * 这是只读镜像：目标由引擎的公开能力创建、更新和清除；omni 不替用户或模型编目标，
+ * 也不根据计划完成度纠正它的状态。
+ */
+export interface EngineGoal {
+  objective: string
+  status: GoalStatus
+  tokenBudget?: number
+  tokensUsed: number
+  timeUsedSeconds: number
+}
 
 /**
  * 引擎自己那边的状态。**只读的镜像，不参与任何判定。**
@@ -120,8 +144,12 @@ export interface Thread {
   engineState?: EngineState
   /** omni 最后一次设档的结果。 */
   trustApply?: TrustApply
+  /** 引擎原生的长期目标；跨轮次保留，与 transcript 中的一次性计划分开。 */
+  goal?: EngineGoal
   /** 侧问的问答，最早在前。**不进 transcript**，见 `Aside`。 */
   asides?: readonly Aside[]
+  /** 引擎正在等人回答的结构化问题；可同时有多组（后台提问会这么做）。 */
+  pendingQuestions?: readonly PendingQuestion[]
   /**
    * 下一句话用哪家引擎。**只是意向，还没生效。**
    *
@@ -288,9 +316,8 @@ export interface Thread {
   /**
    * 这条会话是**从引擎那边接过来的**，不是 omni 建的。
    *
-   * 界面靠它说清楚一件事：前面的内容在引擎那边，omni 这里没有记录。
-   * 不标的话，用户打开看到一片空白，会以为上下文丢了——
-   * 而它其实什么都记得。**「看起来丢了但其实没丢」比真丢了更难受。**
+   * 若驱动拿不到正文，界面靠它解释空白：内容仍在引擎那边，而不是上下文丢了。
+   * 能拿到正文时它仍用于标识来源，不能把「接管」与「正文缺失」压成同一件事。
    */
   adopted?: boolean
 }
@@ -357,9 +384,8 @@ export interface SlashCommand {
  *（`thread/list`，这台机器上 25 条）。omni 的定位是「统一各家原生 agent」，
  * 那么「你在别处跑的那些」本来就该看得见、接得上。
  *
- * **只带得动列表，带不动内容**：codex 的 `thread/items/list` 目前明确回
- * `not supported yet`（实测）。所以接过来的会话在 omni 这边 transcript 是空的，
- * 而引擎那边记得一切——这个落差必须在界面上说出来，不能让人以为内容丢了。
+ * 这里只描述清单；正文能否搬取决于会话接上后是否实现 `EngineSession.transcript`。
+ * 两者必须分开：有的公开接口在 resume 回包里给正文，而列表本身仍只有摘要。
  */
 export interface EngineThread {
   /** 引擎侧句柄。omni 靠它把这条会话接过来续跑。 */

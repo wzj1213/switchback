@@ -55,7 +55,14 @@ describe("额度：握手就问，不等跑完一轮才推", () => {
     expect(events.filter((e) => e.type === "limits.updated")).toHaveLength(1)
   })
 
-  it("读不到就静默：和「这个账号不受额度限制」在界面上是同一种表现", async () => {
+  it("完整快照明确没有窗口时清掉上一账号的额度", async () => {
+    const { events } = await run({
+      "account/rateLimits/read": { rateLimits: { primary: null, secondary: null } },
+    })
+    expect(events.find((e) => e.type === "limits.updated")).toMatchObject({ limits: {} })
+  })
+
+  it("请求本身失败才静默——锦上添花不能拖住开场", async () => {
     const { events } = await run({})
     expect(events).toEqual([])
   })

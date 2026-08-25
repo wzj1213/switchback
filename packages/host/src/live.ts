@@ -29,6 +29,7 @@ const DEFAULT_MAX_LIVE = 4
  *
  * - **正在跑的**：收掉等于中断用户的活
  * - **等着审批的**：那张卡片还挂在界面上，收掉之后它永远等不到答复
+ * - **等着回答原生问题的**：问题卡同样还挂着，收掉会把用户正在填的答案作废
  * - **没有引擎句柄的**：那种收掉就**回不来了**（`resume` 认句柄），
  *   而回不来的不叫「收起来」，叫「弄丢了」
  */
@@ -40,6 +41,7 @@ export async function evict(ctx: Ctx, keep: ThreadId): Promise<void> {
         e.thread.id !== keep &&
         e.turn === undefined &&
         e.thread.status !== "waiting_approval" &&
+        (e.thread.pendingQuestions?.length ?? 0) === 0 &&
         e.thread.engineHandle !== undefined,
     )
     // 最久没动的先走

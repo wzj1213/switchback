@@ -4,9 +4,46 @@ import { Failure } from "./Failure.js"
 import { Thumb } from "./ImageThumb.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
-import type { Item, ToolCallItem } from "@omni/protocol"
+import type { Item, ToolCallItem, UserMessageItem, UserMessageOrigin } from "@omni/protocol"
 import { PlanCard } from "./PlanCard.js"
 import { LinkifiedText } from "./linkified-text.js"
+
+function OriginMeta({ origin }: { origin: UserMessageOrigin }): React.JSX.Element {
+  if (origin === "handoff") return <div className="msg__origin">历史交接</div>
+  if (origin.kind === "shell") return <div className="msg__origin">终端命令</div>
+  if (origin.kind === "goal_continuation") return <div className="msg__origin">长期目标续跑</div>
+  return (
+    <div className="msg__origin">
+      <span>定时触发</span>
+      <code>{origin.schedule}</code>
+      {origin.recurring ? null : <span>单次</span>}
+      {origin.coalescedCount > 1 ? <span>合并 {origin.coalescedCount} 次</span> : null}
+      {origin.stale ? <span>最后一次</span> : null}
+    </div>
+  )
+}
+
+function UserMessage({ item }: { item: UserMessageItem }): React.JSX.Element {
+  const native = item.origin !== undefined
+  return (
+    <div className={native ? "msg--native" : "msg--user"}>
+      {item.origin === undefined ? null : <OriginMeta origin={item.origin} />}
+      {item.text === "" ? null : (
+        <div className={native ? "msg__native-text" : "msg__user-text"}>
+          <LinkifiedText text={item.text} />
+        </div>
+      )}
+      {/* 附件要在记录里留痕：画的是图本身，而不是落盘时生成的时间戳文件名。 */}
+      {item.attachments === undefined || item.attachments.length === 0 ? null : (
+        <div className="msg__attach">
+          {item.attachments.map((path) => (
+            <Thumb key={path} path={path} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /**
  * 除工具调用之外的 item。工具调用由 `ToolRun` 成组渲染——
@@ -38,23 +75,8 @@ export const ItemView = memo(function ItemView({
 }): React.JSX.Element {
   switch (item.kind) {
     case "user_message":
-      // **右对齐在这套界面里只有一个意思：这句是你说的。** 所以这里只有一种形态
-      // ——omni 不再替用户往对话里塞任何东西（交接文本那条路已经删掉）
-      return (
-        <div className="msg--user">
-          <LinkifiedText text={item.text} />
-          {/* 附件要在记录里留痕：三天后回来看「当时贴的是哪张图」，靠的就是这一行。
-              画的是图本身而不是文件名——文件名是落盘时生成的时间戳，
-              回答不了「当时贴的是哪张」这个唯一要问的问题 */}
-          {item.attachments === undefined || item.attachments.length === 0 ? null : (
-            <div className="msg__attach">
-              {item.attachments.map((path) => (
-                <Thumb key={path} path={path} />
-              ))}
-            </div>
-          )}
-        </div>
-      )
+      // **右对齐只有一个意思：这句是你说的。** 原生定时触发必须明确标来源并留在左侧。
+      return <UserMessage item={item} />
     // 用户消息保持字面量：他打的是什么就显示什么，替他解析 Markdown 是意外行为
     case "agent_message":
       return (
@@ -69,6 +91,15 @@ export const ItemView = memo(function ItemView({
     case "approval":
       return <Approval item={item} active={item.turnId === approvalTurn} readOnly={readOnly}
         shortcut={item.id === shortcutApproval} onResolve={onResolve} />
+    case "notice":
+      return (
+        <div
+          className={`engine-note engine-note--${item.level}`}
+          role={item.level === "warning" ? "alert" : "status"}
+        >
+          {item.message}
+        </div>
+      )
     // **可恢复的错误不画成红框。** 实测 codex 断线重连会连发十条
     // `Reconnecting... N/5`，每条都撑成一张整宽红卡片，把正文整个挤没了——
     // 而它们说的是「还在试，你不用做什么」。压成一行灰字，

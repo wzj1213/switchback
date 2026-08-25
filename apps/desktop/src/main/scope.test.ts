@@ -170,6 +170,16 @@ describe("补正文时用当前状态收口", () => {
     expect(out.at(-1)).toMatchObject({ type: "thread.updated", thread: { detached: true, status: "idle" } })
   })
 
+  it("历史里的待回答卡不复活——背后已经没有引擎在等这份答案", () => {
+    const stale: Thread = {
+      ...record("a"),
+      pendingQuestions: [{ id: "q", questions: [{ id: "one", question: "选？", options: [] }] }],
+    }
+    const out = withCurrent([{ type: "thread.started", at: 0, thread: stale }], undefined, 99)
+    const last = out.at(-1)
+    expect(last?.type === "thread.updated" ? last.thread.pendingQuestions : []).toBeUndefined()
+  })
+
   it("空历史不收口——那会凭空造出一条会话", () => {
     expect(withCurrent([], undefined, 99)).toEqual([])
   })

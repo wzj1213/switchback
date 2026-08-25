@@ -60,6 +60,9 @@ export function createItemScope(newId: (prefix: string) => ItemId): ItemScope {
         const itemId = latest.get(event.itemId)
         return itemId === undefined ? event : { ...event, itemId }
       }
+      if (event.type === "item.removed") {
+        return { ...event, itemId: idOf(event.turnId, event.itemId) }
+      }
       if (event.type === "lane.updated") {
         return { ...event, lane: { ...event.lane, id: laneOf(event.lane.id) } }
       }

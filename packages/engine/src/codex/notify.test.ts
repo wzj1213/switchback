@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { Event } from "@omni/protocol"
 import { handleNotification, type NotifyContext } from "./notify.js"
 import type { WireItem } from "./wire.js"
@@ -58,6 +58,26 @@ describe("文本流式 item 的延迟落地", () => {
     handleNotification(ctx, "item/reasoning/textDelta", { threadId: "x", turnId: "y", itemId: "r1", delta: "法" })
     expect(events.filter((e) => e.type === "item.delta")).toHaveLength(2)
   })
+
+  it("reasoning 新段落先切开已有文字，首段信号不制造空白 item", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "item/started", lifecycle({ type: "reasoning", id: "r2" }))
+    handleNotification(ctx, "item/reasoning/summaryPartAdded", {
+      threadId: "x", turnId: "y", itemId: "r2", summaryIndex: 0,
+    })
+    expect(events).toEqual([])
+    handleNotification(ctx, "item/reasoning/summaryTextDelta", {
+      threadId: "x", turnId: "y", itemId: "r2", delta: "第一段",
+    })
+    handleNotification(ctx, "item/reasoning/summaryPartAdded", {
+      threadId: "x", turnId: "y", itemId: "r2", summaryIndex: 1,
+    })
+    handleNotification(ctx, "item/reasoning/summaryTextDelta", {
+      threadId: "x", turnId: "y", itemId: "r2", delta: "第二段",
+    })
+    expect(events.flatMap((event) => event.type === "item.delta" ? [event.append] : []))
+      .toEqual(["第一段", "\n", "第二段"])
+  })
 })
 
 describe("工具类 item", () => {
@@ -80,10 +100,81 @@ describe("工具类 item", () => {
     expect(ctx.inflight.has("e1")).toBe(false)
   })
 
+  it("后台终端轮询更新等待态，stdin 写入留痕且 completed 快照不会抹掉", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "item/started", lifecycle(exec))
+    handleNotification(ctx, "item/commandExecution/outputDelta", {
+      threadId: "cx-th",
+      turnId: "cx-tn",
+      itemId: "e1",
+      delta: "ready\n",
+    })
+    handleNotification(ctx, "item/commandExecution/terminalInteraction", {
+      threadId: "cx-th",
+      turnId: "cx-tn",
+      itemId: "e1",
+      processId: "42",
+      stdin: "",
+    })
+    expect(events.at(-1)).toMatchObject({
+      type: "item.updated",
+      item: { detail: { output: "ready\n", terminal: { waiting: true, inputs: [] } } },
+    })
+    const waitingEvents = events.length
+    handleNotification(ctx, "item/commandExecution/terminalInteraction", {
+      threadId: "cx-th",
+      turnId: "cx-tn",
+      itemId: "e1",
+      processId: "42",
+      stdin: "",
+    })
+    expect(events).toHaveLength(waitingEvents)
+    handleNotification(ctx, "item/commandExecution/terminalInteraction", {
+      threadId: "cx-th",
+      turnId: "cx-tn",
+      itemId: "e1",
+      processId: "42",
+      stdin: "yes\n",
+    })
+    handleNotification(
+      ctx,
+      "item/completed",
+      lifecycle({ ...exec, status: "completed", exitCode: 0 }),
+    )
+    expect(events.at(-1)).toMatchObject({
+      type: "item.updated",
+      item: { status: "ok", detail: { terminal: { waiting: false, inputs: ["yes\n"] } } },
+    })
+  })
+
+  it("终端通知挂不到在途命令时静默忽略，不凭 processId 猜一条工具调用", () => {
+    const { ctx, events } = setup()
+    handleNotification(ctx, "item/commandExecution/terminalInteraction", {
+      threadId: "cx-th",
+      turnId: "cx-tn",
+      itemId: "missing",
+      processId: "42",
+      stdin: "yes\n",
+    })
+    expect(events).toEqual([])
+  })
+
   it("userMessage 不转发——宿主已经发过一条了", () => {
     const { ctx, events } = setup()
     handleNotification(ctx, "item/started", lifecycle({ type: "userMessage", id: "u1" }))
     expect(events).toEqual([])
+  })
+
+  it("上下文压缩生命周期原地收口成一条提示", () => {
+    const { ctx, events } = setup()
+    const item: WireItem = { type: "contextCompaction", id: "compact-1" }
+    handleNotification(ctx, "item/started", lifecycle(item))
+    handleNotification(ctx, "item/completed", lifecycle(item))
+    expect(events.map((event) => event.type)).toEqual(["item.started", "item.updated"])
+    expect(events).toMatchObject([
+      { item: { id: "compact-1", kind: "notice", message: "上下文已压缩。" } },
+      { item: { id: "compact-1", kind: "notice", message: "上下文已压缩。" } },
+    ])
   })
 })
 
@@ -171,7 +262,64 @@ describe("轮次与错误", () => {
     expect(events).toEqual([])
   })
 
-  it("**额度报不出百分比时也不发**——那时发一条空的只会让界面画一根没含义的条", () => {
+  it("对端清掉反向 RPC 时按原始 request id 撤销宿主等待", () => {
+    const { ctx } = setup()
+    const resolved: (string | number)[] = []
+    ctx.onServerRequestResolved = (id) => resolved.push(id)
+    handleNotification(ctx, "serverRequest/resolved", { threadId: "cx", requestId: 0 })
+    handleNotification(ctx, "serverRequest/resolved", { threadId: "cx", requestId: "req-2" })
+    expect(resolved).toEqual([0, "req-2"])
+  })
+
+  it("skill 变化通知只发失效信号，不拿空参数冒充新清单", () => {
+    const { ctx } = setup()
+    const changed = vi.fn()
+    ctx.onSkillsChanged = changed
+    handleNotification(ctx, "skills/changed", {})
+    expect(changed).toHaveBeenCalledOnce()
+  })
+
+  it("hook 起止交给会话跟踪器，轮次收工会解掉悬空运行态", () => {
+    const { ctx } = setup()
+    const hooks = { started: vi.fn(), completed: vi.fn(), settle: vi.fn(), close: vi.fn() }
+    ctx.hooks = hooks
+    const started = { turnId: "native", run: { id: "h", status: "running" } }
+    const completed = { turnId: "native", run: { id: "h", status: "completed" } }
+    handleNotification(ctx, "hook/started", started)
+    handleNotification(ctx, "hook/completed", completed)
+    handleNotification(ctx, "turn/completed", { turn: { id: "native", status: "completed" } })
+    expect(hooks.started).toHaveBeenCalledWith(started)
+    expect(hooks.completed).toHaveBeenCalledWith(completed)
+    expect(hooks.settle).toHaveBeenCalledWith("tn-1", "completed")
+  })
+
+  it("异步 hook 的完成通知允许晚于原生轮次终态", () => {
+    const { ctx } = setup()
+    const completed = vi.fn()
+    ctx.codexThread = () => "native-thread"
+    ctx.codexTurn = () => "current-turn"
+    ctx.settledTurns = new Set(["old-turn"])
+    ctx.hooks = { started: vi.fn(), completed, settle: vi.fn(), close: vi.fn() }
+    const lifecycle = {
+      threadId: "native-thread", turnId: "old-turn", run: { id: "async-hook", status: "completed" },
+    }
+    handleNotification(ctx, "hook/completed", lifecycle)
+    expect(completed).toHaveBeenCalledWith(lifecycle)
+  })
+
+  it("运行、安全、配置与弃用提示都进入统一用户出口", () => {
+    const { ctx, events } = setup()
+    for (const method of ["warning", "guardianWarning", "configWarning", "deprecationNotice"]) {
+      handleNotification(ctx, method, method === "deprecationNotice"
+        ? { summary: `${method} 原文`, details: "迁移说明" }
+        : { message: `${method} 原文` })
+    }
+    expect(events).toHaveLength(4)
+    expect(events.every((event) => event.type === "item.started" && event.item.kind === "notice")).toBe(true)
+    expect(events[3]).toMatchObject({ item: { message: "deprecationNotice 原文\n迁移说明" } })
+  })
+
+  it("稀疏推送的空值不清额度——源码明确说 null 是本帧缺席", () => {
     const { ctx, events } = setup()
     handleNotification(ctx, "account/rateLimits/updated", { rateLimits: {} })
     handleNotification(ctx, "account/rateLimits/updated", { rateLimits: { primary: null, secondary: null } })

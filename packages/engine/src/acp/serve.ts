@@ -1,6 +1,12 @@
+import type { Trust } from "@omni/protocol"
+import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
 import { handlePermission, type PermissionContext } from "./permission.js"
-import type { TerminalHost } from "./terminal.js"
+import { createTerminalHost, type TerminalHost } from "./terminal.js"
+import type { AcpDriverConfig } from "./caps.js"
+import type { AcpToolCall } from "./wire.js"
+import { createForeignInteractionCalls } from "./interaction.js"
+import { mine } from "./route.js"
 
 /**
  * **agent 反过来请求客户端时怎么答。**
@@ -21,6 +27,54 @@ export interface AnswerCtx {
   permission: () => PermissionContext
 }
 
+export interface AcpClientCalls {
+  answer: (call: ServerCall) => Promise<void>
+  resolved: (method: string, params: unknown) => void
+  dispose: () => void
+}
+
+interface ClientCallDeps {
+  req: StartRequest
+  config: AcpDriverConfig
+  inflight: Map<string, AcpToolCall>
+  trust: () => Trust
+  sessionId: () => string | undefined
+}
+
+/** 一条 ACP 连接上 agent 反向调用宿主的全部入口与等待账本。 */
+export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
+  const { req, config } = deps
+  const terminal = config.terminal === true ? createTerminalHost(req.cwd) : undefined
+  const interactions = createForeignInteractionCalls(req.askQuestion)
+  const permission = (): PermissionContext => ({
+    engine: config.id,
+    cwd: req.cwd,
+    home: req.home,
+    trust: deps.trust,
+    memory: req.memory,
+    inflight: deps.inflight,
+    askUser: req.askUser,
+  })
+  const answer = async (call: ServerCall): Promise<void> => {
+    const interaction = config.interaction?.(call.method, call.params)
+    if (interaction === undefined) return answerCall({ terminal, permission }, call)
+    if (!mine(interaction.sessionId, deps.sessionId())) {
+      call.reject({ code: -32602, message: `${call.method} 属于另一条会话` })
+      return
+    }
+    await interactions.answer(call, interaction)
+  }
+  const resolved = (method: string, params: unknown): void => {
+    const key = config.interactionResolved?.(method, params)
+    if (key !== undefined) interactions.resolved(key)
+  }
+  const dispose = (): void => {
+    interactions.abortAll()
+    terminal?.disposeAll()
+  }
+  return { answer, resolved, dispose }
+}
+
 /**
  * 每一条都必须答——**不答 agent 会一直等，整轮卡死**。
  *
@@ -31,7 +85,7 @@ export interface AnswerCtx {
 export async function answerCall(ctx: AnswerCtx, call: ServerCall): Promise<void> {
   if (serveTerminal(ctx.terminal, call)) return
   if (call.method !== "session/request_permission") {
-    call.respond({ error: { code: -32601, message: `omni 未认领 ${call.method}` } })
+    call.reject({ code: -32601, message: `omni 未认领 ${call.method}` })
     return
   }
   await handlePermission(ctx.permission(), call)
@@ -51,7 +105,7 @@ function serveTerminal(host: TerminalHost | undefined, call: ServerCall): boolea
       call.respond(value)
     },
     (error: Error) => {
-      call.respond({ error: { code: -32603, message: error.message } })
+      call.reject({ code: -32603, message: error.message })
     },
   )
   return true

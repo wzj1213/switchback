@@ -36,6 +36,11 @@ export class KimiPrompter {
       }
       const content = await promptContent(text, attachments)
       const prompt = await this.api.post<KimiPrompt>(sessionPath(this.sessionId, "/prompts"), { content })
+      if (prompt.status === "blocked") {
+        this.turn.promptAccepted(generation, prompt.prompt_id)
+        this.turn.failGeneration(generation, "Prompt hook blocked the request.")
+        return
+      }
       if (prompt.status !== "running") {
         await this.cancel(prompt.prompt_id)
         throw new Error(`Kimi 没有开始这一轮（状态：${prompt.status}）`)

@@ -19,17 +19,37 @@ const started: Event = {
 }
 
 describe("shouldPersist", () => {
-  it("item.delta 不落盘——它是冗余的，收工时的 item.updated 带着完整内容", () => {
+  it("普通 item.delta 等终态快照；明确带 threadId 的无终态流自己落盘", () => {
     expect(shouldPersist({ type: "item.delta", at: 1, itemId: "i", append: "x" })).toBe(false)
+    expect(shouldPersist({
+      type: "item.delta", at: 1, threadId: "th-1", itemId: "i", append: "monitor output",
+    })).toBe(true)
+    expect(shouldPersist({
+      type: "item.delta", at: 1, threadId: "", itemId: "i", append: "orphan",
+    })).toBe(false)
   })
 
   it("engine.status 不落盘——它描述的是**那一次进程**，重放会误导人", () => {
     expect(shouldPersist({ type: "engine.status", at: 1, threadId: "t", status: "ready" })).toBe(false)
   })
 
+  it("原生通知不落盘——它属于一次性通知队列", () => {
+    expect(shouldPersist({
+      type: "engine.notification", at: 1, threadId: "t", engine: "claude",
+      key: "k", message: "刚刚发生的事", priority: "medium",
+    })).toBe(false)
+  })
+
+  it("思考 token 不落盘——它只是当前思考块的近似进度", () => {
+    expect(shouldPersist({
+      type: "thinking.updated", at: 1, threadId: "th", turnId: "tu", estimatedTokens: 42,
+    })).toBe(false)
+  })
+
   it("其余都落", () => {
     expect(shouldPersist(started)).toBe(true)
     expect(shouldPersist({ type: "turn.completed", at: 1, turnId: "t", status: "completed" })).toBe(true)
+    expect(shouldPersist({ type: "item.removed", at: 1, turnId: "t", itemId: "i" })).toBe(true)
   })
 })
 

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { FileChange, ToolCallItem } from "@omni/protocol"
-import { VERB, summarize, target } from "../tool.js"
+import { shellTranscript, summarize, target, toolStatusText, VERB } from "../tool.js"
 import { reveal, revealable } from "../reveal.js"
 import { ChevronIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon, GlobeIcon, PencilIcon, TerminalIcon } from "./icons-activity.js"
@@ -27,7 +27,12 @@ function lastLines(text: string, n: number): string {
 /** 有内容可展开的才做成按钮；没有的渲染成静态行，避免出现点了没反应的元素。 */
 function body(item: ToolCallItem): string | undefined {
   if (item.error !== undefined && item.error !== "") return item.error
-  if (item.detail.kind === "shell") return item.detail.output
+  if (item.detail.kind === "shell") return shellTranscript(item.detail)
+  if (item.detail.kind === "other" && item.detail.output !== undefined) {
+    return typeof item.detail.output === "string"
+      ? item.detail.output
+      : JSON.stringify(item.detail.output, null, 2)
+  }
   return undefined
 }
 
@@ -43,14 +48,6 @@ function files(item: ToolCallItem): readonly FileChange[] {
  * 每一行都加一份噪声；真正要人看见的是失败、被拒、中断这几种。
  * 上一版直接打印原始英文枚举，于是整个中文界面上挂着 ok / failed / denied。
  */
-const STATE: Partial<Record<ToolCallItem["status"], string>> = {
-  running: "运行中",
-  pending: "等待",
-  failed: "失败",
-  denied: "已拒绝",
-  interrupted: "已中断",
-}
-
 function Stat({ item }: { item: ToolCallItem }): React.JSX.Element | null {
   if (item.detail.kind === "file_edit" && item.status === "ok") {
     const { added, removed } = item.detail
@@ -62,7 +59,7 @@ function Stat({ item }: { item: ToolCallItem }): React.JSX.Element | null {
       </span>
     )
   }
-  const label = STATE[item.status]
+  const label = toolStatusText(item)
   if (label === undefined) return null
   return <span className={`step__state step__state--${item.status}`}>{label}</span>
 }
@@ -82,7 +79,7 @@ function StepLine({
   return (
     <>
       {/* 图标替掉动词。动词进 aria-label——读屏还是要听见「执行」这两个字 */}
-      <span className="step__icon" aria-label={VERB[item.detail.kind]}>
+      <span className="step__icon" role="img" aria-label={VERB[item.detail.kind]}>
         {GLYPH[item.detail.kind]}
       </span>
       {/* 读文件那种行本来就是静态的（没东西可展开），路径直接可点；
@@ -157,7 +154,11 @@ function Step({ item, cwd }: { item: ToolCallItem; cwd: string }): React.JSX.Ele
 
 /** 这一条要不要单独占一行：**没干完的、出问题的**都要。 */
 function needsOwnRow(item: ToolCallItem): boolean {
-  return item.status !== "ok"
+  const hookOutput = item.tool.startsWith("hook/")
+    && item.detail.kind === "other"
+    && item.detail.output !== undefined
+  // hook 的 warning/context 虽然不等于失败，却是它唯一交给用户看的结果，不能折进成功摘要。
+  return item.status !== "ok" || hookOutput
 }
 
 /**

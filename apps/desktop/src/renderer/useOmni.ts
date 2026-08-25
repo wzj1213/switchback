@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command } from "@omni/protocol"
-import { clearNotices, initial, reduceAll, type ViewState } from "@omni/store"
+import { initial, reduceAll, type ViewState } from "@omni/store"
 import {
   initialStream,
   received,
@@ -15,6 +15,8 @@ import {
 export interface Omni {
   state: ViewState
   send: (command: Command) => void
+  /** 告诉主进程当前正文是哪条会话，只用于抑制眼前这条的系统通知。 */
+  viewing: (threadId: string | undefined) => void
   /** 弹系统目录框。桥没接上时返回 undefined，调用方按「用户取消」处理即可。 */
   pickFolder: () => Promise<string | undefined>
   /** 给一条不属于任何项目的对话要一个目录。 */
@@ -43,6 +45,8 @@ export interface Omni {
    */
   lastStarted: { id: string; seq: number } | undefined
 }
+
+const NOOP_VIEWING = (): void => undefined
 
 /**
  * 订阅主进程的事件流，用 `@omni/store` 的归约器维护视图状态。
@@ -111,10 +115,6 @@ export function useOmni(): Omni {
       // 否则重载之后新旧两份历史会叠在一起
       setState(initial)
       advance(replayed({ ...stream.current, lastSeq: undefined }, replay))
-      // **全量之后把横幅清掉。** `engine.status` 是落盘的（要拿它还原会话状态），
-      // 所以重放会把历史上每一次引擎崩溃重新弹一遍——重启一次，
-      // 迎面几条上周的红条。横幅说的是「刚刚发生了一件事」，那是时刻，不是状态
-      setState(clearNotices)
       setLastStarted(undefined)
     })
     // **两个监听都挂好之后**才喊「我准备好了」。反过来（主进程一加载完就推）
@@ -175,6 +175,7 @@ export function useOmni(): Omni {
     lastStarted,
     state,
     send,
+    viewing: bridge?.viewing ?? NOOP_VIEWING,
     pickFolder,
     onMenu,
     find,

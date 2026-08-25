@@ -21,8 +21,8 @@ import type { ContentHit, SearchOut } from "../shared/search.js"
  *
  * ## 为什么敢直接读整个文件
  *
- * 因为有预筛：先在**原始那行文本**里找关键词（JSON 不转义非 ASCII，中文原样在里面），
- * 命中了才 `JSON.parse`。解析才是贵的那一步，而绝大多数行一个词都不含。
+ * 因为有形态预筛：只解析 user / agent 正文与撤回行，工具、状态、增量都不进 JSON.parse。
+ * 正文按 item id 只认最后一份；撤回是墓碑，所以旧版本既不会重复计数，也不会在搜索里复活。
  * 再加上「按新到旧扫 + 字节预算」两道闸，最坏情况有上界。
  */
 
@@ -58,25 +58,46 @@ export function snippetOf(text: string, terms: readonly string[]): string {
 }
 
 interface Msg {
+  id: string
   text: string
   at: number
 }
 
-/** 一行 jsonl → 「这是一条谁说的话吗」。工具行、状态行一律返回 undefined。 */
-function messageOf(line: string): Msg | undefined {
-  let event: unknown
+type SearchItem = Msg | { id: string; removed: true }
+
+function parseRecord(line: string): Record<string, unknown> | undefined {
   try {
-    event = JSON.parse(line)
+    const value: unknown = JSON.parse(line)
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : undefined
   } catch {
     return undefined
   }
-  if (typeof event !== "object" || event === null) return undefined
-  const rec = event as { type?: string; item?: { kind?: string; text?: string; at?: number } }
-  if (rec.type !== "item.started" && rec.type !== "item.updated") return undefined
-  const item = rec.item
-  if (item === undefined) return undefined
+}
+
+function messageItem(rec: Record<string, unknown>): Msg | undefined {
+  if (rec["type"] !== "item.started" && rec["type"] !== "item.updated") return undefined
+  const value = rec["item"]
+  if (typeof value !== "object" || value === null) return undefined
+  const item = value as { id?: unknown; kind?: unknown; text?: unknown; at?: unknown }
   if (item.kind !== "user_message" && item.kind !== "agent_message") return undefined
-  return typeof item.text === "string" && item.text !== "" ? { text: item.text, at: item.at ?? 0 } : undefined
+  if (typeof item.id !== "string" || typeof item.text !== "string" || item.text === "") return undefined
+  return { id: item.id, text: item.text, at: typeof item.at === "number" ? item.at : 0 }
+}
+
+/** 一行 jsonl → 正文快照或撤回墓碑。工具行、状态行一律返回 undefined。 */
+function searchItemOf(line: string): SearchItem | undefined {
+  const isMessage = line.includes('"kind":"user_message"') || line.includes('"kind":"agent_message"')
+  const isRemoval = line.includes('"type":"item.removed"')
+  if (!isMessage && !isRemoval) return undefined
+  const rec = parseRecord(line)
+  if (rec === undefined) return undefined
+  if (rec["type"] === "item.removed") {
+    const itemId = rec["itemId"]
+    return typeof itemId === "string" ? { id: itemId, removed: true } : undefined
+  }
+  return messageItem(rec)
 }
 
 /**
@@ -87,15 +108,21 @@ function messageOf(line: string): Msg | undefined {
  * 按「同一条消息里全中」筛的话，多词查询几乎永远是空的。
  */
 export function scanLines(lines: readonly string[], terms: readonly string[]): Omit<ContentHit, "threadId"> | undefined {
+  const canonical: Msg[] = []
+  const settled = new Set<string>()
+  // 从后往前：同 id 的最后一份快照或撤回先落定，旧版本无需再参与匹配。
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]
+    if (line === undefined) continue
+    const item = searchItemOf(line)
+    if (item === undefined || settled.has(item.id)) continue
+    settled.add(item.id)
+    if (!("removed" in item)) canonical.push(item)
+  }
   const seen = new Set<string>()
   const best = { score: 0, snippet: "", at: 0 }
   let count = 0
-  for (const line of lines) {
-    const low = line.toLowerCase()
-    // 预筛：整行原文里一个词都没有就不解析。解析才是贵的那一步
-    if (!terms.some((t) => low.includes(t))) continue
-    const msg = messageOf(line)
-    if (msg === undefined) continue
+  for (const msg of canonical) {
     const text = msg.text.toLowerCase()
     const hit = terms.filter((t) => text.includes(t))
     if (hit.length === 0) continue

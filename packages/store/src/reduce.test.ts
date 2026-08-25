@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread, ToolCallItem } from "@omni/protocol"
-import { initial, itemsOf, threadsOf, threadRowsOf } from "./state.js"
+import { initial, itemsOf, limitsOf, threadsOf, threadRowsOf } from "./state.js"
 import { coalesce, reduce, reduceAll, reduceHistory } from "./reduce.js"
 
 const thread = (id: string): Thread => ({
@@ -89,6 +89,21 @@ describe("reduce", () => {
     expect(itemsOf(s, "a")[0]).toEqual(tool)
   })
 
+  it("撤回会删除 item 与反查项，重复撤回和迟到更新都不能把它复活", () => {
+    const seeded = reduceAll(initial(), [
+      started("a"),
+      turnStarted("a", "t1"),
+      { type: "item.started", at: 0, item: msg("i1", "t1", "不再有效") },
+    ])
+    const removed: Event = { type: "item.removed", at: 1, turnId: "t1", itemId: "i1" }
+    const once = reduce(seeded, removed)
+    const twice = reduce(once, removed)
+    const late = reduce(twice, { type: "item.updated", at: 2, item: msg("i1", "t1", "复活") })
+    expect(itemsOf(late, "a")).toEqual([])
+    expect(late.owner["i1"]).toBeUndefined()
+    expect(twice).toBe(once)
+  })
+
   it("turn.completed 清掉当前轮次", () => {
     const s = reduceAll(initial(), [
       started("a"),
@@ -108,6 +123,23 @@ describe("reduce", () => {
     const before = reduceAll(initial(), [started("a")])
     reduce(before, started("b"))
     expect(before.order).toEqual(["a"])
+  })
+
+  it("额度按窗口合并，空对象才清掉旧值", () => {
+    const primary = { usedPercent: 20, windowDurationMins: 10_080 }
+    const secondary = { usedPercent: 80, windowDurationMins: 300 }
+    const first = reduce(initial(), {
+      type: "limits.updated", at: 1, engine: "codex", limits: { primary },
+    })
+    const both = reduce(first, {
+      type: "limits.updated", at: 2, engine: "codex", limits: { secondary },
+    })
+    expect(limitsOf(both, "codex")).toEqual({ primary, secondary })
+
+    const cleared = reduce(both, {
+      type: "limits.updated", at: 3, engine: "codex", limits: {},
+    })
+    expect(limitsOf(cleared, "codex")).toEqual({})
   })
 })
 
@@ -246,6 +278,23 @@ describe("引擎故障通知", () => {
     const s = reduceAll(initial(), many)
     expect(s.notices).toHaveLength(20)
     expect(s.notices[19]?.text).toBe("第 29 条")
+  })
+})
+
+describe("引擎原生通知", () => {
+  const notification = (key: string, message: string, at: number): Event => ({
+    type: "engine.notification", at, threadId: "a", engine: "claude",
+    key, message, priority: "medium", timeoutMs: 3000,
+  })
+
+  it("同一会话、引擎与 key 原地换新，新的通知仍有独立 id", () => {
+    const s = reduceAll(initial(), [notification("quota", "旧", 1), notification("quota", "新", 2)])
+    expect(s.notices).toEqual([expect.objectContaining({ id: "n2", text: "新", timeoutMs: 3000 })])
+  })
+
+  it("不同 key 不互相覆盖", () => {
+    const s = reduceAll(initial(), [notification("one", "一", 1), notification("two", "二", 2)])
+    expect(s.notices.map((notice) => notice.text)).toEqual(["一", "二"])
   })
 })
 

@@ -2,6 +2,7 @@ import type {
   EngineAccount,
   EngineId,
   EngineInfo,
+  EngineNotificationPriority,
   EngineThread,
   Item,
   ItemId,
@@ -26,7 +27,7 @@ export interface ViewState {
   items: Readonly<Record<ThreadId, readonly Item[]>>
   /** 每个会话当前未结束的轮次 */
   turns: Readonly<Record<ThreadId, Turn>>
-  /** item id → 它属于哪个会话。`item.delta` / `item.updated` 只带 item id。 */
+  /** item id → 它属于哪个会话。增量、更新与撤回都靠它反查。 */
   owner: Readonly<Record<ItemId, ThreadId>>
   /** turn id → 它属于哪个会话。`turn.completed` 同理。 */
   turnOwner: Readonly<Record<TurnId, ThreadId>>
@@ -38,6 +39,8 @@ export interface ViewState {
    * 轮次一结束就清空：重放一串早就跑完的任务比不显示更糟。
    */
   tasks: Readonly<Record<ThreadId, readonly TaskRun[]>>
+  /** 当前轮的近似思考 token。活状态，不落盘；轮次收工就清。 */
+  thinking: Readonly<Record<ThreadId, { turnId: TurnId; estimatedTokens: number }>>
   /**
    * 每个会话可选的模型，**连同报它的那家引擎**。引擎报了才有。
    *
@@ -46,7 +49,7 @@ export interface ViewState {
   models: Readonly<Record<ThreadId, Readonly<Record<EngineId, readonly ModelOption[]>>>>
   /** 这台机器上可用的引擎。宿主启动时报一次。 */
   engines: readonly EngineInfo[]
-  /** 引擎层面的故障。最新在后。 */
+  /** 引擎层面的故障与原生瞬时通知。最新在后。 */
   notices: readonly Notice[]
   /**
    * 引擎自己存着的会话（你在终端、别的界面里跑过的）。按引擎分。
@@ -79,16 +82,17 @@ export interface ViewState {
   lanes: Readonly<Record<ThreadId, readonly Lane[]>>
 }
 
-/**
- * 一条要让用户看见的引擎故障。
- *
- * 在这之前 `engine.status` 事件被归约器整个丢弃——引擎起不来、崩了、
- * 进程泄漏，界面上一律**毫无反应**。那不是「没做的功能」，那是故障被吞掉。
- */
-export interface Notice {
+/** 两类横幅共用的身份、时刻、原文与来源会话。 */
+interface NoticeBase {
   id: string
   at: number
   text: string
+  /** 关联的会话；建会话阶段就失败时没有会话。 */
+  threadId: ThreadId | undefined
+}
+
+/** 一条要让用户看见的引擎故障或能力损失。 */
+export interface FailureNotice extends NoticeBase {
   /**
    * 这是哪一类问题。**横幅的抬头照它写。**
    *
@@ -98,9 +102,19 @@ export interface Notice {
    * 结果在界面上又还回去了。
    */
   kind: "crashed" | "degraded"
-  /** 关联的会话；`thread.create` 阶段就失败时没有会话，这里是 undefined。 */
-  threadId: ThreadId | undefined
 }
+
+/** 引擎原生通知队列里的一条瞬时提示。 */
+export interface EngineNotificationNotice extends NoticeBase {
+  kind: "notification"
+  engine: EngineId
+  key: string
+  priority: EngineNotificationPriority
+  color?: string
+  timeoutMs?: number
+}
+
+export type Notice = FailureNotice | EngineNotificationNotice
 
 export function initial(): ViewState {
   return {
@@ -112,6 +126,7 @@ export function initial(): ViewState {
     turnOwner: {},
     usage: {},
     tasks: {},
+    thinking: {},
     models: {},
     commands: {},
     limits: {},
@@ -148,6 +163,11 @@ const NONE: readonly TaskRun[] = []
 
 export function tasksOf(state: ViewState, threadId: ThreadId): readonly TaskRun[] {
   return state.tasks[threadId] ?? NONE
+}
+
+/** 当前轮的近似思考 token；不是最终用量，也不是账单。 */
+export function thinkingTokensOf(state: ViewState, threadId: ThreadId): number | undefined {
+  return state.thinking[threadId]?.estimatedTokens
 }
 
 const NO_LANES: readonly Lane[] = []
@@ -292,21 +312,6 @@ export function projectsOf(rows: readonly ThreadRow[]): readonly Project[] {
   return [...groups.entries()]
     .map(([cwd, list]) => ({ cwd, name: baseNameOf(cwd), rows: list }))
     .sort((a, b) => newest(b.rows) - newest(a.rows))
-}
-
-/**
- * 把横幅清空。**全量重建之后必须调一次。**
- *
- * 横幅说的是「刚刚发生了一件事」——一个时刻，不是一个状态。
- * 而 `engine.status` 是落盘的（它要拿来还原会话状态），
- * 于是全量重放会把**历史上每一次引擎崩溃**重新弹一遍：
- * 重启 omni，迎面几条上周的红条，而那时候的事早就过去了。
- *
- * 和 `thread.removed` 不落盘是同一条道理：
- * **全量重建出来的是「世界现在长什么样」**，不是「都发生过什么」。
- */
-export function clearNotices(state: ViewState): ViewState {
-  return state.notices.length === 0 ? state : { ...state, notices: [] }
 }
 
 /**

@@ -7,7 +7,7 @@
  * codex app-server generate-ts --out /tmp/codex-proto
  * ```
  *
- * 生成出来是 90+ 个文件、74 种通知。这里只声明**我们真正读的字段**，
+ * 生成出来是一整套随版本扩张的请求、应答与通知。这里只声明**我们真正读的字段**，
  * 理由和 `claude/translate.ts` 的 `RawBlock` 一样：直接依赖对方的完整联合，
  * 每次 codex 升级都会编译不过，而我们其实只关心其中一小撮。
  *
@@ -18,6 +18,20 @@ export type { RequestId } from "../rpc.js"
 
 export interface WireThread {
   id: string
+}
+
+export interface WireGoal {
+  objective?: unknown
+  status?: unknown
+  tokenBudget?: unknown
+  tokensUsed?: unknown
+  timeUsedSeconds?: unknown
+}
+
+export interface WireGoalUpdated {
+  threadId?: unknown
+  turnId?: unknown
+  goal?: WireGoal
 }
 
 export type WireTurnStatus = "inProgress" | "completed" | "interrupted" | "failed"
@@ -60,6 +74,11 @@ export interface WireItem {
   commandActions?: readonly WireCommandAction[] | null
   aggregatedOutput?: string | null
   exitCode?: number | null
+  processId?: string | null
+  source?: string
+  /** 驱动从 terminalInteraction 通知并回在在途命令上的会话内状态，不是 app-server item 字段。 */
+  terminalInputs?: readonly string[]
+  waitingForTerminal?: boolean
   /** fileChange */
   changes?: readonly WireFileChangeEntry[]
   /** mcpToolCall */
@@ -86,9 +105,63 @@ export interface WireDelta {
   delta: string
 }
 
+/** 统一终端写入成功后的原生通知；空 stdin 表示仍在轮询活着的后台进程。 */
+export interface WireTerminalInteraction {
+  threadId: string
+  turnId: string
+  itemId: string
+  processId: string
+  stdin: string
+}
+
+export interface WireReasoningPart {
+  threadId: string
+  turnId: string
+  itemId: string
+  summaryIndex: number
+}
+
+export interface WireModelVerification {
+  verifications?: readonly string[]
+}
+
+export interface WireSafetyBuffering {
+  showBufferingUi?: boolean
+  fasterModel?: string | null
+}
+
+export interface WireStrictReview {
+  startedAtMs?: number
+}
+
 export interface WireTurnLifecycle {
   threadId: string
   turn: WireTurn
+}
+
+export interface WireHookEntry {
+  kind?: "warning" | "stop" | "feedback" | "context" | "error" | string
+  text?: string
+}
+
+/** `hook/started` / `hook/completed` 共用；窄声明只留 omni 展示与收口需要的字段。 */
+export interface WireHookRun {
+  id?: string
+  eventName?: string
+  handlerType?: string
+  executionMode?: string
+  scope?: string
+  sourcePath?: string
+  source?: string
+  status?: "running" | "completed" | "failed" | "blocked" | "stopped" | string
+  statusMessage?: string | null
+  entries?: readonly WireHookEntry[]
+}
+
+export interface WireHookLifecycle {
+  threadId?: string
+  turnId?: string | null
+  run: WireHookRun
 }
 
 export interface WireTokenUsage {
@@ -118,6 +191,15 @@ export interface WireError {
   willRetry?: boolean
   threadId?: string
   turnId?: string
+}
+
+/** `warning` / `guardianWarning` / `configWarning` 共用的窄联合。 */
+export interface WireWarning {
+  message?: string
+  summary?: string
+  details?: string | null
+  path?: string
+  range?: { start?: { line?: number; column?: number } }
 }
 
 /**

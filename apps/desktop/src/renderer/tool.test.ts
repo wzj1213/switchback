@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { relPath, summarize } from "./tool.js"
+import { relPath, shellTranscript, summarize } from "./tool.js"
 
 describe("工具活动折成一句话", () => {
   it("**按首次出现去重**——连着读五个文件不该写五遍「读取了文件」", () => {
@@ -38,5 +38,18 @@ describe("工作区里的路径写成相对的", () => {
 
   it("路径就是 cwd 本身时不缩成空字符串", () => {
     expect(relPath("/w", "/w")).toBe("/w")
+  })
+})
+
+describe("后台终端记录", () => {
+  it("把终端输出与后台输入分开，不能把 stdin 冒充成 stdout", () => {
+    expect(
+      shellTranscript({
+        kind: "shell",
+        command: "read answer",
+        output: "ready\n",
+        terminal: { waiting: false, inputs: ["yes\n", "done\n"] },
+      }),
+    ).toBe("终端输出：\nready\n\n\n后台终端输入 1：\nyes\n\n\n后台终端输入 2：\ndone\n")
   })
 })

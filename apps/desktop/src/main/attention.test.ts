@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest"
 import type { Event } from "@omni/protocol"
-import { watchTurns } from "./attention.js"
+import { isAttending, watchTurns } from "./attention.js"
+
+const windowOf = (focused: boolean, destroyed = false): {
+  isDestroyed: () => boolean
+  isFocused: () => boolean
+} => ({
+  isDestroyed: () => destroyed,
+  isFocused: () => focused,
+})
+
+describe("系统通知是不是已经在人眼前", () => {
+  it("只在窗口聚焦且正在看同一条会话时抑制", () => {
+    const cases = [
+      { name: "失焦", windows: [windowOf(false)], viewing: "th-1", event: "th-1", want: false },
+      { name: "已销毁", windows: [windowOf(true, true)], viewing: "th-1", event: "th-1", want: false },
+      { name: "启动首帧未知", windows: [windowOf(true)], viewing: undefined, event: "th-1", want: true },
+      { name: "正在看它", windows: [windowOf(true)], viewing: "th-1", event: "th-1", want: true },
+      { name: "正在看别处", windows: [windowOf(true)], viewing: "th-2", event: "th-1", want: false },
+      { name: "审批归属未知", windows: [windowOf(true)], viewing: "th-2", event: "", want: true },
+    ] as const
+
+    for (const c of cases) {
+      expect(isAttending(c.windows, c.viewing, c.event), c.name).toBe(c.want)
+    }
+  })
+})
 
 /**
  * 「跑完了要不要出声」这件事只有四条规矩，但每一条都是**不出声**的理由——

@@ -38,6 +38,7 @@ describe("Claude 的上下文窗口（真跑）", () => {
       memory: () => [],
       emit: (e) => events.push(e),
       askUser: () => Promise.resolve({ allow: false, remember: "once" as const }),
+      askQuestion: () => Promise.resolve({ dismissed: true }),
     })
     try {
       await session.prompt("只回一个字：好", "t1")

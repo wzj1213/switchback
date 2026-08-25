@@ -73,6 +73,10 @@ export function useShell(): Shell {
   const closeAside = useCallback((laneId: string) => {
     setAside((prev) => closeTab(prev, laneId))
   }, [])
+  // 原生通知的超时 effect 依赖它；引用稳定才能避免每次流式重绘都把计时重新开始。
+  const dismiss = useCallback((id: string) => {
+    setDismissed((prev) => new Set(prev).add(id))
+  }, [])
   return {
     aside,
     openAside,
@@ -80,9 +84,7 @@ export function useShell(): Shell {
     selectedId,
     select: setSelectedId,
     dismissed,
-    dismiss: (id) => {
-      setDismissed((prev) => new Set(prev).add(id))
-    },
+    dismiss,
     finding,
     setFinding,
     comparing,

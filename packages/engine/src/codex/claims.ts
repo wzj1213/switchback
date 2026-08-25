@@ -16,8 +16,8 @@
  * 认领实验面是有代价的——**厂商标了 experimental 就意味着它会变**。
  * 所以两个方向都要卡死：
  *
- * - **认了必须用**：`buys` 里的每一条都要真有 handler。认了却不消费，
- *   等于白白把自己绑在一个不稳定的面上。
+ * - **认了必须用**：`buys` 里的通知要有 handler，反向 RPC 要有应答，客户端方法/字段
+ *   要在回归和版本戳里点名。认了却不消费，等于白白把自己绑在一个不稳定的面上。
  * - **握手发的必须和这张表一致**：代码里那一发 `initialize` 不能和表漂开，
  *   否则表就成了一份「看起来记着、其实没人对照」的文档。
  *
@@ -28,15 +28,21 @@ export interface Claim {
   why: string
   /** 认领之后引擎才会发的那些通知。CI 断言它们每一条都真有 handler。 */
   buys: readonly string[]
+  /** 认领之后才会发的反向 RPC；每一条都必须有精确应答。 */
+  requests?: readonly string[]
+  /** 认领后才可调用的方法或携带的字段；对应调用点必须有协议回归和版本戳。 */
+  methods?: readonly string[]
   /** 在哪个版本上核对过。实验面会变，这一栏是下次核对的起点。 */
   checked: string
 }
 
 export const CLAIMS: Readonly<Record<string, Claim>> = {
   experimentalApi: {
-    why: "换 `thread/settings/updated`——codex 唯一会主动报「我现在是什么档」的通知。不认领它，档位回读那一格就永远空着，而空着看起来就像 codex 不支持。",
-    buys: ["thread/settings/updated"],
-    checked: "openai/codex @ 3b45c2906（2026-08-19）：ThreadSettingsUpdated 标着 #[experimental(\"thread/settings/updated\")]；另有 A/B 实跑——不认领时 thread/settings/update 直接回 requires experimentalApi capability",
+    why: "换 `thread/settings/updated` 的原生档位回读、`item/tool/requestUserInput` 的结构化问题、严格安全复核提示，以及从首轮之前重来所需的 `thread/fork.beforeTurnId` 与分页历史读取。它们都有现成产品落点；不认领才会把引擎能力伪装成空白。",
+    buys: ["thread/settings/updated", "autoApprovalReview/strictReviewRequired"],
+    requests: ["item/tool/requestUserInput"],
+    methods: ["thread/fork.beforeTurnId", "thread/turns/list"],
+    checked: "openai/codex rust-v0.149.0（2026-08-24）：生成协议与 app-server README 均将 requestUserInput 标为 experimental；原生 TUI 源码确认问答语义。档位通知有 capability A/B 实跑；历史分叉 live 确认 lastTurnId 保留前一轮、排除后一轮，beforeTurnId 与 turns/list 由同版本生成契约和定向回归锁定；严格复核通知由同版本 capability 过滤器、app-server guardian 测试与 TUI 警告用例锁定。",
   },
 }
 

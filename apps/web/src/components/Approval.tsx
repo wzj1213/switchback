@@ -23,6 +23,9 @@ const SCOPES: readonly { id: RememberScope; label: string }[] = [
   { id: "session", label: "本会话都允许" },
 ]
 
+const verdictOf = (item: ApprovalItem): string =>
+  item.status === "allowed" ? "已允许" : item.status === "denied" ? "已拒绝" : "已失效"
+
 export function Approval({
   item,
   send,
@@ -38,7 +41,7 @@ export function Approval({
   if (item.status !== "pending") {
     return (
       <div className="item item--approval approval--done" data-status={item.status}>
-        <span className="approval__verdict">{item.status === "allowed" ? "已允许" : "已拒绝"}</span>
+        <span className="approval__verdict">{verdictOf(item)}</span>
         <code className="approval__cmd">{item.summary}</code>
       </div>
     )

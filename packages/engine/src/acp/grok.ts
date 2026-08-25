@@ -1,6 +1,10 @@
 import { access, readdir } from "node:fs/promises"
 import { join } from "node:path"
 import type { Trust } from "@omni/protocol"
+import type { ForeignNotice, ForeignNotification } from "./caps.js"
+
+const nonBlank = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() !== "" ? value : undefined
 
 /**
  * grok 的会话记录在磁盘上的哪儿。
@@ -120,6 +124,91 @@ export function grokCacheRead(method: string, params: unknown): number | undefin
   return typeof hit === "number" && hit > 0 ? hit : undefined
 }
 
+function droppedNotice(update: Record<string, unknown>): ForeignNotice | undefined {
+  const raw = update["notes"]
+  const notes = Array.isArray(raw) ? raw.filter((note): note is string => typeof note === "string" && note !== "") : []
+  return notes.length === 0 ? undefined : { message: notes.join("\n"), level: "warning" }
+}
+
+function compressedNotice(update: Record<string, unknown>): ForeignNotice | undefined {
+  const images = update["images"]
+  const message = update["message"]
+  // Grok 首方 UI：images 非空表示压缩成功，只记日志；空数组才是保留超限原图的降级告警
+  if (!Array.isArray(images) || images.length !== 0 || typeof message !== "string" || message === "") return undefined
+  return { message, level: "warning" }
+}
+
+function compactStartedNotice(update: Record<string, unknown>): ForeignNotice | undefined {
+  const percentage = update["percentage"]
+  if (typeof percentage !== "number") return undefined
+  return { message: `Context ${String(percentage)}% full. Compacting…`, level: "info" }
+}
+
+function compactCompletedNotice(update: Record<string, unknown>): ForeignNotice | undefined {
+  const after = update["tokens_after"]
+  if (typeof after !== "number") return undefined
+  const rawBefore = update["tokens_before"]
+  const before = typeof rawBefore === "number" && rawBefore > 0 ? `${String(rawBefore)} → ` : "→ "
+  const rawMs = update["elapsed_ms"]
+  const elapsed = typeof rawMs === "number" ? ` (${(rawMs / 1000).toFixed(1)}s)` : ""
+  return { message: `Context compacted: ${before}${String(after)} tokens${elapsed}`, level: "info" }
+}
+
+function compactFailedNotice(update: Record<string, unknown>): ForeignNotice | undefined {
+  const error = update["error"]
+  if (typeof error !== "string") return undefined
+  return { message: error.trim() === "" ? "Compaction failed." : `Compaction failed: ${error}`, level: "warning" }
+}
+
+function compactCancelledNotice(update: Record<string, unknown>): ForeignNotice {
+  const reason = update["reason"]
+  const suffix = typeof reason === "string" && reason !== "" ? `: ${reason}` : "."
+  return { message: `Compaction cancelled${suffix}`, level: "notice" }
+}
+
+function hookAnnotationNotice(update: Record<string, unknown>): ForeignNotice | undefined {
+  const message = nonBlank(update["message"])
+  return message === undefined ? undefined : { message, level: "notice" }
+}
+
+const NOTICE: Readonly<Record<string, (update: Record<string, unknown>) => ForeignNotice | undefined>> = {
+  image_dropped: droppedNotice,
+  image_compressed: compressedNotice,
+  auto_compact_started: compactStartedNotice,
+  auto_compact_completed: compactCompletedNotice,
+  auto_compact_failed: compactFailedNotice,
+  auto_compact_cancelled: compactCancelledNotice,
+  hook_annotation: hookAnnotationNotice,
+}
+
+/** Grok 自己在首方 TUI 里显示的附件告警；正常图片压缩按原生规则保持安静。 */
+export function grokNotice(method: string, params: unknown): ForeignNotice | undefined {
+  if (method !== "_x.ai/session_notification") return undefined
+  const update = (params as { update?: Record<string, unknown> } | undefined)?.update
+  if (update === undefined) return undefined
+  return NOTICE[String(update["sessionUpdate"])]?.(update)
+}
+
+/** 首方把模型失效画成会话事件；它可能发生在 session/load 期间，不能硬挂到某一轮。 */
+export function grokNotification(method: string, params: unknown): ForeignNotification | undefined {
+  if (method !== "_x.ai/session_notification") return undefined
+  const update = (params as { update?: Record<string, unknown> } | undefined)?.update
+  if (update?.["sessionUpdate"] !== "model_auto_switched") return undefined
+  const reason = nonBlank(update["reason"])
+  if (reason === undefined) return undefined
+  const replacement = nonBlank(update["new_model_id"])
+  if (replacement === undefined) {
+    return {
+      key: "model-unavailable", message: reason, priority: "immediate", color: "error",
+    }
+  }
+  return {
+    key: "model-unavailable",
+    message: `${reason} Switched to "${replacement}".`,
+    priority: "high",
+  }
+}
+
 /** 记录根目录。 */
 function root(home: string): string {
   return join(home, ".grok", "sessions")
@@ -182,19 +271,32 @@ export async function grokLogPath(home: string, sessionId: string, cwd: string):
  * 顺带：omni 自己发 `session/set_model` 之后 grok 也会回这一条（实测），
  * 所以它同时是一次「真的设进去了」的确认。
  */
-export function grokModelChanged(
-  method: string,
-  params: unknown,
-): { model?: string; effort?: string } | undefined {
-  if (method !== "_x.ai/session_notification") return undefined
-  const update = (params as { update?: Record<string, unknown> } | undefined)?.update
-  if (update?.["sessionUpdate"] !== "model_changed") return undefined
-  const model = update["model_id"]
-  const effort = update["reasoning_effort"]
+interface ModelChange { model?: string; effort?: string }
+
+function selectedModel(update: Record<string, unknown>): ModelChange | undefined {
+  const model = nonBlank(update["model_id"])
+  const effort = nonBlank(update["reasoning_effort"])
   const out = {
-    ...(typeof model === "string" && model !== "" ? { model } : {}),
-    ...(typeof effort === "string" && effort !== "" ? { effort } : {}),
+    ...(model === undefined ? {} : { model }),
+    ...(effort === undefined ? {} : { effort }),
   }
   // 两样都没认出来就当这条与模型无关——**不报一个空的变更**
   return Object.keys(out).length === 0 ? undefined : out
+}
+
+function autoSelectedModel(update: Record<string, unknown>): ModelChange | undefined {
+  const model = nonBlank(update["new_model_id"])
+  return model === undefined ? undefined : { model }
+}
+
+const MODEL_CHANGE: Readonly<Record<string, (update: Record<string, unknown>) => ModelChange | undefined>> = {
+  model_changed: selectedModel,
+  model_auto_switched: autoSelectedModel,
+}
+
+export function grokModelChanged(method: string, params: unknown): ModelChange | undefined {
+  if (method !== "_x.ai/session_notification") return undefined
+  const update = (params as { update?: Record<string, unknown> } | undefined)?.update
+  if (update === undefined) return undefined
+  return MODEL_CHANGE[String(update["sessionUpdate"])]?.(update)
 }

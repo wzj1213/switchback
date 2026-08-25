@@ -9,9 +9,8 @@ import { ForkIcon } from "./icons.js"
  *
  * ## 为什么长得和普通会话行不一样
  *
- * 它们能做的事完全不同：普通行点开就看见全部内容，这些行点开是**把会话接过来**
- * ——接过来之后 omni 这边的记录从零开始（codex 的 `thread/items/list` 目前
- * 回 `not supported yet`，历史内容取不回来）。
+ * 它们能做的事完全不同：普通行点开就看见已落盘内容，这些行点开是
+ * **先把原生会话接过来**；能搬到多少正文由那家引擎接上后公开的历史出口决定。
  *
  * 长得一样的话，用户会按普通会话的预期去点，然后看到一片空白，
  * 以为内容丢了。所以图标、副标题（哪个项目 + 什么时候）都不一样，
@@ -29,7 +28,7 @@ export function ForeignRow({
       <button
         type="button"
         className="row__main"
-        title={`${item.cwd}${item.profile === undefined ? "" : `\nDSH profile：${item.profile}`}\n在 omni 里接着聊（前面的内容在引擎那边）`}
+        title={`${item.cwd}${item.profile === undefined ? "" : `\nDSH profile：${item.profile}`}\n在 omni 里接着聊`}
         onClick={() => {
           onAdopt(item)
         }}
@@ -68,9 +67,8 @@ export function whenOf(at: number, now = Date.now()): string {
  * 「codex 历史」段：**引擎自己存着、omni 从来不知道的那些会话**。
  *
  * 单独成段（而不是混进项目树）是因为它们能做的事完全不同：
- * 普通会话点开就看见全部内容，这些点开是**把会话接过来**，
- * 而接过来之后 omni 这边的记录从零开始。混在一起的话，
- * 用户会按普通会话的预期去点，然后看到一片空白。
+ * 普通会话点开就看见已落盘内容，这些点开是**把原生会话接过来**。
+ * 接管需要启动引擎并读取它能提供的正文，不能冒充普通的本地导航。
  */
 export function ForeignSection({
   engine,

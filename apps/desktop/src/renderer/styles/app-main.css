@@ -178,6 +178,7 @@
 /* 换人说话，或者从「做」回到「说」。审批卡也算——那是要你停下来做决定的东西 */
 .transcript__inner > .copyable:has(> .msg--agent),
 .transcript__inner > .copyable:has(> .msg--user),
+.transcript__inner > .copyable:has(> .msg--native),
 .transcript__inner > .copyable:has(> .approval) {
   margin-top: var(--sp-2);
 }
@@ -269,7 +270,7 @@
   background: var(--danger);
 }
 
-/* ── 引擎故障横幅 ─────────────────────────────────────
+/* ── 引擎状态与原生通知横幅 ───────────────────────────
  * 贴在顶栏下方，不遮挡对话。用 danger 色的极淡底 + 左侧竖条，
  * 而不是整块红——整块红会让人条件反射地关掉它，连读都不读。
  */
@@ -292,16 +293,22 @@
   font-size: var(--text-xs);
 }
 
-/* 「能力受限」不用红：引擎好好的，只是掉了点东西。
-   和真故障用同一个红，两件严重程度差很远的事看起来一样，
-   而看多了红的人会连真的那次也一起无视 */
-.notice__badge--soft {
+.notice--warning .notice__badge {
   color: var(--warn);
 }
 
-.notice:has(.notice__badge--soft) {
+.notice--warning {
   border-left-color: var(--warn);
   background: color-mix(in srgb, var(--warn) 7%, transparent);
+}
+
+.notice--info {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.notice--info .notice__badge {
+  color: var(--accent);
 }
 
 .notice__text {

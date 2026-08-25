@@ -1,5 +1,7 @@
 import type { Event, Item, ItemId, ThreadId } from "@omni/protocol"
-import { type Notice, type ViewState } from "./state.js"
+import { type ViewState } from "./state.js"
+import { reduceEngineNotification, reduceEngineStatus } from "./notices.js"
+import { mergeRateLimits } from "./limits.js"
 
 function withThread(state: ViewState, thread: ViewState["threads"][string]): ViewState {
   const known = state.threads[thread.id] !== undefined
@@ -59,6 +61,19 @@ interface Draft {
   owner: Record<ItemId, ThreadId>
 }
 
+/** 摘掉一条 item 及其反查项。未知 id 幂等忽略，迟到更新因此也无法复活它。 */
+function removeItem(state: ViewState, itemId: ItemId, draft?: Draft): ViewState {
+  const threadId = state.owner[itemId]
+  if (threadId === undefined) return state
+  const owner = omit(state.owner, itemId)
+  if (draft !== undefined) draft.owner = owner
+  return {
+    ...state,
+    items: { ...state.items, [threadId]: (state.items[threadId] ?? []).filter((item) => item.id !== itemId) },
+    owner,
+  }
+}
+
 /** 就地替换一条 item。找不到宿主会话时原样返回——认不出的事件不该让状态崩。 */
 function patchItem(state: ViewState, itemId: ItemId, next: (prev: Item) => Item): ViewState {
   const threadId = state.owner[itemId]
@@ -104,6 +119,8 @@ function onTurnStarted(state: ViewState, event: Extract<Event, { type: "turn.sta
     ...state,
     turns: { ...state.turns, [turn.threadId]: turn },
     turnOwner: { ...state.turnOwner, [turn.id]: turn.threadId },
+    // 新一轮出生就清上一轮可能迟到留下的进度；后续事件还要凭 turnId 才能写回来
+    thinking: omit(state.thinking, turn.threadId),
   }
 }
 
@@ -149,7 +166,12 @@ function onTurnCompleted(
   if (threadId === undefined) return state
   // **子 agent 跟着轮次一起清。** 它们是活状态：一轮结束还留着，界面上就是一串
   // 早就跑完了、却还显示在跑的任务——比不显示更糟
-  return { ...state, turns: omit(state.turns, threadId), tasks: omit(state.tasks, threadId) }
+  return {
+    ...state,
+    turns: omit(state.turns, threadId),
+    tasks: omit(state.tasks, threadId),
+    thinking: omit(state.thinking, threadId),
+  }
 }
 
 /**
@@ -173,6 +195,7 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
     turns: omit(state.turns, threadId),
     usage: omit(state.usage, threadId),
     tasks: omit(state.tasks, threadId),
+    thinking: omit(state.thinking, threadId),
     // 漏了这张就是内存泄漏：lane 里可能挂着一整棵 30 节点的树
     lanes: omit(state.lanes, threadId),
     models: omit(state.models, threadId),
@@ -180,34 +203,6 @@ function removeThread(state: ViewState, threadId: ThreadId): ViewState {
     owner: keepOwner,
     turnOwner: keepTurnOwner,
   }
-}
-
-/**
- * 只有这几档需要打断用户。`starting` / `ready` / `exited` 是正常生命周期。
- *
- * `degraded` 收进来的理由：它描述的是**静默的能力损失**——引擎照跑，
- * 只是少了工具。不出声的话，你看到的只是「它今天做得不太行」。
- */
-const LOUD = new Set(["crashed", "timeout", "degraded"])
-
-/** 最多留这么多条，够排查即可——它不是日志。 */
-const MAX_NOTICES = 20
-
-function onEngineStatus(
-  state: ViewState,
-  event: Extract<Event, { type: "engine.status" }>,
-): ViewState {
-  if (!LOUD.has(event.status)) return state
-  const seq = state.noticeSeq + 1
-  const notice: Notice = {
-    id: `n${String(seq)}`,
-    at: event.at,
-    text: event.detail ?? "引擎报告了一个没有描述的故障",
-    // `timeout` 归到 crashed：对用户来说「起不来」和「崩了」是同一件事
-    kind: event.status === "degraded" ? "degraded" : "crashed",
-    threadId: event.threadId === "" ? undefined : event.threadId,
-  }
-  return { ...state, noticeSeq: seq, notices: [...state.notices, notice].slice(-MAX_NOTICES) }
 }
 
 /**
@@ -236,12 +231,13 @@ function reduceCatalog(
   }
 }
 
-/** item 三兄弟单独拎出来，纯粹为了让 `reduce` 的分支数不撞闸门。 */
+/** item 四种事件单独拎出来，纯粹为了让 `reduce` 的分支数不撞闸门。 */
 function reduceItem(
   state: ViewState,
-  event: Extract<Event, { type: "item.started" | "item.delta" | "item.updated" }>,
+  event: Extract<Event, { type: "item.started" | "item.delta" | "item.updated" | "item.removed" }>,
   draft?: Draft,
 ): ViewState {
+  if (event.type === "item.removed") return removeItem(state, event.itemId, draft)
   if (event.type === "item.delta") {
     return patchItem(state, event.itemId, (prev) => applyDelta(prev, event.append))
   }
@@ -279,6 +275,7 @@ const HANDLERS: Handlers = {
   "item.started": reduceItem,
   "item.delta": reduceItem,
   "item.updated": reduceItem,
+  "item.removed": reduceItem,
   "usage.updated": reduceCatalog,
   "usage.cleared": reduceCatalog,
   // **整份替换**：全量的好处是没有「漏发一次删除」这个失败模式（见事件定义）
@@ -286,6 +283,19 @@ const HANDLERS: Handlers = {
     ...state,
     tasks: { ...state.tasks, [event.threadId]: event.tasks },
   }),
+  "thinking.updated": (state, event) => {
+    if (state.turns[event.threadId]?.id !== event.turnId) return state
+    if (event.estimatedTokens === undefined) {
+      return { ...state, thinking: omit(state.thinking, event.threadId) }
+    }
+    return {
+      ...state,
+      thinking: {
+        ...state.thinking,
+        [event.threadId]: { turnId: event.turnId, estimatedTokens: event.estimatedTokens },
+      },
+    }
+  },
   "commands.updated": (state, event) => ({
     ...state,
     commands: withEngine(state.commands, event.threadId, event.engine, event.commands),
@@ -294,7 +304,10 @@ const HANDLERS: Handlers = {
   "engines.available": reduceCatalog,
   "limits.updated": (state, event) => ({
     ...state,
-    limits: { ...state.limits, [event.engine]: event.limits },
+    limits: {
+      ...state.limits,
+      [event.engine]: mergeRateLimits(state.limits[event.engine], event.limits),
+    },
   }),
   /**
    * **upsert，同 id 整条替换。** 没有「起」和「改」两条事件，所以这里也只有一个分支。
@@ -312,7 +325,8 @@ const HANDLERS: Handlers = {
     const after = at < 0 ? [...before, next] : before.map((l) => (l.id === next.id ? next : l))
     return { ...state, lanes: { ...state.lanes, [event.threadId]: after } }
   },
-  "engine.status": onEngineStatus,
+  "engine.status": reduceEngineStatus,
+  "engine.notification": reduceEngineNotification,
   // 两者都是「整份替换」：引擎报一次就是当前全貌，不是增量
   "engine.history": (state, event) => ({
     ...state,

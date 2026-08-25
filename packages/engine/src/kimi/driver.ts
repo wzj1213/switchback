@@ -1,10 +1,13 @@
 import type { EngineDriver, StartRequest } from "../contract.js"
 import { probeCommand } from "../probe.js"
 import { sessionPath } from "./http.js"
+import { loadKimiMcpSnapshot, type KimiMcpSnapshot } from "./mcp-status.js"
 import { KimiServerPool, type KimiDriverConfig, type KimiLease } from "./server.js"
 import { KimiSession } from "./session.js"
 import { KIMI_TRUST } from "./trust.js"
-import type { KimiSessionRow, KimiSnapshot, KimiStatus } from "./wire.js"
+import type {
+  KimiGoalSnapshot, KimiSessionRow, KimiSnapshot, KimiStatus, KimiTasksResponse, KimiWarningsResponse,
+} from "./wire.js"
 
 interface ConfigResponse {
   default_model?: string
@@ -14,6 +17,10 @@ interface Opened {
   id: string
   status: KimiStatus
   snapshot: KimiSnapshot
+  goal?: KimiGoalSnapshot | null
+  mcp?: KimiMcpSnapshot
+  tasks?: KimiTasksResponse
+  warnings?: KimiWarningsResponse
 }
 
 async function handleOf(lease: KimiLease, req: StartRequest): Promise<KimiSessionRow> {
@@ -45,13 +52,25 @@ async function open(lease: KimiLease, req: StartRequest): Promise<Opened> {
     await lease.api.post(sessionPath(row.id, "/profile"), {
       agent_config: { ...target, ...(model === undefined ? {} : { model }) },
     })
-    const status = await lease.api.get<KimiStatus>(sessionPath(row.id, "/status"))
+    const [status, snapshot, goal, tasks, warnings] = await Promise.all([
+      lease.api.get<KimiStatus>(sessionPath(row.id, "/status")),
+      lease.api.get<KimiSnapshot>(sessionPath(row.id, "/snapshot")),
+      lease.api.get<KimiGoalSnapshot | null>(sessionPath(row.id, "/goal")).catch(() => undefined),
+      lease.api.get<KimiTasksResponse>(sessionPath(row.id, "/tasks")).catch(() => undefined),
+      lease.api.get<KimiWarningsResponse>(sessionPath(row.id, "/warnings")).catch(() => undefined),
+    ])
     if (status.model === undefined || status.model === "") {
       throw new Error("Kimi 没有可用的默认模型；请先在 Kimi Code 里完成登录和模型配置")
     }
-    const snapshot = await lease.api.get<KimiSnapshot>(sessionPath(row.id, "/snapshot"))
     if (snapshot.in_flight_turn !== null) throw new Error("这条 Kimi 会话仍有一轮在运行，暂时不能接入 omni")
-    return { id: row.id, status, snapshot }
+    const mcp = await loadKimiMcpSnapshot(lease.api, row.id).catch(() => undefined)
+    return {
+      id: row.id, status, snapshot,
+      ...(goal === undefined ? {} : { goal }),
+      mcp,
+      tasks,
+      ...(warnings === undefined ? {} : { warnings }),
+    }
   } catch (error) {
     if (req.resume === undefined) await lease.api.post(sessionPath(row.id, ":archive"), {}).catch(() => undefined)
     throw error
@@ -70,7 +89,6 @@ export function createKimiDriver(config: KimiDriverConfig = {}): EngineDriver {
       try {
         const init = await open(lease, req)
         session = new KimiSession(req, lease, init)
-        await session.start()
         return session
       } catch (error) {
         if (session === undefined) await lease.release().catch(() => undefined)

@@ -1,0 +1,62 @@
+/* 引擎原生目标跨轮次常驻；与一次性计划分开，保持一眼可扫的一行。 */
+.goalbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: min(var(--content-max), calc(100% - 2 * var(--sp-4)));
+  min-width: 0;
+  min-height: 30px;
+  margin: 0 auto var(--sp-2);
+  padding: 4px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.goalbar__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--text);
+}
+
+.goalbar[data-status="paused"] .goalbar__dot {
+  background: var(--text-faint);
+}
+
+.goalbar[data-status="blocked"] .goalbar__dot,
+.goalbar[data-status="usage_limited"] .goalbar__dot,
+.goalbar[data-status="budget_limited"] .goalbar__dot {
+  background: var(--warn);
+}
+
+.goalbar[data-status="complete"] .goalbar__dot {
+  background: var(--ok);
+}
+
+.goalbar__state,
+.goalbar__usage {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.goalbar__state {
+  color: var(--text);
+  font-weight: 550;
+}
+
+.goalbar__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goalbar__usage {
+  color: var(--text-faint);
+}

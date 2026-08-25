@@ -2,7 +2,16 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { grokChatPath, grokContextUsed, grokLogPath, grokModelChanged, grokNativeApproval, grokWorkspaceDir } from "./grok.js"
+import {
+  grokChatPath,
+  grokContextUsed,
+  grokLogPath,
+  grokModelChanged,
+  grokNativeApproval,
+  grokNotice,
+  grokNotification,
+  grokWorkspaceDir,
+} from "./grok.js"
 
 /**
  * 目录名的编码规则是从真机上已有的目录反解出来的，所以这张表里的
@@ -101,6 +110,90 @@ describe("grok 的上下文用量", () => {
   })
 })
 
+describe("grok 的图片处理提示", () => {
+  const note = (update: unknown): unknown => ({ sessionId: "s", update })
+
+  it("图片真被丢弃时保留每条原生原因", () => {
+    expect(
+      grokNotice(
+        "_x.ai/session_notification",
+        note({ sessionUpdate: "image_dropped", notes: ["Image 1 was dropped: corrupt.", "Image 2 was too small."] }),
+      ),
+    ).toEqual({
+      message: "Image 1 was dropped: corrupt.\nImage 2 was too small.",
+      level: "warning",
+    })
+  })
+
+  it("成功压缩保持安静；只有空 images 的重编码降级才显示原生提示", () => {
+    expect(
+      grokNotice(
+        "_x.ai/session_notification",
+        note({ sessionUpdate: "image_compressed", images: [{ index: 0 }], message: "compressed" }),
+      ),
+    ).toBeUndefined()
+    expect(
+      grokNotice(
+        "_x.ai/session_notification",
+        note({ sessionUpdate: "image_compressed", images: [], message: "Original image kept." }),
+      ),
+    ).toEqual({ message: "Original image kept.", level: "warning" })
+  })
+
+  it("别的方法、空原因与畸形降级不编提示", () => {
+    expect(grokNotice("session/update", note({ sessionUpdate: "image_dropped", notes: ["x"] }))).toBeUndefined()
+    expect(grokNotice("_x.ai/session_notification", note({ sessionUpdate: "image_dropped", notes: [] }))).toBeUndefined()
+    expect(grokNotice("_x.ai/session_notification", note({ sessionUpdate: "image_compressed", message: "x" }))).toBeUndefined()
+  })
+})
+
+describe("grok 的自动压缩生命周期", () => {
+  const notice = (update: unknown) => grokNotice("_x.ai/session_notification", { sessionId: "s", update })
+
+  it("开始与完成按原生数值显示，旧版缺少 before 也不编", () => {
+    expect(notice({ sessionUpdate: "auto_compact_started", percentage: 82 })).toEqual({
+      message: "Context 82% full. Compacting…",
+      level: "info",
+    })
+    expect(
+      notice({ sessionUpdate: "auto_compact_completed", tokens_before: 120000, tokens_after: 18000, elapsed_ms: 2450 }),
+    ).toEqual({ message: "Context compacted: 120000 → 18000 tokens (2.5s)", level: "info" })
+    expect(notice({ sessionUpdate: "auto_compact_completed", tokens_after: 9000 })).toEqual({
+      message: "Context compacted: → 9000 tokens",
+      level: "info",
+    })
+  })
+
+  it("失败保留原生错误，取消保留原生原因", () => {
+    expect(notice({ sessionUpdate: "auto_compact_failed", error: "summary model unavailable" })).toEqual({
+      message: "Compaction failed: summary model unavailable",
+      level: "warning",
+    })
+    expect(notice({ sessionUpdate: "auto_compact_cancelled", reason: "user pressed Ctrl+C" })).toEqual({
+      message: "Compaction cancelled: user pressed Ctrl+C",
+      level: "notice",
+    })
+  })
+
+  it("关键数值缺席时不拿 0 冒充一次开始或完成", () => {
+    expect(notice({ sessionUpdate: "auto_compact_started" })).toBeUndefined()
+    expect(notice({ sessionUpdate: "auto_compact_completed", tokens_before: 10 })).toBeUndefined()
+    expect(notice({ sessionUpdate: "auto_compact_failed" })).toBeUndefined()
+  })
+})
+
+describe("grok 的 Hook 注解", () => {
+  it("保留首方放在工具调用旁的原文，不从符号猜严重级别", () => {
+    const params = { update: { sessionUpdate: "hook_annotation", message: "⚠ `shell` blocked by hook `guard`: denied" } }
+    expect(grokNotice("_x.ai/session_notification", params)).toEqual({
+      message: "⚠ `shell` blocked by hook `guard`: denied", level: "notice",
+    })
+    expect(grokNotice("_x.ai/session_notification", {
+      update: { sessionUpdate: "hook_annotation", message: "  " },
+    })).toBeUndefined()
+  })
+})
+
 /** 三档都显式占住两枚布尔位，Auto 与 Always-approve 不能再塌成同一档。 */
 describe("grok 的原生审批开关", () => {
   it.each([
@@ -148,5 +241,54 @@ describe("grok 报「模型 / 强度换了」", () => {
     const empty = { update: { sessionUpdate: "model_changed", model_id: 42 } }
     expect(grokModelChanged("_x.ai/session_notification", empty)).toBeUndefined()
     expect(grokModelChanged("_x.ai/session_notification", undefined)).toBeUndefined()
+  })
+
+  it("原生自动替换模型时同步新模型；没有替代项时不拿空串清状态", () => {
+    const replacement = {
+      update: { sessionUpdate: "model_auto_switched", new_model_id: "grok-4.6", reason: "gone" },
+    }
+    expect(grokModelChanged("_x.ai/session_notification", replacement)).toEqual({ model: "grok-4.6" })
+    expect(grokModelChanged("_x.ai/session_notification", {
+      update: { sessionUpdate: "model_auto_switched", new_model_id: "", reason: "gone" },
+    })).toBeUndefined()
+  })
+})
+
+describe("grok 模型失效通知", () => {
+  const notification = (newModel: string) => grokNotification("_x.ai/session_notification", {
+    sessionId: "s",
+    update: {
+      sessionUpdate: "model_auto_switched",
+      previous_model_id: "grok-old",
+      new_model_id: newModel,
+      reason: "Model \"grok-old\" is no longer available.",
+    },
+  })
+
+  it("有替代模型时沿用首方文案并显示切换结果", () => {
+    expect(notification("grok-4.6")).toEqual({
+      key: "model-unavailable",
+      message: "Model \"grok-old\" is no longer available. Switched to \"grok-4.6\".",
+      priority: "high",
+    })
+  })
+
+  it("没有替代模型时保留阻塞原因并提高优先级", () => {
+    expect(notification("")).toEqual({
+      key: "model-unavailable",
+      message: "Model \"grok-old\" is no longer available.",
+      priority: "immediate",
+      color: "error",
+    })
+  })
+
+  it("别的事件、通道或缺文案时不编通知", () => {
+    expect(grokNotification("session/update", {})).toBeUndefined()
+    expect(grokNotification("_x.ai/session_notification", {
+      update: { sessionUpdate: "model_changed", reason: "x" },
+    })).toBeUndefined()
+    expect(grokNotification("_x.ai/session_notification", {
+      update: { sessionUpdate: "model_auto_switched", reason: "" },
+    })).toBeUndefined()
   })
 })

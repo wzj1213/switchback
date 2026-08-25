@@ -51,6 +51,7 @@ describe("kimi ACP（废弃链路）· live · shell", () => {
         memory: () => [],
         emit: (e) => events.push(e),
         askUser: () => Promise.resolve({ allow: true, remember: "once" as const }),
+        askQuestion: () => Promise.resolve({ dismissed: true }),
       })
       try {
         await session.prompt(`用 shell 跑一句 \`echo ${MARK}\`，把原始输出贴给我。不要做别的。`, "turn-1")

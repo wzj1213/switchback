@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES, type Event } from "@omni/protocol"
+import {
+  NO_CAPABILITIES,
+  type Event,
+  type QuestionPrompt,
+  type QuestionResponse,
+} from "@omni/protocol"
 import type { EngineSession } from "@omni/engine"
 import { createHost, type Host } from "./host.js"
 import { setup, create, setupTwoEngines } from "./host-fixture.js"
+
+const QUESTIONS: readonly QuestionPrompt[] = [
+  { id: "one", question: "选哪一个？", options: [{ id: "a", label: "A" }] },
+]
 
 describe("活会话上限：闲着的先收掉", () => {
   /**
@@ -11,10 +20,20 @@ describe("活会话上限：闲着的先收掉", () => {
    */
   const rig = (
     maxLive: number,
-  ): { host: Host; events: Event[]; disposed: string[]; emit: (id: string, e: Event) => void } => {
+  ): {
+    host: Host
+    events: Event[]
+    disposed: string[]
+    emit: (id: string, e: Event) => void
+    question: (id: string) => Promise<QuestionResponse>
+  } => {
     const events: Event[] = []
     const disposed: string[] = []
     const emitters = new Map<string, (e: Event) => void>()
+    const questioners = new Map<
+      string,
+      (questions: readonly QuestionPrompt[]) => Promise<QuestionResponse>
+    >()
     const counter = { n: 0 }
     const host = createHost({
       drivers: {
@@ -24,6 +43,7 @@ describe("活会话上限：闲着的先收掉", () => {
             // 报个句柄，不然按规则它不该被收（收了回不来）
             req.onHandle?.(`cx-${req.threadId}`)
             emitters.set(req.threadId, req.emit)
+            questioners.set(req.threadId, req.askQuestion)
             return Promise.resolve({
               threadId: req.threadId,
               prompt: () => Promise.resolve(),
@@ -49,7 +69,13 @@ describe("活会话上限：闲着的先收掉", () => {
       },
       now: () => counter.n,
     })
-    return { host, events, disposed, emit: (id, e) => emitters.get(id)?.(e) }
+    return {
+      host,
+      events,
+      disposed,
+      emit: (id, e) => emitters.get(id)?.(e),
+      question: (id) => questioners.get(id)?.(QUESTIONS) ?? Promise.resolve({ dismissed: true }),
+    }
   }
 
   /**
@@ -123,6 +149,15 @@ describe("活会话上限：闲着的先收掉", () => {
     await r.host.dispatch({ type: "thread.prompt", threadId: first, text: "跑着呢" })
     await open(r)
     expect(r.disposed).toEqual([])
+  })
+
+  it("状态虽空闲但还挂着原生问题的绝不收——问题卡必须等得到用户回答", async () => {
+    const r = rig(2)
+    const first = await open(r)
+    void r.question(first)
+    await open(r)
+    await open(r)
+    expect(r.disposed).not.toContain(first)
   })
 })
 

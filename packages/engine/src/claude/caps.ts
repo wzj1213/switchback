@@ -36,7 +36,7 @@ import { canAside } from "./aside.js"
  * - `modeReadback` 来自 `system/init` 与 `system/status` 的 `permissionMode`（见 `loop.ts`）。
  * - `sideQuestion` **运行时探测，不嗅版本**：0.3.231 的公开类型没声明它，
  *   所以只能问对象本身。
- * - `activity` 报 true 是**五家里唯一一个活体抓到过帧的**。`task_progress` 是公开类型，
+ * - `activity` 报 true 是因为 Claude 自己的活体帧证据完整。`task_progress` 是公开类型，
  *   帧上那个 `workflow_progress` 数组不在公开类型里（至今没声明它），
  *   但 2026-08-19 真机十帧里四帧带着它——原文贴在 `tasks.ts` 的头注释里。
  *   **判据是「实测报得出来」，不是「源码里有」**：报 true 的后果是界面上多一个入口，

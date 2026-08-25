@@ -226,3 +226,30 @@
   color: var(--text-faint);
   font-size: var(--text-xs);
 }
+
+/* 引擎原生纯文本提示：不套 Markdown，也不冒充模型回答。 */
+.engine-note {
+  padding: 2px 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.engine-note--notice {
+  color: var(--text-muted);
+}
+
+.engine-note--suggestion,
+.engine-note--warning {
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.engine-note--warning {
+  color: var(--warn);
+}

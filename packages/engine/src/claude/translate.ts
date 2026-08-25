@@ -189,3 +189,18 @@ export function turnStatus(subtype: string, isError: boolean): "completed" | "fa
   if (isError) return "failed"
   return subtype === "success" ? "completed" : "interrupted"
 }
+
+interface RawTurnError {
+  result?: unknown
+  errors?: unknown
+}
+
+/**
+ * 两种失败形状都保留：`success + is_error` 把人话放 result，真正 error subtype 放 errors[]。
+ */
+export function turnError(raw: RawTurnError): string | undefined {
+  if (typeof raw.result === "string" && raw.result.trim() !== "") return raw.result
+  if (!Array.isArray(raw.errors)) return undefined
+  const errors = raw.errors.flatMap((value) => typeof value === "string" ? [value.trim()] : []).filter(Boolean)
+  return errors.length === 0 ? undefined : errors.join("; ")
+}

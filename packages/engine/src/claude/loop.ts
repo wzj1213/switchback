@@ -1,72 +1,86 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
-import type { ItemId, ToolCallItem, Trust, TurnId, TurnStatus } from "@omni/protocol"
+import type { ErrorItem, Trust, TurnStatus } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
-import { clearTasks, onTaskProgress, type TaskState } from "./tasks.js"
-import { emitPlan, feedPlan, isPlanTool, resetPlan, type PlanState } from "./plan.js"
-import { applyResult, assistantItems, toolResults, turnStatus } from "./translate.js"
+import { clearTasks, createTaskState, onTaskMessage, type TaskState } from "./tasks.js"
+import { createPlanState, resetPlan } from "./plan.js"
+import { turnError, turnStatus } from "./translate.js"
 import { modeAxis } from "./trust.js"
-import { onStreamEvent, resetStream, type RawStreamEvent, type StreamState } from "./stream.js"
+import { toClaudeLimits } from "./limits.js"
+import { emitInformational } from "./informational.js"
+import { captureTerminalCommands, emitChangedCommands } from "./commands.js"
+import { emitRetry } from "./retry.js"
+import { emitConversationReset } from "./conversation.js"
+import { emitCompaction } from "./compaction.js"
+import { claudeUsage, type RawUsage } from "./usage.js"
+import { clearThinking, createThinkingState, emitThinking } from "./thinking.js"
+import { emitMemoryRecall } from "./memory.js"
+import { makeIdMinter, onAssistant, onToolResults, type MessageRef } from "./messages.js"
+import { clearRetractions, createRetractionState, onModelRefusal } from "./retraction.js"
+import { emitLocalCommandOutput } from "./local-command.js"
+import { closeHooks, createHookState, onHookMessage, type HookState } from "./hooks.js"
+import {
+  applyResultDenials, clearDenials, createDenialState, onPermissionDenied,
+} from "./denials.js"
+import { emitNotification } from "./notification.js"
+import { emitPluginInstall } from "./plugin-install.js"
+import { emitElicitationComplete } from "./elicitation-complete.js"
+import { createStream, onStreamEvent, resetStream, type RawStreamEvent, type StreamState } from "./stream.js"
 
 /** SDK 消息的结构性最小类型——理由同 translate.ts。 */
-interface RawUsage {
-  input_tokens?: number
-  output_tokens?: number
-  cache_read_input_tokens?: number
-  cache_creation_input_tokens?: number
-}
-
 interface RawMessage {
   type: string
-  /** `stream_event` 那一支的载荷。形状见 `stream.ts`。 */
+  /** `stream_event` 的原生载荷；其余事件认不出时照旧忽略。 */
   event?: RawStreamEvent
   subtype?: string
   is_error?: boolean
-  message?: { content?: unknown }
+  message?: { content?: unknown; model?: unknown }
   usage?: RawUsage
-  /** SDK 的会话 id。续跑要靠它，而它**只在 `system/init` 里到达**，比 start() 晚。 */
+  content?: unknown
+  level?: unknown
+  tool_use_id?: unknown
+  rate_limit_info?: unknown
+  result?: unknown
+  errors?: unknown
+  commands?: unknown
+  terminal_slash_commands?: unknown
+  attempt?: unknown
+  max_retries?: unknown
+  retry_delay_ms?: unknown
+  error_status?: unknown
+  error?: unknown
+  name?: unknown
+  mcp_server_name?: unknown
+  elicitation_id?: unknown
+  status?: unknown
+  compact_result?: unknown
+  compact_error?: unknown
+  compact_metadata?: unknown
+  estimated_tokens?: unknown
+  /** 可续跑 session id：初次在 init，`/clear` 后首次在 result。 */
   session_id?: string
+  new_conversation_id?: unknown
   permissionMode?: string
-}
-
-const num = (v: unknown): number => (typeof v === "number" ? v : 0)
-
-/**
- * Claude 的用量。
- *
- * 上下文占用 = 这次请求送上去的输入（含缓存命中的那部分）+ 产出。
- * **缓存命中必须算进去**——它省的是钱，不是上下文：那些 token 照样占窗口。
- *
- * **窗口大小不在这条消息流里**——它随模型变，SDK 的 usage 只说占了多少。
- * 上一版就此认定「引擎不给」，于是界面上只有数字、没有比例条，
- * 而 `getContextUsage()` 这个控制请求一直摆在那儿（`maxTokens`）。现在由会话
- * 问一次再从这里捎带出去；真问不到才缺席，那时照旧只显示数字不画进度条——
- * 宁可少画一条，也不要照一个猜出来的分母画。
- *
- * `cacheRead` 只取 cache_read（命中）；cache_creation 是**写**缓存，不是命中。
- * 字段缺席就是没报，缺席就整个不进事件——不拿 0 冒充「没命中」。
- */
-function usageOf(
-  raw: RawUsage,
-  window: number | undefined,
-): { contextUsed: number; contextWindow?: number; outputTokens?: number; cacheRead?: number } {
-  return {
-    contextUsed:
-      num(raw.input_tokens) +
-      num(raw.cache_read_input_tokens) +
-      num(raw.cache_creation_input_tokens) +
-      num(raw.output_tokens),
-    // **窗口大小不在消息流里**：SDK 的 usage 只说占了多少，不说上限是多少。
-    // 上限由会话另外用 `getContextUsage()` 问一次（见 driver 的 `syncWindow`），
-    // 从这儿捎带出去——**必须和占用量同一条事件**：归约器对 usage 是整份替换，
-    // 另发一条只带窗口的会把 `outputTokens` / `cacheRead` 一起抹掉
-    ...(window === undefined ? {} : { contextWindow: window }),
-    // **单独再报一次生成量。** 它已经算进 `contextUsed` 了，这里不是重复：
-    // 那个数回答「占了多少」，这个数回答「它吐了多少」，而 token/s 的分子只能是后者
-    ...(typeof raw.output_tokens === "number" ? { outputTokens: raw.output_tokens } : {}),
-    ...(typeof raw.cache_read_input_tokens === "number"
-      ? { cacheRead: raw.cache_read_input_tokens }
-      : {}),
-  }
+  uuid?: unknown
+  supersedes?: unknown
+  direction?: unknown
+  scope?: unknown
+  original_model?: unknown
+  fallback_model?: unknown
+  retracted_message_uuids?: unknown
+  hook_id?: unknown
+  hook_name?: unknown
+  hook_event?: unknown
+  stdout?: unknown
+  stderr?: unknown
+  output?: unknown
+  exit_code?: unknown
+  outcome?: unknown
+  permission_denials?: unknown
+  key?: unknown
+  text?: unknown
+  priority?: unknown
+  color?: unknown
+  timeout_ms?: unknown
 }
 
 /**
@@ -74,64 +88,27 @@ function usageOf(
  * 用可变引用而不是参数，是因为消息循环跑在会话整个生命周期上，
  * 而轮次会在这期间反复开合。
  */
-export interface TurnRef {
-  current: TurnId | undefined
-  /** item id 序号，跨轮递增，保证同一会话内不重复 */
-  seq: number
-  /**
-   * 已发出但还没收到结果的工具调用，键是 Claude 的 tool_use id（也是我们的 item id）。
-   * `item.updated` 要带整条 item，所以必须把它留着。
-   */
-  tools: Map<ItemId, ToolCallItem>
+export interface TurnRef extends MessageRef {
+  /** init 明确标为依赖本地终端的命令；omni 只有 GUI，不向两端菜单冒充可用。 */
+  terminalCommands: Set<string>
+  /** init 已被消息循环消费；命令目录据此避开终端标记与开场查询的竞态。 */
+  onInit: (at: number) => void
+  /** 同一轮的 API 重试原地更新，不把指数退避画成一墙重复错误。 */
+  retry?: ErrorItem
   /** 这一轮里子 agent 报的进度。**活状态，轮次收工就清**（见 `tasks.ts`）。 */
   tasks: TaskState
-  /** 这一轮的待办清单。**轮次收工就重置**——下一轮是新的一份，见 `plan.ts`。 */
-  plan: PlanState
-  /** 逐字那一路的状态。**跨消息复用一份**，每条消息开头自己清，见 `stream.ts`。 */
+  /** Hook 可以异步跨过轮次边界，按原生 hook_id 留在会话引用里配对。 */
+  hooks: HookState
+  /** 一条 assistant 消息的增量身份表；完整收尾复用这里已铸好的 id。 */
   stream: StreamState
 }
 
-function makeIdMinter(ref: TurnRef, turnId: TurnId): () => ItemId {
-  return () => {
-    ref.seq += 1
-    return `${turnId}:i${String(ref.seq)}`
-  }
-}
-
-function onAssistant(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
-  const turnId = ref.current
-  // 宿主总是先开轮次再 prompt；没有轮次说明这条消息不属于任何一次请求，丢掉
-  if (turnId === undefined) return
-  const content = msg.message?.content
-  if (!Array.isArray(content)) return
-  const nextId = makeIdMinter(ref, turnId)
-  // **待办工具不画成工具行**：计划卡已经在说同一件事，画两遍是噪声（见 `plan.ts`）
-  let changed = false
-  for (const block of content) if (isPlanTool(block)) changed = feedPlan(ref.plan, block) || changed
-  if (changed) emitPlan(ref.plan, turnId, at, { threadId: req.threadId, emit: req.emit, nextId })
-  // **复用流式那一路已经铸好的 id**：这条收尾消息于是原地替换掉逐字那条，
-  // 而不是在转录区里再长一条一模一样的（见 `stream.ts` 的头注释）
-  const reuse = (order: number): ItemId | undefined => ref.stream.byOrder.get(order)
-  for (const item of assistantItems(content.filter((b) => !isPlanTool(b)), { turnId, at, nextId, reuse })) {
-    if (item.kind === "tool_call") ref.tools.set(item.id, item)
-    req.emit({ type: "item.started", at, item })
-  }
-  // 这条消息翻完了，流式状态跟着清——**一轮里还会有下一条**（每次工具往返之后）
-  resetStream(ref.stream)
-}
-
-/**
- * Claude 把工具结果作为 **user 角色**的消息发回来。不认这一类，
- * 界面上的工具调用会永远停在 `running`——这个 bug 是把界面跑起来才看见的。
- */
-function onToolResults(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
-  const content = msg.message?.content
-  if (!Array.isArray(content)) return
-  for (const result of toolResults(content)) {
-    const pending = ref.tools.get(result.toolUseId)
-    if (pending === undefined) continue
-    ref.tools.delete(result.toolUseId)
-    req.emit({ type: "item.updated", at, item: applyResult(pending, result) })
+export function createTurnRef(onInit: (at: number) => void): TurnRef {
+  return {
+    current: undefined, seq: 0, tools: new Map(), notices: new Map(), terminalCommands: new Set(), onInit,
+    tasks: createTaskState(), plan: createPlanState(), thinking: createThinkingState(),
+    retractions: createRetractionState(), hooks: createHookState(), denials: createDenialState(),
+    stream: createStream(),
   }
 }
 
@@ -163,8 +140,14 @@ function sweepTools(ref: TurnRef, req: StartRequest, at: number, status: TurnSta
 function endTurn(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus): void {
   const turnId = ref.current
   if (turnId === undefined) return
+  clearThinking(ref.thinking, { at, threadId: req.threadId, turnId, emit: req.emit })
   ref.current = undefined
   sweepTools(ref, req, at, status)
+  ref.notices.clear()
+  clearRetractions(ref.retractions)
+  clearDenials(ref.denials)
+  resetStream(ref.stream)
+  ref.retry = undefined
   // 子 agent 跟着轮次一起收：一轮结束还留着，界面上就是一串早就跑完了却还在转的任务
   clearTasks(ref.tasks, at, req)
   resetPlan(ref.plan)
@@ -173,41 +156,114 @@ function endTurn(ref: TurnRef, req: StartRequest, at: number, status: TurnStatus
 
 function onResult(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: number): void {
   const { req } = ctx
+  // `/clear` 后不会再发 init；新的可续跑 session id 首次出现在这条 result 上。
+  if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
   const turnId = ref.current
+  applyResultDenials(msg, ref.denials, ref.tools, { at, emit: req.emit })
+  if (turnId !== undefined) {
+    clearThinking(ref.thinking, { at, threadId: req.threadId, turnId, emit: req.emit })
+  }
   ref.current = undefined
+  resetStream(ref.stream)
   clearTasks(ref.tasks, at, req)
   resetPlan(ref.plan)
   if (msg.usage !== undefined) {
     req.emit({
-      type: "usage.updated", at, threadId: req.threadId, engine: "claude",
-      usage: usageOf(msg.usage, ctx.window()),
+      type: "usage.updated",
+      at,
+      threadId: req.threadId,
+      engine: "claude",
+      usage: claudeUsage(msg.usage, ctx.window()),
     })
   }
-  if (turnId === undefined) return
+  if (turnId === undefined) {
+    clearDenials(ref.denials)
+    return
+  }
   const status = turnStatus(msg.subtype ?? "", msg.is_error === true)
   sweepTools(ref, req, at, status)
-  req.emit({ type: "turn.completed", at, turnId, status })
-}
-
-/** 逐字那一路。**没有轮次就不接**——同 `onAssistant`：那不属于任何一次请求。 */
-function onStream(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
-  const turnId = ref.current
-  if (turnId === undefined) return
-  onStreamEvent(ref.stream, msg.event, {
-    turnId,
-    at,
-    nextId: makeIdMinter(ref, turnId),
-    emit: req.emit,
-  })
+  ref.notices.clear()
+  clearRetractions(ref.retractions)
+  clearDenials(ref.denials)
+  ref.retry = undefined
+  const error = status === "failed" ? turnError(msg) : undefined
+  req.emit({ type: "turn.completed", at, turnId, status, ...(error === undefined ? {} : { error }) })
 }
 
 interface DispatchContext {
   req: StartRequest
   trust: () => Trust
-  /** 上下文窗口。**claude 的消息流里没有这个数**，由会话另外问，见 `syncWindow`。 */
+  /** 消息帧不带窗口上限，由会话通过原生控制请求另取。 */
   window: () => number | undefined
-  /** 引擎起来了/换了模型。会话据此去问一次窗口——窗口是跟着模型走的。 */
+  /** init 说明模型已知，重新同步随模型变化的窗口。 */
   onReady: () => void
+}
+
+/** 逐字增量没有轮次就不接：那不属于宿主发起的任何一次请求。 */
+function onStream(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const turnId = ref.current
+  if (turnId === undefined) return
+  onStreamEvent(ref.stream, msg.event, {
+    turnId, at, nextId: makeIdMinter(ref, turnId), emit: req.emit,
+  })
+}
+
+function emitModelRefusal(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const turnId = ref.current
+  onModelRefusal(msg, ref.retractions, {
+    turnId, at, emit: req.emit, tools: ref.tools, plan: ref.plan, onModel: req.onModel,
+    settledTools: ref.denials.settled, denialMessages: ref.denials.messages,
+    ...(turnId === undefined ? {} : { nextId: makeIdMinter(ref, turnId) }),
+  })
+}
+
+function emitCurrentSystem(msg: RawMessage, ref: TurnRef, req: StartRequest, at: number): void {
+  const turnId = ref.current
+  if (turnId === undefined) return
+  const itemContext = { turnId, at, nextId: makeIdMinter(ref, turnId), emit: req.emit }
+  if (msg.subtype === "informational") emitInformational(msg, ref.notices, itemContext)
+  if (msg.subtype === "local_command_output") emitLocalCommandOutput(msg, itemContext)
+  emitThinking(ref.thinking, msg, {
+    turnId, at, threadId: req.threadId, emit: req.emit,
+  })
+  emitCompaction(msg, ref.notices, { turnId, at, emit: req.emit })
+  emitMemoryRecall(msg, itemContext)
+  if (msg.subtype === "api_retry") {
+    ref.retry = emitRetry(msg, ref.retry, { turnId, at, emit: req.emit }) ?? ref.retry
+  }
+}
+
+function onSystem(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: number): void {
+  const { req } = ctx
+  if (msg.subtype === "notification") {
+    emitNotification(msg, { threadId: req.threadId, at, emit: req.emit })
+  }
+  if (msg.subtype === "plugin_install") {
+    emitPluginInstall(msg, { threadId: req.threadId, at, emit: req.emit })
+  }
+  if (msg.subtype === "elicitation_complete") {
+    emitElicitationComplete(msg, { threadId: req.threadId, at, emit: req.emit })
+  }
+  captureTerminalCommands(msg, ref.terminalCommands)
+  if (msg.permissionMode !== undefined) {
+    req.onEngineState?.({ axes: [modeAxis(msg.permissionMode, ctx.trust())] })
+  }
+  if (msg.subtype === "init") {
+    if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
+    req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
+    ref.onInit(at)
+    ctx.onReady()
+  }
+  emitCurrentSystem(msg, ref, req, at)
+  onHookMessage(ref.hooks, msg, {
+    threadId: req.threadId, turnId: () => ref.current, emit: req.emit, now: () => at,
+  })
+  onPermissionDenied(msg, ref.denials, ref.tools, { at, emit: req.emit })
+  emitModelRefusal(msg, ref, req, at)
+  onTaskMessage(ref.tasks, msg, at, req)
+  emitChangedCommands(msg, {
+    at, threadId: req.threadId, terminalCommands: ref.terminalCommands, emit: req.emit,
+  })
 }
 
 function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: number): void {
@@ -225,20 +281,25 @@ function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: numbe
     case "result":
       onResult(msg, ref, ctx, at)
       return
+    case "rate_limit_event": {
+      const limits = toClaudeLimits(msg.rate_limit_info)
+      if (limits !== undefined) req.emit({ type: "limits.updated", at, engine: "claude", limits })
+      return
+    }
+    case "conversation_reset": {
+      const turnId = ref.current
+      emitConversationReset(msg, {
+        threadId: req.threadId,
+        ...(turnId === undefined ? {} : { turnId }),
+        at,
+        ...(turnId === undefined ? {} : { nextId: makeIdMinter(ref, turnId) }),
+        emit: req.emit,
+      })
+      return
+    }
     case "system":
-      if (msg.permissionMode !== undefined) {
-        req.onEngineState?.({ axes: [modeAxis(msg.permissionMode, ctx.trust())] })
-      }
-      if (msg.subtype === "init") {
-        if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
-        req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
-        // 这时候才知道跑的是哪个模型，而窗口是跟着模型走的
-        ctx.onReady()
-      }
-      // **只接 `task_progress` 一种**：同族还有 task_started / task_updated /
-      // task_notification，形状已在 workflow 那一路抓到，但这里只服务 Task 子 agent，
-      // 那一路还没抓——拿一次实测盖两条路径就是在编字段（见 `tasks.ts`）
-      if (msg.subtype === "task_progress") onTaskProgress(ref.tasks, msg, at, req)
+      // task 生命周期也走 system；认不出的 subtype 由各适配器自己静默略过
+      onSystem(msg, ref, ctx, at)
       return
     default:
       // 其余 30+ 种 SDKMessage 暂不进 transcript，见 README「已知限制」
@@ -252,26 +313,31 @@ function dispatch(msg: RawMessage, ref: TurnRef, ctx: DispatchContext, at: numbe
  * **不吞异常**：迭代抛出时发一条 `engine.status: crashed` 再重新抛出，
  * 让 `dispose()` 的等待方看得到失败，而不是静默结束。
  */
+type LoopOptions = Omit<DispatchContext, "req"> | (() => Trust)
+
+function contextOf(req: StartRequest, options: LoopOptions): DispatchContext {
+  if (typeof options !== "function") return { req, ...options }
+  return { req, trust: options, window: () => undefined, onReady: () => undefined }
+}
+
 export async function runMessageLoop(
   handle: ReturnType<typeof query>,
   req: StartRequest,
   ref: TurnRef,
-  /** 这一层要问外面的几件事。**打包成一个**——分开传会撞参数表闸门。 */
-  ctx: Omit<DispatchContext, "req">,
+  options: LoopOptions,
 ): Promise<void> {
-  const full: DispatchContext = { req, ...ctx }
+  const ctx = contextOf(req, options)
   try {
     for await (const msg of handle) {
-      dispatch(msg as RawMessage, ref, full, Date.now())
+      dispatch(msg as RawMessage, ref, ctx, Date.now())
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     const at = Date.now()
+    closeHooks(ref.hooks, { emit: req.emit, now: () => at })
     /**
      * **必须先把轮次落终态，再抛。**
-     *
-     * 只发 `engine.status: crashed` 的话，宿主那边 `entry.turn` 和
-     * `thread.status = "running"` 永远留着——用户看到的是：一条故障横幅、
+     * 只发 `engine.status: crashed` 会让宿主的 `entry.turn` 和 running 状态永远留着：
      * 一个一直在涨的计时器、和一个点了只会再弹一条横幅的「停止」。
      * 而且输入框会被那个假的「正在跑」永久锁住。
      */
@@ -280,6 +346,7 @@ export async function runMessageLoop(
     throw error
   }
   const at = Date.now()
+  closeHooks(ref.hooks, { emit: req.emit, now: () => at })
   // 正常走完循环但没收到 result 也算没跑完——同样要落终态，理由同上
   endTurn(ref, req, at, "failed")
   req.emit({ type: "engine.status", at, threadId: req.threadId, status: "exited" })

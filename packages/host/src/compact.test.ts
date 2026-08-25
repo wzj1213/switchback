@@ -25,6 +25,15 @@ describe("压缩上下文要等这一轮跑完", () => {
     const { host, id, session } = await opened()
     await host.dispatch({ type: "thread.compact", threadId: id })
     expect(session().compacted()).toBe(1)
+    expect(session().compactions).toHaveLength(1)
+  })
+
+  it("给压缩单独开一轮、但不冒充用户发过一句话", async () => {
+    const { host, id, session } = await opened()
+    await host.dispatch({ type: "thread.compact", threadId: id })
+    const turnId = session().compactions[0]
+    expect(turnId).toMatch(/^tn-/)
+    expect(session().prompts).toEqual([])
   })
 
   it("**引擎在跑就明确拒绝**——发过去只会换回一段像是模型说的英文", async () => {
