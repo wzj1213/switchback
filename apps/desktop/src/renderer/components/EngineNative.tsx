@@ -48,8 +48,11 @@ export function EngineNative({
           <EngineDoors engine={engine} cwd={cwd} dshProfile={dshProfile} onReveal={onReveal} />
         </div>
       </Group>
-      <Group title="版本与更新" hint="只在你点下更新后才会运行界面写出的那条原生命令。">
-        <EngineVersions engine={engine} />
+      <Group
+        title="版本与更新"
+        hint="只在你点下更新后才会运行界面写出的那条原生命令。这一家还没装的话，这里给出装它要跑的那条——omni 确实知道来源的才给，不知道的就照实说不知道。"
+      >
+        <EngineVersions engine={engine} onCopy={onCopy} />
       </Group>
       <div className="eng-registry">
         <span>

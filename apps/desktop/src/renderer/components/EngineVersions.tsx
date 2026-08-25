@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import type { EngineVersion, UpdateResult } from "../../main/enginever.js"
 import { bridge, useAsync } from "../use-async.js"
 import { Actions, Blank, Field } from "./SettingsBits.js"
+import { EngineInstall } from "./EngineInstall.js"
 
 /**
  * 各家引擎的版本与人工更新入口。
@@ -10,7 +11,13 @@ import { Actions, Blank, Field } from "./SettingsBits.js"
  * 由 `useAsync` 传下去——以前这里自己再发一次强制请求，于是两条请求赛跑，
  * 赢的那条往往是拿着缓存的那条。
  */
-export function EngineVersions({ engine }: { engine: string }): React.JSX.Element {
+export function EngineVersions({
+  engine,
+  onCopy,
+}: {
+  engine: string
+  onCopy: (text: string) => void
+}): React.JSX.Element {
   const omni = bridge()
   const load = useMemo(
     () => (omni === undefined ? undefined : (again: boolean) => omni.engineVersions(again)),
@@ -23,14 +30,21 @@ export function EngineVersions({ engine }: { engine: string }): React.JSX.Elemen
   // 更新成功之后本地覆盖一份，不用为了看到新版本号再探一次
   const selected = patched?.engine === engine ? patched : found
 
+  const busy = state.loading || updating !== undefined
   return (
     <>
-      {state.data === undefined && !state.failed ? <Blank>正在检查安装版本…</Blank> : null}
-      {state.failed ? <Blank tone="error">版本探测失败；点下面那颗可以再试一次。</Blank> : null}
-      {state.data !== undefined && selected === undefined ? (
-        <Blank>没探到这家的安装版本；它可能尚未安装，或不在当前 PATH 中。</Blank>
+      <Probe loading={state.data === undefined && !state.failed} failed={state.failed} unknown={state.data !== undefined && selected === undefined} />
+      {selected?.missing === true ? (
+        <EngineInstall
+          key={`install-${selected.engine}`}
+          version={selected}
+          busy={busy}
+          onCopy={onCopy}
+          onBusy={setUpdating}
+          onDone={setPatched}
+        />
       ) : null}
-      {selected === undefined ? null : (
+      {selected === undefined || selected.missing === true ? null : (
         <EngineRow
           key={selected.engine}
           version={selected}
@@ -44,7 +58,7 @@ export function EngineVersions({ engine }: { engine: string }): React.JSX.Elemen
         <button
           type="button"
           className="tbtn"
-          disabled={state.loading || updating !== undefined}
+          disabled={busy}
           title="无视缓存，重新询问 npm 与各家原生更新器"
           onClick={() => {
             setPatched(undefined)
@@ -56,6 +70,25 @@ export function EngineVersions({ engine }: { engine: string }): React.JSX.Elemen
       </Actions>
     </>
   )
+}
+
+/**
+ * 探测那三种状态。**收成一个出口**：三句话分开写的下场这个仓库见过——
+ * 同一块面板里三句「正在读…」字号和内边距各不相同，而它们在用户眼里是同一件事。
+ */
+function Probe({
+  loading,
+  failed,
+  unknown,
+}: {
+  loading: boolean
+  failed: boolean
+  unknown: boolean
+}): React.JSX.Element | null {
+  if (loading) return <Blank>正在检查安装版本…</Blank>
+  if (failed) return <Blank tone="error">版本探测失败；点下面那颗可以再试一次。</Blank>
+  if (unknown) return <Blank>omni 没有这一家的版本来源——第三方 ACP 引擎的版本与安装由它自己管。</Blank>
+  return null
 }
 
 interface EngineRowProps {

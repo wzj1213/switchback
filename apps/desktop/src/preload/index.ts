@@ -63,6 +63,9 @@ const api = {
    * 每开一次设置就 spawn 一次 `npm view`（见 `main/enginever.ts`）。
    * `refresh` 是面板上那颗「重新检查」，无视缓存重探一遍。
    */
+  async installEngine(engine: string): Promise<UpdateResult> {
+    return (await ipcRenderer.invoke("omni:installEngine", engine)) as UpdateResult
+  },
   async engineVersions(refresh?: boolean): Promise<readonly EngineVersion[]> {
     return (await ipcRenderer.invoke("omni:engineVersions", refresh)) as readonly EngineVersion[]
   },
