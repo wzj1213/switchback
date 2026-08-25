@@ -333,3 +333,19 @@ describe("抛壳弹道", () => {
     expect(w.target.shots).toBeGreaterThan(0)
   })
 })
+
+describe("切走很久再回来", () => {
+  it("**回来那一刻不该已经被围了**：一帧几百秒的 dt 不能一次性灌进钟里", () => {
+    const w = createFx()
+    // 切到别的应用待五分钟，回来时浏览器补一帧巨大的 dt
+    stepFx(w, 300, input({ rate: 0, running: true }))
+    expect(w.quiet).toBeLessThanOrEqual(1)
+    expect(w.foes).toHaveLength(0)
+  })
+
+  it("慢拍那一档照常走：120ms 一拍时静默计时不被夹住", () => {
+    const w = createFx()
+    for (let t = 0; t < 4; t += 0.12) stepFx(w, 0.12, input({ rate: 0, running: true }))
+    expect(w.quiet).toBeGreaterThan(3)
+  })
+})

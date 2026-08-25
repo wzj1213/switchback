@@ -41,12 +41,22 @@ export type { FxInput, FxWorld, View } from "./pet-fx-world.js"
  * 推进一帧。`dt` 秒，**调用方不必夹**——这里夹（`MAX_DT`），
  * 因为夹的理由（弹簧的稳定门槛）属于这一层。
  */
+/** 钟一帧最多推进多少秒。见 `stepFx` 开头。 */
+const WALL_MAX = 1
+
 export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
-  const real = rawDt > 0 ? rawDt : 1 / 60
-  // **弹簧要夹，钟不夹。** 夹的理由是显式欧拉的稳定门槛，那只管物理；
-  // 而「静默了多久」「下一只什么时候来」量的是真实时间——闲下来之后这一层
-  // 退到 120ms 一拍（见 `PetFxCanvas.tsx`），钟要是也被夹在 50ms，
-  // 静默三秒那条判据就要等上七秒半才成立
+  // **弹簧夹得紧，钟夹得松，但两个都得夹。**
+  //
+  // 弹簧那道（`MAX_DT`）是显式欧拉的稳定门槛，只管物理。钟不能跟着夹在 50ms：
+  // 闲下来之后这一层退到 120ms 一拍（见 `PetFxCanvas.tsx`），夹住的话
+  // 「静默三秒」要等上七秒半才成立。
+  //
+  // 但钟也**不能完全不夹**——上一版就是不夹的，于是切到别的应用去待五分钟，
+  // 回来那一帧的 `dt` 是三百秒：`quiet` 和 `clock` 一次性跳过去，压力当场拉满、
+  // 怪立刻蹦出来，屏幕上是「一回来就炸了」。而设计上那一刻恰恰是
+  // **你才刚回来**，不是「已经被围了」（同 `spawnDue` 里那句「压力消失又出现时
+  // 不会当场蹦一只」）。1 秒对 120ms 的慢拍有八倍余量，够了。
+  const real = Math.min(rawDt > 0 ? rawDt : 1 / 60, WALL_MAX)
   const dt = Math.min(real, MAX_DT)
   const hand = handOf(input.pet)
   w.quiet = input.rate > 1 ? 0 : w.quiet + real
