@@ -1,20 +1,18 @@
-import { createGun, kickOf, MAX_DT, stepGun, wrapAngle, type Gun } from "./pet-gun.js"
-import {
-  fireStep,
-  GLYPH_W,
-  pushGlyph,
-  rpsOf,
-  spawn,
-  stepShots,
-  stepTape,
-  type Bullet,
-  type Glyph,
-} from "./pet-shots.js"
+import { brassMoving, eject, heave, stepBrass, sweep } from "./pet-brass.js"
+import { kickOf, MAX_DT, stepGun, wrapAngle } from "./pet-gun.js"
+import { fireStep, GLYPH_W, pushGlyph, rpsOf, spawn, stepShots, stepTape } from "./pet-shots.js"
 import { hitFoe, nearest, nextGap, pressureOf, spawnFoes, stepFoes, type Foe } from "./pet-foes.js"
-import { SIZE, type Pet } from "./pets.js"
+import { land, punch } from "./pet-range.js"
+import { DRIFT_QUIET, handOf, muzzleOf, portOf, tapeAt, targetAt } from "./pet-fx-geo.js"
+import type { FxInput, FxWorld, Shot } from "./pet-fx-world.js"
+import { SIZE } from "./pets.js"
+
+export { handOf, muzzleOf, portOf, tapeAt, targetAt } from "./pet-fx-geo.js"
+export { createFx, resetFx } from "./pet-fx-world.js"
+export type { FxInput, FxWorld, View } from "./pet-fx-world.js"
 
 /**
- * 开火那一层的世界。**把三个纯模块（枪、子弹、纸带）串成一帧。**
+ * 开火那一层的世界。**把几个纯模块（枪、子弹、纸带、弹壳、怪、靶）串成一帧。**
  *
  * ## 这一层为什么和桌宠本体是分开的
  *
@@ -35,152 +33,156 @@ import { SIZE, type Pet } from "./pets.js"
  * ## `stepFx` 是**原地改**的，而且明说
  *
  * 上一版它返回 `{...w}`，看起来像纯函数——**但里面那几个数组是共着的**。
- * 于是「从同一个世界分出两条支线」这种再自然不过的写法会让两条互相改对方的子弹，
- * 而且完全不报错（第一次发现是在测试里：火力更猛的那一支反而挨咬更多）。
  * 装成纯的比明着改更危险，所以现在它就是个原地改的推进器：一帧一个世界，
  * 要分支就自己另起一个。
  */
-
-/** 纸带离手多远、离地多高。 */
-const TAPE_DX = 108
-const TAPE_DY = 12
-/** 纸带最左能漂到哪儿（相对手）。到头就没了。 */
-const TAPE_LEN = 190
-/**
- * 静默时纸带漂多快。**开火时的漂速不是常数**——它等于「每秒几发 × 一个字宽」，
- * 于是落下来的永远是一条排得开的字（见 `GLYPH_W`）。
- * 静默时给一个固定的快速度：一条不动的字带会一直挂在那儿，
- * 而「空闲整帧不重绘」那条优化就永远等不到「不动」这一刻。
- */
-const DRIFT_QUIET = 90
-/**
- * 手在身子的哪个位置（占盒子的比例，不是绝对值——螃蟹和鲸的盒子不一样大）。
- *
- * **横向是负的：手在身子左沿外面一点点。** 画布压在桌宠底下，
- * 手心搁在身体内侧的话整把枪都被身子盖住，只剩枪口焰像个悬空的火星
- *（实测就是这样）。挪出去之后，枪托那一小截还压在身下——那正好读作「握着」。
- */
-const HAND_X = -0.04
-const HAND_Y = 0.72
-/** 枪管从手心往外探多远。出膛点＝手 + 这一段，按枪的指向旋过去。 */
-const BARREL = 11
-
-/** 一发子弹外加「它打的是谁」。**敌人的身份只存在于这一层**——见 `stepShots`。 */
-interface Shot extends Bullet {
-  foe?: Foe
-}
-
-export interface FxWorld {
-  gun: Gun
-  bullets: Shot[]
-  tape: Glyph[]
-  /** 从左边爬过来的那些。 */
-  foes: Foe[]
-  /** 这一层自己的钟（秒）。刷怪的节拍按它走，**不读时钟**。 */
-  clock: number
-  /** 下一只该在什么时候来。 */
-  nextAt: number
-  /** 已经安静了多久（秒）。静默那条压力按它算。 */
-  quiet: number
-  /** 这一轮被摸到脸上几次。**只记账，不影响任何数**——它是健康度不是分数。 */
-  bites: number
-  /** 欠着的发数。见 `fireStep`。 */
-  acc: number
-  /** 下一个要落的字。**顺着来而不是随机**：随机会落出一串看不出是文字的乱码。 */
-  ch: number
-  /** 上一帧动没动过。用来判断「忙→闲」那一帧要不要再画一次收尾。 */
-  moving: boolean
-}
-
-export function createFx(): FxWorld {
-  return {
-    gun: createGun(),
-    bullets: [],
-    tape: [],
-    foes: [],
-    clock: 0,
-    nextAt: 3,
-    quiet: 0,
-    bites: 0,
-    acc: 0,
-    ch: 0,
-    moving: true,
-  }
-}
-
-export interface FxInput {
-  /** 当前那只此刻在哪。**这是本层和桌宠本体之间唯一的接口。** */
-  pet: Pet
-  /** 估出来的流速（token/秒）。见 `throughput.ts`。 */
-  rate: number
-  /**
-   * 手里要不要换别的东西：在跑工具、在等审批。
-   * 这时立刻收枪——枪和终端不能同时在手上。
-   */
-  busyHands: boolean
-  /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */
-  running: boolean
-  /** 上下文用了多满（0~1）。引擎没报窗口时给 0。 */
-  ratio: number
-  /** 画布左边界：怪从那儿爬进来。 */
-  left: number
-  /** 让不让压力显形。关掉之后只剩打纸带那一层。 */
-  foes: boolean
-  /** 随机源。**由调用方给**，所以这一层可以被确定性地测。 */
-  rand: () => number
-}
-
-/** 手心在哪（相对活动区）。桌宠本体的坐标是左上角。 */
-export function handOf(pet: Pet): { x: number; y: number } {
-  return { x: pet.x + SIZE * HAND_X, y: pet.y + SIZE * HAND_Y }
-}
-
-/** 枪口在哪。出膛点必须在这儿算——算在别处的话第一帧子弹会从画布左上角飞出来。 */
-export function muzzleOf(gun: Gun): { x: number; y: number } {
-  const a = gun.ang + gun.kick
-  return { x: gun.x + Math.cos(a) * BARREL, y: gun.y + Math.sin(a) * BARREL }
-}
-
-/** 纸带的落点与左边界。 */
-export function tapeAt(hand: { x: number; y: number }): { x: number; y: number; left: number } {
-  return { x: hand.x - TAPE_DX, y: hand.y - TAPE_DY, left: hand.x - TAPE_DX - TAPE_LEN }
-}
 
 /**
  * 推进一帧。`dt` 秒，**调用方不必夹**——这里夹（`MAX_DT`），
  * 因为夹的理由（弹簧的稳定门槛）属于这一层。
  */
 export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
-  const dt = Math.min(rawDt > 0 ? rawDt : 1 / 60, MAX_DT)
+  const real = rawDt > 0 ? rawDt : 1 / 60
+  // **弹簧要夹，钟不夹。** 夹的理由是显式欧拉的稳定门槛，那只管物理；
+  // 而「静默了多久」「下一只什么时候来」量的是真实时间——闲下来之后这一层
+  // 退到 120ms 一拍（见 `PetFxCanvas.tsx`），钟要是也被夹在 50ms，
+  // 静默三秒那条判据就要等上七秒半才成立
+  const dt = Math.min(real, MAX_DT)
   const hand = handOf(input.pet)
-  const target = tapeAt(hand)
-  w.quiet = input.rate > 1 ? 0 : w.quiet + dt
-  w.clock += dt
+  w.quiet = input.rate > 1 ? 0 : w.quiet + real
+  w.clock += real
   spawnDue(w, input, hand)
-  const foe = nearest(w.foes)
-  // **有东西过来就瞄它**，没有才对着纸带打。否则它会一路走到你脸上，
-  // 而你手里正端着一把朝别处的枪
-  const aim = foe === undefined ? target : { x: foe.x + foe.knock, y: foe.y - 11 - foe.fly }
+  aimAndFire(w, dt, input, hand)
+  // 落地算什么由这儿定：纸带上落一个字、敌人掉一点血、靶上留一个洞
+  stepShots(w.bullets, dt, (b) => {
+    landOne(w, b as Shot, input)
+  })
+  w.bites += stepFoes(w.foes, dt, hand.x, eaterOf(w))
+  stepBrass(w.brass, dt)
+  // 结账那一下把弹壳堆扫平。**判据是「这一轮跑完了」**，不是别的：
+  // 堆多高＝这一轮吐了多少，那一堆的意义只到结账为止
+  if (w.ran && !input.running) sweep(w.brass, input.rand)
+  const rps = rpsOf(readyRate(w, input))
+  stepTape(w.tape, dt, rps > 0 ? rps * GLYPH_W : DRIFT_QUIET, tapeAt(hand).left)
+  w.ran = input.running
+  w.moving = busyOf(w)
+  w.view = {
+    handX: hand.x,
+    handY: hand.y,
+    ground: groundOf(input),
+    rate: input.rate,
+    ratio: input.ratio,
+  }
+}
+
+function landOne(w: FxWorld, b: Shot, input: FxInput): void {
+  if (b.hole !== undefined) {
+    land(w.target, b.hole)
+    return
+  }
+  if (b.foe !== undefined) {
+    hitFoe(b.foe, { x: b.x1, y: b.y1 }, input.rand)
+    return
+  }
+  pushGlyph(w.tape, b)
+}
+
+/** 瞄哪儿、这一帧打几发。 */
+function aimAndFire(w: FxWorld, dt: number, input: FxInput, hand: { x: number; y: number }): void {
+  const aim = aimOf(w, input, hand)
   const firing = input.rate > 1 && !input.busyHands
   const want = firing ? wrapAngle(Math.atan2(aim.y - w.gun.y, aim.x - w.gun.x)) : Math.PI * 1.02
   w.gun = stepGun(w.gun, dt, { hand, want, armed: firing, hard: input.busyHands })
-
-  // 抽枪没抽利落之前不开火：**于是「先抽枪、再开打」自然成了一个节拍**
-  const ready = firing && w.gun.arm > 0.55
-  const step = fireStep(w.acc, ready ? input.rate : 0, dt)
+  const step = fireStep(w.acc, readyRate(w, input), dt)
   w.acc = step.acc
-  fireOut(w, { shots: step.shots, aim, ...(foe === undefined ? {} : { foe }) }, input.rand)
+  fireOut(w, step.shots, aim, input)
+}
 
-  // 落地算什么由这儿定：打在纸带上是落一个字，打在敌人身上是掉一点血
-  stepShots(w.bullets, dt, (b) => {
-    const hit = (b as Shot).foe
-    if (hit === undefined) pushGlyph(w.tape, b)
-    else hitFoe(hit)
-  })
-  w.bites += stepFoes(w.foes, dt, hand.x)
-  const rps = rpsOf(ready ? input.rate : 0)
-  stepTape(w.tape, dt, rps > 0 ? rps * GLYPH_W : DRIFT_QUIET, target.left)
-  w.moving = busyOf(w)
+/**
+ * 打向哪儿。三条，优先级从硬到软：
+ *
+ * 1. **打靶**开着就打靶——那是个评估台，开着的时候你要看的就是那张靶；
+ * 2. 有东西过来就瞄它，否则它会一路走到你脸上，而你手里正端着一把朝别处的枪；
+ * 3. 都没有就对着纸带打。
+ */
+function aimOf(
+  w: FxWorld,
+  input: FxInput,
+  hand: { x: number; y: number },
+): { x: number; y: number } {
+  if (input.range) return targetAt(hand)
+  const foe = nearest(w.foes)
+  if (foe !== undefined) return { x: foe.x + foe.knock, y: foe.y - 11 - foe.fly }
+  return tapeAt(hand)
+}
+
+/** 抽利落之前射速按 0 算，于是「先抽枪、再开打」自然成了一个节拍。 */
+function readyRate(w: FxWorld, input: FxInput): number {
+  const firing = input.rate > 1 && !input.busyHands
+  return firing && w.gun.arm > 0.55 ? input.rate : 0
+}
+
+/** 出膛。 */
+function fireOut(w: FxWorld, shots: number, aim: { x: number; y: number }, input: FxInput): void {
+  if (shots <= 0) return
+  const foe = input.range ? undefined : nearest(w.foes)
+  const port = { ...portOf(w.gun), angle: w.gun.ang, ground: groundOf(input) }
+  // **抛壳那一档下这一发就是那枚壳**：不另外造一颗子弹，也不再从抛壳口甩第二枚
+  //（一发两枚就说不清哪一个是「这一发」了）。
+  // 有东西爬过来、或者打靶开着时不算——那两种情况下照旧直射，见 `PetKit.traj`
+  const lob = input.traj === "shell" && foe === undefined && !input.range
+  for (let s = 0; s < shots; s++) {
+    if (lob) {
+      heave(w.brass, input.brass === "pile", port, input.rand)
+      continue
+    }
+    w.bullets.push(shotOf(w, aim, foe, input))
+    eject(w.brass, input.brass, port, input.rand)
+  }
+  w.gun = kickOf(w.gun, shots)
+}
+
+/** 造一发。打靶那一档先把落点算出来，落到的那一刻才记账（见 `pet-range.ts`）。 */
+function shotOf(
+  w: FxWorld,
+  aim: { x: number; y: number },
+  foe: Foe | undefined,
+  input: FxInput,
+): Shot {
+  const b: Shot = spawn(muzzleOf(w.gun), aim, w.ch++, [input.rand() - 0.5, input.rand() - 0.5])
+  if (input.range) {
+    const hole = punch(w.gun.kick, input.ratio, input.rand)
+    b.hole = hole
+    b.x1 = aim.x + hole.x
+    b.y1 = aim.y + hole.y
+    return b
+  }
+  if (foe !== undefined) b.foe = foe
+  return b
+}
+
+/** 弹壳落到哪条线上：脚线。 */
+function groundOf(input: FxInput): number {
+  return input.pet.y + SIZE
+}
+
+/**
+ * 胖子吃字。返回这一口吃掉了哪几个字——碎屑要崩在字原来的位置上。
+ *
+ * 闭包而不是把纸带递进 `pet-foes`：那个模块不认识纸带，认识了就得
+ * import 子弹那一路，而两边本来毫无关系。
+ */
+function eaterOf(w: FxWorld): (x: number, reach: number) => readonly { x: number; y: number }[] {
+  return (x, reach) => {
+    const eaten: { x: number; y: number }[] = []
+    for (let i = w.tape.length - 1; i >= 0; i--) {
+      const g = w.tape[i]
+      if (g === undefined || Math.abs(g.x - x) >= reach) continue
+      eaten.push({ x: g.x, y: g.y })
+      w.tape.splice(i, 1)
+    }
+    return eaten
+  }
 }
 
 /**
@@ -194,29 +196,10 @@ function busyOf(w: FxWorld): boolean {
     w.bullets.length > 0 ||
     w.tape.length > 0 ||
     w.foes.length > 0 ||
+    brassMoving(w.brass) ||
     w.gun.arm > 0 ||
     Math.abs(w.gun.kick) > 0.002
   )
-}
-
-/** 这几发打向哪儿、算在谁头上。 */
-interface Volley {
-  shots: number
-  aim: { x: number; y: number }
-  /** 有值时落地是掉血，没有就是在纸带上落一个字。 */
-  foe?: Foe
-}
-
-/** 出膛。 */
-function fireOut(w: FxWorld, volley: Volley, rand: () => number): void {
-  if (volley.shots <= 0) return
-  const from = muzzleOf(w.gun)
-  for (let s = 0; s < volley.shots; s++) {
-    const b: Shot = spawn(from, volley.aim, w.ch++, [rand() - 0.5, rand() - 0.5])
-    if (volley.foe !== undefined) b.foe = volley.foe
-    w.bullets.push(b)
-  }
-  w.gun = kickOf(w.gun, volley.shots)
 }
 
 /**
@@ -233,7 +216,8 @@ function spawnDue(w: FxWorld, input: FxInput, hand: { x: number; y: number }): v
     quiet: w.quiet,
     ratio: input.ratio,
   })
-  if (press === undefined || !input.foes) {
+  // 打靶开着时不刷怪：那张靶要的是干净的弹着，被一群东西挡在中间就读不出散布了
+  if (press === undefined || !input.foes || input.range) {
     w.nextAt = Math.max(w.nextAt, w.clock + 3)
     return
   }

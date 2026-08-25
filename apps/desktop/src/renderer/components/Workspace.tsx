@@ -24,6 +24,7 @@ import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
 import { stampOf } from "../stamp.js"
 import { Between } from "./Between.js"
+import { useFireProps } from "../use-fire-props.js"
 
 export interface WorkspaceProps {
   thread: Thread
@@ -145,17 +146,10 @@ function useDraft(
  * **换过去之前挑不了新那家的模型**——清单是引擎起来之后自己报的。所以这里除了
  * 名字，还带上「现在就兑现」那条路，由模型选择器画成一颗能点的按钮。
  */
-/**
- * 上下文用了多满（0~1）。**引擎没报窗口就是 0**——没有窗口就没有「多满」可言，
- * 拿一个占用量去除一个猜出来的窗口，画出来的压力是编的。
- */
-function ctxRatioOf(usage: Usage | undefined): number {
-  if (usage?.contextWindow === undefined || usage.contextWindow <= 0) return 0
-  return Math.min(1, usage.contextUsed / usage.contextWindow)
-}
-
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
+  const running = props.turn?.status === "running"
+  const fire = useFireProps({ pets: props.pets, thread, usage: props.usage, running })
   const [env, setEnv] = useState(false)
   const [timeline, setTimeline] = useState(false)
   /**
@@ -233,20 +227,13 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           <Pets
             engines={props.engines}
             engine={thread.engine}
-            running={props.turn?.status === "running"}
+            running={running}
             active={thread.status === "running" || thread.status === "waiting_approval"}
             failed={thread.status === "failed"}
             profile={thread.engineProfile}
             hidden={props.pets.hidden}
             entryOn={props.pets.entry}
-            fire={{
-              on: props.pets.fire,
-              threadId: thread.id,
-              running: props.turn?.status === "running",
-              handsBusy: thread.status === "waiting_approval",
-              ctxRatio: ctxRatioOf(props.usage),
-              foes: props.pets.foes,
-            }}
+            fire={fire}
           />
         ) : null}
       </div>

@@ -1,6 +1,6 @@
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 import { SIZE } from "./pets.js"
-import { resting, type PetsCtl } from "./usePets.js"
+import { type PetsCtl } from "./usePets.js"
 
 /**
  * 捏起来、拖走、松手。
@@ -54,6 +54,16 @@ export interface PetDrag {
   down: (index: number) => (e: React.PointerEvent<HTMLButtonElement>) => void
   move: (e: React.PointerEvent<HTMLButtonElement>) => void
   up: (e: React.PointerEvent<HTMLButtonElement>) => void
+  /**
+   * 指针捕获**没了**。
+   *
+   * 这一条不是防御性编程，它对应一个真的会发生、而且后果很硬的情况：
+   * 捏着一只的时候队伍换了人（换引擎、设置里勾掉一只、只剩一只那一档变了），
+   * React 会把那个 `<button>` 卸掉——**`pointerup` 于是永远不来**。
+   * 而 `busy()` 把 `held` 算作「在动」，所以那一刻起 rAF 再也不停：
+   * 一只钉在半空的桌宠，外加一个天天开着的窗口每秒醒 60 次。
+   */
+  lost: (e: React.PointerEvent<HTMLButtonElement>) => void
 }
 
 export function usePetDrag(
@@ -61,26 +71,31 @@ export function usePetDrag(
   /** 身体那一层。捏起来、蹦一下、砸扁都演在它身上。 */
   bodies: React.RefObject<(HTMLSpanElement | null)[]>,
   reduced: boolean,
+  /** 座位表。**换了人就松手**，理由见 `PetDrag.lost`。 */
+  seats: readonly unknown[],
 ): PetDrag {
   const grab = useRef<Grab | null>(null)
 
-  /**
-   * 你捏起一只时，另外几只**转头看它**——而且跟着看，你把它拖到哪边它们就看哪边。
-   * 松手（`index` 给 undefined）清掉。
-   *
-   * 这是这几只之间唯一一处「互相知道对方在」的地方，也是最便宜的一处：
-   * 两个类名，没有新元素、没有新状态。
-   */
   const watch = (index?: number): void => {
-    const held = index === undefined ? undefined : ctl.pets.current[index]
-    for (const [j, node] of ctl.nodes.current.entries()) {
-      if (node === null) continue
-      node.classList.remove("pet--look-l", "pet--look-r")
-      const me = ctl.pets.current[j]
-      if (held === undefined || me === undefined || j === index) continue
-      node.classList.add(held.x > me.x ? "pet--look-r" : "pet--look-l")
-    }
+    look(ctl, index)
   }
+
+  const release = (): void => {
+    const g = grab.current
+    grab.current = null
+    letGoOf(ctl, g)
+  }
+
+  // 队伍一换人就松手。**不能等 `pointerup`**：那个节点可能已经不在了。
+  // 经 ref 转一道是因为 `release` 每次渲染换身份，直接列进依赖等于每渲染一次松一次手
+  const letGo = useRef(release)
+  letGo.current = release
+  useEffect(
+    () => () => {
+      letGo.current()
+    },
+    [seats],
+  )
 
   const at = (e: React.PointerEvent): { x: number; y: number } => {
     const box = ctl.area.current?.getBoundingClientRect()
@@ -96,34 +111,8 @@ export function usePetDrag(
   const down =
     (index: number) =>
     (e: React.PointerEvent<HTMLButtonElement>): void => {
-      const pet = ctl.pets.current[index]
-      if (pet === undefined) return
-      e.currentTarget.setPointerCapture(e.pointerId)
-      pet.mode = "held"
-      // **捏起来要有反应。** 上一版按下去除了位置什么都不变，手上没有「拿住了」
-      // 这一下——先被指头压扁一瞬，再弹起来托在手里，那才是抓起一个软东西的样子
-      e.currentTarget.classList.add("pet--held")
-      if (!reduced) bodies.current[index]?.animate(LIFT, { duration: 260, easing: "ease-out" })
-      // **捏起来就得把帧循环拉起来。** 互相撞只在循环里算（`bump`），
-      // 不拉的话手里这只从别人身上推过去毫无反应——它是块能推人的石头，
-      // 前提是有人在算
-      ctl.kick()
-      watch(index)
-      const p = at(e)
-      const now = performance.now()
-      grab.current = {
-        index,
-        pointer: e.pointerId,
-        dx: p.x - pet.x,
-        dy: p.y - pet.y,
-        downAt: now,
-        moved: false,
-        lastX: pet.x,
-        lastY: pet.y,
-        lastAt: now,
-        vx: 0,
-        vy: 0,
-      }
+      const started = pickUp({ ctl, bodies: bodies.current, reduced }, index, e, at(e))
+      if (started !== undefined) grab.current = started
     }
 
   const move = (e: React.PointerEvent<HTMLButtonElement>): void => {
@@ -168,7 +157,9 @@ export function usePetDrag(
       return
     }
     if (reduced) {
-      ctl.pets.current[g.index] = resting()
+      pet.vx = 0
+      pet.vy = 0
+      pet.mode = "rest"
       ctl.layout()
       return
     }
@@ -178,10 +169,84 @@ export function usePetDrag(
     ctl.kick()
   }
 
-  return { down, move, up }
+  const lost = (e: React.PointerEvent<HTMLButtonElement>): void => {
+    if (grab.current?.pointer !== e.pointerId) return
+    release()
+  }
+
+  return { down, move, up, lost }
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
+
+/** 捏起来那一刻。返回这一次抓的记录；那一格是空的就什么都不做。 */
+function pickUp(
+  deck: { ctl: PetsCtl; bodies: readonly (HTMLSpanElement | null)[]; reduced: boolean },
+  index: number,
+  e: React.PointerEvent<HTMLButtonElement>,
+  spot: { x: number; y: number },
+): Grab | undefined {
+  const pet = deck.ctl.pets.current[index]
+  if (pet === undefined) return undefined
+  e.currentTarget.setPointerCapture(e.pointerId)
+  pet.mode = "held"
+  // **捏起来要有反应。** 上一版按下去除了位置什么都不变，手上没有「拿住了」
+  // 这一下——先被指头压扁一瞬，再弹起来托在手里，那才是抓起一个软东西的样子
+  e.currentTarget.classList.add("pet--held")
+  if (!deck.reduced) deck.bodies[index]?.animate(LIFT, { duration: 260, easing: "ease-out" })
+  // **捏起来就得把帧循环拉起来。** 互相撞只在循环里算（`bump`），
+  // 不拉的话手里这只从别人身上推过去毫无反应——它是块能推人的石头，前提是有人在算
+  deck.ctl.kick()
+  look(deck.ctl, index)
+  const now = performance.now()
+  return {
+    index,
+    pointer: e.pointerId,
+    dx: spot.x - pet.x,
+    dy: spot.y - pet.y,
+    downAt: now,
+    moved: false,
+    lastX: pet.x,
+    lastY: pet.y,
+    lastAt: now,
+    vx: 0,
+    vy: 0,
+  }
+}
+
+/**
+ * 你捏起一只时，另外几只**转头看它**——而且跟着看，你把它拖到哪边它们就看哪边。
+ * 松手（`index` 给 undefined）清掉。
+ *
+ * 这是这几只之间唯一一处「互相知道对方在」的地方，也是最便宜的一处：
+ * 两个类名，没有新元素、没有新状态。
+ */
+function look(ctl: PetsCtl, index?: number): void {
+  const held = index === undefined ? undefined : ctl.pets.current[index]
+  for (const [j, node] of ctl.nodes.current.entries()) {
+    if (node === null) continue
+    node.classList.remove("pet--look-l", "pet--look-r")
+    const me = ctl.pets.current[j]
+    if (held === undefined || me === undefined || j === index) continue
+    node.classList.add(held.x > me.x ? "pet--look-r" : "pet--look-l")
+  }
+}
+
+/**
+ * 松开手里那只：清掉捏着的标记，让它自己落回去。
+ *
+ * **不瞬移回窝**——正捏在半空时瞬移看起来是「它没了又冒出来」，
+ * 落下去才读得出「手松了」。
+ */
+function letGoOf(ctl: PetsCtl, g: Grab | null): void {
+  if (g === null) return
+  const pet = ctl.pets.current[g.index]
+  ctl.nodes.current[g.index]?.classList.remove("pet--held")
+  look(ctl)
+  if (pet === undefined || pet.mode !== "held") return
+  pet.mode = "air"
+  ctl.kick()
+}
 
 /** 用 WAAPI 而不是 CSS 类：连点两下要能重放，而 CSS 动画不会因为类没变就重来。 */
 function poke(bodies: readonly (HTMLSpanElement | null)[], index: number, reduced: boolean): void {

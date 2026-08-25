@@ -56,9 +56,15 @@ export function Field({ label, hint, stack, children }: {
   )
 }
 
-/** 三段式开关。选项少且互斥时比下拉好：**几个都看得见，不用点开才知道有什么**。 */
+/**
+ * 三段式开关。选项少且互斥时比下拉好：**几个都看得见，不用点开才知道有什么**。
+ *
+ * **单项也能变灰**，而且和整组变灰用的是同一条规矩：`why` 必须写。
+ * 一个点不动又不解释的格子比没有这个格子更糟——用户会以为是坏了，
+ * 而真相往往是「另一项的当前取值让这一格没有意义」，那句话只有这儿写得下。
+ */
 export function Segmented<T extends string>({ options, value, onPick, disabled }: {
-  options: readonly { id: T; label: string }[]
+  options: readonly { id: T; label: string; off?: boolean; why?: string }[]
   value: T
   onPick: (id: T) => void
   disabled?: boolean
@@ -70,8 +76,9 @@ export function Segmented<T extends string>({ options, value, onPick, disabled }
           key={option.id}
           type="button"
           role="radio"
-          disabled={disabled === true}
+          disabled={disabled === true || option.off === true}
           aria-checked={option.id === value}
+          {...(option.why === undefined ? {} : { title: option.why })}
           className={`switch__item${option.id === value ? " switch__item--on" : ""}`}
           onClick={() => {
             onPick(option.id)

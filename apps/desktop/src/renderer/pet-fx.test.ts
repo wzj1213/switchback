@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createFx, handOf, muzzleOf, stepFx, tapeAt, type FxInput, type FxWorld } from "./pet-fx.js"
+import { createFx, handOf, muzzleOf, resetFx, stepFx, tapeAt, type FxInput, type FxWorld } from "./pet-fx.js"
+import { spawnFoes } from "./pet-foes.js"
 import type { Pet } from "./pets.js"
 
 const pet: Pet = { x: 400, y: 120, vx: 0, vy: 0, spin: 0, mode: "rest" }
@@ -17,6 +18,10 @@ const input = (over: Partial<FxInput> = {}): FxInput => ({
   ratio: 0,
   left: 0,
   foes: true,
+  // 默认不抛壳、打字机、不打靶：这一组量的是火力，多一样在动就多一条会晃的判据
+  brass: "off",
+  traj: "tape",
+  range: false,
   rand,
   ...over,
 })
@@ -169,5 +174,162 @@ describe("压力显形的开关", () => {
     expect(w.foes).toHaveLength(0)
     run(w, 2, { rate: 180, running: true, foes: false })
     expect(w.tape.length).toBeGreaterThan(0)
+  })
+})
+
+describe("弹壳", () => {
+  it("三档各去各的地方，**不抛那一档一枚都不出**", () => {
+    const off = run(createFx(), 2, { rate: 180, brass: "off" })
+    const fly = run(createFx(), 2, { rate: 180, brass: "eject" })
+    const pile = run(createFx(), 2, { rate: 180, brass: "pile" })
+    expect(off.brass.flying.length + off.brass.pile.length).toBe(0)
+    expect(fly.brass.flying.length).toBeGreaterThan(0)
+    expect(pile.brass.pile.length).toBeGreaterThan(0)
+  })
+
+  it("**没输出就没有壳**——壳是开了一发的证据，不是装饰", () => {
+    const w = run(createFx(), 4, { rate: 0, brass: "eject" })
+    expect(w.brass.flying).toHaveLength(0)
+  })
+
+  it("堆着那一档在结账那一下被扫平：堆多高说的是这一轮，不是这一天", () => {
+    const w = run(createFx(), 3, { rate: 180, running: true, brass: "pile" })
+    expect(w.brass.pile.length).toBeGreaterThan(0)
+    // 这一轮跑完 → 扫；扫走那一段飞完就空了
+    run(w, 1.5, { rate: 0, running: false, brass: "pile" })
+    expect(w.brass.pile).toHaveLength(0)
+  })
+})
+
+describe("打靶", () => {
+  it("弹着记在靶上，而纸带一个字都不落——同一把枪不能同时打两个地方", () => {
+    const w = run(createFx(), 3, { rate: 180, range: true })
+    expect(w.target.shots).toBeGreaterThan(0)
+    expect(w.tape).toHaveLength(0)
+  })
+
+  it("**上下文越满命中率越低**，而那是唯一有资格影响它的东西", () => {
+    const clear = run(createFx(), 6, { rate: 180, range: true, ratio: 0 })
+    const full = run(createFx(), 6, { rate: 180, range: true, ratio: 0.95 })
+    expect(rateOfHits(full)).toBeLessThan(rateOfHits(clear))
+  })
+
+  it("打靶开着时不刷怪：那张靶要的是干净的弹着", () => {
+    const w = run(createFx(), 20, { rate: 0, running: true, range: true, foes: true })
+    expect(w.foes).toHaveLength(0)
+  })
+})
+
+function rateOfHits(w: FxWorld): number {
+  return w.target.shots === 0 ? 0 : w.target.hits / w.target.shots
+}
+
+describe("胖子吃字", () => {
+  /**
+   * **不能靠「跑一会儿看纸带短没短」来判**：纸带本来就会自己往左漂走、到头就没，
+   * 于是那个断言在胖子根本没接上线的时候也照样成立——第一版就是这么写的，
+   * 扰动（把吃字那一句删掉）一条都没红。
+   *
+   * 所以这里手工把一只胖子摆在某个字上，只推一帧：**那个字必须当场消失**，
+   * 而漂移在一帧里只走不到两个像素。
+   */
+  it("它嘴底下那个字当场没了——上下文满了，前面产出的东西真的会被压缩掉", () => {
+    const w = run(createFx(), 2, { rate: 200, running: true, foes: false })
+    const glyph = w.tape[Math.floor(w.tape.length / 2)]
+    expect(glyph).toBeDefined()
+    const spot = glyph?.x ?? 0
+    spawnFoes(w.foes, "glut", { from: spot, ground: 150 }, () => 0)
+    const before = w.tape.length
+    run(w, 1 / 60, { rate: 200, running: true, ratio: 0.95 })
+    expect(w.tape.length).toBeLessThan(before)
+    expect(w.tape.some((g) => g === glyph)).toBe(false)
+  })
+
+  it("**只有胖子吃**：史莱姆从同一个字上走过去，字还在", () => {
+    const w = run(createFx(), 2, { rate: 200, running: true, foes: false })
+    const glyph = w.tape[Math.floor(w.tape.length / 2)]
+    spawnFoes(w.foes, "slime", { from: glyph?.x ?? 0, ground: 150 }, () => 0)
+    run(w, 1 / 60, { rate: 200, running: true })
+    expect(w.tape.some((g) => g === glyph)).toBe(true)
+  })
+})
+
+describe("换会话", () => {
+  it("**上一条的怪、纸带、弹壳、靶一样都不许留下来**——它们说的是没在这条会话里发生的事", () => {
+    // 四样都得先真的攒出来，否则「清干净了」这句断言是空的（第一版就是这样，
+    // 把清靶那一行删掉照样绿——靶根本没被填过）
+    const w = run(createFx(), 3, { rate: 200, running: true, brass: "pile", range: true })
+    expect(w.target.shots).toBeGreaterThan(0)
+    run(w, 20, { rate: 0, running: true, foes: true, brass: "pile" })
+    expect(w.foes.length).toBeGreaterThan(0)
+    expect(w.brass.pile.length).toBeGreaterThan(0)
+    run(w, 2, { rate: 200, running: true, brass: "pile" })
+    expect(w.tape.length).toBeGreaterThan(0)
+    resetFx(w)
+    expect(w.tape).toHaveLength(0)
+    expect(w.foes).toHaveLength(0)
+    expect(w.bullets).toHaveLength(0)
+    expect(w.brass.pile).toHaveLength(0)
+    expect(w.brass.flying).toHaveLength(0)
+    expect(w.target).toEqual({ holes: [], hits: 0, shots: 0 })
+    expect(w.bites).toBe(0)
+    expect(w.quiet).toBe(0)
+  })
+
+  it("清完是**同一个对象**，不是换了一个新的——正在跑的那一帧还攥着旧引用", () => {
+    const w = createFx()
+    const tape = w.tape
+    const foes = w.foes
+    resetFx(w)
+    expect(w.tape).toBe(tape)
+    expect(w.foes).toBe(foes)
+  })
+
+  it("清完还能接着跑，而且靶上重新开始记账", () => {
+    const w = run(createFx(), 3, { rate: 200, range: true })
+    resetFx(w)
+    run(w, 3, { rate: 200, range: true })
+    expect(w.target.shots).toBeGreaterThan(0)
+  })
+})
+
+describe("抛壳弹道", () => {
+  it("**这一发就是那枚壳**：没有子弹、纸带一个字都不落，壳照样出来", () => {
+    const w = run(createFx(), 3, { rate: 180, traj: "shell", brass: "eject" })
+    expect(w.tape).toHaveLength(0)
+    expect(w.brass.flying.length).toBeGreaterThan(0)
+  })
+
+  it("一发一枚，**不会一发两枚**——那样说不清哪个是「这一发」", () => {
+    const tape = run(createFx(), 1.5, { rate: 60, traj: "tape", brass: "eject" })
+    const shell = run(createFx(), 1.5, { rate: 60, traj: "shell", brass: "eject" })
+    // 打字机那一档：一发一颗子弹 + 侧面一枚壳；抛壳那一档：一发就一枚壳
+    expect(shell.brass.flying.length).toBe(tape.brass.flying.length)
+    expect(shell.bullets).toHaveLength(0)
+  })
+
+  it("「堆着」在这一档下照样堆，结账照样扫平", () => {
+    const w = run(createFx(), 3, { rate: 180, running: true, traj: "shell", brass: "pile" })
+    expect(w.brass.pile.length).toBeGreaterThan(0)
+    run(w, 1.5, { rate: 0, running: false, traj: "shell", brass: "pile" })
+    expect(w.brass.pile).toHaveLength(0)
+  })
+
+  it("**「不抛」吞不掉它**：这一档下那一发确实发生了，界面上那一格因此变灰", () => {
+    const w = run(createFx(), 2, { rate: 180, traj: "shell", brass: "off" })
+    expect(w.brass.flying.length).toBeGreaterThan(0)
+  })
+
+  it("**有东西爬过来时照旧直射**——不然选了抛壳就永远清不掉，胜负说的就成了你的设置", () => {
+    const w = run(createFx(), 20, { rate: 0, running: true, traj: "shell" })
+    expect(w.foes.length).toBeGreaterThan(0)
+    const hp = w.foes[0]?.hp ?? 0
+    run(w, 1.5, { rate: 400, running: true, traj: "shell" })
+    expect(w.bullets.length + (hp - (w.foes[0]?.hp ?? 0))).toBeGreaterThan(0)
+  })
+
+  it("打靶开着时也照旧直射，不改成抛壳", () => {
+    const w = run(createFx(), 3, { rate: 180, traj: "shell", range: true })
+    expect(w.target.shots).toBeGreaterThan(0)
   })
 })

@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import type { EngineInfo } from "@omni/protocol"
 import type { PetKit, Settings } from "../../shared/settings.js"
+import { FireSection } from "./SettingsPetsFire.js"
 import { petRoster, type PetSlot } from "../pet-roster.js"
 import { entryOf } from "../pet-entry.js"
 import type { PetShape } from "../pets.js"
@@ -64,36 +65,7 @@ export function PetsSection({
           </Field>
         ))}
       </Group>
-      <Group title="开火" hint={FIRE_NOTE}>
-        <Field
-          label="按 token 流速开火"
-          hint="只画在当前那只身上，打的是它左边那条纸带。没有输出就没有火力——静默时它会把枪收起来"
-        >
-          <Toggle
-            label="按 token 流速开火"
-            on={kit.fire}
-            disabled={!settings.pets}
-            hint={settings.pets ? undefined : "桌宠整块关着，先把上面那个打开"}
-            onChange={(fire) => {
-              patch({ fire })
-            }}
-          />
-        </Field>
-        <Field
-          label="让压力显形"
-          hint="上下文快满、这一轮卡住不吐字、流速被压到很低时，左边会爬过来一些东西。没有「密度」和「种类」可调——它们各自对着一个真实信号，可调就等于承认它们只是装饰"
-        >
-          <Toggle
-            label="让压力显形"
-            on={kit.foes}
-            disabled={!settings.pets || !kit.fire}
-            hint={foeWhy(settings.pets, kit.fire)}
-            onChange={(foes) => {
-              patch({ foes })
-            }}
-          />
-        </Field>
-      </Group>
+      <FireSection settings={settings} patch={patch} />
       <Group title="出场" hint={ENTRY_NOTE}>
         <Field
           label="播放出场动画"
@@ -112,19 +84,6 @@ export function PetsSection({
       </Group>
     </>
   )
-}
-
-const FIRE_NOTE =
-  "当前那只会抽出一把枪，按引擎此刻吐字的速度往左打；每中一发，纸带上落一个字。" +
-  "它估的是 item.delta 的字节量（所以数字永远写作 ~142 t/s，那是流速不是账单），" +
-  "而**射速恒等于流速**：没有任何一项设置能改快慢——一旦能改，画面上的快慢说的就是你的配置，" +
-  "而不是引擎此刻的表现，那这套东西也就没有存在的理由了。系统「减少动效」开着时自动失效。" +
-  "打不打得掉也就跟着成了一件有信息量的事：引擎吐得快就清得掉，吐不出来就清不掉——这不是平衡，是事实。"
-
-/** 变灰时必须说清楚为什么——一个点不动又不解释的开关是这套界面里最坏的东西。 */
-function foeWhy(pets: boolean, fire: boolean): string | undefined {
-  if (!pets) return "桌宠整块关着，先把上面那个打开"
-  return fire ? undefined : "要开火才有得打，先把上面那个打开"
 }
 
 const ENTRY_NOTE =

@@ -100,6 +100,38 @@ describe("stepFoes", () => {
     expect((foes[0] as Foe).dying).toBeGreaterThan(0)
   })
 
+  it("**碎屑还在飞的时候整只先别删**——不然死掉那一下成了「啪一下没了」，看不出是被打掉的", () => {
+    const foes: Foe[] = []
+    spawnFoes(foes, "slime", { from: 100, ground: 50 }, rand)
+    const f = foes[0] as Foe
+    for (let i = 0; i < 10; i++) hitFoe(f)
+    expect(f.dying).toBeGreaterThan(0)
+    expect(f.parts.length).toBeGreaterThan(0)
+    // 本体的消散是 0.55 秒，死掉炸出来那一圈碎屑能活 0.7 秒：
+    // 中间这一段里数组必须还留着它
+    for (let i = 0; i < 38; i++) stepFoes(foes, 0.016, 9000)
+    expect(foes).toHaveLength(1)
+    expect(foes[0]?.parts.length).toBeGreaterThan(0)
+  })
+
+  it("挨一发就崩几点碎屑：血条要挨过打才出现，而这几点是打中那一帧就在的", () => {
+    const foes: Foe[] = []
+    spawnFoes(foes, "glut", { from: 100, ground: 50 }, rand)
+    const f = foes[0] as Foe
+    expect(f.parts).toHaveLength(0)
+    hitFoe(f, { x: 111, y: 40 }, rand)
+    expect(f.parts.length).toBeGreaterThan(0)
+    expect(f.parts[0]?.x).toBe(111)
+  })
+
+  it("胖子路过时把回调给的那几个点崩成碎屑", () => {
+    const foes: Foe[] = []
+    spawnFoes(foes, "glut", { from: 100, ground: 50 }, rand)
+    const f = foes[0] as Foe
+    stepFoes(foes, 0.016, 9000, () => [{ x: 101, y: 30 }])
+    expect(f.parts.length).toBeGreaterThan(0)
+  })
+
   it("消散完就从数组里消失——不留尸体，不无限长大", () => {
     const foes: Foe[] = []
     spawnFoes(foes, "slime", { from: 100, ground: 50 }, rand)
