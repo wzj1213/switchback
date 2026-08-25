@@ -33,7 +33,9 @@ export class Boundary extends Component<Props, State> {
 
   override componentDidCatch(error: unknown, info: ErrorInfo): void {
     // 主进程日志是排查时唯一还看得到的东西，组件栈必须留在那里。
-    // 这是**唯一**该用 console 的地方——此刻界面已经没了，没有别的出口。
+    // 该用 console 的地方只有两处，判据都是「没有别的出口」：这里是界面已经没了，
+    // 另一处是 `use-shift-watch.ts`（诊断要进用户拿得到的那份日志，而渲染层
+    // 只有 `warn` / `error` 会被主进程转发过去）。
     // eslint-disable-next-line no-console
     console.error("渲染层崩溃：", error, info.componentStack)
   }

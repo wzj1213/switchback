@@ -18,7 +18,7 @@ import { pruneTabs } from "./aside-tabs.js"
 import { Review } from "./components/Review.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
-import { useScrollbars } from "./useScrollbars.js"
+import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
 
 /**
@@ -121,8 +121,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
 }
 
 export function App(): React.JSX.Element {
-  // 滚动条：平时看不见，滚动或悬停才淡进来（只在系统本来就是经典条那一档生效）
-  useScrollbars()
+  useWindowChrome()
   const app = useApp()
   const { shell, state, thread } = app
 

@@ -121,7 +121,10 @@ function createWindow(bounds: {
     minHeight: 560,
     show: false,
     titleBarStyle: "hiddenInset",
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#111113" : "#ffffff",
+    // **和 `tokens.css` 的 `--bg` 逐字对齐。** 这个色是窗口在页面画出来之前、
+    // 以及缩放时边缘露出来的那一块；对不上就会在那些时刻闪一下别的颜色。
+    // 改调色板时这里必须跟着改——它是唯一一处 CSS 管不到的底色
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0e0f13" : "#fcfcfd",
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
       sandbox: true,
