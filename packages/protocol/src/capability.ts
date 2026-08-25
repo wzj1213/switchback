@@ -32,8 +32,8 @@ export interface EngineCapabilities {
    * 这一轮停了再发。不丢东西，但那句话要等上几十秒才起作用——
    * 而它往往正是「别再往下走了」，等它跑完再说等于白说。
    *
-   * codex 的 app-server 有 `turn/steer`；Kimi Web 有 `prompts:steer`，两家都能把话
-   * 递进正在跑的原生轮次。Claude SDK 没有对应入口，报 false，继续排队。
+   * codex 的 app-server 有 `turn/steer`；Kimi Web 有 `prompts:steer`；Claude 的流式
+   * 用户消息有 `priority: "now"`。三家都能把话递进正在跑的原生轮次。
    */
   steer: boolean
   /**

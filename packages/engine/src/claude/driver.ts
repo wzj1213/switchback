@@ -35,7 +35,9 @@ import { answerElicitation } from "./elicitation.js"
 import { refusalDialogOptions } from "./refusal-dialog.js"
 import { planFork, type ForkPlan } from "./fork.js"
 import { toUserMessage } from "./attach.js"
-import type { ContextSnapshot } from "./usage.js"
+import { ContextProbe } from "./context-probe.js"
+import { claudeAccount } from "./account.js"
+import { ClaudeMcpStatus, reportCurrentMcp } from "./mcp-status.js"
 
 /**
  * Claude Code 2.1.83 起正式暴露 `auto`：由另一只模型分类器审批工具调用。
@@ -46,9 +48,6 @@ import type { ContextSnapshot } from "./usage.js"
  */
 /** 等消息循环自然收尾的上限；超过就进入信号阶梯。 */
 const GRACEFUL_WAIT_MS = 4000
-/** 用量是旁路信息；控制请求卡住时不能连轮次收工一起卡住。 */
-const CONTEXT_WAIT_MS = 800
-
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 export interface ClaudeDriverConfig {
@@ -82,13 +81,14 @@ class ClaudeSession implements EngineSession {
     }).catch(() => undefined)
   })
   private readonly owner: ProcessOwner
+  private readonly mcp: ClaudeMcpStatus
   private readonly bypassEnabled: boolean
   private loop: Promise<void> | undefined
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
   private query: ReturnType<typeof query> | undefined
-  /** 当前模型的原生上下文快照；控制请求失败时沿用上一份，不猜。 */
-  private context: ContextSnapshot | undefined
+  /** 当前模型的原生上下文快照；去重控制请求，并隔离换模型前的迟到结果。 */
+  private readonly context = new ContextProbe()
 
   constructor(
     private readonly req: StartRequest,
@@ -99,6 +99,7 @@ class ClaudeSession implements EngineSession {
   ) {
     this.trust = { current: req.trust }
     this.bypassEnabled = req.trust === "full"
+    this.mcp = new ClaudeMcpStatus({ threadId: req.threadId, emit: req.emit })
     // 字段初始化器里读不到构造参数属性，只能在这里建
     this.owner = createProcessOwner(config.reclaim)
   }
@@ -150,12 +151,16 @@ class ClaudeSession implements EngineSession {
       this.turn,
       {
         trust: () => this.trust.current,
-        context: () => this.syncContext(),
-        onReady: () => { void this.syncContext() },
+        context: () => this.context.read(this.query),
+        onReady: () => {
+          void this.context.read(this.query)
+          void reportCurrentMcp(this.query, this.mcp, Date.now())
+        },
+        onMcpStatuses: (statuses, at) => this.mcp.report(statuses, at),
       },
     )
     // init 要等首条 prompt 后才来；先问一次，第一轮也能拿到正确分母。
-    void this.syncContext()
+    void this.context.read(this.query)
   }
 
   /**
@@ -221,20 +226,6 @@ class ClaudeSession implements EngineSession {
       })
     }
     throw new Error("Claude 输入流已经关闭")
-  }
-
-  /**
-   * 查询原生当前上下文。拿它的 `totalTokens`，不从 result 的整轮汇总反推。
-   * 超时只让这一帧沿用旧快照；已经发出的请求稍后回来仍会刷新缓存。
-   */
-  private async syncContext(): Promise<ContextSnapshot | undefined> {
-    const handle = this.query
-    if (handle === undefined) return this.context
-    const read = handle.getContextUsage().then((usage) => {
-      this.context = { totalTokens: usage.totalTokens, maxTokens: usage.maxTokens }
-      return this.context
-    }).catch(() => this.context)
-    return Promise.race([read, sleep(CONTEXT_WAIT_MS).then(() => this.context)])
   }
 
   /** 当前原生阶段停下，随后的 `priority: now` 阶段仍挂在同一个 omni turn 上。 */
@@ -315,9 +306,15 @@ class ClaudeSession implements EngineSession {
     return findSession(this.req.home, id)
   }
 
-  /** 登录的是哪个账号。读 `~/.claude.json` 的身份字段，**不碰凭据**。 */
+  /** 登录的是哪个账号。优先问 SDK 的公开 `accountInfo()`；旧 CLI 失败时才回落本地身份字段。 */
   async account(): Promise<EngineAccount | undefined> {
-    return readAccount(this.req.home)
+    const handle = this.query
+    if (handle === undefined) return readAccount(this.req.home)
+    try {
+      return claudeAccount(await handle.accountInfo())
+    } catch {
+      return readAccount(this.req.home)
+    }
   }
 
   /** 这条会话已经聊过什么；Claude 的公开载体是本地 jsonl 全文。 */
@@ -338,8 +335,8 @@ class ClaudeSession implements EngineSession {
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
     await this.query?.setModel(model)
     // 窗口跟着模型走；换模型后旧分母和旧占用都不能继续沿用。
-    this.context = undefined
-    void this.syncContext()
+    this.context.invalidate()
+    void this.context.read(this.query)
     // **设不上就回空**，调用方据此不把上一模型的旧档冒充成新模型状态
     const applied = await applyEffort(this.query, effort).catch((error: unknown) => {
       this.req.emit({

@@ -73,6 +73,7 @@ interface DispatchContext extends ResultContext {
   trust: () => Trust
   /** init 说明模型已知，重新同步随模型变化的窗口。 */
   onReady: () => void
+  onMcpStatuses?: (statuses: unknown, at: number) => void
 }
 
 /** 逐字增量没有轮次就不接：那不属于宿主发起的任何一次请求。 */
@@ -127,6 +128,7 @@ function onSystem(msg: RawLoopMessage, ref: TurnRef, ctx: DispatchContext, at: n
   if (msg.subtype === "init") {
     if (msg.session_id !== undefined) req.onHandle?.(msg.session_id)
     req.emit({ type: "engine.status", at, threadId: req.threadId, status: "ready" })
+    ctx.onMcpStatuses?.(msg.mcp_servers, at)
     ref.onInit(at)
     ctx.onReady()
   }
@@ -205,7 +207,13 @@ type LoopOptions = Omit<DispatchContext, "req"> | (() => Trust)
 
 function contextOf(req: StartRequest, options: LoopOptions): DispatchContext {
   if (typeof options !== "function") return { req, ...options }
-  return { req, trust: options, context: () => Promise.resolve(undefined), onReady: () => undefined }
+  return {
+    req,
+    trust: options,
+    context: () => Promise.resolve(undefined),
+    onReady: () => undefined,
+    onMcpStatuses: () => undefined,
+  }
 }
 
 export async function runMessageLoop(

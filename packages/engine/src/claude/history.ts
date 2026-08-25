@@ -1,7 +1,8 @@
-import { open, readdir, readFile, stat } from "node:fs/promises"
+import { open, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { EngineAccount, EngineThread, Item } from "@omni/protocol"
 import { applyResult, assistantItems, toolResults, type ToolResult } from "./translate.js"
+import { findSessionFile, recentSessionFiles } from "./history-files.js"
 
 /**
  * Claude 存在磁盘上的会话：怎么列出来。
@@ -27,16 +28,7 @@ const LIST_MAX = 40
 
 /** 每个文件读多少字节来找标题和工作区。够覆盖开头那几行元数据。 */
 const HEAD_BYTES = 64 * 1024
-
-/**
- * **会话文件的文件名就是 session id，而 session id 是 UUID。**
- *
- * 同一个目录下还躺着别的东西：`agent-<hex>.jsonl` 是子 agent 的记录
- *（实测 1484 个文件里有 763 个是这个），`journal.jsonl` 是别的流水。
- * 它们都有 `cwd`、也都有内容，光看「是不是 jsonl」分不出来——
- * 而把一个子 agent 的 id 当句柄去 `resume`，引擎那边根本不认。
- */
-const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const HEAD_BATCH = 12
 
 interface HeadInfo {
   title?: string
@@ -52,46 +44,25 @@ interface HeadInfo {
  * 一个读不了的目录不该让整个会话起不来。
  */
 export async function listSessions(home: string): Promise<readonly EngineThread[]> {
-  const root = join(home, ".claude", "projects")
-  const files = await recentFiles(root)
+  const files = await recentSessionFiles(home)
   const out: EngineThread[] = []
-  for (const file of files) {
-    const head = await readHead(file.path).catch((): HeadInfo => ({}))
-    // **没有工作区就不列。** 和 codex 那边同一条规则：工作区是所有写范围判定的
-    // 真源，猜一个的代价是它在你没想到的目录里动手
-    if (head.cwd === undefined) continue
-    out.push({
-      handle: file.id,
-      // 人起的 > 自动总结的 > 第一句话。**三样都没有才认输**
-      title: head.title ?? head.first ?? "（没有标题）",
-      cwd: head.cwd,
-      updatedAt: file.at,
-    })
-    if (out.length >= LIST_MAX) break
-  }
-  return out
-}
-
-/** 所有会话文件，按最后修改时间倒序。**用 mtime 不解析文件**——列表阶段够用了。 */
-async function recentFiles(root: string): Promise<readonly { path: string; id: string; at: number }[]> {
-  const dirs = await readdir(root, { withFileTypes: true }).catch(() => [])
-  const found: { path: string; id: string; at: number }[] = []
-  for (const dir of dirs) {
-    if (!dir.isDirectory()) continue
-    const inner = join(root, dir.name)
-    const names = await readdir(inner).catch((): string[] => [])
-    for (const name of names) {
-      if (!name.endsWith(".jsonl")) continue
-      const id = name.slice(0, -".jsonl".length)
-      if (!SESSION_ID.test(id)) continue
-      const path = join(inner, name)
-      const info = await stat(path).catch(() => undefined)
-      // 空文件是开了没说话就退出的会话，接过来什么都没有
-      if (info === undefined || info.size === 0) continue
-      found.push({ path, id, at: info.mtimeMs })
+  for (let offset = 0; offset < files.length && out.length < LIST_MAX; offset += HEAD_BATCH) {
+    const batch = files.slice(offset, offset + HEAD_BATCH)
+    const heads = await Promise.all(batch.map((file) => readHead(file.path).catch((): HeadInfo => ({}))))
+    for (const [index, head] of heads.entries()) {
+      const file = batch[index]
+      // **没有工作区就不列。** 工作区是所有写范围判定的真源，不能猜。
+      if (file === undefined || head.cwd === undefined) continue
+      out.push({
+        handle: file.id,
+        title: head.title ?? head.first ?? "（没有标题）",
+        cwd: head.cwd,
+        updatedAt: file.at,
+      })
+      if (out.length >= LIST_MAX) break
     }
   }
-  return found.sort((a, b) => b.at - a.at)
+  return out
 }
 
 /**
@@ -175,15 +146,7 @@ function firstAsk(entry: Record<string, unknown>): string | undefined {
 
 /** 会话文件的绝对路径。`listSessions` 只交出 id，读全文时要靠这个找回来。 */
 export async function findSession(home: string, id: string): Promise<string | undefined> {
-  const root = join(home, ".claude", "projects")
-  const dirs = await readdir(root, { withFileTypes: true }).catch(() => [])
-  for (const dir of dirs) {
-    if (!dir.isDirectory()) continue
-    const path = join(root, dir.name, `${id}.jsonl`)
-    const info = await stat(path).catch(() => undefined)
-    if (info !== undefined) return path
-  }
-  return undefined
+  return findSessionFile(home, id)
 }
 
 /** 读全文，一行一条。解析不了的行跳过——一条坏行不该毁掉整段历史。 */

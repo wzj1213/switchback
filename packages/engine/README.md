@@ -23,6 +23,8 @@
     找不到权威父级就保持不可见，不把子代理明细冒充主线失败
   - `result.ts` 把 Claude 原生 steer 前后的多段 result 折回同一个宿主轮次，
     并以控制请求的当前上下文快照结算用量，不把整轮累计流量冒充窗口占用
+  - `context-probe.ts` 去重在途上下文控制请求，并以模型 epoch 挡住切换前的迟到快照；
+    `account.ts` 读取 SDK 官方账号字段，`mcp-status.ts` 去重报告启动失败与待授权状态
   - `conversation.ts` 接住 `/clear` 的原生 reset：保留旧记录作历史、留下上下文分界，
     并由随后 result 的新 session id 开启下一段可续跑记录
   - `messages.ts` / `retraction.ts` 维护 SDK wire uuid 到 transcript item 的映射；拒答切换模型重试时
@@ -46,6 +48,8 @@
     **一个 workflow 一条 lane，不是一个 agent 一条**——整批共用一个 `task_id`，
     每-agent 的明细进 `LaneProgress.nodes`；30 个 agent 每 tick 产生 30 条落盘事件
     是不能接受的
+  - `history-files.ts` 有界并发枚举主会话与文件头，过滤子 agent / 空文件；`image.ts`
+    是 Claude、Kimi 与 ACP 共用的内联图片格式、体积和 fail-closed 读取边界
   - `driver.ts` 会话生命周期与进程回收
 - `codex/` —— `codex app-server --stdio` 驱动（JSON-RPC 2.0）
   - `rpc.ts` 分帧与请求关联。纯粹字节进字节出，不碰子进程，

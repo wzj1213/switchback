@@ -1,17 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { app, ipcMain, nativeImage } from "electron"
-
-/** 允许贴进来的图片类型。**白名单**——不认的一律不落盘。 */
-const EXT: Readonly<Record<string, string>> = {
-  "image/png": ".png",
-  "image/jpeg": ".jpg",
-  "image/gif": ".gif",
-  "image/webp": ".webp",
-}
-
-/** 单张上限。截图很少超过几 MB，而一张几十 MB 的图对模型也没有意义。 */
-const MAX_BYTES = 12 * 1024 * 1024
+import { imageExtension, MAX_IMAGE_BYTES } from "../shared/attachments.js"
 
 /**
  * 把剪贴板里的图片落到盘上，返回路径。
@@ -30,10 +20,10 @@ const MAX_BYTES = 12 * 1024 * 1024
  */
 export function installAttachChannel(): void {
   ipcMain.handle("omni:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
-    const ext = EXT[req.mime]
+    const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined
     const buf = Buffer.from(req.bytes)
-    if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) return undefined
+    if (buf.byteLength === 0 || buf.byteLength > MAX_IMAGE_BYTES) return undefined
     const dir = join(app.getPath("userData"), "attachments")
     await mkdir(dir, { recursive: true })
     const path = join(dir, `${stamp()}${ext}`)

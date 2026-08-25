@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises"
+import { loadImages, mimeOfImage } from "../image.js"
 
 /**
  * 附件 → ACP 的提示词内容块。
@@ -17,31 +17,17 @@ import { readFile } from "node:fs/promises"
  *
  * **不支持图片的 agent 一个块都不发**（`allowed` 为假）：塞过去要么报错、
  * 要么被静默丢掉，而后者更糟——界面上显示「已附上」，模型其实没看见。
- * 读不出来的文件跳过，不因为一张图毁掉整句话。
+ * 读不出来时拒绝整句；否则转录区会显示一张实际没送到 agent 的图。
  */
 export async function imageBlocks(
   paths: readonly string[] | undefined,
   allowed: boolean,
 ): Promise<readonly unknown[]> {
   if (paths === undefined || paths.length === 0 || !allowed) return []
-  const blocks: unknown[] = []
-  for (const path of paths) {
-    const data = await readFile(path).catch(() => undefined)
-    if (data === undefined) continue
-    blocks.push({ type: "image", data: data.toString("base64"), mimeType: mimeOf(path) })
-  }
-  return blocks
+  return (await loadImages(paths)).map(({ data, mime }) => (
+    { type: "image", data: data.toString("base64"), mimeType: mime }
+  ))
 }
 
-/**
- * 按扩展名认图片类型。**认不出就当 PNG**——协议要一个 mimeType，
- * 而这里唯一的替代方案是不发这张图，那比猜错格式糟：
- * 多数 agent 自己会嗅探真实字节。
- */
-export function mimeOf(path: string): string {
-  const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase()
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg"
-  if (ext === "gif") return "image/gif"
-  if (ext === "webp") return "image/webp"
-  return "image/png"
-}
+/** 按扩展名认图片类型；认不出返回 undefined，由读取入口明确拒绝。 */
+export { mimeOfImage as mimeOf }

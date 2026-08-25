@@ -19,6 +19,7 @@ export interface RawLoopMessage {
   result?: unknown
   errors?: unknown
   commands?: unknown
+  mcp_servers?: unknown
   terminal_slash_commands?: unknown
   attempt?: unknown
   max_retries?: unknown

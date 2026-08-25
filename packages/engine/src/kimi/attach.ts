@@ -1,30 +1,16 @@
-import { readFile } from "node:fs/promises"
 import type { KimiContent, KimiImageContent } from "./wire.js"
+import { loadImages, mimeOfImage } from "../image.js"
 
-const MIME: Readonly<Record<string, string>> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  png: "image/png",
-}
-
-export function imageMime(path: string): string {
-  const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase()
-  return MIME[ext] ?? "image/png"
-}
+export { mimeOfImage as imageMime }
 
 /** prompt 与 skill activation 共用 Kimi 公开的 base64 image source。 */
 export async function attachmentContent(attachments?: readonly string[]): Promise<readonly KimiImageContent[]> {
-  const content: KimiImageContent[] = []
-  for (const path of attachments ?? []) {
-    const data = await readFile(path)
-    content.push({
+  return (await loadImages(attachments)).map(({ mime, data }) => (
+    {
       type: "image",
-      source: { kind: "base64", media_type: imageMime(path), data: data.toString("base64") },
-    })
-  }
-  return content
+      source: { kind: "base64", media_type: mime, data: data.toString("base64") },
+    }
+  ))
 }
 
 /** Kimi 的公开 prompt schema 接受 base64 image source；读失败必须明确抛错，不能假装图片送到了。 */

@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { canAttachImage } from "../shared/attachments.js"
 
 /**
  * 输入区的附件：贴进来、拖进来、去掉。
@@ -40,9 +41,9 @@ export function useAttachments(enabled: boolean): Attachments {
       if (!enabled || items === null || bridge === undefined) return false
       let took = false
       for (const item of Array.from(items)) {
-        if (item.kind !== "file" || !item.type.startsWith("image/")) continue
+        if (item.kind !== "file") continue
         const file = item.getAsFile()
-        if (file === null) continue
+        if (file === null || !canAttachImage(file)) continue
         took = true
         add(await bridge.stashImage(file.type, await file.arrayBuffer()))
       }
@@ -55,8 +56,8 @@ export function useAttachments(enabled: boolean): Attachments {
     (files: FileList | null) => {
       if (!enabled || files === null || bridge === undefined) return
       for (const file of Array.from(files)) {
-        // 粘贴与拖拽必须守同一条边界；否则 `.zip` 只是换个入口就能混进附件。
-        if (!file.type.startsWith("image/")) continue
+        // 粘贴与拖拽必须守同一条格式和体积边界；否则超大原图换个入口就能混进来。
+        if (!canAttachImage(file)) continue
         // 拖进来的文件在盘上本来就有路径，不用再落一次盘。
         // **路径要问主进程要**：`File.path` 那个增补 Electron 32 起就没了
         //（见 preload 的 `pathForFile`），照旧读它的话这条路整个是哑的
