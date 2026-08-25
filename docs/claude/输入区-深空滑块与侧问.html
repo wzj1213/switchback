@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>输入区 · 深空滑块的优化 ＋ 侧问的形态</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-code:#f6f6f7;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#6f6f78; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:8px; --radius:12px; --radius-lg:16px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+  --dur:120ms; --dur-slow:240ms; --ease:ease; --ease-out:cubic-bezier(.22,1,.36,1);
+  --text-xs:11.5px; --text-sm:13px; --text-base:14px; --text-lg:16px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 8px 28px rgb(0 0 0 / 12%);
+  /* 深空三站。滑块坡道、收起态刻度、输入框那圈边，三处同一组值 */
+  --v0:#2b2d6e; --v1:#6d4bc7; --v2:#b4409a; --v3:#c95ab0;
+  --v-ink:#96307c;
+  --track:rgb(0 0 0 / 4%);
+  --base-a:rgb(0 0 0 / 16%); --base-b:rgb(0 0 0 / 65%);
+  --stop-d:rgb(0 0 0 / 26%); --stop-l:rgb(255 255 255 / 34%);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-code:#202024;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --v0:#3a3d8a; --v1:#8367dd; --v2:#d76ab4; --v3:#e489c9; --v-ink:#e094c8;
+  --track:rgb(255 255 255 / 8%);
+  --base-a:rgb(255 255 255 / 22%); --base-b:rgb(255 255 255 / 66%);
+  --stop-d:rgb(255 255 255 / 30%); --stop-l:rgb(0 0 0 / 34%);
+}}
+:root[data-theme="dark"]{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-code:#202024;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --v0:#3a3d8a; --v1:#8367dd; --v2:#d76ab4; --v3:#e489c9; --v-ink:#e094c8;
+  --track:rgb(255 255 255 / 8%);
+  --base-a:rgb(255 255 255 / 22%); --base-b:rgb(255 255 255 / 66%);
+  --stop-d:rgb(255 255 255 / 30%); --stop-l:rgb(0 0 0 / 34%);
+}
+
+*{box-sizing:border-box}
+body{margin:0;padding:44px 24px 120px;background:var(--bg-sunken);color:var(--text);
+  font-family:var(--font);font-size:var(--text-base);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:26px;line-height:1.3;letter-spacing:-.014em;margin:0 0 10px}
+h2{font-size:19px;line-height:1.35;margin:44px 0 8px;letter-spacing:-.01em}
+h3{font-size:var(--text-lg);margin:0 0 6px}
+.lede{margin:0 0 6px;color:var(--text-muted);line-height:1.8}
+.lede b{color:var(--text);font-weight:600}
+code{font-family:var(--font-mono);font-size:.9em;padding:1px 5px;border-radius:4px;background:var(--bg-code)}
+hr{height:1px;background:var(--border);border:0;margin:40px 0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:24px 0 30px}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-raised)}
+.seg button{border:0;background:transparent;color:var(--text-muted);font:inherit;font-size:var(--text-xs);padding:4px 10px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--text-inverse)}
+.seg__lbl{font-size:var(--text-xs);color:var(--text-faint)}
+
+/* ── 对照卡 ─────────────────────────────── */
+.fix{margin:0 0 30px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised);overflow:hidden}
+.fix__h{padding:12px 16px 10px;border-bottom:1px solid var(--border)}
+.fix__h h3{margin:0 0 4px;font-size:var(--text-base)}
+.fix__h p{margin:0;font-size:var(--text-sm);color:var(--text-muted);line-height:1.8}
+.fix__h b{color:var(--text);font-weight:600}
+.pair{display:grid;grid-template-columns:1fr 1fr}
+.pane{padding:18px 16px;min-height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.pane + .pane{border-left:1px solid var(--border)}
+.pane__t{align-self:flex-start;font:11px/1 var(--font-mono);letter-spacing:.08em;color:var(--text-faint)}
+.pane--now .pane__t{color:var(--danger)}
+.pane--new .pane__t{color:var(--ok)}
+@media (max-width:720px){ .pair{grid-template-columns:1fr} .pane + .pane{border-left:0;border-top:1px solid var(--border)} }
+
+/* ── 条子本体（照生产的类结构重写，值一一对齐） ── */
+.gb{position:relative;height:26px;border-radius:999px;background:var(--track);flex:none}
+.gb__fill{position:absolute;inset:0 auto 0 0;border-radius:999px;overflow:hidden}
+.lay{position:absolute;top:0;bottom:0;left:0;background-repeat:no-repeat}
+.lay--base{background-image:linear-gradient(90deg,var(--base-a),var(--base-b))}
+.lay--hot{background-image:var(--ramp)}
+.gb__stops{position:absolute;inset:0;pointer-events:none}
+.gb__stops i{position:absolute;top:50%;width:1px;border-radius:1px;transform:translate(-50%,-50%)}
+.gb__stars{position:absolute;top:0;bottom:0;left:0;pointer-events:none}
+.gb__stars i{position:absolute;top:50%;background:#fff;transform:translateY(-50%);
+  animation:tw 2.4s var(--ease) infinite}
+@keyframes tw{0%,100%{opacity:.22}50%{opacity:.95}}
+.gb__thumb{position:absolute;top:3px;left:0;width:20px;height:20px;border-radius:999px;background:#fff;z-index:2}
+
+/* 现在 */
+.gb--now{--ramp:linear-gradient(90deg,#2b2d6e,#6d4bc7 50%,#b4409a)}
+.gb--now .gb__stops i{height:8px;background:rgb(0 0 0 / 30%)}
+.gb--now.gb--hot .gb__stops i{background:rgb(255 255 255 / 45%)}
+.gb--now .gb__stars i{width:5px;height:5px;
+  clip-path:polygon(50% 0,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%);
+  box-shadow:0 0 4px rgb(255 255 255 / 80%)}
+.gb--now .gb__thumb{box-shadow:0 1px 3px rgb(0 0 0 / 22%),0 0 0 .5px rgb(0 0 0 / 6%)}
+.gb--now.gb--hot .gb__thumb{box-shadow:0 0 6px rgb(180 64 154 / 60%),0 0 14px rgb(180 64 154 / 35%)}
+.gb--now.gb--hot{box-shadow:0 0 0 3px rgb(180 64 154 / 22%)}
+
+/* 改后 */
+.gb--new{--ramp:linear-gradient(90deg,var(--v0),var(--v1) 48%,var(--v2) 86%,var(--v3))}
+.gb--new .gb__stops i{height:8px;background:var(--stop-d);box-shadow:1px 0 0 var(--stop-l)}
+.gb--new.gb--hot .gb__stops i{height:6px;background:rgb(255 255 255 / 24%);box-shadow:none}
+.gb--new .gb__stars i{width:var(--s,2px);height:var(--s,2px);border-radius:999px;
+  box-shadow:0 0 calc(var(--s,2px) * 1.4) rgb(255 255 255 / 70%)}
+.gb--new .gb__stars i.lit{border-radius:0;scale:2;box-shadow:none;
+  clip-path:polygon(50% 0,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%);
+  filter:drop-shadow(0 0 1.5px rgb(255 255 255 / 85%))}
+.gb--new .gb__thumb{box-shadow:0 1px 3px rgb(0 0 0 / 22%),0 0 0 .5px rgb(0 0 0 / 6%)}
+.gb--new.gb--hot .gb__thumb{box-shadow:0 0 0 1.5px rgb(180 64 154 / 60%),0 0 10px rgb(180 64 154 / 40%),0 1px 3px rgb(0 0 0 / 22%)}
+.gb--new.gb--hot{box-shadow:0 0 0 3px rgb(180 64 154 / 22%)}
+
+/* ── 收起态触发器 ─────────────────────────── */
+.trig{display:inline-flex;align-items:center;gap:5px;padding:3px var(--sp-2);border:1px solid transparent;
+  border-radius:999px;background:transparent;color:var(--text-muted);font:inherit;font-size:var(--text-xs);cursor:default}
+.ticks{display:inline-flex;gap:2px;align-items:center}
+.ticks i{width:4px;height:8px;border-radius:2px;background:var(--border-strong)}
+.ticks i.on{background:currentColor}
+.trig--hot .lbl{color:var(--v-ink);font-weight:600}
+
+/* 盒子上限示意：虚线是 max-width 划出来的那个盒子，按钮顶出去就看得见 */
+.cap{display:flex;justify-content:flex-end;overflow:visible;outline:1px dashed var(--danger);outline-offset:2px}
+.cap--96{width:96px}
+.cap--140{width:140px;outline-color:var(--ok)}
+
+/* ── 输入框小样 ───────────────────────────── */
+.comp{position:relative;width:100%;max-width:560px;border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);box-shadow:var(--shadow-1);padding:var(--sp-2) var(--sp-3)}
+.comp__chips{display:flex;gap:var(--sp-3);padding-bottom:6px;border-bottom:1px solid var(--border);
+  font-size:var(--text-xs);color:var(--text-muted)}
+.comp__ta{padding-top:9px;min-height:38px;color:var(--text-faint);font-size:var(--text-base)}
+.comp__row{display:flex;align-items:center;gap:var(--sp-2);padding-top:var(--sp-1);position:relative}
+.comp__gap{flex:1;min-width:8px}
+.send{flex:none;display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:999px;
+  background:var(--text);color:var(--text-inverse);font-size:13px;cursor:pointer}
+.ring{position:absolute;inset:-2px;width:calc(100% + 4px);height:calc(100% + 4px);overflow:visible;pointer-events:none}
+.ring rect{x:2px;y:2px;width:calc(100% - 4px);height:calc(100% - 4px);fill:none}
+.comp--now{border-color:#b4409a;box-shadow:0 0 0 3px rgb(180 64 154 / 22%),var(--shadow-1)}
+.comp--now .ring rect{rx:17px;stroke:#b4409a;stroke-width:2px;stroke-linecap:round;stroke-dasharray:12 88;
+  filter:drop-shadow(0 0 4px rgb(180 64 154 / 35%));animation:orb 6s linear infinite}
+.comp--new{border-color:var(--v1);box-shadow:0 0 0 3px rgb(122 70 190 / 20%),var(--shadow-1)}
+.comp--new .ring rect{rx:16px}
+.comp--new .ring .edge{stroke-width:1.6px}
+.comp--new .ring .orb{stroke-width:2.4px;stroke-linecap:round;stroke-dasharray:10 90;
+  filter:drop-shadow(0 0 4px rgb(150 60 170 / 45%));animation:orb 6s linear infinite}
+@keyframes orb{to{stroke-dashoffset:-100}}
+.warn--now{position:absolute;right:0;bottom:calc(100% + 6px);color:var(--v-ink);font-size:var(--text-xs);white-space:nowrap}
+.warn--new{position:absolute;right:0;bottom:calc(100% + 6px);padding:2px var(--sp-2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);background:var(--bg-raised);box-shadow:var(--shadow-pop);
+  color:var(--v-ink);font-size:var(--text-xs);white-space:nowrap}
+.typed{color:var(--text)}
+
+/* ── 侧问方案 ─────────────────────────────── */
+.opt{margin:0 0 26px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised);overflow:hidden}
+.opt__h{display:flex;align-items:baseline;gap:10px;padding:13px 16px 10px}
+.opt__n{flex:none;font:600 11px/1 var(--font-mono);letter-spacing:.06em;color:var(--text-inverse);
+  background:var(--text);padding:5px 7px;border-radius:5px}
+.opt__h h3{margin:0;font-size:var(--text-base)}
+.opt__h em{font-style:normal;font-size:var(--text-xs);color:var(--text-faint)}
+.opt__body{padding:4px 16px 18px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.opt__note{padding:0 16px 16px;font-size:var(--text-sm);color:var(--text-muted);line-height:1.85}
+.opt__note b{color:var(--text);font-weight:600}
+.opt__note p{margin:0 0 7px}
+.opt__note p:last-child{margin:0}
+.yes::before{content:"＋ ";color:var(--ok);font-weight:600}
+.no::before{content:"− ";color:var(--danger);font-weight:600}
+
+.aside-pill{display:inline-flex;align-items:center;gap:5px;padding:2px var(--sp-2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);background:var(--bg-raised);color:var(--text-muted);font-size:var(--text-sm)}
+.chipmode{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:6px;
+  background:color-mix(in srgb,var(--v1) 14%,transparent);color:var(--v-ink);font-size:var(--text-xs);font-weight:600}
+.send--aside{background:var(--v1)}
+.splitsend{display:inline-flex;align-items:center;gap:0;flex:none}
+.splitsend button{border:0;background:var(--text);color:var(--text-inverse);cursor:pointer;height:28px}
+.splitsend .m{width:28px;border-radius:999px 0 0 999px;display:grid;place-items:center}
+.splitsend .c{width:16px;border-radius:0 999px 999px 0;border-left:1px solid rgb(255 255 255 / 22%);font-size:9px}
+.menu{width:100%;max-width:560px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-raised);
+  box-shadow:var(--shadow-pop);padding:5px;font-size:var(--text-sm)}
+.menu div{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;color:var(--text)}
+.menu div.sel{background:var(--bg-active)}
+.menu u{margin-left:auto;text-decoration:none;color:var(--text-faint);font:11px/1 var(--font-mono)}
+
+.tr{width:100%;max-width:560px;display:flex;flex-direction:column;gap:9px}
+.tr__msg{padding:9px 12px;border-radius:var(--radius);background:var(--bg-hover);font-size:var(--text-sm);color:var(--text)}
+.tr__msg--agent{background:transparent;padding:0 2px;color:var(--text-muted)}
+.tr__aside{position:relative;margin-left:18px;padding:9px 12px;border-radius:var(--radius);
+  border:1px dashed color-mix(in srgb,var(--v1) 40%,var(--border));
+  background:color-mix(in srgb,var(--v1) 5%,transparent);font-size:var(--text-sm)}
+.tr__aside b{display:block;margin-bottom:3px;font-size:var(--text-xs);color:var(--v-ink);font-weight:600}
+.tr__aside p{margin:0;color:var(--text-muted);line-height:1.75}
+.tr__aside p + p{margin-top:5px;color:var(--text)}
+.sel-mark{background:color-mix(in srgb,var(--v1) 22%,transparent);border-radius:3px;padding:0 2px}
+.float{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:var(--text);
+  color:var(--text-inverse);font-size:var(--text-xs);box-shadow:var(--shadow-pop)}
+.drawer{display:flex;width:100%;max-width:560px;border:1px solid var(--border-strong);border-radius:var(--radius);
+  overflow:hidden;background:var(--bg-raised)}
+.drawer__main{flex:1;padding:12px;font-size:var(--text-sm);color:var(--text-muted);min-height:110px}
+.drawer__side{flex:none;width:190px;border-left:1px solid var(--border);background:var(--bg-sunken);padding:10px}
+.drawer__side h4{margin:0 0 7px;font-size:var(--text-xs);color:var(--text-faint);font-weight:600}
+.drawer__side p{margin:0 0 6px;font-size:var(--text-xs);line-height:1.7;color:var(--text-muted)}
+.drawer__handle{flex:none;width:14px;border-left:1px solid var(--border);background:var(--bg-sunken);
+  display:grid;place-items:center;color:var(--text-faint);font-size:10px;writing-mode:vertical-rl}
+
+.note{margin:14px 0 0;padding:14px 16px;border:1px solid var(--border);border-left:2px solid var(--border-strong);
+  border-radius:0 var(--radius) var(--radius) 0;background:var(--bg-raised)}
+.note h4{margin:0 0 8px;font-size:var(--text-sm);font-weight:600}
+.note p{margin:0;font-size:var(--text-sm);line-height:1.85;color:var(--text-muted)}
+.note p + p{margin-top:9px}
+.note b{color:var(--text);font-weight:600}
+.note--pick{border-left-color:var(--v1)}
+.note--warn{border-left-color:var(--warn)}
+.foot{margin:0;color:var(--text-faint);font-size:var(--text-xs);line-height:1.9}
+@media (prefers-reduced-motion: reduce){ .gb__stars i,.ring rect{animation:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>输入区 · 深空滑块的优化 ＋ 侧问的形态</h1>
+<p class="lede">两件事：<b>上半页</b>是深空滑块现在的实现和改后的对照——八处，已经改进代码了；<b>下半页</b>是侧问的四种形态，位置和触发方式各不一样，等你挑。</p>
+<p class="lede">对照两边都是活的控件，不是截图；数值和生产代码里的一一对齐。</p>
+
+<div class="bar">
+  <span class="seg__lbl">主题</span>
+  <div class="seg" role="group" aria-label="主题">
+    <button type="button" data-theme-set="light" aria-pressed="false">浅色</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">深色</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">跟随系统</button>
+  </div>
+</div>
+
+<h2>一、深空滑块：八处</h2>
+<p class="lede">改动都在 <code>EffortBar.tsx</code> / <code>EffortSlider.tsx</code> / <code>Composer.tsx</code> 和两张样式表里，<code>pnpm check</code> 全绿（typecheck / lint / 1877 个测试 / 样式与 token 守卫）。</p>
+
+<div id="fixes"></div>
+
+<hr>
+
+<h2>二、侧问：四种形态</h2>
+<p class="lede">现在是<b>输入区那一排里的一颗带描边的胶囊</b>，点开在它上方弹一个浮层，里面是问答列表加一个小文本框。三处别扭：</p>
+<div class="note note--warn">
+  <h4>它现在别扭在哪</h4>
+  <p><b>① 站错了队。</b>那一排是「这句话由谁、以什么权限、用哪个模型去跑」——四件事都在描述<b>正文这一句的去向</b>。侧问不改这一句的任何属性，它是另一条通道，却挤在同一排里。</p>
+  <p><b>② 它是那一排里唯一带描边的东西。</b>引擎、信任档、模型全是无边的触发器，只有它有边框和背景——在一排安静的胶囊里，它比模型选择器还响，而它远没有那么重要。</p>
+  <p><b>③ 为了打字，先开一个更小的打字框。</b>你面前本来就有一个大文本框，问一句话却要：点胶囊 → 浮层弹出 → 点进 2 行的小框 → 打字 → ⌘↩。而且<b>答案只活在这个浮层里</b>，点一下别处就没了——可它回答的正是你屏幕上正在做的事。</p>
+</div>
+
+<div id="options"></div>
+
+<div class="note note--pick">
+  <h4>我会怎么选</h4>
+  <p><b>A ＋ D，把 B 当快捷键，不做 C。</b></p>
+  <p><b>A 是主路</b>：一个命令 ＋ 一个模式，不占任何常驻位置。你面前那个大文本框本来就是用来打字的，侧问只是它的另一个去向——这比「为了打字先开一个更小的打字框」顺得多。<code>/侧问</code> 走的是已经有的斜杠面板，发现成本为零，也没有 <code>?</code> 那种和正常问号撞车的问题。</p>
+  <p><b>D 是补路</b>：侧问真正最常见的一句是「屏幕上这段是什么意思」。选中就问把上下文变成隐含的——不用把那段话再复述一遍。这两条覆盖的是两种不同的问法，不冲突。</p>
+  <p><b>B 只做键盘那一半</b>（<code>⌥⌘↩ = 作为侧问发送</code>），不做分体键：28px 的圆键劈成两半，主动作那一半只剩 20px 宽，为一个次要动作把主动作变难按，不划算。</p>
+  <p><b>C 我不做。</b><code>docs/侧栏与引擎状态方案.md</code> 里否掉第三栏的那条推理现在仍然成立——这一版的侧问就是一问一答的纯文本，没有工具调用、没有轮次、不流式。抽屉比栏轻，但它仍然是<b>第二个平面</b>，而且平时空着。真出现「一条支线里有多条流式 item」的消费者时，再把它拿出来。</p>
+  <p style="margin-top:11px"><b>还有一条要你拍板</b>：A 和 D 都把答案<b>放回转录区</b>，做成一张虚线的、明显不属于正文的卡片。这和现在那条「问答不进 transcript」的原则<b>看起来</b>冲突，其实不冲突——那条原则说的是<b>模型下一轮读什么</b>，不是<b>你看得见什么</b>。发给引擎的上下文照旧不含它；界面上让你看见，是因为你问的就是屏幕上这件事。要是你希望它连界面上都不留痕，那 A 的答案就只能停在一张点掉就没的小卡上——那等于回到今天。</p>
+</div>
+
+<p class="foot">滑块那八处已经在工作区改好了（未提交）：<code>apps/desktop/src/renderer/components/{EffortBar,EffortSlider,Composer}.tsx</code>、<code>styles/{app-composer,items-composer}.css</code>。侧问四种形态只是小样，一行代码都没动。</p>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+var V=["#2b2d6e","#6d4bc7","#b4409a"];
+function seeded(i){var x=Math.sin(i*12.9898)*43758.5453;return x-Math.floor(x)}
+function voidAt(t){
+  var s=[[0x2b,0x2d,0x6e],[0x6d,0x4b,0xc7],[0xb4,0x40,0x9a]];
+  var x=Math.min(1,Math.max(0,t))*2,i=x>=1?1:0,f=x-i,a=i===0?s[0]:s[1],b=i===0?s[1]:s[2];
+  return "rgb("+Math.round(a[0]+(b[0]-a[0])*f)+" "+Math.round(a[1]+(b[1]-a[1])*f)+" "+Math.round(a[2]+(b[2]-a[2])*f)+")";
+}
+var THUMB=20;
+function barW(n){return 28+n*30}
+
+/** 条子。kind = "now" | "new"；hot = 落在贵档 */
+function bar(n,idx,hot,kind){
+  var w=barW(n), x=(idx/(n-1))*(w-THUMB);
+  var stops="";
+  for(var i=0;i<n;i++) stops+='<i style="left:'+((i/(n-1))*(w-THUMB)+THUMB/2)+'px"></i>';
+  var stars="";
+  if(hot){
+    if(kind==="now"){
+      for(var i=0;i<10;i++){
+        var t=seeded(i*4+1), s=(1+seeded(i*4+2)*1.6).toFixed(1);
+        stars+='<i style="left:'+Math.round(t*t*w)+'px;top:'+(3+Math.round(seeded(i*4+3)*19))+'px;width:'+s+'px;height:'+s+'px;animation-delay:'+(seeded(i*4+4)*-2.6).toFixed(2)+'s"></i>';
+      }
+    } else {
+      var c=Math.max(9,Math.round(w/15));
+      for(var i=0;i<c;i++){
+        var t=seeded(i*4+1), s=(1.4+seeded(i*4+2)*1.8).toFixed(1);
+        stars+='<i class="'+(i%3===1?"lit":"")+'" style="left:'+Math.round(Math.pow(t,1.6)*(w-6)+3)+'px;top:'+(3+Math.round(seeded(i*4+3)*19))+'px;--s:'+s+'px;animation-delay:'+(seeded(i*4+4)*-2.6).toFixed(2)+'s"></i>';
+      }
+    }
+  }
+  return '<span class="gb gb--'+kind+(hot?" gb--hot":"")+'" style="width:'+w+'px">'+
+    '<span class="gb__fill" style="width:'+(x+THUMB)+'px">'+
+      '<span class="lay lay--base" style="width:'+w+'px;background-size:'+w+'px 100%"></span>'+
+      (hot?'<span class="lay lay--hot" style="width:'+w+'px;background-size:'+w+'px 100%"></span>':'')+
+      (hot?'<span class="gb__stars" style="width:'+w+'px">'+stars+'</span>':'')+
+    '</span>'+
+    '<span class="gb__stops">'+stops+'</span>'+
+    '<span class="gb__thumb" style="transform:translateX('+x+'px)"></span></span>';
+}
+/** 收起态触发器 */
+function trig(n,idx,hot,kind,label){
+  var t="";
+  for(var i=0;i<n;i++){
+    var on=i<=idx, st="";
+    if(hot&&on) st=' style="background:'+(kind==="now"?voidAt(1):voidAt(n<2?1:i/(n-1)))+'"';
+    t+='<i class="'+(on?"on":"")+'"'+st+'></i>';
+  }
+  return '<span class="trig'+(hot?" trig--hot":"")+'"><span class="ticks">'+t+'</span><span class="lbl">'+label+'</span></span>';
+}
+/** 输入框小样 */
+function comp(kind,inner,opts){
+  opts=opts||{};
+  var ring = kind==="now"
+    ? '<svg class="ring"><rect pathLength="100"/></svg>'
+    : '<svg class="ring"><defs><linearGradient id="g'+opts.id+'" x1="0" y1="0" x2="1" y2="0">'+
+      '<stop offset="0%" stop-color="var(--v0)"/><stop offset="48%" stop-color="var(--v1)"/><stop offset="100%" stop-color="var(--v2)"/>'+
+      '</linearGradient></defs><rect class="edge" stroke="url(#g'+opts.id+')"/><rect class="orb" stroke="url(#g'+opts.id+')" pathLength="100"/></svg>';
+  return '<div class="comp'+(opts.hot?" comp--"+kind:"")+'">'+(opts.hot?ring:"")+
+    '<div class="comp__chips"><span>▱ omni</span><span>⌘ main</span></div>'+
+    '<div class="comp__ta">'+(opts.text||"交代任务…（@ 引用文件，/ 用命令）")+'</div>'+
+    '<div class="comp__row">'+inner+'</div></div>';
+}
+function row(left,right){
+  return (left||'')+'<span class="comp__gap"></span>'+(right||'<button class="send">↑</button>');
+}
+
+/* ══ 八处对照 ══ */
+var FIXES=[
+ {t:"① 星点：10 颗写死、全堆在左边、1px 方块套 4px 光晕",
+  d:"数量改成按宽度给（<code>w / 15</code>，208px 上 14 颗）；<code>t²</code> 换成 <code>t^1.6</code>——平方是把均匀分布压向 0，原注释写的「密度往右加」<b>方向正好反了</b>；光晕跟着自己的大小走，<b>每第三颗</b>才是带芒的四角星，其余是圆点。",
+  now:bar(6,5,true,"now"), nw:bar(6,5,true,"new")},
+ {t:"② 品红那一站停在 100%，而拇指正好盖住最后 20px",
+  d:"满档时拇指占 <code>20 / 208 ≈ 9.6%</code>，坡道最亮的那一截<b>永远看不见</b>。改成 86% 收尾，末尾补一站淡尾，被盖住的那一小段也不是死色。",
+  now:bar(6,5,true,"now"), nw:bar(6,5,true,"new")},
+ {t:"③ 轨道刻度把星空切成了六段",
+  d:"深空态的刻度是 45% 的白、8px 高，直接在星空上划六道。改成 24% / 6px——<b>要数格子时数得出来就够</b>，它不是这一档要说的话。",
+  now:bar(6,5,true,"now"), nw:bar(6,5,true,"new")},
+ {t:"④ 普通档：刻度是纯黑 30%，被填充盖过的那几根看不见",
+  d:"填充是黑 16%→65% 的灰坡道，黑刻度压在上面就化了。改成<b>一深一浅并排</b>：深线压在浅色轨道上看得见，浅线压在深色填充上看得见，<b>一根都不丢</b>。",
+  now:bar(6,3,false,"now"), nw:bar(6,3,false,"new")},
+ {t:"⑤ 拇指外面两层光晕糊成一团，把落点糊没了",
+  d:"<code>0 0 6px</code> ＋ <code>0 0 14px</code> 两层品红外发光罩在 20px 的圆点上。改成 <b>1.5px 的细边</b>托住 ＋ 一层收敛的柔光——拇指是这条上唯一要看清位置的东西。",
+  now:bar(6,5,true,"now"), nw:bar(6,5,true,"new")},
+];
+var out="";
+FIXES.forEach(function(f){
+  out+='<div class="fix"><div class="fix__h"><h3>'+f.t+'</h3><p>'+f.d+'</p></div><div class="pair">'+
+   '<div class="pane pane--now"><span class="pane__t">现在 · kimi 这版</span>'+f.now+'</div>'+
+   '<div class="pane pane--new"><span class="pane__t">改后</span>'+f.nw+'</div></div></div>';
+});
+/* ⑥ 收起态刻度 */
+out+='<div class="fix"><div class="fix__h"><h3>⑥ 收起态：六枚刻度整排刷成同一个品红</h3>'+
+ '<p><code>voidAt(t)</code> 这个函数本来就是按位置取色的，却被整排传了 <code>voidAt(1)</code>。'+
+ '改成每一枚各染各的位置色——<b>收起态就是那条坡道降采样到几个像素的样子</b>，收起和展开说的是同一件事。</p></div>'+
+ '<div class="pair"><div class="pane pane--now"><span class="pane__t">现在 · kimi 这版</span>'+
+   trig(6,5,true,"now","超高")+'</div>'+
+ '<div class="pane pane--new"><span class="pane__t">改后</span>'+trig(6,5,true,"new","超高")+'</div></div></div>';
+/* ⑧ 收起态宽度上限 */
+out+='<div class="fix"><div class="fix__h"><h3>⑧ 收起态卡在 96px，claude 的「Ultracode」顶出盒子 8.5px</h3>'+
+ '<p>claude 给支持 xhigh 的模型在清单末尾追加一档 <code>ultracode</code>（<code>engine/src/claude/effort.ts</code>），'+
+ '收起态那颗按钮的名字就是「Ultracode」。<b>实测 104.5px</b>（五枚刻度 28 ＋ 名字 53.5 ＋ 间距内边距 23），'+
+ '而外壳的 <code>max-width</code> 是 96——<code>overflow: visible</code>，所以它不是被裁掉，而是<b>顶出自己的盒子去压左边的东西</b>。'+
+ '上限抬到 140；短名字（「超高」）照样按内容收窄，不会因此变宽。</p></div>'+
+ '<div class="pair"><div class="pane pane--now"><span class="pane__t">现在 · kimi 这版</span>'+
+   '<span class="cap cap--96">'+trig(5,4,false,"new","Ultracode")+'</span></div>'+
+ '<div class="pane pane--new"><span class="pane__t">改后</span>'+
+   '<span class="cap cap--140">'+trig(5,4,false,"new","Ultracode")+'</span></div></div></div>';
+
+/* ⑦ 输入框那圈 + 那句话 */
+out+='<div class="fix"><div class="fix__h"><h3>⑦ 输入框那圈是一色品红；「更快消耗使用额度」常驻压在正文上</h3>'+
+ '<p><b>那圈边</b>：一色品红说的是「警告」，而条子上是一片星空——两处对不上就成了两件事。改成<b>同一条深空坡道</b>描边（靛在左、品红在右），绕圈那一段共用这条渐变，<b>转到哪儿就带哪一段的颜色</b>。顺带把 <code>rx</code> 从 17 改回 16，四个角上描边和框边原本错开一像素。</p>'+
+ '<p><b>那句话</b>：它无条件浮在触发器正上方，而那块地就是正文的最后一行——<b>打满字就直接压在字上</b>，还没有底色。改成停一下（或键盘聚焦）才出来的一张带底小卡；常驻那句交给坡道色的刻度和档位名。</p></div>'+
+ '<div class="pair"><div class="pane pane--now"><span class="pane__t">现在 · kimi 这版</span>'+
+   comp("now", row(trig(6,5,true,"now","超高")+'<span class="warn--now">更快消耗使用额度</span>'), {hot:true,text:'<span class="typed">把审批那一屏在窄屏上再过一遍，顺便看看命令原文会不会被截断</span>'})+'</div>'+
+ '<div class="pane pane--new"><span class="pane__t">改后</span>'+
+   comp("new", row(trig(6,5,true,"new","超高")+'<span class="warn--new">更快消耗使用额度</span>'), {hot:true,id:"a",text:'<span class="typed">把审批那一屏在窄屏上再过一遍，顺便看看命令原文会不会被截断</span>'})+'</div></div></div>';
+document.getElementById("fixes").innerHTML=out;
+
+/* ══ 侧问四形态 ══ */
+function optCard(n,title,sub,body,note){
+  return '<div class="opt"><div class="opt__h"><span class="opt__n">'+n+'</span><h3>'+title+'</h3><em>'+sub+'</em></div>'+
+   '<div class="opt__body">'+body+'</div><div class="opt__note">'+note+'</div></div>';
+}
+var o="";
+
+/* A 命令触发 */
+o+=optCard("A","打一条命令进入侧问模式","不占任何常驻位置",
+  '<div class="menu"><div>／ <span>侧问</span><u>问一句不进正文的话</u></div><div class="sel">／ <span>侧问</span><u>⌘⇧K</u></div></div>'+
+  comp("plain", row('<span class="chipmode">✦ 侧问 · 这一句不进正文</span>','<button class="send send--aside">↑</button>'),
+       {text:'<span class="typed">这个仓库里 ResizeObserver 是在哪儿统一挂的？</span>'})+
+  '<div class="tr">'+
+    '<div class="tr__msg">把审批那一屏在窄屏上过一遍</div>'+
+    '<div class="tr__msg tr__msg--agent">正在读 <code>Approval.tsx</code>…</div>'+
+    '<div class="tr__aside"><b>侧问 · 不进正文</b><p>这个仓库里 ResizeObserver 是在哪儿统一挂的？</p>'+
+      '<p>在 <code>useElementSize.ts</code>，整份渲染层只此一处。</p></div>'+
+    '<div class="tr__msg tr__msg--agent">继续：命令原文在 390 点宽下…</div>'+
+  '</div>',
+  '<p class="yes">你面前那个大文本框本来就是用来打字的——<b>侧问只是它的另一个去向</b>，不是另一个更小的输入框。</p>'+
+  '<p class="yes">走的是已经有的斜杠面板，发现成本为零；再配一个 <code>⌘⇧K</code> 直接进模式。发送键换色 ＋ 一枚芯片，<b>发之前一眼知道这一句不进正文</b>。</p>'+
+  '<p class="yes">答案落回转录区，做成虚线的、缩进的、明显不属于正文的一张卡——<b>你问的就是屏幕上这件事，答案就该待在旁边</b>。</p>'+
+  '<p class="no">多一个模式就多一次「我现在在哪个模式」。缓解办法是芯片和发送键颜色一直在说，且 <code>Esc</code> 退出。</p>'+
+  '<p class="no">答案进转录区要和现在那条「不进 transcript」的写法对齐——见最后一段。</p>');
+
+/* B 发送键第二动作 */
+o+=optCard("B","发送键的第二个动作","⌥⌘↩ / 分体键",
+  comp("plain", row('','<span class="splitsend"><button class="m">↑</button><button class="c">⌄</button></span>'),
+       {text:'<span class="typed">这个仓库里 ResizeObserver 是在哪儿统一挂的？</span>'})+
+  '<div class="menu" style="max-width:230px"><div class="sel">发送<u>⌘↩</u></div><div>作为侧问发送<u>⌥⌘↩</u></div></div>',
+  '<p class="yes"><b>零新增面积</b>，而且动作长在动作上：一句话打完，唯一要决定的就是「往哪儿发」。</p>'+
+  '<p class="yes">键盘那一半（<code>⌥⌘↩</code>）几乎没有成本，值得直接做。</p>'+
+  '<p class="no">分体键不值得：28px 的圆键劈两半，主动作只剩 20px 宽——<b>为一个次要动作把主动作变难按</b>。</p>'+
+  '<p class="no">纯快捷键发现不了。所以它是 A 的补充，不是替代。</p>');
+
+/* C 抽屉 */
+o+=optCard("C","转录区右边一条抽屉","第二个平面",
+  '<div class="drawer"><div class="drawer__main">把审批那一屏在窄屏上过一遍<br><br>正在读 <code>Approval.tsx</code>…</div>'+
+  '<div class="drawer__side"><h4>侧问 · 2</h4><p>ResizeObserver 在哪儿挂的？</p><p style="color:var(--text)">在 useElementSize.ts。</p></div></div>'+
+  '<div class="drawer"><div class="drawer__main">收起时只剩右边一条把手</div><div class="drawer__handle">侧问 2</div></div>',
+  '<p class="yes">答案常驻可见，能放历史，也最清楚地说明「这是另一条通道」。</p>'+
+  '<p class="no"><b>这一条 <code>docs/侧栏与引擎状态方案.md</code> 已经否过一次</b>，理由现在仍然成立：这一版的侧问就是一问一答的纯文本，没有工具调用、没有轮次、不流式。为它开一个平面，是照着一个不存在的富流式世界盖房子。</p>'+
+  '<p class="no">平时它是空的。一个大部分时间空着的面板，比没有这个面板糟。</p>');
+
+/* D 选中就问 */
+o+=optCard("D","选中转录区的一段 → 就地问","上下文变成隐含的",
+  '<div class="tr">'+
+   '<div class="tr__msg tr__msg--agent">改动落在 <span class="sel-mark">worktree-baseline.ts 的 rebase 分支</span>，那一段会重算基线。</div>'+
+   '<div style="align-self:center;margin:-2px 0"><span class="float">✦ 问一句</span></div>'+
+   '<div class="tr__aside"><b>侧问 · 不进正文</b><p>选中：「worktree-baseline.ts 的 rebase 分支」</p>'+
+     '<p>它在 <code>rebase</code> 时把基线换成上游的 merge-base，否则 diff 会把别人的提交也算进来。</p></div>'+
+  '</div>',
+  '<p class="yes">侧问最常见的那一句本来就是「<b>屏幕上这段是什么意思</b>」。选中就问把上下文变成隐含的——不用把那段话再复述一遍。</p>'+
+  '<p class="yes">零常驻装置：不选中就什么都没有。</p>'+
+  '<p class="no">只覆盖「问屏幕上的东西」，不覆盖「跑到一半想起来问个不相干的」——所以它是 A 的补路，不是主路。</p>');
+
+document.getElementById("options").innerHTML=o;
+
+/* 主题开关 */
+var ts=document.querySelectorAll("[data-theme-set]");
+for(var i=0;i<ts.length;i++){(function(b){b.addEventListener("click",function(){
+  var v=b.getAttribute("data-theme-set");
+  if(v==="system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme",v);
+  for(var k=0;k<ts.length;k++) ts[k].setAttribute("aria-pressed",String(ts[k]===b));
+});})(ts[i]);}
+})();
+</script>
+</body>
+</html>

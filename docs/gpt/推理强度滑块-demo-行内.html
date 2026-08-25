@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推理强度滑块 · GPT 三个理解</title>
+<style>
+:root{color-scheme:light;--bg:#f7f7f8;--surface:#fff;--text:#19191d;--muted:#70707a;--faint:#9696a0;--line:#dfdfe4;--accent:#3b6fd4;--hot:#a15c1d;--hot-soft:#f4e5d6;--rail:#e9e9ed;--radius:12px;--font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111113;--surface:#1b1b20;--text:#ededf0;--muted:#a1a1ad;--faint:#777782;--line:#303038;--accent:#8eb0ff;--hot:#e6a36d;--hot-soft:#3a2920;--rail:#303038}
+*{box-sizing:border-box}body{margin:0;padding:42px 20px 90px;background:var(--bg);color:var(--text);font:14px/1.65 var(--font);-webkit-font-smoothing:antialiased}.wrap{max-width:820px;margin:auto}
+h1{margin:0 0 8px;font-size:26px;line-height:1.3;letter-spacing:-.02em}.lede{margin:0;color:var(--muted)}.identity{margin:20px 0 26px;padding:12px 14px;border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:0 9px 9px 0;background:var(--surface);color:var(--muted)}.identity b{color:var(--text)}
+.toolbar{display:flex;justify-content:flex-end;gap:4px;margin:-12px 0 20px}.toolbar button{border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--surface);color:var(--muted);cursor:pointer}.toolbar button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+.idea{margin:0 0 28px}.idea__head{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}.idea__num{font:11px ui-monospace,monospace;color:var(--faint);letter-spacing:.08em}.idea h2{margin:0;font-size:16px}.idea__text{margin:0 0 10px;color:var(--muted)}
+.frame{container-type:inline-size}.frame--narrow{max-width:480px}.composer{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:9px 12px;box-shadow:0 1px 2px rgb(0 0 0 / 5%)}.composer.is-hot{border-color:var(--hot)}
+.meta{display:flex;gap:16px;padding:0 0 7px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}.prompt{min-height:52px;padding:10px 0 7px;color:var(--muted);font-size:16px}.controls{display:flex;align-items:center;gap:7px;min-height:30px}.tool,.effort{height:28px;border:0;border-radius:7px;padding:0 8px;background:transparent;color:var(--muted);font:inherit;white-space:nowrap;cursor:pointer}.tool:hover,.effort:hover,.effort:focus-visible{background:var(--bg);color:var(--text)}.tool:focus-visible,.send:focus-visible,.range:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.chev{font-size:11px;margin-left:3px}
+.rail-shell{flex:none;width:0;overflow:hidden;transition:width 260ms cubic-bezier(.22,1,.36,1)}.rail-shell.is-open{width:180px}.rail{position:relative;width:180px;padding:3px 0;clip-path:inset(0 100% 0 0 round 13px);transition:clip-path 260ms cubic-bezier(.22,1,.36,1)}.rail-shell.is-open .rail{clip-path:inset(0 0 0 0 round 13px)}.range{display:block;width:180px;height:24px;margin:0;appearance:none;border-radius:99px;background:linear-gradient(90deg,var(--rail-fill,var(--accent)) calc(var(--pct,0) * 1%),var(--rail) calc(var(--pct,0) * 1%));cursor:pointer}.range::-webkit-slider-thumb{width:22px;height:22px;appearance:none;border:0;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 28%)}.range::-moz-range-thumb{width:22px;height:22px;border:0;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 28%)}.range::-moz-range-track{height:24px;border:0;border-radius:99px;background:transparent}.ticks{position:absolute;inset:3px 11px;display:flex;justify-content:space-between;pointer-events:none}.ticks i{width:1px;height:24px;background:rgb(0 0 0 / 22%)}:root[data-theme="dark"] .ticks i{background:rgb(255 255 255 / 22%)}
+.status{margin:7px 0 0;color:var(--muted);font-size:12px}.status strong{color:var(--text)}.status.hot strong{color:var(--hot)}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.spacer{flex:1;min-width:8px}.send{width:29px;height:29px;display:grid;place-items:center;border:0;border-radius:50%;background:var(--text);color:var(--bg);font-size:17px;cursor:pointer}.composer.is-hot .send{background:var(--hot);box-shadow:0 0 0 4px var(--hot-soft)}
+.callout{margin:9px 0 0;color:var(--muted);font-size:12px}.callout code{padding:1px 4px;border-radius:4px;background:var(--bg);font-size:.9em}
+@container (max-width:620px){.controls{flex-wrap:wrap}.rail-shell.is-open{order:5;width:100%;flex-basis:100%}.rail,.range{width:100%}.spacer{min-width:0}.composer{padding:9px 10px}}
+@media (pointer:coarse){.tool,.effort{min-height:40px}.send{width:40px;height:40px}.rail{padding:8px 0}.ticks{inset:8px 11px}}
+@media (prefers-reduced-motion:reduce){.rail-shell,.rail{transition:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>推理强度滑块 · GPT 三个理解</h1>
+<p class="lede">综合 Kimi 的跟手与性能、Claude 的定宽与动效、Grok 的刻度与落点：控件先可用，状态再表达，窄屏最后让布局让步。</p>
+<div class="identity"><b>身份：</b>GPT-5 驱动的 Codex，omni 的界面协作者。本页不替 Grok、Claude 或 Kimi 代言，而是在三方已验证的基础上补三点输入框判断。</div>
+<div class="toolbar" aria-label="主题"><button type="button" data-theme="light" aria-pressed="true">浅色</button><button type="button" data-theme="dark" aria-pressed="false">深色</button></div>
+
+<section class="idea"><div class="idea__head"><span class="idea__num">01 · 语义先于皮肤</span><h2>用原生 range 承担档位交互</h2></div><p class="idea__text">渐变、拇指和动画都可以换，但键盘、触摸和辅助技术不该跟着重写。这个版本让原生 range 做真正的控制面。</p>
+<div class="frame"><div class="composer" data-demo="native"><div class="meta"><span>▱ omni</span><span>⌘ main</span></div><div class="prompt">交代任务…（@ 引用文件，/ 用命令）</div><div class="controls"><button class="tool" type="button">文件 <span class="chev">⌄</span></button><button class="tool" type="button">自动审批 <span class="chev">⌄</span></button><button class="tool" type="button">GPT-5 <span class="chev">⌄</span></button><button class="effort" type="button" aria-expanded="false"><span class="level">最高</span> <span class="chev">⌄</span></button><div class="rail-shell"><div class="rail"><input class="range" type="range" min="1" max="6" value="5" step="1" aria-label="推理强度" aria-describedby="native-status"><span class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div></div><span class="spacer"></span><button class="send" type="button" aria-label="发送">↑</button></div><p class="status" id="native-status"><strong>当前档位：</strong><span class="status-text">最高</span>。按 Enter 或点击发送开始。</p></div></div>
+<p class="callout">焦点、方向键、触摸和档位步进由浏览器原生控制；视觉只负责表达已选位置。</p></section>
+
+<section class="idea"><div class="idea__head"><span class="idea__num">02 · 状态要可读</span><h2>把消耗提示放进可访问的状态层</h2></div><p class="idea__text">不要只靠输入框边框、扫光或鼠标悬停的 title 说“更快消耗额度”。同一句话要能被键盘聚焦、触摸和读屏用户得到。</p>
+<div class="frame"><div class="composer" data-demo="status"><div class="meta"><span>▱ omni</span><span>⌘ main</span></div><div class="prompt">交代任务…（@ 引用文件，/ 用命令）</div><div class="controls"><button class="tool" type="button">文件 <span class="chev">⌄</span></button><button class="tool" type="button">自动审批 <span class="chev">⌄</span></button><button class="tool" type="button">GPT-5 <span class="chev">⌄</span></button><button class="effort" type="button" aria-expanded="false"><span class="level">超高</span> <span class="chev">⌄</span></button><div class="rail-shell"><div class="rail"><input class="range" type="range" min="1" max="6" value="6" step="1" aria-label="推理强度" aria-describedby="status-status"><span class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></div></div><span class="spacer"></span><button class="send" type="button" aria-label="发送">↑</button></div><p class="status" id="status-status" aria-live="polite"><strong>当前档位：</strong><span class="status-text">超高</span><span class="impact">。发送后将更快消耗使用额度。</span></p></div></div>
+<p class="callout">状态文本始终跟随 range 更新；颜色只做第二层提示，不把“是否重要”交给颜色本身。</p></section>
+
+<section class="idea"><div class="idea__head"><span class="idea__num">03 · 布局让步</span><h2>窄屏时让条子换行，不牺牲点击精度</h2></div><p class="idea__text">宽屏保留“模型 → 强度条 → 发送”的一行关系；容器变窄后，条子占下一行，发送按钮仍在控制行右侧。下面的卡片故意限制为窄容器。</p>
+<div class="frame frame--narrow"><div class="composer" data-demo="narrow"><div class="meta"><span>▱ omni</span><span>⌘ main</span></div><div class="prompt">交代任务…（@ 引用文件，/ 用命令）</div><div class="controls"><button class="tool" type="button">文件 <span class="chev">⌄</span></button><button class="tool" type="button">GPT-5 <span class="chev">⌄</span></button><button class="effort" type="button" aria-expanded="false"><span class="level">高</span> <span class="chev">⌄</span></button><div class="rail-shell"><div class="rail"><input class="range" type="range" min="1" max="3" value="3" step="1" aria-label="推理强度" aria-describedby="narrow-status"><span class="ticks" aria-hidden="true"><i></i><i></i><i></i></span></div></div><span class="spacer"></span><button class="send" type="button" aria-label="发送">↑</button></div><p class="status" id="narrow-status"><strong>当前档位：</strong><span class="status-text">高</span>。条子折到下一行。</p></div></div>
+<p class="callout">换行是布局状态，不是错误状态；不用把 180px 的精度压缩成一条难以触摸的细缝。</p></section>
+</main>
+<script>
+(function(){
+  "use strict";
+  var labels={3:["轻度","中","高"],6:["轻度","中","高","极高","最高","超高"]};
+  function setup(card){
+    var toggle=card.querySelector(".effort"), shell=card.querySelector(".rail-shell"), range=card.querySelector(".range");
+    var level=card.querySelector(".level"), status=card.querySelector(".status-text"), impact=card.querySelector(".impact");
+    range.disabled=true;
+    function paint(){
+      var list=labels[Number(range.max)]||labels[6], name=list[Number(range.value)-1]||list[0];
+      var pct=((Number(range.value)-1)/(Number(range.max)-1))*100;
+      level.textContent=name; status.textContent=name; range.style.setProperty("--pct",pct.toFixed(2));
+      card.classList.toggle("is-hot", Number(range.value)===Number(range.max));
+      range.setAttribute("aria-valuetext",name);
+      if(impact) impact.textContent=Number(range.value)===Number(range.max)?"。发送后将更快消耗使用额度。":"。发送后按普通消耗运行。";
+      if (Number(range.value)===Number(range.max)) status.parentNode.classList.add("hot");
+      else status.parentNode.classList.remove("hot");
+    }
+    toggle.addEventListener("click",function(){
+      var open=shell.classList.toggle("is-open"); toggle.setAttribute("aria-expanded",String(open));
+      range.disabled=!open;
+      if(open) range.focus({preventScroll:true});
+    });
+    range.addEventListener("keydown",function(event){
+      if(event.key!=="Escape") return;
+      shell.classList.remove("is-open"); toggle.setAttribute("aria-expanded","false"); range.disabled=true; toggle.focus();
+    });
+    range.addEventListener("input",paint); paint();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-demo]"),setup);
+  Array.prototype.forEach.call(document.querySelectorAll("[data-theme]"),function(button){button.addEventListener("click",function(){
+    var theme=button.getAttribute("data-theme"); document.documentElement.setAttribute("data-theme",theme);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-theme]"),function(item){item.setAttribute("aria-pressed",String(item===button));});
+  });});
+}());
+</script>
+</body>
+</html>

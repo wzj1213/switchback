@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推理强度滑块 · demo</title>
+<style>
+/* ══ 值照 tokens.css 搬，好让 demo 里的样子就是应用里的样子 ══ */
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-press:#e0e0e5; --bg-code:#f6f6f7; --bg-said:#f0f0f2;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#6f6f78; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --dur:120ms; --dur-slow:240ms; --ease:ease;
+  --text-xs:11.5px; --text-sm:13px; --text-base:14px; --text-prose:15px; --text-lg:16px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --content-max:760px;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 8px 28px rgb(0 0 0 / 12%);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+
+  /*
+   * ── 两套坡道 ──────────────────────────────────
+   * **普通档走中性灰，紫色是 ultra 一家的。**
+   * 上一版从最低档就开始铺紫，等于把「更贵」那句话说了六遍——
+   * 说六遍就等于没说，真到 ultra 反而没有升级空间了。
+   * 这条推理 `status.css` 写过一次（一刻不停的动画等于不抢注意力），
+   * `tokens.css` 的用量表那段也写过一次（一直是彩色，真到危险区就没空间了）。
+   */
+  --eff-n0:#d4d4dc;   /* 中性坡道左端 */
+  --eff-n1:#5a5a63;   /* 中性坡道右端。on 白 6.82 */
+
+  /*
+   * ultra 那一套。**四个 token，因为几处的合格线不一样**：
+   *   --eff-0    紫坡道左端
+   *   --eff-1    紫坡道右端 ＋ 星点 ＋ 边框。图形，WCAG 口径 3:1，实测 on 白 5.26
+   *   --eff-ink  写字用（档位名、「更快消耗使用额度」）。要 4.5:1，实测 6.70
+   *   --eff-soft 柔光
+   * 不拆就是重演 `--warn` 那个 4.37 不过 AA 的老毛病。
+   */
+  --eff-0:#a48ae0;
+  --eff-1:#7b52d3;
+  --eff-ink:#6b3fc4;
+  --eff-soft:rgb(123 82 211 / 24%);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --eff-n0:#3a3a42; --eff-n1:#a8a8b4;
+  /* 深色这侧亮紫对面色 7.08:1，写字画图都够 */
+  --eff-0:#7f63c8; --eff-1:#9a76e8; --eff-ink:#b79aec; --eff-soft:rgb(154 118 232 / 30%);
+}}
+:root[data-theme="dark"]{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --eff-n0:#3a3a42; --eff-n1:#a8a8b4;
+  --eff-0:#7f63c8; --eff-1:#9a76e8; --eff-ink:#b79aec; --eff-soft:rgb(154 118 232 / 30%);
+}
+
+*{box-sizing:border-box}
+body{margin:0;padding:44px 24px 120px;background:var(--bg-sunken);color:var(--text);
+  font-family:var(--font);font-size:var(--text-base);line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto}
+h1{font-size:26px;line-height:1.3;letter-spacing:-.014em;margin:0 0 10px}
+.lede{margin:0 0 6px;color:var(--text-muted);line-height:1.8}
+.lede b{color:var(--text);font-weight:600}
+code{font-family:var(--font-mono);font-size:.9em;padding:1px 5px;border-radius:4px;background:var(--bg-code)}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:26px 0 18px}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);background:var(--bg-raised)}
+.seg button{border:0;background:transparent;color:var(--text-muted);font:inherit;
+  font-size:var(--text-xs);padding:4px 10px;border-radius:4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--text-inverse)}
+.play{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:0;
+  border-radius:var(--radius-sm);background:var(--text);color:var(--text-inverse);
+  font:inherit;font-size:var(--text-xs);font-weight:500;cursor:pointer}
+.play:hover{opacity:.88}
+.play:disabled{opacity:.5;cursor:default}
+.hint{max-width:760px;margin:0 0 26px;font-size:var(--text-xs);color:var(--text-faint);line-height:1.9}
+.hint b{color:var(--text-muted);font-weight:500}
+
+/* ── 小样：一个输入框 ─────────────────────── */
+.stage{margin:0 0 30px}
+.stage__t{margin:0 0 10px;font:11px/1 var(--font-mono);letter-spacing:.08em;color:var(--text-faint)}
+.comp{position:relative;max-width:var(--content-max);border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);box-shadow:var(--shadow-1);
+  padding:var(--sp-2) var(--sp-3);
+  transition:border-color 420ms var(--ease) 260ms, box-shadow 420ms var(--ease) 260ms}
+.comp--on{border-color:var(--accent);transition-delay:0ms}
+.comp--ultra{border-color:var(--eff-1);box-shadow:0 0 0 3px var(--eff-soft),var(--shadow-1)}
+.chips{display:flex;align-items:center;gap:var(--sp-3);padding-bottom:6px;
+  border-bottom:1px solid var(--border);font-size:var(--text-xs);color:var(--text-muted)}
+.chips span{display:inline-flex;align-items:center;gap:5px}
+.ta{padding-top:9px;min-height:42px;color:var(--text-faint);font-size:var(--text-base);line-height:1.6}
+.row{display:flex;align-items:center;gap:var(--sp-2);padding-top:var(--sp-1);
+  margin-left:calc(-1 * (var(--sp-2) + 1px))}
+.trig{display:inline-flex;align-items:center;gap:5px;flex:none;height:26px;padding:0 var(--sp-2);
+  border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;
+  color:var(--text-muted);font:inherit;font-size:var(--text-sm);white-space:nowrap;cursor:pointer;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
+.trig:hover,.trig[aria-expanded="true"]{background:var(--bg-hover);color:var(--text)}
+.trig:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.trig svg{color:var(--text-faint)}
+.gapx{flex:1;min-width:12px}
+.send{flex:none;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;
+  border-radius:999px;background:var(--text);color:var(--text-inverse);cursor:pointer}
+.ic{stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* 模型和强度是**两颗**，中间只留 2px：它们说的是同一件事
+   （这一轮用多强的脑子），但**各开各的面板** */
+.pair{display:flex;align-items:center;gap:2px;flex:none}
+
+/* ══ 扫光环：从底边正中往两边长满一整圈 ══════════════
+   用 SVG 描边而不是 conic-gradient：圆角矩形的四个角离中心更远，
+   角度扫描在角上会「加速」，而 stroke-dashoffset 走的是**周长**，
+   哪一段都同一个速度。起点位置由几何算出来，不是估的。 */
+.ring{position:absolute;left:-1px;top:-1px;pointer-events:none;overflow:visible;opacity:0;
+  transition:opacity 200ms var(--ease)}
+.comp--ultra .ring{opacity:1}
+.ring rect{fill:none;stroke-linecap:round}
+.ring__main{stroke:var(--eff-1);stroke-width:2}
+/* 停住之后那道慢慢绕的高光。**4.5 秒一圈**——
+   `status.css` 早就写过：一刻不停的动画会持续抢注意力，隔一段扫一道才不抢 */
+.ring__orbit{stroke:var(--eff-1);stroke-width:2.4;opacity:.85;
+  filter:drop-shadow(0 0 4px var(--eff-soft))}
+@media (prefers-reduced-motion: reduce){ .ring__orbit{display:none} }
+
+/* ══════════════════════════════════════════════
+   强度控件：一颗独立的触发器 ＋ 它上方浮出的一张卡片
+   ══════════════════════════════════════════════ */
+.eff{position:relative;flex:none}
+.eff__lvl{color:var(--text)}
+.eff--ultra .eff__lvl{color:var(--eff-ink);font-weight:600}
+/* 引擎没报 efforts 时**整颗不出现**，不是显示一个灰的 */
+.eff[hidden]{display:none}
+
+/* ── 浮出来的卡片 ─────────────────────────── */
+.pop{position:absolute;right:0;bottom:calc(100% + 10px);z-index:20;width:262px;
+  padding:13px 14px 15px;border:1px solid var(--border);border-radius:var(--radius-lg);
+  background:var(--bg-raised);box-shadow:var(--shadow-pop);
+  opacity:0;transform:translateY(6px) scale(.97);transform-origin:bottom right;
+  pointer-events:none;
+  transition:opacity 150ms var(--ease),transform 220ms var(--ease-out)}
+.eff--open .pop{opacity:1;transform:none;pointer-events:auto}
+@media (prefers-reduced-motion: reduce){ .pop{transition:none} }
+
+.pop__top{display:flex;align-items:center;gap:6px;margin:0 0 11px;
+  font-size:var(--text-sm);color:var(--text-muted)}
+.pop__lvl{color:var(--text);font-weight:600;transition:color var(--dur-slow) var(--ease)}
+.eff--ultra .pop__lvl{color:var(--eff-ink)}
+.pop__q{margin-left:auto;width:16px;height:16px;flex:none;display:grid;place-items:center;
+  border-radius:999px;border:1px solid var(--border-strong);
+  color:var(--text-faint);font-size:10px;line-height:1;cursor:help}
+.pop__ends{display:flex;justify-content:space-between;margin:0 0 7px;
+  font-size:var(--text-xs);color:var(--text-faint)}
+
+/* ── 胶囊条本体 ─────────────────────────── */
+.gbar{position:relative;height:26px;border-radius:999px;background:var(--bg-sunken);
+  cursor:pointer;touch-action:none;transition:box-shadow 420ms var(--ease)}
+.gbar:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gbar__fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;overflow:hidden;
+  transition:width 190ms var(--ease-out)}
+/*
+ * **两层坡道叠着，靠透明度交叉淡入。**
+ * CSS 没法在两个 `linear-gradient` 之间做过渡——直接换 `background-image`
+ * 是硬切，一帧之内灰变紫，看着像 bug。叠两层、只动上层的 opacity，
+ * 中间那 420ms 是真的在两套颜色之间走，不是跳过去的。
+ */
+.gbar__lay{position:absolute;left:0;top:0;bottom:0;background-repeat:no-repeat}
+.gbar__base{background-image:linear-gradient(90deg,var(--eff-n0),var(--eff-n1))}
+.gbar__hot{background-image:linear-gradient(90deg,var(--eff-0),var(--eff-1));
+  opacity:0;transition:opacity 420ms var(--ease)}
+.eff--ultra .gbar__hot{opacity:1}
+.gbar__stars{position:absolute;left:0;top:0;bottom:0;opacity:0;
+  transition:opacity 380ms var(--ease) 120ms}
+.eff--ultra .gbar__stars{opacity:1}
+.gbar__stars i{position:absolute;display:block;border-radius:999px;background:#fff;
+  animation:twinkle 2.6s var(--ease) infinite}
+@keyframes twinkle{0%,100%{opacity:.22}50%{opacity:.95}}
+@media (prefers-reduced-motion: reduce){ .gbar__stars i{animation:none;opacity:.6} }
+.gbar__thumb{position:absolute;top:2px;width:22px;height:22px;border-radius:999px;
+  background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 22%),0 0 0 .5px rgb(0 0 0 / 6%);
+  transition:left 190ms var(--ease-out),transform 110ms var(--ease-out)}
+/* **拖的时候位置是连续的，不吸附。** 一边拖一边被吸到刻度上，
+   手指和拇指之间会差出一小段——那就是「不丝滑」的来源。
+   松手才落到最近那一档，那一下才用得上过渡。 */
+.eff--grab .gbar__fill,.eff--grab .gbar__thumb{transition:transform 110ms var(--ease-out)}
+.eff--grab .gbar__thumb{transform:scale(1.08)}
+.eff--ultra .gbar{box-shadow:0 0 0 3px var(--eff-soft)}
+
+/* 「更快消耗使用额度」——**只在最高那一档出现**。
+   它不是装饰：EFFORT 表里六档只有 ultra 带说明，原文就是这句 */
+.pop__note{display:flex;align-items:center;gap:6px;margin:0;height:0;overflow:hidden;
+  font-size:var(--text-xs);color:var(--eff-ink);opacity:0;
+  transition:height 260ms var(--ease-out),opacity 220ms var(--ease),margin 260ms var(--ease-out)}
+.eff--ultra .pop__note{height:17px;margin-top:10px;opacity:1}
+.pop__note svg{flex:none}
+
+/* ── 模型菜单 ─────────────────────────────── */
+.mdl{position:relative;flex:none}
+.menu{position:absolute;left:0;bottom:calc(100% + 10px);z-index:20;min-width:210px;
+  padding:5px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-raised);box-shadow:var(--shadow-pop);
+  opacity:0;transform:translateY(6px) scale(.97);transform-origin:bottom left;pointer-events:none;
+  transition:opacity 150ms var(--ease),transform 220ms var(--ease-out)}
+.mdl--open .menu{opacity:1;transform:none;pointer-events:auto}
+@media (prefers-reduced-motion: reduce){ .menu{transition:none} }
+.menu button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;
+  border-radius:var(--radius-sm);background:transparent;color:var(--text);font:inherit;
+  font-size:var(--text-sm);text-align:left;cursor:pointer}
+.menu button:hover{background:var(--bg-hover)}
+.menu button[aria-checked="true"]{background:var(--bg-active)}
+.menu b{flex:none;width:12px;color:var(--text-muted);font-weight:400}
+.menu u{margin-left:auto;text-decoration:none;font-size:var(--text-xs);color:var(--text-faint);
+  white-space:nowrap}
+
+/* ── 说明 ─────────────────────────────────── */
+.note{max-width:760px;margin:22px 0 0;padding:14px 16px;border:1px solid var(--border);
+  border-left:2px solid var(--border-strong);border-radius:0 var(--radius) var(--radius) 0;
+  background:var(--bg-raised)}
+.note h4{margin:0 0 6px;font-size:var(--text-sm);font-weight:600}
+.note p{margin:0;font-size:var(--text-sm);line-height:1.75;color:var(--text-muted)}
+.note p + p{margin-top:8px}
+.note b{color:var(--text);font-weight:600}
+.note--warn{border-left-color:var(--warn)}
+.note--eff{border-left-color:var(--eff-1)}
+.note--dead{border-left-color:var(--danger)}
+hr{height:1px;background:var(--border);border:0;margin:34px 0}
+.foot{max-width:760px;margin:0;color:var(--text-faint);font-size:var(--text-xs);line-height:1.8}
+.tl{max-width:760px;margin:0 0 4px;font-size:var(--text-sm);color:var(--text-muted);line-height:1.9}
+.tl b{display:inline-block;min-width:58px;font:11px/1 var(--font-mono);color:var(--text-faint);font-weight:400}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.6a1 1 0 0 1 1-1h2.8l1.2 1.4H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.6" cy="3.6" r="1.5"/><circle cx="4.6" cy="12.4" r="1.5"/><circle cx="11.4" cy="4.8" r="1.5"/><path d="M4.6 5.1v5.8M11.4 6.3c0 2.2-1.6 2.9-3.4 3.2"/></symbol>
+<symbol id="i-chev-d" viewBox="0 0 16 16"><path d="M3.8 6.2L8 10.4l4.2-4.2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.4l4.4 1.7v3.3c0 2.6-1.85 4.35-4.4 5.2-2.55-.85-4.4-2.6-4.4-5.2V4.1z"/></symbol>
+<symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 2.4l1.35 3.25L12.6 7l-3.25 1.35L8 11.6 6.65 8.35 3.4 7l3.25-1.35z"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.6h4.6L12.2 6.2v7.2H4z"/><path d="M8.4 2.6v3.8h3.8"/></symbol>
+<symbol id="i-up" viewBox="0 0 16 16"><path d="M8 12.8V3.6M4.1 7.5L8 3.4l3.9 4.1"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><path d="M3.4 8.4l3 3 6.2-6.8"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+<h1>推理强度滑块 · demo</h1>
+<p class="lede">上一版四处不对，都改了：<b>模型选择被吃掉了</b>（现在是两颗，各开各的）、<b>拖起来一顿一顿</b>（现在拖的时候是连续的，松手才落档）、<b>普通档也铺紫色</b>（现在普通档走中性灰，紫是 ultra 一家的）、<b>灰紫之间是硬切</b>（现在是 420ms 交叉淡入）。</p>
+<p class="lede">点 <code>超高 ⌄</code> 那颗 → 上方浮出卡片 → 拖那颗白圆点。<b>换成 K2.7 试试</b>：它只报三档、没有 ultra，那整套紫色和特效就都不出现。换成 GPT-5.6 Sol，<b>强度那颗整个消失</b>。</p>
+
+<div class="bar">
+  <button type="button" class="play" id="play">▶ 放一遍</button>
+  <div class="seg" role="group" aria-label="主题">
+    <button type="button" data-theme-set="light" aria-pressed="false">浅色</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">深色</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">跟随系统</button>
+  </div>
+</div>
+<p class="hint"><b>怎么试：</b>点 <code>超高 ⌄</code> → 卡片浮出来 → 拖白圆点，或者点条子上任何一处。← → 和滚轮也能改档，Esc 收起，点外面也收起。<br>
+<b>三个模型演的是三种真实情况</b>：K3 报六档带 ultra；K2.7 报三档、没有 ultra；GPT-5.6 Sol 把强度编进了 modelId（<code>gpt-5.6-sol[low]</code>）所以<b>不报 efforts</b>，强度那颗就不该出现——这三条都是 <code>ModelPicker.tsx</code> 现在的真实逻辑。</p>
+
+<div class="stage">
+  <p class="stage__t">模型和强度，两颗，各开各的面板</p>
+  <div class="comp" id="comp">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false" aria-haspopup="dialog">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="pop" role="dialog" aria-label="推理强度">
+            <p class="pop__top">强度 <span class="pop__lvl">最高</span>
+              <span class="pop__q" title="强度越高，模型想得越久、也越贵">?</span></p>
+            <p class="pop__ends"><span>更快</span><span>更聪明</span></p>
+            <div class="gbar" tabindex="0" role="slider" aria-label="推理强度"
+                 aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+              <span class="gbar__fill">
+                <span class="gbar__lay gbar__base"></span>
+                <span class="gbar__lay gbar__hot"></span>
+                <span class="gbar__stars"></span>
+              </span>
+              <span class="gbar__thumb"></span>
+            </div>
+            <p class="pop__note"><svg class="ic" width="12" height="12"><use href="#i-spark"/></svg>更快消耗使用额度</p>
+          </div>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="note note--dead">
+  <h4>① 模型选择被我吃掉了</h4>
+  <p>上一版那颗触发器写的是 <code>✧ K3 · 最高 ⌄</code>，点开是强度滑块。<b>可那颗就是 <code>ModelPicker</code> 本人</b>——它现在点开是一个面板、里面「模型」和「推理强度」两节。我把它换成滑块，等于<b>把选模型这件事整个删了</b>。</p>
+  <p>改成两颗：<code>✧ K3 ⌄</code> 开模型菜单，<code>最高 ⌄</code> 开强度卡片，中间只留 2px——<b>它们说的是同一件事（这一轮用多强的脑子），但各开各的面板</b>。你给的第一张图也是这么排的：<code>Opus 5 | Ultracode</code> 两颗并排。</p>
+</div>
+
+<div class="note note--dead">
+  <h4>② 为什么上一版拖起来一顿一顿</h4>
+  <p>因为<b>我一边拖一边把它吸附到刻度上</b>：手指走到两档中间时，拇指还停在上一档，两者差出一小段；再走一点它「啪」地跳过去。这就是「不丝滑」的全部来源——<b>不是动画时长的问题，是位置被量化了。</b></p>
+  <p>现在拖的时候拇指<b>1:1 跟着指针走，不吸附、不带过渡</b>；<b>松手才落到最近那一档</b>，那一下才用 190ms 的缓动收过去。档位名在越过中点时就跟着变，所以你知道松手会落到哪儿。</p>
+</div>
+
+<div class="note note--eff">
+  <h4>③ 紫色是 ultra 一家的，普通档走中性灰</h4>
+  <p>上一版从最低档就开始铺紫，等于<b>把「更贵」那句话说了六遍——说六遍就等于没说</b>，真到 ultra 反而没有升级空间了。这条推理这个仓库写过两次：<code>status.css</code> 说「一刻不停的动画会持续抢注意力」，<code>tokens.css</code> 的用量表那段说「一直是彩色的话，真到危险区就没有升级空间了」。</p>
+  <p>现在普通档是<b>中性灰坡道</b>（<code>#d4d4dc</code> → <code>#5a5a63</code>，右端 on 白 6.82），只回答「推到多高了」。<b>只有落到 ultra 才整条转紫</b>，星点才亮，边框才扫。</p>
+  <p><b>而且引擎不报 ultra 的话，这套紫色从头到尾都不出现。</b>换成 K2.7 试一下：它报三档，条子推到头也还是灰的——<b>不是「灰色版的 ultra」，是这个模型根本没有那一档。</b></p>
+</div>
+
+<div class="note note--eff">
+  <h4>④ 灰 → 紫是交叉淡入，不是硬切</h4>
+  <p>CSS <b>没法在两个 <code>linear-gradient</code> 之间做过渡</b>——直接换 <code>background-image</code> 是硬切，一帧之内灰变紫，看着像 bug。</p>
+  <p>做法是<b>两层坡道叠着，只动上层的透明度</b>：灰的那层常驻，紫的那层 <code>opacity: 0 → 1</code>，420ms。中间那段是真的在两套颜色之间走。星点跟着淡入但<b>延后 120ms</b>——先看到颜色变了，再看到星星亮起来，两件事分开说比一起说清楚。</p>
+</div>
+
+<div class="note note--warn">
+  <h4>它凭什么这么响</h4>
+  <p>理由是：<b>ultra 是这一行里唯一一个会明显改变花销的开关</b>。<code>ModelPicker.tsx</code> 的 EFFORT 表里，六档只有它带说明，原文就是「<b>更快消耗使用额度</b>」——卡片里那行字是从那儿抄的，不是我编的。它不是「再强一点」，是「这一轮开始烧钱了」。</p>
+  <p>所以留了那道慢绕的高光：<b>它不是庆祝动画，是常驻提示</b>。你要是忘了自己开着这一档，这一圈会一直提醒。<code>prefers-reduced-motion</code> 下高光和星点闪烁都不出现，颜色、渐变、柔光留着——<b>降级之后信息不丢</b>。</p>
+  <p><b>还有一条要你拍板</b>：<code>tokens.css</code> 开头写着「强调色只用于焦点与链接；主按钮用近黑，不用彩色」。这根紫条是这套界面里第一处<b>大面积的、非内容语义的颜色</b>。我认为它值——它标的是花钱；但它确实是对那条规矩开的第一个口子，<b>得是有意开的</b>。</p>
+</div>
+
+<div class="note note--eff">
+  <h4>那道扫光是怎么走的</h4>
+  <p class="tl"><b>0ms</b>松手，落点是 ultra。紫色先只染卡片自己：条子、标题、那行说明——<b>先说清楚是哪个控件干的</b>。</p>
+  <p class="tl"><b>+60ms</b>描边从<b>底边正中</b>起，往左右两边同时长，620ms 走满一圈在正上方合拢。</p>
+  <p class="tl"><b>+260ms</b>输入框自己那圈边开始转紫，外面那层 3px 的柔光同时浮上来。两条时间线错开，<b>看起来是扫光把颜色「带」过去的</b>。</p>
+  <p class="tl"><b>停住</b>一道高光沿这一圈慢慢绕，4.5 秒一圈。往回拖一格，整套 300ms 内退干净。</p>
+  <p style="margin-top:10px">为什么是 SVG 描边不是 <code>conic-gradient</code>：圆角矩形的四个角离中心更远，<b>按角度扫描在拐角会明显加速</b>；<code>stroke-dashoffset</code> 走的是周长，哪一段都同一个速度。底边正中在周长上的位置由几何算出来（直边 ＋ 圆角弧长），换窗口宽度自动对。</p>
+</div>
+
+<p class="foot">键盘：Tab 聚焦 → 回车展开 → ← → 改档 → Esc 收起。展开态下滚轮也能改。<br>
+颜色、圆角、字号、动效时长取自 <code>tokens.css</code> 当前的值；<code>--eff-*</code> 那六个是这份 demo 新加的。</p>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* EFFORT 表照 ModelPicker.tsx 里那份 */
+  var LABEL = {
+    low:"轻度", medium:"中", high:"高", xhigh:"极高", max:"最高", ultra:"超高"
+  };
+  /**
+   * 三个模型演三种真实情况，全都出自 `ModelPicker.tsx` 的现有逻辑：
+   *   K3            —— 六档，带 ultra
+   *   K2.7          —— 三档，没有 ultra
+   *   GPT-5.6 Sol   —— 强度编进了 modelId，**不报 efforts**，强度那颗整个不出现
+   */
+  var MODELS = [
+    { id:"k3",   label:"K3",          note:"6 档 · 带 ultra",
+      efforts:["low","medium","high","xhigh","max","ultra"], defaultEffort:"max" },
+    { id:"k27",  label:"K2.7",        note:"3 档 · 没有 ultra",
+      efforts:["low","medium","high"], defaultEffort:"high" },
+    { id:"sol",  label:"GPT-5.6 Sol", note:"不报 efforts",
+      efforts:[], defaultEffort:undefined }
+  ];
+
+  var state = { model:"k3", effort:"max", raw:null };   /* raw：拖动中的连续位置 0–1 */
+
+  function model(){
+    for (var i = 0; i < MODELS.length; i++) if (MODELS[i].id === state.model) return MODELS[i];
+    return MODELS[0];
+  }
+  function efforts(){ return model().efforts; }
+  function index(){
+    var e = efforts(), i = e.indexOf(state.effort);
+    return i < 0 ? 0 : i;
+  }
+  function clamp(i){ return Math.max(0, Math.min(efforts().length - 1, i)); }
+  function isUltra(){ return efforts()[index()] === "ultra"; }
+
+  var comp  = document.getElementById("comp");
+  var eff   = document.querySelector(".eff");
+  var btn   = eff.querySelector(".eff__btn");
+  var gbar  = eff.querySelector(".gbar");
+  var fill  = eff.querySelector(".gbar__fill");
+  var stars = eff.querySelector(".gbar__stars");
+  var thumb = eff.querySelector(".gbar__thumb");
+  var mdl   = document.querySelector(".mdl");
+  var mbtn  = mdl.querySelector(".mdl__btn");
+  var menu  = mdl.querySelector(".menu");
+
+  var THUMB = 22, PAD = 2, FALLBACK_W = 234;
+
+  /**
+   * 星点。**位置固定、不随重绘跳动**——用一个确定的伪随机序列铺，
+   * 每次算出来都一样。跳来跳去会读成「它在闪什么」，
+   * 而它要说的是「这一档更费力」。密度往右加：用 t² 把点堆到右端。
+   */
+  function seeded(i){
+    var x = Math.sin(i * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function paintStars(w){
+    if (stars.getAttribute("data-w") === String(w)) return;
+    stars.setAttribute("data-w", String(w));
+    stars.style.width = w + "px";
+    stars.textContent = "";
+    for (var i = 0; i < 22; i++){
+      var t = seeded(i * 4 + 1);
+      var d = document.createElement("i");
+      var s = 1 + seeded(i * 4 + 2) * 1.6;
+      d.style.left = (t * t * w).toFixed(1) + "px";
+      d.style.top = (3 + seeded(i * 4 + 3) * 19).toFixed(1) + "px";
+      d.style.width = s.toFixed(1) + "px";
+      d.style.height = s.toFixed(1) + "px";
+      d.style.animationDelay = (seeded(i * 4 + 4) * -2.6).toFixed(2) + "s";
+      stars.appendChild(d);
+    }
+  }
+
+  /** 当前该画在哪儿。**拖动中用连续值**，松手后用档位算出来的值。 */
+  function ratio(){
+    if (state.raw !== null) return state.raw;
+    var n = efforts().length;
+    return n < 2 ? 0 : index() / (n - 1);
+  }
+
+  function paintBar(){
+    var w = gbar.clientWidth || FALLBACK_W;
+    var travel = w - THUMB - PAD * 2;
+    var x = PAD + ratio() * travel;
+    thumb.style.left = x + "px";
+    fill.style.width = (x + THUMB / 2) + "px";
+    /* 两层坡道都钉在整条的坐标上，不跟着填充宽度缩放：
+       否则拖到一半时右端已经是满色，读起来像「已经到头了」 */
+    var lays = gbar.querySelectorAll(".gbar__lay");
+    for (var i = 0; i < lays.length; i++){
+      lays[i].style.width = w + "px";
+      lays[i].style.backgroundSize = w + "px 100%";
+    }
+    paintStars(w);
+  }
+
+  function paint(){
+    var e = efforts(), has = e.length > 0;
+    eff.hidden = !has;
+    mdl.querySelector(".mdl__lbl").textContent = model().label;
+    if (!has){
+      /* 没有强度这回事的模型：连带把所有强度信号清干净 */
+      eff.classList.remove("eff--ultra", "eff--open");
+      comp.classList.remove("comp--ultra");
+      setRing(false);
+      return;
+    }
+    var name = LABEL[e[index()]] || e[index()];
+    eff.querySelector(".eff__lvl").textContent = name;
+    eff.querySelector(".pop__lvl").textContent = name;
+    eff.classList.toggle("eff--ultra", isUltra());
+    gbar.setAttribute("aria-valuemin", "1");
+    gbar.setAttribute("aria-valuemax", String(e.length));
+    gbar.setAttribute("aria-valuenow", String(index() + 1));
+    gbar.setAttribute("aria-valuetext", name);
+    paintBar();
+  }
+
+  /**
+   * 改档。`commit` = 这一下是不是**最终落点**。
+   *
+   * 条子转紫跟着「最近那一档」实时走——拖到最右边时颜色立刻开始淡入，
+   * 手上有回应。但**输入框那圈扫光只在松手之后放**：
+   * 从「最高」划到「超高」再划回来，不该闪一下。
+   */
+  function set(i, commit){
+    var e = efforts();
+    if (e.length === 0) return;
+    state.effort = e[clamp(i)];
+    paint();
+    var on = isUltra() && commit === true;
+    comp.classList.toggle("comp--ultra", on);
+    setRing(on);
+  }
+
+  function ratioAt(clientX){
+    var r = gbar.getBoundingClientRect();
+    var travel = r.width - THUMB - PAD * 2;
+    if (travel <= 0) return 0;
+    return Math.max(0, Math.min(1, (clientX - r.left - PAD - THUMB / 2) / travel));
+  }
+  function nearest(p){
+    var n = efforts().length;
+    return n < 2 ? 0 : Math.round(p * (n - 1));
+  }
+
+  /* ══ 开合 ════════════════════════════════════════ */
+  function openEff(yes){
+    if (eff.hidden) return;
+    eff.classList.toggle("eff--open", yes);
+    btn.setAttribute("aria-expanded", String(yes));
+    if (!comp.classList.contains("comp--ultra")) comp.classList.toggle("comp--on", yes);
+    if (yes){
+      openMenu(false);
+      requestAnimationFrame(paintBar);   /* 卡片展开之后宽度才量得准 */
+      gbar.focus();
+    } else {
+      comp.classList.remove("comp--on");
+    }
+  }
+  function openMenu(yes){
+    mdl.classList.toggle("mdl--open", yes);
+    mbtn.setAttribute("aria-expanded", String(yes));
+    if (yes) openEff(false);
+  }
+  function closeAll(){ openEff(false); openMenu(false); }
+
+  btn.addEventListener("click", function(e){
+    e.stopPropagation();
+    openEff(!eff.classList.contains("eff--open"));
+  });
+  mbtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    openMenu(!mdl.classList.contains("mdl--open"));
+  });
+  eff.addEventListener("click", function(e){ e.stopPropagation(); });
+  mdl.addEventListener("click", function(e){ e.stopPropagation(); });
+  document.addEventListener("click", closeAll);
+
+  /* ══ 拖：连续跟手，松手才落档 ════════════════════ */
+  var dragging = false;
+  gbar.addEventListener("pointerdown", function(e){
+    e.preventDefault();
+    dragging = true;
+    eff.classList.add("eff--grab");
+    /* 捕获拿不到不是致命的——**不能让它把整个 pointerdown 掀掉**。
+       指针在两个事件之间失效（切窗口、触控板抬手）时它会抛 NotFoundError */
+    try { gbar.setPointerCapture(e.pointerId); } catch (err) { void err; }
+    state.raw = ratioAt(e.clientX);
+    set(nearest(state.raw), false);
+  });
+  gbar.addEventListener("pointermove", function(e){
+    if (!dragging) return;
+    state.raw = ratioAt(e.clientX);
+    set(nearest(state.raw), false);
+  });
+  function endDrag(){
+    if (!dragging) return;
+    dragging = false;
+    eff.classList.remove("eff--grab");
+    state.raw = null;          /* 交还给档位：这一下才有过渡，收得住 */
+    set(index(), true);
+  }
+  gbar.addEventListener("pointerup", endDrag);
+  gbar.addEventListener("pointercancel", endDrag);
+
+  eff.addEventListener("keydown", function(e){
+    if (e.key === "Escape"){ openEff(false); btn.focus(); return; }
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown"){ e.preventDefault(); set(index() - 1, true); }
+    if (e.key === "ArrowRight" || e.key === "ArrowUp"){ e.preventDefault(); set(index() + 1, true); }
+  });
+  btn.addEventListener("keydown", function(e){
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    openEff(true);
+  });
+  eff.addEventListener("wheel", function(e){
+    if (!eff.classList.contains("eff--open")) return;
+    e.preventDefault();
+    set(index() + (e.deltaY > 0 || e.deltaX > 0 ? 1 : -1), true);
+  }, { passive: false });
+
+  /* ══ 模型菜单 ════════════════════════════════════ */
+  function buildMenu(){
+    menu.textContent = "";
+    MODELS.forEach(function(m){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(m.id === state.model));
+      var tick = document.createElement("b");
+      tick.textContent = m.id === state.model ? "✓" : "";
+      var name = document.createElement("span");
+      name.textContent = m.label;
+      var note = document.createElement("u");
+      note.textContent = m.note;
+      b.appendChild(tick); b.appendChild(name); b.appendChild(note);
+      b.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        state.model = m.id;
+        /* 换模型把强度重置成新模型的默认：**旧模型的 ultra 在新模型上可能根本不存在**。
+           这一条抄的是 ModelPicker.tsx 里那句同样的注释。 */
+        state.effort = m.defaultEffort !== undefined ? m.defaultEffort : "";
+        state.raw = null;
+        openMenu(false);
+        comp.classList.remove("comp--ultra");
+        setRing(false);
+        paint();
+        buildMenu();
+      });
+      menu.appendChild(b);
+    });
+  }
+
+  /* ══ 扫光环 ══════════════════════════════════════ */
+  var RING_MS = 620, ORBIT_MS = 4500, ORBIT_LEN = 13;
+  var ring = { at:0, main:null, orbit:null, t0:0, on:false };
+
+  function ringGeom(){
+    var svg = comp.querySelector(".ring");
+    var r = comp.getBoundingClientRect();
+    var w = r.width + 2, h = r.height + 2, rx = 14, sw = 1;
+    svg.setAttribute("width", String(w));
+    svg.setAttribute("height", String(h));
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    var W = w - sw * 2, H = h - sw * 2;
+    var top = W - rx * 2, side = H - rx * 2, arc = Math.PI * rx / 2;
+    var per = (top + side) * 2 + arc * 4;
+    /* 底边正中在**周长**上的位置 = 上边 + 右上弧 + 右边 + 右下弧 + 下边的一半 */
+    var bottomMid = top + arc + side + arc + top / 2;
+    var rects = svg.querySelectorAll("rect");
+    for (var i = 0; i < rects.length; i++){
+      rects[i].setAttribute("x", String(sw));
+      rects[i].setAttribute("y", String(sw));
+      rects[i].setAttribute("width", String(W));
+      rects[i].setAttribute("height", String(H));
+      rects[i].setAttribute("rx", String(rx));
+      rects[i].setAttribute("pathLength", "100");
+    }
+    ring.at = (bottomMid / per) * 100;
+    ring.main = svg.querySelector(".ring__main");
+    ring.orbit = svg.querySelector(".ring__orbit");
+  }
+
+  /** 一段长 len 的描边，**以 at 为中心**向两边铺开。 */
+  function dash(rect, at, len){
+    rect.setAttribute("stroke-dasharray", len + " " + Math.max(0, 100 - len));
+    rect.setAttribute("stroke-dashoffset", String(-(at - len / 2)));
+  }
+  function setRing(on){
+    if (ring.on === on) return;
+    ring.on = on;
+    ring.t0 = performance.now();
+    if (!on) dash(ring.orbit, ring.at, 0);
+  }
+  function easeOut(t){ return 1 - Math.pow(1 - t, 3); }
+  function tick(now){
+    /**
+     * **`dt` 必须夹到 0 以上。** rAF 回调拿到的 `now` 是**这一帧的开始时间**，
+     * 而 `t0` 是在事件处理里用 `performance.now()` 取的——事件跑在这一帧开始
+     * 之后，所以 t0 可能比 now 大几十毫秒。不夹的话第一帧 dt 是负数，
+     * `easeOut` 喂负数返回负值，实测扫光长度算成 **−49.86**，那一帧整圈不画。
+     */
+    var dt = Math.max(0, now - ring.t0);
+    if (ring.on){
+      var p = Math.min(1, dt / RING_MS);
+      dash(ring.main, ring.at, easeOut(p) * 100);
+      if (p >= 1){
+        var q = ((dt - RING_MS) % ORBIT_MS) / ORBIT_MS;
+        dash(ring.orbit, (ring.at + q * 100) % 100, ORBIT_LEN);
+      } else {
+        dash(ring.orbit, ring.at, 0);
+      }
+    } else if (dt < 320){
+      dash(ring.main, ring.at, (1 - easeOut(Math.min(1, dt / 300))) * 100);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  /* ══ 「放一遍」：连续地推上去，最后才落档 ═════════ */
+  var playing = false;
+  function play(){
+    if (playing || eff.hidden) return;
+    playing = true;
+    var pb = document.getElementById("play");
+    pb.disabled = true;
+    openEff(true);
+    comp.classList.remove("comp--ultra");
+    setRing(false);
+    var n = efforts().length;
+    set(0, false);
+    var t0 = performance.now(), MS = 2100;
+    function frame(now){
+      var p = Math.min(1, (now - t0) / MS);
+      state.raw = easeOut(p) * 1;
+      set(nearest(state.raw), false);
+      if (p < 1){ requestAnimationFrame(frame); return; }
+      state.raw = null;
+      set(n - 1, true);      /* 最后一下才是落点，扫光在这儿放 */
+      playing = false;
+      pb.disabled = false;
+    }
+    requestAnimationFrame(frame);
+  }
+  document.getElementById("play").addEventListener("click", function(e){
+    e.stopPropagation();
+    play();
+  });
+
+  /* ══ 主题 ════════════════════════════════════════ */
+  var ts = document.querySelectorAll("[data-theme-set]");
+  for (var m = 0; m < ts.length; m++){
+    (function(b){
+      b.addEventListener("click", function(e){
+        e.stopPropagation();
+        var v = b.getAttribute("data-theme-set");
+        if (v === "system") document.documentElement.removeAttribute("data-theme");
+        else document.documentElement.setAttribute("data-theme", v);
+        for (var k = 0; k < ts.length; k++) ts[k].setAttribute("aria-pressed", String(ts[k] === b));
+      });
+    })(ts[m]);
+  }
+
+  function remeasure(){ ringGeom(); paint(); }
+  window.addEventListener("resize", remeasure);
+  buildMenu();
+  ringGeom();
+  paint();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

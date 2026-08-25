@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推理强度滑块 · 好看优先</title>
+<style>
+/* ══ 值照 tokens.css 搬 ══ */
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-code:#f6f6f7;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#6f6f78; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+  --dur:120ms; --dur-slow:240ms; --ease:ease; --ease-out:cubic-bezier(.22,1,.36,1);
+  --text-xs:11.5px; --text-sm:13px; --text-base:14px; --text-lg:16px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --content-max:760px;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+
+  /* 安静态：一条低饱和的石墨坡道。六套共用，谁都不许在这儿花颜色 */
+  --quiet:linear-gradient(95deg,#dadae2 0%,#9a9aa6 55%,#6c6c78 100%);
+  --rim:inset 0 0 0 1px rgb(0 0 0 / 7%);
+  --gloss:linear-gradient(180deg,rgb(255 255 255 / 26%) 0%,rgb(255 255 255 / 4%) 42%,rgb(0 0 0 / 7%) 100%);
+  --star:#ffffff;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-code:#202024;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none;
+  --quiet:linear-gradient(95deg,#33333b 0%,#6b6b76 55%,#a6a6b2 100%);
+  --rim:inset 0 0 0 1px rgb(255 255 255 / 8%);
+  --gloss:linear-gradient(180deg,rgb(255 255 255 / 16%) 0%,rgb(255 255 255 / 2%) 42%,rgb(0 0 0 / 14%) 100%);
+}}
+:root[data-theme="dark"]{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-code:#202024;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none;
+  --quiet:linear-gradient(95deg,#33333b 0%,#6b6b76 55%,#a6a6b2 100%);
+  --rim:inset 0 0 0 1px rgb(255 255 255 / 8%);
+  --gloss:linear-gradient(180deg,rgb(255 255 255 / 16%) 0%,rgb(255 255 255 / 2%) 42%,rgb(0 0 0 / 14%) 100%);
+}
+
+/* ══════════════════════════════════════════════════════
+   六套「爆」的皮。安静态是共用的，下面每一套只写**爆开之后**：
+     --hot    爆开的坡道
+     --bloom  条子外面那圈柔光
+     --ink    触发器那两个字的颜色
+     --band   条子上那道静止的高光（金属才有；不设不画）
+   ══════════════════════════════════════════════════════ */
+
+/* A 极夜 —— 靛 → 紫 → 品红，星点铺在深底上 */
+.v-night{
+  --hot:linear-gradient(95deg,#221a55 0%,#4a2da6 32%,#8b3fd0 60%,#e463b6 86%,#f7a3dd 100%);
+  --bloom:rgb(122 60 200 / 34%); --ink:#6b3fc4;
+}
+/* B 曙光 —— 黎明前的蓝灰 → 霞粉 → 金；星还没走，所以星点偏在左半边 */
+.v-dawn{
+  --hot:linear-gradient(95deg,#46536e 0%,#8e7288 32%,#d99a86 58%,#f0ad5c 84%,#ffd89a 100%);
+  --bloom:rgb(232 167 101 / 34%); --ink:#8a5a1e;
+}
+/* C 梦幻 —— 粉 → 蓝 → 薄荷，柔光圆点不是星点 */
+.v-dream{
+  --hot:linear-gradient(95deg,#ffa8d4 0%,#b3c0ff 44%,#78e3cb 84%,#a6f0dd 100%);
+  --bloom:rgb(255 160 210 / 34%); --ink:#c2437f;
+}
+/* D 墨金 —— 墨里烧出一道金；右端才是热的那一头 */
+.v-gold{
+  --hot:linear-gradient(95deg,#3c3846 0%,#1b161c 38%,#5c440f 60%,#f2d894 76%,#8a6a14 88%,#e4c377 100%);
+  --band:linear-gradient(100deg,transparent 62%,rgb(255 250 226 / 55%) 74%,transparent 86%);
+  --bloom:rgb(196 156 60 / 32%); --ink:#7d5a0d;
+}
+/* E 玫瑰金 —— 香槟 → 玫瑰 → 酒；金属里最软的一种 */
+.v-rose{
+  --hot:linear-gradient(95deg,#cf9a8a 0%,#f0cdbd 16%,#c07d86 44%,#8a4a5e 68%,#d9a3a8 84%,#96556a 100%);
+  --band:linear-gradient(100deg,transparent 8%,rgb(255 250 246 / 62%) 17%,transparent 28%);
+  --bloom:rgb(192 122 132 / 32%); --ink:#96455a;
+}
+/* F 钛虹 —— 阳极氧化钛：一块金属，色相自己在上面走一圈。
+   三条你都点了（柔和多色 / 深色霓虹 / 金属），这一套是三条的交集 */
+.v-titan{
+  --hot:linear-gradient(100deg,#2f4370 0%,#5f4796 20%,#a04b84 40%,#c2733f 58%,#cfa93a 74%,#6fae9e 88%,#8fc6b6 100%);
+  --band:linear-gradient(100deg,transparent 34%,rgb(255 255 255 / 40%) 50%,transparent 66%);
+  --bloom:rgb(140 80 170 / 32%); --ink:#6b4a92;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  .v-night{ --hot:linear-gradient(95deg,#2b2270 0%,#5b3ac6 32%,#a355e6 60%,#f57ec9 86%,#ffb3e0 100%);
+    --bloom:rgb(163 85 230 / 42%); --ink:#c9a6f7 }
+  .v-dawn{ --hot:linear-gradient(95deg,#36435f 0%,#8a6a80 32%,#d8927e 58%,#eda758 84%,#ffd79b 100%);
+    --bloom:rgb(224 160 92 / 40%); --ink:#f2c489 }
+  .v-dream{ --hot:linear-gradient(95deg,#e79cc4 0%,#a6b4f0 46%,#78d9c0 100%);
+    --bloom:rgb(231 156 196 / 36%); --ink:#f2a9cf }
+  .v-gold{ --hot:linear-gradient(95deg,#302b3a 0%,#181420 38%,#63490f 60%,#ffeec2 76%,#9c7818 88%,#f0d288 100%);
+    --bloom:rgb(232 196 106 / 36%); --ink:#e8c46a }
+  .v-rose{ --hot:linear-gradient(95deg,#6a4f4a 0%,#c69a92 16%,#a06d78 44%,#754450 68%,#f2c9c4 84%,#ab6f7c 100%);
+    --bloom:rgb(226 165 165 / 36%); --ink:#f0bfb8 }
+  .v-titan{ --hot:linear-gradient(100deg,#3b5290 0%,#7658b8 20%,#c25da2 40%,#e08a4c 58%,#ecc94f 74%,#82c8b6 88%,#a3dcca 100%);
+    --bloom:rgb(150 95 200 / 38%); --ink:#c3a4ee }
+}}
+:root[data-theme="dark"] .v-night{ --hot:linear-gradient(95deg,#2b2270 0%,#5b3ac6 32%,#a355e6 60%,#f57ec9 86%,#ffb3e0 100%);
+  --bloom:rgb(163 85 230 / 42%); --ink:#c9a6f7 }
+:root[data-theme="dark"] .v-dawn{ --hot:linear-gradient(95deg,#36435f 0%,#8a6a80 32%,#d8927e 58%,#eda758 84%,#ffd79b 100%);
+  --bloom:rgb(224 160 92 / 40%); --ink:#f2c489 }
+:root[data-theme="dark"] .v-dream{ --hot:linear-gradient(95deg,#e79cc4 0%,#a6b4f0 46%,#78d9c0 100%);
+  --bloom:rgb(231 156 196 / 36%); --ink:#f2a9cf }
+:root[data-theme="dark"] .v-gold{ --hot:linear-gradient(95deg,#302b3a 0%,#181420 38%,#63490f 60%,#ffeec2 76%,#9c7818 88%,#f0d288 100%);
+  --bloom:rgb(232 196 106 / 36%); --ink:#e8c46a }
+:root[data-theme="dark"] .v-rose{ --hot:linear-gradient(95deg,#6a4f4a 0%,#c69a92 16%,#a06d78 44%,#754450 68%,#f2c9c4 84%,#ab6f7c 100%);
+  --bloom:rgb(226 165 165 / 36%); --ink:#f0bfb8 }
+:root[data-theme="dark"] .v-titan{ --hot:linear-gradient(100deg,#3b5290 0%,#7658b8 20%,#c25da2 40%,#e08a4c 58%,#ecc94f 74%,#82c8b6 88%,#a3dcca 100%);
+  --bloom:rgb(150 95 200 / 38%); --ink:#c3a4ee }
+
+*{box-sizing:border-box}
+body{margin:0;padding:44px 24px 120px;background:var(--bg-sunken);color:var(--text);
+  font-family:var(--font);font-size:var(--text-base);line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto}
+h1{font-size:26px;line-height:1.3;letter-spacing:-.014em;margin:0 0 10px}
+h2{font-size:var(--text-lg);line-height:1.4;margin:0 0 6px;letter-spacing:-.008em}
+.lede{margin:0 0 6px;color:var(--text-muted);line-height:1.8}
+.lede b{color:var(--text);font-weight:600}
+code{font-family:var(--font-mono);font-size:.9em;padding:1px 5px;border-radius:4px;background:var(--bg-code)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:26px 0 10px}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);background:var(--bg-raised)}
+.seg button{border:0;background:transparent;color:var(--text-muted);font:inherit;
+  font-size:var(--text-xs);padding:4px 10px;border-radius:4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--text-inverse)}
+.seg__lbl{align-self:center;font-size:var(--text-xs);color:var(--text-faint);margin-right:-2px}
+.play{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:0;
+  border-radius:var(--radius-sm);background:var(--text);color:var(--text-inverse);
+  font:inherit;font-size:var(--text-xs);font-weight:500;cursor:pointer}
+.play:hover{opacity:.88}
+.play:disabled{opacity:.5;cursor:default}
+.hint{max-width:var(--content-max);margin:0 0 30px;font-size:var(--text-xs);
+  color:var(--text-faint);line-height:1.9}
+.hint b{color:var(--text-muted);font-weight:500}
+
+/* ── 小样 ─────────────────────────────────── */
+.stage{margin:26px 0 0}
+.stage__t{display:flex;align-items:center;gap:8px;margin:0 0 9px;
+  font:12px/1.5 var(--font-mono);color:var(--text-faint)}
+.stage__n{color:var(--text);font-weight:600}
+.sw{flex:none;width:34px;height:9px;border-radius:999px;background:var(--hot);
+  box-shadow:var(--rim)}
+.comp{position:relative;max-width:var(--content-max);border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);box-shadow:var(--shadow-1);
+  padding:var(--sp-2) var(--sp-3)}
+.chips{display:flex;align-items:center;gap:var(--sp-3);padding-bottom:6px;
+  border-bottom:1px solid var(--border);font-size:var(--text-xs);color:var(--text-muted)}
+.chips span{display:inline-flex;align-items:center;gap:5px}
+.ta{padding-top:9px;min-height:42px;color:var(--text-faint);font-size:var(--text-base);line-height:1.6}
+.row{display:flex;align-items:center;gap:var(--sp-2);padding-top:var(--sp-1);
+  margin-left:calc(-1 * (var(--sp-2) + 1px))}
+.trig{display:inline-flex;align-items:center;gap:5px;flex:none;height:26px;padding:0 var(--sp-2);
+  border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;
+  color:var(--text-muted);font:inherit;font-size:var(--text-sm);white-space:nowrap;cursor:pointer;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
+.trig--static{cursor:default}
+button.trig:hover,button.trig[aria-expanded="true"]{background:var(--bg-hover);color:var(--text)}
+.trig:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.trig svg{color:var(--text-faint);transition:transform var(--dur-slow) var(--ease-out)}
+.eff--open .eff__btn svg:last-child{transform:rotate(180deg)}
+.gapx{flex:1;min-width:10px}
+.send{flex:none;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;
+  border-radius:999px;background:var(--text);color:var(--text-inverse);cursor:pointer}
+.ic{stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;display:block}
+.pair{display:flex;align-items:center;gap:2px;flex:none}
+.eff{position:relative;flex:none}
+.eff[hidden]{display:none}
+.eff__lvl{color:var(--text);transition:color 380ms var(--ease)}
+.comp.is-hot .eff__lvl{color:var(--ink);font-weight:600}
+
+/* ── 条子 ─────────────────────────────────── */
+.ibar{flex:none;width:0;overflow:visible;transition:width 300ms var(--ease-out)}
+.ibar[hidden]{display:none}
+.ibar .gbar{clip-path:inset(0 100% 0 0 round 13px);transition:clip-path 300ms var(--ease-out)}
+.ibar--open .gbar{clip-path:inset(0 0 0 0 round 13px)}
+.ibar--closing,.ibar--closing .gbar{transition-duration:200ms}
+.gbar{position:relative;width:var(--bw,180px);height:26px;border-radius:999px;
+  background:var(--bg-sunken);cursor:pointer;touch-action:none;
+  box-shadow:0 0 0 0 rgb(0 0 0 / 0%);
+  transition:box-shadow 420ms var(--ease)}
+.gbar:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 爆开之后那圈柔光。**不是动画，是状态** —— 它一直在，但它不动 */
+.ibar--hot .gbar{box-shadow:0 0 16px -2px var(--bloom)}
+.gbar__fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;overflow:hidden;
+  box-shadow:var(--rim);transition:width 190ms var(--ease-out)}
+.lay{position:absolute;left:0;top:0;bottom:0;background-repeat:no-repeat;pointer-events:none}
+/* 安静态和爆开态**叠着交叉淡入**：CSS 没法在两个 linear-gradient 之间过渡，
+   直接换 background-image 是硬切，一帧之内灰变彩，看着像 bug */
+.lay--quiet{background-image:var(--quiet)}
+.lay--hot{background-image:var(--hot);opacity:0;transition:opacity 420ms var(--ease)}
+.ibar--hot .lay--hot{opacity:1}
+.lay--band{background-image:var(--band,none);opacity:0;transition:opacity 520ms var(--ease) 80ms}
+.ibar--hot .lay--band{opacity:1}
+.lay--gloss{background-image:var(--gloss)}
+/* 星点：位置固定不跳。跳来跳去会读成「它在闪什么」 */
+.lay--stars{opacity:0;transition:opacity 420ms var(--ease) 140ms}
+.ibar--hot .lay--stars{opacity:1}
+.lay--stars i{position:absolute;display:block;border-radius:999px;background:var(--star);
+  animation:twinkle 3.4s var(--ease) infinite}
+@keyframes twinkle{0%,100%{opacity:.28}50%{opacity:.95}}
+.v-dream .lay--stars i{filter:blur(.4px);box-shadow:0 0 4px rgb(255 255 255 / 80%)}
+.v-dawn .lay--stars i{background:#fff6e0;box-shadow:0 0 3px rgb(255 236 190 / 80%)}
+
+/* ── 「爆」那一下：一次性的，不是常驻动画 ──────────
+   一道白光扫过 + 柔光先撑大再收回 + 拇指弹一下。
+   跑完就没了，之后留下的是**静止的颜色**。 */
+.flash{position:absolute;top:0;bottom:0;width:52%;left:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgb(255 255 255 / 62%) 46%,transparent);
+  transform:translateX(-140%);opacity:0}
+.pop .flash{animation:flash 720ms cubic-bezier(.28,.72,.28,1) both}
+@keyframes flash{
+  0%{transform:translateX(-140%);opacity:0}
+  18%{opacity:1}
+  100%{transform:translateX(230%);opacity:0}
+}
+.pop .gbar{animation:bloom 720ms var(--ease-out) both}
+@keyframes bloom{
+  0%{box-shadow:0 0 0 0 var(--bloom)}
+  38%{box-shadow:0 0 26px 3px var(--bloom)}
+  100%{box-shadow:0 0 16px -2px var(--bloom)}
+}
+.pop .gbar__thumb{animation:thumbpop 520ms var(--ease-out) both}
+@keyframes thumbpop{0%{scale:1}30%{scale:1.16}100%{scale:1}}
+
+.gbar__thumb{position:absolute;top:2px;left:0;width:22px;height:22px;border-radius:999px;z-index:2;
+  background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 22%),0 0 0 .5px rgb(0 0 0 / 8%);
+  translate:var(--tx,0) 0;
+  transition:translate 190ms var(--ease-out),scale 110ms var(--ease-out),box-shadow 380ms var(--ease)}
+.ibar--hot .gbar__thumb{box-shadow:0 1px 3px rgb(0 0 0 / 26%),0 0 0 1.5px var(--bloom)}
+.ibar--live .gbar__fill,.ibar--live .gbar__thumb{transition:none}
+.ibar--grab .gbar__thumb{scale:1.08}
+
+@media (prefers-reduced-motion: reduce){
+  .lay--stars i{animation:none;opacity:.62}
+  .pop .flash,.pop .gbar,.pop .gbar__thumb{animation:none}
+  .ibar,.ibar .gbar,.gbar__fill,.gbar__thumb,.lay,.trig svg,.eff__lvl{transition:none}
+}
+
+/* ── 说明块 ───────────────────────────────── */
+.note{max-width:var(--content-max);margin:12px 0 0;padding:12px 15px;
+  border:1px solid var(--border);border-left:2px solid var(--border-strong);
+  border-radius:0 var(--radius) var(--radius) 0;background:var(--bg-raised)}
+.note p{margin:0;font-size:var(--text-sm);line-height:1.85;color:var(--text-muted)}
+.note p + p{margin-top:8px}
+.note b{color:var(--text);font-weight:600}
+.note h4{margin:0 0 8px;font-size:var(--text-sm);font-weight:600}
+.note--pick{border-left-color:var(--accent)}
+.note--warn{border-left-color:var(--warn)}
+hr{height:1px;background:var(--border);border:0;margin:40px 0}
+.foot{max-width:var(--content-max);margin:0;color:var(--text-faint);font-size:var(--text-xs);line-height:1.9}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.6a1 1 0 0 1 1-1h2.8l1.2 1.4H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.6" cy="3.6" r="1.5"/><circle cx="4.6" cy="12.4" r="1.5"/><circle cx="11.4" cy="4.8" r="1.5"/><path d="M4.6 5.1v5.8M11.4 6.3c0 2.2-1.6 2.9-3.4 3.2"/></symbol>
+<symbol id="i-chev-d" viewBox="0 0 16 16"><path d="M3.8 6.2L8 10.4l4.2-4.2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.4l4.4 1.7v3.3c0 2.6-1.85 4.35-4.4 5.2-2.55-.85-4.4-2.6-4.4-5.2V4.1z"/></symbol>
+<symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 2.4l1.35 3.25L12.6 7l-3.25 1.35L8 11.6 6.65 8.35 3.4 7l3.25-1.35z"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.6h4.6L12.2 6.2v7.2H4z"/><path d="M8.4 2.6v3.8h3.8"/></symbol>
+<symbol id="i-up" viewBox="0 0 16 16"><path d="M8 12.8V3.6M4.1 7.5L8 3.4l3.9 4.1"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+<h1>推理强度滑块 · 好看优先</h1>
+<p class="lede">按你点的两条重做：<b>前面安静，最后一档才爆</b>；配色走<b>柔和多色 / 深色霓虹 / 金属</b>三路。上一轮我把好看排在了逻辑后面，这一轮反过来。</p>
+<p class="lede">六套共用同一个安静态（一条低饱和的石墨坡道），差别<b>全在爆开之后</b>。都是能拖的真控件。</p>
+
+<div class="bar">
+  <button type="button" class="play" id="play">▶ 从头推一遍（看爆的那一下）</button>
+  <span class="seg__lbl">引擎</span>
+  <div class="seg" role="group" aria-label="引擎">
+    <button type="button" data-model="k3" aria-pressed="true">K3</button>
+    <button type="button" data-model="k27" aria-pressed="false">K2.7</button>
+    <button type="button" data-model="sol" aria-pressed="false">GPT-5.6 Sol</button>
+  </div>
+  <span class="seg__lbl">主题</span>
+  <div class="seg" role="group" aria-label="主题">
+    <button type="button" data-theme-set="light" aria-pressed="false">浅色</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">深色</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">跟随系统</button>
+  </div>
+</div>
+<p class="hint"><b>怎么试：</b>把拇指拖到最右边就爆，往回拖一档就灭；← → 改档，Esc 收起。反复拖进拖出，那一下会重放。<br>
+<b>切 K2.7</b>（三档、没有 ultra）：推到头也<b>永远不爆</b>——不是灰版的 ultra，是这个模型根本没有那一档。<b>切 Sol</b>：强度那颗整个不出现。</p>
+
+<hr>
+
+<div class="stage">
+  <p class="stage__t"><span class="sw v-night"></span><span class="stage__n">A · 极夜</span>靛 → 紫 → 品红，星点铺在深底上才真读成星星</p>
+  <div class="comp v-night" data-stars="left">
+    <div class="chips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span></div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <div class="pair">
+        <span class="trig trig--static"><svg class="ic" width="13" height="13"><use href="#i-spark"/></svg><span class="mdl__lbl">K3</span></span>
+        <div class="eff"><button type="button" class="trig eff__btn" aria-expanded="true"><span class="eff__lvl">超高</span><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="ibar"><div class="gbar" tabindex="0" role="slider" aria-label="推理强度" aria-valuemin="1" aria-valuenow="6" aria-valuemax="6">
+        <span class="gbar__fill">
+          <span class="lay lay--quiet"></span><span class="lay lay--hot"></span>
+          <span class="lay lay--band"></span><span class="lay lay--stars"></span>
+          <span class="lay lay--gloss"></span><span class="flash"></span>
+        </span>
+        <span class="gbar__thumb"></span>
+      </div></div>
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+    <p class="sr-only live" aria-live="polite"></p>
+  </div>
+  <div class="note"><p>⑦ 深空那一路，把坡道拉开了：多一站靛蓝打底，品红只占最右边。<b>星点在这套里才说得通</b>——铺在浅色上它是噪点，铺在深靛上它是星星。</p></div>
+</div>
+
+<div class="stage">
+  <p class="stage__t"><span class="sw v-dawn"></span><span class="stage__n">B · 曙光</span>蓝灰 → 霞粉 → 金；星还没走，所以星点偏在左半边</p>
+  <div class="comp v-dawn" data-stars="left">
+    <div class="chips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span></div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <div class="pair">
+        <span class="trig trig--static"><svg class="ic" width="13" height="13"><use href="#i-spark"/></svg><span class="mdl__lbl">K3</span></span>
+        <div class="eff"><button type="button" class="trig eff__btn" aria-expanded="true"><span class="eff__lvl">超高</span><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="ibar"><div class="gbar" tabindex="0" role="slider" aria-label="推理强度" aria-valuemin="1" aria-valuenow="6" aria-valuemax="6">
+        <span class="gbar__fill">
+          <span class="lay lay--quiet"></span><span class="lay lay--hot"></span>
+          <span class="lay lay--band"></span><span class="lay lay--stars"></span>
+          <span class="lay lay--gloss"></span><span class="flash"></span>
+        </span>
+        <span class="gbar__thumb"></span>
+      </div></div>
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+    <p class="sr-only live" aria-live="polite"></p>
+  </div>
+  <div class="note"><p>⑯ 曙光原版让色温从第一档就开始爬；这里改成<b>只有最后一档才天亮</b>。爆之前是黎明前的灰，爆开是一整条日出。六套里唯一一个自带故事的。</p></div>
+</div>
+
+<div class="stage">
+  <p class="stage__t"><span class="sw v-dream"></span><span class="stage__n">C · 梦幻</span>粉 → 蓝 → 薄荷，柔光圆点不是星点</p>
+  <div class="comp v-dream" data-stars="even">
+    <div class="chips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span></div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <div class="pair">
+        <span class="trig trig--static"><svg class="ic" width="13" height="13"><use href="#i-spark"/></svg><span class="mdl__lbl">K3</span></span>
+        <div class="eff"><button type="button" class="trig eff__btn" aria-expanded="true"><span class="eff__lvl">超高</span><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="ibar"><div class="gbar" tabindex="0" role="slider" aria-label="推理强度" aria-valuemin="1" aria-valuenow="6" aria-valuemax="6">
+        <span class="gbar__fill">
+          <span class="lay lay--quiet"></span><span class="lay lay--hot"></span>
+          <span class="lay lay--band"></span><span class="lay lay--stars"></span>
+          <span class="lay lay--gloss"></span><span class="flash"></span>
+        </span>
+        <span class="gbar__thumb"></span>
+      </div></div>
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+    <p class="sr-only live" aria-live="polite"></p>
+  </div>
+  <div class="note"><p>③ 梦幻原版是整条常驻粉蓝；这里同样憋到最后一档。<b>它是六套里最轻的一个</b>——爆开之后也不压人，缺点是「贵」这句话它说得最含糊。</p></div>
+</div>
+
+<div class="stage">
+  <p class="stage__t"><span class="sw v-gold"></span><span class="stage__n">D · 墨金</span>墨里烧出一道金，右端才是热的那一头</p>
+  <div class="comp v-gold">
+    <div class="chips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span></div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <div class="pair">
+        <span class="trig trig--static"><svg class="ic" width="13" height="13"><use href="#i-spark"/></svg><span class="mdl__lbl">K3</span></span>
+        <div class="eff"><button type="button" class="trig eff__btn" aria-expanded="true"><span class="eff__lvl">超高</span><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="ibar"><div class="gbar" tabindex="0" role="slider" aria-label="推理强度" aria-valuemin="1" aria-valuenow="6" aria-valuemax="6">
+        <span class="gbar__fill">
+          <span class="lay lay--quiet"></span><span class="lay lay--hot"></span>
+          <span class="lay lay--band"></span><span class="lay lay--stars"></span>
+          <span class="lay lay--gloss"></span><span class="flash"></span>
+        </span>
+        <span class="gbar__thumb"></span>
+      </div></div>
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+    <p class="sr-only live" aria-live="polite"></p>
+  </div>
+  <div class="note"><p>⑥ 墨金原版是零彩色 ＋ 一道<b>无限循环</b>的扫光；这里那道光改成<b>爆的时候扫一次就停</b>，之后留在条子上的是静止的金。金属质感留住了，常驻动画的账不欠了。</p></div>
+</div>
+
+<div class="stage">
+  <p class="stage__t"><span class="sw v-rose"></span><span class="stage__n">E · 玫瑰金</span>香槟 → 玫瑰 → 酒，金属里最软的一种</p>
+  <div class="comp v-rose">
+    <div class="chips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span></div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <div class="pair">
+        <span class="trig trig--static"><svg class="ic" width="13" height="13"><use href="#i-spark"/></svg><span class="mdl__lbl">K3</span></span>
+        <div class="eff"><button type="button" class="trig eff__btn" aria-expanded="true"><span class="eff__lvl">超高</span><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="ibar"><div class="gbar" tabindex="0" role="slider" aria-label="推理强度" aria-valuemin="1" aria-valuenow="6" aria-valuemax="6">
+        <span class="gbar__fill">
+          <span class="lay lay--quiet"></span><span class="lay lay--hot"></span>
+          <span class="lay lay--band"></span><span class="lay lay--stars"></span>
+          <span class="lay lay--gloss"></span><span class="flash"></span>
+        </span>
+        <span class="gbar__thumb"></span>
+      </div></div>
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+    <p class="sr-only live" aria-live="polite"></p>
+  </div>
+  <div class="note"><p>⑭ 玫瑰金原版靠的是「整段极慢的呼吸」——没有方向；这里换成<b>金属的明暗</b>：高光、暗部、再一道边光。金属之所以读成金属，靠的不是色相，是<b>亮度不单调</b>——D 墨金同理。</p></div>
+</div>
+
+<div class="stage">
+  <p class="stage__t"><span class="sw v-titan"></span><span class="stage__n">F · 钛虹</span>阳极氧化钛：一块金属，色相自己在上面走一圈</p>
+  <div class="comp v-titan">
+    <div class="chips"><span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span><span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span></div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <div class="pair">
+        <span class="trig trig--static"><svg class="ic" width="13" height="13"><use href="#i-spark"/></svg><span class="mdl__lbl">K3</span></span>
+        <div class="eff"><button type="button" class="trig eff__btn" aria-expanded="true"><span class="eff__lvl">超高</span><svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button></div>
+      </div>
+      <div class="ibar"><div class="gbar" tabindex="0" role="slider" aria-label="推理强度" aria-valuemin="1" aria-valuenow="6" aria-valuemax="6">
+        <span class="gbar__fill">
+          <span class="lay lay--quiet"></span><span class="lay lay--hot"></span>
+          <span class="lay lay--band"></span><span class="lay lay--stars"></span>
+          <span class="lay lay--gloss"></span><span class="flash"></span>
+        </span>
+        <span class="gbar__thumb"></span>
+      </div></div>
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+    <p class="sr-only live" aria-live="polite"></p>
+  </div>
+  <div class="note"><p><b>这一套是新的，不在原来十七套里。</b>你点的三条——柔和多色、深色霓虹、金属质感——它是三条的交集：钛在阳极氧化时色相真的会这样走一圈（青蓝 → 紫 → 品红 → 铜 → 金 → 薄荷），所以它多色但<b>不是彩虹</b>，是一种材料的真实颜色。</p></div>
+</div>
+
+<hr>
+
+<div class="note note--pick">
+  <h4>六套里我会怎么选</h4>
+  <p><b>F 钛虹</b>是我这一轮真会投的一票。它同时满足你点的三条，而且它的多色<b>有出处</b>——不是随手排的渐变，是一种金属的真实氧化色序。这一条在这个仓库里很重要：颜色一旦有出处，就不会被读成装饰。</p>
+  <p><b>A 极夜</b>是「爆」这个字最到位的一套：安静态是灰的，爆开是一整片夜空。它也是唯一一个把星点用对了地方的——星点铺在浅底上是噪点，铺在深靛上才是星星。</p>
+  <p><b>D 墨金</b>是最稳的一票，如果最后还想守住 <code>tokens.css</code> 那条「不用大面积彩色」：它整条几乎是墨，只有右端一截金。上一轮我把它排在第四，理由是「靠材质说话、而界面通篇是平的」——这一条我现在仍然认，但既然你要的就是质感，那它反而是最合适的。</p>
+  <p><b>B 曙光</b>好看，我不投它只有一个原因：<b>日出是个好消息</b>，而这一档要说的是「这一轮开始烧钱了」。C 梦幻同理，更轻。E 玫瑰金和 D 撞在同一个位置（金属），两个选一个就够。</p>
+</div>
+
+<div class="note note--warn">
+  <h4>「爆」是怎么做的 —— 三件事，都是一次性的</h4>
+  <p><b>① 一道白光扫过</b>（720ms，从左扫到右，扫完就没）。<b>② 柔光先撑大再收回</b>（0 → 26px → 落到 16px 常驻）。<b>③ 拇指弹一下</b>（1 → 1.16 → 1）。</p>
+  <p><b>爆完之后留下的是静止的颜色</b>，没有任何东西还在动——这一条是有意的：<code>status.css</code> 那句「一刻不停的动画会持续抢注意力」。原来那圈无限绕的扫光、⑥ 墨金那道无限循环的金、⑪ 落点那个无限脉冲，都是每分钟都在收租；一次性的爆只收一次。</p>
+  <p><b>往回拖一档就灭，再拖回去就再爆一次。</b>它不是「播过一遍就完了」的开场动画，是这一档的<b>状态转换</b>。</p>
+  <p><code>prefers-reduced-motion</code> 下：扫光、柔光撑大、拇指弹跳、星点闪烁<b>全部不出现</b>，颜色和柔光留着——降级之后信息一个字不丢。</p>
+</div>
+
+<p class="foot">
+上一轮那份（按逻辑挑的三套：⑩ 刻度 / ⑮ 炽芯 / ⑨ 刃口）在 <code>docs/claude/推理强度滑块-Top3.html</code>，十七套原稿在 <code>docs/glm/推理强度滑块-demo-行内.html</code>。<br>
+这一版没有重新引入刻度和拇指热度——那两条是上一轮被否掉的表现，等你先定下配色再说。安静态是六套共用的，所以真要落地时换皮只动 <code>--hot / --bloom / --ink / --band</code> 四个变量。
+</p>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var ORDER = ["low","medium","high","xhigh","max","ultra"];
+  var LABEL = { low:"轻度", medium:"中", high:"高", xhigh:"极高", max:"最高", ultra:"超高" };
+  var MODELS = {
+    k3:  { label:"K3",          efforts:ORDER.slice(),           def:"ultra" },
+    k27: { label:"K2.7",        efforts:["low","medium","high"], def:"high"  },
+    sol: { label:"GPT-5.6 Sol", efforts:[],                      def:null    }
+  };
+  var THUMB = 22, BAR_W = 180, GAP = 8;
+  var modelId = "k3", bars = [];
+  function q(s, r){ return (r || document).querySelector(s); }
+
+  /* 星点位置固定不跳：一个确定的伪随机序列 */
+  function seeded(i){ var x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); }
+
+  function make(comp){
+    var eff = q(".eff", comp), btn = q(".eff__btn", comp), lvl = q(".eff__lvl", comp),
+        mlbl = q(".mdl__lbl", comp), ibar = q(".ibar", comp), gbar = q(".gbar", comp),
+        fill = q(".gbar__fill", comp), thumb = q(".gbar__thumb", comp),
+        stars = q(".lay--stars", comp), gapx = q(".gapx", comp), live = q(".live", comp);
+    var lays = Array.prototype.slice.call(comp.querySelectorAll(".lay"));
+    var bias = comp.getAttribute("data-stars");
+    var idx = 0, raw = null, open = true, dragging = false, moveRaf = 0, wasHot = false, popT = 0;
+
+    function model(){ return MODELS[modelId]; }
+    function list(){ return model().efforts; }
+    function clamp(i){ return Math.max(0, Math.min(list().length - 1, i)); }
+    function isUltra(){ return list()[idx] === "ultra"; }
+
+    function room(){
+      var free = gapx.getBoundingClientRect().width + ibar.getBoundingClientRect().width - GAP;
+      return Math.max(96, Math.min(BAR_W, free));
+    }
+
+    function paintStars(w){
+      if (!bias || stars.getAttribute("data-w") === String(w)) return;
+      stars.setAttribute("data-w", String(w));
+      stars.textContent = "";
+      var n = Math.max(8, Math.round(w / 15));
+      for (var i = 0; i < n; i++){
+        var t = seeded(i * 4 + 1);
+        /* 往哪一头堆。t² 把点压向左端，1−t² 压向右端，t 是均匀铺。
+           曙光堆左：天快亮了，星留在还没亮的那半边 */
+        var p = bias === "left" ? t * t : (bias === "even" ? t : 1 - t * t);
+        var d = document.createElement("i");
+        var s = 1 + seeded(i * 4 + 2) * 1.7;
+        d.style.left = (p * (w - 6) + 3).toFixed(1) + "px";
+        d.style.top = (3 + seeded(i * 4 + 3) * 18).toFixed(1) + "px";
+        d.style.width = s.toFixed(1) + "px";
+        d.style.height = s.toFixed(1) + "px";
+        d.style.animationDelay = (seeded(i * 4 + 4) * -3.4).toFixed(2) + "s";
+        stars.appendChild(d);
+      }
+    }
+
+    function paintBar(){
+      var w = gbar.clientWidth; if (w <= THUMB) w = THUMB + 1;
+      var travel = w - THUMB, n = list().length;
+      var t = raw !== null ? raw : (n < 2 ? 0 : idx / (n - 1));
+      thumb.style.setProperty("--tx", (t * travel).toFixed(2) + "px");
+      fill.style.width = (t * travel + THUMB) + "px";
+      /* 坡道钉在整条的坐标上，不跟着填充宽度缩放：
+         否则拖到一半时右端已经是满色，读起来像「已经到头了」 */
+      for (var i = 0; i < lays.length; i++){
+        lays[i].style.width = w + "px";
+        lays[i].style.backgroundSize = w + "px 100%";
+      }
+      paintStars(w);
+    }
+
+    /* 「爆」：一次性。进入 ultra 才放，退出再进入会重放 */
+    function pop(){
+      comp.classList.remove("pop");
+      void comp.offsetWidth;          /* 强制回流，动画才会重新起跑 */
+      comp.classList.add("pop");
+      clearTimeout(popT);
+      popT = setTimeout(function(){ comp.classList.remove("pop"); }, 760);
+    }
+
+    function paint(commit){
+      var e = list(), n = e.length;
+      mlbl.textContent = model().label;
+      eff.hidden = !n; ibar.hidden = !n;
+      if (!n){
+        comp.classList.remove("is-hot", "pop");
+        ibar.classList.remove("ibar--hot", "ibar--open");
+        ibar.style.width = "0px";
+        live.textContent = "这个模型不报推理强度档位";
+        wasHot = false;
+        return;
+      }
+      idx = clamp(idx);
+      var name = LABEL[e[idx]] || e[idx];
+      lvl.textContent = name;
+      var hot = isUltra();
+      comp.classList.toggle("is-hot", hot);
+      ibar.classList.toggle("ibar--hot", hot);
+      btn.title = hot ? "超高：更快消耗使用额度" : "推理强度";
+      gbar.setAttribute("aria-valuemin", "1");
+      gbar.setAttribute("aria-valuemax", String(n));
+      gbar.setAttribute("aria-valuenow", String(idx + 1));
+      gbar.setAttribute("aria-valuetext", name);
+      live.textContent = "推理强度 " + name + (hot ? "，发送后更快消耗使用额度" : "");
+      paintBar();
+      /* 拖动过程中路过 ultra 不放，**松手落在这一档才放** */
+      if (hot && !wasHot && commit) pop();
+      if (!hot) comp.classList.remove("pop");
+      wasHot = hot;
+    }
+
+    function set(i, commit){ idx = clamp(i); paint(commit); }
+
+    function setOpen(yes){
+      if (eff.hidden) return;
+      open = yes;
+      eff.classList.toggle("eff--open", yes);
+      btn.setAttribute("aria-expanded", String(yes));
+      ibar.classList.remove("ibar--closing");
+      if (yes){
+        var w = room();
+        ibar.style.setProperty("--bw", w + "px");
+        ibar.style.width = w + "px";
+        ibar.classList.add("ibar--open");
+        paintBar();
+      } else {
+        ibar.classList.add("ibar--closing");
+        ibar.classList.remove("ibar--open");
+        ibar.style.width = "0px";
+        setTimeout(function(){ ibar.classList.remove("ibar--closing"); }, 240);
+      }
+    }
+
+    function ratioAt(x){
+      var r = gbar.getBoundingClientRect(), travel = r.width - THUMB;
+      if (travel <= 0) return 0;
+      return Math.max(0, Math.min(1, (x - r.left - THUMB / 2) / travel));
+    }
+    function nearest(p){ var n = list().length; return n < 2 ? 0 : Math.round(p * (n - 1)); }
+
+    btn.addEventListener("click", function(e){ e.stopPropagation(); setOpen(!open); });
+
+    gbar.addEventListener("pointerdown", function(e){
+      e.preventDefault();
+      dragging = true;
+      ibar.classList.add("ibar--grab", "ibar--live");
+      try { gbar.setPointerCapture(e.pointerId); } catch (err) { void err; }
+      raw = ratioAt(e.clientX);
+      set(nearest(raw), false);
+      gbar.focus({ preventScroll:true });
+    });
+    gbar.addEventListener("pointermove", function(e){
+      if (!dragging || moveRaf) return;
+      var x = e.clientX;
+      moveRaf = requestAnimationFrame(function(){
+        moveRaf = 0; raw = ratioAt(x); set(nearest(raw), false);
+      });
+    });
+    function endDrag(){
+      if (!dragging) return;
+      dragging = false;
+      if (moveRaf){ cancelAnimationFrame(moveRaf); moveRaf = 0; }
+      ibar.classList.remove("ibar--grab");
+      raw = null;
+      ibar.classList.remove("ibar--live");   /* 先撤零过渡，落档那一下才有 190ms */
+      paint(true);
+    }
+    gbar.addEventListener("pointerup", endDrag);
+    gbar.addEventListener("pointercancel", endDrag);
+
+    gbar.addEventListener("keydown", function(e){
+      if (e.key === "Escape"){ setOpen(false); btn.focus(); return; }
+      if (e.key === "ArrowLeft" || e.key === "ArrowDown"){ e.preventDefault(); set(idx - 1, true); }
+      if (e.key === "ArrowRight" || e.key === "ArrowUp"){ e.preventDefault(); set(idx + 1, true); }
+      if (e.key === "Home"){ e.preventDefault(); set(0, true); }
+      if (e.key === "End"){ e.preventDefault(); set(list().length - 1, true); }
+    });
+    gbar.addEventListener("wheel", function(e){
+      if (!open) return;
+      e.preventDefault();
+      set(idx + (e.deltaY > 0 || e.deltaX > 0 ? 1 : -1), true);
+    }, { passive:false });
+
+    function sync(){
+      var e = list(), want = model().def;
+      idx = want ? Math.max(0, e.indexOf(want)) : 0;
+      wasHot = false;
+      paint(false);
+      if (e.length && open) setOpen(true);
+    }
+
+    function ramp(done){
+      if (!list().length){ done(); return; }
+      var n = list().length, t0 = performance.now(), MS = 1600;
+      wasHot = false;
+      ibar.classList.add("ibar--live");
+      set(0, false);
+      function frame(now){
+        var p = Math.min(1, (now - t0) / MS);
+        raw = 1 - Math.pow(1 - p, 3);
+        set(nearest(raw), false);
+        if (p < 1){ requestAnimationFrame(frame); return; }
+        raw = null;
+        ibar.classList.remove("ibar--live");
+        set(n - 1, true);
+        done();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    sync();
+    return { sync:sync, ramp:ramp, resize:function(){ if (open && !eff.hidden) setOpen(true); } };
+  }
+
+  var comps = document.querySelectorAll(".comp");
+  for (var i = 0; i < comps.length; i++) bars.push(make(comps[i]));
+
+  var ms = document.querySelectorAll("[data-model]");
+  for (var m = 0; m < ms.length; m++){
+    (function(b){ b.addEventListener("click", function(){
+      modelId = b.getAttribute("data-model");
+      for (var k = 0; k < ms.length; k++) ms[k].setAttribute("aria-pressed", String(ms[k] === b));
+      for (var j = 0; j < bars.length; j++) bars[j].sync();
+    }); })(ms[m]);
+  }
+  var ts = document.querySelectorAll("[data-theme-set]");
+  for (var t = 0; t < ts.length; t++){
+    (function(b){ b.addEventListener("click", function(){
+      var v = b.getAttribute("data-theme-set");
+      if (v === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", v);
+      for (var k = 0; k < ts.length; k++) ts[k].setAttribute("aria-pressed", String(ts[k] === b));
+    }); })(ts[t]);
+  }
+  var playBtn = document.getElementById("play");
+  playBtn.addEventListener("click", function(){
+    playBtn.disabled = true;
+    var left = bars.length;
+    for (var j = 0; j < bars.length; j++) bars[j].ramp(function(){ if (--left === 0) playBtn.disabled = false; });
+  });
+  var sizeRaf = 0;
+  window.addEventListener("resize", function(){
+    if (sizeRaf) return;
+    sizeRaf = requestAnimationFrame(function(){
+      sizeRaf = 0;
+      for (var j = 0; j < bars.length; j++) bars[j].resize();
+    });
+  });
+})();
+</script>
+</body>
+</html>

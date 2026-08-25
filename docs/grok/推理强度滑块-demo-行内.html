@@ -1,0 +1,1704 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推理强度滑块 · 行内条版 · Claude 合并稿 · Grok 补三套</title>
+<style>
+/* ══ 值照 tokens.css 搬，好让 demo 里的样子就是应用里的样子 ══ */
+:root{
+  color-scheme: light dark;
+  --bg:#ffffff; --bg-sunken:#f7f7f8; --bg-raised:#ffffff; --bg-hover:#f0f0f2;
+  --bg-active:#e8e8ec; --bg-press:#e0e0e5; --bg-code:#f6f6f7; --bg-said:#f0f0f2;
+  --border:#e6e6e9; --border-strong:#d6d6da;
+  --text:#16161a; --text-muted:#6a6a73; --text-faint:#6f6f78; --text-inverse:#ffffff;
+  --accent:#3b6fd4; --danger:#c2412d; --warn:#9a6b12; --ok:#2f7a4d;
+  --radius-sm:6px; --radius:9px; --radius-lg:13px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --dur:120ms; --dur-slow:240ms; --ease:ease;
+  --text-xs:11.5px; --text-sm:13px; --text-base:14px; --text-prose:15px; --text-lg:16px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --content-max:760px;
+  --shadow-1:0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 8px 28px rgb(0 0 0 / 12%);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+
+  /* 普通档走中性灰，紫色是 ultra 一家的。理由见页面下面那节 */
+  --eff-n0:#d4d4dc;
+  --eff-n1:#5a5a63;
+  /* 紫的四个：--eff-1 是图形（3:1，实测 on 白 5.26），--eff-ink 是文字（4.5:1，实测 6.70） */
+  --eff-0:#a48ae0;
+  --eff-1:#7b52d3;
+  --eff-ink:#6b3fc4;
+  --eff-soft:rgb(123 82 211 / 24%);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --eff-n0:#3a3a42; --eff-n1:#a8a8b4;
+  --eff-0:#7f63c8; --eff-1:#9a76e8; --eff-ink:#b79aec; --eff-soft:rgb(154 118 232 / 30%);
+}}
+:root[data-theme="dark"]{
+  --bg:#17171a; --bg-sunken:#101012; --bg-raised:#1d1d21; --bg-hover:#232328;
+  --bg-active:#2c2c33; --bg-press:#35353d; --bg-code:#202024; --bg-said:#232328;
+  --border:#2a2a30; --border-strong:#3a3a42;
+  --text:#ececef; --text-muted:#9d9da8; --text-faint:#95959f; --text-inverse:#17171a;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+  --shadow-1:none; --shadow-pop:0 10px 32px rgb(0 0 0 / 55%);
+  --eff-n0:#3a3a42; --eff-n1:#a8a8b4;
+  --eff-0:#7f63c8; --eff-1:#9a76e8; --eff-ink:#b79aec; --eff-soft:rgb(154 118 232 / 30%);
+}
+
+/* ══ 四个对比框：同一份逻辑，只换 CSS 变量 ══════════════
+   能这么换，说明原案的主题化是干净的——逻辑里没有一处写死的颜色。
+   --eff-mid / --eff-ring / --star-* / --orbit-dur 不设就落回紫色那套默认。 */
+.v-tech{  /* 科技蓝：青→蓝坡道，方形粒子，扫光快一档 */
+  --eff-0:#55d6f5; --eff-1:#2f7df6; --eff-ink:#1c5fd0;
+  --eff-soft:rgb(47 125 246 / 24%);
+  --orbit-dur:3.2s; --twk-dur:1.8s; --star-radius:1px;
+}
+.v-dream{ /* 梦幻：粉→蓝→薄荷三色极光，圆点带柔光，扫光慢一档 */
+  --eff-0:#ffb3d9; --eff-mid:#a8c8ff; --eff-1:#7ee8c7;
+  --eff-ink:#c2437f; --eff-ring:#e061b4;
+  --eff-soft:rgb(255 140 200 / 26%);
+  --orbit-dur:6.5s; --twk-dur:3.8s; --star-glow:0 0 5px rgb(255 255 255 / 90%);
+}
+.v-lava{  /* 熔岩橙：琥珀→橙三段。「警告」是界面里说「花销」的通用语 */
+  --eff-0:#fcd34d; --eff-mid:#fb923c; --eff-1:#ea580c;
+  --eff-ink:#c2410c;
+  --eff-soft:rgb(234 88 12 / 22%);
+  --orbit-dur:4s; --twk-dur:2.2s;
+}
+.v-mono{  /* 墨色：零彩色。不靠色相，靠黑度和那圈描边 */
+  --eff-0:#9a9aa2; --eff-1:#16161a; --eff-ink:#16161a; --eff-ring:#16161a;
+  --eff-soft:rgb(22 22 26 / 14%);
+  --orbit-dur:5s; --twk-dur:3s;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  .v-tech{ --eff-0:#3fb8dd; --eff-1:#6fa8f8; --eff-ink:#8fc3ff;
+    --eff-soft:rgb(111 168 248 / 30%); }
+  .v-dream{ --eff-0:#d98ab8; --eff-mid:#8fa8e8; --eff-1:#5ec9a8;
+    --eff-ink:#e8a0cd; --eff-ring:#e08ac0; --eff-soft:rgb(224 138 192 / 28%); }
+  .v-lava{ --eff-0:#fbbf24; --eff-mid:#fb923c; --eff-1:#f97316; --eff-ink:#fdba74;
+    --eff-soft:rgb(249 115 22 / 30%); }
+  /* 深底上填充翻成浅色，星点跟着翻成深色——不然白星落在白填上 */
+  .v-mono{ --eff-0:#6a6a73; --eff-1:#ececef; --eff-ink:#ececef; --eff-ring:#ececef;
+    --eff-soft:rgb(236 236 239 / 16%); --star-color:#16161a; }
+}}
+:root[data-theme="dark"] .v-tech{ --eff-0:#3fb8dd; --eff-1:#6fa8f8; --eff-ink:#8fc3ff;
+  --eff-soft:rgb(111 168 248 / 30%); }
+:root[data-theme="dark"] .v-dream{ --eff-0:#d98ab8; --eff-mid:#8fa8e8; --eff-1:#5ec9a8;
+  --eff-ink:#e8a0cd; --eff-ring:#e08ac0; --eff-soft:rgb(224 138 192 / 28%); }
+:root[data-theme="dark"] .v-lava{ --eff-0:#fbbf24; --eff-mid:#fb923c; --eff-1:#f97316;
+  --eff-ink:#fdba74; --eff-soft:rgb(249 115 22 / 30%); }
+:root[data-theme="dark"] .v-mono{ --eff-0:#6a6a73; --eff-1:#ececef; --eff-ink:#ececef;
+  --eff-ring:#ececef; --eff-soft:rgb(236 236 239 / 16%); --star-color:#16161a; }
+
+/* ══ 三套 · Claude ══════════════════════════════════════
+   前四套的思路都是「换一个色相」。这三套各带一个**机制**上的想法，
+   不是只换颜色——所以下面同时加了两个新变量：
+     --eff-mid-at  三段坡道里中间那站停在哪儿（默认 50%）
+     --sheen       填充上那道扫过去的高光（默认 none）
+   两个都不设就落回原样，前四套一个字都不用改。 */
+
+/* ⑥ 墨金：**零彩色的坡道 ＋ 一道金色高光扫过去。**
+   `tokens.css` 开头那条「主按钮用近黑，不用彩色」在这一套里是成立的——
+   它标 ultra 靠的是**材质**（一道金），不是色相。全屏最克制的一套。 */
+.v-gold{
+  --eff-0:#5c5c63; --eff-1:#17151b; --eff-ink:#7d5a0d; --eff-ring:#a8820f;
+  --eff-soft:rgb(168 130 15 / 22%);
+  --sheen:linear-gradient(100deg,transparent 38%,rgb(232 196 106 / .85) 50%,transparent 62%);
+  --orbit-dur:5.5s; --twk-dur:3.2s; --star-color:#e8c46a;
+  --star-glow:0 0 4px rgb(232 196 106 / 70%);
+}
+/* ⑦ 深空：靛 → 紫 → 品红。**星点在这一套里才真的说得通**——
+   前面几套的白点更像噪点，只有铺在深靛底上才读成星星。 */
+.v-void{
+  --eff-0:#2b2d6e; --eff-mid:#6d4bc7; --eff-1:#b4409a;
+  --eff-ink:#96307c; --eff-ring:#b4409a;
+  --eff-soft:rgb(180 64 154 / 26%);
+  --orbit-dur:6s; --twk-dur:2.4s;
+  --star-glow:0 0 4px rgb(255 255 255 / 80%);
+  --star-clip:polygon(50% 0,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%);
+  --star-scale:2.6;
+}
+/* ⑧ 电石：**前四分之三是灰的，色相只在最后一档才涌上来。**
+   其余七套都是整条在渐变，于是「越往右越贵」这句话从第一档就开始说；
+   这一套把它憋到最后——和「紫色是 ultra 一家的」是同一条推理，
+   只是从「档与档之间」下沉到了「一条之内」。 */
+.v-volt{
+  --eff-0:#d4d4dc; --eff-mid:#9aa0a8; --eff-mid-at:74%; --eff-1:#0d9488;
+  --eff-ink:#096b63; --eff-ring:#0d9488;
+  --eff-soft:rgb(13 148 136 / 24%);
+  --orbit-dur:3.6s; --twk-dur:2s; --star-radius:1px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  .v-gold{ --eff-0:#4a4a52; --eff-1:#e9e4d8; --eff-ink:#e8c46a; --eff-ring:#e8c46a;
+    --eff-soft:rgb(232 196 106 / 26%); --star-color:#5a4a1a;
+    --sheen:linear-gradient(100deg,transparent 38%,rgb(255 236 178 / .9) 50%,transparent 62%); }
+  .v-void{ --eff-0:#3a3d8a; --eff-mid:#8367dd; --eff-1:#d76ab4;
+    --eff-ink:#e094c8; --eff-ring:#d76ab4; --eff-soft:rgb(215 106 180 / 30%); }
+  .v-volt{ --eff-0:#3a3a42; --eff-mid:#6d757e; --eff-1:#2dd4bf;
+    --eff-ink:#5ee0cd; --eff-ring:#2dd4bf; --eff-soft:rgb(45 212 191 / 28%); }
+}}
+:root[data-theme="dark"] .v-gold{ --eff-0:#4a4a52; --eff-1:#e9e4d8; --eff-ink:#e8c46a;
+  --eff-ring:#e8c46a; --eff-soft:rgb(232 196 106 / 26%); --star-color:#5a4a1a;
+  --sheen:linear-gradient(100deg,transparent 38%,rgb(255 236 178 / .9) 50%,transparent 62%); }
+:root[data-theme="dark"] .v-void{ --eff-0:#3a3d8a; --eff-mid:#8367dd; --eff-1:#d76ab4;
+  --eff-ink:#e094c8; --eff-ring:#d76ab4; --eff-soft:rgb(215 106 180 / 30%); }
+:root[data-theme="dark"] .v-volt{ --eff-0:#3a3a42; --eff-mid:#6d757e; --eff-1:#2dd4bf;
+  --eff-ink:#5ee0cd; --eff-ring:#2dd4bf; --eff-soft:rgb(45 212 191 / 28%); }
+
+/* ══ 三套 · Grok ══════════════════════════════════════
+   前几套在换色相或换材质。这三套各动一个**装置放在哪、信息怎么切**的问题：
+     --edge        填充上只亮右端那一截（不设整层不画）
+     --ticks       跟档位数对齐的刻度（不设没有刻度）
+     --thumb-glow  ultra 时拇指自己的光（不设还是原来那层阴影）
+   三个都不设就落回原样，前八套一个字不用改。
+   JS 只多写一个 --gears：paint() 本来就知道 N。 */
+
+/* ⑨ 刃口：**彩色只停在条子右端那一截。**
+   ⑧ 电石已经把色相憋到最后一档，但涌上来之后整段填充还是彩的。
+   这一套把「彩色是 ultra 一家的」再往下压一档——连这一档内部，
+   彩色也只是刀锋，不是整段。坡道本身是钢灰，色相是刀口上那一毫米。 */
+.v-edge{
+  --eff-0:#6e6e76; --eff-1:#2e2e34; --eff-ink:#7a5a10; --eff-ring:#c4a035;
+  --eff-soft:rgb(196 160 53 / 22%);
+  --edge:linear-gradient(90deg,transparent 0 76%,#c9a227 90%,#f3e6a8 100%);
+  --thumb-glow:0 0 8px rgb(232 196 106 / 55%),0 0 0 1.5px #e8c46a,0 1px 3px rgb(0 0 0 / 22%);
+  --orbit-dur:5.2s; --twk-dur:3s;
+}
+/* ⑩ 刻度：**条子上画出和档位数相同的刻度。**
+   强度是离散的（3 档或 6 档），条子却一直装成连续坡道——档位只写在
+   触发器的字上，条子自己并不说。刻度是结构，不是皮，可以叠在任何一套上；
+   这一套用近黑把它单独示意。零彩色，合 tokens.css 原规矩。 */
+.v-gauge{
+  --eff-0:#6a6a73; --eff-1:#16161a; --eff-ink:#16161a; --eff-ring:#16161a;
+  --eff-soft:rgb(22 22 26 / 16%);
+  --ticks-on:1;
+  /* 黑白两道叠着：浅底靠黑线，深填靠白线，换档不用改色 */
+  --tick-dark:rgb(0 0 0 / 26%);
+  --tick-light:rgb(255 255 255 / 48%);
+  --ticks:repeating-linear-gradient(90deg,
+      transparent 0,
+      transparent calc(100% / var(--gears, 6) - 1px),
+      var(--tick-dark) calc(100% / var(--gears, 6) - 1px),
+      var(--tick-dark) calc(100% / var(--gears, 6))),
+    repeating-linear-gradient(90deg,
+      transparent 0,
+      transparent calc(100% / var(--gears, 6) - 1px),
+      var(--tick-light) calc(100% / var(--gears, 6) - 1px),
+      var(--tick-light) calc(100% / var(--gears, 6)));
+  --orbit-dur:5s; --twk-dur:3s;
+}
+/* ⑪ 落点：**输入框那圈扫光关掉，改去点亮发送键。**
+   滑块是偏好，真花钱的是按下发送的那一下。把「别忘了你开着 ultra」
+   贴在 760px 的框上，是在用最大的那个平面喊一件发生在 28px 按钮上的事。
+   铜色：和 ④ 熔岩橙（警告）和 ⑥ 墨金（材质高光）都错开——铜是工业热，也是硬币。 */
+.v-commit{
+  --eff-0:#c4a090; --eff-1:#9a4a20; --eff-ink:#8a3b12; --eff-ring:#9a4a20;
+  --eff-soft:rgb(154 74 32 / 24%);
+  --orbit-dur:4.5s;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  .v-edge{ --eff-0:#5c5c64; --eff-1:#d2d2d8; --eff-ink:#e8c46a; --eff-ring:#e8c46a;
+    --eff-soft:rgb(232 196 106 / 26%);
+    --edge:linear-gradient(90deg,transparent 0 76%,#e8c46a 90%,#fff4c4 100%);
+    --thumb-glow:0 0 8px rgb(232 196 106 / 50%),0 0 0 1.5px #e8c46a,0 1px 3px rgb(0 0 0 / 40%); }
+  .v-gauge{ --eff-0:#6a6a73; --eff-1:#ececef; --eff-ink:#ececef; --eff-ring:#ececef;
+    --eff-soft:rgb(236 236 239 / 16%); }
+  .v-commit{ --eff-0:#8a5a3a; --eff-1:#e09060; --eff-ink:#f0b090; --eff-ring:#e09060;
+    --eff-soft:rgb(224 144 96 / 28%); }
+}}
+:root[data-theme="dark"] .v-edge{ --eff-0:#5c5c64; --eff-1:#d2d2d8; --eff-ink:#e8c46a;
+  --eff-ring:#e8c46a; --eff-soft:rgb(232 196 106 / 26%);
+  --edge:linear-gradient(90deg,transparent 0 76%,#e8c46a 90%,#fff4c4 100%);
+  --thumb-glow:0 0 8px rgb(232 196 106 / 50%),0 0 0 1.5px #e8c46a,0 1px 3px rgb(0 0 0 / 40%); }
+:root[data-theme="dark"] .v-gauge{ --eff-0:#6a6a73; --eff-1:#ececef; --eff-ink:#ececef;
+  --eff-ring:#ececef; --eff-soft:rgb(236 236 239 / 16%); }
+:root[data-theme="dark"] .v-commit{ --eff-0:#8a5a3a; --eff-1:#e09060; --eff-ink:#f0b090;
+  --eff-ring:#e09060; --eff-soft:rgb(224 144 96 / 28%); }
+
+/* ⑨⑩⑪ 都不靠星点说话：刃口是一毫米的色，刻度是结构，落点在发送键上。
+   星点叠上去会把这三句话搅在一起。 */
+.v-edge .gbar__stars,.v-gauge .gbar__stars,.v-commit .gbar__stars{display:none}
+
+/* ⑪ 落点：框自己安静，响的是发送键。扫光环 JS 照跑，CSS 把它藏掉——
+   同一份 wireUp，不给主题开分支。 */
+.v-commit.comp--ultra{border-color:var(--border-strong);box-shadow:var(--shadow-1)}
+.v-commit .ring{display:none}
+.v-commit .ibar--hot .gbar{box-shadow:none}
+.v-commit .send{transition:background 420ms var(--ease),box-shadow 420ms var(--ease)}
+.v-commit.comp--ultra .send{background:var(--eff-1);box-shadow:0 0 0 3px var(--eff-soft);
+  animation:commit-pulse 2.6s var(--ease) infinite}
+@keyframes commit-pulse{
+  0%,100%{box-shadow:0 0 0 3px var(--eff-soft)}
+  50%{box-shadow:0 0 0 7px var(--eff-soft)}
+}
+@media (prefers-reduced-motion: reduce){ .v-commit.comp--ultra .send{animation:none} }
+
+*{box-sizing:border-box}
+body{margin:0;padding:44px 24px 120px;background:var(--bg-sunken);color:var(--text);
+  font-family:var(--font);font-size:var(--text-base);line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto}
+h1{font-size:26px;line-height:1.3;letter-spacing:-.014em;margin:0 0 10px}
+.lede{margin:0 0 6px;color:var(--text-muted);line-height:1.8}
+.lede b{color:var(--text);font-weight:600}
+code{font-family:var(--font-mono);font-size:.9em;padding:1px 5px;border-radius:4px;background:var(--bg-code)}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:26px 0 18px}
+.seg{display:inline-flex;padding:2px;border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);background:var(--bg-raised)}
+.seg button{border:0;background:transparent;color:var(--text-muted);font:inherit;
+  font-size:var(--text-xs);padding:4px 10px;border-radius:4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--text-inverse)}
+.play{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:0;
+  border-radius:var(--radius-sm);background:var(--text);color:var(--text-inverse);
+  font:inherit;font-size:var(--text-xs);font-weight:500;cursor:pointer}
+.play:hover{opacity:.88}
+.play:disabled{opacity:.5;cursor:default}
+.hint{max-width:760px;margin:0 0 26px;font-size:var(--text-xs);color:var(--text-faint);line-height:1.9}
+.hint b{color:var(--text-muted);font-weight:500}
+
+/* ── 小样：一个输入框 ─────────────────────── */
+.stage{margin:0 0 30px}
+.stage__t{margin:0 0 10px;font:11px/1 var(--font-mono);letter-spacing:.08em;color:var(--text-faint)}
+/* 色票：对比页就得一眼看出谁是谁，不用点开 */
+.sw{display:inline-block;width:26px;height:8px;border-radius:99px;margin-left:7px;
+  vertical-align:1px;background:var(--sw)}
+.comp{position:relative;max-width:var(--content-max);border:1px solid var(--border-strong);
+  border-radius:var(--radius-lg);background:var(--bg-raised);box-shadow:var(--shadow-1);
+  padding:var(--sp-2) var(--sp-3);
+  transition:border-color 420ms var(--ease) 260ms, box-shadow 420ms var(--ease) 260ms}
+.comp--on{border-color:var(--accent);transition-delay:0ms}
+.comp--ultra{border-color:var(--eff-ring,var(--eff-1));box-shadow:0 0 0 3px var(--eff-soft),var(--shadow-1)}
+.chips{display:flex;align-items:center;gap:var(--sp-3);padding-bottom:6px;
+  border-bottom:1px solid var(--border);font-size:var(--text-xs);color:var(--text-muted)}
+.chips span{display:inline-flex;align-items:center;gap:5px}
+.ta{padding-top:9px;min-height:42px;color:var(--text-faint);font-size:var(--text-base);line-height:1.6}
+.row{display:flex;align-items:center;gap:var(--sp-2);padding-top:var(--sp-1);
+  margin-left:calc(-1 * (var(--sp-2) + 1px))}
+.trig{display:inline-flex;align-items:center;gap:5px;flex:none;height:26px;padding:0 var(--sp-2);
+  border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;
+  color:var(--text-muted);font:inherit;font-size:var(--text-sm);white-space:nowrap;cursor:pointer;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
+.trig:hover,.trig[aria-expanded="true"]{background:var(--bg-hover);color:var(--text)}
+.trig:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.trig svg{color:var(--text-faint);transition:transform var(--dur-slow) var(--ease-out)}
+.gapx{flex:1;min-width:10px}
+.send{flex:none;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;
+  border-radius:999px;background:var(--text);color:var(--text-inverse);cursor:pointer}
+.ic{stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;display:block}
+/* 模型和强度是**两颗**，中间只留 2px：说的是同一件事，但各开各的 */
+.pair{display:flex;align-items:center;gap:2px;flex:none}
+
+/* ══ 扫光环：从底边正中往两边长满一整圈 ══════════════
+   用 SVG 描边而不是 conic-gradient：圆角矩形的四个角离中心更远，
+   角度扫描在角上会「加速」，而 stroke-dashoffset 走的是**周长**，
+   哪一段都同一个速度。起点位置由几何算出来，不是估的。 */
+.ring{position:absolute;left:-1px;top:-1px;pointer-events:none;overflow:visible;opacity:0;
+  transition:opacity 200ms var(--ease)}
+.comp--ultra .ring{opacity:1}
+.ring rect{fill:none;stroke-linecap:round}
+.ring__main{stroke:var(--eff-ring,var(--eff-1));stroke-width:2}
+/*
+ * **绕圈高光跑在 CSS keyframes 上，不在 rAF 上。**
+ * 上一版是 JS 每帧算 dashoffset——也就是说这个页面挂着一条常驻的
+ * requestAnimationFrame，每秒 60 次醒一次，哪怕什么事都没发生。
+ * 绕圈是「把 dashoffset 从 X 匀速推到 X−100」的纯函数，正是 keyframes 的活：
+ * 交给合成器，JS 只在「长出」和「收回」两段有限动画里跑，跑完就停。
+ * 起点不在 0 而在底边正中：把 --ring-at 写成 CSS 变量，keyframes 从它出发。
+ * calc 最后乘 1px：stroke-dashoffset 要的是长度，calc 算出来的是裸数字，不收。
+ */
+.ring__orbit{stroke:var(--eff-ring,var(--eff-1));stroke-width:2.4;opacity:0;
+  stroke-dasharray:13 87;
+  stroke-dashoffset:calc((6.5 - var(--ring-at, 0)) * 1px);
+  filter:drop-shadow(0 0 4px var(--eff-soft));
+  transition:opacity 300ms var(--ease)}
+.ring__orbit--go{opacity:.85;animation:orbit var(--orbit-dur,4.5s) linear infinite}
+@keyframes orbit{ to{ stroke-dashoffset:calc((6.5 - var(--ring-at, 0) - 100) * 1px) } }
+@media (prefers-reduced-motion: reduce){ .ring__orbit{display:none} }
+
+/* ══════════════════════════════════════════════
+   行内条：**点开往右长**，不弹卡片
+   ══════════════════════════════════════════════ */
+.eff{position:relative;flex:none}
+.eff__lvl{color:var(--text)}
+.eff--ultra .eff__lvl{color:var(--eff-ink);font-weight:600}
+.eff--open .eff__btn svg:last-child{transform:rotate(180deg)}
+/* 引擎没报 efforts 时**整颗不出现**，不是显示一个灰的 */
+.eff[hidden]{display:none}
+
+/*
+ * 宽度由 JS 量出来再写上去。
+ * **不能靠 `flex: 1` 加过渡**：flex-basis 从 0 到 auto 没法平滑插值，
+ * 那条会「啪」地弹到位。量一次写一个 px 值，320ms 才是真的在长。
+ */
+/* **状态类挂在 .ibar 自己身上，不能挂 .eff。**
+   条子是触发器的**兄弟**不是后代（它得在 flex 行里自己占一格），
+   `.eff--ultra .gbar__hot` 那种写法一个都匹配不上——
+   实测就是这个：该转紫的时候条子还是灰的。 */
+/*
+ * ── Claude 改的：展开那一下 ─────────────────────────────
+ * 原来是 `.gbar{width:100%}` ＋ `overflow:hidden` 收窄，两个后果：
+ *   ① 切口是**平的**——展开过程中它压根不是一枚胶囊，只有到位那一帧才突然圆起来；
+ *   ② 父容器每帧变宽，条子自己的宽度也每帧在变，于是拇指位置得 rAF 每帧重算。
+ * 现在：宽度一次给定（`--bw`），位置一次算完；露出多少交给
+ * `clip-path: inset(… round 13px)`——**它切出来的右端自带圆角**，
+ * 全程都是完整的一枚，只是短一点。rAF 那圈 follow() 整个删掉。
+ */
+.ibar{flex:none;width:0;overflow:hidden;transition:width 300ms var(--ease-out)}
+.ibar[hidden]{display:none}
+
+.gbar{position:relative;width:var(--bw,180px);height:26px;border-radius:999px;
+  background:var(--bg-sunken);cursor:pointer;touch-action:none;
+  clip-path:inset(0 100% 0 0 round 13px);
+  transition:clip-path 300ms var(--ease-out),box-shadow 420ms var(--ease)}
+.ibar--open .gbar{clip-path:inset(0 0 0 0 round 13px)}
+/* 收起比展开快一档：**关掉一个东西不需要被欣赏** */
+.ibar--closing,.ibar--closing .gbar{transition-duration:200ms}
+/* 展开那一下拇指和填充从最左跟着一起走，看起来是**拇指把条子拽开的** */
+.ibar--intro .gbar__fill,.ibar--intro .gbar__thumb{transition-duration:300ms}
+.ibar--snap .gbar__fill,.ibar--snap .gbar__thumb{transition:none}
+.gbar:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gbar__fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;overflow:hidden;
+  transition:width 190ms var(--ease-out)}
+/*
+ * **两层坡道叠着，靠透明度交叉淡入。**
+ * CSS 没法在两个 `linear-gradient` 之间做过渡——直接换 `background-image`
+ * 是硬切，一帧之内灰变紫，看着像 bug。
+ * 三段的写法：--eff-mid 不设就落回 --eff-1，两段和三段是同一条规则。
+ */
+.gbar__lay{position:absolute;left:0;top:0;bottom:0;background-repeat:no-repeat}
+.gbar__base{background-image:linear-gradient(90deg,var(--eff-n0),var(--eff-n1))}
+/* --eff-mid-at：中间那站停在哪儿。不设就是 50%，前几套一个字不用改；
+   ⑧ 电石把它推到 74%，于是前四分之三是灰的，色相只在最后一档涌上来 */
+.gbar__hot{background-image:linear-gradient(90deg,var(--eff-0),
+  var(--eff-mid,var(--eff-1)) var(--eff-mid-at,50%),var(--eff-1));
+  opacity:0;transition:opacity 420ms var(--ease)}
+.ibar--hot .gbar__hot{opacity:1}
+/*
+ * ── Claude 加的：一道扫过去的高光（--sheen）──
+ * 给 ⑥ 墨金用：那一套是零彩色的，**它标 ultra 靠的是材质不是色相**，
+ * 而「材质」在屏幕上就是一道会动的高光。不设 --sheen 的套系整层不出现，
+ * `background:none` 之后这个 span 就是个空盒子，不画不算。
+ * 跑 keyframes 不跑 rAF，理由和绕圈高光那条一样。
+ */
+.gbar__sheen{background-image:var(--sheen,none);background-size:60% 100%;
+  opacity:0;transition:opacity 420ms var(--ease)}
+.ibar--hot .gbar__sheen{opacity:1;animation:sheen var(--sheen-dur,3.4s) var(--ease) infinite}
+@keyframes sheen{0%{background-position:-70% 0}60%,100%{background-position:170% 0}}
+@media (prefers-reduced-motion: reduce){ .gbar__sheen{animation:none;background-position:40% 0} }
+/*
+ * ── Grok 加的：右端那一截才上色（--edge）──
+ * 给 ⑨ 刃口用。电石把色相憋到最后一档，涌上来之后整段还是彩的；
+ * 刃口再往下压一档：连这一档内部，彩色也只是刀锋。
+ * 不设 --edge 就是 none，这层空着，前八套一个字不用改。
+ * 钉在整条坐标上（和 hot 一样），靠填充裁切——所以它永远在拇指这一侧。
+ */
+.gbar__edge{background-image:var(--edge,none);opacity:0;
+  transition:opacity 420ms var(--ease)}
+.ibar--hot .gbar__edge{opacity:1}
+/*
+ * ── Grok 加的：和档位数对齐的刻度（--ticks）──
+ * 给 ⑩ 刻度用。强度是离散的，条子却一直装成连续坡道。
+ * --gears 由 JS 写（paint() 本来就知道 N）；--ticks 不设就没有刻度。
+ * 刻度在轨道上，不在填充上：空着的那几格也看得到，才能数。
+ * 左右各让 11px，避开胶囊两端的圆帽。
+ */
+.gbar__ticks{position:absolute;inset:0 11px;z-index:1;pointer-events:none;
+  background-image:var(--ticks,none);opacity:0;
+  transition:opacity 300ms var(--ease)}
+.ibar--open .gbar__ticks{opacity:var(--ticks-on,0)}
+.ibar--closing .gbar__ticks{opacity:0;transition-duration:200ms}
+.gbar__stars{position:absolute;left:0;top:0;bottom:0;opacity:0;
+  transition:opacity 380ms var(--ease) 120ms}
+.ibar--hot .gbar__stars{opacity:1}
+/* --star-clip：⑦ 深空用四角星，和界面里那颗 ✧ 是同一个形状。
+   clip-path 一上，border-radius 就不起作用了，两个不会打架。
+   --star-scale：四角星的实心面积比同尺寸的圆小得多，得放大才看得见。 */
+.gbar__stars i{position:absolute;display:block;background:var(--star-color,#fff);
+  border-radius:var(--star-radius,999px);
+  box-shadow:var(--star-glow,none);
+  clip-path:var(--star-clip,none);
+  scale:var(--star-scale,1);
+  animation:twinkle var(--twk-dur,2.6s) var(--ease) infinite}
+@keyframes twinkle{0%,100%{opacity:.22}50%{opacity:.95}}
+@media (prefers-reduced-motion: reduce){ .gbar__stars i{animation:none;opacity:.6} }
+/*
+ * **拇指位移用 translateX，不用 left。**
+ * left 每改一次触发一次排版；translateX 只走合成器。
+ * 按压缩放用独立的 `scale` 属性：位移和缩放各演各的过渡，互不抢。
+ */
+.gbar__thumb{position:absolute;top:2px;left:0;z-index:2;width:22px;height:22px;border-radius:999px;
+  background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 22%),0 0 0 .5px rgb(0 0 0 / 6%);
+  transform:translateX(var(--tx,0px));
+  transition:transform 190ms var(--ease-out),scale 110ms var(--ease-out),box-shadow 420ms var(--ease)}
+/* --thumb-glow 不设就还是原来那层阴影，前八套看不出差别 */
+.ibar--hot .gbar__thumb{box-shadow:var(--thumb-glow,0 1px 3px rgb(0 0 0 / 22%),0 0 0 .5px rgb(0 0 0 / 6%))}
+.ibar--grab .gbar__thumb{scale:1.08}
+/*
+ * **「不丝滑」的根因，就是这两条。**
+ * 拇指和填充挂着 190ms 过渡，而生长/拖动时目标位置**每帧都在变**——
+ * 过渡一直在追一个会跑的目标，永远慢半拍，那就是拖尾巴。
+ * live（生长/拖动/播放）期间位移零过渡、1:1 跟手；
+ * 松手落档那一下才恢复 190ms——过渡只留给「收得住」的瞬间。
+ * scale 不在豁免名单里：按压那下 110ms 的反馈留着。
+ */
+.ibar--live .gbar__thumb{transition:scale 110ms var(--ease-out)}
+.ibar--live .gbar__fill{transition:none}
+.ibar--hot .gbar{box-shadow:0 0 0 3px var(--eff-soft)}
+
+/* ── 模型菜单 ─────────────────────────────── */
+.mdl{position:relative;flex:none}
+.menu{position:absolute;left:0;bottom:calc(100% + 10px);z-index:20;min-width:210px;
+  padding:5px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-raised);box-shadow:var(--shadow-pop);
+  opacity:0;transform:translateY(6px) scale(.97);transform-origin:bottom left;pointer-events:none;
+  transition:opacity 150ms var(--ease),transform 220ms var(--ease-out)}
+.mdl--open .menu{opacity:1;transform:none;pointer-events:auto}
+.menu button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;
+  border-radius:var(--radius-sm);background:transparent;color:var(--text);font:inherit;
+  font-size:var(--text-sm);text-align:left;cursor:pointer}
+.menu button:hover{background:var(--bg-hover)}
+.menu button:focus-visible{background:var(--bg-hover);outline:2px solid var(--accent);outline-offset:-2px}
+.menu button[aria-checked="true"]{background:var(--bg-active)}
+.menu b{flex:none;width:12px;color:var(--text-muted);font-weight:400}
+.menu u{margin-left:auto;text-decoration:none;font-size:var(--text-xs);color:var(--text-faint);
+  white-space:nowrap}
+
+/* ── 说明 ─────────────────────────────────── */
+.note{max-width:760px;margin:22px 0 0;padding:14px 16px;border:1px solid var(--border);
+  border-left:2px solid var(--border-strong);border-radius:0 var(--radius) var(--radius) 0;
+  background:var(--bg-raised)}
+.note h4{margin:0 0 6px;font-size:var(--text-sm);font-weight:600}
+.note p{margin:0;font-size:var(--text-sm);line-height:1.75;color:var(--text-muted)}
+.note p + p{margin-top:8px}
+.note b{color:var(--text);font-weight:600}
+.note--warn{border-left-color:var(--warn)}
+.note--eff{border-left-color:var(--eff-1)}
+.note--dead{border-left-color:var(--danger)}
+hr{height:1px;background:var(--border);border:0;margin:34px 0}
+.foot{max-width:760px;margin:0;color:var(--text-faint);font-size:var(--text-xs);line-height:1.8}
+.tl{max-width:760px;margin:0 0 4px;font-size:var(--text-sm);color:var(--text-muted);line-height:1.9}
+.tl b{display:inline-block;min-width:58px;font:11px/1 var(--font-mono);color:var(--text-faint);font-weight:400}
+
+/* reduced-motion 降级补全：上一版只关了星点闪烁和绕圈高光，
+   条的 320ms 生长、拇指滑动、扫光长出照跑——现在全部变成即时切换。
+   颜色、渐变、柔光留着：降级之后信息不丢。 */
+@media (prefers-reduced-motion: reduce){
+  .menu{transition:none}
+  .ibar,.gbar,.gbar__fill,.gbar__thumb,.gbar__hot,.gbar__edge,.gbar__ticks,.gbar__sheen,.gbar__stars,.comp,.ring,.v-commit .send{transition:none}
+  .ibar--live .gbar__thumb{transition:none}
+}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0" xmlns="http://www.w3.org/2000/svg"><defs>
+<!-- 这条 path 在 kimi 那版是坏的：`V12a1 1 0 0 1-1-1H3` 的弧线终点落在 y=11，
+     文件夹的底边被抬起来一截。正确的是 `-1 1H3`——终点落在 y=13 的圆角上。 -->
+<symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.6a1 1 0 0 1 1-1h2.8l1.2 1.4H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.6" cy="3.6" r="1.5"/><circle cx="4.6" cy="12.4" r="1.5"/><circle cx="11.4" cy="4.8" r="1.5"/><path d="M4.6 5.1v5.8M11.4 6.3c0 2.2-1.6 2.9-3.4 3.2"/></symbol>
+<symbol id="i-chev-d" viewBox="0 0 16 16"><path d="M3.8 6.2L8 10.4l4.2-4.2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2.4l4.4 1.7v3.3c0 2.6-1.85 4.35-4.4 5.2-2.55-.85-4.4-2.6-4.4-5.2V4.1z"/></symbol>
+<symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 2.4l1.35 3.25L12.6 7l-3.25 1.35L8 11.6 6.65 8.35 3.4 7l3.25-1.35z"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.6h4.6L12.2 6.2v7.2H4z"/><path d="M8.4 2.6v3.8h3.8"/></symbol>
+<symbol id="i-up" viewBox="0 0 16 16"><path d="M8 12.8V3.6M4.1 7.5L8 3.4l3.9 4.1"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+
+<h1>推理强度滑块 · 行内条版 <small style="font-size:13px;color:var(--text-faint);font-weight:400">Claude 合并稿 · Grok 补三套 · 十一框</small></h1>
+<p class="lede">照你画的红框做的：<b>点开不弹卡片，往右长出一条</b>，就长 <b>180px</b>——挨着档位，右边那段空地留着。</p>
+<p class="lede">这页有十一个框：<b>同一份 JS、十一套 CSS 变量</b>。① 原案的 ultra 紫；<b>②–⑤ 是 kimi 的</b>（科技蓝、梦幻粉、熔岩橙、墨色）；<b>⑥–⑧ 是 Claude 加的</b>（墨金、深空、电石）；<b>⑨–⑪ 是我（Grok）加的</b>（刃口、刻度、落点）。</p>
+<p class="lede"><b>署名的意思是「这一版谁改的」，不是抢功。</b>下面「四方改了什么」那节把改动逐条分开列了——kimi 和 Claude 那几条原样留着，不是重写。</p>
+
+<div class="bar">
+  <button type="button" class="play" id="play">▶ 放一遍（全部一起）</button>
+  <div class="seg" role="group" aria-label="主题">
+    <button type="button" data-theme-set="light" aria-pressed="false">浅色</button>
+    <button type="button" data-theme-set="dark" aria-pressed="false">深色</button>
+    <button type="button" data-theme-set="system" aria-pressed="true">跟随系统</button>
+  </div>
+</div>
+<p class="hint"><b>怎么试：</b>点 <code>最高 ⌄</code> → 条子往右长出来 → 拖白圆点，或者点条上任何一处。← → 和滚轮也能改档，Esc 或点别处收起。每个框都能这么玩。<br>
+<b>模型菜单里三个模型演的是三种真实情况</b>：K3 报六档带 ultra；K2.7 报三档、没有 ultra；GPT-5.6 Sol 把强度编进了 modelId（<code>gpt-5.6-sol[low]</code>）所以<b>不报 efforts</b>，强度那颗整个不出现——这三条都是 <code>ModelPicker.tsx</code> 现在的真实逻辑。</p>
+
+<div class="stage">
+  <p class="stage__t">① 原案 · ultra 紫 —— 点开之前，档位右边那段空着<i class="sw" style="--sw:linear-gradient(90deg,#a48ae0,#7b52d3)"></i></p>
+  <div class="comp">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <p class="stage__t">② kimi · 科技蓝 —— 青蓝坡道、方形粒子、扫光快一档<i class="sw" style="--sw:linear-gradient(90deg,#55d6f5,#2f7df6)"></i></p>
+  <div class="comp v-tech">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <p class="stage__t">③ kimi · 梦幻 —— 粉→蓝→薄荷极光坡道、柔光圆点、扫光慢一档<i class="sw" style="--sw:linear-gradient(90deg,#ffb3d9,#a8c8ff,#7ee8c7)"></i></p>
+  <div class="comp v-dream">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <p class="stage__t">④ kimi · 熔岩橙 —— 琥珀→橙三段，「警告」语义，师出有名<i class="sw" style="--sw:linear-gradient(90deg,#fcd34d,#fb923c,#ea580c)"></i></p>
+  <div class="comp v-lava">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <p class="stage__t">⑤ kimi · 墨色 —— 零彩色：不靠色相，靠黑度和那圈描边<i class="sw" style="--sw:linear-gradient(90deg,#9a9aa2,#16161a)"></i></p>
+  <div class="comp v-mono">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="stage">
+  <p class="stage__t">⑥ Claude · 墨金 —— 零彩色的坡道 ＋ 一道金色高光扫过去，靠材质不靠色相<i class="sw" style="--sw:linear-gradient(90deg,#5c5c63,#17151b 70%,#a8820f)"></i></p>
+  <div class="comp v-gold">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="stage">
+  <p class="stage__t">⑦ Claude · 深空 —— 靛→紫→品红，星点铺在深底上才真读成星星<i class="sw" style="--sw:linear-gradient(90deg,#2b2d6e,#6d4bc7,#b4409a)"></i></p>
+  <div class="comp v-void">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="stage">
+  <p class="stage__t">⑧ Claude · 电石 —— 前四分之三是灰的，色相只在最后一档涌上来<i class="sw" style="--sw:linear-gradient(90deg,#d4d4dc,#9aa0a8 74%,#0d9488)"></i></p>
+  <div class="comp v-volt">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="stage">
+  <p class="stage__t">⑨ Grok · 刃口 —— 钢灰坡道，彩色只停在右端那一截；连 ultra 内部也不整段铺彩<i class="sw" style="--sw:linear-gradient(90deg,#6e6e76 76%,#c9a227 90%,#f3e6a8)"></i></p>
+  <div class="comp v-edge">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="stage">
+  <p class="stage__t">⑩ Grok · 刻度 —— 条子上画出和档位数相同的刻度；强度是离散的，别装成连续坡道<i class="sw" style="--sw:repeating-linear-gradient(90deg,#16161a 0 9px,#fff 9px 11px)"></i></p>
+  <div class="comp v-gauge">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="stage">
+  <p class="stage__t">⑪ Grok · 落点 —— 输入框那圈扫光关掉，改去点亮发送键：滑块是偏好，真花钱的是按下发送<i class="sw" style="--sw:linear-gradient(90deg,#c4a090,#9a4a20)"></i></p>
+  <div class="comp v-commit">
+    <svg class="ring" aria-hidden="true"><rect class="ring__main"/><rect class="ring__orbit"/></svg>
+    <div class="chips">
+      <span><svg class="ic" width="12" height="12"><use href="#i-folder"/></svg>omni</span>
+      <span><svg class="ic" width="12" height="12"><use href="#i-branch"/></svg>main</span>
+    </div>
+    <div class="ta">交代任务…（@ 引用文件，/ 用命令）</div>
+    <div class="row">
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-file"/></svg>Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+      <button type="button" class="trig"><svg class="ic" width="13" height="13"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></button>
+
+      <div class="pair">
+        <div class="mdl">
+          <button type="button" class="trig mdl__btn" aria-expanded="false" aria-haspopup="menu">
+            <svg class="ic" width="13" height="13"><use href="#i-spark"/></svg>
+            <span class="mdl__lbl">K3</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu" aria-label="模型"></div>
+        </div>
+        <div class="eff">
+          <button type="button" class="trig eff__btn" aria-expanded="false">
+            <span class="eff__lvl">最高</span>
+            <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="ibar">
+        <div class="gbar" tabindex="-1" role="slider" aria-label="推理强度"
+             aria-valuemin="1" aria-valuenow="1" aria-valuemax="1" aria-valuetext="">
+          <span class="gbar__fill">
+            <span class="gbar__lay gbar__base"></span>
+            <span class="gbar__lay gbar__hot"></span>
+            <span class="gbar__lay gbar__sheen"></span>
+            <span class="gbar__lay gbar__edge"></span>
+            <span class="gbar__stars"></span>
+          </span>
+          <span class="gbar__ticks" aria-hidden="true"></span>
+          <span class="gbar__thumb"></span>
+        </div>
+      </div>
+
+      <span class="gapx"></span>
+      <button type="button" class="send" aria-label="发送"><svg class="ic" width="14" height="14"><use href="#i-up"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="note">
+  <h4>四方改了什么 —— 逐条分开列</h4>
+  <p class="tl"><b>署名</b>每条前面标了是谁改的。kimi 和 Claude 那几条<b>原样留着</b>，不是重写。⑨–⑪ 是我（Grok）这轮加的，前八套的 CSS 一个字没改——新变量不设就落回原样。</p>
+  <p class="tl"><b>跟手</b>（kimi）「还不够丝滑」的根因找到了：拇指和填充各挂着一条 190ms 过渡，而生长/拖动时目标位置<b>每帧都在变</b>——过渡一直在追一个会跑的目标，永远慢半拍，那就是拖尾巴。现在生长、拖动、播放期间位移<b>零过渡</b>（1:1 跟手），松手落档那一下才恢复 190ms——过渡只留给「收得住」的瞬间。拇指位移从 <code>left</code> 改成 <code>translateX</code>（走合成器，不触发排版）；pointermove 合并进 rAF，一帧最多算一次；按压缩放改用独立的 <code>scale</code> 属性，位移和缩放各演各的。</p>
+  <p class="tl"><b>对比</b>（kimi）加了 ②–⑤ 四个对比框：同一份 <code>wireUp</code> 跑多个实例，差异只在 CSS 变量。<b>能这么换，说明主题化是干净的</b>——逻辑里一处写死的颜色都没有。</p>
+  <p class="tl"><b>性能</b>（kimi）扫光的「无限绕圈」从 JS 挪进了 CSS keyframes。上一版页面挂着一条<b>常驻 requestAnimationFrame</b>：每秒醒 60 次，每帧还 <code>getBoundingClientRect()</code> 一次，哪怕什么都没在动。现在 JS 只在「长出」（620ms）和「收回」（300ms）两段里跑 rAF，跑完就停——<b>不开 ultra 的时候，这个页面一帧 rAF 都没有</b>；绕圈交给合成器。</p>
+  <p class="tl"><b>性能</b>（kimi）尺寸监听换成 <code>ResizeObserver</code>：输入框真变了才重算周长和扫光起点，不再每帧量。星点重铺按 8px 量化：条子生长的 320ms 里不再每帧重建十几个 DOM 节点。</p>
+  <p class="tl"><b>圆口</b>（Claude）展开途中<b>它压根不是一枚胶囊</b>：<code>overflow: hidden</code> 切出来是平口，只有到位那一帧才突然圆起来。改用 <code>clip-path: inset(… round 13px)</code>，切口自带圆角，<b>全程都是完整的一枚</b>。</p>
+  <p class="tl"><b>定宽</b>（Claude）条子原来是 <code>width: 100%</code>，父容器每帧变宽它就每帧变宽，所以得有个 <code>follow()</code> 每帧 <code>paintBar()</code>。现在宽度一次给定（<code>--bw</code>），位置一次算完——<b>那圈 rAF 整个删掉了，展开期间 JS 一帧都不跑</b>。这一条和 kimi 那条「绕圈挪进 keyframes」是同一个方向：<b>能交给合成器的别放在 JS 里</b>。</p>
+  <p class="tl"><b>手感</b>（Claude）收起 200ms、展开 300ms——<b>关掉一个东西不需要被欣赏</b>。展开时拇指和填充从最左跟着 clip 一起走，看起来是<b>拇指把条子拽开的</b>，不是条子露出来一个静止的拇指。</p>
+  <p class="tl"><b>修</b>（Claude）<code>#i-folder</code> 那条 path 在 kimi 那版是坏的：<code>V12a1 1 0 0 1-1-1H3</code> 的弧线终点落在 y=11，<b>文件夹的底边被抬起来一截</b>。正确的是 <code>-1 1H3</code>。</p>
+  <p class="tl"><b>新机制</b>（Claude）为 ⑥⑧ 两套加了两个变量：<code>--eff-mid-at</code>（三段坡道里中间那站停在哪儿）和 <code>--sheen</code>（填充上扫过去的高光）。<b>都不设就落回原样，前五套一个字没动。</b></p>
+  <p class="tl"><b>刃口</b>（Grok）彩色只停在条子右端那一截。电石已经把色相憋到最后一档，但涌上来之后整段填充还是彩的；这一套把「彩色是 ultra 一家的」再往下压一档——<b>连这一档内部，彩色也只是刀锋，不是整段。</b>新变量 <code>--edge</code>，不设整层不画。</p>
+  <p class="tl"><b>刻度</b>（Grok）条子上画出和档位数相同的刻度。强度是离散的（3 档或 6 档），条子却一直装成连续坡道——<b>档位只写在触发器的字上，条子自己并不说。</b>JS 只多写一个 <code>--gears</code>（<code>paint()</code> 本来就知道 N），<code>--ticks</code> 不设就没有刻度。<b>刻度是结构，不是皮</b>，可以叠在任何一套上；这一框用近黑把它单独示意。</p>
+  <p class="tl"><b>落点</b>（Grok）输入框那圈扫光关掉，改去点亮发送键。滑块是偏好，<b>真花钱的是按下发送的那一下</b>。把「别忘了你开着 ultra」贴在 760px 的框上，是在用最大的那个平面喊一件发生在 28px 按钮上的事。同一份 <code>wireUp</code>，扫光环 JS 照跑，CSS 把它藏掉。</p>
+  <p class="tl"><b>修</b>（Grok）⑥ 墨金的扫光带宽写成 60%，但 <code>paintBar()</code> 把所有坡道层的 <code>background-size</code> 都写成了整条宽——高光条被拉扁，金就不再是「一道」而是「一层」。现在 sheen 自己管自己的尺寸。</p>
+
+  <p class="tl"><b>键盘</b>模型菜单补上了方向键：↑↓ 展开并移动焦点，Home/End 跳首尾，Esc 收起并把焦点还给触发器，选中后焦点也回到触发器——<b>上一版菜单只能用鼠标</b>，和它自己底部的「键盘」说明对不上。</p>
+  <p class="tl"><b>降级</b><code>prefers-reduced-motion</code> 补全：上一版只关了星点闪烁和绕圈高光，条的 320ms 生长、拇指滑动、扫光长出照跑。现在这些全部即时切换，颜色信息保留。</p>
+  <p class="tl"><b>修跳变</b>扫光收回从<b>当前长度</b>开始收。上一版写死从 100 收：长出到一半被打断（比如划出 ultra 又划回来），描边会「啪」地跳满再开始退。</p>
+</div>
+
+<div class="note">
+  <h4>十一框是怎么换皮的</h4>
+  <p>十一框跑的是<b>同一份 <code>wireUp(comp)</code></b>，一行行为代码都没改——所有差异都是 CSS 自定义属性：<code>--eff-0/1/ink/soft/ring</code> 一套色、<code>--eff-mid</code> 给坡道加第三种颜色、<code>--orbit-dur</code> 扫光速度、<code>--twk-dur</code> 粒子节奏、<code>--star-radius / --star-glow / --star-color</code> 粒子形状、光晕和颜色；Claude 加了 <code>--eff-mid-at / --sheen</code>，Grok 加了 <code>--edge / --ticks / --thumb-glow</code>。<b>能这样换皮，说明原案的主题化是干净的：逻辑里没有一处写死的颜色。</b></p>
+  <p>对比度也验过（都是白底文字，4.5:1 是底线）：科技蓝 <code>#1c5fd0</code> 5.8:1、梦幻粉 <code>#c2437f</code> 4.8:1、熔岩橙 <code>#c2410c</code> 5.2:1、墨色 <code>#16161a</code> 15:1、刃口字 <code>#7a5a10</code> 6.4:1、落点字 <code>#8a3b12</code> 7.8:1、落点发送键白字压铜底 <code>#9a4a20</code> 6.2:1。梦幻和墨色那道环用了比坡道更深的 <code>--eff-ring</code>——直接用坡道末端的浅色描环，在白底上站不住；墨色深底时星点翻成深色（<code>--star-color</code>），不然白星落在白填上。</p>
+  <p>节奏也是主题的一部分：科技蓝把节拍<b>调快</b>（扫光 3.2s、闪烁 1.8s、方形粒子），要「精密仪器」；梦幻<b>调慢</b>（6.5s、3.8s、柔光圆点、三色极光），要「氛围感」；熔岩橙和墨色不动节拍——语义已经够响了，不需要节奏帮着喊。刃口和刻度也不调节拍：一个靠位置（右端那一截），一个靠结构（格子），都不靠把动画喊得更响。</p>
+</div>
+
+<div class="note note--warn">
+  <h4>八个里我会怎么选</h4>
+  <p><b>如果那道口子要开：④ 熔岩橙最师出有名。</b>橙是界面里说「警告 / 花销」的通用语，和 ultra 那句「更快消耗使用额度」是同义反复——用户不用学。① 紫靠的是「这个界面里没有紫」的<b>稀缺性</b>，口子一开、彩色一多，稀缺就没了；橙靠的是<b>语义</b>，语义不会过期。</p>
+  <p><b>如果不开：⑤ 墨色就是那个答案。</b>不靠色相，靠黑度和描边——零彩色，合 <code>tokens.css</code> 的原规矩，「这档更贵」由那条最重的黑来说。代价也实在：它不再「响」，忘了关的时候，那圈黑描边比彩环好忽略得多。</p>
+  <p><b>我自己那三套里：⑥ 墨金</b>是我真会投的一票。它和 ⑤ 墨色同一条路——<b>零彩色</b>，合 <code>tokens.css</code> 那条原规矩——但补上了 ⑤ 唯一的短板：⑤ 忘了关的时候那圈黑描边太好忽略，而 ⑥ 有一道会动的金。<b>「响」这件事交给运动，不交给色相</b>：既不开彩色的口子，也不会被忽略。</p>
+  <p><b>⑧ 电石</b>是三套里唯一带结构性想法的：<b>色相只在最后一档涌上来</b>，前四分之三是灰的。其余七套整条都在渐变，于是「越往右越贵」这句话从第一档就开始说——而真正贵的只有最后一档。它把「彩色是 ultra 一家的」这条推理从「档与档之间」下沉到了「一条之内」。<b>但青绿离 <code>--ok</code> 太近</b>，语义上有撞车风险，真要用得换个色相——这一条我认，它是个想法，不是个成品。</p>
+  <p><b>⑦ 深空</b>好看，但我不会投它，理由和 ③ 梦幻一样：<b>它没在说钱</b>。留着是因为它回答了另一个问题——星点这个装置在前几套里更像噪点，只有铺在深靛底上才真读成星星。<b>如果最后决定留星点，⑦ 是它唯一站得住的底色。</b></p>
+  <p><b>② ③ 的问题是语义反着来。</b>蓝在这套界面里是「信息 / 链接」（<code>--accent</code>），粉是「装饰 / 氛围」——都不说「钱」。<b>绿没进对比</b>：绿是 <code>--ok</code>，是「通过」，拿来标「烧钱」是撒谎。<b>红也没进</b>：<code>--danger</code> 是「出错」，而 ultra 不是错误，是用户自己的选择——选它不该被当成出事故。</p>
+</div>
+
+<div class="note note--eff">
+  <h4>我（Grok）那三套里会怎么选</h4>
+  <p><b>⑪ 落点是我会投的一票。</b>前面十套都在条子上或框上喊「这档更贵」——可滑块是偏好，<b>钱是按下发送那一下才走的</b>。把常驻提示从 760px 的框挪到 28px 的发送键上，是把响度贴回动作发生的地方。它也不再给条子开大面积彩色的口子：条子可以继续走灰，发送键只在 ultra 落档之后才亮。</p>
+  <p><b>⑨ 刃口</b>是如果「信号必须在条子上」我会投的那张。电石的推理是对的，但它涌上来之后整段还是彩的，等于最后一档又把「更贵」说成了整条的事。刃口把这句话收到右端那一截——<b>钢灰是本体，色相是刀口</b>。钨丝那点暖黄说的是「这段在发热」，不是警告橙，也不是装饰金。</p>
+  <p><b>⑩ 刻度不是一套皮，是一个该留下的结构。</b>换 K2.7 试一下：三档的刻度立刻变成三格，这是前面十套谁都没说的信息。真落地的时候我会把它叠在 ④ 熔岩橙或 ⑥ 墨金上面，而不是单独用近黑这一框——这一框只是把结构亮出来给你看。</p>
+</div>
+
+<div class="note note--eff">
+  <h4>行内条比卡片好在哪、差在哪</h4>
+  <p class="tl"><b>好在</b>没有第二个平面。卡片是浮在界面上的一层，行内条<b>就在你眼睛已经在的那一行</b>——改完档位，视线不用回收。</p>
+  <p class="tl"><b>好在</b>那段空地本来就闲着。<code>Kimi Code / 自动审批 / K3 / 最高</code> 靠左、发送键靠右，中间那 300 多 px 一直空着——<b>这条是唯一一个「不占新地方」的方案</b>。</p>
+  <p class="tl"><b>定宽 180</b>，不是「剩多少占多少」。铺满到发送键那一版试过，三个毛病：<b>左边四颗控件读起来像被挤到角落</b>；宽度随模型名长度变（<code>GPT-5.6 Sol</code> 比 <code>K3</code> 宽 60px，条子就短 60px）；6 档摊在 319px 上每档 59px，<b>比它需要的精度宽了一倍多</b>。180px 下每档 32px，够点了。</p>
+  <p class="tl"><b>差在</b>窄窗口下还是得让步：空地不够 180 就用空地，下限 96px。卡片那版是固定 262px，不看窗口脸色。</p>
+  <p class="tl"><b>差在</b>装不下字。「更快 / 更聪明」两个端点标签没地方放，「更快消耗使用额度」也没有——<b>26px 高的一条只放得下条子本身</b>。</p>
+  <p style="margin-top:10px"><b>「更快消耗使用额度」不占一行了。</b>上一版把它放在档位行下面，一到 ultra 整个输入框长高 18px，把上面的转录区顶走一截——<b>为了说一句话，把你正在读的东西挪了位置</b>。现在它挂在触发器的 <code>title</code> 上，鼠标停一下就有；而「这一档更贵」这句话，<b>彩色和那圈扫光已经说过了</b>。要那行字常驻可见的话，卡片那版有地方放，行内这版没有——这是两版之间一个实打实的取舍。</p>
+</div>
+
+<div class="note note--dead">
+  <h4>宽度为什么要 JS 量，不能靠 flex</h4>
+  <p><b><code>flex: 1</code> 加过渡是不行的</b>：flex-basis 从 <code>0</code> 到 <code>auto</code> 没法平滑插值，那条会「啪」地弹到位——和「往右长出来」正好相反。</p>
+  <p>所以是：开之前量一下那段空地有多宽（<code>.gapx</code> 的实际宽度减掉一个 gap），把这个 px 值写到条子上，让 <code>width</code> 走 320ms 的缓动。<b>窗口尺寸变了要重量一次</b>，量的时候得把条子自己已经占的那部分加回去，不然越量越窄。</p>
+</div>
+
+<div class="note note--eff">
+  <h4>彩色是 ultra 一家的，普通档走中性灰</h4>
+  <p>从最低档就开始铺彩，等于<b>把「更贵」那句话说了六遍——说六遍就等于没说</b>，真到 ultra 反而没有升级空间了。这条推理这个仓库写过两次：<code>status.css</code> 说「一刻不停的动画会持续抢注意力」，<code>tokens.css</code> 的用量表那段说「一直是彩色的话，真到危险区就没有升级空间了」。</p>
+  <p><b>而且引擎不报 ultra 的话，这套彩色从头到尾都不出现。</b>换成 K2.7 试一下：它报三档，条子推到头也还是灰的——<b>不是「灰色版的 ultra」，是这个模型根本没有那一档。</b>（②–⑤ 同理：颜色跟着「报了 ultra」走，不跟主题走。）</p>
+</div>
+
+<div class="note note--warn">
+  <h4>它凭什么这么响</h4>
+  <p>理由是：<b>ultra 是这一行里唯一一个会明显改变花销的开关</b>。<code>ModelPicker.tsx</code> 的 EFFORT 表里，六档只有它带说明，原文就是「<b>更快消耗使用额度</b>」——那行字是抄的，不是我编的。它不是「再强一点」，是「这一轮开始烧钱了」。</p>
+  <p>那道慢绕的高光<b>不是庆祝动画，是常驻提示</b>：你要是忘了自己开着这一档，这一圈会一直提醒。<code>prefers-reduced-motion</code> 下高光和星点闪烁都不出现，颜色、渐变、柔光留着——<b>降级之后信息不丢</b>。</p>
+  <p><b>还有一条要你拍板</b>：<code>tokens.css</code> 开头写着「强调色只用于焦点与链接；主按钮用近黑，不用彩色」。这根彩条是这套界面里第一处<b>大面积的、非内容语义的颜色</b>。我认为它值——它标的是花钱；但它确实是对那条规矩开的第一个口子，<b>得是有意开的</b>。②–⑤ 四个配色是「如果开，还能是什么颜色；如果不开，长什么样」的参照系——⑤ 就是「不开」的那个答案。</p>
+</div>
+
+<p class="foot">键盘：Tab 聚焦 → 回车展开 → ← → 改档 → Esc 收起。展开态下滚轮也能改。模型菜单里 ↑↓ 移动焦点，Esc 收起。<br>
+另一版（点开弹卡片）在 <code>docs/推理强度滑块-demo.html</code>，优化前的源头在 <code>docs/推理强度滑块-demo-行内.html</code>，三个文件并排开着能直接比。</p>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* EFFORT 表照 ModelPicker.tsx 里那份 */
+  var LABEL = { low:"轻度", medium:"中", high:"高", xhigh:"极高", max:"最高", ultra:"超高" };
+  /**
+   * 三个模型演三种真实情况，全都出自 `ModelPicker.tsx` 的现有逻辑：
+   *   K3          —— 六档，带 ultra
+   *   K2.7        —— 三档，没有 ultra
+   *   GPT-5.6 Sol —— 强度编进了 modelId，**不报 efforts**，强度那颗整个不出现
+   */
+  var MODELS = [
+    { id:"k3",  label:"K3",          note:"6 档 · 带 ultra",
+      efforts:["low","medium","high","xhigh","max","ultra"], defaultEffort:"max" },
+    { id:"k27", label:"K2.7",        note:"3 档 · 没有 ultra",
+      efforts:["low","medium","high"], defaultEffort:"high" },
+    { id:"sol", label:"GPT-5.6 Sol", note:"不报 efforts",
+      efforts:[], defaultEffort:undefined }
+  ];
+
+  var THUMB = 22, GAP = 8, GROW_MS = 340, BAR_W = 180, RING_MS = 620;
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  /** 确定的伪随机序列：星点位置固定，不随重绘跳动。 */
+  function seeded(i){
+    var x = Math.sin(i * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function easeOut(t){ return 1 - Math.pow(1 - t, 3); }
+
+  /* ════════════════════════════════════════════════════
+     一个框一份实例。所有对比框跑的是**同一份 wireUp**，
+     状态全在闭包里，差异只在 CSS 变量。
+     ════════════════════════════════════════════════════ */
+  function wireUp(comp){
+    var state = { model:"k3", effort:"max", raw:null, open:false };
+
+    function model(){
+      for (var i = 0; i < MODELS.length; i++) if (MODELS[i].id === state.model) return MODELS[i];
+      return MODELS[0];
+    }
+    function efforts(){ return model().efforts; }
+    function index(){ var i = efforts().indexOf(state.effort); return i < 0 ? 0 : i; }
+    function clamp(i){ return Math.max(0, Math.min(efforts().length - 1, i)); }
+    function isUltra(){ return efforts()[index()] === "ultra"; }
+
+    var eff   = comp.querySelector(".eff");
+    var btn   = eff.querySelector(".eff__btn");
+    var lvl   = eff.querySelector(".eff__lvl");
+    var ibar  = comp.querySelector(".ibar");
+    var gbar  = ibar.querySelector(".gbar");
+    var fill  = ibar.querySelector(".gbar__fill");
+    var stars = ibar.querySelector(".gbar__stars");
+    var thumb = ibar.querySelector(".gbar__thumb");
+    var gapx  = comp.querySelector(".gapx");
+    var mdl   = comp.querySelector(".mdl");
+    var mbtn  = mdl.querySelector(".mdl__btn");
+    var mlbl  = mdl.querySelector(".mdl__lbl");
+    var menu  = mdl.querySelector(".menu");
+    var lays  = gbar.querySelectorAll(".gbar__lay");
+
+    /*
+     * **跟手模式（live）。** 生长、拖动、播放期间，拇指位移和填充宽度
+     * 摘掉过渡、1:1 跟着目标走；松手落档前撤掉，那一下 190ms 才回得来。
+     * 用计数器不用布尔：生长没结束就按下、播放压着生长，都会叠两层。
+     */
+    var live = 0;
+    function setLive(on){
+      live = Math.max(0, live + (on ? 1 : -1));
+      ibar.classList.toggle("ibar--live", live > 0);
+    }
+
+    /**
+     * 星点。**位置固定、不随重绘跳动**，密度往右加（t² 把点堆到右端）。
+     * 宽度按 8px 量化：生长的 320ms 里 clientWidth 每帧都在变，
+     * 不量化就每帧拆掉重铺十几个节点——肉眼分不出 4px 的差别，分得出掉帧。
+     */
+    function paintStars(w){
+      var qw = Math.max(24, Math.round(w / 8) * 8);
+      if (stars.getAttribute("data-w") === String(qw)) return;
+      stars.setAttribute("data-w", String(qw));
+      stars.style.width = qw + "px";
+      stars.textContent = "";
+      var count = Math.max(8, Math.round(qw / 14));
+      for (var i = 0; i < count; i++){
+        var t = seeded(i * 4 + 1);
+        var d = document.createElement("i");
+        var s = 1 + seeded(i * 4 + 2) * 1.6;
+        d.style.left = (t * t * qw).toFixed(1) + "px";
+        d.style.top = (3 + seeded(i * 4 + 3) * 19).toFixed(1) + "px";
+        d.style.width = s.toFixed(1) + "px";
+        d.style.height = s.toFixed(1) + "px";
+        d.style.animationDelay = (seeded(i * 4 + 4) * -2.6).toFixed(2) + "s";
+        stars.appendChild(d);
+      }
+    }
+
+    /** 当前该画在哪儿。**拖动中用连续值**，松手后用档位算出来的值。 */
+    function ratio(){
+      if (state.raw !== null) return state.raw;
+      var n = efforts().length;
+      return n < 2 ? 0 : index() / (n - 1);
+    }
+
+    /** `force` 有值时按这个比例画（展开那一下先把拇指按 0 摆好用）。 */
+    function paintBar(force){
+      var w = gbar.clientWidth;
+      if (w <= THUMB) w = THUMB + 1;
+      /*
+       * **拇指边到边走，填充盖到拇指的右缘。**
+       * 满档时填充宽度正好等于整条宽度，两端的圆帽严丝合缝。
+       * 拇指位移走 --tx → translateX，不碰 left：合成器的事，不排版。
+       */
+      var travel = w - THUMB;
+      var x = (force === undefined ? ratio() : force) * travel;
+      thumb.style.setProperty("--tx", x.toFixed(2) + "px");
+      fill.style.width = (x + THUMB) + "px";
+      /* 坡道钉在整条的坐标上，不跟着填充宽度缩放：
+         否则拖到一半时右端已经是满色，读起来像「已经到头了」。
+         ⑥ 墨金的扫光带宽是 60%，自己管 background-size——
+         写成整条宽会把「一道金」拉扁成「一层金」。 */
+      for (var i = 0; i < lays.length; i++){
+        lays[i].style.width = w + "px";
+        if (lays[i].classList.contains("gbar__sheen")) continue;
+        lays[i].style.backgroundSize = w + "px 100%";
+      }
+      paintStars(w);
+    }
+
+    function paint(){
+      var e = efforts(), has = e.length > 0;
+      eff.hidden = !has;
+      ibar.hidden = !has;
+      mlbl.textContent = model().label;
+      if (!has){
+        state.open = false;
+        eff.classList.remove("eff--ultra", "eff--open");
+        ibar.classList.remove("ibar--hot", "ibar--grab", "ibar--open", "ibar--intro");
+        comp.classList.remove("comp--ultra", "comp--on");
+        ibar.style.width = "0px";
+        setRing(false);
+        return;
+      }
+      /* 写在框上不写在条子上：--ticks 是 .v-gauge 上算出来的，
+         条子是后代，写在条子上外面看不见，换三档模型格子不会变。 */
+      comp.style.setProperty("--gears", String(Math.max(2, e.length)));
+      var name = LABEL[e[index()]] || e[index()];
+      lvl.textContent = name;
+      eff.classList.toggle("eff--ultra", isUltra());
+      ibar.classList.toggle("ibar--hot", isUltra());
+      /* 「更快消耗使用额度」不占一行，挂在触发器的 title 上 */
+      btn.title = isUltra() ? "超高：更快消耗使用额度" : "推理强度";
+      gbar.setAttribute("aria-valuemin", "1");
+      gbar.setAttribute("aria-valuemax", String(e.length));
+      gbar.setAttribute("aria-valuenow", String(index() + 1));
+      gbar.setAttribute("aria-valuetext", name);
+      paintBar();
+    }
+
+    /**
+     * 改档。`commit` = 这一下是不是**最终落点**。
+     * 条子转色跟着「最近那一档」实时走；扫光只在松手之后放。
+     */
+    function set(i, commit){
+      var e = efforts();
+      if (e.length === 0) return;
+      state.effort = e[clamp(i)];
+      paint();
+      var on = isUltra() && commit === true;
+      comp.classList.toggle("comp--ultra", on);
+      setRing(on);
+    }
+
+    function ratioAt(clientX){
+      var r = gbar.getBoundingClientRect();
+      var travel = r.width - THUMB;
+      if (travel <= 0) return 0;
+      return Math.max(0, Math.min(1, (clientX - r.left - THUMB / 2) / travel));
+    }
+    function nearest(p){
+      var n = efforts().length;
+      return n < 2 ? 0 : Math.round(p * (n - 1));
+    }
+
+    /* ══ 往右长 ══════════════════════════════════════
+       量的时候要把条子自己已经占的那部分加回去，不然越量越窄。 */
+    function room(){
+      var free = gapx.getBoundingClientRect().width + ibar.getBoundingClientRect().width - GAP;
+      return Math.max(96, Math.min(BAR_W, free));
+    }
+    /**
+     * ── Claude 改的 ──
+     * 原来这里有个 `follow()`：生长的 340ms 里每帧 `paintBar()`，
+     * 因为条子是 `width:100%`、宽度每帧都在变。现在宽度一次给定，
+     * **这个 rAF 循环整个不需要了**——展开期间 JS 一帧都不跑。
+     */
+    var introTimer;
+    function openEff(yes){
+      if (eff.hidden) return;
+      state.open = yes;
+      eff.classList.toggle("eff--open", yes);
+      btn.setAttribute("aria-expanded", String(yes));
+      if (!comp.classList.contains("comp--ultra")) comp.classList.toggle("comp--on", yes);
+      clearTimeout(introTimer);
+      ibar.classList.remove("ibar--closing", "ibar--intro", "ibar--snap");
+      if (yes){
+        openMenu(false);
+        var w = room();
+        ibar.style.setProperty("--bw", w + "px");
+        ibar.style.width = w + "px";
+        /* 先把拇指和填充按最左摆好（不带过渡），下一帧再放到目标位置——
+           于是它们和 clip 一起走，看起来是拇指把条子拽开的 */
+        ibar.classList.add("ibar--snap");
+        paintBar(0);
+        requestAnimationFrame(function(){
+          ibar.classList.remove("ibar--snap");
+          ibar.classList.add("ibar--open", "ibar--intro");
+          paintBar();
+          introTimer = setTimeout(function(){ ibar.classList.remove("ibar--intro"); }, GROW_MS + 40);
+        });
+        /* **`preventScroll`。** 条子长出来时给它焦点是对的（← → 要能用），
+           但浏览器默认会把焦点元素滚进视野——输入框本来就在视野里，
+           这一下等于把页面白拽一段。真应用里同理。 */
+        gbar.focus({ preventScroll: true });
+      } else {
+        ibar.classList.add("ibar--closing");
+        ibar.classList.remove("ibar--open");
+        ibar.style.width = "0px";
+        comp.classList.remove("comp--on");
+        introTimer = setTimeout(function(){ ibar.classList.remove("ibar--closing"); }, 240);
+      }
+    }
+    function openMenu(yes){
+      mdl.classList.toggle("mdl--open", yes);
+      mbtn.setAttribute("aria-expanded", String(yes));
+      if (yes) openEff(false);
+    }
+    function closeAll(){ openEff(false); openMenu(false); }
+
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      openEff(!state.open);
+    });
+    mbtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      openMenu(!mdl.classList.contains("mdl--open"));
+    });
+    eff.addEventListener("click", function(e){ e.stopPropagation(); });
+    ibar.addEventListener("click", function(e){ e.stopPropagation(); });
+    mdl.addEventListener("click", function(e){ e.stopPropagation(); });
+    document.addEventListener("click", closeAll);
+
+    /* ══ 拖：连续跟手，松手才落档 ════════════════════ */
+    var dragging = false, pendingX = 0, moveRaf = 0;
+    function applyMove(){
+      moveRaf = 0;
+      state.raw = ratioAt(pendingX);
+      set(nearest(state.raw), false);
+    }
+    gbar.addEventListener("pointerdown", function(e){
+      e.preventDefault();
+      dragging = true;
+      ibar.classList.add("ibar--grab");
+      setLive(true);
+      /* 捕获拿不到不是致命的——**不能让它把整个 pointerdown 掀掉** */
+      try { gbar.setPointerCapture(e.pointerId); } catch (err) { void err; }
+      state.raw = ratioAt(e.clientX);
+      set(nearest(state.raw), false);
+    });
+    gbar.addEventListener("pointermove", function(e){
+      if (!dragging) return;
+      pendingX = e.clientX;
+      /* 一帧最多算一次：触控板的 pointermove 能比屏幕刷新跑得快，
+         不合并的话一帧里排好几次版，那就是「看着卡」的来源 */
+      if (!moveRaf) moveRaf = requestAnimationFrame(applyMove);
+    });
+    function endDrag(){
+      if (!dragging) return;
+      dragging = false;
+      if (moveRaf){ cancelAnimationFrame(moveRaf); moveRaf = 0; }
+      ibar.classList.remove("ibar--grab");
+      state.raw = null;
+      setLive(false);          /* **先撤零过渡，再落档**——那一下才有 190ms */
+      set(index(), true);
+    }
+    gbar.addEventListener("pointerup", endDrag);
+    gbar.addEventListener("pointercancel", endDrag);
+
+    function keys(e){
+      if (e.key === "Escape"){ openEff(false); btn.focus(); return; }
+      if (e.key === "ArrowLeft" || e.key === "ArrowDown"){ e.preventDefault(); set(index() - 1, true); }
+      if (e.key === "ArrowRight" || e.key === "ArrowUp"){ e.preventDefault(); set(index() + 1, true); }
+    }
+    gbar.addEventListener("keydown", keys);
+    eff.addEventListener("keydown", function(e){
+      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); openEff(true); return; }
+      keys(e);
+    });
+    function wheel(e){
+      if (!state.open) return;
+      e.preventDefault();
+      set(index() + (e.deltaY > 0 || e.deltaX > 0 ? 1 : -1), true);
+    }
+    eff.addEventListener("wheel", wheel, { passive:false });
+    ibar.addEventListener("wheel", wheel, { passive:false });
+
+    /* ══ 模型菜单 ════════════════════════════════════
+       方向键归菜单自己管：全部 tabindex=-1，靠 ↑↓ 程序化 .focus()。 */
+    var mitems = [];
+    function curIdx(){
+      for (var i = 0; i < MODELS.length; i++) if (MODELS[i].id === state.model) return i;
+      return 0;
+    }
+    function focusItem(i){
+      var n = mitems.length;
+      if (!n) return;
+      mitems[((i % n) + n) % n].focus();
+    }
+    function buildMenu(){
+      menu.textContent = "";
+      mitems = [];
+      MODELS.forEach(function(m){
+        var b = document.createElement("button");
+        b.type = "button";
+        b.tabIndex = -1;
+        b.setAttribute("role", "menuitemradio");
+        b.setAttribute("aria-checked", String(m.id === state.model));
+        var tick = document.createElement("b");
+        tick.textContent = m.id === state.model ? "✓" : "";
+        var name = document.createElement("span");
+        name.textContent = m.label;
+        var note = document.createElement("u");
+        note.textContent = m.note;
+        b.appendChild(tick); b.appendChild(name); b.appendChild(note);
+        b.addEventListener("click", function(ev){
+          ev.stopPropagation();
+          state.model = m.id;
+          /* 换模型把强度重置成新模型的默认：**旧模型的 ultra 在新模型上可能根本不存在** */
+          state.effort = m.defaultEffort !== undefined ? m.defaultEffort : "";
+          state.raw = null;
+          openMenu(false);
+          openEff(false);
+          comp.classList.remove("comp--ultra");
+          setRing(false);
+          paint();
+          buildMenu();
+          mbtn.focus();   /* 菜单关了焦点不能留在看不见的地方 */
+        });
+        menu.appendChild(b);
+        mitems.push(b);
+      });
+    }
+    mdl.addEventListener("keydown", function(e){
+      var open = mdl.classList.contains("mdl--open");
+      if (!open){
+        /* Enter/Space 走原生 click，不重复开；↓/↑ 是「直接开并进去」 */
+        if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+          e.preventDefault();
+          openMenu(true);
+          focusItem(curIdx());
+        }
+        return;
+      }
+      var i = mitems.indexOf(document.activeElement);
+      if (e.key === "Escape"){ e.preventDefault(); openMenu(false); mbtn.focus(); }
+      else if (e.key === "ArrowDown"){ e.preventDefault(); focusItem(i + 1); }
+      else if (e.key === "ArrowUp"){ e.preventDefault(); focusItem(i - 1); }
+      else if (e.key === "Home"){ e.preventDefault(); focusItem(0); }
+      else if (e.key === "End"){ e.preventDefault(); focusItem(mitems.length - 1); }
+      else if (e.key === "Tab"){ openMenu(false); }   /* 不拦：让焦点接着往前走 */
+    });
+
+    /* ══ 扫光环 ══════════════════════════════════════
+       JS 只管「长出 / 收回」两段有限动画，无限绕圈在 CSS 里。
+       rAF 按需起、跑完停；尺寸变化由 ResizeObserver 报上来。 */
+    var svg = comp.querySelector(".ring");
+    var rMain = svg.querySelector(".ring__main");
+    var rOrbit = svg.querySelector(".ring__orbit");
+    var ring = { at:0, len:0, on:false, raf:0, t0:0, from:0, to:0, dur:0 };
+
+    function ringGeom(){
+      var r = comp.getBoundingClientRect();
+      var w = r.width + 2, h = r.height + 2, rx = 14, sw = 1;
+      svg.setAttribute("width", String(w));
+      svg.setAttribute("height", String(h));
+      svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+      var W = w - sw * 2, H = h - sw * 2;
+      var top = W - rx * 2, side = H - rx * 2, arc = Math.PI * rx / 2;
+      var per = (top + side) * 2 + arc * 4;
+      /* 底边正中在**周长**上的位置 = 上边 + 右上弧 + 右边 + 右下弧 + 下边的一半 */
+      var bottomMid = top + arc + side + arc + top / 2;
+      var rects = svg.querySelectorAll("rect");
+      for (var i = 0; i < rects.length; i++){
+        rects[i].setAttribute("x", String(sw));
+        rects[i].setAttribute("y", String(sw));
+        rects[i].setAttribute("width", String(W));
+        rects[i].setAttribute("height", String(H));
+        rects[i].setAttribute("rx", String(rx));
+        rects[i].setAttribute("pathLength", "100");
+      }
+      ring.at = (bottomMid / per) * 100;
+      /* 绕圈的起点交给 CSS：--ring-at 变了，keyframes 从新的地方接着转 */
+      svg.style.setProperty("--ring-at", ring.at.toFixed(3));
+    }
+    /** 主环一段长 len 的描边，**以 at 为中心**向两边铺开。绕圈那条不归它管。 */
+    function dash(at, len){
+      rMain.setAttribute("stroke-dasharray", len + " " + Math.max(0, 100 - len));
+      rMain.setAttribute("stroke-dashoffset", String(-(at - len / 2)));
+    }
+    function ringFrame(now){
+      /* **dt 必须夹到 0 以上**：rAF 的 now 是帧开始时刻，可能比事件里的 t0 小 */
+      var dt = Math.max(0, now - ring.t0);
+      var p = Math.min(1, dt / ring.dur);
+      ring.len = ring.from + (ring.to - ring.from) * easeOut(p);
+      dash(ring.at, ring.len);
+      if (p < 1){ ring.raf = requestAnimationFrame(ringFrame); return; }
+      ring.raf = 0;
+      /* 长满了才把绕圈交给 CSS——绕圈从「圈已闭合」开始 */
+      if (ring.on) rOrbit.classList.add("ring__orbit--go");
+    }
+    function setRing(on){
+      if (ring.on === on) return;
+      ring.on = on;
+      if (ring.raf) cancelAnimationFrame(ring.raf);
+      ring.raf = 0;
+      rOrbit.classList.remove("ring__orbit--go");
+      /* reduced-motion：不演过程，直接到终点。颜色信息都在，动的部分全省 */
+      if (reduceMotion.matches){
+        ring.len = on ? 100 : 0;
+        dash(ring.at, ring.len);
+        return;
+      }
+      /* **从当前长度收/长**，不写死从 100：长到一半被打断不会跳满再退 */
+      ring.from = ring.len;
+      ring.to = on ? 100 : 0;
+      ring.dur = on ? RING_MS : 300;
+      ring.t0 = performance.now();
+      ring.raf = requestAnimationFrame(ringFrame);
+    }
+
+    /* ══ 「放一遍」：连续地推上去，最后才落档 ═════════ */
+    var playing = false;
+    function play(){
+      if (playing || eff.hidden) return;
+      playing = true;
+      openEff(true);
+      comp.classList.remove("comp--ultra");
+      setRing(false);
+      var n = efforts().length;
+      set(0, false);
+      var t0 = performance.now(), MS = 2100;
+      function frame(now){
+        var p = Math.min(1, (now - t0) / MS);
+        state.raw = easeOut(p);
+        set(nearest(state.raw), false);
+        if (p < 1){ requestAnimationFrame(frame); return; }
+        state.raw = null;
+        setLive(false);        /* 先撤零过渡 */
+        set(n - 1, true);      /* 最后一下才是落点，扫光在这儿放 */
+        playing = false;
+      }
+      setTimeout(function(){
+        t0 = performance.now();
+        setLive(true);         /* 扫射全程 1:1，不拖过渡的尾巴 */
+        requestAnimationFrame(frame);
+      }, GROW_MS);
+    }
+
+    /* 框子尺寸变了才重算扫光几何 */
+    if (window.ResizeObserver){
+      new ResizeObserver(function(){
+        ringGeom();
+        dash(ring.at, ring.len);
+      }).observe(comp);
+    }
+    window.addEventListener("resize", function(){
+      if (state.open){
+        var w = room();
+        ibar.style.setProperty("--bw", w + "px");
+        ibar.style.width = w + "px";
+      }
+      paint();
+    });
+
+    buildMenu();
+    ringGeom();
+    paint();
+    return { play: play };
+  }
+
+  /* ══ 每个 .comp 一份实例 ═══════════════════════════════ */
+  var instances = [];
+  var comps = document.querySelectorAll(".comp");
+  for (var i = 0; i < comps.length; i++) instances.push(wireUp(comps[i]));
+
+  /* 「放一遍」全部一起放：换皮对比就得同一个节拍才比得出来 */
+  var playBtn = document.getElementById("play");
+  playBtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    playBtn.disabled = true;
+    for (var i = 0; i < instances.length; i++) instances[i].play();
+    setTimeout(function(){ playBtn.disabled = false; }, GROW_MS + 2300);
+  });
+
+  /* ══ 主题 ════════════════════════════════════════ */
+  var ts = document.querySelectorAll("[data-theme-set]");
+  for (var m = 0; m < ts.length; m++){
+    (function(b){
+      b.addEventListener("click", function(e){
+        e.stopPropagation();
+        var v = b.getAttribute("data-theme-set");
+        if (v === "system") document.documentElement.removeAttribute("data-theme");
+        else document.documentElement.setAttribute("data-theme", v);
+        for (var k = 0; k < ts.length; k++) ts[k].setAttribute("aria-pressed", String(ts[k] === b));
+      });
+    })(ts[m]);
+  }
+})();
+</script>
+</body>
+</html>

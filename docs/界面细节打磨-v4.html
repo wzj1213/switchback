@@ -14,25 +14,26 @@
 :root{
   color-scheme: light dark;
 
-  /* 面：四层，相邻 ΔL* ≈ 3.2–3.9。够分层，所以线可以少画 */
-  --surface:#ffffff;      /* 抬起面：正文区、卡片、浮层 */
-  --paper:#f4f4f1;        /* 窗底：侧栏、工作台、输入区外圈 */
-  --said:#eaeae6;         /* 沉一档：用户消息、代码块 */
-  --sunk:#e1e1dc;         /* 再沉一档：选中行、按下态 */
+  /* 只有一白一黑；其余一切不是灰，是黑的透明度（同一个黑，不同的量）。
+     面不分层——全是白的，结构交给发丝线 */
+  --surface:#ffffff;      /* 抬起面：卡片、浮层 */
+  --paper:#ffffff;        /* 窗底：侧栏、工作台、输入区外圈 */
+  --said:rgb(0 0 0 / 4%); /* 填充：用户消息、代码块 */
+  --sunk:rgb(0 0 0 / 8%); /* 再沉一档：选中行、按下态 */
 
   /* 线：两档，只有两个角色。structural 切窗口，hair 切区块内部 */
-  --hair:#e4e4df;
-  --rule:#d0d0c9;
+  --hair:rgb(0 0 0 / 8%);
+  --rule:rgb(0 0 0 / 16%);
 
   /* 字：四档，前三档承载文字且处处 ≥4.5:1；第四档只给非文字 */
-  --ink:#111110;          /* 18.89:1 on 纸 */
-  --ink-2:#494946;        /*  9.03:1 */
-  --ink-3:#6a6a67;        /*  5.43:1（气泡上仍有 4.50） */
-  --ink-4:#a8a8a3;        /*  刻度、图标发丝、占位点——不写字 */
-  --ink-on:#ffffff;       /* 反白：写在 --ink 上，18.89:1 */
+  --ink:#000000;          /* 21.00:1 —— 天花板 */
+  --ink-2:rgb(0 0 0 / 70%); /*  8.45:1 */
+  --ink-3:rgb(0 0 0 / 57%); /*  5.33:1（填充上仍有 4.89） */
+  --ink-4:rgb(0 0 0 / 38%); /*  刻度、图标发丝、占位点——不写字 */
+  --ink-on:#ffffff;       /* 反白：写在 --ink 上，21.00:1 */
 
   /* 彩色只有两个。默认零彩色，出事才亮 */
-  --danger:#9d3324;       /* 7.16:1 */
+  --danger:#c2412d;       /* 5.14:1 */
   --warn:#8a6410;         /* 5.37:1 */
 
   /* 圆角：四档 + 一档全圆。同心规则见 B 节 */
@@ -50,7 +51,7 @@
   --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
   --t-xs:11.5px; --t-code:12.5px; --t-sm:13px; --t-base:14px; --t-prose:15px; --t-lg:16px; --t-xl:27px;
 
-  --dur:120ms; --dur-slow:240ms;
+  --dur:120ms; --dur-slow:240ms; --ease:ease;  /* ease 照生产 tokens.css:80，它注释说「太软」是手感断言不是实测 */
 
   --shadow-1:0 1px 2px rgb(0 0 0 / 5%);
   --shadow-pop:0 1px 2px rgb(0 0 0 / 6%),0 10px 30px rgb(0 0 0 / 10%);
@@ -64,18 +65,18 @@
 
 /* 深色是全套的，不是把灰翻过来了事 */
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --surface:#17171a; --paper:#0e0e10; --said:#212125; --sunk:#2a2a2f;
-  --hair:#26262a; --rule:#3a3a40;
-  --ink:#f2f2ef; --ink-2:#b2b2af; --ink-3:#8a8a88; --ink-4:#5b5b5e; --ink-on:#0e0e10;
-  --danger:#e08b7d; --warn:#d3ab63;
+  --surface:rgb(255 255 255 / 5%); --paper:#000000; --said:rgb(255 255 255 / 8%); --sunk:rgb(255 255 255 / 13%);
+  --hair:rgb(255 255 255 / 10%); --rule:rgb(255 255 255 / 20%);
+  --ink:#ffffff; --ink-2:rgb(255 255 255 / 72%); --ink-3:rgb(255 255 255 / 55%); --ink-4:rgb(255 255 255 / 38%); --ink-on:#000000;
+  --danger:#e0705c; --warn:#d3a044;
   --shadow-1:none; --shadow-pop:0 12px 34px rgb(0 0 0 / 55%);
   --scrim:rgb(0 0 0 / 60%);
 }}
 :root[data-theme="dark"]{
-  --surface:#17171a; --paper:#0e0e10; --said:#212125; --sunk:#2a2a2f;
-  --hair:#26262a; --rule:#3a3a40;
-  --ink:#f2f2ef; --ink-2:#b2b2af; --ink-3:#8a8a88; --ink-4:#5b5b5e; --ink-on:#0e0e10;
-  --danger:#e08b7d; --warn:#d3ab63;
+  --surface:rgb(255 255 255 / 5%); --paper:#000000; --said:rgb(255 255 255 / 8%); --sunk:rgb(255 255 255 / 13%);
+  --hair:rgb(255 255 255 / 10%); --rule:rgb(255 255 255 / 20%);
+  --ink:#ffffff; --ink-2:rgb(255 255 255 / 72%); --ink-3:rgb(255 255 255 / 55%); --ink-4:rgb(255 255 255 / 38%); --ink-on:#000000;
+  --danger:#e0705c; --warn:#d3a044;
   --shadow-1:none; --shadow-pop:0 12px 34px rgb(0 0 0 / 55%);
   --scrim:rgb(0 0 0 / 60%);
 }
@@ -331,33 +332,36 @@ body[data-edges="on"] .edge{opacity:1}
 /* ══════════════════════════════════════════════════════════
    打磨后 —— **markup 和上面那张逐字节相同**，只有 class 名从
    ui--now 换成 ui--polish。下面这些是这一版全部的改动：
-   一组 token 值，加十来条只改数值的规则。没有一条动了 DOM。
+   一组 token 值，加三条只改数值的规则。没有一条动了 DOM。
    ══════════════════════════════════════════════════════════ */
 .ui--polish{
-  /* 面：四档，相邻差 3.5–3.9 L*（现在是 2.4–2.7，不够，所以只能靠线） */
-  --bg:#ffffff; --bg-sunken:#f4f4f1; --bg-raised:#ffffff; --bg-hover:#eeeeea;
-  --bg-active:#e4e4de; --bg-code:#f0f0ec; --bg-said:#eaeae6;
-  --border:#e4e4df; --border-strong:#d0d0c9;
-  /* 字：三档，全部 ≥4.87:1（凹面上），ΔL* muted↔faint 从 2.02 拉到 13.80 */
-  --text:#111110; --text-muted:#494946; --text-faint:#6a6a67; --text-inverse:#fff;
-  /* 语义：只给内容，不给 UI 状态。四个全部 ≥4.87:1 */
-  --accent:#2f5fb8; --danger:#9d3324; --warn:#8a6410; --ok:#2c6b45;
+  /* 只有一白一黑；其余全是黑的透明度。面不分层——全是白的，
+     结构交给发丝线：两条结构线留在强档说全话 */
+  --bg:#ffffff; --bg-sunken:#ffffff; --bg-raised:#ffffff; --bg-hover:rgb(0 0 0 / 4%);
+  --bg-active:rgb(0 0 0 / 8%); --bg-code:rgb(0 0 0 / 4%); --bg-said:rgb(0 0 0 / 4%);
+  --border:rgb(0 0 0 / 8%); --border-strong:rgb(0 0 0 / 16%);
+  /* 字：墨 21:1 天花板；次要 8.45；最淡 5.33（填充上 4.89） */
+  --text:#000000; --text-muted:rgb(0 0 0 / 70%); --text-faint:rgb(0 0 0 / 57%); --text-inverse:#ffffff;
+  /* 语义：只动没过 AA 的两个（warn / accent），danger / ok 保持生产值 */
+  --accent:#3568c8; --danger:#c2412d; --warn:#8a6410; --ok:#2f7a4d;
   /* 圆角：加一档 xs，其余整体上抬。规则见 01 */
   --radius-xs:6px; --radius-sm:8px; --radius:12px; --radius-lg:16px;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .ui--polish{
-  --bg:#17171a; --bg-sunken:#0e0e10; --bg-raised:#1d1d21; --bg-hover:#232328;
-  --bg-active:#2e2e34; --bg-code:#202024; --bg-said:#212125;
-  --border:#26262a; --border-strong:#3a3a40;
-  --text:#f2f2ef; --text-muted:#b2b2af; --text-faint:#8a8a88; --text-inverse:#17171a;
-  --accent:#8fb0f0; --danger:#e08b7d; --warn:#d3ab63; --ok:#78c79a;
+  /* 深色整张反过来：纸 #000、墨 #fff，其余是白的透明度 */
+  --bg:#000000; --bg-sunken:#000000; --bg-raised:rgb(255 255 255 / 5%); --bg-hover:rgb(255 255 255 / 8%);
+  --bg-active:rgb(255 255 255 / 13%); --bg-code:rgb(255 255 255 / 8%); --bg-said:rgb(255 255 255 / 8%);
+  --border:rgb(255 255 255 / 10%); --border-strong:rgb(255 255 255 / 20%);
+  --text:#ffffff; --text-muted:rgb(255 255 255 / 72%); --text-faint:rgb(255 255 255 / 55%); --text-inverse:#000000;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
 }}
 :root[data-theme="dark"] .ui--polish{
-  --bg:#17171a; --bg-sunken:#0e0e10; --bg-raised:#1d1d21; --bg-hover:#232328;
-  --bg-active:#2e2e34; --bg-code:#202024; --bg-said:#212125;
-  --border:#26262a; --border-strong:#3a3a40;
-  --text:#f2f2ef; --text-muted:#b2b2af; --text-faint:#8a8a88; --text-inverse:#17171a;
-  --accent:#8fb0f0; --danger:#e08b7d; --warn:#d3ab63; --ok:#78c79a;
+  /* 深色整张反过来：纸 #000、墨 #fff，其余是白的透明度 */
+  --bg:#000000; --bg-sunken:#000000; --bg-raised:rgb(255 255 255 / 5%); --bg-hover:rgb(255 255 255 / 8%);
+  --bg-active:rgb(255 255 255 / 13%); --bg-code:rgb(255 255 255 / 8%); --bg-said:rgb(255 255 255 / 8%);
+  --border:rgb(255 255 255 / 10%); --border-strong:rgb(255 255 255 / 20%);
+  --text:#ffffff; --text-muted:rgb(255 255 255 / 72%); --text-faint:rgb(255 255 255 / 55%); --text-inverse:#000000;
+  --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
 }
 
 /* 01 圆角：≤24px 的小东西退回 6，别跟着 32px 的行一起长 */
@@ -368,15 +372,11 @@ body[data-edges="on"] .edge{opacity:1}
 .ui--polish .uuser,.ui--polish .uagent{margin-top:12px}
 .ui--polish .umark{margin-top:28px}
 
-/* 03 面够厚了，两条区块线就能各降一档 */
-.ui--polish .us{border-right-color:var(--border)}
-.ui--polish .um__top{border-bottom-color:var(--border)}
+/* 03 这两条结构线来回摆了四次，白 + 黑之后终于落定：
+   面全是白的，线就得说全话——留在 --border-strong，一条不降 */
 
-/* 05 居中保留。会漂的是宽度不是位置，而定宽这件事静图上看不出来 */
-
-/* 05 档位挪到发送那一侧 */
-.ui--polish .usend{margin-left:6px}
-.ui--polish .ubar > span:nth-child(2){margin-left:auto}
+/* 05 居中保留。会漂的是宽度不是位置，而定宽这件事静图上看不出来。
+   上一稿这儿还有一条「档位挪到发送那一侧」——06 撤了，规则同步删掉 */
 </style>
 <style>
 /* 节奏尺：把「均匀」和「分级」并排摆出来 */
@@ -522,6 +522,35 @@ body[data-edges="on"] .edge{opacity:1}
 .pvplan__t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .pvx{flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
   border-radius:var(--radius-sm);color:var(--text-faint);font-size:13px}
+/* ── 侧栏悬浮卡小样 · 可交互（移到「待批」那行，或 Tab 过去） ── */
+.sn{display:flex;align-items:flex-start;gap:18px}
+.snlist{width:236px;flex:none;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg-sunken);padding:6px 4px}
+.snr{position:relative;display:flex;align-items:center;gap:7px;width:calc(100% - 8px);margin:0 4px;
+  height:30px;padding:0 8px;border:0;border-radius:var(--radius-sm);background:transparent;
+  font:inherit;font-size:13px;color:var(--text-muted);text-align:left;cursor:default}
+.snr:hover,.snr:focus-visible{background:var(--bg-hover);outline:none}
+.snr__d{width:6px;height:6px;border-radius:3px;background:var(--text-faint);flex:none}
+.snr__t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snr__e{flex:none;font-size:11px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+.snr--un{color:var(--text)}
+.snr--un .snr__d{background:var(--text)}
+.snr .pvring{margin-left:auto}
+.snmain{flex:1;min-width:0;padding:6px 2px}
+.snmain i{display:block;height:10px;border-radius:3px;background:var(--bg-hover);margin:9px 0}
+/* 浮层盖在主区上沿，侧栏一行都不动——「占位的东西不能变」 */
+.sncard{position:absolute;left:calc(100% + 10px);top:-8px;width:256px;padding:11px 13px;z-index:6;
+  border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg-raised);
+  box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transform:translateY(4px);
+  transition:opacity var(--dur-slow) var(--ease),transform var(--dur-slow) var(--ease)}
+.snr:hover .sncard,.snr:focus-visible .sncard{opacity:1;transform:none}
+.sncard b{display:block;font-size:13px;font-weight:500;color:var(--text);margin-bottom:5px}
+.sncard .p{display:block;font:11.5px/1.6 var(--mono);color:var(--text-muted);word-break:break-all}
+.sncard .m{display:block;font-size:12px;color:var(--text-muted);margin-top:5px}
+.sncard .m--w{color:var(--warn)}
+.sncard .f{display:block;font-size:11px;color:var(--text-faint);margin-top:8px;padding-top:7px;
+  border-top:1px solid var(--border)}
+
 .swrow i{flex:1;height:1px;background:var(--hair)}
 </style>
 </head>
@@ -558,15 +587,15 @@ body[data-edges="on"] .edge{opacity:1}
   <p class="kicker">omni · 界面 · v4 · 细节打磨</p>
   <h1>骨架不动，<br>只动值</h1>
   <p class="lede">v3 提了四条结构性改动——脊、工序块、右侧工作台、底部三合一。<strong>那份作废</strong>，你要的是打磨，不是重排。</p>
-  <p class="lede">这一版<strong>一条布局都不改</strong>：侧栏、顶栏、单列转录、右对齐的「你说的话」、底部那三条带，位置全在原地。下面两张小样<strong>用的是同一份 HTML，逐字节相同</strong>——差别只有一组 token 值和十来条改数值的 CSS。</p>
+  <p class="lede">这一版<strong>一条布局都不改</strong>：侧栏、顶栏、单列转录、右对齐的「你说的话」、底部那三条带，位置全在原地。下面两张小样<strong>用的是同一份 HTML，逐字节相同</strong>——差别只有一组 token 值和三条改数值的 CSS。</p>
   <p class="lede"><strong>「现在」那半张，第一稿有四处不是生产的样子</strong>，其中两处还被我当成了「打磨点」。已经对着源码逐条核过、改回真值，核错的四条单列在下面一节里——<strong>那一节比打磨清单更该先看。</strong></p>
   <div class="meta">
-    <span>tokens.css</span><span>items-turns.css</span><span>app-composer.css</span><span>plan.css</span><span>ComposerBar.tsx</span>
+    <span>tokens.css</span><span>items-turns.css</span><span>app-composer.css</span><span>plan.css</span><span>ModelPicker.tsx</span><span>app-sidebar.css</span>
   </div>
 </header>
 
 <h2 class="sec">全景 · 同一份结构，两套值</h2>
-<p class="sub">这两张小样的 HTML <strong>逐字节相同</strong>——我是把「现在」那份复制一遍，只把根节点的 class 从 <code>ui--now</code> 换成 <code>ui--polish</code>。差别全部来自一组 token 和十来条只改数值的规则，<strong>没有一行动了 DOM</strong>。左边那份的值是从 <code>tokens.css</code> 原样搬过来的。</p>
+<p class="sub">这两张小样的 HTML <strong>逐字节相同</strong>——我是把「现在」那份复制一遍，只把根节点的 class 从 <code>ui--now</code> 换成 <code>ui--polish</code>。差别全部来自一组 token 和三条只改数值的规则，<strong>没有一行动了 DOM</strong>。左边那份的值是从 <code>tokens.css</code> 原样搬过来的。</p>
 
 <div class="tools">
   <div class="seg" role="group" aria-label="主题">
@@ -644,7 +673,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
       <div class="uta">它还在跑——现在打的会排在后面。</div>
       <div class="ubar">
         <span class="utrig">Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
-        <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
         <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
         <span class="usend"><svg class="ic" width="13" height="13"><use href="#i-up"/></svg></span>
       </div>
@@ -720,7 +749,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
       <div class="uta">它还在跑——现在打的会排在后面。</div>
       <div class="ubar">
         <span class="utrig">Kimi Code <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
-        <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>引擎自动 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
+        <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-shield"/></svg>自动审批 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
         <span class="utrig"><svg class="ic" width="12" height="12"><use href="#i-think"/></svg>K3-256k · 高 <svg class="ic" width="11" height="11"><use href="#i-chev-d"/></svg></span>
         <span class="usend"><svg class="ic" width="13" height="13"><use href="#i-up"/></svg></span>
       </div>
@@ -728,7 +757,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
   </main>
 </div>
     </div>
-    <p class="cap">圆角<b>四档 ＋ 一条规则</b>（≈ 高 ÷ 4） · <b>ΔL* 13.80</b>，最淡那档在凹面上仍有 4.92:1 · 语义色全部过 AA · 段距三档拉到 8 / 20 / 36 · 档位贴着发送键</p>
+    <p class="cap">圆角<b>四档 ＋ 一条规则</b>（≈ 高 ÷ 4） · <b>白 #fff ＋ 黑 #000</b>，其余全是黑的透明度 · 次要文字 8.45:1 · 语义色只动两个 · 段距 8 / 20 / 36 · 档位原地不动（滑块见 06 demo）</p>
   </div>
 </div>
 
@@ -828,30 +857,31 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 
 <div class="pt">
   <p class="pt__no">03</p>
-  <h3 class="pt__h">灰阶：两档文字其实只有一档，四层面其实只有一层</h3>
+  <h3 class="pt__h">灰阶：白 ＋ 黑，中间地带不住人</h3>
   <p class="pt__sub"><code>tokens.css</code> 里 <code>--text-faint</code> 上面那条注释写着它要「守住 AA 对比度」，而实际值和 <code>--text-muted</code> 差 <strong>2.02 L*</strong>。<strong>2 个明度单位，屏幕上是同一个灰。</strong>界面里凡是想说「这条比那条次要」的地方，说了等于没说。</p>
+  <p><strong>先说这一轮推翻什么。</strong>前面四轮都在找「对的灰」——加厚、收白、果断凹面、统一色相，每一版都比上一版好，每一版都没彻底。这一版发现答案不是找到对的灰，是<strong>把中间值删掉</strong>：雾带存在的前提是灰阶有中间值。白 <code>#ffffff</code>，黑 <code>#000000</code>，其余一切不是灰，是<strong>黑的透明度</strong>——透明度不是第三种颜色，是同一个黑在不同的量。</p>
   <div class="nums">
-    <div class="num"><b>ΔL* muted ↔ faint</b><u>13.80</u><s><span class="was">现在 2.02</span></s></div>
-    <div class="num"><b>相邻两层面的差</b><u>3.9 / 3.5</u><s><span class="was">现在 2.7 / 2.4 —— 所以只能靠线</span></s></div>
-    <div class="num"><b>最淡那档在凹面上</b><u>4.92:1</u><s>仍然过 AA；现在是 4.65:1</s></div>
+    <div class="num"><b>颜色数</b><u>2</u><s><span class="was">其余全是黑的透明度</span></s></div>
+    <div class="num"><b>结构线</b><u>黑 16%</u><s>四次摇摆之后落定：面全白，线说全话</s></div>
+    <div class="num"><b>次要文字对比</b><u>8.45:1</u><s>现在 5.35:1</s></div>
   </div>
-  <p>底色那一侧是同一个病：<code>--bg</code> 到 <code>--bg-sunken</code> 只差 <strong>2.74 L*</strong>，<code>--bg-sunken</code> 到 <code>--bg-said</code> 差 <strong>2.41</strong>。<strong>面几乎没有层次，于是每一处分界都得画一条线。</strong>把四层面拉到相邻 3.5–3.9 之后，侧栏和正文就能靠底色自己分开，顶栏和侧栏那两条线可以从 <code>--border-strong</code> 降到 <code>--border</code>。</p>
+  <p>面不再分层，全是白的；填充只用两档：泡和代码块 <strong>黑 4%</strong>，选中行 <strong>黑 8%</strong>。字：墨 <code>#000</code>（21:1，天花板）；次要 黑 70%（8.45:1）；最淡 黑 57%（白底 5.33，填充上 4.89，AA 全过）。<strong>深色整张反过来：纸 <code>#000</code>、墨 <code>#fff</code>，其余是白的透明度。</strong>那两条来回摆了四次的结构线就此落定——面全是白的，线就得说全话，留在 <code>--border-strong</code>（黑 16%）。</p>
   <div class="swrow"><h4>现在</h4><div class="sw"><div class="swc"><i style="background:#16161a"></i><div><b>--text</b><s>#16161a</s><s>白 18.04:1 · 凹 16.85:1 · L* 7.40</s><u>正文、标题</u></div></div><div class="swc"><i style="background:#6a6a73"></i><div><b>--text-muted</b><s>#6a6a73</s><s>白 5.35:1 · 凹 5.00:1 · L* 45.10</s><u>次级文字</u></div></div><div class="swc"><i style="background:#6f6f78"></i><div><b>--text-faint</b><s>#6f6f78</s><s>白 4.98:1 · 凹 4.65:1 · L* 47.11</s><u>最淡的一档</u></div></div></div></div>
-  <div class="swrow"><h4>打磨后</h4><div class="sw"><div class="swc"><i style="background:#111110"></i><div><b>--text</b><s>#111110</s><s>白 18.89:1 · 凹 17.15:1 · L* 5.04</s><u>正文、标题</u></div></div><div class="swc"><i style="background:#494946"></i><div><b>--text-muted</b><s>#494946</s><s>白 9.03:1 · 凹 8.20:1 · L* 30.93</s><u>次级文字</u></div></div><div class="swc"><i style="background:#6a6a67"></i><div><b>--text-faint</b><s>#6a6a67</s><s>白 5.43:1 · 凹 4.92:1 · L* 44.73</s><u>最淡的一档</u></div></div></div></div>
+  <div class="swrow"><h4>打磨后</h4><div class="sw"><div class="swc"><i style="background:#000000"></i><div><b>--text</b><s>#000000</s><s>白 21.00:1 · 填充 19.26:1</s><u>正文、标题 · 天花板</u></div></div><div class="swc"><i style="background:rgb(0 0 0 / 70%)"></i><div><b>--text-muted</b><s>黑 70%</s><s>白 8.45:1 · 填充 7.75:1</s><u>次级文字</u></div></div><div class="swc"><i style="background:rgb(0 0 0 / 57%)"></i><div><b>--text-faint</b><s>黑 57%</s><s>白 5.33:1 · 填充 4.89:1</s><u>最淡的一档</u></div></div></div></div>
   <div class="note">
     <h4>输入区那条线不在这一条里</h4>
-    <p>上一稿在这儿写了「输入区上面那条通栏线可以整条去掉，换成 12px 渐隐」。<strong>那条线本来就不存在，渐隐也早就在了（28px）</strong>——见上面核错表第 1 条。这一条只剩侧栏和顶栏那两条。</p>
+    <p>上一稿在这儿写了「输入区上面那条通栏线可以整条去掉，换成 12px 渐隐」。<strong>那条线本来就不存在，渐隐也早就在了（28px）</strong>——见上面核错表第 1 条。侧栏和顶栏那两条线留在 <code>--border-strong</code>——面全白了，线得说全话。</p>
   </div>
 </div>
 
 <div class="pt">
   <p class="pt__no">04</p>
-  <h3 class="pt__h">语义色：四个全挤在同一档明度，其中一个还不合格</h3>
-  <p class="pt__sub">把四个语义色的 L* 排出来：<code>--ok</code> 45.72、<code>--danger</code> 46.23、<code>--accent</code> 48.33、<code>--warn</code> 48.80。<strong>跨度 3.08 个明度单位。</strong>眯起眼它们是同一个灰——说明这四个颜色在做的事只有「这是哪一类」，而「哪一类」用图标和位置就够了。</p>
-  <p>更要紧的是<code>--warn</code>：它在凹面底色上是 <strong>4.37:1</strong>，<strong>没过 AA</strong>。而警告文字恰恰经常出现在凹面卡片里。</p>
+  <h3 class="pt__h">语义色：两个不合格，另外两个一个比特都不动</h3>
+  <p class="pt__sub">上一稿在这儿还嫌「四个色 L* 跨度只有 3.08，眯起眼是同一个灰」，于是把四个全换了。<strong>收回来</strong>——「挤」不是病：按「颜色只给内容语义、不给 UI 状态」那条规矩，这四个色本来就不承担分层，同档就同档。<strong>病只有一个：没过 AA。</strong></p>
+  <p><code>--warn</code> 在填充（黑 4%）上是 <strong>4.29:1</strong>，没过；<code>--accent</code> 是 <strong>4.37</strong>——上一稿只抓了 warn，因为白底 4.68 离 4.5 只差一口气，其实横竖都在水下，一起捞。动两个、留两个：warn → <code>#8a6410</code>（填充 4.93），accent → <code>#3568c8</code>（填充 4.86）。<strong>danger 和 ok 本来就合格（填充上 4.71 / 4.80），一个比特不动。</strong></p>
   <div class="swrow"><h4>现在</h4><div class="sw"><div class="swc"><i style="background:#3b6fd4"></i><div><b>--accent</b><s>#3b6fd4</s><s>白 4.76:1 · 凹 4.45:1 · L* 48.33</s><u>链接、焦点</u></div></div><div class="swc"><i style="background:#c2412d"></i><div><b>--danger</b><s>#c2412d</s><s>白 5.14:1 · 凹 4.80:1 · L* 46.23</s><u>失败、删除</u></div></div><div class="swc"><i style="background:#9a6b12"></i><div><b>--warn</b><s>#9a6b12</s><s>白 4.68:1 · 凹 4.37:1 · L* 48.80</s><u>警告</u></div></div><div class="swc"><i style="background:#2f7a4d"></i><div><b>--ok</b><s>#2f7a4d</s><s>白 5.23:1 · 凹 4.89:1 · L* 45.72</s><u>成功、新增</u></div></div></div></div>
-  <div class="swrow"><h4>打磨后</h4><div class="sw"><div class="swc"><i style="background:#2f5fb8"></i><div><b>--accent</b><s>#2f5fb8</s><s>白 6.09:1 · 凹 5.52:1 · L* 41.61</s><u>链接、焦点</u></div></div><div class="swc"><i style="background:#9d3324"></i><div><b>--danger</b><s>#9d3324</s><s>白 7.16:1 · 凹 6.50:1 · L* 37.23</s><u>失败、删除</u></div></div><div class="swc"><i style="background:#8a6410"></i><div><b>--warn</b><s>#8a6410</s><s>白 5.37:1 · 凹 4.87:1 · L* 45.02</s><u>警告</u></div></div><div class="swc"><i style="background:#2c6b45"></i><div><b>--ok</b><s>#2c6b45</s><s>白 6.37:1 · 凹 5.78:1 · L* 40.38</s><u>成功、新增</u></div></div></div></div>
-  <p class="pt__sub" style="margin-top:22px">四个都拉到 <strong>凹面上 ≥4.87:1</strong>，L* 跨度从 3.08 拉到 7.79。<strong>但颜色一个都不删。</strong></p>
+  <div class="swrow"><h4>打磨后</h4><div class="sw"><div class="swc"><i style="background:#3568c8"></i><div><b>--accent</b><s>#3568c8</s><s>白 5.30:1 · 填充 4.86:1</s><u>链接、焦点 · 加深一点</u></div></div><div class="swc"><i style="background:#c2412d"></i><div><b>--danger</b><s>#c2412d</s><s>白 5.14:1 · 填充 4.71:1</s><u>失败、删除 · 不动</u></div></div><div class="swc"><i style="background:#8a6410"></i><div><b>--warn</b><s>#8a6410</s><s>白 5.37:1 · 填充 4.93:1</s><u>警告 · 加深到合格</u></div></div><div class="swc"><i style="background:#2f7a4d"></i><div><b>--ok</b><s>#2f7a4d</s><s>白 5.23:1 · 填充 4.80:1</s><u>成功、新增 · 不动</u></div></div></div></div>
+  <p class="pt__sub" style="margin-top:22px">「打磨后」那排有两个色和「现在」逐比特相同——<strong>那是故意的</strong>。上一稿把「拉开明度跨度」当成了目标（3.08 → 7.79），其实跨度只是手段，合格才是；四个色在黑 4% 填充上全部 ≥4.7:1。</p>
   <div class="note">
     <h4>「黑白灰」不等于没有颜色</h4>
     <p>你给的那张 codex 图里，链接是蓝的、diff 的加减是绿红的——<strong>它的界面外壳全是灰的，颜色只出现在内容里。</strong>这才是那种「高级」的来源：不是把颜色删光，是<strong>颜色只给内容语义（链接、diff、失败），不给 UI 状态（选中、悬停、当前项）</strong>。</p>
@@ -882,15 +912,23 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 </div>
 
 <div class="pt">
-  <p class="pt__no">06</p>
-  <h3 class="pt__h">控件：档位离发送键多远</h3>
-  <p class="pt__sub">上一稿这里还有一条「发送键 26 → 28」——<strong>它本来就是 28</strong>（<code>app-composer.css:5</code>），删了。剩这一条。</p>
-  <ul>
-    <li><strong>档位挪到发送键那一侧。</strong>现在「Kimi Code / 引擎自动 / K3-256k·高」三个下拉全堆在左边，发送键孤零零在右边。而「改一下档位再发」是一个连续动作，中间隔着 400px 等于每次都要横跨一趟。codex 那张图就是这么排的：左边放不常动的，<strong>模型和档位贴着发送键</strong>。</li>
-  </ul>
+  <p class="pt__no">06 · 换掉了</p>
+  <h3 class="pt__h">档位一个都不挪，那块空地拿来放推理强度</h3>
+  <p class="pt__sub">上一稿这里提的是「把引擎和档位挪到发送键那一侧」。<strong>撤了</strong>——那三个下拉的位置是已经学会的，为了填一块空地去动它们不划算。空地本身是真的：<code>Kimi Code / 自动审批 / K3 · 最高</code> 三个下拉靠左，发送键靠右，中间那段一直空着。</p>
+  <p>换的做法是<strong>往那块空地里放一个原本就该有自己位置的控件</strong>：推理强度。它现在藏在模型下拉的标签里（<code>K3 · 最高</code>），要改得先点开面板、再进「推理强度」那一节。而它是这一行里<strong>改得最勤的一个值</strong>——模型基本不动，强度一天调好几次。</p>
+  <div class="nums">
+    <div class="num"><b>档位那三个下拉</b><u>不动</u><s><span class="was">上一稿要把两个挪到右边</span></s></div>
+    <div class="num"><b>改强度要几步</b><u>2</u><s><span class="was">现在 3：点开面板 → 找到那一节 → 选</span></s></div>
+    <div class="num"><b>发送键的 x</b><u>不变</u><s>控件靠右、向左展开</s></div>
+  </div>
+  <p>收起时是一段安静的文字加一枚三格档位图标，<strong>不点开也知道现在在哪一档</strong>；点一下原地长成滑块。<strong>demo 单独出了两份，展开版和行内条版都能真的拖、真的点</strong>——见 <code>docs/推理强度滑块-demo.html</code> 和 <code>docs/推理强度滑块-demo-行内.html</code>。</p>
   <div class="note">
-    <h4>这一条会动位置，可以单独回退</h4>
-    <p>六条里<strong>只有这一条动了位置</strong>——而且是同一行内的左右换位，不跨行、不跨块。一行 CSS 加一次 JSX 顺序调整，觉得别扭就单独去掉，不影响其余五条。</p>
+    <h4>模型下拉上的「· 最高」要一起去掉</h4>
+    <p><code>ModelPicker.tsx</code> 那句注释写着「触发器上把两样都写出来：<strong>只写模型的话，改了强度之后界面上没有任何变化</strong>」。强度有了自己的控件之后这条理由就不成立了——再留着就是同一个值在一行里写两遍，而且改一处另一处跟着变，看起来像 bug。</p>
+  </div>
+  <div class="note note--warn">
+    <h4>没报 efforts 的引擎，这块整个不出现</h4>
+    <p><code>ModelOption.efforts</code> 是可选的。ACP 那类把强度编进 <code>modelId</code> 的引擎（<code>gpt-5.6-sol[low]</code>）根本不报，<code>ModelPicker</code> 现在就是靠这个决定要不要显示「推理强度」那一节。<strong>新控件走同一条判断</strong>：没报就不出现，不是显示一个灰的、点不动的滑块。</p>
   </div>
 </div>
 
@@ -969,7 +1007,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 </div>
 
 <div class="pt">
-  <p class="pt__no">换来什么</p>
+  <p class="pt__no">07 · 换来什么</p>
   <h3 class="pt__h">底部从三行降到两行，少一圈通栏描边</h3>
   <div class="nums">
     <div class="num"><b>输入框上方最多几行</b><u>1</u><s><span class="was">现在 3（变更 / 计划 / 排队）</span></s></div>
@@ -1057,7 +1095,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 <p class="sub">你点的这两处都查出了东西。字号那条和圆角是同一个病；缓存那条是<strong>数据已经在手里，被丢在引擎边界了</strong>。</p>
 
 <div class="pt">
-  <p class="pt__no">07</p>
+  <p class="pt__no">08</p>
   <h3 class="pt__h">字号：一半的界面文字是最小那一档</h3>
   <p class="pt__sub">数了一遍 <code>styles/*.css</code> 里字号 token 的用量：<code>--text-xs</code>（11.5px）<strong>91 处</strong>、<code>--text-sm</code>（13px）49、<code>--text-code</code> 14、<code>--text-base</code>（14px）<strong>只有 9</strong>、<code>--text-lg</code> 7、<code>--text-prose</code> 2、<code>--text-xl</code> 1。</p>
   <div class="nums">
@@ -1075,7 +1113,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 </div>
 
 <div class="pt">
-  <p class="pt__no">08</p>
+  <p class="pt__no">09</p>
   <h3 class="pt__h">缓存命中：三家引擎都在报，全被加成一个数丢掉了</h3>
   <p class="pt__sub">这一条不是显示得不好看，是<strong>数据根本没送到界面</strong>。</p>
   <div class="dz">
@@ -1099,7 +1137,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 </div>
 
 <div class="pt">
-  <p class="pt__no">09</p>
+  <p class="pt__no">10</p>
   <h3 class="pt__h">用量表：百分比藏在 tooltip 里，而标签的宽度会推着右边的按钮走</h3>
   <p class="pt__sub">顶栏那枚 <code>51.9k / 262k</code>，三处可以修，都很小。</p>
   <ul>
@@ -1114,25 +1152,81 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 </div>
 
 <hr class="rule">
+<h2 class="sec">你给的图：侧栏先看再点</h2>
+<p class="sub">那张截图说的是一件事：<strong>侧栏现在只能「点进去才知道」</strong>——而点进去要切换整个主区。下面这条把它落成 omni 数据够得着的样子：<strong>加一张浮层，不在「只动值」那六条里</strong>，和 06、07 一样单列。小样可交互：鼠标移到「待批」那行，或者 Tab 过去。</p>
+
+<div class="pv ui--now">
+  <p class="pv__t">侧栏 · 悬停「待批」那行（demo 从略了 300ms 意图延迟）</p>
+  <div class="sn">
+    <div class="snlist">
+      <div class="snr"><span class="snr__d"></span><span class="snr__t">优化推理强度输入框</span><svg class="ic pvring pvring--go" width="11" height="11"><use href="#i-ring"/></svg></div>
+      <button type="button" class="snr"><span class="snr__d"></span><span class="snr__t">分离鲸鱼阴影并接入 dsh</span><span class="snr__e">待批</span>
+        <span class="sncard">
+          <b>分离鲸鱼阴影并接入 dsh</b>
+          <span class="p">~/work/omni</span>
+          <span class="m">dsh · 默认模型 · 自动审批</span>
+          <span class="m m--w">待批 · 停在 34 分钟前</span>
+          <span class="f">接力过 1 次：kimi → dsh · 创建于 8 月 20 日</span>
+        </span>
+      </button>
+      <div class="snr snr--un"><span class="snr__d"></span><span class="snr__t">查找 GitHub 类似产品</span><span class="snr__e">1 小时前</span></div>
+      <div class="snr"><span class="snr__d"></span><span class="snr__t">添加桌宠并优化 Claude</span><span class="snr__e">14:02</span></div>
+      <div class="snr"><span class="snr__d"></span><span class="snr__t">排查另一窗口报错</span><span class="snr__e">昨天</span></div>
+    </div>
+    <div class="snmain">
+      <i style="width:82%"></i><i style="width:64%"></i><i style="width:76%"></i><i style="width:41%"></i>
+    </div>
+  </div>
+</div>
+
+<div class="pt">
+  <p class="pt__no">11</p>
+  <h3 class="pt__h">侧栏悬浮卡：路径、引擎、状态原文，别再只塞 title</h3>
+  <p class="pt__sub">「那一行是什么」现在有三个答案被藏在三个拿不出来的地方：完整路径在原生 tooltip 里（<code>SidebarRows.tsx:225</code> 的 <code>title={thread.cwd}</code>），hover 一秒才浮出来，不可选中、不可复制；引擎和模型<strong>哪儿都没有</strong>，得点进去看输入框那一行才知道；「待批」在行尾只剩两个字（<code>RowEnd.tsx</code> 的 <code>NOTE</code>），待的是什么、停了多久，不点进去不知道。<strong>而点进去 = 切换整个主区</strong>——为了确认「是不是那条」，代价是打断正在看的这条。</p>
+  <div class="nums">
+    <div class="num"><b>看完整路径现在</b><u>hover 1 秒</u><s>原生 tooltip，不可选中不可复制</s></div>
+    <div class="num"><b>卡片要的新数据</b><u>0</u><s>引擎 / 模型 / 档位 / 时间 / 接力历史都在 Thread 上</s></div>
+    <div class="num"><b>协议与持久化</b><u>不动</u><s>纯 renderer，一张浮层</s></div>
+  </div>
+  <ul>
+    <li><strong>卡片只答三个问题。</strong>这是哪条（标题 ＋ 完整路径，等宽、折行、可选中）；它现在怎么了（状态原文 ＋ 停了多久）；它用什么在跑（引擎 · 模型 · 档位，接力过的带一句 <code>kimi → dsh</code>）。</li>
+    <li><strong>卡里一个可点的东西都不放。</strong>hover 只是预览，真入口是点行本身——和 07 那条「hover 只能当预览」不打架：那边的真入口要点一下钉住，这边的真入口本来就在行上。</li>
+    <li><strong>300ms 意图延迟，扫过不弹。</strong>行高 30px、一屏十几行，鼠标扫过去找东西是常态，没有延迟就是连环弹。Tab 到行上同样弹（<code>:focus-visible</code>），键盘用户不用学新入口。</li>
+    <li><strong>拖动中不弹。</strong>浮层绝对定位、不占位，不会踩 <code>SidebarRows.tsx</code> 注释里那条「占位变了 Chromium 取消拖拽」——但拖的时候它会盖住落点高亮，一样碍事。</li>
+    <li><strong><code>title</code> 跟着撤。</strong>原生 tooltip 和卡片叠两层，比没有还糟。</li>
+  </ul>
+  <div class="note note--warn">
+    <h4>两样不进卡的东西</h4>
+    <p><strong>最后一条消息。</strong>侧栏这层数据只有 <code>preview</code>，而它取的是<strong>第一条</strong>用户消息（<code>state.ts:197</code> 的注释：同一个工作区几个会话光靠目录名分不清）。「最后说到哪」要去读 log——为一次 hover 触发一次读盘，不值。</p>
+    <p><strong>审批的内容。</strong>「批什么」在 items 里，不在 <code>Thread</code> 上。卡里只显示「待批 · 停在 34 分钟前」，要知道批什么就点进去。<strong>数据不在这层，就不在这层画</strong>——不然悬浮卡会长成第二个主区。</p>
+  </div>
+  <div class="note">
+    <h4>为什么浮在右侧，不把行撑高</h4>
+    <p>行高是扫读的密度。一张卡撑开一行，下面所有行跟着挪——拖拽提示那条教训（实测行从 y=333 掉到 391，拖拽被 Chromium 整个取消）说的就是同一件事：<strong>侧栏里占位的东西不能变</strong>。浮层盖在主区上沿，列表一行不动。</p>
+  </div>
+</div>
+
+<hr class="rule">
 <h2 class="sec">落地顺序</h2>
-<p class="sub">十行。<strong>前三行是 token 表里的数字</strong>（一天半，不碰组件）；第 4 行建议先出图比稿再定；<strong>第 6 和第 10 是仅有的两条动结构 / 动协议的</strong>，也是收益最大的两条。</p>
+<p class="sub">十一行，<strong>编号就是正文的条目号</strong>，行序是建议的动手顺序。<strong>前三行是 token 表里的数字</strong>（一天半，不碰组件）；02（段距）存疑，建议先出图比稿再定；<strong>06、07、09、11 是仅有的四条不止改值</strong>——加控件 / 动结构 / 动协议 / 加浮层，收益最大的也在这几条里。</p>
 <table class="t">
   <thead><tr><th style="width:34px"></th><th>做什么</th><th>动哪儿</th><th style="width:70px">工时</th><th style="width:90px">性质</th></tr></thead>
   <tbody>
-    <tr><td class="n">1</td><td><strong>灰阶与面</strong>：三档文字、四层面的值</td><td class="m">tokens.css</td><td class="qty">半天</td><td><span class="pill pill--go">纯 token</span></td></tr>
-    <tr><td class="n">2</td><td><strong>语义色</strong>：四个色拉到 ≥4.87:1</td><td class="m">tokens.css</td><td class="qty">半天</td><td><span class="pill pill--go">纯 token</span></td></tr>
-    <tr><td class="n">3</td><td><strong>圆角阶梯</strong>：加 <code>--radius-xs</code>，抬三档，过一遍 46 处</td><td class="m">tokens.css ＋ 各处 radius</td><td class="qty">1 天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
-    <tr><td class="n">5</td><td><strong>变更胶囊补完定宽</strong>，三处宽度算式统一</td><td class="m">items-turns.css · Changed.tsx · plan.css</td><td class="qty">2 小时</td><td><span class="pill">一个 span</span></td></tr>
-    <tr><td class="n">4</td><td><strong>段距 8/16/28 → 8/20/36</strong>（存疑，先比稿）</td><td class="m">app-main.css · items-errors.css</td><td class="qty">半天</td><td><span class="pill">要出图比稿</span></td></tr>
-    <tr><td class="n">6</td><td><strong>计划并进胶囊排</strong>：一枚胶囊 ＋ hover/点击浮层，标记抽成一个组件（四态一枚环）</td><td class="m">Between.tsx · PlanPanel.tsx · PlanSteps.tsx · plan.css</td><td class="qty">1.5 天</td><td><span class="pill pill--no">动结构</span></td></tr>
-    <tr><td class="n">7</td><td><strong>档位挪到发送侧</strong></td><td class="m">ComposerBar.tsx · items-composer.css</td><td class="qty">2 小时</td><td><span class="pill">动 JSX 顺序</span></td></tr>
-    <tr><td class="n">8</td><td><strong>用量表三修</strong>：百分比出来、label 定宽、累计出来</td><td class="m">usage.ts · ContextMeter.tsx</td><td class="qty">半天</td><td><span class="pill pill--go">不动协议</span></td></tr>
-    <tr><td class="n">9</td><td><strong>字号过一遍</strong>：立「要读的 13 / 扫的 11.5」，收编 12px 那 10 处</td><td class="m">tokens.css ＋ styles/*.css</td><td class="qty">1 天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
-    <tr><td class="n">10</td><td><strong>缓存命中</strong>：<code>Usage.cacheRead?</code> ＋ 三家引擎接上 ＋ 表里显示</td><td class="m">protocol · claude/kimi/acp · usage.ts</td><td class="qty">1 天</td><td><span class="pill pill--no">动协议</span></td></tr>
+    <tr><td class="n">03</td><td><strong>灰阶</strong>：白 ＋ 黑，其余全是黑的透明度；结构线留强档</td><td class="m">tokens.css</td><td class="qty">半天</td><td><span class="pill pill--go">纯 token</span></td></tr>
+    <tr><td class="n">04</td><td><strong>语义色</strong>：只动 warn / accent 两个，填充上全过 AA</td><td class="m">tokens.css</td><td class="qty">半天</td><td><span class="pill pill--go">纯 token</span></td></tr>
+    <tr><td class="n">01</td><td><strong>圆角阶梯</strong>：加 <code>--radius-xs</code>，抬三档，过一遍 46 处</td><td class="m">tokens.css ＋ 各处 radius</td><td class="qty">1 天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
+    <tr><td class="n">05</td><td><strong>变更胶囊补完定宽</strong>，三处宽度算式统一</td><td class="m">items-turns.css · Changed.tsx · plan.css</td><td class="qty">2 小时</td><td><span class="pill">一个 span</span></td></tr>
+    <tr><td class="n">02</td><td><strong>段距 8/16/28 → 8/20/36</strong>（存疑，先比稿）</td><td class="m">app-main.css · items-errors.css</td><td class="qty">半天</td><td><span class="pill">要出图比稿</span></td></tr>
+    <tr><td class="n">07</td><td><strong>计划并进胶囊排</strong>：一枚胶囊 ＋ hover/点击浮层，标记抽成一个组件（四态一枚环）</td><td class="m">Between.tsx · PlanPanel.tsx · PlanSteps.tsx · plan.css</td><td class="qty">1.5 天</td><td><span class="pill pill--no">动结构</span></td></tr>
+    <tr><td class="n">06</td><td><strong>推理强度拎出来做滑块</strong>，放进发送键左边那块空地</td><td class="m">ModelPicker.tsx ＋ 新控件 · app-composer.css</td><td class="qty">1 天</td><td><span class="pill">新控件</span></td></tr>
+    <tr><td class="n">10</td><td><strong>用量表三修</strong>：百分比出来、label 定宽、累计出来</td><td class="m">usage.ts · ContextMeter.tsx</td><td class="qty">半天</td><td><span class="pill pill--go">不动协议</span></td></tr>
+    <tr><td class="n">11</td><td><strong>侧栏悬浮卡</strong>：hover 出路径 / 引擎 / 状态原文，撤掉 title</td><td class="m">SidebarRows.tsx · RowEnd.tsx · app-sidebar.css</td><td class="qty">半天</td><td><span class="pill">新浮层</span></td></tr>
+    <tr><td class="n">08</td><td><strong>字号过一遍</strong>：立「要读的 13 / 扫的 11.5」，收编 12px 那 10 处</td><td class="m">tokens.css ＋ styles/*.css</td><td class="qty">1 天</td><td><span class="pill pill--go">纯 CSS</span></td></tr>
+    <tr><td class="n">09</td><td><strong>缓存命中</strong>：<code>Usage.cacheRead?</code> ＋ 三家引擎接上 ＋ 表里显示</td><td class="m">protocol · claude/kimi/acp · usage.ts</td><td class="qty">1 天</td><td><span class="pill pill--no">动协议</span></td></tr>
   </tbody>
 </table>
-<p>合计约 <strong>六天半</strong>。拆开看是三堆：<strong>值改动</strong>（1–5、7、9，约四天，几乎全在 CSS 和 token 表里）、<strong>计划胶囊</strong>（6，一天半，动结构）、<strong>缓存命中</strong>（10，一天，动协议）。</p>
-<p>如果只做一天：<strong>1、2、5、8</strong>——灰阶、语义色、变更胶囊定宽、用量表三修。前两条把「两档文字其实是一档」和「warn 没过 AA」修掉，后两条把两处「目标会自己挪走」修掉。<strong>这四条互不依赖，也不动任何组件结构。</strong></p>
+<p>合计约 <strong>八天半</strong>。拆开看是三堆：<strong>值改动</strong>（01–05、08、10，约四天，几乎全在 CSS 和 token 表里）、<strong>往界面上加东西</strong>（06、07、11，三天：滑块加控件、胶囊动结构、悬浮卡加浮层，都在 renderer）、<strong>缓存命中</strong>（09，一天，动协议）。</p>
+<p>如果只做一天：<strong>03、04、05、10</strong>——灰阶、语义色、变更胶囊定宽、用量表三修。前两条把「两档文字其实是一档」和「warn 没过 AA」修掉，后两条把两处「目标会自己挪走」修掉。<strong>这四条互不依赖，也不动任何组件结构。</strong></p>
 
 <hr class="rule">
 <h2 class="sec">收回</h2>
@@ -1150,7 +1244,7 @@ warn 4.68:1 · danger 5.14:1 · ok 5.23:1 —— 都在 45–49 这一档</div>
 </div>
 
 <hr class="rule">
-<p class="col" style="color:var(--ink-3);font-size:13.5px;line-height:1.8">对比度按 WCAG 相对亮度公式算：<code>L = 0.2126R + 0.7152G + 0.0722B</code>（分量先做 sRGB 反伽马），<code>(L₁+0.05)/(L₂+0.05)</code>。每个颜色都报两个底：浅色下是纯白 <code>--bg</code> 和凹面 <code>--bg-sunken</code>，深色下是 <code>--bg</code> 和 <code>--bg-sunken</code>。L* 是 CIE 明度，用来比「差多少档」——对比度比值在深色一侧会骗人，L* 不会。圆角用量是数 <code>styles/*.css</code> 里 <code>var(--radius*)</code> 的出现次数得到的。</p>
+<p class="col" style="color:var(--ink-3);font-size:13.5px;line-height:1.8">对比度按 WCAG 相对亮度公式算：<code>L = 0.2126R + 0.7152G + 0.0722B</code>（分量先做 sRGB 反伽马），<code>(L₁+0.05)/(L₂+0.05)</code>。每个颜色都报两个底：浅色下是纯白和黑 4% 的填充，深色下是纯黑和白 8% 的填充；透明度档按叠底合成后的值报。L* 是 CIE 明度，用来比「差多少档」——对比度比值在深色一侧会骗人，L* 不会。圆角用量是数 <code>styles/*.css</code> 里 <code>var(--radius*)</code> 的出现次数得到的。</p>
 
 </div>
 
