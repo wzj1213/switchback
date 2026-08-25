@@ -31,8 +31,14 @@ const electron = createRequire(join(DESKTOP, "package.json"))("electron")
 
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
 const DARK = process.argv.includes("--dark")
-/** 固定窗口尺寸：前后两张图的像素必须能直接叠着比。 */
-const SIZE = { width: 1280, height: 860 }
+/**
+ * 固定窗口尺寸：前后两张图的像素必须能直接叠着比。
+ *
+ * `--min` 换成**这个应用允许的最小窗口**（`main/index.ts` 的 minWidth/minHeight）。
+ * 那一档值得单独拍：布局塌不塌只在那儿看得出来，而平时没人会把窗口拖到那么小。
+ */
+const MIN = process.argv.includes("--min")
+const SIZE = MIN ? { width: 860, height: 560 } : { width: 1280, height: 860 }
 /** 样本的时间戳写死。**不能用 `Date.now()`**——侧栏上那些「3 小时前」会每次都不一样。 */
 const AT = 1_756_000_000_000
 
