@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react"
 import type { ThreadId } from "@omni/protocol"
 import type { Sealed } from "@omni/wire"
-import { absorb, createScope, retarget } from "./flow-scope.js"
-import { clearMeter, createMeter, mark, rateOf } from "./throughput.js"
+import { createScope, drain, retarget } from "./flow-scope.js"
+import { clearMeter, createMeter, rateOf } from "./throughput.js"
 
 /**
  * 这一条会话此刻吐得多快（token/秒）。
@@ -44,10 +44,7 @@ export function useFlow(thread: ThreadId | undefined): () => number {
     const bridge = typeof window === "undefined" ? undefined : window.omni
     if (bridge === undefined) return undefined
     return bridge.subscribe((sealed: readonly Sealed[]) => {
-      const now = performance.now()
-      let bytes = 0
-      for (const one of sealed) bytes += absorb(scope.current, one.event)
-      if (bytes > 0) mark(meter.current, now, bytes)
+      drain(scope.current, meter.current, sealed, performance.now())
     })
   }, [])
 

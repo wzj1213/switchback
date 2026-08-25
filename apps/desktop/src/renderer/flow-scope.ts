@@ -1,4 +1,6 @@
 import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
+import type { Sealed } from "@omni/wire"
+import { mark, type Meter } from "./throughput.js"
 
 /**
  * 「这条 delta 是不是**这一条会话**吐出来的」。
@@ -94,4 +96,21 @@ export function byteLength(s: string): number {
     } else n += 3
   }
   return n
+}
+
+/**
+ * 吃一批事件，把属于这条会话的字节记进流速表。
+ *
+ * 抽出来是为了**它能被测**：留在 hook 里的话，这几行——「一批一次、
+ * 一个字节都没有就别记、时间戳用收到的时刻」——就只能靠肉眼保证，
+ * 而它们恰恰是整条链上最容易错的地方（照仓库里 `usePetMood` 的老规矩：
+ * 逻辑抽出来测，hook 只剩订阅）。
+ *
+ * **一批只记一笔**：主进程已经合过帧（`main/batch.ts`），
+ * 这里再逐条记等于把一次网络往返拆成十几个样本，滑窗会被同一批字撑出假的峰值。
+ */
+export function drain(scope: Scope, meter: Meter, sealed: readonly Sealed[], now: number): void {
+  let bytes = 0
+  for (const one of sealed) bytes += absorb(scope, one.event)
+  if (bytes > 0) mark(meter, now, bytes)
 }
