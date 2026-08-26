@@ -129,6 +129,7 @@ export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick,
         onPick={onPick} searchFiles={searchFiles} />
       {target === undefined ? null : (
         <FilePreviewView target={target} revision={revision} stamp={stamp}
+          active={active !== false}
           onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
           onReveal={onReveal} onCopy={onCopy} />
       )}

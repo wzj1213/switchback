@@ -5,6 +5,7 @@
  * 把“点击没生效”拍成一张看似正常的重复截图。
  */
 import { COMPOSE_VIEWS } from "./shot-views-compose.mjs"
+import { FILE_REFRESH_VIEWS } from "./shot-views-file-refresh.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 export const VIEWS = [
     { name: "01-转录区", open: null, ready: ".md" },
@@ -208,30 +209,7 @@ export const VIEWS = [
         && document.querySelector('.files-index') === window.__omniFileIndex
         && document.activeElement?.matches('.files-search input') === true`,
     },
-    {
-      name: "09-搜索持续刷新",
-      createFiles: ["apps/desktop/src/renderer/attachment-live-refresh-probe.ts"],
-      open: `(() => {
-        window.__omniRefreshProbe = setInterval(() => {
-          const found = [...document.querySelectorAll('.file-row')]
-            .find(row => row.textContent.includes('attachment-live-refresh-probe.ts'))
-          if (found === undefined) return
-          found.scrollIntoView({ block: 'nearest' })
-          clearInterval(window.__omniRefreshProbe)
-          document.documentElement.dataset.fileRefresh = 'ready'
-        }, 50)
-        window.dispatchEvent(new Event('focus'))
-      })()`,
-      ready: "html[data-file-refresh=ready]",
-      assert: `document.querySelector('.files-search input')?.value === 'attachment'
-        && document.querySelector('.files-index') === window.__omniFileIndex
-        && document.querySelector('.files-index')?.textContent.includes('attachment-live-refresh-probe.ts') === true
-        && document.activeElement?.matches('.files-search input') === true`,
-      after: `(() => {
-        clearInterval(window.__omniRefreshProbe); delete window.__omniRefreshProbe
-        delete document.documentElement.dataset.fileRefresh
-      })()`,
-    },
+    ...FILE_REFRESH_VIEWS,
     {
       name: "09-切页重开保留",
       open: [
