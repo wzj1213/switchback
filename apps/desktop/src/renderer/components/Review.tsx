@@ -126,13 +126,13 @@ export function Review({ cwd, threadId, stamp, wanted, onClose, onCopy }: {
       <div className="rv" ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-label="审核改动">
         <header className="rv__head">
           <h2 className="rv__title">审核</h2>
-          <ReviewSummary
-            state={{ noRepo: data.noRepo, loading: data.loading, failed: data.failed,
-              baseline: data.baseline, total, unverified,
-              ...(data.more === undefined ? {} : { more: data.more }) }}
-            added={added}
-            removed={removed}
-          />
+          <div className="rv__summary"><ReviewSummary
+              state={{ noRepo: data.noRepo, loading: data.loading, failed: data.failed,
+                baseline: data.baseline, total, unverified,
+                ...(data.more === undefined ? {} : { more: data.more }) }}
+              added={added}
+              removed={removed}
+            /></div>
           <Tools
             split={split}
             onSplit={setSplit}

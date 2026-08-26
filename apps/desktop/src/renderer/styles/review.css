@@ -49,6 +49,14 @@
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.rv__summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-2);
 }
 
 .rv__count {
@@ -69,6 +77,7 @@
 }
 
 .rv__seg {
+  flex: none;
   padding: 3px var(--sp-2);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -76,6 +85,7 @@
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -105,6 +115,47 @@
 .rv__close:hover {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+/*
+ * 最小窗口的顶栏分两层：身份与结论在第一层，怎么看这份 diff 在第二层。
+ * 原来全部挤在一条 flex 里，860px 下「审核 / 并排 / 整个文件」会逐字竖排，
+ * 控件虽还点得到，却已经读不成一句话。
+ */
+@media (max-width: 1000px) {
+  .rv__head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .rv__summary {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .rv__summary .rv__count {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rv__tools {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .rv__tools::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rv__close {
+    grid-row: 1;
+    grid-column: 3;
+  }
 }
 
 .rv__body {

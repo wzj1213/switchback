@@ -18,7 +18,14 @@ export const VIEWS = [
       open: `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === '审核')?.click()`,
       ready: ".rv .rvd__body",
       assert: `document.querySelector('.rv__file') !== null
-        && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')`,
+        && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')
+        && (window.innerWidth > 1000 || (() => {
+          const title = document.querySelector('.rv__title')?.getBoundingClientRect()
+          const tools = document.querySelector('.rv__tools')?.getBoundingClientRect()
+          const buttons = [...document.querySelectorAll('.rv__seg')].map(button => button.getBoundingClientRect())
+          return title !== undefined && tools !== undefined && tools.top >= title.bottom
+            && buttons.every(button => button.height < 40 && button.width > 24)
+        })())`,
       after: `document.querySelector('.rv__close')?.click()`,
     },
     {
