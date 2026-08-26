@@ -100,6 +100,8 @@ export interface ComposerProps {
   reference?: ComposerFileReference
   /** 从当前任务画布拖入文件后，收起可能挡在输入框前面的工作台。 */
   onFilesDropped: () => void
+  /** 工作台展开时，拖放提示要提升到抽屉之上，不能继续藏在输入卡里。 */
+  workbenchVisible: boolean
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */

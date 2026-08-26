@@ -26,7 +26,7 @@ import axe from "axe-core"
 import WebSocket from "ws"
 import { mainThread, stubThread } from "./ui-fixture.mjs"
 import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
-import { exerciseFileDrop } from "./shot-file-drop.mjs"
+import { completeFileDrop, dragIntoView } from "./shot-file-drop.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
 import { VIEWS } from "./shot-views.mjs"
 
@@ -35,7 +35,8 @@ const DESKTOP = join(ROOT, "apps/desktop")
 const electron = createRequire(join(DESKTOP, "package.json"))("electron")
 
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
-const DARK = process.argv.includes("--dark"), REDUCED = process.argv.includes("--reduce")
+const DARK = process.argv.includes("--dark"),
+  REDUCED = process.argv.includes("--reduce")
 /** 巡检时审整套界面；普通出图仍只审场景自己声明的关键状态，避免拖慢每次比稿。 */
 const AUDIT_ALL = process.argv.includes("--audit")
 /** 桌宠靶场改动：用隔离数据目录真跑一轮 Claude，拍到枪、靶与逐字流。 */
@@ -130,21 +131,25 @@ async function waitFor(cdp, expression, label) {
 
 async function audit(cdp, label, enabled) {
   if (!enabled) return
-  const violations = await value(cdp, `axe.run(document, {
+  const violations = await value(
+    cdp,
+    `axe.run(document, {
     runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
   }).then(result => result.violations.map(one => ({
     id: one.id,
     nodes: one.nodes.map(node => ({ target: node.target, summary: node.failureSummary })),
-  })))`)
-  if (violations.length > 0) throw new Error(`${label} 有 axe A/AA 违规：${JSON.stringify(violations)}`)
+  })))`,
+  )
+  if (violations.length > 0)
+    throw new Error(`${label} 有 axe A/AA 违规：${JSON.stringify(violations)}`)
   console.log(`  ✓ ${label} 没有 axe A/AA 违规`)
 }
 
 function audits(view) {
   return AUDIT_ALL || view.audit === true
 }
-
 async function shoot(cdp, view) {
+  let heldDrop
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
   }
@@ -158,14 +163,12 @@ async function shoot(cdp, view) {
       await value(cdp, `(() => { ${step}; return true })()`)
       await pause(350)
     }
-    if (view.dragFiles !== undefined) {
-      await exerciseFileDrop(
-        { value, pause }, cdp, view.dragFiles.map((path) => join(ROOT, path)), view.dragTarget,
-      )
-      await waitFor(cdp, "document.querySelector('.send:not(:disabled)') !== null", `${view.name} 可发送态`)
-    }
+    heldDrop = await dragIntoView({ value, pause, waitFor, root: ROOT }, cdp, view)
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
-    if (view.absent !== undefined && await value(cdp, `document.querySelector('${view.absent}') !== null`)) {
+    if (
+      view.absent !== undefined &&
+      (await value(cdp, `document.querySelector('${view.absent}') !== null`))
+    ) {
       throw new Error(`${view.name} 仍残留不该出现的 ${view.absent}`)
     }
     if (view.assert !== undefined && !(await value(cdp, view.assert))) {
@@ -185,6 +188,8 @@ async function shoot(cdp, view) {
     await value(cdp, `(() => { ${view.after}; return true })()`)
     await pause(120)
   }
+  await completeFileDrop({ pause }, cdp, heldDrop)
+  await pause(120)
 }
 
 /**

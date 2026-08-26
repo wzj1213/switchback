@@ -63,6 +63,14 @@
   font-weight: 600;
 }
 
+/* 抽屉打开时输入卡在遮罩下面；提示提升到任务表面，但仍不给侧栏染色。 */
+.composer-drop--surface {
+  position: fixed;
+  z-index: 65;
+  inset: 0 0 0 var(--sidebar-w);
+  border-radius: 0;
+}
+
 /* 焦点进出都走同一条过渡，深空那圈才不会「淡入、硬切出」 */
 .composer__inner {
   transition:

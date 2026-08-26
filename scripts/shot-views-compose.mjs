@@ -1,4 +1,6 @@
 /** Composer、图片与后续入口的固定场景；从主清单拆出，避免验收脚本再次长成大文件。 */
+import { MODEL_VIEWS } from "./shot-views-model.mjs"
+
 export const COMPOSE_VIEWS = [
   {
     name: "12-切会话保留草稿",
@@ -106,10 +108,22 @@ export const COMPOSE_VIEWS = [
     assert: `document.activeElement?.classList.contains('composer__input') === true && document.querySelector('[aria-label="添加文件或图片"]')?.disabled === false`,
   },
   {
-    name: "14-工作台也能接文件",
+    name: "14-工作台拖放提示",
     open: `document.querySelector('[title="文件预览"]')?.click()`,
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
     dragTarget: ".workbench__body",
+    holdDrag: true,
+    ready: ".composer-drop--surface",
+    assert: `(() => {
+      const hint = document.querySelector('.composer-drop--surface')?.getBoundingClientRect()
+      const main = document.querySelector('.main')?.getBoundingClientRect()
+      return hint !== undefined && main !== undefined
+        && Math.abs(hint.left - main.left) < 1 && Math.abs(hint.right - innerWidth) < 1
+    })()`,
+  },
+  {
+    name: "14-工作台也能接文件",
+    open: [],
     ready: ".composer__attachwarn",
     absent: ".workbench:not([hidden])",
     assert: `document.querySelector('.composer__input')?.value
@@ -122,6 +136,15 @@ export const COMPOSE_VIEWS = [
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
     })()`,
+  },
+  {
+    name: "14-侧栏仍不接文件",
+    open: `document.querySelector('[title="文件预览"]')?.click()`,
+    dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
+    rejectDragTarget: ".sidebar",
+    ready: ".workbench:not([hidden])",
+    assert: `document.querySelector('.composer-drop') === null
+      && document.querySelector('.composer__input')?.value === ''`,
   },
   {
     name: "15-工作台文件预览",
@@ -190,102 +213,7 @@ export const COMPOSE_VIEWS = [
       input?.dispatchEvent(new Event('input', { bubbles: true }))
     })()`,
   },
-  {
-    name: "18-模型菜单焦点",
-    before: ".composer__bar .trigger:not(:disabled)",
-    open: `(() => {
-      const triggers = [...document.querySelectorAll('.composer__bar .trigger:not(:disabled)')]
-      const model = triggers.find(button => button.textContent.includes('Default')) ?? triggers.at(-1)
-      model?.click()
-      setTimeout(() => {
-        const menu = document.querySelector('.pop [role="menu"]')
-        menu?.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'ArrowDown', bubbles: true, cancelable: true,
-        }))
-        const held = document.activeElement
-        const input = document.querySelector('.composer__input')
-        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
-        setter?.call(input, '触发父级重渲染')
-        input?.dispatchEvent(new Event('input', { bubbles: true }))
-        setTimeout(() => {
-          document.documentElement.dataset.modelFocus = JSON.stringify({
-            same: document.activeElement === held,
-            heldRole: held?.getAttribute('role'),
-            heldText: held?.textContent.trim(),
-            currentRole: document.activeElement?.getAttribute('role'),
-            currentText: document.activeElement?.textContent.trim(),
-            menuOpen: document.querySelector('.pop [role="menu"]') !== null,
-          })
-        }, 80)
-      }, 80)
-    })()`,
-    ready: `html[data-model-focus]`,
-    assert: `(() => {
-      const result = JSON.parse(document.documentElement.dataset.modelFocus ?? '{}')
-      if (result.same === true && result.heldRole === 'menuitem') return true
-      throw new Error('模型菜单焦点诊断：' + JSON.stringify(result))
-    })()`,
-    after: `(() => {
-      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'Escape', bubbles: true, cancelable: true,
-      }))
-      delete document.documentElement.dataset.modelFocus
-      const input = document.querySelector('.composer__input')
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
-      setter?.call(input, '')
-      input?.dispatchEvent(new Event('input', { bubbles: true }))
-    })()`,
-  },
-  {
-    name: "18-超长模型名不出界",
-    before: ".composer__bar .trigger:not(:disabled):not(.trigger--open)",
-    open: `(() => {
-      const triggers = [...document.querySelectorAll('.composer__bar .trigger:not(:disabled)')]
-      const model = triggers.find(button => button.textContent.includes('Default')) ?? triggers.at(-1)
-      model?.click()
-      setTimeout(() => {
-        const panel = document.querySelector('.pop')
-        const value = panel?.querySelector('.pop__value')
-        const label = 'enterprise-reasoning-model-with-extended-context-and-recommended-safety-profile-v2026-preview-'.repeat(3)
-        if (value !== null && value !== undefined) {
-          value.textContent = label
-          value.title = label
-        }
-        setTimeout(() => {
-          const rect = panel?.getBoundingClientRect()
-          document.documentElement.dataset.popoverBounds = JSON.stringify({
-            inside: rect !== undefined && rect.left >= 7 && rect.right <= innerWidth - 7,
-            noHorizontalScroll: panel !== null && panel.scrollWidth <= panel.clientWidth + 1,
-            fullLabelAvailable: value?.title === label,
-            left: rect?.left,
-            right: rect?.right,
-            viewport: innerWidth,
-            clientWidth: panel?.clientWidth,
-            scrollWidth: panel?.scrollWidth,
-          })
-        }, 120)
-      }, 80)
-    })()`,
-    ready: `html[data-popover-bounds]`,
-    assert: `(() => {
-      const result = JSON.parse(document.documentElement.dataset.popoverBounds ?? '{}')
-      if (result.inside && result.noHorizontalScroll && result.fullLabelAvailable) return true
-      throw new Error('超长模型名浮层诊断：' + JSON.stringify(result))
-    })()`,
-    after: `(() => {
-      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', {
-        key: 'Escape', bubbles: true, cancelable: true,
-      }))
-      delete document.documentElement.dataset.popoverBounds
-    })()`,
-  },
-  {
-    name: "18-推理强度",
-    before: ".effort .trigger:not(:disabled):not(.trigger--open)",
-    open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
-    ready: ".effort__bar--grown",
-    dragEffort: true,
-  },
+  ...MODEL_VIEWS,
   {
     name: "19-设置",
     open: [

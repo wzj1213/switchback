@@ -47,7 +47,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
     <div className="composer">
       <div className="composer__inner">
         <ComposerRing />
-        <AttachmentDrop hint={files.dropzone.hint} />
+        <AttachmentDrop hint={files.dropzone.hint} surface={composer.workbenchVisible} />
         {detached ? null : (
           <Chips
             threadId={composer.threadId}

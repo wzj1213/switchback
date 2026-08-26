@@ -33,10 +33,20 @@ interface Options {
   drop: (files: FileList | null) => void
 }
 
-const TASK_SURFACE = ".main, .workbench:not([hidden]), .workbench__scrim"
+const TASK_SURFACE = ".main, .workbench:not([hidden])"
+
+function inTaskScrim(event: DragEvent, target: Element): boolean {
+  if (target.closest(".workbench__scrim") === null) return false
+  const main = document.querySelector(".main")
+  return main !== null && event.clientX >= main.getBoundingClientRect().left
+}
 
 function inTaskSurface(event: DragEvent): boolean {
-  return event.target instanceof Element && event.target.closest(TASK_SURFACE) !== null
+  const target = event.target
+  return (
+    target instanceof Element &&
+    (target.closest(TASK_SURFACE) !== null || inTaskScrim(event, target))
+  )
 }
 
 function transferOf(event: DragEvent): DataTransfer | undefined {

@@ -1,10 +1,21 @@
+import { createPortal } from "react-dom"
 import type { DropHint } from "../attachment-feedback.js"
 
-export function AttachmentDrop({ hint }: { hint: DropHint | undefined }): React.JSX.Element | null {
+export function AttachmentDrop({
+  hint,
+  surface,
+}: {
+  hint: DropHint | undefined
+  surface: boolean
+}): React.JSX.Element | React.ReactPortal | null {
   if (hint === undefined) return null
-  return (
-    <div className={`composer-drop composer-drop--${hint.tone}`} role="status">
+  const overlay = (
+    <div
+      className={`composer-drop composer-drop--${hint.tone}${surface ? " composer-drop--surface" : ""}`}
+      role="status"
+    >
       <span>{hint.text}</span>
     </div>
   )
+  return surface && typeof document !== "undefined" ? createPortal(overlay, document.body) : overlay
 }
