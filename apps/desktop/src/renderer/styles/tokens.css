@@ -91,11 +91,11 @@
   --text-faint: rgb(var(--ink) / 62%);
   --text-inverse: #ffffff;
 
-  /* 语义。warn / accent 在填充上没过 AA，加深到合格；danger / ok 本来就够，不动 */
+  /* 语义。都按它们会出现的最深正文底核过 AA；ok 还会落在选中行的 7% 填充上。 */
   --accent: #3568c8;
   --danger: #c2412d;
   --warn: #8a6410;
-  --ok: #2f7a4d;
+  --ok: #2b7248;
 
   /*
    * 度量。**圆角 ≈ 高 ÷ 4**：22px 的行内按钮是 xs，32px 的行和按钮是 sm，

@@ -2,7 +2,7 @@
 /**
  * 给桌面端出图。**界面改动的唯一验收方式。**
  *
- * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min] [--reduce]`
+ * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min] [--reduce] [--audit]`
  *
  * ## 为什么不用 `OMNI_DEV_SHOT`
  *
@@ -36,6 +36,8 @@ const electron = createRequire(join(DESKTOP, "package.json"))("electron")
 
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
 const DARK = process.argv.includes("--dark"), REDUCED = process.argv.includes("--reduce")
+/** 巡检时审整套界面；普通出图仍只审场景自己声明的关键状态，避免拖慢每次比稿。 */
+const AUDIT_ALL = process.argv.includes("--audit")
 /** 桌宠靶场改动：用隔离数据目录真跑一轮 Claude，拍到枪、靶与逐字流。 */
 const PET_LIVE = process.argv.includes("--pet-live")
 /**
@@ -138,6 +140,10 @@ async function audit(cdp, label, enabled) {
   console.log(`  ✓ ${label} 没有 axe A/AA 违规`)
 }
 
+function audits(view) {
+  return AUDIT_ALL || view.audit === true
+}
+
 async function shoot(cdp, view) {
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
@@ -163,10 +169,10 @@ async function shoot(cdp, view) {
     if (view.assert !== undefined && !(await value(cdp, view.assert))) {
       throw new Error(`${view.name} 没有满足验收表达式：${view.assert}`)
     }
-    await audit(cdp, view.name, view.audit === true)
     if (view.dragEffort === true) await exerciseEffort({ value, pause }, cdp)
     await pause(600)
   }
+  await audit(cdp, view.name, audits(view))
   const shot = await cdp.send("Page.captureScreenshot", {
     format: "png",
     captureBeyondViewport: false,
@@ -195,6 +201,7 @@ async function shootSettings(cdp) {
     await value(cdp, `document.querySelectorAll('.set__tab')[${i}]?.click(); true`)
     // 异步那两页要等内容到齐，否则拍到的是「正在读…」
     await pause(1400)
+    await audit(cdp, `设置-${name}`, AUDIT_ALL)
     const shot = await cdp.send("Page.captureScreenshot", { format: "png" })
     const file = `设置-${String(i + 1).padStart(2, "0")}-${name}.png`
     await writeFile(join(OUT, file), Buffer.from(shot.data, "base64"))
