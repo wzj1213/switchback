@@ -107,12 +107,12 @@ function fillActivity(out, frame) {
   })
 }
 
-function missingFileRead() {
+function fileRead(path, status) {
   return {
     kind: "tool_call",
     tool: "Read",
-    status: "done",
-    detail: { kind: "file_read", path: "missing-output.txt" },
+    status,
+    detail: { kind: "file_read", path },
   }
 }
 
@@ -131,13 +131,13 @@ function fill(push, cwd, externalPath) {
     text: "先看 useFlow 现在的形状：它订阅 bridge，把每一批 sealed 事件里属于当前会话的字节记进滑窗。要抽的是「哪些字节算数」和「怎么记」这两件事。",
   })
   push({
-    kind: "tool_call", tool: "Read", status: "done",
+    kind: "tool_call", tool: "Read", status: "ok",
     detail: { kind: "file_read", path: "apps/desktop/src/renderer/useFlow.ts" },
   })
   push({
     kind: "tool_call",
     tool: "Bash",
-    status: "done",
+    status: "ok",
     detail: {
       kind: "shell",
       command: "grep -rn \"item.delta\" apps/desktop/src/renderer | head",
@@ -159,7 +159,7 @@ function fill(push, cwd, externalPath) {
   push({
     kind: "tool_call",
     tool: "Edit",
-    status: "done",
+    status: "ok",
     detail: {
       kind: "file_edit",
       path: "apps/desktop/src/renderer/flow-scope.ts",
@@ -172,11 +172,12 @@ function fill(push, cwd, externalPath) {
     push({
       kind: "tool_call",
       tool: "Read",
-      status: "done",
+      status: "ok",
       detail: { kind: "file_read", path: externalPath },
     })
   }
-  push(missingFileRead())
+  push(fileRead("missing-output.txt", "ok"))
+  push(fileRead("/tmp/failed-secret.txt", "failed"))
   push(answerOf())
 }
 

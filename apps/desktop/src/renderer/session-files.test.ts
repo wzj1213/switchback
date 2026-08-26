@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest"
-import type { Item } from "@omni/protocol"
+import type { Item, ToolStatus } from "@omni/protocol"
 import { fileTouchOf, sessionFilesOf } from "./session-files.js"
 
-const tool = (id: string, at: number, detail: Extract<Item, { kind: "tool_call" }>["detail"]): Item => ({
+const tool = (
+  id: string,
+  at: number,
+  detail: Extract<Item, { kind: "tool_call" }>["detail"],
+  status: ToolStatus = "ok",
+): Item => ({
   id,
   turnId: "turn-1",
   kind: "tool_call",
   tool: "test",
-  status: "ok",
+  status,
   at,
   detail,
 })
@@ -55,12 +60,30 @@ describe("任务文件清单", () => {
     ])
   })
 
+  it("失败与未完成的路径不进清单；删除后成功读到会恢复入口", () => {
+    const deleted = tool("d", 1, {
+      kind: "file_edit", path: "back.txt",
+      files: [{ path: "back.txt", kind: "delete", added: 0, removed: 1 }],
+      added: 0, removed: 1,
+    })
+    const restored = tool("r", 5, { kind: "file_read", path: "back.txt" })
+    const failed = tool("f", 6, { kind: "file_read", path: "secret.txt" }, "failed")
+    const running = tool("p", 7, { kind: "file_read", path: "pending.txt" }, "running")
+
+    expect(sessionFilesOf([deleted, restored, failed, running], "/work")).toEqual([
+      { path: "/work/back.txt", at: 5, action: "删除", deleted: false },
+    ])
+    expect(fileTouchOf([restored, failed], "/work", "secret.txt")).toBeUndefined()
+  })
+
   it("预览刷新只跟当前文件最近一次触达的对象走", () => {
     const first = tool("a1", 1, {
       kind: "file_edit", path: "src/a.ts", files: [], added: 1, removed: 0,
     })
     const other = tool("b", 2, { kind: "file_read", path: "src/b.ts" })
     const latest = tool("a2", 3, { kind: "file_read", path: "./src/a.ts" })
+    const failed = tool("a3", 4, { kind: "file_read", path: "src/a.ts" }, "failed")
+    expect(fileTouchOf([first, latest, failed], "/work", "/work/src/a.ts")).toBe(latest)
     expect(fileTouchOf([first, other, latest], "/work", "/work/src/a.ts")).toBe(latest)
     expect(fileTouchOf([first, other], "/work", "/work/src/a.ts")).toBe(first)
     expect(fileTouchOf([other], "/work", "/work/src/a.ts")).toBeUndefined()

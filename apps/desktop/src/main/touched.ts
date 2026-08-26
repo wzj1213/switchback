@@ -56,7 +56,7 @@ export function createTouchedFiles(): TouchedFiles {
 
   const record = (threadId: ThreadId, event: Event): void => {
     if (event.type !== "item.started" && event.type !== "item.updated") return
-    if (event.item.kind !== "tool_call") return
+    if (event.item.kind !== "tool_call" || event.item.status !== "ok") return
     const paths = threads.get(threadId) ?? new Map<string, true>()
     touch(threads, threadId, paths, THREADS)
     for (const path of pathsOf(event.item)) if (path !== "") touch(paths, path, true, PATHS)

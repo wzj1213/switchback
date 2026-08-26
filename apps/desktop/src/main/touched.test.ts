@@ -1,4 +1,4 @@
-import type { Event, Item, ThreadId } from "@omni/protocol"
+import type { Event, Item, ThreadId, ToolStatus } from "@omni/protocol"
 import { describe, expect, it } from "vitest"
 import { createTouchedFiles } from "./touched.js"
 
@@ -8,10 +8,10 @@ const turn = (id: string, threadId: string): Event => ({
   turn: { id, threadId: threadId as ThreadId, engine: "kimi", status: "running", startedAt: 1 },
 })
 
-const read = (turnId: string, path: string): Event => ({
-  type: "item.started",
+const read = (turnId: string, path: string, status: ToolStatus = "ok", updated = false): Event => ({
+  type: updated ? "item.updated" : "item.started",
   at: 2,
-  item: { id: `it-${path}`, turnId, at: 2, kind: "tool_call", tool: "Read", status: "ok",
+  item: { id: `it-${path}`, turnId, at: 2, kind: "tool_call", tool: "Read", status,
     detail: { kind: "file_read", path } } satisfies Item,
 })
 
@@ -51,6 +51,22 @@ describe("会话碰过的文件名册", () => {
 
     touched.noteHistory("th-1", [read("tn-old", "/tmp/old.md"), turn("tn-old", "th-9")])
     expect(touched.allows("th-1", "/work", "/tmp/old.md")).toBe(true)
+  })
+
+  it("直播与历史都只放行成功的文件工具", () => {
+    const touched = createTouchedFiles()
+    touched.note(turn("tn-1", "th-1"))
+    const statuses: readonly ToolStatus[] = ["pending", "running", "failed", "denied", "interrupted"]
+    for (const status of statuses) {
+      const path = `/tmp/${status}.md`
+      touched.note(read("tn-1", path, status))
+      touched.noteHistory("th-1", [read("tn-old", `${path}.history`, status)])
+      expect(touched.allows("th-1", "/work", path)).toBe(false)
+      expect(touched.allows("th-1", "/work", `${path}.history`)).toBe(false)
+    }
+    touched.note(read("tn-1", "/tmp/eventual.md", "running"))
+    touched.note(read("tn-1", "/tmp/eventual.md", "ok", true))
+    expect(touched.allows("th-1", "/work", "/tmp/eventual.md")).toBe(true)
   })
 
   it("按会话与路径两级淘汰，最近碰过的留下", () => {

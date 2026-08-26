@@ -30,7 +30,7 @@ function put(
     path,
     at: Math.max(entry.at, before?.at ?? entry.at),
     action,
-    deleted: action === "删除",
+    deleted: entry.action === "删除",
   })
 }
 
@@ -38,7 +38,7 @@ function put(
 export function sessionFilesOf(items: readonly Item[], cwd: string): readonly SessionFile[] {
   const files = new Map<string, SessionFile>()
   for (const item of items) {
-    if (item.kind !== "tool_call") continue
+    if (item.kind !== "tool_call" || item.status !== "ok") continue
     if (item.detail.kind === "file_read") {
       put(files, cwd, { raw: item.detail.path, at: item.at, action: "读取" })
       continue
@@ -63,7 +63,7 @@ export function fileTouchOf(items: readonly Item[], cwd: string, raw: string): I
   const wanted = canonicalPath(raw, cwd)
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index]
-    if (item?.kind !== "tool_call") continue
+    if (item?.kind !== "tool_call" || item.status !== "ok") continue
     if (item.detail.kind === "file_read" && canonicalPath(item.detail.path, cwd) === wanted) return item
     if (item.detail.kind !== "file_edit") continue
     const paths = item.detail.files.length === 0

@@ -38,7 +38,8 @@ export const VIEWS = [
       name: "04-文件清单",
       open: `document.querySelector('[title="文件预览"]')?.click()`,
       ready: ".file-row",
-      assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')`,
+      assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
+        && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')`,
     },
     {
       name: "05-缺失文件可恢复",
