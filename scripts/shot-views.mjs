@@ -5,6 +5,7 @@
  * 把“点击没生效”拍成一张看似正常的重复截图。
  */
 import { COMPOSE_VIEWS } from "./shot-views-compose.mjs"
+import { ACTIVITY_VIEWS } from "./shot-views-activity.mjs"
 import { FILE_REFRESH_VIEWS } from "./shot-views-file-refresh.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 export const VIEWS = [
@@ -72,84 +73,7 @@ export const VIEWS = [
       })()`,
     },
     EDITABLE_REVIEW_VIEW,
-    {
-      name: "06-后台活动工作台",
-      open: [
-        `(() => {
-          window.__omniMainWidth = document.querySelector('.main')?.getBoundingClientRect().width
-          const resume = [...document.querySelectorAll('button')]
-            .find(button => button.textContent.trim() === '继续这个会话')
-          const resumeBox = resume?.getBoundingClientRect()
-          window.__omniResumeInline = resume === undefined || (resumeBox !== undefined
-            && resumeBox.width > resumeBox.height * 2 && resume.scrollWidth <= resume.clientWidth)
-          const button = document.querySelector('[title="后台活动"]')
-          button?.focus(); button?.click()
-        })()`,
-        `document.querySelector('.activity-row')?.click()`,
-        `(() => {
-          const command = document.querySelector('.lane-cmd-block code')
-          const output = document.querySelector('.lane-output code')
-          if (command === null || output === null) throw new Error('后台命令或输出没有就绪')
-          command.textContent = 'pnpm --filter @omni/desktop test -- --runInBand --reporter verbose --coverage --changedSince origin/main --testNamePattern keyboard-scroll-workbench'
-          output.textContent = Array.from({ length: 28 }, (_, index) =>
-            String(index + 1).padStart(2, '0') + '  renderer activity output line ready',
-          ).join('\\n')
-        })()`,
-      ],
-      ready: ".activity-detail",
-      assert: `(() => {
-        const command = document.querySelector('.lane-cmd-block pre')
-        const output = document.querySelector('.lane-output')
-        if (command === null || output === null) return false
-        const result = {
-          commandOverflows: command.scrollWidth > command.clientWidth,
-          commandFocusable: command.tabIndex === 0,
-          commandLabelled: command.getAttribute('aria-label') === '可横向滚动的后台命令',
-          outputOverflows: output.scrollHeight > output.clientHeight,
-          outputFocusable: output.tabIndex === 0,
-          outputLabelled: output.getAttribute('aria-label') === '可滚动的后台输出',
-        }
-        command.focus()
-        result.commandFocused = document.activeElement === command
-        result.copyVisible = Number(getComputedStyle(document.querySelector('.lane-cmd-block__copy')).opacity) > 0
-        const main = document.querySelector('.main')
-        const workbench = document.querySelector('.workbench')
-        const sidebar = document.querySelector('.sidebar')
-        const workbenchBox = workbench?.getBoundingClientRect()
-        const sidebarBox = sidebar?.getBoundingClientRect()
-        const mainBox = main?.getBoundingClientRect()
-        const compact = innerWidth <= 1320
-        result.threadLayout = compact
-          ? getComputedStyle(main).display === 'none'
-          : mainBox !== undefined && sidebarBox !== undefined && workbenchBox !== undefined
-            && getComputedStyle(main).display === 'flex'
-            && Math.abs(mainBox.left - sidebarBox.right) < 1
-            && Math.abs(mainBox.right - workbenchBox.left) < 1
-        result.workbenchLayout = workbenchBox !== undefined && sidebarBox !== undefined
-          && (compact || mainBox !== undefined)
-          && getComputedStyle(workbench).position === 'static'
-          && Math.abs(workbenchBox.left - (compact ? sidebarBox.right : mainBox.right)) < 1
-          && Math.abs(workbenchBox.right - innerWidth) < 1
-        result.resumeStaysInline = window.__omniResumeInline === true
-        if (Object.values(result).every(Boolean)) return true
-        throw new Error('后台活动键盘滚动诊断：' + JSON.stringify(result))
-      })()`,
-      after: `delete window.__omniMainWidth; delete window.__omniResumeInline`,
-    },
-    {
-      name: "06-工作台展开",
-      open: `document.querySelector('.workbench__expand')?.click()`,
-      ready: ".shell--workbench-full .workbench:not([hidden])",
-      assert: `getComputedStyle(document.querySelector('.main')).display === 'none'
-        && document.querySelector('.workbench__expand')?.getAttribute('aria-label') === '并排显示工作台'
-        && (() => {
-          const workbench = document.querySelector('.workbench')?.getBoundingClientRect()
-          const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
-          return workbench !== undefined && sidebar !== undefined
-            && Math.abs(workbench.left - sidebar.right) < 1 && Math.abs(workbench.right - innerWidth) < 1
-        })()`,
-      after: `document.querySelector('.workbench__expand')?.click()`,
-    },
+    ...ACTIVITY_VIEWS,
     {
       name: "07-文件清单",
       open: `document.querySelector('[title="文件预览"]')?.click()`,

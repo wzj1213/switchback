@@ -21,6 +21,13 @@ function coveredByModal(panel: HTMLElement | null): boolean {
   return top !== undefined && top !== panel
 }
 
+function keepsIndexFocus(state: FocusState, active: Element | null): boolean {
+  if (!(active instanceof HTMLElement)) return false
+  if (active.matches(".workbench__tab--on")) return true
+  if (state.page === "files") return state.file === undefined && active.matches(".file-row")
+  return state.laneId === undefined && active.matches(".activity-row")
+}
+
 /** 打开后进工作台；Esc 关闭后还给原触发器。 */
 export function useWorkbenchKeys(
   state: WorkbenchState,
@@ -53,10 +60,7 @@ export function useWorkbenchKeys(
     const panel = box.current
     if (!state.visible || panel === null) return
     const active = document.activeElement
-    const keepsRow = state.page === "files" && state.file === undefined
-      && active instanceof HTMLElement && active.matches(".file-row")
-    if (panel.contains(active) && active instanceof HTMLElement
-      && (active.matches(".workbench__tab--on") || keepsRow)) return
+    if (panel.contains(active) && keepsIndexFocus(state, active)) return
     const target = panel.querySelector<HTMLElement>(selector)
     const focus = target ?? panel
     focus.focus()

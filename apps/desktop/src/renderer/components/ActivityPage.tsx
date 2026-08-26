@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import type { Item, Lane, Thread } from "@omni/protocol"
 import type { ResolveApproval } from "./Approval.js"
 import { groupRows } from "../group.js"
@@ -10,6 +10,7 @@ import { LaneCommandBlock, LaneCommandLine, LaneOutput } from "./lane-command.js
 import { PlanMark, type MarkState } from "./PlanMark.js"
 import { ToolRun } from "./ToolRun.js"
 import { ChevronIcon } from "./icons.js"
+import { focusActivity, focusFirstActivity, moveActivityFocus } from "./activity-navigation.js"
 
 const MARK: Readonly<Record<Lane["status"], MarkState>> = {
   running: "in_progress",
@@ -39,17 +40,21 @@ function ordered(lanes: readonly Lane[]): readonly Lane[] {
   })
 }
 
-function ActivityIndex({ lanes, onPick }: {
+function ActivityIndex({ lanes, hidden, root, onPick }: {
   lanes: readonly Lane[]
+  hidden: boolean
+  root: React.RefObject<HTMLDivElement | null>
   onPick: (id: string) => void
 }): React.JSX.Element {
-  if (lanes.length === 0) return <p className="workbench__empty">这条任务还没有后台活动。</p>
   return (
-    <div className="activity-list">
+    <div ref={root} className="activity-list" hidden={hidden}>
+      {lanes.length === 0 ? <p className="workbench__empty">这条任务还没有后台活动。</p> : null}
       {ordered(lanes).map((lane) => {
         const live = lane.status === "running"
         return (
-          <button key={lane.id} type="button" className="activity-row" onClick={() => { onPick(lane.id) }}>
+          <button key={lane.id} type="button" className="activity-row" data-lane-id={lane.id}
+            aria-keyshortcuts="ArrowUp ArrowDown Home End" onKeyDown={moveActivityFocus}
+            onClick={() => { onPick(lane.id) }}>
             <span className="activity-row__mark"><PlanMark status={MARK[lane.status]} spinning={live} /></span>
             <span className="activity-row__copy">
               <span className="activity-row__title">{lane.title}</span>
@@ -158,7 +163,24 @@ export function ActivityPage({ lanes, laneId, items, thread, onPick, onBack, onC
 }): React.JSX.Element {
   const lane = lanes.find((candidate) => candidate.id === laneId)
   const own = useMemo(() => items.filter((item) => item.lane?.id === lane?.id), [items, lane?.id])
-  return lane === undefined
-    ? <ActivityIndex lanes={lanes} onPick={onPick} />
-    : <LaneDetail lane={lane} items={own} thread={thread} onBack={onBack} onCopy={onCopy} />
+  const root = useRef<HTMLDivElement>(null)
+  const returnLane = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (lane !== undefined || returnLane.current === undefined) return
+    const id = returnLane.current
+    returnLane.current = undefined
+    if (!focusActivity(root.current, id)) focusFirstActivity(root.current)
+  }, [lane])
+  const pick = (id: string): void => {
+    returnLane.current = id
+    onPick(id)
+  }
+  return (
+    <>
+      <ActivityIndex lanes={lanes} hidden={lane !== undefined} root={root} onPick={pick} />
+      {lane === undefined ? null : (
+        <LaneDetail lane={lane} items={own} thread={thread} onBack={onBack} onCopy={onCopy} />
+      )}
+    </>
+  )
 }
