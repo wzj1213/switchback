@@ -8,8 +8,14 @@ type FocusState = Pick<WorkbenchState, "page" | "file" | "laneId">
 
 /** 索引直接进最高频入口，详情先落在可返回的键盘锚点。 */
 export function workbenchFocusSelector(state: FocusState): string {
-  if (state.page === "files") return state.file === undefined ? ".files-search input" : ".workbench__back"
-  return state.laneId === undefined ? ".workbench__tab--on" : ".workbench__back"
+  if (state.page === "files") {
+    return state.file === undefined
+      ? '.workbench__page:not([hidden]) .files-search input'
+      : '.workbench__page:not([hidden]) .workbench__back'
+  }
+  return state.laneId === undefined
+    ? ".workbench__tab--on"
+    : '.workbench__page:not([hidden]) .workbench__back'
 }
 
 function currentOverlay(): boolean {

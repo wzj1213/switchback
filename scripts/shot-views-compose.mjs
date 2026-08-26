@@ -119,7 +119,7 @@ export const COMPOSE_VIEWS = [
   {
     name: "16-工作台文件加入输入框",
     open: `document.querySelector('[aria-label="引用到输入框"]')?.click()`, ready: ".composer__input",
-    absent: ".workbench",
+    absent: ".workbench:not([hidden])",
     assert: `document.activeElement?.classList.contains('composer__input') === true
       && document.querySelector('.composer__input')?.value === '检查这个文件 @apps/desktop/src/renderer/attachment-feedback.ts '
       && document.querySelector('.send')?.disabled === false`,
@@ -129,9 +129,9 @@ export const COMPOSE_VIEWS = [
     name: "17-@文件引用",
     open: [
       `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
-      `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
+      `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
       `document.querySelector('.workbench__scrim')?.click()`,
-      `if (document.querySelector('.workbench') !== null) throw new Error('点击遮罩没有收起工作台')`,
+      `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('点击遮罩没有收起工作台')`,
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '@attachment'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
     ],
     ready: ".mentions__row",

@@ -123,7 +123,7 @@ export const VIEWS = [
     {
       name: "09-文件搜索",
       open: [
-        `document.querySelector('.workbench__back')?.click()`,
+        `document.querySelector('.workbench__page:not([hidden]) .workbench__back')?.click()`,
         `(() => {
         const input = document.querySelector('.files-search input')
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -143,7 +143,7 @@ export const VIEWS = [
       name: "09-搜索返回保留",
       open: [
         `(() => { window.__omniFileIndex = document.querySelector('.files-index'); document.activeElement?.click() })()`,
-        `document.querySelector('.workbench__back')?.click()`,
+        `document.querySelector('.workbench__page:not([hidden]) .workbench__back')?.click()`,
       ],
       ready: ".files-search input",
       assert: `document.querySelector('.files-search input')?.value === 'attachment'
@@ -151,8 +151,24 @@ export const VIEWS = [
         && document.querySelector('.files-index')?.textContent.includes('正在搜索') === false
         && document.querySelector('.files-index') === window.__omniFileIndex
         && document.activeElement?.matches('.files-search input') === true`,
+    },
+    {
+      name: "09-切页重开保留",
+      open: [
+        `window.__omniWorkbench = document.querySelector('.workbench'); [...document.querySelectorAll('.workbench__tab')].find(tab => tab.textContent.includes('活动'))?.click()`,
+        `[...document.querySelectorAll('.workbench__tab')].find(tab => tab.textContent.includes('文件'))?.click()`,
+        `document.querySelector('.workbench__hide')?.click()`,
+        `document.querySelector('[title="文件预览"]')?.click()`,
+      ],
+      ready: ".files-search input",
+      assert: `document.querySelector('.files-search input')?.value === 'attachment'
+        && document.querySelector('.files-index')?.textContent.includes('attachments.ts') === true
+        && document.querySelector('.files-index') === window.__omniFileIndex
+        && document.querySelector('.workbench') === window.__omniWorkbench
+        && document.activeElement?.matches('.files-search input') === true`,
       after: `(() => {
         delete window.__omniFileIndex
+        delete window.__omniWorkbench
         document.querySelector('.files-search input')?.dispatchEvent(
           new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
         )
@@ -168,7 +184,7 @@ export const VIEWS = [
     {
       name: "11-HTML预览",
       open: [
-        `document.querySelector('.workbench__back')?.click()`,
+        `document.querySelector('.workbench__page:not([hidden]) .workbench__back')?.click()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
         `(() => {
           const preview = document.querySelector('[role="tab"][aria-selected="true"]')

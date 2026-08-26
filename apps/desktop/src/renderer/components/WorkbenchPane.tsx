@@ -45,10 +45,10 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
   const fileCount = useMemo(() => sessionFilesOf(items, thread.cwd).length, [items, thread.cwd])
   const overlay = useWorkbenchOverlay()
   const box = useWorkbenchKeys(state, overlay, onHide)
-  if (!state.visible) return null
   return (
-    <aside ref={box} className="workbench" tabIndex={-1} aria-label="任务工作台"
-      role={overlay ? "dialog" : undefined} aria-modal={overlay ? true : undefined}>
+    <aside ref={box} className="workbench" tabIndex={-1} aria-label="任务工作台" hidden={!state.visible}
+      role={state.visible && overlay ? "dialog" : undefined}
+      aria-modal={state.visible && overlay ? true : undefined}>
       <header className="workbench__head">
         <nav className="workbench__tabs" aria-label="工作台页面">
           <ToolTab on={state.page === "activity"} label="活动" count={lanes.length} onClick={onActivity}>
@@ -65,17 +65,18 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
         </button>
       </header>
       <div className="workbench__body">
-        {state.page === "activity" ? (
+        <div className="workbench__page" hidden={state.page !== "activity"}>
           <ActivityPage lanes={lanes} laneId={state.laneId} items={items} thread={thread}
             onPick={onPickLane} onBack={onActivityIndex} onCopy={onCopy} />
-        ) : (
-          /* 搜索上下文只属于这一条任务；切任务时重挂，预览内返回时不重挂。 */
+        </div>
+        <div className="workbench__page" hidden={state.page !== "files"}>
+          {/* 搜索上下文只属于这一条任务；切任务时重挂，页内切换或收起时保活。 */}
           <FilesPage key={`${thread.id}\u0000${thread.cwd}`} threadId={thread.id} cwd={thread.cwd}
             items={items} stamp={stamp}
             target={state.file} onPick={onPickFile}
             onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
-        )}
+        </div>
       </div>
     </aside>
   )

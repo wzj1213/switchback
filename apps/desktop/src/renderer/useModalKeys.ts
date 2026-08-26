@@ -11,7 +11,7 @@ const FOCUSABLE = [
 
 function focusable(box: HTMLElement): readonly HTMLElement[] {
   return [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (node) => node.getAttribute("aria-hidden") !== "true" && !node.hasAttribute("inert"),
+    (node) => node.closest('[hidden], [inert], [aria-hidden="true"]') === null,
   )
 }
 

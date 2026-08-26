@@ -9,6 +9,11 @@
   background: var(--bg);
 }
 
+.workbench[hidden],
+.workbench__page[hidden] {
+  display: none;
+}
+
 .workbench__head {
   display: flex;
   flex: none;
@@ -99,6 +104,14 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+.workbench__page {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
 }
 

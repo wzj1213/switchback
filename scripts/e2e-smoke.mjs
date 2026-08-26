@@ -183,7 +183,7 @@ async function checkWorkbench(cdp) {
     "Tab 不会走出窄屏文件抽屉",
   )
   await key(cdp, "Escape")
-  await waitFor(cdp, "document.querySelector('.workbench') === null")
+  await waitFor(cdp, "document.querySelector('.workbench[hidden]') !== null")
   assert(
     await value(cdp, "document.activeElement?.getAttribute('aria-label') === '打开文件预览'"),
     "Esc 关闭抽屉后焦点回到文件入口",
