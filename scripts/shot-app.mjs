@@ -148,8 +148,15 @@ async function audit(cdp, label, enabled) {
 function audits(view) {
   return AUDIT_ALL || view.audit === true
 }
+
+function assertReadyTime(view, preparedAt) {
+  if (view.readyWithinMs !== undefined && Date.now() - preparedAt > view.readyWithinMs)
+    throw new Error(`${view.name} 超过 ${view.readyWithinMs}ms 才就绪`)
+}
+
 async function shoot(cdp, view, workspaceFiles) {
   let heldDrop
+  const preparedAt = Date.now()
   await prepareWorkspaceFiles(ROOT, view, workspaceFiles)
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
@@ -166,6 +173,7 @@ async function shoot(cdp, view, workspaceFiles) {
     }
     heldDrop = await dragIntoView({ value, pause, waitFor, root: ROOT }, cdp, view)
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
+    assertReadyTime(view, preparedAt)
     if (
       view.absent !== undefined &&
       (await value(cdp, `document.querySelector('${view.absent}') !== null`))

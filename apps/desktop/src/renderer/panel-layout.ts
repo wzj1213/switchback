@@ -7,8 +7,3 @@ export function panelShellClass(open: boolean, full: boolean): string {
 export function shouldClosePanelAfterDrop(viewportWidth: number, full: boolean): boolean {
   return full || viewportWidth <= 1120
 }
-
-/** 从并排宽度缩进单栏宽度时，优先留下会话，而不是让工具面板顶掉正文。 */
-export function shouldHidePanelAfterResize(previousWidth: number, nextWidth: number): boolean {
-  return previousWidth > 1120 && nextWidth <= 1120
-}

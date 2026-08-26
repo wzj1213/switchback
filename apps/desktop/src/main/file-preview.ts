@@ -74,6 +74,18 @@ async function safeTarget(req: FilePreviewRequest, touched: PreviewGuard): Promi
   }
 }
 
+/** 文件监听复用预览的两道安全门；不满足时不暴露目标路径，也不起 watcher。 */
+export async function previewWatchTarget(
+  value: unknown,
+  touched: PreviewGuard,
+  owns: WorkspaceGuard,
+): Promise<string | undefined> {
+  const req = requestOf(value)
+  if (req === undefined || !owns(req.threadId, req.cwd)) return undefined
+  const target = await safeTarget(req, touched)
+  return typeof target === "string" ? target : undefined
+}
+
 function imagePreview(path: string): FilePreview | undefined {
   if (!IMAGE_EXT.has(extname(path).toLowerCase())) return undefined
   const image = nativeImage.createFromPath(path)

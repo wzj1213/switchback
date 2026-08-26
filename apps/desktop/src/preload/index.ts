@@ -14,6 +14,7 @@ import type { EnvConfig } from "../shared/hooks.js"
 import type { ActivityDigest } from "../shared/activity.js"
 import type { FilePreview } from "../shared/file-preview.js"
 import type { PickedFiles } from "../shared/attachments.js"
+import { watchFile } from "./file-watch.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -293,6 +294,7 @@ const api = {
   async filePreview(threadId: string, cwd: string, path: string): Promise<FilePreview> {
     return (await ipcRenderer.invoke("omni:filePreview", { threadId, cwd, path })) as FilePreview
   },
+  watchFile,
 
   /**
    * 远程访问（浏览器端）的四条窄通道。

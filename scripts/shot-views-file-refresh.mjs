@@ -83,6 +83,7 @@ export const FILE_REFRESH_VIEWS = [
   },
   {
     name: "09-打开文件持续刷新",
+    readyWithinMs: 2500,
     before: ".file-source",
     rewriteFiles: [{
       path: "apps/desktop/src/renderer/attachment-live-refresh-probe.ts",

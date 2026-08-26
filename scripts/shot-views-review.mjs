@@ -19,10 +19,13 @@ export const REVIEW_VIEWS = [
         const review = document.querySelector('.rv')?.getBoundingClientRect()
         const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
         if (review === undefined || sidebar === undefined || main === null) return false
-        const expectedMain = window.innerWidth > 1120
-        return (getComputedStyle(main).display !== 'none') === expectedMain
+        const compact = window.innerWidth <= 1280
+        const mainBox = main.getBoundingClientRect()
+        return getComputedStyle(main).display === 'flex'
           && Math.abs(review.right - window.innerWidth) < 1
-          && (expectedMain || Math.abs(review.left - sidebar.right) < 1)
+          && Math.abs(review.left - mainBox.right) < 1
+          && (!compact || (getComputedStyle(document.querySelector('.sidebar')).display === 'none'
+            && Math.abs(mainBox.left) < 1))
       })()
       && (() => {
         const review = document.querySelector('.rv')?.getBoundingClientRect()
@@ -174,8 +177,10 @@ export const REVIEW_VIEWS = [
     assert: `(() => {
       const hint = document.querySelector('.composer-drop--surface')?.getBoundingClientRect()
       const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
+      const compact = innerWidth <= 1280
       return hint !== undefined && sidebar !== undefined
-        && Math.abs(hint.left - sidebar.right) < 1 && Math.abs(hint.right - innerWidth) < 1
+        && Math.abs(hint.left - (compact ? 0 : sidebar.right)) < 1
+        && Math.abs(hint.right - innerWidth) < 1
         && document.querySelector('.composer-drop--surface')?.textContent.includes('先继续会话') === true
     })()`,
   },

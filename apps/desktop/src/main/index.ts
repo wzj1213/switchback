@@ -33,6 +33,7 @@ import { engineEnabled } from "../shared/engine-access.js"
 import { installActivity } from "./activity.js"
 import { installEngineSettings } from "./engine-settings.js"
 import { installFilePreviewChannel } from "./file-preview.js"
+import { installFilePreviewWatch } from "./file-preview-watch.js"
 import { createTouchedFiles } from "./touched.js"
 import { createAttachmentFiles } from "./attachment-files.js"
 import { createWorksiteSearch } from "./worksite-search.js"
@@ -293,6 +294,7 @@ function installChannels(): void {
   installChatDirChannel()
   installAttachChannel(attachmentFiles)
   installFilePreviewChannel(touched, worksiteSearch)
+  installFilePreviewWatch(touched, worksiteSearch)
   installProjectDocChannel(worksiteSearch)
   installEngineVersionChannel(log, engineVersions)
   installEngineDoorChannels()

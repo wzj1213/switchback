@@ -21,7 +21,6 @@ import {
   togglePanelFull,
   type PanelPage,
 } from "./panel-state.js"
-import { usePanelResize } from "./use-panel-resize.js"
 
 /**
  * 外壳自己的那点状态：选中了哪个会话、开着哪个工具组或覆盖层。
@@ -115,7 +114,6 @@ export function useShell(): Shell {
   const closeWorkbench = useCallback(() => {
     setPanel(hidePanel)
   }, [])
-  usePanelResize(closeWorkbench)
   useEffect(() => onFilePreviewRequest(openFile), [openFile])
   // 原生通知的超时 effect 依赖它；引用稳定才能避免每次流式重绘都把计时重新开始。
   const dismiss = useCallback((id: string) => {

@@ -201,7 +201,7 @@ export function Bar({
         />
         <AttachmentPick disabled={detached} onPick={onAttach} />
         {aside}
-        <span style={{ flex: 1 }} />
+        <span className="composer__bar-spacer" />
         {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。
             没报 efforts 的引擎它自己不出来（见 EffortSlider） */}
         <BarEffort

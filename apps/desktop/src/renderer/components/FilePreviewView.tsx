@@ -5,6 +5,7 @@ import type { PreviewTarget } from "../workbench.js"
 import { baseName } from "./file-row.js"
 import { FilePreviewHeader } from "./FilePreviewHeader.js"
 import { FilePreviewContent } from "./file-preview-content.js"
+import { useFilePreviewPulse } from "../use-file-preview-pulse.js"
 
 export type PreviewLoad =
   | { state: "loading" }
@@ -16,7 +17,6 @@ export type PreviewLoad =
       refreshFailed: boolean
     }
 const LOADING: PreviewLoad = { state: "loading" }
-const REFRESH_MS = 15_000
 
 function readyLoad(identity: string, file: FilePreview): PreviewLoad {
   return { state: "ready", identity, file, refreshing: false, refreshFailed: false }
@@ -55,21 +55,9 @@ function usePreview({ target, revision, stamp, manual, active }: {
   active: boolean
 }): PreviewLoad {
   const [load, setLoad] = useState<PreviewLoad>(LOADING)
-  const [visit, setVisit] = useState(0)
   const lastTarget = useRef("")
   const identity = identityOf(target)
-  useEffect(() => {
-    if (!active) return undefined
-    const bump = (): void => {
-      setVisit((before) => before + 1)
-    }
-    window.addEventListener("focus", bump)
-    const timer = window.setInterval(bump, REFRESH_MS)
-    return () => {
-      window.removeEventListener("focus", bump)
-      window.clearInterval(timer)
-    }
-  }, [active])
+  const visit = useFilePreviewPulse(active, target)
   useEffect(() => {
     if (!active) return undefined
     let alive = true

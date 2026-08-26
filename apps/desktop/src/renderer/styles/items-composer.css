@@ -71,6 +71,12 @@
   border-radius: 0;
 }
 
+@media (max-width: 1280px) {
+  body:has(.shell--workbench:not(.shell--workbench-full)) > .composer-drop--surface {
+    left: 0;
+  }
+}
+
 /* 松手后的失败是通知，不再继续伪装成“还拖着”的整面接收层。 */
 .composer-drop--notice {
   place-items: start center;
@@ -334,6 +340,23 @@
 .composer__bar > .trigger {
   flex-shrink: 1;
   min-width: 0;
+}
+
+.composer__bar-spacer {
+  flex: 1;
+}
+
+/* 主区被右侧工作台压到半屏时，控件不能溢出输入卡。
+   配置仍在第一行可用，强度与发送落到右下，不把任何功能藏掉。 */
+@container (max-width: 520px) {
+  .composer__bar {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  .composer__bar > .effortbox {
+    margin-left: auto;
+  }
 }
 
 /* 历史态的唯一动作宁可整颗让位，也不能被窄列压成逐字竖排。 */

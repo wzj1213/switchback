@@ -54,9 +54,12 @@ export const ACTIVITY_VIEWS = [
       const workbenchBox = workbench?.getBoundingClientRect()
       const sidebarBox = sidebar?.getBoundingClientRect()
       const mainBox = main?.getBoundingClientRect()
-      const compact = innerWidth <= 1120
+      const compact = innerWidth <= 1280
       result.threadLayout = compact
-        ? getComputedStyle(main).display === 'none'
+        ? getComputedStyle(main).display === 'flex'
+          && getComputedStyle(sidebar).display === 'none'
+          && mainBox !== undefined && workbenchBox !== undefined
+          && Math.abs(mainBox.left) < 1 && Math.abs(mainBox.right - workbenchBox.left) < 1
         : mainBox !== undefined && sidebarBox !== undefined && workbenchBox !== undefined
           && getComputedStyle(main).display === 'flex'
           && Math.abs(mainBox.left - sidebarBox.right) < 1
@@ -64,7 +67,7 @@ export const ACTIVITY_VIEWS = [
       result.workbenchLayout = workbenchBox !== undefined && sidebarBox !== undefined
         && (compact || mainBox !== undefined)
         && getComputedStyle(workbench).position === 'static'
-        && Math.abs(workbenchBox.left - (compact ? sidebarBox.right : mainBox.right)) < 1
+        && Math.abs(workbenchBox.left - mainBox.right) < 1
         && Math.abs(workbenchBox.right - innerWidth) < 1
       result.resumeStaysInline = window.__omniResumeInline === true
       if (Object.values(result).every(Boolean)) return true

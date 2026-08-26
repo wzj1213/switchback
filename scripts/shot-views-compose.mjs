@@ -138,6 +138,14 @@ export const COMPOSE_VIEWS = [
     assert: `document.documentElement.dataset.fileRefresh === 'true'
       && document.querySelector('.file-preview__path')?.textContent.includes('…/src/renderer') === true
       && (() => {
+        const card = document.querySelector('.composer__inner')?.getBoundingClientRect()
+        const bar = document.querySelector('.composer__bar')
+        if (card === undefined || bar === null) return false
+        const children = [...bar.children].map(node => node.getBoundingClientRect())
+        return bar.scrollWidth <= bar.clientWidth && bar.getBoundingClientRect().height <= 66
+          && children.every(box => box.left >= card.left && box.right <= card.right)
+      })()
+      && (() => {
         const source = document.querySelector('.file-source')
         const copy = source?.querySelector('.file-preview__copy')
         const toolbar = source?.querySelector('.file-source__toolbar')

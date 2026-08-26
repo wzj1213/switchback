@@ -17,8 +17,10 @@ export const DROP_VIEWS = [
     assert: `(() => {
       const hint = document.querySelector('.composer-drop--surface')?.getBoundingClientRect()
       const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
+      const compact = innerWidth <= 1280
       return hint !== undefined && sidebar !== undefined
-        && Math.abs(hint.left - sidebar.right) < 1 && Math.abs(hint.right - innerWidth) < 1
+        && Math.abs(hint.left - (compact ? 0 : sidebar.right)) < 1
+        && Math.abs(hint.right - innerWidth) < 1
     })()`,
   },
   {
@@ -67,12 +69,13 @@ export const DROP_VIEWS = [
   },
   {
     name: "14-侧栏仍不接文件",
-    open: openPanelPage("文件"),
+    open: `document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()`,
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
     rejectDragTarget: ".sidebar",
-    ready: ".workbench:not([hidden])",
+    ready: ".sidebar",
     assert: `document.querySelector('.composer-drop') === null
       && document.querySelector('.composer__input')?.value === ''`,
+    after: `document.querySelector('[aria-label="显示侧边面板"]')?.click()`,
   },
   {
     name: "14-读取失败不关闭工作台",

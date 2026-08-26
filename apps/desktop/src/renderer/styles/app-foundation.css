@@ -162,14 +162,25 @@ body {
   display: none;
 }
 
-/* 跨入这档时 JS 会先收起工具组、保住会话；用户在窄窗主动重开时才暂时独占内容区。 */
-@media (max-width: 1120px) {
-  .shell--workbench {
-    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+/* 窗口变窄时先收左侧导航，留下会话与工具组。
+   工具组是会话的辅助面，不能拿导航与它夹掉会话主体。 */
+@media (max-width: 1280px) {
+  .shell--workbench:not(.shell--workbench-full) {
+    grid-template-columns: minmax(0, 1fr) var(--workbench-w);
   }
 
-  .shell--workbench .main {
+  .shell--workbench:not(.shell--workbench-full) > .sidebar {
     display: none;
+  }
+
+  .shell--workbench:not(.shell--workbench-full) > .main {
+    display: flex;
+    grid-column: 1;
+  }
+
+  /* hiddenInset 的交通灯还在窗口左上角；导航收起后由主顶栏给它们留位。 */
+  .shell--workbench:not(.shell--workbench-full) > .main .topbar {
+    padding-left: 92px;
   }
 }
 

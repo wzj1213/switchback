@@ -86,8 +86,9 @@ export const VIEWS = [
           focus: document.activeElement?.matches('.files-search input') === true,
           nonModal: document.querySelector('.workbench')?.getAttribute('aria-modal') === null
             && document.querySelector('.workbench__scrim') === null,
-          responsive: getComputedStyle(document.querySelector('.main')).display
-            === (innerWidth <= 1120 ? 'none' : 'flex'),
+          responsive: getComputedStyle(document.querySelector('.main')).display === 'flex'
+            && (innerWidth > 1280
+              || getComputedStyle(document.querySelector('.sidebar')).display === 'none'),
           clean: !index?.textContent.includes('failed-secret.txt'),
           scope: scope?.textContent.endsWith('/omni') === true
             && scope?.getAttribute('title')?.endsWith('/omni') === true,

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 import {
   panelShellClass,
   shouldClosePanelAfterDrop,
-  shouldHidePanelAfterResize,
 } from "./panel-layout.js"
 
 describe("工具面板外壳", () => {
@@ -28,19 +27,6 @@ describe("工具面板外壳", () => {
     ]
     for (const [viewportWidth, full, expected] of cases) {
       expect(shouldClosePanelAfterDrop(viewportWidth, full)).toBe(expected)
-    }
-  })
-
-  it("只有从双栏跨进单栏时才让工具面板给会话让位", () => {
-    const cases: readonly [number, number, boolean][] = [
-      [1172, 1120, true],
-      [1121, 860, true],
-      [1172, 1121, false],
-      [860, 720, false],
-      [860, 1172, false],
-    ]
-    for (const [previous, next, expected] of cases) {
-      expect(shouldHidePanelAfterResize(previous, next)).toBe(expected)
     }
   })
 })

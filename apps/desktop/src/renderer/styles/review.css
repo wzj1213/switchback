@@ -29,10 +29,9 @@
   border-left: 0;
 }
 
-@media (max-width: 1120px) {
-  .rv {
+@media (max-width: 1280px) {
+  .shell--workbench:not(.shell--workbench-full) .rv {
     grid-column: 2;
-    border-left: 0;
   }
 }
 
