@@ -96,7 +96,10 @@ export const VIEWS = [
       ready: ".file-row",
       assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
         && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')
-        && document.querySelector('.files-scope')?.textContent.includes('搜索范围是当前工作区') === true`,
+        && document.querySelector('.files-scope')?.textContent.includes('搜索范围是当前工作区') === true
+        && document.querySelector('.files-index')?.textContent.includes('最近一轮改过') === true
+        && document.querySelector('.files-index')?.textContent.includes('此前碰过') === true
+        && document.querySelector('.files-index')?.textContent.includes('AGENTS.md') === true`,
     },
     {
       name: "08-缺失文件可恢复",

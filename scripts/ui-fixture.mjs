@@ -43,8 +43,16 @@ function threadOf(id, title, cwd, at) {
 /** 主会话：一屏里把每一类 item 都摆出来。 */
 export function mainThread(id, cwd, at, externalPath) {
   const turn = `${id}-t1`
+  const earlier = `${id}-t0`
   const out = [
     line({ type: "thread.started", at, thread: threadOf(id, "把订阅那段胶水抽成纯函数", cwd, at) }),
+    line({ type: "turn.started", at, turn: {
+      id: earlier, threadId: id, engine: ENGINE, status: "running", startedAt: at,
+    } }),
+    line({ type: "item.started", at, item: {
+      ...fileRead("AGENTS.md", "ok"), id: `${id}-earlier`, turnId: earlier, at,
+    } }),
+    line({ type: "turn.completed", at, turnId: earlier, status: "completed" }),
     line({
       type: "turn.started",
       at,

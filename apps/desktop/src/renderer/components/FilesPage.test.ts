@@ -6,11 +6,15 @@ import { FileSearchStatus, FilesPage, visibleFileSearch, type FileSearchState } 
 
 const cwd = "/work/repos"
 
-const tool = (id: string, at: number, detail: Extract<Item, { kind: "tool_call" }>["detail"]): Item => ({
-  id, turnId: "tn-1", kind: "tool_call", tool: "test", status: "ok", at, detail,
+const tool = (id: string, at: number, detail: Extract<Item, { kind: "tool_call" }>["detail"],
+  options: { turnId?: string; inherited?: boolean } = {}): Item => ({
+  id, turnId: options.turnId ?? "tn-1", kind: "tool_call", tool: "test", status: "ok", at, detail,
+  ...(options.inherited === true ? { inherited: true as const } : {}),
 })
 
 const items: readonly Item[] = [
+  tool("old", 0, { kind: "file_read", path: "README.md" }, { turnId: "tn-0" }),
+  tool("parent", 0, { kind: "file_read", path: "parent.ts" }, { turnId: "parent", inherited: true }),
   tool("r1", 1, { kind: "file_read", path: "/Users/me/.codex/skills/doc-manage/SKILL.md" }),
   tool("e1", 2, {
     kind: "file_edit",
@@ -34,10 +38,13 @@ function render(): string {
 }
 
 describe("文件清单", () => {
-  it("按改过 / 读过分栏，名字在前、目录收成末两级", () => {
+  it("最近一轮、此前与继承历史分栏，名字在前、目录收成末两级", () => {
     const html = render()
-    expect(html).toContain("这轮改过")
-    expect(html).toContain("读过")
+    expect(html).toContain("最近一轮改过")
+    expect(html).toContain("最近一轮读过")
+    expect(html).toContain("此前碰过")
+    expect(html).toContain("分支继承")
+    expect(html).not.toContain(">这轮改过<")
     expect(html).toContain("OrderBatchService.java")
     expect(html).toContain("…/shop/service")
     expect(html).toContain("SKILL.md")

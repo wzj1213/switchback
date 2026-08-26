@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
-import { fileTouchOf, sessionFilesOf, type SessionFile } from "../session-files.js"
+import { fileTouchOf, sessionFileGroupsOf, type SessionFile } from "../session-files.js"
 import { PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
-
-/** 改过的排前面：一屏里最想找的是「这轮动了什么」，读过的是背景。 */
-function split(files: readonly SessionFile[]): { edited: readonly SessionFile[]; read: readonly SessionFile[] } {
-  return {
-    edited: files.filter((file) => file.action !== "读取"),
-    read: files.filter((file) => file.action === "读取"),
-  }
-}
 
 function FileGroup({ title, files, threadId, cwd, onPick }: {
   title: string
@@ -117,9 +109,11 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
   const input = useRef<HTMLInputElement>(null)
-  const groups = useMemo(() => split(sessionFilesOf(items, cwd)), [items, cwd])
+  const groups = useMemo(() => sessionFileGroupsOf(items, cwd), [items, cwd])
   const found = useFileSearch(cwd, query, searchFiles)
   const searching = query.trim() !== ""
+  const recent = groups.recentEdited.length + groups.recentRead.length
+  const total = recent + groups.earlier.length + groups.inherited.length
   return (
     <div className="files-index" onKeyDown={(event) => {
       if (event.key !== "Escape" || query === "") return
@@ -146,7 +140,7 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
             event.stopPropagation()
             setQuery("")
           }} />
-        <span className="files-scope">默认列出本会话读过或改过的文件；搜索范围是当前工作区。</span>
+        <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索范围是当前工作区。</span>
       </label>
       <div className="files-index__scroll">
         {searching ? (
@@ -159,11 +153,12 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
           </section>
         ) : (
           <>
-            {groups.edited.length + groups.read.length === 0
-              ? <p className="workbench__empty">读过或改过的文件会出现在这里。</p>
-              : null}
-            <FileGroup title="这轮改过" files={groups.edited} threadId={threadId} cwd={cwd} onPick={onPick} />
-            <FileGroup title="读过" files={groups.read} threadId={threadId} cwd={cwd} onPick={onPick} />
+            {total === 0 ? <p className="workbench__empty">本会话还没有读过或改过文件。</p> : null}
+            {total > 0 && recent === 0 ? <p className="workbench__empty">最近一轮没有读写文件。</p> : null}
+            <FileGroup title="最近一轮改过" files={groups.recentEdited} threadId={threadId} cwd={cwd} onPick={onPick} />
+            <FileGroup title="最近一轮读过" files={groups.recentRead} threadId={threadId} cwd={cwd} onPick={onPick} />
+            <FileGroup title="此前碰过" files={groups.earlier} threadId={threadId} cwd={cwd} onPick={onPick} />
+            <FileGroup title="分支继承" files={groups.inherited} threadId={threadId} cwd={cwd} onPick={onPick} />
           </>
         )}
       </div>
