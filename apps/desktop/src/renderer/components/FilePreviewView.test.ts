@@ -3,7 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { FilePreview } from "../../shared/file-preview.js"
 import { canReferencePreview, canRevealPreview, FilePreviewView } from "./FilePreviewView.js"
-import { htmlTabDestination, HtmlPreview, resolvedHtmlMode } from "./file-preview-content.js"
+import {
+  fileCopyLabel,
+  fileCopyTitle,
+  htmlTabDestination,
+  HtmlPreview,
+  resolvedHtmlMode,
+} from "./file-preview-content.js"
 
 describe("文件预览操作", () => {
   const cases: readonly {
@@ -166,6 +172,24 @@ describe("HTML 预览模式", () => {
     } as const
     const html = renderToStaticMarkup(createElement(HtmlPreview, { file, onCopy: () => undefined }))
     expect(html).toContain('class="file-source" tabindex="0"')
+    expect(html).toContain('class="file-source__toolbar"')
     expect(html).toContain('aria-label="可横向滚动的文件源码"')
+    expect(html).toContain('title="只复制当前显示的前 1.5 MB"')
+    expect(html).toContain("复制显示部分")
   })
+})
+
+describe("文件复制反馈", () => {
+  const cases = [
+    [false, false, "复制", "复制文件内容"],
+    [true, false, "复制显示部分", "只复制当前显示的前 1.5 MB"],
+    [false, true, "已复制", "文件内容已复制"],
+    [true, true, "已复制显示部分", "当前显示的前 1.5 MB 已复制"],
+  ] as const
+  for (const [truncated, copied, label, title] of cases) {
+    it(`截断=${String(truncated)} · 已复制=${String(copied)}`, () => {
+      expect(fileCopyLabel(truncated, copied)).toBe(label)
+      expect(fileCopyTitle(truncated, copied)).toBe(title)
+    })
+  }
 })

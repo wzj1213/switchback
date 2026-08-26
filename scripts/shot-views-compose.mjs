@@ -138,10 +138,15 @@ export const COMPOSE_VIEWS = [
       && (() => {
         const source = document.querySelector('.file-source')
         const copy = source?.querySelector('.file-preview__copy')
-        if (source === null || copy === null || source.scrollWidth <= source.clientWidth) return false
+        const toolbar = source?.querySelector('.file-source__toolbar')
+        const code = source?.querySelector('pre')
+        if (source === null || copy === null || toolbar === null || code === null
+          || source.scrollWidth <= source.clientWidth) return false
         source.focus()
         const sourceBox = source.getBoundingClientRect()
         const copyBox = copy.getBoundingClientRect()
+        const toolbarBox = toolbar.getBoundingClientRect()
+        const codeBox = code.getBoundingClientRect()
         const copyTop = document.elementsFromPoint(
           copyBox.left + copyBox.width / 2, copyBox.top + copyBox.height / 2,
         ).includes(copy)
@@ -154,16 +159,26 @@ export const COMPOSE_VIEWS = [
           labelled: source.getAttribute('aria-label') === '可横向滚动的文件源码',
           horizontal: copyBox.left >= sourceBox.left && copyBox.right <= sourceBox.right,
           vertical: copyBox.top >= sourceBox.top && copyBox.bottom <= sourceBox.bottom,
+          separated: codeBox.top >= toolbarBox.bottom,
           inViewport: sourceBox.right <= innerWidth && copyBox.right <= innerWidth,
           indexHidden,
           copyTop, source: { left: sourceBox.left, top: sourceBox.top, right: sourceBox.right,
             bottom: sourceBox.bottom, scrollLeft: source.scrollLeft, scrollWidth: source.scrollWidth },
           copy: { left: copyBox.left, top: copyBox.top, right: copyBox.right, bottom: copyBox.bottom }, stack,
         }
-        if (result.focusable && result.labelled && result.horizontal && result.vertical
+        if (result.focusable && result.labelled && result.horizontal && result.vertical && result.separated
           && result.inViewport && result.indexHidden && result.copyTop) return true
         throw new Error('文件源码焦点与复制按钮诊断：' + JSON.stringify(result))
       })()`,
+  },
+  {
+    name: "15-文件复制有确认",
+    open: `(() => { const button = document.querySelector('.file-preview__copy'); button?.focus(); button?.click() })()`,
+    ready: ".file-preview__copy",
+    assert: `document.querySelector('.file-preview__copy')?.textContent.includes('已复制') === true
+      && document.querySelector('.file-preview__copy')?.getAttribute('title') === '文件内容已复制'
+      && document.querySelector('.file-preview__copy')?.getAttribute('aria-live') === 'polite'
+      && document.activeElement?.classList.contains('file-preview__copy') === true`,
   },
   {
     name: "16-工作台文件加入输入框",
