@@ -16,8 +16,8 @@ import { baseNameOf } from "../sidebar.js"
  * `SidebarFoot.tsx` 那段注释批评过同一个形状——「三行等重、等宽、等间距，
  * 你要找的那一行和你不找的那两行长得一模一样」。底部照着改过了，顶部一直没有。
  *
- * 现在两行 64px：主按钮吃掉整条宽度（tokens.css：主按钮用近黑，不用彩色），
- * 打开文件夹退成一颗方图标键。省下的 32px 归列表。
+ * 现在两行：新建仍吃掉主要宽度，打开文件夹退成一颗方图标键。两颗都使用
+ * 轻量导航行，不在侧栏里竖一块与正文争夺注意力的深色招牌。
  */
 export function Head({
   onNew,
@@ -54,7 +54,7 @@ export function Head({
       <div className="sidebar__act">
         <button
           type="button"
-          className="btn btn--primary sidebar__new"
+          className="sidebar__new"
           onClick={onNew}
           title={here === undefined ? "还没有会话，会先让你选一个文件夹" : `在 ${here} 新建`}
         >
@@ -70,7 +70,7 @@ export function Head({
         {/* 低频动作让位给高频动作，这一条就是这次改动的全部意思 */}
         <button
           type="button"
-          className="btn sidebar__folder"
+          className="sidebar__folder"
           onClick={onOpenFolder}
           title="打开文件夹…"
           aria-label="打开文件夹…"

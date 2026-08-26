@@ -5,7 +5,7 @@
  * 原型（`界面细节打磨-v4.html`「计划并进那一排」）把三条带子并成一条，
  * 验收数就写在那儿：「输入框上方最多几行：1（现在 3）」。
  *
- * 收起来时是一枚**药丸**，和计划那枚并排；展开才长成一张卡。
+ * 收起来时是一条无框摘要，和计划并排；展开才长成一张卡。
  * 上一版不管展不展开都是一张 46px 高的通栏卡，那是三条带子里最占地方的一条。
  */
 .changed {
@@ -28,7 +28,7 @@
   box-shadow: var(--shadow-1);
 }
 
-/* 收起来的时候整枚药丸就是那颗按钮，卡的边退掉——两圈边套在一起太吵 */
+/* 收起来时摘要按钮自己承担交互，卡的边退掉。 */
 .changed[data-open="false"] .changed__card {
   border: 0;
   background: transparent;
@@ -37,8 +37,8 @@
 .changed__head {
   display: flex;
   align-items: center;
-  /* 收起时按药丸的高度走（和 `.plan-pill` 的 24px 同一档），展开才撑到 46 */
-  min-height: 24px;
+  /* 收起时按状态带的高度走，展开才撑到 46。 */
+  min-height: 28px;
   padding: 0;
 }
 
@@ -63,15 +63,15 @@
   cursor: pointer;
 }
 
-/* 收起时它就是那枚药丸本体：高度、圆角、边都和 `.plan-pill` 同一档 */
+/* 收起时它就是状态带里的一个动作：无常驻描边，hover 才浮出底色。 */
 .changed[data-open="false"] .changed__summary {
   flex: none;
   gap: 6px;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-raised);
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
 }
 
 .changed[data-open="false"] .changed__glyph {
@@ -88,17 +88,17 @@
   gap: 6px;
 }
 
-/* 收起时两枚药丸之间留一口气；「审核」自己也是一枚 */
+/* 收起时摘要与「审核」相邻排列。 */
 .changed[data-open="false"] .changed__head {
   gap: var(--sp-2);
 }
 
 .changed[data-open="false"] .changed__review {
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-raised);
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
 }
 
 .changed[data-open="false"] .changed__title,

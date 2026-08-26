@@ -149,12 +149,11 @@
   max-width: 280px;
   align-items: center;
   gap: 6px;
-  height: 24px;
-  padding: 0 9px;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--bg-raised);
-  box-shadow: var(--shadow-1);
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);
@@ -167,9 +166,7 @@
 }
 
 .activity-dock:active {
-  transform: translateY(1px);
   background: var(--bg-press);
-  box-shadow: none;
 }
 
 .activity-dock__mark {
@@ -189,12 +186,6 @@
   color: var(--text-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .activity-dock:active {
-    transform: none;
-  }
 }
 
 /* 分组标题右边那个计数：改过几个、读过几个，一眼看得出这一栏有多长 */

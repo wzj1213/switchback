@@ -122,8 +122,7 @@
   font-size: var(--text-xs);
 }
 
-/* 输入框上方的计划收成一枚胶囊：加载圈 + 步数。hover 预览，点一下钉住。
-   居中——它是浮在输入框上方的一条状态，不属于任何一条正文左边缘。 */
+/* 输入框上方的计划收成一条轻量状态：加载圈 + 步数。hover 预览，点一下钉住。 */
 /*
  * 输入框上方那**一行**：计划、变更、审核并排。
  *
@@ -136,13 +135,14 @@
  *（`max-width:760` / `min(760, 100% - 32px)` / `min(760, 100%)`），
  * 窗口宽时三者重合看不出来，窄到 792 以下才开始各缩各的。取中间那条——
  * **它是三条里唯一在窄窗口下还留边距的**（原型第 910 行点了这件事）。
+ * 这里不再给每种状态各画一颗胶囊：它们同属一条状态带，靠间距与 hover 说明可点。
  */
 .brief {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
+  justify-content: flex-start;
+  gap: 2px;
   width: min(var(--content-max), calc(100% - 2 * var(--sp-4)));
   margin: 0 auto;
 }
@@ -167,11 +167,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-raised);
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-xs);

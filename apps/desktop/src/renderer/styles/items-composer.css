@@ -8,7 +8,7 @@
  * 那道渐隐（见 app.css）——内容溶进去，而不是被齐着切断。
  */
 .composer {
-  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4) var(--sp-4);
 }
 
 .composer__inner {
@@ -21,14 +21,17 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--bg-raised);
-  /* 通栏线拿掉之后卡片得自己站住。2px、6% 是最轻的一道；
-     深色下 `--shadow-1` 本来就是 `none`，那边由描边接手 */
-  box-shadow: var(--shadow-1);
+  /* 通栏线拿掉之后卡片得自己站住。浅色用一层短边影和一层宽而淡的环境影；
+     深色下阴影关闭，由描边接手。 */
+  box-shadow: var(--shadow-composer);
   padding: var(--sp-2) var(--sp-3);
 }
 
 .composer__inner:focus-within {
   border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    var(--shadow-composer);
 }
 
 /* 拖着文件进来时覆盖整个输入卡：松手前就说清收不收，且不让 Chromium 打开文件。 */

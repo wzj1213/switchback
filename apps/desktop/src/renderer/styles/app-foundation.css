@@ -198,10 +198,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg-sunken);
-  /* **骨架线用 `--border-strong`**：这条把窗口切成两块，而它两侧的底色
-     只差 2.72 L*（浅色）／2.71 L*（深色）——用装饰线那个 token 的话，
-     三个颜色全挤在一起。分面本身是新的：上一版两侧同色，这条线独扛全部分界。
-     口径见 tokens.css：strong = 切分区块与控件轮廓，普通 = 区块内部的分节线 */
+  /* 侧栏与正文只差一档浅灰，这根线负责把两块结构收清楚，不再靠深色面分区。 */
   border-right: 1px solid var(--border-strong);
   overflow: hidden;
 }
@@ -220,7 +217,7 @@ body {
 .sidebar {
   --sb-pad: 8px;
   --sb-slot: 24px;
-  --sb-row-h: 32px;
+  --sb-row-h: 34px;
   /* 行尾那几颗图标按钮的方形点击区。**必须是方的**：图标 15、盒子 22，
      四边各留 3.5——上下左右一样多，图标中心才等于盒子中心。
      不对称的内边距（原来是 2px 5px）会让两颗按钮的视觉重心既不在同一条
@@ -248,13 +245,13 @@ body {
   font-size: var(--text-sm);
 }
 
-/* ── 顶上那一行：一颗主按钮 + 一颗图标键 ─────────────────
+/* ── 顶上那一行：一颗主要导航动作 + 一颗图标键 ───────────
  * 见 `SidebarHead.tsx` 的注释。**行高仍然是 `--sb-row-h`**：
  * 侧栏所有的量都挂在那三个变量上，多写一个 30 就是本文件开头说的「第三个 padding」。
  */
 .sidebar__act {
   display: flex;
-  gap: var(--sp-2);
+  gap: var(--sp-1);
   margin: 0 var(--sb-pad) var(--sp-2);
 }
 
@@ -265,8 +262,23 @@ body {
   gap: var(--sp-2);
   min-width: 0;
   height: var(--sb-row-h);
-  /* 左边比右边多 2：图标的视觉重心比它的盒子偏右一点点 */
-  padding: 0 var(--sp-2) 0 10px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sidebar__new:hover {
+  background: var(--bg-hover);
+}
+
+.sidebar__new:active {
+  background: var(--bg-press);
 }
 
 .sidebar__new-label {
@@ -301,7 +313,11 @@ body {
   width: var(--sb-row-h);
   height: var(--sb-row-h);
   padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-muted);
+  cursor: pointer;
 }
 
 .sidebar__folder:hover {
@@ -467,18 +483,18 @@ body {
 /* 搜索行：一个假的输入行，长得和别的行一样，只是里面是 input */
 .row--search {
   margin-bottom: var(--sp-2);
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .row--search:hover {
-  background: var(--bg-raised);
+  background: var(--bg-hover);
 }
 
 /* 系统焦点环在 `.sidebar__filter` 上被关掉了，这条边是这个框**唯一**的焦点指示。
-   `--border-strong` 对 `--border` 只有 1.16:1，等于没画。用强调色——
-   tokens.css 开头那句「强调色只用于焦点与链接」，焦点这半边正好靠它兑现 */
+   用强调色兑现 tokens.css 的「强调色只用于焦点与链接」。 */
 .row--search:focus-within {
+  background: var(--bg-raised);
   border-color: var(--accent);
 }
 
