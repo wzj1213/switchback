@@ -93,6 +93,7 @@ export function useShell(): Shell {
   }, [])
   const closeWorkbench = useCallback(() => {
     setWorkbench(hideWorkbench)
+    setReview(false)
     setPanelFull(false)
   }, [])
   useEffect(() => onFilePreviewRequest(openFile), [openFile])

@@ -5,7 +5,7 @@
  * 把“点击没生效”拍成一张看似正常的重复截图。
  */
 import { COMPOSE_VIEWS } from "./shot-views-compose.mjs"
-import { REVIEW_VIEWS } from "./shot-views-review.mjs"
+import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 
 export const VIEWS = [
     { name: "01-转录区", open: null, ready: ".md" },
@@ -69,10 +69,9 @@ export const VIEWS = [
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
         setter?.call(input, '')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
-        ;[...document.querySelectorAll('.row--thread .row__main')]
-          .find(row => row.textContent.includes('useFlow'))?.click()
       })()`,
     },
+    EDITABLE_REVIEW_VIEW,
     {
       name: "06-后台活动工作台",
       open: [

@@ -47,9 +47,11 @@ export interface WorkspaceProps {
   onOpenLane: (laneId: string) => void
   workbenchPage: WorkbenchPage
   workbenchVisible: boolean
+  /** 任一右侧工具组可见时，拖放提示要覆盖它，而不是藏在输入卡里。 */
+  dropSurfaceVisible: boolean
   onOpenActivity: () => void
   onOpenFiles: () => void
-  /** 从任务画布拖入文件后收起工作台，让结果立刻回到输入框。 */
+  /** 从任务画布拖入文件后收起右侧工具组，让结果立刻回到输入框。 */
   onFilesDropped: () => void
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]

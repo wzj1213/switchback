@@ -98,10 +98,10 @@ export interface ComposerProps {
   prefill?: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
   /** 文件工作台点「引用」后追加到现有草稿；和替换正文的 prefill 不是同一种动作。 */
   reference?: ComposerFileReference
-  /** 从当前任务画布拖入文件后，收起可能挡在输入框前面的工作台。 */
+  /** 从当前任务画布拖入文件后，收起可能挡在输入框前面的右侧工具组。 */
   onFilesDropped: () => void
-  /** 工作台展开时，拖放提示要提升到抽屉之上，不能继续藏在输入卡里。 */
-  workbenchVisible: boolean
+  /** 右侧工具组展开时，拖放提示要提升到任务表面，不能继续藏在输入卡里。 */
+  dropSurfaceVisible: boolean
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */

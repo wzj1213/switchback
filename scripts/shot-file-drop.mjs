@@ -2,7 +2,7 @@ import { join } from "node:path"
 
 /** 用 CDP 的真实文件列表拖进窗口；这会经过 Electron `webUtils.getPathForFile`。 */
 export async function exerciseFileDrop({ value, pause }, cdp, paths, options) {
-  const { target, drop = true } = options
+  const { target, drop = true, hint: expectedHint = "引用" } = options
   const rect = await value(
     cdp,
     `(() => {
@@ -14,7 +14,9 @@ export async function exerciseFileDrop({ value, pause }, cdp, paths, options) {
   await cdp.send("Input.dispatchDragEvent", { type: "dragEnter", ...rect, data })
   await pause(120)
   const hint = await value(cdp, "document.querySelector('.composer-drop')?.textContent ?? ''")
-  if (!hint.includes("引用")) throw new Error(`文件拖入没有给可放提示：${hint}`)
+  if (!hint.includes(expectedHint)) {
+    throw new Error(`文件拖入提示不符合预期（${expectedHint}）：${hint}`)
+  }
   const visible = await value(
     cdp,
     `(() => {
@@ -45,7 +47,7 @@ export async function completeFileDrop({ pause }, cdp, held) {
   await pause(300)
 }
 
-/** 被遮罩盖住的侧栏仍不是任务落点；抽屉不能把全窗口都变成接收区。 */
+/** 侧栏仍不是任务落点；工具组不能把全窗口都变成接收区。 */
 export async function rejectFileDrop({ value, pause }, cdp, paths, target) {
   if (target === undefined) return
   const rect = await value(
@@ -72,6 +74,7 @@ export async function dragIntoView({ value, pause, waitFor, root }, cdp, view) {
   const held = await exerciseFileDrop({ value, pause }, cdp, paths, {
     target: view.dragTarget,
     drop: view.holdDrag !== true,
+    ...(view.dragHint === undefined ? {} : { hint: view.dragHint }),
   })
   if (view.holdDrag === true) return held
   await waitFor(

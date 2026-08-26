@@ -76,6 +76,7 @@ export function ThreadScreen({
         onOpenLane={shell.openAside}
         workbenchPage={workbench.page}
         workbenchVisible={workbench.visible}
+        dropSurfaceVisible={workbench.visible || shell.reviewOpen}
         onOpenActivity={shell.openActivity}
         onOpenFiles={shell.openFiles}
         onFilesDropped={shell.hideWorkbench}

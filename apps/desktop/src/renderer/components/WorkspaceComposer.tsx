@@ -73,7 +73,7 @@ export function WorkspaceComposer({
       prefill={prefill}
       reference={props.composerReference}
       onFilesDropped={props.onFilesDropped}
-      workbenchVisible={props.workbenchVisible}
+      dropSurfaceVisible={props.dropSurfaceVisible}
       canAttach={
         (thread.capabilities ?? NO_CAPABILITIES).attachments &&
         modelAcceptsImages(props.models, thread.model)
