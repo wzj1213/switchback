@@ -274,8 +274,8 @@ const api = {
   async settings(patch?: Partial<Settings>): Promise<Settings> {
     return (await ipcRenderer.invoke("omni:settings", patch)) as Settings
   },
-  async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
-    return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
+  async searchFiles(cwd: string, query: string, refresh?: boolean): Promise<readonly string[]> {
+    return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query, refresh })) as readonly string[]
   },
   /**
    * 读一份文件给侧栏预览。

@@ -85,4 +85,16 @@ describe("主进程工作区文件搜索", () => {
     expect(calls.made).toEqual(["/work"])
     expect(calls.queries[0]).toHaveLength(256)
   })
+
+  it("显式刷新先让已有索引失效，普通搜索继续复用", async () => {
+    const calls = { made: [] as string[], invalidated: [] as string[], queries: [] as string[] }
+    const search = createWorksiteSearch(fakeFactory(calls))
+    search.note(threadEvent("thread.started", "th", "/work"))
+    await search.search({ cwd: "/work", query: "old" })
+    await search.search({ cwd: "/work", query: "new", refresh: "true" })
+    expect(calls.invalidated).toEqual([])
+    await search.search({ cwd: "/work", query: "new", refresh: true })
+    expect(calls.invalidated).toEqual(["/work"])
+    expect(calls.made).toEqual(["/work"])
+  })
 })

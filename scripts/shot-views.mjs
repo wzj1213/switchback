@@ -6,7 +6,6 @@
  */
 import { COMPOSE_VIEWS } from "./shot-views-compose.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
-
 export const VIEWS = [
     { name: "01-转录区", open: null, ready: ".md" },
     {
@@ -159,7 +158,8 @@ export const VIEWS = [
         && document.querySelector('.workbench__scrim') === null
         && getComputedStyle(document.querySelector('.main')).display === (innerWidth <= 1320 ? 'none' : 'flex')
         && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')
-        && document.querySelector('.files-scope')?.textContent.includes('搜索范围是当前工作区') === true
+        && document.querySelector('.files-scope')?.textContent.includes('搜索当前工作区') === true
+        && document.querySelector('.files-scope')?.textContent.includes('文件变化会自动更新') === true
         && document.querySelector('.files-index')?.textContent.includes('最近一轮改过') === true
         && document.querySelector('.files-index')?.textContent.includes('此前碰过') === true
         && document.querySelector('.files-index')?.textContent.includes('AGENTS.md') === true`,
@@ -207,6 +207,30 @@ export const VIEWS = [
         && document.querySelector('.files-index')?.textContent.includes('正在搜索') === false
         && document.querySelector('.files-index') === window.__omniFileIndex
         && document.activeElement?.matches('.files-search input') === true`,
+    },
+    {
+      name: "09-搜索持续刷新",
+      createFiles: ["apps/desktop/src/renderer/attachment-live-refresh-probe.ts"],
+      open: `(() => {
+        window.__omniRefreshProbe = setInterval(() => {
+          const found = [...document.querySelectorAll('.file-row')]
+            .find(row => row.textContent.includes('attachment-live-refresh-probe.ts'))
+          if (found === undefined) return
+          found.scrollIntoView({ block: 'nearest' })
+          clearInterval(window.__omniRefreshProbe)
+          document.documentElement.dataset.fileRefresh = 'ready'
+        }, 50)
+        window.dispatchEvent(new Event('focus'))
+      })()`,
+      ready: "html[data-file-refresh=ready]",
+      assert: `document.querySelector('.files-search input')?.value === 'attachment'
+        && document.querySelector('.files-index') === window.__omniFileIndex
+        && document.querySelector('.files-index')?.textContent.includes('attachment-live-refresh-probe.ts') === true
+        && document.activeElement?.matches('.files-search input') === true`,
+      after: `(() => {
+        clearInterval(window.__omniRefreshProbe); delete window.__omniRefreshProbe
+        delete document.documentElement.dataset.fileRefresh
+      })()`,
     },
     {
       name: "09-切页重开保留",

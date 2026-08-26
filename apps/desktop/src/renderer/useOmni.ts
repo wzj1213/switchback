@@ -31,7 +31,7 @@ export interface Omni {
   /** 在访达里定位一个路径。只定位，不打开。 */
   reveal: (path: string) => void
   /** 工作区内的文件模糊搜索，给 `@` 用 */
-  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  searchFiles: (cwd: string, query: string, refresh?: boolean) => Promise<readonly string[]>
   /**
    * preload 没注入通道。**显式暴露而不是静默 no-op**：
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
@@ -167,7 +167,8 @@ export function useOmni(): Omni {
   )
 
   const searchFiles = useCallback(
-    async (cwd: string, query: string) => (await bridge?.searchFiles(cwd, query)) ?? [],
+    async (cwd: string, query: string, refresh?: boolean) =>
+      (await bridge?.searchFiles(cwd, query, refresh)) ?? [],
     [bridge],
   )
 

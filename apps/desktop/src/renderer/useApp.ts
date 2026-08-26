@@ -70,7 +70,7 @@ export interface AppApi {
     forward: boolean,
   ) => Promise<{ active: number; total: number }>
   stopFind: () => void
-  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  searchFiles: (cwd: string, query: string, refresh?: boolean) => Promise<readonly string[]>
   /** 在指定目录开新会话。 */
   open: (cwd: string) => void
   /** 弹目录框再开。 */

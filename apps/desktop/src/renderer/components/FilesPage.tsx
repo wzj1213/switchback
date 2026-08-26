@@ -1,68 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { fileTouchOf, sessionFileGroupsOf } from "../session-files.js"
+import { useFileSearch, type FileSearchState, type SearchFiles } from "../use-file-search.js"
 import { FileGroup } from "./file-group.js"
 import { focusFirstFile, PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
-
-export interface FileSearchState {
-  key: string
-  loading: boolean
-  paths: readonly string[]
-  failed: boolean
-}
-
-function searchKey(cwd: string, query: string): string {
-  return `${cwd}\u0000${query.trim()}`
-}
-
-/** 查询或工作区刚变化时，旧结果立刻失效，不能撑过 120ms 防抖继续可点。 */
-export function visibleFileSearch(
-  state: FileSearchState,
-  cwd: string,
-  query: string,
-): Omit<FileSearchState, "key"> {
-  if (state.key === searchKey(cwd, query)) {
-    const { loading, paths, failed } = state
-    return { loading, paths, failed }
-  }
-  return { loading: query.trim() !== "", paths: [], failed: false }
-}
-
-function useFileSearch(
-  cwd: string,
-  query: string,
-  search: (cwd: string, query: string) => Promise<readonly string[]>,
-): Omit<FileSearchState, "key"> & { retry: () => void } {
-  const [state, setState] = useState<FileSearchState>({ key: "", loading: false, paths: [], failed: false })
-  const [again, setAgain] = useState(0)
-  const seq = useRef(0)
-  const clean = query.trim()
-  const key = searchKey(cwd, query)
-  useEffect(() => {
-    seq.current += 1
-    const mine = seq.current
-    if (clean === "") {
-      setState({ key, loading: false, paths: [], failed: false })
-      return undefined
-    }
-    setState({ key, loading: true, paths: [], failed: false })
-    const timer = window.setTimeout(() => {
-      void search(cwd, clean).then((paths) => {
-        if (seq.current === mine) setState({ key, loading: false, paths, failed: false })
-      }).catch(() => {
-        if (seq.current === mine) setState({ key, loading: false, paths: [], failed: true })
-      })
-    }, 120)
-    return () => { window.clearTimeout(timer) }
-  }, [again, clean, cwd, key, search])
-  const retry = useCallback(() => { setAgain((before) => before + 1) }, [])
-  return {
-    ...visibleFileSearch(state, cwd, query),
-    retry,
-  }
-}
 
 interface FileSearchView extends Omit<FileSearchState, "key"> {
   retry: () => void
@@ -70,6 +13,9 @@ interface FileSearchView extends Omit<FileSearchState, "key"> {
 
 /** 搜索的三种非结果态；失败与零命中必须是两件不同的事。 */
 export function FileSearchStatus({ state }: { state: FileSearchView }): React.JSX.Element | null {
+  if (state.loading && state.paths.length > 0) {
+    return <p className="files-search__refresh" role="status">正在更新…</p>
+  }
   if (state.loading) return <p className="workbench__empty">正在搜索…</p>
   if (state.failed) {
     return (
@@ -82,20 +28,22 @@ export function FileSearchStatus({ state }: { state: FileSearchView }): React.JS
   return state.paths.length === 0 ? <p className="workbench__empty">没有找到文件。</p> : null
 }
 
-function FileIndex({ threadId, cwd, items, hidden, onPick, searchFiles }: {
+function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
+  stamp: string
+  active: boolean
   hidden: boolean
   onPick: (target: PreviewTarget) => void
-  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  searchFiles: SearchFiles
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
   const input = useRef<HTMLInputElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const enterResults = useRef(false)
   const groups = useMemo(() => sessionFileGroupsOf(items, cwd), [items, cwd])
-  const found = useFileSearch(cwd, query, searchFiles)
+  const found = useFileSearch({ cwd, query, stamp, active, search: searchFiles })
   const searching = query.trim() !== ""
   const recent = groups.recentEdited.length + groups.recentRead.length
   const total = recent + groups.earlier.length + groups.inherited.length
@@ -130,7 +78,7 @@ function FileIndex({ threadId, cwd, items, hidden, onPick, searchFiles }: {
             enterResults.current = false
             setQuery("")
           }} />
-        <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索范围是当前工作区。</span>
+        <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索当前工作区，文件变化会自动更新。</span>
       </label>
       <div className="files-index__scroll">
         {searching ? (
@@ -156,12 +104,13 @@ function FileIndex({ threadId, cwd, items, hidden, onPick, searchFiles }: {
   )
 }
 
-export function FilesPage({ threadId, cwd, items, stamp, target, onPick, onBack, onReference,
+export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick, onBack, onReference,
   referenceDisabled, onReveal, onCopy, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
   stamp: string
+  active?: boolean
   target: PreviewTarget | undefined
   onPick: (target: PreviewTarget) => void
   onBack: () => void
@@ -169,13 +118,14 @@ export function FilesPage({ threadId, cwd, items, stamp, target, onPick, onBack,
   referenceDisabled?: boolean
   onReveal: (path: string) => void
   onCopy: (text: string) => void
-  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  searchFiles: SearchFiles
 }): React.JSX.Element {
   const revision = target === undefined ? undefined : fileTouchOf(items, cwd, target.path)
   return (
     <>
       {/* 详情是盖在索引上的一层；保活才能让返回保住查询、结果与滚动位置。 */}
-      <FileIndex threadId={threadId} cwd={cwd} items={items} hidden={target !== undefined}
+      <FileIndex threadId={threadId} cwd={cwd} items={items} stamp={stamp}
+        active={active !== false && target === undefined} hidden={target !== undefined}
         onPick={onPick} searchFiles={searchFiles} />
       {target === undefined ? null : (
         <FilePreviewView target={target} revision={revision} stamp={stamp}

@@ -50,6 +50,13 @@
   padding: 0 var(--sp-2) var(--sp-4);
 }
 
+.files-search__refresh {
+  margin: 0;
+  padding: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
 .files-search__failure {
   display: flex;
   align-items: center;

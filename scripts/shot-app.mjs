@@ -29,11 +29,10 @@ import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
 import { completeFileDrop, dragIntoView } from "./shot-file-drop.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
 import { VIEWS } from "./shot-views.mjs"
-
+import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
 const electron = createRequire(join(DESKTOP, "package.json"))("electron")
-
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
 const DARK = process.argv.includes("--dark"),
   REDUCED = process.argv.includes("--reduce")
@@ -51,9 +50,7 @@ const MIN = process.argv.includes("--min")
 const SIZE = process.argv.includes("--wide") ? { width: 1404, height: 720 } : MIN ? { width: 860, height: 560 } : { width: 1280, height: 860 }
 /** 样本的时间戳写死。**不能用 `Date.now()`**——侧栏上那些「3 小时前」会每次都不一样。 */
 const AT = 1_787_659_200_000
-
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
 async function freePort() {
   const server = createServer()
   await new Promise((resolve, reject) => {
@@ -148,8 +145,9 @@ async function audit(cdp, label, enabled) {
 function audits(view) {
   return AUDIT_ALL || view.audit === true
 }
-async function shoot(cdp, view) {
+async function shoot(cdp, view, workspaceFiles) {
   let heldDrop
+  await prepareWorkspaceFiles(ROOT, view, workspaceFiles)
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
   }
@@ -244,6 +242,7 @@ async function main() {
   await mkdir(OUT, { recursive: true })
   const port = await freePort()
   const data = await mkdtemp(join(tmpdir(), "omni-shot-"))
+  const workspaceFiles = new Set()
   await seed(data)
   const child = spawn(
     electron,
@@ -275,7 +274,7 @@ async function main() {
     await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
-    for (const view of VIEWS) await shoot(cdp, view)
+    for (const view of VIEWS) await shoot(cdp, view, workspaceFiles)
     await shootSettings(cdp)
     cdp.close()
   } catch (error) {
@@ -292,6 +291,7 @@ async function main() {
   } finally {
     child.kill("SIGTERM")
     await pause(400)
+    await cleanupWorkspaceFiles(workspaceFiles)
     await rm(data, { recursive: true, force: true })
   }
   console.log(`\n出图目录：${OUT}`)

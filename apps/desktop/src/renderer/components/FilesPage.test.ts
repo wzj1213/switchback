@@ -2,7 +2,8 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { Item } from "@omni/protocol"
-import { FileSearchStatus, FilesPage, visibleFileSearch, type FileSearchState } from "./FilesPage.js"
+import { FileSearchStatus, FilesPage } from "./FilesPage.js"
+import { beginFileSearch, visibleFileSearch, type FileSearchState } from "../use-file-search.js"
 
 const cwd = "/work/repos"
 
@@ -67,6 +68,20 @@ describe("文件清单", () => {
     expect(visibleFileSearch(old, "/old", "package")).toEqual({ loading: true, paths: [], failed: false })
     expect(visibleFileSearch(old, "/old", "readme")).toEqual({
       loading: false, paths: ["README.md"], failed: false,
+    })
+  })
+
+  it("同一查询后台重查保留旧结果，换关键词才清空", () => {
+    const old: FileSearchState = {
+      key: "/old\u0000readme", loading: false, paths: ["README.md"], failed: false,
+    }
+    expect(beginFileSearch(old, "/old\u0000readme")).toEqual({
+      refresh: true,
+      state: { ...old, loading: true },
+    })
+    expect(beginFileSearch(old, "/old\u0000package")).toEqual({
+      refresh: false,
+      state: { key: "/old\u0000package", loading: true, paths: [], failed: false },
     })
   })
 

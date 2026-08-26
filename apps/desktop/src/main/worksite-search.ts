@@ -94,12 +94,18 @@ function owns(state: State, threadId: ThreadId, rawCwd: string): boolean {
 
 async function search(state: State, request: unknown): Promise<readonly string[]> {
   if (typeof request !== "object" || request === null) return []
-  const { cwd: rawCwd, query: rawQuery } = request as { cwd?: unknown; query?: unknown }
+  const { cwd: rawCwd, query: rawQuery, refresh } = request as {
+    cwd?: unknown
+    query?: unknown
+    refresh?: unknown
+  }
   if (typeof rawCwd !== "string" || typeof rawQuery !== "string") return []
   const cwd = cwdOf(rawCwd)
   if (cwd === undefined || !state.owners.has(cwd)) return []
   const query = rawQuery.slice(0, QUERY_CHARS)
-  return (await indexOf(state, cwd).search(query)).map((hit) => hit.path)
+  const site = indexOf(state, cwd)
+  if (refresh === true) site.invalidate()
+  return (await site.search(query)).map((hit) => hit.path)
 }
 
 export function createWorksiteSearch(

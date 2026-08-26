@@ -6,6 +6,7 @@ import { useWorkbenchKeys } from "../use-workbench-keys.js"
 import { ActivityPage } from "./ActivityPage.js"
 import { FilesPage } from "./FilesPage.js"
 import { DotBoxIcon, FileIcon } from "./icons-activity.js"
+import type { SearchFiles } from "../use-file-search.js"
 
 function ToolTab({ on, label, count, children, onClick }: {
   on: boolean
@@ -41,7 +42,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
   onHide: () => void
   onReveal: (path: string) => void
   onCopy: (text: string) => void
-  searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  searchFiles: SearchFiles
   full: boolean
   onFull: () => void
 }): React.JSX.Element | null {
@@ -81,7 +82,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
         <div className="workbench__page" hidden={state.page !== "files"}>
           {/* 搜索上下文只属于这一条任务；切任务时重挂，页内切换或收起时保活。 */}
           <FilesPage key={`${thread.id}\u0000${thread.cwd}`} threadId={thread.id} cwd={thread.cwd}
-            items={items} stamp={stamp}
+            items={items} stamp={stamp} active={state.visible && state.page === "files"}
             target={state.file} onPick={onPickFile}
             onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
