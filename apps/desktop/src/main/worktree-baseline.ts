@@ -1,13 +1,19 @@
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
-import { delimiter, isAbsolute, join, relative, resolve, sep } from "node:path"
+import { delimiter, isAbsolute, join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { promisify } from "node:util"
 import { isStaged, parseNumstat, type ReviewFile } from "../shared/review.js"
 import { ignoredOutsideTree } from "./git-ignore.js"
 import { treePatch } from "./worktree-patch.js"
 import { stageInfo, type TreeSnapshot } from "./worktree-stage.js"
+import {
+  baselineKind,
+  baselineNameEntries,
+  selectBaselineEntries,
+  wantedBaselineRel,
+} from "./worktree-baseline-paths.js"
 
 const exec = promisify(execFile)
 const TIMEOUT = 10_000
@@ -28,12 +34,6 @@ interface BaselineMeta {
   tree: string
 }
 
-interface NameEntry {
-  mark: string
-  rel: string
-  from?: string
-}
-
 interface BaselineAccess {
   dir: string
   meta: BaselineMeta
@@ -52,9 +52,11 @@ export interface BaselineReview {
 
 export interface WorktreeBaselines {
   ensure: (threadId: string, cwd: string) => Promise<void>
+  /** 每轮发给引擎前覆盖一次；审核“上一轮”只读这份，不拿会话开场冒充。 */
+  captureTurn: (threadId: string, cwd: string) => Promise<void>
   remove: (threadId: string) => Promise<void>
-  review: (threadId: string, cwd: string, wanted?: readonly string[]) => Promise<BaselineReview | undefined>
-  patch: (threadId: string, cwd: string, rel: string, context: number) => Promise<string | undefined>
+  review: (threadId: string, cwd: string, wanted?: readonly string[], turn?: boolean) => Promise<BaselineReview | undefined>
+  patch: (threadId: string, cwd: string, rel: string, options: { context: number; turn?: boolean }) => Promise<string | undefined>
 }
 
 function keyOf(threadId: string): string {
@@ -131,7 +133,8 @@ async function readMeta(dir: string): Promise<BaselineMeta | undefined> {
   }
 }
 
-async function capture(baseDir: string, target: string, cwd: string): Promise<void> {
+async function capture(options: { baseDir: string; target: string; cwd: string; replace?: boolean }): Promise<void> {
+  const { baseDir, target, cwd, replace = false } = options
   const repo = await repoOf(cwd)
   if (repo === undefined) return
   await mkdir(baseDir, { recursive: true })
@@ -140,6 +143,11 @@ async function capture(baseDir: string, target: string, cwd: string): Promise<vo
     const made = await snapshot(repo, temp, [repo.objects])
     const meta: BaselineMeta = { version: 1, root: repo.root, cwd: repo.cwd, tree: made.tree }
     await writeFile(join(temp, META), JSON.stringify(meta), "utf8")
+    if (replace) {
+      await rm(target, { recursive: true, force: true })
+      await rename(temp, target)
+      return
+    }
     try {
       await rename(temp, target)
     } catch (error) {
@@ -150,68 +158,6 @@ async function capture(baseDir: string, target: string, cwd: string): Promise<vo
     await rm(temp, { recursive: true, force: true })
     throw error
   }
-}
-
-function nameEntries(raw: string): readonly NameEntry[] {
-  const parts = raw.split("\0")
-  const out: NameEntry[] = []
-  for (let index = 0; index < parts.length; index += 1) {
-    const mark = parts[index]
-    if (mark === undefined || mark === "") continue
-    if (mark.startsWith("R") || mark.startsWith("C")) {
-      const from = parts[index + 1]
-      const rel = parts[index + 2]
-      if (from !== undefined && rel !== undefined) out.push({ mark, from, rel })
-      index += 2
-      continue
-    }
-    const rel = parts[index + 1]
-    if (rel !== undefined) out.push({ mark, rel })
-    index += 1
-  }
-  return out
-}
-
-function kindOf(mark: string, currentCode?: string): ReviewFile["kind"] {
-  // `??` 只说明它不在 HEAD，不说明它在**对话开场树**里不存在。
-  // 开场前已有的 untracked 文件本轮被修改时 mark=M，必须叫“修改”而不是“新增”。
-  if (mark.startsWith("A") && currentCode?.startsWith("?") === true) return "untracked"
-  if (mark.startsWith("A")) return "add"
-  if (mark.startsWith("D")) return "delete"
-  if (mark.startsWith("R") || mark.startsWith("C")) return "rename"
-  return "update"
-}
-
-function within(root: string, path: string): string | undefined {
-  const rel = relative(root, path)
-  return rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)
-    ? undefined
-    : rel
-}
-
-function tmpAlias(path: string): string {
-  if (path === "/tmp") return "/private/tmp"
-  return path.startsWith("/tmp/") ? `/private${path}` : path
-}
-
-function wantedRel(path: string, requestedCwd: string, meta: BaselineMeta): string | undefined {
-  const insideRepo = (rel: string): string | undefined =>
-    rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)
-      ? undefined
-      : rel
-  if (!isAbsolute(path)) return insideRepo(join(relative(meta.root, meta.cwd), path))
-  const lexical = within(tmpAlias(resolve(requestedCwd)), tmpAlias(resolve(path)))
-  if (lexical !== undefined) return insideRepo(join(relative(meta.root, meta.cwd), lexical))
-  return within(tmpAlias(meta.root), tmpAlias(resolve(path)))
-}
-
-function selected(all: readonly NameEntry[], wanted: ReadonlySet<string>): readonly NameEntry[] {
-  const first = all.slice(0, MAX_FILES)
-  const seen = new Set(first.map((entry) => entry.rel))
-  const extra = all.filter(
-    (entry) => !seen.has(entry.rel) && (wanted.has(entry.rel) || (entry.from !== undefined && wanted.has(entry.from))),
-  )
-  return [...first, ...extra]
 }
 
 async function withCurrent<T>(
@@ -236,7 +182,7 @@ async function reviewOf(
   const { dir, meta, repo } = found
   const wantedSet = new Set(
     wanted
-      .map((path) => wantedRel(path, requestedCwd, meta))
+      .map((path) => wantedBaselineRel(path, requestedCwd, meta))
       .filter((rel): rel is string => rel !== undefined),
   )
   return withCurrent(dir, repo, async (current) => {
@@ -251,8 +197,8 @@ async function reviewOf(
       }),
       ignoredOutsideTree({ cwd: repo.root, tree: meta.tree, paths: [...wantedSet], env: current.env }),
     ])
-    const all = nameEntries(names)
-    const kept = selected(all, wantedSet)
+    const all = baselineNameEntries(names)
+    const kept = selectBaselineEntries(all, wantedSet, MAX_FILES)
     const stats = parseNumstat(nums)
     const files = kept.map((entry): ReviewFile => {
       const code = stage.codes.get(entry.rel)
@@ -260,7 +206,7 @@ async function reviewOf(
       return {
         path: join(meta.root, entry.rel),
         rel: entry.rel,
-        kind: kindOf(entry.mark, code),
+        kind: baselineKind(entry.mark, code),
         added: stat?.added ?? 0,
         removed: stat?.removed ?? 0,
         ...(entry.from === undefined ? {} : { from: entry.from }),
@@ -274,16 +220,24 @@ async function reviewOf(
   })
 }
 
+async function patchOf(found: BaselineAccess, rel: string, context: number): Promise<string> {
+  return withCurrent(found.dir, found.repo, (current) => treePatch({
+    run: (args, maxBuffer) => git(found.repo.root, args, current.env, maxBuffer),
+    baseline: found.meta.tree,
+    current: current.tree,
+    rel,
+    context,
+  }))
+}
+
 export function createWorktreeBaselines(baseDir: string): WorktreeBaselines {
   const dirOf = (threadId: string): string => join(baseDir, keyOf(threadId))
-  const captures = new Map<string, Promise<void>>()
+  const captures = new Map<string, Promise<void>>(), turnCaptures = new Map<string, Promise<void>>()
   const deleted = new Set<string>()
-  const available = async (threadId: string, cwd: string): Promise<BaselineAccess | undefined> => {
-    const dir = dirOf(threadId)
+  const available = async (threadId: string, cwd: string, turn = false): Promise<BaselineAccess | undefined> => {
+    const dir = turn ? join(dirOf(threadId), "last-turn") : dirOf(threadId)
     const [meta, repo] = await Promise.all([readMeta(dir), repoOf(cwd)])
-    if (meta === undefined || repo === undefined || meta.root !== repo.root || meta.cwd !== repo.cwd) {
-      return undefined
-    }
+    if (meta === undefined || repo === undefined || meta.root !== repo.root || meta.cwd !== repo.cwd) return undefined
     return { dir, meta, repo }
   }
   const ensure = async (threadId: string, cwd: string): Promise<void> => {
@@ -295,7 +249,7 @@ export function createWorktreeBaselines(baseDir: string): WorktreeBaselines {
     if (running !== undefined) return running
     const target = dirOf(threadId)
     const started = rm(target, { recursive: true, force: true })
-      .then(() => capture(baseDir, target, cwd))
+      .then(() => capture({ baseDir, target, cwd }))
       .finally(() => {
         captures.delete(key)
       })
@@ -304,27 +258,34 @@ export function createWorktreeBaselines(baseDir: string): WorktreeBaselines {
   }
   return {
     ensure,
+    captureTurn: async (threadId, cwd) => {
+      await ensure(threadId, cwd)
+      const key = keyOf(threadId)
+      if (deleted.has(key)) return
+      const running = turnCaptures.get(key)
+      if (running !== undefined) return running
+      const parent = dirOf(threadId)
+      const started = capture({ baseDir: parent, target: join(parent, "last-turn"), cwd, replace: true }).finally(() => {
+        turnCaptures.delete(key)
+      })
+      turnCaptures.set(key, started)
+      return started
+    },
     remove: async (threadId) => {
       // 删除与首次取样撞车时先等取样落定再删；反过来会被迟到的 rename 把目录建回来。
       const key = keyOf(threadId)
       deleted.add(key)
       await captures.get(key)?.catch(() => undefined)
+      await turnCaptures.get(key)?.catch(() => undefined)
       await rm(dirOf(threadId), { recursive: true, force: true })
     },
-    review: async (threadId, cwd, wanted = []) => {
-      const found = await available(threadId, cwd)
+    review: async (threadId, cwd, wanted = [], turn = false) => {
+      const found = await available(threadId, cwd, turn)
       return found === undefined ? undefined : reviewOf(found, cwd, wanted)
     },
-    patch: async (threadId, cwd, rel, context) => {
-      const found = await available(threadId, cwd)
-      if (found === undefined) return undefined
-      return withCurrent(found.dir, found.repo, (current) => treePatch({
-        run: (args, maxBuffer) => git(found.repo.root, args, current.env, maxBuffer),
-        baseline: found.meta.tree,
-        current: current.tree,
-        rel,
-        context,
-      }))
+    patch: async (threadId, cwd, rel, options) => {
+      const found = await available(threadId, cwd, options.turn ?? false)
+      return found === undefined ? undefined : patchOf(found, rel, options.context)
     },
   }
 }

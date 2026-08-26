@@ -22,7 +22,6 @@ import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
 import { stampOf } from "../stamp.js"
 import { Between } from "./Between.js"
-import type { WorkbenchPage } from "../workbench.js"
 import { ConversationStage } from "./ConversationStage.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import type { ComposerFileReference } from "../file-references.js"
@@ -45,12 +44,10 @@ export interface WorkspaceProps {
   /** 工作台正开着哪条旁路。主线上那条收成一行，同一棵树不画两遍。 */
   openLane: string | undefined
   onOpenLane: (laneId: string) => void
-  workbenchPage: WorkbenchPage
-  workbenchVisible: boolean
+  panelVisible: boolean
   /** 任一右侧工具组可见时，拖放提示要覆盖它，而不是藏在输入卡里。 */
   dropSurfaceVisible: boolean
-  onOpenActivity: () => void
-  onOpenFiles: () => void
+  onTogglePanel: () => void
   /** 从任务画布拖入文件后收起右侧工具组，让结果立刻回到输入框。 */
   onFilesDropped: () => void
   models: readonly ModelOption[]
@@ -201,13 +198,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         }}
         onReveal={props.onReveal}
         onCopy={props.onCopy}
-        activityCount={
-          props.lanes.filter((lane) => lane.status === "running" || lane.status === "paused").length
-        }
-        workbenchPage={props.workbenchPage}
-        workbenchVisible={props.workbenchVisible}
-        onActivity={props.onOpenActivity}
-        onFiles={props.onOpenFiles}
+        panelVisible={props.panelVisible}
+        onPanel={props.onTogglePanel}
       />
       <Notices
         notices={props.notices}

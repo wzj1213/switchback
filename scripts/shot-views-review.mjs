@@ -2,7 +2,11 @@
 export const REVIEW_VIEWS = [
   {
     name: "04-Git审核",
-    open: [], shortcut: { key: "r", code: "KeyR", modifiers: 12, windowsVirtualKeyCode: 82 },
+    open: [
+      `document.querySelector('.rv__head .trigger')?.click()`,
+      `[...document.querySelectorAll('.pop__item')]
+        .find(button => button.textContent.includes('未提交'))?.click()`,
+    ], shortcut: { key: "r", code: "KeyR", modifiers: 12, windowsVirtualKeyCode: 82 },
     ready: ".rv",
     assert: `(document.querySelector('.rv__file') !== null
         || document.querySelector('.rv')?.textContent.includes('当前工作区相对 HEAD 是干净的') === true)
@@ -22,14 +26,27 @@ export const REVIEW_VIEWS = [
       })()
       && (() => {
         const review = document.querySelector('.rv')?.getBoundingClientRect()
-        const title = document.querySelector('.rv__title')?.getBoundingClientRect()
+        const title = document.querySelector('.panel-tab--on')?.getBoundingClientRect()
         const tools = document.querySelector('.rv__tools')?.getBoundingClientRect()
-        const buttons = [...document.querySelectorAll('.rv__seg')].map(button => button.getBoundingClientRect())
+        const buttons = [...document.querySelectorAll('.rv__tool')].map(button => button.getBoundingClientRect())
         if (review === undefined || title === undefined || tools === undefined) return false
         const stacked = review.width <= 760
         return (!stacked || tools.top >= title.bottom)
           && buttons.every(button => button.height < 40 && button.width > 24)
       })()`,
+  },
+  {
+    name: "04-审核范围菜单",
+    open: `document.querySelector('.rv__head .trigger')?.click()`,
+    ready: `[role="menu"][aria-label="选择审核范围"]`,
+    assert: `(() => {
+      const menu = document.querySelector('[role="menu"][aria-label="选择审核范围"]')
+      const text = menu?.textContent ?? ''
+      return ['上一轮', '未提交', '未暂存', '已暂存', '已提交', '分支']
+        .every(label => text.includes(label))
+        && document.activeElement?.getAttribute('role') === 'menuitemradio'
+    })()`,
+    after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
   },
   {
     name: "04-审核方向键不越界",
@@ -78,6 +95,30 @@ export const REVIEW_VIEWS = [
     })()`,
   },
   {
+    name: "04-跳转到文件",
+    open: `document.querySelector('[aria-label="跳转到文件"]')?.click()`,
+    ready: `[role="menu"][aria-label="跳转到文件"]`,
+    assert: `document.querySelectorAll('[role="menu"][aria-label="跳转到文件"] .pop__item').length > 1
+      && document.activeElement?.getAttribute('role') === 'menuitem'`,
+    after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
+  },
+  {
+    name: "04-统一差异",
+    open: `document.querySelector('[aria-label="切换到统一差异"]')?.click()`,
+    ready: `.rvd__body:not(.rvd__body--split)`,
+    assert: `document.querySelector('.rvd')?.getAttribute('aria-label') === '文件改动，可滚动'
+      && document.querySelector('[aria-label="切换到分栏差异"]') !== null`,
+    after: `document.querySelector('[aria-label="切换到分栏差异"]')?.click()`,
+  },
+  {
+    name: "04-隐藏审核文件",
+    open: `document.querySelector('[aria-label="隐藏文件"]')?.click()`,
+    ready: `.rv__body--list-hidden`,
+    assert: `getComputedStyle(document.querySelector('.rvl')).display === 'none'
+      && document.querySelector('[aria-label="显示文件"]') !== null`,
+    after: `document.querySelector('[aria-label="显示文件"]')?.click()`,
+  },
+  {
     name: "04-历史审核拖放说明",
     open: [],
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
@@ -95,11 +136,12 @@ export const REVIEW_VIEWS = [
   },
   {
     name: "04-Git审核展开",
-    open: `document.querySelector('.rv__expand')?.click()`,
+    open: `document.querySelector('.rv .panel-tabs__expand')?.click()`,
     ready: `.shell--workbench-full .rv`,
     assert: `getComputedStyle(document.querySelector('.main')).display === 'none'
-      && document.querySelector('.rv__expand')?.getAttribute('aria-label') === '并排显示审核'`,
-    after: `document.querySelector('.rv__close')?.click()`,
+      && document.querySelector('.rv .panel-tabs__expand')?.getAttribute('aria-label') === '并排显示侧边面板'`,
+    after: `[...document.querySelectorAll('.rv .panel-tab__close')]
+      .find(button => button.getAttribute('aria-label') === '关闭审查页')?.click()`,
   },
 ]
 
@@ -111,11 +153,14 @@ export const EDITABLE_REVIEW_VIEW = {
   dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
   dragTarget: ".rv__pane",
   ready: ".composer__attachwarn",
-  absent: ".rv",
-  assert: `document.querySelector('.composer__input')?.value
-      .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
-    && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
-    && document.activeElement?.classList.contains('composer__input') === true`,
+  assert: `(() => {
+    const panelOpen = document.querySelector('.rv:not([hidden])') !== null
+    return panelOpen === (innerWidth > 1120)
+      && document.querySelector('.composer__input')?.value
+        .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+      && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
+      && document.activeElement?.classList.contains('composer__input') === true
+  })()`,
   after: `(() => {
     const input = document.querySelector('.composer__input')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set

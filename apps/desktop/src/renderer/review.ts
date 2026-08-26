@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import type { ReviewFile } from "../shared/review.js"
+import type { ReviewFile, ReviewScope } from "../shared/review.js"
 import type { NumberedLine } from "./review-lines.js"
 
 export { numbered, trimMeta, type NumberedLine } from "./review-lines.js"
@@ -114,6 +114,7 @@ export interface ReviewData {
   ignored?: readonly string[]
   baseline: boolean
   failed: boolean
+  turnMissing: boolean
   /** 不是 git 仓库。和「没有改动」是两件事，界面上要说不同的话。 */
   noRepo: boolean
   loading: boolean
@@ -134,7 +135,7 @@ export interface ReviewData {
   reload: () => void
 }
 
-interface ReviewQuery { threadId: string; wanted?: readonly string[] }
+interface ReviewQuery { threadId: string; wanted?: readonly string[]; scope?: ReviewScope }
 
 // `settled` 也排除在外：它不是这份载荷的一部分，是「拿它去渲染时手上有没有东西」，
 // 由 `reviewData` 现算
@@ -149,7 +150,8 @@ function loadedReview(
   out: Awaited<ReturnType<NonNullable<typeof window.omni>["workReview"]>>,
 ): LoadedReview {
   if (out === undefined) {
-    return { key, scope, root: "", cwd: "", files: [], baseline: false, failed: false, noRepo: true }
+    return { key, scope, root: "", cwd: "", files: [], baseline: false, failed: false,
+      turnMissing: false, noRepo: true }
   }
   return {
     key,
@@ -157,6 +159,7 @@ function loadedReview(
     ...out,
     baseline: out.baseline === true,
     failed: out.failed === true,
+    turnMissing: out.turnMissing === true,
     noRepo: false,
   }
 }
@@ -170,7 +173,7 @@ function reviewData(
   if (data === undefined || data.scope !== scope) {
     return {
       root: "", cwd: "", files: [], noRepo: false, baseline: false, failed: false,
-      loading: true, settled: false, revision: key, reload,
+      turnMissing: false, loading: true, settled: false, revision: key, reload,
     }
   }
   // 有这个 scope 的答案了。**`settled` 不跟着 `loading` 走**：重问期间旧答案仍然算数，
@@ -202,7 +205,7 @@ export function useReview(
    * 而那恰恰是它最该稳稳待着的时候。`wanted` 只是**把同一个问题问得更细**，
    * 它变了要重问（所以在 `key` 里），但不该让手上那份答案作废。
    */
-  const scope = `${cwd}\u0000${query.threadId}`
+  const scope = `${cwd}\u0000${query.threadId}\u0000${query.scope ?? "conversation"}`
   const key = `${scope}\u0000${wantedKey}\u0000${stamp}\u0000${String(nonce)}\u0000${String(visit)}`
   const [data, setData] = useState<LoadedReview | undefined>(undefined)
   useEffect(() => {
@@ -220,19 +223,20 @@ export function useReview(
     if (cwd === "" || bridge === undefined) return undefined
     let live = true
     void bridge
-      .workReview(cwd, query.threadId, wanted)
+      .workReview(cwd, query.threadId, wanted, query.scope)
       .then((out) => {
         if (!live) return
         setData(loadedReview(key, scope, out))
       })
       .catch(() => {
         if (!live) return
-        setData({ key, scope, root: "", cwd, files: [], baseline: false, failed: true, noRepo: false })
+        setData({ key, scope, root: "", cwd, files: [], baseline: false, failed: true,
+          turnMissing: false, noRepo: false })
       })
     return () => {
       live = false
     }
-  }, [cwd, key, query.threadId, wantedKey])
+  }, [cwd, key, query.scope, query.threadId, wantedKey])
   const reload = useCallback(() => {
     setNonce((n) => n + 1)
   }, [])

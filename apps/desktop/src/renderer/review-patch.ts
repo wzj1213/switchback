@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import type { ReviewPatch } from "../shared/review.js"
+import type { ReviewScope } from "../shared/review.js"
 import { parseDiff } from "./diff.js"
 import { numbered, trimMeta, type NumberedLine } from "./review-lines.js"
 
@@ -28,16 +29,16 @@ export function reviewCopyText(rel: string, patch: ReviewPatch): string {
 export function usePatch(
   cwd: string,
   rel: string | undefined,
-  query: { context: number; stamp: string; threadId: string; revision?: string },
+  query: { context: number; stamp: string; threadId: string; revision?: string; scope?: ReviewScope },
 ): PatchData {
-  const key = `${cwd}\u0000${rel ?? ""}\u0000${String(query.context)}\u0000${query.stamp}\u0000${query.threadId}\u0000${query.revision ?? ""}`
+  const key = `${cwd}\u0000${rel ?? ""}\u0000${String(query.context)}\u0000${query.stamp}\u0000${query.threadId}\u0000${query.revision ?? ""}\u0000${query.scope ?? "conversation"}`
   const [out, setOut] = useState<(Omit<PatchData, "loading"> & { key: string }) | undefined>()
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni
     if (cwd === "" || rel === undefined || bridge === undefined) return undefined
     let live = true
     void bridge
-      .workPatch(cwd, rel, query.context, query.threadId)
+      .workPatch(cwd, rel, { context: query.context, threadId: query.threadId, scope: query.scope })
       .then((got) => {
         if (live) setOut({ key, ...got, lines: trimMeta(numbered(parseDiff(got.patch, "update"))) })
       })
@@ -47,7 +48,7 @@ export function usePatch(
     return () => {
       live = false
     }
-  }, [cwd, rel, key, query.context, query.threadId])
+  }, [cwd, rel, key, query.context, query.scope, query.threadId])
   if (rel === undefined) return { ...EMPTY, loading: false }
   if (out?.key !== key) return { ...EMPTY, loading: true }
   return { ...out, loading: false }

@@ -2,3 +2,13 @@
 export function panelShellClass(open: boolean, full: boolean): string {
   return `shell${open ? " shell--workbench" : ""}${open && full ? " shell--workbench-full" : ""}`
 }
+
+/** 并排工具组不妨碍继续输入；只有实际遮住主区时，拖放完成后才收起。 */
+export function shouldClosePanelAfterDrop(viewportWidth: number, full: boolean): boolean {
+  return full || viewportWidth <= 1120
+}
+
+/** 从并排宽度缩进单栏宽度时，优先留下会话，而不是让工具面板顶掉正文。 */
+export function shouldHidePanelAfterResize(previousWidth: number, nextWidth: number): boolean {
+  return previousWidth > 1120 && nextWidth <= 1120
+}

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react"
 import { onFilePreviewRequest } from "./file-preview-request.js"
 import {
   CLOSED_WORKBENCH,
-  hideWorkbench,
   showActivity,
   showActivityIndex,
   showFile,
@@ -12,6 +11,17 @@ import {
   type PreviewTarget,
   type WorkbenchState,
 } from "./workbench.js"
+import {
+  CLOSED_PANEL,
+  closePanelTab,
+  hasPanelTab,
+  hidePanel,
+  openPanel,
+  togglePanel,
+  togglePanelFull,
+  type PanelPage,
+} from "./panel-state.js"
+import { usePanelResize } from "./use-panel-resize.js"
 
 /**
  * 外壳自己的那点状态：选中了哪个会话、开着哪个工具组或覆盖层。
@@ -39,9 +49,16 @@ export interface Shell {
   setComparing: (on: boolean) => void
   settingsOpen: boolean
   setSettingsOpen: (on: boolean) => void
-  /** 审核占用右侧工具组；和活动 / 文件互斥。 */
+  /** 审核页签已经打开；切去别页时仍挂载，保住筛选和选中位置。 */
   reviewOpen: boolean
+  reviewActive: boolean
   setReviewOpen: (on: boolean) => void
+  panelTabs: readonly PanelPage[]
+  panelActive: PanelPage
+  panelVisible: boolean
+  openPanelPage: (page: PanelPage) => void
+  closePanelPage: (page: PanelPage) => void
+  togglePanelVisibility: () => void
   /** 宽屏工具组是否暂时独占内容区。 */
   panelFull: boolean
   togglePanelFull: () => void
@@ -78,35 +95,45 @@ export function useShell(): Shell {
   const [finding, setFinding] = useState(false)
   const [comparing, setComparing] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [reviewOpen, setReview] = useState(false)
-  const [panelFull, setPanelFull] = useState(false)
+  const [panel, setPanel] = useState(CLOSED_PANEL)
   const [focusFilter, setFocusFilter] = useState(0)
   const [askRename, setAskRename] = useState(0)
   const [workbench, setWorkbench] = useState<WorkbenchState>(CLOSED_WORKBENCH)
+  const showPanelPage = useCallback((page: PanelPage) => {
+    setPanel((before) => openPanel(before, page))
+    if (page === "activity") setWorkbench(showActivity)
+    if (page === "files") setWorkbench(showFiles)
+  }, [])
   const openAside = useCallback((laneId: string) => {
-    setReview(false)
+    setPanel((before) => openPanel(before, "activity"))
     setWorkbench((prev) => showLane(prev, laneId))
   }, [])
   const openFile = useCallback((target: PreviewTarget) => {
-    setReview(false)
+    setPanel((before) => openPanel(before, "files"))
     setWorkbench((prev) => showFile(prev, target))
   }, [])
   const closeWorkbench = useCallback(() => {
-    setWorkbench(hideWorkbench)
-    setReview(false)
-    setPanelFull(false)
+    setPanel(hidePanel)
   }, [])
+  usePanelResize(closeWorkbench)
   useEffect(() => onFilePreviewRequest(openFile), [openFile])
   // 原生通知的超时 effect 依赖它；引用稳定才能避免每次流式重绘都把计时重新开始。
   const dismiss = useCallback((id: string) => {
     setDismissed((prev) => new Set(prev).add(id))
   }, [])
+  const workbenchPage = panel.active === "activity" || panel.active === "files"
+    ? panel.active
+    : workbench.page
+  const workbenchVisible = panel.visible && panel.active !== "review"
+  const shownWorkbench = workbench.page === workbenchPage && workbench.visible === workbenchVisible
+    ? workbench
+    : { ...workbench, page: workbenchPage, visible: workbenchVisible }
   return {
-    workbench,
+    workbench: shownWorkbench,
     openAside,
-    openActivity: () => { setReview(false); setWorkbench(showActivity) },
+    openActivity: () => { showPanelPage("activity") },
     activityIndex: () => { setWorkbench(showActivityIndex) },
-    openFiles: () => { setReview(false); setWorkbench(showFiles) },
+    openFiles: () => { showPanelPage("files") },
     openFile,
     fileIndex: () => { setWorkbench(showFileIndex) },
     hideWorkbench: closeWorkbench,
@@ -120,14 +147,19 @@ export function useShell(): Shell {
     setComparing,
     settingsOpen,
     setSettingsOpen,
-    reviewOpen,
+    reviewOpen: hasPanelTab(panel, "review"),
+    reviewActive: panel.visible && panel.active === "review",
     setReviewOpen: (on) => {
-      setReview(on)
-      if (on) setWorkbench(hideWorkbench)
-      else setPanelFull(false)
+      setPanel((before) => on ? openPanel(before, "review") : closePanelTab(before, "review"))
     },
-    panelFull,
-    togglePanelFull: () => { setPanelFull((before) => !before) },
+    panelTabs: panel.tabs,
+    panelActive: panel.active,
+    panelVisible: panel.visible,
+    openPanelPage: showPanelPage,
+    closePanelPage: (page) => { setPanel((before) => closePanelTab(before, page)) },
+    togglePanelVisibility: () => { setPanel(togglePanel) },
+    panelFull: panel.full,
+    togglePanelFull: () => { setPanel(togglePanelFull) },
     askRename,
     requestRename: () => {
       setAskRename((n) => n + 1)

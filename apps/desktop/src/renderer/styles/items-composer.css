@@ -321,12 +321,19 @@
 
 .composer__bar {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--sp-2);
   /* 触发器自己带 8px 内边距 + 1px 透明描边，往回拉一格，
      图标才和上面的字对在同一条线上（写法照顶栏标题那颗按钮） */
   margin-left: calc(-1 * (var(--sp-2) + 1px));
   padding-top: var(--sp-1);
+}
+
+/* 右侧面板把会话压窄时，三个选择器必须让标签省略，不能拿内容宽度撑破输入卡。 */
+.composer__bar > .trigger {
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 /* 历史态的唯一动作宁可整颗让位，也不能被窄列压成逐字竖排。 */

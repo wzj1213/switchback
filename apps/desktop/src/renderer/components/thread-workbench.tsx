@@ -41,10 +41,15 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
       items={items}
       stamp={stamp}
       notice={notice?.text}
-      full={props.full}
-      onFull={props.onFull}
-      onActivity={shell.openActivity}
-      onFiles={shell.openFiles}
+      panel={{
+        tabs: shell.panelTabs,
+        active: shell.panelActive,
+        full: props.full,
+        onSelect: shell.openPanelPage,
+        onClose: shell.closePanelPage,
+        onFull: props.onFull,
+        onHide: shell.hideWorkbench,
+      }}
       onPickLane={shell.openAside}
       onActivityIndex={shell.activityIndex}
       onPickFile={shell.openFile}

@@ -22,6 +22,10 @@ function queuedPrompt(cmd: Extract<Command, { type: "thread.prompt" }>): Live["q
   }
 }
 
+async function captureTurnBaseline(ctx: Ctx, entry: Live): Promise<void> {
+  await ctx.deps.captureTurnBaseline?.(entry.thread.id, entry.thread.cwd)
+}
+
 function enqueue(
   ctx: Ctx,
   entry: Live,
@@ -281,6 +285,7 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
   // 留一条什么都没发生的记录——那样时间线会被「我点错了」填满
   void recordSegment(ctx, entry)
   const turnId = ctx.deps.newId("tn")
+  await captureTurnBaseline(ctx, entry)
   entry.turn = turnId
   const turn = {
     id: turnId,

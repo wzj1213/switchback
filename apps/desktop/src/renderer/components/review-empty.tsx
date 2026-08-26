@@ -7,6 +7,8 @@ interface EmptyState {
   total: number
   shown?: number
   unverified?: number
+  range?: string
+  turnMissing?: boolean
 }
 
 function unverifiedOf(state: EmptyState): number {
@@ -14,8 +16,10 @@ function unverifiedOf(state: EmptyState): number {
 }
 
 function zeroSummary(state: EmptyState): string {
+  if (state.turnMissing === true) return "这条旧会话没有上一轮工作区快照"
   const unverified = unverifiedOf(state)
   if (unverified > 0) return `${String(unverified)} 个 Git 忽略文件无法核实`
+  if (state.range !== undefined) return `${state.range}没有改动`
   return state.baseline === true
     ? "本次对话没有净改动"
     : "没有对话开场基线；当前工作区相对 HEAD 是干净的"
@@ -44,7 +48,9 @@ function ChangedSummary({ state, added, removed }: {
   return (
     <>
       <span className="rv__count">
-        {state.baseline === true
+        {state.range !== undefined
+          ? `${state.range} · ${String(state.total)} 个文件`
+          : state.baseline === true
           ? `${String(state.total)} 个文件`
           : `无对话开场基线 · 工作区相对 HEAD 有 ${String(state.total)} 个文件`}
       </span>
@@ -67,10 +73,12 @@ export function ReviewSummary({ state, added, removed }: {
 }
 
 function zeroBlank(state: EmptyState): string {
+  if (state.turnMissing === true) return "这条旧会话没有上一轮工作区快照；请改选“未提交”等 Git 范围"
   const unverified = unverifiedOf(state)
   if (unverified > 0) {
     return `有 ${String(unverified)} 个 Git 忽略文件，但无法核实它们在本次对话前后的内容；请以文件改动摘要里的引擎上报为准`
   }
+  if (state.range !== undefined) return `${state.range}没有改动`
   return state.baseline === true
     ? "本次对话没有净改动"
     : "这条会话没有可用的开场基线；当前工作区相对 HEAD 是干净的，无法还原本次对话净改动"

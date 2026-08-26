@@ -106,8 +106,16 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
         threadId={thread.id}
         stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
         wanted={reportedChangesOf(itemsOf(state, thread.id), thread.cwd).list.map((file) => file.path)}
-        full={shell.panelFull}
-        onFull={shell.togglePanelFull}
+        panelActive={shell.reviewActive}
+        panel={{
+          tabs: shell.panelTabs,
+          active: shell.panelActive,
+          full: shell.panelFull,
+          onSelect: shell.openPanelPage,
+          onClose: shell.closePanelPage,
+          onFull: shell.togglePanelFull,
+          onHide: shell.hideWorkbench,
+        }}
         onCopy={app.copy}
         onClose={() => {
           shell.setReviewOpen(false)
@@ -147,7 +155,7 @@ export function App(): React.JSX.Element {
 
   if (shell.comparing && peer !== undefined) {
     return (
-      <div className={panelShellClass(shell.reviewOpen, shell.panelFull)}>
+      <div className={panelShellClass(shell.panelVisible, shell.panelFull)}>
         {sidebar}
         <CompareScreen
           state={state}

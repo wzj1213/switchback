@@ -12,10 +12,12 @@ const thread = {
 function render(visible: boolean, notice?: string): string {
   return renderToStaticMarkup(createElement(WorkbenchPane, {
     state: { visible, page: "files" }, thread, lanes: [], items: [], stamp: "idle:0",
-    onActivity: () => undefined, onFiles: () => undefined, onPickLane: () => undefined,
+    onPickLane: () => undefined,
     onActivityIndex: () => undefined, onPickFile: () => undefined, onFileIndex: () => undefined,
     onHide: () => undefined, onReveal: () => undefined, onCopy: () => undefined,
-    full: false, onFull: () => undefined,
+    panel: { tabs: ["files"], active: "files", full: false,
+      onSelect: () => undefined, onClose: () => undefined,
+      onFull: () => undefined, onHide: () => undefined },
     ...(notice === undefined ? {} : { notice }),
     searchFiles: () => Promise.resolve([]),
   }))

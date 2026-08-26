@@ -1,39 +1,20 @@
-import { useMemo } from "react"
 import type { Item, Lane, Thread } from "@omni/protocol"
 import type { PreviewTarget, WorkbenchState } from "../workbench.js"
-import { sessionFilesOf } from "../session-files.js"
 import { useWorkbenchKeys } from "../use-workbench-keys.js"
 import { ActivityPage } from "./ActivityPage.js"
 import { FilesPage } from "./FilesPage.js"
-import { DotBoxIcon, FileIcon } from "./icons-activity.js"
 import type { SearchFiles } from "../use-file-search.js"
+import { PanelTabs, type PanelTabsProps } from "./PanelTabs.js"
 
-function ToolTab({ on, label, count, children, onClick }: {
-  on: boolean
-  label: string
-  count: number
-  children: React.ReactNode
-  onClick: () => void
-}): React.JSX.Element {
-  return (
-    <button type="button" className={`workbench__tab${on ? " workbench__tab--on" : ""}`}
-      aria-pressed={on} onClick={onClick}>
-      {children}<span>{label}</span>{count === 0 ? null : <span className="workbench__count">{count}</span>}
-    </button>
-  )
-}
-
-export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, onFiles, onPickLane,
+export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
   onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles,
-  notice, full, onFull }: {
+  notice, panel }: {
   state: WorkbenchState
   thread: Thread
   lanes: readonly Lane[]
   items: readonly Item[]
   /** 轮次 / shell 完成时变化；打开的文件据此重读磁盘。 */
   stamp: string
-  onActivity: () => void
-  onFiles: () => void
   onPickLane: (id: string) => void
   onActivityIndex: () => void
   onPickFile: (target: PreviewTarget) => void
@@ -44,37 +25,13 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
   onCopy: (text: string) => void
   searchFiles: SearchFiles
   notice?: string
-  full: boolean
-  onFull: () => void
+  panel: PanelTabsProps
 }): React.JSX.Element | null {
-  const fileCount = useMemo(() => sessionFilesOf(items, thread.cwd).length, [items, thread.cwd])
   const box = useWorkbenchKeys(state, onHide)
   return (
     <section ref={box} className="workbench" tabIndex={-1}
       aria-label="任务工作台" hidden={!state.visible}>
-      <header className="workbench__head">
-        <nav className="workbench__tabs" aria-label="工作台页面">
-          <ToolTab on={state.page === "activity"} label="活动" count={lanes.length} onClick={onActivity}>
-            <DotBoxIcon size={13} />
-          </ToolTab>
-          <ToolTab on={state.page === "files"} label="文件" count={fileCount} onClick={onFiles}>
-            <FileIcon size={13} />
-          </ToolTab>
-        </nav>
-        <button type="button" className="workbench__expand"
-          aria-label={full ? "并排显示工作台" : "展开工作台"}
-          title={full ? "并排显示工作台" : "展开工作台"} onClick={onFull}>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-            strokeWidth="1.5" aria-hidden="true">
-            <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
-          </svg>
-        </button>
-        <button type="button" className="workbench__hide" aria-label="收起工作台"
-          title="收起工作台" onClick={onHide}>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-            strokeWidth="1.7" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>
-        </button>
-      </header>
+      <PanelTabs {...panel} onHide={onHide} />
       {notice === undefined ? null : <p className="workbench__notice" role="status">{notice}</p>}
       <div className="workbench__body">
         <div className="workbench__page" hidden={state.page !== "activity"}>

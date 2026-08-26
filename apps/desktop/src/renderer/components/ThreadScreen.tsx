@@ -18,7 +18,7 @@ import type { ComposerDrafts } from "../composer-drafts.js"
 import type { ComposerFileReference } from "../file-references.js"
 import { stampOf } from "../stamp.js"
 import { ThreadWorkbench } from "./thread-workbench.js"
-import { panelShellClass } from "../panel-layout.js"
+import { panelShellClass, shouldClosePanelAfterDrop } from "../panel-layout.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -55,7 +55,7 @@ export function ThreadScreen({
     thread.cwd,
   )
   return (
-    <div className={panelShellClass(workbench.visible || shell.reviewOpen, shell.panelFull)}>
+    <div className={panelShellClass(shell.panelVisible, shell.panelFull)}>
       {sidebar}
       <Workspace
         key={thread.id}
@@ -74,12 +74,12 @@ export function ThreadScreen({
         lanes={lanes}
         openLane={workbench.visible && workbench.page === "activity" ? workbench.laneId : undefined}
         onOpenLane={shell.openAside}
-        workbenchPage={workbench.page}
-        workbenchVisible={workbench.visible}
-        dropSurfaceVisible={workbench.visible || shell.reviewOpen}
-        onOpenActivity={shell.openActivity}
-        onOpenFiles={shell.openFiles}
-        onFilesDropped={shell.hideWorkbench}
+        panelVisible={shell.panelVisible}
+        dropSurfaceVisible={shell.panelVisible}
+        onTogglePanel={shell.togglePanelVisibility}
+        onFilesDropped={() => {
+          if (shouldClosePanelAfterDrop(window.innerWidth, shell.panelFull)) shell.hideWorkbench()
+        }}
         models={modelsOf(state, thread.id, thread.engine)}
         engines={engines}
         pets={{ on: app.prefs.settings.pets, ...app.prefs.settings.petKit }}

@@ -8,7 +8,7 @@ import type { EngineDoor } from "../main/enginedoors.js"
 import type { DshProfileCatalog } from "../main/dsh-profiles.js"
 import type { SelfUpdate, SelfUpdateRun } from "../main/selfupdate.js"
 import type { RemoteStatus } from "../main/remote/install.js"
-import type { ReviewFile, ReviewPatch } from "../shared/review.js"
+import type { ReviewFile, ReviewPatch, ReviewScope } from "../shared/review.js"
 import type { ContentHit } from "../shared/search.js"
 import type { EnvConfig } from "../shared/hooks.js"
 import type { ActivityDigest } from "../shared/activity.js"
@@ -49,6 +49,8 @@ interface Review {
   ignored?: readonly string[]
   baseline?: true
   failed?: true
+  turnMissing?: true
+  scope?: ReviewScope
 }
 
 const api = {
@@ -238,8 +240,9 @@ const api = {
     cwd: string,
     threadId: string,
     wanted?: readonly string[],
+    scope?: ReviewScope,
   ): Promise<Review | undefined> {
-    return (await ipcRenderer.invoke("omni:workReview", { cwd, threadId, wanted })) as
+    return (await ipcRenderer.invoke("omni:workReview", { cwd, threadId, wanted, scope })) as
       | Review
       | undefined
   },
@@ -247,8 +250,12 @@ const api = {
    * 一个文件的补丁。**按需取**——一个 200 文件的改动全量取可能是几十 MB，
    * 而人一次只看得了一个。
    */
-  async workPatch(cwd: string, rel: string, context: number | undefined, threadId: string): Promise<ReviewPatch> {
-    return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, context, threadId })) as ReviewPatch
+  async workPatch(cwd: string, rel: string, query: {
+    context?: number
+    threadId: string
+    scope?: ReviewScope
+  }): Promise<ReviewPatch> {
+    return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, ...query })) as ReviewPatch
   },
   /**
    * 在所有会话的**正文**里找一句话。侧栏那个筛选框只搜标题/首句/目录，

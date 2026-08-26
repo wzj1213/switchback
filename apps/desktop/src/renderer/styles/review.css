@@ -20,6 +20,10 @@
   container-type: inline-size;
 }
 
+.rv[hidden] {
+  display: none;
+}
+
 .shell--workbench-full .rv {
   grid-column: 2;
   border-left: 0;
@@ -78,6 +82,41 @@
   align-items: center;
   gap: 2px;
   margin-left: auto;
+}
+
+.rv__tool {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.rv__tool svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.rv__tool:hover,
+.rv__tool--on {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rv__tool:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .rv__gap {
@@ -196,8 +235,10 @@
   }
 
   .rv__body > .rvl {
+    order: 0;
     width: 100%;
     max-height: 190px;
+    border-left: 0;
     border-right: 0;
     border-bottom: 1px solid var(--border-strong);
   }
@@ -209,6 +250,10 @@
   flex: 1;
 }
 
+.rv__body--list-hidden > .rvl {
+  display: none;
+}
+
 /* ── 左列：文件清单 ───────────────────────────────────────────── */
 
 .rvl {
@@ -217,7 +262,8 @@
   flex: none;
   width: 260px;
   min-height: 0;
-  border-right: 1px solid var(--border-strong);
+  order: 2;
+  border-left: 1px solid var(--border-strong);
   background: var(--bg-sunken);
 }
 
@@ -391,6 +437,7 @@
 /* ── 右列：补丁 ───────────────────────────────────────────────── */
 
 .rv__pane {
+  order: 1;
   display: flex;
   flex-direction: column;
   flex: 1;

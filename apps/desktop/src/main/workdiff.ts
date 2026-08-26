@@ -9,9 +9,11 @@ import {
   parseNumstat,
   type ReviewFile,
   type ReviewPatch,
+  type ReviewScope,
 } from "../shared/review.js"
 import { codesOf } from "./worksite.js"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
+import { scopedPatchText, scopedReview } from "./workdiff-scopes.js"
 
 const run = promisify(execFile)
 
@@ -58,6 +60,9 @@ export interface Review {
   baseline?: true
   /** Git 临时读失败；空清单此时绝不等于“没有改动”。 */
   failed?: true
+  /** 旧会话没有逐轮快照；不能拿会话开场或 HEAD 冒充“上一轮”。 */
+  turnMissing?: true
+  scope?: ReviewScope
 }
 
 interface Repo {
@@ -165,23 +170,53 @@ export interface ReviewSource {
   baselines?: WorktreeBaselines
   threadId?: string
   wanted?: readonly string[]
+  scope?: ReviewScope
 }
 
-async function baselineReview(cwd: string, source: ReviewSource): Promise<Review | undefined> {
+async function baselineReview(cwd: string, source: ReviewSource, turn = false): Promise<Review | undefined> {
   if (source.baselines === undefined || source.threadId === undefined) return undefined
-  return source.baselines.review(source.threadId, cwd, source.wanted)
+  return source.baselines.review(source.threadId, cwd, source.wanted, turn)
+}
+
+async function reviewForScope(
+  cwd: string,
+  source: ReviewSource,
+): Promise<{ handled: boolean; review?: Review }> {
+  const scope = source.scope
+  if (scope === undefined || scope === "uncommitted") return { handled: false }
+  if (scope !== "last-turn") {
+    const review = await scopedReview(cwd, scope)
+    return review === undefined ? { handled: true } : { handled: true, review }
+  }
+  const turn = await baselineReview(cwd, source, true).catch(() => undefined)
+  if (turn !== undefined) return { handled: true, review: { ...turn, scope } }
+  const repo = await repoOf(cwd)
+  return repo === undefined
+    ? { handled: true }
+    : { handled: true, review: { ...repo, files: [], baseline: true, turnMissing: true } }
+}
+
+async function conversationBaseline(
+  cwd: string,
+  source: ReviewSource,
+): Promise<{ handled: boolean; review?: Review }> {
+  if (source.scope === "uncommitted") return { handled: false }
+  try {
+    const review = await baselineReview(cwd, source)
+    return review === undefined ? { handled: false } : { handled: true, review }
+  } catch {
+    const repo = await repoOf(cwd)
+    return repo === undefined
+      ? { handled: true }
+      : { handled: true, review: { ...repo, files: [], baseline: true, failed: true } }
+  }
 }
 
 export async function workReview(cwd: string, source: ReviewSource = {}): Promise<Review | undefined> {
-  try {
-    const baseline = await baselineReview(cwd, source)
-    if (baseline !== undefined) return baseline
-  } catch {
-    const failedRepo = await repoOf(cwd)
-    return failedRepo === undefined
-      ? undefined
-      : { ...failedRepo, files: [], baseline: true, failed: true }
-  }
+  const requested = await reviewForScope(cwd, source)
+  if (requested.handled) return requested.review
+  const baseline = await conversationBaseline(cwd, source)
+  if (baseline.handled) return baseline.review
   const repo = await repoOf(cwd)
   if (repo === undefined) return undefined
   // `-uall`：不加的话未跟踪的**目录**会折成一条 `sub/`，界面上看起来像一个文件
@@ -245,12 +280,12 @@ function safeRel(repo: Repo, rel: string): boolean {
 async function baselinePatch(
   cwd: string,
   rel: string,
-  context: number,
-  source: ReviewSource,
+  options: { context: number; source: ReviewSource; turn?: boolean },
 ): Promise<ReviewPatch | undefined> {
+  const { context, source, turn = false } = options
   if (source.baselines === undefined || source.threadId === undefined) return undefined
   try {
-    const patch = await source.baselines.patch(source.threadId, cwd, rel, context)
+    const patch = await source.baselines.patch(source.threadId, cwd, rel, { context, turn })
     return patch === undefined ? undefined : shaped(patch)
   } catch {
     return FAILED
@@ -322,7 +357,13 @@ export async function workPatch(
   // 上下文行数由界面给：默认 3 行，「展开」时给一个大数——这比自己去读原文件
   // 再拼上下文可靠得多，git 知道每个 hunk 真正的行号
   const unified = `--unified=${String(Math.max(0, Math.min(context, 99_999)))}`
-  const fromBaseline = await baselinePatch(cwd, rel, context, source)
+  if (source.scope !== undefined && source.scope !== "last-turn" && source.scope !== "uncommitted") {
+    const patch = await scopedPatchText(cwd, rel, context, source.scope)
+    return patch === undefined ? FAILED : shaped(patch)
+  }
+  const fromBaseline = source.scope === "uncommitted"
+    ? undefined
+    : await baselinePatch(cwd, rel, { context, source, turn: source.scope === "last-turn" })
   if (fromBaseline !== undefined) return fromBaseline
   // **空补丁不等于「未跟踪」。** 一个跟踪中、但此刻和 HEAD 没差别的文件
   //（清单取回来之后你在编辑器里改回去了）走到下面那条会得到一份

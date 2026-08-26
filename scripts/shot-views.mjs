@@ -8,6 +8,7 @@ import { COMPOSE_VIEWS } from "./shot-views-compose.mjs"
 import { ACTIVITY_VIEWS } from "./shot-views-activity.mjs"
 import { FILE_REFRESH_VIEWS } from "./shot-views-file-refresh.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
+import { openPanelPage } from "./shot-panel.mjs"
 export const VIEWS = [
     { name: "01-转录区", open: null, ready: ".md" },
     {
@@ -76,7 +77,7 @@ export const VIEWS = [
     ...ACTIVITY_VIEWS,
     {
       name: "07-文件清单",
-      open: `document.querySelector('[title="文件预览"]')?.click()`,
+      open: openPanelPage("文件"),
       ready: ".file-row",
       assert: `(() => {
         const scope = document.querySelector('.files-scope__root bdi')
@@ -100,6 +101,17 @@ export const VIEWS = [
         if (Object.values(checks).every(Boolean)) return true
         throw new Error('文件清单验收：' + JSON.stringify(checks))
       })()`,
+    },
+    {
+      name: "07-新建侧边页面",
+      open: `document.querySelector('.workbench:not([hidden]) [aria-label="新建侧边页面"]')?.click()`,
+      ready: `[role="menu"][aria-label="新建侧边页面"]`,
+      assert: `(() => {
+        const menu = document.querySelector('[role="menu"][aria-label="新建侧边页面"]')
+        return ['审查', '文件', '活动'].every(label => menu?.textContent.includes(label) === true)
+          && document.activeElement?.getAttribute('role') === 'menuitem'
+      })()`,
+      after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
     },
     {
       name: "08-缺失文件可恢复",
@@ -168,10 +180,11 @@ export const VIEWS = [
     {
       name: "09-切页重开保留",
       open: [
-        `window.__omniWorkbench = document.querySelector('.workbench'); [...document.querySelectorAll('.workbench__tab')].find(tab => tab.textContent.includes('活动'))?.click()`,
-        `[...document.querySelectorAll('.workbench__tab')].find(tab => tab.textContent.includes('文件'))?.click()`,
-        `document.querySelector('.workbench__hide')?.click()`,
-        `document.querySelector('[title="文件预览"]')?.click()`,
+        `window.__omniWorkbench = document.querySelector('.workbench')`,
+        ...openPanelPage("活动"),
+        ...openPanelPage("文件"),
+        `document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()`,
+        ...openPanelPage("文件"),
       ],
       ready: ".files-search input",
       assert: `document.querySelector('.files-search input')?.value === 'attachment'
@@ -202,13 +215,13 @@ export const VIEWS = [
         `document.querySelector('.workbench__page:not([hidden]) .workbench__back')?.click()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
         `(() => {
-          const preview = document.querySelector('[role="tab"][aria-selected="true"]')
+          const preview = document.querySelector('.file-preview [role="tab"][aria-selected="true"]')
           preview?.focus()
           preview?.dispatchEvent(new KeyboardEvent('keydown', {
             key: 'ArrowRight', bubbles: true, cancelable: true,
           }))
           setTimeout(() => {
-            const source = [...document.querySelectorAll('[role="tab"]')]
+            const source = [...document.querySelectorAll('.file-preview [role="tab"]')]
               .find(tab => tab.textContent.trim() === '源码')
             const forward = source?.getAttribute('aria-selected') === 'true'
               && document.activeElement === source && document.querySelector('.file-source') !== null
@@ -216,11 +229,11 @@ export const VIEWS = [
               key: 'ArrowLeft', bubbles: true, cancelable: true,
             }))
             setTimeout(() => {
-              const active = document.querySelector('[role="tab"][aria-selected="true"]')
-              const panel = document.querySelector('[role="tabpanel"]')
+              const active = document.querySelector('.file-preview [role="tab"][aria-selected="true"]')
+              const panel = document.querySelector('.file-preview [role="tabpanel"]')
               document.documentElement.dataset.htmlTabs = String(forward
                 && active?.textContent.trim() === '预览' && document.activeElement === active
-                && [...document.querySelectorAll('[role="tab"]')]
+                && [...document.querySelectorAll('.file-preview [role="tab"]')]
                   .filter(tab => tab.getAttribute('tabindex') === '0').length === 1
                 && panel?.getAttribute('aria-labelledby') === active?.id)
             }, 30)

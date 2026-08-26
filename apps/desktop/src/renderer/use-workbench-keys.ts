@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import type { WorkbenchState } from "./workbench.js"
+import { restorePanelFocus } from "./panel-focus.js"
 
 type FocusState = Pick<WorkbenchState, "page" | "file" | "laneId">
 
@@ -11,7 +12,7 @@ export function workbenchFocusSelector(state: FocusState): string {
       : '.workbench__page:not([hidden]) .workbench__back'
   }
   return state.laneId === undefined
-    ? ".workbench__tab--on"
+    ? ".panel-tab--on .panel-tab__pick"
     : '.workbench__page:not([hidden]) .workbench__back'
 }
 
@@ -23,7 +24,7 @@ function coveredByModal(panel: HTMLElement | null): boolean {
 
 function keepsIndexFocus(state: FocusState, active: Element | null): boolean {
   if (!(active instanceof HTMLElement)) return false
-  if (active.matches(".workbench__tab--on")) return true
+  if (active.matches(".panel-tab--on .panel-tab__pick")) return true
   if (state.page === "files") return state.file === undefined && active.matches(".file-row")
   return state.laneId === undefined && active.matches(".activity-row")
 }
@@ -51,7 +52,7 @@ export function useWorkbenchKeys(
     window.addEventListener("keydown", onKey)
     return () => {
       window.removeEventListener("keydown", onKey)
-      if (origin?.isConnected === true) origin.focus()
+      restorePanelFocus(origin)
     }
   }, [state.visible])
   const selector = workbenchFocusSelector(state)

@@ -119,11 +119,16 @@ function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<type
 function baselineDeps(
   log: Logger,
   baselines: WorktreeBaselines | undefined,
-): Pick<HostDeps, "ensureWorktreeBaseline" | "removeWorktreeBaseline"> {
+): Pick<HostDeps, "ensureWorktreeBaseline" | "captureTurnBaseline" | "removeWorktreeBaseline"> {
   return {
     ensureWorktreeBaseline: async (threadId, cwd) => {
       await baselines?.ensure(threadId, cwd).catch((error: unknown) => {
         log.write("warn", "baseline", `无法记录会话 ${threadId} 的工作区基线：${String(error)}`)
+      })
+    },
+    captureTurnBaseline: async (threadId, cwd) => {
+      await baselines?.captureTurn(threadId, cwd).catch((error: unknown) => {
+        log.write("warn", "baseline", `无法记录会话 ${threadId} 的本轮工作区基线：${String(error)}`)
       })
     },
     removeWorktreeBaseline: async (threadId) => {

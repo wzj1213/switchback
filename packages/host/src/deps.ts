@@ -21,6 +21,8 @@ export interface HostDeps {
   rules?: RuleStore
   /** 对话开场的真实工作树基线；桌面端用它计算“本次对话”的净差异。 */
   ensureWorktreeBaseline?: (threadId: string, cwd: string) => Promise<void>
+  /** 新轮次送出前的真实工作树；桌面端用它计算“上一轮”的净差异。 */
+  captureTurnBaseline?: (threadId: string, cwd: string) => Promise<void>
   /** 会话删除时一起回收基线对象。 */
   removeWorktreeBaseline?: (threadId: string) => Promise<void>
   /**

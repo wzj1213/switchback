@@ -19,6 +19,9 @@
 /** `?` 是未跟踪：git 眼里它还不存在，但工作区里它在。 */
 export type ReviewKind = "add" | "delete" | "update" | "rename" | "untracked"
 
+/** 审核范围直接对应 Git 能诚实回答的比较，不由界面自行拼补丁。 */
+export type ReviewScope = "last-turn" | "uncommitted" | "unstaged" | "staged" | "last-commit" | "branch"
+
 export interface ReviewFile {
   /** 绝对真实路径。要在访达里定位、要和引擎报的路径对得上，都靠它。 */
   path: string

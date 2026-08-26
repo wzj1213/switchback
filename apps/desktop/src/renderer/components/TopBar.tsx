@@ -7,7 +7,6 @@ import { TimelineCard } from "./TimelineCard.js"
 import { labelOf } from "./Composer.js"
 import { nextEngine } from "../engines.js"
 import type { LimitNotice } from "../limits.js"
-import type { WorkbenchPage } from "../workbench.js"
 import { TopBarActions } from "./TopBarActions.js"
 
 /**
@@ -83,11 +82,8 @@ export function TopBar({
   setTimeline,
   setEnv,
   limits,
-  activityCount,
-  workbenchPage,
-  workbenchVisible,
-  onActivity,
-  onFiles,
+  panelVisible,
+  onPanel,
 }: {
   thread: Thread
   usage: Usage | undefined
@@ -106,11 +102,8 @@ export function TopBar({
   setEnv: (open: boolean) => void
   /** 账号额度提示。平时是 undefined（用得不多就不出声）。 */
   limits: LimitNotice | undefined
-  activityCount: number
-  workbenchPage: WorkbenchPage
-  workbenchVisible: boolean
-  onActivity: () => void
-  onFiles: () => void
+  panelVisible: boolean
+  onPanel: () => void
 }): React.JSX.Element {
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
@@ -157,14 +150,11 @@ export function TopBar({
       <ContextMeter usage={usage} />
       <LimitPill limits={limits} />
       <TopBarActions
-        activityCount={activityCount}
-        page={workbenchPage}
-        visible={workbenchVisible}
+        panelVisible={panelVisible}
         peer={peer}
         next={next}
         thread={thread}
-        onActivity={onActivity}
-        onFiles={onFiles}
+        onPanel={onPanel}
         onCompare={onCompare}
         onFork={onFork}
       />

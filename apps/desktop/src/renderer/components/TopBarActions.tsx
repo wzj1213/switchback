@@ -1,55 +1,38 @@
 import type { EngineInfo, Thread } from "@omni/protocol"
-import type { WorkbenchPage } from "../workbench.js"
-import { DotBoxIcon, FileIcon } from "./icons-activity.js"
 import { CompareIcon, ForkIcon } from "./icons.js"
 
 const canForkFrom = (thread: Thread): boolean =>
   thread.detached !== true && (thread.status === "idle" || thread.status === "failed")
 
+function PanelIcon(): React.JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="1.5" aria-hidden="true">
+      <rect x="2" y="2.5" width="12" height="11" rx="2" />
+      <path d="M10.5 2.5v11" />
+    </svg>
+  )
+}
+
 export function TopBarActions({
-  activityCount,
-  page,
-  visible,
   peer,
   next,
   thread,
-  onActivity,
-  onFiles,
+  panelVisible,
+  onPanel,
   onCompare,
   onFork,
 }: {
-  activityCount: number
-  page: WorkbenchPage
-  visible: boolean
   peer: Thread | undefined
   next: EngineInfo | undefined
   thread: Thread
-  onActivity: () => void
-  onFiles: () => void
+  panelVisible: boolean
+  onPanel: () => void
   onCompare: () => void
   onFork: (to: string) => void
 }): React.JSX.Element {
   return (
     <>
-      <button
-        className={`iconbtn${activityCount === 0 ? "" : " iconbtn--count"}${visible && page === "activity" ? " iconbtn--on" : ""}`}
-        type="button"
-        title="后台活动"
-        aria-label={activityCount === 0 ? "打开后台活动" : `后台活动，${String(activityCount)} 条正在进行`}
-        onClick={onActivity}
-      >
-        <DotBoxIcon size={14} />
-        {activityCount === 0 ? null : <span>{activityCount}</span>}
-      </button>
-      <button
-        className={`iconbtn${visible && page === "files" ? " iconbtn--on" : ""}`}
-        type="button"
-        title="文件预览"
-        aria-label="打开文件预览"
-        onClick={onFiles}
-      >
-        <FileIcon size={14} />
-      </button>
       {peer === undefined ? null : (
         <button
           className="iconbtn"
@@ -74,6 +57,11 @@ export function TopBarActions({
           <ForkIcon size={14} />
         </button>
       )}
+      <button className={`iconbtn${panelVisible ? " iconbtn--on" : ""}`} type="button"
+        title={panelVisible ? "隐藏侧边面板" : "显示侧边面板"}
+        aria-label={panelVisible ? "隐藏侧边面板" : "显示侧边面板"} onClick={onPanel}>
+        <PanelIcon />
+      </button>
     </>
   )
 }

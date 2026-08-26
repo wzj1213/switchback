@@ -1,10 +1,26 @@
 import { useMemo, useState } from "react"
-import { filterFiles, tallyReview, untrackedCount, useReview, usePatch } from "../review.js"
+import { filterFiles, tallyReview, useReview, usePatch } from "../review.js"
 import { usePanelKeys } from "../use-panel-keys.js"
 import { ReviewList } from "./ReviewList.js"
 import { Tools } from "./ReviewTools.js"
 import { blank, ReviewSummary } from "./review-empty.js"
 import { ReviewPane } from "./review-pane.js"
+import { PanelTabs, type PanelTabsProps } from "./PanelTabs.js"
+import { Select } from "./Select.js"
+import type { ReviewScope } from "../../shared/review.js"
+
+const SCOPES: readonly { id: ReviewScope; label: string; description: string }[] = [
+  { id: "last-turn", label: "上一轮", description: "只看最近一次发送之后留下的改动" },
+  { id: "uncommitted", label: "未提交", description: "当前工作区相对 HEAD 的全部改动" },
+  { id: "unstaged", label: "未暂存", description: "尚未加入暂存区的改动与新文件" },
+  { id: "staged", label: "已暂存", description: "已经加入 Git 暂存区的改动" },
+  { id: "last-commit", label: "已提交", description: "最近一次提交带来的改动" },
+  { id: "branch", label: "分支", description: "当前分支相对上游或主分支的改动" },
+]
+
+function scopeLabel(scope: ReviewScope): string {
+  return SCOPES.find((candidate) => candidate.id === scope)?.label ?? "审核范围"
+}
 
 /**
  * 审核：**把这次对话最终留下的净改动逐个看一遍**。
@@ -30,44 +46,53 @@ function ignoredOf(paths: readonly string[] | undefined): readonly string[] {
   return paths === undefined ? [] : paths
 }
 
-export function Review({ cwd, threadId, stamp, wanted, full, onFull, onClose, onCopy }: {
+export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClose, onCopy }: {
   cwd: string
   threadId: string
   /** 轮次戳：跑完一轮就重问一遍 git。 */
   stamp: string
   /** 引擎明确上报过的路径；Git 忽略项也必须诚实地出现在审核状态里。 */
   wanted: readonly string[]
-  full: boolean
-  onFull: () => void
+  panelActive: boolean
+  panel: PanelTabsProps
   onClose: () => void
   onCopy: (text: string) => Promise<boolean>
 }): React.JSX.Element {
-  const box = usePanelKeys(onClose)
-  const data = useReview(cwd, stamp, { threadId, wanted })
+  const box = usePanelKeys(onClose, panelActive)
+  const [scope, setScope] = useState<ReviewScope>("last-turn")
+  const data = useReview(cwd, stamp, { threadId, wanted, scope })
   const [query, setQuery] = useState("")
   const [picked, setPicked] = useState<string | undefined>(undefined)
   const [split, setSplit] = useState(true)
   const [context, setContext] = useState<number>(3)
-  const [untracked, setUntracked] = useState(true)
-  const files = useMemo(() => filterFiles(data.files, query, untracked), [data.files, query, untracked])
-  const untrackedN = untrackedCount(data.files)
+  const [list, setList] = useState(true)
+  const files = useMemo(() => filterFiles(data.files, query), [data.files, query])
   // 选中的那个被筛掉了（或者上一轮把它改回去了）就退回第一个——
   // 停在一个列表里已经没有的文件上，右边会一直是空的
   const active = files.some((f) => f.rel === picked) ? picked : files[0]?.rel
-  const patch = usePatch(cwd, active, { context, stamp, threadId, revision: data.revision })
+  const patch = usePatch(cwd, active, { context, stamp, threadId, revision: data.revision, scope })
   const { added, removed } = tallyReview(data.files)
   const total = data.files.length + (data.more ?? 0)
   const ignored = ignoredOf(data.ignored)
   const unverified = ignored.length
   const file = files.find((f) => f.rel === active)
   return (
-    <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动">
+    <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动" hidden={!panelActive}>
+      <PanelTabs {...panel} />
       <header className="rv__head">
-        <h2 className="rv__title">审核</h2>
+        <Select label={scopeLabel(scope)} title="选择审核范围" sections={[{
+          choices: SCOPES,
+          value: scope,
+          onPick: (id) => {
+            const picked = SCOPES.find((candidate) => candidate.id === id)
+            if (picked !== undefined) setScope(picked.id)
+          },
+        }]} />
         <div className="rv__summary">
           <ReviewSummary
             state={{ noRepo: data.noRepo, loading: data.loading, failed: data.failed,
-              baseline: data.baseline, total, unverified,
+              baseline: data.baseline, total, unverified, range: scopeLabel(scope),
+              turnMissing: data.turnMissing,
               ...(data.more === undefined ? {} : { more: data.more }) }}
             added={added}
             removed={removed}
@@ -79,21 +104,14 @@ export function Review({ cwd, threadId, stamp, wanted, full, onFull, onClose, on
             context={context}
             onContext={setContext}
             onReload={data.reload}
-            {...(untrackedN === 0 ? {} : { untracked: { on: untracked, count: untrackedN, onToggle: setUntracked } })}
+            list={list}
+            onList={setList}
+            files={files}
+            active={active}
+            onPick={setPicked}
           />
-          <button type="button" className="rv__expand"
-            aria-label={full ? "并排显示审核" : "展开审核"}
-            title={full ? "并排显示审核" : "展开审核"} onClick={onFull}>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-              strokeWidth="1.5" aria-hidden="true">
-              <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
-            </svg>
-          </button>
-          <button type="button" className="rv__close" onClick={onClose} aria-label="关闭">
-            ✕
-          </button>
       </header>
-      <div className="rv__body">
+      <div className={`rv__body${list ? "" : " rv__body--list-hidden"}`}>
         <ReviewList
           files={files}
           active={active}
@@ -111,6 +129,8 @@ export function Review({ cwd, threadId, stamp, wanted, full, onFull, onClose, on
             loading: data.loading,
             failed: data.failed,
             baseline: data.baseline,
+            range: scopeLabel(scope),
+            turnMissing: data.turnMissing,
             total,
             shown: files.length,
             unverified,

@@ -76,6 +76,7 @@ function rigOf(options: {
   noAttachments?: ReadonlySet<string>
   deps?: {
     ensure?: (threadId: string, cwd: string) => Promise<void>
+    capture?: (threadId: string, cwd: string) => Promise<void>
     remove?: (threadId: string) => Promise<void>
   }
 } = {}): Rig {
@@ -147,6 +148,9 @@ function rigOf(options: {
     ...(options.deps?.ensure === undefined
       ? {}
       : { ensureWorktreeBaseline: options.deps.ensure }),
+    ...(options.deps?.capture === undefined
+      ? {}
+      : { captureTurnBaseline: options.deps.capture }),
     ...(options.deps?.remove === undefined
       ? {}
       : { removeWorktreeBaseline: options.deps.remove }),
@@ -688,6 +692,18 @@ describe("失败收口与基线生命周期", () => {
     await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "b" })
     await rig.host.dispatch({ type: "thread.delete", threadId: id })
     expect(calls).toEqual([`ensure:${id}`, `remove:${id}`])
+  })
+
+  it("新轮次先完成工作树快照，再把提示词交给引擎", async () => {
+    const gate = deferred<undefined>()
+    const rig = rigOf({ deps: { capture: () => gate.promise } })
+    const id = await created(rig)
+    const sending = rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "检查这一轮" })
+    await tick()
+    expect(rig.probes[0]?.prompts).toEqual([])
+    gate.resolve(undefined)
+    await sending
+    expect(rig.probes[0]?.prompts.map((prompt) => prompt.text)).toEqual(["检查这一轮"])
   })
 
   it("新建启动失败也会回收已经生成的基线", async () => {

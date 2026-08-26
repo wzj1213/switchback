@@ -60,7 +60,7 @@ async function copyFile(
     onCopy(`${file.path}\n\n${file.last.diff ?? "（这次编辑没有带补丁）"}`)
     return
   }
-  const patch = await bridge.workPatch(cwd, file.review.rel, 3, threadId).catch(() => undefined)
+  const patch = await bridge.workPatch(cwd, file.review.rel, { context: 3, threadId }).catch(() => undefined)
   onCopy(`${file.path}\n\n${patch === undefined ? "（读取当前净补丁失败）" : bodyOf(patch)}`)
 }
 

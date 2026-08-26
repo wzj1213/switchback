@@ -162,7 +162,7 @@ body {
   display: none;
 }
 
-/* 只有三列合计已不足约 1120px 时才让工具组独占内容区；1172px 仍应像 Codex 并排。 */
+/* 跨入这档时 JS 会先收起工具组、保住会话；用户在窄窗主动重开时才暂时独占内容区。 */
 @media (max-width: 1120px) {
   .shell--workbench {
     grid-template-columns: var(--sidebar-w) minmax(0, 1fr);

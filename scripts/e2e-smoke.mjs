@@ -8,6 +8,7 @@ import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import axe from "axe-core"
 import WebSocket from "ws"
+import { openPanelPage } from "./shot-panel.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -158,14 +159,24 @@ async function checkPets(cdp) {
 }
 
 async function checkWorkbench(cdp) {
+  for (const step of openPanelPage("文件")) {
+    await value(cdp, `(() => { ${step}; return true })()`)
+    await pause(80)
+  }
+  await waitFor(cdp, "document.querySelector('.workbench:not([hidden])') !== null")
   await cdp.send("Emulation.setDeviceMetricsOverride", {
     width: 860, height: 560, deviceScaleFactor: 1, mobile: false,
   })
   await pause(120)
-  await value(
-    cdp,
-    `(() => { const b=document.querySelector('[aria-label="打开文件预览"]'); b.focus(); b.click(); return true })()`,
+  await waitFor(cdp, "document.querySelector('.workbench[hidden]') !== null")
+  assert(
+    await value(cdp, "getComputedStyle(document.querySelector('.main')).display !== 'none'"),
+    "窗口缩进单栏后优先保留会话主体",
   )
+  for (const step of openPanelPage("文件")) {
+    await value(cdp, `(() => { ${step}; return true })()`)
+    await pause(80)
+  }
   await waitFor(cdp, "document.querySelector('.workbench:not([hidden])') !== null")
   await audit(cdp, "文件工作台页面")
   assert(
@@ -179,8 +190,8 @@ async function checkWorkbench(cdp) {
   await key(cdp, "Escape")
   await waitFor(cdp, "document.querySelector('.workbench[hidden]') !== null")
   assert(
-    await value(cdp, "document.activeElement?.getAttribute('aria-label') === '打开文件预览'"),
-    "Esc 关闭面板后焦点回到文件入口",
+    await value(cdp, "document.activeElement?.getAttribute('aria-label') === '显示侧边面板'"),
+    "Esc 关闭面板后焦点回到侧边面板入口",
   )
   await cdp.send("Emulation.clearDeviceMetricsOverride")
   await pause(120)

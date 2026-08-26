@@ -86,17 +86,17 @@ export const ACTIVITY_VIEWS = [
   },
   {
     name: "06-工作台展开",
-    open: `document.querySelector('.workbench__expand')?.click()`,
+    open: `document.querySelector('.workbench .panel-tabs__expand')?.click()`,
     ready: ".shell--workbench-full .workbench:not([hidden])",
     assert: `getComputedStyle(document.querySelector('.main')).display === 'none'
-      && document.querySelector('.workbench__expand')?.getAttribute('aria-label') === '并排显示工作台'
+      && document.querySelector('.workbench .panel-tabs__expand')?.getAttribute('aria-label') === '并排显示侧边面板'
       && (() => {
         const workbench = document.querySelector('.workbench')?.getBoundingClientRect()
         const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
         return workbench !== undefined && sidebar !== undefined
           && Math.abs(workbench.left - sidebar.right) < 1 && Math.abs(workbench.right - innerWidth) < 1
       })()`,
-    after: `document.querySelector('.workbench__expand')?.click()`,
+    after: `document.querySelector('.workbench .panel-tabs__expand')?.click()`,
   },
   {
     name: "06-活动返回原行",

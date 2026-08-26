@@ -25,6 +25,30 @@ function repoAt(base: string): string {
 }
 
 describe("对话工作树基线", () => {
+  it("每轮覆盖上一轮快照，不把更早轮次的改动混进来", async () => {
+    const base = mkdtempSync(join(tmpdir(), "omni-turn-baseline-"))
+    try {
+      const repo = repoAt(base)
+      writeFileSync(join(repo, "one.txt"), "head\n")
+      writeFileSync(join(repo, "two.txt"), "head\n")
+      git(repo, "add", "-A")
+      git(repo, "commit", "-qm", "init")
+      const baselines = createWorktreeBaselines(join(base, "cache"))
+      await baselines.captureTurn("thread-turn", repo)
+      writeFileSync(join(repo, "one.txt"), "first turn\n")
+      expect((await baselines.review("thread-turn", repo, [], true))?.files.map((file) => file.rel))
+        .toEqual(["one.txt"])
+
+      await baselines.captureTurn("thread-turn", repo)
+      writeFileSync(join(repo, "two.txt"), "second turn\n")
+      const review = await baselines.review("thread-turn", repo, [], true)
+      expect(review?.files.map((file) => file.rel)).toEqual(["two.txt"])
+      expect(await baselines.patch("thread-turn", repo, "two.txt", { context: 3, turn: true })).toContain("+second turn")
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+
   it("排除开场前的脏文件，并跨多轮、暂存和提交计算最终净差异", async () => {
     const base = mkdtempSync(join(tmpdir(), "omni-baseline-"))
     try {
@@ -55,7 +79,7 @@ describe("对话工作树基线", () => {
       ])
       expect(review?.files.some((file) => file.rel === "untouched.txt")).toBe(false)
       expect(review?.files.find((file) => file.rel === "preexisting.txt")?.kind).toBe("update")
-      const patch = await baselines.patch("thread-1", repo, "tracked.txt", 3)
+      const patch = await baselines.patch("thread-1", repo, "tracked.txt", { context: 3 })
       expect(patch).toContain("-before")
       expect(patch).toContain("+after")
 
@@ -84,7 +108,7 @@ describe("对话工作树基线", () => {
       expect(review?.files).toEqual([
         expect.objectContaining({ rel: "fresh.txt", added: 2, removed: 0, staged: true }),
       ])
-      expect(await baselines.patch("thread-link", linked, "fresh.txt", 3)).toContain("+one")
+      expect(await baselines.patch("thread-link", linked, "fresh.txt", { context: 3 })).toContain("+one")
     } finally {
       rmSync(base, { recursive: true, force: true })
     }
@@ -215,7 +239,7 @@ describe("对话工作树基线", () => {
       git(repo, "mv", "old.txt", "new.txt")
       writeFileSync(join(repo, "new.txt"), "one\ntwo\nthree\n")
 
-      const patch = await baselines.patch("thread-rename", repo, "new.txt", 3)
+      const patch = await baselines.patch("thread-rename", repo, "new.txt", { context: 3 })
       expect(patch).toContain("rename from old.txt")
       expect(patch).toContain("+three")
       expect(patch).not.toContain("+one")
@@ -238,7 +262,7 @@ describe("对话工作树基线", () => {
       writeFileSync(join(repo, magic), "magic after\n")
       writeFileSync(join(repo, "other.txt"), "other after\n")
 
-      const patch = await baselines.patch("thread-literal", repo, magic, 3)
+      const patch = await baselines.patch("thread-literal", repo, magic, { context: 3 })
       expect(patch).toContain("magic after")
       expect(patch).not.toContain("other after")
     } finally {

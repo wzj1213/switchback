@@ -1,4 +1,5 @@
 /** 文件拖放的连续场景：提示、接收、拒绝与重复操作必须共用真实文件通道。 */
+import { openPanelPage } from "./shot-panel.mjs"
 const MIXED_FILES = [
   "apps/desktop/build/icon.png",
   "apps/desktop/src/renderer/attachment-feedback.ts",
@@ -7,7 +8,7 @@ const MIXED_FILES = [
 export const DROP_VIEWS = [
   {
     name: "14-工作台拖放提示",
-    open: `document.querySelector('[title="文件预览"]')?.click()`,
+    open: openPanelPage("文件"),
     dragFiles: MIXED_FILES,
     dragTarget: ".workbench__body",
     dragHint: "添加 1 张图片并引用 1 个文件",
@@ -24,17 +25,20 @@ export const DROP_VIEWS = [
     name: "14-工作台也能接混合文件",
     open: [],
     ready: ".composer__attachwarn",
-    absent: ".workbench:not([hidden])",
-    assert: `document.querySelector('.composer__input')?.value
-        .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
-      && document.querySelector('.composer__attachwarn')?.textContent
-        .includes('已添加 1 张图片，并引用 1 个文件') === true
-      && document.querySelectorAll('.attach .thumb').length === 1
-      && document.activeElement?.classList.contains('composer__input') === true`,
+    assert: `(() => {
+      const panelOpen = document.querySelector('.workbench:not([hidden])') !== null
+      return panelOpen === (innerWidth > 1120)
+        && document.querySelector('.composer__input')?.value
+          .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+        && document.querySelector('.composer__attachwarn')?.textContent
+          .includes('已添加 1 张图片，并引用 1 个文件') === true
+        && document.querySelectorAll('.attach .thumb').length === 1
+        && document.activeElement?.classList.contains('composer__input') === true
+    })()`,
   },
   {
     name: "14-重复拖放不制造假成功",
-    open: `document.querySelector('[title="文件预览"]')?.click()`,
+    open: openPanelPage("文件"),
     dragFiles: MIXED_FILES,
     dragTarget: ".workbench__body",
     dragHint: "添加 1 张图片并引用 1 个文件",
@@ -57,13 +61,13 @@ export const DROP_VIEWS = [
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
       document.querySelector('[aria-label="去掉这个附件"]')?.click()
-      document.querySelector('.workbench__hide')?.click()
+      document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()
       setTimeout(resolve, 5200)
     })`,
   },
   {
     name: "14-侧栏仍不接文件",
-    open: `document.querySelector('[title="文件预览"]')?.click()`,
+    open: openPanelPage("文件"),
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
     rejectDragTarget: ".sidebar",
     ready: ".workbench:not([hidden])",
@@ -97,7 +101,7 @@ export const DROP_VIEWS = [
       && document.querySelector('.attach .thumb') === null`,
     after: `return new Promise(resolve => {
       delete document.documentElement.dataset.failedDrop
-      document.querySelector('.workbench__hide')?.click()
+      document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()
       setTimeout(resolve, 5200)
     })`,
   },

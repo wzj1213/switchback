@@ -2,12 +2,13 @@
 import { MODEL_VIEWS } from "./shot-views-model.mjs"
 import { DROP_VIEWS } from "./shot-views-drop.mjs"
 import { REVERSE_COMPLETION_VIEW } from "./shot-view-completion.mjs"
+import { openPanelPage } from "./shot-panel.mjs"
 
 export const COMPOSE_VIEWS = [
   {
     name: "12-切会话保留草稿",
     open: [
-      `return new Promise((resolve, reject) => { document.querySelector('[aria-label="收起工作台"]')?.click(); setTimeout(() => { document.activeElement?.getAttribute('title') === '后台活动' ? resolve(true) : reject(new Error('工作台关闭后没有回到原触发器')) }, 80) })`,
+      `return new Promise((resolve, reject) => { document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click(); setTimeout(() => { document.activeElement?.getAttribute('aria-label') === '显示侧边面板' ? resolve(true) : reject(new Error('侧边面板关闭后没有回到总入口')) }, 80) })`,
       `return new Promise((resolve, reject) => {
         const input = document.querySelector('.composer__input')
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
@@ -114,7 +115,7 @@ export const COMPOSE_VIEWS = [
     name: "15-工作台文件预览",
     open: [
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '检查这个文件 '); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
-      `document.querySelector('[title="文件预览"]')?.click()`,
+      ...openPanelPage("文件"),
       `(() => { const input = document.querySelector('.files-search input'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; setter?.call(input, 'attachment-feedback'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
       `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
       `setTimeout(() => {
@@ -194,7 +195,7 @@ export const COMPOSE_VIEWS = [
   {
     name: "16-重复引用保留文件预览",
     open: [
-      `document.querySelector('[title="文件预览"]')?.click()`,
+      ...openPanelPage("文件"),
       `(() => { const button = document.querySelector('[aria-label="引用到输入框"]'); button?.focus(); button?.click() })()`,
     ],
     ready: ".workbench__notice",
@@ -210,15 +211,16 @@ export const COMPOSE_VIEWS = [
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
-      document.querySelector('.workbench__hide')?.click()
+      document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()
     })()`,
   },
   {
     name: "17-@文件引用",
     open: [
       `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
-      `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
-      `document.querySelector('.workbench__hide')?.click()`,
+      `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('Esc 没有收起工作台')`,
+      ...openPanelPage("文件"),
+      `document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()`,
       `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('关闭键没有收起工作台')`,
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '@attachment'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
       `(() => {
