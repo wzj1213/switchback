@@ -96,10 +96,25 @@ export const REVIEW_VIEWS = [
   },
   {
     name: "04-跳转到文件",
-    open: `document.querySelector('[aria-label="跳转到文件"]')?.click()`,
-    ready: `[role="menu"][aria-label="跳转到文件"]`,
-    assert: `document.querySelectorAll('[role="menu"][aria-label="跳转到文件"] .pop__item').length > 1
-      && document.activeElement?.getAttribute('role') === 'menuitem'`,
+    open: [
+      `document.querySelector('button[aria-label="跳转到文件"]')?.click()`,
+      `(() => {
+        const input = document.querySelector('input[aria-label="跳转到文件"]')
+        window.__omniJumpInputFocused = document.activeElement === input
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        setter?.call(input, 'jump')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`,
+      `document.querySelector('input[aria-label="跳转到文件"]')?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))`,
+    ],
+    ready: `[role="dialog"][aria-label="跳转到文件"]`,
+    assert: `(() => {
+      const rows = [...document.querySelectorAll('[role="menu"][aria-label="匹配的审核文件"] .pop__item')]
+      return window.__omniJumpInputFocused === true && rows.length > 0
+        && rows.every(row => row.textContent.toLowerCase().includes('jump'))
+        && document.activeElement?.getAttribute('role') === 'menuitem'
+    })()`,
     after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
   },
   {

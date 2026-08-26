@@ -106,9 +106,9 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClo
             onReload={data.reload}
             list={list}
             onList={setList}
-            files={files}
+            files={data.files}
             active={active}
-            onPick={setPicked}
+            onPick={(rel) => { setQuery(""); setPicked(rel) }}
           />
       </header>
       <div className={`rv__body${list ? "" : " rv__body--list-hidden"}`}>

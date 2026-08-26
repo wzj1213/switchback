@@ -47,6 +47,7 @@ export interface PopoverProps {
 
 const MENU_ITEM = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
 const FOCUSABLE = `button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])`
+const INITIAL_FOCUS = "[data-popover-autofocus]"
 
 function menuItems(panel: HTMLElement): readonly HTMLElement[] {
   return [...panel.querySelectorAll<HTMLElement>(MENU_ITEM)].filter(
@@ -55,6 +56,11 @@ function menuItems(panel: HTMLElement): readonly HTMLElement[] {
 }
 
 function focusPanel(panel: HTMLElement): void {
+  const preferred = panel.querySelector<HTMLElement>(INITIAL_FOCUS)
+  if (preferred !== null) {
+    preferred.focus()
+    return
+  }
   const items = menuItems(panel)
   const selected = items.find((item) => item.getAttribute("aria-checked") === "true")
   ;(selected ?? items[0] ?? panel.querySelector<HTMLElement>(FOCUSABLE) ?? panel).focus()
@@ -119,6 +125,8 @@ export function Popover({
       }
       if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return
       if (panel.current === null || !panel.current.contains(event.target as Node | null)) return
+      // 搜索框里的 Home / End 属于文本编辑；上下键才是进入结果列表。
+      if (event.target instanceof HTMLInputElement && ["Home", "End"].includes(event.key)) return
       if (!moveMenuFocus(panel.current, event.key)) return
       event.preventDefault()
       event.stopPropagation()
