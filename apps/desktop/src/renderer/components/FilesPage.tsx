@@ -116,16 +116,32 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
+  const input = useRef<HTMLInputElement>(null)
   const groups = useMemo(() => split(sessionFilesOf(items, cwd)), [items, cwd])
   const found = useFileSearch(cwd, query, searchFiles)
   const searching = query.trim() !== ""
   return (
-    <div className="files-index">
+    <div className="files-index" onKeyDown={(event) => {
+      if (event.key !== "Escape" || query === "") return
+      event.stopPropagation()
+      setQuery("")
+      input.current?.focus()
+    }}>
       <label className="files-search">
         <span className="sr-only">搜索工作区文件</span>
-        <input value={query} placeholder="搜索工作区文件…"
+        <input ref={input} value={query} placeholder="搜索工作区文件…"
           onChange={(event) => { setQuery(event.currentTarget.value) }}
           onKeyDown={(event) => {
+            if (event.key === "ArrowDown") {
+              const first = event.currentTarget.closest(".files-index")
+                ?.querySelector<HTMLButtonElement>(".file-row:not(:disabled)")
+              if (first !== undefined && first !== null) {
+                event.preventDefault()
+                first.focus()
+                first.scrollIntoView({ block: "nearest" })
+              }
+              return
+            }
             if (event.key !== "Escape" || query === "") return
             event.stopPropagation()
             setQuery("")

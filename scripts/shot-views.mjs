@@ -62,10 +62,22 @@ export const VIEWS = [
         setter?.call(input, 'attachment')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
       })()`,
+        `(() => {
+          const enterResults = () => {
+            const input = document.querySelector('.files-search input')
+            if (document.querySelector('.file-row') !== null) {
+              input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+              return
+            }
+            setTimeout(enterResults, 50)
+          }
+          enterResults()
+        })()`,
       ],
       ready: ".file-row",
-      assert: `[...document.querySelectorAll('.file-row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
-      after: `document.querySelector('.files-search input')?.dispatchEvent(
+      assert: `document.activeElement?.classList.contains('file-row') === true
+        && document.activeElement.textContent.toLowerCase().includes('attachment')`,
+      after: `document.activeElement?.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
       )`,
     },

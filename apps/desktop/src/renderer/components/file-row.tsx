@@ -34,6 +34,28 @@ export function outside(path: string, cwd: string): boolean {
   return !normalized.startsWith(base)
 }
 
+export function fileRowDestination(key: string, at: number, total: number): number | "search" | undefined {
+  if (total === 0 || !["ArrowDown", "ArrowUp", "Home", "End"].includes(key)) return undefined
+  if (key === "Home") return 0
+  if (key === "End") return total - 1
+  if (key === "ArrowUp") return at <= 0 ? "search" : at - 1
+  return Math.min(at + 1, total - 1)
+}
+
+function moveFocus(event: React.KeyboardEvent<HTMLButtonElement>): void {
+  const root = event.currentTarget.closest(".files-index")
+  const rows = [...(root?.querySelectorAll<HTMLButtonElement>(".file-row:not(:disabled)") ?? [])]
+  const destination = fileRowDestination(event.key, rows.indexOf(event.currentTarget), rows.length)
+  if (destination === undefined) return
+  event.preventDefault()
+  if (destination === "search") {
+    root?.querySelector<HTMLInputElement>(".files-search input")?.focus()
+    return
+  }
+  rows[destination]?.focus()
+  rows[destination]?.scrollIntoView({ block: "nearest" })
+}
+
 export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {
   path: string
   cwd: string
@@ -47,6 +69,8 @@ export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {
   return (
     <button type="button" className="file-row" disabled={disabled}
       title={disabled === true ? `${path}\n文件已删除` : path}
+      aria-keyshortcuts="ArrowUp ArrowDown Home End"
+      onKeyDown={moveFocus}
       onClick={() => { onPick({ threadId, cwd, path }) }}>
       <span className="file-row__icon"><FileIcon size={13} /></span>
       <span className="file-row__body">

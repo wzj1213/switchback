@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { baseName, dirHint, outside } from "./file-row.js"
+import { baseName, dirHint, fileRowDestination, outside } from "./file-row.js"
 
 describe("文件行的名字与目录", () => {
   const cwd = "/work/repos"
@@ -33,6 +33,25 @@ describe("文件行的名字与目录", () => {
       expect(baseName(item.path)).toBe(item.name)
       expect(dirHint(item.path, cwd)).toBe(item.hint)
       expect(outside(item.path, cwd)).toBe(item.out)
+    })
+  }
+})
+
+describe("文件行键盘移动", () => {
+  const cases: readonly [key: string, at: number, total: number, expected: number | "search" | undefined][] = [
+    ["ArrowDown", 0, 4, 1],
+    ["ArrowDown", 3, 4, 3],
+    ["ArrowUp", 2, 4, 1],
+    ["ArrowUp", 0, 4, "search"],
+    ["Home", 2, 4, 0],
+    ["End", 1, 4, 3],
+    ["Enter", 1, 4, undefined],
+    ["ArrowDown", 0, 0, undefined],
+  ]
+
+  for (const [key, at, total, expected] of cases) {
+    it(`${key} · ${String(at + 1)}/${String(total)} → ${String(expected)}`, () => {
+      expect(fileRowDestination(key, at, total)).toBe(expected)
     })
   }
 })
