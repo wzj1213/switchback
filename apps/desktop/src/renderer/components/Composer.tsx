@@ -1,20 +1,13 @@
-import { useId } from "react"
-import { Prompt } from "./Prompt.js"
-import { takeCommand } from "./ComposerAction.js"
-import { Chips } from "./Chips.js"
-import { Attachments } from "./Attachments.js"
-import { Bar } from "./ComposerBar.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
-import { attachmentWarning, nothingToSend, projectOf, stateOf } from "./composer-state.js"
-import { AsideChip } from "./aside-chip.js"
-import { AttachmentDrop } from "./AttachmentDrop.js"
+import { attachmentWarning, stateOf } from "./composer-state.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import { useComposerMemory, useRememberComposer } from "../use-composer-memory.js"
 import { useComposerFiles } from "../use-composer-files.js"
 import { useComposerFocus } from "../use-composer-focus.js"
 import type { ComposerFileReference } from "../file-references.js"
+import { ComposerBody } from "./composer-body.js"
 
 /**
  * 信任档。
@@ -41,7 +34,7 @@ const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
   { id: "full", label: "完全访问", hint: "最宽权限；允许工作区外操作与联网，通常不再询问" },
 ]
 
-interface Props {
+export interface ComposerProps {
   threadId: string
   drafts: ComposerDrafts
   /** 档位下面那行说明。**内容由 `trustHint` 算，这一层只往下递、不解释。** */
@@ -105,6 +98,8 @@ interface Props {
   prefill?: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
   /** 文件工作台点「引用」后追加到现有草稿；和替换正文的 prefill 不是同一种动作。 */
   reference?: ComposerFileReference
+  /** 从当前任务画布拖入文件后，收起可能挡在输入框前面的工作台。 */
+  onFilesDropped: () => void
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */
@@ -113,139 +108,73 @@ interface Props {
   onResume: () => void
 }
 
-function AttachmentWarning({ notice }: {
-  notice: { text: string; tone: "info" | "warn" } | undefined
-}): React.JSX.Element | null {
-  return notice === undefined ? null : (
-    <p className={`composer__attachwarn composer__attachwarn--${notice.tone}`} role="status">{notice.text}</p>
-  )
-}
-
-/**
- * 贵档那圈边。**描边取的是同一条深空坡道**（靛 → 紫 → 品红），不是一色品红：
- * 一色品红说的是「警告」，而条子上是一片星空——两处对不上，就成了两件事。
- *
- * 停点的颜色写在 CSS 里（`.compring__s0/1/2` 的 `stop-color`），深色模式才好整组换。
- * 绕圈那一段共用同一条渐变，所以它转到哪儿就带哪一段的颜色，
- * 不是一枚固定颜色的光点在跑。
- *
- * `id` 走 `useId`：一屏可能同时挂着不止一个输入框，写死 id 的话
- * **先卸载的那个会把 `<defs>` 一起带走**，剩下那个的描边直接变成没有。
- */
-function VoidRing(): React.JSX.Element {
-  const id = useId()
-  return (
-    <svg className="compring" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
-          <stop className="compring__s0" offset="0%" />
-          <stop className="compring__s1" offset="48%" />
-          <stop className="compring__s2" offset="100%" />
-        </linearGradient>
-      </defs>
-      <rect className="compring__edge" style={{ stroke: `url(#${id})` }} />
-      <rect className="compring__orbit" style={{ stroke: `url(#${id})` }} pathLength={100} />
-    </svg>
-  )
-}
-
-export function Composer(props: Props): React.JSX.Element {
+export function Composer(props: ComposerProps): React.JSX.Element {
   const { detached = false, busy = false, starting = false } = props
-  const focus = useComposerFocus({ detached, initial: props.focusOnMount === true, prefillAt: props.prefill?.at ?? 0 })
+  const focus = useComposerFocus({
+    detached,
+    initial: props.focusOnMount === true,
+    prefillAt: props.prefill?.at ?? 0,
+  })
   const { initial, attach, aside, imageAttachments } = useComposerMemory({
-    drafts: props.drafts, threadId: props.threadId, engine: props.engine, canAttach: props.canAttach,
-    canAside: props.canAside === true && !detached && !starting, prefill: props.prefill, onAsk: props.onAsk,
+    drafts: props.drafts,
+    threadId: props.threadId,
+    engine: props.engine,
+    canAttach: props.canAttach,
+    canAside: props.canAside === true && !detached && !starting,
+    prefill: props.prefill,
+    onAsk: props.onAsk,
   })
   const attachWarning = attachmentWarning({
-    attachments: attach.paths.length, canAttach: props.canAttach,
-    pending: props.pending !== undefined, aside: aside.on,
+    attachments: attach.paths.length,
+    canAttach: props.canAttach,
+    pending: props.pending !== undefined,
+    aside: aside.on,
   })
   const attachmentBlocked = attachWarning !== undefined
   const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
   const draft = useComposerDraft({
-    prefill: props.prefill, engine: props.engine, attach,
-    blocked: mode.blocked || attachmentBlocked, steering: mode.steering, initial,
+    prefill: props.prefill,
+    engine: props.engine,
+    attach,
+    blocked: mode.blocked || attachmentBlocked,
+    steering: mode.steering,
+    initial,
     onSend: aside.wrapSend(props.onSend),
   })
-  const files = useComposerFiles({ attach, canAttach: imageAttachments, editable: !detached,
-    cwd: props.cwd, setText: draft.setText, focus: focus.focus, reference: props.reference })
+  const files = useComposerFiles({
+    attach,
+    canAttach: imageAttachments,
+    editable: !detached,
+    cwd: props.cwd,
+    setText: draft.setText,
+    focus: focus.focus,
+    onFilesDropped: props.onFilesDropped,
+    reference: props.reference,
+  })
   useRememberComposer({
-    drafts: props.drafts, threadId: props.threadId, engine: props.engine,
-    text: draft.text, attachments: attach.paths, command: draft.command, aside: aside.on,
+    drafts: props.drafts,
+    threadId: props.threadId,
+    engine: props.engine,
+    text: draft.text,
+    attachments: attach.paths,
+    command: draft.command,
+    aside: aside.on,
   })
   return (
-    <div className="composer">
-      <div className="composer__inner">
-        <VoidRing />
-        <AttachmentDrop hint={files.dropzone.hint} />
-        {detached ? null : (
-          <Chips
-            threadId={props.threadId}
-            cwd={props.cwd}
-            project={projectOf(props.cwd)}
-            stamp={props.stamp}
-            passing={props.passing}
-          />
-        )}
-        <Attachments paths={attach.paths} onRemove={attach.remove} />
-        <AttachmentWarning notice={attachWarning === undefined ? attach.notice : { text: attachWarning, tone: "warn" }} />
-        <Prompt
-          input={focus.input}
-          value={draft.text}
-          detached={detached}
-          starting={starting}
-          queueing={mode.queueing}
-          steering={mode.steering}
-          cwd={props.cwd}
-          onPaste={files.paste}
-          commands={aside.commands(props.commands)}
-          command={draft.command}
-          onClearCommand={() => draft.setCommand(undefined)}
-          onCommand={(command) => {
-            if (aside.take(command, () => { draft.setText("") })) return
-            takeCommand(command, draft.setText, draft.setCommand, props.onOmni)
-          }}
-          searchFiles={props.searchFiles}
-          onChange={draft.setText}
-          onSubmit={draft.submit}
-          onAside={() => aside.ask(
-            draft.text, draft.command !== undefined, attachmentBlocked, () => { draft.setText("") },
-          )}
-          asideMode={aside.on}
-          onAsideExit={aside.exit}
-        />
-        <Bar
-          detached={detached}
-          busy={busy}
-          starting={starting}
-          empty={nothingToSend({
-            attachmentBlocked,
-            text: draft.text,
-            hasCommand: draft.command !== undefined,
-            attachments: attach.paths.length,
-          })}
-          engine={props.engine}
-          engines={props.engines}
-          trust={props.trust}
-          models={props.models}
-          model={props.model}
-          effort={props.effort}
-          usage={props.usage}
-          pending={props.pending}
-          onEngineChange={props.onEngineChange}
-          onTrustChange={props.onTrustChange}
-          hint={props.hint}
-          blind={props.blind}
-          aside={aside.on ? <AsideChip onExit={aside.exit} /> : undefined}
-          asideMode={aside.on}
-          onModelChange={props.onModelChange}
-          onAttach={() => { void files.pick() }}
-          onResume={props.onResume}
-          onInterrupt={props.onInterrupt}
-          onSend={draft.submit}
-        />
-      </div>
-    </div>
+    <ComposerBody
+      composer={props}
+      detached={detached}
+      busy={busy}
+      starting={starting}
+      focus={focus}
+      attach={attach}
+      aside={aside}
+      attachWarning={attachWarning}
+      attachmentBlocked={attachmentBlocked}
+      mode={mode}
+      draft={draft}
+      files={files}
+    />
   )
 }
 

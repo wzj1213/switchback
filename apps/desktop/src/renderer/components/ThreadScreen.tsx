@@ -13,11 +13,11 @@ import {
 } from "@omni/store"
 import type { useApp } from "../useApp.js"
 import { scopeWorkbench } from "../workbench.js"
-import { WorkbenchPane } from "./WorkbenchPane.js"
 import { Workspace } from "./Workspace.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
-import { fileReference, type ComposerFileReference } from "../file-references.js"
+import type { ComposerFileReference } from "../file-references.js"
 import { stampOf } from "../stamp.js"
+import { ThreadWorkbench } from "./thread-workbench.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -38,14 +38,21 @@ export function ThreadScreen({
   drafts: ComposerDrafts
 }): React.JSX.Element {
   const { shell, state } = app
-  const [reference, setReference] = useState<(ComposerFileReference & { threadId: string }) | undefined>()
+  const [reference, setReference] = useState<
+    (ComposerFileReference & { threadId: string }) | undefined
+  >()
   const lanes = lanesOf(state, thread.id)
   const allItems = itemsOf(state, thread.id)
   const turn = turnOf(state, thread.id)
   // 预览也要跟着磁盘可能变化的节拍走；旁路 shell 同样可能改当前文件，
   // 所以这里用包含 lane 的 allItems，而主转录区仍拿自己过滤后的 app.items。
   const fileStamp = stampOf(turn, allItems)
-  const workbench = scopeWorkbench(shell.workbench, new Set(lanes.map((lane) => lane.id)), thread.id, thread.cwd)
+  const workbench = scopeWorkbench(
+    shell.workbench,
+    new Set(lanes.map((lane) => lane.id)),
+    thread.id,
+    thread.cwd,
+  )
   return (
     <div className={`shell${workbench.visible ? " shell--workbench" : ""}`}>
       {sidebar}
@@ -55,7 +62,9 @@ export function ThreadScreen({
         composerReference={reference?.threadId === thread.id ? reference : undefined}
         thread={thread}
         peer={peer}
-        onCompare={() => { shell.setComparing(true) }}
+        onCompare={() => {
+          shell.setComparing(true)
+        }}
         rows={app.rows}
         onSelect={shell.select}
         items={app.items}
@@ -70,6 +79,7 @@ export function ThreadScreen({
         workbenchVisible={workbench.visible}
         onOpenActivity={shell.openActivity}
         onOpenFiles={shell.openFiles}
+        onFilesDropped={shell.hideWorkbench}
         models={modelsOf(state, thread.id, thread.engine)}
         engines={engines}
         pets={{ on: app.prefs.settings.pets, ...app.prefs.settings.petKit }}
@@ -83,40 +93,29 @@ export function ThreadScreen({
         }}
         onCopy={app.copy}
         onReveal={app.reveal}
-        commands={thread.nextEngine === undefined ? commandsOf(state, thread.id, thread.engine) : []}
+        commands={
+          thread.nextEngine === undefined ? commandsOf(state, thread.id, thread.engine) : []
+        }
         limits={limitsOf(state, thread.engine)}
         onNew={app.newHere}
         onRename={shell.requestRename}
-        onSettings={() => { shell.setSettingsOpen(true) }}
+        onSettings={() => {
+          shell.setSettingsOpen(true)
+        }}
         searchFiles={app.searchFiles}
-        onReview={() => { shell.setReviewOpen(true) }}
+        onReview={() => {
+          shell.setReviewOpen(true)
+        }}
         send={app.send}
       />
-      {workbench.visible ? (
-        <button type="button" className="workbench__scrim" tabIndex={-1}
-          aria-label="收起任务工作台" onClick={shell.hideWorkbench} />
-      ) : null}
-      <WorkbenchPane
+      <ThreadWorkbench
+        app={app}
         state={workbench}
         thread={thread}
         lanes={lanes}
         items={allItems}
         stamp={fileStamp}
-        onActivity={shell.openActivity}
-        onFiles={shell.openFiles}
-        onPickLane={shell.openAside}
-        onActivityIndex={shell.activityIndex}
-        onPickFile={shell.openFile}
-        onFileIndex={shell.fileIndex}
-        onReference={(target) => {
-          const path = fileReference(target.cwd, target.path).path
-          setReference((before) => ({ threadId: target.threadId, path, at: (before?.at ?? 0) + 1 }))
-          shell.hideWorkbench()
-        }}
-        onHide={shell.hideWorkbench}
-        onReveal={app.reveal}
-        onCopy={app.copy}
-        searchFiles={app.searchFiles}
+        setReference={setReference}
       />
       {layers}
     </div>

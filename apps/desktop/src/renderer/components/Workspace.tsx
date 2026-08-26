@@ -49,6 +49,8 @@ export interface WorkspaceProps {
   workbenchVisible: boolean
   onOpenActivity: () => void
   onOpenFiles: () => void
+  /** 从任务画布拖入文件后收起工作台，让结果立刻回到输入框。 */
+  onFilesDropped: () => void
   models: readonly ModelOption[]
   engines: readonly EngineInfo[]
   /**
@@ -139,12 +141,9 @@ function useDraft(
   }, [draft, draftAttachments, draftRevision])
   // **必须 useCallback**：它一路传到 `Transcript`，而那块是 memo 的。
   // 行内箭头每次渲染换身份，memo 立刻静默失效——和 `onResolve` 同一条理由
-  const reuse = useCallback(
-    (text: string, attachments: readonly string[] = [], aside = false) => {
-      setPrefill((prev) => ({ text, attachments, at: prev.at + 1, aside }))
-    },
-    [],
-  )
+  const reuse = useCallback((text: string, attachments: readonly string[] = [], aside = false) => {
+    setPrefill((prev) => ({ text, attachments, at: prev.at + 1, aside }))
+  }, [])
   return { prefill, reuse }
 }
 
@@ -200,7 +199,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         }}
         onReveal={props.onReveal}
         onCopy={props.onCopy}
-        activityCount={props.lanes.filter((lane) => lane.status === "running" || lane.status === "paused").length}
+        activityCount={
+          props.lanes.filter((lane) => lane.status === "running" || lane.status === "paused").length
+        }
         workbenchPage={props.workbenchPage}
         workbenchVisible={props.workbenchVisible}
         onActivity={props.onOpenActivity}

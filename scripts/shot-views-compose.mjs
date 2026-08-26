@@ -106,6 +106,24 @@ export const COMPOSE_VIEWS = [
     assert: `document.activeElement?.classList.contains('composer__input') === true && document.querySelector('[aria-label="添加文件或图片"]')?.disabled === false`,
   },
   {
+    name: "14-工作台也能接文件",
+    open: `document.querySelector('[title="文件预览"]')?.click()`,
+    dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
+    dragTarget: ".workbench__body",
+    ready: ".composer__attachwarn",
+    absent: ".workbench:not([hidden])",
+    assert: `document.querySelector('.composer__input')?.value
+        .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+      && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
+      && document.activeElement?.classList.contains('composer__input') === true`,
+    after: `(() => {
+      const input = document.querySelector('.composer__input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+      setter?.call(input, '')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`,
+  },
+  {
     name: "15-工作台文件预览",
     open: [
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '检查这个文件 '); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,

@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react"
-import { blockedDropHint, hasFileItems, hoverHint, reviewAttachments, type DropHint } from "./attachment-feedback.js"
+import {
+  blockedDropHint,
+  hasFileItems,
+  hoverHint,
+  reviewAttachments,
+  type DropHint,
+} from "./attachment-feedback.js"
 
 function filesOf(items: DataTransferItemList): readonly Pick<File, "type" | "size">[] {
-  return Array.from(items).filter((item) => item.kind === "file").map((item) => (
-    item.getAsFile() ?? { type: item.type, size: 1 }
-  ))
+  return Array.from(items)
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile() ?? { type: item.type, size: 1 })
 }
 
 function isFileTransfer(transfer: DataTransfer): boolean {
@@ -12,7 +18,9 @@ function isFileTransfer(transfer: DataTransfer): boolean {
 }
 
 function inspect(transfer: DataTransfer, enabled: boolean, editable: boolean): DropHint {
-  return editable ? hoverHint(reviewAttachments(filesOf(transfer.items)), enabled) : blockedDropHint()
+  return editable
+    ? hoverHint(reviewAttachments(filesOf(transfer.items)), enabled)
+    : blockedDropHint()
 }
 
 function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
@@ -25,13 +33,17 @@ interface Options {
   drop: (files: FileList | null) => void
 }
 
-function inWorkspace(event: DragEvent): boolean {
-  return event.target instanceof Element && event.target.closest(".main") !== null
+const TASK_SURFACE = ".main, .workbench:not([hidden]), .workbench__scrim"
+
+function inTaskSurface(event: DragEvent): boolean {
+  return event.target instanceof Element && event.target.closest(TASK_SURFACE) !== null
 }
 
 function transferOf(event: DragEvent): DataTransfer | undefined {
   const transfer = event.dataTransfer
-  return transfer !== null && inWorkspace(event) && isFileTransfer(transfer) ? transfer : undefined
+  return transfer !== null && inTaskSurface(event) && isFileTransfer(transfer)
+    ? transfer
+    : undefined
 }
 
 function listeners(
@@ -56,7 +68,7 @@ function listeners(
       setHint((previous) => keepSame(previous, next))
     },
     dragleave: (event) => {
-      if (!inWorkspace(event) || depth.current === 0) return
+      if (!inTaskSurface(event) || depth.current === 0) return
       depth.current = Math.max(0, depth.current - 1)
       if (depth.current === 0) setHint(undefined)
     },
@@ -85,9 +97,10 @@ function listenForFiles(events: ReturnType<typeof listeners>): () => void {
 }
 
 /**
- * 当前会话整片主区都是落点；侧栏、工作台与模态不在 `.main` 内，不会误改草稿。
- * 监听挂 window 是因为 Composer 拿不到祖先 main 的 props 入口，实际接不接仍由
- * `inWorkspace` 按事件目标裁决。最新能力与可编辑态放 ref，拖动中切状态也立即生效。
+ * 当前任务画布都是落点：正文、已打开的工作台和它的窄屏遮罩；侧栏与模态不接，
+ * 避免文件拖拽和会话排序 / 设置面板互相抢。监听挂 window 是因为 Composer 拿不到
+ * 祖先画布的 DOM 入口，实际接不接仍由事件目标裁决。最新能力与可编辑态放 ref，
+ * 拖动中切状态也立即生效。
  */
 export function useAttachmentDropzone(
   enabled: boolean,

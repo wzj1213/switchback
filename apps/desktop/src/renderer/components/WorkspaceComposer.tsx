@@ -72,8 +72,11 @@ export function WorkspaceComposer({
       searchFiles={props.searchFiles}
       prefill={prefill}
       reference={props.composerReference}
-      canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments &&
-        modelAcceptsImages(props.models, thread.model)}
+      onFilesDropped={props.onFilesDropped}
+      canAttach={
+        (thread.capabilities ?? NO_CAPABILITIES).attachments &&
+        modelAcceptsImages(props.models, thread.model)
+      }
       canSteer={(thread.capabilities ?? NO_CAPABILITIES).steer}
       commands={[...actions.map((a) => a.command), ...props.commands]}
       onOmni={(name: string) => {
@@ -94,7 +97,9 @@ export function WorkspaceComposer({
        * 而这时根本没有主线——那一屏还写着「在 xxx 里做点什么？」。
        * `provisional` 正是「发出第一句话之前」（见 `Thread.provisional`）。
        */
-      canAside={(thread.capabilities ?? NO_CAPABILITIES).sideQuestion && thread.provisional !== true}
+      canAside={
+        (thread.capabilities ?? NO_CAPABILITIES).sideQuestion && thread.provisional !== true
+      }
       onAsk={(text) => {
         send({ type: "thread.sideQuestion", threadId: thread.id, text })
       }}
@@ -113,7 +118,12 @@ export function WorkspaceComposer({
       usage={props.usage}
       {...pendingEngine(thread, props.engines, send)}
       onModelChange={(model, effort) => {
-        send({ type: "thread.setModel", threadId: thread.id, model, ...(effort === undefined ? {} : { effort }) })
+        send({
+          type: "thread.setModel",
+          threadId: thread.id,
+          model,
+          ...(effort === undefined ? {} : { effort }),
+        })
       }}
       // 两个选择器都读**当前会话**的真实值。各存一份局部状态的话，
       // 顶栏写着 Codex、选择器写着 Claude Code——一个会撒谎的控件比没有更糟。
