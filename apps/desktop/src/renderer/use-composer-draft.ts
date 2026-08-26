@@ -10,6 +10,7 @@ interface Options {
   attach: ReturnType<typeof useAttachments>
   blocked: boolean
   steering: boolean
+  initial?: { text: string; command?: SlashCommand }
   onSend: (text: string, attachments: readonly string[], steer: boolean) => void
 }
 
@@ -36,8 +37,8 @@ export function useComposerDraft(options: Options): {
   setCommand: React.Dispatch<React.SetStateAction<SlashCommand | undefined>>
   submit: (steer?: boolean) => void
 } {
-  const [text, setText] = useState("")
-  const [command, setCommand] = useState<SlashCommand>()
+  const [text, setText] = useState(options.initial?.text ?? "")
+  const [command, setCommand] = useState<SlashCommand | undefined>(options.initial?.command)
   usePrefill(options.prefill, options.attach.replace, setText, setCommand)
   useEngineCommand(options.engine, command, setCommand, setText)
 

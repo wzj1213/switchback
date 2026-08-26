@@ -24,8 +24,10 @@ import { stampOf } from "../stamp.js"
 import { Between } from "./Between.js"
 import type { WorkbenchPage } from "../workbench.js"
 import { ConversationStage } from "./ConversationStage.js"
+import type { ComposerDrafts } from "../composer-drafts.js"
 
 export interface WorkspaceProps {
+  drafts: ComposerDrafts
   thread: Thread
   /** 分叉出来的另一个会话；有才显示顶栏的「对比」。 */
   peer: Thread | undefined

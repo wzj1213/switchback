@@ -64,8 +64,9 @@ export function useAsideMode(options: {
    */
   prefill?: { aside?: boolean; at: number }
   onAsk?: (text: string) => void
+  initial?: boolean
 }): AsideMode {
-  const [on, setOn] = useState(false)
+  const [on, setOn] = useState(options.initial === true)
   // **能力没了就退出。** 换引擎、断开、或者会话被回放成历史都会走到这里；
   // 留在一个发不出去的模式里，用户下一次回车会什么都不发生
   useEffect(() => {

@@ -108,7 +108,10 @@ async function value(cdp, expression) {
     awaitPromise: true,
     returnByValue: true,
   })
-  if (reply.exceptionDetails !== undefined) throw new Error(reply.exceptionDetails.text)
+  if (reply.exceptionDetails !== undefined) {
+    const detail = reply.exceptionDetails.exception?.description ?? reply.exceptionDetails.text
+    throw new Error(detail)
+  }
   return reply.result.value
 }
 

@@ -48,6 +48,8 @@ export function WorkspaceComposer({
   const send = props.send
   return (
     <Composer
+      threadId={thread.id}
+      drafts={props.drafts}
       detached={thread.detached === true}
       /* **和当前轮次比一比才算数**：`passTurn` 存的是轮次 id，
          所以「过期」不需要谁记得来清一次——下一轮的 id 不一样，这里自然就是 false */

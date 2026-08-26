@@ -12,6 +12,8 @@ import { SidebarPane } from "./SidebarPane.js"
 import { useApp } from "./useApp.js"
 import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
+import { useMemo } from "react"
+import { createComposerDrafts } from "./composer-drafts.js"
 
 /**
  * 选哪一屏。
@@ -114,6 +116,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
 
 export function App(): React.JSX.Element {
   useWindowChrome()
+  const drafts = useMemo(createComposerDrafts, [])
   const app = useApp()
   const { shell, state, thread } = app
 
@@ -167,6 +170,7 @@ export function App(): React.JSX.Element {
   return (
     <ThreadScreen
       app={app}
+      drafts={drafts}
       thread={thread}
       peer={peer}
       engines={workspaceEngines}

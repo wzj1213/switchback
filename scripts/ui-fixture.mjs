@@ -33,6 +33,10 @@ function threadOf(id, title, cwd, at) {
     engineHistory: [ENGINE],
     model: "claude-opus-5",
     effort: "high",
+    capabilities: {
+      compact: false, attachments: true, steer: true, fork: true, rewind: true,
+      modeReadback: false, sideQuestion: true, activity: true,
+    },
   }
 }
 

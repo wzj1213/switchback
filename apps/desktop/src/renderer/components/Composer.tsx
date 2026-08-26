@@ -4,15 +4,15 @@ import { takeCommand } from "./ComposerAction.js"
 import { Chips } from "./Chips.js"
 import { Attachments } from "./Attachments.js"
 import { Bar } from "./ComposerBar.js"
-import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
 import { nothingToSend, projectOf, stateOf } from "./composer-state.js"
-import { useAsideMode } from "../use-aside-mode.js"
 import { AsideChip } from "./aside-chip.js"
 import { useAttachmentDropzone } from "../use-attachment-dropzone.js"
 import { AttachmentDrop } from "./AttachmentDrop.js"
+import type { ComposerDrafts } from "../composer-drafts.js"
+import { useComposerMemory, useRememberComposer } from "../use-composer-memory.js"
 
 /**
  * 信任档。
@@ -40,6 +40,8 @@ const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
 ]
 
 interface Props {
+  threadId: string
+  drafts: ComposerDrafts
   /** 档位下面那行说明。**内容由 `trustHint` 算，这一层只往下递、不解释。** */
   hint?: TrustHint
   /** 「这家不报自己的档」那句，挂在档位选择器的悬停上。 */
@@ -154,38 +156,30 @@ export function Composer(props: Props): React.JSX.Element {
   const detached = props.detached ?? false
   const busy = props.busy ?? false
   const starting = props.starting ?? false
-  // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
-  const attach = useAttachments(props.canAttach)
+  const canAside = props.canAside === true && !detached && !starting
+  const { initial, attach, aside } = useComposerMemory({
+    drafts: props.drafts, threadId: props.threadId, engine: props.engine,
+    canAttach: props.canAttach, canAside, prefill: props.prefill, onAsk: props.onAsk,
+  })
   const dropzone = useAttachmentDropzone(props.canAttach, attach.drop)
   const attachWarning = attachmentWarning(attach.paths.length, props.canAttach, props.pending)
   const attachmentBlocked = attachWarning !== undefined
-  // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
   const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
-  // 断开和启动期一样发不出去，那时这个模式没有意义
-  const canAside = props.canAside === true && !detached && !starting
-  const aside = useAsideMode({ can: canAside, prefill: props.prefill, onAsk: props.onAsk })
   const draft = useComposerDraft({
-    prefill: props.prefill,
-    engine: props.engine,
-    attach,
-    blocked: mode.blocked || attachmentBlocked,
-    steering: mode.steering,
+    prefill: props.prefill, engine: props.engine, attach,
+    blocked: mode.blocked || attachmentBlocked, steering: mode.steering, initial,
     onSend: aside.wrapSend(props.onSend),
   })
-
+  useRememberComposer({
+    drafts: props.drafts, threadId: props.threadId, engine: props.engine,
+    text: draft.text, attachments: attach.paths, command: draft.command, aside: aside.on,
+  })
   return (
     <div className="composer">
       <div
         className="composer__inner"
         {...dropzone.bind}
       >
-        {/*
-         * 贵档那圈深空描边。**开关不在这里，在 CSS 里**（`:has(.effort--costly)`）：
-         * 滑块上的那个 class 已经是「此刻这一档贵不贵」的唯一真相——**拖动中它跟着
-         * 手指走**，而框子说的正是同一件事。在这里再算一遍的话，就得把预览态顺着
-         * Bar → BarEffort → EffortSlider 传一遍，传的是同一个值的第二份拷贝，
-         * 而且那一份必然慢一整个拖动：它只认已经落档的 `props.effort`。
-         */}
         <VoidRing />
         <AttachmentDrop hint={dropzone.hint} />
         {detached ? null : (
@@ -196,9 +190,6 @@ export function Composer(props: Props): React.JSX.Element {
             passing={props.passing}
           />
         )}
-        {/* 附件排在芯片**下面**、正文上面。芯片说的是「这句话会发到哪儿去」，
-            是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
-            反过来放的话，贴一张图就把抬头顶下去 72 像素 */}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
         <AttachmentWarning text={attachWarning ?? attach.notice} />
         <Prompt

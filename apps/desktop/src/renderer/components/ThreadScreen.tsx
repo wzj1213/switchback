@@ -14,6 +14,7 @@ import type { useApp } from "../useApp.js"
 import { scopeWorkbench } from "../workbench.js"
 import { WorkbenchPane } from "./WorkbenchPane.js"
 import { Workspace } from "./Workspace.js"
+import type { ComposerDrafts } from "../composer-drafts.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -23,6 +24,7 @@ export function ThreadScreen({
   engines,
   sidebar,
   layers,
+  drafts,
 }: {
   app: ReturnType<typeof useApp>
   thread: Thread
@@ -30,6 +32,7 @@ export function ThreadScreen({
   engines: readonly EngineInfo[]
   sidebar: React.ReactNode
   layers: React.ReactNode
+  drafts: ComposerDrafts
 }): React.JSX.Element {
   const { shell, state } = app
   const lanes = lanesOf(state, thread.id)
@@ -40,6 +43,7 @@ export function ThreadScreen({
       {sidebar}
       <Workspace
         key={thread.id}
+        drafts={drafts}
         thread={thread}
         peer={peer}
         onCompare={() => { shell.setComparing(true) }}

@@ -95,14 +95,65 @@ export const VIEWS = [
       ready: ".html-preview__frame",
     },
     {
-      name: "09-新会话",
+      name: "09-切会话保留草稿",
+      open: [
+        `document.querySelector('[aria-label="收起工作台"]')?.click()`,
+        `(() => {
+          const input = document.querySelector('.composer__input')
+          const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+          setter?.call(input, '切回来还要在这里')
+          input?.dispatchEvent(new Event('input', { bubbles: true }))
+          const raw = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
+          const transfer = new DataTransfer()
+          transfer.items.add(new File([Uint8Array.from(raw, c => c.charCodeAt(0))], 'draft.png', { type: 'image/png' }))
+          const paste = new Event('paste', { bubbles: true, cancelable: true })
+          Object.defineProperty(paste, 'clipboardData', { value: transfer })
+          input?.dispatchEvent(paste)
+        })()`,
+        `(() => {
+          const cycle = () => {
+            if (document.querySelector('.attach .thumb') === null) {
+              setTimeout(cycle, 50)
+              return
+            }
+            setTimeout(() => {
+              const selected = document.querySelector('.row--thread.row--selected .row__main')
+              window.__omniDraftThread = selected?.textContent.trim()
+              const other = [...document.querySelectorAll('.row--thread .row__main')]
+                .find(row => row !== selected)
+              other?.click()
+              setTimeout(() => {
+                [...document.querySelectorAll('.row--thread .row__main')]
+                  .find(row => row.textContent.trim() === window.__omniDraftThread)?.click()
+                setTimeout(() => { document.documentElement.dataset.draftRestored = 'true' }, 250)
+              }, 250)
+            }, 100)
+          }
+          cycle()
+        })()`,
+      ],
+      ready: `html[data-draft-restored="true"]`,
+      assert: `document.querySelector('.composer__input')?.value === '切回来还要在这里'
+        && document.querySelector('.attach .thumb') !== null`,
+      after: `(() => {
+        const input = document.querySelector('.composer__input')
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(input, '')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+        document.querySelector('[aria-label="去掉这个附件"]')?.click()
+        delete document.documentElement.dataset.draftRestored
+        delete window.__omniDraftThread
+      })()`,
+    },
+    {
+      name: "10-新会话",
       open: `document.querySelector('.sidebar__new')?.click()`,
       ready: ".blank__title",
       // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
       absent: ".file-preview",
     },
     {
-      name: "10-@文件引用",
+      name: "11-@文件引用",
       open: [
         `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
         `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
@@ -125,14 +176,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "11-推理强度",
+      name: "12-推理强度",
       before: ".effort .trigger:not(:disabled)",
       open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
       ready: ".effort__bar--grown",
       dragEffort: true,
     },
     {
-      name: "12-设置",
+      name: "13-设置",
       // 有账号时侧栏底部先开菜单，没账号时直接进设置；固定样本走前者。
       open: [
         `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,

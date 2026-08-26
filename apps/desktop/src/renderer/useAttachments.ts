@@ -30,8 +30,8 @@ export interface Attachments {
   clear: () => void
 }
 
-export function useAttachments(enabled: boolean): Attachments {
-  const [paths, setPaths] = useState<readonly string[]>([])
+export function useAttachments(enabled: boolean, initial: readonly string[] = []): Attachments {
+  const [paths, setPaths] = useState<readonly string[]>(() => [...new Set(initial)])
   const [notice, setNotice] = useState<string>()
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
