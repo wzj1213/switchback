@@ -1,4 +1,5 @@
 import type { PreviewTarget } from "../workbench.js"
+import { fileReference } from "../file-references.js"
 import { relPath } from "../tool.js"
 import { FileIcon } from "./icons-activity.js"
 
@@ -29,9 +30,7 @@ export function outside(path: string, cwd: string): boolean {
   const normalized = path.replace(/\\/g, "/")
   // 工作区搜索返回相对路径；它的根就是当前 cwd，不能贴成「工作区外」。
   if (!normalized.startsWith("/") && !/^[A-Za-z]:\//.test(normalized)) return false
-  const root = cwd.replace(/\\/g, "/")
-  const base = root.endsWith("/") ? root : `${root}/`
-  return !normalized.startsWith(base)
+  return fileReference(cwd, path).outside
 }
 
 export function fileRowDestination(key: string, at: number, total: number): number | "search" | undefined {

@@ -39,4 +39,24 @@ describe("文件预览操作", () => {
     expect(button).toBeDefined()
     expect(button).not.toContain("disabled")
   })
+
+  it("点开同名文件后仍把目录归属画在标题里，越界路径明确标记", () => {
+    const render = (path: string, cwd = "/work/omni"): string => renderToStaticMarkup(createElement(FilePreviewView, {
+      target: { threadId: "thread", cwd, path },
+      revision: undefined, stamp: "idle:0", onBack: () => undefined,
+      onReveal: () => undefined, onCopy: () => undefined,
+    }))
+    const inside = render("/work/omni/apps/desktop/src/index.ts")
+    const external = render("/Users/me/.codex/skills/review/SKILL.md")
+    const windows = render("c:\\Work\\Omni\\src\\App.ts", "C:\\work\\omni")
+    expect(inside).toContain(">index.ts</strong>")
+    expect(inside).toContain("…/desktop/src")
+    expect(inside).not.toContain("工作区外")
+    expect(external).toContain(">SKILL.md</strong>")
+    expect(external).toContain("工作区外")
+    expect(external).toContain("…/skills/review")
+    expect(windows).toContain(">App.ts</strong>")
+    expect(windows).toContain(">src</span>")
+    expect(windows).not.toContain("工作区外")
+  })
 })

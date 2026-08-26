@@ -3,7 +3,9 @@ import type { FilePreview } from "../../shared/file-preview.js"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { sandboxHtml } from "../safe-html.js"
-import { ChevronIcon, CopyIcon, RevealIcon } from "./icons.js"
+import { baseName } from "./file-row.js"
+import { CopyIcon } from "./icons.js"
+import { FilePreviewHeader } from "./FilePreviewHeader.js"
 
 type Load = { state: "loading" } | {
   state: "ready"
@@ -62,50 +64,6 @@ function usePreview(target: PreviewTarget, revision: Item | undefined, stamp: st
     return () => { alive = false; window.clearTimeout(timer) }
   }, [manual, revision, stamp, target.threadId, target.cwd, target.path, visit])
   return load.state === "ready" && load.identity !== identity ? LOADING : load
-}
-
-function ReloadIcon(): React.JSX.Element {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12.8 5.3V2.7m0 0h-2.6m2.6 0A5.6 5.6 0 1 0 13.4 9" />
-    </svg>
-  )
-}
-
-function PreviewActions({ target, busy, referenceable, referenceDisabled, revealable,
-  onReference, onReload, onReveal }: {
-  target: PreviewTarget
-  busy: boolean
-  referenceable: boolean
-  referenceDisabled: boolean
-  revealable: boolean
-  onReference?: (target: PreviewTarget) => void
-  onReload: () => void
-  onReveal: () => void
-}): React.JSX.Element {
-  return (
-    <span className="file-preview__actions">
-      {onReference === undefined || !referenceable ? null : (
-        <button type="button" className="file-preview__reference"
-          title={referenceDisabled ? "继续会话后才能引用" : "引用到输入框"}
-          aria-label="引用到输入框" disabled={referenceDisabled}
-          onClick={() => { onReference(target) }}>
-          <span aria-hidden="true">@</span> 引用
-        </button>
-      )}
-      <button type="button" className="workbench__icon" title="重新读取文件"
-        aria-label="重新读取文件" disabled={busy} onClick={onReload}>
-        <ReloadIcon />
-      </button>
-      {revealable ? (
-        <button type="button" className="workbench__icon" title="在访达中显示"
-          aria-label="在访达中显示" onClick={onReveal}>
-          <RevealIcon size={12} />
-        </button>
-      ) : null}
-    </span>
-  )
 }
 
 function Source({ file, onCopy }: {
@@ -170,24 +128,17 @@ export function FilePreviewView({ target, revision, stamp, onBack, onReference, 
   const [manual, setManual] = useState(0)
   const load = usePreview(target, revision, stamp, manual)
   const path = load.state === "ready" ? load.file.path : target.path
-  const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
+  const name = load.state === "ready" ? load.file.name : baseName(target.path)
   const revealable = canRevealPreview(load.state === "ready" ? load.file : undefined, path)
   const referenceable = canReferencePreview(load.state === "ready" ? load.file : undefined, path)
+  const refreshing = load.state === "ready" && load.refreshing
   return (
     <div className="file-preview">
-      <header className="file-preview__head">
-        <button type="button" className="workbench__back" onClick={onBack}>
-          <ChevronIcon size={11} /> 文件
-        </button>
-        <span className="file-preview__title">
-          <strong title={path}>{name}</strong>
-          {load.state === "ready" && load.refreshing ? <span>正在更新…</span> : null}
-        </span>
-        <PreviewActions target={target} busy={load.state === "loading" || load.refreshing}
-          referenceable={referenceable} referenceDisabled={referenceDisabled}
-          revealable={revealable} onReference={onReference}
-          onReload={() => { setManual((before) => before + 1) }} onReveal={() => { onReveal(path) }} />
-      </header>
+      <FilePreviewHeader target={target} path={path} name={name} refreshing={refreshing}
+        busy={load.state === "loading" || refreshing} referenceable={referenceable}
+        referenceDisabled={referenceDisabled} revealable={revealable} onBack={onBack}
+        onReference={onReference} onReload={() => { setManual((before) => before + 1) }}
+        onReveal={() => { onReveal(path) }} />
       <div className="file-preview__body">
         {load.state === "loading" ? <p className="workbench__empty">正在读取…</p> : (
           <Content key={`${load.file.kind}:${load.file.path}`} file={load.file} onCopy={onCopy} />

@@ -46,8 +46,9 @@ export const VIEWS = [
     {
       name: "04-Git审核",
       open: [], shortcut: { key: "r", code: "KeyR", modifiers: 12, windowsVirtualKeyCode: 82 },
-      ready: ".rv .rvd__body",
-      assert: `document.querySelector('.rv__file') !== null
+      ready: ".rv",
+      assert: `(document.querySelector('.rv__file') !== null
+          || document.querySelector('.rv')?.textContent.includes('当前工作区相对 HEAD 是干净的') === true)
         && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')
         && (window.innerWidth > 1000 || (() => {
           const title = document.querySelector('.rv__title')?.getBoundingClientRect()
@@ -238,9 +239,10 @@ export const VIEWS = [
           input?.dispatchEvent(new Event('input', { bubbles: true }))
         })()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
-        `setTimeout(() => { window.dispatchEvent(new Event('focus')); const see = () => { if (document.querySelector('.file-preview__title span')?.textContent.includes('正在更新')) document.documentElement.dataset.fileRefresh = String(document.querySelector('.file-source') !== null && document.querySelector('[aria-label="引用到输入框"]')?.disabled === false); else setTimeout(see, 10) }; see() }, 320)`,
+        `setTimeout(() => { window.dispatchEvent(new Event('focus')); const see = () => { if (document.querySelector('.file-preview__status')?.textContent.includes('正在更新')) document.documentElement.dataset.fileRefresh = String(document.querySelector('.file-source') !== null && document.querySelector('[aria-label="引用到输入框"]')?.disabled === false); else setTimeout(see, 10) }; see() }, 320)`,
       ],
-      ready: `html[data-file-refresh]`, assert: `document.documentElement.dataset.fileRefresh === 'true'`,
+      ready: `html[data-file-refresh]`, assert: `document.documentElement.dataset.fileRefresh === 'true'
+        && document.querySelector('.file-preview__path')?.textContent.includes('…/src/renderer') === true`,
     },
     {
       name: "15-工作台文件加入输入框",

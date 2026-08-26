@@ -1,0 +1,116 @@
+.file-preview__body,
+.html-preview,
+.file-source,
+.file-image {
+  min-height: 0;
+  flex: 1;
+}
+
+.file-preview__body {
+  display: flex;
+  overflow: hidden;
+}
+
+.file-source {
+  position: relative;
+  overflow: auto;
+  background: var(--bg-code);
+}
+
+.file-source pre {
+  min-width: max-content;
+  margin: 0;
+  padding: var(--sp-4);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.file-preview__copy {
+  position: sticky;
+  z-index: 1;
+  top: var(--sp-2);
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 26px;
+  margin: var(--sp-2) var(--sp-2) 0 0;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.file-preview__copy:hover {
+  color: var(--text);
+}
+
+.file-preview__note {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  background: color-mix(in srgb, var(--warn) 10%, var(--bg));
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+
+.html-preview {
+  display: flex;
+  flex-direction: column;
+}
+
+.html-preview__switch {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.html-preview__switch button {
+  height: 26px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.html-preview__switch button[aria-selected="true"] {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.html-preview__frame {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  background: var(--bg-raised);
+}
+
+.file-image {
+  display: grid;
+  overflow: auto;
+  place-items: center;
+  padding: var(--sp-4);
+  background: var(--bg-code);
+}
+
+.file-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: var(--shadow-pop);
+}

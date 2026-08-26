@@ -1,4 +1,5 @@
 import type { ToolCallItem, ToolDetail } from "@omni/protocol"
+import { fileReference } from "./file-references.js"
 
 /**
  * 工具形态 → 动词。
@@ -48,11 +49,9 @@ export function toolStatusText(item: ToolCallItem): string | undefined {
  * 的时刻，一个突然变长的绝对路径本身就是提醒。缩短它等于把这个信号抹平。
  */
 export function relPath(path: string, cwd: string): string {
-  const base = cwd.endsWith("/") ? cwd : `${cwd}/`
-  if (!path.startsWith(base)) return path
-  const rest = path.slice(base.length)
-  // `cwd` 本身（rest 为空）不显示成空字符串
-  return rest === "" ? path : rest
+  const reference = fileReference(cwd, path)
+  // `cwd` 本身不显示成点；外部路径也保留原样，让越界仍然醒目。
+  return reference.outside || reference.path === "." ? path : reference.path
 }
 
 export function target(detail: ToolDetail, cwd?: string): string {
