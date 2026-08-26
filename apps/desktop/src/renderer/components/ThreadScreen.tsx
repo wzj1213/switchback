@@ -108,6 +108,7 @@ export function ThreadScreen({
         lanes={lanes}
         items={allItems}
         stamp={fileStamp}
+        drafts={drafts}
         setReference={setReference}
         full={shell.panelFull}
         onFull={shell.togglePanelFull}

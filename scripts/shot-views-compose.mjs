@@ -173,7 +173,28 @@ export const COMPOSE_VIEWS = [
     assert: `document.activeElement?.classList.contains('composer__input') === true
       && document.querySelector('.composer__input')?.value === '检查这个文件 @apps/desktop/src/renderer/attachment-feedback.ts '
       && document.querySelector('.send')?.disabled === false`,
-    after: `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, ''); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
+  },
+  {
+    name: "16-重复引用保留文件预览",
+    open: [
+      `document.querySelector('[title="文件预览"]')?.click()`,
+      `(() => { const button = document.querySelector('[aria-label="引用到输入框"]'); button?.focus(); button?.click() })()`,
+    ],
+    ready: ".workbench__notice",
+    assert: `(() => {
+      const value = document.querySelector('.composer__input')?.value ?? ''
+      return document.querySelector('.workbench:not([hidden])') !== null
+        && document.querySelector('.workbench__notice')?.textContent.includes('没有重复添加') === true
+        && value.split('@apps/desktop/src/renderer/attachment-feedback.ts').length - 1 === 1
+        && document.activeElement?.getAttribute('aria-label') === '引用到输入框'
+    })()`,
+    after: `(() => {
+      const input = document.querySelector('.composer__input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+      setter?.call(input, '')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+      document.querySelector('.workbench__hide')?.click()
+    })()`,
   },
   {
     name: "17-@文件引用",

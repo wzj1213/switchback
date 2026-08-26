@@ -37,6 +37,17 @@
   background: var(--bg-sunken);
 }
 
+.workbench__notice {
+  flex: none;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+  color: var(--accent);
+  font-size: var(--text-xs);
+  line-height: var(--lh-sm);
+}
+
 .workbench__tabs {
   display: flex;
   flex: 1;

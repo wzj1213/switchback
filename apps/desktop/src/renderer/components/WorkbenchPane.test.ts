@@ -9,13 +9,14 @@ const thread = {
   status: "idle", createdAt: 1, updatedAt: 1, engineHistory: ["codex"],
 } as Thread
 
-function render(visible: boolean): string {
+function render(visible: boolean, notice?: string): string {
   return renderToStaticMarkup(createElement(WorkbenchPane, {
     state: { visible, page: "files" }, thread, lanes: [], items: [], stamp: "idle:0",
     onActivity: () => undefined, onFiles: () => undefined, onPickLane: () => undefined,
     onActivityIndex: () => undefined, onPickFile: () => undefined, onFileIndex: () => undefined,
     onHide: () => undefined, onReveal: () => undefined, onCopy: () => undefined,
     full: false, onFull: () => undefined,
+    ...(notice === undefined ? {} : { notice }),
     searchFiles: () => Promise.resolve([]),
   }))
 }
@@ -27,5 +28,11 @@ describe("工作台页面保活", () => {
     expect(html).toContain("hidden")
     expect(html.match(/class="workbench__page"/g)).toHaveLength(2)
     expect(html).toContain('class="files-index"')
+  })
+
+  it("没有产生新引用时把结果留在工作台里说明", () => {
+    const html = render(true, "这个文件已经在输入框中，没有重复添加。")
+    expect(html).toContain('class="workbench__notice" role="status"')
+    expect(html).toContain("没有重复添加")
   })
 })

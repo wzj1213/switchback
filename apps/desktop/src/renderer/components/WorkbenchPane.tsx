@@ -25,7 +25,7 @@ function ToolTab({ on, label, count, children, onClick }: {
 
 export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, onFiles, onPickLane,
   onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles,
-  full, onFull }: {
+  notice, full, onFull }: {
   state: WorkbenchState
   thread: Thread
   lanes: readonly Lane[]
@@ -43,6 +43,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   searchFiles: SearchFiles
+  notice?: string
   full: boolean
   onFull: () => void
 }): React.JSX.Element | null {
@@ -74,6 +75,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
             strokeWidth="1.7" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>
         </button>
       </header>
+      {notice === undefined ? null : <p className="workbench__notice" role="status">{notice}</p>}
       <div className="workbench__body">
         <div className="workbench__page" hidden={state.page !== "activity"}>
           <ActivityPage lanes={lanes} laneId={state.laneId} items={items} thread={thread}
