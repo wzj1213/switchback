@@ -13,6 +13,9 @@ describe("文件行的名字与目录", () => {
     },
     { path: `${cwd}/README.md`, name: "README.md", hint: "", out: false },
     { path: `${cwd}/src/app.ts`, name: "app.ts", hint: "src", out: false },
+    // 工作区搜索给的是相对路径；Windows 下分隔符也可能是反斜杠
+    { path: "apps/desktop/src/main.ts", name: "main.ts", hint: "…/desktop/src", out: false },
+    { path: "apps\\desktop\\src\\main.ts", name: "main.ts", hint: "…/desktop/src", out: false },
     // 工作区外：目录同样收成末两级，完整路径留给 title
     {
       path: "/Users/me/.codex/skills/doc-manage/SKILL.md",

@@ -163,12 +163,29 @@ const VIEWS = [
     ready: ".file-row",
   },
   {
-    name: "05-工作区外文件预览",
+    name: "05-文件搜索",
+    open: `(() => {
+      const input = document.querySelector('.files-search input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input, 'attachment')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`,
+    ready: ".file-row",
+    assert: `[...document.querySelectorAll('.file-row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
+    after: `(() => {
+      const input = document.querySelector('.files-search input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(input, '')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`,
+  },
+  {
+    name: "06-工作区外文件预览",
     open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
     ready: ".file-source",
   },
   {
-    name: "06-HTML预览",
+    name: "07-HTML预览",
     open: [
       `document.querySelector('.workbench__back')?.click()`,
       `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
@@ -176,14 +193,14 @@ const VIEWS = [
     ready: ".html-preview__frame",
   },
   {
-    name: "07-新会话",
+    name: "08-新会话",
     open: `document.querySelector('.sidebar__new')?.click()`,
     ready: ".blank__title",
     // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
     absent: ".file-preview",
   },
   {
-    name: "08-推理强度",
+    name: "09-推理强度",
     before: ".effort .trigger:not(:disabled)",
     open: [
       `document.querySelector('.workbench__hide')?.click()`,
@@ -193,7 +210,7 @@ const VIEWS = [
     dragEffort: true,
   },
   {
-    name: "09-设置",
+    name: "10-设置",
     // 侧栏底部那一行**有账号时点开的是菜单**，没账号时才直接进设置
     //（见 `SidebarFoot.tsx`：「一行只做一件事」）。所以这里走两步，
     // 而不是假设它一点就开——本机跑 smoke 时没账号，出图时有，两边不一样
@@ -217,6 +234,9 @@ async function shoot(cdp, view) {
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
     if (view.absent !== undefined && await value(cdp, `document.querySelector('${view.absent}') !== null`)) {
       throw new Error(`${view.name} 仍残留不该出现的 ${view.absent}`)
+    }
+    if (view.assert !== undefined && !(await value(cdp, view.assert))) {
+      throw new Error(`${view.name} 没有满足验收表达式：${view.assert}`)
     }
     if (view.dragEffort === true) await exerciseEffort({ value, pause }, cdp)
     await pause(600)

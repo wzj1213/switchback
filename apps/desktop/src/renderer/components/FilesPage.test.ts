@@ -2,7 +2,7 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { Item } from "@omni/protocol"
-import { FilesPage } from "./FilesPage.js"
+import { FileSearchStatus, FilesPage, visibleFileSearch, type FileSearchState } from "./FilesPage.js"
 
 const cwd = "/work/repos"
 
@@ -50,5 +50,26 @@ describe("文件清单", () => {
     const html = render()
     expect(html).toContain("工作区外")
     expect(html.match(/工作区外/g)).toHaveLength(1)
+  })
+
+  it("查询或工作区变化后上一批结果立即失效", () => {
+    const old: FileSearchState = {
+      key: "/old\u0000readme", loading: false, paths: ["README.md"], failed: false,
+    }
+    expect(visibleFileSearch(old, "/new", "readme")).toEqual({ loading: true, paths: [], failed: false })
+    expect(visibleFileSearch(old, "/old", "package")).toEqual({ loading: true, paths: [], failed: false })
+    expect(visibleFileSearch(old, "/old", "readme")).toEqual({
+      loading: false, paths: ["README.md"], failed: false,
+    })
+  })
+
+  it("搜索失败不冒充零命中，并提供可聚焦的重试按钮", () => {
+    const html = renderToStaticMarkup(createElement(FileSearchStatus, {
+      state: { loading: false, paths: [], failed: true, retry: () => undefined },
+    }))
+    expect(html).toContain('role="alert"')
+    expect(html).toContain("文件搜索失败，请重试。")
+    expect(html).toContain(">重试</button>")
+    expect(html).not.toContain("没有找到文件")
   })
 })

@@ -12,12 +12,12 @@ import { FileIcon } from "./icons-activity.js"
  */
 
 export function baseName(path: string): string {
-  return path.split("/").filter(Boolean).at(-1) ?? path
+  return path.replace(/\\/g, "/").split("/").filter(Boolean).at(-1) ?? path
 }
 
 /** 目录只留末两级：越靠近文件的那几级越能说明它是谁。 */
 export function dirHint(path: string, cwd: string): string {
-  const rel = relPath(path, cwd)
+  const rel = relPath(path.replace(/\\/g, "/"), cwd.replace(/\\/g, "/"))
   const cut = rel.lastIndexOf("/")
   if (cut <= 0) return ""
   const dir = rel.slice(0, cut)
@@ -26,8 +26,12 @@ export function dirHint(path: string, cwd: string): string {
 }
 
 export function outside(path: string, cwd: string): boolean {
-  const base = cwd.endsWith("/") ? cwd : `${cwd}/`
-  return !path.startsWith(base)
+  const normalized = path.replace(/\\/g, "/")
+  // 工作区搜索返回相对路径；它的根就是当前 cwd，不能贴成「工作区外」。
+  if (!normalized.startsWith("/") && !/^[A-Za-z]:\//.test(normalized)) return false
+  const root = cwd.replace(/\\/g, "/")
+  const base = root.endsWith("/") ? root : `${root}/`
+  return !normalized.startsWith(base)
 }
 
 export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {

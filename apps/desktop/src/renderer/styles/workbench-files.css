@@ -37,6 +37,37 @@
   padding: 0 var(--sp-2) var(--sp-4);
 }
 
+.files-search__failure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-2);
+  color: var(--warn);
+  font-size: var(--text-sm);
+}
+
+.files-search__failure p {
+  margin: 0;
+}
+
+.files-search__failure button {
+  flex: none;
+  min-height: 28px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.files-search__failure button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .file-row {
   display: flex;
   width: 100%;
@@ -145,6 +176,17 @@
   flex: none;
   color: var(--text-faint);
   font-size: var(--text-xs);
+}
+
+.file-preview__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.file-preview__actions .workbench__icon:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .file-preview__body,

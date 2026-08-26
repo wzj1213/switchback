@@ -17,7 +17,7 @@ function identityOf(target: PreviewTarget): string {
   return `${target.threadId}\u0000${target.cwd}\u0000${target.path}`
 }
 
-function usePreview(target: PreviewTarget, revision: Item | undefined): Load {
+function usePreview(target: PreviewTarget, revision: Item | undefined, manual: number): Load {
   const [load, setLoad] = useState<Load>(LOADING)
   const lastTarget = useRef("")
   const identity = identityOf(target)
@@ -47,8 +47,17 @@ function usePreview(target: PreviewTarget, revision: Item | undefined): Load {
       })
     }, refreshing ? 100 : 0)
     return () => { alive = false; window.clearTimeout(timer) }
-  }, [revision, target.threadId, target.cwd, target.path])
+  }, [manual, revision, target.threadId, target.cwd, target.path])
   return load.state === "ready" && load.identity !== identity ? LOADING : load
+}
+
+function ReloadIcon(): React.JSX.Element {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12.8 5.3V2.7m0 0h-2.6m2.6 0A5.6 5.6 0 1 0 13.4 9" />
+    </svg>
+  )
 }
 
 function Source({ file, onCopy }: {
@@ -106,7 +115,8 @@ export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: 
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const load = usePreview(target, revision)
+  const [manual, setManual] = useState(0)
+  const load = usePreview(target, revision, manual)
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
   return (
@@ -119,10 +129,17 @@ export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: 
           <strong title={path}>{name}</strong>
           {load.state === "ready" && load.refreshing ? <span>正在更新…</span> : null}
         </span>
-        <button type="button" className="workbench__icon" title="在访达中显示"
-          aria-label="在访达中显示" onClick={() => { onReveal(path) }}>
-          <RevealIcon size={12} />
-        </button>
+        <span className="file-preview__actions">
+          <button type="button" className="workbench__icon" title="重新读取文件"
+            aria-label="重新读取文件" disabled={load.state === "loading" || load.refreshing}
+            onClick={() => { setManual((before) => before + 1) }}>
+            <ReloadIcon />
+          </button>
+          <button type="button" className="workbench__icon" title="在访达中显示"
+            aria-label="在访达中显示" onClick={() => { onReveal(path) }}>
+            <RevealIcon size={12} />
+          </button>
+        </span>
       </header>
       <div className="file-preview__body">
         {load.state === "loading" ? <p className="workbench__empty">正在读取…</p> : (

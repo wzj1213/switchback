@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { fileTouchOf, sessionFilesOf, type SessionFile } from "../session-files.js"
@@ -32,32 +32,80 @@ function FileGroup({ title, files, threadId, cwd, onPick }: {
   )
 }
 
+export interface FileSearchState {
+  key: string
+  loading: boolean
+  paths: readonly string[]
+  failed: boolean
+}
+
+function searchKey(cwd: string, query: string): string {
+  return `${cwd}\u0000${query.trim()}`
+}
+
+/** 查询或工作区刚变化时，旧结果立刻失效，不能撑过 120ms 防抖继续可点。 */
+export function visibleFileSearch(
+  state: FileSearchState,
+  cwd: string,
+  query: string,
+): Omit<FileSearchState, "key"> {
+  if (state.key === searchKey(cwd, query)) {
+    const { loading, paths, failed } = state
+    return { loading, paths, failed }
+  }
+  return { loading: query.trim() !== "", paths: [], failed: false }
+}
+
 function useFileSearch(
   cwd: string,
   query: string,
   search: (cwd: string, query: string) => Promise<readonly string[]>,
-): { loading: boolean; paths: readonly string[] } {
-  const [state, setState] = useState<{ loading: boolean; paths: readonly string[] }>({ loading: false, paths: [] })
+): Omit<FileSearchState, "key"> & { retry: () => void } {
+  const [state, setState] = useState<FileSearchState>({ key: "", loading: false, paths: [], failed: false })
+  const [again, setAgain] = useState(0)
   const seq = useRef(0)
+  const clean = query.trim()
+  const key = searchKey(cwd, query)
   useEffect(() => {
     seq.current += 1
     const mine = seq.current
-    const clean = query.trim()
     if (clean === "") {
-      setState({ loading: false, paths: [] })
+      setState({ key, loading: false, paths: [], failed: false })
       return undefined
     }
-    setState((before) => ({ ...before, loading: true }))
+    setState({ key, loading: true, paths: [], failed: false })
     const timer = window.setTimeout(() => {
       void search(cwd, clean).then((paths) => {
-        if (seq.current === mine) setState({ loading: false, paths })
+        if (seq.current === mine) setState({ key, loading: false, paths, failed: false })
       }).catch(() => {
-        if (seq.current === mine) setState({ loading: false, paths: [] })
+        if (seq.current === mine) setState({ key, loading: false, paths: [], failed: true })
       })
     }, 120)
     return () => { window.clearTimeout(timer) }
-  }, [cwd, query, search])
-  return state
+  }, [again, clean, cwd, key, search])
+  const retry = useCallback(() => { setAgain((before) => before + 1) }, [])
+  return {
+    ...visibleFileSearch(state, cwd, query),
+    retry,
+  }
+}
+
+interface FileSearchView extends Omit<FileSearchState, "key"> {
+  retry: () => void
+}
+
+/** 搜索的三种非结果态；失败与零命中必须是两件不同的事。 */
+export function FileSearchStatus({ state }: { state: FileSearchView }): React.JSX.Element | null {
+  if (state.loading) return <p className="workbench__empty">正在搜索…</p>
+  if (state.failed) {
+    return (
+      <div className="files-search__failure" role="alert">
+        <p>文件搜索失败，请重试。</p>
+        <button type="button" onClick={state.retry}>重试</button>
+      </div>
+    )
+  }
+  return state.paths.length === 0 ? <p className="workbench__empty">没有找到文件。</p> : null
 }
 
 function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
@@ -76,14 +124,14 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
       <label className="files-search">
         <span className="sr-only">搜索工作区文件</span>
         <input value={query} placeholder="搜索工作区文件…"
-          onChange={(event) => { setQuery(event.currentTarget.value) }} />
+          onChange={(event) => { setQuery(event.currentTarget.value) }}
+          onKeyDown={(event) => { if (event.key === "Escape") setQuery("") }} />
       </label>
       <div className="files-index__scroll">
         {searching ? (
           <section>
             <div className="workbench__section">搜索结果</div>
-            {found.loading ? <p className="workbench__empty">正在搜索…</p> : null}
-            {!found.loading && found.paths.length === 0 ? <p className="workbench__empty">没有找到文件。</p> : null}
+            <FileSearchStatus state={found} />
             {found.paths.map((path) => (
               <PathRow key={path} path={path} cwd={cwd} threadId={threadId} onPick={onPick} />
             ))}
