@@ -35,9 +35,9 @@ export function useComposerFiles(options: {
     addReferences(await options.attach.paste(items, options.cwd))
   }, [addReferences, options.attach.paste, options.cwd])
   const pick = useCallback(async () => {
-    await options.attach.pick()
+    addReferences(await options.attach.pick(options.cwd))
     options.focus()
-  }, [options.attach.pick, options.focus])
+  }, [addReferences, options.attach.pick, options.cwd, options.focus])
   return {
     dropzone: useAttachmentDropzone(options.canAttach, options.editable, drop),
     paste,

@@ -231,7 +231,6 @@ export function Composer(props: Props): React.JSX.Element {
           model={props.model}
           effort={props.effort}
           usage={props.usage}
-          canAttach={props.canAttach}
           pending={props.pending}
           onEngineChange={props.onEngineChange}
           onTrustChange={props.onTrustChange}

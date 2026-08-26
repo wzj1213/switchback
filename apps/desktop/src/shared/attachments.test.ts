@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { canAttachImage, canAttachImagePath, imageExtension, MAX_IMAGE_BYTES } from "./attachments.js"
+import { canAttachImage, canAttachImagePath, imageExtension, MAX_IMAGE_BYTES, pickedFile } from "./attachments.js"
 
 describe("桌面图片附件边界", () => {
   it.each([
@@ -25,5 +25,13 @@ describe("桌面图片附件边界", () => {
     expect(canAttachImagePath("/tmp/a.svg", 10)).toBe(false)
     expect(canAttachImagePath("/tmp/a.png", 0)).toBe(false)
     expect(canAttachImagePath("/tmp/a.png", MAX_IMAGE_BYTES + 1)).toBe(false)
+  })
+
+  it("系统选择器保留所有真实文件，只标记能走原生附件的图片", () => {
+    expect(pickedFile("/tmp/a.png", 10, true)).toEqual({ path: "/tmp/a.png", image: true })
+    expect(pickedFile("/tmp/a.pdf", 10, true)).toEqual({ path: "/tmp/a.pdf", image: false })
+    expect(pickedFile("/tmp/huge.png", MAX_IMAGE_BYTES + 1, true))
+      .toEqual({ path: "/tmp/huge.png", image: false })
+    expect(pickedFile("/tmp/gone.txt", 0, false)).toBeUndefined()
   })
 })

@@ -142,7 +142,6 @@ export function Bar({
   model,
   effort,
   usage,
-  canAttach,
   pending,
   onEngineChange,
   onTrustChange,
@@ -169,8 +168,6 @@ export function Bar({
   asideMode?: boolean
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
-  /** 当前引擎与模型都明确报了图片能力时才给入口。 */
-  canAttach: boolean
   models: readonly ModelOption[]
   model?: string
   effort?: string
@@ -202,7 +199,7 @@ export function Bar({
           pending={pending}
           onChange={onModelChange}
         />
-        <AttachmentPick visible={canAttach} disabled={detached} onPick={onAttach} />
+        <AttachmentPick disabled={detached} onPick={onAttach} />
         {aside}
         <span style={{ flex: 1 }} />
         {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。

@@ -13,7 +13,7 @@ import type { ContentHit } from "../shared/search.js"
 import type { EnvConfig } from "../shared/hooks.js"
 import type { ActivityDigest } from "../shared/activity.js"
 import type { FilePreview } from "../shared/file-preview.js"
-import type { PickedImages } from "../shared/attachments.js"
+import type { PickedFiles } from "../shared/attachments.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -154,9 +154,9 @@ const api = {
   discardImages(paths: readonly string[]): void {
     ipcRenderer.send("omni:discardImages", paths)
   },
-  /** 用系统选择器挑图片；主进程会按格式、空文件与 12 MB 上限再核一次。 */
-  async pickImages(): Promise<PickedImages> {
-    return (await ipcRenderer.invoke("omni:pickImages")) as PickedImages
+  /** 用系统选择器挑文件；主进程标出哪些路径符合原生图片附件条件。 */
+  async pickFiles(): Promise<PickedFiles> {
+    return (await ipcRenderer.invoke("omni:pickFiles")) as PickedFiles
   },
   /**
    * 拖进来的这个 `File` 在盘上的真实路径。图片会进原生附件；其他文件只把这条路径

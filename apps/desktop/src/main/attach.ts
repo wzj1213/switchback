@@ -1,29 +1,22 @@
-import { mkdir, stat, writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { dialog, ipcMain, nativeImage } from "electron"
 import {
-  canAttachImagePath,
   imageExtension,
   MAX_IMAGE_BYTES,
-  type PickedImages,
+  type PickedFiles,
 } from "../shared/attachments.js"
 import { thumbnailSize, type AttachmentFiles } from "./attachment-files.js"
+import { pickedFilesOf } from "./picked-files.js"
 
-async function pickImages(files: AttachmentFiles): Promise<PickedImages> {
+async function pickFiles(files: AttachmentFiles): Promise<PickedFiles> {
   const result = await dialog.showOpenDialog({
-    title: "添加图片",
+    title: "添加文件或图片",
     properties: ["openFile", "multiSelections"],
-    filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
   })
-  if (result.canceled) return { paths: [], rejected: 0, canceled: true }
-  const accepted = await Promise.all(result.filePaths.map(async (path) => {
-    const info = await stat(path).catch(() => undefined)
-    return info?.isFile() === true && canAttachImagePath(path, info.size)
-  }))
-  const paths = result.filePaths.filter((_path, index) => accepted[index] === true)
-  files.allow(paths)
-  return { paths, rejected: result.filePaths.length - paths.length, canceled: false }
+  if (result.canceled) return { files: [], failed: 0, canceled: true }
+  return pickedFilesOf(result.filePaths, (paths) => { files.allow(paths) })
 }
 
 /**
@@ -42,7 +35,7 @@ async function pickImages(files: AttachmentFiles): Promise<PickedImages> {
  * 而会话记录里的路径会指向一个不存在的文件——那比没有更糟。
  */
 export function installAttachChannel(files: AttachmentFiles): void {
-  ipcMain.handle("omni:pickImages", () => pickImages(files))
+  ipcMain.handle("omni:pickFiles", () => pickFiles(files))
   ipcMain.handle("omni:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
     const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined

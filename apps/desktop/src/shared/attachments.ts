@@ -32,8 +32,19 @@ export function canAttachImagePath(path: string, size: number): boolean {
   return PATH_EXTENSION[extension] === true && size > 0 && size <= MAX_IMAGE_BYTES
 }
 
-export interface PickedImages {
-  paths: readonly string[]
-  rejected: number
+export interface PickedFile {
+  path: string
+  image: boolean
+}
+
+export interface PickedFiles {
+  files: readonly PickedFile[]
+  failed: number
   canceled: boolean
+}
+
+/** 系统选择器只回用户亲手选中的路径；这一层标记它能否走原生图片附件。 */
+export function pickedFile(path: string, size: number, isFile: boolean): PickedFile | undefined {
+  if (!isFile || path === "") return undefined
+  return { path, image: canAttachImagePath(path, size) }
 }

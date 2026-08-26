@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { droppedFiles, pasteFiles, pickedImages, type AttachmentResult } from "./attachment-actions.js"
+import { droppedFiles, pasteFiles, pickedFiles, type AttachmentResult } from "./attachment-actions.js"
 
 /**
  * 输入区的附件：贴进来、拖进来、去掉。
@@ -22,8 +22,8 @@ export interface Attachments {
   paste: (items: DataTransferItemList | null, cwd: string) => Promise<readonly string[]>
   /** 处理一次拖放。 */
   drop: (files: FileList | null, cwd: string) => readonly string[]
-  /** 打开系统图片选择器。 */
-  pick: () => Promise<void>
+  /** 打开系统文件选择器；返回需要写进正文的可见路径引用。 */
+  pick: (cwd: string) => Promise<readonly string[]>
   /** 用一组已经落盘的路径替换当前附件（取回队列 / 改一改再发）。 */
   replace: (paths: readonly string[]) => void
   remove: (path: string) => void
@@ -61,9 +61,9 @@ export function useAttachments(enabled: boolean, initial: readonly string[] = []
     return accept(droppedFiles(files, enabled, bridge, cwd))
   }, [accept, bridge, enabled])
 
-  const pick = useCallback(async () => {
-    accept(await pickedImages(bridge))
-  }, [accept, bridge])
+  const pick = useCallback(async (cwd: string): Promise<readonly string[]> => {
+    return accept(await pickedFiles(bridge, enabled, cwd))
+  }, [accept, bridge, enabled])
 
   return {
     paths,

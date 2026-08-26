@@ -2,7 +2,7 @@ import { canAttachImage } from "../shared/attachments.js"
 import { dropNotice } from "./attachment-feedback.js"
 import { fileReference } from "./file-references.js"
 
-type Bridge = Pick<NonNullable<Window["omni"]>, "pathForFile" | "pickImages" | "stashImage">
+type Bridge = Pick<NonNullable<Window["omni"]>, "pathForFile" | "pickFiles" | "stashImage">
 
 export interface AttachmentResult {
   paths: readonly string[]
@@ -100,17 +100,21 @@ export function droppedFiles(
   return finish(result)
 }
 
-export async function pickedImages(bridge: Bridge | undefined): Promise<AttachmentResult> {
+export async function pickedFiles(
+  bridge: Bridge | undefined,
+  enabled: boolean,
+  cwd: string,
+): Promise<AttachmentResult> {
   if (bridge === undefined) return unavailable()
   try {
-    const result = await bridge.pickImages()
-    if (result.canceled) return { paths: [], references: [] }
-    if (result.rejected === 0) return { paths: result.paths, references: [] }
-    const added = result.paths.length
-    const notice = added > 0
-      ? `已添加 ${String(added)} 张；另有 ${String(result.rejected)} 个文件未添加。`
-      : "未添加：图片为空、超过 12 MB，或格式不受支持。"
-    return { paths: result.paths, references: [], notice: { text: notice, tone: "warn" } }
+    const picked = await bridge.pickFiles()
+    if (picked.canceled) return { paths: [], references: [] }
+    const routed: Routed = { paths: [], references: [], failed: picked.failed, outside: [] }
+    for (const file of picked.files) {
+      if (enabled && file.image) routed.paths.push(file.path)
+      else routeReference(routed, cwd, file.path)
+    }
+    return finish(routed)
   } catch {
     return unavailable()
   }

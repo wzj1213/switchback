@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { droppedFiles, pasteFiles, pickedImages } from "./attachment-actions.js"
+import { droppedFiles, pasteFiles, pickedFiles } from "./attachment-actions.js"
 
 function image(name: string, type = "image/png", size = 10): File {
   return { name, type, size, arrayBuffer: async () => new ArrayBuffer(size) } as File
@@ -8,7 +8,10 @@ function image(name: string, type = "image/png", size = 10): File {
 const bridge = {
   pathForFile: (file: File): string => `/tmp/${file.name}`,
   stashImage: async (mime: string): Promise<string> => `/saved/${mime.slice(6)}.png`,
-  pickImages: async () => ({ paths: ["/picked/a.png"], rejected: 0, canceled: false }),
+  pickFiles: async () => ({ files: [
+    { path: "/picked/a.png", image: true },
+    { path: "/picked/code.ts", image: false },
+  ], failed: 0, canceled: false }),
 }
 
 describe("附件三种入口", () => {
@@ -66,8 +69,24 @@ describe("附件三种入口", () => {
     })
   })
 
+  it("系统选择器与拖入走同一套图片附件和文件引用分流", async () => {
+    expect(await pickedFiles(bridge, true, "/picked")).toEqual({
+      paths: ["/picked/a.png"],
+      references: ["code.ts"],
+      notice: { text: "已添加 1 张图片，并引用 1 个文件。", tone: "info" },
+    })
+  })
+
+  it("模型不支持图片时，选择的图片也保留为可见引用", async () => {
+    expect(await pickedFiles(bridge, false, "/picked")).toEqual({
+      paths: [],
+      references: ["a.png", "code.ts"],
+      notice: { text: "已引用 2 个文件。", tone: "info" },
+    })
+  })
+
   it("系统选择器取消时不制造提示", async () => {
-    const canceled = { ...bridge, pickImages: async () => ({ paths: [], rejected: 0, canceled: true }) }
-    expect(await pickedImages(canceled)).toEqual({ paths: [], references: [] })
+    const canceled = { ...bridge, pickFiles: async () => ({ files: [], failed: 0, canceled: true }) }
+    expect(await pickedFiles(canceled, true, "/picked")).toEqual({ paths: [], references: [] })
   })
 })

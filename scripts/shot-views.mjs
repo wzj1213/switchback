@@ -224,7 +224,7 @@ export const VIEWS = [
       ready: ".blank__title",
       // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
       absent: ".file-preview",
-      assert: `document.activeElement?.classList.contains('composer__input') === true`,
+      assert: `document.activeElement?.classList.contains('composer__input') === true && document.querySelector('[aria-label="添加文件或图片"]')?.disabled === false`,
     },
     {
       name: "14-工作台文件预览",
