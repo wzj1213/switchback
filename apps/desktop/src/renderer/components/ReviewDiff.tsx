@@ -107,5 +107,14 @@ export function ReviewDiff({ lines, skip, split, loading }: {
       ))}
     </div>
   )
-  return <div className={loading ? "rvd rvd--stale" : "rvd"}>{body}</div>
+  return (
+    <div
+      className={loading ? "rvd rvd--stale" : "rvd"}
+      role="region"
+      aria-label={split ? "并排文件改动，可滚动" : "文件改动，可滚动"}
+      tabIndex={0}
+    >
+      {body}
+    </div>
+  )
 }

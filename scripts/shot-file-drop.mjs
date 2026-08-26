@@ -1,7 +1,7 @@
-/** 用 CDP 的真实文件列表拖进 composer；这会经过 Electron `webUtils.getPathForFile`。 */
-export async function exerciseFileDrop({ value, pause }, cdp, paths) {
+/** 用 CDP 的真实文件列表拖进窗口；这会经过 Electron `webUtils.getPathForFile`。 */
+export async function exerciseFileDrop({ value, pause }, cdp, paths, target) {
   const rect = await value(cdp, `(() => {
-    const r = document.querySelector('.composer__inner').getBoundingClientRect()
+    const r = document.querySelector('${target}').getBoundingClientRect()
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
   })()`)
   const data = { items: [], files: paths, dragOperationsMask: 1 }

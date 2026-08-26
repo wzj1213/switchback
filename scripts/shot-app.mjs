@@ -159,7 +159,9 @@ async function shoot(cdp, view) {
       await pause(350)
     }
     if (view.dragFiles !== undefined) {
-      await exerciseFileDrop({ value, pause }, cdp, view.dragFiles.map((path) => join(ROOT, path)))
+      await exerciseFileDrop(
+        { value, pause }, cdp, view.dragFiles.map((path) => join(ROOT, path)), view.dragTarget,
+      )
       await waitFor(cdp, "document.querySelector('.send:not(:disabled)') !== null", `${view.name} 可发送态`)
     }
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)

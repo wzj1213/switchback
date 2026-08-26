@@ -52,6 +52,8 @@ export const VIEWS = [
       assert: `(document.querySelector('.rv__file') !== null
           || document.querySelector('.rv')?.textContent.includes('当前工作区相对 HEAD 是干净的') === true)
         && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')
+        && (() => { const diff = document.querySelector('.rvd'); return diff === null
+          || (diff.focus(), document.activeElement === diff) })()
         && (window.innerWidth > 1000 || (() => {
           const title = document.querySelector('.rv__title')?.getBoundingClientRect()
           const tools = document.querySelector('.rv__tools')?.getBoundingClientRect()
@@ -69,6 +71,8 @@ export const VIEWS = [
         `if (!document.activeElement?.classList.contains('composer__input')) throw new Error('新会话没有聚焦输入框'); document.querySelector('.sidebar__filter')?.focus()`,
       ],
       dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
+      // 故意落在空会话正文，不是输入框：整扇当前会话都该是文件落点。
+      dragTarget: ".blank",
       ready: ".composer__attachwarn",
       assert: `document.querySelector('.composer__input')?.value
           .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true

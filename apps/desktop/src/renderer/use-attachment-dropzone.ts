@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { blockedDropHint, hasFileItems, hoverHint, reviewAttachments, type DropHint } from "./attachment-feedback.js"
 
 function filesOf(items: DataTransferItemList): readonly Pick<File, "type" | "size">[] {
@@ -19,45 +19,85 @@ function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
   return previous?.tone === next.tone && previous.text === next.text ? previous : next
 }
 
-type Bind = Pick<React.HTMLAttributes<HTMLDivElement>, "onDragEnter" | "onDragOver" | "onDragLeave" | "onDrop">
+interface Options {
+  enabled: boolean
+  editable: boolean
+  drop: (files: FileList | null) => void
+}
 
+function inWorkspace(event: DragEvent): boolean {
+  return event.target instanceof Element && event.target.closest(".main") !== null
+}
+
+function transferOf(event: DragEvent): DataTransfer | undefined {
+  const transfer = event.dataTransfer
+  return transfer !== null && inWorkspace(event) && isFileTransfer(transfer) ? transfer : undefined
+}
+
+function listeners(
+  depth: React.RefObject<number>,
+  setHint: React.Dispatch<React.SetStateAction<DropHint | undefined>>,
+  current: React.RefObject<Options>,
+): Record<"dragenter" | "dragover" | "dragleave" | "drop", (event: DragEvent) => void> {
+  return {
+    dragenter: (event) => {
+      const transfer = transferOf(event)
+      if (transfer === undefined) return
+      event.preventDefault()
+      depth.current += 1
+      setHint(inspect(transfer, current.current.enabled, current.current.editable))
+    },
+    dragover: (event) => {
+      const transfer = transferOf(event)
+      if (transfer === undefined) return
+      event.preventDefault()
+      const next = inspect(transfer, current.current.enabled, current.current.editable)
+      transfer.dropEffect = next.tone === "ready" ? "copy" : "none"
+      setHint((previous) => keepSame(previous, next))
+    },
+    dragleave: (event) => {
+      if (!inWorkspace(event) || depth.current === 0) return
+      depth.current = Math.max(0, depth.current - 1)
+      if (depth.current === 0) setHint(undefined)
+    },
+    drop: (event) => {
+      const transfer = transferOf(event)
+      if (transfer === undefined) return
+      event.preventDefault()
+      depth.current = 0
+      setHint(undefined)
+      if (current.current.editable) current.current.drop(transfer.files)
+    },
+  }
+}
+
+function listenForFiles(events: ReturnType<typeof listeners>): () => void {
+  window.addEventListener("dragenter", events.dragenter)
+  window.addEventListener("dragover", events.dragover)
+  window.addEventListener("dragleave", events.dragleave)
+  window.addEventListener("drop", events.drop)
+  return () => {
+    window.removeEventListener("dragenter", events.dragenter)
+    window.removeEventListener("dragover", events.dragover)
+    window.removeEventListener("dragleave", events.dragleave)
+    window.removeEventListener("drop", events.drop)
+  }
+}
+
+/**
+ * 当前会话整片主区都是落点；侧栏、工作台与模态不在 `.main` 内，不会误改草稿。
+ * 监听挂 window 是因为 Composer 拿不到祖先 main 的 props 入口，实际接不接仍由
+ * `inWorkspace` 按事件目标裁决。最新能力与可编辑态放 ref，拖动中切状态也立即生效。
+ */
 export function useAttachmentDropzone(
   enabled: boolean,
   editable: boolean,
   drop: (files: FileList | null) => void,
-): { hint: DropHint | undefined; bind: Bind } {
+): { hint: DropHint | undefined } {
   const [hint, setHint] = useState<DropHint>()
   const depth = useRef(0)
-  return {
-    hint,
-    bind: {
-      onDragEnter: (event) => {
-        if (!isFileTransfer(event.dataTransfer)) return
-        event.preventDefault()
-        depth.current += 1
-        setHint(inspect(event.dataTransfer, enabled, editable))
-      },
-      onDragOver: (event) => {
-        if (!isFileTransfer(event.dataTransfer)) return
-        event.preventDefault()
-        const next = inspect(event.dataTransfer, enabled, editable)
-        event.dataTransfer.dropEffect = next.tone === "ready" ? "copy" : "none"
-        // dragover 每秒会来几十次；提示没变就别让整个 composer 跟着重绘。
-        setHint((previous) => keepSame(previous, next))
-      },
-      onDragLeave: () => {
-        // Chromium 在离开窗口边缘时可能清空 DataTransfer；depth 才是这次拖放的所有权。
-        if (depth.current === 0) return
-        depth.current = Math.max(0, depth.current - 1)
-        if (depth.current === 0) setHint(undefined)
-      },
-      onDrop: (event) => {
-        if (!isFileTransfer(event.dataTransfer)) return
-        event.preventDefault()
-        depth.current = 0
-        setHint(undefined)
-        if (editable) drop(event.dataTransfer.files)
-      },
-    },
-  }
+  const current = useRef<Options>({ enabled, editable, drop })
+  current.current = { enabled, editable, drop }
+  useEffect(() => listenForFiles(listeners(depth, setHint, current)), [])
+  return { hint }
 }

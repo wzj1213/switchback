@@ -175,7 +175,7 @@ export function Composer(props: Props): React.JSX.Element {
   })
   return (
     <div className="composer">
-      <div className="composer__inner" {...files.dropzone.bind}>
+      <div className="composer__inner">
         <VoidRing />
         <AttachmentDrop hint={files.dropzone.hint} />
         {detached ? null : (
