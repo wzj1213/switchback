@@ -162,8 +162,8 @@ body {
   display: none;
 }
 
-/* 普通笔记本再硬塞三列只会复现按钮竖排；这时工具组独占右侧内容区。 */
-@media (max-width: 1320px) {
+/* 只有三列合计已不足约 1120px 时才让工具组独占内容区；1172px 仍应像 Codex 并排。 */
+@media (max-width: 1120px) {
   .shell--workbench {
     grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   }

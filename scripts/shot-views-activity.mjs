@@ -54,7 +54,7 @@ export const ACTIVITY_VIEWS = [
       const workbenchBox = workbench?.getBoundingClientRect()
       const sidebarBox = sidebar?.getBoundingClientRect()
       const mainBox = main?.getBoundingClientRect()
-      const compact = innerWidth <= 1320
+      const compact = innerWidth <= 1120
       result.threadLayout = compact
         ? getComputedStyle(main).display === 'none'
         : mainBox !== undefined && sidebarBox !== undefined && workbenchBox !== undefined

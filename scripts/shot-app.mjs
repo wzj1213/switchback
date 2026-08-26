@@ -2,7 +2,7 @@
 /**
  * 给桌面端出图。**界面改动的唯一验收方式。**
  *
- * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min|--wide] [--reduce] [--audit]`
+ * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min|--mid|--wide] [--reduce] [--audit]`
  *
  * ## 为什么不用 `OMNI_DEV_SHOT`
  *
@@ -47,7 +47,10 @@ const PET_LIVE = process.argv.includes("--pet-live")
  * 那一档值得单独拍：布局塌不塌只在那儿看得出来，而平时没人会把窗口拖到那么小。
  */
 const MIN = process.argv.includes("--min")
-const SIZE = process.argv.includes("--wide") ? { width: 1404, height: 720 } : MIN ? { width: 860, height: 560 } : { width: 1280, height: 860 }
+const MID = process.argv.includes("--mid")
+const SIZE = process.argv.includes("--wide")
+  ? { width: 1404, height: 720 }
+  : MID ? { width: 1172, height: 720 } : MIN ? { width: 860, height: 560 } : { width: 1280, height: 860 }
 /** 样本的时间戳写死。**不能用 `Date.now()`**——侧栏上那些「3 小时前」会每次都不一样。 */
 const AT = 1_787_659_200_000
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))

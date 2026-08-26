@@ -15,7 +15,7 @@
   border-left: 0;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1120px) {
   .workbench {
     grid-column: 2;
     border-left: 0;
@@ -128,7 +128,7 @@
   outline-offset: -2px;
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 1120px) {
   .workbench__expand {
     display: none;
   }

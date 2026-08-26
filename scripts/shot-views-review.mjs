@@ -15,7 +15,7 @@ export const REVIEW_VIEWS = [
         const review = document.querySelector('.rv')?.getBoundingClientRect()
         const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
         if (review === undefined || sidebar === undefined || main === null) return false
-        const expectedMain = window.innerWidth > 1320
+        const expectedMain = window.innerWidth > 1120
         return (getComputedStyle(main).display !== 'none') === expectedMain
           && Math.abs(review.right - window.innerWidth) < 1
           && (expectedMain || Math.abs(review.left - sidebar.right) < 1)

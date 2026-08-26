@@ -86,7 +86,7 @@ export const VIEWS = [
           nonModal: document.querySelector('.workbench')?.getAttribute('aria-modal') === null
             && document.querySelector('.workbench__scrim') === null,
           responsive: getComputedStyle(document.querySelector('.main')).display
-            === (innerWidth <= 1320 ? 'none' : 'flex'),
+            === (innerWidth <= 1120 ? 'none' : 'flex'),
           clean: !index?.textContent.includes('failed-secret.txt'),
           scope: scope?.textContent.endsWith('/omni') === true
             && scope?.getAttribute('title')?.endsWith('/omni') === true,

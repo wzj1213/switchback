@@ -83,7 +83,7 @@
   border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--border));
 }
 
-@media (min-width: 1321px) {
+@media (min-width: 1121px) {
   body:has(.shell--workbench:not(.shell--workbench-full)) > .composer-drop--notice {
     left: calc(100vw - var(--workbench-w));
   }
