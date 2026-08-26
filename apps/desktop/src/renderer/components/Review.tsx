@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { filterFiles, tallyReview, untrackedCount, useReview, usePatch } from "../review.js"
 import { usePanelKeys } from "../use-panel-keys.js"
 import { ReviewList } from "./ReviewList.js"
@@ -25,25 +25,6 @@ import { ReviewPane } from "./review-pane.js"
  * **不交给另一家引擎去审。** 那要为 agent 之间发明一套自制协议，是个无底洞
  *（见 `AGENTS.md` 的边界）。要另一双眼睛的话，把路径给它、让它自己读就行。
  */
-
-/** ↑/↓ 在文件之间走。**在筛选框里也生效**：一边打字一边翻是这类面板的常规用法。 */
-function useArrows(rels: readonly string[], active: string | undefined, onPick: (rel: string) => void): void {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
-      if (rels.length === 0) return
-      event.preventDefault()
-      const at = active === undefined ? -1 : rels.indexOf(active)
-      const step = event.key === "ArrowDown" ? 1 : -1
-      const next = rels[(at + step + rels.length) % rels.length]
-      if (next !== undefined) onPick(next)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => {
-      window.removeEventListener("keydown", onKey)
-    }
-  }, [rels, active, onPick])
-}
 
 function ignoredOf(paths: readonly string[] | undefined): readonly string[] {
   return paths === undefined ? [] : paths
@@ -73,8 +54,6 @@ export function Review({ cwd, threadId, stamp, wanted, full, onFull, onClose, on
   // 选中的那个被筛掉了（或者上一轮把它改回去了）就退回第一个——
   // 停在一个列表里已经没有的文件上，右边会一直是空的
   const active = files.some((f) => f.rel === picked) ? picked : files[0]?.rel
-  const rels = useMemo(() => files.map((f) => f.rel), [files])
-  useArrows(rels, active, setPicked)
   const patch = usePatch(cwd, active, { context, stamp, threadId, revision: data.revision })
   const { added, removed } = tallyReview(data.files)
   const total = data.files.length + (data.more ?? 0)

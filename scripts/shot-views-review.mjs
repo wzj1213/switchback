@@ -32,6 +32,34 @@ export const REVIEW_VIEWS = [
       })()`,
   },
   {
+    name: "04-审核方向键不越界",
+    open: `(() => {
+      const before = document.querySelector('.rv__path')?.textContent
+      const outside = document.querySelector('.sidebar__filter')
+      outside?.focus()
+      const outsideKey = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+      outside?.dispatchEvent(outsideKey)
+      const rows = [...document.querySelectorAll('.rvl__row')]
+      const at = rows.findIndex(row => row.getAttribute('aria-current') === 'true')
+      const expected = rows[(at + 1) % rows.length]?.getAttribute('data-review-rel')
+      const input = document.querySelector('.rvl__input')
+      input?.focus()
+      const insideKey = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+      input?.dispatchEvent(insideKey)
+      window.__omniReviewKeys = {
+        before, expected, outsidePreserved: document.querySelector('.rv__path')?.textContent === before,
+        outsidePrevented: outsideKey.defaultPrevented, insidePrevented: insideKey.defaultPrevented,
+      }
+      return new Promise(resolve => requestAnimationFrame(() => resolve(true)))
+    })()`,
+    ready: ".rv__file",
+    assert: `window.__omniReviewKeys?.outsidePreserved === true
+      && window.__omniReviewKeys?.outsidePrevented === false
+      && window.__omniReviewKeys?.insidePrevented === true
+      && document.activeElement?.classList.contains('rvl__input') === true
+      && document.querySelector('.rv__path')?.textContent === window.__omniReviewKeys?.expected`,
+  },
+  {
     name: "04-审核复制有确认",
     open: `(() => {
       const button = document.querySelector('[aria-label="复制这份文件改动"]')

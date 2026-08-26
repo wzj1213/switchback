@@ -1,6 +1,7 @@
 import type { ReviewFile } from "../../shared/review.js"
 import { reviewLabel } from "../../shared/review.js"
 import { splitPath } from "../diff.js"
+import { reviewDestination } from "./review-navigation.js"
 
 /**
  * 审核面板左边那一列：改了哪些文件。
@@ -37,8 +38,11 @@ function Row({ file, active, onPick }: {
     <button
       type="button"
       className={`rvl__row${active ? " rvl__row--on" : ""}`}
+      data-review-rel={file.rel}
+      tabIndex={active ? 0 : -1}
       title={file.rel}
       aria-current={active}
+      aria-keyshortcuts="ArrowUp ArrowDown Home End"
       onClick={() => {
         onPick(file.rel)
       }}
@@ -58,6 +62,25 @@ function Row({ file, active, onPick }: {
   )
 }
 
+function moveSelection(event: React.KeyboardEvent<HTMLDivElement>, files: readonly ReviewFile[],
+  active: string | undefined, onPick: (rel: string) => void): void {
+  if (!(event.target instanceof HTMLElement)) return
+  const row = event.target.closest<HTMLButtonElement>(".rvl__row")
+  if (row === null && !event.target.classList.contains("rvl__input")) return
+  const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>(".rvl__row")]
+  const at = row === null ? files.findIndex((file) => file.rel === active) : rows.indexOf(row)
+  const destination = reviewDestination(event.key, at, files.length)
+  const file = destination === undefined ? undefined : files[destination]
+  if (destination === undefined || file === undefined) return
+  event.preventDefault()
+  event.stopPropagation()
+  onPick(file.rel)
+  if (row !== null) {
+    rows[destination]?.focus()
+    rows[destination]?.scrollIntoView({ block: "nearest" })
+  }
+}
+
 export function ReviewList({ files, active, query, onQuery, onPick, more, ignored }: {
   files: readonly ReviewFile[]
   active: string | undefined
@@ -70,7 +93,7 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
   ignored: readonly string[]
 }): React.JSX.Element {
   return (
-    <div className="rvl">
+    <div className="rvl" onKeyDown={(event) => { moveSelection(event, files, active, onPick) }}>
       <div className="rvl__filter">
         <input
           className="rvl__input"
@@ -78,6 +101,7 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
           value={query}
           placeholder="筛选路径…"
           aria-label="筛选文件"
+          aria-keyshortcuts="ArrowUp ArrowDown Home End"
           onChange={(e) => {
             onQuery(e.target.value)
           }}
