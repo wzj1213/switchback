@@ -53,11 +53,32 @@
 }
 
 .files-scope {
-  display: block;
+  display: grid;
+  gap: 2px;
   margin: 6px 2px 0;
   color: var(--text-faint);
   font-size: var(--text-xs);
   line-height: var(--lh-xs);
+}
+
+.files-scope__root {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sp-1);
+}
+
+.files-scope__root > span {
+  flex: none;
+}
+
+.files-scope__root bdi {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .files-index__scroll {

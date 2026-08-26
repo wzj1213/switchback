@@ -78,19 +78,28 @@ export const VIEWS = [
       name: "07-文件清单",
       open: `document.querySelector('[title="文件预览"]')?.click()`,
       ready: ".file-row",
-      assert: `document.activeElement?.matches('.files-search input') === true
-        && document.querySelector('.workbench')?.getAttribute('aria-modal') === null
-        && document.querySelector('.workbench__scrim') === null
-        && getComputedStyle(document.querySelector('.main')).display === (innerWidth <= 1320 ? 'none' : 'flex')
-        && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')
-        && document.querySelector('.files-scope')?.textContent.includes('搜索当前工作区') === true
-        && document.querySelector('.files-scope')?.textContent.includes('文件变化会自动更新') === true
-        && document.querySelector('.files-index')?.textContent.includes('最近一轮改过') === true
-        && document.querySelector('.files-index')?.textContent.includes('此前碰过') === true
-        && document.querySelector('.files-index')?.textContent.includes('AGENTS.md') === true
-        && [...document.querySelectorAll('.file-row')]
-          .filter(row => row.tabIndex === 0).length === 1
-        && document.querySelector('.file-row[tabindex="0"]')?.disabled === false`,
+      assert: `(() => {
+        const scope = document.querySelector('.files-scope__root bdi')
+        const index = document.querySelector('.files-index')
+        const checks = {
+          focus: document.activeElement?.matches('.files-search input') === true,
+          nonModal: document.querySelector('.workbench')?.getAttribute('aria-modal') === null
+            && document.querySelector('.workbench__scrim') === null,
+          responsive: getComputedStyle(document.querySelector('.main')).display
+            === (innerWidth <= 1320 ? 'none' : 'flex'),
+          clean: !index?.textContent.includes('failed-secret.txt'),
+          scope: scope?.textContent.endsWith('/omni') === true
+            && scope?.getAttribute('title')?.endsWith('/omni') === true,
+          copy: document.querySelector('.files-scope')?.textContent.includes('文件变化会自动更新') === true,
+          groups: index?.textContent.includes('最近一轮改过') === true
+            && index?.textContent.includes('此前碰过') === true
+            && index?.textContent.includes('AGENTS.md') === true,
+          tabStop: [...document.querySelectorAll('.file-row')].filter(row => row.tabIndex === 0).length === 1
+            && document.querySelector('.file-row[tabindex="0"]')?.disabled === false,
+        }
+        if (Object.values(checks).every(Boolean)) return true
+        throw new Error('文件清单验收：' + JSON.stringify(checks))
+      })()`,
     },
     {
       name: "08-缺失文件可恢复",

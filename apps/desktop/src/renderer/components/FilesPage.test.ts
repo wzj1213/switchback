@@ -69,6 +69,8 @@ describe("文件清单", () => {
     expect(button).toContain("disabled")
     expect(button).toContain('aria-busy="false"')
     expect(html).toContain('<label class="sr-only" for=')
+    expect(html).toContain("搜索范围")
+    expect(html).toContain('<bdi title="/work/repos">/work/repos</bdi>')
   })
 
   it("查询或工作区变化后上一批结果立即失效", () => {

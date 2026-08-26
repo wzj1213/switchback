@@ -1,7 +1,8 @@
 import { useId } from "react"
 import { ReloadIcon } from "./reload-icon.js"
 
-export function FileSearchHead({ query, loading, input, onQuery, onEnterResults, onRefresh }: {
+export function FileSearchHead({ cwd, query, loading, input, onQuery, onEnterResults, onRefresh }: {
+  cwd: string
   query: string
   loading: boolean
   input: React.RefObject<HTMLInputElement | null>
@@ -33,7 +34,13 @@ export function FileSearchHead({ query, loading, input, onQuery, onEnterResults,
           <ReloadIcon />
         </button>
       </div>
-      <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索当前工作区，文件变化会自动更新。</span>
+      <span className="files-scope">
+        <span className="files-scope__root">
+          <span>搜索范围</span>
+          <bdi title={cwd}>{cwd}</bdi>
+        </span>
+        <span>文件变化会自动更新；最近一轮优先，此前与分支继承分组保留。</span>
+      </span>
     </div>
   )
 }

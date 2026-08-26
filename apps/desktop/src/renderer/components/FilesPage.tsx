@@ -80,7 +80,7 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
       setQuery("")
       input.current?.focus()
     }}>
-      <FileSearchHead query={query} loading={found.loading} input={input}
+      <FileSearchHead cwd={cwd} query={query} loading={found.loading} input={input}
         onQuery={(text) => { enterResults.current = false; setQuery(text) }}
         onEnterResults={() => { enterResults.current = !focusFirstFile(root.current) }}
         onRefresh={found.retry} />
