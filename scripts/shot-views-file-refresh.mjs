@@ -9,25 +9,44 @@ export const FILE_REFRESH_VIEWS = [
       refresh?.focus()
       refresh?.click()
       window.__omniManualRefresh = refresh
-      return new Promise(resolve => requestAnimationFrame(() => {
-        window.__omniManualLayout = {
-          busy: refresh?.getAttribute('aria-busy'),
-          sameTop: window.__omniManualRow?.getBoundingClientRect().top === beforeTop,
-          announced: document.querySelector('[role="status"]')?.textContent
-            .includes('正在更新搜索结果') === true,
+      return new Promise(resolve => {
+        const deadline = Date.now() + 1000
+        const observe = () => {
+          if (refresh?.getAttribute('aria-busy') !== 'true') {
+            if (Date.now() >= deadline) {
+              window.__omniManualLayout = { busy: 'never-started', sameTop: false, announced: false }
+              resolve(true)
+              return
+            }
+            setTimeout(observe, 5)
+            return
+          }
+          window.__omniManualLayout = {
+            busy: refresh.getAttribute('aria-busy'),
+            sameTop: window.__omniManualRow?.getBoundingClientRect().top === beforeTop,
+            announced: document.querySelector('.files-index [role="status"]')?.textContent
+              .includes('正在更新搜索结果') === true,
+          }
+          resolve(true)
         }
-        resolve(true)
-      }))
+        observe()
+      })
     })()`,
     ready: '[data-file-path="apps/desktop/src/renderer/attachment-manual-refresh-probe.ts"]',
-    assert: `document.querySelector('.files-search input')?.value === 'attachment'
-      && document.querySelector('.files-index') === window.__omniFileIndex
-      && window.__omniManualRow?.isConnected === true
-      && document.activeElement === window.__omniManualRefresh
-      && window.__omniManualRefresh?.getAttribute('aria-busy') === 'false'
-      && window.__omniManualLayout?.busy === 'true'
-      && window.__omniManualLayout?.sameTop === true
-      && window.__omniManualLayout?.announced === true`,
+    assert: `(() => {
+      const result = {
+        query: document.querySelector('.files-search input')?.value,
+        sameIndex: document.querySelector('.files-index') === window.__omniFileIndex,
+        rowConnected: window.__omniManualRow?.isConnected,
+        focusKept: document.activeElement === window.__omniManualRefresh,
+        settled: window.__omniManualRefresh?.getAttribute('aria-busy'),
+        ...window.__omniManualLayout,
+      }
+      if (result.query === 'attachment' && result.sameIndex && result.rowConnected
+        && result.focusKept && result.settled === 'false' && result.busy === 'true'
+        && result.sameTop && result.announced) return true
+      throw new Error('手动刷新现场诊断：' + JSON.stringify(result))
+    })()`,
     after: `(() => {
       window.__omniManualRow?.focus()
       delete window.__omniManualRow

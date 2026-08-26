@@ -72,12 +72,14 @@ function moveFocus(event: React.KeyboardEvent<HTMLButtonElement>): void {
   rows[destination]?.scrollIntoView({ block: "nearest" })
 }
 
-export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {
+export function PathRow({ path, cwd, threadId, meta, disabled, tabStop, onFocusPath, onPick }: {
   path: string
   cwd: string
   threadId: string
   meta?: string
   disabled?: boolean
+  tabStop?: boolean
+  onFocusPath?: (path: string) => void
   onPick: (target: PreviewTarget) => void
 }): React.JSX.Element {
   const hint = dirHint(path, cwd)
@@ -85,8 +87,10 @@ export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {
   return (
     <button type="button" className="file-row" disabled={disabled}
       data-file-path={path}
+      tabIndex={disabled === true || !tabStop ? -1 : 0}
       title={disabled === true ? `${path}\n文件已删除` : path}
       aria-keyshortcuts="ArrowUp ArrowDown Home End"
+      onFocus={() => { onFocusPath?.(path) }}
       onKeyDown={moveFocus}
       onClick={() => { onPick({ threadId, cwd, path }) }}>
       <span className="file-row__icon"><FileIcon size={13} /></span>

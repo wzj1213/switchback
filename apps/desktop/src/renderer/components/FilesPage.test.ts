@@ -53,6 +53,8 @@ describe("文件清单", () => {
     expect(html).toContain('data-file-path="/work/repos/README.md"')
     // 深目录不再整条铺开：截断会把文件名截掉
     expect(html).not.toContain("order-service/src/main/java/com/example/shop/service/OrderBatchService.java<")
+    expect(html.match(/class="file-row"[^>]*tabindex="0"/g)).toHaveLength(1)
+    expect(html.match(/class="file-row"[^>]*tabindex="-1"/g)).toHaveLength(3)
   })
 
   it("工作区外的行标出来；工作区里的不标", () => {

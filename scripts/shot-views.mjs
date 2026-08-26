@@ -87,7 +87,10 @@ export const VIEWS = [
         && document.querySelector('.files-scope')?.textContent.includes('文件变化会自动更新') === true
         && document.querySelector('.files-index')?.textContent.includes('最近一轮改过') === true
         && document.querySelector('.files-index')?.textContent.includes('此前碰过') === true
-        && document.querySelector('.files-index')?.textContent.includes('AGENTS.md') === true`,
+        && document.querySelector('.files-index')?.textContent.includes('AGENTS.md') === true
+        && [...document.querySelectorAll('.file-row')]
+          .filter(row => row.tabIndex === 0).length === 1
+        && document.querySelector('.file-row[tabindex="0"]')?.disabled === false`,
     },
     {
       name: "08-缺失文件可恢复",
@@ -118,7 +121,10 @@ export const VIEWS = [
       ],
       ready: ".file-row",
       assert: `document.activeElement?.classList.contains('file-row') === true
-        && document.activeElement.textContent.toLowerCase().includes('attachment')`,
+        && document.activeElement.textContent.toLowerCase().includes('attachment')
+        && document.activeElement.tabIndex === 0
+        && [...document.querySelectorAll('.file-row')]
+          .filter(row => row.tabIndex === 0).length === 1`,
     },
     {
       name: "09-搜索返回保留",
@@ -135,13 +141,17 @@ export const VIEWS = [
           settled: index?.textContent.includes('正在搜索') === false,
           sameIndex: index === window.__omniFileIndex,
           sameRow: document.activeElement === window.__omniFileRow,
+          oneTabStop: [...(index?.querySelectorAll('.file-row') ?? [])]
+            .filter(row => row.tabIndex === 0).length === 1,
+          activeTabStop: document.activeElement?.tabIndex,
           activeClass: document.activeElement?.className,
           expectedPath: window.__omniFileRow?.dataset?.filePath,
           activePath: document.activeElement?.dataset?.filePath,
           paths: [...(index?.querySelectorAll('.file-row') ?? [])].map(row => row.dataset.filePath),
         }
         if (result.query === 'attachment' && result.hasResult && result.settled
-          && result.sameIndex && result.sameRow && result.activeClass.includes('file-row')) return true
+          && result.sameIndex && result.sameRow && result.oneTabStop
+          && result.activeTabStop === 0 && result.activeClass.includes('file-row')) return true
         throw new Error('文件详情返回焦点诊断：' + JSON.stringify(result))
       })()`,
     },

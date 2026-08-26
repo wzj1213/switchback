@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { fileTouchOf, sessionFileGroupsOf } from "../session-files.js"
@@ -6,7 +6,7 @@ import { useFileSearch, type FileSearchState, type SearchFiles } from "../use-fi
 import { FileGroup } from "./file-group.js"
 import { focusFile, focusFirstFile, PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
-import { ReloadIcon } from "./reload-icon.js"
+import { FileSearchHead } from "./file-search-head.js"
 
 interface FileSearchView extends Omit<FileSearchState, "key"> {
   retry: () => void
@@ -40,16 +40,23 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
   searchFiles: SearchFiles
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
-  const searchId = useId()
   const input = useRef<HTMLInputElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const enterResults = useRef(false)
   const returnPath = useRef<string | undefined>(undefined)
+  const [preferredTabStop, setPreferredTabStop] = useState<string | undefined>(undefined)
   const groups = useMemo(() => sessionFileGroupsOf(items, cwd), [items, cwd])
   const found = useFileSearch({ cwd, query, stamp, active, search: searchFiles })
   const searching = query.trim() !== ""
   const recent = groups.recentEdited.length + groups.recentRead.length
   const total = recent + groups.earlier.length + groups.inherited.length
+  const availablePaths = searching
+    ? found.paths
+    : [groups.recentEdited, groups.recentRead, groups.earlier, groups.inherited]
+      .flat().filter((file) => !file.deleted).map((file) => file.path)
+  const tabStopPath = preferredTabStop !== undefined && availablePaths.includes(preferredTabStop)
+    ? preferredTabStop
+    : availablePaths[0]
   useEffect(() => {
     if (!enterResults.current || found.loading || found.paths.length === 0) return
     enterResults.current = false
@@ -73,50 +80,32 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
       setQuery("")
       input.current?.focus()
     }}>
-      <div className="files-search">
-        <label className="sr-only" htmlFor={searchId}>搜索工作区文件</label>
-        <div className="files-search__field">
-          <input id={searchId} ref={input} value={query} placeholder="搜索工作区文件…"
-            onChange={(event) => {
-              enterResults.current = false
-              setQuery(event.currentTarget.value)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowDown") {
-                event.preventDefault()
-                enterResults.current = !focusFirstFile(root.current)
-                return
-              }
-              if (event.key !== "Escape" || query === "") return
-              event.stopPropagation()
-              enterResults.current = false
-              setQuery("")
-            }} />
-          <button type="button" className="workbench__icon" aria-label="立即刷新搜索结果"
-            title="立即刷新搜索结果" aria-busy={found.loading}
-            disabled={!searching} onClick={found.retry}>
-            <ReloadIcon />
-          </button>
-        </div>
-        <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索当前工作区，文件变化会自动更新。</span>
-      </div>
+      <FileSearchHead query={query} loading={found.loading} input={input}
+        onQuery={(text) => { enterResults.current = false; setQuery(text) }}
+        onEnterResults={() => { enterResults.current = !focusFirstFile(root.current) }}
+        onRefresh={found.retry} />
       <div className="files-index__scroll">
         {searching ? (
           <section>
             <div className="workbench__section">搜索结果</div>
             <FileSearchStatus state={found} />
             {found.paths.map((path) => (
-              <PathRow key={path} path={path} cwd={cwd} threadId={threadId} onPick={pick} />
+              <PathRow key={path} path={path} cwd={cwd} threadId={threadId}
+                tabStop={path === tabStopPath} onFocusPath={setPreferredTabStop} onPick={pick} />
             ))}
           </section>
         ) : (
           <>
             {total === 0 ? <p className="workbench__empty">本会话还没有读过或改过文件。</p> : null}
             {total > 0 && recent === 0 ? <p className="workbench__empty">最近一轮没有读写文件。</p> : null}
-            <FileGroup title="最近一轮改过" files={groups.recentEdited} threadId={threadId} cwd={cwd} onPick={pick} />
-            <FileGroup title="最近一轮读过" files={groups.recentRead} threadId={threadId} cwd={cwd} onPick={pick} />
-            <FileGroup title="此前碰过" files={groups.earlier} threadId={threadId} cwd={cwd} onPick={pick} />
-            <FileGroup title="分支继承" files={groups.inherited} threadId={threadId} cwd={cwd} onPick={pick} />
+            <FileGroup title="最近一轮改过" files={groups.recentEdited} threadId={threadId} cwd={cwd}
+              tabStopPath={tabStopPath} onFocusPath={setPreferredTabStop} onPick={pick} />
+            <FileGroup title="最近一轮读过" files={groups.recentRead} threadId={threadId} cwd={cwd}
+              tabStopPath={tabStopPath} onFocusPath={setPreferredTabStop} onPick={pick} />
+            <FileGroup title="此前碰过" files={groups.earlier} threadId={threadId} cwd={cwd}
+              tabStopPath={tabStopPath} onFocusPath={setPreferredTabStop} onPick={pick} />
+            <FileGroup title="分支继承" files={groups.inherited} threadId={threadId} cwd={cwd}
+              tabStopPath={tabStopPath} onFocusPath={setPreferredTabStop} onPick={pick} />
           </>
         )}
       </div>
