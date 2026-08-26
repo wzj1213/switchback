@@ -170,8 +170,35 @@ export const VIEWS = [
       open: [
         `document.querySelector('.workbench__back')?.click()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
+        `(() => {
+          const preview = document.querySelector('[role="tab"][aria-selected="true"]')
+          preview?.focus()
+          preview?.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'ArrowRight', bubbles: true, cancelable: true,
+          }))
+          setTimeout(() => {
+            const source = [...document.querySelectorAll('[role="tab"]')]
+              .find(tab => tab.textContent.trim() === '源码')
+            const forward = source?.getAttribute('aria-selected') === 'true'
+              && document.activeElement === source && document.querySelector('.file-source') !== null
+            source?.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'ArrowLeft', bubbles: true, cancelable: true,
+            }))
+            setTimeout(() => {
+              const active = document.querySelector('[role="tab"][aria-selected="true"]')
+              const panel = document.querySelector('[role="tabpanel"]')
+              document.documentElement.dataset.htmlTabs = String(forward
+                && active?.textContent.trim() === '预览' && document.activeElement === active
+                && [...document.querySelectorAll('[role="tab"]')]
+                  .filter(tab => tab.getAttribute('tabindex') === '0').length === 1
+                && panel?.getAttribute('aria-labelledby') === active?.id)
+            }, 30)
+          }, 30)
+        })()`,
       ],
-      ready: ".html-preview__frame",
+      ready: `html[data-html-tabs="true"]`,
+      assert: `document.querySelector('.html-preview__frame') !== null`,
+      after: `delete document.documentElement.dataset.htmlTabs`,
     },
     ...COMPOSE_VIEWS,
 ]

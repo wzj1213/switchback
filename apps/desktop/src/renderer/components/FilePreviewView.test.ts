@@ -6,6 +6,8 @@ import {
   canReferencePreview,
   canRevealPreview,
   FilePreviewView,
+  htmlTabDestination,
+  HtmlPreview,
   resolvedHtmlMode,
 } from "./FilePreviewView.js"
 
@@ -90,4 +92,33 @@ describe("HTML 预览模式", () => {
       expect(resolvedHtmlMode(one.picked, one.truncated)).toBe(one.expected)
     })
   }
+
+  const keys = [
+    ["ArrowRight", "preview", false, "source"],
+    ["ArrowLeft", "source", false, "preview"],
+    ["Home", "source", false, "preview"],
+    ["End", "preview", false, "source"],
+    ["ArrowLeft", "source", true, "source"],
+    ["Tab", "preview", false, undefined],
+  ] as const
+
+  for (const [key, mode, truncated, expected] of keys) {
+    it(`${key} · ${mode} · 截断=${String(truncated)} → ${String(expected)}`, () => {
+      expect(htmlTabDestination(key, mode, truncated)).toBe(expected)
+    })
+  }
+
+  it("标签只保留一个 Tab 停点，并与正文面板建立可访问关联", () => {
+    const file = {
+      kind: "html", path: "report.html", name: "report.html", text: "<h1>报告</h1>",
+      language: "html", truncated: false,
+    } as const
+    const html = renderToStaticMarkup(createElement(HtmlPreview, { file, onCopy: () => undefined }))
+    expect(html.match(/role="tab"/g)).toHaveLength(2)
+    expect(html.match(/tabindex="0"/g)).toHaveLength(1)
+    expect(html).toContain('aria-selected="true" tabindex="0"')
+    expect(html).toContain('role="tabpanel"')
+    expect(html).toContain('aria-controls=')
+    expect(html).toContain('aria-labelledby=')
+  })
 })
