@@ -159,7 +159,8 @@ const api = {
     return (await ipcRenderer.invoke("omni:pickImages")) as PickedImages
   },
   /**
-   * 拖进来的这个 `File` 在盘上的真实路径。
+   * 拖进来的这个 `File` 在盘上的真实路径。图片会进原生附件；其他文件只把这条路径
+   * 作为用户可见、可编辑的引用放进输入框，不在 preload 读取内容。
    *
    * **Electron 32 起 `File.path` 那个增补被移除了**（类型定义里的原话：
    * `getPathForFile` superseded 了它），而 omni 用的是 43——于是拖放收附件那条路

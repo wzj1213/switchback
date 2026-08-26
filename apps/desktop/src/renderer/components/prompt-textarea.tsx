@@ -19,7 +19,7 @@ export function promptPlaceholder(state: {
   if (state.steering) return "它还在跑——回车排队，⌘⏎ 直接插入当前轮次。"
   if (state.queueing) return "它还在跑——回车排队，这一轮停下后发送。"
   if (state.detached) return "这是重启前的历史记录。点右侧「继续」把引擎接回来。"
-  return "交代任务…（@ 引用文件，/ 用命令）"
+  return "交代任务…（可拖入文件，@ 搜索，/ 用命令）"
 }
 
 interface Props {

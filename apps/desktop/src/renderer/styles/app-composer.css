@@ -115,6 +115,10 @@
   line-height: 1.5;
 }
 
+.composer__attachwarn--info {
+  color: var(--text-muted);
+}
+
 /* 缩略图。× 压在右上角**外面一点**——压在图里会盖住内容，
    而被盖住的往往正是你想确认的那一角 */
 .thumb {

@@ -146,6 +146,7 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
             event.stopPropagation()
             setQuery("")
           }} />
+        <span className="files-scope">默认列出本会话读过或改过的文件；搜索范围是当前工作区。</span>
       </label>
       <div className="files-index__scroll">
         {searching ? (

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
-import { droppedImages, pasteImages, pickedImages, type AttachmentResult } from "./attachment-actions.js"
+import { droppedFiles, pasteFiles, pickedImages, type AttachmentResult } from "./attachment-actions.js"
 
 /**
  * 输入区的附件：贴进来、拖进来、去掉。
  *
- * ## 只收图片
+ * ## 图片走附件，其他文件走可见引用
  *
- * 拖一个 `.zip` 进来送给模型没有意义——它读不了，而界面上却显示「已附上」，
- * 那是骗人。认不出的类型**当场就不收**，而不是收下之后由引擎报错。
+ * 只有引擎正式报告支持的图片才进入附件数组；其他文件不冒充附件，改为把用户
+ * 亲手选择的路径写进输入框。外部文件不复制进项目，能否读取继续由引擎自己的权限决定。
  *
  * ## 为什么存路径不存字节
  *
@@ -16,12 +16,12 @@ import { droppedImages, pasteImages, pickedImages, type AttachmentResult } from 
  */
 export interface Attachments {
   paths: readonly string[]
-  /** 最近一次没有收下的原因；成功后自动消失。 */
-  notice?: string
+  /** 最近一次添加结果；成功或失败都会短暂出现，然后自动消失。 */
+  notice?: { text: string; tone: "info" | "warn" }
   /** 处理一次粘贴。默认粘贴必须由调用方在异步落盘前同步拦住。 */
-  paste: (items: DataTransferItemList | null) => Promise<void>
+  paste: (items: DataTransferItemList | null, cwd: string) => Promise<readonly string[]>
   /** 处理一次拖放。 */
-  drop: (files: FileList | null) => void
+  drop: (files: FileList | null, cwd: string) => readonly string[]
   /** 打开系统图片选择器。 */
   pick: () => Promise<void>
   /** 用一组已经落盘的路径替换当前附件（取回队列 / 改一改再发）。 */
@@ -32,15 +32,16 @@ export interface Attachments {
 
 export function useAttachments(enabled: boolean, initial: readonly string[] = []): Attachments {
   const [paths, setPaths] = useState<readonly string[]>(() => [...new Set(initial)])
-  const [notice, setNotice] = useState<string>()
+  const [notice, setNotice] = useState<Attachments["notice"]>()
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
-  const accept = useCallback((result: AttachmentResult) => {
+  const accept = useCallback((result: AttachmentResult): readonly string[] => {
     if (result.paths.length > 0) {
       // 同一张图贴两次没有意义，而且会让模型多读一遍
       setPaths((prev) => [...new Set([...prev, ...result.paths])])
     }
     setNotice(result.notice)
+    return result.references
   }, [])
 
   useEffect(() => {
@@ -49,12 +50,15 @@ export function useAttachments(enabled: boolean, initial: readonly string[] = []
     return () => { window.clearTimeout(timer) }
   }, [notice])
 
-  const paste = useCallback(async (items: DataTransferItemList | null): Promise<void> => {
-    accept(await pasteImages(items, enabled, bridge))
+  const paste = useCallback(async (
+    items: DataTransferItemList | null,
+    cwd: string,
+  ): Promise<readonly string[]> => {
+    return accept(await pasteFiles(items, enabled, bridge, cwd))
   }, [accept, bridge, enabled])
 
-  const drop = useCallback((files: FileList | null) => {
-    accept(droppedImages(files, enabled, bridge))
+  const drop = useCallback((files: FileList | null, cwd: string): readonly string[] => {
+    return accept(droppedFiles(files, enabled, bridge, cwd))
   }, [accept, bridge, enabled])
 
   const pick = useCallback(async () => {

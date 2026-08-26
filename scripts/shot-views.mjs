@@ -59,23 +59,25 @@ export const VIEWS = [
       after: `document.querySelector('.rv__close')?.click()`,
     },
     {
-      name: "05-拖拽拒绝提示",
-      open: `(() => {
-        const transfer = new DataTransfer()
-        transfer.items.add(new File(["const nope = true"], "code.ts", { type: "text/typescript" }))
-        window.__omniShotTransfer = transfer
-        document.querySelector('.composer__inner')?.dispatchEvent(
-          new DragEvent('dragenter', { bubbles: true, dataTransfer: transfer }),
-        )
-      })()`,
-      ready: ".composer-drop--blocked",
-      assert: `document.querySelector('.composer-drop')?.textContent.includes('工作区文件请用 @ 引用')`,
+      name: "05-拖入工作区文件",
+      open: [
+        `document.querySelector('.sidebar__new')?.click()`,
+        `if (document.querySelector('.blank__title') === null) throw new Error('新会话没有就绪')`,
+      ],
+      dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
+      ready: ".composer__attachwarn",
+      assert: `document.querySelector('.composer__input')?.value
+          .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+        && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
+        && document.querySelector('.attach .thumb') === null
+        && document.querySelector('.send')?.disabled === false`,
       after: `(() => {
-        const target = document.querySelector('.composer__inner')
-        target?.dispatchEvent(new DragEvent('dragleave', {
-          bubbles: true, dataTransfer: window.__omniShotTransfer,
-        }))
-        delete window.__omniShotTransfer
+        const input = document.querySelector('.composer__input')
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(input, '')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+        ;[...document.querySelectorAll('.row--thread .row__main')]
+          .find(row => row.textContent.includes('useFlow'))?.click()
       })()`,
     },
     {
@@ -91,7 +93,8 @@ export const VIEWS = [
       open: `document.querySelector('[title="文件预览"]')?.click()`,
       ready: ".file-row",
       assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
-        && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')`,
+        && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')
+        && document.querySelector('.files-scope')?.textContent.includes('搜索范围是当前工作区') === true`,
     },
     {
       name: "08-缺失文件可恢复",

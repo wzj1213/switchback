@@ -37,38 +37,38 @@ export function hasFileItems(items: ArrayLike<ItemLike> | null): boolean {
 }
 
 export function hoverHint(review: AttachmentReview, enabled: boolean): DropHint {
-  if (review.total > 0 && review.accepted === 0) {
-    if (review.unsupported > 0) {
-      return { tone: "blocked", text: "这里只能添加图片；工作区文件请用 @ 引用" }
-    }
-    if (review.oversized > 0) return { tone: "blocked", text: "单张图片不能超过 12 MB" }
-    if (review.empty > 0) return { tone: "blocked", text: "空图片不能添加" }
+  const images = enabled ? review.accepted : 0
+  const references = review.total - images
+  if (review.total === 0) return { tone: "ready", text: "松手添加文件" }
+  if (images > 0 && references > 0) {
+    return { tone: "ready", text: `松手添加 ${String(images)} 张图片并引用 ${String(references)} 个文件` }
   }
-  if (!enabled) return { tone: "blocked", text: "当前引擎或模型不支持图片附件" }
-  if (review.total === 0) return { tone: "ready", text: "松手添加图片" }
-  if (review.accepted === review.total) {
-    return { tone: "ready", text: `松手添加 ${String(review.accepted)} 张图片` }
-  }
-  if (review.accepted > 0) {
-    return { tone: "ready", text: `可添加 ${String(review.accepted)} 张；其余文件不会添加` }
-  }
-  return { tone: "blocked", text: "图片未能添加" }
+  if (images > 0) return { tone: "ready", text: `松手添加 ${String(images)} 张图片` }
+  return { tone: "ready", text: `松手引用 ${String(references)} 个文件` }
 }
 
-export function dropNotice(
-  review: AttachmentReview,
-  enabled: boolean,
-  added: number,
-  failed: number,
-): string | undefined {
-  if (review.total > 0 && review.accepted === 0) {
-    if (review.unsupported > 0) return "未添加：这里只接收图片；工作区文件请用 @ 引用。"
-    if (review.oversized > 0) return "未添加：单张图片不能超过 12 MB。"
-    if (review.empty > 0) return "未添加：图片是空文件。"
+export function blockedDropHint(): DropHint {
+  return { tone: "blocked", text: "这是历史记录；先继续会话，再添加文件" }
+}
+
+export function dropNotice(summary: {
+  images: number
+  references: number
+  failed: number
+  outside: number
+}): string | undefined {
+  const { images, references, failed, outside } = summary
+  let text = images > 0 && references > 0
+    ? `已添加 ${String(images)} 张图片，并引用 ${String(references)} 个文件`
+    : images > 0 ? `已添加 ${String(images)} 张图片`
+      : references > 0 ? `已引用 ${String(references)} 个文件` : ""
+  if (failed > 0) {
+    text += text === ""
+      ? `未添加：${String(failed)} 个文件未能读取`
+      : `；另有 ${String(failed)} 个文件未能读取`
   }
-  if (!enabled) return "当前引擎或模型不支持图片附件。"
-  const rejected = review.total - review.accepted + failed
-  if (rejected === 0) return undefined
-  if (added > 0) return `已添加 ${String(added)} 张；另有 ${String(rejected)} 个文件未添加。`
-  return "未添加：读取文件路径失败。"
+  if (outside > 0) {
+    text += `。其中 ${String(outside)} 个在当前工作区外，已保留绝对路径；能否读取由引擎权限决定`
+  }
+  return text === "" ? undefined : `${text}。`
 }

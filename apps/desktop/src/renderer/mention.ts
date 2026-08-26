@@ -2,6 +2,7 @@
  * 输入框里的 `@文件` 引用。**纯函数**——光标位置的边界条件很多，
  * 这些必须能脱离 DOM 被穷举。
  */
+import { formatFileReference } from "./file-references.js"
 
 export interface Mention {
   /** `@` 的下标 */
@@ -37,7 +38,7 @@ export function applyMention(
   mention: Mention,
   path: string,
 ): { text: string; caret: number } {
-  const inserted = `@${path} `
+  const inserted = `${formatFileReference(path)} `
   return {
     text: text.slice(0, mention.start) + inserted + text.slice(mention.end),
     caret: mention.start + inserted.length,

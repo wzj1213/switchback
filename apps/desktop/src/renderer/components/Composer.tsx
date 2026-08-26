@@ -9,10 +9,10 @@ import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
 import { attachmentWarning, nothingToSend, projectOf, stateOf } from "./composer-state.js"
 import { AsideChip } from "./aside-chip.js"
-import { useAttachmentDropzone } from "../use-attachment-dropzone.js"
 import { AttachmentDrop } from "./AttachmentDrop.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import { useComposerMemory, useRememberComposer } from "../use-composer-memory.js"
+import { useComposerFiles } from "../use-composer-files.js"
 
 /**
  * 信任档。
@@ -107,9 +107,11 @@ interface Props {
   onResume: () => void
 }
 
-function AttachmentWarning({ text }: { text: string | undefined }): React.JSX.Element | null {
-  return text === undefined ? null : (
-    <p className="composer__attachwarn" role="status">{text}</p>
+function AttachmentWarning({ notice }: {
+  notice: { text: string; tone: "info" | "warn" } | undefined
+}): React.JSX.Element | null {
+  return notice === undefined ? null : (
+    <p className={`composer__attachwarn composer__attachwarn--${notice.tone}`} role="status">{notice.text}</p>
   )
 }
 
@@ -145,12 +147,10 @@ export function Composer(props: Props): React.JSX.Element {
   const detached = props.detached ?? false
   const busy = props.busy ?? false
   const starting = props.starting ?? false
-  const canAside = props.canAside === true && !detached && !starting
   const { initial, attach, aside } = useComposerMemory({
-    drafts: props.drafts, threadId: props.threadId, engine: props.engine,
-    canAttach: props.canAttach, canAside, prefill: props.prefill, onAsk: props.onAsk,
+    drafts: props.drafts, threadId: props.threadId, engine: props.engine, canAttach: props.canAttach,
+    canAside: props.canAside === true && !detached && !starting, prefill: props.prefill, onAsk: props.onAsk,
   })
-  const dropzone = useAttachmentDropzone(props.canAttach, attach.drop)
   const attachWarning = attachmentWarning({
     attachments: attach.paths.length, canAttach: props.canAttach,
     pending: props.pending !== undefined, aside: aside.on,
@@ -162,15 +162,17 @@ export function Composer(props: Props): React.JSX.Element {
     blocked: mode.blocked || attachmentBlocked, steering: mode.steering, initial,
     onSend: aside.wrapSend(props.onSend),
   })
+  const files = useComposerFiles({ attach, canAttach: props.canAttach, editable: !detached,
+    cwd: props.cwd, setText: draft.setText })
   useRememberComposer({
     drafts: props.drafts, threadId: props.threadId, engine: props.engine,
     text: draft.text, attachments: attach.paths, command: draft.command, aside: aside.on,
   })
   return (
     <div className="composer">
-      <div className="composer__inner" {...dropzone.bind}>
+      <div className="composer__inner" {...files.dropzone.bind}>
         <VoidRing />
-        <AttachmentDrop hint={dropzone.hint} />
+        <AttachmentDrop hint={files.dropzone.hint} />
         {detached ? null : (
           <Chips
             threadId={props.threadId}
@@ -181,7 +183,7 @@ export function Composer(props: Props): React.JSX.Element {
           />
         )}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
-        <AttachmentWarning text={attachWarning ?? attach.notice} />
+        <AttachmentWarning notice={attachWarning === undefined ? attach.notice : { text: attachWarning, tone: "warn" }} />
         <Prompt
           value={draft.text}
           detached={detached}
@@ -189,7 +191,7 @@ export function Composer(props: Props): React.JSX.Element {
           queueing={mode.queueing}
           steering={mode.steering}
           cwd={props.cwd}
-          onPaste={attach.paste}
+          onPaste={files.paste}
           commands={aside.commands(props.commands)}
           command={draft.command}
           onClearCommand={() => draft.setCommand(undefined)}

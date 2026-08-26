@@ -51,7 +51,7 @@ export function Prompt({
   steering?: boolean
   cwd: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
-  /** 贴进来的文件交给附件入口；默认粘贴已在 textarea 同步拦住。 */
+  /** 贴进来的图片交给附件入口，其他文件变成路径引用；默认粘贴已在 textarea 同步拦住。 */
   onPaste: (items: DataTransferItemList | null) => Promise<void>
   /** 这个会话能用的斜杠命令：引擎报的 ＋ omni 自己的。 */
   commands: readonly SlashCommand[]

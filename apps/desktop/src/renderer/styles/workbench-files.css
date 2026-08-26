@@ -30,6 +30,14 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+.files-scope {
+  display: block;
+  margin: 6px 2px 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
 .files-index__scroll {
   flex: 1;
   min-height: 0;

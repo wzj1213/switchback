@@ -59,4 +59,9 @@ describe("applyMention", () => {
   it("保留光标后面的内容", () => {
     expect(applyMention("@ho 后面", at("@ho 后面", 3), "a.ts").text).toBe("@a.ts  后面")
   })
+
+  it("候选路径有空格时引用边界不会断在半路", () => {
+    expect(applyMention("看 @note", at("看 @note", 7), "docs/my note.md").text)
+      .toBe("看 @\"docs/my note.md\" ")
+  })
 })

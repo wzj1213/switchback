@@ -24,7 +24,7 @@ describe("promptPlaceholder", () => {
     {
       name: "没有选择命令时恢复普通任务提示",
       selected: undefined,
-      want: "交代任务…（@ 引用文件，/ 用命令）",
+      want: "交代任务…（可拖入文件，@ 搜索，/ 用命令）",
     },
   ]
 

@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url"
 import WebSocket from "ws"
 import { mainThread, stubThread } from "./ui-fixture.mjs"
 import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
+import { exerciseFileDrop } from "./shot-file-drop.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
 import { VIEWS } from "./shot-views.mjs"
 
@@ -132,6 +133,10 @@ async function shoot(cdp, view) {
     for (const step of [view.open].flat()) {
       await value(cdp, `(() => { ${step}; return true })()`)
       await pause(350)
+    }
+    if (view.dragFiles !== undefined) {
+      await exerciseFileDrop({ value, pause }, cdp, view.dragFiles.map((path) => join(ROOT, path)))
+      await waitFor(cdp, "document.querySelector('.send:not(:disabled)') !== null", `${view.name} 可发送态`)
     }
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
     if (view.absent !== undefined && await value(cdp, `document.querySelector('${view.absent}') !== null`)) {

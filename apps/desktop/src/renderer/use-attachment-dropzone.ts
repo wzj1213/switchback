@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { hasFileItems, hoverHint, reviewAttachments, type DropHint } from "./attachment-feedback.js"
+import { blockedDropHint, hasFileItems, hoverHint, reviewAttachments, type DropHint } from "./attachment-feedback.js"
 
 function filesOf(items: DataTransferItemList): readonly Pick<File, "type" | "size">[] {
   return Array.from(items).filter((item) => item.kind === "file").map((item) => (
@@ -11,8 +11,8 @@ function isFileTransfer(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes("Files") || hasFileItems(transfer.items)
 }
 
-function inspect(transfer: DataTransfer, enabled: boolean): DropHint {
-  return hoverHint(reviewAttachments(filesOf(transfer.items)), enabled)
+function inspect(transfer: DataTransfer, enabled: boolean, editable: boolean): DropHint {
+  return editable ? hoverHint(reviewAttachments(filesOf(transfer.items)), enabled) : blockedDropHint()
 }
 
 function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
@@ -23,6 +23,7 @@ type Bind = Pick<React.HTMLAttributes<HTMLDivElement>, "onDragEnter" | "onDragOv
 
 export function useAttachmentDropzone(
   enabled: boolean,
+  editable: boolean,
   drop: (files: FileList | null) => void,
 ): { hint: DropHint | undefined; bind: Bind } {
   const [hint, setHint] = useState<DropHint>()
@@ -34,12 +35,12 @@ export function useAttachmentDropzone(
         if (!isFileTransfer(event.dataTransfer)) return
         event.preventDefault()
         depth.current += 1
-        setHint(inspect(event.dataTransfer, enabled))
+        setHint(inspect(event.dataTransfer, enabled, editable))
       },
       onDragOver: (event) => {
         if (!isFileTransfer(event.dataTransfer)) return
         event.preventDefault()
-        const next = inspect(event.dataTransfer, enabled)
+        const next = inspect(event.dataTransfer, enabled, editable)
         event.dataTransfer.dropEffect = next.tone === "ready" ? "copy" : "none"
         // dragover 每秒会来几十次；提示没变就别让整个 composer 跟着重绘。
         setHint((previous) => keepSame(previous, next))
@@ -55,7 +56,7 @@ export function useAttachmentDropzone(
         event.preventDefault()
         depth.current = 0
         setHint(undefined)
-        drop(event.dataTransfer.files)
+        if (editable) drop(event.dataTransfer.files)
       },
     },
   }
