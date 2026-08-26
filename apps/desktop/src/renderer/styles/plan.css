@@ -152,6 +152,12 @@
   display: none;
 }
 
+/* 有状态时给桌宠留一条独立跑道：状态在上，脚仍钉在输入框上沿。
+   这份间距只改变转录区可用高度，不参与 `.pets` 的舞台尺寸。 */
+.stage--pets .brief:not(:empty) {
+  margin-bottom: 38px;
+}
+
 .plan-pillrow {
   display: flex;
   min-width: 0;

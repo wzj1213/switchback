@@ -226,18 +226,19 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         send={send}
         onCopy={props.onCopy}
         onReuse={reuse}
-      />
-      <Between
-        thread={thread}
-        items={props.items}
-        send={send}
-        stamp={stamp}
-        onReveal={props.onReveal}
-        onCopy={props.onCopy}
-        onReview={props.onReview}
-        lanes={props.lanes}
-        onOpenLane={props.onOpenLane}
-      />
+      >
+        <Between
+          thread={thread}
+          items={props.items}
+          send={send}
+          stamp={stamp}
+          onReveal={props.onReveal}
+          onCopy={props.onCopy}
+          onReview={props.onReview}
+          lanes={props.lanes}
+          onOpenLane={props.onOpenLane}
+        />
+      </ConversationStage>
       <WorkspaceComposer
         props={props}
         thread={thread}

@@ -6,6 +6,7 @@ import { Transcript } from "./Transcript.js"
 
 /** 正文滚动区与桌宠共用的一块“舞台”；桌宠只订阅这里真正相关的状态。 */
 export function ConversationStage({
+  children,
   thread,
   items,
   turn,
@@ -21,6 +22,8 @@ export function ConversationStage({
   onCopy,
   onReuse,
 }: {
+  /** 输入框上方的动态状态。放进舞台，出现时只压缩正文，不移动桌宠地面。 */
+  children: React.ReactNode
   thread: Thread
   items: readonly Item[]
   turn: Turn | undefined
@@ -39,7 +42,7 @@ export function ConversationStage({
   const running = turn?.status === "running"
   const fire = useFireProps({ pets, thread, usage, running })
   return (
-    <div className="stage">
+    <div className={`stage${pets.on ? " stage--pets" : ""}`}>
       <Transcript
         thread={thread}
         items={items}
@@ -54,6 +57,7 @@ export function ConversationStage({
         onReuse={onReuse}
       />
       <div className="hem" aria-hidden="true" />
+      {children}
       {pets.on ? (
         <Pets
           engines={engines}

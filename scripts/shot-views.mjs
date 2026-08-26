@@ -7,14 +7,44 @@
 export const VIEWS = [
     { name: "01-转录区", open: null, ready: ".md" },
     {
-      name: "02-环境信息",
+      name: "02-桌宠固定地面",
+      open: `(() => {
+        const pet = document.querySelector('.pet--on') ?? document.querySelector('.pet')
+        const brief = document.querySelector('.brief')
+        if (pet === null || brief === null) {
+          document.documentElement.dataset.petGround = 'false'
+          return
+        }
+        const before = pet.getBoundingClientRect().bottom
+        const probe = document.createElement('div')
+        probe.style.cssText = 'height:72px;width:1px;flex:none'
+        brief.append(probe)
+        setTimeout(() => {
+          const after = pet.getBoundingClientRect().bottom
+          const composer = document.querySelector('.composer')?.getBoundingClientRect().top
+          probe.remove()
+          const petTop = Math.min(...[...document.querySelectorAll('.pet')]
+            .map(node => node.getBoundingClientRect().top))
+          const briefBottom = brief.getBoundingClientRect().bottom
+          document.documentElement.dataset.petGround = String(
+            composer !== undefined && Math.abs(after - before) < 2 && Math.abs(after - composer) < 10
+              && briefBottom <= petTop,
+          )
+        }, 180)
+      })()`,
+      ready: `html[data-pet-ground]`,
+      assert: `document.documentElement.dataset.petGround === 'true'`,
+      after: `delete document.documentElement.dataset.petGround`,
+    },
+    {
+      name: "03-环境信息",
       open: `document.querySelector('.topbar__title')?.click()`,
       ready: ".env",
       assert: `document.querySelector('.env')?.textContent.includes('AGENTS.md') === true`,
       after: `document.querySelector('.topbar__title')?.click()`,
     },
     {
-      name: "03-Git审核",
+      name: "04-Git审核",
       open: `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === '审核')?.click()`,
       ready: ".rv .rvd__body",
       assert: `document.querySelector('.rv__file') !== null
@@ -29,7 +59,7 @@ export const VIEWS = [
       after: `document.querySelector('.rv__close')?.click()`,
     },
     {
-      name: "04-拖拽拒绝提示",
+      name: "05-拖拽拒绝提示",
       open: `(() => {
         const transfer = new DataTransfer()
         transfer.items.add(new File(["const nope = true"], "code.ts", { type: "text/typescript" }))
@@ -49,7 +79,7 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "05-后台活动工作台",
+      name: "06-后台活动工作台",
       open: [
         `document.querySelector('[title="后台活动"]')?.click()`,
         `document.querySelector('.activity-row')?.click()`,
@@ -57,14 +87,14 @@ export const VIEWS = [
       ready: ".activity-detail",
     },
     {
-      name: "06-文件清单",
+      name: "07-文件清单",
       open: `document.querySelector('[title="文件预览"]')?.click()`,
       ready: ".file-row",
       assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
         && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')`,
     },
     {
-      name: "07-缺失文件可恢复",
+      name: "08-缺失文件可恢复",
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('missing-output.txt'))?.click()`,
       ready: ".file-preview .workbench__empty",
       assert: `(() => {
@@ -75,7 +105,7 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "08-文件搜索",
+      name: "09-文件搜索",
       open: [
         `document.querySelector('.workbench__back')?.click()`,
         `(() => {
@@ -104,12 +134,12 @@ export const VIEWS = [
       )`,
     },
     {
-      name: "09-工作区外文件预览",
+      name: "10-工作区外文件预览",
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
       ready: ".file-source",
     },
     {
-      name: "10-HTML预览",
+      name: "11-HTML预览",
       open: [
         `document.querySelector('.workbench__back')?.click()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
@@ -117,7 +147,7 @@ export const VIEWS = [
       ready: ".html-preview__frame",
     },
     {
-      name: "11-切会话保留草稿",
+      name: "12-切会话保留草稿",
       open: [
         `document.querySelector('[aria-label="收起工作台"]')?.click()`,
         `(() => {
@@ -178,14 +208,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "12-新会话",
+      name: "13-新会话",
       open: `document.querySelector('.sidebar__new')?.click()`,
       ready: ".blank__title",
       // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
       absent: ".file-preview",
     },
     {
-      name: "13-@文件引用",
+      name: "14-@文件引用",
       open: [
         `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
         `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
@@ -208,14 +238,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "14-推理强度",
+      name: "15-推理强度",
       before: ".effort .trigger:not(:disabled)",
       open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
       ready: ".effort__bar--grown",
       dragEffort: true,
     },
     {
-      name: "15-设置",
+      name: "16-设置",
       // 有账号时侧栏底部先开菜单，没账号时直接进设置；固定样本走前者。
       open: [
         `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,
