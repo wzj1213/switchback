@@ -69,7 +69,9 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
           <ActivityPage lanes={lanes} laneId={state.laneId} items={items} thread={thread}
             onPick={onPickLane} onBack={onActivityIndex} onCopy={onCopy} />
         ) : (
-          <FilesPage threadId={thread.id} cwd={thread.cwd} items={items} stamp={stamp}
+          /* 搜索上下文只属于这一条任务；切任务时重挂，预览内返回时不重挂。 */
+          <FilesPage key={`${thread.id}\u0000${thread.cwd}`} threadId={thread.id} cwd={thread.cwd}
+            items={items} stamp={stamp}
             target={state.file} onPick={onPickFile}
             onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />

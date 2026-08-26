@@ -100,10 +100,11 @@ export function FileSearchStatus({ state }: { state: FileSearchView }): React.JS
   return state.paths.length === 0 ? <p className="workbench__empty">没有找到文件。</p> : null
 }
 
-function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
+function FileIndex({ threadId, cwd, items, hidden, onPick, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
+  hidden: boolean
   onPick: (target: PreviewTarget) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element {
@@ -115,7 +116,7 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
   const recent = groups.recentEdited.length + groups.recentRead.length
   const total = recent + groups.earlier.length + groups.inherited.length
   return (
-    <div className="files-index" onKeyDown={(event) => {
+    <div className="files-index" hidden={hidden} onKeyDown={(event) => {
       if (event.key !== "Escape" || query === "") return
       event.stopPropagation()
       setQuery("")
@@ -182,11 +183,16 @@ export function FilesPage({ threadId, cwd, items, stamp, target, onPick, onBack,
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element {
   const revision = target === undefined ? undefined : fileTouchOf(items, cwd, target.path)
-  return target === undefined ? (
-    <FileIndex threadId={threadId} cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
-  ) : (
-    <FilePreviewView target={target} revision={revision} stamp={stamp}
-      onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
-      onReveal={onReveal} onCopy={onCopy} />
+  return (
+    <>
+      {/* 详情是盖在索引上的一层；保活才能让返回保住查询、结果与滚动位置。 */}
+      <FileIndex threadId={threadId} cwd={cwd} items={items} hidden={target !== undefined}
+        onPick={onPick} searchFiles={searchFiles} />
+      {target === undefined ? null : (
+        <FilePreviewView target={target} revision={revision} stamp={stamp}
+          onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
+          onReveal={onReveal} onCopy={onCopy} />
+      )}
+    </>
   )
 }

@@ -145,9 +145,25 @@ export const VIEWS = [
       ready: ".file-row",
       assert: `document.activeElement?.classList.contains('file-row') === true
         && document.activeElement.textContent.toLowerCase().includes('attachment')`,
-      after: `document.activeElement?.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
-      )`,
+    },
+    {
+      name: "09-搜索返回保留",
+      open: [
+        `(() => { window.__omniFileIndex = document.querySelector('.files-index'); document.activeElement?.click() })()`,
+        `document.querySelector('.workbench__back')?.click()`,
+      ],
+      ready: ".files-search input",
+      assert: `document.querySelector('.files-search input')?.value === 'attachment'
+        && document.querySelector('.files-index')?.textContent.includes('attachments.ts') === true
+        && document.querySelector('.files-index')?.textContent.includes('正在搜索') === false
+        && document.querySelector('.files-index') === window.__omniFileIndex
+        && document.activeElement?.matches('.files-search input') === true`,
+      after: `(() => {
+        delete window.__omniFileIndex
+        document.querySelector('.files-search input')?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        )
+      })()`,
     },
     {
       name: "10-工作区外文件预览",
