@@ -1,8 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { ipcMain, shell } from "electron"
-import type { ThreadId } from "@omni/protocol"
 import type { WorksiteSearch } from "./worksite-search.js"
+import { ownedWorksite, type OwnedWorksite, type WorksiteGuard } from "./worksite-search.js"
 
 /**
  * 项目说明：一份真源，两家引擎都读得到。
@@ -39,12 +39,7 @@ export interface ProjectDoc {
   denied?: true
 }
 
-interface ProjectDocRequest {
-  threadId: ThreadId
-  cwd: string
-}
-
-export type ProjectDocGuard = (threadId: ThreadId, cwd: string) => boolean
+export type ProjectDocGuard = WorksiteGuard
 
 const STARTER = `# 项目说明
 
@@ -65,12 +60,8 @@ const STARTER = `# 项目说明
 - （代码风格、提交信息、命名之类，只写和别处不一样的那些）
 `
 
-function requestOf(value: unknown, owns: ProjectDocGuard): ProjectDocRequest | undefined {
-  if (typeof value !== "object" || value === null) return undefined
-  const req = value as Partial<ProjectDocRequest>
-  if (typeof req.threadId !== "string" || req.threadId === "") return undefined
-  if (typeof req.cwd !== "string" || req.cwd === "") return undefined
-  return owns(req.threadId, req.cwd) ? { threadId: req.threadId, cwd: req.cwd } : undefined
+function requestOf(value: unknown, owns: ProjectDocGuard): OwnedWorksite | undefined {
+  return ownedWorksite(value, owns)
 }
 
 function denied(): ProjectDoc {

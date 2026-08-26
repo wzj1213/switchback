@@ -9,6 +9,13 @@ export interface WorksiteSearch {
   search: (request: unknown) => Promise<readonly string[]>
 }
 
+export interface OwnedWorksite {
+  threadId: ThreadId
+  cwd: string
+}
+
+export type WorksiteGuard = (threadId: ThreadId, cwd: string) => boolean
+
 interface State {
   byThread: Map<ThreadId, string>
   owners: Map<string, Set<ThreadId>>
@@ -22,6 +29,14 @@ const INDEXES = 12
 
 function cwdOf(raw: string): string | undefined {
   return isAbsolute(raw) ? resolve(raw) : undefined
+}
+
+export function ownedWorksite(value: unknown, owns: WorksiteGuard): OwnedWorksite | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const req = value as Partial<OwnedWorksite>
+  if (typeof req.threadId !== "string" || req.threadId === "") return undefined
+  if (typeof req.cwd !== "string" || req.cwd === "") return undefined
+  return owns(req.threadId, req.cwd) ? { threadId: req.threadId, cwd: req.cwd } : undefined
 }
 
 function release(state: State, threadId: ThreadId): void {

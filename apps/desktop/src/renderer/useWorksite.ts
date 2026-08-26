@@ -38,7 +38,7 @@ export interface Worksite {
   dirtyCount?: number
 }
 
-export function useWorksite(cwd: string, stamp: string): Worksite {
+export function useWorksite(threadId: string, cwd: string, stamp: string): Worksite {
   const [site, setSite] = useState<Worksite>({})
   // 焦点回来时 +1，进而触发下面那个 effect 重问一次
   const [visit, setVisit] = useState(0)
@@ -64,13 +64,13 @@ export function useWorksite(cwd: string, stamp: string): Worksite {
     if (bridge === undefined) return undefined
     let live = true
     // 切走之后才回来的那次响应不能再往界面上写：那时显示的已经是另一个工作区了
-    void bridge.worksite(cwd).then((info) => {
+    void bridge.worksite(threadId, cwd).then((info) => {
       if (live) setSite(info)
     })
     return () => {
       live = false
     }
-  }, [bridge, cwd, stamp, visit])
+  }, [bridge, cwd, stamp, threadId, visit])
 
   return site
 }

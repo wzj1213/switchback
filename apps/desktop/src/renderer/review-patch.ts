@@ -28,9 +28,9 @@ export function reviewCopyText(rel: string, patch: ReviewPatch): string {
 export function usePatch(
   cwd: string,
   rel: string | undefined,
-  query: { context: number; stamp: string; threadId?: string; revision?: string },
+  query: { context: number; stamp: string; threadId: string; revision?: string },
 ): PatchData {
-  const key = `${cwd}\u0000${rel ?? ""}\u0000${String(query.context)}\u0000${query.stamp}\u0000${query.threadId ?? ""}\u0000${query.revision ?? ""}`
+  const key = `${cwd}\u0000${rel ?? ""}\u0000${String(query.context)}\u0000${query.stamp}\u0000${query.threadId}\u0000${query.revision ?? ""}`
   const [out, setOut] = useState<(Omit<PatchData, "loading"> & { key: string }) | undefined>()
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni

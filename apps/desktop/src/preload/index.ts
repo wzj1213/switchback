@@ -216,25 +216,15 @@ const api = {
   },
   /** 工作区在哪个分支、脏不脏。不是 git 仓库时返回空对象。 */
   async worksite(
+    threadId: string,
     cwd: string,
   ): Promise<{ branch?: string; detached?: boolean; dirty?: boolean; dirtyCount?: number }> {
-    return (await ipcRenderer.invoke("omni:worksite", cwd)) as {
+    return (await ipcRenderer.invoke("omni:worksite", { threadId, cwd })) as {
       branch?: string
       detached?: boolean
       dirty?: boolean
       dirtyCount?: number
     }
-  },
-  /**
-   * 工作区里现在和 HEAD 不一样的文件（绝对真实路径）。不是 git 仓库时返回 undefined。
-   *
-   * 变更汇总卡拿它补编辑工具看不见的那块盲区（引擎用 shell 改的文件）。
-   * **只回路径，不回内容**。
-   */
-  async workChanges(cwd: string): Promise<{ root: string; paths: readonly string[] } | undefined> {
-    return (await ipcRenderer.invoke("omni:workChanges", cwd)) as
-      | { root: string; paths: readonly string[] }
-      | undefined
   },
   /**
    * 审核面板的文件清单：工作区里所有变了的文件 + 各自的增删数与状态。
@@ -245,7 +235,7 @@ const api = {
    */
   async workReview(
     cwd: string,
-    threadId?: string,
+    threadId: string,
     wanted?: readonly string[],
   ): Promise<Review | undefined> {
     return (await ipcRenderer.invoke("omni:workReview", { cwd, threadId, wanted })) as
@@ -256,7 +246,7 @@ const api = {
    * 一个文件的补丁。**按需取**——一个 200 文件的改动全量取可能是几十 MB，
    * 而人一次只看得了一个。
    */
-  async workPatch(cwd: string, rel: string, context?: number, threadId?: string): Promise<ReviewPatch> {
+  async workPatch(cwd: string, rel: string, context: number | undefined, threadId: string): Promise<ReviewPatch> {
     return (await ipcRenderer.invoke("omni:workPatch", { cwd, rel, context, threadId })) as ReviewPatch
   },
   /**

@@ -173,6 +173,7 @@ export function Composer(props: Props): React.JSX.Element {
         <AttachmentDrop hint={dropzone.hint} />
         {detached ? null : (
           <Chips
+            threadId={props.threadId}
             cwd={props.cwd}
             project={projectOf(props.cwd)}
             stamp={props.stamp}

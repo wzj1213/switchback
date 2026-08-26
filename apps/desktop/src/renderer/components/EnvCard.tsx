@@ -41,7 +41,7 @@ export function EnvCard({
 }): React.JSX.Element {
   // 每次打开都重新问一次（这张卡随浮层挂载）。取数时机与「换工作区清旧值」
   // 都在 `useWorksite` 里，和 `Chips` 共用一份——两份会分头走偏
-  const git = useWorksite(thread.cwd, "open")
+  const git = useWorksite(thread.id, thread.cwd, "open")
   const branch = branchLabel(git)
   const [doc, setDoc] = useState<ProjectDoc | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.omni

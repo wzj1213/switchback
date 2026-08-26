@@ -14,7 +14,15 @@ export const VIEWS = [
       after: `document.querySelector('.topbar__title')?.click()`,
     },
     {
-      name: "03-拖拽拒绝提示",
+      name: "03-Git审核",
+      open: `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === '审核')?.click()`,
+      ready: ".rv .rvd__body",
+      assert: `document.querySelector('.rv__file') !== null
+        && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')`,
+      after: `document.querySelector('.rv__close')?.click()`,
+    },
+    {
+      name: "04-拖拽拒绝提示",
       open: `(() => {
         const transfer = new DataTransfer()
         transfer.items.add(new File(["const nope = true"], "code.ts", { type: "text/typescript" }))
@@ -34,7 +42,7 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "04-后台活动工作台",
+      name: "05-后台活动工作台",
       open: [
         `document.querySelector('[title="后台活动"]')?.click()`,
         `document.querySelector('.activity-row')?.click()`,
@@ -42,14 +50,14 @@ export const VIEWS = [
       ready: ".activity-detail",
     },
     {
-      name: "05-文件清单",
+      name: "06-文件清单",
       open: `document.querySelector('[title="文件预览"]')?.click()`,
       ready: ".file-row",
       assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
         && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')`,
     },
     {
-      name: "06-缺失文件可恢复",
+      name: "07-缺失文件可恢复",
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('missing-output.txt'))?.click()`,
       ready: ".file-preview .workbench__empty",
       assert: `(() => {
@@ -60,7 +68,7 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "07-文件搜索",
+      name: "08-文件搜索",
       open: [
         `document.querySelector('.workbench__back')?.click()`,
         `(() => {
@@ -89,12 +97,12 @@ export const VIEWS = [
       )`,
     },
     {
-      name: "08-工作区外文件预览",
+      name: "09-工作区外文件预览",
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
       ready: ".file-source",
     },
     {
-      name: "09-HTML预览",
+      name: "10-HTML预览",
       open: [
         `document.querySelector('.workbench__back')?.click()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
@@ -102,7 +110,7 @@ export const VIEWS = [
       ready: ".html-preview__frame",
     },
     {
-      name: "10-切会话保留草稿",
+      name: "11-切会话保留草稿",
       open: [
         `document.querySelector('[aria-label="收起工作台"]')?.click()`,
         `(() => {
@@ -163,14 +171,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "11-新会话",
+      name: "12-新会话",
       open: `document.querySelector('.sidebar__new')?.click()`,
       ready: ".blank__title",
       // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
       absent: ".file-preview",
     },
     {
-      name: "12-@文件引用",
+      name: "13-@文件引用",
       open: [
         `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
         `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
@@ -193,14 +201,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "13-推理强度",
+      name: "14-推理强度",
       before: ".effort .trigger:not(:disabled)",
       open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
       ready: ".effort__bar--grown",
       dragEffort: true,
     },
     {
-      name: "14-设置",
+      name: "15-设置",
       // 有账号时侧栏底部先开菜单，没账号时直接进设置；固定样本走前者。
       open: [
         `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,

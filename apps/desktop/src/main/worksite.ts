@@ -3,6 +3,8 @@ import { realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { promisify } from "node:util"
 import { ipcMain } from "electron"
+import type { WorksiteSearch } from "./worksite-search.js"
+import { ownedWorksite } from "./worksite-search.js"
 
 const run = promisify(execFile)
 
@@ -161,11 +163,9 @@ export async function workChanges(cwd: string): Promise<WorkChanges | undefined>
   return { root, paths: parseStatus(status.stdout).map((rel) => join(root, rel)) }
 }
 
-export function installWorksiteChannel(): void {
-  ipcMain.handle("omni:worksite", async (_e, cwd: string) =>
-    typeof cwd === "string" && cwd !== "" ? worksiteInfo(cwd) : {},
-  )
-  ipcMain.handle("omni:workChanges", async (_e, cwd: string) =>
-    typeof cwd === "string" && cwd !== "" ? workChanges(cwd) : undefined,
-  )
+export function installWorksiteChannel(worksites: WorksiteSearch): void {
+  ipcMain.handle("omni:worksite", async (_e, value: unknown) => {
+    const req = ownedWorksite(value, worksites.owns)
+    return req === undefined ? {} : worksiteInfo(req.cwd)
+  })
 }

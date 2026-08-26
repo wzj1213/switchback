@@ -2,7 +2,6 @@ import { execFile } from "node:child_process"
 import { readFile, realpath, stat } from "node:fs/promises"
 import { isAbsolute, join, relative, resolve, sep } from "node:path"
 import { promisify } from "node:util"
-import { ipcMain } from "electron"
 import {
   isStaged,
   kindOf,
@@ -330,20 +329,4 @@ export async function workPatch(
   // 「整个文件都是新增的」补丁——那是**看起来完全可信的错误答案**，
   // 比报错糟得多。所以先问一句 git：它到底认不认识这个文件
   return legacyPatch(repo, rel, unified)
-}
-
-export function installReviewChannel(baselines?: WorktreeBaselines): void {
-  ipcMain.handle("omni:workReview", async (_e, req: { cwd: string; threadId?: string; wanted?: readonly string[] }) =>
-    typeof req.cwd === "string" && req.cwd !== ""
-      ? workReview(req.cwd, { baselines, threadId: req.threadId, wanted: req.wanted })
-      : undefined,
-  )
-  ipcMain.handle("omni:workPatch", async (_e, req: { cwd: string; rel: string; context?: number; threadId?: string }) =>
-    typeof req.cwd === "string" && typeof req.rel === "string"
-      ? workPatch(req.cwd, req.rel, typeof req.context === "number" ? req.context : 3, {
-          baselines,
-          threadId: req.threadId,
-        })
-      : { patch: "", skip: "gone" as const, added: 0, removed: 0 },
-  )
 }

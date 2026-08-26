@@ -134,7 +134,7 @@ export interface ReviewData {
   reload: () => void
 }
 
-interface ReviewQuery { threadId?: string; wanted?: readonly string[] }
+interface ReviewQuery { threadId: string; wanted?: readonly string[] }
 
 // `settled` 也排除在外：它不是这份载荷的一部分，是「拿它去渲染时手上有没有东西」，
 // 由 `reviewData` 现算
@@ -187,7 +187,7 @@ function reviewData(
 export function useReview(
   cwd: string,
   stamp: string,
-  query: ReviewQuery = {},
+  query: ReviewQuery,
 ): ReviewData {
   const [nonce, setNonce] = useState(0)
   const [visit, setVisit] = useState(0)
@@ -202,7 +202,7 @@ export function useReview(
    * 而那恰恰是它最该稳稳待着的时候。`wanted` 只是**把同一个问题问得更细**，
    * 它变了要重问（所以在 `key` 里），但不该让手上那份答案作废。
    */
-  const scope = `${cwd}\u0000${query.threadId ?? ""}`
+  const scope = `${cwd}\u0000${query.threadId}`
   const key = `${scope}\u0000${wantedKey}\u0000${stamp}\u0000${String(nonce)}\u0000${String(visit)}`
   const [data, setData] = useState<LoadedReview | undefined>(undefined)
   useEffect(() => {

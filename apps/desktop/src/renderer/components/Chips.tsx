@@ -22,11 +22,13 @@ import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
  */
 
 export function Chips({
+  threadId,
   cwd,
   project,
   stamp,
   passing,
 }: {
+  threadId: string
   cwd: string
   project: string
   /** 变一次就重新问一遍。调用方把轮次状态传进来。 */
@@ -39,7 +41,7 @@ export function Chips({
    */
   passing: boolean
 }): React.JSX.Element {
-  const git = useWorksite(cwd, stamp)
+  const git = useWorksite(threadId, cwd, stamp)
   const branch = branchLabel(git)
 
   return (
