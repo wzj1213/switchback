@@ -52,3 +52,17 @@ export function nothingToSend(o: {
   if (o.attachmentBlocked) return true
   return o.text.trim() === "" && !o.hasCommand && o.attachments === 0
 }
+
+/** 图片还挂着时，任何会静默丢图的发送路径都必须先停下来。 */
+export function attachmentWarning(o: {
+  attachments: number
+  canAttach: boolean
+  pending: boolean
+  aside: boolean
+}): string | undefined {
+  if (o.attachments === 0) return undefined
+  if (o.aside) return "侧问不支持图片附件；图片已保留，请移除或退出侧问后再发"
+  if (o.pending) return "请先完成引擎切换，再确认新引擎能否接收这些附件；附件会保留"
+  if (!o.canAttach) return "当前引擎或模型不支持图片附件；附件已保留，请移除或切换后再发"
+  return undefined
+}

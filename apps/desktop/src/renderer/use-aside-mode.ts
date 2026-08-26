@@ -39,6 +39,19 @@ export const ASIDE_COMMAND: SlashCommand = {
 
 type Send = (text: string, attachments: readonly string[], steer: boolean) => void
 
+/** 快捷键侧问只返回一段真正能送达的正文；其他状态一律不清输入。 */
+export function asideQuestion(options: {
+  can: boolean
+  handler: boolean
+  text: string
+  hasCommand: boolean
+  blocked: boolean
+}): string | undefined {
+  const text = options.text.trim()
+  if (!options.can || !options.handler || options.hasCommand || options.blocked || text === "") return undefined
+  return text
+}
+
 export interface AsideMode {
   /** 此刻在侧问模式里。 */
   on: boolean
@@ -51,7 +64,7 @@ export interface AsideMode {
   /** 包一层发送：模式开着就走侧通道，否则原样往下发。 */
   wrapSend: (send: Send) => Send
   /** `⌥⌘↩`：**不进模式**，直接把手上这一句当侧问发出去。 */
-  ask: (text: string, hasCommand: boolean, clear: () => void) => void
+  ask: (text: string, hasCommand: boolean, blocked: boolean, clear: () => void) => void
 }
 
 export function useAsideMode(options: {
@@ -110,11 +123,11 @@ export function useAsideMode(options: {
       }
       send(text, attachments, steer)
     },
-    ask: (text, hasCommand, clear) => {
+    ask: (text, hasCommand, blocked, clear) => {
       // 选了引擎命令时不适用：那一句的去向已经由命令决定了
-      const trimmed = text.trim()
-      if (!options.can || onAsk === undefined || hasCommand || trimmed === "") return
-      onAsk(trimmed)
+      const question = asideQuestion({ can: options.can, handler: onAsk !== undefined, text, hasCommand, blocked })
+      if (question === undefined || onAsk === undefined) return
+      onAsk(question)
       clear()
     },
   }

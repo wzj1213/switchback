@@ -7,7 +7,7 @@ import { Bar } from "./ComposerBar.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
-import { nothingToSend, projectOf, stateOf } from "./composer-state.js"
+import { attachmentWarning, nothingToSend, projectOf, stateOf } from "./composer-state.js"
 import { AsideChip } from "./aside-chip.js"
 import { useAttachmentDropzone } from "../use-attachment-dropzone.js"
 import { AttachmentDrop } from "./AttachmentDrop.js"
@@ -107,17 +107,6 @@ interface Props {
   onResume: () => void
 }
 
-function attachmentWarning(
-  count: number,
-  canAttach: boolean,
-  pending: Props["pending"],
-): string | undefined {
-  if (count === 0) return undefined
-  if (pending !== undefined) return "请先完成引擎切换，再确认新引擎能否接收这些附件；附件会保留"
-  if (!canAttach) return "当前引擎或模型不支持图片附件；附件已保留，请移除或切换后再发"
-  return undefined
-}
-
 function AttachmentWarning({ text }: { text: string | undefined }): React.JSX.Element | null {
   return text === undefined ? null : (
     <p className="composer__attachwarn" role="status">{text}</p>
@@ -162,7 +151,10 @@ export function Composer(props: Props): React.JSX.Element {
     canAttach: props.canAttach, canAside, prefill: props.prefill, onAsk: props.onAsk,
   })
   const dropzone = useAttachmentDropzone(props.canAttach, attach.drop)
-  const attachWarning = attachmentWarning(attach.paths.length, props.canAttach, props.pending)
+  const attachWarning = attachmentWarning({
+    attachments: attach.paths.length, canAttach: props.canAttach,
+    pending: props.pending !== undefined, aside: aside.on,
+  })
   const attachmentBlocked = attachWarning !== undefined
   const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
   const draft = useComposerDraft({
@@ -176,10 +168,7 @@ export function Composer(props: Props): React.JSX.Element {
   })
   return (
     <div className="composer">
-      <div
-        className="composer__inner"
-        {...dropzone.bind}
-      >
+      <div className="composer__inner" {...dropzone.bind}>
         <VoidRing />
         <AttachmentDrop hint={dropzone.hint} />
         {detached ? null : (
@@ -210,9 +199,9 @@ export function Composer(props: Props): React.JSX.Element {
           searchFiles={props.searchFiles}
           onChange={draft.setText}
           onSubmit={draft.submit}
-          onAside={() => {
-            aside.ask(draft.text, draft.command !== undefined, () => { draft.setText("") })
-          }}
+          onAside={() => aside.ask(
+            draft.text, draft.command !== undefined, attachmentBlocked, () => { draft.setText("") },
+          )}
           asideMode={aside.on}
           onAsideExit={aside.exit}
         />
