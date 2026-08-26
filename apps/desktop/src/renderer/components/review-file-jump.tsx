@@ -1,15 +1,8 @@
 import { useId, useRef, useState } from "react"
 import type { ReviewFile } from "../../shared/review.js"
 import { FileIcon } from "./icons-activity.js"
+import { FileSearchIcon } from "./icons-panel.js"
 import { Popover } from "./Popover.js"
-
-function SearchIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M3 2.5h7l2 2v4M3 2.5v11h5M9.5 11.5l3 3M11 13a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
-    </svg>
-  )
-}
 
 export function filterReviewJumpFiles(
   files: readonly ReviewFile[],
@@ -42,12 +35,12 @@ export function ReviewFileJump({ files, active, onPick }: {
     <>
       <button ref={trigger} type="button" className="rv__tool" aria-label="跳转到文件"
         title="跳转到文件" aria-haspopup="dialog" aria-expanded={open}
-        onClick={() => { if (open) close(); else setOpen(true) }}><SearchIcon /></button>
+        onClick={() => { if (open) close(); else setOpen(true) }}><FileSearchIcon /></button>
       <Popover open={open} anchor={trigger.current} minWidth={320} ariaLabel="跳转到文件"
         onClose={close}>
         <div className="rv-jump">
           <div className="rv-jump__search">
-            <SearchIcon />
+            <FileSearchIcon size={13} />
             <input ref={input} data-popover-autofocus type="search" value={query}
               aria-label="跳转到文件" aria-controls={resultsId} placeholder="跳转到文件…"
               onChange={(event) => { setQuery(event.currentTarget.value) }} />

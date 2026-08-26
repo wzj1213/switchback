@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { CloseIcon } from "./icons-panel.js"
 import { Popover } from "./Popover.js"
 
 /**
@@ -136,7 +137,7 @@ export function useContextMenu(): {
                     command.run()
                   }}
                 >
-                  ×
+                  <CloseIcon size={11} />
                 </button>
               </div>
             ),

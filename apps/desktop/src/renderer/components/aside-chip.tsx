@@ -5,6 +5,8 @@
  * 你以为在交代任务，其实发进了侧通道，那一句就白打了。
  * 所以它用强调色，而落在转录区的那张答案卡反倒不上色（见 `.asidecard`）。
  */
+import { CloseIcon } from "./icons-panel.js"
+
 export function AsideChip({ onExit }: { onExit: () => void }): React.JSX.Element {
   return (
     <span className="composer__asidechip">
@@ -16,7 +18,7 @@ export function AsideChip({ onExit }: { onExit: () => void }): React.JSX.Element
         aria-label="退出侧问"
         onClick={onExit}
       >
-        ✕
+        <CloseIcon size={11} />
       </button>
     </span>
   )

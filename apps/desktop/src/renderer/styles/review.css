@@ -98,13 +98,10 @@
 }
 
 .rv__tool svg {
-  width: 14px;
-  height: 14px;
+  /* **尺寸与描边一律交给 `icon-base.tsx` 的 `Svg`**：这里写死过
+     `stroke-width: 1.35`，14px 下渲染出来是 1.18，比全套标准的 1.25 细 6%。
+     颜色仍由这里给——它跟着 `.rv__tool` 的状态走 */
   fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.35;
 }
 
 .rv__tool:hover,
@@ -147,10 +144,6 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.35;
 }
 
 .rv-jump__search input {

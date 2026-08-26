@@ -1,18 +1,9 @@
 import type { EngineInfo, Thread } from "@omni/protocol"
 import { CompareIcon, ForkIcon } from "./icons.js"
+import { PanelIcon } from "./icons-panel.js"
 
 const canForkFrom = (thread: Thread): boolean =>
   thread.detached !== true && (thread.status === "idle" || thread.status === "failed")
-
-function PanelIcon(): React.JSX.Element {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" aria-hidden="true">
-      <rect x="2" y="2.5" width="12" height="11" rx="2" />
-      <path d="M10.5 2.5v11" />
-    </svg>
-  )
-}
 
 export function TopBarActions({
   peer,

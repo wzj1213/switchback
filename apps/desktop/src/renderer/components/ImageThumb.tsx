@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { CloseIcon } from "./icons-panel.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { baseName } from "./file-row.js"
 
@@ -88,7 +89,7 @@ export function Thumb({
             onRemove(path)
           }}
         >
-          ×
+          <CloseIcon size={10} />
         </button>
       )}
       {open ? (
@@ -125,7 +126,7 @@ export function ImageLightbox({ path, onClose }: {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <button type="button" className="lightbox__close" aria-label="关闭图片预览" onClick={onClose}>×</button>
+      <button type="button" className="lightbox__close" aria-label="关闭图片预览" onClick={onClose}><CloseIcon size={18} /></button>
       {full.state === "loading" ? <span className="lightbox__miss" role="status">正在打开…</span> : null}
       {full.state === "miss" ? <span className="lightbox__miss" role="alert">这张图打不开了：{path}</span> : null}
       {full.state === "ok" ? <img src={full.url} alt={baseName(path)} /> : null}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { CloseIcon } from "./icons-panel.js"
 
 export interface FindResult {
   active: number
@@ -76,7 +77,7 @@ export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
         ↓
       </button>
       <button className="findbar__btn" type="button" aria-label="关闭查找" onClick={onClose}>
-        ×
+        <CloseIcon size={12} />
       </button>
     </div>
   )

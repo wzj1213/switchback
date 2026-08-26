@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { CloseIcon } from "./icons-panel.js"
 import { humanize } from "../../shared/failure.js"
 import type { Notice } from "@omni/store"
 import type { ThreadRow } from "@omni/store"
@@ -85,7 +86,7 @@ export function Notices({
           onDismiss(latest.id)
         }}
       >
-        ×
+        <CloseIcon size={12} />
       </button>
     </div>
   )

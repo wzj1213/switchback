@@ -1,4 +1,5 @@
 import type { PlanStep } from "@omni/protocol"
+import { LINE, Svg } from "./icon-base.js"
 
 /**
  * 这枚环能画的全部状态。
@@ -38,38 +39,31 @@ export function PlanMark({
   spinning: boolean
 }): React.JSX.Element {
   return (
-    <svg
+    <Svg
+      size={11}
       className={`plan-mark${status === "in_progress" && spinning ? " plan-mark--spin" : ""}`}
-      width="11"
-      height="11"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.35"
-      strokeLinecap="round"
-      aria-hidden="true"
     >
       {status === "done" ? (
         <circle cx="8" cy="8" r="5.4" fill="currentColor" stroke="none" />
       ) : status === "failed" ? (
         // 环 + 叉。**直径和其余四态一样**，标记列一个像素都不动
         <>
-          <circle cx="8" cy="8" r="5.4" opacity=".45" />
-          <path d="M6.1 6.1l3.8 3.8M9.9 6.1l-3.8 3.8" />
+          <circle cx="8" cy="8" r="5.4" opacity=".45" {...LINE} />
+          <path d="M6.1 6.1l3.8 3.8M9.9 6.1l-3.8 3.8" {...LINE} />
         </>
       ) : status === "dropped" ? (
         <>
-          <circle cx="8" cy="8" r="5.4" opacity=".4" />
-          <path d="M5.6 10.4l4.8-4.8" opacity=".7" />
+          <circle cx="8" cy="8" r="5.4" opacity=".4" {...LINE} />
+          <path d="M5.6 10.4l4.8-4.8" opacity=".7" {...LINE} />
         </>
       ) : status === "in_progress" ? (
         <>
-          <circle cx="8" cy="8" r="5.4" opacity=".28" />
-          <path d="M8 2.6a5.4 5.4 0 0 1 5.4 5.4" />
+          <circle cx="8" cy="8" r="5.4" opacity=".28" {...LINE} />
+          <path d="M8 2.6a5.4 5.4 0 0 1 5.4 5.4" {...LINE} />
         </>
       ) : (
-        <circle cx="8" cy="8" r="5.4" opacity=".45" />
+        <circle cx="8" cy="8" r="5.4" opacity=".45" {...LINE} />
       )}
-    </svg>
+    </Svg>
   )
 }

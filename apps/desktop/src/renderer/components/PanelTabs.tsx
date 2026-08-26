@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import type { PanelPage } from "../panel-state.js"
 import { CompareIcon, PlusIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon } from "./icons-activity.js"
+import { CloseIcon, ExpandIcon, PanelIcon } from "./icons-panel.js"
 import { Popover } from "./Popover.js"
 
 const PAGES: readonly { id: PanelPage; label: string; description: string }[] = [
@@ -14,25 +15,6 @@ function PageIcon({ page }: { page: PanelPage }): React.JSX.Element {
   if (page === "review") return <CompareIcon size={13} />
   if (page === "files") return <FileIcon size={13} />
   return <DotBoxIcon size={13} />
-}
-
-function ExpandIcon(): React.JSX.Element {
-  return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" aria-hidden="true">
-      <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
-    </svg>
-  )
-}
-
-function PanelIcon(): React.JSX.Element {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" aria-hidden="true">
-      <rect x="2" y="2.5" width="12" height="11" rx="2" />
-      <path d="M10.5 2.5v11" />
-    </svg>
-  )
 }
 
 export interface PanelTabsProps {
@@ -61,7 +43,7 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
                 <PageIcon page={page} /><span>{label}</span>
               </button>
               <button type="button" className="panel-tab__close" aria-label={`关闭${label}页`}
-                onClick={() => { props.onClose(page) }}>×</button>
+                onClick={() => { props.onClose(page) }}><CloseIcon size={11} /></button>
             </span>
           )
         })}

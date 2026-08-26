@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { CloseIcon } from "./icons-panel.js"
 import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
 import type { Settings } from "../useSettings.js"
 import { useModalKeys } from "../useModalKeys.js"
@@ -183,7 +184,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           <span className="set__heading">设置</span>
           <span className="set__ver">omni {props.version}</span>
           <button type="button" className="iconbtn" aria-label="关闭" onClick={props.onClose}>
-            ✕
+            <CloseIcon />
           </button>
         </header>
         <div className="set__body">
