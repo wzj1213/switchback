@@ -1,6 +1,6 @@
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import type { useAttachments } from "./useAttachments.js"
-import { appendFileReferences } from "./file-references.js"
+import { appendFileReferences, type ComposerFileReference } from "./file-references.js"
 import { useAttachmentDropzone } from "./use-attachment-dropzone.js"
 
 export function useComposerFiles(options: {
@@ -10,6 +10,7 @@ export function useComposerFiles(options: {
   cwd: string
   setText: React.Dispatch<React.SetStateAction<string>>
   focus: () => void
+  reference?: ComposerFileReference
 }): {
   dropzone: ReturnType<typeof useAttachmentDropzone>
   paste: (items: DataTransferItemList | null) => Promise<void>
@@ -18,6 +19,14 @@ export function useComposerFiles(options: {
   const addReferences = useCallback((paths: readonly string[]) => {
     if (paths.length > 0) options.setText((text) => appendFileReferences(text, paths))
   }, [options.setText])
+  const seenReference = useRef(options.reference?.at ?? 0)
+  useEffect(() => {
+    const reference = options.reference
+    if (reference === undefined || reference.at === seenReference.current || !options.editable) return
+    seenReference.current = reference.at
+    addReferences([reference.path])
+    options.focus()
+  }, [addReferences, options.editable, options.focus, options.reference])
   const drop = useCallback((files: FileList | null) => {
     addReferences(options.attach.drop(files, options.cwd))
     if ((files?.length ?? 0) > 0) options.focus()

@@ -166,13 +166,16 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
   )
 }
 
-export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReveal, onCopy, searchFiles }: {
+export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReference,
+  referenceDisabled, onReveal, onCopy, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
   target: PreviewTarget | undefined
   onPick: (target: PreviewTarget) => void
   onBack: () => void
+  onReference?: (target: PreviewTarget) => void
+  referenceDisabled?: boolean
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
@@ -182,6 +185,7 @@ export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReve
     <FileIndex threadId={threadId} cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
   ) : (
     <FilePreviewView target={target} revision={revision}
-      onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
+      onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
+      onReveal={onReveal} onCopy={onCopy} />
   )
 }

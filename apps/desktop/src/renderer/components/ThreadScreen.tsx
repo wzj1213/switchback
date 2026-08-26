@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { EngineInfo, Thread } from "@omni/protocol"
 import {
   commandsOf,
@@ -15,6 +16,7 @@ import { scopeWorkbench } from "../workbench.js"
 import { WorkbenchPane } from "./WorkbenchPane.js"
 import { Workspace } from "./Workspace.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
+import { fileReference, type ComposerFileReference } from "../file-references.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -35,6 +37,7 @@ export function ThreadScreen({
   drafts: ComposerDrafts
 }): React.JSX.Element {
   const { shell, state } = app
+  const [reference, setReference] = useState<(ComposerFileReference & { threadId: string }) | undefined>()
   const lanes = lanesOf(state, thread.id)
   const allItems = itemsOf(state, thread.id)
   const workbench = scopeWorkbench(shell.workbench, new Set(lanes.map((lane) => lane.id)), thread.id, thread.cwd)
@@ -44,6 +47,7 @@ export function ThreadScreen({
       <Workspace
         key={thread.id}
         drafts={drafts}
+        composerReference={reference?.threadId === thread.id ? reference : undefined}
         thread={thread}
         peer={peer}
         onCompare={() => { shell.setComparing(true) }}
@@ -98,6 +102,11 @@ export function ThreadScreen({
         onActivityIndex={shell.activityIndex}
         onPickFile={shell.openFile}
         onFileIndex={shell.fileIndex}
+        onReference={(target) => {
+          const path = fileReference(target.cwd, target.path).path
+          setReference((before) => ({ threadId: target.threadId, path, at: (before?.at ?? 0) + 1 }))
+          shell.hideWorkbench()
+        }}
         onHide={shell.hideWorkbench}
         onReveal={app.reveal}
         onCopy={app.copy}

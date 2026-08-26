@@ -17,6 +17,9 @@ export function canRevealPreview(file: FilePreview | undefined, path: string): b
   return path !== "" && !(file?.kind === "unavailable" && file.reason === "missing")
 }
 
+/** 缺失文件不能再交给输入框；二进制或暂时预览失败的路径仍可交给原生引擎处理。 */
+export const canReferencePreview = canRevealPreview
+
 function identityOf(target: PreviewTarget): string {
   return `${target.threadId}\u0000${target.cwd}\u0000${target.path}`
 }
@@ -61,6 +64,41 @@ function ReloadIcon(): React.JSX.Element {
       strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12.8 5.3V2.7m0 0h-2.6m2.6 0A5.6 5.6 0 1 0 13.4 9" />
     </svg>
+  )
+}
+
+function PreviewActions({ target, busy, referenceable, referenceDisabled, revealable,
+  onReference, onReload, onReveal }: {
+  target: PreviewTarget
+  busy: boolean
+  referenceable: boolean
+  referenceDisabled: boolean
+  revealable: boolean
+  onReference?: (target: PreviewTarget) => void
+  onReload: () => void
+  onReveal: () => void
+}): React.JSX.Element {
+  return (
+    <span className="file-preview__actions">
+      {onReference === undefined || !referenceable ? null : (
+        <button type="button" className="file-preview__reference"
+          title={referenceDisabled ? "继续会话后才能引用" : "引用到输入框"}
+          aria-label="引用到输入框" disabled={busy || referenceDisabled}
+          onClick={() => { onReference(target) }}>
+          <span aria-hidden="true">@</span> 引用
+        </button>
+      )}
+      <button type="button" className="workbench__icon" title="重新读取文件"
+        aria-label="重新读取文件" disabled={busy} onClick={onReload}>
+        <ReloadIcon />
+      </button>
+      {revealable ? (
+        <button type="button" className="workbench__icon" title="在访达中显示"
+          aria-label="在访达中显示" onClick={onReveal}>
+          <RevealIcon size={12} />
+        </button>
+      ) : null}
+    </span>
   )
 }
 
@@ -112,10 +150,13 @@ function Content({ file, onCopy }: { file: FilePreview; onCopy: (text: string) =
   return <Source file={file} onCopy={onCopy} />
 }
 
-export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: {
+export function FilePreviewView({ target, revision, onBack, onReference, referenceDisabled = false,
+  onReveal, onCopy }: {
   target: PreviewTarget
   revision: Item | undefined
   onBack: () => void
+  onReference?: (target: PreviewTarget) => void
+  referenceDisabled?: boolean
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
@@ -124,6 +165,7 @@ export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: 
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
   const revealable = canRevealPreview(load.state === "ready" ? load.file : undefined, path)
+  const referenceable = canReferencePreview(load.state === "ready" ? load.file : undefined, path)
   return (
     <div className="file-preview">
       <header className="file-preview__head">
@@ -134,19 +176,10 @@ export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: 
           <strong title={path}>{name}</strong>
           {load.state === "ready" && load.refreshing ? <span>正在更新…</span> : null}
         </span>
-        <span className="file-preview__actions">
-          <button type="button" className="workbench__icon" title="重新读取文件"
-            aria-label="重新读取文件" disabled={load.state === "loading" || load.refreshing}
-            onClick={() => { setManual((before) => before + 1) }}>
-            <ReloadIcon />
-          </button>
-          {revealable ? (
-            <button type="button" className="workbench__icon" title="在访达中显示"
-              aria-label="在访达中显示" onClick={() => { onReveal(path) }}>
-              <RevealIcon size={12} />
-            </button>
-          ) : null}
-        </span>
+        <PreviewActions target={target} busy={load.state === "loading" || load.refreshing}
+          referenceable={referenceable} referenceDisabled={referenceDisabled}
+          revealable={revealable} onReference={onReference}
+          onReload={() => { setManual((before) => before + 1) }} onReveal={() => { onReveal(path) }} />
       </header>
       <div className="file-preview__body">
         {load.state === "loading" ? <p className="workbench__empty">正在读取…</p> : (

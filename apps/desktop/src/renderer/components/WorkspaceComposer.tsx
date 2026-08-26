@@ -71,6 +71,7 @@ export function WorkspaceComposer({
       stamp={stamp}
       searchFiles={props.searchFiles}
       prefill={prefill}
+      reference={props.composerReference}
       canAttach={(thread.capabilities ?? NO_CAPABILITIES).attachments &&
         modelAcceptsImages(props.models, thread.model)}
       canSteer={(thread.capabilities ?? NO_CAPABILITIES).steer}

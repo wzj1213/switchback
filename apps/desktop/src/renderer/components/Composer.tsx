@@ -14,6 +14,7 @@ import type { ComposerDrafts } from "../composer-drafts.js"
 import { useComposerMemory, useRememberComposer } from "../use-composer-memory.js"
 import { useComposerFiles } from "../use-composer-files.js"
 import { useComposerFocus } from "../use-composer-focus.js"
+import type { ComposerFileReference } from "../file-references.js"
 
 /**
  * 信任档。
@@ -102,6 +103,8 @@ interface Props {
   canSteer: boolean
   /** 外面塞进来的文本（「改一改再发」）。`at` 变了才生效。 */
   prefill?: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
+  /** 文件工作台点「引用」后追加到现有草稿；和替换正文的 prefill 不是同一种动作。 */
+  reference?: ComposerFileReference
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */
@@ -165,7 +168,7 @@ export function Composer(props: Props): React.JSX.Element {
     onSend: aside.wrapSend(props.onSend),
   })
   const files = useComposerFiles({ attach, canAttach: props.canAttach, editable: !detached,
-    cwd: props.cwd, setText: draft.setText, focus: focus.focus })
+    cwd: props.cwd, setText: draft.setText, focus: focus.focus, reference: props.reference })
   useRememberComposer({
     drafts: props.drafts, threadId: props.threadId, engine: props.engine,
     text: draft.text, attachments: attach.paths, command: draft.command, aside: aside.on,

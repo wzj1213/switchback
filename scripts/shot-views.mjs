@@ -109,6 +109,7 @@ export const VIEWS = [
         const preview = document.querySelector('.file-preview')
         return preview?.textContent.includes('文件已经不存在') === true
           && preview.querySelector('[aria-label="重新读取文件"]') !== null
+          && preview.querySelector('[aria-label="引用到输入框"]') === null
           && preview.querySelector('[aria-label="在访达中显示"]') === null
       })()`,
     },
@@ -145,6 +146,8 @@ export const VIEWS = [
       name: "10-工作区外文件预览",
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
       ready: ".file-source",
+      assert: `document.querySelector('[aria-label="引用到输入框"]')?.disabled === true
+        && document.querySelector('[aria-label="引用到输入框"]')?.title.includes('继续会话') === true`,
     },
     {
       name: "11-HTML预览",
@@ -224,7 +227,39 @@ export const VIEWS = [
       assert: `document.activeElement?.classList.contains('composer__input') === true`,
     },
     {
-      name: "14-@文件引用",
+      name: "14-工作台文件预览",
+      open: [
+        `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '检查这个文件 '); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
+        `document.querySelector('[title="文件预览"]')?.click()`,
+        `(() => {
+          const input = document.querySelector('.files-search input')
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+          setter?.call(input, 'attachment-feedback')
+          input?.dispatchEvent(new Event('input', { bubbles: true }))
+        })()`,
+        `[...document.querySelectorAll('.file-row')]
+          .find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
+      ],
+      ready: ".file-source",
+      assert: `document.querySelector('[aria-label="引用到输入框"]')?.disabled === false`,
+    },
+    {
+      name: "15-工作台文件加入输入框",
+      open: `document.querySelector('[aria-label="引用到输入框"]')?.click()`,
+      ready: ".composer__input",
+      absent: ".workbench",
+      assert: `document.activeElement?.classList.contains('composer__input') === true
+        && document.querySelector('.composer__input')?.value === '检查这个文件 @apps/desktop/src/renderer/attachment-feedback.ts '
+        && document.querySelector('.send')?.disabled === false`,
+      after: `(() => {
+        const input = document.querySelector('.composer__input')
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(input, '')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`,
+    },
+    {
+      name: "16-@文件引用",
       open: [
         `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
         `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
@@ -247,14 +282,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "15-推理强度",
+      name: "17-推理强度",
       before: ".effort .trigger:not(:disabled)",
       open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
       ready: ".effort__bar--grown",
       dragEffort: true,
     },
     {
-      name: "16-设置",
+      name: "18-设置",
       // 有账号时侧栏底部先开菜单，没账号时直接进设置；固定样本走前者。
       open: [
         `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,

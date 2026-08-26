@@ -22,7 +22,7 @@ function ToolTab({ on, label, count, children, onClick }: {
 }
 
 export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles, onPickLane,
-  onActivityIndex, onPickFile, onFileIndex, onHide, onReveal, onCopy, searchFiles }: {
+  onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles }: {
   state: WorkbenchState
   thread: Thread
   lanes: readonly Lane[]
@@ -33,6 +33,7 @@ export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles
   onActivityIndex: () => void
   onPickFile: (target: PreviewTarget) => void
   onFileIndex: () => void
+  onReference?: (target: PreviewTarget) => void
   onHide: () => void
   onReveal: (path: string) => void
   onCopy: (text: string) => void
@@ -71,7 +72,8 @@ export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles
             onPick={onPickLane} onBack={onActivityIndex} onCopy={onCopy} />
         ) : (
           <FilesPage threadId={thread.id} cwd={thread.cwd} items={items} target={state.file} onPick={onPickFile}
-            onBack={onFileIndex} onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
+            onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
+            onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
         )}
       </div>
     </aside>

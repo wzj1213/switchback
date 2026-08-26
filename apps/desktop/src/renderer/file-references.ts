@@ -3,6 +3,12 @@ export interface FileReference {
   outside: boolean
 }
 
+/** 从文件工作台交给输入框的一次性信号；at 让连续引用同一路径也各生效一次。 */
+export interface ComposerFileReference {
+  path: string
+  at: number
+}
+
 function normalized(path: string): string {
   const slashes = path.replaceAll("\\", "/")
   if (/^[a-z]:\/?$/i.test(slashes)) return `${slashes.slice(0, 2)}/`

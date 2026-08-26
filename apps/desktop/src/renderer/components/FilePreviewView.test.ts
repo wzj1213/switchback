@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { FilePreview } from "../../shared/file-preview.js"
-import { canRevealPreview } from "./FilePreviewView.js"
+import { canReferencePreview, canRevealPreview } from "./FilePreviewView.js"
 
 describe("文件预览操作", () => {
   const cases: readonly { name: string; file: FilePreview | undefined; path: string; expected: boolean }[] = [
@@ -23,6 +23,7 @@ describe("文件预览操作", () => {
   for (const one of cases) {
     it(one.name, () => {
       expect(canRevealPreview(one.file, one.path)).toBe(one.expected)
+      expect(canReferencePreview(one.file, one.path)).toBe(one.expected)
     })
   }
 })

@@ -78,16 +78,15 @@
   box-shadow: var(--shadow-pop);
 }
 
-/* 入场：从 98% 淡进来。**只在位置算好之后**（见 `Popover.tsx` 的 `data-placed`）。
-   不做退场——那要引一份「正在关闭」的状态，会和 `close()` 打架。
-   `transform-origin` 保持居中：3% 的缩放在 120ms 里分不出是从哪个角长出来的 */
+/* 入场只从 98% 回到原尺寸。**不能从透明淡入**：菜单挂上 DOM 的同一刻焦点已经落到
+   第一项，opacity 动画会让这颗已聚焦的操作在前几十毫秒几乎和背景同色。
+   位置仍等 `data-placed` 后再动；不做退场，避免额外的关闭中间态。 */
 .pop[data-placed="true"] {
   animation: pop-in var(--dur) var(--ease);
 }
 
 @keyframes pop-in {
   from {
-    opacity: 0;
     transform: scale(0.98);
   }
 }
