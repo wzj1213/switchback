@@ -15,13 +15,13 @@ function focusable(box: HTMLElement): readonly HTMLElement[] {
   )
 }
 
-function recoverTab(event: KeyboardEvent, box: HTMLElement,
-  first: HTMLElement | undefined, last: HTMLElement | undefined): boolean {
-  if (box.contains(document.activeElement)) return false
-  event.preventDefault()
-  const target = event.shiftKey ? last : first
-  target?.focus()
-  return true
+/** 当前焦点在第几项；-1 代表容器本身或意外跑出模态。 */
+export function tabDestination(active: number, total: number, backwards: boolean): number | undefined {
+  if (total === 0) return undefined
+  if (active < 0) return backwards ? total - 1 : 0
+  if (backwards && active === 0) return total - 1
+  if (!backwards && active === total - 1) return 0
+  return undefined
 }
 
 /** 把 Tab 留在指定面板内；当前焦点意外跑出去时也会收回。 */
@@ -33,17 +33,13 @@ export function trapTab(event: KeyboardEvent, box: HTMLElement): void {
     box.focus()
     return
   }
-  const first = nodes[0]
-  const last = nodes[nodes.length - 1]
   const active = document.activeElement
-  if (recoverTab(event, box, first, last)) return
-  if (event.shiftKey && active === first) {
-    event.preventDefault()
-    last?.focus()
-  } else if (!event.shiftKey && active === last) {
-    event.preventDefault()
-    first?.focus()
-  }
+  const contained = active instanceof Node && box.contains(active)
+  const at = contained && active !== box ? nodes.indexOf(active as HTMLElement) : -1
+  const destination = tabDestination(at, nodes.length, event.shiftKey)
+  if (destination === undefined) return
+  event.preventDefault()
+  nodes[destination]?.focus()
 }
 
 /**
@@ -63,14 +59,20 @@ export function trapTab(event: KeyboardEvent, box: HTMLElement): void {
  *
  * `aria-modal` 的行为也在这里兑现：Tab 留在面板里，卸载时焦点回到触发器。
  */
-export function useModalKeys(onClose: () => void): React.RefObject<HTMLDivElement | null> {
+export function useModalKeys(
+  onClose: () => void,
+  focusFirst = false,
+): React.RefObject<HTMLDivElement | null> {
   const box = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
+  const first = useRef(focusFirst)
   close.current = onClose
   useEffect(() => {
     const origin =
       document.activeElement instanceof HTMLElement ? document.activeElement : undefined
-    box.current?.focus()
+    const current = box.current
+    const initial = current === null || !first.current ? current : focusable(current)[0] ?? current
+    initial?.focus()
     const onKey = (event: KeyboardEvent): void => {
       const current = box.current
       if (current === null) return

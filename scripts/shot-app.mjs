@@ -22,6 +22,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
+import axe from "axe-core"
 import WebSocket from "ws"
 import { mainThread, stubThread } from "./ui-fixture.mjs"
 import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
@@ -125,6 +126,18 @@ async function waitFor(cdp, expression, label) {
   throw new Error(`界面没有就绪（${label}）：${expression}`)
 }
 
+async function audit(cdp, label, enabled) {
+  if (!enabled) return
+  const violations = await value(cdp, `axe.run(document, {
+    runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
+  }).then(result => result.violations.map(one => ({
+    id: one.id,
+    nodes: one.nodes.map(node => ({ target: node.target, summary: node.failureSummary })),
+  })))`)
+  if (violations.length > 0) throw new Error(`${label} 有 axe A/AA 违规：${JSON.stringify(violations)}`)
+  console.log(`  ✓ ${label} 没有 axe A/AA 违规`)
+}
+
 async function shoot(cdp, view) {
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
@@ -150,6 +163,7 @@ async function shoot(cdp, view) {
     if (view.assert !== undefined && !(await value(cdp, view.assert))) {
       throw new Error(`${view.name} 没有满足验收表达式：${view.assert}`)
     }
+    await audit(cdp, view.name, view.audit === true)
     if (view.dragEffort === true) await exerciseEffort({ value, pause }, cdp)
     await pause(600)
   }
@@ -244,6 +258,7 @@ async function main() {
       })
     }
     await waitFor(cdp, "document.querySelector('.shell') !== null", "外壳")
+    await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
     for (const view of VIEWS) await shoot(cdp, view)

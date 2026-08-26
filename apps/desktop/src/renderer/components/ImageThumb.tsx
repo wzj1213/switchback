@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react"
+import { useModalKeys } from "../useModalKeys.js"
+import { baseName } from "./file-row.js"
 
 /**
  * 图片缩略图 + 点开看大图。
@@ -51,11 +53,6 @@ function useThumb(path: string, max: number): Thumbnail {
   return thumb
 }
 
-/** 文件名。路径又长又是自动生成的，摆出来占满一行还什么都没说。 */
-function nameOf(path: string): string {
-  return path.split("/").pop() ?? path
-}
-
 export function Thumb({
   path,
   onRemove,
@@ -67,11 +64,11 @@ export function Thumb({
   const thumb = useThumb(path, THUMB_PX)
   const [open, setOpen] = useState(false)
   return (
-    <span className="thumb" title={nameOf(path)}>
+    <span className="thumb" title={baseName(path)}>
       <button
         type="button"
         className="thumb__hit"
-        aria-label={`预览 ${nameOf(path)}`}
+        aria-label={`预览 ${baseName(path)}`}
         onClick={() => {
           setOpen(true)
         }}
@@ -79,7 +76,7 @@ export function Thumb({
         {/* 占位块的尺寸和最终那张图**逐字一致**：不一致的话图一到位，
             整排附件连同下面的对话一起往下顶 */}
         {thumb.state === "loading" ? <span className="thumb__skel" aria-hidden="true" /> : null}
-        {thumb.state === "miss" ? <span className="thumb__name">{nameOf(path)}</span> : null}
+        {thumb.state === "miss" ? <span className="thumb__name">{baseName(path)}</span> : null}
         {thumb.state === "ok" ? <img src={thumb.url} alt="" /> : null}
       </button>
       {onRemove === undefined ? null : (
@@ -95,7 +92,7 @@ export function Thumb({
         </button>
       )}
       {open ? (
-        <Lightbox
+        <ImageLightbox
           path={path}
           onClose={() => {
             setOpen(false)
@@ -107,37 +104,31 @@ export function Thumb({
 }
 
 /**
- * 全屏看图。Esc 关、点背景也关。
- *
- * 键盘监听挂在 `window` 而不是这个节点上：点开之后焦点还在输入框里，
- * 挂在节点上的话按 Esc 根本收不到。
+ * 全屏看图。它是真正的模态：打开后焦点进来、Tab 不穿透，关闭回到缩略图。
  */
-function Lightbox({ path, onClose }: { path: string; onClose: () => void }): React.JSX.Element {
+export function ImageLightbox({ path, onClose }: {
+  path: string
+  onClose: () => void
+}): React.JSX.Element {
   const full = useThumb(path, FULL_PX)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== "Escape") return
-      // 挡住：不然这一下会穿透到输入框那层，把命令面板一起关了
-      e.stopPropagation()
-      onClose()
-    }
-    window.addEventListener("keydown", onKey, { capture: true })
-    return () => {
-      window.removeEventListener("keydown", onKey, { capture: true })
-    }
-  }, [onClose])
+  const box = useModalKeys(onClose, true)
 
   return (
     <div
+      ref={box}
       className="lightbox"
-      role="presentation"
-      onClick={() => {
-        onClose()
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`图片预览：${baseName(path)}`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
       }}
     >
-      {full.state === "loading" ? <span className="lightbox__miss">正在打开…</span> : null}
-      {full.state === "miss" ? <span className="lightbox__miss">这张图打不开了：{path}</span> : null}
-      {full.state === "ok" ? <img src={full.url} alt={nameOf(path)} /> : null}
+      <button type="button" className="lightbox__close" aria-label="关闭图片预览" onClick={onClose}>×</button>
+      {full.state === "loading" ? <span className="lightbox__miss" role="status">正在打开…</span> : null}
+      {full.state === "miss" ? <span className="lightbox__miss" role="alert">这张图打不开了：{path}</span> : null}
+      {full.state === "ok" ? <img src={full.url} alt={baseName(path)} /> : null}
     </div>
   )
 }

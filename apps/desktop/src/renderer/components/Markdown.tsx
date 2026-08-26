@@ -23,10 +23,15 @@ import { ExternalLink } from "./external-link.js"
 /** 宽表格由外层容器滚动——给 table 自己加 overflow 会拆散 thead/tbody。 */
 function Table({ children }: { children?: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="md__scroll">
+    <div className="md__scroll" tabIndex={0} aria-label="可横向滚动的表格">
       <table>{children}</table>
     </div>
   )
+}
+
+/** 代码块保留行结构并横向滚动，因此本身必须能从键盘进入。 */
+function Pre({ children }: { children?: React.ReactNode }): React.JSX.Element {
+  return <pre tabIndex={0}>{children}</pre>
 }
 
 /*
@@ -41,7 +46,7 @@ const REMARK = [remarkGfm]
 // 所以加它不违反上面那条红线：结构上仍然不存在注入面。见 `highlight.ts`。
 const REHYPE = [rehypeHighlight]
 const REHYPE_NONE: [] = []
-const COMPONENTS = { a: ExternalLink, table: Table }
+const COMPONENTS = { a: ExternalLink, pre: Pre, table: Table }
 
 /**
  * @param streaming 这段文字还在流。**流式期间不跑语法高亮**，两个原因：
