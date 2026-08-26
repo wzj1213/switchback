@@ -1,10 +1,8 @@
-import { useState, type ReactNode } from "react"
+import type { ReactNode } from "react"
 import type { Item } from "@omni/protocol"
 import { textOf } from "../export.js"
-import { CopyIcon } from "./icons.js"
-
-/** 复制成功后的提示时长。够看见，又不至于让人等它消失。 */
-const FLASH_MS = 1200
+import { copyFeedbackLabel, copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
+import { CheckIcon, CopyIcon } from "./icons.js"
 
 /**
  * 给一条消息挂一个悬停才出现的复制按钮。
@@ -18,12 +16,12 @@ export function Copyable({
   extra,
 }: {
   item: Item
-  onCopy: (text: string) => void
+  onCopy: (text: string) => unknown
   children: ReactNode
   /** 同一条动作栏里再挂几颗（「改一改再发」走这里）。 */
   extra?: ReactNode
 }): React.JSX.Element {
-  const [done, setDone] = useState(false)
+  const [feedback, copy] = useCopyFeedback(() => onCopy(textOf(item)))
   if (item.kind === "approval") return <>{children}</>
   return (
     <div className="copyable">
@@ -39,17 +37,13 @@ export function Copyable({
         <button
           className="act"
           type="button"
-          title="复制这条内容"
-          onClick={() => {
-            onCopy(textOf(item))
-            setDone(true)
-            setTimeout(() => {
-              setDone(false)
-            }, FLASH_MS)
-          }}
+          aria-live="polite"
+          data-state={feedback}
+          title={copyFeedbackTitle(feedback, "复制这条内容")}
+          onClick={copy}
         >
-          <CopyIcon size={11} />
-          {done ? "已复制" : "复制"}
+          {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+          {copyFeedbackLabel(feedback)}
         </button>
         {extra}
       </div>

@@ -13,6 +13,10 @@ describe("后台活动的可滚动原文", () => {
 
     expect(command).toContain('tabindex="0"')
     expect(command).toContain('aria-label="可横向滚动的后台命令"')
+    expect(command).toContain('data-state="idle"')
+    expect(command).toContain('class="lane-cmd-block__toolbar"')
+    expect(command).toContain('aria-live="polite"')
+    expect(command).toContain('title="复制后台命令"')
     expect(output).toContain('tabindex="0"')
     expect(output).toContain('aria-label="可滚动的后台输出"')
   })

@@ -1,4 +1,5 @@
-import { CopyIcon } from "./icons.js"
+import { copyFeedbackLabel, copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
+import { CheckIcon, CopyIcon } from "./icons.js"
 
 /**
  * 一条后台旁路的**命令原文**与**输出片段**——两者都是引擎自己报的，这里只负责画。
@@ -19,13 +20,18 @@ export function LaneCommandLine({ command }: { command: string }): React.JSX.Ele
 
 export function LaneCommandBlock({ command, onCopy }: {
   command: string
-  onCopy: (text: string) => void
+  onCopy: (text: string) => unknown
 }): React.JSX.Element {
+  const [feedback, copy] = useCopyFeedback(() => onCopy(command))
   return (
     <div className="lane-cmd-block">
-      <button type="button" className="lane-cmd-block__copy" onClick={() => { onCopy(command) }}>
-        <CopyIcon size={11} /> 复制
-      </button>
+      <div className="lane-cmd-block__toolbar">
+        <button type="button" className="lane-cmd-block__copy" aria-live="polite"
+          data-state={feedback} title={copyFeedbackTitle(feedback, "复制后台命令")} onClick={copy}>
+          {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+          {copyFeedbackLabel(feedback)}
+        </button>
+      </div>
       <pre tabIndex={0} aria-label="可横向滚动的后台命令"><code>{command}</code></pre>
     </div>
   )

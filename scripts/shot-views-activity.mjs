@@ -31,12 +31,16 @@ export const ACTIVITY_VIEWS = [
     ready: ".activity-detail",
     assert: `(() => {
       const command = document.querySelector('.lane-cmd-block pre')
+      const commandToolbar = document.querySelector('.lane-cmd-block__toolbar')
       const output = document.querySelector('.lane-output')
-      if (command === null || output === null) return false
+      if (command === null || commandToolbar === null || output === null) return false
+      const commandBox = command.getBoundingClientRect()
+      const toolbarBox = commandToolbar.getBoundingClientRect()
       const result = {
         commandOverflows: command.scrollWidth > command.clientWidth,
         commandFocusable: command.tabIndex === 0,
         commandLabelled: command.getAttribute('aria-label') === '可横向滚动的后台命令',
+        commandSeparated: commandBox.top >= toolbarBox.bottom,
         outputOverflows: output.scrollHeight > output.clientHeight,
         outputFocusable: output.tabIndex === 0,
         outputLabelled: output.getAttribute('aria-label') === '可滚动的后台输出',
@@ -67,6 +71,18 @@ export const ACTIVITY_VIEWS = [
       throw new Error('后台活动键盘滚动诊断：' + JSON.stringify(result))
     })()`,
     after: `delete window.__omniMainWidth; delete window.__omniResumeInline`,
+  },
+  {
+    name: "06-后台命令复制有确认",
+    open: `(() => {
+      const button = document.querySelector('.lane-cmd-block__copy')
+      button?.focus(); button?.click()
+    })()`,
+    ready: ".lane-cmd-block__copy",
+    assert: `document.querySelector('.lane-cmd-block__copy')?.getAttribute('data-state') === 'copied'
+      && document.querySelector('.lane-cmd-block__copy')?.textContent.includes('已复制') === true
+      && document.querySelector('.lane-cmd-block__copy')?.getAttribute('title') === '内容已复制'
+      && document.activeElement?.classList.contains('lane-cmd-block__copy') === true`,
   },
   {
     name: "06-工作台展开",

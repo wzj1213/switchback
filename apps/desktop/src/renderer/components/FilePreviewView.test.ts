@@ -8,7 +8,6 @@ import {
   fileCopyTitle,
   htmlTabDestination,
   HtmlPreview,
-  resolveCopyFeedback,
   resolvedHtmlMode,
 } from "./file-preview-content.js"
 
@@ -192,18 +191,6 @@ describe("文件复制反馈", () => {
     it(`截断=${String(truncated)} · 状态=${feedback}`, () => {
       expect(fileCopyLabel(truncated, feedback)).toBe(label)
       expect(fileCopyTitle(truncated, feedback)).toBe(title)
-    })
-  }
-
-  const outcomes = [
-    ["主进程确认", () => Promise.resolve(true), "copied"],
-    ["主进程拒绝", () => Promise.resolve(false), "failed"],
-    ["通道异常", () => Promise.reject(new Error("ipc failed")), "failed"],
-    ["旧同步调用", () => undefined, "copied"],
-  ] as const
-  for (const [name, copy, expected] of outcomes) {
-    it(name, async () => {
-      await expect(resolveCopyFeedback(copy)).resolves.toBe(expected)
     })
   }
 })

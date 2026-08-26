@@ -182,16 +182,21 @@
 }
 
 .lane-cmd-block {
-  position: relative;
   margin: var(--sp-2) 0;
   border-radius: var(--radius-sm);
   background: var(--bg-code);
 }
 
+.lane-cmd-block__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 4px 0;
+}
+
 .lane-cmd-block pre {
   margin: 0;
   overflow-x: auto;
-  padding: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-code);
@@ -200,9 +205,6 @@
 }
 
 .lane-cmd-block__copy {
-  position: absolute;
-  top: 4px;
-  right: 4px;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
@@ -215,13 +217,6 @@
   font: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
-  opacity: 0;
-}
-
-.lane-cmd-block:hover .lane-cmd-block__copy,
-.lane-cmd-block:focus-within .lane-cmd-block__copy,
-.lane-cmd-block__copy:focus-visible {
-  opacity: 1;
 }
 
 .lane-cmd-block__copy:focus-visible {
@@ -231,6 +226,11 @@
 
 .lane-cmd-block__copy:hover {
   color: var(--text);
+}
+
+.lane-cmd-block__copy[data-state="failed"] {
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-raised));
+  color: var(--danger);
 }
 
 /* 输出是引擎给的一截尾巴：等宽、可换行、超高就自己滚，别把整页撑长 */

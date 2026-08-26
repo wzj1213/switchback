@@ -1,10 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { useId, useRef, useState } from "react"
 import type { FilePreview } from "../../shared/file-preview.js"
 import { sandboxHtml } from "../safe-html.js"
+import { useCopyFeedback, type CopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
 
-const COPY_FLASH_MS = 1200
-type CopyFeedback = "idle" | "copied" | "failed"
 type CopyText = (text: string) => unknown
 
 export function fileCopyLabel(truncated: boolean, feedback: CopyFeedback): string {
@@ -20,36 +19,6 @@ export function fileCopyTitle(truncated: boolean, feedback: CopyFeedback): strin
   return truncated ? "只复制当前显示的前 1.5 MB" : "复制文件内容"
 }
 
-export async function resolveCopyFeedback(copy: () => unknown): Promise<CopyFeedback> {
-  try {
-    return (await copy()) === false ? "failed" : "copied"
-  } catch {
-    return "failed"
-  }
-}
-
-function useCopyFeedback(onCopy: CopyText, text: string): [CopyFeedback, () => void] {
-  const [feedback, setFeedback] = useState<CopyFeedback>("idle")
-  const [revision, setRevision] = useState(0)
-  const latest = useRef(0)
-  useEffect(() => {
-    if (feedback === "idle") return undefined
-    const timer = window.setTimeout(() => { setFeedback("idle") }, COPY_FLASH_MS)
-    return () => { window.clearTimeout(timer) }
-  }, [feedback, revision])
-  useEffect(() => () => { latest.current += 1 }, [])
-  const copy = (): void => {
-    const attempt = latest.current + 1
-    latest.current = attempt
-    void resolveCopyFeedback(() => onCopy(text)).then((next) => {
-      if (latest.current !== attempt) return
-      setFeedback(next)
-      setRevision((before) => before + 1)
-    })
-  }
-  return [feedback, copy]
-}
-
 function Source({
   file,
   onCopy,
@@ -57,7 +26,7 @@ function Source({
   file: Extract<FilePreview, { kind: "text" | "html" }>
   onCopy: CopyText
 }): React.JSX.Element {
-  const [feedback, copy] = useCopyFeedback(onCopy, file.text)
+  const [feedback, copy] = useCopyFeedback(() => onCopy(file.text))
   return (
     <div className="file-source" tabIndex={0} aria-label="可横向滚动的文件源码">
       {file.truncated ? <p className="file-preview__note">文件较大，只显示前 1.5 MB。</p> : null}
