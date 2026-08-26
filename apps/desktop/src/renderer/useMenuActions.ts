@@ -12,6 +12,12 @@ export interface MenuHandlers {
   settings: () => void
 }
 
+export function isReviewKey(
+  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey">,
+): boolean {
+  return event.shiftKey && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r"
+}
+
 /**
  * 把菜单发来的意图接到具体动作上。
  *
@@ -39,8 +45,20 @@ export function useMenuActions(
       "filter-threads": filterThreads,
       settings,
     }
-    return onMenu((action) => {
+    const off = onMenu((action) => {
       table[action]?.()
     })
+    // 菜单 accelerator 是主入口；renderer 再接同一组合键，让隐藏菜单或 CDP
+    // 驱动的窗口也能打开审核。动作是幂等的，主进程同时送达时不会反向关掉面板。
+    const onKey = (event: KeyboardEvent): void => {
+      if (!isReviewKey(event)) return
+      event.preventDefault()
+      review()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => {
+      off()
+      window.removeEventListener("keydown", onKey)
+    }
   }, [onMenu, ...deps])
 }

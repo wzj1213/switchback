@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Item, ToolCallItem } from "@omni/protocol"
 import type { ReviewFile } from "../shared/review.js"
-import { reconcileChanges, reportedChangesOf } from "./changes.js"
+import { changeEvidenceOf, reconcileChanges, reportedChangesOf } from "./changes.js"
 
 const edit = (o: {
   id: string
@@ -26,6 +26,17 @@ const edit = (o: {
 })
 
 describe("变更汇总", () => {
+  it("按开场树、HEAD 与引擎记录区分证据来源", () => {
+    const cases = [
+      [{ baseline: true, failed: false, noRepo: false, settled: true }, "baseline"],
+      [{ baseline: false, failed: false, noRepo: false, settled: true }, "head"],
+      [{ baseline: false, failed: false, noRepo: false, settled: false }, "reported"],
+      [{ baseline: false, failed: false, noRepo: true, settled: true }, "reported"],
+      [{ baseline: true, failed: true, noRepo: false, settled: true }, "reported"],
+    ] as const
+    for (const [state, evidence] of cases) expect(changeEvidenceOf(state)).toBe(evidence)
+  })
+
   it("同一个文件改三次仍算一个，但降级数字只留最后一次、绝不累加", () => {
     const out = reportedChangesOf(
       [
@@ -127,6 +138,14 @@ describe("用 git 当前状态校正", () => {
   it("后来改回原样的文件从 git 清单消失，卡片也不再展示", () => {
     const out = reconcileChanges(reports, [review("/w/y.ts", 2, 1)], "/w")
     expect(out.list.map((file) => file.path)).toEqual(["/w/y.ts"])
+  })
+
+  it("旧会话虽无开场基线，也用成功的 HEAD 查询淘汰已经干净的旧上报", () => {
+    const old = reportedChangesOf(
+      [edit({ id: "old", path: "/w/x.ts", added: 116, removed: 0 })],
+      "/w",
+    )
+    expect(reconcileChanges(old, [], "/w")).toEqual({ files: 0, added: 0, removed: 0, list: [] })
   })
 
   it("Git 忽略的上报文件保留最后一次编辑，并明确标成无法核实", () => {

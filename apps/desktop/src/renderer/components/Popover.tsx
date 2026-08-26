@@ -131,7 +131,9 @@ export function Popover({
     setAt(place(anchor, panel.current))
   }, [open, anchor, point, children])
 
-  useEffect(() => {
+  // 和位置一起在绘制前完成：菜单一旦可见，键盘落点也必须已经在里面。
+  // 普通 effect 会留出一帧“菜单出现了、焦点还在旧控件”的竞态。
+  useLayoutEffect(() => {
     if (!open || at === undefined || panel.current === null) return
     focusPanel(panel.current)
   }, [open, at])

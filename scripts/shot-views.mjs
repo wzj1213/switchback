@@ -33,7 +33,7 @@ export const VIEWS = [
         }, 180)
       })()`,
       ready: `html[data-pet-ground]`,
-      assert: `document.documentElement.dataset.petGround === 'true'`,
+      assert: `document.documentElement.dataset.petGround === 'true' && document.querySelector('.changed') === null`,
       after: `delete document.documentElement.dataset.petGround`,
     },
     {
@@ -45,7 +45,7 @@ export const VIEWS = [
     },
     {
       name: "04-Git审核",
-      open: `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === '审核')?.click()`,
+      open: [], shortcut: { key: "r", code: "KeyR", modifiers: 12, windowsVirtualKeyCode: 82 },
       ready: ".rv .rvd__body",
       assert: `document.querySelector('.rv__file') !== null
         && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')

@@ -130,6 +130,11 @@ async function shoot(cdp, view) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
   }
   if (view.open !== null) {
+    if (view.shortcut !== undefined) {
+      await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", ...view.shortcut })
+      await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...view.shortcut })
+      await pause(350)
+    }
     for (const step of [view.open].flat()) {
       await value(cdp, `(() => { ${step}; return true })()`)
       await pause(350)

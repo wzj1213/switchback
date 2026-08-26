@@ -1,8 +1,11 @@
+import type { ChangeEvidence } from "../changes.js"
 import { ChevronIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 
-function label(files: number, others: number, failed: boolean): string {
+function label(files: number, others: number, failed: boolean, evidence: ChangeEvidence): string {
   if (failed) return "无法核实文件改动"
+  if (evidence === "reported") return `编辑记录 ${String(files)} 个文件`
+  if (evidence === "head") return `相关文件 ${String(files)} 个仍有改动`
   return files > 0 ? `已编辑 ${String(files)} 个文件` : `检测到 ${String(others)} 个额外变动`
 }
 
@@ -17,12 +20,21 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
   )
 }
 
-export function ChangedHead({ files, others, added, removed, failed, open, onOpen, onReview }: {
+function detail(evidence: ChangeEvidence, added: number, removed: number): React.JSX.Element | string {
+  if (evidence === "reported") return "未核实当前净值"
+  if (evidence === "head") return (
+    <><span>相对 HEAD</span>{added > 0 || removed > 0 ? <Stat added={added} removed={removed} /> : null}</>
+  )
+  return added > 0 || removed > 0 ? <Stat added={added} removed={removed} /> : "展开查看路径"
+}
+
+export function ChangedHead({ files, others, added, removed, failed, evidence, open, onOpen, onReview }: {
   files: number
   others: number
   added: number
   removed: number
   failed: boolean
+  evidence: ChangeEvidence
   open: boolean
   onOpen: () => void
   onReview: () => void
@@ -32,11 +44,9 @@ export function ChangedHead({ files, others, added, removed, failed, open, onOpe
       <button type="button" className="changed__summary" aria-expanded={open} onClick={onOpen}>
         <span className="changed__glyph"><PencilIcon size={14} /></span>
         <span className="changed__copy">
-          <span className="changed__title">{label(files, others, failed)}</span>
+          <span className="changed__title">{label(files, others, failed, evidence)}</span>
           <span className="changed__total">
-            {failed ? "请展开查看原因" : files > 0 && (added > 0 || removed > 0)
-              ? <Stat added={added} removed={removed} />
-              : "展开查看路径"}
+            {failed ? "请展开查看原因" : detail(evidence, added, removed)}
           </span>
         </span>
         <span className="changed__chev"><ChevronIcon open={open} size={12} /></span>

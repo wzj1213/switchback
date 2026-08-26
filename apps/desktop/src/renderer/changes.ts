@@ -8,6 +8,24 @@ export interface Changes {
   list: readonly ChangedFile[]
 }
 
+export type ChangeEvidence = "baseline" | "head" | "reported"
+
+/**
+ * 变更卡当前能依据什么下结论。
+ *
+ * 旧会话没有开场树，但一次成功的 Git 查询仍能回答「上报路径现在相对 HEAD 脏不脏」；
+ * 它不能归因到本次对话，却足以让已经恢复干净的旧记录消失。
+ */
+export function changeEvidenceOf(state: {
+  baseline: boolean
+  failed: boolean
+  noRepo: boolean
+  settled: boolean
+}): ChangeEvidence {
+  if (state.failed || state.noRepo || !state.settled) return "reported"
+  return state.baseline ? "baseline" : "head"
+}
+
 /** 会话里触达过的文件。`review` 有值时，数字与补丁都以 git 当前状态为准。 */
 export interface ChangedFile {
   path: string

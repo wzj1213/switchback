@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { ReviewFile } from "../../shared/review.js"
-import { reconcileChanges, reportedChangesOf } from "../changes.js"
+import { changeEvidenceOf, reconcileChanges, reportedChangesOf } from "../changes.js"
 import { useReview } from "../review.js"
 import { ChangedOthers, CHANGED_PREVIEW } from "./changed-others.js"
 import { ChangedRow } from "./ChangedRow.js"
@@ -54,24 +54,27 @@ export function Changed({
     threadId,
     wanted: reported.list.map((file) => file.path),
   })
-  const verified = review.baseline && !review.failed
-  const { files, added, removed, list } = !verified
-    ? reported
-    : reconcileChanges(reported, review.files, review.root, {
+  const evidence = changeEvidenceOf(review)
+  const gitKnown = evidence !== "reported"
+  const { files, added, removed, list } = gitKnown
+    ? reconcileChanges(reported, review.files, review.root, {
         reported: cwd,
         real: review.cwd,
         ...(review.ignored === undefined ? {} : { ignored: review.ignored }),
       })
+    : reported
   // **默认收起。** 它现在钉在输入框上方那一行里，和计划那枚药丸并排——
   // 一进来就摊开一张卡的话，那一行就又变回了上一版那条通栏带子
   const [open, setOpen] = useState(false)
   const [all, setAll] = useState(false)
   const mine = new Set(list.flatMap((file) => file.review?.rel ?? []))
   const minePaths = new Set(list.map((file) => file.path))
-  const others = verified
+  const others = evidence === "baseline"
     ? review.files.filter((file) => !mine.has(file.rel) && !minePaths.has(file.path))
     : []
-  const othersTotal = others.length + (review.more ?? 0)
+  // `more` 是整个 Git 查询被截断的余量；只有开场基线能把它归到这次对话。
+  // HEAD 回退若带进来，会把仓库里无关的海量脏文件重新画成历史会话改动。
+  const othersTotal = evidence === "baseline" ? others.length + (review.more ?? 0) : 0
   if (
     shouldHide({
       loading: review.loading,
@@ -92,6 +95,7 @@ export function Changed({
           added={added}
           removed={removed}
           failed={review.failed}
+          evidence={evidence}
           open={open}
           onOpen={() => {
             setOpen((was) => !was)
