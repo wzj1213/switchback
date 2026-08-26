@@ -13,6 +13,10 @@ type Load = { state: "loading" } | {
 }
 const LOADING: Load = { state: "loading" }
 
+export function canRevealPreview(file: FilePreview | undefined, path: string): boolean {
+  return path !== "" && !(file?.kind === "unavailable" && file.reason === "missing")
+}
+
 function identityOf(target: PreviewTarget): string {
   return `${target.threadId}\u0000${target.cwd}\u0000${target.path}`
 }
@@ -119,6 +123,7 @@ export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: 
   const load = usePreview(target, revision, manual)
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
+  const revealable = canRevealPreview(load.state === "ready" ? load.file : undefined, path)
   return (
     <div className="file-preview">
       <header className="file-preview__head">
@@ -135,10 +140,12 @@ export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: 
             onClick={() => { setManual((before) => before + 1) }}>
             <ReloadIcon />
           </button>
-          <button type="button" className="workbench__icon" title="在访达中显示"
-            aria-label="在访达中显示" onClick={() => { onReveal(path) }}>
-            <RevealIcon size={12} />
-          </button>
+          {revealable ? (
+            <button type="button" className="workbench__icon" title="在访达中显示"
+              aria-label="在访达中显示" onClick={() => { onReveal(path) }}>
+              <RevealIcon size={12} />
+            </button>
+          ) : null}
         </span>
       </header>
       <div className="file-preview__body">

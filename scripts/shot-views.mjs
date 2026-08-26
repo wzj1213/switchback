@@ -41,13 +41,27 @@ export const VIEWS = [
       assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')`,
     },
     {
-      name: "05-文件搜索",
-      open: `(() => {
+      name: "05-缺失文件可恢复",
+      open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('missing-output.txt'))?.click()`,
+      ready: ".file-preview .workbench__empty",
+      assert: `(() => {
+        const preview = document.querySelector('.file-preview')
+        return preview?.textContent.includes('文件已经不存在') === true
+          && preview.querySelector('[aria-label="重新读取文件"]') !== null
+          && preview.querySelector('[aria-label="在访达中显示"]') === null
+      })()`,
+    },
+    {
+      name: "06-文件搜索",
+      open: [
+        `document.querySelector('.workbench__back')?.click()`,
+        `(() => {
         const input = document.querySelector('.files-search input')
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
         setter?.call(input, 'attachment')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
       })()`,
+      ],
       ready: ".file-row",
       assert: `[...document.querySelectorAll('.file-row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
       after: `document.querySelector('.files-search input')?.dispatchEvent(
@@ -55,12 +69,12 @@ export const VIEWS = [
       )`,
     },
     {
-      name: "06-工作区外文件预览",
+      name: "07-工作区外文件预览",
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
       ready: ".file-source",
     },
     {
-      name: "07-HTML预览",
+      name: "08-HTML预览",
       open: [
         `document.querySelector('.workbench__back')?.click()`,
         `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
@@ -68,14 +82,14 @@ export const VIEWS = [
       ready: ".html-preview__frame",
     },
     {
-      name: "08-新会话",
+      name: "09-新会话",
       open: `document.querySelector('.sidebar__new')?.click()`,
       ready: ".blank__title",
       // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
       absent: ".file-preview",
     },
     {
-      name: "09-@文件引用",
+      name: "10-@文件引用",
       open: [
         `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
         `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
@@ -98,14 +112,14 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "10-推理强度",
+      name: "11-推理强度",
       before: ".effort .trigger:not(:disabled)",
       open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
       ready: ".effort__bar--grown",
       dragEffort: true,
     },
     {
-      name: "11-设置",
+      name: "12-设置",
       // 有账号时侧栏底部先开菜单，没账号时直接进设置；固定样本走前者。
       open: [
         `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,

@@ -35,6 +35,10 @@ describe("文件预览边界", () => {
         kind: "unavailable",
         reason: "binary",
       })
+      await expect(previewFile(req(root, "gone.txt"), nothing)).resolves.toMatchObject({
+        kind: "unavailable",
+        reason: "missing",
+      })
     } finally {
       await rm(root, { recursive: true, force: true })
       await rm(outside, { recursive: true, force: true })
