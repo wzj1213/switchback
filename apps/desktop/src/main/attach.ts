@@ -8,9 +8,9 @@ import {
   MAX_IMAGE_BYTES,
   type PickedImages,
 } from "../shared/attachments.js"
-import type { AttachmentFiles } from "./attachment-files.js"
+import { thumbnailSize, type AttachmentFiles } from "./attachment-files.js"
 
-async function pickImages(): Promise<PickedImages> {
+async function pickImages(files: AttachmentFiles): Promise<PickedImages> {
   const result = await dialog.showOpenDialog({
     title: "添加图片",
     properties: ["openFile", "multiSelections"],
@@ -22,6 +22,7 @@ async function pickImages(): Promise<PickedImages> {
     return info?.isFile() === true && canAttachImagePath(path, info.size)
   }))
   const paths = result.filePaths.filter((_path, index) => accepted[index] === true)
+  files.allow(paths)
   return { paths, rejected: result.filePaths.length - paths.length, canceled: false }
 }
 
@@ -41,7 +42,7 @@ async function pickImages(): Promise<PickedImages> {
  * 而会话记录里的路径会指向一个不存在的文件——那比没有更糟。
  */
 export function installAttachChannel(files: AttachmentFiles): void {
-  ipcMain.handle("omni:pickImages", () => pickImages())
+  ipcMain.handle("omni:pickImages", () => pickImages(files))
   ipcMain.handle("omni:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
     const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined
@@ -57,7 +58,17 @@ export function installAttachChannel(files: AttachmentFiles): void {
     if (!Array.isArray(paths)) return
     void files.discard(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
   })
-  ipcMain.handle("omni:thumb", (_e, req: { path: string; max: number }) => thumb(req.path, req.max))
+  ipcMain.on("omni:allowAttachmentPaths", (_e, paths: unknown) => {
+    if (!Array.isArray(paths)) return
+    files.allow(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
+  })
+  ipcMain.handle("omni:thumb", (_e, req: unknown) => {
+    if (typeof req !== "object" || req === null) return undefined
+    const { path, max } = req as { path?: unknown; max?: unknown }
+    const size = thumbnailSize(max)
+    if (typeof path !== "string" || size === undefined || !files.allows(path)) return undefined
+    return thumb(path, size)
+  })
 }
 
 /**
@@ -66,8 +77,8 @@ export function installAttachChannel(files: AttachmentFiles): void {
  * ## 为什么不让渲染层直接 `<img src="file://…">`
  *
  * CSP 是 `img-src 'self' data:`——`file:` 被挡着。而放宽 CSP 为了显示缩略图，
- * 等于让渲染层能引用**盘上任意路径**；这条通道只认调用方给的具体路径，
- * 越权的成本高得多。
+ * 等于让渲染层能引用**盘上任意路径**；这条通道只认本次粘贴、用户亲手挑选/拖入，
+ * 或会话历史真实引用过的路径，并把请求边长封顶在 2048。
  *
  * ## 为什么在主进程缩
  *

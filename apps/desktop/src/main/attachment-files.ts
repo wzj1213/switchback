@@ -1,17 +1,25 @@
 import { readdir, rm, stat } from "node:fs/promises"
-import { dirname, join, resolve } from "node:path"
+import { dirname, isAbsolute, join, resolve } from "node:path"
 import type { Event, ThreadId, TurnId } from "@omni/protocol"
 
 export interface AttachmentFiles {
   dir: string
   note: (event: Event) => void
   noteHistory: (threadId: ThreadId, events: readonly Event[]) => void
+  allow: (paths: readonly string[]) => void
+  allows: (path: string) => boolean
   discard: (paths: readonly string[]) => Promise<number>
   removeThread: (threadId: ThreadId) => Promise<number>
   pruneOnce: (now: number) => Promise<number>
 }
 
 const ORPHAN_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const RECENT_ALLOWED = 1000
+
+export function thumbnailSize(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 1) return undefined
+  return Math.min(2048, Math.floor(value))
+}
 
 function pathsOf(event: Event): readonly string[] {
   if (event.type === "thread.started" || event.type === "thread.updated") {
@@ -28,25 +36,39 @@ interface FileState {
   dir: string
   byThread: Map<ThreadId, Set<string>>
   references: Map<string, Set<ThreadId>>
+  allowed: Map<string, true>
   turns: Map<TurnId, ThreadId>
   pruned: boolean
 }
 
 function managed(state: FileState, path: string): string | undefined {
+  if (!isAbsolute(path)) return undefined
   const target = resolve(path)
   return dirname(target) === state.dir ? target : undefined
 }
 
 function remember(state: FileState, threadId: ThreadId, paths: readonly string[]): void {
   for (const raw of paths) {
-    const path = managed(state, raw)
-    if (path === undefined) continue
+    if (!isAbsolute(raw)) continue
+    const path = resolve(raw)
     const owned = state.byThread.get(threadId) ?? new Set<string>()
     owned.add(path)
     state.byThread.set(threadId, owned)
     const owners = state.references.get(path) ?? new Set<ThreadId>()
     owners.add(threadId)
     state.references.set(path, owners)
+  }
+}
+
+function allow(state: FileState, paths: readonly string[]): void {
+  for (const raw of paths) {
+    if (!isAbsolute(raw)) continue
+    const path = resolve(raw)
+    state.allowed.delete(path)
+    state.allowed.set(path, true)
+    if (state.allowed.size <= RECENT_ALLOWED) continue
+    const oldest = state.allowed.keys().next()
+    if (!oldest.done) state.allowed.delete(oldest.value)
   }
 }
 
@@ -105,7 +127,8 @@ async function pruneOnce(state: FileState, now: number): Promise<number> {
 
 export function createAttachmentFiles(rawDir: string): AttachmentFiles {
   const state: FileState = {
-    dir: resolve(rawDir), byThread: new Map(), references: new Map(), turns: new Map(), pruned: false,
+    dir: resolve(rawDir), byThread: new Map(), references: new Map(), allowed: new Map(),
+    turns: new Map(), pruned: false,
   }
 
   return {
@@ -113,6 +136,12 @@ export function createAttachmentFiles(rawDir: string): AttachmentFiles {
     note: (event) => { note(state, event) },
     noteHistory: (threadId, events) => {
       for (const event of events) remember(state, threadId, pathsOf(event))
+    },
+    allow: (paths) => { allow(state, paths) },
+    allows: (path) => {
+      if (!isAbsolute(path)) return false
+      const target = resolve(path)
+      return managed(state, target) !== undefined || state.references.has(target) || state.allowed.has(target)
     },
     discard: (paths) => erase(state, paths),
     removeThread: (threadId) => removeThread(state, threadId),

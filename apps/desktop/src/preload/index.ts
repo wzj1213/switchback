@@ -169,7 +169,9 @@ const api = {
    * 这条通道**只回一个路径，不读内容**：渲染层拿不到任何遍历文件系统的能力。
    */
   pathForFile(file: File): string {
-    return webUtils.getPathForFile(file)
+    const path = webUtils.getPathForFile(file)
+    if (path !== "") ipcRenderer.send("omni:allowAttachmentPaths", [path])
+    return path
   },
   /**
    * 把盘上的一张图缩到边长 `max` 以内，取回 data URL。取不到（文件没了、
