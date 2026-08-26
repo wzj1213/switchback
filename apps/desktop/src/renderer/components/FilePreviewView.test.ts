@@ -8,6 +8,7 @@ import {
   fileCopyTitle,
   htmlTabDestination,
   HtmlPreview,
+  resolveCopyFeedback,
   resolvedHtmlMode,
 } from "./file-preview-content.js"
 
@@ -181,15 +182,28 @@ describe("HTML 预览模式", () => {
 
 describe("文件复制反馈", () => {
   const cases = [
-    [false, false, "复制", "复制文件内容"],
-    [true, false, "复制显示部分", "只复制当前显示的前 1.5 MB"],
-    [false, true, "已复制", "文件内容已复制"],
-    [true, true, "已复制显示部分", "当前显示的前 1.5 MB 已复制"],
+    [false, "idle", "复制", "复制文件内容"],
+    [true, "idle", "复制显示部分", "只复制当前显示的前 1.5 MB"],
+    [false, "copied", "已复制", "文件内容已复制"],
+    [true, "copied", "已复制显示部分", "当前显示的前 1.5 MB 已复制"],
+    [false, "failed", "复制失败", "复制失败，请重试"],
   ] as const
-  for (const [truncated, copied, label, title] of cases) {
-    it(`截断=${String(truncated)} · 已复制=${String(copied)}`, () => {
-      expect(fileCopyLabel(truncated, copied)).toBe(label)
-      expect(fileCopyTitle(truncated, copied)).toBe(title)
+  for (const [truncated, feedback, label, title] of cases) {
+    it(`截断=${String(truncated)} · 状态=${feedback}`, () => {
+      expect(fileCopyLabel(truncated, feedback)).toBe(label)
+      expect(fileCopyTitle(truncated, feedback)).toBe(title)
+    })
+  }
+
+  const outcomes = [
+    ["主进程确认", () => Promise.resolve(true), "copied"],
+    ["主进程拒绝", () => Promise.resolve(false), "failed"],
+    ["通道异常", () => Promise.reject(new Error("ipc failed")), "failed"],
+    ["旧同步调用", () => undefined, "copied"],
+  ] as const
+  for (const [name, copy, expected] of outcomes) {
+    it(name, async () => {
+      await expect(resolveCopyFeedback(copy)).resolves.toBe(expected)
     })
   }
 })

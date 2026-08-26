@@ -190,8 +190,8 @@ const api = {
   stopFind(): void {
     ipcRenderer.send("omni:stopFind")
   },
-  copy(text: string): void {
-    ipcRenderer.send("omni:copy", text)
+  async copy(text: string): Promise<boolean> {
+    return (await ipcRenderer.invoke("omni:copy", text)) === true
   },
   /**
    * 在访达里定位一个路径。

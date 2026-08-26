@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron"
+import { app, dialog, ipcMain, shell, type BrowserWindow } from "electron"
 import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Ledger, Sealed } from "@omni/wire"
 import { createHost, type Host, type HostDeps } from "@omni/host"
@@ -22,6 +22,7 @@ import { createEngineCatalog } from "./engine-catalog.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached } from "./attached.js"
 import type { WorksiteSearch } from "./worksite-search.js"
+import { installClipboardChannel } from "./system-clipboard.js"
 
 export type { Attached } from "./attached.js"
 
@@ -40,6 +41,7 @@ interface Channels {
  * 都是**窄到只能做一件事**的通道，不是把 fs 或 ipcRenderer 交出去。
  */
 function installBridgeChannels(deps: Channels): void {
+  installClipboardChannel(deps.log)
   // 目录选择必须在主进程弹：渲染层没有、也不该有触碰文件系统的能力。
   // 回给渲染层的只是一个用户亲手选中的路径。
   ipcMain.handle("omni:pickFolder", async () => {
@@ -48,12 +50,6 @@ function installBridgeChannels(deps: Channels): void {
       title: "选择工作区",
     })
     return result.canceled ? undefined : result.filePaths[0]
-  })
-
-  // 剪贴板走主进程：渲染层加载的是 file://，那里的 navigator.clipboard
-  // 不算安全上下文，写入会被静默拒绝
-  ipcMain.on("omni:copy", (_e, text: string) => {
-    clipboard.writeText(text)
   })
 
   // 只定位不打开：`showItemInFolder` 在访达里选中它，不会执行任何东西

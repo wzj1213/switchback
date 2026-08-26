@@ -65,6 +65,11 @@
   color: var(--text);
 }
 
+.file-preview__copy[data-state="failed"] {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+  color: var(--danger);
+}
+
 .file-preview__note {
   margin: 0;
   padding: var(--sp-2) var(--sp-4);

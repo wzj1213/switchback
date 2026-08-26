@@ -26,8 +26,8 @@ export interface Omni {
   /** 页内查找。桥没接上时永远是 0/0。 */
   find: (query: string, next: boolean, forward: boolean) => Promise<{ active: number; total: number }>
   stopFind: () => void
-  /** 写系统剪贴板 */
-  copy: (text: string) => void
+  /** 写系统剪贴板；只有主进程完成系统调用才回 true。 */
+  copy: (text: string) => Promise<boolean>
   /** 在访达里定位一个路径。只定位，不打开。 */
   reveal: (path: string) => void
   /** 工作区内的文件模糊搜索，给 `@` 用 */
@@ -47,6 +47,14 @@ export interface Omni {
 }
 
 const NOOP_VIEWING = (): void => undefined
+
+async function copyText(bridge: typeof window.omni | undefined, text: string): Promise<boolean> {
+  try {
+    return (await bridge?.copy(text)) ?? false
+  } catch {
+    return false
+  }
+}
 
 /**
  * 订阅主进程的事件流，用 `@omni/store` 的归约器维护视图状态。
@@ -153,9 +161,7 @@ export function useOmni(): Omni {
   }, [bridge])
 
   const copy = useCallback(
-    (text: string) => {
-      bridge?.copy(text)
-    },
+    (text: string) => copyText(bridge, text),
     [bridge],
   )
 

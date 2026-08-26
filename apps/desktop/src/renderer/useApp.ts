@@ -62,7 +62,7 @@ export interface AppApi {
   prefs: SettingsApi
   bridgeMissing: boolean
   send: (command: Command) => void
-  copy: (text: string) => void
+  copy: (text: string) => Promise<boolean>
   reveal: (path: string) => void
   find: (
     query: string,

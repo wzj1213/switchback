@@ -4,15 +4,50 @@ import { sandboxHtml } from "../safe-html.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
 
 const COPY_FLASH_MS = 1200
+type CopyFeedback = "idle" | "copied" | "failed"
+type CopyText = (text: string) => unknown
 
-export function fileCopyLabel(truncated: boolean, copied: boolean): string {
-  if (copied) return truncated ? "已复制显示部分" : "已复制"
+export function fileCopyLabel(truncated: boolean, feedback: CopyFeedback): string {
+  if (feedback === "failed") return "复制失败"
+  if (feedback === "copied") return truncated ? "已复制显示部分" : "已复制"
   return truncated ? "复制显示部分" : "复制"
 }
 
-export function fileCopyTitle(truncated: boolean, copied: boolean): string {
-  if (copied) return truncated ? "当前显示的前 1.5 MB 已复制" : "文件内容已复制"
+export function fileCopyTitle(truncated: boolean, feedback: CopyFeedback): string {
+  if (feedback === "failed") return "复制失败，请重试"
+  if (feedback === "copied")
+    return truncated ? "当前显示的前 1.5 MB 已复制" : "文件内容已复制"
   return truncated ? "只复制当前显示的前 1.5 MB" : "复制文件内容"
+}
+
+export async function resolveCopyFeedback(copy: () => unknown): Promise<CopyFeedback> {
+  try {
+    return (await copy()) === false ? "failed" : "copied"
+  } catch {
+    return "failed"
+  }
+}
+
+function useCopyFeedback(onCopy: CopyText, text: string): [CopyFeedback, () => void] {
+  const [feedback, setFeedback] = useState<CopyFeedback>("idle")
+  const [revision, setRevision] = useState(0)
+  const latest = useRef(0)
+  useEffect(() => {
+    if (feedback === "idle") return undefined
+    const timer = window.setTimeout(() => { setFeedback("idle") }, COPY_FLASH_MS)
+    return () => { window.clearTimeout(timer) }
+  }, [feedback, revision])
+  useEffect(() => () => { latest.current += 1 }, [])
+  const copy = (): void => {
+    const attempt = latest.current + 1
+    latest.current = attempt
+    void resolveCopyFeedback(() => onCopy(text)).then((next) => {
+      if (latest.current !== attempt) return
+      setFeedback(next)
+      setRevision((before) => before + 1)
+    })
+  }
+  return [feedback, copy]
 }
 
 function Source({
@@ -20,15 +55,9 @@ function Source({
   onCopy,
 }: {
   file: Extract<FilePreview, { kind: "text" | "html" }>
-  onCopy: (text: string) => void
+  onCopy: CopyText
 }): React.JSX.Element {
-  const [copy, setCopy] = useState(0)
-  useEffect(() => {
-    if (copy === 0) return undefined
-    const timer = window.setTimeout(() => { setCopy(0) }, COPY_FLASH_MS)
-    return () => { window.clearTimeout(timer) }
-  }, [copy])
-  const copied = copy > 0
+  const [feedback, copy] = useCopyFeedback(onCopy, file.text)
   return (
     <div className="file-source" tabIndex={0} aria-label="可横向滚动的文件源码">
       {file.truncated ? <p className="file-preview__note">文件较大，只显示前 1.5 MB。</p> : null}
@@ -37,14 +66,12 @@ function Source({
           type="button"
           className="file-preview__copy"
           aria-live="polite"
-          title={fileCopyTitle(file.truncated, copied)}
-          onClick={() => {
-            onCopy(file.text)
-            setCopy((before) => before + 1)
-          }}
+          data-state={feedback}
+          title={fileCopyTitle(file.truncated, feedback)}
+          onClick={copy}
         >
-          {copied ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
-          {fileCopyLabel(file.truncated, copied)}
+          {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+          {fileCopyLabel(file.truncated, feedback)}
         </button>
       </div>
       <pre>
@@ -79,7 +106,7 @@ export function HtmlPreview({
   onCopy,
 }: {
   file: Extract<FilePreview, { kind: "html" }>
-  onCopy: (text: string) => void
+  onCopy: CopyText
 }): React.JSX.Element {
   const [picked, setPicked] = useState<HtmlMode>(file.truncated ? "source" : "preview")
   const mode = resolvedHtmlMode(picked, file.truncated)
@@ -152,7 +179,7 @@ export function FilePreviewContent({
   onCopy,
 }: {
   file: FilePreview
-  onCopy: (text: string) => void
+  onCopy: CopyText
 }): React.JSX.Element {
   if (file.kind === "unavailable") return <p className="workbench__empty">{file.message}</p>
   if (file.kind === "image")
