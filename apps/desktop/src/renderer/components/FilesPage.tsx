@@ -1,28 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
-import { fileTouchOf, sessionFileGroupsOf, type SessionFile } from "../session-files.js"
-import { PathRow } from "./file-row.js"
+import { fileTouchOf, sessionFileGroupsOf } from "../session-files.js"
+import { FileGroup } from "./file-group.js"
+import { focusFirstFile, PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
-
-function FileGroup({ title, files, threadId, cwd, onPick }: {
-  title: string
-  files: readonly SessionFile[]
-  threadId: string
-  cwd: string
-  onPick: (target: PreviewTarget) => void
-}): React.JSX.Element | null {
-  if (files.length === 0) return null
-  return (
-    <section>
-      <div className="workbench__section">{title}<span className="workbench__count">{files.length}</span></div>
-      {files.map((file) => (
-        <PathRow key={file.path} path={file.path} cwd={cwd} threadId={threadId}
-          disabled={file.deleted} onPick={onPick} />
-      ))}
-    </section>
-  )
-}
 
 export interface FileSearchState {
   key: string
@@ -110,35 +92,42 @@ function FileIndex({ threadId, cwd, items, hidden, onPick, searchFiles }: {
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
   const input = useRef<HTMLInputElement>(null)
+  const root = useRef<HTMLDivElement>(null)
+  const enterResults = useRef(false)
   const groups = useMemo(() => sessionFileGroupsOf(items, cwd), [items, cwd])
   const found = useFileSearch(cwd, query, searchFiles)
   const searching = query.trim() !== ""
   const recent = groups.recentEdited.length + groups.recentRead.length
   const total = recent + groups.earlier.length + groups.inherited.length
+  useEffect(() => {
+    if (!enterResults.current || found.loading || found.paths.length === 0) return
+    enterResults.current = false
+    if (document.activeElement === input.current) focusFirstFile(root.current)
+  }, [found.loading, found.paths])
   return (
-    <div className="files-index" hidden={hidden} onKeyDown={(event) => {
+    <div ref={root} className="files-index" hidden={hidden} onKeyDown={(event) => {
       if (event.key !== "Escape" || query === "") return
       event.stopPropagation()
+      enterResults.current = false
       setQuery("")
       input.current?.focus()
     }}>
       <label className="files-search">
         <span className="sr-only">搜索工作区文件</span>
         <input ref={input} value={query} placeholder="搜索工作区文件…"
-          onChange={(event) => { setQuery(event.currentTarget.value) }}
+          onChange={(event) => {
+            enterResults.current = false
+            setQuery(event.currentTarget.value)
+          }}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown") {
-              const first = event.currentTarget.closest(".files-index")
-                ?.querySelector<HTMLButtonElement>(".file-row:not(:disabled)")
-              if (first !== undefined && first !== null) {
-                event.preventDefault()
-                first.focus()
-                first.scrollIntoView({ block: "nearest" })
-              }
+              event.preventDefault()
+              enterResults.current = !focusFirstFile(root.current)
               return
             }
             if (event.key !== "Escape" || query === "") return
             event.stopPropagation()
+            enterResults.current = false
             setQuery("")
           }} />
         <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索范围是当前工作区。</span>

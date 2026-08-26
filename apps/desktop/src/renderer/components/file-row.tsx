@@ -41,6 +41,14 @@ export function fileRowDestination(key: string, at: number, total: number): numb
   return Math.min(at + 1, total - 1)
 }
 
+export function focusFirstFile(root: Element | null): boolean {
+  const first = root?.querySelector<HTMLButtonElement>(".file-row:not(:disabled)")
+  if (first === undefined || first === null) return false
+  first.focus()
+  first.scrollIntoView({ block: "nearest" })
+  return true
+}
+
 function moveFocus(event: React.KeyboardEvent<HTMLButtonElement>): void {
   const root = event.currentTarget.closest(".files-index")
   const rows = [...(root?.querySelectorAll<HTMLButtonElement>(".file-row:not(:disabled)") ?? [])]

@@ -127,19 +127,12 @@ export const VIEWS = [
         `(() => {
         const input = document.querySelector('.files-search input')
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        input?.focus()
         setter?.call(input, 'attachment')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
-      })()`,
-        `(() => {
-          const enterResults = () => {
-            const input = document.querySelector('.files-search input')
-            if (document.querySelector('.file-row') !== null) {
-              input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-              return
-            }
-            setTimeout(enterResults, 50)
-          }
-          enterResults()
+        setTimeout(() => input?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+        ), 0)
         })()`,
       ],
       ready: ".file-row",
