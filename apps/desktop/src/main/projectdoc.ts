@@ -1,6 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { ipcMain, shell } from "electron"
+import type { ThreadId } from "@omni/protocol"
+import type { WorksiteSearch } from "./worksite-search.js"
 
 /**
  * 项目说明：一份真源，两家引擎都读得到。
@@ -33,7 +35,16 @@ export interface ProjectDoc {
   linked: boolean
   /** 真源的绝对路径，给「打开」用。 */
   path: string
+  /** 请求不属于一条真实会话时，不碰文件系统，也不画一个假的创建入口。 */
+  denied?: true
 }
+
+interface ProjectDocRequest {
+  threadId: ThreadId
+  cwd: string
+}
+
+export type ProjectDocGuard = (threadId: ThreadId, cwd: string) => boolean
 
 const STARTER = `# 项目说明
 
@@ -54,21 +65,43 @@ const STARTER = `# 项目说明
 - （代码风格、提交信息、命名之类，只写和别处不一样的那些）
 `
 
-export function installProjectDocChannel(): void {
-  ipcMain.handle("omni:projectDoc", async (_e, cwd: string): Promise<ProjectDoc> => read(cwd))
+function requestOf(value: unknown, owns: ProjectDocGuard): ProjectDocRequest | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const req = value as Partial<ProjectDocRequest>
+  if (typeof req.threadId !== "string" || req.threadId === "") return undefined
+  if (typeof req.cwd !== "string" || req.cwd === "") return undefined
+  return owns(req.threadId, req.cwd) ? { threadId: req.threadId, cwd: req.cwd } : undefined
+}
+
+function denied(): ProjectDoc {
+  return { agents: false, claude: false, linked: false, path: "", denied: true }
+}
+
+export async function projectDoc(value: unknown, owns: ProjectDocGuard): Promise<ProjectDoc> {
+  const req = requestOf(value, owns)
+  return req === undefined ? denied() : read(req.cwd)
+}
+
+export async function ensureProjectDoc(value: unknown, owns: ProjectDocGuard): Promise<ProjectDoc> {
+  const req = requestOf(value, owns)
+  if (req === undefined) return denied()
+  const before = await read(req.cwd)
+  if (!before.agents) await writeFile(join(req.cwd, AGENTS), STARTER, "utf8")
+  // 只在「压根没有」时写指路牌。人家自己写过 CLAUDE.md 的话，
+  // 那是他的内容，我们没有资格替他扔掉
+  if (!before.claude) await writeFile(join(req.cwd, CLAUDE), `${POINTER}\n`, "utf8")
+  return read(req.cwd)
+}
+
+export function installProjectDocChannel(worksites: WorksiteSearch): void {
+  ipcMain.handle("omni:projectDoc", (_e, req: unknown) => projectDoc(req, worksites.owns))
 
   /** 建起来：缺什么补什么。**已经有内容的 `CLAUDE.md` 绝不覆盖**。 */
-  ipcMain.handle("omni:ensureProjectDoc", async (_e, cwd: string): Promise<ProjectDoc> => {
-    const before = await read(cwd)
-    if (!before.agents) await writeFile(join(cwd, AGENTS), STARTER, "utf8")
-    // 只在「压根没有」时写指路牌。人家自己写过 CLAUDE.md 的话，
-    // 那是他的内容，我们没有资格替他扔掉
-    if (!before.claude) await writeFile(join(cwd, CLAUDE), `${POINTER}\n`, "utf8")
-    return read(cwd)
-  })
+  ipcMain.handle("omni:ensureProjectDoc", (_e, req: unknown) => ensureProjectDoc(req, worksites.owns))
 
-  ipcMain.handle("omni:openProjectDoc", async (_e, cwd: string) => {
-    await shell.openPath(join(cwd, AGENTS))
+  ipcMain.handle("omni:openProjectDoc", async (_e, value: unknown) => {
+    const req = requestOf(value, worksites.owns)
+    if (req !== undefined) await shell.openPath(join(req.cwd, AGENTS))
   })
 }
 

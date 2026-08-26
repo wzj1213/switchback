@@ -49,13 +49,13 @@ export function EnvCard({
   useEffect(() => {
     if (bridge === undefined) return undefined
     let live = true
-    void bridge.projectDoc(thread.cwd).then((info) => {
+    void bridge.projectDoc(thread.id, thread.cwd).then((info) => {
       if (live) setDoc(info)
     })
     return () => {
       live = false
     }
-  }, [bridge, thread.cwd])
+  }, [bridge, thread.cwd, thread.id])
 
   return (
     <Popover open anchor={anchor} minWidth={260} ariaLabel="环境信息" onClose={onClose}>
@@ -80,7 +80,7 @@ export function EnvCard({
           {TRUST_TEXT[thread.trust]}
         </Line>
         <Line icon={<FileIcon size={15} />} label="说明">
-          <ProjectDocLine cwd={thread.cwd} doc={doc} onDoc={setDoc} />
+          <ProjectDocLine threadId={thread.id} cwd={thread.cwd} doc={doc} onDoc={setDoc} />
         </Line>
         {thread.engineHistory.length <= 1 ? null : (
           <Line icon={<EngineIcon />} label="接力过">
@@ -153,23 +153,26 @@ function Line({
  * 我们没有资格替他扔掉——所以那种情况只提示，不动手。
  */
 function ProjectDocLine({
+  threadId,
   cwd,
   doc,
   onDoc,
 }: {
+  threadId: string
   cwd: string
   doc: ProjectDoc | undefined
   onDoc: (next: ProjectDoc) => void
 }): React.JSX.Element {
   const bridge = typeof window === "undefined" ? undefined : window.omni
   if (doc === undefined) return <>…</>
+  if (doc.denied === true) return <>项目说明暂时不可用</>
   if (doc.agents && doc.linked) {
     return (
       <button
         type="button"
         className="env__link"
         onClick={() => {
-          bridge?.openProjectDoc(cwd)
+          bridge?.openProjectDoc(threadId, cwd)
         }}
       >
         AGENTS.md（Claude 也读这份）
@@ -182,7 +185,7 @@ function ProjectDocLine({
         type="button"
         className="env__link"
         onClick={() => {
-          bridge?.openProjectDoc(cwd)
+          bridge?.openProjectDoc(threadId, cwd)
         }}
       >
         两份说明各写各的 · 打开看看
@@ -194,7 +197,7 @@ function ProjectDocLine({
       type="button"
       className="env__link"
       onClick={() => {
-        void bridge?.ensureProjectDoc(cwd).then(onDoc)
+        void bridge?.ensureProjectDoc(threadId, cwd).then(onDoc)
       }}
     >
       {doc.agents ? "有 AGENTS.md，但 Claude 还读不到 · 建立指向" : "还没有项目说明 · 建一份"}

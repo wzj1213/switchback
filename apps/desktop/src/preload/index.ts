@@ -125,16 +125,16 @@ const api = {
   },
 
   /** 这个项目的说明文件在不在、两家是不是读的同一份。 */
-  async projectDoc(cwd: string): Promise<ProjectDoc> {
-    return (await ipcRenderer.invoke("omni:projectDoc", cwd)) as ProjectDoc
+  async projectDoc(threadId: string, cwd: string): Promise<ProjectDoc> {
+    return (await ipcRenderer.invoke("omni:projectDoc", { threadId, cwd })) as ProjectDoc
   },
   /** 缺什么补什么：建 `AGENTS.md`，并让 `CLAUDE.md` 指过去。 */
-  async ensureProjectDoc(cwd: string): Promise<ProjectDoc> {
-    return (await ipcRenderer.invoke("omni:ensureProjectDoc", cwd)) as ProjectDoc
+  async ensureProjectDoc(threadId: string, cwd: string): Promise<ProjectDoc> {
+    return (await ipcRenderer.invoke("omni:ensureProjectDoc", { threadId, cwd })) as ProjectDoc
   },
   /** 用系统默认编辑器打开说明文件。 */
-  openProjectDoc(cwd: string): void {
-    void ipcRenderer.invoke("omni:openProjectDoc", cwd)
+  openProjectDoc(threadId: string, cwd: string): void {
+    void ipcRenderer.invoke("omni:openProjectDoc", { threadId, cwd })
   },
 
   /** 给一条不属于任何项目的对话要一个目录（主进程自动建在 `~/Documents/omni/` 下）。 */

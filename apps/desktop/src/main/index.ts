@@ -293,7 +293,7 @@ function installChannels(): void {
   installChatDirChannel()
   installAttachChannel(attachmentFiles)
   installFilePreviewChannel(touched, worksiteSearch)
-  installProjectDocChannel()
+  installProjectDocChannel(worksiteSearch)
   installEngineVersionChannel(log, engineVersions)
   installEngineDoorChannels()
   installEnvChannel(log)
