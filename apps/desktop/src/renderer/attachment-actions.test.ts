@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { droppedFiles, pasteFiles, pickedFiles } from "./attachment-actions.js"
+import { attachmentAcceptance } from "./useAttachments.js"
 
 function image(name: string, type = "image/png", size = 10): File {
   return { name, type, size, arrayBuffer: async () => new ArrayBuffer(size) } as File
@@ -15,6 +16,23 @@ const bridge = {
 }
 
 describe("附件三种入口", () => {
+  it("只有真正加入附件或正文的 drop 才算接收成功", () => {
+    expect(attachmentAcceptance({ paths: [], references: [] })).toEqual({
+      references: [], accepted: false,
+    })
+    expect(attachmentAcceptance({ paths: ["/tmp/a.png"], references: [] })).toEqual({
+      references: [], accepted: true,
+    })
+    expect(attachmentAcceptance({ paths: [], references: ["a.ts"] })).toEqual({
+      references: ["a.ts"], accepted: true,
+    })
+    expect(attachmentAcceptance({
+      paths: [], references: [], notice: { text: "读取失败", tone: "warn" },
+    })).toEqual({
+      references: [], accepted: false, notice: { text: "读取失败", tone: "warn" },
+    })
+  })
+
   it("拖入时图片走附件、普通文件写成工作区引用", () => {
     const files = [image("a.png"), image("code.ts", "text/typescript")] as unknown as FileList
     expect(droppedFiles(files, true, bridge, "/tmp")).toEqual({

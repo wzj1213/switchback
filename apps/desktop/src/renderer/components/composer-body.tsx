@@ -43,6 +43,9 @@ function AttachmentWarning({
 export function ComposerBody(view: Props): React.JSX.Element {
   const { composer, detached, busy, starting, focus, attach, aside } = view
   const { attachWarning, attachmentBlocked, mode, draft, files } = view
+  const notice = attachWarning === undefined
+    ? (files.dropzone.hint?.compact === true ? undefined : attach.notice)
+    : { text: attachWarning, tone: "warn" as const }
   return (
     <div className="composer">
       <div className="composer__inner">
@@ -58,11 +61,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
           />
         )}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
-        <AttachmentWarning
-          notice={
-            attachWarning === undefined ? attach.notice : { text: attachWarning, tone: "warn" }
-          }
-        />
+        <AttachmentWarning notice={notice} />
         <Prompt
           input={focus.input}
           value={draft.text}

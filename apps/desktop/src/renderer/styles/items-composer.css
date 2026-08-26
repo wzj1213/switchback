@@ -71,6 +71,24 @@
   border-radius: 0;
 }
 
+/* 松手后的失败是通知，不再继续伪装成“还拖着”的整面接收层。 */
+.composer-drop--notice {
+  place-items: start center;
+  padding-top: 128px;
+  border: 0;
+  background: transparent;
+}
+
+.composer-drop--notice span {
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--border));
+}
+
+@media (min-width: 1321px) {
+  body:has(.shell--workbench:not(.shell--workbench-full)) > .composer-drop--notice {
+    left: calc(100vw - var(--workbench-w));
+  }
+}
+
 /* 焦点进出都走同一条过渡，深空那圈才不会「淡入、硬切出」 */
 .composer__inner {
   transition:

@@ -21,7 +21,7 @@ export interface Attachments {
   /** 处理一次粘贴。默认粘贴必须由调用方在异步落盘前同步拦住。 */
   paste: (items: DataTransferItemList | null, cwd: string) => Promise<readonly string[]>
   /** 处理一次拖放。 */
-  drop: (files: FileList | null, cwd: string) => readonly string[]
+  drop: (files: FileList | null, cwd: string) => AttachmentAcceptance
   /** 打开系统文件选择器；返回需要写进正文的可见路径引用。 */
   pick: (cwd: string) => Promise<readonly string[]>
   /** 用一组已经落盘的路径替换当前附件（取回队列 / 改一改再发）。 */
@@ -30,18 +30,32 @@ export interface Attachments {
   clear: () => void
 }
 
+export interface AttachmentAcceptance {
+  references: readonly string[]
+  accepted: boolean
+  notice?: { text: string; tone: "info" | "warn" }
+}
+
+export function attachmentAcceptance(result: AttachmentResult): AttachmentAcceptance {
+  return {
+    references: result.references,
+    accepted: result.paths.length > 0 || result.references.length > 0,
+    ...(result.notice === undefined ? {} : { notice: result.notice }),
+  }
+}
+
 export function useAttachments(enabled: boolean, initial: readonly string[] = []): Attachments {
   const [paths, setPaths] = useState<readonly string[]>(() => [...new Set(initial)])
   const [notice, setNotice] = useState<Attachments["notice"]>()
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
-  const accept = useCallback((result: AttachmentResult): readonly string[] => {
+  const accept = useCallback((result: AttachmentResult): AttachmentAcceptance => {
     if (result.paths.length > 0) {
       // 同一张图贴两次没有意义，而且会让模型多读一遍
       setPaths((prev) => [...new Set([...prev, ...result.paths])])
     }
     setNotice(result.notice)
-    return result.references
+    return attachmentAcceptance(result)
   }, [])
 
   useEffect(() => {
@@ -54,15 +68,15 @@ export function useAttachments(enabled: boolean, initial: readonly string[] = []
     items: DataTransferItemList | null,
     cwd: string,
   ): Promise<readonly string[]> => {
-    return accept(await pasteFiles(items, enabled, bridge, cwd))
+    return accept(await pasteFiles(items, enabled, bridge, cwd)).references
   }, [accept, bridge, enabled])
 
-  const drop = useCallback((files: FileList | null, cwd: string): readonly string[] => {
+  const drop = useCallback((files: FileList | null, cwd: string): AttachmentAcceptance => {
     return accept(droppedFiles(files, enabled, bridge, cwd))
   }, [accept, bridge, enabled])
 
   const pick = useCallback(async (cwd: string): Promise<readonly string[]> => {
-    return accept(await pickedFiles(bridge, enabled, cwd))
+    return accept(await pickedFiles(bridge, enabled, cwd)).references
   }, [accept, bridge, enabled])
 
   return {

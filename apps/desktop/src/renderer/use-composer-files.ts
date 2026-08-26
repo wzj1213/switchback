@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { useAttachments } from "./useAttachments.js"
 import { appendFileReferences, type ComposerFileReference } from "./file-references.js"
+import { failedDropHint } from "./attachment-feedback.js"
 import { useAttachmentDropzone } from "./use-attachment-dropzone.js"
 
 function focusAfterSurfaceCloses(focus: () => void): void {
@@ -41,10 +42,15 @@ export function useComposerFiles(options: {
   }, [addReferences, options.editable, options.focus, options.reference])
   const drop = useCallback(
     (files: FileList | null) => {
-      addReferences(options.attach.drop(files, options.cwd))
-      if ((files?.length ?? 0) === 0) return
+      const result = options.attach.drop(files, options.cwd)
+      addReferences(result.references)
+      if ((files?.length ?? 0) === 0) return undefined
+      if (!result.accepted) {
+        return result.notice === undefined ? undefined : failedDropHint(result.notice)
+      }
       options.onFilesDropped()
       focusAfterSurfaceCloses(options.focus)
+      return undefined
     },
     [addReferences, options.attach.drop, options.cwd, options.focus, options.onFilesDropped],
   )

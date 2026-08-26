@@ -11,7 +11,7 @@ export function AttachmentDrop({
   if (hint === undefined) return null
   const overlay = (
     <div
-      className={`composer-drop composer-drop--${hint.tone}${surface ? " composer-drop--surface" : ""}`}
+      className={`composer-drop composer-drop--${hint.tone}${surface ? " composer-drop--surface" : ""}${hint.compact === true ? " composer-drop--notice" : ""}`}
       role="status"
     >
       <span>{hint.text}</span>

@@ -30,7 +30,7 @@ function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
 interface Options {
   enabled: boolean
   editable: boolean
-  drop: (files: FileList | null) => void
+  drop: (files: FileList | null) => DropHint | undefined
 }
 
 const TASK_SURFACE = ".main, .workbench:not([hidden]), .rv"
@@ -47,8 +47,27 @@ function transferOf(event: DragEvent): DataTransfer | undefined {
     : undefined
 }
 
+function cancelExpiry(expiry: React.RefObject<number | undefined>): void {
+  if (expiry.current === undefined) return
+  window.clearTimeout(expiry.current)
+  expiry.current = undefined
+}
+
+function expireHint(
+  expiry: React.RefObject<number | undefined>,
+  setHint: React.Dispatch<React.SetStateAction<DropHint | undefined>>,
+  hint: DropHint,
+): void {
+  cancelExpiry(expiry)
+  expiry.current = window.setTimeout(() => {
+    setHint((shown) => shown === hint ? undefined : shown)
+    expiry.current = undefined
+  }, 5000)
+}
+
 function listeners(
   depth: React.RefObject<number>,
+  expiry: React.RefObject<number | undefined>,
   setHint: React.Dispatch<React.SetStateAction<DropHint | undefined>>,
   current: React.RefObject<Options>,
 ): Record<"dragenter" | "dragover" | "dragleave" | "drop", (event: DragEvent) => void> {
@@ -57,6 +76,7 @@ function listeners(
       const transfer = transferOf(event)
       if (transfer === undefined) return
       event.preventDefault()
+      cancelExpiry(expiry)
       depth.current += 1
       setHint(inspect(transfer, current.current.enabled, current.current.editable))
     },
@@ -78,8 +98,9 @@ function listeners(
       if (transfer === undefined) return
       event.preventDefault()
       depth.current = 0
-      setHint(undefined)
-      if (current.current.editable) current.current.drop(transfer.files)
+      const feedback = current.current.editable ? current.current.drop(transfer.files) : undefined
+      setHint(feedback)
+      if (feedback !== undefined) expireHint(expiry, setHint, feedback)
     },
   }
 }
@@ -106,12 +127,16 @@ function listenForFiles(events: ReturnType<typeof listeners>): () => void {
 export function useAttachmentDropzone(
   enabled: boolean,
   editable: boolean,
-  drop: (files: FileList | null) => void,
+  drop: (files: FileList | null) => DropHint | undefined,
 ): { hint: DropHint | undefined } {
   const [hint, setHint] = useState<DropHint>()
   const depth = useRef(0)
+  const expiry = useRef<number | undefined>(undefined)
   const current = useRef<Options>({ enabled, editable, drop })
   current.current = { enabled, editable, drop }
-  useEffect(() => listenForFiles(listeners(depth, setHint, current)), [])
+  useEffect(() => {
+    const stop = listenForFiles(listeners(depth, expiry, setHint, current))
+    return () => { stop(); cancelExpiry(expiry) }
+  }, [])
   return { hint }
 }

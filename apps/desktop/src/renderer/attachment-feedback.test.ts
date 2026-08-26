@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { blockedDropHint, dropNotice, hasFileItems, hoverHint, reviewAttachments } from "./attachment-feedback.js"
+import { blockedDropHint, dropNotice, failedDropHint, hasFileItems, hoverHint,
+  reviewAttachments } from "./attachment-feedback.js"
 
 describe("附件拖放反馈", () => {
   const cases = [
@@ -36,6 +37,12 @@ describe("附件拖放反馈", () => {
 
   it("历史记录明确阻止拖入，不把文件吞掉", () => {
     expect(blockedDropHint()).toEqual({ tone: "blocked", text: "这是历史记录；先继续会话，再添加文件" })
+  })
+
+  it("落下后失败收成非阻塞通知，不继续覆盖整个任务表面", () => {
+    expect(failedDropHint({ text: "未能读取", tone: "warn" })).toEqual({
+      text: "未能读取", tone: "blocked", compact: true,
+    })
   })
 
   it("落下后把附件、引用、失败和工作区外路径都说清", () => {

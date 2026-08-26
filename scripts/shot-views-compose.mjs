@@ -147,6 +147,37 @@ export const COMPOSE_VIEWS = [
       && document.querySelector('.composer__input')?.value === ''`,
   },
   {
+    name: "14-读取失败不关闭工作台",
+    open: `(() => {
+      const target = document.querySelector('.workbench__body')
+      const transfer = new DataTransfer()
+      transfer.items.add(new File(['orphan'], 'orphan.ts', { type: 'text/typescript' }))
+      for (const type of ['dragenter', 'dragover', 'drop']) {
+        target?.dispatchEvent(new DragEvent(type, {
+          bubbles: true, cancelable: true, dataTransfer: transfer,
+        }))
+      }
+      const settled = () => {
+        const notice = document.querySelector('.composer-drop--surface')?.textContent ?? ''
+        if (notice.includes('未能读取')) document.documentElement.dataset.failedDrop = 'ready'
+        else setTimeout(settled, 30)
+      }
+      settled()
+    })()`,
+    ready: "html[data-failed-drop=ready]",
+    assert: `document.querySelector('.workbench:not([hidden])') !== null
+      && document.querySelector('.composer-drop--surface')?.textContent.includes('未能读取') === true
+      && document.querySelector('.composer-drop--notice') !== null
+      && document.querySelector('.composer__attachwarn') === null
+      && document.querySelector('.composer__input')?.value === ''
+      && document.querySelector('.attach .thumb') === null`,
+    after: `return new Promise(resolve => {
+      delete document.documentElement.dataset.failedDrop
+      document.querySelector('.workbench__hide')?.click()
+      setTimeout(resolve, 5200)
+    })`,
+  },
+  {
     name: "15-工作台文件预览",
     open: [
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '检查这个文件 '); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,

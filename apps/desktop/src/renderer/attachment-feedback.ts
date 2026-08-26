@@ -11,6 +11,7 @@ export interface AttachmentReview {
 export interface DropHint {
   tone: "ready" | "blocked"
   text: string
+  compact?: boolean
 }
 
 interface FileLike {
@@ -49,6 +50,14 @@ export function hoverHint(review: AttachmentReview, enabled: boolean): DropHint 
 
 export function blockedDropHint(): DropHint {
   return { tone: "blocked", text: "这是历史记录；先继续会话，再添加文件" }
+}
+
+export function failedDropHint(notice: { text: string; tone: "info" | "warn" }): DropHint {
+  return {
+    text: notice.text,
+    tone: notice.tone === "warn" ? "blocked" : "ready",
+    compact: true,
+  }
 }
 
 export function dropNotice(summary: {
