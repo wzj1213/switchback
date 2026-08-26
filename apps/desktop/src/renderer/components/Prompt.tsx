@@ -98,7 +98,7 @@ export function Prompt({
 
   return (
     <>
-      <MentionList paths={mentions.paths} active={mentions.active} open={mentions.open}
+      <MentionList cwd={cwd} paths={mentions.paths} active={mentions.active} open={mentions.open}
         loading={mentions.loading} failed={mentions.failed} onPick={choose} onRetry={mentions.retry} />
       <SlashList
         commands={slash.hits}

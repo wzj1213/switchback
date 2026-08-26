@@ -504,6 +504,31 @@
   box-shadow: var(--shadow-pop);
 }
 
+.mentions__scope {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin: 0 var(--sp-1) var(--sp-1);
+  padding: 2px var(--sp-1) 5px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.mentions__scope > span {
+  flex: none;
+}
+
+.mentions__scope bdi {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mentions__row {
   display: flex;
   align-items: baseline;

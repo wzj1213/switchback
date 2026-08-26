@@ -222,7 +222,10 @@ export const COMPOSE_VIEWS = [
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '@attachment'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
     ],
     ready: ".mentions__row",
-    assert: `[...document.querySelectorAll('.mentions__row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
+    assert: `[...document.querySelectorAll('.mentions__row')]
+        .some(row => row.textContent.toLowerCase().includes('attachment'))
+      && document.querySelector('.mentions__scope bdi')?.textContent.endsWith('/omni') === true
+      && document.querySelector('[role="listbox"]')?.getAttribute('aria-label')?.endsWith('/omni') === true`,
     after: `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, ''); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
   },
   {

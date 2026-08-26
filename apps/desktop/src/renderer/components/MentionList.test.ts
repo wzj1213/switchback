@@ -6,7 +6,7 @@ import { MentionList, MentionStatus } from "./MentionList.js"
 describe("@ 文件候选反馈", () => {
   it("加载、零命中与失败是三个不同状态", () => {
     const render = (loading: boolean, failed: boolean): string => renderToStaticMarkup(
-      createElement(MentionStatus, { loading, failed, onRetry: () => undefined }),
+      createElement(MentionStatus, { cwd: "/work/repos", loading, failed, onRetry: () => undefined }),
     )
     expect(render(true, false)).toContain("正在搜索工作区文件")
     expect(render(false, false)).toContain("没有匹配的工作区文件")
@@ -17,11 +17,13 @@ describe("@ 文件候选反馈", () => {
 
   it("候选列表保持文件语义与当前项", () => {
     const html = renderToStaticMarkup(createElement(MentionList, {
-      paths: ["src/a.ts", "docs/a.md"], active: 1, open: true, loading: false, failed: false,
+      cwd: "/work/repos", paths: ["src/a.ts", "docs/a.md"],
+      active: 1, open: true, loading: false, failed: false,
       onPick: () => undefined, onRetry: () => undefined,
     }))
     expect(html).toContain('role="listbox"')
-    expect(html).toContain('aria-label="工作区文件"')
+    expect(html).toContain('aria-label="工作区文件：/work/repos"')
+    expect(html).toContain('<bdi title="/work/repos">/work/repos</bdi>')
     expect(html.match(/aria-selected="true"/g)).toHaveLength(1)
   })
 })
