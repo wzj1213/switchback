@@ -69,7 +69,9 @@
   -webkit-app-region: no-drag;
   position: fixed;
   z-index: 50;
+  max-width: calc(100vw - 2 * var(--sp-2));
   max-height: min(60vh, 420px);
+  overflow-x: hidden;
   overflow-y: auto;
   padding: var(--sp-1);
   border: 1px solid var(--border-pop);
@@ -111,6 +113,7 @@
 
 .pop__item {
   display: flex;
+  min-width: 0;
   align-items: flex-start;
   gap: 6px;
   width: 100%;
@@ -149,12 +152,17 @@
   gap: var(--sp-2);
 }
 
-/* 当前值贴右，紧挨着那个 ›。**不许缩**：被截断的当前值就是错的信息 */
+/* 当前值贴右，紧挨着那个 ›。引擎可能报极长 displayName：不能让它撑出窗口，
+   完整原文由同节点的 title 保留（见 Select），菜单本体保持一行可扫。 */
 .pop__value {
   flex: none;
+  overflow: hidden;
+  max-width: min(54vw, 360px);
   margin-left: auto;
   color: var(--text-faint);
   font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 「恢复默认设置」和上面那几行之间画一道：它不是第 N 个选项，
@@ -236,6 +244,7 @@
   color: var(--text-faint);
   font-size: var(--text-xs);
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .pop__note {

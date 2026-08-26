@@ -159,7 +159,9 @@ function Top({
           }}
         >
           <span className="pop__label">{section.title ?? "选项"}</span>
-          <span className="pop__value">{currentLabel(section)}</span>
+          <span className="pop__value" title={currentLabel(section)}>
+            {currentLabel(section)}
+          </span>
           <ChevronIcon open={false} size={12} />
         </button>
       ))}

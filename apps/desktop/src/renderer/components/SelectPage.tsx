@@ -27,7 +27,9 @@ function Item({
     >
       <span className="pop__check">{selected ? <CheckIcon /> : null}</span>
       <span className="pop__text">
-        <span className="pop__label">{choice.label}</span>
+        <span className="pop__label" title={choice.label}>
+          {choice.label}
+        </span>
         {choice.description === undefined ? null : (
           <span className="pop__desc">{choice.description}</span>
         )}

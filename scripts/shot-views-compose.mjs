@@ -219,6 +219,49 @@ export const COMPOSE_VIEWS = [
     })()`,
   },
   {
+    name: "18-超长模型名不出界",
+    before: ".composer__bar .trigger:not(:disabled):not(.trigger--open)",
+    open: `(() => {
+      const triggers = [...document.querySelectorAll('.composer__bar .trigger:not(:disabled)')]
+      const model = triggers.find(button => button.textContent.includes('Default')) ?? triggers.at(-1)
+      model?.click()
+      setTimeout(() => {
+        const panel = document.querySelector('.pop')
+        const value = panel?.querySelector('.pop__value')
+        const label = 'enterprise-reasoning-model-with-extended-context-and-recommended-safety-profile-v2026-preview-'.repeat(3)
+        if (value !== null && value !== undefined) {
+          value.textContent = label
+          value.title = label
+        }
+        setTimeout(() => {
+          const rect = panel?.getBoundingClientRect()
+          document.documentElement.dataset.popoverBounds = JSON.stringify({
+            inside: rect !== undefined && rect.left >= 7 && rect.right <= innerWidth - 7,
+            noHorizontalScroll: panel !== null && panel.scrollWidth <= panel.clientWidth + 1,
+            fullLabelAvailable: value?.title === label,
+            left: rect?.left,
+            right: rect?.right,
+            viewport: innerWidth,
+            clientWidth: panel?.clientWidth,
+            scrollWidth: panel?.scrollWidth,
+          })
+        }, 120)
+      }, 80)
+    })()`,
+    ready: `html[data-popover-bounds]`,
+    assert: `(() => {
+      const result = JSON.parse(document.documentElement.dataset.popoverBounds ?? '{}')
+      if (result.inside && result.noHorizontalScroll && result.fullLabelAvailable) return true
+      throw new Error('超长模型名浮层诊断：' + JSON.stringify(result))
+    })()`,
+    after: `(() => {
+      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape', bubbles: true, cancelable: true,
+      }))
+      delete document.documentElement.dataset.popoverBounds
+    })()`,
+  },
+  {
     name: "18-推理强度",
     before: ".effort .trigger:not(:disabled):not(.trigger--open)",
     open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
