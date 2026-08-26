@@ -81,18 +81,26 @@ function Source({ file, onCopy }: {
   )
 }
 
+type HtmlMode = "preview" | "source"
+
+/** 截断的 HTML 不是一份完整网页；即使此前选了预览，也只能按源码显示。 */
+export function resolvedHtmlMode(picked: HtmlMode, truncated: boolean): HtmlMode {
+  return truncated ? "source" : picked
+}
+
 function Html({ file, onCopy }: {
   file: Extract<FilePreview, { kind: "html" }>
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const [mode, setMode] = useState<"preview" | "source">(file.truncated ? "source" : "preview")
+  const [picked, setPicked] = useState<HtmlMode>(file.truncated ? "source" : "preview")
+  const mode = resolvedHtmlMode(picked, file.truncated)
   return (
     <div className="html-preview">
       <div className="html-preview__switch" role="tablist" aria-label="HTML 查看方式">
         <button type="button" role="tab" aria-selected={mode === "preview"} disabled={file.truncated}
-          onClick={() => { setMode("preview") }}>预览</button>
+          onClick={() => { setPicked("preview") }}>预览</button>
         <button type="button" role="tab" aria-selected={mode === "source"}
-          onClick={() => { setMode("source") }}>源码</button>
+          onClick={() => { setPicked("source") }}>源码</button>
       </div>
       {mode === "source" ? <Source file={file} onCopy={onCopy} /> : (
         <iframe

@@ -2,7 +2,12 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { FilePreview } from "../../shared/file-preview.js"
-import { canReferencePreview, canRevealPreview, FilePreviewView } from "./FilePreviewView.js"
+import {
+  canReferencePreview,
+  canRevealPreview,
+  FilePreviewView,
+  resolvedHtmlMode,
+} from "./FilePreviewView.js"
 
 describe("文件预览操作", () => {
   const cases: readonly { name: string; file: FilePreview | undefined; path: string; expected: boolean }[] = [
@@ -40,6 +45,17 @@ describe("文件预览操作", () => {
     expect(button).not.toContain("disabled")
   })
 
+  it("会话只读时把恢复办法直接写在禁用操作上", () => {
+    const html = renderToStaticMarkup(createElement(FilePreviewView, {
+      target: { threadId: "thread", cwd: "/work", path: "src/app.ts" },
+      revision: undefined, stamp: "idle:0", onBack: () => undefined,
+      onReference: () => undefined, referenceDisabled: true,
+      onReveal: () => undefined, onCopy: () => undefined,
+    }))
+    expect(html).toContain("继续后引用")
+    expect(html).toContain('aria-label="继续会话后引用到输入框"')
+  })
+
   it("点开同名文件后仍把目录归属画在标题里，越界路径明确标记", () => {
     const render = (path: string, cwd = "/work/omni"): string => renderToStaticMarkup(createElement(FilePreviewView, {
       target: { threadId: "thread", cwd, path },
@@ -59,4 +75,19 @@ describe("文件预览操作", () => {
     expect(windows).toContain(">src</span>")
     expect(windows).not.toContain("工作区外")
   })
+})
+
+describe("HTML 预览模式", () => {
+  const cases = [
+    { picked: "preview", truncated: false, expected: "preview" },
+    { picked: "source", truncated: false, expected: "source" },
+    { picked: "preview", truncated: true, expected: "source" },
+    { picked: "source", truncated: true, expected: "source" },
+  ] as const
+
+  for (const one of cases) {
+    it(`${one.picked} · ${one.truncated ? "截断" : "完整"} → ${one.expected}`, () => {
+      expect(resolvedHtmlMode(one.picked, one.truncated)).toBe(one.expected)
+    })
+  }
 })

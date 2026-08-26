@@ -46,14 +46,15 @@ function PreviewActions({ target, busy, referenceable, referenceDisabled, reveal
   onReload: () => void
   onReveal: () => void
 }): React.JSX.Element {
+  const referenceLabel = referenceDisabled ? "继续会话后引用到输入框" : "引用到输入框"
   return (
     <span className="file-preview__actions">
       {onReference === undefined || !referenceable ? null : (
         <button type="button" className="file-preview__reference"
           title={referenceDisabled ? "继续会话后才能引用" : "引用到输入框"}
-          aria-label="引用到输入框" disabled={referenceDisabled}
+          aria-label={referenceLabel} disabled={referenceDisabled}
           onClick={() => { onReference(target) }}>
-          <span aria-hidden="true">@</span> 引用
+          <span aria-hidden="true">@</span> {referenceDisabled ? "继续后引用" : "引用"}
         </button>
       )}
       <button type="button" className="workbench__icon" title="重新读取文件"
