@@ -1,12 +1,14 @@
 import { mkdir, stat, writeFile } from "node:fs/promises"
+import { randomUUID } from "node:crypto"
 import { join } from "node:path"
-import { app, dialog, ipcMain, nativeImage } from "electron"
+import { dialog, ipcMain, nativeImage } from "electron"
 import {
   canAttachImagePath,
   imageExtension,
   MAX_IMAGE_BYTES,
   type PickedImages,
 } from "../shared/attachments.js"
+import type { AttachmentFiles } from "./attachment-files.js"
 
 async function pickImages(): Promise<PickedImages> {
   const result = await dialog.showOpenDialog({
@@ -38,18 +40,22 @@ async function pickImages(): Promise<PickedImages> {
  * 放 `userData` 下而不是临时目录：临时目录会被系统清掉，
  * 而会话记录里的路径会指向一个不存在的文件——那比没有更糟。
  */
-export function installAttachChannel(): void {
+export function installAttachChannel(files: AttachmentFiles): void {
   ipcMain.handle("omni:pickImages", () => pickImages())
   ipcMain.handle("omni:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
     const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined
     const buf = Buffer.from(req.bytes)
     if (buf.byteLength === 0 || buf.byteLength > MAX_IMAGE_BYTES) return undefined
-    const dir = join(app.getPath("userData"), "attachments")
+    const dir = files.dir
     await mkdir(dir, { recursive: true })
-    const path = join(dir, `${stamp()}${ext}`)
+    const path = join(dir, `${stamp()}-${randomUUID()}${ext}`)
     await writeFile(path, buf)
     return path
+  })
+  ipcMain.on("omni:discardImages", (_e, paths: unknown) => {
+    if (!Array.isArray(paths)) return
+    void files.discard(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
   })
   ipcMain.handle("omni:thumb", (_e, req: { path: string; max: number }) => thumb(req.path, req.max))
 }
@@ -83,13 +89,11 @@ function thumb(path: string, max: number): string | undefined {
   return fit.toDataURL()
 }
 
-/** 文件名带时间，同一秒内贴两张也不撞（后缀随机四位）。 */
+/** 时间方便排查；UUID 保证同一秒批量粘贴也不会覆盖上一张。 */
 function stamp(): string {
   const now = new Date()
   const p = (n: number): string => String(n).padStart(2, "0")
   const day = `${String(now.getFullYear())}${p(now.getMonth() + 1)}${p(now.getDate())}`
   const time = `${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`
-  return `${day}-${time}-${Math.floor(Math.random() * 10000)
-    .toString()
-    .padStart(4, "0")}`
+  return `${day}-${time}`
 }

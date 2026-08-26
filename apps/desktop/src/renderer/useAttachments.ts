@@ -68,12 +68,17 @@ export function useAttachments(enabled: boolean, initial: readonly string[] = []
     drop,
     pick,
     replace: useCallback((next: readonly string[]) => {
-      setPaths([...new Set(next)])
+      const unique = [...new Set(next)]
+      const removed = paths.filter((path) => !unique.includes(path))
+      if (removed.length > 0) bridge?.discardImages(removed)
+      setPaths(unique)
       setNotice(undefined)
-    }, []),
+    }, [bridge, paths]),
     remove: useCallback((path: string) => {
+      if (!paths.includes(path)) return
+      bridge?.discardImages([path])
       setPaths((prev) => prev.filter((p) => p !== path))
-    }, []),
+    }, [bridge, paths]),
     clear: useCallback(() => {
       setPaths([])
       setNotice(undefined)

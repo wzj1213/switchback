@@ -135,12 +135,22 @@ export const VIEWS = [
       ready: `html[data-draft-restored="true"]`,
       assert: `document.querySelector('.composer__input')?.value === '切回来还要在这里'
         && document.querySelector('.attach .thumb') !== null`,
-      after: `(() => {
+      after: `(async () => {
+        const thumb = document.querySelector('.attach .thumb')
+        const name = thumb?.getAttribute('title')
+        if (name === null || name === undefined) throw new Error('找不到待移除图片的文件名')
+        const info = await window.omni.appInfo()
+        const path = info.dataDir.replace(/[\\\\/]$/, '') + '/attachments/' + name
         const input = document.querySelector('.composer__input')
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
         setter?.call(input, '')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
         document.querySelector('[aria-label="去掉这个附件"]')?.click()
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          if (await window.omni.thumb(path, 16) === undefined) break
+          await new Promise(resolve => setTimeout(resolve, 50))
+          if (attempt === 39) throw new Error('移除图片后，本地草稿副本仍然存在')
+        }
         delete document.documentElement.dataset.draftRestored
         delete window.__omniDraftThread
       })()`,

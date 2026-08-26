@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { app, clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron"
-import type { Command, EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
+import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Ledger, Sealed } from "@omni/wire"
 import { createHost, type Host, type HostDeps } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
@@ -11,7 +11,7 @@ import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
 import type { NotifyMode } from "../shared/settings.js"
-import { createAwake, type Awake } from "./awake.js"
+import { createAwake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
 import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
@@ -20,42 +20,10 @@ import { createWorktreeBaselines, type WorktreeBaselines } from "./worktree-base
 import { readBuildInfo } from "./build-info.js"
 import type { TouchedFiles } from "./touched.js"
 import { createEngineCatalog } from "./engine-catalog.js"
+import type { AttachmentFiles } from "./attachment-files.js"
+import type { Attached } from "./attached.js"
 
-export interface Attached {
-  host: Host
-  baselines: WorktreeBaselines
-  /** 回放磁盘上的历史用得到 */
-  journal: ReturnType<typeof createJournal>
-  /**
-   * 这台机器上注册了哪些引擎。界面据此渲染选择器。
-   *
-   * **异步**，因为每一家还要回答「装了吗」——那要起一次 `which` 甚至 `--version`。
-   * 结果缓存：探测在启动时做一次就够，用户装引擎的频率远低于开窗的频率。
-   */
-  engines: () => Promise<readonly EngineInfo[]>
-  /** 设置改变引擎接入范围后，把新清单推给所有桌面与远程客户端。 */
-  refreshEngines: () => Promise<void>
-  /** 最近建好的会话 id。`dispatch` 不回传 id，所以在事件流上截。 */
-  lastThreadId: () => ThreadId | undefined
-  /** 事件流的序号与保留缓冲。（重）连接时的全量重建要用它对齐游标。 */
-  ledger: Ledger
-  /** 客户端注册表。远程服务端把连接注册进来，就自动收到广播。 */
-  sinks: Sinks
-  /** 有活在跑时挡住闲置待机。退出前要 `release()`，否则断言留在系统里。 */
-  awake: Awake
-  /** 会话碰过哪些文件。全量重建时要把历史补进去，否则重启后老会话的文件点不开。 */
-  touched: TouchedFiles
-  /** 记一行。分级 replay 要说出「省了多少」。 */
-  log: Logger
-  /**
-   * 把一次失败翻成界面看得见的东西。
-   *
-   * **每一条通往 `dispatch` 的路都必须经过它。** 之前只有 IPC 那条有 catch，
-   * 开机自动建会话那条是裸的 `void promise`——引擎起不来时它变成一条未处理拒绝，
-   * 界面就永远停在「正在打开工作区…」，没有报错、没有超时、什么都没有。
-   */
-  report: (error: unknown, threadId?: ThreadId) => void
-}
+export type { Attached } from "./attached.js"
 
 
 interface Channels {
@@ -196,6 +164,7 @@ function openStores(log: Logger, emit: (event: Event) => void): {
  */
 export interface HostPorts {
   touched: TouchedFiles
+  attachmentFiles: AttachmentFiles
   relay?: Relay
   engineVisible?: (id: string) => boolean
   dshProfile?: () => string
@@ -216,9 +185,12 @@ function reporter(emit: (event: Event) => void): (error: unknown, threadId?: Thr
 }
 
 /** 每条事件都先进名册再广播：预览工作区外的文件凭它放行（见 `touched.ts`）。 */
-function noting(touched: TouchedFiles, publish: (event: Event) => void): (event: Event) => void {
+function noting(touched: TouchedFiles, attachments: AttachmentFiles,
+  publish: (event: Event) => void): (event: Event) => void {
   return (event) => {
     touched.note(event)
+    attachments.note(event)
+    if (event.type === "thread.removed") void attachments.removeThread(event.threadId)
     publish(event)
   }
 }
@@ -244,7 +216,7 @@ export function attachHost(
 
   const { emit: publish, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
   // 挂在**唯一那个出口**上，不是各个驱动里——漏一处就是某类会话的文件点不开
-  const emit = noting(ports.touched, publish)
+  const emit = noting(ports.touched, ports.attachmentFiles, publish)
 
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)
@@ -283,6 +255,7 @@ export function attachHost(
     baselines,
     awake,
     touched: ports.touched,
+    attachmentFiles: ports.attachmentFiles,
     journal,
     engines,
     refreshEngines,
@@ -385,7 +358,12 @@ export async function rebuild(
   )
   // 磁盘上的历史也要进名册：重启之后打开一条老会话，侧栏列的文件同样要点得开
   // （名册按会话与路径两级淘汰，见 `touched.ts` 的已知限制）
-  for (const thread of threads) attached.touched.noteHistory(thread.id, thread.events)
+  for (const thread of threads) {
+    attached.touched.noteHistory(thread.id, thread.events)
+    attached.attachmentFiles.noteHistory(thread.id, thread.events)
+  }
+  const pruned = await attached.attachmentFiles.pruneOnce(Date.now()).catch(() => 0)
+  if (pruned > 0) attached.log.write("info", "attachments", `清理了 ${String(pruned)} 个过期孤立图片`)
   // 读磁盘期间被封号的那些。它们保证**晚于快照、且还在保留缓冲里**，
   // 所以拼在最后就补上了那条缝。和磁盘那份的重叠是必然的，靠归约器的
   // 幂等去重（`@omni/store` 的 `appendItem`），不在这里判——

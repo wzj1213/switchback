@@ -34,6 +34,7 @@ import { installActivity } from "./activity.js"
 import { installEngineSettings } from "./engine-settings.js"
 import { installFilePreviewChannel } from "./file-preview.js"
 import { createTouchedFiles } from "./touched.js"
+import { createAttachmentFiles } from "./attachment-files.js"
 
 /**
  * Electron 主进程。
@@ -71,6 +72,7 @@ const engineVersions = createEngineVersions(log, { claudeExecutable: buildInfo.c
  * 而两边说的必须是同一份名册。理由同 `engineVersions`——有状态，就显式传下去。
  */
 const touched = createTouchedFiles()
+const attachmentFiles = createAttachmentFiles(join(app.getPath("userData"), "attachments"))
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
@@ -286,7 +288,7 @@ function installChannels(): void {
   installWorksiteChannel()
   installSearchChannel()
   installChatDirChannel()
-  installAttachChannel()
+  installAttachChannel(attachmentFiles)
   installFilePreviewChannel(touched)
   installProjectDocChannel()
   installEngineVersionChannel(log, engineVersions)
@@ -333,6 +335,7 @@ function bootstrap(): Promise<void> {
     const relay: { notify?: (threadId: string, title: string, body: string) => void } = {}
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
       touched,
+      attachmentFiles,
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
       notify: () => settings.get().notify,

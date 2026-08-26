@@ -150,6 +150,10 @@ const api = {
   async stashImage(mime: string, bytes: ArrayBuffer): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:stashImage", { mime, bytes })) as string | undefined
   },
+  /** 只会删除 omni 自己复制、且没有会话历史引用的图片；原文件路径会被主进程拒绝。 */
+  discardImages(paths: readonly string[]): void {
+    ipcRenderer.send("omni:discardImages", paths)
+  },
   /** 用系统选择器挑图片；主进程会按格式、空文件与 12 MB 上限再核一次。 */
   async pickImages(): Promise<PickedImages> {
     return (await ipcRenderer.invoke("omni:pickImages")) as PickedImages
