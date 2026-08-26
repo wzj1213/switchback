@@ -256,7 +256,7 @@
   }
 }
 
-/* 编辑组自己的宽度不足时，工具栏换行、文件清单移到补丁上方。 */
+/* 编辑组自己的宽度不足时工具栏先换行；这不代表正文也该立刻变成单列。 */
 @container (max-width: 760px) {
   .rv__head {
     display: grid;
@@ -298,7 +298,11 @@
     grid-row: 1;
     grid-column: 4;
   }
+}
 
+/* 只有差异正文已经不足约 260px 时才把文件栏移到上方。常规右面板保留
+   “差异在左、文件在右”的编辑器结构，和页签方向保持一致。 */
+@container (max-width: 520px) {
   .rv__body {
     flex-direction: column;
   }

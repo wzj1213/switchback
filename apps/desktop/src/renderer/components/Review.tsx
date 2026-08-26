@@ -63,7 +63,7 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClo
   const data = useReview(cwd, stamp, { threadId, wanted, scope })
   const [query, setQuery] = useState("")
   const [picked, setPicked] = useState<string | undefined>(undefined)
-  const [split, setSplit] = useState(true)
+  const [split, setSplit] = useState(false)
   const [context, setContext] = useState<number>(3)
   const [list, setList] = useState(true)
   const files = useMemo(() => filterFiles(data.files, query), [data.files, query])

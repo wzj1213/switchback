@@ -28,12 +28,18 @@ export const REVIEW_VIEWS = [
         const review = document.querySelector('.rv')?.getBoundingClientRect()
         const title = document.querySelector('.panel-tab--on')?.getBoundingClientRect()
         const tools = document.querySelector('.rv__tools')?.getBoundingClientRect()
+        const list = document.querySelector('.rvl')?.getBoundingClientRect()
+        const pane = document.querySelector('.rv__pane')?.getBoundingClientRect()
         const buttons = [...document.querySelectorAll('.rv__tool')].map(button => button.getBoundingClientRect())
-        if (review === undefined || title === undefined || tools === undefined) return false
-        const stacked = review.width <= 760
-        return (!stacked || tools.top >= title.bottom)
+        if ([review, title, tools, list, pane].some(rect => rect === undefined)) return false
+        const narrowHead = review.width <= 760
+        const stackedBody = review.width <= 520
+        const bodyAligned = stackedBody ? list.bottom <= pane.top + 1 : list.left >= pane.right - 1
+        return (!narrowHead || tools.top >= title.bottom) && bodyAligned
           && buttons.every(button => button.height < 40 && button.width > 24)
-      })()`,
+      })()
+      && document.querySelector('.rvd__body--split') === null
+      && document.querySelector('[aria-label="切换到分栏差异"]') !== null`,
   },
   {
     name: "04-审核范围菜单",
@@ -102,7 +108,7 @@ export const REVIEW_VIEWS = [
         const input = document.querySelector('input[aria-label="跳转到文件"]')
         window.__omniJumpInputFocused = document.activeElement === input
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-        setter?.call(input, 'jump')
+        setter?.call(input, 'review')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
       })()`,
       `document.querySelector('input[aria-label="跳转到文件"]')?.dispatchEvent(
@@ -112,18 +118,18 @@ export const REVIEW_VIEWS = [
     assert: `(() => {
       const rows = [...document.querySelectorAll('[role="menu"][aria-label="匹配的审核文件"] .pop__item')]
       return window.__omniJumpInputFocused === true && rows.length > 0
-        && rows.every(row => row.textContent.toLowerCase().includes('jump'))
+        && rows.every(row => row.textContent.toLowerCase().includes('review'))
         && document.activeElement?.getAttribute('role') === 'menuitem'
     })()`,
     after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
   },
   {
-    name: "04-统一差异",
-    open: `document.querySelector('[aria-label="切换到统一差异"]')?.click()`,
-    ready: `.rvd__body:not(.rvd__body--split)`,
-    assert: `document.querySelector('.rvd')?.getAttribute('aria-label') === '文件改动，可滚动'
-      && document.querySelector('[aria-label="切换到分栏差异"]') !== null`,
-    after: `document.querySelector('[aria-label="切换到分栏差异"]')?.click()`,
+    name: "04-分栏差异",
+    open: `document.querySelector('[aria-label="切换到分栏差异"]')?.click()`,
+    ready: `.rvd__body.rvd__body--split`,
+    assert: `document.querySelector('.rvd')?.getAttribute('aria-label') === '并排文件改动，可滚动'
+      && document.querySelector('[aria-label="切换到统一差异"]') !== null`,
+    after: `document.querySelector('[aria-label="切换到统一差异"]')?.click()`,
   },
   {
     name: "04-隐藏审核文件",
