@@ -5,6 +5,7 @@ import { createWorksite, type Worksite } from "@omni/worksite"
 export interface WorksiteSearch {
   note: (event: Event) => void
   noteHistory: (events: readonly Event[]) => void
+  owns: (threadId: ThreadId, cwd: string) => boolean
   search: (request: unknown) => Promise<readonly string[]>
 }
 
@@ -71,6 +72,11 @@ function indexOf(state: State, cwd: string): Worksite {
   return site
 }
 
+function owns(state: State, threadId: ThreadId, rawCwd: string): boolean {
+  const cwd = cwdOf(rawCwd)
+  return cwd !== undefined && state.byThread.get(threadId) === cwd
+}
+
 async function search(state: State, request: unknown): Promise<readonly string[]> {
   if (typeof request !== "object" || request === null) return []
   const { cwd: rawCwd, query: rawQuery } = request as { cwd?: unknown; query?: unknown }
@@ -91,6 +97,7 @@ export function createWorksiteSearch(
   return {
     note: (event) => { note(state, event) },
     noteHistory: (events) => { for (const event of events) note(state, event) },
+    owns: (threadId, cwd) => owns(state, threadId, cwd),
     search: (request) => search(state, request),
   }
 }

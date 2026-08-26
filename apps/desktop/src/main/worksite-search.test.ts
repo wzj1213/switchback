@@ -36,19 +36,26 @@ describe("主进程工作区文件搜索", () => {
   it("只搜索真实 thread 持有的绝对工作区，共享目录等最后一个 owner 删除才失效", async () => {
     const calls = { made: [] as string[], invalidated: [] as string[], queries: [] as string[] }
     const search = createWorksiteSearch(fakeFactory(calls))
+    expect(search.owns("th-a", "/work")).toBe(false)
     await expect(search.search({ cwd: "/private", query: "secret" })).resolves.toEqual([])
     search.note(threadEvent("thread.started", "th-a", "/work"))
     search.note(threadEvent("thread.started", "th-b", "/work"))
+    expect(search.owns("th-a", "/work")).toBe(true)
+    expect(search.owns("th-a", "/private")).toBe(false)
+    expect(search.owns("unknown", "/work")).toBe(false)
     await expect(search.search({ cwd: "relative", query: "x" })).resolves.toEqual([])
     await expect(search.search({ cwd: "/work", query: "x" })).resolves.toEqual([
       "/work:x",
     ])
 
     search.note(removed("th-a"))
+    expect(search.owns("th-a", "/work")).toBe(false)
+    expect(search.owns("th-b", "/work")).toBe(true)
     await expect(search.search({ cwd: "/work", query: "y" })).resolves.toEqual([
       "/work:y",
     ])
     search.note(removed("th-b"))
+    expect(search.owns("th-b", "/work")).toBe(false)
     await expect(search.search({ cwd: "/work", query: "z" })).resolves.toEqual([])
     expect(calls.invalidated).toEqual(["/work"])
   })

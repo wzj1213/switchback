@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 import { previewFile } from "./file-preview.js"
 
 const nothing = (): boolean => false
+const owned = (): boolean => true
 const req = (cwd: string, path: string): { threadId: string; cwd: string; path: string } =>
   ({ threadId: "th-1", cwd, path })
 
@@ -18,24 +19,24 @@ describe("文件预览边界", () => {
       await writeFile(join(outside, "secret.txt"), "outside")
       await symlink(join(outside, "secret.txt"), join(root, "linked.txt"))
 
-      await expect(previewFile(req(root, "page.html"), nothing)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "page.html"), nothing, owned)).resolves.toMatchObject({
         kind: "html",
         text: "<h1>预览</h1>",
         truncated: false,
       })
-      await expect(previewFile(req(root, "../secret.txt"), nothing)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "../secret.txt"), nothing, owned)).resolves.toMatchObject({
         kind: "unavailable",
         reason: "outside",
       })
-      await expect(previewFile(req(root, "linked.txt"), nothing)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "linked.txt"), nothing, owned)).resolves.toMatchObject({
         kind: "unavailable",
         reason: "outside",
       })
-      await expect(previewFile(req(root, "binary.bin"), nothing)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "binary.bin"), nothing, owned)).resolves.toMatchObject({
         kind: "unavailable",
         reason: "binary",
       })
-      await expect(previewFile(req(root, "gone.txt"), nothing)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "gone.txt"), nothing, owned)).resolves.toMatchObject({
         kind: "unavailable",
         reason: "missing",
       })
@@ -55,31 +56,55 @@ describe("文件预览边界", () => {
       await symlink(join(outside, "secret.txt"), join(root, "linked.txt"))
 
       const noted = (_thread: string, _cwd: string, path: string): boolean => path === skill
-      await expect(previewFile(req(root, skill), noted)).resolves.toMatchObject({
+      await expect(previewFile(req(root, skill), noted, owned)).resolves.toMatchObject({
         kind: "text",
         text: "# 技能",
         language: "markdown",
       })
-      await expect(previewFile(req(root, join(outside, "secret.txt")), noted)).resolves.toMatchObject({
+      await expect(previewFile(req(root, join(outside, "secret.txt")), noted, owned)).resolves.toMatchObject({
         kind: "unavailable",
         reason: "outside",
       })
-      await expect(previewFile(req(root, "linked.txt"), noted)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "linked.txt"), noted, owned)).resolves.toMatchObject({
         kind: "unavailable",
         reason: "outside",
       })
       // 同一份文件，会话报过就连符号链接那条路也放行
-      await expect(previewFile(req(root, "linked.txt"), () => true)).resolves.toMatchObject({
+      await expect(previewFile(req(root, "linked.txt"), () => true, owned)).resolves.toMatchObject({
         kind: "text",
         text: "没读过的",
       })
       // 没有会话身份时只剩工作区那道门
-      await expect(previewFile({ threadId: "", cwd: root, path: skill }, () => true)).resolves.toMatchObject({
+      await expect(previewFile({ threadId: "", cwd: root, path: skill }, () => true, owned)).resolves.toMatchObject({
         kind: "unavailable",
-        reason: "outside",
+        reason: "failed",
       })
     } finally {
       await rm(root, { recursive: true, force: true })
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it("先核对会话真实工作区，伪造根目录时不会读取任意路径", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "omni-preview-forged-"))
+    try {
+      const secret = join(outside, "secret.txt")
+      await writeFile(secret, "不能泄露")
+      const owns = (threadId: string, cwd: string): boolean => threadId === "th-1" && cwd === outside
+
+      await expect(previewFile(req(outside, secret), nothing, owns)).resolves.toMatchObject({
+        kind: "text",
+        text: "不能泄露",
+      })
+      await expect(previewFile(req("/", secret), nothing, owns)).resolves.toMatchObject({
+        kind: "unavailable",
+        reason: "outside",
+      })
+      await expect(previewFile({ threadId: "other", cwd: outside, path: secret }, nothing, owns))
+        .resolves.toMatchObject({ kind: "unavailable", reason: "outside" })
+      await expect(previewFile({ threadId: "th-1", cwd: outside }, nothing, owns))
+        .resolves.toMatchObject({ kind: "unavailable", reason: "failed" })
+    } finally {
       await rm(outside, { recursive: true, force: true })
     }
   })

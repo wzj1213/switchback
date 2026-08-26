@@ -21,7 +21,7 @@ import type { TouchedFiles } from "./touched.js"
 import { createEngineCatalog } from "./engine-catalog.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached } from "./attached.js"
-import { createWorksiteSearch, type WorksiteSearch } from "./worksite-search.js"
+import type { WorksiteSearch } from "./worksite-search.js"
 
 export type { Attached } from "./attached.js"
 
@@ -154,12 +154,13 @@ function openStores(log: Logger, emit: (event: Event) => void): {
  * 宿主要向外借的那几件事。
  *
  * **偏好那几条全是函数，不是值**：它们背后是用户偏好，而偏好随时会改——
- * 传值的话，改完要等到重启才生效。`touched` 例外：它不是偏好，是一份**有状态的服务**，
- * 而且通道比宿主先挂（见 `index.ts`），两边必须拿到同一份。
+ * 传值的话，改完要等到重启才生效。`touched` / `worksiteSearch` 例外：它们不是偏好，
+ * 而是通道与宿主事件出口必须共享的**有状态服务**（见 `index.ts`）。
  */
 export interface HostPorts {
   touched: TouchedFiles
   attachmentFiles: AttachmentFiles
+  worksiteSearch: WorksiteSearch
   relay?: Relay
   engineVisible?: (id: string) => boolean
   dshProfile?: () => string
@@ -205,7 +206,7 @@ export function attachHost(
   // 自己再判，因为只有那一层知道每台远程设备停在哪儿。
   const attention = createAttention(windows, relay, ports?.notify)
   const awake = createAwake()
-  const worksiteSearch = createWorksiteSearch()
+  const worksiteSearch = ports.worksiteSearch
   // **迟绑定**：outlet 比 host 先建，而它要问 host「现在有几条在跑」。
   // 传函数而不是值，读到的才是当下那一份
   const holder: { host: Host | undefined } = { host: undefined }

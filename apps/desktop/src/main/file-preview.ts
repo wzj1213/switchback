@@ -4,6 +4,7 @@ import { ipcMain, nativeImage } from "electron"
 import type { ThreadId } from "@omni/protocol"
 import type { FilePreview, FilePreviewRequest } from "../shared/file-preview.js"
 import type { TouchedFiles } from "./touched.js"
+import type { WorksiteSearch } from "./worksite-search.js"
 
 const MAX_TEXT = 1_500_000
 const MAX_IMAGE = 1600
@@ -37,9 +38,15 @@ function beneath(root: string, target: string): boolean {
  * 渲染层说什么不算数。
  */
 export type PreviewGuard = (threadId: ThreadId, cwd: string, path: string) => boolean
+export type WorkspaceGuard = (threadId: ThreadId, cwd: string) => boolean
 
-function malformed(req: FilePreviewRequest): boolean {
-  return typeof req?.cwd !== "string" || typeof req.path !== "string" || req.cwd === "" || req.path === ""
+function requestOf(value: unknown): FilePreviewRequest | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const req = value as Partial<FilePreviewRequest>
+  if (typeof req.threadId !== "string" || req.threadId === "") return undefined
+  if (typeof req.cwd !== "string" || req.cwd === "") return undefined
+  if (typeof req.path !== "string" || req.path === "") return undefined
+  return { threadId: req.threadId, cwd: req.cwd, path: req.path }
 }
 
 /** 这条会话自己报过这条路径吗。认不出会话就一律当没报过。 */
@@ -49,7 +56,6 @@ function reported(req: FilePreviewRequest, touched: PreviewGuard): boolean {
 }
 
 async function safeTarget(req: FilePreviewRequest, touched: PreviewGuard): Promise<string | FilePreview> {
-  if (malformed(req)) return unavailable("", "failed", "没有可预览的文件路径。")
   const lexicalRoot = resolve(req.cwd)
   const lexicalTarget = resolve(lexicalRoot, req.path)
   const noted = reported(req, touched)
@@ -99,7 +105,16 @@ function looksBinary(buffer: Buffer): boolean {
   return sample.length > 0 && controls / sample.length > 0.08
 }
 
-export async function previewFile(req: FilePreviewRequest, touched: PreviewGuard): Promise<FilePreview> {
+export async function previewFile(
+  value: unknown,
+  touched: PreviewGuard,
+  owns: WorkspaceGuard,
+): Promise<FilePreview> {
+  const req = requestOf(value)
+  if (req === undefined) return unavailable("", "failed", "没有可预览的文件路径。")
+  if (!owns(req.threadId, req.cwd)) {
+    return unavailable(req.path, "outside", "这条会话没有使用这个工作区，不能预览其中的文件。")
+  }
   const target = await safeTarget(req, touched)
   if (typeof target !== "string") return target
   try {
@@ -124,6 +139,8 @@ export async function previewFile(req: FilePreviewRequest, touched: PreviewGuard
   }
 }
 
-export function installFilePreviewChannel(touched: TouchedFiles): void {
-  ipcMain.handle("omni:filePreview", (_event, req: FilePreviewRequest) => previewFile(req, touched.allows))
+export function installFilePreviewChannel(touched: TouchedFiles, worksites: WorksiteSearch): void {
+  ipcMain.handle("omni:filePreview", (_event, req: unknown) => (
+    previewFile(req, touched.allows, worksites.owns)
+  ))
 }

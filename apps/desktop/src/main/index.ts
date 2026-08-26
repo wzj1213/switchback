@@ -35,6 +35,7 @@ import { installEngineSettings } from "./engine-settings.js"
 import { installFilePreviewChannel } from "./file-preview.js"
 import { createTouchedFiles } from "./touched.js"
 import { createAttachmentFiles } from "./attachment-files.js"
+import { createWorksiteSearch } from "./worksite-search.js"
 
 /**
  * Electron 主进程。
@@ -66,13 +67,15 @@ const settings = createSettings(log)
 const engineVersions = createEngineVersions(log, { claudeExecutable: buildInfo.claudeExecutable })
 
 /**
- * 「这条会话碰过哪些文件」的名册。预览工作区外那些文件时凭它放行（见 `touched.ts`）。
+ * 「会话碰过哪些文件 / 真正拥有哪个工作区」的名册。预览先凭 worksiteSearch 核根，
+ * 工作区外的文件再凭 touched 放行（见 `file-preview.ts`）。
  *
  * **在这里建**：通道比宿主先挂（`installChannels` 在 `attachHost` 之前），
  * 而两边说的必须是同一份名册。理由同 `engineVersions`——有状态，就显式传下去。
  */
 const touched = createTouchedFiles()
 const attachmentFiles = createAttachmentFiles(join(app.getPath("userData"), "attachments"))
+const worksiteSearch = createWorksiteSearch()
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
@@ -289,7 +292,7 @@ function installChannels(): void {
   installSearchChannel()
   installChatDirChannel()
   installAttachChannel(attachmentFiles)
-  installFilePreviewChannel(touched)
+  installFilePreviewChannel(touched, worksiteSearch)
   installProjectDocChannel()
   installEngineVersionChannel(log, engineVersions)
   installEngineDoorChannels()
@@ -336,6 +339,7 @@ function bootstrap(): Promise<void> {
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
       touched,
       attachmentFiles,
+      worksiteSearch,
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
       notify: () => settings.get().notify,
