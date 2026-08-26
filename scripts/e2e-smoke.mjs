@@ -157,6 +157,41 @@ async function checkPets(cdp) {
   )
 }
 
+async function checkWorkbench(cdp) {
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 860, height: 560, deviceScaleFactor: 1, mobile: false,
+  })
+  await pause(120)
+  await value(
+    cdp,
+    `(() => { const b=document.querySelector('[aria-label="打开文件预览"]'); b.focus(); b.click(); return true })()`,
+  )
+  await waitFor(cdp, "document.querySelector('.workbench[aria-modal=true]') !== null")
+  await audit(cdp, "窄屏文件工作台")
+  assert(
+    await value(cdp, "document.querySelector('.workbench').contains(document.activeElement)"),
+    "打开文件抽屉后焦点进入工作台",
+  )
+  const count = await value(
+    cdp,
+    `(() => { const d=document.querySelector('.workbench'); const a=[...d.querySelectorAll("button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex='-1'])")]; a.at(-1).focus(); return a.length })()`,
+  )
+  assert(count > 1, "文件抽屉有可遍历的焦点顺序")
+  await key(cdp, "Tab")
+  assert(
+    await value(cdp, "document.querySelector('.workbench').contains(document.activeElement)"),
+    "Tab 不会走出窄屏文件抽屉",
+  )
+  await key(cdp, "Escape")
+  await waitFor(cdp, "document.querySelector('.workbench') === null")
+  assert(
+    await value(cdp, "document.activeElement?.getAttribute('aria-label') === '打开文件预览'"),
+    "Esc 关闭抽屉后焦点回到文件入口",
+  )
+  await cdp.send("Emulation.clearDeviceMetricsOverride")
+  await pause(120)
+}
+
 async function inspect(cdp) {
   await waitFor(cdp, "document.querySelector('.shell') !== null")
   const boot = await value(
@@ -195,6 +230,8 @@ async function inspect(cdp) {
     await value(cdp, "document.activeElement?.matches('.row--group .row__main') === true"),
     "Esc 关闭菜单后焦点回到项目行",
   )
+
+  await checkWorkbench(cdp)
 
   await value(
     cdp,

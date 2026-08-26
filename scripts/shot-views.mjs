@@ -85,7 +85,7 @@ export const VIEWS = [
     {
       name: "06-后台活动工作台",
       open: [
-        `document.querySelector('[title="后台活动"]')?.click()`,
+        `(() => { const button = document.querySelector('[title="后台活动"]'); button?.focus(); button?.click() })()`,
         `document.querySelector('.activity-row')?.click()`,
       ],
       ready: ".activity-detail",
@@ -94,7 +94,7 @@ export const VIEWS = [
       name: "07-文件清单",
       open: `document.querySelector('[title="文件预览"]')?.click()`,
       ready: ".file-row",
-      assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
+      assert: `document.activeElement?.matches('.files-search input') === true && document.querySelector('.workbench')?.getAttribute('aria-modal') === (window.innerWidth <= 1120 ? 'true' : null) && (window.innerWidth > 1120 || (() => { const box = document.querySelector('.workbench'); const before = document.activeElement; const nodes = [...box.querySelectorAll('button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])')]; nodes.at(-1)?.focus(); document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); const trapped = document.activeElement === nodes[0]; before?.focus(); return trapped })()) && getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')
         && !document.querySelector('.files-index')?.textContent.includes('failed-secret.txt')
         && document.querySelector('.files-scope')?.textContent.includes('搜索范围是当前工作区') === true
         && document.querySelector('.files-index')?.textContent.includes('最近一轮改过') === true
@@ -160,7 +160,7 @@ export const VIEWS = [
     {
       name: "12-切会话保留草稿",
       open: [
-        `document.querySelector('[aria-label="收起工作台"]')?.click()`,
+        `return new Promise((resolve, reject) => { document.querySelector('[aria-label="收起工作台"]')?.click(); setTimeout(() => { document.activeElement?.getAttribute('title') === '后台活动' ? resolve(true) : reject(new Error('工作台关闭后没有回到原触发器')) }, 80) })`,
         `(() => {
           const input = document.querySelector('.composer__input')
           const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set

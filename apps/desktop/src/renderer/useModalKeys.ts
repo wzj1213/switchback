@@ -15,7 +15,17 @@ function focusable(box: HTMLElement): readonly HTMLElement[] {
   )
 }
 
-function trapTab(event: KeyboardEvent, box: HTMLElement): void {
+function recoverTab(event: KeyboardEvent, box: HTMLElement,
+  first: HTMLElement | undefined, last: HTMLElement | undefined): boolean {
+  if (box.contains(document.activeElement)) return false
+  event.preventDefault()
+  const target = event.shiftKey ? last : first
+  target?.focus()
+  return true
+}
+
+/** 把 Tab 留在指定面板内；当前焦点意外跑出去时也会收回。 */
+export function trapTab(event: KeyboardEvent, box: HTMLElement): void {
   if (event.key !== "Tab") return
   const nodes = focusable(box)
   if (nodes.length === 0) {
@@ -26,7 +36,8 @@ function trapTab(event: KeyboardEvent, box: HTMLElement): void {
   const first = nodes[0]
   const last = nodes[nodes.length - 1]
   const active = document.activeElement
-  if (event.shiftKey && (active === first || !box.contains(active))) {
+  if (recoverTab(event, box, first, last)) return
+  if (event.shiftKey && active === first) {
     event.preventDefault()
     last?.focus()
   } else if (!event.shiftKey && active === last) {
