@@ -22,10 +22,10 @@ function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
             role="status">{status}</span>
         )}
       </span>
-      {directory === "" ? null : (
+      {directory === "" && !external ? null : (
         <span className="file-preview__path">
           {external ? <span className="file-preview__scope">工作区外</span> : null}
-          <span>{directory}</span>
+          {directory === "" ? null : <span>{directory}</span>}
         </span>
       )}
     </span>

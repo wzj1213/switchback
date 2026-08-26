@@ -183,7 +183,9 @@ export const VIEWS = [
       open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
       ready: ".file-source",
       assert: `document.querySelector('[aria-label="继续会话后引用到输入框"]')?.disabled === true
-        && document.querySelector('[aria-label="继续会话后引用到输入框"]')?.textContent.includes('继续后引用') === true`,
+        && document.querySelector('[aria-label="继续会话后引用到输入框"]')?.textContent.includes('继续后引用') === true
+        && document.querySelector('.file-preview__scope')?.textContent === '工作区外'
+        && document.querySelector('.file-preview__path')?.textContent.includes('工作区外') === true`,
     },
     {
       name: "11-HTML预览",
