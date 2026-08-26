@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { fileTouchOf, sessionFileGroupsOf } from "../session-files.js"
@@ -6,6 +6,7 @@ import { useFileSearch, type FileSearchState, type SearchFiles } from "../use-fi
 import { FileGroup } from "./file-group.js"
 import { focusFile, focusFirstFile, PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
+import { ReloadIcon } from "./reload-icon.js"
 
 interface FileSearchView extends Omit<FileSearchState, "key"> {
   retry: () => void
@@ -39,6 +40,7 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
   searchFiles: SearchFiles
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
+  const searchId = useId()
   const input = useRef<HTMLInputElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const enterResults = useRef(false)
@@ -71,26 +73,33 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
       setQuery("")
       input.current?.focus()
     }}>
-      <label className="files-search">
-        <span className="sr-only">搜索工作区文件</span>
-        <input ref={input} value={query} placeholder="搜索工作区文件…"
-          onChange={(event) => {
-            enterResults.current = false
-            setQuery(event.currentTarget.value)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown") {
-              event.preventDefault()
-              enterResults.current = !focusFirstFile(root.current)
-              return
-            }
-            if (event.key !== "Escape" || query === "") return
-            event.stopPropagation()
-            enterResults.current = false
-            setQuery("")
-          }} />
+      <div className="files-search">
+        <label className="sr-only" htmlFor={searchId}>搜索工作区文件</label>
+        <div className="files-search__field">
+          <input id={searchId} ref={input} value={query} placeholder="搜索工作区文件…"
+            onChange={(event) => {
+              enterResults.current = false
+              setQuery(event.currentTarget.value)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault()
+                enterResults.current = !focusFirstFile(root.current)
+                return
+              }
+              if (event.key !== "Escape" || query === "") return
+              event.stopPropagation()
+              enterResults.current = false
+              setQuery("")
+            }} />
+          <button type="button" className="workbench__icon" aria-label="立即刷新搜索结果"
+            title="立即刷新搜索结果" aria-busy={found.loading}
+            disabled={!searching} onClick={found.retry}>
+            <ReloadIcon />
+          </button>
+        </div>
         <span className="files-scope">先列最近一轮；此前与分支继承记录分开保留。搜索当前工作区，文件变化会自动更新。</span>
-      </label>
+      </div>
       <div className="files-index__scroll">
         {searching ? (
           <section>

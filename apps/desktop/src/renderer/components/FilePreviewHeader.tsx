@@ -1,15 +1,7 @@
 import type { PreviewTarget } from "../workbench.js"
 import { dirHint, outside } from "./file-row.js"
 import { ChevronIcon, RevealIcon } from "./icons.js"
-
-function ReloadIcon(): React.JSX.Element {
-  return (
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12.8 5.3V2.7m0 0h-2.6m2.6 0A5.6 5.6 0 1 0 13.4 9" />
-    </svg>
-  )
-}
+import { ReloadIcon } from "./reload-icon.js"
 
 function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
   path: string

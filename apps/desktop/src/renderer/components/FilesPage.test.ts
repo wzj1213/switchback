@@ -61,6 +61,14 @@ describe("文件清单", () => {
     expect(html.match(/工作区外/g)).toHaveLength(1)
   })
 
+  it("搜索框提供原位刷新，空查询时不会制造无意义请求", () => {
+    const html = render()
+    const button = html.match(/<button[^>]+aria-label="立即刷新搜索结果"[^>]*>/)?.[0]
+    expect(button).toContain("disabled")
+    expect(button).toContain('aria-busy="false"')
+    expect(html).toContain('<label class="sr-only" for=')
+  })
+
   it("查询或工作区变化后上一批结果立即失效", () => {
     const old: FileSearchState = {
       key: "/old\u0000readme", loading: false, paths: ["README.md"], failed: false,

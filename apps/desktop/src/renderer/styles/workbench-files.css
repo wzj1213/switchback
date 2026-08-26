@@ -17,6 +17,13 @@
   border-bottom: 1px solid var(--border);
 }
 
+.files-search__field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
 .files-search input {
   width: 100%;
   height: 32px;
@@ -33,6 +40,16 @@
 .files-search input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.files-search__field .workbench__icon:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.files-search__field .workbench__icon:disabled:hover {
+  background: transparent;
+  color: var(--text-faint);
 }
 
 .files-scope {

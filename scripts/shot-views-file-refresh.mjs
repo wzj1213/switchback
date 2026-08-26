@@ -1,5 +1,27 @@
 export const FILE_REFRESH_VIEWS = [
   {
+    name: "09-手动刷新立刻发现文件",
+    createFiles: ["apps/desktop/src/renderer/attachment-manual-refresh-probe.ts"],
+    open: `(() => {
+      window.__omniManualRow = document.activeElement
+      const refresh = document.querySelector('[aria-label="立即刷新搜索结果"]')
+      refresh?.focus()
+      refresh?.click()
+      window.__omniManualRefresh = refresh
+    })()`,
+    ready: '[data-file-path="apps/desktop/src/renderer/attachment-manual-refresh-probe.ts"]',
+    assert: `document.querySelector('.files-search input')?.value === 'attachment'
+      && document.querySelector('.files-index') === window.__omniFileIndex
+      && window.__omniManualRow?.isConnected === true
+      && document.activeElement === window.__omniManualRefresh
+      && window.__omniManualRefresh?.getAttribute('aria-busy') === 'false'`,
+    after: `(() => {
+      window.__omniManualRow?.focus()
+      delete window.__omniManualRow
+      delete window.__omniManualRefresh
+    })()`,
+  },
+  {
     name: "09-搜索持续刷新",
     createFiles: ["apps/desktop/src/renderer/attachment-live-refresh-probe.ts"],
     open: `(() => {
