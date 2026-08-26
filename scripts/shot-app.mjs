@@ -139,7 +139,7 @@ const VIEWS = [
         new DragEvent('dragenter', { bubbles: true, dataTransfer: transfer }),
       )
     })()`,
-    ready: ".composer-drop--blocked",
+    ready: ".composer-drop--blocked", assert: `document.querySelector('.composer-drop')?.textContent.includes('工作区文件请用 @ 引用')`,
     after: `(() => {
       const target = document.querySelector('.composer__inner')
       target?.dispatchEvent(new DragEvent('dragleave', {

@@ -8,7 +8,13 @@ describe("附件拖放反馈", () => {
     { name: "模型不支持时明确拒绝", files: [{ type: "image/png", size: 10 }], enabled: false,
       tone: "blocked", text: "当前引擎或模型不支持图片附件" },
     { name: "源码文件不冒充附件", files: [{ type: "text/typescript", size: 10 }], enabled: true,
-      tone: "blocked", text: "这里只能添加 PNG、JPEG、GIF 或 WebP 图片" },
+      tone: "blocked", text: "这里只能添加图片；工作区文件请用 @ 引用" },
+    { name: "不支持图片的模型也先说清源码文件的用法",
+      files: [{ type: "text/typescript", size: 10 }], enabled: false,
+      tone: "blocked", text: "这里只能添加图片；工作区文件请用 @ 引用" },
+    { name: "超大源码仍先按文件类型拒绝",
+      files: [{ type: "text/typescript", size: 13 * 1024 * 1024 }], enabled: true,
+      tone: "blocked", text: "这里只能添加图片；工作区文件请用 @ 引用" },
     { name: "超大图片当场说明上限", files: [{ type: "image/png", size: 13 * 1024 * 1024 }], enabled: true,
       tone: "blocked", text: "单张图片不能超过 12 MB" },
     { name: "混合拖放保留能收的", files: [
@@ -32,5 +38,10 @@ describe("附件拖放反馈", () => {
       { type: "image/png", size: 10 }, { type: "image/svg+xml", size: 10 },
     ])
     expect(dropNotice(review, true, 1, 0)).toBe("已添加 1 张；另有 1 个文件未添加。")
+  })
+
+  it("落下源码文件后给可行动的正确入口", () => {
+    const review = reviewAttachments([{ type: "text/typescript", size: 10 }])
+    expect(dropNotice(review, false, 0, 0)).toBe("未添加：这里只接收图片；工作区文件请用 @ 引用。")
   })
 })

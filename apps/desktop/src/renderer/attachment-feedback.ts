@@ -20,9 +20,10 @@ interface FileLike {
 interface ItemLike { kind: string }
 
 function issue(file: FileLike): keyof Omit<AttachmentReview, "total"> {
+  if (imageExtension(file.type) === undefined) return "unsupported"
   if (file.size <= 0) return "empty"
   if (file.size > MAX_IMAGE_BYTES) return "oversized"
-  return imageExtension(file.type) === undefined ? "unsupported" : "accepted"
+  return "accepted"
 }
 
 export function reviewAttachments(files: readonly FileLike[]): AttachmentReview {
@@ -36,6 +37,13 @@ export function hasFileItems(items: ArrayLike<ItemLike> | null): boolean {
 }
 
 export function hoverHint(review: AttachmentReview, enabled: boolean): DropHint {
+  if (review.total > 0 && review.accepted === 0) {
+    if (review.unsupported > 0) {
+      return { tone: "blocked", text: "这里只能添加图片；工作区文件请用 @ 引用" }
+    }
+    if (review.oversized > 0) return { tone: "blocked", text: "单张图片不能超过 12 MB" }
+    if (review.empty > 0) return { tone: "blocked", text: "空图片不能添加" }
+  }
   if (!enabled) return { tone: "blocked", text: "当前引擎或模型不支持图片附件" }
   if (review.total === 0) return { tone: "ready", text: "松手添加图片" }
   if (review.accepted === review.total) {
@@ -44,9 +52,7 @@ export function hoverHint(review: AttachmentReview, enabled: boolean): DropHint 
   if (review.accepted > 0) {
     return { tone: "ready", text: `可添加 ${String(review.accepted)} 张；其余文件不会添加` }
   }
-  if (review.oversized > 0) return { tone: "blocked", text: "单张图片不能超过 12 MB" }
-  if (review.empty > 0) return { tone: "blocked", text: "空图片不能添加" }
-  return { tone: "blocked", text: "这里只能添加 PNG、JPEG、GIF 或 WebP 图片" }
+  return { tone: "blocked", text: "图片未能添加" }
 }
 
 export function dropNotice(
@@ -55,12 +61,14 @@ export function dropNotice(
   added: number,
   failed: number,
 ): string | undefined {
+  if (review.total > 0 && review.accepted === 0) {
+    if (review.unsupported > 0) return "未添加：这里只接收图片；工作区文件请用 @ 引用。"
+    if (review.oversized > 0) return "未添加：单张图片不能超过 12 MB。"
+    if (review.empty > 0) return "未添加：图片是空文件。"
+  }
   if (!enabled) return "当前引擎或模型不支持图片附件。"
   const rejected = review.total - review.accepted + failed
   if (rejected === 0) return undefined
   if (added > 0) return `已添加 ${String(added)} 张；另有 ${String(rejected)} 个文件未添加。`
-  if (review.oversized > 0) return "未添加：单张图片不能超过 12 MB。"
-  if (review.empty > 0) return "未添加：图片是空文件。"
-  if (review.unsupported > 0) return "未添加：只支持 PNG、JPEG、GIF 或 WebP 图片。"
   return "未添加：读取文件路径失败。"
 }

@@ -20,6 +20,14 @@ describe("附件三种入口", () => {
     })
   })
 
+  it("拖入源码时不把文件类型错报成模型能力", () => {
+    const files = [image("code.ts", "text/typescript")] as unknown as FileList
+    expect(droppedImages(files, false, bridge)).toEqual({
+      paths: [],
+      notice: "未添加：这里只接收图片；工作区文件请用 @ 引用。",
+    })
+  })
+
   it("粘贴图片异步落盘，普通文本文件不进入上下文", async () => {
     const items = [image("a.png"), image("notes.txt", "text/plain")].map((file) => ({
       kind: "file", getAsFile: () => file,
