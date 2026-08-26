@@ -26,6 +26,7 @@ import WebSocket from "ws"
 import { mainThread, stubThread } from "./ui-fixture.mjs"
 import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
+import { VIEWS } from "./shot-views.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -119,109 +120,6 @@ async function waitFor(cdp, expression, label) {
   }
   throw new Error(`界面没有就绪（${label}）：${expression}`)
 }
-
-/**
- * 要拍哪几屏。
- *
- * `open` 把界面摆成那一屏，`ready` 是「摆好了」的判据——**两样都不能省**：
- * 只有 `open` 没有 `ready` 的话，点了没生效也照样出图，四张长得一模一样
- * 而你以为拍到了四屏（第一版就是这样，02/03/04 三张字节数都相同）。
- */
-const VIEWS = [
-  { name: "01-转录区", open: null, ready: ".md" },
-  {
-    name: "02-拖拽拒绝提示",
-    open: `(() => {
-      const transfer = new DataTransfer()
-      transfer.items.add(new File(["const nope = true"], "code.ts", { type: "text/typescript" }))
-      window.__omniShotTransfer = transfer
-      document.querySelector('.composer__inner')?.dispatchEvent(
-        new DragEvent('dragenter', { bubbles: true, dataTransfer: transfer }),
-      )
-    })()`,
-    ready: ".composer-drop--blocked", assert: `document.querySelector('.composer-drop')?.textContent.includes('工作区文件请用 @ 引用')`,
-    after: `(() => {
-      const target = document.querySelector('.composer__inner')
-      target?.dispatchEvent(new DragEvent('dragleave', {
-        bubbles: true, dataTransfer: window.__omniShotTransfer,
-      }))
-      delete window.__omniShotTransfer
-    })()`,
-  },
-  {
-    name: "03-后台活动工作台",
-    open: [
-      `document.querySelector('[title="后台活动"]')?.click()`,
-      `document.querySelector('.activity-row')?.click()`,
-    ],
-    ready: ".activity-detail",
-  },
-  {
-    name: "04-文件清单",
-    open: `document.querySelector('[title="文件预览"]')?.click()`,
-    ready: ".file-row",
-    assert: MIN ? `getComputedStyle(document.querySelector('.workbench__scrim')).display !== 'none'`
-      : `getComputedStyle(document.querySelector('.workbench__scrim')).display === 'none'`,
-  },
-  {
-    name: "05-文件搜索",
-    open: `(() => {
-      const input = document.querySelector('.files-search input')
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(input, 'attachment')
-      input?.dispatchEvent(new Event('input', { bubbles: true }))
-    })()`,
-    ready: ".file-row",
-    assert: `[...document.querySelectorAll('.file-row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
-    after: `(() => {
-      const input = document.querySelector('.files-search input')
-      input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    })()`,
-  },
-  {
-    name: "06-工作区外文件预览",
-    open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
-    ready: ".file-source",
-  },
-  {
-    name: "07-HTML预览",
-    open: [
-      `document.querySelector('.workbench__back')?.click()`,
-      `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
-    ],
-    ready: ".html-preview__frame",
-  },
-  {
-    name: "08-新会话",
-    open: `document.querySelector('.sidebar__new')?.click()`,
-    ready: ".blank__title",
-    // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
-    absent: ".file-preview",
-  },
-  {
-    name: "09-推理强度",
-    before: ".effort .trigger:not(:disabled)",
-    open: [
-      `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
-      `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
-      `document.querySelector('.workbench__scrim')?.click()`,
-      `if (document.querySelector('.workbench') !== null) throw new Error('点击遮罩没有收起工作台'); document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
-    ],
-    ready: ".effort__bar--grown",
-    dragEffort: true,
-  },
-  {
-    name: "10-设置",
-    // 侧栏底部那一行**有账号时点开的是菜单**，没账号时才直接进设置
-    //（见 `SidebarFoot.tsx`：「一行只做一件事」）。所以这里走两步，
-    // 而不是假设它一点就开——本机跑 smoke 时没账号，出图时有，两边不一样
-    open: [
-      `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,
-      `[...document.querySelectorAll('[role=menuitem]')].find(m => m.textContent.includes('设置'))?.click()`,
-    ],
-    ready: ".set",
-  },
-]
 
 async function shoot(cdp, view) {
   if (view.before !== undefined) {

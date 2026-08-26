@@ -10,11 +10,19 @@ import { splitPath } from "../diff.js"
 export function MentionList({
   paths,
   active,
+  open,
+  loading,
+  failed,
   onPick,
+  onRetry,
 }: {
   paths: readonly string[]
   active: number
+  open: boolean
+  loading: boolean
+  failed: boolean
   onPick: (path: string) => void
+  onRetry: () => void
 }): React.JSX.Element | null {
   const box = useRef<HTMLDivElement>(null)
 
@@ -23,9 +31,12 @@ export function MentionList({
     box.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" })
   }, [active])
 
-  if (paths.length === 0) return null
+  if (!open) return null
+  if (paths.length === 0) {
+    return <MentionStatus loading={loading} failed={failed} onRetry={onRetry} />
+  }
   return (
-    <div className="mentions" ref={box} role="listbox">
+    <div className="mentions" ref={box} role="listbox" aria-label="工作区文件">
       {paths.map((path, i) => {
         const { dir, name } = splitPath(path)
         return (
@@ -48,6 +59,23 @@ export function MentionList({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+export function MentionStatus({ loading, failed, onRetry }: {
+  loading: boolean
+  failed: boolean
+  onRetry: () => void
+}): React.JSX.Element {
+  if (loading) return <div className="mentions mentions__status" role="status">正在搜索工作区文件…</div>
+  if (!failed) return <div className="mentions mentions__status" role="status">没有匹配的工作区文件</div>
+  return (
+    <div className="mentions mentions__status" role="alert">
+      <span>文件搜索失败</span>
+      <button type="button" className="mentions__retry" onMouseDown={(event) => {
+        event.preventDefault()
+      }} onClick={onRetry}>重试</button>
     </div>
   )
 }

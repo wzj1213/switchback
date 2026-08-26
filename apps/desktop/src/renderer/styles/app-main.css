@@ -540,6 +540,36 @@
   font-size: var(--text-xs);
 }
 
+.mentions__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.mentions__retry {
+  flex: none;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.mentions__retry:hover {
+  background: var(--bg-hover);
+}
+
+.mentions__retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* 次要按钮：文字的、轻的。对比视图的「退出对比」「接着用这边」用它。
    顶栏那种一眼就懂的动作用 `.iconbtn`，这里的需要文字说清楚 */
 .tbtn {

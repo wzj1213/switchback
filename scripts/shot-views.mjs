@@ -1,0 +1,116 @@
+/**
+ * 固定视觉验收页面。
+ *
+ * `open` 把界面摆成那一屏，`ready` 证明它真的摆好了；少任意一个都可能
+ * 把“点击没生效”拍成一张看似正常的重复截图。
+ */
+export const VIEWS = [
+    { name: "01-转录区", open: null, ready: ".md" },
+    {
+      name: "02-拖拽拒绝提示",
+      open: `(() => {
+        const transfer = new DataTransfer()
+        transfer.items.add(new File(["const nope = true"], "code.ts", { type: "text/typescript" }))
+        window.__omniShotTransfer = transfer
+        document.querySelector('.composer__inner')?.dispatchEvent(
+          new DragEvent('dragenter', { bubbles: true, dataTransfer: transfer }),
+        )
+      })()`,
+      ready: ".composer-drop--blocked",
+      assert: `document.querySelector('.composer-drop')?.textContent.includes('工作区文件请用 @ 引用')`,
+      after: `(() => {
+        const target = document.querySelector('.composer__inner')
+        target?.dispatchEvent(new DragEvent('dragleave', {
+          bubbles: true, dataTransfer: window.__omniShotTransfer,
+        }))
+        delete window.__omniShotTransfer
+      })()`,
+    },
+    {
+      name: "03-后台活动工作台",
+      open: [
+        `document.querySelector('[title="后台活动"]')?.click()`,
+        `document.querySelector('.activity-row')?.click()`,
+      ],
+      ready: ".activity-detail",
+    },
+    {
+      name: "04-文件清单",
+      open: `document.querySelector('[title="文件预览"]')?.click()`,
+      ready: ".file-row",
+      assert: `getComputedStyle(document.querySelector('.workbench__scrim')).display === (window.innerWidth <= 1120 ? 'block' : 'none')`,
+    },
+    {
+      name: "05-文件搜索",
+      open: `(() => {
+        const input = document.querySelector('.files-search input')
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        setter?.call(input, 'attachment')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`,
+      ready: ".file-row",
+      assert: `[...document.querySelectorAll('.file-row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
+      after: `document.querySelector('.files-search input')?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )`,
+    },
+    {
+      name: "06-工作区外文件预览",
+      open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
+      ready: ".file-source",
+    },
+    {
+      name: "07-HTML预览",
+      open: [
+        `document.querySelector('.workbench__back')?.click()`,
+        `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
+      ],
+      ready: ".html-preview__frame",
+    },
+    {
+      name: "08-新会话",
+      open: `document.querySelector('.sidebar__new')?.click()`,
+      ready: ".blank__title",
+      // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
+      absent: ".file-preview",
+    },
+    {
+      name: "09-@文件引用",
+      open: [
+        `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+        `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
+        `document.querySelector('.workbench__scrim')?.click()`,
+        `if (document.querySelector('.workbench') !== null) throw new Error('点击遮罩没有收起工作台')`,
+        `(() => {
+          const input = document.querySelector('.composer__input')
+          const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+          setter?.call(input, '@attachment')
+          input?.dispatchEvent(new Event('input', { bubbles: true }))
+        })()`,
+      ],
+      ready: ".mentions__row",
+      assert: `[...document.querySelectorAll('.mentions__row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
+      after: `(() => {
+        const input = document.querySelector('.composer__input')
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(input, '')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`,
+    },
+    {
+      name: "10-推理强度",
+      before: ".effort .trigger:not(:disabled)",
+      open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
+      ready: ".effort__bar--grown",
+      dragEffort: true,
+    },
+    {
+      name: "11-设置",
+      // 有账号时侧栏底部先开菜单，没账号时直接进设置；固定样本走前者。
+      open: [
+        `(() => { const b=document.querySelector('.foot__who'); b?.focus(); b?.click() })()`,
+        `[...document.querySelectorAll('[role=menuitem]')].find(m => m.textContent.includes('设置'))?.click()`,
+      ],
+      ready: ".set",
+    },
+]
