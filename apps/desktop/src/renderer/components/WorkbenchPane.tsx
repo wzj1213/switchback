@@ -22,12 +22,14 @@ function ToolTab({ on, label, count, children, onClick }: {
   )
 }
 
-export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles, onPickLane,
+export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, onFiles, onPickLane,
   onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles }: {
   state: WorkbenchState
   thread: Thread
   lanes: readonly Lane[]
   items: readonly Item[]
+  /** 轮次 / shell 完成时变化；打开的文件据此重读磁盘。 */
+  stamp: string
   onActivity: () => void
   onFiles: () => void
   onPickLane: (id: string) => void
@@ -67,7 +69,8 @@ export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles
           <ActivityPage lanes={lanes} laneId={state.laneId} items={items} thread={thread}
             onPick={onPickLane} onBack={onActivityIndex} onCopy={onCopy} />
         ) : (
-          <FilesPage threadId={thread.id} cwd={thread.cwd} items={items} target={state.file} onPick={onPickFile}
+          <FilesPage threadId={thread.id} cwd={thread.cwd} items={items} stamp={stamp}
+            target={state.file} onPick={onPickFile}
             onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
         )}

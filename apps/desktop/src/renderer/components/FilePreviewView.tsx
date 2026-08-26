@@ -24,10 +24,16 @@ function identityOf(target: PreviewTarget): string {
   return `${target.threadId}\u0000${target.cwd}\u0000${target.path}`
 }
 
-function usePreview(target: PreviewTarget, revision: Item | undefined, manual: number): Load {
+function usePreview(target: PreviewTarget, revision: Item | undefined, stamp: string, manual: number): Load {
   const [load, setLoad] = useState<Load>(LOADING)
+  const [visit, setVisit] = useState(0)
   const lastTarget = useRef("")
   const identity = identityOf(target)
+  useEffect(() => {
+    const bump = (): void => { setVisit((before) => before + 1) }
+    window.addEventListener("focus", bump)
+    return () => { window.removeEventListener("focus", bump) }
+  }, [])
   useEffect(() => {
     let alive = true
     const refreshing = lastTarget.current === identity
@@ -54,7 +60,7 @@ function usePreview(target: PreviewTarget, revision: Item | undefined, manual: n
       })
     }, refreshing ? 100 : 0)
     return () => { alive = false; window.clearTimeout(timer) }
-  }, [manual, revision, target.threadId, target.cwd, target.path])
+  }, [manual, revision, stamp, target.threadId, target.cwd, target.path, visit])
   return load.state === "ready" && load.identity !== identity ? LOADING : load
 }
 
@@ -83,7 +89,7 @@ function PreviewActions({ target, busy, referenceable, referenceDisabled, reveal
       {onReference === undefined || !referenceable ? null : (
         <button type="button" className="file-preview__reference"
           title={referenceDisabled ? "继续会话后才能引用" : "引用到输入框"}
-          aria-label="引用到输入框" disabled={busy || referenceDisabled}
+          aria-label="引用到输入框" disabled={referenceDisabled}
           onClick={() => { onReference(target) }}>
           <span aria-hidden="true">@</span> 引用
         </button>
@@ -150,10 +156,11 @@ function Content({ file, onCopy }: { file: FilePreview; onCopy: (text: string) =
   return <Source file={file} onCopy={onCopy} />
 }
 
-export function FilePreviewView({ target, revision, onBack, onReference, referenceDisabled = false,
+export function FilePreviewView({ target, revision, stamp, onBack, onReference, referenceDisabled = false,
   onReveal, onCopy }: {
   target: PreviewTarget
   revision: Item | undefined
+  stamp: string
   onBack: () => void
   onReference?: (target: PreviewTarget) => void
   referenceDisabled?: boolean
@@ -161,7 +168,7 @@ export function FilePreviewView({ target, revision, onBack, onReference, referen
   onCopy: (text: string) => void
 }): React.JSX.Element {
   const [manual, setManual] = useState(0)
-  const load = usePreview(target, revision, manual)
+  const load = usePreview(target, revision, stamp, manual)
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
   const revealable = canRevealPreview(load.state === "ready" ? load.file : undefined, path)

@@ -30,7 +30,7 @@ const items: readonly Item[] = [
 
 function render(): string {
   return renderToStaticMarkup(createElement(FilesPage, {
-    threadId: "th-1", cwd, items, target: undefined,
+    threadId: "th-1", cwd, items, stamp: "idle:0", target: undefined,
     onPick: () => undefined, onBack: () => undefined,
     onReveal: () => undefined, onCopy: () => undefined,
     searchFiles: () => Promise.resolve([]),

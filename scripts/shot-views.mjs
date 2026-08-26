@@ -237,11 +237,10 @@ export const VIEWS = [
           setter?.call(input, 'attachment-feedback')
           input?.dispatchEvent(new Event('input', { bubbles: true }))
         })()`,
-        `[...document.querySelectorAll('.file-row')]
-          .find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
+        `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
+        `setTimeout(() => { window.dispatchEvent(new Event('focus')); const see = () => { if (document.querySelector('.file-preview__title span')?.textContent.includes('正在更新')) document.documentElement.dataset.fileRefresh = String(document.querySelector('.file-source') !== null && document.querySelector('[aria-label="引用到输入框"]')?.disabled === false); else setTimeout(see, 10) }; see() }, 320)`,
       ],
-      ready: ".file-source",
-      assert: `document.querySelector('[aria-label="引用到输入框"]')?.disabled === false`,
+      ready: `html[data-file-refresh]`, assert: `document.documentElement.dataset.fileRefresh === 'true'`,
     },
     {
       name: "15-工作台文件加入输入框",

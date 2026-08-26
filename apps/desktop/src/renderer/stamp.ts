@@ -8,7 +8,7 @@ import type { Item, Turn } from "@omni/protocol"
  * **而不是各自起一个定时器**：定时器要么问得太勤（每次都 spawn 一个 git），
  * 要么太懒（改完半天界面还是旧的）。
  *
- * 抽成一个函数是因为它现在有三个调用方，而算错了不会报错——
+ * 抽成一个函数是因为 Git 状态、审核、变更卡与文件预览都拿它，而算错了不会报错——
  * 只会让某一块永远不刷新，或者每帧刷新一次。
  */
 export function stampOf(turn: Turn | undefined, items: readonly Item[] = []): string {

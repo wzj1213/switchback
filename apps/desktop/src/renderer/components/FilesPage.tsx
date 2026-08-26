@@ -166,11 +166,12 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
   )
 }
 
-export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReference,
+export function FilesPage({ threadId, cwd, items, stamp, target, onPick, onBack, onReference,
   referenceDisabled, onReveal, onCopy, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
+  stamp: string
   target: PreviewTarget | undefined
   onPick: (target: PreviewTarget) => void
   onBack: () => void
@@ -184,7 +185,7 @@ export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onRefe
   return target === undefined ? (
     <FileIndex threadId={threadId} cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
   ) : (
-    <FilePreviewView target={target} revision={revision}
+    <FilePreviewView target={target} revision={revision} stamp={stamp}
       onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
       onReveal={onReveal} onCopy={onCopy} />
   )

@@ -17,6 +17,7 @@ import { WorkbenchPane } from "./WorkbenchPane.js"
 import { Workspace } from "./Workspace.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import { fileReference, type ComposerFileReference } from "../file-references.js"
+import { stampOf } from "../stamp.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -40,6 +41,10 @@ export function ThreadScreen({
   const [reference, setReference] = useState<(ComposerFileReference & { threadId: string }) | undefined>()
   const lanes = lanesOf(state, thread.id)
   const allItems = itemsOf(state, thread.id)
+  const turn = turnOf(state, thread.id)
+  // 预览也要跟着磁盘可能变化的节拍走；旁路 shell 同样可能改当前文件，
+  // 所以这里用包含 lane 的 allItems，而主转录区仍拿自己过滤后的 app.items。
+  const fileStamp = stampOf(turn, allItems)
   const workbench = scopeWorkbench(shell.workbench, new Set(lanes.map((lane) => lane.id)), thread.id, thread.cwd)
   return (
     <div className={`shell${workbench.visible ? " shell--workbench" : ""}`}>
@@ -54,7 +59,7 @@ export function ThreadScreen({
         rows={app.rows}
         onSelect={shell.select}
         items={app.items}
-        turn={turnOf(state, thread.id)}
+        turn={turn}
         usage={usageOf(state, thread.id, thread.engine)}
         tasks={tasksOf(state, thread.id)}
         thinkingTokens={thinkingTokensOf(state, thread.id)}
@@ -96,6 +101,7 @@ export function ThreadScreen({
         thread={thread}
         lanes={lanes}
         items={allItems}
+        stamp={fileStamp}
         onActivity={shell.openActivity}
         onFiles={shell.openFiles}
         onPickLane={shell.openAside}
