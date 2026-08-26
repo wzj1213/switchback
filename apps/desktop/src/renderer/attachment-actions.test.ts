@@ -33,6 +33,15 @@ describe("附件三种入口", () => {
     })
   })
 
+  it("图片附件关闭时，拖入的图片也保留为可见引用", () => {
+    const files = [image("a.png")] as unknown as FileList
+    expect(droppedFiles(files, false, bridge, "/tmp")).toEqual({
+      paths: [],
+      references: ["a.png"],
+      notice: { text: "已引用 1 个文件。", tone: "info" },
+    })
+  })
+
   it("粘贴图片异步落盘，普通文件同时进入可编辑正文", async () => {
     const items = [image("a.png"), image("notes.txt", "text/plain")].map((file) => ({
       kind: "file", getAsFile: () => file,

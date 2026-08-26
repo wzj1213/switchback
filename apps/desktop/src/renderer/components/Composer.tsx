@@ -152,7 +152,7 @@ function VoidRing(): React.JSX.Element {
 export function Composer(props: Props): React.JSX.Element {
   const { detached = false, busy = false, starting = false } = props
   const focus = useComposerFocus({ detached, initial: props.focusOnMount === true, prefillAt: props.prefill?.at ?? 0 })
-  const { initial, attach, aside } = useComposerMemory({
+  const { initial, attach, aside, imageAttachments } = useComposerMemory({
     drafts: props.drafts, threadId: props.threadId, engine: props.engine, canAttach: props.canAttach,
     canAside: props.canAside === true && !detached && !starting, prefill: props.prefill, onAsk: props.onAsk,
   })
@@ -167,7 +167,7 @@ export function Composer(props: Props): React.JSX.Element {
     blocked: mode.blocked || attachmentBlocked, steering: mode.steering, initial,
     onSend: aside.wrapSend(props.onSend),
   })
-  const files = useComposerFiles({ attach, canAttach: props.canAttach, editable: !detached,
+  const files = useComposerFiles({ attach, canAttach: imageAttachments, editable: !detached,
     cwd: props.cwd, setText: draft.setText, focus: focus.focus, reference: props.reference })
   useRememberComposer({
     drafts: props.drafts, threadId: props.threadId, engine: props.engine,
