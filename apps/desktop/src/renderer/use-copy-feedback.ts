@@ -9,8 +9,8 @@ export function copyFeedbackLabel(feedback: CopyFeedback): string {
   return feedback === "failed" ? "复制失败" : "复制"
 }
 
-export function copyFeedbackTitle(feedback: CopyFeedback, idle: string): string {
-  if (feedback === "copied") return "内容已复制"
+export function copyFeedbackTitle(feedback: CopyFeedback, idle: string, copied = "内容已复制"): string {
+  if (feedback === "copied") return copied
   return feedback === "failed" ? "复制失败，请重试" : idle
 }
 

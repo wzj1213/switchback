@@ -10,7 +10,7 @@ export function ReviewPane({ file, patch, empty, split, onCopy }: {
   patch: PatchData
   empty: string
   split: boolean
-  onCopy: (text: string) => void
+  onCopy: (text: string) => unknown
 }): React.JSX.Element {
   if (file === undefined) {
     return <section className="rv__pane"><p className="rvd__note">{empty}</p></section>
@@ -18,10 +18,11 @@ export function ReviewPane({ file, patch, empty, split, onCopy }: {
   return (
     <section className="rv__pane">
       <ReviewFileHead
+        key={file.rel}
         file={file}
         copyDisabled={patch.loading || patch.skip === "failed"}
         onReveal={() => { reveal(file.path) }}
-        onCopy={() => { onCopy(reviewCopyText(file.rel, patch)) }}
+        onCopy={() => onCopy(reviewCopyText(file.rel, patch))}
       />
       <ReviewDiff
         lines={patch.lines}

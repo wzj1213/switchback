@@ -11,6 +11,9 @@ describe("复制反馈文案", () => {
     it(feedback, () => {
       expect(copyFeedbackLabel(feedback)).toBe(label)
       expect(copyFeedbackTitle(feedback, "复制后台命令")).toBe(title)
+      if (feedback === "copied") {
+        expect(copyFeedbackTitle(feedback, "复制", "文件改动已复制")).toBe("文件改动已复制")
+      }
     })
   }
 })

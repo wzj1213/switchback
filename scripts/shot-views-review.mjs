@@ -32,6 +32,24 @@ export const REVIEW_VIEWS = [
       })()`,
   },
   {
+    name: "04-审核复制有确认",
+    open: `(() => {
+      const button = document.querySelector('[aria-label="复制这份文件改动"]')
+      window.__omniReviewDiff = document.querySelector('.rvd')
+      window.__omniReviewPath = document.querySelector('.rv__path')?.textContent
+      button?.focus()
+      button?.click()
+    })()`,
+    ready: '.rv__act[data-state="copied"]',
+    assert: `(() => {
+      const button = document.querySelector('.rv__act[data-state="copied"]')
+      return button?.getAttribute('aria-label') === '文件改动已复制'
+        && button === document.activeElement
+        && document.querySelector('.rvd') === window.__omniReviewDiff
+        && document.querySelector('.rv__path')?.textContent === window.__omniReviewPath
+    })()`,
+  },
+  {
     name: "04-历史审核拖放说明",
     open: [],
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],

@@ -59,7 +59,7 @@ export function Review({ cwd, threadId, stamp, wanted, full, onFull, onClose, on
   full: boolean
   onFull: () => void
   onClose: () => void
-  onCopy: (text: string) => void
+  onCopy: (text: string) => Promise<boolean>
 }): React.JSX.Element {
   const box = usePanelKeys(onClose)
   const data = useReview(cwd, stamp, { threadId, wanted })

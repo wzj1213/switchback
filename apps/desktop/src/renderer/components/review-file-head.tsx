@@ -1,14 +1,19 @@
 import { reviewLabel, type ReviewFile } from "../../shared/review.js"
 import { revealable } from "../reveal.js"
-import { CopyIcon, RevealIcon } from "./icons.js"
+import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
+import { CheckIcon, CopyIcon, RevealIcon } from "./icons.js"
 
 export function ReviewFileHead({ file, copyDisabled, onReveal, onCopy }: {
   file: ReviewFile
   copyDisabled: boolean
   onReveal: () => void
-  onCopy: () => void
+  onCopy: () => unknown
 }): React.JSX.Element {
   const canGo = file.kind !== "delete" && revealable(file.path)
+  const [copyFeedback, copy] = useCopyFeedback(onCopy)
+  const copyTitle = copyDisabled
+    ? "文件改动读取完成后才能复制"
+    : copyFeedbackTitle(copyFeedback, "复制这份文件改动", "文件改动已复制")
   return (
     <div className="rv__file">
       <span className={`rvl__kind rvl__kind--${file.kind}`} aria-hidden="true" />
@@ -20,10 +25,10 @@ export function ReviewFileHead({ file, copyDisabled, onReveal, onCopy }: {
           <RevealIcon size={12} />
         </button>
       ) : null}
-      <button type="button" className="rv__act" aria-label="复制这份文件改动"
-        title={copyDisabled ? "文件改动读取完成后才能复制" : "复制这份文件改动"}
-        disabled={copyDisabled} onClick={onCopy}>
-        <CopyIcon size={12} />
+      <button type="button" className="rv__act" aria-label={copyTitle}
+        aria-live="polite" data-state={copyFeedback} title={copyTitle}
+        disabled={copyDisabled} onClick={copy}>
+        {copyFeedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
       </button>
     </div>
   )
