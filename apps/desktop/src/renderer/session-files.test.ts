@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Item } from "@omni/protocol"
-import { sessionFilesOf } from "./session-files.js"
+import { fileTouchOf, sessionFilesOf } from "./session-files.js"
 
 const tool = (id: string, at: number, detail: Extract<Item, { kind: "tool_call" }>["detail"]): Item => ({
   id,
@@ -53,5 +53,16 @@ describe("任务文件清单", () => {
     expect(sessionFilesOf(items, "/work")).toEqual([
       { path: "/work/src/a.ts", at: 5, action: "编辑", deleted: false },
     ])
+  })
+
+  it("预览刷新只跟当前文件最近一次触达的对象走", () => {
+    const first = tool("a1", 1, {
+      kind: "file_edit", path: "src/a.ts", files: [], added: 1, removed: 0,
+    })
+    const other = tool("b", 2, { kind: "file_read", path: "src/b.ts" })
+    const latest = tool("a2", 3, { kind: "file_read", path: "./src/a.ts" })
+    expect(fileTouchOf([first, other, latest], "/work", "/work/src/a.ts")).toBe(latest)
+    expect(fileTouchOf([first, other], "/work", "/work/src/a.ts")).toBe(first)
+    expect(fileTouchOf([other], "/work", "/work/src/a.ts")).toBeUndefined()
   })
 })

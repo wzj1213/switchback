@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
-import { sessionFilesOf, type SessionFile } from "../session-files.js"
+import { fileTouchOf, sessionFilesOf, type SessionFile } from "../session-files.js"
 import { PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
 
@@ -113,9 +113,11 @@ export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReve
   onCopy: (text: string) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element {
+  const revision = target === undefined ? undefined : fileTouchOf(items, cwd, target.path)
   return target === undefined ? (
     <FileIndex threadId={threadId} cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
   ) : (
-    <FilePreviewView target={target} onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
+    <FilePreviewView target={target} revision={revision}
+      onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
   )
 }

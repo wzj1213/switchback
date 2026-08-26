@@ -127,11 +127,24 @@
   border-bottom: 1px solid var(--border);
 }
 
-.file-preview__head strong {
+.file-preview__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.file-preview__title strong {
   overflow: hidden;
   font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-preview__title span {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
 }
 
 .file-preview__body,

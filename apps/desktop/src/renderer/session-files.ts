@@ -57,3 +57,19 @@ export function sessionFilesOf(items: readonly Item[], cwd: string): readonly Se
   }
   return [...files.values()].sort((a, b) => b.at - a.at)
 }
+
+/** 最近一次碰到这份文件的 item；对象身份变化就是预览需要重读的最窄节拍。 */
+export function fileTouchOf(items: readonly Item[], cwd: string, raw: string): Item | undefined {
+  const wanted = canonicalPath(raw, cwd)
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index]
+    if (item?.kind !== "tool_call") continue
+    if (item.detail.kind === "file_read" && canonicalPath(item.detail.path, cwd) === wanted) return item
+    if (item.detail.kind !== "file_edit") continue
+    const paths = item.detail.files.length === 0
+      ? [item.detail.path]
+      : item.detail.files.map((file) => file.path)
+    if (paths.some((path) => canonicalPath(path, cwd) === wanted)) return item
+  }
+  return undefined
+}

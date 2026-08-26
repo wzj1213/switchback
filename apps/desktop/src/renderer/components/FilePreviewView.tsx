@@ -1,35 +1,54 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { FilePreview } from "../../shared/file-preview.js"
+import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { sandboxHtml } from "../safe-html.js"
 import { ChevronIcon, CopyIcon, RevealIcon } from "./icons.js"
 
-type Load = { state: "loading" } | { state: "ready"; file: FilePreview }
+type Load = { state: "loading" } | {
+  state: "ready"
+  identity: string
+  file: FilePreview
+  refreshing: boolean
+}
+const LOADING: Load = { state: "loading" }
 
-function usePreview(target: PreviewTarget): Load {
-  const [load, setLoad] = useState<Load>({ state: "loading" })
+function identityOf(target: PreviewTarget): string {
+  return `${target.threadId}\u0000${target.cwd}\u0000${target.path}`
+}
+
+function usePreview(target: PreviewTarget, revision: Item | undefined): Load {
+  const [load, setLoad] = useState<Load>(LOADING)
+  const lastTarget = useRef("")
+  const identity = identityOf(target)
   useEffect(() => {
     let alive = true
-    setLoad({ state: "loading" })
+    const refreshing = lastTarget.current === identity
+    lastTarget.current = identity
+    setLoad((before) => refreshing && before.state === "ready"
+      ? { ...before, refreshing: true }
+      : LOADING)
     const bridge = window.omni
     if (bridge === undefined) {
-      setLoad({ state: "ready", file: {
+      setLoad({ state: "ready", identity, file: {
         kind: "unavailable", path: target.path, name: target.path,
         reason: "failed", message: "桌面桥没有接通，暂时不能读取文件。",
-      } })
+      }, refreshing: false })
       return () => { alive = false }
     }
-    void bridge.filePreview(target.threadId, target.cwd, target.path).then((file) => {
-      if (alive) setLoad({ state: "ready", file })
-    }).catch(() => {
-      if (alive) setLoad({ state: "ready", file: {
-        kind: "unavailable", path: target.path, name: target.path,
-        reason: "failed", message: "读取这份文件失败，请稍后重试。",
-      } })
-    })
-    return () => { alive = false }
-  }, [target.threadId, target.cwd, target.path])
-  return load
+    const timer = window.setTimeout(() => {
+      void bridge.filePreview(target.threadId, target.cwd, target.path).then((file) => {
+        if (alive) setLoad({ state: "ready", identity, file, refreshing: false })
+      }).catch(() => {
+        if (alive) setLoad({ state: "ready", identity, file: {
+          kind: "unavailable", path: target.path, name: target.path,
+          reason: "failed", message: "读取这份文件失败，请稍后重试。",
+        }, refreshing: false })
+      })
+    }, refreshing ? 100 : 0)
+    return () => { alive = false; window.clearTimeout(timer) }
+  }, [revision, target.threadId, target.cwd, target.path])
+  return load.state === "ready" && load.identity !== identity ? LOADING : load
 }
 
 function Source({ file, onCopy }: {
@@ -80,13 +99,14 @@ function Content({ file, onCopy }: { file: FilePreview; onCopy: (text: string) =
   return <Source file={file} onCopy={onCopy} />
 }
 
-export function FilePreviewView({ target, onBack, onReveal, onCopy }: {
+export function FilePreviewView({ target, revision, onBack, onReveal, onCopy }: {
   target: PreviewTarget
+  revision: Item | undefined
   onBack: () => void
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const load = usePreview(target)
+  const load = usePreview(target, revision)
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
   return (
@@ -95,7 +115,10 @@ export function FilePreviewView({ target, onBack, onReveal, onCopy }: {
         <button type="button" className="workbench__back" onClick={onBack}>
           <ChevronIcon size={11} /> 文件
         </button>
-        <strong title={path}>{name}</strong>
+        <span className="file-preview__title">
+          <strong title={path}>{name}</strong>
+          {load.state === "ready" && load.refreshing ? <span>正在更新…</span> : null}
+        </span>
         <button type="button" className="workbench__icon" title="在访达中显示"
           aria-label="在访达中显示" onClick={() => { onReveal(path) }}>
           <RevealIcon size={12} />
