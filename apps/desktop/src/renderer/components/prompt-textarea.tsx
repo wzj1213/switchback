@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import type { SlashCommand } from "@omni/protocol"
 import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
@@ -44,6 +45,9 @@ interface Props {
 }
 
 export function PromptTextarea(props: Props): React.JSX.Element {
+  useEffect(() => {
+    if (props.mentions.pendingPath !== undefined) props.choose(props.mentions.pendingPath)
+  }, [props.choose, props.mentions.pendingPath])
   return (
     <textarea
       ref={props.input}

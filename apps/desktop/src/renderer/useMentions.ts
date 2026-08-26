@@ -8,6 +8,8 @@ export interface Mentions {
   open: boolean
   loading: boolean
   failed: boolean
+  /** Enter / Tab 早于搜索结果时，结果一到需要兑现的第一条路径。 */
+  pendingPath: string | undefined
   /** 输入或移动光标之后调用，决定要不要弹列表 */
   refresh: (text: string, caret: number) => void
   /** 键盘导航。返回 true 表示这次按键被列表吃掉了，调用方不要再处理。 */
@@ -23,6 +25,13 @@ interface SearchState {
   loading: boolean
   failed: boolean
   paths: readonly string[]
+}
+
+export function queuedMentionPath(
+  pending: boolean,
+  state: Pick<SearchState, "loading" | "failed" | "paths">,
+): string | undefined {
+  return pending && !state.loading && !state.failed ? state.paths[0] : undefined
 }
 
 const CLOSED_SEARCH: SearchState = { open: false, loading: false, failed: false, paths: [] }
@@ -71,10 +80,12 @@ function useMentionSearch(
  */
 export function useMentions(cwd: string, search: (cwd: string, query: string) => Promise<readonly string[]>): Mentions {
   const [active, setActive] = useState(0)
+  const [pendingPick, setPendingPick] = useState(false)
   const found = useMentionSearch(cwd, search)
   const close = useCallback(() => {
     found.close()
     setActive(0)
+    setPendingPick(false)
   }, [found.close])
 
   const refresh = useCallback(
@@ -84,6 +95,7 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
         close()
         return
       }
+      setPendingPick(false)
       setActive(0)
       found.run(mention.query)
     },
@@ -100,7 +112,10 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
       }
       if (found.paths.length === 0) {
         const waits = found.loading && (e.key === "Enter" || e.key === "Tab")
-        if (waits) e.preventDefault()
+        if (waits) {
+          e.preventDefault()
+          setPendingPick(true)
+        }
         return waits
       }
       if (e.key === "ArrowDown") {
@@ -119,6 +134,10 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
     [found.open, found.loading, found.paths, close],
   )
 
+  useEffect(() => {
+    if (pendingPick && !found.loading && (found.failed || found.paths.length === 0)) setPendingPick(false)
+  }, [found.failed, found.loading, found.paths.length, pendingPick])
+
   const pick = useCallback(
     (path: string, text: string, caret: number) => {
       const mention = mentionAt(text, caret)
@@ -134,6 +153,7 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
     open: found.open,
     loading: found.loading,
     failed: found.failed,
+    pendingPath: queuedMentionPath(pendingPick, found),
     retry: found.retry,
     active,
     refresh,

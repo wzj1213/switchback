@@ -139,6 +139,37 @@ export const COMPOSE_VIEWS = [
     after: `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, ''); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
   },
   {
+    name: "17-即时确认文件引用",
+    open: `(() => {
+      const input = document.querySelector('.composer__input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+      input?.focus()
+      setter?.call(input, '@attachment')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+      setTimeout(() => input?.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter', bubbles: true, cancelable: true,
+      })), 0)
+      const settled = () => {
+        const value = input?.value ?? ''
+        if (value !== '@attachment' && value.includes('attachment') && document.querySelector('.mentions') === null) {
+          document.documentElement.dataset.mentionCommitted = 'true'
+        } else setTimeout(settled, 30)
+      }
+      setTimeout(settled, 30)
+    })()`,
+    ready: `html[data-mention-committed="true"]`,
+    assert: `document.querySelector('.composer__input')?.value.startsWith('@') === true
+      && document.querySelector('.composer__input')?.value.endsWith(' ') === true
+      && document.querySelector('.send')?.disabled === false`,
+    after: `(() => {
+      delete document.documentElement.dataset.mentionCommitted
+      const input = document.querySelector('.composer__input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+      setter?.call(input, '')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`,
+  },
+  {
     name: "18-推理强度", before: ".effort .trigger:not(:disabled)",
     open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
     ready: ".effort__bar--grown", dragEffort: true,
