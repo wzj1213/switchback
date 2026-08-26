@@ -13,9 +13,10 @@ function split(files: readonly SessionFile[]): { edited: readonly SessionFile[];
   }
 }
 
-function FileGroup({ title, files, cwd, onPick }: {
+function FileGroup({ title, files, threadId, cwd, onPick }: {
   title: string
   files: readonly SessionFile[]
+  threadId: string
   cwd: string
   onPick: (target: PreviewTarget) => void
 }): React.JSX.Element | null {
@@ -24,7 +25,7 @@ function FileGroup({ title, files, cwd, onPick }: {
     <section>
       <div className="workbench__section">{title}<span className="workbench__count">{files.length}</span></div>
       {files.map((file) => (
-        <PathRow key={file.path} path={file.path} cwd={cwd}
+        <PathRow key={file.path} path={file.path} cwd={cwd} threadId={threadId}
           disabled={file.deleted} onPick={onPick} />
       ))}
     </section>
@@ -59,7 +60,8 @@ function useFileSearch(
   return state
 }
 
-function FileIndex({ cwd, items, onPick, searchFiles }: {
+function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
+  threadId: string
   cwd: string
   items: readonly Item[]
   onPick: (target: PreviewTarget) => void
@@ -82,15 +84,17 @@ function FileIndex({ cwd, items, onPick, searchFiles }: {
             <div className="workbench__section">搜索结果</div>
             {found.loading ? <p className="workbench__empty">正在搜索…</p> : null}
             {!found.loading && found.paths.length === 0 ? <p className="workbench__empty">没有找到文件。</p> : null}
-            {found.paths.map((path) => <PathRow key={path} path={path} cwd={cwd} onPick={onPick} />)}
+            {found.paths.map((path) => (
+              <PathRow key={path} path={path} cwd={cwd} threadId={threadId} onPick={onPick} />
+            ))}
           </section>
         ) : (
           <>
             {groups.edited.length + groups.read.length === 0
               ? <p className="workbench__empty">读过或改过的文件会出现在这里。</p>
               : null}
-            <FileGroup title="这轮改过" files={groups.edited} cwd={cwd} onPick={onPick} />
-            <FileGroup title="读过" files={groups.read} cwd={cwd} onPick={onPick} />
+            <FileGroup title="这轮改过" files={groups.edited} threadId={threadId} cwd={cwd} onPick={onPick} />
+            <FileGroup title="读过" files={groups.read} threadId={threadId} cwd={cwd} onPick={onPick} />
           </>
         )}
       </div>
@@ -110,8 +114,8 @@ export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReve
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element {
   return target === undefined ? (
-    <FileIndex cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
+    <FileIndex threadId={threadId} cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
   ) : (
-    <FilePreviewView threadId={threadId} target={target} onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
+    <FilePreviewView target={target} onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
   )
 }

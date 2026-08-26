@@ -34,7 +34,7 @@ export function ThreadScreen({
   const { shell, state } = app
   const lanes = lanesOf(state, thread.id)
   const allItems = itemsOf(state, thread.id)
-  const workbench = scopeWorkbench(shell.workbench, new Set(lanes.map((lane) => lane.id)), thread.cwd)
+  const workbench = scopeWorkbench(shell.workbench, new Set(lanes.map((lane) => lane.id)), thread.id, thread.cwd)
   return (
     <div className={`shell${workbench.visible ? " shell--workbench" : ""}`}>
       {sidebar}

@@ -161,7 +161,8 @@ function List({
         />
       ))}
       {othersTotal === 0 ? null : (
-        <ChangedOthers files={others} total={othersTotal} cwd={cwd} onReveal={onReveal} />
+        <ChangedOthers files={others} total={othersTotal} threadId={threadId}
+          cwd={cwd} onReveal={onReveal} />
       )}
       {files.length <= CHANGED_PREVIEW ? null : (
         <button type="button" className="changed__more" onClick={onAll}>

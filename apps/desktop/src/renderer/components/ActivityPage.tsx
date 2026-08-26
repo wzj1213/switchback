@@ -67,8 +67,9 @@ function ActivityIndex({ lanes, onPick }: {
   )
 }
 
-function ActivityFeed({ items, cwd, onCopy }: {
+function ActivityFeed({ items, threadId, cwd, onCopy }: {
   items: readonly Item[]
+  threadId: string
   cwd: string
   onCopy: (text: string) => void
 }): React.JSX.Element | null {
@@ -78,7 +79,9 @@ function ActivityFeed({ items, cwd, onCopy }: {
     <div className="activity-feed">
       <div className="workbench__section">过程</div>
       {rows.map((row) => {
-        if (row.kind === "run") return <ToolRun key={row.items[0]?.id} items={row.items} cwd={cwd} />
+        if (row.kind === "run") {
+          return <ToolRun key={row.items[0]?.id} items={row.items} threadId={threadId} cwd={cwd} />
+        }
         if (row.kind !== "item") return null
         return (
           <Copyable key={row.item.id} item={row.item} onCopy={onCopy}>
@@ -135,7 +138,7 @@ function LaneDetail({ lane, items, thread, onBack, onCopy }: {
         {nodes.length === 0 ? null : <LaneTree nodes={nodes} live={live} />}
         {lane.command === undefined ? null : <LaneCommandBlock command={lane.command} onCopy={onCopy} />}
         <LaneConclusion lane={lane} />
-        <ActivityFeed items={items} cwd={thread.cwd} onCopy={onCopy} />
+        <ActivityFeed items={items} threadId={thread.id} cwd={thread.cwd} onCopy={onCopy} />
         {nodes.length === 0 && lane.summary === undefined && lane.command === undefined && items.length === 0 ? (
           <p className="workbench__empty">引擎只报告了这条活动的存在，还没有给出逐步明细。</p>
         ) : null}

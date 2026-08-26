@@ -11,11 +11,13 @@ export const CHANGED_PREVIEW = 3
 export function ChangedOthers({
   files,
   total,
+  threadId,
   cwd,
   onReveal,
 }: {
   files: readonly ReviewFile[]
   total: number
+  threadId: string
   cwd: string
   onReveal: (path: string) => void
 }): React.JSX.Element {
@@ -42,7 +44,7 @@ export function ChangedOthers({
                   aria-label="预览文件"
                   title="在工作台预览"
                   onClick={() => {
-                    requestFilePreview(cwd, path)
+                    requestFilePreview(threadId, cwd, path)
                   }}
                 >
                   <FileIcon size={12} />

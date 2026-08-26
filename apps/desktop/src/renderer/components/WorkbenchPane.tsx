@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import type { Item, Lane, Thread } from "@omni/protocol"
-import type { WorkbenchState } from "../workbench.js"
+import type { PreviewTarget, WorkbenchState } from "../workbench.js"
 import { sessionFilesOf } from "../session-files.js"
 import { ActivityPage } from "./ActivityPage.js"
 import { FilesPage } from "./FilesPage.js"
@@ -31,7 +31,7 @@ export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles
   onFiles: () => void
   onPickLane: (id: string) => void
   onActivityIndex: () => void
-  onPickFile: (target: { cwd: string; path: string }) => void
+  onPickFile: (target: PreviewTarget) => void
   onFileIndex: () => void
   onHide: () => void
   onReveal: (path: string) => void

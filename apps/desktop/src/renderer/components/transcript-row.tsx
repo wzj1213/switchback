@@ -85,9 +85,10 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
   readOnly ? undefined : itemId
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
+export function RowView({ row, threadId, cwd, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
   readOnly, openLane, onOpenLane, laneLive }: {
   row: Row
+  threadId: string
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
   /** 从某一轮之前重来。 */
@@ -147,7 +148,7 @@ export function RowView({ row, cwd, onRewind, onRetry, folded, onFold, onCopy, o
       </div>
     )
   }
-  if (row.kind === "run") return <ToolRun items={row.items} cwd={cwd} />
+  if (row.kind === "run") return <ToolRun items={row.items} threadId={threadId} cwd={cwd} />
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
   if (row.kind === "lane") {
     return (

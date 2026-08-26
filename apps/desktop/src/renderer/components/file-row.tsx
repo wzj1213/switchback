@@ -30,9 +30,10 @@ export function outside(path: string, cwd: string): boolean {
   return !path.startsWith(base)
 }
 
-export function PathRow({ path, cwd, meta, disabled, onPick }: {
+export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {
   path: string
   cwd: string
+  threadId: string
   meta?: string
   disabled?: boolean
   onPick: (target: PreviewTarget) => void
@@ -41,7 +42,8 @@ export function PathRow({ path, cwd, meta, disabled, onPick }: {
   const tag = disabled === true ? "已删除" : (outside(path, cwd) ? "工作区外" : meta)
   return (
     <button type="button" className="file-row" disabled={disabled}
-      title={disabled === true ? `${path}\n文件已删除` : path} onClick={() => { onPick({ cwd, path }) }}>
+      title={disabled === true ? `${path}\n文件已删除` : path}
+      onClick={() => { onPick({ threadId, cwd, path }) }}>
       <span className="file-row__icon"><FileIcon size={13} /></span>
       <span className="file-row__body">
         <span className="file-row__name">{baseName(path)}</span>

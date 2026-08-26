@@ -179,6 +179,8 @@ const VIEWS = [
     name: "07-新会话",
     open: `document.querySelector('.sidebar__new')?.click()`,
     ready: ".blank__title",
+    // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
+    absent: ".file-preview",
   },
   {
     name: "08-推理强度",
@@ -213,6 +215,9 @@ async function shoot(cdp, view) {
       await pause(350)
     }
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
+    if (view.absent !== undefined && await value(cdp, `document.querySelector('${view.absent}') !== null`)) {
+      throw new Error(`${view.name} 仍残留不该出现的 ${view.absent}`)
+    }
     if (view.dragEffort === true) await exerciseEffort({ value, pause }, cdp)
     await pause(600)
   }

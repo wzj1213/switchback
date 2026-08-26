@@ -91,7 +91,11 @@ function RevealFile({ file, onReveal }: { file: ChangedFile; onReveal: (path: st
   )
 }
 
-function PreviewFile({ file, cwd }: { file: ChangedFile; cwd: string }): React.JSX.Element | null {
+function PreviewFile({ file, threadId, cwd }: {
+  file: ChangedFile
+  threadId: string
+  cwd: string
+}): React.JSX.Element | null {
   const deleted = file.review?.kind === "delete" || (file.review === undefined && file.last.kind === "delete")
   if (deleted) return null
   return (
@@ -101,7 +105,7 @@ function PreviewFile({ file, cwd }: { file: ChangedFile; cwd: string }): React.J
       aria-label="预览文件"
       title="在工作台预览"
       onClick={() => {
-        requestFilePreview(cwd, file.path)
+        requestFilePreview(threadId, cwd, file.path)
       }}
     >
       <FileIcon size={12} />
@@ -143,7 +147,7 @@ export function ChangedRow({
         <span className="changed__stat">
           <Stat added={file.added} removed={file.removed} />
         </span>
-        <PreviewFile file={file} cwd={cwd} />
+        <PreviewFile file={file} threadId={threadId} cwd={cwd} />
         <RevealFile file={file} onReveal={onReveal} />
         <button
           type="button"

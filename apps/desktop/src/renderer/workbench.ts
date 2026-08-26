@@ -1,6 +1,8 @@
 export type WorkbenchPage = "activity" | "files"
 
 export interface PreviewTarget {
+  /** 预览属于哪条会话；同一个 cwd 里的另一条任务也不能继承。 */
+  threadId: string
   cwd: string
   path: string
 }
@@ -52,14 +54,15 @@ export function showFileIndex(state: WorkbenchState): WorkbenchState {
   }
 }
 
-/** 切会话时只投影当前工作区有效的选择；切回来还能回到原位置。 */
+/** 切会话时只投影属于当前任务的选择；切回来还能回到原位置。 */
 export function scopeWorkbench(
   state: WorkbenchState,
   laneIds: ReadonlySet<string>,
+  threadId: string,
   cwd: string,
 ): WorkbenchState {
   const laneId = state.laneId !== undefined && laneIds.has(state.laneId) ? state.laneId : undefined
-  const file = state.file?.cwd === cwd ? state.file : undefined
+  const file = state.file?.threadId === threadId && state.file.cwd === cwd ? state.file : undefined
   if (laneId === state.laneId && file === state.file) return state
   return {
     ...state,

@@ -67,11 +67,13 @@ function Stat({ item }: { item: ToolCallItem }): React.JSX.Element | null {
 /** 一行的内容。抽出来是为了让 `Step` 只管「这一行是哪种形态」，不再兼管排版。 */
 function StepLine({
   item,
+  threadId,
   cwd,
   open,
   expandable,
 }: {
   item: ToolCallItem
+  threadId: string
   cwd: string
   open: boolean
   expandable: boolean
@@ -89,7 +91,7 @@ function StepLine({
           className="step__target step__target--go"
           title={`在工作台预览\n${item.detail.path}`}
           onClick={() => {
-            requestFilePreview(cwd, item.detail.kind === "file_read" ? item.detail.path : "")
+            requestFilePreview(threadId, cwd, item.detail.kind === "file_read" ? item.detail.path : "")
           }}
         >
           {target(item.detail, cwd)}
@@ -117,7 +119,7 @@ function StepLine({
  * 才看得到进展，那这个进展等于不存在。跑完自动收回折叠态：那时候人关心的
  * 通常只是「成没成」。
  */
-function Step({ item, cwd }: { item: ToolCallItem; cwd: string }): React.JSX.Element {
+function Step({ item, threadId, cwd }: { item: ToolCallItem; threadId: string; cwd: string }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const content = body(item)
   const changed = files(item)
@@ -125,7 +127,7 @@ function Step({ item, cwd }: { item: ToolCallItem; cwd: string }): React.JSX.Ele
   const expandable = changed.length > 0 || hasOutput
   const live = item.status === "running" && hasOutput
 
-  const line = <StepLine item={item} cwd={cwd} open={open} expandable={expandable} />
+  const line = <StepLine item={item} threadId={threadId} cwd={cwd} open={open} expandable={expandable} />
   // 没东西可展开的渲染成静态行，不做成按钮——避免出现点了没反应的元素
   if (!expandable) return <div className="step">{line}</div>
 
@@ -171,15 +173,17 @@ function needsOwnRow(item: ToolCallItem): boolean {
  */
 function Folded({
   items,
+  threadId,
   cwd,
 }: {
   items: readonly ToolCallItem[]
+  threadId: string
   cwd: string
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   if (items.length === 1) {
     const only = items[0]
-    return only === undefined ? <></> : <Step item={only} cwd={cwd} />
+    return only === undefined ? <></> : <Step item={only} threadId={threadId} cwd={cwd} />
   }
   return (
     <>
@@ -202,7 +206,7 @@ function Folded({
       {open ? (
         <div className="run__nested">
           {items.map((item) => (
-            <Step key={item.id} item={item} cwd={cwd} />
+            <Step key={item.id} item={item} threadId={threadId} cwd={cwd} />
           ))}
         </div>
       ) : null}
@@ -218,9 +222,11 @@ function Folded({
  */
 export function ToolRun({
   items,
+  threadId,
   cwd,
 }: {
   items: readonly ToolCallItem[]
+  threadId: string
   cwd: string
 }): React.JSX.Element {
   // 按「要不要单独一行」切成若干段，段内顺序不变
@@ -235,9 +241,9 @@ export function ToolRun({
     <div className="run">
       {groups.map((group, index) =>
         group.folded ? (
-          <Folded key={group.items[0]?.id ?? index} items={group.items} cwd={cwd} />
+          <Folded key={group.items[0]?.id ?? index} items={group.items} threadId={threadId} cwd={cwd} />
         ) : (
-          group.items.map((item) => <Step key={item.id} item={item} cwd={cwd} />)
+          group.items.map((item) => <Step key={item.id} item={item} threadId={threadId} cwd={cwd} />)
         ),
       )}
     </div>

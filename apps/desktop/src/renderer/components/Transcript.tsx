@@ -93,6 +93,7 @@ export const Transcript = memo(function Transcript({
           <RowView
             key={keyOf(row)}
             row={row}
+            threadId={thread.id}
             cwd={thread.cwd}
             openLane={openLane} onOpenLane={onOpenLane}
             {...(canRewind(thread, turn, readOnly === true)
