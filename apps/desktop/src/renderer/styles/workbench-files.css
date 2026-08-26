@@ -40,7 +40,7 @@
 .file-row {
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 40px;
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
@@ -63,6 +63,12 @@
   background: var(--bg-press);
 }
 
+.file-row:focus-visible,
+.file-preview__copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .file-row:disabled {
   opacity: 0.5;
   cursor: default;
@@ -76,18 +82,36 @@
   color: var(--text-faint);
 }
 
-.file-row__path {
+/* 名字一行、目录一行：深目录被从右边截断时，截掉的正好是文件名 */
+.file-row__body {
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
+}
+
+.file-row__name,
+.file-row__dir {
   overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: var(--text-code);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.file-row__name {
+  font-size: var(--text-sm);
+}
+
+.file-row__dir {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
 .file-row__meta {
   flex: none;
+  padding: 1px var(--sp-1);
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
   color: var(--text-faint);
   font-size: var(--text-xs);
 }

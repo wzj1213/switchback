@@ -105,24 +105,56 @@ function isBackgroundTask(kind: unknown): boolean {
   return kind === "process" || kind === "bash"
 }
 
-function taskLane(raw: Record<string, unknown>, before: Lane | undefined, out: ActivityOut, at: number): Lane | undefined {
+/**
+ * 后台任务的结论。**全是引擎自己给的原文**，omni 一个字不补。
+ *
+ * 实测（Kimi 0.38.0，2026-08-25 真机）：**WebSocket 的 `task.terminated` 只带
+ * 命令、退出码与起止时间，不带输出**；输出在它的 REST 那侧
+ *（`GET /sessions/{id}/tasks` 的 `output_preview`、`/tasks/{id}?with_output=true`），
+ * 而 omni 目前只在启动与重连时读回任务表。所以这里三个来源都收着：
+ * 哪一头给了就用哪一头，都没给就缺席——**不去翻它 `~/.kimi-code` 下的日志文件**。
+ * （`outputTail` 是它自己 wire 日志里的字段名，同一份数据换个门出来时还叫这个。）
+ */
+function taskSummary(raw: Record<string, unknown>, status: Lane["status"]): string | undefined {
+  const output = firstString([raw["outputTail"], raw["output_preview"]])
+  if (status !== "failed") return output
+  return firstString([raw["stopReason"], raw["error"], output])
+}
+
+interface TaskFacts {
+  native: string
+  title: string
+  status: Lane["status"]
+}
+
+function taskFacts(raw: Record<string, unknown>, before: Lane | undefined): TaskFacts | undefined {
   if (!isBackgroundTask(raw["kind"])) return undefined
   const native = str(raw["taskId"] ?? raw["id"])
   const title = firstString([raw["description"], before?.title])
   const status = taskStatus(raw["status"])
   if (native === undefined || title === undefined || status === undefined) return undefined
+  return { native, title, status }
+}
+
+function taskLane(raw: Record<string, unknown>, before: Lane | undefined, out: ActivityOut, at: number): Lane | undefined {
+  const facts = taskFacts(raw, before)
+  if (facts === undefined) return undefined
   const started = raw["startedAt"] ?? raw["created_at"] ?? raw["started_at"]
-  const summary = status === "failed" ? str(raw["stopReason"]) : undefined
+  // 命令原文只在开始帧齐全，心跳与快照可能不带；带过一次就不能被后来的空帧抹掉
+  const command = firstString([raw["command"], before?.command])
   return decorate({
-    id: taskLaneId(native), threadId: out.threadId, kind: "activity", title, status,
-    at: before?.at ?? nativeAt(started, at), handle: native,
-  }, summary, undefined)
+    id: taskLaneId(facts.native), threadId: out.threadId, kind: "activity",
+    title: facts.title, status: facts.status,
+    at: before?.at ?? nativeAt(started, at), handle: facts.native,
+    ...(command === undefined ? {} : { command }),
+    // 同理：重连读回若不带输出，也不能把已经收到的那份结论抹掉
+  }, taskSummary(raw, facts.status) ?? before?.summary, undefined)
 }
 
 function sameLane(left: Lane | undefined, right: Lane): boolean {
   if (left === undefined) return false
   return left.title === right.title && left.status === right.status && left.at === right.at &&
-    left.summary === right.summary && left.handle === right.handle &&
+    left.summary === right.summary && left.handle === right.handle && left.command === right.command &&
     JSON.stringify(left.progress) === JSON.stringify(right.progress)
 }
 
@@ -174,10 +206,12 @@ export class KimiActivityTracker {
 
   private task(payload: KimiPayload, at: number): void {
     if (typeof payload["info"] !== "object" || payload["info"] === null) return
-    const raw = payload["info"] as Record<string, unknown>
-    const native = str(raw["taskId"])
+    const info = payload["info"] as Record<string, unknown>
+    const native = str(info["taskId"])
     const before = native === undefined ? undefined : this.lanes.get(taskLaneId(native))
-    const lane = taskLane(raw, before, this.out, at)
+    // 输出若真的随帧来，它是 `info` 的**兄弟字段**（实测它自己的 wire 日志里如此），
+    // 不在 `info` 里面——摊平一层再判，省得两处各写一遍
+    const lane = taskLane({ ...info, outputTail: payload["outputTail"] }, before, this.out, at)
     if (lane !== undefined) this.emit(lane, at)
   }
 

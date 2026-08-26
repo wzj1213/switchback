@@ -1,7 +1,9 @@
 import { open, realpath, stat } from "node:fs/promises"
 import { basename, extname, isAbsolute, relative, resolve } from "node:path"
 import { ipcMain, nativeImage } from "electron"
+import type { ThreadId } from "@omni/protocol"
 import type { FilePreview, FilePreviewRequest } from "../shared/file-preview.js"
+import type { TouchedFiles } from "./touched.js"
 
 const MAX_TEXT = 1_500_000
 const MAX_IMAGE = 1600
@@ -27,18 +29,38 @@ function beneath(root: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
 }
 
-async function safeTarget(req: FilePreviewRequest): Promise<string | FilePreview> {
-  if (typeof req?.cwd !== "string" || typeof req.path !== "string" || req.cwd === "" || req.path === "") {
-    return unavailable("", "failed", "没有可预览的文件路径。")
-  }
+/**
+ * 工作区之外还有第二道门：**这条会话自己读过或改过的那些文件**。
+ *
+ * 侧栏列的就是它们（技能文档、`/tmp` 里的中间产物、引擎自己的后台日志），
+ * 一律挡住等于「列得出来、打不开」。名册由主进程按事件流记，见 `touched.ts`；
+ * 渲染层说什么不算数。
+ */
+export type PreviewGuard = (threadId: ThreadId, cwd: string, path: string) => boolean
+
+function malformed(req: FilePreviewRequest): boolean {
+  return typeof req?.cwd !== "string" || typeof req.path !== "string" || req.cwd === "" || req.path === ""
+}
+
+/** 这条会话自己报过这条路径吗。认不出会话就一律当没报过。 */
+function reported(req: FilePreviewRequest, touched: PreviewGuard): boolean {
+  if (typeof req.threadId !== "string" || req.threadId === "") return false
+  return touched(req.threadId, req.cwd, req.path)
+}
+
+async function safeTarget(req: FilePreviewRequest, touched: PreviewGuard): Promise<string | FilePreview> {
+  if (malformed(req)) return unavailable("", "failed", "没有可预览的文件路径。")
   const lexicalRoot = resolve(req.cwd)
   const lexicalTarget = resolve(lexicalRoot, req.path)
-  if (!beneath(lexicalRoot, lexicalTarget)) {
-    return unavailable(lexicalTarget, "outside", "只能预览当前工作区里的文件。")
+  const noted = reported(req, touched)
+  if (!noted && !beneath(lexicalRoot, lexicalTarget)) {
+    return unavailable(lexicalTarget, "outside", "这个文件在工作区外，而且这条会话没读过它。")
   }
   try {
     const [root, target] = await Promise.all([realpath(lexicalRoot), realpath(lexicalTarget)])
-    return beneath(root, target)
+    // 会话读过的那份，符号链接指到哪儿都照读——引擎早就把内容拿走了，
+    // 这里再挡一次只挡得住用户自己
+    return noted || beneath(root, target)
       ? target
       : unavailable(lexicalTarget, "outside", "这个路径通过符号链接离开了当前工作区。")
   } catch {
@@ -77,8 +99,8 @@ function looksBinary(buffer: Buffer): boolean {
   return sample.length > 0 && controls / sample.length > 0.08
 }
 
-export async function previewFile(req: FilePreviewRequest): Promise<FilePreview> {
-  const target = await safeTarget(req)
+export async function previewFile(req: FilePreviewRequest, touched: PreviewGuard): Promise<FilePreview> {
+  const target = await safeTarget(req, touched)
   if (typeof target !== "string") return target
   try {
     const info = await stat(target)
@@ -102,6 +124,6 @@ export async function previewFile(req: FilePreviewRequest): Promise<FilePreview>
   }
 }
 
-export function installFilePreviewChannel(): void {
-  ipcMain.handle("omni:filePreview", (_event, req: FilePreviewRequest) => previewFile(req))
+export function installFilePreviewChannel(touched: TouchedFiles): void {
+  ipcMain.handle("omni:filePreview", (_event, req: FilePreviewRequest) => previewFile(req, touched.allows))
 }

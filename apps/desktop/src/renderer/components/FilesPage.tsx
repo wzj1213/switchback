@@ -1,25 +1,33 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { Item } from "@omni/protocol"
 import type { PreviewTarget } from "../workbench.js"
-import { sessionFilesOf } from "../session-files.js"
-import { relPath } from "../tool.js"
-import { FileIcon } from "./icons-activity.js"
+import { sessionFilesOf, type SessionFile } from "../session-files.js"
+import { PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
 
-function PathRow({ path, cwd, meta, disabled, onPick }: {
-  path: string
+/** 改过的排前面：一屏里最想找的是「这轮动了什么」，读过的是背景。 */
+function split(files: readonly SessionFile[]): { edited: readonly SessionFile[]; read: readonly SessionFile[] } {
+  return {
+    edited: files.filter((file) => file.action !== "读取"),
+    read: files.filter((file) => file.action === "读取"),
+  }
+}
+
+function FileGroup({ title, files, cwd, onPick }: {
+  title: string
+  files: readonly SessionFile[]
   cwd: string
-  meta?: string
-  disabled?: boolean
   onPick: (target: PreviewTarget) => void
-}): React.JSX.Element {
+}): React.JSX.Element | null {
+  if (files.length === 0) return null
   return (
-    <button type="button" className="file-row" disabled={disabled}
-      title={disabled ? `${path}\n文件已删除` : path} onClick={() => { onPick({ cwd, path }) }}>
-      <span className="file-row__icon"><FileIcon size={13} /></span>
-      <span className="file-row__path">{relPath(path, cwd)}</span>
-      {meta === undefined ? null : <span className="file-row__meta">{meta}</span>}
-    </button>
+    <section>
+      <div className="workbench__section">{title}<span className="workbench__count">{files.length}</span></div>
+      {files.map((file) => (
+        <PathRow key={file.path} path={file.path} cwd={cwd}
+          disabled={file.deleted} onPick={onPick} />
+      ))}
+    </section>
   )
 }
 
@@ -58,7 +66,7 @@ function FileIndex({ cwd, items, onPick, searchFiles }: {
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
-  const touched = useMemo(() => sessionFilesOf(items, cwd), [items, cwd])
+  const groups = useMemo(() => split(sessionFilesOf(items, cwd)), [items, cwd])
   const found = useFileSearch(cwd, query, searchFiles)
   const searching = query.trim() !== ""
   return (
@@ -77,21 +85,21 @@ function FileIndex({ cwd, items, onPick, searchFiles }: {
             {found.paths.map((path) => <PathRow key={path} path={path} cwd={cwd} onPick={onPick} />)}
           </section>
         ) : (
-          <section>
-            <div className="workbench__section">本次任务触达</div>
-            {touched.length === 0 ? <p className="workbench__empty">读过或改过的文件会出现在这里。</p> : null}
-            {touched.map((file) => (
-              <PathRow key={file.path} path={file.path} cwd={cwd} meta={file.action}
-                disabled={file.deleted} onPick={onPick} />
-            ))}
-          </section>
+          <>
+            {groups.edited.length + groups.read.length === 0
+              ? <p className="workbench__empty">读过或改过的文件会出现在这里。</p>
+              : null}
+            <FileGroup title="这轮改过" files={groups.edited} cwd={cwd} onPick={onPick} />
+            <FileGroup title="读过" files={groups.read} cwd={cwd} onPick={onPick} />
+          </>
         )}
       </div>
     </div>
   )
 }
 
-export function FilesPage({ cwd, items, target, onPick, onBack, onReveal, onCopy, searchFiles }: {
+export function FilesPage({ threadId, cwd, items, target, onPick, onBack, onReveal, onCopy, searchFiles }: {
+  threadId: string
   cwd: string
   items: readonly Item[]
   target: PreviewTarget | undefined
@@ -104,6 +112,6 @@ export function FilesPage({ cwd, items, target, onPick, onBack, onReveal, onCopy
   return target === undefined ? (
     <FileIndex cwd={cwd} items={items} onPick={onPick} searchFiles={searchFiles} />
   ) : (
-    <FilePreviewView target={target} onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
+    <FilePreviewView threadId={threadId} target={target} onBack={onBack} onReveal={onReveal} onCopy={onCopy} />
   )
 }

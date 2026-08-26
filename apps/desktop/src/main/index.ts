@@ -33,6 +33,7 @@ import { engineEnabled } from "../shared/engine-access.js"
 import { installActivity } from "./activity.js"
 import { installEngineSettings } from "./engine-settings.js"
 import { installFilePreviewChannel } from "./file-preview.js"
+import { createTouchedFiles } from "./touched.js"
 
 /**
  * Electron 主进程。
@@ -62,6 +63,14 @@ const settings = createSettings(log)
  * 它有状态（缓存），而这个仓库不允许状态挂在模块上。
  */
 const engineVersions = createEngineVersions(log, { claudeExecutable: buildInfo.claudeExecutable })
+
+/**
+ * 「这条会话碰过哪些文件」的名册。预览工作区外那些文件时凭它放行（见 `touched.ts`）。
+ *
+ * **在这里建**：通道比宿主先挂（`installChannels` 在 `attachHost` 之前），
+ * 而两边说的必须是同一份名册。理由同 `engineVersions`——有状态，就显式传下去。
+ */
+const touched = createTouchedFiles()
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
@@ -278,7 +287,7 @@ function installChannels(): void {
   installSearchChannel()
   installChatDirChannel()
   installAttachChannel()
-  installFilePreviewChannel()
+  installFilePreviewChannel(touched)
   installProjectDocChannel()
   installEngineVersionChannel(log, engineVersions)
   installEngineDoorChannels()
@@ -323,6 +332,7 @@ function bootstrap(): Promise<void> {
     // 这一格在 `attachRemote` 之前是空的，那期间也确实没有客户端可推
     const relay: { notify?: (threadId: string, title: string, body: string) => void } = {}
     const attached = attachHost(sinks, () => BrowserWindow.getAllWindows(), log, {
+      touched,
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
       notify: () => settings.get().notify,

@@ -139,20 +139,30 @@ const VIEWS = [
     ready: ".activity-detail",
   },
   {
-    name: "03-HTML预览",
+    name: "03-文件清单",
+    open: `document.querySelector('[title="文件预览"]')?.click()`,
+    ready: ".file-row",
+  },
+  {
+    name: "04-工作区外文件预览",
+    open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
+    ready: ".file-source",
+  },
+  {
+    name: "05-HTML预览",
     open: [
-      `document.querySelector('[title="文件预览"]')?.click()`,
+      `document.querySelector('.workbench__back')?.click()`,
       `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
     ],
     ready: ".html-preview__frame",
   },
   {
-    name: "04-新会话",
+    name: "06-新会话",
     open: `document.querySelector('.sidebar__new')?.click()`,
     ready: ".blank__title",
   },
   {
-    name: "05-推理强度",
+    name: "07-推理强度",
     before: ".effort .trigger:not(:disabled)",
     open: [
       `document.querySelector('.workbench__hide')?.click()`,
@@ -162,7 +172,7 @@ const VIEWS = [
     dragEffort: true,
   },
   {
-    name: "06-设置",
+    name: "08-设置",
     // 侧栏底部那一行**有账号时点开的是菜单**，没账号时才直接进设置
     //（见 `SidebarFoot.tsx`：「一行只做一件事」）。所以这里走两步，
     // 而不是假设它一点就开——本机跑 smoke 时没账号，出图时有，两边不一样
@@ -220,8 +230,10 @@ async function shootSettings(cdp) {
 
 async function seed(dir) {
   const threads = join(dir, "threads")
+  const external = join(dir, "会话碰过的工作区外文件.md")
   await mkdir(threads, { recursive: true })
-  await writeFile(join(threads, "th-shot.jsonl"), mainThread("th-shot", ROOT, AT))
+  await writeFile(external, "# 工作区外文件\n\n这份文件由固定样本模拟引擎读过。\n")
+  await writeFile(join(threads, "th-shot.jsonl"), mainThread("th-shot", ROOT, AT, external))
   const stubs = [
     ["th-a", "修一下这个空断言", AT - 3 * 3600_000],
     ["th-b", "看一下断线重连那条链路", AT - 8 * 3600_000],

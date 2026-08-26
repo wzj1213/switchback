@@ -1,4 +1,6 @@
 export interface FilePreviewRequest {
+  /** 哪条会话在看。工作区外的文件只有这条会话读过时才放行（见 `main/touched.ts`）。 */
+  threadId: string
   cwd: string
   path: string
 }

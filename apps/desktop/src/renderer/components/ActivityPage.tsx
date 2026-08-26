@@ -6,6 +6,7 @@ import { compact } from "../usage.js"
 import { Copyable } from "./Copyable.js"
 import { ItemView } from "./ItemView.js"
 import { LaneTree } from "./LaneTree.js"
+import { LaneCommandBlock, LaneCommandLine, LaneOutput } from "./lane-command.js"
 import { PlanMark, type MarkState } from "./PlanMark.js"
 import { ToolRun } from "./ToolRun.js"
 import { ChevronIcon } from "./icons.js"
@@ -23,6 +24,12 @@ const LABEL: Readonly<Record<Lane["status"], string>> = {
   failed: "失败",
 }
 const ignoreApproval: ResolveApproval = () => undefined
+
+/** 一条命令一个「节点」不值得报数——那一行读起来像凑数的。 */
+function nodeCount(lane: Lane): string {
+  const nodes = lane.progress?.nodes.length ?? 0
+  return nodes > 1 ? ` · ${String(nodes)} 个节点` : ""
+}
 
 function ordered(lanes: readonly Lane[]): readonly Lane[] {
   return [...lanes].sort((a, b) => {
@@ -46,9 +53,10 @@ function ActivityIndex({ lanes, onPick }: {
             <span className="activity-row__mark"><PlanMark status={MARK[lane.status]} spinning={live} /></span>
             <span className="activity-row__copy">
               <span className="activity-row__title">{lane.title}</span>
+              {lane.command === undefined ? null : <LaneCommandLine command={lane.command} />}
               <span className="activity-row__meta">
                 {LABEL[lane.status]}
-                {lane.progress?.nodes.length === undefined ? "" : ` · ${String(lane.progress.nodes.length)} 个节点`}
+                {nodeCount(lane)}
               </span>
             </span>
             <ChevronIcon size={11} />
@@ -83,6 +91,21 @@ function ActivityFeed({ items, cwd, onCopy }: {
   )
 }
 
+/**
+ * 结论那一块。**命令的输出按等宽画，别人的总结按正文画**——
+ * 一段 shell 输出塞进正文段落里，缩进和列都没了，等于没给。
+ */
+function LaneConclusion({ lane }: { lane: Lane }): React.JSX.Element | null {
+  if (lane.summary === undefined) return null
+  if (lane.command === undefined) return <p className="activity-detail__summary">{lane.summary}</p>
+  return (
+    <>
+      <div className="workbench__section">输出片段</div>
+      <LaneOutput text={lane.summary} />
+    </>
+  )
+}
+
 function LaneDetail({ lane, items, thread, onBack, onCopy }: {
   lane: Lane
   items: readonly Item[]
@@ -110,9 +133,10 @@ function LaneDetail({ lane, items, thread, onBack, onCopy }: {
       </header>
       <div className="activity-detail__scroll">
         {nodes.length === 0 ? null : <LaneTree nodes={nodes} live={live} />}
-        {lane.summary === undefined ? null : <p className="activity-detail__summary">{lane.summary}</p>}
+        {lane.command === undefined ? null : <LaneCommandBlock command={lane.command} onCopy={onCopy} />}
+        <LaneConclusion lane={lane} />
         <ActivityFeed items={items} cwd={thread.cwd} onCopy={onCopy} />
-        {nodes.length === 0 && lane.summary === undefined && items.length === 0 ? (
+        {nodes.length === 0 && lane.summary === undefined && lane.command === undefined && items.length === 0 ? (
           <p className="workbench__empty">引擎只报告了这条活动的存在，还没有给出逐步明细。</p>
         ) : null}
       </div>

@@ -90,6 +90,8 @@
   - `skill.ts` 只投影 Kimi 上报的可激活 skill，并通过公开 `:activate` 入口执行
   - `activation.ts` 保留原生 skill / plugin command 激活标记并按 activation id 去重；
     `transcript.ts` 隐藏只供模型使用的展开内容，跨页恢复同一标记
+  - `activity.ts` 把公开的子代理帧与后台任务帧折成 activity lane：后台任务收下引擎自报的
+    **命令原文**（`task.started` / `task.terminated` 的 `info.command`），命令与结论都不由 omni 拼
   - `shell-history.ts` 按公开 transcript 的 `shell_command` 来源恢复 Kimi 原生 `!` 命令与输出，
     去掉内部 XML 和终端控制字符，不把进程输出冒充用户消息
   - `native-turn.ts` 接住同会话其他 Kimi 原生客户端公开发起的普通用户轮；只有宿主空闲且
@@ -213,6 +215,12 @@
 - **Kimi 0.38.0 没有公开的终端命令执行路由。** 原生 `!` 由发起它的 TUI 本地执行，公开
   transcript 只保存输入与输出，实时 `shell.*` 帧也依赖该 TUI 自己持有的输出流。omni 因此只恢复
   已保存的终端历史，不新增执行按钮、不直接跑本机 shell，也不为别处发起的命令伪造实时状态。
+- **Kimi 后台任务的输出不在实时流上。** 0.38.0 真机（2026-08-25）核对：`task.started` /
+  `task.terminated` 只带 `command`、`exitCode`、`startedAt` / `endedAt`，没有任何输出字段；
+  输出在它 REST 那侧（`GET /sessions/{id}/tasks` 的 `output_preview`、
+  `/tasks/{id}?with_output=true`），而 omni 目前只在启动与重连读回任务表。所以 lane 上一定有命令原文，
+  **结论只有引擎把它报进任务读回时才有**。omni 不去读它 `~/.kimi-code/…/tasks/*/output.log`——
+  那是拿它的零件替它攒功能。要按需取输出，得先有一条「打开这条旁路」的控制面，那是另一件事。
 - **Kimi 定时任务仍由 Kimi 自己创建、保存与调度。** omni 只在已接入会话的公开实时流收到
   `cron_job` 主动轮时显示当次执行，并从公开 transcript 恢复已经保存的结果；它不复制 Kimi 的
   cron 管理界面，也不自行补跑。首次接管或断线漏过开始帧但该轮仍在运行时，只按快照的原生 turn id

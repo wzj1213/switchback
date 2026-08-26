@@ -6,7 +6,7 @@ import { ChevronIcon, CopyIcon, RevealIcon } from "./icons.js"
 
 type Load = { state: "loading" } | { state: "ready"; file: FilePreview }
 
-function usePreview(target: PreviewTarget): Load {
+function usePreview(threadId: string, target: PreviewTarget): Load {
   const [load, setLoad] = useState<Load>({ state: "loading" })
   useEffect(() => {
     let alive = true
@@ -19,7 +19,7 @@ function usePreview(target: PreviewTarget): Load {
       } })
       return () => { alive = false }
     }
-    void bridge.filePreview(target.cwd, target.path).then((file) => {
+    void bridge.filePreview(threadId, target.cwd, target.path).then((file) => {
       if (alive) setLoad({ state: "ready", file })
     }).catch(() => {
       if (alive) setLoad({ state: "ready", file: {
@@ -28,7 +28,7 @@ function usePreview(target: PreviewTarget): Load {
       } })
     })
     return () => { alive = false }
-  }, [target.cwd, target.path])
+  }, [threadId, target.cwd, target.path])
   return load
 }
 
@@ -80,13 +80,15 @@ function Content({ file, onCopy }: { file: FilePreview; onCopy: (text: string) =
   return <Source file={file} onCopy={onCopy} />
 }
 
-export function FilePreviewView({ target, onBack, onReveal, onCopy }: {
+export function FilePreviewView({ threadId, target, onBack, onReveal, onCopy }: {
+  /** 工作区外的文件靠它认会话：只有这条会话读过的才准预览。 */
+  threadId: string
   target: PreviewTarget
   onBack: () => void
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const load = usePreview(target)
+  const load = usePreview(threadId, target)
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : target.path.split("/").at(-1) ?? target.path
   return (

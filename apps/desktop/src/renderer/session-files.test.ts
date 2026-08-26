@@ -37,4 +37,21 @@ describe("任务文件清单", () => {
       { path: "/work/src/a.ts", at: 2, action: "编辑", deleted: false },
     ])
   })
+
+  it("改完再读一遍，那份文件仍然算改过", () => {
+    const items: readonly Item[] = [
+      tool("e", 1, {
+        kind: "file_edit",
+        path: "src/a.ts",
+        files: [{ path: "src/a.ts", kind: "update", added: 2, removed: 1 }],
+        added: 2,
+        removed: 1,
+      }),
+      tool("r", 5, { kind: "file_read", path: "src/a.ts" }),
+    ]
+
+    expect(sessionFilesOf(items, "/work")).toEqual([
+      { path: "/work/src/a.ts", at: 5, action: "编辑", deleted: false },
+    ])
+  })
 })

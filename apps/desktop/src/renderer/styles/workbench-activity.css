@@ -118,3 +118,8 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
 }
+
+/* 列表里命令夹在标题和状态之间：它比状态更能说明"这条是什么" */
+.activity-row__copy .lane-cmd {
+  margin: 2px 0 1px;
+}

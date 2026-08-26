@@ -62,7 +62,7 @@ export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles
           <ActivityPage lanes={lanes} laneId={state.laneId} items={items} thread={thread}
             onPick={onPickLane} onBack={onActivityIndex} onCopy={onCopy} />
         ) : (
-          <FilesPage cwd={thread.cwd} items={items} target={state.file} onPick={onPickFile}
+          <FilesPage threadId={thread.id} cwd={thread.cwd} items={items} target={state.file} onPick={onPickFile}
             onBack={onFileIndex} onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
         )}
       </div>

@@ -73,6 +73,51 @@ describe("Kimi 原生活动", () => {
     })
   })
 
+  it("后台任务收下引擎自报的命令原文与输出末尾；重连读回不带输出也不抹掉结论", () => {
+    const out = tracker()
+    const info = {
+      taskId: "bash-a13", description: "跑 OrderBatchServiceTest 单测", status: "running",
+      detached: true, startedAt: 10, kind: "process", command: "mvn -o -B test -Dtest=X", pid: 4816,
+      exitCode: null,
+    }
+    out.activity.handle({ type: "task.started", info }, 10)
+    expect(laneOf(out.events)).toMatchObject({ command: "mvn -o -B test -Dtest=X", at: 10 })
+    expect(laneOf(out.events)?.summary).toBeUndefined()
+
+    // 生产 wire 里 `outputTail` 是 `info` 的兄弟字段，不在它里面
+    out.activity.handle({
+      type: "task.terminated",
+      info: { ...info, status: "completed", endedAt: 20, exitCode: 0 },
+      outputTail: "[INFO] BUILD SUCCESS",
+    }, 20)
+    expect(laneOf(out.events)).toMatchObject({
+      status: "done", command: "mvn -o -B test -Dtest=X", summary: "[INFO] BUILD SUCCESS",
+    })
+
+    // 重连读回：REST 快照这次既没有 command 也没有 output_preview
+    const seen = out.events.length
+    out.activity.reconcile(snapshot([]), 99, [
+      { id: "bash-a13", session_id: "s-1", kind: "bash", description: "跑 OrderBatchServiceTest 单测",
+        status: "completed", created_at: 10 },
+    ])
+    expect(out.events).toHaveLength(seen)
+    expect(laneOf(out.events)).toMatchObject({
+      command: "mvn -o -B test -Dtest=X", summary: "[INFO] BUILD SUCCESS",
+    })
+  })
+
+  it("失败的后台任务把原生原因排在输出前面", () => {
+    const out = tracker()
+    const info = { taskId: "bash-x", description: "打包", status: "running", startedAt: 1, kind: "process" }
+    out.activity.handle({ type: "task.started", info }, 1)
+    out.activity.handle({
+      type: "task.terminated",
+      info: { ...info, status: "timed_out", stopReason: "timeout" },
+      outputTail: "[ERROR] 卡在依赖解析",
+    }, 2)
+    expect(laneOf(out.events)).toMatchObject({ status: "failed", summary: "timeout" })
+  })
+
   it("任务读回只补 process/bash；agent 与 question 仍分别归子代理和问题卡", () => {
     const out = tracker()
     out.activity.reconcile(snapshot([]), 99, [

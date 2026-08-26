@@ -159,3 +159,88 @@
   background: var(--bg-hover);
   color: var(--text);
 }
+
+/*
+ * 后台旁路的命令与输出。
+ *
+ * 命令一律等宽：它是要照着复制去重跑的东西，按正文排版就丢了空格和引号的边界。
+ * 列表里那一行收成单行（原文挂 title），详情里给整块、可复制、可横向滚。
+ */
+.lane-cmd {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lane__cmd {
+  padding: 0 var(--sp-3) var(--sp-2);
+}
+
+.lane-cmd-block {
+  position: relative;
+  margin: var(--sp-2) 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+}
+
+.lane-cmd-block pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: var(--sp-3);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.lane-cmd-block__copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 22px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.lane-cmd-block:hover .lane-cmd-block__copy,
+.lane-cmd-block__copy:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lane-cmd-block__copy:hover {
+  color: var(--text);
+}
+
+/* 输出是引擎给的一截尾巴：等宽、可换行、超高就自己滚，别把整页撑长 */
+.lane-output {
+  max-height: 320px;
+  margin: 0 0 var(--sp-2);
+  overflow: auto;
+  padding: var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

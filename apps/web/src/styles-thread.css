@@ -469,6 +469,29 @@
   color: var(--warn);
 }
 
+/* 后台任务的命令原文与输出：等宽，一行装不下就收起来（完整的在 title 里） */
+.branch__cmd {
+  display: block;
+  overflow: hidden;
+  margin-top: var(--sp-1);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch__summary--out {
+  max-height: 240px;
+  overflow: auto;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 .branch {
   border-style: solid;
 }

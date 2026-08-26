@@ -275,9 +275,14 @@ const api = {
   async searchFiles(cwd: string, query: string): Promise<readonly string[]> {
     return (await ipcRenderer.invoke("omni:searchFiles", { cwd, query })) as readonly string[]
   },
-  /** 只读当前工作区内的一份文件；主进程会核对真实路径与符号链接边界。 */
-  async filePreview(cwd: string, path: string): Promise<FilePreview> {
-    return (await ipcRenderer.invoke("omni:filePreview", { cwd, path })) as FilePreview
+  /**
+   * 读一份文件给侧栏预览。
+   *
+   * 主进程核对两道门：工作区内的照读；工作区外的只有**这条会话自己读过或改过**
+   * 才放行（名册在主进程里按事件流记，见 `main/touched.ts`）。
+   */
+  async filePreview(threadId: string, cwd: string, path: string): Promise<FilePreview> {
+    return (await ipcRenderer.invoke("omni:filePreview", { threadId, cwd, path })) as FilePreview
   },
 
   /**

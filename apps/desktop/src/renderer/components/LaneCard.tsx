@@ -1,4 +1,5 @@
 import type { Lane } from "@omni/protocol"
+import { LaneCommandLine, LaneOutput } from "./lane-command.js"
 import { LaneTree } from "./LaneTree.js"
 import { PlanMark, type MarkState } from "./PlanMark.js"
 import { compact } from "../usage.js"
@@ -61,10 +62,32 @@ interface LaneCardProps {
   folded?: boolean
 }
 
+/**
+ * 正文：命令原文 → 进度树 → 结论。
+ *
+ * **命令的输出按等宽画，别人的总结按正文画**——一段 shell 输出塞进正文段落里，
+ * 缩进和列都没了，等于没给。工作台那侧同一套判断（`ActivityPage`）。
+ */
+function LaneBody({ lane, spinning }: { lane: Lane; spinning: boolean }): React.JSX.Element {
+  const nodes = lane.progress?.nodes ?? []
+  return (
+    <>
+      {lane.command === undefined ? null : (
+        <div className="lane__cmd"><LaneCommandLine command={lane.command} /></div>
+      )}
+      {nodes.length === 0 ? null : <LaneTree nodes={nodes} live={spinning} />}
+      {lane.summary === undefined ? null : (
+        lane.command === undefined
+          ? <p className="lane__summary">{lane.summary}</p>
+          : <div className="lane__cmd"><LaneOutput text={lane.summary} /></div>
+      )}
+    </>
+  )
+}
+
 export function LaneCard({ lane, live, onOpen, folded = false }: LaneCardProps): React.JSX.Element {
   if (lane.kind === "aside") return <AsideLaneCard lane={lane} live={live} onOpen={onOpen} folded={folded} />
   const nodes = lane.progress?.nodes ?? []
-  const spinning = lane.status === "running" && live
   return (
     <section className={`lane lane--${lane.status}`} aria-label={lane.title}>
       <LaneHead lane={lane} live={live} nodes={nodes.length} />
@@ -73,8 +96,7 @@ export function LaneCard({ lane, live, onOpen, folded = false }: LaneCardProps):
           {folded ? "已在工作台打开" : "在工作台查看"}
         </button>
       )}
-      {folded || nodes.length === 0 ? null : <LaneTree nodes={nodes} live={spinning} />}
-      {folded || lane.summary === undefined ? null : <p className="lane__summary">{lane.summary}</p>}
+      {folded ? null : <LaneBody lane={lane} spinning={lane.status === "running" && live} />}
     </section>
   )
 }

@@ -37,7 +37,7 @@ function threadOf(id, title, cwd, at) {
 }
 
 /** 主会话：一屏里把每一类 item 都摆出来。 */
-export function mainThread(id, cwd, at) {
+export function mainThread(id, cwd, at, externalPath) {
   const turn = `${id}-t1`
   const out = [
     line({ type: "thread.started", at, thread: threadOf(id, "把订阅那段胶水抽成纯函数", cwd, at) }),
@@ -51,7 +51,7 @@ export function mainThread(id, cwd, at) {
   const push = (item) => {
     out.push(line({ type: "item.started", at, item: { ...item, id: `${id}-i${++n}`, turnId: turn, at } }))
   }
-  fill(push, cwd)
+  fill(push, cwd, externalPath)
   fillActivity(out, { threadId: id, turnId: turn, cwd, at })
   out.push(line({ type: "turn.completed", at, turnId: turn, status: "completed" }))
   out.push(
@@ -75,6 +75,8 @@ function fillActivity(out, frame) {
     lane: {
       id: lane, threadId, kind: "activity", title: "并行检查侧栏与 HTML 预览",
       status: "running", at,
+      command: "pnpm check:css && pnpm typecheck --pretty false",
+      summary: "样式守卫通过：1033 个类有规则\nTypeScript：0 errors",
       progress: {
         nodes: [
           { id: "agent-a", label: "检查交互", state: "done", detail: "拖动与点击" },
@@ -109,7 +111,7 @@ function fillActivity(out, frame) {
  * 一屏里该出现的那几类。**顺序就是真实会话的顺序**：
  * 问 → 想 → 读 → 跑 → 计划 → 改 → 答。
  */
-function fill(push, cwd) {
+function fill(push, cwd, externalPath) {
   push({
     kind: "user_message",
     text: "useFlow 里那几行——一批一次、一个字节都没有就别记、时间戳用收到的时刻——现在只能靠肉眼保证。照仓库里 usePetMood 的老规矩抽出来测一下。",
@@ -159,6 +161,14 @@ function fill(push, cwd) {
       removed: 0,
     },
   })
+  if (externalPath !== undefined) {
+    push({
+      kind: "tool_call",
+      tool: "Read",
+      status: "done",
+      detail: { kind: "file_read", path: externalPath },
+    })
+  }
   push(answerOf())
 }
 

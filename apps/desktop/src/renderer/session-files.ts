@@ -8,6 +8,13 @@ export interface SessionFile {
   deleted: boolean
 }
 
+/**
+ * 「改过」压得住后来的「读过」。
+ *
+ * 引擎改完常常再读一遍核对，末次触达是读——按末次记的话，那份文件就从
+ * 「改过」栏掉进「读过」栏，而侧栏那两栏正是用来回答「这轮到底动了什么」的。
+ * 时间仍按最近一次触达走：排序要的是「刚才在弄哪个」。
+ */
 function put(
   files: Map<string, SessionFile>,
   cwd: string,
@@ -15,11 +22,15 @@ function put(
 ): void {
   const path = canonicalPath(entry.raw, cwd)
   if (path === "") return
+  const before = files.get(path)
+  const action = entry.action === "读取" && before !== undefined && before.action !== "读取"
+    ? before.action
+    : entry.action
   files.set(path, {
     path,
-    at: entry.at,
-    action: entry.action,
-    deleted: entry.action === "删除",
+    at: Math.max(entry.at, before?.at ?? entry.at),
+    action,
+    deleted: action === "删除",
   })
 }
 

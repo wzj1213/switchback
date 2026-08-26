@@ -18,6 +18,7 @@ import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
 import type { Logger } from "./log.js"
 import { createWorktreeBaselines, type WorktreeBaselines } from "./worktree-baseline.js"
 import { readBuildInfo } from "./build-info.js"
+import type { TouchedFiles } from "./touched.js"
 import { createEngineCatalog } from "./engine-catalog.js"
 
 export interface Attached {
@@ -42,6 +43,8 @@ export interface Attached {
   sinks: Sinks
   /** 有活在跑时挡住闲置待机。退出前要 `release()`，否则断言留在系统里。 */
   awake: Awake
+  /** 会话碰过哪些文件。全量重建时要把历史补进去，否则重启后老会话的文件点不开。 */
+  touched: TouchedFiles
   /** 记一行。分级 replay 要说出「省了多少」。 */
   log: Logger
   /**
@@ -185,21 +188,46 @@ function openStores(log: Logger, emit: (event: Event) => void): {
 }
 
 /**
- * 宿主要向外借的那几件事。**全是函数，不是值**：它们背后是用户偏好，
- * 而偏好随时会改——传值的话，改完要等到重启才生效。
+ * 宿主要向外借的那几件事。
+ *
+ * **偏好那几条全是函数，不是值**：它们背后是用户偏好，而偏好随时会改——
+ * 传值的话，改完要等到重启才生效。`touched` 例外：它不是偏好，是一份**有状态的服务**，
+ * 而且通道比宿主先挂（见 `index.ts`），两边必须拿到同一份。
  */
 export interface HostPorts {
+  touched: TouchedFiles
   relay?: Relay
   engineVisible?: (id: string) => boolean
   dshProfile?: () => string
   notify?: () => NotifyMode
 }
 
+/** 一次失败翻成界面看得见的东西；每一条通往 `dispatch` 的路都要经过它。 */
+function reporter(emit: (event: Event) => void): (error: unknown, threadId?: ThreadId) => void {
+  return (error, threadId) => {
+    emit({
+      type: "engine.status",
+      at: Date.now(),
+      threadId: threadId ?? "",
+      status: "crashed",
+      detail: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+/** 每条事件都先进名册再广播：预览工作区外的文件凭它放行（见 `touched.ts`）。 */
+function noting(touched: TouchedFiles, publish: (event: Event) => void): (event: Event) => void {
+  return (event) => {
+    touched.note(event)
+    publish(event)
+  }
+}
+
 export function attachHost(
   sinks: Sinks,
   windows: () => readonly BrowserWindow[],
   log: Logger,
-  ports?: HostPorts,
+  ports: HostPorts,
 ): Attached {
   const relay = ports?.relay
   const seen = { thread: undefined as ThreadId | undefined }
@@ -214,7 +242,9 @@ export function attachHost(
   const holder: { host: Host | undefined } = { host: undefined }
   const live = (): readonly Thread[] => holder.host?.live() ?? []
 
-  const { emit, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
+  const { emit: publish, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
+  // 挂在**唯一那个出口**上，不是各个驱动里——漏一处就是某类会话的文件点不开
+  const emit = noting(ports.touched, publish)
 
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)
@@ -234,15 +264,7 @@ export function attachHost(
     now: () => Date.now(),
   })
 
-  const report = (error: unknown, threadId?: ThreadId): void => {
-    emit({
-      type: "engine.status",
-      at: Date.now(),
-      threadId: threadId ?? "",
-      status: "crashed",
-      detail: error instanceof Error ? error.message : String(error),
-    })
-  }
+  const report = reporter(emit)
 
   holder.host = host
   installBridgeChannels({ host, log, ledger, report })
@@ -260,6 +282,7 @@ export function attachHost(
     host,
     baselines,
     awake,
+    touched: ports.touched,
     journal,
     engines,
     refreshEngines,
@@ -360,6 +383,9 @@ export async function rebuild(
       events: await attached.journal.read(id).catch((): readonly Event[] => []),
     })),
   )
+  // 磁盘上的历史也要进名册：重启之后打开一条老会话，侧栏列的文件同样要点得开
+  // （名册按会话与路径两级淘汰，见 `touched.ts` 的已知限制）
+  for (const thread of threads) attached.touched.noteHistory(thread.id, thread.events)
   // 读磁盘期间被封号的那些。它们保证**晚于快照、且还在保留缓冲里**，
   // 所以拼在最后就补上了那条缝。和磁盘那份的重叠是必然的，靠归约器的
   // 幂等去重（`@omni/store` 的 `appendItem`），不在这里判——

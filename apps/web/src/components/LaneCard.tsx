@@ -67,8 +67,13 @@ export function LaneCard({ lane, live }: { lane: Lane; live: boolean }): React.J
         <span className="branch__title">{lane.title}</span>
         <span className="branch__state">{running && !live ? "状态待确认" : STATUS[lane.status]}</span>
       </header>
+      {lane.command === undefined ? null : (
+        <code className="branch__cmd" title={lane.command}>{lane.command.replace(/\s+/g, " ").trim()}</code>
+      )}
       {nodes.length === 0 ? null : <ul className="branch__tree">{nodes.map((node) => <Node key={node.id} node={node} />)}</ul>}
-      {lane.summary === undefined ? null : <p className="branch__summary">{lane.summary}</p>}
+      {lane.summary === undefined ? null : (
+        <p className={`branch__summary${lane.command === undefined ? "" : " branch__summary--out"}`}>{lane.summary}</p>
+      )}
     </section>
   )
 }
