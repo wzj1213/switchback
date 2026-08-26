@@ -1,16 +1,16 @@
 import type { ReviewFile } from "../../shared/review.js"
 import { reviewLabel } from "../../shared/review.js"
-import { splitPath } from "../diff.js"
 import { reviewDestination } from "./review-navigation.js"
+import { ReviewTree } from "./review-tree.js"
 
 /**
- * 审核面板左边那一列：改了哪些文件。
+ * 审核面板右侧文件栏：改了哪些文件。
  *
- * ## 排序照 git 给的来
+ * ## 目录优先、单链压缩
  *
- * 也就是字母序。这里**不按「首次出现」排**（变更汇总卡那样）——那份的语境是
- * 「它刚才动了什么」，这份的语境是「我要逐个看过去」，而逐个看的时候
- * 同一个目录下的文件挨在一起才好读。
+ * 这里**不按「首次出现」排**（变更汇总卡那样）——审核的语境是逐个看过去，
+ * 因此同目录聚在一起，目录排在文件前；只有一个子目录时合成 `apps/desktop/src`，
+ * 避免把窄栏浪费在没有选择意义的中间层上。
  *
  * ## 已暂存的标出来
  *
@@ -18,67 +18,32 @@ import { reviewDestination } from "./review-navigation.js"
  * 一个已经 `git add` 过的文件和一个没动过的在这列里长得一模一样。
  */
 
-function Stat({ added, removed }: { added: number; removed: number }): React.JSX.Element | null {
-  if (added === 0 && removed === 0) return null
-  return (
-    <span className="rvl__stat">
-      {added > 0 ? <span className="diffstat__add">+{added}</span> : null}
-      {removed > 0 ? <span className="diffstat__del">−{removed}</span> : null}
-    </span>
-  )
-}
-
-function Row({ file, active, onPick }: {
-  file: ReviewFile
-  active: boolean
-  onPick: (rel: string) => void
-}): React.JSX.Element {
-  const { dir, name } = splitPath(file.rel)
-  return (
-    <button
-      type="button"
-      className={`rvl__row${active ? " rvl__row--on" : ""}`}
-      data-review-rel={file.rel}
-      tabIndex={active ? 0 : -1}
-      title={file.rel}
-      aria-current={active}
-      aria-keyshortcuts="ArrowUp ArrowDown Home End"
-      onClick={() => {
-        onPick(file.rel)
-      }}
-    >
-      <span className={`rvl__kind rvl__kind--${file.kind}`} aria-hidden="true" />
-      <span className="rvl__name">
-        {/* 末尾那个 `\u200e` 是 LRM，**不能删**：这一列的目录是从左边截断的
-            （`direction: rtl`，见 review.css），而 `/` 是双向算法里的中性字符——
-            处在 LTR 文本和 rtl 段落末尾之间时它会被搬到最前面，
-            `src/main/` 就显示成 `/src/main`。补一个强 LTR 记号把它夹住 */}
-        <span className="rvl__dir">{dir === "" ? "" : `${dir}\u200e`}</span>
-        <span className="rvl__base">{name}</span>
-      </span>
-      {file.staged === true ? <span className="rvl__staged" title="已在暂存区">已暂存</span> : null}
-      <Stat added={file.added} removed={file.removed} />
-    </button>
-  )
-}
-
 function moveSelection(event: React.KeyboardEvent<HTMLDivElement>, files: readonly ReviewFile[],
   active: string | undefined, onPick: (rel: string) => void): void {
   if (!(event.target instanceof HTMLElement)) return
-  const row = event.target.closest<HTMLButtonElement>(".rvl__row")
-  if (row === null && !event.target.classList.contains("rvl__input")) return
-  const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>(".rvl__row")]
-  const at = row === null ? files.findIndex((file) => file.rel === active) : rows.indexOf(row)
+  if (!event.target.classList.contains("rvl__input")) return
+  const at = files.findIndex((file) => file.rel === active)
   const destination = reviewDestination(event.key, at, files.length)
   const file = destination === undefined ? undefined : files[destination]
   if (destination === undefined || file === undefined) return
   event.preventDefault()
   event.stopPropagation()
   onPick(file.rel)
-  if (row !== null) {
-    rows[destination]?.focus()
-    rows[destination]?.scrollIntoView({ block: "nearest" })
-  }
+}
+
+function Notices({ more, ignored }: { more?: number; ignored: readonly string[] }): React.JSX.Element {
+  return <>
+    {more === undefined ? null : (
+      <p className="rvl__none">改动太多，这里只列了前面这些，还有 {more} 个没显示</p>
+    )}
+    {ignored.length === 0 ? null : (
+      <p className="rvl__none">
+        另有 {ignored.length} 个 Git 忽略文件无法核实：
+        {ignored.slice(0, 3).join("、")}
+        {ignored.length > 3 ? ` 等 ${String(ignored.length)} 个` : ""}
+      </p>
+    )}
+  </>
 }
 
 export function ReviewList({ files, active, query, onQuery, onPick, more, ignored }: {
@@ -107,26 +72,16 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
           }}
         />
       </div>
-      <div className="rvl__rows">
-        {files.map((file) => (
-          <Row key={file.rel} file={file} active={file.rel === active} onPick={onPick} />
-        ))}
-        {files.length === 0 ? (
-          <p className="rvl__none">
-            {more === undefined ? "当前筛选条件下没有可显示的文件" : "已列出的文件里没有匹配项"}
-          </p>
-        ) : null}
-        {more === undefined ? null : (
-          <p className="rvl__none">改动太多，这里只列了前面这些，还有 {more} 个没显示</p>
-        )}
-        {ignored.length === 0 ? null : (
-          <p className="rvl__none">
-            另有 {ignored.length} 个 Git 忽略文件无法核实：
-            {ignored.slice(0, 3).join("、")}
-            {ignored.length > 3 ? ` 等 ${String(ignored.length)} 个` : ""}
-          </p>
-        )}
-      </div>
+      {files.length === 0 ? <div className="rvl__rows">
+        <p className="rvl__none">
+          {more === undefined ? "当前筛选条件下没有可显示的文件" : "已列出的文件里没有匹配项"}
+        </p>
+        <Notices more={more} ignored={ignored} />
+      </div> : (
+        <ReviewTree files={files} active={active} searching={query.trim() !== ""} onPick={onPick}>
+          <Notices more={more} ignored={ignored} />
+        </ReviewTree>
+      )}
       <p className="rvl__legend">
         {(["add", "update", "delete", "rename", "untracked"] as const).map((kind) => (
           <span key={kind} className="rvl__key">

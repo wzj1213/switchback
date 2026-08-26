@@ -327,7 +327,7 @@
   display: none;
 }
 
-/* ── 左列：文件清单 ───────────────────────────────────────────── */
+/* ── 文件侧栏 ─────────────────────────────────────────────────── */
 
 .rvl {
   display: flex;
@@ -371,7 +371,7 @@
 
 .rvl__row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--sp-2);
   width: 100%;
   padding: 3px var(--sp-2) 3px var(--sp-3);
@@ -384,12 +384,30 @@
   cursor: pointer;
 }
 
+.rvl__row--directory {
+  color: var(--text-muted);
+}
+
+.rvl__row--directory > svg {
+  flex: none;
+}
+
+.rvl__row--file > svg {
+  flex: none;
+  color: var(--text-faint);
+}
+
 .rvl__row:hover {
   background: var(--bg-hover);
 }
 
 .rvl__row--on {
   background: var(--bg-active);
+}
+
+.rvl__row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* 状态用一个小色块，不用文字：五种状态各占两个汉字的话，
@@ -426,39 +444,9 @@
   box-shadow: inset 0 0 0 1.5px var(--ok);
 }
 
-.rvl__name {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-}
-
-/*
- * 目录**从左边截断**（`…components/`），不是从右边（`src/renderer/co…`）。
- * 这一列只有 260px，而路径深的时候最靠近文件名的那一段信息量最大。
- *
- * `direction: rtl` 是让省略号落在开头的唯一办法，代价是双向算法会把结尾那个
- * `/` 搬到最前面——组件那边补了一个 LRM 挡住它，两处一起看才成立。
- */
-.rvl__dir {
-  overflow: hidden;
-  color: var(--text-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;
-  text-align: left;
-}
-
-/*
- * 文件名**也要能缩**。原来是 `flex: none`：目录段缩到底之后它继续按内容撑，
- * 于是一个长文件名（`05-request-sequence.excalidraw`）直接压到右边的 `+963` 上，
- * 两行字叠在一起——260px 的列里这不是边角情况，是常态。
- *
- * 缩的顺序仍然是「先目录、后文件名」：目录那段 `flex-shrink` 默认是 1 且更长，
- * 会先被压掉；这里只是给文件名留一条最后的退路。
- */
 .rvl__base {
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

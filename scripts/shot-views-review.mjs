@@ -39,7 +39,10 @@ export const REVIEW_VIEWS = [
           && buttons.every(button => button.height < 40 && button.width > 24)
       })()
       && document.querySelector('.rvd__body--split') === null
-      && document.querySelector('[aria-label="切换到分栏差异"]') !== null`,
+      && document.querySelector('[aria-label="切换到分栏差异"]') !== null
+      && document.querySelectorAll('[role="treeitem"][aria-expanded]').length > 0
+      && document.querySelectorAll('[role="treeitem"][data-review-rel]').length > 0
+      && document.querySelectorAll('[role="treeitem"][tabindex="0"]').length === 1`,
   },
   {
     name: "04-审核范围菜单",
@@ -62,7 +65,7 @@ export const REVIEW_VIEWS = [
       outside?.focus()
       const outsideKey = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
       outside?.dispatchEvent(outsideKey)
-      const rows = [...document.querySelectorAll('.rvl__row')]
+      const rows = [...document.querySelectorAll('.rvl__row--file')]
       const at = rows.findIndex(row => row.getAttribute('aria-current') === 'true')
       const expected = rows[(at + 1) % rows.length]?.getAttribute('data-review-rel')
       const input = document.querySelector('.rvl__input')
@@ -81,6 +84,27 @@ export const REVIEW_VIEWS = [
       && window.__omniReviewKeys?.insidePrevented === true
       && document.activeElement?.classList.contains('rvl__input') === true
       && document.querySelector('.rv__path')?.textContent === window.__omniReviewKeys?.expected`,
+  },
+  {
+    name: "04-审核目录折叠",
+    open: `(() => {
+      const active = document.querySelector('[role="treeitem"][aria-current="true"]')?.getAttribute('data-review-rel')
+      const dirs = [...document.querySelectorAll('[role="treeitem"][aria-expanded="true"]')]
+      const target = dirs.find(row => !active?.startsWith(row.getAttribute('title') + '/'))
+      window.__omniReviewTree = { path: target?.getAttribute('title'), before: document.querySelectorAll('[role="treeitem"]').length }
+      target?.focus()
+      target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+    })()`,
+    ready: `[role="treeitem"][aria-expanded="false"]`,
+    assert: `(() => {
+      const target = [...document.querySelectorAll('[role="treeitem"]')]
+        .find(row => row.getAttribute('title') === window.__omniReviewTree?.path)
+      return target?.getAttribute('aria-expanded') === 'false'
+        && target === document.activeElement
+        && document.querySelectorAll('[role="treeitem"]').length < window.__omniReviewTree?.before
+    })()`,
+    after: `document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))`,
   },
   {
     name: "04-审核复制有确认",
