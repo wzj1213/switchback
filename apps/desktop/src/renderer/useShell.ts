@@ -85,6 +85,7 @@ export function useShell(): Shell {
   const openFile = useCallback((target: PreviewTarget) => {
     setWorkbench((prev) => showFile(prev, target))
   }, [])
+  const closeWorkbench = useCallback(() => { setWorkbench(hideWorkbench) }, [])
   useEffect(() => onFilePreviewRequest(openFile), [openFile])
   // 原生通知的超时 effect 依赖它；引用稳定才能避免每次流式重绘都把计时重新开始。
   const dismiss = useCallback((id: string) => {
@@ -98,7 +99,7 @@ export function useShell(): Shell {
     openFiles: () => { setWorkbench(showFiles) },
     openFile,
     fileIndex: () => { setWorkbench(showFileIndex) },
-    hideWorkbench: () => { setWorkbench(hideWorkbench) },
+    hideWorkbench: closeWorkbench,
     selectedId,
     select: setSelectedId,
     dismissed,

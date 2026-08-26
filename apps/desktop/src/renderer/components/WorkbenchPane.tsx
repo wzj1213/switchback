@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import type { Item, Lane, Thread } from "@omni/protocol"
 import type { PreviewTarget, WorkbenchState } from "../workbench.js"
 import { sessionFilesOf } from "../session-files.js"
@@ -39,6 +39,14 @@ export function WorkbenchPane({ state, thread, lanes, items, onActivity, onFiles
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
 }): React.JSX.Element | null {
   const fileCount = useMemo(() => sessionFilesOf(items, thread.cwd).length, [items, thread.cwd])
+  useEffect(() => {
+    if (!state.visible) return undefined
+    const close = (event: KeyboardEvent): void => {
+      if (event.key === "Escape" && !event.defaultPrevented) onHide()
+    }
+    window.addEventListener("keydown", close)
+    return () => { window.removeEventListener("keydown", close) }
+  }, [state.visible, onHide])
   if (!state.visible) return null
   return (
     <aside className="workbench" aria-label="任务工作台">

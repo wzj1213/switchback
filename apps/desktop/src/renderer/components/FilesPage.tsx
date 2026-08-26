@@ -125,7 +125,11 @@ function FileIndex({ threadId, cwd, items, onPick, searchFiles }: {
         <span className="sr-only">搜索工作区文件</span>
         <input value={query} placeholder="搜索工作区文件…"
           onChange={(event) => { setQuery(event.currentTarget.value) }}
-          onKeyDown={(event) => { if (event.key === "Escape") setQuery("") }} />
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || query === "") return
+            event.stopPropagation()
+            setQuery("")
+          }} />
       </label>
       <div className="files-index__scroll">
         {searching ? (

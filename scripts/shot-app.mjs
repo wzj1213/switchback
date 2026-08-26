@@ -32,8 +32,7 @@ const DESKTOP = join(ROOT, "apps/desktop")
 const electron = createRequire(join(DESKTOP, "package.json"))("electron")
 
 const OUT = process.argv[2] ?? join(ROOT, "release", "app-shots")
-const DARK = process.argv.includes("--dark")
-const REDUCED = process.argv.includes("--reduce")
+const DARK = process.argv.includes("--dark"), REDUCED = process.argv.includes("--reduce")
 /** 桌宠靶场改动：用隔离数据目录真跑一轮 Claude，拍到枪、靶与逐字流。 */
 const PET_LIVE = process.argv.includes("--pet-live")
 /**
@@ -161,6 +160,8 @@ const VIEWS = [
     name: "04-文件清单",
     open: `document.querySelector('[title="文件预览"]')?.click()`,
     ready: ".file-row",
+    assert: MIN ? `getComputedStyle(document.querySelector('.workbench__scrim')).display !== 'none'`
+      : `getComputedStyle(document.querySelector('.workbench__scrim')).display === 'none'`,
   },
   {
     name: "05-文件搜索",
@@ -174,9 +175,7 @@ const VIEWS = [
     assert: `[...document.querySelectorAll('.file-row')].some(row => row.textContent.toLowerCase().includes('attachment'))`,
     after: `(() => {
       const input = document.querySelector('.files-search input')
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(input, '')
-      input?.dispatchEvent(new Event('input', { bubbles: true }))
+      input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })()`,
   },
   {
@@ -203,8 +202,10 @@ const VIEWS = [
     name: "09-推理强度",
     before: ".effort .trigger:not(:disabled)",
     open: [
-      `document.querySelector('.workbench__hide')?.click()`,
-      `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
+      `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+      `if (document.querySelector('.workbench') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
+      `document.querySelector('.workbench__scrim')?.click()`,
+      `if (document.querySelector('.workbench') !== null) throw new Error('点击遮罩没有收起工作台'); document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
     ],
     ready: ".effort__bar--grown",
     dragEffort: true,

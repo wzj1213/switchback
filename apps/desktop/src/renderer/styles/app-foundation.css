@@ -158,6 +158,11 @@ body {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--workbench-w);
 }
 
+/* 宽屏是持久分栏，不需要遮住主区；窄屏才把这颗按钮变成抽屉遮罩。 */
+.workbench__scrim {
+  display: none;
+}
+
 /*
  * 窄屏：工作台从一列变成从右边压上来的一层。**改 CSS 不改组件结构**——
  * 换屏要改 JS，那意味着窄宽两套渲染路径，两套都得测（见方案 §7.6）。
@@ -175,6 +180,17 @@ body {
     width: min(560px, 86vw);
     z-index: 60;
     box-shadow: var(--shadow-pop);
+  }
+
+  .workbench__scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: var(--scrim);
+    cursor: default;
   }
 }
 

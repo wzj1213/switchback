@@ -79,6 +79,10 @@ export function ThreadScreen({
         onReview={() => { shell.setReviewOpen(true) }}
         send={app.send}
       />
+      {workbench.visible ? (
+        <button type="button" className="workbench__scrim" tabIndex={-1}
+          aria-label="收起任务工作台" onClick={shell.hideWorkbench} />
+      ) : null}
       <WorkbenchPane
         state={workbench}
         thread={thread}
