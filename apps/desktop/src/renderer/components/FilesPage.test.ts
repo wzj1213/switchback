@@ -50,6 +50,7 @@ describe("文件清单", () => {
     expect(html).toContain("…/shop/service")
     expect(html).toContain("SKILL.md")
     expect(html).toContain("…/skills/doc-manage")
+    expect(html).toContain('data-file-path="/work/repos/README.md"')
     // 深目录不再整条铺开：截断会把文件名截掉
     expect(html).not.toContain("order-service/src/main/java/com/example/shop/service/OrderBatchService.java<")
   })

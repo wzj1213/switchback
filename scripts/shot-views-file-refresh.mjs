@@ -17,7 +17,8 @@ export const FILE_REFRESH_VIEWS = [
     assert: `document.querySelector('.files-search input')?.value === 'attachment'
       && document.querySelector('.files-index') === window.__omniFileIndex
       && document.querySelector('.files-index')?.textContent.includes('attachment-live-refresh-probe.ts') === true
-      && document.activeElement?.matches('.files-search input') === true`,
+      && document.activeElement === window.__omniFileRow
+      && document.activeElement?.matches('.file-row') === true`,
     after: `(() => {
       clearInterval(window.__omniRefreshProbe); delete window.__omniRefreshProbe
       delete document.documentElement.dataset.fileRefresh

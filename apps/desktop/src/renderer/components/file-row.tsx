@@ -49,6 +49,15 @@ export function focusFirstFile(root: Element | null): boolean {
   return true
 }
 
+export function focusFile(root: Element | null, path: string): boolean {
+  const rows = root?.querySelectorAll<HTMLButtonElement>(".file-row:not(:disabled)") ?? []
+  const row = [...rows].find((candidate) => candidate.dataset.filePath === path)
+  if (row === undefined) return false
+  row.focus()
+  row.scrollIntoView({ block: "nearest" })
+  return true
+}
+
 function moveFocus(event: React.KeyboardEvent<HTMLButtonElement>): void {
   const root = event.currentTarget.closest(".files-index")
   const rows = [...(root?.querySelectorAll<HTMLButtonElement>(".file-row:not(:disabled)") ?? [])]
@@ -75,6 +84,7 @@ export function PathRow({ path, cwd, threadId, meta, disabled, onPick }: {
   const tag = disabled === true ? "已删除" : (outside(path, cwd) ? "工作区外" : meta)
   return (
     <button type="button" className="file-row" disabled={disabled}
+      data-file-path={path}
       title={disabled === true ? `${path}\n文件已删除` : path}
       aria-keyshortcuts="ArrowUp ArrowDown Home End"
       onKeyDown={moveFocus}

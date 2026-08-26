@@ -199,15 +199,27 @@ export const VIEWS = [
     {
       name: "09-搜索返回保留",
       open: [
-        `(() => { window.__omniFileIndex = document.querySelector('.files-index'); document.activeElement?.click() })()`,
+        `(() => { window.__omniFileIndex = document.querySelector('.files-index'); window.__omniFileRow = document.activeElement; document.activeElement?.click() })()`,
         `document.querySelector('.workbench__page:not([hidden]) .workbench__back')?.click()`,
       ],
       ready: ".files-search input",
-      assert: `document.querySelector('.files-search input')?.value === 'attachment'
-        && document.querySelector('.files-index')?.textContent.includes('attachments.ts') === true
-        && document.querySelector('.files-index')?.textContent.includes('正在搜索') === false
-        && document.querySelector('.files-index') === window.__omniFileIndex
-        && document.activeElement?.matches('.files-search input') === true`,
+      assert: `(() => {
+        const index = document.querySelector('.files-index')
+        const result = {
+          query: document.querySelector('.files-search input')?.value,
+          hasResult: index?.textContent.includes('attachments.ts') === true,
+          settled: index?.textContent.includes('正在搜索') === false,
+          sameIndex: index === window.__omniFileIndex,
+          sameRow: document.activeElement === window.__omniFileRow,
+          activeClass: document.activeElement?.className,
+          expectedPath: window.__omniFileRow?.dataset?.filePath,
+          activePath: document.activeElement?.dataset?.filePath,
+          paths: [...(index?.querySelectorAll('.file-row') ?? [])].map(row => row.dataset.filePath),
+        }
+        if (result.query === 'attachment' && result.hasResult && result.settled
+          && result.sameIndex && result.sameRow && result.activeClass.includes('file-row')) return true
+        throw new Error('文件详情返回焦点诊断：' + JSON.stringify(result))
+      })()`,
     },
     ...FILE_REFRESH_VIEWS,
     {

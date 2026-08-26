@@ -53,7 +53,10 @@ export function useWorkbenchKeys(
     const panel = box.current
     if (!state.visible || panel === null) return
     const active = document.activeElement
-    if (panel.contains(active) && active instanceof HTMLElement && active.matches(".workbench__tab--on")) return
+    const keepsRow = state.page === "files" && state.file === undefined
+      && active instanceof HTMLElement && active.matches(".file-row")
+    if (panel.contains(active) && active instanceof HTMLElement
+      && (active.matches(".workbench__tab--on") || keepsRow)) return
     const target = panel.querySelector<HTMLElement>(selector)
     const focus = target ?? panel
     focus.focus()

@@ -4,7 +4,7 @@ import type { PreviewTarget } from "../workbench.js"
 import { fileTouchOf, sessionFileGroupsOf } from "../session-files.js"
 import { useFileSearch, type FileSearchState, type SearchFiles } from "../use-file-search.js"
 import { FileGroup } from "./file-group.js"
-import { focusFirstFile, PathRow } from "./file-row.js"
+import { focusFile, focusFirstFile, PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
 
 interface FileSearchView extends Omit<FileSearchState, "key"> {
@@ -42,6 +42,7 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
   const input = useRef<HTMLInputElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const enterResults = useRef(false)
+  const returnPath = useRef<string | undefined>(undefined)
   const groups = useMemo(() => sessionFileGroupsOf(items, cwd), [items, cwd])
   const found = useFileSearch({ cwd, query, stamp, active, search: searchFiles })
   const searching = query.trim() !== ""
@@ -52,6 +53,16 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
     enterResults.current = false
     if (document.activeElement === input.current) focusFirstFile(root.current)
   }, [found.loading, found.paths])
+  useEffect(() => {
+    if (hidden || returnPath.current === undefined) return
+    const path = returnPath.current
+    returnPath.current = undefined
+    if (!focusFile(root.current, path)) input.current?.focus()
+  }, [hidden])
+  const pick = (target: PreviewTarget): void => {
+    returnPath.current = target.path
+    onPick(target)
+  }
   return (
     <div ref={root} className="files-index" hidden={hidden} onKeyDown={(event) => {
       if (event.key !== "Escape" || query === "") return
@@ -86,17 +97,17 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
             <div className="workbench__section">搜索结果</div>
             <FileSearchStatus state={found} />
             {found.paths.map((path) => (
-              <PathRow key={path} path={path} cwd={cwd} threadId={threadId} onPick={onPick} />
+              <PathRow key={path} path={path} cwd={cwd} threadId={threadId} onPick={pick} />
             ))}
           </section>
         ) : (
           <>
             {total === 0 ? <p className="workbench__empty">本会话还没有读过或改过文件。</p> : null}
             {total > 0 && recent === 0 ? <p className="workbench__empty">最近一轮没有读写文件。</p> : null}
-            <FileGroup title="最近一轮改过" files={groups.recentEdited} threadId={threadId} cwd={cwd} onPick={onPick} />
-            <FileGroup title="最近一轮读过" files={groups.recentRead} threadId={threadId} cwd={cwd} onPick={onPick} />
-            <FileGroup title="此前碰过" files={groups.earlier} threadId={threadId} cwd={cwd} onPick={onPick} />
-            <FileGroup title="分支继承" files={groups.inherited} threadId={threadId} cwd={cwd} onPick={onPick} />
+            <FileGroup title="最近一轮改过" files={groups.recentEdited} threadId={threadId} cwd={cwd} onPick={pick} />
+            <FileGroup title="最近一轮读过" files={groups.recentRead} threadId={threadId} cwd={cwd} onPick={pick} />
+            <FileGroup title="此前碰过" files={groups.earlier} threadId={threadId} cwd={cwd} onPick={pick} />
+            <FileGroup title="分支继承" files={groups.inherited} threadId={threadId} cwd={cwd} onPick={pick} />
           </>
         )}
       </div>
