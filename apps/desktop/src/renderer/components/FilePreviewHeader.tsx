@@ -11,19 +11,24 @@ function ReloadIcon(): React.JSX.Element {
   )
 }
 
-function PreviewTitle({ path, cwd, name, refreshing }: {
+function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
   path: string
   cwd: string
   name: string
   refreshing: boolean
+  refreshFailed: boolean
 }): React.JSX.Element {
   const directory = dirHint(path, cwd)
   const external = outside(path, cwd)
+  const status = refreshing ? "正在更新…" : refreshFailed ? "更新失败" : undefined
   return (
     <span className="file-preview__title" title={path}>
       <span className="file-preview__identity">
         <strong>{name}</strong>
-        {refreshing ? <span className="file-preview__status">正在更新…</span> : null}
+        {status === undefined ? null : (
+          <span className={`file-preview__status${refreshFailed ? " file-preview__status--failed" : ""}`}
+            role="status">{status}</span>
+        )}
       </span>
       {directory === "" ? null : (
         <span className="file-preview__path">
@@ -35,10 +40,11 @@ function PreviewTitle({ path, cwd, name, refreshing }: {
   )
 }
 
-function PreviewActions({ target, busy, referenceable, referenceDisabled, revealable,
+function PreviewActions({ target, busy, refreshing, referenceable, referenceDisabled, revealable,
   onReference, onReload, onReveal }: {
   target: PreviewTarget
   busy: boolean
+  refreshing: boolean
   referenceable: boolean
   referenceDisabled: boolean
   revealable: boolean
@@ -58,7 +64,7 @@ function PreviewActions({ target, busy, referenceable, referenceDisabled, reveal
         </button>
       )}
       <button type="button" className="workbench__icon" title="重新读取文件"
-        aria-label="重新读取文件" disabled={busy} onClick={onReload}>
+        aria-label="重新读取文件" aria-busy={busy} disabled={busy && !refreshing} onClick={onReload}>
         <ReloadIcon />
       </button>
       {revealable ? (
@@ -71,12 +77,13 @@ function PreviewActions({ target, busy, referenceable, referenceDisabled, reveal
   )
 }
 
-export function FilePreviewHeader({ target, path, name, refreshing, busy, referenceable,
+export function FilePreviewHeader({ target, path, name, refreshing, refreshFailed, busy, referenceable,
   referenceDisabled, revealable, onBack, onReference, onReload, onReveal }: {
   target: PreviewTarget
   path: string
   name: string
   refreshing: boolean
+  refreshFailed: boolean
   busy: boolean
   referenceable: boolean
   referenceDisabled: boolean
@@ -91,8 +98,9 @@ export function FilePreviewHeader({ target, path, name, refreshing, busy, refere
       <button type="button" className="workbench__back" onClick={onBack}>
         <ChevronIcon size={11} /> 文件
       </button>
-      <PreviewTitle path={path} cwd={target.cwd} name={name} refreshing={refreshing} />
-      <PreviewActions target={target} busy={busy} referenceable={referenceable}
+      <PreviewTitle path={path} cwd={target.cwd} name={name}
+        refreshing={refreshing} refreshFailed={refreshFailed} />
+      <PreviewActions target={target} busy={busy} refreshing={refreshing} referenceable={referenceable}
         referenceDisabled={referenceDisabled} revealable={revealable} onReference={onReference}
         onReload={onReload} onReveal={onReveal} />
     </header>

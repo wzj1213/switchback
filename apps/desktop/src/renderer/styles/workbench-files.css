@@ -207,6 +207,10 @@
   font-size: var(--text-xs);
 }
 
+.file-preview__status--failed {
+  color: var(--warn);
+}
+
 .file-preview__path {
   display: flex;
   min-width: 0;

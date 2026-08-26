@@ -6,16 +6,35 @@ import { baseName } from "./file-row.js"
 import { FilePreviewHeader } from "./FilePreviewHeader.js"
 import { FilePreviewContent } from "./file-preview-content.js"
 
-type Load =
+export type PreviewLoad =
   | { state: "loading" }
   | {
       state: "ready"
       identity: string
       file: FilePreview
       refreshing: boolean
+      refreshFailed: boolean
     }
-const LOADING: Load = { state: "loading" }
+const LOADING: PreviewLoad = { state: "loading" }
 const REFRESH_MS = 15_000
+
+function readyLoad(identity: string, file: FilePreview): PreviewLoad {
+  return { state: "ready", identity, file, refreshing: false, refreshFailed: false }
+}
+
+/** 自动刷新暂时失败时保留上一份正文；首次读取没有旧内容，仍然诚实显示失败。 */
+export function failedPreviewLoad(
+  before: PreviewLoad,
+  identity: string,
+  failure: FilePreview,
+): PreviewLoad {
+  if (before.state !== "ready" || before.identity !== identity) return readyLoad(identity, failure)
+  return { ...before, refreshing: false, refreshFailed: true }
+}
+
+function transientFailure(file: FilePreview): boolean {
+  return file.kind === "unavailable" && file.reason === "failed"
+}
 
 export function canRevealPreview(file: FilePreview | undefined, path: string): boolean {
   return path !== "" && !(file?.kind === "unavailable" && file.reason === "missing")
@@ -34,8 +53,8 @@ function usePreview({ target, revision, stamp, manual, active }: {
   stamp: string
   manual: number
   active: boolean
-}): Load {
-  const [load, setLoad] = useState<Load>(LOADING)
+}): PreviewLoad {
+  const [load, setLoad] = useState<PreviewLoad>(LOADING)
   const [visit, setVisit] = useState(0)
   const lastTarget = useRef("")
   const identity = identityOf(target)
@@ -57,22 +76,19 @@ function usePreview({ target, revision, stamp, manual, active }: {
     const refreshing = lastTarget.current === identity
     lastTarget.current = identity
     setLoad((before) =>
-      refreshing && before.state === "ready" ? { ...before, refreshing: true } : LOADING,
+      refreshing && before.state === "ready"
+        ? { ...before, refreshing: true, refreshFailed: false }
+        : LOADING,
     )
     const bridge = window.omni
     if (bridge === undefined) {
-      setLoad({
-        state: "ready",
-        identity,
-        file: {
-          kind: "unavailable",
-          path: target.path,
-          name: target.path,
-          reason: "failed",
-          message: "桌面桥没有接通，暂时不能读取文件。",
-        },
-        refreshing: false,
-      })
+      setLoad(readyLoad(identity, {
+        kind: "unavailable",
+        path: target.path,
+        name: target.path,
+        reason: "failed",
+        message: "桌面桥没有接通，暂时不能读取文件。",
+      }))
       return () => {
         alive = false
       }
@@ -82,22 +98,23 @@ function usePreview({ target, revision, stamp, manual, active }: {
         void bridge
           .filePreview(target.threadId, target.cwd, target.path)
           .then((file) => {
-            if (alive) setLoad({ state: "ready", identity, file, refreshing: false })
+            if (!alive) return
+            setLoad((before) => refreshing && transientFailure(file)
+              ? failedPreviewLoad(before, identity, file)
+              : readyLoad(identity, file))
           })
           .catch(() => {
-            if (alive)
-              setLoad({
-                state: "ready",
-                identity,
-                file: {
-                  kind: "unavailable",
-                  path: target.path,
-                  name: target.path,
-                  reason: "failed",
-                  message: "读取这份文件失败，请稍后重试。",
-                },
-                refreshing: false,
-              })
+            if (!alive) return
+            const failure: FilePreview = {
+              kind: "unavailable",
+              path: target.path,
+              name: target.path,
+              reason: "failed",
+              message: "读取这份文件失败，请稍后重试。",
+            }
+            setLoad((before) => refreshing
+              ? failedPreviewLoad(before, identity, failure)
+              : readyLoad(identity, failure))
           })
       },
       refreshing ? 100 : 0,
@@ -138,6 +155,7 @@ export function FilePreviewView({
   const revealable = canRevealPreview(load.state === "ready" ? load.file : undefined, path)
   const referenceable = canReferencePreview(load.state === "ready" ? load.file : undefined, path)
   const refreshing = load.state === "ready" && load.refreshing
+  const refreshFailed = load.state === "ready" && load.refreshFailed
   return (
     <div className="file-preview">
       <FilePreviewHeader
@@ -145,6 +163,7 @@ export function FilePreviewView({
         path={path}
         name={name}
         refreshing={refreshing}
+        refreshFailed={refreshFailed}
         busy={load.state === "loading" || refreshing}
         referenceable={referenceable}
         referenceDisabled={referenceDisabled}

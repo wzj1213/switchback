@@ -49,8 +49,30 @@ export const FILE_REFRESH_VIEWS = [
     after: `(() => {
       clearInterval(window.__omniPreviewPoll)
       delete window.__omniPreviewPoll
-      delete window.__omniPreviewSource
       delete document.documentElement.dataset.previewRefresh
+    })()`,
+  },
+  {
+    name: "09-刷新失败保留内容",
+    before: ".file-source",
+    chmodFiles: [{
+      path: "apps/desktop/src/renderer/attachment-live-refresh-probe.ts",
+      mode: 0o000,
+    }],
+    open: `(() => {
+      const reload = document.querySelector('[aria-label="重新读取文件"]')
+      reload?.focus()
+      reload?.click()
+    })()`,
+    ready: ".file-preview__status--failed",
+    assert: `document.querySelector('.file-source') === window.__omniPreviewSource
+      && document.querySelector('.file-source code')?.textContent.includes('refreshedWithoutFocus') === true
+      && document.querySelector('.file-preview__status--failed')?.textContent === '更新失败'
+      && document.querySelector('.file-preview__status--failed')?.getAttribute('role') === 'status'
+      && document.querySelector('[aria-label="重新读取文件"]')?.disabled === false
+      && document.activeElement === document.querySelector('[aria-label="重新读取文件"]')`,
+    after: `(() => {
+      delete window.__omniPreviewSource
       document.querySelector('.file-preview .workbench__back')?.click()
     })()`,
   },

@@ -2,7 +2,14 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { FilePreview } from "../../shared/file-preview.js"
-import { canReferencePreview, canRevealPreview, FilePreviewView } from "./FilePreviewView.js"
+import {
+  canReferencePreview,
+  canRevealPreview,
+  failedPreviewLoad,
+  FilePreviewView,
+  type PreviewLoad,
+} from "./FilePreviewView.js"
+import { FilePreviewHeader } from "./FilePreviewHeader.js"
 import {
   fileCopyLabel,
   fileCopyTitle,
@@ -111,6 +118,45 @@ describe("文件预览操作", () => {
     expect(windows).toContain(">App.ts</strong>")
     expect(windows).toContain(">src</span>")
     expect(windows).not.toContain("工作区外")
+  })
+})
+
+describe("文件预览刷新失败", () => {
+  const failure: FilePreview = {
+    kind: "unavailable", path: "/work/app.ts", name: "app.ts",
+    reason: "failed", message: "读取失败",
+  }
+  const ready: PreviewLoad = {
+    state: "ready", identity: "thread\u0000/work\u0000app.ts",
+    file: { kind: "text", path: "/work/app.ts", name: "app.ts", text: "旧内容", truncated: false },
+    refreshing: true, refreshFailed: false,
+  }
+
+  it("同一文件后台刷新失败时保留已有正文", () => {
+    expect(failedPreviewLoad(ready, ready.identity, failure)).toEqual({
+      ...ready, refreshing: false, refreshFailed: true,
+    })
+  })
+
+  it("首次读取或已经换文件时显示对应失败，不借用旧正文", () => {
+    expect(failedPreviewLoad({ state: "loading" }, "new", failure)).toEqual({
+      state: "ready", identity: "new", file: failure, refreshing: false, refreshFailed: false,
+    })
+    expect(failedPreviewLoad(ready, "other", failure)).toEqual({
+      state: "ready", identity: "other", file: failure, refreshing: false, refreshFailed: false,
+    })
+  })
+
+  it("后台刷新不禁用重试按钮，避免浏览器丢掉原焦点", () => {
+    const html = renderToStaticMarkup(createElement(FilePreviewHeader, {
+      target: { threadId: "thread", cwd: "/work", path: "app.ts" },
+      path: "/work/app.ts", name: "app.ts", refreshing: true, refreshFailed: false,
+      busy: true, referenceable: true, referenceDisabled: false, revealable: true,
+      onBack: () => undefined, onReload: () => undefined, onReveal: () => undefined,
+    }))
+    const reload = html.match(/<button[^>]+aria-label="重新读取文件"[^>]*>/)?.[0]
+    expect(reload).toContain('aria-busy="true"')
+    expect(reload).not.toContain("disabled")
   })
 })
 
