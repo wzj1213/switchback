@@ -86,7 +86,13 @@ export const Transcript = memo(function Transcript({
   // 「改一改再发」只挂最后一句人话，而且只在能 rewind 时——见 `transcript-row.tsx`
   const retry = { id: useMemo(() => lastMine(rows), [rows]), active: canRewind(thread, turn, readOnly === true) }
   return (
-    <div className="transcript" ref={scroller}>
+    <div
+      className="transcript"
+      ref={scroller}
+      role="region"
+      aria-label={`对话记录：${thread.title}`}
+      tabIndex={0}
+    >
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
       <div className="transcript__inner" ref={inner}>
         {rows.map((row) => (

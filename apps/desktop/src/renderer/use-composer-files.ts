@@ -16,6 +16,7 @@ export function useComposerFiles(options: {
   canAttach: boolean
   editable: boolean
   cwd: string
+  text: string
   setText: React.Dispatch<React.SetStateAction<string>>
   focus: () => void
   onFilesDropped: () => void
@@ -42,7 +43,7 @@ export function useComposerFiles(options: {
   }, [addReferences, options.editable, options.focus, options.reference])
   const drop = useCallback(
     (files: FileList | null) => {
-      const result = options.attach.drop(files, options.cwd)
+      const result = options.attach.drop(files, options.cwd, options.text)
       addReferences(result.references)
       if ((files?.length ?? 0) === 0) return undefined
       if (!result.accepted) {
@@ -52,18 +53,18 @@ export function useComposerFiles(options: {
       focusAfterSurfaceCloses(options.focus)
       return undefined
     },
-    [addReferences, options.attach.drop, options.cwd, options.focus, options.onFilesDropped],
+    [addReferences, options.attach.drop, options.cwd, options.focus, options.onFilesDropped, options.text],
   )
   const paste = useCallback(
     async (items: DataTransferItemList | null) => {
-      addReferences(await options.attach.paste(items, options.cwd))
+      addReferences(await options.attach.paste(items, options.cwd, options.text))
     },
-    [addReferences, options.attach.paste, options.cwd],
+    [addReferences, options.attach.paste, options.cwd, options.text],
   )
   const pick = useCallback(async () => {
-    addReferences(await options.attach.pick(options.cwd))
+    addReferences(await options.attach.pick(options.cwd, options.text))
     options.focus()
-  }, [addReferences, options.attach.pick, options.cwd, options.focus])
+  }, [addReferences, options.attach.pick, options.cwd, options.focus, options.text])
   return {
     dropzone: useAttachmentDropzone(options.canAttach, options.editable, drop),
     paste,

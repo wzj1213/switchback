@@ -148,6 +148,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     canAttach: imageAttachments,
     editable: !detached,
     cwd: props.cwd,
+    text: draft.text,
     setText: draft.setText,
     focus: focus.focus,
     onFilesDropped: props.onFilesDropped,

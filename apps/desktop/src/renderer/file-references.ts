@@ -38,9 +38,28 @@ export function formatFileReference(path: string): string {
   return /[\s"\\]/.test(path) ? `@${JSON.stringify(path)}` : `@${path}`
 }
 
+function includesReference(text: string, path: string): boolean {
+  const token = formatFileReference(path)
+  let at = text.indexOf(token)
+  while (at >= 0) {
+    const end = at + token.length
+    const before = at === 0 || /\s/.test(text[at - 1] ?? "")
+    const after = end === text.length || /\s/.test(text[end] ?? "")
+    if (before && after) return true
+    at = text.indexOf(token, at + 1)
+  }
+  return false
+}
+
+/** 同一批与正文里已经存在的 @ 引用都不再追加。 */
+export function newFileReferences(text: string, paths: readonly string[]): readonly string[] {
+  return [...new Set(paths.filter((path) => path !== ""))]
+    .filter((path) => !includesReference(text, path))
+}
+
 /** 文件拖放和手选 @ 走同一种可见文本，不另造隐藏附件协议。 */
 export function appendFileReferences(text: string, paths: readonly string[]): string {
-  const unique = [...new Set(paths.filter((path) => path !== ""))]
+  const unique = newFileReferences(text, paths)
   if (unique.length === 0) return text
   const gap = text === "" || /\s$/.test(text) ? "" : " "
   return `${text}${gap}${unique.map(formatFileReference).join(" ")} `

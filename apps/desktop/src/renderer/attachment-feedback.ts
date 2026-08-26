@@ -14,6 +14,14 @@ export interface DropHint {
   compact?: boolean
 }
 
+export interface AttachmentSummary {
+  images: number
+  references: number
+  failed: number
+  outside: number
+  duplicates: number
+}
+
 interface FileLike {
   type: string
   size: number
@@ -65,8 +73,9 @@ export function dropNotice(summary: {
   references: number
   failed: number
   outside: number
+  duplicates?: number
 }): string | undefined {
-  const { images, references, failed, outside } = summary
+  const { images, references, failed, outside, duplicates = 0 } = summary
   let text = images > 0 && references > 0
     ? `已添加 ${String(images)} 张图片，并引用 ${String(references)} 个文件`
     : images > 0 ? `已添加 ${String(images)} 张图片`
@@ -75,6 +84,11 @@ export function dropNotice(summary: {
     text += text === ""
       ? `未添加：${String(failed)} 个文件未能读取`
       : `；另有 ${String(failed)} 个文件未能读取`
+  }
+  if (duplicates > 0) {
+    text += text === ""
+      ? `没有重复添加：${String(duplicates)} 个文件已经在待发送内容中`
+      : `；另有 ${String(duplicates)} 个文件已经在待发送内容中，没有重复添加`
   }
   if (outside > 0) {
     text += `。其中 ${String(outside)} 个在当前工作区外，已保留绝对路径；能否读取由引擎权限决定`

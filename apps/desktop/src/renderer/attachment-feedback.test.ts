@@ -55,4 +55,9 @@ describe("附件拖放反馈", () => {
     expect(dropNotice({ images: 0, references: 0, failed: 2, outside: 0 }))
       .toBe("未添加：2 个文件未能读取。")
   })
+
+  it("重复项既不计入成功数量，也明确说明没有再次添加", () => {
+    expect(dropNotice({ images: 0, references: 0, failed: 0, outside: 0, duplicates: 2 }))
+      .toBe("没有重复添加：2 个文件已经在待发送内容中。")
+  })
 })

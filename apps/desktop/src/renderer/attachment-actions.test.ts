@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { droppedFiles, pasteFiles, pickedFiles } from "./attachment-actions.js"
-import { attachmentAcceptance } from "./useAttachments.js"
+import { attachmentAcceptance, withoutExistingAttachments } from "./useAttachments.js"
 
 function image(name: string, type = "image/png", size = 10): File {
   return { name, type, size, arrayBuffer: async () => new ArrayBuffer(size) } as File
@@ -38,6 +38,8 @@ describe("附件三种入口", () => {
     expect(droppedFiles(files, true, bridge, "/tmp")).toEqual({
       paths: ["/tmp/a.png"],
       references: ["code.ts"],
+      summary: { images: 1, references: 1, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已添加 1 张图片，并引用 1 个文件。", tone: "info" },
     })
   })
@@ -47,6 +49,8 @@ describe("附件三种入口", () => {
     expect(droppedFiles(files, false, bridge, "/tmp")).toEqual({
       paths: [],
       references: ["code.ts"],
+      summary: { images: 0, references: 1, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已引用 1 个文件。", tone: "info" },
     })
   })
@@ -56,6 +60,8 @@ describe("附件三种入口", () => {
     expect(droppedFiles(files, false, bridge, "/tmp")).toEqual({
       paths: [],
       references: ["a.png"],
+      summary: { images: 0, references: 1, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已引用 1 个文件。", tone: "info" },
     })
   })
@@ -67,6 +73,8 @@ describe("附件三种入口", () => {
     expect(await pasteFiles(items, true, bridge, "/tmp")).toEqual({
       paths: ["/saved/png.png"],
       references: ["notes.txt"],
+      summary: { images: 1, references: 1, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已添加 1 张图片，并引用 1 个文件。", tone: "info" },
     })
   })
@@ -80,6 +88,8 @@ describe("附件三种入口", () => {
     expect(await pasteFiles(items, true, bridge, "/tmp")).toEqual({
       paths: [],
       references: ["broken.png"],
+      summary: { images: 0, references: 1, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已引用 1 个文件。", tone: "info" },
     })
   })
@@ -89,6 +99,8 @@ describe("附件三种入口", () => {
     expect(droppedFiles(files, true, bridge, "/work/omni")).toEqual({
       paths: [],
       references: ["/tmp/spec.pdf"],
+      summary: { images: 0, references: 1, failed: 0, outside: 1, duplicates: 0 },
+      outsideReferences: ["/tmp/spec.pdf"],
       notice: {
         text: "已引用 1 个文件。其中 1 个在当前工作区外，已保留绝对路径；能否读取由引擎权限决定。",
         tone: "warn",
@@ -100,6 +112,8 @@ describe("附件三种入口", () => {
     expect(await pickedFiles(bridge, true, "/picked")).toEqual({
       paths: ["/picked/a.png"],
       references: ["code.ts"],
+      summary: { images: 1, references: 1, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已添加 1 张图片，并引用 1 个文件。", tone: "info" },
     })
   })
@@ -108,6 +122,8 @@ describe("附件三种入口", () => {
     expect(await pickedFiles(bridge, false, "/picked")).toEqual({
       paths: [],
       references: ["a.png", "code.ts"],
+      summary: { images: 0, references: 2, failed: 0, outside: 0, duplicates: 0 },
+      outsideReferences: [],
       notice: { text: "已引用 2 个文件。", tone: "info" },
     })
   })
@@ -115,5 +131,32 @@ describe("附件三种入口", () => {
   it("系统选择器取消时不制造提示", async () => {
     const canceled = { ...bridge, pickFiles: async () => ({ files: [], failed: 0, canceled: true }) }
     expect(await pickedFiles(canceled, true, "/picked")).toEqual({ paths: [], references: [] })
+  })
+
+  it("同批重复图片在生成通知前只计一次", () => {
+    const files = [image("a.png"), image("a.png")] as unknown as FileList
+    expect(droppedFiles(files, true, bridge, "/tmp")).toMatchObject({
+      paths: ["/tmp/a.png"],
+      summary: { images: 1, references: 0, failed: 0, outside: 0, duplicates: 1 },
+      notice: {
+        text: "已添加 1 张图片；另有 1 个文件已经在待发送内容中，没有重复添加。",
+        tone: "info",
+      },
+    })
+  })
+
+  it("再次拖入正文与附件已有文件时不制造假成功", () => {
+    const files = [image("a.png"), image("code.ts", "text/typescript")] as unknown as FileList
+    const result = withoutExistingAttachments(
+      droppedFiles(files, true, bridge, "/tmp"),
+      new Set(["/tmp/a.png"]),
+      "检查 @code.ts ",
+    )
+    expect(result).toMatchObject({
+      paths: [], references: [],
+      summary: { images: 0, references: 0, failed: 0, outside: 0, duplicates: 2 },
+      notice: { text: "没有重复添加：2 个文件已经在待发送内容中。", tone: "info" },
+    })
+    expect(attachmentAcceptance(result).accepted).toBe(false)
   })
 })

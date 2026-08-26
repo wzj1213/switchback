@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { appendFileReferences, fileReference, formatFileReference } from "./file-references.js"
+import { appendFileReferences, fileReference, formatFileReference, newFileReferences } from "./file-references.js"
 
 describe("拖入文件引用", () => {
   const relativeCases = [
@@ -27,5 +27,13 @@ describe("拖入文件引用", () => {
   it("追加引用时保留原文、去重并补发送所需的分隔空格", () => {
     expect(appendFileReferences("检查", ["a.ts", "a.ts", "docs/my note.md"]))
       .toBe("检查 @a.ts @\"docs/my note.md\" ")
+  })
+
+  it("正文中已有的普通与带空格引用都不重复追加", () => {
+    const text = "检查 @a.ts @\"docs/my note.md\" "
+    expect(newFileReferences(text, ["a.ts", "docs/my note.md", "b.ts", "b.ts"]))
+      .toEqual(["b.ts"])
+    expect(appendFileReferences(text, ["a.ts", "docs/my note.md"])).toBe(text)
+    expect(newFileReferences("检查 @a.tsx ", ["a.ts"])).toEqual(["a.ts"])
   })
 })

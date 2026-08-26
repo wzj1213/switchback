@@ -52,7 +52,7 @@ function Notice({
 }): React.JSX.Element {
   if (fatal) {
     return (
-      <div className="transcript">
+      <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
         <div className="transcript__inner">
           <div className="error">{text}</div>
         </div>
@@ -60,7 +60,7 @@ function Notice({
     )
   }
   return (
-    <div className="transcript">
+    <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
       <div className="transcript__inner">
         <div className="blank">
           {waiting ? (

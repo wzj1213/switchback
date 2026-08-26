@@ -1,5 +1,5 @@
 import { canAttachImage } from "../shared/attachments.js"
-import { dropNotice } from "./attachment-feedback.js"
+import { dropNotice, type AttachmentSummary } from "./attachment-feedback.js"
 import { fileReference } from "./file-references.js"
 
 type Bridge = Pick<NonNullable<Window["omni"]>, "pathForFile" | "pickFiles" | "stashImage">
@@ -7,6 +7,8 @@ type Bridge = Pick<NonNullable<Window["omni"]>, "pathForFile" | "pickFiles" | "s
 export interface AttachmentResult {
   paths: readonly string[]
   references: readonly string[]
+  summary?: AttachmentSummary
+  outsideReferences?: readonly string[]
   notice?: { text: string; tone: "info" | "warn" }
 }
 
@@ -47,15 +49,20 @@ async function stash(bridge: Bridge, file: File): Promise<string | undefined> {
 }
 
 function finish(result: Routed): AttachmentResult {
+  const paths = [...new Set(result.paths)]
   const references = [...new Set(result.references)]
-  const outside = new Set(result.outside).size
-  const text = dropNotice({ images: result.paths.length, references: references.length,
-    failed: result.failed, outside })
+  const outsideReferences = [...new Set(result.outside)]
+  const duplicates = result.paths.length - paths.length + result.references.length - references.length
+  const summary = { images: paths.length, references: references.length,
+    failed: result.failed, outside: outsideReferences.length, duplicates }
+  const text = dropNotice(summary)
   return {
-    paths: result.paths,
+    paths,
     references,
+    summary,
+    outsideReferences,
     ...(text === undefined ? {} : { notice: {
-      text, tone: result.failed > 0 || outside > 0 ? "warn" as const : "info" as const,
+      text, tone: result.failed > 0 || outsideReferences.length > 0 ? "warn" as const : "info" as const,
     } }),
   }
 }
