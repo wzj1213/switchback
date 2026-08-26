@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>omni 界面全面审查 · v5 · 声明与落地之间的那道缝</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --ink: 22 22 28;
+  --bg:#fff; --sunken:#f7f7f8; --raised:#fff;
+  --fill:rgb(var(--ink)/4%); --fill-2:rgb(var(--ink)/7%);
+  --hair:rgb(var(--ink)/8%); --rule:rgb(var(--ink)/14%);
+  --t1:rgb(var(--ink)); --t2:rgb(var(--ink)/72%); --t3:rgb(var(--ink)/56%);
+  --accent:#3568c8; --danger:#b63b29; --warn:#8a6410; --ok:#2b7248;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --r1:6px; --r2:10px; --r3:14px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+  --shadow:0 1px 2px rgb(0 0 0/6%),0 8px 28px rgb(0 0 0/9%);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ink:244 245 248;
+    --bg:#0e0f13; --sunken:#08090c; --raised:rgb(var(--ink)/5%);
+    --fill:rgb(var(--ink)/7%); --fill-2:rgb(var(--ink)/12%);
+    --hair:rgb(var(--ink)/11%); --rule:rgb(var(--ink)/20%);
+    --t2:rgb(var(--ink)/74%); --t3:rgb(var(--ink)/56%);
+    --accent:#7aa2f7; --danger:#e0705c; --warn:#d3a044; --ok:#6cc48d;
+    --shadow:0 10px 32px rgb(0 0 0/55%);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t1);font:15px/1.75 var(--font);-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:var(--s7) var(--s5) 96px}
+h1{font-size:30px;line-height:1.25;font-weight:640;margin:0 0 var(--s2);letter-spacing:-.01em}
+.sub{color:var(--t3);font-size:14px;margin:0 0 var(--s6)}
+h2{font-size:21px;font-weight:620;margin:var(--s7) 0 var(--s3);padding-top:var(--s5);border-top:1px solid var(--rule);letter-spacing:-.005em}
+h2 .n{color:var(--t3);font-weight:500;font-variant-numeric:tabular-nums;margin-right:.5em}
+h3{font-size:16px;font-weight:620;margin:var(--s5) 0 var(--s2)}
+p{margin:0 0 var(--s3)}
+code{font-family:var(--mono);font-size:.86em;background:var(--fill);padding:.12em .38em;border-radius:var(--r1)}
+strong{font-weight:640}
+.lede{font-size:16.5px;line-height:1.72;border-left:3px solid var(--t1);padding-left:var(--s4);margin:0 0 var(--s5)}
+table{width:100%;border-collapse:collapse;margin:var(--s3) 0 var(--s5);font-size:13.5px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--hair);vertical-align:top}
+th{font-weight:600;color:var(--t3);font-size:12px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+tr.bad td{background:color-mix(in srgb,var(--danger) 7%,transparent)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;vertical-align:1px}
+.tag--bad{background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)}
+.tag--ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.tag--warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.box{border:1px solid var(--hair);border-radius:var(--r3);padding:var(--s4) var(--s5);margin:var(--s4) 0;background:var(--raised)}
+.box--why{background:var(--fill);border-color:transparent}
+.box h4{margin:0 0 var(--s2);font-size:13px;font-weight:640;color:var(--t3);letter-spacing:.04em}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.65;background:var(--fill);border-radius:var(--r2);padding:var(--s3) var(--s4);overflow-x:auto;margin:var(--s2) 0 var(--s3)}
+pre .del{color:var(--danger)}
+pre .add{color:var(--ok)}
+pre .cm{color:var(--t3)}
+ul,ol{margin:0 0 var(--s3);padding-left:1.35em}
+li{margin-bottom:5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4);margin:var(--s4) 0}
+@media (max-width:700px){.two{grid-template-columns:1fr}}
+.demo{border:1px solid var(--hair);border-radius:var(--r3);overflow:hidden;background:var(--raised)}
+.demo__cap{font-size:11.5px;font-weight:600;letter-spacing:.04em;color:var(--t3);padding:8px 12px;border-bottom:1px solid var(--hair);background:var(--fill)}
+.demo__body{padding:var(--s4)}
+/* ── 侧栏对照 demo ── */
+.sb{--pad:8px;--slot:24px;width:240px;font-size:14px;background:var(--sunken);border-radius:var(--r2);padding-bottom:8px;position:relative;overflow:hidden}
+.sb__guide{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--danger) 60%,transparent);z-index:2}
+.sb__row{display:flex;align-items:center;height:34px;margin:0 var(--pad);border-radius:var(--r1);color:var(--t2)}
+.sb__row i{display:flex;width:var(--slot);flex:none;justify-content:center;color:var(--t3)}
+.sb__row--on{background:var(--fill-2);color:var(--t1);font-weight:500}
+.sb__row--new{font-weight:500;color:var(--t1);padding:0 8px;gap:8px}
+.sb__row--new i{width:auto}
+.sb__sec{display:flex;align-items:center;margin:0 var(--pad);color:var(--t3);font-size:13px;font-weight:500}
+.sb__brand{padding:14px var(--pad) 10px;font-size:16px;font-weight:600}
+.sb__ind{margin-left:var(--slot)}
+.sb--old .sb__sec{height:43px;padding:16px 0 4px 24px;box-sizing:content-box;height:23px}
+.sb--old .sb__sec span{padding-left:6px}
+.sb--new .sb__sec{height:26px;padding-left:var(--slot);margin-top:14px}
+.sb--new .sb__sec:first-of-type{margin-top:8px}
+.sb__brand.sb--pad{padding-left:calc(var(--pad) + var(--slot))}
+.sb__dim{color:var(--t3);font-size:12px;margin-left:auto;padding-right:8px}
+/* ── 图标笔画对照 ── */
+.icons{display:flex;flex-wrap:wrap;gap:var(--s4);align-items:flex-end}
+.icons figure{margin:0;text-align:center;width:74px}
+.icons svg{display:block;margin:0 auto 6px;color:var(--t1)}
+.icons figcaption{font-size:10.5px;line-height:1.4;color:var(--t3);font-family:var(--mono)}
+.icons .off figcaption{color:var(--danger)}
+/* ── 左缘对照 ── */
+.col{position:relative;background:var(--sunken);border-radius:var(--r2);padding:22px 0;margin:4px 0;font-size:12.5px}
+.col__line{height:9px;border-radius:3px;background:var(--fill-2);margin:5px 0}
+.col__mark{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--danger) 55%,transparent)}
+.col__mark b{position:absolute;top:-2px;left:3px;font:600 9px var(--mono);color:var(--danger);white-space:nowrap}
+.col__mark--ok{background:color-mix(in srgb,var(--ok) 60%,transparent)}
+.col__mark--ok b{color:var(--ok)}
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps li{counter-increment:s;position:relative;padding-left:34px;margin-bottom:var(--s3)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;background:var(--t1);color:var(--bg);font:600 12px/22px var(--font);text-align:center}
+.foot{margin-top:var(--s7);padding-top:var(--s5);border-top:1px solid var(--rule);color:var(--t3);font-size:12.5px}
+.kbd{font:600 11px var(--mono);border:1px solid var(--rule);border-bottom-width:2px;border-radius:5px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>omni 界面全面审查 · v5</h1>
+<p class="sub">2026-08-26 · 对着跑起来的桌面端实测 · 承接 <code>docs/UI细节优化计划.md</code>（v1，已落地）与 <code>界面细节打磨-v4.html</code></p>
+
+<p class="lede">这套界面欠的不是设计，是<strong>把已经写在注释里的决定收敛到数字上</strong>。<code>tokens.css</code>
+声明 5 档字号、4 档圆角、2 档时长、6 档间距；实际渲染出来是 7 档字号、10 种圆角、6 种时长，外加 239 处硬编码 px。
+最小那档字号（11.5px）占了全部字号声明的 55%，而「要读的」14px 只有 11 处——<strong>和 codex 并排显小气，
+原因不是没选过字号，是选好的那张表没被用起来</strong>。同一件事在图标上、按下态上、左缘上各发生了一遍。</p>
+
+<div class="box box--why">
+<h4>怎么测的</h4>
+<p style="margin:0">用仓库自带的 <code>scripts/shot-app.mjs</code> 起 Electron + CDP，在固定样本上连拍 58 屏（浅/深/最小窗口三套），
+再用一份 <code>Runtime.evaluate</code> 探针读全树的 <code>getComputedStyle</code> 与 <code>getBoundingClientRect</code>。
+下面每一个数字都是那次实读，不是估的。窗口 1440×900、2× 屏、经典滚动条档位。</p>
+</div>
+
+<!-- ══════════════════ A ══════════════════ -->
+<h2><span class="n">A</span>声明 vs 落地：七张表</h2>
+
+<h3>A1 · 字号：表里 5 档，屏幕上 7 档，且分布倒挂</h3>
+<table>
+<tr><th>token</th><th class="num">值</th><th class="num">CSS 里用了几次</th><th>本该承担什么</th></tr>
+<tr class="bad"><td><code>--text-xs</code></td><td class="num">11.5px</td><td class="num">163</td><td>「扫一眼的」：时间戳、token 数、<code>+A −B</code></td></tr>
+<tr><td><code>--text-sm</code></td><td class="num">13px</td><td class="num">89</td><td>「要读的」：按钮里的字、选项名</td></tr>
+<tr class="bad"><td><code>--text-base</code></td><td class="num">14px</td><td class="num">11</td><td>body 默认档</td></tr>
+<tr class="bad"><td><code>--text-prose</code></td><td class="num">15px</td><td class="num">3</td><td>用户消息 + agent 回答</td></tr>
+<tr><td><code>--text-lg</code></td><td class="num">16px</td><td class="num">7</td><td>品牌、面板抬头</td></tr>
+<tr><td><code>--text-xl</code></td><td class="num">27px</td><td class="num">2</td><td>空会话大标题</td></tr>
+<tr><td><code>--text-code</code></td><td class="num">12.5px</td><td class="num">21</td><td>等宽正文</td></tr>
+<tr class="bad"><td>（无）</td><td class="num">13.8px</td><td class="num">渲染出 8 处</td><td><code>0.92em</code>／<code>0.95em</code> 相对字号算出来的第七档</td></tr>
+</table>
+
+<p><strong>163 / 296 = 55% 的字号声明是 11.5px。</strong> <code>tokens.css</code> 自己写着「要读的是 13，扫一眼的是 11.5」，
+但部署下来 11.5 成了主力字号，14px 只剩 11 处。转录区实测叶子文本节点的字号分布是
+<code>12.5×25 / 11.5×23 / 13×16 / 13.8×8 / 15×5 / 14×4 / 16×1</code>——<strong>82 个文本节点里 48 个 ≤ 12.5px</strong>。</p>
+
+<div class="box box--why">
+<h4>为什么这是「显小气」的主因，而不是字号本身选小了</h4>
+<p style="margin:0">上一轮已经把整套阶梯抬过一档（11→11.5、12.5→13、13.5→14），阶梯本身没问题。
+问题是<strong>阶梯抬高了，用哪一档的决定没跟着重做</strong>：所有次级信息一律落到最淡最小那一档，
+于是一屏扫下去只有两种字——很大的标题和很小的其余。codex 与 claude 的那两张图里，
+次级信息用的是「同样大小、更淡的颜色」，只有真正的角标才降字号。</p>
+</div>
+
+<h3>A2 · 圆角：表里 4 档 + 全圆，屏幕上 10 种</h3>
+<table>
+<tr><th>渲染值</th><th class="num">出现次数</th><th>在不在表里</th></tr>
+<tr><td><code>8px</code>（--radius-sm）</td><td class="num">17</td><td><span class="tag tag--ok">在</span></td></tr>
+<tr class="bad"><td><code>4px</code></td><td class="num">8</td><td><span class="tag tag--bad">不在</span></td></tr>
+<tr><td><code>6px</code>（--radius-xs）</td><td class="num">7</td><td><span class="tag tag--ok">在</span></td></tr>
+<tr><td><code>999px</code></td><td class="num">7</td><td><span class="tag tag--ok">在</span></td></tr>
+<tr class="bad"><td><code>50%</code></td><td class="num">6</td><td><span class="tag tag--warn">圆点/头像，可豁免</span></td></tr>
+<tr class="bad"><td><code>2px</code> / <code>1px</code> / <code>16px 16px 8px</code></td><td class="num">3</td><td><span class="tag tag--bad">不在</span></td></tr>
+<tr><td><code>12px</code>（--radius）/ <code>16px</code>（--radius-lg）</td><td class="num">2</td><td><span class="tag tag--ok">在</span></td></tr>
+</table>
+
+<h3>A3 · 动效时长：表里 2 档，屏幕上 6 种</h3>
+<table>
+<tr><th>渲染值</th><th class="num">次数</th><th>来源</th></tr>
+<tr><td><code>0.12s</code></td><td class="num">24</td><td><code>--dur</code> <span class="tag tag--ok">在表里</span></td></tr>
+<tr><td><code>0.24s</code></td><td class="num">10</td><td><code>--dur-slow</code> <span class="tag tag--ok">在表里</span></td></tr>
+<tr class="bad"><td><code>0.07s</code></td><td class="num">5</td><td>写死 <span class="tag tag--bad">不在表里</span></td></tr>
+<tr class="bad"><td><code>0.32s</code></td><td class="num">1</td><td><code>--bar-fade: 320ms</code>（滚动条淡出）</td></tr>
+<tr class="bad"><td><code>0.22s</code></td><td class="num">1</td><td><code>items-composer.css:101</code> 输入框描边 220ms</td></tr>
+</table>
+
+<h3>A4 · 间距：<code>--sp-*</code> 用了 509 次，硬编码 px 239 次</h3>
+<table>
+<tr><th>硬编码值</th><th class="num">次数</th><th>在不在 --sp 阶梯里</th></tr>
+<tr><td><code>2px</code></td><td class="num">49</td><td><span class="tag tag--bad">不在</span></td></tr>
+<tr><td><code>4px</code></td><td class="num">47</td><td>= --sp-1，属绕开 token</td></tr>
+<tr class="bad"><td><code>5px</code></td><td class="num">44</td><td><span class="tag tag--bad">不在</span></td></tr>
+<tr class="bad"><td><code>6px</code></td><td class="num">39</td><td><span class="tag tag--bad">不在</span></td></tr>
+<tr class="bad"><td><code>3px</code></td><td class="num">27</td><td><span class="tag tag--bad">不在</span></td></tr>
+<tr class="bad"><td><code>7px</code> / <code>9px</code></td><td class="num">16</td><td><span class="tag tag--bad">不在</span></td></tr>
+</table>
+<p><strong>239 处硬编码里有 186 处落在 2/3/5/6/7/9/10/14/15/18px 上——一个都不在阶梯里。</strong>
+这就是下面 B1「十个左缘挤在 37px 内」的直接来源：一个元素内边距 5px、旁边那个 4px、再旁边 6px，
+每一处单看都无所谓，摞在一列上就是「差不多齐」。</p>
+
+<h3>A5 · 按下态：110 处 hover，只有 23 处 active</h3>
+<p><code>tokens.css</code> 立 <code>--bg-press</code> 时写的理由是：</p>
+<blockquote style="margin:0 0 var(--s3);padding-left:var(--s4);border-left:2px solid var(--hair);color:var(--t2);font-size:14px">
+hover 说的是「这儿能点」，按下态说的是「我点了」——macOS 上按下与松开之间那一百毫秒是「系统收到了」的唯一凭据。
+</blockquote>
+<p>全仓 <code>var(--bg-press)</code> 只出现 19 次，<code>:active</code> 规则 23 条，而 <code>:hover</code> 有 110 条。
+<strong>约 80% 可悬停的控件按下去毫无反应。</strong> 你说的「各种交互感觉差很多」，最大的单项就是这个：
+点击在视觉上是空的，手感就是「界面没收到」。</p>
+
+<h3>A6 · 图标笔画：全套声明 1.25px，实测跨度 0.93–1.31（41%）</h3>
+<p><code>icon-base.tsx</code> 的 <code>Svg</code> 按尺寸反向补偿 <code>strokeWidth = 1.25 × 16 / size</code>，
+让任何尺寸下屏幕笔画恒为 1.25px。但有 <strong>8 处自己写了裸 <code>&lt;svg&gt;</code></strong>，全部绕过补偿：</p>
+<table>
+<tr><th>图标</th><th>文件</th><th class="num">尺寸</th><th class="num">strokeWidth</th><th class="num">实际笔画</th><th class="num">偏差</th></tr>
+<tr><td>全套（经 Svg）</td><td><code>icon-base.tsx</code></td><td class="num">任意</td><td class="num">自动</td><td class="num">1.25</td><td class="num">基准</td></tr>
+<tr class="bad"><td>计划步骤圈</td><td><code>PlanMark.tsx:43</code></td><td class="num">11</td><td class="num">1.35</td><td class="num">0.93</td><td class="num">−26%</td></tr>
+<tr class="bad"><td>全屏</td><td><code>PanelTabs.tsx:21</code></td><td class="num">12</td><td class="num">1.5</td><td class="num">1.13</td><td class="num">−10%</td></tr>
+<tr class="bad"><td>审核四枚 + 跳转</td><td><code>review.css:107/153</code></td><td class="num">14</td><td class="num">1.35</td><td class="num">1.18</td><td class="num">−6%</td></tr>
+<tr class="bad"><td>面板（工作台内）</td><td><code>PanelTabs.tsx:30</code></td><td class="num">13</td><td class="num">1.5</td><td class="num">1.22</td><td class="num">−2%</td></tr>
+<tr class="bad"><td>回形针</td><td><code>attachment-pick.tsx:3</code></td><td class="num">14</td><td class="num">1.45</td><td class="num">1.27</td><td class="num">+2%</td></tr>
+<tr class="bad"><td>面板（顶栏）</td><td><code>TopBarActions.tsx:10</code></td><td class="num">14</td><td class="num">1.5</td><td class="num">1.31</td><td class="num">+5%</td></tr>
+</table>
+<p><strong>最要命的一对是并排的：</strong>工作台右上角「全屏」（1.13）和顶栏「面板」（1.31）挨着，笔画差 16%；
+而计划卡里的步骤圈只有 0.93，比旁边 13px 的文字图标细 26%——<code>icon-base.tsx</code> 的注释说这套补偿
+就是为了修「侧栏那一列里 14 和 12 挨着，笔画差 28%」，同一个毛病在别处又长回来了 8 处。</p>
+
+<div class="demo" style="margin:var(--s4) 0">
+<div class="demo__cap">实际笔画对照（下面这排就是按各自的真实参数画的）</div>
+<div class="demo__body">
+<div class="icons">
+<figure><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.714" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M10.5 2.5v11"/></svg><figcaption>基准<br>1.25</figcaption></figure>
+<figure class="off"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.531" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M5.6 8.2 7.3 9.9l3.2-3.6"/></svg><figcaption>计划圈<br>0.93 −26%</figcaption></figure>
+<figure class="off"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.646" stroke-linecap="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg><figcaption>全屏<br>1.13 −10%</figcaption></figure>
+<figure class="off"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.674" stroke-linecap="round"><path d="M5 3h8M5 8h8M5 13h8M2.5 3h.01M2.5 8h.01M2.5 13h.01"/></svg><figcaption>审核列表<br>1.18 −6%</figcaption></figure>
+<figure class="off"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.749" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M10.5 2.5v11"/></svg><figcaption>顶栏面板<br>1.31 +5%</figcaption></figure>
+</div>
+<p style="margin:var(--s4) 0 0;font-size:12.5px;color:var(--t3)">同一个「面板」图标，顶栏那颗（最右）比工作台那颗（中间偏左）粗 16%。放大到 28px 看得最清楚，13px 下看不出是「粗细不同」，只会觉得「这一排有点脏」。</p>
+</div>
+</div>
+
+<h3>A7 · 点击区：20 处低于 28px</h3>
+<table>
+<tr><th>类</th><th class="num">实测</th><th>是什么</th></tr>
+<tr class="bad"><td><code>.sidebar__filter</code></td><td class="num">221×17</td><td>搜索框本体只有 17px 高（外框 34，中间那 17px 之外点不进输入）</td></tr>
+<tr class="bad"><td><code>.row__act</code></td><td class="num">22×22</td><td>行尾全部图标按钮（新建/更多/删除）</td></tr>
+<tr class="bad"><td><code>.sidebar__section-main</code></td><td class="num">213×23</td><td>四个分段标题（置顶/项目/对话/别处的历史）</td></tr>
+<tr class="bad"><td><code>.trigger</code></td><td class="num">124×24</td><td>输入区的引擎选择、审批档位</td></tr>
+<tr><td><code>.iconbtn</code></td><td class="num">26×26</td><td>顶栏动作</td></tr>
+<tr><td><code>.act</code></td><td class="num">56×22</td><td>「复制」</td></tr>
+</table>
+<p>macOS 上指针目标的实用下限是 28×28（HIG 给触控是 44）。22×22 在触控板上要瞄，
+而这几颗恰好是最常点的：删会话、新建、切引擎。</p>
+
+<!-- ══════════════════ B ══════════════════ -->
+<h2><span class="n">B</span>排版重排：先把三条左缘并成一条</h2>
+
+<h3>B1 · 正文列有十个左缘，挤在 37px 里</h3>
+<p>1440px 宽、主栏从 x=264 起。实测主栏内所有可见块的左缘直方图：</p>
+<table>
+<tr><th class="num">x</th><th>元素</th><th>说明</th></tr>
+<tr><td class="num">274 / 280</td><td><code>.topbar__title</code> / <code>-text</code></td><td>顶栏标题贴着窗格左沿</td></tr>
+<tr><td class="num">467</td><td><code>.transcript__inner</code>、<code>.run</code>、<code>.step</code>、<code>.think</code>、<code>.md</code></td><td><span class="tag tag--ok">正文列的真身</span></td></tr>
+<tr class="bad"><td class="num">468</td><td><code>.lane__head</code>、<code>.lane__cmd</code>、<code>.lane__tree</code></td><td>差 1px</td></tr>
+<tr class="bad"><td class="num">472</td><td><code>.brief</code>、<code>.activity-dock</code>、<code>.composer__inner</code></td><td>差 5px ← 见 B2</td></tr>
+<tr class="bad"><td class="num">476</td><td><code>.composer__bar</code>、<code>.trigger</code></td><td>差 9px</td></tr>
+<tr class="bad"><td class="num">480 / 481</td><td><code>.lane__open</code>、<code>.lane-node</code>、<code>.badge</code></td><td>差 13px</td></tr>
+<tr class="bad"><td class="num">485</td><td><code>.composer__input</code></td><td><strong>光标起点，差 18px</strong></td></tr>
+<tr class="bad"><td class="num">488 / 491 / 499 / 504</td><td><code>li</code>、<code>.step__target</code>、<code>.lane__title</code>、<code>.trigger__label</code></td><td>差 21–37px</td></tr>
+</table>
+
+<div class="two">
+<div class="demo"><div class="demo__cap">现状 · 五条主要左缘</div><div class="demo__body">
+<div class="col">
+<div class="col__mark" style="left:10px"><b style="top:-14px">467</b></div>
+<div class="col__mark" style="left:16px"></div>
+<div class="col__mark" style="left:26px"></div>
+<div class="col__mark" style="left:34px"><b style="top:auto;bottom:-14px">485</b></div>
+<div style="padding-left:10px"><div class="col__line" style="width:76%"></div><div class="col__line" style="width:62%"></div></div>
+<div style="padding-left:16px"><div class="col__line" style="width:50%"></div></div>
+<div style="padding-left:26px"><div class="col__line" style="width:44%"></div></div>
+<div style="padding-left:34px"><div class="col__line" style="width:60%;background:color-mix(in srgb,var(--accent) 22%,var(--fill-2))"></div></div>
+</div>
+</div></div>
+<div class="demo"><div class="demo__cap">目标 · 一条</div><div class="demo__body">
+<div class="col">
+<div class="col__mark col__mark--ok" style="left:12px"><b>一条</b></div>
+<div style="padding-left:12px">
+<div class="col__line" style="width:76%"></div><div class="col__line" style="width:62%"></div>
+<div class="col__line" style="width:50%"></div><div class="col__line" style="width:44%"></div>
+<div class="col__line" style="width:66%;background:color-mix(in srgb,var(--accent) 22%,var(--fill-2))"></div>
+</div>
+</div>
+</div></div>
+</div>
+
+<h3>B2 · 那 5px 是上一轮 <code>scrollbar-gutter</code> 引进来的</h3>
+<p><code>UI细节优化计划.md</code> 第 6 条给 <code>.transcript</code> 加了 <code>scrollbar-gutter: stable</code>，
+理由完全正确（滚动条冒出来时正文列会向左跳）。但 <strong><code>.composer</code> 没有跟着加</strong>：</p>
+<pre><span class="cm">/* app-main.css:156 */</span>
+.transcript { padding: var(--sp-5) var(--sp-4) var(--sp-6); <span class="del">scrollbar-gutter: stable;</span> }
+.transcript__inner { max-width: 760px; margin: 0 auto; }
+
+<span class="cm">/* items-composer.css:10 —— 没有 gutter */</span>
+.composer { padding: var(--sp-2) var(--sp-4) var(--sp-4); }
+.composer__inner { max-width: 760px; margin: 0 auto; }</pre>
+<p>经典滚动条档位下 <code>::-webkit-scrollbar</code> 宽 10px，于是转录区的内容盒比输入区窄 10px，
+<strong>两个居中的 760px 列因此差 5px</strong>。再叠上输入卡自己的 <code>1px 描边 + 12px 内边距</code>，
+你打的字比 agent 的回答<strong>右移 18px</strong>。</p>
+<div class="box box--why"><h4>为什么这条一直没被发现</h4>
+<p style="margin:0">它<strong>只在插了鼠标的时候出现</strong>。macOS「自动根据鼠标或触控板」这一档，
+用触控板时是叠加条、gutter 恒为零、两列完全对齐；插上鼠标才切经典条，5px 才冒出来。
+出图脚本跑在同一台机器上，所以这一档一直被拍进图里，只是没人拿尺子量。</p></div>
+<pre><span class="cm">/* 修法：把两列的居中基准变成同一个。改 items-composer.css:10 */</span>
+.composer {
+  padding: var(--sp-2) var(--sp-4) var(--sp-4);
+<span class="add">  scrollbar-gutter: stable;   /* 和 .transcript 同一个理由的另一半 */</span>
+}
+<span class="cm">/* 再把输入卡的内边距从盒子挪成「文字对齐正文列」：
+   卡片仍然 760 宽，但左内边距吃进 max-width，让 caret 落在 467 而不是 485 */</span>
+.composer__inner {
+<span class="del">  max-width: var(--content-max);</span>
+<span class="add">  max-width: calc(var(--content-max) + var(--sp-3) * 2 + 2px);</span>
+  padding: var(--sp-2) var(--sp-3);
+}</pre>
+<p class="tag tag--warn" style="display:block;padding:8px 12px;border-radius:var(--r1);font-weight:400;font-size:13px">
+验收：插鼠标 + 触控板各拍一张 <code>01-转录区</code>，用探针断言
+<code>.md</code> 与 <code>.composer__input</code> 的 <code>left</code> 相等（现在差 18）。这条断言值得直接写进 <code>shot-views.mjs</code>。</p>
+
+<h3>B3 · 顶栏与正文列脱节</h3>
+<p>顶栏标题在 x=280，正文在 467——中间 187px 空白。顶栏高 44px、<code>padding: 0 16px</code>，
+它排的是「窗格」，正文排的是「列」，两套坐标系。</p>
+<p><strong>建议：顶栏内容也进 760 列</strong>（<code>.topbar</code> 内加一层 <code>max-width: var(--content-max); margin: 0 auto</code>，
+用量表和动作按钮 <code>position: absolute</code> 靠右）。这一条改完，标题 / 回答 / 输入框三条横带的左沿终于在一条线上——
+claude 与 codex 两张图里都是这么排的，这是它们「看起来是一个整体」的主要原因。</p>
+
+<h3>B4 · 空会话：标题和输入框不是一组</h3>
+<p>实测（1440×900）：大标题 <code>.blank__title</code> 在 y≈340，输入框顶 y=735，<strong>中间 340px 纯空</strong>。
+<code>.blank</code> 写着 <code>min-height: 55vh; justify-content: center</code>，它在转录区里居中，
+而转录区是「输入框以上的全部」——于是标题被推到全窗口的 38% 高处，和输入框各据一方。</p>
+<pre><span class="cm">/* app-main.css:631 */</span>
+.blank {
+<span class="del">  justify-content: center;</span>
+<span class="del">  min-height: 55vh;</span>
+<span class="add">  justify-content: flex-end;      /* 沉到底，和输入框成一组 */</span>
+<span class="add">  padding-bottom: var(--sp-6);    /* 与输入框之间只留一个段距 */</span>
+}</pre>
+<p>顺带：<code>.blank__glyph</code> 是个 62px 的空心圆套一个终端图标。
+建议<strong>整个删掉</strong>——codex 那屏没有图标，claude 那屏也没有；一个 62px 的装饰圆在
+「你想做点什么」上面，既不指示状态也不可点，只是把标题连同它下面那一整组往下压了 70px。</p>
+
+<h3>B5 · 输入框贴死窗口底沿</h3>
+<p><code>.composer</code> 的下内边距是 <code>--sp-4</code>（16px），而卡片本身有 <code>--shadow-composer</code>
+向下扩散 24px——<strong>阴影被窗口边缘切掉，卡片看起来是「长在窗框上」而不是「浮在纸上」</strong>。
+改成 <code>--sp-5</code>（24px）能让那层环境影完整落地。深色下阴影关闭，这 8px 也仍然值：
+它是「这张卡是独立一层」的唯一证据。</p>
+
+<!-- ══════════════════ C ══════════════════ -->
+<h2><span class="n">C</span>侧栏</h2>
+
+<h3>C1 · 文字列声明只有一条，实测四条</h3>
+<p><code>app-foundation.css:199</code> 写着：</p>
+<blockquote style="margin:0 0 var(--s3);padding-left:var(--s4);border-left:2px solid var(--hair);color:var(--t2);font-size:14px">
+整个侧栏只有两个横向的量。所有行——导航、搜索、组标题、会话——共用同一套：外边距 <code>--sb-pad</code>，
+图标落在宽 <code>--sb-slot</code> 的第一列，文字从 <code>--sb-pad + --sb-slot</code> 开始。<br>
+上一版没有这条规则，于是品牌 12px、按钮 8px、组标题 8px、行内文字 32px，四个左边距互不相干——「没对齐」就是这么来的。
+</blockquote>
+<p>应为 <code>8 + 24 = 32</code>。实测：</p>
+<table>
+<tr><th>行</th><th class="num">文字左缘</th><th>差</th></tr>
+<tr><td><code>omni 同文</code> 品牌</td><td class="num">32</td><td><span class="tag tag--ok">对</span></td></tr>
+<tr><td><code>设置</code>（底部）</td><td class="num">32</td><td><span class="tag tag--ok">对</span></td></tr>
+<tr class="bad"><td><code>筛选会话…</code></td><td class="num">33</td><td>+1</td></tr>
+<tr class="bad"><td><code>置顶 / 项目 / 对话 / 别处的历史</code></td><td class="num">38</td><td><strong>+6</strong></td></tr>
+<tr class="bad"><td><code>新建会话</code></td><td class="num">39</td><td><strong>+7</strong></td></tr>
+<tr><td>项目行 / 会话行（缩进一级）</td><td class="num">56</td><td><span class="tag tag--ok">= 32 + 24，对</span></td></tr>
+</table>
+<p><strong>违规的恰好是视觉上最重的两类：主按钮和全部四个分段标题。</strong>
+原因：<code>.sidebar__new</code> 用 <code>padding: 0 var(--sp-2)</code> + <code>gap: var(--sp-2)</code> + 15px 图标
+凑出 8+8+15+8=39，没走 <code>--sb-slot</code>；<code>.sidebar__section-main</code> 的内 <code>span</code> 又多 6px。</p>
+<pre><span class="cm">/* app-foundation.css —— 让这两类也走同一条槽 */</span>
+.sidebar__new {
+<span class="del">  gap: var(--sp-2);</span>
+<span class="del">  padding: 0 var(--sp-2);</span>
+<span class="add">  gap: 0;</span>
+<span class="add">  padding: 0 var(--sp-2) 0 0;</span>
+}
+<span class="add">.sidebar__new > svg { width: var(--sb-slot); }   /* 图标占满第一列，居中 */</span>
+
+.sidebar__section-main {
+<span class="add">  padding-left: 0;</span>
+}
+<span class="del">.sidebar__section-main span { padding-left: 6px; }</span></pre>
+
+<h3>C2 · 纵向节奏：相邻块的间距是 8 / 13 / 4 / 0 / 0</h3>
+<table>
+<tr><th>块</th><th class="num">top</th><th class="num">高</th><th class="num">与上一块的间距</th></tr>
+<tr><td>搜索行</td><td class="num">114</td><td class="num">34</td><td class="num">—</td></tr>
+<tr><td>「置顶」段头</td><td class="num">156</td><td class="num">43</td><td class="num">8</td></tr>
+<tr class="bad"><td>「项目」段头</td><td class="num">212</td><td class="num">43</td><td class="num">13</td></tr>
+<tr class="bad"><td>omni 项目行</td><td class="num">259</td><td class="num">34</td><td class="num">4</td></tr>
+<tr class="bad"><td>会话行</td><td class="num">293</td><td class="num">34</td><td class="num">0</td></tr>
+<tr class="bad"><td>「对话」段头</td><td class="num">327</td><td class="num">43</td><td class="num">0</td></tr>
+</table>
+<p>两条硬伤：</p>
+<ul>
+<li><strong>段头 43px 比内容行 34px 还高 26%。</strong> 一个次级标签比它统领的内容更重，
+层级是反的。43 = <code>padding: 16px 0 4px</code> + 23px 内容，那个 16px 是 <code>--sp-4</code>，
+用作「段与段之间的呼吸」——但它被算进了段头自己的盒子里，于是段头看起来是个大块。</li>
+<li><strong>「置顶」段是空的，却占 56px。</strong> 你的截图里它下面什么都没有，
+下一行直接是「项目」。空段渲染成一个标题＋两段留白，是纯损耗。</li>
+</ul>
+<div class="two">
+<div class="demo"><div class="demo__cap">现状</div><div class="demo__body">
+<div class="sb sb--old"><div class="sb__guide" style="left:38px"></div>
+<div class="sb__brand" style="padding-left:32px">omni <span style="color:var(--t3);font-size:13px;font-weight:400">同文</span></div>
+<div class="sb__row sb__row--new"><i>＋</i><span style="padding-left:0">新建会话</span></div>
+<div class="sb__row"><i>⌕</i>筛选会话…</div>
+<div class="sb__sec"><span>置顶 ⌄</span></div>
+<div class="sb__sec"><span>项目 ⌄</span></div>
+<div class="sb__row"><i>⌄</i><i>▢</i><span style="margin-left:0">omni</span><span class="sb__dim">1</span></div>
+<div class="sb__row sb__row--on"><i></i><i>•</i><span>useFlow 里那几行…</span><span class="sb__dim">昨天</span></div>
+<div class="sb__sec"><span>对话 ⌄</span></div>
+<div style="padding-left:38px;color:var(--t3);font-size:12px;height:28px;line-height:28px">还没有独立对话</div>
+<div class="sb__sec"><span>别处的历史 ›</span></div>
+</div>
+<p style="margin:12px 0 0;font-size:12px;color:var(--t3)">红线 = 段头文字的实际左缘 38px。品牌与「设置」在 32，会话行在 56。</p>
+</div></div>
+<div class="demo"><div class="demo__cap">调整后</div><div class="demo__body">
+<div class="sb sb--new"><div class="sb__guide" style="left:32px;background:color-mix(in srgb,var(--ok) 60%,transparent)"></div>
+<div class="sb__brand" style="padding-left:32px">omni <span style="color:var(--t3);font-size:13px;font-weight:400">同文</span></div>
+<div class="sb__row sb__row--new" style="padding:0;gap:0"><i style="width:24px">＋</i><span>新建会话</span></div>
+<div class="sb__row"><i>⌕</i>筛选会话…</div>
+<div class="sb__sec" style="padding-left:32px">项目</div>
+<div class="sb__row"><i>⌄</i><i>▢</i><span>omni</span><span class="sb__dim">1</span></div>
+<div class="sb__row sb__row--on"><i></i><i>•</i><span>useFlow 里那几行…</span><span class="sb__dim">昨天</span></div>
+<div class="sb__sec" style="padding-left:32px">对话</div>
+<div style="padding-left:32px;color:var(--t3);font-size:12px;height:26px;line-height:26px">还没有独立对话</div>
+<div class="sb__sec" style="padding-left:32px">别处的历史 ›</div>
+</div>
+<p style="margin:12px 0 0;font-size:12px;color:var(--t3)">段头降到 26px、只保留段前 14px 的呼吸；空的「置顶」段不渲染；文字统一落在 32px。</p>
+</div></div>
+</div>
+<pre><span class="cm">/* app-foundation.css:517 —— 段头瘦身：呼吸挪到 margin，盒子只包文字 */</span>
+.sidebar__section {
+<span class="del">  padding: var(--sp-4) 0 var(--sp-1) var(--sb-slot);</span>
+<span class="del">  min-height: calc(var(--sp-4) + var(--sb-act) + var(--sp-1));</span>
+<span class="add">  margin-top: var(--sp-4);</span>
+<span class="add">  padding: 0 0 0 var(--sb-slot);</span>
+<span class="add">  min-height: 26px;</span>
+}
+<span class="add">.sidebar__section:first-child { margin-top: var(--sp-2); }</span></pre>
+<p>「置顶」空段不渲染：<code>SidebarPinned.tsx</code> 里 <code>pinned.length === 0</code> 时直接 <code>return null</code>——
+但要留一条例外：<strong>正在拖会话时仍然渲染</strong>，否则那个落点就消失了（<code>dragKind !== undefined</code>）。</p>
+
+<h3>C3 · 没有折叠侧栏的入口</h3>
+<p>全仓搜不到任何收起侧栏的控件。侧栏固定 264px，只有在<strong>工作台打开且窗口 ≤1280px</strong> 时才被 CSS 自动隐藏
+（<code>app-foundation.css:150</code>）。实测最小窗口 900px 宽时，侧栏吃掉 <strong>29.3%</strong>，正文列被压到 430px，
+代码块横向溢出——而用户没有任何办法把它收起来。</p>
+<p>claude 与 codex 两张图里，左上角第一颗按钮都是侧栏开关。建议：</p>
+<ul>
+<li>顶栏最左（交通灯右侧）加一颗 <code>PanelLeftIcon</code>，与右侧那颗工作台开关成对；</li>
+<li>快捷键 <span class="kbd">⌘\</span>（claude / codex / vscode 三家一致）；</li>
+<li>收起后主栏 <code>padding-left: 92px</code> 给交通灯让位——这段逻辑 <code>app-foundation.css:172</code> 已经写好了，直接复用。</li>
+</ul>
+
+<h3>C4 · 底部身份行显示的是 <code>a1b2c3d4e5@privaterelay.appleid….</code></h3>
+<p><code>SidebarFoot.tsx</code> 的设计是对的（一行、左身份右动作、无账号时整行变「设置」）。
+问题只在<strong>取什么字</strong>：Apple 中继邮箱在 264px 宽的行里必然被截成一串乱码，
+而 claude 那张图里是「alice · Max」。</p>
+<ul>
+<li>label 超过 18 字符时只取 <code>@</code> 前面的本地部分；本地部分本身像随机串（无元音／长度 &gt;12）时退回引擎报的 display name；</li>
+<li><code>plan</code> 报得上来就跟在后面（<code>名字 · Max</code>），这一行现在是空的，而它正是最该被一眼看到的东西；</li>
+<li>完整邮箱留在 <code>title</code> 和弹出菜单抬头里——那两处本来就有。</li>
+</ul>
+
+<!-- ══════════════════ D ══════════════════ -->
+<h2><span class="n">D</span>图标</h2>
+
+<h3>D1 · 八处裸 <code>&lt;svg&gt;</code> 收回 <code>Svg</code></h3>
+<p>见 A6 的实测表。改法是机械的，但有一条不能省：<strong>不要只把 <code>strokeWidth</code> 删掉</strong>——
+<code>Svg</code> 只在 <code>&lt;svg&gt;</code> 元素上设 <code>strokeWidth</code>，子元素若自带 <code>stroke-width</code> 会盖掉它。
+<code>review.css:107 / 153</code> 那两条是写在 CSS 里的，必须删掉整条声明，而不是改数值。</p>
+<pre><span class="cm">/* TopBarActions.tsx —— 从裸 svg 收回 icons.tsx */</span>
+<span class="del">function PanelIcon() {
+  return &lt;svg width="14" height="14" viewBox="0 0 16 16" fill="none"
+    stroke="currentColor" strokeWidth="1.5" aria-hidden="true"&gt;
+    &lt;rect x="2" y="2.5" width="12" height="11" rx="2" /&gt;
+    &lt;path d="M10.5 2.5v11" /&gt;
+  &lt;/svg&gt;
+}</span>
+<span class="cm">/* icons.tsx 里加一枚，两处（顶栏 / 工作台）共用同一个形 */</span>
+<span class="add">export function PanelIcon({ size }: { size?: number } = {}) {
+  return (
+    &lt;Svg size={size}&gt;
+      &lt;rect x="2" y="2.5" width="12" height="11" rx="2" {...LINE} /&gt;
+      &lt;path d="M10.5 2.5v11" {...LINE} /&gt;
+    &lt;/Svg&gt;
+  )
+}</span>
+
+<span class="cm">/* review.css —— 删掉这两条，交给 Svg 算 */</span>
+.rv__tool svg { width:14px; height:14px; fill:none; stroke:currentColor;
+  stroke-linecap:round; stroke-linejoin:round; <span class="del">stroke-width: 1.35;</span> }</pre>
+
+<h3>D2 · 加一条守卫，让这件事不再长回来</h3>
+<p>这是第二次修同一个毛病了（<code>icon-base.tsx</code> 的注释记着第一次）。
+仓库已经有 <code>check-tokens.mjs</code> / <code>check-css.mjs</code> 两条守卫，缺的是这一条：</p>
+<pre><span class="cm">// scripts/check-icons.mjs —— 串进 pnpm check</span>
+<span class="cm">// 判据：renderer 下除 icon-base.tsx / pets-art.tsx / dsh-art.tsx / composer-ring.tsx</span>
+<span class="cm">// 之外，任何 .tsx 里出现 `&lt;svg` 或 `strokeWidth=` 即失败；</span>
+<span class="cm">// styles/*.css 里出现 `stroke-width:` 即失败（那是 Svg 的职责）。</span>
+<span class="cm">// 豁免名单写在文件里并注明理由 —— 照 check-css.mjs 的 INTENTIONAL 写法。</span></pre>
+<p>豁免的四个是<strong>真正的插画</strong>（桌宠、DSH 形象、输入框那圈渐变环），它们不是图标，不该受 1.25px 约束。</p>
+
+<h3>D3 · 尺寸档也该收敛</h3>
+<p><code>icon-base.tsx</code> 定了 <code>SIDEBAR_ICON = 15</code> / <code>SIDEBAR_ICON_SMALL = 12</code>，
+但组件里散着 <code>size={11}</code>、<code>{13}</code>、<code>{14}</code>、<code>{34}</code>。建议在 <code>icon-base.tsx</code> 再立三个名字，
+把「多大」也变成有限档：<code>ICON_INLINE = 13</code>（正文里的）、<code>ICON_UI = 15</code>（控件里的）、<code>ICON_HERO = 34</code>（空态）。
+和字号一样，<strong>档少的好处不是省事，是让「这两个不该一样大」变成一个要写理由的决定</strong>。</p>
+
+<!-- ══════════════════ E ══════════════════ -->
+<h2><span class="n">E</span>交互细节</h2>
+
+<h3>E1 · 补齐按下态（收益最大的单项）</h3>
+<p>110 处 hover / 23 处 active。不必逐个补——<strong>把它做成一条基线规则</strong>：</p>
+<pre><span class="cm">/* app-foundation.css 顶部，紧跟 svg 那条全局规则 */</span>
+<span class="add">/* 能点的东西按下去都要有一档。个别控件（主按钮、危险按钮）自己覆盖。 */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+summary:active {
+  background: var(--bg-press);
+}</span></pre>
+<p>然后逐个排除三类：底色本来就深的主按钮（改 <code>opacity: .88</code>）、
+危险确认键（<code>.row__act--danger</code>，它按下去要更红不是更灰）、
+以及输入框内的 <code>.trigger</code>（它按下会弹菜单，菜单出现本身就是反馈——但仍建议给 60ms 的按下态，
+弹出有延迟时那 60ms 是唯一凭据）。</p>
+<div class="box box--why"><h4>为什么优先做这条</h4>
+<p style="margin:0">A1–A4 那几条是「看起来不精致」，这一条是「用起来觉得没反应」。
+你说的「各种交互感觉差很多」，绝大部分是它。而且它是全局一条规则的事，
+不需要出图比稿——按下去有没有一档灰，肉眼在真机上一秒就判得出。</p></div>
+
+<h3>E2 · 时长收敛到三档</h3>
+<pre><span class="cm">/* tokens.css —— 补第三档，删掉散落的 0.07 / 0.22 / 0.32 */</span>
+<span class="add">--dur-fast: 70ms;   /* 按下态、hover 底色：要跟手，慢一点就是「粘」 */</span>
+--dur: 120ms;       /* 浮现、淡入淡出 */
+--dur-slow: 240ms;  /* 位移、展开 */</pre>
+<p>0.07s 已经在用（5 处），只是没登记；<code>items-composer.css:101</code> 的 220ms 归 240ms；
+<code>--bar-fade: 320ms</code> 是滚动条淡出，那是刻意慢的，<strong>保留但改成 token</strong>（<code>--dur-bar</code>）并写明理由。</p>
+
+<h3>E3 · 点击区抬到 28</h3>
+<pre>.sidebar { <span class="del">--sb-act: 22px;</span> <span class="add">--sb-act: 26px;</span> }   <span class="cm">/* 图标仍 15，四边各 5.5 */</span>
+.iconbtn { <span class="del">width:26px; height:26px;</span> <span class="add">width:28px; height:28px;</span> }
+.trigger { <span class="del">height:24px;</span> <span class="add">height:28px;</span> }
+.act     { <span class="del">height:22px;</span> <span class="add">height:26px;</span> }</pre>
+<p>搜索行那条不一样：<code>.sidebar__filter</code> 只有 17px 高是因为 <code>input</code> 没被拉满，
+外面 34px 的 <code>.row--search</code> 里上下各 8px 点不进去。<code>height: 100%</code> 一行解决。</p>
+
+<h3>E4 · 设置面板定高 660px，多数页面撑不满</h3>
+<p><code>settings.css:33</code> 是 <code>height: min(660px, 100%)</code>。实测「通用」页只有两张卡（约 200px 内容），
+下面 460px 全空；而「引擎」「环境」两页要滚。<code>shot-app.mjs</code> 自己的注释也记着这个现象。</p>
+<pre>.set {
+<span class="del">  height: min(660px, 100%);</span>
+<span class="add">  min-height: 380px;</span>
+<span class="add">  max-height: min(660px, 100%);</span>
+}</pre>
+<p>加下限是为了不让「通用」页缩成一张小卡——左侧那列有 8 个页签，面板比页签列还矮会很怪。</p>
+
+<h3>E5 · 密度倒挂：把次级信息从「更小」改成「更淡」</h3>
+<p>A1 的分布问题，落到具体改法上是一条替换规则：</p>
+<table>
+<tr><th>现在</th><th>改成</th><th>典型位置</th></tr>
+<tr><td><code>--text-xs</code> + <code>--text-faint</code></td><td><code>--text-sm</code> + <code>--text-faint</code></td><td>侧栏时间、行内计数、工具行的次级名</td></tr>
+<tr><td><code>--text-xs</code> + <code>--text-muted</code></td><td><code>--text-sm</code> + <code>--text-faint</code></td><td>卡片抬头、段说明</td></tr>
+<tr><td><code>--text-xs</code></td><td>保留</td><td>真角标：<code>+12 −3</code>、<code>2/3</code>、徽标里的字</td></tr>
+</table>
+<p>换句话说：<strong>11.5px 从「次要」的意思收回成「角标」的意思</strong>，次要交给颜色。
+这一条动的地方多（163 处里大约一半），但每一处都是同一个判断，可以一次性做完再出一轮图比。</p>
+
+<h3>E6 · 投入不均：一个高保真控件，一屋子裸控件</h3>
+<p><code>app-composer.css</code> 844 行里，推理强度滑块独占约 400 行，
+带内阴影、渐变轨道、品红警示色（<code>#96307c</code> / <code>#b4409a</code>）、三段 clip-path 动画。
+它做得很好——但它是<strong>全应用唯一</strong>这个规格的控件，旁边的引擎选择器是一行无边框文字。
+两者并排时，眼睛读到的不是「这个更重要」，是「这两个不是一个应用里的」。</p>
+<p>两条路选一条，不要都不选：</p>
+<ul>
+<li><strong>要么把它降下来</strong>：保留渐变刻度（那确实在说「越往右越贵」），去掉内阴影与拟物高光，
+品红收进 <code>--warn</code>／<code>--danger</code> 语义色；</li>
+<li><strong>要么把旁边抬上来</strong>：<code>.trigger</code> 给一层 <code>--bg-raised</code> + 发丝边，
+让输入框底排的四个控件成为同一族。</li>
+</ul>
+<p>我倾向第二条：滑块的高保真是有理由的（它是唯一一个「拖着调、且调错要花钱」的控件），
+问题不在它太重，在别的太轻。</p>
+
+<!-- ══════════════════ F ══════════════════ -->
+<h2><span class="n">F</span>落地顺序</h2>
+
+<ol class="steps">
+<li><strong>第一批 · 一条规则换一片手感</strong>（半天，不需要出图比稿）<br>
+E1 全局按下态 · E2 时长收敛 · E3 点击区 · B2 那 5px · B5 输入框下边距 · E4 设置定高。<br>
+<span style="color:var(--t3);font-size:13px">这一批全是「加一条规则 / 改一个数」，回归风险接近零，但把「点了没反应」和「差不多齐」两件事一次性解决。</span></li>
+
+<li><strong>第二批 · 骨架</strong>（一天，每条都要出图前后对照）<br>
+B1+B3 三条左缘并成一条 · B4 空态成组、删装饰圆 · C1 侧栏文字列归 32 · C2 段头瘦身＋空段不渲染 · C3 侧栏折叠 <span class="kbd">⌘\</span>。<br>
+<span style="color:var(--t3);font-size:13px">动的是布局，必须 1440 / 1172 / 900 三档各拍一轮，并在 <code>shot-views.mjs</code> 里补断言（左缘相等、段头高度、折叠后交通灯不被压）。</span></li>
+
+<li><strong>第三批 · 收敛</strong>（一到两天，改动面大但机械）<br>
+E5 字号分布重排 · D1 图标收回 Svg · D2 新增 <code>check-icons.mjs</code> · A2/A4 圆角与间距回表 · E6 控件规格拉齐。<br>
+<span style="color:var(--t3);font-size:13px">这一批的价值不在单条，在做完之后<strong>「新写的代码自动是对的」</strong>——守卫补上，第四次不用再修同一个毛病。</span></li>
+</ol>
+
+<div class="box">
+<h4>不建议做的三件事</h4>
+<ul style="margin:0">
+<li><strong>不要换基调。</strong> 纸＋墨、面不分层、强调色只给焦点与链接——这套决定是对的，
+上面所有条目都不动它。看起来「差」的从来不是色板。</li>
+<li><strong>不要给桌宠让路，也不要把它挪走。</strong> 它现在浮在输入框上沿、和转录区最后一行重叠。
+但那是它自己的设定（站在输入框这条地面上），改成侧边或角落会让它变成一个贴纸。
+真要改就只改一件事：<strong>转录区最后一个块与桌宠之间加一个 <code>--sp-6</code> 的下摆</strong>，别让文字从它脚下穿过去。</li>
+<li><strong>不要顺手加命令面板（⌘K）。</strong> 已经有 <code>/</code> 面板了，
+<code>omniCommands.ts</code> 的注释写明「再复制一份到命令面板只会有两处状态要同步」。这条结论仍然成立。</li>
+</ul>
+</div>
+
+<p class="foot">
+所有 file:line 与数值取自 2026-08-26 的实测：<code>node scripts/shot-app.mjs</code> 连拍 58 屏（浅/深/最小三套），
+外加一份 CDP 探针读全树计算样式。<br>
+未验证项：<span class="kbd">⌘\</span> 折叠后 <code>hiddenInset</code> 交通灯的实际占位需真机确认；
+E5 的字号替换需要出一轮图才能定「哪些留在 11.5」。
+</p>
+
+</div>
+</body>
+</html>

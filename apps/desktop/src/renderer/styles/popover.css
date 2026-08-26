@@ -287,6 +287,13 @@
   color: var(--text-inverse);
 }
 
+/* 已经红了，再深一档。**不能让兜底把它压成灰**——那一下正是要确认「我按的是这条」 */
+.pop__cmd--danger:active {
+  background: var(--danger);
+  color: var(--text-inverse);
+  opacity: 0.86;
+}
+
 .pop__cmd-icon {
   display: flex;
   flex: none;

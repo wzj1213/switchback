@@ -264,7 +264,7 @@
 .pet__eyes {
   transform-box: fill-box;
   transform-origin: center;
-  transition: transform 70ms var(--ease);
+  transition: transform var(--dur-fast) var(--ease);
 }
 
 .pet--blink .pet__eyes {

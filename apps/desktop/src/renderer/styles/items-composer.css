@@ -98,8 +98,8 @@
 /* 焦点进出都走同一条过渡，深空那圈才不会「淡入、硬切出」 */
 .composer__inner {
   transition:
-    border-color 220ms var(--ease),
-    box-shadow 220ms var(--ease);
+    border-color var(--dur-slow) var(--ease),
+    box-shadow var(--dur-slow) var(--ease);
 }
 
 /*
@@ -143,7 +143,7 @@
 
 .composer__inner:has(.effort--costly):focus-within .compring {
   display: block;
-  animation: ring-in 220ms var(--ease) both;
+  animation: ring-in var(--dur-slow) var(--ease) both;
 }
 
 @keyframes ring-in {

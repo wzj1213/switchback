@@ -24,6 +24,28 @@
   opacity: 0.88;
 }
 
+/*
+ * 三态各写一条。**不能只写 `.send:active`**：`app-foundation.css` 那条兜底
+ * 会把底色压成 `--bg-press`，于是主键（近黑）、侧问（强调色）、停止（浅底）
+ * 按下去会长成同一块灰——一个控件三个意思，正好在按下那一刻全丢了。
+ *
+ * 实心那两颗接着 hover 的 `opacity: .88` 往下走一档；
+ * 停止本来就是浅底控件，兜底给的 `--bg-press` 正是它要的，只把透明度顶回去。
+ */
+.send:active:not(:disabled) {
+  background: var(--text);
+  opacity: 0.74;
+}
+
+.send--aside:active:not(:disabled) {
+  background: var(--accent);
+}
+
+.send--stop:active:not(:disabled) {
+  background: var(--bg-press);
+  opacity: 1;
+}
+
 .send:disabled {
   background: var(--bg-hover);
   color: var(--text-faint);
@@ -197,6 +219,12 @@
   background: var(--danger);
 }
 
+/* 已经红了，再深一档说明「松手就真删」 */
+.thumb__drop:active {
+  background: var(--danger);
+  opacity: 0.82;
+}
+
 /* 全屏看图。点哪儿都能关，所以整块都是 zoom-out */
 .lightbox {
   position: fixed;
@@ -239,6 +267,10 @@
 
 .lightbox__close:hover {
   background: rgb(255 255 255 / 20%);
+}
+
+.lightbox__close:active {
+  background: rgb(255 255 255 / 30%);
 }
 
 .lightbox__close:focus-visible {
@@ -675,8 +707,8 @@
   scale: 0.92;
   box-shadow: 0 1px 1px rgb(0 0 0 / 20%);
   transition:
-    scale 70ms var(--ease),
-    box-shadow 70ms var(--ease);
+    scale var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 /* 深空态的星点：四角星（和界面里那颗 ✧ 同一个形状），错落闪烁。

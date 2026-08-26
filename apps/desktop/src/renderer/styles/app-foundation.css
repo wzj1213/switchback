@@ -58,6 +58,76 @@ svg {
   align-self: center;
 }
 
+/*
+ * ── 按下态的兜底 ──────────────────────────────────────
+ *
+ * **hover 说的是「这儿能点」，按下态说的是「我点了」**（见 tokens.css 立
+ * `--bg-press` 时的那段）。改之前全仓 110 条 `:hover` 底色规则里，
+ * **只有 20 条配了 `:active`**——也就是说八成的控件按下去屏幕上什么都不发生。
+ * 那正是「点了没反应」的来源，而它不是任何一个组件的 bug，是缺一条基线。
+ *
+ * ## 为什么用 `:where()`
+ *
+ * 这条必须**输给任何一条写明了的 `:active`**，否则实心主键（`.send`、
+ * `.btn--primary`、危险确认键）会被压成一块灰。`:where()` 把元素选择器的
+ * 权重清零，整条落在 **(0,2,0)**——和 `.btn:active` 打平，而本文件由
+ * `app.css` 第一个 `@import`，所以后面每一个文件里写明的那条都赢。
+ *
+ * 同一个道理保证了**两个类以上定的底色不会被这条动到**：
+ * `.row__act--danger`（(0,2,0)、在后面的文件里）按下去仍然是红的。
+ *
+ * ## 为什么不列 `a`
+ *
+ * 链接按下去要发生的事是「打开」，而它多半没有底色可压；
+ * 正文里那颗 `.outlink` 有自己的强调色底，单独写在 markdown.css。
+ */
+:where(button, [role="button"], [role="menuitem"], [role="option"], summary):active:not(:disabled) {
+  background: var(--bg-press);
+}
+
+/*
+ * ── 热区撑到 28，盒子不动 ─────────────────────────────
+ *
+ * 实测有 20 个交互元素低于 28×28，而 macOS 上指针目标的实用下限就是 28
+ *（HIG 给触控的是 44）。偏偏最小的那几颗是**最常点的**：删会话、在此新建、
+ * 切引擎、复制。
+ *
+ * **不能靠把盒子改大来解决。** 侧栏那颗 `--sb-act` 一旦从 22 变 26，
+ * 段头的 `min-height` 跟着从 42 变 46——为了好点，把整条侧栏撑高一档，
+ * 这笔账是亏的。而且底色也跟着变大，那是设计上的另一件事。
+ *
+ * 所以走一个溢出的伪元素：**看得见的仍是 22，点得中的是 28**。
+ * 这也是原生控件一直以来的做法。横向留得比纵向少——同一行里两颗按钮
+ * 只隔 2px，横向也撑 3px 的话它们会互相抢命中。
+ */
+.row__act,
+.iconbtn,
+.act,
+.trigger,
+.sidebar__section-main,
+.topbar__title,
+.step__target {
+  position: relative;
+}
+
+.row__act::after,
+.iconbtn::after,
+.act::after,
+.trigger::after,
+.topbar__title::after,
+.step__target::after {
+  content: "";
+  position: absolute;
+  inset: -3px -1px;
+}
+
+/* 段头是整行宽的，纵向伸进它自己那圈内边距就够，横向一个像素都不用给 */
+.sidebar__section-main::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
 html,
 body,
 #root {
@@ -106,7 +176,7 @@ body,
 }
 
 [data-bars="classic"] {
-  --bar-fade: 320ms;
+  --bar-fade: var(--dur-bar);
 }
 
 [data-bars="classic"] ::-webkit-scrollbar-track,
@@ -488,8 +558,12 @@ body {
   border-color: var(--accent);
 }
 
+/* **拉满行高。** 改之前这个 `input` 只有 17px 高，而它外面那一行是 34——
+   上下各 8px 看着像输入框、点下去什么都不发生。一个只有一半能用的输入框，
+   比一个明显小一点的输入框更让人以为界面坏了 */
 .sidebar__filter {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
   padding: 0 var(--sp-2) 0 0;
   border: 0;
@@ -531,6 +605,7 @@ body {
 .sidebar__section-main {
   display: flex;
   flex: 1;
+  align-self: stretch;
   align-items: center;
   gap: 3px;
   min-width: 0;

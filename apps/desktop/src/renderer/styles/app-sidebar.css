@@ -136,6 +136,12 @@
   color: var(--text-inverse);
 }
 
+/* 确认键已经是红底，兜底那条（两个类，(0,2,0)）压不动它——
+   所以按下的反馈只能自己给，走透明度 */
+.row__act--danger:active {
+  opacity: 0.82;
+}
+
 .row__dot {
   width: 6px;
   height: 6px;

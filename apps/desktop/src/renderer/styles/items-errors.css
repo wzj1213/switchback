@@ -190,3 +190,9 @@
   cursor: pointer;
   transform: translate(-50%, -100%);
 }
+
+/* 实心键，按下走透明度：底色交给兜底会变成一块灰 */
+.askfloat:active {
+  background: var(--text);
+  opacity: 0.78;
+}
