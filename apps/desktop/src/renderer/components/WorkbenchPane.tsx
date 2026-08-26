@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import type { Item, Lane, Thread } from "@omni/protocol"
 import type { PreviewTarget, WorkbenchState } from "../workbench.js"
 import { sessionFilesOf } from "../session-files.js"
-import { useWorkbenchKeys, useWorkbenchOverlay } from "../use-workbench-keys.js"
+import { useWorkbenchKeys } from "../use-workbench-keys.js"
 import { ActivityPage } from "./ActivityPage.js"
 import { FilesPage } from "./FilesPage.js"
 import { DotBoxIcon, FileIcon } from "./icons-activity.js"
@@ -23,7 +23,8 @@ function ToolTab({ on, label, count, children, onClick }: {
 }
 
 export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, onFiles, onPickLane,
-  onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles }: {
+  onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles,
+  full, onFull }: {
   state: WorkbenchState
   thread: Thread
   lanes: readonly Lane[]
@@ -41,14 +42,14 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
+  full: boolean
+  onFull: () => void
 }): React.JSX.Element | null {
   const fileCount = useMemo(() => sessionFilesOf(items, thread.cwd).length, [items, thread.cwd])
-  const overlay = useWorkbenchOverlay()
-  const box = useWorkbenchKeys(state, overlay, onHide)
+  const box = useWorkbenchKeys(state, onHide)
   return (
-    <aside ref={box} className="workbench" tabIndex={-1} aria-label="任务工作台" hidden={!state.visible}
-      role={state.visible && overlay ? "dialog" : undefined}
-      aria-modal={state.visible && overlay ? true : undefined}>
+    <section ref={box} className="workbench" tabIndex={-1}
+      aria-label="任务工作台" hidden={!state.visible}>
       <header className="workbench__head">
         <nav className="workbench__tabs" aria-label="工作台页面">
           <ToolTab on={state.page === "activity"} label="活动" count={lanes.length} onClick={onActivity}>
@@ -58,6 +59,14 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
             <FileIcon size={13} />
           </ToolTab>
         </nav>
+        <button type="button" className="workbench__expand"
+          aria-label={full ? "并排显示工作台" : "展开工作台"}
+          title={full ? "并排显示工作台" : "展开工作台"} onClick={onFull}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+            strokeWidth="1.5" aria-hidden="true">
+            <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
+          </svg>
+        </button>
         <button type="button" className="workbench__hide" aria-label="收起工作台"
           title="收起工作台" onClick={onHide}>
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
@@ -78,6 +87,6 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onActivity, 
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
         </div>
       </div>
-    </aside>
+    </section>
   )
 }

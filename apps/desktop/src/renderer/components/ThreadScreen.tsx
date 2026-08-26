@@ -18,6 +18,7 @@ import type { ComposerDrafts } from "../composer-drafts.js"
 import type { ComposerFileReference } from "../file-references.js"
 import { stampOf } from "../stamp.js"
 import { ThreadWorkbench } from "./thread-workbench.js"
+import { panelShellClass } from "../panel-layout.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -54,7 +55,7 @@ export function ThreadScreen({
     thread.cwd,
   )
   return (
-    <div className={`shell${workbench.visible ? " shell--workbench" : ""}`}>
+    <div className={panelShellClass(workbench.visible || shell.reviewOpen, shell.panelFull)}>
       {sidebar}
       <Workspace
         key={thread.id}
@@ -62,9 +63,7 @@ export function ThreadScreen({
         composerReference={reference?.threadId === thread.id ? reference : undefined}
         thread={thread}
         peer={peer}
-        onCompare={() => {
-          shell.setComparing(true)
-        }}
+        onCompare={() => { shell.setComparing(true) }}
         rows={app.rows}
         onSelect={shell.select}
         items={app.items}
@@ -87,10 +86,7 @@ export function ThreadScreen({
         onDismiss={shell.dismiss}
         finding={shell.finding}
         onFind={app.find}
-        onCloseFind={() => {
-          shell.setFinding(false)
-          app.stopFind()
-        }}
+        onCloseFind={() => { shell.setFinding(false); app.stopFind() }}
         onCopy={app.copy}
         onReveal={app.reveal}
         commands={
@@ -99,13 +95,9 @@ export function ThreadScreen({
         limits={limitsOf(state, thread.engine)}
         onNew={app.newHere}
         onRename={shell.requestRename}
-        onSettings={() => {
-          shell.setSettingsOpen(true)
-        }}
+        onSettings={() => { shell.setSettingsOpen(true) }}
         searchFiles={app.searchFiles}
-        onReview={() => {
-          shell.setReviewOpen(true)
-        }}
+        onReview={() => { shell.setReviewOpen(true) }}
         send={app.send}
       />
       <ThreadWorkbench
@@ -116,6 +108,8 @@ export function ThreadScreen({
         items={allItems}
         stamp={fileStamp}
         setReference={setReference}
+        full={shell.panelFull}
+        onFull={shell.togglePanelFull}
       />
       {layers}
     </div>

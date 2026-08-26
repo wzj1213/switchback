@@ -1,12 +1,25 @@
 /* 持久右侧工作台：后台活动与文件共用一块稳定空间，关闭只隐藏，不丢浏览位置。 */
 .workbench {
   display: flex;
+  grid-column: 3;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
   border-left: 1px solid var(--border-strong);
   background: var(--bg);
+}
+
+.shell--workbench-full .workbench {
+  grid-column: 2;
+  border-left: 0;
+}
+
+@media (max-width: 1320px) {
+  .workbench {
+    grid-column: 2;
+    border-left: 0;
+  }
 }
 
 .workbench[hidden],
@@ -68,6 +81,7 @@
 }
 
 .workbench__hide,
+.workbench__expand,
 .workbench__icon {
   display: grid;
   flex: none;
@@ -83,21 +97,30 @@
 }
 
 .workbench__hide:hover,
+.workbench__expand:hover,
 .workbench__icon:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
 .workbench__hide:active,
+.workbench__expand:active,
 .workbench__icon:active {
   background: var(--bg-press);
 }
 
 .workbench__tab:focus-visible,
 .workbench__hide:focus-visible,
+.workbench__expand:focus-visible,
 .workbench__icon:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+@media (max-width: 1320px) {
+  .workbench__expand {
+    display: none;
+  }
 }
 
 .workbench__body {

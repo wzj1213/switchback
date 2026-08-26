@@ -14,6 +14,7 @@ import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
 import { useMemo } from "react"
 import { createComposerDrafts } from "./composer-drafts.js"
+import { panelShellClass } from "./panel-layout.js"
 
 /**
  * 选哪一屏。
@@ -70,7 +71,7 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
 }
 
 /**
- * 盖在界面上的那两块面板：设置、审核。
+ * 设置浮在界面上；审核占右侧编辑器组。
  *
  * 它们和「渲染哪一屏」是两件事——三条 return 路径里每一条都要带上它们，
  * 所以算一次、三处共用。**不是组件而是取值函数**：写成组件的话
@@ -94,7 +95,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
       }}
     />
   ) : null
-  // 审核面板。**和设置同层**：都是盖住界面的一块，Esc 关。
+  // 审核与设置共用渲染出口，但审核是外壳里的编辑器组，不是遮罩层；Esc 仍可关。
   // 没有会话时不给——它审的是「这条会话的工作区」，没有会话就没有那个目录
   const review =
     shell.reviewOpen && thread !== undefined ? (
@@ -105,6 +106,8 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
         threadId={thread.id}
         stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
         wanted={reportedChangesOf(itemsOf(state, thread.id), thread.cwd).list.map((file) => file.path)}
+        full={shell.panelFull}
+        onFull={shell.togglePanelFull}
         onCopy={app.copy}
         onClose={() => {
           shell.setReviewOpen(false)
@@ -144,7 +147,7 @@ export function App(): React.JSX.Element {
 
   if (shell.comparing && peer !== undefined) {
     return (
-      <div className="shell">
+      <div className={panelShellClass(shell.reviewOpen, shell.panelFull)}>
         {sidebar}
         <CompareScreen
           state={state}

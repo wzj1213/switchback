@@ -89,7 +89,7 @@ function Resume({ onResume }: { onResume?: () => void }): React.JSX.Element {
       /* **不是主按钮。** 近黑的实心块是留给「你现在要做个决定」的（审批卡那颗）；
          「这条会话是历史」是一个**状态**，不是一件催你办的事。输入框里那句
          占位文本已经把话说清了，而这是这一条里唯一能点的控件，找不着的风险为零 */
-      className="btn"
+      className="btn composer__resume"
       type="button"
       disabled={going || onResume === undefined}
       onClick={() => {

@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
-import { reviewLabel, type ReviewFile } from "../../shared/review.js"
-import { filterFiles, reviewCopyText, tallyReview, untrackedCount, useReview, usePatch } from "../review.js"
-import { useModalKeys } from "../useModalKeys.js"
-import { reveal, revealable } from "../reveal.js"
+import { filterFiles, tallyReview, untrackedCount, useReview, usePatch } from "../review.js"
+import { usePanelKeys } from "../use-panel-keys.js"
 import { ReviewList } from "./ReviewList.js"
-import { ReviewDiff } from "./ReviewDiff.js"
 import { Tools } from "./ReviewTools.js"
-import { CopyIcon, RevealIcon } from "./icons.js"
 import { blank, ReviewSummary } from "./review-empty.js"
+import { ReviewPane } from "./review-pane.js"
 
 /**
  * 审核：**把这次对话最终留下的净改动逐个看一遍**。
@@ -48,60 +45,23 @@ function useArrows(rels: readonly string[], active: string | undefined, onPick: 
   }, [rels, active, onPick])
 }
 
-/**
- * 右边那一片的文件头。
- *
- * 删掉的文件**不给「在访达里显示」**：它已经不在了，点了什么都不会发生——
- * 那正是这个仓库一直在避免的那种元素（见 `Diff.tsx` 里同一处判断）。
- */
-function FileHead({ file, copyDisabled, onReveal, onCopy }: {
-  file: ReviewFile
-  copyDisabled: boolean
-  onReveal: () => void
-  onCopy: () => void
-}): React.JSX.Element {
-  const canGo = file.kind !== "delete" && revealable(file.path)
-  return (
-    <div className="rv__file">
-      <span className={`rvl__kind rvl__kind--${file.kind}`} aria-hidden="true" />
-      <span className="rv__kindtext">{reviewLabel(file.kind)}</span>
-      <span className="rv__path" title={file.rel}>
-        {file.rel}
-      </span>
-      {canGo ? (
-        <button type="button" className="rv__act" aria-label="在访达中显示" title="在访达中显示" onClick={onReveal}>
-          <RevealIcon size={12} />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="rv__act"
-        aria-label="复制这份文件改动"
-        title={copyDisabled ? "文件改动读取完成后才能复制" : "复制这份文件改动"}
-        disabled={copyDisabled}
-        onClick={onCopy}
-      >
-        <CopyIcon size={12} />
-      </button>
-    </div>
-  )
-}
-
 function ignoredOf(paths: readonly string[] | undefined): readonly string[] {
   return paths === undefined ? [] : paths
 }
 
-export function Review({ cwd, threadId, stamp, wanted, onClose, onCopy }: {
+export function Review({ cwd, threadId, stamp, wanted, full, onFull, onClose, onCopy }: {
   cwd: string
   threadId: string
   /** 轮次戳：跑完一轮就重问一遍 git。 */
   stamp: string
   /** 引擎明确上报过的路径；Git 忽略项也必须诚实地出现在审核状态里。 */
   wanted: readonly string[]
+  full: boolean
+  onFull: () => void
   onClose: () => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const box = useModalKeys(onClose)
+  const box = usePanelKeys(onClose)
   const data = useReview(cwd, stamp, { threadId, wanted })
   const [query, setQuery] = useState("")
   const [picked, setPicked] = useState<string | undefined>(undefined)
@@ -122,17 +82,18 @@ export function Review({ cwd, threadId, stamp, wanted, onClose, onCopy }: {
   const unverified = ignored.length
   const file = files.find((f) => f.rel === active)
   return (
-    <div className="rv__scrim" role="presentation">
-      <div className="rv" ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-label="审核改动">
-        <header className="rv__head">
-          <h2 className="rv__title">审核</h2>
-          <div className="rv__summary"><ReviewSummary
-              state={{ noRepo: data.noRepo, loading: data.loading, failed: data.failed,
-                baseline: data.baseline, total, unverified,
-                ...(data.more === undefined ? {} : { more: data.more }) }}
-              added={added}
-              removed={removed}
-            /></div>
+    <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动">
+      <header className="rv__head">
+        <h2 className="rv__title">审核</h2>
+        <div className="rv__summary">
+          <ReviewSummary
+            state={{ noRepo: data.noRepo, loading: data.loading, failed: data.failed,
+              baseline: data.baseline, total, unverified,
+              ...(data.more === undefined ? {} : { more: data.more }) }}
+            added={added}
+            removed={removed}
+          />
+        </div>
           <Tools
             split={split}
             onSplit={setSplit}
@@ -141,57 +102,45 @@ export function Review({ cwd, threadId, stamp, wanted, onClose, onCopy }: {
             onReload={data.reload}
             {...(untrackedN === 0 ? {} : { untracked: { on: untracked, count: untrackedN, onToggle: setUntracked } })}
           />
+          <button type="button" className="rv__expand"
+            aria-label={full ? "并排显示审核" : "展开审核"}
+            title={full ? "并排显示审核" : "展开审核"} onClick={onFull}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+              strokeWidth="1.5" aria-hidden="true">
+              <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
+            </svg>
+          </button>
           <button type="button" className="rv__close" onClick={onClose} aria-label="关闭">
             ✕
           </button>
-        </header>
-        <div className="rv__body">
-          <ReviewList
-            files={files}
-            active={active}
-            query={query}
-            onQuery={setQuery}
-            onPick={setPicked}
-            ignored={ignored}
-            {...(data.more === undefined ? {} : { more: data.more })}
-          />
-          <section className="rv__pane">
-            {file === undefined ? (
-              <p className="rvd__note">
-                {blank({
-                  noRepo: data.noRepo,
-                  loading: data.loading,
-                  failed: data.failed,
-                  baseline: data.baseline,
-                  total,
-                  shown: files.length,
-                  unverified,
-                  ...(data.more === undefined ? {} : { more: data.more }),
-                })}
-              </p>
-            ) : (
-              <>
-                <FileHead
-                  file={file}
-                  copyDisabled={patch.loading || patch.skip === "failed"}
-                  onReveal={() => {
-                    reveal(file.path)
-                  }}
-                  onCopy={() => {
-                    onCopy(reviewCopyText(file.rel, patch))
-                  }}
-                />
-                <ReviewDiff
-                  lines={patch.lines}
-                  {...(patch.skip === undefined ? {} : { skip: patch.skip })}
-                  split={split}
-                  loading={patch.loading}
-                />
-              </>
-            )}
-          </section>
-        </div>
+      </header>
+      <div className="rv__body">
+        <ReviewList
+          files={files}
+          active={active}
+          query={query}
+          onQuery={setQuery}
+          onPick={setPicked}
+          ignored={ignored}
+          {...(data.more === undefined ? {} : { more: data.more })}
+        />
+        <ReviewPane
+          file={file}
+          patch={patch}
+          empty={blank({
+            noRepo: data.noRepo,
+            loading: data.loading,
+            failed: data.failed,
+            baseline: data.baseline,
+            total,
+            shown: files.length,
+            unverified,
+            ...(data.more === undefined ? {} : { more: data.more }),
+          })}
+          split={split}
+          onCopy={onCopy}
+        />
       </div>
-    </div>
+    </section>
   )
 }

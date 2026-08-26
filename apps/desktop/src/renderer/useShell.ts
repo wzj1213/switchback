@@ -14,7 +14,7 @@ import {
 } from "./workbench.js"
 
 /**
- * 外壳自己的那点状态：选中了哪个会话、开着哪个覆盖层。
+ * 外壳自己的那点状态：选中了哪个会话、开着哪个工具组或覆盖层。
  *
  * 拆成一个 hook 不只是为了行数——**这五个值属于同一个概念**（「界面现在是什么模式」），
  * 散在 `App` 里和业务状态混在一起时，很容易在加第六个的时候忘了它们是一组的。
@@ -39,9 +39,12 @@ export interface Shell {
   setComparing: (on: boolean) => void
   settingsOpen: boolean
   setSettingsOpen: (on: boolean) => void
-  /** 审核面板开着没有。和设置同层：一块盖住界面的面板，Esc 关。 */
+  /** 审核占用右侧工具组；和活动 / 文件互斥。 */
   reviewOpen: boolean
   setReviewOpen: (on: boolean) => void
+  /** 宽屏工具组是否暂时独占内容区。 */
+  panelFull: boolean
+  togglePanelFull: () => void
   /**
    * 焦点信号。
    *
@@ -75,17 +78,23 @@ export function useShell(): Shell {
   const [finding, setFinding] = useState(false)
   const [comparing, setComparing] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewOpen, setReview] = useState(false)
+  const [panelFull, setPanelFull] = useState(false)
   const [focusFilter, setFocusFilter] = useState(0)
   const [askRename, setAskRename] = useState(0)
   const [workbench, setWorkbench] = useState<WorkbenchState>(CLOSED_WORKBENCH)
   const openAside = useCallback((laneId: string) => {
+    setReview(false)
     setWorkbench((prev) => showLane(prev, laneId))
   }, [])
   const openFile = useCallback((target: PreviewTarget) => {
+    setReview(false)
     setWorkbench((prev) => showFile(prev, target))
   }, [])
-  const closeWorkbench = useCallback(() => { setWorkbench(hideWorkbench) }, [])
+  const closeWorkbench = useCallback(() => {
+    setWorkbench(hideWorkbench)
+    setPanelFull(false)
+  }, [])
   useEffect(() => onFilePreviewRequest(openFile), [openFile])
   // 原生通知的超时 effect 依赖它；引用稳定才能避免每次流式重绘都把计时重新开始。
   const dismiss = useCallback((id: string) => {
@@ -94,9 +103,9 @@ export function useShell(): Shell {
   return {
     workbench,
     openAside,
-    openActivity: () => { setWorkbench(showActivity) },
+    openActivity: () => { setReview(false); setWorkbench(showActivity) },
     activityIndex: () => { setWorkbench(showActivityIndex) },
-    openFiles: () => { setWorkbench(showFiles) },
+    openFiles: () => { setReview(false); setWorkbench(showFiles) },
     openFile,
     fileIndex: () => { setWorkbench(showFileIndex) },
     hideWorkbench: closeWorkbench,
@@ -111,7 +120,13 @@ export function useShell(): Shell {
     settingsOpen,
     setSettingsOpen,
     reviewOpen,
-    setReviewOpen,
+    setReviewOpen: (on) => {
+      setReview(on)
+      if (on) setWorkbench(hideWorkbench)
+      else setPanelFull(false)
+    },
+    panelFull,
+    togglePanelFull: () => { setPanelFull((before) => !before) },
     askRename,
     requestRename: () => {
       setAskRename((n) => n + 1)

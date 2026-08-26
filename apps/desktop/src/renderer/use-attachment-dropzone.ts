@@ -35,18 +35,9 @@ interface Options {
 
 const TASK_SURFACE = ".main, .workbench:not([hidden])"
 
-function inTaskScrim(event: DragEvent, target: Element): boolean {
-  if (target.closest(".workbench__scrim") === null) return false
-  const main = document.querySelector(".main")
-  return main !== null && event.clientX >= main.getBoundingClientRect().left
-}
-
 function inTaskSurface(event: DragEvent): boolean {
   const target = event.target
-  return (
-    target instanceof Element &&
-    (target.closest(TASK_SURFACE) !== null || inTaskScrim(event, target))
-  )
+  return target instanceof Element && target.closest(TASK_SURFACE) !== null
 }
 
 function transferOf(event: DragEvent): DataTransfer | undefined {
@@ -107,7 +98,7 @@ function listenForFiles(events: ReturnType<typeof listeners>): () => void {
 }
 
 /**
- * 当前任务画布都是落点：正文、已打开的工作台和它的窄屏遮罩；侧栏与模态不接，
+ * 当前任务画布都是落点：正文或已打开的工作台；侧栏与模态不接，
  * 避免文件拖拽和会话排序 / 设置面板互相抢。监听挂 window 是因为 Composer 拿不到
  * 祖先画布的 DOM 入口，实际接不接仍由事件目标裁决。最新能力与可编辑态放 ref，
  * 拖动中切状态也立即生效。

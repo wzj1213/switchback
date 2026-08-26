@@ -311,6 +311,12 @@
   padding-top: var(--sp-1);
 }
 
+/* 历史态的唯一动作宁可整颗让位，也不能被窄列压成逐字竖排。 */
+.composer__resume {
+  flex: none;
+  white-space: nowrap;
+}
+
 /*
  * 可用宽度不足时，展开的推理滑块独占一行。
  *

@@ -166,27 +166,21 @@ async function checkWorkbench(cdp) {
     cdp,
     `(() => { const b=document.querySelector('[aria-label="打开文件预览"]'); b.focus(); b.click(); return true })()`,
   )
-  await waitFor(cdp, "document.querySelector('.workbench[aria-modal=true]') !== null")
-  await audit(cdp, "窄屏文件工作台")
+  await waitFor(cdp, "document.querySelector('.workbench:not([hidden])') !== null")
+  await audit(cdp, "文件工作台页面")
   assert(
     await value(cdp, "document.querySelector('.workbench').contains(document.activeElement)"),
-    "打开文件抽屉后焦点进入工作台",
+    "打开文件面板后焦点进入工作台",
   )
-  const count = await value(
-    cdp,
-    `(() => { const d=document.querySelector('.workbench'); const a=[...d.querySelectorAll("button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex='-1'])")]; a.at(-1).focus(); return a.length })()`,
-  )
-  assert(count > 1, "文件抽屉有可遍历的焦点顺序")
-  await key(cdp, "Tab")
   assert(
-    await value(cdp, "document.querySelector('.workbench').contains(document.activeElement)"),
-    "Tab 不会走出窄屏文件抽屉",
+    await value(cdp, "getComputedStyle(document.querySelector('.main')).display === 'none'"),
+    "工作台打开后会话页退出布局",
   )
   await key(cdp, "Escape")
   await waitFor(cdp, "document.querySelector('.workbench[hidden]') !== null")
   assert(
     await value(cdp, "document.activeElement?.getAttribute('aria-label') === '打开文件预览'"),
-    "Esc 关闭抽屉后焦点回到文件入口",
+    "Esc 关闭面板后焦点回到文件入口",
   )
   await cdp.send("Emulation.clearDeviceMetricsOverride")
   await pause(120)
@@ -287,7 +281,11 @@ async function main() {
     console.error(output.join("").slice(-12_000))
     throw error
   } finally {
+    const exited = child.exitCode === null
+      ? new Promise((resolve) => { child.once("exit", resolve) })
+      : Promise.resolve()
     child.kill("SIGTERM")
+    await exited
     await rm(data, { recursive: true, force: true })
   }
 }

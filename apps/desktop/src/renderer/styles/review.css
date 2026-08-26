@@ -1,34 +1,35 @@
 /*
  * 审核面板。
  *
- * 比设置面板宽得多，也高得多：设置是几组选择，审核是**一屏一屏读代码**。
- * 代码要宽——一份 diff 折行之后，缩进层级就没了，而缩进正是读代码的骨架。
- *
- * 两列：左边固定 260px（够放 `src/renderer/components/…` 的尾段），
- * 右边吃掉剩下的全部。窄窗口下右边优先——文件名再挤也认得出，代码挤了就没法读。
+ * 它和活动、文件预览一样，是右侧编辑器组，不是盖住会话的模态窗口。
+ * 宽屏并排；普通窗口由外壳让它独占侧栏右边；组内再按自己的实际宽度决定
+ * 文件清单放左边还是上面，不能拿整扇窗口宽度猜面板有多宽。
  */
-
-.rv__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--sp-5) var(--sp-4);
-  background: var(--scrim);
-}
 
 .rv {
   display: flex;
+  grid-column: 3;
+  min-width: 0;
+  min-height: 0;
   flex-direction: column;
-  width: min(1240px, 100%);
+  width: 100%;
   height: 100%;
   overflow: hidden;
-  border: 1px solid var(--border-pop);
-  border-radius: var(--radius-lg);
+  border-left: 1px solid var(--border-strong);
   background: var(--bg);
-  box-shadow: var(--shadow-pop);
+  container-type: inline-size;
+}
+
+.shell--workbench-full .rv {
+  grid-column: 2;
+  border-left: 0;
+}
+
+@media (max-width: 1320px) {
+  .rv {
+    grid-column: 2;
+    border-left: 0;
+  }
 }
 
 .rv:focus {
@@ -38,17 +39,24 @@
 .rv__head {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   flex: none;
-  padding: var(--sp-3) var(--sp-4);
+  min-height: 44px;
+  padding: 0 var(--sp-2) 0 var(--sp-3);
   border-bottom: 1px solid var(--border-strong);
   background: var(--bg-sunken);
 }
 
 .rv__title {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
   margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 600;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-xs);
+  background: var(--bg-active);
+  font-size: var(--text-sm);
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -100,33 +108,54 @@
   color: var(--text);
 }
 
+.rv__expand,
 .rv__close {
+  display: grid;
   flex: none;
-  padding: 2px var(--sp-2);
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
+.rv__expand:hover,
 .rv__close:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-/*
- * 最小窗口的顶栏分两层：身份与结论在第一层，怎么看这份 diff 在第二层。
- * 原来全部挤在一条 flex 里，860px 下「审核 / 并排 / 整个文件」会逐字竖排，
- * 控件虽还点得到，却已经读不成一句话。
- */
-@media (max-width: 1000px) {
+.rv__expand:active,
+.rv__close:active {
+  background: var(--bg-press);
+}
+
+.rv__expand:focus-visible,
+.rv__close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+@media (max-width: 1320px) {
+  .rv__expand {
+    display: none;
+  }
+}
+
+/* 编辑组自己的宽度不足时，工具栏换行、文件清单移到补丁上方。 */
+@container (max-width: 760px) {
   .rv__head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--sp-2) var(--sp-3);
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: var(--sp-1) var(--sp-2);
+    padding-top: var(--sp-1);
+    padding-bottom: var(--sp-1);
   }
 
   .rv__summary {
@@ -142,7 +171,7 @@
   .rv__tools {
     grid-row: 2;
     grid-column: 1 / -1;
-    justify-content: flex-end;
+    justify-content: flex-start;
     margin-left: 0;
     overflow-x: auto;
     scrollbar-width: none;
@@ -152,9 +181,25 @@
     display: none;
   }
 
-  .rv__close {
+  .rv__expand {
     grid-row: 1;
     grid-column: 3;
+  }
+
+  .rv__close {
+    grid-row: 1;
+    grid-column: 4;
+  }
+
+  .rv__body {
+    flex-direction: column;
+  }
+
+  .rv__body > .rvl {
+    width: 100%;
+    max-height: 190px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-strong);
   }
 }
 

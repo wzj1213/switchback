@@ -15,6 +15,7 @@ function render(visible: boolean): string {
     onActivity: () => undefined, onFiles: () => undefined, onPickLane: () => undefined,
     onActivityIndex: () => undefined, onPickFile: () => undefined, onFileIndex: () => undefined,
     onHide: () => undefined, onReveal: () => undefined, onCopy: () => undefined,
+    full: false, onFull: () => undefined,
     searchFiles: () => Promise.resolve([]),
   }))
 }

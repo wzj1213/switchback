@@ -26,11 +26,15 @@ export function LaneCommandBlock({ command, onCopy }: {
       <button type="button" className="lane-cmd-block__copy" onClick={() => { onCopy(command) }}>
         <CopyIcon size={11} /> 复制
       </button>
-      <pre><code>{command}</code></pre>
+      <pre tabIndex={0} aria-label="可横向滚动的后台命令"><code>{command}</code></pre>
     </div>
   )
 }
 
 export function LaneOutput({ text }: { text: string }): React.JSX.Element {
-  return <pre className="lane-output"><code>{text}</code></pre>
+  return (
+    <pre className="lane-output" tabIndex={0} aria-label="可滚动的后台输出">
+      <code>{text}</code>
+    </pre>
+  )
 }

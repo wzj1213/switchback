@@ -1,8 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import type { WorkbenchState } from "./workbench.js"
-import { trapTab } from "./useModalKeys.js"
-
-const OVERLAY_QUERY = "(max-width: 1120px)"
 
 type FocusState = Pick<WorkbenchState, "page" | "file" | "laneId">
 
@@ -18,41 +15,20 @@ export function workbenchFocusSelector(state: FocusState): string {
     : '.workbench__page:not([hidden]) .workbench__back'
 }
 
-function currentOverlay(): boolean {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function"
-    && window.matchMedia(OVERLAY_QUERY).matches
-}
-
 function coveredByModal(panel: HTMLElement | null): boolean {
   const modals = [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')]
   const top = modals.at(-1)
   return top !== undefined && top !== panel
 }
 
-/** 与 CSS 的抽屉断点保持同步，让语义和焦点契约也跟着变。 */
-export function useWorkbenchOverlay(): boolean {
-  const [overlay, setOverlay] = useState(currentOverlay)
-  useEffect(() => {
-    const media = window.matchMedia(OVERLAY_QUERY)
-    const update = (): void => { setOverlay(media.matches) }
-    update()
-    media.addEventListener("change", update)
-    return () => { media.removeEventListener("change", update) }
-  }, [])
-  return overlay
-}
-
-/** 打开后进工作台；窄屏锁 Tab；关闭后还给原触发器。 */
+/** 打开后进工作台；Esc 关闭后还给原触发器。 */
 export function useWorkbenchKeys(
   state: WorkbenchState,
-  overlay: boolean,
   onClose: () => void,
 ): React.RefObject<HTMLElement | null> {
   const box = useRef<HTMLElement>(null)
   const close = useRef(onClose)
-  const modal = useRef(overlay)
   close.current = onClose
-  modal.current = overlay
   useEffect(() => {
     if (!state.visible) return undefined
     const panel = box.current
@@ -63,7 +39,7 @@ export function useWorkbenchKeys(
         event.preventDefault()
         event.stopPropagation()
         close.current()
-      } else if (panel !== null && modal.current) trapTab(event, panel)
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => {
@@ -81,6 +57,6 @@ export function useWorkbenchKeys(
     const target = panel.querySelector<HTMLElement>(selector)
     const focus = target ?? panel
     focus.focus()
-  }, [focusKey, overlay, selector, state.visible])
+  }, [focusKey, selector, state.visible])
   return box
 }

@@ -116,9 +116,9 @@ export const COMPOSE_VIEWS = [
     ready: ".composer-drop--surface",
     assert: `(() => {
       const hint = document.querySelector('.composer-drop--surface')?.getBoundingClientRect()
-      const main = document.querySelector('.main')?.getBoundingClientRect()
-      return hint !== undefined && main !== undefined
-        && Math.abs(hint.left - main.left) < 1 && Math.abs(hint.right - innerWidth) < 1
+      const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
+      return hint !== undefined && sidebar !== undefined
+        && Math.abs(hint.left - sidebar.right) < 1 && Math.abs(hint.right - innerWidth) < 1
     })()`,
   },
   {
@@ -153,7 +153,21 @@ export const COMPOSE_VIEWS = [
       `document.querySelector('[title="文件预览"]')?.click()`,
       `(() => { const input = document.querySelector('.files-search input'); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; setter?.call(input, 'attachment-feedback'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
       `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
-      `setTimeout(() => { window.dispatchEvent(new Event('focus')); const see = () => { if (document.querySelector('.file-preview__status')?.textContent.includes('正在更新')) document.documentElement.dataset.fileRefresh = String(document.querySelector('.file-source') !== null && document.querySelector('[aria-label="引用到输入框"]')?.disabled === false); else setTimeout(see, 10) }; see() }, 320)`,
+      `setTimeout(() => {
+        window.dispatchEvent(new Event('focus'))
+        const see = () => {
+          if (!document.querySelector('.file-preview__status')?.textContent.includes('正在更新')) {
+            setTimeout(see, 10); return
+          }
+          const source = document.querySelector('.file-source')
+          const code = source?.querySelector('code')
+          code?.append('\\n// keyboard horizontal overflow probe: ' + 'workbench-content-page-'.repeat(24))
+          document.documentElement.dataset.fileRefresh = String(
+            source !== null && document.querySelector('[aria-label="引用到输入框"]')?.disabled === false,
+          )
+        }
+        see()
+      }, 320)`,
     ],
     ready: `html[data-file-refresh]`,
     assert: `document.documentElement.dataset.fileRefresh === 'true'
@@ -203,8 +217,8 @@ export const COMPOSE_VIEWS = [
     open: [
       `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
       `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('Esc 没有收起工作台'); document.querySelector('[title="文件预览"]')?.click()`,
-      `document.querySelector('.workbench__scrim')?.click()`,
-      `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('点击遮罩没有收起工作台')`,
+      `document.querySelector('.workbench__hide')?.click()`,
+      `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('关闭键没有收起工作台')`,
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '@attachment'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
     ],
     ready: ".mentions__row",
