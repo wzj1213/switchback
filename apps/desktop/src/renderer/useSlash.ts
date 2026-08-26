@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react"
 import type { SlashCommand } from "@omni/protocol"
 import { matchCommands, slashAt } from "./slash.js"
+import { acceptsCompletion } from "./completion-keys.js"
 
 export interface Slash {
   /** 当前候选。空数组 = 面板不显示。 */
@@ -50,6 +51,7 @@ export function useSlash(commands: readonly SlashCommand[]): Slash {
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
       if (hits.length === 0) return false
+      if (e.nativeEvent.isComposing) return false
       if (e.key === "ArrowDown") {
         e.preventDefault()
         setActive((i) => (i + 1) % hits.length)
@@ -66,7 +68,7 @@ export function useSlash(commands: readonly SlashCommand[]): Slash {
         return true
       }
       // Enter 与 Tab 都算「选中」：面板开着的时候 Enter 不该把 `/re` 当消息发出去
-      return e.key === "Enter" || e.key === "Tab"
+      return acceptsCompletion(e.key, e.shiftKey, false)
     },
     [hits, close],
   )

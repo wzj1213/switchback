@@ -2,6 +2,7 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { MentionList, MentionStatus } from "./MentionList.js"
+import { SlashList } from "./SlashList.js"
 
 describe("@ 文件候选反馈", () => {
   it("加载、零命中与失败是三个不同状态", () => {
@@ -25,5 +26,16 @@ describe("@ 文件候选反馈", () => {
     expect(html).toContain('aria-label="工作区文件：/work/repos"')
     expect(html).toContain('<bdi title="/work/repos">/work/repos</bdi>')
     expect(html.match(/aria-selected="true"/g)).toHaveLength(1)
+    expect(html.match(/role="option" tabindex="0"/g)).toHaveLength(1)
+    expect(html.match(/role="option" tabindex="-1"/g)).toHaveLength(1)
+  })
+
+  it("文件与命令候选都留在输入框的虚拟焦点里", () => {
+    const html = renderToStaticMarkup(createElement(SlashList, {
+      commands: [{ name: "review", description: "审阅改动", source: "engine" }],
+      query: "re", active: 0, onPick: () => undefined,
+    }))
+    expect(html).toContain('role="listbox"')
+    expect(html).toContain('role="option" tabindex="0" aria-selected="true"')
   })
 })

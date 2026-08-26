@@ -140,6 +140,7 @@ function Row({
     <button
       type="button"
       role="option"
+      tabIndex={active ? 0 : -1}
       aria-selected={active}
       data-active={active}
       className={`slash__row${active ? " slash__row--active" : ""}`}

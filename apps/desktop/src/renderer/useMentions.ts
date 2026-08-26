@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { applyMention, mentionAt } from "./mention.js"
+import { acceptsCompletion } from "./completion-keys.js"
 
 export interface Mentions {
   /** 当前候选；是否显示由 open 决定，空数组也可能正在加载或显示失败。 */
@@ -105,13 +106,14 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
       if (!found.open) return false
+      if (e.nativeEvent.isComposing) return false
       if (e.key === "Escape") {
         e.preventDefault()
         close()
         return true
       }
       if (found.paths.length === 0) {
-        const waits = found.loading && (e.key === "Enter" || e.key === "Tab")
+        const waits = found.loading && acceptsCompletion(e.key, e.shiftKey, false)
         if (waits) {
           e.preventDefault()
           setPendingPick(true)
@@ -129,7 +131,7 @@ export function useMentions(cwd: string, search: (cwd: string, query: string) =>
         return true
       }
       // Enter 与 Tab 都算「选中」：列表开着的时候 Enter 不该把消息发出去
-      return e.key === "Enter" || e.key === "Tab"
+      return acceptsCompletion(e.key, e.shiftKey, false)
     },
     [found.open, found.loading, found.paths, close],
   )

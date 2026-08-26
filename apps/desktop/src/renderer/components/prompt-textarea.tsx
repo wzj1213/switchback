@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { flushSync } from "react-dom"
 import type { SlashCommand } from "@omni/protocol"
 import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
@@ -81,6 +82,7 @@ export function PromptTextarea(props: Props): React.JSX.Element {
 function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props): void {
   if (asideKeys(event, props)) return
   if (removeCommand(event, props)) return
+  if (releaseCompletion(event, props)) return
   if (chooseSlash(event, props)) return
   if (chooseMention(event, props)) return
   if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -89,6 +91,17 @@ function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props
     props.slash.close()
     props.onSubmit(event.metaKey || event.ctrlKey)
   }
+}
+
+/** 反向 Tab 不确认候选；先同步卸掉浮层，再让浏览器寻找真正的上一站。 */
+function releaseCompletion(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props): boolean {
+  const open = props.mentions.open || props.slash.hits.length > 0
+  if (event.key !== "Tab" || !event.shiftKey || !open) return false
+  flushSync(() => {
+    props.mentions.close()
+    props.slash.close()
+  })
+  return true
 }
 
 /**

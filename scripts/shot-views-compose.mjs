@@ -1,6 +1,7 @@
 /** Composer、图片与后续入口的固定场景；从主清单拆出，避免验收脚本再次长成大文件。 */
 import { MODEL_VIEWS } from "./shot-views-model.mjs"
 import { DROP_VIEWS } from "./shot-views-drop.mjs"
+import { REVERSE_COMPLETION_VIEW } from "./shot-view-completion.mjs"
 
 export const COMPOSE_VIEWS = [
   {
@@ -220,14 +221,27 @@ export const COMPOSE_VIEWS = [
       `document.querySelector('.workbench__hide')?.click()`,
       `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('关闭键没有收起工作台')`,
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '@attachment'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
+      `(() => {
+        const input = document.querySelector('.composer__input')
+        const before = input?.value
+        const composing = new KeyboardEvent('keydown', {
+          key: 'Enter', isComposing: true, bubbles: true, cancelable: true,
+        })
+        document.documentElement.dataset.completionPass = String(
+          input?.dispatchEvent(composing) === true && input?.value === before,
+        )
+      })()`,
     ],
     ready: ".mentions__row",
     assert: `[...document.querySelectorAll('.mentions__row')]
         .some(row => row.textContent.toLowerCase().includes('attachment'))
       && document.querySelector('.mentions__scope bdi')?.textContent.endsWith('/omni') === true
-      && document.querySelector('[role="listbox"]')?.getAttribute('aria-label')?.endsWith('/omni') === true`,
-    after: `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, ''); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
+      && document.querySelector('[role="listbox"]')?.getAttribute('aria-label')?.endsWith('/omni') === true
+      && [...document.querySelectorAll('.mentions__row')].filter(row => row.tabIndex === 0).length === 1
+      && document.documentElement.dataset.completionPass === 'true'`,
+    after: `(() => { delete document.documentElement.dataset.completionPass; const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, ''); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
   },
+  REVERSE_COMPLETION_VIEW,
   {
     name: "17-即时确认文件引用",
     open: `(() => {

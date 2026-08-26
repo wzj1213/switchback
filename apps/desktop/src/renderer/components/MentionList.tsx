@@ -48,6 +48,7 @@ export function MentionList({
               key={path}
               type="button"
               role="option"
+              tabIndex={i === active ? 0 : -1}
               aria-selected={i === active}
               data-active={i === active}
               className={`mentions__row${i === active ? " mentions__row--active" : ""}`}
