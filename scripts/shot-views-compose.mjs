@@ -100,7 +100,8 @@ export const COMPOSE_VIEWS = [
   },
   {
     name: "14-新会话",
-    open: `document.querySelector('.sidebar__new')?.click()`, ready: ".blank__title",
+    open: `document.querySelector('.sidebar__new')?.click()`,
+    ready: ".blank__title",
     absent: ".file-preview",
     assert: `document.activeElement?.classList.contains('composer__input') === true && document.querySelector('[aria-label="添加文件或图片"]')?.disabled === false`,
   },
@@ -113,12 +114,14 @@ export const COMPOSE_VIEWS = [
       `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('attachment-feedback.ts'))?.click()`,
       `setTimeout(() => { window.dispatchEvent(new Event('focus')); const see = () => { if (document.querySelector('.file-preview__status')?.textContent.includes('正在更新')) document.documentElement.dataset.fileRefresh = String(document.querySelector('.file-source') !== null && document.querySelector('[aria-label="引用到输入框"]')?.disabled === false); else setTimeout(see, 10) }; see() }, 320)`,
     ],
-    ready: `html[data-file-refresh]`, assert: `document.documentElement.dataset.fileRefresh === 'true'
+    ready: `html[data-file-refresh]`,
+    assert: `document.documentElement.dataset.fileRefresh === 'true'
       && document.querySelector('.file-preview__path')?.textContent.includes('…/src/renderer') === true`,
   },
   {
     name: "16-工作台文件加入输入框",
-    open: `document.querySelector('[aria-label="引用到输入框"]')?.click()`, ready: ".composer__input",
+    open: `document.querySelector('[aria-label="引用到输入框"]')?.click()`,
+    ready: ".composer__input",
     absent: ".workbench:not([hidden])",
     assert: `document.activeElement?.classList.contains('composer__input') === true
       && document.querySelector('.composer__input')?.value === '检查这个文件 @apps/desktop/src/renderer/attachment-feedback.ts '
@@ -170,9 +173,57 @@ export const COMPOSE_VIEWS = [
     })()`,
   },
   {
-    name: "18-推理强度", before: ".effort .trigger:not(:disabled)",
+    name: "18-模型菜单焦点",
+    before: ".composer__bar .trigger:not(:disabled)",
+    open: `(() => {
+      const triggers = [...document.querySelectorAll('.composer__bar .trigger:not(:disabled)')]
+      const model = triggers.find(button => button.textContent.includes('Default')) ?? triggers.at(-1)
+      model?.click()
+      setTimeout(() => {
+        const menu = document.querySelector('.pop [role="menu"]')
+        menu?.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowDown', bubbles: true, cancelable: true,
+        }))
+        const held = document.activeElement
+        const input = document.querySelector('.composer__input')
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(input, '触发父级重渲染')
+        input?.dispatchEvent(new Event('input', { bubbles: true }))
+        setTimeout(() => {
+          document.documentElement.dataset.modelFocus = JSON.stringify({
+            same: document.activeElement === held,
+            heldRole: held?.getAttribute('role'),
+            heldText: held?.textContent.trim(),
+            currentRole: document.activeElement?.getAttribute('role'),
+            currentText: document.activeElement?.textContent.trim(),
+            menuOpen: document.querySelector('.pop [role="menu"]') !== null,
+          })
+        }, 80)
+      }, 80)
+    })()`,
+    ready: `html[data-model-focus]`,
+    assert: `(() => {
+      const result = JSON.parse(document.documentElement.dataset.modelFocus ?? '{}')
+      if (result.same === true && result.heldRole === 'menuitem') return true
+      throw new Error('模型菜单焦点诊断：' + JSON.stringify(result))
+    })()`,
+    after: `(() => {
+      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape', bubbles: true, cancelable: true,
+      }))
+      delete document.documentElement.dataset.modelFocus
+      const input = document.querySelector('.composer__input')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+      setter?.call(input, '')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`,
+  },
+  {
+    name: "18-推理强度",
+    before: ".effort .trigger:not(:disabled):not(.trigger--open)",
     open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
-    ready: ".effort__bar--grown", dragEffort: true,
+    ready: ".effort__bar--grown",
+    dragEffort: true,
   },
   {
     name: "19-设置",

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
+import { usePopoverLayout } from "./use-popover-layout.js"
 
 /**
  * 浮层。所有下拉、菜单都长在它上面。
@@ -40,15 +41,10 @@ export interface PopoverProps {
   minWidth?: number
   /** 非菜单浮层必须给名字；有值时外壳按非模态 dialog 暴露。 */
   ariaLabel?: string
+  /** 菜单真正换页时才换；普通父级重渲染不能借机把焦点拉回第一项。 */
+  contentKey?: string | number
 }
 
-interface Placement {
-  left: number
-  top: number
-}
-
-const GAP = 6
-const MARGIN = 8
 const MENU_ITEM = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
 const FOCUSABLE = `button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])`
 
@@ -84,26 +80,6 @@ function moveMenuFocus(panel: HTMLElement, key: string): boolean {
   return true
 }
 
-/** 贴着鼠标点弹。**默认往右下**，装不下才翻——右下是光标的自然去向。 */
-function placeAtPoint(point: { x: number; y: number }, panel: HTMLElement): Placement {
-  const p = panel.getBoundingClientRect()
-  const left = point.x + p.width + MARGIN <= window.innerWidth ? point.x : point.x - p.width
-  const top = point.y + p.height + MARGIN <= window.innerHeight ? point.y : point.y - p.height
-  return { left: Math.max(MARGIN, left), top: Math.max(MARGIN, top) }
-}
-
-function place(anchor: HTMLElement, panel: HTMLElement): Placement {
-  const a = anchor.getBoundingClientRect()
-  const p = panel.getBoundingClientRect()
-  // 默认往上弹：这些触发器都在贴底的输入区里，往下没有地方
-  const above = a.top - p.height - GAP
-  const below = a.bottom + GAP
-  const top = above >= MARGIN ? above : Math.min(below, window.innerHeight - p.height - MARGIN)
-  // 左对齐触发器，但不许越过右边界
-  const left = Math.max(MARGIN, Math.min(a.left, window.innerWidth - p.width - MARGIN))
-  return { left, top }
-}
-
 export function Popover({
   open,
   onClose,
@@ -112,31 +88,18 @@ export function Popover({
   children,
   minWidth,
   ariaLabel,
+  contentKey,
 }: PopoverProps): React.JSX.Element | null {
   const panel = useRef<HTMLDivElement>(null)
-  const [at, setAt] = useState<Placement | undefined>(undefined)
-
-  // useLayoutEffect 而不是 useEffect：要在浏览器画之前把位置算好，
-  // 否则会看到面板先在左上角闪一下再跳到位
-  useLayoutEffect(() => {
-    if (!open || panel.current === null) {
-      setAt(undefined)
-      return
-    }
-    if (point !== undefined) {
-      setAt(placeAtPoint(point, panel.current))
-      return
-    }
-    if (anchor === null) return
-    setAt(place(anchor, panel.current))
-  }, [open, anchor, point, children])
+  const at = usePopoverLayout({ open, anchor, point, panel, contentKey })
+  const placed = at !== undefined
 
   // 和位置一起在绘制前完成：菜单一旦可见，键盘落点也必须已经在里面。
   // 普通 effect 会留出一帧“菜单出现了、焦点还在旧控件”的竞态。
   useLayoutEffect(() => {
-    if (!open || at === undefined || panel.current === null) return
+    if (!open || !placed || panel.current === null) return
     focusPanel(panel.current)
-  }, [open, at])
+  }, [open, placed, contentKey])
 
   useEffect(() => {
     if (!open) return undefined

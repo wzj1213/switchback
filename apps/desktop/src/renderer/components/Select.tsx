@@ -100,7 +100,13 @@ export function Select({
         <span className="trigger__label">{label}</span>
         <CaretIcon />
       </button>
-      <Popover open={open} anchor={trigger.current} minWidth={220} onClose={close}>
+      <Popover
+        open={open}
+        anchor={trigger.current}
+        minWidth={220}
+        contentKey={shown ?? "top"}
+        onClose={close}
+      >
         <div role="menu" aria-label={title ?? label}>
           {shown === undefined ? (
             <Top sections={sections} reset={reset} onOpen={setPage} onClose={close} />
