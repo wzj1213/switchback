@@ -6,7 +6,6 @@ import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Ledger, Sealed } from "@omni/wire"
 import { createHost, type Host, type HostDeps } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
-import { createWorksite, type Worksite } from "@omni/worksite"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
@@ -22,6 +21,7 @@ import type { TouchedFiles } from "./touched.js"
 import { createEngineCatalog } from "./engine-catalog.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached } from "./attached.js"
+import { createWorksiteSearch, type WorksiteSearch } from "./worksite-search.js"
 
 export type { Attached } from "./attached.js"
 
@@ -31,6 +31,7 @@ interface Channels {
   log: Logger
   ledger: Ledger
   report: (error: unknown, threadId?: ThreadId) => void
+  worksiteSearch: WorksiteSearch
 }
 
 /**
@@ -60,13 +61,7 @@ function installBridgeChannels(deps: Channels): void {
     if (typeof path === "string" && path !== "") shell.showItemInFolder(path)
   })
 
-  // 一个工作区一份索引，按 cwd 复用：同一目录开好几个会话不该各扫一遍
-  const worksites = new Map<string, Worksite>()
-  ipcMain.handle("omni:searchFiles", async (_e, req: { cwd: string; query: string }) => {
-    const site = worksites.get(req.cwd) ?? createWorksite(req.cwd)
-    worksites.set(req.cwd, site)
-    return (await site.search(req.query)).map((h) => h.path)
-  })
+  ipcMain.handle("omni:searchFiles", (_e, req: unknown) => deps.worksiteSearch.search(req))
 
   // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
   // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
@@ -186,10 +181,11 @@ function reporter(emit: (event: Event) => void): (error: unknown, threadId?: Thr
 
 /** 每条事件都先进名册再广播：预览工作区外的文件凭它放行（见 `touched.ts`）。 */
 function noting(touched: TouchedFiles, attachments: AttachmentFiles,
-  publish: (event: Event) => void): (event: Event) => void {
+  worksites: WorksiteSearch, publish: (event: Event) => void): (event: Event) => void {
   return (event) => {
     touched.note(event)
     attachments.note(event)
+    worksites.note(event)
     if (event.type === "thread.removed") void attachments.removeThread(event.threadId)
     publish(event)
   }
@@ -209,6 +205,7 @@ export function attachHost(
   // 自己再判，因为只有那一层知道每台远程设备停在哪儿。
   const attention = createAttention(windows, relay, ports?.notify)
   const awake = createAwake()
+  const worksiteSearch = createWorksiteSearch()
   // **迟绑定**：outlet 比 host 先建，而它要问 host「现在有几条在跑」。
   // 传函数而不是值，读到的才是当下那一份
   const holder: { host: Host | undefined } = { host: undefined }
@@ -216,7 +213,7 @@ export function attachHost(
 
   const { emit: publish, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
   // 挂在**唯一那个出口**上，不是各个驱动里——漏一处就是某类会话的文件点不开
-  const emit = noting(ports.touched, ports.attachmentFiles, publish)
+  const emit = noting(ports.touched, ports.attachmentFiles, worksiteSearch, publish)
 
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)
@@ -239,7 +236,7 @@ export function attachHost(
   const report = reporter(emit)
 
   holder.host = host
-  installBridgeChannels({ host, log, ledger, report })
+  installBridgeChannels({ host, log, ledger, report, worksiteSearch })
 
   const engines = createEngineCatalog(drivers, labels, log, {
     visible: ports?.engineVisible,
@@ -256,6 +253,7 @@ export function attachHost(
     awake,
     touched: ports.touched,
     attachmentFiles: ports.attachmentFiles,
+    worksiteSearch,
     journal,
     engines,
     refreshEngines,
@@ -361,6 +359,7 @@ export async function rebuild(
   for (const thread of threads) {
     attached.touched.noteHistory(thread.id, thread.events)
     attached.attachmentFiles.noteHistory(thread.id, thread.events)
+    attached.worksiteSearch.noteHistory(thread.events)
   }
   const pruned = await attached.attachmentFiles.pruneOnce(Date.now()).catch(() => 0)
   if (pruned > 0) attached.log.write("info", "attachments", `清理了 ${String(pruned)} 个过期孤立图片`)

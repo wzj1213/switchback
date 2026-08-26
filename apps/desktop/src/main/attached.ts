@@ -8,6 +8,7 @@ import type { Awake } from "./awake.js"
 import type { TouchedFiles } from "./touched.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Logger } from "./log.js"
+import type { WorksiteSearch } from "./worksite-search.js"
 
 /** 桌面壳与宿主接好之后，对窗口、远程入口和退出流程开放的窄表面。 */
 export interface Attached {
@@ -25,6 +26,7 @@ export interface Attached {
   touched: TouchedFiles
   /** omni 自己复制的图片；历史引用与会话删除都在事件出口登记。 */
   attachmentFiles: AttachmentFiles
+  worksiteSearch: WorksiteSearch
   log: Logger
   report: (error: unknown, threadId?: ThreadId) => void
 }
