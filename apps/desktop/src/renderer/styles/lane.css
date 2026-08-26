@@ -61,7 +61,7 @@
 /* 状态词推到右边；`已完成` 三个字在一屏里重复出现，压到最淡一档 */
 .lane__state {
   margin-left: auto;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-faint);
   flex: none;
 }
@@ -115,7 +115,7 @@
 
 /* 「最近一步在干什么」是扫一眼的东西，不和名字抢注意力；长了就截断 */
 .lane-node__detail {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -151,7 +151,7 @@
   background: none;
   color: var(--text-muted);
   font: inherit;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -215,7 +215,7 @@
   background: var(--bg-raised);
   color: var(--text-faint);
   font: inherit;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 

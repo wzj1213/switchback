@@ -164,7 +164,7 @@
 .eng-pref__note {
   max-width: 270px;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.5;
   text-align: right;
 }
@@ -287,7 +287,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

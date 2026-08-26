@@ -60,7 +60,7 @@
 .approval__reason {
   margin-top: 6px;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -224,14 +224,14 @@
 .error--soft {
   padding: 2px 0;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 
 /* 引擎原生纯文本提示：不套 Markdown，也不冒充模型回答。 */
 .engine-note {
   padding: 2px 0;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }

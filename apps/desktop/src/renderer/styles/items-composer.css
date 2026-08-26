@@ -485,8 +485,8 @@
   background: transparent;
   color: var(--text-faint);
   font: inherit;
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   white-space: nowrap;
   cursor: default;
   transition:

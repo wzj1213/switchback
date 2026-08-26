@@ -609,8 +609,8 @@
   background: var(--bg-raised);
   color: var(--text-muted);
   font: inherit;
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   cursor: default;
 }
 

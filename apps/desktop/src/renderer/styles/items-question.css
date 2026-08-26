@@ -77,8 +77,8 @@
 .question-field__body {
   margin: var(--sp-1) 0 var(--sp-2);
   color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -158,8 +158,8 @@
 
 .question-option__desc {
   color: var(--text-faint);
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
 }
 
 .question-option__preview {
@@ -172,8 +172,8 @@
   background: var(--bg-sunken);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -238,7 +238,7 @@
 .question-field__empty {
   margin: 0;
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 
 .question-card__actions {

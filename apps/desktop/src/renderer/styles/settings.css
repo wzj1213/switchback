@@ -165,7 +165,7 @@
 /* 一组整体要交代的一句话。也给正文里那些独立的说明句用 */
 .set__note {
   margin: 0 0 var(--sp-3);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--text-faint);
 }
@@ -213,7 +213,7 @@
 }
 
 .set__hint {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--text-faint);
   overflow-wrap: anywhere;
@@ -248,7 +248,7 @@
 .set__blank {
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--text-faint);
 }
 

@@ -19,8 +19,8 @@
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
   cursor: default;
 }
 
@@ -242,7 +242,7 @@
    截成一行之后每条都以「…」结尾，等于没写 */
 .pop__desc {
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -410,7 +410,7 @@
   gap: 5px;
   align-items: center;
   padding: 3px var(--sp-2);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 
 /* 环境卡片里可点的那几项。**看起来就该是能点的**——

@@ -53,8 +53,8 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   color: var(--text-faint);
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
 }
 
 .sidebar__list {
