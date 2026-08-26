@@ -2,27 +2,38 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { FilePreview } from "../../shared/file-preview.js"
-import {
-  canReferencePreview,
-  canRevealPreview,
-  FilePreviewView,
-  htmlTabDestination,
-  HtmlPreview,
-  resolvedHtmlMode,
-} from "./FilePreviewView.js"
+import { canReferencePreview, canRevealPreview, FilePreviewView } from "./FilePreviewView.js"
+import { htmlTabDestination, HtmlPreview, resolvedHtmlMode } from "./file-preview-content.js"
 
 describe("文件预览操作", () => {
-  const cases: readonly { name: string; file: FilePreview | undefined; path: string; expected: boolean }[] = [
+  const cases: readonly {
+    name: string
+    file: FilePreview | undefined
+    path: string
+    expected: boolean
+  }[] = [
     { name: "正在读取的有效路径", file: undefined, path: "src/app.ts", expected: true },
     {
       name: "存在但不能预览的二进制",
-      file: { kind: "unavailable", path: "logo.bin", name: "logo.bin", reason: "binary", message: "不能预览" },
+      file: {
+        kind: "unavailable",
+        path: "logo.bin",
+        name: "logo.bin",
+        reason: "binary",
+        message: "不能预览",
+      },
       path: "logo.bin",
       expected: true,
     },
     {
       name: "已经缺失的文件",
-      file: { kind: "unavailable", path: "gone.txt", name: "gone.txt", reason: "missing", message: "已经不存在" },
+      file: {
+        kind: "unavailable",
+        path: "gone.txt",
+        name: "gone.txt",
+        reason: "missing",
+        message: "已经不存在",
+      },
       path: "gone.txt",
       expected: false,
     },
@@ -37,33 +48,51 @@ describe("文件预览操作", () => {
   }
 
   it("后台读取不阻塞路径引用，只有会话只读或确认缺失才挡", () => {
-    const html = renderToStaticMarkup(createElement(FilePreviewView, {
-      target: { threadId: "thread", cwd: "/work", path: "src/app.ts" },
-      revision: undefined, stamp: "idle:0", onBack: () => undefined,
-      onReference: () => undefined, onReveal: () => undefined, onCopy: () => undefined,
-    }))
+    const html = renderToStaticMarkup(
+      createElement(FilePreviewView, {
+        target: { threadId: "thread", cwd: "/work", path: "src/app.ts" },
+        revision: undefined,
+        stamp: "idle:0",
+        onBack: () => undefined,
+        onReference: () => undefined,
+        onReveal: () => undefined,
+        onCopy: () => undefined,
+      }),
+    )
     const button = html.match(/<button[^>]+aria-label="引用到输入框"[^>]*>/)?.[0]
     expect(button).toBeDefined()
     expect(button).not.toContain("disabled")
   })
 
   it("会话只读时把恢复办法直接写在禁用操作上", () => {
-    const html = renderToStaticMarkup(createElement(FilePreviewView, {
-      target: { threadId: "thread", cwd: "/work", path: "src/app.ts" },
-      revision: undefined, stamp: "idle:0", onBack: () => undefined,
-      onReference: () => undefined, referenceDisabled: true,
-      onReveal: () => undefined, onCopy: () => undefined,
-    }))
+    const html = renderToStaticMarkup(
+      createElement(FilePreviewView, {
+        target: { threadId: "thread", cwd: "/work", path: "src/app.ts" },
+        revision: undefined,
+        stamp: "idle:0",
+        onBack: () => undefined,
+        onReference: () => undefined,
+        referenceDisabled: true,
+        onReveal: () => undefined,
+        onCopy: () => undefined,
+      }),
+    )
     expect(html).toContain("继续后引用")
     expect(html).toContain('aria-label="继续会话后引用到输入框"')
   })
 
   it("点开同名文件后仍把目录归属画在标题里，越界路径明确标记", () => {
-    const render = (path: string, cwd = "/work/omni"): string => renderToStaticMarkup(createElement(FilePreviewView, {
-      target: { threadId: "thread", cwd, path },
-      revision: undefined, stamp: "idle:0", onBack: () => undefined,
-      onReveal: () => undefined, onCopy: () => undefined,
-    }))
+    const render = (path: string, cwd = "/work/omni"): string =>
+      renderToStaticMarkup(
+        createElement(FilePreviewView, {
+          target: { threadId: "thread", cwd, path },
+          revision: undefined,
+          stamp: "idle:0",
+          onBack: () => undefined,
+          onReveal: () => undefined,
+          onCopy: () => undefined,
+        }),
+      )
     const inside = render("/work/omni/apps/desktop/src/index.ts")
     const external = render("/Users/me/.codex/skills/review/SKILL.md")
     const windows = render("c:\\Work\\Omni\\src\\App.ts", "C:\\work\\omni")
@@ -110,15 +139,33 @@ describe("HTML 预览模式", () => {
 
   it("标签只保留一个 Tab 停点，并与正文面板建立可访问关联", () => {
     const file = {
-      kind: "html", path: "report.html", name: "report.html", text: "<h1>报告</h1>",
-      language: "html", truncated: false,
+      kind: "html",
+      path: "report.html",
+      name: "report.html",
+      text: "<h1>报告</h1>",
+      language: "html",
+      truncated: false,
     } as const
     const html = renderToStaticMarkup(createElement(HtmlPreview, { file, onCopy: () => undefined }))
     expect(html.match(/role="tab"/g)).toHaveLength(2)
     expect(html.match(/tabindex="0"/g)).toHaveLength(1)
     expect(html).toContain('aria-selected="true" tabindex="0"')
     expect(html).toContain('role="tabpanel"')
-    expect(html).toContain('aria-controls=')
-    expect(html).toContain('aria-labelledby=')
+    expect(html).toContain("aria-controls=")
+    expect(html).toContain("aria-labelledby=")
+  })
+
+  it("源码滚动区进入键盘顺序并说明横向操作", () => {
+    const file = {
+      kind: "html",
+      path: "large.html",
+      name: "large.html",
+      text: "<p>截断内容</p>",
+      language: "html",
+      truncated: true,
+    } as const
+    const html = renderToStaticMarkup(createElement(HtmlPreview, { file, onCopy: () => undefined }))
+    expect(html).toContain('class="file-source" tabindex="0"')
+    expect(html).toContain('aria-label="可横向滚动的文件源码"')
   })
 })

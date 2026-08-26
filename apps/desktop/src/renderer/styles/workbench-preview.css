@@ -17,6 +17,11 @@
   background: var(--bg-code);
 }
 
+.file-source:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .file-source pre {
   min-width: max-content;
   margin: 0;
@@ -32,6 +37,7 @@
   position: sticky;
   z-index: 1;
   top: var(--sp-2);
+  right: var(--sp-2);
   float: right;
   display: inline-flex;
   align-items: center;

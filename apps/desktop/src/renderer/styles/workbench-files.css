@@ -6,6 +6,11 @@
   flex-direction: column;
 }
 
+/* 索引保留 React 实例与滚动现场，但详情打开时必须真正退出布局。 */
+.files-index[hidden] {
+  display: none;
+}
+
 .files-search {
   flex: none;
   padding: var(--sp-3);

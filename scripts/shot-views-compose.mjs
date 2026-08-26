@@ -157,7 +157,36 @@ export const COMPOSE_VIEWS = [
     ],
     ready: `html[data-file-refresh]`,
     assert: `document.documentElement.dataset.fileRefresh === 'true'
-      && document.querySelector('.file-preview__path')?.textContent.includes('…/src/renderer') === true`,
+      && document.querySelector('.file-preview__path')?.textContent.includes('…/src/renderer') === true
+      && (() => {
+        const source = document.querySelector('.file-source')
+        const copy = source?.querySelector('.file-preview__copy')
+        if (source === null || copy === null || source.scrollWidth <= source.clientWidth) return false
+        source.focus()
+        const sourceBox = source.getBoundingClientRect()
+        const copyBox = copy.getBoundingClientRect()
+        const copyTop = document.elementsFromPoint(
+          copyBox.left + copyBox.width / 2, copyBox.top + copyBox.height / 2,
+        ).includes(copy)
+        const stack = document.elementsFromPoint(
+          copyBox.left + copyBox.width / 2, copyBox.top + copyBox.height / 2,
+        ).map(node => ({ tag: node.tagName, className: node.className }))
+        const indexHidden = getComputedStyle(document.querySelector('.files-index')).display === 'none'
+        const result = {
+          focusable: source.tabIndex === 0 && document.activeElement === source,
+          labelled: source.getAttribute('aria-label') === '可横向滚动的文件源码',
+          horizontal: copyBox.left >= sourceBox.left && copyBox.right <= sourceBox.right,
+          vertical: copyBox.top >= sourceBox.top && copyBox.bottom <= sourceBox.bottom,
+          inViewport: sourceBox.right <= innerWidth && copyBox.right <= innerWidth,
+          indexHidden,
+          copyTop, source: { left: sourceBox.left, top: sourceBox.top, right: sourceBox.right,
+            bottom: sourceBox.bottom, scrollLeft: source.scrollLeft, scrollWidth: source.scrollWidth },
+          copy: { left: copyBox.left, top: copyBox.top, right: copyBox.right, bottom: copyBox.bottom }, stack,
+        }
+        if (result.focusable && result.labelled && result.horizontal && result.vertical
+          && result.inViewport && result.indexHidden && result.copyTop) return true
+        throw new Error('文件源码焦点与复制按钮诊断：' + JSON.stringify(result))
+      })()`,
   },
   {
     name: "16-工作台文件加入输入框",
