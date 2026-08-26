@@ -9,21 +9,29 @@ export function useComposerFiles(options: {
   editable: boolean
   cwd: string
   setText: React.Dispatch<React.SetStateAction<string>>
+  focus: () => void
 }): {
   dropzone: ReturnType<typeof useAttachmentDropzone>
   paste: (items: DataTransferItemList | null) => Promise<void>
+  pick: () => Promise<void>
 } {
   const addReferences = useCallback((paths: readonly string[]) => {
     if (paths.length > 0) options.setText((text) => appendFileReferences(text, paths))
   }, [options.setText])
   const drop = useCallback((files: FileList | null) => {
     addReferences(options.attach.drop(files, options.cwd))
-  }, [addReferences, options.attach.drop, options.cwd])
+    if ((files?.length ?? 0) > 0) options.focus()
+  }, [addReferences, options.attach.drop, options.cwd, options.focus])
   const paste = useCallback(async (items: DataTransferItemList | null) => {
     addReferences(await options.attach.paste(items, options.cwd))
   }, [addReferences, options.attach.paste, options.cwd])
+  const pick = useCallback(async () => {
+    await options.attach.pick()
+    options.focus()
+  }, [options.attach.pick, options.focus])
   return {
     dropzone: useAttachmentDropzone(options.canAttach, options.editable, drop),
     paste,
+    pick,
   }
 }

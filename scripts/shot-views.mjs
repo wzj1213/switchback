@@ -63,6 +63,7 @@ export const VIEWS = [
       open: [
         `document.querySelector('.sidebar__new')?.click()`,
         `if (document.querySelector('.blank__title') === null) throw new Error('新会话没有就绪')`,
+        `if (!document.activeElement?.classList.contains('composer__input')) throw new Error('新会话没有聚焦输入框'); document.querySelector('.sidebar__filter')?.focus()`,
       ],
       dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
       ready: ".composer__attachwarn",
@@ -70,7 +71,8 @@ export const VIEWS = [
           .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
         && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
         && document.querySelector('.attach .thumb') === null
-        && document.querySelector('.send')?.disabled === false`,
+        && document.querySelector('.send')?.disabled === false
+        && document.activeElement?.classList.contains('composer__input') === true`,
       after: `(() => {
         const input = document.querySelector('.composer__input')
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
@@ -216,6 +218,7 @@ export const VIEWS = [
       ready: ".blank__title",
       // 同一 cwd 也不能把上一条任务的文件详情带进来；文件索引可以继续开着。
       absent: ".file-preview",
+      assert: `document.activeElement?.classList.contains('composer__input') === true`,
     },
     {
       name: "14-@文件引用",

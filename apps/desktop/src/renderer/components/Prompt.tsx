@@ -1,4 +1,3 @@
-import { useRef } from "react"
 import type { SlashCommand } from "@omni/protocol"
 import { MentionList } from "./MentionList.js"
 import { useMentions } from "../useMentions.js"
@@ -18,6 +17,7 @@ import { PromptTextarea, promptPlaceholder } from "./prompt-textarea.js"
  * `/` 只在整段文本的最开头才算命令。互斥是天然的，不用额外仲裁。
  */
 export function Prompt({
+  input,
   value,
   detached,
   starting = false,
@@ -36,6 +36,7 @@ export function Prompt({
   asideMode = false,
   onAsideExit,
 }: {
+  input: React.RefObject<HTMLTextAreaElement | null>
   value: string
   detached: boolean
   /** 引擎还在起：发不出去，但**不是**因为「正在跑」。 */
@@ -69,7 +70,6 @@ export function Prompt({
   asideMode?: boolean
   onAsideExit?: () => void
 }): React.JSX.Element {
-  const input = useRef<HTMLTextAreaElement>(null)
   const mentions = useMentions(cwd, searchFiles)
   const slash = useSlash(commands)
 

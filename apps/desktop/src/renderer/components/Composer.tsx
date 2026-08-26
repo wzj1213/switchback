@@ -13,6 +13,7 @@ import { AttachmentDrop } from "./AttachmentDrop.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import { useComposerMemory, useRememberComposer } from "../use-composer-memory.js"
 import { useComposerFiles } from "../use-composer-files.js"
+import { useComposerFocus } from "../use-composer-focus.js"
 
 /**
  * 信任档。
@@ -52,6 +53,8 @@ interface Props {
   onAsk?: (text: string) => void
   /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
   detached?: boolean
+  /** 新建的临时会话挂载后直接准备输入；切换旧会话不抢侧栏焦点。 */
+  focusOnMount?: boolean
   /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
   busy?: boolean
   /** 引擎还在起。**和 `busy` 不是一回事**：那时什么都没在跑，而且发不出去。 */
@@ -144,9 +147,8 @@ function VoidRing(): React.JSX.Element {
 }
 
 export function Composer(props: Props): React.JSX.Element {
-  const detached = props.detached ?? false
-  const busy = props.busy ?? false
-  const starting = props.starting ?? false
+  const { detached = false, busy = false, starting = false } = props
+  const focus = useComposerFocus({ detached, initial: props.focusOnMount === true, prefillAt: props.prefill?.at ?? 0 })
   const { initial, attach, aside } = useComposerMemory({
     drafts: props.drafts, threadId: props.threadId, engine: props.engine, canAttach: props.canAttach,
     canAside: props.canAside === true && !detached && !starting, prefill: props.prefill, onAsk: props.onAsk,
@@ -163,7 +165,7 @@ export function Composer(props: Props): React.JSX.Element {
     onSend: aside.wrapSend(props.onSend),
   })
   const files = useComposerFiles({ attach, canAttach: props.canAttach, editable: !detached,
-    cwd: props.cwd, setText: draft.setText })
+    cwd: props.cwd, setText: draft.setText, focus: focus.focus })
   useRememberComposer({
     drafts: props.drafts, threadId: props.threadId, engine: props.engine,
     text: draft.text, attachments: attach.paths, command: draft.command, aside: aside.on,
@@ -185,6 +187,7 @@ export function Composer(props: Props): React.JSX.Element {
         <Attachments paths={attach.paths} onRemove={attach.remove} />
         <AttachmentWarning notice={attachWarning === undefined ? attach.notice : { text: attachWarning, tone: "warn" }} />
         <Prompt
+          input={focus.input}
           value={draft.text}
           detached={detached}
           starting={starting}
@@ -234,7 +237,7 @@ export function Composer(props: Props): React.JSX.Element {
           aside={aside.on ? <AsideChip onExit={aside.exit} /> : undefined}
           asideMode={aside.on}
           onModelChange={props.onModelChange}
-          onAttach={() => { void attach.pick() }}
+          onAttach={() => { void files.pick() }}
           onResume={props.onResume}
           onInterrupt={props.onInterrupt}
           onSend={draft.submit}
