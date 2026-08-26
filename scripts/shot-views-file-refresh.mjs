@@ -4,21 +4,35 @@ export const FILE_REFRESH_VIEWS = [
     createFiles: ["apps/desktop/src/renderer/attachment-manual-refresh-probe.ts"],
     open: `(() => {
       window.__omniManualRow = document.activeElement
+      const beforeTop = window.__omniManualRow?.getBoundingClientRect().top
       const refresh = document.querySelector('[aria-label="立即刷新搜索结果"]')
       refresh?.focus()
       refresh?.click()
       window.__omniManualRefresh = refresh
+      return new Promise(resolve => requestAnimationFrame(() => {
+        window.__omniManualLayout = {
+          busy: refresh?.getAttribute('aria-busy'),
+          sameTop: window.__omniManualRow?.getBoundingClientRect().top === beforeTop,
+          announced: document.querySelector('[role="status"]')?.textContent
+            .includes('正在更新搜索结果') === true,
+        }
+        resolve(true)
+      }))
     })()`,
     ready: '[data-file-path="apps/desktop/src/renderer/attachment-manual-refresh-probe.ts"]',
     assert: `document.querySelector('.files-search input')?.value === 'attachment'
       && document.querySelector('.files-index') === window.__omniFileIndex
       && window.__omniManualRow?.isConnected === true
       && document.activeElement === window.__omniManualRefresh
-      && window.__omniManualRefresh?.getAttribute('aria-busy') === 'false'`,
+      && window.__omniManualRefresh?.getAttribute('aria-busy') === 'false'
+      && window.__omniManualLayout?.busy === 'true'
+      && window.__omniManualLayout?.sameTop === true
+      && window.__omniManualLayout?.announced === true`,
     after: `(() => {
       window.__omniManualRow?.focus()
       delete window.__omniManualRow
       delete window.__omniManualRefresh
+      delete window.__omniManualLayout
     })()`,
   },
   {

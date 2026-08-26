@@ -15,7 +15,7 @@ interface FileSearchView extends Omit<FileSearchState, "key"> {
 /** 搜索的三种非结果态；失败与零命中必须是两件不同的事。 */
 export function FileSearchStatus({ state }: { state: FileSearchView }): React.JSX.Element | null {
   if (state.loading && state.paths.length > 0) {
-    return <p className="files-search__refresh" role="status">正在更新…</p>
+    return <span className="sr-only" role="status">正在更新搜索结果…</span>
   }
   if (state.loading) return <p className="workbench__empty">正在搜索…</p>
   if (state.failed) {

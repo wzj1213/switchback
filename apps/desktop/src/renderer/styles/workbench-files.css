@@ -67,11 +67,14 @@
   padding: 0 var(--sp-2) var(--sp-4);
 }
 
-.files-search__refresh {
-  margin: 0;
-  padding: var(--sp-2);
-  color: var(--text-faint);
-  font-size: var(--text-xs);
+.files-search__field .workbench__icon[aria-busy="true"] svg {
+  animation: row-spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .files-search__field .workbench__icon[aria-busy="true"] svg {
+    animation: none;
+  }
 }
 
 .files-search__failure {

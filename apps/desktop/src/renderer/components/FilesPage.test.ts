@@ -103,4 +103,14 @@ describe("文件清单", () => {
     expect(html).toContain(">重试</button>")
     expect(html).not.toContain("没有找到文件")
   })
+
+  it("后台刷新只播报状态，不在结果流里插入可见行", () => {
+    const html = renderToStaticMarkup(createElement(FileSearchStatus, {
+      state: { loading: true, paths: ["src/app.ts"], failed: false, retry: () => undefined },
+    }))
+    expect(html).toContain('class="sr-only"')
+    expect(html).toContain('role="status"')
+    expect(html).toContain("正在更新搜索结果…")
+    expect(html).not.toContain("files-search__refresh")
+  })
 })
