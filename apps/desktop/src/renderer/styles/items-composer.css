@@ -31,6 +31,35 @@
   border-color: var(--accent);
 }
 
+/* 拖着文件进来时覆盖整个输入卡：松手前就说清收不收，且不让 Chromium 打开文件。 */
+.composer-drop {
+  position: absolute;
+  z-index: 45;
+  inset: -2px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-raised) 92%, var(--accent));
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.composer-drop--blocked {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--bg-raised) 92%, var(--warn));
+  color: var(--warn);
+}
+
+.composer-drop span {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
 /* 焦点进出都走同一条过渡，深空那圈才不会「淡入、硬切出」 */
 .composer__inner {
   transition:

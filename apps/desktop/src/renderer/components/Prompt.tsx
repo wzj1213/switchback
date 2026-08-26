@@ -51,8 +51,8 @@ export function Prompt({
   steering?: boolean
   cwd: string
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
-  /** 贴进来的东西里有图就收下。返回 true 表示收了，调用方据此拦掉默认粘贴。 */
-  onPaste: (items: DataTransferItemList | null) => Promise<boolean>
+  /** 贴进来的文件交给附件入口；默认粘贴已在 textarea 同步拦住。 */
+  onPaste: (items: DataTransferItemList | null) => Promise<void>
   /** 这个会话能用的斜杠命令：引擎报的 ＋ omni 自己的。 */
   commands: readonly SlashCommand[]
   /** 已选中的引擎命令；输入框里的 value 此时只保存参数。 */

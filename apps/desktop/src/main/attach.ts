@@ -1,7 +1,27 @@
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { app, ipcMain, nativeImage } from "electron"
-import { imageExtension, MAX_IMAGE_BYTES } from "../shared/attachments.js"
+import { app, dialog, ipcMain, nativeImage } from "electron"
+import {
+  canAttachImagePath,
+  imageExtension,
+  MAX_IMAGE_BYTES,
+  type PickedImages,
+} from "../shared/attachments.js"
+
+async function pickImages(): Promise<PickedImages> {
+  const result = await dialog.showOpenDialog({
+    title: "添加图片",
+    properties: ["openFile", "multiSelections"],
+    filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
+  })
+  if (result.canceled) return { paths: [], rejected: 0, canceled: true }
+  const accepted = await Promise.all(result.filePaths.map(async (path) => {
+    const info = await stat(path).catch(() => undefined)
+    return info?.isFile() === true && canAttachImagePath(path, info.size)
+  }))
+  const paths = result.filePaths.filter((_path, index) => accepted[index] === true)
+  return { paths, rejected: result.filePaths.length - paths.length, canceled: false }
+}
 
 /**
  * 把剪贴板里的图片落到盘上，返回路径。
@@ -19,6 +39,7 @@ import { imageExtension, MAX_IMAGE_BYTES } from "../shared/attachments.js"
  * 而会话记录里的路径会指向一个不存在的文件——那比没有更糟。
  */
 export function installAttachChannel(): void {
+  ipcMain.handle("omni:pickImages", () => pickImages())
   ipcMain.handle("omni:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
     const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined

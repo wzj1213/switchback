@@ -52,6 +52,32 @@
   background: var(--bg-active);
 }
 
+/* 图片选择器与引擎/模型选择同属输入参数，保持安静；能力缺席时整个按钮缺席。 */
+.attach-pick {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.attach-pick:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.attach-pick:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
 /* 额度提示。**只在快用完时出现**，所以不需要"平时不打扰"的低调处理——
    它出现本身就是信息 */
 .limit {

@@ -1,6 +1,7 @@
 import type { SlashCommand } from "@omni/protocol"
 import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
+import { hasFileItems } from "../attachment-feedback.js"
 
 export function promptPlaceholder(state: {
   command: SlashCommand | undefined
@@ -30,7 +31,7 @@ interface Props {
   mentions: ReturnType<typeof useMentions>
   slash: ReturnType<typeof useSlash>
   onChange: (text: string) => void
-  onPaste: (items: DataTransferItemList | null) => Promise<boolean>
+  onPaste: (items: DataTransferItemList | null) => Promise<void>
   clearCommand: () => void
   choose: (path: string) => void
   pickCommand: (command: SlashCommand) => void
@@ -58,9 +59,11 @@ export function PromptTextarea(props: Props): React.JSX.Element {
           props.slash.refresh(event.target.value, event.target.selectionStart)
       }}
       onPaste={(event) => {
-        void props.onPaste(event.clipboardData.items).then((took) => {
-          if (took) event.preventDefault()
-        })
+        const items = event.clipboardData.items
+        if (!hasFileItems(items)) return
+        // Finder 会同时给图片和路径文本。必须在异步落盘前拦住，`.then()` 里已经太迟。
+        event.preventDefault()
+        void props.onPaste(items)
       }}
       onBlur={() => {
         props.mentions.close()

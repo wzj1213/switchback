@@ -32,26 +32,6 @@ export function stateOf(o: { detached: boolean; starting: boolean; busy: boolean
   }
 }
 
-/**
- * 拖进来一张图。**引擎不支持附件时连 `preventDefault` 都不做**——
- * 那样浏览器自己接管这一放（打开那个文件），而不是无声无息地什么都没发生。
- */
-export function dropzone(
-  can: boolean,
-  drop: (files: FileList | null) => void,
-): Pick<React.HTMLAttributes<HTMLDivElement>, "onDragOver" | "onDrop"> {
-  return {
-    onDragOver: (event) => {
-      if (can) event.preventDefault()
-    },
-    onDrop: (event) => {
-      if (!can) return
-      event.preventDefault()
-      drop(event.dataTransfer.files)
-    },
-  }
-}
-
 /** 目录名当项目名。整条绝对路径在芯片里放不下，而尾段正是人叫它的那个名字。 */
 export function projectOf(cwd: string): string {
   return cwd.split("/").filter(Boolean).pop() ?? cwd

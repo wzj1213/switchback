@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react"
-import { canAttachImage } from "../shared/attachments.js"
+import { useCallback, useEffect, useState } from "react"
+import { droppedImages, pasteImages, pickedImages, type AttachmentResult } from "./attachment-actions.js"
 
 /**
  * 输入区的附件：贴进来、拖进来、去掉。
@@ -16,10 +16,14 @@ import { canAttachImage } from "../shared/attachments.js"
  */
 export interface Attachments {
   paths: readonly string[]
-  /** 处理一次粘贴。返回 true 表示确实收了图（调用方据此 `preventDefault`）。 */
-  paste: (items: DataTransferItemList | null) => Promise<boolean>
+  /** 最近一次没有收下的原因；成功后自动消失。 */
+  notice?: string
+  /** 处理一次粘贴。默认粘贴必须由调用方在异步落盘前同步拦住。 */
+  paste: (items: DataTransferItemList | null) => Promise<void>
   /** 处理一次拖放。 */
   drop: (files: FileList | null) => void
+  /** 打开系统图片选择器。 */
+  pick: () => Promise<void>
   /** 用一组已经落盘的路径替换当前附件（取回队列 / 改一改再发）。 */
   replace: (paths: readonly string[]) => void
   remove: (path: string) => void
@@ -28,58 +32,51 @@ export interface Attachments {
 
 export function useAttachments(enabled: boolean): Attachments {
   const [paths, setPaths] = useState<readonly string[]>([])
+  const [notice, setNotice] = useState<string>()
   const bridge = typeof window === "undefined" ? undefined : window.omni
 
-  const add = useCallback((path: string | undefined) => {
-    if (path === undefined) return
-    // 同一张图贴两次没有意义，而且会让模型多读一遍
-    setPaths((prev) => (prev.includes(path) ? prev : [...prev, path]))
+  const accept = useCallback((result: AttachmentResult) => {
+    if (result.paths.length > 0) {
+      // 同一张图贴两次没有意义，而且会让模型多读一遍
+      setPaths((prev) => [...new Set([...prev, ...result.paths])])
+    }
+    setNotice(result.notice)
   }, [])
 
-  const paste = useCallback(
-    async (items: DataTransferItemList | null): Promise<boolean> => {
-      if (!enabled || items === null || bridge === undefined) return false
-      let took = false
-      for (const item of Array.from(items)) {
-        if (item.kind !== "file") continue
-        const file = item.getAsFile()
-        if (file === null || !canAttachImage(file)) continue
-        took = true
-        add(await bridge.stashImage(file.type, await file.arrayBuffer()))
-      }
-      return took
-    },
-    [enabled, bridge, add],
-  )
+  useEffect(() => {
+    if (notice === undefined) return undefined
+    const timer = window.setTimeout(() => { setNotice(undefined) }, 5000)
+    return () => { window.clearTimeout(timer) }
+  }, [notice])
 
-  const drop = useCallback(
-    (files: FileList | null) => {
-      if (!enabled || files === null || bridge === undefined) return
-      for (const file of Array.from(files)) {
-        // 粘贴与拖拽必须守同一条格式和体积边界；否则超大原图换个入口就能混进来。
-        if (!canAttachImage(file)) continue
-        // 拖进来的文件在盘上本来就有路径，不用再落一次盘。
-        // **路径要问主进程要**：`File.path` 那个增补 Electron 32 起就没了
-        //（见 preload 的 `pathForFile`），照旧读它的话这条路整个是哑的
-        const path = bridge.pathForFile(file)
-        if (path !== "") add(path)
-      }
-    },
-    [enabled, add, bridge],
-  )
+  const paste = useCallback(async (items: DataTransferItemList | null): Promise<void> => {
+    accept(await pasteImages(items, enabled, bridge))
+  }, [accept, bridge, enabled])
+
+  const drop = useCallback((files: FileList | null) => {
+    accept(droppedImages(files, enabled, bridge))
+  }, [accept, bridge, enabled])
+
+  const pick = useCallback(async () => {
+    accept(await pickedImages(bridge))
+  }, [accept, bridge])
 
   return {
     paths,
+    notice,
     paste,
     drop,
+    pick,
     replace: useCallback((next: readonly string[]) => {
       setPaths([...new Set(next)])
+      setNotice(undefined)
     }, []),
     remove: useCallback((path: string) => {
       setPaths((prev) => prev.filter((p) => p !== path))
     }, []),
     clear: useCallback(() => {
       setPaths([])
+      setNotice(undefined)
     }, []),
   }
 }

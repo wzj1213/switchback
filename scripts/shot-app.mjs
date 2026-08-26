@@ -131,7 +131,26 @@ async function waitFor(cdp, expression, label) {
 const VIEWS = [
   { name: "01-转录区", open: null, ready: ".md" },
   {
-    name: "02-后台活动工作台",
+    name: "02-拖拽拒绝提示",
+    open: `(() => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File(["const nope = true"], "code.ts", { type: "text/typescript" }))
+      window.__omniShotTransfer = transfer
+      document.querySelector('.composer__inner')?.dispatchEvent(
+        new DragEvent('dragenter', { bubbles: true, dataTransfer: transfer }),
+      )
+    })()`,
+    ready: ".composer-drop--blocked",
+    after: `(() => {
+      const target = document.querySelector('.composer__inner')
+      target?.dispatchEvent(new DragEvent('dragleave', {
+        bubbles: true, dataTransfer: window.__omniShotTransfer,
+      }))
+      delete window.__omniShotTransfer
+    })()`,
+  },
+  {
+    name: "03-后台活动工作台",
     open: [
       `document.querySelector('[title="后台活动"]')?.click()`,
       `document.querySelector('.activity-row')?.click()`,
@@ -139,17 +158,17 @@ const VIEWS = [
     ready: ".activity-detail",
   },
   {
-    name: "03-文件清单",
+    name: "04-文件清单",
     open: `document.querySelector('[title="文件预览"]')?.click()`,
     ready: ".file-row",
   },
   {
-    name: "04-工作区外文件预览",
+    name: "05-工作区外文件预览",
     open: `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('会话碰过的工作区外文件.md'))?.click()`,
     ready: ".file-source",
   },
   {
-    name: "05-HTML预览",
+    name: "06-HTML预览",
     open: [
       `document.querySelector('.workbench__back')?.click()`,
       `[...document.querySelectorAll('.file-row')].find(x => x.textContent.includes('旁路侧栏-原型.html'))?.click()`,
@@ -157,12 +176,12 @@ const VIEWS = [
     ready: ".html-preview__frame",
   },
   {
-    name: "06-新会话",
+    name: "07-新会话",
     open: `document.querySelector('.sidebar__new')?.click()`,
     ready: ".blank__title",
   },
   {
-    name: "07-推理强度",
+    name: "08-推理强度",
     before: ".effort .trigger:not(:disabled)",
     open: [
       `document.querySelector('.workbench__hide')?.click()`,
@@ -172,7 +191,7 @@ const VIEWS = [
     dragEffort: true,
   },
   {
-    name: "08-设置",
+    name: "09-设置",
     // 侧栏底部那一行**有账号时点开的是菜单**，没账号时才直接进设置
     //（见 `SidebarFoot.tsx`：「一行只做一件事」）。所以这里走两步，
     // 而不是假设它一点就开——本机跑 smoke 时没账号，出图时有，两边不一样
@@ -203,6 +222,10 @@ async function shoot(cdp, view) {
   })
   await writeFile(join(OUT, `${view.name}.png`), Buffer.from(shot.data, "base64"))
   console.log(`  ✓ ${view.name}.png`)
+  if (view.after !== undefined) {
+    await value(cdp, `(() => { ${view.after}; return true })()`)
+    await pause(120)
+  }
 }
 
 /**

@@ -13,6 +13,7 @@ import type { ContentHit } from "../shared/search.js"
 import type { EnvConfig } from "../shared/hooks.js"
 import type { ActivityDigest } from "../shared/activity.js"
 import type { FilePreview } from "../shared/file-preview.js"
+import type { PickedImages } from "../shared/attachments.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -148,6 +149,10 @@ const api = {
    */
   async stashImage(mime: string, bytes: ArrayBuffer): Promise<string | undefined> {
     return (await ipcRenderer.invoke("omni:stashImage", { mime, bytes })) as string | undefined
+  },
+  /** 用系统选择器挑图片；主进程会按格式、空文件与 12 MB 上限再核一次。 */
+  async pickImages(): Promise<PickedImages> {
+    return (await ipcRenderer.invoke("omni:pickImages")) as PickedImages
   },
   /**
    * 拖进来的这个 `File` 在盘上的真实路径。

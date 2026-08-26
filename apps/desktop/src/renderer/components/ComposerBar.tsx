@@ -7,6 +7,7 @@ import { Select } from "./Select.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
 import { TRUSTS, labelOf } from "./Composer.js"
 import type { TrustHint } from "../trustHint.js"
+import { AttachmentPick } from "./attachment-pick.js"
 
 /**
  * 输入框下面那一排：引擎 / 信任档 / 模型 ＋ 右下角那颗键。
@@ -141,10 +142,12 @@ export function Bar({
   model,
   effort,
   usage,
+  canAttach,
   pending,
   onEngineChange,
   onTrustChange,
   onModelChange,
+  onAttach,
   onResume,
   onInterrupt,
   onSend,
@@ -166,6 +169,8 @@ export function Bar({
   asideMode?: boolean
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
+  /** 当前引擎与模型都明确报了图片能力时才给入口。 */
+  canAttach: boolean
   models: readonly ModelOption[]
   model?: string
   effort?: string
@@ -175,6 +180,7 @@ export function Bar({
   onEngineChange: (next: EngineId) => void
   onTrustChange: (next: Trust) => void
   onModelChange: (model: string, effort?: string) => void
+  onAttach: () => void
   onResume?: () => void
   onInterrupt?: () => void
   onSend: () => void
@@ -196,6 +202,7 @@ export function Bar({
           pending={pending}
           onChange={onModelChange}
         />
+        <AttachmentPick visible={canAttach} disabled={detached} onPick={onAttach} />
         {aside}
         <span style={{ flex: 1 }} />
         {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。
@@ -219,13 +226,7 @@ export function Bar({
         />
       </div>
       {/* **自己一行**：挤在两个选择器中间时它把模型选择器顶到一边，而且被截断 */}
-      <Hint
-        hint={hint}
-        disabled={detached || busy || starting}
-        onReapply={() => {
-          onTrustChange(trust)
-        }}
-      />
+      <Hint hint={hint} disabled={detached || busy || starting} onReapply={() => { onTrustChange(trust) }} />
     </div>
   )
 }

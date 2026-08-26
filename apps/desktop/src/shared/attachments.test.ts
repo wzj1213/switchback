@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { canAttachImage, imageExtension, MAX_IMAGE_BYTES } from "./attachments.js"
+import { canAttachImage, canAttachImagePath, imageExtension, MAX_IMAGE_BYTES } from "./attachments.js"
 
 describe("桌面图片附件边界", () => {
   it.each([
@@ -17,5 +17,13 @@ describe("桌面图片附件边界", () => {
     expect(canAttachImage({ type: "image/png", size: 0 })).toBe(false)
     expect(canAttachImage({ type: "image/png", size: MAX_IMAGE_BYTES + 1 })).toBe(false)
     expect(canAttachImage({ type: "image/png", size: MAX_IMAGE_BYTES })).toBe(true)
+  })
+
+  it("系统选择器回来的路径按同一组格式与大小核对", () => {
+    expect(canAttachImagePath("/tmp/a.JPEG", 10)).toBe(true)
+    expect(canAttachImagePath("/tmp/a.webp", MAX_IMAGE_BYTES)).toBe(true)
+    expect(canAttachImagePath("/tmp/a.svg", 10)).toBe(false)
+    expect(canAttachImagePath("/tmp/a.png", 0)).toBe(false)
+    expect(canAttachImagePath("/tmp/a.png", MAX_IMAGE_BYTES + 1)).toBe(false)
   })
 })

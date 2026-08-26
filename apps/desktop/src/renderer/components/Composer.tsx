@@ -8,9 +8,11 @@ import { useAttachments } from "../useAttachments.js"
 import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
-import { dropzone, nothingToSend, projectOf, stateOf } from "./composer-state.js"
+import { nothingToSend, projectOf, stateOf } from "./composer-state.js"
 import { useAsideMode } from "../use-aside-mode.js"
 import { AsideChip } from "./aside-chip.js"
+import { useAttachmentDropzone } from "../use-attachment-dropzone.js"
+import { AttachmentDrop } from "./AttachmentDrop.js"
 
 /**
  * 信任档。
@@ -154,6 +156,7 @@ export function Composer(props: Props): React.JSX.Element {
   const starting = props.starting ?? false
   // 引擎不支持附件就整套不出现——一个贴上去不会被送达的图比不能贴更糟
   const attach = useAttachments(props.canAttach)
+  const dropzone = useAttachmentDropzone(props.canAttach, attach.drop)
   const attachWarning = attachmentWarning(attach.paths.length, props.canAttach, props.pending)
   const attachmentBlocked = attachWarning !== undefined
   // **跑着的时候照样能打、能发**——发出去是排队，这一轮停了就接上
@@ -174,7 +177,7 @@ export function Composer(props: Props): React.JSX.Element {
     <div className="composer">
       <div
         className="composer__inner"
-        {...dropzone(props.canAttach === true, attach.drop)}
+        {...dropzone.bind}
       >
         {/*
          * 贵档那圈深空描边。**开关不在这里，在 CSS 里**（`:has(.effort--costly)`）：
@@ -184,6 +187,7 @@ export function Composer(props: Props): React.JSX.Element {
          * 而且那一份必然慢一整个拖动：它只认已经落档的 `props.effort`。
          */}
         <VoidRing />
+        <AttachmentDrop hint={dropzone.hint} />
         {detached ? null : (
           <Chips
             cwd={props.cwd}
@@ -196,7 +200,7 @@ export function Composer(props: Props): React.JSX.Element {
             是这一块的抬头，得钉在最上面；而附件是这句话的一部分，紧挨着正文才对。
             反过来放的话，贴一张图就把抬头顶下去 72 像素 */}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
-        <AttachmentWarning text={attachWarning} />
+        <AttachmentWarning text={attachWarning ?? attach.notice} />
         <Prompt
           value={draft.text}
           detached={detached}
@@ -238,6 +242,7 @@ export function Composer(props: Props): React.JSX.Element {
           model={props.model}
           effort={props.effort}
           usage={props.usage}
+          canAttach={props.canAttach}
           pending={props.pending}
           onEngineChange={props.onEngineChange}
           onTrustChange={props.onTrustChange}
@@ -246,6 +251,7 @@ export function Composer(props: Props): React.JSX.Element {
           aside={aside.on ? <AsideChip onExit={aside.exit} /> : undefined}
           asideMode={aside.on}
           onModelChange={props.onModelChange}
+          onAttach={() => { void attach.pick() }}
           onResume={props.onResume}
           onInterrupt={props.onInterrupt}
           onSend={draft.submit}
