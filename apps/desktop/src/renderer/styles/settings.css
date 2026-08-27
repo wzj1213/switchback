@@ -30,7 +30,15 @@
   display: flex;
   flex-direction: column;
   width: min(920px, 100%);
-  height: min(660px, 100%);
+  /*
+   * **按内容长，不写死。** 改之前是 `height: min(660px, 100%)`，
+   * 于是「通用」页两张卡（约 200px 内容）下面空着 460px，而「引擎」「环境」
+   * 两页要滚——同一个盒子，一半页面撑不满、一半溢出。
+   *
+   * 下限留 380：左边那列有 8 个页签，面板比页签列还矮会很怪。
+   */
+  min-height: 380px;
+  max-height: min(660px, 100%);
   overflow: hidden;
   border: 1px solid var(--border-pop);
   border-radius: var(--radius-lg);

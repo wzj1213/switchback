@@ -628,15 +628,34 @@
  * 空白的正文区技术上没错，但它分不出「新会话 / 正在加载 / 坏了」三种情况。
  * 见 components/Transcript.tsx 的 Blank。
  */
+/*
+ * 空会话那一组。
+ *
+ * ## 锚在输入框上，不在转录区里居中
+ *
+ * 改之前是 `justify-content: center`——在「顶栏到输入框之间」那一整块里居中，
+ * 实测标题落在窗口高度的 **32%**，而它下面到输入框还空着 379px。
+ * 于是这一屏读起来是「一句话飘在上面，一个框钉在下面」，两样各据一方。
+ * codex 那屏的同一句话在 44%，离输入框约三成窗高——**它和输入框是一组**，
+ * 因为你读完那句话下一步就是往框里打字。
+ *
+ * `flex-end` + 一段按窗高走的下内边距，正是把这层关系写出来：
+ * 窗口拉高拉低，那段距离跟着按比例变，而这一组永远贴着输入框那一头。
+ */
 .blank {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: var(--sp-2);
-  min-height: 55vh;
-  padding: var(--sp-6) var(--sp-4);
+  /* **`100%` 而不是 `55vh`。** 空态是 `.transcript` 的直接子元素，而
+     `.transcript` 是 `.stage` 里 `flex: 1` 的项、高度是确定的，所以百分比解析得出来。
+     写成 `55vh` 的话这一组的落点只由窗口高度决定，和它真正要对齐的那个东西
+     （下面的输入框）没有任何关系——`justify-content` 也就无从生效，
+     实测标题在 32%，加了 `flex-end` 之后纹丝不动。 */
+  min-height: 100%;
+  padding: var(--sp-6) var(--sp-4) 24vh;
   text-align: center;
 }
 
