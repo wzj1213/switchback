@@ -10,7 +10,30 @@ import { FILE_REFRESH_VIEWS } from "./shot-views-file-refresh.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 import { openPanelPage } from "./shot-panel.mjs"
 export const VIEWS = [
-    { name: "01-转录区", open: null, ready: ".md" },
+    {
+      name: "01-转录区",
+      open: null,
+      ready: ".md",
+      /*
+       * **四条横带必须落在同一条左缘上。**
+       *
+       * 转录区有 `scrollbar-gutter: stable`（会话长过一屏那一刻滚动条冒出来，
+       * 居中的正文列不该横跳），而状态带与输入区不滚、拿不到那条 gutter——
+       * 于是两根居中的 760 列差了 5px，实测 467 vs 472。
+       *
+       * 这条只在**插了鼠标**（经典条档位）时出现，触控板下 gutter 恒为零、
+       * 两边天然对齐，所以它躲过了此前每一轮出图。断言写在这里，
+       * 不管出图机器是哪一档都成立：要么都有 gutter，要么都没有。
+       *
+       * 输入框里的字比卡片边缘再缩 13px（1px 描边 + 12px 内边距），那是卡片
+       * 自己的内距，不在这条断言里——claude 与 codex 也都是卡片对齐、文字内缩。
+       */
+      assert: `(() => {
+        const at = (s) => { const n = document.querySelector(s); return n === null ? null : Math.round(n.getBoundingClientRect().left) }
+        const edges = ['.transcript__inner', '.md', '.brief', '.composer__inner'].map(at)
+        return edges.every(edge => edge !== null && edge === edges[0])
+      })()`,
+    },
     {
       name: "02-桌宠固定地面",
       open: `(() => {

@@ -144,7 +144,13 @@
   justify-content: flex-start;
   gap: 2px;
   width: min(var(--content-max), calc(100% - 2 * var(--sp-4)));
-  margin: 0 auto;
+  /* 和 `.composer` 同一件事：这一带不滚，拿不到转录区那条 gutter，
+     得自己补 `--bar-w` 才落在同一条中线上。**`margin: 0 auto` 换成
+     `align-self` 是必须的**——flex 里 `margin-left: auto` 会把剩余空间
+     全吃掉，盒子直接贴到右边去，而 `align-self: center` 之后
+     右外边距照常参与居中，正好把它往左推半个槽宽。 */
+  align-self: center;
+  margin: 0 var(--bar-w) 0 0;
 }
 
 /* 这一行里一个孩子都没有时不占高度——`gap` 和 `margin` 都会在空行上留下白 */

@@ -170,9 +170,14 @@ body,
   initial-value: 0;
 }
 
+[data-bars="classic"] {
+  /* 槽宽与「输入区那一带要补多少」必须是同一个数，见 tokens.css 的 `--bar-w` */
+  --bar-w: 10px;
+}
+
 [data-bars="classic"] ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: var(--bar-w);
+  height: var(--bar-w);
 }
 
 [data-bars="classic"] {

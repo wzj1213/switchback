@@ -8,7 +8,10 @@
  * 那道渐隐（见 app.css）——内容溶进去，而不是被齐着切断。
  */
 .composer {
-  padding: var(--sp-2) var(--sp-4) var(--sp-4);
+  /* 右边多留一个 `--bar-w`：转录区有 `scrollbar-gutter: stable`，这一带没有，
+     不补的话两根居中的 760 列会差 5px（只在插了鼠标、也就是经典条档位下出现，
+     所以它躲过了每一轮出图）。见 tokens.css 里 `--bar-w` 那段。 */
+  padding: var(--sp-2) calc(var(--sp-4) + var(--bar-w)) var(--sp-4) var(--sp-4);
 }
 
 .composer__inner {

@@ -43,9 +43,20 @@ export const REVIEW_VIEWS = [
       })()
       && document.querySelector('.rvd__body--split') === null
       && document.querySelector('[aria-label="切换到分栏差异"]') !== null
-      && document.querySelectorAll('[role="treeitem"][aria-expanded]').length > 0
-      && document.querySelectorAll('[role="treeitem"][data-review-rel]').length > 0
-      && document.querySelectorAll('[role="treeitem"][tabindex="0"]').length === 1`,
+      && (() => {
+        /*
+         * **目录树的断言只在真有改动文件时才成立。**
+         *
+         * 上面那段已经允许「工作区相对 HEAD 是干净的」这一种结局，
+         * 但这三条无条件要求树里有节点——于是**在一棵干净的树上出图必然失败**，
+         * 而「界面改动的唯一验收方式」因此在最常见的那个状态下跑不起来
+         *（改完样式、还没动业务文件的时候，树正好是干净的）。
+         */
+        const files = document.querySelectorAll('[role="treeitem"][data-review-rel]')
+        if (files.length === 0) return document.querySelector('.rvl__none') !== null
+        return document.querySelectorAll('[role="treeitem"][aria-expanded]').length > 0
+          && document.querySelectorAll('[role="treeitem"][tabindex="0"]').length === 1
+      })()`,
   },
   {
     name: "04-审核范围菜单",
@@ -128,14 +139,29 @@ export const REVIEW_VIEWS = [
     })()`,
   },
   {
+    /*
+     * 查询词从真实清单里取，不写死。
+     *
+     * 原来写死 "review"，于是这一屏能不能过取决于**出图那一刻开发者工作区里
+     * 改了哪些文件**：改的全是 styles/tokens.css 这类路径时，过滤结果为空，
+     * rows.length > 0 直接失败。现在拿第一份改动文件的文件名当查询词——
+     * 它必然至少命中自己，干净树则退化成「只验输入框拿到了焦点」。
+     *
+     * **注意里面那几步是模板字符串，不是代码。** 说明只能写在这儿：
+     * 写进模板里的话，注释里的反引号会把字符串提前收尾。这一条踩过一次。
+     */
     name: "04-跳转到文件",
     open: [
       `document.querySelector('button[aria-label="跳转到文件"]')?.click()`,
       `(() => {
         const input = document.querySelector('input[aria-label="跳转到文件"]')
         window.__omniJumpInputFocused = document.activeElement === input
+        const first = document.querySelector('[role="menu"][aria-label="匹配的审核文件"] .pop__label')
+        const rel = first?.getAttribute('title') ?? ''
+        const term = (rel.split('/').pop() ?? '').slice(0, 6)
+        window.__omniJumpTerm = term
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-        setter?.call(input, 'review')
+        setter?.call(input, term)
         input?.dispatchEvent(new Event('input', { bubbles: true }))
       })()`,
       `document.querySelector('input[aria-label="跳转到文件"]')?.dispatchEvent(
@@ -144,8 +170,11 @@ export const REVIEW_VIEWS = [
     ready: `[role="dialog"][aria-label="跳转到文件"]`,
     assert: `(() => {
       const rows = [...document.querySelectorAll('[role="menu"][aria-label="匹配的审核文件"] .pop__item')]
+      const term = (window.__omniJumpTerm ?? '').toLowerCase()
+      // 干净树没有可跳转的文件，这一屏拍的就是空清单——不该因此判失败
+      if (term === '') return window.__omniJumpInputFocused === true
       return window.__omniJumpInputFocused === true && rows.length > 0
-        && rows.every(row => row.textContent.toLowerCase().includes('review'))
+        && rows.every(row => row.textContent.toLowerCase().includes(term))
         && document.activeElement?.getAttribute('role') === 'menuitem'
     })()`,
     after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
