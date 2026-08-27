@@ -179,9 +179,23 @@ async function hoverOver(cdp, view) {
   await pause(200)
 }
 
+/**
+ * 这一屏在**当前这个窗口宽度下**存不存在（场景自己用 `only` 声明）。
+ *
+ * 有些东西是按设计随宽度撤掉的（提问导航条：正文列两边的空档容不下它时整条不画）。
+ * 那时候它「拍不到」不是回归，是对的。可**不能默默跳过**——一屏在某个尺寸下
+ * 悄悄消失，日志读起来和全都拍到了一模一样。所以要么拍，要么打印一行说为什么没拍。
+ */
+async function present(cdp, view) {
+  if (view.only === undefined || (await value(cdp, view.only))) return true
+  console.log(`  ⏭ ${view.name}：这个宽度下按设计不存在`)
+  return false
+}
+
 async function shoot(cdp, view, workspaceFiles) {
   let heldDrop
   const preparedAt = Date.now()
+  if (!(await present(cdp, view))) return
   await prepareWorkspaceFiles(ROOT, view, workspaceFiles)
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
@@ -200,12 +214,9 @@ async function shoot(cdp, view, workspaceFiles) {
     await hoverOver(cdp, view)
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
     assertReadyTime(view, preparedAt)
-    if (
-      view.absent !== undefined &&
-      (await value(cdp, `document.querySelector('${view.absent}') !== null`))
-    ) {
-      throw new Error(`${view.name} 仍残留不该出现的 ${view.absent}`)
-    }
+    const stale = view.absent !== undefined
+      && (await value(cdp, `document.querySelector('${view.absent}') !== null`))
+    if (stale) throw new Error(`${view.name} 仍残留不该出现的 ${view.absent}`)
     if (view.assert !== undefined && !(await value(cdp, view.assert))) {
       throw new Error(`${view.name} 没有满足验收表达式：${view.assert}`)
     }

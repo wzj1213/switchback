@@ -54,18 +54,17 @@ export const ACTIVITY_VIEWS = [
       const workbenchBox = workbench?.getBoundingClientRect()
       const sidebarBox = sidebar?.getBoundingClientRect()
       const mainBox = main?.getBoundingClientRect()
-      const compact = innerWidth <= 1280
-      result.threadLayout = compact
-        ? getComputedStyle(main).display === 'flex'
-          && getComputedStyle(sidebar).display === 'none'
-          && mainBox !== undefined && workbenchBox !== undefined
-          && Math.abs(mainBox.left) < 1 && Math.abs(mainBox.right - workbenchBox.left) < 1
-        : mainBox !== undefined && sidebarBox !== undefined && workbenchBox !== undefined
-          && getComputedStyle(main).display === 'flex'
-          && Math.abs(mainBox.left - sidebarBox.right) < 1
-          && Math.abs(mainBox.right - workbenchBox.left) < 1
+      // **不分宽窄，永远是三块紧挨着排**：导航右缘 = 会话左缘，会话右缘 = 工具台左缘。
+      // 上一版在 ≤1280 时另有一套（导航 display:none、会话贴到 x=0）——
+      // 那条已经去掉了：点开右边的面板不该让左边消失，窄了让工具台收窄就行。
+      result.threadLayout = mainBox !== undefined && sidebarBox !== undefined
+        && workbenchBox !== undefined
+        && getComputedStyle(main).display === 'flex'
+        && sidebarBox.width > 100
+        && Math.abs(mainBox.left - sidebarBox.right) < 1
+        && Math.abs(mainBox.right - workbenchBox.left) < 1
       result.workbenchLayout = workbenchBox !== undefined && sidebarBox !== undefined
-        && (compact || mainBox !== undefined)
+        && mainBox !== undefined
         && getComputedStyle(workbench).position === 'static'
         && Math.abs(workbenchBox.left - mainBox.right) < 1
         && Math.abs(workbenchBox.right - innerWidth) < 1

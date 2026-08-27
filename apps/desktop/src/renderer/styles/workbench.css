@@ -10,14 +10,32 @@
   background: var(--bg);
 }
 
+/* 占满时不再画左边那条界线——它左边已经没有东西了。
+   **列位置不变**：外壳永远三列，收起的那一列宽度是 0（见 `app-foundation.css`）。 */
 .shell--workbench-full .workbench {
-  grid-column: 2;
   border-left: 0;
 }
 
-@media (max-width: 1280px) {
-  .shell--workbench:not(.shell--workbench-full) .workbench {
-    grid-column: 2;
+/*
+ * 抽屉推过来。**只在它出现的那一下**——列宽由外壳那条 `transition` 滑，
+ * 这里补的是内容本身：不补的话列在滑、里面的东西却是「啪」地整块出现在那儿。
+ */
+.workbench,
+.rv {
+  animation: panel-in 200ms var(--ease);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workbench,
+  .rv {
+    animation: none;
   }
 }
 

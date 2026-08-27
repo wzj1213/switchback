@@ -36,8 +36,12 @@ export const REVIEW_VIEWS = [
         return getComputedStyle(main).display === 'flex'
           && Math.abs(review.right - window.innerWidth) < 1
           && Math.abs(review.left - mainBox.right) < 1
-          && (!compact || (getComputedStyle(document.querySelector('.sidebar')).display === 'none'
-            && Math.abs(mainBox.left) < 1))
+          // **窄窗口下导航照样在。** 让步的是工具台（--workbench-w 收到 300），
+          // 不是把左边整条抹掉——点开右边的面板不该让左边消失，那是两件事。
+          // 三块紧挨着排：导航右缘 = 会话左缘，会话右缘 = 面板左缘。
+          && sidebar.width > 100
+          && Math.abs(mainBox.left - sidebar.right) < 1
+          && (!compact || review.width <= 320)
       })()
       && (() => {
         const review = document.querySelector('.rv')?.getBoundingClientRect()

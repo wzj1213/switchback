@@ -142,7 +142,11 @@ export const COMPOSE_VIEWS = [
         const bar = document.querySelector('.composer__bar')
         if (card === undefined || bar === null) return false
         const children = [...bar.children].map(node => node.getBoundingClientRect())
-        return bar.scrollWidth <= bar.clientWidth && bar.getBoundingClientRect().height <= 66
+        // **换行是设计好的让步，不是回归**：容器窄到 520 以下时那一排本来就折成两行
+        // （见 items-composer.css 那条容器查询——宁可折行也不藏功能）。所以「一行装得下」
+        // 只在**有地方**的时候才要求；任何宽度下都得成立的是另外两条：不溢出、不出卡片
+        return bar.scrollWidth <= bar.clientWidth
+          && (card.width <= 520 || bar.getBoundingClientRect().height <= 66)
           && children.every(box => box.left >= card.left && box.right <= card.right)
       })()
       && (() => {

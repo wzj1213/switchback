@@ -42,6 +42,14 @@ export const CHANGED_VIEWS = [
        * 而这条路本来就要为键盘用户留着（组件里 focus 与 hover 同一条线）。
        */
       name: "01d-提问导航条",
+      // 正文列两边的空档放不下它时整条按设计不画（见 transcript-rail.css 的 container 查询）。
+      // 最小窗口那一档正好在门槛下面，那时这一屏不该拍，也不该被当成回归
+      // 注意是**算出来的 display**，不是 querySelector：容器查询把它 display:none 掉之后
+      // 元素照样在 DOM 里，只判 `!== null` 等于没判
+      only: `(() => {
+        const rail = document.querySelector('.rail')
+        return rail !== null && getComputedStyle(rail).display !== 'none'
+      })()`,
       open: `true`,
       // 真把指针移上去：`:hover` 和 onMouseEnter 都只认真实指针事件（见 `hoverOver`）
       hover: ".rail__tick",

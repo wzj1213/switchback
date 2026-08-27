@@ -48,13 +48,21 @@ export const VIEWS = [
        * hiddenInset 的交通灯还在窗口左上角，不让位的话会压在标题上。
        */
       name: "01b-收起侧栏",
-      open: `document.querySelector('button[aria-label="收起侧栏"]')?.click()`,
+      // 第二步是个空动作：**等那条列宽过渡走完**（外壳 200ms）。
+      // 每个 open 步骤后面 harness 都会停 350ms，所以多一步就够了——
+      // 不等的话下面量到的宽度是滑到一半时的值，断言随机失败
+      open: [`document.querySelector('button[aria-label="收起侧栏"]')?.click()`, `true`],
       ready: `.shell--norail`,
       assert: `(() => {
         const sidebar = document.querySelector('.sidebar')
         const main = document.querySelector('.main')
         if (main === null) return false
-        return (sidebar === null || getComputedStyle(sidebar).display === 'none')
+        // 收起 = **那一列宽度变 0**，不再是 display:none（外壳永远三列，
+        // 见 app-foundation.css）。所以这里量宽度，不量 display
+        const railGone = sidebar === null
+          || (sidebar.getBoundingClientRect().width < 1
+            && getComputedStyle(sidebar).visibility === 'hidden')
+        return railGone
           && Math.abs(main.getBoundingClientRect().left) < 1
           && getComputedStyle(document.querySelector('.topbar')).paddingLeft === '92px'
           && document.querySelector('button[aria-label="展开侧栏"]') !== null
@@ -138,9 +146,10 @@ export const VIEWS = [
           focus: document.activeElement?.matches('.files-search input') === true,
           nonModal: document.querySelector('.workbench')?.getAttribute('aria-modal') === null
             && document.querySelector('.workbench__scrim') === null,
+          // 窄窗口下**导航照样在**：让步的是工具台，不是把左边整条抹掉。
+          // 这里只认「会话这一列还立得住」——不再要求某个宽度下导航必须消失
           responsive: getComputedStyle(document.querySelector('.main')).display === 'flex'
-            && (innerWidth > 1280
-              || getComputedStyle(document.querySelector('.sidebar')).display === 'none'),
+            && document.querySelector('.sidebar').getBoundingClientRect().width > 100,
           clean: !index?.textContent.includes('failed-secret.txt'),
           scope: scope?.textContent.endsWith('/omni') === true
             && scope?.getAttribute('title')?.endsWith('/omni') === true,
