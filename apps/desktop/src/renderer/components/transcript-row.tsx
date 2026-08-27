@@ -76,14 +76,19 @@ export function lastMine(rows: readonly Row[]): string | undefined {
 export function answerActs(rows: readonly Row[], activeTurnId?: string): ReadonlySet<string> {
   // 一轮一条：后来的覆盖先前的，收尾时留下的就是每轮最后那条
   const last = new Map<string, string>()
+  const mine: string[] = []
   for (const row of rows) {
     if (row.kind !== "item") continue
     const item = row.item
+    if (item.kind === "user_message") {
+      mine.push(item.id)
+      continue
+    }
     if (item.kind !== "agent_message" || !item.complete) continue
     if (item.turnId === activeTurnId) continue
     last.set(item.turnId, item.id)
   }
-  return new Set(last.values())
+  return new Set([...mine, ...last.values()])
 }
 
 /**

@@ -42,7 +42,8 @@ describe("那排动作挂在哪几条上", () => {
       { kind: "item", item: item("u2", "user_message", "t2") },
       { kind: "item", item: item("a3", "agent_message", "t2", { complete: true }) },
     ]
-    expect([...answerActs(rows)].sort()).toEqual(["a2", "a3"])
+    // 人话每一句都挂（自己写的东西常常还想再用一次），回答只挂每轮最后那段
+    expect([...answerActs(rows)].sort()).toEqual(["a2", "a3", "u1", "u2"])
   })
 
   it("只认回答：思考、通知、人话都不挂——挂在一段思考上等于说它和答案同级", () => {
@@ -51,7 +52,7 @@ describe("那排动作挂在哪几条上", () => {
       { kind: "item", item: item("r1", "reasoning", "t1", { complete: true }) },
       { kind: "item", item: item("n1", "notice", "t1", { level: "info", message: "…" }) },
     ]
-    expect([...answerActs(rows)]).toEqual([])
+    expect([...answerActs(rows)]).toEqual(["u1"])
   })
 
   it("还在吐字的那条不给——没有定稿可拿，画出来只会跟着文字往下跳", () => {
@@ -75,8 +76,8 @@ describe("还在跑的那一轮", () => {
       // 这一段写完了，但它是「我先查一下…」那种过程话，后面还有
       { kind: "item", item: item("a2", "agent_message", "t2", { complete: true }) },
     ]
-    expect([...answerActs(rows, "t2")]).toEqual(["a1"])
+    expect([...answerActs(rows, "t2")].sort()).toEqual(["a1", "u2"])
     // 这一轮跑完之后它才拿到
-    expect([...answerActs(rows)].sort()).toEqual(["a1", "a2"])
+    expect([...answerActs(rows)].sort()).toEqual(["a1", "a2", "u2"])
   })
 })

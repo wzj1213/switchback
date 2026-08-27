@@ -60,8 +60,16 @@ export function mainThread(id, cwd, at, externalPath) {
     }),
   ]
   let n = 0
+  /**
+   * **每条往后错一秒**（`at + n × 1000`）。
+   *
+   * 不错开的话一轮里所有 item 时间戳相同，`markFor` 认作零时长、不插分界线，
+   * 而分界线是「折起这一轮的过程」唯一的展开入口——于是那一屏永远拍不到
+   * 折叠态（`foldTurns` 也因此不折它）。加号是固定的，出图仍然可对照。
+   */
   const push = (item) => {
-    out.push(line({ type: "item.started", at, item: { ...item, id: `${id}-i${++n}`, turnId: turn, at } }))
+    const stamp = at + ++n * 1000
+    out.push(line({ type: "item.started", at: stamp, item: { ...item, id: `${id}-i${n}`, turnId: turn, at: stamp } }))
   }
   fill(push, cwd, externalPath)
   fillActivity(out, { threadId: id, turnId: turn, cwd, at })
@@ -209,7 +217,8 @@ function followUp(out, { id, at }) {
   } }))
   let n = 0
   const push = (item) => {
-    out.push(line({ type: "item.started", at: later, item: { ...item, id: `${id}-b${++n}`, turnId: turn, at: later } }))
+    const stamp = later + ++n * 1000
+    out.push(line({ type: "item.started", at: stamp, item: { ...item, id: `${id}-b${n}`, turnId: turn, at: stamp } }))
   }
   push({ kind: "user_message", text: "顺手把 throughput 那条滑窗的窗口长度也提出来做成常量吧。" })
   push({

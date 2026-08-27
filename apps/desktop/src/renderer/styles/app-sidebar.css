@@ -582,3 +582,120 @@
 .row--flat .row__slot {
   margin-left: 0;
 }
+
+/*
+ * ── 改名对话框 ──────────────────────────────────────
+ * 为什么从「就地编辑」换成它，见 `components/RowName.tsx` 开头那段账。
+ * 遮罩与卡的形制跟设置面板同一套（`settings.css` 的 `.set__scrim` / `.set`）——
+ * 同一个应用里两种模态长成两个样子，人每次都要重新认一遍哪个是可点的。
+ */
+.rename__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5) var(--sp-4);
+  background: var(--scrim);
+}
+
+.rename {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  padding: var(--sp-4);
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-pop);
+  animation: rename-in var(--dur) var(--ease);
+}
+
+.rename:focus {
+  outline: none;
+}
+
+@keyframes rename-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rename {
+    animation: none;
+  }
+}
+
+.rename__title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: var(--lh-sm);
+}
+
+.rename__hint {
+  margin: 4px 0 var(--sp-3);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.rename__input {
+  width: 100%;
+  padding: 7px var(--sp-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  /* 打开就聚焦、就全选，所以描边一开始就是强调色——再给一圈 outline 是重复的 */
+  outline: none;
+}
+
+.rename__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.rename__cancel,
+.rename__save {
+  padding: 6px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+.rename__cancel:hover {
+  background: var(--bg-hover);
+}
+
+/* 主操作实心：一屏两颗按钮时，哪一颗是「就这样」要一眼看出来 */
+.rename__save {
+  border-color: transparent;
+  background: var(--text);
+  color: var(--text-inverse);
+}
+
+.rename__save:hover:not(:disabled) {
+  opacity: 0.86;
+}
+
+.rename__save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

@@ -123,7 +123,7 @@ describe("withAsides", () => {
 
   it("**折起某一轮不会把侧问一起折掉**——它不归任何一轮", () => {
     const rows = groupRows([user("u1", "t1", 0), reply("a1", "t1", 1000), reply("a2", "t1", 3000)])
-    const folded = foldTurns(rows, new Set(["t1"]))
+    const folded = foldTurns(rows, (id) => id === "t1")
     const out = withAsides(folded, [ask(2000, "折起来也还在")])
     expect(out.some((r) => r.kind === "aside")).toBe(true)
   })

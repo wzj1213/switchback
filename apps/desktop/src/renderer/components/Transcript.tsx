@@ -70,11 +70,22 @@ export const Transcript = memo(function Transcript({
   readOnly?: boolean
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
-  /** 折起来的那几轮。**按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管 */
-  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  /**
+   * **你手动展开过的那几轮。**
+   *
+   * 存「展开的」而不是「折起的」，因为默认是折着的：过程（思考、工具）是给
+   * 「它怎么得出这个」准备的，而多数时候你先要的是结论（见 `group.ts` 的 `foldTurns`）。
+   * **按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管。
+   */
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set())
   const onFold = useCallback((turnId: string) => {
-    setFolded((prev) => toggled(prev, turnId))
+    setUnfolded((prev) => toggled(prev, turnId))
   }, [])
+  // 还在跑的那一轮不折：那时候过程就是全部内容，它正一步步长出来
+  const folded = useCallback(
+    (turnId: string) => turnId !== turn?.id && !unfolded.has(turnId),
+    [turn?.id, unfolded],
+  )
   const rows = useMemo(
     // **折叠在前、插侧问在后**：侧问不归任何一轮，折起某一轮不该把它一起折掉。
     // **旁路不进流里**：输入框上方那条状态带（`ActivityDock`）说的是同一件事，
@@ -115,7 +126,7 @@ export const Transcript = memo(function Transcript({
               ? { onRewind: (turnId: string) => { send({ type: "thread.rewind", threadId: thread.id, turnId }) } }
               : {})}
             {...retryProps(row, { ...retry, threadId: thread.id, send })}
-            folded={row.kind === "turn" && folded.has(row.turnId)}
+            folded={row.kind === "turn" && folded(row.turnId)}
             onFold={onFold}
             onCopy={onCopy}
             onResolve={approval.resolve}

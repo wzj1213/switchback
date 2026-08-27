@@ -9,7 +9,9 @@ import { SidebarFoot, type AccountLine } from "./SidebarFoot.js"
 import { useContextMenu } from "./Menu.js"
 import { useSidebarMenus, type Acts } from "./SidebarMenus.js"
 import { Head } from "./SidebarHead.js"
-import { useRenaming } from "./RowName.js"
+import { useRenaming, type RenameCtl } from "./RowName.js"
+import { RenameDialog } from "./RenameDialog.js"
+import { rowLabelOf } from "../sidebar.js"
 import { SectionList } from "./SidebarSections.js"
 import { sidebarMoves } from "../sidebarMove.js"
 import { SidebarFound } from "./SidebarFound.js"
@@ -101,13 +103,37 @@ interface Props {
   focusFilter: number
 }
 
-export function Sidebar(props: Props): React.JSX.Element {
-  const [query, setQuery] = useState("")
+/**
+ * 正在改名的那一行 → 一张对话框。
+ *
+ * **名字取 `rowLabelOf`**：对话框里要能在完整的当前名字上改，而侧栏显示的就是它
+ *（人亲自起的名 > 引擎起的名 > 第一句话）。抽出来是函数行数闸门逼的。
+ */
+function Renaming({ row, ctl }: { row: SidebarRow | undefined; ctl: RenameCtl }): React.JSX.Element | null {
+  if (row === undefined) return null
+  return (
+    <RenameDialog
+      title={rowLabelOf(row)}
+      onSave={(title) => {
+        ctl.commit(row.thread.id, title)
+      }}
+      onClose={ctl.done}
+    />
+  )
+}
+
+/** 外面请求「去筛选框」时把它全选。抽出来是函数行数闸门逼的。 */
+function useFilterFocus(at: number): React.RefObject<HTMLInputElement | null> {
   const box = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (props.focusFilter > 0) box.current?.select()
-  }, [props.focusFilter])
+    if (at > 0) box.current?.select()
+  }, [at])
+  return box
+}
 
+export function Sidebar(props: Props): React.JSX.Element {
+  const [query, setQuery] = useState("")
+  const box = useFilterFocus(props.focusFilter)
   const { open: openMenu, menu } = useContextMenu()
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
@@ -152,6 +178,7 @@ export function Sidebar(props: Props): React.JSX.Element {
   const selected = props.rows.find((row) => row.thread.id === props.selectedId)?.thread
   const { isOpen, toggle } = useSidebarOpen(selected?.cwd)
   const rename = useRenaming(props.onRename, { at: props.askRename, id: props.selectedId })
+  const renaming = props.rows.find((row) => row.thread.id === rename.id)
   const { rowMenu, groupMenu } = useSidebarMenus({ ...acts, onSetIcon: props.onSetIcon }, openMenu)
   const { onSelect, onDelete, engines } = props
   const foundOn = { onSelect, onDelete, rowMenu, rename, engines }
@@ -204,6 +231,7 @@ export function Sidebar(props: Props): React.JSX.Element {
       </div>
       <SidebarFoot account={props.account} onOpenSettings={props.onOpenSettings} />
       {menu}
+      <Renaming row={renaming} ctl={rename} />
     </aside>
   )
 }

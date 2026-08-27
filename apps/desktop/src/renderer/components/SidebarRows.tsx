@@ -203,16 +203,7 @@ export function Row({
         <span className="row__slot">
           <Dot status={thread.status} unread={unread} />
         </span>
-        <RowName
-          value={rowLabelOf(row)}
-          editing={rename?.id === thread.id}
-          onCommit={(title) => {
-            rename?.commit(thread.id, title)
-          }}
-          onCancel={() => {
-            rename?.done()
-          }}
-        />
+        <RowName value={rowLabelOf(row)} />
         <RowEnd thread={thread} unread={unread} {...(aside === undefined ? {} : { aside })} />
       </button>
       <RowActions

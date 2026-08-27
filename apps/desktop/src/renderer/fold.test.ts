@@ -1,38 +1,66 @@
 import { describe, expect, it } from "vitest"
 import { foldTurns, groupRows } from "./group.js"
-import type { Item } from "@omni/protocol"
+import type { Item, ToolCallItem } from "@omni/protocol"
 
 const item = (id: string, kind: Item["kind"], turnId: string, at: number): Item =>
   ({ id, kind, turnId, at, text: id }) as Item
 
-/** 一轮：提问 → 回答 → 再提问 */
+const tool = (id: string, turnId: string, at: number): ToolCallItem =>
+  ({ id, turnId, at, kind: "tool_call", tool: "Bash", status: "ok",
+    detail: { kind: "shell", command: "ls" } }) as ToolCallItem
+
+/** 两轮，每轮都是：提问 → 思考 → 跑命令 → 回答。 */
 const ITEMS: readonly Item[] = [
   item("q1", "user_message", "t1", 0),
+  item("r1", "reasoning", "t1", 1000),
+  tool("x1", "t1", 2000),
   item("a1", "agent_message", "t1", 5000),
   item("q2", "user_message", "t2", 6000),
+  item("r2", "reasoning", "t2", 7000),
   item("a2", "agent_message", "t2", 9000),
 ]
 
-describe("折起一轮", () => {
-  it("折起来之后**提问还在**——人是靠自己问过的话定位的", () => {
-    const rows = groupRows(ITEMS)
-    const folded = foldTurns(rows, new Set(["t1"]))
-    const texts = folded.flatMap((r) => (r.kind === "item" ? [r.item.id] : []))
-    expect(texts).toContain("q1")
-    expect(texts).not.toContain("a1")
+const inSet = (ids: readonly string[]) => (turnId: string): boolean => ids.includes(turnId)
+const idsOf = (rows: ReturnType<typeof groupRows>): readonly string[] =>
+  rows.flatMap((row) => (row.kind === "item" ? [row.item.id] : []))
+
+describe("折起一轮的过程", () => {
+  it("**折的是过程，不是答案**：思考和工具组藏起来，提问和回答都留着", () => {
+    const folded = foldTurns(groupRows(ITEMS), inSet(["t1"]))
+    const ids = idsOf(folded)
+    // 人是靠自己问过的话定位的；而回答是这一轮的结论，藏了等于清空
+    expect(ids).toContain("q1")
+    expect(ids).toContain("a1")
+    expect(ids).not.toContain("r1")
+    // 工具组整组不见
+    expect(folded.some((row) => row.kind === "run")).toBe(false)
   })
 
   it("分界线自己留着——不然没有地方点开", () => {
-    expect(foldTurns(groupRows(ITEMS), new Set(["t1"])).some((r) => r.kind === "turn")).toBe(true)
+    expect(foldTurns(groupRows(ITEMS), inSet(["t1"])).some((r) => r.kind === "turn")).toBe(true)
   })
 
   it("只折被点的那一轮，别的轮一条不少", () => {
-    const folded = foldTurns(groupRows(ITEMS), new Set(["t1"]))
-    expect(folded.flatMap((r) => (r.kind === "item" ? [r.item.id] : []))).toContain("a2")
+    const ids = idsOf(foldTurns(groupRows(ITEMS), inSet(["t1"])))
+    expect(ids).toContain("r2")
+    expect(ids).toContain("a2")
+  })
+
+  it("**没有分界线的那一轮不折**——那时候折了就没有地方点回来", () => {
+    // 所有 item 同一个时间戳 ⇒ `markFor` 不插分界线（零时长）
+    const flat: readonly Item[] = [
+      item("q1", "user_message", "t1", 0),
+      item("r1", "reasoning", "t1", 0),
+      tool("x1", "t1", 0),
+      item("a1", "agent_message", "t1", 0),
+    ]
+    const rows = groupRows(flat)
+    expect(rows.some((row) => row.kind === "turn")).toBe(false)
+    expect(foldTurns(rows, () => true)).toEqual(rows)
   })
 
   it("没折任何一轮时原样返回", () => {
     const rows = groupRows(ITEMS)
-    expect(foldTurns(rows, new Set())).toEqual(rows)
+    expect(foldTurns(rows, () => false)).toEqual(rows)
   })
 })

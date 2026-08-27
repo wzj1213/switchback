@@ -32,11 +32,12 @@ export const VIEWS = [
       assert: `(() => {
         const at = (s) => { const n = document.querySelector(s); return n === null ? null : Math.round(n.getBoundingClientRect().left) }
         const edges = ['.transcript__inner', '.md', '.brief', '.composer__inner'].map(at)
-        // 那排动作（复制）**每轮的最后一条回答各一条**——这份样本只有一轮有回答，
-        // 所以整屏应该恰好一条。上一版每条消息都挂一条透明的，看不见却照样占着
-        // 二十来像素高，于是这一屏所有间距都比样式表里写的多一档（见 answerActs）
+        // 那排动作挂在**每句人话**和**每轮最后一条回答**上（悬停才显形）。
+        // 这份样本两轮：两句人话 + 两条回答 = 4。上一版是**每条消息**都挂一条
+        // 透明的，看不见却照样占着二十来像素高，于是这一屏所有间距都比样式表里
+        // 写的多一档（见 transcript-row.tsx 的 answerActs）
         const acts = document.querySelectorAll('.transcript .msgacts').length
-        return acts === 1 && edges.every(edge => edge !== null && edge === edges[0])
+        return acts === 4 && edges.every(edge => edge !== null && edge === edges[0])
       })()`,
     },
     {

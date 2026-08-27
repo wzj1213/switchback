@@ -114,28 +114,40 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
 }
 
 /**
- * 折起某几轮的**回答**。
+ * 折起某几轮的**过程**。
  *
- * 折的是分界线**之后**、属于同一轮的东西——提问本身永远留着。
- * 一个折了三轮的 transcript 如果连问题也看不见，那就不是「折叠」，是「清空」：
- * 人是靠自己问过的那句话来定位「我要找的是哪一段」的。
+ * ## 折的是过程，不是答案
  *
- * 纯函数，所以能直接测「折了以后提问还在不在」这种事。
+ * 上一版折的是「分界线之后属于这一轮的一切」——连那一轮的回答一起藏。
+ * 那读起来是「清空」不是「折叠」：一条跑了十轮的会话折起来之后，
+ * 屏幕上只剩十条「已处理 X」，你连它们各自说了什么都看不见。
+ *
+ * 现在藏的只有**过程**：工具组和思考。人话、回答、审批卡、改动卡一律留着。
+ * 于是一轮跑完之后那一段读起来是「我问了什么 → 用时 1m 26s ↘ → 它答了什么」，
+ * 想看它中间怎么走的，点那条分界线展开。
+ *
+ * **默认就是折着的**（见 `Transcript` 的 `unfolded`）：过程是给「它怎么得出这个」
+ * 这个问题准备的，而多数时候你先要的是结论。还在跑的那一轮不折——那时候
+ * 过程就是全部内容，它正一步步长出来。
+ *
+ * ## 没有分界线的那一轮**不折**
+ *
+ * 分界线（「已处理 1m 26s」那条）是唯一的展开入口，而它只在这一轮真花了时间时
+ * 才插（`markFor`：零时长不插）。没有它还照折的话，那一轮的过程就藏得
+ * **没有任何地方能点回来**——那不是折叠，是丢失。实测出图样本里所有 item
+ * 共用同一个时间戳，于是整屏的工具行凭空消失，一开始还以为是渲染坏了。
+ *
+ * 纯函数，所以能直接测「折了以后提问和回答还在不在」「没有入口时不折」这种事。
  */
-export function foldTurns(rows: readonly Row[], collapsed: ReadonlySet<string>): readonly Row[] {
-  const hiding = new Set<string>()
-  const out: Row[] = []
-  for (const row of rows) {
+export function foldTurns(rows: readonly Row[], folded: (turnId: string) => boolean): readonly Row[] {
+  const openable = new Set(rows.flatMap((row) => (row.kind === "turn" ? [row.turnId] : [])))
+  return rows.filter((row) => {
+    if (row.kind === "turn") return true
     const id = turnIdOf(row)
-    if (row.kind === "turn" && collapsed.has(row.turnId)) {
-      hiding.add(row.turnId)
-      out.push(row)
-      continue
-    }
-    if (id !== undefined && hiding.has(id)) continue
-    out.push(row)
-  }
-  return out
+    if (id === undefined || !openable.has(id) || !folded(id)) return true
+    if (row.kind === "run") return false
+    return !(row.kind === "item" && row.item.kind === "reasoning")
+  })
 }
 
 /**
