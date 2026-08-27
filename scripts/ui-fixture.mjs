@@ -66,6 +66,7 @@ export function mainThread(id, cwd, at, externalPath) {
   fill(push, cwd, externalPath)
   fillActivity(out, { threadId: id, turnId: turn, cwd, at })
   out.push(line({ type: "turn.completed", at, turnId: turn, status: "completed" }))
+  followUp(out, { id, at })
   out.push(
     line({
       type: "usage.updated",
@@ -191,6 +192,45 @@ function fill(push, cwd, externalPath) {
   push(fileRead("missing-output.txt", "ok"))
   push(fileRead("/tmp/failed-secret.txt", "failed"))
   push(answerOf())
+}
+
+/**
+ * 第二轮。**样本里必须有两轮**，否则有两样东西一次都拍不到：
+ *
+ * - 左边那条导航（`transcript-rail.ts`）少于两问就整条不画——一格导航到它自己；
+ * - 「这一轮改了哪些文件」那张卡是**每轮一张**，只有一轮就看不出「每轮」这件事，
+ *   也看不出它跟在自己那一轮末尾、而不是钉在最底下。
+ */
+function followUp(out, { id, at }) {
+  const turn = `${id}-t2`
+  const later = at + 60_000
+  out.push(line({ type: "turn.started", at: later, turn: {
+    id: turn, threadId: id, engine: ENGINE, status: "running", startedAt: later,
+  } }))
+  let n = 0
+  const push = (item) => {
+    out.push(line({ type: "item.started", at: later, item: { ...item, id: `${id}-b${++n}`, turnId: turn, at: later } }))
+  }
+  push({ kind: "user_message", text: "顺手把 throughput 那条滑窗的窗口长度也提出来做成常量吧。" })
+  push({
+    kind: "tool_call", tool: "Edit", status: "ok",
+    detail: {
+      kind: "file_edit", path: "apps/desktop/src/renderer/throughput.ts", added: 4, removed: 2,
+      files: [{
+        path: "apps/desktop/src/renderer/throughput.ts", kind: "update", added: 4, removed: 2,
+        diff: "@@ -8,6 +8,8 @@\n" +
+          "-const WINDOW = 3000\n" +
+          "+/** 滑窗长度。3 秒是试出来的：再短读数抖，再长看不出「刚才那一下」。 */\n" +
+          "+export const WINDOW_MS = 3000\n",
+      }],
+    },
+  })
+  push({
+    kind: "agent_message", complete: true,
+    text: "提出来了：`WINDOW_MS = 3000`，注释里写清了这个数是怎么来的——" +
+      "再短读数抖，再长看不出「刚才那一下」。",
+  })
+  out.push(line({ type: "turn.completed", at: later, turnId: turn, status: "completed" }))
 }
 
 /**

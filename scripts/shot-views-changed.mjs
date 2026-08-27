@@ -1,55 +1,63 @@
 /**
- * 「引擎报了 N 个文件」那张清单的验收屏。
+ * 「这一轮改了哪些文件」那张卡，和左边那条导航。
  *
  * 单开一个文件是行数闸门逼的（`shot-views.mjs` 撑到了 303），这一刀也顺：
- * 这一屏要先切到一条**工作区不是 Git 仓库**的会话才有东西看，
+ * 这两样都要**先把内容摆到位**（切到某条会话、滚到某个位置）才看得见，
  * 那套摆场步骤和「转录区长什么样」不是一回事。
  */
 export const CHANGED_VIEWS = [
     {
       /*
-       * 「引擎报了 N 个文件」那张清单。**它是浮层，不是这一行长高。**
+       * 一轮一张的改动卡。**卡跟着那一轮走，不是钉在最底下。**
        *
-       * 要先切到那条 cwd 不是 Git 仓库的会话（`ui-fixture.mjs` 的 `noRepoThread`）：
-       * 主样本的 cwd 是本仓库，引擎上报的那几条会被 git 核销掉，这张卡根本不出现。
-       *
-       * 断言盯三件事：展开前后**转录区高度一个像素都不变**、清单浮在摘要**上方**、
-       * 而且整屏只有一张清单。上一版展开是就地摊开一张最高 36vh 的卡，
-       * 正文当场缩掉三分之一——清单还没看完，上下文已经被挤没了。
+       * 断言盯三件事：卡的张数 = 有编辑的轮数（样本里两轮各改过文件）、
+       * 每张都排在**下一轮的提问之前**（说明它属于自己那一轮）、
+       * 而输入框上方那条状态带里**再也没有那张卡**（它从那儿搬回流里了）。
        */
-      name: "01c-编辑记录浮层",
-      open: [
-        // 那条会话的 cwd 不是本仓库，于是侧栏把它单列成一个**折着的**项目组
-        `[...document.querySelectorAll('.sidebar button')]
-          .find(row => row.textContent.includes('临时工作区'))?.click()`,
-        // 侧栏那一行显示的是第一句人话（不是 thread.title），而且会截断——认「设计稿」就够
-        `[...document.querySelectorAll('.row--thread .row__main')]
-          .find(row => row.textContent.includes('设计稿'))?.click()`,
-        `(() => {
-          const bar = document.querySelector('.changed__summary')
-          if (bar === null) throw new Error('这条会话没有出「引擎报了 N 个文件」那一条')
-          const tall = document.querySelector('.transcript')?.getBoundingClientRect().height ?? 0
-          document.documentElement.dataset.tallBefore = String(Math.round(tall))
-          bar.click()
-        })()`,
-      ],
-      ready: ".pop .changed__list",
+      name: "01c-每轮的改动卡",
+      open: `(() => {
+        const cards = [...document.querySelectorAll('.edits')]
+        const first = cards[0]
+        first?.scrollIntoView({ block: 'center' })
+      })()`,
+      ready: ".edits",
       assert: `(() => {
-        const before = Number(document.documentElement.dataset.tallBefore)
-        const after = Math.round(document.querySelector('.transcript')?.getBoundingClientRect().height ?? -1)
-        const pop = document.querySelector('.pop')?.getBoundingClientRect()
-        const anchor = document.querySelector('.changed__summary')?.getBoundingClientRect()
-        if (pop === undefined || anchor === undefined) return false
-        return before === after && pop.bottom <= anchor.top
-          && document.querySelectorAll('.changed__list').length === 1
-          && document.querySelector('.changed__title')?.textContent.includes('引擎报了 2 个文件') === true
+        const cards = [...document.querySelectorAll('.transcript .edits')]
+        if (cards.length !== 2) return false
+        // 每张卡都在下一轮的提问之前：DOM 顺序即可判断
+        const rows = [...document.querySelectorAll('.transcript__inner > *')]
+        const at = (node) => rows.indexOf(node)
+        const asks = [...document.querySelectorAll('.transcript .copyable[data-nav]')]
+        if (asks.length !== 2) return false
+        return at(cards[0]) < at(asks[1]) && at(cards[0]) > at(asks[0])
+          && document.querySelector('.brief .edits') === null
+          && document.querySelector('.brief .changed') === null
       })()`,
-      after: `(() => {
-        document.querySelector('.changed__summary')?.click()
-        delete document.documentElement.dataset.tallBefore
-        ;[...document.querySelectorAll('.row--thread .row__main')]
-          // 侧栏这一行显示的是**原生标题**，不再是第一句话（见 sidebar.ts 的 rowLabelOf）
-      .find(row => row.textContent.includes('订阅'))?.click()
+    },
+    {
+      /*
+       * 左边那条导航。一格 = 你问的一次，悬停给出那句话。
+       *
+       * 用 `focus()` 而不是鼠标事件来唤起悬停卡：CDP 那边没有真实指针，
+       * 而这条路本来就要为键盘用户留着（组件里 focus 与 hover 同一条线）。
+       */
+      name: "01d-提问导航条",
+      open: `true`,
+      // 真把指针移上去：`:hover` 和 onMouseEnter 都只认真实指针事件（见 `hoverOver`）
+      hover: ".rail__tick",
+      ready: ".rail__peek",
+      assert: `(() => {
+        const ticks = [...document.querySelectorAll('.rail__tick')]
+        const peek = document.querySelector('.rail__peek')
+        const rail = document.querySelector('.rail')
+        if (ticks.length !== 2 || peek === null || rail === null) return false
+        // 整条只有一个 tab 停靠点：二三十轮的会话不该在 tab 序里塞三十个格子
+        const stops = ticks.filter(tick => tick.tabIndex === 0).length
+        // 格子按深浅排开，不能挤在同一个 y 上
+        const ys = ticks.map(tick => Math.round(tick.getBoundingClientRect().top))
+        return stops === 1 && ys[0] < ys[1]
+          && peek.textContent.includes('useFlow')
       })()`,
+
     },
 ]

@@ -154,6 +154,29 @@ function assertReadyTime(view, preparedAt) {
     throw new Error(`${view.name} 超过 ${view.readyWithinMs}ms 才就绪`)
 }
 
+/**
+ * 把指针**真的**移到某个元素上。
+ *
+ * 悬停态此前一屏都拍不到：场景只会 `evaluate` 一段 JS，而 `:hover` 和
+ * React 的 `onMouseEnter` 都只认真实指针事件。用 `element.focus()` 顶替也不行——
+ * 窗口没有系统焦点时，Chromium 只挪 `activeElement`，**不派发 focus 事件**
+ *（实测：导航条那一格 `document.activeElement` 已经是它，悬停卡却没出来）。
+ *
+ * 指针停在那儿不收回：这一屏拍的就是「鼠标正停在上面」。
+ */
+async function hoverOver(cdp, view) {
+  if (view.hover === undefined) return
+  const at = await value(cdp, `(() => {
+    const node = document.querySelector('${view.hover}')
+    if (node === null) return null
+    const box = node.getBoundingClientRect()
+    return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) }
+  })()`)
+  if (at === null) throw new Error(`${view.name} 找不到要悬停的 ${view.hover}`)
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y, buttons: 0 })
+  await pause(200)
+}
+
 async function shoot(cdp, view, workspaceFiles) {
   let heldDrop
   const preparedAt = Date.now()
@@ -172,6 +195,7 @@ async function shoot(cdp, view, workspaceFiles) {
       await pause(350)
     }
     heldDrop = await dragIntoView({ value, pause, waitFor, root: ROOT }, cdp, view)
+    await hoverOver(cdp, view)
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
     assertReadyTime(view, preparedAt)
     if (

@@ -1,4 +1,5 @@
 import type { Aside, Item, Lane, ToolCallItem } from "@omni/protocol"
+import { reportedChangesOf, type Changes } from "./changes.js"
 
 /**
  * 连续的工具调用合成一组。
@@ -24,6 +25,11 @@ export type Row =
    * 按 `Lane.at`（出生时刻）插，位置就是「你起这一批的时候屏幕停在哪儿」。
    */
   | { kind: "lane"; lane: Lane }
+  /**
+   * 一轮改了哪些文件，跟在那一轮的末尾。**每轮一张，不是整条会话一张**——
+   * 为什么，见 `components/TurnEdits.tsx` 开头。
+   */
+  | { kind: "edits"; turnId: string; edits: Changes }
 
 /**
  * 一轮花了多久，从**这一轮自己的 item** 算。
@@ -62,6 +68,7 @@ function markFor(
 /** 这一行属于哪一轮。三种行的归属来源不一样，抽出来免得散在调用处。 */
 export function turnIdOf(row: Row): string | undefined {
   if (row.kind === "turn") return row.turnId
+  if (row.kind === "edits") return row.turnId
   if (row.kind === "run") return row.items[0]?.turnId
   // 侧问**不归任何一轮**：折起某一轮时它不该跟着消失——
   // 它问的常常正是那一轮里的东西，折起来是为了少看回答，不是为了少看自己问过的话
@@ -74,6 +81,7 @@ export function turnIdOf(row: Row): string | undefined {
 /** 这一行发生在什么时候。分界线没有自己的时间（它是上一条提问的表头）。 */
 function atOf(row: Row): number | undefined {
   if (row.kind === "item") return row.item.at
+  if (row.kind === "edits") return undefined
   if (row.kind === "run") return row.items[row.items.length - 1]?.at
   if (row.kind === "aside") return row.aside.at
   return undefined
@@ -145,10 +153,36 @@ export function foldTurns(rows: readonly Row[], collapsed: ReadonlySet<string>):
   return out
 }
 
-export function groupRows(items: readonly Item[], activeTurnId?: string): readonly Row[] {
+/**
+ * 一轮末尾那张「改了哪些文件」。**换轮的那一刻补上一轮的，收尾时补最后一轮的。**
+ *
+ * 数的是那一轮里引擎明确报成功的编辑（`reportedChangesOf`），一个文件一行、
+ * 后一次覆盖前一次。一轮没改过文件就不插——空卡片比没有更吵。
+ */
+function editsFor(items: readonly Item[], turnId: string, cwd: string): Row | undefined {
+  const edits = reportedChangesOf(items.filter((item) => item.turnId === turnId), cwd)
+  return edits.files === 0 ? undefined : { kind: "edits", turnId, edits }
+}
+
+/**
+ * @param cwd 工作区路径。**给了才插「改了哪些文件」那张卡**——
+ *   引擎报的路径要按它归一，没有 cwd 就归不了（活动页那种场景就不插）。
+ */
+export function groupRows(items: readonly Item[], activeTurnId?: string, cwd?: string): readonly Row[] {
   const rows: Row[] = []
   const marked = new Set<string>()
+  let open: string | undefined
+  const seal = (turnId: string | undefined): void => {
+    if (turnId === undefined || cwd === undefined) return
+    const card = editsFor(items, turnId, cwd)
+    if (card !== undefined) rows.push(card)
+  }
   for (const item of items) {
+    // 换轮了：先把上一轮的那张卡补在它自己的末尾
+    if (item.turnId !== open) {
+      seal(open)
+      open = item.turnId
+    }
     if (item.kind !== "tool_call") {
       rows.push({ kind: "item", item })
       // 分界线插在提问**之后**：它是这一轮回答的表头，说的是「下面这些花了多久」
@@ -160,5 +194,6 @@ export function groupRows(items: readonly Item[], activeTurnId?: string): readon
     if (last?.kind === "run") rows[rows.length - 1] = { kind: "run", items: [...last.items, item] }
     else rows.push({ kind: "run", items: [item] })
   }
+  seal(open)
   return rows
 }

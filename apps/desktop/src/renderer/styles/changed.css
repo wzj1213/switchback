@@ -1,137 +1,82 @@
 /*
- * 会话触达文件的当前净变更。
+ * 一轮改了哪些文件——**跟在那一轮末尾的一张卡**。
+ * 为什么是每轮一张、数字为什么是引擎报的那一份，见 `components/TurnEdits.tsx`。
  *
- * **它钉在输入框上方那一行里**（`.brief`），不是转录区最后一个跟着滚的孩子。
- * 原型（`界面细节打磨-v4.html`「计划并进那一排」）把三条带子并成一条，
- * 验收数就写在那儿：「输入框上方最多几行：1（现在 3）」。
- *
- * **所以这里只剩一种形态：一条无框摘要。** 展开出来的清单是浮层
- *（`components/Changed.tsx` 用 `Popover`），不在版面里占地方——
- * 上一版展开是就地摊开一张最高 36vh 的卡，而它长高多少转录区就矮多少，
- * 那条「最多 1 行」的验收数一展开就不成立了。
+ * 文件行（`.changed__*`）这一族留着：它本来就是「一个文件一行」的画法，
+ * 卡换了位置不该换画法。上一版那些只服务于「钉在输入框上方那条带子」的规则
+ *（收起态的药丸、展开态的浮层）跟着那条带子一起删了。
  */
-.changed {
-  min-width: 0;
-}
-
-/* 摘要按钮自己承担全部交互，所以这一层不画边也不铺底。 */
-.changed__card {
+.edits {
+  align-self: stretch;
   overflow: hidden;
-  border: 0;
+  width: 100%;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: transparent;
+  background: var(--bg-raised);
 }
 
-.changed__head {
+.edits__head {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  /* 和状态带里别的东西同高 */
-  min-height: 28px;
-  padding: 0;
+  min-height: 42px;
+  padding: var(--sp-1) var(--sp-2);
 }
 
-/* 状态带里的一个动作：无常驻描边，hover 才浮出底色。 */
-.changed__summary {
+.edits__glyph {
   display: flex;
   flex: none;
-  min-width: 0;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 var(--sp-2);
-  border: 0;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  background: var(--bg-sunken);
+  color: var(--text-muted);
 }
 
-.changed__summary:hover {
-  background: var(--bg-hover);
-}
-
-.changed__summary:active {
-  background: var(--bg-press);
-}
-
-/* 浮层开着时它保持高亮。同 `.trigger--open` 那条理由：清单浮在正文上面，
-   触发它的那颗却是常态的话，看不出这张清单是从哪儿出来的。 */
-.changed[data-open="true"] .changed__summary {
-  background: var(--bg-active);
-}
-
-/* 标题与原因压成一行：「引擎报了 9 个文件 · 不是 Git 仓库，没核对」。
-   **必须显式写 `row`**：默认那条是 `column`，不写方向的话两行会竖着叠进
-   28px 的药丸里，撑出去而且被切掉（出图才看见的） */
-.changed__copy {
-  display: flex;
-  flex: none;
+.edits__title {
+  flex: 1;
   min-width: 0;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.changed__title {
   overflow: hidden;
   color: var(--text);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: var(--lh-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.changed__total {
+.edits__stat {
   display: flex;
+  flex: none;
   gap: 5px;
-  overflow: hidden;
-  color: var(--text-faint);
   font-size: var(--text-xs);
-  line-height: var(--lh-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.changed__chev {
-  display: flex;
+.edits__review {
   flex: none;
-  color: var(--text-faint);
-}
-
-.changed__review {
-  flex: none;
-  height: 28px;
+  height: 26px;
   padding: 0 var(--sp-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
 }
 
-.changed__review:hover {
+.edits__review:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-/* 清单住在浮层里：边、影、最大高度和滚动都是 `.pop` 的事，这里只管排版。
-   上一版这里有 `max-height: 36vh` 和一条上边线——那是它还长在版面里时的装束。 */
-.changed__list {
-  min-width: 0;
-}
-
-/* 浮层一打开，焦点就落在这一层上（`data-popover-autofocus`，见 changed-list.tsx）。
-   **它只是个落脚点，不是能操作的东西**，画一圈焦点框会让整张清单看起来被选中了；
-   里面每一颗按钮各自的焦点框照常。 */
-.changed__list:focus-visible {
-  outline: none;
+.edits__list {
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--border);
 }
 
 .changed__file > .diff {
@@ -226,22 +171,12 @@
   color: var(--text);
 }
 
-.changed__others {
-  margin-top: var(--sp-1);
-  padding-top: var(--sp-1);
-  border-top: 1px solid var(--border);
-}
-
 .changed__note {
   margin: 0;
   padding: 3px var(--sp-1) 5px;
   color: var(--text-faint);
   font-size: var(--text-xs);
   line-height: 1.5;
-}
-
-.changed__name--flat {
-  cursor: default;
 }
 
 .changed__more {

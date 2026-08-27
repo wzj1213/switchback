@@ -163,3 +163,37 @@ describe("withLanes", () => {
     expect(foldTurns(rows, new Set(["t1"])).some((r) => r.kind === "lane")).toBe(true)
   })
 })
+
+describe("每轮末尾那张「改了哪些文件」", () => {
+  const edit = (id: string, turnId: string, path: string, added: number): Item => ({
+    id, turnId, at: 1, kind: "tool_call", tool: "Edit", status: "ok",
+    detail: { kind: "file_edit", path, added, removed: 0,
+      files: [{ path, kind: "update", added, removed: 0 }] },
+  })
+  const say = (id: string, turnId: string): Item =>
+    ({ id, turnId, at: 1, kind: "user_message", text: "改一下" }) as Item
+
+  it("一轮一张，跟在那一轮末尾——换轮那一刻补上一轮的", () => {
+    const rows = groupRows([
+      say("u1", "t1"), edit("e1", "t1", "a.ts", 3),
+      say("u2", "t2"), edit("e2", "t2", "b.ts", 5),
+    ], undefined, "/w")
+    const cards = rows.flatMap((row) => (row.kind === "edits" ? [row] : []))
+    expect(cards.map((c) => c.turnId)).toEqual(["t1", "t2"])
+    expect(cards[0]?.edits.list.map((f) => f.path)).toEqual(["/w/a.ts"])
+    // 第一张必须排在第二轮的提问**之前**：它属于上一轮
+    const first = rows.findIndex((row) => row.kind === "edits")
+    const asked = rows.findIndex((row) => row.kind === "item" && row.item.id === "u2")
+    expect(first).toBeLessThan(asked)
+  })
+
+  it("没改过文件的那一轮不插——空卡片比没有更吵", () => {
+    const rows = groupRows([say("u1", "t1")], undefined, "/w")
+    expect(rows.some((row) => row.kind === "edits")).toBe(false)
+  })
+
+  it("没给 cwd 就一张都不插：引擎报的路径归一不了（活动页那种场景）", () => {
+    const rows = groupRows([say("u1", "t1"), edit("e1", "t1", "a.ts", 3)])
+    expect(rows.some((row) => row.kind === "edits")).toBe(false)
+  })
+})

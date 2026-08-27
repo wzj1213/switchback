@@ -88,7 +88,8 @@ export const VIEWS = [
         }, 180)
       })()`,
       ready: `html[data-pet-ground]`,
-      assert: `document.documentElement.dataset.petGround === 'true' && document.querySelector('.changed') === null`,
+      assert: `document.documentElement.dataset.petGround === 'true'
+        && document.querySelector('.brief .edits') === null`,
       after: `delete document.documentElement.dataset.petGround`,
     },
     {

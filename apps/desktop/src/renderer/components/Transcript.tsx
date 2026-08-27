@@ -9,6 +9,9 @@ import { useApprovalState } from "../use-approval-state.js"
 import { RowView, canAsk, canRewind, keyOf, answerActs, lastMine, retryProps, approvalShortcut } from "./transcript-row.js"
 import { useAskSelection } from "../use-ask-selection.js"
 import { AskFloat } from "./ask-float.js"
+import { TranscriptRail } from "./TranscriptRail.js"
+import { useTranscriptRail } from "../use-transcript-rail.js"
+import { navPointsOf } from "../transcript-rail.js"
 
 /**
  * 对话正文。
@@ -27,6 +30,13 @@ import { AskFloat } from "./ask-float.js"
  * 这些都会让 `App` 整棵树重跑一遍，而它们和转录区里的内容没有半点关系。
  * 一屏几百条的会话上，那一次白跑正是「点开设置顿一下」里剩下的那部分。
  */
+/** 折/展一轮。抽出来是行数闸门逼的，这一刀也顺：它是集合运算，不是这一屏的事。 */
+function toggled(prev: ReadonlySet<string>, turnId: string): ReadonlySet<string> {
+  const next = new Set(prev)
+  if (!next.delete(turnId)) next.add(turnId)
+  return next
+}
+
 export const Transcript = memo(function Transcript({
   thread,
   items,
@@ -35,6 +45,7 @@ export const Transcript = memo(function Transcript({
   thinkingTokens,
   lanes,
   openLane, onOpenLane,
+  stamp, onReveal, onReview,
   send,
   onCopy,
   onReuse,
@@ -54,6 +65,10 @@ export const Transcript = memo(function Transcript({
   /** 工作台正开着哪条。缺席 = 没有工作台那一档（对比视图）。 */
   openLane?: string | undefined
   onOpenLane?: ((laneId: string) => void) | undefined
+  /** 「工作区可能变了」的节拍；缺席时那张改动卡也不画（对比视图没有工作区节拍）。 */
+  stamp?: string | undefined
+  onReveal?: ((path: string) => void) | undefined
+  onReview?: (() => void) | undefined
   send: (command: Command) => void
   onCopy: (text: string) => void
   /**
@@ -68,16 +83,15 @@ export const Transcript = memo(function Transcript({
   /** 折起来的那几轮。**按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管 */
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
   const onFold = useCallback((turnId: string) => {
-    setFolded((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(turnId)) next.add(turnId)
-      return next
-    })
+    setFolded((prev) => toggled(prev, turnId))
   }, [])
   const rows = useMemo(
     // **折叠在前、插旁路在后**：侧问与旁路都不归任何一轮，折起某一轮不该把它们一起折掉
-    () => withLanes(withAsides(foldTurns(groupRows(items, turn?.id), folded), thread.asides ?? []), lanes),
-    [items, turn?.id, folded, thread.asides, lanes],
+    () => withLanes(
+      withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd), folded), thread.asides ?? []),
+      lanes,
+    ),
+    [items, turn?.id, folded, thread.asides, lanes, thread.cwd],
   )
   // resolve 必须引用稳定，`ItemView` 的 memo 才不会在每帧流式更新时整屏失效。
   const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)
@@ -86,7 +100,9 @@ export const Transcript = memo(function Transcript({
   // 「改一改再发」只挂最后一句人话，而且只在能 rewind 时——见 `transcript-row.tsx`
   const retry = { id: useMemo(() => lastMine(rows), [rows]), active: canRewind(thread, turn, readOnly === true) }
   // 那排动作每轮只挂最后一条回答。**每条都挂的那一版连间距都被它带偏了**，见 `transcript-row.tsx`
-  const acts = useMemo(() => answerActs(rows), [rows])
+  const acts = useMemo(() => answerActs(rows, turn?.id), [rows, turn?.id])
+  // 左边那条导航：一格 = 你问的一次（`navPointsOf` 定的谁算一格）
+  const rail = useTranscriptRail(scroller, inner, useMemo(() => navPointsOf(rows), [rows]))
   return (
     <div
       className="transcript"
@@ -95,6 +111,7 @@ export const Transcript = memo(function Transcript({
       aria-label={`对话记录：${thread.title}`}
       tabIndex={0}
     >
+      <TranscriptRail marks={rail.marks} activeId={rail.activeId} onJump={rail.jump} />
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
       <div className="transcript__inner" ref={inner}>
         {rows.map((row) => (
@@ -104,6 +121,8 @@ export const Transcript = memo(function Transcript({
             threadId={thread.id}
             cwd={thread.cwd}
             acts={row.kind === "item" && acts.has(row.item.id)}
+            stamp={stamp ?? ""}
+            onReveal={onReveal} onReview={onReview}
             openLane={openLane} onOpenLane={onOpenLane}
             {...(canRewind(thread, turn, readOnly === true)
               ? { onRewind: (turnId: string) => { send({ type: "thread.rewind", threadId: thread.id, turnId }) } }

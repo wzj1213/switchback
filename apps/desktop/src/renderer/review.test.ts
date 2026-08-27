@@ -3,7 +3,6 @@ import type { ReviewFile } from "../shared/review.js"
 import { parseDiff } from "./diff.js"
 import { filterFiles, numbered, reviewCopyText, splitRows, tallyReview, trimMeta } from "./review.js"
 import { blank } from "./components/review-empty.js"
-import { shouldHide } from "./components/Changed.js"
 
 const PATCH = [
   "diff --git a/x.ts b/x.ts",
@@ -206,39 +205,3 @@ describe("trimMeta", () => {
   })
 })
 
-describe("「已编辑 N 个文件」什么时候藏起来", () => {
-  const base = { loading: false, settled: true, failed: false, files: 3, others: 0 }
-
-  it("**重问期间不藏**——这就是切走再切回来那一下的频闪", () => {
-    // `window.focus` 会触发重问（`useReview` 里那个 `bump`），于是 `loading` 转真。
-    // 上一版按 loading 一真就藏，卡片整张消失又装回来；而这时手上明明还有上一份答案
-    expect(shouldHide({ ...base, loading: true, settled: true })).toBe(false)
-  })
-
-  it("第一次加载、手上什么都没有时才藏", () => {
-    expect(shouldHide({ ...base, loading: true, settled: false, files: 0 })).toBe(true)
-  })
-
-  it("换会话（scope 变了）也算什么都没有：上一条的清单不能画在这一条上", () => {
-    // `reviewData` 在 scope 不匹配时给 settled:false，即使 data 还在
-    expect(shouldHide({ ...base, loading: true, settled: false })).toBe(true)
-  })
-
-  it("真的没有改动就藏——那时它没什么可说的", () => {
-    expect(shouldHide({ ...base, files: 0, others: 0 })).toBe(true)
-  })
-
-  it("自己没改但别人改了，照样要出现", () => {
-    expect(shouldHide({ ...base, files: 0, others: 2 })).toBe(false)
-  })
-
-  it("问 git 失败了要出现——**失败得说出来**，不能装作没有改动", () => {
-    expect(shouldHide({ ...base, files: 0, others: 0, failed: true })).toBe(false)
-  })
-
-  it("**跑动时不再整张藏起来**：它并进了输入框上方那一行，那时你更想知道动了什么", () => {
-    // 上一版有个 `hidden`，一开跑整张卡退出视线。并排之后那条没了——
-    // 卡还在转录区里跟着滚时藏得有道理，钉在输入框上方就没道理了
-    expect(shouldHide({ ...base, files: 2 })).toBe(false)
-  })
-})

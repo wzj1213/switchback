@@ -1,7 +1,6 @@
 import type { Command, Item, Lane, Thread } from "@omni/protocol"
 import { PlanPanel } from "./PlanPanel.js"
 import { QuestionStack } from "./QuestionCard.js"
-import { Changed } from "./Changed.js"
 import { Queued } from "./Queued.js"
 import { GoalBar } from "./GoalBar.js"
 import { ActivityDock } from "./ActivityDock.js"
@@ -31,11 +30,14 @@ interface Props {
  * 原型（`docs/界面细节打磨-v4.html`「计划并进那一排」）把这件事定死了，
  * 连验收数都写了：「输入框上方最多几行：1（现在 3）」。这一版把前两条并了。
  *
- * ## 变更卡为什么从转录区搬出来
+ * ## 变更卡为什么又回到了转录区，而且一轮一张
  *
- * 它原来是转录区的最后一个孩子，**跟着内容滚**——理由是「它是对话结果的一部分」。
- * 但那条理由和「你按回车之前该知道什么」是冲突的：往回翻一屏，它就滚没了，
- * 而那时你恰恰更想知道这一轮到底动了哪些文件。并进这一行之后它不再滚走。
+ * 它一度是转录区最后一个孩子（整条会话一张，跟着内容滚），后来搬进这一行钉住。
+ * 两版都错在同一个地方：**一张卡说的是整条会话的总账**，而人要问的是
+ * 「刚才那一轮动了什么」。钉住之后更别扭——你正读第三轮，它写的是十轮的累计。
+ *
+ * 现在一轮一张，跟在那一轮末尾（`components/TurnEdits.tsx`）。这一行于是只剩
+ * 计划与旁路，「输入框上方最多 1 行」那条验收数守得更稳。
  */
 export function Between(props: Props): React.JSX.Element {
   const waiting = props.thread.queued ?? []
@@ -46,17 +48,6 @@ export function Between(props: Props): React.JSX.Element {
       <div className="brief">
         <ActivityDock lanes={props.lanes} onOpen={props.onOpenLane} />
         <PlanPanel key={props.thread.id} items={props.items} running={props.thread.status === "running"} />
-        {props.stamp === undefined ? null : (
-          <Changed
-            items={props.items}
-            threadId={props.thread.id}
-            cwd={props.thread.cwd}
-            stamp={props.stamp}
-            onReveal={props.onReveal}
-            onCopy={props.onCopy}
-            onReview={props.onReview}
-          />
-        )}
       </div>
       <Queued
         texts={waiting}

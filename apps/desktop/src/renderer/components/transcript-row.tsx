@@ -5,6 +5,7 @@ import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
 import { AsideCard } from "./aside-card.js"
 import { LaneCard } from "./LaneCard.js"
+import { TurnEdits } from "./TurnEdits.js"
 import { ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
 import type { Row } from "../group.js"
@@ -20,6 +21,7 @@ import { spent } from "../status.js"
 /** 一行的 key。几种行各有各的身份来源，抽出来免得写在 JSX 里看不清。 */
 export function keyOf(row: Row): string {
   if (row.kind === "turn") return `mark-${row.turnId}`
+  if (row.kind === "edits") return `edits-${row.turnId}`
   if (row.kind === "run") return row.items[0]?.id ?? "run"
   if (row.kind === "aside") return `aside-${String(row.aside.at)}`
   // **拿 lane id 不拿 at**：卡片会就地更新几百次，key 跟着变的话 React 每次都重建整棵子树
@@ -69,17 +71,19 @@ export function lastMine(rows: readonly Row[]): string | undefined {
  * - **只认回答**。人话、思考、通知、计划卡都不挂——把复制挂在一段思考上，
  *   等于说那段思考和答案是同一级的东西。（你自己那句话上挂的是「改一改再发」，
  *   那是另一件事，见 `lastMine`。）
- * - **还在吐字的不算**。那一刻没有一份定稿可拿，而按钮一旦画出来，
- *   下一帧文字长高它就往下跳一次。写完才出现。
+ * - **还在跑的那一轮一条都不给**。它此刻说的每一段都是中间产物——
+ *   「我先查一下这两个字段的用途」写完了（`complete` 为真），可它不是这一轮的结论，
+ *   下一段马上就来。给它挂一颗复制，等于把过程当成了答案。
  * - **一轮里说了好几段就归最后那段**。前面几段是过程，末尾那段才是这一轮的结论。
  */
-export function answerActs(rows: readonly Row[]): ReadonlySet<string> {
+export function answerActs(rows: readonly Row[], activeTurnId?: string): ReadonlySet<string> {
   // 一轮一条：后来的覆盖先前的，收尾时留下的就是每轮最后那条
   const last = new Map<string, string>()
   for (const row of rows) {
     if (row.kind !== "item") continue
     const item = row.item
     if (item.kind !== "agent_message" || !item.complete) continue
+    if (item.turnId === activeTurnId) continue
     last.set(item.turnId, item.id)
   }
   return new Set(last.values())
@@ -116,14 +120,20 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
   readOnly ? undefined : itemId
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
-  readOnly, openLane, onOpenLane, laneLive }: {
+export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, onReveal, onReview, folded, onFold, onCopy,
+  onResolve, approvalTurn, shortcutApproval, readOnly, openLane, onOpenLane, laneLive }: {
   row: Row
   /** 这一行是不是「最后一条说出来的话」。见 `lastSpoken`。 */
   acts: boolean
   threadId: string
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
+  /** 「工作区可能变了」的节拍；那张改动卡拿它当补丁的缓存键。 */
+  stamp: string
+  /** 在访达里定位一个文件。给了那张改动卡才画行内动作。 */
+  onReveal?: ((path: string) => void) | undefined
+  /** 去审核面板。那张改动卡上「审核」那颗走它。 */
+  onReview?: (() => void) | undefined
   /** 从某一轮之前重来。 */
   onRewind?: (turnId: string) => void
   /**
@@ -182,6 +192,15 @@ export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, folded, o
     )
   }
   if (row.kind === "run") return <ToolRun items={row.items} threadId={threadId} cwd={cwd} />
+  // 这一轮改了哪些文件。**没有工作区节拍或没有入口时不画**——
+  // 一张点了什么都不会发生的卡比没有更糟（同「从这里重来」那条）
+  if (row.kind === "edits") {
+    if (onReveal === undefined || onReview === undefined) return <></>
+    return (
+      <TurnEdits edits={row.edits} cwd={cwd} stamp={stamp} threadId={threadId}
+        onReveal={onReveal} onCopy={onCopy} onReview={onReview} />
+    )
+  }
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
   if (row.kind === "lane") {
     return (

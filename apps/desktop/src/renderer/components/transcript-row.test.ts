@@ -66,3 +66,17 @@ describe("那排动作挂在哪几条上", () => {
     expect([...answerActs(done)]).toEqual(["a1"])
   })
 })
+
+describe("还在跑的那一轮", () => {
+  it("一条都不给——它此刻说的每一段都是中间产物，哪怕那一段自己写完了", () => {
+    const rows: readonly Row[] = [
+      { kind: "item", item: item("a1", "agent_message", "t1", { complete: true }) },
+      { kind: "item", item: item("u2", "user_message", "t2") },
+      // 这一段写完了，但它是「我先查一下…」那种过程话，后面还有
+      { kind: "item", item: item("a2", "agent_message", "t2", { complete: true }) },
+    ]
+    expect([...answerActs(rows, "t2")]).toEqual(["a1"])
+    // 这一轮跑完之后它才拿到
+    expect([...answerActs(rows)].sort()).toEqual(["a1", "a2"])
+  })
+})

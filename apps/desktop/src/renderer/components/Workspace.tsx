@@ -225,6 +225,9 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         usage={props.usage}
         pets={props.pets}
         send={send}
+        stamp={stamp}
+        onReveal={props.onReveal}
+        onReview={props.onReview}
         onCopy={props.onCopy}
         onReuse={reuse}
       >

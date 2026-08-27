@@ -18,6 +18,9 @@ export function ConversationStage({
   engines,
   usage,
   pets,
+  stamp,
+  onReveal,
+  onReview,
   send,
   onCopy,
   onReuse,
@@ -35,6 +38,10 @@ export function ConversationStage({
   engines: readonly EngineInfo[]
   usage: Usage | undefined
   pets: PetKit & { on: boolean }
+  /** 「工作区可能变了」的节拍，转录区里那张改动卡拿它当补丁的缓存键。 */
+  stamp: string | undefined
+  onReveal: (path: string) => void
+  onReview: () => void
   send: (command: Command) => void
   onCopy: (text: string) => void
   onReuse: (text: string, attachments?: readonly string[], aside?: boolean) => void
@@ -52,6 +59,9 @@ export function ConversationStage({
         lanes={lanes}
         openLane={openLane}
         onOpenLane={onOpenLane}
+        stamp={stamp}
+        onReveal={onReveal}
+        onReview={onReview}
         send={send}
         onCopy={onCopy}
         onReuse={onReuse}

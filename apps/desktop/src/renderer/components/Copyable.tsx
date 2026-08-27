@@ -41,10 +41,13 @@ export function Copyable({
 }): React.JSX.Element {
   const [feedback, copy] = useCopyFeedback(() => onCopy(textOf(item)))
   if (item.kind === "approval") return <>{children}</>
+  // 左边那条导航按「你问的一次」摆格子，位置只能从 DOM 量（见 `use-transcript-rail.ts`），
+  // 所以人话这一层要留一个认得出的锚点
+  const nav = item.kind === "user_message" ? { "data-nav": item.id } : {}
   // 一颗都没有就连那个盒子也别要：它占的那行高度正是上一版间距失真的来源
-  if (!acts && extra === undefined) return <div className="copyable">{children}</div>
+  if (!acts && extra === undefined) return <div className="copyable" {...nav}>{children}</div>
   return (
-    <div className="copyable" data-acts={acts ? "answer" : "extra"}>
+    <div className="copyable" data-acts={acts ? "answer" : "extra"} {...nav}>
       {children}
       {/*
         动作栏在消息**下面**，不是压在它身上。

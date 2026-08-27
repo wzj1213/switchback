@@ -1,0 +1,115 @@
+/*
+ * 转录区左边那条导航。一格 = 你问的一次。
+ * 为什么是这个尺度、几何怎么算，见 `transcript-rail.ts`。
+ */
+
+/*
+ * **`sticky` 而不是 `absolute`。** 这一层住在滚动容器里，而容器里的
+ * `position: absolute` 参照的是**可滚动内容**的内边距盒，不是可视区——
+ * 挂成 absolute 的话整条导航会跟着内容滚走（`.hem` 那段注释踩的是同一个坑）。
+ *
+ * 高度为 0：它不占布局，格子自己按量出来的像素绝对定位。
+ * `margin-top` 抵掉转录区的上内边距——不抵的话，滚到最顶端时这一层停在
+ * 内容盒顶边（比可视区顶边低 `--sp-5`），而格子的 y 是按可视区量的，
+ * 于是**只有在最顶上那一刻**整条会往下错 20px。
+ */
+.rail {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 0;
+  margin-top: calc(-1 * var(--sp-5));
+  /* 条身不接事件：鼠标从正文划过左边这十来像素时不该被它截住 */
+  pointer-events: none;
+}
+
+.rail__tick {
+  position: absolute;
+  left: 0;
+  width: 9px;
+  height: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: var(--border-strong);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    width var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+/*
+ * 点击热区比看得见的那条宽得多。**画出来的是 2px 高的一道线，
+ * 而 2px 的目标点不中**——上下各补 5px 的透明外扩，指针不用瞄。
+ */
+.rail__tick::after {
+  content: "";
+  position: absolute;
+  inset: -5px -4px;
+}
+
+.rail__tick:hover,
+.rail__tick:focus-visible {
+  width: 15px;
+  background: var(--text-muted);
+}
+
+.rail__tick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 当下那一格：更长、更实。**位置本身已经说明了「我在哪儿」**，
+   所以这里只做强调，不另外画一个游标 */
+.rail__tick[data-on="true"] {
+  width: 15px;
+  height: 3px;
+  background: var(--text);
+}
+
+/*
+ * 悬停卡。和侧栏那张（`.peek`）同一套装束：浮层要同时有边和影——
+ * 只有边的在浅色里浮不起来，只有影的在深色里边界消失。
+ */
+.rail__peek {
+  position: absolute;
+  left: 22px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 260px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-pop);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  /* 卡自己不接事件：接了它会盖住下一格，鼠标划过去就闪 */
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.rail__peek-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--lh-sm);
+  overflow-wrap: anywhere;
+}
+
+/* 正文压三行：它是「认出是哪一问」的辅助，不是读全文的地方 */
+.rail__peek-body {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
