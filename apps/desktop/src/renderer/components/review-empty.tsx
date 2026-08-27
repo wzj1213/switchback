@@ -1,5 +1,7 @@
 interface EmptyState {
   noRepo: boolean
+  /** 这张清单是跨几个仓库并起来的（工作区自己不是仓库）。 */
+  spread?: boolean
   loading?: boolean
   failed?: boolean
   baseline?: boolean
@@ -56,6 +58,9 @@ function ChangedSummary({ state, added, removed }: {
       </span>
       {unverified > 0 ? <span className="rv__count">另有 {unverified} 个 Git 忽略文件无法核实</span> : null}
       <DiffStats state={state} added={added} removed={removed} />
+      {/* 跨仓库那一档：数字各自相对它自己那个仓库的 HEAD，**不是**本次对话的净改动。
+          不说的话这几个数看起来和单仓库那档一模一样，而它们的口径不同 */}
+      {state.spread === true ? <span className="rv__note">跨仓库 · 各自相对 HEAD</span> : null}
     </>
   )
 }

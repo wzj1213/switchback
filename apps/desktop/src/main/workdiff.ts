@@ -14,6 +14,8 @@ import {
 import { codesOf } from "./worksite.js"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
 import { scopedPatchText, scopedReview } from "./workdiff-scopes.js"
+import { spreadReview } from "./workdiff-multi.js"
+import { repoForRel } from "./workdiff-multi.js"
 
 const run = promisify(execFile)
 
@@ -58,6 +60,11 @@ export interface Review {
   ignored?: readonly string[]
   /** 这份差异以对话开场工作树为基线，而不是 HEAD。 */
   baseline?: true
+  /**
+   * 这张清单是**跨几个仓库并起来的**（工作区自己不是仓库）。
+   * 界面据此说清「这几个数各自相对它自己那个仓库的 HEAD」。
+   */
+  spread?: true
   /** Git 临时读失败；空清单此时绝不等于“没有改动”。 */
   failed?: true
   /** 旧会话没有逐轮快照；不能拿会话开场或 HEAD 冒充“上一轮”。 */
@@ -218,7 +225,8 @@ export async function workReview(cwd: string, source: ReviewSource = {}): Promis
   const baseline = await conversationBaseline(cwd, source)
   if (baseline.handled) return baseline.review
   const repo = await repoOf(cwd)
-  if (repo === undefined) return undefined
+  // 工作区自己不是仓库，但底下挂着几个——按文件所属的仓库分头问（见 `workdiff-multi.ts`）
+  if (repo === undefined) return spreadReview(cwd, source, workReview)
   // `-uall`：不加的话未跟踪的**目录**会折成一条 `sub/`，界面上看起来像一个文件
   const status = await run("git", ["status", "--porcelain", "-z", "-uall"], { cwd: repo.root, timeout: TIMEOUT }).catch(
     () => undefined,
@@ -353,7 +361,12 @@ export async function workPatch(
   source: ReviewSource = {},
 ): Promise<ReviewPatch> {
   const repo = await repoOf(cwd)
-  if (repo === undefined || !safeRel(repo, rel)) return GONE
+  if (repo === undefined) {
+    // 跨仓库那一档：`rel` 是相对总目录的，先找到它自己那个仓库（见 `workdiff-multi.ts`）
+    const owner = await repoForRel(cwd, rel)
+    return owner === undefined ? GONE : workPatch(owner.root, owner.rel, context, { ...source, wanted: undefined })
+  }
+  if (!safeRel(repo, rel)) return GONE
   // 上下文行数由界面给：默认 3 行，「展开」时给一个大数——这比自己去读原文件
   // 再拼上下文可靠得多，git 知道每个 hunk 真正的行号
   const unified = `--unified=${String(Math.max(0, Math.min(context, 99_999)))}`

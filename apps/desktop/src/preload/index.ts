@@ -51,6 +51,8 @@ interface Review {
   baseline?: true
   failed?: true
   turnMissing?: true
+  /** 这张清单是跨几个仓库并起来的（工作区自己不是仓库）。见 `main/workdiff-multi.ts`。 */
+  spread?: true
   scope?: ReviewScope
 }
 

@@ -151,6 +151,9 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  /* 左缘那条大纲要按**这块地有多宽**决定画不画，而不是按窗口多宽：
+     侧栏收没收起、工作台开没开，同一个窗口宽度下这块地能差六百像素 */
+  container: stage / inline-size;
 }
 
 .transcript {

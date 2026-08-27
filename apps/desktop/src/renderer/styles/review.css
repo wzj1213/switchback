@@ -681,3 +681,14 @@
   background: var(--bg-sunken);
   color: var(--text-faint);
 }
+
+/* 「跨仓库 · 各自相对 HEAD」。**和统计数同一行、但明显更轻**——它是口径说明，
+   不是又一个数（见 `review-empty.tsx` 的 `ReviewSummary`）。 */
+.rv__note {
+  padding: 1px var(--sp-1);
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}

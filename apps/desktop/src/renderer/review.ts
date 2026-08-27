@@ -117,6 +117,8 @@ export interface ReviewData {
   turnMissing: boolean
   /** 不是 git 仓库。和「没有改动」是两件事，界面上要说不同的话。 */
   noRepo: boolean
+  /** 跨仓库并起来的那一档：每个仓库各自相对它自己的 HEAD。 */
+  spread: boolean
   loading: boolean
   /**
    * 手上有没有**这个 scope 的**答案——哪怕它旧了、正在重问。
@@ -151,7 +153,7 @@ function loadedReview(
 ): LoadedReview {
   if (out === undefined) {
     return { key, scope, root: "", cwd: "", files: [], baseline: false, failed: false,
-      turnMissing: false, noRepo: true }
+      turnMissing: false, noRepo: true, spread: false }
   }
   return {
     key,
@@ -161,6 +163,7 @@ function loadedReview(
     failed: out.failed === true,
     turnMissing: out.turnMissing === true,
     noRepo: false,
+    spread: out.spread === true,
   }
 }
 
@@ -172,7 +175,7 @@ function reviewData(
 ): ReviewData {
   if (data === undefined || data.scope !== scope) {
     return {
-      root: "", cwd: "", files: [], noRepo: false, baseline: false, failed: false,
+      root: "", cwd: "", files: [], noRepo: false, spread: false, baseline: false, failed: false,
       turnMissing: false, loading: true, settled: false, revision: key, reload,
     }
   }
@@ -231,7 +234,7 @@ export function useReview(
       .catch(() => {
         if (!live) return
         setData({ key, scope, root: "", cwd, files: [], baseline: false, failed: true,
-          turnMissing: false, noRepo: false })
+          turnMissing: false, noRepo: false, spread: false })
       })
     return () => {
       live = false
