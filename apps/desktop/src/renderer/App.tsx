@@ -137,7 +137,7 @@ export function App(): React.JSX.Element {
 
   if (thread === undefined) {
     return (
-      <div className="shell">
+      <div className={panelShellClass(false, false, shell.railOpen)}>
         {sidebar}
         <EmptyScreen
           notices={app.notices}
@@ -155,7 +155,7 @@ export function App(): React.JSX.Element {
 
   if (shell.comparing && peer !== undefined) {
     return (
-      <div className={panelShellClass(shell.panelVisible, shell.panelFull)}>
+      <div className={panelShellClass(shell.panelVisible, shell.panelFull, shell.railOpen)}>
         {sidebar}
         <CompareScreen
           state={state}

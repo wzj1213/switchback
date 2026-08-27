@@ -35,6 +35,27 @@ export const VIEWS = [
       })()`,
     },
     {
+      /*
+       * 收起左侧导航。侧栏固定 264px，在最小窗口下吃掉三成宽度，而此前
+       * 全仓没有任何入口能收起它。断言要盯住三件事，缺一件都算没做完：
+       * 侧栏真的不占位、主区顶到 x=0、以及**顶栏给交通灯让出了位置**——
+       * hiddenInset 的交通灯还在窗口左上角，不让位的话会压在标题上。
+       */
+      name: "01b-收起侧栏",
+      open: `document.querySelector('button[aria-label="收起侧栏"]')?.click()`,
+      ready: `.shell--norail`,
+      assert: `(() => {
+        const sidebar = document.querySelector('.sidebar')
+        const main = document.querySelector('.main')
+        if (main === null) return false
+        return (sidebar === null || getComputedStyle(sidebar).display === 'none')
+          && Math.abs(main.getBoundingClientRect().left) < 1
+          && getComputedStyle(document.querySelector('.topbar')).paddingLeft === '92px'
+          && document.querySelector('button[aria-label="展开侧栏"]') !== null
+      })()`,
+      after: `document.querySelector('button[aria-label="展开侧栏"]')?.click()`,
+    },
+    {
       name: "02-桌宠固定地面",
       open: `(() => {
         const pet = document.querySelector('.pet--on') ?? document.querySelector('.pet')

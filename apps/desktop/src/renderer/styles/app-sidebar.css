@@ -1,3 +1,213 @@
+/*
+ * 侧栏的行与它上面的一切。
+ *
+ * **从 `app-foundation.css` 搬过来的**，理由不是行数闸门（虽然是它先响的）：
+ * `.row__act` / `.row__dot` / `.row__time` / `.row--unread` 本来就在这个文件里，
+ * 而 `.row` / `.row__slot` / `.row__label` 在那边——**同一个组件被劈成两个文件**，
+ * 改一处底色要翻两处。现在整条行在一个文件里。
+ */
+
+/* ── 行：侧栏里所有可点的东西都是这个形状 ───────────────── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: calc(100% - var(--sb-pad) * 2);
+  margin: 0 var(--sb-pad);
+  min-height: var(--sb-row-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: default;
+}
+
+/* 图标列。**固定宽度**——图标本身大小不一，靠居中把它们对到同一条中线上 */
+.row__slot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-slot);
+  color: var(--text-faint);
+}
+
+/* 组标题那一行里，展开箭头之后还有一个文件夹图标。
+   **宽度必须和 `.row__slot` 一样**：会话行缩进一个 slot 之后，
+   状态点正好落在这个文件夹图标的那一列上。差几个像素就是「差不多齐」，
+   而「差不多齐」比明显不齐更难看 */
+.row__lead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-slot);
+  color: var(--text-faint);
+}
+
+.row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 按下去要有反应：hover 说的是「这儿能点」，按下态说的是「我点了」——
+   macOS 上按下与松开之间那一百毫秒是「系统收到了」的唯一凭据。
+   底色写在 `.row` 上而不是 `.row__main`（后者透明，也不含右边那颗 `···`）；
+   假输入行排除在外，它的 hover 本来就被顶回 `--bg-raised` */
+.row:not(.row--search):active {
+  background: var(--bg-press);
+}
+
+.row:hover .row__slot,
+.row:hover .row__lead {
+  color: var(--text-muted);
+}
+
+/* 组标题：字号小一档、字重重一档。**左边距和普通行一样**，
+   靠展开箭头占住图标列，所以它和下面的会话行是对齐的 */
+.row--group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: var(--sp-1);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.row__count {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 6px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 组标题现在也是「主按钮 + 贴右的 ···」，和会话行同一套结构 */
+.row--group {
+  padding: 0;
+}
+
+.row--group .row__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--sb-row-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 会话行整体是个 flex，主按钮撑满、删除按钮贴右 */
+.row--thread {
+  position: relative;
+  padding: 0;
+}
+
+.row--thread .row__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--sb-row-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+/* 会话缩进一级：它属于上面那个项目。缩进量正好是图标列宽，
+   于是会话的状态点落在组标题的文件夹图标那一列上 */
+.row--thread .row__slot {
+  margin-left: var(--sb-slot);
+}
+
+/* **提到 (0,2,0) 压过 `.row:hover`**：不提的话，指针放到「当前打开的这条」上，
+   选中态被 hover 顶掉一档——浅色变亮、深色变暗，两个方向都往「更不显眼」走。
+   同一个坑 `.row--search:hover` 打过一次补丁，当时没回头修选中行 */
+.row.row--selected {
+  background: var(--bg-active);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* 悬停时**再深一档**，不是退回去 */
+.row.row--selected:hover {
+  background: var(--bg-press);
+}
+
+.row.row--selected .row__slot {
+  color: var(--text-muted);
+}
+
+/* 搜索行：一个假的输入行，长得和别的行一样，只是里面是 input */
+/* **焦点环走 inset 阴影，不走 border。** 描边会占 1px 布局，
+   于是这一行里的图标和输入框比其余所有行右移 1px——它是四条左缘里
+   最不起眼、也最没必要的那一条。阴影不占位，视觉上和 1px 描边一样。 */
+.row--search {
+  margin-bottom: var(--sp-2);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px transparent;
+}
+
+.row--search:hover {
+  background: var(--bg-hover);
+}
+
+/* 系统焦点环在 `.sidebar__filter` 上被关掉了，这条边是这个框**唯一**的焦点指示。
+   用强调色兑现 tokens.css 的「强调色只用于焦点与链接」。 */
+.row--search:focus-within {
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* **拉满行高。** 改之前这个 `input` 只有 17px 高，而它外面那一行是 34——
+   上下各 8px 看着像输入框、点下去什么都不发生。一个只有一半能用的输入框，
+   比一个明显小一点的输入框更让人以为界面坏了 */
+.sidebar__filter {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  padding: 0 var(--sp-2) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  appearance: none;
+}
+
+.sidebar__filter:focus {
+  outline: none;
+}
+
+.sidebar__filter::placeholder {
+  color: var(--text-faint);
+}
+
 /* ── 正文命中 ────────────────────────────────────────
  * 「标题里没有，但正文里提过」的那几条。**两行**：标题 + 以命中词为中心的摘要。
  * 只给标题的话你还是得逐个点开确认，那这一段就白做了。见 components/SidebarDeep.tsx。
@@ -305,4 +515,48 @@
   border-top: 1px solid var(--border);
   color: var(--text-faint);
   font-size: var(--text-xs);
+}
+
+/* ── 行家族的其余成员 ────────────────────────────────
+ * **顺序有意义**：`.row--flat .row__slot` 要压过上面的
+ * `.row--thread .row__slot`（两者都是 (0,2,0)，靠先后决定），
+ * 搬文件时差点把这条颠倒过来——筛选结果那几行会莫名多出一级缩进。
+ */
+
+/* 折叠的项目里有人等你批：**转圈说「在忙」，这两个字说「等你」**——
+   一个可以走开，一个不能。用 --warn 是因为它属于「需要你做点什么」那一类 */
+.row__wait {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+
+/* 失败不是「等你批」。`--warn` 那个颜色留给「需要你做点什么」，
+   崩掉的会话是既成事实，走 `--danger`——和工具行的失败状态同一档 */
+.row__note--fail {
+  color: var(--danger);
+}
+
+/* 行右侧的一小段附注：「最近」段的项目名、底部那行的快捷键 */
+/* 项目名让位给正文：**这一列是给「哪个项目」做参照的，不是主角**。
+   给它 84px 的时候，会话标题被截成「给 m.js 的 a…」，等于两边都读不出来 */
+.row__aside {
+  flex: none;
+  margin-left: var(--sp-2);
+  padding-right: 4px;
+  overflow: hidden;
+  max-width: 62px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+/* 不在项目组里的会话行（筛选结果、最近段）：不缩进那一级 */
+.row--flat .row__slot {
+  margin-left: 0;
 }

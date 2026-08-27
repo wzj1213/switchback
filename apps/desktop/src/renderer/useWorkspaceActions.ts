@@ -41,6 +41,8 @@ export function useWorkspaceActions(deps: {
   onReview: () => void
   onFilterThreads: () => void
   onSettings: () => void
+  /** 收起 / 展开左侧导航（⌘\ 与「显示」菜单同一条路）。 */
+  onToggleRail: () => void
   /**
    * 新会话开成什么样：引擎 + 模型 + 思维档。**已经按优先级算好了**
    *（见 `newThreadPrefs.ts` 的 `openWith`）——这里只负责发出去。
@@ -116,6 +118,7 @@ export function useWorkspaceActions(deps: {
       review: deps.onReview,
       settings: deps.onSettings,
       filterThreads: deps.onFilterThreads,
+      toggleRail: deps.onToggleRail,
       copyMarkdown: () => {
         if (thread === undefined) return
         deps.copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine)))

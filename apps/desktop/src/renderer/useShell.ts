@@ -46,6 +46,12 @@ export interface Shell {
   setFinding: (on: boolean) => void
   comparing: boolean
   setComparing: (on: boolean) => void
+  /**
+   * 左侧导航展开着没有。**默认展开**——收起是一个显式动作，
+   * 不是启动时的默认状态；一个新用户打开应用应该先看见有什么。
+   */
+  railOpen: boolean
+  toggleRail: () => void
   settingsOpen: boolean
   setSettingsOpen: (on: boolean) => void
   /** 审核页签已经打开；切去别页时仍挂载，保住筛选和选中位置。 */
@@ -93,6 +99,7 @@ export function useShell(): Shell {
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
   const [finding, setFinding] = useState(false)
   const [comparing, setComparing] = useState(false)
+  const [railOpen, setRailOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [panel, setPanel] = useState(CLOSED_PANEL)
   const [focusFilter, setFocusFilter] = useState(0)
@@ -143,6 +150,8 @@ export function useShell(): Shell {
     setFinding,
     comparing,
     setComparing,
+    railOpen,
+    toggleRail: () => { setRailOpen((was) => !was) },
     settingsOpen,
     setSettingsOpen,
     reviewOpen: hasPanelTab(panel, "review"),

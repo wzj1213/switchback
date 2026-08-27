@@ -45,6 +45,8 @@ export interface WorkspaceProps {
   openLane: string | undefined
   onOpenLane: (laneId: string) => void
   panelVisible: boolean
+  railOpen: boolean
+  onRail: () => void
   /** 任一右侧工具组可见时，拖放提示要覆盖它，而不是藏在输入卡里。 */
   dropSurfaceVisible: boolean
   onTogglePanel: () => void
@@ -200,6 +202,8 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onCopy={props.onCopy}
         panelVisible={props.panelVisible}
         onPanel={props.onTogglePanel}
+        railOpen={props.railOpen}
+        onRail={props.onRail}
       />
       <Notices
         notices={props.notices}

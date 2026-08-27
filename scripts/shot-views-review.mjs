@@ -72,6 +72,18 @@ export const REVIEW_VIEWS = [
     after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
   },
   {
+    /*
+     * 方向键不越界。
+     *
+     * **断言只钉不变量，不钉具体落到哪一份。** 原来写的是
+     * `rows[(at + 1) % rows.length]`——那是给**扁平清单**算的，
+     * 而文件栏早就改成了可折叠目录树：折起来的目录里那些文件根本不在
+     * `.rvl__row--file` 里，于是「下一份」按渲染行算出来的和键盘按模型走到的
+     * 不是同一个，出图在真实工作区上必然失败（14 份改动、四层目录时实测复现）。
+     *
+     * 现在要的是两件事：面板外面按方向键选中不变；面板里面按下去要被吃掉、
+     * 焦点留在筛选框、并且**换到了另一份确实存在的文件**。
+     */
     name: "04-审核方向键不越界",
     open: `(() => {
       const before = document.querySelector('.rv__path')?.textContent
@@ -79,25 +91,30 @@ export const REVIEW_VIEWS = [
       outside?.focus()
       const outsideKey = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
       outside?.dispatchEvent(outsideKey)
-      const rows = [...document.querySelectorAll('.rvl__row--file')]
-      const at = rows.findIndex(row => row.getAttribute('aria-current') === 'true')
-      const expected = rows[(at + 1) % rows.length]?.getAttribute('data-review-rel')
+      const known = [...document.querySelectorAll('.rvl__row--file')]
+        .map(row => row.getAttribute('data-review-rel'))
       const input = document.querySelector('.rvl__input')
       input?.focus()
       const insideKey = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
       input?.dispatchEvent(insideKey)
       window.__omniReviewKeys = {
-        before, expected, outsidePreserved: document.querySelector('.rv__path')?.textContent === before,
+        before, known, outsidePreserved: document.querySelector('.rv__path')?.textContent === before,
         outsidePrevented: outsideKey.defaultPrevented, insidePrevented: insideKey.defaultPrevented,
       }
       return new Promise(resolve => requestAnimationFrame(() => resolve(true)))
     })()`,
     ready: ".rv__file",
-    assert: `window.__omniReviewKeys?.outsidePreserved === true
-      && window.__omniReviewKeys?.outsidePrevented === false
-      && window.__omniReviewKeys?.insidePrevented === true
-      && document.activeElement?.classList.contains('rvl__input') === true
-      && document.querySelector('.rv__path')?.textContent === window.__omniReviewKeys?.expected`,
+    assert: `(() => {
+      const keys = window.__omniReviewKeys
+      const now = document.querySelector('.rv__path')?.textContent
+      // 越界那半：面板外面按方向键，选中的文件一个字都不能变
+      if (keys?.outsidePreserved !== true || keys.outsidePrevented !== false) return false
+      // 面板里面那半：必须吃掉这次按键，焦点留在筛选框，并且真的换了一份文件
+      return keys.insidePrevented === true
+        && document.activeElement?.classList.contains('rvl__input') === true
+        && now !== keys.before
+        && keys.known.includes(now)
+    })()`,
   },
   {
     name: "04-审核目录折叠",

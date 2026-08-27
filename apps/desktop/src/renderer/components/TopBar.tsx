@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import type { EngineInfo, Thread, Usage } from "@omni/protocol"
 import { CaretIcon } from "./icons.js"
+import { RailIcon } from "./icons-panel.js"
 import { ContextMeter } from "./ContextMeter.js"
 import { EnvCard } from "./EnvCard.js"
 import { TimelineCard } from "./TimelineCard.js"
@@ -68,6 +69,26 @@ function Cards({
   return null
 }
 
+/**
+ * 侧栏开关。**摆在最左，在标题之前**——它管的是标题左边那一列，
+ * 而 claude、codex、VS Code 三家的这颗都在同一个位置。
+ * 导航收起时交通灯会挪到顶栏里，这颗就紧挨着它们（见 `.shell--norail`）。
+ */
+function RailToggle({ open, onToggle }: { open: boolean; onToggle: () => void }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`iconbtn${open ? "" : " iconbtn--on"}`}
+      title={open ? "收起侧栏（⌘\\）" : "展开侧栏（⌘\\）"}
+      aria-label={open ? "收起侧栏" : "展开侧栏"}
+      aria-pressed={!open}
+      onClick={onToggle}
+    >
+      <RailIcon size={14} />
+    </button>
+  )
+}
+
 export function TopBar({
   thread,
   usage,
@@ -84,6 +105,8 @@ export function TopBar({
   limits,
   panelVisible,
   onPanel,
+  railOpen,
+  onRail,
 }: {
   thread: Thread
   usage: Usage | undefined
@@ -104,12 +127,16 @@ export function TopBar({
   limits: LimitNotice | undefined
   panelVisible: boolean
   onPanel: () => void
+  /** 左侧导航展开着没有 + 怎么切。⌘\ 与「显示」菜单走同一条路。 */
+  railOpen: boolean
+  onRail: () => void
 }): React.JSX.Element {
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
   const envAnchor = useRef<HTMLButtonElement>(null)
   return (
     <header className="topbar">
+      <RailToggle open={railOpen} onToggle={onRail} />
       {/* 标题点开是环境信息。**把它挂在标题上**而不是另放一颗按钮：
           「我在哪个会话里」和「这个会话跑在什么环境里」是同一个问题的两半 */}
       <button

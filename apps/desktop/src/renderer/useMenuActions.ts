@@ -10,6 +10,7 @@ export interface MenuHandlers {
   review: () => void
   filterThreads: () => void
   settings: () => void
+  toggleRail: () => void
 }
 
 export function isReviewKey(
@@ -32,7 +33,7 @@ export function useMenuActions(
   handlers: MenuHandlers,
   deps: readonly unknown[],
 ): void {
-  const { newThread, openFolder, interrupt, find, copyMarkdown, compare, review, filterThreads, settings } = handlers
+  const { newThread, openFolder, interrupt, find, copyMarkdown, compare, review, filterThreads, settings, toggleRail } = handlers
   useEffect(() => {
     const table: Readonly<Record<string, () => void>> = {
       "new-thread": newThread,
@@ -44,6 +45,7 @@ export function useMenuActions(
       review,
       "filter-threads": filterThreads,
       settings,
+      "toggle-rail": toggleRail,
     }
     const off = onMenu((action) => {
       table[action]?.()
@@ -51,9 +53,16 @@ export function useMenuActions(
     // 菜单 accelerator 是主入口；renderer 再接同一组合键，让隐藏菜单或 CDP
     // 驱动的窗口也能打开审核。动作是幂等的，主进程同时送达时不会反向关掉面板。
     const onKey = (event: KeyboardEvent): void => {
-      if (!isReviewKey(event)) return
-      event.preventDefault()
-      review()
+      if (isReviewKey(event)) {
+        event.preventDefault()
+        review()
+        return
+      }
+      // 侧栏开关同样接一份：出图脚本与隐藏菜单的窗口拿不到 accelerator
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key === "\\") {
+        event.preventDefault()
+        toggleRail()
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => {

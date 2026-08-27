@@ -55,7 +55,7 @@ export function ThreadScreen({
     thread.cwd,
   )
   return (
-    <div className={panelShellClass(shell.panelVisible, shell.panelFull)}>
+    <div className={panelShellClass(shell.panelVisible, shell.panelFull, shell.railOpen)}>
       {sidebar}
       <Workspace
         key={thread.id}
@@ -75,6 +75,8 @@ export function ThreadScreen({
         openLane={workbench.visible && workbench.page === "activity" ? workbench.laneId : undefined}
         onOpenLane={shell.openAside}
         panelVisible={shell.panelVisible}
+        railOpen={shell.railOpen}
+        onRail={shell.toggleRail}
         dropSurfaceVisible={shell.panelVisible}
         onTogglePanel={shell.togglePanelVisibility}
         onFilesDropped={() => {

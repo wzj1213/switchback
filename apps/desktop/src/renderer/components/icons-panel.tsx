@@ -60,6 +60,21 @@ export function PanelIcon({ size = 14 }: { size?: number } = {}): React.JSX.Elem
   )
 }
 
+/**
+ * 左侧导航。**PanelIcon 的镜像**——同一个盒子，竖线换到左边。
+ *
+ * 两颗必须是一对：它们一左一右摆在顶栏两头，管的是同一件事的两侧。
+ * 画成两个不相干的形（比如左边用「三条横线」）的话，用户得各记一次。
+ */
+export function RailIcon({ size = 14 }: { size?: number } = {}): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <rect x="2" y="2.5" width="12" height="11" rx="2" {...LINE} />
+      <path d="M5.5 2.5v11" {...LINE} />
+    </Svg>
+  )
+}
+
 /** 铺满。四个角往外顶——不是箭头，箭头在这套里已经是「去某处」的意思。 */
 export function ExpandIcon({ size = 13 }: { size?: number } = {}): React.JSX.Element {
   return (

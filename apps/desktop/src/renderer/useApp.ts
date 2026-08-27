@@ -97,6 +97,27 @@ export interface AppApi {
 }
 
 /** 没有会话时那份空条目。**同一个引用**，理由见 `AppApi.items`。 */
+/**
+ * 只改「界面现在是什么模式」的那几个意图。
+ *
+ * 抽出来是函数行数闸门逼的，但边界也顺：它们**一个都不碰会话状态**，
+ * 全部落在 `useShell` 上——和上面那批（新建会话、打开文件夹、中断）
+ * 完全是两类东西。
+ */
+function viewActions(shell: Shell): Pick<
+  Parameters<typeof useWorkspaceActions>[0],
+  "onFind" | "onCompare" | "onReview" | "onFilterThreads" | "onToggleRail" | "onSettings"
+> {
+  return {
+    onFind: () => { shell.setFinding(true) },
+    onCompare: () => { shell.setComparing(true) },
+    onReview: () => { shell.setReviewOpen(true) },
+    onFilterThreads: shell.askFocusFilter,
+    onToggleRail: shell.toggleRail,
+    onSettings: () => { shell.setSettingsOpen(true) },
+  }
+}
+
 const EMPTY_ITEMS: readonly Item[] = []
 
 export function useApp(): AppApi {
@@ -179,19 +200,7 @@ export function useApp(): AppApi {
     // 兜底沿用当前会话；它被设置隐藏时才退到第一家，见纯函数里的表驱动测试。
     opened: openWithEngines(prefs.settings, thread?.engine, engines),
     defaultTrust: prefs.settings.defaultTrust,
-    onFind: () => {
-      shell.setFinding(true)
-    },
-    onCompare: () => {
-      shell.setComparing(true)
-    },
-    onReview: () => {
-      shell.setReviewOpen(true)
-    },
-    onFilterThreads: shell.askFocusFilter,
-    onSettings: () => {
-      shell.setSettingsOpen(true)
-    },
+    ...viewActions(shell),
   })
 
   return {

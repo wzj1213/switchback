@@ -17,6 +17,7 @@ export type MenuAction =
   | "review"
   | "filter-threads"
   | "settings"
+  | "toggle-rail"
 
 const isMac = process.platform === "darwin"
 
@@ -132,6 +133,44 @@ function threadMenu(): MenuItemConstructorOptions {
 }
 
 /**
+ * 显示。
+ *
+ * **这一栏原来是 `{ role: "viewMenu" }`**，而文件头那句「编辑/显示/窗口三栏
+ * 一律用 role」的理由是「系统会自己本地化、自己接上原生行为」。那条理由
+ * 是**逐项**成立的，所以下面每一项仍然是 role——手写的只有栏目标签本身，
+ * 而文件、会话、帮助三栏本来就是手写的中文标签。
+ *
+ * 换掉它只为加一件 role 给不了的事：**收起侧栏**。侧栏固定 264px，
+ * 在最小窗口（860px）下吃掉三成宽度，而此前全仓没有任何入口能收起它——
+ * claude 与 codex 的左上角第一颗按钮都是这个开关，`⌘\` 也是这三家
+ * （连同 VS Code）一致的组合键。
+ */
+function viewMenu(): MenuItemConstructorOptions {
+  return {
+    label: "显示",
+    submenu: [
+      {
+        label: "收起 / 展开侧栏",
+        accelerator: "CmdOrCtrl+\\",
+        click: (_i, focused) => {
+          send("toggle-rail", focused)
+        },
+      },
+      { type: "separator" },
+      { role: "resetZoom" },
+      { role: "zoomIn" },
+      { role: "zoomOut" },
+      { type: "separator" },
+      { role: "togglefullscreen" },
+      { type: "separator" },
+      { role: "reload" },
+      { role: "forceReload" },
+      { role: "toggleDevTools" },
+    ],
+  }
+}
+
+/**
  * 帮助：打包之后没有终端，出问题时用户手上什么都没有。
  * 这一项就是「把能说明情况的东西凑成一份」。
  */
@@ -184,7 +223,7 @@ export function installMenu(
     fileMenu(onEngines),
     { role: "editMenu" },
     threadMenu(),
-    { role: "viewMenu" },
+    viewMenu(),
     { role: "windowMenu" },
     helpMenu(onDiagnose, onCheckUpdate),
   ]
