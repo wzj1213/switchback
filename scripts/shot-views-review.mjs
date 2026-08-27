@@ -9,8 +9,20 @@ export const REVIEW_VIEWS = [
     ], shortcut: { key: "r", code: "KeyR", modifiers: 12, windowsVirtualKeyCode: 82 },
     ready: ".rv",
     assert: `(document.querySelector('.rv__file') !== null
-        || document.querySelector('.rv')?.textContent.includes('当前工作区相对 HEAD 是干净的') === true)
-      && !document.querySelector('.rv__pane')?.textContent.includes('读取当前净补丁失败')
+        // 干净树：认「清单说了没有改动」这个**结构事实**，不认某一句具体文案。
+        // 原来钉的是「当前工作区相对 HEAD 是干净的」，而这一屏自己点了「未提交」，
+        // 那个范围下 review-empty.tsx 说的是「未提交没有改动」——两句都对，
+        // 钉死一句的结果是：一棵干净的树在这一屏必然失败。
+        || document.querySelector('.rvl__none') !== null)
+      // 失败态只看**那个专门的元素**，不扫整块面板的文字。
+      // 原来扫的是 .rv__pane 的 textContent，而它包含**正在展示的那份 diff 正文**——
+      // 于是这一屏在「被审核的文件恰好含有这个字符串」时必然失败，
+      // 而含有它的文件正是这个断言自己所在的那一份。实测复现过。
+      // 顺带：原来找的那句话（「读取当前净补丁失败」）压根不会出现在面板里，
+      // 它是**复制**动作的兜底文案（review-patch.ts 的 SKIP_COPY）；
+      // 面板真正会说的是 ReviewDiff.tsx 的 SKIP。
+      && [...document.querySelectorAll('.rvd__note')]
+        .every(note => !note.textContent.includes('读取这份改动失败'))
       && document.querySelector('.rv__scrim') === null
       && (() => { const diff = document.querySelector('.rvd'); return diff === null
         || (diff.focus(), document.activeElement === diff) })()
@@ -110,9 +122,12 @@ export const REVIEW_VIEWS = [
       // 越界那半：面板外面按方向键，选中的文件一个字都不能变
       if (keys?.outsidePreserved !== true || keys.outsidePrevented !== false) return false
       // 面板里面那半：必须吃掉这次按键，焦点留在筛选框，并且真的换了一份文件
+      // 只有一份改动文件时，「下一份」就是它自己——这时不该要求选中变了。
+      // 这条第一次写出来就漏了它，而工作区只改一个文件恰恰是最常见的情形。
+      const moved = keys.known.length > 1 ? now !== keys.before : now === keys.before
       return keys.insidePrevented === true
         && document.activeElement?.classList.contains('rvl__input') === true
-        && now !== keys.before
+        && moved
         && keys.known.includes(now)
     })()`,
   },
@@ -121,7 +136,12 @@ export const REVIEW_VIEWS = [
     open: `(() => {
       const active = document.querySelector('[role="treeitem"][aria-current="true"]')?.getAttribute('data-review-rel')
       const dirs = [...document.querySelectorAll('[role="treeitem"][aria-expanded="true"]')]
-      const target = dirs.find(row => !active?.startsWith(row.getAttribute('title') + '/'))
+      const outside = dirs.find(row => !active?.startsWith(row.getAttribute('title') + '/'))
+      // 优先挑**不含当前文件**的目录（折起来不动选中，更干净）；工作区只改了
+      // 一份文件时这样的目录根本不存在，那就退回任意一个展开的目录——
+      // 这一屏验的是「折起来之后节点变少、焦点还在原行」，两种情形都成立。
+      // 不退的话 target 是 undefined，什么都不折，ready 直接超时。
+      const target = outside ?? dirs[0]
       window.__omniReviewTree = { path: target?.getAttribute('title'), before: document.querySelectorAll('[role="treeitem"]').length }
       target?.focus()
       target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
