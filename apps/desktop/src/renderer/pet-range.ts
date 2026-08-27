@@ -148,6 +148,68 @@ export function spreadOf(target: Target): number | undefined {
   return Math.sqrt(sum / n)
 }
 
+/**
+ * ## 靶场什么时候显形
+ *
+ * 靶是**钉死在台面上**的（见上），而台面就压在正文最后几行上面。开着打靶那一档
+ * 读一屏字，视线里永远有一张纸靶和两行读数——它挡的不是点击（这一层
+ * `pointer-events: none`），是**读**。
+ *
+ * 所以它跟着「这一轮在不在跑」走：**在跑就是全开**，那时候你看的本来就是它；
+ * 跑完再**多留几秒**（那几秒正是唯一能读到成绩的时候：`0.62s → 87 t/s`、
+ * 命中和散布），然后落到一个很浅的底。落到底而不是消失，是因为它得**还在那儿**——
+ * 一个会整个不见的东西，下次出现时你要重新找它在哪。
+ *
+ * 代价说清楚：**攒了一轮的弹着在跑完几秒后就只剩个影子**，而那串洞恰恰是
+ * 打靶这一档唯一测得出来的东西。这是拿「读字的时候不被挡」换的，换得值不值
+ * 取决于你开着它是在测还是在读——而绝大多数时候是在读。
+ */
+export interface Show {
+  /** 此刻画多浓。`SHOW_REST`（很浅）到 1（全开）。 */
+  on: number
+  /** 跑完之后还剩几秒的全开。 */
+  hold: number
+}
+
+/** 闲下来之后落到多浅。再低一档纸靶的边就看不见了，那等于「消失」。 */
+export const SHOW_REST = 0.18
+/** 跑完还留几秒全开。够看一眼那行成绩，短于你读完一段答案。 */
+const SHOW_HOLD = 4
+/** 亮起来用多久（秒）。快——开火那一下它得已经在那儿。 */
+const SHOW_UP = 0.25
+/** 淡下去用多久（秒）。慢一点，免得像是被谁关掉了。 */
+const SHOW_DOWN = 0.8
+
+export function createShow(): Show {
+  // 从底开始：进来时还没开火，那就该是浅的
+  return { on: SHOW_REST, hold: 0 }
+}
+
+/** 推进一帧。`live` = 这一轮在跑、或者枪还没收、或者还有子弹在飞。 */
+export function stepShow(show: Show, dt: number, live: boolean): void {
+  if (live) {
+    show.hold = SHOW_HOLD
+    show.on = Math.min(1, show.on + dt / SHOW_UP)
+    return
+  }
+  if (show.hold > 0) {
+    show.hold = Math.max(0, show.hold - dt)
+    return
+  }
+  show.on = Math.max(SHOW_REST, show.on - dt / SHOW_DOWN)
+}
+
+/**
+ * 这一帧还需不需要重画。
+ *
+ * **按住不动的那几秒不算**：那几秒画面一个像素都不变，让整条 rAF 为它醒着是白烧
+ *（同 `PetFxCanvas` 开头那条「闲下来是真的停」）。慢拍照样推进世界，
+ * `hold` 在慢拍上走完，真开始淡的时候再切回 rAF。
+ */
+export function showMoving(show: Show, live: boolean): boolean {
+  return live ? show.on < 1 : show.hold === 0 && show.on > SHOW_REST
+}
+
 /** 清靶。换会话、换轮次时调——上一轮的弹着不属于这一轮。 */
 export function clearTarget(target: Target): void {
   target.holes.length = 0

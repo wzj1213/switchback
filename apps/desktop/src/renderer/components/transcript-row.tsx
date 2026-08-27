@@ -55,6 +55,29 @@ export function lastMine(rows: readonly Row[]): string | undefined {
 }
 
 /**
+ * 最后一条**说出来的话**的 id。那排动作（复制）只挂在它身上。
+ *
+ * 上一版每条消息都挂一颗悬停才出现的「复制」，见 `Copyable.tsx` 开头那段账。
+ * 这里定的是「最后一条」到底算谁：
+ *
+ * - **只认人话和回答**。思考、通知、错误、计划卡都不算——把复制挂在
+ *   一段思考上，等于说那段思考和答案是同一级的东西。
+ * - **还在吐字的回答不给**。那一刻没有一份定稿可拿，而按钮一旦画出来，
+ *   下一帧文字长高它就往下跳一次。等它写完再出现。
+ * - 工具组、旁路、侧问都跨过去：它们各有各的复制入口。
+ */
+export function lastSpoken(rows: readonly Row[]): string | undefined {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]
+    if (row?.kind !== "item") continue
+    const item = row.item
+    if (item.kind === "user_message") return item.id
+    if (item.kind === "agent_message") return item.complete ? item.id : undefined
+  }
+  return undefined
+}
+
+/**
  * 「改一改再发」那颗按钮的接线。**给不出来就返回空对象**，`RowView` 据此不画。
  *
  * 抽出来是行数闸门逼的（`Transcript` 撑到了 116 行），这一刀也顺：
@@ -85,9 +108,11 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
   readOnly ? undefined : itemId
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, threadId, cwd, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
+export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, folded, onFold, onCopy, onResolve, approvalTurn, shortcutApproval,
   readOnly, openLane, onOpenLane, laneLive }: {
   row: Row
+  /** 这一行是不是「最后一条说出来的话」。见 `lastSpoken`。 */
+  acts: boolean
   threadId: string
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
@@ -176,6 +201,7 @@ export function RowView({ row, threadId, cwd, onRewind, onRetry, folded, onFold,
   return (
     <Copyable
       item={row.item}
+      acts={acts}
       onCopy={onCopy}
       {...(onRetry === undefined
         ? {}

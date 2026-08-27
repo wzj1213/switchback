@@ -283,6 +283,7 @@ export const EDITABLE_REVIEW_VIEW = {
     setter?.call(input, '')
     input?.dispatchEvent(new Event('input', { bubbles: true }))
     ;[...document.querySelectorAll('.row--thread .row__main')]
-      .find(row => row.textContent.includes('useFlow'))?.click()
+      // 侧栏这一行显示的是**原生标题**，不再是第一句话（见 sidebar.ts 的 rowLabelOf）
+      .find(row => row.textContent.includes('订阅'))?.click()
   })()`,
 }

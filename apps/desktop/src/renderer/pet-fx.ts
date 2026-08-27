@@ -2,7 +2,7 @@ import { brassMoving, eject, heave, stepBrass, sweep } from "./pet-brass.js"
 import { emptied, kickOf, loaded, MAX_DT, RELOAD_ANGLE, RELOAD_SHOTS, stepGun, wrapAngle } from "./pet-gun.js"
 import { fireStep, GLYPH_W, pushGlyph, rpsOf, spawn, stepShots, stepTape } from "./pet-shots.js"
 import { hitFoe, nearest, nextGap, pressureOf, spawnFoes, stepFoes, type Foe } from "./pet-foes.js"
-import { land, punch, TG_D } from "./pet-range.js"
+import { land, punch, showMoving, stepShow, TG_D } from "./pet-range.js"
 import { DRIFT_QUIET, handOf, muzzleOf, portOf, standOf, tapeAt, targetAt } from "./pet-fx-geo.js"
 import type { FxInput, FxWorld, Shot } from "./pet-fx-world.js"
 import { SIZE } from "./pets.js"
@@ -77,7 +77,11 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
   const rps = rpsOf(readyRate(w, input))
   stepTape(w.tape, dt, rps > 0 ? rps * GLYPH_W : DRIFT_QUIET, tapeAt(hand).left)
   w.ran = input.running
-  w.moving = busyOf(w)
+  // 靶场显形：这一轮在跑、枪还没收、或者还有子弹在飞，都算「在开火」。
+  // **跑完那几秒的按住不算 moving**——画面不变，不值得为它续一条 rAF
+  const live = input.range && (input.running || w.gun.arm > 0 || w.bullets.length > 0)
+  stepShow(w.show, dt, live)
+  w.moving = busyOf(w) || (input.range && showMoving(w.show, live))
   w.view = {
     handX: hand.x,
     handY: hand.y,

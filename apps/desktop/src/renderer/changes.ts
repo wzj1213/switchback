@@ -1,5 +1,6 @@
 import type { FileChange, Item } from "@omni/protocol"
 import type { ReviewFile } from "../shared/review.js"
+import { absolute, canonicalPath, normalizePath } from "../shared/paths.js"
 
 export interface Changes {
   files: number
@@ -45,53 +46,6 @@ function tally(list: readonly ChangedFile[]): Changes {
     removed: list.reduce((sum, file) => sum + file.removed, 0),
     list,
   }
-}
-
-function absolute(path: string): boolean {
-  return path.startsWith("/") || /^[A-Za-z]:\//.test(path)
-}
-
-function rootOf(path: string): { body: string; prefix: string; rooted: boolean } {
-  const drive = /^[A-Za-z]:\//.exec(path)?.[0]
-  if (drive !== undefined) return { body: path.slice(drive.length), prefix: drive, rooted: true }
-  if (path.startsWith("/")) return { body: path, prefix: "/", rooted: true }
-  return { body: path, prefix: "", rooted: false }
-}
-
-function collapsed(body: string, rooted: boolean): readonly string[] {
-  const parts: string[] = []
-  for (const part of body.split("/")) {
-    if (part === "" || part === ".") continue
-    if (part !== "..") {
-      parts.push(part)
-      continue
-    }
-    const last = parts.at(-1)
-    if (last !== undefined && last !== "..") parts.pop()
-    else if (!rooted) parts.push(part)
-  }
-  return parts
-}
-
-function tmpAlias(path: string): string {
-  if (path === "/tmp") return "/private/tmp"
-  return path.startsWith("/tmp/") ? `/private${path}` : path
-}
-
-/** 不碰文件系统的词法归一；renderer 里不能拿 `realpath`，已知的 macOS `/tmp` 别名在此收口。 */
-function normalizePath(raw: string): string {
-  if (raw === "") return ""
-  const path = raw.replace(/\\/g, "/")
-  const root = rootOf(path)
-  const normalized = `${root.prefix}${collapsed(root.body, root.rooted).join("/")}`
-  return tmpAlias(normalized || (root.rooted ? root.prefix : "."))
-}
-
-/** 引擎路径统一到会话 cwd；用于归属、去重与和 Git 真实路径对齐。 */
-export function canonicalPath(path: string, cwd: string): string {
-  const normalized = normalizePath(path)
-  if (normalized === "" || absolute(normalized) || cwd === "") return normalized
-  return normalizePath(`${normalizePath(cwd)}/${normalized}`)
 }
 
 /**

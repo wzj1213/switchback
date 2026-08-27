@@ -43,6 +43,22 @@ describe("会话碰过的文件名册", () => {
     expect(touched.allows("th-2", "/work", "/tmp/b.md")).toBe(false)
   })
 
+  it("`/tmp` 与 `/private/tmp` 是同一个文件——界面递来的正是收口后那条", () => {
+    const touched = createTouchedFiles()
+    touched.note(turn("tn-1", "th-1"))
+    // 引擎照它自己的写法报 `/tmp`，而渲染层（`shared/paths.ts`）把它收口成
+    // `/private/tmp` 再显示、再来问。逐字比的那一版在这里返回 false，
+    // 于是引擎在 `/tmp` 下改过的文件全都「列得出来、打不开」
+    touched.note(edit("tn-1", ["/tmp/deck_design.md"]))
+    expect(touched.allows("th-1", "/work", "/private/tmp/deck_design.md")).toBe(true)
+    // 反过来同样成立：报的是长的那条，问的是短的那条
+    touched.note(read("tn-1", "/private/tmp/notes.md"))
+    expect(touched.allows("th-1", "/work", "/tmp/notes.md")).toBe(true)
+    // 别名只认这一条，不是「路径里出现 tmp 就放行」
+    expect(touched.allows("th-1", "/work", "/private/tmp/never.md")).toBe(false)
+    expect(touched.allows("th-1", "/work", "/var/tmp/deck_design.md")).toBe(false)
+  })
+
   it("认不出会话的 item 一概不记；历史那条路 threadId 是现成的", () => {
     const touched = createTouchedFiles()
     // 没有 turn.started 就没有归属，不能猜

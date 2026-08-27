@@ -1,59 +1,45 @@
 /*
  * 会话触达文件的当前净变更。
  *
- * **它现在钉在输入框上方那一行里**（`.brief`），不再是转录区最后一个跟着滚的孩子。
+ * **它钉在输入框上方那一行里**（`.brief`），不是转录区最后一个跟着滚的孩子。
  * 原型（`界面细节打磨-v4.html`「计划并进那一排」）把三条带子并成一条，
  * 验收数就写在那儿：「输入框上方最多几行：1（现在 3）」。
  *
- * 收起来时是一条无框摘要，和计划并排；展开才长成一张卡。
- * 上一版不管展不展开都是一张 46px 高的通栏卡，那是三条带子里最占地方的一条。
+ * **所以这里只剩一种形态：一条无框摘要。** 展开出来的清单是浮层
+ *（`components/Changed.tsx` 用 `Popover`），不在版面里占地方——
+ * 上一版展开是就地摊开一张最高 36vh 的卡，而它长高多少转录区就矮多少，
+ * 那条「最多 1 行」的验收数一展开就不成立了。
  */
 .changed {
   min-width: 0;
 }
 
+/* 摘要按钮自己承担全部交互，所以这一层不画边也不铺底。 */
 .changed__card {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
-}
-
-/* 展开了才是一张卡：加阴影、铺满那一行 */
-.changed[data-open="true"] {
-  flex: 1 1 100%;
-}
-
-.changed[data-open="true"] .changed__card {
-  box-shadow: var(--shadow-1);
-}
-
-/* 收起来时摘要按钮自己承担交互，卡的边退掉。 */
-.changed[data-open="false"] .changed__card {
   border: 0;
+  border-radius: var(--radius);
   background: transparent;
 }
 
 .changed__head {
   display: flex;
   align-items: center;
-  /* 收起时按状态带的高度走，展开才撑到 46。 */
+  gap: var(--sp-2);
+  /* 和状态带里别的东西同高 */
   min-height: 28px;
   padding: 0;
 }
 
-.changed[data-open="true"] .changed__head {
-  min-height: 46px;
-  padding: var(--sp-1) var(--sp-2);
-}
-
+/* 状态带里的一个动作：无常驻描边，hover 才浮出底色。 */
 .changed__summary {
   display: flex;
-  flex: 1;
+  flex: none;
   min-width: 0;
   align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1);
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--sp-2);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -61,49 +47,6 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-/* 收起时它就是状态带里的一个动作：无常驻描边，hover 才浮出底色。 */
-.changed[data-open="false"] .changed__summary {
-  flex: none;
-  gap: 6px;
-  height: 28px;
-  padding: 0 var(--sp-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-}
-
-.changed[data-open="false"] .changed__glyph {
-  display: none;
-}
-
-/* 展开时是上下两行（标题 / 统计），收起时压成一行：「已编辑 3 个文件 +12 −4」。
-   **必须显式写 `row`**：默认那条是 `column`，不写方向的话两行会竖着叠进
-   24px 的药丸里，撑出去而且被切掉（出图才看见的） */
-.changed[data-open="false"] .changed__copy {
-  flex: none;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 收起时摘要与「审核」相邻排列。 */
-.changed[data-open="false"] .changed__head {
-  gap: var(--sp-2);
-}
-
-.changed[data-open="false"] .changed__review {
-  height: 28px;
-  padding: 0 var(--sp-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-}
-
-.changed[data-open="false"] .changed__title,
-.changed[data-open="false"] .changed__total {
-  font-size: var(--text-xs);
 }
 
 .changed__summary:hover {
@@ -114,30 +57,28 @@
   background: var(--bg-press);
 }
 
-.changed__glyph {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
-  color: var(--text-muted);
+/* 浮层开着时它保持高亮。同 `.trigger--open` 那条理由：清单浮在正文上面，
+   触发它的那颗却是常态的话，看不出这张清单是从哪儿出来的。 */
+.changed[data-open="true"] .changed__summary {
+  background: var(--bg-active);
 }
 
+/* 标题与原因压成一行：「引擎报了 9 个文件 · 不是 Git 仓库，没核对」。
+   **必须显式写 `row`**：默认那条是 `column`，不写方向的话两行会竖着叠进
+   28px 的药丸里，撑出去而且被切掉（出图才看见的） */
 .changed__copy {
   display: flex;
-  flex: 1;
+  flex: none;
   min-width: 0;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 
 .changed__title {
   overflow: hidden;
   color: var(--text);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   line-height: var(--lh-sm);
   text-overflow: ellipsis;
@@ -147,9 +88,12 @@
 .changed__total {
   display: flex;
   gap: 5px;
+  overflow: hidden;
   color: var(--text-faint);
   font-size: var(--text-xs);
   line-height: var(--lh-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -161,10 +105,11 @@
 
 .changed__review {
   flex: none;
-  padding: 4px var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-raised);
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-sm);
@@ -176,11 +121,17 @@
   color: var(--text);
 }
 
+/* 清单住在浮层里：边、影、最大高度和滚动都是 `.pop` 的事，这里只管排版。
+   上一版这里有 `max-height: 36vh` 和一条上边线——那是它还长在版面里时的装束。 */
 .changed__list {
-  max-height: 36vh;
-  overflow-y: auto;
-  padding: var(--sp-1) var(--sp-2) var(--sp-2);
-  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+
+/* 浮层一打开，焦点就落在这一层上（`data-popover-autofocus`，见 changed-list.tsx）。
+   **它只是个落脚点，不是能操作的东西**，画一圈焦点框会让整张清单看起来被选中了；
+   里面每一颗按钮各自的焦点框照常。 */
+.changed__list:focus-visible {
+  outline: none;
 }
 
 .changed__file > .diff {
@@ -228,6 +179,17 @@
 .changed__base {
   flex: none;
   font-weight: 500;
+}
+
+/* 「工作区外」那一枚。和侧栏文件清单的 `.file-row__meta` 同一套装束——
+   同一件事在两处出现，不该长成两个样子。 */
+.changed__tag {
+  flex: none;
+  padding: 1px var(--sp-1);
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
 }
 
 .changed__stat {

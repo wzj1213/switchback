@@ -55,19 +55,27 @@ export function baseNameOf(cwd: string): string {
 }
 
 /**
- * 一行显示什么。
+ * 一行显示什么。三档，从硬到软。
  *
- * **第一句话优先**，没有才回落到标题。一个刚建好还没说话的会话
- * 显示「新会话」——比显示一个和组标题重复的目录名有用。
+ * 1. **人亲自起的名字最大。** 不加这一条的话改名会「没反应」——
+ *    下面那句 preview 永远赢，而 preview 是自动的。
+ * 2. **引擎自己起的名字次之。** 各家原生客户端都会给会话起名（ACP 走
+ *    `session_info`，Claude 走 `generateSessionTitle`），宿主收到就落进 `title`
+ *    （见 `host` 的 `rememberTitle`，它同样让着上面那一条）。上一版这层不存在，
+ *    于是引擎起好的名字**一个字都没显示出来**：preview 永远赢。而 preview 是
+ *    第一句话的原文——第一句话经常是一整段 `curl … | bash && git clone …`，
+ *    侧栏一列下来全是命令行开头的那几个字，认不出哪条是哪条。
+ * 3. 都没有才回落到第一句话；连话都还没说的显示「新会话」。
+ *
+ * 「有没有名字」的判据是**它还是不是出生时那个目录名**：新建会话的 title
+ * 就取自 cwd 末级（`useWorkspaceActions`），所以只要它变过，就一定是
+ * 上面两条之一写的。不为此另加一个字段——那要同时改协议、落盘和回放。
  */
 export function rowLabelOf(row: ThreadRow): string {
-  // **人亲自起的名字最大。** 不加这一条的话改名会「没反应」——
-  // 下面那句 preview 永远赢，而 preview 是自动的
   if (row.thread.named === true) return row.thread.title
+  if (row.thread.title !== baseNameOf(row.thread.cwd)) return row.thread.title
   const preview = row.preview?.trim()
-  if (preview !== undefined && preview !== "") return preview
-  // 标题和组标题一样时说明它就是目录名，重复一遍没有意义
-  return row.thread.title === baseNameOf(row.thread.cwd) ? "新会话" : row.thread.title
+  return preview === undefined || preview === "" ? "新会话" : preview
 }
 
 /**

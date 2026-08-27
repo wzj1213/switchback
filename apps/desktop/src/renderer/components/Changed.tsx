@@ -1,11 +1,10 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import type { Item } from "@omni/protocol"
-import type { ReviewFile } from "../../shared/review.js"
 import { changeEvidenceOf, reconcileChanges, reportedChangesOf } from "../changes.js"
 import { useReview } from "../review.js"
-import { ChangedOthers, CHANGED_PREVIEW } from "./changed-others.js"
-import { ChangedRow } from "./ChangedRow.js"
-import { ChangedHead } from "./changed-head.js"
+import { ChangedList } from "./changed-list.js"
+import { ChangedHead, type ReportReason } from "./changed-head.js"
+import { Popover } from "./Popover.js"
 import { changeNote } from "../changed-note.js"
 
 interface Props {
@@ -17,6 +16,9 @@ interface Props {
   onCopy: (text: string) => void
   onReview: () => void
 }
+
+/** 清单浮层的宽度。够一行放下「两级目录 / 文件名 +12 −4」再加三颗行内动作。 */
+const POP_WIDTH = 460
 
 /**
  * 这张卡这一帧该不该出现。
@@ -39,7 +41,26 @@ export function shouldHide(state: {
   return state.files === 0 && state.others === 0 && !state.failed
 }
 
-/** 会话触达文件的当前净变更：总数 → 文件清单 → git 实时补丁。 */
+/** 只有引擎一面之词时，是哪一种「核不了」。三选一，按能确定的先后排。 */
+export function reasonOf(state: { noRepo: boolean; failed: boolean; settled: boolean }): ReportReason {
+  if (state.noRepo) return "noRepo"
+  return state.failed ? "failed" : "pending"
+}
+
+/**
+ * 会话触达文件的当前净变更：总数 → 文件清单 → git 实时补丁。
+ *
+ * ## 展开的那张清单是**浮层**，不是这一行长高
+ *
+ * 上一版展开是就地摊开：`.changed` 占满整行，卡片长出一张最高 36vh 的表。
+ * 它住在输入框上方那条状态带里，而那条带子是**版面里的一格**——它长高多少，
+ * 转录区就矮多少。于是「看一眼刚才改了哪些文件」的代价是**正文当场缩掉三分之一**，
+ * 你还没看完清单，上下文已经被挤没了；关掉之后正文又弹回来，读到哪儿也丢了。
+ *
+ * 现在它借 `Popover` 浮在正文上面：位置贴着摘要那颗按钮，点外面或 Esc 关闭，
+ * 版面一个像素都不动。**这也和这条带子的初衷一致**——它的验收数是
+ *「输入框上方最多几行：1」，一个会把自己撑成半屏的展开态从来就不该住在那儿。
+ */
 export function Changed({
   items,
   threadId,
@@ -63,10 +84,14 @@ export function Changed({
         ...(review.ignored === undefined ? {} : { ignored: review.ignored }),
       })
     : reported
-  // **默认收起。** 它现在钉在输入框上方那一行里，和计划那枚药丸并排——
+  // **默认收起。** 它钉在输入框上方那一行里，和计划那枚药丸并排——
   // 一进来就摊开一张卡的话，那一行就又变回了上一版那条通栏带子
   const [open, setOpen] = useState(false)
   const [all, setAll] = useState(false)
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null)
+  const close = useCallback(() => {
+    setOpen(false)
+  }, [])
   const mine = new Set(list.flatMap((file) => file.review?.rel ?? []))
   const minePaths = new Set(list.map((file) => file.path))
   const others = evidence === "baseline"
@@ -96,85 +121,35 @@ export function Changed({
           removed={removed}
           failed={review.failed}
           evidence={evidence}
+          reason={reasonOf(review)}
           open={open}
+          anchor={setAnchor}
           onOpen={() => {
             setOpen((was) => !was)
           }}
           onReview={onReview}
         />
-        {open ? (
-          <List
-            files={list}
-            others={others}
-            othersTotal={othersTotal}
-            all={all}
-            cwd={cwd}
-            stamp={`${stamp}\u0000${review.revision}`}
-            threadId={threadId}
-            note={changeNote(review, list)}
-            onReveal={onReveal}
-            onCopy={onCopy}
-            onAll={() => {
-              setAll((was) => !was)
-            }}
-          />
-        ) : null}
       </div>
-    </section>
-  )
-}
-
-function List({
-  files,
-  others,
-  othersTotal,
-  all,
-  cwd,
-  stamp,
-  threadId,
-  note,
-  onReveal,
-  onCopy,
-  onAll,
-}: {
-  files: ReturnType<typeof reportedChangesOf>["list"]
-  others: readonly ReviewFile[]
-  othersTotal: number
-  all: boolean
-  cwd: string
-  stamp: string
-  threadId: string
-  note: string | undefined
-  onReveal: (path: string) => void
-  onCopy: (text: string) => void
-  onAll: () => void
-}): React.JSX.Element {
-  const shown = all ? files : files.slice(0, CHANGED_PREVIEW)
-  return (
-    <div className="changed__list">
-      {note === undefined ? null : <p className="changed__note">{note}</p>}
-      {shown.map((file) => (
-        <ChangedRow
-          key={file.path}
-          file={file}
+      {/* **不给 `contentKey`**：那是「菜单换页了，把焦点带回第一项」用的。
+          这里点「再显示 6 个文件」只是同一张清单变长，焦点该留在刚点的那颗上 */}
+      <Popover open={open} onClose={close} anchor={anchor} minWidth={POP_WIDTH}
+        ariaLabel="这条会话改过的文件">
+        <ChangedList
+          files={list}
+          others={others}
+          othersTotal={othersTotal}
+          all={all}
           cwd={cwd}
-          stamp={stamp}
+          stamp={`${stamp}\u0000${review.revision}`}
           threadId={threadId}
+          note={changeNote(review, list)}
           onReveal={onReveal}
           onCopy={onCopy}
+          onAll={() => {
+            setAll((was) => !was)
+          }}
         />
-      ))}
-      {othersTotal === 0 ? null : (
-        <ChangedOthers files={others} total={othersTotal} threadId={threadId}
-          cwd={cwd} onReveal={onReveal} />
-      )}
-      {files.length <= CHANGED_PREVIEW ? null : (
-        <button type="button" className="changed__more" onClick={onAll}>
-          {all
-            ? `只显示前 ${String(CHANGED_PREVIEW)} 个文件`
-            : `再显示 ${String(files.length - CHANGED_PREVIEW)} 个文件`}
-        </button>
-      )}
-    </div>
+      </Popover>
+    </section>
   )
 }

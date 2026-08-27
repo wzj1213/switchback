@@ -24,7 +24,7 @@ import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import axe from "axe-core"
 import WebSocket from "ws"
-import { mainThread, stubThread } from "./ui-fixture.mjs"
+import { mainThread, noRepoThread, stubThread } from "./ui-fixture.mjs"
 import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
 import { completeFileDrop, dragIntoView } from "./shot-file-drop.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
@@ -238,6 +238,13 @@ async function seed(dir) {
   ]
   for (const [id, title, at] of stubs)
     await writeFile(join(threads, `${id}.jsonl`), stubThread(id, title, ROOT, at))
+  // 工作区不是 Git 仓库的那条：那张「引擎报了 N 个文件」的卡只有在这种 cwd 下才出得来。
+  // **cwd 用固定名字的子目录，不用 `dir` 本身**——数据目录是 mkdtemp 出来的
+  // （`omni-shot-Jtzj1D`），而侧栏按目录名分组，随机后缀会让每次出图的侧栏都不一样，
+  // 「两张图除了改动之外一模一样」当场就不成立了
+  const noRepo = join(dir, "临时工作区")
+  await mkdir(noRepo, { recursive: true })
+  await writeFile(join(threads, "th-norepo.jsonl"), noRepoThread("th-norepo", noRepo, AT - 5 * 3600_000))
   await writeFile(
     join(dir, "settings.json"),
     `${JSON.stringify({

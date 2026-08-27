@@ -475,14 +475,36 @@
   pointer-events: none;
 }
 
+/*
+ * **标题最多两行。**
+ *
+ * 没改过名的会话，标题就是**第一句话的原文**——而第一句话经常是一整段
+ * shell（实测一条 `curl … | bash && git clone … && git config …` 在 256px 宽里
+ * 铺了十一行），于是这张卡长成一根柱子，把它本来要说的三件事
+ *（路径、引擎、什么时候建的）全推到视线之外。
+ *
+ * 截两行不是省地方，是**这张卡的用途决定的**：它回答「这是哪条会话」，
+ * 两行足够认人；要读全文该点进去，那才是入口。
+ */
 .peek__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--text);
   font-size: var(--text-sm);
   font-weight: 500;
+  /* 一整段没有空格的命令行不折就撑破卡片 */
+  overflow-wrap: anywhere;
 }
 
+/* 路径同理：深目录在 256px 里能铺四行，而它只需要说清「在哪个项目下」。 */
 .peek__path {
+  display: -webkit-box;
+  overflow: hidden;
   margin-top: 4px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);

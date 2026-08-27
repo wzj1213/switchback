@@ -8,11 +8,12 @@ describe("文件改动摘要的证据文案", () => {
     const cases = [
       ["baseline", "已编辑 1 个文件", "+3", "相对 HEAD"],
       ["head", "相关文件 1 个仍有改动", "相对 HEAD", "已编辑"],
-      ["reported", "编辑记录 1 个文件", "未核实当前净值", "+3"],
+      ["reported", "引擎报了 1 个文件", "不是 Git 仓库，没核对", "+3"],
     ] as const
     for (const [evidence, included, detail, excluded] of cases) {
       const html = renderToStaticMarkup(createElement(ChangedHead, {
         files: 1, others: 0, added: 3, removed: 1, failed: false, evidence, open: false,
+        reason: "noRepo" as const, anchor: () => undefined,
         onOpen: () => undefined, onReview: () => undefined,
       }))
       expect(html).toContain(included)

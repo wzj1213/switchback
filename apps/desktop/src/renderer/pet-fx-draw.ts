@@ -114,6 +114,7 @@ function drawTarget(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void
   const at = targetAt(view.stand)
   drawRange(g, {
     target: w.target,
+    show: w.show.on,
     at: { x: at.x, y: at.y, ground: view.stand.ground },
     live: { rate: view.rate, ratio: view.ratio, bench: view.bench },
     pal: {

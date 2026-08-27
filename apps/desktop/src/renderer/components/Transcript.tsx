@@ -6,7 +6,7 @@ import { TurnStatus } from "./TurnStatus.js"
 import { ArrowDownIcon } from "./icons.js"
 import { TranscriptBlank } from "./transcript-blank.js"
 import { useApprovalState } from "../use-approval-state.js"
-import { RowView, canAsk, canRewind, keyOf, lastMine, retryProps, approvalShortcut } from "./transcript-row.js"
+import { RowView, canAsk, canRewind, keyOf, lastMine, lastSpoken, retryProps, approvalShortcut } from "./transcript-row.js"
 import { useAskSelection } from "../use-ask-selection.js"
 import { AskFloat } from "./ask-float.js"
 
@@ -85,6 +85,8 @@ export const Transcript = memo(function Transcript({
   const ask = useAskSelection(inner, canAsk(thread, onReuse !== undefined))
   // 「改一改再发」只挂最后一句人话，而且只在能 rewind 时——见 `transcript-row.tsx`
   const retry = { id: useMemo(() => lastMine(rows), [rows]), active: canRewind(thread, turn, readOnly === true) }
+  // 那排动作只挂最后一条说出来的话。**每条都挂的那一版连间距都被它带偏了**，见 `Copyable.tsx`
+  const spoken = useMemo(() => lastSpoken(rows), [rows])
   return (
     <div
       className="transcript"
@@ -101,6 +103,7 @@ export const Transcript = memo(function Transcript({
             row={row}
             threadId={thread.id}
             cwd={thread.cwd}
+            acts={row.kind === "item" && row.item.id === spoken}
             openLane={openLane} onOpenLane={onOpenLane}
             {...(canRewind(thread, turn, readOnly === true)
               ? { onRewind: (turnId: string) => { send({ type: "thread.rewind", threadId: thread.id, turnId }) } }

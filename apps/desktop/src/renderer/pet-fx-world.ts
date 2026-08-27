@@ -5,7 +5,7 @@ import type { Bullet, Glyph } from "./pet-shots.js"
 import type { Foe } from "./pet-foes.js"
 import type { Bench } from "./bench.js"
 import type { Field, Stand } from "./pet-fx-geo.js"
-import { createTarget, type Hole, type Target } from "./pet-range.js"
+import { createShow, createTarget, type Hole, type Show, type Target } from "./pet-range.js"
 import type { Pet, PetShape } from "./pets.js"
 
 /**
@@ -34,6 +34,8 @@ export interface FxWorld {
   brass: Brass
   /** 靶。**只有打靶那一档用得上**，其余时候它是空的。 */
   target: Target
+  /** 靶场此刻画多浓。见 `pet-range.ts` 里「靶场什么时候显形」。 */
+  show: Show
   /** 这一层自己的钟（秒）。刷怪的节拍按它走，**不读时钟**。 */
   clock: number
   /** 下一只该在什么时候来。 */
@@ -84,6 +86,7 @@ export function createFx(): FxWorld {
     foes: [],
     brass: createBrass(),
     target: createTarget(),
+    show: createShow(),
     clock: 0,
     nextAt: 3,
     quiet: 0,

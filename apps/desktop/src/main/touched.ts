@@ -1,5 +1,5 @@
-import { resolve } from "node:path"
 import type { Event, ThreadId, ToolCallItem, TurnId } from "@omni/protocol"
+import { canonicalPath } from "../shared/paths.js"
 
 /**
  * 这条会话**确实读过或改过**的文件。
@@ -26,7 +26,14 @@ export interface TouchedFiles {
   note: (event: Event) => void
   /** 开窗时从 journal 补历史：那边 threadId 是现成的，不必再认。 */
   noteHistory: (threadId: ThreadId, events: readonly Event[]) => void
-  /** `path` 与名册里的原文都按 `cwd` 归一后再比——引擎报的可能是相对路径。 */
+  /**
+   * `path` 与名册里的原文都按 `cwd` 归一后再比——引擎报的可能是相对路径。
+   *
+   * 归一走 `shared/paths.ts`，**和渲染层同一份**。它比 `path.resolve` 多认一条
+   * macOS 别名（`/tmp` → `/private/tmp`），而渲染层递过来的正是收口之后那条：
+   * 用 `resolve` 的那一版里，引擎在 `/tmp` 下改过的文件永远对不上名册，
+   * 点开清一色「这个文件在工作区外，而且这条会话没读过它」。
+   */
   allows: (threadId: ThreadId, cwd: string, path: string) => boolean
 }
 
@@ -78,8 +85,9 @@ export function createTouchedFiles(): TouchedFiles {
     allows: (threadId, cwd, path) => {
       const paths = threads.get(threadId)
       if (paths === undefined) return false
-      const target = resolve(cwd, path)
-      for (const raw of paths.keys()) if (resolve(cwd, raw) === target) return true
+      const target = canonicalPath(path, cwd)
+      if (target === "") return false
+      for (const raw of paths.keys()) if (canonicalPath(raw, cwd) === target) return true
       return false
     },
   }

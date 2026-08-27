@@ -1,5 +1,5 @@
 import type { Item } from "@omni/protocol"
-import { canonicalPath } from "./changes.js"
+import { canonicalPath } from "../shared/paths.js"
 
 export interface SessionFile {
   path: string

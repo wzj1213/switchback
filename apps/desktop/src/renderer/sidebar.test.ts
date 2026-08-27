@@ -83,8 +83,15 @@ describe("目录名", () => {
 })
 
 describe("一行显示什么", () => {
-  it("**第一句话优先**——真正区分同一项目下几个会话的就是它", () => {
+  it("还没人起过名时才用第一句话——它至少能区分同一项目下的几个会话", () => {
     expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "omni", preview: "给 add 加 JSDoc" }))).toBe("给 add 加 JSDoc")
+  })
+
+  it("**引擎自己起的名字压过第一句话**——第一句常常是一整段命令行", () => {
+    const shell = "curl -s https://git.example.com/tools/setup.sh | bash && git clone …"
+    // title 已经不是出生时那个目录名了，说明宿主收到过原生标题（rememberTitle）
+    expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "拉取仓库并配置提交钩子", preview: shell })))
+      .toBe("拉取仓库并配置提交钩子")
   })
 
   it("标题就是目录名时不重复显示——组标题已经说过一遍了", () => {
@@ -178,14 +185,20 @@ describe("侧栏分三段", () => {
 })
 
 describe("起过名的行显示名字", () => {
+  // **默认 title 必须就是 cwd 末级**——新建会话出生时取的就是它（`useWorkspaceActions`），
+  // 而「有没有名字」的判据正是「它还是不是那个目录名」（见 `rowLabelOf`）
   const row = (over: Partial<ThreadRow["thread"]> & { preview?: string }): ThreadRow =>
     ({
-      thread: { id: "t", title: "标题", cwd: "/w/proj", engine: "claude", trust: "auto-edit", status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["claude"], ...over },
+      thread: { id: "t", title: "proj", cwd: "/w/proj", engine: "claude", trust: "auto-edit", status: "idle", createdAt: 0, updatedAt: 0, engineHistory: ["claude"], ...over },
       preview: over.preview,
     }) as ThreadRow
 
-  it("没起过名时显示第一句提问——那通常比目录名有用", () => {
+  it("谁都没起过名时显示第一句提问——那通常比目录名有用", () => {
     expect(rowLabelOf(row({ preview: "帮我看看这个报错" }))).toBe("帮我看看这个报错")
+  })
+
+  it("引擎起过名就显示它，第一句提问让位", () => {
+    expect(rowLabelOf(row({ preview: "帮我看看这个报错", title: "排查登录 500" }))).toBe("排查登录 500")
   })
 
   it("**起过名之后名字最大**，盖过第一句提问；否则改名看起来毫无反应", () => {

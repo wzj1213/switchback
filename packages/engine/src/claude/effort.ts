@@ -43,6 +43,29 @@ export function withEfforts(option: ModelOption, raw: EffortAware): ModelOption 
   return { ...option, efforts: efforts.includes("xhigh") ? [...efforts, "ultracode"] : efforts }
 }
 
+/** SDK 报的一条模型。**只声明我们真的读的那几个字段。** */
+interface RawModel extends EffortAware {
+  value: string
+  displayName: string
+  description?: string
+}
+
+/**
+ * 把 SDK 的模型清单变成 omni 的 `ModelOption[]`。
+ *
+ * 从 `driver.ts` 搬过来是行数闸门逼的，这一刀也顺：**它是一次对清单的纯变换**，
+ * 而每一条出来长什么样，一半的答案（强度档）本来就写在这个文件里。
+ * 驱动那边只剩「问 SDK 要清单」这一句，那才是它的事。
+ */
+export function modelOptions(list: readonly RawModel[] | undefined): readonly ModelOption[] {
+  return (list ?? []).map((m) =>
+    withEfforts(
+      { id: m.value, label: m.displayName, ...(m.description === "" ? {} : { description: m.description }) },
+      m,
+    ),
+  )
+}
+
 /** SDK 上那条运行期改强度的路。**公开声明的**，不像侧问那样要运行时探测。 */
 interface EffortSettable {
   applyFlagSettings: (settings: { effortLevel?: string | null; ultracode?: boolean | null }) => Promise<void>

@@ -8,6 +8,7 @@ import { COMPOSE_VIEWS } from "./shot-views-compose.mjs"
 import { ACTIVITY_VIEWS } from "./shot-views-activity.mjs"
 import { FILE_REFRESH_VIEWS } from "./shot-views-file-refresh.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
+import { CHANGED_VIEWS } from "./shot-views-changed.mjs"
 import { openPanelPage } from "./shot-panel.mjs"
 export const VIEWS = [
     {
@@ -31,7 +32,11 @@ export const VIEWS = [
       assert: `(() => {
         const at = (s) => { const n = document.querySelector(s); return n === null ? null : Math.round(n.getBoundingClientRect().left) }
         const edges = ['.transcript__inner', '.md', '.brief', '.composer__inner'].map(at)
-        return edges.every(edge => edge !== null && edge === edges[0])
+        // 那排动作（复制）**整屏只该有一条**，挂在最后一条说出来的话上。
+        // 上一版每条消息都挂一条透明的，看不见却照样占着二十来像素高——
+        // 于是这一屏所有的间距都比样式表里写的多一档（见 components/Copyable.tsx）
+        const acts = document.querySelectorAll('.transcript .msgacts').length
+        return acts === 1 && edges.every(edge => edge !== null && edge === edges[0])
       })()`,
     },
     {
@@ -55,6 +60,7 @@ export const VIEWS = [
       })()`,
       after: `document.querySelector('button[aria-label="展开侧栏"]')?.click()`,
     },
+    ...CHANGED_VIEWS,
     {
       name: "02-桌宠固定地面",
       open: `(() => {

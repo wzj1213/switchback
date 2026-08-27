@@ -5,17 +5,35 @@ import { copyFeedbackLabel, copyFeedbackTitle, useCopyFeedback } from "../use-co
 import { CheckIcon, CopyIcon } from "./icons.js"
 
 /**
- * 给一条消息挂一个悬停才出现的复制按钮。
+ * 给一条消息挂一排动作。
+ *
+ * ## 只有最后那条挂得住
+ *
+ * 上一版是**每一条都挂**：思考、回答、提问、通知，一条一个悬停出现的「复制」。
+ * 挂着的时候它是隐形的，可它**照样占着一行的高度**（`opacity: 0` 不是
+ * `display: none`），于是每两条消息之间凭空多出二十来像素——
+ * `app-main.css` 里那套「8 是连着干的几件事、16 是换人说话」的间距体系，
+ * 说的话没有一句在屏幕上是真的。
+ *
+ * 而它多出来的那些也没人用：往回翻十屏去复制第三条思考不是真实动作，
+ * 真实动作是「把刚才那段答案拿走」。所以现在只有**最后一条说出来的话**挂，
+ * 并且**常驻**——一颗藏起来的按钮如果只剩一颗，那就是没有。
  *
  * 审批卡不挂——那上面有需要点的按钮，再放一个只会误点。
  */
 export function Copyable({
   item,
+  acts,
   onCopy,
   children,
   extra,
 }: {
   item: Item
+  /**
+   * 这条是不是「最后一条说出来的话」。给了才有那颗复制，而且是常驻的。
+   * 见 `transcript-row.tsx` 的 `lastSpoken`。
+   */
+  acts: boolean
   onCopy: (text: string) => unknown
   children: ReactNode
   /** 同一条动作栏里再挂几颗（「改一改再发」走这里）。 */
@@ -23,8 +41,10 @@ export function Copyable({
 }): React.JSX.Element {
   const [feedback, copy] = useCopyFeedback(() => onCopy(textOf(item)))
   if (item.kind === "approval") return <>{children}</>
+  // 一颗都没有就连那个盒子也别要：它占的那行高度正是上一版间距失真的来源
+  if (!acts && extra === undefined) return <div className="copyable">{children}</div>
   return (
-    <div className="copyable">
+    <div className="copyable" data-acts={acts ? "last" : "extra"}>
       {children}
       {/*
         动作栏在消息**下面**，不是压在它身上。
@@ -34,17 +54,19 @@ export function Copyable({
         正是鼠标停在上面的那条**。
       */}
       <div className="msgacts">
-        <button
-          className="act"
-          type="button"
-          aria-live="polite"
-          data-state={feedback}
-          title={copyFeedbackTitle(feedback, "复制这条内容")}
-          onClick={copy}
-        >
-          {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
-          {copyFeedbackLabel(feedback)}
-        </button>
+        {acts ? (
+          <button
+            className="act"
+            type="button"
+            aria-live="polite"
+            data-state={feedback}
+            title={copyFeedbackTitle(feedback, "复制这条内容")}
+            onClick={copy}
+          >
+            {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+            {copyFeedbackLabel(feedback)}
+          </button>
+        ) : null}
         {extra}
       </div>
     </div>

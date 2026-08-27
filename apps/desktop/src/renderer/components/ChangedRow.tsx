@@ -3,12 +3,13 @@ import type { FileChange, FileChangeKind } from "@omni/protocol"
 import type { PatchSkip, ReviewKind, ReviewPatch } from "../../shared/review.js"
 import type { ChangedFile } from "../changes.js"
 import { splitPath } from "../diff.js"
-import { usePatch } from "../review.js"
+import { usePatch, type PatchData } from "../review.js"
 import { relPath } from "../tool.js"
 import { requestFilePreview } from "../file-preview-request.js"
 import { FileDiff } from "./Diff.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 import { FileIcon } from "./icons-activity.js"
+import { outside } from "./file-row.js"
 
 interface Props {
   file: ChangedFile
@@ -113,6 +114,39 @@ function PreviewFile({ file, threadId, cwd }: {
   )
 }
 
+/**
+ * 展开一行却什么都看不到，是这张清单上最常见的一次失望。
+ *
+ * 两种情形合起来就是它：**工作区不是 Git 仓库**（或者这个文件根本不在工作区里），
+ * 于是补丁只能指望引擎自己带；而**有几家引擎报编辑时不带补丁**，只报路径和增删数。
+ * 两条一撞，`FileDiff` 拿到一份空补丁，画出来是一个只有文件头的空盒子——
+ * 和「这个文件没有改动」长得一模一样。
+ *
+ * 所以这里改成直说：没有补丁可看，以及还能往哪儿看（工作台里那份当前内容）。
+ */
+function bareOf(file: ChangedFile): boolean {
+  return file.review === undefined && (file.last.diff ?? "") === ""
+}
+
+/** 展开之后这一行底下画什么。四种互斥的结局，抽出来是圈复杂度闸门逼的——这一刀也顺。 */
+function ChangedBody({ file, patch }: { file: ChangedFile; patch: PatchData }): React.JSX.Element {
+  if (patch.loading) return <p className="changed__note">正在读取当前净补丁…</p>
+  if (patch.skip !== undefined) return <p className="changed__note">{SKIP_TEXT[patch.skip]}</p>
+  if (bareOf(file)) {
+    return (
+      <p className="changed__note">
+        这次编辑引擎没有带补丁，核不出改了什么；文件当前内容可以在工作台打开。
+      </p>
+    )
+  }
+  return (
+    <FileDiff
+      file={actualFile(file, patch.patch)}
+      parseAs={file.review === undefined ? undefined : "update"}
+    />
+  )
+}
+
 export function ChangedRow({
   file,
   cwd,
@@ -144,6 +178,9 @@ export function ChangedRow({
           <span className="changed__dir">{shown.dir}</span>
           <span className="changed__base">{shown.name}</span>
         </button>
+        {/* 「对话不在目标改动目录」时，这一行是唯一能看出来的地方——
+            而那正是补丁看不看得到、文件点不点得开的分水岭 */}
+        {outside(file.path, cwd) ? <span className="changed__tag">工作区外</span> : null}
         <span className="changed__stat">
           <Stat added={file.added} removed={file.removed} />
         </span>
@@ -161,16 +198,7 @@ export function ChangedRow({
           <CopyIcon size={12} />
         </button>
       </div>
-      {open && patch.loading ? <p className="changed__note">正在读取当前净补丁…</p> : null}
-      {open && !patch.loading && patch.skip !== undefined ? (
-        <p className="changed__note">{SKIP_TEXT[patch.skip]}</p>
-      ) : null}
-      {open && !patch.loading && patch.skip === undefined ? (
-        <FileDiff
-          file={actualFile(file, patch.patch)}
-          parseAs={review === undefined ? undefined : "update"}
-        />
-      ) : null}
+      {open ? <ChangedBody file={file} patch={patch} /> : null}
     </div>
   )
 }

@@ -15,8 +15,9 @@ import type {
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createQueue } from "../queue.js"
 import { askAside } from "./aside.js"
+import { nameFirst } from "./title.js"
 import { capabilitiesOf } from "./caps.js"
-import { applyEffort, withEfforts } from "./effort.js"
+import { applyEffort, modelOptions } from "./effort.js"
 import { claudeCommands } from "./commands.js"
 import {
   buildRequest,
@@ -86,6 +87,8 @@ class ClaudeSession implements EngineSession {
   private loop: Promise<void> | undefined
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
+  /** 起名问过没有。**一条会话只问一次**，见 `title.ts` 的 `nameFirst`。 */
+  private readonly naming = { asked: false }
   private query: ReturnType<typeof query> | undefined
   /** 当前模型的原生上下文快照；去重控制请求，并隔离换模型前的迟到结果。 */
   private readonly context = new ContextProbe()
@@ -214,7 +217,11 @@ class ClaudeSession implements EngineSession {
     this.turn.latestUsage = undefined
     this.turn.outputTokens = undefined
     const accepted = this.input.push(message)
-    if (accepted) return
+    if (accepted) {
+      nameFirst({ once: this.naming, query: this.query, first: text,
+        resume: this.req.resume, forked: this.fork !== undefined, onTitle: this.req.onTitle })
+      return
+    }
     if (this.turn.current === turnId) {
       this.turn.current = undefined
       this.req.emit({
@@ -248,17 +255,7 @@ class ClaudeSession implements EngineSession {
    * 不支持的那些一档都不给（见 `effort.ts`——那里也记了上一版为什么写着「没有」）。
    */
   async models(): Promise<readonly ModelOption[]> {
-    const list = await this.query?.supportedModels().catch(() => undefined)
-    return (list ?? []).map((m) =>
-      withEfforts(
-        {
-          id: m.value,
-          label: m.displayName,
-          ...(m.description === "" ? {} : { description: m.description }),
-        },
-        m,
-      ),
-    )
+    return modelOptions(await this.query?.supportedModels().catch(() => undefined))
   }
 
   /**

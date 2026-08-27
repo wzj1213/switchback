@@ -221,3 +221,70 @@ function answerOf() {
 export function stubThread(id, title, cwd, at) {
   return `${line({ type: "thread.started", at, thread: threadOf(id, title, cwd, at) })}\n`
 }
+
+/**
+ * **工作区不是 Git 仓库**的那条会话。
+ *
+ * 主样本的 cwd 是本仓库，于是「改了哪些文件」永远由 git 说了算——引擎上报的那几条
+ * 会被核销掉，那张卡一次都不出现（`shot-views.mjs` 的「桌宠固定地面」还专门断言了
+ * 它是 null）。而真实使用里最常撞见这张卡的恰恰是另一头：**在一个不是仓库的目录里
+ * 让引擎干活**（/tmp 下的中间产物、别的项目的目录、临时工作区）。那时候数字只有
+ * 引擎一面之词，omni 既核不了、也不该假装核过。
+ *
+ * 所以样本里单开这么一条，cwd 指向出图用的临时数据目录（那儿没有 .git）。
+ * 它一条就能同时摆出三种状态：**有补丁的**、**引擎没带补丁的**、**落在工作区外的**。
+ */
+export function noRepoThread(id, cwd, at) {
+  const turn = `${id}-t1`
+  const out = [
+    line({ type: "thread.started", at, thread: threadOf(id, "在临时目录里改那份设计稿", cwd, at) }),
+    line({ type: "turn.started", at, turn: {
+      id: turn, threadId: id, engine: ENGINE, status: "running", startedAt: at,
+    } }),
+  ]
+  let n = 0
+  const push = (item) => {
+    out.push(line({ type: "item.started", at, item: { ...item, id: `${id}-i${++n}`, turnId: turn, at } }))
+  }
+  push({ kind: "user_message", text: "把那份设计稿里的「默认」改成明确表述" })
+  push({
+    kind: "tool_call",
+    tool: "Edit",
+    status: "ok",
+    detail: {
+      kind: "file_edit",
+      path: "主题设置设计稿.md",
+      files: [{
+        path: "主题设置设计稿.md",
+        kind: "update",
+        added: 2,
+        removed: 1,
+        diff:
+          "@@ -12,7 +12,8 @@\n" +
+          " | 字段 | 含义 |\n" +
+          "-| 默认 | 跟随系统 |\n" +
+          "+| 跟随系统 | 按系统外观切换浅色或深色 |\n" +
+          "+| 固定 | 始终使用选定主题 |\n",
+      }],
+      added: 2,
+      removed: 1,
+    },
+  })
+  // **不带补丁的那一份**：好几家引擎报编辑时只给路径和增删数。
+  // 上一版展开它得到的是一个只有文件头的空盒子，和「没有改动」长得一模一样
+  push({
+    kind: "tool_call",
+    tool: "Write",
+    status: "ok",
+    detail: {
+      kind: "file_edit",
+      path: "/tmp/omni-出图-临时笔记.md",
+      files: [{ path: "/tmp/omni-出图-临时笔记.md", kind: "added", added: 242, removed: 0 }],
+      added: 242,
+      removed: 0,
+    },
+  })
+  push({ kind: "agent_message", complete: true, text: "改完了。「默认」已全部替换为明确表述。" })
+  out.push(line({ type: "turn.completed", at, turnId: turn, status: "completed" }))
+  return `${out.join("\n")}\n`
+}

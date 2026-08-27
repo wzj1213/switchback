@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { clearTarget, createTarget, effOf, land, punch, spreadOf, TG_D, TG_R } from "./pet-range.js"
+import {
+  clearTarget, createShow, createTarget, effOf, land, punch, showMoving, SHOW_REST, spreadOf,
+  stepShow, TG_D, TG_R,
+} from "./pet-range.js"
 
 const mid = (): number => 0.5
 
@@ -99,5 +102,33 @@ describe("spreadOf", () => {
       land(loose, { x: (i % 2) * 10, y: (i % 3) * 8, in: true })
     }
     expect(spreadOf(tight) ?? 9).toBeLessThan(spreadOf(loose) ?? 0)
+  })
+})
+
+describe("靶场什么时候显形", () => {
+  it("在跑就全开，跑完按住几秒，然后落到很浅的底", () => {
+    const show = createShow()
+    // 进来时还没开火，就该是浅的
+    expect(show.on).toBe(SHOW_REST)
+    // 开火：四分之一秒亮满
+    for (let i = 0; i < 20; i++) stepShow(show, 1 / 60, true)
+    expect(show.on).toBe(1)
+    // 停下之后先按住：这几秒画面不变，一个像素都不淡
+    for (let i = 0; i < 60; i++) stepShow(show, 1 / 60, false)
+    expect(show.on).toBe(1)
+    // 按住的这几秒**不算 moving**——不值得为一张不变的画面续一条 rAF
+    expect(showMoving(show, false)).toBe(false)
+    // 按住走完才开始淡，淡到底就停在 SHOW_REST，不会变成 0
+    for (let i = 0; i < 600; i++) stepShow(show, 1 / 60, false)
+    expect(show.on).toBe(SHOW_REST)
+    expect(showMoving(show, false)).toBe(false)
+  })
+
+  it("淡到一半又开火：立刻往回亮，且这一帧算 moving", () => {
+    const show = { on: 0.5, hold: 0 }
+    stepShow(show, 1 / 60, true)
+    expect(show.on).toBeGreaterThan(0.5)
+    expect(show.hold).toBeGreaterThan(0)
+    expect(showMoving(show, true)).toBe(true)
   })
 })

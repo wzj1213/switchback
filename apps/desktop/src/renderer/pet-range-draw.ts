@@ -30,6 +30,8 @@ const RATE_FULL = 240
 
 export interface RangeShot {
   target: Target
+  /** 画多浓。0.18（闲着）到 1（在开火）。见 `pet-range.ts` 的「靶场什么时候显形」。 */
+  show: number
   at: { x: number; y: number; ground: number }
   live: { rate: number; ratio: number; bench: Bench | undefined }
   pal: RangePaint
@@ -44,19 +46,23 @@ export function drawRange(
   const { live, pal } = shot
   const level = live.ratio >= 0.9 ? pal.danger : live.ratio >= 0.7 ? pal.warn : pal.faint
   const all: RangeShot = { ...shot, level }
+  // **整张靶的浓度在这一层定**，里面每处自己的半透明都乘上它；
+  // 画完还原成 1，后面的枪、子弹、弹壳不跟着淡
+  g.globalAlpha = all.show
   post(g, all)
   rings(g, all)
   face(g, all, effOf(live.ratio))
   holes(g, all)
   readout(g, all)
+  g.globalAlpha = 1
 }
 
 /** 靶杆。**靶得立在台面上**——飘着的一张纸不是靶，是贴纸。 */
-function post(g: CanvasRenderingContext2D, { at, pal }: RangeShot): void {
-  g.globalAlpha = 0.5
+function post(g: CanvasRenderingContext2D, { at, pal, show }: RangeShot): void {
+  g.globalAlpha = 0.5 * show
   g.fillStyle = pal.faint
   g.fillRect(at.x - 0.5, at.y + TG_R, 1, Math.max(0, at.ground - at.y - TG_R))
-  g.globalAlpha = 1
+  g.globalAlpha = show
 }
 
 function rings(g: CanvasRenderingContext2D, { at, live, level, pal }: RangeShot): void {
@@ -87,16 +93,16 @@ function arc(
 }
 
 /** 靶纸：一圈外框，中间是**上下文吃剩的有效区**。 */
-function face(g: CanvasRenderingContext2D, { at, level, pal }: RangeShot, eff: number): void {
+function face(g: CanvasRenderingContext2D, { at, level, pal, show }: RangeShot, eff: number): void {
   g.fillStyle = pal.line
   round(g, { x: at.x - TG_R, y: at.y - TG_R, w: TG_R * 2, h: TG_R * 2 }, 3)
   g.fill()
-  g.globalAlpha = 0.35
+  g.globalAlpha = 0.35 * show
   g.fillStyle = level
   g.beginPath()
   g.arc(at.x, at.y, eff, 0, Math.PI * 2)
   g.fill()
-  g.globalAlpha = 1
+  g.globalAlpha = show
   g.strokeStyle = level
   g.lineWidth = 1
   g.beginPath()
@@ -105,18 +111,18 @@ function face(g: CanvasRenderingContext2D, { at, level, pal }: RangeShot, eff: n
 }
 
 /** 弹着：进了的实心，脱靶的空心。**都不消失**——那一串就是这一轮的记录。 */
-function holes(g: CanvasRenderingContext2D, { target, at, pal }: RangeShot): void {
+function holes(g: CanvasRenderingContext2D, { target, at, pal, show }: RangeShot): void {
   for (const hole of target.holes) {
     if (hole.in) {
       g.fillStyle = pal.text
       g.fillRect(at.x + hole.x - 0.85, at.y + hole.y - 0.85, 1.8, 1.8)
       continue
     }
-    g.globalAlpha = 0.5
+    g.globalAlpha = 0.5 * show
     g.strokeStyle = pal.text
     g.lineWidth = 0.8
     g.strokeRect(at.x + hole.x - 1.1, at.y + hole.y - 1.1, 2.2, 2.2)
-    g.globalAlpha = 1
+    g.globalAlpha = show
   }
 }
 
