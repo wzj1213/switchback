@@ -108,6 +108,33 @@ li{margin-bottom:5px}
 <h1>omni 界面全面审查 · v5</h1>
 <p class="sub">2026-08-26 · 对着跑起来的桌面端实测 · 承接 <code>docs/UI细节优化计划.md</code>（v1，已落地）与 <code>界面细节打磨-v4.html</code></p>
 
+<div class="box" style="border-color:color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 6%,transparent)">
+<h4 style="color:var(--ok)">这份审查已经落地（2026-08-26 当天，八轮）</h4>
+<p style="margin:0 0 var(--s2)">下面正文是<strong>改之前</strong>的实测，一个字没动——留着是因为每一条都记着<strong>为什么</strong>，
+下次有人想把某个值改回去时，理由在这儿。已落地的部分：</p>
+<ul style="margin:0">
+<li><strong>A5 按下态</strong>：<code>app-foundation.css</code> 加 <code>:where()</code> 兜底（(0,2,0)，输给任何写明的 <code>:active</code>），实心主键各自写明。20 处低于 28px 的点击区改用溢出伪元素撑热区 → 实测 20 → 2。</li>
+<li><strong>A3 时长</strong>：新增 <code>--dur-fast</code> / <code>--dur-bar</code>，散落的 70/220/320 全部收回。编排动画与角色动画按判据留在表外并说明。</li>
+<li><strong>A1 字号</strong>：46 处「要读的字」从 11.5 提到 13。实测转录区 13px 成为主力（29 处），11.5px 从 23 降到 10，≤12.5px 占比 58% → 42%。</li>
+<li><strong>A6 图标</strong>：八处裸 <code>&lt;svg&gt;</code> 收回 <code>Svg</code>；七处 <code>×</code>/<code>✕</code> 换 <code>CloseIcon</code>；新增 <code>scripts/check-icons.mjs</code> 串进 <code>pnpm check</code>。</li>
+<li><strong>A2 圆角</strong>：十六处非 token 值按「它到底是什么形状」归位（胶囊 / 圆点 / 微记号 / 同心算式），实测<strong>零处</strong>非 token 圆角。</li>
+<li><strong>B1 B2 B5</strong>：立 <code>--bar-w</code>，四条横带回到同一条居中基准（实测四带同为 467），断言写进 <code>01-转录区</code>；输入卡下沿留够阴影。</li>
+<li><strong>B4</strong>：空态去掉装饰圆、改为锚在输入框上（标题 32% → 46%，间距 43% → 28%，对上 codex 的 44/30）。</li>
+<li><strong>C1 C2 C3 C4</strong>：侧栏文字列四条 → 一条（32）；段头 43 → 26；新增 ⌘\ 折叠与「显示」菜单；身份行显示名字 + 套餐。</li>
+<li><strong>E4</strong>：设置面板从定高 660 改成按内容长。</li>
+</ul>
+<p style="margin:var(--s3) 0 0"><strong>没做的两条，各有理由</strong>：<br>
+· <strong>B3 顶栏进正文列</strong>——照做的话侧栏展开时顶栏左边会空出 187px，比现在更糟。<br>
+· <strong>E6 控件规格拉齐</strong>——<code>.trigger</code> 的「平时是文字、悬停才成胶囊」是 <code>popover.css</code> 里写明的决定，
+改它是拿我的口味换掉一条有据的决定，不是修缺陷。<br>
+· <strong>A4 硬编码间距</strong>——其中绝大多数是 8px 以下的微值（图标与箭头之间的 3px 之类），
+和 <code>--radius-mark</code> 同一类：<code>--sp</code> 阶梯从 4 起步，本来就管不到那一档。</p>
+<p style="margin:var(--s3) 0 0">另有一条正文没提、做的时候才发现的：<strong>出图套件本身在任何工作区状态下都跑不完</strong>
+（四条断言隐含假设了工作区是某个形状，其中一条还是自指的——它扫 diff 正文找一个字符串，
+而含有那个字符串的文件正是它自己）。修完之后浅色 / 深色 / 最小窗口三档各跑一遍全过，
+这是这个仓库第一次三档都能跑完。</p>
+</div>
+
 <p class="lede">这套界面欠的不是设计，是<strong>把已经写在注释里的决定收敛到数字上</strong>。<code>tokens.css</code>
 声明 5 档字号、4 档圆角、2 档时长、6 档间距；实际渲染出来是 7 档字号、10 种圆角、6 种时长，外加 239 处硬编码 px。
 最小那档字号（11.5px）占了全部字号声明的 55%，而「要读的」14px 只有 11 处——<strong>和 codex 并排显小气，
