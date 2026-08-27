@@ -151,6 +151,24 @@ export function reframe(cwd: string, root: string, files: readonly ReviewFile[])
  * numstat 全都复用，这里只管分组和合并。**回调而不是直接 import**：
  * 那边已经 import 了这个文件，反过来再 import 就成了环。
  */
+/**
+ * 跨仓库那条的入口。**递归回去时调用方要把 `scope` 摘掉**。
+ *
+ * 不摘的话：总目录带着 `scope: "last-turn"` 递进每个仓库根，那边找不到这一轮的
+ * 工作区快照（快照按**会话工作目录**记，对不上仓库根），于是每个仓库都返回一张
+ * `turnMissing` 的空清单——并起来还是空的，界面上和「不是 git 仓库」一模一样。
+ * 摘掉之后每个仓库走「相对自己 HEAD」，那正是这一档能给的答案。
+ *
+ * 这条只是个说明位；真正摘 scope 的是 `workdiff.ts` 那个同名薄封装。
+ */
+export async function spreadFrom(
+  cwd: string,
+  source: { wanted?: readonly string[] },
+  one: OneRepo,
+): Promise<Spread | undefined> {
+  return spreadReview(cwd, source, one)
+}
+
 export async function spreadReview(
   cwd: string,
   source: { wanted?: readonly string[] },

@@ -165,8 +165,18 @@ export function useRowPeek({
         arm(e.currentTarget)
       },
       onMouseLeave: disarm,
+      /*
+       * **只有键盘来的焦点才弹。**
+       *
+       * 上一版是「拿到焦点就弹」，于是鼠标根本不在侧栏时也会莫名其妙冒出一张卡：
+       * 选中一条会话、改名对话框关掉把焦点还回来、列表重排之后浏览器补焦点——
+       * 每一次都算「拿到焦点」。这些都不是「我想看看这条是什么」。
+       *
+       * `:focus-visible` 正是浏览器对「这次焦点该不该给用户看见」的判断，
+       * 借它一用：键盘 Tab 过来是真，点一下、程序 `focus()` 是假。
+       */
       onFocus: (e) => {
-        arm(e.currentTarget)
+        if (e.currentTarget.matches(":focus-visible")) arm(e.currentTarget)
       },
       onBlur: disarm,
       onPointerDownCapture: disarm,

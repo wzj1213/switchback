@@ -283,7 +283,7 @@ export function stubThread(id, title, cwd, at) {
  * 所以样本里单开这么一条，cwd 指向出图用的临时数据目录（那儿没有 .git）。
  * 它一条就能同时摆出三种状态：**有补丁的**、**引擎没带补丁的**、**落在工作区外的**。
  */
-export function noRepoThread(id, cwd, at) {
+export function noRepoThread(id, cwd, at, outside) {
   const turn = `${id}-t1`
   const out = [
     line({ type: "thread.started", at, thread: threadOf(id, "在临时目录里改那份设计稿", cwd, at) }),
@@ -319,16 +319,20 @@ export function noRepoThread(id, cwd, at) {
       removed: 1,
     },
   })
-  // **不带补丁的那一份**：好几家引擎报编辑时只给路径和增删数。
-  // 上一版展开它得到的是一个只有文件头的空盒子，和「没有改动」长得一模一样
+  // **落在工作区外、而且不带补丁的那一份。**
+  //
+  // 路径由调用方给一个**真实存在、又不在临时目录里的**（出图套件给的是本仓库里
+  // 的一个文件）。不能随手写 `/tmp/xxx`——那种是引擎的一次性草稿，
+  // 已经不进这张卡了（见 `shared/paths.ts` 的 `isScratch`），拿它当样本
+  // 等于让这一屏永远空着。
   push({
     kind: "tool_call",
     tool: "Write",
     status: "ok",
     detail: {
       kind: "file_edit",
-      path: "/tmp/omni-出图-临时笔记.md",
-      files: [{ path: "/tmp/omni-出图-临时笔记.md", kind: "added", added: 242, removed: 0 }],
+      path: outside,
+      files: [{ path: outside, kind: "added", added: 242, removed: 0 }],
       added: 242,
       removed: 0,
     },

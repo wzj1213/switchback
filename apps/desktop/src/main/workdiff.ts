@@ -14,8 +14,7 @@ import {
 import { codesOf } from "./worksite.js"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
 import { scopedPatchText, scopedReview } from "./workdiff-scopes.js"
-import { spreadReview } from "./workdiff-multi.js"
-import { repoForRel } from "./workdiff-multi.js"
+import { repoForRel, spreadFrom as spreadWith, type OneRepo } from "./workdiff-multi.js"
 
 const run = promisify(execFile)
 
@@ -185,6 +184,10 @@ async function baselineReview(cwd: string, source: ReviewSource, turn = false): 
   return source.baselines.review(source.threadId, cwd, source.wanted, turn)
 }
 
+/** 递归回单仓库那条时用的回调。**摘掉 `scope`**——见 `workdiff-multi.ts` 的 `spreadFrom`。 */
+const spreadOne = (source: ReviewSource): OneRepo =>
+  (root, slice) => workReview(root, { ...source, ...slice, scope: undefined })
+
 async function reviewForScope(
   cwd: string,
   source: ReviewSource,
@@ -198,9 +201,14 @@ async function reviewForScope(
   const turn = await baselineReview(cwd, source, true).catch(() => undefined)
   if (turn !== undefined) return { handled: true, review: { ...turn, scope } }
   const repo = await repoOf(cwd)
-  return repo === undefined
-    ? { handled: true }
-    : { handled: true, review: { ...repo, files: [], baseline: true, turnMissing: true } }
+  if (repo !== undefined) {
+    return { handled: true, review: { ...repo, files: [], baseline: true, turnMissing: true } }
+  }
+  // **总目录不是仓库**：退到跨仓库那条。这一档本来就没有「这一轮」的基线可谈，
+  // 给「各自相对 HEAD」比给一句「不是 git 仓库」有用得多。
+  // **递归回去要摘掉 `scope`**，理由见 `workdiff-multi.ts` 的 `spreadFrom`
+  const spread = await spreadWith(cwd, source, spreadOne(source))
+  return spread === undefined ? { handled: true } : { handled: true, review: spread }
 }
 
 async function conversationBaseline(
@@ -226,7 +234,7 @@ export async function workReview(cwd: string, source: ReviewSource = {}): Promis
   if (baseline.handled) return baseline.review
   const repo = await repoOf(cwd)
   // 工作区自己不是仓库，但底下挂着几个——按文件所属的仓库分头问（见 `workdiff-multi.ts`）
-  if (repo === undefined) return spreadReview(cwd, source, workReview)
+  if (repo === undefined) return spreadWith(cwd, source, spreadOne(source)) as Promise<Review | undefined>
   // `-uall`：不加的话未跟踪的**目录**会折成一条 `sub/`，界面上看起来像一个文件
   const status = await run("git", ["status", "--porcelain", "-z", "-uall"], { cwd: repo.root, timeout: TIMEOUT }).catch(
     () => undefined,

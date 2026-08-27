@@ -65,3 +65,41 @@ export function canonicalPath(path: string, cwd: string): string {
   if (normalized === "" || absolute(normalized) || cwd === "") return normalized
   return normalizePath(`${normalizePath(cwd)}/${normalized}`)
 }
+
+/**
+ * 这条路径是不是**系统临时目录里的草稿**。
+ *
+ * 引擎干活时经常往 `/tmp` 写一次性的脚本：拼一段 python 跑一下、导出一份中间
+ * JSON、生成一个补丁再 apply。那些**不是你的改动**——它们没进你的项目，
+ * 下次重启就没了，而「这一轮改了哪些文件」那张卡问的是「我的工作区变成什么样了」。
+ * 三个 `/private/tmp/xxx_8655.py` 混在里面，会把真正改到的那两个文件挤下去。
+ *
+ * **必须同时满足「在临时目录里」和「不在工作区里」。** 只判前一条会误伤一类
+ * 真实用法：有人就是把工作区开在临时目录下（出图套件那份样本正是如此），
+ * 那时候那些文件是**正经产出**，一个都不能少。
+ */
+export function isScratch(path: string, cwd: string): boolean {
+  const at = normalizePath(path)
+  const root = normalizePath(cwd)
+  if (at === "" || (root !== "" && (at === root || at.startsWith(`${root}/`)))) return false
+  const lower = at.toLowerCase()
+  return TEMP_ROOTS.some((prefix) => lower.startsWith(prefix)) || WIN_TEMP.test(lower)
+}
+
+/**
+ * 算临时目录的那几个前缀。
+ *
+ * `/tmp` 已经被 `tmpAlias` 收口成 `/private/tmp`，所以这里不再单列它。
+ * `/var/folders/…` 是 macOS 每用户的临时区（`TMPDIR` 指的就是它），
+ * realpath 之后带 `/private` 前缀，两种写法都收。Windows 那条是
+ * `AppData/Local/Temp`，大小写不敏感，所以比较前先压成小写。
+ */
+const TEMP_ROOTS = [
+  "/private/tmp/",
+  "/private/var/folders/",
+  "/var/folders/",
+  "/var/tmp/",
+] as const
+
+/** Windows：`C:/Users/<谁>/AppData/Local/Temp/…`。盘符和大小写都不定，用正则收。 */
+const WIN_TEMP = /^[a-z]:\/users\/[^/]+\/appdata\/local\/temp\//

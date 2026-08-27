@@ -226,3 +226,27 @@ describe("用 git 当前状态校正", () => {
     ])
   })
 })
+
+describe("临时目录里的草稿不算这一轮的改动", () => {
+  const edit = (path: string): Item => ({
+    id: `e-${path}`, turnId: "t1", at: 1, kind: "tool_call", tool: "Write", status: "ok",
+    detail: { kind: "file_edit", path, added: 4, removed: 0,
+      files: [{ path, kind: "add", added: 4, removed: 0 }] },
+  })
+
+  it("引擎顺手写在 /tmp 的一次性脚本不进清单——它没进你的项目", () => {
+    const out = reportedChangesOf([
+      edit("/tmp/transform_8655.py"),
+      edit("/private/tmp/upload_8655.py"),
+      edit("/var/folders/ab/cd/T/scratch.json"),
+      edit("src/real.ts"),
+    ], "/work/proj")
+    expect(out.list.map((f) => f.path)).toEqual(["/work/proj/src/real.ts"])
+  })
+
+  it("**工作区本来就开在临时目录下时一个都不能少**——那时候它们是正经产出", () => {
+    const cwd = "/private/var/folders/ab/cd/T/omni-work/临时工作区"
+    const out = reportedChangesOf([edit(`${cwd}/设计稿.md`), edit("/private/tmp/别处的.py")], cwd)
+    expect(out.list.map((f) => f.path)).toEqual([`${cwd}/设计稿.md`])
+  })
+})

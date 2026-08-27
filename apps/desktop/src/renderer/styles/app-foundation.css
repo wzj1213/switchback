@@ -284,6 +284,22 @@ body {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   height: 100%;
+  /*
+   * **开关侧栏、开关工具台时列宽是滑过去的，不是跳过去的。**
+   *
+   * 这几个开关一按，整扇窗口的分栏当场重排——正文的行宽、每一行的折行位置
+   * 全变，读到一半的那一段跳到别处去。滑 180ms 不是为了好看，是给眼睛一个
+   * 「东西挪到那儿去了」的交代（Chromium 从 107 起 `grid-template-columns` 可动画）。
+   *
+   * 只动列宽，不动别的：里面每一块自己的过渡该怎样还怎样。
+   */
+  transition: grid-template-columns 180ms var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    transition: none;
+  }
 }
 
 /*

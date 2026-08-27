@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { reframe, repoForRel, repoSlices, spreadReview } from "./workdiff-multi.js"
+import { reframe, repoForRel, repoSlices, spreadFrom, spreadReview } from "./workdiff-multi.js"
 
 const run = promisify(execFile)
 
@@ -67,6 +67,18 @@ describe("总目录不是仓库、底下挂着几个仓库", () => {
     expect(files[0]?.rel).toBe("仓库甲/src/index.ts")
     // 身份仍然是绝对路径，不受影响
     expect(files[0]?.path).toBe(join(dirs.repoA, "src/index.ts"))
+  })
+
+  it("**递归回去时 `scope` 必须摘掉**——不摘每个仓库都回一张 turnMissing 的空清单", async () => {
+    const seen: (string | undefined)[] = []
+    const one = async (root: string, source: { wanted?: readonly string[]; scope?: string }) => {
+      seen.push(source.scope)
+      return { root, cwd: root, files: [] }
+    }
+    // 调用方（`workdiff.ts` 的 `spreadOne`）负责摘；这里验的是它确实摘了
+    await spreadFrom(dirs.home, { wanted: [join(dirs.repoA, "src/index.ts")] },
+      (root, slice) => one(root, { ...slice, scope: undefined }))
+    expect(seen).toEqual([undefined])
   })
 
   it("几个仓库的清单并成一张；一个都问不出来时才算没有", async () => {

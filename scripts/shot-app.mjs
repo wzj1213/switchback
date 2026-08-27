@@ -286,7 +286,11 @@ async function seed(dir) {
   // 一起删会互相踩（实测 `ENOTEMPTY`）
   const noRepo = join(WORK, "临时工作区")
   await mkdir(noRepo, { recursive: true })
-  await writeFile(join(threads, "th-norepo.jsonl"), noRepoThread("th-norepo", noRepo, AT - 5 * 3600_000))
+  // 「工作区外」那一条给一个**本仓库里的**路径：既不在会话工作区里，也不是临时草稿
+  await writeFile(
+    join(threads, "th-norepo.jsonl"),
+    noRepoThread("th-norepo", noRepo, AT - 5 * 3600_000, join(ROOT, "AGENTS.md")),
+  )
   await writeFile(
     join(dir, "settings.json"),
     `${JSON.stringify({

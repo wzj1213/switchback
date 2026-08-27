@@ -1,6 +1,6 @@
 import type { FileChange, Item } from "@omni/protocol"
 import type { ReviewFile } from "../shared/review.js"
-import { absolute, canonicalPath, normalizePath } from "../shared/paths.js"
+import { absolute, canonicalPath, isScratch, normalizePath } from "../shared/paths.js"
 
 export interface Changes {
   files: number
@@ -61,7 +61,10 @@ export function reportedChangesOf(items: readonly Item[], cwd: string): Changes 
       continue
     for (const file of item.detail.files) {
       const path = canonicalPath(file.path, cwd)
-      if (path === "") continue
+      // 系统临时目录里的草稿不算「这一轮改了什么」——它们没进你的项目，
+      // 下次重启就没了（见 `shared/paths.ts` 的 `isScratch`）。侧栏那张
+      // 「这条会话碰过的文件」照旧列它们：那一问问的是「它读写过什么」
+      if (path === "" || isScratch(path, cwd)) continue
       files.set(path, { path, added: file.added, removed: file.removed, last: file })
     }
   }
