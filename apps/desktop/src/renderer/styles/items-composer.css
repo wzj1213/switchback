@@ -124,7 +124,7 @@
  * 真正看到的那圈由 `.compring__edge` 用渐变描出来，盖在它上面。
  */
 .composer__inner:has(.effort--costly):focus-within {
-  border-color: #6d4bc7;
+  border-color: var(--ramp-1);
   box-shadow:
     0 0 0 3px rgb(122 70 190 / 20%),
     var(--shadow-1);
@@ -173,15 +173,15 @@
 
 /* 停点的颜色写在这儿，深色模式整组换。和滑块那条 `.effort__hot` 同一组值 */
 .compring__s0 {
-  stop-color: #2b2d6e;
+  stop-color: var(--ramp-0);
 }
 
 .compring__s1 {
-  stop-color: #6d4bc7;
+  stop-color: var(--ramp-1);
 }
 
 .compring__s2 {
-  stop-color: #b4409a;
+  stop-color: var(--ramp-2);
 }
 
 /* 常驻的那一圈：整圈渐变，靛在左上、品红在右下——**和条子上的坡道同一个方向** */
@@ -214,22 +214,22 @@
 
 @media (prefers-color-scheme: dark) {
   .composer__inner:has(.effort--costly):focus-within {
-    border-color: #8367dd;
+    border-color: var(--ramp-1);
     box-shadow:
       0 0 0 3px rgb(140 95 220 / 24%),
       var(--shadow-1);
   }
 
   .compring__s0 {
-    stop-color: #3a3d8a;
+    stop-color: var(--ramp-0);
   }
 
   .compring__s1 {
-    stop-color: #8367dd;
+    stop-color: var(--ramp-1);
   }
 
   .compring__s2 {
-    stop-color: #d76ab4;
+    stop-color: var(--ramp-2);
   }
 
   .compring__orbit {

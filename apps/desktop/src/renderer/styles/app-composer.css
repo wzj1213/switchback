@@ -61,7 +61,11 @@
  */
 .send--aside {
   background: var(--accent);
-  color: #fff;
+  /* **`--text-inverse` 而不是 `#fff`。** 它的定义就是「压在实心面上的墨」：
+     浅色下是白（强调色是深蓝），深色下是近黑（强调色是浅蓝）。
+     写死白之后深色那边还得另写一条把它翻回近黑——两条声明说同一件事，
+     而 token 一条就够，也不会有哪次漏改。 */
+  color: var(--text-inverse);
 }
 
 /* 停止不用主键那份重量：主键是「往前走」，而停止是打断 */
@@ -441,7 +445,7 @@
   border-radius: var(--radius-sm);
   background: var(--bg-raised);
   box-shadow: var(--shadow-pop);
-  color: #96307c;
+  color: var(--ramp-ink);
   font-size: var(--text-xs);
   white-space: nowrap;
   pointer-events: none;
@@ -456,7 +460,7 @@
 
 @media (prefers-color-scheme: dark) {
   .effort__warn {
-    color: #e094c8;
+    color: var(--ramp-ink);
   }
 }
 
@@ -526,7 +530,7 @@
 
 /* 贵档：名字染坡道尽头那个色，和收起态的档位名说同一句话 */
 .effort--costly .effort__now {
-  color: #96307c;
+  color: var(--ramp-ink);
   font-weight: 600;
 }
 
@@ -627,7 +631,7 @@
   /* 品红那一站停在 **84%**：满档时拇指盖住的是末端 24px，
      停在 100% 的话整条最亮的那一截**永远看不见**。末尾那站是淡尾，
      让被拇指压住的那一小段也不是死色 */
-  background-image: linear-gradient(90deg, #2b2d6e, #6d4bc7 48%, #b4409a 84%, #c95ab0);
+  background-image: linear-gradient(90deg, var(--ramp-0), var(--ramp-1) 48%, var(--ramp-2) 84%, var(--ramp-3));
   opacity: 0;
   transition: opacity 420ms var(--ease);
 }
@@ -818,16 +822,11 @@
 
 /* 贵档落档时触发器的档位名也要说「这一档更贵」：品红加粗（demo 的 eff__lvl） */
 .effort--costly .trigger__label {
-  color: #96307c;
+  color: var(--ramp-ink);
   font-weight: 600;
 }
 
 @media (prefers-color-scheme: dark) {
-  /* 深色下的强调色是浅蓝，图标得翻成近黑才看得见 */
-  .send--aside {
-    color: #17171a;
-  }
-
   .effort__bar {
     background: color-mix(in srgb, var(--bg-press) 82%, var(--bg-raised));
     box-shadow:
@@ -840,7 +839,7 @@
   }
 
   .effort__hot {
-    background-image: linear-gradient(90deg, #3a3d8a, #8367dd 48%, #d76ab4 84%, #e489c9);
+    background-image: linear-gradient(90deg, var(--ramp-0), var(--ramp-1) 48%, var(--ramp-2) 84%, var(--ramp-3));
   }
 
   .effort__stops i {
@@ -850,7 +849,7 @@
 
   .effort--costly .trigger__label,
   .effort--costly .effort__now {
-    color: #e094c8;
+    color: var(--ramp-ink);
   }
 
   .effort--costly.effort--open {
