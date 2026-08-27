@@ -32,9 +32,9 @@ export const VIEWS = [
       assert: `(() => {
         const at = (s) => { const n = document.querySelector(s); return n === null ? null : Math.round(n.getBoundingClientRect().left) }
         const edges = ['.transcript__inner', '.md', '.brief', '.composer__inner'].map(at)
-        // 那排动作（复制）**整屏只该有一条**，挂在最后一条说出来的话上。
-        // 上一版每条消息都挂一条透明的，看不见却照样占着二十来像素高——
-        // 于是这一屏所有的间距都比样式表里写的多一档（见 components/Copyable.tsx）
+        // 那排动作（复制）**每轮的最后一条回答各一条**——这份样本只有一轮有回答，
+        // 所以整屏应该恰好一条。上一版每条消息都挂一条透明的，看不见却照样占着
+        // 二十来像素高，于是这一屏所有间距都比样式表里写的多一档（见 answerActs）
         const acts = document.querySelectorAll('.transcript .msgacts').length
         return acts === 1 && edges.every(edge => edge !== null && edge === edges[0])
       })()`,

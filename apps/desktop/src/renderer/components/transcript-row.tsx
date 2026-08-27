@@ -55,26 +55,34 @@ export function lastMine(rows: readonly Row[]): string | undefined {
 }
 
 /**
- * 最后一条**说出来的话**的 id。那排动作（复制）只挂在它身上。
+ * 哪几条消息挂那排动作（复制）。**每一轮的最后一条回答各挂一条。**
  *
- * 上一版每条消息都挂一颗悬停才出现的「复制」，见 `Copyable.tsx` 开头那段账。
- * 这里定的是「最后一条」到底算谁：
+ * 上一版是给**每条消息**都挂一颗悬停才出现的「复制」，连思考和通知都有。
+ * 挂着的时候它是隐形的，可它照样占着一行的高度（`opacity: 0` 不是 `display: none`），
+ * 于是每两条消息之间凭空多出二十来像素，`app-main.css` 那套间距体系一档都不准。
  *
- * - **只认人话和回答**。思考、通知、错误、计划卡都不算——把复制挂在
- *   一段思考上，等于说那段思考和答案是同一级的东西。
- * - **还在吐字的回答不给**。那一刻没有一份定稿可拿，而按钮一旦画出来，
- *   下一帧文字长高它就往下跳一次。等它写完再出现。
- * - 工具组、旁路、侧问都跨过去：它们各有各的复制入口。
+ * 收到「每轮一条」而不是「整屏一条」：**你要拿走的是某一轮的答案**，
+ * 而一屏里往往压着好几轮——只留最后那一条的话，往回翻两屏就没有任何入口了。
+ *
+ * 三条规矩：
+ *
+ * - **只认回答**。人话、思考、通知、计划卡都不挂——把复制挂在一段思考上，
+ *   等于说那段思考和答案是同一级的东西。（你自己那句话上挂的是「改一改再发」，
+ *   那是另一件事，见 `lastMine`。）
+ * - **还在吐字的不算**。那一刻没有一份定稿可拿，而按钮一旦画出来，
+ *   下一帧文字长高它就往下跳一次。写完才出现。
+ * - **一轮里说了好几段就归最后那段**。前面几段是过程，末尾那段才是这一轮的结论。
  */
-export function lastSpoken(rows: readonly Row[]): string | undefined {
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const row = rows[i]
-    if (row?.kind !== "item") continue
+export function answerActs(rows: readonly Row[]): ReadonlySet<string> {
+  // 一轮一条：后来的覆盖先前的，收尾时留下的就是每轮最后那条
+  const last = new Map<string, string>()
+  for (const row of rows) {
+    if (row.kind !== "item") continue
     const item = row.item
-    if (item.kind === "user_message") return item.id
-    if (item.kind === "agent_message") return item.complete ? item.id : undefined
+    if (item.kind !== "agent_message" || !item.complete) continue
+    last.set(item.turnId, item.id)
   }
-  return undefined
+  return new Set(last.values())
 }
 
 /**

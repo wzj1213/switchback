@@ -4,7 +4,7 @@ import type { ResolveApproval } from "./Approval.js"
 import { groupRows } from "../group.js"
 import { compact } from "../usage.js"
 import { Copyable } from "./Copyable.js"
-import { lastSpoken } from "./transcript-row.js"
+import { answerActs } from "./transcript-row.js"
 import { ItemView } from "./ItemView.js"
 import { LaneTree } from "./LaneTree.js"
 import { LaneCommandBlock, LaneCommandLine, LaneOutput } from "./lane-command.js"
@@ -80,8 +80,8 @@ function ActivityFeed({ items, threadId, cwd, onCopy }: {
   onCopy: (text: string) => void
 }): React.JSX.Element | null {
   const rows = useMemo(() => groupRows(items), [items])
-  // 和转录区同一条规矩：动作只挂最后一条说出来的话（见 `Copyable.tsx`）
-  const spoken = lastSpoken(rows)
+  // 和转录区同一条规矩：每轮只挂最后一条回答（见 `transcript-row.tsx` 的 `answerActs`）
+  const acts = answerActs(rows)
   if (rows.length === 0) return null
   return (
     <div className="activity-feed">
@@ -92,7 +92,7 @@ function ActivityFeed({ items, threadId, cwd, onCopy }: {
         }
         if (row.kind !== "item") return null
         return (
-          <Copyable key={row.item.id} item={row.item} acts={row.item.id === spoken} onCopy={onCopy}>
+          <Copyable key={row.item.id} item={row.item} acts={acts.has(row.item.id)} onCopy={onCopy}>
             <ItemView item={row.item} onResolve={ignoreApproval} readOnly
               approvalTurn={undefined} shortcutApproval={undefined} />
           </Copyable>

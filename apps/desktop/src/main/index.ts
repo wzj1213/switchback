@@ -12,6 +12,7 @@ import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js
 import { createSinks, windowSink } from "./sink.js"
 import { attachRemote } from "./remote/index.js"
 import { installMenu } from "./menu.js"
+import { installContextMenu } from "./context-menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
 import { exportReport } from "./diagnose.js"
@@ -175,6 +176,10 @@ function createWindow(bounds: {
     event.preventDefault()
     void openExternal(url)
   })
+
+  // 右键。**Electron 不给默认菜单**，不接的话右键什么都不弹——
+  // 而「选中一段话 → 右键 → 复制」是大多数人复制文字唯一会走的那条路
+  installContextMenu(win.webContents)
 
   const devUrl = process.env["ELECTRON_RENDERER_URL"]
   if (isDev && devUrl !== undefined) void win.loadURL(devUrl)

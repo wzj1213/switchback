@@ -30,8 +30,8 @@ export function Copyable({
 }: {
   item: Item
   /**
-   * 这条是不是「最后一条说出来的话」。给了才有那颗复制，而且是常驻的。
-   * 见 `transcript-row.tsx` 的 `lastSpoken`。
+   * 这条是不是「这一轮的最后一条回答」。给了才有那颗复制，而且是常驻的。
+   * 见 `transcript-row.tsx` 的 `answerActs`。
    */
   acts: boolean
   onCopy: (text: string) => unknown
@@ -44,7 +44,7 @@ export function Copyable({
   // 一颗都没有就连那个盒子也别要：它占的那行高度正是上一版间距失真的来源
   if (!acts && extra === undefined) return <div className="copyable">{children}</div>
   return (
-    <div className="copyable" data-acts={acts ? "last" : "extra"}>
+    <div className="copyable" data-acts={acts ? "answer" : "extra"}>
       {children}
       {/*
         动作栏在消息**下面**，不是压在它身上。
