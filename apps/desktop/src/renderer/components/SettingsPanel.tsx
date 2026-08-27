@@ -183,7 +183,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         <header className="set__head">
           <span className="set__heading">设置</span>
           <span className="set__ver">omni {props.version}</span>
-          <button type="button" className="iconbtn" aria-label="关闭" title="关闭设置（Esc）" onClick={props.onClose}>
+          <button type="button" className="iconbtn" aria-label="关闭" data-tip="关闭设置（Esc）" onClick={props.onClose}>
             <CloseIcon />
           </button>
         </header>

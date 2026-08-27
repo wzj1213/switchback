@@ -21,12 +21,12 @@ export function ReviewFileHead({ file, copyDisabled, onReveal, onCopy }: {
       <span className="rv__path" title={file.rel}>{file.rel}</span>
       {canGo ? (
         <button type="button" className="rv__act" aria-label="在访达中显示"
-          title="在访达中显示" onClick={onReveal}>
+          data-tip="在访达中显示" onClick={onReveal}>
           <RevealIcon size={14} />
         </button>
       ) : null}
       <button type="button" className="rv__act" aria-label={copyTitle}
-        aria-live="polite" data-state={copyFeedback} title={copyTitle}
+        aria-live="polite" data-state={copyFeedback} data-tip={copyTitle}
         disabled={copyDisabled} onClick={copy}>
         {copyFeedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
       </button>

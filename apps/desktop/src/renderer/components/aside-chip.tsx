@@ -14,7 +14,7 @@ export function AsideChip({ onExit }: { onExit: () => void }): React.JSX.Element
       <button
         type="button"
         className="composer__asideoff"
-        title="退出侧问（Esc）"
+        data-tip="退出侧问（Esc）"
         aria-label="退出侧问"
         onClick={onExit}
       >

@@ -72,7 +72,7 @@ export function Head({
           type="button"
           className="sidebar__folder"
           onClick={onOpenFolder}
-          title="打开文件夹…"
+          data-tip="打开文件夹…"
           aria-label="打开文件夹…"
         >
           <FolderIcon size={SIDEBAR_ICON} />

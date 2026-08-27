@@ -68,11 +68,11 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
       <span className="panel-tabs__spacer" />
       <button type="button" className="panel-tabs__button panel-tabs__expand"
         aria-label={props.full ? "并排显示侧边面板" : "展开侧边面板"}
-        title={props.full ? "并排显示侧边面板" : "展开侧边面板"} onClick={props.onFull}>
+        data-tip={props.full ? "并排显示侧边面板" : "展开侧边面板"} onClick={props.onFull}>
         <ExpandIcon />
       </button>
       <button type="button" className="panel-tabs__button" aria-label="隐藏侧边面板"
-        title="隐藏侧边面板" onClick={props.onHide}>
+        data-tip="隐藏侧边面板" onClick={props.onHide}>
         <PanelIcon />
       </button>
     </header>

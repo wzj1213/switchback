@@ -29,7 +29,7 @@ export function FileSearchHead({ cwd, query, loading, input, onQuery, onEnterRes
             onQuery("")
           }} />
         <button type="button" className="workbench__icon" aria-label="立即刷新搜索结果"
-          title="立即刷新搜索结果" aria-busy={loading}
+          data-tip="立即刷新搜索结果" aria-busy={loading}
           disabled={!searching} onClick={onRefresh}>
           <ReloadIcon />
         </button>

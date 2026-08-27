@@ -36,7 +36,7 @@ function Source({
           className="file-preview__copy"
           aria-live="polite"
           data-state={feedback}
-          title={fileCopyTitle(file.truncated, feedback)}
+          data-tip={fileCopyTitle(file.truncated, feedback)}
           onClick={copy}
         >
           {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}

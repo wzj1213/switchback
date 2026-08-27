@@ -38,7 +38,7 @@ export function Action({
   // 那时候没有任何东西可停
   if (starting) {
     return (
-      <button className="send" type="button" title="引擎正在启动" aria-label="发送" disabled>
+      <button className="send" type="button" data-tip="引擎正在启动" aria-label="发送" disabled>
         <SendIcon />
       </button>
     )
@@ -50,7 +50,7 @@ export function Action({
       <button
         className="send send--stop"
         type="button"
-        title="停止（Esc）"
+        data-tip="停止（Esc）"
         aria-label="停止"
         onClick={onInterrupt}
         disabled={onInterrupt === undefined}
@@ -65,7 +65,7 @@ export function Action({
     <button
       className={`send${aside === true ? " send--aside" : ""}`}
       type="button"
-      title={aside === true ? "作为侧问发送（⌥⌘↵）——不进正文" : "发送（⌘↵）"}
+      data-tip={aside === true ? "作为侧问发送（⌥⌘↵）——不进正文" : "发送（⌘↵）"}
       aria-label={aside === true ? "作为侧问发送" : "发送"}
       onClick={onSend}
       disabled={empty}

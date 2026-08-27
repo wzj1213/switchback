@@ -55,12 +55,12 @@ function PreviewActions({ target, busy, refreshing, referenceable, referenceDisa
           <span aria-hidden="true">@</span> {referenceDisabled ? "继续后引用" : "引用"}
         </button>
       )}
-      <button type="button" className="workbench__icon" title="重新读取文件"
+      <button type="button" className="workbench__icon" data-tip="重新读取文件"
         aria-label="重新读取文件" aria-busy={busy} disabled={busy && !refreshing} onClick={onReload}>
         <ReloadIcon />
       </button>
       {revealable ? (
-        <button type="button" className="workbench__icon" title="在访达中显示"
+        <button type="button" className="workbench__icon" data-tip="在访达中显示"
           aria-label="在访达中显示" onClick={onReveal}>
           <RevealIcon size={14} />
         </button>

@@ -61,6 +61,8 @@ export interface AppApi {
   shell: Shell
   prefs: SettingsApi
   bridgeMissing: boolean
+  /** 主进程的全量到了没有。见 `useOmni` 的同名字段。 */
+  ready: boolean
   send: (command: Command) => void
   copy: (text: string) => Promise<boolean>
   reveal: (path: string) => void
@@ -214,6 +216,7 @@ export function useApp(): AppApi {
     shell,
     prefs,
     bridgeMissing: omni.bridgeMissing,
+    ready: omni.ready,
     send,
     copy: omni.copy,
     reveal: omni.reveal,

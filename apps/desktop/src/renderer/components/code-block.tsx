@@ -60,7 +60,7 @@ export function CodeBlock({ children, lang }: {
           aria-live="polite"
           data-state={feedback}
           aria-label={copyFeedbackTitle(feedback, "复制这段代码")}
-          title={copyFeedbackTitle(feedback, "复制这段代码")}
+          data-tip={copyFeedbackTitle(feedback, "复制这段代码")}
           onClick={copy}
         >
           {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}

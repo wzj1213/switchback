@@ -608,3 +608,77 @@
 .chip--warn {
   color: var(--warn);
 }
+
+/*
+ * ── 太长的那条收起来 ─────────────────────────────────
+ * 判据、为什么只对人话做，见 `components/clamped.tsx`。
+ */
+.clamp {
+  min-width: 0;
+}
+
+/*
+ * 收起时**底下留一道渐隐**，而不是齐着切一刀。
+ *
+ * 齐着切的那一版看起来像渲染坏了——半个字被切在边界上，人第一反应是
+ * 「这里是不是出错了」。渐隐说的是「下面还有」，那正是这一刀要传达的意思。
+ */
+.clamp[data-clamped="true"] {
+  position: relative;
+  overflow: hidden;
+  max-height: 264px;
+}
+
+.clamp[data-clamped="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 56px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+
+/*
+ * 渐隐得压在**它所在那块的底色**上，不是页面底色。
+ * 人话是有底色的气泡（`--bg-said`），引擎自己触发的那种是一层强调色的薄底——
+ * 用页面底色去渐隐，渐出来的是一道颜色不对的白边。
+ */
+.msg--user .clamp[data-clamped="true"]::after {
+  background: linear-gradient(to bottom, transparent, var(--bg-said));
+}
+
+.msg--native .clamp[data-clamped="true"]::after {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--accent) 6%, var(--bg))
+  );
+}
+
+.clamp__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.clamp__more:hover {
+  border-color: var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+}

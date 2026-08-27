@@ -63,7 +63,7 @@ export function Copyable({
             type="button"
             aria-live="polite"
             data-state={feedback}
-            title={copyFeedbackTitle(feedback, "复制这条内容")}
+            data-tip={copyFeedbackTitle(feedback, "复制这条内容")}
             onClick={copy}
           >
             {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}

@@ -11,7 +11,7 @@ export function AttachmentPick({
     <button
       type="button"
       className="attach-pick"
-      title="添加文件或图片（也可拖入或粘贴）"
+      data-tip="添加文件或图片（也可拖入或粘贴）"
       aria-label="添加文件或图片"
       disabled={disabled}
       onClick={onPick}

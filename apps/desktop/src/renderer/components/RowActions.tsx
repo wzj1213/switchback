@@ -37,7 +37,7 @@ export function RowActions({
       type="button"
       className="row__act"
       aria-label="更多操作"
-      title="更多操作"
+      data-tip="更多操作"
       onClick={onMenu}
     >
       <EllipsisIcon size={SIDEBAR_ICON} />

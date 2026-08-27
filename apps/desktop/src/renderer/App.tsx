@@ -9,6 +9,7 @@ import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
 import { Review } from "./components/Review.js"
 import { ThreadScreen } from "./components/ThreadScreen.js"
 import { SidebarPane } from "./SidebarPane.js"
+import { TipLayer } from "./components/tips.js"
 import { useApp } from "./useApp.js"
 import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
@@ -135,17 +136,23 @@ export function App(): React.JSX.Element {
   const sidebar = <Rail app={app} />
 
   const { settings, review } = Layers({ app })
+  // 悬停提示是**一层**，不是每颗按钮各挂一个（见 `components/tips.tsx`）。
+  // 三条分支都要有它，所以跟着 settings / review 那一层一起走
+  const tips = <TipLayer />
 
   if (thread === undefined) {
     return (
       <div className={panelShellClass(false, false, shell.railOpen)}>
         {sidebar}
+        {tips}
         <EmptyScreen
           notices={app.notices}
           onDismiss={shell.dismiss}
           bridgeMissing={app.bridgeMissing}
+          ready={app.ready}
         />
         {settings}
+        {tips}
       </div>
     )
   }
@@ -175,6 +182,7 @@ export function App(): React.JSX.Element {
         />
         {settings}
         {review}
+        {tips}
       </div>
     )
   }
@@ -187,7 +195,7 @@ export function App(): React.JSX.Element {
       peer={peer}
       engines={workspaceEngines}
       sidebar={sidebar}
-      layers={<>{settings}{review}</>}
+      layers={<>{settings}{review}{tips}</>}
     />
   )
 }

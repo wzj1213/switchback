@@ -224,7 +224,7 @@ describe("HTML 预览模式", () => {
     expect(html).toContain('class="file-source" tabindex="0"')
     expect(html).toContain('class="file-source__toolbar"')
     expect(html).toContain('aria-label="可横向滚动的文件源码"')
-    expect(html).toContain('title="只复制当前显示的前 1.5 MB"')
+    expect(html).toContain('data-tip="只复制当前显示的前 1.5 MB"')
     expect(html).toContain("复制显示部分")
   })
 })

@@ -37,6 +37,8 @@ export interface Omni {
    * 桥断了会表现成「界面全都在、点什么都没反应」，那是最难查的一类故障。
    */
   bridgeMissing: boolean
+  /** 主进程的全量到了没有。**「一条会话都没有」和「还没收到」是两件事。** */
+  ready: boolean
   /**
    * 最近一条**增量里**新开的会话，带递增序号。
    *
@@ -78,6 +80,15 @@ export function useOmni(): Omni {
    * 点了新建就会跳到一个别的会话上，而且不报错。
    */
   const [lastStarted, setLastStarted] = useState<{ id: string; seq: number } | undefined>(undefined)
+  /**
+   * 主进程的全量到了没有。
+   *
+   * **「一条会话都没有」和「还没收到」是两件事**，而界面上它们此前长得一模一样：
+   * 都画一个转圈加「正在打开工作区…」。于是一个**全新用户**（真的一条会话都没有）
+   * 会对着一个永远转下去的加载提示——那正是 `screens.tsx` 里那句
+   * 「一个会等到天亮的加载提示比一句直白的失败更糟」说的情形，只是当时没接住这一档。
+   */
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     if (bridge === undefined) return undefined
@@ -119,6 +130,8 @@ export function useOmni(): Omni {
       advance(received(stream.current, sealed))
     })
     const offReplay = bridge.onReplay((replay) => {
+      // 全量到了：从这一刻起「没有会话」就是真的没有，不再是「还没收到」
+      setReady(true)
       // 全量是「世界现在长什么样」，不是增量——先把归约器清回初始态，
       // 否则重载之后新旧两份历史会叠在一起
       setState(initial)
@@ -180,6 +193,7 @@ export function useOmni(): Omni {
 
   return {
     lastStarted,
+    ready,
     state,
     send,
     viewing: bridge?.viewing ?? NOOP_VIEWING,

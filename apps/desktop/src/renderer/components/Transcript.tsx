@@ -143,7 +143,7 @@ export const Transcript = memo(function Transcript({
           不是把状态行钉住，而是给一个「回到底部」 */}
       <AskFloat pick={ask} onAsk={onReuse} />
       {atBottom ? null : (
-        <button type="button" className="tobottom" aria-label="回到底部" title="回到底部" onClick={toBottom}>
+        <button type="button" className="tobottom" aria-label="回到底部" data-tip="回到底部" onClick={toBottom}>
           <ArrowDownIcon />
         </button>
       )}

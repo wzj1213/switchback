@@ -7,6 +7,7 @@ import { memo } from "react"
 import type { Item, ToolCallItem, UserMessageItem, UserMessageOrigin } from "@omni/protocol"
 import { PlanCard } from "./PlanCard.js"
 import { LinkifiedText } from "./linkified-text.js"
+import { Clamped } from "./clamped.js"
 
 function OriginMeta({ origin }: { origin: UserMessageOrigin }): React.JSX.Element {
   if (origin === "handoff") return <div className="msg__origin">历史交接</div>
@@ -29,9 +30,13 @@ function UserMessage({ item }: { item: UserMessageItem }): React.JSX.Element {
     <div className={native ? "msg--native" : "msg--user"}>
       {item.origin === undefined ? null : <OriginMeta origin={item.origin} />}
       {item.text === "" ? null : (
-        <div className={native ? "msg__native-text" : "msg__user-text"}>
-          <LinkifiedText text={item.text} />
-        </div>
+        // 粘一整份日志进来是常事，那条消息能铺满两三屏，把它下面的回答推到看不见
+        // 的地方。太长就收起来，给一颗「显示更多」（见 `clamped.tsx`）
+        <Clamped>
+          <div className={native ? "msg__native-text" : "msg__user-text"}>
+            <LinkifiedText text={item.text} />
+          </div>
+        </Clamped>
       )}
       {/* 附件要在记录里留痕：画的是图本身，而不是落盘时生成的时间戳文件名。 */}
       {item.attachments === undefined || item.attachments.length === 0 ? null : (

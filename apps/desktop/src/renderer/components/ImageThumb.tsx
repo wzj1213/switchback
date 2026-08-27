@@ -127,7 +127,7 @@ export function ImageLightbox({ path, onClose }: {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <button type="button" className="lightbox__close" aria-label="关闭图片预览" title="关闭（Esc）" onClick={onClose}><CloseIcon size={18} /></button>
+      <button type="button" className="lightbox__close" aria-label="关闭图片预览" data-tip="关闭（Esc）" onClick={onClose}><CloseIcon size={18} /></button>
       {full.state === "loading" ? <span className="lightbox__miss" role="status">正在打开…</span> : null}
       {full.state === "miss" ? <span className="lightbox__miss" role="alert">这张图打不开了：{path}</span> : null}
       {full.state === "ok" ? <img src={full.url} alt={baseName(path)} /> : null}

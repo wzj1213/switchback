@@ -208,6 +208,68 @@ body,
   }
 }
 
+/*
+ * ── 状态变化一律有过渡 ───────────────────────────────
+ *
+ * 审计出来 **67 处**：`:hover` / `:active` 改了底色、字色或透明度，而基础规则上
+ * 没有任何 `transition`——点上去、移开都是「啪」的一下。一屏里有的地方渐、
+ * 有的地方跳，读起来像两套界面拼在一起。
+ *
+ * 与其在 67 个地方各补一遍，这里给所有**可交互元素**一条统一的底。
+ * 它排在最前面（`app.css` 第一个 import），所以任何组件自己写的 `transition`
+ * 都盖得过它——`.effort__bar` 那条跟手的位移、`.rail__mark` 那条拉长，各自的曲线不受影响。
+ *
+ * **只过渡颜色一族**（底色、描边、字色、透明度）：那是「你碰到了它」的反馈。
+ * 尺寸和位移不进来——它们各有各的时长，统一成一个数会让抽屉和小药丸用同一条曲线。
+ */
+button,
+a,
+summary,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="menuitemradio"],
+/* 几处不是 button 的：侧栏会话行、审核文件树、活动行、改动行、
+   问答的选项（label）、分节标题、引擎页签、设置页签 */
+.row,
+.rvl__row,
+.activity-row,
+.changed__row,
+.think__row,
+.question-option,
+.sidebar__section,
+.eng-tab,
+.set__tab {
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+/* 系统说了不要动效就一条都不动。**放在这里而不是各组件里**：
+   上面那条是全局的，它的开关也该是全局的 */
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  .row,
+  .rvl__row,
+  .activity-row,
+  .changed__row,
+  .think__row,
+  .question-option,
+  .sidebar__section,
+  .eng-tab,
+  .set__tab {
+    transition: none;
+  }
+}
+
 body {
   font-family: var(--font);
   font-size: var(--text-base);
@@ -267,8 +329,14 @@ body {
   display: none;
 }
 
-/* 窗口变窄时先收左侧导航，留下会话与工具组。
-   工具组是会话的辅助面，不能拿导航与它夹掉会话主体。 */
+/*
+ * 窗口变窄时先收左侧导航，留下会话与工具组。
+ * 工具组是会话的辅助面，不能拿导航与它夹掉会话主体。
+ *
+ * **门槛按「会话还剩多宽」倒推，不是拍一个整数。** 侧栏 264 + 工具组 420 = 684
+ * 是两侧固定要走的；正文列本身 760 宽（`--content-max`），两边各留一点才读得下去。
+ * 1280 就是这么来的：1280 − 684 ≈ 596，已经比正文列还窄了，再不收会话就被夹扁。
+ */
 @media (max-width: 1280px) {
   .shell--workbench:not(.shell--workbench-full) {
     grid-template-columns: minmax(0, 1fr) var(--workbench-w);
@@ -285,6 +353,30 @@ body {
 
   /* hiddenInset 的交通灯还在窗口左上角；导航收起后由主顶栏给它们留位。 */
   .shell--workbench:not(.shell--workbench-full) > .main .topbar {
+    padding-left: 92px;
+  }
+}
+
+/*
+ * **工具组没开、但窗口已经很窄**的那一档。
+ *
+ * 上一版只在工具组开着时收导航，于是把窗口拖到 900 以下、工具组关着时，
+ * 264 的侧栏照样钉在那儿，会话只剩六百出头——比正文列（760）还窄，
+ * 每一行都在折。会话是主体，导航是辅助，**夹到主体的时候先收辅助**。
+ *
+ * 880 = 264（侧栏）+ 600（会话最少要有的）+ 一点余量。这一档只在**没开工具组**
+ * 时成立；开着的那一档由上面那条 1280 管，两条不会互相打架。
+ */
+@media (max-width: 880px) {
+  .shell:not(.shell--workbench):not(.shell--norail) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell:not(.shell--workbench):not(.shell--norail) > .sidebar {
+    display: none;
+  }
+
+  .shell:not(.shell--workbench):not(.shell--norail) > .main .topbar {
     padding-left: 92px;
   }
 }

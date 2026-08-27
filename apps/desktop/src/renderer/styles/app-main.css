@@ -787,3 +787,29 @@
     animation: none;
   }
 }
+
+/*
+ * ── 还没有会话时的那一屏 ─────────────────────────────
+ * 为什么要把框架先画出来，见 `screens.tsx` 的 `EmptyScreen`。
+ */
+
+/* 顶栏那条线。没有会话就没有标题、没有引擎、没有任何可点的东西——
+   它在这儿只为一件事：**让主区有个上边**。交通灯那份左内距照给。 */
+.topbar--bare {
+  min-height: 44px;
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+/*
+ * 输入框的位子。**只是个位子**：没有会话时打进去的字无处可去，
+ * 所以这里不放 textarea、不放按钮，只留一个明显不可用的框——
+ * 它说的是「这儿等会儿会有输入框」，不是「你可以在这儿打字」。
+ */
+.composer--waiting .composer__inner {
+  min-height: 96px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-sunken);
+  opacity: 0.55;
+}

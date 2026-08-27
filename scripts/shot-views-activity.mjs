@@ -84,7 +84,7 @@ export const ACTIVITY_VIEWS = [
     ready: ".lane-cmd-block__copy",
     assert: `document.querySelector('.lane-cmd-block__copy')?.getAttribute('data-state') === 'copied'
       && document.querySelector('.lane-cmd-block__copy')?.textContent.includes('已复制') === true
-      && document.querySelector('.lane-cmd-block__copy')?.getAttribute('title') === '内容已复制'
+      && document.querySelector('.lane-cmd-block__copy')?.getAttribute('data-tip') === '内容已复制'
       && document.activeElement?.classList.contains('lane-cmd-block__copy') === true`,
   },
   {

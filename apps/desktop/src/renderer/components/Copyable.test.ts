@@ -17,7 +17,7 @@ describe("消息复制反馈", () => {
     }))
     expect(html).toContain('data-state="idle"')
     expect(html).toContain('aria-live="polite"')
-    expect(html).toContain('title="复制这条内容"')
+    expect(html).toContain('data-tip="复制这条内容"')
     expect(html).toContain(">复制</button>")
   })
 

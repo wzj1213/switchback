@@ -28,7 +28,7 @@ export function TopBarActions({
         <button
           className="iconbtn"
           type="button"
-          title={`和「${peer.title}」并排比一比（⇧⌘D）`}
+          data-tip={`和「${peer.title}」并排比一比（⇧⌘D）`}
           aria-label="对比分叉"
           onClick={onCompare}
         >
@@ -49,7 +49,7 @@ export function TopBarActions({
         </button>
       )}
       <button className={`iconbtn${panelVisible ? " iconbtn--on" : ""}`} type="button"
-        title={panelVisible ? "隐藏侧边面板" : "显示侧边面板"}
+        data-tip={panelVisible ? "隐藏侧边面板" : "显示侧边面板"}
         aria-label={panelVisible ? "隐藏侧边面板" : "显示侧边面板"} onClick={onPanel}>
         <PanelIcon />
       </button>

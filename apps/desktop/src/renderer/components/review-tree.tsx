@@ -55,7 +55,7 @@ function TreeRowView({ row, index, tabKey, active, onToggle, onPick, onFocus }: 
     data-review-rel={file?.rel} tabIndex={row.key === tabKey ? 0 : -1} aria-level={row.depth}
     aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End"
     aria-current={chosen ? "true" : undefined}
-    aria-expanded={expanded} title={title} onClick={click} onFocus={onFocus}>
+    aria-expanded={expanded} data-tip={title} onClick={click} onFocus={onFocus}>
     <RowIcon row={row} />
     <span className="rvl__base">{row.label}</span>
     <RowTail file={file} />

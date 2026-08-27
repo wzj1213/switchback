@@ -187,7 +187,7 @@ export const COMPOSE_VIEWS = [
     ready: ".file-preview__copy",
     assert: `document.querySelector('.file-preview__copy')?.textContent.includes('已复制') === true
       && document.querySelector('.file-preview__copy')?.getAttribute('data-state') === 'copied'
-      && document.querySelector('.file-preview__copy')?.getAttribute('title') === '文件内容已复制'
+      && document.querySelector('.file-preview__copy')?.getAttribute('data-tip') === '文件内容已复制'
       && document.querySelector('.file-preview__copy')?.getAttribute('aria-live') === 'polite'
       && document.activeElement?.classList.contains('file-preview__copy') === true`,
   },

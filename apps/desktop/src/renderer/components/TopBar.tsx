@@ -79,7 +79,7 @@ function RailToggle({ open, onToggle }: { open: boolean; onToggle: () => void })
     <button
       type="button"
       className={`iconbtn${open ? "" : " iconbtn--on"}`}
-      title={open ? "收起侧栏（⌘\\）" : "展开侧栏（⌘\\）"}
+      data-tip={open ? "收起侧栏（⌘\\）" : "展开侧栏（⌘\\）"}
       aria-label={open ? "收起侧栏" : "展开侧栏"}
       aria-pressed={!open}
       onClick={onToggle}

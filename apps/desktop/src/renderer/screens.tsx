@@ -19,57 +19,56 @@ import { engineModelCatalogs } from "./engine-settings-model.js"
  */
 
 /**
- * 空状态说什么。
+ * 这一屏说什么。
  *
- * 有故障横幅时**不能**再说「正在打开工作区…」——那是句谎话，它永远不会打开，
- * 用户会一直等下去。一个会等到天亮的加载提示比一句直白的失败更糟。
+ * **「一条会话都没有」和「还没收到」是两件事。** 上一版把它们合成了一句
+ * 「正在打开工作区…」，于是一个真的一条会话都没有的用户，对着一个
+ * **永远转下去**的加载提示——而这个文件自己的注释早就写过那条判据：
+ * 「一个会等到天亮的加载提示比一句直白的失败更糟」，只是当时没接住这一档。
+ *
+ * 现在四档：通道没建立 / 有故障 / 全量还没到（转圈）/ 真的一条都没有（给出路）。
  */
-function emptyText(bridgeMissing: boolean, failed: boolean): string {
-  if (bridgeMissing) {
+function emptyText(state: { bridgeMissing: boolean; failed: boolean; ready: boolean }): string {
+  if (state.bridgeMissing) {
     return "与主进程的通道没建立（preload 未注入）。界面此时点什么都不会有反应——先查主进程日志。"
   }
-  if (failed) return "没有可用的会话。上方的故障说明了原因；处理好之后点「＋ 新建会话」重试。"
-  return "正在打开工作区…"
+  if (state.failed) return "没有可用的会话。上方的故障说明了原因；处理好之后点「＋ 新建会话」重试。"
+  return state.ready ? "还没有会话" : "正在打开工作区…"
 }
 
 /**
  * 一个会话都没有时的正文。
  *
- * **走 `.blank` 那一套，不借 `.reasoning`**：后者是转录区里 agent 的推理块，
- * 拿它画应用级的加载态是语义错配——将来调推理块的样式会莫名改到启动屏。
+ * ## 为什么要把外壳画出来
  *
- * 转圈只在「真的在等」那一支画：有故障横幅时它永远不会转完，
- * 而一个会等到天亮的加载提示比一句直白的失败更糟。
+ * 上一版是**整块主区一片空白，正中一个转圈**。侧栏已经列着一排项目，右边却
+ * 什么框都没有——那一屏看起来像应用坏了，而不是像它正在打开。**框架先在，
+ * 只有对话主体那块显示加载**：顶栏那条线、正文区、输入框位置都摆着，
+ * 于是加载完成时也不会整屏跳一下。
+ *
+ * 输入框那块**只画一个明显不可用的位子**，不画一个能点的假输入框——
+ * 那时候没有会话，打进去的字无处可去（同「画一颗点了会炸的按钮比没有更糟」）。
  */
-function Notice({
-  text,
-  fatal,
-  waiting,
-}: {
+function Notice({ text, fatal, waiting }: {
   text: string
   fatal: boolean
   waiting: boolean
 }): React.JSX.Element {
-  if (fatal) {
-    return (
-      <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
-        <div className="transcript__inner">
-          <div className="error">{text}</div>
-        </div>
-      </div>
-    )
-  }
   return (
     <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
       <div className="transcript__inner">
-        <div className="blank">
-          {waiting ? (
-            <div className="blank__glyph blank__glyph--spin" aria-hidden="true">
-              <SpinnerIcon size={34} />
-            </div>
-          ) : null}
-          <p className="blank__title">{text}</p>
-        </div>
+        {fatal ? (
+          <div className="error">{text}</div>
+        ) : (
+          <div className="blank">
+            {waiting ? (
+              <div className="blank__glyph blank__glyph--spin" aria-hidden="true">
+                <SpinnerIcon size={34} />
+              </div>
+            ) : null}
+            <p className="blank__title">{text}</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -80,20 +79,28 @@ export function EmptyScreen({
   notices,
   onDismiss,
   bridgeMissing,
+  ready,
 }: {
   notices: readonly StoreNotice[]
   onDismiss: (id: string) => void
   bridgeMissing: boolean
+  ready: boolean
 }): React.JSX.Element {
+  const failed = notices.length > 0
   return (
     <main className="main">
-      {/* 一条会话都没有的那一屏：横幅照显，但没有会话可跳 */}
+      {/* 顶栏那条线先在：主区一片空白、连边都没有的那一版看起来像应用坏了 */}
+      <header className="topbar topbar--bare" />
       <Notices notices={notices} rows={[]} onDismiss={onDismiss} onSelect={() => undefined} />
       <Notice
         fatal={bridgeMissing}
-        waiting={!bridgeMissing && notices.length === 0}
-        text={emptyText(bridgeMissing, notices.length > 0)}
+        waiting={!bridgeMissing && !failed && !ready}
+        text={emptyText({ bridgeMissing, failed, ready })}
       />
+      {/* 输入框的位子。**只是个位子**——没有会话时打进去的字无处可去 */}
+      <div className="composer composer--waiting" aria-hidden="true">
+        <div className="composer__inner" />
+      </div>
     </main>
   )
 }

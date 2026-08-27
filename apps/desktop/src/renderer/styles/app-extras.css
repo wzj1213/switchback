@@ -123,3 +123,47 @@
   color: var(--text-faint);
   font-size: var(--text-xs);
 }
+
+/*
+ * ── 悬停提示 ────────────────────────────────────────
+ * 为什么自己画一层、不用系统的 `title`，见 `components/tips.tsx`。
+ */
+.tip {
+  position: fixed;
+  z-index: 80;
+  max-width: 260px;
+  padding: 4px var(--sp-2);
+  border-radius: var(--radius-sm);
+  /* **深色小牌子**，浅色深色两套主题下都是它——提示是浮在界面之上的东西，
+     跟着底色变的话它就不再是「一层」，而成了界面的一部分 */
+  background: var(--tip-bg);
+  color: var(--tip-ink);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  white-space: nowrap;
+  /* 它自己绝不接事件：接了就会挡住底下那颗刚要点的按钮 */
+  pointer-events: none;
+  box-shadow: var(--shadow-pop);
+  animation: tip-in var(--dur) var(--ease);
+}
+
+/* 摆在触发器上方时，用 translate 把自己的高度让出来；下方时只居中 */
+.tip[data-side="top"] {
+  transform: translate(-50%, -100%);
+}
+
+.tip[data-side="bottom"] {
+  transform: translate(-50%, 0);
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    animation: none;
+  }
+}
