@@ -26,7 +26,7 @@ export function ActivityDock({
       </span>
       <span className="activity-dock__count">后台 {active.length}</span>
       <span className="activity-dock__title">{latest.title}</span>
-      <ChevronIcon size={11} />
+      <ChevronIcon size={13} />
     </button>
   )
 }

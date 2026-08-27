@@ -43,7 +43,7 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
                 <PageIcon page={page} /><span>{label}</span>
               </button>
               <button type="button" className="panel-tab__close" aria-label={`关闭${label}页`}
-                onClick={() => { props.onClose(page) }}><CloseIcon size={11} /></button>
+                onClick={() => { props.onClose(page) }}><CloseIcon size={13} /></button>
             </span>
           )
         })}

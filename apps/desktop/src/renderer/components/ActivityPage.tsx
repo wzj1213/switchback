@@ -65,7 +65,7 @@ function ActivityIndex({ lanes, hidden, root, onPick }: {
                 {nodeCount(lane)}
               </span>
             </span>
-            <ChevronIcon size={11} />
+            <ChevronIcon size={13} />
           </button>
         )
       })}
@@ -130,7 +130,7 @@ function LaneDetail({ lane, items, thread, onBack, onCopy }: {
   return (
     <div className="activity-detail">
       <button type="button" className="workbench__back" onClick={onBack}>
-        <ChevronIcon size={11} /> 全部活动
+        <ChevronIcon size={13} /> 全部活动
       </button>
       <header className="activity-detail__head">
         <span className="activity-row__mark"><PlanMark status={MARK[lane.status]} spinning={live} /></span>

@@ -95,7 +95,7 @@ export function EnvCard({
               onReveal(thread.cwd)
             }}
           >
-            <RevealIcon size={12} />
+            <RevealIcon size={14} />
             在访达中显示
           </button>
           {/* codex 那张卡片上唯一一颗按钮就是「复制分支名称」——
@@ -108,7 +108,7 @@ export function EnvCard({
               if (git.branch !== undefined) onCopy(git.branch)
             }}
           >
-            <CopyIcon size={12} />
+            <CopyIcon size={14} />
             复制分支名
           </button>
         </div>

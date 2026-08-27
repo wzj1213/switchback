@@ -162,7 +162,7 @@ function Top({
           <span className="pop__value" title={currentLabel(section)}>
             {currentLabel(section)}
           </span>
-          <ChevronIcon open={false} size={12} />
+          <ChevronIcon open={false} size={14} />
         </button>
       ))}
       {reset === undefined ? null : (

@@ -53,6 +53,8 @@ const SIZE = process.argv.includes("--wide")
   : MID ? { width: 1172, height: 720 } : MIN ? { width: 860, height: 560 } : { width: 1280, height: 860 }
 /** 样本的时间戳写死。**不能用 `Date.now()`**——侧栏上那些「3 小时前」会每次都不一样。 */
 const AT = 1_787_659_200_000
+/** 非 Git 工作区的家。**在数据目录之外**，理由见 `seed` 里那段。 */
+const WORK = await mkdtemp(join(tmpdir(), "omni-work-"))
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 async function freePort() {
   const server = createServer()
@@ -249,6 +251,22 @@ async function shootSettings(cdp) {
   }
 }
 
+/**
+ * 收尾时删临时目录。**要重试**：`SIGTERM` 之后应用还会往数据目录里写一小会儿
+ *（日志、状态落盘），而 `rm -r` 正走在里面时会撞上 `ENOTEMPTY`——
+ * 出图全部通过、最后却以非零码退出，看起来像是这一轮失败了。
+ */
+async function removeQuietly(dir) {
+  for (let i = 0; i < 4; i++) {
+    try {
+      await rm(dir, { recursive: true, force: true })
+      return
+    } catch {
+      await pause(250)
+    }
+  }
+}
+
 async function seed(dir) {
   const threads = join(dir, "threads")
   const external = join(dir, "会话碰过的工作区外文件.md")
@@ -262,11 +280,11 @@ async function seed(dir) {
   ]
   for (const [id, title, at] of stubs)
     await writeFile(join(threads, `${id}.jsonl`), stubThread(id, title, ROOT, at))
-  // 工作区不是 Git 仓库的那条：那张「引擎报了 N 个文件」的卡只有在这种 cwd 下才出得来。
-  // **cwd 用固定名字的子目录，不用 `dir` 本身**——数据目录是 mkdtemp 出来的
-  // （`omni-shot-Jtzj1D`），而侧栏按目录名分组，随机后缀会让每次出图的侧栏都不一样，
-  // 「两张图除了改动之外一模一样」当场就不成立了
-  const noRepo = join(dir, "临时工作区")
+  // 工作区不是 Git 仓库的那条：那张「已编辑 N 个文件」的卡在 git 工作区里会被核销掉。
+  // **固定名字**（侧栏按目录名分组，随机后缀会让每次出图的侧栏都不一样），
+  // 而且**不放在数据目录里面**——它是个被应用监听的工作区，收尾时和数据目录
+  // 一起删会互相踩（实测 `ENOTEMPTY`）
+  const noRepo = join(WORK, "临时工作区")
   await mkdir(noRepo, { recursive: true })
   await writeFile(join(threads, "th-norepo.jsonl"), noRepoThread("th-norepo", noRepo, AT - 5 * 3600_000))
   await writeFile(
@@ -334,7 +352,8 @@ async function main() {
     child.kill("SIGTERM")
     await pause(400)
     await cleanupWorkspaceFiles(workspaceFiles)
-    await rm(data, { recursive: true, force: true })
+    await removeQuietly(data)
+    await removeQuietly(WORK)
   }
   console.log(`\n出图目录：${OUT}`)
 }

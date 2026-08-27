@@ -65,7 +65,13 @@ export interface FxWorld {
 export interface View {
   handX: number
   handY: number
-  /** 那只的脚线。**弹壳落在这儿**——它是从这把枪里飞出来的，跟着人走是对的。 */
+  /**
+   * 那只的脚线。画的那一层拿它定「这只站在哪儿」。
+   *
+   * **弹壳不落在这条线上**（一度是）：拎着它一边拖一边打时，这条线在半空，
+   * 于是每一枚壳都停在甩出去那一刻手的高度——整屏悬着壳。壳落 `Stand.ground`
+   * 那条台面线，见 `pet-fx.ts` 的 `fireOut`。
+   */
   ground: number
   /**
    * 靶立在哪儿。**和 `ground` 是两条线，不能合**：弹壳跟着人走，靶不跟。

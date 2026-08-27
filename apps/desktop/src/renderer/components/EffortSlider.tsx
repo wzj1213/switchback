@@ -154,6 +154,17 @@ export function EffortSlider({
    */
   const [preview, setPreview] = useState<string>()
   const trig = useRef<HTMLButtonElement>(null)
+  /**
+   * 展开时**把收起态那格宽度冻住**。
+   *
+   * 条子展开要从 140px 长到两百多，而它住在输入框底下那一行里——不冻的话，
+   * 它左边的每一样（模型、审批档、附件…）都会被推着横移六十来像素，
+   * 而你的指针正停在刚点下去的那颗上。**点一下不该让别的东西动**。
+   * 冻住之后条子改为浮在这一格上（`.effort--open` 的 `position: absolute`），
+   * 长出来的那截盖住左边的邻居，一收起就归位。
+   */
+  const box = useRef<HTMLSpanElement>(null)
+  const [slot, setSlot] = useState<number>()
   const reduced = useReduced()
   const efforts = current.efforts ?? []
   const value = effort ?? current.defaultEffort ?? efforts[0]
@@ -175,13 +186,17 @@ export function EffortSlider({
   useEffect(() => {
     if (!open) setPreview(undefined)
   }, [open])
+  // 收完（连收回动画一起）才把那格放开：动画期间条子还浮着，位置得钉住
+  useEffect(() => {
+    if (!open && !closing) setSlot(undefined)
+  }, [open, closing])
 
   /** 收起走 190ms 的收回动画，条子退场、触发器才回来。 */
   const close = useEffortClose({ reduced, trigger: trig, setOpen, setClosing })
 
   if (efforts.length === 0) return null
   return (
-    <span className="effortbox">
+    <span className="effortbox" ref={box} {...(slot === undefined ? {} : { style: { width: slot } })}>
       {/* 「更快消耗使用额度」那句话。**不常驻**——上一版它常驻浮在触发器正上方，
           而那块地正是正文的最后一行：打满字就直接压在字上。
           现在它是停一下（或键盘聚焦）才出来的一张带底的小卡，
@@ -210,6 +225,7 @@ export function EffortSlider({
             disabled={disabled}
             trig={trig}
             onOpen={() => {
+              setSlot(box.current?.getBoundingClientRect().width)
               setOpen(true)
             }}
           />

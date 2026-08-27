@@ -14,7 +14,7 @@ export function ExternalLink({
   return (
     <a className="outlink" href={href} target="_blank" rel="noreferrer noopener">
       <span className="outlink__icon">
-        {isGitHubLink(target) ? <GitHubIcon size={12} /> : <GlobeIcon size={12} />}
+        {isGitHubLink(target) ? <GitHubIcon size={14} /> : <GlobeIcon size={14} />}
       </span>
       {children}
     </a>

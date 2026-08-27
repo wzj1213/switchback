@@ -87,7 +87,7 @@ function RevealFile({ file, onReveal }: { file: ChangedFile; onReveal: (path: st
         onReveal(file.path)
       }}
     >
-      <RevealIcon size={12} />
+      <RevealIcon size={14} />
     </button>
   )
 }
@@ -109,7 +109,7 @@ function PreviewFile({ file, threadId, cwd }: {
         requestFilePreview(threadId, cwd, file.path)
       }}
     >
-      <FileIcon size={12} />
+      <FileIcon size={14} />
     </button>
   )
 }
@@ -195,7 +195,7 @@ export function ChangedRow({
             void copyFile(file, cwd, onCopy, threadId)
           }}
         >
-          <CopyIcon size={12} />
+          <CopyIcon size={14} />
         </button>
       </div>
       {open ? <ChangedBody file={file} patch={patch} /> : null}

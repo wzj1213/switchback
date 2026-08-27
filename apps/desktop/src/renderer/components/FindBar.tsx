@@ -76,8 +76,8 @@ export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
       <button className="findbar__btn" type="button" aria-label="下一个" onClick={() => { step(true) }}>
         ↓
       </button>
-      <button className="findbar__btn" type="button" aria-label="关闭查找" onClick={onClose}>
-        <CloseIcon size={12} />
+      <button className="findbar__btn" type="button" aria-label="关闭查找" title="关闭查找（Esc）" onClick={onClose}>
+        <CloseIcon size={14} />
       </button>
     </div>
   )

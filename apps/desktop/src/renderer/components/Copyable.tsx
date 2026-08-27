@@ -66,7 +66,7 @@ export function Copyable({
             title={copyFeedbackTitle(feedback, "复制这条内容")}
             onClick={copy}
           >
-            {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+            {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
             {copyFeedbackLabel(feedback)}
           </button>
         ) : null}

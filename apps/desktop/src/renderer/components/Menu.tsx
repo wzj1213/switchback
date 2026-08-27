@@ -137,7 +137,7 @@ export function useContextMenu(): {
                     command.run()
                   }}
                 >
-                  <CloseIcon size={11} />
+                  <CloseIcon size={13} />
                 </button>
               </div>
             ),

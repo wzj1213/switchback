@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { rehypeHighlight } from "../highlight.js"
 import { ExternalLink } from "./external-link.js"
+import { CodeBlock, langOf } from "./code-block.js"
 
 /**
  * 渲染模型产出的 Markdown。
@@ -29,9 +30,16 @@ function Table({ children }: { children?: React.ReactNode }): React.JSX.Element 
   )
 }
 
-/** 代码块保留行结构并横向滚动，因此本身必须能从键盘进入。 */
+/**
+ * 代码块。**自带一条工具栏**：语言名 + 复制（见 `code-block.tsx`）。
+ *
+ * 语言名要从**里面那个 `<code>`** 上取——`rehype-highlight` 把
+ * `language-ts` 写在 code 上，不是 pre 上。取不到就不写，不猜。
+ */
 function Pre({ children }: { children?: React.ReactNode }): React.JSX.Element {
-  return <pre tabIndex={0}>{children}</pre>
+  const only = Array.isArray(children) ? children[0] : children
+  const props = (only as { props?: { className?: string } } | undefined)?.props
+  return <CodeBlock lang={langOf(props?.className)}>{children}</CodeBlock>
 }
 
 /*

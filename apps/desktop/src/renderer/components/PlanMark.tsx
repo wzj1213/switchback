@@ -40,7 +40,7 @@ export function PlanMark({
 }): React.JSX.Element {
   return (
     <Svg
-      size={11}
+      size={13}
       className={`plan-mark${status === "in_progress" && spinning ? " plan-mark--spin" : ""}`}
     >
       {status === "done" ? (

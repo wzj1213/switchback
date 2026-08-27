@@ -15,7 +15,7 @@ function Stat({ file }: { file: ReviewFile }): React.JSX.Element | null {
 
 function RowIcon({ row }: { row: ReviewTreeRow }): React.JSX.Element {
   if (row.kind === "directory") {
-    return <><ChevronIcon open={row.expanded} size={11} /><FolderIcon size={13} /></>
+    return <><ChevronIcon open={row.expanded} size={13} /><FolderIcon size={13} /></>
   }
   return <><span className={`rvl__kind rvl__kind--${row.file?.kind}`} aria-hidden="true" />
     <FileIcon /></>

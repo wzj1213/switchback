@@ -126,7 +126,7 @@ function EngineBlock({
           setOpen(!open)
         }}
       >
-        <ChevronIcon open={open} size={12} />
+        <ChevronIcon open={open} size={14} />
         {ENGINE_TEXT[engine].label}
         <span className="hk__total">{total === 0 ? "没有钩子" : `${String(total)} 个钩子`}</span>
         {/* 待审核的数目要在**折起来的时候也看得见**：它就是「配了但不跑」那个答案 */}

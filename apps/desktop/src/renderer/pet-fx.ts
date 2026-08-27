@@ -150,7 +150,14 @@ function readyRate(w: FxWorld, input: FxInput): number {
 function fireOut(w: FxWorld, shots: number, aim: { x: number; y: number }, input: FxInput): void {
   if (shots <= 0) return
   const foe = input.range ? undefined : nearest(w.foes)
-  const port = { ...portOf(w.gun), angle: w.gun.ang, ground: groundOf(input) }
+  // **壳落到台面，不落到那只此刻的脚下。**
+  //
+  // 上一版这里给的是 `groundOf(input)`（那只的脚线），理由写在 `View.ground` 上：
+  // 「弹壳是从这把枪里飞出来的，跟着人走是对的」。那句话在它**站着**时没问题——
+  // 站着时脚线就是台面。可你把它拎起来一边拖一边打的时候，每一枚壳都停在
+  // 「甩出去那一刻它的脚在哪儿」：半空中，各停各的高度，整屏铺满悬着的壳。
+  // 那不是重量感，是没有重量——**掉下去的东西该掉到地上**。
+  const port = { ...portOf(w.gun), angle: w.gun.ang, ground: input.field.ground }
   // **抛壳那一档下这一发就是那枚壳**：不另外造一颗子弹，也不再从抛壳口甩第二枚
   //（一发两枚就说不清哪一个是「这一发」了）。
   // 有东西爬过来、或者打靶开着时不算——那两种情况下照旧直射，见 `PetKit.traj`

@@ -18,7 +18,7 @@ export function AsideChip({ onExit }: { onExit: () => void }): React.JSX.Element
         aria-label="退出侧问"
         onClick={onExit}
       >
-        <CloseIcon size={11} />
+        <CloseIcon size={13} />
       </button>
     </span>
   )

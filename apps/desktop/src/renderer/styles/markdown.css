@@ -122,6 +122,74 @@
  * 遮罩打在 `pre` 上而不是里面的 `code`：`100%` 要解析成**可视区**宽度,
  * 而 `code` 的宽度是内容宽度（比可视区宽）,打在它身上糊的是内容最右端,不是边缘。
  */
+/*
+ * 代码块：**上面压一条工具栏**（语言名 + 复制），见 `components/code-block.tsx`。
+ *
+ * 工具栏和代码同底色、只靠一条细线分开：两块底色会让一段十行的代码
+ * 看起来像两个不相干的盒子摞着。
+ */
+.cblock {
+  margin: 0 0 var(--sp-3);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+}
+
+.cblock__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 28px;
+  padding: 0 6px 0 var(--sp-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.cblock__lang {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 只有图标、没有文字：语言名已经把这条栏的用途说清了，
+   再摆两个字会让它比代码本身还抢眼。名字进 `aria-label` 和悬停提示 */
+.cblock__copy {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.cblock__copy:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.cblock__copy[data-state="copied"] {
+  color: var(--ok);
+}
+
+/* 工具栏接管了外框，所以正文这一层不再自己画圆角和外边距 */
+.md .cblock pre {
+  margin: 0;
+  border-radius: 0;
+}
+
 .md pre {
   --edge-a: 0;
   --edge-b: 0;

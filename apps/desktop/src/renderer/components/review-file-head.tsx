@@ -22,7 +22,7 @@ export function ReviewFileHead({ file, copyDisabled, onReveal, onCopy }: {
       {canGo ? (
         <button type="button" className="rv__act" aria-label="在访达中显示"
           title="在访达中显示" onClick={onReveal}>
-          <RevealIcon size={12} />
+          <RevealIcon size={14} />
         </button>
       ) : null}
       <button type="button" className="rv__act" aria-label={copyTitle}

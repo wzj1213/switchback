@@ -62,7 +62,7 @@ function PreviewActions({ target, busy, refreshing, referenceable, referenceDisa
       {revealable ? (
         <button type="button" className="workbench__icon" title="在访达中显示"
           aria-label="在访达中显示" onClick={onReveal}>
-          <RevealIcon size={12} />
+          <RevealIcon size={14} />
         </button>
       ) : null}
     </span>
@@ -88,7 +88,7 @@ export function FilePreviewHeader({ target, path, name, refreshing, refreshFaile
   return (
     <header className="file-preview__head">
       <button type="button" className="workbench__back" onClick={onBack}>
-        <ChevronIcon size={11} /> 文件
+        <ChevronIcon size={13} /> 文件
       </button>
       <PreviewTitle path={path} cwd={target.cwd} name={name}
         refreshing={refreshing} refreshFailed={refreshFailed} />

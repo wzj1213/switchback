@@ -58,7 +58,7 @@ export function Failure({
         <span className="error__text">{failure.text}</span>
         <span className="error__more">
           详情
-          <ChevronIcon open={open} size={11} />
+          <ChevronIcon open={open} size={13} />
         </span>
       </button>
       {why}

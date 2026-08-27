@@ -439,3 +439,20 @@ describe("换弹", () => {
     expect(w.gun.reload).toBe(0)
   })
 })
+
+describe("拎着它一边拖一边打", () => {
+  it("壳落到台面，不落到那只此刻的脚下——不然整屏悬着壳", () => {
+    // 把它拎到半空：脚线（pet.y + 30）比台面高出一大截
+    const air: Pet = { ...pet, y: 40, mode: "held" }
+    const table = 400
+    const w = createFx()
+    run(w, 1.2, { pet: air, rate: 120, running: true, brass: "pile", field: { homeX: air.x, ground: table } })
+    const shells = [...w.brass.pile, ...w.brass.flying]
+    expect(shells.length).toBeGreaterThan(0)
+    // 每一枚的落点都在台面上，而不是在半空那条脚线上
+    for (const shell of shells) {
+      expect(shell.gy).toBeGreaterThan(table - 6)
+      expect(shell.gy).toBeLessThanOrEqual(table)
+    }
+  })
+})

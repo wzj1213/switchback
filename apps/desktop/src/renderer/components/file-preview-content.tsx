@@ -39,7 +39,7 @@ function Source({
           title={fileCopyTitle(file.truncated, feedback)}
           onClick={copy}
         >
-          {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+          {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
           {fileCopyLabel(file.truncated, feedback)}
         </button>
       </div>

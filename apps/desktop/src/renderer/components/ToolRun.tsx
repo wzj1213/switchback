@@ -105,7 +105,7 @@ function StepLine({
           命令一长，提示连同文字一起被省略号吃掉，有输出的行和没输出的行长得一模一样 */}
       {expandable ? (
         <span className="step__chev">
-          <ChevronIcon open={open} size={12} />
+          <ChevronIcon open={open} size={14} />
         </span>
       ) : null}
     </>
@@ -200,7 +200,7 @@ function Folded({
         <span className="step__folded">{summarize(items.map((i) => i.detail.kind))}</span>
         <span className="step__count">{items.length}</span>
         <span className="step__chev">
-          <ChevronIcon open={open} size={12} />
+          <ChevronIcon open={open} size={14} />
         </span>
       </button>
       {open ? (

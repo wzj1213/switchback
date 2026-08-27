@@ -171,7 +171,7 @@ export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, on
           }}
         >
           <span>已处理 {spent(row.ms)}</span>
-          <ChevronIcon open={!folded} size={11} />
+          <ChevronIcon open={!folded} size={13} />
         </button>
         {/* **回到还没发生这一轮的时候。** 走错方向时唯一的出路，
           否则只能把整个会话丢掉重开——而那会连前面对的部分一起丢 */}
@@ -184,7 +184,7 @@ export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, on
               onRewind(row.turnId)
             }}
           >
-            <ResetIcon size={11} />
+            <ResetIcon size={13} />
             从这里重来
           </button>
         )}
@@ -240,7 +240,7 @@ export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, on
                 title="回到发这句话之前，把它交还给你改；原会话保留"
                 onClick={onRetry}
               >
-                <PencilIcon size={11} />
+                <PencilIcon size={13} />
                 改一改再发
               </button>
             ),

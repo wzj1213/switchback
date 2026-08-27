@@ -28,7 +28,7 @@ export function LaneCommandBlock({ command, onCopy }: {
       <div className="lane-cmd-block__toolbar">
         <button type="button" className="lane-cmd-block__copy" aria-live="polite"
           data-state={feedback} title={copyFeedbackTitle(feedback, "复制后台命令")} onClick={copy}>
-          {feedback === "copied" ? <CheckIcon size={11} /> : <CopyIcon size={11} />}
+          {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
           {copyFeedbackLabel(feedback)}
         </button>
       </div>

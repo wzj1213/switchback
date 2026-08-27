@@ -86,7 +86,7 @@ export function Notices({
           onDismiss(latest.id)
         }}
       >
-        <CloseIcon size={12} />
+        <CloseIcon size={14} />
       </button>
     </div>
   )

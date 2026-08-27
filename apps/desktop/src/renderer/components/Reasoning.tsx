@@ -66,7 +66,7 @@ export function Reasoning({ text, running }: { text: string; running: boolean })
           {summary}
         </span>
         <span className="think__chev">
-          <ChevronIcon open={open} size={12} />
+          <ChevronIcon open={open} size={14} />
         </span>
       </button>
       {open ? (
