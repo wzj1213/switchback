@@ -180,7 +180,7 @@
 .heat__cell {
   width: var(--heat-cell);
   height: var(--heat-cell);
-  border-radius: 2px;
+  border-radius: var(--radius-mark);
   background: var(--bg-hover);
 }
 
@@ -336,7 +336,7 @@
   flex: 1;
   min-width: 0;
   height: 6px;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--bg-hover);
   overflow: hidden;
 }
@@ -344,7 +344,7 @@
 .stat-rank__bar span {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--accent);
 }
 

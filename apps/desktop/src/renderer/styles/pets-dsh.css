@@ -27,7 +27,7 @@
   width: 5px;
   height: 5px;
   border: 1px solid color-mix(in srgb, var(--pet-dsh-eye) 70%, var(--pet-dsh));
-  border-radius: 2px;
+  border-radius: 50%;
   background: var(--pet-dsh);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 78%, transparent);
 }

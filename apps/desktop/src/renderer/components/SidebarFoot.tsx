@@ -72,7 +72,7 @@ export function SidebarFoot({
             </span>
           )}
         </span>
-        <span className="foot__name">{account?.label ?? "设置"}</span>
+        <span className="foot__name">{account === undefined ? "设置" : nameOf(account)}</span>
       </button>
       <UpdateButton />
       {account === undefined ? null : (
@@ -122,6 +122,30 @@ export function SidebarFoot({
       )}
     </div>
   )
+}
+
+/**
+ * 这一行显示的那个名字。
+ *
+ * ## 邮箱只取 `@` 前面那一截
+ *
+ * 侧栏这一行宽 264px，减去头像那一列只剩两百出头。一个完整邮箱在这儿
+ * **必然被截断，而且是从域名中间截**——实测显示成
+ * `a1b2c3d4e5@privaterelay.appleid….`，那既不是名字也不是地址，只是一串乱码。
+ * 域名从来不是这一行要回答的问题（「现在是谁」），砍掉它反而更准。
+ *
+ * **完整地址一个字都没丢**：`title` 上有，点开的菜单抬头里也有。
+ * 这是显示形态的选择，不是替引擎改它报上来的东西。
+ *
+ * ## 有套餐就跟在后面
+ *
+ * 引擎报得上来的话，「谁」和「哪一档」是同一个问题的两半，而这一行
+ * 此前只答了前一半——另一半藏在要点一下才出来的菜单里。
+ */
+export function nameOf(account: AccountLine): string {
+  const at = account.label.lastIndexOf("@")
+  const who = at > 0 ? account.label.slice(0, at) : account.label
+  return account.plan === undefined || account.plan === "" ? who : `${who} · ${account.plan}`
 }
 
 /** 头像上那个字。取第一个字符——邮箱就是首字母，中文名就是姓。 */

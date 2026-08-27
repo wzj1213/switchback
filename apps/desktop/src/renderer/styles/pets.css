@@ -598,7 +598,7 @@
   /* 比它吊着的那只宽（螃蟹 34px 宽）。窄于载荷的伞看着托不住 */
   width: 32px;
   height: 15px;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: currentColor;
   transform: translate(-50%, 0);
   transform-origin: bottom center;

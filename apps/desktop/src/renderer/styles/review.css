@@ -408,7 +408,7 @@
   flex: none;
   width: 6px;
   height: 6px;
-  border-radius: 2px;
+  border-radius: var(--radius-mark);
   background: var(--text-faint);
   transform: translateY(-1px);
 }
@@ -447,7 +447,7 @@
 .rvl__staged {
   flex: none;
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
   font-size: var(--text-xs);

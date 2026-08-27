@@ -282,7 +282,10 @@
 .switch__item {
   padding: 5px var(--sp-3);
   border: 0;
-  border-radius: 5px;
+  /* **同心**（见 tokens.css：外圆角 = 内圆角 + 内边距）：
+     外壳 --radius-sm 8 − 内边距 2 − 描边 1 = 5。写成算式，外壳那一档改了
+     它自己会跟上；写字面 5 的话下次就对不上了 */
+  border-radius: calc(var(--radius-sm) - 3px);
   background: transparent;
   color: var(--text-muted);
   font: inherit;

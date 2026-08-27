@@ -125,7 +125,7 @@
 .kbd {
   margin-left: 6px;
   padding: 0 3px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, currentColor 12%, transparent);
   font-family: var(--font);
   font-size: var(--text-xs);

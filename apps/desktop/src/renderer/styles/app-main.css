@@ -249,7 +249,8 @@
 .meter__track {
   width: 44px;
   height: 4px;
-  border-radius: 2px;
+  /* 半高圆角就是胶囊。写 2 只是把「999」算了一遍，还算错了会看不出来 */
+  border-radius: 999px;
   background: var(--bg-active);
   overflow: hidden;
 }

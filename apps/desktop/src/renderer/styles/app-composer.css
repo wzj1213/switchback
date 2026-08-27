@@ -479,7 +479,7 @@
 .effort__ticks i {
   width: 4px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--border-strong);
 }
 
@@ -648,7 +648,7 @@
   top: 50%;
   width: 1px;
   height: 8px;
-  border-radius: 1px;
+  border-radius: 999px;
   /* **一深一浅并排。** 只有一道的话，填充推到哪儿刻度就在哪儿消失——
      深线压在浅色轨道上看得见，浅线压在深色填充上看得见，一根都不丢 */
   background: rgb(0 0 0 / 26%);
