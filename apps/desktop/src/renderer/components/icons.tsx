@@ -119,11 +119,19 @@ export function RevealIcon({ size = 13 }: { size?: number }): React.JSX.Element 
   )
 }
 
+/**
+ * 复制。**两张纸，前面那张整个画出来、后面那张只露一个角**。
+ *
+ * 上一版前张 7.5×7.5、圆角 1.5，后张那条折线收在 `1.5` 的小圆角上——
+ * 在 13px 上两张纸几乎贴在一起，圆角小到看不出是圆的，出来是一个含糊的方框套方框。
+ * 现在前张放到 8×8、圆角 2，后张的折线拉长并跟着放圆角：两张纸分得开，
+ * 拐角是圆的，一眼认得出是「复制」而不是「两个框」。
+ */
 export function CopyIcon({ size = 13 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <rect x="5.5" y="5.5" width="7.5" height="7.5" rx="1.5" {...LINE} />
-      <path d="M10.5 5.5v-1A1.5 1.5 0 0 0 9 3H4.5A1.5 1.5 0 0 0 3 4.5V9a1.5 1.5 0 0 0 1.5 1.5h1" {...LINE} />
+      <rect x="5.5" y="5.5" width="8" height="8" rx="2" {...LINE} />
+      <path d="M11 3.5H5.5A2 2 0 0 0 3.5 5.5V11" {...LINE} />
     </Svg>
   )
 }

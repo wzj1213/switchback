@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Item, Lane, TaskRun, Thread, Turn, Usage } from "@omni/protocol"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, Usage } from "@omni/protocol"
 import type { PetKit } from "../../shared/settings.js"
 import { useFireProps } from "../use-fire-props.js"
 import { Pets } from "./Pets.js"
@@ -12,15 +12,12 @@ export function ConversationStage({
   turn,
   tasks,
   thinkingTokens,
-  lanes,
-  openLane,
-  onOpenLane,
   engines,
   usage,
   pets,
-  stamp,
   onReveal,
   onReview,
+  onOpenFile,
   send,
   onCopy,
   onReuse,
@@ -32,16 +29,13 @@ export function ConversationStage({
   turn: Turn | undefined
   tasks: readonly TaskRun[]
   thinkingTokens: number | undefined
-  lanes: readonly Lane[]
-  openLane: string | undefined
-  onOpenLane: (laneId: string) => void
   engines: readonly EngineInfo[]
   usage: Usage | undefined
   pets: PetKit & { on: boolean }
-  /** 「工作区可能变了」的节拍，转录区里那张改动卡拿它当补丁的缓存键。 */
-  stamp: string | undefined
   onReveal: (path: string) => void
   onReview: () => void
+  /** 点改动卡里某个文件：打开审核面板并落在它上面。 */
+  onOpenFile: (path: string) => void
   send: (command: Command) => void
   onCopy: (text: string) => void
   onReuse: (text: string, attachments?: readonly string[], aside?: boolean) => void
@@ -56,12 +50,9 @@ export function ConversationStage({
         turn={turn}
         tasks={tasks}
         thinkingTokens={thinkingTokens}
-        lanes={lanes}
-        openLane={openLane}
-        onOpenLane={onOpenLane}
-        stamp={stamp}
         onReveal={onReveal}
         onReview={onReview}
+        onOpenFile={onOpenFile}
         send={send}
         onCopy={onCopy}
         onReuse={onReuse}

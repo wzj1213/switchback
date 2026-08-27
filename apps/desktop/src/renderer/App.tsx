@@ -107,6 +107,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
         stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
         wanted={reportedChangesOf(itemsOf(state, thread.id), thread.cwd).list.map((file) => file.path)}
         panelActive={shell.reviewActive}
+        focus={shell.reviewFocus}
         panel={{
           tabs: shell.panelTabs,
           active: shell.panelActive,

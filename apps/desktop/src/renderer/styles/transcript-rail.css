@@ -1,12 +1,12 @@
 /*
- * 转录区左边那条导航。一格 = 你问的一次。
- * 为什么是这个尺度、几何怎么算，见 `transcript-rail.ts`。
+ * 转录区左缘那条大纲。一格 = 你问的一次；为什么长成一块波形，见 `transcript-rail.ts`。
+ * 形制照 crew 那版（`internal/webui/static/style.css` 的 `.minimap`）。
  */
 
 /*
  * **`sticky` 而不是 `absolute`。** 这一层住在滚动容器里，而容器里的
  * `position: absolute` 参照的是**可滚动内容**的内边距盒，不是可视区——
- * 挂成 absolute 的话整条导航会跟着内容滚走（`.hem` 那段注释踩的是同一个坑）。
+ * 挂成 absolute 的话整条会跟着内容滚走（`.hem` 那段注释踩的是同一个坑）。
  *
  * 高度为 0：它不占布局，格子自己按量出来的像素绝对定位。
  * `margin-top` 抵掉转录区的上内边距——不抵的话，滚到最顶端时这一层停在
@@ -23,49 +23,61 @@
   pointer-events: none;
 }
 
+/*
+ * 热区。**画出来的是一道 1.5px 高的线，而这块透明的按钮是 24×7**——
+ * 1.5px 的目标点不中，也扫不中。
+ */
 .rail__tick {
   position: absolute;
   left: 0;
-  width: 9px;
-  height: 2px;
+  width: 24px;
+  height: 7px;
   padding: 0;
   border: 0;
-  border-radius: 1px;
-  background: var(--border-strong);
+  background: transparent;
+  color: var(--text-faint);
   cursor: pointer;
   pointer-events: auto;
+  transform: translateY(-50%);
+}
+
+.rail__tick:focus-visible {
+  border-radius: 2px;
+  outline: 1px solid var(--border-strong);
+}
+
+/* 看得见的只有这一道。长短由那一轮的产出定（行内 `--mark-w`），
+   悬停时统一拉到 22——那一刻它不再是波形的一部分，而是「你指着的那一格」 */
+.rail__mark {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: var(--mark-w, 8px);
+  height: 1.5px;
+  border-radius: 2px;
+  background: currentcolor;
+  opacity: 0.3;
+  transform: translateY(-50%);
+  transform-origin: left center;
   transition:
     width var(--dur) var(--ease),
+    left var(--dur) var(--ease),
+    opacity var(--dur) var(--ease),
     background var(--dur) var(--ease);
 }
 
-/*
- * 点击热区比看得见的那条宽得多。**画出来的是 2px 高的一道线，
- * 而 2px 的目标点不中**——上下各补 5px 的透明外扩，指针不用瞄。
- */
-.rail__tick::after {
-  content: "";
-  position: absolute;
-  inset: -5px -4px;
-}
-
-.rail__tick:hover,
-.rail__tick:focus-visible {
-  width: 15px;
+/* 当下那一格：更实、更深。**位置本身已经说明了「我在哪儿」**，
+   所以这里只加重，不另外画一个游标 */
+.rail__tick[data-on="true"] .rail__mark {
   background: var(--text-muted);
+  opacity: 0.68;
 }
 
-.rail__tick:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* 当下那一格：更长、更实。**位置本身已经说明了「我在哪儿」**，
-   所以这里只做强调，不另外画一个游标 */
-.rail__tick[data-on="true"] {
-  width: 15px;
-  height: 3px;
-  background: var(--text);
+.rail__tick:hover .rail__mark,
+.rail__tick:focus-visible .rail__mark {
+  left: 2px;
+  width: 22px;
+  opacity: 0.94;
 }
 
 /*
@@ -74,20 +86,50 @@
  */
 .rail__peek {
   position: absolute;
-  left: 22px;
+  left: 30px;
   z-index: 1;
   display: flex;
+  width: min(292px, calc(100vw - 420px));
+  min-width: 210px;
   flex-direction: column;
-  gap: 3px;
-  width: 260px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 9px 11px;
   border: 1px solid var(--border-pop);
   border-radius: var(--radius);
   background: var(--bg-raised);
   box-shadow: var(--shadow-pop);
-  /* 卡自己不接事件：接了它会盖住下一格，鼠标划过去就闪 */
-  pointer-events: none;
+  /* 卡自己可以停、可以选：它常常是一整句提问，而人看到想要的那句
+     第一反应是选中它——一碰就消失的话这件事做不成（见组件里那条延迟关） */
+  pointer-events: auto;
   transform: translateY(-50%);
+  animation: rail-peek var(--dur) var(--ease);
+  user-select: text;
+}
+
+/*
+ * 格的右缘到卡的左缘之间有一条缝。**铺一层隐形的桥把它并进热区**——
+ * 不铺的话指针从格挪向卡的途中会经过一段谁都不在的死区，卡当场闪掉。
+ */
+.rail__peek::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  width: 10px;
+}
+
+@keyframes rail-peek {
+  from {
+    opacity: 0;
+    transform: translate(-5px, -50%) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail__peek {
+    animation: none;
+  }
 }
 
 .rail__peek-title {
@@ -97,7 +139,7 @@
   -webkit-line-clamp: 2;
   color: var(--text);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: 600;
   line-height: var(--lh-sm);
   overflow-wrap: anywhere;
 }
@@ -108,8 +150,15 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--text-xs);
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/* 触控设备上没有悬停，这条大纲的一半功能不存在——整条不画 */
+@media (hover: none), (pointer: coarse) {
+  .rail {
+    display: none;
+  }
 }

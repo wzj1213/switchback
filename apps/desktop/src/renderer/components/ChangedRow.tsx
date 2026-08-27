@@ -1,12 +1,8 @@
-import { useState } from "react"
-import type { FileChange, FileChangeKind } from "@omni/protocol"
-import type { PatchSkip, ReviewKind, ReviewPatch } from "../../shared/review.js"
+import type { PatchSkip, ReviewPatch } from "../../shared/review.js"
 import type { ChangedFile } from "../changes.js"
 import { splitPath } from "../diff.js"
-import { usePatch, type PatchData } from "../review.js"
 import { relPath } from "../tool.js"
 import { requestFilePreview } from "../file-preview-request.js"
-import { FileDiff } from "./Diff.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 import { FileIcon } from "./icons-activity.js"
 import { outside } from "./file-row.js"
@@ -14,10 +10,11 @@ import { outside } from "./file-row.js"
 interface Props {
   file: ChangedFile
   cwd: string
-  stamp: string
   threadId: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
+  /** 点文件名去哪儿：**右侧审核面板里那份 diff**。 */
+  onOpen: (path: string) => void
 }
 
 const SKIP_TEXT: Readonly<Record<PatchSkip, string>> = {
@@ -25,24 +22,6 @@ const SKIP_TEXT: Readonly<Record<PatchSkip, string>> = {
   large: "（补丁过大，请在审核面板或外部工具中查看）",
   gone: "（文件已不存在）",
   failed: "（读取这份净改动失败，请重试）",
-}
-
-function fileKind(kind: ReviewKind): FileChangeKind {
-  if (kind === "delete") return "delete"
-  if (kind === "add" || kind === "untracked") return "add"
-  return "update"
-}
-
-function actualFile(file: ChangedFile, patch: string): FileChange {
-  const review = file.review
-  if (review === undefined) return file.last
-  return {
-    path: file.path,
-    kind: fileKind(review.kind),
-    diff: patch,
-    added: file.added,
-    removed: file.removed,
-  }
 }
 
 function bodyOf(patch: ReviewPatch): string {
@@ -115,53 +94,21 @@ function PreviewFile({ file, threadId, cwd }: {
 }
 
 /**
- * 展开一行却什么都看不到，是这张清单上最常见的一次失望。
+ * 改动卡里的一行。**点文件名直接去右侧审核面板看 diff。**
  *
- * 两种情形合起来就是它：**工作区不是 Git 仓库**（或者这个文件根本不在工作区里），
- * 于是补丁只能指望引擎自己带；而**有几家引擎报编辑时不带补丁**，只报路径和增删数。
- * 两条一撞，`FileDiff` 拿到一份空补丁，画出来是一个只有文件头的空盒子——
- * 和「这个文件没有改动」长得一模一样。
- *
- * 所以这里改成直说：没有补丁可看，以及还能往哪儿看（工作台里那份当前内容）。
+ * 上一版点了是就地展开一段补丁。两个毛病：一是展开之后这张卡把正文顶开，
+ * 而你本来只是想看一眼那处改动；二是**它展开的是引擎当时报的那份**，
+ * 而右侧面板给的是「现在相对开场」的那份，同一个文件两处两个答案。
+ * 现在只留一条路：去面板。
  */
-function bareOf(file: ChangedFile): boolean {
-  return file.review === undefined && (file.last.diff ?? "") === ""
-}
-
-/** 展开之后这一行底下画什么。四种互斥的结局，抽出来是圈复杂度闸门逼的——这一刀也顺。 */
-function ChangedBody({ file, patch }: { file: ChangedFile; patch: PatchData }): React.JSX.Element {
-  if (patch.loading) return <p className="changed__note">正在读取当前净补丁…</p>
-  if (patch.skip !== undefined) return <p className="changed__note">{SKIP_TEXT[patch.skip]}</p>
-  if (bareOf(file)) {
-    return (
-      <p className="changed__note">
-        这次编辑引擎没有带补丁，核不出改了什么；文件当前内容可以在工作台打开。
-      </p>
-    )
-  }
-  return (
-    <FileDiff
-      file={actualFile(file, patch.patch)}
-      parseAs={file.review === undefined ? undefined : "update"}
-    />
-  )
-}
-
 export function ChangedRow({
   file,
   cwd,
-  stamp,
   threadId,
   onReveal,
   onCopy,
+  onOpen,
 }: Props): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const review = file.review
-  const patch = usePatch(cwd, open ? review?.rel : undefined, {
-    context: 3,
-    stamp,
-    threadId,
-  })
   const shown = splitPath(relPath(file.path, cwd))
   return (
     <div className="changed__file">
@@ -169,10 +116,9 @@ export function ChangedRow({
         <button
           type="button"
           className="changed__name"
-          title={file.path}
-          aria-expanded={open}
+          title={`在右侧审核面板里看这份改动\n${file.path}`}
           onClick={() => {
-            setOpen((was) => !was)
+            onOpen(file.path)
           }}
         >
           <span className="changed__dir">{shown.dir}</span>
@@ -198,7 +144,6 @@ export function ChangedRow({
           <CopyIcon size={14} />
         </button>
       </div>
-      {open ? <ChangedBody file={file} patch={patch} /> : null}
     </div>
   )
 }

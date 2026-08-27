@@ -1,4 +1,4 @@
-import type { Aside, Item, Lane, ToolCallItem } from "@omni/protocol"
+import type { Aside, Item, ToolCallItem } from "@omni/protocol"
 import { reportedChangesOf, type Changes } from "./changes.js"
 
 /**
@@ -17,14 +17,6 @@ export type Row =
    * 由 `withAsides` 按时间插进来（见那个函数的注释）。
    */
   | { kind: "aside"; aside: Aside }
-  /**
-   * 一条旁路（子 agent、编排进度）。**同样不属于任何一轮**，也不在 `items` 里——
-   * 它在 store 的 `lanes` 表上，由 `withLanes` 按时间插进来。
-   *
-   * workflow 恰恰是**主循环收工之后**才跑起来的，所以它一定落在某条分界线之后；
-   * 按 `Lane.at`（出生时刻）插，位置就是「你起这一批的时候屏幕停在哪儿」。
-   */
-  | { kind: "lane"; lane: Lane }
   /**
    * 一轮改了哪些文件，跟在那一轮的末尾。**每轮一张，不是整条会话一张**——
    * 为什么，见 `components/TurnEdits.tsx` 开头。
@@ -72,9 +64,7 @@ export function turnIdOf(row: Row): string | undefined {
   if (row.kind === "run") return row.items[0]?.turnId
   // 侧问**不归任何一轮**：折起某一轮时它不该跟着消失——
   // 它问的常常正是那一轮里的东西，折起来是为了少看回答，不是为了少看自己问过的话
-  // 侧问与旁路**都不归任何一轮**：折起某一轮时它们不该跟着消失——侧问问的常常正是
-  // 那一轮里的东西；而 workflow 是主循环收工之后才跑起来的，本来就不在任何一轮里
-  if (row.kind === "aside" || row.kind === "lane") return undefined
+  if (row.kind === "aside") return undefined
   return row.item.turnId
 }
 
@@ -123,11 +113,6 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
   return interpose(rows, asides, (aside) => ({ kind: "aside", aside }))
 }
 
-/** 旁路。**排在侧问之后插**，两者都不归轮次，谁先谁后只影响同一毫秒时的并列顺序。 */
-export function withLanes(rows: readonly Row[], lanes: readonly Lane[]): readonly Row[] {
-  return interpose(rows, lanes, (lane) => ({ kind: "lane", lane }))
-}
-
 /**
  * 折起某几轮的**回答**。
  *
@@ -165,6 +150,17 @@ function editsFor(items: readonly Item[], turnId: string, cwd: string): Row | un
 }
 
 /**
+ * 还在跑的那一轮不出卡。
+ *
+ * 跑到一半时这张卡是**半张账**：它此刻写着「已编辑 2 个文件」，而下一分钟
+ * 可能变成五个、也可能其中一个被它自己改回去。一张会在你眼皮底下变数字的
+ * 「已编辑」不是记录，是噪声——同「还在跑的那一轮不给复制」那条判据。
+ */
+function sealed(turnId: string, activeTurnId: string | undefined): boolean {
+  return turnId !== activeTurnId
+}
+
+/**
  * @param cwd 工作区路径。**给了才插「改了哪些文件」那张卡**——
  *   引擎报的路径要按它归一，没有 cwd 就归不了（活动页那种场景就不插）。
  */
@@ -173,7 +169,7 @@ export function groupRows(items: readonly Item[], activeTurnId?: string, cwd?: s
   const marked = new Set<string>()
   let open: string | undefined
   const seal = (turnId: string | undefined): void => {
-    if (turnId === undefined || cwd === undefined) return
+    if (turnId === undefined || cwd === undefined || !sealed(turnId, activeTurnId)) return
     const card = editsFor(items, turnId, cwd)
     if (card !== undefined) rows.push(card)
   }

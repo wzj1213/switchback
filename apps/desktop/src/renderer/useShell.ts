@@ -58,6 +58,14 @@ export interface Shell {
   reviewOpen: boolean
   reviewActive: boolean
   setReviewOpen: (on: boolean) => void
+  /**
+   * 打开审核面板并落在这个文件上（绝对路径）。
+   *
+   * **带一个自增的号**：连着点同一个文件两次也要各生效一次——只带路径的话
+   * 第二次的值和第一次相同，面板那边看不出「又点了一下」。
+   */
+  reviewFocus: { path: string; at: number } | undefined
+  openReviewAt: (path: string) => void
   panelTabs: readonly PanelPage[]
   panelActive: PanelPage
   panelVisible: boolean
@@ -101,6 +109,7 @@ export function useShell(): Shell {
   const [comparing, setComparing] = useState(false)
   const [railOpen, setRailOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [reviewFocus, setReviewFocus] = useState<{ path: string; at: number }>()
   const [panel, setPanel] = useState(CLOSED_PANEL)
   const [focusFilter, setFocusFilter] = useState(0)
   const [askRename, setAskRename] = useState(0)
@@ -158,6 +167,11 @@ export function useShell(): Shell {
     reviewActive: panel.visible && panel.active === "review",
     setReviewOpen: (on) => {
       setPanel((before) => on ? openPanel(before, "review") : closePanelTab(before, "review"))
+    },
+    reviewFocus,
+    openReviewAt: (path) => {
+      setPanel((before) => openPanel(before, "review"))
+      setReviewFocus((was) => ({ path, at: (was?.at ?? 0) + 1 }))
     },
     panelTabs: panel.tabs,
     panelActive: panel.active,

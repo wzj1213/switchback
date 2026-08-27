@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Item, ToolCallItem } from "@omni/protocol"
-import type { Lane } from "@omni/protocol"
-import { foldTurns, groupRows, turnIdOf, withAsides, withLanes } from "./group.js"
+import { foldTurns, groupRows, withAsides } from "./group.js"
 
 const tool = (id: string): ToolCallItem => ({
   id,
@@ -130,40 +129,6 @@ describe("withAsides", () => {
   })
 })
 
-describe("withLanes", () => {
-  const lane = (at: number, id: string, patch: Partial<Lane> = {}): Lane => ({
-    id, threadId: "th-1", kind: "activity", title: id, status: "running", at, ...patch,
-  })
-
-  it("按出生时刻插进去——workflow 是主循环收工之后才跑的，位置就是你起它的那一刻", () => {
-    const rows = groupRows([user("u1", "t1", 0), reply("a1", "t1", 1000), reply("a2", "t1", 3000)])
-    const out = withLanes(rows, [lane(2000, "w1")])
-    expect(out.map((r) => r.kind)).toEqual(["item", "turn", "item", "lane", "item"])
-  })
-
-  it("**引擎不报旁路的那三家是空数组**——空数组原样返回，一行都不多", () => {
-    const rows = groupRows([user("u1", "t1", 0)])
-    expect(withLanes(rows, [])).toBe(rows)
-  })
-
-  it("比所有行都晚的落队尾——跑起来之后还没有新内容，它就该在最下面", () => {
-    const rows = groupRows([user("u1", "t1", 0)])
-    expect(withLanes(rows, [lane(9999, "w1")]).at(-1)?.kind).toBe("lane")
-  })
-
-  it("多条按出生时刻排，标签「先开的在左边」靠的就是这个顺序", () => {
-    const rows = groupRows([user("u1", "t1", 5000)])
-    const out = withLanes(rows, [lane(3000, "晚"), lane(1000, "早")])
-    expect(out.filter((r) => r.kind === "lane").map((r) => (r.kind === "lane" ? r.lane.id : ""))).toEqual(["早", "晚"])
-  })
-
-  it("**不归任何一轮**：折起某一轮不会把它一起折掉", () => {
-    expect(turnIdOf({ kind: "lane", lane: lane(0, "w1") })).toBeUndefined()
-    const rows = withLanes(groupRows([user("u1", "t1", 0), reply("a1", "t1", 1000)]), [lane(500, "w1")])
-    expect(foldTurns(rows, new Set(["t1"])).some((r) => r.kind === "lane")).toBe(true)
-  })
-})
-
 describe("每轮末尾那张「改了哪些文件」", () => {
   const edit = (id: string, turnId: string, path: string, added: number): Item => ({
     id, turnId, at: 1, kind: "tool_call", tool: "Edit", status: "ok",
@@ -190,6 +155,13 @@ describe("每轮末尾那张「改了哪些文件」", () => {
   it("没改过文件的那一轮不插——空卡片比没有更吵", () => {
     const rows = groupRows([say("u1", "t1")], undefined, "/w")
     expect(rows.some((row) => row.kind === "edits")).toBe(false)
+  })
+
+  it("还在跑的那一轮不出卡——半张账会在你眼皮底下变数字", () => {
+    const items = [say("u1", "t1"), edit("e1", "t1", "a.ts", 3)]
+    expect(groupRows(items, "t1", "/w").some((row) => row.kind === "edits")).toBe(false)
+    // 这一轮跑完（不再是 activeTurnId）它才出来
+    expect(groupRows(items, undefined, "/w").some((row) => row.kind === "edits")).toBe(true)
   })
 
   it("没给 cwd 就一张都不插：引擎报的路径归一不了（活动页那种场景）", () => {

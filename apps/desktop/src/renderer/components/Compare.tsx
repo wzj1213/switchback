@@ -185,7 +185,6 @@ export function Compare({
               items={side.items}
               tasks={side.tasks}
               thinkingTokens={side.thinkingTokens}
-              lanes={side.lanes}
               turn={side.turn}
               send={send}
               onCopy={onCopy}

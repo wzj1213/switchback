@@ -1,19 +1,22 @@
-import { useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import { railPeek, type RailMark } from "../transcript-rail.js"
 
 /**
- * 转录区左边那条导航。一格 = **你问的一次**。
+ * 转录区左缘那条大纲。一格 = **你问的一次**；为什么长成一块波形，见 `transcript-rail.ts`。
  *
- * 为什么是「你问的一次」而不是每条消息，见 `transcript-rail.ts` 开头。
+ * ## 三处照 crew 那版抄的交互（`internal/webui/static/app.js` 的 minimap）
  *
- * ## 三件事上跟着 `RowPeek` 的先例
+ * - **热区比看得见的那道线大得多**：画出来的是一道 1.5px 高的短线，
+ *   而按钮本身是 24×7 的透明块——1.5px 的目标点不中。
+ * - **格与卡之间铺一条隐形的桥**：卡浮在格右边 12px 处，中间那条缝里
+ *   一旦 `mouseleave` 触发，卡就闪一下没了。桥把这条缝并进热区。
+ * - **卡自己可以停、可以选**：进了卡就不关。它常常是一整句提问，
+ *   而人看到想要的那句话第一反应是选中它——卡一碰就消失的话这件事做不成。
  *
- * - **悬停卡里一个可点的东西都不放**：它是预览，真入口是点那一格本身。
- * - **不抢 Tab**：整条导航条只有一个 tab 停靠点（当下那一格），
- *   进去之后上下键在格之间走。二三十轮的会话如果每格都是一个 tab 停靠点，
- *   键盘用户从侧栏走到输入框要按三十次。
- * - **导航条自己不吃滚轮**：它只占左边十来像素，鼠标从正文划过去时
- *   不该在那儿卡一下（`pointer-events` 只给格子，条身不接）。
+ * ## 不抢 Tab
+ *
+ * 整条只有一个 tab 停靠点（当下那一格），进去之后上下键在格之间走。
+ * 三十格如果各是一个停靠点，键盘用户从侧栏走到输入框要按三十次。
  */
 export function TranscriptRail({ marks, activeId, onJump }: {
   marks: readonly RailMark[]
@@ -21,6 +24,18 @@ export function TranscriptRail({ marks, activeId, onJump }: {
   onJump: (id: string) => void
 }): React.JSX.Element | null {
   const [hover, setHover] = useState<string | undefined>(undefined)
+  // 松开那一下不立刻关：指针正从格挪向卡，中间那几十毫秒不该让它闪
+  const timer = useRef(0)
+  const hold = useCallback((id: string | undefined) => {
+    window.clearTimeout(timer.current)
+    if (id !== undefined) {
+      setHover(id)
+      return
+    }
+    timer.current = window.setTimeout(() => {
+      setHover(undefined)
+    }, 90)
+  }, [])
   if (marks.length === 0) return null
   const shown = marks.find((mark) => mark.id === hover)
   const peek = shown === undefined ? undefined : railPeek(shown.text)
@@ -33,31 +48,40 @@ export function TranscriptRail({ marks, activeId, onJump }: {
           className="rail__tick"
           data-on={mark.id === activeId}
           style={{ top: mark.y }}
-          // 二三十格各报一遍全文对读屏是灾难；名字给第一行就够认人
           aria-label={`跳到这一问：${railPeek(mark.text).title}`}
           aria-current={mark.id === activeId ? "true" : undefined}
           tabIndex={mark.id === activeId ? 0 : -1}
           onMouseEnter={() => {
-            setHover(mark.id)
+            hold(mark.id)
           }}
           onMouseLeave={() => {
-            setHover((was) => (was === mark.id ? undefined : was))
+            hold(undefined)
           }}
           onFocus={() => {
-            setHover(mark.id)
+            hold(mark.id)
           }}
           onBlur={() => {
-            setHover((was) => (was === mark.id ? undefined : was))
+            hold(undefined)
           }}
           onClick={() => {
             onJump(mark.id)
           }}
-        />
+        >
+          {/* 看得见的只有这一道线；长短由那一轮的产出定 */}
+          <i className="rail__mark" style={{ "--mark-w": `${String(mark.width)}px` } as React.CSSProperties} />
+        </button>
       ))}
       {shown === undefined || peek === undefined ? null : (
-        // 卡贴着那一格的高度浮出来；`pointer-events: none` 让鼠标穿过去，
-        // 不然它自己会盖住下一格，划过去就闪
-        <span className="rail__peek" style={{ top: shown.y }} aria-hidden="true">
+        <span
+          className="rail__peek"
+          style={{ top: shown.y }}
+          onMouseEnter={() => {
+            hold(shown.id)
+          }}
+          onMouseLeave={() => {
+            hold(undefined)
+          }}
+        >
           <span className="rail__peek-title">{peek.title}</span>
           {peek.body === "" ? null : <span className="rail__peek-body">{peek.body}</span>}
         </span>

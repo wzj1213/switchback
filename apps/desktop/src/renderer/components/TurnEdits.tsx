@@ -26,14 +26,16 @@ const PREVIEW = 4
  * 引擎当时报的那份；要看「现在相对开场还剩什么」，那是审核面板的事——
  * 「审核」那颗就是去那儿的门。
  */
-export function TurnEdits({ edits, cwd, stamp, threadId, onReveal, onCopy, onReview }: {
+export function TurnEdits({ edits, cwd, threadId, onReveal, onCopy, onReview, onOpen }: {
   edits: Changes
   cwd: string
-  stamp: string
   threadId: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
+  /** 「审核」那颗：打开右侧面板（不指定文件）。 */
   onReview: () => void
+  /** 点某个文件：打开右侧面板并落在它上面。 */
+  onOpen: (path: string) => void
 }): React.JSX.Element | null {
   const [all, setAll] = useState(false)
   if (edits.files === 0) return null
@@ -53,8 +55,8 @@ export function TurnEdits({ edits, cwd, stamp, threadId, onReveal, onCopy, onRev
       </div>
       <div className="edits__list">
         {shown.map((file) => (
-          <ChangedRow key={file.path} file={file} cwd={cwd} stamp={stamp} threadId={threadId}
-            onReveal={onReveal} onCopy={onCopy} />
+          <ChangedRow key={file.path} file={file} cwd={cwd} threadId={threadId}
+            onReveal={onReveal} onCopy={onCopy} onOpen={onOpen} />
         ))}
         {edits.list.length <= PREVIEW ? null : (
           <button type="button" className="changed__more" onClick={() => { setAll((was) => !was) }}>

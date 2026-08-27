@@ -98,11 +98,15 @@
   padding: var(--sp-3) var(--sp-4) var(--sp-5);
 }
 
+/* 结论按 Markdown 渲染（见 `ActivityPage` 的 `LaneConclusion`）。这一层只管
+   「它是一段引述」——底、边距、字号；里面的排版归 `.md` 那一套。
+   **底色退到 `--bg-sunken`**：`--bg-code` 是给代码块的，一整段带标题和清单的
+   结论坐在代码底上，读起来像它整段都是代码。 */
 .activity-detail__summary {
   margin: var(--sp-3) 0;
-  padding: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-sm);
-  background: var(--bg-code);
+  background: var(--bg-sunken);
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
@@ -131,4 +135,14 @@
 /* 列表里命令夹在标题和状态之间：它比状态更能说明"这条是什么" */
 .activity-row__copy .lane-cmd {
   margin: 2px 0 1px;
+}
+
+/* 结论里那套 markdown 比正文小一号：它是引述，不是这一屏的主角。
+   最后一段不再留下摆，不然引述块底下会多出一截空白。 */
+.activity-detail__summary .md {
+  font-size: var(--text-sm);
+}
+
+.activity-detail__summary .md > :last-child {
+  margin-bottom: 0;
 }

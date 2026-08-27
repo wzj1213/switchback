@@ -11,6 +11,7 @@ import { LaneCommandBlock, LaneCommandLine, LaneOutput } from "./lane-command.js
 import { PlanMark, type MarkState } from "./PlanMark.js"
 import { ToolRun } from "./ToolRun.js"
 import { ChevronIcon } from "./icons.js"
+import { Markdown } from "./Markdown.js"
 import { focusActivity, focusFirstActivity, moveActivityFocus } from "./activity-navigation.js"
 
 const MARK: Readonly<Record<Lane["status"], MarkState>> = {
@@ -106,9 +107,22 @@ function ActivityFeed({ items, threadId, cwd, onCopy }: {
  * 结论那一块。**命令的输出按等宽画，别人的总结按正文画**——
  * 一段 shell 输出塞进正文段落里，缩进和列都没了，等于没给。
  */
+/**
+ * 子 agent 交回来的那段结论。
+ *
+ * **按 Markdown 渲染，不是一坨预格式文本。** 上一版是塞进一个 `<p>` 里的原文，
+ * 而这些结论几乎全都是 markdown：反引号包着的类名、编号小标题、清单、表格。
+ * 一段两千字的结论那样铺出来是一堵墙——实测一条真实的复核结论在面板里
+ * 铺了三十多行不带任何断点，读的人得自己在心里断句。
+ *
+ * 和转录区共用同一个 `Markdown`（同一套安全前提、同一套排版），
+ * 不另写一份——两份 markdown 渲染迟早会分岔成两种样子。
+ */
 function LaneConclusion({ lane }: { lane: Lane }): React.JSX.Element | null {
   if (lane.summary === undefined) return null
-  if (lane.command === undefined) return <p className="activity-detail__summary">{lane.summary}</p>
+  if (lane.command === undefined) {
+    return <div className="activity-detail__summary"><Markdown text={lane.summary} /></div>
+  }
   return (
     <>
       <div className="workbench__section">输出片段</div>

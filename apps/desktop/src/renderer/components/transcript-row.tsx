@@ -4,7 +4,6 @@ import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
 import { AsideCard } from "./aside-card.js"
-import { LaneCard } from "./LaneCard.js"
 import { TurnEdits } from "./TurnEdits.js"
 import { ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
@@ -24,8 +23,6 @@ export function keyOf(row: Row): string {
   if (row.kind === "edits") return `edits-${row.turnId}`
   if (row.kind === "run") return row.items[0]?.id ?? "run"
   if (row.kind === "aside") return `aside-${String(row.aside.at)}`
-  // **拿 lane id 不拿 at**：卡片会就地更新几百次，key 跟着变的话 React 每次都重建整棵子树
-  if (row.kind === "lane") return `lane-${row.lane.id}`
   return row.item.id
 }
 
@@ -120,20 +117,20 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
   readOnly ? undefined : itemId
 
 /** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, onReveal, onReview, folded, onFold, onCopy,
-  onResolve, approvalTurn, shortcutApproval, readOnly, openLane, onOpenLane, laneLive }: {
+export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, onReveal, onReview, onOpenFile, folded, onFold, onCopy,
+  onResolve, approvalTurn, shortcutApproval, readOnly }: {
   row: Row
   /** 这一行是不是「最后一条说出来的话」。见 `lastSpoken`。 */
   acts: boolean
   threadId: string
   /** 工作区路径。工具行据此把绝对路径写成相对的。 */
   cwd: string
-  /** 「工作区可能变了」的节拍；那张改动卡拿它当补丁的缓存键。 */
-  stamp: string
   /** 在访达里定位一个文件。给了那张改动卡才画行内动作。 */
   onReveal?: ((path: string) => void) | undefined
   /** 去审核面板。那张改动卡上「审核」那颗走它。 */
   onReview?: (() => void) | undefined
+  /** 去审核面板**并落在这个文件上**。点文件名走它。 */
+  onOpenFile?: ((path: string) => void) | undefined
   /** 从某一轮之前重来。 */
   onRewind?: (turnId: string) => void
   /**
@@ -148,11 +145,6 @@ export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, on
   approvalTurn: string | undefined
   shortcutApproval: string | undefined
   readOnly: boolean
-  /** 工作台正开着哪条旁路。**注意和上面那个 `folded` 不是一回事**：那个是折轮次。 */
-  openLane?: string | undefined
-  onOpenLane?: ((laneId: string) => void) | undefined
-  /** 历史线程里的 running 只是最后快照；没接回引擎前不能继续转圈。 */
-  laneLive: boolean
 }): React.JSX.Element {
   // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
   // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
@@ -195,23 +187,13 @@ export function RowView({ row, threadId, cwd, acts, stamp, onRewind, onRetry, on
   // 这一轮改了哪些文件。**没有工作区节拍或没有入口时不画**——
   // 一张点了什么都不会发生的卡比没有更糟（同「从这里重来」那条）
   if (row.kind === "edits") {
-    if (onReveal === undefined || onReview === undefined) return <></>
+    if (onReveal === undefined || onReview === undefined || onOpenFile === undefined) return <></>
     return (
-      <TurnEdits edits={row.edits} cwd={cwd} stamp={stamp} threadId={threadId}
-        onReveal={onReveal} onCopy={onCopy} onReview={onReview} />
+      <TurnEdits edits={row.edits} cwd={cwd} threadId={threadId} onReveal={onReveal}
+        onCopy={onCopy} onReview={onReview} onOpen={onOpenFile} />
     )
   }
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
-  if (row.kind === "lane") {
-    return (
-      <LaneCard
-        lane={row.lane}
-        live={laneLive}
-        folded={openLane === row.lane.id}
-        {...(onOpenLane === undefined ? {} : { onOpen: onOpenLane })}
-      />
-    )
-  }
   /*
    * 「改一改再发」**只挂在最后一句人话上，而且只在能 rewind 的时候**。
    *
