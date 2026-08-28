@@ -23,6 +23,7 @@ import { closeText, createUpdateState, handleUpdate, type UpdateContext, type Up
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
 import { foreignSessionId, mine, onForeign } from "./route.js"
 import { AcpPromptBridge } from "./prompt.js"
+import { SessionRevive } from "./revive.js"
 
 /**
  * 通用 ACP 驱动。**一个驱动接所有讲 ACP 的引擎**——这是接第三家协议的全部意义：
@@ -81,6 +82,8 @@ class AcpSession implements EngineSession {
   private readonly trust: { current: Trust }
   private readonly activity: ForeignActivityParser | undefined
   private readonly prompts: AcpPromptBridge
+  /** 会话睡着了时把它挂回来；重挂期间还负责挡住重放。见 `revive.ts`。 */
+  private readonly revive: SessionRevive
   private readonly clientCalls: AcpClientCalls
   private readonly state: SessionState
   private seq = 0
@@ -120,6 +123,7 @@ class AcpSession implements EngineSession {
       req, config, inflight: this.inflight, trust: () => this.trust.current,
       sessionId: () => this.state.acpSession,
     })
+    this.revive = new SessionRevive(config.id, this.rpc, req.cwd, this.state)
     this.prompts = new AcpPromptBridge({
       id: config.id,
       rpc: this.rpc,
@@ -129,6 +133,7 @@ class AcpSession implements EngineSession {
       now: () => Date.now(),
       complete: (turnId, reason) => this.finishTurn(turnId, reason),
       fail: (turnId, message) => this.failTurn(turnId, message),
+      revive: () => this.revive.run(),
     })
   }
 
@@ -210,6 +215,16 @@ class AcpSession implements EngineSession {
     }
     const note = params as AcpNotification | undefined
     if (note?.update === undefined || !mine(note.sessionId, this.state.acpSession)) return
+    /*
+     * **重挂期间整段丢掉。** `session/load` 会把全部历史重放成 `session/update`
+     *（实测 ZCode 213 条）。开场续跑时这是无害的——那时 `state.turn` 还没有值，
+     * `update.ts` 里每条都写着 `turnId === undefined` 就返回。而中途重挂时
+     * `state.turn` 正指着这一轮，不挡的话整段历史会灌进你刚发的那句话下面。
+     */
+    if (this.revive.replaying) {
+      this.revive.saw()
+      return
+    }
     handleUpdate(this.updateContext(), this.updates, note.update)
   }
 
