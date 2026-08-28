@@ -1,7 +1,8 @@
 import type { ThreadRow } from "@omni/store"
 import type { EngineInfo } from "@omni/protocol"
 import { tallyOf, type Group } from "../sidebar.js"
-import { ChevronIcon, FolderIcon, SpinnerIcon } from "./icons.js"
+import { SpinnerIcon } from "./icons.js"
+import { FolderIcon, FolderOpenIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
@@ -104,7 +105,7 @@ export function GroupBlock({
 }
 
 /**
- * 项目标题那一行：展开箭头、图标、名字、在跑的圈、条数、两颗操作键。
+ * 项目标题那一行：图标（只在用户设了 emoji 时）、名字、在跑的圈、条数、两颗操作键。
  * 从 `GroupBlock` 拆出来是行数闸门逼的，边界也顺——
  * 那边管「这个项目底下有哪些会话」，这边管「这个项目自己长什么样」。
  */
@@ -183,14 +184,12 @@ function GroupHead({
       }}
     >
       <button type="button" className="row__main" {...moveKeyProps(onMove)} onClick={onToggle}>
+        {/* 文件夹的**开/合就是折叠态**（作者拍板照 Codex：不要那个 > 箭头）。
+            整行可点这件事不变；设过 emoji 的项目用它顶替文件夹——
+            一列一样的图标里一眼认出哪个是哪个，这是它解决的全部问题。 */}
         <span className="row__slot">
-          <ChevronIcon open={!collapsed} size={SIDEBAR_ICON} />
-        </span>
-        <span className="row__lead">
-          {/* 设过图标就用它——**一列长得一样的文件夹图标里，
-                  一眼认出哪个是哪个**，这就是它要解决的全部问题 */}
           {icon === undefined ? (
-            <FolderIcon size={SIDEBAR_ICON} />
+            collapsed ? <FolderIcon size={SIDEBAR_ICON} /> : <FolderOpenIcon size={SIDEBAR_ICON} />
           ) : (
             <span className="row__emoji">{icon}</span>
           )}

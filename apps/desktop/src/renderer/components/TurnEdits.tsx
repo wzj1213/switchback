@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { Changes } from "../changes.js"
 import { ChangedRow } from "./ChangedRow.js"
+import { CompareIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 
 /** 默认露几个文件。再多就折起来——一轮改二十个文件的卡会把整屏正文推走。 */
@@ -32,7 +33,7 @@ export function TurnEdits({ edits, cwd, threadId, onReveal, onCopy, onReview, on
   threadId: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
-  /** 「审核」那颗：打开右侧面板（不指定文件）。 */
+  /** 「审一遍」那颗：打开右侧面板（不指定文件）。 */
   onReview: () => void
   /** 点某个文件：打开右侧面板并落在它上面。 */
   onOpen: (path: string) => void
@@ -49,8 +50,10 @@ export function TurnEdits({ edits, cwd, threadId, onReveal, onCopy, onReview, on
           {edits.added > 0 ? <span className="diffstat__add">+{edits.added}</span> : null}
           {edits.removed > 0 ? <span className="diffstat__del">−{edits.removed}</span> : null}
         </span>
-        <button type="button" className="edits__review" title="在右侧逐个看一遍（⇧⌘R）" onClick={onReview}>
-          审核
+        {/* 纯图标：左边「已编辑 N 个文件」是状态，这颗才是动作，两者不缝在一颗胶囊上 */}
+        <button type="button" className="edits__review" aria-label="审一遍（⇧⌘R）"
+          data-tip="审一遍（⇧⌘R）" onClick={onReview}>
+          <CompareIcon size={14} />
         </button>
       </div>
       <div className="edits__list">

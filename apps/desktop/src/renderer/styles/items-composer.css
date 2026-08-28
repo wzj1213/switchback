@@ -452,8 +452,9 @@
 }
 
 /* ── 消息动作栏 ───────────────────────────────────────
- * **每一轮的最后一条回答各挂一条**，而且常驻。为什么是这条规矩、
- * 上一版「每条都挂一颗悬停复制」错在哪儿，见 `components/Copyable.tsx` 开头。
+ * **每一轮的最后一条回答各挂一条**，悬停才现。为什么挂这几条、
+ * 上一版「每条都挂一颗悬停复制」错在哪儿，见 `components/Copyable.tsx` 开头；
+ * 为什么不是常驻，见下面 `.msgacts` 的注释。
  */
 .copyable {
   position: relative;
@@ -467,19 +468,19 @@
   align-items: flex-end;
 }
 
-/* ── 行内动作：转录区里那几颗「顺手能做的事」 ──────────────
+/* ── 行内动作：「顺手能做的事」的两套形制 ─────────────────
  *
- * 「从这里重来」「复制」「改一改再发」「立刻插入」「撤回」——它们是同一类东西：
- * **不是这一屏的主操作，但要点得到**。所以给一套共同的样子，而不是各写各的
- *（上一版就是各写各的，其中一颗还因为共用选择器被误删，直接退化成
- * 一颗带边框、会折行的浏览器默认按钮）。
+ * **`.act` 药丸如今只剩排队条在用**（`Queued.tsx` 的「立刻插入」「取回」——
+ * 那几颗必须带文字：「插入」「取回」没有自足的图形）。转录区那三颗
+ *（复制 / 改一改再发 / 从这里重来）已经是纯图标的 `.msgact`，见下。
+ * 别给 `.act` 添新用法：图形语义自足的动作一律去 `.msgact`。
  *
- * 形制是**药丸**，和芯片、匹配标签同族：平时只有文字，悬停才浮出一圈描边和底色。
+ * 药丸形制和芯片、匹配标签同族：平时只有文字，悬停才浮出一圈描边和底色。
  * 不用下划线——下划线是链接的语义，一颗会执行动作的东西不该长成链接；
  * 而且下划线在 11.5px 上和文字挤在一起，看起来是「没做完」而不是「克制」。
  *
- * `white-space: nowrap` 不是装饰：这几颗都住在会被压窄的行里
- *（轮次分界线那一行右端只剩几十像素），能折行的按钮迟早会折成两行。
+ * `white-space: nowrap` 不是装饰：这几颗都住在会被压窄的行里，
+ * 能折行的按钮迟早会折成两行。
  */
 .act {
   display: inline-flex;
@@ -508,32 +509,53 @@
   color: var(--text);
 }
 
-/*
- * **一露头就带着描边。**
- *
- * 这几颗平时是藏着的（父行悬停才出现）。只在「悬停到它自己身上」才显形的话，
- * 它出现的那一刻是一行光秃秃的灰字——看起来像说明文字，不像能点的东西，
- * 而人要先猜它能点、再移过去才得到反馈。既然已经决定把它显示出来，
- * 就该在那一刻就说清「这是一颗按钮」。
- */
-.turnmark__row:hover .act,
-.copyable:hover .act {
-  border-color: var(--border);
-  background: var(--bg-raised);
-}
-
 .act:active {
   background: var(--bg-active);
-}
-
-.act[data-state="failed"] {
-  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
-  color: var(--danger);
 }
 
 /* 撤回是**收回一句话**，不是危险操作，所以只在悬停时染色，平时和别的一样安静 */
 .act--danger:hover {
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+/*
+ * 消息动作：**纯图标**（复制 / 改一改再发 / 从这里重来）。
+ *
+ * 图形语义自足的动作不需要文字——⧉ 是全球最稳的图标之一，而药丸的
+ * 描边+圆角在 15px 正文流里视觉重量过大（判据的完整版在 `icon-base.tsx` 开头）。
+ * 形制对齐 `changed.css` 的 `.changed__act` 族：22×22、无框、hover 给底色。
+ * 显隐不归这里管：消息底下那排走 `.msgacts` 容器，分界线上那颗走 `.turnmark__act`。
+ */
+.msgact {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.msgact:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.msgact:active {
+  background: var(--bg-active);
+}
+
+/* 图标化之后没有文字可写了，复制失败就靠染色说「失败了」 */
+.msgact[data-state="failed"] {
   color: var(--danger);
 }
 
@@ -545,13 +567,13 @@
  * 而用户消息是右对齐的，第一行的末尾就在那个位置。悬停才出现救不了它：
  * 你要复制的那条，正是鼠标停着的那条。
  *
- * 做成**纯文字**、不带框：它是「顺手能做的事」，不是这一屏的操作。
+ * 纯图标、不带框：它是「顺手能做的事」，不是这一屏的操作。
  * 一带框就成了两颗小按钮挂在每条消息屁股后面，一屏十条就是二十个框。
  */
 .msgacts {
   display: flex;
   gap: var(--sp-1);
-  /* 药丸自带内边距，所以这里贴着消息更近一点，视觉上仍是「挂在它下面」 */
+  /* 图标钮没有内边距，所以这里贴着消息更近一点，视觉上仍是「挂在它下面」 */
   margin-top: 1px;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);

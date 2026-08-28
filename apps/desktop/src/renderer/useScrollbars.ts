@@ -34,10 +34,27 @@ const IDLE_MS = 900
 const FADE_MS = 320
 const FADE = `--bar var(--bar-fade, ${String(FADE_MS)}ms) linear`
 
-/** 只追加自己的 custom-property 过渡，不覆盖容器原有的 inline transition。 */
+/** 只追加自己的 custom-property 过渡，不覆盖容器原有的过渡。 */
 export function withBarFade(current: string): string {
   if (current.includes("--bar")) return current
   return current.trim() === "" ? FADE : `${current}, ${FADE}`
+}
+
+/**
+ * 要合并的是**计算后的**过渡，不只是 inline 那一条。
+ *
+ * `.shell` 的列宽过渡（抽屉滑 420ms）写在样式表里；如果合并时只看
+ * `el.style.transition`（inline），写回的 `--bar` 一条会把样式表那条
+ * **整个顶掉**（inline 优先级高）——表现就是面板/侧栏开关瞬切、抽屉动画
+ * 凭空消失，而且只在经典条档位（插鼠标）发作，触控板出图从来不踩。
+ *
+ * `transitionDuration === "0s"` 就是没有过渡（`transition-property` 初值是
+ * `all`，看它没用；时长 0s 的过渡也不值得保）。
+ */
+function baseTransitionOf(el: HTMLElement): string {
+  if (el.style.transition.includes("--bar")) return el.style.transition
+  const computed = getComputedStyle(el)
+  return computed.transitionDuration === "0s" ? "" : computed.transition
 }
 
 /**
@@ -98,8 +115,9 @@ export function useScrollbars(): void {
     const onScroll = (event: Event): void => {
       const el = event.target
       if (!(el instanceof HTMLElement) || root.dataset["bars"] !== "classic") return
-      // 过渡写一次就够，而且**不会覆盖别人**：滚动容器里没有一个带 CSS 过渡的
-      el.style.transition = withBarFade(el.style.transition)
+      // 过渡写一次就够。合并计算后的值（见 `baseTransitionOf`）——
+      // 样式表里的过渡（`.shell` 的列宽）被 inline 顶掉过一次，别再只并 inline
+      el.style.transition = withBarFade(baseTransitionOf(el))
       el.style.setProperty("--bar", "1")
       window.clearTimeout(timers.get(el))
       timers.set(

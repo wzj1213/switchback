@@ -1,19 +1,12 @@
 import { LINE, Svg } from "./icon-base.js"
 
 /*
- * 界面骨架用的图标。对话内容里那几个（终端、笔、地球…）在 `icons-activity.tsx`。
+ * 界面骨架用的图标。对话内容里那几个（终端、笔、地球…）在 `icons-activity.tsx`，
+ * 两只文件夹在 `icons-folder.tsx`（行数闸门逼的）。
  * 画法的约定、`Svg`/`LINE`/`BOX` 在 `icon-base.tsx`。
  */
 
 export { Svg } from "./icon-base.js"
-
-export function FolderIcon({ size }: { size?: number } = {}): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <path d="M2 4.25A1.25 1.25 0 0 1 3.25 3h2.4l1.35 1.5h5.75A1.25 1.25 0 0 1 14 5.75v6A1.25 1.25 0 0 1 12.75 13h-9.5A1.25 1.25 0 0 1 2 11.75z" {...LINE} />
-    </Svg>
-  )
-}
 
 export function PlusIcon({ size }: { size?: number } = {}): React.JSX.Element {
   return (

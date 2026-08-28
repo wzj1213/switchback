@@ -56,17 +56,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 「审一遍」的动作位：**纯图标**。左边「已编辑 N 个文件」是状态（留着读），
+ * 它是动作——信息和动作不缝在一颗胶囊上。快捷键的说明在 data-tip 里。
+ * 形制对齐本文件 `.changed__act` 那一族，只是它常驻：卡头只有这一颗动作，
+ * 藏起来就没有入口了。
+ */
 .edits__review {
+  display: flex;
   flex: none;
-  height: 26px;
-  padding: 0 var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-raised);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
   cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
 }
 
 .edits__review:hover {

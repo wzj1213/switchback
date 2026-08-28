@@ -48,21 +48,23 @@ export const VIEWS = [
        * hiddenInset 的交通灯还在窗口左上角，不让位的话会压在标题上。
        */
       name: "01b-收起侧栏",
-      // 第二步是个空动作：**等那条列宽过渡走完**（外壳 200ms）。
-      // 每个 open 步骤后面 harness 都会停 350ms，所以多一步就够了——
-      // 不等的话下面量到的宽度是滑到一半时的值，断言随机失败
-      open: [`document.querySelector('button[aria-label="收起侧栏"]')?.click()`, `true`],
+      // 后面几个空动作是**等那条列宽过渡走完**（外壳 420ms + visibility 延迟同程）。
+      // 每个 open 步骤后面 harness 都会停 350ms，所以要三步——
+      // 不等的话下面量到的是滑到一半时的值，断言随机失败
+      open: [`document.querySelector('button[aria-label="收起侧栏"]')?.click()`, `true`, `true`, `true`],
       ready: `.shell--norail`,
       assert: `(() => {
+        const shell = document.querySelector('.shell')
         const sidebar = document.querySelector('.sidebar')
         const main = document.querySelector('.main')
-        if (main === null) return false
-        // 收起 = **那一列宽度变 0**，不再是 display:none（外壳永远三列，
-        // 见 app-foundation.css）。所以这里量宽度，不量 display
-        const railGone = sidebar === null
-          || (sidebar.getBoundingClientRect().width < 1
-            && getComputedStyle(sidebar).visibility === 'hidden')
+        if (shell === null || main === null) return false
+        // 收起 = **第一列宽度变 0**。量列不量侧栏元素——抽屉化之后侧栏是刚性板
+        //（min-width 顶住 264，探出窗口左缘的部分被外壳裁掉），元素自己的宽度恒是 264，
+        // 见 app-foundation.css「抽屉，不淡化」那段
+        const railGone = getComputedStyle(shell).gridTemplateColumns.split(' ')[0] === '0px'
         return railGone
+          && sidebar !== null
+          && getComputedStyle(sidebar).visibility === 'hidden'
           && Math.abs(main.getBoundingClientRect().left) < 1
           && getComputedStyle(document.querySelector('.topbar')).paddingLeft === '92px'
           && document.querySelector('button[aria-label="展开侧栏"]') !== null
@@ -245,7 +247,7 @@ export const VIEWS = [
         `window.__omniWorkbench = document.querySelector('.workbench')`,
         ...openPanelPage("活动"),
         ...openPanelPage("文件"),
-        `document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()`,
+        `document.querySelector('.paneltoggle')?.click()`,
         ...openPanelPage("文件"),
       ],
       ready: ".files-search input",

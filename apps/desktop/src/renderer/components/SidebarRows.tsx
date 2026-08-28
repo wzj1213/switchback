@@ -144,7 +144,7 @@ export function Row({
   onMove?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const { thread } = row
-  // 后台跑完、还没打开过的那条要**亮着**：整行提亮 + 状态点点起来（见 `RowEnd`）。
+  // 后台跑完、还没打开过的那条要**亮着**：整行提亮 + 行首那颗点换亮色（见 `Dot`）。
   // 选中的那条不算——你正看着它
   const unread = row.unread === true && !selected
   const dropping = drag?.over === thread.id && drag.dragging !== thread.id
@@ -200,11 +200,19 @@ export function Row({
         {...moveKeyProps(onMove)}
         onClick={onSelect}
       >
+        {/* 行首状态点列**所有会话行都在**——它是「这行现在怎么样」的常驻位：
+            绿点在跑、黄点待批、红点失败、亮色点未读（作者拍板：状态不能拿掉）。
+            行尾那列答的是「多久以前」，会被转圈/徽注顶掉，两套各管各的。
+            项目内行的这一列缩进一级（CSS 的 `margin-left`），文字落在 56px。 */}
         <span className="row__slot">
           <Dot status={thread.status} unread={unread} />
         </span>
         <RowName value={rowLabelOf(row)} />
-        <RowEnd thread={thread} unread={unread} {...(aside === undefined ? {} : { aside })} />
+        <RowEnd
+          thread={thread}
+          unread={unread}
+          {...(aside === undefined ? {} : { aside })}
+        />
       </button>
       <RowActions
         confirming={confirming}

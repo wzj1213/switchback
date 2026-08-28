@@ -39,7 +39,7 @@ export function TopBarActions({
         <button
           className="iconbtn"
           type="button"
-          title={`用 ${next.label} 另开一条同工作区分支（原会话保留，不自动发送内容）`}
+          data-tip={`用 ${next.label} 另开一条同工作区分支（原会话保留，不自动发送内容）`}
           aria-label={`分叉到 ${next.label}`}
           onClick={() => {
             onFork(next.id)
@@ -48,9 +48,13 @@ export function TopBarActions({
           <ForkIcon size={14} />
         </button>
       )}
-      <button className={`iconbtn${panelVisible ? " iconbtn--on" : ""}`} type="button"
-        data-tip={panelVisible ? "隐藏侧边面板" : "显示侧边面板"}
-        aria-label={panelVisible ? "隐藏侧边面板" : "显示侧边面板"} onClick={onPanel}>
+      {/* 面板开关是顶栏的最后一颗（拖拽区的 no-drag 只在它的子树里生效——
+          挪出顶栏就点不动了，踩过两回）。视觉上的「钉在原地」由 CSS 反向
+          translate 给：顶栏随会话列收窄多少，它就往右平移多少（app-main.css）。 */}
+      <button className={`iconbtn paneltoggle${panelVisible ? " iconbtn--on" : ""}`} type="button"
+        data-tip={panelVisible ? "隐藏侧边面板（⌥⌘B）" : "显示侧边面板（⌥⌘B）"}
+        aria-label={panelVisible ? "隐藏侧边面板" : "显示侧边面板"}
+        aria-pressed={panelVisible} onClick={onPanel}>
         <PanelIcon />
       </button>
     </>

@@ -1,4 +1,5 @@
-import { FolderIcon, PlusIcon, SearchIcon } from "./icons.js"
+import { PlusIcon, SearchIcon } from "./icons.js"
+import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
 
@@ -43,6 +44,9 @@ export function Head({
   query: string
   onQuery: (next: string) => void
 }): React.JSX.Element {
+  // 落点名的取值沿用原来按钮右侧附注那一套：没会话 → 选文件夹；
+  // 对话态 → 「对话」；否则项目目录名
+  const where = here === undefined ? "选文件夹…" : hereKind === "chat" ? "对话" : baseNameOf(here)
   return (
     <>
       <div className="sidebar__head">
@@ -52,20 +56,18 @@ export function Head({
       </div>
 
       <div className="sidebar__act">
+        {/* 落点（开在哪）收进 tooltip：它是这颗按钮唯一说不清的事，
+            **必须在点之前就看得见**，但写进按钮里的话中文按钮跟着目录名
+            忽长忽短。走全局自绘层 `data-tip`（见 `tips.tsx`），不用原生
+            `title`——慢、长得不像这个应用、自动化出图拍不到。 */}
         <button
           type="button"
           className="sidebar__new"
           onClick={onNew}
-          title={here === undefined ? "还没有会话，会先让你选一个文件夹" : `在 ${here} 新建`}
+          data-tip={`新建会话 —— 落在 ${where}`}
         >
           <PlusIcon size={SIDEBAR_ICON} />
           <span className="sidebar__new-label">新建会话</span>
-          {/* 落点写在右边，和底部「设置 ⌘,」同一套排版。
-              **不写进按钮文字里**——中文按钮跟着目录名忽长忽短，读起来更差。
-              也**不能省**：它是这颗按钮唯一说不清的事（点下去开在哪个项目里） */}
-          <span className="sidebar__new-where">
-            {here === undefined ? "选文件夹…" : hereKind === "chat" ? "对话" : baseNameOf(here)}
-          </span>
         </button>
         {/* 低频动作让位给高频动作，这一条就是这次改动的全部意思 */}
         <button

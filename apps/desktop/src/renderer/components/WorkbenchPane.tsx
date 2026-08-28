@@ -31,7 +31,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
   return (
     <section ref={box} className="workbench" tabIndex={-1}
       aria-label="任务工作台" hidden={!state.visible}>
-      <PanelTabs {...panel} onHide={onHide} />
+      <PanelTabs {...panel} />
       {notice === undefined ? null : <p className="workbench__notice" role="status">{notice}</p>}
       <div className="workbench__body">
         <div className="workbench__page" hidden={state.page !== "activity"}>

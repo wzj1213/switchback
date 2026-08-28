@@ -108,7 +108,7 @@ export interface AppApi {
  */
 function viewActions(shell: Shell): Pick<
   Parameters<typeof useWorkspaceActions>[0],
-  "onFind" | "onCompare" | "onReview" | "onFilterThreads" | "onToggleRail" | "onSettings"
+  "onFind" | "onCompare" | "onReview" | "onFilterThreads" | "onToggleRail" | "onTogglePanel" | "onSettings"
 > {
   return {
     onFind: () => { shell.setFinding(true) },
@@ -116,6 +116,7 @@ function viewActions(shell: Shell): Pick<
     onReview: () => { shell.setReviewOpen(true) },
     onFilterThreads: shell.askFocusFilter,
     onToggleRail: shell.toggleRail,
+    onTogglePanel: shell.togglePanelVisibility,
     onSettings: () => { shell.setSettingsOpen(true) },
   }
 }

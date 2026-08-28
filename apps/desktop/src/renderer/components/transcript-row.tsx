@@ -54,7 +54,7 @@ export function lastMine(rows: readonly Row[]): string | undefined {
 }
 
 /**
- * 哪几条消息挂那排动作（复制）。**每一轮的最后一条回答各挂一条。**
+ * 哪几条消息挂那排动作（复制）。**每一条人话，加上每一轮的最后一条回答。**
  *
  * 上一版是给**每条消息**都挂一颗悬停才出现的「复制」，连思考和通知都有。
  * 挂着的时候它是隐形的，可它照样占着一行的高度（`opacity: 0` 不是 `display: none`），
@@ -65,9 +65,10 @@ export function lastMine(rows: readonly Row[]): string | undefined {
  *
  * 三条规矩：
  *
- * - **只认回答**。人话、思考、通知、计划卡都不挂——把复制挂在一段思考上，
- *   等于说那段思考和答案是同一级的东西。（你自己那句话上挂的是「改一改再发」，
- *   那是另一件事，见 `lastMine`。）
+ * - **人话每条都挂，回答才按轮收**。思考、通知、计划卡不挂——把复制挂在一段
+ *   思考上，等于说那段思考和答案是同一级的东西。人话是另一笔账：那句是你
+ *   自己写的，拿走它和拿走答案一样是真动作（同一排里的「改一改再发」
+ *   是另一颗，见 `lastMine`）。
  * - **还在跑的那一轮一条都不给**。它此刻说的每一段都是中间产物——
  *   「我先查一下这两个字段的用途」写完了（`complete` 为真），可它不是这一轮的结论，
  *   下一段马上就来。给它挂一颗复制，等于把过程当成了答案。
@@ -132,7 +133,7 @@ export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, onReveal,
   cwd: string
   /** 在访达里定位一个文件。给了那张改动卡才画行内动作。 */
   onReveal?: ((path: string) => void) | undefined
-  /** 去审核面板。那张改动卡上「审核」那颗走它。 */
+  /** 去审核面板。那张改动卡上「审一遍」那颗走它。 */
   onReview?: (() => void) | undefined
   /** 去审核面板**并落在这个文件上**。点文件名走它。 */
   onOpenFile?: ((path: string) => void) | undefined
@@ -175,14 +176,14 @@ export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, onReveal,
         {onRewind === undefined ? null : (
           <button
             type="button"
-            className="act turnmark__act"
-            title="新开一个会话，只带这一轮之前的原生上下文（原会话保留）"
+            className="msgact turnmark__act"
+            aria-label="从这里重来"
+            data-tip="从这里重来：新开会话，只带这轮之前的上下文"
             onClick={() => {
               onRewind(row.turnId)
             }}
           >
             <ResetIcon size={13} />
-            从这里重来
           </button>
         )}
       </div>
@@ -223,12 +224,12 @@ export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, onReveal,
             extra: (
               <button
                 type="button"
-                className="act"
-                title="回到发这句话之前，把它交还给你改；原会话保留"
+                className="msgact"
+                aria-label="改一改再发"
+                data-tip="改一改再发"
                 onClick={onRetry}
               >
                 <PencilIcon size={13} />
-                改一改再发
               </button>
             ),
           })}

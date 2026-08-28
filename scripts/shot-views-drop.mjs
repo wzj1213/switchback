@@ -63,13 +63,13 @@ export const DROP_VIEWS = [
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
       document.querySelector('[aria-label="去掉这个附件"]')?.click()
-      document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()
+      document.querySelector('.paneltoggle')?.click()
       setTimeout(resolve, 5200)
     })`,
   },
   {
     name: "14-侧栏仍不接文件",
-    open: `document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()`,
+    open: `document.querySelector('.paneltoggle')?.click()`,
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
     rejectDragTarget: ".sidebar",
     ready: ".sidebar",
@@ -104,7 +104,7 @@ export const DROP_VIEWS = [
       && document.querySelector('.attach .thumb') === null`,
     after: `return new Promise(resolve => {
       delete document.documentElement.dataset.failedDrop
-      document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()
+      document.querySelector('.paneltoggle')?.click()
       setTimeout(resolve, 5200)
     })`,
   },

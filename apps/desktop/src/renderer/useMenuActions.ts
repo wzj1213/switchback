@@ -11,6 +11,7 @@ export interface MenuHandlers {
   filterThreads: () => void
   settings: () => void
   toggleRail: () => void
+  togglePanel: () => void
 }
 
 export function isReviewKey(
@@ -33,7 +34,7 @@ export function useMenuActions(
   handlers: MenuHandlers,
   deps: readonly unknown[],
 ): void {
-  const { newThread, openFolder, interrupt, find, copyMarkdown, compare, review, filterThreads, settings, toggleRail } = handlers
+  const { newThread, openFolder, interrupt, find, copyMarkdown, compare, review, filterThreads, settings, toggleRail, togglePanel } = handlers
   useEffect(() => {
     const table: Readonly<Record<string, () => void>> = {
       "new-thread": newThread,
@@ -46,6 +47,7 @@ export function useMenuActions(
       "filter-threads": filterThreads,
       settings,
       "toggle-rail": toggleRail,
+      "toggle-panel": togglePanel,
     }
     const off = onMenu((action) => {
       table[action]?.()
@@ -62,6 +64,12 @@ export function useMenuActions(
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key === "\\") {
         event.preventDefault()
         toggleRail()
+        return
+      }
+      // 面板开关（⌥⌘B）：Alt 组合下 event.key 是特殊字符（∫），要看物理键 code
+      if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === "KeyB") {
+        event.preventDefault()
+        togglePanel()
       }
     }
     window.addEventListener("keydown", onKey)

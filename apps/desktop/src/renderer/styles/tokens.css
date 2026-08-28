@@ -168,7 +168,12 @@
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  /*
+   * 等宽链里没有一家带 CJK 字形：「执行 rm -rf ./build」这类中英混排，
+   * 中文会掉给系统随便捡一个字体兜底，每次可能不一样。
+   * 末尾指定 PingFang SC，让中文的落点是确定的。
+   */
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "PingFang SC", monospace;
 
   /*
    * 字号。

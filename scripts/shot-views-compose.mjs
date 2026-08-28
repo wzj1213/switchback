@@ -8,7 +8,7 @@ export const COMPOSE_VIEWS = [
   {
     name: "12-切会话保留草稿",
     open: [
-      `return new Promise((resolve, reject) => { document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click(); setTimeout(() => { document.activeElement?.getAttribute('aria-label') === '显示侧边面板' ? resolve(true) : reject(new Error('侧边面板关闭后没有回到总入口')) }, 80) })`,
+      `return new Promise((resolve, reject) => { document.querySelector('.paneltoggle')?.click(); setTimeout(() => { document.activeElement?.getAttribute('aria-label') === '显示侧边面板' ? resolve(true) : reject(new Error('侧边面板关闭后没有回到总入口')) }, 80) })`,
       `return new Promise((resolve, reject) => {
         const input = document.querySelector('.composer__input')
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
@@ -223,7 +223,7 @@ export const COMPOSE_VIEWS = [
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
-      document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()
+      document.querySelector('.paneltoggle')?.click()
     })()`,
   },
   {
@@ -232,7 +232,7 @@ export const COMPOSE_VIEWS = [
       `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
       `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('Esc 没有收起工作台')`,
       ...openPanelPage("文件"),
-      `document.querySelector('.workbench .panel-tabs__button[aria-label="隐藏侧边面板"]')?.click()`,
+      `document.querySelector('.paneltoggle')?.click()`,
       `if (document.querySelector('.workbench:not([hidden])') !== null) throw new Error('关闭键没有收起工作台')`,
       `(() => { const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, '@attachment'); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,
       `(() => {

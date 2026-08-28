@@ -6,7 +6,9 @@ export async function openFixture({ value, waitFor, pause }, cdp) {
   let selected = false
   while (!selected) {
     if (Date.now() >= deadline) throw new Error("界面没有就绪（会话列表）")
-    if (!(await value(cdp, `${group}?.querySelector('.chev--open') !== null`))) {
+    // 展开与否看组里有没有会话行——组头的展开箭头已按拍板换成开/合文件夹图标，
+    // 没有 `.chev--open` 可问了（见 SidebarGroup.tsx）
+    if (!(await value(cdp, `${group}?.parentElement?.querySelector('.row--thread .row__main') !== null`))) {
       await value(cdp, `${group}?.querySelector('.row__main')?.click(); true`)
     }
     selected = await value(

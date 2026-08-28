@@ -118,17 +118,22 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
  *
  * ## 折的是过程，不是答案
  *
- * 上一版折的是「分界线之后属于这一轮的一切」——连那一轮的回答一起藏。
- * 那读起来是「清空」不是「折叠」：一条跑了十轮的会话折起来之后，
- * 屏幕上只剩十条「已处理 X」，你连它们各自说了什么都看不见。
+ * 折起的那一轮只留四样：
  *
- * 现在藏的只有**过程**：工具组和思考。人话、回答、审批卡、改动卡一律留着。
- * 于是一轮跑完之后那一段读起来是「我问了什么 → 用时 1m 26s ↘ → 它答了什么」，
- * 想看它中间怎么走的，点那条分界线展开。
+ * - **提问**：它是这一轮的表头，人是靠自己问过的话定位的；
+ * - **最后一条 agent 文本**：这一轮的结论；
+ * - **改动卡**：这一轮动了哪些文件；
+ * - **报错**：故障不能藏——藏了，折起来的一轮看起来就像没出过事。
  *
- * **默认就是折着的**（见 `Transcript` 的 `unfolded`）：过程是给「它怎么得出这个」
- * 这个问题准备的，而多数时候你先要的是结论。还在跑的那一轮不折——那时候
- * 过程就是全部内容，它正一步步长出来。
+ * 其余全是过程，一并折进去：工具组、思考、计划、已决的审批卡，以及**非最后一条**的
+ * 所有 agent 文本。上一版只折工具组和思考，agent 边干边说的叙述全摊着——长会话里
+ * 过程占了七成位置，折叠名存实亡。判据不变（见 `Transcript` 的 `unfolded`）：过程是给
+ * 「它怎么得出这个」这个问题准备的，而多数时候你先要的是结论。还在跑的那一轮不折——
+ * 那时候过程就是全部内容，它正一步步长出来。pending 的审批只可能出现在那一轮，
+ * 所以折起来的轮里审批卡一定已决，藏了不丢事。
+ *
+ * 「最后一条」按行序取：该轮最后一个 `agent_message` 行。一轮可能一条 agent 文本
+ * 都没有（全是工具调用，出错退出了）——那就没有可额外折的，行为与旧版相同。
  *
  * ## 没有分界线的那一轮**不折**
  *
@@ -141,12 +146,22 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
  */
 export function foldTurns(rows: readonly Row[], folded: (turnId: string) => boolean): readonly Row[] {
   const openable = new Set(rows.flatMap((row) => (row.kind === "turn" ? [row.turnId] : [])))
-  return rows.filter((row) => {
+  // 预扫一遍，记下每轮最后一条 agent 文本的行号——后出现的覆盖先前的，
+  // 留下的就是最后那条。rows 可能上千：O(n) 预扫 + O(n) 过滤，不在过滤里回查。
+  const lastAnswerAt = new Map<string, number>()
+  rows.forEach((row, index) => {
+    if (row.kind === "item" && row.item.kind === "agent_message") lastAnswerAt.set(row.item.turnId, index)
+  })
+  return rows.filter((row, index) => {
     if (row.kind === "turn") return true
     const id = turnIdOf(row)
     if (id === undefined || !openable.has(id) || !folded(id)) return true
-    if (row.kind === "run") return false
-    return !(row.kind === "item" && row.item.kind === "reasoning")
+    // aside 上一行就返回了（它不归任何一轮）；走到这里只剩 item / run / edits：
+    // run 整组折掉，改动卡留着
+    if (row.kind !== "item") return row.kind === "edits"
+    // 提问是表头、报错不能藏、最后一条回答是结论，其余都是过程
+    if (row.item.kind === "user_message" || row.item.kind === "error") return true
+    return row.item.kind === "agent_message" && lastAnswerAt.get(id) === index
   })
 }
 

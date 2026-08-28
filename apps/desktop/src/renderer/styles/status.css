@@ -95,32 +95,6 @@
   line-height: var(--lh-xs);
 }
 
-.turnstatus__stop {
-  margin-left: auto;
-  padding: 2px var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: default;
-}
-
-/*
- * 停止按钮**常显**。
- *
- * 上一版是 hover 才现，理由写的是「它是逃生口，不是常用操作」——
- * 那句话把因果搞反了：**正因为是逃生口，才不能要求你先知道它在那儿**。
- * 一个要靠悬停去撞的停止键，在你真的想停的时候是找不到的。
- * 靠字重和颜色压住存在感就够了，不用靠藏。
- */
-
-.turnstatus__stop:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
 /* ── 快捷键提示 ────────────────────────────────────── */
 .kbd {
   margin-left: 6px;

@@ -18,6 +18,7 @@ export type MenuAction =
   | "filter-threads"
   | "settings"
   | "toggle-rail"
+  | "toggle-panel"
 
 const isMac = process.platform === "darwin"
 
@@ -154,6 +155,14 @@ function viewMenu(): MenuItemConstructorOptions {
         accelerator: "CmdOrCtrl+\\",
         click: (_i, focused) => {
           send("toggle-rail", focused)
+        },
+      },
+      {
+        // 右上角那颗开关的「一定可以点」版本：拖拽区出问题时菜单和快捷键永远在
+        label: "收起 / 展开侧边面板",
+        accelerator: "Alt+CmdOrCtrl+B",
+        click: (_i, focused) => {
+          send("toggle-panel", focused)
         },
       },
       { type: "separator" },

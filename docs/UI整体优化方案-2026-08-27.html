@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>omni · UI 整体优化方案 · 2026-08-27</title>
+<style>
+/* ============ 文档自身的设计语言：就用 omni 自己的 token ============ */
+:root {
+  --text: #16161a;
+  --muted: #55555c;
+  --faint: #85858f;
+  --bg: #ffffff;
+  --sunken: #f6f6f7;
+  --raised: #fbfbfd;
+  --border: #e6e6e9;
+  --strong: #d6d6da;
+  --accent: #3b6fd4;
+  --ok: #2e9e5b;
+  --warn: #b57d0a;
+  --danger: #d4483e;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --dur: 120ms;
+  --dur-slow: 240ms;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+  font-size: 15px; line-height: 1.7; color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(59,111,212,.16); }
+
+.page { display: grid; grid-template-columns: 208px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; }
+
+/* ---- 左导航 ---- */
+.nav { position: sticky; top: 0; height: 100vh; padding: 56px 20px 24px 0; border-right: 1px solid var(--border); }
+.nav a {
+  display: block; padding: 5px 10px; margin: 0 -10px 2px; border-radius: 6px;
+  color: var(--muted); text-decoration: none; font-size: 13px; transition: background var(--dur), color var(--dur);
+}
+.nav a:hover { background: var(--sunken); color: var(--text); }
+.nav .nav__brand { font-size: 16px; font-weight: 600; color: var(--text); padding: 5px 10px 14px; }
+.nav .nav__brand small { display: block; font-size: 11.5px; font-weight: 400; color: var(--faint); margin-top: 2px; }
+.nav .nav__sep { height: 1px; background: var(--border); margin: 10px 0; }
+
+.main { padding: 0 0 120px 44px; min-width: 0; }
+
+/* ---- Hero ---- */
+.hero { padding: 64px 0 40px; border-bottom: 1px solid var(--border); }
+.eyebrow { font-size: 12px; color: var(--faint); letter-spacing: .06em; font-family: var(--mono); }
+.hero h1 { font-size: 34px; line-height: 1.25; font-weight: 650; letter-spacing: -.01em; margin: 14px 0 16px; max-width: 720px; }
+.hero .lede { font-size: 16px; color: var(--muted); max-width: 640px; }
+.hero .lede b { color: var(--text); font-weight: 600; }
+.hero__meta { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
+.chip {
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  background: var(--sunken); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px;
+}
+
+/* ---- 章节 ---- */
+section { padding: 48px 0 8px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+.sec-num { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+h2 { font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
+.sec-sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; max-width: 680px; }
+h3 { font-size: 16px; font-weight: 600; margin: 32px 0 12px; }
+h3 .h3-tag { font-size: 11.5px; font-weight: 500; color: var(--faint); font-family: var(--mono); margin-left: 8px; }
+
+/* ---- 审计条目 ---- */
+.find { border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; background: var(--raised); }
+.find__t { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.find__t .sev { font-size: 10.5px; font-family: var(--mono); padding: 1px 7px; border-radius: 99px; }
+.sev--keep { color: var(--ok); background: rgba(46,158,91,.1); }
+.sev--fix { color: var(--warn); background: rgba(181,125,10,.1); }
+.sev--now { color: var(--danger); background: rgba(212,72,62,.09); }
+.find p { font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.find p b { color: var(--text); font-weight: 600; }
+.find .ev { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.find .ev code {
+  font-family: var(--mono); font-size: 11px; color: var(--faint);
+  background: var(--sunken); border-radius: 5px; padding: 2px 6px;
+}
+.verdict {
+  display: flex; gap: 10px; align-items: flex-start; background: var(--sunken);
+  border-left: 2px solid var(--accent); border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 20px 0;
+  font-size: 13.5px; color: var(--muted);
+}
+.verdict b { color: var(--text); }
+
+/* ---- 方案条目 ---- */
+.batch { margin-top: 28px; }
+.batch__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.batch__head h3 { margin: 0; }
+.batch__note { font-size: 12.5px; color: var(--faint); }
+.plan { border-top: 1px solid var(--border); margin-top: 12px; }
+.plan__row { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 12px; padding: 14px 4px; border-bottom: 1px solid var(--border); }
+.plan__no { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 3px; }
+.plan__body b { font-size: 14px; }
+.plan__body .do { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.plan__body .where { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; }
+.plan__body .where code { font-family: var(--mono); font-size: 11px; color: var(--faint); background: var(--sunken); padding: 2px 6px; border-radius: 5px; }
+.plan__body .why { font-size: 12.5px; color: var(--faint); margin-top: 7px; }
+.plan__body .why::before { content: "为什么 "; color: var(--accent); font-family: var(--mono); font-size: 10.5px; }
+.plan__skip { opacity: .62; }
+.plan__skip .plan__body b::after { content: "不做"; font-size: 10.5px; font-family: var(--mono); color: var(--muted); background: var(--sunken); border: 1px solid var(--border); padding: 1px 7px; border-radius: 99px; margin-left: 8px; vertical-align: 1px; }
+
+/* ============ 原型区 ============ */
+.mockbar { display: flex; align-items: center; gap: 14px; margin: 28px 0 14px; flex-wrap: wrap; }
+.mode-switch { display: inline-flex; background: var(--sunken); border: 1px solid var(--border); border-radius: 9px; padding: 2px; }
+.mode-switch button {
+  font: inherit; font-size: 12.5px; font-weight: 500; border: 0; background: transparent; color: var(--muted);
+  padding: 5px 14px; border-radius: 7px; cursor: pointer; transition: background var(--dur), color var(--dur);
+}
+.mode-switch button.on { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.07); }
+.mockbar .hint { font-size: 12.5px; color: var(--faint); }
+
+/* 窗口外壳 */
+.mock {
+  border: 1px solid var(--strong); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 24px 64px -24px rgba(22,22,26,.22), 0 4px 16px rgba(22,22,26,.06);
+  background: var(--bg); user-select: none;
+}
+.mock__win { display: grid; grid-template-rows: 40px minmax(0,1fr); height: 520px; }
+.mock__body { display: grid; min-height: 0; }
+
+/* 列宽动画：现状 200ms ease 硬滑；方案 340ms 等感曲线（前段快后段沉，双向一致） */
+.mock__body { grid-template-columns: 208px minmax(0,1fr); }
+.mock[data-mode="before"] .mock__body { transition: grid-template-columns 200ms ease; }
+.mock[data-mode="after"]  .mock__body { transition: grid-template-columns 420ms cubic-bezier(.3,.8,.25,1); }
+.mock__body.norail { grid-template-columns: 0px minmax(0,1fr); }
+
+/* 侧栏内容：现状硬切（瞬间消失）；方案交叉淡化——收起 150ms 同起拍，展开延迟 90ms 再淡入 */
+.mside { background: var(--sunken); border-right: 1px solid var(--strong); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.mock[data-mode="before"] .mside__in { transition: none; }
+.mock[data-mode="after"]  .mside__in { transition: opacity 180ms ease 90ms; }
+.mock__body.norail .mside { border-right-color: transparent; }
+.mock[data-mode="before"] .mock__body.norail .mside__in { opacity: 0; visibility: hidden; }
+.mock[data-mode="after"]  .mock__body.norail .mside__in { opacity: 0; transition: opacity 150ms ease; }
+.mside__in { width: 208px; display: flex; flex-direction: column; height: 100%; }
+
+.mside__brand { padding: 10px 12px 8px; font-size: 13px; font-weight: 600; }
+.mside__brand small { font-weight: 400; color: var(--faint); font-size: 11px; margin-left: 4px; }
+.mside__new {
+  display: flex; align-items: center; gap: 6px; margin: 0 8px 6px; padding: 0 10px; height: 28px;
+  background: var(--bg); border: 1px solid var(--strong); border-radius: 7px;
+  font-size: 12px; font-weight: 500; cursor: pointer; color: var(--text); transition: background var(--dur);
+}
+.mside__new:hover { background: var(--raised); }
+.mside__new svg { color: var(--muted); }
+.mside__search {
+  display: flex; align-items: center; gap: 6px; margin: 0 8px 8px; padding: 0 10px; height: 26px;
+  border: 1px solid var(--border); border-radius: 7px; color: var(--faint); font-size: 11.5px; background: var(--bg);
+}
+.mside__list { flex: 1; overflow: hidden; padding-bottom: 10px; }
+.msec { padding: 12px 12px 2px 24px; font-size: 11px; color: var(--faint); display: flex; justify-content: space-between; align-items: center; }
+.msec .msec__act { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; opacity: 0; transition: opacity var(--dur); }
+.msec:hover .msec__act { opacity: 1; }
+.mrow {
+  position: relative; display: flex; align-items: center; gap: 0; height: 28px; margin: 0 8px; border-radius: 6px;
+  font-size: 12.5px; color: var(--muted); cursor: pointer; transition: background var(--dur), color var(--dur);
+}
+.mrow:hover { background: rgba(22,22,26,.045); color: var(--text); }
+.mrow--sel { background: rgba(22,22,26,.07); color: var(--text); font-weight: 500; }
+.mrow__slot { width: 24px; flex: none; display: grid; place-items: center; }
+.mrow__label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrow__time { font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; padding-right: 8px; }
+.mrow__act {
+  position: absolute; right: 4px; width: 20px; height: 20px; display: grid; place-items: center;
+  border-radius: 5px; opacity: 0; transition: opacity var(--dur), background var(--dur); color: var(--muted);
+}
+.mrow:hover .mrow__act { opacity: 1; }
+.mrow:hover .mrow__time { opacity: 0; }
+.mrow__act:hover { background: rgba(22,22,26,.08); color: var(--text); }
+.mrow--child .mrow__slot { margin-left: 20px; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: #b6b6be; }
+.dot--run { background: var(--ok); animation: breathe 1.8s ease-in-out infinite; }
+.dot--wait { background: var(--warn); }
+@keyframes breathe { 50% { opacity: .35; } }
+.mside__foot { border-top: 1px solid var(--border); padding: 5px 8px; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); }
+.avatar { width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg,#7d9bd6,#3b6fd4); flex: none; }
+
+/* 顶栏 */
+.mtop { display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: 1px solid var(--strong); background: var(--bg); }
+.mtop .traffic { display: flex; gap: 6px; margin-right: 8px; }
+.mtop .traffic i { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+.mtop .traffic i:first-child { background: #f06a5d; } .mtop .traffic i:nth-child(2) { background: #f5bf4f; } .mtop .traffic i:nth-child(3) { background: #61c454; }
+.mbtn {
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; border: 0; background: transparent;
+  color: var(--muted); cursor: pointer; transition: background var(--dur), color var(--dur); position: relative;
+}
+.mbtn:hover { background: rgba(22,22,26,.06); color: var(--text); }
+.mbtn:active { background: rgba(22,22,26,.1); }
+.mtop__title { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; margin: 0 auto 0 6px; color: var(--text); cursor: pointer; }
+.mtop__title svg { color: var(--faint); }
+
+/* 会话区 */
+.mconv { overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.mtrans { flex: 1; overflow-y: auto; padding: 18px 20px 12px; }
+.mcol { max-width: 460px; margin: 0 auto; }
+.mturn { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 6px; font-size: 10.5px; color: var(--faint); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.mturn svg { color: var(--faint); }
+.mmsg-u {
+  margin: 12px 0 12px auto; max-width: 74%; background: rgba(22,22,26,.04); border-radius: 13px 13px 6px 13px;
+  padding: 7px 12px; font-size: 12.5px; line-height: 1.65; width: fit-content;
+}
+.mmsg-a { font-size: 12.5px; line-height: 1.75; color: var(--text); }
+.mmsg-a p { margin-bottom: 10px; }
+.mmsg-a code.inl { font-family: var(--mono); font-size: .92em; background: var(--sunken); padding: 1px 4px; border-radius: 4px; }
+.mthink {
+  display: flex; align-items: center; gap: 6px; height: 24px; font-size: 11.5px; color: var(--faint);
+  cursor: pointer; margin: 2px 0;
+}
+.mthink .ticker { white-space: nowrap; overflow: hidden; position: relative; flex: 1; }
+.mthink .ticker::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 26px; background: linear-gradient(90deg, transparent, var(--bg)); }
+.mstep { display: flex; align-items: center; gap: 7px; height: 24px; font-size: 11.5px; color: var(--muted); cursor: pointer; }
+.mstep svg { color: var(--faint); flex: none; }
+.mstep .cmd { font-family: var(--mono); font-size: 11px; }
+.mstep .ok { color: var(--faint); }
+.mcode { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 10px 0 12px; }
+.mcode__bar { display: flex; align-items: center; height: 24px; padding: 0 6px 0 10px; background: var(--sunken); font-size: 10px; color: var(--faint); font-family: var(--mono); }
+.mcode__bar .mbtn { width: 20px; height: 20px; margin-left: auto; }
+.mcode pre { font-family: var(--mono); font-size: 11px; line-height: 1.6; padding: 8px 12px; background: var(--sunken); background: rgba(22,22,26,.028); color: var(--text); overflow: hidden; }
+.mcode pre .k { color: #8a4fb8; } .mcode pre .s { color: #2e7d46; } .mcode pre .f { color: #2058c8; }
+
+/* 消息动作条：两种形制，由 data-mode 决定显示哪套 */
+.macts { display: flex; gap: 4px; margin: 4px 0 10px; opacity: 0; transition: opacity var(--dur); }
+.mmsgwrap:hover .macts, .mmsgwrap--u:hover .macts { opacity: 1; }
+.mmsgwrap--u .macts { justify-content: flex-end; }
+/* 现状：图标+文字药丸 */
+.act-pill {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted);
+  border: 1px solid transparent; background: transparent; border-radius: 99px; padding: 3px 10px; cursor: pointer;
+  transition: background var(--dur), border-color var(--dur), color var(--dur);
+}
+.mmsgwrap:hover .act-pill { border-color: var(--border); }
+.act-pill:hover { background: var(--sunken); color: var(--text); }
+.mock[data-mode="after"] .act-pill { display: none; }
+/* 方案：纯图标方钮 */
+.act-ico {
+  display: none; width: 22px; height: 22px; place-items: center; border: 0; border-radius: 6px;
+  background: transparent; color: var(--faint); cursor: pointer; transition: background var(--dur), color var(--dur);
+}
+.act-ico:hover { background: rgba(22,22,26,.06); color: var(--text); }
+.mock[data-mode="after"] .act-ico { display: grid; }
+
+/* 输入框 */
+.mcomp { padding: 8px 20px 16px; }
+.mcomp__in { max-width: 460px; margin: 0 auto; border: 1px solid var(--strong); border-radius: 13px; padding: 9px 12px 7px; box-shadow: 0 1px 3px rgba(22,22,26,.05); }
+.mcomp__ta { font-size: 12.5px; color: var(--faint); min-height: 20px; }
+.mcomp__bar { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+.mtrig { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 99px; padding: 2.5px 9px; cursor: pointer; }
+.mtrig:hover { background: var(--sunken); }
+.msend { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--text); color: #fff; display: grid; place-items: center; cursor: pointer; transition: opacity var(--dur); }
+.msend:hover { opacity: .86; }
+
+/* 工作台页签演示条 */
+.tabsdemo { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tabsdemo__clip { max-width: 168px; overflow: hidden; border-bottom: 1px solid var(--border); }
+.tabsdemo__tabs { display: flex; gap: 2px; padding: 6px; background: var(--sunken); }
+.tabsdemo__tabs button {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 11.5px;
+  border: 0; background: transparent; color: var(--muted); padding: 3px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.tabsdemo__tabs button .x { font-style: normal; color: var(--faint); font-size: 11px; }
+.tabsdemo__tabs button.on { background: var(--bg); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+/* 方案：窄态图标化（名字进 tooltip）+ 横向滚轮兜底；现状：overflow 裁断，第三枚的 × 掉出可视区 */
+.mock[data-mode="after"] .tabsdemo__tabs .lbl { display: none; }
+.mock[data-mode="after"] .tabsdemo__clip { overflow-x: auto; scrollbar-width: none; }
+.tabsdemo__pane { height: 88px; padding: 12px 16px; font-size: 12px; color: var(--muted); }
+.mock[data-mode="after"] .tabsdemo__pane { animation: panein 200ms ease; }
+@keyframes panein { from { opacity: 0; transform: translateX(8px); } }
+
+/* ---- 二轮追加：轮次折叠演示 ---- */
+.mturn svg { transition: transform 120ms ease; transform: rotate(90deg); }
+.mock.folded .mturn svg { transform: rotate(0); }
+.mturn .fold-hint { display: none; }
+.mock[data-mode="after"].folded .mturn .fold-hint { display: inline; }
+/* 现状折叠：只藏工具行和思考；方案折叠：中间叙述一起收，只留提问 + 最终回答 */
+.mock[data-mode="before"].folded .mf-hide-b { display: none; }
+.mock[data-mode="after"].folded .mf-hide-b,
+.mock[data-mode="after"].folded .mf-hide-a { display: none; }
+
+/* ---- 终版：组头去图标列（chevron 收起不画），子行状态点保留 ---- */
+.mock[data-mode="after"] .mrow--group .mrow__slot svg { display: none; }
+/* 状态点始终在行首：绿在跑 / 黄待批——两个模式不再有别 */
+.mrow__state { display: none; }
+
+/* tooltip：方案=深色自绘 380ms，现状=仿系统 850ms */
+.mtip {
+  position: fixed; z-index: 99; pointer-events: none; font-size: 11px; padding: 4px 9px; border-radius: 6px;
+  white-space: nowrap; opacity: 0; transform: translateY(2px); transition: opacity 100ms ease, transform 100ms ease;
+}
+.mtip.show { opacity: 1; transform: translateY(0); }
+.mtip--dark { background: #23232a; color: #ececf0; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.mtip--sys { background: #ffffe0; color: #333; border: 1px solid #d8d8c0; box-shadow: 0 2px 8px rgba(0,0,0,.12); font-family: -apple-system, sans-serif; }
+
+/* 比稿条 */
+.vs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0 6px; }
+.vs__cell { border: 1px solid var(--border); border-radius: 10px; padding: 18px; background: var(--raised); }
+.vs__cell .vs__cap { font-size: 11px; font-family: var(--mono); color: var(--faint); margin-bottom: 14px; }
+.vs__cell .vs__cap b { color: var(--text); font-weight: 600; }
+.vs__row { display: flex; gap: 6px; align-items: center; min-height: 30px; }
+.vs__note { font-size: 11.5px; color: var(--faint); margin-top: 12px; }
+
+/* 拍板 */
+.decide { border: 1px solid var(--border); border-left: 2px solid var(--warn); border-radius: 0 10px 10px 0; padding: 14px 18px; margin-bottom: 10px; background: var(--raised); }
+.decide b { font-size: 13.5px; }
+.decide p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.decide .opts { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.decide .opts span { font-size: 11.5px; border: 1px solid var(--border); border-radius: 99px; padding: 2px 10px; color: var(--muted); }
+
+footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--faint); }
+code.px { font-family: var(--mono); font-size: .92em; background: var(--sunken); padding: 1px 5px; border-radius: 4px; }
+
+@media (max-width: 860px) {
+  .page { grid-template-columns: 1fr; }
+  .nav { display: none; }
+  .main { padding: 0 20px 80px; }
+  .vs { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<nav class="nav">
+  <div class="nav__brand">omni<small>UI 审计与优化方案</small></div>
+  <a href="#audit">01 · 审计结论</a>
+  <a href="#audit-sidebar" style="padding-left:22px">侧栏排版</a>
+  <a href="#audit-type" style="padding-left:22px">会话字体</a>
+  <a href="#audit-motion" style="padding-left:22px">动效丝滑度</a>
+  <a href="#audit-icon" style="padding-left:22px">图标哲学</a>
+  <a href="#audit-fold" style="padding-left:22px">轮次折叠</a>
+  <a href="#plan">02 · 优化方案</a>
+  <a href="#proto">03 · 交互原型</a>
+  <a href="#decide">04 · 拍板记录</a>
+  <div class="nav__sep"></div>
+  <a href="UI细节优化计划.md" style="font-size:11.5px">↳ 上一版计划（36 条，已落地）</a>
+</nav>
+
+<main class="main">
+
+<header class="hero">
+  <div class="eyebrow">UI AUDIT &amp; PROPOSAL · 2026-08-27</div>
+  <h1>不缺设计，缺收尾——<br>把已经立好的规矩执行完。</h1>
+  <p class="lede">
+    审计结论一句话：omni 的设计骨架（<b>--sb-* 对齐体系、笔画补偿图标、全局 120ms 颜色过渡、自绘 tooltip 层</b>）都已经在了，
+    而且是对的。真正的问题是<b>三处没收尾</b>：按钮上的原生 <code class="px">title</code> 没迁完、
+    面板切换的一半动画没接上、消息动作还停在「图标+文字药丸」的旧形制。
+    这份方案只做收尾和收敛，不推翻任何已写明的决定。
+    <b>2026-08-27 二轮更新</b>：作者拍板后追加 P14–P16（页签窄态 / 子行平移 / 轮次折叠扩范围），三条拍板定案见 §04。
+  </p>
+  <div class="hero__meta">
+    <span class="chip">基线 main @ 工作区现状</span>
+    <span class="chip">样式 12,347 行 / 38 个 css</span>
+    <span class="chip">组件 ~150 个</span>
+    <span class="chip">图标 43 枚 · 全部走 Svg 笔画补偿</span>
+  </div>
+</header>
+
+<!-- ==================== 01 审计 ==================== -->
+<section id="audit">
+  <div class="sec-head"><span class="sec-num">01</span><h2>审计结论</h2></div>
+  <p class="sec-sub">按你点名的四个主题。每条都对着代码核过，证据是 file:line。标 <b style="color:var(--ok)">保持</b> 的是判过「现状即正确、不要动」的——它们和要修的一样重要。</p>
+
+  <h3 id="audit-sidebar">侧栏排版<span class="h3-tag">--sb-pad 8 · --sb-slot 24 · --sb-row-h 34 · --sb-act 22</span></h3>
+
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>两列对齐体系已经是结构性的，不只是视觉</div>
+    <p>图标落 24px 第一列、文字从 32px 起、所有行高钉死 34px、呼吸挂在分节 margin 上——这套由四个 <code class="px">--sb-*</code> 变量保证，且注释里写着「要加新东西用这两个变量，不要再写第三个 padding」。<b>不要重排，只需补残缺。</b></p>
+    <div class="ev"><code>app-foundation.css:411-420</code><code>Sidebar.tsx:19-37</code><code>tokens.css:276 --sidebar-w: 264px</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收尾</span>tooltip 三轨并行：data-tip / 原生 title / RowPeek</div>
+    <p>自绘 <code class="px">TipLayer</code>（380ms、深色牌）已有 ~30 处，但按钮上仍残留原生 <code class="px">title</code>（系统黄条、850ms+ 才出、截图拍不到）。<b>同是行尾方钮，「更多操作」走 data-tip，「确认删除」却走 title</b>——形制不一致就发生在同一行上。RowPeek 悬停卡是会话行专用，定位正确，不动。</p>
+    <div class="ev"><code>tips.tsx:7-25（弃用 title 的三条理由）</code><code>RowActions.tsx:27 确认=title</code><code>RowActions.tsx:40 更多=data-tip</code><code>SidebarGroupActions.tsx:20,31</code><code>SidebarSections.tsx:69</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收敛</span>子会话行缩进 56px：图标列在子行里只是占位</div>
+    <p>项目内会话行的状态点被 <code class="px">margin-left: 24px</code> 推到第二列，文字从 <b>56px</b> 才开始——264px 的侧栏里标题只剩 ~180px。Codex 的做法是子行<b>没有图标列</b>，文字直接对齐项目名那一列（32px），状态用行尾说。平移 24px ≈ 14px 字号下<b>多装 3 个汉字</b>，长标题被截的场景直接少一半。「哪个会话在跑」的信号不丢：运行中转圈、待批黄字本来就在行尾，圆点挪过去和时间并排即可。</p>
+    <div class="ev"><code>app-sidebar.css:144-146</code><code>SidebarRows.tsx:178-220</code><code>RowEnd.tsx:31-93</code><code>参照：Codex 桌面版侧栏（作者截图）</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收敛</span>侧栏头部信息层级：品牌 + 主 CTA + 文件夹 + 搜索四层高</div>
+    <p>「新建会话」是 34px 高、图标+文字+落点附注三段的大按钮，右侧再挂一颗 34×34 文件夹方钮。<b>主 CTA 保持图标+文字是对的</b>（它是入口不是动作），但落点附注（max-width 84px 的 11.5px 灰字）与按钮主文案争抢，可以收敛成 tooltip。</p>
+    <div class="ev"><code>SidebarHead.tsx:55-79</code><code>app-foundation.css:446-524</code></div>
+  </div>
+
+  <h3 id="audit-type">会话字体<span class="h3-tag">正文 15/26 · 代码 12.5 · UI 11.5/13/14/16 · 空态 27</span></h3>
+
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>字号阶梯干净，且「次要交给颜色不交给字号」被遵守了</div>
+    <p>六档阶梯 + 正文专用档 <code class="px">--text-prose: 15px / 26px</code>，注释直接写了「要读的是 13，扫一眼的是 11.5」。正文 15px 比 body 14px 大一档——对话是被读的东西，这个倒挂是刻意的、对的。<b>字号体系一处不动。</b></p>
+    <div class="ev"><code>tokens.css:201-234</code><code>items-activity.css:19-27, 69-73</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--now">现在就在发生</span>等宽 + 中文混排：mono 栈里没有 CJK 字形</div>
+    <p><code class="px">--font-mono</code> 链（ui-monospace / SF Mono / JetBrains Mono / Menlo）不含中文，「执行 <code class="px">rm -rf</code>」这类审批卡、命令行里的中文会兜底到 PingFang，<b>和英文等宽拼在同一行、基线还差一点</b>。这是目前会话区唯一真实存在的字体破绽，上一版第 18 条已留过退路（别扭就退 13px+500），但没解混排本身。</p>
+    <div class="ev"><code>tokens.css:171</code><code>items.css:177-181 审批卡</code><code>docs/UI细节优化计划.md 第 18 条</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>思考块比正文小两档淡一档，是刻意层级，不是疏忽</div>
+    <p>思考 13px/--text-muted、正式回答 15px/--text。「过程 vs 结论」的层级靠这个拉开。之前审计已确认，不翻案。</p>
+    <div class="ev"><code>items-turns.css:47-155</code></div>
+  </div>
+
+  <h3 id="audit-motion">动效丝滑度<span class="h3-tag">--dur-fast 70 · --dur 120 · --dur-slow 240 · --dur-bar 320</span></h3>
+
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>骨架在：grid 列宽动画 + 全局颜色兜底 + reduce 全覆盖</div>
+    <p>侧栏/工作台开关靠 <code class="px">grid-template-columns</code> 过渡（Chromium 107+ 可动画），67 处「啪的一下」已被一条全局颜色过渡兜底，25+ 个 <code class="px">prefers-reduced-motion</code> 块覆盖全部 keyframes。<b>底子比绝大多数 Electron 应用好。</b></p>
+    <div class="ev"><code>app-foundation.css:318, 225-248</code><code>tokens.css:153-157</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收尾</span>侧栏收放：列宽滑了，但内容是「硬切」消失的</div>
+    <p>列宽 200ms 滑动的同时，<code class="px">.sidebar</code> 直接 <code class="px">visibility: hidden</code>——内容瞬间消失、空列再滑走，视觉上像「先凭空蒸发、再收抽屉」。另外 200ms 起步快、停得急，<b>开关缺乏厚重感</b>（作者反馈：要慢慢的、舒服的、双向一致）。规格见 P3：340ms 等感曲线 + 交叉淡化。下方原型可以亲手对比。</p>
+    <div class="ev"><code>app-foundation.css:349-363</code><code>app-foundation.css:318（写死 200ms）</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收尾</span>工作台页签内切换是瞬切，与外壳的 200ms 滑动反差明显</div>
+    <p>面板开/关有 <code class="px">panel-in</code> 200ms 入场，但「审查 / 文件 / 活动」三个页签之间是 <code class="px">hidden</code> 直接切——同一扇面板，开合丝滑、换页生硬的对比就摆在旁边。</p>
+    <div class="ev"><code>WorkbenchPane.tsx:37,41</code><code>workbench.css:25-28</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>popover 无退场动画，是写明了的决定</div>
+    <p>「避免关闭中间态」——退场要引一份「正在关闭」状态，和 close() 打架。不翻案。</p>
+    <div class="ev"><code>popover.css:83-85</code></div>
+  </div>
+
+  <h3 id="audit-icon">图标设计哲学<span class="h3-tag">43 枚 · 笔画恒 1.25px · check-icons.mjs 强制</span></h3>
+
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>图标体系本身已经是你要的哲学</div>
+    <p>统一 16 视口、笔画按尺寸反补偿恒 1.25px、lint 脚本收回过 8 处自绘。<b>「复制」「发送」「更多」这些高频动作本来就全是纯图标。</b>要改的不是图标，是还穿着「图标+文字」旧形制的几个残留。</p>
+    <div class="ev"><code>icon-base.tsx:28-79</code><code>scripts/check-icons.mjs</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收敛</span>消息动作条还是药丸：CopyIcon + 「复制」两个字</div>
+    <p>每条回答下面 hover 浮现「⧉ 复制」「✎ 改一改再发」「↺ 从这里重来」三颗描边药丸。<b>复制是图形语义全球最稳的图标之一</b>，文字是噪音；而且药丸的描边+圆角在 15px 正文流里视觉重量过大。同仓库的代码块复制、改动行复制早就是 24×24 纯图标了——会话区是自己落后的那一处。</p>
+    <div class="ev"><code>Copyable.tsx:61-71</code><code>items-composer.css:484-527</code><code>对照 markdown.css:160-185 / changed.css:163-182</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--fix">收敛</span>「N 处改动 · 审一遍」把信息和动作缝在了一颗胶囊上</div>
+    <p>「N 处改动」是状态（该留着读），「审一遍」是动作（可以是图标）。拆开后动作位交给纯图标 + tooltip（顺带把 ⇧⌘R 快捷键从 title 搬进 data-tip）。</p>
+    <div class="ev"><code>TurnEdits.tsx:52-54</code><code>changed.css:59-75</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--keep">保持</span>明确不图标化的清单（防止误改）</div>
+    <p><b>选择器</b>（引擎/信任档/模型——文字是当前值本身）、<b>新建会话</b>（主 CTA）、<b>审批卡按钮</b>（「整个产品最关键的界面」，文字必须直白）、<b>右键菜单项</b>（菜单需要文字，图标只是助记）。这些保留图标+文字。</p>
+    <div class="ev"><code>ComposerBar.tsx:69,107</code><code>Approval.tsx</code><code>SidebarMenus.tsx</code></div>
+  </div>
+  <div class="find">
+    <div class="find__t"><span class="sev sev--now">现在就在发生</span>面板页签一窄就裁烂：关闭钮整个掉出可视区</div>
+    <p><code class="px">.panel-tabs__list</code> 是 <code class="px">overflow: hidden</code>，工作台压到 300px（≤1280px 窗口）时三个「图标+文字」页签排不下，<b>最后一枚被从中裁断，它的 × 落在裁切区外点不到</b>（作者截图实证）。不换行是对的；解法是窄态图标化（三枚页签本来就有 13px 图标，名字让位给 data-tip）+ 横向滚轮兜底。</p>
+    <div class="ev"><code>panel-tabs.css:15-21</code><code>PanelTabs.tsx:40-48</code><code>tokens.css:278 --workbench-w</code></div>
+  </div>
+
+  <h3 id="audit-fold">轮次折叠<span class="h3-tag">foldTurns · group.ts</span></h3>
+
+  <div class="find">
+    <div class="find__t"><span class="sev sev--now">现在就在发生</span>折起来的只有工具行和思考，中间叙述文字全摊在原地</div>
+    <p>非当前轮默认折叠（Transcript.tsx:86），但 <code class="px">foldTurns</code> 只过滤 <code class="px">run</code>（工具组）和 <code class="px">reasoning</code>——agent 边干边说的中间段落全都还摊着。<b>作者的预期：折完之后只剩提问和最终回答</b>（改动卡保留——它是这一轮最薄的那张账）。长会话里中间过程占的位置超过七成，折叠因此名存实亡。</p>
+    <div class="ev"><code>group.ts:142-151</code><code>Transcript.tsx:80-94</code><code>fold.test.ts</code></div>
+  </div>
+</section>
+
+<!-- ==================== 02 方案 ==================== -->
+<section id="plan">
+  <div class="sec-head"><span class="sec-num">02</span><h2>优化方案</h2></div>
+  <p class="sec-sub">三批，按风险排。第一批全是机械替换，可以一次合；第二批改形制，逐条出图比稿；第三批要真机验证。每条都给了「动哪儿」。</p>
+
+  <div class="batch">
+    <div class="batch__head"><h3>第一批 · 收尾（机械替换，无回归风险）</h3><span class="batch__note">建议一个 PR 合完</span></div>
+    <div class="plan">
+      <div class="plan__row"><div class="plan__no">P1</div><div class="plan__body">
+        <b>按钮上的原生 title 全部迁 data-tip（6 处）</b>
+        <div class="do">文本截断类的 title（路径、长标签）保留——那是给截断内容兜底读的；按钮上的 6 处换成 data-tip，顺带统一写法「动作名（快捷键）」。</div>
+        <div class="where"><code>TopBarActions.tsx:42</code><code>RowActions.tsx:27</code><code>SidebarSections.tsx:69</code><code>PanelTabs.tsx:52</code><code>Select.tsx:90</code><code>ReviewTools.tsx:14</code></div>
+        <div class="why">同一行上「更多操作」是 380ms 深色牌、「确认删除」是 850ms 系统黄条——tooltip 双轨的最后一个不一致点。tips.tsx:7-25 弃用 title 的三条理由（慢/不像本应用/截图拍不到）对按钮全部成立。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P2</div><div class="plan__body">
+        <b>shell 列宽 200ms 写死 → 并入 P3</b>
+        <div class="do">原案是换成 <code class="px">--dur-slow</code>(240ms)；作者拍板「要慢、要厚重」后被 P3 吸收——侧栏收放走 340ms 编排值，这条只剩「删掉写死的 200ms」。</div>
+        <div class="where"><code>app-foundation.css:318</code></div>
+        <div class="why">全仓唯一一条写死时长的布局过渡。修订记录留在这里，免得下次有人按原案又迁回 240ms。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P3</div><div class="plan__body">
+        <b>侧栏收放：等感曲线 + 交叉淡化，双向一致<span style="font-size:10.5px;font-family:var(--mono);color:var(--faint)">（落地时修订为 420ms，见 §04 追记）</span></b>
+        <div class="do">列宽过渡 200ms → <code class="px">340ms cubic-bezier(.3,.8,.25,1)</code>（写死编排值 + 注释，与 effort 滑块「编排不走 token」同一先例；<code class="px">--dur-slow</code> 不动）。<b>收起与展开同一条曲线反向播放</b>。内容：收起时 150ms 淡出（与列宽同起拍）；展开时列宽先动、内容延迟 90ms 再 180ms 淡入。visibility 切换用 transition-delay 挂在淡出之后，「0 宽下还能 Tab 进去」那个已修过的坑不复发。reduce 块照旧整条关掉。</div>
+        <div class="where"><code>app-foundation.css:318, 349-363</code><code>panel-layout.ts:8-10</code></div>
+        <div class="why">作者原话：「慢慢的展开推出来，舒服的速度，双向一致，要有厚重感」。200ms ease 像没重量的滑片；340ms + 前段快后段沉的曲线才是抽屉被推着走。原型「方案」档已按此调校。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P4</div><div class="plan__body">
+        <b>工作台页签切换接 panel-in</b>
+        <div class="do">两个 <code class="px">.workbench__page</code> 从 hidden 瞬切改为复用 panel-in 200ms（opacity + translateX 8px，幅度比面板入场的 12px 小一档——同容器内换内容，位移该更轻）。</div>
+        <div class="where"><code>WorkbenchPane.tsx:37,41</code><code>workbench.css:25-28</code></div>
+        <div class="why">同一扇面板，开/合有动画、换页瞬切，反差就摆在旁边。下方原型有对照演示。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P5</div><div class="plan__body">
+        <b>清死代码与说谎的注释（3 处）</b>
+        <div class="do">删 <code class="px">.turnstatus__stop</code> 死 CSS；Copyable.tsx:20 注释「并且常驻」改成 hover 才现（CSS 早就改了）；transcript-row.tsx:67-69 注释「人话不挂」与实现（每条用户消息都挂了复制）对齐。</div>
+        <div class="where"><code>status.css:99-123</code><code>Copyable.tsx:20</code><code>transcript-row.tsx:67-69</code></div>
+        <div class="why">这个仓库把注释当决策记录用，说谎的注释比没注释贵。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P14</div><div class="plan__body">
+        <b>面板页签条窄态：图标化 + 横向滚轮兜底，不换行<span style="font-size:10.5px;font-family:var(--mono);color:var(--faint)">（二轮追加）</span></b>
+        <div class="do">页签条加容器查询：面板窄于约 200px 时 <code class="px">.panel-tab__pick span</span> 让位（三枚页签本来就有 13px 图标，名字进 data-tip）；同时 <code class="px">overflow: hidden</code> 改 <code class="px">overflow-x: auto</code> + 滚轮转横向 + 两端渐隐。关闭钮 <code class="px">flex: none</code> 已在，保证任何宽度下点得到。</div>
+        <div class="where"><code>panel-tabs.css:15-21, 54-65</code><code>PanelTabs.tsx:40-48</code></div>
+        <div class="why">现状是 overflow:hidden 直接裁断，最后一枚页签的 × 掉出可视区（作者截图实证）。图标化与 P6 同一哲学；滚轮只兜底「图标化后还排不下」的极端窄，不是主交互。</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="batch">
+    <div class="batch__head"><h3>第二批 · 形制收敛（改视觉，逐条出图比稿）</h3><span class="batch__note">对应「图标哲学」</span></div>
+    <div class="plan">
+      <div class="plan__row"><div class="plan__no">P6</div><div class="plan__body">
+        <b>消息动作条：图标+文字药丸 → 22×22 纯图标 + data-tip</b>
+        <div class="do">复制 / 改一改再发 / 从这里重来 三颗药丸换成图标方钮，形制对齐已有的 changed__act 族（14px 图标、hover 行才现、hover 底色反馈）。tooltip 写「复制」「改一改再发（⌘E）」「从这里重来」。「已复制」对号反馈 1200ms 保留。</div>
+        <div class="where"><code>Copyable.tsx:61-71</code><code>transcript-row.tsx:176-187, 224-233</code><code>items-composer.css:484-527</code></div>
+        <div class="why">复制的图形语义不需要文字；药丸描边在 15px 正文流里重量过大。下方 §03 有比稿，这条是整份方案里视觉变化最大的一处，先比稿再合。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P7</div><div class="plan__body">
+        <b>「N 处改动 · 审一遍」拆开：信息留文字，动作变图标</b>
+        <div class="do">「N 处改动」保留为 11.5px 文字徽注（它是状态）；「审一遍」变纯图标（LinesIcon 或 CompareIcon）+ data-tip「审一遍（⇧⌘R）」。</div>
+        <div class="where"><code>TurnEdits.tsx:52-54</code><code>changed.css:59-75</code></div>
+        <div class="why">信息和动作缝在一颗胶囊上，读的时候找动作、点的时候被文字干扰。拆开各归各位。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P8</div><div class="plan__body">
+        <b>侧栏「新建会话」的落点附注收进 tooltip</b>
+        <div class="do">按钮上 11.5px 的落点灰字（「项目名 / 对话 / 选文件夹…」三段轮显）从按钮里拿掉，落点信息并入按钮的 title→data-tip：「新建会话 —— 落在 {当前项目}」。按钮本体回到 PlusIcon + 「新建会话」两段。</div>
+        <div class="where"><code>SidebarHead.tsx:55-69</code><code>app-foundation.css:446-524</code></div>
+        <div class="why">主 CTA 保持图标+文字不变；拿掉的是和主文案争抢的第三段灰字。这是收敛，不是重设计。</div>
+      </div></div>
+      <div class="plan__row plan__skip"><div class="plan__no">P9</div><div class="plan__body">
+        <b>选择器 / 审批卡 / 菜单 / 主 CTA 图标化</b>
+        <div class="do">引擎、信任档、模型选择器的文字就是当前值；审批是「整个产品最关键的界面」，文字必须直白；菜单项需要文字。全部保持图标+文字，并把这条写进 icon-base.tsx 的注释，防止以后有人「顺手统一」。</div>
+        <div class="why">图标化的判据是「图形语义是否自足」。齿轮=设置、⧉=复制自足；「codex」「gpt-5 高」没有图形可替。</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="batch">
+    <div class="batch__head"><h3>第三批 · 字体精修（要真机/样张验证）</h3><span class="batch__note">对应「会话字体」</span></div>
+    <div class="plan">
+      <div class="plan__row"><div class="plan__no">P10</div><div class="plan__body">
+        <b>mono 栈补 CJK 落点，解等宽+中文同行混排</b>
+        <div class="do"><code class="px">--font-mono</code> 链尾（monospace 之前）插 <code class="px">"PingFang SC"</code>，让中文兜底走 PingFang 而不是随机落到系统 serif；同时按上一版第 18 条的样张法出四张图（浅/深 × 命令/路径），验证基线差。</div>
+        <div class="where"><code>tokens.css:171</code></div>
+        <div class="why">审批卡「执行 rm -rf ./build」这种「整句中文常驻等宽」的场景上一版已落地，混排是它唯一没解的尾巴。不动阶梯，只动兜底顺序。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P11</div><div class="plan__body">
+        <b>正文 15/26 的中文密度真机复核</b>
+        <div class="do">PingFang SC 在 15px/26px 下的字面率比拉丁大，找两段真实的长中文回答在 Retina 和非 Retina 各看一眼；如果偏挤，备选是行高 26→27（偶数变奇数要重验 2x 屏栅格化，tokens.css 注释里有这条约束）。</div>
+        <div class="where"><code>tokens.css:231-232</code><code>items-activity.css:19-27</code></div>
+        <div class="why">阶梯本身不动；这是唯一一个「数值可能对、但没在真机上见过中文长文」的档位。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P12</div><div class="plan__body">
+        <b>RailToggle 图标加状态形变</b>
+        <div class="do">RailIcon 的两条竖线做 120ms 的间距形变（开=展开、合=并拢），让顶栏最左这颗每天点几十次的键有「它听懂了」的反馈，而不只是面板在旁边动。</div>
+        <div class="where"><code>icons-panel.tsx（RailIcon）</code><code>TopBar.tsx:77-90</code><code>app-main.css:95-122</code></div>
+        <div class="why">按下态仓库已有 --bg-press 兜底，但侧栏开关是「切换」不是「动作」，aria-pressed 已具备，缺的只是图形的两态。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P15</div><div class="plan__body">
+        <b>组头去图标列（chevron + 默认文件夹），子行状态点保留<span style="font-size:10.5px;font-family:var(--mono);color:var(--faint)">（终版 · 作者两轮纠偏）</span></b>
+        <div class="do">撤的是<b>组头行</b>的展开箭头和文件夹图标（红圈部分）：项目名文字落 32px 与分节标题同列，用户设的 emoji 图标保留。子会话行的<b>行首状态点常驻</b>——绿在跑 / 黄待批 / 红失败 / 亮未读，点列缩进一级、文字落 56px（对齐组头文字再深一级）。折叠态的组头靠行尾条数 + 待批/转圈/未读点兜底。</div>
+        <div class="where"><code>SidebarGroup.tsx</code><code>SidebarRows.tsx</code><code>RowEnd.tsx</code><code>app-sidebar.css:142-149</code></div>
+        <div class="why">初版误读成「撤子行的状态点列」——作者红圈指的是组头的两列图标；Codex 参照图里会话行的状态（转圈、蓝点）一直都在，只是不在行首图标列的位置感上。状态是「这行现在怎么样」的常驻信号，不能拿。</div>
+      </div></div>
+      <div class="plan__row"><div class="plan__no">P16</div><div class="plan__body">
+        <b>轮次折叠扩到中间叙述：折完只剩提问 + 最终回答<span style="font-size:10.5px;font-family:var(--mono);color:var(--faint)">（二轮追加）</span></b>
+        <div class="do"><code class="px">foldTurns</code> 在现有 run / reasoning 之外，再把该轮「非最后一条」的 agent 文本折进去。保留清单：用户提问（它是轮表头）、最后一条完整回答、改动卡、报错。fold.test.ts 补表驱动 case：多段叙述 + 工具穿插 + 轮内报错的长轮。</div>
+        <div class="where"><code>group.ts:142-151</code><code>fold.test.ts</code><code>Transcript.tsx:80-94</code></div>
+        <div class="why">现在折叠只藏工具行和思考，中间叙述全留着——判据就写在 Transcript.tsx:77：「多数时候你先要的是结论」。折上去的行数可以在 turnmark 上说一句（「已处理 32 秒 · 过程已折叠」），让人知道有东西可展开。</div>
+      </div></div>
+      <div class="plan__row plan__skip"><div class="plan__no">P13</div><div class="plan__body">
+        <b>popover 退场动画 / 字号阶梯调整 / 侧栏重排</b>
+        <div class="do">全部不动。popover 退场有写明的不做理由（popover.css:83-85）；字号阶梯审计结论是「干净的」；侧栏 --sb-* 体系是结构性的。</div>
+        <div class="why">写进方案是为了给它们立「判过了」的记录，和上一版第 35 条一样的待遇。</div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 03 原型 ==================== -->
+<section id="proto">
+  <div class="sec-head"><span class="sec-num">03</span><h2>交互原型</h2></div>
+  <p class="sec-sub">下面是一个能点的 omni 微缩模型。用开关在<b>现状</b>和<b>方案</b>之间切，几处差别都能亲手摸到：① 点顶栏最左的侧栏开关（方案是 340ms 等感推出 + 内容交叉淡化，双向一致）；② 把指针放到 AI 回答上，看动作条形制和 tooltip；③ 点「已处理 14 秒」那行，看两种折叠范围；④ 侧栏组头在方案档去掉箭头+文件夹（会话行的状态点保留）；⑤ 下面还有页签窄态对照。</p>
+
+  <div class="mockbar">
+    <div class="mode-switch" id="modeSwitch">
+      <button data-mode="before" class="on">现状</button>
+      <button data-mode="after">方案</button>
+    </div>
+    <span class="hint" id="modeHint">现状：内容瞬切 + 200ms 列宽 · 药丸动作条 + 系统黄条 tooltip（慢）· 折叠只藏工具行 · 组头带箭头+文件夹</span>
+  </div>
+
+  <div class="mock" data-mode="before" id="mock">
+    <div class="mock__win">
+      <div class="mtop">
+        <div class="traffic"><i></i><i></i><i></i></div>
+        <button class="mbtn" id="railBtn" data-tip="收起侧栏（⌘\）" aria-pressed="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6.5" y1="2.5" x2="6.5" y2="13.5"/></svg>
+        </button>
+        <div class="mtop__title">给 parser 补中文路径支持
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 6.5 8 9.5l3-3"/></svg>
+        </div>
+        <button class="mbtn" data-tip="对比两家引擎">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><line x1="8" y1="2.5" x2="8" y2="13.5"/></svg>
+        </button>
+        <button class="mbtn" data-tip="打开工作台（⌘]）">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="9.5" y1="2.5" x2="9.5" y2="13.5"/></svg>
+        </button>
+      </div>
+      <div class="mock__body" id="mockBody">
+        <aside class="mside">
+          <div class="mside__in">
+            <div class="mside__brand">omni<small>同文</small></div>
+            <button class="mside__new">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>
+              新建会话
+            </button>
+            <div class="mside__search">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+              筛选会话…
+            </div>
+            <div class="mside__list">
+              <div class="msec">置顶
+                <span class="msec__act"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg></span>
+              </div>
+              <div class="mrow"><span class="mrow__slot"><span class="dot dot--run"></span></span><span class="mrow__label">发布前把 0.0.213 的 dmg 重签</span><span class="mrow__time">2 分</span>
+                <span class="mrow__act" data-tip="更多操作"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></span>
+              </div>
+              <div class="msec">项目
+                <span class="msec__act" data-tip="打开一个文件夹"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2l1.5 2h5.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7Z"/></svg></span>
+              </div>
+              <div class="mrow mrow--group"><span class="mrow__slot"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 6.5 8 9.5l3-3"/></svg></span><span class="mrow__label">~/work/omni</span><span class="mrow__time">12</span></div>
+              <div class="mrow mrow--child mrow--sel"><span class="mrow__slot"><span class="dot dot--run"></span></span><span class="mrow__label">给 parser 补中文路径支持</span><span class="mrow__state dot--run"></span><span class="mrow__time">刚刚</span>
+                <span class="mrow__act" data-tip="更多操作"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></span>
+              </div>
+              <div class="mrow mrow--child"><span class="mrow__slot"><span class="dot dot--wait"></span></span><span class="mrow__label">审核 8 月的手动测试清单</span><span class="mrow__state dot--wait"></span><span class="mrow__time">待批</span>
+                <span class="mrow__act" data-tip="更多操作"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></span>
+              </div>
+              <div class="msec">对话
+                <span class="msec__act" data-tip="新开一条对话"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg></span>
+              </div>
+              <div class="mrow"><span class="mrow__slot"><span class="dot"></span></span><span class="mrow__label">更新日志的时间线视图草稿</span><span class="mrow__time">1 时</span>
+                <span class="mrow__act" data-tip="更多操作"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></span>
+              </div>
+              <div class="mrow"><span class="mrow__slot"><span class="dot"></span></span><span class="mrow__label">对比 codex 和 kimi 的 diff 质量</span><span class="mrow__time">昨</span>
+                <span class="mrow__act" data-tip="更多操作"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></span>
+              </div>
+            </div>
+            <div class="mside__foot"><span class="avatar"></span>alice</div>
+          </div>
+        </aside>
+
+        <div class="mconv">
+          <div class="mtrans">
+            <div class="mcol">
+              <div class="mturn" data-tip="点击折叠 / 展开这一轮">
+                已处理 14 秒<span class="fold-hint"> · 过程已折叠（含 2 步工具调用和叙述）</span>
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 5 9.5 8l-3 3"/></svg>
+              </div>
+
+              <div class="mmsgwrap--u">
+                <div class="mmsg-u">把 parseEntry 改成支持中文路径，别把中文给我转义掉。</div>
+                <div class="macts">
+                  <button class="act-pill"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>复制</button>
+                  <button class="act-ico" data-tip="复制"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg></button>
+                  <button class="act-ico" data-tip="改一改再发"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 2.5 13.5 5 5.5 13H3v-2.5l8-8Z"/></svg></button>
+                </div>
+              </div>
+
+              <div class="mthink mf-hide-b">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2a4.5 4.5 0 0 1 2.5 8.2c-.8.6-1 1.2-1 2.3h-3c0-1.1-.2-1.7-1-2.3A4.5 4.5 0 0 1 8 2Z"/><path d="M6.5 14h3"/></svg>
+                思考
+                <span class="ticker">先看 parseEntry 现在怎么处理非 ASCII，转义发生在哪一层……</span>
+              </div>
+
+              <div class="mstep mf-hide-b">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="m4.5 4-2.5 4 2.5 4M11.5 4l2.5 4-2.5 4"/></svg>
+                <span class="cmd">读取 src/parser.ts</span><span class="ok">· 214 行</span>
+              </div>
+              <div class="mstep mf-hide-b">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 2.5 13.5 5 5.5 13H3v-2.5l8-8Z"/></svg>
+                <span class="cmd">编辑 src/parser.ts</span><span class="ok">· +18 −6</span>
+              </div>
+
+              <div class="mmsgwrap">
+                <div class="mmsg-a mf-hide-a">
+                  <p>改完了。转义发生在 <code class="px" style="font-size:.92em">encodeSegment</code> 里而不是 parse 层，所以不用动解析器，只把白名单从 <code class="px" style="font-size:.92em">[\w./-]</code> 放宽到 <code class="px" style="font-size:.92em">[^\s]</code>，再在写出时按段编码：</p>
+                </div>
+                <div class="mcode mf-hide-a">
+                  <div class="mcode__bar">src/parser.ts · diff
+                    <button class="mbtn" data-tip="复制"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg></button>
+                  </div>
+                  <pre><span class="k">const</span> SAFE = <span class="s">/[^\s]/u</span>;
+<span class="k">export function</span> <span class="f">parseEntry</span>(raw: <span class="k">string</span>) {
+  <span class="k">return</span> raw.split(<span class="s">"/"</span>).filter(Boolean)
+    .map(seg =&gt; SAFE.test(seg) ? seg : <span class="f">encode</span>(seg));
+}</pre>
+                </div>
+                <div class="mmsg-a"><p>中文段会原样进 AST，只在序列化时编码。单测补了「中文/目录/名.ts」和空格两个 case。</p></div>
+                <div class="macts">
+                  <button class="act-pill"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>复制</button>
+                  <button class="act-pill"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 13.5c3-1 3.5-4 4-7.5M3 13.5c3.5.5 7-.5 9.5-3M7 6.5 3.5 3l-1 1L6 7.5" stroke-linejoin="round"/></svg>从这里重来</button>
+                  <button class="act-ico" data-tip="复制"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg></button>
+                  <button class="act-ico" data-tip="从这里重来"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 13.5c3-1 3.5-4 4-7.5M3 13.5c3.5.5 7-.5 9.5-3M7 6.5 3.5 3l-1 1L6 7.5" stroke-linejoin="round"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mcomp">
+            <div class="mcomp__in">
+              <div class="mcomp__ta">问点什么，或 / 选个命令…</div>
+              <div class="mcomp__bar">
+                <span class="mtrig">kimi</span>
+                <span class="mtrig">只读</span>
+                <button class="msend" data-tip="发送（⏎）"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 12.5v-9M4.5 7 8 3.5 11.5 7"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:40px">页签切换 + 窄态对照<span class="h3-tag">P4 · P14</span></h3>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:12px">页签条被故意压到 168px 复现你截图里的情况。<b>现状</b>：第三枚「活动」被裁断，它的 × 掉出可视区点不到。<b>方案</b>：页签图标化（名字进 tooltip），× 永远在；滚轮可横向扫。</p>
+  <div class="mock" data-mode="before" id="tabsMock" style="box-shadow:none">
+    <div class="tabsdemo">
+      <div class="tabsdemo__clip" id="tabsClip">
+        <div class="tabsdemo__tabs">
+          <button class="on" data-pane="a" data-tip="审查"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><line x1="8" y1="2.5" x2="8" y2="13.5"/></svg><span class="lbl">审查</span><i class="x">✕</i></button>
+          <button data-pane="b" data-tip="文件"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 1.5h5L13 5.5v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1Z"/><path d="M9 1.5V6h4"/></svg><span class="lbl">文件</span><i class="x">✕</i></button>
+          <button data-pane="c" data-tip="活动"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2.5"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/></svg><span class="lbl">活动</span><i class="x">✕</i></button>
+        </div>
+      </div>
+      <div class="tabsdemo__pane" id="tabsPane">3 个文件待审 · parser.ts +18 −6 · 最近一轮 2 分钟前</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:40px">动作条形制比稿<span class="h3-tag">P6 · 整份方案里唯一改「长相」的一条</span></h3>
+  <div class="vs">
+    <div class="vs__cell">
+      <div class="vs__cap"><b>A · 现状</b> 图标+文字药丸</div>
+      <div class="vs__row">
+        <button class="act-pill" style="border-color:var(--border)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>复制</button>
+        <button class="act-pill" style="border-color:var(--border)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 2.5 13.5 5 5.5 13H3v-2.5l8-8Z"/></svg>改一改再发</button>
+        <button class="act-pill" style="border-color:var(--border)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 13.5c3-1 3.5-4 4-7.5M3 13.5c3.5.5 7-.5 9.5-3" stroke-linejoin="round"/></svg>从这里重来</button>
+      </div>
+      <div class="vs__note">优点：零学习成本。缺点：描边胶囊在正文流里重，三颗排一排像工具栏；「复制」两个字是噪音。</div>
+    </div>
+    <div class="vs__cell">
+      <div class="vs__cap"><b>B · 方案</b> 纯图标 + data-tip（把指针放上去看提示）</div>
+      <div class="vs__row">
+        <button class="act-ico" style="display:grid" data-tip="复制"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg></button>
+        <button class="act-ico" style="display:grid" data-tip="改一改再发"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 2.5 13.5 5 5.5 13H3v-2.5l8-8Z"/></svg></button>
+        <button class="act-ico" style="display:grid" data-tip="从这里重来"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 13.5c3-1 3.5-4 4-7.5M3 13.5c3.5.5 7-.5 9.5-3" stroke-linejoin="round"/></svg></button>
+      </div>
+      <div class="vs__note">与代码块复制、改动行复制同族。动作语义交给图标，名字交给 tooltip，快捷键顺带出现在提示里。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 04 拍板 ==================== -->
+<section id="decide">
+  <div class="sec-head"><span class="sec-num">04</span><h2>拍板记录</h2></div>
+  <p class="sec-sub">2026-08-27 作者已拍板，原三条全部定案，同日追加三条授权。此处留档，不再是开放问题。</p>
+
+  <div class="decide" style="border-left-color:var(--ok)">
+    <b>① 消息动作条：全部图标化 ✅</b>
+    <p>按 P6 原案执行：复制 / 改一改再发 / 从这里重来 三颗全换 22×22 纯图标 + data-tip，「已复制」对号反馈保留。</p>
+  </div>
+  <div class="decide" style="border-left-color:var(--ok)">
+    <b>② 侧栏动效：慢速、有厚重感、双向一致 ✅</b>
+    <p>不按原「先淡出 / 利落收」二选一。新规格即 P3：列宽 340ms 等感曲线，收起与展开同一条曲线反向；内容交叉淡化接在上面。原型「方案」档就是这个手感。</p>
+  </div>
+  <div class="decide" style="border-left-color:var(--ok)">
+    <b>③ 新建会话落点附注收进 tooltip ✅</b>
+    <p>按 P8 原案执行；空会话 blank 页顺带交代落点。</p>
+  </div>
+  <div class="decide">
+    <b>追加授权（同日，来自截图反馈）</b>
+    <p>④ 轮次折叠扩到中间叙述文字，折完只剩提问 + 最终回答（改动卡、报错保留）→ P16；⑤ 子会话行去图标列、文字平移 24px，状态挪行尾（Codex 式）→ P15；⑥ 面板页签条窄态：图标化 + 横向滚轮，不换行，关闭钮任何宽度可点 → P14。</p>
+  </div>
+
+  <div class="decide">
+    <b>落地追记（同日）：右侧面板也上了抽屉，时长再放缓到 420ms</b>
+    <p>试用后反馈「面板出现/消失还是太快、不是抽屉感」。终版机制：面板内容做成<b>刚性板</b>（<code class="px">min-width: var(--workbench-w)</code>），列宽动画全程不压扁、跟着边缘整块滑进滑出；关闭方向同一趟滑（hidden 只翻 visibility、推迟到滑完）。340ms 对 560px 行程仍嫌快，两侧统一放到 <b>420ms</b>。原型「方案」档已同步成终版手感。</p>
+  </div>
+
+  <footer>
+    omni · UI 整体优化方案 · 2026-08-27 · 审计基线：工作区现状 · 上一版：<a href="UI细节优化计划.md" style="color:var(--accent)">UI细节优化计划.md</a>（36 条，已落地）· 本方案只收尾不翻案
+  </footer>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var mock = document.getElementById("mock");
+  var tabsMock = document.getElementById("tabsMock");
+  var modeHint = document.getElementById("modeHint");
+  var mode = "before";
+
+  /* ---- 模式开关 ---- */
+  var hints = {
+    before: "现状：内容瞬切 + 200ms 列宽 · 药丸动作条 + 系统黄条 tooltip（慢）· 折叠只藏工具行 · 组头带箭头+文件夹",
+    after: "方案：420ms 抽屉推出 + 交叉淡化 · 纯图标动作条 + 380ms tooltip · 折叠只留最终回答 · 组头去图标列（状态点保留）"
+  };
+  document.getElementById("modeSwitch").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.mode;
+    mock.dataset.mode = mode;
+    tabsMock.dataset.mode = mode;
+    modeHint.textContent = hints[mode];
+    this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+  });
+
+  /* ---- 侧栏收放 ---- */
+  var railBtn = document.getElementById("railBtn");
+  var mockBody = document.getElementById("mockBody");
+  railBtn.addEventListener("click", function () {
+    var closed = mockBody.classList.toggle("norail");
+    railBtn.setAttribute("aria-pressed", String(!closed));
+    railBtn.dataset.tip = closed ? "展开侧栏（⌘\\）" : "收起侧栏（⌘\\）";
+  });
+
+  /* ---- 页签演示 ---- */
+  var panes = {
+    a: "3 个文件待审 · parser.ts +18 −6 · 最近一轮 2 分钟前",
+    b: "src/parser.ts · src/encode.ts · tests/中文路径.test.ts —— 双击预览",
+    c: "2 条后台任务在跑 · kimi 引擎 · 最近输出 10 秒前"
+  };
+  var tabsPane = document.getElementById("tabsPane");
+  tabsMock.querySelector(".tabsdemo__tabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    this.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+    tabsPane.textContent = panes[b.dataset.pane];
+    if (tabsMock.dataset.mode === "after") {
+      tabsPane.style.animation = "none";
+      void tabsPane.offsetWidth; /* 重播 keyframe */
+      tabsPane.style.animation = "";
+    }
+  });
+  /* 窄态滚轮兜底：方案模式下滚轮转横向 */
+  var tabsClip = document.getElementById("tabsClip");
+  tabsClip.addEventListener("wheel", function (e) {
+    if (tabsMock.dataset.mode !== "after") return;
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    tabsClip.scrollLeft += e.deltaY;
+  }, { passive: false });
+
+  /* ---- 轮次折叠演示 ---- */
+  mock.querySelector(".mturn").addEventListener("click", function () {
+    mock.classList.toggle("folded");
+  });
+
+  /* ---- tooltip：现状=仿系统黄条 850ms；方案=深色自绘 380ms ---- */
+  var tip = document.createElement("div");
+  tip.className = "mtip mtip--sys";
+  document.body.appendChild(tip);
+  var timer = null, anchor = null;
+
+  function showTip(el) {
+    var r = el.getBoundingClientRect();
+    tip.textContent = el.dataset.tip;
+    tip.className = "mtip " + (mode === "after" ? "mtip--dark" : "mtip--sys");
+    tip.style.left = Math.min(r.left + r.width / 2, window.innerWidth - 80) + "px";
+    tip.style.top = (r.bottom + 6) + "px";
+    tip.style.transform = "translateX(-50%) translateY(2px)";
+    requestAnimationFrame(function () {
+      tip.classList.add("show");
+      tip.style.transform = "translateX(-50%) translateY(0)";
+    });
+  }
+  function hideTip() {
+    clearTimeout(timer); timer = null; anchor = null;
+    tip.classList.remove("show");
+  }
+  document.addEventListener("pointerover", function (e) {
+    var el = e.target.closest("[data-tip]");
+    if (!el || el === anchor) return;
+    hideTip(); anchor = el;
+    timer = setTimeout(function () { showTip(el); }, mode === "after" ? 380 : 850);
+  });
+  document.addEventListener("pointerout", function (e) {
+    if (anchor && !anchor.contains(e.relatedTarget)) hideTip();
+  });
+  document.addEventListener("pointerdown", hideTip, true);
+  document.addEventListener("scroll", hideTip, true);
+})();
+</script>
+</body>
+</html>

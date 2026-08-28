@@ -64,7 +64,9 @@ export function useWorkbenchKeys(
     if (panel.contains(active) && keepsIndexFocus(state, active)) return
     const target = panel.querySelector<HTMLElement>(selector)
     const focus = target ?? panel
-    focus.focus()
+    // preventScroll：同 `use-panel-keys.ts` 那段——scroll-into-view 会把
+    // 列宽过渡强制走完，抽屉滑动变瞬切
+    focus.focus({ preventScroll: true })
   }, [focusKey, selector, state.visible])
   return box
 }

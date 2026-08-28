@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import type { ReviewFile } from "../../shared/review.js"
 import { FileIcon } from "./icons-activity.js"
-import { ChevronIcon, FolderIcon } from "./icons.js"
+import { ChevronIcon } from "./icons.js"
+import { FolderIcon } from "./icons-folder.js"
 import { revealReviewTreePath, reviewTreeDestination, reviewTreeRows,
   type ReviewTreeRow } from "./review-tree-model.js"
 

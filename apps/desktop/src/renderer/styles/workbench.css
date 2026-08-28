@@ -2,12 +2,48 @@
 .workbench {
   display: flex;
   grid-column: 3;
-  min-width: 0;
+  /* 刚性板：列宽动画全程保持 `--workbench-w`。`width: 100%` 管占满态（1fr），
+     min-width 管滑程——**两个都要**：只写 min-width 的话内容比轨道宽时会
+     顶破轨道（侧栏踩过这个坑，见 app-foundation.css `.sidebar` 那段） */
+  width: 100%;
+  min-width: var(--workbench-w);
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
   border-left: 1px solid var(--border-strong);
   background: var(--bg);
+}
+
+/*
+ * 抽屉抽入抽出。**内容是一块刚性板子，跟着列宽滑进滑出**——
+ * 不是淡出来、更不是先蒸发再收列：
+ *
+ * - `min-width: var(--workbench-w)` 让面板在列宽动画全程保持固有宽度
+ *  （轨道是写死的像素值，min-width 顶不开它，只会溢出，外壳 `overflow: hidden`
+ *   裁掉探出窗口右缘的部分）。左对齐（stretch 的兜底），于是列宽收/放时
+ *   板子整体跟着左缘滑——这就是抽屉。
+ * - 关闭方向也要这一趟滑：`display` 走 `allow-discrete` 离散过渡（Chromium 117+），
+ *   **滑完才真正脱离布局**。这里不能停留在一个中间态上——`visibility: hidden`
+ *   的元素**仍然占着 grid 格子**：审核面板（`.rv`）和工作台同放第 3 列，
+ *   收起的那个若不脱离布局，会把另一个挤到第 2 行吊在右下角（真出过这个图）。
+ * - 推迟只在**整扇面板收工**时生效（`:not(.shell--workbench)`）；
+ *   页签换页（面板还开着）必须瞬切，那条走 `.workbench__page[hidden]`。
+ * - 收起后不可聚焦由 `display: none` 兜底（终态就是 None），
+ *   焦点归还有 `use-workbench-keys.ts` 的 `restorePanelFocus`。
+ */
+.shell:not(.shell--workbench) .workbench[hidden] {
+  transition:
+    visibility 0s 420ms,
+    display 0s 420ms allow-discrete;
+}
+
+.workbench[hidden] {
+  visibility: hidden;
+  display: none;
+}
+
+.workbench__page[hidden] {
+  display: none;
 }
 
 /* 占满时不再画左边那条界线——它左边已经没有东西了。
@@ -17,31 +53,37 @@
 }
 
 /*
- * 抽屉推过来。**只在它出现的那一下**——列宽由外壳那条 `transition` 滑，
- * 这里补的是内容本身：不补的话列在滑、里面的东西却是「啪」地整块出现在那儿。
+ * 页签换页补一段入场。**位移 8px，比抽屉行程小得多**——
+ * 抽屉是整块面板跟列宽滑，这里是**同一个容器里换内容**：容器没动，
+ * 里面的东西用大位移，读起来就像整个工作台又晃了一下。
+ *
+ * **零 JS**：两页靠 `hidden` 属性切换（`WorkbenchPane.tsx`），
+ * `display: none → block` 会重播 CSS animation，挂上选择器就够了。
+ *
+ * 面板自身的出现/消失**不再有任何 animation**——那是抽屉的活儿（见文件顶部），
+ * 叠一层原地淡入只会把「滑出来」读成「闪出来」。
  */
-.workbench,
-.rv {
-  animation: panel-in 200ms var(--ease);
+.workbench__page:not([hidden]) {
+  animation: page-in 200ms var(--ease);
 }
 
-@keyframes panel-in {
+@keyframes page-in {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateX(8px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .workbench,
-  .rv {
+  .workbench__page {
     animation: none;
   }
-}
 
-.workbench[hidden],
-.workbench__page[hidden] {
-  display: none;
+  /* 抽屉也关：列宽瞬切（外壳的 reduce 块关了 .shell 的过渡），
+     内容同步瞬隐——推迟 display/visibility 的那条规则一并失效 */
+  .shell:not(.shell--workbench) .workbench[hidden] {
+    transition: none;
+  }
 }
 
 .workbench__head {
@@ -108,7 +150,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.workbench__hide,
 .workbench__expand,
 .workbench__icon {
   display: grid;
@@ -124,21 +165,18 @@
   cursor: pointer;
 }
 
-.workbench__hide:hover,
 .workbench__expand:hover,
 .workbench__icon:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.workbench__hide:active,
 .workbench__expand:active,
 .workbench__icon:active {
   background: var(--bg-press);
 }
 
 .workbench__tab:focus-visible,
-.workbench__hide:focus-visible,
 .workbench__expand:focus-visible,
 .workbench__icon:focus-visible {
   outline: 2px solid var(--accent);

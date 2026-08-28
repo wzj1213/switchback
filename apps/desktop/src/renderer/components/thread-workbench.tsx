@@ -48,7 +48,6 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
         onSelect: shell.openPanelPage,
         onClose: shell.closePanelPage,
         onFull: props.onFull,
-        onHide: shell.hideWorkbench,
       }}
       onPickLane={shell.openAside}
       onActivityIndex={shell.activityIndex}

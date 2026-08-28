@@ -132,6 +132,55 @@
 }
 
 /*
+ * 面板开关：顶栏最后一颗。**物理上它必须留在顶栏里**——`no-drag` 只在拖拽区
+ * 的子树里生效，挪出顶栏就变成拖窗口（踩过两回，真机才现形，探针测不出）。
+ *
+ * 视觉上的「钉在原地」由反向平移给：面板一开，顶栏随会话列收窄 `--panel-col`，
+ * 给它一个等量反向的 translateX。同一条 420ms 曲线、同一帧起跑，抵消是精确的。
+ * full 态 `--panel-col` 是 `minmax(0,1fr)` 不是长度，translate 自动失效——
+ * 那种态下顶栏整个不画（`.main` display:none），按钮跟着不在，正确。
+ */
+.paneltoggle {
+  /* 平移出去后要压在同帧滑进的面板页签条上面（它是 grid 第三列、DOM 更靠后） */
+  position: relative;
+  z-index: 30;
+  transition: transform 420ms cubic-bezier(0.3, 0.8, 0.25, 1);
+}
+
+.shell--workbench .paneltoggle {
+  transform: translateX(var(--panel-col));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paneltoggle {
+    transition: none;
+  }
+}
+
+/*
+ * 侧栏开关图标的两态（`RailIcon`；状态类由 TopBar 的 RailToggle 按 railOpen 传）。
+ *
+ * 开着 = 竖线在正常位；收着 = 竖线向左收 1.5px——「这条缝没了」由形变自己说，
+ * 不再只靠 `.iconbtn--on` 那层底色。位移写在 viewBox 的 16 格坐标系里，
+ * 渲染 14px 时约等于屏幕上 1.3px，一点就够，多了就成另一颗图标。
+ * 时长走 `--dur`：它和「图标换色」同属状态浮现，不是编排（判据见 `tokens.css` 时长那节）。
+ */
+.rail-icon .rail-icon__line {
+  transition: transform var(--dur) var(--ease);
+}
+
+.rail-icon--closed .rail-icon__line {
+  transform: translateX(-1.5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 终态保留（收着就是收着的形），只去掉中间那段 tween */
+  .rail-icon .rail-icon__line {
+    transition: none;
+  }
+}
+
+/*
  * 转录区**只上下滚，绝不左右滚**。
  *
  * `overflow-y: auto` 单写一条是不够的：CSS 里两轴只有一个是 `visible` 时，

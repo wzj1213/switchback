@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { Item } from "@omni/protocol"
 import { textOf } from "../export.js"
-import { copyFeedbackLabel, copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
+import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
 
 /**
@@ -16,8 +16,10 @@ import { CheckIcon, CopyIcon } from "./icons.js"
  * 说的话没有一句在屏幕上是真的。
  *
  * 而它多出来的那些也没人用：往回翻十屏去复制第三条思考不是真实动作，
- * 真实动作是「把刚才那段答案拿走」。所以现在只有**最后一条说出来的话**挂，
- * 并且**常驻**——一颗藏起来的按钮如果只剩一颗，那就是没有。
+ * 真实动作是「把刚才那段答案拿走」。所以只有**每轮最后一条回答**挂
+ *（哪几条算，见 `transcript-row.tsx` 的 `answerActs`），而且**悬停才现**——
+ * 常驻过一版，一屏三四轮就是三四颗小按钮钉在正文边上，在你不需要的时候
+ * 也一直在说话（完整经过见 `items-composer.css` 里 `.msgacts` 的注释）。
  *
  * 审批卡不挂——那上面有需要点的按钮，再放一个只会误点。
  */
@@ -30,8 +32,8 @@ export function Copyable({
 }: {
   item: Item
   /**
-   * 这条是不是「这一轮的最后一条回答」。给了才有那颗复制，而且是常驻的。
-   * 见 `transcript-row.tsx` 的 `answerActs`。
+   * 这条挂不挂那排动作（复制）。给了才画——悬停才现，不是常驻。
+   * 哪几条算，见 `transcript-row.tsx` 的 `answerActs`。
    */
   acts: boolean
   onCopy: (text: string) => unknown
@@ -59,15 +61,15 @@ export function Copyable({
       <div className="msgacts">
         {acts ? (
           <button
-            className="act"
+            className="msgact"
             type="button"
             aria-live="polite"
             data-state={feedback}
-            data-tip={copyFeedbackTitle(feedback, "复制这条内容")}
+            aria-label={copyFeedbackTitle(feedback, "复制", "已复制")}
+            data-tip={copyFeedbackTitle(feedback, "复制", "已复制")}
             onClick={copy}
           >
             {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-            {copyFeedbackLabel(feedback)}
           </button>
         ) : null}
         {extra}

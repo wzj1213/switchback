@@ -11,7 +11,7 @@ function ToolButton({ label, on, onClick, children }: {
 }): React.JSX.Element {
   return (
     <button type="button" className={`rv__tool${on === true ? " rv__tool--on" : ""}`}
-      aria-label={label} title={label} aria-pressed={on} onClick={onClick}>
+      aria-label={label} data-tip={label} aria-pressed={on} onClick={onClick}>
       {children}
     </button>
   )

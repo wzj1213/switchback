@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
-import { FolderIcon } from "./icons.js"
+import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { GroupBlock } from "./SidebarGroup.js"
 import { SectionHead, type GroupHandlers } from "./SidebarSections.js"

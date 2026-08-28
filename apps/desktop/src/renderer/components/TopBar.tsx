@@ -84,7 +84,7 @@ function RailToggle({ open, onToggle }: { open: boolean; onToggle: () => void })
       aria-pressed={!open}
       onClick={onToggle}
     >
-      <RailIcon size={14} />
+      <RailIcon size={14} className={`rail-icon${open ? "" : " rail-icon--closed"}`} />
     </button>
   )
 }

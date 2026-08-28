@@ -9,7 +9,8 @@
 .rv {
   display: flex;
   grid-column: 3;
-  min-width: 0;
+  /* 刚性板子跟着列宽滑进滑出——抽屉机制同 `.workbench`，完整说明在 workbench.css 顶部 */
+  min-width: var(--workbench-w);
   min-height: 0;
   flex-direction: column;
   width: 100%;
@@ -20,8 +21,24 @@
   container-type: inline-size;
 }
 
+/* 页签换走（面板还开着）瞬隐；整扇面板收工时才推迟到列宽滑完（420ms，与外壳同程）。
+   display 走 allow-discrete：滑完才脱离布局——visibility 隐形的元素仍占 grid 格子，
+   会把同列的另一个面板挤到第 2 行（workbench.css 顶部有完整说明）。 */
+.shell:not(.shell--workbench) .rv[hidden] {
+  transition:
+    visibility 0s 420ms,
+    display 0s 420ms allow-discrete;
+}
+
 .rv[hidden] {
+  visibility: hidden;
   display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell:not(.shell--workbench) .rv[hidden] {
+    transition: none;
+  }
 }
 
 .shell--workbench-full .rv {

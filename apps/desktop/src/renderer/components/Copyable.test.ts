@@ -17,8 +17,9 @@ describe("消息复制反馈", () => {
     }))
     expect(html).toContain('data-state="idle"')
     expect(html).toContain('aria-live="polite"')
-    expect(html).toContain('data-tip="复制这条内容"')
-    expect(html).toContain(">复制</button>")
+    expect(html).toContain('data-tip="复制"')
+    // 纯图标按钮没有文字，报给读屏的那句就是它的名字
+    expect(html).toContain('aria-label="复制"')
   })
 
   it("不是最后那条就连动作栏都不画——它占的那行高度正是间距失真的来源", () => {
@@ -32,7 +33,7 @@ describe("消息复制反馈", () => {
       children: createElement("p", null, item.text),
     }))
     expect(html).not.toContain("msgacts")
-    expect(html).not.toContain(">复制</button>")
+    expect(html).not.toContain('class="msgact"')
     // 外壳还在：用户消息靠右、行间距都挂在 `.copyable` 上
     expect(html).toContain('class="copyable"')
   })
@@ -50,6 +51,6 @@ describe("消息复制反馈", () => {
     }))
     expect(html).toContain("msgacts")
     expect(html).toContain("改一改再发")
-    expect(html).not.toContain(">复制</button>")
+    expect(html).not.toContain('class="msgact"')
   })
 })

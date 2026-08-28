@@ -1,8 +1,8 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { PanelPage } from "../panel-state.js"
 import { CompareIcon, PlusIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon } from "./icons-activity.js"
-import { CloseIcon, ExpandIcon, PanelIcon } from "./icons-panel.js"
+import { CloseIcon, ExpandIcon } from "./icons-panel.js"
 import { Popover } from "./Popover.js"
 
 const PAGES: readonly { id: PanelPage; label: string; description: string }[] = [
@@ -24,22 +24,35 @@ export interface PanelTabsProps {
   onSelect: (page: PanelPage) => void
   onClose: (page: PanelPage) => void
   onFull: () => void
-  onHide: () => void
 }
 
 export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
   const [menu, setMenu] = useState(false)
   const plus = useRef<HTMLButtonElement>(null)
+  const list = useRef<HTMLElement>(null)
+  // React 的 onWheel 是 passive 的，拦不下默认滚动；纵向滚轮转横向必须上原生监听。
+  // 窄态图标化后 300px 面板已不溢出，这只是更极端窄下的兜底，所以不做 edge 渐隐。
+  useEffect(() => {
+    const node = list.current
+    if (!node) return
+    const onWheel = (event: WheelEvent): void => {
+      if (event.deltaY === 0) return
+      event.preventDefault()
+      node.scrollLeft += event.deltaY
+    }
+    node.addEventListener("wheel", onWheel, { passive: false })
+    return () => { node.removeEventListener("wheel", onWheel) }
+  }, [])
   return (
     <header className="panel-tabs">
-      <nav className="panel-tabs__list" aria-label="侧边面板页面">
+      <nav ref={list} className="panel-tabs__list" aria-label="侧边面板页面">
         {props.tabs.map((page) => {
           const label = PAGES.find((candidate) => candidate.id === page)?.label ?? page
           const active = props.active === page
           return (
             <span className={`panel-tab${active ? " panel-tab--on" : ""}`} key={page}>
               <button type="button" className="panel-tab__pick" aria-current={active ? "page" : undefined}
-                onClick={() => { props.onSelect(page) }}>
+                data-tip={label} onClick={() => { props.onSelect(page) }}>
                 <PageIcon page={page} /><span>{label}</span>
               </button>
               <button type="button" className="panel-tab__close" aria-label={`关闭${label}页`}
@@ -49,7 +62,7 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
         })}
       </nav>
       <button ref={plus} type="button" className="panel-tabs__button" aria-label="新建侧边页面"
-        title="新建侧边页面" aria-haspopup="menu" aria-expanded={menu}
+        data-tip="新建侧边页面" aria-haspopup="menu" aria-expanded={menu}
         onClick={() => { setMenu((open) => !open) }}>
         <PlusIcon size={13} />
       </button>
@@ -71,10 +84,8 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
         data-tip={props.full ? "并排显示侧边面板" : "展开侧边面板"} onClick={props.onFull}>
         <ExpandIcon />
       </button>
-      <button type="button" className="panel-tabs__button" aria-label="隐藏侧边面板"
-        data-tip="隐藏侧边面板" onClick={props.onHide}>
-        <PanelIcon />
-      </button>
+      {/* 「隐藏」不在这条栏里——开关钉在窗口右上角（`ThreadScreen` 的 PanelToggle），
+          开/关抽屉都在同一个位置点；栏右侧的留白就是给它留的（panel-tabs.css） */}
     </header>
   )
 }

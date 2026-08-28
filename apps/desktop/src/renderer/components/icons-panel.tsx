@@ -65,12 +65,18 @@ export function PanelIcon({ size = 14 }: { size?: number } = {}): React.JSX.Elem
  *
  * 两颗必须是一对：它们一左一右摆在顶栏两头，管的是同一件事的两侧。
  * 画成两个不相干的形（比如左边用「三条横线」）的话，用户得各记一次。
+ *
+ * 那条竖线有两态：侧栏开着它在正常位，收起时向左收 1.5px——「这条缝没了」。
+ * 状态类由调用方（TopBar 的 `RailToggle`）按 `railOpen` 传到 `Svg` 上，
+ * 形变和过渡都在 CSS（`.rail-icon`，`app-main.css`）——行内 style 的话
+ * `prefers-reduced-motion` 盖不住（`Svg` 的 className 口子就是为这个开的），
+ * 这里只给竖线留个类名把手。
  */
-export function RailIcon({ size = 14 }: { size?: number } = {}): React.JSX.Element {
+export function RailIcon({ size = 14, className }: { size?: number; className?: string } = {}): React.JSX.Element {
   return (
-    <Svg size={size}>
+    <Svg size={size} className={className}>
       <rect x="2" y="2.5" width="12" height="11" rx="2" {...LINE} />
-      <path d="M5.5 2.5v11" {...LINE} />
+      <path className="rail-icon__line" d="M5.5 2.5v11" {...LINE} />
     </Svg>
   )
 }

@@ -24,7 +24,7 @@ export function RowActions({
         type="button"
         className="row__act row__act--danger"
         aria-label="确认删除"
-        title="再点一次就真的删了，不可撤销"
+        data-tip="再点一次就真的删了，不可撤销"
         onClick={onDelete}
         onBlur={onDisarm}
       >

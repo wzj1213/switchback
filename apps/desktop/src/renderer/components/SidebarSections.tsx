@@ -66,7 +66,7 @@ export function SectionHead({
           type="button"
           className="row__act sidebar__section-act"
           aria-label={action.label}
-          title={action.label}
+          data-tip={action.label}
           onClick={action.run}
         >
           {action.icon}

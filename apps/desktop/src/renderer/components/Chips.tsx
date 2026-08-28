@@ -1,4 +1,5 @@
-import { BranchIcon, FolderIcon } from "./icons.js"
+import { BranchIcon } from "./icons.js"
+import { FolderIcon } from "./icons-folder.js"
 import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
 
 /**

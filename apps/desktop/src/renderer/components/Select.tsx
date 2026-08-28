@@ -87,7 +87,7 @@ export function Select({
         type="button"
         ref={trigger}
         className={`trigger${open ? " trigger--open" : ""}`}
-        title={title ?? label}
+        data-tip={title ?? label}
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={open}

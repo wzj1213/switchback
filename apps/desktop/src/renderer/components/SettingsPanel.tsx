@@ -10,7 +10,8 @@ import { EnvSection } from "./SettingsEnv.js"
 import { ActivitySection } from "./SettingsActivity.js"
 import { RemotePanel } from "./RemotePanel.js"
 import { PetsSection } from "./SettingsPets.js"
-import { ChartIcon, EngineIcon, FolderIcon, PetIcon, PlusIcon, SparkIcon } from "./icons.js"
+import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon } from "./icons.js"
+import { FolderIcon } from "./icons-folder.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 
 /**

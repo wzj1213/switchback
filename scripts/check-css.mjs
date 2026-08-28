@@ -49,6 +49,7 @@ const INTENTIONAL = new Map([
   ["step__verb", "父级 .step 是 flex 行，动词继承它的字号与颜色"],
   ["row__rename", "和 .row__label 同挂，外观全在后者"],
   ["sidebar__section-act", "和 .row__act 同挂，外观全在后者"],
+  ["row--flat", "侧栏行的语义标记（flat = 上面没有项目行）；曾经有缩进规则，撤缩进后只剩名字"],
   ["step--expanded", "只作状态标记，展开态的外观由 .step--open 与子元素表达"],
   ["item--agent", "浏览器端：agent 的话就是默认排版，.item 已经给完；用户那条才需要 .item--user 靠右"],
   ["item--reasoning", "浏览器端：外观全在 .fold 与 .reasoning__text 上"],

@@ -46,7 +46,7 @@ describe("那排动作挂在哪几条上", () => {
     expect([...answerActs(rows)].sort()).toEqual(["a2", "a3", "u1", "u2"])
   })
 
-  it("只认回答：思考、通知、人话都不挂——挂在一段思考上等于说它和答案同级", () => {
+  it("思考、通知不挂——挂在一段思考上等于说它和答案同级；人话是每条都挂的", () => {
     const rows: readonly Row[] = [
       { kind: "item", item: item("u1", "user_message", "t1") },
       { kind: "item", item: item("r1", "reasoning", "t1", { complete: true }) },
