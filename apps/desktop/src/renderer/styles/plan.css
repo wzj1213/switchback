@@ -204,7 +204,7 @@
   padding: 9px 8px 4px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
   pointer-events: none;
 }

@@ -434,17 +434,19 @@ body {
 /*
  * ── 侧栏的一条槽 ───────────────────────────────────────────
  *
- * 整个侧栏只有两个横向的量。所有行——导航、搜索、组标题、会话——
- * 共用同一套：外边距 `--sb-pad`，图标落在宽 `--sb-slot` 的第一列，
- * 文字从 `--sb-pad + --sb-slot` 开始。
+ * 整个侧栏共用两条纵向基线：图标落在宽 `--sb-slot` 的第一列并按中心对齐；
+ * 品牌与分节标题落在 `--sb-pad + --sb-ink-offset`，对齐图标的视觉左缘。
+ * 行内正文仍从 `--sb-pad + --sb-slot` 开始。
  *
  * 上一版没有这条规则，于是品牌 12px、按钮 8px、组标题 8px、行内文字 32px，
  * 四个左边距互不相干——「没对齐」就是这么来的。
  * **要加新东西，用这两个变量，不要再写第三个 padding。**
  */
 .sidebar {
-  --sb-pad: 8px;
-  --sb-slot: 24px;
+  /* Codex 的左缘关系：行底色离窗边 4px，图标中心在 20px，正文从 36px 开始。 */
+  --sb-pad: var(--sp-1);
+  --sb-slot: var(--sp-6);
+  --sb-ink-offset: var(--sp-2);
   --sb-row-h: 34px;
   /* 行尾那几颗图标按钮的方形点击区。**必须是方的**：图标 15、盒子 22，
      四边各留 3.5——上下左右一样多，图标中心才等于盒子中心。
@@ -459,7 +461,8 @@ body {
 }
 
 .sidebar__brand {
-  padding-left: var(--sb-slot);
+  /* 品牌是侧栏标题，不该缩进到项目名那一列；它与分节标题共用视觉左缘。 */
+  padding-left: var(--sb-ink-offset);
   font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -572,10 +575,10 @@ body {
   align-items: center;
   width: calc(100% - var(--sb-pad) * 2);
   margin: var(--sp-4) var(--sb-pad) 0;
-  /* 分节标题**挂最左**（padding-left 为 0）：它是环境标签，不对任何一列——
-     作者照 Codex 拍板，整排往左让出一个图标列（原「对着文字列」作废） */
-  padding: 0 0 var(--sp-1);
+  /* 和品牌共用视觉左缘；图标与状态点仍按自己的中心线排，不被推走。 */
+  padding: 0 0 var(--sp-1) var(--sb-ink-offset);
   min-height: var(--sb-act);
+  border-radius: var(--radius-sm);
   color: var(--text-faint);
   font-size: var(--text-sm);
 }
@@ -601,8 +604,20 @@ body {
   cursor: default;
 }
 
-.sidebar__section:hover {
+.sidebar__section:not(.sidebar__section--static):hover {
+  background: var(--bg-hover);
   color: var(--text-muted);
+}
+
+/* 底色属于整条分节行，而不是只到右侧操作键之前的内层 button。
+   这样 hover / 按下态和项目行共用同一左右边距与圆角。 */
+.sidebar__section:not(.sidebar__section--static):has(> .sidebar__section-main:active) {
+  background: var(--bg-press);
+}
+
+/* 压过文件开头那条全局 button 按下兜底；反馈已经由外层完整地画了。 */
+.sidebar__section-main:active:not(:disabled) {
+  background: transparent;
 }
 
 /*

@@ -55,6 +55,8 @@
   --bg: #ffffff;
   --bg-sunken: #f7f7f8;
   --bg-raised: #ffffff;
+  /* 浮层必须是不透明的：菜单盖住正文时，下层文字不能穿过来。浅色下与 raised 同色。 */
+  --bg-float: var(--bg-raised);
   --bg-hover: rgb(var(--ink) / 4%);
   --bg-active: rgb(var(--ink) / 7%);
   /* 按下去的那一档。**hover 说的是「这儿能点」，按下态说的是「我点了」**——
@@ -372,6 +374,9 @@
     --bg: #0e0f13;
     --bg-sunken: #050609;
     --bg-raised: rgb(var(--ink) / 5%);
+    /* `--bg-raised` 是半透明填充，适合卡片叠在自己的底面上；浮层会跨过侧栏、
+       正文和输入框，必须先合成到不透明表面，否则下面的字会直接透出来。 */
+    --bg-float: color-mix(in srgb, var(--bg) 95%, rgb(var(--ink)) 5%);
     --bg-hover: rgb(var(--ink) / 8%);
     --bg-active: rgb(var(--ink) / 13%);
     --bg-press: rgb(var(--ink) / 17%);

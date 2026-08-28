@@ -382,7 +382,7 @@
   padding: 6px 9px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
   color: var(--text-muted);
   font-size: var(--text-sm);
@@ -443,7 +443,7 @@
   padding: 2px var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
   color: var(--ramp-ink);
   font-size: var(--text-xs);
@@ -527,7 +527,7 @@
   padding: 2px 7px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
   color: var(--text);
   font-size: var(--text-xs);

@@ -76,7 +76,7 @@
   padding: var(--sp-1);
   border: 1px solid var(--border-pop);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
 }
 

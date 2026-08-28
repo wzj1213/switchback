@@ -471,7 +471,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border-pop);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
   pointer-events: none;
 }

@@ -96,7 +96,7 @@
   padding: 9px 11px;
   border: 1px solid var(--border-pop);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
   /* 卡自己可以停、可以选：它常常是一整句提问，而人看到想要的那句
      第一反应是选中它——一碰就消失的话这件事做不成（见组件里那条延迟关） */

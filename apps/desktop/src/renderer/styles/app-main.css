@@ -549,11 +549,10 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: var(--sp-1);
-  /* 和别的浮层用同一套 token。写死一份的话，深色下这一个的阴影
-     只有 14% 而别的是 55%——`@` 列表会是唯一一个和背景糊在一起的浮层 */
+  /* 和别的浮层用同一套 token。背景必须不透明，否则候选字会和输入框内容叠在一起。 */
   border: 1px solid var(--border-pop);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--bg-float);
   box-shadow: var(--shadow-pop);
 }
 
