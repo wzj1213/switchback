@@ -114,10 +114,18 @@
   fill: none;
 }
 
-.rv__tool:hover,
+.rv__tool:hover:not(:disabled),
 .rv__tool--on {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+/* 窄面板下并排不可用。**留在原地压淡，不是移走**——移走了没人知道并排去哪了，
+   下次拉宽也不会想起来还有这个功能。理由由 `data-tip` 说（「面板太窄，
+   放不下两列代码」）。悬停态要一起挡掉：`:hover` 照样匹配禁用的按钮 */
+.rv__tool:disabled {
+  opacity: 0.38;
+  cursor: default;
 }
 
 .rv__tool:focus-visible {
@@ -506,6 +514,18 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
+  /*
+   * **补丁区自己是一个容器**，行号那条容器查询量的是它，不是整扇面板。
+   *
+   * 整扇面板里还并排站着 260px 的文件清单：`.rv` 有 540px 的时候补丁区只有 279px，
+   * 「面板够宽」和「补丁够宽」在这一档下差了将近一倍。而 `.rvl` 还能被那颗
+   * 「隐藏文件」关掉、520px 以下又会挪到上方——补丁到底有多宽只有这个盒子知道。
+   * `Review.tsx` 的并排闸门量的也是这个盒子（`useNarrowPanel`），两处必须同源。
+   *
+   * `flex: 1` + `min-width: 0` 意味着它的宽度本来就由外面给，
+   * `inline-size` 的尺寸限制不改变任何既有布局。
+   */
+  container-type: inline-size;
 }
 
 .rv__file {
@@ -589,7 +609,7 @@
   padding: var(--sp-1) 0;
   font-family: var(--font-mono);
   font-size: var(--text-code);
-  line-height: 1.55;
+  line-height: var(--lh-code);
 }
 
 .rvd__line {
@@ -608,9 +628,41 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 宽面板：旧号 + 新号两列。窄面板：**只留一个**（`--one`，删行给旧号、
+ * 增行给新号、上下文给新号）。
+ *
+ * 两列行号恒占 7.2em ≈ 90px，加上记号列和右边距，正文之外恒定吃掉约 119px——
+ * 而窗口 ≤1280px 时这块面板只有 300px，行号列占掉整块面板的三成，
+ * 正文只剩约 24 个字符。**窄面板下真正要读的是「改了什么」**，
+ * 「这行在旧文件的哪儿」是那一刻最不重要的一列。宽面板下两列照旧，
+ * 那时候它是有用的。
+ *
+ * 并排两侧本来就只画一个号，用的是同一个 `--one` 槽。
+ */
+.rvd__n--one {
+  display: none;
+}
+
+@container (max-width: 420px) {
+  .rvd__line .rvd__n--old,
+  .rvd__line .rvd__n--new {
+    display: none;
+  }
+
+  .rvd__line .rvd__n--one {
+    display: block;
+  }
+}
+
+/* 并排：每侧只有一个号，不受上面那条容器查询影响 */
+.rvd__cell .rvd__n--one {
+  display: block;
+}
+
 .rvd__sign {
   flex: none;
-  width: 1.4em;
+  width: var(--diff-sign-w);
   color: var(--text-faint);
   text-align: center;
   user-select: none;
@@ -618,7 +670,7 @@
 
 .rvd__text {
   min-width: 0;
-  padding-right: var(--sp-3);
+  padding-right: var(--diff-pad-r);
 }
 
 .rvd__line--add {
@@ -637,13 +689,60 @@
   color: var(--danger);
 }
 
+/*
+ * 词级高亮：**行底 12% 之上再叠 22%**，合成约 31%。
+ *
+ * 「改了一个词」和「重写了整行」原来长得一模一样，得逐字比对两行中文才能确认。
+ * 哪几个字变了由 `review-words.ts` 算（LCS + 相似度闸门），这里只管画。
+ *
+ * **不加粗**：等宽字加粗会改变字面密度，一行里几个粗词会把对齐读乱——
+ * 而对齐正是这一屏赖以工作的东西。
+ */
+.rvd__hit {
+  border-radius: 3px;
+}
+
+.rvd__line--add .rvd__hit {
+  background: color-mix(in srgb, var(--ok) 22%, transparent);
+}
+
+.rvd__line--del .rvd__hit {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+/*
+ * 补丁里的注释**不斜**。`markdown.css` 给 `.hljs-comment` 配了 `font-style: italic`，
+ * 那是给代码块的；**但补丁不是**——这仓库的补丁里中文注释是主体，
+ * 而 PingFang SC 没有斜体面，浏览器会做倾斜合成（synthetic oblique），
+ * 12.5px 下笔画糊成一片。配色照旧复用那一套，只关掉这一项。
+ */
+.rvd .hljs-comment,
+.rvd .hljs-quote {
+  font-style: normal;
+}
+
 .rvd__line--hunk,
 .rvd__line--meta {
   color: var(--text-faint);
 }
 
+/*
+ * hunk 头粘顶。**git 把函数签名塞在 hunk 头尾巴上就是为了这个用途**——
+ * `@@ … @@ export function withAsides(…)` 说的是「你正在改哪个函数」，
+ * 而一个 hunk 常有三四十行，滚到中段时那句话已经滚走了，屏幕上一个字都没有。
+ *
+ * 不需要 JS：第二个 hunk 顶上来时前一个自然被顶掉。滚动容器是 `.rvd`
+ *（`overflow: auto`），中间没有别的 overflow 挡着，sticky 直接成立。
+ *
+ * 底色本来就是不透明的 `--bg-sunken`，不用再补一层。但**要一条下边线**：
+ * 粘住的时候它和底下的代码贴成一块，看不出是浮着的还是就长在那儿。
+ */
 .rvd__line--hunk {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--bg-sunken);
+  box-shadow: 0 1px 0 var(--border);
 }
 
 /* ── 并排 ─────────────────────────────────────────────────────── */
@@ -690,6 +789,15 @@
   padding-left: var(--sp-2);
   background: var(--bg-sunken);
   color: var(--text-faint);
+}
+
+/* 并排下同一条规矩。**只给 hunk 不给 meta**：`.rvd__row--full` 也装文件头
+   那几行，而它们只出现在补丁最顶上，粘住没有意义还会和 hunk 头叠在一起 */
+.rvd__row--full.rvd__line--hunk {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: 0 1px 0 var(--border);
 }
 
 /* 「跨仓库 · 各自相对 HEAD」。**和统计数同一行、但明显更轻**——它是口径说明，

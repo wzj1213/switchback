@@ -200,7 +200,7 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-code);
-  line-height: 1.55;
+  line-height: var(--lh-code);
   white-space: pre;
 }
 

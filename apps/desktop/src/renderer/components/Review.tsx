@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { filterFiles, tallyReview, useReview, usePatch } from "../review.js"
 import { usePanelKeys } from "../use-panel-keys.js"
+import { useNarrowPanel } from "../use-narrow-panel.js"
 import type { ReviewFile } from "../../shared/review.js"
 import { ReviewList } from "./ReviewList.js"
 import { Tools } from "./ReviewTools.js"
@@ -88,6 +89,11 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
   onCopy: (text: string) => Promise<boolean>
 }): React.JSX.Element {
   const box = usePanelKeys(onClose, panelActive)
+  // 并排的闸门。`split` 记的是「你想怎么看」，`narrow` 记的是「现在放不放得下」——
+  // 两件事各存各的，于是拉宽之后自己回到并排，不用人再点一次。
+  // **量的是补丁区，不是这扇面板**：面板里还并排站着 260px 的文件清单
+  const pane = useRef<HTMLElement>(null)
+  const narrow = useNarrowPanel(pane)
   const [scope, setScope] = useState<ReviewScope>("last-turn")
   const data = useReview(cwd, stamp, { threadId, wanted, scope })
   const [query, setQuery] = useState("")
@@ -110,6 +116,19 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
   const ignored = ignoredOf(data.ignored)
   const unverified = ignored.length
   const file = files.find((f) => f.rel === active)
+  // 顶上那行统计和右边那句空态说的是**同一份现状**，原来各拼了一遍同样的九个字段。
+  // 拼两遍的代价不是行数，是「改一处漏一处」——两句话从此对不上而且不报错
+  const view = {
+    noRepo: data.noRepo,
+    loading: data.loading,
+    failed: data.failed,
+    baseline: data.baseline,
+    total,
+    unverified,
+    range: scopeLabel(scope),
+    turnMissing: data.turnMissing,
+    ...(data.more === undefined ? {} : { more: data.more }),
+  }
   return (
     <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动" hidden={!panelActive}>
       <PanelTabs {...panel} />
@@ -123,17 +142,11 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
           },
         }]} />
         <div className="rv__summary">
-          <ReviewSummary
-            state={{ noRepo: data.noRepo, loading: data.loading, failed: data.failed,
-              baseline: data.baseline, total, unverified, range: scopeLabel(scope),
-              turnMissing: data.turnMissing,
-              ...(data.more === undefined ? {} : { more: data.more }) }}
-            added={added}
-            removed={removed}
-          />
+          <ReviewSummary state={view} added={added} removed={removed} />
         </div>
           <Tools
             split={split}
+            narrow={narrow}
             onSplit={setSplit}
             context={context}
             onContext={setContext}
@@ -158,19 +171,9 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
         <ReviewPane
           file={file}
           patch={patch}
-          empty={blank({
-            noRepo: data.noRepo,
-            loading: data.loading,
-            failed: data.failed,
-            baseline: data.baseline,
-            range: scopeLabel(scope),
-            turnMissing: data.turnMissing,
-            total,
-            shown: files.length,
-            unverified,
-            ...(data.more === undefined ? {} : { more: data.more }),
-          })}
-          split={split}
+          empty={blank({ ...view, shown: files.length })}
+          split={split && !narrow}
+          box={pane}
           onCopy={onCopy}
         />
       </div>

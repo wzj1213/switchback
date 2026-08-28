@@ -1,4 +1,6 @@
+import { useMemo } from "react"
 import type { PatchSkip } from "../../shared/review.js"
+import { paintPatch, type Seg } from "../review-paint.js"
 import type { NumberedLine, SplitRow } from "../review.js"
 import { splitRows } from "../review.js"
 
@@ -15,7 +17,15 @@ import { splitRows } from "../review.js"
  * ## 并排是拼出来的
  *
  * git 不产出并排格式。规则见 `splitRows`：一段连续的删配一段连续的增。
- * 窄的时候不给并排（父层判断），两列各 40 字符的代码谁也读不了。
+ * **窄的时候不给并排**：闸门在 `Review.tsx`（`useNarrowPanel`），低于 420px
+ * 时按钮置灰、正在并排的自动退回单栏——两列各 14 个字符的代码谁也读不了。
+ *
+ * ## 三层增删信号，不是一层
+ *
+ * 记号列（`+`/`−`）、行底色、词级高亮。**单栏一直有记号列，并排原来漏了**——
+ * 于是并排下「这行是加的还是删的」只剩颜色一个信号，而那层 12% 的底色
+ * 压在纸上只有 1.18:1，红绿色觉障碍者在并排视图下拿不到任何可判读的线索。
+ * 补上之后灰度截图里增删仍然可分，那是这一条唯一真正的验收标准。
  */
 
 const SIGN: Readonly<Record<NumberedLine["kind"], string>> = {
@@ -33,40 +43,75 @@ const SKIP: Readonly<Record<PatchSkip, string>> = {
   failed: "读取这份改动失败，请刷新后重试",
 }
 
-function Num({ n }: { n: number | undefined }): React.JSX.Element {
+type Paint = ReadonlyMap<NumberedLine, readonly Seg[]>
+
+/**
+ * 行号槽。**三个槽，宽窄各用其中之一**（`review.css` 的容器查询决定谁显示）：
+ * 宽面板下旧号 + 新号两列，窄面板下只留一个「按行别取」的号——
+ * 那一档下两列行号要吃掉整块面板的三成，而窄面板下真正要读的是「改了什么」。
+ */
+function Num({ n, slot }: { n: number | undefined; slot: string }): React.JSX.Element {
   return (
-    <span className="rvd__n" aria-hidden="true">
+    <span className={`rvd__n rvd__n--${slot}`} aria-hidden="true">
       {n === undefined ? "" : n}
     </span>
   )
 }
 
-/** 单栏：行号两列（旧/新）+ 记号 + 正文。 */
-function UniLine({ line }: { line: NumberedLine }): React.JSX.Element {
+/** 正文。没什么可画的行不进 `paint` 表，那时一个 span 都不多生。 */
+function Text({ line, paint }: { line: NumberedLine; paint: Paint }): React.JSX.Element {
+  const segs = paint.get(line)
+  if (segs === undefined) {
+    return <span className="rvd__text">{line.text === "" ? " " : line.text}</span>
+  }
+  return (
+    <span className="rvd__text">
+      {segs.map((seg, index) => {
+        const cls = `${seg.cls ?? ""}${seg.hit === true ? " rvd__hit" : ""}`.trim()
+        return (
+          <span key={index} className={cls === "" ? undefined : cls}>
+            {seg.text}
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+/** 单栏：行号（宽两列 / 窄一列）+ 记号 + 正文。 */
+function UniLine({ line, paint }: { line: NumberedLine; paint: Paint }): React.JSX.Element {
   return (
     <div className={`rvd__line rvd__line--${line.kind}`}>
-      <Num n={line.old} />
-      <Num n={line.new} />
+      <Num n={line.old} slot="old" />
+      <Num n={line.new} slot="new" />
+      <Num n={line.kind === "del" ? line.old : line.new} slot="one" />
       <span className="rvd__sign" aria-hidden="true">
         {SIGN[line.kind]}
       </span>
-      <span className="rvd__text">{line.text === "" ? " " : line.text}</span>
+      <Text line={line} paint={paint} />
     </div>
   )
 }
 
 /** 并排的一侧。空的那一侧要画出来——不画的话两列高度对不齐，整片就错位了。 */
-function Side({ line, side }: { line: NumberedLine | undefined; side: "old" | "new" }): React.JSX.Element {
+function Side({ line, side, paint }: {
+  line: NumberedLine | undefined
+  side: "old" | "new"
+  paint: Paint
+}): React.JSX.Element {
   if (line === undefined) return <div className="rvd__cell rvd__cell--void" />
   return (
     <div className={`rvd__cell rvd__line--${line.kind}`}>
-      <Num n={side === "old" ? line.old : line.new} />
-      <span className="rvd__text">{line.text === "" ? " " : line.text}</span>
+      <Num n={side === "old" ? line.old : line.new} slot="one" />
+      <span className="rvd__sign" aria-hidden="true">
+        {SIGN[line.kind]}
+      </span>
+      <Text line={line} paint={paint} />
     </div>
   )
 }
 
-function SplitLine({ row }: { row: SplitRow }): React.JSX.Element {
+function SplitLine({ row, paint }: { row: SplitRow; paint: Paint }): React.JSX.Element {
   if (row.full !== undefined) {
     return (
       <div className={`rvd__row rvd__row--full rvd__line--${row.full.kind}`}>
@@ -76,18 +121,22 @@ function SplitLine({ row }: { row: SplitRow }): React.JSX.Element {
   }
   return (
     <div className="rvd__row">
-      <Side line={row.left} side="old" />
-      <Side line={row.right} side="new" />
+      <Side line={row.left} side="old" paint={paint} />
+      <Side line={row.right} side="new" paint={paint} />
     </div>
   )
 }
 
-export function ReviewDiff({ lines, skip, split, loading }: {
+export function ReviewDiff({ lines, path, skip, split, loading }: {
   lines: readonly NumberedLine[]
+  /** 相对路径，**只用来取语言**——取不到就不染（沿用「没标语言就不猜」）。 */
+  path?: string | undefined
   skip?: PatchSkip
   split: boolean
   loading: boolean
 }): React.JSX.Element {
+  // 着色和词级高亮一起算，一份补丁一次。切文件、换上下文档位才重算
+  const paint = useMemo(() => paintPatch(path, lines), [path, lines])
   if (skip !== undefined) return <p className="rvd__note">{SKIP[skip]}</p>
   // **加载中不清空正文**：切文件时闪一下白比等半秒更难受。旧的先留着，压淡
   if (lines.length === 0) {
@@ -97,13 +146,13 @@ export function ReviewDiff({ lines, skip, split, loading }: {
     <div className="rvd__body rvd__body--split">
       {splitRows(lines).map((row, i) => (
         // 行没有天然 id，这份数组在一次渲染里不变——用下标是正确的
-        <SplitLine key={`${String(i)}-${row.full?.kind ?? "p"}`} row={row} />
+        <SplitLine key={`${String(i)}-${row.full?.kind ?? "p"}`} row={row} paint={paint} />
       ))}
     </div>
   ) : (
     <div className="rvd__body">
       {lines.map((line, i) => (
-        <UniLine key={`${String(i)}-${line.kind}`} line={line} />
+        <UniLine key={`${String(i)}-${line.kind}`} line={line} paint={paint} />
       ))}
     </div>
   )

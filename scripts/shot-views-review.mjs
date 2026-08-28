@@ -58,7 +58,19 @@ export const REVIEW_VIEWS = [
           && buttons.every(button => button.height < 40 && button.width > 24)
       })()
       && document.querySelector('.rvd__body--split') === null
-      && document.querySelector('[aria-label="切换到分栏差异"]') !== null
+      && (() => {
+        /*
+         * **并排按钮两种长相都合法，认的是「它说的和它的状态一致」。**
+         *
+         * 补丁区放不下两列时它置灰，并把理由写进 aria-label
+         *（闸门见 use-narrow-panel.ts 的 SPLIT_MIN_W）。而这一屏的面板只有
+         * 300px、里面还站着 260px 的文件清单——**这一档正是它该灰的那一档**。
+         * 钉死「切换到分栏差异」必然失败，钉死置灰又会在展开态失败。
+         */
+        const split = document.querySelector('[aria-label="切换到分栏差异"], [aria-label^="补丁区放不下两列"]')
+        if (split === null) return false
+        return split.disabled === split.getAttribute('aria-label').startsWith('补丁区放不下两列')
+      })()
       && (() => {
         /*
          * **目录树的断言只在真有改动文件时才成立。**
@@ -222,11 +234,20 @@ export const REVIEW_VIEWS = [
   },
   {
     name: "04-分栏差异",
-    open: `document.querySelector('[aria-label="切换到分栏差异"]')?.click()`,
+    // **先展开成整扇再切并排。** 并排要求补丁区 ≥ 420px（`use-narrow-panel.ts` 的
+    // `SPLIT_MIN_W`），而停靠态下这块面板最宽 560px、里面还并排站着 260px 的
+    // 文件清单，补丁区只剩不到 300px——每侧 14 个字符，那正是这条闸门要挡的。
+    // 展开态才是并排真正可用的那一档，所以这一屏拍的就是那一档。
+    open: [
+      `document.querySelector('.rv .panel-tabs__expand')?.click()`,
+      `document.querySelector('[aria-label="切换到分栏差异"]')?.click()`,
+    ],
     ready: `.rvd__body.rvd__body--split`,
     assert: `document.querySelector('.rvd')?.getAttribute('aria-label') === '并排文件改动，可滚动'
-      && document.querySelector('[aria-label="切换到统一差异"]') !== null`,
-    after: `document.querySelector('[aria-label="切换到统一差异"]')?.click()`,
+      && document.querySelector('[aria-label="切换到统一差异"]') !== null
+      && document.querySelectorAll('.rvd__row:not(.rvd__row--full) .rvd__sign').length > 0`,
+    after: `document.querySelector('[aria-label="切换到统一差异"]')?.click();
+      document.querySelector('.rv .panel-tabs__expand')?.click()`,
   },
   {
     name: "04-隐藏审核文件",

@@ -246,7 +246,7 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-code);
-  line-height: 1.55;
+  line-height: var(--lh-code);
   white-space: pre-wrap;
   /* 任意处折行，不要让人横着读报错。横滚的白名单在 app.css 那条注释里
      （`.md pre` 和 `.md__scroll`），工具输出不在上面 */
@@ -262,7 +262,7 @@
    它盖的是这个盒子自己的底色，收错了会在末尾露出一道浅边 */
 .step__out--clip {
   position: relative;
-  max-height: calc(12 * 1.55 * var(--text-code));
+  max-height: calc(12 * var(--lh-code));
 }
 
 .step__out--clip::after {

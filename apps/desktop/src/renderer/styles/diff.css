@@ -111,18 +111,18 @@
   background: var(--bg-raised);
   font-family: var(--font-mono);
   font-size: var(--text-code);
-  line-height: 1.55;
+  line-height: var(--lh-code);
 }
 
 .dl {
   display: flex;
-  padding-right: var(--sp-2);
+  padding-right: var(--diff-pad-r);
   white-space: pre;
 }
 
 .dl__sign {
   flex: none;
-  width: 1.6em;
+  width: var(--diff-sign-w);
   text-align: center;
   color: var(--text-faint);
   user-select: none;
