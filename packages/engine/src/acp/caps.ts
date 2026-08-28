@@ -172,6 +172,25 @@ export interface AcpDriverConfig {
    * zcode-acp-server 0.5.1 会转发 steer，ZCode 后端 0.16.3 仍回 `Method not found`；
    * Grok 已验证的首方扩展另走 `steerCall`。
    * 不填就是没有：给一个点了没反应的入口，比不给更糟。
+   *
+   * **2026-08-28 复测（ZCode.app 3.7.7 / zcode-acp-server 0.5.1，mac2）**：
+   *
+   * | 方法 | 结果 |
+   * | --- | --- |
+   * | `session/steer` | `steer failed: Method not found: session/steer` —— **仍然没有** |
+   * | `session/compact` | **通**，回一份 snapshot |
+   *
+   * 作者问「ZCode 自己的 GUI 明显支持插话，为什么 omni 说不支持」——**GUI 走的
+   * 不是 ACP**。`zcode-acp-server` 是一层第三方转接壳，只翻译得出后端公开的那些
+   * 入口；GUI 直接跟后端说话，不经过这层转接。「产品支持」和
+   * 「ACP 暴露」是两件事，而 omni 只看得见后一件。
+   *
+   * 复测方法（不烧 token）：`initialize` → `session/new` → 在**没有进行中的轮次**上
+   * 发一次带 `content` 的 `session/steer`。方法在的话报的会是别的错（比如没有可插话
+   * 的轮次），`Method not found` 才是真没有。注意 `content` 不能空——壳自己会先抛
+   * `steer requires content`，那样测不到后端。
+   *
+   * ⚠️ `session/compact` **不能这么探**：它会真的压缩。那一项只能手填。
    */
   compact?: boolean
   steer?: boolean
