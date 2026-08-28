@@ -111,12 +111,48 @@ function nameOfLabel(label: string | undefined): string {
   return head.trim()
 }
 
-function categoryOfLabel(label: string | undefined): Category | undefined {
-  const name = nameOfLabel(label)
+function categoryOfName(name: string): Category | undefined {
   if (name === "") return undefined
   const direct = TOOL_CATEGORY[name]
   if (direct !== undefined) return direct
   return NAME_CATEGORY.find(([re]) => re.test(name))?.[1]
+}
+
+/**
+ * 名字在括号里的那一种。**实测 ZCode**：审批请求的 `title` 是
+ *
+ * ```
+ * tool permission (Bash)
+ * ```
+ *
+ * 取第一段拿到的是 `tool`——一个方向词都不中，于是每一条 Bash 都落 `unknown`。
+ * 而 `unknown` 恰好是**唯一**一个在「自动审批 → 完全访问」之间从 escalate 翻成
+ * allow 的类别：用户的体感就是「必须开完全访问，否则连 `ls` 都要点一次放行」，
+ * 而他挑的「自动审批」那一档在矩阵里 `exec` 本来就是 `allow`。
+ *
+ * ## 为什么敢看括号，而「冒号后面那截」仍然不看
+ *
+ * 冒号后面是**参数**（kimi 的 `Shell: cd /x && ls`），拿它判方向等于把展示层
+ * 接进安全层。括号里是**名字**——而且这一层只在头一段认不出方向时才问它，
+ * `Bash: rm (危险)` 这种头一段就中的，括号一眼都不看。
+ *
+ * ## 为什么放宽得起
+ *
+ * 认成 `exec` 之后并不等于放行：`blindExec` 紧跟着要求 `args.command` 也在。
+ * **命令原文看不见的话它照旧退回 `unknown`**——于是这一条只可能在
+ * 「omni 同时看得见命令原文」时生效，而那时靠命令原文的那 8 条红线
+ *（凭据读取、越界删除、`npm i -g`、`git push`、解析不了…）全都是活的。
+ */
+const PARENTHESISED = /[(（]\s*([^)）]+?)\s*[)）]/g
+
+function categoryOfLabel(label: string | undefined): Category | undefined {
+  const head = categoryOfName(nameOfLabel(label))
+  if (head !== undefined) return head
+  for (const match of (label ?? "").matchAll(PARENTHESISED)) {
+    const inner = categoryOfName(nameOfLabel(match[1]))
+    if (inner !== undefined) return inner
+  }
+  return undefined
 }
 
 /**

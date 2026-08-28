@@ -441,6 +441,59 @@ describe("kind 报 other 时按工具名字补一次分类", () => {
     expect(decide(acp(""), state("auto-edit")).action).toBe("escalate")
   })
 
+  /**
+   * **实测 ZCode**：审批请求的 `title` 是 `tool permission (Bash)`——
+   * 方向词在括号里，取第一段拿到的是 `tool`，一个都不中。
+   * 于是每条 Bash 都落 `unknown`，而 `unknown` 恰好是唯一一个在
+   * 「自动审批 → 完全访问」之间从 escalate 翻成 allow 的类别：
+   * 用户被逼着开完全访问，才不用给 `ls` 点放行。
+   */
+  describe("方向词在括号里（ZCode 的 `tool permission (Bash)`）", () => {
+    it("以前：括号不看 → 自动审批档下每条命令都要问", () => {
+      expect(decide(acp("tool permission (Bash)", { command: "ls -la" }), state("auto-edit")).action).toBe("allow")
+    })
+
+    /**
+     * **这条是上面那条敢放宽的全部理由。** 认成 `exec` 不等于放行：
+     * `blindExec` 紧跟着要求命令原文也在，看不见就退回 `unknown`。
+     * 于是括号这一层只可能在「omni 同时看得见命令」时生效，
+     * 而那时靠命令原文的 8 条红线全是活的。
+     */
+    it("**命令原文没到就照旧问**——括号只补方向，补不出事实", () => {
+      expect(decide(acp("tool permission (Bash)"), state("auto-edit")).action).toBe("escalate")
+    })
+
+    it("命令到了，红线跟着活：括号这一层不是绕过红线的入口", () => {
+      expect(decide(acp("tool permission (Bash)", { command: "cat ~/.ssh/id_rsa" }), state("auto-edit"))).toMatchObject({
+        action: "deny",
+        redline: "credential-read",
+      })
+      expect(decide(acp("tool permission (Bash)", { command: "git push" }), state("auto-edit"))).toMatchObject({
+        action: "escalate",
+        redline: "git-push",
+      })
+    })
+
+    it("只读档仍是地板：括号认出「跑命令」也照旧拒", () => {
+      expect(decide(acp("tool permission (Bash)", { command: "ls" }), state("read-only")).action).toBe("deny")
+    })
+
+    // 括号是**名字**才看；头一段认得出方向时它一眼都不看，否则冒号后面那截参数
+    // 里随便一个括号就成了改判方向的入口
+    it("头一段认得出方向时括号不参与", () => {
+      expect(decide(acp("WebFetch (Bash)", { command: "ls" }), state("auto-edit")).action).toBe("escalate")
+    })
+
+    it("括号里也认不出方向的照旧 unknown——这一层同样没有兜底成 allow 的分支", () => {
+      expect(decide(acp("tool permission (Frobnicate)", { command: "ls" }), state("auto-edit")).action).toBe("escalate")
+      expect(decide(acp("tool permission ()", { command: "ls" }), state("auto-edit")).action).toBe("escalate")
+    })
+
+    it("中文全角括号一样认——各家排版不统一", () => {
+      expect(decide(acp("工具授权（Bash）", { command: "ls -la" }), state("auto-edit")).action).toBe("allow")
+    })
+  })
+
   // `tool` 认得出来的时候一个字都不看标签，否则标签就成了绕过分类的入口
   it("`tool` 认得出来时以它为准，标签不参与", () => {
     expect(

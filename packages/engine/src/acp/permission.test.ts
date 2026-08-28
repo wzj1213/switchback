@@ -201,6 +201,41 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
     expect(pickMode(REAL, "auto-edit")).not.toBe("agent-full-access")
   })
 
+  /**
+   * **实测 ZCode**（`zcode-acp-server 0.5.1`）报五个档。
+   * 它同时有 `edit` 和 `auto`，而 omni 的「自动审批」定义是
+   *「优先使用引擎原生安全评审」——那说的就是 Auto，不是「能编辑」。
+   * 上一版 `edit` 6 分压过 `auto` 4 分，于是每条 `ls` 都要点一次放行。
+   */
+  describe("同时有 edit 和 auto 的那种档位表（ZCode）", () => {
+    const ZCODE = [
+      { id: "plan", name: "Plan" },
+      { id: "build", name: "Build" },
+      { id: "edit", name: "Edit" },
+      { id: "yolo", name: "Yolo" },
+      { id: "auto", name: "Auto" },
+    ]
+
+    it("自动审批挑 `auto`，不是 `edit`", () => {
+      expect(pickMode(ZCODE, "auto-edit")).toBe("auto")
+    })
+
+    it("上下两档不受影响：只读还是 plan，完全访问还是 yolo", () => {
+      expect(pickMode(ZCODE, "read-only")).toBe("plan")
+      expect(pickMode(ZCODE, "full")).toBe("yolo")
+    })
+
+    it("**放宽只放一格**：`auto` 加了权重也绝不会滑到 `yolo` 去", () => {
+      expect(pickMode(ZCODE, "auto-edit")).not.toBe("yolo")
+      expect(pickMode(ZCODE, "read-only")).not.toBe("auto")
+    })
+
+    // 没有 auto 的那些一个字都不受影响——codex-acp 照旧落 agent
+    it("没有 `auto` 的档位表照旧：codex-acp 仍然是 agent", () => {
+      expect(pickMode(REAL, "auto-edit")).toBe("agent")
+    })
+  })
+
   it("认不出的档位表就返回 undefined，由驱动保持引擎默认档并说明", () => {
     expect(pickMode([{ id: "alpha" }, { id: "beta" }], "auto-edit")).toBeUndefined()
     expect(pickMode([], "full")).toBeUndefined()

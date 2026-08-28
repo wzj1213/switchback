@@ -43,10 +43,28 @@ const HINTS: Readonly<Record<Trust, readonly (readonly [string, number])[]>> = {
     ["auto", -6],
   ],
   "auto-edit": [
+    /*
+     * **`auto` 压过 `agent` / `edit`。** 这一档 omni 自己的定义是
+     *「优先使用引擎原生安全评审；需要人工决定时才询问」——那说的**就是**一个
+     * 叫 Auto 的档，不是「能编辑」。
+     *
+     * 实测 ZCode（`zcode-acp-server 0.5.1`，五个档
+     * `plan / build / edit / yolo / auto`）：`auto` 只有 4 分、`edit` 有 6 分，
+     * 于是 omni 把它顶到了 **Edit**——一个能改文件、但每条命令都要问的档。
+     * 用户的体感是「必须开完全访问，否则连 `ls` 都要点一次放行」，
+     * 而他挑的那一档在 omni 自己的矩阵里 `exec` 本来就是 `allow`。
+     *
+     * 对 codex-acp（`read-only / agent / agent-full-access`）没有影响：那边
+     * 压根没有 `auto`，`agent` 照旧以 6 分拿下。
+     *
+     * ⚠️ 这是一次**放宽**，不是收紧——本文件开头那条「猜错的方向必须是安全的
+     * 那一边」仍然管着上下两档：`yolo` / `bypass` / `danger` 在这一档是 -10，
+     * 它绝不会因为多了几分就滑到最宽那一档去。
+     */
+    ["auto", 8],
     ["agent", 6],
     ["edit", 6],
     ["write", 5],
-    ["auto", 4],
     ["default", 3],
     ["full", -8],
     ["read-only", -10],
