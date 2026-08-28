@@ -405,8 +405,27 @@ class AcpSession implements EngineSession {
     if (needsNativeRestart(this.state.native, this.config.nativeApproval?.(trust))) {
       return { restart: true, detail: `${this.config.id} 的原生审批档要在开场设置；请等当前轮结束后续接重启。` }
     }
-    await applyTrust(this.knobs(), trust, this.state.modes)
+    /*
+     * **先记下新档，再去发 `session/set_mode`。**
+     *
+     * 反过来写会出一条稳定的假警告（实测 mac2）：`applyTrust` 是 await 的，
+     * 而引擎在这个 await 里就把新档推回来了——`onMode` 于是拿**还没更新的**
+     * `trust.current` 去算 `modeAxis`，算出「引擎在 yolo、omni 想要 edit」这种
+     * 根本不存在的分家。实测那条会话 `trust=full`、引擎正在 `yolo`
+     *（full 本来就映射到 yolo），黄字却挂了 17 分钟。
+     *
+     * 先记也更合本来的道理：档位下拉显示的**永远是 omni 的档**，它是唯一一个
+     *「点了就一定生效」的东西——就算引擎那边接不上，它至少驱动着本机的判定层
+     *（见 `trustHint.ts` 开头）。所以 `applyTrust` 抛了也不该退回旧档。
+     */
     this.trust.current = trust
+    await applyTrust(this.knobs(), trust, this.state.modes)
+    /*
+     * **换完档主动重算一次。** `modeAxis` 原来只在 `onMode` 里跑，而引擎**已经在
+     * 目标档上时不会再报一次**——于是之前存下的那条 `diverged` 永远不会自己消失，
+     * 哪怕两边此刻明明是一致的。判断依据变了就重判，不能等引擎开口。
+     */
+    if (this.state.mode !== undefined) this.updateContext().onMode?.(this.state.mode)
     return { restart: false }
   }
 

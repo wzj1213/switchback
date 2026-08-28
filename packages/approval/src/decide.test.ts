@@ -436,6 +436,18 @@ describe("kind 报 other 时按工具名字补一次分类", () => {
     expect(decide(acp("WebFetch: https://x.dev/a"), state("auto-edit")).action).toBe("escalate")
   })
 
+  /**
+   * **认不出动作时那句话要说实话。** `unknown` 是唯一一个在「自动审批 → 完全访问」
+   * 之间从 escalate 翻成 allow 的类别，所以笼统说一句「超出当前档位的自动放行范围」
+   * 会把人推去升档——而升到完全访问确实"管用"。那是最不该拉的那根杆。
+   */
+  it("没看清就说没看清，别让人以为该升档", () => {
+    const v = decide(acp("Frobnicate: 42"), state("auto-edit"))
+    expect(v.action).toBe("escalate")
+    expect(v.reason).toContain("没认出")
+    expect(v.reason).not.toContain("超出当前档位")
+  })
+
   it("认不出方向的名字**照旧 unknown**——这张表没有兜底成 allow 的分支", () => {
     expect(decide(acp("Frobnicate: 42"), state("auto-edit")).action).toBe("escalate")
     expect(decide(acp(""), state("auto-edit")).action).toBe("escalate")

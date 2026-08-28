@@ -228,6 +228,27 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
       expect(pickMode(ZCODE, "full")).toBe("yolo")
     })
 
+    /**
+     * **引擎已经在这一档想要的那个 mode 上，就必须判 aligned。**
+     *
+     * 实测出过反例：`trust=full`、引擎正在 `yolo`（full 本来就映射到 yolo），
+     * 界面上那条黄字却挂了 17 分钟。根因在 `driver.ts` 的 `setTrust`——
+     * `applyTrust` 是 await 的，引擎在这个 await 里就把新档推回来，
+     * 于是 `onMode` 拿**还没更新的** `trust.current` 去算这条轴。
+     * 这一组钉的是「算对了应该是什么」，那一半的时序修在 `setTrust` 里。
+     */
+    it("引擎已经在目标档上 → aligned，不是分家", () => {
+      expect(modeAxis(ZCODE, "full", "yolo").match).toBe("aligned")
+      expect(modeAxis(ZCODE, "auto-edit", "edit").match).toBe("aligned")
+      expect(modeAxis(ZCODE, "read-only", "plan").match).toBe("aligned")
+    })
+
+    it("真的不一致才判分家，而且带上引擎自己的档位名", () => {
+      const axis = modeAxis(ZCODE, "auto-edit", "yolo")
+      expect(axis.match).toBe("diverged")
+      expect(axis.label).toBe("Yolo")
+    })
+
     it("上下两档也不会滑到它身上", () => {
       expect(pickMode(ZCODE, "auto-edit")).not.toBe("yolo")
       expect(pickMode(ZCODE, "read-only")).not.toBe("auto")
