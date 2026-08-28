@@ -79,6 +79,41 @@ describe("档位说明：四种情形各说一句，其余一个字都不说", (
     expect(trustHint(thread, "Grok", "完全")?.text).toContain("agent-full-access")
   })
 
+  /**
+   * 分家那一句的形状。上一版实测「看不出是什么」，这四条各钉一处毛病，
+   * 免得下次有人「顺手改简洁一点」又把它改回去。
+   */
+  describe("分家那一句：一个轴，两个值，去处写在按钮上", () => {
+    const diverged = with_({ engineState: { axes: [axis("diverged", "yolo", "Yolo")], at: 1 } })
+    const hint = (): ReturnType<typeof trustHint> => trustHint(diverged, "ZCode", "完全访问")
+
+    it("**先说轴名**：不说的话「Yolo」和「完全访问」读起来像两个不相干的设置", () => {
+      expect(hint()?.text).toContain("权限档")
+      expect(hint()?.text).toContain("「Yolo」")
+      expect(hint()?.text).toContain("「完全访问」")
+    })
+
+    it("**omni 侧的档要出现在正文里**——「用户以为自己的档被引擎改掉了」是这句话要防的", () => {
+      expect(hint()?.text).toContain("omni 这条会话是「完全访问」")
+    })
+
+    it("「不是 omni 切的」挪进悬停：它替自己撇清，不该占第一眼的位置", () => {
+      expect(hint()?.text).not.toContain("不是 omni 切的")
+      expect(hint()?.tip).toContain("不是 omni 切的")
+    })
+
+    it("**按钮说去处**：上面一行常常正好是「切到 Grok」，「切回来」和它撞同一个动词", () => {
+      expect(hint()?.action?.label).toBe("改回「完全访问」")
+    })
+
+    it("悬停里不枚举红线清单——`redline.ts` 会增减，抄进文案迟早变成一句谎", () => {
+      const tip = hint()?.tip ?? ""
+      expect(tip).toContain("红线")
+      expect(tip).toContain("…")
+      expect(tip).toContain("ZCode")
+    })
+  })
+
   it("只有分家那一种给动作——其余三种真的没有动作可做", () => {
     expect(trustHint(with_({ engineState: { axes: [axis("diverged")], at: 1 } }), "G", "自动编辑")?.action).toBeDefined()
     expect(trustHint(with_({ trustApply: apply("fixed") }), "G", "自动编辑")?.action).toBeUndefined()

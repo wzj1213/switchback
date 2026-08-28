@@ -3,7 +3,7 @@ import { memo, useCallback, useMemo, useState } from "react"
 import { foldTurns, groupRows, withAsides } from "../group.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
-import { ArrowDownIcon } from "./icons.js"
+import { ToBottomIcon } from "./icons.js"
 import { TranscriptBlank } from "./transcript-blank.js"
 import { useApprovalState } from "../use-approval-state.js"
 import { RowView, canAsk, canRewind, keyOf, answerActs, lastMine, retryProps, approvalShortcut } from "./transcript-row.js"
@@ -144,7 +144,7 @@ export const Transcript = memo(function Transcript({
       <AskFloat pick={ask} onAsk={onReuse} />
       {atBottom ? null : (
         <button type="button" className="tobottom" aria-label="回到底部" data-tip="回到底部" onClick={toBottom}>
-          <ArrowDownIcon />
+          <ToBottomIcon />
         </button>
       )}
     </div>

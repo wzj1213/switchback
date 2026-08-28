@@ -21,6 +21,14 @@ import type { Thread } from "@omni/protocol"
 export interface TrustHint {
   kind: "diverged" | "fixed" | "unmapped"
   text: string
+  /**
+   * 「所以呢」。**摆在悬停里，不摆在那一行上。**
+   *
+   * 那一行占的是输入框正下方——整个界面最贵的一条地。它只该回答
+   * 「此刻发生了什么」，一句话说完；「这意味着什么、我该不该管、点了会怎样」
+   * 是你**追问**的时候才要的，和 `trustBlind` 挂在档位选择器悬停上同一条道理。
+   */
+  tip?: string
   /** 有动作可做时给一个。没有动作就别给按钮——一个点了没用的按钮比没有更糟。 */
   action?: { label: string; kind: "reapply" }
 }
@@ -38,10 +46,33 @@ function divergedHint(thread: Thread, engineLabel: string, trustLabel: string): 
   const name = diverged.label ?? diverged.id
   return {
     kind: "diverged",
-    // **后半句不能省。** 只说前半句，用户会以为自己的档位被引擎改掉了——
-    // 而 omni 的判定层其实一直按他选的那一档在拦
-    text: `${engineLabel} 那边现在是 ${name}（不是 omni 切的）。omni 的审批层仍按「${trustLabel}」在拦。`,
-    action: { label: "切回来", kind: "reapply" },
+    /*
+     * 一句话，一个轴，两个值。上一版是
+     * 「X 那边现在是 Yolo（不是 omni 切的）。omni 的审批层仍按「完全访问」在拦。」
+     * 实测「看不出是什么」，四处毛病各治各的：
+     *
+     * ① **两套词摆在一起，没说它们是同一个轴。**「Yolo」是引擎的词、「完全访问」
+     *    是 omni 的词，指的是同一件事——权限档——但句子里看不出来，读着像两个
+     *    不相干的设置各自出了状况。所以开头先把**轴名说出来**，后面两个值才有归属。
+     * ② **「（不是 omni 切的）」是替自己撇清，不是给用户信息。** 它回答的是一个
+     *    用户还没问出口的问题，却占着第一眼的位置。挪进 `tip`。
+     * ③ **「审批层」是 omni 的内部词。** 用户认识的是下拉里那三个档；
+     *    而「后半句不能省」要防的是「用户以为自己的档被引擎改掉了」——
+     *    直接说「omni 这条会话是「X」」比说「审批层仍按 X 在拦」更直接地防住它。
+     * ④ **「切回来」切什么回来。** 上面一行常常正好是「切到 Grok」，同一个动词
+     *    用在两件毫不相干的事上。改成把**去处**写进按钮。
+     */
+    text: `权限档不一致：${engineLabel} 在「${name}」，omni 这条会话是「${trustLabel}」。`,
+    /*
+     * **红线那句不枚举到底有哪几条。** `redline.ts` 里 `always("escalate" | "deny")`
+     * 的规则会随版本增减，把清单抄进一句 UI 文案，迟早变成一句谎——
+     * 而这个仓库把「说谎的注释比没注释贵」当规矩。举三个例子、后面留省略号。
+     */
+    tip:
+      `不是 omni 切的——引擎那边被改过。omni 的审批层不吃引擎的档：` +
+      `它仍按「${trustLabel}」判定，红线动作（工作区外的删除、读凭据、推远端…）` +
+      `任何档位下都要问过你。右边那颗键把 omni 的档重新推给 ${engineLabel}。`,
+    action: { label: `改回「${trustLabel}」`, kind: "reapply" },
   }
 }
 

@@ -34,7 +34,12 @@ function Hint({
 }): React.JSX.Element | null {
   if (hint === undefined) return null
   return (
-    <span className={`composer__hint composer__hint--${hint.kind}`} title={hint.text}>
+    <span
+      className={`composer__hint composer__hint--${hint.kind}`}
+      /* 全文 + 那句「所以呢」。**全文不能丢**：这一行会被挤窄截断，
+         悬停原本就是它唯一读全的办法，`tip` 是加在后面的，不是顶掉它的 */
+      title={hint.tip === undefined ? hint.text : `${hint.text}\n\n${hint.tip}`}
+    >
       {hint.text}
       {hint.action === undefined ? null : (
         <button type="button" className="composer__hintact" disabled={disabled} onClick={onReapply}>

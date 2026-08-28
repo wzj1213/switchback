@@ -774,17 +774,26 @@
   height: 30px;
   margin-left: -15px;
   padding: 0;
-  border: 1px solid var(--border);
+  /*
+   * **边框走 `--border-strong`，不是 `--border`。** 浅色下 `--bg-raised` 和
+   * `--bg` 是同一个纯白（见 `tokens.css`「只有浅色是三个纯白」），
+   * 于是这颗圆盘在浅色下的全部边界就只剩这一圈——7% 那一档撑不住，
+   * 远看是「白纸上一团浅灰」，连是不是个按钮都要犹豫一下。
+   * 深色下 `--bg-raised` 本来就比纸面亮一档，这一圈只是把它收干净。
+   */
+  border: 1px solid var(--border-strong);
   border-radius: 50%;
   background: var(--bg-raised);
-  color: var(--text-muted);
+  /* 它是屏幕上**唯一**一颗浮着的圆键，不是一排里的一颗：不必压到 muted 去和邻居
+     让位，压淡只会让本来就小的图形更难认 */
+  color: var(--text);
   box-shadow: var(--shadow-pop);
   cursor: default;
 }
 
 .tobottom:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  border-color: var(--text-faint);
 }
 
 /* 侧栏行里的转圈：那个会话还在跑 */

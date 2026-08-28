@@ -217,11 +217,24 @@ export function BranchIcon({ size }: { size?: number } = {}): React.JSX.Element 
 
 
 
-/** 回到底部。圆底加一个下箭头——codex 和 dsh 的那颗都是这个形状 */
-export function ArrowDownIcon({ size = 15 }: { size?: number }): React.JSX.Element {
+/**
+ * 回到底部。**箭头 + 一条底线**，不是光秃秃一支下箭头。
+ *
+ * 上一版照 codex / dsh 画了个纯下箭头，实测「看不出是什么」，原因是两层叠加的：
+ *
+ * - **形不达意。** 一支下箭头能是下载、能是收起、能是展开更多；
+ *   而这颗要说的是「到**底**」。箭头指着一条线才是那句话——
+ *   底线一加，图形语义才自足（`icon-base.tsx` 里那条判据）。
+ * - **太小。** 原来 15 号里箭头只占 9.6/16，落在 30px 的圆里是 9px 一根细线，
+ *   四周 10px 空白——远看只是个灰盘子上的一点脏。现在 17 号、竖向占 10.2/16，
+ *   底线横向拉到 8/16 给它一个能认出来的轮廓。
+ *
+ * 笔画粗细不用管：`Svg` 按尺寸反算，17 和 12 落到屏幕上一样粗。
+ */
+export function ToBottomIcon({ size = 17 }: { size?: number }): React.JSX.Element {
   return (
     <Svg size={size}>
-      <path d="M8 3.2v9.6M4.2 9 8 12.8 11.8 9" {...LINE} />
+      <path d="M8 2.4v6.7M4.8 5.9 8 9.1 11.2 5.9M4 12.6h8" {...LINE} />
     </Svg>
   )
 }
