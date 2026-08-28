@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>omni · 字体与 Diff 融合原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fff;
+      --side: #f4f4f4;
+      --soft: #f7f7f7;
+      --hover: #ebebeb;
+      --active: #e4e4e4;
+      --ink: #2b2b2b;
+      --muted: #707070;
+      --faint: #a0a0a0;
+      --line: #e5e5e5;
+      --line-strong: #d9d9d9;
+      --blue: #3578bc;
+      --green: #228a4b;
+      --green-bg: #effaf2;
+      --green-hit: #c9efd3;
+      --red: #ce4a55;
+      --red-bg: #fdf0f1;
+      --red-hit: #f4cbd0;
+      --hunk: #f3f7fa;
+      --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+      --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, "PingFang SC", monospace;
+      --text-title: 14px;
+      --text-prose: 15px;
+      --text-ui: 14px;
+      --text-meta: 13px;
+      --text-code: 12.5px;
+      --line-prose: 26px;
+      --line-ui: 20px;
+      --line-meta: 16px;
+      --weight-regular: 400;
+      --weight-medium: 500;
+      --weight-semibold: 600;
+      --radius-control: 7px;
+      --radius-chat: 16px;
+      --shadow-float: 0 4px 18px rgb(0 0 0 / 8%);
+      --ease: cubic-bezier(.2, .8, .2, 1);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #e9eaec;
+      color: var(--ink);
+      font-family: var(--ui);
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-ui);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    button, textarea { color: inherit; font: inherit; font-family: var(--ui); }
+    button { border: 0; }
+    svg { display: block; }
+
+    .window {
+      position: relative;
+      display: grid;
+      grid-template-rows: 46px minmax(0, 1fr);
+      width: calc(100vw - 32px);
+      height: calc(100vh - 32px);
+      margin: 16px;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: 0 18px 60px rgb(0 0 0 / 15%);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 246px minmax(0, 1fr) minmax(560px, .95fr);
+      border-bottom: 1px solid var(--line);
+      transition: grid-template-columns 320ms var(--ease);
+      user-select: none;
+    }
+    .top-left, .thread-top, .review-top { display: flex; align-items: center; }
+    .top-left { gap: 8px; padding: 0 16px; background: var(--side); }
+    .traffic { display: flex; gap: 7px; margin-right: 10px; }
+    .traffic i { width: 11px; height: 11px; border-radius: 50%; }
+    .traffic i:first-child { background: #ef6258; }
+    .traffic i:nth-child(2) { background: #f6bd3f; }
+    .traffic i:last-child { background: #31bd55; }
+    .ghost-icon {
+      display: grid;
+      width: 27px;
+      height: 27px;
+      padding: 0;
+      place-items: center;
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: #8a8a8a;
+      cursor: pointer;
+    }
+    .ghost-icon:hover { background: var(--hover); color: var(--ink); }
+    .ghost-icon:focus-visible, .layout-switch button:focus-visible,
+    .task:focus-visible, .file-tab:focus-visible, .send:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--blue) 72%, white);
+      outline-offset: -2px;
+    }
+    .thread-top { gap: 8px; min-width: 0; padding: 0 14px; }
+    .thread-title {
+      min-width: 0;
+      overflow: hidden;
+      font-size: var(--text-title);
+      font-weight: var(--weight-semibold);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .top-spacer { flex: 1; }
+    .review-top {
+      gap: 8px;
+      min-width: 0;
+      padding: 0 10px 0 12px;
+      border-left: 1px solid var(--line-strong);
+      background: var(--soft);
+    }
+    .review-title { font-size: var(--text-title); font-weight: var(--weight-semibold); }
+    .review-stat { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-regular); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 246px minmax(0, 1fr) minmax(560px, .95fr);
+      min-height: 0;
+      transition: grid-template-columns 320ms var(--ease);
+    }
+    .window.diff-focus .layout { grid-template-columns: 0 0 minmax(0, 1fr); }
+    .window.diff-focus .topbar { grid-template-columns: 0 0 minmax(0, 1fr); }
+    .window.diff-focus .top-left, .window.diff-focus .thread-top,
+    .window.diff-focus .sidebar, .window.diff-focus .thread { visibility: hidden; opacity: 0; }
+
+    .sidebar {
+      display: flex;
+      min-width: 246px;
+      min-height: 0;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid var(--line);
+      background: var(--side);
+      transition: opacity 140ms ease, visibility 0s 320ms;
+    }
+    .side-head { padding: 12px 14px 8px; }
+    .product {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 2px 10px;
+      font-size: var(--text-title);
+      font-weight: var(--weight-semibold);
+    }
+    .quick-row {
+      display: flex;
+      height: 32px;
+      align-items: center;
+      gap: 9px;
+      padding: 0 6px;
+      width: 100%;
+      border-radius: var(--radius-control);
+      color: #505050;
+      background: transparent;
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+      text-align: left;
+      cursor: pointer;
+    }
+    .quick-row:hover { background: var(--hover); }
+    .quick-row svg { flex: none; color: #727272; }
+    .quick-row .quick-end { margin-left: auto; color: #8c8c8c; }
+    .status-mark { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--blue); }
+    .side-scroll { min-height: 0; flex: 1; overflow: auto; padding: 2px 8px 12px; }
+    .side-label {
+      padding: 13px 9px 5px;
+      color: #929292;
+      font-size: var(--text-meta);
+      font-weight: var(--weight-regular);
+    }
+    .project {
+      display: flex;
+      height: 29px;
+      align-items: center;
+      gap: 7px;
+      padding: 0 8px;
+      color: #454545;
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+    }
+    .task {
+      display: flex;
+      width: 100%;
+      min-height: 30px;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 8px 5px 30px;
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: #484848;
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-ui);
+      text-align: left;
+      cursor: pointer;
+    }
+    .task:hover { background: var(--hover); }
+    .task.active { background: var(--active); color: #242424; font-weight: var(--weight-medium); }
+    .task span:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .spin { width: 9px; height: 9px; flex: none; border: 1.5px solid #aaa; border-right-color: transparent; border-radius: 50%; }
+    .side-foot {
+      display: flex;
+      height: 45px;
+      flex: none;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      border-top: 1px solid var(--line-strong);
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+    }
+    .avatar {
+      display: grid;
+      width: 19px;
+      height: 19px;
+      place-items: center;
+      border-radius: 50%;
+      background: #9f6cc3;
+      color: #fff;
+      font-size: 8px;
+      font-weight: var(--weight-semibold);
+    }
+
+    .thread {
+      display: flex;
+      min-width: 0;
+      min-height: 0;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+      transition: opacity 140ms ease, visibility 0s 320ms;
+    }
+    .timeline { min-height: 0; flex: 1; overflow: auto; padding: 34px 34px 122px; }
+    .content { width: min(100%, 760px); margin: 0 auto; }
+    .user-message {
+      width: fit-content;
+      max-width: 72%;
+      margin: 4px 0 48px auto;
+      padding: 11px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-chat) var(--radius-chat) 6px var(--radius-chat);
+      background: #f3f3f3;
+      font-size: var(--text-prose);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-prose);
+    }
+    .turn-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      color: #8d8d8d;
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-ui);
+    }
+    .turn-mark::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+    .answer {
+      color: #282828;
+      font-size: var(--text-prose);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-prose);
+    }
+    .answer p { margin: 0 0 13px; }
+    .answer strong { font-weight: var(--weight-semibold); }
+    .answer code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: var(--soft);
+      font-family: var(--mono);
+      font-size: .88em;
+    }
+    .activity {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin: 13px 0 15px;
+      color: #8b8b8b;
+      font-size: var(--text-ui);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-ui);
+    }
+    .activity b { color: #6f6f6f; font-weight: var(--weight-medium); }
+    .activity svg { flex: none; color: #898989; }
+    .activity .cmd { min-width: 0; overflow: hidden; font-family: var(--mono); font-size: var(--text-code); text-overflow: ellipsis; white-space: nowrap; }
+    .fade { color: #c4c4c4; }
+
+    .compose-zone {
+      position: absolute;
+      right: calc(max(560px, (100vw - 32px - 246px) * .487));
+      bottom: 28px;
+      left: 246px;
+      z-index: 3;
+      padding: 0 34px;
+      pointer-events: none;
+      transition: inset 320ms var(--ease), opacity 140ms;
+    }
+    .window.diff-focus .compose-zone { opacity: 0; visibility: hidden; }
+    .compose-inner { width: min(100%, 760px); margin: 0 auto; pointer-events: auto; }
+    .change-pill {
+      width: fit-content;
+      margin: 0 auto 7px;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgb(255 255 255 / 92%);
+      box-shadow: var(--shadow-float);
+      color: #777;
+      font-size: var(--text-meta);
+      font-weight: var(--weight-medium);
+      backdrop-filter: blur(12px);
+    }
+    .composer {
+      min-height: 96px;
+      padding: 12px 13px 9px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-chat);
+      background: rgb(255 255 255 / 96%);
+      box-shadow: var(--shadow-float);
+      backdrop-filter: blur(14px);
+    }
+    .composer textarea {
+      width: 100%;
+      min-height: 45px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font-size: var(--text-prose);
+      font-weight: var(--weight-regular);
+      line-height: var(--line-prose);
+    }
+    .composer textarea::placeholder { color: #b8b8b8; }
+    .composer-bar { display: flex; align-items: center; gap: 8px; color: #888; }
+    .composer-action { display: flex; align-items: center; gap: 5px; background: transparent; color: #777; font-size: var(--text-meta); font-weight: var(--weight-medium); }
+    .model { display: flex; align-items: center; gap: 3px; margin-left: auto; color: #555; font-size: var(--text-meta); font-weight: var(--weight-medium); }
+    .send {
+      display: grid;
+      width: 29px;
+      height: 29px;
+      padding: 0;
+      place-items: center;
+      border-radius: 50%;
+      background: #202329;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .review {
+      display: flex;
+      min-width: 560px;
+      min-height: 0;
+      flex-direction: column;
+      overflow: hidden;
+      border-left: 1px solid var(--line-strong);
+      background: var(--bg);
+    }
+    .review-tools {
+      display: flex;
+      min-height: 43px;
+      flex: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+    .scope {
+      display: flex;
+      height: 28px;
+      align-items: center;
+      gap: 4px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      background: var(--bg);
+      font-size: var(--text-meta);
+      font-weight: var(--weight-medium);
+    }
+    .layout-switch {
+      display: flex;
+      margin-left: auto;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      background: var(--soft);
+    }
+    .layout-switch button {
+      height: 23px;
+      padding: 0 8px;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      font-size: var(--text-meta);
+      font-weight: var(--weight-medium);
+      cursor: pointer;
+    }
+    .layout-switch button.on { background: var(--bg); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+    .file-strip {
+      display: flex;
+      min-height: 45px;
+      flex: none;
+      align-items: stretch;
+      gap: 2px;
+      padding: 6px 7px 0;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--soft);
+    }
+    .file-tab {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      min-width: 154px;
+      max-width: 196px;
+      align-items: center;
+      gap: 8px;
+      padding: 0 9px;
+      border: 1px solid transparent;
+      border-radius: 8px 8px 0 0;
+      background: transparent;
+      color: #666;
+      text-align: left;
+      cursor: pointer;
+    }
+    .file-tab.on { border-color: var(--line-strong); border-bottom-color: var(--bg); background: var(--bg); color: var(--ink); }
+    .file-name { overflow: hidden; font-family: var(--mono); font-size: var(--text-meta); font-weight: var(--weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+    .file-count { font-family: var(--mono); font-size: var(--text-meta); }
+    .plus { color: var(--green); }
+    .minus { color: var(--red); }
+    .diff-head {
+      display: flex;
+      height: 37px;
+      flex: none;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      font-size: var(--text-meta);
+    }
+    .path { min-width: 0; flex: 1; overflow: hidden; font-family: var(--mono); font-weight: var(--weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+    .kind { padding: 2px 6px; border-radius: 5px; background: var(--soft); color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+    .diff-scroll { min-height: 0; flex: 1; overflow: auto; }
+    .diff-table {
+      min-width: 540px;
+      padding: 7px 0 24px;
+      font-family: var(--mono);
+      font-size: var(--text-code);
+      font-weight: var(--weight-regular);
+      line-height: 20px;
+      tab-size: 2;
+    }
+    .diff-row { display: grid; grid-template-columns: minmax(270px, 1fr) minmax(270px, 1fr); }
+    .diff-line {
+      display: grid;
+      grid-template-columns: 42px 18px minmax(0, 1fr);
+      min-height: 20px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .diff-line:first-child { border-right: 1px solid var(--line-strong); }
+    .diff-row:hover .diff-line { background-color: #fff7e6; }
+    .line-number {
+      padding-right: 8px;
+      border-right: 1px solid rgb(217 217 217 / 70%);
+      color: #aaa;
+      text-align: right;
+      user-select: none;
+      font-variant-numeric: tabular-nums;
+    }
+    .mark { color: #aaa; text-align: center; font-weight: var(--weight-semibold); user-select: none; }
+    .code { padding: 0 9px 0 3px; color: #414141; }
+    .del { background: var(--red-bg); }
+    .del .mark { color: var(--red); }
+    .add { background: var(--green-bg); }
+    .add .mark { color: var(--green); }
+    .void {
+      background-color: #f6f6f6;
+      background-image: repeating-linear-gradient(-45deg, transparent 0 7px, rgb(0 0 0 / 2.5%) 7px 8px);
+    }
+    .void > * { visibility: hidden; }
+    .hunk {
+      grid-column: 1 / -1;
+      min-height: 26px;
+      padding: 3px 10px;
+      border-block: 1px solid var(--line);
+      background: var(--hunk);
+      color: #607486;
+      font-size: var(--text-meta);
+      font-weight: var(--weight-medium);
+    }
+    .kw { color: #8a4fa4; }
+    .sel { color: #2f6fac; }
+    .val { color: #9e5b37; }
+    .comment { color: #929292; font-style: italic; }
+    .hit-del { border-radius: 2px; background: var(--red-hit); }
+    .hit-add { border-radius: 2px; background: var(--green-hit); }
+    .diff-table.unified { min-width: 440px; }
+    .diff-table.unified .diff-row { grid-template-columns: minmax(440px, 1fr); }
+    .diff-table.unified .same.new, .diff-table.unified .void { display: none; }
+    .diff-table.unified .diff-line:first-child { border-right: 0; }
+
+    @media (max-width: 1240px) {
+      .topbar, .layout { grid-template-columns: 210px minmax(420px, .8fr) minmax(540px, 1.2fr); }
+      .sidebar { min-width: 210px; }
+      .compose-zone { left: 210px; right: max(540px, (100vw - 32px - 210px) * .57); }
+      .timeline { padding-inline: 24px; }
+    }
+    @media (max-width: 1020px) {
+      .topbar, .layout { grid-template-columns: 0 minmax(400px, .8fr) minmax(520px, 1.2fr); }
+      .top-left, .sidebar { visibility: hidden; opacity: 0; }
+      .compose-zone { left: 0; right: max(520px, (100vw - 32px) * .6); padding-inline: 20px; }
+    }
+    @media (max-width: 900px) {
+      .topbar, .layout { grid-template-columns: 0 0 minmax(0, 1fr); }
+      .thread-top, .thread, .compose-zone { visibility: hidden; opacity: 0; }
+      .review { min-width: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <symbol id="folder" viewBox="0 0 24 24"><path d="M3.5 6.5h6l2 2h9v9.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.55"/><path d="m15 15 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/></symbol>
+    <symbol id="focus" viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/></symbol>
+    <symbol id="send" viewBox="0 0 24 24"><path d="M12 18V6m0 0-4.5 4.5M12 6l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6M16 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.55"/><path d="M9 4v16" fill="none" stroke="currentColor" stroke-width="1.55"/></symbol>
+    <symbol id="arrow-left" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="arrow-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.35" fill="currentColor"/><circle cx="12" cy="12" r="1.35" fill="currentColor"/><circle cx="19" cy="12" r="1.35" fill="currentColor"/></symbol>
+    <symbol id="chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="compose" viewBox="0 0 24 24"><path d="M13.5 5.5H6a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2v-7.5" fill="none" stroke="currentColor" stroke-width="1.55"/><path d="m11 13 1.2-3.8L18.4 3a1.8 1.8 0 0 1 2.6 2.6l-6.2 6.2z" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"/></symbol>
+    <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.55"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/></symbol>
+    <symbol id="terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.55"/><path d="m7 9 3 3-3 3M13 15h4" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.6 2.8 8 7 10 4.2-2 7-5.4 7-10V6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.55"/><path d="M9.8 9.5a2.4 2.4 0 1 1 3.3 2.2c-.8.4-1.1.8-1.1 1.6M12 16.8h.01" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <div class="window" id="window">
+    <header class="topbar">
+      <div class="top-left">
+        <div class="traffic"><i></i><i></i><i></i></div>
+        <button class="ghost-icon" aria-label="收起侧栏"><svg width="15" height="15"><use href="#sidebar"/></svg></button>
+        <button class="ghost-icon" aria-label="后退"><svg width="15" height="15"><use href="#arrow-left"/></svg></button>
+        <button class="ghost-icon" aria-label="前进"><svg width="15" height="15"><use href="#arrow-right"/></svg></button>
+      </div>
+      <div class="thread-top">
+        <svg width="15" height="15"><use href="#folder"/></svg>
+        <span class="thread-title">打磨 omni 字体与差异阅读</span>
+        <button class="ghost-icon" aria-label="更多"><svg width="15" height="15"><use href="#more"/></svg></button>
+        <span class="top-spacer"></span>
+      </div>
+      <div class="review-top">
+        <svg width="14" height="14"><use href="#code"/></svg>
+        <span class="review-title">审核改动</span>
+        <span class="review-stat">上一轮 · 3 个文件</span>
+        <span class="top-spacer"></span>
+        <button class="ghost-icon" id="focusButton" aria-label="专注查看差异" aria-pressed="false"><svg width="14" height="14"><use href="#focus"/></svg></button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="side-head">
+          <div class="product">omni <svg width="13" height="13"><use href="#chevron"/></svg><span class="top-spacer"></span><svg width="14" height="14"><use href="#search"/></svg></div>
+          <button class="quick-row"><svg width="15" height="15"><use href="#compose"/></svg><span>新对话</span><svg class="quick-end" width="14" height="14"><use href="#plus"/></svg></button>
+          <button class="quick-row"><svg width="15" height="15"><use href="#search"/></svg><span>快速搜索</span></button>
+          <button class="quick-row"><svg width="15" height="15"><use href="#clock"/></svg><span>已安排</span><i class="status-mark"></i></button>
+        </div>
+        <div class="side-scroll">
+          <div class="side-label">置顶</div>
+          <div class="side-label">项目</div>
+          <div class="project"><svg width="15" height="15"><use href="#folder"/></svg><span>omni</span></div>
+          <button class="task active"><span>打磨 omni 字体与差异阅读</span><i class="spin"></i></button>
+          <button class="task"><span>远程接管验收</span></button>
+          <button class="task"><span>修复工作台切换闪烁</span></button>
+          <button class="task"><span>设置页引擎状态梳理</span></button>
+          <button class="task"><span>分支对比信息架构</span></button>
+          <div class="project"><svg width="15" height="15"><use href="#folder"/></svg><span>notes-app</span></div>
+          <div class="project"><svg width="15" height="15"><use href="#folder"/></svg><span>mac2</span></div>
+          <div class="project"><svg width="15" height="15"><use href="#folder"/></svg><span>dsh</span></div>
+        </div>
+        <div class="side-foot"><span class="avatar">ML</span><span>messi leo</span><span class="top-spacer"></span><svg width="15" height="15"><use href="#help"/></svg></div>
+      </aside>
+
+      <main class="thread">
+        <div class="timeline">
+          <div class="content">
+            <div class="user-message">参考 Codex 这套 GUI 的字体与留白，再把舒服的并排 diff 融进 omni。</div>
+            <div class="turn-mark">已处理 3 分 26 秒</div>
+            <div class="answer">
+              <p>这版保留 Codex 界面最有辨识度的三件事：<strong>系统字体、宽松行高、回答区不套卡片</strong>。正文提升到 15.5px / 27px，辅助信息靠颜色退后，不再一律缩成小字。</p>
+              <div class="activity"><svg width="14" height="14"><use href="#search"/></svg><b>检索了 9 个文件</b><span>·</span><span>读取现有字体 token 与 ReviewDiff</span></div>
+              <p>用户消息仍然靠右收成浅灰气泡；回答保持平铺，工具活动只占一行。右边的审核面板则把文件改为顶部页签，让 diff 得到完整宽度。</p>
+              <div class="activity fade"><svg width="14" height="14"><use href="#terminal"/></svg><span class="cmd">pnpm test ReviewDiff transcript-row</span><span>通过</span></div>
+              <p>并排视图使用稳定的行号槽与 12px 等宽字体，增删面只有轻微色相，真正变化的词再加一层高亮。这样颜色说明差异，不会抢正文。</p>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside class="review">
+        <div class="review-tools">
+          <button class="scope">上一轮<svg width="12" height="12"><use href="#chevron"/></svg></button>
+          <span class="review-stat">3 个文件 · <span class="plus">+74</span> <span class="minus">−31</span></span>
+          <div class="layout-switch"><button id="unifiedButton">单栏</button><button class="on" id="splitButton">并排</button></div>
+          <button class="ghost-icon" aria-label="搜索文件"><svg width="14" height="14"><use href="#search"/></svg></button>
+        </div>
+        <div class="file-strip">
+          <button class="file-tab on"><span class="file-name">review.css</span><span class="file-count"><span class="plus">+42</span> <span class="minus">−18</span></span></button>
+          <button class="file-tab"><span class="file-name">ReviewDiff.tsx</span><span class="file-count"><span class="plus">+24</span> <span class="minus">−9</span></span></button>
+          <button class="file-tab"><span class="file-name">tokens.css</span><span class="file-count"><span class="plus">+8</span> <span class="minus">−4</span></span></button>
+        </div>
+        <div class="diff-head"><span class="kind">已修改</span><span class="path">apps/desktop/src/renderer/styles/review.css</span><span class="review-stat">UTF-8</span></div>
+        <div class="diff-scroll" tabindex="0">
+          <div class="diff-table" id="diffTable">
+            <div class="diff-row"><div class="hunk">@@ −486,12 +486,18 @@ · .rvd__body</div></div>
+            <div class="diff-row">
+              <div class="diff-line same old"><span class="line-number">486</span><span class="mark"></span><span class="code"><span class="comment">/* 代码正文不再使用最小字号 */</span></span></div>
+              <div class="diff-line same new"><span class="line-number">486</span><span class="mark"></span><span class="code"><span class="comment">/* 代码正文不再使用最小字号 */</span></span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line same old"><span class="line-number">487</span><span class="mark"></span><span class="code"><span class="sel">.rvd__body</span> {</span></div>
+              <div class="diff-line same new"><span class="line-number">487</span><span class="mark"></span><span class="code"><span class="sel">.rvd__body</span> {</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line del old"><span class="line-number">488</span><span class="mark">−</span><span class="code">  <span class="kw">font-size</span>: <span class="hit-del">11.5px</span>;</span></div>
+              <div class="diff-line add new"><span class="line-number">488</span><span class="mark">+</span><span class="code">  <span class="kw">font-size</span>: <span class="hit-add">12px</span>;</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line del old"><span class="line-number">489</span><span class="mark">−</span><span class="code">  <span class="kw">line-height</span>: <span class="hit-del">1.45</span>;</span></div>
+              <div class="diff-line add new"><span class="line-number">489</span><span class="mark">+</span><span class="code">  <span class="kw">line-height</span>: <span class="hit-add">20px</span>;</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line same old"><span class="line-number">490</span><span class="mark"></span><span class="code">  <span class="kw">font-family</span>: var(--font-mono);</span></div>
+              <div class="diff-line same new"><span class="line-number">490</span><span class="mark"></span><span class="code">  <span class="kw">font-family</span>: var(--font-mono);</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line void old"><span></span><span></span><span></span></div>
+              <div class="diff-line add new"><span class="line-number">491</span><span class="mark">+</span><span class="code">  <span class="kw">font-weight</span>: <span class="val">450</span>;</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line same old"><span class="line-number">491</span><span class="mark"></span><span class="code">}</span></div>
+              <div class="diff-line same new"><span class="line-number">492</span><span class="mark"></span><span class="code">}</span></div>
+            </div>
+            <div class="diff-row"><div class="hunk">@@ −521,8 +527,15 @@ · .rvd__cell</div></div>
+            <div class="diff-row">
+              <div class="diff-line same old"><span class="line-number">521</span><span class="mark"></span><span class="code"><span class="sel">.rvd__cell</span> {</span></div>
+              <div class="diff-line same new"><span class="line-number">527</span><span class="mark"></span><span class="code"><span class="sel">.rvd__cell</span> {</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line del old"><span class="line-number">522</span><span class="mark">−</span><span class="code">  <span class="kw">display</span>: <span class="hit-del">flex</span>;</span></div>
+              <div class="diff-line add new"><span class="line-number">528</span><span class="mark">+</span><span class="code">  <span class="kw">display</span>: <span class="hit-add">grid</span>;</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line void old"><span></span><span></span><span></span></div>
+              <div class="diff-line add new"><span class="line-number">529</span><span class="mark">+</span><span class="code">  <span class="kw">grid-template-columns</span>: <span class="val">42px 18px 1fr</span>;</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line del old"><span class="line-number">523</span><span class="mark">−</span><span class="code">  <span class="kw">word-break</span>: <span class="hit-del">break-all</span>;</span></div>
+              <div class="diff-line add new"><span class="line-number">530</span><span class="mark">+</span><span class="code">  <span class="kw">overflow-wrap</span>: <span class="hit-add">anywhere</span>;</span></div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-line same old"><span class="line-number">524</span><span class="mark"></span><span class="code">}</span></div>
+              <div class="diff-line same new"><span class="line-number">531</span><span class="mark"></span><span class="code">}</span></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="compose-zone">
+      <div class="compose-inner">
+        <div class="change-pill">3 个文件已更改 <span class="plus">+74</span> <span class="minus">−31</span></div>
+        <div class="composer">
+          <textarea aria-label="消息" placeholder="随心输入"></textarea>
+          <div class="composer-bar"><button class="composer-action" aria-label="添加附件"><svg width="14" height="14"><use href="#plus"/></svg></button><button class="composer-action"><svg width="14" height="14"><use href="#shield"/></svg>帮我批准</button><span class="model">5.6 Sol · 极高<svg width="11" height="11"><use href="#chevron"/></svg></span><button class="send" aria-label="发送"><svg width="15" height="15"><use href="#send"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const windowElement = document.querySelector("#window");
+    const focusButton = document.querySelector("#focusButton");
+    const diffTable = document.querySelector("#diffTable");
+    const splitButton = document.querySelector("#splitButton");
+    const unifiedButton = document.querySelector("#unifiedButton");
+
+    focusButton.addEventListener("click", () => {
+      const focused = windowElement.classList.toggle("diff-focus");
+      focusButton.setAttribute("aria-pressed", String(focused));
+      focusButton.setAttribute("aria-label", focused ? "退出专注查看" : "专注查看差异");
+    });
+
+    function changeLayout(unified) {
+      diffTable.classList.toggle("unified", unified);
+      splitButton.classList.toggle("on", !unified);
+      unifiedButton.classList.toggle("on", unified);
+    }
+    splitButton.addEventListener("click", () => changeLayout(false));
+    unifiedButton.addEventListener("click", () => changeLayout(true));
+  </script>
+</body>
+</html>

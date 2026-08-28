@@ -1,0 +1,2234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>omni · Diff 阅读与等宽排版 · 优化方案原型 · 2026-08-27</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   这份文件里有两套样式，别混淆：
+
+   1. `.pg*` —— 文档本身的排版（这一页是怎么长的）。
+   2. `.rv* / .rvd* / .dfile* / .msg* / .row*` —— **omni 的类名原样搬过来**，
+      值取自 apps/desktop/src/renderer/styles/*.css 的实测值。
+      改这里等于改提案，不是改文档。
+
+   现状与方案的切换**全部走自定义属性**（`--d-*`），不走选择器：
+   自定义属性是继承的，所以最内层那个 `[data-mode]` 说了算——
+   同一页里可以出现「外层是方案、内层某块是现状」的并排比稿。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── omni 的 token（tokens.css 原值） ───────────────────────── */
+:root {
+  --ink: 22 22 28;
+  --bg: #ffffff;
+  --bg-sunken: #f7f7f8;
+  --bg-raised: #ffffff;
+  --bg-hover: rgb(var(--ink) / 4%);
+  --bg-active: rgb(var(--ink) / 7%);
+  --bg-press: rgb(var(--ink) / 9%);
+  --bg-code: rgb(var(--ink) / 4%);
+  --bg-said: rgb(var(--ink) / 4%);
+  --border: rgb(var(--ink) / 7%);
+  --border-strong: rgb(var(--ink) / 12%);
+  --text: rgb(var(--ink));
+  --text-muted: rgb(var(--ink) / 70%);
+  --text-faint: rgb(var(--ink) / 62%);
+  --text-inverse: #ffffff;
+  --accent: #3568c8;
+  --danger: #b63b29;
+  --warn: #8a6410;
+  --ok: #2b7248;
+  --radius-mark: 2px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --dur-fast: 70ms;
+  --dur: 120ms;
+  --dur-slow: 240ms;
+  --ease: ease;
+  --lh-xs: 16px;
+  --lh-sm: 20px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "PingFang SC", monospace;
+  --text-xs: 11.5px;
+  --text-code: 12.5px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-prose: 15px;
+  --lh-prose: 26px;
+  --text-lg: 16px;
+  --hl-keyword: #8250df;
+  --hl-string: #0a6640;
+  --hl-number: #b35900;
+  --hl-title: #1f5fbf;
+  --hl-type: #0f6b78;
+  --sidebar-w: 264px;
+  --workbench-w: 560px;
+  --content-max: 760px;
+  --tip-bg: #23232a;
+  --tip-ink: #f4f4f6;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 6%), 0 8px 28px rgb(0 0 0 / 12%);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 6%);
+  --scrim: rgb(0 0 0 / 28%);
+}
+
+[data-theme="dark"] {
+  --ink: 244 245 248;
+  --bg: #0e0f13;
+  --bg-sunken: #050609;
+  --bg-raised: rgb(var(--ink) / 5%);
+  --bg-hover: rgb(var(--ink) / 8%);
+  --bg-active: rgb(var(--ink) / 13%);
+  --bg-press: rgb(var(--ink) / 17%);
+  --bg-code: rgb(var(--ink) / 8%);
+  --bg-said: rgb(var(--ink) / 8%);
+  --border: rgb(var(--ink) / 10%);
+  --border-strong: rgb(var(--ink) / 20%);
+  --text: rgb(var(--ink));
+  --text-muted: rgb(var(--ink) / 72%);
+  --text-faint: rgb(var(--ink) / 55%);
+  --text-inverse: #0e0f13;
+  --accent: #7aa2f7;
+  --danger: #e0705c;
+  --warn: #d3a044;
+  --ok: #6cc48d;
+  --hl-keyword: #c792ea;
+  --hl-string: #7fd3a2;
+  --hl-number: #f0a868;
+  --hl-title: #82aaff;
+  --hl-type: #6fd6e0;
+  --shadow-pop: 0 10px 32px rgb(0 0 0 / 55%);
+  --shadow-1: none;
+  --scrim: rgb(0 0 0 / 60%);
+}
+
+/* ── 现状 ⇄ 方案：全部经由自定义属性 ─────────────────────────
+   一个 `[data-mode]` 就是一档。嵌套时内层胜出——比稿区靠这个。 */
+[data-mode="now"] {
+  --d-group-ink: var(--text);          /* app-sidebar.css:70 .row--group */
+  --d-lh: 1.55;                       /* review.css:592 实测 */
+  --d-hl-kw: inherit;
+  --d-hl-str: inherit;
+  --d-hl-num: inherit;
+  --d-hl-title: inherit;
+  --d-hl-type: inherit;
+  --d-hl-com: inherit;
+  --d-hit-add: transparent;
+  --d-hit-del: transparent;
+  --d-hit-weight: inherit;
+  --d-split-sign: none;               /* ReviewDiff.tsx 的 Side 不画记号 */
+  --d-hunk-pos: static;
+  --d-hunk-line: transparent;
+  --d-void-bg: var(--bg-sunken);
+}
+[data-mode="next"] {
+  --d-group-ink: var(--text-muted);    /* P9：最深那一档留给「你正在看的那条」 */
+  --d-lh: 20px;                       /* 12.5 × 1.6，整数 */
+  --d-hl-kw: var(--hl-keyword);
+  --d-hl-str: var(--hl-string);
+  --d-hl-num: var(--hl-number);
+  --d-hl-title: var(--hl-title);
+  --d-hl-type: var(--hl-type);
+  --d-hl-com: var(--text-muted);
+  --d-hit-add: color-mix(in srgb, var(--ok) 22%, transparent);
+  --d-hit-del: color-mix(in srgb, var(--danger) 22%, transparent);
+  --d-hit-weight: inherit;
+  --d-split-sign: inline-block;
+  --d-hunk-pos: sticky;
+  --d-hunk-line: var(--border);
+  --d-void-bg: var(--bg-sunken);
+}
+/* 只在 P6 的窄态演示里打开：单栏收掉旧行号列 */
+.narrow-demo [data-mode="next"],
+[data-mode="next"].narrow-demo { --d-n-two: none; --d-n-one: inline-block; }
+
+/* ── 文档排版 ──────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg-sunken);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+svg { display: block; }
+code, kbd { font-family: var(--font-mono); }
+
+.pg { max-width: 1180px; margin: 0 auto; padding: 0 28px 120px; }
+.pg--wide { max-width: 1440px; }
+
+/* 顶栏 */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  padding: 8px 28px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px);
+}
+.bar__name { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+.bar__name span { color: var(--text-faint); font-weight: 400; }
+.bar__spacer { flex: 1; }
+.bar__jump { display: flex; gap: 2px; flex-wrap: wrap; }
+.bar__jump a {
+  padding: 4px 9px; border-radius: var(--radius-xs);
+  color: var(--text-faint); font-size: 12px; text-decoration: none;
+}
+.bar__jump a:hover { background: var(--bg-hover); color: var(--text); }
+
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-sunken); }
+.seg button {
+  padding: 3px 11px; border-radius: 7px; color: var(--text-muted);
+  font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--text); box-shadow: var(--shadow-1); }
+[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--bg-active); }
+.seg--tiny button { padding: 2px 9px; font-size: 12px; }
+
+/* 大标题 */
+.hero { padding: 72px 0 40px; }
+.hero__eyebrow {
+  margin: 0 0 18px; color: var(--text-faint);
+  font-size: 11.5px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase;
+}
+.hero h1 { margin: 0; font-size: 42px; line-height: 1.22; font-weight: 600; letter-spacing: -.018em; max-width: 19ch; }
+.hero h1 em { font-style: normal; color: var(--text-faint); }
+.hero__lede { max-width: 62ch; margin: 22px 0 0; color: var(--text-muted); font-size: 16.5px; line-height: 1.72; }
+.hero__meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+.tag {
+  padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg); color: var(--text-faint); font-size: 11.5px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tag b { color: var(--text-muted); font-weight: 500; }
+
+/* 分节 */
+.sec { padding-top: 56px; }
+.sec__head { display: flex; align-items: baseline; gap: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border-strong); }
+.sec__no { color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: .1em; }
+.sec__head h2 { margin: 0; font-size: 23px; font-weight: 600; letter-spacing: -.01em; }
+.sec__sub { margin: 14px 0 0; max-width: 74ch; color: var(--text-muted); font-size: 14.5px; }
+.sec__sub code { font-size: 12.5px; padding: 1px 4px; border-radius: 4px; background: var(--bg-code); }
+
+/* 卡片 */
+.card { margin-top: 20px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
+.card__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--bg-sunken); }
+.card__head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.card__head .tag { background: var(--bg); }
+.card__body { padding: 16px; }
+.card__foot { padding: 11px 16px; border-top: 1px solid var(--border); background: var(--bg-sunken); color: var(--text-faint); font-size: 12.5px; }
+
+/* 对照表 */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tbl th, .tbl td { padding: 11px 14px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.tbl th { color: var(--text-faint); font-size: 11.5px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl td:first-child { color: var(--text-muted); white-space: nowrap; }
+.tbl .was { color: var(--text-faint); }
+.tbl .now { color: var(--text); }
+.tbl code { font-size: 12px; }
+
+/* 发现条目 */
+.find { display: grid; grid-template-columns: 62px minmax(0, 1fr); border-top: 1px solid var(--border); }
+.find:first-child { border-top: 0; }
+.find__no {
+  padding: 16px 0 16px 16px; color: var(--text-faint);
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .04em;
+}
+.find__body { padding: 16px 16px 16px 0; }
+.find__t { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; letter-spacing: -.005em; }
+.find__t .sev {
+  display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .04em; vertical-align: 2px;
+}
+.sev--bug { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.sev--fix { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.sev--keep { background: var(--bg-active); color: var(--text-muted); }
+.find__body p { margin: 0 0 8px; color: var(--text-muted); font-size: 13.5px; line-height: 1.72; }
+.find__body p:last-child { margin-bottom: 0; }
+.find__body strong { color: var(--text); font-weight: 600; }
+.find__body code { font-size: 12px; padding: 1px 4px; border-radius: 4px; background: var(--bg-code); color: var(--text); }
+.ev { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 9px; }
+.ev span {
+  color: var(--text-faint); font-family: var(--font-mono); font-size: 11px;
+  padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px; white-space: nowrap;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* 比稿：现状 | 方案 */
+.vs { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0; }
+.vs > * { min-width: 0; }
+.vs__col { border-right: 1px solid var(--border); }
+.vs__col:last-child { border-right: 0; }
+.vs__cap {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  color: var(--text-faint); font-size: 11.5px; letter-spacing: .04em;
+}
+.vs__cap b { color: var(--text); font-size: 12px; font-weight: 600; letter-spacing: 0; }
+.vs__cap i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); font-style: normal; }
+.vs__col--next .vs__cap i { background: var(--ok); }
+@media (max-width: 900px) { .vs { grid-template-columns: 1fr; } .vs__col { border-right: 0; border-bottom: 1px solid var(--border); } }
+
+.spec { display: grid; grid-template-columns: 74px minmax(0,1fr); gap: 2px 12px; margin-top: 12px; font-size: 13px; }
+.spec dt { color: var(--text-faint); font-size: 11.5px; padding-top: 3px; }
+.spec dd { margin: 0; color: var(--text-muted); line-height: 1.7; }
+.spec dd code { font-size: 12px; padding: 1px 4px; border-radius: 4px; background: var(--bg-code); color: var(--text); }
+.spec dd strong { color: var(--text); font-weight: 600; }
+</style>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   omni 的复现。类名与数值来自 apps/desktop/src/renderer/styles/*.css。
+   只删掉了与本方案无关的分支（拖拽区、reduce-motion、容器查询的一部分）。
+   ══════════════════════════════════════════════════════════════════ */
+
+.win {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+.win--frame { height: 760px; display: flex; flex-direction: column; }
+
+/* shell：三列常量（导航 1 / 会话 2 / 面板 3），只有宽度变 —— app-foundation.css:304 */
+.shell {
+  --rail-col: var(--sidebar-w);
+  --main-col: minmax(0, 1fr);
+  --panel-col: var(--workbench-w);
+  display: grid;
+  grid-template-columns: var(--rail-col) var(--main-col) var(--panel-col);
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  transition: grid-template-columns 420ms cubic-bezier(0.3, 0.8, 0.25, 1);
+}
+.shell--norail { --rail-col: 0px; }
+.shell--norail > .sidebar { border-right: 0; visibility: hidden; opacity: 0; transition: opacity 150ms ease, visibility 0s 150ms; }
+
+/* ── 侧栏 —— app-foundation.css:428-680 / app-sidebar.css:11-400，按实测值复现 ── */
+.sidebar {
+  --sb-pad: 8px; --sb-slot: 24px; --sb-row-h: 34px; --sb-act: 22px;
+  position: relative;
+  grid-column: 1;
+  display: flex; flex-direction: column;
+  min-width: 0;
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--border-strong);
+  overflow: hidden;
+  transition: opacity 180ms ease 90ms, visibility 0s 0s;
+}
+.traffic { position: absolute; top: 13px; left: 13px; display: flex; gap: 7px; z-index: 2; }
+.traffic i { width: 11px; height: 11px; border-radius: 50%; }
+/* 交通灯是 hiddenInset 给的，DOM 里没有；这 34px 就是给它让的位 */
+.sidebar__head { padding: 34px var(--sb-pad) var(--sp-3); }
+.sidebar__brand { padding-left: var(--sb-slot); font-size: var(--text-lg); font-weight: 600; letter-spacing: .01em; color: var(--text); }
+.sidebar__brand span { margin-left: var(--sp-1); color: var(--text-faint); font-size: var(--text-sm); font-weight: 400; }
+
+/* 顶上那一行：一颗主按钮 + 一颗方图标键（SidebarHead.tsx） */
+.sidebar__act { display: flex; gap: var(--sp-1); margin: 0 var(--sb-pad) var(--sp-2); }
+.sidebar__new {
+  display: flex; flex: 1; align-items: center; gap: 0;
+  min-width: 0; height: var(--sb-row-h); padding: 0 var(--sp-2) 0 0;
+  border-radius: var(--radius-sm); background: transparent;
+  color: var(--text); font-size: var(--text-base); font-weight: 500;
+}
+.sidebar__new:hover { background: var(--bg-hover); }
+.sidebar__new > svg { flex: none; width: var(--sb-slot); }
+.sidebar__new-label { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar__folder {
+  display: flex; flex: none; align-items: center; justify-content: center;
+  width: var(--sb-row-h); height: var(--sb-row-h);
+  border-radius: var(--radius-sm); color: var(--text-muted);
+}
+.sidebar__folder:hover { background: var(--bg-hover); color: var(--text); }
+
+/* 分节标题：**挂最左**（padding-left: 0，照 Codex 拍板），带 chevron，整段可折叠 */
+.sidebar__section {
+  position: relative; display: flex; align-items: center;
+  width: calc(100% - var(--sb-pad) * 2);
+  margin: var(--sp-4) var(--sb-pad) 0;
+  padding: 0 0 var(--sp-1);
+  min-height: var(--sb-act);
+  color: var(--text-faint); font-size: var(--text-sm);
+}
+.sidebar__section:hover { color: var(--text-muted); }
+.sidebar__section-main {
+  display: flex; flex: 1; align-self: stretch; align-items: center; gap: 3px;
+  min-width: 0; padding: 0; color: inherit; font: inherit; font-size: inherit; text-align: left;
+}
+.chev { flex: none; transition: transform var(--dur) var(--ease); }
+.chev--closed { transform: rotate(-90deg); }
+.sidebar__list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--sp-4); }
+.sidebar__empty { margin: 0; padding: var(--sp-2) calc(var(--sb-pad) + var(--sb-slot)); color: var(--text-faint); font-size: var(--text-sm); }
+.sidebar__empty--one { padding-top: 2px; padding-bottom: var(--sp-1); }
+
+/* 行：侧栏里所有可点的东西都是这个形状 */
+.row {
+  display: flex; align-items: center; gap: 0;
+  width: calc(100% - var(--sb-pad) * 2);
+  margin: 0 var(--sb-pad);
+  min-height: var(--sb-row-h);
+  padding: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted);
+  font-size: var(--text-base); text-align: left;
+}
+.row:hover { background: var(--bg-hover); color: var(--text); }
+.row:hover .row__slot { color: var(--text-muted); }
+.row__main { display: flex; flex: 1; align-items: center; min-width: 0; min-height: var(--sb-row-h); padding: 0; color: inherit; font: inherit; font-size: inherit; font-weight: inherit; text-align: left; }
+.row__slot { display: flex; flex: none; align-items: center; justify-content: center; width: var(--sb-slot); color: var(--text-faint); }
+.row__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 项目内会话行缩进一级：点落 32px、文字落 56px */
+.row--thread:not(.row--flat) .row__slot { margin-left: var(--sb-slot); }
+.row--selected { background: var(--bg-active); color: var(--text); font-weight: 500; }
+.row--selected:hover { background: var(--bg-press); }
+.row--selected .row__slot { color: var(--text-muted); }
+.row--unread { color: var(--text); font-weight: 500; }
+
+/*
+ * 项目行。**这一条就是 P9**：现状 `--text` + 500，方案退到 `--text-muted`。
+ * 字重不动——它仍该比会话行重一档。
+ */
+.row--group { position: relative; margin-top: var(--sp-1); color: var(--d-group-ink); font-weight: 500; }
+
+.row__count { flex: none; margin-left: var(--sp-2); padding-right: 6px; color: var(--text-faint); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.row__time { flex: none; margin-left: var(--sp-2); padding-right: 4px; max-width: 68px; overflow: hidden; color: var(--text-faint); font-size: var(--text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row__time--bright { color: var(--text-muted); }
+.row__wait { flex: none; margin-left: var(--sp-2); padding: 0 5px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); font-size: var(--text-xs); }
+.row__spin { display: flex; flex: none; margin-left: var(--sp-2); color: var(--text-faint); }
+.row__spin svg { animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.row__dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+.row__dot--running { background: var(--ok); animation: dot-breathe 1.8s ease-in-out infinite; }
+.row__dot--waiting { background: var(--warn); }
+.row__dot--failed { background: var(--danger); }
+.row__dot--unread { background: var(--accent); }
+.row__dot--idle { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+@keyframes dot-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.row__act {
+  display: inline-flex; flex: none; align-items: center; justify-content: center;
+  width: var(--sb-act); height: var(--sb-act); margin-right: 2px;
+  border-radius: var(--radius-xs); color: var(--text-faint); font-size: var(--text-xs); opacity: 0;
+}
+.row:hover .row__act, .sidebar__section:hover .row__act { opacity: 1; }
+.row__act:hover { background: var(--bg-hover); color: var(--text); }
+.row--search { margin-bottom: var(--sp-2); }
+.row--search:hover { background: var(--bg-hover); }
+.sidebar__filter { flex: 1; min-width: 0; padding-right: var(--sp-2); color: var(--text-faint); font-size: var(--text-base); }
+
+/* 底部一行 */
+.foot { display: flex; flex: none; align-items: center; gap: var(--sp-1); padding: var(--sp-1) var(--sb-pad) var(--sp-2); border-top: 1px solid var(--border); }
+.foot__who { display: flex; flex: 1; min-width: 0; align-items: center; gap: 0; min-height: var(--sb-row-h); padding: 0; border-radius: var(--radius-sm); }
+.foot__who:hover { background: var(--bg-hover); }
+.foot__slot { display: flex; flex: none; align-items: center; justify-content: center; width: var(--sb-slot); color: var(--text-faint); }
+.foot__name { overflow: hidden; color: var(--text-muted); font-size: var(--text-base); text-overflow: ellipsis; white-space: nowrap; }
+.avatar { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--bg-active); color: var(--text-muted); font-size: 10px; font-weight: 600; }
+
+/* 比稿里那两扇克隆出来的侧栏（不属于 omni） */
+.sb-demo { height: 700px; overflow: hidden; }
+.sb-demo .sidebar { height: 100%; border-right: 0; }
+.sb-demo .traffic { display: none; }
+.sb-demo .sidebar__head { padding-top: var(--sp-3); }
+
+/* ── 主区 —— app-main.css ── */
+.main { grid-column: 2; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+.topbar {
+  display: flex; align-items: center; gap: var(--sp-3);
+  height: 44px; padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--border-strong);
+}
+.topbar__title { display: flex; align-items: center; gap: 4px; max-width: 40%; padding: 2px 6px; border-radius: var(--radius-sm); font-size: var(--text-base); font-weight: 600; }
+.topbar__title:hover { background: var(--bg-hover); }
+.topbar__spacer { flex: 1; }
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px var(--sp-2); border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-raised); color: var(--text-muted);
+  font-size: var(--text-xs); line-height: var(--lh-xs); font-weight: 500; white-space: nowrap;
+}
+.iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: var(--radius-xs); color: var(--text-faint); }
+.iconbtn:hover { background: var(--bg-hover); color: var(--text); }
+.iconbtn--on { background: var(--bg-active); color: var(--text); }
+.meter { display: flex; align-items: center; gap: 6px; color: var(--text-faint); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.meter__track { width: 44px; height: 4px; border-radius: 999px; background: var(--bg-active); overflow: hidden; }
+.meter__fill { display: block; height: 100%; background: var(--text-faint); }
+
+.stage { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.transcript { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--sp-5) var(--sp-4) var(--sp-6); }
+.transcript__inner {
+  --step-icon: 16px;
+  --step-slot: calc(var(--step-icon) + var(--sp-2));
+  max-width: var(--content-max); margin: 0 auto;
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.copyable { position: relative; }
+.copyable--user { display: flex; flex-direction: column; align-items: flex-end; margin-top: var(--sp-2); }
+.copyable--agent { margin-top: var(--sp-2); }
+
+.msg--user {
+  max-width: 72%; padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background: var(--bg-said);
+  font-size: var(--text-prose); line-height: var(--lh-prose); white-space: pre-wrap;
+}
+.msg--agent { min-width: 0; font-size: var(--text-prose); line-height: var(--lh-prose); }
+.msg--agent p { margin: 0 0 var(--sp-3); }
+.msg--agent p:last-child { margin-bottom: 0; }
+.msg--agent code { font-family: var(--font-mono); font-size: .92em; padding: 1px 4px; border-radius: 4px; background: var(--bg-code); }
+.msgacts { display: flex; gap: var(--sp-1); margin-top: 1px; opacity: 0; transition: opacity var(--dur) var(--ease); }
+.copyable:hover .msgacts { opacity: 1; }
+.copyable--user .msgacts { justify-content: flex-end; }
+.msgact { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: var(--radius-xs); color: var(--text-faint); }
+.msgact:hover { background: var(--bg-hover); color: var(--text); }
+
+.turnmark { display: flex; align-items: center; gap: var(--sp-3); width: 100%; padding: 2px 0; color: var(--text-faint); font-size: var(--text-xs); text-align: left; }
+.turnmark::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.turnmark[data-folded="true"]::after { background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px); }
+.turnmark__row { margin-top: 20px; }
+
+.run { display: flex; flex-direction: column; gap: 1px; }
+.step { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 4px 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-sm); text-align: left; }
+.step__icon { display: flex; flex: none; align-items: center; justify-content: center; width: 16px; color: var(--text-faint); }
+.step__target { font-family: var(--font-mono); font-size: var(--text-code); color: var(--text-muted); }
+.step__meta { color: var(--text-faint); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.think__row { display: flex; align-items: center; gap: var(--sp-2); padding: 4px 0; color: var(--text-muted); font-size: var(--text-sm); line-height: var(--lh-sm); }
+.think__dot { flex: none; width: 2px; height: 2px; border-radius: 50%; background: currentColor; opacity: .5; }
+.think__txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); }
+
+/* 改动卡 —— changed.css */
+.edits { align-self: stretch; overflow: hidden; width: 100%; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.edits__head { display: flex; align-items: center; gap: var(--sp-2); min-height: 42px; padding: var(--sp-1) var(--sp-2); }
+.edits__glyph { display: flex; flex: none; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-sunken); color: var(--text-muted); }
+.edits__title { flex: 1; min-width: 0; font-size: var(--text-sm); font-weight: 600; line-height: var(--lh-sm); }
+.edits__stat { display: flex; flex: none; gap: 5px; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.edits__review { display: flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-xs); color: var(--text-faint); }
+.edits__review:hover { background: var(--bg-hover); color: var(--text); }
+.edits__list { padding: var(--sp-1) var(--sp-2) var(--sp-2); border-top: 1px solid var(--border); }
+.changed__row { display: flex; align-items: center; gap: var(--sp-1); min-height: 28px; padding: 2px var(--sp-1); border-radius: var(--radius-sm); }
+.changed__row:hover { background: var(--bg-hover); }
+.changed__name { display: flex; flex: 1; min-width: 0; align-items: baseline; padding: 3px 2px; font-family: var(--font-mono); font-size: var(--text-code); line-height: var(--lh-sm); text-align: left; }
+.changed__dir { min-width: 0; overflow: hidden; color: var(--text-faint); text-overflow: ellipsis; white-space: nowrap; }
+.changed__base { flex: none; font-weight: 500; }
+.changed__stat { display: flex; flex: none; gap: 5px; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.plus { color: var(--ok); }
+.minus { color: var(--danger); }
+
+/* 输入区 */
+.composer { flex: none; padding: 0 var(--sp-4) var(--sp-4); }
+.composer__inner {
+  max-width: var(--content-max); margin: 0 auto;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+  background: var(--bg-raised); box-shadow: var(--shadow-1);
+}
+.composer__input { padding: var(--sp-3) var(--sp-3) var(--sp-2); color: var(--text-faint); font-size: var(--text-prose); line-height: var(--lh-prose); }
+.composer__bar { display: flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-2) var(--sp-2); }
+.trigger { display: inline-flex; align-items: center; gap: 5px; padding: 3px var(--sp-2); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--text-sm); }
+.trigger:hover { background: var(--bg-hover); color: var(--text); }
+.send { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--text); color: var(--text-inverse); }
+
+/* ── 审核面板 —— review.css ── */
+.rv {
+  grid-column: 3;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0; width: 100%;
+  overflow: hidden;
+  border-left: 1px solid var(--border-strong);
+  background: var(--bg);
+  container-type: inline-size;
+}
+.panel-tabs { display: flex; align-items: center; gap: 4px; height: 44px; min-width: 0; padding: 0 6px; border-bottom: 1px solid var(--border-strong); background: var(--bg-sunken); }
+.panel-tab { display: inline-flex; min-width: 0; align-items: center; border-radius: var(--radius-sm); color: var(--text-muted); }
+.panel-tab--on { background: var(--bg-active); color: var(--text); }
+.panel-tab__pick { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 28px; padding-left: 9px; font-size: var(--text-sm); white-space: nowrap; }
+.panel-tab__close { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 28px; color: var(--text-faint); font-size: 15px; }
+.panel-tabs__spacer { flex: 1; }
+.panel-tabs__button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--text-faint); }
+
+.rv__head { display: flex; align-items: center; gap: var(--sp-2); flex: none; min-height: 44px; padding: 0 var(--sp-2) 0 var(--sp-3); border-bottom: 1px solid var(--border-strong); background: var(--bg-sunken); }
+.rv__title { display: inline-flex; align-items: center; height: 28px; padding: 0 var(--sp-2); border-radius: var(--radius-xs); background: var(--bg-active); font-size: var(--text-sm); font-weight: 500; white-space: nowrap; }
+.rv__summary { display: flex; min-width: 0; align-items: center; gap: var(--sp-2); }
+.rv__count { color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
+.rv__tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.rv__tool { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-xs); color: var(--text-faint); }
+.rv__tool:hover, .rv__tool--on { background: var(--bg-hover); color: var(--text); }
+.rv__tool--on { color: var(--text); background: var(--bg-active); }
+.rv__body { display: flex; min-height: 0; flex: 1; }
+.rv__body--list-hidden > .rvl { display: none; }
+.rv__pane { order: 1; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.rvl { display: flex; flex-direction: column; flex: none; width: 260px; min-height: 0; order: 2; border-left: 1px solid var(--border-strong); background: var(--bg-sunken); }
+.rvl__filter { flex: none; padding: var(--sp-2); border-bottom: 1px solid var(--border); }
+.rvl__input { width: 100%; padding: 4px var(--sp-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-faint); font-size: var(--text-sm); }
+.rvl__rows { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-1) 0; }
+.rvl__row { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 3px var(--sp-2) 3px var(--sp-3); color: var(--text); font-size: var(--text-sm); text-align: left; }
+.rvl__row:hover { background: var(--bg-hover); }
+.rvl__row--on { background: var(--bg-active); }
+.rvl__kind { flex: none; width: 6px; height: 6px; border-radius: var(--radius-mark); background: var(--text-faint); transform: translateY(-1px); }
+.rvl__kind--add { background: var(--ok); }
+.rvl__kind--update { background: var(--accent); }
+.rvl__kind--untracked { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ok); }
+.rvl__base { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rvl__stat { flex: none; display: flex; gap: 4px; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.rvl__legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); flex: none; padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--border); color: var(--text-faint); font-size: var(--text-xs); }
+.rvl__key { display: flex; align-items: center; gap: 4px; }
+.rv__file { display: flex; align-items: center; gap: var(--sp-2); flex: none; padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); font-size: var(--text-xs); }
+.rv__kindtext { color: var(--text-muted); }
+.rv__path { min-width: 0; overflow: hidden; color: var(--text); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.rv__act { flex: none; display: grid; width: 26px; height: 26px; place-items: center; border-radius: var(--radius-sm); color: var(--text-faint); margin-left: auto; }
+.rv__act:hover { background: var(--bg-hover); color: var(--text); }
+</style>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   补丁正文。**这一段就是提案本体**——凡是带 `--d-` 的声明，
+   现状与方案的差别就在那一行上。
+   ══════════════════════════════════════════════════════════════════ */
+
+.rvd { flex: 1; min-height: 0; overflow: auto; }
+.rvd__note { margin: 0; padding: var(--sp-5) var(--sp-4); color: var(--text-faint); font-size: var(--text-sm); text-align: center; }
+.rvd__body {
+  min-width: min-content;
+  padding: var(--sp-1) 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  line-height: var(--d-lh);          /* 现状 1.55（=19.375px）｜方案 20px */
+}
+.rvd__line { display: flex; white-space: pre; }
+.rvd__n {
+  flex: none; width: 3.6em; padding-right: var(--sp-2);
+  color: var(--text-faint); text-align: right; user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.rvd__n--old, .rvd__n--new { display: var(--d-n-two, inline-block); }
+.rvd__n--one { display: var(--d-n-one, none); }   /* 窄容器下方案只留这一列 */
+.rvd__sign { flex: none; width: 1.4em; color: var(--text-faint); text-align: center; user-select: none; }
+.rvd__text { min-width: 0; padding-right: var(--sp-3); }
+.rvd__line--add { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.rvd__line--add > .rvd__sign { color: var(--ok); }
+.rvd__line--del { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.rvd__line--del > .rvd__sign { color: var(--danger); }
+.rvd__line--hunk, .rvd__line--meta { color: var(--text-faint); }
+.rvd__line--hunk {
+  background: var(--bg-sunken);
+  position: var(--d-hunk-pos);        /* 现状 static ｜方案 sticky */
+  top: 0; z-index: 2;
+  box-shadow: 0 1px 0 var(--d-hunk-line);
+}
+
+/* 并排 */
+.rvd__body--split { display: flex; flex-direction: column; }
+.rvd__row { display: flex; white-space: pre; }
+.rvd__cell { display: flex; width: 50%; min-width: 0; flex: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rvd__cell:first-child { border-right: 1px solid var(--border); }
+.rvd__cell--void { width: 50%; background: var(--d-void-bg); border-right: 1px solid var(--border); }
+.rvd__row--full {
+  padding-left: var(--sp-2); background: var(--bg-sunken); color: var(--text-faint);
+  position: var(--d-hunk-pos); top: 0; z-index: 2;
+  box-shadow: 0 1px 0 var(--d-hunk-line);
+}
+/* 现状：并排一侧不画记号列（ReviewDiff.tsx 的 Side 只有行号 + 正文） */
+.rvd__cell > .rvd__sign { display: var(--d-split-sign); }
+
+/* 语法着色。现状全部 `inherit`＝没有着色 */
+.t-kw { color: var(--d-hl-kw); }
+.t-str { color: var(--d-hl-str); }
+.t-num { color: var(--d-hl-num); }
+.t-fn { color: var(--d-hl-title); }
+.t-ty { color: var(--d-hl-type); }
+.t-com { color: var(--d-hl-com); }
+
+/* 词级高亮。现状 transparent＝没有 */
+.hit { border-radius: var(--radius-mark); font-weight: var(--d-hit-weight); }
+.rvd__line--add .hit, .rvd__cell.rvd__line--add .hit { background: var(--d-hit-add); }
+.rvd__line--del .hit, .rvd__cell.rvd__line--del .hit { background: var(--d-hit-del); }
+
+/* 转录区里的那份内联 diff —— diff.css 的 .dfile / .dl 族 */
+.dfile { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.dfile__head { display: flex; align-items: baseline; gap: var(--sp-2); padding: 5px var(--sp-2); background: var(--bg-sunken); border-bottom: 1px solid var(--border); font-size: var(--text-xs); }
+.dfile__path { display: flex; min-width: 0; font-family: var(--font-mono); }
+.dfile__dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); }
+.dfile__name { flex: none; color: var(--text); font-weight: 500; }
+.dfile__stat { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; }
+.dfile__stat > * + * { margin-left: 5px; }
+.dfile__body {
+  max-height: 300px; overflow: auto; padding: var(--sp-1) 0;
+  background: var(--bg-raised);
+  font-family: var(--font-mono); font-size: var(--text-code);
+  line-height: var(--d-lh);
+}
+.dl { display: flex; padding-right: var(--sp-2); white-space: pre; }
+.dl__sign { flex: none; width: 1.6em; text-align: center; color: var(--text-faint); user-select: none; }
+.dl__text { min-width: 0; }
+.dl--add { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.dl--add .dl__sign { color: var(--ok); }
+.dl--del { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.dl--del .dl__sign { color: var(--danger); }
+.dl--hunk .dl__text { color: var(--text-faint); }
+
+/* ── 演示用的框（不属于 omni） ─────────────────────────────── */
+.demo { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg); }
+.demo--pane { display: flex; flex-direction: column; }
+.demo .rvd { max-height: var(--demo-h, 300px); }
+.rule {
+  position: relative;
+  padding: 0 0 0 0;
+}
+.rule__lines { position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: 0; transition: opacity var(--dur) var(--ease); }
+.rule--on .rule__lines { opacity: 1; }
+.rule__lines i {
+  position: absolute; left: 0; right: 0; height: 1px;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent) 0 3px, transparent 3px 7px);
+}
+.note {
+  margin: 10px 0 0; padding: 10px 12px;
+  border-left: 2px solid var(--border-strong); border-radius: 0 6px 6px 0;
+  background: var(--bg-sunken); color: var(--text-muted); font-size: 12.5px; line-height: 1.7;
+}
+.note b { color: var(--text); }
+.note code { font-size: 11.5px; }
+.mini { color: var(--text-faint); font-size: 11.5px; }
+.swatch { display: inline-block; width: 26px; height: 12px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -2px; }
+.ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ctl__label { color: var(--text-faint); font-size: 11.5px; }
+/* P1 的自查工具：一层 20px 的基线网格。现状那侧的行会从格子上漂走 */
+.grid-on .rvd__body {
+  background-image: repeating-linear-gradient(to bottom,
+    color-mix(in srgb, var(--accent) 34%, transparent) 0 1px, transparent 1px 20px);
+  background-position: 0 4px;
+}
+</style>
+</head>
+<body data-theme="light" data-mode="now">
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="i-folder-open" viewBox="0 0 16 16"><path d="M2 12.6V4.2h4l1.3 1.4H12v1.6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><path d="M2 12.6 4 7.6h10.6l-2 5z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></symbol>
+  <symbol id="i-spin" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".25"/><path d="M13.4 8a5.4 5.4 0 0 0-5.4-5.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.2h4l1.3 1.4H14v7a1.2 1.2 0 0 1-1.2 1.2H3.2A1.2 1.2 0 0 1 2 12.6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7.2" cy="7.2" r="4.2" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="m10.4 10.4 2.8 2.8" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.4v9.2M3.4 8h9.2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></symbol>
+  <symbol id="i-rail" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.25"/><path class="rail-icon__line" d="M6.2 3v10" fill="none" stroke="currentColor" stroke-width="1.25"/></symbol>
+  <symbol id="i-lines" viewBox="0 0 16 16"><path d="M2.6 4.5h10.8M2.6 8h7.4M2.6 11.5h10.8" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></symbol>
+  <symbol id="i-split" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M8 3v10" fill="none" stroke="currentColor" stroke-width="1.25"/></symbol>
+  <symbol id="i-filelist" viewBox="0 0 16 16"><path d="M2.6 4h4.2M2.6 8h4.2M2.6 12h4.2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><rect x="9.4" y="3" width="4" height="10" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.25"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><path d="M13 2.6V5h-2.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="8" height="8" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M10.6 5.4V4.2A1.6 1.6 0 0 0 9 2.6H4.2a1.6 1.6 0 0 0-1.6 1.6V9a1.6 1.6 0 0 0 1.6 1.6h1.2" fill="none" stroke="currentColor" stroke-width="1.25"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2.4h5l3 3v8.2H4z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><path d="M9 2.4v3.2h3" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></symbol>
+  <symbol id="i-code" viewBox="0 0 16 16"><path d="m5.6 4.4-3.2 3.6 3.2 3.6M10.4 4.4l3.2 3.6-3.2 3.6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="m5.6 6.4 2.4 2.6 2.4-2.6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-think" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M8 5.2v3l2 1.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 16 16"><path d="M3 11.4 10.6 3.8a1.7 1.7 0 0 1 2.4 2.4L5.4 13.8 2.4 14z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></symbol>
+  <symbol id="i-send" viewBox="0 0 16 16"><path d="M8 12.6V4.2m0 0L4.6 7.6M8 4.2l3.4 3.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-rerun" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><path d="M3 2.6V5h2.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="bar__name">omni · Diff 阅读与等宽排版 <span>· 优化方案原型 · 2026-08-27</span></div>
+  <nav class="bar__jump">
+    <a href="#s0">这版差在哪</a><a href="#s1">现状实测</a><a href="#s2">逐条比稿</a><a href="#s3">整机原型</a><a href="#s4">侧栏</a><a href="#s5">判过不动</a><a href="#s6">落地顺序</a>
+  </nav>
+  <div class="bar__spacer"></div>
+  <span class="ctl__label">原型</span>
+  <div class="seg" role="group" aria-label="现状与方案">
+    <button type="button" data-mode-btn="now" aria-pressed="true">现状</button>
+    <button type="button" data-mode-btn="next" aria-pressed="false">方案</button>
+  </div>
+  <div class="seg seg--tiny" role="group" aria-label="明暗">
+    <button type="button" data-theme-btn="light" aria-pressed="true">明</button>
+    <button type="button" data-theme-btn="dark" aria-pressed="false">暗</button>
+  </div>
+</header>
+
+<main class="pg">
+
+  <section class="hero">
+    <p class="hero__eyebrow">omni · diff reading &amp; mono typography · 2026-08-27</p>
+    <h1>一行里到底改了<em>哪几个字</em>，现在看不出来</h1>
+    <p class="hero__lede">
+      上一版《字体与 Diff 融合原型》是一张理想图：手编的假补丁、没有现状可比、结论只能靠看。
+      这一版对着<strong>当前 omni 的真实结构</strong>重做——补丁取自本仓库工作区的真实改动，
+      现状按 <code>review.css</code> / <code>ReviewDiff.tsx</code> 的实测值 1:1 复现，
+      而页面里的<strong>词级高亮与语法着色是当场算出来的</strong>，不是手工标的 span。
+      八条提案，每条都能在同一屏上对切。
+    </p>
+    <div class="hero__meta">
+      <span class="tag">基线 <b>main + 工作区</b></span>
+      <span class="tag">review.css <b class="num">704 行</b></span>
+      <span class="tag">ReviewDiff.tsx <b class="num">120 行</b></span>
+      <span class="tag">--text-code <b class="num">12.5px</b></span>
+      <span class="tag">补丁样本 <b class="num">3 文件 / 6 段 hunk / +53 −17</b></span>
+      <span class="tag">提案 <b class="num">9 条</b> · 判过不动 <b class="num">6 条</b></span>
+    </div>
+  </section>
+
+  <!-- ═══ §00 ═══ -->
+  <section class="sec" id="s0">
+    <div class="sec__head"><span class="sec__no">00</span><h2>这版和上一版差在哪</h2></div>
+    <p class="sec__sub">
+      「太草率、看不出 diff」说的是三件具体的事：补丁是假的、没有现状可比、结论没有落点。逐条对上。
+    </p>
+    <div class="card">
+      <table class="tbl">
+        <thead><tr><th></th><th>字体与Diff融合原型（上一版）</th><th>本方案原型</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>补丁内容</td>
+            <td class="was">手编的 14 行假 <code>review.css</code>，凑出两处 <code>flex→grid</code></td>
+            <td class="now">本仓库工作区的<strong>真实 <code>git diff</code></strong>：<code>group.ts</code> / <code>RowEnd.tsx</code> / <code>panel-tabs.css</code>，共 6 段 hunk、含中文块注释</td>
+          </tr>
+          <tr>
+            <td>现状</td>
+            <td class="was">没有。只有一张「应该长这样」的图</td>
+            <td class="now">现状按 <code>review.css</code> 实测值复现（行高 1.55、并排无记号列、行号 3.6em），<strong>与方案同屏对切</strong></td>
+          </tr>
+          <tr>
+            <td>词级高亮</td>
+            <td class="was">手工标了两处 <code>&lt;span class="hit-add"&gt;</code></td>
+            <td class="now">页面里跑真的<strong>词级 LCS</strong>：分词 → 最长公共子序列 → 相似度闸门。你看到的每一处高亮都是算出来的</td>
+          </tr>
+          <tr>
+            <td>语法着色</td>
+            <td class="was">手工 <code>&lt;span class="kw"&gt;</code>，只够摆样子</td>
+            <td class="now">页面里跑真的<strong>按 hunk 分侧扫描</strong>（跨行状态：块注释、字符串），和落地方案同一套做法</td>
+          </tr>
+          <tr>
+            <td>结论</td>
+            <td class="was">一张图，没说改哪儿</td>
+            <td class="now">9 条提案，每条给<strong>判断 / 动哪儿 file:line / 风险 / 验收</strong>；另有 6 条判过不动（含对上一版<strong>三处提法的反驳</strong>）</td>
+          </tr>
+          <tr>
+            <td>深色</td>
+            <td class="was">只有浅色一套</td>
+            <td class="now">明暗都能切。<strong>「12% 底色够不够用」这个问题只有在深色下才答得清楚</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <b>范围。</b>这份只管一件事：<strong>补丁怎么被读</strong>——等宽排版、着色、增删信号、并排结构。
+      侧栏 / 动效 / 图标哲学那一摊在同日的《UI 整体优化方案》里已经拍板落地，这里不重开——<b>只有 §04 那一条例外</b>：把原型的侧栏按真实结构对齐时，顺手看出一处字色层级问题，就近收在这份里。
+      整机原型（§03）里能看到它们现在的样子，那是背景不是提案。
+    </div>
+  </section>
+
+  <!-- ═══ §01 ═══ -->
+  <section class="sec" id="s1">
+    <div class="sec__head"><span class="sec__no">01</span><h2>现状实测</h2></div>
+    <p class="sec__sub">
+      下面这块是<strong>现在的审核面板</strong>，装的是本仓库工作区里 <code>group.ts</code> 的真实改动
+      （<code>foldTurns</code> 那一处，含一整段中文块注释——这仓库的补丁大半长这样）。
+      样式取自 <code>review.css</code>，一个数没改。先看它，再看下面八条。
+    </p>
+
+    <div class="card">
+      <div class="card__head">
+        <h3>现状 · 单栏</h3>
+        <span class="tag">line-height <b>1.55 = 19.375px</b></span>
+        <span class="tag">无着色</span>
+        <span class="tag">无词级高亮</span>
+        <span class="bar__spacer"></span>
+        <div class="seg seg--tiny" data-local-mode="now" role="group" aria-label="视图">
+          <button type="button" data-view-btn="uni" data-target="d-01" aria-pressed="true">单栏</button>
+          <button type="button" data-view-btn="split" data-target="d-01" aria-pressed="false">并排</button>
+        </div>
+      </div>
+      <div data-mode="now">
+        <div class="rv__file">
+          <span class="rv__kindtext">已修改</span>
+          <span class="rv__path">apps/desktop/src/renderer/group.ts</span>
+          <button class="rv__act" type="button" aria-label="复制这份补丁"><svg width="14" height="14"><use href="#i-copy"/></svg></button>
+        </div>
+        <div class="demo" style="--demo-h: 340px">
+          <div class="rvd" id="d-01" data-file="group" data-view="uni" tabindex="0" role="region" aria-label="文件改动，可滚动"></div>
+        </div>
+      </div>
+      <div class="card__foot">
+        这一段有 <span class="num">12</span> 行删、<span class="num">27</span> 行增，两个 hunk。
+        试试切到「并排」——<strong>左右两侧一个 <code>+</code> / <code>−</code> 都没有</strong>，
+        增删全靠那层 12% 的底色说话。再把右上角切到「暗」，看它还剩多少。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>八条实测</h3><span class="tag">每条对着代码核过</span></div>
+
+      <div class="find">
+        <div class="find__no">F1</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--bug">现在就在发生</span>补丁正文的行高是小数：<code>1.55 × 12.5 = 19.375px</code></p>
+          <p><code>tokens.css</code> 自己立过规矩——「<strong>奇数行高在 2x 屏上会让相邻两行的字形栅格化结果不一样（同一个字，一行清一行糊）</strong>」，所以正文行高特意取了偶数的 26。而补丁正文写的是比值 <code>1.55</code>，算出来是 <strong>19.375px</strong>：不是奇数，是<strong>小数</strong>——每行的基线落点在 2x 屏上以 0.375px 为步长漂移，一屏 40 行漂满 15px。</p>
+          <p>两处都是这个值，而且它们会并排出现在同一屏上（转录区的内联 diff 和右面板的补丁）。</p>
+          <div class="ev"><span>review.css:587-593 .rvd__body</span><span>diff.css:107-115 .dfile__body</span><span>tokens.css:232 --lh-prose 取偶数的理由</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F2</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--fix">该收</span>补丁没有语法着色，而高亮器<strong>早就打进包里了</strong></p>
+          <p><code>highlight.ts</code> 里手挑了 12 种语言进 lowlight（并且写明了为什么不用 <code>rehype-highlight</code>：那玩意无条件塞 35 种语言、涨 382 KB）。可这套着色<strong>只有 Markdown 代码块在用</strong>——审核面板里的补丁是纯文本 <code>{line.text}</code>。</p>
+          <p>于是同一段 TypeScript，出现在回答的代码块里是彩色的，出现在右边审核面板里是灰的。<strong>而后者才是要逐行判对错的那一份。</strong></p>
+          <div class="ev"><span>highlight.ts:29-43</span><span>components/Markdown.tsx:4</span><span>ReviewDiff.tsx:45-57 UniLine</span><span>markdown.css:280-345</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F3</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--bug">现在就在发生</span>「改了一个词」和「重写了整行」长得一模一样</p>
+          <p>一对删/增行只有整行底色，没有词级标记。上面那块面板里 <code>RowEnd.tsx</code> 那处（切到 §02 的 P3 看）改的其实只是几个词，但现在你得<strong>逐字比对两行中文</strong>才能确认——这正是审核最耗神、也最容易看漏的动作。</p>
+          <p>git 自己有 <code>--word-diff</code>，但它产出的是另一种文本格式，和现在这条「补丁一行一行画」的路子不搭。要在渲染层算。</p>
+          <div class="ev"><span>ReviewDiff.tsx:45-67</span><span>review.ts splitRows</span><span>review-lines.ts numbered</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F4</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--bug">现在就在发生</span>并排视图<strong>没有记号列</strong>，增删只由一层 12% 的底色承担</p>
+          <p><code>ReviewDiff.tsx</code> 的 <code>Side</code> 只渲染行号 + 正文，<code>UniLine</code> 才有 <code>.rvd__sign</code>。也就是说并排下「这行是加的还是删的」<strong>只有颜色一个信号</strong>。</p>
+          <p>那层颜色有多轻，可以算：<code>color-mix(--ok 12%, transparent)</code> 压在纸上，浅色是 <span class="num">1.18:1</span>、深色是 <span class="num">1.21:1</span>。底色本来就不必过 AA——问题是<strong>它是唯一的信号</strong>，而它偏偏用红/绿承担；红绿色觉障碍者在并排视图下拿不到任何可判读的线索。</p>
+          <div class="ev"><span>ReviewDiff.tsx:59-67 Side</span><span>review.css:624-638</span><span>tokens.css --ok #2b7248 / --danger #b63b29</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F5</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--fix">该收</span>hunk 头不粘顶：滚到中段就不知道自己在哪一段里</p>
+          <p><code>@@ −118,17 +118,22 @@</code> 这行只是普通一行，滚过去就没了。补丁一个 hunk 常有三四十行，滚到中间时「我在改哪个函数」这件事屏幕上一个字都没有——而 git 的 hunk 头尾巴上恰好带着函数签名（<code>export function withAsides(...)</code>），那正是最该一直看得见的一句。</p>
+          <p>面板顶上的 <code>.rv__file</code>（文件路径）在滚动容器外，一直在，不用改。缺的只有 hunk 这一层。</p>
+          <div class="ev"><span>review.css:645-649 .rvd__line--hunk</span><span>review.css:689 .rvd__row--full</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F6</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--fix">该收</span>单栏两列行号恒占 <code>7.2em ≈ 90px</code>，而面板最窄只有 300px</p>
+          <p><code>UniLine</code> 画两个 <code>Num</code>（旧行号 + 新行号），各 <code>3.6em</code>。加上记号列 <code>1.4em</code> 和右边距 12px，<strong>正文之前恒定吃掉约 119px</strong>。</p>
+          <p>面板宽度是 <code>clamp(440px, 39vw, 560px)</code>，窗口 ≤1280px 时压到 <strong>300px</strong>。那一档下正文只剩约 180px ≈ <span class="num">24</span> 个字符——<strong>行号列占了整块面板的三成</strong>。而窄面板下真正要读的是「改了什么」，旧行号是那一刻最不重要的一列。</p>
+          <div class="ev"><span>ReviewDiff.tsx:48-49 两个 Num</span><span>review.css:601-609 .rvd__n 3.6em</span><span>tokens.css:283 --workbench-w</span><span>app-foundation.css:415-419 ≤1280 → 300px</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F7</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--bug">说谎的注释</span>「窄的时候不给并排（父层判断）」——父层没有这个判断</p>
+          <p><code>ReviewDiff.tsx</code> 开头写着：「<em>窄的时候不给并排（父层判断），两列各 40 字符的代码谁也读不了</em>」。翻上去看父层：<code>split</code> 只是 <code>Review.tsx:95</code> 的一个 <code>useState(false)</code>，从工具栏那颗按钮直接翻转，<strong>全链路没有任何宽度闸门</strong>；<code>review.css</code> 的两个容器查询一个管工具栏换行、一个管文件清单挪位置，都不碰 split。</p>
+          <p>结果就是它自己预言的那个场景：300px 面板 + 并排 = 每侧 150px，减去 45px 行号，<strong>正文各剩约 105px ≈ 14 个字符</strong>。这仓库把注释当决策记录用，说谎的注释比没注释贵——要么补上闸门，要么改掉那句话。本方案选前者（P6）。</p>
+          <div class="ev"><span>ReviewDiff.tsx:18 注释</span><span>Review.tsx:95 useState(false)</span><span>review.css:262 @container 760</span><span>review.css:307 @container 520</span></div>
+        </div>
+      </div>
+
+      <div class="find">
+        <div class="find__no">F8</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--fix">该收</span>同一段补丁，转录区和审核面板是<strong>两套度量</strong></p>
+          <p>记号列 <code>1.6em</code>（<code>.dl__sign</code>）对 <code>1.4em</code>（<code>.rvd__sign</code>）；正文右边距 8px 对 12px；底色一个是 <code>--bg-raised</code> 一个没有；一个 <code>max-height: 420px</code> 一个撑满。</p>
+          <p>而这两份<strong>会同时出现在屏幕上</strong>：左边转录区里那一轮的内联 diff，右边面板里同一个文件的补丁。两套记号列宽度差 0.2em，看不出差在哪，只觉得不对——和 <code>tokens.css</code> 里说的「差不多齐比明显不齐更难看」是同一种病。</p>
+          <div class="ev"><span>diff.css:117-131 .dl 族</span><span>review.css:578-620 .rvd 族</span><span>tokens.css:296 「两条居中线差 5px」</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ §02 ═══ -->
+  <section class="sec" id="s2">
+    <div class="sec__head"><span class="sec__no">02</span><h2>逐条比稿</h2></div>
+    <p class="sec__sub">
+      八条。每条左边是<strong>现在的样子</strong>、右边是<strong>改完的样子</strong>，装的是同一段真实补丁——
+      两边不是两张图，是同一份 DOM 换了一组自定义属性，所以差别只可能来自提案本身。
+      顶栏那个「原型」开关不影响这一节：这里两档永远同时在，它管的是 §03 那扇窗。
+    </p>
+
+    <!-- P1 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P1 · 补丁行高改成整数</h3>
+        <span class="tag">1.55 → <b>20px</b></span>
+        <span class="tag">机械替换</span>
+        <span class="bar__spacer"></span>
+        <div class="seg seg--tiny"><button type="button" id="gridBtn" aria-pressed="false">叠 20px 基线网格</button></div>
+      </div>
+      <div class="vs" id="p1vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> line-height: 1.55 → 19.375px</div>
+          <div class="demo" style="--demo-h: 300px"><div class="rvd" data-file="group" data-hunks="0" data-view="uni"></div></div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> line-height: 20px（12.5 × 1.6）</div>
+          <div class="demo" style="--demo-h: 300px"><div class="rvd" data-file="group" data-hunks="0" data-view="uni"></div></div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="note" style="margin-top:0">
+          <b>把网格叠上去看。</b>左边每行往下漂 0.625px，第 8 行已经离网格 5px，第 32 行差满一整行；
+          右边一直咬在格子上。这不是「像素洁癖」——它就是 <code>tokens.css</code> 里
+          「同一个字，一行清一行糊」那句话描述的东西，只不过那句话当时是写给正文行高的。
+        </p>
+        <dl class="spec">
+          <dt>判断</dt><dd>比值改成绝对值，并立一个 <code>--lh-code: 20px</code> 的 token，两处补丁正文共用。<strong>不改字号</strong>——<code>--text-code: 12.5px</code> 是核过的。</dd>
+          <dt>动哪儿</dt><dd><code>tokens.css</code> 新增 <code>--lh-code</code>；<code>review.css:592</code> 与 <code>diff.css:114</code> 各改一行。</dd>
+          <dt>风险</dt><dd>行高涨 0.625px，40 行的补丁总高 +25px。补丁区本来就滚，没有布局连锁。</dd>
+          <dt>验收</dt><dd>2x 屏上截同一段补丁，前后两张图叠一起看字形边缘；或按上面那张网格自查。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P2 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P2 · 补丁上语法着色</h3>
+        <span class="tag">复用已打包的 lowlight</span>
+        <span class="tag">新增依赖 <b>0</b></span>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 纯文本</div>
+          <div class="demo" style="--demo-h: 320px"><div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div></div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 按 hunk 分侧扫描后着色</div>
+          <div class="demo" style="--demo-h: 320px"><div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div></div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="note" style="margin-top:0">
+          <b>为什么不能逐行高亮。</b>补丁是一行一行给的，而语言不是——这段 hunk 的前半截整个泡在
+          <code>/** … */</code> 里。逐行喂给高亮器，块注释会被当成除号加乘号。
+          <strong>正确的做法是按 hunk 分成「旧侧」（上下文 + 删）和「新侧」（上下文 + 增）两段连续文本各扫一遍</strong>，
+          扫描器带着跨行状态走，再把结果按行切回去。这一页里的着色就是这么算的——把上面那段注释的着色和下面代码的着色一起看，它认得出边界。
+        </p>
+        <dl class="spec">
+          <dt>判断</dt><dd>做。<code>highlight.ts</code> 的 lowlight 实例已经在包里（12 种语言，含 ts/css/json/bash），审核面板复用它<strong>一个字节都不增</strong>。语言按文件扩展名取，取不到就不染——沿用 <code>highlight.ts</code> 那条「没标语言就不猜」。</dd>
+          <dt>动哪儿</dt><dd><code>highlight.ts</code> 导出一个 <code>highlightLines(lang, lines)</code>；<code>ReviewDiff.tsx</code> 的 <code>UniLine</code> / <code>Side</code> 把 <code>{line.text}</code> 换成 hast 子树；<code>markdown.css</code> 的 <code>.hljs-*</code> 配色<strong>原样复用</strong>，不另立一套。</dd>
+          <dt>风险</dt><dd>大补丁的渲染开销。三道闸门：一次只染当前打开的那一个文件（现在本来就是）、按 hunk 缓存、超过阈值退回纯文本（<code>PatchSkip.large</code> 已有先例）。</dd>
+          <dt>验收</dt><dd><code>ReviewDiff.test.ts</code> 补一例：一段横跨 hunk 边界的块注释，断言不会把注释外的代码染成注释。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P3 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P3 · 词级高亮</h3>
+        <span class="tag">LCS + 相似度闸门</span>
+        <span class="tag">这一页现算</span>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 整行底色</div>
+          <div class="demo" style="--demo-h: 250px"><div class="rvd" data-file="rowend" data-view="uni"></div></div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 只标真正变了的那几个词</div>
+          <div class="demo" style="--demo-h: 250px"><div class="rvd" data-file="rowend" data-view="uni"></div></div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="note" style="margin-top:0">
+          <b>这是 <code>RowEnd.tsx</code> 里一段真实的注释重写。</b>左边你得逐字读两遍中文才敢说「哦，只是把
+          『不占这一列』改成了『不顶掉时间』、把括号里的话挪了位置」；右边一眼看完。
+          <strong>中文按字分词、英文按词分词</strong>——中文没有空格，按词切等于不切。
+        </p>
+        <dl class="spec">
+          <dt>判断</dt><dd>做，但要有闸门。配对沿用 <code>splitRows</code> 的规则（一段连续的删配一段连续的增，逐行对位）；两行的公共部分不足 <span class="num">30%</span> 时<strong>整行不标</strong>——那是重写不是改动，全标满等于没标。</dd>
+          <dt>动哪儿</dt><dd>新增 <code>review-words.ts</code>（纯函数 + 表驱动测试，和 <code>splitRows</code> 同一待遇）；<code>review.css</code> 加 <code>.rvd__hit</code>；<code>ReviewDiff.tsx</code> 在配对时把两行送进去。</dd>
+          <dt>取色</dt><dd>行底 12% 之上再叠 22%（<code>color-mix(--ok 22%, transparent)</code>），合成约 35%。<strong>不加粗</strong>：等宽字加粗会改变字面密度，一行里几个粗词会把对齐读乱。</dd>
+          <dt>风险</dt><dd>LCS 是 O(n·m)。长行按 token 数设上限（超过就整行不标），和上面那条闸门共用一个出口。</dd>
+          <dt>限度</dt><dd><strong>配对是逐行对位的</strong>（和 <code>splitRows</code> 同一规则）。整段重排、删增行数不等时，会把内容并不对应的两行配到一起——上面右栏第 3、4 行就是这个情况，标出来的比真正改动的多。相似度闸门挡掉最离谱的那类，剩下的挡不住。<strong>这是逐行 diff 的通病，不是这条的 bug</strong>；要更准得先做行级配对（Patience / Myers），不在本轮。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P4 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P4 · 并排补上记号列</h3>
+        <span class="tag sev--bug" style="border:0">可达性</span>
+        <span class="tag">深色下差别最大</span>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 只有 12% 底色（1.18:1）</div>
+          <div class="demo" style="--demo-h: 280px"><div class="rvd" data-file="tabs" data-view="split"></div></div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 记号列 + 底色 + 词级，三层信号</div>
+          <div class="demo" style="--demo-h: 280px"><div class="rvd" data-file="tabs" data-view="split"></div></div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="note" style="margin-top:0">
+          <b>把右上角切到「暗」再看一遍。</b>深色下 <code>--ok</code> 12% 压在 <code>#0e0f13</code> 上是
+          <span class="num">1.21:1</span>，绿和红几乎并成同一档深灰——而并排下它是唯一的信号。
+          单栏一直有记号列，<strong>并排是自己漏掉的那一半</strong>，不是一个新设计。
+        </p>
+        <dl class="spec">
+          <dt>判断</dt><dd>做。<code>Side</code> 补一个 <code>.rvd__sign</code>，宽度与单栏同为 <code>1.4em</code>（P7 之后是同一个 token）。<code>user-select: none</code> 跟着单栏那条走，复制补丁不会带上记号。</dd>
+          <dt>动哪儿</dt><dd><code>ReviewDiff.tsx:59-67</code> 的 <code>Side</code>；<code>review.css</code> 的 <code>.rvd__cell</code> 那一族。</dd>
+          <dt>代价</dt><dd>每侧再吃 <code>1.4em ≈ 17.5px</code>。这正是 P6 要腾出来的那点宽度，两条一起落。</dd>
+          <dt>验收</dt><dd>灰度截图（去色）看一眼：增删是否仍然可分。这是这条唯一真正的验收标准。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P5 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P5 · hunk 头粘顶</h3>
+        <span class="tag">两行 CSS</span>
+        <span class="tag">往下滚看差别</span>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> position: static，滚过去就没了</div>
+          <div class="demo" style="--demo-h: 260px"><div class="rvd" data-file="group" data-view="uni"></div></div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> position: sticky; top: 0</div>
+          <div class="demo" style="--demo-h: 260px"><div class="rvd" data-file="group" data-view="uni"></div></div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="note" style="margin-top:0">
+          <b>两边一起往下滚。</b>右边那条 <code>@@ … export function withAsides(…)</code> 一直贴在顶上——
+          git 把函数签名塞在 hunk 头尾巴上就是为了这个用途，而现状把它滚走了。
+          第二个 hunk 顶上来时前一个自然被顶掉，不需要额外的 JS。
+        </p>
+        <dl class="spec">
+          <dt>判断</dt><dd>做。单栏的 <code>.rvd__line--hunk</code> 和并排的 <code>.rvd__row--full</code> 各加 <code>position: sticky; top: 0; z-index: 1</code>。底色本来就是 <code>--bg-sunken</code>（不透明），不用再补。</dd>
+          <dt>动哪儿</dt><dd><code>review.css:645-649</code>、<code>review.css:689-694</code>。滚动容器是 <code>.rvd</code>，中间没有 <code>overflow</code> 挡着，sticky 直接成立。</dd>
+          <dt>附带</dt><dd>粘住时补一条 <code>box-shadow: 0 1px 0 var(--border)</code>——不然它和底下的代码贴成一块，看不出是浮着的。</dd>
+          <dt>风险</dt><dd>无。<code>z-index</code> 只在补丁区内部，不与浮层争层级。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P6 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P6 · 窄面板：收掉旧行号列，并把「窄了不给并排」那句注释兑现</h3>
+        <span class="tag">面板 300px 档</span>
+        <span class="tag">对上 F6 / F7</span>
+      </div>
+      <div class="card__body" style="padding-bottom:6px">
+        <p class="mini" style="margin:0 0 12px">下面两组都按 <b>300px</b> 面板宽度摆——就是窗口 ≤1280px 时 <code>--workbench-w</code> 的实际值。</p>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 单栏 · 两列行号吃掉 90px</div>
+          <div style="width:300px;max-width:100%;margin:0 auto 16px">
+            <div class="demo" style="--demo-h: 210px"><div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div></div>
+          </div>
+        </div>
+        <div class="vs__col vs__col--next narrow-demo" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 单栏 · 按行别只给一个行号</div>
+          <div style="width:300px;max-width:100%;margin:0 auto 16px">
+            <div class="demo" style="--demo-h: 210px"><div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="vs" style="border-top:1px solid var(--border)">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 并排 · 任何宽度都能开，每侧剩 14 字符</div>
+          <div style="width:300px;max-width:100%;margin:0 auto 16px">
+            <div class="demo" style="--demo-h: 210px"><div class="rvd" data-file="group" data-hunks="1" data-view="split"></div></div>
+          </div>
+        </div>
+        <div class="vs__col vs__col--next narrow-demo" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 闸门生效 · 退回单栏，按钮置灰</div>
+          <div style="width:300px;max-width:100%;margin:0 auto 16px">
+            <div class="demo demo--pane" style="--demo-h: 210px">
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 9px;border-bottom:1px solid var(--border);background:var(--bg-sunken);color:var(--text-faint);font-size:11.5px">
+                <svg width="13" height="13" style="opacity:.45"><use href="#i-split"/></svg>
+                面板 &lt; 420px：并排不可用
+              </div>
+              <div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card__body">
+        <dl class="spec">
+          <dt>行号</dt><dd>窄容器下单栏只画<strong>一个</strong>行号，按行别取：删行给旧号、增行给新号、上下文给新号。省 <code>3.6em ≈ 45px</code>，正文多出 <span class="num">6</span> 个字符（+25%）。宽面板下两列照旧——那时候「这行在旧文件的哪儿」是有用的。</dd>
+          <dt>并排闸门</dt><dd><code>.rv</code> 已经是 <code>container-type: inline-size</code>，容器查询直接可用。<strong>低于 420px 停用并排</strong>（每侧 210px 减去行号与记号，正文约 20 字符，已到下限）：按钮 <code>disabled</code> + <code>data-tip</code> 说明理由，正在并排的自动退回单栏。这就把 <code>ReviewDiff.tsx:18</code> 那句注释兑现了。</dd>
+          <dt>动哪儿</dt><dd><code>ReviewDiff.tsx</code> 的 <code>UniLine</code>（行号按行别取）；<code>review.css</code> 加 <code>@container (max-width: 420px)</code>；<code>Review.tsx</code> 的 <code>split</code> 加一个宽度来源（<code>ResizeObserver</code> 或把闸门放进 <code>Tools</code>）。</dd>
+          <dt>风险</dt><dd>闸门要<strong>记住用户的选择</strong>：窄了自动退回，拉宽了应该自己回到并排，而不是让人再点一次。这条要写进测试。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P7 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P7 · 两份补丁并成一套度量</h3>
+        <span class="tag">转录区 .dl ↔ 面板 .rvd</span>
+        <span class="tag">收敛来源，不改长相</span>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 记号列 1.6em ／ 1.4em，行高各写一遍</div>
+          <div class="card__body" style="padding:14px">
+            <div class="dfile"><div class="dfile__head"><span class="dfile__path"><span class="dfile__dir">apps/desktop/src/renderer/</span><span class="dfile__name">group.ts</span></span><span class="dfile__stat"><span class="plus">+27</span><span class="minus">−12</span></span></div><div class="dfile__body" data-inline="group"></div></div>
+            <p class="mini" style="margin:10px 0 0">↑ 转录区内联（<code>diff.css</code>）　↓ 审核面板（<code>review.css</code>）</p>
+            <div class="demo" style="--demo-h: 150px;margin-top:8px"><div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div></div>
+          </div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 三个共用 token，两处各引一次</div>
+          <div class="card__body" style="padding:14px">
+            <div class="dfile"><div class="dfile__head"><span class="dfile__path"><span class="dfile__dir">apps/desktop/src/renderer/</span><span class="dfile__name">group.ts</span></span><span class="dfile__stat"><span class="plus">+27</span><span class="minus">−12</span></span></div><div class="dfile__body" data-inline="group"></div></div>
+            <p class="mini" style="margin:10px 0 0">↑ 同一套行高与记号列宽　↓ 同上</p>
+            <div class="demo" style="--demo-h: 150px;margin-top:8px"><div class="rvd" data-file="group" data-hunks="1" data-view="uni"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="note" style="margin-top:0">
+          <b>这一条屏幕上的差别最小，价值不在长相。</b>F1 就是它的活例：行高 <code>1.55</code> 在两个文件里各写了一遍，
+          于是「改补丁行高」这件事天然是两处，漏一处就成了「同一段代码在左右两边行距不一样」。
+          <strong>一个值只该有一个改它的地方。</strong>
+        </p>
+        <dl class="spec">
+          <dt>立哪几个</dt><dd><code>--lh-code: 20px</code>（P1）、<code>--diff-sign-w: 1.4em</code>、<code>--diff-pad-r: var(--sp-3)</code>。就三个，不做「diff 主题」那种大工程。</dd>
+          <dt>取值</dt><dd>记号列取<strong>面板那份的 1.4em</strong>：它旁边紧挨着行号列，间距是算过的；转录区那份的 1.6em 旁边什么都没有，只是当初随手写的。</dd>
+          <dt>不并的</dt><dd>卡片底色（<code>.dfile__body</code> 的 <code>--bg-raised</code>）与最大高度 420px <strong>留着</strong>——那两条是「它是嵌在正文里的一张卡」的属性，不是补丁的属性。</dd>
+          <dt>动哪儿</dt><dd><code>tokens.css</code> 加三行；<code>diff.css:107-150</code>、<code>review.css:578-620</code> 各换成 var。</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- P8 -->
+    <div class="card">
+      <div class="card__head">
+        <h3>P8 · 中文在 12.5px 等宽下的落点</h3>
+        <span class="tag sev--keep" style="border:0">要样张，本轮不拍板</span>
+      </div>
+      <div class="card__body">
+        <p style="margin:0 0 14px;color:var(--text-muted);font-size:13.5px">
+          <code>--font-mono</code> 链尾已经补过 <code>PingFang SC</code>，「中文兜底到哪个字体」这件事定了。
+          <strong>没定的是字号。</strong>这仓库的补丁里中文注释是主体（上面每一段都能看到），
+          而 12.5px 的 PingFang SC 比同尺寸拉丁字面密得多。三档摆在一起，请在真机上看，别信这张网页。
+        </p>
+        <div class="vs" style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+          <div class="vs__col" data-mode="next" style="--text-code:12.5px">
+            <div class="vs__cap"><i style="background:var(--text-faint)"></i><b>12.5px</b> 现值 · --text-code</div>
+            <div class="demo" style="--demo-h:190px;border:0;border-radius:0"><div class="rvd" data-file="rowend" data-view="uni"></div></div>
+          </div>
+          <div class="vs__col" data-mode="next" style="--text-code:13px">
+            <div class="vs__cap"><i style="background:var(--warn)"></i><b>13px</b> 候选 · 与 --text-sm 同档</div>
+            <div class="demo" style="--demo-h:190px;border:0;border-radius:0"><div class="rvd" data-file="rowend" data-view="uni"></div></div>
+          </div>
+        </div>
+        <dl class="spec">
+          <dt>判断</dt><dd><strong>本轮不动。</strong>但要留一条记录：这个数字从来没有对着「一屏全是中文注释的补丁」看过，而那正是这仓库补丁的常态。</dd>
+          <dt>怎么定</dt><dd>四张样张：浅/深 × Retina/非 Retina，各截一段中文块注释的补丁。判据是<strong>笔画有没有粘连</strong>（「懂」「藏」这类高笔画字先糊），不是「看着挤不挤」。</dd>
+          <dt>如果改</dt><dd>只改 <code>--text-code</code> 一个数；行高跟着从 <strong>20</strong> 走到 <strong>21</strong>（13 × 1.6 = 20.8，向上取整）。<strong>21 是奇数，要在样张上单独看一眼</strong>——<code>--lh-prose</code> 取偶数那条理由是否也管等宽，本方案没有证据，不替它下结论。</dd>
+          <dt>不做的</dt><dd>不给中文单开一档字号：<code>font-size-adjust</code> 和分语言字号会让同一行里的中英文变成两个尺寸，比密一点难看得多。</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="pg pg--wide">
+  <!-- ═══ §03 ═══ -->
+  <section class="sec" id="s3">
+    <div class="sec__head"><span class="sec__no">03</span><h2>整机原型</h2></div>
+    <p class="sec__sub">
+      八条落在一起是什么样。一扇能点的 omni：侧栏 / 会话 / 右面板都在，
+      <strong>右边那块补丁是真的</strong>——切「现状 ⇄ 方案」看整屏的差别，切「单栏 ⇄ 并排」看结构，
+      点顶栏最左那颗收起侧栏。会话区那一半是背景，不是本方案的提案。
+    </p>
+
+    <div class="ctl" style="margin:18px 0 12px">
+      <span class="ctl__label">补丁</span>
+      <div class="seg" role="group" aria-label="原型模式">
+        <button type="button" data-proto-mode="now" aria-pressed="true">现状</button>
+        <button type="button" data-proto-mode="next" aria-pressed="false">方案</button>
+      </div>
+      <span class="ctl__label">视图</span>
+      <div class="seg seg--tiny" role="group" aria-label="视图">
+        <button type="button" data-view-btn="uni" data-target="d-proto" aria-pressed="true">单栏</button>
+        <button type="button" data-view-btn="split" data-target="d-proto" aria-pressed="false">并排</button>
+      </div>
+      <span class="ctl__label">文件</span>
+      <div class="seg seg--tiny" role="group" aria-label="文件">
+        <button type="button" data-file-btn="group" aria-pressed="true">group.ts</button>
+        <button type="button" data-file-btn="rowend" aria-pressed="false">RowEnd.tsx</button>
+        <button type="button" data-file-btn="tabs" aria-pressed="false">panel-tabs.css</button>
+      </div>
+    </div>
+
+    <div class="win win--frame">
+      <div class="shell" id="protoShell">
+        <aside class="sidebar">
+          <div class="traffic"><i style="background:#ef6258"></i><i style="background:#f6bd3f"></i><i style="background:#31bd55"></i></div>
+          <div class="sidebar__head">
+            <div class="sidebar__brand">omni<span>同文</span></div>
+          </div>
+          <div class="sidebar__act">
+            <button class="sidebar__new" type="button" title="新建会话 —— 落在 omni"><svg width="15" height="15"><use href="#i-plus"/></svg><span class="sidebar__new-label">新建会话</span></button>
+            <button class="sidebar__folder" type="button" aria-label="打开文件夹…"><svg width="15" height="15"><use href="#i-folder"/></svg></button>
+          </div>
+          <div class="row row--search">
+            <span class="row__slot"><svg width="15" height="15"><use href="#i-search"/></svg></span>
+            <span class="sidebar__filter">筛选会话…</span>
+          </div>
+          <div class="sidebar__list">
+            <div class="sidebar__section"><button class="sidebar__section-main" type="button"><span>置顶</span><svg class="chev" width="13" height="13"><use href="#i-chev"/></svg></button></div>
+            <div class="row row--thread row--flat"><button class="row__main" type="button"><span class="row__slot"><i class="row__dot row__dot--idle"></i></span><span class="row__label">发布前把 0.0.213 的 dmg 重签</span><span class="row__time">2 分</span></button><button class="row__act" type="button" aria-label="更多操作">···</button></div>
+
+            <div class="sidebar__section">
+              <button class="sidebar__section-main" type="button"><span>项目</span><svg class="chev" width="13" height="13"><use href="#i-chev"/></svg></button>
+              <button class="row__act" type="button" aria-label="打开一个文件夹"><svg width="15" height="15"><use href="#i-folder"/></svg></button>
+            </div>
+            <div class="row row--group"><button class="row__main" type="button"><span class="row__slot"><svg width="15" height="15"><use href="#i-folder-open"/></svg></span><span class="row__label">omni</span><span class="row__count">12</span></button><button class="row__act" type="button" aria-label="在此新建"><svg width="15" height="15"><use href="#i-plus"/></svg></button></div>
+            <div class="row row--thread row--selected"><button class="row__main" type="button"><span class="row__slot"><i class="row__dot row__dot--running"></i></span><span class="row__label">补丁读起来太累，先出方案</span><span class="row__spin"><svg width="13" height="13"><use href="#i-spin"/></svg></span></button></div>
+            <div class="row row--thread"><button class="row__main" type="button"><span class="row__slot"><i class="row__dot row__dot--waiting"></i></span><span class="row__label">审核 8 月的手动测试清单</span><span class="row__wait">待批</span></button></div>
+            <div class="row row--thread row--unread"><button class="row__main" type="button"><span class="row__slot"><i class="row__dot row__dot--unread"></i></span><span class="row__label">轮次折叠扩到中间叙述</span><span class="row__time row__time--bright">1 时</span></button></div>
+            <div class="row row--thread"><button class="row__main" type="button"><span class="row__slot"><i class="row__dot row__dot--idle"></i></span><span class="row__label">对比 codex 和 kimi 的 diff 质量</span><span class="row__time">昨</span></button></div>
+            <div class="row row--group"><button class="row__main" type="button"><span class="row__slot"><svg width="15" height="15"><use href="#i-folder"/></svg></span><span class="row__label">doc-manager</span><span class="row__wait">待批</span><span class="row__count">3</span></button></div>
+            <div class="row row--group"><button class="row__main" type="button"><span class="row__slot"><svg width="15" height="15"><use href="#i-folder"/></svg></span><span class="row__label">style</span><span class="row__count">1</span></button></div>
+            <div class="row row--group"><button class="row__main" type="button"><span class="row__slot"><svg width="15" height="15"><use href="#i-folder"/></svg></span><span class="row__label">agent-learn</span><span class="row__count">2</span></button></div>
+
+            <div class="sidebar__section">
+              <button class="sidebar__section-main" type="button"><span>对话</span><svg class="chev" width="13" height="13"><use href="#i-chev"/></svg></button>
+              <button class="row__act" type="button" aria-label="新开一条对话"><svg width="15" height="15"><use href="#i-plus"/></svg></button>
+            </div>
+            <p class="sidebar__empty sidebar__empty--one">还没有独立对话</p>
+
+            <div class="sidebar__section"><button class="sidebar__section-main" type="button"><span>别处的历史</span><svg class="chev chev--closed" width="13" height="13"><use href="#i-chev"/></svg></button></div>
+          </div>
+          <div class="foot">
+            <button class="foot__who" type="button"><span class="foot__slot"><span class="avatar">A</span></span><span class="foot__name">alice</span></button>
+          </div>
+        </aside>
+
+        <div class="main">
+          <div class="topbar">
+            <button class="iconbtn iconbtn--on" type="button" id="railBtn" aria-label="收起侧栏"><svg width="15" height="15"><use href="#i-rail"/></svg></button>
+            <button class="topbar__title" type="button"><span>补丁读起来太累，先出方案</span><svg width="13" height="13" style="color:var(--text-faint)"><use href="#i-chev"/></svg></button>
+            <span class="topbar__spacer"></span>
+            <span class="badge">claude · 只读</span>
+            <span class="meter"><span class="meter__track"><span class="meter__fill" style="width:31%"></span></span>31%</span>
+            <button class="iconbtn" type="button" aria-label="审核改动"><svg width="15" height="15"><use href="#i-code"/></svg></button>
+          </div>
+          <div class="stage">
+            <div class="transcript">
+              <div class="transcript__inner">
+                <div class="copyable copyable--user">
+                  <div class="msg--user">审核面板里的补丁读着累：一行改了哪几个字得自己对，中文注释尤其难认。先别动代码，给我一版对着现状的方案。</div>
+                  <div class="msgacts"><button class="msgact" type="button" aria-label="复制"><svg width="14" height="14"><use href="#i-copy"/></svg></button><button class="msgact" type="button" aria-label="改一改再发"><svg width="14" height="14"><use href="#i-edit"/></svg></button></div>
+                </div>
+                <div class="turnmark turnmark__row" data-folded="true"><span>已处理 4 分 12 秒 · 过程已折叠（含 6 步工具调用）</span></div>
+                <div class="think__row"><span class="step__icon"><svg width="15" height="15"><use href="#i-think"/></svg></span><span>思考</span><span class="think__dot"></span><span class="think__txt">先量现状：行高、记号列、行号列各占多少，别凭印象说累……</span></div>
+                <div class="run">
+                  <div class="step"><span class="step__icon"><svg width="15" height="15"><use href="#i-file"/></svg></span><span>读取</span><span class="step__target">styles/review.css</span><span class="step__meta">704 行</span></div>
+                  <div class="step"><span class="step__icon"><svg width="15" height="15"><use href="#i-file"/></svg></span><span>读取</span><span class="step__target">components/ReviewDiff.tsx</span><span class="step__meta">120 行</span></div>
+                  <div class="step"><span class="step__icon"><svg width="15" height="15"><use href="#i-search"/></svg></span><span>检索</span><span class="step__target">--text-code</span><span class="step__meta">9 处</span></div>
+                </div>
+                <div class="copyable copyable--agent">
+                  <div class="msg--agent">
+                    <p>量完了，问题不在字号。补丁正文的行高写的是比值 <code>1.55</code>，算出来 <strong>19.375px</strong>——小数，每行往下漂 0.625px；而 <code>tokens.css</code> 自己写过「奇数行高在 2x 屏上会让同一个字一行清一行糊」，正文行高就是为此取的偶数 26。</p>
+                    <p>真正让你「得自己对」的是另外两件：一行里<strong>没有词级标记</strong>，改一个词和重写整行长得一样；并排视图<strong>没有记号列</strong>，增删只剩一层 12% 的底色（深色下 1.21:1）。另外 <code>highlight.ts</code> 里那套 lowlight 早就打进包了，只有 Markdown 代码块在用，右边这块补丁一直是纯文本。</p>
+                    <p>八条写进方案了，右边这块面板就是按现状复现的——切「方案」看改完的样子。</p>
+                  </div>
+                  <div class="msgacts"><button class="msgact" type="button" aria-label="复制"><svg width="14" height="14"><use href="#i-copy"/></svg></button><button class="msgact" type="button" aria-label="从这里重来"><svg width="14" height="14"><use href="#i-rerun"/></svg></button></div>
+                </div>
+                <div class="edits">
+                  <div class="edits__head">
+                    <span class="edits__glyph"><svg width="14" height="14"><use href="#i-code"/></svg></span>
+                    <span class="edits__title">已编辑 3 个文件</span>
+                    <span class="edits__stat"><span class="plus">+53</span><span class="minus">−17</span></span>
+                    <button class="edits__review" type="button" aria-label="审一遍（⇧⌘R）"><svg width="14" height="14"><use href="#i-lines"/></svg></button>
+                  </div>
+                  <div class="edits__list">
+                    <div class="changed__row"><span class="changed__name"><span class="changed__dir">apps/desktop/src/renderer/</span><span class="changed__base">group.ts</span></span><span class="changed__stat"><span class="plus">+27</span><span class="minus">−12</span></span></div>
+                    <div class="changed__row"><span class="changed__name"><span class="changed__dir">apps/desktop/src/renderer/components/</span><span class="changed__base">RowEnd.tsx</span></span><span class="changed__stat"><span class="plus">+4</span><span class="minus">−4</span></span></div>
+                    <div class="changed__row"><span class="changed__name"><span class="changed__dir">apps/desktop/src/renderer/styles/</span><span class="changed__base">panel-tabs.css</span></span><span class="changed__stat"><span class="plus">+22</span><span class="minus">−1</span></span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="composer">
+            <div class="composer__inner">
+              <div class="composer__input">问点什么，或 / 选个命令…</div>
+              <div class="composer__bar">
+                <button class="trigger" type="button"><svg width="14" height="14"><use href="#i-plus"/></svg></button>
+                <button class="trigger" type="button">claude<svg width="12" height="12"><use href="#i-chev"/></svg></button>
+                <button class="trigger" type="button">只读<svg width="12" height="12"><use href="#i-chev"/></svg></button>
+                <span class="topbar__spacer"></span>
+                <button class="send" type="button" aria-label="发送"><svg width="15" height="15"><use href="#i-send"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="rv">
+          <div class="panel-tabs">
+            <div class="panel-tab panel-tab--on"><button class="panel-tab__pick" type="button"><svg width="13" height="13"><use href="#i-lines"/></svg><span>审查</span></button><button class="panel-tab__close" type="button" aria-label="关闭">×</button></div>
+            <div class="panel-tab"><button class="panel-tab__pick" type="button"><svg width="13" height="13"><use href="#i-file"/></svg><span>文件</span></button><button class="panel-tab__close" type="button" aria-label="关闭">×</button></div>
+            <span class="panel-tabs__spacer"></span>
+            <button class="panel-tabs__button" type="button" aria-label="占满"><svg width="14" height="14"><use href="#i-split"/></svg></button>
+          </div>
+          <div class="rv__head">
+            <span class="rv__title">上一轮<svg width="12" height="12" style="margin-left:4px"><use href="#i-chev"/></svg></span>
+            <div class="rv__summary"><span class="rv__count">3 个文件 · <span class="plus">+53</span> <span class="minus">−17</span></span></div>
+            <div class="rv__tools">
+              <button class="rv__tool" type="button" aria-label="展开全部差异"><svg width="14" height="14"><use href="#i-lines"/></svg></button>
+              <button class="rv__tool" type="button" aria-label="跳到文件"><svg width="14" height="14"><use href="#i-search"/></svg></button>
+              <button class="rv__tool" type="button" id="protoSplitTool" aria-label="切换到分栏差异"><svg width="14" height="14"><use href="#i-split"/></svg></button>
+              <button class="rv__tool rv__tool--on" type="button" id="protoListTool" aria-label="隐藏文件"><svg width="14" height="14"><use href="#i-filelist"/></svg></button>
+              <button class="rv__tool" type="button" aria-label="刷新 Git 差异"><svg width="14" height="14"><use href="#i-reload"/></svg></button>
+            </div>
+          </div>
+          <div class="rv__body" id="protoBody">
+            <div class="rv__pane">
+              <div class="rv__file">
+                <span class="rv__kindtext">已修改</span>
+                <span class="rv__path" id="protoPath">apps/desktop/src/renderer/group.ts</span>
+                <button class="rv__act" type="button" aria-label="复制这份补丁"><svg width="14" height="14"><use href="#i-copy"/></svg></button>
+              </div>
+              <div class="rvd" id="d-proto" data-file="group" data-view="uni" tabindex="0"></div>
+            </div>
+            <div class="rvl">
+              <div class="rvl__filter"><div class="rvl__input">筛选文件…</div></div>
+              <div class="rvl__rows">
+                <button class="rvl__row rvl__row--on" type="button" data-file-row="group"><i class="rvl__kind rvl__kind--update"></i><span class="rvl__base">group.ts</span><span class="rvl__stat"><span class="plus">+27</span><span class="minus">−12</span></span></button>
+                <button class="rvl__row" type="button" data-file-row="rowend"><i class="rvl__kind rvl__kind--update"></i><span class="rvl__base">RowEnd.tsx</span><span class="rvl__stat"><span class="plus">+4</span><span class="minus">−4</span></span></button>
+                <button class="rvl__row" type="button" data-file-row="tabs"><i class="rvl__kind rvl__kind--update"></i><span class="rvl__base">panel-tabs.css</span><span class="rvl__stat"><span class="plus">+22</span><span class="minus">−1</span></span></button>
+                <button class="rvl__row" type="button"><i class="rvl__kind rvl__kind--untracked"></i><span class="rvl__base">Diff与字体优化方案.html</span><span class="rvl__stat"><span class="plus">+1</span></span></button>
+              </div>
+              <div class="rvl__legend">
+                <span class="rvl__key"><i class="rvl__kind rvl__kind--update"></i>修改</span>
+                <span class="rvl__key"><i class="rvl__kind rvl__kind--add"></i>新建</span>
+                <span class="rvl__key"><i class="rvl__kind rvl__kind--untracked"></i>未跟踪</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <p class="mini" style="margin-top:12px">
+      <b>右边那块补丁只剩 300px 宽，那不是原型摆窄了。</b>面板按 <code>--workbench-w</code> 取 560px，文件清单固定 260px——
+      剩给补丁正文的就是 300，而其中 90px 又是两列行号（F6）。点工具栏那颗<b>文件清单</b>按钮把清单收起来，正文立刻回到 560px。<br>
+      会话那一侧按当前 omni 复现：正文 15/26、工具行 13、动作条已是 22×22 纯图标、改动卡的「审一遍」已是纯图标——
+      这些是同日《UI 整体优化方案》落地后的样子，摆在这里是为了让右边那块补丁有真实的上下文。
+    </p>
+  </section>
+</div>
+
+<div class="pg">
+
+  <!-- ═══ §04 ═══ -->
+  <section class="sec" id="s4">
+    <div class="sec__head"><span class="sec__no">04</span><h2>侧栏：先对齐，再收一档字色</h2></div>
+    <p class="sec__sub">
+      §03 那扇窗的侧栏之前是<strong>凭印象画的</strong>，和真机并排一看差了五处。
+      这一节先按 <code>SidebarHead.tsx</code> / <code>SidebarSections.tsx</code> / <code>SidebarGroup.tsx</code> 重画，
+      <strong>对齐之后露出一个原来看不出来的问题</strong>——那就是 P9。
+    </p>
+
+    <div class="card">
+      <div class="card__head"><h3>A · 之前画错的五处（已改）</h3><span class="tag">对着组件核过</span></div>
+      <table class="tbl">
+        <thead><tr><th>位置</th><th>原型之前</th><th>真实结构</th></tr></thead>
+        <tbody>
+          <tr><td>新建会话</td><td class="was">和「筛选会话」一样，一条普通 <code>.row</code></td>
+              <td class="now"><code>.sidebar__act</code> 里的<strong>主按钮</strong>（撑满宽度、字重 500、图标占满第一列）+ 右边一颗 34×34 的<strong>文件夹方键</strong>。低频动作让位给高频动作，这是 <code>SidebarHead.tsx</code> 那次改动的全部意思</td></tr>
+          <tr><td>分节标题</td><td class="was">缩进 32px 的一行灰字，不可点</td>
+              <td class="now"><code>.sidebar__section</code>：<strong>挂最左</strong>（<code>padding-left: 0</code>，照 Codex 拍板）、带 <code>⌄</code>、<strong>整段可折叠</strong>；「项目」「对话」两段悬停时右边还各现一颗动作键（打开文件夹 / 新开一条）</td></tr>
+          <tr><td>项目行</td><td class="was">显示完整路径 <code>~/work/omni</code></td>
+              <td class="now">显示目录名 <code>omni</code>；图标是<strong>开 / 合两只文件夹</strong>——折叠态由它自己说，<strong>没有那个 <code>›</code> 箭头</strong>；折起来时行尾还挂着 待批 / 转圈 / 未读点</td></tr>
+          <tr><td>对话段</td><td class="was">底下挂了一条会话</td>
+              <td class="now">段头常驻、空了也在，显示「还没有独立对话」——<strong>「这里能放什么」不该只有已经知道的人看得见</strong></td></tr>
+          <tr><td>底部</td><td class="was">没画</td>
+              <td class="now">「别处的历史」一段（默认折叠）+ <code>.foot</code> 一行（头像 + 名字）</td></tr>
+        </tbody>
+      </table>
+      <div class="card__foot">§03 那扇窗已经换成上面这一列。下面这两扇是从它<strong>克隆</strong>出来的，所以不会再走样。</div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <h3>B · P9：最深那一档字色，四种东西在用</h3>
+        <span class="tag">一行 CSS</span>
+        <span class="tag">深色下同理</span>
+      </div>
+      <div class="vs">
+        <div class="vs__col" data-mode="now">
+          <div class="vs__cap"><i></i><b>现状</b> 项目行 --text + 500</div>
+          <div class="sb-demo" data-sidebar-clone></div>
+        </div>
+        <div class="vs__col vs__col--next" data-mode="next">
+          <div class="vs__cap"><i></i><b>方案</b> 项目行退到 --text-muted</div>
+          <div class="sb-demo" data-sidebar-clone></div>
+        </div>
+      </div>
+      <div class="card__body">
+        <p class="mini" style="margin:0 0 14px">看「<b>omni / doc-manager / style / agent-learn</b>」那四行——两边其余一个像素都没动。</p>
+        <table class="tbl" style="margin-bottom:14px">
+          <thead><tr><th>元素</th><th>色</th><th>字号</th><th>字重</th></tr></thead>
+          <tbody>
+            <tr><td>品牌 omni</td><td><code>--text</code></td><td class="num">16</td><td class="num">600</td></tr>
+            <tr><td>新建会话</td><td><strong><code>--text</code></strong></td><td class="num">14</td><td class="num"><strong>500</strong></td></tr>
+            <tr><td>分节标题 置顶 / 项目 / 对话</td><td><code>--text-faint</code></td><td class="num">13</td><td class="num">400</td></tr>
+            <tr><td><strong>项目行</strong></td><td><strong><code>--text</code></strong></td><td class="num">14</td><td class="num"><strong>500</strong></td></tr>
+            <tr><td>会话行</td><td><code>--text-muted</code></td><td class="num">14</td><td class="num">400</td></tr>
+            <tr><td><strong>选中的那条会话</strong></td><td><strong><code>--text</code></strong></td><td class="num">14</td><td class="num"><strong>500</strong></td></tr>
+            <tr><td><strong>跑完还没看的会话</strong></td><td><strong><code>--text</code></strong></td><td class="num">14</td><td class="num"><strong>500</strong></td></tr>
+          </tbody>
+        </table>
+        <p class="note" style="margin-top:0">
+          <b>「--text + 500」同时给了四种东西。</b>而它们的数量完全不成比例：项目行是<strong>常驻的一摞</strong>
+          （这台机器上六个），选中的会话<strong>永远只有一条</strong>。一列扫下来，
+          「你正在看的是哪条」和「这里有几个项目」一样重——<strong>最强的那一档没有给最该强的那件事留位置。</strong>
+        </p>
+        <dl class="spec">
+          <dt>判断</dt><dd>项目行退到 <code>--text-muted</code>。<strong>只退色</strong>——字重 500 不动、字号不动、结构不动。改完之后整个侧栏满墨的只剩两处：顶上的主按钮，和你正在看的那条。</dd>
+          <dt>字重为什么留着</dt><dd>项目是<strong>容器</strong>、会话是<strong>内容</strong>，同一列里必须留一档区别。图标和计数不够：折叠着的项目行和置顶段里那条 flat 会话行，图标列在同一个位置（都是 24px 那一格）。</dd>
+          <dt>动哪儿</dt><dd><code>app-sidebar.css:70-76</code> 的 <code>.row--group</code>，<strong>一行</strong>：<code>color: var(--text)</code> → <code>var(--text-muted)</code>。</dd>
+          <dt>来路</dt><dd>这一档是对照原型时点出来的：草稿里项目行<strong>本来是画错的</strong>（用了普通 <code>.row</code>，于是落在 <code>--text-muted</code>），并排一看反而更合适。这条提案就是把那个错误扶正成一个决定——留档免得下次有人「顺手改回去」。</dd>
+          <dt>风险</dt><dd>低。筛选结果里的项目名走同一个类，会一起变淡——那正好：筛选时要找的是会话，不是项目。</dd>
+          <dt>验收</dt><dd>截一屏侧栏，数一数满墨的地方有几处。两处是对的。</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+  <!-- ═══ §05 ═══ -->
+  <section class="sec" id="s5">
+    <div class="sec__head"><span class="sec__no">05</span><h2>判过，不动</h2></div>
+    <p class="sec__sub">
+      和提案一样重要的一半。前三条是<strong>对上一版原型的反驳</strong>——那份草图里有几处提法，对着这个仓库已经写下的决定核完之后不成立。
+      留档是为了下次不再从头议一遍。
+    </p>
+    <div class="card">
+      <div class="find">
+        <div class="find__no">K1</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--keep">不做</span>补丁正文 <code>font-weight: 450</code></p>
+          <p>上一版原型给 <code>.rvd__body</code> 加了 <code>font-weight: 450</code>。<strong>450 不是 450。</strong>CSS Fonts 4 的权重匹配规则是：目标值落在 400–500 之间时，<em>先向上</em>依次找到 500，再回头往下找。SF Mono 和 PingFang SC 都有 Medium 面，所以 450 会被解析成 <strong>500</strong>——写 450 只会让人以为存在一档中间量。</p>
+          <p>这个坑仓库里已经踩过并留了记录：<code>app-main.css:44</code>「<em>550 在 mac 上是半句谎话：PingFang SC 没有 550 面（落到 600）</em>」。同一条推理换个方向而已。</p>
+          <p>而就算真的要 500：补丁正文加粗会和「增删底色」抢注意力——这一屏上负责说话的是<strong>颜色</strong>，字重该保持安静。深色下若嫌薄，该调的是 <code>--ink</code> 的透明度档，不是字重。</p>
+          <div class="ev"><span>app-main.css:44 550 的同型判例</span><span>CSS Fonts 4 §5.2 font matching</span></div>
+        </div>
+      </div>
+      <div class="find">
+        <div class="find__no">K2</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--keep">不做</span>正文抬到 <code>15.5px / 27px</code></p>
+          <p>上一版原型把回答正文提到 15.5/27。<code>--text-prose: 15px / --lh-prose: 26px</code> 是核过的，而且 26 取偶数写了理由：<em>奇数行高在 2x 屏上会让相邻两行的字形栅格化结果不一样</em>。27 正好踩上那条。</p>
+          <p>本方案<strong>一个字号都不动</strong>——它管的是补丁怎么被读，不是重排字号阶梯。</p>
+          <div class="ev"><span>tokens.css:230-238</span><span>docs/UI整体优化方案 §01「字号阶梯干净」</span></div>
+        </div>
+      </div>
+      <div class="find">
+        <div class="find__no">K3</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--keep">不做</span>并排改成 <code>grid-template-columns: 42px 18px 1fr</code></p>
+          <p>两处不成立。其一，<strong>行号列写死 px 会脱离字号</strong>：补丁字号是 token（<code>--text-code</code>，P8 还可能动它），行号列必须用 <code>em</code> 跟着走。其二，并排两侧要<strong>各自折行且左右等高</strong>——现在的 <code>flex</code> + <code>width: 50%</code> + <code>pre-wrap</code> 已经成立（高的那侧把行撑起来，另一侧跟着），换成 grid 是无收益的改写，还得重新处理空侧。</p>
+          <p>本方案对 <code>.rvd__cell</code> 只加一个记号列（P4），结构一个字不动。</p>
+          <div class="ev"><span>review.css:660-681 .rvd__cell 的折行注释</span></div>
+        </div>
+      </div>
+      <div class="find">
+        <div class="find__no">K4</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--keep">不照搬</span>补丁里的注释<strong>不加斜体</strong></p>
+          <p><code>markdown.css:290-294</code> 给 <code>.hljs-comment</code> 配了 <code>font-style: italic</code>，那是对的——代码块里的注释多是英文。<strong>但补丁不是。</strong>这仓库的补丁里中文注释是主体，而 PingFang SC 没有斜体面，浏览器会做倾斜合成（synthetic oblique），12.5px 下笔画会糊成一片。</p>
+          <p>所以 P2 复用 <code>markdown.css</code> 的<strong>配色</strong>，但补一条：补丁区里注释只染 <code>--text-muted</code>，不斜。</p>
+          <div class="ev"><span>markdown.css:290-294</span><span>P2 的落地要点</span></div>
+        </div>
+      </div>
+      <div class="find">
+        <div class="find__no">K5</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--keep">本轮不做</span>hunk 之间的「展开这 N 行」</p>
+          <p>现在上下文是全局的 3 ⇄ 9999 两档（<code>ReviewTools.tsx:34-36</code> 那颗 <code>LinesIcon</code>）。GitHub 式的逐段展开更精细，但它要把 <code>context</code> 从「一个数」改成「按 hunk 记的一张表」，穿透到取补丁的那一层。收益不如上面八条直接，先记着。</p>
+          <div class="ev"><span>ReviewTools.tsx:34-36</span><span>review-patch.ts usePatch</span></div>
+        </div>
+      </div>
+      <div class="find">
+        <div class="find__no">K6</div>
+        <div class="find__body">
+          <p class="find__t"><span class="sev sev--keep">保持</span>并排空侧仍用 <code>--bg-sunken</code></p>
+          <p>深色下 <code>#050609</code> 比纸面更深，读起来像个洞——<strong>那正是「这边没有内容」该有的样子</strong>。换成比纸浅的填充会让空白看起来像一块内容。不动。</p>
+          <div class="ev"><span>review.css:683 .rvd__cell--void</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═══ §06 ═══ -->
+  <section class="sec" id="s6">
+    <div class="sec__head"><span class="sec__no">06</span><h2>落地顺序</h2></div>
+    <p class="sec__sub">按风险排三批。第一批可以直接合；第二批动渲染层、要新测试；第三批动状态、要交互测试。</p>
+
+    <div class="card">
+      <div class="card__head"><h3>批一 · 纯样式与 token</h3><span class="tag">建议一个 PR</span><span class="tag">无回归风险</span></div>
+      <table class="tbl">
+        <thead><tr><th>条目</th><th>动哪儿</th><th>验收</th></tr></thead>
+        <tbody>
+          <tr><td><b>P1</b> 行高 20px</td><td>tokens.css 新增 <code>--lh-code</code>；review.css:592；diff.css:114</td><td>2x 屏叠图 / 网格自查</td></tr>
+          <tr><td><b>P5</b> hunk 粘顶</td><td>review.css:645 / 689 各加三行</td><td>滚到第二个 hunk，头是否换人</td></tr>
+          <tr><td><b>P7</b> 度量并成 token</td><td>tokens.css 加三行；diff.css / review.css 换 var</td><td>全仓 grep 不再有第二处字面量行高</td></tr>
+          <tr><td><b>P9</b> 项目行退一档字色</td><td>app-sidebar.css:70-76 <code>.row--group</code> 一行</td><td>一屏侧栏里满墨只剩两处</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>批二 · 渲染层</h3><span class="tag">动 ReviewDiff.tsx</span><span class="tag">逐条出图比稿</span></div>
+      <table class="tbl">
+        <thead><tr><th>条目</th><th>动哪儿</th><th>验收</th></tr></thead>
+        <tbody>
+          <tr><td><b>P4</b> 并排记号列</td><td>ReviewDiff.tsx:59-67；review.css .rvd__cell</td><td><strong>灰度截图</strong>下增删仍可分</td></tr>
+          <tr><td><b>P2</b> 语法着色</td><td>highlight.ts 导出 <code>highlightLines</code>；ReviewDiff.tsx 两处渲染；复用 markdown.css 配色</td><td>ReviewDiff.test.ts 补「跨行块注释」一例；大补丁退回纯文本的阈值有测试</td></tr>
+          <tr><td><b>P3</b> 词级高亮</td><td>新增 review-words.ts + 表驱动测试；review.css 加 .rvd__hit；ReviewDiff.tsx 配对时调用</td><td>相似度低于 30% 的整行改写<strong>不标</strong>；超长行走上限出口</td></tr>
+        </tbody>
+      </table>
+      <div class="card__foot">顺序有讲究：<b>P4 先落</b>。记号列是结构，着色和高亮是叠在结构上的颜色——反过来做，比稿时分不清哪一层在起作用。</div>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>批三 · 宽度策略</h3><span class="tag">动状态</span><span class="tag">要交互测试</span></div>
+      <table class="tbl">
+        <thead><tr><th>条目</th><th>动哪儿</th><th>验收</th></tr></thead>
+        <tbody>
+          <tr><td><b>P6</b> 窄态单行号 + 并排闸门</td><td>ReviewDiff.tsx UniLine；review.css <code>@container 420px</code>；Review.tsx 的 split 加宽度来源</td><td>拉窄→自动退回单栏；<strong>拉宽→自己回到并排</strong>（不要求再点一次）；<code>ReviewDiff.tsx:18</code> 那句注释改成描述实现</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>不排期</h3></div>
+      <table class="tbl">
+        <tbody>
+          <tr><td><b>P8</b> 中文在 12.5px 的落点</td><td>四张样张（浅/深 × Retina/非 Retina），判据是笔画粘连</td><td>看完再决定动不动 <code>--text-code</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p style="margin:56px 0 0;padding-top:20px;border-top:1px solid var(--border);color:var(--text-faint);font-size:12px;line-height:1.9">
+    omni · Diff 阅读与等宽排版 · 优化方案原型 · 2026-08-27 ·
+    审计基线：main + 工作区现状 ·
+    补丁样本取自本仓库真实 <code>git diff</code>（group.ts / RowEnd.tsx / panel-tabs.css）·
+    上一版：字体与Diff融合原型-2026-08-27.html（本方案对其中三处提法作了反驳，见 §04）·
+    同日另一份：UI整体优化方案-2026-08-27.html（侧栏 / 动效 / 图标，已拍板落地，本方案不重开）
+  </p>
+</div>
+
+<!-- ══ 补丁样本：本仓库工作区的真实 git diff ══ -->
+<script type="text/plain" id="patch-group" data-lang="ts" data-path="apps/desktop/src/renderer/group.ts">
+@@ -118,17 +118,22 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
+  *
+  * ## 折的是过程，不是答案
+  *
+- * 上一版折的是「分界线之后属于这一轮的一切」——连那一轮的回答一起藏。
+- * 那读起来是「清空」不是「折叠」：一条跑了十轮的会话折起来之后，
+- * 屏幕上只剩十条「已处理 X」，你连它们各自说了什么都看不见。
++ * 折起的那一轮只留四样：
+  *
+- * 现在藏的只有**过程**：工具组和思考。人话、回答、审批卡、改动卡一律留着。
+- * 于是一轮跑完之后那一段读起来是「我问了什么 → 用时 1m 26s ↘ → 它答了什么」，
+- * 想看它中间怎么走的，点那条分界线展开。
++ * - **提问**：它是这一轮的表头，人是靠自己问过的话定位的；
++ * - **最后一条 agent 文本**：这一轮的结论；
++ * - **改动卡**：这一轮动了哪些文件；
++ * - **报错**：故障不能藏——藏了，折起来的一轮看起来就像没出过事。
+  *
+- * **默认就是折着的**（见 `Transcript` 的 `unfolded`）：过程是给「它怎么得出这个」
+- * 这个问题准备的，而多数时候你先要的是结论。还在跑的那一轮不折——那时候
+- * 过程就是全部内容，它正一步步长出来。
++ * 其余全是过程，一并折进去：工具组、思考、计划、已决的审批卡，以及**非最后一条**的
++ * 所有 agent 文本。上一版只折工具组和思考，agent 边干边说的叙述全摊着——长会话里
++ * 过程占了七成位置，折叠名存实亡。判据不变（见 `Transcript` 的 `unfolded`）：过程是给
++ * 「它怎么得出这个」这个问题准备的，而多数时候你先要的是结论。还在跑的那一轮不折——
++ * 那时候过程就是全部内容，它正一步步长出来。pending 的审批只可能出现在那一轮，
++ * 所以折起来的轮里审批卡一定已决，藏了不丢事。
++ *
++ * 「最后一条」按行序取：该轮最后一个 `agent_message` 行。一轮可能一条 agent 文本
++ * 都没有（全是工具调用，出错退出了）——那就没有可额外折的，行为与旧版相同。
+  *
+  * ## 没有分界线的那一轮**不折**
+  *
+@@ -141,12 +146,22 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
+  */
+ export function foldTurns(rows: readonly Row[], folded: (turnId: string) => boolean): readonly Row[] {
+   const openable = new Set(rows.flatMap((row) => (row.kind === "turn" ? [row.turnId] : [])))
+-  return rows.filter((row) => {
++  // 预扫一遍，记下每轮最后一条 agent 文本的行号——后出现的覆盖先前的，
++  // 留下的就是最后那条。rows 可能上千：O(n) 预扫 + O(n) 过滤，不在过滤里回查。
++  const lastAnswerAt = new Map<string, number>()
++  rows.forEach((row, index) => {
++    if (row.kind === "item" && row.item.kind === "agent_message") lastAnswerAt.set(row.item.turnId, index)
++  })
++  return rows.filter((row, index) => {
+     if (row.kind === "turn") return true
+     const id = turnIdOf(row)
+     if (id === undefined || !openable.has(id) || !folded(id)) return true
+-    if (row.kind === "run") return false
+-    return !(row.kind === "item" && row.item.kind === "reasoning")
++    // aside 上一行就返回了（它不归任何一轮）；走到这里只剩 item / run / edits：
++    // run 整组折掉，改动卡留着
++    if (row.kind !== "item") return row.kind === "edits"
++    // 提问是表头、报错不能藏、最后一条回答是结论，其余都是过程
++    if (row.item.kind === "user_message" || row.item.kind === "error") return true
++    return row.item.kind === "agent_message" && lastAnswerAt.get(id) === index
+   })
+ }
+ 
+</script>
+<script type="text/plain" id="patch-rowend" data-lang="ts" data-path="apps/desktop/src/renderer/components/RowEnd.tsx">
+@@ -61,10 +61,10 @@ export function RowEnd({
+   /**
+    * 后台跑完了、还没打开过。
+    *
+-   * **不占这一列**：那一列答的是「多久以前」，未读答的是「你看没看过」，
+-   * 用一个新问题的答案换掉老问题的答案是亏的——尤其「一小时前跑完的」
+-   * 这句话本身就是未读那条最想知道的。亮的是行首那颗点和整行的字重
+-   *（见 `Dot` 与 `.row--unread`）。这里只用来把行尾那截也提一档亮度。
++   * **不顶掉时间**：这一列答的是「多久以前」，未读答的是「你看没看过」
++   *（归行首那颗点，`Dot`），用一个新问题的答案换掉老问题的答案是亏的——
++   * 尤其「一小时前跑完的」这句话本身就是未读那条最想知道的。
++   * 所以未读在这里只把时间和整行提一档亮度（`.row--unread`）。
+    */
+   unread?: boolean
+ }): React.JSX.Element {
+</script>
+<script type="text/plain" id="patch-tabs" data-lang="css" data-path="apps/desktop/src/renderer/styles/panel-tabs.css">
+@@ -10,6 +10,10 @@
+   padding: 0 6px;
+   border-bottom: 1px solid var(--border-strong);
+   background: var(--bg-sunken);
++  /* 页签条自己做容器：窄态图标化的断点要按整条栏的宽度算，
++     而不是按 list——按钮区（约 112px）是固定开销，list 感知不到。 */
++  container-type: inline-size;
++  container-name: ptabs;
+ }
+ 
+ .panel-tabs__list {
+@@ -17,7 +21,11 @@
+   min-width: 0;
+   align-items: center;
+   gap: 3px;
+-  overflow: hidden;
++  /* 原来是 hidden：窄面板把最后一枚页签从中裁断，关闭 × 掉出可视区点不到。
++     改可横向滚动兜底（图标化后 300px 面板已不溢出，只有更极端窄才用得上），
++     所以不做 edge 渐隐。 */
++  overflow-x: auto;
++  scrollbar-width: none;
+ }
+ 
+ .panel-tab {
+@@ -98,3 +106,16 @@
+   outline: 2px solid var(--accent);
+   outline-offset: -2px;
+ }
++
++/* 窄态图标化：三枚带文字的页签约 240px，加按钮区约 112px，栏宽低于约 352px 就会裁断，
++   取 360px 在裁断发生前先收成纯图标；图标一直都在，名字靠 pick 上的 data-tip tooltip 补回。
++   × 必须保留——「窄面板下关闭点不了」正是这个 bug 的原案。 */
++@container ptabs (max-width: 360px) {
++  .panel-tab__pick {
++    padding: 0 9px;
++  }
++
++  .panel-tab__pick span {
++    display: none;
++  }
++}
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ───────────────────────────────────────────────────────────────
+     1. 解析补丁。行号自己算——git 只在 hunk 头里给（review-lines.ts 同理）。
+     ─────────────────────────────────────────────────────────────── */
+  function parsePatch(text) {
+    var hunks = [], cur = null, oldNo = 0, newNo = 0;
+    var rows = text.split("\n");
+    for (var i = 0; i < rows.length; i++) {
+      var raw = rows[i];
+      if (raw.indexOf("@@") === 0) {
+        var m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/.exec(raw);
+        oldNo = m ? +m[1] : 0;
+        newNo = m ? +m[2] : 0;
+        cur = { header: raw, lines: [] };
+        hunks.push(cur);
+        continue;
+      }
+      if (!cur) continue;
+      var sign = raw.charAt(0), body = raw.slice(1);
+      if (sign === "+") cur.lines.push({ kind: "add", text: body, nw: newNo++ });
+      else if (sign === "-") cur.lines.push({ kind: "del", text: body, od: oldNo++ });
+      else if (sign === "\\") continue;
+      else cur.lines.push({ kind: "ctx", text: raw === "" ? "" : body, od: oldNo++, nw: newNo++ });
+    }
+    return hunks;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     2. 语法扫描。**带跨行状态，按 hunk 分侧走一遍**——
+        这一段就是 P2 说的那个做法的最小实现。落地时换成 lowlight，
+        分侧扫描这一层不变。
+     ─────────────────────────────────────────────────────────────── */
+  var TS_KW = {};
+  ("import export from const let var function return if else for of in new class extends implements interface type readonly as await async void undefined null true false this typeof is enum switch case break continue throw try catch finally default do while delete instanceof yield satisfies keyof infer declare namespace abstract public private protected static get set")
+    .split(" ").forEach(function (w) { TS_KW[w] = 1; });
+  var CSS_KW = {};
+  ("important inherit initial unset var calc min max clamp none auto").split(" ").forEach(function (w) { CSS_KW[w] = 1; });
+
+  function scanTs(line, st) {
+    var out = [], i = 0, n = line.length;
+    function push(t, c) { if (t) out.push([t, c]); }
+    while (i < n) {
+      if (st.block) {
+        var e = line.indexOf("*/", i);
+        if (e < 0) { push(line.slice(i), "com"); i = n; }
+        else { push(line.slice(i, e + 2), "com"); i = e + 2; st.block = false; }
+        continue;
+      }
+      var ch = line.charAt(i);
+      if (ch === "/" && line.charAt(i + 1) === "*") { st.block = true; push("/*", "com"); i += 2; continue; }
+      if (ch === "/" && line.charAt(i + 1) === "/") { push(line.slice(i), "com"); i = n; continue; }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        var j = i + 1;
+        while (j < n) { if (line.charAt(j) === "\\") { j += 2; continue; } if (line.charAt(j) === ch) { j++; break; } j++; }
+        push(line.slice(i, j), "str"); i = j; continue;
+      }
+      var w = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(line.slice(i));
+      if (w) {
+        var t = w[0], cls = null;
+        if (TS_KW[t]) cls = "kw";
+        else if (/^[A-Z]/.test(t)) cls = "ty";
+        else if (line.charAt(i + t.length) === "(") cls = "fn";
+        push(t, cls); i += t.length; continue;
+      }
+      var d = /^\d[\d._]*/.exec(line.slice(i));
+      if (d) { push(d[0], "num"); i += d[0].length; continue; }
+      push(ch, null); i++;
+    }
+    return out;
+  }
+
+  function scanCss(line, st) {
+    var out = [], i = 0, n = line.length;
+    function push(t, c) { if (t) out.push([t, c]); }
+    while (i < n) {
+      if (st.block) {
+        var e = line.indexOf("*/", i);
+        if (e < 0) { push(line.slice(i), "com"); i = n; }
+        else { push(line.slice(i, e + 2), "com"); i = e + 2; st.block = false; }
+        continue;
+      }
+      var ch = line.charAt(i);
+      if (ch === "/" && line.charAt(i + 1) === "*") { st.block = true; push("/*", "com"); i += 2; continue; }
+      if (ch === '"' || ch === "'") {
+        var j = i + 1;
+        while (j < n) { if (line.charAt(j) === ch) { j++; break; } j++; }
+        push(line.slice(i, j), "str"); i = j; continue;
+      }
+      var at = /^@[a-z-]+/.exec(line.slice(i));
+      if (at) { push(at[0], "kw"); i += at[0].length; continue; }
+      var cv = /^--[A-Za-z0-9-]+/.exec(line.slice(i));
+      if (cv) { push(cv[0], "ty"); i += cv[0].length; continue; }
+      var sel = /^[.#][A-Za-z][A-Za-z0-9_-]*/.exec(line.slice(i));
+      if (sel) { push(sel[0], "fn"); i += sel[0].length; continue; }
+      var w = /^[A-Za-z-][A-Za-z0-9-]*/.exec(line.slice(i));
+      if (w) {
+        var t = w[0], rest = line.slice(i + t.length), cls = null;
+        if (CSS_KW[t]) cls = "kw";
+        else if (/^\s*:/.test(rest)) cls = "ty";
+        push(t, cls); i += t.length; continue;
+      }
+      var d = /^\d[\d.]*(px|em|rem|%|s|ms|vw|vh|fr|deg)?/.exec(line.slice(i));
+      if (d) { push(d[0], "num"); i += d[0].length; continue; }
+      push(ch, null); i++;
+    }
+    return out;
+  }
+
+  function scanSide(lang, lines, key) {
+    var st = { block: false }, fn = lang === "css" ? scanCss : scanTs;
+    for (var i = 0; i < lines.length; i++) lines[i][key] = fn(lines[i].text, st);
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     3. 词级 diff。分词 → LCS → 相似度闸门 → 空白桥接。
+        中文按字切（`[\s\S]` 那一档兜住），英文按词切。
+     ─────────────────────────────────────────────────────────────── */
+  var SIM_FLOOR = 0.3;
+  var TOKEN_CAP = 400;
+
+  function words(s) { return s.match(/[A-Za-z0-9_$]+|\s+|[\s\S]/g) || []; }
+
+  function markPair(a, b) {
+    var A = words(a.text), B = words(b.text);
+    if (A.length === 0 || B.length === 0) return;
+    if (A.length > TOKEN_CAP || B.length > TOKEN_CAP) return;
+    var n = A.length, m = B.length, w = m + 1;
+    var dp = new Uint16Array((n + 1) * w);
+    for (var i = n - 1; i >= 0; i--) {
+      for (var j = m - 1; j >= 0; j--) {
+        dp[i * w + j] = A[i] === B[j]
+          ? dp[(i + 1) * w + j + 1] + 1
+          : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+      }
+    }
+    var fa = new Array(n), fb = new Array(m), common = 0;
+    for (var k = 0; k < n; k++) fa[k] = 1;
+    for (var k2 = 0; k2 < m; k2++) fb[k2] = 1;
+    var p = 0, q = 0;
+    while (p < n && q < m) {
+      if (A[p] === B[q]) { fa[p] = 0; fb[q] = 0; common += A[p].length; p++; q++; }
+      else if (dp[(p + 1) * w + q] >= dp[p * w + q + 1]) p++;
+      else q++;
+    }
+    var sim = common / Math.max(a.text.length, b.text.length, 1);
+    if (sim < SIM_FLOOR) return;                    // 整行重写：全标等于没标
+    bridge(A, fa); bridge(B, fb);
+    a.hit = expand(A, fa); b.hit = expand(B, fb);
+  }
+
+  /* 两处改动之间只隔着空白时，把空白也算进去——不然高亮碎成两块 */
+  function bridge(T, f) {
+    for (var i = 1; i < T.length - 1; i++) {
+      if (f[i] || !/^\s+$/.test(T[i])) continue;
+      if (f[i - 1] && f[i + 1]) f[i] = 1;
+    }
+  }
+  function expand(T, f) {
+    var out = [], p = 0;
+    for (var i = 0; i < T.length; i++) { for (var k = 0; k < T[i].length; k++) out[p + k] = f[i]; p += T[i].length; }
+    return out;
+  }
+
+  /* 配对规则与 review.ts 的 splitRows 一致：一段连续的删配一段连续的增 */
+  function pairHunk(hunk) {
+    var dels = [], adds = [];
+    function drain() {
+      for (var i = 0; i < Math.min(dels.length, adds.length); i++) markPair(dels[i], adds[i]);
+      dels.length = 0; adds.length = 0;
+    }
+    for (var i = 0; i < hunk.lines.length; i++) {
+      var l = hunk.lines[i];
+      if (l.kind === "del") { dels.push(l); continue; }
+      if (l.kind === "add") { adds.push(l); continue; }
+      drain();
+    }
+    drain();
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     4. 渲染。类名与 ReviewDiff.tsx 一一对应。
+     ─────────────────────────────────────────────────────────────── */
+  function esc(s) {
+    return s.replace(/[&<>]/g, function (c) { return c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"; });
+  }
+
+  function body(line) {
+    var s = line.text;
+    if (s === "") return " ";
+    var cls = new Array(s.length), p = 0, tok = line.tok || [];
+    for (var i = 0; i < s.length; i++) cls[i] = null;
+    for (var t = 0; t < tok.length; t++) {
+      for (var k = 0; k < tok[t][0].length && p + k < s.length; k++) cls[p + k] = tok[t][1];
+      p += tok[t][0].length;
+    }
+    var hit = line.hit, out = "", a = 0;
+    while (a < s.length) {
+      var c = cls[a], h = hit ? (hit[a] || 0) : 0, b = a + 1;
+      while (b < s.length && cls[b] === c && (hit ? (hit[b] || 0) : 0) === h) b++;
+      var seg = esc(s.slice(a, b)), names = [];
+      if (c) names.push("t-" + c);
+      if (h) names.push("hit");
+      out += names.length ? '<span class="' + names.join(" ") + '">' + seg + "</span>" : seg;
+      a = b;
+    }
+    return out;
+  }
+
+  var SIGN = { add: "+", del: "−", ctx: " ", hunk: " " };
+
+  function num(v) { return v === undefined ? "" : String(v); }
+
+  /** 单栏。三个行号槽：旧 / 新 / 窄态合一（后者平时 display:none）。 */
+  function uniLine(l) {
+    var one = l.kind === "del" ? l.od : l.nw;
+    return '<div class="rvd__line rvd__line--' + l.kind + '">'
+      + '<span class="rvd__n rvd__n--old" aria-hidden="true">' + num(l.od) + "</span>"
+      + '<span class="rvd__n rvd__n--new" aria-hidden="true">' + num(l.nw) + "</span>"
+      + '<span class="rvd__n rvd__n--one" aria-hidden="true">' + num(one) + "</span>"
+      + '<span class="rvd__sign" aria-hidden="true">' + SIGN[l.kind] + "</span>"
+      + '<span class="rvd__text">' + (l.kind === "hunk" ? esc(l.text) : body(l)) + "</span>"
+      + "</div>";
+  }
+
+  function side(l, which) {
+    if (!l) return '<div class="rvd__cell rvd__cell--void"></div>';
+    var n = which === "old" ? l.od : l.nw;
+    return '<div class="rvd__cell rvd__line--' + l.kind + '">'
+      + '<span class="rvd__n" aria-hidden="true">' + num(n) + "</span>"
+      + '<span class="rvd__sign" aria-hidden="true">' + SIGN[l.kind] + "</span>"
+      + '<span class="rvd__text">' + body(l) + "</span>"
+      + "</div>";
+  }
+
+  /* review.ts 的 splitRows 原样搬过来 */
+  function splitRows(lines) {
+    var rows = [], dels = [], adds = [];
+    function drain() {
+      var n = Math.max(dels.length, adds.length);
+      for (var i = 0; i < n; i++) rows.push({ left: dels[i], right: adds[i] });
+      dels.length = 0; adds.length = 0;
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      if (l.kind === "del") { dels.push(l); continue; }
+      if (l.kind === "add") { adds.push(l); continue; }
+      drain();
+      if (l.kind === "ctx") rows.push({ left: l, right: l });
+      else rows.push({ full: l });
+    }
+    drain();
+    return rows;
+  }
+
+  function renderUni(lines) {
+    var h = "";
+    for (var i = 0; i < lines.length; i++) h += uniLine(lines[i]);
+    return '<div class="rvd__body">' + h + "</div>";
+  }
+
+  function renderSplit(lines) {
+    var rows = splitRows(lines), h = "";
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.full) {
+        h += '<div class="rvd__row rvd__row--full rvd__line--' + r.full.kind + '">'
+          + '<span class="rvd__text">' + esc(r.full.text) + "</span></div>";
+        continue;
+      }
+      h += '<div class="rvd__row">' + side(r.left, "old") + side(r.right, "new") + "</div>";
+    }
+    return '<div class="rvd__body rvd__body--split">' + h + "</div>";
+  }
+
+  /** 转录区那份内联 diff（diff.css 的 .dl 族）——没有行号，形制另一套。 */
+  function renderInline(lines) {
+    var h = "";
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      h += '<div class="dl dl--' + l.kind + '">'
+        + '<span class="dl__sign" aria-hidden="true">' + SIGN[l.kind] + "</span>"
+        + '<span class="dl__text">' + (l.kind === "hunk" ? esc(l.text) : body(l)) + "</span></div>";
+    }
+    return h;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     5. 装配
+     ─────────────────────────────────────────────────────────────── */
+  var FILES = {};
+
+  Array.prototype.forEach.call(document.querySelectorAll('script[type="text/plain"][id^="patch-"]'), function (node) {
+    var key = node.id.replace("patch-", "");
+    var lang = node.getAttribute("data-lang");
+    var hunks = parsePatch(node.textContent);
+    for (var i = 0; i < hunks.length; i++) {
+      var hk = hunks[i];
+      scanSide(lang, hk.lines.filter(function (l) { return l.kind !== "add"; }), "tokA");
+      scanSide(lang, hk.lines.filter(function (l) { return l.kind !== "del"; }), "tokB");
+      for (var j = 0; j < hk.lines.length; j++) {
+        var l = hk.lines[j];
+        l.tok = l.tokB || l.tokA;
+      }
+      pairHunk(hk);
+    }
+    FILES[key] = { lang: lang, path: node.getAttribute("data-path"), hunks: hunks };
+  });
+
+  function linesOf(key, pick) {
+    var f = FILES[key];
+    if (!f) return [];
+    var out = [];
+    for (var i = 0; i < f.hunks.length; i++) {
+      if (pick && pick.indexOf(i) < 0) continue;
+      out.push({ kind: "hunk", text: f.hunks[i].header });
+      out = out.concat(f.hunks[i].lines);
+    }
+    return out;
+  }
+
+  function pickOf(node) {
+    var raw = node.getAttribute("data-hunks");
+    if (!raw) return null;
+    return raw.split(",").map(function (s) { return +s.trim(); });
+  }
+
+  function paint(node) {
+    var key = node.getAttribute("data-file");
+    var lines = linesOf(key, pickOf(node));
+    node.innerHTML = node.getAttribute("data-view") === "split" ? renderSplit(lines) : renderUni(lines);
+  }
+
+  function paintAll() {
+    Array.prototype.forEach.call(document.querySelectorAll(".rvd[data-file]"), paint);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-inline]"), function (node) {
+      node.innerHTML = renderInline(linesOf(node.getAttribute("data-inline"), [1]));
+    });
+  }
+  paintAll();
+
+  /* ───────────────────────────────────────────────────────────────
+     6. 开关
+     ─────────────────────────────────────────────────────────────── */
+  function press(list, on) {
+    Array.prototype.forEach.call(list, function (b) { b.setAttribute("aria-pressed", String(b === on)); });
+  }
+
+  function setMode(mode) {
+    document.body.setAttribute("data-mode", mode);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mode-btn]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-mode-btn") === mode));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-proto-mode]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-proto-mode") === mode));
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-mode-btn]"), function (b) {
+    b.addEventListener("click", function () { setMode(b.getAttribute("data-mode-btn")); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-proto-mode]"), function (b) {
+    b.addEventListener("click", function () { setMode(b.getAttribute("data-proto-mode")); });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-theme-btn]"), function (b) {
+    b.addEventListener("click", function () {
+      document.body.setAttribute("data-theme", b.getAttribute("data-theme-btn"));
+      press(document.querySelectorAll("[data-theme-btn]"), b);
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-view-btn]"), function (b) {
+    b.addEventListener("click", function () {
+      var view = b.getAttribute("data-view-btn");
+      var id = b.getAttribute("data-target");
+      var group = document.querySelectorAll('[data-view-btn][data-target="' + id + '"]');
+      press(group, b);
+      var host = document.getElementById(id);
+      if (host) {
+        var targets = host.classList.contains("rvd") ? [host] : host.querySelectorAll(".rvd[data-file]");
+        Array.prototype.forEach.call(targets, function (n) { n.setAttribute("data-view", view); paint(n); });
+      }
+      // §01 那块的两个 rvd（现状/方案同装一段）也跟着切
+      if (id === "d-01") {
+        Array.prototype.forEach.call(document.querySelectorAll('#d-01'), function (n) { n.setAttribute("data-view", view); paint(n); });
+      }
+      var tool = document.getElementById("protoSplitTool");
+      if (id === "d-proto" && tool) tool.classList.toggle("rv__tool--on", view === "split");
+    });
+  });
+
+  function chooseFile(key) {
+    var host = document.getElementById("d-proto");
+    if (!host) return;
+    host.setAttribute("data-file", key);
+    paint(host);
+    var path = document.getElementById("protoPath");
+    if (path && FILES[key]) path.textContent = FILES[key].path;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-file-btn]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-file-btn") === key));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-file-row]"), function (r) {
+      r.classList.toggle("rvl__row--on", r.getAttribute("data-file-row") === key);
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-file-btn]"), function (b) {
+    b.addEventListener("click", function () { chooseFile(b.getAttribute("data-file-btn")); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-file-row]"), function (r) {
+    r.addEventListener("click", function () { chooseFile(r.getAttribute("data-file-row")); });
+  });
+
+  var protoTool = document.getElementById("protoSplitTool");
+  if (protoTool) {
+    protoTool.addEventListener("click", function () {
+      var host = document.getElementById("d-proto");
+      var next = host.getAttribute("data-view") === "split" ? "uni" : "split";
+      host.setAttribute("data-view", next);
+      paint(host);
+      protoTool.classList.toggle("rv__tool--on", next === "split");
+      Array.prototype.forEach.call(document.querySelectorAll('[data-view-btn][data-target="d-proto"]'), function (b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-view-btn") === next));
+      });
+    });
+  }
+
+  var rail = document.getElementById("railBtn");
+  if (rail) {
+    rail.addEventListener("click", function () {
+      var shell = document.getElementById("protoShell");
+      var closed = shell.classList.toggle("shell--norail");
+      rail.classList.toggle("iconbtn--on", !closed);
+      rail.setAttribute("aria-label", closed ? "展开侧栏" : "收起侧栏");
+    });
+  }
+
+  // §04 那两扇侧栏是从原型里克隆出来的：同一份 DOM，只是外面套的 [data-mode] 不同
+  var sbSrc = document.querySelector("#protoShell .sidebar");
+  if (sbSrc) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-sidebar-clone]"), function (box) {
+      box.appendChild(sbSrc.cloneNode(true));
+    });
+  }
+
+  var listTool = document.getElementById("protoListTool");
+  if (listTool) {
+    listTool.addEventListener("click", function () {
+      var hidden = document.getElementById("protoBody").classList.toggle("rv__body--list-hidden");
+      listTool.classList.toggle("rv__tool--on", !hidden);
+      listTool.setAttribute("aria-label", hidden ? "显示文件" : "隐藏文件");
+    });
+  }
+
+  var gridBtn = document.getElementById("gridBtn");
+  if (gridBtn) {
+    gridBtn.addEventListener("click", function () {
+      var on = document.getElementById("p1vs").classList.toggle("grid-on");
+      gridBtn.setAttribute("aria-pressed", String(on));
+    });
+  }
+})();
+</script>
+</body>
+</html>
