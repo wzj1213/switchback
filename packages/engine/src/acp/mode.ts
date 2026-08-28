@@ -44,27 +44,34 @@ const HINTS: Readonly<Record<Trust, readonly (readonly [string, number])[]>> = {
   ],
   "auto-edit": [
     /*
-     * **`auto` 压过 `agent` / `edit`。** 这一档 omni 自己的定义是
-     *「优先使用引擎原生安全评审；需要人工决定时才询问」——那说的**就是**一个
-     * 叫 Auto 的档，不是「能编辑」。
+     * ⚠️ **`auto` 不能压过 `edit` —— 试过，是错的。**
      *
-     * 实测 ZCode（`zcode-acp-server 0.5.1`，五个档
-     * `plan / build / edit / yolo / auto`）：`auto` 只有 4 分、`edit` 有 6 分，
-     * 于是 omni 把它顶到了 **Edit**——一个能改文件、但每条命令都要问的档。
-     * 用户的体感是「必须开完全访问，否则连 `ls` 都要点一次放行」，
-     * 而他挑的那一档在 omni 自己的矩阵里 `exec` 本来就是 `allow`。
+     * 2026-08-28 曾把它提到 8 分，理由看着很硬：omni 给这一档写的定义是
+     *「优先使用引擎原生安全评审；需要人工决定时才询问」，而 ZCode
+     *（`zcode-acp-server 0.5.1`）的档位表里明明白白有一个 `auto`：
+     * `plan / build / edit / yolo / auto`。名字对得严丝合缝。
      *
-     * 对 codex-acp（`read-only / agent / agent-full-access`）没有影响：那边
-     * 压根没有 `auto`，`agent` 照旧以 6 分拿下。
+     * **真机上它是个占位档。** 切过去之后每一条命令都被引擎自己顶回来：
      *
-     * ⚠️ 这是一次**放宽**，不是收紧——本文件开头那条「猜错的方向必须是安全的
-     * 那一边」仍然管着上下两档：`yolo` / `bypass` / `danger` 在这一档是 -10，
-     * 它绝不会因为多了几分就滑到最宽那一档去。
+     *     Auto mode is reserved but not implemented yet
+     *
+     * 连 `pwd`、`echo` 都跑不了——比多问几次坏得多。
+     *
+     * 教训写在这儿免得下次有人照着同一条推理再改一遍：
+     * **`availableModes` 是一张「有哪些名字」的表，不是「哪些能用」的表。**
+     * 名字对得上不等于它实现了，而这里除了名字什么都看不见。本文件开头那条
+     *「猜错的方向必须是安全的那一边」因此还要再加一句——**没把握就别动**：
+     * 停在 `edit`（能改文件、命令要问）最多是多问几次，
+     * 停在一个没实现的档是整条会话瘫掉。
+     *
+     * 那次真正解决「每条 bash 都要放行」的是另一半——`@omni/approval` 的
+     * `classify.ts` 认出了括号里的工具名（`tool permission (Bash)`），
+     * 于是自动审批档下 `exec` 本来就该 `allow`。这一半没有引擎侧的赌注。
      */
-    ["auto", 8],
     ["agent", 6],
     ["edit", 6],
     ["write", 5],
+    ["auto", 4],
     ["default", 3],
     ["full", -8],
     ["read-only", -10],

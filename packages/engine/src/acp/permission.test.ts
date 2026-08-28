@@ -202,12 +202,15 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
   })
 
   /**
-   * **实测 ZCode**（`zcode-acp-server 0.5.1`）报五个档。
-   * 它同时有 `edit` 和 `auto`，而 omni 的「自动审批」定义是
-   *「优先使用引擎原生安全评审」——那说的就是 Auto，不是「能编辑」。
-   * 上一版 `edit` 6 分压过 `auto` 4 分，于是每条 `ls` 都要点一次放行。
+   * **实测 ZCode**（`zcode-acp-server 0.5.1`）报五个档，其中 `auto` 是**占位档**：
+   * 名字在表里，切过去每条命令都被引擎顶回来
+   *（`Auto mode is reserved but not implemented yet`，连 `pwd` 都跑不了）。
+   *
+   * 2026-08-28 按「omni 的自动审批 = 引擎的 Auto」把 `auto` 提过权重，真机上
+   * 整条会话瘫掉，当天回退。这一组就是钉住那次回退——
+   * **`availableModes` 是「有哪些名字」的表，不是「哪些能用」的表。**
    */
-  describe("同时有 edit 和 auto 的那种档位表（ZCode）", () => {
+  describe("档位表里有个叫 auto 的占位档（ZCode）", () => {
     const ZCODE = [
       { id: "plan", name: "Plan" },
       { id: "build", name: "Build" },
@@ -216,8 +219,8 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
       { id: "auto", name: "Auto" },
     ]
 
-    it("自动审批挑 `auto`，不是 `edit`", () => {
-      expect(pickMode(ZCODE, "auto-edit")).toBe("auto")
+    it("**自动审批停在 `edit`，不许滑到 `auto`**——那个档没实现，切过去整条会话瘫掉", () => {
+      expect(pickMode(ZCODE, "auto-edit")).toBe("edit")
     })
 
     it("上下两档不受影响：只读还是 plan，完全访问还是 yolo", () => {
@@ -225,9 +228,10 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
       expect(pickMode(ZCODE, "full")).toBe("yolo")
     })
 
-    it("**放宽只放一格**：`auto` 加了权重也绝不会滑到 `yolo` 去", () => {
+    it("上下两档也不会滑到它身上", () => {
       expect(pickMode(ZCODE, "auto-edit")).not.toBe("yolo")
       expect(pickMode(ZCODE, "read-only")).not.toBe("auto")
+      expect(pickMode(ZCODE, "full")).not.toBe("auto")
     })
 
     // 没有 auto 的那些一个字都不受影响——codex-acp 照旧落 agent
