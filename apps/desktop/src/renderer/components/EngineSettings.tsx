@@ -11,7 +11,6 @@ import {
 } from "../engine-settings-model.js"
 import { settingsCopyOf } from "../engine-settings-copy.js"
 import { EngineNative } from "./EngineNative.js"
-import { EngineShared } from "./EngineShared.js"
 import { EngineOmniSettings } from "./EngineOmniSettings.js"
 import { EnginePreference } from "./EnginePreference.js"
 import { Field, Group } from "./SettingsBits.js"
@@ -25,8 +24,8 @@ export function EnginesSection({
   cwd,
   onPatch,
   onCopy,
-  onOpenEngines,
   onReveal,
+  onGoInstall,
 }: {
   settings: Settings
   catalog: readonly EngineInfo[]
@@ -35,8 +34,9 @@ export function EnginesSection({
   cwd: string | undefined
   onPatch: (next: Partial<Settings>) => void
   onCopy: (text: string) => void
-  onOpenEngines: () => void
   onReveal: (path: string) => void
+  /** 「装一家、升级、接一家新的」都在另一页；这里给一条过去的路。 */
+  onGoInstall: () => void
 }): React.JSX.Element {
   const items = engineSettingItems(catalog)
   const root = useRef<HTMLElement>(null)
@@ -101,8 +101,17 @@ export function EnginesSection({
           onReveal={onReveal}
         />
       </div>
-      {/* 出了 tab 面板：这一块问的是「omni 认得哪几家」，不是「这一家怎么配」 */}
-      <EngineShared onCopy={onCopy} onOpenEngines={onOpenEngines} />
+      {/*
+        装 / 升级 / 接一家新的搬到了「安装与接入」那一页（理由见 `SettingsPanel`
+        的 TABS）。**但要留一条路过去**：一个人是先想到「我要用 codex」才想到
+        「哦它没装」的，而那一刻他人在这一页。
+      */}
+      <div className="eng-registry">
+        <span>装一家、升级到新版、或者接一家 omni 还不认识的 ACP 引擎——都在「安装与接入」。</span>
+        <button type="button" className="tbtn" onClick={onGoInstall}>
+          去那儿
+        </button>
+      </div>
     </section>
   )
 }

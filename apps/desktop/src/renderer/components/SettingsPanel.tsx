@@ -10,7 +10,8 @@ import { EnvSection } from "./SettingsEnv.js"
 import { ActivitySection } from "./SettingsActivity.js"
 import { RemotePanel } from "./RemotePanel.js"
 import { PetsSection } from "./SettingsPets.js"
-import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon } from "./icons.js"
+import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon, ToBottomIcon } from "./icons.js"
+import { EngineShared } from "./EngineShared.js"
 import { FolderIcon } from "./icons-folder.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 
@@ -57,6 +58,19 @@ const TABS = [
   { id: "pets", label: "桌宠", icon: <PetIcon size={14} /> },
   { id: "new", label: "新会话", icon: <PlusIcon size={14} /> },
   { id: "engines", label: "引擎", icon: <EngineIcon size={14} /> },
+  /*
+   * **和「引擎」分开的两个理由，第二个是硬的。**
+   *
+   * ① 引擎页上沿那条 tab 条是 sticky 的——它在视觉上宣告了「下面这些属于选中
+   *    的那一家」。把一块不归它管的东西压在它作用域里，等于把「散落在五个 tab
+   *    里」改成「藏在一个 tab 底下」，问题只搬了个家。
+   *
+   * ② **它要 spawn 一串子进程。** 这一组会去跑 `codex --version` 和 `npm view`
+   *    （见本文件开头那段：分页正是为了「没点到的那一页根本不挂载」）。
+   *    挂在引擎页上的话，每次进去改个默认模型都白付一次这个代价——
+   *    而那才是引擎页真正的日常用途。
+   */
+  { id: "install", label: "安装与接入", icon: <ToBottomIcon size={14} /> },
   { id: "env", label: "环境", icon: <TerminalIcon size={14} /> },
   // 排在「看东西」那一段之前：它是一件要**开**的事
   { id: "remote", label: "远程访问", icon: <GlobeIcon size={14} /> },
@@ -95,7 +109,7 @@ function engineNamer(catalog: readonly EngineInfo[]): (id: string) => string {
 }
 
 /** 哪一页画什么。抽成取值函数是行数闸门，但边界也对：面板只管「切哪一页」。 */
-function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
+function paneOf(tab: TabId, props: SettingsPanelProps, go: (id: TabId) => void): React.JSX.Element {
   const { settings, onPatch } = props
   if (tab === "look") return <LookSection settings={settings} onPatch={onPatch} />
   if (tab === "pets")
@@ -112,10 +126,14 @@ function paneOf(tab: TabId, props: SettingsPanelProps): React.JSX.Element {
         cwd={props.cwd}
         onPatch={onPatch}
         onCopy={props.onCopy}
-        onOpenEngines={props.onOpenEngines}
         onReveal={props.onReveal}
+        onGoInstall={() => {
+          go("install")
+        }}
       />
     )
+  if (tab === "install")
+    return <EngineShared onCopy={props.onCopy} onOpenEngines={props.onOpenEngines} />
   if (tab === "env") return <EnvSection cwd={props.cwd} />
   if (tab === "remote") return <RemotePanel settings={settings} onPatch={onPatch} />
   if (tab === "activity")
@@ -193,7 +211,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           {/* key 按分页隔离：切走再切回来是**重新开始**（环境那页会重新读盘），
               而不是接着上一次的半截状态 */}
           <div className="set__pane" key={tab}>
-            {paneOf(tab, props)}
+            {paneOf(tab, props, setTab)}
           </div>
         </div>
       </div>
