@@ -18,7 +18,11 @@ process.stdin.on("data", (d) => {
     if (req.method !== "initialize") continue
     process.stdout.write(JSON.stringify({
       jsonrpc: "2.0", id: req.id,
-      result: { protocolVersion: 1, agentCapabilities: { loadSession: true, promptCapabilities: {} } },
+      result: { protocolVersion: 1, agentCapabilities: {
+        loadSession: true,
+        promptCapabilities: { image: true, audio: false },
+        sessionCapabilities: { list: {}, fork: {} },
+      } },
     }) + "\\n")
   }
   buf = buf.slice(buf.lastIndexOf("\\n") + 1)
@@ -32,7 +36,16 @@ describe("试接一个 ACP 适配器", () => {
     const trial = await tryAcp({ command: process.execPath, args: ["-e", AGENT], cwd: tmpdir() })
     expect(trial.ok).toBe(true)
     expect(trial.protocolVersion).toBe(1)
-    expect(trial.capabilities).toEqual(["loadSession", "promptCapabilities"])
+    /*
+     * **必须往里再走一层。** 只列顶层的话，kimi 那种会被折成
+     * `loadSession / promptCapabilities / sessionCapabilities` 三个词，
+     * 而真正有用的 fork / list 全丢在里面了。
+     *
+     * 两种语义分开：`sessionCapabilities` 是「存在即支持」（空对象当标记），
+     * `promptCapabilities` 是实打实的布尔——所以 `audio: false` 不能跟着列出来，
+     * 那是「明确说了不支持」。
+     */
+    expect(trial.capabilities).toEqual(["loadSession", "prompt:image", "session/list", "session/fork"])
   })
 
   it("命令根本不存在 → 说得出下一步，而不是一句 ENOENT", async () => {

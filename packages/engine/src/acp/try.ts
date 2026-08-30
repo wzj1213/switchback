@@ -43,13 +43,38 @@ const STDERR_KEEP = 4000
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-/** 它认领的能力键。**只列它自己写了的**，值为假的也算「提到了」——那是两种不同的信息。 */
+/**
+ * 它认领的能力，摊平成一串键。
+ *
+ * ## 为什么必须往里再走一层
+ *
+ * 上一版只列顶层键，于是 kimi 那种报
+ * `{loadSession, promptCapabilities:{...}, sessionCapabilities:{list,resume,close,delete,fork}}`
+ * 的会被折成 `loadSession / promptCapabilities / sessionCapabilities` 三个词——
+ * **真正有用的那几个（fork、resume、list）全丢在里面了**，而它们正好对应
+ * omni 界面上的分叉、续接、历史。摊平一层，前缀保留方法名的样子
+ *（`session/fork`），方便对着它自己的文档查。
+ *
+ * ## 「存在即支持」
+ *
+ * `sessionCapabilities` 用空对象当标记（见 `wire.ts`），所以判据是**键在不在**，
+ * 不是值真不真。`promptCapabilities` 相反，是实打实的布尔——`audio: false`
+ * 是「明确说了不支持」，不能跟着列出来。两种语义不一样，分开处理。
+ *
+ * 一个字都不补：**没声明只是没声明**。ACP 里 `session/compact` 与 `session/steer`
+ * 就没有对应的声明位（实测的几家也都没往 `sessionCapabilities` 里写），
+ * 所以那两位在 `engines.json` 里仍然只能手填，见 `caps.ts` 那段复测记录。
+ */
 function claimed(info: AcpInitialize): readonly string[] {
   const caps = info.agentCapabilities
   if (caps === undefined || typeof caps !== "object") return []
-  return Object.entries(caps)
-    .filter(([, value]) => value === true || (typeof value === "object" && value !== null))
-    .map(([key]) => key)
+  const out: string[] = []
+  if (caps.loadSession === true) out.push("loadSession")
+  for (const [key, value] of Object.entries(caps.promptCapabilities ?? {})) {
+    if (value === true) out.push(`prompt:${key}`)
+  }
+  for (const key of Object.keys(caps.sessionCapabilities ?? {})) out.push(`session/${key}`)
+  return out
 }
 
 export async function tryAcp(req: {
