@@ -73,7 +73,7 @@ const settings = createSettings(log)
  * `attachHost` 之前），所以 `engineVersions` 建得比 `attached` 早，拿不到它。
  * 同 `relay` 那处的写法。宿主还没起时这一格是空的——那时也确实没有清单要刷。
  */
-const engineRefresh: { run?: (id?: string) => Promise<void> } = {}
+const engineRefresh: { run?: (id?: string) => Promise<unknown> } = {}
 const engineVersions = createEngineVersions(log, {
   claudeExecutable: buildInfo.claudeExecutable,
   onChanged: () => {

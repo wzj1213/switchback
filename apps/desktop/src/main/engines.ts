@@ -55,7 +55,8 @@ const TEMPLATE = {
   _说明: [
     "这里注册讲 ACP（Agent Client Protocol）的第三方引擎。",
     "键是引擎 id，会以 acp: 前缀出现在界面上；值里的 command 是可执行文件。",
-    "改完这个文件需要重启 omni 才生效。",
+    "新加一家：存盘后去 设置 → 引擎 → 安装与版本 点「重新探测」就能用，不用重启。",
+    "改已有那家的配置、或者删掉它：要重启 omni——正在跑的会话还握着旧的那份。",
     "下面 example 那一条是样板，删掉它或改成你真正装了的适配器。",
   ],
   example: {
@@ -143,6 +144,72 @@ export function ensureEngineFile(dir: string): string {
 export interface Registered {
   drivers: Record<string, EngineDriver>
   labels: Record<string, string>
+}
+
+/**
+ * 重读 `engines.json` 之后发生了什么。
+ *
+ * 两拨分开报，因为**它们对用户的意思完全不同**：`added` 是「现在就能用了」，
+ * `needsRestart` 是「我看见你改了，但这一次没法生效」。合成一句
+ * 「配置已更新」的话，后一拨会被当成已经生效——而那正是最需要说清楚的一种。
+ */
+export interface AcpReload {
+  /** 这次新接进来的（id）。它们立刻可用，不用重启。 */
+  added: readonly string[]
+  /** 改过的、或者从文件里删掉的（id）。**这一次不生效**，得重启。 */
+  needsRestart: readonly string[]
+}
+
+/**
+ * 把 `engines.json` 里新增的那几家接进来。**只加，不改也不删。**
+ *
+ * ## 为什么敢在运行期加
+ *
+ * 宿主是**用的时候**才去读 `deps.drivers[thread.engine]`（`host/session.ts`、
+ * `host/branch.ts`），从不在构造时快照。所以往这个对象里加一个键，
+ * 下一条会话立刻就能选到它——不需要重建宿主，也不影响任何在跑的会话。
+ *
+ * ## 为什么改过的和删掉的不动
+ *
+ * 那两种都会**换掉或抽走一个正在被使用的驱动实例**：活着的会话握着它的引用，
+ * 底下还挂着引擎进程。为了省一次重启去冒「会话半路换了驱动」的险不划算，
+ * 而且那种故障的样子会非常难查。所以照实报出来，让人自己决定什么时候重启。
+ *
+ * `known` 里存的是**注册时那份 entry 的 JSON**，用来认出「改过的」——
+ * 比对驱动对象是比不出来的，它是个闭包。
+ */
+export function mergeAcpEngines(
+  target: Registered,
+  known: Map<string, string>,
+  file: EngineFile,
+): AcpReload {
+  const added: string[] = []
+  const needsRestart: string[] = []
+  const seen = new Set<string>()
+  for (const [name, entry] of Object.entries(file)) {
+    const id = `acp:${name}`
+    seen.add(id)
+    const shape = JSON.stringify(entry)
+    const before = known.get(id)
+    if (before === shape) continue
+    if (before !== undefined) {
+      needsRestart.push(id)
+      continue
+    }
+    const one = registerAcpEngines({ [name]: entry })
+    Object.assign(target.drivers, one.drivers)
+    Object.assign(target.labels, one.labels)
+    known.set(id, shape)
+    added.push(id)
+  }
+  // 从文件里删掉的：驱动留着（可能有会话在用），但要说出来
+  for (const id of known.keys()) if (!seen.has(id)) needsRestart.push(id)
+  return { added, needsRestart }
+}
+
+/** 注册时那份 entry 的形状，供 `mergeAcpEngines` 认出「改过的」。 */
+export function acpShapes(file: EngineFile): Map<string, string> {
+  return new Map(Object.entries(file).map(([name, entry]) => [`acp:${name}`, JSON.stringify(entry)]))
 }
 
 /**

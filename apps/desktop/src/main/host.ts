@@ -20,11 +20,11 @@ import { readBuildInfo } from "./build-info.js"
 import type { TouchedFiles } from "./touched.js"
 import { createEngineCatalog } from "./engine-catalog.js"
 import type { AttachmentFiles } from "./attachment-files.js"
-import type { Attached } from "./attached.js"
+import type { Attached, RescanReport } from "./attached.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { installClipboardChannel } from "./system-clipboard.js"
 
-export type { Attached } from "./attached.js"
+export type { Attached, RescanReport } from "./attached.js"
 
 
 interface Channels {
@@ -220,7 +220,7 @@ export function attachHost(
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)
 
-  const { drivers, labels } = buildRegistry(app.getPath("userData"), log,
+  const { drivers, labels, reload } = buildRegistry(app.getPath("userData"), log,
     readBuildInfo(app.getAppPath()).claudeExecutable, ports?.dshProfile)
 
   const host = createHost({
@@ -251,9 +251,13 @@ export function attachHost(
    * 而「刚装完一家」「用户点了重新探测」时我们并不知道变的是哪一家——
    * 用户可能在终端里装的，也可能一次装了两家。
    */
-  const refreshEngines = async (id?: string): Promise<void> => {
+  const refreshEngines = async (id?: string): Promise<RescanReport> => {
+    // **全量重探时先重读 `engines.json`。** 给了 id 的那种是「这一家的配置变了」
+    //（目前只有 DSH 改 profile），和注册表没关系，不必去读盘
+    const reloaded = id === undefined ? reload() : { added: [], needsRestart: [] }
     engines.invalidate(id)
     emit({ type: "engines.available", at: Date.now(), engines: await engines() })
+    return { needsRestart: reloaded.needsRestart.map((one) => labels[one] ?? one) }
   }
 
   return {

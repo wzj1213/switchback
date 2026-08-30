@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest"
 import { rescanMessage, type EngineChange } from "./rescan-message.js"
 
 describe("rescanMessage", () => {
-  const cases: readonly { name: string; changed: readonly EngineChange[]; want: string }[] = [
+  const cases: readonly {
+    name: string
+    changed: readonly EngineChange[]
+    restart?: readonly string[]
+    want: string
+  }[] = [
     {
       name: "什么都没变也要说话——否则和「按钮没反应」分不开",
       changed: [],
@@ -44,8 +49,20 @@ describe("rescanMessage", () => {
       changed: [{ id: "dsh", label: "DSH" }],
       want: "DSH 现在用不了了。",
     },
+    {
+      name: "改过的那几家没兑现——**单独说**，别混进「已经变了」那句里",
+      changed: [],
+      restart: ["ZCode"],
+      want: "查过了，没有变化——装的还是那几家。ZCode 改过了，要重启 omni 才生效。",
+    },
+    {
+      name: "新接了一家、另一家改过了：两件事各说各的",
+      changed: [{ id: "acp:zcode", label: "ZCode", state: "ok" }],
+      restart: ["旧适配器"],
+      want: "认出了 ZCode。旧适配器 改过了，要重启 omni 才生效。",
+    },
   ]
-  it.each(cases)("$name", ({ changed, want }) => {
-    expect(rescanMessage(changed)).toBe(want)
+  it.each(cases)("$name", ({ changed, restart, want }) => {
+    expect(rescanMessage(changed, restart)).toBe(want)
   })
 })

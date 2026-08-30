@@ -34,9 +34,10 @@ export function installEngineSettings(store: Store, attached: Attached, log: Log
     // **前后各读一次，diff 在这里算。** 放渲染层算的话要和事件流里那份异步的
     // `engines.available` 赛跑——而这里手上就有确定的前后两份
     const before = new Map((await attached.engines()).map((one) => [one.id, one.state ?? "unknown"]))
-    await attached.refreshEngines()
-    return (await attached.engines())
+    const report = await attached.refreshEngines()
+    const changed = (await attached.engines())
       .filter((one) => (one.state ?? "unknown") !== (before.get(one.id) ?? "unknown"))
       .map((one) => ({ id: one.id, label: one.label, ...(one.state === undefined ? {} : { state: one.state }) }))
+    return { changed, needsRestart: report.needsRestart }
   })
 }

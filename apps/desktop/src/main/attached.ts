@@ -10,6 +10,18 @@ import type { AttachmentFiles } from "./attachment-files.js"
 import type { Logger } from "./log.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 
+/**
+ * 一次全量重探的回执。
+ *
+ * **只报「没生效的」**：生效了的那些会随 `engines.available` 事件推过去，
+ * 界面自己看得见；而「我看见你改了，但这一次没兑现」是**只有主进程知道**的事，
+ * 不说出来它就悄悄消失了——用户会以为改完了。
+ */
+export interface RescanReport {
+  /** `engines.json` 里改过或删掉、这一次不生效的那几家（人话名字）。 */
+  needsRestart: readonly string[]
+}
+
 /** 桌面壳与宿主接好之后，对窗口、远程入口和退出流程开放的窄表面。 */
 export interface Attached {
   host: Host
@@ -18,8 +30,13 @@ export interface Attached {
   journal: ReturnType<typeof createJournal>
   /** 这台机器上注册了哪些引擎；异步探测结果由实现缓存。 */
   engines: () => Promise<readonly EngineInfo[]>
-  /** 重探引擎清单并广播。不给 id 就全部重探；见 `host.ts`。 */
-  refreshEngines: (id?: string) => Promise<void>
+  /**
+   * 重探引擎清单并广播。不给 id 就全部重探、并重读一遍 `engines.json`；见 `host.ts`。
+   *
+   * 返回的是**这一次没能生效的那几家**：`engines.json` 里改过或删掉的条目
+   * 不会在运行期兑现（活着的会话握着旧驱动实例），只能照实说要重启。
+   */
+  refreshEngines: (id?: string) => Promise<RescanReport>
   lastThreadId: () => ThreadId | undefined
   ledger: Ledger
   sinks: Sinks

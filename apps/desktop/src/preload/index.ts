@@ -87,13 +87,18 @@ const api = {
    * **返回的是「哪几家变了」**，不是全量清单：全量会由 `engines.available`
    * 事件推过来（那是唯一真源）。这里要的只是那句反馈——按下去什么都不说的
    * 按钮，用户只会按第二遍。
+   *
+   * `needsRestart` 是另一件事：`engines.json` 里**改过或删掉**的条目不会在运行期
+   * 兑现（活着的会话握着旧驱动实例）。它只有主进程知道，不说出来就悄悄消失了。
    */
-  async rescanEngines(): Promise<readonly { id: string; label: string; state?: string }[]> {
-    return (await ipcRenderer.invoke("omni:rescanEngines")) as readonly {
-      id: string
-      label: string
-      state?: string
-    }[]
+  async rescanEngines(): Promise<{
+    changed: readonly { id: string; label: string; state?: string }[]
+    needsRestart: readonly string[]
+  }> {
+    return (await ipcRenderer.invoke("omni:rescanEngines")) as {
+      changed: readonly { id: string; label: string; state?: string }[]
+      needsRestart: readonly string[]
+    }
   },
   /** 各家引擎自己的设置在哪儿。**omni 只把门指出来**，见 `main/enginedoors.ts`。 */
   async engineDoors(cwd?: string, dshProfile?: string): Promise<readonly EngineDoor[]> {

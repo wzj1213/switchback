@@ -46,7 +46,7 @@ export function DataSection({
         />
       </Group>
       <Group title="第三方引擎" hint="内置那几家在「引擎」页；这里是你自己往里加的那些。">
-        <Field label="引擎注册表" hint={`${dataDir}/engines.json —— 一份十行的 JSON，用你自己的编辑器改比在这儿点开一个表单强。改完重启 omni 生效`} stack>
+        <Field label="引擎注册表" hint={`${dataDir}/engines.json —— 一份十行的 JSON，用你自己的编辑器改比在这儿点开一个表单强。新加一家存盘后点「重新探测」即可；改已有那家或删掉它要重启`} stack>
           <button type="button" className="tbtn" onClick={onOpenEngines}>
             用编辑器打开
           </button>

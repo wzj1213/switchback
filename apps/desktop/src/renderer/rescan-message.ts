@@ -20,12 +20,21 @@ export interface EngineChange {
   state?: string
 }
 
-export function rescanMessage(changed: readonly EngineChange[]): string {
-  if (changed.length === 0) return "查过了，没有变化——装的还是那几家。"
+/**
+ * @param needsRestart `engines.json` 里改过或删掉、这一次没兑现的那几家。
+ *   **必须单独说**：它和上面那两拨不是一回事——那两拨是「已经变了」，
+ *   这一拨是「我看见你改了，但没生效」。混进同一句里，人会以为改完了。
+ */
+export function rescanMessage(
+  changed: readonly EngineChange[],
+  needsRestart: readonly string[] = [],
+): string {
   const ready = changed.filter((one) => one.state === "ok").map((one) => one.label)
   const lost = changed.filter((one) => one.state !== "ok").map((one) => one.label)
   const parts: string[] = []
   if (ready.length > 0) parts.push(`认出了 ${ready.join("、")}`)
   if (lost.length > 0) parts.push(`${lost.join("、")} 现在用不了了`)
-  return `${parts.join("；")}。`
+  if (parts.length === 0) parts.push("查过了，没有变化——装的还是那几家")
+  const tail = needsRestart.length === 0 ? "" : `${needsRestart.join("、")} 改过了，要重启 omni 才生效。`
+  return `${parts.join("；")}。${tail}`
 }

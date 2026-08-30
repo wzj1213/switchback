@@ -39,8 +39,8 @@ export function EngineShared({
       </Group>
       <div className="eng-registry">
         <span>
-          第三方 ACP 引擎从 <code>engines.json</code> 接入。<b>改完这个文件要重启 omni</b>
-          ——驱动表在启动时建一次，「重新探测」只重探已经认得的那几家，不重读这个文件。
+          第三方 ACP 引擎从 <code>engines.json</code> 接入。<b>新加一家，点上面的「重新探测」就能用</b>；
+          改已有那家的配置、或者把它删掉，要重启 omni 才生效——正在跑的会话还握着旧的那份。
         </span>
         <button type="button" className="tbtn" onClick={onOpenEngines}>
           打开注册表

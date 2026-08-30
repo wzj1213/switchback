@@ -2,7 +2,15 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { ENGINES_FILE, ensureEngineFile, readEngineFile, registerAcpEngines } from "./engines.js"
+import {
+  acpShapes,
+  ENGINES_FILE,
+  ensureEngineFile,
+  mergeAcpEngines,
+  readEngineFile,
+  registerAcpEngines,
+  type EngineEntry,
+} from "./engines.js"
 import type { Logger } from "./log.js"
 
 function dirWith(content?: string): { dir: string; log: Logger; logged: string[] } {
@@ -96,5 +104,62 @@ describe("注册成驱动", () => {
 
   it("空表就空表，不凭空注册第三方引擎", () => {
     expect(registerAcpEngines({}).drivers).toEqual({})
+  })
+})
+
+/**
+ * 运行期把 `engines.json` 里新增的那几家接进来。
+ *
+ * **这条守的是「只加，不改也不删」。** 改和删都会换掉或抽走一个正在被使用的
+ * 驱动实例——活着的会话握着它的引用，底下还挂着引擎进程。为了省一次重启
+ * 去冒「会话半路换了驱动」的险不划算，而那种故障非常难查。
+ */
+describe("运行期合并 engines.json", () => {
+  const entry = (command: string): EngineEntry => ({ label: `L-${command}`, command })
+
+  it("新增的接进来、立刻可用；已有的原样不动", () => {
+    const file = { a: entry("a") }
+    const target = registerAcpEngines(file)
+    const known = acpShapes(file)
+    const first = target.drivers["acp:a"]
+
+    const done = mergeAcpEngines(target, known, { a: entry("a"), b: entry("b") })
+
+    expect(done).toEqual({ added: ["acp:b"], needsRestart: [] })
+    expect(target.labels["acp:b"]).toBe("L-b")
+    // **同一个实例**：没被顺手重建，正在用它的会话不受影响
+    expect(target.drivers["acp:a"]).toBe(first)
+  })
+
+  it("改过的不换驱动，只报「要重启」", () => {
+    const file = { a: entry("a") }
+    const target = registerAcpEngines(file)
+    const known = acpShapes(file)
+    const first = target.drivers["acp:a"]
+
+    const done = mergeAcpEngines(target, known, { a: entry("改成了别的") })
+
+    expect(done).toEqual({ added: [], needsRestart: ["acp:a"] })
+    expect(target.drivers["acp:a"]).toBe(first)
+  })
+
+  it("从文件里删掉的**不抽走**驱动，同样只报「要重启」", () => {
+    const file = { a: entry("a") }
+    const target = registerAcpEngines(file)
+    const known = acpShapes(file)
+
+    const done = mergeAcpEngines(target, known, {})
+
+    expect(done).toEqual({ added: [], needsRestart: ["acp:a"] })
+    expect(target.drivers["acp:a"]).toBeDefined()
+  })
+
+  it("一个字没改就什么都不报——重复点「重新探测」不该每次都说有事", () => {
+    const file = { a: entry("a") }
+    const target = registerAcpEngines(file)
+    const known = acpShapes(file)
+
+    expect(mergeAcpEngines(target, known, file)).toEqual({ added: [], needsRestart: [] })
+    expect(mergeAcpEngines(target, known, file)).toEqual({ added: [], needsRestart: [] })
   })
 })

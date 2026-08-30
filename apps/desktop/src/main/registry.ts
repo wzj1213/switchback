@@ -23,7 +23,7 @@ import {
   type EngineDriver,
   type ClaudeExecutable,
 } from "@omni/engine"
-import { readEngineFile, registerAcpEngines } from "./engines.js"
+import { acpShapes, mergeAcpEngines, readEngineFile, registerAcpEngines, type AcpReload } from "./engines.js"
 import type { Logger } from "./log.js"
 import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
 
@@ -66,9 +66,23 @@ export function buildRegistry(
   log: Logger,
   claudeExecutable: ClaudeExecutable = "bundled",
   dshProfile: () => string = () => "acp",
-): { drivers: Readonly<Record<string, EngineDriver>>; labels: Readonly<Record<string, string>> } {
-  const acp = registerAcpEngines(readEngineFile(userData, log))
-  return {
+): {
+  drivers: Readonly<Record<string, EngineDriver>>
+  labels: Readonly<Record<string, string>>
+  /**
+   * 重读 `engines.json`，把新增的那几家接进来。**只加，不改也不删**——理由见
+   * `engines.ts` 的 `mergeAcpEngines`。
+   *
+   * 敢在运行期加是因为宿主**用的时候**才读 `deps.drivers[id]`，从不快照；
+   * 所以这两个对象是**故意可变**的（`Readonly` 只是不让外面写）。
+   * 上一版没有这条路，于是往注册表里加一家之后唯一的出路是重启应用。
+   */
+  reload: () => AcpReload
+} {
+  const file = readEngineFile(userData, log)
+  const acp = registerAcpEngines(file)
+  const known = acpShapes(file)
+  const built = {
     drivers: {
       claude: createClaudeDriver({ executable: claudeExecutable }),
       codex: createCodexDriver(),
@@ -119,6 +133,16 @@ export function buildRegistry(
     labels: {
       ...BUILTIN_ENGINE_LABELS,
       ...acp.labels,
+    },
+  }
+  return {
+    ...built,
+    reload: () => {
+      const next = mergeAcpEngines(built, known, readEngineFile(userData, log))
+      if (next.added.length > 0) log.write("info", "engines", `接入了 ${next.added.join("、")}`)
+      if (next.needsRestart.length > 0)
+        log.write("info", "engines", `${next.needsRestart.join("、")} 改过或已删除，要重启才生效`)
+      return next
     },
   }
 }

@@ -88,9 +88,9 @@ export function EngineVersions({
             setRescanning(true)
             setRescanned(undefined)
             setPatched({})
-            void (omni?.rescanEngines() ?? Promise.resolve([]))
-              .then((changed) => {
-                setRescanned(rescanMessage(changed))
+            void (omni?.rescanEngines() ?? Promise.resolve({ changed: [], needsRestart: [] }))
+              .then((done) => {
+                setRescanned(rescanMessage(done.changed, done.needsRestart))
               })
               .catch(() => {
                 setRescanned("探测没跑起来；日志里有原文。")
