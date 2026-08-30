@@ -18,7 +18,8 @@ export interface Attached {
   journal: ReturnType<typeof createJournal>
   /** 这台机器上注册了哪些引擎；异步探测结果由实现缓存。 */
   engines: () => Promise<readonly EngineInfo[]>
-  refreshEngines: () => Promise<void>
+  /** 重探引擎清单并广播。不给 id 就全部重探；见 `host.ts`。 */
+  refreshEngines: (id?: string) => Promise<void>
   lastThreadId: () => ThreadId | undefined
   ledger: Ledger
   sinks: Sinks

@@ -396,7 +396,10 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
   const command = config.command ?? "codex"
   return {
     id: "codex",
-    probe: () => probeCommand(command, "装好之后重启 omni。"),
+    // **这句话会出现在两个地方**：设置页那家的状态说明，和输入区引擎下拉里那一条的说明。
+    // 原文是「装好之后重启 omni」——那曾经是真的（探测结果在进程里只算一次），
+    // 现在不是了：装完会自动重探，手动也有一颗按钮。留着旧话等于教用户做无用功。
+    probe: () => probeCommand(command, "设置 → 引擎 → 安装与版本 里可以直接装；在终端里装完点那儿的「重新探测」即可，不用重启。"),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new CodexSession(req, config)
       // 握手失败要在这里就抛出来，别让宿主拿到一个看着正常、一发消息就炸的会话

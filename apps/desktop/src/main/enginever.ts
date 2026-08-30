@@ -32,6 +32,19 @@ export interface EngineVersionOptions {
   claudeExecutable?: ClaudeExecutable
   run?: EngineCommandRunner
   now?: () => number
+  /**
+   * 装成功 / 更新成功之后喊一声。
+   *
+   * **不喊的后果是这个仓库里最尴尬的一个 bug**：在设置页点「安装」，装成功了，
+   * 这一行的版本号也更新了，而引擎下拉里那家**still 写着「未安装」**——
+   * 因为 `engine-catalog` 有自己的一份缓存，进程内永久有效，
+   * 除了 DSH 改 profile 之外没有任何东西让它失效。于是 codex 那条安装提示
+   * 只能写成「装好之后重启 omni」——那是把缺陷写进了说明书。
+   *
+   * 用回调而不是在这里直接调宿主：这个 store 在宿主起来**之前**就建好了
+   *（通道要先挂），拿不到 `attached`。index.ts 用一个可变槽把环解开。
+   */
+  onChanged?: () => void
 }
 
 export interface EngineVersionStore {
@@ -75,6 +88,18 @@ export function createEngineVersions(
     return inflight
   }
 
+  /**
+   * 装完 / 更新完的收尾。**三件事一直是同一套**，原来在 `install` 与 `update`
+   * 里各写一遍——而「喊 onChanged」这一条加进来时，两处都得记得加。
+   * 一个值只该有一个改它的地方。
+   */
+  const settle = (ok: boolean): void => {
+    cached = undefined
+    void get().catch(() => undefined)
+    // 成功了才喊：没成的时候机器上什么都没变，重探一遍只是白跑几个子进程
+    if (ok) options.onChanged?.()
+  }
+
   const update = async (engine: string): Promise<UpdateResult> => {
     const spec = known.find((candidate) => candidate.engine === engine)
     if (spec?.update === undefined) return unavailable(engine)
@@ -85,8 +110,8 @@ export function createEngineVersions(
     const current = await spec.inspect(inspectContext())
     const changed = after !== undefined && (before === undefined || compare(after, before) > 0)
     const ok = updateSucceeded({ spec, command, current, after, changed })
-    cached = undefined
-    void get().catch(() => undefined)
+    // 更新成功也要重探：版本变了，probe 缓存里那条 detail（含绝对路径与版本号）就过期了
+    settle(ok)
     log.write(
       ok ? "info" : "error",
       "engines",
@@ -105,8 +130,7 @@ export function createEngineVersions(
     const spec = known.find((candidate) => candidate.engine === engine)
     if (spec?.install === undefined) return noInstaller(engine)
     const done = await runInstall(spec, { run, log })
-    cached = undefined
-    void get().catch(() => undefined)
+    settle(done.ok)
     return done
   }
 

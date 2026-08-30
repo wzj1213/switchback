@@ -448,7 +448,7 @@ class AcpSession implements EngineSession {
 export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
   return {
     id: config.id,
-    probe: () => probeCommand(config.command, "检查 engines.json 里写的路径对不对。"),
+    probe: () => probeCommand(config.command, "检查 engines.json 里写的路径对不对；改完那个文件要重启 omni。"),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new AcpSession(req, config)
       // **握手失败也要回收。** `start()` 第一件事就是 spawn，而握手超时 / 对端回

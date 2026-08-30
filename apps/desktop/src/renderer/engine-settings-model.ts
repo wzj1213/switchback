@@ -107,7 +107,18 @@ export function engineSettingState(
     return { label: "未安装", tone: "warn", hint: item.detail ?? "当前 PATH 中没有探测到它。" }
   }
   if (item.state === "unavailable") {
-    return { label: "配置不可用", tone: "warn", hint: item.detail ?? "原生入口暂时不能启动。" }
+    /*
+     * **「起不来」而不是「配置不可用」。**
+     *
+     * 这一档现在有两种成因：DSH 的 profile 名不对（确实是配置问题），
+     * 以及**文件在 PATH 上但跑不起来**（`probeCommand` 新归到这一档——
+     * 空壳、装坏了、架构不对）。后者跟配置没关系，说「配置不可用」
+     * 会把人支到一个没问题的地方去。
+     *
+     * 两种成因共有的只有一件事：它在，但起不来。那就说这句。
+     * 具体是哪一种由 `detail` 说——它一直是照实写的。
+     */
+    return { label: "起不来", tone: "warn", hint: item.detail ?? "探到了，但它启动不了。" }
   }
   return {
     label: item.state === "unknown" ? "未确认" : "等待探测",

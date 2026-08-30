@@ -132,7 +132,7 @@ describe("引擎设置页的数据", () => {
       dsh === undefined
         ? undefined
         : engineSettingState(dsh, { dsh: { profile: "acp", confirmedProfiles: ["acp"] }, disabledEngines: [] }),
-    ).toMatchObject({ label: "配置不可用", hint: "profile 无 ACP", tone: "warn" })
+    ).toMatchObject({ label: "起不来", hint: "profile 无 ACP", tone: "warn" })
     expect(
       dsh === undefined
         ? undefined

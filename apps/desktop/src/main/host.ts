@@ -244,8 +244,15 @@ export function attachHost(
     visible: ports?.engineVisible,
     profile: (id) => id === "dsh" ? (ports?.dshProfile?.() ?? "acp") : undefined,
   })
-  const refreshEngines = async (): Promise<void> => {
-    engines.invalidate("dsh")
+  /**
+   * 重探一遍再广播。
+   *
+   * **不给 id 就全部重探**：DSH 改 profile 时只需要它自己（那是我们确知的变化），
+   * 而「刚装完一家」「用户点了重新探测」时我们并不知道变的是哪一家——
+   * 用户可能在终端里装的，也可能一次装了两家。
+   */
+  const refreshEngines = async (id?: string): Promise<void> => {
+    engines.invalidate(id)
     emit({ type: "engines.available", at: Date.now(), engines: await engines() })
   }
 

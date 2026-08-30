@@ -11,6 +11,7 @@ import {
 } from "../engine-settings-model.js"
 import { settingsCopyOf } from "../engine-settings-copy.js"
 import { EngineNative } from "./EngineNative.js"
+import { EngineShared } from "./EngineShared.js"
 import { EngineOmniSettings } from "./EngineOmniSettings.js"
 import { EnginePreference } from "./EnginePreference.js"
 import { Field, Group } from "./SettingsBits.js"
@@ -97,10 +98,11 @@ export function EnginesSection({
           copy={copy}
           cwd={cwd}
           onCopy={onCopy}
-          onOpenEngines={onOpenEngines}
           onReveal={onReveal}
         />
       </div>
+      {/* 出了 tab 面板：这一块问的是「omni 认得哪几家」，不是「这一家怎么配」 */}
+      <EngineShared onCopy={onCopy} onOpenEngines={onOpenEngines} />
     </section>
   )
 }

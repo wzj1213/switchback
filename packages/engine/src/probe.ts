@@ -94,8 +94,40 @@ export async function probeCommand(command: string, hint?: string): Promise<Prob
   // 一个都跑不起来。**把试过几个说出来**：只报第一个的话，用户会拿着一条
   // 「/a/b/codex 装坏了」的提示去修一个根本不该用的文件
   const tried = paths.length === 1 ? `\`${paths[0] ?? ""}\`` : `PATH 上 ${String(paths.length)} 个同名文件（${paths.join("、")}）`
+  /*
+   * **这一支原来一个「下一步」都没有。**
+   *
+   * 上面 `Probe.detail` 的契约写着「`missing` / `unavailable` 时必须说得出
+   * 下一步做什么」，而它只描述了症状就收尾了。以前这一支归在 `missing` 名下、
+   * 现实中也很少走到，于是没人发现它欠着这句；现在它是一个用户真会看到的状态。
+   *
+   * 多个候选时那句话尤其要紧：**坏的多半是排在最前面的那个**（后面的往往好好的），
+   * 而不说这一句的话，用户会对着 homebrew 那份完好的文件反复重装。
+   */
+  const which =
+    paths.length === 1
+      ? ""
+      : "PATH 上靠前的那个先被用到，坏的多半是它；后面几个可能好好的。"
   return {
-    state: "missing",
-    detail: `${tried} 都跑不起来 \`--version\`——装坏了、版本不兼容，或者那只是个空壳。`,
+    /*
+     * **`unavailable` 而不是 `missing`。**
+     *
+     * 文件就在那儿——`which` 找到了它。说「未安装」是**事实错误**，
+     * 而这条错误的代价很具体：用户照着去装第二遍，装完还是那样
+     *（原因是那个坏壳排在 PATH 前面，装多少遍都不会变）。
+     *
+     * 上一版把这一档压进 `missing`，理由写在测试里：「装了」和「能用」是两回事。
+     * 那句话是对的，但它论证的恰恰是**该分开**——这个类型里本来就有第三档，
+     * 界面也早就会画它（`engine-settings-model.ts`），只是一直没人产。
+     * detail 里那句「装坏了、版本不兼容，或者那只是个空壳」也一直是照实说的，
+     * **只有状态名在撒谎**。
+     *
+     * 下游对两档的处理完全一致（都不进轮换、都不当默认），所以这一改
+     * 只换掉那个词，不改任何行为。
+     */
+    state: "unavailable",
+    detail: [`${tried} 都跑不起来 \`--version\`——装坏了、版本不兼容，或者那只是个空壳。`, which, hint]
+      .filter(Boolean)
+      .join(""),
   }
 }

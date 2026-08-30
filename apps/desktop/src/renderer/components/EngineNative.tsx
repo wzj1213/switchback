@@ -1,5 +1,4 @@
 import { EngineDoors } from "./EngineDoors.js"
-import { EngineVersions } from "./EngineVersions.js"
 import { Field, Group } from "./SettingsBits.js"
 import { CopyIcon } from "./icons.js"
 import type { EngineSettingsCopy } from "../engine-settings-copy.js"
@@ -10,7 +9,6 @@ export function EngineNative({
   copy,
   cwd,
   onCopy,
-  onOpenEngines,
   onReveal,
 }: {
   engine: string
@@ -18,7 +16,6 @@ export function EngineNative({
   copy: EngineSettingsCopy
   cwd: string | undefined
   onCopy: (text: string) => void
-  onOpenEngines: () => void
   onReveal: (path: string) => void
 }): React.JSX.Element {
   return (
@@ -48,20 +45,6 @@ export function EngineNative({
           <EngineDoors engine={engine} cwd={cwd} dshProfile={dshProfile} onReveal={onReveal} />
         </div>
       </Group>
-      <Group
-        title="版本与更新"
-        hint="只在你点下更新后才会运行界面写出的那条原生命令。这一家还没装的话，这里给出装它要跑的那条——omni 确实知道来源的才给，不知道的就照实说不知道。"
-      >
-        <EngineVersions engine={engine} onCopy={onCopy} />
-      </Group>
-      <div className="eng-registry">
-        <span>
-          第三方 ACP 引擎仍从 <code>engines.json</code> 接入；改完后重启 omni。
-        </span>
-        <button type="button" className="tbtn" onClick={onOpenEngines}>
-          打开注册表
-        </button>
-      </div>
     </>
   )
 }

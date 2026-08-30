@@ -3,19 +3,35 @@ import type { EngineVersion, UpdateResult } from "../../main/enginever.js"
 import { bridge, useAsync } from "../use-async.js"
 import { Actions, Blank, Field } from "./SettingsBits.js"
 import { EngineInstall } from "./EngineInstall.js"
+import { rescanMessage } from "../rescan-message.js"
 
 /**
- * 各家引擎的版本与人工更新入口。
+ * 安装与版本——**所有引擎一次列全**。
+ *
+ * ## 为什么不再挂在每一家下面
+ *
+ * 上一版这块长在每家引擎的 tab 里（`EngineNative` 的「版本与更新」组），
+ * 于是同一件事有五个入口：想看 codex 的版本要先点 codex，看 claude 要再点 claude。
+ * 而**数据本来就是全量的**——`engineVersions()` 一次返回整个数组，
+ * 每个 tab 只是从里面 `find` 出自己那条。连「重新检查」都有五颗，点哪颗都一样：
+ * 全都是同一次全量请求。
+ *
+ * 那不是「统一的安装入口」，那是同一个入口印了五份。摊平成一张表之后，
+ * 「这台机器上装了哪几家、哪几家该升级」变成扫一眼的事，
+ * 而各家 tab 里只剩真正属于那一家的东西。
+ *
+ * ## 表里没有的那些
+ *
+ * 只列 omni **确实知道版本来源**的那几家。第三方 ACP 引擎的版本与安装由它自己管，
+ * omni 编不出那条命令——这一点写在组说明里，不在表里摆一行「未知」占位。
  *
  * 主进程缓存探测结果六小时；「重新检查」走的是**同一条通道的 `again` 分支**，
  * 由 `useAsync` 传下去——以前这里自己再发一次强制请求，于是两条请求赛跑，
  * 赢的那条往往是拿着缓存的那条。
  */
 export function EngineVersions({
-  engine,
   onCopy,
 }: {
-  engine: string
   onCopy: (text: string) => void
 }): React.JSX.Element {
   const omni = bridge()
@@ -25,69 +41,101 @@ export function EngineVersions({
   )
   const state = useAsync<readonly EngineVersion[]>(load)
   const [updating, setUpdating] = useState<string | undefined>(undefined)
-  const [patched, setPatched] = useState<EngineVersion | undefined>(undefined)
-  const found = state.data?.find((version) => version.engine === engine)
-  // 更新成功之后本地覆盖一份，不用为了看到新版本号再探一次
-  const selected = patched?.engine === engine ? patched : found
+  const [rescanning, setRescanning] = useState(false)
+  // 上一次重新探测的结果。**大多数时候它是「没有变化」**——而那句话
+  // 恰恰是这颗按钮最该说的：「我查过了」和「我没查」必须分得出来
+  const [rescanned, setRescanned] = useState<string | undefined>(undefined)
+  // 装完 / 更新完就地覆盖那一行，不用为了看到新版本号再等一次全量探测。
+  // 按 engine 存：这是一张表了，一个单值会让 A 的结果盖到 B 的行上
+  const [patched, setPatched] = useState<Readonly<Record<string, EngineVersion>>>({})
+  const list = (state.data ?? []).map((version) => patched[version.engine] ?? version)
+  const busy = state.loading || updating !== undefined || rescanning
+  const patch = (next: EngineVersion): void => {
+    setPatched((prev) => ({ ...prev, [next.engine]: next }))
+  }
 
-  const busy = state.loading || updating !== undefined
   return (
     <>
-      <Probe loading={state.data === undefined && !state.failed} failed={state.failed} unknown={state.data !== undefined && selected === undefined} />
-      {selected?.missing === true ? (
-        <EngineInstall
-          key={`install-${selected.engine}`}
-          version={selected}
-          busy={busy}
-          onCopy={onCopy}
-          onBusy={setUpdating}
-          onDone={setPatched}
-        />
-      ) : null}
-      {selected === undefined || selected.missing === true ? null : (
-        <EngineRow
-          key={selected.engine}
-          version={selected}
-          active={updating}
-          checking={state.loading}
-          onActive={setUpdating}
-          onDone={setPatched}
-        />
+      <Probe loading={state.data === undefined && !state.failed} failed={state.failed} />
+      {list.map((version) =>
+        version.missing === true ? (
+          <EngineInstall
+            key={`install-${version.engine}`}
+            version={version}
+            busy={busy}
+            onCopy={onCopy}
+            onBusy={setUpdating}
+            onDone={patch}
+          />
+        ) : (
+          <EngineRow
+            key={version.engine}
+            version={version}
+            active={updating}
+            checking={state.loading}
+            onActive={setUpdating}
+            onDone={patch}
+          />
+        ),
       )}
       <Actions>
         <button
           type="button"
           className="tbtn"
           disabled={busy}
-          title="无视缓存，重新询问 npm 与各家原生更新器"
+          title="重新看这台机器上装了哪几家（本地跑一遍 which 与 --version）"
           onClick={() => {
-            setPatched(undefined)
+            setRescanning(true)
+            setRescanned(undefined)
+            setPatched({})
+            void (omni?.rescanEngines() ?? Promise.resolve([]))
+              .then((changed) => {
+                setRescanned(rescanMessage(changed))
+              })
+              .catch(() => {
+                setRescanned("探测没跑起来；日志里有原文。")
+              })
+              .finally(() => {
+                setRescanning(false)
+                state.reload()
+              })
+          }}
+        >
+          {rescanning ? "正在探…" : "重新探测"}
+        </button>
+        <button
+          type="button"
+          className="tbtn"
+          disabled={busy}
+          title="无视缓存，重新询问 npm 与各家原生更新器有没有新版"
+          onClick={() => {
+            setPatched({})
             state.reload()
           }}
         >
-          {state.loading ? "正在查…" : "重新检查"}
+          {state.loading ? "正在查…" : "检查新版"}
         </button>
+        {/* 结果紧挨着那颗按钮，不另起一块：它是那一下的回执，不是一条独立通知 */}
+        {rescanned === undefined ? null : (
+          <span className="set__hint" role="status">
+            {rescanned}
+          </span>
+        )}
       </Actions>
     </>
   )
 }
 
 /**
- * 探测那三种状态。**收成一个出口**：三句话分开写的下场这个仓库见过——
- * 同一块面板里三句「正在读…」字号和内边距各不相同，而它们在用户眼里是同一件事。
+ * 读取那两种状态。**收成一个出口**：两句话分开写的下场这个仓库见过——
+ * 同一块面板里几句「正在读…」字号和内边距各不相同，而它们在用户眼里是同一件事。
+ *
+ * 上一版还有第三个分支「omni 没有这一家的版本来源」——那是**按家看**时才存在的
+ * 状态。摊平成一张表之后没有来源的那几家压根不在表里，那句话搬进了组说明。
  */
-function Probe({
-  loading,
-  failed,
-  unknown,
-}: {
-  loading: boolean
-  failed: boolean
-  unknown: boolean
-}): React.JSX.Element | null {
+function Probe({ loading, failed }: { loading: boolean; failed: boolean }): React.JSX.Element | null {
   if (loading) return <Blank>正在检查安装版本…</Blank>
-  if (failed) return <Blank tone="error">版本探测失败；点下面那颗可以再试一次。</Blank>
-  if (unknown) return <Blank>omni 没有这一家的版本来源——第三方 ACP 引擎的版本与安装由它自己管。</Blank>
+  if (failed) return <Blank tone="error">版本探测失败；点上面那颗可以再试一次。</Blank>
   return null
 }
 

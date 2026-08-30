@@ -122,7 +122,7 @@ function EngineSelect({
             id: item.id,
             label: item.label,
             ...(item.state === "missing" ? { note: "未安装" } : {}),
-            ...(item.state === "unavailable" ? { note: "配置不可用" } : {}),
+            ...(item.state === "unavailable" ? { note: "起不来" } : {}),
             ...(item.detail === undefined ? {} : { description: item.detail }),
           })),
         },

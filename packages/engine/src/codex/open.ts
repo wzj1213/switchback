@@ -82,7 +82,10 @@ const OPEN_THREAD_MS = 20_000
 function startupMessage(command: string, error: Error): string {
   const code = (error as NodeJS.ErrnoException).code
   if (code === "ENOENT") {
-    return `找不到可执行文件 \`${command}\`。请确认已安装 codex CLI，且它在 PATH 上（终端里跑 \`which codex\` 验证）。`
+    // **这句话出现在用户最需要出路的那一刻**（发出去了，起不来）。原来它只指向终端，
+    // 而 omni 自己就能装这一家——设置里那条命令是抄它官方来源的，不是编的。
+    // 终端那条留着：有人本来就在终端里，而且 `which` 能看出是不是 PATH 的问题
+    return `找不到可执行文件 \`${command}\`。设置 → 引擎 → 安装与版本 里可以直接装；已经装过的话，去那儿点「重新探测」（终端里跑 \`which codex\` 能看出是不是 PATH 的问题）。`
   }
   if (code === "EACCES") return `没有权限执行 \`${command}\`。`
   return `启动 \`${command}\` 失败：${error.message}`

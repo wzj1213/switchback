@@ -14,8 +14,15 @@ interface CatalogOptions {
 
 export interface EngineCatalog {
   (): Promise<readonly EngineInfo[]>
-  /** 原生配置或插件树变了；下一次读取必须真探，不能复用旧结论。 */
-  invalidate: (id: string) => void
+  /**
+   * 原生配置或插件树变了；下一次读取必须真探，不能复用旧结论。
+   *
+   * **不给 id 就是全部失效。** 用在「刚装完一家」和用户手点「重新探测」上：
+   * 那两种时刻我们并不知道机器上变的是哪一家——用户可能是在终端里装的，
+   * 也可能一次装了两家。只清一家等于自作聪明，而这里猜错的代价
+   * 恰恰就是那个要修的 bug：装完了还显示未安装。
+   */
+  invalidate: (id?: string) => void
 }
 
 /**
@@ -61,7 +68,15 @@ export function createEngineCatalog(
     return current
   }
   return Object.assign(read, {
-    invalidate: (id: string) => invalidate(cached, generation, id),
+    invalidate: (id?: string) => {
+      if (id !== undefined) return invalidate(cached, generation, id)
+      // 全清：`generation` 里已经出现过的都推一格，缓存整张丢掉。
+      // 推 generation 而不是只清 cached，是因为可能有正在跑的探测——
+      // 它回包时会拿旧 revision 比对，对不上就被丢掉（见 `read`）
+      for (const id of [...cached.keys()].map((key) => key.split("\0")[0] ?? "")) {
+        invalidate(cached, generation, id)
+      }
+    },
   })
 }
 

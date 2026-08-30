@@ -28,10 +28,14 @@ describe("探命令", () => {
   })
 
   // Windows 上没有 `false` 这个命令，换一个「一定在 PATH 上但 --version 会失败」的：
-  // `cmd` 收到 `--version` 会报错退出。这条验的是「装了」和「能用」是两回事
-  it("在 PATH 上但 `--version` 跑不起来 → 也算 missing，**「装了」和「能用」是两回事**", async () => {
+  // `cmd` 收到 `--version` 会报错退出。
+  //
+  // **这条以前断言 missing，那是错的**：文件就在 PATH 上，`which` 找得到它。
+  // 报「未安装」会让人去装第二遍，而装多少遍都不会变（坏壳排在前面）。
+  // 「装了」和「能用」确实是两回事——所以它们该是两个状态，不是同一个。
+  it("在 PATH 上但 `--version` 跑不起来 → unavailable，**不是「未安装」：文件就在那儿**", async () => {
     const probe = await probeCommand(isWindows ? "cmd" : "false")
-    expect(probe.state).toBe("missing")
+    expect(probe.state).toBe("unavailable")
     expect(probe.detail).toContain("跑不起来")
   })
 
@@ -92,12 +96,16 @@ describe.skipIf(isWindows)("PATH 上有好几个同名的", () => {
     expect(resolved).toBe(join(good, TARGET))
   })
 
-  it("全都坏 → missing，而且**把试过几个说出来**", async () => {
+  it("全都坏 → unavailable，而且**把试过几个说出来**", async () => {
     const a = bin(BROKEN)
     const b = bin(BROKEN)
-    const probe = await withPath([a, b], () => probeCommand(TARGET))
-    expect(probe.state).toBe("missing")
+    const probe = await withPath([a, b], () => probeCommand(TARGET, "去设置里重装一遍。"))
+    expect(probe.state).toBe("unavailable")
     expect(probe.detail).toContain("2 个同名文件")
+    // **坏的多半是排在最前面那个**——不说这句，用户会对着后面那份完好的反复重装
+    expect(probe.detail).toContain("靠前的那个先被用到")
+    // 契约：missing / unavailable 都必须说得出下一步。这一支以前欠着
+    expect(probe.detail).toContain("去设置里重装一遍。")
     expect(probe.path).toBeUndefined()
   })
 

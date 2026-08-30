@@ -36,6 +36,49 @@ describe("宿主引擎目录", () => {
     expect(calls).toEqual({ dsh: 1, codex: 1 })
   })
 
+  /**
+   * **这条测的是那个「装完了还显示未安装」的 bug。**
+   *
+   * 缓存原来只有 DSH 改 profile 那一条失效路径，于是在终端里装好一家引擎
+   * 之后，界面上唯一的出路是重启 omni——codex 的安装提示原话就是
+   * 「装好之后重启 omni」。不给 id 的 `invalidate()` 是那条出路。
+   */
+  it("不给 id 的 invalidate 让**每一家**都重探——装完一家不必重启", async () => {
+    const calls = { codex: 0, kimi: 0 }
+    const state = { codex: "missing" as string }
+    const catalog = createEngineCatalog(
+      {
+        codex: {
+          probe: async () => {
+            calls.codex += 1
+            return { state: state.codex, detail: state.codex }
+          },
+        },
+        kimi: {
+          probe: async () => {
+            calls.kimi += 1
+            return { state: "ok", detail: "ok" }
+          },
+        },
+      },
+      { codex: "Codex", kimi: "Kimi Code" },
+      log,
+    )
+
+    expect((await catalog()).find((e) => e.id === "codex")?.state).toBe("missing")
+    await catalog()
+    expect(calls).toEqual({ codex: 1, kimi: 1 })
+
+    // 用户在终端里把 codex 装上了。**不重探的话这里永远还是 missing**
+    state.codex = "ok"
+    expect((await catalog()).find((e) => e.id === "codex")?.state).toBe("missing")
+
+    catalog.invalidate()
+    expect((await catalog()).find((e) => e.id === "codex")?.state).toBe("ok")
+    // 两家都重探了：我们并不知道用户装的是哪一家，只清一家等于自作聪明
+    expect(calls).toEqual({ codex: 2, kimi: 2 })
+  })
+
   it("探测还没回来就关闭接入时，旧结果不能把 DSH 写回远程清单", async () => {
     const shown = { dsh: true }
     const gate: { finish?: () => void } = {}

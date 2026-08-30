@@ -146,8 +146,40 @@ export const tree: TreeControl = isWindows ? windowsTree() : posixTree()
  */
 const SENTINEL = { start: "__OMNI_PATH__", end: "__OMNI_END__" }
 
-/** 问不到时至少把这几个常见位置垫上。装引擎的地方就那么几处。 */
-const COMMON = ["/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin", "~/.bun/bin", "~/.cargo/bin"]
+/**
+ * 问不到时垫上的常见位置。
+ *
+ * ## 为什么必须有 Node 版本管理器那一族
+ *
+ * 上一版只有五个目录，**整族 Node 版本管理器都不在里面**——而 claude / codex /
+ * kimi 全是 npm 装的，绝大多数人的 node 由 nvm / volta / fnm / asdf / mise 管着。
+ * 于是「登录 shell 那一问超时了」这条支线直接等于「npm 装的引擎全部找不到」，
+ * 而**最容易超时的机器恰恰就是 rc 里 source 了版本管理器的那些**——
+ * 兜底方案在最需要它的场合失效，是最坏的一种兜底。
+ *
+ * nvm 那条写 `~/.nvm/current/bin`：真目录是 `~/.nvm/versions/node/<版本>/bin`，
+ * 这里不能展开通配（PATH 不认），而 `current` 是 nvm 自己维护的符号链接
+ * ——**在就对，不在也只是白搭一格**。提供 shims 的（asdf / mise）指 shims，
+ * 它们自己会转发到当前版本。
+ *
+ * 多垫几个目录的代价只有 `which` 多走几步；漏一个的代价是一整类机器上
+ * 引擎全部「未安装」。这个不对称决定了这张表宁可长。
+ */
+const COMMON = [
+  "/opt/homebrew/bin",
+  "/usr/local/bin",
+  "~/.local/bin",
+  "~/.bun/bin",
+  "~/.cargo/bin",
+  // npm / pnpm 的全局 bin
+  "~/.npm-global/bin",
+  "~/Library/pnpm",
+  // Node 版本管理器
+  "~/.volta/bin",
+  "~/.nvm/current/bin",
+  "~/.asdf/shims",
+  "~/.local/share/mise/shims",
+]
 
 export interface LoginPathDeps {
   shell: string | undefined
@@ -165,7 +197,19 @@ export async function resolveLoginPath(current: string, deps: LoginPathDeps): Pr
   if (deps.platform === "win32") return current
   const shell = deps.shell ?? "/bin/zsh"
   const script = `printf '%s%s%s' '${SENTINEL.start}' "$PATH" '${SENTINEL.end}'`
-  const out = await deps.run(shell, ["-ilc", script], 3000).catch(() => undefined)
+  /*
+   * 5 秒，不是 3 秒。
+   *
+   * `-i` 会读 `.zshrc`，而那正是绝大多数人设置 PATH 的地方（nvm / oh-my-zsh /
+   * conda 的初始化全在那儿）。3 秒对一台装了 oh-my-zsh + nvm 的机器是紧的，
+   * 而**超时的后果不是慢一点，是拿不到真 PATH**——只能退到下面那张兜底表，
+   * 于是这台机器上所有 npm 装的引擎都得靠猜目录去撞。
+   *
+   * 多等 2 秒只发生在 shell 真的很慢或者卡死的时候；换来的是那些机器
+   * 拿到**准确**的 PATH 而不是一张通用清单。上限仍然要有：rc 里可以有任何东西
+   *（等网络、等输入），没有硬超时的话代价是整个应用起不来。
+   */
+  const out = await deps.run(shell, ["-ilc", script], 5000).catch(() => undefined)
   const asked = out === undefined ? undefined : between(out, SENTINEL.start, SENTINEL.end)
   const home = deps.home
   const extras = COMMON.map((p) => (p.startsWith("~/") && home !== undefined ? `${home}/${p.slice(2)}` : p))

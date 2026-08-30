@@ -81,7 +81,12 @@ export function createKimiDriver(config: KimiDriverConfig = {}): EngineDriver {
   const pool = new KimiServerPool(config)
   return {
     id: "kimi",
-    probe: () => probeCommand(config.command ?? "kimi", "安装或升级 Kimi Code 后重启 omni。"),
+    // 同 codex：装完不再需要重启，见那边的注释
+    probe: () =>
+      probeCommand(
+        config.command ?? "kimi",
+        "设置 → 引擎 → 安装与版本 里可以直接装；在终端里装完点那儿的「重新探测」即可，不用重启。",
+      ),
     start: async (req) => {
       req.emit({ type: "engine.status", at: Date.now(), threadId: req.threadId, status: "starting" })
       const lease = await pool.acquire()

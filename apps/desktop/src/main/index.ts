@@ -66,7 +66,22 @@ const settings = createSettings(log)
  * 引擎版本的探测结果。**在这里建、显式传下去**，理由和 `settings` 一样：
  * 它有状态（缓存），而这个仓库不允许状态挂在模块上。
  */
-const engineVersions = createEngineVersions(log, { claudeExecutable: buildInfo.claudeExecutable })
+/**
+ * 装完 / 更新完之后，让引擎清单重探一遍。
+ *
+ * **可变槽是为了解开一个环**：通道必须比宿主先挂（`installChannels` 在
+ * `attachHost` 之前），所以 `engineVersions` 建得比 `attached` 早，拿不到它。
+ * 同 `relay` 那处的写法。宿主还没起时这一格是空的——那时也确实没有清单要刷。
+ */
+const engineRefresh: { run?: (id?: string) => Promise<void> } = {}
+const engineVersions = createEngineVersions(log, {
+  claudeExecutable: buildInfo.claudeExecutable,
+  onChanged: () => {
+    void engineRefresh.run?.().catch((error: unknown) => {
+      log.write("warn", "engines", `装完之后重探引擎失败：${String(error)}`)
+    })
+  },
+})
 
 /**
  * 「会话碰过哪些文件 / 真正拥有哪个工作区」的名册。预览先凭 worksiteSearch 核根，
@@ -356,6 +371,8 @@ function bootstrap(): Promise<void> {
     installActivity(attached, log)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
     installEngineSettings(settings, attached, log)
+    // 环在这儿闭合：从这一刻起，装完一家引擎不必重启 omni 就能被认出来
+    engineRefresh.run = attached.refreshEngines
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })
     relay.notify = remote.relay.notify
     await remote.sync()
