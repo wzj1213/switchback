@@ -193,7 +193,6 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         setTimeline={setTimeline}
         limits={limitNotice(props.limits)}
         thread={thread}
-        usage={props.usage}
         engines={props.engines}
         peer={props.peer}
         onCompare={props.onCompare}

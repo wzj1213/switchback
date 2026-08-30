@@ -284,67 +284,6 @@
   pointer-events: none;
 }
 
-/* ── 上下文用量表 ─────────────────────────────────────
- * 顶栏右侧一个窄条 + 数字。平时是中性灰，逼近窗口上限时才变色——
- * 一直是彩色的话，真到危险区就没有升级空间了。
- */
-.meter {
-  -webkit-app-region: no-drag;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.meter__track {
-  width: 44px;
-  height: 4px;
-  /* 半高圆角就是胶囊。写 2 只是把「999」算了一遍，还算错了会看不出来 */
-  border-radius: 999px;
-  background: var(--bg-active);
-  overflow: hidden;
-}
-
-.meter__fill {
-  display: block;
-  height: 100%;
-  background: var(--text-faint);
-  transition: width var(--dur-slow) var(--ease);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .meter__fill {
-    transition: none;
-  }
-}
-
-/*
- * 标签的字符数会变（9% → 10% 多一个字符），右边那排按钮跟着整体挪。
- * tabular-nums 管得住每个数字一样宽，管不住多一个字符——min-width 管。
- */
-.meter__label {
-  min-width: 4ch;
-  text-align: right;
-}
-
-.meter--warn {
-  color: var(--warn);
-}
-
-.meter--warn .meter__fill {
-  background: var(--warn);
-}
-
-.meter--danger {
-  color: var(--danger);
-}
-
-.meter--danger .meter__fill {
-  background: var(--danger);
-}
-
 /* ── 引擎状态与原生通知横幅 ───────────────────────────
  * 贴在顶栏下方，不遮挡对话。用 danger 色的极淡底 + 左侧竖条，
  * 而不是整块红——整块红会让人条件反射地关掉它，连读都不读。

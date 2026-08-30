@@ -2,6 +2,7 @@ import type { ModelOption } from "@omni/protocol"
 import { SparkIcon } from "./icons.js"
 import { Select, type Section } from "./Select.js"
 import { currentModel } from "../model-options.js"
+import { triggerLabel } from "../model-label.js"
 
 /**
  * 模型与推理强度。
@@ -196,12 +197,14 @@ export function ModelPicker({
   const level = effort ?? current.defaultEffort
   // 触发器上只写模型：强度有了自己的控件（`EffortSlider`），再把两样都写出来，
   // 就是同一个值在一行里写两遍——改一处另一处跟着变，看起来像 bug
-  const label = current.label
+  // 尾部那对括号只在触发器上裁掉（理由见 `model-label.ts`）；
+  // 裁过就把全名挂到悬停上，别让它只能靠打开菜单才找得回来
+  const label = triggerLabel(current.label)
   const reset = resetOf(models, current, level, onChange)
   return (
     <Select
       label={label}
-      title={current.description ?? "模型与推理强度"}
+      title={current.description ?? (label === current.label ? "模型与推理强度" : current.label)}
       disabled={disabled}
       sections={sectionsOf(models, current, level, onChange)}
       {...(reset === undefined ? {} : { reset })}

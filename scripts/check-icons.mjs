@@ -63,7 +63,7 @@ const ILLUSTRATIONS = new Map([
 /** CSS 里允许出现 stroke-width 的地方。同上，写清楚为什么。 */
 const CSS_ALLOW = new Map([
   ["styles/items-composer.css", "输入框渐变环的两条描边，配合 composer-ring.tsx"],
-  ["styles/app-composer.css", "推理强度滑块的刻度，不是图标"],
+  ["styles/usage.css", "用量环：半径与弧长按数据算的一段弧，不是固定形的图标（同 UsageRing.tsx）"],
 ])
 
 function walk(dir) {

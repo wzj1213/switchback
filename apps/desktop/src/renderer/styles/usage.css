@@ -1,0 +1,118 @@
+/*
+ * ── 上下文用量 ────────────────────────────────────────
+ * 输入区那一排里唯一**只读不设**的一格：它不接受任何操作，只报一个数。
+ *
+ * 从 `app-composer.css` 拆出来是 900 行闸门逼的（同 `queued.css` 那次），
+ * 但这条边界本来就该划：那个文件讲的是「输入区的控件」，而这一枚不是控件。
+ * 顶栏原来还有一份画同一个数的 `ContextMeter`，已经删掉——
+ * 理由写在 `components/UsageRing.tsx`。
+ */
+
+.usage-ring {
+  display: block;
+  color: var(--text-faint);
+}
+
+.usage-ring circle {
+  fill: none;
+  /*
+   * **2.2 而不是 1.6。** 细弧 + 圆头是 loading 转圈的长相，而这一屏上
+   * 真的有转圈（跑起来的那一轮）。同一个形说两件事，眼睛先认形——
+   * 于是这枚表被读成「在转」，这正是它一直「看不出是干嘛的」的原因。
+   * 加粗 + 平口（见下面 `__fill` 不再写 `stroke-linecap`）之后它是一段
+   * **量出来的弧**，不是一段跑动的弧。
+   */
+  stroke-width: 2.2;
+}
+
+.usage-ring__track {
+  stroke: var(--border-strong);
+}
+
+.usage-ring__fill {
+  stroke: currentColor;
+  /* **不写 `stroke-linecap: round`**：圆头是转圈的记号（见上）。
+     平口还有一个附带好处——0% 时它真的什么都不画，而圆头会留下一个点。 */
+  transition: stroke-dashoffset var(--dur-slow) var(--ease);
+}
+
+.usage-ring--warn {
+  color: var(--warn);
+}
+
+.usage-ring--danger {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-ring__fill {
+    transition: none;
+  }
+}
+
+/* 环是独立指示：悬停出数字卡。向上弹——它在窗口底部那一排 */
+.usage {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  transition: background var(--dur) var(--ease);
+}
+
+/* 悬停给个底：这一格不是按钮，但它有话要说（悬停出数字卡），
+   没有任何反馈的话没人知道值得停在上面 */
+.usage:hover {
+  background: var(--bg-hover);
+}
+
+/*
+ * 常驻的百分比。**它和环不是同一件事说两遍**：环给的是「在逼近吗」——
+ * 形与色带，扫一眼就有；数字给的是精度。一枚 14px 的弧分不出 23% 和 45%，
+ * 而恰恰是「快满了没有」这个判断需要那点精度。
+ *
+ * `tabular-nums` 是必须的：这个数每一轮都在变，比例字宽会让它左右抖。
+ */
+.usage__pct {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 逼近上限才上色（阈值见 usage.ts 的 WARN_AT / DANGER_AT）。
+   **数字跟着环一起变**——只染环的话，色带的话说了一半 */
+.usage--warn {
+  color: var(--warn);
+}
+
+.usage--danger {
+  color: var(--danger);
+}
+
+.usage__tip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: -8px;
+  z-index: 40;
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-float);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.usage:hover .usage__tip,
+.usage:focus-visible .usage__tip {
+  opacity: 1;
+}

@@ -1,8 +1,7 @@
 import { useRef } from "react"
-import type { EngineInfo, Thread, Usage } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@omni/protocol"
 import { CaretIcon } from "./icons.js"
 import { RailIcon } from "./icons-panel.js"
-import { ContextMeter } from "./ContextMeter.js"
 import { EnvCard } from "./EnvCard.js"
 import { TimelineCard } from "./TimelineCard.js"
 import { labelOf } from "./Composer.js"
@@ -91,7 +90,6 @@ function RailToggle({ open, onToggle }: { open: boolean; onToggle: () => void })
 
 export function TopBar({
   thread,
-  usage,
   engines,
   peer,
   onFork,
@@ -109,7 +107,6 @@ export function TopBar({
   onRail,
 }: {
   thread: Thread
-  usage: Usage | undefined
   engines: readonly EngineInfo[]
   /** 有血缘的另一个会话。有才显示「对比」。 */
   peer: Thread | undefined
@@ -174,7 +171,6 @@ export function TopBar({
         </span>
       ) : null}
       <span className="topbar__spacer" />
-      <ContextMeter usage={usage} />
       <LimitPill limits={limits} />
       <TopBarActions
         panelVisible={panelVisible}
