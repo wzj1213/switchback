@@ -127,6 +127,77 @@ function entryOf([id, value]: [string, unknown]): (readonly [string, EngineEntry
   ]
 }
 
+/** 从命令名或标签推一个能当 JSON 键用的 id。**推不出来就返回 undefined**，别硬凑。 */
+export function engineNameOf(raw: string): string | undefined {
+  const base = raw.split(/[/\\]/).pop() ?? raw
+  const id = base
+    .toLowerCase()
+    .replace(/\.(exe|cmd|bat|sh|js|mjs)$/u, "")
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+  // 下划线开头是注释键（见 `TEMPLATE._说明`），空的也不行
+  return id === "" || id.startsWith("_") ? undefined : id
+}
+
+export interface AddResult {
+  ok: boolean
+  /** 成功时它在界面上的 id（带 `acp:` 前缀）。 */
+  id?: string
+  error?: string
+}
+
+/**
+ * 往 `engines.json` 里加一条。
+ *
+ * ## 为什么读的是原文而不是 `readEngineFile`
+ *
+ * 那个函数会把文件**规范化**：过滤掉下划线开头的键、丢掉不认识的字段、
+ * 补上默认值。拿它的结果写回去，等于把用户的 `_说明` 和任何我们还不认识的
+ * 字段一起删掉——**用别人的配置文件当自己的数据结构用，是最容易背刺人的一种写法。**
+ * 所以这里自己读原文、只改一个键、原样写回。
+ *
+ * ## 重名不覆盖
+ *
+ * 已经有同名的键就直接报错，不合并也不改名。那可能是一条正在被会话使用的配置，
+ * 而「我以为我加了一条，结果改掉了另一条」是最坏的一种结果。
+ *
+ * 文件坏掉（不是 JSON、不是对象）同样不写：宁可让人自己去修，
+ * 也不能拿一份新的把他手写的东西盖掉。
+ */
+export function addEngineEntry(
+  dir: string,
+  name: string,
+  entry: { label: string; command: string; args?: readonly string[] },
+): AddResult {
+  const path = join(dir, ENGINES_FILE)
+  let raw: unknown
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"))
+  } catch {
+    // 文件不在是正常的（第一次用）；坏掉才要拦
+    try {
+      readFileSync(path, "utf8")
+      return { ok: false, error: `${ENGINES_FILE} 现在不是合法的 JSON，omni 不敢往里写。请先自己打开修一下。` }
+    } catch {
+      raw = {}
+    }
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: `${ENGINES_FILE} 的最外层不是一个对象，omni 不敢往里写。` }
+  }
+  const file = raw as Record<string, unknown>
+  if (Object.hasOwn(file, name)) {
+    return { ok: false, error: `${ENGINES_FILE} 里已经有一条叫 \`${name}\` 的了。换个名字，或者先自己去改那一条。` }
+  }
+  file[name] = {
+    label: entry.label,
+    command: entry.command,
+    ...(entry.args === undefined || entry.args.length === 0 ? {} : { args: [...entry.args] }),
+  }
+  writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`, "utf8")
+  return { ok: true, id: `acp:${name}` }
+}
+
 /**
  * 文件不存在就写一份样板出来。已存在**绝不覆盖**——那是用户的配置。
  * 返回路径，供菜单里「用编辑器打开」用。

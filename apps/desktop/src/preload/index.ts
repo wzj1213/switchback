@@ -91,6 +91,36 @@ const api = {
    * `needsRestart` 是另一件事：`engines.json` 里**改过或删掉**的条目不会在运行期
    * 兑现（活着的会话握着旧驱动实例）。它只有主进程知道，不说出来就悄悄消失了。
    */
+  /** 试着和一个可执行文件握一次 ACP 的手。**只握手，不开会话。** */
+  async tryAcpEngine(req: {
+    command: string
+    args?: readonly string[]
+  }): Promise<{ ok: boolean; protocolVersion?: number; capabilities?: readonly string[]; error?: string; stderr?: string }> {
+    return (await ipcRenderer.invoke("omni:tryAcpEngine", req)) as {
+      ok: boolean
+      protocolVersion?: number
+      capabilities?: readonly string[]
+      error?: string
+      stderr?: string
+    }
+  },
+  /** 弹系统的文件选择器挑一个可执行文件。取消返回 undefined。 */
+  async pickExecutable(): Promise<string | undefined> {
+    return (await ipcRenderer.invoke("omni:pickExecutable")) as string | undefined
+  },
+  /** 试通过了，写进 `engines.json` 并当场接上（不用重启）。 */
+  async addAcpEngine(req: {
+    name: string
+    label: string
+    command: string
+    args?: readonly string[]
+  }): Promise<{ ok: boolean; id?: string; error?: string }> {
+    return (await ipcRenderer.invoke("omni:addAcpEngine", req)) as {
+      ok: boolean
+      id?: string
+      error?: string
+    }
+  },
   async rescanEngines(): Promise<{
     changed: readonly { id: string; label: string; state?: string }[]
     needsRestart: readonly string[]

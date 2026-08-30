@@ -204,6 +204,32 @@
 }
 
 /*
+ * 接一家新的：三个输入 + 两颗按钮。
+ *
+ * 输入框和「浏览…」并排是因为**它们是同一件事的两条路**——手打命令名，
+ * 或者去文件系统里挑一个。分成两行的话，看起来像两个各自独立的字段。
+ */
+.acp-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.acp-add__row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 输入框吃掉剩下的宽：按钮宽度固定，剩多少都归它 */
+.acp-add__row .set__input {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
  * 所有引擎共用的那一块。**用一条实线和上面的 tab 面板断开**——
  * 它和上面那些不是同一个层级：上面回答「这一家怎么配」，这里回答
  * 「omni 认得哪几家」。不断开的话它读起来像当前这一家的最后一组设置，

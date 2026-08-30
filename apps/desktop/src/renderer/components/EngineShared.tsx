@@ -1,3 +1,4 @@
+import { AcpConnect } from "./AcpConnect.js"
 import { EngineVersions } from "./EngineVersions.js"
 import { Group } from "./SettingsBits.js"
 
@@ -6,10 +7,10 @@ import { Group } from "./SettingsBits.js"
  *
  * ## 为什么单独存在
  *
- * 这里的两样东西**都不属于任何一家**：安装与版本是一张全量表（`engineVersions()`
- * 本来就一次返回所有家），`engines.json` 是一份注册表。它们原来长在
- * `EngineNative` 里，也就是长在**每一家的 tab 里面**——于是同一件事印了五份，
- * 而五份里没有一份看得到全貌。
+ * 这里的三样东西**都不属于任何一家**：安装与版本是一张全量表
+ *（`engineVersions()` 本来就一次返回所有家）、接一家新的、`engines.json` 注册表。
+ * 前两样原来长在 `EngineNative` 里，也就是长在**每一家的 tab 里面**——
+ * 于是同一件事印了五份，而五份里没有一份看得到全貌。
  *
  * 判据是一句话：**这一项改的是「这一家」，还是「omni 认得哪几家」？**
  * 前者留在 tab 里（接入开关、新会话默认、模型/思考档、它自己的原生入口），
@@ -37,10 +38,17 @@ export function EngineShared({
       >
         <EngineVersions onCopy={onCopy} />
       </Group>
+      <Group
+        title="接一家新的"
+        hint="omni 还不认识的 ACP 引擎：指一个可执行文件，omni 发一次 ACP 的 initialize 试试——答得上来才让你接。命令和参数由你给（各家进 ACP 模式的写法不同，看它自己的文档），omni 不猜、也不内置一张迟早会过期的表。"
+      >
+        <AcpConnect />
+      </Group>
       <div className="eng-registry">
         <span>
-          第三方 ACP 引擎从 <code>engines.json</code> 接入。<b>新加一家，点上面的「重新探测」就能用</b>；
-          改已有那家的配置、或者把它删掉，要重启 omni 才生效——正在跑的会话还握着旧的那份。
+          接好的会写进 <code>engines.json</code>，也可以自己拿编辑器改。
+          <b>新加一家点上面的「重新探测」就能用</b>；改已有那家的配置、或者把它删掉，
+          要重启 omni 才生效——正在跑的会话还握着旧的那份。
         </span>
         <button type="button" className="tbtn" onClick={onOpenEngines}>
           打开注册表

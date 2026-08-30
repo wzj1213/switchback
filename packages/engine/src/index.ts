@@ -38,6 +38,8 @@ export { handlePermission, respond as respondPermission } from "./acp/permission
 export type { PermissionContext as AcpPermissionContext } from "./acp/permission.js"
 export { createQueue } from "./queue.js"
 export { probeCommand } from "./probe.js"
+export { tryAcp } from "./acp/try.js"
+export type { AcpTrial } from "./acp/try.js"
 export { isWindows, lookupCommand, resolveLoginPath, tree } from "./platform.js"
 export type { LoginPathDeps, TreeControl } from "./platform.js"
 export type { Probe, ProbeState } from "./probe.js"

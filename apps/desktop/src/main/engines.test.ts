@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
   acpShapes,
+  addEngineEntry,
+  engineNameOf,
   ENGINES_FILE,
   ensureEngineFile,
   mergeAcpEngines,
@@ -161,5 +163,79 @@ describe("运行期合并 engines.json", () => {
 
     expect(mergeAcpEngines(target, known, file)).toEqual({ added: [], needsRestart: [] })
     expect(mergeAcpEngines(target, known, file)).toEqual({ added: [], needsRestart: [] })
+  })
+})
+
+describe("从命令名推 id", () => {
+  const cases: readonly { raw: string; want: string | undefined; why: string }[] = [
+    { raw: "zcode-acp-server", want: "zcode-acp-server", why: "本来就合法就原样" },
+    { raw: "/opt/homebrew/bin/codex-acp", want: "codex-acp", why: "绝对路径只取文件名" },
+    { raw: "ZCode", want: "zcode", why: "统一小写" },
+    { raw: "My Agent 2", want: "my-agent-2", why: "空格并成连字符" },
+    { raw: "agent.exe", want: "agent", why: "去掉可执行后缀" },
+    { raw: "  ", want: undefined, why: "推不出来就说推不出来，别硬凑一个空 id" },
+    { raw: "***", want: undefined, why: "同上" },
+    { raw: "_说明", want: undefined, why: "下划线开头是注释键，不能占用" },
+  ]
+  it.each(cases)("$raw → $want（$why）", ({ raw, want }) => {
+    expect(engineNameOf(raw)).toBe(want)
+  })
+})
+
+/**
+ * 往注册表里加一条。**这几条守的都是同一件事：那是用户手写的文件。**
+ */
+describe("写进 engines.json", () => {
+  const dir = (): string => mkdtempSync(join(tmpdir(), "omni-add-"))
+  const log: Logger = { file: "/tmp/omni-engines-add.log", write: () => undefined }
+
+  it("加完能读回来，`acp:` 前缀由这一层给", () => {
+    const at = dir()
+    expect(addEngineEntry(at, "zcode", { label: "ZCode", command: "zcode-acp", args: ["--stdio"] })).toEqual({
+      ok: true,
+      id: "acp:zcode",
+    })
+    expect(readEngineFile(at, log)["zcode"]).toEqual({
+      label: "ZCode",
+      command: "zcode-acp",
+      args: ["--stdio"],
+    })
+  })
+
+  it("**`_说明` 和不认识的字段不能被写没了**——那是用户的文件，不是我们的数据结构", () => {
+    const at = dir()
+    writeFileSync(
+      join(at, ENGINES_FILE),
+      JSON.stringify({ _说明: ["别删我"], old: { label: "旧", command: "x", 我们还不认识的字段: 1 } }),
+      "utf8",
+    )
+    expect(addEngineEntry(at, "新的", { label: "新", command: "y" }).ok).toBe(true)
+    const raw = JSON.parse(readFileSync(join(at, ENGINES_FILE), "utf8")) as Record<string, unknown>
+    expect(raw["_说明"]).toEqual(["别删我"])
+    expect(raw["old"]).toEqual({ label: "旧", command: "x", 我们还不认识的字段: 1 })
+  })
+
+  it("重名不覆盖——那可能是一条正在被会话用着的配置", () => {
+    const at = dir()
+    addEngineEntry(at, "zcode", { label: "ZCode", command: "a" })
+    const again = addEngineEntry(at, "zcode", { label: "别的", command: "b" })
+    expect(again.ok).toBe(false)
+    expect(again.error).toContain("已经有一条")
+    expect(readEngineFile(at, log)["zcode"]?.command).toBe("a")
+  })
+
+  it("文件坏掉时**不写**：宁可让人自己修，也不能拿新的盖掉他手写的", () => {
+    const at = dir()
+    writeFileSync(join(at, ENGINES_FILE), "{ 这不是 JSON", "utf8")
+    const done = addEngineEntry(at, "zcode", { label: "ZCode", command: "a" })
+    expect(done.ok).toBe(false)
+    expect(readFileSync(join(at, ENGINES_FILE), "utf8")).toBe("{ 这不是 JSON")
+  })
+
+  it("空参数不写进去——`args: []` 和「没有 args」在文件里该长一个样", () => {
+    const at = dir()
+    addEngineEntry(at, "a", { label: "A", command: "a", args: [] })
+    const raw = JSON.parse(readFileSync(join(at, ENGINES_FILE), "utf8")) as Record<string, unknown>
+    expect(Object.hasOwn(raw["a"] as object, "args")).toBe(false)
   })
 })
