@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { useAttachments } from "./useAttachments.js"
-import { appendFileReferences, type ComposerFileReference } from "./file-references.js"
+import type { ComposerFileReference } from "./file-references.js"
 import { failedDropHint } from "./attachment-feedback.js"
 import { useAttachmentDropzone } from "./use-attachment-dropzone.js"
+import { referencedText } from "./composer-blocks.js"
+import type { DraftBlocks } from "./use-draft-blocks.js"
 
 function focusAfterSurfaceCloses(focus: () => void): void {
   focus()
@@ -11,13 +13,23 @@ function focusAfterSurfaceCloses(focus: () => void): void {
   })
 }
 
+/**
+ * 拖进来、贴进来、手选进来的文件。
+ *
+ * **图片进附件数组，其他文件进输入框上方那排芯片**（`DraftBlocks`）。
+ * 上一版是把路径写成正文里的一行 `@绝对路径`——为什么换掉，
+ * 见 `composer-blocks.ts` 开头。发出去的字一个都没变。
+ *
+ * 去重的基准是**「这一刻已经引用了哪些文件」**（`referencedText`）：
+ * 手打过 `@src/a.ts` 之后再拖同一个文件进来，不该多一枚芯片。
+ */
 export function useComposerFiles(options: {
   attach: ReturnType<typeof useAttachments>
+  blocks: DraftBlocks
   canAttach: boolean
   editable: boolean
   cwd: string
   text: string
-  setText: React.Dispatch<React.SetStateAction<string>>
   focus: () => void
   onFilesDropped: () => void
   reference?: ComposerFileReference
@@ -26,25 +38,21 @@ export function useComposerFiles(options: {
   paste: (items: DataTransferItemList | null) => Promise<void>
   pick: () => Promise<void>
 } {
-  const addReferences = useCallback(
-    (paths: readonly string[]) => {
-      if (paths.length > 0) options.setText((text) => appendFileReferences(text, paths))
-    },
-    [options.setText],
-  )
+  const addFiles = options.blocks.addFiles
+  const sent = referencedText(options.text, options.blocks.blocks)
   const seenReference = useRef(options.reference?.at ?? 0)
   useEffect(() => {
     const reference = options.reference
     if (reference === undefined || reference.at === seenReference.current || !options.editable)
       return
     seenReference.current = reference.at
-    addReferences([reference.path])
+    addFiles([reference.path])
     options.focus()
-  }, [addReferences, options.editable, options.focus, options.reference])
+  }, [addFiles, options.editable, options.focus, options.reference])
   const drop = useCallback(
     (files: FileList | null) => {
-      const result = options.attach.drop(files, options.cwd, options.text)
-      addReferences(result.references)
+      const result = options.attach.drop(files, options.cwd, sent)
+      addFiles(result.references)
       if ((files?.length ?? 0) === 0) return undefined
       if (!result.accepted) {
         return result.notice === undefined ? undefined : failedDropHint(result.notice)
@@ -53,18 +61,18 @@ export function useComposerFiles(options: {
       focusAfterSurfaceCloses(options.focus)
       return undefined
     },
-    [addReferences, options.attach.drop, options.cwd, options.focus, options.onFilesDropped, options.text],
+    [addFiles, options.attach.drop, options.cwd, options.focus, options.onFilesDropped, sent],
   )
   const paste = useCallback(
     async (items: DataTransferItemList | null) => {
-      addReferences(await options.attach.paste(items, options.cwd, options.text))
+      addFiles(await options.attach.paste(items, options.cwd, sent))
     },
-    [addReferences, options.attach.paste, options.cwd, options.text],
+    [addFiles, options.attach.paste, options.cwd, sent],
   )
   const pick = useCallback(async () => {
-    addReferences(await options.attach.pick(options.cwd, options.text))
+    addFiles(await options.attach.pick(options.cwd, sent))
     options.focus()
-  }, [addReferences, options.attach.pick, options.cwd, options.focus, options.text])
+  }, [addFiles, options.attach.pick, options.cwd, options.focus, sent])
   return {
     dropzone: useAttachmentDropzone(options.canAttach, options.editable, drop),
     paste,

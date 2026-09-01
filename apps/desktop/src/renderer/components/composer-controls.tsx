@@ -12,6 +12,9 @@ interface Props {
   text: string
   hasCommand: boolean
   attachments: number
+  /** 输入框上方那排芯片有几枚。**它们也是「要发的东西」**——只挂一枚芯片
+      一个字没打时，发送键不能是灰的。 */
+  blocks: number
   engine: EngineId
   engines: readonly EngineInfo[]
   trust: Trust
@@ -44,6 +47,7 @@ export function ComposerControls(props: Props): React.JSX.Element {
         text: props.text,
         hasCommand: props.hasCommand,
         attachments: props.attachments,
+        blocks: props.blocks,
       })}
       engine={props.engine}
       engines={props.engines}

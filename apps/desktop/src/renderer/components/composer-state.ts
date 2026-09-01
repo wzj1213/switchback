@@ -48,9 +48,14 @@ export function nothingToSend(o: {
   text: string
   hasCommand: boolean
   attachments: number
+  /** 输入框上方那排芯片（拖进来的文件、折起来的粘贴）有几枚。 */
+  blocks: number
 }): boolean {
   if (o.attachmentBlocked) return true
-  return o.text.trim() === "" && !o.hasCommand && o.attachments === 0
+  // **芯片也算「有东西要发」**：拖一份日志进来、一个字不打直接回车是成立的用法，
+  // 而上一版那些路径写在正文里，所以「正文空」天然就等于「没东西发」。
+  // 换成芯片之后这条不再自动成立，得在这里说出来
+  return o.text.trim() === "" && !o.hasCommand && o.attachments === 0 && o.blocks === 0
 }
 
 /** 图片还挂着时，任何会静默丢图的发送路径都必须先停下来。 */

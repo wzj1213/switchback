@@ -23,6 +23,15 @@ describe("输入区发送状态", () => {
       text: "这张图怎么了",
       hasCommand: false,
       attachments: 1,
+      blocks: 0,
     })).toBe(true)
+  })
+
+  // 拖一份日志进来、一个字不打直接回车是成立的用法。上一版那些路径写在正文里，
+  // 所以「正文空」天然等于「没东西发」；换成芯片之后这条不再自动成立
+  it("只挂了一枚芯片、一个字没打，发送键也不该是灰的", () => {
+    const empty = { attachmentBlocked: false, text: "  ", hasCommand: false, attachments: 0 }
+    expect(nothingToSend({ ...empty, blocks: 0 })).toBe(true)
+    expect(nothingToSend({ ...empty, blocks: 1 })).toBe(false)
   })
 })

@@ -3,6 +3,7 @@ import { MODEL_VIEWS } from "./shot-views-model.mjs"
 import { DROP_VIEWS } from "./shot-views-drop.mjs"
 import { REVERSE_COMPLETION_VIEW } from "./shot-view-completion.mjs"
 import { openPanelPage } from "./shot-panel.mjs"
+import { PASTE_VIEW } from "./shot-view-paste.mjs"
 
 export const COMPOSE_VIEWS = [
   {
@@ -200,8 +201,10 @@ export const COMPOSE_VIEWS = [
     open: `document.querySelector('[aria-label="引用到输入框"]')?.click()`,
     ready: ".composer__input",
     absent: ".workbench:not([hidden])",
+    // 工作台的「引用」和拖放走同一条路：进的是芯片，不是正文
     assert: `document.activeElement?.classList.contains('composer__input') === true
-      && document.querySelector('.composer__input')?.value === '检查这个文件 @apps/desktop/src/renderer/attachment-feedback.ts '
+      && document.querySelector('.composer__input')?.value === '检查这个文件 '
+      && document.querySelector('.dblock')?.title === 'apps/desktop/src/renderer/attachment-feedback.ts'
       && document.querySelector('.send')?.disabled === false`,
   },
   {
@@ -212,10 +215,9 @@ export const COMPOSE_VIEWS = [
     ],
     ready: ".workbench__notice",
     assert: `(() => {
-      const value = document.querySelector('.composer__input')?.value ?? ''
       return document.querySelector('.workbench:not([hidden])') !== null
         && document.querySelector('.workbench__notice')?.textContent.includes('没有重复添加') === true
-        && value.split('@apps/desktop/src/renderer/attachment-feedback.ts').length - 1 === 1
+        && document.querySelectorAll('.dblock').length === 1
         && document.activeElement?.getAttribute('aria-label') === '引用到输入框'
     })()`,
     after: `(() => {
@@ -223,6 +225,7 @@ export const COMPOSE_VIEWS = [
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
+      for (const x of document.querySelectorAll('.dblock__x')) x.click()
       document.querySelector('.paneltoggle')?.click()
     })()`,
   },
@@ -287,6 +290,7 @@ export const COMPOSE_VIEWS = [
       input?.dispatchEvent(new Event('input', { bubbles: true }))
     })()`,
   },
+  PASTE_VIEW,
   ...MODEL_VIEWS,
   {
     name: "19-设置",

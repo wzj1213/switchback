@@ -26,6 +26,7 @@ export function Prompt({
   cwd,
   searchFiles,
   onPaste,
+  onPasteText,
   commands,
   command,
   onClearCommand,
@@ -54,6 +55,8 @@ export function Prompt({
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
   /** 贴进来的图片交给附件入口，其他文件变成路径引用；默认粘贴已在 textarea 同步拦住。 */
   onPaste: (items: DataTransferItemList | null) => Promise<void>
+  /** 一次大段的纯文本粘贴：折成输入框上方一枚芯片，不撑爆正文。 */
+  onPasteText: (text: string) => void
   /** 这个会话能用的斜杠命令：引擎报的 ＋ omni 自己的。 */
   commands: readonly SlashCommand[]
   /** 已选中的引擎命令；输入框里的 value 此时只保存参数。 */
@@ -98,14 +101,7 @@ export function Prompt({
 
   return (
     <>
-      <MentionList cwd={cwd} paths={mentions.paths} active={mentions.active} open={mentions.open}
-        loading={mentions.loading} failed={mentions.failed} onPick={choose} onRetry={mentions.retry} />
-      <SlashList
-        commands={slash.hits}
-        query={slash.query}
-        active={slash.active}
-        onPick={pickCommand}
-      />
+      <Lists cwd={cwd} mentions={mentions} slash={slash} onPick={choose} onCommand={pickCommand} />
       {/* **灰字预览和输入框必须共用一个原点。** 它是一层贴在文本框上的镜像：
           你打的字画成透明的占住位置，后面那截灰字才落在光标正后方。
           差一个像素的内边距或字体，这层就露馅——所以两者都写 `font: inherit`、
@@ -126,6 +122,7 @@ export function Prompt({
           slash={slash}
           onChange={onChange}
           onPaste={onPaste}
+          onPasteText={onPasteText}
           clearCommand={clearCommand}
           choose={choose}
           pickCommand={pickCommand}
@@ -135,6 +132,23 @@ export function Prompt({
           onAsideExit={onAsideExit}
         />
       </div>
+    </>
+  )
+}
+
+/** `@` 与 `/` 两张候选表。拆出来是行数闸门逼的；它们本来就是同一类东西（浮在输入框上的候选）。 */
+function Lists({ cwd, mentions, slash, onPick, onCommand }: {
+  cwd: string
+  mentions: ReturnType<typeof useMentions>
+  slash: ReturnType<typeof useSlash>
+  onPick: (path: string) => void
+  onCommand: (command: SlashCommand) => void
+}): React.JSX.Element {
+  return (
+    <>
+      <MentionList cwd={cwd} paths={mentions.paths} active={mentions.active} open={mentions.open}
+        loading={mentions.loading} failed={mentions.failed} onPick={onPick} onRetry={mentions.retry} />
+      <SlashList commands={slash.hits} query={slash.query} active={slash.active} onPick={onCommand} />
     </>
   )
 }

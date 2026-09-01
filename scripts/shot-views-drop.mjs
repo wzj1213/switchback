@@ -30,8 +30,8 @@ export const DROP_VIEWS = [
     assert: `(() => {
       const panelOpen = document.querySelector('.workbench:not([hidden])') !== null
       return panelOpen === (innerWidth > 1120)
-        && document.querySelector('.composer__input')?.value
-          .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+        && document.querySelector('.dblock')?.title === 'apps/desktop/src/renderer/attachment-feedback.ts'
+        && document.querySelector('.composer__input')?.value === ''
         && document.querySelector('.composer__attachwarn')?.textContent
           .includes('已添加 1 张图片，并引用 1 个文件') === true
         && document.querySelectorAll('.attach .thumb').length === 1
@@ -46,8 +46,7 @@ export const DROP_VIEWS = [
     dragHint: "添加 1 张图片并引用 1 个文件",
     ready: ".composer-drop--notice",
     assert: `(() => {
-      const value = document.querySelector('.composer__input')?.value ?? ''
-      const references = value.split('@apps/desktop/src/renderer/attachment-feedback.ts').length - 1
+      const references = document.querySelectorAll('.dblock').length
       return document.querySelector('.workbench:not([hidden])') !== null
         && document.querySelector('.composer-drop--notice')?.textContent
           .includes('没有重复添加：2 个文件已经在待发送内容中') === true
@@ -63,6 +62,7 @@ export const DROP_VIEWS = [
       setter?.call(input, '')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
       document.querySelector('[aria-label="去掉这个附件"]')?.click()
+      for (const x of document.querySelectorAll('.dblock__x')) x.click()
       document.querySelector('.paneltoggle')?.click()
       setTimeout(resolve, 5200)
     })`,
@@ -74,7 +74,8 @@ export const DROP_VIEWS = [
     rejectDragTarget: ".sidebar",
     ready: ".sidebar",
     assert: `document.querySelector('.composer-drop') === null
-      && document.querySelector('.composer__input')?.value === ''`,
+      && document.querySelector('.composer__input')?.value === ''
+      && document.querySelector('.dblock') === null`,
     after: `document.querySelector('[aria-label="显示侧边面板"]')?.click()`,
   },
   {
@@ -101,6 +102,7 @@ export const DROP_VIEWS = [
       && document.querySelector('.composer-drop--notice') !== null
       && document.querySelector('.composer__attachwarn') === null
       && document.querySelector('.composer__input')?.value === ''
+      && document.querySelector('.dblock') === null
       && document.querySelector('.attach .thumb') === null`,
     after: `return new Promise(resolve => {
       delete document.documentElement.dataset.failedDrop

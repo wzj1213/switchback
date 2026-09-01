@@ -292,6 +292,85 @@
 }
 
 /*
+ * ── 输入框上方那排待发芯片 ──────────────────────────
+ *
+ * 拖进来的文件、折起来的大段粘贴都落在这儿。**正文里只有你自己打的字**——
+ * 上一版把路径写成正文里的一行 `@绝对路径`，从访达拖一份 PDF 进来，
+ * 你还没开始打字，输入框已经被一条不需要读的字符串占满了。
+ *
+ * 和图片那排（`.attach`）用同一个纵向节奏，但形制不同：图片要看内容所以是缩略图，
+ * 这几样要看的是**名字**，所以是一枚扁芯片。
+ */
+.dblocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 var(--sp-2);
+}
+
+.dblock {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+}
+
+.dblock__glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* 上一级目录压暗。**它在，只是不抢**——「同名的两个 index.ts」这种时候
+   它就是唯一的判据，而整条路径在 `title` 里 */
+.dblock__dir {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dblock__name {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dblock__x {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.dblock__x:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.dblock__x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/*
  * 光标后面那截灰字：按下 Tab 或回车会补上的东西。
  *
  * 一层贴在文本框上的镜像：你已经打的那部分画成透明的**占住位置**，

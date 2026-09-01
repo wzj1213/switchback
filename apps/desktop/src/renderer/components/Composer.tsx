@@ -117,7 +117,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     initial: props.focusOnMount === true,
     prefillAt: props.prefill?.at ?? 0,
   })
-  const { initial, attach, aside, imageAttachments } = useComposerMemory({
+  const { initial, attach, blocks, aside, imageAttachments } = useComposerMemory({
     drafts: props.drafts,
     threadId: props.threadId,
     engine: props.engine,
@@ -138,6 +138,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     prefill: props.prefill,
     engine: props.engine,
     attach,
+    blocks,
     blocked: mode.blocked || attachmentBlocked,
     steering: mode.steering,
     initial,
@@ -145,11 +146,11 @@ export function Composer(props: ComposerProps): React.JSX.Element {
   })
   const files = useComposerFiles({
     attach,
+    blocks,
     canAttach: imageAttachments,
     editable: !detached,
     cwd: props.cwd,
     text: draft.text,
-    setText: draft.setText,
     focus: focus.focus,
     onFilesDropped: props.onFilesDropped,
     reference: props.reference,
@@ -160,6 +161,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     engine: props.engine,
     text: draft.text,
     attachments: attach.paths,
+    blocks: blocks.blocks,
     command: draft.command,
     aside: aside.on,
   })
@@ -171,6 +173,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
       starting={starting}
       focus={focus}
       attach={attach}
+      blocks={blocks}
       aside={aside}
       attachWarning={attachWarning}
       attachmentBlocked={attachmentBlocked}

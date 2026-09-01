@@ -5,6 +5,7 @@ import type { useComposerFiles } from "../use-composer-files.js"
 import type { useComposerFocus } from "../use-composer-focus.js"
 import type { useComposerMemory } from "../use-composer-memory.js"
 import { Attachments } from "./Attachments.js"
+import { DraftBlocks } from "./DraftBlocks.js"
 import { AttachmentDrop } from "./AttachmentDrop.js"
 import { Chips } from "./Chips.js"
 import { ComposerControls } from "./composer-controls.js"
@@ -20,6 +21,7 @@ interface Props {
   starting: boolean
   focus: ReturnType<typeof useComposerFocus>
   attach: ReturnType<typeof useComposerMemory>["attach"]
+  blocks: ReturnType<typeof useComposerMemory>["blocks"]
   aside: ReturnType<typeof useComposerMemory>["aside"]
   attachWarning: string | undefined
   attachmentBlocked: boolean
@@ -41,7 +43,7 @@ function AttachmentWarning({
 }
 
 export function ComposerBody(view: Props): React.JSX.Element {
-  const { composer, detached, busy, starting, focus, attach, aside } = view
+  const { composer, detached, busy, starting, focus, attach, aside, blocks } = view
   const { attachWarning, attachmentBlocked, mode, draft, files } = view
   const notice = attachWarning === undefined
     ? (files.dropzone.hint?.compact === true ? undefined : attach.notice)
@@ -61,6 +63,9 @@ export function ComposerBody(view: Props): React.JSX.Element {
           />
         )}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
+        {/* 拖进来的文件、折起来的大段粘贴。**和图片那排并排**：
+            你附上的东西都在正文上方，正文里只有你自己打的字 */}
+        <DraftBlocks blocks={blocks.blocks} onRemove={blocks.remove} />
         <AttachmentWarning notice={notice} />
         <Prompt
           input={focus.input}
@@ -71,6 +76,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
           steering={mode.steering}
           cwd={composer.cwd}
           onPaste={files.paste}
+          onPasteText={blocks.addPaste}
           commands={aside.commands(composer.commands)}
           command={draft.command}
           onClearCommand={() => draft.setCommand(undefined)}
@@ -97,6 +103,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
           text={draft.text}
           hasCommand={draft.command !== undefined}
           attachments={attach.paths.length}
+          blocks={blocks.blocks.length}
           engine={composer.engine}
           engines={composer.engines}
           trust={composer.trust}

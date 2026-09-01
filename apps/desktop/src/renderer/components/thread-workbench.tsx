@@ -4,6 +4,7 @@ import type { itemsOf, lanesOf } from "@omni/store"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import type { ComposerFileReference } from "../file-references.js"
 import { fileReference, newFileReferences } from "../file-references.js"
+import { composeDraft } from "../composer-blocks.js"
 import type { useApp } from "../useApp.js"
 import type { scopeWorkbench } from "../workbench.js"
 import { WorkbenchPane } from "./WorkbenchPane.js"
@@ -55,7 +56,10 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
       onFileIndex={shell.fileIndex}
       onReference={(target) => {
         const path = fileReference(target.cwd, target.path).path
-        const text = props.drafts.read(target.threadId)?.text ?? ""
+        // 「已经在输入框里了吗」的判据是**按下发送会送出什么**：
+        // 正文里手打的 `@` 和上方那排芯片都算数（见 `composer-blocks.ts`）
+        const saved = props.drafts.read(target.threadId)
+        const text = saved === undefined ? "" : composeDraft(saved.text, saved.blocks)
         if (newFileReferences(text, [path]).length === 0) {
           setNotice((before) => ({
             text: "这个文件已经在输入框中，没有重复添加。",

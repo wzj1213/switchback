@@ -4,6 +4,7 @@ import type { SlashCommand } from "@omni/protocol"
 import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
 import { hasFileItems } from "../attachment-feedback.js"
+import { worthFolding } from "../composer-blocks.js"
 
 export function promptPlaceholder(state: {
   command: SlashCommand | undefined
@@ -34,6 +35,8 @@ interface Props {
   slash: ReturnType<typeof useSlash>
   onChange: (text: string) => void
   onPaste: (items: DataTransferItemList | null) => Promise<void>
+  /** 一次大段的纯文本粘贴。折成输入框上方一枚芯片，见 `composer-blocks.ts`。 */
+  onPasteText: (text: string) => void
   clearCommand: () => void
   choose: (path: string) => void
   pickCommand: (command: SlashCommand) => void
@@ -65,10 +68,26 @@ export function PromptTextarea(props: Props): React.JSX.Element {
       }}
       onPaste={(event) => {
         const items = event.clipboardData.items
-        if (!hasFileItems(items)) return
-        // Finder 会同时给图片和路径文本。必须在异步落盘前拦住，`.then()` 里已经太迟。
+        if (hasFileItems(items)) {
+          // Finder 会同时给图片和路径文本。必须在异步落盘前拦住，`.then()` 里已经太迟。
+          event.preventDefault()
+          void props.onPaste(items)
+          return
+        }
+        /*
+         * **一大段纯文本折成一枚芯片。**
+         *
+         * 输入框最高 180px；粘一段 500 行的日志进去，它就此变成一个只能滚的
+         * 小窗口，你要在里面找自己那句话。而会话历史里这段日志本来就是折起来的
+         *——输入框没道理比历史更吵。
+         *
+         * 折的是显示不是内容：发送时它原样接在正文后面（见 `composeDraft`）。
+         * 小段粘贴照旧原样进正文——那本来就是你要读、要改的那几行。
+         */
+        const text = event.clipboardData.getData("text/plain")
+        if (!worthFolding(text)) return
         event.preventDefault()
-        void props.onPaste(items)
+        props.onPasteText(text)
       }}
       onBlur={() => {
         props.mentions.close()

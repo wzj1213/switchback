@@ -297,8 +297,8 @@ export const EDITABLE_REVIEW_VIEW = {
   assert: `(() => {
     const panelOpen = document.querySelector('.rv:not([hidden])') !== null
     return panelOpen === (innerWidth > 1120)
-      && document.querySelector('.composer__input')?.value
-        .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+      && document.querySelector('.dblock')?.title === 'apps/desktop/src/renderer/attachment-feedback.ts'
+      && document.querySelector('.composer__input')?.value === ''
       && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
       && document.activeElement?.classList.contains('composer__input') === true
   })()`,
@@ -307,6 +307,7 @@ export const EDITABLE_REVIEW_VIEW = {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
     setter?.call(input, '')
     input?.dispatchEvent(new Event('input', { bubbles: true }))
+    for (const x of document.querySelectorAll('.dblock__x')) x.click()
     ;[...document.querySelectorAll('.row--thread .row__main')]
       // 侧栏这一行显示的是**原生标题**，不再是第一句话（见 sidebar.ts 的 rowLabelOf）
       .find(row => row.textContent.includes('订阅'))?.click()
