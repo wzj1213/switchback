@@ -1,6 +1,6 @@
-import type { Command, Item, TaskRun, Thread, Turn } from "@omni/protocol"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn } from "@omni/protocol"
 import { memo, useCallback, useMemo, useState } from "react"
-import { foldTurns, groupRows, withAsides } from "../group.js"
+import { foldTurns, groupRows, withAsides, withEngineMarks } from "../group.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ToBottomIcon } from "./icons.js"
@@ -12,6 +12,7 @@ import { AskFloat } from "./ask-float.js"
 import { TranscriptRail } from "./TranscriptRail.js"
 import { useTranscriptRail } from "../use-transcript-rail.js"
 import { navPointsOf } from "../transcript-rail.js"
+import { engineStints } from "../engine-mark.js"
 
 /**
  * 对话正文。
@@ -42,6 +43,7 @@ export const Transcript = memo(function Transcript({
   items,
   turn,
   tasks,
+  engines,
   thinkingTokens,
   onReveal, onReview, onOpenFile,
   send,
@@ -54,6 +56,8 @@ export const Transcript = memo(function Transcript({
   turn: Turn | undefined
   /** 此刻在跑的子 agent。**引擎报了才有**，一个都没有时是空数组。 */
   tasks: readonly TaskRun[]
+  /** 引擎清单：换手那条分界要把 id 翻成人话。引用稳定，不破 memo。 */
+  engines: readonly EngineInfo[]
   thinkingTokens: number | undefined
   onReveal?: ((path: string) => void) | undefined
   onReview?: (() => void) | undefined
@@ -87,11 +91,16 @@ export const Transcript = memo(function Transcript({
     [turn?.id, unfolded],
   )
   const rows = useMemo(
-    // **折叠在前、插侧问在后**：侧问不归任何一轮，折起某一轮不该把它一起折掉。
+    // **折叠在前、插侧问与换手分界在后**：这两样都不归任何一轮，
+    // 折起某一轮不该把它们一起折掉。
     // **旁路不进流里**：输入框上方那条状态带（`ActivityDock`）说的是同一件事，
     // 两处画同一条旁路，读到第二处时人要先确认「这是不是刚才那个」
-    () => withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd), folded), thread.asides ?? []),
-    [items, turn?.id, folded, thread.asides, thread.cwd],
+    () =>
+      withEngineMarks(
+        withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd), folded), thread.asides ?? []),
+        thread.segments,
+      ),
+    [items, turn?.id, folded, thread.asides, thread.cwd, thread.segments],
   )
   // resolve 必须引用稳定，`ItemView` 的 memo 才不会在每帧流式更新时整屏失效。
   const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)
@@ -101,8 +110,11 @@ export const Transcript = memo(function Transcript({
   const retry = { id: useMemo(() => lastMine(rows), [rows]), active: canRewind(thread, turn, readOnly === true) }
   // 那排动作每轮只挂最后一条回答。**每条都挂的那一版连间距都被它带偏了**，见 `transcript-row.tsx`
   const acts = useMemo(() => answerActs(rows, turn?.id), [rows, turn?.id])
-  // 左边那条导航：一格 = 你问的一次（`navPointsOf` 定的谁算一格）
-  const rail = useTranscriptRail(scroller, inner, useMemo(() => navPointsOf(rows), [rows]))
+  // 左边那条导航：一格 = 你问的一次（`navPointsOf` 定的谁算一格），颜色 = 那一问归谁跑
+  const stints = useMemo(() => engineStints(thread.segments), [thread.segments])
+  const rail = useTranscriptRail(
+    scroller, inner, useMemo(() => navPointsOf(rows, stints), [rows, stints]),
+  )
   return (
     <div
       className="transcript"
@@ -111,7 +123,7 @@ export const Transcript = memo(function Transcript({
       aria-label={`对话记录：${thread.title}`}
       tabIndex={0}
     >
-      <TranscriptRail marks={rail.marks} activeId={rail.activeId} onJump={rail.jump} />
+      <TranscriptRail marks={rail.marks} activeId={rail.activeId} engines={engines} onJump={rail.jump} />
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
       <div className="transcript__inner" ref={inner}>
         {rows.map((row) => (
@@ -120,6 +132,7 @@ export const Transcript = memo(function Transcript({
             row={row}
             threadId={thread.id}
             cwd={thread.cwd}
+            engines={engines}
             acts={row.kind === "item" && acts.has(row.item.id)}
             onReveal={onReveal} onReview={onReview} onOpenFile={onOpenFile}
             {...(canRewind(thread, turn, readOnly === true)

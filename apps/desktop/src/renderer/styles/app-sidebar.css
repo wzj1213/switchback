@@ -445,6 +445,21 @@
   white-space: nowrap;
 }
 
+/*
+ * 换过引擎的会话在行尾留一颗引擎色的点（见 `RowEnd` 的 `EngineDot`）。
+ *
+ * **它不占那一列的语义位**：那一列答的是「多久以前」，这颗点答的是「归谁」，
+ * 所以它排在时间前面而不是顶掉时间。行首那颗是状态，两头各管一件事，
+ * 不会被读成同一种东西。
+ */
+.row__engine {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: var(--sp-2);
+  border-radius: 50%;
+}
+
 /* 等待批准的会话在侧栏直接写出来：状态点的颜色说不清「要你去做什么」 */
 .row__note {
   flex: none;

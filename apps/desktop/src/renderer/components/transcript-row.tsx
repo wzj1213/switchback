@@ -1,9 +1,10 @@
-import type { Command, Thread, Turn } from "@omni/protocol"
+import type { Command, EngineInfo, Thread, Turn } from "@omni/protocol"
 import { ItemView } from "./ItemView.js"
 import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
 import { AsideCard } from "./aside-card.js"
+import { EngineSwitchMark } from "./engine-switch.js"
 import { TurnEdits } from "./TurnEdits.js"
 import { ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
@@ -23,6 +24,7 @@ export function keyOf(row: Row): string {
   if (row.kind === "edits") return `edits-${row.turnId}`
   if (row.kind === "run") return row.items[0]?.id ?? "run"
   if (row.kind === "aside") return `aside-${String(row.aside.at)}`
+  if (row.kind === "engine") return `hand-${row.stint.engine}-${String(row.stint.at)}`
   return row.item.id
 }
 
@@ -122,10 +124,12 @@ export function retryProps(
 export const approvalShortcut = (readOnly: boolean, itemId: string | undefined): string | undefined =>
   readOnly ? undefined : itemId
 
-/** 一行。三种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, onReveal, onReview, onOpenFile, folded, onFold, onCopy,
+/** 一行。几种形态在这里分派，`Transcript` 只管遍历。 */
+export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, onReveal, onReview, onOpenFile, folded, onFold, onCopy,
   onResolve, approvalTurn, shortcutApproval, readOnly }: {
   row: Row
+  /** 引擎清单：换手分界要把 id 翻成人话。 */
+  engines: readonly EngineInfo[]
   /** 这一行是不是「最后一条说出来的话」。见 `lastSpoken`。 */
   acts: boolean
   threadId: string
@@ -200,6 +204,7 @@ export function RowView({ row, threadId, cwd, acts, onRewind, onRetry, onReveal,
     )
   }
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
+  if (row.kind === "engine") return <EngineSwitchMark stint={row.stint} engines={engines} />
   /*
    * 「改一改再发」**只挂在最后一句人话上，而且只在能 rewind 的时候**。
    *

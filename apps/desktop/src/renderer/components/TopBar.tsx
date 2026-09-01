@@ -50,7 +50,7 @@ function Cards({
 }): React.JSX.Element | null {
   if (timeline) {
     return (
-      <TimelineCard thread={thread} anchor={anchor} onCopy={onCopy} onReveal={onReveal} onClose={onClose} />
+      <TimelineCard thread={thread} engines={engines} anchor={anchor} onCopy={onCopy} onReveal={onReveal} onClose={onClose} />
     )
   }
   if (env) {

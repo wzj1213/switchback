@@ -16,7 +16,21 @@ function rememberSegment(ctx: Ctx, entry: Live): SegmentRef | undefined {
   const engine = entry.thread.engine
   const profile = entry.thread.engineProfile
   const had = entry.thread.segments ?? []
-  if (had.some((seg) => seg.engine === engine && seg.profile === profile && seg.handle === handle)) {
+  /**
+   * **只和「最后一段」比，不和全部比。**
+   *
+   * 上一版是 `had.some(...)`：只要这条会话在任何时候跑过这家引擎，就不再记第二段。
+   * 于是 A → B → A 在记录上只有两段，第三段（切回 A）**一点痕迹都没有**——
+   * 而那恰好是最需要痕迹的一刻：转录区要在那儿画一条「切换至 A」，
+   * 左缘导航要知道后面这几问归谁跑，「中途换过引擎」也要数对次数。
+   *
+   * 换成和最后一段比之后：同一家连着跑多少轮仍然只记一段（`recordSegment`
+   * 每轮都调用，第二轮起 last 就等于自己），而换出去再换回来会各记一段。
+   * 句柄照旧是同一个（切回去续的就是那条原生 session，见 `branch.ts`
+   * 的 `latestSegment`），所以「续跑身份」这件事一点没变，变的只是**时间线更全**。
+   */
+  const last = had[had.length - 1]
+  if (last?.engine === engine && last.profile === profile && last.handle === handle) {
     return { engine, ...(profile === undefined ? {} : { profile }), handle }
   }
   const at = ctx.deps.now()
@@ -37,7 +51,9 @@ export async function recordSegment(ctx: Ctx, entry: Live): Promise<void> {
   if (path === undefined) return
   const live = ctx.live.get(entry.thread.id)
   const had = live?.thread.segments ?? []
-  const mine = had.find(
+  // **补最后那一段**：同一家可能出现好几段（切出去又切回来），
+  // 而这次异步查到的路径属于此刻正在跑的那一段，不是三十轮之前的同名段
+  const mine = had.findLast(
     (seg) => seg.engine === ref.engine && seg.profile === ref.profile && seg.handle === ref.handle,
   )
   if (live === undefined || mine === undefined || mine.logPath === path) return

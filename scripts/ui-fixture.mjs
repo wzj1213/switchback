@@ -40,6 +40,32 @@ function threadOf(id, title, cwd, at) {
   }
 }
 
+/**
+ * **这条会话中途换过引擎。**
+ *
+ * 第二轮之前切去 codex 跑，事后又切回 claude（切回来还没说话，所以只有两段——
+ * 段是在那一轮开始时才落的，见 `host/segment.ts`）。样本里必须有这么一条，
+ * 否则三处「谁跑的」都拍不到：转录区那条「切换至 Codex」、左缘导航按引擎分段的
+ * 颜色、以及侧栏行尾那颗引擎点。
+ *
+ * 当前引擎仍是 claude，输入区那两个选择器一个字都不变——出图的前后对照不受影响。
+ */
+function handedOff(out, { id, cwd, at, when }) {
+  out.push(line({
+    type: "thread.updated",
+    at: when,
+    thread: {
+      ...threadOf(id, "把订阅那段胶水抽成纯函数", cwd, at),
+      engineHistory: [ENGINE, "codex", ENGINE],
+      segments: [
+        { engine: ENGINE, handle: "claude-session-1", logPath: "/logs/claude-1.jsonl", startedAt: at },
+        { engine: "codex", handle: "codex-thread-9", logPath: "/logs/codex-9.jsonl", startedAt: when },
+      ],
+      updatedAt: when,
+    },
+  }))
+}
+
 /** 主会话：一屏里把每一类 item 都摆出来。 */
 export function mainThread(id, cwd, at, externalPath) {
   const turn = `${id}-t1`
@@ -74,7 +100,7 @@ export function mainThread(id, cwd, at, externalPath) {
   fill(push, cwd, externalPath)
   fillActivity(out, { threadId: id, turnId: turn, cwd, at })
   out.push(line({ type: "turn.completed", at, turnId: turn, status: "completed" }))
-  followUp(out, { id, at })
+  followUp(out, { id, cwd, at })
   out.push(
     line({
       type: "usage.updated",
@@ -209,9 +235,10 @@ function fill(push, cwd, externalPath) {
  * - 「这一轮改了哪些文件」那张卡是**每轮一张**，只有一轮就看不出「每轮」这件事，
  *   也看不出它跟在自己那一轮末尾、而不是钉在最底下。
  */
-function followUp(out, { id, at }) {
+function followUp(out, { id, cwd, at }) {
   const turn = `${id}-t2`
   const later = at + 60_000
+  handedOff(out, { id, cwd, at, when: later - 1_000 })
   out.push(line({ type: "turn.started", at: later, turn: {
     id: turn, threadId: id, engine: ENGINE, status: "running", startedAt: later,
   } }))

@@ -184,6 +184,7 @@ export function Compare({
               thread={side.thread}
               items={side.items}
               tasks={side.tasks}
+              engines={engines}
               thinkingTokens={side.thinkingTokens}
               turn={side.turn}
               send={send}

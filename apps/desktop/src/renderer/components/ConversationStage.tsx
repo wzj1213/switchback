@@ -49,6 +49,7 @@ export function ConversationStage({
         items={items}
         turn={turn}
         tasks={tasks}
+        engines={engines}
         thinkingTokens={thinkingTokens}
         onReveal={onReveal}
         onReview={onReview}

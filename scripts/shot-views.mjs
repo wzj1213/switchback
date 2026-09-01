@@ -112,6 +112,30 @@ export const VIEWS = [
     },
     ...REVIEW_VIEWS,
     {
+      /*
+       * **换引擎在转录区里要留下痕迹。**
+       *
+       * 样本这条会话第二轮之前切去 codex 跑过（见 `ui-fixture.mjs` 的 `handedOff`）。
+       * 不画的话，往回翻时「上面五问是谁答的、下面三问是谁答的」屏幕上一个字都没说。
+       *
+       * 三处同时验：转录区那条分界、左缘导航那一格的引擎色、侧栏行尾那颗引擎点。
+       * 三处共用一套色（`engine-mark.ts`），对不上就连不成一句话。
+       */
+      name: "05b-换引擎留痕",
+      open: null,
+      ready: ".handmark",
+      assert: `(() => {
+        const mark = document.querySelector('.handmark')
+        const tinted = [...document.querySelectorAll('.rail__mark')]
+          .map(node => getComputedStyle(node).backgroundColor)
+        const dot = document.querySelector('.row--selected .row__engine')
+        return mark?.textContent.includes('切换至 Codex') === true
+          && mark.getAttribute('role') === 'separator'
+          && new Set(tinted).size === 2
+          && dot !== null
+      })()`,
+    },
+    {
       name: "05-拖入工作区文件",
       open: [
         `document.querySelector('.sidebar__new')?.click()`,
@@ -122,8 +146,11 @@ export const VIEWS = [
       // 故意落在空会话正文，不是输入框：整扇当前会话都该是文件落点。
       dragTarget: ".blank",
       ready: ".composer__attachwarn",
-      assert: `document.querySelector('.composer__input')?.value
-          .includes('@apps/desktop/src/renderer/attachment-feedback.ts') === true
+      // **正文里一个字都不该多**：拖进来的文件现在是输入框上方一枚芯片
+      //（见 composer-blocks.ts），发送时才展开成同一条 `@路径`
+      assert: `document.querySelector('.composer__input')?.value === ''
+        && document.querySelector('.dblock')?.title === 'apps/desktop/src/renderer/attachment-feedback.ts'
+        && document.querySelector('.dblock__name')?.textContent === 'attachment-feedback.ts'
         && document.querySelector('.composer__attachwarn')?.textContent.includes('已引用 1 个文件') === true
         && document.querySelector('.attach .thumb') === null
         && document.querySelector('.send')?.disabled === false
@@ -133,6 +160,7 @@ export const VIEWS = [
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
         setter?.call(input, '')
         input?.dispatchEvent(new Event('input', { bubbles: true }))
+        for (const x of document.querySelectorAll('.dblock__x')) x.click()
       })()`,
     },
     EDITABLE_REVIEW_VIEW,

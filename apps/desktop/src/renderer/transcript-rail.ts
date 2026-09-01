@@ -1,3 +1,5 @@
+import { engineAt, type EngineStint } from "./engine-mark.js"
+
 /**
  * 转录区左缘那条大纲。
  *
@@ -32,6 +34,12 @@ export interface NavPoint {
   id: string
   text: string
   weight: number
+  /**
+   * 这一问归哪家引擎跑。**换过引擎的会话才有意义**——它让整条导航
+   * 按颜色分成几段，「上面那五问是 codex 答的」一眼就看得出来。
+   * 从 `Thread.segments` 按时刻查（见 `engine-mark.ts`），第一段之前的没有。
+   */
+  engine?: string
 }
 
 /** 算完之后的一格。 */
@@ -45,6 +53,8 @@ export interface RailMark {
   width: number
   /** 这一格罩着哪几问。当下那一问落在其中就算这一格是当下。 */
   ids: readonly string[]
+  /** 这一格代表的那一问归谁跑。并格时取头一问的——它就是这一格代表的那问。 */
+  engine?: string
 }
 
 export interface RailBox {
@@ -121,6 +131,7 @@ export function railLayout(
     ids: bin.ids,
     y: Math.round(top + at * gap),
     width: widthOf(bin.weight, at),
+    ...(bin.engine === undefined ? {} : { engine: bin.engine }),
   }))
   // 当下读到哪一问：视线上沿再往下一点点算「正在读」，滚到底时一定是最后一问
   const line = box.scrollTop + box.clientHeight * 0.2
@@ -148,9 +159,11 @@ export function railPeek(text: string): { title: string; body: string } {
 export function navPointsOf(
   rows: readonly {
     kind: string
-    item?: { id: string; kind: string; text?: string; turnId?: string; origin?: unknown }
+    item?: { id: string; kind: string; text?: string; turnId?: string; origin?: unknown; at?: number }
     items?: readonly { turnId?: string; tool?: string }[]
   }[],
+  /** 这条会话的分段。给了才给每一格标上引擎；没换过引擎的会话不用传。 */
+  stints: readonly EngineStint[] = [],
 ): readonly NavPoint[] {
   const weight = new Map<string, number>()
   const add = (turnId: string | undefined, n: number): void => {
@@ -162,13 +175,15 @@ export function navPointsOf(
     // 工具行也算产出：一轮跑了二十个命令、一个字没说，那一格不该是最短的
     if (row.kind === "run") for (const one of row.items ?? []) add(one.turnId, 24)
   }
-  return rows.flatMap((row) =>
-    row.kind === "item" && row.item?.kind === "user_message" && row.item.origin === undefined
-      ? [{
-          id: row.item.id,
-          text: row.item.text ?? "",
-          weight: weight.get(row.item.turnId ?? "") ?? 0,
-        }]
-      : [],
-  )
+  return rows.flatMap((row) => {
+    const item = row.item
+    if (row.kind !== "item" || item?.kind !== "user_message" || item.origin !== undefined) return []
+    const engine = engineAt(stints, item.at ?? 0)?.engine
+    return [{
+      id: item.id,
+      text: item.text ?? "",
+      weight: weight.get(item.turnId ?? "") ?? 0,
+      ...(engine === undefined ? {} : { engine }),
+    }]
+  })
 }

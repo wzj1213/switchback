@@ -489,6 +489,47 @@ describe("换引擎的在途竞态", () => {
     await tick()
     expect(rig.host.live()[0]?.segments?.[0]?.logPath).toBe("/logs/a.jsonl")
   })
+
+  /**
+   * 上一版只按「这条会话跑过这家没有」去重，于是 A→B→A 只留两段——
+   * **切回 A 的那一刻在时间线上不存在**。转录区那条「切换至 A」、
+   * 左缘导航的归属、以及「中途换过引擎」的次数全都要从这里读。
+   */
+  it("A→B→A 记三段，第三段续用 A 的旧句柄但另起时刻", async () => {
+    const rig = rigOf({})
+    const id = await created(rig)
+    const first = rig.probes[0] as Probe
+    first.handle("a-handle")
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "A 做事" })
+    complete(first)
+    await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "b" })
+    await rig.host.dispatch({ type: "thread.switchNow", threadId: id })
+    const second = rig.probes[1] as Probe
+    second.handle("b-handle")
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "B 做事" })
+    complete(second)
+    await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "a" })
+    await rig.host.dispatch({ type: "thread.switchNow", threadId: id })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "A 接着做" })
+
+    expect(rig.host.live()[0]?.segments?.map((seg) => [seg.engine, seg.handle])).toEqual([
+      ["a", "a-handle"],
+      ["b", "b-handle"],
+      ["a", "a-handle"],
+    ])
+  })
+
+  it("同一家连着跑几轮仍然只记一段", async () => {
+    const rig = rigOf({})
+    const id = await created(rig)
+    const first = rig.probes[0] as Probe
+    first.handle("a-handle")
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    complete(first)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第二句" })
+    complete(first)
+    expect(rig.host.live()[0]?.segments).toHaveLength(1)
+  })
 })
 
 describe("失败收口与基线生命周期", () => {

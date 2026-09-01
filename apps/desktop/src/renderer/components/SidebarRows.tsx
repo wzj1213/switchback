@@ -210,6 +210,7 @@ export function Row({
         <RowName value={rowLabelOf(row)} />
         <RowEnd
           thread={thread}
+          engines={engines}
           unread={unread}
           {...(aside === undefined ? {} : { aside })}
         />

@@ -182,3 +182,44 @@
   padding-left: calc(var(--step-slot) - var(--step-icon) / 2);
   border-left: 1px solid var(--border);
 }
+
+/* ── 换了一家引擎 ─────────────────────────────────────
+ * 形制照上面那条轮次分界：**同一种视觉语言说同一类事**——「这里是个接缝」。
+ * 差别只有一个：这条线在牌子两边各一段，牌子居中。
+ *
+ * 为什么不做成一条消息：它不是谁说的话，是 `Thread.segments` 里那个时刻
+ * 被画了出来（见 `group.ts` 的 `withEngineMarks`）。靠左靠右带头像的那几种
+ * 形制都在暗示「有人说了句话」，而那句话不存在。
+ */
+.handmark {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.handmark::before,
+.handmark::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.handmark__tag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* 引擎色那颗点。**颜色由组件用内联变量给**（`engineTint`），
+   这里只定形状——五家各一色的表在 `tokens.css`，不在这儿抄第二份 */
+.handmark__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}

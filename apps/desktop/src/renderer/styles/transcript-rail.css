@@ -55,7 +55,10 @@
   width: var(--mark-w, 8px);
   height: 1.5px;
   border-radius: 2px;
-  background: currentcolor;
+  /* 换过引擎的会话按引擎上色（行内 `--mark-tint`，见 `engine-mark.ts`）——
+     整条于是按颜色分成几段，「上面那五问是谁答的」不用往回翻。
+     没换过、或者第三方引擎，退回墨色：那时整条一个颜色，和上一版一模一样 */
+  background: var(--mark-tint, currentcolor);
   opacity: 0.3;
   transform: translateY(-50%);
   transform-origin: left center;
@@ -67,10 +70,12 @@
 }
 
 /* 当下那一格：更实、更深。**位置本身已经说明了「我在哪儿」**，
-   所以这里只加重，不另外画一个游标 */
+   所以这里只加重，不另外画一个游标。
+   **引擎色仍然赢**：加重的是不透明度，不是把颜色换掉——不然当下那一格
+   会从它所在的那一段里掉出来，而那一段的颜色正是它要说的话 */
 .rail__tick[data-on="true"] .rail__mark {
-  background: var(--text-muted);
-  opacity: 0.68;
+  background: var(--mark-tint, var(--text-muted));
+  opacity: 0.78;
 }
 
 .rail__tick:hover .rail__mark,
@@ -154,6 +159,22 @@
   font-size: var(--text-xs);
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/* 卡底那一行「这一问归谁跑」。**只有换过引擎的会话才画**（见 `TranscriptRail`）：
+   一家跑到底时它每一格都一样，说了等于没说 */
+.rail__peek-engine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.rail__peek-engine i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 /* 触控设备上没有悬停，这条大纲的一半功能不存在——整条不画 */

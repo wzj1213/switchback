@@ -1,5 +1,6 @@
-import type { Aside, Item, ToolCallItem } from "@omni/protocol"
+import type { Aside, EngineSegment, Item, ToolCallItem } from "@omni/protocol"
 import { reportedChangesOf, type Changes } from "./changes.js"
+import { engineSwitches, type EngineStint } from "./engine-mark.js"
 
 /**
  * 连续的工具调用合成一组。
@@ -22,6 +23,14 @@ export type Row =
    * 为什么，见 `components/TurnEdits.tsx` 开头。
    */
   | { kind: "edits"; turnId: string; edits: Changes }
+  /**
+   * **这里换了一家引擎。** 和侧问一样不属于任何一轮，按时刻插进来。
+   *
+   * 它不是一条 item，也不进 journal：`Thread.segments` 已经记着谁在什么时候
+   * 接的手，再造一条消息只会多一份要同步的真相。**更要紧的是它不是给模型看的**
+   *——引擎的上下文里不该出现一句 omni 写的「你接手了」。
+   */
+  | { kind: "engine"; stint: EngineStint }
 
 /**
  * 一轮花了多久，从**这一轮自己的 item** 算。
@@ -65,6 +74,8 @@ export function turnIdOf(row: Row): string | undefined {
   // 侧问**不归任何一轮**：折起某一轮时它不该跟着消失——
   // 它问的常常正是那一轮里的东西，折起来是为了少看回答，不是为了少看自己问过的话
   if (row.kind === "aside") return undefined
+  // 换手分界同理，而且更硬：它标的正是两轮之间那条缝，折起谁都不该把它折掉
+  if (row.kind === "engine") return undefined
   return row.item.turnId
 }
 
@@ -74,6 +85,7 @@ function atOf(row: Row): number | undefined {
   if (row.kind === "edits") return undefined
   if (row.kind === "run") return row.items[row.items.length - 1]?.at
   if (row.kind === "aside") return row.aside.at
+  if (row.kind === "engine") return row.stint.at
   return undefined
 }
 
@@ -111,6 +123,29 @@ function interpose<T extends { at: number }>(
 /** 侧问。 */
 export function withAsides(rows: readonly Row[], asides: readonly Aside[]): readonly Row[] {
   return interpose(rows, asides, (aside) => ({ kind: "aside", aside }))
+}
+
+/**
+ * 换引擎那条分界。
+ *
+ * ## 为什么它值一条线
+ *
+ * 一条会话在几家之间来回切之后，转录区是一条**看不出接缝的长流**：
+ * 上面那五问是 codex 答的、下面这三问是 Claude 答的，而屏幕上一个字都没说。
+ * 于是往回翻的时候人只能靠语气猜，而「这段是谁做的」恰好是换引擎之后
+ * 最常问的一句——尤其是上一家出了问题、你正是为此才换的。
+ *
+ * ## 它只说这一句，不说别的
+ *
+ * 线上只有「切换至 X」。**不写「上一家的记录在哪」，也不写任何给模型的话**——
+ * 前者是 `/timeline` 与「承接上一段」那颗键的事，后者根本不该存在
+ *（见 `AGENTS.md`：不往模型的上下文里塞 omni 写的话）。
+ */
+export function withEngineMarks(
+  rows: readonly Row[],
+  segments: readonly EngineSegment[] | undefined,
+): readonly Row[] {
+  return interpose(rows, engineSwitches(segments), (stint) => ({ kind: "engine", stint }))
 }
 
 /**
@@ -156,8 +191,8 @@ export function foldTurns(rows: readonly Row[], folded: (turnId: string) => bool
     if (row.kind === "turn") return true
     const id = turnIdOf(row)
     if (id === undefined || !openable.has(id) || !folded(id)) return true
-    // aside 上一行就返回了（它不归任何一轮）；走到这里只剩 item / run / edits：
-    // run 整组折掉，改动卡留着
+    // aside / engine 上一行就返回了（它们不归任何一轮）；走到这里只剩
+    // item / run / edits：run 整组折掉，改动卡留着
     if (row.kind !== "item") return row.kind === "edits"
     // 提问是表头、报错不能藏、最后一条回答是结论，其余都是过程
     if (row.item.kind === "user_message" || row.item.kind === "error") return true

@@ -1,7 +1,9 @@
-import type { Thread, ThreadStatus } from "@omni/protocol"
+import type { EngineInfo, Thread, ThreadStatus } from "@omni/protocol"
 import { SpinnerIcon } from "./icons.js"
 import { sinceOf } from "../status.js"
 import { useMinute } from "../useMinute.js"
+import { engineTint } from "../engine-mark.js"
+import { labelOf } from "./Composer.js"
 
 /*
  * 侧栏会话行的状态点和右边那一列。从 `SidebarRows.tsx` 拆出来是行数闸门逼的，
@@ -42,6 +44,37 @@ const NOTE: Partial<Record<ThreadStatus, string>> = {
 }
 
 /**
+ * 换过引擎的会话，在这一行上留一颗引擎色的点。
+ *
+ * **只有换过的才有。** 一家跑到底时这颗点在整列上是同一个颜色，
+ * 说了等于没说；而换过之后，「这条现在归谁」正是你在侧栏扫一眼时想知道的事
+ *——尤其是上一家出了问题、你为此才换的那几条。
+ *
+ * 颜色和转录区那条分界、左缘导航是同一套（`engineTint`）：三处对得上，
+ * 这颗点才不用配一行字也能读懂。名字在悬停卡和 `title` 里，一个字都没少。
+ */
+function EngineDot({
+  thread,
+  engines,
+}: {
+  thread: Thread
+  engines: readonly EngineInfo[]
+}): React.JSX.Element | null {
+  if (thread.engineHistory.length < 2) return null
+  const name = labelOf(engines, thread.engine)
+  const note = `现在归 ${name} 跑 · 接力 ${String(thread.engineHistory.length)} 手`
+  return (
+    <span
+      className="row__engine"
+      style={{ background: engineTint(thread.engine) }}
+      role="img"
+      aria-label={note}
+      title={note}
+    />
+  )
+}
+
+/**
  * 行右边那一列。**一条规矩管一列：默认答「多久以前」，有更要紧的事就顶掉它。**
  *
  * 那一格以前是空的（只有置顶段拿去写项目名）。而会话标题彼此都长得差不多
@@ -53,10 +86,13 @@ const NOTE: Partial<Record<ThreadStatus, string>> = {
  */
 export function RowEnd({
   thread,
+  engines,
   aside,
   unread = false,
 }: {
   thread: Thread
+  /** 引擎清单：那颗引擎点的 `title` 要把 id 翻成人话。 */
+  engines: readonly EngineInfo[]
   aside?: string
   /**
    * 后台跑完了、还没打开过。
@@ -72,6 +108,7 @@ export function RowEnd({
   const running = thread.status === "running"
   return (
     <>
+      <EngineDot thread={thread} engines={engines} />
       {aside === undefined ? null : <span className="row__aside">{aside}</span>}
       {aside === undefined && !running && note === undefined ? (
         <Since at={thread.updatedAt} bright={unread} />

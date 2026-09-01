@@ -1,5 +1,8 @@
 import { useCallback, useRef, useState } from "react"
+import type { EngineInfo } from "@omni/protocol"
 import { railPeek, type RailMark } from "../transcript-rail.js"
+import { engineTint } from "../engine-mark.js"
+import { labelOf } from "./Composer.js"
 
 /**
  * 转录区左缘那条大纲。一格 = **你问的一次**；为什么长成一块波形，见 `transcript-rail.ts`。
@@ -17,10 +20,21 @@ import { railPeek, type RailMark } from "../transcript-rail.js"
  *
  * 整条只有一个 tab 停靠点（当下那一格），进去之后上下键在格之间走。
  * 三十格如果各是一个停靠点，键盘用户从侧栏走到输入框要按三十次。
+ *
+ * ## 换过引擎的会话按引擎上色
+ *
+ * 一条来回切过几家的会话，在转录区里是一条**看不出接缝的长流**。
+ * 这条导航本来就是这条会话的缩影，让它按引擎分段染色之后，
+ * 「上面那五问是 codex 答的、下面这三问是 Claude 答的」不用往回翻就看得出来。
+ *
+ * **没换过引擎的会话看不出变化**：整条只有一种颜色时和原来那道中性线
+ * 是同一个样子（`engineTint` 给的是低饱和度色，不是招牌色）。
  */
-export function TranscriptRail({ marks, activeId, onJump }: {
+export function TranscriptRail({ marks, activeId, engines, onJump }: {
   marks: readonly RailMark[]
   activeId: string | undefined
+  /** 引擎清单：悬停卡要把 id 翻成人话。 */
+  engines: readonly EngineInfo[]
   onJump: (id: string) => void
 }): React.JSX.Element | null {
   const [hover, setHover] = useState<string | undefined>(undefined)
@@ -37,6 +51,8 @@ export function TranscriptRail({ marks, activeId, onJump }: {
     }, 90)
   }, [])
   if (marks.length === 0) return null
+  // 整条只有一家时不提引擎——那句话每一格都一样，说了等于没说
+  const mixed = new Set(marks.map((mark) => mark.engine)).size > 1
   const shown = marks.find((mark) => mark.id === hover)
   const peek = shown === undefined ? undefined : railPeek(shown.text)
   return (
@@ -67,8 +83,16 @@ export function TranscriptRail({ marks, activeId, onJump }: {
             onJump(mark.id)
           }}
         >
-          {/* 看得见的只有这一道线；长短由那一轮的产出定 */}
-          <i className="rail__mark" style={{ "--mark-w": `${String(mark.width)}px` } as React.CSSProperties} />
+          {/* 看得见的只有这一道线；长短由那一轮的产出定，颜色由那一问归谁跑定 */}
+          <i
+            className="rail__mark"
+            style={
+              {
+                "--mark-w": `${String(mark.width)}px`,
+                ...(mark.engine === undefined ? {} : { "--mark-tint": engineTint(mark.engine) }),
+              } as React.CSSProperties
+            }
+          />
         </button>
       ))}
       {shown === undefined || peek === undefined ? null : (
@@ -84,6 +108,13 @@ export function TranscriptRail({ marks, activeId, onJump }: {
         >
           <span className="rail__peek-title">{peek.title}</span>
           {peek.body === "" ? null : <span className="rail__peek-body">{peek.body}</span>}
+          {/* 换过引擎才写这一行：只有一家时它每格都一样，等于白占一行 */}
+          {shown.engine === undefined || !mixed ? null : (
+            <span className="rail__peek-engine">
+              <i style={{ background: engineTint(shown.engine) }} aria-hidden="true" />
+              {labelOf(engines, shown.engine)}
+            </span>
+          )}
         </span>
       )}
     </nav>

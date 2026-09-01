@@ -1,6 +1,8 @@
-import type { EngineSegment, Thread } from "@omni/protocol"
+import type { EngineInfo, EngineSegment, Thread } from "@omni/protocol"
 import { Popover } from "./Popover.js"
-import { CopyIcon, EngineIcon, RevealIcon } from "./icons.js"
+import { CopyIcon, RevealIcon } from "./icons.js"
+import { engineTint } from "../engine-mark.js"
+import { labelOf } from "./Composer.js"
 
 /**
  * 「这条会话都被谁跑过」——一条时间线答完。
@@ -27,12 +29,15 @@ import { CopyIcon, EngineIcon, RevealIcon } from "./icons.js"
  */
 export function TimelineCard({
   thread,
+  engines,
   anchor,
   onClose,
   onCopy,
   onReveal,
 }: {
   thread: Thread
+  /** 引擎清单：把 id 翻成人话。这张卡以前直接印 `codex`，那是给机器读的名字 */
+  engines: readonly EngineInfo[]
   anchor: HTMLElement | null
   onClose: () => void
   onCopy: (text: string) => void
@@ -51,9 +56,12 @@ export function TimelineCard({
         ) : (
           segments.map((seg, i) => (
             <Segment
-              key={`${seg.engine}-${seg.profile ?? ""}-${seg.handle}`}
+              // **时刻要进 key**：同一家可能出现好几段（切出去又切回来），
+              // 那几段的引擎、profile、句柄全一样，只有接手的时刻不同
+              key={`${seg.engine}-${seg.profile ?? ""}-${seg.handle}-${String(seg.startedAt)}`}
               seg={seg}
               index={i + 1}
+              label={labelOf(engines, seg.engine)}
               onCopy={onCopy}
               onReveal={onReveal}
             />
@@ -67,11 +75,14 @@ export function TimelineCard({
 function Segment({
   seg,
   index,
+  label,
   onCopy,
   onReveal,
 }: {
   seg: EngineSegment
   index: number
+  /** 这家引擎的人话名。 */
+  label: string
   onCopy: (text: string) => void
   onReveal: (path: string) => void
 }): React.JSX.Element {
@@ -79,9 +90,11 @@ function Segment({
     <div className="seg">
       <div className="seg__head">
         <span className="seg__no">{index}</span>
-        <EngineIcon />
+        {/* 引擎色那颗点。和转录区那条分界、左缘导航是同一套色——
+            三处对得上，「这一段是谁跑的」才连得成一句话 */}
+        <i className="handmark__dot" style={{ background: engineTint(seg.engine) }} aria-hidden="true" />
         <span className="seg__engine">
-          {seg.engine}{seg.profile === undefined ? "" : ` · ${seg.profile}`}
+          {label}{seg.profile === undefined ? "" : ` · ${seg.profile}`}
         </span>
         <span className="seg__when">{whenOf(seg.startedAt)}</span>
       </div>
