@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { indexAt } from "./effort-geometry.js"
+import { shownEffort } from "./use-effort-pending.js"
 
 describe("indexAt", () => {
   it("指针位置 → 档位序号：贴边、越界、单档、空清单", () => {
@@ -19,4 +20,20 @@ describe("indexAt", () => {
       expect(indexAt(x, width, count)).toBe(want)
     }
   })
+})
+
+describe("shownEffort", () => {
+  const efforts = ["low", "medium", "high", "xhigh", "ultracode"] as const
+  const cases: readonly [name: string, layers: Parameters<typeof shownEffort>[0], want: string | undefined][] = [
+    ["拖动中手指最大", { preview: "ultracode", pending: "high", effort: "low", efforts }, "ultracode"],
+    // 这一条就是「点开、拖到 ultracode、马上收起」：条子没了、回声还没到
+    ["收起后仍是刚落的那一档，不是引擎那份旧值", { pending: "ultracode", effort: "low", efforts }, "ultracode"],
+    ["没有在途落档时听引擎的", { effort: "medium", efforts }, "medium"],
+    ["引擎没报就用模型默认", { defaultEffort: "high", efforts }, "high"],
+    ["什么都没有时退到清单第一档", { efforts }, "low"],
+    ["清单也空就没有值可画", { efforts: [] }, undefined],
+  ]
+  for (const [name, layers, want] of cases) {
+    it(name, () => { expect(shownEffort(layers)).toBe(want) })
+  }
 })

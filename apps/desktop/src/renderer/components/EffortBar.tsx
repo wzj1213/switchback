@@ -149,16 +149,16 @@ export function EffortBar({
   const bar = useRef<HTMLSpanElement>(null)
   const active = useRef<number | undefined>(undefined)
   const [dragIndex, setDragIndex] = useState<number | undefined>(undefined)
-  /** 已发给引擎、还没等到最终回声的落点；连续按方向键时下一步从这里算。 */
-  const [pendingIndex, setPendingIndex] = useState<number | undefined>(undefined)
   const { grown, intro } = useBarLife(bar, onClose, reduced)
-  // 拖动中画手指位置，松手后守住本地落点，最终再交给引擎回声。
-  const shown = dragIndex ?? pendingIndex ?? committed
-
-  useEffect(() => {
-    // 只在回声追到最终本地落点时撤；较早的一次回声不能把连续点击拉回去。
-    setPendingIndex((pending) => (pending === committed ? undefined : pending))
-  }, [committed])
+  /**
+   * 拖动中画手指位置，其余时候画 `committed`。
+   *
+   * **「已落档、还没等到回声」那一层不在这里**——它在 `EffortSlider`
+   *（见 `use-effort-pending.ts`）。放在这里的那一版有个说不过去的后果：
+   * 条子一收起就卸载，本地落点跟着没，于是收起来的触发器上写的还是旧档位。
+   * 这里只画条子；「现在是哪一档」由上面那层答，收起展开都是同一个答案。
+   */
+  const shown = dragIndex ?? committed
 
   const width = barWidth(efforts.length)
   const t = (shown / Math.max(1, efforts.length - 1)) * (grown ? 1 : 0)
@@ -176,7 +176,6 @@ export function EffortBar({
    * 深空特效会闪一下灰再亮回来。预览由 `EffortSlider` 在回声到达时撤。
    */
   const commit = (index: number): void => {
-    setPendingIndex(index)
     onPreview(efforts[index])
     onCommit(index)
   }

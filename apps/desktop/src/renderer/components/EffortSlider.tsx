@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import type { ModelOption } from "@omni/protocol"
 import { currentOf, effortLabel, costlyOf } from "./ModelPicker.js"
+import { EffortTrigger } from "./effort-trigger.js"
 import { EffortBar } from "./EffortBar.js"
 import { barWidth } from "./effort-geometry.js"
 import { useReduced } from "../use-reduced.js"
 import { useEffortClose } from "./use-effort-close.js"
+import { shownEffort, useEffortPending } from "./use-effort-pending.js"
 
 /**
  * 推理强度的行内滑块。收起时是一段安静的文字加几枚刻度——**不点开也知道
@@ -20,95 +22,6 @@ import { useEffortClose } from "./use-effort-close.js"
  * 白拇指边走边走、填充盖到拇指右缘、坡道钉在整条坐标上、生长靠
  * `clip-path` 保持胶囊形、拖动期零过渡。展开那条的交互在 `EffortBar.tsx`。
  */
-
-/** 深空配色的坡道：靛 → 紫 → 品红。三站线性插值，和 CSS 里那条渐变同一组值。 */
-function voidAt(t: number): string {
-  type Rgb = readonly [number, number, number]
-  const stops: [Rgb, Rgb, Rgb] = [
-    [0x2b, 0x2d, 0x6e],
-    [0x6d, 0x4b, 0xc7],
-    [0xb4, 0x40, 0x9a],
-  ]
-  const x = Math.min(1, Math.max(0, t)) * 2
-  const i = x >= 1 ? 1 : 0
-  const from = i === 0 ? stops[0] : stops[1]
-  const to = i === 0 ? stops[1] : stops[2]
-  const f = x - i
-  return `rgb(${String(Math.round(from[0] + (to[0] - from[0]) * f))} ${String(
-    Math.round(from[1] + (to[1] - from[1]) * f),
-  )} ${String(Math.round(from[2] + (to[2] - from[2]) * f))})`
-}
-
-/**
- * 收起态那几枚小刻度：亮到第几格就是第几档，不点开也知道。
- *
- * **贵档时每一枚各染各的位置色**（`voidAt(i / (count-1))`），不是整排刷成品红：
- * 那样一排六枚同色，等于把「更贵」这句话在 24px 里说了六遍，
- * 而且和展开后那条坡道对不上——收起和展开说的得是同一件事，
- * 收起态就是那条坡道**降采样到几个像素**的样子。
- */
-function Ticks({
-  count,
-  index,
-  costly,
-}: {
-  count: number
-  index: number
-  /** 贵档落档：亮着的那几枚按各自的位置取坡道色。 */
-  costly: boolean
-}): React.JSX.Element {
-  return (
-    <span className="effort__ticks" aria-hidden="true">
-      {Array.from({ length: count }, (_, i) => (
-        <i
-          key={i}
-          className={i <= index ? "on" : undefined}
-          style={
-            costly && i <= index
-              ? { background: voidAt(count < 2 ? 1 : i / (count - 1)) }
-              : undefined
-          }
-        />
-      ))}
-    </span>
-  )
-}
-
-/** 收起态的触发器：几枚小刻度 + 档位名。 */
-function EffortTrigger({
-  count,
-  index,
-  costly,
-  label,
-  disabled,
-  trig,
-  onOpen,
-}: {
-  count: number
-  index: number
-  costly: boolean
-  label: string
-  disabled: boolean
-  trig: React.RefObject<HTMLButtonElement | null>
-  onOpen: () => void
-}): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      ref={trig}
-      className="trigger"
-      /* 贵档时那句话进 title：**它不再常驻浮在正文上方**（会压住正在打的字），
-         改成停一下才出来的那张小卡（见 `.effort__warn`）。 */
-      title={costly ? "超高：更快消耗使用额度" : "推理强度"}
-      disabled={disabled}
-      aria-expanded={false}
-      onClick={onOpen}
-    >
-      <Ticks count={count} index={index} costly={costly} />
-      <span className="trigger__label">{label}</span>
-    </button>
-  )
-}
 
 /** 提交那一档：没变或序号越界就不发命令。 */
 function committer(
@@ -167,12 +80,33 @@ export function EffortSlider({
   const [slot, setSlot] = useState<number>()
   const reduced = useReduced()
   const efforts = current.efforts ?? []
-  const value = effort ?? current.defaultEffort ?? efforts[0]
+  /**
+   * 现在该画哪一档。三层，从最「当下」往最「确凿」退：
+   *
+   * 1. `preview`——手指正指着的那一档（只在拖动中有）
+   * 2. `pending`——**已经落档、命令发出去了、引擎还没回声**（见 `useEffortPending`）
+   * 3. `effort`——引擎确认过的真值
+   *
+   * 第二层是上一版缺的那一层：它当时住在展开的条子里，条子一收就没了，
+   * 于是「拖到 ultracode 马上收起」之后触发器上写的还是旧档位。
+   */
+  const { pending, mark } = useEffortPending(effort)
+  /**
+   * **落定的那一档**（不含拖动预览）：`pending` 优先，其次引擎的真值。
+   *
+   * 它和下面那个 `value` 必须分开，而这正是最容易合掉的一刀：合掉之后
+   * 「这一档和现在这档一样吗」会拿**手指指着的那一档**去比——拖动中预览
+   * 已经先一步变成目标档，松手时两者相等，于是 `committer` 判成「没变」，
+   * **命令一次都发不出去**（改完滑块什么都没发生，实测过一次）。
+   */
+  const settled = shownEffort({ pending, effort, defaultEffort: current.defaultEffort, efforts })
+  const value = preview ?? settled
   // 不在清单里的旧值（换过模型）按 0 档画位置、但标签照原文显示——不编一个档位
   const committed = Math.max(0, efforts.indexOf(value ?? ""))
+  const settledIndex = Math.max(0, efforts.indexOf(settled ?? ""))
   // 深空处理只落在最贵的那一档（kimi 的 ultra、claude 的 max / ultracode）——
   // 顶档只是 high 的模型永远没有，见 ModelPicker 的 costlyOf
-  const costly = costlyOf([current], current.id, preview ?? effort)
+  const costly = costlyOf([current], current.id, value)
 
   /**
    * 引擎的回声一到（`effort` 变了）就把预览撤掉，交回给真值；收起时也撤。
@@ -181,8 +115,10 @@ export function EffortSlider({
    */
   useEffect(() => {
     // 连续点两档时，第一档的较早回声不能把第二档的本地反馈清掉。
-    setPreview((pending) => (pending === effort ? undefined : pending))
+    setPreview((shown) => (shown === effort ? undefined : shown))
   }, [effort])
+  // **收起只撤预览，不撤 `pending`**：预览说的是「手指在哪儿」，收起来手指就不在了；
+  // 而 `pending` 说的是「我已经改成这一档了」，那句话在收起之后照样成立
   useEffect(() => {
     if (!open) setPreview(undefined)
   }, [open])
@@ -211,7 +147,11 @@ export function EffortSlider({
             efforts={efforts}
             committed={committed}
             costly={costly}
-            onCommit={committer(efforts, committed, onChange)}
+            onCommit={committer(efforts, settledIndex, (next) => {
+              // 先把乐观档位记下来再发命令：这一行就是「点完立刻变」的全部
+              mark(next)
+              onChange(next)
+            })}
             onPreview={setPreview}
             onClose={close}
             reduced={reduced}

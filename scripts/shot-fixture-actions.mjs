@@ -76,5 +76,39 @@ export async function exerciseEffort({ value, pause }, cdp) {
     button: "left",
     clickCount: 1,
   })
+  await pause(40)
+  await collapsesToDraggedLevel({ value, pause }, cdp)
   await pause(160)
+}
+
+/**
+ * **松手之后马上收起，收起来的那颗要写着刚落的那一档。**
+ *
+ * 上一版不是这样：「已落档、还没等到引擎回声」那份本地状态住在展开的条子里，
+ * 条子一收就卸载了，于是触发器退回 `thread.effort`——也就是**你刚刚亲手改掉的
+ * 那一档**。而 `thread.setModel` 要进宿主的串行队列、再 await 引擎自己的 setter，
+ * 实测那是好几秒；这几秒里界面在撒谎。
+ *
+ * 所以这里故意**不等回声**：松手 40ms 就点走，再等过收回动画（190ms）立刻读。
+ * 引擎的回声几乎不可能这么快到，读到的只能是本地那份乐观档位。
+ */
+async function collapsesToDraggedLevel({ value, pause }, cdp) {
+  const wanted = await value(
+    cdp,
+    "document.querySelector('.effort__bar')?.getAttribute('aria-valuetext') ?? ''",
+  )
+  const away = await value(
+    cdp,
+    `(() => { const r = document.querySelector('.transcript').getBoundingClientRect()
+      return { x: r.left + r.width / 2, y: r.top + 40 } })()`,
+  )
+  await cdp.send("Input.dispatchMouseEvent", { ...away, type: "mousePressed", button: "left", clickCount: 1 })
+  await cdp.send("Input.dispatchMouseEvent", { ...away, type: "mouseReleased", button: "left", clickCount: 1 })
+  await pause(240)
+  const shown = await value(cdp, "document.querySelector('.effort .trigger__label')?.textContent ?? ''")
+  if (shown !== wanted) {
+    throw new Error(`收起后的推理强度还是旧档位：条子上是「${wanted}」，收起来写着「${shown}」`)
+  }
+  await value(cdp, "document.querySelector('.effort .trigger:not(:disabled)')?.click(); true")
+  await pause(360)
 }
