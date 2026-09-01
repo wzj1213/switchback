@@ -6,6 +6,8 @@ export interface MenuHandlers {
   interrupt: () => void
   find: () => void
   copyMarkdown: () => void
+  /** 承接上一段引擎记录（⇧⌘E）。没有可承接的那一段时什么都不做。 */
+  pickup: () => void
   compare: () => void
   review: () => void
   filterThreads: () => void
@@ -34,7 +36,7 @@ export function useMenuActions(
   handlers: MenuHandlers,
   deps: readonly unknown[],
 ): void {
-  const { newThread, openFolder, interrupt, find, copyMarkdown, compare, review, filterThreads, settings, toggleRail, togglePanel } = handlers
+  const { newThread, openFolder, interrupt, find, copyMarkdown, pickup, compare, review, filterThreads, settings, toggleRail, togglePanel } = handlers
   useEffect(() => {
     const table: Readonly<Record<string, () => void>> = {
       "new-thread": newThread,
@@ -42,6 +44,7 @@ export function useMenuActions(
       interrupt,
       find,
       "copy-markdown": copyMarkdown,
+      pickup,
       compare,
       review,
       "filter-threads": filterThreads,

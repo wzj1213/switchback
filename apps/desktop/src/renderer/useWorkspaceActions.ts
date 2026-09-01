@@ -4,6 +4,8 @@ import { labelOf } from "./components/Composer.js"
 import { toMarkdown } from "./export.js"
 import { useMenuActions } from "./useMenuActions.js"
 import type { Opened } from "./newThreadPrefs.js"
+import { pickupOf } from "./pickup.js"
+import { requestComposerReference } from "./composer-reference-request.js"
 
 /**
  * 「新建会话 / 换工作区 / 菜单动作」这一坨。
@@ -122,6 +124,16 @@ export function useWorkspaceActions(deps: {
       filterThreads: deps.onFilterThreads,
       toggleRail: deps.onToggleRail,
       togglePanel: deps.onTogglePanel,
+      /*
+       * 承接上一段：把上一家引擎那份原始记录的路径填进输入框（⇧⌘E）。
+       * **和 `/承接上一段` 走同一条路**——两个入口共用 `pickupOf` 的判据
+       * 和同一个窗口事件，不会出现「命令有、快捷键没有」这种对不上的情况。
+       */
+      pickup: () => {
+        if (thread === undefined) return
+        const found = pickupOf(thread)
+        if (found !== undefined) requestComposerReference(thread.id, found.path)
+      },
       copyMarkdown: () => {
         if (thread === undefined) return
         deps.copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine)))

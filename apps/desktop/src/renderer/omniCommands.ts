@@ -33,6 +33,8 @@ export function omniCommands(acts: {
   onStop?: () => void
   onRename: () => void
   onCompact?: () => void
+  /** 承接上一段：把上一家引擎那份原始记录的路径填进输入框。没有可承接的就不给。 */
+  onPickup?: { run: () => void; from: string }
 }): readonly OmniAction[] {
   const list: (OmniAction | undefined)[] = [
     make("new", "新建会话", "在当前工作区另开一个", acts.onNew),
@@ -43,6 +45,16 @@ export function omniCommands(acts: {
     // 下面这几条**没有对象就不给**：一个点了没反应的命令比没有这条命令更糟
     make("fork", "分叉", "用另一家引擎另开一条同工作区分支", acts.onFork),
     make("handoff", "接力", "换一家引擎接着做这个会话", acts.onHandoff),
+    // 名字里带上是谁：这条命令的全部价值就在「承接的是哪一段」，
+    // 写成干巴巴的「承接上一段」的话，一条会话切过三家之后你不知道拿到的是谁那份
+    make(
+      "pickup",
+      "承接上一段",
+      acts.onPickup === undefined
+        ? ""
+        : `把 ${acts.onPickup.from} 那份原始记录的路径填进输入框，让新的一家自己去读`,
+      acts.onPickup?.run,
+    ),
     make("compare", "对比", "和分叉出来的那个并排比一比", acts.onCompare),
     make("stop", "停止", "打断正在跑的这一轮", acts.onStop),
     make("compact", "压缩上下文", "让引擎把前面的对话总结掉，腾出窗口继续", acts.onCompact),

@@ -12,6 +12,7 @@ import {
   StopOutlineIcon,
 } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
+import { FileSearchIcon } from "./icons-panel.js"
 
 /**
  * omni 自己那几条各配各的图标——**它们和界面上已有的动作是同一件事**，
@@ -25,6 +26,8 @@ const GLYPH: Readonly<Record<string, React.ReactNode>> = {
   export: <CopyIcon size={15} />,
   fork: <ForkIcon size={15} />,
   handoff: <ForkIcon size={15} />,
+  // 承接给的是**一个可以去翻的文件**，不是又一次分叉——所以不跟 handoff 共用叉子
+  pickup: <FileSearchIcon size={15} />,
   compare: <CompareIcon size={15} />,
   stop: <StopOutlineIcon />,
   settings: <GearIcon />,

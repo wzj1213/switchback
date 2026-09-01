@@ -4,6 +4,8 @@ import { labelOf } from "./components/Composer.js"
 import { nextEngine } from "./engines.js"
 import { toMarkdown } from "./export.js"
 import { omniCommands, type OmniAction } from "./omniCommands.js"
+import { pickupOf } from "./pickup.js"
+import { requestComposerReference } from "./composer-reference-request.js"
 
 /**
  * omni 自己能做的那几件事，装配成斜杠命令。
@@ -37,6 +39,8 @@ export function useOmniActions(
   // 原来这里是 `commands.some(c => c.name === "compact")`——那意味着某家引擎
   // 哪天把命令改名叫 `condense`，omni 会默默多出一个重复入口，没有任何地方报错
   const can = thread.capabilities ?? NO_CAPABILITIES
+  // 承接上一段：拿得到上一家的原始记录才给这条命令（判据见 `pickup.ts`）
+  const pickup = pickupOf(thread)
   return omniCommands({
     onNew: props.onNew,
     onRename: props.onRename,
@@ -47,6 +51,16 @@ export function useOmniActions(
       props.onCopy(toMarkdown(thread, props.items, labelOf(props.engines, thread.engine)))
     },
     ...(props.peer === undefined ? {} : { onCompare: props.onCompare }),
+    ...(pickup === undefined
+      ? {}
+      : {
+          onPickup: {
+            from: labelOf(props.engines, pickup.engine),
+            run: () => {
+              requestComposerReference(thread.id, pickup.path)
+            },
+          },
+        }),
     ...(next === undefined
       ? {}
       : {

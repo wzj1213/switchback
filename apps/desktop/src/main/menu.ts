@@ -13,6 +13,7 @@ export type MenuAction =
   | "interrupt"
   | "find"
   | "copy-markdown"
+  | "pickup"
   | "compare"
   | "review"
   | "filter-threads"
@@ -120,6 +121,20 @@ function threadMenu(): MenuItemConstructorOptions {
         accelerator: "Shift+CmdOrCtrl+R",
         click: (_i, focused) => {
           send("review", focused)
+        },
+      },
+      {
+        /*
+         * 换引擎最常连着做的第二件事：把上一家那份原始记录的路径填进输入框。
+         *
+         * **它只填路径，不发送、也不替你写那句话**（见 `renderer/pickup.ts`）。
+         * 和「对比分叉」一样，主进程不知道当前选中的是谁，所以这一项没法按
+         * 状态禁用——没有可承接的那一段时按它不会有任何反应。
+         */
+        label: "承接上一段引擎记录",
+        accelerator: "Shift+CmdOrCtrl+E",
+        click: (_i, focused) => {
+          send("pickup", focused)
         },
       },
       {

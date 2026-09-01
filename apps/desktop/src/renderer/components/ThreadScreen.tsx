@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { EngineInfo, Thread } from "@omni/protocol"
 import {
   commandsOf,
@@ -15,10 +14,10 @@ import type { useApp } from "../useApp.js"
 import { scopeWorkbench } from "../workbench.js"
 import { Workspace } from "./Workspace.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
-import type { ComposerFileReference } from "../file-references.js"
 import { stampOf } from "../stamp.js"
 import { ThreadWorkbench } from "./thread-workbench.js"
 import { panelShellClass, shouldClosePanelAfterDrop } from "../panel-layout.js"
+import { useComposerReference } from "../use-composer-reference.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
 export function ThreadScreen({
@@ -39,9 +38,8 @@ export function ThreadScreen({
   drafts: ComposerDrafts
 }): React.JSX.Element {
   const { shell, state } = app
-  const [reference, setReference] = useState<
-    (ComposerFileReference & { threadId: string }) | undefined
-  >()
+  // 「把这条路径填进输入框」：文件工作台点「引用」、`/承接上一段`、⇧⌘E 都进这一个格子
+  const { reference, set: setReference } = useComposerReference()
   const lanes = lanesOf(state, thread.id)
   const allItems = itemsOf(state, thread.id)
   const turn = turnOf(state, thread.id)
