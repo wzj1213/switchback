@@ -61,7 +61,7 @@ export function EffortSlider({
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   /**
-   * 拖动中指着哪一档。**深空那套特效跟着它走，不跟着已落档的值走**——
+   * 拖动中指着哪一档。**档位提示跟着它走，不跟着已落档的值走**——
    * 拖到 ultra 就该当场看见 ultra 的样子，而不是松手才变。
    * 命令仍然只在松手那一下发（见 `EffortBar` 的 `commit`）。
    */
@@ -104,7 +104,7 @@ export function EffortSlider({
   // 不在清单里的旧值（换过模型）按 0 档画位置、但标签照原文显示——不编一个档位
   const committed = Math.max(0, efforts.indexOf(value ?? ""))
   const settledIndex = Math.max(0, efforts.indexOf(settled ?? ""))
-  // 深空处理只落在最贵的那一档（kimi 的 ultra、claude 的 max / ultracode）——
+  // 用量提示只落在原生清单的 ultra / ultracode 顶档——
   // 顶档只是 high 的模型永远没有，见 ModelPicker 的 costlyOf
   const costly = costlyOf([current], current.id, value)
 
@@ -136,7 +136,7 @@ export function EffortSlider({
       {/* 「更快消耗使用额度」那句话。**不常驻**——上一版它常驻浮在触发器正上方，
           而那块地正是正文的最后一行：打满字就直接压在字上。
           现在它是停一下（或键盘聚焦）才出来的一张带底的小卡，
-          常驻那句话交给坡道色的刻度和档位名（见 `.effort__warn`）。 */}
+          常驻那句话交给刻度和档位名（见 `.effort__warn`）。 */}
       {costly && !open ? <span className="effort__warn">更快消耗使用额度</span> : null}
       <span
         className={effortClass(open, closing, costly)}
@@ -146,7 +146,6 @@ export function EffortSlider({
           <EffortBar
             efforts={efforts}
             committed={committed}
-            costly={costly}
             onCommit={committer(efforts, settledIndex, (next) => {
               // 先把乐观档位记下来再发命令：这一行就是「点完立刻变」的全部
               mark(next)

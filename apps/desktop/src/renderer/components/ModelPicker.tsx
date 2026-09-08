@@ -116,23 +116,14 @@ export function currentOf(
   return currentModel(models, model)
 }
 
-/**
- * 真正贵的那几档。**只有落在这几档才给深空处理**——high 不在其中：
- * 它不是「明显改变花销」的那一档。判据看各家自己报的清单的**最后一档**，
- * 名字随厂商（kimi 叫 ultra、claude 叫 max），所以认 id 不认位置。
- */
-/**
- * 开 workflow 的那一档。**特效只给它**——max、xhigh 都不算：
- * 它们只是更强的强度，而 ultra / ultracode 是另一个模式
- *（claude 的原话是「xhigh effort plus standing dynamic-workflow orchestration」）。
- */
+/** 只有原生清单里的 ultra / ultracode 顶档显示更快消耗额度的提示。 */
 const COSTLY: ReadonlySet<string> = new Set(["ultra", "ultracode"])
 
 /**
  * 贵档落没落。模型自己报的清单里**最后一档得是开 workflow 的那个模式**
  *（`ultra` / `ultracode`；顶档只是 max / xhigh 的模型永远没有），
  * 当前强度还得正落在那一档上——换模型残留的旧值不算。
- * 输入框与滑块的深空态都拿它当闸门。
+ * 滑块的档位强调和用量提示共用这个判定。
  */
 export function costlyOf(
   models: readonly ModelOption[],

@@ -1,11 +1,28 @@
 /** 模型菜单与推理强度场景；和输入内容场景分开，避免固定页面清单越过行数闸门。 */
 export const MODEL_VIEWS = [
   {
+    name: "18-输入区布局",
+    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)',
+    open: `true`,
+    ready: '.composer__model',
+    assert: `(() => {
+      const card = document.querySelector('.composer__inner').getBoundingClientRect()
+      const bar = document.querySelector('.composer__bar')
+      const controls = [...bar.querySelectorAll('button, .usage')]
+        .map(node => node.getBoundingClientRect()).filter(box => box.width > 0 && box.height > 0)
+      const inside = controls.every(box => box.left >= card.left && box.right <= card.right
+        && box.top >= card.top && box.bottom <= card.bottom)
+      const separate = controls.every((box, i) => controls.slice(i + 1).every(next =>
+        box.right <= next.left + 1 || next.right <= box.left + 1
+        || box.bottom <= next.top + 1 || next.bottom <= box.top + 1))
+      return inside && separate && bar.scrollWidth <= bar.clientWidth
+    })()`,
+  },
+  {
     name: "18-模型菜单焦点",
-    before: ".composer__bar .trigger:not(:disabled)",
+    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)',
     open: `(() => {
-      const triggers = [...document.querySelectorAll('.composer__bar .trigger:not(:disabled)')]
-      const model = triggers.find(button => button.textContent.includes('Default')) ?? triggers.at(-1)
+      const model = document.querySelector('.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)')
       model?.click()
       setTimeout(() => {
         const menu = document.querySelector('.pop [role="menu"]')
@@ -48,10 +65,9 @@ export const MODEL_VIEWS = [
   },
   {
     name: "18-超长模型名不出界",
-    before: ".composer__bar .trigger:not(:disabled):not(.trigger--open)",
+    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled):not(.trigger--open)',
     open: `(() => {
-      const triggers = [...document.querySelectorAll('.composer__bar .trigger:not(:disabled)')]
-      const model = triggers.find(button => button.textContent.includes('Default')) ?? triggers.at(-1)
+      const model = document.querySelector('.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)')
       model?.click()
       setTimeout(() => {
         const panel = document.querySelector('.pop')

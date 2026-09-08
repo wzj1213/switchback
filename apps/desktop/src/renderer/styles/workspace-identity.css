@@ -1,0 +1,75 @@
+.omni-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--selection);
+  color: var(--accent);
+}
+
+.row--selected .row__time {
+  display: none;
+}
+
+.blank > .omni-mark {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius);
+}
+
+.blank__description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  line-height: 1.7;
+}
+
+.blank__path bdi {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 960px) {
+  :root {
+    --sidebar-w: 224px;
+    --content-gutter: 24px;
+  }
+
+  .topbar {
+    padding-inline: var(--sp-3);
+  }
+
+  .blank {
+    padding-inline: var(--sp-3);
+  }
+}
+
+@media (max-height: 650px) {
+  .blank {
+    padding-block: var(--sp-4) var(--sp-5);
+  }
+
+  .blank > .omni-mark {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 0;
+  }
+
+  .blank__title {
+    font-size: 23px;
+  }
+
+  .composer__input {
+    min-height: 42px;
+  }
+}
+
+.group .row--thread {
+  width: calc(100% - var(--sb-pad) * 2 - 12px);
+  margin-left: calc(var(--sb-pad) + 12px);
+  font-size: var(--text-sm);
+}

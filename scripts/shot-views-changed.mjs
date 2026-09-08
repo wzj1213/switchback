@@ -32,7 +32,21 @@ export const CHANGED_VIEWS = [
         return at(cards[0]) < at(asks[1]) && at(cards[0]) > at(asks[0])
           && document.querySelector('.brief .edits') === null
           && document.querySelector('.brief .changed') === null
+          && cards.every(card => card.querySelector('.edits__toggle')?.getAttribute('aria-expanded') === 'false')
+          && document.querySelector('.edits .changed__row') === null
       })()`,
+    },
+    {
+      name: "01c-展开本轮文件",
+      open: `document.querySelector('.edits__toggle')?.click()`,
+      ready: '.edits__toggle[aria-expanded="true"]',
+      assert: `(() => {
+        const toggle = document.querySelector('.edits__toggle[aria-expanded="true"]')
+        const list = document.getElementById(toggle?.getAttribute('aria-controls') ?? '')
+        return list !== null && !list.hidden && list.querySelector('.changed__name') !== null
+          && document.querySelectorAll('.edits__toggle[aria-expanded="true"]').length === 1
+      })()`,
+      after: `document.querySelector('.edits__toggle[aria-expanded="true"]')?.click()`,
     },
     {
       /*

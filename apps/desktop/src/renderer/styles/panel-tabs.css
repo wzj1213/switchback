@@ -8,11 +8,11 @@
   flex: none;
   align-items: center;
   gap: 4px;
-  height: 44px;
+  height: 56px;
   min-width: 0;
   /* 右侧给平移过来的面板开关留位（26 + 一段 gap），这条栏的内容别钻到它底下 */
-  padding: 0 calc(var(--sp-4) + 26px + var(--sp-2)) 0 6px;
-  border-bottom: 1px solid var(--border-strong);
+  padding: 0 calc(var(--sp-4) + 30px + var(--sp-2)) 0 6px;
+  border-bottom: 1px solid var(--border);
   background: var(--bg-sunken);
   /* 页签条自己做容器：窄态图标化的断点要按整条栏的宽度算，
      而不是按 list——按钮区与右侧开关留位（约 120px）是固定开销，list 感知不到。 */

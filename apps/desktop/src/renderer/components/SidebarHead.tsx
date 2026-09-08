@@ -2,6 +2,7 @@ import { PlusIcon, SearchIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
+import { OmniMark } from "./omni-mark.js"
 
 /*
  * 侧栏顶上那一块：品牌、新建、打开文件夹、筛选。
@@ -51,7 +52,7 @@ export function Head({
     <>
       <div className="sidebar__head">
         <div className="sidebar__brand">
-          omni<span>同文</span>
+          <OmniMark />omni<span className="sidebar__name">同文</span>
         </div>
       </div>
 

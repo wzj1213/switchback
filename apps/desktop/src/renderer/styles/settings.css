@@ -35,7 +35,7 @@
 .set {
   display: flex;
   flex-direction: column;
-  width: min(920px, 100%);
+  width: min(960px, 100%);
   /*
    * **写死高度。** 这条翻烧饼过一次，两次的理由是两件不同的事，记在这儿免得再翻：
    *
@@ -70,9 +70,9 @@
   align-items: center;
   gap: var(--sp-3);
   flex: none;
-  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--border-strong);
-  background: var(--bg-sunken);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .set__heading {
@@ -102,19 +102,19 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  gap: 2px;
-  width: 172px;
-  padding: var(--sp-2);
+  gap: var(--sp-1);
+  width: 184px;
+  padding: var(--sp-3);
   overflow-y: auto;
-  border-right: 1px solid var(--border-strong);
-  background: var(--bg-sunken);
+  border-right: 1px solid var(--border);
+  background: var(--bg-sidebar);
 }
 
 .set__tab {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 6px var(--sp-2);
+  padding: var(--sp-2) 10px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -133,8 +133,9 @@
 }
 
 .set__tab--on {
-  background: var(--bg-active);
-  color: var(--text);
+  background: var(--selection);
+  color: var(--selection-ink);
+  font-weight: 600;
 }
 
 /* 图标比文字淡一档：它是路标不是内容。选中那条跟着文字一起提亮 */
@@ -161,7 +162,7 @@
 
   flex: 1;
   min-width: 0;
-  padding: var(--sp-5);
+  padding: var(--sp-5) var(--sp-6);
   overflow-y: auto;
   animation: edge-scroll linear;
   animation-timeline: scroll(self block);
@@ -175,14 +176,14 @@
 }
 
 .set__group + .set__group {
-  margin-top: var(--sp-5);
+  margin-top: var(--sp-6);
 }
 
 .set__title {
-  margin: 0 0 var(--sp-2);
-  font-size: var(--text-sm);
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-base);
   font-weight: 600;
-  color: var(--text-faint);
+  color: var(--text);
 }
 
 /* 一组整体要交代的一句话。也给正文里那些独立的说明句用 */
@@ -197,9 +198,10 @@
    卡片这一层不只是好看：它让「这几行是一组」在**没有标题的时候也成立** */
 .set__rows {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-top: 1px solid var(--border);
 }
 
 /* 一行一件事：左边说明，右边控件。**说明必须写全**——
@@ -208,7 +210,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--sp-4);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4) 0;
 }
 
 .set__field + .set__field {

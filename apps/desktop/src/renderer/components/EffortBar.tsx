@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { barWidth, indexAt, PAD, THUMB, travelOf } from "./effort-geometry.js"
 import { effortLabel } from "./ModelPicker.js"
-import { Stars } from "./effort-stars.js"
 import { grip } from "./effort-pointer.js"
 
 /**
@@ -124,7 +123,6 @@ function useBarLife(
 export function EffortBar({
   efforts,
   committed,
-  costly,
   onCommit,
   onPreview,
   onClose,
@@ -132,12 +130,10 @@ export function EffortBar({
 }: {
   efforts: readonly string[]
   committed: number
-  /** 落在最贵档：条子进深空态（渐变坡道 + 星点 + 拇指光）。由 `EffortSlider` 算好。 */
-  costly: boolean
   onCommit: (index: number) => void
   /**
    * 拖动中指着哪一档。**发的是视觉预览，不是命令**——
-   * 深空那套特效得跟着手指走（拖到 ultra 就该看见 ultra 的样子），
+   * 档位名与刻度跟着手指走，
    * 而 `thread.setModel` 仍然只在松手那一下发一次。
    */
   onPreview: (effort: string | undefined) => void
@@ -173,7 +169,7 @@ export function EffortBar({
   /**
    * 落档。**预览留在松手那一档，不清空**——`onCommit` 发出去的是命令，
    * 要等引擎回声才改到 `thread.effort`；中间那一小段里清掉预览的话，
-   * 深空特效会闪一下灰再亮回来。预览由 `EffortSlider` 在回声到达时撤。
+   * 档位名与刻度会短暂退回旧值。预览由 `EffortSlider` 在回声到达时撤。
    */
   const commit = (index: number): void => {
     onPreview(efforts[index])
@@ -220,8 +216,6 @@ export function EffortBar({
           少那 4px 的话最右会剩一条没填上的浅色缝，读起来像没到头 */}
         <span className="effort__fill" style={{ width: `${String(x + THUMB + PAD)}px` }}>
           <span className="effort__lay effort__base" />
-          <span className="effort__lay effort__hot" />
-          {costly ? <Stars width={width} /> : null}
         </span>
         <Stops count={efforts.length} />
         <span

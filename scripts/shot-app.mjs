@@ -40,6 +40,9 @@ const DARK = process.argv.includes("--dark"),
 const AUDIT_ALL = process.argv.includes("--audit")
 /** 桌宠靶场改动：用隔离数据目录真跑一轮 Claude，拍到枪、靶与逐字流。 */
 const PET_LIVE = process.argv.includes("--pet-live")
+/** 定向巡检：逗号分隔场景名；隔离目录的默认引擎可选，绝不向真实用户设置写入。 */
+const ONLY = process.argv.find(arg => arg.startsWith("--views="))?.slice(8).split(",")
+const ENGINE = process.argv.find(arg => arg.startsWith("--engine="))?.slice(9)
 /**
  * 固定窗口尺寸：前后两张图的像素必须能直接叠着比。
  *
@@ -306,6 +309,7 @@ async function seed(dir) {
     join(dir, "settings.json"),
     `${JSON.stringify({
       projects: [ROOT],
+      ...(ENGINE === undefined ? {} : { defaultEngine: ENGINE }),
       theme: DARK ? "dark" : "light",
       pets: true,
       ...(PET_LIVE ? { defaultEngine: "claude", petKit: { range: true } } : {}),
@@ -349,7 +353,7 @@ async function main() {
     await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
-    for (const view of VIEWS) await shoot(cdp, view, workspaceFiles)
+    for (const view of VIEWS.filter(view => ONLY === undefined || ONLY.includes(view.name))) await shoot(cdp, view, workspaceFiles)
     await shootSettings(cdp)
     cdp.close()
   } catch (error) {

@@ -13,7 +13,7 @@ import { openPanelPage } from "./shot-panel.mjs"
 export const VIEWS = [
     {
       name: "01-转录区",
-      open: null,
+      open: `true`,
       ready: ".md",
       /*
        * **四条横带必须落在同一条左缘上。**

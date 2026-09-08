@@ -22,9 +22,11 @@ import "./styles/review.css"
 import "./styles/popover.css"
 import "./styles/panel-tabs.css"
 import "./styles/settings.css"
+import "./styles/settings-theme.css"
 import "./styles/settings-engines.css"
 import "./styles/settings-dsh.css"
 import "./styles/settings-activity.css"
+import "./styles/workspace-identity.css"
 
 const root = document.getElementById("root")
 if (root === null) throw new Error("找不到 #root 挂载点")

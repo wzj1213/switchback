@@ -2,6 +2,7 @@ import type { EngineInfo, Trust } from "@omni/protocol"
 import type { NotifyMode, Settings } from "../../shared/settings.js"
 import { TRUSTS } from "./Composer.js"
 import { Field, Group, Segmented } from "./SettingsBits.js"
+import { ThemeOptions } from "./theme-options.js"
 
 /**
  * 「通用」与「新会话」两页。
@@ -10,12 +11,6 @@ import { Field, Group, Segmented } from "./SettingsBits.js"
  * 和「下一个新会话长什么样」，而在此之前后者只能每开一个会话手动改一次。
  */
 
-const THEMES = [
-  { id: "system", label: "跟随系统" },
-  { id: "light", label: "浅色" },
-  { id: "dark", label: "深色" },
-] as const
-
 const NOTIFY = [
   { id: "all", label: "全部" },
   { id: "approval", label: "只有审批" },
@@ -23,9 +18,9 @@ const NOTIFY = [
 ] as const
 
 const NOTIFY_HINT: Readonly<Record<NotifyMode, string>> = {
-  all: "审批、跑完、跑挂了都出声。15 秒以内跑完的那些不算——那时候你多半还看着屏幕。",
-  approval: "只有「它停下来等你」才出声。跑完与跑挂了不打扰，回来再看。",
-  off: "不弹系统通知、也不往手机推。Dock 角标照挂——它不出声，只写着有几张卡等你。",
+  all: "收到审批、完成或失败时通知。15 秒内完成的任务不会提醒。",
+  approval: "仅在需要你审批时通知。",
+  off: "关闭桌面和手机推送，Dock 角标仍显示待审批数量。",
 }
 
 export function LookSection({
@@ -38,9 +33,8 @@ export function LookSection({
   return (
     <>
       <Group title="外观">
-        <Field label="主题" hint="跟随系统时会随系统的深浅色切换">
-          <Segmented
-            options={THEMES}
+        <Field label="主题" hint="选择工作台的显示方式" stack>
+          <ThemeOptions
             value={settings.theme}
             onPick={(theme) => {
               onPatch({ theme })
@@ -52,9 +46,9 @@ export function LookSection({
         这一组回答的是「它在背后跑完了，怎么让我知道」——这个应用的用法就是
         「交代一件事然后去干别的」，而在此之前**没有任何地方能把提醒关掉**。
       */}
-      <Group title="提醒" hint="omni 的用法是交代一件事然后去干别的，所以它得在该说话的时候说话。">
+      <Group title="通知">
         {/* 不 stack：三个选项一共不到 200px，判据是**控件宽不宽**，不是这一项重不重要 */}
-        <Field label="什么时候出声" hint={NOTIFY_HINT[settings.notify]}>
+        <Field label="通知范围" hint={NOTIFY_HINT[settings.notify]}>
           <Segmented
             options={NOTIFY}
             value={settings.notify}

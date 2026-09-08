@@ -9,7 +9,6 @@ import { DraftBlocks } from "./DraftBlocks.js"
 import { AttachmentDrop } from "./AttachmentDrop.js"
 import { Chips } from "./Chips.js"
 import { ComposerControls } from "./composer-controls.js"
-import { ComposerRing } from "./composer-ring.js"
 import { projectOf } from "./composer-state.js"
 import { takeCommand } from "./ComposerAction.js"
 import { Prompt } from "./Prompt.js"
@@ -51,7 +50,6 @@ export function ComposerBody(view: Props): React.JSX.Element {
   return (
     <div className="composer">
       <div className="composer__inner">
-        <ComposerRing />
         <AttachmentDrop hint={files.dropzone.hint} surface={composer.dropSurfaceVisible} />
         {detached ? null : (
           <Chips

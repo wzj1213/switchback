@@ -1,10 +1,10 @@
-import { useState } from "react"
+import { useId, useState } from "react"
 import type { Changes } from "../changes.js"
 import { ChangedRow } from "./ChangedRow.js"
-import { CompareIcon } from "./icons.js"
+import { CaretIcon, CompareIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 
-/** 默认露几个文件。再多就折起来——一轮改二十个文件的卡会把整屏正文推走。 */
+/** 展开摘要后默认露几个文件，长清单再按需展开。 */
 const PREVIEW = 4
 
 /**
@@ -39,29 +39,34 @@ export function TurnEdits({ edits, cwd, threadId, onReveal, onCopy, onReview, on
   onOpen: (path: string) => void
 }): React.JSX.Element | null {
   const [all, setAll] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const listId = useId()
   if (edits.files === 0) return null
   const shown = all ? edits.list : edits.list.slice(0, PREVIEW)
   return (
     <section className="edits" aria-label={`这一轮编辑了 ${String(edits.files)} 个文件`}>
       <div className="edits__head">
-        <span className="edits__glyph"><PencilIcon size={13} /></span>
-        <span className="edits__title">已编辑 {edits.files} 个文件</span>
-        <span className="edits__stat">
-          {edits.added > 0 ? <span className="diffstat__add">+{edits.added}</span> : null}
-          {edits.removed > 0 ? <span className="diffstat__del">−{edits.removed}</span> : null}
-        </span>
-        {/* 纯图标：左边「已编辑 N 个文件」是状态，这颗才是动作，两者不缝在一颗胶囊上 */}
+        <button type="button" className="edits__toggle" aria-expanded={expanded} aria-controls={listId}
+          onClick={() => { setExpanded((was) => !was) }}>
+          <span className="edits__glyph"><PencilIcon size={13} /></span>
+          <span className="edits__title">已编辑 {edits.files} 个文件</span>
+          <span className="edits__stat">
+            {edits.added > 0 ? <span className="diffstat__add">+{edits.added}</span> : null}
+            {edits.removed > 0 ? <span className="diffstat__del">−{edits.removed}</span> : null}
+          </span>
+          <CaretIcon size={12} />
+        </button>
         <button type="button" className="edits__review" aria-label="审一遍（⇧⌘R）"
           data-tip="审一遍（⇧⌘R）" onClick={onReview}>
           <CompareIcon size={14} />
         </button>
       </div>
-      <div className="edits__list">
-        {shown.map((file) => (
+      <div id={listId} className="edits__list" hidden={!expanded}>
+        {expanded ? shown.map((file) => (
           <ChangedRow key={file.path} file={file} cwd={cwd} threadId={threadId}
             onReveal={onReveal} onCopy={onCopy} onOpen={onOpen} />
-        ))}
-        {edits.list.length <= PREVIEW ? null : (
+        )) : null}
+        {!expanded || edits.list.length <= PREVIEW ? null : (
           <button type="button" className="changed__more" onClick={() => { setAll((was) => !was) }}>
             {all ? `只显示前 ${String(PREVIEW)} 个文件` : `再显示 ${String(edits.list.length - PREVIEW)} 个文件`}
           </button>

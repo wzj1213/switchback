@@ -205,6 +205,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           {/* key 按分页隔离：切走再切回来是**重新开始**（环境那页会重新读盘），
               而不是接着上一次的半截状态 */}
           <div className="set__pane" key={tab}>
+            <h2 className="set__page-title">{TABS.find((entry) => entry.id === tab)?.label}</h2>
             <Suspense fallback={<p className="set__loading" role="status">正在加载设置…</p>}>
               {paneOf(tab, props, setTab)}
             </Suspense>

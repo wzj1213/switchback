@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 import axe from "axe-core"
 import WebSocket from "ws"
 import { openPanelPage } from "./shot-panel.mjs"
+import { checkThemeCards } from "./shot-theme-cards.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -123,6 +124,8 @@ async function scheme(cdp, value) {
 async function auditSchemes(cdp) {
   // 外壳先于探测和默认会话出现，交互巡检应等输入区真正可用。
   await waitFor(cdp, "document.querySelector('.composer__input:not(:disabled)') !== null")
+  await waitFor(cdp, 'document.querySelector(\'.composer__bar [data-tip="信任档"]:not(:disabled)\') !== null')
+  await waitFor(cdp, 'document.querySelector(\'.composer__bar [data-tip="引擎"]:not(:disabled)\') !== null')
   await pause(250)
   await scheme(cdp, "light")
   await audit(cdp, "浅色主界面")
@@ -237,12 +240,10 @@ async function inspect(cdp) {
 
   await checkWorkbench(cdp)
 
-  await value(
-    cdp,
-    `(() => { const b = document.querySelector(".foot__who"); b.focus(); b.click(); return true })()`,
-  )
+  await value(cdp, `(() => { const b = document.querySelector(".foot__who"); b.focus(); b.click(); return true })()`)
   await waitFor(cdp, "document.querySelector('.set') !== null")
   await audit(cdp, "设置面板")
+  await checkThemeCards({ value, waitFor, pause, audit, assert }, cdp)
   const trapped = await value(
     cdp,
     `(() => { const d=document.querySelector(".set"); const a=[...d.querySelectorAll("button:not([disabled]),input:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex='-1'])")]; a.at(-1).focus(); return a.length })()`,

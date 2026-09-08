@@ -17,9 +17,9 @@
  * 唯一的身份信号就被稀释了**——右边只剩不到 140px 的空隙在说这件事。
  */
 .msg--user {
-  max-width: 72%;
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  max-width: 78%;
+  padding: 10px var(--sp-4);
+  border-radius: var(--radius) var(--radius) var(--radius-xs) var(--radius);
   background: var(--bg-said);
   font-size: var(--text-prose);
   line-height: var(--lh-prose);

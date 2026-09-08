@@ -190,32 +190,31 @@ export function Bar({
   return (
     <div className="composer__barwrap">
       <div className="composer__bar">
-        <EngineSelect engine={engine} engines={engines} disabled={detached || starting} onPick={onEngineChange} />
-        <TrustSelect trust={trust} blind={blind}
-          disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
-        {/* 上下文进度环：贴着模型胶囊的独立指示（它原来的图标位）——
-            不是胶囊的一部分，嵌进去悬停全被触发器吃掉 */}
-        <UsageBadge usage={usage} />
-        <ModelPicker
-          models={models}
-          model={model}
-          effort={effort}
-          disabled={detached || busy || starting}
-          pending={pending}
-          onChange={onModelChange}
-        />
-        <AttachmentPick disabled={detached} onPick={onAttach} />
-        {aside}
-        <span className="composer__bar-spacer" />
-        {/* 推理强度滑块：长在发送键左边那块空地里，弹性槽吸收宽度，发送键不动。
-            没报 efforts 的引擎它自己不出来（见 EffortSlider） */}
-        <BarEffort
-          models={models}
-          model={model}
-          effort={effort}
-          disabled={detached || busy || starting}
-          onChange={onModelChange}
-        />
+        <div className="composer__tools">
+          <AttachmentPick disabled={detached} onPick={onAttach} />
+          <TrustSelect trust={trust} blind={blind}
+            disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
+          {aside}
+        </div>
+        <div className="composer__model">
+          <UsageBadge usage={usage} />
+          <EngineSelect engine={engine} engines={engines} disabled={detached || starting} onPick={onEngineChange} />
+          <ModelPicker
+            models={models}
+            model={model}
+            effort={effort}
+            disabled={detached || busy || starting}
+            pending={pending}
+            onChange={onModelChange}
+          />
+          <BarEffort
+            models={models}
+            model={model}
+            effort={effort}
+            disabled={detached || busy || starting}
+            onChange={onModelChange}
+          />
+        </div>
         <Action
           detached={detached}
           busy={busy}

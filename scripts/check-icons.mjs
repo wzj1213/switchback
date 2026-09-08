@@ -55,14 +55,12 @@ const ILLUSTRATIONS = new Map([
   ["components/icon-base.tsx", "补偿算法本体，`<svg>` 是它的产物"],
   ["components/pets-art.tsx", "桌宠形象：逐格写死的像素画，没有描边"],
   ["components/dsh-art.tsx", "DSH 形象：同上"],
-  ["components/composer-ring.tsx", "输入框那圈渐变环，是装饰不是图标"],
   ["components/UsageRing.tsx", "用量环：半径与弧长按数据算，不是固定形"],
   ["components/PetFxCanvas.tsx", "桌宠特效画布"],
 ])
 
 /** CSS 里允许出现 stroke-width 的地方。同上，写清楚为什么。 */
 const CSS_ALLOW = new Map([
-  ["styles/items-composer.css", "输入框渐变环的两条描边，配合 composer-ring.tsx"],
   ["styles/usage.css", "用量环：半径与弧长按数据算的一段弧，不是固定形的图标（同 UsageRing.tsx）"],
 ])
 

@@ -5,54 +5,12 @@
  * 「展开 / 收起 / 现在是哪一档」的状态机，这边只回答「收起来长什么样」。
  */
 
-/** 深空配色的坡道：靛 → 紫 → 品红。三站线性插值，和 CSS 里那条渐变同一组值。 */
-function voidAt(t: number): string {
-  type Rgb = readonly [number, number, number]
-  const stops: [Rgb, Rgb, Rgb] = [
-    [0x2b, 0x2d, 0x6e],
-    [0x6d, 0x4b, 0xc7],
-    [0xb4, 0x40, 0x9a],
-  ]
-  const x = Math.min(1, Math.max(0, t)) * 2
-  const i = x >= 1 ? 1 : 0
-  const from = i === 0 ? stops[0] : stops[1]
-  const to = i === 0 ? stops[1] : stops[2]
-  const f = x - i
-  return `rgb(${String(Math.round(from[0] + (to[0] - from[0]) * f))} ${String(
-    Math.round(from[1] + (to[1] - from[1]) * f),
-  )} ${String(Math.round(from[2] + (to[2] - from[2]) * f))})`
-}
-
-/**
- * 收起态那几枚小刻度：亮到第几格就是第几档，不点开也知道。
- *
- * **贵档时每一枚各染各的位置色**（`voidAt(i / (count-1))`），不是整排刷成品红：
- * 那样一排六枚同色，等于把「更贵」这句话在 24px 里说了六遍，
- * 而且和展开后那条坡道对不上——收起和展开说的得是同一件事，
- * 收起态就是那条坡道**降采样到几个像素**的样子。
- */
-function Ticks({
-  count,
-  index,
-  costly,
-}: {
-  count: number
-  index: number
-  /** 贵档落档：亮着的那几枚按各自的位置取坡道色。 */
-  costly: boolean
-}): React.JSX.Element {
+/** 用同一墨色与亮起的刻度数量表达档位，颜色不再随强度变化。 */
+function Ticks({ count, index }: { count: number; index: number }): React.JSX.Element {
   return (
     <span className="effort__ticks" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <i
-          key={i}
-          className={i <= index ? "on" : undefined}
-          style={
-            costly && i <= index
-              ? { background: voidAt(count < 2 ? 1 : i / (count - 1)) }
-              : undefined
-          }
-        />
+        <i key={i} className={i <= index ? "on" : undefined} />
       ))}
     </span>
   )
@@ -88,7 +46,7 @@ export function EffortTrigger({
       aria-expanded={false}
       onClick={onOpen}
     >
-      <Ticks count={count} index={index} costly={costly} />
+      <Ticks count={count} index={index} />
       <span className="trigger__label">{label}</span>
     </button>
   )
