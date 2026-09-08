@@ -1,4 +1,5 @@
-import type { EngineInfo, ThreadId } from "@omni/protocol"
+import type { ThreadId } from "@omni/protocol"
+import type { EngineCatalog } from "./engine-catalog.js"
 import type { Host } from "@omni/host"
 import type { Ledger } from "@omni/wire"
 import type { createJournal } from "@omni/journal"
@@ -29,7 +30,7 @@ export interface Attached {
   /** 回放磁盘上的历史用得到。 */
   journal: ReturnType<typeof createJournal>
   /** 这台机器上注册了哪些引擎；异步探测结果由实现缓存。 */
-  engines: () => Promise<readonly EngineInfo[]>
+  engines: EngineCatalog
   /**
    * 重探引擎清单并广播。不给 id 就全部重探、并重读一遍 `engines.json`；见 `host.ts`。
    *

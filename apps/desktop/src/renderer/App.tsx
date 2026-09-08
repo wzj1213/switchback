@@ -151,7 +151,6 @@ export function App(): React.JSX.Element {
           ready={app.ready}
         />
         {settings}
-        {tips}
       </div>
     )
   }

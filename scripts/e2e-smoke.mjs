@@ -116,9 +116,14 @@ async function scheme(cdp, value) {
     media: "",
     features: [{ name: "prefers-color-scheme", value }],
   })
+  // 主题切换会触发控件的颜色过渡；等稳定后再测对比度，避免采到半途旧字色。
+  await pause(250)
 }
 
 async function auditSchemes(cdp) {
+  // 外壳先于探测和默认会话出现，交互巡检应等输入区真正可用。
+  await waitFor(cdp, "document.querySelector('.composer__input:not(:disabled)') !== null")
+  await pause(250)
   await scheme(cdp, "light")
   await audit(cdp, "浅色主界面")
   await scheme(cdp, "dark")
@@ -168,25 +173,19 @@ async function checkWorkbench(cdp) {
     width: 860, height: 560, deviceScaleFactor: 1, mobile: false,
   })
   await pause(120)
-  await waitFor(cdp, "document.querySelector('.workbench[hidden]') !== null")
   assert(
     await value(cdp, "getComputedStyle(document.querySelector('.main')).display !== 'none'"),
-    "窗口缩进单栏后优先保留会话主体",
+    "窄窗口并排显示时保留会话主体",
   )
-  for (const step of openPanelPage("文件")) {
-    await value(cdp, `(() => { ${step}; return true })()`)
-    await pause(80)
-  }
   await waitFor(cdp, "document.querySelector('.workbench:not([hidden])') !== null")
   await audit(cdp, "文件工作台页面")
   assert(
     await value(cdp, "document.querySelector('.workbench').contains(document.activeElement)"),
     "打开文件面板后焦点进入工作台",
   )
-  assert(
-    await value(cdp, "getComputedStyle(document.querySelector('.main')).display === 'none'"),
-    "工作台打开后会话页退出布局",
-  )
+  await value(cdp, `document.querySelector('[aria-label="展开侧边面板"]')?.click(); true`)
+  await waitFor(cdp, "getComputedStyle(document.querySelector('.main')).display === 'none'")
+  assert(true, "展开面板后会话页退出布局")
   await key(cdp, "Escape")
   await waitFor(cdp, "document.querySelector('.workbench[hidden]') !== null")
   assert(

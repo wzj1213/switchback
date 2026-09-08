@@ -5,6 +5,26 @@ import type { Logger } from "./log.js"
 const log: Logger = { file: "/tmp/omni-engine-catalog.log", write: () => undefined }
 
 describe("宿主引擎目录", () => {
+  it("首屏快照不等待探测，完成后可读；失效或隐藏时撤掉旧状态", async () => {
+    const shown = { value: true }
+    const gate: { finish?: () => void } = {}
+    const catalog = createEngineCatalog({ codex: {
+      probe: () => new Promise((resolve) => {
+        gate.finish = () => resolve({ state: "ok", detail: "ready" })
+      }),
+    } }, { codex: "Codex" }, log, { visible: () => shown.value })
+    const pending = catalog()
+    expect(catalog.current()).toEqual([])
+    gate.finish?.()
+    await pending
+    expect(catalog.current()).toMatchObject([{ id: "codex", state: "ok" }])
+    shown.value = false
+    expect(catalog.current()).toEqual([])
+    shown.value = true
+    catalog.invalidate("codex")
+    expect(catalog.current()).toEqual([])
+  })
+
   it("隐藏项不探测；后来显示时只探一次", async () => {
     const calls = { dsh: 0, codex: 0 }
     const shown = { dsh: false }

@@ -52,7 +52,7 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
           return (
             <span className={`panel-tab${active ? " panel-tab--on" : ""}`} key={page}>
               <button type="button" className="panel-tab__pick" aria-current={active ? "page" : undefined}
-                data-tip={label} onClick={() => { props.onSelect(page) }}>
+                aria-label={label} data-tip={label} onClick={() => { props.onSelect(page) }}>
                 <PageIcon page={page} /><span>{label}</span>
               </button>
               <button type="button" className="panel-tab__close" aria-label={`关闭${label}页`}

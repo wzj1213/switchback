@@ -93,6 +93,8 @@ export default defineConfig({
     root: resolve(here, "src/renderer"),
     plugins: [react()],
     build: {
+      // electron-vite 默认关闭压缩；生产包也需要减少解析与编译成本。
+      minify: true,
       rollupOptions: {
         input: resolve(here, "src/renderer/index.html"),
         output: {

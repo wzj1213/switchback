@@ -391,7 +391,7 @@ export async function rebuild(
   }
   const events = [
     ...replayEvents({
-      engines: await attached.engines(),
+      engines: attached.engines.current(),
       threads,
       alive,
       now: Date.now(),

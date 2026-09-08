@@ -14,6 +14,8 @@ interface CatalogOptions {
 
 export interface EngineCatalog {
   (): Promise<readonly EngineInfo[]>
+  /** 首屏只读已完成的探测，不等待慢引擎，也不猜测未完成项的状态。 */
+  current: () => readonly EngineInfo[]
   /**
    * 原生配置或插件树变了；下一次读取必须真探，不能复用旧结论。
    *
@@ -39,7 +41,12 @@ export function createEngineCatalog(
   const cached = new Map<string, Promise<EngineInfo>>()
   const generation = new Map<string, number>()
   const reported = new Map<string, string>()
+  const snapshots = new Map<string, { engine: EngineInfo; revision: string }>()
   const visible = options.visible ?? (() => true)
+  const current = (): readonly EngineInfo[] => [...snapshots.values()]
+    .filter(({ engine, revision }) => visible(engine.id)
+      && revisionOf(options, generation, engine.id, options.profile?.(engine.id)) === revision)
+    .map(({ engine }) => engine)
   const read = async (): Promise<readonly EngineInfo[]> => {
     const entries = Object.entries(drivers)
       .filter(([id]) => visible(id))
@@ -58,16 +65,18 @@ export function createEngineCatalog(
     )
     // 探测期间用户可能又把接入关掉。**回包时再认一遍当前设置**，否则较慢的旧探测
     // 会在远程端最后写回一份过期清单（桌面还有本地过滤，远程没有）。
-    const current = inspected
+    const fresh = inspected
       .filter(({ engine, revision }) =>
         visible(engine.id) &&
         revisionOf(options, generation, engine.id, options.profile?.(engine.id)) === revision,
       )
-      .map(({ engine }) => engine)
-    reportFresh(current, reported, log)
-    return current
+    for (const entry of fresh) snapshots.set(entry.engine.id, entry)
+    const engines = current()
+    reportFresh(engines, reported, log)
+    return engines
   }
   return Object.assign(read, {
+    current,
     invalidate: (id?: string) => {
       if (id !== undefined) return invalidate(cached, generation, id)
       // 全清：`generation` 里已经出现过的都推一格，缓存整张丢掉。

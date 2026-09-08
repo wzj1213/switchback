@@ -1,17 +1,11 @@
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { CloseIcon } from "./icons-panel.js"
 import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
 import type { Settings } from "../useSettings.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { LookSection, NewThreadSection } from "./SettingsGeneral.js"
-import { DataSection } from "./SettingsData.js"
-import { EnginesSection } from "./EngineSettings.js"
-import { EnvSection } from "./SettingsEnv.js"
-import { ActivitySection } from "./SettingsActivity.js"
-import { RemotePanel } from "./RemotePanel.js"
-import { PetsSection } from "./SettingsPets.js"
+import { DataSection, EnginesSection, EnvSection, ActivitySection, RemotePanel, PetsSection, EngineShared } from "./deferred-settings.js"
 import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon, ToBottomIcon } from "./icons.js"
-import { EngineShared } from "./EngineShared.js"
 import { FolderIcon } from "./icons-folder.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 
@@ -211,7 +205,9 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           {/* key 按分页隔离：切走再切回来是**重新开始**（环境那页会重新读盘），
               而不是接着上一次的半截状态 */}
           <div className="set__pane" key={tab}>
-            {paneOf(tab, props, setTab)}
+            <Suspense fallback={<p className="set__loading" role="status">正在加载设置…</p>}>
+              {paneOf(tab, props, setTab)}
+            </Suspense>
           </div>
         </div>
       </div>

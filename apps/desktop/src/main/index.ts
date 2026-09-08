@@ -322,6 +322,17 @@ function installChannels(): void {
   installSelfUpdateChannel(log)
 }
 
+async function openMainWindow(attached: Attached): Promise<BrowserWindow> {
+  installHello(attached)
+  // 历史先显示，引擎探测完成后走正常增量；重载从 current() 补已知结果。
+  void attached.refreshEngines().catch(attached.report)
+  const win = createWindow(await loadBounds())
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
+  })
+  return win
+}
+
 function bootstrap(): Promise<void> {
   return app.whenReady().then(async () => {
     // **第一件事**：把 PATH 补成登录 shell 那一份。探测引擎、spawn 引擎都要用，
@@ -375,13 +386,9 @@ function bootstrap(): Promise<void> {
     engineRefresh.run = attached.refreshEngines
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })
     relay.notify = remote.relay.notify
-    await remote.sync()
-    const bounds = await loadBounds()
-    const win = createWindow(bounds)
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) void loadBounds().then(createWindow)
-    })
-    installHello(attached)
+    // 远程监听不阻塞本机开窗；失败已有远程设置页与日志承接。
+    void remote.sync().catch((error: unknown) => log.write("warn", "remote", String(error)))
+    const win = await openMainWindow(attached)
     // 开发钩子只挂一次，和重建是两回事——它们不依赖会话，也不该在重载时重复挂
     win.webContents.once("did-finish-load", () => {
       installDevHooks(win, attached, log)

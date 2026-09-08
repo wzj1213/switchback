@@ -2,6 +2,7 @@ import type { Event, Item, ItemId, ThreadId } from "@omni/protocol"
 import { type ViewState } from "./state.js"
 import { reduceEngineNotification, reduceEngineStatus } from "./notices.js"
 import { mergeRateLimits } from "./limits.js"
+import { appendDraft, draftList, type Draft } from "./item-draft.js"
 
 function withThread(state: ViewState, thread: ViewState["threads"][string]): ViewState {
   const known = state.threads[thread.id] !== undefined
@@ -32,6 +33,9 @@ function withThread(state: ViewState, thread: ViewState["threads"][string]): Vie
 function appendItem(state: ViewState, threadId: ThreadId, item: Item, draft?: Draft): ViewState {
   const owner = draft?.owner ?? { ...state.owner }
   owner[item.id] = threadId
+  if (draft !== undefined) {
+    return { ...state, items: { ...state.items, [threadId]: appendDraft(state, threadId, item, draft) }, owner }
+  }
   const list = state.items[threadId] ?? []
   // **同一条 item 来两次就替换，不追加。**
   //
@@ -64,11 +68,6 @@ function itemIndex(list: readonly Item[], itemId: ItemId): number {
   return -1
 }
 
-/** 批量归约时的可变累加器。**只在 `reduceAll` 内部存在。** */
-interface Draft {
-  owner: Record<ItemId, ThreadId>
-}
-
 /** 摘掉一条 item 及其反查项。未知 id 幂等忽略，迟到更新因此也无法复活它。 */
 function removeItem(state: ViewState, itemId: ItemId, draft?: Draft): ViewState {
   const threadId = state.owner[itemId]
@@ -83,15 +82,16 @@ function removeItem(state: ViewState, itemId: ItemId, draft?: Draft): ViewState 
 }
 
 /** 就地替换一条 item。找不到宿主会话时原样返回——认不出的事件不该让状态崩。 */
-function patchItem(state: ViewState, itemId: ItemId, next: (prev: Item) => Item): ViewState {
+function patchItem(state: ViewState, itemId: ItemId, next: (prev: Item) => Item, draft?: Draft): ViewState {
   const threadId = state.owner[itemId]
   if (threadId === undefined) return state
-  const list = state.items[threadId] ?? []
-  const index = itemIndex(list, itemId)
+  const cached = draft === undefined ? undefined : draftList(state, threadId, draft)
+  const list = cached?.items ?? state.items[threadId] ?? []
+  const index = cached === undefined ? itemIndex(list, itemId) : (cached.index.get(itemId) ?? -1)
   if (index === -1) return state
   const prev = list[index]
   if (prev === undefined) return state
-  const updated = [...list]
+  const updated = cached?.items ?? [...list]
   updated[index] = next(prev)
   return { ...state, items: { ...state.items, [threadId]: updated } }
 }
@@ -197,8 +197,9 @@ function onTurnCompleted(
  * `owner` / `turnOwner` 里的反查项也要清——留着的话，一条迟到的
  * `item.updated` 会把内容写回一个已经不存在的会话，那份数据从此再也删不掉。
  */
-function removeThread(state: ViewState, threadId: ThreadId): ViewState {
+function removeThread(state: ViewState, threadId: ThreadId, draft?: Draft): ViewState {
   const keepOwner = withoutValue(state.owner, threadId)
+  if (draft !== undefined) draft.owner = keepOwner
   const keepTurnOwner = withoutValue(state.turnOwner, threadId)
   return {
     ...state,
@@ -252,9 +253,9 @@ function reduceItem(
 ): ViewState {
   if (event.type === "item.removed") return removeItem(state, event.itemId, draft)
   if (event.type === "item.delta") {
-    return patchItem(state, event.itemId, (prev) => applyDelta(prev, event.append))
+    return patchItem(state, event.itemId, (prev) => applyDelta(prev, event.append), draft)
   }
-  if (event.type === "item.updated") return patchItem(state, event.item.id, () => event.item)
+  if (event.type === "item.updated") return patchItem(state, event.item.id, () => event.item, draft)
   const threadId = state.turnOwner[event.item.turnId]
   return threadId === undefined ? state : appendItem(state, threadId, event.item, draft)
 }
@@ -276,7 +277,7 @@ type Handlers = {
 const HANDLERS: Handlers = {
   "thread.started": (state, event) => withThread(state, event.thread),
   "thread.updated": (state, event) => withThread(state, event.thread),
-  "thread.removed": (state, event) => removeThread(state, event.threadId),
+  "thread.removed": (state, event, draft) => removeThread(state, event.threadId, draft),
   "thread.renamed": (state, event) => {
     const thread = state.threads[event.threadId]
     // 不认识的 id 直接忽略：改名事件可能先于会话本身到达（补发乱序），
@@ -447,6 +448,6 @@ export function reduceAll(state: ViewState, events: readonly Event[]): ViewState
   const list = coalesce(events)
   // 一条的时候不值得开累加器：多一次整表复制，反而更慢
   if (list.length <= 1) return list.reduce((acc, event) => reduce(acc, event), state)
-  const draft: Draft = { owner: { ...state.owner } }
+  const draft: Draft = { owner: { ...state.owner }, lists: new Map() }
   return list.reduce((acc, event) => reduce(acc, event, draft), state)
 }
