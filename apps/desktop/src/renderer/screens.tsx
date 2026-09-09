@@ -54,21 +54,38 @@ function Notice({ text, fatal, waiting }: {
   fatal: boolean
   waiting: boolean
 }): React.JSX.Element {
+  /*
+   * **`.blank` 必须是 `.transcript` 的直接子元素。**
+   *
+   * 它靠 `min-height: 100%` + `justify-content: center` 在整块正文区里居中
+   *（见 app-main.css），而百分比高度要求父级高度是确定的。上一版把它包进了
+   * `.transcript__inner`——那是个高度 auto 的 flex 列，于是 `100%` 解析成 0，
+   * **整段居中一天都没生效**：一句「正在打开工作区…」吊在左上角，
+   * 底下空着七百像素。`Transcript.tsx` 里那个空态一直是直接子元素，所以只有这一屏错。
+   *
+   * 故障那一档仍然走 `.transcript__inner`：它是一段要读的正文，
+   * 该和转录区里别的字共用同一条 780 的列。
+   */
+  if (fatal) {
+    return (
+      <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
+        <div className="transcript__inner">
+          <div className="error">{text}</div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
-      <div className="transcript__inner">
-        {fatal ? (
-          <div className="error">{text}</div>
-        ) : (
-          <div className="blank">
-            {waiting ? (
-              <div className="blank__glyph blank__glyph--spin" aria-hidden="true">
-                <SpinnerIcon size={34} />
-              </div>
-            ) : null}
-            <p className="blank__title">{text}</p>
+      {/* 纯等待/纯状态：**两个方向都居中**。它没有下一步动作可以对齐——
+          新会话那一屏靠左是因为你下一秒就要在同一条左缘上打字，这里没有那件事 */}
+      <div className="blank blank--notice">
+        {waiting ? (
+          <div className="blank__glyph blank__glyph--spin" aria-hidden="true">
+            <SpinnerIcon size={34} />
           </div>
-        )}
+        ) : null}
+        <p className="blank__title">{text}</p>
       </div>
     </div>
   )

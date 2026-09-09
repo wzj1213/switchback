@@ -120,13 +120,16 @@ describe("槽的容身空间", () => {
     return Number(found[1])
   }
 
-  it("门槛容得下一条槽、一条缝，还有靠窗那边 4px 的余量", () => {
+  it("门槛容得下一条槽加一条缝，槽从转录区的内容盒左缘起画", () => {
     const tokens = read("tokens.css")
     const rail = read("transcript-rail.css")
     // 经典滚动条那条 gutter 只占终点侧，于是正文两边的空档不等宽——按它算才安全
     const bar = px(read("app-foundation.css"), "--bar-w")
     const need =
-      px(tokens, "--content-max") + bar + 2 * (px(rail, "--rail-lane") + px(rail, "--rail-clear") + 4)
+      px(tokens, "--content-max") +
+      bar +
+      2 * px(tokens, "--content-gutter") +
+      2 * (px(rail, "--rail-lane") + px(rail, "--rail-clear"))
     const gate = /@container stage \(max-width: (\d+)px\)/.exec(rail)
     expect(gate?.[1], "transcript-rail.css 里那条容器查询").toBeDefined()
     expect(Number(gate?.[1]), `舞台至少要 ${String(need)}px 才站得下这条槽`).toBeGreaterThanOrEqual(need)

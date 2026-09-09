@@ -17,21 +17,17 @@
   /*
    * ── 这条槽站在哪 ─────────────────────────────────────
    *
-   * **贴着正文列站，不钉在滚动区的最左边。** 钉左缘那一版有两个毛病，
-   * 一个丑一个是 bug：
+   * **钉在滚动区左缘，不跟着正文列走。** 中间试过一版「贴着正文列站」——
+   * 位置由 `(100% - --content-max) / 2` 反推，窗口一宽它就跟着正文往右挪。
+   * 那一版是错的：这条东西是**这一屏的固定家具**，位置该由窗口定，
+   * 不该由这一屏的正文有多宽定；跟着正文漂之后，拖窗口大小时它一路横移，
+   * 比原来难看得多。
    *
-   * - 窗口一宽，正文两边的空档能有 125px，这条大纲就孤零零地贴在窗边，
-   *   离它索引的那段文字十万八千里；
-   * - 窗口一窄（实测舞台 845~900 那一段），空档只剩几像素，
-   *   而它照旧从左缘起画 24px——**整条压在正文上**，正是这次要修的那张图。
-   *
-   * 现在它的位置由正文列反推：正文列是 `--content-max` 居中的，
-   * 于是 `(100% - --content-max) / 2` 就是正文左缘，往左退开一条槽加一点呼吸。
-   * 空档比一条槽宽时它落在空档里，空档再宽也不会离开正文——两头都对。
+   * 所以位置写死在左缘，**变的只有「什么时候不画」**——见文件末尾那条容器查询：
+   * 正文列左边的空档容不下 `--rail-lane + --rail-clear` 时整条撤掉。
    */
   --rail-lane: 24px;
   --rail-clear: 8px;
-  --rail-x: calc((100% - var(--content-max)) / 2 - var(--rail-lane) - var(--rail-clear));
 
   position: sticky;
   top: 0;
@@ -48,7 +44,7 @@
  */
 .rail__tick {
   position: absolute;
-  left: var(--rail-x);
+  left: 0;
   width: var(--rail-lane);
   height: 7px;
   padding: 0;
@@ -66,15 +62,11 @@
 }
 
 /* 看得见的只有这一道。长短由那一轮的产出定（行内 `--mark-w`），
-   悬停时统一拉到 22——那一刻它不再是波形的一部分，而是「你指着的那一格」。
-
-   **靠右挂，向左长。** 槽的右缘离正文列恒是 `--rail-clear`，所以靠右挂等于
-   「每一道线离正文一样远」；靠左挂的话线尾随产出忽长忽短，紧挨着正文的那一侧
-   是一条参差的边——而那正是眼睛读正文时扫过的地方。 */
+   悬停时统一拉到 22——那一刻它不再是波形的一部分，而是「你指着的那一格」 */
 .rail__mark {
   position: absolute;
   top: 50%;
-  right: 0;
+  left: 4px;
   width: var(--mark-w, 8px);
   height: 1.5px;
   border-radius: 2px;
@@ -84,9 +76,10 @@
   background: var(--mark-tint, currentcolor);
   opacity: 0.3;
   transform: translateY(-50%);
-  transform-origin: right center;
+  transform-origin: left center;
   transition:
     width var(--dur) var(--ease),
+    left var(--dur) var(--ease),
     opacity var(--dur) var(--ease),
     background var(--dur) var(--ease);
 }
@@ -100,10 +93,9 @@
   opacity: 0.78;
 }
 
-/* **只改宽度**：`left` / `right` / `width` 三个同时给会把 `right` 判掉
-   （绝对定位的过约束由 `left` + `width` 赢），线会当场跳到槽的左边 */
 .rail__tick:hover .rail__mark,
 .rail__tick:focus-visible .rail__mark {
+  left: 2px;
   width: calc(var(--rail-lane) - 2px);
   opacity: 0.94;
 }
@@ -115,7 +107,7 @@
 .rail__peek {
   position: absolute;
   /* 贴着槽的右缘开画（槽 + 6px 的缝，那条缝由下面的隐形桥并进热区） */
-  left: calc(var(--rail-x) + var(--rail-lane) + 6px);
+  left: calc(var(--rail-lane) + 6px);
   z-index: 1;
   display: flex;
   width: min(292px, calc(100vw - 420px));
@@ -209,33 +201,36 @@
 }
 
 /*
- * **窄到一定程度就整条撤掉。**
+ * **正文左边的空档容不下它，就整条撤掉。**
  *
- * 大纲住在正文列左边那条空档里；地一窄，空档先归零，那时它是纯负担——
- * 一个压着正文、让人读不了字的辅助不如没有。
+ * 这是这条大纲唯一的自适应：位置钉死在左缘（见文件开头），
+ * 变的只有画不画。空档一窄它就压在字上，而一个压着正文、让人读不了字的
+ * 辅助不如没有。
  *
  * ## 门槛是算出来的，不是估的
  *
- * 记舞台宽 S、正文列 `--content-max`、经典滚动条那条 gutter `--bar-w`
- *（`scrollbar-gutter: stable` 只占终点侧，所以两边空档不等宽）。转录区自己那圈
- * `--content-gutter` 在这里会**约掉**——大纲可以站进内边距里：
+ * 记舞台宽 S、正文列 `--content-max`、转录区两侧的 `--content-gutter`、
+ * 经典滚动条那条 gutter `--bar-w`（`scrollbar-gutter: stable` 只占终点侧）。
+ * 槽从转录区的**内容盒**左缘起画，所以要看的是正文列离内容盒左缘多远：
  *
- *     正文左缘离转录区左缘 = gutter + (S − 2·gutter − bar − max) / 2
- *                          = (S − bar − max) / 2
+ *     正文左缘离内容盒左缘 = (S − 2·gutter − bar − max) / 2
  *
- * 槽要占掉 `--rail-lane + --rail-clear`（32），再给窗边留 4，于是
+ * 它要放得下一条槽加一点呼吸（`--rail-lane + --rail-clear` = 32），于是
  *
- *     S ≥ max + bar + 2·(lane + clear + 4) = 780 + 10 + 72 = 862
+ *     S ≥ max + bar + 2·gutter + 2·(lane + clear) = 780 + 10 + 64 + 64 = 918
  *
- * 取 864。**这个数会随 `--content-max` 漂**：上一版门槛写的是 840，
+ * 取 920。**这个数会随上面四个量一起漂**：上一版门槛写的是 840，
  * 那是正文列还是 760 时算出来的——正文列后来加到 780，门槛没跟着动，
- * 于是 840~900 这一段里大纲照画、正好压在字上。所以它有一条守卫盯着
+ * 于是 840~918 这一段里大纲照画、正好压在字上。所以它有一条守卫盯着
  *（`transcript-rail.test.ts` 的「槽的容身空间」），改任何一个数都会红。
+ *
+ * 窄档的 `--content-gutter`（24，窗口 ≤960）算出来的门槛更低（902），
+ * 这里取宽档那个更保守的数：宁可早半档收起来，不要晚一档压在字上。
  *
  * **按 `container` 不按 `@media`**：侧栏收没收起、工作台开没开，
  * 同一个窗口宽度下这块地能差六百像素。
  */
-@container stage (max-width: 864px) {
+@container stage (max-width: 920px) {
   .rail {
     display: none;
   }
