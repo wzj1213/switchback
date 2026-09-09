@@ -9,7 +9,16 @@ export interface Bounds {
   height: number
 }
 
-const DEFAULT: Bounds = { x: 0, y: 0, width: 1180, height: 780 }
+/**
+ * 第一次打开时的窗口。**只影响新装的那一份**——之后每次改动都会记进
+ * `window.json`（见 `trackBounds`）。
+ *
+ * 宽度 1280 是算出来的：右侧工具台开着时它正好给对话列留下 740
+ *（1280 − 导航 240 − 工具台下限 300），而 740 正是输入区那排控件
+ * 不折成两行的宽度（见 app-foundation.css 的 `--workbench-w`）。
+ * 上一版的 1180 差 100px，于是**默认窗口 + 打开审核** = 输入区当场折行。
+ */
+const DEFAULT: Bounds = { x: 0, y: 0, width: 1280, height: 780 }
 const MIN_VISIBLE = 80
 
 const file = (): string => join(app.getPath("userData"), "window.json")

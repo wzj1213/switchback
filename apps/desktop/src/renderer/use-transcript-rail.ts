@@ -28,9 +28,24 @@ export function useTranscriptRail(
     const box = scroller.current
     if (box === null) return
     const top = box.getBoundingClientRect().top
+    /*
+     * **一次扫出全部落点，不是每个落点扫一遍 DOM。**
+     *
+     * 这个函数挂在滚动、可视区变化和内容长高上，也就是**滚动的每一帧、
+     * 抽屉开合的每一帧、流式输出的每一帧**都要跑一次。上一版对每个落点各发一次
+     * `querySelector`：一条问过九十次的会话就是九十次全子树匹配，
+     * 而它们要找的东西全在同一棵树里。现在一次 `querySelectorAll` 建表，
+     * 剩下的是 Map 查表。
+     */
+    const nodes = new Map<string, HTMLElement>()
+    for (const node of box.querySelectorAll<HTMLElement>("[data-nav]")) {
+      const id = node.getAttribute("data-nav")
+      // 先到先得：`querySelector` 取的就是第一个，重复 id（不该有）时行为不变
+      if (id !== null && !nodes.has(id)) nodes.set(id, node)
+    }
     const placed = live.current.flatMap((point) => {
-      const node = box.querySelector<HTMLElement>(`[data-nav="${CSS.escape(point.id)}"]`)
-      if (node === null) return []
+      const node = nodes.get(point.id)
+      if (node === undefined) return []
       // 相对**内容顶端**的偏移：可视区里的位置加上已经滚过去的那一段
       return [{ ...point, top: node.getBoundingClientRect().top - top + box.scrollTop }]
     })

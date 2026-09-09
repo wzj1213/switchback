@@ -145,6 +145,23 @@
   max-width: none;
 }
 
+/*
+ * 对比栏里不画左缘那条大纲。
+ *
+ * 它站的地方是**正文列左边那条空档**（见 transcript-rail.css），而上面那条
+ * `max-width: none` 刚好把空档取消了——正文撑满整栏。没有空档时它只能压在字上，
+ * 那时它是纯负担。
+ *
+ * **写明不画，不靠溢出裁掉。** 它的槽位是按 `--content-max` 反推的，
+ * 在这里算出来是个负数、恰好被 `.transcript` 的 `overflow-x: hidden` 裁没——
+ * 靠一个巧合达成的正确会在下一次改动里悄悄失效。
+ * （`transcript-rail.css` 那条按 `@container stage` 收起的规则在这里不生效：
+ *  对比屏没有 `.stage` 这一层。）
+ */
+.cmp__pane .rail {
+  display: none;
+}
+
 /* 「这不是对照实验」那句。比 flag 更轻，但必须看得见——见 Compare.tsx 开头 */
 .cmp__caveat {
   margin: var(--sp-2) 0 0;

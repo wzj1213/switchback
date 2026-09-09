@@ -9,16 +9,31 @@
   background: var(--bg);
 }
 
-/* 与侧边面板页签同高，为会话标题和操作留出上下空间。 */
+/*
+ * 会话顶栏。**高度、底线都和侧栏头、面板页签条共用**（`--topbar-h`）：
+ * 三块拼成窗口顶上那一条走通的横带，理由写在 app-foundation.css 的
+ * 「顶上那条横带」一节。
+ *
+ * `padding-left` 要过渡：导航收起时它从 20 跳到 `--traffic`（92），而列宽是
+ * 滑过去的——不过渡的话标题**先向右弹 72px，再随列滑回来**，一次收起看得见
+ * 两个方向的位移。同一条时长曲线，两段位移就合成一段单调的滑动。
+ */
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  height: 56px;
+  height: var(--topbar-h);
   padding: 0 20px;
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
-  min-height: 56px;
+  min-height: var(--topbar-h);
+  transition: padding-left var(--dur-shell) var(--ease-shell);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar {
+    transition: none;
+  }
 }
 
 /* 标题现在可点（点开环境信息）。**平时看不出是按钮**——它首先是标题，
@@ -137,7 +152,7 @@
  * 的子树里生效，挪出顶栏就变成拖窗口（踩过两回，真机才现形，探针测不出）。
  *
  * 视觉上的「钉在原地」由反向平移给：面板一开，顶栏随会话列收窄 `--panel-col`，
- * 给它一个等量反向的 translateX。同一条 420ms 曲线、同一帧起跑，抵消是精确的。
+ * 给它一个等量反向的 translateX。同一条 `--dur-shell` 曲线、同一帧起跑，抵消是精确的。
  * full 态 `--panel-col` 是 `minmax(0,1fr)` 不是长度，translate 自动失效——
  * 那种态下顶栏整个不画（`.main` display:none），按钮跟着不在，正确。
  */
@@ -145,7 +160,7 @@
   /* 平移出去后要压在同帧滑进的面板页签条上面（它是 grid 第三列、DOM 更靠后） */
   position: relative;
   z-index: 30;
-  transition: transform 220ms cubic-bezier(0.3, 0.8, 0.25, 1);
+  transition: transform var(--dur-shell) var(--ease-shell);
 }
 
 .shell--workbench .paneltoggle {
@@ -804,9 +819,10 @@
  */
 
 /* 顶栏那条线。没有会话就没有标题、没有引擎、没有任何可点的东西——
-   它在这儿只为一件事：**让主区有个上边**。交通灯那份左内距照给。 */
+   它在这儿只为一件事：**让主区有个上边**。交通灯那份左内距照给。
+   **高度必须是 `--topbar-h`**：空态下侧栏照画，44 的话那条横带在侧栏边界上错一档。 */
 .topbar--bare {
-  min-height: 44px;
+  min-height: var(--topbar-h);
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
 }

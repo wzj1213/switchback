@@ -48,6 +48,12 @@
   --dur-slow: 240ms;
   --dur-bar: 320ms;
   --ease: ease;
+  /* 外壳分栏的开合：列宽、顶栏让位、面板脱离布局全走这一条。
+     **散开写过一次，代价是它们不同步**——列宽早先是 420，后来收到 220，
+     而 review.css / workbench.css 里那两条推迟仍停在 420：抽屉滑完之后，
+     面板还占着两百毫秒的布局。一个数只能有一个出处。 */
+  --dur-shell: 220ms;
+  --ease-shell: cubic-bezier(0.3, 0.8, 0.25, 1);
   --lh-xs: 16px;
   --lh-sm: 20px;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
@@ -74,7 +80,13 @@
   --hl-title: #1f5fbf;
   --hl-type: #0f6b78;
   --sidebar-w: 240px;
-  --workbench-w: clamp(440px, 39vw, 560px);
+  /* 窗口顶上那条横带的高度。**侧栏头、会话顶栏、面板页签条共用它**——
+     三块各写各的高度时，横线在侧栏边界上断掉，而品牌和会话标题差着 26px
+     的中线，读起来像两个应用拼在一起。 */
+  --topbar-h: 56px;
+  /* hiddenInset 的交通灯在窗口左上角占的那块地。侧栏头与「收起侧栏后的顶栏」
+     都要给它让位，是同一个数——写两处必然分叉。 */
+  --traffic: 92px;
   --diff-sign-w: 1.4em;
   --diff-pad-r: var(--sp-3);
   --content-max: 780px;

@@ -15,8 +15,9 @@ const useMeasure = typeof window === "undefined" ? useEffect : useLayoutEffect
  *
  * 每侧 210px，减去行号 3.6em ≈ 45px、记号列 1.4em ≈ 17.5px、右边距 12px，
  * 正文只剩约 135px ≈ **18 个字符**——已经到下限。
- * 而窗口 ≤1280px 时 `--workbench-w` 就是 300px，那一档下并排每侧只剩 14 个字符：
- * `ReviewDiff.tsx` 开头那句「窄的时候不给并排」原来是句空话，父层根本没有这个判断。
+ * 而 `--workbench-w` 的下限是 300px（窗口窄到 1280 以下就一直是它），
+ * 那一档下并排每侧只剩 14 个字符：`ReviewDiff.tsx` 开头那句「窄的时候不给并排」
+ * 原来是句空话，父层根本没有这个判断。
  *
  * ⚠️ **`review.css` 的 `@container (max-width: 420px)` 用的是同一个数**
  *（那条管的是「单栏收掉旧行号列」）。改一处要改两处——它们说的是同一件事：

@@ -21,13 +21,13 @@
   container-type: inline-size;
 }
 
-/* 页签换走（面板还开着）瞬隐；整扇面板收工时才推迟到列宽滑完（420ms，与外壳同程）。
+/* 页签换走（面板还开着）瞬隐；整扇面板收工时才推迟到列宽滑完（`--dur-shell`，与外壳同程）。
    display 走 allow-discrete：滑完才脱离布局——visibility 隐形的元素仍占 grid 格子，
    会把同列的另一个面板挤到第 2 行（workbench.css 顶部有完整说明）。 */
 .shell:not(.shell--workbench) .rv[hidden] {
   transition:
-    visibility 0s 420ms,
-    display 0s 420ms allow-discrete;
+    visibility 0s var(--dur-shell),
+    display 0s var(--dur-shell) allow-discrete;
 }
 
 .rv[hidden] {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { navPointsOf, railLayout, railPeek, widthOf } from "./transcript-rail.js"
 
@@ -95,5 +97,38 @@ describe("哪些行算一格、那一轮有多重", () => {
     const [point] = navPointsOf(rows)
     // 1（提问）+ 300（回答）+ 2 × 24（两个工具）
     expect(point?.weight).toBe(1 + 300 + 48)
+  })
+})
+
+/**
+ * 槽的容身空间。
+ *
+ * **这条守卫是一次真事故留下的。** 大纲那条「窄了就整条不画」的门槛是按
+ * 正文列宽算出来的一个字面数；后来 `--content-max` 从 760 加到 780，
+ * 门槛那个 840 没人动——于是舞台 840~900 的窗口里，大纲照画，
+ * 而它要站的那条空档已经只剩几像素，整条压在正文上。
+ *
+ * 门槛没法写成 `calc()`（容器查询的条件里不许有 `var()`），所以只能是个字面数；
+ * 那就让它**每次都被重算一遍**：下面这条读回四个数自己算，对不上就红。
+ */
+describe("槽的容身空间", () => {
+  const styles = join(import.meta.dirname, "styles")
+  const read = (file: string): string => readFileSync(join(styles, file), "utf8")
+  const px = (text: string, name: string): number => {
+    const found = new RegExp(`${name}:\\s*(\\d+(?:\\.\\d+)?)px`).exec(text)
+    if (found?.[1] === undefined) throw new Error(`没在样式里找到 ${name}`)
+    return Number(found[1])
+  }
+
+  it("门槛容得下一条槽、一条缝，还有靠窗那边 4px 的余量", () => {
+    const tokens = read("tokens.css")
+    const rail = read("transcript-rail.css")
+    // 经典滚动条那条 gutter 只占终点侧，于是正文两边的空档不等宽——按它算才安全
+    const bar = px(read("app-foundation.css"), "--bar-w")
+    const need =
+      px(tokens, "--content-max") + bar + 2 * (px(rail, "--rail-lane") + px(rail, "--rail-clear") + 4)
+    const gate = /@container stage \(max-width: (\d+)px\)/.exec(rail)
+    expect(gate?.[1], "transcript-rail.css 里那条容器查询").toBeDefined()
+    expect(Number(gate?.[1]), `舞台至少要 ${String(need)}px 才站得下这条槽`).toBeGreaterThanOrEqual(need)
   })
 })

@@ -304,14 +304,35 @@ body {
   --rail-col: var(--sidebar-w);
   --main-col: minmax(0, 1fr);
   --panel-col: 0px;
+  /*
+   * 右侧工具台有多宽。**和另外两列的宽度写在一起**：它是这三个数之一，
+   * 摆进 tokens.css 会让「三列怎么分」这件事分散在两个文件里。
+   *
+   * **连续的一条式子，不是两档。** 上一版是「1280 以上 clamp(440,39vw,560)、
+   * 以下一律 300」：窗口宽 1280 和 1281 之间，面板从 300 跳到 500——
+   * 拖窗口的人会看到工具台**瞬间胖了两百像素**，而那一帧里对话列同样瞬间瘦掉。
+   *
+   * 现在这条式子的意思是「**先给对话列 740，剩下的都归工具台，上限 560**」。
+   * 980 = 740 + 导航 240（导航收起时不把地让给工具台——你收它是为了看对话）。
+   *
+   * 740 不是随手取的：输入区那排控件在容器窄于 620 时会折成两行
+   *（items-composer.css 的 `@container (max-width: 620px)`），而那个容器
+   * 比对话列窄 98（两侧 `--content-gutter`、滚动条槽、输入卡自己的描边与内边距）。
+   * 实测 main=700 → 容器 602（两行）、main=800 → 702（一行），于是取 740。
+   *
+   * 于是 1180 → 300、1280 → 300、1400 → 420、1540 → 560：
+   * **对话列从 1280 一路到 1540 恒定 740**，多出来的宽度全进工具台，
+   * 到顶之后才轮到对话列变宽。中间没有任何一处跳变。
+   */
+  --workbench-w: clamp(300px, calc(100vw - 980px), 560px);
 
   display: grid;
   grid-template-columns: var(--rail-col) var(--main-col) var(--panel-col);
   height: 100%;
   /* 整扇窗口不滚：抽屉推进来的那一刻内容可能短暂超出，让它裁掉而不是冒出滚动条 */
   overflow: hidden;
-  /* 分栏在 220ms 内归位；减少动态效果时立即切换，避免连续重排拖慢操作。 */
-  transition: grid-template-columns 220ms cubic-bezier(0.3, 0.8, 0.25, 1);
+  /* 分栏归位；减少动态效果时立即切换，避免连续重排拖慢操作。时长与曲线见 tokens.css。 */
+  transition: grid-template-columns var(--dur-shell) var(--ease-shell);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -349,7 +370,7 @@ body {
  * **抽屉，不淡化**：内容是一块刚性板（`min-width` 顶住固有宽度），钉在列的
  * 右缘（`justify-self: end`）——列宽收/放时右缘在动，板子整体跟着滑进滑出。
  * 早一版给内容做过交叉淡化，实测读起来是「先蒸发再收列」，不是抽屉；
- * 滑动的本体由 `.shell` 那条 420ms 列宽过渡承担，这里只管别掺和。
+ * 滑动的本体由 `.shell` 那条 `--dur-shell` 列宽过渡承担，这里只管别掺和。
  *
  * `visibility` 延迟到滑完才翻：0 宽的侧栏里不该还能 Tab 进去，
  * 可一上来就 `hidden` 又会把滑动掐死在第一帧。
@@ -375,12 +396,15 @@ body {
      收起来之后窗口最左边会留下一道谁也说不清的竖线（实测量出来宽度是 1 不是 0） */
   border-right: 0;
   visibility: hidden;
-  transition: visibility 0s 220ms;
+  transition: visibility 0s var(--dur-shell);
 }
 
+/* 导航收起后交通灯落进顶栏，标题要给它让位。**这条要跟着列宽一起走**——
+   类一翻就瞬间加 72px 的话，标题会先向右弹一下再随列滑回来（见 app-main.css
+   `.topbar` 上那条 padding 过渡）。 */
 .shell--norail > .main .topbar,
 .shell--norail > .cmp .topbar {
-  padding-left: 92px;
+  padding-left: var(--traffic);
 }
 
 /* 工具台占满：会话那一列收成 0，面板拿走全部剩余宽度。 */
@@ -400,14 +424,10 @@ body {
  * 而把它们绑在一起的那一版实测最让人恼火：你只是想看一眼 diff，
  * 结果整个导航没了，还得再点一次把它找回来。
  *
- * 算一遍最窄那档（应用允许的最小窗口 860）：导航 264 + 工具台 300 = 564，
- * 会话还剩 296。窄，但**三样都在**，而且要不要收导航由你自己那颗开关决定。
+ * 让步这件事现在由 `--workbench-w` 那条 clamp 自己完成（见 `.shell`），
+ * 不再需要一条断点：最小窗口 860 下它取下限 300，导航 224 + 工具台 300，
+ * 会话还剩 336——窄，但**三样都在**，而且要不要收导航由你自己那颗开关决定。
  */
-@media (max-width: 1280px) {
-  .shell--workbench:not(.shell--workbench-full) {
-    --workbench-w: 300px;
-  }
-}
 
 .sidebar {
   display: flex;
@@ -442,25 +462,52 @@ body {
   --sb-act: 22px;
 }
 
+/*
+ * ── 顶上那条横带 ───────────────────────────────────────
+ *
+ * **侧栏头和会话顶栏是同一条带子的两段。** 改之前它俩各写各的：顶栏 56px 高、
+ * 底下一条线；侧栏头是 `38 / 16` 的内边距堆出来的 82px、没有线。结果有两个，
+ * 都出现在整扇窗口最先被看见的地方：
+ *
+ * - 品牌的中线在 54，会话标题的中线在 28——**同一条横带上两个标题差 26px**；
+ * - 顶栏那条线走到侧栏边界就断了，右边面板的页签条却又接着画一条，
+ *   于是这条线断一段、接一段。
+ *
+ * 现在三块共用 `--topbar-h` 与同一条底线，横线一路走通。品牌**让开交通灯**
+ * （`--traffic`，和「收起导航后顶栏的左内距」是同一个数）——那块地是系统的，
+ * 挤进去的字会被三颗灯压住。
+ */
 .sidebar__head {
-  padding: 38px var(--sp-4) var(--sp-4);
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: var(--topbar-h);
+  padding: 0 var(--sp-4) 0 var(--traffic);
+  border-bottom: 1px solid var(--border);
+  /* 交通灯那块地已经吃掉 92px，224px 的窄侧栏里只剩 116。品牌实测 98，
+     留了余量；真撑破时裁掉，不许把这条带子顶高一档 */
+  overflow: hidden;
   -webkit-app-region: drag;
 }
 
 .sidebar__brand {
   /* 品牌是侧栏标题，不该缩进到项目名那一列；它与分节标题共用视觉左缘。 */
   padding-left: 0;
-  font-size: 20px;
-  font-weight: 700;
+  /* **不再是 20/700。** 进了横带之后它旁边就是会话标题（14/600）——
+     招牌比正在看的那条会话还重两档，眼睛第一个落点是错的。 */
+  font-size: var(--text-lg);
+  font-weight: 600;
   letter-spacing: 0;
   color: var(--text);
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: var(--sp-2);
+  gap: 6px;
   font-family: var(--font);
 }
 
 .sidebar__name {
+  flex: none;
   color: var(--text-faint);
   font-weight: 400;
   margin-left: 0;
@@ -472,10 +519,12 @@ body {
  * 见 `SidebarHead.tsx` 的注释。**行高仍然是 `--sb-row-h`**：
  * 侧栏所有的量都挂在那三个变量上，多写一个 30 就是本文件开头说的「第三个 padding」。
  */
+/* 横带底下第一行。**上外边距是新加的**：头那一块不再靠内边距撑高，
+   紧贴着底线开画的话，这颗最常点的按钮会像粘在线上 */
 .sidebar__act {
   display: flex;
   gap: var(--sp-2);
-  margin: 0 var(--sb-pad) var(--sp-3);
+  margin: var(--sp-3) var(--sb-pad) var(--sp-3);
 }
 
 .sidebar__new {

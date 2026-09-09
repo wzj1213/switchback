@@ -8,12 +8,17 @@
   flex: none;
   align-items: center;
   gap: 4px;
-  height: 56px;
+  /* 和会话顶栏、侧栏头同高同底线：三块拼成窗口顶上那一条走通的横带
+     （app-foundation.css「顶上那条横带」） */
+  height: var(--topbar-h);
   min-width: 0;
   /* 右侧给平移过来的面板开关留位（26 + 一段 gap），这条栏的内容别钻到它底下 */
   padding: 0 calc(var(--sp-4) + 30px + var(--sp-2)) 0 6px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-sunken);
+  /* **画布色，不是沉底灰。** 灰的那一版让这条横带成了「灰-白-灰」三段：
+     左边侧栏是灰的、中间顶栏是白的、右边页签条又是灰的——同一条带子上
+     三种底色，读起来像三个应用并排。它和会话顶栏是同一级的东西，就该同一个底。 */
+  background: var(--bg);
   /* 页签条自己做容器：窄态图标化的断点要按整条栏的宽度算，
      而不是按 list——按钮区与右侧开关留位（约 120px）是固定开销，list 感知不到。 */
   container-type: inline-size;

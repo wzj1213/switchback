@@ -43,7 +43,7 @@ export function withBarFade(current: string): string {
 /**
  * 要合并的是**计算后的**过渡，不只是 inline 那一条。
  *
- * `.shell` 的列宽过渡（抽屉滑 420ms）写在样式表里；如果合并时只看
+ * `.shell` 的列宽过渡（抽屉滑 `--dur-shell`）写在样式表里；如果合并时只看
  * `el.style.transition`（inline），写回的 `--bar` 一条会把样式表那条
  * **整个顶掉**（inline 优先级高）——表现就是面板/侧栏开关瞬切、抽屉动画
  * 凭空消失，而且只在经典条档位（插鼠标）发作，触控板出图从来不踩。
