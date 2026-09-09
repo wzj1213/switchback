@@ -30,8 +30,12 @@ function Item({
         <span className="pop__label" title={choice.label}>
           {choice.label}
         </span>
+        {/* 说明压到三行（popover.css），全文留在 `title` 上：
+            菜单是用来挑的，一条一百多字的故障说明会把整块浮层撑成横幅 */}
         {choice.description === undefined ? null : (
-          <span className="pop__desc">{choice.description}</span>
+          <span className="pop__desc" title={choice.description}>
+            {choice.description}
+          </span>
         )}
       </span>
       {choice.note === undefined ? null : <span className="pop__note">{choice.note}</span>}

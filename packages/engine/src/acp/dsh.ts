@@ -169,10 +169,21 @@ export async function probeDshAcp(
     ]
     return { ...found, detail: details.filter(Boolean).join(" · ") }
   }
+  /*
+   * **说的是「omni 观察到什么」，以及「下一步点哪儿」。**
+   *
+   * 上一版第一句是「`web` profile 还不能启动」——那是猜的：那棵 profile
+   * 很可能起得好好的，只是它装的是 web 应用、根本不讲 ACP。omni 能确定的
+   * 只有一件事：**它没应答 ACP initialize**。照实说这一件。
+   *
+   * 第二句给出路。「请给它加入兼容的 ACP 插件」正确但落不了地——
+   * profile 是在哪儿换的、这台机器上还有哪几棵，全在设置里那一页
+   *（`DshProfileSettings`），指过去就够了；omni 不代装插件（AGENTS.md 的产品边界）。
+   */
   return {
     state: "unavailable",
     detail: [
-      `DSH 已安装，但 \`${profile}\` profile 还不能启动。请给它加入兼容的 ACP 插件；也可运行 \`dsh --profile ${profile}\` 查看原始错误（成功时会等待 ACP 输入，按 Ctrl-C 退出）。`,
+      `DSH 装着，但 \`${profile}\` 这棵 profile 没有应答 ACP。到「设置 → 引擎 → DSH」换一棵装了 ACP 插件的；\`dsh --profile ${profile}\` 能看它自己的报错。`,
       checked.detail,
     ]
       .filter(Boolean)

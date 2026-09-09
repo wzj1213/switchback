@@ -19,6 +19,41 @@ export const MODEL_VIEWS = [
     })()`,
   },
   {
+    /*
+     * **一个菜单再宽也就这么宽。**
+     *
+     * 引擎菜单里每条都可能带一句探测说明，而 DSH 起不来时那句有一百多字——
+     * 浮层原来的上限是「窗口宽减 16」，于是整块面板顶到两边窗框，
+     * 变成一条横跨屏幕的横幅（真机截图见 popover.css 的 `--pop-max` 那段）。
+     *
+     * 这一屏钉的是**几何**，不是某一句文案：这台机器上探到几家、说明有多长
+     * 都不影响结论——菜单不许比 `--pop-max` 宽，也不许探出窗口。
+     */
+    name: "18-菜单不占满窗口",
+    // 引擎菜单优先（带探测说明的就是它），历史会话里它是禁着的，那时退回模型菜单
+    before: '.composer__model > .trigger:not(:disabled)',
+    open: `(document.querySelector('.trigger[data-tip="引擎"]:not(:disabled)')
+      ?? document.querySelector('.composer__model > .trigger:not(:disabled)'))?.click()`,
+    ready: '.pop [role="menuitem"], .pop [role="menuitemradio"]',
+    assert: `(() => {
+      const pop = document.querySelector('.pop')
+      if (pop === null) return false
+      const box = pop.getBoundingClientRect()
+      const cap = Math.min(420, window.innerWidth - 16)
+      // **量的是上限本身，不是这一屏碰巧多宽。** 这台机器上探到几家引擎、
+      // 每条说明多长都不该影响结论——会撑破的是那句一百多字的探测说明，
+      // 而它出不出现取决于本机装了什么，钉不住。
+      const declared = Math.round(parseFloat(getComputedStyle(pop).maxWidth))
+      // 说明压到三行：菜单是用来挑的，不是用来读一段故障报告的
+      const clamp = getComputedStyle(pop).getPropertyValue('--pop-max')
+      const desc = pop.querySelector('.pop__desc')
+      const lines = desc === null ? '3' : getComputedStyle(desc).webkitLineClamp
+      return declared === cap && clamp.trim() === '' && lines === '3'
+        && box.left >= 0 && box.right <= window.innerWidth
+    })()`,
+    after: `document.querySelector('.trigger--open')?.click()`,
+  },
+  {
     name: "18-模型菜单焦点",
     before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)',
     open: `(() => {
