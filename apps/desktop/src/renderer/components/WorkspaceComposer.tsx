@@ -52,6 +52,8 @@ export function WorkspaceComposer({
       drafts={props.drafts}
       detached={thread.detached === true}
       focusOnMount={thread.provisional === true}
+      /* 起手那一屏（还没发过第一句）输入区摆得重一些；开工之后收窄。见 `ComposerProps.opening`。 */
+      opening={thread.provisional === true}
       /* **和当前轮次比一比才算数**：`passTurn` 存的是轮次 id，
          所以「过期」不需要谁记得来清一次——下一轮的 id 不一样，这里自然就是 false */
       passing={thread.passTurn !== undefined && thread.passTurn === props.turn?.id}

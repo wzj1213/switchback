@@ -20,6 +20,14 @@ import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
  * 取数与时机全在 `useWorksite`——那里也解释了为什么焦点回来时要重问一次，
  * 以及为什么换工作区要清旧值、同一个工作区重问则不清。
  * 抽出去的直接原因是 `EnvCard` 抄了一份一模一样的，两份会分头走偏。
+ *
+ * ## 两种摆法，一份取数
+ *
+ * `compact` 关掉时它是输入卡里**自己一行**的题注（起手那一屏用）；
+ * 打开时它缩进下面那一排控件里，只留真正会变的那枚。
+ *
+ * **不做成两个组件**：那正是 `EnvCard` 当年犯的错——同一件事两份实现，
+ * 迟早在其中一份上加了「脏了标黄」而另一份没加。
  */
 
 export function Chips({
@@ -28,6 +36,7 @@ export function Chips({
   project,
   stamp,
   passing,
+  compact = false,
 }: {
   threadId: string
   cwd: string
@@ -41,16 +50,26 @@ export function Chips({
    * 屏幕上没有任何痕迹——而这恰恰是最不该沉默的一类状态。
    */
   passing: boolean
+  /**
+   * 缩进控件那一排（会话已经开工）。
+   *
+   * **项目名这时不再出现**：它一整条会话都不会变，而侧栏的分组和这条会话
+   * 所在的位置已经在说同一句话。分支不同——你可能刚在终端里 `git switch`
+   * 过，回来接着让它改，而改的是新分支。**会变的留下，不变的收走。**
+   */
+  compact?: boolean
 }): React.JSX.Element {
   const git = useWorksite(threadId, cwd, stamp)
   const branch = branchLabel(git)
 
   return (
-    <div className="chips">
-      <span className="chip" title={cwd}>
-        <FolderIcon />
-        {project}
-      </span>
+    <div className={compact ? "chips chips--bar" : "chips"}>
+      {compact ? null : (
+        <span className="chip" title={cwd}>
+          <FolderIcon />
+          <span className="chip__name">{project}</span>
+        </span>
+      )}
       {passing ? (
         <span className="chip chip--warn" title="这一轮剩下的审批都自动放行了（红线除外）。要收回：⌘. 中断这一轮">
           本轮已放行
@@ -59,10 +78,12 @@ export function Chips({
       {branch === undefined ? null : (
         <span
           className={`chip${git.dirty === true ? " chip--warn" : ""}`}
-          title={branchTitle(git.detached === true, git.dirtyCount)}
+          /* 缩进那一排之后项目名没了，工作区路径就挂到这枚上——
+             「它到底在哪儿动手」不能只剩一个分支名 */
+          title={`${compact ? `${cwd}\n` : ""}${branchTitle(git.detached === true, git.dirtyCount)}`}
         >
           <BranchIcon />
-          {branch}
+          <span className="chip__name">{branch}</span>
           {dirtyMark(git)}
         </span>
       )}

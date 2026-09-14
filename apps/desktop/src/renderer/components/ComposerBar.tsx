@@ -143,6 +143,7 @@ export function Bar({
   blind,
   aside,
   asideMode,
+  site,
   models,
   model,
   effort,
@@ -171,6 +172,15 @@ export function Bar({
   aside?: React.ReactNode
   /** 侧问模式：右下角那颗键换色、换说明。 */
   asideMode?: boolean
+  /**
+   * 工作区芯片（分支、脏标、本轮已放行）。**只有开工之后才从上面搬下来**——
+   * 起手那一屏它连同项目名自己占一行，那时这里是 undefined。
+   *
+   * 为什么不干脆让它一直待在上面：那一行在会话进行中一整屏都不变，
+   * 而输入卡是这一屏唯一压着正文的东西。摆在这儿分支照样看得见，
+   * 输入卡少一行。
+   */
+  site?: React.ReactNode
   /** 上下文用量：模型选择器把它画成触发器上的进度环。 */
   usage?: Usage
   models: readonly ModelOption[]
@@ -194,6 +204,7 @@ export function Bar({
           <AttachmentPick disabled={detached} onPick={onAttach} />
           <TrustSelect trust={trust} blind={blind}
             disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
+          {site}
           {aside}
         </div>
         <div className="composer__model">

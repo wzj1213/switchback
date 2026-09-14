@@ -270,8 +270,19 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  min-height: 64px;
+  /*
+   * **两档起始高度。** 开工之后是 44（两行），起手那一屏是 64（三行）。
+   *
+   * 一个空框的高度是一句邀请：那一屏除了它什么都没有，写下来的是这条会话
+   * 要干什么，矮一档等于在催。而进行中那一屏，输入框正压着你要读的正文，
+   * 它此时只是「下一句话的入口」——打长了自己会长，最高仍是 180。
+   */
+  min-height: 44px;
   max-height: 180px;
+}
+
+.composer__inner--opening .composer__input {
+  min-height: 64px;
 }
 
 .composer__input::placeholder {
@@ -578,6 +589,25 @@
   margin: 0 0 var(--sp-3);
 }
 
+/*
+ * 开工之后这几枚缩进下面那一排。**不再自己占一行**：那一行在会话进行中
+ * 一整屏都不变，而输入卡是唯一压着正文的东西——留白该让给正文。
+ * 项目名这时不出现（`Chips` 的 `compact` 那段解释了为什么），
+ * 于是这里通常只剩分支一枚，摆在档位选择器右边像一句落款。
+ */
+.chips--bar {
+  gap: var(--sp-2);
+  min-width: 0;
+  /* 左边多 4px：触发器自带 8px 内边距，芯片一点没有。不补的话分支名会贴着
+     上一颗的箭头，读起来像那颗下拉的一部分——它不是控件，是一句落款 */
+  margin: 0 0 0 var(--sp-1);
+}
+
+/* 不是仓库、也没有「本轮已放行」时它一枚都不剩：空盒子不许在那一排里占 gap */
+.chips:empty {
+  display: none;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -589,6 +619,23 @@
 
 .chip svg {
   flex: none;
+}
+
+/* 分支名可以很长（`release/2026-09-09-hotfix`）。自己一行时有的是地方，
+   缩进那一排就得让出宽度——省略号加在名字上，脏标和图标不许被吃掉。 */
+.chip__name {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chips--bar .chip {
+  min-width: 0;
+}
+
+.chips--bar .chip__name {
+  max-width: 16ch;
 }
 
 /* 脏工作区标黄。**不是报错，是提醒**：在别人的改动上面继续动手是合法的，

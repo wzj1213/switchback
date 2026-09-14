@@ -27,6 +27,8 @@ interface Props {
   blind: string | undefined
   aside: boolean
   onAsideExit: () => void
+  /** 开工之后缩进那一排的工作区芯片；起手那一屏它自己占一行，这里就是 undefined。 */
+  site: React.ReactNode
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   onModelChange: (model: string, effort?: string) => void
@@ -63,6 +65,7 @@ export function ComposerControls(props: Props): React.JSX.Element {
       blind={props.blind}
       aside={props.aside ? <AsideChip onExit={props.onAsideExit} /> : undefined}
       asideMode={props.aside}
+      site={props.site}
       onModelChange={props.onModelChange}
       onAttach={props.onAttach}
       onResume={props.onResume}
