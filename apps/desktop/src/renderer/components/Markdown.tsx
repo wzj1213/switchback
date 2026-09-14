@@ -1,8 +1,9 @@
 import { memo } from "react"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { rehypeHighlight } from "../highlight.js"
-import { ExternalLink } from "./external-link.js"
+import { LinkedCode, MessageLink } from "./message-link.js"
+import { messageTarget } from "../message-links.js"
 import { CodeBlock, langOf } from "./code-block.js"
 
 /**
@@ -54,7 +55,12 @@ const REMARK = [remarkGfm]
 // 所以加它不违反上面那条红线：结构上仍然不存在注入面。见 `highlight.ts`。
 const REHYPE = [rehypeHighlight]
 const REHYPE_NONE: [] = []
-const COMPONENTS = { a: ExternalLink, pre: Pre, table: Table }
+const COMPONENTS = { a: MessageLink, code: LinkedCode, pre: Pre, table: Table }
+
+function urlTransform(url: string, key: string): string {
+  if (key !== "href") return defaultUrlTransform(url)
+  return messageTarget(url).kind === "unsupported" ? "" : url
+}
 
 /**
  * @param streaming 这段文字还在流。**流式期间不跑语法高亮**，两个原因：
@@ -79,6 +85,7 @@ export const Markdown = memo(function Markdown({
         remarkPlugins={REMARK}
         rehypePlugins={streaming ? REHYPE_NONE : REHYPE}
         components={COMPONENTS}
+        urlTransform={urlTransform}
       >
         {text}
       </ReactMarkdown>

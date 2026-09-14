@@ -207,7 +207,7 @@ export function foldTurns(rows: readonly Row[], folded: (turnId: string) => bool
  * 后一次覆盖前一次。一轮没改过文件就不插——空卡片比没有更吵。
  */
 function editsFor(items: readonly Item[], turnId: string, cwd: string): Row | undefined {
-  const edits = reportedChangesOf(items.filter((item) => item.turnId === turnId), cwd)
+  const edits = reportedChangesOf(items.filter((item) => item.turnId === turnId), cwd, true)
   return edits.files === 0 ? undefined : { kind: "edits", turnId, edits }
 }
 

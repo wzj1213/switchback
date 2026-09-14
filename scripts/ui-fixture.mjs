@@ -210,7 +210,7 @@ function fill(push, cwd, externalPath) {
     detail: {
       kind: "file_edit",
       path: "apps/desktop/src/renderer/flow-scope.ts",
-      files: [{ path: "apps/desktop/src/renderer/flow-scope.ts", kind: "added", added: 116, removed: 0 }],
+      files: [{ path: "apps/desktop/src/renderer/flow-scope.ts", kind: "add", added: 116, removed: 0 }],
       added: 116,
       removed: 0,
     },
@@ -264,7 +264,10 @@ function followUp(out, { id, cwd, at }) {
   push({
     kind: "agent_message", complete: true,
     text: "提出来了：`WINDOW_MS = 3000`，注释里写清了这个数是怎么来的——" +
-      "再短读数抖，再长看不出「刚才那一下」。",
+      "再短读数抖，再长看不出「刚才那一下」。\n\n" +
+      "[查看代码](apps/desktop/src/renderer/throughput.ts:8) · " +
+      "[预览文档](docs/.omni-link-probe.md) · " +
+      "[大文件](docs/.omni-source-probe.ts:40000) · `http://127.0.0.1:8766`",
   })
   out.push(line({ type: "turn.completed", at: later, turnId: turn, status: "completed" }))
 }
@@ -359,7 +362,7 @@ export function noRepoThread(id, cwd, at, outside) {
     detail: {
       kind: "file_edit",
       path: outside,
-      files: [{ path: outside, kind: "added", added: 242, removed: 0 }],
+      files: [{ path: outside, kind: "add", added: 242, removed: 0 }],
       added: 242,
       removed: 0,
     },

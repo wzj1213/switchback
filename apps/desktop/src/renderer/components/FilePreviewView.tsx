@@ -6,6 +6,7 @@ import { baseName } from "./file-row.js"
 import { FilePreviewHeader } from "./FilePreviewHeader.js"
 import { FilePreviewContent } from "./file-preview-content.js"
 import { useFilePreviewPulse } from "../use-file-preview-pulse.js"
+import { FileLinkScope } from "./message-link.js"
 
 export type PreviewLoad =
   | { state: "loading" }
@@ -169,11 +170,14 @@ export function FilePreviewView({
         {load.state === "loading" ? (
           <p className="workbench__empty">正在读取…</p>
         ) : (
+          <FileLinkScope threadId={target.threadId} cwd={target.cwd} documentPath={path}>
           <FilePreviewContent
             key={`${load.file.kind}:${load.file.path}`}
             file={load.file}
             onCopy={onCopy}
+            target={target}
           />
+          </FileLinkScope>
         )}
       </div>
     </div>

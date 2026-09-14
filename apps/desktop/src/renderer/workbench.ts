@@ -5,6 +5,11 @@ export interface PreviewTarget {
   threadId: string
   cwd: string
   path: string
+  line?: number
+  column?: number
+  fragment?: string
+  /** 每次点击都能重新定位，包括连续两次点击同一行。 */
+  at?: number
 }
 
 /** 右侧工作台只存“正在看什么”；关闭它不会碰后台任务或文件。 */

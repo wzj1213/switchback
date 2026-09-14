@@ -99,7 +99,6 @@ export function ThreadScreen({
         onSettings={() => { shell.setSettingsOpen(true) }}
         searchFiles={app.searchFiles}
         onReview={() => { shell.setReviewOpen(true) }}
-        onOpenFile={shell.openReviewAt}
         send={app.send}
       />
       <ThreadWorkbench

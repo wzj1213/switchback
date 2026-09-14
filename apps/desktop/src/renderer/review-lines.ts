@@ -11,13 +11,17 @@ const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
 /** 给 unified diff 正文配行号；每个 hunk 头都会重置新旧两侧游标。 */
 export function numbered(lines: readonly DiffLine[]): readonly NumberedLine[] {
   const at = { old: 0, new: 0 }
+  let located = false
   return lines.map((line) => {
     const hunk = line.kind === "hunk" ? HUNK.exec(line.text) : null
     if (hunk !== null) {
+      located = true
       at.old = Number(hunk[1])
       at.new = Number(hunk[2])
       return line
     }
+    // 引擎可能只提供增删片段，没有位置时不编造第 0 行或第 1 行。
+    if (!located) return line
     if (line.kind === "del") return { ...line, old: at.old++ }
     if (line.kind === "add") return { ...line, new: at.new++ }
     if (line.kind === "ctx") return { ...line, old: at.old++, new: at.new++ }

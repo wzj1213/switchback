@@ -3,6 +3,7 @@ import type { Changes } from "../changes.js"
 import { ChangedRow } from "./ChangedRow.js"
 import { CaretIcon, CompareIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
+import { requestTurnReview } from "../turn-review.js"
 
 /** 展开摘要后默认露几个文件，长清单再按需展开。 */
 const PREVIEW = 4
@@ -17,26 +18,22 @@ const PREVIEW = 4
  * 你正在读第三轮的答案，那张卡说的却是十轮累计的结果，两者对不上。
  * 往回翻更糟：翻到第三轮，卡还钉在下面，写着现在的总账。
  *
- * 现在一轮一张，谁改的跟着谁。这也让「撤销这一轮」「只看这一轮的 diff」
- * 这类事将来有地方挂——它们本来就以轮次为单位。
+ * 每轮卡携带自己的编辑记录；点开后不再去当前 Git 范围里找同名文件。
  *
  * ## 数字是**引擎报的那一轮**，不是 git 的当前净值
  *
  * 一轮的改动是**已经发生的事实**，拿它去和此刻的磁盘核对是问错了问题：
  * 后面几轮很可能又改过同几行，核出来的净值不属于这一轮。所以这里如实写
- * 引擎当时报的那份；要看「现在相对开场还剩什么」，那是审核面板的事——
- * 「审核」那颗就是去那儿的门。
+ * 引擎当时报的那份；卡片与面板默认都看每文件最后一次上报，多次编辑可以逐次翻阅。
+ * 要看当前工作区则走面板里的「Git 差异」，由主进程读取真实 Git 范围。
  */
-export function TurnEdits({ edits, cwd, threadId, onReveal, onCopy, onReview, onOpen }: {
+export function TurnEdits({ edits, cwd, threadId, turnId, onReveal, onCopy }: {
   edits: Changes
   cwd: string
   threadId: string
+  turnId: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
-  /** 「审一遍」那颗：打开右侧面板（不指定文件）。 */
-  onReview: () => void
-  /** 点某个文件：打开右侧面板并落在它上面。 */
-  onOpen: (path: string) => void
 }): React.JSX.Element | null {
   const [all, setAll] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -56,15 +53,16 @@ export function TurnEdits({ edits, cwd, threadId, onReveal, onCopy, onReview, on
           </span>
           <CaretIcon size={12} />
         </button>
-        <button type="button" className="edits__review" aria-label="审一遍（⇧⌘R）"
-          data-tip="审一遍（⇧⌘R）" onClick={onReview}>
+        <button type="button" className="edits__review" aria-label="查看本轮改动"
+          data-tip="查看本轮改动" onClick={() => { requestTurnReview({ threadId, cwd, turnId, edits }) }}>
           <CompareIcon size={14} />
         </button>
       </div>
       <div id={listId} className="edits__list" hidden={!expanded}>
         {expanded ? shown.map((file) => (
           <ChangedRow key={file.path} file={file} cwd={cwd} threadId={threadId}
-            onReveal={onReveal} onCopy={onCopy} onOpen={onOpen} />
+            onReveal={onReveal} onCopy={onCopy}
+            onOpen={(path) => { requestTurnReview({ threadId, cwd, turnId, edits, path }) }} />
         )) : null}
         {!expanded || edits.list.length <= PREVIEW ? null : (
           <button type="button" className="changed__more" onClick={() => { setAll((was) => !was) }}>

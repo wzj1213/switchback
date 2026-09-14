@@ -9,6 +9,7 @@ import { ACTIVITY_VIEWS } from "./shot-views-activity.mjs"
 import { FILE_REFRESH_VIEWS } from "./shot-views-file-refresh.mjs"
 import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 import { CHANGED_VIEWS } from "./shot-views-changed.mjs"
+import { LINK_REVIEW_VIEWS } from "./shot-views-links.mjs"
 import { openPanelPage } from "./shot-panel.mjs"
 export const VIEWS = [
     {
@@ -71,7 +72,7 @@ export const VIEWS = [
       })()`,
       after: `document.querySelector('button[aria-label="展开侧栏"]')?.click()`,
     },
-    ...CHANGED_VIEWS,
+    ...CHANGED_VIEWS, ...LINK_REVIEW_VIEWS,
     {
       name: "02-桌宠固定地面",
       open: `(() => {

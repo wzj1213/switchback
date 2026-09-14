@@ -13,6 +13,7 @@ import { TranscriptRail } from "./TranscriptRail.js"
 import { useTranscriptRail } from "../use-transcript-rail.js"
 import { navPointsOf } from "../transcript-rail.js"
 import { engineStints } from "../engine-mark.js"
+import { FileLinkScope } from "./message-link.js"
 
 /**
  * 对话正文。
@@ -45,7 +46,7 @@ export const Transcript = memo(function Transcript({
   tasks,
   engines,
   thinkingTokens,
-  onReveal, onReview, onOpenFile,
+  onReveal,
   send,
   onCopy,
   onReuse,
@@ -60,9 +61,6 @@ export const Transcript = memo(function Transcript({
   engines: readonly EngineInfo[]
   thinkingTokens: number | undefined
   onReveal?: ((path: string) => void) | undefined
-  onReview?: (() => void) | undefined
-  /** 点改动卡里某个文件：打开审核面板并落在它上面。缺席时那张卡不画（对比视图）。 */
-  onOpenFile?: ((path: string) => void) | undefined
   send: (command: Command) => void
   onCopy: (text: string) => void
   /**
@@ -125,6 +123,7 @@ export const Transcript = memo(function Transcript({
     >
       <TranscriptRail marks={rail.marks} activeId={rail.activeId} engines={engines} onJump={rail.jump} />
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
+      <FileLinkScope threadId={thread.id} cwd={thread.cwd}>
       <div className="transcript__inner" ref={inner}>
         {rows.map((row) => (
           <RowView
@@ -134,7 +133,7 @@ export const Transcript = memo(function Transcript({
             cwd={thread.cwd}
             engines={engines}
             acts={row.kind === "item" && acts.has(row.item.id)}
-            onReveal={onReveal} onReview={onReview} onOpenFile={onOpenFile}
+            onReveal={onReveal}
             {...(canRewind(thread, turn, readOnly === true)
               ? { onRewind: (turnId: string) => { send({ type: "thread.rewind", threadId: thread.id, turnId }) } }
               : {})}
@@ -152,6 +151,7 @@ export const Transcript = memo(function Transcript({
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
         <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} thinkingTokens={thinkingTokens} />
       </div>
+      </FileLinkScope>
       {/* 往回翻的时候给一条回去的路。**这才是「逃生口不该滚走」的正确解法**——
           不是把状态行钉住，而是给一个「回到底部」 */}
       <AskFloat pick={ask} onAsk={onReuse} />

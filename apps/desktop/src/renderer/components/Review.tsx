@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { filterFiles, tallyReview, useReview, usePatch } from "../review.js"
 import { usePanelKeys } from "../use-panel-keys.js"
 import { useNarrowPanel } from "../use-narrow-panel.js"
-import type { ReviewFile } from "../../shared/review.js"
 import { ReviewList } from "./ReviewList.js"
 import { Tools } from "./ReviewTools.js"
 import { blank, ReviewSummary } from "./review-empty.js"
@@ -10,6 +9,7 @@ import { ReviewPane } from "./review-pane.js"
 import { PanelTabs, type PanelTabsProps } from "./PanelTabs.js"
 import { Select } from "./Select.js"
 import type { ReviewScope } from "../../shared/review.js"
+import { ReviewNavigationBar } from "./review-navigation-bar.js"
 
 const SCOPES: readonly { id: ReviewScope; label: string; description: string }[] = [
   { id: "last-turn", label: "上一轮", description: "只看最近一次发送之后留下的改动" },
@@ -48,30 +48,7 @@ function ignoredOf(paths: readonly string[] | undefined): readonly string[] {
   return paths === undefined ? [] : paths
 }
 
-/**
- * 从转录区那张改动卡点过来：落到那个文件上。
- *
- * **认绝对路径不认 rel**：卡那边是引擎报的路径（已归一），而这边的 rel 是
- * 相对 git 根的——两者在符号链接、子仓库那些情形下对不上。清单里没有它
- *（被筛掉了、或者那处改动已经没了）就什么都不做，**不清掉用户当前选的那个**。
- *
- * 抽成 hook 是函数行数闸门逼的，这一刀也顺：面板那个函数管的是「这一屏怎么摆」，
- * 而这条管的是「别处来的一个意图怎么落地」。
- */
-function useFocusFile(
-  focus: { path: string; at: number } | undefined,
-  files: readonly ReviewFile[],
-  onPick: (rel: string) => void,
-): void {
-  useEffect(() => {
-    if (focus === undefined) return
-    const hit = files.find((one) => one.path === focus.path)
-    if (hit !== undefined) onPick(hit.rel)
-    // 依赖只有落点和清单：`onPick` 每次渲染都是新函数，进依赖会让这条每帧重跑
-  }, [focus, files, onPick])
-}
-
-export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus, onClose, onCopy }: {
+export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClose, onCopy }: {
   cwd: string
   threadId: string
   /** 轮次戳：跑完一轮就重问一遍 git。 */
@@ -79,11 +56,6 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
   /** 引擎明确上报过的路径；Git 忽略项也必须诚实地出现在审核状态里。 */
   wanted: readonly string[]
   panelActive: boolean
-  /**
-   * 从别处点过来时要落在哪个文件上（绝对路径）。**带一个自增的号**——
-   * 连着点同一个文件两次，路径没变但那两下都该生效。
-   */
-  focus?: { path: string; at: number } | undefined
   panel: PanelTabsProps
   onClose: () => void
   onCopy: (text: string) => Promise<boolean>
@@ -101,12 +73,8 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
   const [split, setSplit] = useState(false)
   const [context, setContext] = useState<number>(3)
   const [list, setList] = useState(true)
+  const [wrap, setWrap] = useState(true)
   const files = useMemo(() => filterFiles(data.files, query), [data.files, query])
-  const land = useCallback((rel: string) => {
-    setQuery("")
-    setPicked(rel)
-  }, [])
-  useFocusFile(focus, data.files, land)
   // 选中的那个被筛掉了（或者上一轮把它改回去了）就退回第一个——
   // 停在一个列表里已经没有的文件上，右边会一直是空的
   const active = files.some((f) => f.rel === picked) ? picked : files[0]?.rel
@@ -158,6 +126,7 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
             onPick={(rel) => { setQuery(""); setPicked(rel) }}
           />
       </header>
+      <ReviewNavigationBar files={files} active={active} onPick={setPicked} wrap={wrap} onWrap={setWrap} fixedWrap={split && !narrow} />
       <div className={`rv__body${list ? "" : " rv__body--list-hidden"}`}>
         <ReviewList
           files={files}
@@ -168,11 +137,12 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, focus
           ignored={ignored}
           {...(data.more === undefined ? {} : { more: data.more })}
         />
-        <ReviewPane
-          file={file}
-          patch={patch}
+        <ReviewPane file={file} patch={patch}
           empty={blank({ ...view, shown: files.length })}
           split={split && !narrow}
+          wrap={wrap}
+          cwd={cwd}
+          threadId={threadId}
           box={pane}
           onCopy={onCopy}
         />

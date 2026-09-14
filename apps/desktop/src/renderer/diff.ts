@@ -14,9 +14,9 @@ export interface DiffLine {
   text: string
 }
 
-function classify(line: string): DiffLineKind {
+function classify(line: string, inHunk: boolean): DiffLineKind {
   if (line.startsWith("@@")) return "hunk"
-  if (line.startsWith("+++") || line.startsWith("---")) return "meta"
+  if (!inHunk && (line.startsWith("+++ ") || line.startsWith("--- "))) return "meta"
   if (line.startsWith("diff ") || line.startsWith("index ")) return "meta"
   if (/^(?:old mode|new mode|deleted file mode|new file mode|copy from|copy to|rename from|rename to|similarity index|dissimilarity index|\\ No newline at end of file)/.test(line)) return "meta"
   if (line.startsWith("+")) return "add"
@@ -44,8 +44,11 @@ export function parseDiff(diff: string, kind: FileChangeKind): readonly DiffLine
   const lines = raw[raw.length - 1] === "" ? raw.slice(0, -1) : raw
   if (kind === "add") return lines.map((text) => ({ kind: "add" as const, text }))
   if (kind === "delete") return lines.map((text) => ({ kind: "del" as const, text }))
+  let inHunk = false
   return lines.map((line) => {
-    const lineKind = classify(line)
+    if (line.startsWith("diff --git ")) inHunk = false
+    if (line.startsWith("@@")) inHunk = true
+    const lineKind = classify(line, inHunk)
     return { kind: lineKind, text: stripPrefix(lineKind, line) }
   })
 }

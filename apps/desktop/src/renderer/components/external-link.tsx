@@ -12,7 +12,7 @@ export function ExternalLink({
 }): React.JSX.Element {
   const target = href ?? ""
   return (
-    <a className="outlink" href={href} target="_blank" rel="noreferrer noopener">
+    <a className="outlink" href={href} target="_blank" rel="noreferrer noopener" title={`在浏览器中打开 · ${target}`}>
       <span className="outlink__icon">
         {isGitHubLink(target) ? <GitHubIcon size={14} /> : <GlobeIcon size={14} />}
       </span>

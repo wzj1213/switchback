@@ -16,8 +16,6 @@ export function ConversationStage({
   usage,
   pets,
   onReveal,
-  onReview,
-  onOpenFile,
   send,
   onCopy,
   onReuse,
@@ -33,9 +31,6 @@ export function ConversationStage({
   usage: Usage | undefined
   pets: PetKit & { on: boolean }
   onReveal: (path: string) => void
-  onReview: () => void
-  /** 点改动卡里某个文件：打开审核面板并落在它上面。 */
-  onOpenFile: (path: string) => void
   send: (command: Command) => void
   onCopy: (text: string) => void
   onReuse: (text: string, attachments?: readonly string[], aside?: boolean) => void
@@ -52,8 +47,6 @@ export function ConversationStage({
         engines={engines}
         thinkingTokens={thinkingTokens}
         onReveal={onReveal}
-        onReview={onReview}
-        onOpenFile={onOpenFile}
         send={send}
         onCopy={onCopy}
         onReuse={onReuse}

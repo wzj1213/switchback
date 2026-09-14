@@ -1,54 +1,12 @@
-import { useId, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import type { FilePreview } from "../../shared/file-preview.js"
 import { sandboxHtml } from "../safe-html.js"
-import { useCopyFeedback, type CopyFeedback } from "../use-copy-feedback.js"
-import { CheckIcon, CopyIcon } from "./icons.js"
+import { Source } from "./file-source.js"
+import { TextPreview } from "./text-preview.js"
+import type { PreviewTarget } from "../workbench.js"
+export { fileCopyLabel, fileCopyTitle } from "./file-source.js"
 
 type CopyText = (text: string) => unknown
-
-export function fileCopyLabel(truncated: boolean, feedback: CopyFeedback): string {
-  if (feedback === "failed") return "复制失败"
-  if (feedback === "copied") return truncated ? "已复制显示部分" : "已复制"
-  return truncated ? "复制显示部分" : "复制"
-}
-
-export function fileCopyTitle(truncated: boolean, feedback: CopyFeedback): string {
-  if (feedback === "failed") return "复制失败，请重试"
-  if (feedback === "copied")
-    return truncated ? "当前显示的前 1.5 MB 已复制" : "文件内容已复制"
-  return truncated ? "只复制当前显示的前 1.5 MB" : "复制文件内容"
-}
-
-function Source({
-  file,
-  onCopy,
-}: {
-  file: Extract<FilePreview, { kind: "text" | "html" }>
-  onCopy: CopyText
-}): React.JSX.Element {
-  const [feedback, copy] = useCopyFeedback(() => onCopy(file.text))
-  return (
-    <div className="file-source" tabIndex={0} aria-label="可横向滚动的文件源码">
-      {file.truncated ? <p className="file-preview__note">文件较大，只显示前 1.5 MB。</p> : null}
-      <div className="file-source__toolbar">
-        <button
-          type="button"
-          className="file-preview__copy"
-          aria-live="polite"
-          data-state={feedback}
-          data-tip={fileCopyTitle(file.truncated, feedback)}
-          onClick={copy}
-        >
-          {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-          {fileCopyLabel(file.truncated, feedback)}
-        </button>
-      </div>
-      <pre>
-        <code data-language={file.language}>{file.text}</code>
-      </pre>
-    </div>
-  )
-}
 
 type HtmlMode = "preview" | "source"
 
@@ -73,12 +31,15 @@ export function htmlTabDestination(
 export function HtmlPreview({
   file,
   onCopy,
+  target,
 }: {
   file: Extract<FilePreview, { kind: "html" }>
   onCopy: CopyText
+  target?: PreviewTarget | undefined
 }): React.JSX.Element {
-  const [picked, setPicked] = useState<HtmlMode>(file.truncated ? "source" : "preview")
+  const [picked, setPicked] = useState<HtmlMode>(file.truncated || target?.line !== undefined ? "source" : "preview")
   const mode = resolvedHtmlMode(picked, file.truncated)
+  useEffect(() => { if (target?.line !== undefined) setPicked("source") }, [target?.line, target?.at])
   const preview = useRef<HTMLButtonElement>(null)
   const source = useRef<HTMLButtonElement>(null)
   const base = useId()
@@ -128,7 +89,7 @@ export function HtmlPreview({
       </div>
       <div id={panelId} className="html-preview__panel" role="tabpanel" aria-labelledby={tabId}>
         {mode === "source" ? (
-          <Source file={file} onCopy={onCopy} />
+          <Source file={file} onCopy={onCopy} target={target} />
         ) : (
           <iframe
             className="html-preview__frame"
@@ -146,9 +107,11 @@ export function HtmlPreview({
 export function FilePreviewContent({
   file,
   onCopy,
+  target,
 }: {
   file: FilePreview
   onCopy: CopyText
+  target?: PreviewTarget | undefined
 }): React.JSX.Element {
   if (file.kind === "unavailable") return <p className="workbench__empty">{file.message}</p>
   if (file.kind === "image")
@@ -157,6 +120,6 @@ export function FilePreviewContent({
         <img src={file.dataUrl} alt={file.name} />
       </div>
     )
-  if (file.kind === "html") return <HtmlPreview file={file} onCopy={onCopy} />
-  return <Source file={file} onCopy={onCopy} />
+  if (file.kind === "html") return <HtmlPreview file={file} onCopy={onCopy} target={target} />
+  return <TextPreview file={file} onCopy={onCopy} target={target} />
 }

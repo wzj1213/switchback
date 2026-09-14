@@ -6,7 +6,7 @@ import {
 import { stampOf } from "./stamp.js"
 import { reportedChangesOf } from "./changes.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"
-import { Review } from "./components/Review.js"
+import { ReviewSurface } from "./components/review-surface.js"
 import { ThreadScreen } from "./components/ThreadScreen.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { TipLayer } from "./components/tips.js"
@@ -100,7 +100,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
   // 没有会话时不给——它审的是「这条会话的工作区」，没有会话就没有那个目录
   const review =
     shell.reviewOpen && thread !== undefined ? (
-      <Review
+      <ReviewSurface
         /* 切任务时整块重挂：筛选词、选中文件和上一任务的缓存都不能跨任务短暂露出来。 */
         key={thread.id}
         cwd={thread.cwd}
@@ -108,7 +108,8 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
         stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
         wanted={reportedChangesOf(itemsOf(state, thread.id), thread.cwd).list.map((file) => file.path)}
         panelActive={shell.reviewActive}
-        focus={shell.reviewFocus}
+        reported={shell.reportedReview}
+        onGit={shell.clearReportedReview}
         panel={{
           tabs: shell.panelTabs,
           active: shell.panelActive,

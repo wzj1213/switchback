@@ -34,6 +34,8 @@ export interface ChangedFile {
   removed: number
   /** 非 git 工作区的诚实降级：只保留最后一次上报，不把多轮数字相加。 */
   last: FileChange
+  /** 同一轮同一文件的原始编辑序列，只在重复编辑时保存。 */
+  edits?: readonly FileChange[]
   review?: ReviewFile
   /** Git ignore 规则让开场树无法覆盖这条路径，只能保留引擎最后一次上报。 */
   unverified?: true
@@ -48,13 +50,17 @@ function tally(list: readonly ChangedFile[]): Changes {
   }
 }
 
+function editHistory(previous: ChangedFile | undefined, file: FileChange): Pick<ChangedFile, "edits"> {
+  return previous === undefined ? {} : { edits: [...(previous.edits ?? [previous.last]), file] }
+}
+
 /**
  * 引擎明确报告成功的编辑。
  *
  * 同一文件按 cwd 归一后只占一行、按首次出现排序；后续别名上报只更新最后一次编辑。
  * 真实净变更随后由 `reconcileChanges` 向 git 核实。
  */
-export function reportedChangesOf(items: readonly Item[], cwd: string): Changes {
+export function reportedChangesOf(items: readonly Item[], cwd: string, keepEdits = false): Changes {
   const files = new Map<string, ChangedFile>()
   for (const item of items) {
     if (item.inherited === true || item.kind !== "tool_call" || item.detail.kind !== "file_edit" || item.status !== "ok")
@@ -65,7 +71,11 @@ export function reportedChangesOf(items: readonly Item[], cwd: string): Changes 
       // 下次重启就没了（见 `shared/paths.ts` 的 `isScratch`）。侧栏那张
       // 「这条会话碰过的文件」照旧列它们：那一问问的是「它读写过什么」
       if (path === "" || isScratch(path, cwd)) continue
-      files.set(path, { path, added: file.added, removed: file.removed, last: file })
+      // 完整会话的路径清单不复制整段历史；只有按轮读取的改动卡需要逐次记录。
+      const previous = keepEdits ? files.get(path) : undefined
+      files.set(path, { path, added: file.added, removed: file.removed, last: file,
+        ...editHistory(previous, file),
+      })
     }
   }
   return tally([...files.values()])

@@ -127,13 +127,14 @@ function SplitLine({ row, paint }: { row: SplitRow; paint: Paint }): React.JSX.E
   )
 }
 
-export function ReviewDiff({ lines, path, skip, split, loading }: {
+export function ReviewDiff({ lines, path, skip, split, loading, wrap = false }: {
   lines: readonly NumberedLine[]
   /** 相对路径，**只用来取语言**——取不到就不染（沿用「没标语言就不猜」）。 */
   path?: string | undefined
   skip?: PatchSkip
   split: boolean
   loading: boolean
+  wrap?: boolean
 }): React.JSX.Element {
   // 着色和词级高亮一起算，一份补丁一次。切文件、换上下文档位才重算
   const paint = useMemo(() => paintPatch(path, lines), [path, lines])
@@ -158,7 +159,7 @@ export function ReviewDiff({ lines, path, skip, split, loading }: {
   )
   return (
     <div
-      className={loading ? "rvd rvd--stale" : "rvd"}
+      className={`rvd${loading ? " rvd--stale" : ""}${wrap ? " rvd--wrap" : ""}`}
       role="region"
       aria-label={split ? "并排文件改动，可滚动" : "文件改动，可滚动"}
       tabIndex={0}

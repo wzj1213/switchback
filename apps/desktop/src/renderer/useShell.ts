@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { onFilePreviewRequest } from "./file-preview-request.js"
+import { onTurnReviewRequest, type TurnReviewTarget } from "./turn-review.js"
 import {
   CLOSED_WORKBENCH,
   showActivity,
@@ -58,14 +59,9 @@ export interface Shell {
   reviewOpen: boolean
   reviewActive: boolean
   setReviewOpen: (on: boolean) => void
-  /**
-   * 打开审核面板并落在这个文件上（绝对路径）。
-   *
-   * **带一个自增的号**：连着点同一个文件两次也要各生效一次——只带路径的话
-   * 第二次的值和第一次相同，面板那边看不出「又点了一下」。
-   */
-  reviewFocus: { path: string; at: number } | undefined
-  openReviewAt: (path: string) => void
+  /** 从转录区打开的某轮原始编辑记录。 */
+  reportedReview: TurnReviewTarget | undefined
+  clearReportedReview: () => void
   panelTabs: readonly PanelPage[]
   panelActive: PanelPage
   panelVisible: boolean
@@ -109,7 +105,7 @@ export function useShell(): Shell {
   const [comparing, setComparing] = useState(false)
   const [railOpen, setRailOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [reviewFocus, setReviewFocus] = useState<{ path: string; at: number }>()
+  const [reportedReview, setReportedReview] = useState<TurnReviewTarget>()
   const [panel, setPanel] = useState(CLOSED_PANEL)
   const [focusFilter, setFocusFilter] = useState(0)
   const [askRename, setAskRename] = useState(0)
@@ -125,12 +121,16 @@ export function useShell(): Shell {
   }, [])
   const openFile = useCallback((target: PreviewTarget) => {
     setPanel((before) => openPanel(before, "files"))
-    setWorkbench((prev) => showFile(prev, target))
+    setWorkbench((prev) => showFile(prev, { ...target, at: (prev.file?.at ?? 0) + 1 }))
   }, [])
   const closeWorkbench = useCallback(() => {
     setPanel(hidePanel)
   }, [])
   useEffect(() => onFilePreviewRequest(openFile), [openFile])
+  useEffect(() => onTurnReviewRequest((target) => {
+    setReportedReview((before) => ({ ...target, at: (before?.at ?? 0) + 1 }))
+    setPanel((before) => openPanel(before, "review"))
+  }), [])
   // 原生通知的超时 effect 依赖它；引用稳定才能避免每次流式重绘都把计时重新开始。
   const dismiss = useCallback((id: string) => {
     setDismissed((prev) => new Set(prev).add(id))
@@ -166,13 +166,11 @@ export function useShell(): Shell {
     reviewOpen: hasPanelTab(panel, "review"),
     reviewActive: panel.visible && panel.active === "review",
     setReviewOpen: (on) => {
+      if (on) setReportedReview(undefined)
       setPanel((before) => on ? openPanel(before, "review") : closePanelTab(before, "review"))
     },
-    reviewFocus,
-    openReviewAt: (path) => {
-      setPanel((before) => openPanel(before, "review"))
-      setReviewFocus((was) => ({ path, at: (was?.at ?? 0) + 1 }))
-    },
+    reportedReview,
+    clearReportedReview: () => { setReportedReview(undefined) },
     panelTabs: panel.tabs,
     panelActive: panel.active,
     panelVisible: panel.visible,

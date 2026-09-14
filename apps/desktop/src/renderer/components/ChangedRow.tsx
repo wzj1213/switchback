@@ -1,11 +1,11 @@
-import type { PatchSkip, ReviewPatch } from "../../shared/review.js"
 import type { ChangedFile } from "../changes.js"
 import { splitPath } from "../diff.js"
 import { relPath } from "../tool.js"
 import { requestFilePreview } from "../file-preview-request.js"
-import { CopyIcon, RevealIcon } from "./icons.js"
+import { CheckIcon, CopyIcon, RevealIcon } from "./icons.js"
 import { FileIcon } from "./icons-activity.js"
 import { outside } from "./file-row.js"
+import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
 
 interface Props {
   file: ChangedFile
@@ -15,33 +15,6 @@ interface Props {
   onCopy: (text: string) => void
   /** 点文件名去哪儿：**右侧审核面板里那份 diff**。 */
   onOpen: (path: string) => void
-}
-
-const SKIP_TEXT: Readonly<Record<PatchSkip, string>> = {
-  binary: "（二进制文件不显示补丁）",
-  large: "（补丁过大，请在审核面板或外部工具中查看）",
-  gone: "（文件已不存在）",
-  failed: "（读取这份净改动失败，请重试）",
-}
-
-function bodyOf(patch: ReviewPatch): string {
-  if (patch.patch !== "") return patch.patch
-  return patch.skip === undefined ? "（当前没有净改动）" : SKIP_TEXT[patch.skip]
-}
-
-async function copyFile(
-  file: ChangedFile,
-  cwd: string,
-  onCopy: (text: string) => void,
-  threadId: string,
-): Promise<void> {
-  const bridge = typeof window === "undefined" ? undefined : window.omni
-  if (file.review === undefined || bridge === undefined) {
-    onCopy(`${file.path}\n\n${file.last.diff ?? "（这次编辑没有带补丁）"}`)
-    return
-  }
-  const patch = await bridge.workPatch(cwd, file.review.rel, { context: 3, threadId }).catch(() => undefined)
-  onCopy(`${file.path}\n\n${patch === undefined ? "（读取当前净补丁失败）" : bodyOf(patch)}`)
 }
 
 function Stat({ added, removed }: { added: number; removed: number }): React.JSX.Element {
@@ -93,14 +66,7 @@ function PreviewFile({ file, threadId, cwd }: {
   )
 }
 
-/**
- * 改动卡里的一行。**点文件名直接去右侧审核面板看 diff。**
- *
- * 上一版点了是就地展开一段补丁。两个毛病：一是展开之后这张卡把正文顶开，
- * 而你本来只是想看一眼那处改动；二是**它展开的是引擎当时报的那份**，
- * 而右侧面板给的是「现在相对开场」的那份，同一个文件两处两个答案。
- * 现在只留一条路：去面板。
- */
+/** 点文件名打开该轮原始编辑记录；预览按钮读取当前文件。 */
 export function ChangedRow({
   file,
   cwd,
@@ -110,13 +76,15 @@ export function ChangedRow({
   onOpen,
 }: Props): React.JSX.Element {
   const shown = splitPath(relPath(file.path, cwd))
+  const [feedback, copy] = useCopyFeedback(() => onCopy(`${file.path}\n\n${file.last.diff ?? "引擎未提供补丁内容"}`))
+  const copyTitle = copyFeedbackTitle(feedback, "复制这次编辑记录", "编辑记录已复制")
   return (
     <div className="changed__file">
       <div className="changed__row">
         <button
           type="button"
           className="changed__name"
-          title={`在右侧审核面板里看这份改动\n${file.path}`}
+          title={`查看本轮编辑记录\n${file.path}`}
           onClick={() => {
             onOpen(file.path)
           }}
@@ -135,13 +103,13 @@ export function ChangedRow({
         <button
           type="button"
           className="changed__act"
-          aria-label="复制这份当前净改动"
-          title="复制这份当前净改动"
-          onClick={() => {
-            void copyFile(file, cwd, onCopy, threadId)
-          }}
+          aria-label={copyTitle}
+          title={copyTitle}
+          data-state={feedback}
+          aria-live="polite"
+          onClick={copy}
         >
-          <CopyIcon size={14} />
+          {feedback === "copied" ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
         </button>
       </div>
     </div>

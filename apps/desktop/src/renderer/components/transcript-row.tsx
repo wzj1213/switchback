@@ -125,7 +125,7 @@ export const approvalShortcut = (readOnly: boolean, itemId: string | undefined):
   readOnly ? undefined : itemId
 
 /** 一行。几种形态在这里分派，`Transcript` 只管遍历。 */
-export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, onReveal, onReview, onOpenFile, folded, onFold, onCopy,
+export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, onReveal, folded, onFold, onCopy,
   onResolve, approvalTurn, shortcutApproval, readOnly }: {
   row: Row
   /** 引擎清单：换手分界要把 id 翻成人话。 */
@@ -137,10 +137,6 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
   cwd: string
   /** 在访达里定位一个文件。给了那张改动卡才画行内动作。 */
   onReveal?: ((path: string) => void) | undefined
-  /** 去审核面板。那张改动卡上「审一遍」那颗走它。 */
-  onReview?: (() => void) | undefined
-  /** 去审核面板**并落在这个文件上**。点文件名走它。 */
-  onOpenFile?: ((path: string) => void) | undefined
   /** 从某一轮之前重来。 */
   onRewind?: (turnId: string) => void
   /**
@@ -197,10 +193,10 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
   // 这一轮改了哪些文件。**没有工作区节拍或没有入口时不画**——
   // 一张点了什么都不会发生的卡比没有更糟（同「从这里重来」那条）
   if (row.kind === "edits") {
-    if (onReveal === undefined || onReview === undefined || onOpenFile === undefined) return <></>
+    if (onReveal === undefined || readOnly) return <></>
     return (
-      <TurnEdits edits={row.edits} cwd={cwd} threadId={threadId} onReveal={onReveal}
-        onCopy={onCopy} onReview={onReview} onOpen={onOpenFile} />
+      <TurnEdits edits={row.edits} cwd={cwd} threadId={threadId} turnId={row.turnId}
+        onReveal={onReveal} onCopy={onCopy} />
     )
   }
   if (row.kind === "aside") return <AsideCard aside={row.aside} />

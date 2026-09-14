@@ -83,8 +83,6 @@ export interface WorkspaceProps {
   onSettings: () => void
   /** 打开审核面板。变更汇总卡上那颗按钮走这条。 */
   onReview: () => void
-  /** 打开审核面板并落在某个文件上。转录区那张改动卡点文件名走它。 */
-  onOpenFile: (path: string) => void
   /** 让侧栏把当前会话切进改名态。 */
   onRename: () => void
   onNew: () => void
@@ -224,8 +222,6 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         pets={props.pets}
         send={send}
         onReveal={props.onReveal}
-        onReview={props.onReview}
-        onOpenFile={props.onOpenFile}
         onCopy={props.onCopy}
         onReuse={reuse}
       >
