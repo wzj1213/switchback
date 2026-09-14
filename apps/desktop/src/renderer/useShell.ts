@@ -3,6 +3,7 @@ import { onFilePreviewRequest } from "./file-preview-request.js"
 import { onTurnReviewRequest, type TurnReviewTarget } from "./turn-review.js"
 import {
   CLOSED_WORKBENCH,
+  navigateFile,
   showActivity,
   showActivityIndex,
   showFile,
@@ -94,6 +95,7 @@ export interface Shell {
   activityIndex: () => void
   openFiles: () => void
   openFile: (target: PreviewTarget) => void
+  navigateFile: (direction: -1 | 1) => void
   fileIndex: () => void
   hideWorkbench: () => void
 }
@@ -149,6 +151,7 @@ export function useShell(): Shell {
     activityIndex: () => { setWorkbench(showActivityIndex) },
     openFiles: () => { showPanelPage("files") },
     openFile,
+    navigateFile: (direction) => { setWorkbench((before) => navigateFile(before, direction)) },
     fileIndex: () => { setWorkbench(showFileIndex) },
     hideWorkbench: closeWorkbench,
     selectedId,

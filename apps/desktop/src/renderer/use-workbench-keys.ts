@@ -22,9 +22,10 @@ function coveredByModal(panel: HTMLElement | null): boolean {
   return top !== undefined && top !== panel
 }
 
-function keepsIndexFocus(state: FocusState, active: Element | null): boolean {
+function keepsWorkbenchFocus(state: FocusState, active: Element | null): boolean {
   if (!(active instanceof HTMLElement)) return false
   if (active.matches(".panel-tab--on .panel-tab__pick")) return true
+  if (state.page === "files" && state.file !== undefined) return active.closest(".file-preview-nav") !== null
   if (state.page === "files") return state.file === undefined && active.matches(".file-row")
   return state.laneId === undefined && active.matches(".activity-row")
 }
@@ -61,7 +62,7 @@ export function useWorkbenchKeys(
     const panel = box.current
     if (!state.visible || panel === null) return
     const active = document.activeElement
-    if (panel.contains(active) && keepsIndexFocus(state, active)) return
+    if (panel.contains(active) && keepsWorkbenchFocus(state, active)) return
     const target = panel.querySelector<HTMLElement>(selector)
     const focus = target ?? panel
     // preventScroll：同 `use-panel-keys.ts` 那段——scroll-into-view 会把

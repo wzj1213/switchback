@@ -57,7 +57,15 @@ describe("Markdown 链接渲染", () => {
     expect(html).not.toContain("<a ")
     expect(html).not.toContain("<script>")
   })
+  it("行内命令保持可复制的原文，含空格文件仍能通过显式链接打开", () => {
+    const html = render('`./run.sh --help` `/usr/bin/python app.py` `http://localhost:8766 --help` [脚本](</work/My Script.sh>)')
+    expect(html.match(/<a /g)).toHaveLength(1)
+    expect(html).toContain('<code>./run.sh --help</code>')
+    expect(html).toContain('预览文件 · /work/My Script.sh')
+  })
   const inline = [["src/app.ts:8", true], ["manager.py", true], ["v1.2", false],
+    ["./run.sh --help", false], ["/usr/bin/python app.py", false], ["./run.sh|cat", false], ["./run.sh|cat.txt", false],
+    ["http://localhost:8766 --help", false], ["./中文文件.py", true],
     ["pnpm test", false], ["git diff --stat", false], ["foo()", false], ["http://x.test\n", false]] as const
   for (const [text, expected] of inline) it(`行内代码 ${text}`, () => { expect(inlineTarget(text)).toBe(expected) })
 })

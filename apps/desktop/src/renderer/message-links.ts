@@ -68,9 +68,9 @@ export function messageTarget(href: string): MessageTarget {
 /** 行内代码只识别完整 URL 或明确文件名，不把命令、版本号和表达式变成链接。 */
 export function inlineTarget(text: string): boolean {
   if (text.includes("\n") || text !== text.trim()) return false
-  if (/^(?:https?:\/\/|file:\/\/)/i.test(text)) return messageTarget(text).kind !== "unsupported"
-  return /^(?:\.?\.?[/\\]|[A-Za-z]:[/\\])[^\n]+$/.test(text)
-    || /^[^\s<>:]+\.(?:tsx?|jsx?|py|go|rs|md|txt|html?|css|json|ya?ml|toml|sh)(?::\d+(?::\d+)?|#L\d+)?$/i.test(text)
+  if (/^(?:https?:\/\/|file:\/\/)/i.test(text)) return !/\s/.test(text) && messageTarget(text).kind !== "unsupported"
+  return /^(?:\.?\.?[/\\]|[A-Za-z]:[/\\])[^\s<>|;&]+$/.test(text)
+    || /^[^\s<>:|;&]+\.(?:tsx?|jsx?|py|go|rs|md|txt|html?|css|json|ya?ml|toml|sh)(?::\d+(?::\d+)?|#L\d+)?$/i.test(text)
 }
 
 export function resolveMessagePath(path: string, cwd: string, documentPath?: string): string {

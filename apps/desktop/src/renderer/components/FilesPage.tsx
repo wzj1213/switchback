@@ -7,6 +7,7 @@ import { FileGroup } from "./file-group.js"
 import { focusFile, focusFirstFile, PathRow } from "./file-row.js"
 import { FilePreviewView } from "./FilePreviewView.js"
 import { FileSearchHead } from "./file-search-head.js"
+import type { PreviewNavigation } from "./file-preview-navigation.js"
 
 interface FileSearchView extends Omit<FileSearchState, "key"> {
   retry: () => void
@@ -114,7 +115,7 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
 }
 
 export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick, onBack, onReference,
-  referenceDisabled, onReveal, onCopy, searchFiles }: {
+  referenceDisabled, navigation, onReveal, onCopy, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
@@ -125,6 +126,7 @@ export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick,
   onBack: () => void
   onReference?: (target: PreviewTarget) => void
   referenceDisabled?: boolean
+  navigation?: PreviewNavigation | undefined
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   searchFiles: SearchFiles
@@ -138,7 +140,7 @@ export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick,
         onPick={onPick} searchFiles={searchFiles} />
       {target === undefined ? null : (
         <FilePreviewView target={target} revision={revision} stamp={stamp}
-          active={active !== false}
+          active={active !== false} navigation={navigation}
           onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
           onReveal={onReveal} onCopy={onCopy} />
       )}

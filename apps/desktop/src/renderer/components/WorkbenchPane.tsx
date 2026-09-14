@@ -5,10 +5,11 @@ import { ActivityPage } from "./ActivityPage.js"
 import { FilesPage } from "./FilesPage.js"
 import type { SearchFiles } from "../use-file-search.js"
 import { PanelTabs, type PanelTabsProps } from "./PanelTabs.js"
+import { adjacentPreview } from "../preview-history.js"
 
 export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
   onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles,
-  notice, panel }: {
+  notice, panel, onNavigateFile }: {
   state: WorkbenchState
   thread: Thread
   lanes: readonly Lane[]
@@ -19,6 +20,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
   onActivityIndex: () => void
   onPickFile: (target: PreviewTarget) => void
   onFileIndex: () => void
+  onNavigateFile?: (direction: -1 | 1) => void
   onReference?: (target: PreviewTarget) => void
   onHide: () => void
   onReveal: (path: string) => void
@@ -43,6 +45,10 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
           <FilesPage key={`${thread.id}\u0000${thread.cwd}`} threadId={thread.id} cwd={thread.cwd}
             items={items} stamp={stamp} active={state.visible && state.page === "files"}
             target={state.file} onPick={onPickFile}
+            navigation={onNavigateFile === undefined ? undefined : {
+              back: adjacentPreview(state.fileHistory, -1), forward: adjacentPreview(state.fileHistory, 1),
+              onGo: onNavigateFile,
+            }}
             onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
         </div>

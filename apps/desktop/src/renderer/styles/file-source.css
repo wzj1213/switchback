@@ -13,7 +13,7 @@
     gap: var(--sp-1) var(--sp-2);
   }
 
-  .file-preview__head > .workbench__back {
+  .file-preview-nav {
     grid-row: 1;
     grid-column: 1;
     justify-self: start;
@@ -29,6 +29,37 @@
     grid-column: 1 / -1;
     gap: var(--sp-1);
     padding: var(--sp-1);
+  }
+}
+
+.file-preview-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.file-preview-nav .workbench__back svg {
+  transform: none;
+}
+
+.file-preview-nav__previous svg {
+  transform: rotate(180deg);
+}
+
+.file-preview-nav .workbench__icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@container file-preview (max-width: 380px) {
+  .file-preview__reference {
+    width: 28px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .file-preview__reference-text {
+    display: none;
   }
 }
 

@@ -296,7 +296,7 @@
   cursor: pointer;
 }
 
-.file-preview__reference > span {
+.file-preview__reference > span:first-child {
   color: var(--text-faint);
   font-family: var(--font-mono);
   font-weight: 600;

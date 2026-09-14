@@ -54,6 +54,7 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
       onActivityIndex={shell.activityIndex}
       onPickFile={shell.openFile}
       onFileIndex={shell.fileIndex}
+      onNavigateFile={shell.navigateFile}
       onReference={(target) => {
         const path = fileReference(target.cwd, target.path).path
         // 「已经在输入框里了吗」的判据是**按下发送会送出什么**：

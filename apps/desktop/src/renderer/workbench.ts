@@ -1,3 +1,5 @@
+import { stepPreview, visitPreview, type PreviewHistory } from "./preview-history.js"
+
 export type WorkbenchPage = "activity" | "files"
 
 export interface PreviewTarget {
@@ -18,6 +20,7 @@ export interface WorkbenchState {
   page: WorkbenchPage
   laneId?: string
   file?: PreviewTarget
+  fileHistory?: PreviewHistory
 }
 
 export const CLOSED_WORKBENCH: WorkbenchState = { visible: false, page: "activity" }
@@ -40,6 +43,7 @@ export function showActivityIndex(state: WorkbenchState): WorkbenchState {
     visible: true,
     page: "activity",
     ...(state.file === undefined ? {} : { file: state.file }),
+    ...(state.fileHistory === undefined ? {} : { fileHistory: state.fileHistory }),
   }
 }
 
@@ -48,7 +52,13 @@ export function showFiles(state: WorkbenchState): WorkbenchState {
 }
 
 export function showFile(state: WorkbenchState, file: PreviewTarget): WorkbenchState {
-  return { ...state, visible: true, page: "files", file }
+  return { ...state, visible: true, page: "files", file,
+    fileHistory: visitPreview(state.fileHistory, state.file, file) }
+}
+
+export function navigateFile(state: WorkbenchState, direction: -1 | 1): WorkbenchState {
+  const next = stepPreview(state.fileHistory, state.file, direction)
+  return next === undefined ? state : { ...state, file: next.file, fileHistory: next.history }
 }
 
 export function showFileIndex(state: WorkbenchState): WorkbenchState {
@@ -73,5 +83,6 @@ export function scopeWorkbench(
     ...state,
     ...(laneId === undefined ? { laneId: undefined } : { laneId }),
     ...(file === undefined ? { file: undefined } : { file }),
+    ...(file === undefined ? { fileHistory: undefined } : {}),
   }
 }

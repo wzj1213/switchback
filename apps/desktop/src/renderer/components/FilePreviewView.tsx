@@ -7,6 +7,7 @@ import { FilePreviewHeader } from "./FilePreviewHeader.js"
 import { FilePreviewContent } from "./file-preview-content.js"
 import { useFilePreviewPulse } from "../use-file-preview-pulse.js"
 import { FileLinkScope } from "./message-link.js"
+import { navigatePreviewKey, type PreviewNavigation } from "./file-preview-navigation.js"
 
 export type PreviewLoad =
   | { state: "loading" }
@@ -121,6 +122,7 @@ export function FilePreviewView({
   revision,
   stamp,
   active = true,
+  navigation,
   onBack,
   onReference,
   referenceDisabled = false,
@@ -131,6 +133,7 @@ export function FilePreviewView({
   revision: Item | undefined
   stamp: string
   active?: boolean
+  navigation?: PreviewNavigation | undefined
   onBack: () => void
   onReference?: (target: PreviewTarget) => void
   referenceDisabled?: boolean
@@ -146,7 +149,7 @@ export function FilePreviewView({
   const refreshing = load.state === "ready" && load.refreshing
   const refreshFailed = load.state === "ready" && load.refreshFailed
   return (
-    <div className="file-preview">
+    <div className="file-preview" onKeyDown={(event) => { navigatePreviewKey(event, navigation) }}>
       <FilePreviewHeader
         target={target}
         path={path}
@@ -157,6 +160,7 @@ export function FilePreviewView({
         referenceable={referenceable}
         referenceDisabled={referenceDisabled}
         revealable={revealable}
+        navigation={navigation}
         onBack={onBack}
         onReference={onReference}
         onReload={() => {
@@ -171,12 +175,8 @@ export function FilePreviewView({
           <p className="workbench__empty">正在读取…</p>
         ) : (
           <FileLinkScope threadId={target.threadId} cwd={target.cwd} documentPath={path}>
-          <FilePreviewContent
-            key={`${load.file.kind}:${load.file.path}`}
-            file={load.file}
-            onCopy={onCopy}
-            target={target}
-          />
+            <FilePreviewContent key={`${load.file.kind}:${load.file.path}`}
+              file={load.file} onCopy={onCopy} target={target} />
           </FileLinkScope>
         )}
       </div>

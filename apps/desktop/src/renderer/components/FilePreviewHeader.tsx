@@ -1,7 +1,8 @@
 import type { PreviewTarget } from "../workbench.js"
 import { dirHint, outside } from "./file-row.js"
-import { ChevronIcon, RevealIcon } from "./icons.js"
+import { RevealIcon } from "./icons.js"
 import { ReloadIcon } from "./reload-icon.js"
+import { FilePreviewNavigation, type PreviewNavigation } from "./file-preview-navigation.js"
 
 function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
   path: string
@@ -52,7 +53,8 @@ function PreviewActions({ target, busy, refreshing, referenceable, referenceDisa
           title={referenceDisabled ? "继续会话后才能引用" : "引用到输入框"}
           aria-label={referenceLabel} disabled={referenceDisabled}
           onClick={() => { onReference(target) }}>
-          <span aria-hidden="true">@</span> {referenceDisabled ? "继续后引用" : "引用"}
+          <span aria-hidden="true">@</span>
+          <span className="file-preview__reference-text">{referenceDisabled ? "继续后引用" : "引用"}</span>
         </button>
       )}
       <button type="button" className="workbench__icon" data-tip="重新读取文件"
@@ -70,7 +72,7 @@ function PreviewActions({ target, busy, refreshing, referenceable, referenceDisa
 }
 
 export function FilePreviewHeader({ target, path, name, refreshing, refreshFailed, busy, referenceable,
-  referenceDisabled, revealable, onBack, onReference, onReload, onReveal }: {
+  referenceDisabled, revealable, navigation, onBack, onReference, onReload, onReveal }: {
   target: PreviewTarget
   path: string
   name: string
@@ -80,6 +82,7 @@ export function FilePreviewHeader({ target, path, name, refreshing, refreshFaile
   referenceable: boolean
   referenceDisabled: boolean
   revealable: boolean
+  navigation?: PreviewNavigation | undefined
   onBack: () => void
   onReference?: (target: PreviewTarget) => void
   onReload: () => void
@@ -87,9 +90,7 @@ export function FilePreviewHeader({ target, path, name, refreshing, refreshFaile
 }): React.JSX.Element {
   return (
     <header className="file-preview__head">
-      <button type="button" className="workbench__back" onClick={onBack}>
-        <ChevronIcon size={13} /> 文件
-      </button>
+      <FilePreviewNavigation navigation={navigation} onIndex={onBack} />
       <PreviewTitle path={path} cwd={target.cwd} name={name}
         refreshing={refreshing} refreshFailed={refreshFailed} />
       <PreviewActions target={target} busy={busy} refreshing={refreshing} referenceable={referenceable}

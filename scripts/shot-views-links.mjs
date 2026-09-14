@@ -59,7 +59,10 @@ export const LINK_REVIEW_VIEWS = [
     assert: `(() => {
       const row = document.querySelector('.source-line[data-selected="true"]')?.getBoundingClientRect()
       const box = document.querySelector('.file-source')?.getBoundingClientRect()
+      const navigation = document.querySelector('.file-preview-nav')?.getBoundingClientRect()
+      const actions = document.querySelector('.file-preview__actions')?.getBoundingClientRect()
       return row !== undefined && box !== undefined && row.top >= box.top && row.bottom <= box.bottom
+        && navigation !== undefined && actions !== undefined && navigation.right <= actions.left + 1
         && document.querySelector('.file-preview__title')?.textContent.includes('throughput.ts') === true
         && document.querySelector('.transcript code a[href="http://127.0.0.1:8766/"]')?.target === '_blank'
     })()`,
@@ -86,6 +89,30 @@ export const LINK_REVIEW_VIEWS = [
     assert: `document.querySelector('.file-preview__title')?.textContent.includes('throughput.ts') === true`,
   },
   {
+    name: "01f-后退回到文档",
+    open: `(() => {
+      const button = document.querySelector('[aria-label="后退到上一个文件"]')
+      button?.focus(); button?.click()
+    })()`,
+    ready: '.text-preview__document h1',
+    assert: `document.querySelector('.text-preview__document h1')?.textContent === '预览与跳转'
+      && document.activeElement?.getAttribute('aria-label') === '后退到上一个文件'
+      && document.querySelector('[aria-label="前进到下一个文件"]')?.disabled === false`,
+  },
+  {
+    name: "01f-键盘前进恢复代码行",
+    open: `(() => {
+      document.querySelector('.text-preview__document')?.focus()
+      const event = new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true, cancelable: true })
+      document.querySelector('.text-preview__document')?.dispatchEvent(event)
+      window.__omniFileNavigationKeyHandled = event.defaultPrevented
+    })()`,
+    ready: '.source-line[data-line="8"][data-selected="true"]',
+    assert: `window.__omniFileNavigationKeyHandled === true
+      && document.querySelector('[aria-label="前进到下一个文件"]')?.disabled === true
+      && document.querySelector('.file-preview__title')?.textContent.includes('throughput.ts') === true`,
+  },
+  {
     name: "01f-缺失文件有明确提示",
     open: [`${docLink}?.click()`, `document.querySelector('.text-preview__document a[href="./.omni-missing-probe.txt"]')?.click()`],
     ready: '.file-preview__body .workbench__empty',
@@ -107,6 +134,14 @@ export const LINK_REVIEW_VIEWS = [
         && document.querySelectorAll('.source-line').length < 250
         && rect !== undefined && box !== undefined && rect.top >= box.top && rect.bottom <= box.bottom
     })()`,
+    after: `document.querySelector('.file-source').scrollTop = 1000`,
+  },
+  {
+    name: "01f-文件更新不抢阅读位置",
+    rewriteFiles: [{ path: 'docs/.omni-source-probe.ts', text: Array.from({ length: 50_001 }, (_, i) => `const n${i} = ${i}\n`).join('') }],
+    open: `document.querySelector('[aria-label="重新读取文件"]')?.click()`,
+    ready: '.file-source[data-line-count="50002"]',
+    assert: `document.querySelector('.file-source')?.scrollTop === 1000`,
     after: `${closeFiles}; document.querySelectorAll('.edits__toggle[aria-expanded="true"]').forEach(button => button.click())`,
   },
 ]

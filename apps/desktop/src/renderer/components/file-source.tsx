@@ -25,6 +25,7 @@ export function Source({ file, onCopy, target }: {
 }): React.JSX.Element {
   const [feedback, copy] = useCopyFeedback(() => onCopy(file.text))
   const box = useRef<HTMLDivElement>(null)
+  const positioned = useRef("")
   const [scroll, setScroll] = useState(0)
   const [height, setHeight] = useState(800)
   const lines = useMemo(() => file.text.split("\n"), [file.text])
@@ -42,12 +43,15 @@ export function Source({ file, onCopy, target }: {
   useEffect(() => {
     const node = box.current
     if (node === null || line === undefined || line > lines.length) return
+    const intent = `${String(line)}:${String(target?.at)}`
+    if (positioned.current === intent) return
+    positioned.current = intent
     const top = Math.max(0, (line - 1) * SOURCE_LINE_HEIGHT - node.clientHeight / 2 + 44)
     node.scrollTop = top
     setScroll(top)
   }, [line, target?.at, lines.length])
   return (
-    <div className="file-source" tabIndex={0} aria-label="可横向滚动的文件源码" ref={box}
+    <div className="file-source" tabIndex={0} aria-label="可横向滚动的文件源码" ref={box} data-line-count={lines.length}
       onScroll={(event) => { setScroll(event.currentTarget.scrollTop) }}>
       {file.truncated ? <p className="file-preview__note">文件较大，只显示前 1.5 MB。</p> : null}
       {line !== undefined && line > lines.length ? <p className="file-preview__note" role="status">当前内容没有第 {line} 行。</p> : null}
