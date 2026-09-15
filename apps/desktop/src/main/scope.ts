@@ -173,10 +173,35 @@ export function headerOf(thread: ThreadHistory): readonly Event[] {
  */
 export function withCurrent(events: readonly Event[], live: Thread | undefined, now: number): readonly Event[] {
   if (events.length === 0) return events
-  if (live !== undefined) return [...events, { type: "thread.updated", at: now, thread: live }]
+  const closed = [...events, ...staleTurnEnd(events, live)]
+  if (live !== undefined) return [...closed, { type: "thread.updated", at: now, thread: live }]
   const last = [...events].reverse().find((e) => e.type === "thread.started" || e.type === "thread.updated")
-  if (last === undefined) return events
-  return [...events, { type: "thread.updated", at: now, thread: detachedThread(last.thread) }]
+  if (last === undefined) return closed
+  return [...closed, { type: "thread.updated", at: now, thread: detachedThread(last.thread) }]
+}
+
+/**
+ * 记录里停在半路的那一轮：**宿主手上没在跑，就补一条中断把它收掉**。
+ *
+ * 归约器只凭 `turn.completed` 摘掉当前轮，而这条事件只有跑着那一轮的进程写得出来。
+ * 进程在轮次中间没了（退应用、崩溃、记录写满）就再也等不到它：重放出来的会话
+ * 永远显示在跑，停止键发给一个早已空闲的引擎，按多少次都没反应——
+ * 真机上 Kimi 自己报着 `busy: false`，这边的停止键就是这么按不动的。
+ *
+ * 判据只用宿主自己的账：宿主开一轮必然同时把状态置成 running（挂着审批时是
+ * waiting_approval），收工必然改回去。状态不在这两档，记录里那一轮就不可能
+ * 还有人在跑——这是 omni 收自己的账，不是替引擎猜它的状态。
+ *
+ * 收口时刻取记录停下的那一刻、不取重建时刻：同一份记录每次重建都该得出同一个结果。
+ */
+export function staleTurnEnd(events: readonly Event[], live: Thread | undefined): readonly Event[] {
+  if (live?.status === "running" || live?.status === "waiting_approval") return []
+  const at = events.findLastIndex((e) => e.type === "turn.started")
+  const started = events[at]
+  if (started?.type !== "turn.started") return []
+  const turnId = started.turn.id
+  if (events.slice(at + 1).some((e) => e.type === "turn.completed" && e.turnId === turnId)) return []
+  return [{ type: "turn.completed", at: events.at(-1)?.at ?? started.at, turnId, status: "interrupted" }]
 }
 
 /**
@@ -244,6 +269,8 @@ export function replayEvents({ engines, threads, alive, now, bodies, cap }: Repl
     const content = bodies === undefined ? thread.events : partOf(thread, bodies, cap)
     events.push(...historicalContent(content))
     const live = alive.get(thread.id)
+    // 进程在轮次中间没了的，那一轮要收口——见 `staleTurnEnd`
+    events.push(...staleTurnEnd(content, live))
     if (live !== undefined) {
       // 用宿主手上那份当前状态收尾：journal 里最后一条可能停在轮次中间
       events.push({ type: "thread.updated", at: now, thread: live })

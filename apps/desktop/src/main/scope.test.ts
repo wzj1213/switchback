@@ -193,4 +193,20 @@ describe("补正文时用当前状态收口", () => {
     const events: Event[] = [{ type: "item.started", at: 0, item: msg("i") }]
     expect(withCurrent(events, undefined, 99)).toEqual(events)
   })
+
+  const halfway: Event[] = [
+    { type: "thread.started", at: 0, thread: record("a") },
+    { type: "turn.started", at: 1, turn: { id: "tn", threadId: "a", engine: "codex", status: "running", startedAt: 1 } },
+    { type: "item.started", at: 2, item: { ...msg("u"), turnId: "tn", at: 2 } },
+  ]
+
+  it("**停在半路的那一轮、宿主手上没在跑的，补一条中断收口**——否则停止键按了也停不下来", () => {
+    const out = withCurrent(halfway, { ...record("a"), status: "idle" }, 99)
+    expect(out).toContainEqual({ type: "turn.completed", at: 2, turnId: "tn", status: "interrupted" })
+  })
+
+  it("宿主手上正在跑的那一轮不收——收了正在流的回答就没了主", () => {
+    const out = withCurrent(halfway, { ...record("a"), status: "running" }, 99)
+    expect(out.some((e) => e.type === "turn.completed")).toBe(false)
+  })
 })

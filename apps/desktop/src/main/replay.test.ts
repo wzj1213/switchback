@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { createJournal } from "@omni/journal"
 import type { Event, Thread, ThreadId } from "@omni/protocol"
-import { initial, itemsOf, reduceAll, threadRowsOf } from "@omni/store"
+import { initial, itemsOf, reduceAll, threadRowsOf, turnOf } from "@omni/store"
 import type { ThreadHistory } from "./host.js"
 import { replayEvents } from "./scope.js"
 
@@ -206,5 +206,57 @@ describe("活着但磁盘上什么都没有的会话", () => {
     const alive = new Map<ThreadId, Thread>([["t1", thread("t1", "最旧")]])
     const events = replayEvents({ engines: [], threads: NEWEST_FIRST, alive: alive, now: 1 })
     expect(events.filter((e) => e.type === "thread.started" && e.thread.id === "t1")).toHaveLength(1)
+  })
+})
+
+/**
+ * 进程在轮次中间没了（退应用、崩溃、记录写满）留下的那一轮。
+ *
+ * 真机现场：Kimi 那条会话发出「继续」之后 omni 被重启，记录里 114 次开始、113 次结束。
+ * 重启后界面一直显示在跑，停止键发给早已空闲的 Kimi，按多少次都没反应。
+ */
+describe("停在半路的那一轮", () => {
+  const turn = (id: string, at: number): Event => ({
+    type: "turn.started", at, turn: { id, threadId: "t", engine: "kimi", status: "running", startedAt: at },
+  })
+  const said = (id: string, turnId: string, at: number, text: string): Event => ({
+    type: "item.started", at, item: { id, turnId, at, kind: "user_message", text },
+  })
+  /** 现场那条的形状：上一轮按停止正常收口，接着说的「继续」没等到结束，进程就没了。 */
+  const saved: ThreadHistory = {
+    id: "t",
+    events: [
+      { type: "thread.started", at: 0, thread: thread("t", "托管平台") },
+      turn("before", 1),
+      said("u1", "before", 1, "你说的是这个配置吗？"),
+      { type: "turn.completed", at: 2, turnId: "before", status: "interrupted" },
+      turn("after", 3),
+      said("u2", "after", 3, "继续"),
+    ],
+  }
+  /** 重建一遍，看这条会话还挂着哪一轮。`status` 不给 = 背后没有引擎进程。 */
+  const current = (status?: Thread["status"]): string | undefined => {
+    const alive = status === undefined ? none : new Map<ThreadId, Thread>([["t", { ...thread("t", "托管平台"), status }]])
+    return turnOf(reduceAll(initial(), replayEvents({ engines: [], threads: [saved], alive, now: 99 })), "t")?.id
+  }
+
+  it("**重启后宿主已空闲的，重建出来不再挂着那一轮**——停止键和运行指示跟着撤掉", () => {
+    expect(current("idle")).toBeUndefined()
+    expect(current("starting")).toBeUndefined()
+  })
+
+  it("背后没有引擎进程的历史也一样收口", () => {
+    expect(current()).toBeUndefined()
+  })
+
+  it("**宿主手上真在跑的不收**——收了的话正在流的回答就没了主", () => {
+    expect(current("running")).toBe("after")
+    expect(current("waiting_approval")).toBe("after")
+  })
+
+  it("正常收口过的不重复补", () => {
+    const done: ThreadHistory = { id: "t", events: saved.events.slice(0, 4) }
+    const events = replayEvents({ engines: [], threads: [done], alive: none, now: 99 })
+    expect(events.filter((e) => e.type === "turn.completed")).toHaveLength(1)
   })
 })
