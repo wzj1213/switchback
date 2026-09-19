@@ -30,7 +30,8 @@ import { labelOf } from "./Composer.js"
  * **没换过引擎的会话看不出变化**：整条只有一种颜色时和原来那道中性线
  * 是同一个样子（`engineTint` 给的是低饱和度色，不是招牌色）。
  */
-export function TranscriptRail({ marks, activeId, engines, onJump }: {
+export function TranscriptRail({ marks, activeId, engines, onJump, navRef }: {
+  navRef?: React.RefObject<HTMLElement | null>
   marks: readonly RailMark[]
   activeId: string | undefined
   /** 引擎清单：悬停卡要把 id 翻成人话。 */
@@ -50,13 +51,12 @@ export function TranscriptRail({ marks, activeId, engines, onJump }: {
       setHover(undefined)
     }, 90)
   }, [])
-  if (marks.length === 0) return null
   // 整条只有一家时不提引擎——那句话每一格都一样，说了等于没说
   const mixed = new Set(marks.map((mark) => mark.engine)).size > 1
   const shown = marks.find((mark) => mark.id === hover)
   const peek = shown === undefined ? undefined : railPeek(shown.text)
   return (
-    <nav className="rail" aria-label="按提问跳转">
+    <nav className="rail" aria-label="按提问跳转" ref={navRef}>
       {marks.map((mark) => (
         <button
           key={mark.id}

@@ -129,7 +129,7 @@ export function useApp(): AppApi {
   const prefs = useSettings()
   const engines = useEnabledEngines(prefs.settings, omni.state.engines)
 
-  const rows = threadRowsOf(omni.state)
+  const rows = useMemo(() => threadRowsOf(omni.state), [omni.state.threads, omni.state.items])
   /**
    * 新建之后跳到新会话上。
    *

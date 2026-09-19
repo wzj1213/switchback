@@ -45,7 +45,10 @@ export function Copyable({
   if (item.kind === "approval") return <>{children}</>
   // 左边那条导航按「你问的一次」摆格子，位置只能从 DOM 量（见 `use-transcript-rail.ts`），
   // 所以人话这一层要留一个认得出的锚点
-  const nav = item.kind === "user_message" ? { "data-nav": item.id } : {}
+  const nav = {
+    ...(item.kind === "user_message" ? { "data-nav": item.id } : {}),
+    ...(item.kind === "agent_message" && item.complete ? { "data-deferred": true } : {}),
+  }
   // 一颗都没有就连那个盒子也别要：它占的那行高度正是上一版间距失真的来源
   if (!acts && extra === undefined) return <div className="copyable" {...nav}>{children}</div>
   return (

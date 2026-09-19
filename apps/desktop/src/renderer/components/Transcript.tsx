@@ -9,8 +9,7 @@ import { useApprovalState } from "../use-approval-state.js"
 import { RowView, canAsk, canRewind, keyOf, answerActs, lastMine, retryProps, approvalShortcut } from "./transcript-row.js"
 import { useAskSelection } from "../use-ask-selection.js"
 import { AskFloat } from "./ask-float.js"
-import { TranscriptRail } from "./TranscriptRail.js"
-import { useTranscriptRail } from "../use-transcript-rail.js"
+import { TranscriptNavigation } from "./transcript-navigation.js"
 import { navPointsOf } from "../transcript-rail.js"
 import { engineStints } from "../engine-mark.js"
 import { FileLinkScope } from "./message-link.js"
@@ -110,9 +109,7 @@ export const Transcript = memo(function Transcript({
   const acts = useMemo(() => answerActs(rows, turn?.id), [rows, turn?.id])
   // 左边那条导航：一格 = 你问的一次（`navPointsOf` 定的谁算一格），颜色 = 那一问归谁跑
   const stints = useMemo(() => engineStints(thread.segments), [thread.segments])
-  const rail = useTranscriptRail(
-    scroller, inner, useMemo(() => navPointsOf(rows, stints), [rows, stints]),
-  )
+  const points = useMemo(() => navPointsOf(rows, stints), [rows, stints])
   return (
     <div
       className="transcript"
@@ -121,7 +118,7 @@ export const Transcript = memo(function Transcript({
       aria-label={`对话记录：${thread.title}`}
       tabIndex={0}
     >
-      <TranscriptRail marks={rail.marks} activeId={rail.activeId} engines={engines} onJump={rail.jump} />
+      <TranscriptNavigation scroller={scroller} inner={inner} points={points} engines={engines} />
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
       <FileLinkScope threadId={thread.id} cwd={thread.cwd}>
       <div className="transcript__inner" ref={inner}>

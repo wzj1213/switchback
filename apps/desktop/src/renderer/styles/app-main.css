@@ -272,6 +272,13 @@
   margin-top: 0;
 }
 
+/* 历史回答保留 DOM、查找与复制；屏外 Markdown 不参加每一帧分栏排版。
+   auto 记住测过的真实高度，首次未见时才用估值。流式回答始终正常排版。 */
+.transcript__inner > .copyable[data-deferred] {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 240px;
+}
+
 /*
  * 滚动区的下摆：一道 28px 的渐隐，接替原来输入区那条通栏线（见 items.css 的 `.composer`）。
  *
