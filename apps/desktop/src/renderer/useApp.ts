@@ -167,10 +167,8 @@ export function useApp(): AppApi {
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
   useEffect(() => omni.viewing(thread?.id), [omni.viewing, thread?.id])
   const items = useThreadItems(omni.state, thread)
-  const sidebarRows = useUnread(
-    rows.filter((r) => r.thread.provisional !== true),
-    thread?.id,
-  )
+  const visibleRows = useMemo(() => rows.filter((r) => r.thread.provisional !== true), [rows])
+  const sidebarRows = useUnread(visibleRows, thread?.id)
 
   // 出口收在 `useSend` 里：它必须引用稳定，而**那条约束不属于「接线」这件事**——
   // 理由（以及它曾经怎么静默地废掉一整条 memo 链）写在那个文件开头

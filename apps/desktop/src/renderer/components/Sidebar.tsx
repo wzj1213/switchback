@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { EngineInfo, EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
 import { useDeepSearch } from "../useDeepSearch.js"
@@ -137,15 +137,15 @@ export function Sidebar(props: Props): React.JSX.Element {
   const { open: openMenu, menu } = useContextMenu()
   const filtering = query !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
-  const pins = {
+  const pins = useMemo(() => ({
     projects: props.pinned,
     threads: props.pinnedThreads,
     order: props.threadOrder,
     known: props.knownProjects,
     projectOrder: props.projectOrder,
-  }
-  const found = filterRows(props.rows, query)
-  const sections = sectionsOf(found, pins)
+  }), [props.pinned, props.pinnedThreads, props.threadOrder, props.knownProjects, props.projectOrder])
+  const found = useMemo(() => filterRows(props.rows, query), [props.rows, query])
+  const sections = useMemo(() => sectionsOf(found, pins), [found, pins])
   const moves = sidebarMoves({
     sections,
     onThreads: props.onReorderPinnedThreads,

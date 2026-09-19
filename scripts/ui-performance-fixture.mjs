@@ -1,5 +1,15 @@
 import { stubThread } from "./ui-fixture.mjs"
 
+/** 真实说过一句话的历史；只有 started 的空壳会由宿主当作临时会话收走。 */
+export function sidebarThread(id, title, cwd, at) {
+  const turnId = `${id}-turn`
+  return stubThread(id, title, cwd, at) + [
+    { type: "turn.started", at, turn: { id: turnId, threadId: id, engine: "claude", status: "running", startedAt: at } },
+    { type: "item.started", at, item: { id: `${id}-q`, turnId, kind: "user_message", text: title, at } },
+    { type: "turn.completed", at, turnId, status: "completed" },
+  ].map(event => JSON.stringify(event)).join("\n") + "\n"
+}
+
 /** 240 轮带 Markdown/代码/表格的固定长会话，不读取用户数据、不发送任务。 */
 export function longThread(id, cwd, at) {
   const events = [JSON.parse(stubThread(id, "长会话性能样本", cwd, at).split("\n")[0])]

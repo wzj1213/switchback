@@ -86,7 +86,7 @@ export function rowLabelOf(row: ThreadRow): string {
  * 和侧栏「最近的在上面」这条规则打架，而那条规则刚修好过一次。
  */
 export function groupByWorkspace(rows: readonly SidebarRow[]): readonly Group[] {
-  const groups = new Map<string, Group>()
+  const groups = new Map<string, { cwd: string; label: string; rows: SidebarRow[] }>()
   for (const row of rows) {
     const cwd = row.thread.cwd
     const existing = groups.get(cwd)
@@ -94,7 +94,7 @@ export function groupByWorkspace(rows: readonly SidebarRow[]): readonly Group[] 
       groups.set(cwd, { cwd, label: baseNameOf(cwd), rows: [row] })
       continue
     }
-    groups.set(cwd, { ...existing, rows: [...existing.rows, row] })
+    existing.rows.push(row)
   }
   return [...groups.values()]
 }

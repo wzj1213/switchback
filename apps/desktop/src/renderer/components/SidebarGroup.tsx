@@ -8,6 +8,7 @@ import { Row, type RowDrag } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
 import { moveKeyProps } from "../moveKey.js"
 import { GroupActions } from "./SidebarGroupActions.js"
+import { ProjectThreads } from "./project-threads.js"
 
 /*
  * 一个项目：标题行 + 它底下的会话。
@@ -72,12 +73,8 @@ export function GroupBlock({
         onGroupMenu={onGroupMenu}
         {...(onMove === undefined ? {} : { onMove })}
       />
-      {collapsed ? null : group.rows.length === 0 ? (
-        // **空项目也要说句话。** 打开一个文件夹之后它就在这儿了，但还没有会话——
-        // 什么都不显示的话，人会以为「打开」这个动作失败了
-        <p className="sidebar__empty">还没有会话。点这一行右边的 + 开一条。</p>
-      ) : (
-        group.rows.map((row) => (
+      <ProjectThreads rows={group.rows} selectedId={selectedId} collapsed={collapsed}>
+        {(row) => (
           <Row
             key={row.thread.id}
             row={row}
@@ -98,8 +95,8 @@ export function GroupBlock({
               onRowMenu(e, row, arm, ren)
             }}
           />
-        ))
-      )}
+        )}
+      </ProjectThreads>
     </div>
   )
 }

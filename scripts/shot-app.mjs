@@ -30,6 +30,7 @@ import { completeFileDrop, dragIntoView } from "./shot-file-drop.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
 import { VIEWS } from "./shot-views.mjs"
 import { PERFORMANCE_VIEWS } from "./shot-views-performance.mjs"
+import { SIDEBAR_VIEWS } from "./shot-views-sidebar.mjs"
 import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -45,6 +46,7 @@ const PET_LIVE = process.argv.includes("--pet-live")
 const ONLY = process.argv.find(arg => arg.startsWith("--views="))?.slice(8).split(",")
 const ENGINE = process.argv.find(arg => arg.startsWith("--engine="))?.slice(9)
 const STRESS = process.argv.includes("--stress")
+const MANY = process.argv.includes("--sidebar-stress")
 /**
  * 固定窗口尺寸：前后两张图的像素必须能直接叠着比。
  *
@@ -289,7 +291,7 @@ async function main() {
   const port = await freePort()
   const data = await mkdtemp(join(tmpdir(), "omni-shot-"))
   const workspaceFiles = new Set()
-  await seedUi(data, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS })
+  await seedUi(data, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS, MANY })
   const child = spawn(
     electron,
     [DESKTOP, `--user-data-dir=${data}`, `--remote-debugging-port=${port}`, "--disable-gpu"],
@@ -320,7 +322,7 @@ async function main() {
     await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
-    const views = STRESS ? PERFORMANCE_VIEWS : VIEWS
+    const views = MANY ? SIDEBAR_VIEWS : STRESS ? PERFORMANCE_VIEWS : VIEWS
     for (const view of views.filter(view => ONLY === undefined || ONLY.includes(view.name))) await shoot(cdp, view, workspaceFiles)
     await shootSettings(cdp)
     cdp.close()
