@@ -1,27 +1,29 @@
 import { useEffect, useState } from "react"
 import type { EngineInfo } from "@omni/protocol"
-import { rowLabelOf, type SidebarRow } from "../sidebar.js"
+import { rowLabelOf, type DropEdge, type SidebarRow } from "../sidebar.js"
 import { Dot, RowEnd } from "./RowEnd.js"
 import { useRowPeek } from "./RowPeek.js"
 import { RowActions } from "./RowActions.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
 import { moveKeyProps } from "../moveKey.js"
+import { rowDragProps } from "../sidebar-row-drag.js"
 
 /** 一行需要的拖放接线。状态在 `useThreadDrag`，这里只是把它接到 DOM 事件上。 */
 export interface RowDrag {
   dragging: string | undefined
   over: string | undefined
+  overEdge: DropEdge | undefined
   start: (item: DragItem) => void
   end: () => void
   canDropOn: (cwd: string) => boolean
   /** 拖的是不是一个项目。项目行据此决定认不认这次落点。 */
   draggingProject?: boolean
-  hoverRow: (id: string) => void
+  hoverRow: (id: string, edge?: DropEdge) => void
   /** 悬在「置顶」那一段上。 */
   hoverPinned: () => void
-  /** 放在这一条**前面**。 */
-  drop: (beforeId: string) => void
+  /** 按落点半行插到前面或后面。 */
+  drop: (targetId: string, edge?: DropEdge) => void
 }
 
 /**
@@ -31,58 +33,6 @@ export interface RowDrag {
  * 那边管「侧栏由哪几块组成」，这边管「一行长什么样」。
  * 两边共用 `app.css` 里那套 `.row` —— 对齐靠的是它，不是各自的 padding。
  */
-
-/**
- * 一行的拖放事件。
- *
- * 抽出来是行数闸门逼的，但它确实自成一件事——而且这里藏着**跨项目怎么挡住的**：
- * `onDragOver` 不调 `preventDefault` 就等于「这儿不能放」，
- * 于是鼠标上是禁止标，用户在松手之前就知道不行。**用平台原生的方式说不，
- * 比放下之后弹一句「不能跨项目」好得多。**
- *
- * ## 一条不写下来就会再犯的约束
- *
- * `onDragStart` 里的 `drag.start()` 会当场 setState、当场重渲染整条侧栏。
- * **那一次重渲染不许让这一行的位置变。** 只要它上面多出（或少掉）任何占位的东西，
- * Chromium 会**直接取消这次拖拽**：`dragstart` 照常触发、谁也没 `preventDefault`、
- * 节点也还连着，就是拖不动，而且一声不吭。
- *
- * 实测（0.0.206 的包，CDP 量的）：拖项目行 → 「置顶」段插进一句「松手就置顶了…」
- * → 这一行从 y=333 掉到 391 → 拖拽没起来。绝对定位的东西不算数（它不占位），
- * 换底色、改透明度也不算数——**只有「占位的东西变了」才致命**。
- */
-function dragProps(
-  id: string,
-  cwd: string,
-  pinned: boolean,
-  drag: RowDrag | undefined,
-): React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean } {
-  if (drag === undefined) return {}
-  return {
-    draggable: true,
-    onDragStart: (e) => {
-      // 拖的是一条会话，不是它的文字。不设的话有的地方会把行内文本当拖拽内容
-      e.dataTransfer.effectAllowed = "move"
-      e.dataTransfer.setData("text/plain", id)
-      // **带上「它现在是不是置顶的」**：落点靠这一条决定要不要顺手取消置顶
-      drag.start({ kind: "thread", id, cwd, pinned })
-    },
-    onDragEnd: () => {
-      drag.end()
-    },
-    onDragOver: (e) => {
-      if (!drag.canDropOn(cwd)) return
-      e.preventDefault()
-      e.dataTransfer.dropEffect = "move"
-      drag.hoverRow(id)
-    },
-    onDrop: (e) => {
-      if (!drag.canDropOn(cwd)) return
-      e.preventDefault()
-      drag.drop(id)
-    },
-  }
-}
 
 /** 一行的 class。拼在 JSX 里的话那一行会长到看不出是在拼什么。 */
 function rowClass(o: {
@@ -185,7 +135,8 @@ export function Row({
         dropping,
       })}
       {...peek.handlers}
-      {...dragProps(thread.id, thread.cwd, pinned, drag)}
+      {...rowDragProps(thread.id, thread.cwd, pinned, drag)}
+      data-drop-edge={dropping ? drag.overEdge : undefined}
       onContextMenu={(e) => {
         onMenu(e, arm, startRename)
       }}

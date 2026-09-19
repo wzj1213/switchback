@@ -42,7 +42,8 @@ export function PinnedSection({
           // 用户只能靠猜「松手会不会落在这儿」——而落点是一整段，猜不出来
           on.drag?.hoverPinned()
         }}
-        onDragLeave={() => {
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
           on.drag?.hoverRow("")
         }}
         onDrop={(e) => {

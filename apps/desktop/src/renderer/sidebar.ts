@@ -246,10 +246,14 @@ export function ordered(rows: readonly SidebarRow[], order: readonly string[] | 
  * 拖到自己身上、或者拖到自己后面那一条的前面，结果都和原来一样——
  * 这两种是最容易误触的，**必须是无操作而不是抖一下**。
  */
-export function reorder(ids: readonly string[], from: string, to: string | undefined): readonly string[] {
+export type DropEdge = "before" | "after"
+
+export function reorder(ids: readonly string[], from: string, to: string | undefined, edge: DropEdge = "before"): readonly string[] {
+  if (from === to) return ids
   const without = ids.filter((id) => id !== from)
   if (to === undefined) return [...without, from]
   const at = without.indexOf(to)
   if (at < 0) return ids
-  return [...without.slice(0, at), from, ...without.slice(at)]
+  const insert = at + (edge === "after" ? 1 : 0)
+  return [...without.slice(0, insert), from, ...without.slice(insert)]
 }

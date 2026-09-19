@@ -35,4 +35,35 @@ export const SIDEBAR_VIEWS = [
       (${project}).querySelector('.row--selected')?.textContent.includes('历史会话 500') &&
       (${project}).querySelector('.project-pages span').textContent === '501–503 / 503'`,
   },
+  {
+    name: "36-项目内拖到末尾",
+    open: `true`,
+    sidebarDrag: { from: "历史会话 500", to: "历史会话 502", edge: "after" },
+    ready: ".project-pages",
+    assert: `(() => {
+      const rows = [...(${project}).querySelectorAll('.row--thread .row__label')].map(row => row.textContent)
+      return rows.join(',') === '历史会话 501,历史会话 502,历史会话 500'
+    })()`,
+  },
+  {
+    name: "37-项目内向前排序",
+    open: `true`,
+    sidebarDrag: { from: "历史会话 500", to: "历史会话 501", edge: "before" },
+    ready: ".project-pages",
+    assert: `(${project}).querySelector('.row--thread .row__label').textContent === '历史会话 500'`,
+  },
+  {
+    name: "38-置顶项目内排序",
+    open: [
+      `(${project}).querySelector('[aria-label="项目操作"]').click()`,
+      `[...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent.includes('置顶项目'))?.click()`,
+    ],
+    sidebarDrag: { from: "历史会话 500", to: "历史会话 502", edge: "after" },
+    ready: ".sidebar__droppin .group",
+    assert: `window.omni.settings().then(settings => {
+      const order = Object.values(settings.threadOrder).find(ids => ids.length === 503)
+      return settings.pinnedThreads.length === 0 && order?.at(-1) === 'th-page-500' &&
+        document.querySelector('.sidebar__droppin .group .row__count').textContent === '503'
+    })`,
+  },
 ]

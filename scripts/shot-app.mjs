@@ -31,6 +31,7 @@ import { openPetLive } from "./shot-pet-live.mjs"
 import { VIEWS } from "./shot-views.mjs"
 import { PERFORMANCE_VIEWS } from "./shot-views-performance.mjs"
 import { SIDEBAR_VIEWS } from "./shot-views-sidebar.mjs"
+import { dragSidebar } from "./shot-sidebar-drag.mjs"
 import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -107,6 +108,14 @@ function createCdp(url) {
     // `close()` 要等 Electron 回 WebSocket 握手；真跑引擎后它可能已经在退出，
     // 句柄会把出图脚本永久挂住。CDP 是一次性验收通道，拍完直接终止即可。
     close: () => socket.terminate(),
+    on: (method, listener) => {
+      const handle = raw => {
+        const message = JSON.parse(String(raw))
+        if (message.method === method) listener(message.params)
+      }
+      socket.on("message", handle)
+      return () => socket.off("message", handle)
+    },
     send: (method, params = {}) =>
       new Promise((resolve, reject) => {
         id += 1
@@ -219,6 +228,7 @@ async function shoot(cdp, view, workspaceFiles) {
     }
     heldDrop = await dragIntoView({ value, pause, waitFor, root: ROOT }, cdp, view)
     await hoverOver(cdp, view)
+    await dragSidebar({ value, pause }, cdp, view.sidebarDrag)
     await waitFor(cdp, `document.querySelector('${view.ready}') !== null`, view.name)
     assertReadyTime(view, preparedAt)
     const stale = view.absent !== undefined

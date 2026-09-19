@@ -1,4 +1,5 @@
 import { useState } from "react"
+import type { DropEdge } from "./sidebar.js"
 
 /**
  * 侧栏里的拖放。
@@ -43,6 +44,7 @@ export interface ThreadDrag {
   dragging: string | undefined
   /** 现在悬在谁上面（会画一条插入线）：会话 id 或项目路径。 */
   over: string | undefined
+  overEdge: DropEdge | undefined
   /** 悬在「置顶」那一段上。 */
   overPinned: boolean
   /** 悬在「项目」那一段上（**拖出置顶**时的落点）。 */
@@ -53,7 +55,7 @@ export interface ThreadDrag {
   canDropOn: (cwd: string) => boolean
   /** 拖的是不是一个项目（项目行据此决定认不认这次落点）。 */
   draggingProject: boolean
-  hoverRow: (id: string) => void
+  hoverRow: (id: string, edge?: DropEdge) => void
   hoverPinned: () => void
   hoverProjects: () => void
   leave: () => void
@@ -70,7 +72,7 @@ export function canDrop(item: DragItem | undefined, cwd: string): boolean {
 
 export function useThreadDrag(): ThreadDrag {
   const [item, setItem] = useState<DragItem | undefined>(undefined)
-  const [over, setOver] = useState<string | undefined>(undefined)
+  const [over, setOver] = useState<{ id: string; edge: DropEdge } | undefined>(undefined)
   const [zone, setZone] = useState<"pinned" | "projects" | undefined>(undefined)
 
   const hover = (next: "pinned" | "projects"): void => {
@@ -82,7 +84,8 @@ export function useThreadDrag(): ThreadDrag {
     item,
     dragging: item?.kind === "thread" ? item.id : undefined,
     draggingProject: item?.kind === "project",
-    over,
+    over: over?.id,
+    overEdge: over?.edge,
     overPinned: zone === "pinned",
     overProjects: zone === "projects",
     start: setItem,
@@ -92,8 +95,8 @@ export function useThreadDrag(): ThreadDrag {
       setZone(undefined)
     },
     canDropOn: (cwd) => canDrop(item, cwd),
-    hoverRow: (id) => {
-      setOver(id)
+    hoverRow: (id, edge = "before") => {
+      setOver((was) => was?.id === id && was.edge === edge ? was : { id, edge })
       setZone(undefined)
     },
     hoverPinned: () => {
@@ -121,29 +124,30 @@ export function rowDragOf(o: {
   drag: ThreadDrag
   groupOf: (id: string) => { cwd: string; ids: readonly string[] } | undefined
   onReorder: (cwd: string, ids: readonly string[]) => void
-  reorder: (ids: readonly string[], from: string, to: string | undefined) => readonly string[]
+  reorder: (ids: readonly string[], from: string, to: string | undefined, edge?: DropEdge) => readonly string[]
   onPinThread: (id: string, pin: boolean) => void
 }): RowDragBox {
   const { drag, groupOf, onReorder, reorder, onPinThread } = o
   return {
     dragging: drag.dragging,
     over: drag.over,
+    overEdge: drag.overEdge,
     start: drag.start,
     end: drag.end,
     canDropOn: drag.canDropOn,
     draggingProject: drag.draggingProject,
     hoverRow: drag.hoverRow,
     hoverPinned: drag.hoverPinned,
-    drop: (beforeId) => {
+    drop: (targetId, edge = "before") => {
       const from = drag.item
       drag.end()
-      if (from?.kind !== "thread" || from.id === beforeId) return
+      if (from?.kind !== "thread" || from.id === targetId) return
+      const group = groupOf(targetId)
+      if (group === undefined || group.cwd !== from.cwd) return
       // **落在自己项目的某一行上 = 顺便取消置顶。** 置顶只是「换个地方显示」，
       // 拖回原项目里那一刻它就该从置顶段消失——否则同一条会话会同时出现两处
       if (from.pinned) onPinThread(from.id, false)
-      const group = groupOf(beforeId)
-      if (group === undefined) return
-      onReorder(group.cwd, reorder(group.ids, from.id, beforeId))
+      onReorder(group.cwd, reorder(group.ids, from.id, targetId, edge))
     },
   }
 }
@@ -152,11 +156,12 @@ export function rowDragOf(o: {
 interface RowDragBox {
   dragging: string | undefined
   over: string | undefined
+  overEdge: DropEdge | undefined
   start: (item: DragItem) => void
   end: () => void
   canDropOn: (cwd: string) => boolean
   draggingProject: boolean
-  hoverRow: (id: string) => void
+  hoverRow: (id: string, edge?: DropEdge) => void
   hoverPinned: () => void
-  drop: (beforeId: string) => void
+  drop: (targetId: string, edge?: DropEdge) => void
 }

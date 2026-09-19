@@ -132,12 +132,14 @@ function projectDrag(
     onDragOver: (e) => {
       if (!mine()) return
       e.preventDefault()
+      e.stopPropagation()
       e.dataTransfer.dropEffect = "move"
       drag.hoverRow(cwd)
     },
     onDrop: (e) => {
       if (!mine()) return
       e.preventDefault()
+      e.stopPropagation()
       onDrop?.(cwd)
     },
   }

@@ -6,10 +6,13 @@
   opacity: 0.4;
 }
 
-/* 落点画在**上边缘**，因为放下的语义是「插到这一条前面」。
-   画成整行高亮的话，「前面」还是「后面」就说不清了 */
+/* 插入线跟随鼠标所在的半行，明确表示落在前面或后面。 */
 .row--dropping {
   box-shadow: inset 0 2px 0 0 var(--accent, var(--text));
+}
+
+.row--dropping[data-drop-edge="after"] {
+  box-shadow: inset 0 -2px 0 0 var(--accent, var(--text));
 }
 
 /* 「置顶」整段都是落点——只让段头能放的话，那是一条 24 像素高的线，
