@@ -117,6 +117,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
           onSelect: shell.openPanelPage,
           onClose: shell.closePanelPage,
           onFull: shell.togglePanelFull,
+          onHide: shell.hideWorkbench,
         }}
         onCopy={app.copy}
         onClose={() => {

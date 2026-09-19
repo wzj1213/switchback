@@ -10,6 +10,6 @@ export function panelShellClass(open: boolean, full: boolean, rail = true): stri
 }
 
 /** 并排工具组不妨碍继续输入；只有实际遮住主区时，拖放完成后才收起。 */
-export function shouldClosePanelAfterDrop(viewportWidth: number, full: boolean): boolean {
-  return full || viewportWidth <= 1120
+export function shouldClosePanelAfterDrop(viewportWidth: number, full: boolean, rail = true): boolean {
+  return full || viewportWidth <= (rail ? 1240 : 1040)
 }

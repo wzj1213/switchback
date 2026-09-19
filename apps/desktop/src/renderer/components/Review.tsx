@@ -99,7 +99,7 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClo
   }
   return (
     <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动" hidden={!panelActive}>
-      <PanelTabs {...panel} />
+      <PanelTabs {...panel} onHide={panel.onHide ?? onClose} />
       <header className="rv__head">
         <Select label={scopeLabel(scope)} title="选择审核范围" sections={[{
           choices: SCOPES,

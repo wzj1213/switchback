@@ -24,6 +24,7 @@ export interface PanelTabsProps {
   onSelect: (page: PanelPage) => void
   onClose: (page: PanelPage) => void
   onFull: () => void
+  onHide?: () => void
 }
 
 export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
@@ -84,8 +85,12 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
         data-tip={props.full ? "并排显示侧边面板" : "展开侧边面板"} onClick={props.onFull}>
         <ExpandIcon />
       </button>
-      {/* 「隐藏」不在这条栏里——开关钉在窗口右上角（`ThreadScreen` 的 PanelToggle），
-          开/关抽屉都在同一个位置点；栏右侧的留白就是给它留的（panel-tabs.css） */}
+      {props.onHide === undefined ? null : (
+        <button type="button" className="panel-tabs__button panel-tabs__hide"
+          aria-label="收起侧边面板" data-tip="收起侧边面板" onClick={props.onHide}>
+          <CloseIcon size={14} />
+        </button>
+      )}
     </header>
   )
 }

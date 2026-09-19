@@ -18,15 +18,17 @@ describe("工具面板外壳", () => {
   })
 
   it("只有窄窗或手动独占时才在拖放后关闭工具组", () => {
-    const cases: readonly [number, boolean, boolean][] = [
-      [1172, false, false],
-      [1121, false, false],
-      [1120, false, true],
-      [860, false, true],
-      [1172, true, true],
+    const cases: readonly [number, boolean, boolean, boolean][] = [
+      [1280, false, true, false],
+      [1241, false, true, false],
+      [1240, false, true, true],
+      [860, false, true, true],
+      [1172, false, false, false],
+      [1040, false, false, true],
+      [1280, true, false, true],
     ]
-    for (const [viewportWidth, full, expected] of cases) {
-      expect(shouldClosePanelAfterDrop(viewportWidth, full)).toBe(expected)
+    for (const [viewportWidth, full, rail, expected] of cases) {
+      expect(shouldClosePanelAfterDrop(viewportWidth, full, rail)).toBe(expected)
     }
   })
 })

@@ -32,23 +32,12 @@ export const REVIEW_VIEWS = [
         const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
         if (review === undefined || sidebar === undefined || main === null) return false
         const mainBox = main.getBoundingClientRect()
-        /*
-         * **让步的是工具台，不是导航。** 点开右边的面板不该让左边消失，那是两件事。
-         *
-         * 让步多少现在是一条连续式子（app-foundation.css 的 --workbench-w），
-         * 不再是「1280 以上一档、以下一档」——所以这里钉的也不再是某一个宽度，
-         * 而是那条式子存在的**理由**：先把 700 留给对话列，剩下的才归工具台；
-         * 窗口窄到留不出 700 时，工具台也不许再瘦过 300。
-         */
-        const room = window.innerWidth - sidebar.width - 300
-        return getComputedStyle(main).display === 'flex'
-          && Math.abs(review.right - window.innerWidth) < 1
-          && Math.abs(review.left - mainBox.right) < 1
-          // 三块紧挨着排：导航右缘 = 会话左缘，会话右缘 = 面板左缘。
-          && sidebar.width > 100
-          && Math.abs(mainBox.left - sidebar.right) < 1
-          && review.width >= 300 && review.width <= 560
-          && mainBox.width >= Math.min(740, room) - 1
+        const stacked = getComputedStyle(main).display === 'none'
+        return Math.abs(review.right - window.innerWidth) < 1 && sidebar.width > 100
+          && review.width >= 559
+          && (stacked ? Math.abs(review.left - sidebar.right) < 1
+            : Math.abs(review.left - mainBox.right) < 1 && mainBox.width >= 439
+              && Math.abs(mainBox.left - sidebar.right) < 1)
       })()
       && (() => {
         const review = document.querySelector('.rv')?.getBoundingClientRect()
@@ -59,7 +48,7 @@ export const REVIEW_VIEWS = [
         const buttons = [...document.querySelectorAll('.rv__tool')].map(button => button.getBoundingClientRect())
         if ([review, title, tools, list, pane].some(rect => rect === undefined)) return false
         const narrowHead = review.width <= 760
-        const stackedBody = review.width <= 520
+        const stackedBody = review.width <= 760
         const bodyAligned = stackedBody ? list.bottom <= pane.top + 1 : list.left >= pane.right - 1
         return (!narrowHead || tools.top >= title.bottom) && bodyAligned
           && buttons.every(button => button.height < 40 && button.width > 24)
@@ -241,27 +230,16 @@ export const REVIEW_VIEWS = [
   },
   {
     name: "04-分栏差异",
-    /*
-     * **最小窗口那一档按设计没有这一屏。**
-     *
-     * 并排要求补丁区 ≥ 420（use-narrow-panel.ts 的 SPLIT_MIN_W）。展开成整扇之后
-     * 面板 = 窗口宽 − 导航；面板宽过 520 时文件清单（260 + 1px 描边）还并排站着，
-     * 补丁区要再减掉它。860×560 那一档算出来只有 375——按钮此时**就该是灰的**。
-     *
-     * 不写这条 `only` 的话，`--min` 巡检会在这里抛错**并把后面所有屏一起带停**，
-     * 看起来像是这次改动把审核面板改坏了（实测：HEAD 上也一样停在这里）。
-     */
+    // 以实际补丁宽度决定是否支持并排，窄面板的文件列表放在上方。
     only: `(() => {
       const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect().width ?? 0
       const panel = window.innerWidth - sidebar
-      return (panel <= 520 ? panel : panel - 261) >= 420
+      return (panel <= 760 ? panel : panel - 261) >= 420
     })()`,
-    // **先展开成整扇再切并排。** 并排要求补丁区 ≥ 420px（`use-narrow-panel.ts` 的
-    // `SPLIT_MIN_W`），而停靠态下这块面板最宽 560px、里面还并排站着 260px 的
-    // 文件清单，补丁区只剩不到 300px——每侧 14 个字符，那正是这条闸门要挡的。
-    // 展开态才是并排真正可用的那一档，所以这一屏拍的就是那一档。
+    // 宽窗先展开再切并排；窄窗已占满工作区，不点击隐藏的展开按钮。
     open: [
-      `document.querySelector('.rv .panel-tabs__expand')?.click()`,
+      `(() => { const button = document.querySelector('.rv .panel-tabs__expand');
+        if (button?.getClientRects().length) button.click() })()`,
       `document.querySelector('[aria-label="切换到分栏差异"]')?.click()`,
     ],
     ready: `.rvd__body.rvd__body--split`,
@@ -269,7 +247,8 @@ export const REVIEW_VIEWS = [
       && document.querySelector('[aria-label="切换到统一差异"]') !== null
       && document.querySelectorAll('.rvd__row:not(.rvd__row--full) .rvd__sign').length > 0`,
     after: `document.querySelector('[aria-label="切换到统一差异"]')?.click();
-      document.querySelector('.rv .panel-tabs__expand')?.click()`,
+      (() => { const button = document.querySelector('.rv .panel-tabs__expand');
+        if (button?.getClientRects().length) button.click() })()`,
   },
   {
     name: "04-隐藏审核文件",

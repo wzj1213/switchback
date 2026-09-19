@@ -78,7 +78,7 @@ export function ThreadScreen({
         dropSurfaceVisible={shell.panelVisible}
         onTogglePanel={shell.togglePanelVisibility}
         onFilesDropped={() => {
-          if (shouldClosePanelAfterDrop(window.innerWidth, shell.panelFull)) shell.hideWorkbench()
+          if (shouldClosePanelAfterDrop(window.innerWidth, shell.panelFull, shell.railOpen)) shell.hideWorkbench()
         }}
         models={modelsOf(state, thread.id, thread.engine)}
         engines={engines}

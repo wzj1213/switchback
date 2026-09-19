@@ -49,7 +49,7 @@ export function ReportedReview({ target, panel, panelActive, onClose, onCopy, on
   }
   return (
     <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动" hidden={!panelActive}>
-      <PanelTabs {...panel} />
+      <PanelTabs {...panel} onHide={panel.onHide ?? onClose} />
       <header className="rv__head">
         <span className="rv__title">本轮改动</span>
         <div className="rv__summary"><span className="rv__count">{all.length} 个文件</span>

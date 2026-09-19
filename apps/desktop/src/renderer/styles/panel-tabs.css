@@ -13,7 +13,7 @@
   height: var(--topbar-h);
   min-width: 0;
   /* 右侧给平移过来的面板开关留位（26 + 一段 gap），这条栏的内容别钻到它底下 */
-  padding: 0 calc(var(--sp-4) + 30px + var(--sp-2)) 0 6px;
+  padding: 0 var(--panel-end-pad, calc(var(--sp-4) + 30px + var(--sp-2))) 0 6px;
   border-bottom: 1px solid var(--border);
   /* **画布色，不是沉底灰。** 灰的那一版让这条横带成了「灰-白-灰」三段：
      左边侧栏是灰的、中间顶栏是白的、右边页签条又是灰的——同一条带子上
@@ -109,9 +109,13 @@
   flex: 1;
 }
 
-/* 宽窄两栏都保留显式展开入口；只有点了它才隐藏会话。 */
+/* 窄窗已占满工作区，省掉无效果的展开键；收起入口由面板自己提供。 */
 .panel-tabs__expand {
-  display: inline-flex;
+  display: var(--panel-expand-display, inline-flex);
+}
+
+.panel-tabs__hide {
+  display: var(--panel-hide-display, none);
 }
 
 .panel-tab__pick:focus-visible,

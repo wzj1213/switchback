@@ -32,6 +32,7 @@ import { VIEWS } from "./shot-views.mjs"
 import { PERFORMANCE_VIEWS } from "./shot-views-performance.mjs"
 import { SIDEBAR_VIEWS } from "./shot-views-sidebar.mjs"
 import { dragSidebar } from "./shot-sidebar-drag.mjs"
+import { PANEL_SIZING_VIEWS } from "./shot-views-panel-sizing.mjs"
 import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -332,7 +333,7 @@ async function main() {
     await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
-    const views = MANY ? SIDEBAR_VIEWS : STRESS ? PERFORMANCE_VIEWS : VIEWS
+    const views = MANY ? SIDEBAR_VIEWS : STRESS ? PERFORMANCE_VIEWS : [...VIEWS, ...PANEL_SIZING_VIEWS]
     for (const view of views.filter(view => ONLY === undefined || ONLY.includes(view.name))) await shoot(cdp, view, workspaceFiles)
     await shootSettings(cdp)
     cdp.close()

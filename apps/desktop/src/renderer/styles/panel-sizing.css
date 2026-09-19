@@ -1,0 +1,76 @@
+/* 560px 阅读区 + 至少 440px 会话；放不下时工具台占满工作区，导航保持原选择。 */
+.shell--workbench-full {
+  --panel-hide-display: inline-flex;
+  --panel-end-pad: var(--sp-4);
+}
+
+.shell--workbench-full .cmp {
+  display: none;
+}
+
+.shell--norail.shell--workbench-full .panel-tabs {
+  padding-left: var(--traffic);
+}
+
+@media (max-width: 1240px) {
+  .shell--workbench:not(.shell--norail) {
+    --main-col: 0px;
+    --panel-col: calc(100vw - var(--rail-col));
+    --panel-hide-display: inline-flex;
+    --panel-expand-display: none;
+    --panel-end-pad: var(--sp-4);
+  }
+
+  .shell--workbench:not(.shell--norail) > :is(.main, .cmp) {
+    display: none;
+  }
+
+  .shell--workbench:not(.shell--norail) .panel-tabs {
+    -webkit-app-region: drag;
+  }
+}
+
+@media (max-width: 1040px) {
+  .shell--workbench.shell--norail {
+    --main-col: 0px;
+    --panel-col: 100vw;
+    --panel-hide-display: inline-flex;
+    --panel-expand-display: none;
+    --panel-end-pad: var(--sp-4);
+  }
+
+  .shell--workbench.shell--norail > :is(.main, .cmp) {
+    display: none;
+  }
+
+  .shell--workbench.shell--norail .panel-tabs {
+    -webkit-app-region: drag;
+    padding-left: var(--traffic);
+  }
+}
+
+/* 正文逐层约束在面板内，不能由 flex 子项的固有宽度撑开整个阅读区。 */
+.workbench__body,
+.file-preview__body,
+.html-preview,
+.html-preview__panel,
+.html-preview__frame,
+.text-preview__document {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.html-preview__frame {
+  display: block;
+}
+
+.text-preview__document .md {
+  overflow-wrap: anywhere;
+}
+
+/* 文档阅读默认折行；源码与宽表格仍在各自区域按原始结构阅读。 */
+.text-preview__document .md pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

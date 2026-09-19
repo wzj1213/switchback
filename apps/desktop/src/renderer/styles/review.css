@@ -310,9 +310,8 @@
   }
 }
 
-/* 只有差异正文已经不足约 260px 时才把文件栏移到上方。常规右面板保留
-   “差异在左、文件在右”的编辑器结构，和页签方向保持一致。 */
-@container (max-width: 520px) {
+/* 阅读区不足 500px 时把文件列表移到上方，让默认右栏的宽度真正留给补丁正文。 */
+@container (max-width: 760px) {
   .rv__body {
     flex-direction: column;
   }
@@ -320,7 +319,7 @@
   .rv__body > .rvl {
     order: 0;
     width: 100%;
-    max-height: 190px;
+    max-height: clamp(96px, 25vh, 190px);
     border-left: 0;
     border-right: 0;
     border-bottom: 1px solid var(--border-strong);
@@ -413,6 +412,10 @@
 
 .rvl__row--on {
   background: var(--bg-active);
+}
+
+.rvl__row--on .diffstat__del {
+  color: color-mix(in srgb, var(--danger) 70%, var(--text));
 }
 
 .rvl__row:focus-visible {
@@ -519,7 +522,7 @@
    *
    * 整扇面板里还并排站着 260px 的文件清单：`.rv` 有 540px 的时候补丁区只有 279px，
    * 「面板够宽」和「补丁够宽」在这一档下差了将近一倍。而 `.rvl` 还能被那颗
-   * 「隐藏文件」关掉、520px 以下又会挪到上方——补丁到底有多宽只有这个盒子知道。
+   * 「隐藏文件」关掉、760px 以下又会挪到上方——补丁到底有多宽只有这个盒子知道。
    * `Review.tsx` 的并排闸门量的也是这个盒子（`useNarrowPanel`），两处必须同源。
    *
    * `flex: 1` + `min-width: 0` 意味着它的宽度本来就由外面给，
