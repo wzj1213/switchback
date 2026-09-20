@@ -52,7 +52,8 @@ export function Head({
     <>
       <div className="sidebar__head">
         <div className="sidebar__brand">
-          <OmniMark />omni<span className="sidebar__name">同文</span>
+          <span className="row__slot"><OmniMark /></span>
+          <span className="sidebar__wordmark">omni<span className="sidebar__name">同文</span></span>
         </div>
       </div>
 

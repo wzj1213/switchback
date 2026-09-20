@@ -6,7 +6,7 @@ import { FolderIcon } from "./icons-folder.js"
 export function TranscriptBlank({ thread }: { thread: Thread }): React.JSX.Element {
   return (
     <div className="blank">
-      <OmniMark size={28} />
+      <OmniMark />
       <p className="blank__title">
         {thread.adopted === true ? (
           "继续这段工作"

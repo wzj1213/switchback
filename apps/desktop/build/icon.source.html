@@ -1,49 +1,23 @@
-<!doctype html><html><head><meta charset="utf-8"><title>omni 图标源稿</title><style>
-/*
- * omni 的产品图标：**三条并成一条**。
- *
- * 说的就是这个产品在干什么——不同的引擎从左边进来，一个界面从右边出去。
- *
- * ## 为什么不是那个「同」字
- *
- * 上一版是把系统字体的「同」放大。三个问题：
- * 1. 依赖**构建机**装了对应中文字体，换台机器打包，图标可能就变了
- * 2. 16px（访达列表、菜单栏、⌘Tab）下密笔画糊成一块方糖
- * 3. 它没说这个产品是干什么的
- *
- * ## 为什么画成这样
- *
- * - 三条线从左边进来 = 三家引擎各有各的样子
- * - 汇到一点之后**只剩一条、而且更粗** = 一个界面
- * - 只有四条描边，16px 下还剩得下一个有辨识度的轮廓
- *
- * ## 线宽是量出来的，不是看着顺眼定的
- *
- * 第一版 `stroke-width` 是 7、glyph 520。折算到 16px 图标上，一条线只有
- * **0.57 个像素**——低于一个像素就必然被抗锯齿抹成灰糊。真拿 sips 降采样到
- * 16/32/48 排出来看，那一版和它要取代的「同」字一样，16px 下是一块深色方糖。
- * 换了个形状，没换掉毛病。
- *
- * 现在是 12 / glyph 620（≈1.2px @16）。再往上试到 15 / 660 反而更差：
- * 32px 时三条进线互相粘住，结构就没了。**这一档是上下都试过的中间值。**
- *
- * 改完用 `pnpm 图标` 重新生成 icns（见 scripts/make-icon.mjs），
- * 并且**必须真降采样到 16px 看一眼**——1024 上好看说明不了任何事。
- */
-html,body{margin:0;width:1024px;height:1024px;background:transparent}
-.pad{width:1024px;height:1024px;display:flex;align-items:center;justify-content:center}
-.mark{width:824px;height:824px;border-radius:184px;
-  background:linear-gradient(155deg,#3b3b46 0%,#17171c 100%);
-  display:flex;align-items:center;justify-content:center}
-</style></head><body><div class="pad"><div class="mark">
-<svg width="620" height="620" viewBox="0 0 100 100" fill="none">
-  <!-- 三条线从左边进来（三家引擎），并成一条从右边出去（一个界面）。
-       透明度只差 0.15：差得再多，小尺寸下淡的那两条直接消失，
-       「三条」就变成了「一条」——而那正好是这枚图标要说的反面 -->
-  <path d="M10 24 H42 C58 24 56 50 72 50 H92" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
-  <path d="M10 50 H92" stroke="#fff" stroke-width="12" stroke-linecap="round" opacity=".85"/>
-  <path d="M10 76 H42 C58 76 56 50 72 50 H92" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
-  <!-- 汇合之后那一段更粗、且不透明：**它才是主语** -->
-  <path d="M72 50 H92" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
-</svg>
-</div></div></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>omni 图标源稿</title>
+  <style>
+    /* 与侧栏、空会话共用三线汇合的轮廓。左右端点含圆帽都在视口内，
+       单条不透明路径消除交叠接缝；100px 外留白与 75% 内图形保持居中。
+       修改后运行 pnpm 图标，同时检查 16 / 32 / 64px 的实际栅格。 */
+    html, body { margin: 0; width: 1024px; height: 1024px; background: transparent; }
+    body { display: grid; place-items: center; }
+    .mark {
+      width: 824px; height: 824px; border-radius: 184px;
+      background: linear-gradient(155deg, #3b3b46, #17171c);
+      display: grid; place-items: center;
+    }
+    .symbol { width: 75%; height: 75%; }
+  </style>
+</head>
+<body>
+  <div class="mark"><img class="symbol" src="../src/renderer/assets/omni-symbol.svg" alt=""></div>
+</body>
+</html>

@@ -413,7 +413,7 @@ body {
  * ── 侧栏的一条槽 ───────────────────────────────────────────
  *
  * 整个侧栏共用两条纵向基线：图标落在宽 `--sb-slot` 的第一列并按中心对齐；
- * 品牌与分节标题落在 `--sb-pad + --sb-ink-offset`，对齐图标的视觉左缘。
+ * 品牌标记复用图标槽，分节标题落在 `--sb-pad + --sb-ink-offset`。
  * 行内正文仍从 `--sb-pad + --sb-slot` 开始。
  *
  * 上一版没有这条规则，于是品牌 12px、按钮 8px、组标题 8px、行内文字 32px，
@@ -425,7 +425,7 @@ body {
   --sb-pad: var(--sp-3);
   --sb-slot: 28px;
   --sb-ink-offset: var(--sp-2);
-  --sb-row-h: 36px;
+  --sb-row-h: 32px;
   /* 行尾那几颗图标按钮的方形点击区。**必须是方的**：图标 15、盒子 22，
      四边各留 3.5——上下左右一样多，图标中心才等于盒子中心。
      不对称的内边距（原来是 2px 5px）会让两颗按钮的视觉重心既不在同一条
@@ -433,39 +433,20 @@ body {
   --sb-act: 22px;
 }
 
-/*
- * ── 顶上那条横带 ───────────────────────────────────────
- *
- * **侧栏头和会话顶栏是同一条带子的两段。** 改之前它俩各写各的：顶栏 56px 高、
- * 底下一条线；侧栏头是 `38 / 16` 的内边距堆出来的 82px、没有线。结果有两个，
- * 都出现在整扇窗口最先被看见的地方：
- *
- * - 品牌的中线在 54，会话标题的中线在 28——**同一条横带上两个标题差 26px**；
- * - 顶栏那条线走到侧栏边界就断了，右边面板的页签条却又接着画一条，
- *   于是这条线断一段、接一段。
- *
- * 现在三块共用 `--topbar-h` 与同一条底线，横线一路走通。品牌**让开交通灯**
- * （`--traffic`，和「收起导航后顶栏的左内距」是同一个数）——那块地是系统的，
- * 挤进去的字会被三颗灯压住。
- */
+/* 窗口控制区在上、品牌在下。品牌回到导航的图标/文字列，避免为交通灯
+   水平缩进 92px，造成它与整条侧栏脱节。主会话和工具台仍共用顶栏高度。 */
 .sidebar__head {
   display: flex;
   flex: none;
   align-items: center;
-  height: var(--topbar-h);
-  padding: 0 var(--sp-4) 0 var(--traffic);
-  border-bottom: 1px solid var(--border);
-  /* 交通灯那块地已经吃掉 92px，224px 的窄侧栏里只剩 116。品牌实测 98，
-     留了余量；真撑破时裁掉，不许把这条带子顶高一档 */
+  height: calc(var(--window-controls-h) + var(--sb-row-h));
+  padding: var(--window-controls-h) var(--sb-pad) 0;
   overflow: hidden;
   -webkit-app-region: drag;
 }
 
 .sidebar__brand {
-  /* 品牌是侧栏标题，不该缩进到项目名那一列；它与分节标题共用视觉左缘。 */
-  padding-left: 0;
-  /* **不再是 20/700。** 进了横带之后它旁边就是会话标题（14/600）——
-     招牌比正在看的那条会话还重两档，眼睛第一个落点是错的。 */
+  /* 标记与导航图标同列，名称与新建、项目标题同列。 */
   font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: 0;
@@ -473,7 +454,7 @@ body {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   font-family: var(--font);
 }
 
@@ -490,12 +471,11 @@ body {
  * 见 `SidebarHead.tsx` 的注释。**行高仍然是 `--sb-row-h`**：
  * 侧栏所有的量都挂在那三个变量上，多写一个 30 就是本文件开头说的「第三个 padding」。
  */
-/* 横带底下第一行。**上外边距是新加的**：头那一块不再靠内边距撑高，
-   紧贴着底线开画的话，这颗最常点的按钮会像粘在线上 */
+/* 品牌和新建之间只留一档间距，搜索前留两档，列表保留独立滚动。 */
 .sidebar__act {
   display: flex;
   gap: var(--sp-2);
-  margin: var(--sp-3) var(--sb-pad) var(--sp-3);
+  margin: var(--sp-1) var(--sb-pad) var(--sp-2);
 }
 
 .sidebar__new {
@@ -588,7 +568,7 @@ body {
   align-items: center;
   width: calc(100% - var(--sb-pad) * 2);
   margin: var(--sp-3) var(--sb-pad) 0;
-  /* 和品牌共用视觉左缘；图标与状态点仍按自己的中心线排，不被推走。 */
+  /* 对齐导航图标的视觉左缘；图标与状态点仍按自己的中心线排。 */
   padding: 0 0 var(--sp-1) var(--sb-ink-offset);
   min-height: var(--sb-act);
   border-radius: var(--radius-sm);
