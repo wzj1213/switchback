@@ -16,7 +16,7 @@ import { Workspace } from "./Workspace.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import { stampOf } from "../stamp.js"
 import { ThreadWorkbench } from "./thread-workbench.js"
-import { panelShellClass, shouldClosePanelAfterDrop } from "../panel-layout.js"
+import { panelShellClass } from "../panel-layout.js"
 import { useComposerReference } from "../use-composer-reference.js"
 
 /** 当前任务的一整屏接线；App 只负责在空白页、对比页与这里之间选路。 */
@@ -78,7 +78,7 @@ export function ThreadScreen({
         dropSurfaceVisible={shell.panelVisible}
         onTogglePanel={shell.togglePanelVisibility}
         onFilesDropped={() => {
-          if (shouldClosePanelAfterDrop(window.innerWidth, shell.panelFull, shell.railOpen)) shell.hideWorkbench()
+          if (shell.panelFull) shell.hideWorkbench()
         }}
         models={modelsOf(state, thread.id, thread.engine)}
         engines={engines}

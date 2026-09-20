@@ -6,16 +6,18 @@ const documentPath = "docs/omni-panel-reading-probe.md"
 
 export const PANEL_SIZING_VIEWS = [
   {
-    name: "40-右栏默认阅读宽度",
+    name: "40-打开右栏保留主对话",
     open: openPanelPage("审查"),
     ready: ".shell--workbench .rv:not([hidden])",
     assert: `(() => {
       const panel = document.querySelector('.rv:not([hidden])')
       const rect = panel.getBoundingClientRect()
       const main = document.querySelector('.main')
-      const close = panel.querySelector('[aria-label="收起侧边面板"]')
-      return rect.width >= 559 && rect.right <= window.innerWidth + 1 &&
-        (getComputedStyle(main).display !== 'none' || close.getClientRects().length > 0)
+      const mainBox = main.getBoundingClientRect()
+      const composer = main.querySelector('.composer').getBoundingClientRect()
+      return rect.width >= 279 && rect.width <= 560 && rect.right <= window.innerWidth + 1 &&
+        getComputedStyle(main).display === 'flex' && mainBox.width > rect.width &&
+        composer.width > 250 && composer.bottom <= window.innerHeight + 1
     })()`,
     after: hide,
   },
@@ -62,5 +64,25 @@ export const PANEL_SIZING_VIEWS = [
     open: [...openPanelPage("审查"), hide],
     ready: ".shell:not(.shell--workbench)",
     assert: `document.querySelector('.main').getBoundingClientRect().width > 600`,
+  },
+  {
+    name: "44-手动展开才独占",
+    open: [...openPanelPage("审查"), `document.querySelector('.rv .panel-tabs__expand')?.click()`],
+    ready: ".shell--workbench-full",
+    assert: `getComputedStyle(document.querySelector('.main')).display === 'none' &&
+      document.querySelector('.rv [aria-label="收起侧边面板"]').getClientRects().length > 0`,
+    after: `document.querySelector('.rv .panel-tabs__expand')?.click()`,
+  },
+  {
+    name: "45-收起导航仍与对话并排",
+    open: `document.querySelector('[aria-label="收起侧栏"]')?.click()`,
+    ready: ".shell--norail:not(.shell--workbench-full)",
+    assert: `(() => {
+      const main = document.querySelector('.main')
+      const panel = document.querySelector('.rv:not([hidden])')
+      return getComputedStyle(main).display === 'flex' &&
+        main.getBoundingClientRect().width > panel.getBoundingClientRect().width
+    })()`,
+    after: `document.querySelector('[aria-label="展开侧栏"]')?.click(); ${hide}`,
   },
 ]

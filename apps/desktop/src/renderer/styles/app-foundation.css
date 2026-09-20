@@ -304,8 +304,8 @@ body {
   --rail-col: var(--sidebar-w);
   --main-col: minmax(0, 1fr);
   --panel-col: 0px;
-  /* 默认给阅读区至少 560px，宽屏与会话平分工作区；小窗口由 panel-sizing.css 接管。 */
-  --workbench-w: min(calc(100vw - var(--rail-col)), clamp(560px, calc((100vw - var(--rail-col)) / 2), 900px));
+  /* 默认保留主对话：工具台取工作区的四成，窄窗收至 280px，宽屏至多 560px。 */
+  --workbench-w: clamp(280px, calc((100vw - var(--rail-col)) * 0.4), 560px);
 
   display: grid;
   grid-template-columns: var(--rail-col) var(--main-col) var(--panel-col);

@@ -109,9 +109,9 @@
   flex: 1;
 }
 
-/* 窄窗已占满工作区，省掉无效果的展开键；收起入口由面板自己提供。 */
+/* 任何窗口都由用户决定是否独占；独占时收起入口由面板自己提供。 */
 .panel-tabs__expand {
-  display: var(--panel-expand-display, inline-flex);
+  display: inline-flex;
 }
 
 .panel-tabs__hide {

@@ -32,12 +32,10 @@ export const REVIEW_VIEWS = [
         const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect()
         if (review === undefined || sidebar === undefined || main === null) return false
         const mainBox = main.getBoundingClientRect()
-        const stacked = getComputedStyle(main).display === 'none'
         return Math.abs(review.right - window.innerWidth) < 1 && sidebar.width > 100
-          && review.width >= 559
-          && (stacked ? Math.abs(review.left - sidebar.right) < 1
-            : Math.abs(review.left - mainBox.right) < 1 && mainBox.width >= 439
-              && Math.abs(mainBox.left - sidebar.right) < 1)
+          && review.width >= 279 && review.width <= 560 && getComputedStyle(main).display === 'flex'
+          && mainBox.width > review.width && mainBox.width >= 350
+          && Math.abs(review.left - mainBox.right) < 1 && Math.abs(mainBox.left - sidebar.right) < 1
       })()
       && (() => {
         const review = document.querySelector('.rv')?.getBoundingClientRect()
@@ -236,7 +234,7 @@ export const REVIEW_VIEWS = [
       const panel = window.innerWidth - sidebar
       return (panel <= 760 ? panel : panel - 261) >= 420
     })()`,
-    // 宽窗先展开再切并排；窄窗已占满工作区，不点击隐藏的展开按钮。
+    // 手动展开后切并排，默认面板给主对话保留更多宽度。
     open: [
       `(() => { const button = document.querySelector('.rv .panel-tabs__expand');
         if (button?.getClientRects().length) button.click() })()`,
