@@ -45,4 +45,51 @@ export const SELFCHECK_VIEWS = [
         (${section('项目')}).getAttribute('aria-expanded') === 'true'
     })()`,
   },
+  {
+    name: '76-滚动取消待弹出的会话预览',
+    open: `document.querySelector('.group .row--thread .row__main').scrollIntoView({ block: 'center' })`,
+    hover: '.group .row--thread .row__main',
+    duringHover: `document.querySelector('.sidebar__list').scrollTop += 6`,
+    hoverDelayMs: 650,
+    ready: '.group .row--thread',
+    assert: `document.querySelector('.peek') === null`,
+  },
+  {
+    name: '78-重新悬停正常显示会话预览',
+    open: `document.querySelector('.group .row--thread .row__main').scrollIntoView({ block: 'center' })`,
+    hover: '.group .row--thread .row__main',
+    hoverDelayMs: 650,
+    ready: '.peek',
+    assert: `(() => {
+      const peek = document.querySelector('.peek'), rect = peek.getBoundingClientRect()
+      peek.style.pointerEvents = 'auto'
+      const hit = document.elementFromPoint(rect.left + 60, rect.top + 40)
+      peek.style.removeProperty('pointer-events')
+      return document.querySelectorAll('.peek').length === 1 && peek.contains(hit) &&
+        rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight &&
+        peek.querySelector('.peek__title').textContent === document.querySelector('.group .row--thread .row__label').textContent
+    })()`,
+  },
+  {
+    name: '79-滚动收起已显示的会话预览',
+    open: `document.querySelector('.group .row--thread .row__main').scrollIntoView({ block: 'center' })`,
+    hover: '.group .row--thread .row__main',
+    duringHover: `new Promise(resolve => setTimeout(resolve, 350)).then(() => {
+      if (document.querySelector('.peek') === null) throw new Error('会话预览尚未显示')
+      document.querySelector('.sidebar__list').scrollTop += 6
+    })`,
+    hoverDelayMs: 650,
+    ready: '.group .row--thread',
+    assert: `document.querySelector('.peek') === null`,
+  },
+  {
+    name: '80-翻页清理待弹出的会话预览',
+    open: `document.querySelector('.group .row--thread .row__main').scrollIntoView({ block: 'center' })`,
+    hover: '.group .row--thread .row__main',
+    duringHover: `(${project}).querySelector('[aria-label="下一页会话"]').click()`,
+    hoverDelayMs: 650,
+    ready: '.group .row--thread',
+    assert: `document.querySelector('.peek') === null &&
+      (${project}).querySelectorAll('.row--thread').length === 20`,
+  },
 ]

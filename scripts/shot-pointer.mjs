@@ -24,6 +24,10 @@ export async function hoverOver(cdp, view) {
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...at, buttons: 0 })
   if (view.press === true)
     await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", ...at, button: "left", buttons: 1, clickCount: 1 })
+  if (view.duringHover !== undefined) {
+    const result = await cdp.send("Runtime.evaluate", { expression: view.duringHover, awaitPromise: true })
+    if (result.exceptionDetails !== undefined) throw new Error(`${view.name} 悬停操作失败：${JSON.stringify(result.exceptionDetails)}`)
+  }
   await pause(view.hoverDelayMs ?? 200)
 }
 

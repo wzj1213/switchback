@@ -27,48 +27,53 @@ export interface PeekSpot {
 
 const DELAY = 300
 
-export function usePeek(dragging: boolean): {
+export function usePeek(disabled: boolean): {
   spot: PeekSpot | undefined
   arm: (el: HTMLElement) => void
   disarm: () => void
 } {
   const [spot, setSpot] = useState<PeekSpot | undefined>(undefined)
   const timer = useRef(0)
+  const events = useRef<AbortController | undefined>(undefined)
 
-  const disarm = useCallback(() => {
+  const cancel = useCallback(() => {
     window.clearTimeout(timer.current)
     timer.current = 0
-    setSpot(undefined)
+    events.current?.abort()
+    events.current = undefined
   }, [])
+  const disarm = useCallback(() => {
+    cancel()
+    setSpot(undefined)
+  }, [cancel])
 
   const arm = useCallback(
     (el: HTMLElement) => {
-      if (dragging) return
-      const rect = el.getBoundingClientRect()
-      window.clearTimeout(timer.current)
+      disarm()
+      if (disabled) return
+      events.current = new AbortController()
+      const { signal } = events.current
+      // 从等待弹出开始就能取消；只给当前悬停行注册，避免每条会话常驻监听。
+      window.addEventListener("scroll", disarm, { capture: true, signal })
+      window.addEventListener("resize", disarm, { signal })
+      window.addEventListener("blur", disarm, { signal })
       timer.current = window.setTimeout(() => {
+        timer.current = 0
+        const rect = el.getBoundingClientRect()
         // 卡高按 ~180 估：宁可往上收，也不探出窗口下沿
         setSpot({ x: rect.right + 10, y: Math.min(rect.top - 8, window.innerHeight - 188) })
       }, DELAY)
     },
-    [dragging],
+    [disabled, disarm],
   )
 
-  // 拖起来就收——浮层会盖住落点高亮
+  // 改名或拖动时收起，避免盖住当前操作。
   useEffect(() => {
-    if (dragging) disarm()
-  }, [dragging, disarm])
+    if (disabled) disarm()
+  }, [disabled, disarm])
 
-  // 滚动/缩放即收：fixed 卡不跟滚动区走，留着就是指着一条已经挪走的行
-  useEffect(() => {
-    if (spot === undefined) return undefined
-    window.addEventListener("scroll", disarm, true)
-    window.addEventListener("resize", disarm)
-    return () => {
-      window.removeEventListener("scroll", disarm, true)
-      window.removeEventListener("resize", disarm)
-    }
-  }, [spot, disarm])
+  // 翻页或筛选会卸载行，不能留下等待中的计时器和窗口监听。
+  useEffect(() => cancel, [cancel])
 
   return { spot, arm, disarm }
 }
@@ -157,7 +162,7 @@ export function useRowPeek({
   >
   card: React.JSX.Element | null
 } {
-  const { spot, arm, disarm } = usePeek(drag?.dragging !== undefined)
+  const { spot, arm, disarm } = usePeek(disabled || drag?.dragging !== undefined)
   if (disabled) return { handlers: {}, card: null }
   return {
     handlers: {
