@@ -35,6 +35,7 @@ import { dragSidebar } from "./shot-sidebar-drag.mjs"
 import { PANEL_SIZING_VIEWS } from "./shot-views-panel-sizing.mjs"
 import { INTERACTION_VIEWS } from "./shot-views-interactions.mjs"
 import { BRAND_VIEWS } from "./shot-views-brand.mjs"
+import { SEARCH_VIEWS } from "./shot-views-search.mjs"
 import { hoverOver, releasePointer, resetPointer } from "./shot-pointer.mjs"
 import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
@@ -52,6 +53,8 @@ const ONLY = process.argv.find(arg => arg.startsWith("--views="))?.slice(8).spli
 const ENGINE = process.argv.find(arg => arg.startsWith("--engine="))?.slice(9)
 const STRESS = process.argv.includes("--stress")
 const MANY = process.argv.includes("--sidebar-stress")
+const SCENES = MANY ? [...SIDEBAR_VIEWS, ...SEARCH_VIEWS] : STRESS ? PERFORMANCE_VIEWS
+  : [...VIEWS, ...PANEL_SIZING_VIEWS, ...INTERACTION_VIEWS, ...BRAND_VIEWS, ...SEARCH_VIEWS]
 /**
  * 固定窗口尺寸：前后两张图的像素必须能直接叠着比。
  *
@@ -315,8 +318,7 @@ async function main() {
     await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
-    const views = MANY ? SIDEBAR_VIEWS : STRESS ? PERFORMANCE_VIEWS : [...VIEWS, ...PANEL_SIZING_VIEWS, ...INTERACTION_VIEWS, ...BRAND_VIEWS]
-    for (const view of views.filter(view => ONLY === undefined || ONLY.includes(view.name))) await shoot(cdp, view, workspaceFiles)
+    for (const view of SCENES.filter(view => ONLY === undefined || ONLY.includes(view.name))) await shoot(cdp, view, workspaceFiles)
     await shootSettings(cdp)
     cdp.close()
   } catch (error) {

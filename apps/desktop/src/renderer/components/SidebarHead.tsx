@@ -1,8 +1,9 @@
-import { PlusIcon, SearchIcon } from "./icons.js"
+import { PlusIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
 import { OmniMark } from "./omni-mark.js"
+import { SidebarSearch } from "./sidebar-search.js"
 
 /*
  * 侧栏顶上那一块：品牌、新建、打开文件夹、筛选。
@@ -83,27 +84,7 @@ export function Head({
         </button>
       </div>
 
-      <div className="row row--search">
-        <span className="row__slot">
-          <SearchIcon size={SIDEBAR_ICON} />
-        </span>
-        <input
-          className="sidebar__filter"
-          ref={box}
-          type="text"
-          value={query}
-          placeholder="筛选会话…"
-          aria-label="筛选会话"
-          onChange={(e) => {
-            onQuery(e.target.value)
-          }}
-          onKeyDown={(e) => {
-            // Esc 清空而不是失焦：清空之后列表立刻全回来，
-            // 这是「我搜错了」时想要的那个动作
-            if (e.key === "Escape") onQuery("")
-          }}
-        />
-      </div>
+      <SidebarSearch box={box} query={query} onQuery={onQuery} />
     </>
   )
 }

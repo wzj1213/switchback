@@ -135,7 +135,7 @@ export function Sidebar(props: Props): React.JSX.Element {
   const [query, setQuery] = useState("")
   const box = useFilterFocus(props.focusFilter)
   const { open: openMenu, menu } = useContextMenu()
-  const filtering = query !== ""
+  const filtering = query.trim() !== ""
   // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
   const pins = useMemo(() => ({
     projects: props.pinned,
@@ -198,6 +198,7 @@ export function Sidebar(props: Props): React.JSX.Element {
       <div className="sidebar__list">
         {filtering ? (
           <SidebarFound
+            key={query.trim()}
             rows={props.rows}
             found={found}
             deep={deep}

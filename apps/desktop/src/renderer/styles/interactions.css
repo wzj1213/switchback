@@ -6,7 +6,7 @@
   .file-preview__copy, .file-preview__reference, .cblock__copy, .lane-cmd-block__copy,
   .msgact, .row__act:where(:not(.row__act--danger)), .act:where(:not(.act--danger)),
   .pop__item, .pop__back, .pop__cmd:where(:not(.pop__cmd--danger)),
-  .set__tab, .eng-tab, .switch__item, .html-preview__switch button, .project-pages button
+  .set__tab, .eng-tab, .switch__item, .html-preview__switch button, .project-pages button, .deep__row
 ) {
   &:hover:not(:disabled):where(:not([aria-disabled="true"], [data-state="failed"])) {
     background-color: var(--bg-hover);
@@ -22,7 +22,7 @@
 :is(
   .row--selected, .rvl__row--on, .iconbtn--on, .trigger--open, .rv__tool--on,
   .workbench__tab--on, .panel-tab--on, .pop__item--on, .set__tab--on,
-  .eng-tab--on, .switch__item--on,
+  .eng-tab--on, .switch__item--on, .deep__row--on,
   .html-preview__switch button[aria-selected="true"],
   .html-preview__switch button[aria-pressed="true"]
 ) {
@@ -37,7 +37,7 @@
     background-color: var(--selection-press);
   }
 
-  & :is(.pop__desc, .pop__value, .row__time, .row__aside, .row__count, .workbench__count, .set__tabicon) {
+  & :is(.pop__desc, .pop__value, .row__time, .row__aside, .row__count, .workbench__count, .set__tabicon, .deep__count, .deep__snip) {
     color: var(--selection-muted);
   }
 

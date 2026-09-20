@@ -1,8 +1,11 @@
 import type { ThreadRow } from "@omni/store"
+import { useLayoutEffect, useRef, useState } from "react"
 import type { EngineInfo } from "@omni/protocol"
 import type { SidebarRow } from "../sidebar.js"
 import { Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
+import { threadPage } from "../sidebar-page.js"
+import { SidebarPages } from "./sidebar-pages.js"
 
 /**
  * 筛选命中的结果。**不分段**——命中的几条散在各组里，
@@ -30,14 +33,21 @@ export function Hits({
     engines: readonly EngineInfo[]
   }
 }): React.JSX.Element {
+  const [page, setPage] = useState(0)
+  const visible = threadPage(rows, page)
+  const heading = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    heading.current?.closest(".sidebar__list")?.scrollTo({ top: 0, behavior: "instant" })
+  }, [visible.page])
   return (
     <>
-      <div className="sidebar__section sidebar__section--static">
-        命中 {rows.length} / {total}
+      <div ref={heading} className="sidebar__section sidebar__section--static">
+        会话信息 {rows.length} / {total}
       </div>
+      <SidebarPages {...visible} total={rows.length} label="搜索结果" onPage={setPage} />
       {/* 空列表什么都不说的话，看起来像「会话全没了」 */}
-      {rows.length === 0 ? <p className="sidebar__empty">没有匹配的会话。</p> : null}
-      {rows.map((row) => (
+      {rows.length === 0 ? <p className="sidebar__empty">标题、首句和目录没有匹配。</p> : null}
+      {visible.rows.map((row) => (
         <Row
           key={row.thread.id}
           row={row}

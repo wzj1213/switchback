@@ -204,6 +204,25 @@
   color: var(--text-faint);
 }
 
+.sidebar__shortcut,
+.sidebar__clear {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: var(--sp-1);
+}
+
+.sidebar__shortcut {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font: var(--text-xs) var(--font);
+}
+
+.row--search:focus-within .sidebar__shortcut {
+  visibility: hidden;
+}
+
 /* ── 正文命中 ────────────────────────────────────────
  * 「标题里没有，但正文里提过」的那几条。**两行**：标题 + 以命中词为中心的摘要。
  * 只给标题的话你还是得逐个点开确认，那这一段就白做了。见 components/SidebarDeep.tsx。
@@ -212,9 +231,11 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  width: 100%;
-  padding: var(--sp-1) calc(var(--sb-pad) + var(--sb-slot));
+  width: calc(100% - var(--sb-pad) * 2);
+  margin: 0 var(--sb-pad);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sb-slot);
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font: inherit;
