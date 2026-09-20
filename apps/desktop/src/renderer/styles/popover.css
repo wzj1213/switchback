@@ -137,11 +137,11 @@
   cursor: default;
 }
 
-.pop__item:hover {
+.pop__item:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.pop__item:active {
+.pop__item:active:not(:disabled) {
   background: var(--bg-press);
 }
 
@@ -167,7 +167,7 @@
   overflow: hidden;
   max-width: min(54vw, 360px);
   margin-left: auto;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -255,7 +255,7 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -287,25 +287,24 @@
   cursor: default;
 }
 
-.pop__cmd:hover {
+.pop__cmd:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
 /* 危险项排除：按下「删除」那一瞬红底被灰色盖掉，是最不该出现的一次反馈 */
-.pop__cmd:not(.pop__cmd--danger):active {
+.pop__cmd:not(.pop__cmd--danger):active:not(:disabled) {
   background: var(--bg-press);
 }
 
-.pop__cmd--danger:hover {
-  background: var(--danger);
+.pop__cmd--danger:hover:not(:disabled) {
+  background: var(--danger-hover);
   color: var(--text-inverse);
 }
 
 /* 已经红了，再深一档。**不能让兜底把它压成灰**——那一下正是要确认「我按的是这条」 */
-.pop__cmd--danger:active {
-  background: var(--danger);
+.pop__cmd--danger:active:not(:disabled) {
+  background: var(--danger-press);
   color: var(--text-inverse);
-  opacity: 0.86;
 }
 
 .pop__cmd-icon {

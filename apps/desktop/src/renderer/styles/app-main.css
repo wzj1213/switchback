@@ -123,12 +123,12 @@
   cursor: default;
 }
 
-.iconbtn:hover {
+.iconbtn:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.iconbtn:active {
+.iconbtn:active:not(:disabled) {
   background: var(--bg-press);
 }
 

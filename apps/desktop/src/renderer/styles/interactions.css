@@ -1,0 +1,92 @@
+/* 普通操作共用轻悬停和按下反馈；主操作、危险确认、拨块保留各自的语义颜色。 */
+:is(
+  .iconbtn, .trigger, .topbar__title, .foot__act, .tbtn,
+  .workbench__icon, .workbench__expand, .workbench__back, .workbench__tab,
+  .rv__tool, .rv__act, .rv__seg, .panel-tabs__button, .panel-tab__close,
+  .file-preview__copy, .file-preview__reference, .cblock__copy, .lane-cmd-block__copy,
+  .msgact, .row__act:where(:not(.row__act--danger)), .act:where(:not(.act--danger)),
+  .pop__item, .pop__back, .pop__cmd:where(:not(.pop__cmd--danger)),
+  .set__tab, .eng-tab, .switch__item, .html-preview__switch button, .project-pages button
+) {
+  &:hover:not(:disabled):where(:not([aria-disabled="true"], [data-state="failed"])) {
+    background-color: var(--bg-hover);
+    color: var(--text);
+  }
+
+  &:active:not(:disabled):where(:not([aria-disabled="true"], [data-state="failed"])) {
+    background-color: var(--bg-press);
+  }
+}
+
+/* 选中是一种持续状态，hover / 按下只在它之上加深，不能掉回未选中的底色。 */
+:is(
+  .row--selected, .rvl__row--on, .iconbtn--on, .trigger--open, .rv__tool--on,
+  .workbench__tab--on, .panel-tab--on, .pop__item--on, .set__tab--on,
+  .eng-tab--on, .switch__item--on,
+  .html-preview__switch button[aria-selected="true"],
+  .html-preview__switch button[aria-pressed="true"]
+) {
+  background-color: var(--selection);
+  color: var(--selection-ink);
+
+  &:where(:not(:disabled, [aria-disabled="true"])):hover {
+    background-color: var(--selection-hover);
+  }
+
+  &:where(:not(:disabled, [aria-disabled="true"])):active {
+    background-color: var(--selection-press);
+  }
+
+  & :is(.pop__desc, .pop__value, .row__time, .row__aside, .row__count, .workbench__count, .set__tabicon) {
+    color: var(--selection-muted);
+  }
+
+  & .pop__note {
+    color: color-mix(in srgb, var(--warn) 50%, var(--selection-ink));
+  }
+
+  & .diffstat__del {
+    color: color-mix(in srgb, var(--danger) 40%, var(--selection-ink));
+  }
+
+  & .diffstat__add {
+    color: color-mix(in srgb, var(--ok) 40%, var(--selection-ink));
+  }
+}
+
+/* 页签的底色由整枚页签承担，标题按钮不再压一层矩形。 */
+.panel-tab__pick:is(:hover, :active) {
+  background: transparent;
+}
+
+.panel-tab--on:has(.panel-tab__pick:active) {
+  background: var(--selection-press);
+}
+
+.row__main,
+.sidebar__section-main {
+  border-radius: inherit;
+}
+
+/* 鼠标不画键盘环；键盘用户在按钮、行、菜单、页签间看到同一条焦点线。 */
+:is(button, a[href], summary, [role="button"], [role="tab"], [role="menuitem"],
+  [role="menuitemradio"], [role="menuitemcheckbox"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 隐藏的行内操作在键盘进入当前行时显现。 */
+.row:focus-within > .row__act,
+.sidebar__section:focus-within > .row__act {
+  opacity: 1;
+}
+
+/* 禁用态保持静止，仍能悬停阅读说明。 */
+button:disabled,
+button[aria-disabled="true"] {
+  cursor: default;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+}

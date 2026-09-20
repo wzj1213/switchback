@@ -155,11 +155,6 @@
   font-weight: 500;
 }
 
-/* 悬停时**再深一档**，不是退回去 */
-.row.row--selected:hover {
-  background: color-mix(in srgb, var(--selection) 84%, var(--accent));
-}
-
 .row.row--selected .row__slot {
   color: var(--selection-ink);
 }
@@ -320,8 +315,8 @@
    和分段标题上的按钮永远是 `opacity: 0`——它们在 DOM 里、能被读屏读到、
    点得中，但对鼠标用户根本不存在。
    `SidebarRows.tsx` 里那句「看不见的功能等于没有」被这行 CSS 字面兑现了。 */
-.row:hover .row__act,
-.sidebar__section:hover .row__act,
+.row:hover > .row__act,
+.sidebar__section:hover > .row__act,
 .row__act:focus-visible,
 .row__act--danger {
   opacity: 1;
@@ -329,13 +324,14 @@
 
 /* 悬停变红是**删除**的语义，不能所有行内按钮都红——
    现在这一列里还有「在此新建」和「更多操作」，它们不危险 */
-.row__act:hover {
+.row__act:hover:not(:disabled) {
   color: var(--text);
   background: var(--bg-hover);
 }
 
-.row__act--danger:hover {
-  color: var(--danger);
+.row__act--danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+  color: var(--text-inverse);
 }
 
 /* 确认态就要显眼——这一步之后没有回头路。
@@ -347,10 +343,10 @@
   color: var(--text-inverse);
 }
 
-/* 确认键已经是红底，兜底那条（两个类，(0,2,0)）压不动它——
-   所以按下的反馈只能自己给，走透明度 */
-.row__act--danger:active {
-  opacity: 0.82;
+/* 按下继续保留危险语义；只改底色，文字不随透明度一起变淡。 */
+.row__act--danger:active:not(:disabled) {
+  background: var(--danger-press);
+  color: var(--text-inverse);
 }
 
 .row__dot {

@@ -129,12 +129,12 @@
   cursor: pointer;
 }
 
-.workbench__tab:hover {
+.workbench__tab:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.workbench__tab:active {
+.workbench__tab:active:not(:disabled) {
   background: var(--bg-press);
 }
 
@@ -165,14 +165,14 @@
   cursor: pointer;
 }
 
-.workbench__expand:hover,
-.workbench__icon:hover {
+.workbench__expand:hover:not(:disabled),
+.workbench__icon:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.workbench__expand:active,
-.workbench__icon:active {
+.workbench__expand:active:not(:disabled),
+.workbench__icon:active:not(:disabled) {
   background: var(--bg-press);
 }
 

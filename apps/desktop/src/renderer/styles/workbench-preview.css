@@ -61,7 +61,7 @@
   cursor: pointer;
 }
 
-.file-preview__copy:hover {
+.file-preview__copy:hover:not(:disabled) {
   color: var(--text);
 }
 

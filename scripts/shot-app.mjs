@@ -33,6 +33,8 @@ import { PERFORMANCE_VIEWS } from "./shot-views-performance.mjs"
 import { SIDEBAR_VIEWS } from "./shot-views-sidebar.mjs"
 import { dragSidebar } from "./shot-sidebar-drag.mjs"
 import { PANEL_SIZING_VIEWS } from "./shot-views-panel-sizing.mjs"
+import { INTERACTION_VIEWS } from "./shot-views-interactions.mjs"
+import { hoverOver, releasePointer, resetPointer } from "./shot-pointer.mjs"
 import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const DESKTOP = join(ROOT, "apps/desktop")
@@ -174,29 +176,6 @@ function assertReadyTime(view, preparedAt) {
 }
 
 /**
- * 把指针**真的**移到某个元素上。
- *
- * 悬停态此前一屏都拍不到：场景只会 `evaluate` 一段 JS，而 `:hover` 和
- * React 的 `onMouseEnter` 都只认真实指针事件。用 `element.focus()` 顶替也不行——
- * 窗口没有系统焦点时，Chromium 只挪 `activeElement`，**不派发 focus 事件**
- *（实测：导航条那一格 `document.activeElement` 已经是它，悬停卡却没出来）。
- *
- * 指针停在那儿不收回：这一屏拍的就是「鼠标正停在上面」。
- */
-async function hoverOver(cdp, view) {
-  if (view.hover === undefined) return
-  const at = await value(cdp, `(() => {
-    const node = document.querySelector('${view.hover}')
-    if (node === null) return null
-    const box = node.getBoundingClientRect()
-    return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) }
-  })()`)
-  if (at === null) throw new Error(`${view.name} 找不到要悬停的 ${view.hover}`)
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y, buttons: 0 })
-  await pause(200)
-}
-
-/**
  * 这一屏在**当前这个窗口宽度下**存不存在（场景自己用 `only` 声明）。
  *
  * 有些东西是按设计随宽度撤掉的（提问导航条：正文列两边的空档容不下它时整条不画）。
@@ -214,6 +193,7 @@ async function shoot(cdp, view, workspaceFiles) {
   const preparedAt = Date.now()
   if (!(await present(cdp, view))) return
   await prepareWorkspaceFiles(ROOT, view, workspaceFiles)
+  await resetPointer(cdp, view)
   if (view.before !== undefined) {
     await waitFor(cdp, `document.querySelector('${view.before}') !== null`, `${view.name} 前置`)
   }
@@ -248,6 +228,7 @@ async function shoot(cdp, view, workspaceFiles) {
   })
   await writeFile(join(OUT, `${view.name}.png`), Buffer.from(shot.data, "base64"))
   console.log(`  ✓ ${view.name}.png`)
+  await releasePointer(cdp, view)
   if (view.after !== undefined) {
     await value(cdp, `(() => { ${view.after}; return true })()`)
     await pause(120)
@@ -333,7 +314,7 @@ async function main() {
     await value(cdp, axe.source)
     await openFixture({ value, waitFor, pause }, cdp)
     if (PET_LIVE) await openPetLive({ value, waitFor, pause }, cdp)
-    const views = MANY ? SIDEBAR_VIEWS : STRESS ? PERFORMANCE_VIEWS : [...VIEWS, ...PANEL_SIZING_VIEWS]
+    const views = MANY ? SIDEBAR_VIEWS : STRESS ? PERFORMANCE_VIEWS : [...VIEWS, ...PANEL_SIZING_VIEWS, ...INTERACTION_VIEWS]
     for (const view of views.filter(view => ONLY === undefined || ONLY.includes(view.name))) await shoot(cdp, view, workspaceFiles)
     await shootSettings(cdp)
     cdp.close()

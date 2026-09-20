@@ -150,7 +150,7 @@ export function useRowPeek({
   row: SidebarRow
   engines: readonly EngineInfo[]
 }): {
-  /** 摊到行外壳上：进入/聚焦布防，离开/失焦/按下即收。 */
+  /** 只摊到主按钮：操作按钮各自显示提示，不叠加整张会话预览。 */
   handlers: Pick<
     React.HTMLAttributes<HTMLElement>,
     "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur" | "onPointerDownCapture"
@@ -162,7 +162,7 @@ export function useRowPeek({
   return {
     handlers: {
       onMouseEnter: (e) => {
-        arm(e.currentTarget)
+        arm(e.currentTarget.closest<HTMLElement>(".row") ?? e.currentTarget)
       },
       onMouseLeave: disarm,
       /*
@@ -176,7 +176,8 @@ export function useRowPeek({
        * 借它一用：键盘 Tab 过来是真，点一下、程序 `focus()` 是假。
        */
       onFocus: (e) => {
-        if (e.currentTarget.matches(":focus-visible")) arm(e.currentTarget)
+        if (e.currentTarget.matches(":focus-visible"))
+          arm(e.currentTarget.closest<HTMLElement>(".row") ?? e.currentTarget)
       },
       onBlur: disarm,
       onPointerDownCapture: disarm,

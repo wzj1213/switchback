@@ -134,7 +134,6 @@ export function Row({
         dragging: drag?.dragging === thread.id,
         dropping,
       })}
-      {...peek.handlers}
       {...rowDragProps(thread.id, thread.cwd, pinned, drag)}
       data-drop-edge={dropping ? drag.overEdge : undefined}
       onContextMenu={(e) => {
@@ -148,6 +147,7 @@ export function Row({
         type="button"
         className="row__main"
         aria-current={selected ? "page" : undefined}
+        {...peek.handlers}
         {...moveKeyProps(onMove)}
         onClick={onSelect}
       >

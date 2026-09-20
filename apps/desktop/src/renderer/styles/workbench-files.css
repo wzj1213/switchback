@@ -146,12 +146,12 @@
   cursor: pointer;
 }
 
-.file-row:hover {
+.file-row:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.file-row:active {
+.file-row:active:not(:disabled) {
   background: var(--bg-press);
 }
 
@@ -302,7 +302,7 @@
   font-weight: 600;
 }
 
-.file-preview__reference:hover {
+.file-preview__reference:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--bg-hover);
   color: var(--text);
 }

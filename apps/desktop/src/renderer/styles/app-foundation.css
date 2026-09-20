@@ -240,6 +240,7 @@ summary,
 .think__row,
 .question-option,
 .sidebar__section,
+.panel-tab,
 .eng-tab,
 .set__tab {
   transition:
@@ -266,6 +267,7 @@ summary,
   .think__row,
   .question-option,
   .sidebar__section,
+  .panel-tab,
   .eng-tab,
   .set__tab {
     transition: none;

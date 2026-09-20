@@ -178,13 +178,13 @@
   cursor: default;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
 /* 用 `--bg-active` 而不是 `--bg-press`：后者和这颗按钮自己的
    `--border-strong` 描边只差 1.05:1，按下去边框会消失 */
-.btn:active {
+.btn:active:not(:disabled) {
   background: var(--bg-active);
 }
 
@@ -195,13 +195,13 @@
   font-weight: 500;
 }
 
-.btn--primary:hover {
+.btn--primary:hover:not(:disabled) {
   opacity: 0.88;
   background: var(--text);
 }
 
 /* 近黑的主按钮没有「更深一档」可走，压透明度 */
-.btn--primary:active {
+.btn--primary:active:not(:disabled) {
   opacity: 0.78;
 }
 

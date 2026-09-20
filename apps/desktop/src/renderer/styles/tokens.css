@@ -10,6 +10,9 @@
   --action-ink: #ffffff;
   --selection: #e8eaed;
   --selection-ink: #2d3238;
+  --selection-hover: color-mix(in srgb, var(--selection) 90%, var(--accent));
+  --selection-press: color-mix(in srgb, var(--selection) 80%, var(--accent));
+  --selection-muted: color-mix(in srgb, var(--selection-ink) 85%, var(--selection));
   --preview-light: #ffffff;
   --preview-dark: #202225;
   --preview-rail: #f5f6f7;
@@ -30,6 +33,8 @@
   --text-inverse: #ffffff;
   --accent: #49596a;
   --danger: #b63b29;
+  --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--text));
+  --danger-press: color-mix(in srgb, var(--danger) 76%, var(--text));
   --warn: #8a6410;
   --ok: #2b7248;
   --radius-mark: 2px;
