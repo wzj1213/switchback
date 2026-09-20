@@ -18,6 +18,12 @@
   }
 }
 
+/* 普通导航行加深底色时，小字同步提亮一档，日期与计数仍须可读。 */
+:is(.row:where(:not(.row--selected)), .deep__row:where(:not(.deep__row--on))):is(:hover, :active, :focus-within)
+  :is(.row__time, .row__aside, .row__count, .deep__count, .deep__snip) {
+  color: var(--text-muted);
+}
+
 /* 选中是一种持续状态，hover / 按下只在它之上加深，不能掉回未选中的底色。 */
 :is(
   .row--selected, .rvl__row--on, .iconbtn--on, .trigger--open, .rv__tool--on,

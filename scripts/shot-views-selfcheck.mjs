@@ -5,6 +5,7 @@ const filter = text => `(() => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(text)})
   input.dispatchEvent(new Event('input', { bubbles: true }))
 })()`
+const normal = '.group .row--thread:not(.row--selected)'
 
 export const SELFCHECK_VIEWS = [
   {
@@ -91,5 +92,49 @@ export const SELFCHECK_VIEWS = [
     ready: '.group .row--thread',
     assert: `document.querySelector('.peek') === null &&
       (${project}).querySelectorAll('.row--thread').length === 20`,
+  },
+  {
+    name: '81-普通会话悬停日期可读',
+    open: `document.querySelector('${normal} .row__main').scrollIntoView({ block: 'center' })`,
+    hover: `${normal} .row__main`, ready: `${normal} .row__time`, audit: true,
+    assert: `document.querySelector('${normal}').matches(':hover')`,
+  },
+  {
+    name: '82-普通会话按下日期可读',
+    open: `true`, hover: `${normal} .row__main`, press: true,
+    ready: `${normal} .row__time`, audit: true,
+    assert: `document.querySelector('${normal}').matches(':active')`,
+  },
+  {
+    name: '83-项目悬停计数可读',
+    open: `document.querySelector('.row--group').scrollIntoView({ block: 'center' })`,
+    hover: '.row--group .row__main', ready: '.row--group .row__count', audit: true,
+    assert: `document.querySelector('.row--group').matches(':hover')`,
+  },
+  {
+    name: '84-正文搜索悬停摘要可读',
+    open: [
+      filter('历史会话 21'), `document.querySelector('.row--thread .row__main').click()`,
+      filter('WINDOW_MS'),
+      `return new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const check = () => {
+          if (document.querySelector('.deep__snip')?.textContent.includes('WINDOW_MS')) return resolve()
+          if (Date.now() > deadline) return reject(new Error('正文搜索未完成'))
+          setTimeout(check, 50)
+        }
+        check()
+      })`,
+    ],
+    before: '.sidebar__filter', hover: '.deep__row:not(.deep__row--on)',
+    ready: '.deep__row:not(.deep__row--on)', audit: true,
+    assert: `document.querySelector('.deep__row:not(.deep__row--on)').matches(':hover')`,
+  },
+  {
+    name: '85-正文搜索按下摘要可读',
+    open: `true`, hover: '.deep__row:not(.deep__row--on)', press: true,
+    ready: '.deep__snip', audit: true,
+    assert: `document.querySelector('.deep__row:not(.deep__row--on)').matches(':active')`,
+    after: filter(''),
   },
 ]
