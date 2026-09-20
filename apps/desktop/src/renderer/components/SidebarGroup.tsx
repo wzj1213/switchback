@@ -9,6 +9,7 @@ import type { RenameCtl } from "./RowName.js"
 import { moveKeyProps } from "../moveKey.js"
 import { GroupActions } from "./SidebarGroupActions.js"
 import { ProjectThreads } from "./project-threads.js"
+import type { SidebarNavigation } from "../use-sidebar-navigation.js"
 
 /*
  * 一个项目：标题行 + 它底下的会话。
@@ -18,6 +19,7 @@ import { ProjectThreads } from "./project-threads.js"
 
 export function GroupBlock({
   group,
+  pages,
   collapsed,
   selectedId,
   engines,
@@ -36,6 +38,7 @@ export function GroupBlock({
   onMoveThread,
 }: {
   group: Group
+  pages: SidebarNavigation["pages"]
   /** 拖动接线。传下去这一组的会话就能互相排序；项目行自己也能拖。 */
   drag?: RowDrag
   /** 这个项目挂在「置顶」段里。 */
@@ -73,7 +76,7 @@ export function GroupBlock({
         onGroupMenu={onGroupMenu}
         {...(onMove === undefined ? {} : { onMove })}
       />
-      <ProjectThreads rows={group.rows} selectedId={selectedId} collapsed={collapsed}>
+      <ProjectThreads rows={group.rows} selectedId={selectedId} collapsed={collapsed} pages={pages} cwd={group.cwd}>
         {(row) => (
           <Row
             key={row.thread.id}

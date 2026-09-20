@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import type { EngineInfo, EngineThread } from "@omni/protocol"
 import { filterRows } from "../filter.js"
 import { useDeepSearch } from "../useDeepSearch.js"
@@ -15,6 +15,7 @@ import { rowLabelOf } from "../sidebar.js"
 import { SectionList } from "./SidebarSections.js"
 import { sidebarMoves } from "../sidebarMove.js"
 import { SidebarFound } from "./SidebarFound.js"
+import { revealSidebarResult, useSidebarNavigation } from "../use-sidebar-navigation.js"
 
 /**
  * 侧栏。
@@ -131,12 +132,7 @@ function useFilterFocus(at: number): React.RefObject<HTMLInputElement | null> {
   return box
 }
 
-export function Sidebar(props: Props): React.JSX.Element {
-  const [query, setQuery] = useState("")
-  const box = useFilterFocus(props.focusFilter)
-  const { open: openMenu, menu } = useContextMenu()
-  const filtering = query.trim() !== ""
-  // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
+function useSections(props: Props, query: string) {
   const pins = useMemo(() => ({
     projects: props.pinned,
     threads: props.pinnedThreads,
@@ -146,6 +142,16 @@ export function Sidebar(props: Props): React.JSX.Element {
   }), [props.pinned, props.pinnedThreads, props.threadOrder, props.knownProjects, props.projectOrder])
   const found = useMemo(() => filterRows(props.rows, query), [props.rows, query])
   const sections = useMemo(() => sectionsOf(found, pins), [found, pins])
+  return { pins, found, sections }
+}
+
+export function Sidebar(props: Props): React.JSX.Element {
+  const { query, onQuery, view, list } = useSidebarNavigation(props.selectedId)
+  const box = useFilterFocus(props.focusFilter)
+  const { open: openMenu, menu } = useContextMenu()
+  // 筛选时**不分组**：命中的几条散在各组里，分组只会让人多点几下才看得见
+  const filtering = query.trim() !== ""
+  const { pins, found, sections } = useSections(props, query)
   const moves = sidebarMoves({
     sections,
     onThreads: props.onReorderPinnedThreads,
@@ -176,11 +182,19 @@ export function Sidebar(props: Props): React.JSX.Element {
     onTogglePin: props.onTogglePin,
   })
   const selected = props.rows.find((row) => row.thread.id === props.selectedId)?.thread
-  const { isOpen, toggle } = useSidebarOpen(selected?.cwd)
+  const { isOpen, toggle, reveal } = useSidebarOpen(selected?.cwd)
   const rename = useRenaming(props.onRename, { at: props.askRename, id: props.selectedId })
   const renaming = props.rows.find((row) => row.thread.id === rename.id)
   const { rowMenu, groupMenu } = useSidebarMenus({ ...acts, onSetIcon: props.onSetIcon }, openMenu)
-  const { onSelect, onDelete, engines } = props
+  const { onDelete, engines } = props
+  const onSelect = (id: string): void => {
+    const row = props.rows.find(item => item.thread.id === id)
+    if (row !== undefined) {
+      revealSidebarResult(view, sectionsOf(props.rows, pins), row)
+      reveal(row.thread.cwd)
+    }
+    props.onSelect(id)
+  }
   const foundOn = { onSelect, onDelete, rowMenu, rename, engines }
 
   return (
@@ -191,11 +205,10 @@ export function Sidebar(props: Props): React.JSX.Element {
         here={selected?.cwd}
         hereKind={selected?.workspaceKind}
         box={box}
-        query={query}
-        onQuery={setQuery}
+        query={query} onQuery={onQuery}
       />
 
-      <div className="sidebar__list">
+      <div className="sidebar__list" ref={list}>
         {filtering ? (
           <SidebarFound
             key={query.trim()}
@@ -209,6 +222,7 @@ export function Sidebar(props: Props): React.JSX.Element {
           <SectionList
             sections={sections}
             on={{
+              view,
               selectedId: props.selectedId,
               engines: props.engines,
               isOpen,

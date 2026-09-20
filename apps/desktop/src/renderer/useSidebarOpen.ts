@@ -3,6 +3,7 @@ import { useState } from "react"
 interface SidebarOpen {
   isOpen: (cwd: string) => boolean
   toggle: (cwd: string) => void
+  reveal: (cwd: string) => void
 }
 
 /** Keeps explicit expand/collapse choices separate from the selected-project default. */
@@ -16,5 +17,8 @@ export function useSidebarOpen(here: string | undefined): SidebarOpen {
       return next
     })
   }
-  return { isOpen, toggle }
+  const reveal = (cwd: string): void => {
+    setChoice(previous => new Map(previous).set(cwd, true))
+  }
+  return { isOpen, toggle, reveal }
 }

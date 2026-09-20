@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useLayoutEffect, useState } from "react"
 import type { ThreadRow } from "@omni/store"
 import type { EngineInfo, EngineThread } from "@omni/protocol"
 import { type Group, type Sections, type SidebarRow } from "../sidebar.js"
@@ -10,6 +10,7 @@ import { PinnedSection } from "./SidebarPinned.js"
 import { ProjectsSection } from "./SidebarProjects.js"
 import type { RenameCtl } from "./RowName.js"
 import type { SidebarMoveActions } from "../sidebarMove.js"
+import type { SidebarNavigation } from "../use-sidebar-navigation.js"
 
 /**
  * 侧栏的三段：置顶 / 项目 / 最近。
@@ -56,7 +57,7 @@ export function SectionHead({
 }): React.JSX.Element {
   return (
     <div className="sidebar__section">
-      <button type="button" className="sidebar__section-main" onClick={onToggle}>
+      <button type="button" className="sidebar__section-main" aria-expanded={open} onClick={onToggle}>
         <span>{title}</span>
         <ChevronIcon open={open} size={SIDEBAR_ICON_SMALL} />
       </button>
@@ -77,6 +78,7 @@ export function SectionHead({
 }
 
 export interface GroupHandlers extends SidebarMoveActions {
+  view: SidebarNavigation
   selectedId: string
   /** 引擎清单：行的悬停卡要把 engine id 翻成人话。 */
   engines: readonly EngineInfo[]
@@ -195,7 +197,8 @@ export function SectionList({
   on: GroupHandlers
 }): React.JSX.Element {
   // 记的是「被人扳过的段」，不是「收起来的段」——默认值由 `defaultOpen` 说了算
-  const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
+  const [toggled, setToggled] = useState(on.view.sections)
+  useLayoutEffect(() => { on.view.sections = toggled }, [on.view, toggled])
   const toggle = (key: string): void => {
     setToggled((prev) => {
       const next = new Set(prev)

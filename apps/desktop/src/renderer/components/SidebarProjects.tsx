@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useLayoutEffect, useState } from "react"
 import { PROJECT_MAX, type Group, type Sections } from "../sidebar.js"
 import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
@@ -79,7 +79,8 @@ function Projects({
   groups: readonly Group[]
   on: GroupHandlers
 }): React.JSX.Element {
-  const [all, setAll] = useState(false)
+  const [all, setAll] = useState(on.view.allProjects)
+  useLayoutEffect(() => { on.view.allProjects = all }, [on.view, all])
   const shown = all ? groups : groups.slice(0, PROJECT_MAX)
   return (
     <>
@@ -87,6 +88,7 @@ function Projects({
         <GroupBlock
           key={group.cwd}
           group={group}
+          pages={on.view.pages}
           engines={on.engines}
           {...(on.onDropOnProject === undefined ? {} : { onDropOnProject: on.onDropOnProject })}
           collapsed={!on.isOpen(group.cwd)}

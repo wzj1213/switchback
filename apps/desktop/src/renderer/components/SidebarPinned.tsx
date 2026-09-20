@@ -98,6 +98,7 @@ function PinnedItems({
         <GroupBlock
           key={group.cwd}
           group={group}
+          pages={on.view.pages}
           pinned
           engines={on.engines}
           {...(on.onDropOnProject === undefined ? {} : { onDropOnProject: on.onDropOnProject })}
