@@ -74,7 +74,7 @@
 .composer-drop--surface {
   position: fixed;
   z-index: 65;
-  inset: 0 0 0 var(--sidebar-w);
+  inset: 0 0 0 var(--sidebar-live);
   border-radius: 0;
 }
 

@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { app, ipcMain, nativeTheme } from "electron"
 import { isDshProfileName, SETTINGS_DEFAULTS, type EnginePick, type Settings } from "../shared/settings.js"
 import type { Logger } from "./log.js"
+import { paneWidths } from "../shared/pane-widths.js"
 
 /**
  * 用户偏好。
@@ -64,6 +65,7 @@ function parse(raw: unknown): Settings {
     projectIcons: icons(it.projectIcons),
     lastUsed: lastUsed(it.lastUsed),
     remote: remote(it.remote),
+    panes: paneWidths(it.panes),
   }
 }
 

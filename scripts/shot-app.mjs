@@ -37,6 +37,7 @@ import { INTERACTION_VIEWS } from "./shot-views-interactions.mjs"
 import { BRAND_VIEWS } from "./shot-views-brand.mjs"
 import { SEARCH_VIEWS } from "./shot-views-search.mjs"
 import { SELFCHECK_VIEWS } from "./shot-views-selfcheck.mjs"
+import { PANE_VIEWS } from "./shot-views-panes.mjs"
 import { hoverOver, releasePointer, resetPointer } from "./shot-pointer.mjs"
 import { cleanupWorkspaceFiles, prepareWorkspaceFiles } from "./shot-workspace-files.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
@@ -55,7 +56,7 @@ const ENGINE = process.argv.find(arg => arg.startsWith("--engine="))?.slice(9)
 const STRESS = process.argv.includes("--stress")
 const MANY = process.argv.includes("--sidebar-stress")
 const SCENES = MANY ? [...SIDEBAR_VIEWS, ...SEARCH_VIEWS, ...SELFCHECK_VIEWS] : STRESS ? PERFORMANCE_VIEWS
-  : [...VIEWS, ...PANEL_SIZING_VIEWS, ...INTERACTION_VIEWS, ...BRAND_VIEWS, ...SEARCH_VIEWS]
+  : [...VIEWS, ...PANEL_SIZING_VIEWS, ...INTERACTION_VIEWS, ...BRAND_VIEWS, ...SEARCH_VIEWS, ...PANE_VIEWS]
 /**
  * 固定窗口尺寸：前后两张图的像素必须能直接叠着比。
  *

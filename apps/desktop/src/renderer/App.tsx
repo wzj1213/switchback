@@ -10,6 +10,7 @@ import { ReviewSurface } from "./components/review-surface.js"
 import { ThreadScreen } from "./components/ThreadScreen.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { TipLayer } from "./components/tips.js"
+import { PaneHandles } from "./components/pane-handles.js"
 import { useApp } from "./useApp.js"
 import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
@@ -137,7 +138,13 @@ export function App(): React.JSX.Element {
   const { settings, review } = Layers({ app })
   // 悬停提示是**一层**，不是每颗按钮各挂一个（见 `components/tips.tsx`）。
   // 三条分支都要有它，所以跟着 settings / review 那一层一起走
-  const tips = <TipLayer />
+  const tips = (
+    <>
+      <TipLayer />
+      {/* 分栏拖拽柄同样每一种外壳都要有，跟着这一层走 */}
+      <PaneHandles panes={app.prefs.settings.panes} onChange={(panes) => { app.prefs.patch({ panes }) }} />
+    </>
+  )
 
   if (thread === undefined) {
     return (

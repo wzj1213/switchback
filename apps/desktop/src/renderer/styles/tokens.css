@@ -88,6 +88,12 @@
   --hl-title: #1f5fbf;
   --hl-type: #0f6b78;
   --sidebar-w: 240px;
+  /* 中间那一列（对话）至少留这么宽；拖侧栏、拖面板、缩窗口都不能把它挤到这以下。
+     与 `shared/pane-widths.ts` 的 `MAIN_MIN` 同一个数。 */
+  --main-min: 420px;
+  /* 侧栏实际宽度：用户拖出来的那个（`usePaneWidths` 写在根元素上，盖住上面的默认值），
+     窗口缩小时先给对话让位，但不低于 200。 */
+  --sidebar-live: min(var(--sidebar-w), max(200px, calc(100vw - var(--main-min))));
   /* 主会话与面板页签条同高；侧栏品牌在独立的窗口控制区下方。
      **必须等于 `main/index.ts` 的 `titleBarOverlay.height`**：交通灯按那个高度垂直居中，
      两边对不上，顶栏里的按钮就和红绿灯不在一条水平线上。 */

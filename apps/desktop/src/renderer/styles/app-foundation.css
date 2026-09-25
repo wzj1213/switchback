@@ -307,11 +307,15 @@ body {
  *   点开右边不该让左边消失，那是两件事。
  */
 .shell {
-  --rail-col: var(--sidebar-w);
+  --rail-col: var(--sidebar-live);
   --main-col: minmax(0, 1fr);
   --panel-col: 0px;
-  /* 默认保留主对话：工具台取工作区的四成，窄窗收至 280px，宽屏至多 560px。 */
-  --workbench-w: clamp(280px, calc((100vw - var(--rail-col)) * 0.4), 560px);
+  /* 默认保留主对话：工具台取工作区的四成，窄窗收至 280px，宽屏至多 560px。
+     拖过就用拖出来的宽度（`--panel-user`，写在根元素上）；两种都给对话留出 `--main-min`。 */
+  --workbench-w: min(
+    var(--panel-user, clamp(280px, calc((100vw - var(--rail-col)) * 0.4), 560px)),
+    max(280px, calc(100vw - var(--rail-col) - var(--main-min)))
+  );
 
   display: grid;
   grid-template-columns: var(--rail-col) var(--main-col) var(--panel-col);
@@ -369,7 +373,7 @@ body {
      min-width 只保下限——内容一旦比 264 宽（某行长文本的 max-content），
      侧栏就会顶破轨道、左缘探出窗口被裁掉一截（实测 289）。宽度写死，
      多的由 `overflow: hidden` 裁，滑进滑出的刚性板形状才永远成立。 */
-  width: var(--sidebar-w);
+  width: var(--sidebar-live);
   justify-self: end;
   transition: visibility 0s;
 }

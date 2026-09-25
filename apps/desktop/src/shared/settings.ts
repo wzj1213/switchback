@@ -1,4 +1,5 @@
 import type { Trust } from "@omni/protocol"
+import { NO_PANES, type PaneWidths } from "./pane-widths.js"
 
 /**
  * 用户偏好。**主进程、preload、渲染层共用这一份定义。**
@@ -147,6 +148,11 @@ export interface Settings {
   lastUsed: LastUsed
   /** 远程访问（浏览器端）。**默认整个关着**。 */
   remote: RemoteSettings
+  /**
+   * 侧栏和右侧面板被拖成了多宽（见 `pane-widths.ts`）。0 = 没拖过，跟着窗口宽度走。
+   * 跟着偏好文件走而不是 localStorage：两台机器、重装之后都还是你拖出来的那个宽度。
+   */
+  panes: PaneWidths
 }
 
 /**
@@ -353,4 +359,5 @@ export const SETTINGS_DEFAULTS: Settings = {
   projectIcons: {},
   lastUsed: { engine: "", byEngine: {} },
   remote: { enabled: false, port: 17800, trustedHosts: [], maxTrust: "auto-edit" },
+  panes: NO_PANES,
 }

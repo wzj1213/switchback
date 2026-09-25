@@ -1,0 +1,75 @@
+/*
+ * ── 分栏拖拽柄 ────────────────────────────────────────
+ *
+ * 侧栏右缘、面板左缘各一条。**8px 的热区跨在分界线上**，平时看不见，
+ * 悬停稍等一下显出一条细线，拖动时整条亮着。
+ *
+ * 用绝对定位的网格子元素摆：`grid-column` 定在哪一列的起点，`left: -4px` 骑在线上。
+ * 列宽开合、拖动时它跟着那条线走，不用 JS 算位置。
+ */
+.shell {
+  position: relative;
+}
+
+.pane-handle {
+  /* 顶上那一截落在顶栏（窗口拖拽区）里：不写这一行，Electron 会把按下当成拖窗口 */
+  -webkit-app-region: no-drag;
+  position: absolute;
+  z-index: 25;
+  grid-row: 1;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-handle--rail {
+  grid-column: 2;
+}
+
+.pane-handle--panel {
+  grid-column: 3;
+}
+
+.pane-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+/* 稍等一下再亮：指针只是路过分界线时，别一闪一闪 */
+.pane-handle:hover::after {
+  opacity: 0.45;
+  transition-delay: 150ms;
+}
+
+.pane-handle:focus-visible {
+  outline: none;
+}
+
+.pane-handle:focus-visible::after,
+.pane-handle--live::after {
+  opacity: 1;
+  transition-delay: 0s;
+}
+
+/* 那一栏不在的时候，它的拖拽柄也不在 */
+.shell--norail > .pane-handle--rail,
+.shell:not(.shell--workbench) > .pane-handle--panel,
+.shell--workbench-full > .pane-handle--panel {
+  display: none;
+}
+
+/* 拖动时列宽跟手，不走开合那条 `--dur-shell` 过渡（标记挂在根元素上，见 `use-pane-drag.ts`） */
+:root[data-pane-resizing] .shell,
+:root[data-pane-resizing] .sidebar {
+  transition: none;
+}
