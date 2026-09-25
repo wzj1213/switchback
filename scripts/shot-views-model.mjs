@@ -141,10 +141,46 @@ export const MODEL_VIEWS = [
     })()`,
   },
   {
+    /*
+     * **推理强度只在模型菜单里改，按钮上看得见现在是哪一档。**
+     *
+     * 输入区原来另有一条可展开的强度滑块，展开后盖住左边的模型按钮；它和菜单里
+     * 「推理强度」那一节是同一个值的两个入口，去掉了。这一屏验：滑块不在了、
+     * 从菜单换一档之后模型按钮**立刻**写着「· 新档位」——不等引擎回声
+     *（`thread.setModel` 要排队再等引擎的 setter，实测好几秒，见 `use-pick-pending.ts`）。
+     */
     name: "18-推理强度",
-    before: ".effort .trigger:not(:disabled):not(.trigger--open)",
-    open: `document.querySelector('.effort .trigger:not(:disabled)')?.click()`,
-    ready: ".effort__bar--grown",
-    dragEffort: true,
+    // 引擎没报默认档、这条会话也还没选过时，按钮上不写强度（不猜）；选过一档就写
+    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled):not(.trigger--open)',
+    open: `(() => {
+      const model = document.querySelector('.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)')
+      const before = model?.querySelector('.trigger__detail')?.textContent ?? ''
+      model?.click()
+      setTimeout(() => {
+        ;[...document.querySelectorAll('.pop .pop__item--row')]
+          .find(node => node.querySelector('.pop__label')?.textContent === '推理强度')?.click()
+        setTimeout(() => {
+          const next = [...document.querySelectorAll('.pop [role="menuitemradio"]')]
+            .find(node => node.getAttribute('aria-checked') !== 'true')
+          const picked = next?.querySelector('.pop__label')?.textContent ?? ''
+          next?.click()
+          setTimeout(() => {
+            document.documentElement.dataset.effortPick = JSON.stringify({
+              before, picked,
+              after: model?.querySelector('.trigger__detail')?.textContent ?? '',
+              slider: document.querySelector('.effort, .effortbox') !== null,
+              menuClosed: document.querySelector('.pop [role="menu"]') === null,
+            })
+          }, 60)
+        }, 80)
+      }, 80)
+    })()`,
+    ready: 'html[data-effort-pick]',
+    assert: `(() => {
+      const r = JSON.parse(document.documentElement.dataset.effortPick ?? '{}')
+      if (!r.slider && r.menuClosed && r.picked !== '' && r.after === '· ' + r.picked && r.before !== r.after) return true
+      throw new Error('推理强度诊断：' + JSON.stringify(r))
+    })()`,
+    after: `delete document.documentElement.dataset.effortPick`,
   },
 ]

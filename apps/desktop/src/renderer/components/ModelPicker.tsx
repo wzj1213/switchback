@@ -3,6 +3,7 @@ import { SparkIcon } from "./icons.js"
 import { Select, type Section } from "./Select.js"
 import { currentModel } from "../model-options.js"
 import { triggerLabel } from "../model-label.js"
+import { usePickPending } from "./use-pick-pending.js"
 
 /**
  * 模型与推理强度。
@@ -123,7 +124,7 @@ const COSTLY: ReadonlySet<string> = new Set(["ultra", "ultracode"])
  * 贵档落没落。模型自己报的清单里**最后一档得是开 workflow 的那个模式**
  *（`ultra` / `ultracode`；顶档只是 max / xhigh 的模型永远没有），
  * 当前强度还得正落在那一档上——换模型残留的旧值不算。
- * 滑块的档位强调和用量提示共用这个判定。
+ * 触发器上那截强度据此加重。
  */
 export function costlyOf(
   models: readonly ModelOption[],
@@ -135,6 +136,22 @@ export function costlyOf(
   const top = efforts[efforts.length - 1]
   if (current === undefined || top === undefined || !COSTLY.has(top)) return false
   return (effort ?? current.defaultEffort) === top
+}
+
+/**
+ * 触发器上跟在模型名后面的那截强度（`Default · 高`）。
+ *
+ * 输入区原来另有一条强度滑块，触发器就只写模型——同一个值不在一行里写两遍。
+ * 滑块去掉之后强度只在这个菜单里改，于是按钮上得看得出现在是哪一档。
+ * 没报 `efforts` 的模型（ACP 那类把强度编进 modelId）没有这一截。
+ */
+export function triggerDetail(
+  models: readonly ModelOption[],
+  current: ModelOption,
+  level: string | undefined,
+): { text: string; strong: boolean } | undefined {
+  if ((current.efforts ?? []).length === 0 || level === undefined) return undefined
+  return { text: effortLabel(level).label, strong: costlyOf(models, current.id, level) }
 }
 
 export function ModelPicker({
@@ -153,6 +170,8 @@ export function ModelPicker({
   pending?: { label: string; onSwitchNow: () => void }
   onChange: (model: string, effort?: string) => void
 }): React.JSX.Element | null {
+  // 选完到引擎回声之间那几秒，按钮照刚选的画（见 `use-pick-pending.ts`）
+  const { picked, mark } = usePickPending(model, effort)
   /**
    * **有待切换的引擎时，这颗控件变成一条出路，而不是一句解释。**
    *
@@ -183,21 +202,25 @@ export function ModelPicker({
       </button>
     )
   }
-  const current = currentOf(models, model)
+  const current = currentOf(models, picked?.model ?? model)
   if (current === undefined) return null
-  const level = effort ?? current.defaultEffort
-  // 触发器上只写模型：强度有了自己的控件（`EffortSlider`），再把两样都写出来，
-  // 就是同一个值在一行里写两遍——改一处另一处跟着变，看起来像 bug
+  const level = (picked === undefined ? effort : picked.effort) ?? current.defaultEffort
+  const change = (next: string, nextEffort?: string): void => {
+    mark({ model: next, ...(nextEffort === undefined ? {} : { effort: nextEffort }) })
+    onChange(next, nextEffort)
+  }
   // 尾部那对括号只在触发器上裁掉（理由见 `model-label.ts`）；
   // 裁过就把全名挂到悬停上，别让它只能靠打开菜单才找得回来
   const label = triggerLabel(current.label)
-  const reset = resetOf(models, current, level, onChange)
+  const reset = resetOf(models, current, level, change)
+  const detail = triggerDetail(models, current, level)
   return (
     <Select
       label={label}
+      {...(detail === undefined ? {} : { detail })}
       title={current.description ?? (label === current.label ? "模型与推理强度" : current.label)}
       disabled={disabled}
-      sections={sectionsOf(models, current, level, onChange)}
+      sections={sectionsOf(models, current, level, change)}
       {...(reset === undefined ? {} : { reset })}
     />
   )

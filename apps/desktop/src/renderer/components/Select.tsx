@@ -47,6 +47,11 @@ export interface Section {
 export interface SelectProps {
   /** 触发器上显示的文字。 */
   label: string
+  /**
+   * 跟在文字后面的那一截（模型菜单上是推理强度）。**不参与省略**：
+   * 窄的时候先省略 `label`，这一截始终看得见。`strong` 时加重（贵档）。
+   */
+  detail?: { text: string; strong?: boolean }
   /** 触发器前面的小图标，可选。 */
   icon?: React.ReactNode
   title?: string
@@ -61,6 +66,7 @@ export interface SelectProps {
 
 export function Select({
   label,
+  detail,
   icon,
   title,
   disabled = false,
@@ -98,6 +104,11 @@ export function Select({
       >
         {icon === undefined ? null : <span className="trigger__icon">{icon}</span>}
         <span className="trigger__label">{label}</span>
+        {detail === undefined ? null : (
+          <span className={`trigger__detail${detail.strong === true ? " trigger__detail--strong" : ""}`}>
+            · {detail.text}
+          </span>
+        )}
         <CaretIcon />
       </button>
       <Popover

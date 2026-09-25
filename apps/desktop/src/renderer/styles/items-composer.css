@@ -345,34 +345,6 @@
   white-space: nowrap;
 }
 
-/*
- * 可用宽度不足时，展开的推理滑块独占一行。
- *
- * 不能缩薄轨道来硬塞：32px 槽与 24px 拇指是它“厚实”的手感来源；也不能只按
- * viewport 写媒体查询，右工作台打开时窗口很宽、正文列照样很窄。容器查询认的
- * 正是输入框此刻剩下多少。收起态仍留在原行，不平白增高输入框。
- */
-@container (max-width: 620px) {
-  .composer__model:has(.effort--open) {
-    flex-wrap: wrap;
-    row-gap: var(--sp-2);
-  }
-
-  .composer__model:has(.effort--open) .effortbox {
-    order: -1;
-    flex: 0 0 100%;
-    justify-content: flex-end;
-    min-width: 0;
-  }
-
-  /* 独占一行后，档位牌放到轨道左边；继续放上方会压进正在输入的最后一行字。 */
-  .composer__model:has(.effort--open) .effort__now {
-    right: calc(100% + var(--sp-2));
-    bottom: 50%;
-    translate: 0 50%;
-  }
-}
-
 /**
  * 档位下面那行说明。**默认不出现**——只在 omni 的档和引擎那边分家、
  * 或者 omni 明确没设上时才有内容（见 `renderer/trustHint.ts`）。

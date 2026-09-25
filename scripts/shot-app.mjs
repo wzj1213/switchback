@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url"
 import axe from "axe-core"
 import WebSocket from "ws"
 import { seedUi } from "./shot-seed.mjs"
-import { exerciseEffort, openFixture } from "./shot-fixture-actions.mjs"
+import { openFixture } from "./shot-fixture-actions.mjs"
 import { completeFileDrop, dragIntoView } from "./shot-file-drop.mjs"
 import { openPetLive } from "./shot-pet-live.mjs"
 import { VIEWS } from "./shot-views.mjs"
@@ -224,7 +224,6 @@ async function shoot(cdp, view, workspaceFiles) {
     if (view.assert !== undefined && !(await value(cdp, view.assert))) {
       throw new Error(`${view.name} 没有满足验收表达式：${view.assert}`)
     }
-    if (view.dragEffort === true) await exerciseEffort({ value, pause }, cdp)
     await pause(600)
   }
   await audit(cdp, view.name, audits(view))

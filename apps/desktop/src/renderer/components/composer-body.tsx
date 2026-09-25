@@ -128,7 +128,9 @@ export function ComposerBody(view: Props): React.JSX.Element {
           asideMode={aside.on}
           onAsideExit={aside.exit}
         />
+        {/* 按会话重建这一排：选完模型等回声的那份本地值、开着的菜单，都不能带到别的会话上 */}
         <ComposerControls
+          key={composer.threadId}
           detached={detached}
           busy={busy}
           starting={starting}

@@ -1,7 +1,6 @@
 import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@omni/protocol"
 import { Action } from "./ComposerAction.js"
 import { ModelPicker } from "./ModelPicker.js"
-import { BarEffort } from "./EffortSlider.js"
 import { UsageBadge } from "./UsageRing.js"
 import { Select } from "./Select.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
@@ -216,13 +215,6 @@ export function Bar({
             effort={effort}
             disabled={detached || busy || starting}
             pending={pending}
-            onChange={onModelChange}
-          />
-          <BarEffort
-            models={models}
-            model={model}
-            effort={effort}
-            disabled={detached || busy || starting}
             onChange={onModelChange}
           />
         </div>

@@ -61,6 +61,19 @@
   white-space: nowrap;
 }
 
+/* 名字后面那一截（模型菜单上的推理强度）。**不参与省略**：窄的时候先省略名字，
+   这一截始终看得见——按钮上能看出「现在用多强」的只有它 */
+.trigger__detail {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* 顶档（ultra / ultracode）更快消耗额度：加重一档，一眼看得出开着的是贵档 */
+.trigger__detail--strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* ── 浮层 ─────────────────────────────────────────── */
 .pop {
   /* 顶栏是拖拽区，而浮层可能从顶栏的按钮上弹出来——不写这一行，
