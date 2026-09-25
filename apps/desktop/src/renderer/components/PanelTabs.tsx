@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react"
 import type { PanelPage } from "../panel-state.js"
-import { CompareIcon, PlusIcon } from "./icons.js"
+import { pressSelect } from "../press.js"
+import { CompareIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon } from "./icons-activity.js"
 import { CloseIcon, ExpandIcon } from "./icons-panel.js"
-import { Popover } from "./Popover.js"
 
 const PAGES: readonly { id: PanelPage; label: string; description: string }[] = [
   { id: "review", label: "审查", description: "查看工作区的真实 Git 差异" },
@@ -12,73 +11,48 @@ const PAGES: readonly { id: PanelPage; label: string; description: string }[] = 
 ]
 
 function PageIcon({ page }: { page: PanelPage }): React.JSX.Element {
-  if (page === "review") return <CompareIcon size={13} />
-  if (page === "files") return <FileIcon size={13} />
-  return <DotBoxIcon size={13} />
+  if (page === "review") return <CompareIcon size={14} />
+  if (page === "files") return <FileIcon size={14} />
+  return <DotBoxIcon size={14} />
 }
 
 export interface PanelTabsProps {
-  tabs: readonly PanelPage[]
   active: PanelPage
   full: boolean
   onSelect: (page: PanelPage) => void
-  onClose: (page: PanelPage) => void
   onFull: () => void
   onHide?: () => void
 }
 
+/**
+ * 侧边面板的页面切换。**三页固定常驻**：审查、文件、活动，一直都在这一排上。
+ *
+ * 上一版是浏览器式的页签——开过的页才显示、每页一颗 ×、「+」再从菜单里挑。
+ * 面板默认只有两三百像素宽，于是这一排常年缩成「图标 × 图标 × +」，
+ * 看不出哪颗是哪页；而页面总共就这三种，「新建」「关闭」两个动作本身就多余。
+ * 照 VS Code 底部面板：固定几页常驻，右侧只留独占与收起。
+ *
+ * 页面第一次打开时才挂载，之后切走也保留（筛选词、选中位置都在）。
+ * 审查页按 Esc 仍会关掉并重置自己（`usePanelKeys`），这一排上它照样在，点一下就回来。
+ * 切换按下即生效（`press.ts`），说明文字进悬停提示。
+ */
 export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
-  const [menu, setMenu] = useState(false)
-  const plus = useRef<HTMLButtonElement>(null)
-  const list = useRef<HTMLElement>(null)
-  // React 的 onWheel 是 passive 的，拦不下默认滚动；纵向滚轮转横向必须上原生监听。
-  // 窄态图标化后 300px 面板已不溢出，这只是更极端窄下的兜底，所以不做 edge 渐隐。
-  useEffect(() => {
-    const node = list.current
-    if (!node) return
-    const onWheel = (event: WheelEvent): void => {
-      if (event.deltaY === 0) return
-      event.preventDefault()
-      node.scrollLeft += event.deltaY
-    }
-    node.addEventListener("wheel", onWheel, { passive: false })
-    return () => { node.removeEventListener("wheel", onWheel) }
-  }, [])
   return (
     <header className="panel-tabs">
-      <nav ref={list} className="panel-tabs__list" aria-label="侧边面板页面">
-        {props.tabs.map((page) => {
-          const label = PAGES.find((candidate) => candidate.id === page)?.label ?? page
-          const active = props.active === page
+      <nav className="panel-tabs__list" aria-label="侧边面板页面">
+        {PAGES.map((page) => {
+          const active = props.active === page.id
+          const pick = (): void => { props.onSelect(page.id) }
           return (
-            <span className={`panel-tab${active ? " panel-tab--on" : ""}`} key={page}>
+            <span className={`panel-tab${active ? " panel-tab--on" : ""}`} key={page.id}>
               <button type="button" className="panel-tab__pick" aria-current={active ? "page" : undefined}
-                aria-label={label} data-tip={label} onClick={() => { props.onSelect(page) }}>
-                <PageIcon page={page} /><span>{label}</span>
+                data-tip={page.description} {...pressSelect(!active, pick)} onClick={pick}>
+                <PageIcon page={page.id} /><span className="panel-tab__label">{page.label}</span>
               </button>
-              <button type="button" className="panel-tab__close" aria-label={`关闭${label}页`}
-                onClick={() => { props.onClose(page) }}><CloseIcon size={13} /></button>
             </span>
           )
         })}
       </nav>
-      <button ref={plus} type="button" className="panel-tabs__button" aria-label="新建侧边页面"
-        data-tip="新建侧边页面" aria-haspopup="menu" aria-expanded={menu}
-        onClick={() => { setMenu((open) => !open) }}>
-        <PlusIcon size={13} />
-      </button>
-      <Popover open={menu} anchor={plus.current} minWidth={220} onClose={() => { setMenu(false) }}>
-        <div role="menu" aria-label="新建侧边页面">
-          {PAGES.map((page) => (
-            <button key={page.id} type="button" role="menuitem" className="pop__item"
-              onClick={() => { setMenu(false); props.onSelect(page.id) }}>
-              <PageIcon page={page.id} />
-              <span className="pop__text"><span className="pop__label">{page.label}</span>
-                <span className="pop__desc">{page.description}</span></span>
-            </button>
-          ))}
-        </div>
-      </Popover>
       <span className="panel-tabs__spacer" />
       <button type="button" className="panel-tabs__button panel-tabs__expand"
         aria-label={props.full ? "并排显示侧边面板" : "展开侧边面板"}

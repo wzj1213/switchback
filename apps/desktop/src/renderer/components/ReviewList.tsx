@@ -72,24 +72,29 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
           }}
         />
       </div>
+      {/* 一个文件都没有、又没在筛选：为什么没有由正文那一栏说（范围没快照、工作区干净），
+          这里再说一遍「当前筛选条件下没有」是错的——根本没筛 */}
       {files.length === 0 ? <div className="rvl__rows">
-        <p className="rvl__none">
-          {more === undefined ? "当前筛选条件下没有可显示的文件" : "已列出的文件里没有匹配项"}
-        </p>
+        {query.trim() === "" && more === undefined ? null : (
+          <p className="rvl__none">
+            {more === undefined ? "当前筛选条件下没有可显示的文件" : "已列出的文件里没有匹配项"}
+          </p>
+        )}
         <Notices more={more} ignored={ignored} />
       </div> : (
         <ReviewTree files={files} active={active} searching={query.trim() !== ""} onPick={onPick}>
           <Notices more={more} ignored={ignored} />
         </ReviewTree>
       )}
-      <p className="rvl__legend">
+      {/* 图例解释的是文件行前那颗色点；没有文件行时它只是噪声 */}
+      {files.length === 0 ? null : <p className="rvl__legend">
         {(["add", "update", "delete", "rename", "untracked"] as const).map((kind) => (
           <span key={kind} className="rvl__key">
             <span className={`rvl__kind rvl__kind--${kind}`} aria-hidden="true" />
             {reviewLabel(kind)}
           </span>
         ))}
-      </p>
+      </p>}
     </div>
   )
 }

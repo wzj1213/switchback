@@ -280,8 +280,9 @@ export const REVIEW_VIEWS = [
     ready: `.shell--workbench-full .rv`,
     assert: `getComputedStyle(document.querySelector('.main')).display === 'none'
       && document.querySelector('.rv .panel-tabs__expand')?.getAttribute('aria-label') === '并排显示侧边面板'`,
-    after: `[...document.querySelectorAll('.rv .panel-tab__close')]
-      .find(button => button.getAttribute('aria-label') === '关闭审查页')?.click()`,
+    // 三页常驻，没有逐页关闭键了：直接收起整个面板（同时退出独占），后面的场景从主对话起步。
+    // 不用 Esc——文件页开过时 Esc 只关审查页、面板仍独占，主区还是藏着的
+    after: `document.querySelector('[aria-label="隐藏侧边面板"]')?.click()`,
   },
 ]
 

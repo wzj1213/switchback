@@ -43,11 +43,9 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
       stamp={stamp}
       notice={notice?.text}
       panel={{
-        tabs: shell.panelTabs,
         active: shell.panelActive,
         full: props.full,
         onSelect: shell.openPanelPage,
-        onClose: shell.closePanelPage,
         onFull: props.onFull,
       }}
       onPickLane={shell.openAside}

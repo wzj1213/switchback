@@ -63,11 +63,9 @@ export interface Shell {
   /** 从转录区打开的某轮原始编辑记录。 */
   reportedReview: TurnReviewTarget | undefined
   clearReportedReview: () => void
-  panelTabs: readonly PanelPage[]
   panelActive: PanelPage
   panelVisible: boolean
   openPanelPage: (page: PanelPage) => void
-  closePanelPage: (page: PanelPage) => void
   togglePanelVisibility: () => void
   /** 宽屏工具组是否暂时独占内容区。 */
   panelFull: boolean
@@ -174,11 +172,9 @@ export function useShell(): Shell {
     },
     reportedReview,
     clearReportedReview: () => { setReportedReview(undefined) },
-    panelTabs: panel.tabs,
     panelActive: panel.active,
     panelVisible: panel.visible,
     openPanelPage: showPanelPage,
-    closePanelPage: (page) => { setPanel((before) => closePanelTab(before, page)) },
     togglePanelVisibility: () => { setPanel(togglePanel) },
     panelFull: panel.full,
     togglePanelFull: () => { setPanel(togglePanelFull) },

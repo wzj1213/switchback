@@ -15,9 +15,7 @@ function render(visible: boolean, notice?: string): string {
     onPickLane: () => undefined,
     onActivityIndex: () => undefined, onPickFile: () => undefined, onFileIndex: () => undefined,
     onHide: () => undefined, onReveal: () => undefined, onCopy: () => undefined,
-    panel: { tabs: ["files"], active: "files", full: false,
-      onSelect: () => undefined, onClose: () => undefined,
-      onFull: () => undefined },
+    panel: { active: "files", full: false, onSelect: () => undefined, onFull: () => undefined },
     ...(notice === undefined ? {} : { notice }),
     searchFiles: () => Promise.resolve([]),
   }))

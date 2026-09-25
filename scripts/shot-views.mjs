@@ -196,15 +196,15 @@ export const VIEWS = [
       })()`,
     },
     {
-      name: "07-新建侧边页面",
-      open: `document.querySelector('.workbench:not([hidden]) [aria-label="新建侧边页面"]')?.click()`,
-      ready: `[role="menu"][aria-label="新建侧边页面"]`,
+      name: "07-侧边页面三页常驻",
+      open: `true`,
+      ready: `.workbench:not([hidden]) .panel-tabs__list`,
       assert: `(() => {
-        const menu = document.querySelector('[role="menu"][aria-label="新建侧边页面"]')
-        return ['审查', '文件', '活动'].every(label => menu?.textContent.includes(label) === true)
-          && document.activeElement?.getAttribute('role') === 'menuitem'
+        const list = document.querySelector('.workbench:not([hidden]) .panel-tabs__list')
+        const labels = [...list.querySelectorAll('.panel-tab__pick')].map(button => button.textContent.trim())
+        return labels.join() === '审查,文件,活动' && list.querySelector('[aria-current="page"]')?.textContent.trim() === '文件'
+          && document.querySelector('.panel-tab__close, [aria-label="新建侧边页面"]') === null
       })()`,
-      after: `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`,
     },
     {
       name: "08-缺失文件可恢复",

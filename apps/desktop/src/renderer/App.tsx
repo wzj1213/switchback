@@ -111,11 +111,9 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
         reported={shell.reportedReview}
         onGit={shell.clearReportedReview}
         panel={{
-          tabs: shell.panelTabs,
           active: shell.panelActive,
           full: shell.panelFull,
           onSelect: shell.openPanelPage,
-          onClose: shell.closePanelPage,
           onFull: shell.togglePanelFull,
           onHide: shell.hideWorkbench,
         }}

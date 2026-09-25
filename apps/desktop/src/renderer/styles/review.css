@@ -55,7 +55,8 @@
   gap: var(--sp-2);
   flex: none;
   min-height: 44px;
-  padding: 0 var(--sp-2) 0 var(--sp-3);
+  /* 面板里每一层左右都是同一个 12：头部、导航条、筛选框、列表提示与图例对齐同一条边 */
+  padding: 0 var(--sp-3);
   border-bottom: 1px solid var(--border-strong);
   background: var(--bg-sunken);
 }
@@ -351,7 +352,7 @@
 
 .rvl__filter {
   flex: none;
-  padding: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--border);
 }
 
@@ -376,6 +377,11 @@
   min-height: 0;
   overflow-y: auto;
   padding: var(--sp-1) 0;
+}
+
+/* 没有文件、没在筛选、也没有截断或忽略的提示：这一格整个不占，不留一条空带 */
+.rvl__rows:empty {
+  display: none;
 }
 
 .rvl__row {

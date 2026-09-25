@@ -13,7 +13,7 @@
   align-items: center;
   flex: none;
   gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
   font-size: var(--text-xs);

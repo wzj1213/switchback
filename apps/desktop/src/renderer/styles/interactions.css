@@ -2,7 +2,7 @@
 :is(
   .iconbtn, .trigger, .topbar__title, .foot__act, .tbtn,
   .workbench__icon, .workbench__expand, .workbench__back, .workbench__tab,
-  .rv__tool, .rv__act, .rv__seg, .panel-tabs__button, .panel-tab__close,
+  .rv__tool, .rv__act, .rv__seg, .panel-tabs__button,
   .file-preview__copy, .file-preview__reference, .cblock__copy, .lane-cmd-block__copy,
   .msgact, .row__act:where(:not(.row__act--danger)), .act:where(:not(.act--danger)),
   .pop__item, .pop__back, .pop__cmd:where(:not(.pop__cmd--danger)),
