@@ -62,6 +62,23 @@ function siteChips(view: Props, opening: boolean): React.JSX.Element | null {
   )
 }
 
+/**
+ * 点输入卡的空白处也进输入框。
+ *
+ * 卡片有一百多像素高，真正点得进去的只有那两行字——点在芯片行和控件行之间的留白上
+ * 什么都不发生，看起来就像输入框坏了。按钮、链接、芯片、缩略图这些自己能点的东西不接管。
+ * 在按下时就给焦点并拦下默认行为：不拦的话按下会先把焦点落到卡片上，松手才被抢回来，闪一下。
+ */
+function focusFromBlank(event: React.MouseEvent, input: React.RefObject<HTMLTextAreaElement | null>): void {
+  if (event.button !== 0) return
+  const target = event.target as HTMLElement
+  if (target.closest("button, a, input, textarea, select, label, [role], [contenteditable]") !== null) return
+  const field = input.current
+  if (field === null || field.disabled) return
+  event.preventDefault()
+  field.focus()
+}
+
 export function ComposerBody(view: Props): React.JSX.Element {
   const { composer, detached, busy, starting, focus, attach, aside, blocks } = view
   const { attachWarning, attachmentBlocked, mode, draft, files } = view
@@ -72,7 +89,10 @@ export function ComposerBody(view: Props): React.JSX.Element {
   const site = siteChips(view, opening)
   return (
     <div className="composer">
-      <div className={`composer__inner${opening ? " composer__inner--opening" : ""}`}>
+      <div
+        className={`composer__inner${opening ? " composer__inner--opening" : ""}`}
+        onMouseDown={(event) => { focusFromBlank(event, focus.input) }}
+      >
         <AttachmentDrop hint={files.dropzone.hint} surface={composer.dropSurfaceVisible} />
         {opening ? site : null}
         <Attachments paths={attach.paths} onRemove={attach.remove} />

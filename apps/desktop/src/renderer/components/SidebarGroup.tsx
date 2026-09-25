@@ -1,7 +1,7 @@
 import type { ThreadRow } from "@omni/store"
 import type { EngineInfo } from "@omni/protocol"
 import { tallyOf, type Group } from "../sidebar.js"
-import { SpinnerIcon } from "./icons.js"
+import { GroupEnd } from "./RowEnd.js"
 import { FolderIcon, FolderOpenIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { Row, type RowDrag } from "./SidebarRows.js"
@@ -89,6 +89,7 @@ export function GroupBlock({
             onDelete={() => {
               onDelete(row.thread.id)
             }}
+            selectOnPress
             rename={rename}
             {...(onMoveThread === undefined
               ? {}
@@ -175,7 +176,6 @@ function GroupHead({
   onMove?: (direction: -1 | 1) => void
 }): React.JSX.Element {
   const { running, waiting, unread } = tallyOf(group)
-  const unreadLabel = `${String(unread)} 条跑完了还没看`
   return (
     <div
       className={`row row--group${drag?.over === group.cwd ? " row--dropping" : ""}`}
@@ -197,29 +197,7 @@ function GroupHead({
           )}
         </span>
         <span className="row__label">{group.label}</span>
-        {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
-                展开时每行自己会转圈，这里就不重复了 */}
-        {collapsed && waiting > 0 ? (
-          <span className="row__wait" aria-label={`${String(waiting)} 个等你批`}>
-            待批
-          </span>
-        ) : null}
-        {collapsed && running > 0 ? (
-          <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
-            <SpinnerIcon />
-          </span>
-        ) : null}
-        {/* 跑完了还没看的。**不摆数字**：右边已经有一个数（会话条数），
-                两个数字挨着谁也说不清哪个是哪个——一颗点说「里面有新东西」就够 */}
-        {collapsed && unread > 0 ? (
-          <span
-            className="row__dot row__dot--unread"
-            role="img"
-            aria-label={unreadLabel}
-            title={unreadLabel}
-          />
-        ) : null}
-        <span className="row__count">{group.rows.length}</span>
+        <GroupEnd collapsed={collapsed} waiting={waiting} running={running} unread={unread} count={group.rows.length} />
       </button>
       <GroupActions group={group} onNewIn={onNewIn} onMenu={onGroupMenu} />
     </div>

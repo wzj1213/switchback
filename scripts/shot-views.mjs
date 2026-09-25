@@ -67,7 +67,7 @@ export const VIEWS = [
           && sidebar !== null
           && getComputedStyle(sidebar).visibility === 'hidden'
           && Math.abs(main.getBoundingClientRect().left) < 1
-          && getComputedStyle(document.querySelector('.topbar')).paddingLeft === '92px'
+          && parseFloat(getComputedStyle(document.querySelector('.topbar')).paddingLeft) >= (navigator.windowControlsOverlay?.getTitlebarAreaRect?.().x ?? 78) + 8
           && document.querySelector('button[aria-label="展开侧栏"]') !== null
       })()`,
       after: `document.querySelector('button[aria-label="展开侧栏"]')?.click()`,

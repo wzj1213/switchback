@@ -223,6 +223,10 @@ body,
  *
  * **只过渡颜色一族**（底色、描边、字色、透明度）：那是「你碰到了它」的反馈。
  * 尺寸和位移不进来——它们各有各的时长，统一成一个数会让抽屉和小药丸用同一条曲线。
+ *
+ * **时长是 `--dur-fast`（70），不是 `--dur`（120）。** 一次普通点击从按下到松开
+ * 只有八九十毫秒，120 的渐变还没走完手指已经抬起——按下态的颜色从来没有完整出现过，
+ * 选中色也要再淡入一截，整个界面「慢半拍」。按下那一下的零延迟见 interactions.css。
  */
 button,
 a,
@@ -244,10 +248,10 @@ summary,
 .eng-tab,
 .set__tab {
   transition:
-    background-color var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    color var(--dur) var(--ease),
-    opacity var(--dur) var(--ease);
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
 }
 
 /* 系统说了不要动效就一条都不动。**放在这里而不是各组件里**：
@@ -277,7 +281,7 @@ summary,
 body {
   font-family: var(--font);
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: 1.5;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -425,7 +429,7 @@ body {
   --sb-pad: var(--sp-3);
   --sb-slot: 28px;
   --sb-ink-offset: var(--sp-2);
-  --sb-row-h: 32px;
+  --sb-row-h: 30px;
   /* 行尾那几颗图标按钮的方形点击区。**必须是方的**：图标 15、盒子 22，
      四边各留 3.5——上下左右一样多，图标中心才等于盒子中心。
      不对称的内边距（原来是 2px 5px）会让两颗按钮的视觉重心既不在同一条
@@ -561,16 +565,20 @@ body {
  *
  * `min-height` 仍然锁死：那颗 `+`（22）比标题文字（21）高，不锁的话
  * 「有 +」的段和「没 +」的段差 1px。
+ *
+ * **段尾那 4px 也挂 margin。** 它原来是 `padding-bottom`：悬停底色铺满 22px，
+ * 里面的按钮却只有 18px 高——底色下沿那一条看着能点，点下去什么都不发生。
+ * 盒子高度锁在 24：比会话行矮一档，层级不变；按钮撑满整个盒子，看见的都点得到。
  */
 .sidebar__section {
   position: relative;
   display: flex;
   align-items: center;
   width: calc(100% - var(--sb-pad) * 2);
-  margin: var(--sp-3) var(--sb-pad) 0;
+  margin: var(--sp-3) var(--sb-pad) var(--sp-1);
   /* 对齐导航图标的视觉左缘；图标与状态点仍按自己的中心线排。 */
-  padding: 0 0 var(--sp-1) var(--sb-ink-offset);
-  min-height: var(--sb-act);
+  padding: 0 0 0 var(--sb-ink-offset);
+  min-height: 24px;
   border-radius: var(--radius-sm);
   color: var(--text-faint);
   font-size: var(--text-xs);
@@ -595,7 +603,6 @@ body {
   font: inherit;
   font-size: inherit;
   text-align: left;
-  cursor: default;
 }
 
 .sidebar__section:not(.sidebar__section--static):hover {
@@ -656,7 +663,6 @@ body {
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
-  cursor: default;
 }
 
 .sidebar__more:hover {
@@ -701,7 +707,6 @@ body {
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
-  cursor: default;
 }
 
 .foot__who:hover {
@@ -757,7 +762,6 @@ body {
   border-radius: 999px;
   background: var(--bg-hover);
   color: var(--text-muted);
-  cursor: default;
 }
 
 .foot__act:hover:not(:disabled) {
@@ -808,7 +812,6 @@ body {
   text-decoration: underline;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: default;
   opacity: 0.75;
 }
 

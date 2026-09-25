@@ -31,7 +31,7 @@
   /* 通栏线拿掉之后卡片得自己站住。浅色用一层短边影和一层宽而淡的环境影；
      深色下阴影关闭，由描边接手。 */
   box-shadow: var(--shadow-composer);
-  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
 }
 
 .composer__inner:focus-within {
@@ -104,6 +104,9 @@
 
 .composer__field {
   position: relative;
+  /* 输入框与它上面那层灰字镜像（`.composer__ghost`）都从这里取字号：
+     界面外框收到 13 之后，你打的字仍是 14，两层也必须一起变 */
+  font-size: var(--text-input);
 }
 
 .composer__field--command {
@@ -271,18 +274,18 @@
   color: var(--text);
   font: inherit;
   /*
-   * **两档起始高度。** 开工之后是 44（两行），起手那一屏是 64（三行）。
+   * **两档起始高度。** 开工之后是 42（两行），起手那一屏是 63（三行）——14px × 1.5 行高。
    *
    * 一个空框的高度是一句邀请：那一屏除了它什么都没有，写下来的是这条会话
    * 要干什么，矮一档等于在催。而进行中那一屏，输入框正压着你要读的正文，
    * 它此时只是「下一句话的入口」——打长了自己会长，最高仍是 180。
    */
-  min-height: 44px;
+  min-height: 42px;
   max-height: 180px;
 }
 
 .composer__inner--opening .composer__input {
-  min-height: 64px;
+  min-height: 63px;
 }
 
 .composer__input::placeholder {
@@ -466,7 +469,6 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   white-space: nowrap;
-  cursor: default;
   transition:
     color var(--dur) var(--ease),
     background var(--dur) var(--ease),

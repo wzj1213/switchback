@@ -14,7 +14,7 @@ export const BRAND_VIEWS = [
       return Math.max(...words) - Math.min(...words) < 1 && brand.top >= 40 &&
         mark.width === 20 && mark.height === 20 &&
         Math.abs(mark.left + mark.width / 2 - icon.left - icon.width / 2) < 1 &&
-        mark.right < words[0] && box('.sidebar__new').height === 32 &&
+        mark.right < words[0] && box('.sidebar__new').height === box('.row--group').height &&
         brand.right <= box('.sidebar').right && (panel === undefined || panel.height === title.height)
     })()`,
   },

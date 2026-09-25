@@ -129,7 +129,6 @@
   min-height: 32px;
   padding: 6px var(--sp-2);
   border-radius: var(--radius-sm);
-  cursor: default;
 }
 
 .question-option:hover {

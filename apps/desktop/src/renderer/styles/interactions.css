@@ -18,6 +18,15 @@
   }
 }
 
+/* 按下要和手指同一帧出现：「我点了」这件事不能慢慢渐出来。
+   松手时时长回到 app-foundation.css 那条统一的 70ms，底色从按下态平滑退回悬停态。
+   放在最后加载的这个文件里、用零特异度的列表：同等权重下压得过前面组件各自的 transition。 */
+:where(button, a, summary, [role="button"], [role="tab"], [role="menuitem"], [role="menuitemradio"],
+  .row, .rvl__row, .activity-row, .changed__row, .think__row, .question-option,
+  .sidebar__section, .panel-tab, .eng-tab, .set__tab):active {
+  transition-duration: 0s;
+}
+
 /* 普通导航行加深底色时，小字同步提亮一档，日期与计数仍须可读。 */
 :is(.row:where(:not(.row--selected)), .deep__row:where(:not(.deep__row--on))):is(:hover, :active, :focus-within)
   :is(.row__time, .row__aside, .row__count, .deep__count, .deep__snip) {
@@ -85,6 +94,16 @@
 .row:focus-within > .row__act,
 .sidebar__section:focus-within > .row__act {
   opacity: 1;
+}
+
+/* 能点的一律是手型，禁用的回到箭头。
+   上一版三十多种控件各写各的：菜单项、下拉、顶栏图标键、设置页签是箭头，
+   侧栏新建、行尾按钮、面板页签又是手型——指针划过同一排按钮，光标来回变。
+   **零特异度**（`:where`）：桌宠的抓手、强度滑块的拖拽这类自有光标照样压得过它；
+   反过来，可点的控件也别再各自声明 `cursor: default`。 */
+:where(button, a[href], summary, select, label[for], [role="button"], [role="tab"], [role="menuitem"],
+  [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"], [role="switch"]) {
+  cursor: pointer;
 }
 
 /* 禁用态保持静止，仍能悬停阅读说明。 */

@@ -106,8 +106,9 @@ export function RowEnd({
 }): React.JSX.Element {
   const note = NOTE[thread.status]
   const running = thread.status === "running"
+  // 包一层 `.row__end`：悬停时整列让位给行内操作，操作按钮浮在这一列上（见 app-sidebar.css）
   return (
-    <>
+    <span className="row__end">
       <EngineDot thread={thread} engines={engines} />
       {aside === undefined ? null : <span className="row__aside">{aside}</span>}
       {aside === undefined && !running && note === undefined ? (
@@ -125,7 +126,7 @@ export function RowEnd({
           {note}
         </span>
       )}
-    </>
+    </span>
   )
 }
 
@@ -135,4 +136,45 @@ export function RowEnd({
  */
 function Since({ at, bright = false }: { at: number; bright?: boolean }): React.JSX.Element {
   return <span className={`row__time${bright ? " row__time--bright" : ""}`}>{sinceOf(at, useMinute())}</span>
+}
+
+/**
+ * 项目行的行尾那一列：待批、在跑、未读，最后是会话条数。
+ * 和会话行的 `RowEnd` 同一个壳（`.row__end`）：悬停时整列让位给行内操作。
+ */
+export function GroupEnd({ collapsed, waiting, running, unread, count }: {
+  collapsed: boolean
+  waiting: number
+  running: number
+  unread: number
+  count: number
+}): React.JSX.Element {
+  const unreadLabel = `${String(unread)} 条跑完了还没看`
+  return (
+    <span className="row__end">
+      {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
+              展开时每行自己会转圈，这里就不重复了 */}
+      {collapsed && waiting > 0 ? (
+        <span className="row__wait" aria-label={`${String(waiting)} 个等你批`}>
+          待批
+        </span>
+      ) : null}
+      {collapsed && running > 0 ? (
+        <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
+          <SpinnerIcon />
+        </span>
+      ) : null}
+      {/* 跑完了还没看的。**不摆数字**：右边已经有一个数（会话条数），
+              两个数字挨着谁也说不清哪个是哪个——一颗点说「里面有新东西」就够 */}
+      {collapsed && unread > 0 ? (
+        <span
+          className="row__dot row__dot--unread"
+          role="img"
+          aria-label={unreadLabel}
+          title={unreadLabel}
+        />
+      ) : null}
+      <span className="row__count">{count}</span>
+    </span>
+  )
 }

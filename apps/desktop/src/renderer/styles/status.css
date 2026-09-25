@@ -131,7 +131,6 @@
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
-  cursor: default;
 }
 
 /* 菜单项底下那行小字。**只给会让人误解的那几项加**——

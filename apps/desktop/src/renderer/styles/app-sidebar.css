@@ -23,7 +23,6 @@
   font: inherit;
   font-size: var(--text-base);
   text-align: left;
-  cursor: default;
 }
 
 /* 图标列。**固定宽度**——图标本身大小不一，靠居中把它们对到同一条中线上 */
@@ -92,7 +91,8 @@
 .row__count {
   flex: none;
   margin-left: var(--sp-2);
-  padding-right: 6px;
+  /* 和会话行的时间、徽注同一个右内缩：两列数字落在同一条右缘上 */
+  padding-right: 4px;
   color: var(--text-faint);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
@@ -139,7 +139,6 @@
   font: inherit;
   font-size: inherit;
   text-align: left;
-  cursor: default;
 }
 
 /* 所有行都是两列：图标列（24）+ 文字列（32px 起）。项目行和它的会话**不再缩进**——
@@ -330,6 +329,47 @@
   font-size: var(--text-xs);
   cursor: pointer;
   opacity: 0;
+}
+
+/*
+ * ── 行尾那一列：计数、时间、转圈、徽注 ──────────────────────
+ *
+ * **平时贴右缘，悬停或键盘进入时让位给行内操作。** 操作按钮浮在这一列上
+ *（绝对定位），不再常驻占位：上一版透明的按钮照样占着 24–48px，
+ * 于是项目计数被挤在行中间、会话标题提前一截就被截断——「图标对不齐」大半出在这儿。
+ *
+ * 这一列至少和操作一样宽（会话行一颗、项目行两颗），悬停时按钮只盖住这一列，
+ * 不压标题，标题的截断位置也不随悬停变。
+ */
+.row__end {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: calc(var(--sb-act) + 2px);
+}
+
+.row--group .row__end {
+  min-width: calc((var(--sb-act) + 2px) * 2);
+}
+
+/* 用 `visibility` 而不是 `opacity`：藏起来的时间和引擎点也不该再接悬停，
+   不然指针停在按钮旁边会冒出一个看不见的元素的 title。 */
+.row:is(:hover, :focus-within) .row__end,
+.row:has(> .row__act--danger) .row__end {
+  visibility: hidden;
+}
+
+.row--thread > .row__act,
+.row--group > .row__act {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.row--group > .row__act:nth-last-child(2) {
+  right: calc(var(--sb-act) + 2px);
 }
 
 /* **选择器原来只写了 `.row--thread:hover`**，于是项目行（`.row--group`）

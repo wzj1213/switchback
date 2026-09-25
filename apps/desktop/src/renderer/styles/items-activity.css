@@ -107,7 +107,7 @@
 }
 
 .step--open {
-  cursor: default;
+
 }
 
 .step--open:hover .step__target {
@@ -161,7 +161,6 @@
   font-size: inherit;
   line-height: inherit;
   text-align: left;
-  cursor: default;
 }
 
 .step__target--go:hover {
@@ -286,7 +285,6 @@
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
-  cursor: default;
 }
 
 .step__more:hover {

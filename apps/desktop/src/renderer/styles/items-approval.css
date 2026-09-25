@@ -175,7 +175,6 @@
   font: inherit;
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
-  cursor: default;
 }
 
 .btn:hover:not(:disabled) {

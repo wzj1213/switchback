@@ -61,7 +61,6 @@
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
-  cursor: default;
   /* 扫光要在这一层里裁掉 */
   position: relative;
   overflow: hidden;
@@ -171,7 +170,6 @@
   color: var(--text-faint);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
-  cursor: default;
 }
 
 /* 摊开之后的那几条缩进一级，看得出是从上面那行展开来的。

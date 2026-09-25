@@ -68,7 +68,10 @@
   --text-code: 12.5px;
   --lh-code: 20px;
   --text-sm: 13px;
-  --text-base: 14px;
+  /* 界面外框（侧栏、顶栏、菜单、卡片抬头）13；你打字的地方与读的正文不跟着缩，
+     输入框走 `--text-input`，回答走 `--text-prose`。 */
+  --text-base: 13px;
+  --text-input: 14px;
   --text-prose: 15px;
   --lh-prose: 26px;
   --text-lg: 16px;
@@ -85,11 +88,15 @@
   --hl-title: #1f5fbf;
   --hl-type: #0f6b78;
   --sidebar-w: 240px;
-  /* 主会话与面板页签条同高；侧栏品牌在独立的窗口控制区下方。 */
-  --topbar-h: 56px;
+  /* 主会话与面板页签条同高；侧栏品牌在独立的窗口控制区下方。
+     **必须等于 `main/index.ts` 的 `titleBarOverlay.height`**：交通灯按那个高度垂直居中，
+     两边对不上，顶栏里的按钮就和红绿灯不在一条水平线上。 */
+  --topbar-h: 48px;
   --window-controls-h: 40px;
-  /* 收起导航后，主顶栏与独占面板都要水平避让 hiddenInset 的交通灯。 */
-  --traffic: 92px;
+  /* 收起导航后，主顶栏与独占面板都要水平避让交通灯。**量出来的，不是估的**：
+     开了 titleBarOverlay 之后 Chromium 报出交通灯占到哪（`titlebar-area-x`，实测 78），
+     再留一档间距；取不到时退回同一个数。上一版写死 92，是按旧位置估的。 */
+  --traffic: calc(env(titlebar-area-x, 78px) + var(--sp-3));
   --diff-sign-w: 1.4em;
   --diff-pad-r: var(--sp-3);
   --content-max: 780px;

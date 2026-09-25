@@ -32,7 +32,6 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   white-space: nowrap;
-  cursor: default;
 }
 
 .eng-tab:hover {

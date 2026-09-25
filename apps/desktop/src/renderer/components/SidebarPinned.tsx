@@ -89,6 +89,7 @@ function PinnedItems({
           aside={baseNameOf(row.thread.cwd)}
           onSelect={() => on.onSelect(row.thread.id)}
           onDelete={() => on.onDelete(row.thread.id)}
+          selectOnPress
           rename={on.rename}
           onMove={(direction) => on.moveThread(row.thread.id, direction)}
           onMenu={(event, arm, rename) => on.onRowMenu(event, row, arm, rename)}

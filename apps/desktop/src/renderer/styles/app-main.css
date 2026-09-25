@@ -13,7 +13,7 @@
  * 会话顶栏与面板页签条共用高度、底线（`--topbar-h`）。侧栏品牌在独立的
  * 窗口控制区下方，与导航的图标/文字列对齐。
  *
- * `padding-left` 要过渡：导航收起时它从 20 跳到 `--traffic`（92），而列宽是
+ * `padding-left` 要过渡：导航收起时它从 16 跳到 `--traffic`（约 90），而列宽是
  * 滑过去的——不过渡的话标题**先向右弹 72px，再随列滑回来**，一次收起看得见
  * 两个方向的位移。同一条时长曲线，两段位移就合成一段单调的滑动。
  */
@@ -22,7 +22,7 @@
   align-items: center;
   gap: var(--sp-2);
   height: var(--topbar-h);
-  padding: 0 20px;
+  padding: 0 var(--sp-4);
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
   min-height: var(--topbar-h);
@@ -112,14 +112,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-faint);
-  cursor: default;
 }
 
 .iconbtn:hover:not(:disabled) {
@@ -384,7 +383,6 @@
   color: var(--text-faint);
   font: inherit;
   font-size: var(--text-base);
-  cursor: default;
 }
 
 .notice__close:hover {
@@ -511,7 +509,6 @@
   color: var(--text-muted);
   font: inherit;
   font-size: var(--text-sm);
-  cursor: default;
 }
 
 .findbar__btn:hover {
@@ -580,11 +577,16 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   text-align: left;
-  cursor: default;
 }
 
 .mentions__row--active {
   background: var(--bg-active);
+}
+
+/* 高亮行底色深一档，目录那截灰字要跟着提一档：`--text-faint` 压在 `--bg-active` 上
+   只有 4.17:1（axe 在「@文件引用」那屏报的就是它），`--text-muted` 回到 5:1 以上。 */
+.mentions__row--active > .mentions__dir {
+  color: var(--text-muted);
 }
 
 .mentions__name {
@@ -647,7 +649,6 @@
   font: inherit;
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
-  cursor: default;
 }
 
 .tbtn:hover:not(:disabled) {
@@ -795,7 +796,6 @@
      让位，压淡只会让本来就小的图形更难认 */
   color: var(--text);
   box-shadow: var(--shadow-pop);
-  cursor: default;
 }
 
 .tobottom:hover {

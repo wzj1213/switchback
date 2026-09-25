@@ -124,7 +124,6 @@
   line-height: var(--lh-sm);
   text-align: left;
   white-space: nowrap;
-  cursor: default;
 }
 
 .set__tab:hover {
@@ -309,7 +308,6 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   white-space: nowrap;
-  cursor: default;
 }
 
 .switch__item:hover {
@@ -342,7 +340,6 @@
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--bg-sunken);
-  cursor: default;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
@@ -508,7 +505,6 @@
   font-size: var(--text-base);
   font-weight: 600;
   text-align: left;
-  cursor: default;
 }
 
 .hk__name:hover {

@@ -4,6 +4,7 @@ import { rowLabelOf, type DropEdge, type SidebarRow } from "../sidebar.js"
 import { Dot, RowEnd } from "./RowEnd.js"
 import { useRowPeek } from "./RowPeek.js"
 import { RowActions } from "./RowActions.js"
+import { pressSelect } from "../press.js"
 import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
 import { moveKeyProps } from "../moveKey.js"
@@ -54,6 +55,28 @@ function rowClass(o: {
     .join(" ")
 }
 
+/**
+ * 删除的二次确认。做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
+ * 但也不能点一下就没。照 codex 的 confirmArchiveTask。
+ *
+ * **武装状态要自己解除。** 上一版只靠确认按钮的 `onBlur`，而从右键菜单武装时那个按钮
+ * 根本没拿到过焦点，于是 blur 永远不来——那一行就一直挂着「确认」，**下一次点它直接把
+ * 会话删了**，而用户以为自己点的是「更多操作」。删除不可撤销，不能有这种残留。
+ */
+function useArmedDelete(): { confirming: boolean; arm: () => void; setConfirming: (on: boolean) => void } {
+  const [confirming, setConfirming] = useState(false)
+  useEffect(() => {
+    if (!confirming) return undefined
+    const timer = setTimeout(() => {
+      setConfirming(false)
+    }, 4000)
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [confirming])
+  return { confirming, arm: () => { setConfirming(true) }, setConfirming }
+}
+
 export function Row({
   row,
   selected,
@@ -67,6 +90,7 @@ export function Row({
   rename,
   drag,
   onMove,
+  selectOnPress = false,
 }: {
   row: SidebarRow
   selected: boolean
@@ -92,37 +116,18 @@ export function Row({
   drag?: RowDrag
   /** `Alt+↑/↓` 与右键菜单共用的排序动作。 */
   onMove?: (direction: -1 | 1) => void
+  /** 按下即选中（`press.ts`）。筛选结果不给：打开结果会换掉整张列表，松手会落在别的行上。 */
+  selectOnPress?: boolean
 }): React.JSX.Element {
   const { thread } = row
   // 后台跑完、还没打开过的那条要**亮着**：整行提亮 + 行首那颗点换亮色（见 `Dot`）。
   // 选中的那条不算——你正看着它
   const unread = row.unread === true && !selected
   const dropping = drag?.over === thread.id && drag.dragging !== thread.id
-  // 二次确认做在**同一个按钮**上而不是弹一个对话框：删一个会话不值得打断整个界面，
-  // 但也不能点一下就没。照 codex 的 confirmArchiveTask。
-  const [confirming, setConfirming] = useState(false)
-  const arm = (): void => {
-    setConfirming(true)
-  }
+  const { confirming, arm, setConfirming } = useArmedDelete()
   const startRename = (): void => {
     rename?.start(thread.id)
   }
-  /**
-   * **武装状态要自己解除。**
-   *
-   * 上一版只靠确认按钮的 `onBlur`，而从右键菜单武装时那个按钮根本没拿到过焦点，
-   * 于是 blur 永远不来——那一行就一直挂着「确认」，**下一次点它直接把会话删了**，
-   * 而用户以为自己点的是「更多操作」。删除不可撤销，不能有这种残留。
-   */
-  useEffect(() => {
-    if (!confirming) return undefined
-    const timer = setTimeout(() => {
-      setConfirming(false)
-    }, 4000)
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [confirming])
   // 悬停卡：改名时不弹（输入框正在这一行上），拖动中不弹（会盖住落点高亮）
   const peek = useRowPeek({ drag, disabled: rename?.id === thread.id, row, engines })
   return (
@@ -149,6 +154,7 @@ export function Row({
         aria-current={selected ? "page" : undefined}
         {...peek.handlers}
         {...moveKeyProps(onMove)}
+        {...pressSelect(selectOnPress, onSelect)}
         onClick={onSelect}
       >
         {/* 行首状态点列**所有会话行都在**——它是「这行现在怎么样」的常驻位：

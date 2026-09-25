@@ -165,6 +165,7 @@ function Chats({
           onDelete={() => {
             on.onDelete(row.thread.id)
           }}
+          selectOnPress
           rename={on.rename}
           onMenu={(e, arm, ren) => {
             on.onRowMenu(e, row, arm, ren)

@@ -21,7 +21,6 @@
   font: inherit;
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
-  cursor: default;
 }
 
 .trigger:hover:not(:disabled) {
@@ -134,7 +133,6 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   text-align: left;
-  cursor: default;
 }
 
 .pop__item:hover:not(:disabled) {
@@ -204,7 +202,6 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   text-align: left;
-  cursor: default;
 }
 
 .pop__back:hover {
@@ -284,7 +281,6 @@
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
   text-align: left;
-  cursor: default;
 }
 
 .pop__cmd:hover:not(:disabled) {

@@ -95,7 +95,7 @@ export function Svg({
  *
  * 段头的箭头例外，它属于另一个层级（小一号字的分节标题），用 `SIDEBAR_ICON_SMALL`。
  */
-export const SIDEBAR_ICON = 15
+export const SIDEBAR_ICON = 14
 export const SIDEBAR_ICON_SMALL = 12
 
 /**
