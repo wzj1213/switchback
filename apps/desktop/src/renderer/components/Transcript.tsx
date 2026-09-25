@@ -1,6 +1,5 @@
 import type { Command, EngineInfo, Item, TaskRun, Thread, Turn } from "@omni/protocol"
-import { memo, useCallback, useMemo, useState } from "react"
-import { foldTurns, groupRows, withAsides, withEngineMarks } from "../group.js"
+import { memo, useMemo } from "react"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus } from "./TurnStatus.js"
 import { ToBottomIcon } from "./icons.js"
@@ -13,6 +12,8 @@ import { TranscriptNavigation } from "./transcript-navigation.js"
 import { navPointsOf } from "../transcript-rail.js"
 import { engineStints } from "../engine-mark.js"
 import { FileLinkScope } from "./message-link.js"
+import { useProgressiveRows } from "../use-progressive-rows.js"
+import { useTranscriptRows } from "../use-transcript-rows.js"
 
 /**
  * 对话正文。
@@ -31,13 +32,6 @@ import { FileLinkScope } from "./message-link.js"
  * 这些都会让 `App` 整棵树重跑一遍，而它们和转录区里的内容没有半点关系。
  * 一屏几百条的会话上，那一次白跑正是「点开设置顿一下」里剩下的那部分。
  */
-/** 折/展一轮。抽出来是行数闸门逼的，这一刀也顺：它是集合运算，不是这一屏的事。 */
-function toggled(prev: ReadonlySet<string>, turnId: string): ReadonlySet<string> {
-  const next = new Set(prev)
-  if (!next.delete(turnId)) next.add(turnId)
-  return next
-}
-
 export const Transcript = memo(function Transcript({
   thread,
   items,
@@ -50,6 +44,7 @@ export const Transcript = memo(function Transcript({
   onCopy,
   onReuse,
   readOnly,
+  full,
 }: {
   thread: Thread
   items: readonly Item[]
@@ -69,36 +64,11 @@ export const Transcript = memo(function Transcript({
   onReuse?: (text: string, attachments?: readonly string[], aside?: boolean) => void
   /** 对比页只允许阅读、折叠与复制，不执行审批或创建新分支。 */
   readOnly?: boolean
+  /** 会话内查找开着：整段历史必须都在 DOM 里，原生查找才数得全（见 `useProgressiveRows`）。 */
+  full?: boolean
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
-  /**
-   * **你手动展开过的那几轮。**
-   *
-   * 存「展开的」而不是「折起的」，因为默认是折着的：过程（思考、工具）是给
-   * 「它怎么得出这个」准备的，而多数时候你先要的是结论（见 `group.ts` 的 `foldTurns`）。
-   * **按会话隔离**靠 `App` 给 `Workspace` 的 key，这里不用自己管。
-   */
-  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set())
-  const onFold = useCallback((turnId: string) => {
-    setUnfolded((prev) => toggled(prev, turnId))
-  }, [])
-  // 还在跑的那一轮不折：那时候过程就是全部内容，它正一步步长出来
-  const folded = useCallback(
-    (turnId: string) => turnId !== turn?.id && !unfolded.has(turnId),
-    [turn?.id, unfolded],
-  )
-  const rows = useMemo(
-    // **折叠在前、插侧问与换手分界在后**：这两样都不归任何一轮，
-    // 折起某一轮不该把它们一起折掉。
-    // **旁路不进流里**：输入框上方那条状态带（`ActivityDock`）说的是同一件事，
-    // 两处画同一条旁路，读到第二处时人要先确认「这是不是刚才那个」
-    () =>
-      withEngineMarks(
-        withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd), folded), thread.asides ?? []),
-        thread.segments,
-      ),
-    [items, turn?.id, folded, thread.asides, thread.cwd, thread.segments],
-  )
+  const { rows, folded, onFold } = useTranscriptRows(items, turn, thread)
   // resolve 必须引用稳定，`ItemView` 的 memo 才不会在每帧流式更新时整屏失效。
   const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)
   // 选中转录区一段话 → 浮一颗「问一句」。没有输入框的对比视图不给
@@ -110,6 +80,8 @@ export const Transcript = memo(function Transcript({
   // 左边那条导航：一格 = 你问的一次（`navPointsOf` 定的谁算一格），颜色 = 那一问归谁跑
   const stints = useMemo(() => engineStints(thread.segments), [thread.segments])
   const points = useMemo(() => navPointsOf(rows, stints), [rows, stints])
+  // 长会话先挂末尾、其余空闲时补齐；上面这些派生仍按整段历史算
+  const shown = useProgressiveRows(rows, full === true)
   return (
     <div
       className="transcript"
@@ -122,7 +94,7 @@ export const Transcript = memo(function Transcript({
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
       <FileLinkScope threadId={thread.id} cwd={thread.cwd}>
       <div className="transcript__inner" ref={inner}>
-        {rows.map((row) => (
+        {shown.map((row) => (
           <RowView
             key={keyOf(row)}
             row={row}

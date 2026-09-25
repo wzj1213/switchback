@@ -19,6 +19,7 @@ export function ConversationStage({
   send,
   onCopy,
   onReuse,
+  finding,
 }: {
   /** 输入框上方的动态状态。放进舞台，出现时只压缩正文，不移动桌宠地面。 */
   children: React.ReactNode
@@ -34,6 +35,8 @@ export function ConversationStage({
   send: (command: Command) => void
   onCopy: (text: string) => void
   onReuse: (text: string, attachments?: readonly string[], aside?: boolean) => void
+  /** 查找条开着。转录区要把分片挂载的历史一次补齐，原生查找才数得全。 */
+  finding: boolean
 }): React.JSX.Element {
   const running = turn?.status === "running"
   const fire = useFireProps({ pets, thread, usage, running })
@@ -50,6 +53,7 @@ export function ConversationStage({
         send={send}
         onCopy={onCopy}
         onReuse={onReuse}
+        full={finding}
       />
       <div className="hem" aria-hidden="true" />
       {children}

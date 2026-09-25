@@ -224,6 +224,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         onReveal={props.onReveal}
         onCopy={props.onCopy}
         onReuse={reuse}
+        finding={props.finding}
       >
         <Between
           thread={thread}

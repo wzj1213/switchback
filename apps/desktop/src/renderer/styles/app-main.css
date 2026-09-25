@@ -271,11 +271,33 @@
   margin-top: 0;
 }
 
-/* 历史回答保留 DOM、查找与复制；屏外 Markdown 不参加每一帧分栏排版。
-   auto 记住测过的真实高度，首次未见时才用估值。流式回答始终正常排版。 */
+/* 历史内容保留 DOM、查找与复制；屏外的行不参加每一帧的样式、排版与绘制。
+   auto 记住测过的真实高度，首次未见时才用估值。流式回答始终正常排版。
+
+   **不止回答**：折起的历史里每轮还剩提问、分界和改动卡，400 轮就是上千行常驻排版，
+   开合侧栏 / 右栏的每一帧都要把它们全部重排一遍（实测 64–72ms → 32–40ms）。
+
+   **只挂在确认过的几类行上**：content-visibility 自带 layout / paint containment，
+   行内的 fixed 元素会被困在这一行里。这几类行里唯一的 fixed 是图片灯箱，
+   已改走 portal（`ImageThumb.tsx`）；新增行类型要先查一遍再加进来。 */
 .transcript__inner > .copyable[data-deferred] {
   content-visibility: auto;
   contain-intrinsic-block-size: auto 240px;
+}
+
+.transcript__inner > .copyable:has(> .msg--user) {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 64px;
+}
+
+.transcript__inner > .turnmark__row {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 22px;
+}
+
+.transcript__inner > .edits {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 44px;
 }
 
 /*

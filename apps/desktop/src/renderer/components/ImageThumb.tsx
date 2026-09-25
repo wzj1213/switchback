@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { CloseIcon } from "./icons-panel.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { baseName } from "./file-row.js"
@@ -93,13 +94,16 @@ export function Thumb({
           <CloseIcon size={12} />
         </button>
       )}
-      {open ? (
+      {/* 全屏遮罩挂到 body 上：缩略图所在的那一行可能带 content-visibility，
+          它自带的 layout / paint containment 会把 fixed 元素困在行里（见 app-main.css） */}
+      {open ? createPortal(
         <ImageLightbox
           path={path}
           onClose={() => {
             setOpen(false)
           }}
-        />
+        />,
+        document.body,
       ) : null}
     </span>
   )

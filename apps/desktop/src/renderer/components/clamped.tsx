@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { flushSync } from "react-dom"
 import { ChevronIcon } from "./icons.js"
 
 /**
@@ -32,14 +33,19 @@ export function Clamped({ children }: { children: React.ReactNode }): React.JSX.
   const box = useRef<HTMLDivElement>(null)
   const [tall, setTall] = useState(false)
   const [open, setOpen] = useState(false)
-  // 内容会长高（流式、图片加载完、窗口变窄导致折行变多），所以盯着量而不是量一次
+  // 内容会长高（流式、图片加载完、窗口变窄导致折行变多），所以盯着量而不是量一次。
+  //
+  // **只在 ResizeObserver 里量，挂载时不同步量一次。** observe 之后本来就会回调一次，
+  // 那时排版刚算完，读 `scrollHeight` 不花钱；挂载时当场读则会逼浏览器先把整段
+  // 转录区排一遍——长会话分片补齐时每片都付这一次，实测累计上百毫秒。
+  // 屏外的行（content-visibility 跳过）不排版也就不回调，看得见时才量。
+  // `flushSync`：回调在绘制之前，同一帧里收起，长消息不会先整段露一帧再缩回去。
   useEffect(() => {
     const node = box.current
     if (node === null) return undefined
     const measure = (): void => {
-      setTall(needsClamp(node.scrollHeight))
+      flushSync(() => { setTall(needsClamp(node.scrollHeight)) })
     }
-    measure()
     const observer = new ResizeObserver(measure)
     observer.observe(node)
     return () => {

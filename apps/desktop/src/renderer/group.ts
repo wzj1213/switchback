@@ -39,8 +39,7 @@ export type Row =
  * 要让历史里每一轮都显示时长，就得再存一份完成记录。
  * 而「第一条到最后一条」本来就是用户看到的那段时间，多存一份没有换来更准。
  */
-function spanOf(items: readonly Item[], turnId: string): number {
-  const own = items.filter((i) => i.turnId === turnId)
+function spanOf(own: readonly Item[]): number {
   const first = own[0]
   const last = own[own.length - 1]
   if (first === undefined || last === undefined) return 0
@@ -53,7 +52,7 @@ function spanOf(items: readonly Item[], turnId: string): number {
  */
 /** 这条 item 之后要不要插一条分界线。`marked` 会被就地更新——一轮只插一次。 */
 function markFor(
-  items: readonly Item[],
+  byTurn: ReadonlyMap<string, readonly Item[]>,
   item: Item,
   activeTurnId: string | undefined,
   marked: Set<string>,
@@ -61,7 +60,7 @@ function markFor(
   if (item.kind !== "user_message") return undefined
   if (item.turnId === activeTurnId || marked.has(item.turnId)) return undefined
   marked.add(item.turnId)
-  const ms = spanOf(items, item.turnId)
+  const ms = spanOf(byTurn.get(item.turnId) ?? [])
   // 零时长不插：那一轮只有一条提问，没有可交代的过程
   return ms > 0 ? { kind: "turn", turnId: item.turnId, ms } : undefined
 }
@@ -206,8 +205,8 @@ export function foldTurns(rows: readonly Row[], folded: (turnId: string) => bool
  * 数的是那一轮里引擎明确报成功的编辑（`reportedChangesOf`），一个文件一行、
  * 后一次覆盖前一次。一轮没改过文件就不插——空卡片比没有更吵。
  */
-function editsFor(items: readonly Item[], turnId: string, cwd: string): Row | undefined {
-  const edits = reportedChangesOf(items.filter((item) => item.turnId === turnId), cwd, true)
+function editsFor(own: readonly Item[], turnId: string, cwd: string): Row | undefined {
+  const edits = reportedChangesOf(own, cwd, true)
   return edits.files === 0 ? undefined : { kind: "edits", turnId, edits }
 }
 
@@ -226,13 +225,29 @@ function sealed(turnId: string, activeTurnId: string | undefined): boolean {
  * @param cwd 工作区路径。**给了才插「改了哪些文件」那张卡**——
  *   引擎报的路径要按它归一，没有 cwd 就归不了（活动页那种场景就不插）。
  */
+/**
+ * 按轮分桶，一遍。**时长和改动卡都从这里取**：它们原来各自对每一轮把整条会话
+ * 过滤一遍，400 轮 × 几千条就是 O(n²)——切到长会话时光这一步就要十几毫秒。
+ * 桶里保持原顺序，首尾两条与逐条过滤出来的一样。
+ */
+function bucketByTurn(items: readonly Item[]): ReadonlyMap<string, readonly Item[]> {
+  const out = new Map<string, Item[]>()
+  for (const item of items) {
+    const own = out.get(item.turnId)
+    if (own === undefined) out.set(item.turnId, [item])
+    else own.push(item)
+  }
+  return out
+}
+
 export function groupRows(items: readonly Item[], activeTurnId?: string, cwd?: string): readonly Row[] {
   const rows: Row[] = []
   const marked = new Set<string>()
+  const byTurn = bucketByTurn(items)
   let open: string | undefined
   const seal = (turnId: string | undefined): void => {
     if (turnId === undefined || cwd === undefined || !sealed(turnId, activeTurnId)) return
-    const card = editsFor(items, turnId, cwd)
+    const card = editsFor(byTurn.get(turnId) ?? [], turnId, cwd)
     if (card !== undefined) rows.push(card)
   }
   for (const item of items) {
@@ -244,7 +259,7 @@ export function groupRows(items: readonly Item[], activeTurnId?: string, cwd?: s
     if (item.kind !== "tool_call") {
       rows.push({ kind: "item", item })
       // 分界线插在提问**之后**：它是这一轮回答的表头，说的是「下面这些花了多久」
-      const mark = markFor(items, item, activeTurnId, marked)
+      const mark = markFor(byTurn, item, activeTurnId, marked)
       if (mark !== undefined) rows.push(mark)
       continue
     }
