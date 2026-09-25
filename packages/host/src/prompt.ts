@@ -1,6 +1,7 @@
-import type { Command } from "@omni/protocol"
+import type { Command, Item } from "@omni/protocol"
 import { switchEngine } from "./branch.js"
 import { emit, isCurrent, setStatus, withQueue, type Ctx, type Live } from "./ctx.js"
+import { handoffNote, withNote } from "./handoff-note.js"
 import { recordSegment } from "./segment.js"
 
 /**
@@ -279,14 +280,41 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
     }
     return prompt(ctx, cmd)
   }
-  const at = ctx.deps.now()
-  commit(ctx, entry, at, cmd.draftRevision)
+  return startTurn(ctx, entry, cmd)
+}
+
+function userItem(
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+  base: { id: string; turnId: string; at: number },
+): Extract<Item, { kind: "user_message" }> {
+  return {
+    ...base,
+    kind: "user_message",
+    text: cmd.text,
+    ...(cmd.attachments === undefined || cmd.attachments.length === 0
+      ? {}
+      : { attachments: cmd.attachments }),
+  }
+}
+
+/** 开一轮：转正、记分段、抓基线，发出 turn.started 与用户那句，再送给引擎。 */
+async function startTurn(
+  ctx: Ctx,
+  entry: Live,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+): Promise<void> {
+  commit(ctx, entry, ctx.deps.now(), cmd.draftRevision)
+  // 交接说明要在记分段**之前**判定：新那家一旦落下自己那一段，就认不出这是第一句了。
+  // 它要读盘；等它的这段时间里会话若被换掉、或引擎自己开了一轮，交回主路重新判定
+  const note = await handoffNote(ctx, entry)
+  if (!isCurrent(ctx, entry) || entry.turn !== undefined) return prompt(ctx, cmd)
   // **有实际对话才记这一段。** 切过去没说话就切走，不该在时间线上
   // 留一条什么都没发生的记录——那样时间线会被「我点错了」填满
   void recordSegment(ctx, entry)
   const turnId = ctx.deps.newId("tn")
   await captureTurnBaseline(ctx, entry)
   entry.turn = turnId
+  const at = ctx.deps.now()
   const turn = {
     id: turnId,
     threadId: cmd.threadId,
@@ -296,19 +324,11 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
   }
   setStatus(ctx, entry, "running")
   emit(ctx, { type: "turn.started", at, turn })
-  emit(ctx, {
-    type: "item.started",
-    at,
-    item: {
-      id: ctx.deps.newId("it"),
-      turnId,
-      kind: "user_message",
-      at,
-      text: cmd.text,
-      ...(cmd.attachments === undefined || cmd.attachments.length === 0
-        ? {}
-        : { attachments: cmd.attachments }),
-    },
-  })
-  await sendPrompt(ctx, entry, cmd, turnId)
+  // 交接说明原样记进转录区，排在用户那句前面——和真正送出去的顺序一致
+  if (note !== undefined) {
+    const item = { id: ctx.deps.newId("it"), turnId, kind: "user_message" as const, at, text: note }
+    emit(ctx, { type: "item.started", at, item: { ...item, origin: "handoff" } })
+  }
+  emit(ctx, { type: "item.started", at, item: userItem(cmd, { id: ctx.deps.newId("it"), turnId, at }) })
+  await sendPrompt(ctx, entry, { ...cmd, text: withNote(cmd.text, note) }, turnId)
 }

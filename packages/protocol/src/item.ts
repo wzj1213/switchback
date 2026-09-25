@@ -42,6 +42,12 @@ export type UserMessageOrigin =
 
 interface ItemBase {
   id: ItemId
+  /**
+   * 引擎（驱动）报上来的原 id。宿主为了全局唯一把 `id` 重铸了（见 host 的 `item-scope.ts`），
+   * 原来那个留在这里，只用来到那一家的原始记录里对位——换引擎交接的转写把它标在工具调用后面。
+   * 宿主自己铸的条目（用户消息、审批卡等）和旧记录没有这个字段。
+   */
+  nativeId?: string
   turnId: TurnId
   kind: ItemKind
   at: number
@@ -64,7 +70,8 @@ export interface UserMessageItem extends ItemBase {
   attachments?: readonly string[]
   /**
    * 缺席才表示人亲手发送；存在时必须换形态，不能靠右冒充“你说的”。
-   * `handoff` 只为读回已删除功能留下的旧日志；structured origin 来自引擎公开事件。
+   * `handoff` 是换引擎后 omni 附在第一句话前的交接说明（用户开着「换引擎自动交接」时），
+   * 界面原样显示它到底发了什么；旧日志里同名的条目也按它读。structured origin 来自引擎公开事件。
    */
   origin?: UserMessageOrigin
 }

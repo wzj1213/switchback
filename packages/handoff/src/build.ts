@@ -75,7 +75,8 @@ export function buildHandoff(thread: Thread, items: readonly Item[]): Handoff {
   const own = items.filter((item) => item.inherited !== true)
   // 用 flatMap 而不是 filter().map()：filter 的类型谓词不会把联合窄下来，
   // 后面就得靠断言，而断言在这种「按 kind 取字段」的地方最容易写错
-  const users = own.flatMap((i) => (i.kind === "user_message" ? [i.text] : []))
+  // 换引擎的交接说明是 omni 附的，不是用户的要求
+  const users = own.flatMap((i) => (i.kind === "user_message" && i.origin !== "handoff" ? [i.text] : []))
   const messages = own.flatMap((i) => (i.kind === "agent_message" ? [i.text] : []))
   const decisions = own.flatMap((i) =>
     i.kind === "approval" && i.status !== "pending"

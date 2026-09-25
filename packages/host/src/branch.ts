@@ -262,7 +262,9 @@ function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
  *
  * **不传原始上下文，也不注入摘要或提示词**——各家 session 格式不通，
  * omni 不能替用户翻译，更不能以用户身份发一段他没写过的话。
- * 引擎公开可定位的原生记录路径保留在 `Thread.segments`，需要时由用户明确让引擎读取。
+ * 引擎公开可定位的原生记录路径保留在 `Thread.segments`；用户开着「换引擎自动交接」时，
+ * 换家后的第一句话前会附一段只陈述事实的说明，告诉新那家转写与这些记录在哪
+ *（见 `handoff-note.ts`，AGENTS.md 那条边界唯一的例外）。
  */
 export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
@@ -370,10 +372,11 @@ async function finishSwitch(
  * 换过去之后：起新进程、停旧的、清掉模型与强度（上一家的模型 id 在新的一家
  * 那里通常根本不存在）、`nextEngine` 清空。
  *
- * **不传原始上下文，也不塞任何文本。** 各家 session 格式不通，硬翻既做不对也
+ * **不传原始上下文，切换本身也不塞任何文本。** 各家 session 格式不通，硬翻既做不对也
  * 维护不起；而 omni 替用户编一段摘要塞进输入框更糟——那是他没打过的话。
  * 上一家若公开可定位的原始记录路径，omni 已存在 `Thread.segments` 里（`/timeline` 看得见），
- * 新的一家自己有文件工具，要读的时候读全量原文。
+ * 新的一家自己有文件工具，要读的时候读全量原文。「换引擎自动交接」开着时，
+ * 由 `prompt` 在换家后的第一句话前附上这些路径（见 `handoff-note.ts`），不在这里。
  */
 export async function switchEngine(
   ctx: Ctx,

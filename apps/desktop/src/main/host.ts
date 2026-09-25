@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { app, dialog, ipcMain, shell, type BrowserWindow } from "electron"
 import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Ledger, Sealed } from "@omni/wire"
-import { createHost, type Host, type HostDeps } from "@omni/host"
+import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createAttention, type Relay } from "./attention.js"
@@ -23,6 +23,7 @@ import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached, RescanReport } from "./attached.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { installClipboardChannel } from "./system-clipboard.js"
+import { baselineDeps, handoffDeps } from "./host-deps.js"
 
 export type { Attached, RescanReport } from "./attached.js"
 
@@ -116,29 +117,6 @@ function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<type
   })
 }
 
-function baselineDeps(
-  log: Logger,
-  baselines: WorktreeBaselines | undefined,
-): Pick<HostDeps, "ensureWorktreeBaseline" | "captureTurnBaseline" | "removeWorktreeBaseline"> {
-  return {
-    ensureWorktreeBaseline: async (threadId, cwd) => {
-      await baselines?.ensure(threadId, cwd).catch((error: unknown) => {
-        log.write("warn", "baseline", `无法记录会话 ${threadId} 的工作区基线：${String(error)}`)
-      })
-    },
-    captureTurnBaseline: async (threadId, cwd) => {
-      await baselines?.captureTurn(threadId, cwd).catch((error: unknown) => {
-        log.write("warn", "baseline", `无法记录会话 ${threadId} 的本轮工作区基线：${String(error)}`)
-      })
-    },
-    removeWorktreeBaseline: async (threadId) => {
-      await baselines?.remove(threadId).catch((error: unknown) => {
-        log.write("warn", "baseline", `无法删除会话 ${threadId} 的工作区基线：${String(error)}`)
-      })
-    },
-  }
-}
-
 function openStores(log: Logger, emit: (event: Event) => void): {
   journal: ReturnType<typeof createJournal>
   rules: ReturnType<typeof createRuleStore>
@@ -166,6 +144,8 @@ export interface HostPorts {
   engineVisible?: (id: string) => boolean
   dshProfile?: () => string
   notify?: () => NotifyMode
+  /** 「换引擎自动交接」开着没有。不给＝关着。 */
+  handoffBrief?: () => boolean
 }
 
 /** 一次失败翻成界面看得见的东西；每一条通往 `dispatch` 的路都要经过它。 */
@@ -229,6 +209,7 @@ export function attachHost(
     journal,
     rules,
     ...baselineDeps(log, baselines),
+    ...handoffDeps({ journal, labels, log, userData: app.getPath("userData"), enabled: ports.handoffBrief }),
     ...(devMaxLive() === undefined ? {} : { maxLive: devMaxLive() }),
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,

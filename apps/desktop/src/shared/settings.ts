@@ -82,6 +82,18 @@ export interface Settings {
   /** 什么时候出声。见 `NotifyMode`。 */
   notify: NotifyMode
   /**
+   * **换引擎自动交接**。默认开。
+   *
+   * 开着时，会话中途换了一家之后发出的第一句话前面，omni 附一段交接说明：
+   * 此前谁跑了哪几轮、完整转写落在哪、各家原始记录在哪、那些记录实际是什么格式
+   *（见 `@omni/handoff` 的 `briefOf`）。这是 AGENTS.md「不往模型上下文塞 omni 写的话」
+   * 唯一的例外，所以它是一个用户看得见、关得掉的开关；关掉就只发用户那句话。
+   *
+   * 默认开：换引擎几乎总是为了「让新的一家接着干」（额度用光是最常见的原因），
+   * 而关着时用户得自己去 `/timeline` 抄路径、再告诉新那家怎么读——那正是它要省掉的两步。
+   */
+  handoffBrief: boolean
+  /**
    * DSH profile 与接入确认。
    *
    * DSH 的 provider、model 与 API 凭证仍归它自己的设置与凭证服务管理；
@@ -352,6 +364,7 @@ export const SETTINGS_DEFAULTS: Settings = {
     range: false,
   },
   notify: "all",
+  handoffBrief: true,
   dsh: { profile: "acp", confirmedProfiles: [] },
   disabledEngines: [],
   defaultEngine: "",

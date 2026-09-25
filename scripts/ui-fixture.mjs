@@ -15,6 +15,8 @@
  * 单独看任何一类都看不出「所有行长得一样」这个毛病。
  */
 
+import { HANDOFF_NOTE } from "./ui-fixture-handoff.mjs"
+
 const ENGINE = "claude"
 
 /** 一条事件一行，就是 journal 的格式。 */
@@ -247,6 +249,8 @@ function followUp(out, { id, cwd, at }) {
     const stamp = later + ++n * 1000
     out.push(line({ type: "item.started", at: stamp, item: { ...item, id: `${id}-b${n}`, turnId: turn, at: stamp } }))
   }
+  // 换家后的第一句：「换引擎自动交接」默认开着，这一轮最前面是 omni 附的交接说明
+  push({ kind: "user_message", origin: "handoff", text: HANDOFF_NOTE })
   push({ kind: "user_message", text: "顺手把 throughput 那条滑窗的窗口长度也提出来做成常量吧。" })
   push({
     kind: "tool_call", tool: "Edit", status: "ok",

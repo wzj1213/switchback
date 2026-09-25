@@ -44,9 +44,10 @@ export function Copyable({
   const [feedback, copy] = useCopyFeedback(() => onCopy(textOf(item)))
   if (item.kind === "approval") return <>{children}</>
   // 左边那条导航按「你问的一次」摆格子，位置只能从 DOM 量（见 `use-transcript-rail.ts`），
-  // 所以人话这一层要留一个认得出的锚点
+  // 所以人话这一层要留一个认得出的锚点。**只挂人亲手发的**：交接说明、定时触发这些
+  // 带 `origin` 的不算「你问的」，导航本来就跳过它们（`transcript-rail.ts`）
   const nav = {
-    ...(item.kind === "user_message" ? { "data-nav": item.id } : {}),
+    ...(item.kind === "user_message" && item.origin === undefined ? { "data-nav": item.id } : {}),
     ...(item.kind === "agent_message" && item.complete ? { "data-deferred": true } : {}),
   }
   // 一颗都没有就连那个盒子也别要：它占的那行高度正是上一版间距失真的来源

@@ -381,6 +381,7 @@ function bootstrap(): Promise<void> {
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
       notify: () => settings.get().notify,
+      handoffBrief: () => settings.get().handoffBrief,
     })
     installReviewChannel(attached.baselines, attached.worksiteSearch)
     // 设置面板的「活动」那一页。**只在点进去时才扫盘**，所以挂通道不花任何东西

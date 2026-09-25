@@ -45,6 +45,14 @@ describe("引擎 item id 进入宿主后重新定域", () => {
       ask.toolCallId,
     ]).toEqual(["it-1", "it-1", "it-1", "it-1", "it-1"])
   })
+
+  it("原来那个 id 留作 nativeId：到引擎自己的原始记录里对位靠它", () => {
+    const scope = createItemScope(() => "it-1")
+    const begin = scope.event(started("turn-a", "toolu_01A"))
+    const update = scope.event({ ...started("turn-a", "toolu_01A"), type: "item.updated" })
+    expect([begin, update].map((e) => (e.type === "item.started" || e.type === "item.updated" ? e.item.nativeId : "")))
+      .toEqual(["toolu_01A", "toolu_01A"])
+  })
 })
 
 describe("旁路的身份", () => {

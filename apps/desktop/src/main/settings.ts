@@ -56,6 +56,8 @@ function parse(raw: unknown): Settings {
     // 认不出就回默认（全都提醒），**不回落到 off**：一个读坏的偏好把审批提醒
     // 静音掉的话，agent 会停在那儿无声地等，而没有任何地方会报错
     notify: oneOf(it.notify, NOTIFY, DEFAULTS.notify),
+    // 同 `pets`：默认开，只认字面的 `false`
+    handoffBrief: it.handoffBrief !== false,
     dsh: dsh(it.dsh),
     // **不校验 id 存不存在。** 第三方引擎从 `engines.json` 接入，用户可能先关掉
     // 再去改注册表；把「现在认不出」当脏数据丢掉，等于替他把开关拨回开

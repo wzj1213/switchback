@@ -1,7 +1,7 @@
 import type { EngineInfo, Trust } from "@omni/protocol"
 import type { NotifyMode, Settings } from "../../shared/settings.js"
 import { TRUSTS } from "./Composer.js"
-import { Field, Group, Segmented } from "./SettingsBits.js"
+import { Field, Group, Segmented, Toggle } from "./SettingsBits.js"
 import { ThemeOptions } from "./theme-options.js"
 
 /**
@@ -54,6 +54,28 @@ export function LookSection({
             value={settings.notify}
             onPick={(notify) => {
               onPatch({ notify })
+            }}
+          />
+        </Field>
+      </Group>
+      {/*
+        omni 往模型上下文里写话只有这一处（AGENTS.md 的那条例外），所以它必须是
+        一个看得见、关得掉的开关，而且说清楚会发什么、落在哪。
+      */}
+      <Group title="换引擎">
+        <Field
+          label="自动交接"
+          hint={
+            settings.handoffBrief
+              ? "换了一家之后，你发的第一句话前面会附一段交接说明：此前谁跑了哪几轮、完整转写存在哪（工作区 .omni/handoff/，不进版本库）、各家原始记录在哪、是什么格式。它会原样显示在对话里。"
+              : "关着：换了一家之后只发你那句话。新的一家不知道此前发生过什么，要读历史得你自己把路径给它（/timeline 里有）。"
+          }
+        >
+          <Toggle
+            label="换引擎自动交接"
+            on={settings.handoffBrief}
+            onChange={(handoffBrief) => {
+              onPatch({ handoffBrief })
             }}
           />
         </Field>

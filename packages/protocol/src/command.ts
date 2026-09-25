@@ -162,7 +162,10 @@ export type Command =
   | { type: "thread.fork"; threadId: ThreadId; to: EngineId }
   /** 换模型 / 改推理强度。`effort` 只对报了 `efforts` 的引擎有意义。 */
   | { type: "thread.setModel"; threadId: ThreadId; model: string; effort?: string }
-  /** L2 接力：换引擎继续同一个 thread；不翻译上下文，也不替用户注入提示词。 */
+  /**
+   * L2 接力：换引擎继续同一个 thread。不翻译上下文；用户开着「换引擎自动交接」时，
+   * 换家后的第一句话前会附上一段交接说明（宿主 `HostDeps.handoffBrief`），否则什么都不附。
+   */
   | { type: "thread.handoff"; threadId: ThreadId; to: EngineId }
   /**
    * 落定一张审批卡。

@@ -1,4 +1,4 @@
-import type { EngineId, Event } from "@omni/protocol"
+import type { EngineId, Event, Thread } from "@omni/protocol"
 import type { EngineDriver } from "@omni/engine"
 import type { Journal, RuleStore } from "@omni/journal"
 
@@ -25,6 +25,12 @@ export interface HostDeps {
   captureTurnBaseline?: (threadId: string, cwd: string) => Promise<void>
   /** 会话删除时一起回收基线对象。 */
   removeWorktreeBaseline?: (threadId: string) => Promise<void>
+  /**
+   * 换家后第一句话前面附的交接说明（见 `handoff-note.ts`）。宿主只在那一句上问一次；
+   * 返回 undefined＝不附（用户关了「换引擎自动交接」，或者这边写不出来）。
+   * 转写落盘、读原始记录都在调用方做：宿主不碰文件。
+   */
+  handoffBrief?: (thread: Thread) => Promise<string | undefined>
   /**
    * 同时活着的引擎会话上限。超了就把**最久没动的空闲会话**收掉。
    *

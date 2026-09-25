@@ -57,7 +57,8 @@ function markFor(
   activeTurnId: string | undefined,
   marked: Set<string>,
 ): Row | undefined {
-  if (item.kind !== "user_message") return undefined
+  // 换引擎的交接说明排在这一轮最前面，但它不是提问：分界线要落在用户那句之后
+  if (item.kind !== "user_message" || item.origin === "handoff") return undefined
   if (item.turnId === activeTurnId || marked.has(item.turnId)) return undefined
   marked.add(item.turnId)
   const ms = spanOf(byTurn.get(item.turnId) ?? [])

@@ -8,6 +8,7 @@ import {
 import type { ApprovalAsk, EngineDriver, EngineSession, NativeTurnStart, StartRequest } from "@omni/engine"
 import type { Rule } from "@omni/approval"
 import { createHost, type Host } from "./host.js"
+import type { HostDeps } from "./deps.js"
 
 export interface Fake {
   prompts: { text: string; turnId: string }[]
@@ -206,7 +207,8 @@ function twoEngineDriver(id: string, sessions: Fake[]): EngineDriver {
   }
 }
 
-export function setupTwoEngines(): TwoEngineRig {
+/** `extra` 补进宿主依赖：个别用例要一项可选依赖（例如交接说明）。 */
+export function setupTwoEngines(extra: Partial<HostDeps> = {}): TwoEngineRig {
   const stored: Event[] = []
   const sessions: Fake[] = []
   const events: Event[] = []
@@ -230,6 +232,7 @@ export function setupTwoEngines(): TwoEngineRig {
       remove: () => Promise.resolve(),
       flush: () => Promise.resolve(),
     },
+    ...extra,
   })
   return { host, events, sessions, stored }
 }

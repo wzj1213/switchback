@@ -129,6 +129,8 @@ function noteCommand(tally: Tally, text: string): void {
 
 function noteItem(tally: Tally, at: number, item: Item): void {
   if (item.kind === "user_message") {
+    // 换引擎的交接说明是 omni 附的，不算你问的
+    if (item.origin === "handoff") return
     tally.totals.asks += 1
     dayOf(tally, at).asks += 1
     noteCommand(tally, item.text)

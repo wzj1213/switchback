@@ -11,6 +11,7 @@ import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 import { CHANGED_VIEWS } from "./shot-views-changed.mjs"
 import { LINK_REVIEW_VIEWS } from "./shot-views-links.mjs"
 import { openPanelPage } from "./shot-panel.mjs"
+import { HANDOFF_VIEW } from "./shot-views-handoff.mjs"
 export const VIEWS = [
     {
       name: "01-转录区",
@@ -34,11 +35,11 @@ export const VIEWS = [
         const at = (s) => { const n = document.querySelector(s); return n === null ? null : Math.round(n.getBoundingClientRect().left) }
         const edges = ['.transcript__inner', '.md', '.brief', '.composer__inner'].map(at)
         // 那排动作挂在**每句人话**和**每轮最后一条回答**上（悬停才显形）。
-        // 这份样本两轮：两句人话 + 两条回答 = 4。上一版是**每条消息**都挂一条
-        // 透明的，看不见却照样占着二十来像素高，于是这一屏所有间距都比样式表里
-        // 写的多一档（见 transcript-row.tsx 的 answerActs）
+        // 这份样本两轮：两句人话 + 一条交接说明（也能复制）+ 两条回答 = 5。上一版是
+        // **每条消息**都挂一条透明的，看不见却照样占着二十来像素高，于是这一屏所有间距
+        // 都比样式表里写的多一档（见 transcript-row.tsx 的 answerActs）
         const acts = document.querySelectorAll('.transcript .msgacts').length
-        return acts === 4 && edges.every(edge => edge !== null && edge === edges[0])
+        return acts === 5 && edges.every(edge => edge !== null && edge === edges[0])
       })()`,
     },
     {
@@ -112,30 +113,7 @@ export const VIEWS = [
       after: `document.querySelector('.topbar__title')?.click()`,
     },
     ...REVIEW_VIEWS,
-    {
-      /*
-       * **换引擎在转录区里要留下痕迹。**
-       *
-       * 样本这条会话第二轮之前切去 codex 跑过（见 `ui-fixture.mjs` 的 `handedOff`）。
-       * 不画的话，往回翻时「上面五问是谁答的、下面三问是谁答的」屏幕上一个字都没说。
-       *
-       * 三处同时验：转录区那条分界、左缘导航那一格的引擎色、侧栏行尾那颗引擎点。
-       * 三处共用一套色（`engine-mark.ts`），对不上就连不成一句话。
-       */
-      name: "05b-换引擎留痕",
-      open: null,
-      ready: ".handmark",
-      assert: `(() => {
-        const mark = document.querySelector('.handmark')
-        const tinted = [...document.querySelectorAll('.rail__mark')]
-          .map(node => getComputedStyle(node).backgroundColor)
-        const dot = document.querySelector('.row--selected .row__engine')
-        return mark?.textContent.includes('切换至 Codex') === true
-          && mark.getAttribute('role') === 'separator'
-          && new Set(tinted).size === 2
-          && dot !== null
-      })()`,
-    },
+    HANDOFF_VIEW,
     {
       name: "05-拖入工作区文件",
       open: [

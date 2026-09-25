@@ -43,6 +43,12 @@ describe("buildHandoff", () => {
     expect(buildHandoff(thread, [user("a", "一"), user("b", "二")]).asks).toEqual(["二"])
   })
 
+  it("换引擎的交接说明不是用户的要求：目标与追加要求都不收它", () => {
+    const note: Item = { id: "h", turnId: "t", kind: "user_message", at: 0, text: "<omni-handoff>…</omni-handoff>", origin: "handoff" }
+    const h = buildHandoff(thread, [note, user("a", "一"), note, user("b", "二")])
+    expect([h.goal, h.asks]).toEqual(["一", ["二"]])
+  })
+
   it("只收成功的命令——失败的命令交出去只会误导", () => {
     const h = buildHandoff(thread, [shell("a", "pnpm test", "ok"), shell("b", "pnpm bulid", "failed")])
     expect(h.commands).toEqual(["pnpm test"])

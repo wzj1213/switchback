@@ -85,7 +85,8 @@ export function createItemScope(newId: (prefix: string) => ItemId): ItemScope {
                 : { originItemId: idOf(event.item.turnId, lane.originItemId) }),
             },
           }
-      return { ...event, item: { ...event.item, id, ...scoped } }
+      // 原来那个 id 留作 `nativeId`：到引擎自己的原始记录里对位只能靠它
+      return { ...event, item: { ...event.item, id, nativeId: event.item.nativeId ?? event.item.id, ...scoped } }
     },
     ask: (ask, turnId) =>
       turnId === undefined ? ask : { ...ask, toolCallId: idOf(turnId, ask.toolCallId) },

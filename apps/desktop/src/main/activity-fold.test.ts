@@ -121,6 +121,13 @@ describe("排行榜", () => {
     expect(out.totals.asks).toBe(3)
   })
 
+  it("换引擎的交接说明是 omni 附的，不算一次提问", () => {
+    const at = day("2026-08-01")
+    const note = item(at + 1, { id: "h", turnId: "u", kind: "user_message", at: at + 1, text: "<omni-handoff>…</omni-handoff>", origin: "handoff" })
+    const out = digest([started(at), note, said(at + 2, "接着弄")])
+    expect(out.totals.asks).toBe(1)
+  })
+
   it("工具按引擎给的原名计数，并且按天也留一份", () => {
     const out = digest([started(day("2026-08-01")), tool(day("2026-08-01"), "Bash"), tool(day("2026-08-01"), "Bash"), tool(day("2026-08-02"), "Read")])
     expect(out.tools).toEqual([{ id: "Bash", count: 2 }, { id: "Read", count: 1 }])
