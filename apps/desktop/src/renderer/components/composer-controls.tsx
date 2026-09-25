@@ -27,7 +27,7 @@ interface Props {
   blind: string | undefined
   aside: boolean
   onAsideExit: () => void
-  /** 开工之后缩进那一排的工作区芯片；起手那一屏它自己占一行，这里就是 undefined。 */
+  /** 缩在这一排里的工作区芯片（分支、脏标、本轮已放行）；历史记录没有，是 undefined。 */
   site: React.ReactNode
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void

@@ -9,7 +9,6 @@ import { DraftBlocks } from "./DraftBlocks.js"
 import { AttachmentDrop } from "./AttachmentDrop.js"
 import { Chips } from "./Chips.js"
 import { ComposerControls } from "./composer-controls.js"
-import { projectOf } from "./composer-state.js"
 import { takeCommand } from "./ComposerAction.js"
 import { Prompt } from "./Prompt.js"
 
@@ -42,23 +41,14 @@ function AttachmentWarning({
 }
 
 /**
- * 「这句话会发到哪儿去」那几枚。
- *
- * **起手时自己一行，开工之后缩进控件那一排**——两处只是位置不同，
- * 取数与措辞是同一份（见 `Chips`）。历史记录没有「发出去」这回事，两处都不给。
+ * 「这句话会发到哪儿去」那几枚，缩在控件那一排里（见 `Chips`）。
+ * 历史记录没有「发出去」这回事，不给。
  */
-function siteChips(view: Props, opening: boolean): React.JSX.Element | null {
+function siteChips(view: Props): React.JSX.Element | null {
   const { composer } = view
   if (view.detached) return null
   return (
-    <Chips
-      threadId={composer.threadId}
-      cwd={composer.cwd}
-      project={projectOf(composer.cwd)}
-      stamp={composer.stamp}
-      passing={composer.passing}
-      compact={!opening}
-    />
+    <Chips threadId={composer.threadId} cwd={composer.cwd} stamp={composer.stamp} passing={composer.passing} />
   )
 }
 
@@ -85,16 +75,11 @@ export function ComposerBody(view: Props): React.JSX.Element {
   const notice = attachWarning === undefined
     ? (files.dropzone.hint?.compact === true ? undefined : attach.notice)
     : { text: attachWarning, tone: "warn" as const }
-  const opening = composer.opening === true
-  const site = siteChips(view, opening)
+  const site = siteChips(view)
   return (
     <div className="composer">
-      <div
-        className={`composer__inner${opening ? " composer__inner--opening" : ""}`}
-        onMouseDown={(event) => { focusFromBlank(event, focus.input) }}
-      >
+      <div className="composer__inner" onMouseDown={(event) => { focusFromBlank(event, focus.input) }}>
         <AttachmentDrop hint={files.dropzone.hint} surface={composer.dropSurfaceVisible} />
-        {opening ? site : null}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
         {/* 拖进来的文件、折起来的大段粘贴。**和图片那排并排**：
             你附上的东西都在正文上方，正文里只有你自己打的字 */}
@@ -134,7 +119,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
           detached={detached}
           busy={busy}
           starting={starting}
-          site={opening ? undefined : site}
+          site={site}
           attachmentBlocked={attachmentBlocked}
           text={draft.text}
           hasCommand={draft.command !== undefined}

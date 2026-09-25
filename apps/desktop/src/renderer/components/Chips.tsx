@@ -1,5 +1,4 @@
 import { BranchIcon } from "./icons.js"
-import { FolderIcon } from "./icons-folder.js"
 import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
 
 /**
@@ -21,26 +20,22 @@ import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
  * 以及为什么换工作区要清旧值、同一个工作区重问则不清。
  * 抽出去的直接原因是 `EnvCard` 抄了一份一模一样的，两份会分头走偏。
  *
- * ## 两种摆法，一份取数
+ * ## 为什么只在控件那一排、没有项目名
  *
- * `compact` 关掉时它是输入卡里**自己一行**的题注（起手那一屏用）；
- * 打开时它缩进下面那一排控件里，只留真正会变的那枚。
- *
- * **不做成两个组件**：那正是 `EnvCard` 当年犯的错——同一件事两份实现，
- * 迟早在其中一份上加了「脏了标黄」而另一份没加。
+ * 起手那一屏原来让它**自己占一行**，还带着项目名——那一行加上三行高的空输入框，
+ * 让最小窗口里的输入卡占掉正文区四成多。项目名一整条会话都不会变，顶栏标题和
+ * 空态那枚路径已经在说同一句话；分支不同，你可能刚在终端里 `git switch` 过，
+ * 回来接着让它改，而改的是新分支。**会变的留下，不变的收走**，起手和开工一个样。
  */
 
 export function Chips({
   threadId,
   cwd,
-  project,
   stamp,
   passing,
-  compact = false,
 }: {
   threadId: string
   cwd: string
-  project: string
   /** 变一次就重新问一遍。调用方把轮次状态传进来。 */
   stamp: string
   /**
@@ -50,26 +45,12 @@ export function Chips({
    * 屏幕上没有任何痕迹——而这恰恰是最不该沉默的一类状态。
    */
   passing: boolean
-  /**
-   * 缩进控件那一排（会话已经开工）。
-   *
-   * **项目名这时不再出现**：它一整条会话都不会变，而侧栏的分组和这条会话
-   * 所在的位置已经在说同一句话。分支不同——你可能刚在终端里 `git switch`
-   * 过，回来接着让它改，而改的是新分支。**会变的留下，不变的收走。**
-   */
-  compact?: boolean
 }): React.JSX.Element {
   const git = useWorksite(threadId, cwd, stamp)
   const branch = branchLabel(git)
 
   return (
-    <div className={compact ? "chips chips--bar" : "chips"}>
-      {compact ? null : (
-        <span className="chip" title={cwd}>
-          <FolderIcon />
-          <span className="chip__name">{project}</span>
-        </span>
-      )}
+    <div className="chips">
       {passing ? (
         <span className="chip chip--warn" title="这一轮剩下的审批都自动放行了（红线除外）。要收回：⌘. 中断这一轮">
           本轮已放行
@@ -80,7 +61,7 @@ export function Chips({
           className={`chip${git.dirty === true ? " chip--warn" : ""}`}
           /* 缩进那一排之后项目名没了，工作区路径就挂到这枚上——
              「它到底在哪儿动手」不能只剩一个分支名 */
-          title={`${compact ? `${cwd}\n` : ""}${branchTitle(git.detached === true, git.dirtyCount)}`}
+          title={`${cwd}\n${branchTitle(git.detached === true, git.dirtyCount)}`}
         >
           <BranchIcon />
           <span className="chip__name">{branch}</span>

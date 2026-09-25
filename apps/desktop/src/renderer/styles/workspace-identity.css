@@ -78,10 +78,6 @@
   .blank__title {
     font-size: 23px;
   }
-
-  .composer__input {
-    min-height: 42px;
-  }
 }
 
 .group .row--thread {

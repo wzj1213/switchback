@@ -32,11 +32,6 @@ export function stateOf(o: { detached: boolean; starting: boolean; busy: boolean
   }
 }
 
-/** 目录名当项目名。整条绝对路径在芯片里放不下，而尾段正是人叫它的那个名字。 */
-export function projectOf(cwd: string): string {
-  return cwd.split("/").filter(Boolean).pop() ?? cwd
-}
-
 /**
  * 右下角那颗键是不是禁着的。
  *
