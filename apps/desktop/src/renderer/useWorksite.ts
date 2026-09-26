@@ -16,7 +16,9 @@ import { useEffect, useState } from "react"
  * 2. **窗口重新获得焦点**：你要去终端里 `git switch`，**必然离开 omni 又回到 omni**。
  *    这一条覆盖「用户自己在别处改了工作区」的全部情况，而且不需要任何 watcher——
  *    全仓库零 watcher 是有意的（见 `packages/worksite/README.md`）。
- * 3. 没有第三条。别加定时器：问得勤就是每次 spawn 一个 git，问得懒就是界面说假话。
+ * 3. **omni 自己刚动过它**（审查页里暂存、提交）：那一下不离开窗口，焦点事件不会来，
+ *    由动手的那一方发 `announceWorksiteChanged()`。
+ * 没有第四条。别加定时器：问得勤就是每次 spawn 一个 git，问得懒就是界面说假话。
  *
  * ## 换工作区要清掉旧值，同一个工作区重问则不清
  *
@@ -38,6 +40,13 @@ export interface Worksite {
   dirtyCount?: number
 }
 
+const CHANGED = "omni:worksite-changed"
+
+/** omni 自己刚改过工作区的 Git 状态（暂存、提交）：让分支芯片与环境卡重问一次。 */
+export function announceWorksiteChanged(): void {
+  window.dispatchEvent(new Event(CHANGED))
+}
+
 export function useWorksite(threadId: string, cwd: string, stamp: string): Worksite {
   const [site, setSite] = useState<Worksite>({})
   // 焦点回来时 +1，进而触发下面那个 effect 重问一次
@@ -50,8 +59,10 @@ export function useWorksite(threadId: string, cwd: string, stamp: string): Works
       setVisit((n) => n + 1)
     }
     window.addEventListener("focus", bump)
+    window.addEventListener(CHANGED, bump)
     return () => {
       window.removeEventListener("focus", bump)
+      window.removeEventListener(CHANGED, bump)
     }
   }, [])
 

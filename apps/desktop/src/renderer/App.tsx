@@ -110,6 +110,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
         stamp={stampOf(turnOf(state, thread.id), itemsOf(state, thread.id))}
         wanted={reportedChangesOf(itemsOf(state, thread.id), thread.cwd).list.map((file) => file.path)}
         panelActive={shell.reviewActive}
+        running={thread.status === "running" || thread.status === "waiting_approval"}
         reported={shell.reportedReview}
         onGit={shell.clearReportedReview}
         panel={{

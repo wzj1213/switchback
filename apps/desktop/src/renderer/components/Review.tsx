@@ -10,6 +10,8 @@ import { PanelTabs, type PanelTabsProps } from "./PanelTabs.js"
 import { Select } from "./Select.js"
 import type { ReviewScope } from "../../shared/review.js"
 import { ReviewNavigationBar } from "./review-navigation-bar.js"
+import { CommitBar } from "./CommitBar.js"
+import { useReviewGit } from "../use-git.js"
 
 const SCOPES: readonly { id: ReviewScope; label: string; description: string }[] = [
   { id: "last-turn", label: "上一轮", description: "只看最近一次发送之后留下的改动" },
@@ -48,11 +50,13 @@ function ignoredOf(paths: readonly string[] | undefined): readonly string[] {
   return paths === undefined ? [] : paths
 }
 
-export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClose, onCopy }: {
+export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, running, onClose, onCopy }: {
   cwd: string
   threadId: string
   /** 轮次戳：跑完一轮就重问一遍 git。 */
   stamp: string
+  /** 这条会话正在跑。提交要等它停下，免得提交到改了一半的文件。 */
+  running: boolean
   /** 引擎明确上报过的路径；Git 忽略项也必须诚实地出现在审核状态里。 */
   wanted: readonly string[]
   panelActive: boolean
@@ -68,6 +72,7 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClo
   const narrow = useNarrowPanel(pane)
   const [scope, setScope] = useState<ReviewScope>("last-turn")
   const data = useReview(cwd, stamp, { threadId, wanted, scope })
+  const git = useReviewGit({ threadId, cwd, scope, review: data })
   const [query, setQuery] = useState("")
   const [picked, setPicked] = useState<string | undefined>(undefined)
   const [split, setSplit] = useState(false)
@@ -145,8 +150,10 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, onClo
           threadId={threadId}
           box={pane}
           onCopy={onCopy}
+          onStage={git.onStage}
         />
       </div>
+      <CommitBar {...git.bar} running={running} />
     </section>
   )
 }

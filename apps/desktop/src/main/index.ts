@@ -22,6 +22,7 @@ import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings } from "./settings.js"
 import { installWorksiteChannel } from "./worksite.js"
 import { installReviewChannel } from "./work-review-channel.js"
+import { installGitChannel } from "./git-channel.js"
 import { installSearchChannel } from "./search.js"
 import { installEnvChannel } from "./envconfig.js"
 import { loadBounds, trackBounds } from "./window-state.js"
@@ -385,6 +386,8 @@ function bootstrap(): Promise<void> {
       handoffBrief: () => settings.get().handoffBrief,
     })
     installReviewChannel(attached.baselines, attached.worksiteSearch)
+    // 审查页底下的暂存与提交：守卫同审核面板，只认有会话在用的工作区
+    installGitChannel(attached.worksiteSearch)
     // 设置面板的「活动」那一页。**只在点进去时才扫盘**，所以挂通道不花任何东西
     installActivity(attached, log)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。

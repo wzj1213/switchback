@@ -6,7 +6,7 @@ import { ReviewFileHead } from "./review-file-head.js"
 import { requestFilePreview } from "../file-preview-request.js"
 
 /** 审核编辑组的补丁区；空态与已选文件在这里切换。 */
-export function ReviewPane({ file, patch, empty, split, box, onCopy, cwd, threadId, wrap }: {
+export function ReviewPane({ file, patch, empty, split, box, onCopy, cwd, threadId, wrap, onStage }: {
   file: ReviewFile | undefined
   patch: PatchData
   empty: string
@@ -21,6 +21,8 @@ export function ReviewPane({ file, patch, empty, split, box, onCopy, cwd, thread
    */
   box: React.RefObject<HTMLElement | null>
   onCopy: (text: string) => unknown
+  /** 暂存 / 取消暂存这个文件。已提交、分支那两档看的是历史，不给。 */
+  onStage?: ((rel: string, stage: boolean) => void) | undefined
 }): React.JSX.Element {
   if (file === undefined) {
     return <section className="rv__pane" ref={box}><p className="rvd__note">{empty}</p></section>
@@ -34,6 +36,7 @@ export function ReviewPane({ file, patch, empty, split, box, onCopy, cwd, thread
         onReveal={() => { reveal(file.path) }}
         onCopy={() => onCopy(reviewCopyText(file.rel, patch))}
         onPreview={file.kind === "delete" ? undefined : () => { requestFilePreview(threadId, cwd, file.path) }}
+        onStage={onStage === undefined ? undefined : (stage) => { onStage(file.rel, stage) }}
       />
       <ReviewDiff
         key={file.path}

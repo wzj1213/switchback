@@ -1,0 +1,128 @@
+/*
+ * 审查页底下的「提交」与文件头上的「暂存 / 取消暂存」。
+ *
+ * 平时只有一行，贴着面板底边；点开才长出说明框。左右内缩同面板里其余各层（12px）。
+ */
+.rv__commit {
+  flex: none;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--border-strong);
+  background: var(--bg-sunken);
+  font-size: var(--text-sm);
+}
+
+.rv__commit-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: 26px;
+  color: var(--text-muted);
+}
+
+.rv__commit-sum {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rv__commit-form {
+  margin-top: var(--sp-2);
+}
+
+.rv__commit-msg {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  max-height: 160px;
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  resize: vertical;
+}
+
+.rv__commit-msg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.rv__commit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+/* 点不了的理由：跟在按钮后面，一眼看得到，不必悬停 */
+.rv__commit-why {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.rv__commit-note {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.rv__commit-note--ok {
+  color: var(--ok);
+}
+
+.rv__commit-note--ok code {
+  font-family: var(--font-mono);
+}
+
+.rv__commit-note--error {
+  color: var(--danger);
+}
+
+.rv__commit-log {
+  max-height: 140px;
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-2);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  white-space: pre-wrap;
+}
+
+/* 文件头上的「暂存 / 取消暂存」：文字小按钮，和旁边的图标按钮同高 */
+.rv__stage {
+  flex: none;
+  height: 24px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+}
+
+.rv__stage:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rv__stage:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 提交成功那一行末尾的「撤销」：跟在文字后面，别贴着 */
+.rv__undo {
+  margin-left: var(--sp-2);
+}
