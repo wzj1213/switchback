@@ -247,6 +247,14 @@ export type Event =
       color?: string
       timeoutMs?: number
     }
+  /**
+   * omni 的外发守卫看见一个进程在往本机外面**批量**发数据（见 desktop 的 `egress-*.ts`）。
+   *
+   * 不是引擎自报的状态，是 omni 自己量的——所以单独一类，不混进 `engine.status`。
+   * `threadId` 是那个引擎所在的会话；不是 omni 起的进程（比如单独开着的 ZCode）时是空串。
+   * `stopped`：omni 已经按设置把它停掉了。不落盘：它说的是「刚才」，重放出来只是一条过期的警报。
+   */
+  | { type: "egress.alert"; at: number; threadId: ThreadId; detail: string; stopped: boolean }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */
   | {
       type: "engine.status"

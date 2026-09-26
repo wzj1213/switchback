@@ -53,6 +53,22 @@ export function reduceEngineStatus(
   return { ...base, noticeSeq: seq, notices: [...kept, merged].slice(-MAX_NOTICES) }
 }
 
+/** 外发守卫的警报：和故障同一种横幅，抬头不同（见 `FailureNotice.kind`）。 */
+export function reduceEgressAlert(state: ViewState, event: Extract<Event, { type: "egress.alert" }>): ViewState {
+  const seq = state.noticeSeq + 1
+  const notice: Notice = {
+    id: `n${String(seq)}`,
+    at: event.at,
+    text: event.detail,
+    kind: "egress",
+    threadId: event.threadId === "" ? undefined : event.threadId,
+  }
+  const repeat = sameAsLast(state.notices, notice)
+  const kept = repeat === undefined ? state.notices : state.notices.slice(0, -1)
+  const merged: Notice = repeat === undefined ? notice : { ...notice, count: (repeat.count ?? 1) + 1 }
+  return { ...state, noticeSeq: seq, notices: [...kept, merged].slice(-MAX_NOTICES) }
+}
+
 export function reduceEngineNotification(
   state: ViewState,
   event: Extract<Event, { type: "engine.notification" }>,

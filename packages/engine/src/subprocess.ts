@@ -59,6 +59,11 @@ export interface ProcessOwner {
   died: () => Promise<Error>
   /** 回收阶梯。幂等；返回时要么有退出证明，要么 rung 是 `escaped`。 */
   reclaim: () => Promise<ReclaimReport>
+  /**
+   * 引擎进程的 pid——`detached` 起的，所以它也是**整个进程组的组长**，工具进程都在这个组里。
+   * 没起过、或者已经退了就是 undefined。外发守卫靠它把流量记到这一家、这条会话上。
+   */
+  pid: () => number | undefined
 }
 
 /**
@@ -201,5 +206,6 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
     // 没 spawn 过就永远挂着——它只在 race 的另一边有意义
     died: () => state.owned?.died ?? new Promise<Error>(() => undefined),
     reclaim,
+    pid: () => (state.owned === undefined || state.owned.exited ? undefined : state.owned.child.pid),
   }
 }

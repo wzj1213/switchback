@@ -119,8 +119,11 @@ export interface FailureNotice extends NoticeBase {
    *
    * `auth` 是引擎明确要求先登录（`engine.status` 的 `unauthenticated`）：抬头写「需要登录」，
    * 桌面端顺手给一条去登录的路。
+   *
+   * `egress` 是 omni 的外发守卫看见某个进程在批量往外发数据（`egress.alert`）。
+   * 它不是引擎报的故障，抬头要说清楚是「批量外发」。
    */
-  kind: "crashed" | "degraded" | "auth"
+  kind: "crashed" | "degraded" | "auth" | "egress"
   /** `auth` 那一类说的是哪家引擎；那一家登录成功后界面据此收起它。 */
   engine?: EngineId
 }

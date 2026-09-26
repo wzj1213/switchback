@@ -1,6 +1,6 @@
 import type { Event, Item, ItemId, ThreadId } from "@omni/protocol"
 import { type ViewState } from "./state.js"
-import { reduceEngineNotification, reduceEngineStatus } from "./notices.js"
+import { reduceEgressAlert, reduceEngineNotification, reduceEngineStatus } from "./notices.js"
 import { mergeRateLimits } from "./limits.js"
 import { appendDraft, draftList, type Draft } from "./item-draft.js"
 
@@ -346,6 +346,7 @@ const HANDLERS: Handlers = {
     return { ...state, lanes: { ...state.lanes, [event.threadId]: after } }
   },
   "engine.status": reduceEngineStatus,
+  "egress.alert": reduceEgressAlert,
   "engine.notification": reduceEngineNotification,
   // 两者都是「整份替换」：引擎报一次就是当前全貌，不是增量
   "engine.history": (state, event) => ({

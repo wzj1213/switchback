@@ -1,4 +1,5 @@
-import type { Command, Event, Thread, ThreadId, TurnId } from "@omni/protocol"
+import type { Command, EngineId, Event, Thread, ThreadId, TurnId } from "@omni/protocol"
+import type { EngineSession } from "@omni/engine"
 import { resolveApproval } from "./approval.js"
 import { resolveQuestion } from "./question.js"
 import { clearQueue, discardUnstarted, emit, liveStateOf, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
@@ -40,7 +41,27 @@ export interface Host {
    * 实测代价是 `/` 面板里一条技能都不显示，而链路上每一环看起来都是好的。
    */
   liveState: () => readonly Event[]
+  /**
+   * 每条活会话背后的引擎进程。外发守卫（desktop 的 `egress-*.ts`）拿它把流量记到会话上。
+   * 几条会话共用一个进程（kimi web）时会出现几行、pid 相同；还在起的会话没有这一行。
+   */
+  processes: () => readonly EngineProcess[]
   dispose: () => Promise<void>
+}
+
+export interface EngineProcess {
+  threadId: ThreadId
+  engine: EngineId
+  pid: number
+}
+
+function processesOf(ctx: Ctx): EngineProcess[] {
+  return [...ctx.live.values()].flatMap((entry) => {
+    // 还在起的那几条，`session` 是个空壳（见 `preparingLive`）
+    const session: EngineSession | undefined = entry.session
+    const pid = session?.pid?.()
+    return pid === undefined ? [] : [{ threadId: entry.thread.id, engine: entry.thread.engine, pid }]
+  })
 }
 
 /**
@@ -370,6 +391,7 @@ export function createHost(deps: HostDeps): Host {
     dispatch: (command) => dispatch(ctx, command),
     live: () => [...ctx.live.values()].map((entry) => entry.thread),
     liveState: () => liveStateOf(ctx),
+    processes: () => processesOf(ctx),
     dispose: () => dispose(ctx),
   }
 }

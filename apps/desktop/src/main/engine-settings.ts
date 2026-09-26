@@ -5,6 +5,7 @@ import { addEngineEntry, engineNameOf } from "./engines-file.js"
 import type { Attached } from "./host.js"
 import type { Logger } from "./log.js"
 import { installSettingsChannel, type Store } from "./settings.js"
+import { applyZcodeLock } from "./guard-channel.js"
 
 /**
  * 改到「哪几家算接入」的那些偏好之后，让宿主把同一份新清单推给桌面与远程端。
@@ -16,7 +17,9 @@ import { installSettingsChannel, type Store } from "./settings.js"
 const ACCESS_KEYS = ["dsh", "disabledEngines"] as const
 
 export function installEngineSettings(store: Store, attached: Attached, log: Logger): void {
-  installSettingsChannel(store, (_before, _after, patch) => {
+  installSettingsChannel(store, (_before, after, patch) => {
+    // ZCode 快照目录的锁跟着开关走：开就锁上，关就解开
+    if (Object.hasOwn(patch, "zcodeLock")) void applyZcodeLock(after.zcodeLock, log)
     if (!ACCESS_KEYS.some((key) => Object.hasOwn(patch, key))) return
     void attached.refreshEngines("dsh").catch((error: unknown) => {
       log.write("warn", "engines", `刷新引擎接入状态失败：${String(error)}`)

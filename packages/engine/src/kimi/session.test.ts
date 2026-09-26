@@ -45,6 +45,7 @@ function lease(api: KimiApi): KimiLease {
     api,
     onCrash: () => () => undefined,
     release: () => Promise.resolve(),
+    pid: () => undefined,
   }
 }
 

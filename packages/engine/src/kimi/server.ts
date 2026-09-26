@@ -23,6 +23,8 @@ export interface KimiLease extends KimiEndpoint {
   api: KimiApi
   onCrash: (listener: (detail: string) => void) => () => void
   release: () => Promise<void>
+  /** 共用的那个 `kimi web` 进程的 pid。几条会话报同一个。 */
+  pid: () => number | undefined
 }
 
 interface ServerState extends KimiEndpoint {
@@ -180,6 +182,7 @@ export class KimiServerPool {
         released.value = true
         await this.release(state)
       },
+      pid: () => state.owner.pid(),
     }
   }
 

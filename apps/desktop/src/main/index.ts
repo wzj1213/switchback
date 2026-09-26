@@ -16,6 +16,7 @@ import { installContextMenu } from "./context-menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
 import { watchStalls } from "./stall.js"
+import { installGuard } from "./guard-channel.js"
 import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines-file.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
@@ -390,6 +391,7 @@ function bootstrap(): Promise<void> {
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
       notify: () => settings.get().notify,
       handoffBrief: () => settings.get().handoffBrief,
+      egressStop: () => settings.get().egressStop,
     })
     installReviewChannel(attached.baselines, attached.worksiteSearch)
     // 审查页底下的暂存与提交：守卫同审核面板，只认有会话在用的工作区
@@ -400,6 +402,8 @@ function bootstrap(): Promise<void> {
     installEngineSettings(settings, attached, log)
     // ACP 注册表、接入、登录：同样要宿主（接完当场重探、判断哪几家正在被会话用着）
     installAcpChannels(attached, log)
+    // 外发守卫的账和 ZCode 防护状态；开着「给 ZCode 的快照目录上锁」就在起来时锁上
+    installGuard(attached, settings.get().zcodeLock, log)
     // 环在这儿闭合：从这一刻起，装完一家引擎不必重启 omni 就能被认出来
     engineRefresh.run = attached.refreshEngines
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })
@@ -468,6 +472,7 @@ async function shutdown(
   // 远程客户端收不到优雅关闭，最多是多等一次重连；漏一棵有写和执行权限的
   // 进程树没有「最多」。
   attached.awake.release()
+  attached.egress.dispose()
   await attached.host.dispose().catch((error: unknown) => {
     logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
   })

@@ -80,6 +80,17 @@ describe("回收阶梯", () => {
   })
 })
 
+describe("pid", () => {
+  it("跑着时给组长 pid——外发守卫靠它认出这一家；退了就不再给，免得把流量记到一个复用的 pid 上", async () => {
+    const owner = createProcessOwner(FAST)
+    expect(owner.pid()).toBeUndefined()
+    const child = owner.spawn(nodeProc("setTimeout(()=>process.exit(0), 100)"))
+    expect(owner.pid()).toBe(child.pid)
+    await owner.died()
+    expect(owner.pid()).toBeUndefined()
+  })
+})
+
 describe("unpacked", () => {
   it("把指进 asar 的路径改到解包目录——spawn 交给操作系统，而 asar 是文件不是目录", () => {
     expect(unpacked("/Applications/omni.app/Contents/Resources/app.asar/node_modules/x/cli.js")).toBe(

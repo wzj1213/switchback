@@ -12,13 +12,23 @@ function toneOf(notice: Notice): NoticeTone {
     if (notice.color === "error") return "danger"
     return notice.priority === "high" || notice.priority === "immediate" ? "warning" : "info"
   }
-  return notice.kind === "crashed" ? "danger" : "warning"
+  return notice.kind === "crashed" || notice.kind === "egress" ? "danger" : "warning"
+}
+
+/**
+ * 横幅上摆哪一条。平时是最新那条；**有没关掉的「批量外发」就一直是它**：
+ * omni 停掉一个正在往外传的引擎之后，驱动紧接着会报一条「进程退出了」——
+ * 按最新摆的话，那条故障会把真正的原因盖掉。
+ */
+function shownOf(notices: readonly Notice[]): Notice | undefined {
+  return notices.findLast((notice) => notice.kind === "egress") ?? notices[notices.length - 1]
 }
 
 function labelOf(notice: Notice): string {
   if (notice.kind === "crashed") return "引擎故障"
   if (notice.kind === "degraded") return "能力受限"
   if (notice.kind === "auth") return "需要登录"
+  if (notice.kind === "egress") return "批量外发"
   return "引擎提示"
 }
 
@@ -48,7 +58,7 @@ export function Notices({
   /** 「需要登录」那一类直接给一条去登录的路（设置 → 安装与接入）。 */
   onLogin?: () => void
 }): React.JSX.Element | null {
-  const latest = notices[notices.length - 1]
+  const latest = shownOf(notices)
   useEffect(() => {
     if (latest?.kind !== "notification" || latest.timeoutMs === undefined) return
     // 以本端收到事件的时刻起算；远程设备与宿主的系统时钟不一定一致。

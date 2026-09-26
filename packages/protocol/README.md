@@ -21,7 +21,8 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
   自动续轮只保留没有提示正文的原生边界，不把引擎内部 continuation prompt 冒充成用户输入，
   旧 `handoff` 字面量只负责读回历史日志
 - `Event` —— 引擎 → 宿主 → 渲染层的单向事件流；item 可开始、追加、全量更新或由引擎明确撤回；
-  原生一次性通知另走 `engine.notification`，保留 key、优先级和超时，不混进 transcript
+  原生一次性通知另走 `engine.notification`，保留 key、优先级和超时，不混进 transcript；
+  omni 自己量到的「某个进程在批量往外发」走 `egress.alert`，不冒充引擎自报的 `engine.status`
 - `Command` —— 渲染层 → 宿主的反向指令（提问、批准、中断、切档、接力）
 - `QuestionPrompt` / `QuestionResponse` / `PendingQuestion` —— 引擎公开给宿主的结构化问题、
   用户原样作出的选择，以及挂在会话上的待回答组；单选、多选、其他答案、选项备注、自由回答、

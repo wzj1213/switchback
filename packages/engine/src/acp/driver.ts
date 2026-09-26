@@ -10,14 +10,7 @@ import type { AcpDriverConfig, ForeignActivityParser } from "./caps.js"
 import { adoptCatalog, startSession, type OpenState, type StartCtx } from "./open.js"
 import { applyTrust, modeAxis, needsNativeRestart, type TrustCtx } from "./mode.js"
 import { createAcpClientCalls, type AcpClientCalls } from "./serve.js"
-import {
-  cancelTurn,
-  compactAndReport,
-  failTurn,
-  finishTurn,
-  steerSession,
-  type EndCtx,
-} from "./turn.js"
+import { cancelTurn, compactAndReport, failTurn, finishTurn, steerSession, type EndCtx } from "./turn.js"
 import { applyModel, type ModelCtx } from "./model.js"
 import { closeText, createUpdateState, handleUpdate, type UpdateContext, type UpdateState } from "./update.js"
 import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
@@ -341,6 +334,8 @@ class AcpSession implements EngineSession {
    * 于是接进来的引擎就算支持贴图、支持原生分叉，界面上那些入口一个都不给。
    * 一个驱动接所有讲 ACP 的引擎，那各家能力就只能一家一家问。
    */
+  pid(): number | undefined { return this.owner.pid() }
+
   capabilities(): EngineCapabilities {
     return this.state.caps
   }

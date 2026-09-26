@@ -17,6 +17,7 @@ import type { PickedFiles } from "../shared/attachments.js"
 import { watchFile } from "./file-watch.js"
 import { acpBridge } from "./acp.js"
 import { gitBridge } from "./git.js"
+import { guardBridge } from "./guard.js"
 import type { AcpTrialView } from "../shared/acp-registry.js"
 
 /**
@@ -62,6 +63,7 @@ interface Review {
 const api = {
   ...acpBridge,
   ...gitBridge,
+  ...guardBridge,
   send(command: Command): void {
     ipcRenderer.send("omni:command", command)
   },

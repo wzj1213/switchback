@@ -94,6 +94,22 @@ export interface Settings {
    */
   handoffBrief: boolean
   /**
+   * **引擎批量往外发数据时停掉它**。默认开。
+   *
+   * 外发守卫（`main/egress-guard.ts`）一直在看每个引擎进程往本机外面发了多少；这个开关只管
+   * 看见之后停不停。一分钟里它**自己**发了超过 64 MB（不算它跑的命令）就停——正常对话碰不到这条线，
+   * 整个仓库连同 .git 往外打包上传过不去。关掉就只报警不停。
+   */
+  egressStop: boolean
+  /**
+   * **给 ZCode 的快照目录上锁**。默认开。
+   *
+   * ZCode 3.14.0 之前的版本会把整个工作区连同 .git 历史打包加密，先落在
+   * `~/.zcode/v2/checkpoints/`，再传到阿里云 OSS。给这个目录加上不可改标志，它就写不进新包，
+   * 整条链路就断了（见 `main/zcode-guard.ts`）。没装过 ZCode 的机器上什么都不做。
+   */
+  zcodeLock: boolean
+  /**
    * DSH profile 与接入确认。
    *
    * DSH 的 provider、model 与 API 凭证仍归它自己的设置与凭证服务管理；
@@ -365,6 +381,8 @@ export const SETTINGS_DEFAULTS: Settings = {
   },
   notify: "all",
   handoffBrief: true,
+  egressStop: true,
+  zcodeLock: true,
   dsh: { profile: "acp", confirmedProfiles: [] },
   disabledEngines: [],
   defaultEngine: "",

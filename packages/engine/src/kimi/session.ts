@@ -308,6 +308,8 @@ export class KimiSession implements EngineSession {
     return readKimiTranscript(this.lease.api, this.init.id)
   }
 
+  pid(): number | undefined { return this.lease.pid() }
+
   capabilities(): EngineCapabilities {
     return {
       compact: true,

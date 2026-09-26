@@ -24,6 +24,7 @@ import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached, RescanReport } from "./attached.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { installClipboardChannel } from "./system-clipboard.js"
+import { egressFor } from "./guard-channel.js"
 import { baselineDeps, handoffDeps } from "./host-deps.js"
 
 export type { Attached, RescanReport } from "./attached.js"
@@ -147,6 +148,8 @@ export interface HostPorts {
   notify?: () => NotifyMode
   /** 「换引擎自动交接」开着没有。不给＝关着。 */
   handoffBrief?: () => boolean
+  /** 「批量外发时停掉」开着没有。不给＝开着：守卫宁可多停一次，也不放一个仓库出去。 */
+  egressStop?: () => boolean
 }
 
 /** 一次失败翻成界面看得见的东西；每一条通往 `dispatch` 的路都要经过它。 */
@@ -246,6 +249,7 @@ export function attachHost(
   })
 
   const report = reporter(emit)
+  const egress = egressFor({ host, emit, log, stop: ports.egressStop, labels })
 
   holder.host = host
   installBridgeChannels({ host, log, ledger, report, worksiteSearch })
@@ -271,6 +275,7 @@ export function attachHost(
     sinks,
     log,
     report,
+    egress,
   }
 }
 

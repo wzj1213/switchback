@@ -10,6 +10,7 @@ import type { TouchedFiles } from "./touched.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Logger } from "./log.js"
 import type { WorksiteSearch } from "./worksite-search.js"
+import type { EgressGuard } from "./egress-guard.js"
 
 /**
  * 一次全量重探的回执。
@@ -48,4 +49,6 @@ export interface Attached {
   worksiteSearch: WorksiteSearch
   log: Logger
   report: (error: unknown, threadId?: ThreadId) => void
+  /** 外发守卫：每个引擎进程往本机外面发了多少，批量外发时停掉它。 */
+  egress: EgressGuard
 }

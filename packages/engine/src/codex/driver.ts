@@ -1,15 +1,5 @@
 import type { ChildProcess } from "node:child_process"
-import type {
-  EngineAccount,
-  EngineCapabilities,
-  EngineThread,
-  ModelOption,
-  SlashCommand,
-  Trust,
-  TurnId,
-  TurnStatus,
-  Item,
-} from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus, Item } from "@omni/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
@@ -307,6 +297,8 @@ class CodexSession implements EngineSession {
    * 提供入口——否则 codex 会话撞满上下文就只能新开一个，两小时的历史全丢。
    */
   compact(turnId: TurnId): Promise<void> { return startCompaction({ state: this.state, call: (method, params) => this.rpc.call(method, params), fail: (message) => this.endTurn("failed", message) }, turnId) }
+
+  pid(): number | undefined { return this.owner.pid() }
 
   /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
   capabilities(): EngineCapabilities {

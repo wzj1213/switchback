@@ -4,7 +4,7 @@ import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
 import type { Settings } from "../useSettings.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { LookSection, NewThreadSection } from "./SettingsGeneral.js"
-import { DataSection, EnginesSection, EnvSection, ActivitySection, RemotePanel, PetsSection, EngineShared } from "./deferred-settings.js"
+import { DataSection, EnginesSection, EnvSection, ActivitySection, RemotePanel, PetsSection, EngineShared, GuardSection } from "./deferred-settings.js"
 import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon, ToBottomIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
@@ -141,13 +141,16 @@ function paneOf(tab: TabId, props: SettingsPanelProps, go: (id: TabId) => void):
       />
     )
   return (
-    <DataSection
-      dataDir={props.dataDir}
-      onReveal={props.onReveal}
-      onCopy={props.onCopy}
-      onDiagnose={props.onDiagnose}
-      onOpenEngines={props.onOpenEngines}
-    />
+    <>
+      <GuardSection settings={settings} onPatch={onPatch} onReveal={props.onReveal} />
+      <DataSection
+        dataDir={props.dataDir}
+        onReveal={props.onReveal}
+        onCopy={props.onCopy}
+        onDiagnose={props.onDiagnose}
+        onOpenEngines={props.onOpenEngines}
+      />
+    </>
   )
 }
 

@@ -8,7 +8,8 @@
 ## 拥有什么
 
 - `EngineDriver` / `EngineSession` 契约（`contract.ts`）
-- `subprocess.ts` —— 进程组所有权与回收阶梯，各引擎共用
+- `subprocess.ts` —— 进程组所有权与回收阶梯，各引擎共用；`pid()` 报组长 pid（退了就不报），
+  各驱动经 `EngineSession.pid` 交给宿主，桌面端的外发守卫靠它把流量记到这一家、这条会话上
 - `rpc.ts` —— JSON-RPC 2.0 over 换行分隔 JSON。**codex 与 ACP 共用一份**（对端报的错以 `RpcError` 抛出，错误码留着——ACP 的 `-32000` 只能靠它认）：
   接 ACP 时这个文件从 `codex/` 提到包根，一个字没改就跑通了
 - `claude/` —— Claude Agent SDK 驱动（`@anthropic-ai/claude-agent-sdk`）

@@ -213,6 +213,12 @@ export interface EngineSession {
   /** 这条会话实际由哪个引擎 profile 创建；宿主只记录，不解释。 */
   readonly profile?: string
   /**
+   * 背后那个引擎进程的 pid（进程组组长，见 `ProcessOwner.pid`）。
+   * 几条会话共用一个进程的（kimi web）报的是同一个。**只拿来量它往外发了多少**——
+   * omni 不凭它改引擎的任何行为；只在它批量往外发、用户又开着守卫时停掉它。
+   */
+  pid?: () => number | undefined
+  /**
    * 需要在宿主登记会话之后才连接实时流的驱动，把最后一步握手放这里。
    *
    * `start()` 阶段的同步状态仍可走握手快照；但会主动开轮的事件必须等宿主持有

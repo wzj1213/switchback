@@ -8,7 +8,12 @@ function toneOf(notice: Notice): NoticeTone {
     if (notice.color === "error") return "danger"
     return notice.priority === "high" || notice.priority === "immediate" ? "warning" : "info"
   }
-  return notice.kind === "crashed" ? "danger" : "warning"
+  return notice.kind === "crashed" || notice.kind === "egress" ? "danger" : "warning"
+}
+
+/** 平时摆最新那条；有没关掉的「批量外发」就一直是它（理由同桌面端）。 */
+function shownOf(notices: readonly Notice[]): Notice | undefined {
+  return notices.findLast((notice) => notice.kind === "egress") ?? notices.at(-1)
 }
 
 function labelOf(notice: Notice): string {
@@ -16,6 +21,7 @@ function labelOf(notice: Notice): string {
   if (notice.kind === "degraded") return "能力受限"
   // 登录只能在那台 Mac 上办（它会开浏览器或终端），这里只照实说
   if (notice.kind === "auth") return "需要登录"
+  if (notice.kind === "egress") return "批量外发"
   return "引擎提示"
 }
 
@@ -53,7 +59,7 @@ export function Notices({
 }): React.JSX.Element | null {
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set())
   // 只画最新那条：小屏上堆三条横幅等于把正文挤没了，而人要看的是最近发生的事
-  const latest = notices.filter((n) => !gone.has(n.id)).at(-1)
+  const latest = shownOf(notices.filter((n) => !gone.has(n.id)))
   useEffect(() => {
     if (latest?.kind !== "notification" || latest.timeoutMs === undefined) return
     const timer = setTimeout(() => {

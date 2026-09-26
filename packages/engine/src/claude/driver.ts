@@ -321,6 +321,8 @@ class ClaudeSession implements EngineSession {
     return readTranscript(this.req.home, id, Date.now())
   }
 
+  pid(): number | undefined { return this.owner.pid() }
+
   capabilities(): EngineCapabilities {
     return capabilitiesOf(this.query)
   }
