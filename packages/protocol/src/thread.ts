@@ -338,6 +338,24 @@ export interface Turn {
 }
 
 /**
+ * 一轮的出字节奏。**宿主在这一轮收工时量出来**，挂在 `turn.completed` 上一起落盘——
+ * 流式增量本身不落盘，回放时已经没有东西可以再量一遍。
+ *
+ * 和 `Usage` 不是一类：那是引擎报的「占了多少」，这是 omni 按事件时刻量的「吐得多快」。
+ * 量法见 `@omni/store` 的 `pace.ts`。
+ */
+export interface TurnPace {
+  /** 首字延迟（毫秒）：这一轮开跑，到模型第一次有输出。 */
+  firstMs: number
+  /** 出字速度（token/秒）：生成量 ÷ 出字时长。出字时长太短、量不准时缺席。 */
+  tps?: number
+  /** 这一轮生成了多少 token。 */
+  tokens: number
+  /** `true`：生成量是引擎报的真数；`false`：引擎没报，按字符种类估的——界面带 ≈。 */
+  exact: boolean
+}
+
+/**
  * 一条斜杠命令。
  *
  * 两个来源，**界面上要分得出**：

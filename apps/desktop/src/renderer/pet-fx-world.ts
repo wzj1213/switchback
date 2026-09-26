@@ -3,7 +3,7 @@ import type { TrajMode } from "../shared/settings.js"
 import { createGun, type Gun } from "./pet-gun.js"
 import type { Bullet, Glyph } from "./pet-shots.js"
 import type { Foe } from "./pet-foes.js"
-import type { Bench } from "./bench.js"
+import type { TurnPace } from "@omni/protocol"
 import type { Field, Stand } from "./pet-fx-geo.js"
 import { createShow, createTarget, type Hole, type Show, type Target } from "./pet-range.js"
 import type { Pet, PetShape } from "./pets.js"
@@ -77,11 +77,11 @@ export interface View {
    */
   stand: Stand
   rate: number
-  /** 这一轮此刻的生成速度（业界口径）。靶上那行读数用它。 */
+  /** 这一轮此刻的出字速度。靶上那行读数用它。 */
   speed: number | undefined
   ratio: number
   /** 上一轮的成绩。**靶上那行读数用它**，见 `pet-range-draw.ts`。 */
-  bench: Bench | undefined
+  pace: TurnPace | undefined
 }
 
 export function createFx(): FxWorld {
@@ -108,7 +108,7 @@ export function createFx(): FxWorld {
       rate: 0,
       speed: undefined,
       ratio: 0,
-      bench: undefined,
+      pace: undefined,
     },
   }
 }
@@ -130,11 +130,11 @@ export interface FxInput {
   /** 上下文用了多满（0~1）。引擎没报窗口时给 0。 */
   ratio: number
   /**
-   * 上一轮的成绩（TTFT 与业界口径的 tok/s）。**只有靶那一档读它**——
-   * 它不参与任何物理，纯粹是要印到画面上的一行字。见 `bench.ts`。
+   * 上一轮的成绩（首字与 tok/s，宿主量好落了盘的那一份）。**只有靶那一档读它**——
+   * 它不参与任何物理，纯粹是要印到画面上的一行字。和分界线上印的是同一个数。
    */
-  bench: Bench | undefined
-  /** 这一轮此刻的生成速度（token/秒，业界口径）。只有靶那一档印它，见 `bench.ts` 的 `speedOf`。 */
+  pace: TurnPace | undefined
+  /** 这一轮此刻的出字速度（token/秒）。只有靶那一档印它，算法见 `@omni/store` 的 `pace.ts`。 */
   speed: number | undefined
   /** 纸带上下一发落哪个字：模型刚写出来的那一个（`tape-text.ts`）。 */
   nextChar: () => string

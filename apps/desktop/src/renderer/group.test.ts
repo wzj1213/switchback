@@ -97,6 +97,18 @@ describe("一轮的分界", () => {
     const marks = rows.filter((r) => r.kind === "turn")
     expect(marks.map((m) => (m.kind === "turn" ? m.ms : 0))).toEqual([1000, 3000])
   })
+
+  it("宿主量到了那一轮的节奏就带上；量不到的（抄过来的、一个字都没写）只说时长", () => {
+    const pace = { firstMs: 800, tps: 34, tokens: 900, exact: true }
+    const rows = groupRows(
+      [user("u1", "t1", 0), reply("a1", "t1", 1000), user("u2", "t2", 2000), reply("a2", "t2", 5000)],
+      undefined,
+      undefined,
+      { t2: pace },
+    )
+    const marks = rows.flatMap((r) => (r.kind === "turn" ? [r] : []))
+    expect(marks.map((m) => m.pace)).toEqual([undefined, pace])
+  })
 })
 
 describe("withAsides", () => {

@@ -1,4 +1,4 @@
-import type { Item, Thread, Turn } from "@omni/protocol"
+import type { Item, Thread, Turn, TurnId, TurnPace } from "@omni/protocol"
 import { useCallback, useMemo, useState } from "react"
 import { foldTurns, groupRows, withAsides, withEngineMarks, type Row } from "./group.js"
 
@@ -15,7 +15,12 @@ function toggled(prev: ReadonlySet<string>, turnId: string): ReadonlySet<string>
  * 从 `Transcript` 拆出来是函数行数闸门逼的，边界也顺：这里回答「画哪些行」，
  * 那边回答「一屏怎么滚、选中之后浮什么」。
  */
-export function useTranscriptRows(items: readonly Item[], turn: Turn | undefined, thread: Thread): {
+export function useTranscriptRows(
+  items: readonly Item[],
+  turn: Turn | undefined,
+  thread: Thread,
+  paces?: Readonly<Record<TurnId, TurnPace>>,
+): {
   rows: readonly Row[]
   folded: (turnId: string) => boolean
   onFold: (turnId: string) => void
@@ -43,10 +48,10 @@ export function useTranscriptRows(items: readonly Item[], turn: Turn | undefined
     // 两处画同一条旁路，读到第二处时人要先确认「这是不是刚才那个」
     () =>
       withEngineMarks(
-        withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd), folded), thread.asides ?? []),
+        withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd, paces), folded), thread.asides ?? []),
         thread.segments,
       ),
-    [items, turn?.id, folded, thread.asides, thread.cwd, thread.segments],
+    [items, turn?.id, folded, thread.asides, thread.cwd, thread.segments, paces],
   )
   return { rows, folded, onFold }
 }

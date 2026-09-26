@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, Usage } from "@omni/protocol"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, TurnId, TurnPace, Usage } from "@omni/protocol"
 import type { PetKit } from "../../shared/settings.js"
 import type { Reconnecting } from "./TurnStatus.js"
 import { useFireProps } from "../use-fire-props.js"
@@ -13,6 +13,7 @@ export function ConversationStage({
   turn,
   tasks,
   thinkingTokens,
+  paces,
   reconnecting,
   engines,
   usage,
@@ -30,6 +31,8 @@ export function ConversationStage({
   turn: Turn | undefined
   tasks: readonly TaskRun[]
   thinkingTokens: number | undefined
+  /** 每一轮的出字节奏（store 的 `pacesOf`）。分界线和靶上那行印它。 */
+  paces: Readonly<Record<TurnId, TurnPace>>
   reconnecting?: Reconnecting | undefined
   engines: readonly EngineInfo[]
   usage: Usage | undefined
@@ -42,7 +45,7 @@ export function ConversationStage({
   finding: boolean
 }): React.JSX.Element {
   const running = turn?.status === "running"
-  const fire = useFireProps({ pets, thread, usage, running })
+  const fire = useFireProps({ pets, thread, usage, running, paces })
   return (
     <div className={`stage${pets.on ? " stage--pets" : ""}`}>
       <Transcript
@@ -52,6 +55,7 @@ export function ConversationStage({
         tasks={tasks}
         engines={engines}
         thinkingTokens={thinkingTokens}
+        paces={paces}
         reconnecting={reconnecting}
         onReveal={onReveal}
         send={send}

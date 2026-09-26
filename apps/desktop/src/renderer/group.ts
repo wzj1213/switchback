@@ -1,4 +1,4 @@
-import type { Aside, EngineSegment, Item, ToolCallItem } from "@omni/protocol"
+import type { Aside, EngineSegment, Item, ToolCallItem, TurnPace } from "@omni/protocol"
 import { reportedChangesOf, type Changes } from "./changes.js"
 import { engineSwitches, type EngineStint } from "./engine-mark.js"
 
@@ -11,8 +11,11 @@ import { engineSwitches, type EngineStint } from "./engine-mark.js"
 export type Row =
   | { kind: "item"; item: Exclude<Item, ToolCallItem> }
   | { kind: "run"; items: readonly ToolCallItem[] }
-  /** 一轮的分界：跑完之后插在那一轮的提问和回答之间，说这一轮花了多久。 */
-  | { kind: "turn"; turnId: string; ms: number }
+  /**
+   * 一轮的分界：跑完之后插在那一轮的提问和回答之间，说这一轮花了多久；
+   * 宿主量到了节奏（首字、tok/s）就一起说。
+   */
+  | { kind: "turn"; turnId: string; ms: number; pace?: TurnPace }
   /**
    * 一次侧问。**它不属于任何一轮**，也不在 `items` 里——挂在 `Thread.asides` 上，
    * 由 `withAsides` 按时间插进来（见那个函数的注释）。
@@ -56,7 +59,7 @@ function markFor(
   item: Item,
   activeTurnId: string | undefined,
   marked: Set<string>,
-): Row | undefined {
+): Extract<Row, { kind: "turn" }> | undefined {
   // 换引擎的交接说明排在这一轮最前面，但它不是提问：分界线要落在用户那句之后
   if (item.kind !== "user_message" || item.origin === "handoff") return undefined
   if (item.turnId === activeTurnId || marked.has(item.turnId)) return undefined
@@ -241,7 +244,18 @@ function bucketByTurn(items: readonly Item[]): ReadonlyMap<string, readonly Item
   return out
 }
 
-export function groupRows(items: readonly Item[], activeTurnId?: string, cwd?: string): readonly Row[] {
+/** 分界线带上那一轮的节奏。量不到（抄过来的历史、一个字都没写）就只说时长。 */
+function withPace(mark: Extract<Row, { kind: "turn" }>, paces: Readonly<Record<string, TurnPace>> | undefined): Row {
+  const pace = paces?.[mark.turnId]
+  return pace === undefined ? mark : { ...mark, pace }
+}
+
+export function groupRows(
+  items: readonly Item[],
+  activeTurnId?: string,
+  cwd?: string,
+  paces?: Readonly<Record<string, TurnPace>>,
+): readonly Row[] {
   const rows: Row[] = []
   const marked = new Set<string>()
   const byTurn = bucketByTurn(items)
@@ -261,7 +275,7 @@ export function groupRows(items: readonly Item[], activeTurnId?: string, cwd?: s
       rows.push({ kind: "item", item })
       // 分界线插在提问**之后**：它是这一轮回答的表头，说的是「下面这些花了多久」
       const mark = markFor(byTurn, item, activeTurnId, marked)
-      if (mark !== undefined) rows.push(mark)
+      if (mark !== undefined) rows.push(withPace(mark, paces))
       continue
     }
     const last = rows[rows.length - 1]

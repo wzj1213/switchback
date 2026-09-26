@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import type { Command, EngineInfo, Thread } from "@omni/protocol"
 import {
-  itemsOf, lanesOf, tasksOf, thinkingTokensOf, turnOf,
+  itemsOf, lanesOf, pacesOf, tasksOf, thinkingTokensOf, turnOf,
   type Notice as StoreNotice, type ViewState,
 } from "@omni/store"
 import { Notices } from "./components/Notices.js"
@@ -157,6 +157,7 @@ export function CompareScreen({
     tasks: tasksOf(state, t.id),
     thinkingTokens: thinkingTokensOf(state, t.id),
     lanes: lanesOf(state, t.id),
+    paces: pacesOf(state, t.id),
   })
   // 谁在左边由**创建先后**定，不是由「当前选中的是谁」定：
   // 从两边分别点进来看到的应该是同一张图，否则「左边那栏」这句话就没法说

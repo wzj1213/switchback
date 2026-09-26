@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Item, TaskRun, Thread, Turn } from "@omni/protocol"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, TurnId, TurnPace } from "@omni/protocol"
 import { memo, useMemo } from "react"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus, type Reconnecting } from "./TurnStatus.js"
@@ -8,7 +8,6 @@ import { useApprovalState } from "../use-approval-state.js"
 import { RowView, canAsk, canRewind, keyOf, answerActs, lastMine, retryProps, errorProps, approvalShortcut } from "./transcript-row.js"
 import { planErrors } from "../error-plan.js"
 import { useFailedRetry } from "../use-failed-retry.js"
-import { useFlow } from "../useFlow.js"
 import { useAskSelection } from "../use-ask-selection.js"
 import { AskFloat } from "./ask-float.js"
 import { TranscriptNavigation } from "./transcript-navigation.js"
@@ -49,6 +48,7 @@ export const Transcript = memo(function Transcript({
   onReuse,
   readOnly,
   full,
+  paces,
 }: {
   thread: Thread
   items: readonly Item[]
@@ -72,9 +72,11 @@ export const Transcript = memo(function Transcript({
   readOnly?: boolean
   /** 会话内查找开着：整段历史必须都在 DOM 里，原生查找才数得全（见 `useProgressiveRows`）。 */
   full?: boolean
+  /** 每一轮的出字节奏（store 的 `pacesOf`，引用稳定）。分界线上印；不给就不印。 */
+  paces?: Readonly<Record<TurnId, TurnPace>> | undefined
 }): React.JSX.Element {
   const { scroller, inner, atBottom, toBottom } = useStickToBottom<HTMLDivElement, HTMLDivElement>()
-  const { rows, folded, onFold } = useTranscriptRows(items, turn, thread)
+  const { rows, folded, onFold } = useTranscriptRows(items, turn, thread, paces)
   // resolve 必须引用稳定，`ItemView` 的 memo 才不会在每帧流式更新时整屏失效。
   const approval = useApprovalState(items, thread.detached === true ? undefined : turn?.id, send)
   // 选中转录区一段话 → 浮一颗「问一句」。没有输入框的对比视图不给
@@ -86,8 +88,6 @@ export const Transcript = memo(function Transcript({
   // 左边那条导航：一格 = 你问的一次（`navPointsOf` 定的谁算一格），颜色 = 那一问归谁跑
   const stints = useMemo(() => engineStints(thread.segments), [thread.segments])
   const points = useMemo(() => navPointsOf(rows, stints), [rows, stints])
-  // 出字速度要从这一轮一开头就在听：挂在状态行里的话，它出现时 `turn.started` 早就过去了
-  const flow = useFlow(thread.id)
   // 报错按它在这一轮里的位置画：正在重试、已经过去，还是并进后面那张终态卡（见 `error-plan.ts`）
   const errors = useMemo(() => planErrors(items, turn?.id), [items, turn?.id])
   const again = useFailedRetry(items, { thread, turn, readOnly: readOnly === true, send })
@@ -130,7 +130,7 @@ export const Transcript = memo(function Transcript({
         ))}
         {/* **状态行是对话流的最后一个孩子**，跟着内容滚。它说的是「它在想什么」，
             那是内容，不是状态栏。逃生口（停止）在输入区里，本来就不会滚走 */}
-        <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} thinkingTokens={thinkingTokens} reconnecting={reconnecting} flow={flow} />
+        <TurnStatus thread={thread} turn={turn} items={items} tasks={tasks} thinkingTokens={thinkingTokens} reconnecting={reconnecting} />
       </div>
       </FileLinkScope>
       {/* 往回翻的时候给一条回去的路。**这才是「逃生口不该滚走」的正确解法**——

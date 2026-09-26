@@ -11,6 +11,7 @@ import { sideQuestion } from "./engine-state.js"
 import { prompt, steerQueued } from "./prompt.js"
 import { recordSegment } from "./segment.js"
 import { compact } from "./compact.js"
+import { createPaceBook } from "@omni/store"
 
 export type { HostDeps } from "./deps.js"
 
@@ -346,6 +347,7 @@ export function createHost(deps: HostDeps): Host {
     uncommitted: new Map<ThreadId, Event[]>(),
     echo: new Map<string, string>(),
     explained: new Map<TurnId, string>(),
+    pace: createPaceBook(),
   }
   /**
    * 一轮跑完就把排队的下一句发出去。

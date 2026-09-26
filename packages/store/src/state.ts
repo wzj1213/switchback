@@ -15,6 +15,7 @@ import type {
   ThreadId,
   Turn,
   TurnId,
+  TurnPace,
   Usage,
 } from "@omni/protocol"
 
@@ -27,6 +28,11 @@ export interface ViewState {
   items: Readonly<Record<ThreadId, readonly Item[]>>
   /** 每个会话当前未结束的轮次 */
   turns: Readonly<Record<ThreadId, Turn>>
+  /**
+   * 每一轮的出字节奏（`turn.completed` 带来的，见 `TurnPace`）。按会话分表、按轮次 id 存。
+   * **跑完的轮次也留着**——正是 `turns` 不留的那份：分界线上每一轮都要印它自己的。
+   */
+  paces: Readonly<Record<ThreadId, Readonly<Record<TurnId, TurnPace>>>>
   /** item id → 它属于哪个会话。增量、更新与撤回都靠它反查。 */
   owner: Readonly<Record<ItemId, ThreadId>>
   /** turn id → 它属于哪个会话。`turn.completed` 同理。 */
@@ -137,6 +143,7 @@ export function initial(): ViewState {
     order: [],
     items: {},
     turns: {},
+    paces: {},
     owner: {},
     turnOwner: {},
     usage: {},
@@ -376,4 +383,16 @@ export function foreignByEngine(state: ViewState): readonly { engine: string; th
 /** 某家引擎登录的账号。没报过就是 undefined，界面据此什么都不画。 */
 export function accountOf(state: ViewState, engine: string): EngineAccount | undefined {
   return state.accounts[engine]
+}
+
+const NO_PACES: Readonly<Record<TurnId, TurnPace>> = {}
+
+/** 一条会话每一轮的出字节奏。一轮都没有时给同一个空表——引用稳定，`memo` 认得住。 */
+export function pacesOf(state: ViewState, threadId: ThreadId): Readonly<Record<TurnId, TurnPace>> {
+  return state.paces[threadId] ?? NO_PACES
+}
+
+/** 这条会话最近跑完的那一轮的节奏。表里的键按收工先后插入，最后一个就是最近的。 */
+export function latestPaceOf(state: ViewState, threadId: ThreadId): TurnPace | undefined {
+  return Object.values(pacesOf(state, threadId)).at(-1)
 }

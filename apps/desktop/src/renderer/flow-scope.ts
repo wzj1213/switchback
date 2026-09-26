@@ -1,9 +1,8 @@
 import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
 import type { Sealed } from "@omni/wire"
-import { begin, feed, pause, report, settle, type Run } from "./bench.js"
+import { estimateTokens, notePace, type PaceBook } from "@omni/store"
 import { mark, type Meter } from "./throughput.js"
 import { pushText, type TapeText } from "./tape-text.js"
-import { estimateTokens } from "./tokens.js"
 
 /**
  * 「这条 delta 是不是**这一条会话**吐出来的」。
@@ -32,8 +31,9 @@ import { estimateTokens } from "./tokens.js"
  * 而模型此刻一个 token 都没生成**。那不是读数偏差，是在画一件没发生的事。
  *
  * 现在只收 `SPOKEN` 那几种。挑这几种还有第二个理由：业界那个 token/s 的分子是
- * `output_tokens`，而**推理 token 是算在 output 里的**——所以 `reasoning` 必须收，
- * 收了两边才对得上，`bench.ts` 那条校准才有意义。
+ * `output_tokens`，而**推理 token 是算在 output 里的**——所以 `reasoning` 必须收。
+ *
+ * 这一轮的 tok/s 不在这儿算：那是 `@omni/store` 的 `pace.ts`，宿主和这里跑的是同一份。
  *
  * 纯逻辑：不读时钟、不碰 DOM、不订阅任何东西。
  */
@@ -72,28 +72,16 @@ export function retarget(scope: Scope, thread: ThreadId | undefined): void {
  * `user_message` / `approval` / `error` 同理，那些根本不是模型产的。
  *
  * 有一处它天然收不全，而且**只能记下来不能补**：工具调用的参数（那串 JSON）
- * 也算模型的 output token，但它不以 `item.delta` 的形式过来。于是这里的字节
- * 相对真 token 数**系统性偏少**——这正好是 `bench.ts` 那条校准要吸收的偏差，
- * 不该在这儿拿别的东西凑。
+ * 也算模型的 output token，但它不以 `item.delta` 的形式过来。于是这里的估数
+ * 相对真 token 数**系统性偏少**。开火节奏只要「此刻在不在写、写得多密」，偏少不要紧；
+ * 要紧的那个数（一轮的 tok/s）按真数和估数分开量，见 `pace.ts`。
  */
 const SPOKEN: ReadonlySet<string> = new Set(["agent_message", "reasoning"])
 
-/**
- * 一条事件对这套账意味着什么。**返回一件事而不是一个数**：
- * 上一版只返回字节数，于是「一轮开了」「一轮完了」「引擎报了生成量」
- * 这三件同样在这条流里的事没地方说，`bench.ts` 那本账就无从记起。
- */
-export type Beat =
-  | { kind: "idle" }
-  | { kind: "start" }
-  | { kind: "text"; tokens: number; text: string }
-  /** 这一轮里开了一条**不是它在说话**的 item（调工具、等批准、报错）：它停下来了。 */
-  | { kind: "pause" }
-  | { kind: "tokens"; tokens: number }
-  | { kind: "end" }
+/** 一条事件对滑窗和纸带意味着什么：要么没事，要么是这条会话里模型刚写出来的一段字。 */
+export type Beat = { kind: "idle" } | { kind: "text"; tokens: number; text: string }
 
 const IDLE: Beat = { kind: "idle" }
-const PAUSE: Beat = { kind: "pause" }
 
 /** 吃一条事件。不属于当前会话的一律 `idle`。 */
 export function absorb(scope: Scope, event: Event): Beat {
@@ -101,18 +89,13 @@ export function absorb(scope: Scope, event: Event): Beat {
     if (event.turn.threadId !== scope.thread) return IDLE
     scope.turn = event.turn.id
     scope.items.clear()
-    return { kind: "start" }
+    return IDLE
   }
   if (event.type === "turn.completed") {
     if (scope.turn === undefined || event.turnId !== scope.turn) return IDLE
     scope.turn = undefined
     scope.items.clear()
-    return { kind: "end" }
-  }
-  if (event.type === "usage.updated") {
-    const out = event.usage.outputTokens
-    if (event.threadId !== scope.thread || out === undefined) return IDLE
-    return { kind: "tokens", tokens: out }
+    return IDLE
   }
   return onItem(scope, event)
 }
@@ -120,9 +103,8 @@ export function absorb(scope: Scope, event: Event): Beat {
 /** item 那两条。拆出来是圈复杂度闸门逼的，边界也顺：上面管轮次，这里管 item。 */
 function onItem(scope: Scope, event: Event): Beat {
   if (event.type === "item.started") {
-    if (scope.turn === undefined || event.item.turnId !== scope.turn) return IDLE
-    if (!SPOKEN.has(event.item.kind)) return PAUSE
-    if (scope.items.size < MAX_ITEMS) scope.items.add(event.item.id)
+    const mine = scope.turn !== undefined && event.item.turnId === scope.turn
+    if (mine && SPOKEN.has(event.item.kind) && scope.items.size < MAX_ITEMS) scope.items.add(event.item.id)
     return IDLE
   }
   if (event.type !== "item.delta") return IDLE
@@ -131,36 +113,31 @@ function onItem(scope: Scope, event: Event): Beat {
 }
 
 /**
- * 吃一批事件：把（估出来的）token 记进流速表，把轮次记进账本，把字交给纸带。
+ * 吃一批事件：把（估出来的）token 记进滑窗，把字交给纸带，把每一条都交给节奏账本。
  *
  * 抽出来是为了**它能被测**：留在 hook 里的话，这几行——「一批一次、
- * 一个字节都没有就别记、时间戳用收到的时刻」——就只能靠肉眼保证，
+ * 一个字都没有就别记、滑窗用收到的时刻」——就只能靠肉眼保证，
  * 而它们恰恰是整条链上最容易错的地方（照仓库里 `usePetMood` 的老规矩：
  * 逻辑抽出来测，hook 只剩订阅）。
  *
  * **滑窗一批只记一笔**：主进程已经合过帧（`main/batch.ts`），
  * 这里再逐条记等于把一次网络往返拆成十几个样本，滑窗会被同一批字撑出假的峰值。
- * **账本那边则要逐条按顺序走**：一批里可能同时装着「最后一段字」和「这一轮完了」，
- * 合并之后就分不出谁先谁后，而生成时长的末端正好卡在这两条之间。
+ * **节奏账本则要逐条按顺序走**，而且用事件自己的 `at`：它和宿主跑的是同一份算法，
+ * 跑完时两边的数才对得上。它**不看是哪条会话**——账本自己按会话分，谁在看由读的人决定。
  */
 export function drain(
   scope: Scope,
-  into: { meter: Meter; run: Run; tape?: TapeText },
+  into: { meter: Meter; book: PaceBook; tape?: TapeText },
   sealed: readonly Sealed[],
   now: number,
 ): void {
-  const { meter, run } = into
   let tokens = 0
   for (const one of sealed) {
+    notePace(into.book, one.event)
     const beat = absorb(scope, one.event)
-    if (beat.kind === "start") begin(run, now)
-    else if (beat.kind === "text") {
-      tokens += beat.tokens
-      feed(run, now, beat.tokens)
-      if (into.tape !== undefined) pushText(into.tape, beat.text)
-    } else if (beat.kind === "pause") pause(run)
-    else if (beat.kind === "tokens") report(run, beat.tokens)
-    else if (beat.kind === "end") settle(run, now)
+    if (beat.kind !== "text") continue
+    tokens += beat.tokens
+    if (into.tape !== undefined) pushText(into.tape, beat.text)
   }
-  if (tokens > 0) mark(meter, now, tokens)
+  if (tokens > 0) mark(into.meter, now, tokens)
 }

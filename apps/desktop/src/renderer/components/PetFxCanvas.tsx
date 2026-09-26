@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import type { TurnPace } from "@omni/protocol"
 import type { BrassMode, TrajMode } from "../../shared/settings.js"
 import { createFx, resetFx, stepFx } from "../pet-fx.js"
 import { createFoeArt } from "../pet-foe-art.js"
@@ -73,7 +74,7 @@ export function PetFx(props: FxProps): React.JSX.Element {
           ratio: props2.ratio,
           left: -20,
           field: { homeX: home.x, ground: home.y + SIZE },
-          bench: flow.last, speed: flow.speed, nextChar: flow.nextChar,
+          pace: props2.last, speed: flow.speed, nextChar: flow.nextChar,
           foes: props2.foes,
           brass: props2.brass,
           traj: props2.traj,
@@ -214,8 +215,10 @@ interface FxProps {
   tone: string
   /** 当前桌宠轮廓。只用于把枪托接到真实的手/横臂上。 */
   shape: PetShape
-  /** 取此刻的流速与上一轮的成绩。见 `useFlow`。 */
+  /** 取此刻的流速。见 `useFlow`。 */
   flow: () => Flow
+  /** 上一轮的成绩：宿主量好、跟着那一轮落了盘的那一份（和分界线上印的同一个数）。靶上那行印它。 */
+  last: TurnPace | undefined
   /** 手里要不要换别的东西（在跑工具、在等审批）。 */
   busyHands: boolean
   /** 这一轮在不在跑。不跑的时候没有压力可言——它只是在等你说话。 */

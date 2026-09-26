@@ -19,13 +19,12 @@
  *
  * ## 文字怎么换成 token
  *
- * 每条 delta 先按字符种类估成 token（`tokens.ts`），这里记的就是估出来的那个数。
+ * 每条 delta 先按字符种类估成 token（`@omni/store` 的 `tokens.ts`），这里记的就是估出来的那个数。
  * 早先记的是 UTF-8 字节、再除一个常数：中文一个字 3 字节却常常不到一个 token，
  * 英文 4 个字母才一个——除同一个常数，读数就跟着语言漂。
  *
- * 估数和真数之间还差一个倍率（各家分词器不一样），**倍率由调用方给**：
- * `rateOf` 收一个 `scale`，由 `bench.ts` 拿每轮结账的真 token 数学出来。
- * 这一层只做它本来的事：一个滑窗。
+ * 这一层只做它本来的事：一个滑窗，驱动开火节奏。**它不是「这一轮的 tok/s」**——
+ * 那个数按一轮一轮量，见 `@omni/store` 的 `pace.ts`。
  *
  * ## 为什么是滑窗不是瞬时值
  *
@@ -92,16 +91,13 @@ export function mark(meter: Meter, at: number, tokens: number): void {
 }
 
 /**
- * 此刻的流速（token/秒）。
- *
- * `scale` = 真数 ÷ 估数，**由调用方给**（`bench.ts` 从真数学出来的那个）。
- * 这一层不持有它，理由见文件头。
+ * 此刻的流速（token/秒，估）。
  *
  * 窗口里一笔都没有就是 0——**不是「上一次的值」**：静默恰恰是这套东西里
  * 最有意义的状态之一（没有输出就没有火力），把它平滑成一个衰减的尾巴，
  * 等于把「它停了」这件事藏起来。
  */
-export function rateOf(meter: Meter, now: number, scale: number): number {
+export function rateOf(meter: Meter, now: number): number {
   // 窗口里必然一笔都没有——**绝大多数帧走的是这一条**
   if (meter.last <= now - WINDOW_MS) return 0
   const from = now - WINDOW_MS
@@ -110,7 +106,7 @@ export function rateOf(meter: Meter, now: number, scale: number): number {
     if (slot.at > from && slot.at <= now) tokens += slot.tokens
   }
   if (tokens === 0) return 0
-  return (tokens * scale) / (WINDOW_MS / 1000)
+  return tokens / (WINDOW_MS / 1000)
 }
 
 /**

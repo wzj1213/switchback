@@ -178,12 +178,16 @@ function onTurnCompleted(
   const threadId = state.turnOwner[event.turnId]
   if (threadId === undefined) return state
   const turnOwner = omit(state.turnOwner, event.turnId)
+  const paces = event.pace === undefined
+    ? state.paces
+    : { ...state.paces, [threadId]: { ...state.paces[threadId], [event.turnId]: event.pace } }
   // 原生事件迟到时，旧轮的终态不能把同会话已经开始的新轮清掉
-  if (state.turns[threadId]?.id !== event.turnId) return { ...state, turnOwner }
+  if (state.turns[threadId]?.id !== event.turnId) return { ...state, turnOwner, paces }
   // **子 agent 跟着轮次一起清。** 它们是活状态：一轮结束还留着，界面上就是一串
   // 早就跑完了、却还显示在跑的任务——比不显示更糟
   return {
     ...state,
+    paces,
     turns: omit(state.turns, threadId),
     tasks: omit(state.tasks, threadId),
     thinking: omit(state.thinking, threadId),
@@ -207,6 +211,7 @@ function removeThread(state: ViewState, threadId: ThreadId, draft?: Draft): View
     order: state.order.filter((id) => id !== threadId),
     items: omit(state.items, threadId),
     turns: omit(state.turns, threadId),
+    paces: omit(state.paces, threadId),
     usage: omit(state.usage, threadId),
     tasks: omit(state.tasks, threadId),
     thinking: omit(state.thinking, threadId),
@@ -440,6 +445,7 @@ export function reduceHistory(state: ViewState, threadId: ThreadId, events: read
   const cleared: ViewState = {
     ...state,
     items: { ...state.items, [threadId]: [] },
+    paces: omit(state.paces, threadId),
     owner: withoutValue(state.owner, threadId),
   }
   return reduceAll(cleared, events)

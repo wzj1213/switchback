@@ -1,4 +1,4 @@
-import type { Item, Thread } from "@omni/protocol"
+import type { Item, Thread, TurnPace } from "@omni/protocol"
 import { runningToolLabel } from "./tool.js"
 import { headingOf } from "./reasoning.js"
 
@@ -50,6 +50,24 @@ export function spent(ms: number): string {
   const minutes = Math.floor(total / 60)
   const seconds = total % 60
   return seconds === 0 ? `${String(minutes)} 分` : `${String(minutes)} 分 ${String(seconds)} 秒`
+}
+
+/**
+ * 一轮的出字节奏，给分界线用：`首字 0.8 秒 · 34 tok/s`。
+ *
+ * 速度量不出来（出字时长太短）就只说首字；引擎没报生成量、按字估的那几家带 ≈。
+ * 首字十秒以内留一位小数、再往上取整；速度十以上取整、以下留一位——和 DSH 那一行同一个写法：
+ * 小数只留在它真有信息量的那一档。
+ */
+export function paceLine(pace: TurnPace): string {
+  const first = `首字 ${oneDecimalBelow(pace.firstMs / 1000, 10)} 秒`
+  if (pace.tps === undefined) return first
+  return `${first} · ${pace.exact ? "" : "≈ "}${oneDecimalBelow(pace.tps, 10)} tok/s`
+}
+
+function oneDecimalBelow(value: number, edge: number): string {
+  const v = Math.max(0, value)
+  return v < edge ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v))
 }
 
 /**

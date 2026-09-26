@@ -10,6 +10,8 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
 ## 拥有什么
 
 - `Thread` / `Turn` / `Item` 三级原语与它们的状态机取值
+- `TurnPace` —— 一轮的出字节奏（首字延迟、tok/s、生成量、是不是真数）。宿主收工时量出来挂在
+  `turn.completed` 上落盘；流式增量不落盘，回放时没法再量一遍
 - `EngineGoal` —— 引擎原生长期目标的只读镜像；跨轮次挂在 `Thread`，不与一次性计划混同
 - `ToolDetail` —— 工具调用的五种渲染形态（shell / file_edit / file_read / fetch / other）；
   shell 可携带引擎明确上报的后台等待状态与 stdin 历史，输入和输出始终分开

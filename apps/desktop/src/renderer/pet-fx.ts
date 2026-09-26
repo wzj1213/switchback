@@ -91,7 +91,7 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
     rate: input.rate,
     speed: input.speed,
     ratio: input.ratio,
-    bench: input.bench,
+    pace: input.pace,
   }
 }
 

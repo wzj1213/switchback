@@ -1,7 +1,7 @@
 import type { EngineId, ItemId, ThreadId, TurnId } from "./ids.js"
 import type { Item } from "./item.js"
 import type { Lane } from "./lane.js"
-import type { EngineAccount, EngineThread, SlashCommand, Thread, Turn, TurnStatus } from "./thread.js"
+import type { EngineAccount, EngineThread, SlashCommand, Thread, Turn, TurnPace, TurnStatus } from "./thread.js"
 
 /**
  * 用量。
@@ -145,7 +145,8 @@ export type Event =
    */
   | { type: "thread.renamed"; at: number; threadId: ThreadId; title: string }
   | { type: "turn.started"; at: number; turn: Turn }
-  | { type: "turn.completed"; at: number; turnId: TurnId; status: TurnStatus; error?: string }
+  /** `pace`：宿主量的这一轮出字节奏（见 `TurnPace`）。量不出来、或者是抄过来的历史时缺席。 */
+  | { type: "turn.completed"; at: number; turnId: TurnId; status: TurnStatus; error?: string; pace?: TurnPace }
   | { type: "item.started"; at: number; item: Item }
   | {
       type: "item.delta"

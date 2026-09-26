@@ -113,7 +113,7 @@ function drawTarget(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void
     target: w.target,
     show: w.show.on,
     at: { x: at.x, y: at.y, ground: view.stand.ground },
-    live: { rate: view.rate, speed: view.speed, ratio: view.ratio, bench: view.bench },
+    live: { rate: view.rate, speed: view.speed, ratio: view.ratio, pace: view.pace },
     pal: {
       line: pal.line,
       faint: pal.glyph,

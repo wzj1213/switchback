@@ -9,6 +9,8 @@ import type {
   SlashCommand,
   Thread,
   Turn,
+  TurnId,
+  TurnPace,
   Usage,
   TaskRun,
 } from "@omni/protocol"
@@ -41,6 +43,8 @@ export interface WorkspaceProps {
   tasks: readonly TaskRun[]
   /** Claude 原生上报的当前思考块近似 token；没有信号就不显示。 */
   thinkingTokens: number | undefined
+  /** 每一轮的出字节奏（store 的 `pacesOf`）。分界线和靶上那行印它。 */
+  paces: Readonly<Record<TurnId, TurnPace>>
   /** 实时连接正断着、驱动在自己接回来（见 store 的 `reconnectingOf`）。 */
   reconnecting?: Reconnecting | undefined
   lanes: readonly Lane[]
@@ -223,6 +227,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         turn={props.turn}
         tasks={props.tasks}
         thinkingTokens={props.thinkingTokens}
+        paces={props.paces}
         reconnecting={props.reconnecting}
         engines={props.engines}
         usage={props.usage}

@@ -1,6 +1,7 @@
 import type { Event, ThreadId, Thread, ThreadStatus, TurnId, ItemId } from "@omni/protocol"
 import type { Rule } from "@omni/approval"
 import type { EngineSession } from "@omni/engine"
+import { notePace, type PaceBook } from "@omni/store"
 import type { Gate } from "./gate.js"
 import type { HostDeps } from "./deps.js"
 import { clearThreadLiveState, clearTurnLiveState, rememberLiveState } from "./live-state.js"
@@ -192,6 +193,12 @@ export interface Ctx {
    * 和驱动自己发过的 error item 常常是同一句，摆两遍就是同一件事说两次。
    */
   explained: Map<TurnId, string>
+  /**
+   * 每一轮的出字节奏的账本（`@omni/store` 的 `pace.ts`）。**只有这里看得见每一条会话的每一条增量**
+   * ——渲染层只跟着眼前那条，而增量本身不落盘，回放时已经没东西可量。
+   * 所以在这儿量，收工那一刻挂到 `turn.completed` 上，跟着它一起落盘、一起发出去。
+   */
+  pace: PaceBook
   /**
    * 把待发队列里的第一句发出去。**由 `host.ts` 在建 ctx 时填进来。**
    *
@@ -413,9 +420,10 @@ function explainFailure(ctx: Ctx, event: Event): void {
  * 顺序有讲究：先发给渲染层，再落盘，最后才做旁路观察。
  * 界面响应不该等磁盘；而 `observe` 会改会话状态并再发事件，放最后免得穿插。
  */
-export function emit(ctx: Ctx, event: Event): void {
-  if (ctx.closed || echoed(ctx, event)) return
-  explainFailure(ctx, event)
+export function emit(ctx: Ctx, raw: Event): void {
+  if (ctx.closed || echoed(ctx, raw)) return
+  explainFailure(ctx, raw)
+  const event = paced(ctx, raw)
   if (event.type === "turn.started") ctx.turnOwner.set(event.turn.id, event.turn.threadId)
   rememberLiveState(ctx, event)
   ctx.deps.emit(event)
@@ -425,6 +433,15 @@ export function emit(ctx: Ctx, event: Event): void {
   if (owner !== undefined) persist(ctx, owner, event)
   observe(ctx, event)
   finishTurnState(ctx, event, owner)
+}
+
+/**
+ * 量这一轮的出字节奏；收工那一条带上结果。驱动自己带了的（抄历史时照搬原来那份）不覆盖。
+ */
+function paced(ctx: Ctx, event: Event): Event {
+  const pace = notePace(ctx.pace, event)
+  if (pace === undefined || event.type !== "turn.completed" || event.pace !== undefined) return event
+  return { ...event, pace }
 }
 
 /**

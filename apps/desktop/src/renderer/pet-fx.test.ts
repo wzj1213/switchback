@@ -23,7 +23,7 @@ const input = (over: Partial<FxInput> = {}): FxInput => ({
   // 于是「不动它」时的读数和靶跟着手走的老版本完全一致，用例里量的还是同一件事
   field: { homeX: pet.x, ground: pet.y + 30 },
   // 成绩不参与任何物理，只是要印到靶上的一行字——这一组量的是物理
-  bench: undefined,
+  pace: undefined,
   speed: undefined,
   nextChar: () => "字",
   foes: true,

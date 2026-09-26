@@ -1,4 +1,4 @@
-import type { EngineId } from "@omni/protocol"
+import type { EngineId, TurnPace } from "@omni/protocol"
 import type { BrassMode, TrajMode } from "../../shared/settings.js"
 import { PetFx } from "./PetFxCanvas.js"
 import { lookOf, type Pet } from "../pets.js"
@@ -30,6 +30,8 @@ export interface FireProps {
   traj: TrajMode
   /** 打靶。 */
   range: boolean
+  /** 这条会话上一轮的成绩（宿主量好落了盘的那份）。靶上那行印它。 */
+  last: TurnPace | undefined
 }
 
 /**
@@ -70,6 +72,7 @@ export function FireLayer({
       tone={look.tone}
       shape={look.shape}
       flow={flow}
+      last={fire.last}
       busyHands={fire.handsBusy}
       running={fire.running}
       ratio={fire.ctxRatio}

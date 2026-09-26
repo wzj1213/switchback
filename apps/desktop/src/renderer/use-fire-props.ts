@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import type { Thread, Usage } from "@omni/protocol"
+import type { Thread, TurnId, TurnPace, Usage } from "@omni/protocol"
 import type { PetKit } from "../shared/settings.js"
 import type { FireProps } from "./components/PetFx.js"
 
@@ -21,10 +21,14 @@ export function useFireProps(input: {
   thread: Thread
   usage: Usage | undefined
   running: boolean
+  /** 这条会话每一轮的节奏（store 的 `pacesOf`）。靶上印最近那一轮的。 */
+  paces: Readonly<Record<TurnId, TurnPace>>
 }): FireProps {
-  const { pets, thread, usage, running } = input
+  const { pets, thread, usage, running, paces } = input
   const ctxRatio = ctxRatioOf(usage)
   const handsBusy = thread.status === "waiting_approval"
+  // 表里的键按收工先后插入，最后一个就是最近跑完的那一轮
+  const last = useMemo(() => Object.values(paces).at(-1), [paces])
   return useMemo(
     () => ({
       on: pets.fire,
@@ -36,8 +40,9 @@ export function useFireProps(input: {
       brass: pets.brass,
       traj: pets.traj,
       range: pets.range,
+      last,
     }),
-    [pets.fire, pets.foes, pets.brass, pets.traj, pets.range, thread.id, running, handsBusy, ctxRatio],
+    [pets.fire, pets.foes, pets.brass, pets.traj, pets.range, thread.id, running, handsBusy, ctxRatio, last],
   )
 }
 

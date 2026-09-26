@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Turn } from "@omni/protocol"
-import { createRun, SCALE_GUESS } from "./bench.js"
+import { createPaceBook, estimateTokens, livePace } from "@omni/store"
 import { absorb, createScope, drain, retarget } from "./flow-scope.js"
 import { createTapeText, nextChar } from "./tape-text.js"
-import { estimateTokens } from "./tokens.js"
 import { createMeter, rateOf } from "./throughput.js"
 
 const turn = (id: string, threadId: string): Event => ({
@@ -16,15 +15,6 @@ const item = (id: string, turnId: string, kind = "agent_message"): Event => ({
   at: 0,
   item: { id, turnId, kind, at: 0, text: "" } as unknown as Item,
 })
-const used = (threadId: string, outputTokens?: number): Event => ({
-  type: "usage.updated",
-  at: 0,
-  threadId,
-  engine: "kimi",
-  usage: { contextUsed: 100, ...(outputTokens === undefined ? {} : { outputTokens }) },
-} as Event)
-const ended = (turnId: string): Event =>
-  ({ type: "turn.completed", at: 0, turnId, status: "completed" }) as Event
 const delta = (itemId: string, append: string): Event => ({ type: "item.delta", at: 0, itemId, append })
 
 /** `absorb` 返回一件事而不是一个数——这几条用例问的是「算了多少（估出来的）token」。 */
@@ -102,16 +92,16 @@ describe("drain", () => {
     const s = createScope()
     const m = createMeter()
     retarget(s, "t1")
-    drain(s, { meter: m, run: createRun() }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2), seal(delta("i1", "x".repeat(384)), 3)], 1000)
-    expect(rateOf(m, 1000, SCALE_GUESS)).toBeGreaterThan(0)
+    drain(s, { meter: m, book: createPaceBook() }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2), seal(delta("i1", "x".repeat(384)), 3)], 1000)
+    expect(rateOf(m, 1000)).toBeGreaterThan(0)
   })
 
   it("别的会话那一批一个字都不记", () => {
     const s = createScope()
     const m = createMeter()
     retarget(s, "t1")
-    drain(s, { meter: m, run: createRun() }, [seal(turn("r9", "t2"), 1), seal(item("i9", "r9"), 2), seal(delta("i9", "x".repeat(999)), 3)], 1000)
-    expect(rateOf(m, 1000, SCALE_GUESS)).toBe(0)
+    drain(s, { meter: m, book: createPaceBook() }, [seal(turn("r9", "t2"), 1), seal(item("i9", "r9"), 2), seal(delta("i9", "x".repeat(999)), 3)], 1000)
+    expect(rateOf(m, 1000)).toBe(0)
   })
 
   it("一批只记一笔——主进程已经合过帧，逐条记会把同一批字撑成假峰值", () => {
@@ -123,17 +113,17 @@ describe("drain", () => {
     retarget(s2, "t1")
     const head = [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2)]
     const body = Array.from({ length: 8 }, (_, i) => seal(delta("i1", "x".repeat(48)), i + 3))
-    drain(s1, { meter: one, run: createRun() }, [...head, ...body], 1000)
-    for (const [i, ev] of [...head, ...body].entries()) drain(s2, { meter: many, run: createRun() }, [ev], 1000 + i)
+    drain(s1, { meter: one, book: createPaceBook() }, [...head, ...body], 1000)
+    for (const [i, ev] of [...head, ...body].entries()) drain(s2, { meter: many, book: createPaceBook() }, [ev], 1000 + i)
     // 同样的字、同样的窗口（都在 1200ms 内）：合成一笔和拆成八笔算出来的必须一样
-    expect(rateOf(one, 1100, SCALE_GUESS)).toBeCloseTo(rateOf(many, 1100, SCALE_GUESS), 6)
+    expect(rateOf(one, 1100)).toBeCloseTo(rateOf(many, 1100), 6)
   })
 
   it("这一批里没有属于自己的字就什么都不记", () => {
     const s = createScope()
     const m = createMeter()
     retarget(s, "t1")
-    drain(s, { meter: m, run: createRun() }, [seal(turn("r1", "t1"), 1)], 1000)
+    drain(s, { meter: m, book: createPaceBook() }, [seal(turn("r1", "t1"), 1)], 1000)
     expect(m.last).toBeLessThan(0)
   })
 })
@@ -156,15 +146,6 @@ describe("只认模型自己说的话", () => {
     expect(tokensOf(absorb(s, delta("th", "думаю")))).toBeGreaterThan(0)
   })
 
-  it("这一轮里开了一条工具调用：**它停下来了**；别的会话的不算", () => {
-    const s = createScope()
-    retarget(s, "t1")
-    absorb(s, turn("r1", "t1"))
-    expect(absorb(s, item("sh", "r1", "tool_call")).kind).toBe("pause")
-    expect(absorb(s, item("say", "r1")).kind).toBe("idle")
-    expect(absorb(s, item("other", "r9", "tool_call")).kind).toBe("idle")
-  })
-
   it("同一轮里工具在刷屏、模型也在说话，只有后者进账", () => {
     const s = createScope()
     retarget(s, "t1")
@@ -176,64 +157,30 @@ describe("只认模型自己说的话", () => {
   })
 })
 
-describe("一轮的账", () => {
+describe("节奏账本：每一条都交给它，时刻用事件自己的 `at`", () => {
   const seal = (event: Event, seq: number): { seq: number; event: Event } => ({ seq, event })
+  const said = (itemId: string, at: number): Event => ({ type: "item.delta", at, itemId, append: "分页照搬" })
 
-  it("走完一整轮，靶上那行拿到的是**引擎报的真数**", () => {
+  it("和宿主同一个算法、同一个钟：一整批一起收到，读数照样按每条事件发生的时刻量", () => {
     const s = createScope()
-    const run = createRun()
+    const book = createPaceBook()
     retarget(s, "t1")
-    drain(s, { meter: createMeter(), run }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2)], 1000)
-    drain(s, { meter: createMeter(), run }, [seal(delta("i1", "x".repeat(400)), 3)], 1600)
-    drain(s, { meter: createMeter(), run }, [seal(delta("i1", "x".repeat(400)), 4)], 2600)
-    drain(s, { meter: createMeter(), run }, [seal(delta("i1", "x".repeat(400)), 5)], 3600)
-    drain(s, { meter: createMeter(), run }, [seal(used("t1", 200), 6), seal(ended("r1"), 7)], 3700)
-    expect(run.done?.exact).toBe(true)
-    expect(run.done?.tokens).toBe(200)
-    expect(run.done?.ttft).toBeCloseTo(0.6, 6) // 1000 → 1600
-    // 三批一样大、每批隔 1 秒：头一批的时长没法量不算，后两批的那份真数 / 2 秒
-    expect(run.done?.tps).toBeCloseTo((200 * (2 / 3)) / 2, 6)
+    const body = [100, 300, 500, 700, 900, 1100].map((at, i) => seal(said("i1", at), i + 3))
+    drain(s, { meter: createMeter(), book }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2), ...body], 5000)
+    // 后五批 15 个 token / 1 秒——和收到的时刻（全是 5000）无关
+    expect(livePace(book, "t1")?.tps).toBeCloseTo(15, 9)
   })
 
-  it("引擎不报生成量（kimi / codex / 通用 ACP）就退回估数，`exact` 是 false", () => {
+  it("别的会话也记：账本自己按会话分，切回那一条时它那一轮还接得上", () => {
     const s = createScope()
-    const run = createRun()
+    const book = createPaceBook()
+    const meter = createMeter()
     retarget(s, "t1")
-    drain(s, { meter: createMeter(), run }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2)], 1000)
-    drain(s, { meter: createMeter(), run }, [seal(delta("i1", "x".repeat(400)), 3)], 1600)
-    drain(s, { meter: createMeter(), run }, [seal(delta("i1", "x".repeat(400)), 4)], 3600)
-    drain(s, { meter: createMeter(), run }, [seal(used("t1"), 5), seal(ended("r1"), 6)], 3700)
-    expect(run.done?.exact).toBe(false)
-  })
-
-  it("中间调了一次工具，**哪怕只隔一秒出头**，前后两段字之间那段也不算出字时间", () => {
-    const s = createScope()
-    const run = createRun()
-    const at = (ms: number, ...events: Event[]): void => {
-      drain(s, { meter: createMeter(), run }, events.map((e, i) => seal(e, ms + i)), ms)
-    }
-    retarget(s, "t1")
-    at(1000, turn("r1", "t1"), item("i1", "r1"))
-    at(1100, delta("i1", "x".repeat(400)))
-    at(1600, delta("i1", "x".repeat(400)))
-    at(1700, item("read", "r1", "tool_call"))
-    // 隔了 1.2 秒：没到 `GAP_MS`，光看间隔会被当成「一直在出字」
-    at(2800, item("i2", "r1"))
-    at(2800, delta("i2", "x".repeat(400)))
-    at(3300, delta("i2", "x".repeat(400)))
-    at(3400, used("t1", 400), ended("r1"))
-    // 两段各量到 0.5 秒、各一批：四批的一半 / 1 秒 = 200。把工具那 1.2 秒也算进去是 300 / 2.2 秒 ≈ 136
-    expect(run.done?.tps).toBeCloseTo((400 * (2 / 4)) / 1, 6)
-  })
-
-  it("别的会话报的用量不进这本账", () => {
-    const s = createScope()
-    const run = createRun()
-    retarget(s, "t1")
-    drain(s, { meter: createMeter(), run }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2)], 1000)
-    drain(s, { meter: createMeter(), run }, [seal(delta("i1", "x".repeat(400)), 3)], 1600)
-    drain(s, { meter: createMeter(), run }, [seal(used("t2", 999), 4), seal(ended("r1"), 5)], 2600)
-    expect(run.done?.exact).toBe(false)
+    const body = [100, 300, 500, 700, 900, 1100].map((at, i) => seal(said("i9", at), i + 3))
+    drain(s, { meter, book }, [seal(turn("r9", "t2"), 1), seal(item("i9", "r9"), 2), ...body], 5000)
+    expect(livePace(book, "t2")?.tps).toBeCloseTo(15, 9)
+    // 滑窗和纸带仍然只跟眼前这一条
+    expect(rateOf(meter, 5000)).toBe(0)
   })
 })
 
@@ -244,7 +191,7 @@ describe("纸带上落的字", () => {
     const s = createScope()
     const tape = createTapeText()
     retarget(s, "t1")
-    drain(s, { meter: createMeter(), run: createRun(), tape }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2), seal(delta("i1", "分页 a;"), 3)], 1000)
+    drain(s, { meter: createMeter(), book: createPaceBook(), tape }, [seal(turn("r1", "t1"), 1), seal(item("i1", "r1"), 2), seal(delta("i1", "分页 a;"), 3)], 1000)
     expect([nextChar(tape), nextChar(tape), nextChar(tape), nextChar(tape)]).toEqual(["分", "页", "a", ";"])
   })
 
@@ -252,7 +199,7 @@ describe("纸带上落的字", () => {
     const s = createScope()
     const tape = createTapeText()
     retarget(s, "t1")
-    drain(s, { meter: createMeter(), run: createRun(), tape }, [seal(turn("r1", "t1"), 1), seal(item("sh", "r1", "tool_call"), 2), seal(delta("sh", "npm WARN"), 3)], 1000)
+    drain(s, { meter: createMeter(), book: createPaceBook(), tape }, [seal(turn("r1", "t1"), 1), seal(item("sh", "r1", "tool_call"), 2), seal(delta("sh", "npm WARN"), 3)], 1000)
     expect(tape.chars).toEqual([])
   })
 })

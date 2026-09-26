@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Item, Thread, ToolCallItem } from "@omni/protocol"
-import { elapsed, statusLabel } from "./status.js"
+import { elapsed, paceLine, statusLabel } from "./status.js"
 import { brief, target } from "./tool.js"
 
 const thread = (status: Thread["status"]): Thread => ({
@@ -137,4 +137,20 @@ describe("elapsed", () => {
   it("时钟回拨也不会出现负数", () => {
     expect(elapsed(1000, 0)).toBe("0s")
   })
+})
+
+describe("paceLine", () => {
+  const cases: readonly (readonly [string, { firstMs: number; tps?: number; tokens: number; exact: boolean }, string])[] = [
+    ["真数不带 ≈", { firstMs: 800, tps: 34.4, tokens: 900, exact: true }, "首字 0.8 秒 · 34 tok/s"],
+    ["估数带 ≈", { firstMs: 1240, tps: 58.6, tokens: 900, exact: false }, "首字 1.2 秒 · ≈ 59 tok/s"],
+    ["慢到十以下留一位小数", { firstMs: 400, tps: 7.26, tokens: 90, exact: true }, "首字 0.4 秒 · 7.3 tok/s"],
+    ["首字十秒以上取整", { firstMs: 12_600, tps: 40, tokens: 900, exact: true }, "首字 13 秒 · 40 tok/s"],
+    ["整秒也写一位小数：一行里的数位对得齐", { firstMs: 1000, tps: 40, tokens: 900, exact: true }, "首字 1.0 秒 · 40 tok/s"],
+    ["出字时长太短量不出速度：只说首字", { firstMs: 900, tokens: 12, exact: true }, "首字 0.9 秒"],
+  ]
+  for (const [name, pace, want] of cases) {
+    it(name, () => {
+      expect(paceLine(pace)).toBe(want)
+    })
+  }
 })

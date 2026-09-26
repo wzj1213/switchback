@@ -1,5 +1,5 @@
 import type { Command, EngineInfo, Item,
-  Lane, TaskRun, Thread, Turn } from "@omni/protocol"
+  Lane, TaskRun, Thread, Turn, TurnId, TurnPace } from "@omni/protocol"
 import { buildHandoff, compareRuns, comparisonItems, type Comparison, type FileDiff, type Side } from "@omni/handoff"
 import { Transcript } from "./Transcript.js"
 import { labelOf } from "./Composer.js"
@@ -126,6 +126,8 @@ export interface ComparePane {
   tasks: readonly TaskRun[]
   thinkingTokens: number | undefined
   lanes: readonly Lane[]
+  /** 每一轮的出字节奏：两栏各自分界线上印，对比的正是这个。 */
+  paces: Readonly<Record<TurnId, TurnPace>>
 }
 
 export function Compare({
@@ -186,6 +188,7 @@ export function Compare({
               tasks={side.tasks}
               engines={engines}
               thinkingTokens={side.thinkingTokens}
+              paces={side.paces}
               turn={side.turn}
               send={send}
               onCopy={onCopy}

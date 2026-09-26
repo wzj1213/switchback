@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Thread } from "@omni/protocol"
+import { createPaceBook } from "@omni/store"
 import { emit, liveStateOf, ownerOf } from "./ctx.js"
 import type { Ctx } from "./ctx.js"
 
@@ -82,6 +83,7 @@ describe("不落盘、但描述现状的事件（重建时要补发）", () => {
       uncommitted: new Map(),
       echo: new Map(),
       explained: new Map(),
+      pace: createPaceBook(),
     }) as unknown as Ctx
 
   const commands: Event = {
@@ -235,6 +237,7 @@ describe("回声挡在唯一出口上", () => {
       uncommitted: new Map(),
       echo: new Map(),
       explained: new Map(),
+      pace: createPaceBook(),
     } as unknown as Ctx
     return { ctx, seen, written }
   }

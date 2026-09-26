@@ -11,7 +11,7 @@ import { TurnEdits } from "./TurnEdits.js"
 import { ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
 import type { Row } from "../group.js"
-import { spent } from "../status.js"
+import { TurnMarkText } from "./turn-mark.js"
 
 /**
  * 转录区里的**一行**。四种形态在这里分派，`Transcript` 只管遍历。
@@ -207,7 +207,7 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
             onFold(row.turnId)
           }}
         >
-          <span>已处理 {spent(row.ms)}</span>
+          <TurnMarkText ms={row.ms} pace={row.pace} />
           <ChevronIcon open={!folded} size={13} />
         </button>
         {/* **回到还没发生这一轮的时候。** 走错方向时唯一的出路，
