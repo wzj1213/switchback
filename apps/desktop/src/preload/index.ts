@@ -15,6 +15,8 @@ import type { ActivityDigest } from "../shared/activity.js"
 import type { FilePreview } from "../shared/file-preview.js"
 import type { PickedFiles } from "../shared/attachments.js"
 import { watchFile } from "./file-watch.js"
+import { acpBridge } from "./acp.js"
+import type { AcpTrialView } from "../shared/acp-registry.js"
 
 /**
  * 线上的两种形状。**从 `@omni/wire` 转出，不在这里再抄一份。**
@@ -57,6 +59,7 @@ interface Review {
 }
 
 const api = {
+  ...acpBridge,
   send(command: Command): void {
     ipcRenderer.send("omni:command", command)
   },
@@ -92,17 +95,8 @@ const api = {
    * 兑现（活着的会话握着旧驱动实例）。它只有主进程知道，不说出来就悄悄消失了。
    */
   /** 试着和一个可执行文件握一次 ACP 的手。**只握手，不开会话。** */
-  async tryAcpEngine(req: {
-    command: string
-    args?: readonly string[]
-  }): Promise<{ ok: boolean; protocolVersion?: number; capabilities?: readonly string[]; error?: string; stderr?: string }> {
-    return (await ipcRenderer.invoke("omni:tryAcpEngine", req)) as {
-      ok: boolean
-      protocolVersion?: number
-      capabilities?: readonly string[]
-      error?: string
-      stderr?: string
-    }
+  async tryAcpEngine(req: { command: string; args?: readonly string[] }): Promise<AcpTrialView> {
+    return (await ipcRenderer.invoke("omni:tryAcpEngine", req)) as AcpTrialView
   },
   /** 弹系统的文件选择器挑一个可执行文件。取消返回 undefined。 */
   async pickExecutable(): Promise<string | undefined> {

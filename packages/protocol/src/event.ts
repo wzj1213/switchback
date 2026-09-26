@@ -247,7 +247,18 @@ export type Event =
       timeoutMs?: number
     }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */
-  | { type: "engine.status"; at: number; threadId: ThreadId; status: EngineStatus; detail?: string }
+  | {
+      type: "engine.status"
+      at: number
+      threadId: ThreadId
+      status: EngineStatus
+      detail?: string
+      /**
+       * 说的是哪一家。只有 `unauthenticated` 带：开会话失败时会话已经撤了，
+       * 界面要靠它在「那一家登录成功」之后收起这条横幅。
+       */
+      engine?: EngineId
+    }
 
 /**
  * `degraded` 是**引擎还活着、但掉了一部分能力**。
@@ -255,8 +266,12 @@ export type Event =
  * 加这一档是因为 MCP 服务器起不来：codex 照跑不误，只是那台服务器的工具
  * 全都不在了。报 `crashed` 是撒谎（引擎好好的），不报又是最坏的一种——
  * agent 少了几十个工具，你只会看到它「做得不太行」，而不知道为什么。
+ *
+ * `unauthenticated` 是**引擎明确说了「要先登录」**（ACP 的 `-32000`）：进程好好的，
+ * 只是这一步它不肯做。同样不能报成 `crashed`——那会把人引去查一个没坏的东西；
+ * 下一步是登录，界面据此直接给出去登录的路。
  */
-export type EngineStatus = "starting" | "ready" | "exited" | "crashed" | "timeout" | "degraded"
+export type EngineStatus = "starting" | "ready" | "exited" | "crashed" | "timeout" | "degraded" | "unauthenticated"
 
 /**
  * 账号额度。

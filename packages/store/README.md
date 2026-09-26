@@ -9,7 +9,9 @@
 ## 拥有什么
 
 - `ViewState` —— 会话表、顺序、每个会话的 item 列表与当前轮次
-- `notices` —— 引擎故障与原生一次性通知；同一会话、引擎和原生 key 的提示只留最新一条
+- `notices` —— 引擎故障与原生一次性通知；同一会话、引擎和原生 key 的提示只留最新一条。
+  故障按状态分三类抬头：`crashed`（故障）、`degraded`（能力受限）、`auth`（引擎明确要先登录，带引擎 id，
+  那一家登录成功后界面据此收起）
 - `reduce(state, event)` —— 唯一入口，纯函数，不可变更新
 - `reduceHistory(state, threadId, events)` —— **单独补一条会话的历史**。
   先清掉这条的条目再按历史铺开：直接 `reduceAll` 的话，已经在直播的那几条

@@ -204,8 +204,15 @@ export interface AcpInitialize {
      * 所以判据是「这个键在不在」，不是「它的值是不是 true」。
      */
     sessionCapabilities?: Record<string, unknown>
+    /** 登录相关。`logout: {}` 表示认 `logout`（存在即支持，同 `sessionCapabilities`）。 */
+    auth?: { logout?: unknown } | null
   }
   agentInfo?: { name?: string; title?: string; version?: string }
+  /**
+   * 它认的登录方式。**形状由 `auth.ts` 逐条认**——协议要求跳过认不出的项，
+   * 而实测各家混着两代写法（`type: "terminal"` 与旧的 `_meta["terminal-auth"]`）。
+   */
+  authMethods?: readonly unknown[]
 }
 
 /** `session/list` 回来的一条。实测 kimi 的字段就这四个。 */

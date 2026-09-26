@@ -90,6 +90,7 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
       engines={app.engines}
       state={state}
       cwd={thread?.cwd}
+      initialTab={shell.settingsTab}
       onReveal={app.reveal}
       onCopy={app.copy}
       onClose={() => {
@@ -154,6 +155,7 @@ export function App(): React.JSX.Element {
         <EmptyScreen
           notices={app.notices}
           onDismiss={shell.dismiss}
+          onLogin={() => { shell.openSettingsAt("install") }}
           bridgeMissing={app.bridgeMissing}
           ready={app.ready}
         />

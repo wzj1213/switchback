@@ -9,7 +9,7 @@
 
 - `EngineDriver` / `EngineSession` 契约（`contract.ts`）
 - `subprocess.ts` —— 进程组所有权与回收阶梯，各引擎共用
-- `rpc.ts` —— JSON-RPC 2.0 over 换行分隔 JSON。**codex 与 ACP 共用一份**：
+- `rpc.ts` —— JSON-RPC 2.0 over 换行分隔 JSON。**codex 与 ACP 共用一份**（对端报的错以 `RpcError` 抛出，错误码留着——ACP 的 `-32000` 只能靠它认）：
   接 ACP 时这个文件从 `codex/` 提到包根，一个字没改就跑通了
 - `claude/` —— Claude Agent SDK 驱动（`@anthropic-ai/claude-agent-sdk`）
   - `permission.ts` 把 SDK 的 `canUseTool` 请求翻成 `@omni/approval` 的 `Request`，
@@ -128,6 +128,13 @@
   - `grok-scheduled.ts` 只认 Grok 到点通知给出的任务原文、计划与 id，并用其原生 prompt 标识发回
   - `grok-interaction.ts` 把 Grok `AskUserQuestion` 与 `exit_plan_mode` 的题目、选项、聚焦预览、计划正文和反馈翻成宿主问题卡，按原生响应形状回送
   - `grok-activity.ts` 镜像 Grok 私有通知里的后台任务、Monitor 输出、子代理、workflow 与长期目标；输出仍回到原生工具 item，不复制任务查看器协议
+  - `auth.ts` 认 `initialize` 报的登录方式（`type: "terminal"` 与旧的 `_meta["terminal-auth"]`
+    两代写法，`_meta["api-key"]` 标出要 key 的那种），并在握手里声明客户端能跑 terminal 型登录；
+    开会话撞上 `-32000` 时抛 `AcpAuthRequired`：它自己的原话在前，它报的登录方式与去处在后，
+    宿主据此报 `unauthenticated` 而不是 `crashed`
+  - `login.ts` 只做转达：一次性进程里握手后发 `authenticate` / `logout`（agent 型，最多等五分钟、可取消），
+    terminal 型只算出要在终端里跑的整条命令（启动命令 + 追加参数，旧写法用它给的整条命令）；
+    `oneshot.ts` 是试接、登录、退出共用的「起进程 → 握手 → 办完就回收」
   - `grok.ts` 负责它的会话记录路径；`kimi.ts` 仅是废弃 ACP 链路的兼容重导出。
     内置 Kimi 不再注册 `kimi acp`，Kimi 的日志定位归 `kimi/log.ts`
 
@@ -136,7 +143,9 @@
 - **不拥有审批判定**。判定在 `@omni/approval`，本包只做协议翻译与应答。
 - 不拥有 UI。需要人工裁决时调 `StartRequest.askUser`，由宿主决定怎么呈现。
 - 不拥有持久化。事件流往外发，落盘是 `@omni/journal` 的事。
-- 不拥有引擎的安装、登录、模型选择——用宿主上已有的原生配置。
+- 不拥有凭证。ACP 的登录只是把人挑的那种方式转给 agent（`authenticate`），或给出它自己的终端登录命令；
+  开浏览器、收回调、存凭证都是 agent 的事，本包看不到任何一个凭证。
+- 不拥有引擎的安装与模型选择——用宿主上已有的原生配置。
 
 ## 四条链路的结构差别
 
@@ -241,6 +250,11 @@
   与 `/questions/{id}` 往返，桌面和远程端都能回答或跳过。
 - **Kimi 只能从会话末尾原生分叉。** 普通完整分叉照常开放；「从这里重来」不会出现，
   驱动也会防御性拒绝带历史截断的请求，不把“复制整条会话”冒充成“从指定轮次分叉”。
+- **ACP 的 terminal 型登录要人回来确认。** 协议里它没有带内的成功信号（终端里那个进程退出码 0 即成功，
+  而那个进程由桌面交给系统终端跑，不在本包手里）；所以桌面只报「终端已打开」，登没登上要再试接一次才知道。
+  agent 型则有回包，办完就是办完。
+- **ACP 的 `env_var` 型登录（2026-07 已从协议里拿掉）与认不出的型一律跳过**，不替它猜要什么变量。
+  要 API key 的那几种（`_meta["api-key"]`）照样列出、照样转达，key 由 agent 自己从环境里读。
 - **ACP 侧的能力由 agent 自报**（`capabilitiesOf`），不再一律 `NO_CAPABILITIES`。
   旧 Kimi ACP（`kimi acp`，0.36.1）的实测仍作为通用驱动样本保留：能贴图、能原生分叉、能列历史、能续跑，
   **不能压缩**（`session/compact` → Method not found）、不能通过标准 `session/steer` 改向。

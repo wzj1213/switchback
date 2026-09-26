@@ -95,11 +95,13 @@ function Notice({ text, fatal, waiting }: {
 export function EmptyScreen({
   notices,
   onDismiss,
+  onLogin,
   bridgeMissing,
   ready,
 }: {
   notices: readonly StoreNotice[]
   onDismiss: (id: string) => void
+  onLogin: () => void
   bridgeMissing: boolean
   ready: boolean
 }): React.JSX.Element {
@@ -108,7 +110,7 @@ export function EmptyScreen({
     <main className="main">
       {/* 顶栏那条线先在：主区一片空白、连边都没有的那一版看起来像应用坏了 */}
       <header className="topbar topbar--bare" />
-      <Notices notices={notices} rows={[]} onDismiss={onDismiss} onSelect={() => undefined} />
+      <Notices notices={notices} rows={[]} onDismiss={onDismiss} onSelect={() => undefined} onLogin={onLogin} />
       <Notice
         fatal={bridgeMissing}
         waiting={!bridgeMissing && !failed && !ready}
@@ -174,6 +176,7 @@ export function SettingsScreen({
   engines,
   state,
   cwd,
+  initialTab,
   onReveal,
   onCopy,
   onClose,
@@ -183,6 +186,8 @@ export function SettingsScreen({
   state: ViewState
   /** 当前会话的工作区。「环境」那页要按它算项目级的钩子；没有会话时是 undefined。 */
   cwd: string | undefined
+  /** 打开时落在哪一页；不给就是第一页。 */
+  initialTab?: string | undefined
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   onClose: () => void
@@ -203,6 +208,7 @@ export function SettingsScreen({
       version={info.version}
       dataDir={info.dataDir}
       cwd={cwd}
+      {...(initialTab === undefined ? {} : { initialTab })}
       onPatch={prefs.patch}
       onClose={onClose}
       onReveal={onReveal}

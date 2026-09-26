@@ -88,6 +88,8 @@ export interface SettingsPanelProps {
   dataDir: string
   /** 当前会话的工作区。「环境」那页要靠它算项目级的配置；没有会话时就只有用户级那几份。 */
   cwd?: string
+  /** 打开时落在哪一页（「需要登录」横幅直接落到「安装与接入」）。认不出的就从第一页开始。 */
+  initialTab?: string
   onPatch: (next: Partial<Settings>) => void
   onClose: () => void
   onReveal: (path: string) => void
@@ -172,7 +174,7 @@ function Nav({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }): Reac
 }
 
 export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
-  const [tab, setTab] = useState<TabId>("look")
+  const [tab, setTab] = useState<TabId>(() => TABS.find((one) => one.id === props.initialTab)?.id ?? "look")
   // 这是最上层的模态，却曾经是唯一按 Esc 关不掉的浮层（见 `useModalKeys`）
   const box = useModalKeys(props.onClose)
   return (

@@ -279,6 +279,15 @@ describe("引擎故障通知", () => {
     expect(s.notices.map((n) => n.text)).toEqual(["找不到可执行文件 codex", "握手超时"])
   })
 
+  it("抬头照状态分：故障、能力受限、要先登录各是各的", () => {
+    const s = reduceAll(initial(), [
+      status("crashed", "炸了"),
+      status("degraded", "MCP 没起来"),
+      status("unauthenticated", "Gemini CLI 要先登录"),
+    ])
+    expect(s.notices.map((n) => n.kind)).toEqual(["crashed", "degraded", "auth"])
+  })
+
   it("没有 detail 时也要有一句话，不能是空白横幅", () => {
     expect(reduceAll(initial(), [status("crashed")]).notices[0]?.text).toContain("没有描述")
   })

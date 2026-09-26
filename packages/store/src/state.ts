@@ -100,8 +100,13 @@ export interface FailureNotice extends NoticeBase {
    *（MCP 没起来、没登录），把它顶着「引擎故障」四个字端出去，
    * 等于把排查引到错的方向——**这正是当初不用 `crashed` 的理由**，
    * 结果在界面上又还回去了。
+   *
+   * `auth` 是引擎明确要求先登录（`engine.status` 的 `unauthenticated`）：抬头写「需要登录」，
+   * 桌面端顺手给一条去登录的路。
    */
-  kind: "crashed" | "degraded"
+  kind: "crashed" | "degraded" | "auth"
+  /** `auth` 那一类说的是哪家引擎；那一家登录成功后界面据此收起它。 */
+  engine?: EngineId
 }
 
 /** 引擎原生通知队列里的一条瞬时提示。 */

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { NO_CAPABILITIES } from "@omni/protocol"
 import type { StartRequest } from "../contract.js"
+import { RpcError } from "../rpc.js"
+import { AcpAuthRequired } from "./auth.js"
 import { openSession, type OpenCtx, type OpenState } from "./open.js"
 
 /**
@@ -143,5 +145,35 @@ describe("ACP 分叉只承诺复制末尾", () => {
     ])
     expect(h.state.acpSession).toBe("s-native")
     expect(h.state.models).toHaveLength(2)
+  })
+})
+
+describe("开会话撞上 -32000（要先登录）", () => {
+  const refuse = (h: ReturnType<typeof ctxWith>, error: { code: number; message: string; data?: unknown }): void => {
+    h.ctx.rpc.call = () => Promise.reject(new RpcError(error))
+  }
+
+  it("认错误码不认措辞：它的原话、握手时报的登录方式、去哪儿登录，一句说清", async () => {
+    const h = ctxWith({})
+    h.ctx.config.label = "Gemini CLI"
+    h.state.authMethods = [{ id: "oauth-personal", name: "Log in with Google", kind: "agent" }]
+    // 实测 Gemini CLI 在这一码下说的根本不是「请登录」
+    refuse(h, { code: -32000, message: "This client is no longer supported", data: { authMethods: [] } })
+    const error = (await openSession(h.ctx).catch((caught: unknown) => caught)) as Error
+    expect(error).toBeInstanceOf(AcpAuthRequired)
+    expect(error.message).toContain("Gemini CLI 要先登录")
+    expect(error.message).toContain("This client is no longer supported")
+    // data 里那串 JSON 不拖进人话里
+    expect(error.message).not.toContain("authMethods")
+    expect(error.message).toContain("Log in with Google")
+  })
+
+  it("续跑撞上同一码也一样翻译；别的码原样抛", async () => {
+    const h = ctxWith({}, { resume: "s-old" })
+    refuse(h, { code: -32000, message: "Authentication required" })
+    await expect(openSession(h.ctx)).rejects.toThrow(/acp:grok 要先登录/)
+    const other = ctxWith({})
+    refuse(other, { code: -32603, message: "炸了" })
+    await expect(openSession(other.ctx)).rejects.toThrow("炸了")
   })
 })

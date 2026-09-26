@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
+import { useAuthNotices } from "./acp-login-signal.js"
 import {
   accountOf,
   foreignByEngine,
@@ -166,6 +167,7 @@ export function useApp(): AppApi {
   }, [omni.lastStarted, shell])
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
   useEffect(() => omni.viewing(thread?.id), [omni.viewing, thread?.id])
+  useAuthNotices(omni.state.notices, shell.dismiss)
   const items = useThreadItems(omni.state, thread)
   const visibleRows = useMemo(() => rows.filter((r) => r.thread.provisional !== true), [rows])
   const sidebarRows = useUnread(visibleRows, thread?.id)

@@ -198,7 +198,7 @@ export function createDshDriver(options: DshDriverOptions = {}): EngineDriver {
     id: "dsh",
     start: (req) => {
       const profile = dshProfileOf(req.profile, options.profile)
-      const driver = createAcpDriver({ id: "dsh", command, args: argsOf(profile) })
+      const driver = createAcpDriver({ id: "dsh", label: "DSH", command, args: argsOf(profile) })
       return driver.start({ ...req, profile })
     },
     probe: () =>

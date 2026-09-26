@@ -56,6 +56,9 @@ export interface Shell {
   toggleRail: () => void
   settingsOpen: boolean
   setSettingsOpen: (on: boolean) => void
+  /** 直接打开到某一页（「需要登录」横幅要落在「安装与接入」）。普通打开仍从头一页开始。 */
+  settingsTab: string | undefined
+  openSettingsAt: (tab: string) => void
   /** 审核页签已经打开；切去别页时仍挂载，保住筛选和选中位置。 */
   reviewOpen: boolean
   reviewActive: boolean
@@ -105,6 +108,7 @@ export function useShell(): Shell {
   const [comparing, setComparing] = useState(false)
   const [railOpen, setRailOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined)
   const [reportedReview, setReportedReview] = useState<TurnReviewTarget>()
   const [panel, setPanel] = useState(CLOSED_PANEL)
   const [focusFilter, setFocusFilter] = useState(0)
@@ -163,7 +167,15 @@ export function useShell(): Shell {
     railOpen,
     toggleRail: () => { setRailOpen((was) => !was) },
     settingsOpen,
-    setSettingsOpen,
+    setSettingsOpen: (on) => {
+      setSettingsTab(undefined)
+      setSettingsOpen(on)
+    },
+    settingsTab,
+    openSettingsAt: (tab) => {
+      setSettingsTab(tab)
+      setSettingsOpen(true)
+    },
     reviewOpen: hasPanelTab(panel, "review"),
     reviewActive: panel.visible && panel.active === "review",
     setReviewOpen: (on) => {

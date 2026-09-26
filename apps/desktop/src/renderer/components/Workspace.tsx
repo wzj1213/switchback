@@ -68,6 +68,8 @@ export interface WorkspaceProps {
   onDismiss: (id: string) => void
   /** 点横幅上那个名字跳过去。 */
   onSelect: (id: string) => void
+  /** 「需要登录」横幅上那颗「去登录」。 */
+  onLogin: () => void
   finding: boolean
   onFind: (query: string, next: boolean, forward: boolean) => Promise<FindResult>
   onCloseFind: () => void
@@ -209,6 +211,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         rows={props.rows}
         onDismiss={props.onDismiss}
         onSelect={props.onSelect}
+        onLogin={props.onLogin}
       />
       {props.finding ? <FindBar onFind={props.onFind} onClose={props.onCloseFind} /> : null}
       <ConversationStage

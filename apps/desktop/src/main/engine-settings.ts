@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { app, dialog, ipcMain } from "electron"
 import { tryAcp } from "@omni/engine"
-import { addEngineEntry, engineNameOf } from "./engines.js"
+import { addEngineEntry, engineNameOf } from "./engines-file.js"
 import type { Attached } from "./host.js"
 import type { Logger } from "./log.js"
 import { installSettingsChannel, type Store } from "./settings.js"

@@ -4,15 +4,13 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
   acpShapes,
-  addEngineEntry,
-  engineNameOf,
   ENGINES_FILE,
-  ensureEngineFile,
   mergeAcpEngines,
   readEngineFile,
   registerAcpEngines,
   type EngineEntry,
 } from "./engines.js"
+import { addEngineEntry, engineNameOf, ensureEngineFile, removeEngineEntry, replaceEngineEntry } from "./engines-file.js"
 import type { Logger } from "./log.js"
 
 function dirWith(content?: string): { dir: string; log: Logger; logged: string[] } {
@@ -127,42 +125,81 @@ describe("运行期合并 engines.json", () => {
 
     const done = mergeAcpEngines(target, known, { a: entry("a"), b: entry("b") })
 
-    expect(done).toEqual({ added: ["acp:b"], needsRestart: [] })
+    expect(done).toEqual({ added: ["acp:b"], replaced: [], removed: [], needsRestart: [] })
     expect(target.labels["acp:b"]).toBe("L-b")
     // **同一个实例**：没被顺手重建，正在用它的会话不受影响
     expect(target.drivers["acp:a"]).toBe(first)
   })
 
-  it("改过的不换驱动，只报「要重启」", () => {
+  it("改过的、**有会话在用**：不换驱动，只报「要重启」", () => {
     const file = { a: entry("a") }
     const target = registerAcpEngines(file)
     const known = acpShapes(file)
     const first = target.drivers["acp:a"]
 
-    const done = mergeAcpEngines(target, known, { a: entry("改成了别的") })
+    const done = mergeAcpEngines(target, known, { a: entry("改成了别的") }, () => true)
 
-    expect(done).toEqual({ added: [], needsRestart: ["acp:a"] })
+    expect(done).toEqual({ added: [], replaced: [], removed: [], needsRestart: ["acp:a"] })
     expect(target.drivers["acp:a"]).toBe(first)
   })
 
-  it("从文件里删掉的**不抽走**驱动，同样只报「要重启」", () => {
+  it("从文件里删掉的、**有会话在用**：不抽走驱动，同样只报「要重启」", () => {
     const file = { a: entry("a") }
     const target = registerAcpEngines(file)
     const known = acpShapes(file)
 
-    const done = mergeAcpEngines(target, known, {})
+    const done = mergeAcpEngines(target, known, {}, () => true)
 
-    expect(done).toEqual({ added: [], needsRestart: ["acp:a"] })
+    expect(done).toEqual({ added: [], replaced: [], removed: [], needsRestart: ["acp:a"] })
     expect(target.drivers["acp:a"]).toBeDefined()
+  })
+
+  it("不说谁在用就当都在用——退回最保守的老路", () => {
+    const file = { a: entry("a") }
+    const target = registerAcpEngines(file)
+    const done = mergeAcpEngines(target, acpShapes(file), { a: entry("b") })
+    expect(done.needsRestart).toEqual(["acp:a"])
+  })
+
+  it("没人在用：改过的当场换成新配置，删掉的当场摘掉（名字留给历史会话）", () => {
+    const file = { a: entry("a"), gone: entry("gone") }
+    const target = registerAcpEngines(file)
+    const known = acpShapes(file)
+    const first = target.drivers["acp:a"]
+
+    const done = mergeAcpEngines(target, known, { a: entry("a2") }, () => false)
+
+    expect(done).toEqual({ added: [], replaced: ["acp:a"], removed: ["acp:gone"], needsRestart: [] })
+    expect(target.drivers["acp:a"]).not.toBe(first)
+    expect(target.labels["acp:a"]).toBe("L-a2")
+    expect(target.drivers["acp:gone"]).toBeUndefined()
+    expect(target.labels["acp:gone"]).toBe("L-gone")
+    // 换过之后再读同一份就不再报事
+    expect(mergeAcpEngines(target, known, { a: entry("a2") }, () => false)).toEqual({
+      added: [], replaced: [], removed: [], needsRestart: [],
+    })
   })
 
   it("一个字没改就什么都不报——重复点「重新探测」不该每次都说有事", () => {
     const file = { a: entry("a") }
     const target = registerAcpEngines(file)
     const known = acpShapes(file)
+    const quiet = { added: [], replaced: [], removed: [], needsRestart: [] }
 
-    expect(mergeAcpEngines(target, known, file)).toEqual({ added: [], needsRestart: [] })
-    expect(mergeAcpEngines(target, known, file)).toEqual({ added: [], needsRestart: [] })
+    expect(mergeAcpEngines(target, known, file)).toEqual(quiet)
+    expect(mergeAcpEngines(target, known, file)).toEqual(quiet)
+  })
+
+  it("注册表来源三样齐全才认，缺一样当手接的", () => {
+    const { dir, log } = dirWith(JSON.stringify({
+      a: { command: "npx", registry: { id: "gemini", version: "0.61.0", kind: "npx" } },
+      b: { command: "npx", registry: { id: "gemini", version: "0.61.0", kind: "pip" } },
+      c: { command: "npx", registry: { id: "gemini" } },
+    }))
+    const file = readEngineFile(dir, log)
+    expect(file["a"]?.registry).toEqual({ id: "gemini", version: "0.61.0", kind: "npx" })
+    expect(file["b"]?.registry).toBeUndefined()
+    expect(file["c"]?.registry).toBeUndefined()
   })
 })
 
@@ -234,8 +271,73 @@ describe("写进 engines.json", () => {
 
   it("空参数不写进去——`args: []` 和「没有 args」在文件里该长一个样", () => {
     const at = dir()
-    addEngineEntry(at, "a", { label: "A", command: "a", args: [] })
+    addEngineEntry(at, "a", { label: "A", command: "a", args: [], env: {} })
     const raw = JSON.parse(readFileSync(join(at, ENGINES_FILE), "utf8")) as Record<string, unknown>
     expect(Object.hasOwn(raw["a"] as object, "args")).toBe(false)
+    expect(Object.hasOwn(raw["a"] as object, "env")).toBe(false)
+  })
+
+  it("环境与注册表来源照写，读回来一样", () => {
+    const at = dir()
+    const registry = { id: "auggie", version: "0.36.0", kind: "npx" } as const
+    addEngineEntry(at, "auggie", {
+      label: "Auggie CLI", command: "npx", args: ["-y", "@augmentcode/auggie@0.36.0", "--acp"],
+      env: { AUGMENT_DISABLE_AUTO_UPDATE: "1" }, registry,
+    })
+    expect(readEngineFile(at, log)["auggie"]).toEqual({
+      label: "Auggie CLI", command: "npx", args: ["-y", "@augmentcode/auggie@0.36.0", "--acp"],
+      env: { AUGMENT_DISABLE_AUTO_UPDATE: "1" }, registry,
+    })
+  })
+})
+
+describe("换掉与删掉 engines.json 里的一条", () => {
+  const dir = (content: Record<string, unknown>): string => {
+    const at = mkdtempSync(join(tmpdir(), "omni-edit-"))
+    writeFileSync(join(at, ENGINES_FILE), JSON.stringify(content), "utf8")
+    return at
+  }
+  const raw = (at: string): Record<string, Record<string, unknown>> =>
+    JSON.parse(readFileSync(join(at, ENGINES_FILE), "utf8")) as Record<string, Record<string, unknown>>
+
+  it("换：新的字段盖上去，人手加的 compact / 不认识的键原样留着，别的条目一字不动", () => {
+    const at = dir({
+      _说明: ["别删我"],
+      gemini: { label: "Gemini", command: "npx", args: ["-y", "@google/gemini-cli@0.60.0"], compact: true, 手加的: 1 },
+      other: { label: "O", command: "o" },
+    })
+    const done = replaceEngineEntry(at, "gemini", {
+      label: "Gemini CLI", command: "npx", args: ["-y", "@google/gemini-cli@0.61.0", "--acp"],
+      registry: { id: "gemini", version: "0.61.0", kind: "npx" },
+    })
+    expect(done).toEqual({ ok: true, id: "acp:gemini" })
+    const file = raw(at)
+    expect(file["gemini"]).toEqual({
+      label: "Gemini CLI", command: "npx", args: ["-y", "@google/gemini-cli@0.61.0", "--acp"],
+      registry: { id: "gemini", version: "0.61.0", kind: "npx" }, compact: true, 手加的: 1,
+    })
+    expect(file["other"]).toEqual({ label: "O", command: "o" })
+    expect(file["_说明"]).toEqual(["别删我"])
+  })
+
+  it("换一条不存在的不能悄悄变成加", () => {
+    const at = dir({})
+    expect(replaceEngineEntry(at, "nope", { label: "N", command: "n" }).ok).toBe(false)
+    expect(raw(at)).toEqual({})
+  })
+
+  it("删：只删这一个键；删不存在的照实说", () => {
+    const at = dir({ _说明: ["x"], a: { command: "a" }, b: { command: "b" } })
+    expect(removeEngineEntry(at, "a")).toEqual({ ok: true, id: "acp:a" })
+    expect(raw(at)).toEqual({ _说明: ["x"], b: { command: "b" } })
+    expect(removeEngineEntry(at, "a").ok).toBe(false)
+  })
+
+  it("文件坏了不删也不换", () => {
+    const at = mkdtempSync(join(tmpdir(), "omni-edit-"))
+    writeFileSync(join(at, ENGINES_FILE), "[1,2]", "utf8")
+    expect(removeEngineEntry(at, "a").ok).toBe(false)
+    expect(replaceEngineEntry(at, "a", { label: "A", command: "a" }).ok).toBe(false)
+    expect(readFileSync(join(at, ENGINES_FILE), "utf8")).toBe("[1,2]")
   })
 })

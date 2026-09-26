@@ -27,9 +27,10 @@ interface Trial {
   capabilities?: readonly string[]
   error?: string
   stderr?: string
+  authMethods?: readonly { name: string }[]
 }
 
-export function AcpConnect(): React.JSX.Element {
+export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Element {
   const omni = bridge()
   const [command, setCommand] = useState("")
   const [args, setArgs] = useState("")
@@ -99,6 +100,7 @@ export function AcpConnect(): React.JSX.Element {
                 // 接完把表单清空：留着上一条会让人以为还没提交，然后再点一次
                 //（第二次会撞上「已经有一条叫 X 的了」，看起来像出了错）
                 if (done.ok) {
+                  onAdded?.()
                   setCommand("")
                   setArgs("")
                   setLabel("")
@@ -190,10 +192,12 @@ function TrialResult({ trial, note }: { trial?: Trial; note?: string }): React.J
     )
   }
   const caps = trial.capabilities ?? []
+  const logins = (trial.authMethods ?? []).map((method) => method.name)
   return (
     <p className="set__blank">
       握手成功{trial.protocolVersion === undefined ? "" : `（ACP v${String(trial.protocolVersion)}）`}。
       {caps.length === 0 ? "它没有声明任何能力——那只是没声明，不代表不行。" : `它认领了：${caps.join("、")}。`}
+      {logins.length === 0 ? "" : `它报了这些登录方式：${logins.join("、")}——接入后在上面「已接入的 ACP 引擎」里登录。`}
     </p>
   )
 }

@@ -70,14 +70,14 @@ export function buildRegistry(
   drivers: Readonly<Record<string, EngineDriver>>
   labels: Readonly<Record<string, string>>
   /**
-   * 重读 `engines.json`，把新增的那几家接进来。**只加，不改也不删**——理由见
-   * `engines.ts` 的 `mergeAcpEngines`。
+   * 重读 `engines.json`，把变化接进来：新增的立刻加，改过的与删掉的**只在没有会话在用时**
+   * 才动——理由见 `engines.ts` 的 `mergeAcpEngines`。
    *
    * 敢在运行期加是因为宿主**用的时候**才读 `deps.drivers[id]`，从不快照；
    * 所以这两个对象是**故意可变**的（`Readonly` 只是不让外面写）。
    * 上一版没有这条路，于是往注册表里加一家之后唯一的出路是重启应用。
    */
-  reload: () => AcpReload
+  reload: (inUse?: (id: string) => boolean) => AcpReload
 } {
   const file = readEngineFile(userData, log)
   const acp = registerAcpEngines(file)
@@ -89,6 +89,7 @@ export function buildRegistry(
       kimi: createKimiDriver(),
       grok: createAcpDriver({
         id: "grok",
+        label: BUILTIN_ENGINE_LABELS.grok,
         command: "grok",
         args: ["agent", "stdio"],
         logPath: grokLogPath,
@@ -137,12 +138,19 @@ export function buildRegistry(
   }
   return {
     ...built,
-    reload: () => {
-      const next = mergeAcpEngines(built, known, readEngineFile(userData, log))
-      if (next.added.length > 0) log.write("info", "engines", `接入了 ${next.added.join("、")}`)
-      if (next.needsRestart.length > 0)
-        log.write("info", "engines", `${next.needsRestart.join("、")} 改过或已删除，要重启才生效`)
+    reload: (inUse) => {
+      const next = mergeAcpEngines(built, known, readEngineFile(userData, log), inUse)
+      logReload(log, next)
       return next
     },
   }
+}
+
+/** 每一拨各记一行：「已经生效」和「看见了但这一次没生效」在日志里也得分得开。 */
+function logReload(log: Logger, next: AcpReload): void {
+  if (next.added.length > 0) log.write("info", "engines", `接入了 ${next.added.join("、")}`)
+  if (next.replaced.length > 0) log.write("info", "engines", `换上了新配置：${next.replaced.join("、")}`)
+  if (next.removed.length > 0) log.write("info", "engines", `摘掉了 ${next.removed.join("、")}`)
+  if (next.needsRestart.length > 0)
+    log.write("info", "engines", `${next.needsRestart.join("、")} 改过或已删除，但有会话在用，等它们关掉或重启才生效`)
 }

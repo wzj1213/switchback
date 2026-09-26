@@ -14,6 +14,8 @@ function toneOf(notice: Notice): NoticeTone {
 function labelOf(notice: Notice): string {
   if (notice.kind === "crashed") return "出错了"
   if (notice.kind === "degraded") return "能力受限"
+  // 登录只能在那台 Mac 上办（它会开浏览器或终端），这里只照实说
+  if (notice.kind === "auth") return "需要登录"
   return "引擎提示"
 }
 

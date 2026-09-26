@@ -85,6 +85,8 @@ export interface ForeignFork {
 export interface AcpDriverConfig {
   /** 引擎身份，落进事件与判定请求。约定用 `acp:` 前缀，如 `acp:zcode`。 */
   id: string
+  /** 给人看的名字。报「要先登录」这类话时用它，没有就退回 id。 */
+  label?: string
   command: string
   args?: readonly string[]
   env?: Readonly<Record<string, string>>

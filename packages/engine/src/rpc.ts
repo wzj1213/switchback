@@ -51,6 +51,33 @@ interface Pending {
   reject: (error: Error) => void
 }
 
+/**
+ * 对端回的 JSON-RPC 错误。**错误码必须留着**：ACP 的 `-32000`（要先登录）
+ * 只能靠它认出来——`message` 是各家自己写的话，实测 Gemini CLI 在这一码下
+ * 说的根本不是「Authentication required」。
+ *
+ * 消息文本照旧是 `errorText` 那一句，原来只读 `message` 的调用方不受影响。
+ */
+export class RpcError extends Error {
+  readonly code: number | undefined
+  readonly data: unknown
+  /** 对端 `message` 的原文，不带 `data`。拿它转述给人时不会拖出一串 JSON。 */
+  readonly said: string
+
+  constructor(error: { message?: string; code?: number; data?: unknown }) {
+    super(errorText(error))
+    this.name = "RpcError"
+    this.code = error.code
+    this.data = error.data
+    this.said = error.message ?? ""
+  }
+}
+
+/** 对端报的错误码。进程退出、连接关闭这类不是对端回的错，一律 undefined。 */
+export function rpcCodeOf(error: unknown): number | undefined {
+  return error instanceof RpcError ? error.code : undefined
+}
+
 interface Incoming {
   id?: RequestId
   method?: string
@@ -84,7 +111,7 @@ function settleReply(state: RpcState, msg: Incoming): void {
   if (waiter === undefined) return
   state.pending.delete(id)
   if (msg.error === undefined) waiter.resolve(msg.result)
-  else waiter.reject(new Error(errorText(msg.error)))
+  else waiter.reject(new RpcError(msg.error))
 }
 
 /**

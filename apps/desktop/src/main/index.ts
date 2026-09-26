@@ -16,7 +16,7 @@ import { installContextMenu } from "./context-menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
 import { exportReport } from "./diagnose.js"
-import { ensureEngineFile } from "./engines.js"
+import { ensureEngineFile } from "./engines-file.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
 import { announce, checkForUpdate, feedOf, fetchText } from "./update.js"
 import { createSettings } from "./settings.js"
@@ -33,6 +33,7 @@ import { readBuildInfo } from "./build-info.js"
 import { engineEnabled } from "../shared/engine-access.js"
 import { installActivity } from "./activity.js"
 import { installEngineSettings } from "./engine-settings.js"
+import { installAcpChannels } from "./acp-channels.js"
 import { installFilePreviewChannel } from "./file-preview.js"
 import { installFilePreviewWatch } from "./file-preview-watch.js"
 import { createTouchedFiles } from "./touched.js"
@@ -388,6 +389,8 @@ function bootstrap(): Promise<void> {
     installActivity(attached, log)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
     installEngineSettings(settings, attached, log)
+    // ACP 注册表、接入、登录：同样要宿主（接完当场重探、判断哪几家正在被会话用着）
+    installAcpChannels(attached, log)
     // 环在这儿闭合：从这一刻起，装完一家引擎不必重启 omni 就能被认出来
     engineRefresh.run = attached.refreshEngines
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createAcpDriver, type EngineDriver } from "@omni/engine"
 import type { Logger } from "./log.js"
@@ -22,6 +22,13 @@ import type { Logger } from "./log.js"
  *
  * 那等于在用户没说话的情况下从网上下载并执行代码。装不装、装哪个版本，
  * 是用户的决定，不是 omni 的。
+ *
+ * ## 那 ACP 注册表那条路算什么
+ *
+ * 「安装与接入」页能从 ACP 官方注册表接一家（`acp-connect.ts`）。它不违背上面两条：
+ * 启动命令是各家**自己在注册表里登记的**，omni 运行时现读、原样照做，代码里一条都不写；
+ * 而且只在人点了「接入」、看过要执行 / 要下载的那一行之后才动手。接进来的条目照样写在这个文件里，
+ * 多记一个 `registry` 来源，之后才比得出有没有新版。
  */
 
 export interface EngineEntry {
@@ -44,31 +51,23 @@ export interface EngineEntry {
    */
   compact?: boolean
   steer?: boolean
+  /**
+   * 从 ACP 注册表接进来的那几家记着来源：之后拿注册表比一比，才知道有没有新版。
+   * 手接的（「指个文件」）没有这一项——那一家的版本由它自己管，omni 不假装知道。
+   */
+  registry?: RegistrySource
+}
+
+/** 一条注册表条目的来源：哪一家、哪个版本、以哪种分发接进来的。 */
+export interface RegistrySource {
+  id: string
+  version: string
+  kind: "npx" | "uvx" | "binary"
 }
 
 export type EngineFile = Readonly<Record<string, EngineEntry>>
 
 export const ENGINES_FILE = "engines.json"
-
-/** 第一次打开时写进去的样板。**注释在 `_说明` 里**——JSON 没有注释。 */
-const TEMPLATE = {
-  _说明: [
-    "这里注册讲 ACP（Agent Client Protocol）的第三方引擎。",
-    "键是引擎 id，会以 acp: 前缀出现在界面上；值里的 command 是可执行文件。",
-    "新加一家：存盘后去 设置 → 引擎 → 安装与版本 点「重新探测」就能用，不用重启。",
-    "改已有那家的配置、或者删掉它：要重启 omni——正在跑的会话还握着旧的那份。",
-    "下面 example 那一条是样板，删掉它或改成你真正装了的适配器。",
-  ],
-  example: {
-    label: "示例（把这条删掉）",
-    command: "codex-acp",
-    args: [] as readonly string[],
-    // 这两位 ACP 握手里问不出来，只能你告诉 omni；不填就是没有。
-    // 只写真正对当前后端活体验证过的能力；桥里有路由不等于后端兑现
-    compact: false,
-    steer: false,
-  },
-} as const
 
 /**
  * 读注册表。**读不出来不能影响启动**——这个文件是用户手写的，
@@ -108,6 +107,15 @@ function saidBy(entry: Partial<EngineEntry>): { compact?: true; steer?: true } {
   }
 }
 
+/** 来源三样齐全才认；缺一样就当手接的——拿半截来源去比版本，只会报出假的「有新版」。 */
+function sourceOf(raw: unknown): { registry?: RegistrySource } {
+  if (typeof raw !== "object" || raw === null) return {}
+  const { id, version, kind } = raw as Partial<RegistrySource>
+  if (typeof id !== "string" || typeof version !== "string") return {}
+  if (kind !== "npx" && kind !== "uvx" && kind !== "binary") return {}
+  return { registry: { id, version, kind } }
+}
+
 /** 下划线开头的键是说明文字，跳过。字段不全的条目一并跳过，别半残地注册。 */
 function entryOf([id, value]: [string, unknown]): (readonly [string, EngineEntry])[] {
   if (id.startsWith("_") || typeof value !== "object" || value === null) return []
@@ -122,94 +130,10 @@ function entryOf([id, value]: [string, unknown]): (readonly [string, EngineEntry
         ...(Array.isArray(entry.args) ? { args: entry.args.filter((a) => typeof a === "string") } : {}),
         ...(typeof entry.env === "object" && entry.env !== null ? { env: entry.env } : {}),
         ...saidBy(entry),
+        ...sourceOf(entry.registry),
       },
     ],
   ]
-}
-
-/** 从命令名或标签推一个能当 JSON 键用的 id。**推不出来就返回 undefined**，别硬凑。 */
-export function engineNameOf(raw: string): string | undefined {
-  const base = raw.split(/[/\\]/).pop() ?? raw
-  const id = base
-    .toLowerCase()
-    .replace(/\.(exe|cmd|bat|sh|js|mjs)$/u, "")
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-  // 下划线开头是注释键（见 `TEMPLATE._说明`），空的也不行
-  return id === "" || id.startsWith("_") ? undefined : id
-}
-
-export interface AddResult {
-  ok: boolean
-  /** 成功时它在界面上的 id（带 `acp:` 前缀）。 */
-  id?: string
-  error?: string
-}
-
-/**
- * 往 `engines.json` 里加一条。
- *
- * ## 为什么读的是原文而不是 `readEngineFile`
- *
- * 那个函数会把文件**规范化**：过滤掉下划线开头的键、丢掉不认识的字段、
- * 补上默认值。拿它的结果写回去，等于把用户的 `_说明` 和任何我们还不认识的
- * 字段一起删掉——**用别人的配置文件当自己的数据结构用，是最容易背刺人的一种写法。**
- * 所以这里自己读原文、只改一个键、原样写回。
- *
- * ## 重名不覆盖
- *
- * 已经有同名的键就直接报错，不合并也不改名。那可能是一条正在被会话使用的配置，
- * 而「我以为我加了一条，结果改掉了另一条」是最坏的一种结果。
- *
- * 文件坏掉（不是 JSON、不是对象）同样不写：宁可让人自己去修，
- * 也不能拿一份新的把他手写的东西盖掉。
- */
-export function addEngineEntry(
-  dir: string,
-  name: string,
-  entry: { label: string; command: string; args?: readonly string[] },
-): AddResult {
-  const path = join(dir, ENGINES_FILE)
-  let raw: unknown
-  try {
-    raw = JSON.parse(readFileSync(path, "utf8"))
-  } catch {
-    // 文件不在是正常的（第一次用）；坏掉才要拦
-    try {
-      readFileSync(path, "utf8")
-      return { ok: false, error: `${ENGINES_FILE} 现在不是合法的 JSON，omni 不敢往里写。请先自己打开修一下。` }
-    } catch {
-      raw = {}
-    }
-  }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: `${ENGINES_FILE} 的最外层不是一个对象，omni 不敢往里写。` }
-  }
-  const file = raw as Record<string, unknown>
-  if (Object.hasOwn(file, name)) {
-    return { ok: false, error: `${ENGINES_FILE} 里已经有一条叫 \`${name}\` 的了。换个名字，或者先自己去改那一条。` }
-  }
-  file[name] = {
-    label: entry.label,
-    command: entry.command,
-    ...(entry.args === undefined || entry.args.length === 0 ? {} : { args: [...entry.args] }),
-  }
-  writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`, "utf8")
-  return { ok: true, id: `acp:${name}` }
-}
-
-/**
- * 文件不存在就写一份样板出来。已存在**绝不覆盖**——那是用户的配置。
- * 返回路径，供菜单里「用编辑器打开」用。
- */
-export function ensureEngineFile(dir: string): string {
-  const path = join(dir, ENGINES_FILE)
-  try {
-    readFileSync(path, "utf8")
-  } catch {
-    writeFileSync(path, `${JSON.stringify(TEMPLATE, null, 2)}\n`, "utf8")
-  }
-  return path
 }
 
 export interface Registered {
@@ -220,31 +144,36 @@ export interface Registered {
 /**
  * 重读 `engines.json` 之后发生了什么。
  *
- * 两拨分开报，因为**它们对用户的意思完全不同**：`added` 是「现在就能用了」，
- * `needsRestart` 是「我看见你改了，但这一次没法生效」。合成一句
+ * 分几拨报，因为**它们对用户的意思完全不同**：`added` / `replaced` / `removed` 是
+ * 「现在已经生效了」，`needsRestart` 是「我看见你改了，但这一次没法生效」。合成一句
  * 「配置已更新」的话，后一拨会被当成已经生效——而那正是最需要说清楚的一种。
  */
 export interface AcpReload {
   /** 这次新接进来的（id）。它们立刻可用，不用重启。 */
   added: readonly string[]
-  /** 改过的、或者从文件里删掉的（id）。**这一次不生效**，得重启。 */
+  /** 改过、而且此刻没有会话在用的：已经换成新配置。 */
+  replaced: readonly string[]
+  /** 从文件里删掉、而且此刻没有会话在用的：已经摘掉。 */
+  removed: readonly string[]
+  /** 改过或删掉、但**有会话正在用**的（id）。这一次不生效，等那些会话关掉或重启。 */
   needsRestart: readonly string[]
 }
 
 /**
- * 把 `engines.json` 里新增的那几家接进来。**只加，不改也不删。**
+ * 把 `engines.json` 的变化接进来。新增的立刻加；改过的、删掉的**只在没人用时**才动。
  *
- * ## 为什么敢在运行期加
+ * ## 为什么敢在运行期动
  *
  * 宿主是**用的时候**才去读 `deps.drivers[thread.engine]`（`host/session.ts`、
  * `host/branch.ts`），从不在构造时快照。所以往这个对象里加一个键，
  * 下一条会话立刻就能选到它——不需要重建宿主，也不影响任何在跑的会话。
  *
- * ## 为什么改过的和删掉的不动
+ * ## 为什么在用的那几家不动
  *
- * 那两种都会**换掉或抽走一个正在被使用的驱动实例**：活着的会话握着它的引用，
- * 底下还挂着引擎进程。为了省一次重启去冒「会话半路换了驱动」的险不划算，
- * 而且那种故障的样子会非常难查。所以照实报出来，让人自己决定什么时候重启。
+ * 活着的会话底下挂着引擎进程；它一旦要续接重启（换信任档、断线重挂），拿到的就会是
+ * **换过的驱动**——对着一条旧句柄起一个可能完全不同的程序，那种故障的样子会非常难查。
+ * 没人在用的就没有这个风险：上一版连它们也一律要求重启，于是「从注册表升个版本」
+ * 也得重启一次 omni。`inUse` 不给就当全都在用，退回那条最保守的老路。
  *
  * `known` 里存的是**注册时那份 entry 的 JSON**，用来认出「改过的」——
  * 比对驱动对象是比不出来的，它是个闭包。
@@ -253,9 +182,9 @@ export function mergeAcpEngines(
   target: Registered,
   known: Map<string, string>,
   file: EngineFile,
+  inUse: (id: string) => boolean = () => true,
 ): AcpReload {
-  const added: string[] = []
-  const needsRestart: string[] = []
+  const done = { added: [] as string[], replaced: [] as string[], removed: [] as string[], needsRestart: [] as string[] }
   const seen = new Set<string>()
   for (const [name, entry] of Object.entries(file)) {
     const id = `acp:${name}`
@@ -263,19 +192,29 @@ export function mergeAcpEngines(
     const shape = JSON.stringify(entry)
     const before = known.get(id)
     if (before === shape) continue
-    if (before !== undefined) {
-      needsRestart.push(id)
+    if (before !== undefined && inUse(id)) {
+      done.needsRestart.push(id)
       continue
     }
     const one = registerAcpEngines({ [name]: entry })
     Object.assign(target.drivers, one.drivers)
     Object.assign(target.labels, one.labels)
     known.set(id, shape)
-    added.push(id)
+    const bucket = before === undefined ? done.added : done.replaced
+    bucket.push(id)
   }
-  // 从文件里删掉的：驱动留着（可能有会话在用），但要说出来
-  for (const id of known.keys()) if (!seen.has(id)) needsRestart.push(id)
-  return { added, needsRestart }
+  for (const id of [...known.keys()]) {
+    if (seen.has(id)) continue
+    if (inUse(id)) {
+      done.needsRestart.push(id)
+      continue
+    }
+    // **名字留着**：磁盘上用它开过的历史会话还要靠它显示成人话
+    Reflect.deleteProperty(target.drivers, id)
+    known.delete(id)
+    done.removed.push(id)
+  }
+  return done
 }
 
 /** 注册时那份 entry 的形状，供 `mergeAcpEngines` 认出「改过的」。 */
@@ -297,6 +236,7 @@ export function registerAcpEngines(file: EngineFile): Registered {
     const id = `acp:${name}`
     drivers[id] = createAcpDriver({
       id,
+      label: entry.label,
       command: entry.command,
       ...(entry.args === undefined ? {} : { args: entry.args }),
       ...(entry.env === undefined ? {} : { env: entry.env }),

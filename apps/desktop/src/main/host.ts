@@ -6,6 +6,7 @@ import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
 import type { Ledger, Sealed } from "@omni/wire"
 import { createHost, type Host } from "@omni/host"
 import { createJournal, createRuleStore } from "@omni/journal"
+import { AcpAuthRequired } from "@omni/engine"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
@@ -18,7 +19,7 @@ import type { Logger } from "./log.js"
 import { createWorktreeBaselines, type WorktreeBaselines } from "./worktree-baseline.js"
 import { readBuildInfo } from "./build-info.js"
 import type { TouchedFiles } from "./touched.js"
-import { createEngineCatalog } from "./engine-catalog.js"
+import { createEngineCatalog, type EngineCatalog } from "./engine-catalog.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached, RescanReport } from "./attached.js"
 import type { WorksiteSearch } from "./worksite-search.js"
@@ -155,9 +156,37 @@ function reporter(emit: (event: Event) => void): (error: unknown, threadId?: Thr
       type: "engine.status",
       at: Date.now(),
       threadId: threadId ?? "",
-      status: "crashed",
+      // 引擎明确要先登录时不是故障：报成故障会把人引去查一个没坏的东西
+      status: error instanceof AcpAuthRequired ? "unauthenticated" : "crashed",
       detail: error instanceof Error ? error.message : String(error),
+      ...(error instanceof AcpAuthRequired ? { engine: error.engine } : {}),
     })
+  }
+}
+
+/**
+ * 重探一遍再广播。
+ *
+ * **不给 id 就全部重探**：DSH 改 profile 时只需要它自己（那是我们确知的变化），
+ * 而「刚装完一家」「用户点了重新探测」时我们并不知道变的是哪一家——
+ * 用户可能在终端里装的，也可能一次装了两家。
+ */
+function refresherOf(deps: {
+  reload: ReturnType<typeof buildRegistry>["reload"]
+  engines: EngineCatalog
+  emit: (event: Event) => void
+  labels: Readonly<Record<string, string>>
+  live: () => readonly Thread[]
+}): (id?: string) => Promise<RescanReport> {
+  return async (id) => {
+    // **全量重探时先重读 `engines.json`。** 给了 id 的那种是「这一家的配置变了」
+    //（目前只有 DSH 改 profile），和注册表没关系，不必去读盘。
+    // 改过或删掉的那几家，**此刻没有会话在用**才当场换（见 `mergeAcpEngines`）
+    const inUse = (engine: string): boolean => deps.live().some((thread) => thread.engine === engine)
+    const reloaded = id === undefined ? deps.reload(inUse) : undefined
+    deps.engines.invalidate(id)
+    deps.emit({ type: "engines.available", at: Date.now(), engines: await deps.engines() })
+    return { needsRestart: (reloaded?.needsRestart ?? []).map((one) => deps.labels[one] ?? one) }
   }
 }
 
@@ -225,21 +254,7 @@ export function attachHost(
     visible: ports?.engineVisible,
     profile: (id) => id === "dsh" ? (ports?.dshProfile?.() ?? "acp") : undefined,
   })
-  /**
-   * 重探一遍再广播。
-   *
-   * **不给 id 就全部重探**：DSH 改 profile 时只需要它自己（那是我们确知的变化），
-   * 而「刚装完一家」「用户点了重新探测」时我们并不知道变的是哪一家——
-   * 用户可能在终端里装的，也可能一次装了两家。
-   */
-  const refreshEngines = async (id?: string): Promise<RescanReport> => {
-    // **全量重探时先重读 `engines.json`。** 给了 id 的那种是「这一家的配置变了」
-    //（目前只有 DSH 改 profile），和注册表没关系，不必去读盘
-    const reloaded = id === undefined ? reload() : { added: [], needsRestart: [] }
-    engines.invalidate(id)
-    emit({ type: "engines.available", at: Date.now(), engines: await engines() })
-    return { needsRestart: reloaded.needsRestart.map((one) => labels[one] ?? one) }
-  }
+  const refreshEngines = refresherOf({ reload, engines, emit, labels, live: () => host.live() })
 
   return {
     host,

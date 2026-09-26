@@ -3,7 +3,8 @@ import type { EngineCapabilities, EngineStatus, ModelOption, Trust } from "@omni
 import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
 import { resolveCommand } from "../probe.js"
-import type { RpcPeer } from "../rpc.js"
+import { rpcCodeOf, RpcError, type RpcPeer } from "../rpc.js"
+import { AcpAuthRequired, AUTH_REQUIRED, authMethodsOf, authRequiredText, CLIENT_AUTH, type AcpAuthMethod } from "./auth.js"
 import {
   canList,
   capabilitiesOf,
@@ -98,6 +99,11 @@ export interface OpenState {
   native: Native | undefined
   /** 子进程的 stderr 尾巴。握手超时要把它摊出来，不然只有一句「超时了」。 */
   stderr: string
+  /**
+   * 握手时它报的登录方式。开会话撞上 `-32000` 时要靠它说清「可以怎么登录」——
+   * 那一刻手上只有它自己的一句话，而那句话实测不一定提到登录。
+   */
+  authMethods?: readonly AcpAuthMethod[]
 }
 
 /** `startSession` 要的东西：`OpenCtx` 再加三件驱动才知道怎么做的事。 */
@@ -119,6 +125,7 @@ export interface OpenCtx {
       driver → open → driver 的循环 import。 */
   config: {
     id: string
+    label?: string
     command: string
     modeReadback?: boolean
     compact?: boolean
@@ -144,9 +151,11 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
       protocolVersion: PROTOCOL_VERSION,
       // `terminal` **按引擎注入**：kimi 不认领就一条命令都跑不了（它没有本地兜底），
       // 而别家自己起进程，认领了反而把命令从它们的沙箱里拽出来。见 `terminal.ts`
+      // 声明能跑 terminal 型登录：不声明的话有的 agent 一种登录方式都不报（见 `auth.ts`）
       clientCapabilities: {
         fs: { readTextFile: false, writeTextFile: false },
         terminal: ctx.config.terminal === true,
+        ...CLIENT_AUTH,
       },
       clientInfo: CLIENT_INFO,
     }),
@@ -169,6 +178,7 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
     )
   }
   ctx.state.loadSession = info.agentCapabilities?.loadSession === true
+  ctx.state.authMethods = authMethodsOf(info)
   // **能力由 agent 自报，不由 omni 猜**：同一个驱动接的几家本来就不一样。
   // 但「没声明」只是没声明——实测 grok 的能力表是空的，`session/list` 却能答，
   // 所以这里留 undefined，由 `history()` 问一次再定（见那边的注释）
@@ -214,12 +224,31 @@ export async function startSession(ctx: StartCtx): Promise<void> {
 }
 
 /**
+ * 开会话撞上 `-32000`（要先登录）时，把它那句话翻成**说得出下一步**的一句：
+ * 它自己的原话、握手时报过哪几种登录方式、去哪儿登录。别的错误原样抛。
+ *
+ * 只认错误码，不认措辞：实测 Gemini CLI 在这一码下说的是「这个客户端已不再支持」，
+ * 按「Authentication required」字样去匹配就会漏掉它。
+ */
+function loginFirst(ctx: OpenCtx, error: unknown): unknown {
+  if (rpcCodeOf(error) !== AUTH_REQUIRED) return error
+  const said = error instanceof RpcError && error.said !== "" ? error.said : "Authentication required"
+  return new AcpAuthRequired(authRequiredText(ctx.config.label ?? ctx.config.id, ctx.state.authMethods ?? [], said), ctx.config.id)
+}
+
+/**
  * 开会话。带句柄就 `session/load` 续跑。
  *
  * **agent 不支持 `loadSession` 时不能静默新开**——用户会以为上下文还在，
  * 实际模型什么都不记得。宁可把失败摆出来（和 codex 驱动同一条原则）。
  */
 export async function openSession(ctx: OpenCtx): Promise<void> {
+  await openOrFail(ctx).catch((error: unknown) => {
+    throw loginFirst(ctx, error)
+  })
+}
+
+async function openOrFail(ctx: OpenCtx): Promise<void> {
   // **原生审批开关只在开会话时能设**（grok 的 `autoMode` / `yoloMode` 在 `_meta` 里），
   // 所以它必须在这儿算好，而且续跑/分叉那两条路也要带上——
   // 只给新会话带的话，接着跑的那条会话会悄悄退回引擎自己的默认档

@@ -85,6 +85,7 @@ export function ThreadScreen({
         pets={{ on: app.prefs.settings.pets, ...app.prefs.settings.petKit }}
         notices={app.notices}
         onDismiss={shell.dismiss}
+        onLogin={() => { shell.openSettingsAt("install") }}
         finding={shell.finding}
         onFind={app.find}
         onCloseFind={() => { shell.setFinding(false); app.stopFind() }}

@@ -102,12 +102,21 @@ omni 唯一的用户界面是 GUI；命令行只用于开发和打包。
 | Kimi Code | `kimi web` REST + WebSocket | 内置 |
 | Grok | ACP | 内置 |
 | DSH | `dsh --profile <profile>`（ACP） | 内置；按 profile 选择插件组装并确认接入 |
-| 其他 ACP 引擎 | `engines.json` 注册 | 按引擎自报能力接入 |
+| 其他 ACP 引擎 | ACP 官方注册表一键接入，或指一个可执行文件 | 按引擎自报能力接入；登录走它自己报的方式 |
 
 内置引擎会显示真实探测状态；DSH 设置页会从各 profile 的 `package.json` 展示 bundle 加载顺序、
 profile 声明的直接依赖与 patch 状态。确认当前 profile 的原生配置后它才进入清单；会话会记住创建时的 profile，
 以后切默认组装也不会把旧句柄送进另一棵插件树。插件通过 ACP 自报的新模型、命令和会话能力会沿用通用驱动，
 用户自配的 ACP 引擎则只有注册后才会出现。
+
+第三方 ACP 引擎在设置 →「安装与接入」里接：
+
+- **从 ACP 注册表接入**：列出 [ACP 官方注册表](https://agentclientprotocol.com/registry)里各家自己登记的
+  启动方式（Gemini CLI、GitHub Copilot、goose、OpenCode、Qwen Code……）。点「接入」先摆出要执行的命令
+  或要下载的包与校验值，确认后装好、握手试接、写进 `engines.json`，不用重启；注册表有新版时给「升级」。
+- **手动接入**：注册表里没有的，指一个可执行文件，答得上 ACP 握手才让接。
+- **登录**：试接时列出它自己报的登录方式。浏览器那一类由它自己办（omni 只转一次 `authenticate`），
+  终端那一类在系统「终端」里跑它自己的登录界面。开会话时它说要先登录，界面会显示「需要登录」并给出去登录的路。
 
 ## 跑起来
 
@@ -175,6 +184,8 @@ xattr -dr com.apple.quarantine /Applications/omni.app
 - 会话事件流，包含完整的提示词、回复和工具输出
 - 日志，其中像凭证的字符串会被抹去
 - `engines.json`：写在它 `env` 里的值是明文
+- `agents/`：从 ACP 注册表接入的二进制引擎，每家每个版本一个目录；没人用的旧版本会被清掉
+- `acp-registry.json`：ACP 注册表的本机缓存
 - 远程设备表：令牌只存哈希
 
 不属于任何项目的对话，会在 `~/Documents/omni/` 下建目录。
@@ -185,6 +196,11 @@ omni 没有遥测、统计或崩溃上报，崩溃转储只留在本机。omni �
 
 - **引擎版本检查**：启动约 8 秒后运行。对用 npm 全局安装的 codex / kimi 执行 `npm view`，装了 grok 时执行 `grok update --check`。
 - **应用更新检查**：`apps/desktop/package.json` 里的 `updateFeed` 默认为空，也就是整个关闭。
+- **ACP 注册表**：打开设置里的「安装与接入」、而本机缓存超过一小时时，从 `cdn.agentclientprotocol.com`
+  取一次注册表（约 60 KB）；点「刷新」也会取。
+- **你在「安装与接入」里点「接入」「升级」时**：npx / uvx 分发的由它们按你自己的 npm / uv 配置下载包；
+  二进制分发的由 omni 从注册表登记的地址下载，并按注册表给的 sha256 校验。
+- **你点某种「登录」时**：由那一家引擎自己联网（通常会打开浏览器），omni 只转达你选的方式。
 - **远程访问**：默认关闭；打开后也只监听 `127.0.0.1`，由你自己的隧道暴露出去。开启通知后，会向浏览器的推送服务发送加密消息。
 - **你在设置里点「安装 / 更新」引擎时**：执行对应的安装命令。
 

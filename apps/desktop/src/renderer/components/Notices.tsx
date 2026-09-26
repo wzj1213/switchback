@@ -17,6 +17,7 @@ function toneOf(notice: Notice): NoticeTone {
 function labelOf(notice: Notice): string {
   if (notice.kind === "crashed") return "引擎故障"
   if (notice.kind === "degraded") return "能力受限"
+  if (notice.kind === "auth") return "需要登录"
   return "引擎提示"
 }
 
@@ -35,6 +36,7 @@ export function Notices({
   rows,
   onDismiss,
   onSelect,
+  onLogin,
 }: {
   notices: readonly Notice[]
   /** 全部会话。横幅要靠它把 `threadId` 翻成看得懂的名字。 */
@@ -42,6 +44,8 @@ export function Notices({
   onDismiss: (id: string) => void
   /** 点横幅跳到出事的那条会话。 */
   onSelect: (id: string) => void
+  /** 「需要登录」那一类直接给一条去登录的路（设置 → 安装与接入）。 */
+  onLogin?: () => void
 }): React.JSX.Element | null {
   const latest = notices[notices.length - 1]
   useEffect(() => {
@@ -66,6 +70,11 @@ export function Notices({
       <span className="notice__text" title={latest.text}>
         {latest.kind === "notification" ? latest.text : humanize(latest.text).text}
       </span>
+      {latest.kind === "auth" && onLogin !== undefined ? (
+        <button type="button" className="notice__go" title="打开 设置 → 安装与接入，在那一家的卡片上登录" onClick={onLogin}>
+          去登录
+        </button>
+      ) : null}
       {source === undefined ? null : (
         <button
           type="button"

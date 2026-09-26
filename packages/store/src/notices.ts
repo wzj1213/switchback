@@ -1,9 +1,14 @@
 import type { Event } from "@omni/protocol"
-import type { Notice, ViewState } from "./state.js"
+import type { FailureNotice, Notice, ViewState } from "./state.js"
 
 /** 只有这几档需要打断用户；其余是正常引擎生命周期。 */
-const LOUD = new Set(["crashed", "timeout", "degraded"])
+const LOUD = new Set(["crashed", "timeout", "degraded", "unauthenticated"])
 const MAX_NOTICES = 20
+
+function kindOf(status: string): FailureNotice["kind"] {
+  if (status === "degraded") return "degraded"
+  return status === "unauthenticated" ? "auth" : "crashed"
+}
 
 export function reduceEngineStatus(
   state: ViewState,
@@ -15,8 +20,9 @@ export function reduceEngineStatus(
     id: `n${String(seq)}`,
     at: event.at,
     text: event.detail ?? "引擎报告了一个没有描述的故障",
-    kind: event.status === "degraded" ? "degraded" : "crashed",
+    kind: kindOf(event.status),
     threadId: event.threadId === "" ? undefined : event.threadId,
+    ...(event.engine === undefined ? {} : { engine: event.engine }),
   }
   return { ...state, noticeSeq: seq, notices: [...state.notices, notice].slice(-MAX_NOTICES) }
 }

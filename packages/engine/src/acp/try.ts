@@ -1,6 +1,5 @@
-import { createProcessOwner } from "../subprocess.js"
-import { resolveCommand } from "../probe.js"
-import { createRpc } from "../rpc.js"
+import { authMethodsOf, canLogout, type AcpAuthMethod } from "./auth.js"
+import { initializeOnce, PROTOCOL_VERSION, withAcpProcess, type Initialized, type OneShotRequest } from "./oneshot.js"
 import { startupMessage } from "./setup.js"
 import type { AcpInitialize } from "./wire.js"
 
@@ -33,15 +32,19 @@ export interface AcpTrial {
   error?: string
   /** 它自己打到 stderr 的尾巴。**失败时这常常是唯一的线索**，别吞掉。 */
   stderr?: string
+  /**
+   * 它报的登录方式，按它报的顺序。**只列、不办**——试接没有副作用，
+   * 登录要人挑了才去做（见 `login.ts`）。
+   */
+  authMethods?: readonly AcpAuthMethod[]
+  /** 它认不认 `logout`。 */
+  logout?: boolean
+  /** 它自报的名字与版本（`agentInfo`），原样。 */
+  agent?: { name?: string; title?: string; version?: string }
 }
 
-const PROTOCOL_VERSION = 1
-const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
 /** 试接比开会话短得多：这里只发一个 `initialize`，起得来的话是毫秒级。 */
 const TRY_MS = 8000
-const STDERR_KEEP = 4000
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 /**
  * 它认领的能力，摊平成一串键。
@@ -77,71 +80,33 @@ function claimed(info: AcpInitialize): readonly string[] {
   return out
 }
 
-export async function tryAcp(req: {
-  command: string
-  args?: readonly string[]
-  env?: Readonly<Record<string, string | undefined>>
-  cwd: string
-  /** 等多久算不答。**只为测试可注入**——真用的时候就是 `TRY_MS`。 */
+export async function tryAcp(req: OneShotRequest & {
+  /** 等多久算不答。默认 `TRY_MS`；注册表里 npx 分发的第一次要现下载，调用方会给长一些。 */
   timeoutMs?: number
 }): Promise<AcpTrial> {
   const budget = req.timeoutMs ?? TRY_MS
-  const owner = createProcessOwner()
-  let stderr = ""
-  const rpc = createRpc({
-    send: (line) => child.stdin?.write(`${line}\n`),
-    onNotification: () => undefined,
-    // 试接阶段 agent 不该反过来叫我们；真叫了也只能不理——这里没有会话可以答
-    onRequest: () => undefined,
-  })
-  // **spawn 真正能跑的那个绝对路径**，理由同 `resolveCommand`：裸名字会被 PATH
-  // 再解析一次，而那次可能落到另一个同名文件上——试接说好、真跑的是另一个
-  const child = owner.spawn({
-    command: await resolveCommand(req.command),
-    args: req.args ?? [],
-    cwd: req.cwd,
-    ...(req.env === undefined ? {} : { env: { ...process.env, ...req.env } }),
-  })
-  child.stdout?.setEncoding("utf8")
-  child.stdout?.on("data", (chunk: string) => rpc.feed(chunk))
-  child.stderr?.setEncoding("utf8")
-  child.stderr?.on("data", (chunk: string) => {
-    stderr = (stderr + chunk).slice(-STDERR_KEEP)
-  })
-
+  const tail = { stderr: "" }
   try {
-    const result = await Promise.race([
-      rpc.call("initialize", {
-        protocolVersion: PROTOCOL_VERSION,
-        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-        clientInfo: CLIENT_INFO,
-      }),
-      // 起不来这件事毫秒级就已知，不该让人干等八秒
-      owner.died().then((error) => ({ died: error })),
-      sleep(budget).then(() => "timeout" as const),
-    ])
-    return verdict(result, req.command, stderr, budget)
+    return await withAcpProcess(req, async (shot) => {
+      const result = await initializeOnce(shot, budget)
+      tail.stderr = shot.stderr()
+      return verdict(result, req.command, tail.stderr, budget)
+    })
   } catch (error) {
     // 对方答了但答的是错误（JSON-RPC error），或者进程中途关了流
-    return fail(error instanceof Error ? error.message : String(error), stderr)
-  } finally {
-    rpc.close("试接结束")
-    child.stdin?.end()
-    await owner.reclaim()
+    return fail(error instanceof Error ? error.message : String(error), tail.stderr)
   }
 }
 
-function verdict(result: unknown, command: string, stderr: string, budget: number): AcpTrial {
-  if (result === "timeout") {
+function verdict(result: Initialized, command: string, stderr: string, budget: number): AcpTrial {
+  if (result.kind === "timeout") {
     return fail(
-      `${String(budget / 1000)} 秒内没有回应。它可能不讲 ACP，或者要换一组参数才进 ACP 模式（有几家是 \`<命令> acp\` 或 \`<命令> agent stdio\`）。`,
+      `${String(Math.round(budget / 1000))} 秒内没有回应。它可能不讲 ACP，或者要换一组参数才进 ACP 模式（有几家是 \`<命令> acp\` 或 \`<命令> agent stdio\`）。`,
       stderr,
     )
   }
-  if (typeof result === "object" && result !== null && "died" in result) {
-    return fail(startupMessage(command, (result as { died: Error }).died), stderr)
-  }
-  const info = result as AcpInitialize
+  if (result.kind === "died") return fail(startupMessage(command, result.error), stderr)
+  const info = result.info
   const version = info.protocolVersion
   if (version !== undefined && version > PROTOCOL_VERSION) {
     return fail(
@@ -149,10 +114,14 @@ function verdict(result: unknown, command: string, stderr: string, budget: numbe
       stderr,
     )
   }
+  const agent = info.agentInfo
   return {
     ok: true,
     ...(version === undefined ? {} : { protocolVersion: version }),
     capabilities: claimed(info),
+    authMethods: authMethodsOf(info),
+    logout: canLogout(info),
+    ...(agent === undefined ? {} : { agent: { ...agent } }),
     ...(stderr === "" ? {} : { stderr }),
   }
 }

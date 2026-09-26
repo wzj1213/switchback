@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { createRpc, type RpcHandlers, type ServerCall } from "./rpc.js"
+import { createRpc, rpcCodeOf, RpcError, type RpcHandlers, type ServerCall } from "./rpc.js"
 
 interface Harness {
   sent: string[]
@@ -58,6 +58,21 @@ describe("createRpc 请求应答", () => {
     const sent = JSON.parse(h.sent[0] ?? "{}") as { id: number }
     rpc.feed(`${JSON.stringify({ jsonrpc: "2.0", id: sent.id, error: { message: "炸了" } })}\n`)
     await expect(pending).rejects.toThrow("炸了")
+  })
+
+  it("错误码留在 reject 出来的错误上——ACP 的 -32000 只能靠它认", async () => {
+    const { rpc, h } = harness()
+    const pending = rpc.call("session/new")
+    const sent = JSON.parse(h.sent[0] ?? "{}") as { id: number }
+    rpc.feed(`${JSON.stringify({ jsonrpc: "2.0", id: sent.id, error: { code: -32000, message: "先登录" } })}\n`)
+    const error = await pending.catch((caught: unknown) => caught)
+    expect(rpcCodeOf(error)).toBe(-32000)
+    expect(error).toBeInstanceOf(RpcError)
+    expect((error as Error).message).toBe("先登录")
+    // 连接关闭不是对端回的错，没有码可言
+    const closed = rpc.call("x")
+    rpc.close("关了")
+    expect(rpcCodeOf(await closed.catch((caught: unknown) => caught))).toBeUndefined()
   })
 
   it("带 method 的 id 是服务端请求，不是应答", () => {
