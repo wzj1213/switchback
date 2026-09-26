@@ -22,8 +22,8 @@ export interface DraftBlocks {
   blocks: readonly DraftBlock[]
   /** 拖入 / 手选 / 工作台「引用」都走这条。已经在里面的路径不重复挂。 */
   addFiles: (paths: readonly string[]) => void
-  /** 折起来的一次大段粘贴。 */
-  addPaste: (text: string) => void
+  /** 折起来的一次大段粘贴；审查页的引用也走这里，带一句芯片上的说法。 */
+  addPaste: (text: string, label?: string) => void
   remove: (id: string) => void
   clear: () => void
   /** 「改一改再发」「从待发队列取回」整份换掉。 */
@@ -60,10 +60,10 @@ export function useDraftBlocks(initial: readonly DraftBlock[] = []): DraftBlocks
       [take],
     ),
     addPaste: useCallback(
-      (text) => {
+      (text, label) => {
         if (text === "") return
         const id = `b${String(take(1) + 1)}`
-        setBlocks((had) => [...had, { id, kind: "paste", text }])
+        setBlocks((had) => [...had, { id, kind: "paste", text, ...(label === undefined ? {} : { label }) }])
       },
       [take],
     ),

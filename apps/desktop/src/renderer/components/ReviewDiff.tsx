@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { PatchSkip } from "../../shared/review.js"
 import { paintPatch, type Seg } from "../review-paint.js"
 import type { NumberedLine, SplitRow } from "../review.js"
@@ -78,8 +78,27 @@ function Text({ line, paint }: { line: NumberedLine; paint: Paint }): React.JSX.
   )
 }
 
-/** 单栏：行号（宽两列 / 窄一列）+ 记号 + 正文。 */
-function UniLine({ line, paint }: { line: NumberedLine; paint: Paint }): React.JSX.Element {
+/**
+ * hunk 头上的「引用」：把这一段连同位置放进输入框上方的一枚芯片（见 `review-quote.ts`）。
+ * 引过的写成「已引用」，免得连点两次塞进去两份。
+ */
+function Quote({ quoted, onQuote }: { quoted: boolean; onQuote: () => void }): React.JSX.Element {
+  return (
+    <button type="button" className="rvd__quote" disabled={quoted}
+      title={quoted ? "这一段已经放进输入框了" : "把这一段改动连同位置放进输入框，写一句你要它怎么改"} onClick={onQuote}>
+      {quoted ? "已引用" : "引用"}
+    </button>
+  )
+}
+
+/** 引用那一格要的东西：哪几段已经引过、点了之后怎么办。缺席就不画按钮。 */
+interface Quoting {
+  quoted: ReadonlySet<number>
+  onQuote: (at: number) => void
+}
+
+/** 单栏：行号（宽两列 / 窄一列）+ 记号 + 正文。hunk 头的末尾多一颗「引用」。 */
+function UniLine({ line, at, paint, quoting }: { line: NumberedLine; at: number; paint: Paint; quoting?: Quoting | undefined }): React.JSX.Element {
   return (
     <div className={`rvd__line rvd__line--${line.kind}`}>
       <Num n={line.old} slot="old" />
@@ -89,6 +108,9 @@ function UniLine({ line, paint }: { line: NumberedLine; paint: Paint }): React.J
         {SIGN[line.kind]}
       </span>
       <Text line={line} paint={paint} />
+      {line.kind === "hunk" && quoting !== undefined ? (
+        <Quote quoted={quoting.quoted.has(at)} onQuote={() => { quoting.onQuote(at) }} />
+      ) : null}
     </div>
   )
 }
@@ -111,11 +133,14 @@ function Side({ line, side, paint }: {
   )
 }
 
-function SplitLine({ row, paint }: { row: SplitRow; paint: Paint }): React.JSX.Element {
+function SplitLine({ row, at, paint, quoting }: { row: SplitRow; at: number; paint: Paint; quoting?: Quoting | undefined }): React.JSX.Element {
   if (row.full !== undefined) {
     return (
       <div className={`rvd__row rvd__row--full rvd__line--${row.full.kind}`}>
         <span className="rvd__text">{row.full.text}</span>
+        {row.full.kind === "hunk" && quoting !== undefined ? (
+          <Quote quoted={quoting.quoted.has(at)} onQuote={() => { quoting.onQuote(at) }} />
+        ) : null}
       </div>
     )
   }
@@ -127,7 +152,7 @@ function SplitLine({ row, paint }: { row: SplitRow; paint: Paint }): React.JSX.E
   )
 }
 
-export function ReviewDiff({ lines, path, skip, split, loading, wrap = false }: {
+export function ReviewDiff({ lines, path, skip, split, loading, wrap = false, onQuote }: {
   lines: readonly NumberedLine[]
   /** 相对路径，**只用来取语言**——取不到就不染（沿用「没标语言就不猜」）。 */
   path?: string | undefined
@@ -135,9 +160,19 @@ export function ReviewDiff({ lines, path, skip, split, loading, wrap = false }: 
   split: boolean
   loading: boolean
   wrap?: boolean
+  /** 引用第 `at` 行起的那一段（`at` 是 hunk 头在 `lines` 里的下标）。缺席就不给「引用」。 */
+  onQuote?: ((at: number) => void) | undefined
 }): React.JSX.Element {
   // 着色和词级高亮一起算，一份补丁一次。切文件、换上下文档位才重算
   const paint = useMemo(() => paintPatch(path, lines), [path, lines])
+  const [quoted, setQuoted] = useState<ReadonlySet<number>>(new Set())
+  const quoting: Quoting | undefined = onQuote === undefined ? undefined : {
+    quoted,
+    onQuote: (at) => {
+      onQuote(at)
+      setQuoted((had) => new Set([...had, at]))
+    },
+  }
   if (skip !== undefined) return <p className="rvd__note">{SKIP[skip]}</p>
   // **加载中不清空正文**：切文件时闪一下白比等半秒更难受。旧的先留着，压淡
   if (lines.length === 0) {
@@ -147,13 +182,14 @@ export function ReviewDiff({ lines, path, skip, split, loading, wrap = false }: 
     <div className="rvd__body rvd__body--split">
       {splitRows(lines).map((row, i) => (
         // 行没有天然 id，这份数组在一次渲染里不变——用下标是正确的
-        <SplitLine key={`${String(i)}-${row.full?.kind ?? "p"}`} row={row} paint={paint} />
+        <SplitLine key={`${String(i)}-${row.full?.kind ?? "p"}`} row={row} paint={paint}
+          at={row.full === undefined ? -1 : lines.indexOf(row.full)} quoting={quoting} />
       ))}
     </div>
   ) : (
     <div className="rvd__body">
       {lines.map((line, i) => (
-        <UniLine key={`${String(i)}-${line.kind}`} line={line} paint={paint} />
+        <UniLine key={`${String(i)}-${line.kind}`} line={line} at={i} paint={paint} quoting={quoting} />
       ))}
     </div>
   )

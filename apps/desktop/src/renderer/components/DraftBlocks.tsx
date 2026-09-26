@@ -26,7 +26,7 @@ function Chip({
 }): React.JSX.Element {
   const file = block.kind === "file" ? fileChip(block.path) : undefined
   const title = block.kind === "file" ? block.path : peekOf(block.text)
-  const label = block.kind === "file" ? "" : pasteChip(block.text)
+  const label = block.kind === "file" ? "" : (block.label ?? pasteChip(block.text))
   return (
     <span className="dblock" title={title}>
       <span className="dblock__glyph" aria-hidden="true">

@@ -126,3 +126,38 @@
 .rv__undo {
   margin-left: var(--sp-2);
 }
+
+/*
+ * hunk 头末尾的「引用」。hunk 头那一行本来就是淡字，按钮跟着压低；
+ * 推到行尾（`margin-left: auto`），不和 `@@ -12,7 +12,9 @@` 挤在一起。
+ */
+.rvd__quote {
+  /* 不折行的单栏会横向滚：粘在右缘，滚到哪儿都点得到 */
+  position: sticky;
+  right: var(--sp-2);
+  flex: none;
+  margin: 1px var(--sp-2) 1px auto;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+
+.rvd__quote:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.rvd__quote:disabled {
+  opacity: 0.7;
+}
+
+.rvd__quote:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

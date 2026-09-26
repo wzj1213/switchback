@@ -27,7 +27,8 @@ import { appendFileReferences, formatFileReference } from "./file-references.js"
 /** 一枚待发的芯片。 */
 export type DraftBlock =
   | { id: string; kind: "file"; path: string }
-  | { id: string; kind: "paste"; text: string }
+  /** `label`：芯片上换一句话说它是什么（审查页的引用写「引用 路径:行号」）；缺席就是「粘贴文本 · N 行」。 */
+  | { id: string; kind: "paste"; text: string; label?: string }
 
 /**
  * 多大算「大」。

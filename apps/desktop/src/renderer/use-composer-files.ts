@@ -4,6 +4,7 @@ import type { ComposerFileReference } from "./file-references.js"
 import { failedDropHint } from "./attachment-feedback.js"
 import { useAttachmentDropzone } from "./use-attachment-dropzone.js"
 import { referencedText } from "./composer-blocks.js"
+import { quoteLabel } from "./review-quote.js"
 import type { DraftBlocks } from "./use-draft-blocks.js"
 
 function focusAfterSurfaceCloses(focus: () => void): void {
@@ -39,6 +40,7 @@ export function useComposerFiles(options: {
   pick: () => Promise<void>
 } {
   const addFiles = options.blocks.addFiles
+  const addPaste = options.blocks.addPaste
   const sent = referencedText(options.text, options.blocks.blocks)
   const seenReference = useRef(options.reference?.at ?? 0)
   useEffect(() => {
@@ -46,9 +48,10 @@ export function useComposerFiles(options: {
     if (reference === undefined || reference.at === seenReference.current || !options.editable)
       return
     seenReference.current = reference.at
-    addFiles([reference.path])
+    if (reference.quote === undefined) addFiles([reference.path])
+    else addPaste(reference.quote, quoteLabel(reference.quote))
     options.focus()
-  }, [addFiles, options.editable, options.focus, options.reference])
+  }, [addFiles, addPaste, options.editable, options.focus, options.reference])
   const drop = useCallback(
     (files: FileList | null) => {
       const result = options.attach.drop(files, options.cwd, sent)

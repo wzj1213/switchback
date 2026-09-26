@@ -4,6 +4,8 @@ import { reveal } from "../reveal.js"
 import { ReviewDiff } from "./ReviewDiff.js"
 import { ReviewFileHead } from "./review-file-head.js"
 import { requestFilePreview } from "../file-preview-request.js"
+import { requestComposerQuote } from "../composer-reference-request.js"
+import { quoteHunk } from "../review-quote.js"
 
 /** 审核编辑组的补丁区；空态与已选文件在这里切换。 */
 export function ReviewPane({ file, patch, empty, split, box, onCopy, cwd, threadId, wrap, onStage }: {
@@ -46,6 +48,10 @@ export function ReviewPane({ file, patch, empty, split, box, onCopy, cwd, thread
         split={split}
         loading={patch.loading}
         wrap={wrap}
+        onQuote={(at) => {
+          const quote = quoteHunk(file.rel, patch.lines, at)
+          if (quote !== undefined) requestComposerQuote(threadId, file.path, quote)
+        }}
       />
     </section>
   )

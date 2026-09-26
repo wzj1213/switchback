@@ -23,7 +23,12 @@ export function useComposerReference(): {
     () =>
       onComposerReference((detail) => {
         // `at` 自增而不是取时钟：同一毫秒内连按两次也得是两次不同的要求
-        set((before) => ({ threadId: detail.threadId, path: detail.path, at: (before?.at ?? 0) + 1 }))
+        set((before) => ({
+          threadId: detail.threadId,
+          path: detail.path,
+          at: (before?.at ?? 0) + 1,
+          ...(detail.quote === undefined ? {} : { quote: detail.quote }),
+        }))
       }),
     [],
   )

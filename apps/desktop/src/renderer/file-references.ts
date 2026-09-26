@@ -7,6 +7,8 @@ export interface FileReference {
 export interface ComposerFileReference {
   path: string
   at: number
+  /** 审查页「引用这一段」：一段带位置的改动，进输入框上方的粘贴芯片而不是文件芯片。 */
+  quote?: string
 }
 
 function normalized(path: string): string {
