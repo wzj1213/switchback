@@ -6,13 +6,13 @@
 
 .eng-tabs {
   position: sticky;
-  /* 吸在滚动区的最上沿：往上抵掉页面的上内边距，左右撑满（变量见 `.set__pane`） */
-  top: calc(-1 * var(--pane-y));
+  /* 吸在页标题那条带子下面（`--pagehead-h`），左右撑满（变量见 `.set__pane`） */
+  top: calc(var(--pagehead-h) - var(--pane-y));
   z-index: 2;
   display: flex;
   gap: var(--sp-1);
   margin: calc(-1 * var(--sp-2)) calc(-1 * var(--pane-x)) var(--sp-4);
-  padding: var(--sp-2) var(--pane-x);
+  padding: 0 var(--pane-x) var(--sp-2);
   overflow-x: auto;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
@@ -122,10 +122,22 @@
   font-size: var(--text-xs);
 }
 
+/* 抬头那枚状态：一颗色点 + 两个字，底色只淡淡地染一层。描边胶囊和旁边的标题抢分量 */
 .eng-status {
-  padding: 2px var(--sp-2);
-  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px var(--sp-2);
   border-radius: 999px;
+  background: var(--bg-sunken);
+}
+
+.eng-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
 }
 
 .eng-status--ok,
@@ -145,10 +157,7 @@
 
 .eng-pref {
   display: flex;
-  width: 100%;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
 }
 
 /* 输入区里的 trigger 是轻量胶囊；放进设置卡后，它要看起来像一个完整字段。 */
@@ -159,14 +168,6 @@
   border-radius: var(--radius-sm);
   background: var(--bg-sunken);
   color: var(--text);
-}
-
-.eng-pref__note {
-  max-width: 270px;
-  color: var(--text-faint);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  text-align: right;
 }
 
 .eng-command {
@@ -188,32 +189,17 @@
   user-select: all;
 }
 
-.eng-sources {
-  padding: var(--sp-3) var(--sp-4);
-  border-top: 1px solid var(--border);
-}
-
-.eng-sources:first-child {
-  border-top: 0;
-}
-
-.eng-sources__title {
-  margin-bottom: var(--sp-2);
-  color: var(--text);
-  font-size: var(--text-base);
-}
-
 /*
  * 接一家新的：三个输入 + 两颗按钮。
  *
  * 输入框和「浏览…」并排是因为**它们是同一件事的两条路**——手打命令名，
  * 或者去文件系统里挑一个。分成两行的话，看起来像两个各自独立的字段。
  */
+/* 表单的每一栏自己就是一行设置（`.set__field` 带左右内距），外面不再垫一圈——
+   垫了的话它比别的卡里的字往里多缩一截，行间的分隔线也够不到卡的两边 */
 .acp-add {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
 }
 
 .acp-add__row {
@@ -239,15 +225,17 @@
   min-width: 0;
 }
 
+/* 页尾那条「去安装与接入」：一块淡底的提示，不是又一张设置卡。
+   上一版是虚线框，虚线在这套界面里说的是「这儿还空着」（没创建的配置、拖放区），用在这儿读错了 */
 .eng-registry {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   margin-top: var(--sp-5);
-  padding: var(--sp-3) var(--sp-4);
-  border: 1px dashed var(--border-strong);
+  padding: 10px 10px 10px 14px;
   border-radius: var(--radius);
-  color: var(--text-faint);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
   font-size: var(--text-xs);
   line-height: 1.5;
 }
@@ -262,11 +250,11 @@
   font-size: var(--text-code);
 }
 
-/* 一份原生配置是一张两行小卡：第一行回答层级/状态/动作，第二行保留完整路径。 */
+/* 一份原生配置是卡片里的一行：第一行回答层级/状态/动作，第二行保留完整路径。
+   上一版每份各画一张带框的小卡，又装在设置组那张卡里，框里套框 */
 .doors {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
 }
 
 .doors__wait {
@@ -277,15 +265,16 @@
 
 .doors__row {
   min-width: 0;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-sunken);
+  padding: 10px 14px;
 }
 
-.doors__row--none {
-  border-style: dashed;
-  background: transparent;
+.doors__row + .doors__row {
+  border-top: 1px solid var(--border);
+}
+
+/* 还没创建的那份：照样摆出来（「这儿可以配」本身是信息），整行压淡一档 */
+.doors__row--none .doors__path {
+  color: var(--text-faint);
 }
 
 .doors__top {
@@ -348,14 +337,14 @@
 }
 
 @media (max-width: 720px) {
-  .eng-pref,
   .eng-registry {
     align-items: flex-start;
     flex-direction: column;
   }
-
-  .eng-pref__note {
-    max-width: none;
-    text-align: left;
-  }
 }
+
+/* 引擎页：页签条紧贴在页标题下面，那条「滚动了」的细线由页签条自己的底线来画，不画两道 */
+.set__pane:has(.eng-tabs) .set__pagehead {
+  animation: none;
+}
+

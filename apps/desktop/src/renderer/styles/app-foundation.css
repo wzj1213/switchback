@@ -17,6 +17,12 @@
  * 自己收掉：还能往哪走,边上就在哪糊。
  *
  * `a` / `b` 是**起点侧 / 终点侧**,不写死上下左右——同一套机件横竖都用。
+ *
+ * **用的地方一律写长手属性**（`animation-name` / `animation-timing-function` /
+ * `animation-timeline`），不写 `animation: edge-scroll linear` 再补一行 timeline：
+ * 构建时的 CSS 压缩会把两行并回成 `animation: linear edge-scroll scroll(self)`，
+ * 而 Chromium 的 `animation` 简写**不收** timeline，整条声明作废——
+ * 这套渐隐在打包后的应用里因此一直没生效过（2026-09-26 查出来的），开发时看不出。
  */
 @property --edge-a {
   syntax: "<number>";

@@ -186,9 +186,7 @@ function EngineRow({
           >
             {running ? "更新中…" : actionOf(version)}
           </button>
-        ) : (
-          <span className="set__hint">—</span>
-        )}
+        ) : null}
       </Field>
       {result !== undefined && (!result.ok || !result.changed) ? (
         <pre className="set__log" {...(result.ok ? {} : { role: "alert" })}>

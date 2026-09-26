@@ -199,7 +199,8 @@
   border-radius: var(--radius-sm);
   background: var(--bg-code);
   overflow-x: auto;
-  animation: edge-scroll linear;
+  animation-name: edge-scroll;
+  animation-timing-function: linear;
   animation-timeline: scroll(self inline);
   mask-image: linear-gradient(
     to right,
@@ -234,7 +235,8 @@
 
   margin: 0 0 var(--sp-3);
   overflow-x: auto;
-  animation: edge-scroll linear;
+  animation-name: edge-scroll;
+  animation-timing-function: linear;
   animation-timeline: scroll(self inline);
   mask-image: linear-gradient(
     to right,

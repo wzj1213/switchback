@@ -1,3 +1,6 @@
+import { useId, useState } from "react"
+import { ChevronIcon } from "./icons.js"
+
 /**
  * 设置面板里反复出现的那几个小件：分组、一行设置项、三段式开关、二元开关、
  * 空/错状态那句话、卡片底下那条页脚。
@@ -16,16 +19,52 @@
  * 收进这里之后，「统一」是**默认结果**而不是每次都要记得的纪律。
  */
 
-export function Group({ title, hint, children }: {
+/**
+ * 「说明」：一行提示之外那段更长的交代，默认折起来。
+ *
+ * 有几项要交代清楚它编码的是哪个真实信号（桌宠那一页尤其），那些话一口气铺开，
+ * 一行设置能长到五行，整页读起来像一篇文章，开关被挤在一大段字的正中间。
+ * 提示只留「改了会怎样」那一句，为什么收在这里——想知道的人点一下，一个字不少。
+ */
+export function More({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return (
+    <>
+      <button
+        type="button"
+        className="set__more"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => {
+          setOpen((was) => !was)
+        }}
+      >
+        说明
+        <ChevronIcon open={open} size={11} />
+      </button>
+      {open ? <span id={id} className="set__more-text">{children}</span> : null}
+    </>
+  )
+}
+
+export function Group({ title, hint, more, children }: {
   title: string
   /** 这一组整体要交代的一句话。**不是每组都有**——没话说就别硬写。 */
   hint?: string
+  /** 那句话之外更长的交代，折在「说明」里。 */
+  more?: React.ReactNode
   children: React.ReactNode
 }): React.JSX.Element {
   return (
     <section className="set__group">
       <h3 className="set__title">{title}</h3>
-      {hint === undefined ? null : <p className="set__note">{hint}</p>}
+      {hint === undefined ? null : (
+        <p className="set__note">
+          {hint}
+          {more === undefined ? null : <More>{more}</More>}
+        </p>
+      )}
       <div className="set__rows">{children}</div>
     </section>
   )
@@ -39,17 +78,29 @@ export function Group({ title, hint, children }: {
  * 挤在右边会把左边那句说明压成每行两三个字（改之前就是这样）。
  * 那时让控件自己占一整行，说明写在上面——**判据是控件宽不宽，不是重不重要**。
  */
-export function Field({ label, hint, stack, children }: {
+export function Field({ label, tag, hint, more, stack, children }: {
   label: string
+  /** 跟在名字后面的一小段淡字（桌宠那几行的「螃蟹 · 降落伞」）。一行说得完的就别再占一行提示。 */
+  tag?: string
   hint?: React.ReactNode
+  /** 提示之外更长的交代，折在「说明」里，见 `More`。 */
+  more?: React.ReactNode
   stack?: boolean
   children: React.ReactNode
 }): React.JSX.Element {
   return (
     <div className={`set__field${stack === true ? " set__field--stack" : ""}`}>
       <div className="set__text">
-        <span className="set__label">{label}</span>
-        {hint === undefined ? null : <span className="set__hint">{hint}</span>}
+        <span className="set__label">
+          {label}
+          {tag === undefined ? null : <span className="set__tag">{tag}</span>}
+        </span>
+        {hint === undefined ? null : (
+          <span className="set__hint">
+            {hint}
+            {more === undefined ? null : <More>{more}</More>}
+          </span>
+        )}
       </div>
       <div className="set__control">{children}</div>
     </div>

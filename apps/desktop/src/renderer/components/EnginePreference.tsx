@@ -29,11 +29,6 @@ export function EnginePreference({
           pick === undefined ? undefined : { label: "跟随引擎默认", run: () => onPick(undefined) }
         }
       />
-      <span className="eng-pref__note">
-        {models.length === 0
-          ? "先用这家开过会话，才会列出它自己报告的模型"
-          : "选项来自这家引擎本次实际报告的清单"}
-      </span>
     </div>
   )
 }

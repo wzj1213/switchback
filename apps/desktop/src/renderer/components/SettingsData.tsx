@@ -1,4 +1,4 @@
-import { Actions, Field, Group } from "./SettingsBits.js"
+import { Field, Group } from "./SettingsBits.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 
 /**
@@ -48,21 +48,27 @@ export function DataSection({
         />
       </Group>
       <Group title="第三方引擎" hint="内置那几家在「引擎」页；这里是你自己往里加的那些。">
-        <Field label="引擎注册表" hint="数据目录/engines.json——一份十行的 JSON，用你自己的编辑器改比在这儿点开一个表单强。存盘后到「安装与接入」点「重新探测」就生效；正被会话用着的那家，要等那些会话关掉">
+        <Field
+          label="引擎注册表"
+          hint={
+            <>
+              一份十行的 JSON，用你自己的编辑器改；存盘后到「安装与接入」点「重新探测」就生效
+              <br />
+              <code className="set__path" title={`${dataDir}/engines.json`}>数据目录/engines.json</code>
+            </>
+          }
+        >
           <button type="button" className="tbtn" onClick={onOpenEngines}>
             用编辑器打开
           </button>
         </Field>
       </Group>
       <Group title="出问题了" hint="报问题时把这一份带上，比描述现象快得多。">
-        <Field label="诊断报告" hint="版本、引擎探测结果、崩溃记录、日志尾部。不含会话内容">
+        <Field label="诊断报告" hint="版本、引擎探测结果、崩溃记录、日志尾部，不含会话内容。导出后会在访达里选中它">
           <button type="button" className="tbtn" onClick={onDiagnose}>
             导出…
           </button>
         </Field>
-        <Actions>
-          <span className="set__hint">导出后会在访达里选中那个文件。</span>
-        </Actions>
       </Group>
     </>
   )

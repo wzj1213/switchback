@@ -95,10 +95,15 @@
 
 /* ── 热力图 ───────────────────────────────────────── */
 
+/* 热力图也装进一张卡：和下面那几张统计卡同一种框，控件那一排是卡的抬头 */
 .heat {
   --heat-cell: 11px;
   --heat-gap: 3px;
-  margin-bottom: var(--sp-5);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
 }
 
 .heat__head {
@@ -112,6 +117,9 @@
 .heat__title {
   margin: 0;
   flex: none;
+  color: var(--text);
+  font-size: var(--text-base);
+  font-weight: 600;
 }
 
 /* 悬停读数。**位置固定**——浮动 tooltip 要算位置、要处理贴边、要跟着滚动，
@@ -235,16 +243,17 @@
 
 /* ── 洞察与排行榜 ────────────────────────────────── */
 
+/* 两栏顺着排满（多栏布局），每张卡不许被栏断开 */
 .stat__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-3);
+  column-count: 2;
+  column-gap: var(--sp-3);
   margin-bottom: var(--sp-3);
-  align-items: start;
 }
 
 .stat-card {
   min-width: 0;
+  margin-bottom: var(--sp-3);
+  break-inside: avoid;
   padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -368,7 +377,7 @@
   }
 
   .stat__grid {
-    grid-template-columns: minmax(0, 1fr);
+    column-count: 1;
   }
 
   .stat__tiles {

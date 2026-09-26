@@ -4,7 +4,7 @@ import { bigNumber, durationParts } from "../activity-view.js"
 import { bridge, useAsync, type Async } from "../use-async.js"
 import { ActivityHeat } from "./ActivityHeat.js"
 import { ActivityInsight, ActivityRanks, ActivityTokens } from "./ActivityTallies.js"
-import { Actions, Blank } from "./SettingsBits.js"
+import { Actions, Blank, More } from "./SettingsBits.js"
 
 /**
  * 「活动」——**你在 omni 里到底干了多少**。
@@ -68,22 +68,29 @@ function Tiles({ digest }: { digest: ActivityDigest }): React.JSX.Element {
 
 /** 抬头那一行：**这份统计是从哪儿来的、覆盖到哪儿**。 */
 function Lead({ digest, dataDir }: { digest: ActivityDigest; dataDir: string }): React.JSX.Element {
-  const span = digest.since === undefined
-    ? "还没有任何记录"
-    : `${stamp(digest.since)} 起，到 ${stamp(digest.until ?? digest.since)}`
+  const span = digest.since === undefined ? "还没有任何记录" : spanOf(digest.since, digest.until ?? digest.since)
+  // 路径写短名、完整的放在悬停里：数据页那三行同一个做法，一长串临时目录读起来只是噪声
   return (
     <p className="set__note stat__lead">
-      统计的是 <strong>omni 自己记下的那些会话</strong>（{dataDir}/threads 里的 {digest.threads} 条记录，{span}）。
-      你在终端里直接跑引擎的那些不在这儿，引擎自己的账单 omni 也读不到——
-      <strong>这不是账单，是你在 omni 里的工作量</strong>。
+      统计的是 <strong>omni 自己记下的那些会话</strong>
+      （<span title={`${dataDir}/threads`}>数据目录/threads</span> 里的 {digest.threads} 条记录，{span}）——
+      <strong>这是你在 omni 里的工作量，不是账单</strong>。
       {digest.skipped === 0 ? null : ` 有 ${String(digest.skipped)} 条记录读不动，已跳过。`}
+      <More>你在终端里直接跑引擎的那些不在这儿，引擎自己的账单 omni 也读不到。</More>
     </p>
   )
 }
 
-function stamp(at: number): string {
+function stamp(at: number, withYear = true): string {
   const d = new Date(at)
-  return `${String(d.getFullYear())} 年 ${String(d.getMonth() + 1)} 月 ${String(d.getDate())} 日`
+  const day = `${String(d.getMonth() + 1)} 月 ${String(d.getDate())} 日`
+  return withYear ? `${String(d.getFullYear())} 年 ${day}` : day
+}
+
+/** 「2026 年 8 月 22 日—8 月 25 日」：同一年就不再写第二遍年份。 */
+function spanOf(since: number, until: number): string {
+  const sameYear = new Date(since).getFullYear() === new Date(until).getFullYear()
+  return `${stamp(since)}—${stamp(until, !sameYear)}`
 }
 
 export function ActivitySection(props: ActivityProps): React.JSX.Element {
@@ -117,11 +124,11 @@ function Loaded({ digest, props, state }: {
       {state.failed ? <Blank tone="error">刚才那次重新统计没成功，下面还是上一次的结果。</Blank> : null}
       <Tiles digest={digest} />
       <ActivityHeat days={digest.days} now={props.now} />
+      {/* 七张卡按两栏**顺着排满**（CSS 多栏），不按行对齐：一行里一高一矮时，
+          矮的那张底下会空出一大块，整页看着东缺一块西缺一块 */}
       <div className="stat__grid">
         <ActivityInsight digest={digest} />
         <ActivityTokens digest={digest} name={props.engineName} />
-      </div>
-      <div className="stat__grid">
         <ActivityRanks digest={digest} name={props.engineName} />
       </div>
       <Actions>

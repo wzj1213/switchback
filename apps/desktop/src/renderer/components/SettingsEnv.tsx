@@ -38,7 +38,7 @@ const ENGINE_TEXT: Readonly<Record<HookEngine, { label: string; note: string }>>
   },
   kimi: {
     label: "Kimi Code",
-    note: "omni 起的是 kimi acp，读家目录那份 config.toml。它的钩子是一张平表（[[hooks]]，事件写在条目上），而且只有用户这一层——项目里没有第二份。",
+    note: "omni 起的是 kimi web，读家目录那份 config.toml。它的钩子是一张平表（[[hooks]]，事件写在条目上），而且只有用户这一层——项目里没有第二份。",
   },
   grok: {
     label: "Grok",
@@ -77,18 +77,21 @@ export function EnvSection({ cwd }: { cwd: string | undefined }): React.JSX.Elem
           管理员配置里开着 <code>allowManagedHooksOnly</code>：只有管理员那份里的钩子会跑。
         </p>
       ) : null}
-      {env.data === undefined ? (
-        <p className="set__hint">正在读各家的配置…</p>
-      ) : (
-        (Object.keys(ENGINE_TEXT) as HookEngine[]).map((engine) => (
-          <EngineBlock
-            key={engine}
-            engine={engine}
-            home={env.data?.home ?? ""}
-            sources={sources.filter((s) => s.engine === engine)}
-          />
-        ))
-      )}
+      {/* 四家收在一张卡里、一家一行：和设置其余各页同一种「这几行是一组」的画法 */}
+      <div className="hk__list">
+        {env.data === undefined ? (
+          <p className="set__blank">正在读各家的配置…</p>
+        ) : (
+          (Object.keys(ENGINE_TEXT) as HookEngine[]).map((engine) => (
+            <EngineBlock
+              key={engine}
+              engine={engine}
+              home={env.data?.home ?? ""}
+              sources={sources.filter((s) => s.engine === engine)}
+            />
+          ))
+        )}
+      </div>
       {/* **没读到的要说出来。** 一页写着「没有钩子」的界面，和一页写着
           「这几处我没查」的界面，给人的判断完全不同——前者会让他停止排查 */}
       <p className="hk__foot">
@@ -133,12 +136,12 @@ function EngineBlock({
         {pending === 0 ? null : <span className="hk__trust hk__trust--wait">{pending} 项待审核</span>}
       </button>
       {open ? (
-        <>
+        <div className="hk__body">
           <p className="hk__why">{ENGINE_TEXT[engine].note}</p>
           {sources.map((source) => (
             <SourceCard key={source.path} source={source} home={home} />
           ))}
-        </>
+        </div>
       ) : null}
     </section>
   )

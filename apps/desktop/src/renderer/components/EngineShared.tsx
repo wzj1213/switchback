@@ -45,19 +45,22 @@ export function EngineShared({
     <section className="eng-shared" aria-label="所有引擎共用">
       <Group
         title="安装与版本"
-        hint="内置五家一次列全。只在你点下按钮后才会运行界面写出的那条原生命令；还没装的那几家给出装它要跑的命令——omni 确实知道来源的才给，不知道的就照实说不知道。第三方 ACP 引擎在下面两组。"
+        hint="内置五家一次列全。只在你点下按钮后才会运行界面上写出的那条原生命令。"
+        more="还没装的那几家给出装它要跑的命令——omni 确实知道来源的才给，不知道的就照实说不知道。第三方 ACP 引擎在下面几组。"
       >
         <EngineVersions onCopy={onCopy} />
       </Group>
       <Group
         title="已接入的 ACP 引擎"
-        hint="写在 engines.json 里的那几家。「试接」只握手不开会话，顺带列出它自己报的登录方式；升级、移除当场生效——正在被会话用着的那家，要等那些会话关掉。"
+        hint="写在 engines.json 里的那几家。「试接」只握手不开会话，顺带列出它自己报的登录方式。"
+        more="升级、移除当场生效——正在被会话用着的那家，要等那些会话关掉。"
       >
         <AcpEngines engines={acp.engines} registry={acp.registry.data} onChanged={acp.changed} />
       </Group>
       <Group
         title="从 ACP 注册表接入"
-        hint="ACP 官方注册表里各家自己登记的启动方式。点「接入」先把要执行、要下载的东西摆出来；确认后装好（只有二进制要装）、握手试接、写进 engines.json，不用重启。打开这一页时，本机那份超过一小时才联网取一次。"
+        hint="ACP 官方注册表里各家自己登记的启动方式。点「接入」先把要执行、要下载的东西摆出来，确认了才装。"
+        more="确认后装好（只有二进制要装）、握手试接、写进 engines.json，不用重启。打开这一页时，本机那份超过一小时才联网取一次。"
       >
         <AcpRegistry
           view={acp.registry.data}
@@ -69,7 +72,8 @@ export function EngineShared({
       </Group>
       <Group
         title="手动接入"
-        hint="注册表里没有的：指一个可执行文件，omni 发一次 ACP 的 initialize 试试——答得上来才让你接。命令和参数由你给（各家进 ACP 模式的写法不同，看它自己的文档），omni 不猜。"
+        hint="注册表里没有的：指一个可执行文件，omni 发一次 ACP 的 initialize 试试，答得上来才让你接。"
+        more="命令和参数由你给（各家进 ACP 模式的写法不同，看它自己的文档），omni 不猜。"
       >
         <AcpConnect onAdded={acp.changed} />
       </Group>

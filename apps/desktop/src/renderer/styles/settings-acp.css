@@ -243,6 +243,26 @@
   border-bottom: 0;
 }
 
+/* 「显示全部 41 家」：清单底下整行宽的一颗轻按钮，像卡片的页脚 */
+.acp-reg__more {
+  display: block;
+  width: 100%;
+  padding: var(--sp-2) 14px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.acp-reg__more:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
 .acp-row--open {
   padding-bottom: var(--sp-3);
 }

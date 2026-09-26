@@ -33,7 +33,7 @@ export function LookSection({
   return (
     <>
       <Group title="外观">
-        <Field label="主题" hint="选择工作台的显示方式" stack>
+        <Field label="主题" stack>
           <ThemeOptions
             value={settings.theme}
             onPick={(theme) => {
@@ -67,8 +67,13 @@ export function LookSection({
           label="自动交接"
           hint={
             settings.handoffBrief
-              ? "换了一家之后，你发的第一句话前面会附一段交接说明：此前谁跑了哪几轮、完整转写存在哪（工作区 .omni/handoff/，不进版本库）、各家原始记录在哪、是什么格式。它会原样显示在对话里。"
-              : "关着：换了一家之后只发你那句话。新的一家不知道此前发生过什么，要读历史得你自己把路径给它（/timeline 里有）。"
+              ? "换了一家之后，你发的第一句话前面会附一段交接说明，原样显示在对话里。"
+              : "关着：换了一家之后只发你那句话，新的一家不知道此前发生过什么。"
+          }
+          more={
+            settings.handoffBrief
+              ? "说明里写的是：此前谁跑了哪几轮、完整转写存在哪（工作区 .omni/handoff/，不进版本库）、各家原始记录在哪、是什么格式。"
+              : "要让它读历史，得你自己把路径给它（/timeline 里有）。"
           }
         >
           <Toggle

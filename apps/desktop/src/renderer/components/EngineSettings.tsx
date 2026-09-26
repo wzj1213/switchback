@@ -81,7 +81,12 @@ export function EnginesSection({
           title="新会话的模型与思考档"
           hint="平时会记住这家上一次开工时的选择；这里可以直接改，也可以退回引擎默认。"
         >
-          <Field label="沿用配置" hint="只影响之后新开的会话；当前会话不会被重启" stack>
+          <Field
+            label="沿用配置"
+            hint={(models[item.id] ?? []).length === 0
+              ? "先用这家开过会话，才会列出它自己报告的模型"
+              : "只影响之后新开的会话，当前会话不会被重启。选项是这家引擎本次实际报告的清单"}
+          >
             <EnginePreference
               pick={settings.lastUsed.byEngine[item.id]}
               models={models[item.id] ?? []}

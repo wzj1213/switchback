@@ -20,6 +20,7 @@ export function AcpRegistry({ view, loading, failed, onRefresh, onChanged }: {
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
   const rows = filterRows(view?.rows ?? [], query)
+  const fold = useFold(rows, query)
   const status = statusOf(view, loading)
   return (
     <div className="acp-reg">
@@ -42,15 +43,43 @@ export function AcpRegistry({ view, loading, failed, onRefresh, onChanged }: {
       {view?.error === undefined ? null : <p className="acp-reg__error" role="alert">{view.error}</p>}
       {failed && view === undefined ? <p className="acp-reg__error" role="alert">读不到注册表。</p> : null}
       <ul className="acp-reg__list">
-        {rows.map((row) => (
+        {fold.shown.map((row) => (
           <AcpRegistryRow key={row.id} row={row} onChanged={onChanged} />
         ))}
       </ul>
+      {fold.toggle}
       {view !== undefined && view.rows.length > 0 && rows.length === 0 ? (
         <p className="acp-reg__empty">没有匹配「{query}」的。</p>
       ) : null}
     </div>
   )
+}
+
+/**
+ * 不筛选时先摆几家。四十来行一口气铺开，这一页有三屏是注册表，
+ * 排在它下面的「手动接入」就再也没人看得见了；要找哪一家，上面那个筛选框比滚动快。
+ */
+const FIRST = 8
+
+/** 折起来的那几行和「显示全部」那颗开关。有筛选词时不折：那时要的就是全部匹配。 */
+function useFold(rows: readonly RegistryRow[], query: string): { shown: readonly RegistryRow[]; toggle: React.ReactNode } {
+  const [all, setAll] = useState(false)
+  if (query.trim() !== "" || rows.length <= FIRST) return { shown: rows, toggle: null }
+  return {
+    shown: all ? rows : rows.slice(0, FIRST),
+    toggle: (
+      <button
+        type="button"
+        className="acp-reg__more"
+        aria-expanded={all}
+        onClick={() => {
+          setAll((was) => !was)
+        }}
+      >
+        {all ? "收起" : `显示全部 ${String(rows.length)} 家`}
+      </button>
+    ),
+  }
 }
 
 function statusOf(view: RegistryView | undefined, loading: boolean): string {

@@ -71,7 +71,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 2;
+  z-index: 4;
 }
 
 /* 左列顶上的标题：写的是「这是哪儿」，版本号压一档跟在后面 */
@@ -173,20 +173,48 @@
      上一版那边写死了 -24px，这边一收，页签条就压住了页标题的下半截 */
   --pane-y: var(--sp-4);
   --pane-x: var(--sp-5);
+  /* 吸顶的页标题带子有多高：引擎页的页签条要吸在它下面 */
+  --pagehead-h: 48px;
 
   flex: 1;
   min-width: 0;
   padding: var(--pane-y) var(--pane-x) var(--sp-5);
   overflow-y: auto;
-  animation: edge-scroll linear;
+  animation-name: edge-scroll;
+  animation-timing-function: linear;
   animation-timeline: scroll(self block);
+  /* 只在底边渐隐：顶上有吸顶的页标题带子挡着，再渐隐就把标题自己也隐掉了 */
   mask-image: linear-gradient(
     to bottom,
-    transparent 0,
-    #000 calc(var(--edge-fade) * var(--edge-a)),
     #000 calc(100% - var(--edge-fade) * var(--edge-b)),
     transparent 100%
   );
+}
+
+/* 页标题的带子：吸在滚动区最上沿，往两边撑满。关闭键浮在它右端 */
+.set__pagehead {
+  position: sticky;
+  top: calc(-1 * var(--pane-y));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  height: var(--pagehead-h);
+  margin: calc(-1 * var(--pane-y)) calc(-1 * var(--pane-x)) var(--sp-2);
+  padding: 0 calc(var(--pane-x) + 36px) 0 var(--pane-x);
+  border-bottom: 1px solid transparent;
+  background: var(--bg);
+  /* 一滚动就在底下出现一条细线；停在顶上时没有——那时它下面就是内容，不需要隔开 */
+  animation-name: set-head-scrolled;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0 24px;
+}
+
+@keyframes set-head-scrolled {
+  to {
+    border-bottom-color: var(--border);
+  }
 }
 
 .set__group + .set__group {
@@ -203,8 +231,10 @@
   color: var(--text-muted);
 }
 
-/* 一组整体要交代的一句话。也给正文里那些独立的说明句用 */
+/* 一组整体要交代的一句话。也给正文里那些独立的说明句用。
+   **行长封顶**：宽窗口里一行能铺到九十个字，读到行尾再找下一行的开头要扫过整块面板 */
 .set__note {
+  max-width: 52em;
   margin: 0 0 var(--sp-2) 2px;
   font-size: var(--text-xs);
   line-height: 1.6;
@@ -261,11 +291,45 @@
   color: var(--text);
 }
 
+/* 名字后面那一小段淡字（「螃蟹 · 降落伞」）：一行说得完，就不再另占一行提示 */
+.set__tag {
+  margin-left: var(--sp-2);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
 .set__hint {
+  max-width: 48em;
   font-size: var(--text-xs);
   line-height: 1.55;
   color: var(--text-faint);
   overflow-wrap: anywhere;
+}
+
+/* 「说明」：跟在提示句尾的一颗小开关，展开的那段另起一行。分量压在它说明的那句话下面 */
+.set__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.set__more:hover {
+  color: var(--text);
+}
+
+.set__more-text {
+  display: block;
+  margin-top: var(--sp-1);
+  color: var(--text-faint);
 }
 
 .set__control {
@@ -441,8 +505,11 @@
   gap: var(--sp-2);
 }
 
+/* 页脚里的那句话撑满左边：提示句的行长上限（48em）在这儿不适用，
+   不然 `flex-end` 会把它连同按钮一起推到右边去，左边空出一截 */
 .set__act .set__hint {
   flex: 1;
+  max-width: none;
 }
 
 /* 更新失败、或原生更新器检查后版本没变时的原文；结果不能只靠 omni 猜 */
@@ -480,6 +547,11 @@
   margin: 0;
 }
 
+/* 「重新读一遍」贴卡片的右缘，和下面那张卡对齐（那句说明有行长上限，撑不到头） */
+.hk__lead > .tbtn {
+  margin-left: auto;
+}
+
 .hk__cwd {
   margin: 0 0 var(--sp-3);
   font-size: var(--text-xs);
@@ -504,22 +576,16 @@
   font-size: var(--text-code);
 }
 
-.hk__engine + .hk__engine {
-  margin-top: var(--sp-5);
+/* 四家引擎一张卡、一家一行（和设置其余各页的 `.set__rows` 同一种画法） */
+.hk__list {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
 }
 
-/*
- * **两家都折起来时，段距收一档。**
- *
- * 24 是给展开态定的——那时一家引擎底下挂着说明、来源卡和一串钩子，
- * 段与段之间确实需要那么多。但**没配钩子的引擎默认是折起来的**，
- * 而「一条钩子都没有」恰恰是绝大多数人的常态：四行标题各隔 24px，
- * 读出来是「四个不相干的段」，而不是「四家引擎」。
- *
- * 只收**相邻两个都折着**的那一档：任何一边展开了，24 仍然是对的。
- */
-.hk__engine:has(> [aria-expanded="false"]) + .hk__engine:has(> [aria-expanded="false"]) {
-  margin-top: var(--sp-2);
+.hk__engine + .hk__engine {
+  border-top: 1px solid var(--border);
 }
 
 /* 一家引擎的标题**整条是开关**：没配钩子的那几家默认折起来。
@@ -530,18 +596,23 @@
   align-items: center;
   gap: var(--sp-2);
   margin: 0;
-  padding: var(--sp-2) 0;
+  padding: 10px 14px;
   border: 0;
   background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: 500;
   text-align: left;
 }
 
 .hk__name:hover {
-  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+/* 展开的那一家：说明、来源和钩子，左缘和标题的文字对齐 */
+.hk__body {
+  padding: 0 14px 12px 36px;
 }
 
 .hk__total {
@@ -559,18 +630,19 @@
   color: var(--text-muted);
 }
 
+/* 一份配置：卡片里的一块淡底，不再是又一张带框的卡（框里套框） */
 .hk__src {
   margin-top: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
 }
 
 /* 还没有这份文件的那一格。**照样摆出来**——「这儿可以配」本身是信息，
    但它得看起来是空的，不能和真有内容的那几格一样重 */
 .hk__src--none {
-  border-style: dashed;
+  border: 1px dashed var(--border-strong);
   background: transparent;
 }
 
@@ -669,8 +741,10 @@
 }
 
 .hk__foot {
-  margin: var(--sp-5) 0 0;
+  max-width: 52em;
+  margin: var(--sp-3) 0 0 2px;
   font-size: var(--text-xs);
+  line-height: 1.6;
   color: var(--text-faint);
 }
 

@@ -212,7 +212,11 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           {/* key 按分页隔离：切走再切回来是**重新开始**（环境那页会重新读盘），
               而不是接着上一次的半截状态 */}
           <div className="set__pane" key={tab}>
-            <h2 className="set__page-title">{TABS.find((entry) => entry.id === tab)?.label}</h2>
+            {/* 页标题那一条吸顶：右上角的关闭键就落在这条带子里，内容滚上来从它底下过，
+                不会再和关闭键叠在一起 */}
+            <div className="set__pagehead">
+              <h2 className="set__page-title">{TABS.find((entry) => entry.id === tab)?.label}</h2>
+            </div>
             <Suspense fallback={<p className="set__loading" role="status">正在加载设置…</p>}>
               {paneOf(tab, props, setTab)}
             </Suspense>

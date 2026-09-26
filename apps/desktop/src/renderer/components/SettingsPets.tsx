@@ -36,12 +36,13 @@ export function PetsSection({
   }
   return (
     <>
-      <Group title="显示" hint={showHint(roster, kit.hidden)}>
+      <Group title="显示" {...showHint(roster, kit.hidden)}>
         {/* 主开关在这一页，不在「通用」：它和下面几项是同一件事的粗细两档，
             分在两页的话，关掉之后下面这些还亮着，读起来像是它们仍然生效 */}
         <Field
           label="桌宠"
-          hint="蹲在输入框上沿的那几只，一家引擎一只。能拖能扔，松手它自己回窝。关掉是整块不渲染，不是藏起来"
+          hint="蹲在输入框上沿的那几只，一家引擎一只。关掉是整块不渲染，不是藏起来"
+          more="能拖能扔，松手它自己回窝。"
         >
           <Toggle
             label="桌宠"
@@ -52,7 +53,7 @@ export function PetsSection({
           />
         </Field>
         {roster.map((slot) => (
-          <Field key={slot.key} label={slot.label} hint={slotHint(slot)}>
+          <Field key={slot.key} label={slot.label} tag={slotHint(slot)}>
             <Toggle
               label={slot.label}
               on={!kit.hidden.includes(slot.key)}
@@ -66,7 +67,7 @@ export function PetsSection({
         ))}
       </Group>
       <FireSection settings={settings} patch={patch} />
-      <Group title="出场" hint={ENTRY_NOTE}>
+      <Group title="出场" hint="开应用、或者换一家引擎的时候，那只按自己的物性登场。" more={ENTRY_NOTE}>
         <Field
           label="播放出场动画"
           hint="关掉之后换引擎是直接换人。系统「减少动效」开着时这一项自动失效，不用你来关"
@@ -87,8 +88,7 @@ export function PetsSection({
 }
 
 const ENTRY_NOTE =
-  "开应用、或者换一家引擎的时候，那只不是「啪」地出现，是登场。每家按自己的物性来：" +
-  "史莱姆砸下来，落地摊成一滩再弹回原形；" +
+  "不是「啪」地出现：史莱姆砸下来，落地摊成一滩再弹回原形；" +
   "鲸先炸一圈水花再划弧跃出来。没见过的那一家只是淡进来——它连出场都不编花样，而这本身是个信号。"
 
 const SHAPE: Readonly<Record<PetShape, string>> = {
@@ -112,11 +112,16 @@ function slotHint(slot: PetSlot): string {
  * 这一组下面那句话。**它得随着勾选实时变**——
  * 「只留一只」那条规则不写在这儿的话，用户关到只剩一只时会以为自己关坏了。
  */
-function showHint(roster: readonly PetSlot[], hidden: readonly string[]): string {
+function showHint(roster: readonly PetSlot[], hidden: readonly string[]): { hint: string; more: string } {
   const kept = roster.filter((slot) => !hidden.includes(slot.key)).length
-  const base = "输入框上沿站着的那几只。它们不是装饰——站位说的是「谁在答」：当前引擎那只亮着，其余压暗留在队里。"
-  if (kept > 1) return `${base}现在留着 ${String(kept)} 只。当前这家藏不掉：只要这一轮归它，它就得在场。`
-  return `${base}只留一只时，台面上永远是当前引擎那只，不管勾的是哪一个——「只留一只」要的是「只看正在答的那个」。`
+  const why = "它们不是装饰——站位说的是「谁在答」：当前引擎那只亮着，其余压暗留在队里。"
+  if (kept > 1) {
+    return { hint: `现在留着 ${String(kept)} 只；当前引擎那只亮着，其余压暗留在队里。`, more: `${why}当前这家藏不掉：只要这一轮归它，它就得在场。` }
+  }
+  return {
+    hint: "只留一只时，台面上永远是当前引擎那只。",
+    more: `${why}不管勾的是哪一个——「只留一只」要的是「只看正在答的那个」。`,
+  }
 }
 
 /** 黑名单的增删。**存的是藏起来的那几只**，理由见 `shared/settings.ts` 的 `PetKit`。 */

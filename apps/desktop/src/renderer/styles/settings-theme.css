@@ -1,55 +1,79 @@
 /* 页标题。左列已经高亮了你在哪一页，这里只是给读屏和滚到一半时的一个锚——
    上一版 22px 粗体，是整块面板里最大的字，而它说的恰恰是最不需要说的那件事 */
 .set__page-title {
-  margin: 2px 0 var(--sp-4);
-  padding-right: 40px;
+  margin: 0;
+  overflow: hidden;
   color: var(--text);
   font-size: var(--text-lg);
   font-weight: 600;
   line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/*
+ * 主题三选一：三张缩略图，选中的那张外面套一圈环。
+ *
+ * 上一版每一张都是「带边框的卡片 + 里面一张带边框的缩略图」，又整个装在设置组的卡片里——
+ * 三层框套在一起，选中那张再加粗边、再铺底色，一行里全是线。
+ * 现在缩略图本身就是可点的东西，名字写在它下面，选中只靠那一圈环说。
+ */
 .theme-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-3);
-  width: 100%;
-  max-width: 510px;
-  padding-top: var(--sp-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  padding: var(--sp-1) 0 2px;
 }
 
 .theme-card {
-  min-width: 0;
-  padding: 6px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--bg-raised);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 132px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-muted);
   font: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
 .theme-card:hover {
-  border-color: var(--accent);
+  color: var(--text);
 }
 
 .theme-card[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--selection);
-  box-shadow: 0 0 0 1px var(--accent);
-  color: var(--selection-ink);
+  color: var(--text);
 }
 
 .theme-card__preview {
   --preview-bg: var(--preview-light);
   --preview-side: var(--preview-rail);
   display: flex;
-  height: 72px;
+  width: 100%;
+  height: 80px;
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: var(--preview-bg);
+  transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.theme-card:hover .theme-card__preview {
+  border-color: var(--text-faint);
+}
+
+/* 选中：缩略图外面隔 2px 再套一圈 2px 的环——隔开那一圈，环才不会和缩略图自己的边糊成一条粗线 */
+.theme-card[aria-pressed="true"] .theme-card__preview {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 4px var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-card__preview {
+    transition: none;
+  }
 }
 
 .theme-card--light {
@@ -110,10 +134,12 @@
 .theme-card__label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-1);
-  padding: var(--sp-2) 2px 2px;
+  gap: 3px;
   font-size: var(--text-sm);
+}
+
+.theme-card[aria-pressed="true"] .theme-card__label {
+  font-weight: 600;
 }
 
 .theme-card__check {
@@ -122,7 +148,7 @@
 }
 
 .theme-card[aria-pressed="false"] .theme-card__check {
-  visibility: hidden;
+  display: none;
 }
 
 /* 窄窗口（实际常用的 950×681 就落在这一档）：左右再收一档，正文多让出 16px */

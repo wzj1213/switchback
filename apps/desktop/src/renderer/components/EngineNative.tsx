@@ -18,13 +18,15 @@ export function EngineNative({
   onCopy: (text: string) => void
   onReveal: (path: string) => void
 }): React.JSX.Element {
+  // 「配置来源」自成一组，每份文件是卡片里的一行——上一版把它们画成一张张带框的小卡，
+  // 塞在「原生配置」那张卡里，框里套框
   return (
     <>
-      <Group
-        title="原生配置"
-        hint="常用的新会话偏好在上面直接改；认证、Provider 和厂商高级项仍走它公开的原生入口。"
-      >
-        {copy.native === undefined ? null : (
+      {copy.native === undefined ? null : (
+        <Group
+          title="原生配置"
+          hint="认证、Provider 和厂商高级项走它公开的原生入口；常用的新会话偏好在上面直接改。"
+        >
           <Field label={copy.native.title} hint={copy.native.hint} stack>
             <div className="eng-command">
               <code>{copy.native.command}</code>
@@ -39,11 +41,10 @@ export function EngineNative({
               </button>
             </div>
           </Field>
-        )}
-        <div className="eng-sources">
-          <div className="eng-sources__title">配置来源</div>
-          <EngineDoors engine={engine} cwd={cwd} dshProfile={dshProfile} onReveal={onReveal} />
-        </div>
+        </Group>
+      )}
+      <Group title="配置来源" hint="这家引擎自己读的那几份配置。omni 只帮你打开，不替它改。">
+        <EngineDoors engine={engine} cwd={cwd} dshProfile={dshProfile} onReveal={onReveal} />
       </Group>
     </>
   )

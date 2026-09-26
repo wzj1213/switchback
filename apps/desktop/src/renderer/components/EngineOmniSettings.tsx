@@ -104,8 +104,9 @@ export function EngineOmniSettings({
           }}
         />
       </Field>
+      {/* 状态那两个字已经在这一页抬头的徽章上（`eng-status`），这一行只摆它探到的实情，不再右边再写一遍 */}
       <Field label="运行状态" hint={state.hint}>
-        <span className={`eng-readout eng-readout--${state.tone}`}>{state.label}</span>
+        {null}
       </Field>
       <Field label="账号" hint={accountHint(account)}>
         <span className="eng-readout">{account?.label ?? "未报告"}</span>
