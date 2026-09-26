@@ -6,28 +6,143 @@
   display: flex;
   align-items: baseline;
   gap: var(--sp-3);
-  width: 100%;
+}
+
+/* 不撑满：「详情」紧跟在那句话后面，而不是漂到行尾、和它隔着半屏空白 */
+.error__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 「详情」：一颗没有外框的小开关，分量压在它说明的那句话下面 */
+.error__more {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+  align-items: center;
   padding: 0;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
-  text-align: left;
+  font-size: var(--text-xs);
   cursor: pointer;
+  opacity: 0.75;
 }
 
-.error__text {
+.error__more:hover {
+  opacity: 1;
+}
+
+/* 正在重试的那一条：前面挂一个会呼吸的琥珀点。它说的是「还在试」，不是「坏了」 */
+.error--live {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-items: baseline;
+}
+
+.error--live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  transform: translateY(-1px);
+  animation: error-breathe 1.4s var(--ease) infinite;
+}
+
+.error--live .error__why {
+  grid-column: 2;
+}
+
+@keyframes error-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .error--live::before {
+    animation: none;
+  }
+}
+
+/*
+ * 终态报错：这一轮停在这儿了，值得一张卡。
+ *
+ * **淡底、细边、只有图标是红的。** 上一版是红框红字，一整段英文原文全是红的——
+ * 红到那个程度，人读不进去，只想关掉。现在红色只负责「这是报错」这一个信号，
+ * 抬头说是哪一类，原话用正文的灰，读得下去。
+ */
+.failcard {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 4%, var(--bg));
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.failcard__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 28px;
+}
+
+.failcard__icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--danger);
+}
+
+.failcard__title {
   flex: 1;
   min-width: 0;
+  color: var(--text);
+  font-weight: 600;
 }
 
-.error__more {
-  display: flex;
+/* 下面几行和抬头的文字对齐：图标 14 + 间距 8 */
+.failcard__text,
+.failcard__why,
+.failcard__note,
+.failcard > .error__more,
+.failcard > .error__raw {
+  margin-left: 22px;
+}
+
+.failcard__text {
+  margin-top: 2px;
+  margin-bottom: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.failcard__why {
+  margin-top: 2px;
+  margin-bottom: 0;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.failcard__note {
+  margin-top: var(--sp-1);
+  margin-bottom: 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  overflow-wrap: anywhere;
+}
+
+.failcard > .error__more {
+  margin-top: var(--sp-2);
+  color: var(--text-faint);
+}
+
+.failcard__retry {
   flex: none;
-  gap: 3px;
-  align-items: center;
-  opacity: 0.7;
-  font-size: var(--text-sm);
 }
 
 /*

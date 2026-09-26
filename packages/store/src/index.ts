@@ -16,6 +16,7 @@ export {
   threadRowsOf,
   threadsOf,
   thinkingTokensOf,
+  reconnectingOf,
   turnOf,
   tasksOf,
   usageOf,

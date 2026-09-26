@@ -8,6 +8,29 @@ import { compact } from "../usage.js"
 const CLOCK_AFTER_MS = 15_000
 const TICK_MS = 1000
 
+/**
+ * 实时连接断了多久才说出来。多数断开一秒内就自己接上了——
+ * 以前每次都弹一条横幅，一天几十次，人很快就学会了无视所有横幅，包括真出事的那条。
+ */
+export const RECONNECT_AFTER_MS = 3000
+
+/** store 里记的「正在重连」：从什么时候开始、驱动怎么说的。 */
+export interface Reconnecting {
+  since: number
+  detail?: string
+}
+
+/** 到了 `at` 这一刻才变成 true；之前不做任何重绘。 */
+function useReached(at: number | undefined): boolean {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (at === undefined || Date.now() >= at) return undefined
+    const timer = setTimeout(() => { setNow(Date.now()) }, at - Date.now() + 20)
+    return () => { clearTimeout(timer) }
+  }, [at])
+  return at !== undefined && Math.max(now, Date.now()) >= at
+}
+
 /** 先睡到秒表真的会出现；出现后再对齐到整秒。前 15 秒不做无效重绘。 */
 export function nextClockDelay(now: number, startedAt: number): number {
   const untilVisible = startedAt + CLOCK_AFTER_MS - now
@@ -59,6 +82,7 @@ export function TurnStatus({
   items,
   tasks,
   thinkingTokens,
+  reconnecting,
 }: {
   thread: Thread
   turn: Turn | undefined
@@ -67,8 +91,11 @@ export function TurnStatus({
   tasks: readonly TaskRun[]
   /** 当前 thinking block 的近似值；频繁变化，不放进 aria-live 的播报内容。 */
   thinkingTokens: number | undefined
+  /** 实时连接正断着、在自己接回来。断了超过 `RECONNECT_AFTER_MS` 才说。 */
+  reconnecting?: Reconnecting | undefined
 }): React.JSX.Element | null {
   const now = useTurnClock(turn?.startedAt)
+  const linkDown = useReached(reconnecting === undefined ? undefined : reconnecting.since + RECONNECT_AFTER_MS)
 
   const label = statusLabel(thread, items)
   if (turn === undefined || label === undefined) return null
@@ -87,6 +114,13 @@ export function TurnStatus({
         </span>
       )}
       {showClock ? <span className="turnstatus__clock">{elapsed(turn.startedAt, now)}</span> : null}
+      {/* 连接断了**不是故障**：人什么都不用做，所以只在这一行里安静地说一句，接上就消失。
+          真接不回来时驱动会另报一次崩溃，那才弹横幅 */}
+      {linkDown ? (
+        <span className="turnstatus__link" title={reconnecting?.detail}>
+          连接断了，正在接回…
+        </span>
+      ) : null}
       {/*
        * 子 agent 各占一行。**这一段只在引擎真报了的时候才存在**——
        * 一个没有子 agent 的轮次不该多出一块空的「任务」区。

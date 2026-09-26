@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { KimiStream } from "./stream.js"
+import { KimiStream, type KimiDisconnect } from "./stream.js"
 
 class FakeSocket {
   readonly listeners = new Map<string, ((event: unknown) => void)[]>()
@@ -257,4 +257,47 @@ describe("Kimi WebSocket", () => {
     await nextTick()
     await stream.dispose()
   })
+})
+
+describe("断开原因照实报", () => {
+  const handshake = (socket: FakeSocket | undefined): void => {
+    socket?.frame({ type: "server_hello" })
+    socket?.frame({ type: "ack", id: "omni-subscribe", code: 0, msg: "", payload: { accepted: ["s1"], resync_required: [] } })
+  }
+  const boom = { type: "session_event", session_id: "s1", seq: 9, payload: { type: "boom" } }
+  const cases: readonly { name: string; act: (stream: KimiStream, socket: FakeSocket | undefined) => void; want: KimiDisconnect }[] = [
+    { name: "对面关的：带上关闭码和原因", act: (_s, socket) => socket?.emit("close", { code: 1001, reason: "heartbeat timeout" }), want: { kind: "closed", code: 1001, reason: "heartbeat timeout" } },
+    { name: "没有关闭码就不编一个", act: (_s, socket) => socket?.emit("close", {}), want: { kind: "closed" } },
+    { name: "omni 发现缺口、主动重同步", act: (stream) => stream.requestResync(), want: { kind: "resync", why: "omni 发现流里有缺口" } },
+    { name: "服务端要求重同步", act: (_s, socket) => socket?.frame({ type: "resync_required", session_id: "s1" }), want: { kind: "resync", why: "服务端要求重新同步" } },
+    { name: "omni 自己处理某一帧时出错", act: (_s, socket) => socket?.frame(boom), want: { kind: "error", message: "炸了" } },
+  ]
+  for (const one of cases) {
+    it(one.name, async () => {
+      const sockets: FakeSocket[] = []
+      const causes: KimiDisconnect[] = []
+      const stream = new KimiStream({
+        wsUrl: "ws://127.0.0.1/api/v1/ws", protocol: "p", sessionId: "s1", cursor: { seq: 1 },
+        onFrame: (frame) => {
+          if ((frame.payload as { type?: string } | undefined)?.type === "boom") throw new Error("炸了")
+        },
+        onResync: () => Promise.resolve({ seq: 11 }),
+        onDisconnect: (cause) => causes.push(cause),
+        onRecovered: () => undefined,
+        onFatal: () => undefined,
+        socket: () => {
+          const socket = new FakeSocket()
+          sockets.push(socket)
+          return socket
+        },
+      })
+      const connecting = stream.connect()
+      handshake(sockets[0])
+      await connecting
+      one.act(stream, sockets[0])
+      await nextTick()
+      expect(causes).toEqual([one.want])
+      await stream.dispose()
+    })
+  }
 })

@@ -95,6 +95,24 @@
   line-height: var(--lh-xs);
 }
 
+/* 连接断了、正在接回：一个小琥珀点加一句淡字。它不是故障，不用红，也不抢主标签 */
+.turnstatus__link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.turnstatus__link::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  transform: translateY(-1px);
+}
+
 /* ── 快捷键提示 ────────────────────────────────────── */
 .kbd {
   margin-left: 6px;

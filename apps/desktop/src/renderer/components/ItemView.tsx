@@ -1,6 +1,6 @@
 import { Markdown } from "./Markdown.js"
 import { Reasoning } from "./Reasoning.js"
-import { Failure } from "./Failure.js"
+import { ErrorView } from "./Failure.js"
 import { Thumb } from "./ImageThumb.js"
 import { Approval, type ResolveApproval } from "./Approval.js"
 import { memo } from "react"
@@ -105,17 +105,12 @@ export const ItemView = memo(function ItemView({
           {item.message}
         </div>
       )
-    // **可恢复的错误不画成红框。** 实测 codex 断线重连会连发十条
+    // **可恢复的错误不画成卡。** 实测 codex 断线重连会连发十条
     // `Reconnecting... N/5`，每条都撑成一张整宽红卡片，把正文整个挤没了——
     // 而它们说的是「还在试，你不用做什么」。压成一行灰字，
-    // 真正的终态错误才配那张红卡
+    // 真正的终态错误才配那张卡。转录区里还要看它前后的位置（见 `error-plan.ts`），
+    // 那条路走 `transcript-row.tsx`，这里是不知道上下文时的默认样子
     case "error":
-      return (
-        <Failure
-          text={item.message}
-          soft={item.fatal !== true}
-          {...(item.detail === undefined ? {} : { detail: item.detail })}
-        />
-      )
+      return <ErrorView item={item} />
   }
 })

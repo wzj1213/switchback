@@ -210,6 +210,7 @@ function removeThread(state: ViewState, threadId: ThreadId, draft?: Draft): View
     usage: omit(state.usage, threadId),
     tasks: omit(state.tasks, threadId),
     thinking: omit(state.thinking, threadId),
+    reconnecting: omit(state.reconnecting, threadId),
     // 漏了这张就是内存泄漏：lane 里可能挂着一整棵 30 节点的树
     lanes: omit(state.lanes, threadId),
     models: omit(state.models, threadId),

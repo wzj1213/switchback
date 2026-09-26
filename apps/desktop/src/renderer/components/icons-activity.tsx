@@ -98,3 +98,14 @@ export function ResetIcon({ size = 13 }: { size?: number }): React.JSX.Element {
     </Svg>
   )
 }
+
+/** 终态报错卡的抬头：一个圈里一道竖加一个点。**只给终态报错用**——可恢复的那些不配一个图标 */
+export function AlertIcon({ size = 14 }: { size?: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <circle cx="8" cy="8" r="5.9" {...LINE} />
+      <path d="M8 4.9v3.7" {...LINE} />
+      <circle cx="8" cy="10.9" r="0.8" fill="currentColor" />
+    </Svg>
+  )
+}

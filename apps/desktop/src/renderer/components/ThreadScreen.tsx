@@ -5,6 +5,7 @@ import {
   lanesOf,
   limitsOf,
   modelsOf,
+  reconnectingOf,
   tasksOf,
   thinkingTokensOf,
   turnOf,
@@ -69,6 +70,7 @@ export function ThreadScreen({
         usage={usageOf(state, thread.id, thread.engine)}
         tasks={tasksOf(state, thread.id)}
         thinkingTokens={thinkingTokensOf(state, thread.id)}
+        reconnecting={reconnectingOf(state, thread.id)}
         lanes={lanes}
         openLane={workbench.visible && workbench.page === "activity" ? workbench.laneId : undefined}
         onOpenLane={shell.openAside}

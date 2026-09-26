@@ -32,6 +32,7 @@ import "./styles/settings-dsh.css"
 import "./styles/settings-activity.css"
 import "./styles/workspace-identity.css"
 import "./styles/pane-handles.css"
+import "./styles/notices.css"
 import "./styles/interactions.css"
 
 const root = document.getElementById("root")

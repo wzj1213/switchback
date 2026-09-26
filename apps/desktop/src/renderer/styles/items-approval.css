@@ -204,15 +204,6 @@
   opacity: 0.78;
 }
 
-/* 终态错误：这一轮完了，值得一张卡 */
-.error {
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius);
-  color: var(--danger);
-  font-size: var(--text-sm);
-}
-
 /*
  * 可恢复的错误：一行灰字。
  *

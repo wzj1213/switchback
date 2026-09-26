@@ -8,6 +8,7 @@ import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
 import { SpinnerIcon } from "./components/icons.js"
+import { AlertIcon } from "./components/icons-activity.js"
 import type { SettingsApi } from "./useSettings.js"
 import { engineModelCatalogs } from "./engine-settings-model.js"
 
@@ -70,7 +71,13 @@ function Notice({ text, fatal, waiting }: {
     return (
       <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
         <div className="transcript__inner">
-          <div className="error">{text}</div>
+          <div className="failcard">
+            <div className="failcard__head">
+              <span className="failcard__icon"><AlertIcon size={14} /></span>
+              <span className="failcard__title">界面和后台没接上</span>
+            </div>
+            <p className="failcard__text">{text}</p>
+          </div>
         </div>
       </div>
     )

@@ -13,6 +13,16 @@ export interface KimiCursor {
   epoch?: string
 }
 
+/**
+ * 实时连接为什么断了。**只用来如实说给人听、写进日志**——恢复路径对几种一视同仁
+ *（读快照、从新水位重新订阅）。以前一律报成同一句「实时连接已中断」，
+ * 于是两千多条记录分不出是对面关的、要重同步的，还是 omni 自己处理某一帧时出了错。
+ */
+export type KimiDisconnect =
+  | { kind: "closed"; code?: number; reason?: string }
+  | { kind: "resync"; why: string }
+  | { kind: "error"; message: string }
+
 export interface KimiStreamDeps {
   wsUrl: string
   protocol: string
@@ -20,17 +30,37 @@ export interface KimiStreamDeps {
   cursor: KimiCursor
   onFrame: (frame: KimiFrame) => void
   onResync: () => Promise<KimiCursor>
-  onDisconnect: () => void
+  onDisconnect: (cause: KimiDisconnect) => void
   onRecovered: () => void
   onFatal: (error: Error) => void
   handshakeMs?: number
   socket?: SocketFactory
 }
 
-const RETRY_MS = [0, 100, 250, 500, 1000] as const
+/**
+ * 重连的间隔。前两次很快（多数断开一秒内就能接上），后面放慢、总共等十来秒：
+ * 服务端正忙（卡住几秒）时，五连发两秒内打完就判死，反而把一条还活着的会话报成崩溃。
+ */
+const RETRY_MS = [0, 250, 1000, 2000, 4000, 8000] as const
 const HANDSHAKE_MS = 15_000
 
 class ResyncError extends Error {}
+
+const GAP: KimiDisconnect = { kind: "resync", why: "omni 发现流里有缺口" }
+
+function closedBy(event: unknown): KimiDisconnect {
+  const { code, reason } = (event ?? {}) as { code?: unknown; reason?: unknown }
+  return {
+    kind: "closed",
+    ...(typeof code === "number" ? { code } : {}),
+    ...(typeof reason === "string" && reason !== "" ? { reason } : {}),
+  }
+}
+
+function causeOf(error: unknown): KimiDisconnect {
+  if (error instanceof ResyncError) return { kind: "resync", why: "服务端要求重新同步" }
+  return { kind: "error", message: error instanceof Error ? error.message : String(error) }
+}
 
 function defaultSocket(url: string, protocols: readonly string[]): SocketLike {
   const Ctor = (
@@ -123,7 +153,9 @@ export class KimiStream {
     return new Promise((resolve, reject) => {
       const socket = (this.deps.socket ?? defaultSocket)(this.deps.wsUrl, [this.deps.protocol])
       this.socket = socket
-      const state = { settled: false, subscribed: false, ready: false }
+      const state: { settled: boolean; subscribed: boolean; ready: boolean; cause?: KimiDisconnect } = {
+        settled: false, subscribed: false, ready: false,
+      }
       const settle = (error?: Error): void => {
         if (state.settled) return
         state.settled = true
@@ -151,19 +183,22 @@ export class KimiStream {
           }
           this.takeEvent(frame)
         } catch (error) {
+          state.cause = causeOf(error)
           settle(error instanceof Error ? error : new Error(String(error)))
           socket.close()
         }
       })
       socket.addEventListener("error", () => settle(new Error("Kimi WebSocket 连接失败")))
-      socket.addEventListener("close", () => {
+      socket.addEventListener("close", (event) => {
         if (this.socket === socket) this.socket = undefined
         if (!state.settled) {
           const error = this.forceSnapshot
             ? new ResyncError("Kimi 流式 offset 要求重新同步")
             : new Error("Kimi WebSocket 在订阅完成前断开")
           settle(error)
-        } else if (state.ready && !this.disposed) void this.recover()
+        } else if (state.ready && !this.disposed) {
+          void this.recover(state.cause ?? (this.forceSnapshot ? GAP : closedBy(event)))
+        }
       })
     })
   }
@@ -183,9 +218,9 @@ export class KimiStream {
     await this.connectWithResync()
   }
 
-  private recover(): Promise<void> {
+  private recover(cause: KimiDisconnect): Promise<void> {
     if (this.recovering !== undefined) return this.recovering
-    this.deps.onDisconnect()
+    this.deps.onDisconnect(cause)
     this.recovering = this.tryRecover().finally(() => {
       this.recovering = undefined
     })

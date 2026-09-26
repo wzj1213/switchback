@@ -84,7 +84,10 @@ export function Notices({
         >
           {/* 抬头照 `kind` 写：`degraded` 是「引擎好好的、只是掉了能力」，
               顶着「引擎故障」端出去会把排查引到错的方向 */}
-          <span className="notice__kind">{labelOf(latest)}</span>
+          {/* 同一件事接连报了几次，store 里已经合成一条；这里照实带上次数 */}
+          <span className="notice__kind">
+            {(latest.count ?? 1) > 1 ? `${labelOf(latest)} ×${String(latest.count)}` : labelOf(latest)}
+          </span>
           <span className="notice__text">{latest.text}</span>
           <button
             className="btn btn--ghost"

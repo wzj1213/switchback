@@ -800,29 +800,6 @@ body {
   }
 }
 
-/* 横幅上那个会话名：点它跳过去。**它是链接不是按钮**——按钮该长得像能按，
-   而这一条的分量必须低于旁边那句故障本身 */
-.notice__go {
-  flex: none;
-  max-width: 12em;
-  overflow: hidden;
-  margin-left: var(--sp-2);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: var(--text-sm);
-  text-decoration: underline;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.75;
-}
-
-.notice__go:hover {
-  opacity: 1;
-}
-
 .sidebar__empty {
   margin: 0;
   padding: var(--sp-2) calc(var(--sb-pad) + var(--sb-slot));

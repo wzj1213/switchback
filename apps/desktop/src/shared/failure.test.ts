@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { humanize } from "./failure.js"
+import { failureKind, humanize, type FailureKind } from "./failure.js"
 
 describe("把引擎的报错翻成人话", () => {
   it("JSON 里捞出那句 message——实测 codex 就这么报的", () => {
@@ -34,3 +34,24 @@ describe("把引擎的报错翻成人话", () => {
     expect(humanize(`{"message":"   ","x":1}`).text).toBe(`{"message":"   ","x":1}`)
   })
 })
+
+describe("终态报错的抬头只认原文里明写的", () => {
+  const cases: readonly [string, FailureKind][] = [
+    ["429 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends.", "quota"],
+    ["403 You've reached your weekly (7-day) usage limit.", "quota"],
+    ["You exceeded your current quota, please check your plan and billing details.", "quota"],
+    ["rate_limit_error: Number of request tokens has exceeded your per-minute rate limit", "rate"],
+    ["429 Too Many Requests", "rate"],
+    ["401 Unauthorized", "auth"],
+    ["Invalid API key provided", "auth"],
+    ["504 Gateway Time-out", "server"],
+    ["529 Overloaded", "server"],
+    ["stream disconnected before completion: idle timeout waiting for SSE", "network"],
+    ["Connection error.", "network"],
+    ["read ECONNRESET", "network"],
+    ["The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account.", "other"],
+    ["引擎莫名其妙地没了", "other"],
+  ]
+  for (const [raw, want] of cases) it(`${want} ← ${raw.slice(0, 40)}`, () => expect(failureKind(raw)).toBe(want))
+})
+

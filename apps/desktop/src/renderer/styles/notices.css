@@ -1,0 +1,145 @@
+/* ── 引擎状态与原生通知：浮在正文上面的一张卡 ─────────────
+ *
+ * 上一版是插进版面里的一整条色带：左边一道竖条、整块淡红底、文字一口气铺三行。
+ * 每弹一次，整个对话往下一跳；弹得勤的时候（断线重连一天几十次），
+ * 人很快就学会了不读直接关——包括真出事的那一条。
+ *
+ * 现在：零高度的锚 + 浮起来的卡。出现和消失都不动版面；颜色只落在图标和抬头上，
+ * 正文用正文的颜色，读得下去。
+ */
+.notices {
+  position: relative;
+  z-index: 25;
+  height: 0;
+}
+
+.notice {
+  position: absolute;
+  top: var(--sp-2);
+  left: 50%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  width: min(640px, calc(100% - var(--sp-5)));
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-float);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  transform: translateX(-50%);
+  animation: notice-in var(--dur-slow) var(--ease);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice {
+    animation: none;
+  }
+}
+
+.notice__icon {
+  display: inline-flex;
+  flex: none;
+  /* 和抬头那一行的文字居中对齐 */
+  margin-top: 3px;
+  color: var(--danger);
+}
+
+.notice--warning .notice__icon {
+  color: var(--warn);
+}
+
+.notice--info .notice__icon {
+  color: var(--accent);
+}
+
+.notice__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.notice__badge {
+  flex: none;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 同一件事接连报了几次 */
+.notice__count {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 出事的那条会话：点它跳过去。**它是链接不是按钮**——分量必须低于那句故障本身 */
+.notice__go {
+  min-width: 0;
+  max-width: 16em;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.notice__go:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* 原话最多三行：完整原文在 title 里，也会作为一条报错落在对话里 */
+.notice__text {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.notice__act {
+  flex: none;
+  align-self: center;
+}
+
+.notice__close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.notice__close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}

@@ -1,5 +1,7 @@
 import type { Command, EngineInfo, Thread, Turn } from "@omni/protocol"
 import { ItemView } from "./ItemView.js"
+import { ErrorView, type ErrorContext } from "./Failure.js"
+import type { ErrorPlan, RetryTarget } from "../error-plan.js"
 import type { ResolveApproval } from "./Approval.js"
 import { ToolRun } from "./ToolRun.js"
 import { Copyable } from "./Copyable.js"
@@ -121,13 +123,50 @@ export function retryProps(
   }
 }
 
+/**
+ * 报错行的上下文：它在这一轮里是正在重试、已经过去，还是被后面的终态报错吞了；
+ * 终态那张能不能「再试一次」。**给不出来就返回空对象**，同 `retryProps`。
+ */
+export function errorProps(
+  row: Row,
+  plan: ErrorPlan,
+  again: { target: RetryTarget; run: (target: RetryTarget) => void } | undefined,
+): { error?: ErrorContext } {
+  if (row.kind !== "item" || row.item.kind !== "error") return {}
+  const id = row.item.id
+  const state = plan.soft.get(id)
+  const prior = plan.prior.get(id)
+  return {
+    error: {
+      ...(state === undefined ? {} : { state }),
+      ...(prior === undefined ? {} : { prior }),
+      ...(again?.target.errorId === id ? { onRetry: () => { again.run(again.target) } } : {}),
+    },
+  }
+}
+
 export const approvalShortcut = (readOnly: boolean, itemId: string | undefined): string | undefined =>
   readOnly ? undefined : itemId
 
+/** 一条 item 的正文。报错要看它在这一轮里的位置，走 `ErrorView`；别的都交给 `ItemView`。 */
+function ItemBody({ item, error, ...rest }: {
+  item: Extract<Row, { kind: "item" }>["item"]
+  error: ErrorContext | undefined
+  approvalTurn: string | undefined
+  readOnly: boolean
+  shortcutApproval: string | undefined
+  onResolve: ResolveApproval
+}): React.JSX.Element | null {
+  if (item.kind === "error") return <ErrorView item={item} context={error} />
+  return <ItemView item={item} {...rest} />
+}
+
 /** 一行。几种形态在这里分派，`Transcript` 只管遍历。 */
 export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, onReveal, folded, onFold, onCopy,
-  onResolve, approvalTurn, shortcutApproval, readOnly }: {
+  onResolve, approvalTurn, shortcutApproval, readOnly, error }: {
   row: Row
+  /** 报错行的上下文（见 `errorProps`）。别的行没有。 */
+  error?: ErrorContext
   /** 引擎清单：换手分界要把 id 翻成人话。 */
   engines: readonly EngineInfo[]
   /** 这一行是不是「最后一条说出来的话」。见 `lastSpoken`。 */
@@ -214,6 +253,8 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
    * 能不能 rewind 由 `canRewind` 定（引擎报不报原生 fork、这一轮跑完没有……）。
    * 不能的时候**不画**——画一颗点了会炸的按钮比没有更糟。
    */
+  // 被同一轮后面那张终态报错卡吞掉的重试：卡里已经说了，这里不再摆一遍
+  if (error?.state === "absorbed") return <></>
   return (
     <Copyable
       item={row.item}
@@ -235,7 +276,7 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
             ),
           })}
     >
-      <ItemView item={row.item} approvalTurn={approvalTurn} readOnly={readOnly}
+      <ItemBody item={row.item} error={error} approvalTurn={approvalTurn} readOnly={readOnly}
         shortcutApproval={shortcutApproval} onResolve={onResolve} />
     </Copyable>
   )

@@ -5,6 +5,7 @@ import { KimiActivityTracker } from "./activity.js"
 import { KimiAsides } from "./aside.js"
 import { toAccount, toHistory, toLimits, toModels, type OAuthUsage } from "./catalog.js"
 import { KimiDiagnostics, type KimiMcpSnapshot } from "./diagnostics.js"
+import { disconnectText } from "./disconnect.js"
 import { sessionPath } from "./http.js"
 import { readKimiTranscript } from "./history.js"
 import { KimiInteractions } from "./interactions.js"
@@ -84,9 +85,11 @@ export class KimiSession implements EngineSession {
       cursor: this.cursorOf(init.snapshot),
       onFrame: (frame) => this.onFrame(frame),
       onResync: () => this.resync(),
-      onDisconnect: () => this.status("degraded", "Kimi 实时连接已中断，正在从会话快照恢复…"),
+      // 断了先报「正在重连」而不是 `degraded`：它不是故障，界面不为它弹横幅；
+      // 接上报 `ready` 收起，接不回来才报 `crashed`
+      onDisconnect: (cause) => this.status("reconnecting", disconnectText(cause)),
       onRecovered: () => this.status("ready"),
-      onFatal: (error) => this.crashed(`Kimi 实时连接无法恢复：${error.message}`),
+      onFatal: (error) => this.crashed(`Kimi 的实时连接重试多次都没接上：${error.message}`),
     })
     this.unlisten = lease.onCrash((detail) => this.crashed(detail))
   }
@@ -110,7 +113,7 @@ export class KimiSession implements EngineSession {
     }
   }
   get threadId(): StartRequest["threadId"] { return this.req.threadId }
-  private status(status: "ready" | "degraded" | "crashed", detail?: string): void {
+  private status(status: "ready" | "degraded" | "crashed" | "reconnecting", detail?: string): void {
     this.req.emit({
       type: "engine.status",
       at: Date.now(),

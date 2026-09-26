@@ -15,6 +15,7 @@ import { installMenu } from "./menu.js"
 import { installContextMenu } from "./context-menu.js"
 import { installFind } from "./find.js"
 import { createLogger, type Logger } from "./log.js"
+import { watchStalls } from "./stall.js"
 import { exportReport } from "./diagnose.js"
 import { ensureEngineFile } from "./engines-file.js"
 import { clearMarker, installCrashReporter, watchProcesses } from "./crash.js"
@@ -141,6 +142,11 @@ process.on("unhandledRejection", (reason: unknown) => {
     "main",
     `未处理拒绝：${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`,
   )
+})
+// 卡顿留痕：主进程一卡，引擎推来的消息和心跳都没人读，对面会以为这头断了
+watchStalls({
+  now: () => performance.now(),
+  report: (late) => log.write("warn", "main", `主进程卡了 ${(late / 1000).toFixed(1)} 秒，这期间收不到引擎推来的任何消息`),
 })
 
 function createWindow(bounds: {

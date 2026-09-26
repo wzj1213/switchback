@@ -270,8 +270,13 @@ export type Event =
  * `unauthenticated` 是**引擎明确说了「要先登录」**（ACP 的 `-32000`）：进程好好的，
  * 只是这一步它不肯做。同样不能报成 `crashed`——那会把人引去查一个没坏的东西；
  * 下一步是登录，界面据此直接给出去登录的路。
+ *
+ * `reconnecting` 是**驱动和引擎之间的实时连接断了、正在自己接回来**：不是故障，也不是能力损失，
+ * 人什么都不用做。界面不为它弹横幅，只在这一轮的状态行里安静地说一句；
+ * 同一条会话下一次报别的状态（通常是 `ready`）就把它收起。真接不回来时驱动另报 `crashed`。
  */
-export type EngineStatus = "starting" | "ready" | "exited" | "crashed" | "timeout" | "degraded" | "unauthenticated"
+export type EngineStatus =
+  | "starting" | "ready" | "exited" | "crashed" | "timeout" | "degraded" | "unauthenticated" | "reconnecting"
 
 /**
  * 账号额度。

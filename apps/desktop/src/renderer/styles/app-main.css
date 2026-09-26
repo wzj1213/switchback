@@ -327,68 +327,6 @@
   pointer-events: none;
 }
 
-/* ── 引擎状态与原生通知横幅 ───────────────────────────
- * 贴在顶栏下方，不遮挡对话。用 danger 色的极淡底 + 左侧竖条，
- * 而不是整块红——整块红会让人条件反射地关掉它，连读都不读。
- */
-.notice {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  flex: none;
-  padding: var(--sp-2) var(--sp-4);
-  border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--danger);
-  background: color-mix(in srgb, var(--danger) 7%, transparent);
-  font-size: var(--text-sm);
-}
-
-.notice__badge {
-  flex: none;
-  color: var(--danger);
-  font-weight: 600;
-  font-size: var(--text-xs);
-}
-
-.notice--warning .notice__badge {
-  color: var(--warn);
-}
-
-.notice--warning {
-  border-left-color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 7%, transparent);
-}
-
-.notice--info {
-  border-left-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-
-.notice--info .notice__badge {
-  color: var(--accent);
-}
-
-.notice__text {
-  min-width: 0;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.notice__close {
-  margin-left: auto;
-  flex: none;
-  padding: 0 var(--sp-1);
-  border: 0;
-  background: transparent;
-  color: var(--text-faint);
-  font: inherit;
-  font-size: var(--text-base);
-}
-
-.notice__close:hover {
-  color: var(--text);
-}
-
 /* 历史会话的标记：比引擎/档位那两枚更淡，它是状态不是配置 */
 .badge--muted {
   color: var(--text-faint);

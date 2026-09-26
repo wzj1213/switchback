@@ -1,5 +1,6 @@
 import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, Usage } from "@omni/protocol"
 import type { PetKit } from "../../shared/settings.js"
+import type { Reconnecting } from "./TurnStatus.js"
 import { useFireProps } from "../use-fire-props.js"
 import { Pets } from "./Pets.js"
 import { Transcript } from "./Transcript.js"
@@ -12,6 +13,7 @@ export function ConversationStage({
   turn,
   tasks,
   thinkingTokens,
+  reconnecting,
   engines,
   usage,
   pets,
@@ -28,6 +30,7 @@ export function ConversationStage({
   turn: Turn | undefined
   tasks: readonly TaskRun[]
   thinkingTokens: number | undefined
+  reconnecting?: Reconnecting | undefined
   engines: readonly EngineInfo[]
   usage: Usage | undefined
   pets: PetKit & { on: boolean }
@@ -49,6 +52,7 @@ export function ConversationStage({
         tasks={tasks}
         engines={engines}
         thinkingTokens={thinkingTokens}
+        reconnecting={reconnecting}
         onReveal={onReveal}
         send={send}
         onCopy={onCopy}

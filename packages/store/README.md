@@ -11,7 +11,11 @@
 - `ViewState` —— 会话表、顺序、每个会话的 item 列表与当前轮次
 - `notices` —— 引擎故障与原生一次性通知；同一会话、引擎和原生 key 的提示只留最新一条。
   故障按状态分三类抬头：`crashed`（故障）、`degraded`（能力受限）、`auth`（引擎明确要先登录，带引擎 id，
-  那一家登录成功后界面据此收起）
+  那一家登录成功后界面据此收起）。和最后一条同类、同会话、同一句话的故障**合成一条**：
+  `count` 加一、拿新的 id 与时刻（界面据此重新亮出来），不再叠一张一模一样的
+- `reconnecting` / `reconnectingOf` —— 哪条会话的实时连接正断着、驱动在自己接回来
+  （`engine.status` 的 `reconnecting`）。**不进 `notices`**：它不是故障，人什么都不用做；
+  同一会话报任何别的状态（接上的 `ready`、接不回来的 `crashed`）就收起，删会话一起清
 - `reduce(state, event)` —— 唯一入口，纯函数，不可变更新
 - `reduceHistory(state, threadId, events)` —— **单独补一条会话的历史**。
   先清掉这条的条目再按历史铺开：直接 `reduceAll` 的话，已经在直播的那几条

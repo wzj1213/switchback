@@ -42,6 +42,11 @@ export interface ViewState {
   /** 当前轮的近似思考 token。活状态，不落盘；轮次收工就清。 */
   thinking: Readonly<Record<ThreadId, { turnId: TurnId; estimatedTokens: number }>>
   /**
+   * 哪些会话的实时连接正断着、驱动正在自己接回来（`engine.status` 的 `reconnecting`）。
+   * 活状态，不落盘；同一条会话下一次报别的状态就清掉。**不进横幅**——见 `reconnectingOf`。
+   */
+  reconnecting: Readonly<Record<ThreadId, { since: number; detail?: string }>>
+  /**
    * 每个会话可选的模型，**连同报它的那家引擎**。引擎报了才有。
    *
    * 记着「谁报的」是为了切引擎之后不撒谎：见 `modelsOf`。
@@ -89,6 +94,11 @@ interface NoticeBase {
   text: string
   /** 关联的会话；建会话阶段就失败时没有会话。 */
   threadId: ThreadId | undefined
+  /**
+   * 同一件事接连报了几次（同一类、同一条会话、同一句话）。**合成一条带计数**，
+   * 不是再弹一条一模一样的横幅：连着弹五次的同一句话只会让人更早地开始无视它。
+   */
+  count?: number
 }
 
 /** 一条要让用户看见的引擎故障或能力损失。 */
@@ -132,6 +142,7 @@ export function initial(): ViewState {
     usage: {},
     tasks: {},
     thinking: {},
+    reconnecting: {},
     models: {},
     commands: {},
     limits: {},
@@ -173,6 +184,14 @@ export function tasksOf(state: ViewState, threadId: ThreadId): readonly TaskRun[
 /** 当前轮的近似思考 token；不是最终用量，也不是账单。 */
 export function thinkingTokensOf(state: ViewState, threadId: ThreadId): number | undefined {
   return state.thinking[threadId]?.estimatedTokens
+}
+
+/**
+ * 这条会话的实时连接是不是正断着、在自己重连。界面只在这一轮还在跑时说一句，
+ * 接上了就消失——它不是报错，人什么都不用做。
+ */
+export function reconnectingOf(state: ViewState, threadId: ThreadId): { since: number; detail?: string } | undefined {
+  return state.reconnecting[threadId]
 }
 
 const NO_LANES: readonly Lane[] = []

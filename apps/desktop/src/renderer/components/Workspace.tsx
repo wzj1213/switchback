@@ -12,6 +12,7 @@ import type {
   Usage,
   TaskRun,
 } from "@omni/protocol"
+import type { Reconnecting } from "./TurnStatus.js"
 import type { Notice, ThreadRow } from "@omni/store"
 import type { PetKit } from "../../shared/settings.js"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
@@ -40,6 +41,8 @@ export interface WorkspaceProps {
   tasks: readonly TaskRun[]
   /** Claude 原生上报的当前思考块近似 token；没有信号就不显示。 */
   thinkingTokens: number | undefined
+  /** 实时连接正断着、驱动在自己接回来（见 store 的 `reconnectingOf`）。 */
+  reconnecting?: Reconnecting | undefined
   lanes: readonly Lane[]
   /** 工作台正开着哪条旁路。主线上那条收成一行，同一棵树不画两遍。 */
   openLane: string | undefined
@@ -220,6 +223,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         turn={props.turn}
         tasks={props.tasks}
         thinkingTokens={props.thinkingTokens}
+        reconnecting={props.reconnecting}
         engines={props.engines}
         usage={props.usage}
         pets={props.pets}

@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { CloseIcon } from "./icons-panel.js"
+import { AlertIcon } from "./icons-activity.js"
 import { humanize } from "../../shared/failure.js"
 import type { Notice } from "@omni/store"
 import type { ThreadRow } from "@omni/store"
@@ -29,7 +30,7 @@ function labelOf(notice: Notice): string {
  * 那不是缺功能，那是把故障吞掉了。
  *
  * 只显示**最新一条**：连着报五条同源的故障，把屏幕铺满并不会让人更容易看懂，
- * 只会让人更早地开始无视它。
+ * 只会让人更早地开始无视它。同一件事接连报的在 store 里就合成了一条（`count`）。
  */
 export function Notices({
   notices,
@@ -56,47 +57,45 @@ export function Notices({
   }, [latest, onDismiss])
   if (latest === undefined) return null
   /**
-   * **出事的是哪一条**。横幅画在当前会话的正文区里，而故障可能来自另一条——
+   * **出事的是哪一条**。横幅浮在当前会话的正文上，而故障可能来自另一条——
    * 上一版不写名字也点不过去：B 崩了，红条挂在你正在看的 A 上面。
    */
   const source = rows.find((r) => r.thread.id === latest.threadId)?.thread
+  const tone = toneOf(latest)
+  const text = latest.kind === "notification" ? latest.text : humanize(latest.text).text
   return (
-    <div className={`notice notice--${toneOf(latest)}`} role={toneOf(latest) === "info" ? "status" : "alert"}>
-      {/* **抬头照实写。** 上一版一律写「引擎故障」，而「MCP 没起来」「没登录」
-          这两种引擎好好的——顶着「故障」端出去，就是把排查引到错的方向 */}
-      <span className="notice__badge">{labelOf(latest)}</span>
-      {/* 横幅上只放人话那一句：这一条本来就是「扫一眼就走」的东西，
-          真要看原文，同一段也会作为一条 error 落在对话里，那边能展开 */}
-      <span className="notice__text" title={latest.text}>
-        {latest.kind === "notification" ? latest.text : humanize(latest.text).text}
-      </span>
-      {latest.kind === "auth" && onLogin !== undefined ? (
-        <button type="button" className="notice__go" title="打开 设置 → 安装与接入，在那一家的卡片上登录" onClick={onLogin}>
-          去登录
+    // **零高度的锚**：卡浮在正文上面，出现和消失都不把对话往下推——
+    // 上一版是一整条插进版面里的色带，每弹一次整屏跳一下，弹得越勤越烦
+    <div className="notices">
+      <div key={latest.id} className={`notice notice--${tone}`} role={tone === "info" ? "status" : "alert"}>
+        <span className="notice__icon" aria-hidden="true">
+          <AlertIcon size={14} />
+        </span>
+        <div className="notice__body">
+          <div className="notice__head">
+            {/* **抬头照实写。** 上一版一律写「引擎故障」，而「MCP 没起来」「没登录」
+                这两种引擎好好的——顶着「故障」端出去，就是把排查引到错的方向 */}
+            <span className="notice__badge">{labelOf(latest)}</span>
+            {/* 同一件事接连报了几次：合成一条、记个数，不是再弹一张一模一样的 */}
+            {(latest.count ?? 1) > 1 ? <span className="notice__count">{`×${String(latest.count)}`}</span> : null}
+            {source === undefined ? null : (
+              <button type="button" className="notice__go" title={`跳到「${source.title}」`} onClick={() => { onSelect(source.id) }}>
+                {source.title}
+              </button>
+            )}
+          </div>
+          {/* 只放人话那一句、最多三行：真要看原文，同一段也会作为一条报错落在对话里，那边能展开 */}
+          <p className="notice__text" title={latest.text}>{text}</p>
+        </div>
+        {latest.kind === "auth" && onLogin !== undefined ? (
+          <button type="button" className="btn btn--slim notice__act" title="打开 设置 → 安装与接入，在那一家的卡片上登录" onClick={onLogin}>
+            去登录
+          </button>
+        ) : null}
+        <button className="notice__close" type="button" aria-label="关闭" onClick={() => { onDismiss(latest.id) }}>
+          <CloseIcon size={14} />
         </button>
-      ) : null}
-      {source === undefined ? null : (
-        <button
-          type="button"
-          className="notice__go"
-          title={`跳到「${source.title}」`}
-          onClick={() => {
-            onSelect(source.id)
-          }}
-        >
-          {source.title}
-        </button>
-      )}
-      <button
-        className="notice__close"
-        type="button"
-        aria-label="关闭"
-        onClick={() => {
-          onDismiss(latest.id)
-        }}
-      >
-        <CloseIcon size={14} />
-      </button>
+      </div>
     </div>
   )
 }
