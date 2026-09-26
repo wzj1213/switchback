@@ -195,15 +195,20 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         aria-modal="true"
         aria-label="设置"
       >
-        <header className="set__head">
-          <span className="set__heading">设置</span>
-          <span className="set__ver">omni {props.version}</span>
-          <button type="button" className="iconbtn" aria-label="关闭" data-tip="关闭设置（Esc）" onClick={props.onClose}>
-            <CloseIcon />
-          </button>
-        </header>
+        {/* 标题收进左列顶上：上一版在整块面板上面横着压了一条 60px 的抬头，
+            只写着「设置」和版本号，而左列选中的那一项本来就说明了你在哪儿 */}
+        {/* 关闭键浮在右上角，但在 DOM 里排第一个：键盘进来先碰到的还是它 */}
+        <button type="button" className="iconbtn set__close" aria-label="关闭" data-tip="关闭设置（Esc）" onClick={props.onClose}>
+          <CloseIcon />
+        </button>
         <div className="set__body">
-          <Nav tab={tab} onPick={setTab} />
+          <div className="set__side">
+            <div className="set__brand">
+              <span className="set__heading">设置</span>
+              <span className="set__ver">omni {props.version}</span>
+            </div>
+            <Nav tab={tab} onPick={setTab} />
+          </div>
           {/* key 按分页隔离：切走再切回来是**重新开始**（环境那页会重新读盘），
               而不是接着上一次的半截状态 */}
           <div className="set__pane" key={tab}>

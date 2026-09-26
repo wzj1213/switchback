@@ -1,8 +1,8 @@
 /*
  * 「安装与接入」页 ACP 那三块：已接的几家（卡）、注册表（清单）、接入与登录的流程。
  *
- * 和设置页其余部分同一套平铺写法：没有外框，行与行之间一条细线，左右不再内缩——
- * 这一页本来就是一列长清单，再套一层卡片只会让 41 行更挤。
+ * 它们都装在 `Group` 的那张卡片里（`.set__rows`），和设置页其余各行同一套左右内距（14px）：
+ * 卡片自己画外框，行与行之间一条细线，最后一行不再画底线——那条线卡片的边框已经画了。
  */
 
 /* ── 已接的几家 ───────────────────────────────────── */
@@ -13,7 +13,7 @@
 
 .acp-card {
   min-width: 0;
-  padding: var(--sp-3) 0;
+  padding: 10px 14px;
 }
 
 .acp-card + .acp-card {
@@ -197,7 +197,7 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-3) 0;
+  padding: 10px 14px;
 }
 
 .acp-reg__search {
@@ -214,7 +214,8 @@
 
 .acp-reg__error,
 .acp-reg__empty {
-  margin: 0 0 var(--sp-2);
+  margin: 0;
+  padding: 0 14px 10px;
   font-size: var(--text-sm);
 }
 
@@ -234,8 +235,12 @@
 }
 
 .acp-row {
-  padding: var(--sp-2) 0;
+  padding: var(--sp-2) 14px;
   border-bottom: 1px solid var(--border);
+}
+
+.acp-row:last-child {
+  border-bottom: 0;
 }
 
 .acp-row--open {

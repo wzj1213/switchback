@@ -6,12 +6,13 @@
 
 .eng-tabs {
   position: sticky;
-  top: calc(-1 * var(--sp-5));
+  /* 吸在滚动区的最上沿：往上抵掉页面的上内边距，左右撑满（变量见 `.set__pane`） */
+  top: calc(-1 * var(--pane-y));
   z-index: 2;
   display: flex;
   gap: var(--sp-1);
-  margin: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5)) var(--sp-4);
-  padding: var(--sp-3) var(--sp-5);
+  margin: calc(-1 * var(--sp-2)) calc(-1 * var(--pane-x)) var(--sp-4);
+  padding: var(--sp-2) var(--pane-x);
   overflow-x: auto;
   border-bottom: 1px solid var(--border);
   background: var(--bg);

@@ -33,6 +33,7 @@ export function DataSection({
         <PathRow
           label="会话记录"
           path={`${dataDir}/threads`}
+          shown="数据目录/threads"
           hint="一条会话一个 .jsonl，追加式。重启之后历史还在，靠的就是它"
           onReveal={onReveal}
           onCopy={onCopy}
@@ -40,13 +41,14 @@ export function DataSection({
         <PathRow
           label="运行日志"
           path={`${dataDir}/logs/omni.log`}
+          shown="数据目录/logs/omni.log"
           hint="引擎起停、崩溃、写盘失败都记在这儿。不含对话内容"
           onReveal={onReveal}
           onCopy={onCopy}
         />
       </Group>
       <Group title="第三方引擎" hint="内置那几家在「引擎」页；这里是你自己往里加的那些。">
-        <Field label="引擎注册表" hint={`${dataDir}/engines.json —— 一份十行的 JSON，用你自己的编辑器改比在这儿点开一个表单强。新加一家存盘后点「重新探测」即可；改已有那家或删掉它要重启`} stack>
+        <Field label="引擎注册表" hint="数据目录/engines.json——一份十行的 JSON，用你自己的编辑器改比在这儿点开一个表单强。存盘后到「安装与接入」点「重新探测」就生效；正被会话用着的那家，要等那些会话关掉">
           <button type="button" className="tbtn" onClick={onOpenEngines}>
             用编辑器打开
           </button>
@@ -67,9 +69,18 @@ export function DataSection({
 }
 
 /** 一行「这是什么 · 在哪儿 · 两个动作」。三处一模一样，抽出来免得措辞各写一套。 */
-function PathRow({ label, path, hint, onReveal, onCopy }: {
+/**
+ * 一条路径：名字、一句说明、路径本身，右边两颗图标键。
+ *
+ * 上一版每条都是「说明 + 整条路径 + 两颗带字的大按钮」竖着叠，三条路径就占满一屏，
+ * 而数据目录那一长串前缀在三行里重复了三遍。子路径现在只写「数据目录/threads」，
+ * 完整路径在悬停提示里、复制出去的也是完整路径——**读的时候省眼，拿的时候不缺字**。
+ */
+function PathRow({ label, path, shown, hint, onReveal, onCopy }: {
   label: string
   path: string
+  /** 行里显示成什么。缺省就是完整路径。 */
+  shown?: string
   hint: string
   onReveal: (path: string) => void
   onCopy: (text: string) => void
@@ -81,28 +92,31 @@ function PathRow({ label, path, hint, onReveal, onCopy }: {
         <>
           {hint}
           <br />
-          <code className="set__path">{path}</code>
+          <code className="set__path" title={path}>{shown ?? path}</code>
         </>
       }
-      stack
     >
       <button
         type="button"
-        className="tbtn"
+        className="iconbtn"
+        aria-label={`在访达中显示${label}`}
+        data-tip="在访达中显示"
         onClick={() => {
           onReveal(path)
         }}
       >
-        <RevealIcon /> 在访达中显示
+        <RevealIcon />
       </button>
       <button
         type="button"
-        className="tbtn"
+        className="iconbtn"
+        aria-label={`复制${label}的路径`}
+        data-tip="复制完整路径"
         onClick={() => {
           onCopy(path)
         }}
       >
-        <CopyIcon /> 复制路径
+        <CopyIcon />
       </button>
     </Field>
   )

@@ -102,8 +102,9 @@ export function RemotePanel({
 
   return (
     <>
+      {/* 组名不再写「远程访问」：页标题就是这四个字，紧跟着再写一遍是同一句话念两次 */}
       <Group
-        title="远程访问"
+        title="服务"
         hint="在手机或另一台电脑的浏览器里接着用同一批会话。服务端跑在这台机器上，默认整个关着。"
       >
         <Field label="开启" hint={status === undefined ? "正在读…" : statusText(status)}>

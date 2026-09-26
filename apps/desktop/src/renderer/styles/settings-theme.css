@@ -1,7 +1,10 @@
+/* 页标题。左列已经高亮了你在哪一页，这里只是给读屏和滚到一半时的一个锚——
+   上一版 22px 粗体，是整块面板里最大的字，而它说的恰恰是最不需要说的那件事 */
 .set__page-title {
-  margin: 0 0 var(--sp-5);
+  margin: 2px 0 var(--sp-4);
+  padding-right: 40px;
   color: var(--text);
-  font-size: 22px;
+  font-size: var(--text-lg);
   font-weight: 600;
   line-height: 1.4;
 }
@@ -122,8 +125,9 @@
   visibility: hidden;
 }
 
+/* 窄窗口（实际常用的 950×681 就落在这一档）：左右再收一档，正文多让出 16px */
 @media (max-width: 960px) {
   .set__pane {
-    padding: var(--sp-5);
+    --pane-x: var(--sp-4);
   }
 }
