@@ -83,12 +83,14 @@ function claimed(info: AcpInitialize): readonly string[] {
 export async function tryAcp(req: OneShotRequest & {
   /** 等多久算不答。默认 `TRY_MS`；注册表里 npx 分发的第一次要现下载，调用方会给长一些。 */
   timeoutMs?: number
+  /** 人点了「取消」。进程照常回收。 */
+  signal?: AbortSignal
 }): Promise<AcpTrial> {
   const budget = req.timeoutMs ?? TRY_MS
   const tail = { stderr: "" }
   try {
     return await withAcpProcess(req, async (shot) => {
-      const result = await initializeOnce(shot, budget)
+      const result = await initializeOnce(shot, budget, req.signal)
       tail.stderr = shot.stderr()
       return verdict(result, req.command, tail.stderr, budget)
     })
@@ -99,6 +101,7 @@ export async function tryAcp(req: OneShotRequest & {
 }
 
 function verdict(result: Initialized, command: string, stderr: string, budget: number): AcpTrial {
+  if (result.kind === "aborted") return { ok: false, error: "已取消。" }
   if (result.kind === "timeout") {
     return fail(
       `${String(Math.round(budget / 1000))} 秒内没有回应。它可能不讲 ACP，或者要换一组参数才进 ACP 模式（有几家是 \`<命令> acp\` 或 \`<命令> agent stdio\`）。`,

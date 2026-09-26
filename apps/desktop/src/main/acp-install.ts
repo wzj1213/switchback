@@ -39,6 +39,7 @@ export interface InstallDeps {
 export type InstallResult = { ok: true; command: string } | { ok: false; error: string }
 
 const DOWNLOAD_MS = 20 * 60_000
+const STAGING_FRESH_MS = 60 * 60_000
 const EXTRACT_MS = 5 * 60_000
 
 type ArchiveKind = "zip" | "tar" | "raw"
@@ -141,17 +142,27 @@ export async function installBinary(
  * `keep` 是 engines.json 里所有条目的 command（绝对路径）。一个版本目录里只要还有
  * 任何一条在用的命令，就原样留着——哪怕它是个手改过的条目。
  */
-export async function pruneAgents(root: string, keep: readonly string[]): Promise<readonly string[]> {
+export async function pruneAgents(root: string, keep: readonly string[], now = Date.now()): Promise<readonly string[]> {
   const removed: string[] = []
   const ids = await readdir(root).catch(() => [] as string[])
   for (const id of ids) {
     const versions = await readdir(join(root, id)).catch(() => [] as string[])
     for (const version of versions) {
       const dir = join(root, id, version)
-      if (keep.some((command) => command.startsWith(`${dir}${sep}`))) continue
+      if (keep.some((command) => command.startsWith(`${dir}${sep}`)) || (await downloading(dir, version, now))) continue
       await rm(dir, { recursive: true, force: true })
       removed.push(dir)
     }
   }
   return removed
+}
+
+/**
+ * 一小时内动过的暂存目录可能正是另一家正在下的那份（一边装 A、一边移除 B 时就会碰上）。
+ * 删了它，那边的下载会在挪位时莫名失败；真正残留的半截下载等下一次再清。
+ */
+async function downloading(dir: string, name: string, now: number): Promise<boolean> {
+  if (!name.startsWith(".staging-")) return false
+  const touched = await stat(dir).then((info) => info.mtimeMs, () => 0)
+  return now - touched < STAGING_FRESH_MS
 }

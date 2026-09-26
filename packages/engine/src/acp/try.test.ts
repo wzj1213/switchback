@@ -65,6 +65,16 @@ describe("试接一个 ACP 适配器", () => {
     expect(trial.error).toBeDefined()
   })
 
+  it("人点了取消：不等到超时，进程照样收掉", async () => {
+    const controller = new AbortController()
+    const started = Date.now()
+    const pending = tryAcp({ command: process.execPath, args: ["-e", MUTE], cwd: tmpdir(), timeoutMs: 60_000, signal: controller.signal })
+    setTimeout(() => controller.abort(), 100)
+    const trial = await pending
+    expect(trial).toMatchObject({ ok: false, error: "已取消。" })
+    expect(Date.now() - started).toBeLessThan(10_000)
+  })
+
   it("活着但一声不吭 → 超时那句要说出「可能要换一组参数」", async () => {
     const trial = await tryAcp({
       command: process.execPath,

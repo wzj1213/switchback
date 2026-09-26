@@ -1,5 +1,5 @@
 import { authMethodsOf, canLogout, type AcpAuthMethod } from "./auth.js"
-import { initializeOnce, sleep, withAcpProcess, type OneShot, type OneShotRequest } from "./oneshot.js"
+import { abortedBy, initializeOnce, sleep, withAcpProcess, type OneShot, type OneShotRequest } from "./oneshot.js"
 import { startupMessage } from "./setup.js"
 
 /**
@@ -25,14 +25,6 @@ const LOGIN_MS = 5 * 60_000
 
 type Outcome = { done: unknown } | { failed: Error } | { died: Error } | "timeout" | "aborted"
 
-function aborted(signal: AbortSignal | undefined): Promise<"aborted"> {
-  return new Promise((resolve) => {
-    if (signal === undefined) return
-    if (signal.aborted) resolve("aborted")
-    else signal.addEventListener("abort", () => resolve("aborted"), { once: true })
-  })
-}
-
 async function settle(
   shot: OneShot,
   call: Promise<unknown>,
@@ -42,7 +34,7 @@ async function settle(
     call.then((done) => ({ done }), (error: unknown) => ({ failed: error instanceof Error ? error : new Error(String(error)) })),
     shot.died.then((error) => ({ died: error })),
     sleep(limit.ms).then(() => "timeout" as const),
-    aborted(limit.signal),
+    abortedBy(limit.signal),
   ])
 }
 
@@ -62,6 +54,7 @@ async function methodFrom(
   const init = await initializeOnce(shot, HANDSHAKE_MS)
   if (init.kind === "timeout") return { logout: false, error: "它 30 秒内没有完成握手，没法登录。先点「试接」看看它还起不起得来。" }
   if (init.kind === "died") return { logout: false, error: startupMessage(req.command, init.error) }
+  if (init.kind === "aborted") return { logout: false, error: "已取消。" }
   const method = authMethodsOf(init.info).find((one) => one.id === req.methodId)
   return { logout: canLogout(init.info), ...(method === undefined ? {} : { method }) }
 }
@@ -98,6 +91,7 @@ export async function acpLogout(req: OneShotRequest): Promise<AcpLoginResult> {
     const init = await initializeOnce(shot, HANDSHAKE_MS)
     if (init.kind === "timeout") return { ok: false, error: "它 30 秒内没有完成握手，没法退出登录。" }
     if (init.kind === "died") return { ok: false, error: startupMessage(req.command, init.error) }
+    if (init.kind === "aborted") return { ok: false, error: "已取消。" }
     if (!canLogout(init.info)) return { ok: false, error: "它没有声明支持退出登录，只能照它自己的文档来。" }
     const outcome = await settle(shot, shot.rpc.call("logout", {}), { ms: HANDSHAKE_MS })
     const error = outcomeText(outcome, req.command)

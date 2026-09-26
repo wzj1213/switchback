@@ -106,7 +106,8 @@ export function installAcpChannels(attached: Attached, log: Logger): void {
     return connectAgent(agentId, {
       userData, log, home: homedir(), platform: platformOf(process.platform, process.arch),
       registry: () => registry.read(), launchers, refresh, inUse, progress,
-      trial: (req) => tryAcp(req),
+      // 同一个信号：下载时点「取消」停下载，试接时点停握手（npx 第一次下载能等三分钟）
+      trial: (req) => tryAcp({ ...req, signal }),
       install: (agent, plan) => installBinary(agent, plan, {
         root: join(userData, "agents"), fetch, run: runCommand, platform: process.platform, signal,
         onProgress: (phase, received, total) => progress({ agentId, phase, ...(received === undefined ? {} : { received }), ...(total === undefined ? {} : { total }) }),

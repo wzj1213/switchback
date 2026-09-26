@@ -31,6 +31,7 @@ export type Initialized =
   | { kind: "ok"; info: AcpInitialize }
   | { kind: "timeout" }
   | { kind: "died"; error: Error }
+  | { kind: "aborted" }
 
 export const PROTOCOL_VERSION = 1
 const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
@@ -74,13 +75,22 @@ export async function withAcpProcess<T>(req: OneShotRequest, run: (shot: OneShot
   }
 }
 
+/** 人点了「取消」。没给信号就永远不来——在赛跑里只是不参赛。 */
+export function abortedBy(signal: AbortSignal | undefined): Promise<"aborted"> {
+  return new Promise((resolve) => {
+    if (signal === undefined) return
+    if (signal.aborted) resolve("aborted")
+    else signal.addEventListener("abort", () => resolve("aborted"), { once: true })
+  })
+}
+
 /**
- * 发一次 `initialize`，和进程死亡、超时三方赛跑。
+ * 发一次 `initialize`，和进程死亡、超时、人喊停四方赛跑。
  *
  * 声明 terminal 型登录（`CLIENT_AUTH`）：不声明的话有的 agent 一种登录方式都不报，
  * 试接页上就看不到「这家怎么登录」。
  */
-export async function initializeOnce(shot: OneShot, budget: number): Promise<Initialized> {
+export async function initializeOnce(shot: OneShot, budget: number, signal?: AbortSignal): Promise<Initialized> {
   const result = await Promise.race([
     shot.rpc.call("initialize", {
       protocolVersion: PROTOCOL_VERSION,
@@ -89,7 +99,10 @@ export async function initializeOnce(shot: OneShot, budget: number): Promise<Ini
     }),
     shot.died.then((error) => ({ died: error })),
     sleep(budget).then(() => "timeout" as const),
+    // npx / uvx 第一次要现下载，试接能等上三分钟：人得能在中途喊停
+    abortedBy(signal),
   ])
+  if (result === "aborted") return { kind: "aborted" }
   if (result === "timeout") return { kind: "timeout" }
   if (typeof result === "object" && result !== null && "died" in result) {
     return { kind: "died", error: (result as { died: Error }).died }

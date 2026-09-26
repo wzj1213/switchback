@@ -110,8 +110,14 @@ describe("收掉没人用的旧版本", () => {
   it("只留还有条目在用的版本目录", async () => {
     const root = mkdtempSync(join(tmpdir(), "omni-prune-"))
     for (const dir of ["goose/1.0.0", "goose/1.1.0", "goose/.staging-x", "opencode/2.0.0"]) mkdirSync(join(root, dir), { recursive: true })
-    const removed = await pruneAgents(root, [join(root, "goose", "1.1.0", "goose"), join(root, "opencode", "2.0.0", "bin", "opencode")])
-    expect(removed.map((path) => path.slice(root.length + 1)).sort()).toEqual(["goose/.staging-x", "goose/1.0.0"])
+    const keep = [join(root, "goose", "1.1.0", "goose"), join(root, "opencode", "2.0.0", "bin", "opencode")]
+    // 刚动过的暂存目录可能正在下载：先不删
+    const fresh = await pruneAgents(root, keep)
+    expect(fresh.map((path) => path.slice(root.length + 1)).sort()).toEqual(["goose/1.0.0"])
+    expect(existsSync(join(root, "goose", ".staging-x"))).toBe(true)
+    // 放了一个多小时的才是真残留
+    const later = await pruneAgents(root, keep, Date.now() + 2 * 60 * 60_000)
+    expect(later.map((path) => path.slice(root.length + 1))).toEqual(["goose/.staging-x"])
     expect(existsSync(join(root, "goose", "1.1.0"))).toBe(true)
   })
 })
