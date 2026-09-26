@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -40,10 +41,32 @@ export function buildIdentity() {
   }
 }
 
-export function builderConfig(mode, identity, sourcePackage) {
+/**
+ * 打包用的 Electron 直接取 `electron` 包已经解好的那一份（`node_modules/electron/dist`）。
+ *
+ * 不给的话 electron-builder 走 `@electron/get`：缓存里明明有同版本的 zip，它也要**每次现下一份
+ * `SHASUMS256.txt`** 去 GitHub 校验（源码注释原话：“Never use the cache for loading checksums”）。
+ * 连 GitHub 不稳的机器上打包就卡在这一步——2026-09-26 那台连着四次 ECONNRESET / 十分钟超时，
+ * 往缓存里拷 zip 也没用。这一份是 `electron` 包装的时候按它自带的 checksums.json 校验过的，
+ * 版本对得上就用它；对不上（或还没解出来）就退回原来那条下载的路，不硬用一份错版本的。
+ */
+export function electronDistOf(desktop = DESKTOP) {
+  const pkg = join(desktop, "node_modules/electron")
+  const dist = join(pkg, "dist")
+  try {
+    const wanted = JSON.parse(readFileSync(join(pkg, "package.json"), "utf8")).version
+    const got = readFileSync(join(dist, "version"), "utf8").trim()
+    return got === wanted && existsSync(join(dist, "Electron.app")) ? dist : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function builderConfig(mode, identity, sourcePackage, electronDist = electronDistOf()) {
   const thin = mode === "thin"
   return {
     extends: join(DESKTOP, "electron-builder.yml"),
+    ...(electronDist === undefined ? {} : { electronDist }),
     extraMetadata: {
       version: identity.version,
       omni: {
