@@ -22,10 +22,15 @@ describe("pressureOf", () => {
   })
 
   it("低流速来蜂群——越慢越凶，那正是被限流的体感", () => {
-    const slowish = pressureOf({ ...quiet, rate: 35 })
+    const slowish = pressureOf({ ...quiet, rate: 15 })
     const crawling = pressureOf({ ...quiet, rate: 3 })
     expect(slowish?.kind).toBe("swarm")
     expect(crawling?.level).toBeGreaterThan(slowish?.level ?? 1)
+  })
+
+  it("常见的出字速度（30 tok/s 往上）不算慢：一跑起来就刷满蜂群，压力就成了噪声", () => {
+    expect(pressureOf({ ...quiet, rate: 30 })).toBeUndefined()
+    expect(pressureOf({ ...quiet, rate: 60 })).toBeUndefined()
   })
 
   it("上下文逼近上限来胖子，而且盖过其他一切——它是最硬的那条", () => {

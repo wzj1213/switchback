@@ -59,6 +59,13 @@ describe("statusLabel", () => {
     expect(statusLabel(thread("running"), [text()])).toBe("正在思考")
   })
 
+  it("回答正在往外写时说「正在回答」，不挂着前面那段推理", () => {
+    const writing: Item = { id: "w", turnId: "tn", kind: "agent_message", at: 1, text: "分页那段", complete: false }
+    const reasoning: Item = { id: "r", turnId: "tn", kind: "reasoning", at: 0, text: "**看一下订阅**\n先看", complete: true }
+    expect(statusLabel(thread("running"), [writing])).toBe("正在回答")
+    expect(statusLabel(thread("running"), [reasoning, writing])).toBe("正在回答")
+  })
+
   it("越过已完成的工具往前找的行为不存在——只看最后一个", () => {
     const items = [tool({ id: "a" }), tool({ id: "b", status: "ok" })]
     expect(statusLabel(thread("running"), items)).toBe("正在思考")

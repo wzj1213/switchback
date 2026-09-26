@@ -3,6 +3,7 @@ import type { Item, TaskRun, Thread, Turn } from "@omni/protocol"
 import { Shimmer } from "./Shimmer.js"
 import { elapsed, statusLabel } from "../status.js"
 import { compact } from "../usage.js"
+import type { Flow } from "../useFlow.js"
 
 /** 多久之后才显示计时器。抄 dsh：**短轮次不需要秒表**，三秒的事摆个计时器只是噪声。 */
 const CLOCK_AFTER_MS = 15_000
@@ -29,6 +30,28 @@ function useReached(at: number | undefined): boolean {
     return () => { clearTimeout(timer) }
   }, [at])
   return at !== undefined && Math.max(now, Date.now()) >= at
+}
+
+/**
+ * 这一轮此刻的出字速度，一秒读一次。**只在这一轮跑着时读**，读数本身见 `bench.ts` 的 `speedOf`：
+ * 生成量 ÷ 真在出字的时间（不含等首字、不含调工具的空档），和各家评测里的 Output Speed 同一个口径。
+ * 一秒一跳而不是每帧：数字每帧都在变的话，人眼读到的只是抖。
+ */
+function useSpeed(flow: (() => Flow) | undefined, running: boolean): number | undefined {
+  const [speed, setSpeed] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    if (flow === undefined || !running) {
+      setSpeed(undefined)
+      return undefined
+    }
+    const timer = setInterval(() => {
+      setSpeed(flow().speed)
+    }, TICK_MS)
+    return () => {
+      clearInterval(timer)
+    }
+  }, [flow, running])
+  return speed
 }
 
 /** 先睡到秒表真的会出现；出现后再对齐到整秒。前 15 秒不做无效重绘。 */
@@ -83,6 +106,7 @@ export function TurnStatus({
   tasks,
   thinkingTokens,
   reconnecting,
+  flow,
 }: {
   thread: Thread
   turn: Turn | undefined
@@ -93,8 +117,11 @@ export function TurnStatus({
   thinkingTokens: number | undefined
   /** 实时连接正断着、在自己接回来。断了超过 `RECONNECT_AFTER_MS` 才说。 */
   reconnecting?: Reconnecting | undefined
+  /** 这条会话的流速（`useFlow`）。给了才显示出字速度。 */
+  flow?: (() => Flow) | undefined
 }): React.JSX.Element | null {
   const now = useTurnClock(turn?.startedAt)
+  const speed = useSpeed(flow, turn !== undefined)
   const linkDown = useReached(reconnecting === undefined ? undefined : reconnecting.since + RECONNECT_AFTER_MS)
 
   const label = statusLabel(thread, items)
@@ -111,6 +138,16 @@ export function TurnStatus({
           title="当前思考块的近似值，不是最终用量"
         >
           约 {compact(thinkingTokens)} tokens
+        </span>
+      )}
+      {/* 出字速度。跑着的时候引擎还没报生成量，所以一定是按字估的，带 ≈ */}
+      {speed === undefined ? null : (
+        <span
+          className="turnstatus__tokens"
+          aria-hidden="true"
+          title="这一轮的出字速度：生成量 ÷ 真在出字的时间（不含等首字、不含调工具的空档）。按写出来的字估，引擎报了生成量后会拿真数校准"
+        >
+          ≈ {Math.round(speed)} tok/s
         </span>
       )}
       {showClock ? <span className="turnstatus__clock">{elapsed(turn.startedAt, now)}</span> : null}

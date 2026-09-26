@@ -1,7 +1,9 @@
 import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
 import type { Sealed } from "@omni/wire"
-import { begin, feed, report, settle, type Run } from "./bench.js"
+import { begin, feed, pause, report, settle, type Run } from "./bench.js"
 import { mark, type Meter } from "./throughput.js"
+import { pushText, type TapeText } from "./tape-text.js"
+import { estimateTokens } from "./tokens.js"
 
 /**
  * 「这条 delta 是不是**这一条会话**吐出来的」。
@@ -84,11 +86,14 @@ const SPOKEN: ReadonlySet<string> = new Set(["agent_message", "reasoning"])
 export type Beat =
   | { kind: "idle" }
   | { kind: "start" }
-  | { kind: "text"; bytes: number }
+  | { kind: "text"; tokens: number; text: string }
+  /** 这一轮里开了一条**不是它在说话**的 item（调工具、等批准、报错）：它停下来了。 */
+  | { kind: "pause" }
   | { kind: "tokens"; tokens: number }
   | { kind: "end" }
 
 const IDLE: Beat = { kind: "idle" }
+const PAUSE: Beat = { kind: "pause" }
 
 /** 吃一条事件。不属于当前会话的一律 `idle`。 */
 export function absorb(scope: Scope, event: Event): Beat {
@@ -115,43 +120,18 @@ export function absorb(scope: Scope, event: Event): Beat {
 /** item 那两条。拆出来是圈复杂度闸门逼的，边界也顺：上面管轮次，这里管 item。 */
 function onItem(scope: Scope, event: Event): Beat {
   if (event.type === "item.started") {
-    const mine = scope.turn !== undefined && event.item.turnId === scope.turn
-    if (mine && SPOKEN.has(event.item.kind) && scope.items.size < MAX_ITEMS) {
-      scope.items.add(event.item.id)
-    }
+    if (scope.turn === undefined || event.item.turnId !== scope.turn) return IDLE
+    if (!SPOKEN.has(event.item.kind)) return PAUSE
+    if (scope.items.size < MAX_ITEMS) scope.items.add(event.item.id)
     return IDLE
   }
   if (event.type !== "item.delta") return IDLE
   if (!scope.items.has(event.itemId)) return IDLE
-  return { kind: "text", bytes: byteLength(event.append) }
+  return { kind: "text", tokens: estimateTokens(event.append), text: event.append }
 }
 
 /**
- * UTF-8 字节数。
- *
- * 不能用 `str.length`：那是 UTF-16 码元数，中文一个字算 1、英文一个字母也算 1，
- * 于是**同一段内容中文会被当成英文的三分之一**。流速要比的是各家吐得多快，
- * 而它们的语言分布完全不同。
- *
- * 手算而不是 `TextEncoder`：这条路在吐字最快时每秒要走几十次，
- * 每次 `new TextEncoder().encode()` 会分配一整个 `Uint8Array`。
- */
-export function byteLength(s: string): number {
-  let n = 0
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i)
-    if (c < 0x80) n += 1
-    else if (c < 0x800) n += 2
-    else if (c >= 0xd800 && c <= 0xdbff) {
-      n += 4
-      i++ // 代理对：两个码元一个字符
-    } else n += 3
-  }
-  return n
-}
-
-/**
- * 吃一批事件：把字节记进流速表，把轮次记进账本。
+ * 吃一批事件：把（估出来的）token 记进流速表，把轮次记进账本，把字交给纸带。
  *
  * 抽出来是为了**它能被测**：留在 hook 里的话，这几行——「一批一次、
  * 一个字节都没有就别记、时间戳用收到的时刻」——就只能靠肉眼保证，
@@ -165,20 +145,22 @@ export function byteLength(s: string): number {
  */
 export function drain(
   scope: Scope,
-  into: { meter: Meter; run: Run },
+  into: { meter: Meter; run: Run; tape?: TapeText },
   sealed: readonly Sealed[],
   now: number,
 ): void {
   const { meter, run } = into
-  let bytes = 0
+  let tokens = 0
   for (const one of sealed) {
     const beat = absorb(scope, one.event)
     if (beat.kind === "start") begin(run, now)
     else if (beat.kind === "text") {
-      bytes += beat.bytes
-      feed(run, now, beat.bytes)
-    } else if (beat.kind === "tokens") report(run, beat.tokens)
+      tokens += beat.tokens
+      feed(run, now, beat.tokens)
+      if (into.tape !== undefined) pushText(into.tape, beat.text)
+    } else if (beat.kind === "pause") pause(run)
+    else if (beat.kind === "tokens") report(run, beat.tokens)
     else if (beat.kind === "end") settle(run, now)
   }
-  if (bytes > 0) mark(meter, now, bytes)
+  if (tokens > 0) mark(meter, now, tokens)
 }

@@ -75,7 +75,8 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
   // 堆多高＝这一轮吐了多少，那一堆的意义只到结账为止
   if (w.ran && !input.running) sweep(w.brass, input.rand)
   const rps = rpsOf(readyRate(w, input))
-  stepTape(w.tape, dt, rps > 0 ? rps * GLYPH_W : DRIFT_QUIET, tapeAt(hand).left)
+  // 收工就把纸带淡掉：这一轮结束了，输入框上面不该还挂着几个零散的字
+  stepTape(w.tape, dt, { speed: rps > 0 ? rps * GLYPH_W : DRIFT_QUIET, left: tapeAt(hand).left, clear: !input.running })
   w.ran = input.running
   // 靶场显形：这一轮在跑、枪还没收、或者还有子弹在飞，都算「在开火」。
   // **跑完那几秒的按住不算 moving**——画面不变，不值得为它续一条 rAF
@@ -88,6 +89,7 @@ export function stepFx(w: FxWorld, rawDt: number, input: FxInput): void {
     ground: groundOf(input),
     stand: standOf(input.field, input.shape),
     rate: input.rate,
+    speed: input.speed,
     ratio: input.ratio,
     bench: input.bench,
   }
@@ -201,7 +203,9 @@ function shotOf(
   input: FxInput,
 ): Shot {
   const muzzle = muzzleOf(w.gun)
-  const b: Shot = spawn(muzzle, aim, w.ch++, [input.rand() - 0.5, input.rand() - 0.5])
+  // 只有落到纸带上的那一发才取字：打怪、打靶的那几发取了也落不下，白白跳过一个字
+  const ch = input.range || foe !== undefined ? "" : input.nextChar()
+  const b: Shot = spawn(muzzle, aim, ch, [input.rand() - 0.5, input.rand() - 0.5])
   if (input.range) {
     // **靶钉死之后距离是个变量**：散布按它放大，飞行时间也按它拉长——
     // 把桌宠拖远，那一串弹着变散、子弹在空中待得更久，两件事都该看得见

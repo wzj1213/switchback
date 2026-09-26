@@ -24,6 +24,8 @@ const input = (over: Partial<FxInput> = {}): FxInput => ({
   field: { homeX: pet.x, ground: pet.y + 30 },
   // 成绩不参与任何物理，只是要印到靶上的一行字——这一组量的是物理
   bench: undefined,
+  speed: undefined,
+  nextChar: () => "字",
   foes: true,
   // 默认不抛壳、打字机、不打靶：这一组量的是火力，多一样在动就多一条会晃的判据
   brass: "off",
@@ -32,6 +34,19 @@ const input = (over: Partial<FxInput> = {}): FxInput => ({
   rand,
   ...over,
 })
+
+/** 跑 `secs` 秒，数一数打到纸带上的有几发（每一发取一个字）。 */
+function shotsAt(rate: number, secs: number): number {
+  let n = 0
+  run(createFx(), secs, {
+    rate,
+    nextChar: () => {
+      n += 1
+      return "字"
+    },
+  })
+  return n
+}
 
 /**
  * 跑 `secs` 秒。**原地改**，返回的就是传进来那个世界——
@@ -56,12 +71,12 @@ describe("stepFx", () => {
   })
 
   it("火力恒等于流速：流速翻倍，打出去的发数也翻倍", () => {
-    // 比的是**打了多少发**（`ch` 每出一发加一），不是纸带上剩几个字：
+    // 比的是**打了多少发**（每出一发取一个字），不是纸带上剩几个字：
     // 纸带的漂速也跟着流速走，所以它长度恒定——快慢体现在它走得多快
-    const slow = run(createFx(), 4, { rate: 40 })
-    const fast = run(createFx(), 4, { rate: 80 })
-    expect(fast.ch / Math.max(1, slow.ch)).toBeGreaterThan(1.7)
-    expect(fast.ch / Math.max(1, slow.ch)).toBeLessThan(2.3)
+    const slow = shotsAt(40, 4)
+    const fast = shotsAt(80, 4)
+    expect(fast / Math.max(1, slow)).toBeGreaterThan(1.7)
+    expect(fast / Math.max(1, slow)).toBeLessThan(2.3)
   })
 
   it("纸带是一条排得开的字，不是堆在一个点上的一团", () => {
@@ -105,12 +120,23 @@ describe("stepFx", () => {
     }
   })
 
-  it("落下的字是顺着来的，不是随机的乱码", () => {
-    const w = run(createFx(), 3, { rate: 120 })
-    const chars = w.tape.map((g) => g.ch)
-    for (let i = 1; i < chars.length; i++) {
-      expect(chars[i]).toBe((chars[i - 1] ?? 0) + 1)
-    }
+  it("落下的是模型写出来的字，按到手的顺序——不是一串写死的字轮着用", () => {
+    const source = "分页那段和订阅方式几乎一样可以直接照搬".repeat(20)
+    let at = 0
+    const w = run(createFx(), 3, {
+      rate: 120,
+      nextChar: () => source[at++] ?? "·",
+    })
+    const chars = w.tape.map((g) => g.ch).join("")
+    expect(chars.length).toBeGreaterThan(3)
+    expect(source.includes(chars)).toBe(true)
+  })
+
+  it("收工之后纸带一秒内淡干净，不留零散的字", () => {
+    const w = run(createFx(), 2, { rate: 120, running: true })
+    expect(w.tape.length).toBeGreaterThan(0)
+    run(w, 1.2, { rate: 0, running: false })
+    expect(w.tape).toHaveLength(0)
   })
 })
 
@@ -417,17 +443,16 @@ describe("换弹", () => {
 
   it("**换弹不改「火力恒等于流速」**：停的是几发的工夫，不是几秒", () => {
     // 固定秒数的换弹会按流速高低吃掉不同比例的发数，比值当场就不是 2 了
-    const slow = run(createFx(), 5, { rate: 50 })
-    const fast = run(createFx(), 5, { rate: 100 })
-    const ratio = fast.ch / Math.max(1, slow.ch)
+    const slow = shotsAt(50, 5)
+    const fast = shotsAt(100, 5)
+    const ratio = fast / Math.max(1, slow)
     expect(ratio).toBeGreaterThan(1.7)
     expect(ratio).toBeLessThan(2.3)
   })
 
   it("高流速下也不会卡死在换弹里——占空比和流速无关", () => {
-    const w = run(createFx(), 5, { rate: 240 })
     // 真卡死的话一发都出不来
-    expect(w.ch).toBeGreaterThan(50)
+    expect(shotsAt(240, 5)).toBeGreaterThan(50)
   })
 
   it("收枪之后弹匣是满的：下次抽出来不该接着上次那半匣", () => {

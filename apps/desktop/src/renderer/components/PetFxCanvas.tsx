@@ -73,7 +73,7 @@ export function PetFx(props: FxProps): React.JSX.Element {
           ratio: props2.ratio,
           left: -20,
           field: { homeX: home.x, ground: home.y + SIZE },
-          bench: flow.last,
+          bench: flow.last, speed: flow.speed, nextChar: flow.nextChar,
           foes: props2.foes,
           brass: props2.brass,
           traj: props2.traj,

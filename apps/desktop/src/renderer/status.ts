@@ -16,6 +16,12 @@ export function statusLabel(thread: Thread, items: readonly Item[]): string | un
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i]
     if (item === undefined) continue
+    // **正在往外写的那段回答**：上一版越过它去找前面的推理，于是模型明明在写答案和代码，
+    // 状态行还挂着「正在思考」。写完了的回答不算——那之后它在干别的（想下一步、调工具）
+    if (item.kind === "agent_message") {
+      if (!item.complete) return "正在回答"
+      continue
+    }
     // **最后一条推理里模型自己给这一段起的小标题**，比「正在思考」有信息量得多。
     // 放在工具之前判断是因为它就在工具的上一条——模型先说「我要去看看 X」，
     // 再去调工具；调用一结束又接着说下一段

@@ -40,6 +40,7 @@ const external = [
 const VENDOR: ReadonlySet<string> = new Set([
   "react-markdown",
   "remark-gfm",
+  "remark-cjk-friendly",
   "remark-parse",
   "remark-rehype",
   "rehype-react",

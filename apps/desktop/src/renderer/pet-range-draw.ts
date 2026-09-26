@@ -25,7 +25,7 @@ export interface RangePaint {
   font: string
 }
 
-/** 流速环画满对应多少 t/s。**封顶不是限制，是刻度**。 */
+/** 流速环画满对应多少 tok/s。**封顶不是限制，是刻度**。 */
 const RATE_FULL = 240
 
 export interface RangeShot {
@@ -33,7 +33,7 @@ export interface RangeShot {
   /** 画多浓。0.18（闲着）到 1（在开火）。见 `pet-range.ts` 的「靶场什么时候显形」。 */
   show: number
   at: { x: number; y: number; ground: number }
-  live: { rate: number; ratio: number; bench: Bench | undefined }
+  live: { rate: number; speed: number | undefined; ratio: number; bench: Bench | undefined }
   pal: RangePaint
   /** 上下文那一档对应的颜色。**和顶栏那条 meter 同一套档位**（70% 黄 / 90% 红）。 */
   level: string
@@ -127,23 +127,23 @@ function holes(g: CanvasRenderingContext2D, { target, at, pal, show }: RangeShot
 }
 
 /**
- * 靶上头那一行。**一行，两种状态**——而两种状态说的是两个不同口径的数。
+ * 靶上头那一行。**一行，两种状态，同一个口径**（见 `bench.ts`）：
  *
- * - **在跑**：`~142 t/s`。滑窗估出来的**速度表**，就是驱动开火的那个数。
- *   波浪号不是谦虚，是说清楚它和账单上的数不是一个东西（见 `throughput.ts`）。
- * - **跑完**：`0.62s → 87 t/s`。上一轮的**成绩**，业界口径：
- *   箭头左边是 TTFT，右边是解码速度（真 token ÷ 首字到末字，不含 TTFT）。
- *   引擎报得出生成量时它是**真数，没有波浪号**；报不出的那几家仍带波浪号。
+ * - **在跑**：`≈58 tok/s`。这一轮此刻的生成速度——生成量 ÷ 真在出字的时间。
+ *   跑着的时候引擎还没报生成量，所以一定是估的，带 ≈。刚开头那几百毫秒还算不出来，
+ *   先印驱动开火的那个滑窗读数，也带 ≈。
+ * - **跑完**：`首字 0.62s · 87 tok/s`。上一轮的**成绩**：TTFT 单列，速度不含它。
+ *   引擎报得出生成量时它是**真数，不带 ≈**；报不出的那几家仍带。
  *
- * 上一版这里只有前一种，于是**一轮跑完之后这行永远写着「0 t/s」**——
- * 那一刻恰恰是唯一能给出真数的时候，却拿它去印一个零。
+ * 上一版在跑时印的是滑窗读数（最近 1.2 秒），跑完印的是「首字到末字」的商——两个口径，
+ * 一轮里只要调过一次工具，跑完那个数就比跑着时的小一大截，读起来像是「它变慢了」。
  */
 function headOf(live: RangeShot["live"]): string {
-  if (live.rate > 1) return `~${String(Math.round(live.rate))} t/s`
+  if (live.speed !== undefined) return `≈${String(Math.round(live.speed))} tok/s`
+  if (live.rate > 1) return `≈${String(Math.round(live.rate))} tok/s`
   const done = live.bench
-  if (done === undefined) return "0 t/s"
-  const tps = `${done.exact ? "" : "~"}${String(Math.round(done.tps))}`
-  return `${done.ttft.toFixed(2)}s → ${tps} t/s`
+  if (done === undefined) return "0 tok/s"
+  return `首字 ${done.ttft.toFixed(2)}s · ${done.exact ? "" : "≈"}${String(Math.round(done.tps))} tok/s`
 }
 
 /**
@@ -160,7 +160,7 @@ function readout(g: CanvasRenderingContext2D, { target, at, live, pal }: RangeSh
   g.textAlign = "center"
   g.textBaseline = "bottom"
   // 在跑用强调色，跑完那个真数用正文色——**估出来的那个不配用正文色**
-  g.fillStyle = live.rate > 1 ? pal.accent : live.bench?.exact === true ? pal.text : pal.faint
+  g.fillStyle = live.rate > 1 || live.speed !== undefined ? pal.accent : live.bench?.exact === true ? pal.text : pal.faint
   g.fillText(headOf(live), at.x, at.y - TG_R - 14)
   g.fillStyle = pal.faint
   const sd = spread === undefined ? "—" : `±${spread.toFixed(1)}px`

@@ -5,7 +5,7 @@
  *
  * 说清楚这件事比算得准更要紧。业界口径的 token/s 是**一整轮的商**
  *（真 token 数 ÷ 首字到末字），那个数在 `bench.ts` 里算，靶上单独显示。
- * 这里量的是**此刻**——最近 `WINDOW_MS` 里到手多少字节——因为开火节奏
+ * 这里量的是**此刻**——最近 `WINDOW_MS` 里到手多少（估出来的）token——因为开火节奏
  * 需要一个每帧都能读的数，而一轮结束才有的商喂不了每一帧。
  *
  * 两个数不是一个东西，所以**画面上也不许长得像**：这儿的读数永远带波浪号。
@@ -15,17 +15,17 @@
  * - `Usage` **一轮只来一次**，在结账那一刻。它回答「这一轮花了多少」，是账。
  * - `item.delta` 是**逐帧**的。它回答「此刻在发生什么」。
  *
- * 流速属于后者，所以只能从 `item.delta` 的字节量估。
+ * 流速属于后者，所以只能从 `item.delta` 的文字估。
  *
- * ## 字节怎么换成 token：**常数由调用方给**
+ * ## 文字怎么换成 token
  *
- * 上一版把它写死成 3.2，理由是「不需要准，需要稳定」。那句话对了一半：
- * 拿它去驱动开火确实只要稳定，**但画面上还印着一个 `t/s` 字样**，
- * 而那个字样是在宣称一个物理量。同一段文字英文约 4 字节一个 token、
- * 中文约 3 字节却常一字一 token——写死一个数，等于让读数跟着语言漂。
+ * 每条 delta 先按字符种类估成 token（`tokens.ts`），这里记的就是估出来的那个数。
+ * 早先记的是 UTF-8 字节、再除一个常数：中文一个字 3 字节却常常不到一个 token，
+ * 英文 4 个字母才一个——除同一个常数，读数就跟着语言漂。
  *
- * 现在这里不持有那个常数：`rateOf` 收一个 `bpt` 参数，由 `bench.ts`
- * **拿每轮结账的真 token 数学出来**。这一层退回它本来的职责：一个滑窗。
+ * 估数和真数之间还差一个倍率（各家分词器不一样），**倍率由调用方给**：
+ * `rateOf` 收一个 `scale`，由 `bench.ts` 拿每轮结账的真 token 数学出来。
+ * 这一层只做它本来的事：一个滑窗。
  *
  * ## 为什么是滑窗不是瞬时值
  *
@@ -36,10 +36,10 @@
  * 纯逻辑：不读时钟（时间由调用方传入）、不碰 DOM。
  */
 
-/** 一格样本：这一刻收到了多少字节。 */
+/** 一格样本：这一刻收到了多少（估出来的）token。 */
 interface Mark {
   at: number
-  bytes: number
+  tokens: number
 }
 
 /**
@@ -74,7 +74,7 @@ export interface Meter {
 }
 
 export function createMeter(): Meter {
-  return { marks: Array.from({ length: SLOTS }, () => ({ at: 0, bytes: 0 })), head: 0, last: -1e12 }
+  return { marks: Array.from({ length: SLOTS }, () => ({ at: 0, tokens: 0 })), head: 0, last: -1e12 }
 }
 
 /**
@@ -82,11 +82,11 @@ export function createMeter(): Meter {
  *
  * 原地写而不是 push：见 `SLOTS` 那段。
  */
-export function mark(meter: Meter, at: number, bytes: number): void {
+export function mark(meter: Meter, at: number, tokens: number): void {
   const slot = meter.marks[meter.head]
   if (slot === undefined) return
   slot.at = at
-  slot.bytes = bytes
+  slot.tokens = tokens
   meter.head = (meter.head + 1) % SLOTS
   if (at > meter.last) meter.last = at
 }
@@ -94,23 +94,23 @@ export function mark(meter: Meter, at: number, bytes: number): void {
 /**
  * 此刻的流速（token/秒）。
  *
- * `bpt` = 字节/token，**由调用方给**（`bench.ts` 从真数学出来的那个）。
+ * `scale` = 真数 ÷ 估数，**由调用方给**（`bench.ts` 从真数学出来的那个）。
  * 这一层不持有它，理由见文件头。
  *
  * 窗口里一笔都没有就是 0——**不是「上一次的值」**：静默恰恰是这套东西里
  * 最有意义的状态之一（没有输出就没有火力），把它平滑成一个衰减的尾巴，
  * 等于把「它停了」这件事藏起来。
  */
-export function rateOf(meter: Meter, now: number, bpt: number): number {
+export function rateOf(meter: Meter, now: number, scale: number): number {
   // 窗口里必然一笔都没有——**绝大多数帧走的是这一条**
   if (meter.last <= now - WINDOW_MS) return 0
   const from = now - WINDOW_MS
-  let bytes = 0
+  let tokens = 0
   for (const slot of meter.marks) {
-    if (slot.at > from && slot.at <= now) bytes += slot.bytes
+    if (slot.at > from && slot.at <= now) tokens += slot.tokens
   }
-  if (bytes === 0) return 0
-  return bytes / Math.max(1, bpt) / (WINDOW_MS / 1000)
+  if (tokens === 0) return 0
+  return (tokens * scale) / (WINDOW_MS / 1000)
 }
 
 /**
@@ -120,7 +120,7 @@ export function rateOf(meter: Meter, now: number, bpt: number): number {
 export function clearMeter(meter: Meter): void {
   for (const slot of meter.marks) {
     slot.at = 0
-    slot.bytes = 0
+    slot.tokens = 0
   }
   meter.head = 0
   meter.last = -1e12

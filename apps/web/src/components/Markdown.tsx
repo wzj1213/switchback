@@ -1,5 +1,6 @@
 import { memo } from "react"
 import ReactMarkdown from "react-markdown"
+import remarkCjkFriendly from "remark-cjk-friendly/parseOnly"
 import remarkGfm from "remark-gfm"
 
 /**
@@ -57,7 +58,8 @@ function Pre({ children }: { children?: React.ReactNode }): React.JSX.Element {
  * 这一段是照抄桌面端的（`renderer/components/Markdown.tsx`）——**上一版这一条
  * 一个字都没抄**，两个字面量都写在行内，于是这一端从来没有过 memo 的收益。
  */
-const REMARK = [remarkGfm]
+// 中文里「**原因：**这里」这种粗体收不上的毛病，理由见桌面端同名文件那一段。两端必须一起装
+const REMARK = [remarkGfm, remarkCjkFriendly]
 const COMPONENTS = { a: Anchor, table: Table, pre: Pre }
 
 export const Markdown = memo(function Markdown({ text }: { text: string }): React.JSX.Element {

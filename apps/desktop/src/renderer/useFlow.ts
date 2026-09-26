@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react"
 import type { ThreadId } from "@omni/protocol"
 import type { Sealed } from "@omni/wire"
-import { clearRun, createRun, type Bench } from "./bench.js"
+import { clearRun, createRun, speedOf, type Bench } from "./bench.js"
 import { createScope, drain, retarget } from "./flow-scope.js"
+import { clearTapeText, createTapeText, nextChar } from "./tape-text.js"
 import { clearMeter, createMeter, rateOf } from "./throughput.js"
 
 /**
@@ -22,12 +23,13 @@ import { clearMeter, createMeter, rateOf } from "./throughput.js"
  * 返回数就得存进 state，存进 state 就是每帧一次重渲染——正是上面要躲的。
  * 返回一个稳定的取值函数，调用方在自己的 rAF 里读。
  *
- * ## 为什么返回两个数
+ * ## 为什么返回好几个数
  *
- * `rate` 是**速度表**（此刻多快，估的），`last` 是**成绩**（上一轮的
- * TTFT 和 t/s，业界口径，引擎报得出真 token 时就是真数）。
- * 两个都从同一条事件流上来，但回答的是完全不同的问题——**合成一个数就一定会
- * 有人拿速度表的读数去对账**，所以它们从这儿出去就是分开的。见 `bench.ts`。
+ * `rate` 是**速度表**（最近 1.2 秒多快，驱动开火节奏），`speed` 是这一轮**此刻的生成速度**
+ *（业界口径：生成量 ÷ 真在出字的时间），`last` 是**上一轮的成绩**（TTFT 和 tok/s，
+ * 引擎报得出真 token 时就是真数）。三个都从同一条事件流上来，但回答的是不同的问题——
+ * **合成一个数就一定会有人拿速度表的读数去对账**，所以它们从这儿出去就是分开的。见 `bench.ts`。
+ * `nextChar` 给纸带取字：模型刚写出来的那些字（`tape-text.ts`）。
  *
  * ## 时间戳用收到的时刻，不用 `event.at`
  *
@@ -40,36 +42,45 @@ import { clearMeter, createMeter, rateOf } from "./throughput.js"
  */
 /** 此刻的一切。见 `useFlow` 里那段「为什么返回两个数」。 */
 export interface Flow {
-  /** 此刻的流速（token/秒，**估**）。开火节奏按它走。 */
+  /** 最近 1.2 秒的流速（token/秒，**估**）。开火节奏按它走。 */
   rate: number
+  /** 这一轮此刻的生成速度（token/秒），业界口径。还没攒够时缺席。 */
+  speed: number | undefined
   /** 上一轮的成绩。这条会话还没跑完过一轮时缺席。 */
   last: Bench | undefined
+  /** 纸带上下一发落哪个字。 */
+  nextChar: () => string
 }
 
 export function useFlow(thread: ThreadId | undefined): () => Flow {
   const meter = useRef(createMeter())
   const scope = useRef(createScope())
   const run = useRef(createRun())
+  const tape = useRef(createTapeText())
 
   useEffect(() => {
     retarget(scope.current, thread)
     // 换会话就把窗口和账本都清空：上一条的流速和成绩都不属于这一条
     clearMeter(meter.current)
     clearRun(run.current)
+    clearTapeText(tape.current)
   }, [thread])
 
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.omni
     if (bridge === undefined) return undefined
     return bridge.subscribe((sealed: readonly Sealed[]) => {
-      drain(scope.current, { meter: meter.current, run: run.current }, sealed, performance.now())
+      drain(scope.current, { meter: meter.current, run: run.current, tape: tape.current }, sealed, performance.now())
     })
   }, [])
 
+  const take = useRef(() => nextChar(tape.current)).current
   return useRef(
     (): Flow => ({
-      rate: rateOf(meter.current, performance.now(), run.current.bpt),
+      rate: rateOf(meter.current, performance.now(), run.current.scale),
+      speed: run.current.till === undefined ? speedOf(run.current) : undefined,
       last: run.current.done,
+      nextChar: take,
     }),
   ).current
 }

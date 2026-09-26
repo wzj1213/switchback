@@ -16,9 +16,6 @@ import { posOf } from "./pet-shots.js"
  * 每帧付十来次——而它们只在换主题时变。`Palette` 由调用方按主题代数重建一次。
  */
 
-/** 落到纸带上的那些字。**是真的字，不是符号**：产出看起来该像产出。 */
-const CHARS = "模型上下文进度环token流速引擎会话const{}=>();return"
-
 export interface Palette {
   /** 敌人的底色。**和五家的配色无关**——它们是压力，不是哪一家。 */
   foe: string
@@ -116,7 +113,7 @@ function drawTarget(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void
     target: w.target,
     show: w.show.on,
     at: { x: at.x, y: at.y, ground: view.stand.ground },
-    live: { rate: view.rate, ratio: view.ratio, bench: view.bench },
+    live: { rate: view.rate, speed: view.speed, ratio: view.ratio, bench: view.bench },
     pal: {
       line: pal.line,
       faint: pal.glyph,
@@ -151,15 +148,17 @@ function drawTape(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void {
     const pop = glyph.t < 0.09 ? 1 + (1 - glyph.t / 0.09) * 0.7 : 1
     // 走到左端就淡掉。**不是「到点消失」**——那样每个字都是啪一下没的，
     // 一条本该在流动的带子会读成一排在闪的字
-    g.globalAlpha = Math.min(1, Math.max(0, (glyph.x - edge.left) / TAPE_FADE)) * 0.85
+    // 落的是模型刚写出来的那个字（`tape-text.ts`）；收工之后整条一起淡掉（`gone`）
+    g.globalAlpha = Math.min(1, Math.max(0, (glyph.x - edge.left) / TAPE_FADE)) * 0.85 * (1 - glyph.gone)
+    const ch = glyph.ch === "" ? "·" : glyph.ch
     if (pop === 1) {
-      g.fillText(CHARS[glyph.ch % CHARS.length] ?? "·", glyph.x, glyph.y)
+      g.fillText(ch, glyph.x, glyph.y)
       continue
     }
     g.save()
     g.translate(glyph.x, glyph.y)
     g.scale(pop, pop)
-    g.fillText(CHARS[glyph.ch % CHARS.length] ?? "·", 0, 0)
+    g.fillText(ch, 0, 0)
     g.restore()
   }
   g.globalAlpha = 1

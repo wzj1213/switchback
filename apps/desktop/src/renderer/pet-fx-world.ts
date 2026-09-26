@@ -46,8 +46,6 @@ export interface FxWorld {
   bites: number
   /** 欠着的发数。见 `fireStep`。 */
   acc: number
-  /** 下一个要落的字。**顺着来而不是随机**：随机会落出一串看不出是文字的乱码。 */
-  ch: number
   /** 上一帧这一轮在不在跑。**结账那一下靠它认**——弹壳堆要在那时被扫平。 */
   ran: boolean
   /** 上一帧动没动过。用来判断「忙→闲」那一帧要不要再画一次收尾。 */
@@ -79,6 +77,8 @@ export interface View {
    */
   stand: Stand
   rate: number
+  /** 这一轮此刻的生成速度（业界口径）。靶上那行读数用它。 */
+  speed: number | undefined
   ratio: number
   /** 上一轮的成绩。**靶上那行读数用它**，见 `pet-range-draw.ts`。 */
   bench: Bench | undefined
@@ -98,7 +98,6 @@ export function createFx(): FxWorld {
     quiet: 0,
     bites: 0,
     acc: 0,
-    ch: 0,
     ran: false,
     moving: true,
     view: {
@@ -107,6 +106,7 @@ export function createFx(): FxWorld {
       ground: 0,
       stand: { x: 0, ground: 0 },
       rate: 0,
+      speed: undefined,
       ratio: 0,
       bench: undefined,
     },
@@ -130,10 +130,14 @@ export interface FxInput {
   /** 上下文用了多满（0~1）。引擎没报窗口时给 0。 */
   ratio: number
   /**
-   * 上一轮的成绩（TTFT 与业界口径的 t/s）。**只有靶那一档读它**——
+   * 上一轮的成绩（TTFT 与业界口径的 tok/s）。**只有靶那一档读它**——
    * 它不参与任何物理，纯粹是要印到画面上的一行字。见 `bench.ts`。
    */
   bench: Bench | undefined
+  /** 这一轮此刻的生成速度（token/秒，业界口径）。只有靶那一档印它，见 `bench.ts` 的 `speedOf`。 */
+  speed: number | undefined
+  /** 纸带上下一发落哪个字：模型刚写出来的那一个（`tape-text.ts`）。 */
+  nextChar: () => string
   /** 画布左边界：怪从那儿爬进来。 */
   left: number
   /**
@@ -182,7 +186,6 @@ export function resetFx(w: FxWorld): void {
   w.quiet = fresh.quiet
   w.bites = fresh.bites
   w.acc = fresh.acc
-  w.ch = fresh.ch
   w.ran = fresh.ran
   w.moving = true
 }

@@ -65,13 +65,13 @@ describe("spawn / posOf", () => {
   const to = { x: 20, y: 60 }
 
   it("同样的输入给同样的输出——随机由调用方给", () => {
-    const a = spawn(from, to, 3, [0.1, -0.2])
-    const b = spawn(from, to, 3, [0.1, -0.2])
+    const a = spawn(from, to, "字", [0.1, -0.2])
+    const b = spawn(from, to, "字", [0.1, -0.2])
     expect(a).toEqual(b)
   })
 
   it("出膛在枪口，落点在纸带上，走直线", () => {
-    const b = spawn(from, to, 0, [0, 0])
+    const b = spawn(from, to, "字", [0, 0])
     expect(posOf(b)).toEqual({ x: 100, y: 50 })
     b.t = b.dur / 2
     expect(posOf(b).x).toBeCloseTo(60, 6)
@@ -81,7 +81,7 @@ describe("spawn / posOf", () => {
 })
 
 describe("stepShots", () => {
-  const one = (): Bullet => spawn({ x: 100, y: 50 }, { x: 20, y: 60 }, 7, [0, 0])
+  const one = (): Bullet => spawn({ x: 100, y: 50 }, { x: 20, y: 60 }, "七", [0, 0])
 
   it("飞够时间才落地，落地时把那一发交出去", () => {
     const bullets = [one()]
@@ -91,7 +91,7 @@ describe("stepShots", () => {
     stepShots(bullets, 0.2, (b) => landed.push(b))
     expect(landed).toHaveLength(1)
     expect(bullets).toHaveLength(0)
-    expect(landed[0]?.ch).toBe(7)
+    expect(landed[0]?.ch).toBe("七")
   })
 
   it("「打中了算什么」由调用方定——这个模块不认识敌人", () => {
@@ -106,31 +106,45 @@ describe("pushGlyph", () => {
   it("纸带有上限，到头丢最旧的——不然它会一直长下去", () => {
     const tape: Glyph[] = []
     for (let i = 0; i < TAPE_MAX + 40; i++) {
-      pushGlyph(tape, spawn({ x: 100, y: 50 }, { x: 20, y: 60 }, i, [0, 0]))
+      pushGlyph(tape, spawn({ x: 100, y: 50 }, { x: 20, y: 60 }, String(i), [0, 0]))
     }
     expect(tape).toHaveLength(TAPE_MAX)
     // 丢的是最旧的：留下来的应该是后 72 个
-    expect(tape[0]?.ch).toBe(40)
+    expect(tape[0]?.ch).toBe("40")
   })
 })
 
 describe("stepTape", () => {
   it("向左漂，漂过头就没了", () => {
-    const tape: Glyph[] = [{ x: 50, y: 10, ch: 0, t: 0 }]
-    stepTape(tape, 1, 20, 0)
+    const tape: Glyph[] = [{ x: 50, y: 10, ch: "字", t: 0, gone: 0 }]
+    stepTape(tape, 1, { speed: 20, left: 0 })
     expect(tape[0]?.x).toBe(30)
-    stepTape(tape, 2, 20, 0)
+    stepTape(tape, 2, { speed: 20, left: 0 })
     expect(tape).toHaveLength(0)
   })
 
   it("漂得快就清得快——「不动」那一刻要来得到，跳帧优化才有得跳", () => {
-    const slow: Glyph[] = [{ x: 90, y: 0, ch: 0, t: 0 }]
-    const fast: Glyph[] = [{ x: 90, y: 0, ch: 0, t: 0 }]
+    const slow: Glyph[] = [{ x: 90, y: 0, ch: "字", t: 0, gone: 0 }]
+    const fast: Glyph[] = [{ x: 90, y: 0, ch: "字", t: 0, gone: 0 }]
     for (let i = 0; i < 72; i++) {
-      stepTape(slow, 1 / 60, 13, 0)
-      stepTape(fast, 1 / 60, 90, 0)
+      stepTape(slow, 1 / 60, { speed: 13, left: 0 })
+      stepTape(fast, 1 / 60, { speed: 90, left: 0 })
     }
     expect(slow).toHaveLength(1)
     expect(fast).toHaveLength(0)
   })
 })
+
+describe("收工之后纸带淡掉", () => {
+  it("一秒以内淡干净，没收工时不淡", () => {
+    const kept: Glyph[] = [{ x: 90, y: 0, ch: "字", t: 0, gone: 0 }]
+    stepTape(kept, 0.5, { speed: 0, left: 0 })
+    expect(kept[0]?.gone).toBe(0)
+    const tape: Glyph[] = [{ x: 90, y: 0, ch: "字", t: 0, gone: 0 }]
+    stepTape(tape, 0.5, { speed: 0, left: 0, clear: true })
+    expect(tape).toHaveLength(1)
+    stepTape(tape, 0.5, { speed: 0, left: 0, clear: true })
+    expect(tape).toHaveLength(0)
+  })
+})
+

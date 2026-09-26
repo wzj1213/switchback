@@ -231,6 +231,15 @@
   padding: var(--sp-5) var(--content-gutter);
 }
 
+/* 桌宠在的时候，正文最后一行要落在它们那一条上面：状态行、纸带、爬过来的那些都在输入框上沿那一截里，
+   不让开的话「正在思考」会被爬过来的东西踩在脚下。用伪元素垫而不是加转录区的下内边距——
+   后者会把吸底的「回到底部」一起抬高 */
+.stage--pets .transcript__inner::after {
+  content: "";
+  flex: none;
+  height: 40px;
+}
+
 .transcript__inner {
   /*
    * 工具行的图标列。**展开出来的东西都对着这一条槽**——

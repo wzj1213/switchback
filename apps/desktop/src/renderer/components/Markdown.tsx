@@ -1,10 +1,12 @@
 import { memo } from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown"
+import remarkCjkFriendly from "remark-cjk-friendly/parseOnly"
 import remarkGfm from "remark-gfm"
 import { rehypeHighlight } from "../highlight.js"
 import { LinkedCode, MessageLink } from "./message-link.js"
 import { messageTarget } from "../message-links.js"
 import { CodeBlock, langOf } from "./code-block.js"
+import { mendTail } from "../stream-mend.js"
 
 /**
  * 渲染模型产出的 Markdown。
@@ -50,7 +52,14 @@ function Pre({ children }: { children?: React.ReactNode }): React.JSX.Element {
  * 一律当成「配置变了」重建整条 unified 管线——于是下面那个 `memo` 白包。
  * 这类失效是静默的：功能全对，只是每帧多花一毫秒，测不出来也看不出来。
  */
-const REMARK = [remarkGfm]
+/*
+ * `remark-cjk-friendly`：CommonMark 判断 `**` 能不能收尾，看的是它两边是空白还是标点——
+ * 这套规则照着「词和词之间有空格」的文字定的。中文不空格，于是「**原因：**这里」这种
+ * 模型天天写的句子永远收不上，**定稿之后那对星号也一直印在屏幕上**。
+ * 这个插件只放宽这一条判定（紧挨中日韩文字时），出自提这条规范修订的同一位作者；
+ * 英文、代码和别的语法一概不动。只要解析那一半（`parseOnly`），序列化用不着。
+ */
+const REMARK = [remarkGfm, remarkCjkFriendly]
 // 高亮插件产出的是 **hast 元素树**，不是 HTML 字符串——
 // 所以加它不违反上面那条红线：结构上仍然不存在注入面。见 `highlight.ts`。
 const REHYPE = [rehypeHighlight]
@@ -71,6 +80,9 @@ function urlTransform(url: string, key: string): string {
  *    dsh 在流式那支干脆不装会出错的渲染器，同一个道理。
  *
  * 定稿之后一次性着色，颜色只出现一次、不再变。
+ *
+ * 流式期间还把最后一段里没闭合的 `**` 和反引号先补上（见 `stream-mend.ts`），
+ * 不然收尾到之前那对星号是当字面量印出来的。
  */
 export const Markdown = memo(function Markdown({
   text,
@@ -87,7 +99,7 @@ export const Markdown = memo(function Markdown({
         components={COMPONENTS}
         urlTransform={urlTransform}
       >
-        {text}
+        {streaming ? mendTail(text) : text}
       </ReactMarkdown>
     </div>
   )

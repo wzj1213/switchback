@@ -78,6 +78,8 @@ const KINDS: Readonly<Record<FoeKind, Kind>> = {
 
 /** 最多同时几只。**不是难度，是别让画面糊掉**。 */
 const MAX_ALIVE = 8
+/** 流速低于这个（token/秒）就算「慢」。见 `pressureOf`。 */
+const SLOW = 20
 /** 消散动画多久。 */
 const FADE = 0.55
 /** 走到离手多近算咬到。 */
@@ -103,7 +105,9 @@ export function pressureOf(input: {
   if (input.ratio >= 0.78) return { kind: "glut", level: clamp((input.ratio - 0.78) / 0.2, 0.2, 1) }
   if (!input.running) return undefined
   if (input.quiet >= 3) return { kind: "slime", level: clamp((input.quiet - 3) / 12, 0.15, 1) }
-  if (input.rate > 1 && input.rate < 40) return { kind: "swarm", level: clamp((40 - input.rate) / 39, 0.15, 1) }
+  // 低流速的线划在 20 tok/s：常见的模型大多在 30~100 之间出字，上一版的 40 把它们都算成了「慢」，
+  // 于是一跑起来左边就刷满了蜂群——压力只该在真慢下来时出现
+  if (input.rate > 1 && input.rate < SLOW) return { kind: "swarm", level: clamp((SLOW - input.rate) / (SLOW - 1), 0.15, 1) }
   return undefined
 }
 

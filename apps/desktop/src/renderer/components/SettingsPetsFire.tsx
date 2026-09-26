@@ -24,7 +24,7 @@ export function FireSection({
   const kit = settings.petKit
   const off = !settings.pets || !kit.fire
   return (
-    <Group title="开火" hint="当前那只按引擎此刻吐字的速度往左打，每中一发，纸带上落一个字。" more={FIRE_NOTE}>
+    <Group title="开火" hint="当前那只按引擎此刻吐字的速度往左打，每中一发，纸带上落一个它刚写出来的字。" more={FIRE_NOTE}>
       <Field
         label="按 token 流速开火"
         hint="只画在当前那只身上。没有输出就没有火力——静默时它会把枪收起来"
@@ -86,8 +86,9 @@ export function FireSection({
 }
 
 const FIRE_NOTE =
-  "它估的是 item.delta 的字节量（所以数字永远写作 ~142 t/s，那是流速不是账单），" +
-  "而射速恒等于流速：没有任何一项设置能改快慢——一旦能改，画面上的快慢说的就是你的配置，" +
+  "流速是把模型写出来的字按字符种类估成 token（中文、英文、代码各按各的算，引擎报了生成量就拿真数校准），" +
+  "对话末尾那行状态里的「≈ 58 tok/s」就是它，口径和各家评测的输出速度一样：生成量 ÷ 真在出字的时间。" +
+  "射速恒等于流速：没有任何一项设置能改快慢——一旦能改，画面上的快慢说的就是你的配置，" +
   "而不是引擎此刻的表现，那这套东西也就没有存在的理由了。系统「减少动效」开着时自动失效。"
 
 const TRAJ: readonly { id: TrajMode; label: string }[] = [

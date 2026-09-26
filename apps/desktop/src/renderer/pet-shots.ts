@@ -52,18 +52,28 @@ export interface Bullet {
   /** 飞了多久 / 要飞多久（秒）。 */
   t: number
   dur: number
-  /** 这一发落下的是哪个字（`CHARS` 的下标）。 */
-  ch: number
+  /** 这一发落下的是哪个字：模型刚写出来的那一个（`tape-text.ts`）。打怪、打靶的那几发是空串。 */
+  ch: string
 }
 
 /** 纸带上已经落下的一个字。 */
 export interface Glyph {
   x: number
   y: number
-  ch: number
+  ch: string
   /** 落下多久了（秒）。刚落下的那一下会弹一下。 */
   t: number
+  /** 收工之后淡出到哪儿了（0~1）。到 1 就摘掉。 */
+  gone: number
 }
+
+/**
+ * 收工之后纸带多久淡干净（秒）。
+ *
+ * 上一版收工之后字照旧按静默速度慢慢往左漂，一条带子要漂好几秒才走完，
+ * 这一轮都结束了，输入框上面还挂着几个零散的字（「>」「(」）。
+ */
+const TAPE_CLEAR = 0.9
 
 /** 纸带最多留几个字。到头就从最旧的开始丢。 */
 export const TAPE_MAX = 72
@@ -99,7 +109,7 @@ export function rpsOf(rate: number): number {
 export function spawn(
   from: { x: number; y: number },
   to: { x: number; y: number },
-  ch: number,
+  ch: string,
   jitter: readonly [number, number],
 ): Bullet {
   return {
@@ -142,22 +152,27 @@ export function stepShots(bullets: Bullet[], dt: number, onLand: (b: Bullet) => 
 
 /** 落一个字。上限在这儿而不在调用方——它是纸带自己的事。 */
 export function pushGlyph(tape: Glyph[], b: Bullet): void {
-  tape.push({ x: b.x1, y: b.y1, ch: b.ch, t: 0 })
+  tape.push({ x: b.x1, y: b.y1, ch: b.ch, t: 0, gone: 0 })
   while (tape.length > TAPE_MAX) tape.shift()
 }
 
 /**
- * 纸带向左漂。`speed` 是每秒多少像素，`left` 是漂到哪儿就没了。
+ * 纸带向左漂。`speed` 是每秒多少像素，`left` 是漂到哪儿就没了；`clear` 为真时整条一起淡掉（收工之后）。
  *
  * **静默时漂得快**（调用方给一个更大的 speed）：不然一条不动的字带会一直
  * 挂在那儿，而「空闲整帧不重绘」那条优化就永远等不到「不动」这一刻。
  */
-export function stepTape(tape: Glyph[], dt: number, speed: number, left: number): void {
+export function stepTape(
+  tape: Glyph[],
+  dt: number,
+  { speed, left, clear = false }: { speed: number; left: number; clear?: boolean },
+): void {
   for (let i = tape.length - 1; i >= 0; i--) {
     const g = tape[i]
     if (g === undefined) continue
     g.t += dt
     g.x -= speed * dt
-    if (g.x < left) tape.splice(i, 1)
+    if (clear) g.gone += dt / TAPE_CLEAR
+    if (g.x < left || g.gone >= 1) tape.splice(i, 1)
   }
 }
