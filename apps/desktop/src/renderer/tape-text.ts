@@ -12,7 +12,7 @@
  * 纯逻辑：不读时钟、不碰 DOM。
  */
 export interface TapeText {
-  /** 最近到手的字，旧的在前。空白不进来：纸带上落一个空格等于什么都没落。 */
+  /** 最近到手的字，旧的在前。空白和 Markdown 标记不进来（见 `SKIP`）。 */
   chars: string[]
   /** 下一发取哪一个。 */
   read: number
@@ -21,13 +21,22 @@ export interface TapeText {
 /** 最多留多少个字。 */
 const KEEP = 48
 
+/**
+ * 不落到纸带上的字：Markdown 的标记。
+ *
+ * 它们也是模型写出来的，但那是排版指令，不是话：「**结论：**」在正文里画成粗体，
+ * 纸带上却落下两颗星号，读起来像乱码。表格的竖线和横线、列表的短横同理。
+ * 代码里的 `|`、`-`、`>` 也会一起跳过——纸带本来就是隔几个字取一个，少这几种不影响它像不像代码。
+ */
+const SKIP: ReadonlySet<string> = new Set(["*", "`", "#", "_", "~", "|", "-", ">"])
+
 export function createTapeText(): TapeText {
   return { chars: [], read: 0 }
 }
 
 export function pushText(tape: TapeText, text: string): void {
   for (const ch of text) {
-    if (ch.trim() === "") continue
+    if (ch.trim() === "" || SKIP.has(ch)) continue
     tape.chars.push(ch)
   }
   const extra = tape.chars.length - KEEP
