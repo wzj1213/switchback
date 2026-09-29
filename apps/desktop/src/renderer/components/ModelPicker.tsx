@@ -187,11 +187,14 @@ export function ModelPicker({
    * 会改名、会因为账号权限而不同，而猜错的代价是「挑好了、切过去发现没有这个模型」。
    */
   if (pending !== undefined) {
+    // 输入区收成图标时这里只剩那枚火花，「切到谁」只能靠悬停和读屏名说出来——
+    // 所以用 `data-tip` 而不是系统 `title`（理由见 `tips.tsx` 开头）
     return (
       <button
         type="button"
         className="trigger"
-        title={`现在就把原生会话切到 ${pending.label}；不会自动发送内容。换完就能挑它自己报的模型`}
+        data-tip={`现在就把原生会话切到 ${pending.label}；不会自动发送内容。换完就能挑它自己报的模型`}
+        aria-label={`切到 ${pending.label} 再选模型`}
         disabled={disabled}
         onClick={pending.onSwitchNow}
       >
@@ -218,7 +221,10 @@ export function ModelPicker({
     <Select
       label={label}
       {...(detail === undefined ? {} : { detail })}
-      title={current.description ?? (label === current.label ? "模型与推理强度" : current.label)}
+      // 平时只写名字；输入区收成图标时，名字让位给这枚火花
+      compactIcon={<SparkIcon />}
+      name="模型"
+      title={current.description ?? (label === current.label ? undefined : current.label)}
       disabled={disabled}
       sections={sectionsOf(models, current, level, change)}
       {...(reset === undefined ? {} : { reset })}

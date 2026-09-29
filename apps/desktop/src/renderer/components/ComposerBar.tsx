@@ -73,7 +73,8 @@ function TrustSelect({
     <Select
       label={labelOf(TRUSTS, trust)}
       icon={<ShieldIcon />}
-      title={blind ?? "信任档"}
+      name="信任档"
+      title={blind}
       disabled={disabled}
       sections={[
         {
@@ -111,7 +112,7 @@ function EngineSelect({
     <Select
       label={labelOf(engines, engine)}
       icon={<EngineIcon />}
-      title="引擎"
+      name="引擎"
       disabled={disabled}
       sections={[
         {

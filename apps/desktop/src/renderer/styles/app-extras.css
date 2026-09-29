@@ -134,6 +134,10 @@
 .tip {
   position: fixed;
   z-index: 80;
+  /* 短的一行照旧；长的在 260 处折行，而不是 `nowrap` 那样把字画出牌子外面
+     （模型描述、「这家不报档位」那句都有这么长）。`\n` 另起一行：
+     输入区收成图标时，第一行是「名：当前值」，原来的说明排在第二行 */
+  width: max-content;
   max-width: 260px;
   padding: 4px var(--sp-2);
   border-radius: var(--radius-sm);
@@ -143,7 +147,8 @@
   color: var(--tip-ink);
   font-size: var(--text-sm);
   line-height: var(--lh-sm);
-  white-space: nowrap;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
   /* 它自己绝不接事件：接了就会挡住底下那颗刚要点的按钮 */
   pointer-events: none;
   box-shadow: var(--shadow-pop);

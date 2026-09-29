@@ -55,6 +55,11 @@
   color: var(--text-muted);
 }
 
+/* 只在输入区那一排收成图标时露面（见 items-composer.css 的「收成图标」） */
+.trigger__icon--compact {
+  display: none;
+}
+
 .trigger__label {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { tipSpot, type TipBox } from "../tips.js"
 
 /**
@@ -28,7 +28,16 @@ import { tipSpot, type TipBox } from "../tips.js"
 const DELAY = 380
 
 export function TipLayer(): React.JSX.Element | null {
-  const [tip, setTip] = useState<{ text: string; box: TipBox } | undefined>(undefined)
+  const [tip, setTip] = useState<
+    { text: string; box: TipBox; size?: { width: number; height: number } } | undefined
+  >(undefined)
+  const plate = useRef<HTMLSpanElement>(null)
+  // 先按估的大小画一次、量出真宽高、再按真值摆——都在绘制之前，屏幕上只有最后那一帧
+  useLayoutEffect(() => {
+    const el = plate.current
+    if (el === null || tip === undefined || tip.size !== undefined) return
+    setTip({ ...tip, size: { width: el.offsetWidth, height: el.offsetHeight } })
+  }, [tip])
   useEffect(() => {
     let timer = 0
     const clear = (): void => {
@@ -66,9 +75,9 @@ export function TipLayer(): React.JSX.Element | null {
     }
   }, [])
   if (tip === undefined) return null
-  const at = tipSpot(tip.box, { width: window.innerWidth, height: window.innerHeight })
+  const at = tipSpot(tip.box, { width: window.innerWidth, height: window.innerHeight }, tip.size)
   return (
-    <span className="tip" style={{ left: at.left, top: at.top }} data-side={at.side} role="tooltip">
+    <span ref={plate} className="tip" style={{ left: at.left, top: at.top }} data-side={at.side} role="tooltip">
       {tip.text}
     </span>
   )

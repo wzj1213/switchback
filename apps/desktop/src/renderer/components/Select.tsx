@@ -54,6 +54,17 @@ export interface SelectProps {
   detail?: { text: string; strong?: boolean }
   /** 触发器前面的小图标，可选。 */
   icon?: React.ReactNode
+  /**
+   * 只在输入区那一排收成图标时才露出来的图标。平时只写名字的触发器（模型菜单）
+   * 收起之后得有个东西可点；已经有 `icon` 的不用给。
+   */
+  compactIcon?: React.ReactNode
+  /**
+   * 这颗控件管的是什么（「引擎」「信任档」「模型」）。给了它，读屏名与悬停提示
+   * 都先说「名：当前值」——见 `triggerWords`。
+   */
+  name?: string
+  /** 悬停时补的那句说明。给了 `name` 时排在「名：当前值」下一行。 */
   title?: string
   disabled?: boolean
   sections: readonly Section[]
@@ -64,10 +75,33 @@ export interface SelectProps {
   reset?: { label: string; run: () => void }
 }
 
+/**
+ * 触发器的悬停提示与读屏名。
+ *
+ * 输入区那一排窄了会收成图标（见 `items-composer.css` 的「收成图标」那段），
+ * 那时**当前值只剩悬停里这一句看得见**——所以给了 `name` 的触发器，提示先说
+ * 「名：当前值」，原来那句说明（这家不报档位、模型描述）挪到下一行。
+ * 读屏名同理：图标没有字，不给 `aria-label` 的话，收起之后这颗按钮在读屏里没有名字。
+ *
+ * 没给 `name` 的（审核范围、设置页那几个）照旧：提示是 `title`，没有就是标签本身。
+ */
+export function triggerWords({
+  name,
+  label,
+  detail,
+  title,
+}: Pick<SelectProps, "name" | "label" | "detail" | "title">): { tip: string; spoken?: string } {
+  if (name === undefined) return { tip: title ?? label }
+  const spoken = `${name}：${detail === undefined ? label : `${label} · ${detail.text}`}`
+  return { tip: title === undefined ? spoken : `${spoken}\n${title}`, spoken }
+}
+
 export function Select({
   label,
   detail,
   icon,
+  compactIcon,
+  name,
   title,
   disabled = false,
   sections,
@@ -79,6 +113,7 @@ export function Select({
   const trigger = useRef<HTMLButtonElement>(null)
   const many = sections.length > 1
   const shown = many ? page : 0
+  const words = triggerWords({ name, label, detail, title })
 
   const close = (): void => {
     setOpen(false)
@@ -93,7 +128,8 @@ export function Select({
         type="button"
         ref={trigger}
         className={`trigger${open ? " trigger--open" : ""}`}
-        data-tip={title ?? label}
+        data-tip={words.tip}
+        aria-label={words.spoken}
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -102,14 +138,7 @@ export function Select({
           else setOpen(true)
         }}
       >
-        {icon === undefined ? null : <span className="trigger__icon">{icon}</span>}
-        <span className="trigger__label">{label}</span>
-        {detail === undefined ? null : (
-          <span className={`trigger__detail${detail.strong === true ? " trigger__detail--strong" : ""}`}>
-            · {detail.text}
-          </span>
-        )}
-        <CaretIcon />
+        <Face icon={icon} compactIcon={compactIcon} label={label} detail={detail} />
       </button>
       <Popover
         open={open}
@@ -118,7 +147,7 @@ export function Select({
         contentKey={shown ?? "top"}
         onClose={close}
       >
-        <div role="menu" aria-label={title ?? label}>
+        <div role="menu" aria-label={name ?? title ?? label}>
           {shown === undefined ? (
             <Top sections={sections} reset={reset} onOpen={setPage} onClose={close} />
           ) : (
@@ -136,6 +165,30 @@ export function Select({
           )}
         </div>
       </Popover>
+    </>
+  )
+}
+
+/** 触发器上摆的那几样。拆出来是复杂度闸门逼的：每一样都是「有才画」。 */
+function Face({
+  icon,
+  compactIcon,
+  label,
+  detail,
+}: Pick<SelectProps, "icon" | "compactIcon" | "label" | "detail">): React.JSX.Element {
+  return (
+    <>
+      {icon === undefined ? null : <span className="trigger__icon">{icon}</span>}
+      {compactIcon === undefined ? null : (
+        <span className="trigger__icon trigger__icon--compact">{compactIcon}</span>
+      )}
+      <span className="trigger__label">{label}</span>
+      {detail === undefined ? null : (
+        <span className={`trigger__detail${detail.strong === true ? " trigger__detail--strong" : ""}`}>
+          · {detail.text}
+        </span>
+      )}
+      <CaretIcon />
     </>
   )
 }

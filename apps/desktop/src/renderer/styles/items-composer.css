@@ -321,31 +321,81 @@
   min-width: 0;
 }
 
-/*
- * 窄了先收间距、再让标签省略，**实在放不下才折成两行**。
- *
- * 上一版在 620 就强制折行：那是输入区还有一条强度滑块时定的。滑块去掉之后这一排
- * 一行只要 440 上下，而最小窗口里输入卡正好 588 宽——一刀切的折行让它平白高出一行
- * （实测 156 → 192），窗口越缩输入框反而越大。现在只在 440 以下（右侧工作台把
- * 正文列压到最窄时）才折。
- */
+/* 窄了先收间距。**这一排永远不折行**——放不下完整标签就收成图标，见下一段。 */
 @container (max-width: 620px) {
   .composer__bar {
     column-gap: var(--sp-2);
   }
 }
 
-@container (max-width: 440px) {
+/*
+ * ── 收成图标 ─────────────────────────────────────────
+ * 右栏一开，正文列只剩四百出头：950 宽的窗口里输入卡内宽 354，而带完整标签的
+ * 一排要 500 上下（实测 Claude Code + 分支 + 用量 504，再带上强度 536）。
+ * 上一版在 440 以下把模型那半排折到第二行，两行各自对齐，读起来就是排版错了。
+ *
+ * 现在 540 以下整排只留图标：信任档、引擎、模型收成和回形针、发送键一样的 28px 方块，
+ * 站成一排；当前值挪进悬停提示和读屏名（「引擎：Claude Code」，见 `Select.tsx`
+ * 的 `triggerWords`）。540 这条线：右栏开着的 1280 窗口（526）收，右栏关着的
+ * 最小窗口（554）不收。
+ */
+@container (max-width: 540px) {
+  /* 被挤的换成左边那格：分支、侧问这些芯片先省略，图标和发送键寸步不让 */
   .composer__bar {
-    row-gap: var(--sp-2);
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
-  .composer__tools {
-    grid-column: 1 / -1;
+  .composer__tools > .trigger,
+  .composer__model > .trigger {
+    flex: none;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: var(--radius-sm);
   }
 
-  .composer__model {
-    grid-column: 1 / 3;
+  /* `.trigger > svg` 是下拉箭头：图标本身就是按钮，箭头只会把 28px 的方块挤歪 */
+  .composer__bar .trigger__label,
+  .composer__bar .trigger__detail,
+  .composer__bar .trigger > svg,
+  .composer__asidewhy {
+    display: none;
+  }
+
+  .composer__bar .trigger__icon--compact {
+    display: flex;
+  }
+
+  /* 平时那枚图标淡一档，是因为旁边有字在说话；只剩图标时跟回形针一个深浅，
+     悬停一起变深（第二条压过 popover.css 里悬停时那条） */
+  .composer__bar .trigger .trigger__icon,
+  .composer__bar .trigger:hover:not(:disabled) .trigger__icon {
+    color: inherit;
+  }
+
+  /* 分支芯片挤到头时整枚收掉，而不是图标探出去压住隔壁。`nowrap` 管的是
+     跟在名字后面那截脏标（` · 14`）：它是裸文字，挤窄了会折到第二行把这一排撑高 */
+  .composer__bar .chips .chip {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  /* 用量卡改成对着环居中：收起之后环右边只剩两颗图标和发送键，
+     原来那样从环的左沿往右铺 260px，会探出输入卡 */
+  .composer__bar .usage__tip {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/*
+ * 再窄：最小窗口开着右栏（内宽 274），又正好在侧问或历史会话里，图标排也差二三十像素。
+ * 用量只留环，数字还在悬停卡上。
+ */
+@container (max-width: 300px) {
+  .composer__bar .usage__pct {
+    display: none;
   }
 }
 

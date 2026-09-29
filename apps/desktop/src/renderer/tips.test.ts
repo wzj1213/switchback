@@ -23,4 +23,15 @@ describe("悬停提示摆在哪儿", () => {
     expect(tipSpot(box(0, 400), view).left).toBe(86)
     expect(tipSpot(box(1260, 400), view).left).toBe(1194)
   })
+
+  it("量出真宽之后按真宽夹：折成两行的长提示贴着右边也整块留在窗口里", () => {
+    const at = tipSpot(box(1200, 400), view, { width: 260, height: 44 })
+    expect(at.left).toBe(1144)
+    expect(at.left + 130).toBeLessThanOrEqual(view.width - 6)
+  })
+
+  it("翻不翻面也按真高算：三行高的提示在上方放不下时翻到下方", () => {
+    expect(tipSpot(box(600, 40), view).side).toBe("top")
+    expect(tipSpot(box(600, 40), view, { width: 260, height: 62 }).side).toBe("bottom")
+  })
 })

@@ -124,8 +124,8 @@ async function scheme(cdp, value) {
 async function auditSchemes(cdp) {
   // 外壳先于探测和默认会话出现，交互巡检应等输入区真正可用。
   await waitFor(cdp, "document.querySelector('.composer__input:not(:disabled)') !== null")
-  await waitFor(cdp, 'document.querySelector(\'.composer__bar [data-tip="信任档"]:not(:disabled)\') !== null')
-  await waitFor(cdp, 'document.querySelector(\'.composer__bar [data-tip="引擎"]:not(:disabled)\') !== null')
+  await waitFor(cdp, 'document.querySelector(\'.composer__bar [aria-label^="信任档："]:not(:disabled)\') !== null')
+  await waitFor(cdp, 'document.querySelector(\'.composer__bar [aria-label^="引擎："]:not(:disabled)\') !== null')
   await pause(250)
   await scheme(cdp, "light")
   await audit(cdp, "浅色主界面")

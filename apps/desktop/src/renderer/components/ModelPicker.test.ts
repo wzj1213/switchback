@@ -1,6 +1,8 @@
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { ModelOption } from "@omni/protocol"
-import { triggerDetail } from "./ModelPicker.js"
+import { ModelPicker, triggerDetail } from "./ModelPicker.js"
 
 const opus: ModelOption = { id: "opus", label: "Opus", efforts: ["low", "high", "xhigh", "ultracode"], defaultEffort: "high" }
 const sonnet: ModelOption = { id: "sonnet", label: "Sonnet", efforts: ["low", "high", "max"] }
@@ -21,4 +23,26 @@ describe("模型按钮上那截强度", () => {
       expect(triggerDetail(models, c.current, c.level)).toEqual(c.want)
     })
   }
+})
+
+describe("输入区收成图标时的模型按钮", () => {
+  const picker = (pending?: { label: string; onSwitchNow: () => void }): string =>
+    renderToStaticMarkup(createElement(ModelPicker, {
+      models, model: "opus", effort: "high", disabled: false, onChange: () => undefined,
+      ...(pending === undefined ? {} : { pending }),
+    }))
+
+  it("备好一枚火花；名字让位之后，读屏名和悬停提示说出模型与强度", () => {
+    const html = picker()
+    expect(html).toContain("trigger__icon--compact")
+    expect(html).toContain('aria-label="模型：Opus · 高"')
+    expect(html).toContain('data-tip="模型：Opus · 高"')
+  })
+
+  it("等着换引擎的那颗也说得出要切到谁，而且走自绘提示，不走系统 title", () => {
+    const html = picker({ label: "Grok", onSwitchNow: () => undefined })
+    expect(html).toContain('aria-label="切到 Grok 再选模型"')
+    expect(html).toContain('data-tip="现在就把原生会话切到 Grok')
+    expect(html).not.toContain(" title=")
+  })
 })

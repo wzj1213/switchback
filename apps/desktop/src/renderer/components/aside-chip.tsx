@@ -10,7 +10,10 @@ import { CloseIcon } from "./icons-panel.js"
 export function AsideChip({ onExit }: { onExit: () => void }): React.JSX.Element {
   return (
     <span className="composer__asidechip">
-      侧问 · 这一句不进正文
+      侧问
+      {/* 那一排收成图标时这半句先让位（见 items-composer.css）：「侧问」两个字
+          和变了色的发送键已经说明这一句去哪儿。不带前导空格——芯片自带 4px 间距 */}
+      <span className="composer__asidewhy">· 这一句不进正文</span>
       <button
         type="button"
         className="composer__asideoff"

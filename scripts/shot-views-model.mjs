@@ -1,8 +1,10 @@
+import { openPanelPage } from "./shot-panel.mjs"
+
 /** 模型菜单与推理强度场景；和输入内容场景分开，避免固定页面清单越过行数闸门。 */
 export const MODEL_VIEWS = [
   {
     name: "18-输入区布局",
-    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)',
+    before: '.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled)',
     open: `true`,
     ready: '.composer__model',
     assert: `(() => {
@@ -20,6 +22,40 @@ export const MODEL_VIEWS = [
   },
   {
     /*
+     * **右栏一开，输入区那一排收成图标，而且还是一排。**
+     *
+     * 上一版在输入卡内宽 440 以下把模型那半排折到第二行，两行各自对齐，看着就是排版错了。
+     * 现在 540 以下（右栏开着的 1280 窗口正好 526）信任档、引擎、模型都只剩 28px 的图标；
+     * 当前值不能跟着消失——每一颗的读屏名都得带着它（「引擎：Claude Code」）。
+     */
+    name: "18-右栏开着收成图标",
+    before: '.composer__model > .trigger:not(:disabled)',
+    open: openPanelPage("审查"),
+    ready: ".shell--workbench .composer__model",
+    assert: `(() => {
+      const card = document.querySelector('.composer__inner').getBoundingClientRect()
+      const bar = document.querySelector('.composer__bar')
+      const boxes = [...bar.querySelectorAll('button, .usage, .chip')]
+        .filter(node => node.getClientRects().length > 0).map(node => node.getBoundingClientRect())
+      const middles = boxes.map(box => box.top + box.height / 2)
+      const oneRow = Math.max(...middles) - Math.min(...middles) <= 2
+      const inside = boxes.every(box => box.left >= card.left && box.right <= card.right)
+      const triggers = [...bar.querySelectorAll('.trigger')]
+      const iconOnly = triggers.length >= 2 && triggers.every(t => Math.round(t.getBoundingClientRect().width) === 28
+        && t.querySelector('.trigger__label')?.getClientRects().length === 0)
+      const named = triggers.every(t => {
+        const value = t.querySelector('.trigger__label')?.textContent ?? ''
+        return value !== '' && (t.getAttribute('aria-label') ?? '').includes(value) && (t.dataset.tip ?? '') !== ''
+      })
+      const scroll = bar.scrollWidth - bar.clientWidth
+      if (oneRow && inside && iconOnly && named && scroll <= 0) return true
+      throw new Error('收成图标诊断：' + JSON.stringify({ oneRow, inside, iconOnly, named, scroll, width: card.width }))
+    })()`,
+    after: `([...document.querySelectorAll('[aria-label="收起侧边面板"], [aria-label="隐藏侧边面板"]')]
+      .find(button => button.getClientRects().length > 0))?.click()`,
+  },
+  {
+    /*
      * **一个菜单再宽也就这么宽。**
      *
      * 引擎菜单里每条都可能带一句探测说明，而 DSH 起不来时那句有一百多字——
@@ -32,7 +68,7 @@ export const MODEL_VIEWS = [
     name: "18-菜单不占满窗口",
     // 引擎菜单优先（带探测说明的就是它），历史会话里它是禁着的，那时退回模型菜单
     before: '.composer__model > .trigger:not(:disabled)',
-    open: `(document.querySelector('.trigger[data-tip="引擎"]:not(:disabled)')
+    open: `(document.querySelector('.trigger[aria-label^="引擎："]:not(:disabled)')
       ?? document.querySelector('.composer__model > .trigger:not(:disabled)'))?.click()`,
     ready: '.pop [role="menuitem"], .pop [role="menuitemradio"]',
     assert: `(() => {
@@ -55,9 +91,9 @@ export const MODEL_VIEWS = [
   },
   {
     name: "18-模型菜单焦点",
-    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)',
+    before: '.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled)',
     open: `(() => {
-      const model = document.querySelector('.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)')
+      const model = document.querySelector('.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled)')
       model?.click()
       setTimeout(() => {
         const menu = document.querySelector('.pop [role="menu"]')
@@ -100,9 +136,9 @@ export const MODEL_VIEWS = [
   },
   {
     name: "18-超长模型名不出界",
-    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled):not(.trigger--open)',
+    before: '.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled):not(.trigger--open)',
     open: `(() => {
-      const model = document.querySelector('.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)')
+      const model = document.querySelector('.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled)')
       model?.click()
       setTimeout(() => {
         const panel = document.querySelector('.pop')
@@ -151,9 +187,9 @@ export const MODEL_VIEWS = [
      */
     name: "18-推理强度",
     // 引擎没报默认档、这条会话也还没选过时，按钮上不写强度（不猜）；选过一档就写
-    before: '.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled):not(.trigger--open)',
+    before: '.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled):not(.trigger--open)',
     open: `(() => {
-      const model = document.querySelector('.composer__model > .trigger:not([data-tip="引擎"]):not(:disabled)')
+      const model = document.querySelector('.composer__model > .trigger:not([aria-label^="引擎："]):not(:disabled)')
       const before = model?.querySelector('.trigger__detail')?.textContent ?? ''
       model?.click()
       setTimeout(() => {
