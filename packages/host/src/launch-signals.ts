@@ -1,4 +1,4 @@
-import type { EngineAxis, EngineGoal, Thread, TrustApply } from "@omni/protocol"
+import type { EngineAxis, EngineGoal, Thread, TrustApply } from "@switchback/protocol"
 
 /** 驱动在 `start()` 返回前就可能回报的会话状态。 */
 export interface EarlySignals {

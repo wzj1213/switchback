@@ -26,8 +26,8 @@ describe("触发器的悬停提示与读屏名", () => {
     },
     {
       name: "原来那句说明挪到第二行；读屏名只要名字和值",
-      input: { name: "信任档", label: "自动审批", title: "Claude Code 不会把它自己改的档位告诉 omni。" },
-      want: { tip: "信任档：自动审批\nClaude Code 不会把它自己改的档位告诉 omni。", spoken: "信任档：自动审批" },
+      input: { name: "信任档", label: "自动审批", title: "Claude Code 不会把它自己改的档位告诉 Switchback。" },
+      want: { tip: "信任档：自动审批\nClaude Code 不会把它自己改的档位告诉 Switchback。", spoken: "信任档：自动审批" },
     },
   ]
   for (const c of cases) {

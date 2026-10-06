@@ -2,15 +2,15 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 import { createGrokActivity } from "./grok-activity.js"
 import { grokNativeApproval } from "./grok.js"
 
 const TURN = "grok-monitor-live"
 const DESCRIPTION = "Monitor native output audit"
-const FIRST = "OMNI_MONITOR_NATIVE_LINE_1"
-const SECOND = "OMNI_MONITOR_NATIVE_LINE_2"
+const FIRST = "SWITCHBACK_MONITOR_NATIVE_LINE_1"
+const SECOND = "SWITCHBACK_MONITOR_NATIVE_LINE_2"
 
 function monitorEvidence(events: readonly Event[]): { output: string; done: boolean } {
   const item = events.find((event) =>
@@ -26,14 +26,14 @@ function monitorEvidence(events: readonly Event[]): { output: string; done: bool
 
 describe("Grok Monitor 输出（真跑）", () => {
   it("原生监控日志回到对应工具卡，并由任务终态收口", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-grok-monitor-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-grok-monitor-"))
     const events: Event[] = []
     let complete: (() => void) | undefined
     const done = new Promise<void>((resolve) => { complete = resolve })
     const driver = createAcpDriver({
       id: "grok",
-      command: process.env["OMNI_ACP_COMMAND"] ?? "grok",
-      args: process.env["OMNI_ACP_ARGS"]?.split(" ").filter(Boolean)
+      command: process.env["SWITCHBACK_ACP_COMMAND"] ?? "grok",
+      args: process.env["SWITCHBACK_ACP_ARGS"]?.split(" ").filter(Boolean)
         ?? ["agent", "stdio", "--debug", "--debug-file", join(cwd, "grok-debug.log")],
       nativeApproval: grokNativeApproval,
       activity: createGrokActivity,

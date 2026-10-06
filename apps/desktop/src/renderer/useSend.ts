@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react"
-import type { Command } from "@omni/protocol"
-import type { ThreadRow } from "@omni/store"
+import type { Command } from "@switchback/protocol"
+import type { ThreadRow } from "@switchback/store"
 import { learnFrom } from "./newThreadPrefs.js"
 import type { LastUsed, Settings } from "../shared/settings.js"
 

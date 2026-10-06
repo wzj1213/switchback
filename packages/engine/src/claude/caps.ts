@@ -1,4 +1,4 @@
-import type { EngineCapabilities } from "@omni/protocol"
+import type { EngineCapabilities } from "@switchback/protocol"
 import { canAside } from "./aside.js"
 
 /**
@@ -7,11 +7,11 @@ import { canAside } from "./aside.js"
  * 它的凭据（实测、源码行号、版本）比代码本身长，摊在会话生命周期中间读不动。
  *
  * - `compact` 报 false：claude 自己的 `/compact` 已经在斜杠命令列表里，
- *   omni 再给一个就是同一件事出现两次。
+ *   Switchback 再给一个就是同一件事出现两次。
  * - `steer` 报 true：2026-08-25 在 SDK 0.3.231 / CLI 2.1.245 真跑
  *   `priority: "now"`，数数回答在 27 处停下，下一段只回了 `STEER_OK`。
  *   CLI 会为“被打断的阶段”和“插话后的阶段”各发一条 result，所以驱动必须把它们
- *   折成同一个 omni turn；`steer.live.test.ts` 同时钉“真叫停”和“只收工一次”。
+ *   折成同一个 Switchback turn；`steer.live.test.ts` 同时钉“真叫停”和“只收工一次”。
  * - `fork` **报 true 了**（2026-08-25 接上，见 `fork.ts`）。原话是「SDK 没有复制会话的
  *   入口，只能诚实地开空白分支」，而 0.3.231 上 `resume` + `forkSession` +
  *   `resumeSessionAt` 三件套齐全，SDK 自己把这套叫 edit-and-retry——缺的从来不是入口，

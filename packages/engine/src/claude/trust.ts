@@ -1,5 +1,5 @@
 import type { Options, PermissionMode } from "@anthropic-ai/claude-agent-sdk"
-import type { EngineAxis, Trust } from "@omni/protocol"
+import type { EngineAxis, Trust } from "@switchback/protocol"
 
 /** Claude Code 自己公开的 Plan / Auto / Bypass 三档。 */
 export const CLAUDE_TRUST: Readonly<Record<Trust, PermissionMode>> = {

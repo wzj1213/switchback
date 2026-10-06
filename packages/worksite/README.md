@@ -1,4 +1,4 @@
-# @omni/worksite
+# @switchback/worksite
 
 工作区的文件索引与模糊搜索。**引擎无关。**
 

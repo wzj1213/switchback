@@ -45,7 +45,7 @@ describe("scrub 抹凭据", () => {
   })
 
   it("路径不会被当成凭据抹掉——那是排查时最有用的信息", () => {
-    const msg = "spawn /Applications/omni.app/Contents/Resources/app.asar/node_modules/x ENOTDIR"
+    const msg = "spawn /Applications/Switchback.app/Contents/Resources/app.asar/node_modules/x ENOTDIR"
     expect(scrub(msg)).toBe(msg)
   })
 })

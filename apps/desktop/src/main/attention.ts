@@ -1,6 +1,6 @@
 import { app, ipcMain, Notification } from "electron"
 import type { BrowserWindow } from "electron"
-import type { Event, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ThreadId, TurnId } from "@switchback/protocol"
 import { humanize } from "../shared/failure.js"
 import type { NotifyMode } from "../shared/settings.js"
 import { watchQuestions, type QuestionChange } from "./attention-questions.js"
@@ -80,7 +80,7 @@ export function isAttending(
 
 /** renderer 只报一个会话 id；Electron 能力仍留在主进程。 */
 function connectViewing(attention: Attention): Attention {
-  ipcMain.on("omni:viewing", (_event, threadId: unknown) => {
+  ipcMain.on("switchback:viewing", (_event, threadId: unknown) => {
     attention.viewing(typeof threadId === "string" && threadId !== "" ? threadId : undefined)
   })
   return attention
@@ -150,7 +150,7 @@ export function createAttention(
 
   /** 通知的正文：会话名打头——你可能同时开着四条，不说是哪条等于没说。 */
   const tell = (threadId: ThreadId, body: string): void => {
-    const title = titles.get(threadId) ?? "omni"
+    const title = titles.get(threadId) ?? "Switchback"
     new Notification({ title, body, silent: false }).on("click", raise).show()
     // 同一个出口再送一份到手机上。**不在这里判「要不要推」**——
     // 那要知道谁正看着哪条会话，而那是远程那一层才有的信息
@@ -184,7 +184,7 @@ export function createAttention(
       // 角标已经挂上了，下面这一步只决定要不要出声
       if (mode() === "off" || attending(seen.threadId) || announced.has(seen.id)) return
       announced.add(seen.id)
-      askFor(seen, titles.get(seen.threadId) ?? "omni 在等你确认", raise, relay)
+      askFor(seen, titles.get(seen.threadId) ?? "Switchback 在等你确认", raise, relay)
     },
     viewing: (threadId) => {
       view.threadId = threadId
@@ -213,7 +213,7 @@ function askFor(
   raise: () => void,
   relay: Relay | undefined,
 ): void {
-  new Notification({ title: "omni 在等你确认", body: seen.summary, silent: false })
+  new Notification({ title: "Switchback 在等你确认", body: seen.summary, silent: false })
     .on("click", raise)
     .show()
   relay?.(seen.threadId, title, seen.summary)

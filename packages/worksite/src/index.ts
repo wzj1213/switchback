@@ -19,9 +19,9 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([
   "dist",
   "build",
   "out",
-  // electron-builder 的默认输出目录，**omni 自己就用它**。
-  // 漏掉的代价实测过：打完包之后在 omni 里打 `@reduce`，九条候选里六条是
-  // `release/mac-arm64/omni.app/Contents/Frameworks/…/locale.pak`——
+  // electron-builder 的默认输出目录，**Switchback 自己就用它**。
+  // 漏掉的代价实测过：打完包之后在 Switchback 里打 `@reduce`，九条候选里六条是
+  // `release/mac-arm64/Switchback.app/Contents/Frameworks/…/locale.pak`——
   // 它们能命中纯粹因为那串长路径里恰好散落着 r、e、d、u、c、e
   "release",
   "target",

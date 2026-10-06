@@ -10,19 +10,19 @@ import { describe, expect, it, vi } from "vitest"
 vi.mock("electron", () => ({
   app: {
     getVersion: () => "9.9.9",
-    getPath: () => "/tmp/omni-test",
+    getPath: () => "/tmp/switchback-test",
     isPackaged: false,
   },
   dialog: { showSaveDialog: vi.fn() },
 }))
 
 vi.mock("./crash.js", () => ({
-  dumpDir: () => "/tmp/omni-test/CrashDumps",
+  dumpDir: () => "/tmp/switchback-test/CrashDumps",
 }))
 
 const { buildReport } = await import("./diagnose.js")
 
-const logger = { file: "/tmp/omni-test/does-not-exist.log", write: () => undefined }
+const logger = { file: "/tmp/switchback-test/does-not-exist.log", write: () => undefined }
 
 describe("诊断报告里的崩溃那一段", () => {
   it("**只有文件名和时间，没有转储内容**——这份报告是要发给别人的", async () => {

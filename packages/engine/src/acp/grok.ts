@@ -1,6 +1,6 @@
 import { access, readdir } from "node:fs/promises"
 import { join } from "node:path"
-import type { Trust } from "@omni/protocol"
+import type { Trust } from "@switchback/protocol"
 import type { ForeignNotice, ForeignNotification } from "./caps.js"
 
 const nonBlank = (value: unknown): string | undefined =>
@@ -14,12 +14,12 @@ const nonBlank = (value: unknown): string | undefined =>
  *
  * ## 和 kimi 相反：这条路是算得出来的
  *
- * kimi 的工作区目录名是它自己算的哈希（`wd_omni_0123456789ab`），猜不出来，
+ * kimi 的工作区目录名是它自己算的哈希（`wd_switchback_0123456789ab`），猜不出来，
  * 只能查它自己的索引。grok 不用：**目录名就是工作区绝对路径按 URL 编码**，
  * 里面那层目录名就是 ACP 报上来的 sessionId，一字不差——
  *
  * ```
- * ~/.grok/sessions/%2FUsers%2Fyou%2Fwork%2Fomni/01a00e5e-2fea-…/chat_history.jsonl
+ * ~/.grok/sessions/%2FUsers%2Fyou%2Fwork%2Fswitchback/01a00e5e-2fea-…/chat_history.jsonl
  * ```
  *
  * 实测立得住：拿一个全新的临时目录开一条 ACP 会话，`session/new` 回的 sessionId
@@ -265,10 +265,10 @@ export async function grokLogPath(home: string, sessionId: string, cwd: string):
  *                           "model_id": "grok-4.6", "reasoning_effort": "xhigh" } } }
  * ```
  *
- * 为什么要接：**你在 grok 自己的界面里改了强度，omni 靠这条才跟得上**。
+ * 为什么要接：**你在 grok 自己的界面里改了强度，Switchback 靠这条才跟得上**。
  * 不接的话选择器停在旧值——和今天修掉的那一族「界面显示的和引擎在跑的分家」是同一件事。
  *
- * 顺带：omni 自己发 `session/set_model` 之后 grok 也会回这一条（实测），
+ * 顺带：Switchback 自己发 `session/set_model` 之后 grok 也会回这一条（实测），
  * 所以它同时是一次「真的设进去了」的确认。
  */
 interface ModelChange { model?: string; effort?: string }

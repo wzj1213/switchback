@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const RELEASE = join(ROOT, "release")
 const KEEP = 3
-const ARTIFACT = /^omni-.+\.(?:dmg|zip|AppImage|tar\.gz)(?:\.blockmap)?$/u
+const ARTIFACT = /^Switchback-.+\.(?:dmg|zip|AppImage|tar\.gz)(?:\.blockmap)?$/u
 
 function artifactKey(name) {
   return name.endsWith(".blockmap") ? name.slice(0, -".blockmap".length) : name

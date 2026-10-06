@@ -16,7 +16,7 @@ export interface KimiCursor {
 /**
  * 实时连接为什么断了。**只用来如实说给人听、写进日志**——恢复路径对几种一视同仁
  *（读快照、从新水位重新订阅）。以前一律报成同一句「实时连接已中断」，
- * 于是两千多条记录分不出是对面关的、要重同步的，还是 omni 自己处理某一帧时出了错。
+ * 于是两千多条记录分不出是对面关的、要重同步的，还是 Switchback 自己处理某一帧时出了错。
  */
 export type KimiDisconnect =
   | { kind: "closed"; code?: number; reason?: string }
@@ -46,7 +46,7 @@ const HANDSHAKE_MS = 15_000
 
 class ResyncError extends Error {}
 
-const GAP: KimiDisconnect = { kind: "resync", why: "omni 发现流里有缺口" }
+const GAP: KimiDisconnect = { kind: "resync", why: "Switchback 发现流里有缺口" }
 
 function closedBy(event: unknown): KimiDisconnect {
   const { code, reason } = (event ?? {}) as { code?: unknown; reason?: unknown }
@@ -107,7 +107,7 @@ export class KimiStream {
     socket.send(
       JSON.stringify({
         type: "subscribe",
-        id: "omni-subscribe",
+        id: "switchback-subscribe",
         payload: {
           session_ids: [this.deps.sessionId],
           ...(cursor === undefined ? {} : { cursors: cursor }),
@@ -175,7 +175,7 @@ export class KimiStream {
             this.subscription(socket)
             return
           }
-          if (frame.type === "ack" && frame.id === "omni-subscribe") {
+          if (frame.type === "ack" && frame.id === "switchback-subscribe") {
             this.ack(frame)
             state.ready = true
             settle()

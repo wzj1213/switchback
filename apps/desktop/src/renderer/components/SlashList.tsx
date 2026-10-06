@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef } from "react"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { markOf } from "../slash.js"
 import {
   CommandIcon,
@@ -15,7 +15,7 @@ import { PencilIcon } from "./icons-activity.js"
 import { FileSearchIcon } from "./icons-panel.js"
 
 /**
- * omni 自己那几条各配各的图标——**它们和界面上已有的动作是同一件事**，
+ * Switchback 自己那几条各配各的图标——**它们和界面上已有的动作是同一件事**，
  * 用同一个图标，人在两处认的是同一个东西。
  * 引擎报的一律用中性图标：我们不知道它们会做什么。
  */
@@ -42,13 +42,13 @@ const GLYPH: Readonly<Record<string, React.ReactNode>> = {
  *
  * ## 两边怎么分得出来
  *
- * 引擎报的命令会**发给引擎**，omni 自己的**就地执行**——行为不同，得看得出。
- * 上一版是在每行挂一个 `omni` 灰角标，十行就是十个角标，
+ * 引擎报的命令会**发给引擎**，Switchback 自己的**就地执行**——行为不同，得看得出。
+ * 上一版是在每行挂一个 `switchback` 灰角标，十行就是十个角标，
  * 而它们说的是同一件事：噪声。
  *
- * 现在靠**图标**分：omni 那几条各用界面上已有的那个动作的图标
+ * 现在靠**图标**分：Switchback 那几条各用界面上已有的那个动作的图标
  *（新建是加号、重命名是笔、对比是对比…），引擎的一律中性方括号。
- * 顺带名字也不一样——omni 的显示中文名（「新建会话」），
+ * 顺带名字也不一样——Switchback 的显示中文名（「新建会话」），
  * 引擎的显示 `/code-review`，因为那本来就是它的名字。
  */
 export function SlashList({
@@ -75,7 +75,7 @@ export function SlashList({
       {commands.map((command, i) => (
         <Fragment key={`${command.source}:${command.name}`}>
           {/* 来源一变就起一节。**分节是给「行为不同」用的**：
-              引擎的技能发给引擎，omni 那几条就地执行 */}
+              引擎的技能发给引擎，Switchback 那几条就地执行 */}
           {command.source === commands[i - 1]?.source ? null : (
             <div className="slash__head">{SECTION[command.source]}</div>
           )}
@@ -89,7 +89,7 @@ export function SlashList({
 /** 分节抬头的字。照 codex 那张：小字、灰、贴在第一条上面。 */
 const SECTION: Readonly<Record<SlashCommand["source"], string>> = {
   engine: "技能",
-  omni: "omni",
+  switchback: "Switchback",
 }
 
 /**
@@ -155,7 +155,7 @@ function Row({
       }}
     >
       <span className="slash__icon">
-        {(command.source === "omni" ? GLYPH[command.name] : undefined) ?? <CommandIcon />}
+        {(command.source === "switchback" ? GLYPH[command.name] : undefined) ?? <CommandIcon />}
       </span>
       <span className="slash__name">
         <Marked text={command.label ?? `/${command.name}`} query={query} />

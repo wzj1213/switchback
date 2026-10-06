@@ -6,8 +6,27 @@
  * 由代码显式带上，跨站的页面读不到它（同源策略），也没有「自动附带」这回事。
  */
 
-const KEY = "omni.token"
-const NAME_KEY = "omni.device"
+const KEY = "switchback.token"
+const NAME_KEY = "switchback.device"
+
+/**
+ * 改名（omni → Switchback）之前用的两个键。新键没有、旧键有，就挪过来一次——
+ * 不然每台配对过的手机，在桌面端升级之后都会被莫名其妙踢回配对屏。
+ */
+const LEGACY: readonly (readonly [string, string])[] = [
+  ["omni.token", KEY],
+  ["omni.device", NAME_KEY],
+]
+
+/** 把旧键的值挪到新键上。新键已经有值时只删旧键，不覆盖。 */
+export function adoptLegacy(storage: Pick<Storage, "getItem" | "setItem" | "removeItem">): void {
+  for (const [old, now] of LEGACY) {
+    const value = storage.getItem(old)
+    if (value === null) continue
+    if (storage.getItem(now) === null) storage.setItem(now, value)
+    storage.removeItem(old)
+  }
+}
 
 export interface Me {
   id: string
@@ -23,6 +42,7 @@ export interface Me {
 
 export function tokenOf(): string {
   try {
+    adoptLegacy(window.localStorage)
     return window.localStorage.getItem(KEY) ?? ""
   } catch {
     // Safari 的隐私模式会让 localStorage 直接抛。**不能因此白屏**——
@@ -52,6 +72,7 @@ export function forgetToken(): void {
 /** 这台设备默认叫什么。用户可以改；这只是个不用动脑的初值。 */
 export function guessName(): string {
   try {
+    adoptLegacy(window.localStorage)
     const saved = window.localStorage.getItem(NAME_KEY)
     if (saved !== null && saved !== "") return saved
   } catch {

@@ -109,7 +109,7 @@ export function SidebarFoot({
               className="pop__cmd"
               onClick={() => {
                 close()
-                window.omni?.diagnose()
+                window.switchback?.diagnose()
               }}
             >
               <span className="pop__cmd-icon">

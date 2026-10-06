@@ -1,4 +1,4 @@
-import type { QuestionPrompt } from "@omni/protocol"
+import type { QuestionPrompt } from "@switchback/protocol"
 import type { QuestionDraft } from "../question-answer.js"
 
 const MAX_EXTERNAL_URL = 4096

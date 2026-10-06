@@ -1,8 +1,8 @@
-import type { Command, EngineAxis, EngineGoal, Lane, ThreadId, TrustApply } from "@omni/protocol"
+import type { Command, EngineAxis, EngineGoal, Lane, ThreadId, TrustApply } from "@switchback/protocol"
 import { emit, isCurrent, type Ctx } from "./ctx.js"
 
 /**
- * **引擎那边先发生、omni 后知道**的那些变化，落到 `Thread` 上并广播。
+ * **引擎那边先发生、Switchback 后知道**的那些变化，落到 `Thread` 上并广播。
  *
  * 单独一个文件是因为它们和这个包里其余东西方向相反：别处是「用户点了什么 →
  * 让引擎去做」，这里是「引擎报了什么 → 改我们的记录」。驱动手上只有 `emit`、
@@ -37,7 +37,7 @@ export function rememberTitle(ctx: Ctx, id: ThreadId, raw: string): void {
 /**
  * 引擎**自己**换了模型 / 强度：记下来并广播。
  *
- * 和上面那条同一个模子，也同一个理由——**都是引擎那边先发生、omni 后知道**，
+ * 和上面那条同一个模子，也同一个理由——**都是引擎那边先发生、Switchback 后知道**，
  * 而驱动碰不到 `Thread`，只能把结果递上来由这里落（见 `StartRequest.onModel`）。
  *
  * 没变就不发。`undefined` 的那一项一律**不动原值**：「引擎没报这一项」和
@@ -88,7 +88,7 @@ export function rememberEngineState(
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
-/** omni 设档的结果。同一个模子，只是这一条是「omni 做了什么」而不是「引擎报了什么」。 */
+/** Switchback 设档的结果。同一个模子，只是这一条是「Switchback 做了什么」而不是「引擎报了什么」。 */
 export function rememberTrustApply(ctx: Ctx, id: ThreadId, result: TrustApply): void {
   const entry = ctx.live.get(id)
   if (entry === undefined) return
@@ -143,7 +143,7 @@ export async function sideQuestion(
   emit(ctx, { type: "lane.updated", at, threadId: cmd.threadId, lane })
   try {
     const answer = await ask.call(entry.session, question)
-    // lane 已在发起时归到这条 omni 会话；即使期间接力，迟到的原生答案也只更新
+    // lane 已在发起时归到这条 Switchback 会话；即使期间接力，迟到的原生答案也只更新
     // 自己这张旁路卡，不会覆盖新引擎的 Thread 状态或进入它的上下文。
     if (!ctx.removed.has(cmd.threadId)) {
       emit(ctx, {

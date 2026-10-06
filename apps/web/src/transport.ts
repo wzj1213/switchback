@@ -1,4 +1,4 @@
-import { createReassembler, type ClientFrame, type ServerFrame } from "@omni/wire"
+import { createReassembler, type ClientFrame, type ServerFrame } from "@switchback/wire"
 
 /**
  * 浏览器这一端的连接。
@@ -25,7 +25,7 @@ import { createReassembler, type ClientFrame, type ServerFrame } from "@omni/wir
  * **过期的那条只许关掉自己，不许碰共享状态**。
  */
 
-const WS_PROTOCOL = "omni.v1"
+const WS_PROTOCOL = "switchback.v1"
 const PING_MS = 15_000
 /** 这么久没收到任何东西就认定这条连接已经死了。手机切后台回来时最常触发。 */
 const DEAD_MS = 45_000
@@ -200,7 +200,7 @@ export function createTransport(deps: TransportDeps): Transport {
         }
         if (verdict === "unknown") {
           // 问不出来就当网络问题，接着退避重试——**别把人踢回配对屏**
-          retry("连不上 omni")
+          retry("连不上 Switchback")
           return
         }
         // 令牌走子协议：浏览器的 `WebSocket` 构造器设不了请求头，

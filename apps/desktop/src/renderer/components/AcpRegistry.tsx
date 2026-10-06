@@ -9,7 +9,7 @@ import { ExternalLink } from "./external-link.js"
  * ACP 官方注册表里的各家：筛一筛、点「接入」。
  *
  * 清单是注册表的原样——名字、描述、作者、许可都是各家自己登记的（多是英文），
- * omni 不翻译、不排推荐位；按名字字母序排，和注册表网页一致。
+ * Switchback 不翻译、不排推荐位；按名字字母序排，和注册表网页一致。
  */
 export function AcpRegistry({ view, loading, failed, onRefresh, onChanged }: {
   view: RegistryView | undefined
@@ -121,12 +121,12 @@ function AcpRegistryRow({ row, onChanged }: { row: RegistryRow; onChanged: () =>
   )
 }
 
-/** omni 已经内置了原生入口的那几家：标一下，不拦。 */
+/** Switchback 已经内置了原生入口的那几家：标一下，不拦。 */
 function Twin({ id }: { id: string }): React.JSX.Element | null {
   const builtin = builtinTwin(id)
   if (builtin === undefined) return null
   return (
-    <span className="acp-row__twin" title={`omni 已内置 ${builtin}，走它自己的原生入口；这一条是它的 ACP 版本，接了会在引擎下拉里另占一项`}>
+    <span className="acp-row__twin" title={`Switchback 已内置 ${builtin}，走它自己的原生入口；这一条是它的 ACP 版本，接了会在引擎下拉里另占一项`}>
       已内置
     </span>
   )

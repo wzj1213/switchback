@@ -31,7 +31,7 @@ function git(cwd: string, ...args: string[]): string {
 const repo = { dir: "" }
 
 beforeAll(() => {
-  repo.dir = mkdtempSync(join(tmpdir(), "omni-review-"))
+  repo.dir = mkdtempSync(join(tmpdir(), "switchback-review-"))
   git(repo.dir, "init", "-q")
   writeFileSync(join(repo.dir, "keep.txt"), "a\nb\nc\n")
   writeFileSync(join(repo.dir, "old.txt"), "x\ny\n")
@@ -104,7 +104,7 @@ describe("workReview", () => {
   })
 
   it("不是 git 仓库就整个缺席，不是空列表——两者在界面上要长得不一样", async () => {
-    const plain = mkdtempSync(join(tmpdir(), "omni-plain-"))
+    const plain = mkdtempSync(join(tmpdir(), "switchback-plain-"))
     try {
       expect(await workReview(plain)).toBeUndefined()
     } finally {
@@ -160,7 +160,7 @@ describe("workPatch", () => {
   })
 
   it("pathspec 魔法前缀是合法文件名，不会把其他匹配文件混进补丁", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-review-literal-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-review-literal-"))
     try {
       git(dir, "init", "-q")
       const magic = ":(glob)*.txt"
@@ -234,7 +234,7 @@ describe("空补丁不等于未跟踪", () => {
 
 describe("多轮编辑看最终净 diff", () => {
   it("中间轮次不累加，最后改回原样时清单归零", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-review-rounds-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-review-rounds-"))
     try {
       git(dir, "init", "-q")
       writeFileSync(join(dir, "rounds.txt"), "one\ntwo\n")
@@ -267,7 +267,7 @@ describe("多轮编辑看最终净 diff", () => {
 
 describe("还没有 HEAD 的仓库", () => {
   it("已暂存的新文件仍有行数和补丁", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-review-unborn-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-review-unborn-"))
     try {
       git(dir, "init", "-q")
       writeFileSync(join(dir, "first.txt"), "one\ntwo\n")

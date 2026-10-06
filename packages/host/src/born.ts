@@ -1,4 +1,4 @@
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 import { withQueue, type Ctx, type Live } from "./ctx.js"
 
 /**

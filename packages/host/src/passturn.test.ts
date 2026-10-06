@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES } from "@omni/protocol"
-import type { Event, Item } from "@omni/protocol"
-import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@omni/engine"
+import { NO_CAPABILITIES } from "@switchback/protocol"
+import type { Event, Item } from "@switchback/protocol"
+import type { ApprovalAnswer, ApprovalAsk, EngineDriver, EngineSession } from "@switchback/engine"
 import { createHost, type Host } from "./host.js"
 
 /**

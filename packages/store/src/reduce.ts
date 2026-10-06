@@ -1,4 +1,4 @@
-import type { Event, Item, ItemId, ThreadId } from "@omni/protocol"
+import type { Event, Item, ItemId, ThreadId } from "@switchback/protocol"
 import { type ViewState } from "./state.js"
 import { reduceEgressAlert, reduceEngineNotification, reduceEngineStatus } from "./notices.js"
 import { mergeRateLimits } from "./limits.js"

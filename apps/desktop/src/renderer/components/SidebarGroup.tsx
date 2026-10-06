@@ -1,5 +1,5 @@
-import type { ThreadRow } from "@omni/store"
-import type { EngineInfo } from "@omni/protocol"
+import type { ThreadRow } from "@switchback/store"
+import type { EngineInfo } from "@switchback/protocol"
 import { tallyOf, type Group } from "../sidebar.js"
 import { GroupEnd } from "./RowEnd.js"
 import { FolderIcon, FolderOpenIcon } from "./icons-folder.js"

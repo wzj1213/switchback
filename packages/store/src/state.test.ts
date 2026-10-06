@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Thread } from "@omni/protocol"
+import type { Event, Thread } from "@switchback/protocol"
 import {
   baseNameOf,
   commandsOf,
@@ -207,9 +207,9 @@ describe("按项目归堆", () => {
   const rows = (...list: Thread[]) => threadRowsOf(stateWith(...list))
 
   it("同一个工作区的会话归到一堆", () => {
-    const out = projectsOf(rows(at("a", "/w/omni", 1), at("b", "/w/omni", 2), at("c", "/w/别的", 3)))
-    expect(out.map((p) => p.name)).toEqual(["别的", "omni"])
-    expect(out.find((p) => p.name === "omni")?.rows).toHaveLength(2)
+    const out = projectsOf(rows(at("a", "/w/switchback", 1), at("b", "/w/switchback", 2), at("c", "/w/别的", 3)))
+    expect(out.map((p) => p.name)).toEqual(["别的", "switchback"])
+    expect(out.find((p) => p.name === "switchback")?.rows).toHaveLength(2)
   })
 
   it("**组间按各自最新那条排**——你回头找的是「刚才在弄的那个项目」", () => {
@@ -221,15 +221,15 @@ describe("按项目归堆", () => {
     // **直接构造入参**：走 `threadRowsOf` 的话顺序由归约器决定，
     // 那验的就不是这个函数了
     const given = [
-      { thread: at("先", "/w/omni", 5), preview: undefined },
-      { thread: at("后", "/w/omni", 1), preview: undefined },
+      { thread: at("先", "/w/switchback", 5), preview: undefined },
+      { thread: at("后", "/w/switchback", 1), preview: undefined },
     ]
     expect(projectsOf(given)[0]?.rows.map((r) => r.thread.id)).toEqual(["先", "后"])
   })
 
   it("目录名当项目名；根目录不至于变成空字符串", () => {
-    expect(baseNameOf("/Users/you/work/omni")).toBe("omni")
-    expect(baseNameOf("/Users/you/work/omni/")).toBe("omni")
+    expect(baseNameOf("/Users/you/work/switchback")).toBe("switchback")
+    expect(baseNameOf("/Users/you/work/switchback/")).toBe("switchback")
     expect(baseNameOf("/")).toBe("/")
   })
 

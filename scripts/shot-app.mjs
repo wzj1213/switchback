@@ -4,7 +4,7 @@
  *
  * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min|--mid|--wide] [--reduce] [--audit]`
  *
- * ## 为什么不用 `OMNI_DEV_SHOT`
+ * ## 为什么不用 `SWITCHBACK_DEV_SHOT`
  *
  * 那条路一次只出一张、每张都要重启一次应用（默认还等 45 秒）。
  * 而界面改动要看的是**一整组屏**——侧栏、转录区、空态、设置各一张，
@@ -71,7 +71,7 @@ const SIZE = process.argv.includes("--wide")
 /** 样本的时间戳写死。**不能用 `Date.now()`**——侧栏上那些「3 小时前」会每次都不一样。 */
 const AT = 1_787_659_200_000
 /** 非 Git 工作区的家。**在数据目录之外**，理由见 `seed` 里那段。 */
-const WORK = await mkdtemp(join(tmpdir(), "omni-work-"))
+const WORK = await mkdtemp(join(tmpdir(), "switchback-work-"))
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 async function freePort() {
   const server = createServer()
@@ -286,7 +286,7 @@ async function removeQuietly(dir) {
 async function main() {
   await mkdir(OUT, { recursive: true })
   const port = await freePort()
-  const data = await mkdtemp(join(tmpdir(), "omni-shot-"))
+  const data = await mkdtemp(join(tmpdir(), "switchback-shot-"))
   const workspaceFiles = new Set()
   await seedUi(data, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS, MANY })
   const child = spawn(
@@ -294,7 +294,7 @@ async function main() {
     [DESKTOP, `--user-data-dir=${data}`, `--remote-debugging-port=${port}`, "--disable-gpu"],
     {
       cwd: ROOT,
-      env: { ...process.env, OMNI_DEV_THEME: DARK ? "dark" : "light" },
+      env: { ...process.env, SWITCHBACK_DEV_THEME: DARK ? "dark" : "light" },
       stdio: ["ignore", "pipe", "pipe"],
     },
   )

@@ -1,4 +1,4 @@
-import type { ThreadId } from "@omni/protocol"
+import type { ThreadId } from "@switchback/protocol"
 import { emit, type Ctx, type Live } from "./ctx.js"
 
 /**

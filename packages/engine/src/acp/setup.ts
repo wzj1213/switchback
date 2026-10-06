@@ -1,4 +1,4 @@
-import type { EngineCapabilities, EngineThread, ModelOption } from "@omni/protocol"
+import type { EngineCapabilities, EngineThread, ModelOption } from "@switchback/protocol"
 import type {
   AcpConfigOption,
   AcpInitialize,
@@ -207,8 +207,8 @@ export function sayWhy(engine: string, what: string, error: unknown): string {
 export function startupMessage(command: string, error: Error): string {
   const code = (error as NodeJS.ErrnoException).code
   if (code === "ENOENT") {
-    // **不提「设置里可以装」**：第三方适配器 omni 不知道怎么装，也不该编一条命令。
-    // 但「装完怎么让 omni 认出来」是能说的——那一步现在不用重启了。
+    // **不提「设置里可以装」**：第三方适配器 Switchback 不知道怎么装，也不该编一条命令。
+    // 但「装完怎么让 Switchback 认出来」是能说的——那一步现在不用重启了。
     // （新往 engines.json 里加一家仍然要重启：驱动表在启动时建一次。）
     return `找不到可执行文件 \`${command}\`。请确认这个 ACP 适配器已安装且在 PATH 上（终端里跑 \`which ${command}\` 验证）；装好之后在 设置 → 引擎 → 安装与版本 点「重新探测」即可，不用重启。`
   }

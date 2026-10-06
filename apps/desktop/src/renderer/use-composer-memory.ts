@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { EngineId, SlashCommand } from "@omni/protocol"
+import type { EngineId, SlashCommand } from "@switchback/protocol"
 import { recallComposerDraft, type ComposerDrafts } from "./composer-drafts.js"
 import { useAsideMode } from "./use-aside-mode.js"
 import { useAttachments } from "./useAttachments.js"

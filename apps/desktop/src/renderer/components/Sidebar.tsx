@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import type { EngineInfo, EngineThread } from "@omni/protocol"
+import type { EngineInfo, EngineThread } from "@switchback/protocol"
 import { filterRows } from "../filter.js"
 import { useDeepSearch } from "../useDeepSearch.js"
 import { sectionsOf, type SidebarRow } from "../sidebar.js"

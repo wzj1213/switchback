@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { ApprovalItem, ItemId, RememberScope } from "@omni/protocol"
+import type { ApprovalItem, ItemId, RememberScope } from "@switchback/protocol"
 import { ShieldIcon } from "./icons.js"
 
 /** 用户对一张审批卡的裁决。 */
@@ -196,7 +196,7 @@ export function Approval({
         <div className="approval__reason">{item.reason}</div>
       </div>
       <div className="approval__actions">
-        {/* 「始终允许」只在这一条审批明确提供持久化语义时出现：可能是 omni
+        {/* 「始终允许」只在这一条审批明确提供持久化语义时出现：可能是 Switchback
             的可记忆规则，也可能是引擎自己的原生授权（例如 Computer Use）。 */}
         {item.rememberHint === undefined || settled ? null : (
           <button

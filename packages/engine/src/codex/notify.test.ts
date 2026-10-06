@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { handleNotification, type NotifyContext } from "./notify.js"
 import type { WireItem } from "./wire.js"
 
@@ -576,7 +576,7 @@ describe("MCP 服务器起不来：静默的能力损失必须出声", () => {
 })
 
 /**
- * **同一条 stdio 上可能跑多条 thread。** 今天 omni 一个进程只开一条，所以判不出区别；
+ * **同一条 stdio 上可能跑多条 thread。** 今天 Switchback 一个进程只开一条，所以判不出区别；
  * 但 app-server 一条连接本来就能带多条，而分叉、子 agent、后台轮次都会往那儿走。
  * 到那时串了不会报错——只会把别的会话的正文画进这一条。
  */

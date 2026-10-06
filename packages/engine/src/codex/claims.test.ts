@@ -8,7 +8,7 @@ import type { NotifyContext } from "./notify.js"
  * **认领实验面是有代价的**：厂商标了 experimental 就意味着它会变。
  * 所以两个方向都要卡死，见 `claims.ts` 的注释。
  */
-describe("omni 认领了 codex 的哪些实验面", () => {
+describe("Switchback 认领了 codex 的哪些实验面", () => {
   it("**认了必须用**：每一条 `buys` 都要真有 handler，否则是白白把自己绑在不稳定的面上", () => {
     for (const [name, claim] of Object.entries(CLAIMS)) {
       expect(claim.buys.length, `${name} 认了却什么都没换到`).toBeGreaterThan(0)

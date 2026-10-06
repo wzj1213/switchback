@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Thread } from "@omni/protocol"
+import type { Event, Thread } from "@switchback/protocol"
 import { reduceAll } from "./reduce.js"
 import { initial, thinkingTokensOf } from "./state.js"
 

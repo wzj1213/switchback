@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { FilePreview } from "../../shared/file-preview.js"
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { baseName } from "./file-row.js"
 import { FilePreviewHeader } from "./FilePreviewHeader.js"
@@ -70,7 +70,7 @@ function usePreview({ target, revision, stamp, manual, active }: {
         ? { ...before, refreshing: true, refreshFailed: false }
         : LOADING,
     )
-    const bridge = window.omni
+    const bridge = window.switchback
     if (bridge === undefined) {
       setLoad(readyLoad(identity, {
         kind: "unavailable",

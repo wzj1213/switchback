@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import {
   applyCommand,
   commandLabel,
@@ -46,7 +46,7 @@ describe("筛命令", () => {
   const all = [
     cmd("review", "审阅改动"),
     cmd("code-review", "审阅 PR"),
-    cmd("new", "新建会话", "omni"),
+    cmd("new", "新建会话", "switchback"),
     cmd("berth-adopt", "berth 收编 · 把项目注册进端口管理"),
   ]
 
@@ -58,8 +58,8 @@ describe("筛命令", () => {
     expect(matchCommands(all, "收编").map((c) => c.name)).toEqual(["berth-adopt"])
   })
 
-  // 这条原来钉的是反的（「omni 排前面，免得被几十条技能淹掉」）。
-  // 反过来是因为那个理由站不住：omni 那几条在界面上**本来就另有入口**，
+  // 这条原来钉的是反的（「Switchback 排前面，免得被几十条技能淹掉」）。
+  // 反过来是因为那个理由站不住：Switchback 那几条在界面上**本来就另有入口**，
   // 而技能没有第二扇门。旧规则的真实后果是 22 条技能一条都没露过面
   it("空查询时技能排前面——它们在整个界面里没有别的入口", () => {
     expect(matchCommands(all, "")[0]?.source).toBe("engine")
@@ -76,34 +76,34 @@ describe("筛命令", () => {
 })
 
 describe("两节的配额：谁也不许把对方挤没", () => {
-  /** 这台机器上的真实数量：codex 报 22 条技能，omni 自己 10 条。 */
+  /** 这台机器上的真实数量：codex 报 22 条技能，Switchback 自己 10 条。 */
   const real = [
     ...Array.from({ length: 22 }, (_, i) => cmd(`skill-${String(i)}`)),
-    ...Array.from({ length: 10 }, (_, i) => cmd(`omni-${String(i)}`, "", "omni")),
+    ...Array.from({ length: 10 }, (_, i) => cmd(`switchback-${String(i)}`, "", "switchback")),
   ]
 
-  it("**空查询下技能全都在**——上一版 limit=12 被 omni 的 10 条吃掉，22 条技能一条都没露过面", () => {
+  it("**空查询下技能全都在**——上一版 limit=12 被 Switchback 的 10 条吃掉，22 条技能一条都没露过面", () => {
     const hits = matchCommands(real, "")
     expect(hits.filter((c) => c.source === "engine")).toHaveLength(22)
-    expect(hits.filter((c) => c.source === "omni")).toHaveLength(10)
+    expect(hits.filter((c) => c.source === "switchback")).toHaveLength(10)
   })
 
-  it("技能排在前面：omni 那几条在界面上另有入口，技能没有第二扇门", () => {
+  it("技能排在前面：Switchback 那几条在界面上另有入口，技能没有第二扇门", () => {
     expect(matchCommands(real, "")[0]?.source).toBe("engine")
   })
 
   it("扁平返回，且同一节的连在一起——分节的界线靠相邻两条 source 变化看出来", () => {
     const sources = matchCommands(real, "").map((c) => c.source)
-    expect(sources.indexOf("omni")).toBe(sources.lastIndexOf("engine") + 1)
+    expect(sources.indexOf("switchback")).toBe(sources.lastIndexOf("engine") + 1)
   })
 
-  it("技能多到装不下时，omni 也保得住底——不会反过来被挤没", () => {
+  it("技能多到装不下时，Switchback 也保得住底——不会反过来被挤没", () => {
     const many = [
       ...Array.from({ length: 300 }, (_, i) => cmd(`skill-${String(i)}`)),
-      ...Array.from({ length: 10 }, (_, i) => cmd(`omni-${String(i)}`, "", "omni")),
+      ...Array.from({ length: 10 }, (_, i) => cmd(`switchback-${String(i)}`, "", "switchback")),
     ]
     const hits = matchCommands(many, "")
-    expect(hits.filter((c) => c.source === "omni").length).toBeGreaterThanOrEqual(4)
+    expect(hits.filter((c) => c.source === "switchback").length).toBeGreaterThanOrEqual(4)
     expect(hits).toHaveLength(100)
   })
 
@@ -150,7 +150,7 @@ describe("不该出现在面板里的", () => {
       name: "new",
       label: "新建会话",
       description: "在当前工作区另开一个",
-      source: "omni",
+      source: "switchback",
     }
     expect(matchCommands([c], "新建").map((x) => x.name)).toEqual(["new"])
   })

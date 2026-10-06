@@ -1,4 +1,4 @@
-import type { AcpTrial } from "@omni/engine"
+import type { AcpTrial } from "@switchback/engine"
 import type { ConnectProgress, ConnectResult, LaunchPlan } from "../shared/acp-registry.js"
 import { planOf, type RegistryAgent, type RegistryPlatform } from "./acp-registry-model.js"
 import type { InstallResult } from "./acp-install.js"

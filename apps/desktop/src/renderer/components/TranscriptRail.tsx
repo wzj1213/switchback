@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import { railPeek, type RailMark } from "../transcript-rail.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"

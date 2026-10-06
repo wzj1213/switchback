@@ -8,7 +8,7 @@ import { watchPreviewFile, type StartDirectoryWatch } from "./file-preview-watch
 
 describe("文件预览监听", () => {
   it("只响应目标文件，并在停止时关闭目录 watcher", async () => {
-    const root = await mkdtemp(join(tmpdir(), "omni-preview-watch-"))
+    const root = await mkdtemp(join(tmpdir(), "switchback-preview-watch-"))
     try {
       const target = join(root, "app.ts")
       await writeFile(target, "export const before = true\n")
@@ -41,8 +41,8 @@ describe("文件预览监听", () => {
   })
 
   it("伪造工作区或未授权的外部文件不会启动 watcher", async () => {
-    const root = await mkdtemp(join(tmpdir(), "omni-preview-watch-root-"))
-    const outside = await mkdtemp(join(tmpdir(), "omni-preview-watch-outside-"))
+    const root = await mkdtemp(join(tmpdir(), "switchback-preview-watch-root-"))
+    const outside = await mkdtemp(join(tmpdir(), "switchback-preview-watch-outside-"))
     try {
       const target = join(outside, "secret.ts")
       await writeFile(target, "secret\n")

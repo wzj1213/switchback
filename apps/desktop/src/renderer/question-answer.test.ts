@@ -1,4 +1,4 @@
-import type { QuestionPrompt } from "@omni/protocol"
+import type { QuestionPrompt } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import { questionResponse, type QuestionDrafts } from "./question-answer.js"
 

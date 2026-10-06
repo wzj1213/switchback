@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 import { acpAuthenticate } from "./login.js"
 
@@ -12,7 +12,7 @@ import { acpAuthenticate } from "./login.js"
  *
  * 假 agent 学的是真实 agent 的做法：**凭证存在它自己那儿**（这里是一个标记文件），
  * 所以登录用的那个一次性进程和之后开会话的进程不是同一个，照样认得出登录过。
- * 这正是 omni 敢「另起一个进程去登录」的前提。
+ * 这正是 Switchback 敢「另起一个进程去登录」的前提。
  */
 const AGENT = `
 const fs = require("node:fs")
@@ -59,7 +59,7 @@ function request(cwd: string, events: Event[]): Parameters<ReturnType<typeof cre
 
 describe("ACP 开会话要先登录", () => {
   it("没登录：说清谁、它的原话、它报的登录方式；登录之后同一条命令就开得起来", async () => {
-    const state = mkdtempSync(join(tmpdir(), "omni-fake-acp-"))
+    const state = mkdtempSync(join(tmpdir(), "switchback-fake-acp-"))
     const launch = { command: process.execPath, args: ["-e", AGENT], env: { FAKE_STATE: state } }
     const driver = createAcpDriver({ id: "acp:example", label: "Example Agent", ...launch })
     const events: Event[] = []

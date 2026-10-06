@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event, ToolCallItem } from "@omni/protocol"
+import type { Event, ToolCallItem } from "@switchback/protocol"
 import { createCodexDriver } from "./driver.js"
 
 async function waitForTurn(events: readonly Event[]): Promise<void> {
@@ -29,7 +29,7 @@ function terminalItems(events: readonly Event[]): ToolCallItem[] {
 /** `pnpm vitest run --mode live packages/engine/src/codex/terminal.live.test.ts` */
 describe("Codex 后台终端交互（真机）", () => {
   it("真实 write_stdin 通知把等待与输入并回原命令，并在完成后保留输入", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-terminal-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-terminal-live-"))
     const events: Event[] = []
     const session = await createCodexDriver().start({
       threadId: "live-codex-terminal",
@@ -48,7 +48,7 @@ describe("Codex 后台终端交互（真机）", () => {
           "严格按三步执行，不要省略第二步：",
           "1. 用 exec_command 启动 `sh -c 'IFS= read -r line; echo GOT:$line'`，yield_time_ms 设为 250。",
           "2. 得到 session_id 后，先用 write_stdin 发送空 chars 轮询一次。",
-          "3. 再用 write_stdin 向同一 session_id 写入 `OMNI_TERMINAL_INPUT\\n` 并等它结束。",
+          "3. 再用 write_stdin 向同一 session_id 写入 `SWITCHBACK_TERMINAL_INPUT\\n` 并等它结束。",
           "最后只回复完成。",
         ].join("\n"),
         "turn-terminal",
@@ -60,7 +60,7 @@ describe("Codex 后台终端交互（真机）", () => {
       ).toBe(true)
       const final = items.findLast((item) => item.status === "ok")
       expect(final?.detail.kind === "shell" ? final.detail.terminal?.inputs : []).toContain(
-        "OMNI_TERMINAL_INPUT\n",
+        "SWITCHBACK_TERMINAL_INPUT\n",
       )
     } finally {
       await session.interrupt().catch(() => undefined)

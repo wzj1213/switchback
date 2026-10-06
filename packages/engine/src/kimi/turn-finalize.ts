@@ -1,4 +1,4 @@
-import type { Event, TurnStatus } from "@omni/protocol"
+import type { Event, TurnStatus } from "@switchback/protocol"
 import { sweepTool } from "./tool.js"
 import type { KimiActiveTurn } from "./turn-active.js"
 import { kimiTextState, type KimiTextState } from "./text-stream.js"

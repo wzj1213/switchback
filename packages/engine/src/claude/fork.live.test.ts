@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -33,7 +33,7 @@ const ASK = "我一共告诉过你哪些暗号？只列出来，不要解释。"
 
 describe("Claude 原生分叉（真跑）", () => {
   it("砍掉最后一轮之后，那一轮的上下文真的不在了", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-fork-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-fork-live-"))
     const first: Event[] = []
     const driver = createClaudeDriver({})
     let handle: string | undefined

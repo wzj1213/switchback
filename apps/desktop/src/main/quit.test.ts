@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Thread, ThreadStatus } from "@omni/protocol"
+import type { Thread, ThreadStatus } from "@switchback/protocol"
 import { busy, createAwake, type Blocker } from "./awake.js"
 import { quitBlurb } from "./quit.js"
 

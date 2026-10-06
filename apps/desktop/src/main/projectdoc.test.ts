@@ -6,7 +6,7 @@ import { ensureProjectDoc, projectDoc } from "./projectdoc.js"
 
 describe("项目说明工作区边界", () => {
   it("只为真实 thread/cwd 配对读写，拒绝请求不会碰磁盘", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "omni-projectdoc-"))
+    const cwd = await mkdtemp(join(tmpdir(), "switchback-projectdoc-"))
     const owns = (threadId: string, candidate: string): boolean => threadId === "th-1" && candidate === cwd
     try {
       const forbidden = [

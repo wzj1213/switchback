@@ -1,5 +1,5 @@
 import { memo, useRef } from "react"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import type { NavPoint } from "../transcript-rail.js"
 import { useTranscriptRail } from "../use-transcript-rail.js"
 import { TranscriptRail } from "./TranscriptRail.js"

@@ -96,7 +96,7 @@ describe("附件三种入口", () => {
 
   it("工作区外文件保留绝对路径并提示引擎权限", () => {
     const files = [image("spec.pdf", "application/pdf")] as unknown as FileList
-    expect(droppedFiles(files, true, bridge, "/work/omni")).toEqual({
+    expect(droppedFiles(files, true, bridge, "/work/switchback")).toEqual({
       paths: [],
       references: ["/tmp/spec.pdf"],
       summary: { images: 0, references: 1, failed: 0, outside: 1, duplicates: 0 },

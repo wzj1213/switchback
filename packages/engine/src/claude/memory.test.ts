@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { emitMemoryRecall } from "./memory.js"
 
 describe("Claude 记忆召回", () => {

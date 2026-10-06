@@ -7,8 +7,8 @@ import { CopyIcon, RevealIcon } from "./icons.js"
  * ## 为什么每一样都摆出路径
  *
  * 这一页是出问题时才来的。那时候人要的是「把那个文件给我」，
- * 而不是「omni 帮我判断一下」——所以每一行都是一个**能打开、能复制**的真实位置，
- * omni 自己一句结论都不下。
+ * 而不是「Switchback 帮我判断一下」——所以每一行都是一个**能打开、能复制**的真实位置，
+ * Switchback 自己一句结论都不下。
  *
  * 日志与引擎注册表原来只有菜单里有入口（`main/menu.ts`），而没人会为了找日志
  * 去翻菜单——**一个只在菜单里的东西，等于只有写它的人知道**。
@@ -28,7 +28,7 @@ export function DataSection({
 }): React.JSX.Element {
   return (
     <>
-      <Group title="东西都在哪儿" hint="omni 的全部本地数据都在这一个目录下；换机器时整份带走就行。">
+      <Group title="东西都在哪儿" hint="Switchback 的全部本地数据都在这一个目录下；换机器时整份带走就行。">
         <PathRow label="数据目录" path={dataDir} hint="偏好、会话记录、审批规则、附件、日志，都在这儿" onReveal={onReveal} onCopy={onCopy} />
         <PathRow
           label="会话记录"
@@ -40,8 +40,8 @@ export function DataSection({
         />
         <PathRow
           label="运行日志"
-          path={`${dataDir}/logs/omni.log`}
-          shown="数据目录/logs/omni.log"
+          path={`${dataDir}/logs/switchback.log`}
+          shown="数据目录/logs/switchback.log"
           hint="引擎起停、崩溃、写盘失败都记在这儿。不含对话内容"
           onReveal={onReveal}
           onCopy={onCopy}

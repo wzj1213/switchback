@@ -1,4 +1,4 @@
-import type { EngineInfo, Event, Thread, ThreadId } from "@omni/protocol"
+import type { EngineInfo, Event, Thread, ThreadId } from "@switchback/protocol"
 import type { ThreadHistory } from "./host.js"
 
 /**
@@ -38,7 +38,7 @@ import type { ThreadHistory } from "./host.js"
  * 一份全量里，所有正文加起来的上限。
  *
  * **单位是 UTF-16 码元，不是字节**——分片切的就是码元
- *（`@omni/wire` 的 `segment.ts`，一片 16,384 个），所以这个数直接换算成
+ *（`@switchback/wire` 的 `segment.ts`，一片 16,384 个），所以这个数直接换算成
  * 「切成几片」，而片数才是手机上那段空白的长短。名字上别写「字节」骗人：
  * 中文一个字是 1 个码元、3 个字节，两者差三倍。
  *
@@ -190,7 +190,7 @@ export function withCurrent(events: readonly Event[], live: Thread | undefined, 
  *
  * 判据只用宿主自己的账：宿主开一轮必然同时把状态置成 running（挂着审批时是
  * waiting_approval），收工必然改回去。状态不在这两档，记录里那一轮就不可能
- * 还有人在跑——这是 omni 收自己的账，不是替引擎猜它的状态。
+ * 还有人在跑——这是 Switchback 收自己的账，不是替引擎猜它的状态。
  *
  * 收口时刻取记录停下的那一刻、不取重建时刻：同一份记录每次重建都该得出同一个结果。
  */
@@ -257,7 +257,7 @@ export function replayEvents({ engines, threads, alive, now, bodies, cap }: Repl
     if (thread.events.length === 0) continue
     // **一句话都没说过的会话不算历史。**
     //
-    // omni 每次启动都会开一个默认会话，用不用它是另一回事——于是每启动一次
+    // Switchback 每次启动都会开一个默认会话，用不用它是另一回事——于是每启动一次
     // 侧栏就多一行「新会话」。跑一周下来那一列全是空壳，把真正的历史挤没了。
     //
     // 这种会话也确实没有可续的东西：续跑要靠引擎侧的句柄接上一段对话，

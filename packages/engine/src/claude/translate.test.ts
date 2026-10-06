@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ToolCallItem } from "@omni/protocol"
+import type { ToolCallItem } from "@switchback/protocol"
 import { applyResult, toolResults } from "./translate.js"
 
 const call = (): ToolCallItem => ({

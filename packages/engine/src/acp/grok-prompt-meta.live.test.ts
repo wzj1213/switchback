@@ -2,11 +2,11 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 import { grokPromptMeta } from "./grok-hooks.js"
 
-const TURN = "omni-audit-turn"
+const TURN = "switchback-audit-turn"
 
 function echoedPromptId(method: string, params: unknown): string | undefined {
   const raw = params as {
@@ -45,14 +45,14 @@ function waitForTurn(events: readonly Event[]): Promise<void> {
 
 describe("Grok promptId 关联（真跑）", () => {
   it("把宿主 turn id 放进原生扩展位后，Grok 在原生完成事件上原样返回", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-grok-prompt-meta-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-grok-prompt-meta-"))
     const events: Event[] = []
     const echoed: string[] = []
     const shapes = new Set<string>()
     const driver = createAcpDriver({
       id: "grok",
-      command: process.env["OMNI_ACP_COMMAND"] ?? "grok",
-      args: (process.env["OMNI_ACP_ARGS"] ?? "agent stdio").split(" ").filter(Boolean),
+      command: process.env["SWITCHBACK_ACP_COMMAND"] ?? "grok",
+      args: (process.env["SWITCHBACK_ACP_ARGS"] ?? "agent stdio").split(" ").filter(Boolean),
       promptMeta: grokPromptMeta,
       notification: (method, params) => {
         shapes.add(shapeOf(method, params))

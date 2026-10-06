@@ -3,9 +3,9 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
-import { createClaudeDriver } from "@omni/engine"
-import { initial, itemsOf, reduce, threadsOf, type ViewState } from "@omni/store"
+import type { Event } from "@switchback/protocol"
+import { createClaudeDriver } from "@switchback/engine"
+import { initial, itemsOf, reduce, threadsOf, type ViewState } from "@switchback/store"
 import { createHost } from "./host.js"
 
 /**
@@ -21,7 +21,7 @@ describe("全链路 · live", () => {
   it(
     "一次真实对话能一路走到视图状态",
     async () => {
-      const cwd = mkdtempSync(join(tmpdir(), "omni-host-"))
+      const cwd = mkdtempSync(join(tmpdir(), "switchback-host-"))
       writeFileSync(join(cwd, "answer.txt"), "42\n")
 
       const events: Event[] = []

@@ -38,7 +38,7 @@ describe("登录脚本", () => {
   })
 
   it("真的跑一遍：命令拿到的参数与环境一字不差，跑完脚本已经不在盘上", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-login-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-login-"))
     const out = join(dir, "seen.txt")
     const probe = join(dir, "probe.sh")
     writeFileSync(probe, `#!/bin/sh\nprintf '%s|' "$@" > ${shellQuote(out)}\nprintf '%s' "$API_KEY" >> ${shellQuote(out)}\n`, { mode: 0o755 })
@@ -54,7 +54,7 @@ describe("登录脚本", () => {
   })
 
   it("系统打不开就照实说", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-login-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-login-"))
     const error = await openTerminalLogin(dir, login, () => Promise.resolve("No application knows how to open"))
     expect(error).toContain("没能打开「终端」")
   })

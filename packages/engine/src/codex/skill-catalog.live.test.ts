@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createCodexDriver } from "./driver.js"
 
 function writeSkill(path: string, description: string): void {
@@ -27,12 +27,12 @@ async function waitForUpdated(events: readonly Event[]): Promise<Event> {
 }
 
 /**
- * 真起 Codex，验证文件 watcher 通知和 omni 的刷新链；默认 `pnpm test` 排除：
+ * 真起 Codex，验证文件 watcher 通知和 Switchback 的刷新链；默认 `pnpm test` 排除：
  * `pnpm vitest run --mode live packages/engine/src/codex/skill-catalog.live.test.ts`
  */
 describe("Codex skill 热刷新（真机）", () => {
   it("项目 skill 改动后，运行中的会话收到新目录", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-skill-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-skill-live-"))
     const skill = join(cwd, ".agents", "skills", "audit-live", "SKILL.md")
     const events: Event[] = []
     writeSkill(skill, "before-change")

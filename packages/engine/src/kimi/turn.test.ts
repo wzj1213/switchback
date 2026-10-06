@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { KimiTurnTracker } from "./turn.js"
 import { handleTurnEvent } from "./turn-events.js"
 import type { KimiSnapshot } from "./wire.js"
@@ -30,7 +30,7 @@ describe("Kimi 轮次事件", () => {
   it("流式文本、命令输出和收工都落在宿主铸的同一轮上", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
     handleTurnEvent(tracker, { type: "thinking.delta", turnId: 7, delta: "想" }, 2)
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "答" }, 3)
@@ -58,7 +58,7 @@ describe("Kimi 轮次事件", () => {
     handleTurnEvent(tracker, { type: "turn.ended", turnId: 7, reason: "completed" }, 7)
 
     expect(events.filter((event) => event.type === "turn.completed")).toEqual([
-      { type: "turn.completed", at: 7, turnId: "omni-turn", status: "completed" },
+      { type: "turn.completed", at: 7, turnId: "switchback-turn", status: "completed" },
     ])
     expect(
       events.filter((event) => event.type === "item.started").map((event) => event.item.kind),
@@ -78,7 +78,7 @@ describe("Kimi 轮次事件", () => {
   it("不是当前原生 turn 的事件不会串进来", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "a")
+    tracker.begin("switchback-turn", "a")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "a" }, 1)
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 2, delta: "别人的" }, 2)
     expect(events).toEqual([])
@@ -87,7 +87,7 @@ describe("Kimi 轮次事件", () => {
   it("工具调用把正文切成前后两段——后续文字必须长在工具下面", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "工具前" }, 2)
     handleTurnEvent(
@@ -112,9 +112,9 @@ describe("Kimi 轮次事件", () => {
       "agent_message",
     ])
     expect(started.map((item) => item.id)).toEqual([
-      "kimi-answer-omni-turn",
+      "kimi-answer-switchback-turn",
       "tc",
-      "kimi-answer-omni-turn-2",
+      "kimi-answer-switchback-turn-2",
     ])
     const messages = events.flatMap((event) =>
       event.type === "item.updated" && event.item.kind === "agent_message" ? [event.item.text] : [],
@@ -125,7 +125,7 @@ describe("Kimi 轮次事件", () => {
   it("工具之后重连也只把快照新增的后缀放在工具下面", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "工具前" }, 2)
     handleTurnEvent(
@@ -153,7 +153,7 @@ describe("Kimi 轮次事件", () => {
   it("快照文本按 Kimi 的当前 step 边界恢复，不拿上一 step 长度裁前缀", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
     handleTurnEvent(tracker, { type: "turn.step.started", turnId: 7, step: 1 }, 2)
     handleTurnEvent(tracker, { type: "assistant.delta", turnId: 7, delta: "第一步正文" }, 3)
@@ -170,7 +170,7 @@ describe("Kimi 轮次事件", () => {
   it("offset 重复帧不追加，重叠帧只追加新后缀，缺口要求重同步", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 7, prompt: "做事" }, 1)
     handleTurnEvent(tracker, { type: "turn.step.started", turnId: 7, step: 1 }, 2)
     expect(
@@ -187,14 +187,14 @@ describe("Kimi 轮次事件", () => {
     ).toBe(true)
 
     expect(events.filter((event) => event.type === "item.delta")).toEqual([
-      { type: "item.delta", at: 5, itemId: "kimi-answer-omni-turn", append: "来" },
+      { type: "item.delta", at: 5, itemId: "kimi-answer-switchback-turn", append: "来" },
     ])
   })
 
   it("todo_list 原地更新成计划卡，不重复画成工具行", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
     handleTurnEvent(
       tracker,
@@ -222,11 +222,11 @@ describe("Kimi 轮次事件", () => {
     expect(events).toMatchObject([
       {
         type: "item.started",
-        item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "in_progress" }] },
+        item: { id: "kimi-plan-switchback-turn", kind: "plan", steps: [{ status: "in_progress" }] },
       },
       {
         type: "item.updated",
-        item: { id: "kimi-plan-omni-turn", kind: "plan", steps: [{ status: "done" }] },
+        item: { id: "kimi-plan-switchback-turn", kind: "plan", steps: [{ status: "done" }] },
       },
     ])
   })
@@ -234,18 +234,18 @@ describe("Kimi 轮次事件", () => {
   it("同一轮多次 retry 原地更新一条提示，不重复 started", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
     handleTurnEvent(tracker, { type: "turn.step.retrying", turnId: 1, errorMessage: "第一次" }, 2)
     handleTurnEvent(tracker, { type: "turn.step.retrying", turnId: 1, errorMessage: "第二次" }, 3)
     expect(events.map((event) => event.type)).toEqual(["item.started", "item.updated"])
-    expect(events[1]).toMatchObject({ item: { id: "kimi-retry-omni-turn", message: "第二次" } })
+    expect(events[1]).toMatchObject({ item: { id: "kimi-retry-switchback-turn", message: "第二次" } })
   })
 
   it("busy 快照尚未出现 in-flight turn 时不提前收工", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    const generation = tracker.begin("omni-turn", "做事")
+    const generation = tracker.begin("switchback-turn", "做事")
     tracker.promptAccepted(generation, "prompt-1")
     const snapshot = runningSnapshot("")
     tracker.reconcile({
@@ -260,7 +260,7 @@ describe("Kimi 轮次事件", () => {
   it("提示词还没被 HTTP 接受时，旧的空闲快照也不能收掉新轮次", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "带图提问")
+    tracker.begin("switchback-turn", "带图提问")
     const snapshot = runningSnapshot("")
     tracker.reconcile({
       ...snapshot,
@@ -274,7 +274,7 @@ describe("Kimi 轮次事件", () => {
   it("HTTP 已接受后的空闲快照能补回丢失的 turn.ended", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    const generation = tracker.begin("omni-turn", "这轮的问题")
+    const generation = tracker.begin("switchback-turn", "这轮的问题")
     tracker.promptAccepted(generation, "prompt-new")
     const snapshot = runningSnapshot("")
     tracker.reconcile({
@@ -288,14 +288,14 @@ describe("Kimi 轮次事件", () => {
     })
     expect(tracker.hasActive()).toBe(false)
     expect(events).toEqual([
-      { type: "turn.completed", at: 0, turnId: "omni-turn", status: "completed" },
+      { type: "turn.completed", at: 0, turnId: "switchback-turn", status: "completed" },
     ])
   })
 
   it("skill activation 没有 prompt id 时，接受后的快照仍能绑定并收工", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    const generation = tracker.begin("omni-turn", "/write-goal 新目标")
+    const generation = tracker.begin("switchback-turn", "/write-goal 新目标")
     tracker.activationAccepted(generation)
     tracker.reconcile(runningSnapshot("skill 回答"))
     const snapshot = runningSnapshot("")
@@ -307,14 +307,14 @@ describe("Kimi 轮次事件", () => {
     expect(events).toMatchObject([
       { type: "item.started", item: { kind: "agent_message", text: "skill 回答" } },
       { type: "item.updated", item: { kind: "agent_message", text: "skill 回答", complete: true } },
-      { type: "turn.completed", turnId: "omni-turn", status: "completed" },
+      { type: "turn.completed", turnId: "switchback-turn", status: "completed" },
     ])
   })
 
   it("POST 前的外来 in-flight 快照不能抢先绑定宿主新轮次", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "这轮的新问题")
+    tracker.begin("switchback-turn", "这轮的新问题")
     tracker.reconcile({
       ...runningSnapshot("上一轮还在输出"),
       session: { ...runningSnapshot("").session, last_prompt: "上一轮的问题" },
@@ -328,7 +328,7 @@ describe("Kimi 轮次事件", () => {
   it("POST 后也只接 prompt id 对得上的 in-flight 快照", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    const generation = tracker.begin("omni-turn", "新问题")
+    const generation = tracker.begin("switchback-turn", "新问题")
     tracker.promptAccepted(generation, "prompt-new")
     const snapshot = runningSnapshot("旧回答")
     const flight = snapshot.in_flight_turn
@@ -357,7 +357,7 @@ describe("Kimi 轮次事件", () => {
   it("中断工具时保留已经流出来的命令输出", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
     handleTurnEvent(
       tracker,
@@ -387,7 +387,7 @@ describe("Kimi 轮次事件", () => {
   it("正常收工仍缺工具结果时明确失败，不留下 running", () => {
     const events: Event[] = []
     const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 0 })
-    tracker.begin("omni-turn", "做事")
+    tracker.begin("switchback-turn", "做事")
     handleTurnEvent(tracker, { type: "turn.started", turnId: 1, prompt: "做事" }, 1)
     handleTurnEvent(
       tracker,

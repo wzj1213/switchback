@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { app, dialog } from "electron"
-import { probeCommand } from "@omni/engine"
+import { probeCommand } from "@switchback/engine"
 import type { Logger } from "./log.js"
 import { dumpDir, type CrashInfo } from "./crash.js"
 
@@ -13,7 +13,7 @@ const TAIL_LINES = 400
  * **「装了没」是支持渠道的第一个问题**，而它有三种不同的答案：
  * 不在 PATH 上、在但跑不起来、在且能跑。分开报，别都归成「引擎有问题」。
  *
- * 直接用 `@omni/engine` 的 `probeCommand`，不在这里再写一份：
+ * 直接用 `@switchback/engine` 的 `probeCommand`，不在这里再写一份：
  * 原来这里自己 `which` 了一遍，于是「Windows 上没有 which」这个 bug
  * 得修两处——而第二处一定会被漏掉。
  */
@@ -73,7 +73,7 @@ function systemVersion(): string {
 export async function buildReport(logger: Logger, crash: CrashInfo): Promise<string> {
   const engines = await Promise.all([probeEngine("codex"), probeEngine("claude")])
   return [
-    "# omni 诊断报告",
+    "# Switchback 诊断报告",
     "",
     "> **不含会话内容**：没有提示词、没有模型回复、没有文件内容、没有命令输出。",
     ">",
@@ -81,7 +81,7 @@ export async function buildReport(logger: Logger, crash: CrashInfo): Promise<str
     "> 像凭据的部分已按模式抹去，但那份模式清单不可能完备——**发出去之前扫一眼**。",
     "",
     "## 版本",
-    `- omni ${app.getVersion()}`,
+    `- Switchback ${app.getVersion()}`,
     `- Electron ${process.versions.electron} / Chromium ${process.versions.chrome} / Node ${process.versions.node}`,
     `- ${process.platform} ${process.arch} ${systemVersion()}`,
     `- 已打包：${app.isPackaged ? "是" : "否（开发模式）"}`,
@@ -108,7 +108,7 @@ export async function exportReport(logger: Logger, crash: CrashInfo): Promise<vo
   const report = await buildReport(logger, crash)
   const target = await dialog.showSaveDialog({
     title: "导出诊断报告",
-    defaultPath: `omni-诊断-${new Date().toISOString().slice(0, 10)}.md`,
+    defaultPath: `Switchback-诊断-${new Date().toISOString().slice(0, 10)}.md`,
     filters: [{ name: "Markdown", extensions: ["md"] }],
   })
   if (target.canceled || target.filePath === undefined) return

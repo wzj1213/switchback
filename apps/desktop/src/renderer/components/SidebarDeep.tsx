@@ -1,4 +1,4 @@
-import type { ThreadRow } from "@omni/store"
+import type { ThreadRow } from "@switchback/store"
 import type { DeepHit } from "../useDeepSearch.js"
 import { whenOf } from "./ForeignRow.js"
 

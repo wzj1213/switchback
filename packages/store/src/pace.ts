@@ -1,10 +1,10 @@
-import type { Event, Item, ItemId, ThreadId, TurnId, TurnPace } from "@omni/protocol"
+import type { Event, Item, ItemId, ThreadId, TurnId, TurnPace } from "@switchback/protocol"
 import { estimateTokens } from "./tokens.js"
 
 /**
  * 一轮的出字节奏怎么量：首字延迟、tok/s、生成量。
  *
- * **宿主在事件的唯一出口上跑它**（`@omni/host` 的 `ctx.ts`），收工那一刻把结果挂到
+ * **宿主在事件的唯一出口上跑它**（`@switchback/host` 的 `ctx.ts`），收工那一刻把结果挂到
  * `turn.completed` 上一起落盘——之后回放、分界线、靶上那行读的都是那一份。
  * 渲染层跑同一份代码只为了跑着时给一个现场读数（`livePace`）：两边吃的是同一串事件、
  * 同一个 `at`，所以跑完时对得上，不会出现「跑着时 58、跑完变 41」。

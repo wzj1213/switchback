@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { isWindows, lookupCommand, type ClaudeExecutable } from "@omni/engine"
+import { isWindows, lookupCommand, type ClaudeExecutable } from "@switchback/engine"
 import {
   compare,
   grokCheck,
@@ -29,11 +29,11 @@ export interface EngineVersion {
    */
   missing?: boolean
   /**
-   * 装它要跑的那条命令。**只有 omni 真的知道来源的那几家才有**。
+   * 装它要跑的那条命令。**只有 Switchback 真的知道来源的那几家才有**。
    *
-   * 没有就是没有：grok 与 DSH 各自走自己的安装器，omni 手上没有一个
-   * 验证过的包名，那就照实说「omni 不知道」，**不编一条命令出来**——
-   * 编出来的那条一旦是错的，用户会以为是 omni 装坏了。
+   * 没有就是没有：grok 与 DSH 各自走自己的安装器，Switchback 手上没有一个
+   * 验证过的包名，那就照实说「Switchback 不知道」，**不编一条命令出来**——
+   * 编出来的那条一旦是错的，用户会以为是 Switchback 装坏了。
    */
   install?: string
   /** 解释为什么没按钮，或最新版为什么暂时查不到。 */
@@ -68,8 +68,8 @@ export interface EngineSpec {
 /**
  * 没装的那一家长什么样。
  *
- * **它必须留在清单里。** 从清单里消失等于「omni 不知道有这一家」，
- * 而事实是 omni 知道得很清楚——它只是没装。这两件事在界面上必须分得开。
+ * **它必须留在清单里。** 从清单里消失等于「Switchback 不知道有这一家」，
+ * 而事实是 Switchback 知道得很清楚——它只是没装。这两件事在界面上必须分得开。
  */
 export function missingOf(spec: EngineSpec): EngineVersion {
   return {
@@ -105,7 +105,7 @@ function claudeSpec(mode: ClaudeExecutable): EngineSpec {
     label: BUILTIN_ENGINE_LABELS.claude,
     bin: "claude",
     ...(update === undefined ? {} : { update }),
-    // 完整版随 omni 打包，机器上没有 claude 也照样能跑，所以那一档不给安装入口；
+    // 完整版随 Switchback 打包，机器上没有 claude 也照样能跑，所以那一档不给安装入口；
     // 轻量版要 PATH 上有 claude，那一档才需要装
     ...(mode === "system" ? { install } : {}),
     inspect: async ({ run }) => {
@@ -129,7 +129,7 @@ function bundledClaude(): EngineVersion {
     engine: "claude",
     label: BUILTIN_ENGINE_LABELS.claude,
     stale: false,
-    detail: "完整版使用随 omni 打包的 Claude；更新 omni 才会换掉它",
+    detail: "完整版使用随 Switchback 打包的 Claude；更新 Switchback 才会换掉它",
   }
 }
 
@@ -210,7 +210,7 @@ function otherInstall(engine: string, label: string, installed: string): EngineV
     label,
     installed,
     stale: false,
-    detail: "当前不是 omni 验过的 npm 全局安装；为免装出第二份，请用原安装来源更新",
+    detail: "当前不是 Switchback 验过的 npm 全局安装；为免装出第二份，请用原安装来源更新",
   }
 }
 
@@ -222,7 +222,7 @@ function grokSpec(): EngineSpec {
     bin: "grok",
     update,
     // **不给命令**：这台机器上的 grok 装在 `~/.grok/bin`，那是它自己的安装器铺的，
-    // omni 手上没有一个验证过的包名。编一条出来一旦是错的，用户会以为是 omni 装坏了
+    // Switchback 手上没有一个验证过的包名。编一条出来一旦是错的，用户会以为是 Switchback 装坏了
     where: "grok 由它自己的安装器铺在 ~/.grok 下；装好后确保 grok 在 PATH 上",
     inspect: async ({ run }) => inspectGrok(run, update.display),
   }
@@ -233,7 +233,7 @@ function dshSpec(): EngineSpec {
     engine: "dsh",
     label: BUILTIN_ENGINE_LABELS.dsh,
     bin: "dsh",
-    where: "DSH 的版本与 profiles 由它自己管理，omni 不代装；装好后确保 dsh 在 PATH 上",
+    where: "DSH 的版本与 profiles 由它自己管理，Switchback 不代装；装好后确保 dsh 在 PATH 上",
     inspect: async ({ run }) => {
       const installed = await versionOf("dsh", run)
       if (installed === undefined) return undefined
@@ -242,7 +242,7 @@ function dshSpec(): EngineSpec {
         label: BUILTIN_ENGINE_LABELS.dsh,
         installed,
         stale: false,
-        detail: "版本与 profiles 由 DSH 自己管理，omni 不代装插件",
+        detail: "版本与 profiles 由 DSH 自己管理，Switchback 不代装插件",
       }
     },
   }

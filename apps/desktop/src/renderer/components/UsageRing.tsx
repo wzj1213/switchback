@@ -1,4 +1,4 @@
-import type { Usage } from "@omni/protocol"
+import type { Usage } from "@switchback/protocol"
 import { meterOf, type UsageLevel } from "../usage.js"
 
 /**

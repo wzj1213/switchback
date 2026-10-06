@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { ErrorItem } from "@omni/protocol"
+import type { ErrorItem } from "@switchback/protocol"
 import { ChevronIcon } from "./icons.js"
 import { AlertIcon } from "./icons-activity.js"
 import { LinkifiedText } from "./linkified-text.js"
@@ -64,7 +64,7 @@ function priorText(prior: readonly ErrorItem[]): string {
   return prior.map((item) => (item.detail === undefined ? item.message : `${item.message} — ${item.detail}`)).join("\n")
 }
 
-/** 抬头下面那几行小字：引擎补的原因、被并进来的那几条、omni 手里有的下一步。 */
+/** 抬头下面那几行小字：引擎补的原因、被并进来的那几条、Switchback 手里有的下一步。 */
 function CardNotes({ item, prior, hint }: { item: ErrorItem; prior: readonly ErrorItem[]; hint: string | undefined }): React.JSX.Element {
   const last = prior[prior.length - 1]
   return (

@@ -9,7 +9,7 @@ import { Blank } from "./SettingsBits.js"
  * 一家引擎实际会读的原生配置来源。
  *
  * 这里把「哪一层、有没有、管什么」直接画出来；能安全打开的现有文件可一键交给系统编辑器。
- * 字段本身仍不由 omni 改写：厂商没有稳定写接口时，伪造表单只会把旧格式包装得更像真的。
+ * 字段本身仍不由 Switchback 改写：厂商没有稳定写接口时，伪造表单只会把旧格式包装得更像真的。
  */
 export function EngineDoors({
   engine,
@@ -22,10 +22,10 @@ export function EngineDoors({
   dshProfile?: string
   onReveal: (path: string) => void
 }): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   const load = useMemo(
-    () => (omni === undefined ? undefined : () => omni.engineDoors(cwd, dshProfile)),
-    [omni, cwd, dshProfile],
+    () => (switchback === undefined ? undefined : () => switchback.engineDoors(cwd, dshProfile)),
+    [switchback, cwd, dshProfile],
   )
   const state = useAsync<readonly EngineDoor[]>(load)
 
@@ -33,7 +33,7 @@ export function EngineDoors({
   if (state.data === undefined) return <Blank>正在确认配置来源…</Blank>
   const rows = state.data.filter((door) => door.id === engine)
   if (rows.length === 0) {
-    return <Blank>这家由 engines.json 接入；omni 不知道它自己的配置放在哪里。</Blank>
+    return <Blank>这家由 engines.json 接入；Switchback 不知道它自己的配置放在哪里。</Blank>
   }
   return (
     <div className="doors">
@@ -66,7 +66,7 @@ function DoorRow({
               type="button"
               className="tbtn"
               onClick={() => {
-                window.omni?.openEngineFile(door.path)
+                window.switchback?.openEngineFile(door.path)
               }}
             >
               <PencilIcon /> 编辑

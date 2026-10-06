@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -17,7 +17,7 @@ describe("Claude /clear（真跑）", () => {
     const driver = createClaudeDriver({})
     const session = await driver.start({
       threadId: "live-clear",
-      cwd: mkdtempSync(join(tmpdir(), "omni-clear-live-")),
+      cwd: mkdtempSync(join(tmpdir(), "switchback-clear-live-")),
       trust: "auto-edit",
       home: homedir(),
       memory: () => [],

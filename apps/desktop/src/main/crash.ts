@@ -8,7 +8,7 @@ import type { Logger } from "./log.js"
  *
  * ## 一切都留在本机
  *
- * `uploadToServer: false`。omni 不往任何服务器发东西——**这不是省事，是产品前提**：
+ * `uploadToServer: false`。Switchback 不往任何服务器发东西——**这不是省事，是产品前提**：
  * 崩溃转储里可能有内存快照，而这个应用的内存里装着用户的代码、提示词、路径。
  * 把它悄悄传出去，一次就够失去信任。
  *

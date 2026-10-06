@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { initialStream, received, replayed, reset, resynced, type Step } from "./stream.js"
 import type { Sealed } from "./types.js"
 

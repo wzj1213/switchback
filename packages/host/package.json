@@ -1,5 +1,5 @@
 {
-  "name": "@omni/host",
+  "name": "@switchback/host",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,11 +13,11 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "@omni/approval": "workspace:*",
-    "@omni/engine": "workspace:*",
-    "@omni/protocol": "workspace:*",
-    "@omni/store": "workspace:*",
-    "@omni/journal": "workspace:*",
-    "@omni/handoff": "workspace:*"
+    "@switchback/approval": "workspace:*",
+    "@switchback/engine": "workspace:*",
+    "@switchback/protocol": "workspace:*",
+    "@switchback/store": "workspace:*",
+    "@switchback/journal": "workspace:*",
+    "@switchback/handoff": "workspace:*"
   }
 }

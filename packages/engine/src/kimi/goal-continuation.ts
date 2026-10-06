@@ -1,4 +1,4 @@
-import type { GoalContinuationOrigin } from "@omni/protocol"
+import type { GoalContinuationOrigin } from "@switchback/protocol"
 import type { NativeTurnStart } from "../contract.js"
 import type { KimiPayload, KimiTranscriptTurn } from "./wire.js"
 

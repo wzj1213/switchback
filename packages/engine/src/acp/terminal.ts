@@ -15,7 +15,7 @@ import { spawn, type ChildProcess } from "node:child_process"
  * `if (!this.connection.terminalEnabled) throw new Error("ACP terminal capability is unavailable")`，
  * **没有本地兜底**：客户端不认领，它一条命令都跑不了。
  *
- * A/B 实测（2026-08-19，同一句话、omni 原样的握手参数，只改这一位）：
+ * A/B 实测（2026-08-19，同一句话、Switchback 原样的握手参数，只改这一位）：
  *
  * | `terminal` | 结果 |
  * |---|---|
@@ -27,9 +27,9 @@ import { spawn, type ChildProcess } from "node:child_process"
  *
  * ## 那条「不认领」的理由为什么在这儿不成立
  *
- * 原来的理由是「命令跑在 omni 进程里，和『引擎跑自己的原生进程、用自己的沙箱』冲突」。
+ * 原来的理由是「命令跑在 Switchback 进程里，和『引擎跑自己的原生进程、用自己的沙箱』冲突」。
  * 但 kimi **压根没有引擎侧的 shell 沙箱**——它的设计就是把起进程这件事交给客户端。
- * 所以真实的取舍不是「omni 的进程 vs kimi 的沙箱」，而是**「omni 的进程 vs 完全没有 shell」**。
+ * 所以真实的取舍不是「Switchback 的进程 vs kimi 的沙箱」，而是**「Switchback 的进程 vs 完全没有 shell」**。
  *
  * 因此这一位**按引擎注入**（`AcpDriverConfig.terminal`），不是全家族打开：
  * codex-acp / grok / zcode 自己起进程，认领了反而是把命令从**它们自己的沙箱里拽出来**。
@@ -37,8 +37,8 @@ import { spawn, type ChildProcess } from "node:child_process"
  * ## 边界：这里不做审批
  *
  * 命令该不该跑由引擎那侧的档位决定（kimi 的 mode 落在 `session/set_config_option`），
- * omni 在这一层**只负责把进程起起来、把输出还回去**。在这儿再加一道判定，
- * 就是在引擎已经批准的事情上叠 omni 的第二套规则——撞总纲。
+ * Switchback 在这一层**只负责把进程起起来、把输出还回去**。在这儿再加一道判定，
+ * 就是在引擎已经批准的事情上叠 Switchback 的第二套规则——撞总纲。
  */
 
 /** `terminal/create` 的入参形状（读 kimi 包里的 zod schema 抄的）。 */
@@ -69,7 +69,7 @@ const DEFAULT_LIMIT = 4 * 1024 * 1024
 export interface TerminalHost {
   /** 处理一条 `terminal/*` 请求。返回 undefined 表示这个方法不归它管。 */
   handle: (method: string, params: unknown) => Promise<unknown> | undefined
-  /** 会话结束时把还活着的进程全杀掉。**不做的话它们会活过 omni**。 */
+  /** 会话结束时把还活着的进程全杀掉。**不做的话它们会活过 Switchback**。 */
   disposeAll: () => void
 }
 

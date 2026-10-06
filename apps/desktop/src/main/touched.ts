@@ -1,4 +1,4 @@
-import type { Event, ThreadId, ToolCallItem, TurnId } from "@omni/protocol"
+import type { Event, ThreadId, ToolCallItem, TurnId } from "@switchback/protocol"
 import { canonicalPath } from "../shared/paths.js"
 
 /**

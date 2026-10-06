@@ -1,4 +1,4 @@
-import type { Aside, Item, Lane } from "@omni/protocol"
+import type { Aside, Item, Lane } from "@switchback/protocol"
 
 export type TimelineRow =
   | { kind: "item"; key: string; at: number; item: Item }

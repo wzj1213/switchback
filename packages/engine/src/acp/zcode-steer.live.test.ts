@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 
 const TURN = "zcode-steer-live"
@@ -24,7 +24,7 @@ function waitFor(done: () => boolean, ms: number): Promise<void> {
 
 describe("ZCode · live · steer 兼容边界", () => {
   it("桥会转发 session/steer，但当前后端明确拒绝，不能据此放出入口", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-zcode-steer-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-zcode-steer-"))
     const events: Event[] = []
     const driver = createAcpDriver({
       id: "acp:zcode",

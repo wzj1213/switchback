@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
-import type { Thread, ThreadId } from "@omni/protocol"
-import { itemsOf, projectsOf, threadRowsOf } from "@omni/store"
+import type { Thread, ThreadId } from "@switchback/protocol"
+import { itemsOf, projectsOf, threadRowsOf } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { PushToggle } from "../components/PushToggle.js"
 
@@ -180,7 +180,7 @@ export function Threads({
           {projects.map((project) => (
             <li key={project.cwd}>
               {/*
-                **按项目分组，和桌面侧栏同一条规则**（`@omni/store` 的 `projectsOf`）。
+                **按项目分组，和桌面侧栏同一条规则**（`@switchback/store` 的 `projectsOf`）。
                 原来这里是一条平列表——同一台机器上的同一批会话在两端长得完全不一样：
                 一边分着项目，一边十几条混在一起，谁属于哪个仓库全靠标题猜。
               */}

@@ -1,4 +1,4 @@
-import type { Trust } from "@omni/protocol"
+import type { Trust } from "@switchback/protocol"
 import { NO_PANES, type PaneWidths } from "./pane-widths.js"
 
 /**
@@ -7,10 +7,10 @@ import { NO_PANES, type PaneWidths } from "./pane-widths.js"
  * 原来是两份手抄的（`main/settings.ts` 一份、`renderer/useSettings.ts` 一份），
  * 今天恰好一致——而「恰好一致」不是保证。preload 那层更糟：
  * 它的签名写的是 `Record<string, unknown>`，于是渲染层拿到的东西
- * **在类型上根本不是 Settings**，只是没人发现（那份 `window.omni` 的声明
+ * **在类型上根本不是 Settings**，只是没人发现（那份 `window.switchback` 的声明
  * 是手写的，和实现各说各话）。
  *
- * 放 `shared/` 而不是 `@omni/protocol`：这是**桌面应用自己的偏好**，
+ * 放 `shared/` 而不是 `@switchback/protocol`：这是**桌面应用自己的偏好**，
  * 和「渲染层与宿主之间的协议」是两回事。protocol 那层要保持只描述会话与事件。
  */
 export type ThemeChoice = "system" | "light" | "dark"
@@ -84,9 +84,9 @@ export interface Settings {
   /**
    * **换引擎自动交接**。默认开。
    *
-   * 开着时，会话中途换了一家之后发出的第一句话前面，omni 附一段交接说明：
+   * 开着时，会话中途换了一家之后发出的第一句话前面，Switchback 附一段交接说明：
    * 此前谁跑了哪几轮、完整转写落在哪、各家原始记录在哪、那些记录实际是什么格式
-   *（见 `@omni/handoff` 的 `briefOf`）。这是 AGENTS.md「不往模型上下文塞 omni 写的话」
+   *（见 `@switchback/handoff` 的 `briefOf`）。这是 AGENTS.md「不往模型上下文塞 Switchback 写的话」
    * 唯一的例外，所以它是一个用户看得见、关得掉的开关；关掉就只发用户那句话。
    *
    * 默认开：换引擎几乎总是为了「让新的一家接着干」（额度用光是最常见的原因），
@@ -113,7 +113,7 @@ export interface Settings {
    * DSH profile 与接入确认。
    *
    * DSH 的 provider、model 与 API 凭证仍归它自己的设置与凭证服务管理；
-   * omni 只记「用户确认那边已经配好，可以把 DSH 放进引擎清单」。默认不确认，
+   * Switchback 只记「用户确认那边已经配好，可以把 DSH 放进引擎清单」。默认不确认，
    * 因为 ACP 的 initialize 不公开凭证是否就绪，不能拿一次握手冒充可运行。
    */
   dsh: DshSettings
@@ -122,7 +122,7 @@ export interface Settings {
    *
    * ## 为什么和 `dsh.confirmedProfiles` 是两件事
    *
-   * 那一条回答「这家的原生配置就绪了吗」——是**它那边**的事实，omni 只是记下用户
+   * 那一条回答「这家的原生配置就绪了吗」——是**它那边**的事实，Switchback 只是记下用户
    * 替它作的证。这一条回答「我要不要用这家」——是**用户**的选择。装了 grok 但
    * 这台机器上从不用它，和 grok 没配好，在界面上该长得不一样：前者是你关的，
    * 后者是它坏的。压成一个开关，用户关掉一家之后就再也分不出这两种情况。
@@ -130,7 +130,7 @@ export interface Settings {
    * 关掉的那家**连探测都不起**（`engineVisible` 就是拿它过滤的），
    * 所以这也是唯一能让启动少 spawn 几个进程的开关。
    *
-   * **omni 不因此改引擎自己的任何行为**：它只是不出现在 omni 的清单里。
+   * **Switchback 不因此改引擎自己的任何行为**：它只是不出现在 Switchback 的清单里。
    * 你在终端里跑那家，一切照旧。
    */
   disabledEngines: readonly string[]
@@ -197,7 +197,7 @@ export interface RemoteSettings {
   /** 回环上的端口。0 = 由系统挑一个。 */
   port: number
   /**
-   * 隧道那头对外的 authority（`omni.example.com:8443`），可以写多条。
+   * 隧道那头对外的 authority（`switchback.example.com:8443`），可以写多条。
    *
    * 不填就只认回环——那时只有 `ssh -L` 那种把端口映到本机的用法能通。
    * 填的必须是**裸 host[:port]**：写成带路径或带 scheme 的形式会在启动时大声报错，

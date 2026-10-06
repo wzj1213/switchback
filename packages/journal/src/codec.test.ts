@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { decode, decodeAll, encode, fileNameOf, shouldPersist, threadIdOf } from "./codec.js"
 
 const started: Event = {

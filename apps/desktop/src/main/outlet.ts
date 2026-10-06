@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
-import type { Event, Thread, ThreadId } from "@omni/protocol"
-import { createLedger, type Ledger } from "@omni/wire"
-import { coalesce } from "@omni/store"
+import type { Event, Thread, ThreadId } from "@switchback/protocol"
+import { createLedger, type Ledger } from "@switchback/wire"
+import { coalesce } from "@switchback/store"
 import { createBatcher } from "./batch.js"
 import type { Attention } from "./attention.js"
 import type { Awake } from "./awake.js"
@@ -11,7 +11,7 @@ import type { Logger } from "./log.js"
 /**
  * 事件出口：合帧 → 编号 → 广播给**每一个客户端** → 顺带记日志。
  *
- * 合帧的理由见 `batch.ts`，编号与保留的理由见 `@omni/wire`；
+ * 合帧的理由见 `batch.ts`，编号与保留的理由见 `@switchback/wire`；
  * 记日志只挑 `engine.status`，因为那是唯一**用户看不见却必须留痕**的一类——
  * 其余事件在界面上都有对应的呈现。
  *
@@ -54,7 +54,7 @@ export function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; 
     // `MAX_BATCH` 那个 500 正是为它存在的。
     //
     // 真正的收益也不在字节上，在**账本的保留窗口**：一次构建就能刷满 5000 条，
-    // 而那正是 `@omni/wire` 自己写下的失败模式——出隧道时缺口已经被自己的
+    // 而那正是 `@switchback/wire` 自己写下的失败模式——出隧道时缺口已经被自己的
     // 构建日志挤出缓冲，只能在信号最差的时候做最贵的那件事（全量重建）。
     // 合并之后同样 5000 条覆盖的墙钟时间长一到两个数量级。
     //
@@ -64,7 +64,7 @@ export function createOutlet(deps: OutletDeps): { emit: (event: Event) => void; 
     // **编号在合帧之后**：合帧只改变什么时候发，编号定的是发了什么。
     // 反过来（先编号再攒）在批被丢弃时会留下号码空洞，看起来像丢事件
     const sealed = ledger.seal(coalesce(events))
-    for (const sink of deps.sinks.list()) sink.send({ channel: "omni:events", sealed })
+    for (const sink of deps.sinks.list()) sink.send({ channel: "switchback:events", sealed })
   })
   return {
     emit: (event) => {

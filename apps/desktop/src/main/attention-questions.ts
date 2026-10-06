@@ -1,4 +1,4 @@
-import type { Event, Thread, ThreadId } from "@omni/protocol"
+import type { Event, Thread, ThreadId } from "@switchback/protocol"
 
 export interface QuestionChange {
   id: string

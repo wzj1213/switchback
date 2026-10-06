@@ -1,4 +1,4 @@
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import type { Logger } from "./log.js"
 
 interface ProbeDriver {

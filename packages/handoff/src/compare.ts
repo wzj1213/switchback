@@ -1,4 +1,4 @@
-import type { Item, Thread } from "@omni/protocol"
+import type { Item, Thread } from "@switchback/protocol"
 import type { Handoff } from "./build.js"
 
 /**

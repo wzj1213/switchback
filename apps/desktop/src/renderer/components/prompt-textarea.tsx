@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { flushSync } from "react-dom"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
 import { hasFileItems } from "../attachment-feedback.js"

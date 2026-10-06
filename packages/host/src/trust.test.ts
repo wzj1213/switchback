@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import type { EngineDriver, EngineSession, StartRequest } from "@omni/engine"
-import { NO_CAPABILITIES } from "@omni/protocol"
-import type { Event, Thread, Trust } from "@omni/protocol"
+import type { EngineDriver, EngineSession, StartRequest } from "@switchback/engine"
+import { NO_CAPABILITIES } from "@switchback/protocol"
+import type { Event, Thread, Trust } from "@switchback/protocol"
 import { createHost } from "./host.js"
 
 function nativeClass(trust: Trust): string {

@@ -1,4 +1,4 @@
-import type { RateLimits, RateWindow } from "@omni/protocol"
+import type { RateLimits, RateWindow } from "@switchback/protocol"
 
 interface RawRateLimitInfo {
   status?: unknown

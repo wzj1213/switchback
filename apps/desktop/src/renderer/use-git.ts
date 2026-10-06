@@ -13,13 +13,13 @@ export function useGit(threadId: string, cwd: string, revision: string): {
   state: GitState | undefined
   reload: () => void
 } {
-  const omni = bridge()
+  const switchback = bridge()
   const [state, setState] = useState<GitState | undefined>(undefined)
   const [nonce, setNonce] = useState(0)
   useEffect(() => {
-    if (omni === undefined) return undefined
+    if (switchback === undefined) return undefined
     const live = { on: true }
-    void omni.gitState({ threadId, cwd }).then(
+    void switchback.gitState({ threadId, cwd }).then(
       (next) => {
         if (live.on) setState(next)
       },
@@ -28,7 +28,7 @@ export function useGit(threadId: string, cwd: string, revision: string): {
     return () => {
       live.on = false
     }
-  }, [omni, threadId, cwd, revision, nonce])
+  }, [switchback, threadId, cwd, revision, nonce])
   return { state, reload: useCallback(() => setNonce((n) => n + 1), []) }
 }
 
@@ -40,7 +40,7 @@ export function useGitActions(threadId: string, cwd: string, changed: () => void
   stage: (rel: string, stage: boolean) => void
   undo: (full: string) => void
 } {
-  const omni = bridge()
+  const switchback = bridge()
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<CommitResult | undefined>(undefined)
   const run = async (job: Promise<CommitResult> | undefined): Promise<boolean> => {
@@ -56,12 +56,12 @@ export function useGitActions(threadId: string, cwd: string, changed: () => void
   return {
     busy,
     result,
-    commit: (message, all) => run(omni?.gitCommit({ threadId, cwd, message, all })),
+    commit: (message, all) => run(switchback?.gitCommit({ threadId, cwd, message, all })),
     stage: (rel, stage) => {
-      void run(omni?.gitStage({ threadId, cwd, rel, stage }))
+      void run(switchback?.gitStage({ threadId, cwd, rel, stage }))
     },
     undo: (full) => {
-      void run(omni?.gitUndo({ threadId, cwd, full }))
+      void run(switchback?.gitUndo({ threadId, cwd, full }))
     },
   }
 }

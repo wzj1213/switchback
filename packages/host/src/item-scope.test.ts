@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createItemScope } from "./item-scope.js"
 
 const started = (turnId: string, id = "c1"): Extract<Event, { type: "item.started" }> => ({

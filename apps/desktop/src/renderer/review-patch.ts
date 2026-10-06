@@ -34,7 +34,7 @@ export function usePatch(
   const key = `${cwd}\u0000${rel ?? ""}\u0000${String(query.context)}\u0000${query.stamp}\u0000${query.threadId}\u0000${query.revision ?? ""}\u0000${query.scope ?? "conversation"}`
   const [out, setOut] = useState<(Omit<PatchData, "loading"> & { key: string }) | undefined>()
   useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.omni
+    const bridge = typeof window === "undefined" ? undefined : window.switchback
     if (cwd === "" || rel === undefined || bridge === undefined) return undefined
     let live = true
     void bridge

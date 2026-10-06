@@ -1,4 +1,4 @@
-import type { FileChange } from "@omni/protocol"
+import type { FileChange } from "@switchback/protocol"
 import type { Changes, ChangedFile } from "./changes.js"
 import type { ReviewFile } from "../shared/review.js"
 import { parseDiff } from "./diff.js"
@@ -14,7 +14,7 @@ export interface TurnReviewTarget {
   at?: number
 }
 
-const EVENT = "omni:review-turn"
+const EVENT = "switchback:review-turn"
 
 export function requestTurnReview(target: TurnReviewTarget): void {
   window.dispatchEvent(new CustomEvent<TurnReviewTarget>(EVENT, { detail: target }))

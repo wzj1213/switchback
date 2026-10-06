@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createLedger, type Ledger } from "./ledger.js"
 
 /** 这一次运行的代号。测试里固定一个，跨运行的用例自己换。 */

@@ -11,23 +11,23 @@ export interface EngineSettingsCopy {
 
 const COPY: Readonly<Record<BuiltinEngineId, EngineSettingsCopy>> = {
   claude: {
-    summary: "账号、权限、Hooks 与项目规则仍由 Claude Code 管；omni 保存新会话怎么起。",
+    summary: "账号、权限、Hooks 与项目规则仍由 Claude Code 管；Switchback 保存新会话怎么起。",
     native: {
       title: "认证与账户",
       command: "claude auth",
-      hint: "登录与凭证由 Claude Code 自己保存；omni 不读取密钥。",
+      hint: "登录与凭证由 Claude Code 自己保存；Switchback 不读取密钥。",
     },
   },
   codex: {
-    summary: "账号、沙箱、审批与功能开关仍由 Codex 管；omni 保存新会话怎么起。",
+    summary: "账号、沙箱、审批与功能开关仍由 Codex 管；Switchback 保存新会话怎么起。",
     native: {
       title: "认证与账户",
       command: "codex login",
-      hint: "登录结果进入 Codex 自己的凭证存储；omni 不复制 access token。",
+      hint: "登录结果进入 Codex 自己的凭证存储；Switchback 不复制 access token。",
     },
   },
   kimi: {
-    summary: "Provider、模型与凭证仍由 Kimi Code 管；omni 使用它公开的运行接口。",
+    summary: "Provider、模型与凭证仍由 Kimi Code 管；Switchback 使用它公开的运行接口。",
     native: {
       title: "Provider 与模型",
       command: "kimi web",
@@ -35,11 +35,11 @@ const COPY: Readonly<Record<BuiltinEngineId, EngineSettingsCopy>> = {
     },
   },
   grok: {
-    summary: "账号、模型与原生偏好仍由 Grok 管；omni 使用它自带的 Agent Mode。",
+    summary: "账号、模型与原生偏好仍由 Grok 管；Switchback 使用它自带的 Agent Mode。",
     native: {
       title: "认证与账户",
       command: "grok login",
-      hint: "登录与凭证由 Grok 自己保存；omni 不读取密钥。",
+      hint: "登录与凭证由 Grok 自己保存；Switchback 不读取密钥。",
     },
   },
   dsh: {

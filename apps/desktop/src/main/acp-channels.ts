@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { app, ipcMain, shell, type WebContents } from "electron"
-import { probeCommand, tryAcp } from "@omni/engine"
+import { probeCommand, tryAcp } from "@switchback/engine"
 import type { ConnectProgress, RegistryRow, RegistryView } from "../shared/acp-registry.js"
 import { connectAgent } from "./acp-connect.js"
 import { engineRows, loginEngine, logoutEngine, pruneUnused, removeEngine, tryEngine, type EngineOpsDeps } from "./acp-engines.js"
@@ -78,7 +78,7 @@ function progressTo(sender: WebContents): (step: ConnectProgress) => void {
     if (step.phase === last.phase && now - last.at < PROGRESS_MS) return
     last.at = now
     last.phase = step.phase
-    if (!sender.isDestroyed()) sender.send("omni:acpProgress", step)
+    if (!sender.isDestroyed()) sender.send("switchback:acpProgress", step)
   }
 }
 
@@ -99,8 +99,8 @@ export function installAcpChannels(attached: Attached, log: Logger): void {
     return controller.signal
   }
 
-  ipcMain.handle("omni:acpRegistry", async (_event, force?: boolean) => viewOf(await registry.read(force === true), userData, log))
-  ipcMain.handle("omni:acpConnect", async (event, agentId: string) => {
+  ipcMain.handle("switchback:acpRegistry", async (_event, force?: boolean) => viewOf(await registry.read(force === true), userData, log))
+  ipcMain.handle("switchback:acpConnect", async (event, agentId: string) => {
     const signal = abortable(`connect:${agentId}`)
     const progress = progressTo(event.sender)
     return connectAgent(agentId, {
@@ -114,13 +114,13 @@ export function installAcpChannels(attached: Attached, log: Logger): void {
       }),
     })
   })
-  ipcMain.handle("omni:acpEngines", () => engineRows(ops))
-  ipcMain.handle("omni:acpEngineTry", (_event, name: string) => tryEngine(name, ops))
-  ipcMain.handle("omni:acpLogin", (_event, req: { name: string; methodId: string; kind: "agent" | "terminal" }) =>
+  ipcMain.handle("switchback:acpEngines", () => engineRows(ops))
+  ipcMain.handle("switchback:acpEngineTry", (_event, name: string) => tryEngine(name, ops))
+  ipcMain.handle("switchback:acpLogin", (_event, req: { name: string; methodId: string; kind: "agent" | "terminal" }) =>
     loginEngine(req, ops, abortable(`login:${req.name}`)))
-  ipcMain.handle("omni:acpLogout", (_event, name: string) => logoutEngine(name, ops))
-  ipcMain.handle("omni:acpEngineRemove", (_event, name: string) => removeEngine(name, ops))
-  ipcMain.handle("omni:acpCancel", (_event, key: string) => {
+  ipcMain.handle("switchback:acpLogout", (_event, name: string) => logoutEngine(name, ops))
+  ipcMain.handle("switchback:acpEngineRemove", (_event, name: string) => removeEngine(name, ops))
+  ipcMain.handle("switchback:acpCancel", (_event, key: string) => {
     pending.get(key)?.abort()
   })
   // 启动时清一次没人用的旧版本：此刻还没有任何会话起过，删不到在用的

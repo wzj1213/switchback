@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineCapabilities, EngineStatus, ModelOption, Trust } from "@omni/protocol"
+import type { EngineCapabilities, EngineStatus, ModelOption, Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
 import { resolveCommand } from "../probe.js"
@@ -27,7 +27,7 @@ import type { AcpInitialize, AcpNewSession } from "./wire.js"
  */
 
 const PROTOCOL_VERSION = 1
-const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
+const CLIENT_INFO = { name: "switchback", title: "Switchback", version: "0.1.0" }
 const HANDSHAKE_MS = 20_000
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -54,7 +54,7 @@ export interface OpenState {
    * 引擎此刻在哪一档——**开场时由回包认领，之后由 `current_mode_update` 跟着更新**。
    *
    * ACP 的 mode 是双向的：客户端能设，agent 也能自己切。两条来源都要落到这里，
-   * 否则它记的就只是「omni 一厢情愿设过什么」。上一版正是那样，而 `applyTrust`
+   * 否则它记的就只是「Switchback 一厢情愿设过什么」。上一版正是那样，而 `applyTrust`
    * 曾拿它做「已经是这一档就不发」的短路——于是 agent 自己切走之后，
    * 用户再切回来是个**空操作**（见 `mode.ts` 里那段注释，短路已经拿掉）。
    *
@@ -174,12 +174,12 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
   // 版本不合就直接说。协议原文：客户端不支持返回的版本时应当断开
   if (version !== undefined && version > PROTOCOL_VERSION) {
     throw new Error(
-      `${ctx.config.id} 讲的是 ACP v${String(version)}，omni 只认到 v${String(PROTOCOL_VERSION)}。请升级 omni。`,
+      `${ctx.config.id} 讲的是 ACP v${String(version)}，Switchback 只认到 v${String(PROTOCOL_VERSION)}。请升级 Switchback。`,
     )
   }
   ctx.state.loadSession = info.agentCapabilities?.loadSession === true
   ctx.state.authMethods = authMethodsOf(info)
-  // **能力由 agent 自报，不由 omni 猜**：同一个驱动接的几家本来就不一样。
+  // **能力由 agent 自报，不由 Switchback 猜**：同一个驱动接的几家本来就不一样。
   // 但「没声明」只是没声明——实测 grok 的能力表是空的，`session/list` 却能答，
   // 所以这里留 undefined，由 `history()` 问一次再定（见那边的注释）
   ctx.state.canList = canList(info) ? true : undefined

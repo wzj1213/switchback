@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { KimiTurnTracker } from "./turn.js"
 import { handleTurnEvent } from "./turn-events.js"
 

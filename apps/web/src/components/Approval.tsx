@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { ApprovalItem, Command, RememberScope } from "@omni/protocol"
+import type { ApprovalItem, Command, RememberScope } from "@switchback/protocol"
 
 /**
  * 审批卡。**这一端最要紧的一屏。**
@@ -94,7 +94,7 @@ export function Approval({
           允许
         </button>
       </div>
-      {offline ? <p className="approval__offline">没连上 omni，先等重连——它那头还在等你。</p> : null}
+      {offline ? <p className="approval__offline">没连上 Switchback，先等重连——它那头还在等你。</p> : null}
     </div>
   )
 }

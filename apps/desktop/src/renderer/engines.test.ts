@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import { nextEngine, withThreadEngines } from "./engines.js"
 
 const engine = (id: string, state: EngineInfo["state"] = "ok"): EngineInfo => ({

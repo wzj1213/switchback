@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 
 /** 合帧窗口。16ms ≈ 一帧，人感知不到，但能把一秒内的上千条压成 60 批。 */
 const WINDOW_MS = 16

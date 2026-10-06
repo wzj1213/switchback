@@ -28,7 +28,7 @@ const noIoInPurePackages = {
     {
       patterns: [
         { group: ["node:*", "fs", "path", "child_process", "os"], message: "纯逻辑包禁止 IO" },
-        { group: ["@omni/*/src/*", "@omni/*/dist/*"], message: "只能 import 包入口，不得深引用" },
+        { group: ["@switchback/*/src/*", "@switchback/*/dist/*"], message: "只能 import 包入口，不得深引用" },
       ],
     },
   ],

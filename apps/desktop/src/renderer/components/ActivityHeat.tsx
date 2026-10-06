@@ -15,7 +15,7 @@ import { Segmented } from "./SettingsBits.js"
  *
  * token 的口径**各家不是一回事**（见 `shared/activity.ts` 的 `tokensByEngine`）：
  * 同样一条长会话，一家报几百万，另一家能报出三个数量级更大的数。
- * 轮次是 omni 自己数的，跨引擎可比——所以它是默认，token 是可选。
+ * 轮次是 Switchback 自己数的，跨引擎可比——所以它是默认，token 是可选。
  *
  * ## 悬停读数摆在标题行，不做浮动 tooltip
  *

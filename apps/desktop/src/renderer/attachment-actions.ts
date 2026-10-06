@@ -2,7 +2,7 @@ import { canAttachImage } from "../shared/attachments.js"
 import { dropNotice, type AttachmentSummary } from "./attachment-feedback.js"
 import { fileReference } from "./file-references.js"
 
-type Bridge = Pick<NonNullable<Window["omni"]>, "pathForFile" | "pickFiles" | "stashImage">
+type Bridge = Pick<NonNullable<Window["switchback"]>, "pathForFile" | "pickFiles" | "stashImage">
 
 export interface AttachmentResult {
   paths: readonly string[]
@@ -15,7 +15,7 @@ export interface AttachmentResult {
 function unavailable(): AttachmentResult {
   return {
     paths: [], references: [],
-    notice: { text: "文件入口暂时不可用，请重新打开 omni。", tone: "warn" },
+    notice: { text: "文件入口暂时不可用，请重新打开 Switchback。", tone: "warn" },
   }
 }
 

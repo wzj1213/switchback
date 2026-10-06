@@ -2,7 +2,7 @@ import type { EngineCapabilities } from "./capability.js"
 import type { EngineId, ThreadId, TurnId } from "./ids.js"
 import type { PendingQuestion } from "./question.js"
 
-/** 引擎原生长期目标的状态。字段只复述引擎，不由 omni 根据轮次结果推断。 */
+/** 引擎原生长期目标的状态。字段只复述引擎，不由 Switchback 根据轮次结果推断。 */
 export type GoalStatus =
   | "active"
   | "paused"
@@ -14,7 +14,7 @@ export type GoalStatus =
 /**
  * 引擎自己为这条会话维护的长期目标。它跨轮次存在，和一次轮次里的 `PlanItem` 分开。
  *
- * 这是只读镜像：目标由引擎的公开能力创建、更新和清除；omni 不替用户或模型编目标，
+ * 这是只读镜像：目标由引擎的公开能力创建、更新和清除；Switchback 不替用户或模型编目标，
  * 也不根据计划完成度纠正它的状态。
  */
 export interface EngineGoal {
@@ -28,14 +28,14 @@ export interface EngineGoal {
 /**
  * 引擎自己那边的状态。**只读的镜像，不参与任何判定。**
  *
- * 与 `Thread.trust` / `Thread.model` 的关系：那两个是 **omni 设的**，这一份是**引擎报的**。
+ * 与 `Thread.trust` / `Thread.model` 的关系：那两个是 **Switchback 设的**，这一份是**引擎报的**。
  * 两者可以不一致，而**不一致本身正是要显示给用户看的东西**。
  *
  * ## 为什么绝不能写进 `Thread.trust`
  *
- * `trust` 有双重身份：它既是「omni 想让引擎处于哪一档」，也是 **omni 本机审批判定器的输入**
- *（`@omni/approval` 的 `decide()` 吃的就是它）。引擎报 yolo 就把它写成 `full`，
- * 等于**顺手把 omni 自己那层审批也关掉**——那是用户从没点过的一次放权，
+ * `trust` 有双重身份：它既是「Switchback 想让引擎处于哪一档」，也是 **Switchback 本机审批判定器的输入**
+ *（`@switchback/approval` 的 `decide()` 吃的就是它）。引擎报 yolo 就把它写成 `full`，
+ * 等于**顺手把 Switchback 自己那层审批也关掉**——那是用户从没点过的一次放权，
  * 而且没有任何地方会报错。任何把引擎自报状态直接写进 `Trust` 的做法都是一个静默提权口。
  */
 export interface EngineState {
@@ -47,7 +47,7 @@ export interface EngineState {
    * 压成一个值就得由驱动现编一个合成 id——那正是「界面显示一个引擎从没说过的东西」。
    */
   axes: readonly EngineAxis[]
-  /** 引擎当前实际在用的模型 id。和 `Thread.model`（omni 设的）分开存。 */
+  /** 引擎当前实际在用的模型 id。和 `Thread.model`（Switchback 设的）分开存。 */
   modelId?: string
   /** 这份镜像什么时候报的。**陈旧的镜像比没有更糟**，界面据此判断还显不显示。 */
   at: number
@@ -56,26 +56,26 @@ export interface EngineState {
 export interface EngineAxis {
   /**
    * 这是哪一维。ACP 家填 `"mode"`；codex 填 `"approval"` 与 `"sandbox"` 两条。
-   * **omni 不解释这个字符串**，只用它做去重和排序。
+   * **Switchback 不解释这个字符串**，只用它做去重和排序。
    */
   axis: string
-  /** 引擎侧原样的值（`"yolo"` / `"bypassPermissions"` / `"dangerFullAccess"`）。**omni 不翻译它。** */
+  /** 引擎侧原样的值（`"yolo"` / `"bypassPermissions"` / `"dangerFullAccess"`）。**Switchback 不翻译它。** */
   id: string
   /** 引擎给的人话名。没有就显示 `id`。**界面永远不自己编一个中文名。** */
   label?: string
   /**
-   * omni 设的档和这一维**对不对得上**——由**驱动**判定，界面不反推。
+   * Switchback 设的档和这一维**对不对得上**——由**驱动**判定，界面不反推。
    *
    * 反推做不到：`pickMode` 是 Trust→modeId 的打分匹配，有损、多对一，反过来是一对多。
    * 而驱动知道它自己发过什么、引擎回了什么，它答得起。
    *
    * ## 为什么必须有第三种 `unknown`
    *
-   * 二元装不下「**omni 压根没设过**」。实测 grok：`session/new` 不报 `availableModes`，
+   * 二元装不下「**Switchback 压根没设过**」。实测 grok：`session/new` 不报 `availableModes`，
    * 但它**会推 `current_mode_update`**（源码原话：进出每一档都通知）。
-   * 于是 omni 手上没有档位表、匹配不出任何目标，却收得到引擎的当前档——
-   * 这时报 `diverged` 会让界面上**常亮一条「引擎那边现在是 X（不是 omni 切的）」**，
-   * 而 omni 从没设过任何档，谈不上分家。那是这一批要消灭的那类谎，只是反过来。
+   * 于是 Switchback 手上没有档位表、匹配不出任何目标，却收得到引擎的当前档——
+   * 这时报 `diverged` 会让界面上**常亮一条「引擎那边现在是 X（不是 Switchback 切的）」**，
+   * 而 Switchback 从没设过任何档，谈不上分家。那是这一批要消灭的那类谎，只是反过来。
    *
    * `unknown` 的意思是「引擎报了它在哪一档，但**没有可比的基准**」——
    * 为什么没有基准，由 `Thread.trustApply` 的 `unmapped` 那条去讲，不塞进这一个字段。
@@ -83,7 +83,7 @@ export interface EngineAxis {
   match: "aligned" | "diverged" | "unknown"
 }
 
-/** omni 最后一次设档的结果。**设不上要说出来**，而不是像以前那样发一条被过滤掉的状态。 */
+/** Switchback 最后一次设档的结果。**设不上要说出来**，而不是像以前那样发一条被过滤掉的状态。 */
 export interface TrustApply {
   /**
    * `applied` = 发出去了；`unmapped` = 这家的档位表里找不到对应项，保持了它自己的默认档；
@@ -111,7 +111,7 @@ export interface Aside {
   answer: string
 }
 
-/** 会话的信任档。语义与 `@omni/approval` 的 `Trust` 一致，此处只做承载。 */
+/** 会话的信任档。语义与 `@switchback/approval` 的 `Trust` 一致，此处只做承载。 */
 export type Trust = "read-only" | "auto-edit" | "full"
 
 /**
@@ -142,7 +142,7 @@ export interface Thread {
   trust: Trust
   /** 引擎自报的状态。**只有驱动写得动，不参与任何判定**（见 `EngineState`）。 */
   engineState?: EngineState
-  /** omni 最后一次设档的结果。 */
+  /** Switchback 最后一次设档的结果。 */
   trustApply?: TrustApply
   /** 引擎原生的长期目标；跨轮次保留，与 transcript 中的一次性计划分开。 */
   goal?: EngineGoal
@@ -173,7 +173,7 @@ export interface Thread {
   /**
    * **还没发出第一句话的临时会话。**
    *
-   * 点一下「+」、或者 omni 启动时自动开的那条，都是这种：引擎已经起好了
+   * 点一下「+」、或者 Switchback 启动时自动开的那条，都是这种：引擎已经起好了
    *（所以模型清单、斜杠命令都能用），但它还什么都没发生。
    *
    * 界面据此**不把它放进侧栏**——你以为自己只是点开看看，结果攒出一串
@@ -200,7 +200,7 @@ export interface Thread {
    * 引擎自己的会话句柄，用于续跑。
    *
    * 各家格式不同（codex 是它自己的 thread id，Claude 是 SDK 的 session id），
-   * **omni 只负责原样存取，不解释它**。没有句柄的会话恢复出来只能读。
+   * **Switchback 只负责原样存取，不解释它**。没有句柄的会话恢复出来只能读。
    */
   engineHandle?: string
   /** 当前模型的引擎侧 id。没设过就是引擎自己的默认，界面显示为「默认」。 */
@@ -271,7 +271,7 @@ export interface Thread {
    *
    * - `"project"`（缺省）：挂在某个代码目录下，侧栏按项目分组
    * - `"chat"`：**不需要先有项目就能开的对话**。它仍然有 `cwd`
-   *   （自动建在 `~/Documents/omni/` 下），只是不进项目树
+   *   （自动建在 `~/Documents/Switchback/` 下），只是不进项目树
    *
    * ## 为什么 `cwd` 不做成可空
    *
@@ -314,7 +314,7 @@ export interface Thread {
   /** 当前宿主草稿的身份；发送只可清掉自己看到的这一版，不能误清后来取回的新草稿。 */
   draftRevision?: string
   /**
-   * 这条会话是**从引擎那边接过来的**，不是 omni 建的。
+   * 这条会话是**从引擎那边接过来的**，不是 Switchback 建的。
    *
    * 若驱动拿不到正文，界面靠它解释空白：内容仍在引擎那边，而不是上下文丢了。
    * 能拿到正文时它仍用于标识来源，不能把「接管」与「正文缺失」压成同一件事。
@@ -341,8 +341,8 @@ export interface Turn {
  * 一轮的出字节奏。**宿主在这一轮收工时量出来**，挂在 `turn.completed` 上一起落盘——
  * 流式增量本身不落盘，回放时已经没有东西可以再量一遍。
  *
- * 和 `Usage` 不是一类：那是引擎报的「占了多少」，这是 omni 按事件时刻量的「吐得多快」。
- * 量法见 `@omni/store` 的 `pace.ts`。
+ * 和 `Usage` 不是一类：那是引擎报的「占了多少」，这是 Switchback 按事件时刻量的「吐得多快」。
+ * 量法见 `@switchback/store` 的 `pace.ts`。
  */
 export interface TurnPace {
   /** 首字延迟（毫秒）：这一轮开跑，到模型第一次有输出。 */
@@ -364,7 +364,7 @@ export interface TurnPace {
  *   （实测这台机器上 52 条，技能和内置命令都在里面）；
  *   codex 走 app-server 的 `skills/list`。**不硬编码任何一家的命令表**——
  *   用户装了什么技能只有引擎知道，写死的表第二天就过期。
- * - `omni`：omni 自己能做的事（新建、分叉、接力、导出…）。它们**不发给引擎**，
+ * - `switchback`：Switchback 自己能做的事（新建、分叉、接力、导出…）。它们**不发给引擎**，
  *   点了就在本地执行。
  */
 export interface SlashCommand {
@@ -382,7 +382,7 @@ export interface SlashCommand {
   description: string
   /** 参数提示，如 `<file>` 或 `[<pr#>]`。没有参数就缺席。 */
   argumentHint?: string
-  source: "engine" | "omni"
+  source: "engine" | "switchback"
   /**
    * 这条命令是**哪儿来的**：你自己装的、这个项目带的、还是引擎自带的。
    *
@@ -396,17 +396,17 @@ export interface SlashCommand {
 }
 
 /**
- * **引擎自己存的一条会话**——不是 omni 建的。
+ * **引擎自己存的一条会话**——不是 Switchback 建的。
  *
  * codex 在终端里、在 ChatGPT.app 里跑过的对话都躺在它自己的记录里
- *（`thread/list`，这台机器上 25 条）。omni 的定位是「统一各家原生 agent」，
+ *（`thread/list`，这台机器上 25 条）。Switchback 的定位是「统一各家原生 agent」，
  * 那么「你在别处跑的那些」本来就该看得见、接得上。
  *
  * 这里只描述清单；正文能否搬取决于会话接上后是否实现 `EngineSession.transcript`。
  * 两者必须分开：有的公开接口在 resume 回包里给正文，而列表本身仍只有摘要。
  */
 export interface EngineThread {
-  /** 引擎侧句柄。omni 靠它把这条会话接过来续跑。 */
+  /** 引擎侧句柄。Switchback 靠它把这条会话接过来续跑。 */
   handle: string
   /** 这条原生会话属于哪个 profile；接管时必须原样带回驱动。 */
   profile?: string
@@ -450,7 +450,7 @@ export interface EngineSegment {
    *
    * **这是换引擎时唯一要交接的东西**：别的引擎有文件工具，
    * 你让它 review 前面的活，它自己去读这个文件就行——
-   * 比 omni 提炼一份摘要塞给它准确得多，而且不问就不读。
+   * 比 Switchback 提炼一份摘要塞给它准确得多，而且不问就不读。
    */
   logPath?: string
   startedAt: number

@@ -1,4 +1,4 @@
-import type { ModelOption, Trust } from "@omni/protocol"
+import type { ModelOption, Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { trustAxes } from "./trust.js"
 import type { KimiEventUsage, KimiPayload, KimiStatus, KimiUsage } from "./wire.js"

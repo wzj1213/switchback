@@ -8,7 +8,7 @@ export interface Proc {
   pid: number
   ppid: number
   pgid: number
-  /** 完整命令行（`ps -o command=`）。可执行文件的路径里可能有空格（`omni Helper.app`）。 */
+  /** 完整命令行（`ps -o command=`）。可执行文件的路径里可能有空格（`Switchback Helper.app`）。 */
   command: string
 }
 
@@ -32,7 +32,7 @@ export interface Traffic {
 /**
  * `nettop -P -L 1 -x -t external -J bytes_in,bytes_out` 的输出：`名字.pid,收,发,`。
  *
- * **只数 external**：回环不算。kimi web 跑在本机、omni 走 localhost 跟它说话，
+ * **只数 external**：回环不算。kimi web 跑在本机、Switchback 走 localhost 跟它说话，
  * 那些字节从来没离开过这台机器——算进来的话它每回一句话都像在往外发。
  * 名字里可能有点号，所以 pid 取最后一个点号后面那段。
  */
@@ -110,7 +110,7 @@ function underShell(byPid: ReadonlyMap<number, Proc>, pid: number, leader: numbe
  * 单独开着的 ZCode 桌面端的主进程。
  *
  * 主进程认法：可执行文件在 `ZCode.app/Contents/MacOS/` 底下，而且它的父进程不是另一个 ZCode 进程
- *（helper 都挂在主进程下面）。它不是 omni 起的，但它就是那个会把整个工作区连同 .git 打包上传的东西。
+ *（helper 都挂在主进程下面）。它不是 Switchback 起的，但它就是那个会把整个工作区连同 .git 打包上传的东西。
  */
 export function zcodeMains(procs: readonly Proc[]): number[] {
   const isZcode = (p: Proc | undefined): boolean => p !== undefined && /\/ZCode\.app\/Contents\//.test(p.command)

@@ -45,7 +45,7 @@ execFileSync(chrome(), [
   `file://${join(BUILD, "icon.source.html")}`,
 ], { timeout: 60_000, stdio: "ignore" })
 
-const set = mkdtempSync(join(tmpdir(), "omni-icon-")) + ".iconset"
+const set = mkdtempSync(join(tmpdir(), "switchback-icon-")) + ".iconset"
 execFileSync("mkdir", ["-p", set])
 for (const size of SIZES) {
   // iconset 的命名是死规矩：`icon_<n>x<n>.png` 和 `icon_<n>x<n>@2x.png`

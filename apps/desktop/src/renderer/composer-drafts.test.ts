@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { createComposerDrafts, recallComposerDraft, type ComposerDraftMemory } from "./composer-drafts.js"
 
 const command: SlashCommand = { name: "review", description: "审查", source: "engine" }

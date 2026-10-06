@@ -2,7 +2,7 @@ import { openPanelPage } from "./shot-panel.mjs"
 
 const hide = `([...document.querySelectorAll('[aria-label="收起侧边面板"], [aria-label="隐藏侧边面板"]')]
   .find(button => button.getClientRects().length > 0))?.click()`
-const documentPath = "docs/omni-panel-reading-probe.md"
+const documentPath = "docs/switchback-panel-reading-probe.md"
 
 export const PANEL_SIZING_VIEWS = [
   {
@@ -31,7 +31,7 @@ export const PANEL_SIZING_VIEWS = [
       `document.querySelector('[aria-label="返回文件列表"]')?.click()`,
       `(() => {
         const input = document.querySelector('.files-search input')
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'omni-panel-reading-probe')
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'switchback-panel-reading-probe')
         input.dispatchEvent(new Event('input', { bubbles: true }))
       })()`,
       `return new Promise((resolve, reject) => {

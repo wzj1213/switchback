@@ -249,7 +249,7 @@ function followUp(out, { id, cwd, at }) {
     const stamp = later + ++n * 1000
     out.push(line({ type: "item.started", at: stamp, item: { ...item, id: `${id}-b${n}`, turnId: turn, at: stamp } }))
   }
-  // 换家后的第一句：「换引擎自动交接」默认开着，这一轮最前面是 omni 附的交接说明
+  // 换家后的第一句：「换引擎自动交接」默认开着，这一轮最前面是 Switchback 附的交接说明
   push({ kind: "user_message", origin: "handoff", text: HANDOFF_NOTE })
   push({ kind: "user_message", text: "顺手把 throughput 那条滑窗的窗口长度也提出来做成常量吧。" })
   push({
@@ -270,8 +270,8 @@ function followUp(out, { id, cwd, at }) {
     text: "提出来了：`WINDOW_MS = 3000`，注释里写清了这个数是怎么来的——" +
       "再短读数抖，再长看不出「刚才那一下」。\n\n" +
       "[查看代码](apps/desktop/src/renderer/throughput.ts:8) · " +
-      "[预览文档](docs/.omni-link-probe.md) · " +
-      "[大文件](docs/.omni-source-probe.ts:40000) · `http://127.0.0.1:8766`",
+      "[预览文档](docs/.switchback-link-probe.md) · " +
+      "[大文件](docs/.switchback-source-probe.ts:40000) · `http://127.0.0.1:8766`",
   })
   out.push(line({ type: "turn.completed", at: later, turnId: turn, status: "completed" }))
 }
@@ -312,7 +312,7 @@ export function stubThread(id, title, cwd, at) {
  * 会被核销掉，那张卡一次都不出现（`shot-views.mjs` 的「桌宠固定地面」还专门断言了
  * 它是 null）。而真实使用里最常撞见这张卡的恰恰是另一头：**在一个不是仓库的目录里
  * 让引擎干活**（/tmp 下的中间产物、别的项目的目录、临时工作区）。那时候数字只有
- * 引擎一面之词，omni 既核不了、也不该假装核过。
+ * 引擎一面之词，Switchback 既核不了、也不该假装核过。
  *
  * 所以样本里单开这么一条，cwd 指向出图用的临时数据目录（那儿没有 .git）。
  * 它一条就能同时摆出三种状态：**有补丁的**、**引擎没带补丁的**、**落在工作区外的**。

@@ -1,4 +1,4 @@
-import type { Event, PendingQuestion, QuestionResponse, Thread } from "@omni/protocol"
+import type { Event, PendingQuestion, QuestionResponse, Thread } from "@switchback/protocol"
 import { describe, expect, it, vi } from "vitest"
 import { create, setup } from "./host-fixture.js"
 import { validQuestionResponse } from "./question.js"

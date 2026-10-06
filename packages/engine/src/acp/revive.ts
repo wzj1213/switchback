@@ -11,9 +11,9 @@ import type { RpcPeer } from "../rpc.js"
  * Internal error：session/subscribe failed: Session is not active: sess_5ff6cd36-… (code -32004)
  * ```
  *
- * 那句话不是 omni 说的——omni 对 ACP 只发 `session/{new,load,fork,prompt,steer,cancel,
+ * 那句话不是 Switchback 说的——Switchback 对 ACP 只发 `session/{new,load,fork,prompt,steer,cancel,
  * compact,list,set_mode,set_model,set_config_option}`，**没有 `subscribe`**。
- * 是桥在替我们跟后端说话时挂了，omni 只是把 `data.details` 原样转出来。
+ * 是桥在替我们跟后端说话时挂了，Switchback 只是把 `data.details` 原样转出来。
  *
  * 关键是拿那个句柄去 `session/load` **成功了**——它只是睡着了，不是没了。
  * ZCode 自己也分得清这两句：不活跃是 `Session is not active`，

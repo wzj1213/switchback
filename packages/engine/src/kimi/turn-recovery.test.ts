@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { KimiApi } from "./http.js"
 import { KimiTurnEvents } from "./turn-events.js"
 import { reconcileKimiTurn } from "./turn-recovery.js"

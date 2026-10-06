@@ -29,7 +29,7 @@ import {
  *
  * 拆成一个 hook 不只是为了行数——**这五个值属于同一个概念**（「界面现在是什么模式」），
  * 散在 `App` 里和业务状态混在一起时，很容易在加第六个的时候忘了它们是一组的。
- * 真源仍然是 `@omni/store` 的 `ViewState`；这里存的都是**不该落盘**的东西。
+ * 真源仍然是 `@switchback/store` 的 `ViewState`；这里存的都是**不该落盘**的东西。
  */
 export interface Shell {
   /** 用户手动选中的会话。`undefined` = 跟着「最近那个」走。 */

@@ -1,4 +1,4 @@
-import type { ToolCallItem, TurnId } from "@omni/protocol"
+import type { ToolCallItem, TurnId } from "@switchback/protocol"
 import { finishTool, transcriptTool } from "./tool.js"
 import type { KimiTurnTracker } from "./turn.js"
 import type { KimiPayload, KimiTranscriptFrame } from "./wire.js"

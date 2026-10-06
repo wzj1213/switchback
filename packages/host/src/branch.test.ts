@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item } from "@omni/protocol"
-import type { EngineDriver, EngineSession } from "@omni/engine"
+import type { Event, Item } from "@switchback/protocol"
+import type { EngineDriver, EngineSession } from "@switchback/engine"
 import { createHost, type Host } from "./host.js"
 
 /**
  * 分叉的两条路：同一家引擎让它自己复制会话（上下文一点不少），
- * 换一家只开同工作区的空白分支（各家会话格式不通，omni 不注入文本）。
+ * 换一家只开同工作区的空白分支（各家会话格式不通，Switchback 不注入文本）。
  *
  * 这里钉的是**选哪条路**以及**选错时会发生什么**——后者更要紧：
  * 普通分叉可退回空白分支；“从这里重来”承诺上下文，失败必须明说。

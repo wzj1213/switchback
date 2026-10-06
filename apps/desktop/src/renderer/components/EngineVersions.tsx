@@ -22,8 +22,8 @@ import { rescanMessage } from "../rescan-message.js"
  *
  * ## 表里没有的那些
  *
- * 只列 omni **确实知道版本来源**的那几家。第三方 ACP 引擎的版本与安装由它自己管，
- * omni 编不出那条命令——这一点写在组说明里，不在表里摆一行「未知」占位。
+ * 只列 Switchback **确实知道版本来源**的那几家。第三方 ACP 引擎的版本与安装由它自己管，
+ * Switchback 编不出那条命令——这一点写在组说明里，不在表里摆一行「未知」占位。
  *
  * 主进程缓存探测结果六小时；「重新检查」走的是**同一条通道的 `again` 分支**，
  * 由 `useAsync` 传下去——以前这里自己再发一次强制请求，于是两条请求赛跑，
@@ -34,10 +34,10 @@ export function EngineVersions({
 }: {
   onCopy: (text: string) => void
 }): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   const load = useMemo(
-    () => (omni === undefined ? undefined : (again: boolean) => omni.engineVersions(again)),
-    [omni],
+    () => (switchback === undefined ? undefined : (again: boolean) => switchback.engineVersions(again)),
+    [switchback],
   )
   const state = useAsync<readonly EngineVersion[]>(load)
   const [updating, setUpdating] = useState<string | undefined>(undefined)
@@ -88,7 +88,7 @@ export function EngineVersions({
             setRescanning(true)
             setRescanned(undefined)
             setPatched({})
-            void (omni?.rescanEngines() ?? Promise.resolve({ changed: [], needsRestart: [] }))
+            void (switchback?.rescanEngines() ?? Promise.resolve({ changed: [], needsRestart: [] }))
               .then((done) => {
                 setRescanned(rescanMessage(done.changed, done.needsRestart))
               })
@@ -130,7 +130,7 @@ export function EngineVersions({
  * 读取那两种状态。**收成一个出口**：两句话分开写的下场这个仓库见过——
  * 同一块面板里几句「正在读…」字号和内边距各不相同，而它们在用户眼里是同一件事。
  *
- * 上一版还有第三个分支「omni 没有这一家的版本来源」——那是**按家看**时才存在的
+ * 上一版还有第三个分支「Switchback 没有这一家的版本来源」——那是**按家看**时才存在的
  * 状态。摊平成一张表之后没有来源的那几家压根不在表里，那句话搬进了组说明。
  */
 function Probe({ loading, failed }: { loading: boolean; failed: boolean }): React.JSX.Element | null {
@@ -155,7 +155,7 @@ function EngineRow({
   onDone,
 }: EngineRowProps): React.JSX.Element {
   const [result, setResult] = useState<UpdateResult | undefined>(undefined)
-  const omni = bridge()
+  const switchback = bridge()
   const running = active === version.engine
   const actionable = version.update !== undefined && (version.stale || version.latest === undefined)
 
@@ -170,7 +170,7 @@ function EngineRow({
             aria-busy={running}
             title={`将执行：${version.update ?? ""}`}
             onClick={() => {
-              const request = omni?.updateEngine(version.engine)
+              const request = switchback?.updateEngine(version.engine)
               if (request === undefined) return
               onActive(version.engine)
               setResult(undefined)

@@ -1,12 +1,12 @@
-import type { ItemId, TurnId } from "@omni/protocol"
-import type { Event } from "@omni/protocol"
+import type { ItemId, TurnId } from "@switchback/protocol"
+import type { Event } from "@switchback/protocol"
 
 /**
  * 逐字那一路：把 SDK 的 `stream_event` 翻成 `item.delta`。
  *
  * ## 在这之前 claude 一条 delta 都不发
  *
- * 实测（2026-08-25，CLI 2.1.245）：跑一句「数到 40」，omni 收到的是
+ * 实测（2026-08-25，CLI 2.1.245）：跑一句「数到 40」，Switchback 收到的是
  * **一条 `item.started`，`text` 里已经是整段答案**，然后 `usage.updated`、
  * `turn.completed`——总共四条事件，`item.delta` 零条。
  *

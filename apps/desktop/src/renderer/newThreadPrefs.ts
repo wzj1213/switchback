@@ -1,4 +1,4 @@
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import type { EnginePick, LastUsed, Settings } from "../shared/settings.js"
 
 /**

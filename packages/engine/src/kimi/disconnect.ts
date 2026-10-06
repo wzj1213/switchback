@@ -12,5 +12,5 @@ function closeNote(code: number | undefined, reason: string | undefined): string
 export function disconnectText(cause: KimiDisconnect): string {
   if (cause.kind === "closed") return `Kimi 的实时连接断了${closeNote(cause.code, cause.reason)}，正在接回`
   if (cause.kind === "resync") return `Kimi 的实时流要重新同步（${cause.why}），正在按会话快照接回`
-  return `omni 处理 Kimi 推来的消息时出错（${cause.message}），正在按会话快照接回`
+  return `Switchback 处理 Kimi 推来的消息时出错（${cause.message}），正在按会话快照接回`
 }

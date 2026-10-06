@@ -100,7 +100,7 @@ export async function worksiteInfo(cwd: string): Promise<WorksiteInfo> {
  * ## 为什么界面需要它
  *
  * 变更汇总卡上那个数只认**编辑类工具报上来的**改动。引擎用 shell 直接写文件
- * （`sed -i`、`>` 重定向、跑一个生成脚本）一个都不算——omni 只看见「跑了一条命令」。
+ * （`sed -i`、`>` 重定向、跑一个生成脚本）一个都不算——Switchback 只看见「跑了一条命令」。
  * 于是它跑完 `pnpm build` 改了三十个文件，卡上写着「0 个文件已更改」。
  * 问一次 git 就能把这块盲区摊开。
  *
@@ -164,7 +164,7 @@ export async function workChanges(cwd: string): Promise<WorkChanges | undefined>
 }
 
 export function installWorksiteChannel(worksites: WorksiteSearch): void {
-  ipcMain.handle("omni:worksite", async (_e, value: unknown) => {
+  ipcMain.handle("switchback:worksite", async (_e, value: unknown) => {
     const req = ownedWorksite(value, worksites.owns)
     return req === undefined ? {} : worksiteInfo(req.cwd)
   })

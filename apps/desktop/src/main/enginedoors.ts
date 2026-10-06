@@ -10,14 +10,14 @@ import { installDshProfileChannel } from "./dsh-profiles.js"
 /**
  * **各家引擎自己的设置在哪儿。**
  *
- * ## omni 在这件事上只做一件事：把门指出来
+ * ## Switchback 在这件事上只做一件事：把门指出来
  *
- * 不解析、不改写、不在 omni 里再造一套表单。理由写在 `AGENTS.md` 的产品边界总纲里：
- * omni 与引擎是共建者，不是上下级。它们各自的配置格式、默认值、生效时机都是它们的事，
- * omni 抄一份进来就得跟着它们改——而厂商改的时候不会通知我们，
+ * 不解析、不改写、不在 Switchback 里再造一套表单。理由写在 `AGENTS.md` 的产品边界总纲里：
+ * Switchback 与引擎是共建者，不是上下级。它们各自的配置格式、默认值、生效时机都是它们的事，
+ * Switchback 抄一份进来就得跟着它们改——而厂商改的时候不会通知我们，
  * 于是界面上摆着一份**过期的、看起来还能用的**设置。
  *
- * 反过来，「配置在哪儿」这件事 omni 是知道的（它本来就要读这些文件算钩子），
+ * 反过来，「配置在哪儿」这件事 Switchback 是知道的（它本来就要读这些文件算钩子），
  * 而用户往往不知道。把路径摆出来 + 一颗「打开」，正好落在两者之间。
  *
  * ## 为什么要报 `exists`
@@ -135,13 +135,13 @@ export function editableEngineDoorPaths(doors: readonly EngineDoor[]): readonly 
 export function installEngineDoorChannel(): void {
   // 只允许打开刚发给设置页、并且确实存在的那几份。渲染层拿不到通用文件打开口子。
   const shown = new Set<string>()
-  ipcMain.handle("omni:engineDoors", async (_e, req?: { cwd?: string; dshProfile?: string }) => {
+  ipcMain.handle("switchback:engineDoors", async (_e, req?: { cwd?: string; dshProfile?: string }) => {
     const doors = await engineDoors(req?.cwd, req?.dshProfile)
     shown.clear()
     for (const path of editableEngineDoorPaths(doors)) shown.add(path)
     return doors
   })
-  ipcMain.on("omni:openEngineFile", (_e, path: string) => {
+  ipcMain.on("switchback:openEngineFile", (_e, path: string) => {
     if (shown.has(path)) void shell.openPath(path)
   })
 }

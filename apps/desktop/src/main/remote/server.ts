@@ -2,8 +2,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { hostname } from "node:os"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type WebSocket } from "ws"
-import type { Command, Event, Trust } from "@omni/protocol"
-import type { Ledger } from "@omni/wire"
+import type { Command, Event, Trust } from "@switchback/protocol"
+import type { Ledger } from "@switchback/wire"
 import type { Sink, Sinks } from "../sink.js"
 import { checkRequest, headersOf } from "./fence.js"
 import { createSession } from "./session.js"
@@ -24,14 +24,14 @@ import type { TokenStore } from "./tokens.js"
  */
 
 export const WS_PATH = "/api/stream"
-export const WS_PROTOCOL = "omni.v1"
+export const WS_PROTOCOL = "switchback.v1"
 
 /** 配对请求的体积上限。它只有两个短字段，给这么多已经是宽的。 */
 const MAX_BODY = 4096
 
 export interface RemoteConfig {
   port: number
-  /** 隧道那头对外的 authority（`omni.example.com:8443`）。空 = 只认回环。 */
+  /** 隧道那头对外的 authority（`switchback.example.com:8443`）。空 = 只认回环。 */
   trustedHosts: readonly string[]
   /** 远程连接的档位上限。 */
   maxTrust: Trust
@@ -138,7 +138,7 @@ async function handlePair(deps: RemoteDeps, req: IncomingMessage, res: ServerRes
  * 记下一台设备的推送订阅。
  *
  * **要带令牌**：订阅是「往这台设备推」的凭据，谁都能写的话，
- * 任何人都能让 omni 把你的会话标题推到他自己的手机上。
+ * 任何人都能让 Switchback 把你的会话标题推到他自己的手机上。
  */
 async function handleSubscribe(deps: RemoteDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const device = deps.tokens.verify(bearer(req))
@@ -181,7 +181,7 @@ function safeParse(text: string): Record<string, unknown> | undefined {
 }
 
 /** 被闸门拦下时给人的那句话。**指向要改的那一栏**，而不是只说「被拒了」。 */
-const FENCE_HINT = "在那台 Mac 上打开 omni → 设置 → 远程访问，把「隧道那头的域名」填成你现在地址栏里的 host[:端口]（不要带 https://）"
+const FENCE_HINT = "在那台 Mac 上打开 Switchback → 设置 → 远程访问，把「隧道那头的域名」填成你现在地址栏里的 host[:端口]（不要带 https://）"
 
 function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) => void {
   return (req, res) => {

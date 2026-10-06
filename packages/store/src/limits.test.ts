@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { RateLimits } from "@omni/protocol"
+import type { RateLimits } from "@switchback/protocol"
 import { mergeRateLimits } from "./limits.js"
 
 const primary = { usedPercent: 20, windowDurationMins: 10_080 }

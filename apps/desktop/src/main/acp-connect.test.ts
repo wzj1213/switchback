@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { AcpTrial } from "@omni/engine"
+import type { AcpTrial } from "@switchback/engine"
 import type { ConnectProgress } from "../shared/acp-registry.js"
 import { connectAgent, type ConnectDeps } from "./acp-connect.js"
 import { parseRegistry } from "./acp-registry-model.js"
@@ -16,7 +16,7 @@ const AGENTS = parseRegistry({ agents: [
 const OK: AcpTrial = { ok: true, protocolVersion: 1, capabilities: [], authMethods: [{ id: "oauth", name: "Log in", kind: "agent" }] }
 
 function setup(options: { trial?: AcpTrial; file?: unknown; npx?: boolean; inUse?: boolean } = {}) {
-  const userData = mkdtempSync(join(tmpdir(), "omni-connect-"))
+  const userData = mkdtempSync(join(tmpdir(), "switchback-connect-"))
   if (options.file !== undefined) writeFileSync(join(userData, ENGINES_FILE), JSON.stringify(options.file), "utf8")
   const steps: ConnectProgress["phase"][] = []
   const trials: unknown[] = []

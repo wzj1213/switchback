@@ -12,14 +12,14 @@
  * node --import jiti/register apps/desktop/harness/web.ts
  * ```
  *
- * 打印出来的令牌可以直接塞进 `localStorage.omni.token`，跳过配对屏。
+ * 打印出来的令牌可以直接塞进 `localStorage.switchback.token`，跳过配对屏。
  * 加 `--live` 会每两秒往会话里追加一段流式文本，用来看滚动与贴底。
  */
 import { createHash } from "node:crypto"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import type { Command, Event, Item, Lane, Thread } from "@omni/protocol"
-import { createLedger } from "@omni/wire"
+import type { Command, Event, Item, Lane, Thread } from "@switchback/protocol"
+import { createLedger } from "@switchback/wire"
 import { createTokenStore, type Device } from "../src/main/remote/tokens.js"
 import { startRemote } from "../src/main/remote/server.js"
 import type { Sink } from "../src/main/sink.js"
@@ -31,8 +31,8 @@ import { promptEcho } from "./web-prompt.js"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 /** 端口与可信 Host 都能用环境变量覆盖：隧道那头的域名要填进来才过得了 Host 闸。 */
-const PORT = Number(process.env["OMNI_HARNESS_PORT"] ?? 17801)
-const TRUSTED = (process.env["OMNI_HARNESS_HOSTS"] ?? "").split(/\s+/).filter((s) => s !== "")
+const PORT = Number(process.env["SWITCHBACK_HARNESS_PORT"] ?? 17801)
+const TRUSTED = (process.env["SWITCHBACK_HARNESS_HOSTS"] ?? "").split(/\s+/).filter((s) => s !== "")
 /** 固定令牌，**只在这个 harness 里**。真实的令牌是 32 字节随机数。 */
 const DEV_TOKEN = "harness-dev-token-not-a-secret"
 
@@ -49,7 +49,7 @@ const NATIVE_NOTIFICATION: Event = {
 const thread = (id: string, title: string, status: Thread["status"]): Thread => ({
   id,
   title,
-  cwd: "/Users/you/work/omni",
+  cwd: "/Users/you/work/switchback",
   engine: id === "t-2" ? "claude" : "codex",
   trust: "auto-edit",
   status,
@@ -135,7 +135,7 @@ const items: readonly Item[] = [
     at: at + 5,
     toolCallId: "i-7",
     tool: "Bash",
-    summary: "rm -rf /Users/you/work/omni/apps/web/dist && pnpm --filter @omni/web run build",
+    summary: "rm -rf /Users/you/work/switchback/apps/web/dist && pnpm --filter @switchback/web run build",
     status: "pending",
     reason: "这条命令里有 `rm -rf`，解析不出它最终会删到哪儿——按红线表必须问你一次。",
     rememberHint: "本会话内的构建命令",
@@ -189,14 +189,14 @@ async function replayHarness(ledger: ReturnType<typeof createLedger>, sinks: Sin
   // t-长 与 t-1 的正文就在这份基线里；其余两条故意留给 watch → thread，
   // 同生产分级 replay 一样验到「按需补正文」与真正空会话的收口。
   sink.send({
-    channel: "omni:replay",
+    channel: "switchback:replay",
     replay: { events: seed, resumeAt: ledger.latest(), epoch: EPOCH, bodies: ["t-长", "t-1"] },
   })
   await Promise.resolve()
   // replay 收尾会清历史横幅；稍后作为真正的 live event 推，才能验到原生瞬时通知。
   setTimeout(() => {
     const sealed = ledger.seal([NATIVE_NOTIFICATION])
-    for (const target of new Set([...sinks, sink])) target.send({ channel: "omni:events", sealed })
+    for (const target of new Set([...sinks, sink])) target.send({ channel: "switchback:events", sealed })
   }, 250)
 }
 
@@ -250,10 +250,10 @@ function main(): void {
       console.log(`[${level}] ${message}`)
     },
   }).then(() => {
-    console.log(`\nomni web harness: http://127.0.0.1:${String(PORT)}`)
+    console.log(`\nswitchback web harness: http://127.0.0.1:${String(PORT)}`)
     console.log(`令牌：${DEV_TOKEN}`)
     console.log(`配对码：${pairing.code}`)
-    console.log(`跳过配对：localStorage.setItem("omni.token", ${JSON.stringify(DEV_TOKEN)})\n`)
+    console.log(`跳过配对：localStorage.setItem("switchback.token", ${JSON.stringify(DEV_TOKEN)})\n`)
     if (process.argv.includes("--live")) live(ledger, sinks)
   })
 }
@@ -271,7 +271,7 @@ function live(ledger: ReturnType<typeof createLedger>, sinks: Sink[]): void {
 
 function broadcast(ledger: ReturnType<typeof createLedger>, sinks: readonly Sink[], events: readonly Event[]): void {
   const sealed = ledger.seal(events)
-  for (const sink of sinks) sink.send({ channel: "omni:events", sealed })
+  for (const sink of sinks) sink.send({ channel: "switchback:events", sealed })
 }
 
 main()

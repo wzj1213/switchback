@@ -6,8 +6,8 @@ import type {
   QuestionResponse,
   Thread,
   ThreadId,
-} from "@omni/protocol"
-import type { InteractionWait } from "@omni/engine"
+} from "@switchback/protocol"
+import type { InteractionWait } from "@switchback/engine"
 import { emit, isCurrent, type Ctx, type Live } from "./ctx.js"
 
 const DISMISSED: QuestionResponse = { dismissed: true }

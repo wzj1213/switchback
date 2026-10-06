@@ -1,4 +1,4 @@
-import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@switchback/protocol"
 import type { EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { KimiActivations } from "./activation.js"
 import { KimiActivityTracker } from "./activity.js"

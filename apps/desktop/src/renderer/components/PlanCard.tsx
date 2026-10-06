@@ -1,6 +1,6 @@
 import { useState } from "react"
-import type { PlanItem } from "@omni/protocol"
-import { stepProgressOf } from "@omni/store"
+import type { PlanItem } from "@switchback/protocol"
+import { stepProgressOf } from "@switchback/store"
 import { ChevronIcon } from "./icons.js"
 import { PlanSteps } from "./PlanSteps.js"
 

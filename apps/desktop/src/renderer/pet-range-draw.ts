@@ -1,4 +1,4 @@
-import type { TurnPace } from "@omni/protocol"
+import type { TurnPace } from "@switchback/protocol"
 import { round } from "./pet-foe-art.js"
 import { effOf, spreadOf, TG_R, type Target } from "./pet-range.js"
 
@@ -127,7 +127,7 @@ function holes(g: CanvasRenderingContext2D, { target, at, pal, show }: RangeShot
 }
 
 /**
- * 靶上头那一行。**一行，两种状态，同一个算法**（`@omni/store` 的 `pace.ts`）：
+ * 靶上头那一行。**一行，两种状态，同一个算法**（`@switchback/store` 的 `pace.ts`）：
  *
  * - **在跑**：`≈58 tok/s`。这一轮此刻的出字速度。跑着的时候引擎还没报生成量，
  *   所以一定是估的，带 ≈。刚开头那几百毫秒还算不出来，先印驱动开火的那个滑窗读数，也带 ≈。

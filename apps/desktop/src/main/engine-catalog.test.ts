@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { createEngineCatalog } from "./engine-catalog.js"
 import type { Logger } from "./log.js"
 
-const log: Logger = { file: "/tmp/omni-engine-catalog.log", write: () => undefined }
+const log: Logger = { file: "/tmp/switchback-engine-catalog.log", write: () => undefined }
 
 describe("宿主引擎目录", () => {
   it("首屏快照不等待探测，完成后可读；失效或隐藏时撤掉旧状态", async () => {
@@ -60,8 +60,8 @@ describe("宿主引擎目录", () => {
    * **这条测的是那个「装完了还显示未安装」的 bug。**
    *
    * 缓存原来只有 DSH 改 profile 那一条失效路径，于是在终端里装好一家引擎
-   * 之后，界面上唯一的出路是重启 omni——codex 的安装提示原话就是
-   * 「装好之后重启 omni」。不给 id 的 `invalidate()` 是那条出路。
+   * 之后，界面上唯一的出路是重启 Switchback——codex 的安装提示原话就是
+   * 「装好之后重启 Switchback」。不给 id 的 `invalidate()` 是那条出路。
    */
   it("不给 id 的 invalidate 让**每一家**都重探——装完一家不必重启", async () => {
     const calls = { codex: 0, kimi: 0 }

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { SendIcon, StopIcon } from "./icons.js"
 
 /*
@@ -105,7 +105,7 @@ function Resume({ onResume }: { onResume?: () => void }): React.JSX.Element {
 /**
  * 选中一条命令之后往哪走。
  *
- * **两种命令，两种去处**：omni 自己的就地执行——它们没有参数，
+ * **两种命令，两种去处**：Switchback 自己的就地执行——它们没有参数，
  * 执行完这条输入就完了，所以顺手把输入框清空；引擎的填进输入框，
  * 带参数的还等着人填。
  *
@@ -116,12 +116,12 @@ export function takeCommand(
   command: SlashCommand,
   setText: (text: string) => void,
   setCommand: (command: SlashCommand | undefined) => void,
-  onOmni: (name: string) => void,
+  onSwitchback: (name: string) => void,
 ): void {
-  if (command.source === "omni") {
+  if (command.source === "switchback") {
     setText("")
     setCommand(undefined)
-    onOmni(command.name)
+    onSwitchback(command.name)
     return
   }
   setText("")

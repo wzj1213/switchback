@@ -1,4 +1,4 @@
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption } from "@switchback/protocol"
 
 /**
  * Claude 的推理强度。
@@ -51,7 +51,7 @@ interface RawModel extends EffortAware {
 }
 
 /**
- * 把 SDK 的模型清单变成 omni 的 `ModelOption[]`。
+ * 把 SDK 的模型清单变成 Switchback 的 `ModelOption[]`。
  *
  * 从 `driver.ts` 搬过来是行数闸门逼的，这一刀也顺：**它是一次对清单的纯变换**，
  * 而每一条出来长什么样，一半的答案（强度档）本来就写在这个文件里。

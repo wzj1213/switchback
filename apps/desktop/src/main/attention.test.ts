@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { isAttending, watchTurns } from "./attention.js"
 
 const windowOf = (focused: boolean, destroyed = false): {

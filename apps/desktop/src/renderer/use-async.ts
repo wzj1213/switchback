@@ -81,6 +81,6 @@ export function useAsync<T>(load: ((again: boolean) => Promise<T>) | undefined):
 }
 
 /** 渲染层拿桥的那一句。到处 `typeof window === "undefined"` 判一遍太吵。 */
-export function bridge(): Window["omni"] {
-  return typeof window === "undefined" ? undefined : window.omni
+export function bridge(): Window["switchback"] {
+  return typeof window === "undefined" ? undefined : window.switchback
 }

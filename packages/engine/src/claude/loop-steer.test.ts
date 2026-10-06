@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { capabilitiesOf } from "./caps.js"
 import { createTurnRef, runMessageLoop } from "./loop.js"
@@ -24,7 +24,7 @@ describe("Claude 原生 steer 的阶段折叠", () => {
     expect(capabilitiesOf(undefined).steer).toBe(true)
   })
 
-  it("被打断 result 不收工，插话后的 result 才让同一个 omni turn 收工", async () => {
+  it("被打断 result 不收工，插话后的 result 才让同一个 Switchback turn 收工", async () => {
     const events: Event[] = []
     const ref = createTurnRef(() => undefined)
     ref.current = "turn-steer"

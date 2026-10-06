@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { Item, Thread, ToolCallItem } from "@omni/protocol"
+import type { Item, Thread, ToolCallItem } from "@switchback/protocol"
 import { buildHandoff } from "./build.js"
 
 const thread: Thread = {
   id: "th",
-  title: "omni",
+  title: "switchback",
   cwd: "/w",
   engine: "codex",
   trust: "auto-edit",
@@ -36,7 +36,7 @@ describe("buildHandoff", () => {
   })
 
   it("没有用户消息时退回会话标题，不给空串", () => {
-    expect(buildHandoff(thread, []).goal).toBe("omni")
+    expect(buildHandoff(thread, []).goal).toBe("switchback")
   })
 
   it("后续用户消息进「追加的要求」", () => {
@@ -44,7 +44,7 @@ describe("buildHandoff", () => {
   })
 
   it("换引擎的交接说明不是用户的要求：目标与追加要求都不收它", () => {
-    const note: Item = { id: "h", turnId: "t", kind: "user_message", at: 0, text: "<omni-handoff>…</omni-handoff>", origin: "handoff" }
+    const note: Item = { id: "h", turnId: "t", kind: "user_message", at: 0, text: "<switchback-handoff>…</switchback-handoff>", origin: "handoff" }
     const h = buildHandoff(thread, [note, user("a", "一"), note, user("b", "二")])
     expect([h.goal, h.asks]).toEqual(["一", ["二"]])
   })
@@ -79,7 +79,7 @@ describe("buildHandoff", () => {
       { ...agent("a", "共同结论"), inherited: true as const },
     ]
     expect(buildHandoff(thread, inherited)).toMatchObject({
-      goal: "omni", asks: [], decisions: [], open: [], last: undefined,
+      goal: "switchback", asks: [], decisions: [], open: [], last: undefined,
     })
   })
 

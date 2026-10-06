@@ -410,7 +410,7 @@ describe("失败要说人话", () => {
 /**
  * **有的 agent 把强度放在模型清单的扩展位里**，而不是 `configOptions`。
  * 下面这份是实测 grok 的原文（`grok agent stdio` 的 `session/new` 回包）。
- * omni 原来只翻 `configOptions`，于是 grok 上一档都看不见——而它明明支持四档。
+ * Switchback 原来只翻 `configOptions`，于是 grok 上一档都看不见——而它明明支持四档。
  */
 describe("强度也可能在模型的扩展位里", () => {
   const grok = {

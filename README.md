@@ -1,14 +1,14 @@
-# omni · 同文
+# Switchback
 
 > 原生 coding agent 的接力工作台。
 
 **一家卡住，换一家接着干。**
 
-在 Claude Code、Codex、Kimi Code、Grok 与 DSH 之间延续同一件工作。omni 会把目标、
+在 Claude Code、Codex、Kimi Code、Grok 与 DSH 之间延续同一件工作。Switchback 会把目标、
 工作树、各家的原生会话句柄，以及引擎公开可定位的原始记录路径留在同一条工作线上；每一家仍运行自己的原生进程，
-使用自己的登录、模型、配置和工具。换过去时 omni 不替你写提示词，也不会把一份自制摘要塞进模型上下文。
+使用自己的登录、模型、配置和工具。换过去时 Switchback 不替你写提示词，也不会把一份自制摘要塞进模型上下文。
 
-接力之后也可以切回来——上一家自己的原生会话句柄仍然保留。omni 管的是一条工作的连续性，
+接力之后也可以切回来——上一家自己的原生会话句柄仍然保留。Switchback 管的是一条工作的连续性，
 不是把多家 agent 编成一支自动协作的队伍。
 
 目前内置五家：Codex、Claude Code、Kimi Code、Grok 与 DSH；其他讲 ACP 的引擎也可以注册。
@@ -23,7 +23,7 @@ coding agent 各有所长，也都会遇到自己的问题：
 - 想让另一家从头再试，同时保留原来的结果
 
 通常这意味着重开窗口、重新选择项目，再找回上一家改到了哪里。
-omni 保留同一个工作区、界面历史和每家的原生句柄；需要新引擎看上一段原文时，
+Switchback 保留同一个工作区、界面历史和每家的原生句柄；需要新引擎看上一段原文时，
 从时间线拿到该引擎确实提供的记录路径，再由你明确让它自己读取。
 
 ## 接力怎么工作
@@ -40,10 +40,10 @@ flowchart LR
 
 | 会继续保留 | 不会自动送进新引擎上下文 |
 | --- | --- |
-| 同一个工作区与磁盘上的真实文件 | omni 编写的摘要、提示词或提醒 |
-| omni 界面里的完整工作线 | 另一家引擎的隐藏推理与私有模型上下文 |
+| 同一个工作区与磁盘上的真实文件 | Switchback 编写的摘要、提示词或提醒 |
+| Switchback 界面里的完整工作线 | 另一家引擎的隐藏推理与私有模型上下文 |
 | 每一家自己的原生会话句柄 | 凭证与登录信息 |
-| 引擎确实公开的原始记录路径（若有） | omni 猜测出来的状态 |
+| 引擎确实公开的原始记录路径（若有） | Switchback 猜测出来的状态 |
 
 工作区是真源；接手后你可以直接给下一句，也可以明确给出时间线里的路径，让它自行核对原文和代码。
 
@@ -61,20 +61,20 @@ flowchart LR
 
 ## “原生”意味着什么
 
-omni 启动的是你本机已经安装并登录过的 coding agent：
+Switchback 启动的是你本机已经安装并登录过的 coding agent：
 
-- **不另外索要或代管凭证。** 没有 omni 自己的 API key、OAuth 或 token 仓库。
+- **不另外索要或代管凭证。** 没有 Switchback 自己的 API key、OAuth 或 token 仓库。
 - **不代理模型请求。** 请求由各家原生进程直接发出。
 - **不重写 agent loop、提示词或工具。** 各家的上游升级会被原样继承。
 - **不替引擎猜能力和状态。** 引擎报告什么，界面就展示什么；分辨不出就明确说不知道。
 - **不碰凭证存储。** 不读 `.credentials.json`、`auth.json` 这类凭证文件，也不访问钥匙串。
-  omni 会解析各家的配置文件来说明哪些钩子正在生效，只保留钩子相关字段；
+  Switchback 会解析各家的配置文件来说明哪些钩子正在生效，只保留钩子相关字段；
   具体读哪些文件见下文[「本机数据与网络」](#本机数据与网络)。
 
 源码仓库不包含任何一家的二进制。Claude 完整版使用官方 Agent SDK 提供的平台可执行文件；
 轻量版则使用 `PATH` 上已有的 `claude`。
 
-如果你要的是统一模型网关、自己实现的 agent harness，或自动多 agent 编排，omni 不是那个产品。
+如果你要的是统一模型网关、自己实现的 agent harness，或自动多 agent 编排，Switchback 不是那个产品。
 
 ## 一条工作线里有什么
 
@@ -87,11 +87,11 @@ omni 启动的是你本机已经安装并登录过的 coding agent：
 
 ## 适合谁
 
-omni 适合同时使用两家以上原生 coding agent、希望保留各家订阅与配置，
+Switchback 适合同时使用两家以上原生 coding agent、希望保留各家订阅与配置，
 又不想每次切换都重新交代工作的开发者。
 
 它不适合需要统一模型 API、云端 IDE、自动并行 agent 团队，或者纯命令行工作流的人。
-omni 唯一的用户界面是 GUI；命令行只用于开发和打包。
+Switchback 唯一的用户界面是 GUI；命令行只用于开发和打包。
 
 ## 支持的引擎
 
@@ -115,7 +115,7 @@ profile 声明的直接依赖与 patch 状态。确认当前 profile 的原生�
   启动方式（Gemini CLI、GitHub Copilot、goose、OpenCode、Qwen Code……）。点「接入」先摆出要执行的命令
   或要下载的包与校验值，确认后装好、握手试接、写进 `engines.json`，不用重启；注册表有新版时给「升级」。
 - **手动接入**：注册表里没有的，指一个可执行文件，答得上 ACP 握手才让接。
-- **登录**：试接时列出它自己报的登录方式。浏览器那一类由它自己办（omni 只转一次 `authenticate`），
+- **登录**：试接时列出它自己报的登录方式。浏览器那一类由它自己办（Switchback 只转一次 `authenticate`），
   终端那一类在系统「终端」里跑它自己的登录界面。开会话时它说要先登录，界面会显示「需要登录」并给出去登录的路。
 
 ## 跑起来
@@ -141,18 +141,18 @@ pnpm test:live    # 真引擎测试，默认不跑；需要本机装好并登录
 使用前提：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh`）并按各家方式完成登录；
 Claude 完整版内置 SDK 对应的平台可执行文件，轻量版要求 `claude --version` 可运行。
 DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让选中的 profile
-能完成 ACP 握手；之后在 omni 的设置 → 引擎 → DSH 中选择 profile 并确认接入。
+能完成 ACP 握手；之后在 Switchback 的设置 → 引擎 → DSH 中选择 profile 并确认接入。
 profile、凭证与插件版本仍由 DSH 自己管理；当前官方 automation-only ACP 没有报告续跑能力时，
-omni 会明确拒绝恢复旧会话，不会静默开一条空会话冒充接上。
+Switchback 会明确拒绝恢复旧会话，不会静默开一条空会话冒充接上。
 它当前也只从 ACP 提交最终 assistant 文本，推理与工具活动留在 DSH 自己的 session log；
-因此 omni 的转录区不会编造缺席的工具行，最终文件变化仍由工作树开场基线与审核面板核对。
-omni 直接使用各家的原生登录态，不另外配置密钥。
+因此 Switchback 的转录区不会编造缺席的工具行，最终文件变化仍由工作树开场基线与审核面板核对。
+Switchback 直接使用各家的原生登录态，不另外配置密钥。
 
 当前打出来的包没有签名（`identity: null`）。首次打开要在
 「系统设置 → 隐私与安全性」里放行，或者运行：
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/omni.app
+xattr -dr com.apple.quarantine /Applications/Switchback.app
 ```
 
 远程访问的配对、隧道与设备吊销见 [`docs/远程访问设置.md`](docs/远程访问设置.md)。
@@ -161,24 +161,24 @@ xattr -dr com.apple.quarantine /Applications/omni.app
 
 ### 会读取的别家文件
 
-这些文件都只在本机使用，omni 不会把它们发出去。
+这些文件都只在本机使用，Switchback 不会把它们发出去。
 
 | 读什么 | 为什么 | 留下什么 |
 | --- | --- | --- |
 | `~/.claude/settings.json`、`~/.codex/config.toml`、`~/.kimi-code/config.toml`、`~/.grok/` 下的配置与 hooks，以及项目里的同名文件 | 在「环境」页列出正在生效的钩子 | 只留钩子相关字段。这些文件里如果写着 provider key，会随整份文件一起被解析，但不会保留 |
-| `~/.claude/projects/` 下的会话记录 | 列出、接管 Claude 的历史会话 | 接管时，把最近的记录写进 omni 自己的会话日志 |
+| `~/.claude/projects/` 下的会话记录 | 列出、接管 Claude 的历史会话 | 接管时，把最近的记录写进 Switchback 自己的会话日志 |
 | `~/.claude.json` | 只在 SDK 取不到账号信息时，用来显示登录的是谁 | `oauthAccount` 里的名字、邮箱、套餐 |
 | `~/.kimi-code/session_index.jsonl`、`~/.grok/sessions/` 的目录结构 | 在时间线上给出引擎原始记录的路径 | 只定位路径，不读记录内容 |
 | `~/.dsh/profiles/*/package.json` | 展示 DSH 各 profile 的组装情况 | bundle 顺序与依赖版本 |
 | 项目里的 `AGENTS.md`、`CLAUDE.md` | 判断项目指令在不在 | 只看文件是否存在 |
 
 - **账号与额度**：优先走各家接口，也就是 Claude Agent SDK、`codex app-server` 和 `kimi web` 的本地 API。
-- **Kimi 的本地会话 token**：来自 omni 自己启动的 `kimi web` 进程的输出，只放在内存里，只发往回环地址。
-- **环境变量与 PATH**：引擎子进程继承你的环境变量。启动时，omni 会以登录 shell 取一次 `PATH`，这会执行你的 shell 配置文件。
+- **Kimi 的本地会话 token**：来自 Switchback 自己启动的 `kimi web` 进程的输出，只放在内存里，只发往回环地址。
+- **环境变量与 PATH**：引擎子进程继承你的环境变量。启动时，Switchback 会以登录 shell 取一次 `PATH`，这会执行你的 shell 配置文件。
 
-### omni 自己存的东西
+### Switchback 自己存的东西
 
-数据目录是 `~/Library/Application Support/omni`，里面有：
+数据目录是 `~/Library/Application Support/Switchback`，里面有：
 
 - 设置、审批规则、粘贴进来的图片
 - 会话事件流，包含完整的提示词、回复和工具输出
@@ -188,19 +188,19 @@ xattr -dr com.apple.quarantine /Applications/omni.app
 - `acp-registry.json`：ACP 注册表的本机缓存
 - 远程设备表：令牌只存哈希
 
-不属于任何项目的对话，会在 `~/Documents/omni/` 下建目录。
+不属于任何项目的对话，会在 `~/Documents/Switchback/` 下建目录。
 
 ### 网络
 
-omni 没有遥测、统计或崩溃上报，崩溃转储只留在本机。omni 自己发起的联网只有下面这些：
+Switchback 没有遥测、统计或崩溃上报，崩溃转储只留在本机。Switchback 自己发起的联网只有下面这些：
 
 - **引擎版本检查**：启动约 8 秒后运行。对用 npm 全局安装的 codex / kimi 执行 `npm view`，装了 grok 时执行 `grok update --check`。
 - **应用更新检查**：`apps/desktop/package.json` 里的 `updateFeed` 默认为空，也就是整个关闭。
 - **ACP 注册表**：打开设置里的「安装与接入」、而本机缓存超过一小时时，从 `cdn.agentclientprotocol.com`
   取一次注册表（约 60 KB）；点「刷新」也会取。
 - **你在「安装与接入」里点「接入」「升级」时**：npx / uvx 分发的由它们按你自己的 npm / uv 配置下载包；
-  二进制分发的由 omni 从注册表登记的地址下载，并按注册表给的 sha256 校验。
-- **你点某种「登录」时**：由那一家引擎自己联网（通常会打开浏览器），omni 只转达你选的方式。
+  二进制分发的由 Switchback 从注册表登记的地址下载，并按注册表给的 sha256 校验。
+- **你点某种「登录」时**：由那一家引擎自己联网（通常会打开浏览器），Switchback 只转达你选的方式。
 - **远程访问**：默认关闭；打开后也只监听 `127.0.0.1`，由你自己的隧道暴露出去。开启通知后，会向浏览器的推送服务发送加密消息。
 - **你在设置里点「安装 / 更新」引擎时**：执行对应的安装命令。
 
@@ -247,11 +247,11 @@ pnpm check       # 提交前必须全绿
 pnpm test:watch
 ```
 
-工程规范见 [`AGENTS.md`](AGENTS.md)。名字取自「书同文」——多家写法，一条工作线。
+工程规范见 [`AGENTS.md`](AGENTS.md)。名字是山路上的之字形折返道（switchback）：坡太陡，就折个弯接着往上走；也是字面上的「切回去」——接力之后，随时能切回上一家。
 
 ## 许可与商标
 
-omni 的源码以 [Apache License 2.0](LICENSE) 发布。
+Switchback 的源码以 [Apache License 2.0](LICENSE) 发布。
 
 - **Claude Agent SDK 不在此列。** `@anthropic-ai/claude-agent-sdk` 及其平台可执行文件是 Anthropic 的专有软件，
   使用受 Anthropic 的条款约束。
@@ -259,7 +259,7 @@ omni 的源码以 [Apache License 2.0](LICENSE) 发布。
   - `pnpm dist` 打出的完整版会把 SDK 和平台可执行文件放进安装包。
   - 轻量版只带 SDK 的 JavaScript 部分，不带平台可执行文件。
   - 自行分发安装包之前，请先确认符合 Anthropic 的条款。
-- **与各厂商无关联。** omni 是独立的个人项目，与 Anthropic、OpenAI、Moonshot AI、xAI、DeepSeek
+- **与各厂商无关联。** Switchback 是独立的个人项目，与 Anthropic、OpenAI、Moonshot AI、xAI、DeepSeek
   以及其他引擎的提供方都没有关联，也没有获得它们的认可或赞助。
   Claude、Claude Code、Codex、Kimi、Grok、DSH 等名称与商标归各自的所有者所有，
-  本文提到它们只是为了说明 omni 能驱动哪些引擎。
+  本文提到它们只是为了说明 Switchback 能驱动哪些引擎。

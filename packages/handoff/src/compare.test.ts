@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Handoff } from "./build.js"
-import type { Item, Thread } from "@omni/protocol"
+import type { Item, Thread } from "@switchback/protocol"
 import { compareRuns, comparisonItems } from "./compare.js"
 
 const run = (over: Partial<Handoff>): Handoff => ({

@@ -42,17 +42,21 @@ import { installFilePreviewWatch } from "./file-preview-watch.js"
 import { createTouchedFiles } from "./touched.js"
 import { createAttachmentFiles } from "./attachment-files.js"
 import { createWorksiteSearch } from "./worksite-search.js"
+import { adoptLegacyDataDir } from "./legacy-data-dir.js"
 
 /**
  * Electron 主进程。
  *
- * 现在只负责开窗。`@omni/host` 接进来之后，引擎子进程会住在这一侧，
+ * 现在只负责开窗。`@switchback/host` 接进来之后，引擎子进程会住在这一侧，
  * 渲染层永远不直接 spawn 任何东西——这条边界是故意的：
  * 渲染层崩了不该带走正在跑的引擎。
  */
 
 const isDev = process.env["ELECTRON_RENDERER_URL"] !== undefined
 const buildInfo = readBuildInfo(app.getAppPath())
+
+// **必须是第一个碰数据目录的**：改名前的旧目录要在这之前搬过来，见 legacy-data-dir.ts
+adoptLegacyDataDir()
 
 const log = createLogger(join(app.getPath("userData"), "logs"))
 
@@ -103,7 +107,7 @@ const worksiteSearch = createWorksiteSearch()
  * 只查不装的理由见 `update.ts`：没签名的应用装不了更新。
  */
 const feed = feedOf(
-  buildInfo.updateFeed === undefined ? undefined : { omni: { updateFeed: buildInfo.updateFeed } },
+  buildInfo.updateFeed === undefined ? undefined : { switchback: { updateFeed: buildInfo.updateFeed } },
 )
 
 const runUpdateCheck = async (manual: boolean): Promise<void> => {
@@ -224,17 +228,17 @@ function createWindow(bounds: {
  * 摆两份实现的下场是其中一份迟早不更新，而那份正好是用户用的那份。
  */
 function installAppChannels(): void {
-  ipcMain.handle("omni:appInfo", () => ({
+  ipcMain.handle("switchback:appInfo", () => ({
     version: app.getVersion(),
     // 构建标识（短 sha）。**版本号本身回答不了「你装的是哪一次构建」**——
     // 同一个版本号可能对应好几次重打，而 bug 报告要的正是那个精确的点
     build: buildInfo.build ?? "开发版",
     dataDir: app.getPath("userData"),
   }))
-  ipcMain.on("omni:openEngines", () => {
+  ipcMain.on("switchback:openEngines", () => {
     void shell.openPath(ensureEngineFile(app.getPath("userData")))
   })
-  ipcMain.on("omni:diagnose", () => {
+  ipcMain.on("switchback:diagnose", () => {
     void exportReport(log, crash)
   })
 }
@@ -255,7 +259,7 @@ function installAppChannels(): void {
  */
 function installHello(attached: Attached): void {
   const state = { seeded: false }
-  ipcMain.on("omni:hello", (event) => {
+  ipcMain.on("switchback:hello", (event) => {
     // **认发来 hello 的那扇窗，不认启动时那扇。**
     //
     // 原来写的是 `event.sender !== win.webContents`，闭包捕获的是启动时那个
@@ -281,7 +285,7 @@ function installHello(attached: Attached): void {
 
 /** 开发钩子。全挂在这里，`whenReady` 那段只管应用本身怎么起。 */
 /**
- * 只允许开一个 omni。
+ * 只允许开一个 Switchback。
  *
  * ## 为什么这不是「体验优化」，是数据完整性
  *
@@ -309,7 +313,7 @@ function claimSingleInstance(): boolean {
 if (!claimSingleInstance()) {
   // `app.quit()` 是异步的，这里必须挡住后面的启动流程，
   // 否则这个注定要退出的实例还是会先建窗口、先碰一遍 journal
-  log.write("info", "app", "已经有一个 omni 在跑了，把那扇窗举到前面，这个实例退出")
+  log.write("info", "app", "已经有一个 Switchback 在跑了，把那扇窗举到前面，这个实例退出")
 } else {
   void bootstrap()
 }
@@ -404,7 +408,7 @@ function bootstrap(): Promise<void> {
     installAcpChannels(attached, log)
     // 外发守卫的账和 ZCode 防护状态；开着「给 ZCode 的快照目录上锁」就在起来时锁上
     installGuard(attached, settings.get().zcodeLock, log)
-    // 环在这儿闭合：从这一刻起，装完一家引擎不必重启 omni 就能被认出来
+    // 环在这儿闭合：从这一刻起，装完一家引擎不必重启 Switchback 就能被认出来
     engineRefresh.run = attached.refreshEngines
     const remote = attachRemote({ attached, sinks, settings: settings.get, log })
     relay.notify = remote.relay.notify

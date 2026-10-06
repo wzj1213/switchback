@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process"
-import { NO_CAPABILITIES } from "@omni/protocol"
-import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust, TurnId } from "@omni/protocol"
+import { NO_CAPABILITIES } from "@switchback/protocol"
+import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust, TurnId } from "@switchback/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner } from "../subprocess.js"
@@ -27,7 +27,7 @@ import { SessionRevive } from "./revive.js"
  * ACP 允许客户端认领 `fs/*`（代 agent 读写文件）和 `terminal/*`（代 agent 开终端）。
  *
  * - `fs` **一律不认领**。它的用处是让 agent 看见编辑器里**没存盘的缓冲区**。
- *   omni 没有编辑器，认领了只是把 agent 自己就能做的事绕一圈回到我们这儿。
+ *   Switchback 没有编辑器，认领了只是把 agent 自己就能做的事绕一圈回到我们这儿。
  * - `terminal` **按引擎注入**（`AcpDriverConfig.terminal`），默认不认领。
  *
  * ## `terminal` 这一位曾经写死成 false，那是个 bug
@@ -40,9 +40,9 @@ import { SessionRevive } from "./revive.js"
  * 而表现是**静默的能力损失**——照样读写文件、看起来一切正常，只是测试、构建、git 全废。
  * A/B 实测与修法见 `terminal.ts`，哨兵在 `kimi-shell.live.test.ts`。
  *
- * 拒绝认领的原本理由（「命令跑在 omni 进程里，和引擎自己的沙箱冲突」）对**有**沙箱的
+ * 拒绝认领的原本理由（「命令跑在 Switchback 进程里，和引擎自己的沙箱冲突」）对**有**沙箱的
  * 那几家仍然成立，所以它们维持 false；对 kimi 不成立，因为它根本没有那层沙箱——
- * 真实的取舍是「omni 的进程 vs 完全没有 shell」。
+ * 真实的取舍是「Switchback 的进程 vs 完全没有 shell」。
  *
  * ## 同一个代价：审批的可见性由 agent 决定
  *
@@ -51,7 +51,7 @@ import { SessionRevive } from "./revive.js"
  * **一次 `session/request_permission` 都没发**。换到 `read-only` 档，
  * 同一个改文件的操作立刻变成一条审批请求。
  *
- * 也就是说 omni 的判定器只在 agent 决定问我们时才有发言权。这是「引擎原生」
+ * 也就是说 Switchback 的判定器只在 agent 决定问我们时才有发言权。这是「引擎原生」
  * 这个前提的必然代价，不是可以修的 bug——写在 README 的已知限制里。
  */
 
@@ -405,11 +405,11 @@ class AcpSession implements EngineSession {
      *
      * 反过来写会出一条稳定的假警告（实测 mac2）：`applyTrust` 是 await 的，
      * 而引擎在这个 await 里就把新档推回来了——`onMode` 于是拿**还没更新的**
-     * `trust.current` 去算 `modeAxis`，算出「引擎在 yolo、omni 想要 edit」这种
+     * `trust.current` 去算 `modeAxis`，算出「引擎在 yolo、Switchback 想要 edit」这种
      * 根本不存在的分家。实测那条会话 `trust=full`、引擎正在 `yolo`
      *（full 本来就映射到 yolo），黄字却挂了 17 分钟。
      *
-     * 先记也更合本来的道理：档位下拉显示的**永远是 omni 的档**，它是唯一一个
+     * 先记也更合本来的道理：档位下拉显示的**永远是 Switchback 的档**，它是唯一一个
      *「点了就一定生效」的东西——就算引擎那边接不上，它至少驱动着本机的判定层
      *（见 `trustHint.ts` 开头）。所以 `applyTrust` 抛了也不该退回旧档。
      */
@@ -429,7 +429,7 @@ class AcpSession implements EngineSession {
     // 有在途文本就先收口，否则最后一条消息会永远停在「正在输入」
     closeText(this.updateContext(), this.updates)
     this.clientCalls.dispose()
-    // **替 agent 起的那些进程要一起收掉**：它们的父进程是 omni，不是引擎，
+    // **替 agent 起的那些进程要一起收掉**：它们的父进程是 Switchback，不是引擎，
     // 所以引擎那边的回收管不着它们——不杀就会活过整个应用
     this.state.child?.stdin?.end()
     this.rpc.close("会话正在关闭")
@@ -443,7 +443,7 @@ class AcpSession implements EngineSession {
 export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
   return {
     id: config.id,
-    probe: () => probeCommand(config.command, "检查 engines.json 里写的路径对不对；改完那个文件要重启 omni。"),
+    probe: () => probeCommand(config.command, "检查 engines.json 里写的路径对不对；改完那个文件要重启 Switchback。"),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new AcpSession(req, config)
       // **握手失败也要回收。** `start()` 第一件事就是 spawn，而握手超时 / 对端回

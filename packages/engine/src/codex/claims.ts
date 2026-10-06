@@ -1,11 +1,11 @@
 /**
- * **omni 在握手时认领了 codex 的哪些实验面。**
+ * **Switchback 在握手时认领了 codex 的哪些实验面。**
  *
  * ## 为什么要有这张表
  *
  * app-server 有一部分能力藏在 `initialize` 的 `capabilities` 后面（源码里标着
  * `#[experimental(...)]`）。不认领，引擎就不发——而界面上看到的是**一个格子空着**。
- * 那个空格和「这家引擎确实没有这件事」长得一模一样：**omni 自己的握手把它挡住了，
+ * 那个空格和「这家引擎确实没有这件事」长得一模一样：**Switchback 自己的握手把它挡住了，
  * 却让它伪装成引擎的属性。**
  *
  * 所以认领这件事必须留痕：认了什么、为什么认、认了之后换来哪几条通知。
@@ -49,7 +49,7 @@ export const CLAIMS: Readonly<Record<string, Claim>> = {
 export function claimedCapabilities(): Readonly<Record<string, boolean>> {
   return {
     ...Object.fromEntries(Object.keys(CLAIMS).map((name) => [name, true])),
-    // 0.149.0 的 InitializeCapabilities 已把它列为必填；omni 不代管上游凭据证明。
+    // 0.149.0 的 InitializeCapabilities 已把它列为必填；Switchback 不代管上游凭据证明。
     requestAttestation: false,
   }
 }

@@ -1,4 +1,4 @@
-import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@omni/protocol"
+import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@switchback/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { AsideChip } from "./aside-chip.js"
 import { Bar } from "./ComposerBar.js"

@@ -1,5 +1,5 @@
-import { decide } from "@omni/approval"
-import type { QuestionAnswer, QuestionPrompt, QuestionResponse, Trust } from "@omni/protocol"
+import { decide } from "@switchback/approval"
+import type { QuestionAnswer, QuestionPrompt, QuestionResponse, Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { sanitize } from "../claude/permission.js"
 import { approvalRequest, approvalSummary } from "./approve.js"

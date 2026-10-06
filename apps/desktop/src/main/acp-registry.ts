@@ -15,7 +15,7 @@ import type { Logger } from "./log.js"
  * ## 离线
  *
  * 取不到就给本机那份，并把「取不到」和「这份是什么时候的」一起摆出来——
- * 用户常在没网的地方用 omni，一份旧清单照样能看、能照着接（npx 缓存过的也照样能起）。
+ * 用户常在没网的地方用 Switchback，一份旧清单照样能看、能照着接（npx 缓存过的也照样能起）。
  */
 export const REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json"
 const CACHE_FILE = "acp-registry.json"

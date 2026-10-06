@@ -1,4 +1,4 @@
-import type { ThreadRow } from "@omni/store"
+import type { ThreadRow } from "@switchback/store"
 
 /**
  * 侧栏的分组与行文案。
@@ -16,7 +16,7 @@ import type { ThreadRow } from "@omni/store"
 /**
  * 侧栏那份行：`ThreadRow` 加一个**渲染层自己的**旗子。
  *
- * 未读不属于 `@omni/store`——那份状态是「世界现在长什么样」，两端共用一个归约器，
+ * 未读不属于 `@switchback/store`——那份状态是「世界现在长什么样」，两端共用一个归约器，
  * 而「你看没看过」只有这扇窗知道（它甚至不知道另一台机器上你看没看过）。
  * 旗子挂在行上而不是另开一个集合往下传：它描述的就是这一行，
  * 而侧栏从段到组到行有五层，多传一个集合就是五处都要接一遍。

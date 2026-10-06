@@ -1,4 +1,4 @@
-.omni-mark {
+.switchback-mark {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -10,12 +10,12 @@
   color: var(--accent);
 }
 
-.omni-mark::before {
+.switchback-mark::before {
   content: "";
   width: 75%;
   height: 75%;
   background: currentColor;
-  mask: url("../assets/omni-symbol.svg") center / contain no-repeat;
+  mask: url("../assets/switchback-symbol.svg") center / contain no-repeat;
 }
 
 .sidebar__wordmark {
@@ -30,7 +30,7 @@
   display: none;
 }
 
-.blank > .omni-mark {
+.blank > .switchback-mark {
   width: 48px;
   height: 48px;
   margin-bottom: var(--sp-2);
@@ -69,7 +69,7 @@
     padding-block: var(--sp-4) var(--sp-5);
   }
 
-  .blank > .omni-mark {
+  .blank > .switchback-mark {
     width: 36px;
     height: 36px;
     margin-bottom: 0;

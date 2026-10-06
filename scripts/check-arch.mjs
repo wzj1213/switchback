@@ -16,7 +16,7 @@ import { PACKAGE_GRAPH, renderPackageGraph } from "./package-graph.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
 /** 这些包不得有任何运行时依赖（devDependencies 不限）。 */
-const PURE = new Set(["@omni/protocol", "@omni/approval"])
+const PURE = new Set(["@switchback/protocol", "@switchback/approval"])
 
 const REQUIRED_README_SECTIONS = ["## 拥有什么", "## 不拥有什么", "## 已知限制"]
 
@@ -59,7 +59,7 @@ function checkDependencies({ json }) {
     fail(`${json.name}: 未在 scripts/package-graph.mjs 登记`)
     return
   }
-  const actual = Object.keys(json.dependencies ?? {}).filter((dep) => dep.startsWith("@omni/"))
+  const actual = Object.keys(json.dependencies ?? {}).filter((dep) => dep.startsWith("@switchback/"))
   for (const dep of actual) {
     if (PACKAGE_GRAPH[dep] === undefined) fail(`${json.name} → ${dep}: 目标未在精确依赖图登记`)
     else if (!allowed.includes(dep)) fail(`${json.name} → ${dep}: 精确依赖图中没有这条边`)
@@ -86,7 +86,7 @@ function checkGraphDocs(file) {
 
 function checkPure({ json }) {
   if (!PURE.has(json.name)) return
-  const deps = Object.keys(json.dependencies ?? {}).filter((d) => !d.startsWith("@omni/"))
+  const deps = Object.keys(json.dependencies ?? {}).filter((d) => !d.startsWith("@switchback/"))
   if (deps.length > 0) {
     fail(`${json.name}: 纯逻辑包不得有运行时依赖，实际有 ${deps.join(", ")}`)
   }

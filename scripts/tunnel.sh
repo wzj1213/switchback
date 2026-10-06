@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# omni 的反向隧道：把本机的远程口送到中转服务器的回环上。
+# Switchback 的反向隧道：把本机的远程口送到中转服务器的回环上。
 #
 #   scripts/tunnel.sh start | stop | status | rotate
 #
@@ -25,11 +25,13 @@
 # `127.0.0.1:1` 是个语法合法、实际上永远连不通的目标，效果等价于「本地转发全禁」。
 set -euo pipefail
 
-HOST="${OMNI_TUNNEL_HOST:-kr-omni}"
-PORT="${OMNI_TUNNEL_PORT:-17800}"
-LOCAL="${OMNI_TUNNEL_LOCAL:-17800}"
-KEY="${OMNI_TUNNEL_KEY:-$HOME/.ssh/omni-tunnel}"
+HOST="${SWITCHBACK_TUNNEL_HOST:-kr-omni}"
+PORT="${SWITCHBACK_TUNNEL_PORT:-17800}"
+LOCAL="${SWITCHBACK_TUNNEL_LOCAL:-17800}"
+KEY="${SWITCHBACK_TUNNEL_KEY:-$HOME/.ssh/omni-tunnel}"
 # 认自己的进程用这个标记，不靠 pgrep 猜端口号——那会误伤别人的隧道
+# `kr-omni`、`omni-tunnel` 这几个值**改名之后也不动**：它们是 ~/.ssh/config 里的主机别名、
+# 钥匙文件名和正在跑的隧道命令行里的标记，改了就认不出已有的钥匙和进程
 TAG="omni-tunnel-$PORT"
 
 # **变量后面紧跟全角字符时必须用 `${x}`。** 某些 locale 下 bash 会把
@@ -53,7 +55,7 @@ start)
     -o ServerAliveInterval=30 \
     -o ServerAliveCountMax=3 \
     -o BatchMode=yes \
-    -o "SetEnv=OMNI_TAG=$TAG" \
+    -o "SetEnv=SWITCHBACK_TAG=$TAG" \
     -R "127.0.0.1:$PORT:127.0.0.1:$LOCAL" \
     "$HOST"
   sleep 1
@@ -100,7 +102,7 @@ rotate)
 
   echo "2/5 备份 authorized_keys 并装上新钥匙（旧的先留着）…"
   # 用**你自己的主密钥**登进去：受限的那把跑不了命令
-  ssh "${OMNI_ADMIN_HOST:-kr}" "
+  ssh "${SWITCHBACK_ADMIN_HOST:-kr}" "
     set -e
     cd ~/.ssh
     test -s authorized_keys
@@ -124,7 +126,7 @@ rotate)
     -o BatchMode=yes \
     -o IdentitiesOnly=yes \
     -i "$KEY.new" \
-    -o "SetEnv=OMNI_TAG=$TAG" \
+    -o "SetEnv=SWITCHBACK_TAG=$TAG" \
     -R "127.0.0.1:$PORT:127.0.0.1:$LOCAL" \
     "$HOST"; then
     echo "新钥匙起不来。**旧的还在服务器上，什么都没删** —— $0 start 就能回到原样。" >&2
@@ -142,7 +144,7 @@ rotate)
   if [ -z "$old_key" ]; then
     echo "读不出旧公钥的本体（$KEY.pub），旧钥匙留在服务器上没删。手动清一下。" >&2
   else
-    ssh "${OMNI_ADMIN_HOST:-kr}" "
+    ssh "${SWITCHBACK_ADMIN_HOST:-kr}" "
       set -e
       cd ~/.ssh
       grep -vF '$old_key' authorized_keys > authorized_keys.tmp

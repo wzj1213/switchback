@@ -111,7 +111,7 @@ export function ActivityTokens({ digest, name }: {
       {digest.tokenless.length === 0 ? null : (
         <p className="stat-card__hint">
           跑过、但一次都没报过累计用量：{digest.tokenless.map(name).join("、")}。
-          <strong>这不等于没用过它</strong>——是 omni 手上没有这个数字。
+          <strong>这不等于没用过它</strong>——是 Switchback 手上没有这个数字。
         </p>
       )}
     </section>

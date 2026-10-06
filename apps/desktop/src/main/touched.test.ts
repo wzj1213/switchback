@@ -1,4 +1,4 @@
-import type { Event, Item, ThreadId, ToolStatus } from "@omni/protocol"
+import type { Event, Item, ThreadId, ToolStatus } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import { createTouchedFiles } from "./touched.js"
 

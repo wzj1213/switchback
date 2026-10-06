@@ -17,7 +17,7 @@ export interface ElicitationDeps {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-/** omni 目前只有二元审批卡；需要用户填写字段的表单不能假装已经填好。 */
+/** Switchback 目前只有二元审批卡；需要用户填写字段的表单不能假装已经填好。 */
 function isBinaryApproval(params: WireMcpElicitation): boolean {
   if (params._meta?.codex_approval_kind !== "mcp_tool_call") return false
   if (params.mode !== "form" && params.mode !== "openai/form") return false

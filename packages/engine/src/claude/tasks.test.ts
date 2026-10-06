@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { clearTasks, createTaskState, onTaskMessage, onTaskProgress } from "./tasks.js"
 
 /** 实测抓到的一帧，一字不改。 */
@@ -55,7 +55,7 @@ describe("子 agent 在干什么", () => {
     expect(tasksOf(o.events)?.[0]?.description).toBe("第二步")
   })
 
-  it("**没有 description 就整条不要**——拿工具名拼一句顶替，是 omni 在替引擎说话", () => {
+  it("**没有 description 就整条不要**——拿工具名拼一句顶替，是 Switchback 在替引擎说话", () => {
     const state = createTaskState()
     const o = out()
     onTaskProgress(state, { task_id: "x", last_tool_name: "Read" }, 1, o.sink)

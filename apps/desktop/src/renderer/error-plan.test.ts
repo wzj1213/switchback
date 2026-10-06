@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import { planErrors, retryTarget, type SoftState } from "./error-plan.js"
 
 const said = (id: string, turnId: string, at: number): Item => ({ id, turnId, at, kind: "agent_message", text: "嗯", complete: true })

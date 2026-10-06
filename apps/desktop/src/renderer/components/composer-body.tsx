@@ -100,7 +100,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
           onClearCommand={() => draft.setCommand(undefined)}
           onCommand={(command) => {
             if (aside.take(command, () => draft.setText(""))) return
-            takeCommand(command, draft.setText, draft.setCommand, composer.onOmni)
+            takeCommand(command, draft.setText, draft.setCommand, composer.onSwitchback)
           }}
           searchFiles={composer.searchFiles}
           onChange={draft.setText}

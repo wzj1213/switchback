@@ -1,9 +1,9 @@
-# @omni/engine
+# @switchback/engine
 
-把各家原生 agent 翻译成 `@omni/protocol` 的事件模型。每个驱动一个子目录，
+把各家原生 agent 翻译成 `@switchback/protocol` 的事件模型。每个驱动一个子目录，
 对上暴露同一个 `EngineDriver` 契约，对下讲各家自己的协议。
 
-引擎跑自己的原生进程、用自己的鉴权和模型配置。omni 不重写任何一家的循环。
+引擎跑自己的原生进程、用自己的鉴权和模型配置。Switchback 不重写任何一家的循环。
 
 ## 拥有什么
 
@@ -13,7 +13,7 @@
 - `rpc.ts` —— JSON-RPC 2.0 over 换行分隔 JSON。**codex 与 ACP 共用一份**（对端报的错以 `RpcError` 抛出，错误码留着——ACP 的 `-32000` 只能靠它认）：
   接 ACP 时这个文件从 `codex/` 提到包根，一个字没改就跑通了
 - `claude/` —— Claude Agent SDK 驱动（`@anthropic-ai/claude-agent-sdk`）
-  - `permission.ts` 把 SDK 的 `canUseTool` 请求翻成 `@omni/approval` 的 `Request`，
+  - `permission.ts` 把 SDK 的 `canUseTool` 请求翻成 `@switchback/approval` 的 `Request`，
     再把 `Verdict` 翻回 SDK 的 `PermissionResult`
   - `denials.ts` 配对自动拒绝提示、工具结果与 result 的权威拒绝清单；工具明确落 `denied`，
     保留 Claude 原始原因，拒答回退撤销工具时同步清掉结算缓存
@@ -59,7 +59,7 @@
   - `translate.ts` / `notify.ts` 通知 → 事件；文件 patch 与 MCP progress 原地更新，
     没有 status 的工具以 completed 生命周期收口，模型安全改道同步当前设置
   - `approve.ts` 精确路由 app-server 反向 RPC；`permissions.ts` 把额外网络/文件 profile
-    请求单独翻译成 `@omni/approval`，并按要求回 `{permissions, scope}`
+    请求单独翻译成 `@switchback/approval`，并按要求回 `{permissions, scope}`
   - `user-input.ts` 把原生选项、备注、自由回答与密文标记翻成宿主问题卡，再按 Codex
     的 label / `user_note:` 数组回送；非阻塞问题采用原生 `autoResolutionMs`，缺席才回落 120 秒
   - `server-requests.ts` 持有每条反向 RPC 的取消柄；对端 `serverRequest/resolved`、进程退出
@@ -85,7 +85,7 @@
   - `server.ts` 只接 loopback 地址，一份私有服务由活跃 Kimi 会话共享，最后一条释放时回收
   - `http.ts` / `stream.ts` 负责原生 envelope、游标补发与断线重订；`text-stream.ts`
     按公开 offset 去重和裁重叠后缀，发现缺口就从原子快照水位重建。断开时照实报是怎么断的
-    （`KimiDisconnect`：对面关的带关闭码与原因 / 要重新同步 / omni 自己处理某一帧出错），
+    （`KimiDisconnect`：对面关的带关闭码与原因 / 要重新同步 / Switchback 自己处理某一帧出错），
     `disconnect.ts` 写成 `reconnecting` 的那句 detail；重连 0 → 8 秒退避、共六次，接不回来才报 `crashed`
   - `session.ts` 接会话、审批、模型、档位、历史、侧问与归档；`prompt.ts` 接普通提示与插话
   - `interactions.ts` 接公开的审批与结构化问题：问题文本和选项只做安全清洗，
@@ -94,7 +94,7 @@
   - `activation.ts` 保留原生 skill / plugin command 激活标记并按 activation id 去重；
     `transcript.ts` 隐藏只供模型使用的展开内容，跨页恢复同一标记
   - `activity.ts` 把公开的子代理帧与后台任务帧折成 activity lane：后台任务收下引擎自报的
-    **命令原文**（`task.started` / `task.terminated` 的 `info.command`），命令与结论都不由 omni 拼
+    **命令原文**（`task.started` / `task.terminated` 的 `info.command`），命令与结论都不由 Switchback 拼
   - `shell-history.ts` 按公开 transcript 的 `shell_command` 来源恢复 Kimi 原生 `!` 命令与输出，
     去掉内部 XML 和终端控制字符，不把进程输出冒充用户消息
   - `native-turn.ts` 接住同会话其他 Kimi 原生客户端公开发起的普通用户轮；只有宿主空闲且
@@ -143,9 +143,9 @@
 
 ## 不拥有什么
 
-- **不拥有审批判定**。判定在 `@omni/approval`，本包只做协议翻译与应答。
+- **不拥有审批判定**。判定在 `@switchback/approval`，本包只做协议翻译与应答。
 - 不拥有 UI。需要人工裁决时调 `StartRequest.askUser`，由宿主决定怎么呈现。
-- 不拥有持久化。事件流往外发，落盘是 `@omni/journal` 的事。
+- 不拥有持久化。事件流往外发，落盘是 `@switchback/journal` 的事。
 - 不拥有凭证。ACP 的登录只是把人挑的那种方式转给 agent（`authenticate`），或给出它自己的终端登录命令；
   开浏览器、收回调、存凭证都是 agent 的事，本包看不到任何一个凭证。
 - 不拥有引擎的安装与模型选择——用宿主上已有的原生配置。
@@ -188,15 +188,15 @@
   而一个填错的「最近一次生成量」会让界面算出荒谬的 t/s，比缺席糟得多。
 - **内置 DSH 只启动它公开的 `dsh --profile <profile>`。** 新会话采用设置中选中的 profile，
   旧会话按自己保存的 profile 续接；profile 与插件仍由 DSH 自己管理，
-  omni 不代装、不代升级；兼容性探测会真的发送一次 ACP `initialize`，因此缺 profile、插件依赖错配与
+  Switchback 不代装、不代升级；兼容性探测会真的发送一次 ACP `initialize`，因此缺 profile、插件依赖错配与
   协议版本不合都会按原始启动结果报告，而不是看见配置文件就猜成可握手。该入口没有公开凭证就绪状态，
   所以握手成功不等于 provider/model/API 已可用；桌面层只在用户确认 DSH 原生配置完成后才探测并列出它。
 - **DSH 0.1.0-rc.6 的 automation-only ACP 基线只认领新建文本会话、取消与权限决策。**
   本机握手没有上报模型清单、续跑、分叉、压缩、插话或档位回读；通用驱动因此不显示这些控件，
-  后续能力只随 DSH 自己的 ACP 回包增加，omni 不补一套私有控制面。
+  后续能力只随 DSH 自己的 ACP 回包增加，Switchback 不补一套私有控制面。
 - **同一条 DSH ACP 也不发布工具过程。** 真机让它改临时文件时，文件与最终正文都成功，
   但线上只有 `agent_message_chunk`，没有 `tool_call*`；DSH 源码契约也明确把推理与工具活动留在
-  自己的 session log。omni 不读私有日志反编事件，工作树净变化仍由 desktop 的 Git 基线核对。
+  自己的 session log。Switchback 不读私有日志反编事件，工作树净变化仍由 desktop 的 Git 基线核对。
 - **Claude 侧只覆盖 `SDKMessage` 联合中有当前产品语义的部分。** 该联合有 39 个成员；
   assistant、流式增量、工具结果、轮次结果、用量、订阅限额、权限档、任务生命周期，以及 SDK 明确要求宿主展示的
   `system/informational`、本地斜杠命令输出、权限拒绝、Hook 生命周期、思考 token 进度、记忆召回、
@@ -207,11 +207,11 @@
 - **Claude `/goal` 当前没有可消费的目标状态帧。** SDK 0.3.231 导出了 `SDKActiveGoalMessage`，
   运行时也有转发分支，但内置 CLI 2.1.231 真跑已设置、未完成与完成三条路径都没有向 SDK 流发
   `active_goal`；原生日志里的 `goal_status` 能证明评估器确实运行，却不是公开事件出口。
-  omni 不从命令文本或私有日志反推目标，等 Claude 真正在 SDK 流上报后再接。
+  Switchback 不从命令文本或私有日志反推目标，等 Claude 真正在 SDK 流上报后再接。
 - **Claude Auto 受账号、模型、提供方与管理员策略约束。** SDK 类型公开了该档，
   但运行环境不满足时 Claude 会明确拒绝；驱动保留这个原生失败，不静默退回 `default` 冒充自动审批。
 - **Claude 拒答对话的“修改后重发”不会自动回填输入框。** 当前公开 dialog payload 只带原模型、
-  备用模型、引导文案与撤回 uuid，不带原提示正文，也没有 composer prefill 回调；omni 因此如实结束当前轮，
+  备用模型、引导文案与撤回 uuid，不带原提示正文，也没有 composer prefill 回调；Switchback 因此如实结束当前轮，
   让用户在输入框自行修改后发送，不从 transcript 猜一份文字塞回去。
 - **Claude 的终端专用命令标记只随首轮 `system/init` 出来。** 开场 `supportedCommands()`
   没有该字段，所以全新会话第一条消息前，GUI 的目录可能短暂包含当前版本的
@@ -222,39 +222,39 @@
 - **内置 Kimi 要求带 `web` 子命令与公开 API 的 Kimi Code。** 当前验收版本是 0.38.0；
   启动后还会读 `/meta` 确认 WebSocket 与 bearer 鉴权，缺能力就明确失败，不回退 ACP。
 - **Kimi 0.38.0 的冷 transcript 会丢掉 step finish reason 和多数 interruption reason。**
-  用户主动停止另有公开 `interruption` marker，omni 会据此恢复；`max_tokens` 与安全过滤的 raw reason
-  没有对应的持久字段，只能在实时接入时显示。omni 不从半截正文、token 数或最终状态反猜原因。
+  用户主动停止另有公开 `interruption` marker，Switchback 会据此恢复；`max_tokens` 与安全过滤的 raw reason
+  没有对应的持久字段，只能在实时接入时显示。Switchback 不从半截正文、token 数或最终状态反猜原因。
 - **Kimi 0.38.0 没有公开的终端命令执行路由。** 原生 `!` 由发起它的 TUI 本地执行，公开
-  transcript 只保存输入与输出，实时 `shell.*` 帧也依赖该 TUI 自己持有的输出流。omni 因此只恢复
+  transcript 只保存输入与输出，实时 `shell.*` 帧也依赖该 TUI 自己持有的输出流。Switchback 因此只恢复
   已保存的终端历史，不新增执行按钮、不直接跑本机 shell，也不为别处发起的命令伪造实时状态。
 - **Kimi 后台任务的输出不在实时流上。** 0.38.0 真机（2026-08-25）核对：`task.started` /
   `task.terminated` 只带 `command`、`exitCode`、`startedAt` / `endedAt`，没有任何输出字段；
   输出在它 REST 那侧（`GET /sessions/{id}/tasks` 的 `output_preview`、
-  `/tasks/{id}?with_output=true`），而 omni 目前只在启动与重连读回任务表。所以 lane 上一定有命令原文，
-  **结论只有引擎把它报进任务读回时才有**。omni 不去读它 `~/.kimi-code/…/tasks/*/output.log`——
+  `/tasks/{id}?with_output=true`），而 Switchback 目前只在启动与重连读回任务表。所以 lane 上一定有命令原文，
+  **结论只有引擎把它报进任务读回时才有**。Switchback 不去读它 `~/.kimi-code/…/tasks/*/output.log`——
   那是拿它的零件替它攒功能。要按需取输出，得先有一条「打开这条旁路」的控制面，那是另一件事。
 - **Kimi 实时连接频繁断开的根因还没钉死。** 2026-09 在一台机器的日志里见到两千多次断开，
   成对出现、活跃时段里约每 32–37 秒一次——正好是 Kimi 服务端心跳规则（每 10 秒 ping，20 秒收不到
-  任何入站帧就以 1001 `heartbeat timeout` 关掉）加上重连耗时。本机按 omni 的写法回 pong、挂真驱动空会话，
+  任何入站帧就以 1001 `heartbeat timeout` 关掉）加上重连耗时。本机按 Switchback 的写法回 pong、挂真驱动空会话，
   都复现不出来。以前四种断法报的是同一句话，分不清；现在每次断开的原因都进 `reconnecting` 的 detail
   （也就进了主进程日志），主进程另记卡顿（见 desktop 的 `stall.ts`）。**驱动不为此加私有保活帧**：
   那是拿对面「任何入站帧都算活着」这个实现细节替它的心跳协议打补丁。
-- **Kimi 定时任务仍由 Kimi 自己创建、保存与调度。** omni 只在已接入会话的公开实时流收到
+- **Kimi 定时任务仍由 Kimi 自己创建、保存与调度。** Switchback 只在已接入会话的公开实时流收到
   `cron_job` 主动轮时显示当次执行，并从公开 transcript 恢复已经保存的结果；它不复制 Kimi 的
   cron 管理界面，也不自行补跑。首次接管或断线漏过开始帧但该轮仍在运行时，只按快照的原生 turn id
   读取公开 transcript 对应项后续接；离线错过的次数是否合并、过期任务是否最后执行，完全采用 Kimi 上报值。
 - **Kimi 0.38.0 的 MCP REST 快照没有 session 参数。** 它固定读取“最近创建且仍活跃”的会话；
   驱动只有在快照前后都遍历公开会话清单、确认那个 id 正是当前目标时才采用，避免串会话。较旧会话续跑时若
   不是这个目标，开场 MCP 状态只能缺席；后续原生 `mcp.server.status` 翻面仍会实时报告并由游标补发。
-  omni 不读私有事件日志，也不把另一条会话的工具状态猜到这里。
+  Switchback 不读私有事件日志，也不把另一条会话的工具状态猜到这里。
 - **Kimi Web API 只列 skills，不列它自己 Web/TUI 的完整控制命令。** 0.38.0 的公开 OpenAPI 仍只有
   `GET /skills` 与 `POST /skills/{name}:activate`，没有 commands list/run；`/goal`、`/plan`、`/login`
   等是 Kimi Web 客户端自己合并的本地菜单。驱动不复制这份私有静态表，只展示并原生激活服务端上报的
-  skills；计划档、压缩、侧问等已有公开能力由各自的 omni 界面入口承载。
+  skills；计划档、压缩、侧问等已有公开能力由各自的 Switchback 界面入口承载。
 - **Kimi 的 steer 在同一原生 turn 的下一模型 step 前生效。** 它不会掐断已经发出的单次
   模型请求，也不会杀掉正在执行的工具；工具或当前生成结束后，插话才进入下一 step。
 - **Kimi 0.38.0 的自动审批档原生禁用 `AskUserQuestion`。** 它的权限策略会直接拒绝该工具，
-  同时明确要求模型自行决定；omni 保留这项原生行为，不为了让问题卡出现而改档或注入开关。
+  同时明确要求模型自行决定；Switchback 保留这项原生行为，不为了让问题卡出现而改档或注入开关。
   只读规划与完全访问档若由 Kimi 发出问题，则走公开 `event.question.requested` / `pending_questions`
   与 `/questions/{id}` 往返，桌面和远程端都能回答或跳过。
 - **Kimi 只能从会话末尾原生分叉。** 普通完整分叉照常开放；「从这里重来」不会出现，
@@ -298,7 +298,7 @@
   `WebFetch`/`WebSearch`/`Think`），**其余一律 `other`**——它 k3 那套工具叫
   `Shell`、`ReadFile`，全部落成 `acp:other` → `unknown` → 自动编辑档下每条都弹窗。
   驱动因此把 `title` 原文放进 `Request.toolLabel`，判定器在 `tool` 认不出来时
-  按名字词根补一次方向（`@omni/approval` 的 `NAME_CATEGORY`）。
+  按名字词根补一次方向（`@switchback/approval` 的 `NAME_CATEGORY`）。
   **没有兜底成 allow 的分支**：认不出方向照旧 `unknown`。
 - **grok 不发 ACP 的 `usage_update`**（kimi 一轮一条，grok 零条）。它的 token 数在
   `_x.ai/session_notification` 的 `turn_completed` 里，窗口大小在
@@ -311,9 +311,9 @@
 - **Grok 的审批档仍只在会话开场设置。** `session/load` 会接收同样两枚扩展位，所以
   空闲时换档会保留原生 session id 续接重启；运行中不打断，也不先显示一个尚未生效的档位。
   Auto 还受 Grok 自己的 feature gate 与管理员策略约束；ACP 回包没有独立的审批档读回字段，
-  omni 不从普通 `current_mode_update` 猜它是否启用。
+  Switchback 不从普通 `current_mode_update` 猜它是否启用。
 - **Grok 的循环任务仍由 Grok 创建、保存与调度。** 后台循环继续由它自己的子代理执行；前台循环到点时，
-  1.0.5 会明确把 `scheduled_task_inject_prompt` 交给当前 ACP driver。omni 只把事件中的任务原文排进宿主主线，
+  1.0.5 会明确把 `scheduled_task_inject_prompt` 交给当前 ACP driver。Switchback 只把事件中的任务原文排进宿主主线，
   忙时等当前轮收工，并用 `scheduler-fired-` 原生标识让 Grok 把它记成 synthetic scheduled turn；不复制任务管理
   面板，也不补首方 pager 额外写入的 system-reminder。当前 stdio 实测会把方法改成 `_x.ai/...` 而保持直达参数，
   leader 模式则可能再套一层 method/params，两种生产形状都只在 Grok 注入模块识别。
@@ -329,7 +329,7 @@
   `thread/settings/update` 也不行——它什么都收、回 `{}`、不发任何确认，效果验不了。
   宿主现在只在空闲时释放旧进程，用同一个 native handle resume 并传入新三元组；运行中拒绝换档，
   不会为了权限切换打断当前轮，也不会先写一个并未生效的新档位。
-- **各家自己的放行表都在 omni 之前生效**：Claude 是用户写的 allow 规则，
+- **各家自己的放行表都在 Switchback 之前生效**：Claude 是用户写的 allow 规则，
   codex 是内置可信命令表（`ls`、`sed`、`cat` 这类根本不会送到客户端）。
   这是「引擎原生」这个前提的必然代价——用户的原生配置压过宿主的自动策略。
 - 事件流不做背压。宿主必须能消费得比引擎产出快，否则内存增长
@@ -344,12 +344,12 @@
   开场问一次，而是收到 `available_commands_update` 就发一条 `commands.updated`。
   什么时候推、推几次由 agent 定（实测 grok 在 `session/new` 之后推 12 条内建命令，
   kimi 把它认到的 skill 也报在同一条里）。
-- **omni 不认领 ACP 的 `fs/*`，`terminal/*` 则按引擎明确选择。** `fs` 的用处是让 agent
-  看见编辑器里没存盘的缓冲区——omni 没有编辑器。Grok、ZCode 与 DSH 自己起命令进程，
+- **Switchback 不认领 ACP 的 `fs/*`，`terminal/*` 则按引擎明确选择。** `fs` 的用处是让 agent
+  看见编辑器里没存盘的缓冲区——Switchback 没有编辑器。Grok、ZCode 与 DSH 自己起命令进程，
   因此不认领 terminal，输出从各自的 `rawOutput` 回来；已废弃的 Kimi ACP 兼容样本反而要求
   客户端提供 terminal，不认领就一条 shell 都跑不了，所以只对那份显式开启。内置 Kimi Web
   不走 ACP。这一位不能全家族写死，否则一个方向会越过原生沙箱，另一个方向会让工具彻底失效。
-- **ACP 的 mode 是 agent 自定义字符串，omni 的信任档只能打分匹配**（`acp/mode.ts`）。
+- **ACP 的 mode 是 agent 自定义字符串，Switchback 的信任档只能打分匹配**（`acp/mode.ts`）。
   匹配不上就保持 agent 默认档并报一条 `engine.status`——硬塞一个猜的 mode，
   塞错方向就是悄悄放开了权限。
 - **ACP 的一条消息是我们「划」出来的**。协议只给裸 chunk，连 `messageId` 都没有。
@@ -358,17 +358,17 @@
   Codex 与内置 Grok；没有一家注入解析器的通用 ACP 仍是 false：
   - **Kimi Web**：0.38.0 公开 `subagent.*` 完整生命周期、会话快照的 `subagents`，以及
     后台进程的 `task.*` / `/tasks` 都已用隔离生产会话抓到并接入。两类都是镜像
-    Kimi 自己已启动的活动，omni 不开 swarm，也不自建子代理。
+    Kimi 自己已启动的活动，Switchback 不开 swarm，也不自建子代理。
   - **codex**：0.149.0 的公开 `thread/list` 已列出 100+ 条 `thread_spawn` 子 thread；
     抽查一条公开 `thread/read(includeTurns:true)` 的生产历史，73 轮里有 266 条
     `SubAgentActivity`。驱动按 `agentThreadId` / `agentPath` 投影原生树，并用公开
-    `thread/status/changed` 的 active / idle / systemError 收口；omni 不调用 spawn、send 或 wait。
+    `thread/status/changed` 的 active / idle / systemError 收口；Switchback 不调用 spawn、send 或 wait。
   - **内置 Grok**：协议里没有声明位，但 1.0.5 明确从私有通知发后台任务、Monitor、
     子代理、workflow 与 goal 生命周期；源码发送点、首方 Pager 消费点和真机后台任务/Monitor
-    帧均已交叉确认，因此只在 Grok 注册配置上注入解析器。活动仍由 Grok 自己启动，omni 不编排。
+    帧均已交叉确认，因此只在 Grok 注册配置上注入解析器。活动仍由 Grok 自己启动，Switchback 不编排。
   - **其余 ACP（zcode / DSH / 自配）**：没有对应解析器就保持 false。zcode 的前台子 agent
     走 `tool_call._meta.subagent`（那是**工具调用**，已经在主线上了），
-    后台子 agent 的正文以裸 `agent_message_chunk` 混进主线、无标记，omni 单方面解不了。
+    后台子 agent 的正文以裸 `agent_message_chunk` 混进主线、无标记，Switchback 单方面解不了。
     所以不从普通 `AcpSaid` 猜 activity——开了就等于替 agent 说一句它没说过的话。
 - **Claude workflow 的阶段状态仍是算出来的，整条 lane 终态不是。** `workflow_phase`
   帧上没有 state，所以阶段先由子节点 `rollUp`；整条任务随后以公开的 `task_updated` /

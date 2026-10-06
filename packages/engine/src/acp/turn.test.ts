@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { compactSession, reportCompaction, steerSession, type TurnCtx } from "./turn.js"
 
 /**
@@ -104,7 +104,7 @@ describe("中途插话", () => {
     expect(c.sent).toEqual([])
   })
 
-  // 这条私有扩展没有附件位。把路径拼进正文是 omni 替引擎编格式——
+  // 这条私有扩展没有附件位。把路径拼进正文是 Switchback 替引擎编格式——
   // 宁可退回排队（那条路附件是完整的）
   it("带附件时拒绝，而不是把附件悄悄丢掉", async () => {
     const c = ctx({ steer: true })

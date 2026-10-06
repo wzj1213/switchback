@@ -1,4 +1,4 @@
-import type { Event, ItemId, TurnId } from "@omni/protocol"
+import type { Event, ItemId, TurnId } from "@switchback/protocol"
 
 interface RawLocalCommandOutput {
   content?: unknown

@@ -1,5 +1,5 @@
 import { useRef } from "react"
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import { CaretIcon } from "./icons.js"
 import { RailIcon } from "./icons-panel.js"
 import { EnvCard } from "./EnvCard.js"

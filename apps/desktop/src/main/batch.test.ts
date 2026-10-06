@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createBatcher } from "./batch.js"
 
 const tick = (n: number): Event => ({ type: "item.delta", at: n, itemId: "i", append: String(n) })

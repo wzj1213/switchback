@@ -1,4 +1,4 @@
-import type { EngineStatus, Event } from "@omni/protocol"
+import type { EngineStatus, Event } from "@switchback/protocol"
 import type { RpcPeer } from "../rpc.js"
 import { emitLimits } from "./limits.js"
 import type { WireRateLimits } from "./wire.js"
@@ -9,7 +9,7 @@ import type { WireRateLimits } from "./wire.js"
  * ## 为什么不能只等推送
  *
  * codex 会推 `account/rateLimits/updated`，但那是**跑完一轮才推的**。
- * 也就是说：额度早就用光了、或者压根没登录，omni 却一个字不说，
+ * 也就是说：额度早就用光了、或者压根没登录，Switchback 却一个字不说，
  * 等你打完一整段话按下回车，才回一句英文的
  * `You've hit your usage limit`。那时这条信息已经晚了——
  * 「还能不能干活」本来就该在动手之前知道。（实测撞到过。）

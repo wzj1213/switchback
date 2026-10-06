@@ -1,4 +1,4 @@
-import type { Item, PlanItem, Thread, ToolCallItem } from "@omni/protocol"
+import type { Item, PlanItem, Thread, ToolCallItem } from "@switchback/protocol"
 import { isoAt, ownerOf, stintsOf, turnsOf, type TurnEngines } from "./stints.js"
 
 /**
@@ -8,7 +8,7 @@ import { isoAt, ownerOf, stintsOf, turnsOf, type TurnEngines } from "./stints.js
  * 只留工具标题；这里读者是模型，能留的都留——推理原文、完整命令输出、完整 diff、
  * 审批与报错。工具调用行尾带 `〔原生 id〕`：宿主为全局唯一重铸了条目 id，引擎自己报的那个
  * 留在 `nativeId` 上，拿它去那一段的原始记录里搜就能落到同一次调用。没有 `nativeId`
- *（旧记录）就不标——omni 自己铸的 id 在原始记录里搜不到，标上只会让人白搜一趟。
+ *（旧记录）就不标——Switchback 自己铸的 id 在原始记录里搜不到，标上只会让人白搜一趟。
  *
  * 纯函数：时间由调用方传入，不读时钟、不碰磁盘。
  */
@@ -143,7 +143,7 @@ function header(input: TranscriptInput, turns: number): string {
     "",
     `- 会话 id：${thread.id}`,
     `- 工作区：${thread.cwd}`,
-    `- 生成时间：${isoAt(input.at)}（omni 从会话记录整理）`,
+    `- 生成时间：${isoAt(input.at)}（Switchback 从会话记录整理）`,
     `- 共 ${String(turns)} 轮；引擎：${route.length === 0 ? input.label(thread.engine) : route.join(" → ")}`,
     "- 记法：每轮标题写着第几轮、开始时间（UTC）、哪家引擎在跑；工具调用行尾〔…〕是引擎自己报的调用 id，用来到它的原始记录里对位。",
   ].join("\n")

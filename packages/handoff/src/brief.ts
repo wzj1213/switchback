@@ -4,13 +4,13 @@ import { isoAt, type Stint } from "./stints.js"
 /**
  * 换引擎后第一句话前面那段交接说明。
  *
- * ## 这是 omni 往模型上下文里写话的唯一一处
+ * ## 这是 Switchback 往模型上下文里写话的唯一一处
  *
- * AGENTS.md 的边界是「不往模型的上下文里塞 omni 写的话」，这里是它唯一的例外：
+ * AGENTS.md 的边界是「不往模型的上下文里塞 Switchback 写的话」，这里是它唯一的例外：
  * 用户开着「换引擎自动交接」、刚换了一家、发出第一句话时才附，而且**只陈述事实**——
  * 此前谁跑了哪几轮、完整转写在哪、各段原始记录在哪、那份记录实际是什么格式。
  * 不下任务、不评价、不催进度；读不读、读多少由接手的那家自己定。
- * 包在 `<omni-handoff>` 里，接手的那家分得清哪段是交接、哪段是用户这一句。
+ * 包在 `<switchback-handoff>` 里，接手的那家分得清哪段是交接、哪段是用户这一句。
  *
  * 纯函数：路径、大小、格式事实都由调用方量好传进来。
  */
@@ -67,7 +67,7 @@ function factsText(facts: LogFacts): string {
 function logLine(log: BriefLog): string {
   if (log.bytes === undefined) return `- ${log.engine}：${log.path}（这个路径上已经没有文件了）`
   const facts = log.facts === "large" ? "太大，没有逐行统计格式"
-    : log.facts === "unreadable" ? "omni 读不了这份文件，没有统计格式" : factsText(log.facts)
+    : log.facts === "unreadable" ? "Switchback 读不了这份文件，没有统计格式" : factsText(log.facts)
   return `- ${log.engine}：${log.path}（${sizeOf(log.bytes)}；${facts}）`
 }
 
@@ -83,15 +83,15 @@ function transcriptLine(t: BriefInput["transcript"]): string {
 
 export function briefOf(input: BriefInput): string {
   return [
-    "<omni-handoff>",
+    "<switchback-handoff>",
     `这条会话中途换了引擎，接下来由 ${input.engine} 接着进行。此前的工作：`,
     ...stintLines(input.stints),
     "",
-    "完整转写（omni 从会话记录整理：每轮的提问、回答、思考、工具调用与完整输出、改动 diff；按 `## 第 N 轮` 分节，标题里是这一轮的开始时间（UTC），工具调用行尾〔…〕是原生 id）：",
+    "完整转写（Switchback 从会话记录整理：每轮的提问、回答、思考、工具调用与完整输出、改动 diff；按 `## 第 N 轮` 分节，标题里是这一轮的开始时间（UTC），工具调用行尾〔…〕是原生 id）：",
     transcriptLine(input.transcript),
     "",
     "各段原始记录（引擎自己的会话文件，下面的格式是从文件里读出来的）：",
     ...logLines(input.logs),
-    "</omni-handoff>",
+    "</switchback-handoff>",
   ].join("\n")
 }

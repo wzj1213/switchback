@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, Lane } from "@omni/protocol"
+import type { Event, Item, Lane } from "@switchback/protocol"
 import { initial } from "./state.js"
 import { lanesOf, laneItems, mainItems } from "./state.js"
 import { reduce } from "./reduce.js"

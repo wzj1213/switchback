@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Item, Thread, ToolCallItem } from "@omni/protocol"
+import type { Item, Thread, ToolCallItem } from "@switchback/protocol"
 import { elapsed, paceLine, statusLabel } from "./status.js"
 import { brief, target } from "./tool.js"
 

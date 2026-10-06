@@ -77,8 +77,8 @@ function canonicalAuthority(entry: string, parsed: URL): string {
  * 校验一条配置项是**裸 authority**，否则**大声失败**。
  *
  * 悄悄忽略一条打错的配置，后果是它一直 403 却没人知道为什么；
- * 而更坏的一类是**悄悄扩大授权**：`omni.example.com/path` 会授权其中的主机名，
- * `omni.example.com:` 这种悬空冒号会把「只信这个端口」放宽成「任意端口」。
+ * 而更坏的一类是**悄悄扩大授权**：`switchback.example.com/path` 会授权其中的主机名，
+ * `switchback.example.com:` 这种悬空冒号会把「只信这个端口」放宽成「任意端口」。
  */
 export function assertTrustedAuthority(entry: string): void {
   const parsed = parseAuthority(entry)

@@ -50,10 +50,10 @@ function load(dir: string): Loaded {
   try {
     raw = JSON.parse(text)
   } catch {
-    return { ok: false, error: `${ENGINES_FILE} 现在不是合法的 JSON，omni 不敢往里写。请先自己打开修一下。` }
+    return { ok: false, error: `${ENGINES_FILE} 现在不是合法的 JSON，Switchback 不敢往里写。请先自己打开修一下。` }
   }
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: `${ENGINES_FILE} 的最外层不是一个对象，omni 不敢往里写。` }
+    return { ok: false, error: `${ENGINES_FILE} 的最外层不是一个对象，Switchback 不敢往里写。` }
   }
   return { ok: true, file: raw as Record<string, unknown> }
 }
@@ -88,7 +88,7 @@ export function addEngineEntry(dir: string, name: string, entry: EntryInput): Ad
 /**
  * 换掉一条（升级到注册表里的新版本就是这样）。
  *
- * **那一条里 omni 不认识的字段原样留着**：人可能手加过 `compact` / `steer`，
+ * **那一条里 Switchback 不认识的字段原样留着**：人可能手加过 `compact` / `steer`，
  * 或者将来版本才认的键——升级不该把它们一起抹掉。
  */
 export function replaceEngineEntry(dir: string, name: string, entry: EntryInput): AddResult {
@@ -123,14 +123,14 @@ const TEMPLATE = {
     "键是引擎 id，会以 acp: 前缀出现在界面上；值里的 command 是可执行文件。",
     "更省事的接法：设置 → 安装与接入，从 ACP 注册表里点「接入」，或者指一个可执行文件让它自己回答。",
     "手改这个文件之后去 设置 → 安装与接入 点「重新探测」：新加的当场可用，改过或删掉的只要没有会话在用也当场生效。",
-    "正在被会话用着的那几家要等那些会话关掉（或重启 omni）——它们还握着旧的那份。",
+    "正在被会话用着的那几家要等那些会话关掉（或重启 Switchback）——它们还握着旧的那份。",
     "下面 example 那一条是样板，删掉它或改成你真正装了的适配器。",
   ],
   example: {
     label: "示例（把这条删掉）",
     command: "codex-acp",
     args: [] as readonly string[],
-    // 这两位 ACP 握手里问不出来，只能你告诉 omni；不填就是没有。
+    // 这两位 ACP 握手里问不出来，只能你告诉 Switchback；不填就是没有。
     // 只写真正对当前后端活体验证过的能力；桥里有路由不等于后端兑现
     compact: false,
     steer: false,

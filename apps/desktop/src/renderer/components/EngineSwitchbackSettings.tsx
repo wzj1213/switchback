@@ -1,17 +1,17 @@
-import type { EngineAccount } from "@omni/protocol"
+import type { EngineAccount } from "@switchback/protocol"
 import { withEngineEnabled } from "../../shared/engine-access.js"
 import { dshProfileConfirmed, type Settings } from "../../shared/settings.js"
 import type { EngineSettingItem, EngineSettingState } from "../engine-settings-model.js"
 import { Field, Group, Toggle } from "./SettingsBits.js"
 
 /**
- * 「在 omni 中」——**这一组里的每一件事都是 omni 自己的**。
+ * 「在 Switchback 中」——**这一组里的每一件事都是 Switchback 自己的**。
  *
  * ## 为什么这里能有开关，而下面「原生配置」那一组只能指路
  *
- * 判据是那句总纲：**这件事是引擎自己把它当功能暴露出来的，还是 omni 拿它的零件
- * 替它攒出来的？** 「这家出不出现在 omni 的引擎选择器里」「新会话默认用哪家」
- * 完全是 omni 自己的界面状态，和引擎的行为一点关系都没有——所以它们是开关。
+ * 判据是那句总纲：**这件事是引擎自己把它当功能暴露出来的，还是 Switchback 拿它的零件
+ * 替它攒出来的？** 「这家出不出现在 Switchback 的引擎选择器里」「新会话默认用哪家」
+ * 完全是 Switchback 自己的界面状态，和引擎的行为一点关系都没有——所以它们是开关。
  * 而「关掉这家的某个工具」「替它改一条环境变量」是替引擎改它自己的行为，
  * 一律不做，哪怕零件够得着。
  *
@@ -20,7 +20,7 @@ import { Field, Group, Toggle } from "./SettingsBits.js"
  * 「我不用这家」和「这家没配好」压成一个开关之后，用户关掉一家再回来看，
  * 就再也说不清自己当初关它是因为什么。所以并排两条，各说各的。
  */
-export function EngineOmniSettings({
+export function EngineSwitchbackSettings({
   item,
   state,
   settings,
@@ -36,7 +36,7 @@ export function EngineOmniSettings({
    * 这是**最后一家还开着的**。
    *
    * 全关掉的话新会话一条都开不起来，而界面上不会有任何地方说明为什么。
-   * 挡在这儿而不是在读取偏好时悄悄纠正：「我把它们全关了，omni 自作主张
+   * 挡在这儿而不是在读取偏好时悄悄纠正：「我把它们全关了，Switchback 自作主张
    * 又打开一家」比一个点不动的开关更让人迷惑。
    */
   locked: boolean
@@ -46,13 +46,13 @@ export function EngineOmniSettings({
   const off = settings.disabledEngines.includes(item.id)
   const ready = item.id !== "dsh" || dshProfileConfirmed(settings.dsh)
   return (
-    <Group title="在 omni 中" hint="这一组只改 omni 自己的行为；引擎那边一个字节都不动。">
+    <Group title="在 Switchback 中" hint="这一组只改 Switchback 自己的行为；引擎那边一个字节都不动。">
       <Field
         label="接入"
         hint={
           off
             ? "关着：不探测它、也不出现在引擎选择器里。你在终端里跑这家一切照旧。"
-            : "开着：omni 启动时会探它一次，它出现在新会话的引擎选择器里。关掉能省下那次探测。"
+            : "开着：Switchback 启动时会探它一次，它出现在新会话的引擎选择器里。关掉能省下那次探测。"
         }
       >
         <Toggle
@@ -117,6 +117,6 @@ export function EngineOmniSettings({
 
 /** 「这家没报」和「你没登录」是两回事。**说不准的时候要说自己说不准。** */
 function accountHint(account: EngineAccount | undefined): string {
-  if (account === undefined) return "这家没有向 omni 报告账号；这不等于未登录。"
+  if (account === undefined) return "这家没有向 Switchback 报告账号；这不等于未登录。"
   return account.plan === undefined ? "由引擎自己报告" : `由引擎自己报告 · ${account.plan}`
 }

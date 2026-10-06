@@ -1,4 +1,4 @@
-import type { FileChange, FileChangeKind } from "@omni/protocol"
+import type { FileChange, FileChangeKind } from "@switchback/protocol"
 
 /**
  * 一行 diff 的语义。

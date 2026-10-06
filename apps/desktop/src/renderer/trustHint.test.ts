@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineAxis, Thread, TrustApply } from "@omni/protocol"
+import type { EngineAxis, Thread, TrustApply } from "@switchback/protocol"
 import { trustBlind, trustHint } from "./trustHint.js"
 
 const BASE = {
@@ -46,12 +46,12 @@ describe("档位说明：四种情形各说一句，其余一个字都不说", (
     })
   }
 
-  it("**`unknown` 不算分家**——引擎报了它在哪一档，但 omni 压根没设过，那不是分家", () => {
+  it("**`unknown` 不算分家**——引擎报了它在哪一档，但 Switchback 压根没设过，那不是分家", () => {
     const thread = with_({
       engineState: { axes: [{ axis: "mode", id: "default", match: "unknown" }], at: 1 },
       trustApply: apply("unmapped", "对不上"),
     })
-    // 落到 unmapped 那句说明上，而不是常亮一条「引擎那边现在是 X（不是 omni 切的）」
+    // 落到 unmapped 那句说明上，而不是常亮一条「引擎那边现在是 X（不是 Switchback 切的）」
     expect(trustHint(thread, "Grok", "自动编辑")?.kind).toBe("unmapped")
   })
 
@@ -93,13 +93,13 @@ describe("档位说明：四种情形各说一句，其余一个字都不说", (
       expect(hint()?.text).toContain("「完全访问」")
     })
 
-    it("**omni 侧的档要出现在正文里**——「用户以为自己的档被引擎改掉了」是这句话要防的", () => {
-      expect(hint()?.text).toContain("omni 这条会话是「完全访问」")
+    it("**Switchback 侧的档要出现在正文里**——「用户以为自己的档被引擎改掉了」是这句话要防的", () => {
+      expect(hint()?.text).toContain("Switchback 这条会话是「完全访问」")
     })
 
-    it("「不是 omni 切的」挪进悬停：它替自己撇清，不该占第一眼的位置", () => {
-      expect(hint()?.text).not.toContain("不是 omni 切的")
-      expect(hint()?.tip).toContain("不是 omni 切的")
+    it("「不是 Switchback 切的」挪进悬停：它替自己撇清，不该占第一眼的位置", () => {
+      expect(hint()?.text).not.toContain("不是 Switchback 切的")
+      expect(hint()?.tip).toContain("不是 Switchback 切的")
     })
 
     it("**按钮说去处**：上面一行常常正好是「切到 Grok」，「切回来」和它撞同一个动词", () => {

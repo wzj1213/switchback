@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { classify } from "@omni/approval"
+import { classify } from "@switchback/approval"
 import { buildRequest, decisionFor, summarize, toolOf } from "./approve.js"
 import type { WireApprovalRequest, WireItem } from "./wire.js"
 

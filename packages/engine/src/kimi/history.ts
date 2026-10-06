@@ -1,4 +1,4 @@
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import { sessionPath, type KimiApi } from "./http.js"
 import { toTranscript, TRANSCRIPT_ITEM_MAX } from "./transcript.js"
 import type { KimiTranscriptPage, KimiTranscriptTurn } from "./wire.js"

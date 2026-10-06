@@ -2,7 +2,7 @@
 /**
  * 真 Electron 应用的端到端验收。**单元测试全绿但跑起来不动，靠这一条兜住。**
  *
- * 完整的一条路：CDP 驱动渲染层调 `window.omni.remote.pair()`（这一步同时验了
+ * 完整的一条路：CDP 驱动渲染层调 `window.switchback.remote.pair()`（这一步同时验了
  * preload 通道与主进程的处理器）→ 拿配对码换令牌 → 连 WebSocket →
  * 收真实的全量重建（**要重组分片**）→ 发命令 → 看宿主有没有真的动 →
  * 验档位上限 → 喂坏输入看连接活不活。
@@ -11,12 +11,12 @@
  *
  * ```sh
  * pnpm build:web
- * pnpm --filter @omni/desktop exec electron-vite build
+ * pnpm --filter @switchback/desktop exec electron-vite build
  * # 用一份**独立的 userData**，别碰你自己那份。里面的 settings.json 要写：
  * #   "remote": { "enabled": true, "port": 17802, "trustedHosts": [], "maxTrust": "auto-edit" }
- * # `OMNI_DEV_MAXLIVE=1` 是为了造出一条 detached 的会话：新建第二条会把第一条挤下来，
+ * # `SWITCHBACK_DEV_MAXLIVE=1` 是为了造出一条 detached 的会话：新建第二条会把第一条挤下来，
  * # 而它带着**真的引擎句柄**——「接回老会话」那一步验的就是它
- * cd apps/desktop && OMNI_DEV_MAXLIVE=1 npx electron . --user-data-dir=/tmp/omni-e2e --remote-debugging-port=9222 &
+ * cd apps/desktop && SWITCHBACK_DEV_MAXLIVE=1 npx electron . --user-data-dir=/tmp/switchback-e2e --remote-debugging-port=9222 &
  * node scripts/e2e-remote.mjs
  * ```
  *
@@ -34,8 +34,8 @@ import WebSocket from "ws"
 import { fixture } from "./e2e-fixture.mjs"
 import { stepScoped } from "./e2e-scoped.mjs"
 
-const CDP = process.env["OMNI_E2E_CDP"] ?? "http://127.0.0.1:9222"
-const BASE = process.env["OMNI_E2E_BASE"] ?? "http://127.0.0.1:17802"
+const CDP = process.env["SWITCHBACK_E2E_CDP"] ?? "http://127.0.0.1:9222"
+const BASE = process.env["SWITCHBACK_E2E_BASE"] ?? "http://127.0.0.1:17802"
 
 const state = { failed: 0 }
 const ok = (label, cond, extra = "") => {
@@ -88,8 +88,8 @@ async function evaluate(send, expression) {
 }
 
 async function stepPair(send) {
-  console.log("1. CDP 驱动渲染层：window.omni.remote.pair()")
-  const status = await evaluate(send, "window.omni.remote.pair().then(s => JSON.stringify(s))")
+  console.log("1. CDP 驱动渲染层：window.switchback.remote.pair()")
+  const status = await evaluate(send, "window.switchback.remote.pair().then(s => JSON.stringify(s))")
   ok("preload → 主进程的 remote/pair 通道通了", typeof status.pairing?.code === "string", status.pairing?.code)
   ok("状态报的是真在听", status.listening === true, `port ${status.port}`)
 
@@ -112,7 +112,7 @@ async function stepPair(send) {
 
 /** 开一条连接，帧收进数组（**分片已重组**）。 */
 async function connect(token) {
-  const ws = new WebSocket(`${BASE.replace("http", "ws")}/api/stream`, ["omni.v1", token])
+  const ws = new WebSocket(`${BASE.replace("http", "ws")}/api/stream`, ["switchback.v1", token])
   const frames = []
   const observe = reassembler()
   const chunks = { n: 0 }
@@ -176,7 +176,7 @@ function checkReplay(frames, chunkCount) {
  */
 async function stepResume(send, token) {
   console.log("8. 老会话接回引擎")
-  const dir = join((await evaluate(send, "window.omni.appInfo().then(s => JSON.stringify(s))")).dataDir, "threads")
+  const dir = join((await evaluate(send, "window.switchback.appInfo().then(s => JSON.stringify(s))")).dataDir, "threads")
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, "e2e-old.jsonl"), fixture("e2e-old", 2000), "utf8")
   const { ws: ws2, frames: f2 } = await connect(token)
@@ -267,7 +267,7 @@ async function stepCommands({ ws, frames, target }, send, token) {
  */
 async function stepRevoke(send) {
   console.log("14. 吊销当场断开正连着的那条")
-  const status = await evaluate(send, "window.omni.remote.pair().then(s => JSON.stringify(s))")
+  const status = await evaluate(send, "window.switchback.remote.pair().then(s => JSON.stringify(s))")
   const paired = await (
     await fetch(`${BASE}/api/pair`, {
       method: "POST",
@@ -275,7 +275,7 @@ async function stepRevoke(send) {
       body: JSON.stringify({ code: status.pairing.code, name: "要被吊销的" }),
     })
   ).json()
-  const ws = new WebSocket(`${BASE.replace("http", "ws")}/api/stream`, ["omni.v1", paired.token])
+  const ws = new WebSocket(`${BASE.replace("http", "ws")}/api/stream`, ["switchback.v1", paired.token])
   const closed = { code: 0 }
   ws.on("close", (code) => {
     closed.code = code
@@ -285,9 +285,9 @@ async function stepRevoke(send) {
     ws.once("error", j)
   })
   ok("连上了", ws.readyState === WebSocket.OPEN)
-  const list = await evaluate(send, "window.omni.remote.status().then(s => JSON.stringify(s))")
+  const list = await evaluate(send, "window.switchback.remote.status().then(s => JSON.stringify(s))")
   const victim = list.devices.find((d) => d.name === "要被吊销的")
-  await evaluate(send, `window.omni.remote.revoke(${JSON.stringify(victim.id)}).then(s => JSON.stringify(s))`)
+  await evaluate(send, `window.switchback.remote.revoke(${JSON.stringify(victim.id)}).then(s => JSON.stringify(s))`)
   await pause(800)
   ok("**那条连接当场断了**", ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING, `code ${String(closed.code)}`)
   const me = await fetch(`${BASE}/api/me`, { headers: { authorization: `Bearer ${paired.token}` } })
@@ -304,7 +304,7 @@ async function stepPush(token) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ endpoint: "https://x/y", p256dh: "a", auth: "b" }),
   })
-  ok("**订阅要带令牌**——谁都能写的话，别人能让 omni 把你的会话标题推到他手机上", noAuth.status === 401)
+  ok("**订阅要带令牌**——谁都能写的话，别人能让 Switchback 把你的会话标题推到他手机上", noAuth.status === 401)
   const saved = await fetch(`${BASE}/api/push/subscribe`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
@@ -345,7 +345,7 @@ async function main() {
   console.log("13. 断开之后设备仍在表里（吊销才该消失）")
   conn.ws.close()
   await pause(800)
-  const after = await evaluate(send, "window.omni.remote.status().then(s => JSON.stringify(s))")
+  const after = await evaluate(send, "window.switchback.remote.status().then(s => JSON.stringify(s))")
   ok(
     "设备表里有这一台",
     after.devices.some((d) => d.name === "端到端验收"),

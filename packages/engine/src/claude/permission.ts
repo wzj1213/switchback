@@ -1,5 +1,5 @@
 import type { PermissionResult, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk"
-import type { Request as ApprovalRequest } from "@omni/approval"
+import type { Request as ApprovalRequest } from "@switchback/approval"
 
 /**
  * `canUseTool` 回调携带的上下文。字段名与 SDK 一致。
@@ -40,7 +40,7 @@ export function sanitize(text: string): string {
  *
  * SDK 文档原文：带 `matchedAskRule` 的请求是**用户自己配的 ask 规则**强制出来的，
  * 「the user's stated intent is a human prompt」——宿主侧的自动批准必须让位。
- * 这是 omni 唯一一处「引擎的意见压过 omni 判定器」的地方。
+ * 这是 Switchback 唯一一处「引擎的意见压过 Switchback 判定器」的地方。
  */
 export function forcesHumanPrompt(meta: AskMeta): boolean {
   return meta.matchedAskRule !== undefined
@@ -75,7 +75,7 @@ export function toDeny(reason: string): PermissionResult {
 
 /**
  * 放行。`remember` 为真时把 SDK 给的 `suggestions` 原样回传成 `updatedPermissions`——
- * 这是 SDK 原生的「本会话不再询问」，不需要 omni 自己造。
+ * 这是 SDK 原生的「本会话不再询问」，不需要 Switchback 自己造。
  */
 export function toAllow(remember: boolean, meta: AskMeta): PermissionResult {
   const suggestions = meta.suggestions

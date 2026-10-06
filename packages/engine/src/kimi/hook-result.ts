@@ -1,4 +1,4 @@
-import type { AgentMessageItem, TurnId } from "@omni/protocol"
+import type { AgentMessageItem, TurnId } from "@switchback/protocol"
 import type { KimiPayload } from "./wire.js"
 
 function nonEmpty(value: unknown): string | undefined {

@@ -1,15 +1,15 @@
-# @omni/desktop
+# @switchback/desktop
 
-Electron 壳 + React 渲染层。**这是 omni 唯一的完整主界面**；浏览器端是远程看护界面，
+Electron 壳 + React 渲染层。**这是 Switchback 唯一的完整主界面**；浏览器端是远程看护界面，
 没有面向用户的 CLI。
 
 三个进程角色：
 
 | 角色 | 职责 |
 | --- | --- |
-| `src/main` | 起窗口；运行 `@omni/host`、引擎子进程与远程服务端 |
+| `src/main` | 起窗口；运行 `@switchback/host`、引擎子进程与远程服务端 |
 | `src/preload` | 只暴露一条窄通道：渲染层发 `Command`，接收 `Event` |
-| `src/renderer` | 只认 `@omni/protocol` 的事件模型，不知道任何一家引擎的存在 |
+| `src/renderer` | 只认 `@switchback/protocol` 的事件模型，不知道任何一家引擎的存在 |
 
 ## 拥有什么
 
@@ -29,7 +29,7 @@ Electron 壳 + React 渲染层。**这是 omni 唯一的完整主界面**；浏�
 
 ## 界面布局与验收
 
-- 侧栏、空会话与 Dock 图标共用 `omni-symbol.svg` 的三线汇合轮廓：上下镜像、等粗笔画、两端等距留白，无半透明叠色。侧栏中英文字对齐基线；图标源稿改动后运行 `pnpm 图标` 更新 PNG / ICNS，并检查 16 / 32 / 64px。
+- 侧栏、空会话与 Dock 图标共用 `switchback-symbol.svg` 的三线汇合轮廓：上下镜像、等粗笔画、两端等距留白，无半透明叠色。侧栏中英文字对齐基线；图标源稿改动后运行 `pnpm 图标` 更新 PNG / ICNS，并检查 16 / 32 / 64px。
 - 浅色使用白色画布与浅灰侧栏，深色沿用同一套文字、边框和选中层级。
   彩色只承担状态和引擎身份。推理强度只在模型菜单里改，模型按钮写成「模型 · 档位」，更费额度的顶档（ultra / ultracode）加粗。
 - 界面外框字号 13px（`--text-base`），输入框 14px（`--text-input`），回答正文 15px（`--text-prose`）不随外框缩放。侧栏顶部独立留出 40px 窗口控制区，品牌在下方与导航共用图标列和文字列；标记 20px、名称 16px、导航行 30px。会话顶栏与右侧页签条保持 48px 同高，macOS 上 `titleBarOverlay.height` 取同一个数，交通灯在这条带子里垂直居中；收起导航时 `--traffic` 读 `env(titlebar-area-x)`（实测 78px）再留 12px 避让交通灯。
@@ -51,7 +51,7 @@ Electron 壳 + React 渲染层。**这是 omni 唯一的完整主界面**；浏�
   同一帧起跑同一帧落定；`prefers-reduced-motion` 下全部瞬切。
 - 输入区左侧放附件与审批，右侧放用量、引擎、模型和强度；可用宽度不超过 620px 时分两行。
   文件改动默认显示本轮摘要，展开才挂载明细，审核入口始终可用。
-- 长会话打开时先挂末尾 40 行，其余在空闲时每片 60 行向上补齐（transition，可被输入打断）；打开查找条时一次补全，原生查找仍覆盖完整历史。屏外的回答、提问、轮次分界与改动卡走 `content-visibility: auto`，开合侧栏 / 右栏只重排看得见的部分；这几类行里的全屏遮罩必须走 portal。大纲独立订阅滚动，隐藏时不测量正文。`node scripts/shot-app.mjs /tmp/omni-stress --stress --audit --reduce` 用 240 轮固定记录验收。首次打开仍需解析完整会话，未做历史记录截断。
+- 长会话打开时先挂末尾 40 行，其余在空闲时每片 60 行向上补齐（transition，可被输入打断）；打开查找条时一次补全，原生查找仍覆盖完整历史。屏外的回答、提问、轮次分界与改动卡走 `content-visibility: auto`，开合侧栏 / 右栏只重排看得见的部分；这几类行里的全屏遮罩必须走 portal。大纲独立订阅滚动，隐藏时不测量正文。`node scripts/shot-app.mjs /tmp/switchback-stress --stress --audit --reduce` 用 240 轮固定记录验收。首次打开仍需解析完整会话，未做历史记录截断。
 - 设置保留固定外框与独立滚动，主题采用可点选的预览，键盘焦点仍锁在弹窗内。
 - 可点的控件一律手型光标、禁用回到箭头（`interactions.css` 的零特异度规则，组件别再各写 `cursor: default`）；颜色过渡 70ms，按下态零延迟。侧栏会话行与右栏页面切换按下即生效，筛选结果仍在松手时打开。行尾的计数、时间平时贴右缘，悬停时让位给浮在其上的行内操作；分节标题的按钮撑满整个悬停底色。输入卡空白处点击直接进入输入框。
 - 普通操作的 hover / 按下、选中项的加深反馈与键盘焦点由 `interactions.css` 统一；底色使用语义 token，选中不会在悬停时退回普通态。禁用控件不响应悬停变色；危险确认保持可读的红色反馈，主按钮与拨块保留语义样式。侧栏行内操作在当前行悬停或键盘进入时显现，尺寸不随状态变化。
@@ -59,9 +59,9 @@ Electron 壳 + React 渲染层。**这是 omni 唯一的完整主界面**；浏�
 先构建，再用隔离数据运行实际 Electron 巡检：
 
 ```sh
-pnpm --filter @omni/desktop build
+pnpm --filter @switchback/desktop build
 node scripts/e2e-smoke.mjs
-node scripts/shot-app.mjs /tmp/omni-ui --audit --reduce --engine=codex \
+node scripts/shot-app.mjs /tmp/switchback-ui --audit --reduce --engine=codex \
   --views=01-转录区,01b-收起侧栏,01c-每轮的改动卡,01c-展开本轮文件,01d-提问导航条,03-环境信息,14-新会话,18-输入区布局,18-模型菜单焦点,18-超长模型名不出界,18-推理强度,19-设置
 ```
 
@@ -89,14 +89,14 @@ node scripts/shot-app.mjs /tmp/omni-ui --audit --reduce --engine=codex \
 ## 不拥有什么
 
 - **不拥有引擎驱动**。渲染层不 spawn 进程、不解析任何一家的协议。
-- 不拥有审批判定。判定在 `@omni/approval`，这里只渲染 `escalate` 出来的卡片。
-- 不拥有持久化。落盘在 `@omni/journal`。
-- 不拥有业务编排。跨会话、跨引擎的编制在 `@omni/host`。
+- 不拥有审批判定。判定在 `@switchback/approval`，这里只渲染 `escalate` 出来的卡片。
+- 不拥有持久化。落盘在 `@switchback/journal`。
+- 不拥有业务编排。跨会话、跨引擎的编制在 `@switchback/host`。
 - 不拥有 DSH 插件生命周期。安装、升级、Provider、模型与凭证仍走 DSH 自己的入口。
 
 ## 为什么 desktop 直接依赖了 Claude 的 SDK
 
-`@omni/engine` 是 workspace 源码，会被**打进** main 进程产物。产物因此继承了
+`@switchback/engine` 是 workspace 源码，会被**打进** main 进程产物。产物因此继承了
 engine 的运行时依赖，而 Node 从产物所在目录往上找 `node_modules`——
 所以这些依赖必须出现在 app 根目录，否则运行时报 `ERR_MODULE_NOT_FOUND`。
 每新增一个引擎驱动，它的运行时依赖都要在这里跟着加一条。
@@ -136,7 +136,7 @@ Developer ID Application 证书、App Store Connect 的 app-specific password。
 
 ### 强化运行时已经验过了，不用等证书
 
-公证强制要求强化运行时，而**强化运行时默认会掐掉 omni 赖以工作的两件事**：
+公证强制要求强化运行时，而**强化运行时默认会掐掉 Switchback 赖以工作的两件事**：
 V8 的 JIT，以及「加载别人签的二进制」——后者正是这个产品的核心
 （spawn codex / ACP 适配器 / Claude SDK 自带的 CLI）。
 等付完钱那天才第一次打开它，就要在最不该调试的时刻调试它。
@@ -147,9 +147,9 @@ V8 的 JIT，以及「加载别人签的二进制」——后者正是这个产�
 ```sh
 codesign --force --deep --options runtime \
   --entitlements apps/desktop/build/entitlements.mac.plist \
-  --sign - release/mac-arm64/omni.app
-codesign -d --verbose=2 release/mac-arm64/omni.app   # 应含 flags=…(adhoc,runtime)
-codesign -d --entitlements - release/mac-arm64/omni.app
+  --sign - release/mac-arm64/Switchback.app
+codesign -d --verbose=2 release/mac-arm64/Switchback.app   # 应含 flags=…(adhoc,runtime)
+codesign -d --entitlements - release/mac-arm64/Switchback.app
 ```
 
 已实测：`flags=0x10002(adhoc,runtime)`、六条授权全部生效，
@@ -158,13 +158,13 @@ codesign -d --entitlements - release/mac-arm64/omni.app
 
 ## 本机自更新：改完代码，在应用里点一下
 
-装在 `/Applications/omni.app` 的那份是从**这台机器上的源码**打出来的，所以
+装在 `/Applications/Switchback.app` 的那份是从**这台机器上的源码**打出来的，所以
 「让刚改的代码生效」这件事不必绕一圈终端。侧栏底下那一行（`UpdateRow`）
 在**有源码比这份包新**时出现，点它就是：
 
 ```
-pnpm --filter @omni/desktop run dist:local   # 只出 .app，不打 DMG（实测 ~11 秒）
-ditto → 换掉 /Applications/omni.app → open   # 由一个独立脚本在应用退出后做
+pnpm --filter @switchback/desktop run dist:local   # 只出 .app，不打 DMG（实测 ~11 秒）
+ditto → 换掉 /Applications/Switchback.app → open   # 由一个独立脚本在应用退出后做
 ```
 
 三件事值得知道：
@@ -172,20 +172,20 @@ ditto → 换掉 /Applications/omni.app → open   # 由一个独立脚本在应
 - **判据是文件时间，不是版本号。** 版本号来自 git 提交数，而开发时的改动
   大多还没提交——按版本号比，改完它会说「已经是最新」。所以直接问文件系统：
   有没有源码文件比装着的这份包新（`find -newer`，剪掉 node_modules/.git/release/out/dist）。
-- **源码路径是打包时烤进去的**（`omni.repo`，见 `scripts/dist.mjs` 的临时元数据）。
+- **源码路径是打包时烤进去的**（`switchback.repo`，见 `scripts/dist.mjs` 的临时元数据）。
   包拷到别人机器上时那个路径不存在，这一行**整个不出现**——不是灰掉，是不画。
 - **换包在应用退出之后由独立进程做**：等旧进程真的退出 → `ditto` 到旁边 →
   同目录两次 `mv`（同盘原子）→ 失败就把旧的挪回来。这一步没有界面能报错，
   所以它有一条**真跑一遍**的测试（`selfupdate.test.ts`）。
 
-第一次（或者按钮本身坏了）手动装：**先退出 omni**，然后
+第一次（或者按钮本身坏了）手动装：**先退出 Switchback**，然后
 
 ```sh
-pnpm --filter @omni/desktop run dist:local
-ditto release/mac-arm64/omni.app /Applications/omni.app.新 \
-  && rm -rf /Applications/omni.app \
-  && mv /Applications/omni.app.新 /Applications/omni.app \
-  && open /Applications/omni.app
+pnpm --filter @switchback/desktop run dist:local
+ditto release/mac-arm64/Switchback.app /Applications/Switchback.app.新 \
+  && rm -rf /Applications/Switchback.app \
+  && mv /Applications/Switchback.app.新 /Applications/Switchback.app \
+  && open /Applications/Switchback.app
 ```
 
 ## 更新检查（远端）
@@ -195,14 +195,14 @@ ditto release/mac-arm64/omni.app /Applications/omni.app.新 \
 进来只会在下载完之后卡在安装那一步，而**一个走到最后一步才失败的更新流程，
 比没有更新流程糟**。
 
-feed 地址填在 `apps/desktop/package.json` 的 `omni.updateFeed`
-（`OMNI_UPDATE_FEED` 可覆盖，企业内网自建源用得上）。**留空 = 整个功能不存在**：
+feed 地址填在 `apps/desktop/package.json` 的 `switchback.updateFeed`
+（`SWITCHBACK_UPDATE_FEED` 可覆盖，企业内网自建源用得上）。**留空 = 整个功能不存在**：
 不发请求、不起定时器、菜单里也不出现「检查更新…」。
 
 源返回一个 JSON：
 
 ```json
-{ "version": "1.2.3", "url": "https://…/omni-1.2.3.dmg", "notes": "改了什么" }
+{ "version": "1.2.3", "url": "https://…/switchback-1.2.3.dmg", "notes": "改了什么" }
 ```
 
 `url` **只认 https**——一个能被改成 `http://` 或 `file://` 的更新地址，
@@ -214,7 +214,7 @@ feed 地址填在 `apps/desktop/package.json` 的 `omni.updateFeed`
 正在看这条会话不弹、同一件事只弹一次、**15 秒以内跑完的不弹**（那种你八成还盯着屏幕）、
 **自己按停的不弹**（那是你刚做的动作，报告它等于回声）。
 
-窗口在前台但你看的是**另一条**会话时照样通知：渲染层通过 `omni:viewing`
+窗口在前台但你看的是**另一条**会话时照样通知：渲染层通过 `switchback:viewing`
 只报当前会话 id，主进程不读取界面状态。启动首帧还没报上来时保守地不弹，避免乱响。
 
 Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角标是「有事等你做」，不是「它在忙」。
@@ -239,7 +239,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 
 `main/remote/` 起一个**只听回环**的 HTTP + WebSocket 服务端（没有绑公网的开关；
 要从外面进来就开隧道，那条路是显式的、可撤销的）。桌面窗口和手机是**对等的两个客户端**
-——同一份编号、同一条事件流（`sink.ts` + `@omni/wire`），不是「主界面 + 一个远程视图」。
+——同一份编号、同一条事件流（`sink.ts` + `@switchback/wire`），不是「主界面 + 一个远程视图」。
 
 四条判定在这一侧，不在浏览器里：**档位上限**（远程默认 `auto-edit`，钳的是档位不是命令白名单）、
 **`Host` 头闸**（绑回环挡不住 DNS 改绑，浏览器是可以被骗的代理人）、
@@ -267,7 +267,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 每个 hunk 头上有「引用」（`review-quote.ts`）：把这一段写成 `路径:行号` + 一个 diff 代码块，
 放进输入框上方一枚粘贴芯片（写着「引用 路径:行号」，删得掉），发送时接在你那句话后面。
 行号按改动后的文件算（纯删除的段按旧文件）；一段最多附 300 行；正文里有 ``` 时围栏自动加长。
-没有 omni 写的话——你在前面说「这里不对」还是「照这个改法把别处也改了」，都是你的话。
+没有 Switchback 写的话——你在前面说「这里不对」还是「照这个改法把别处也改了」，都是你的话。
 
 几条边界：
 
@@ -285,7 +285,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 
 - **只搜 `user_message` / `agent_message`，不搜 `tool_call`。** 把命令原文算进来的话，
   搜「review」会命中每一条跑过 `git diff` 的记录，噪音会把真正想找的那句埋掉。
-- **多个词是「与」，但不要求在同一条消息里**：「omni 流式」找的是「在 omni 那条会话里
+- **多个词是「与」，但不要求在同一条消息里**：「Switchback 流式」找的是「在 Switchback 那条会话里
   聊过流式」，那两个词多半分散在不同轮次。
 - 预筛之后才 `JSON.parse`（原始行里一个词都没有就跳过）。本机 5 MB 实测 27ms；
   48 MB 预算用完就停，剩下几条**照实报给界面**。
@@ -305,8 +305,8 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 设置 →「通用」→「换引擎」里的开关，默认开（`Settings.handoffBrief`）。会话中途换了一家之后，
 第一句话前面附一段交接说明，原样显示为一条「历史交接」（`main/handoff-brief.ts`）：
 
-- **转写**：从 omni 的会话记录整理（每轮的提问、回答、思考、工具调用与完整输出、diff），
-  写到 `<工作区>/.omni/handoff/<会话 id>.md`。`.omni/` 里放一份内容为 `*` 的 `.gitignore`
+- **转写**：从 Switchback 的会话记录整理（每轮的提问、回答、思考、工具调用与完整输出、diff），
+  写到 `<工作区>/.switchback/handoff/<会话 id>.md`。`.switchback/` 里放一份内容为 `*` 的 `.gitignore`
   （已有就不动）：不进版本库、`rg` 默认不搜，按路径照样读得到。工作区写不进去才退到
   `userData/handoff/`。每次换家重写一遍。
 - **原始记录**：各段 `logPath` 现量现读——JSONL 与否、行数、顶层 `type` 取值、
@@ -329,7 +329,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
   注册表里已被内置的几家（Claude / Codex / Grok / Kimi 的 ACP 适配器）标「已内置」，不拦。
 - **已接入的卡片**（`main/acp-engines.ts`）：试接只握手不开会话，顺带列出它报的登录方式；
   注册表有新版就给「升级」；移除只删 `engines.json` 里那一个键。
-- **登录**：agent 型在一次性进程里转一次 `authenticate`（它自己开浏览器、存凭证，omni 看不到凭证）；
+- **登录**：agent 型在一次性进程里转一次 `authenticate`（它自己开浏览器、存凭证，Switchback 看不到凭证）；
   terminal 型写一个首行自删的 `.command` 脚本交给系统「终端」，跑它自己的登录界面（`main/terminal-login.ts`）。
   开会话时 agent 回 `-32000` 会显示「需要登录」横幅（不是「引擎故障」），「去登录」直接落到这一页；
   那一家登录成功后横幅自己收起（`acp-login-signal.ts`）。
@@ -356,7 +356,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
   抓一次 `lsof` 对端，开着「批量外发时停掉」（默认开）就 SIGTERM 整个进程组、三秒后强杀；
   单独开着的 ZCode 桌面端也在盯的名单里。「设置 → 数据与排查 → 外发守卫」列出这次启动以来每个进程的账。
   横幅上没关掉的「批量外发」一直压在最上面，不被随后那条「进程退出了」盖掉。
-  开发时 `OMNI_DEV_EGRESS_IFACE=loopback` + `OMNI_DEV_EGRESS_LIMIT_MB` 可以在本机演一遍。
+  开发时 `SWITCHBACK_DEV_EGRESS_IFACE=loopback` + `SWITCHBACK_DEV_EGRESS_LIMIT_MB` 可以在本机演一遍。
 - **ZCode 快照目录上锁**（`zcode-guard.ts`，设置「给它的快照目录上锁」，默认开）：`~/.zcode` 在就给
   `~/.zcode/v2/checkpoints` 加 `uchg`（ZCode 3.14.0 之前把整个工作区连同 .git 打包后先落在这里再传）；
   关掉即 `nouchg`。已有的包只报个数与大小，不删。设置页同时报装着的版本、是否早于 3.14.0。
@@ -366,12 +366,12 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 - **外发守卫只看量，不看内容。** 一分钟 64 MB 以下的慢速外发抓不到；它跑的命令（`git push` 之类）的外发只记账不判；
   只在 macOS 上起（靠 `nettop`）。停掉的是整个引擎进程，那条会话要再发一句才会重新起来。
 - **ZCode 快照目录上锁只对 3.14.0 之前的版本有意义**（之后那条链路删了），锁着不碍事；已经传出去的撤不回来，
-  omni 也分辨不出过去传没传过——ZCode 自己的日志不记这件事，传成功的包也不在本地留底。
+  Switchback 也分辨不出过去传没传过——ZCode 自己的日志不记这件事，传成功的包也不在本地留底。
 - **提交只在本地。** 不推送；提交说明原样交给 `git commit -m`（第一行是标题），签名走你自己的 Git 配置——
   需要交互输入密码的签名方式（终端里的 pinentry）在这里等不到输入，会超时失败，原文照实摆出来。
-- **terminal 型登录的结果要人回来确认。** 协议没有带内成功信号，omni 只知道「终端打开了」；
+- **terminal 型登录的结果要人回来确认。** 协议没有带内成功信号，Switchback 只知道「终端打开了」；
   登没登上要再点一次「试接」或直接开会话才知道。横幅也因此不会在打开终端时自动收起。
-- **注册表清单是英文原文。** 名字、描述、作者、许可都是各家自己登记的，omni 不翻译、不排推荐位。
+- **注册表清单是英文原文。** 名字、描述、作者、许可都是各家自己登记的，Switchback 不翻译、不排推荐位。
 - **npx / uvx 分发的第一次接入要现下载。** 试接给三分钟；网络慢时会超时，提示会给出先在终端里
   跑一次那条命令的办法。之后用本机缓存，离线也能起；清掉 npm / uv 缓存后第一次会再下载。
 
@@ -384,7 +384,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 
 - **输入区附件目前只支持图片。** 只有当前引擎与模型明确公开图片能力时才显示选择入口；
   PNG/JPEG/GIF/WebP 单张不超过 12 MB。各家现有公开出口没有统一的任意源文件附件，普通文件
-  请用 `@` 引用工作区路径；omni 不把路径或自写提示词塞进模型上下文冒充文件附件。
+  请用 `@` 引用工作区路径；Switchback 不把路径或自写提示词塞进模型上下文冒充文件附件。
 - **文件预览只跟踪当前打开的文件。** 原生文件事件触发重读，会话读写、轮次状态、窗口聚焦和
   15 秒轮询负责兜底；不会轮询整个工作区。文件系统事件丢失时可能存在刷新延迟，也可手动「重新读取」。
 
@@ -403,7 +403,7 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
   所以本机只装 darwin-arm64 那一个，不占地方）。但**在 macOS 上交叉打 Linux 包
   仍然拿不到 linux 的那个**——那台机器上根本没装。CI 的三格里各打各的才对。
   在真机上跑过之前，这仍然算未验证。
-- **只在 macOS 上验过。** 平台差异收在 `@omni/engine` 的 `platform.ts` 一处：
+- **只在 macOS 上验过。** 平台差异收在 `@switchback/engine` 的 `platform.ts` 一处：
   查命令（`which` / `where.exe`）与进程树回收（负 pid 信号 / `taskkill /T /F`）。
   Windows 那几支**没有在真机上跑过**——写它们是因为原来的实现在 Windows 上
   是默默错的（负 pid 不是进程组），错得无声无息比明说不支持糟得多。

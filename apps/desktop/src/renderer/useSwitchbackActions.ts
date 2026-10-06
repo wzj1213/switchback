@@ -1,14 +1,14 @@
-import { NO_CAPABILITIES } from "@omni/protocol"
-import type { Command, EngineInfo, Item, Thread, Turn } from "@omni/protocol"
+import { NO_CAPABILITIES } from "@switchback/protocol"
+import type { Command, EngineInfo, Item, Thread, Turn } from "@switchback/protocol"
 import { labelOf } from "./components/Composer.js"
 import { nextEngine } from "./engines.js"
 import { toMarkdown } from "./export.js"
-import { omniCommands, type OmniAction } from "./omniCommands.js"
+import { switchbackCommands, type SwitchbackAction } from "./switchbackCommands.js"
 import { pickupOf } from "./pickup.js"
 import { requestComposerReference } from "./composer-reference-request.js"
 
 /**
- * omni 自己能做的那几件事，装配成斜杠命令。
+ * Switchback 自己能做的那几件事，装配成斜杠命令。
  *
  * **没有对象的不给**：没有分叉对手就没有 `/compare`，没在跑就没有 `/stop`，
  * 只有一家引擎就没有 `/fork`、`/handoff`。一个点了没反应的命令
@@ -17,7 +17,7 @@ import { requestComposerReference } from "./composer-reference-request.js"
  * 从 `Workspace` 拆出来是行数闸门逼的，但这一刀顺：那边是「一屏怎么摆」，
  * 这边是「这一屏此刻能做什么」。
  */
-export function useOmniActions(
+export function useSwitchbackActions(
   props: {
     thread: Thread
     items: readonly Item[]
@@ -32,16 +32,16 @@ export function useOmniActions(
     send: (command: Command) => void
   },
   extra: { onEnv: () => void; onTimeline: () => void },
-): readonly OmniAction[] {
+): readonly SwitchbackAction[] {
   const { thread, send } = props
   const next = nextEngine(props.engines, thread.engine)
   // **只看能力，不看引擎叫什么、也不嗅探命令名。**
   // 原来这里是 `commands.some(c => c.name === "compact")`——那意味着某家引擎
-  // 哪天把命令改名叫 `condense`，omni 会默默多出一个重复入口，没有任何地方报错
+  // 哪天把命令改名叫 `condense`，Switchback 会默默多出一个重复入口，没有任何地方报错
   const can = thread.capabilities ?? NO_CAPABILITIES
   // 承接上一段：拿得到上一家的原始记录才给这条命令（判据见 `pickup.ts`）
   const pickup = pickupOf(thread)
-  return omniCommands({
+  return switchbackCommands({
     onNew: props.onNew,
     onRename: props.onRename,
     onSettings: props.onSettings,

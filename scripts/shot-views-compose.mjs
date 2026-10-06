@@ -20,7 +20,7 @@ export const COMPOSE_VIEWS = [
         const draw = canvas.getContext('2d')
         if (draw === null) { reject(new Error('固定图片画布不可用')); return }
         draw.fillStyle = '#f7f7f8'; draw.fillRect(0, 0, 960, 540)
-        draw.fillStyle = '#18181b'; draw.font = '700 64px sans-serif'; draw.fillText('omni 同文', 72, 118)
+        draw.fillStyle = '#18181b'; draw.font = '700 64px sans-serif'; draw.fillText('Switchback', 72, 118)
         draw.fillStyle = '#71717a'; draw.font = '32px sans-serif'; draw.fillText('图片预览 · 键盘闭环', 72, 178)
         draw.fillStyle = '#ffffff'; draw.strokeStyle = '#d4d4d8'; draw.lineWidth = 3
         draw.roundRect(72, 252, 816, 178, 24); draw.fill(); draw.stroke()
@@ -41,12 +41,12 @@ export const COMPOSE_VIEWS = [
           if (document.querySelector('.attach .thumb') === null) { setTimeout(cycle, 50); return }
           setTimeout(() => {
             const selected = document.querySelector('.row--thread.row--selected .row__main')
-            window.__omniDraftThread = selected?.textContent.trim()
+            window.__switchbackDraftThread = selected?.textContent.trim()
             const other = [...document.querySelectorAll('.row--thread .row__main')].find(row => row !== selected)
             other?.click()
             setTimeout(() => {
               [...document.querySelectorAll('.row--thread .row__main')]
-                .find(row => row.textContent.trim() === window.__omniDraftThread)?.click()
+                .find(row => row.textContent.trim() === window.__switchbackDraftThread)?.click()
               setTimeout(() => { document.documentElement.dataset.draftRestored = 'true' }, 250)
             }, 250)
           }, 100)
@@ -61,7 +61,7 @@ export const COMPOSE_VIEWS = [
   {
     name: "13-图片查看器",
     audit: true,
-    open: `(() => { const trigger = document.querySelector('.thumb__hit'); window.__omniImageTrigger = trigger; trigger?.focus(); trigger?.click() })()`,
+    open: `(() => { const trigger = document.querySelector('.thumb__hit'); window.__switchbackImageTrigger = trigger; trigger?.focus(); trigger?.click() })()`,
     ready: `.lightbox[aria-modal="true"]`,
     assert: `(() => {
       const dialog = document.querySelector('.lightbox')
@@ -77,7 +77,7 @@ export const COMPOSE_VIEWS = [
     after: `return new Promise((resolve, reject) => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
       setTimeout(() => {
-        if (document.querySelector('.lightbox') !== null || document.activeElement !== window.__omniImageTrigger) {
+        if (document.querySelector('.lightbox') !== null || document.activeElement !== window.__switchbackImageTrigger) {
           reject(new Error('图片查看器关闭后没有回到缩略图'))
           return
         }
@@ -85,7 +85,7 @@ export const COMPOSE_VIEWS = [
           const thumb = document.querySelector('.attach .thumb')
           const name = thumb?.getAttribute('title')
           if (name === null || name === undefined) throw new Error('找不到待移除图片的文件名')
-          const info = await window.omni.appInfo()
+          const info = await window.switchback.appInfo()
           const path = info.dataDir.replace(/[\\\\/]$/, '') + '/attachments/' + name
           const input = document.querySelector('.composer__input')
           const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
@@ -93,13 +93,13 @@ export const COMPOSE_VIEWS = [
           input?.dispatchEvent(new Event('input', { bubbles: true }))
           document.querySelector('[aria-label="去掉这个附件"]')?.click()
           for (let attempt = 0; attempt < 40; attempt += 1) {
-            if (await window.omni.thumb(path, 16) === undefined) break
+            if (await window.switchback.thumb(path, 16) === undefined) break
             await new Promise(done => setTimeout(done, 50))
             if (attempt === 39) throw new Error('移除图片后，本地草稿副本仍然存在')
           }
           delete document.documentElement.dataset.draftRestored
-          delete window.__omniDraftThread
-          delete window.__omniImageTrigger
+          delete window.__switchbackDraftThread
+          delete window.__switchbackImageTrigger
         })().then(resolve, reject)
       }, 80)
     })`,
@@ -252,8 +252,8 @@ export const COMPOSE_VIEWS = [
     ready: ".mentions__row",
     assert: `[...document.querySelectorAll('.mentions__row')]
         .some(row => row.textContent.toLowerCase().includes('attachment'))
-      && document.querySelector('.mentions__scope bdi')?.textContent.endsWith('/omni') === true
-      && document.querySelector('[role="listbox"]')?.getAttribute('aria-label')?.endsWith('/omni') === true
+      && document.querySelector('.mentions__scope bdi')?.textContent.endsWith('/switchback') === true
+      && document.querySelector('[role="listbox"]')?.getAttribute('aria-label')?.endsWith('/switchback') === true
       && [...document.querySelectorAll('.mentions__row')].filter(row => row.tabIndex === 0).length === 1
       && document.documentElement.dataset.completionPass === 'true'`,
     after: `(() => { delete document.documentElement.dataset.completionPass; const input = document.querySelector('.composer__input'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set; setter?.call(input, ''); input?.dispatchEvent(new Event('input', { bubbles: true })) })()`,

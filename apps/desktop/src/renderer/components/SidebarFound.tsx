@@ -1,5 +1,5 @@
 import type { useDeepSearch } from "../useDeepSearch.js"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import type { SidebarRow } from "../sidebar.js"
 import { Deep } from "./SidebarDeep.js"
 import { Hits } from "./SidebarHits.js"

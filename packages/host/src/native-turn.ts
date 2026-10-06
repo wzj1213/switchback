@@ -1,4 +1,4 @@
-import type { NativeTurnStart } from "@omni/engine"
+import type { NativeTurnStart } from "@switchback/engine"
 import { emit, isCurrent, setStatus, type Ctx, type Live } from "./ctx.js"
 import { recordSegment } from "./segment.js"
 

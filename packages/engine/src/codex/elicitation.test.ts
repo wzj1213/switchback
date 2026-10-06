@@ -12,7 +12,7 @@ const meta: WireElicitationMeta = {
   persist: ["session", "always"],
   riskLevel: "low",
   tool_name: "get_app_state",
-  tool_params_display: [{ display_name: "App", name: "app", value: "omni" }],
+  tool_params_display: [{ display_name: "App", name: "app", value: "switchback" }],
 }
 
 const params: WireMcpElicitation = {
@@ -21,7 +21,7 @@ const params: WireMcpElicitation = {
   serverName: "node_repl",
   mode: "form",
   _meta: meta,
-  message: 'Allow Computer Use to use "omni"?',
+  message: 'Allow Computer Use to use "switchback"?',
   requestedSchema: { type: "object", properties: {} },
 }
 
@@ -40,7 +40,7 @@ function serverCall(value: WireMcpElicitation): { call: ServerCall; replies: unk
 }
 
 describe("Codex MCP elicitation", () => {
-  it("Computer Use 的原生应用授权会进入 omni 审批卡，再按协议回给 app-server", async () => {
+  it("Computer Use 的原生应用授权会进入 Switchback 审批卡，再按协议回给 app-server", async () => {
     const { call, replies } = serverCall(params)
     const askUser = vi.fn(() => Promise.resolve<ApprovalAnswer>({ allow: true, remember: "once" }))
     await answerApproval(call, {
@@ -55,9 +55,9 @@ describe("Codex MCP elicitation", () => {
     expect(askUser).toHaveBeenCalledWith(expect.objectContaining({
       toolCallId: "mcp-elicitation-17",
       tool: "Computer Use",
-      summary: 'Allow Computer Use to use "omni"?',
-      reason: "Computer Use 请求调用 get_app_state（App：omni）",
-      rememberHint: "Computer Use · App：omni",
+      summary: 'Allow Computer Use to use "switchback"?',
+      reason: "Computer Use 请求调用 get_app_state（App：switchback）",
+      rememberHint: "Computer Use · App：switchback",
     }))
     expect(replies).toEqual([{ action: "accept", content: {}, _meta: null }])
   })

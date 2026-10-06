@@ -3,7 +3,7 @@ import type {
   Command,
   PendingQuestion,
   QuestionResponse,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import {
   draftOf,
   freshDrafts,
@@ -63,7 +63,7 @@ function Card({ group, onResolve, offline }: {
           回答
         </button>
       </div>
-      {offline ? <p className="question-card__offline">没连上 omni，重连后才能回答。</p> : null}
+      {offline ? <p className="question-card__offline">没连上 Switchback，重连后才能回答。</p> : null}
     </form>
   )
 }

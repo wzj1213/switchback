@@ -26,8 +26,8 @@ import axe from "axe-core"
 import WebSocket from "ws"
 
 const OUT = process.argv[2] ?? join(process.cwd(), "release", "web-shots")
-// 和 harness 的 `OMNI_HARNESS_PORT` 对上：隧道验证时它跑在 17800
-const BASE = `http://127.0.0.1:${process.env["OMNI_HARNESS_PORT"] ?? "17801"}`
+// 和 harness 的 `SWITCHBACK_HARNESS_PORT` 对上：隧道验证时它跑在 17800
+const BASE = `http://127.0.0.1:${process.env["SWITCHBACK_HARNESS_PORT"] ?? "17801"}`
 const TOKEN = "harness-dev-token-not-a-secret"
 const PORT = 9333
 /** 墙钟看门狗：`--virtual-time-budget` 说好 4 秒，跑过这个数就是卡死了。 */
@@ -124,8 +124,8 @@ async function shoot(send, view) {
   // 令牌塞进 localStorage 再重载：第一屏是配对屏，不塞就只能拍到那一屏
   const script =
     view.setup === "unpair"
-      ? `localStorage.removeItem("omni.token"); location.reload()`
-      : `localStorage.setItem("omni.token", ${JSON.stringify(TOKEN)}); location.reload()`
+      ? `localStorage.removeItem("switchback.token"); location.reload()`
+      : `localStorage.setItem("switchback.token", ${JSON.stringify(TOKEN)}); location.reload()`
   await send("Runtime.evaluate", { expression: script })
   await new Promise((r) => setTimeout(r, 1400))
   if (view.setup === "open") {
@@ -147,7 +147,7 @@ async function main() {
     "--headless",
     "--hide-scrollbars",
     "--no-sandbox",
-    "--user-data-dir=/tmp/omni-shot-profile",
+    "--user-data-dir=/tmp/switchback-shot-profile",
     "about:blank",
   ])
   const kill = () => {

@@ -1,7 +1,7 @@
 import type {
   Options, UserDialogRequest, UserDialogResult,
 } from "@anthropic-ai/claude-agent-sdk"
-import type { ItemId, QuestionPrompt, QuestionResponse, ToolCallItem } from "@omni/protocol"
+import type { ItemId, QuestionPrompt, QuestionResponse, ToolCallItem } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { PlanState } from "./plan.js"
 import { sanitize } from "./permission.js"

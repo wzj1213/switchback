@@ -1,4 +1,4 @@
-import type { EngineInfo, Thread, ThreadStatus } from "@omni/protocol"
+import type { EngineInfo, Thread, ThreadStatus } from "@switchback/protocol"
 import { SpinnerIcon } from "./icons.js"
 import { sinceOf } from "../status.js"
 import { useMinute } from "../useMinute.js"
@@ -78,7 +78,7 @@ function EngineDot({
  * 行右边那一列。**一条规矩管一列：默认答「多久以前」，有更要紧的事就顶掉它。**
  *
  * 那一格以前是空的（只有置顶段拿去写项目名）。而会话标题彼此都长得差不多
- *（「omni」「接着上面…」「修一下那个 bug」），一列排下来唯一能把它们区分开的
+ *（「Switchback」「接着上面…」「修一下那个 bug」），一列排下来唯一能把它们区分开的
  * 就是新旧——`Thread.updatedAt` 一直有，只是从来没显示过。
  *
  * 顶掉它的有四种，按要紧程度排：正在跑（那颗转圈）、待批、失败、启动中。

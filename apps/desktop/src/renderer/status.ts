@@ -1,4 +1,4 @@
-import type { Item, Thread, TurnPace } from "@omni/protocol"
+import type { Item, Thread, TurnPace } from "@switchback/protocol"
 import { runningToolLabel } from "./tool.js"
 import { headingOf } from "./reasoning.js"
 
@@ -75,7 +75,7 @@ function oneDecimalBelow(value: number, edge: number): string {
  *
  * ## 为什么侧栏需要它
  *
- * 会话标题彼此都长得差不多（「omni」「接着上面…」「修一下那个 bug」），
+ * 会话标题彼此都长得差不多（「Switchback」「接着上面…」「修一下那个 bug」），
  * 一列排下来**唯一能把它们区分开的是新旧**——而这件事 `Thread.updatedAt`
  * 一直握在手里，从来没显示过。那一格今天是空的。
  *

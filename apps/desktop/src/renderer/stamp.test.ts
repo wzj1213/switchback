@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Item, Turn } from "@omni/protocol"
+import type { Item, Turn } from "@switchback/protocol"
 import { stampOf } from "./stamp.js"
 
 function shell(id: string, status: "running" | "ok", lane = false): Item {

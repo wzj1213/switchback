@@ -1,4 +1,4 @@
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption } from "@switchback/protocol"
 import type { EnginePick } from "../../shared/settings.js"
 import { effortLabel } from "./ModelPicker.js"
 import { Select, type Choice, type Section } from "./Select.js"

@@ -1,5 +1,5 @@
-import type { Event, ThreadId } from "@omni/protocol"
-import { mergeRateLimits } from "@omni/store"
+import type { Event, ThreadId } from "@switchback/protocol"
+import { mergeRateLimits } from "@switchback/store"
 
 interface LiveStateCtx {
   liveState: Map<string, Event>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import { rowLabelOf, type DropEdge, type SidebarRow } from "../sidebar.js"
 import { Dot, RowEnd } from "./RowEnd.js"
 import { useRowPeek } from "./RowPeek.js"

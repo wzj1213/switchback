@@ -1,4 +1,4 @@
-import type { ErrorItem, Event, TurnId } from "@omni/protocol"
+import type { ErrorItem, Event, TurnId } from "@switchback/protocol"
 
 interface RawRetry {
   attempt?: unknown

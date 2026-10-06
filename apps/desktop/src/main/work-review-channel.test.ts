@@ -1,4 +1,4 @@
-import type { Worksite } from "@omni/worksite"
+import type { Worksite } from "@switchback/worksite"
 import { describe, expect, it, vi } from "vitest"
 import { createWorksiteSearch } from "./worksite-search.js"
 import { createWorkReviewChannels, type WorkReviewOps } from "./work-review-channel.js"

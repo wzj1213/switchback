@@ -69,7 +69,7 @@ export function installFind(windows: () => readonly BrowserWindow[]): void {
     return win?.webContents
   }
 
-  ipcMain.handle("omni:find", async (_e, request: FindRequest): Promise<FindResult> => {
+  ipcMain.handle("switchback:find", async (_e, request: FindRequest): Promise<FindResult> => {
     const contents = focused()
     if (contents === undefined) return EMPTY
     if (request.query === "") {
@@ -79,7 +79,7 @@ export function installFind(windows: () => readonly BrowserWindow[]): void {
     return once(contents, request)
   })
 
-  ipcMain.on("omni:stopFind", () => {
+  ipcMain.on("switchback:stopFind", () => {
     // clearSelection 而不是 keepSelection：关掉查找条之后还留着一段黄色高亮，
     // 会让人以为选中了什么
     focused()?.stopFindInPage("clearSelection")

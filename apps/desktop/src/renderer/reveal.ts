@@ -21,6 +21,6 @@ export function revealable(path: string | undefined): path is string {
 
 export function reveal(path: string): void {
   if (!revealable(path)) return
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
   bridge?.reveal(path)
 }

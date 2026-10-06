@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ThreadStatus } from "@omni/protocol"
+import type { ThreadStatus } from "@switchback/protocol"
 import { stepUnread, type UnreadStep } from "./unread.js"
 
 const step = (over: Partial<UnreadStep>): UnreadStep => ({

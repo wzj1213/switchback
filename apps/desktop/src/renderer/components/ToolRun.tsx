@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { FileChange, ToolCallItem } from "@omni/protocol"
+import type { FileChange, ToolCallItem } from "@switchback/protocol"
 import { shellTranscript, summarize, target, toolStatusText, VERB } from "../tool.js"
 import { requestFilePreview } from "../file-preview-request.js"
 import { ChevronIcon } from "./icons.js"

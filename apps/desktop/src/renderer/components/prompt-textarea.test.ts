@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { promptPlaceholder } from "./prompt-textarea.js"
 
 const command = (argumentHint?: string): SlashCommand => ({

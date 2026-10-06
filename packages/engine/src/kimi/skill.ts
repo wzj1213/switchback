@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { attachmentContent } from "./attach.js"
 import type { KimiApi } from "./http.js"
 import { sessionPath } from "./http.js"

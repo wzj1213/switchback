@@ -6,7 +6,7 @@ const WRAPPED = "_x.ai/scheduled_task_inject_prompt"
 
 /**
  * Grok 到点后把前台循环交给当前 ACP driver；宿主必须以 `scheduler-fired-` promptId 回送。
- * 只发送事件给出的任务原文。首方 pager 另加的 system-reminder 不属于引擎协议输出，omni 不复制。
+ * 只发送事件给出的任务原文。首方 pager 另加的 system-reminder 不属于引擎协议输出，Switchback 不复制。
  */
 export function grokScheduledTurn(method: string, params: unknown): ForeignTurn | undefined {
   const payload = method === WRAPPED || method === DIRECT ? grokExtPayload(method, params, DIRECT) : undefined

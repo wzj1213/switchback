@@ -9,12 +9,12 @@ function measure(selector) {
 }
 
 function baseline(selector) {
-  return `window.__omniControl = ${measure(selector)}`
+  return `window.__switchbackControl = ${measure(selector)}`
 }
 
 function feedback(selector, unchanged = false) {
   return `(() => {
-    const before = window.__omniControl, after = ${measure(selector)}
+    const before = window.__switchbackControl, after = ${measure(selector)}
     return before.width === after.width && before.height === after.height &&
       ${unchanged ? "before.bg === after.bg && before.color === after.color && before.opacity === after.opacity"
         : "before.bg !== after.bg && after.bg !== 'rgba(0, 0, 0, 0)'"}
@@ -56,13 +56,13 @@ export const INTERACTION_VIEWS = [
     name: "49-文档模式悬停统一",
     open: [...openPanelPage('文件'), baseline(source)], hover: source, ready: '.text-preview__document',
     assert: feedback(source),
-    after: `window.__omniHover = getComputedStyle(document.querySelector('${source}')).backgroundColor`,
+    after: `window.__switchbackHover = getComputedStyle(document.querySelector('${source}')).backgroundColor`,
   },
   {
     name: "50-按下反馈区别于悬停",
     open: baseline(source), hover: source, press: true, ready: '.text-preview__document',
     assert: `${feedback(source)} && document.querySelector('${source}').matches(':active') &&
-      getComputedStyle(document.querySelector('${source}')).backgroundColor !== window.__omniHover`,
+      getComputedStyle(document.querySelector('${source}')).backgroundColor !== window.__switchbackHover`,
   },
   {
     name: "51-禁用导航悬停保持静止",
@@ -118,7 +118,7 @@ export const INTERACTION_VIEWS = [
     name: "57-设置普通项悬停",
     open: baseline('.set__tab:not(.set__tab--on)'), hover: '.set__tab:not(.set__tab--on)', ready: '.set',
     assert: feedback('.set__tab:not(.set__tab--on)'),
-    after: `${escape}; delete window.__omniControl; delete window.__omniHover`,
+    after: `${escape}; delete window.__switchbackControl; delete window.__switchbackHover`,
   },
   {
     name: "58a-操作按钮不叠加会话预览",
@@ -140,6 +140,6 @@ export const INTERACTION_VIEWS = [
     open: baseline('.row__act--danger'), hover: '.row__act--danger', press: true, ready: '.row__act--danger',
     assert: `${feedback('.row__act--danger')} && document.querySelector('.row__act--danger').matches(':active')`,
     after: `document.querySelector('.row__act--danger')?.focus(); document.querySelector('.paneltoggle').focus();
-      delete window.__omniControl`,
+      delete window.__switchbackControl`,
   },
 ]

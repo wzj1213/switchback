@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 
 /**
  * 事件 ↔ JSONL 的编解码。**纯函数，不碰文件系统**——

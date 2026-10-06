@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import { textOf } from "../export.js"
 import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"

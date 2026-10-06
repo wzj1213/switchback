@@ -1,6 +1,6 @@
 import type { QuestionId } from "./ids.js"
 
-/** 一道结构化问题里的一个原生选项。id 由引擎给，omni 不改写。 */
+/** 一道结构化问题里的一个原生选项。id 由引擎给，Switchback 不改写。 */
 export interface QuestionOption {
   id: string
   label: string

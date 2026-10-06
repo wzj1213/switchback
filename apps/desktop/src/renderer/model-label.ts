@@ -12,7 +12,7 @@
  *
  * ## 为什么在这一层裁，而不是改数据
  *
- * `(recommended)` 是**引擎自己报的** `ModelOption.label`，omni 没有加过一个字。
+ * `(recommended)` 是**引擎自己报的** `ModelOption.label`，Switchback 没有加过一个字。
  * 改掉它等于替引擎改它自报的东西。所以这里只做**显示**：全名照旧进菜单
  * （`sectionsOf` 用的是 `m.label`），也照旧进触发器的悬停。
  *

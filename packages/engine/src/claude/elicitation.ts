@@ -1,5 +1,5 @@
 import type { ElicitationRequest, ElicitationResult } from "@anthropic-ai/claude-agent-sdk"
-import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@omni/protocol"
+import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { sanitize } from "./permission.js"
 import { urlPrompt } from "./elicitation-url.js"
@@ -265,7 +265,7 @@ function withError(form: Form, problem: Extract<Decoded, { error: string }>): Fo
   return { ...form, fields, prompts: fields.map((field) => field.prompt) }
 }
 
-/** Claude 公开的 MCP elicitation → omni 原生问题卡；不支持的 schema 明确 cancel。 */
+/** Claude 公开的 MCP elicitation → Switchback 原生问题卡；不支持的 schema 明确 cancel。 */
 export async function answerElicitation(
   request: ElicitationRequest,
   askQuestion: StartRequest["askQuestion"],

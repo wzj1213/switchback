@@ -1,4 +1,4 @@
-import type { Aside, Lane } from "@omni/protocol"
+import type { Aside, Lane } from "@switchback/protocol"
 import { PlanMark, type MarkState } from "./PlanMark.js"
 
 const ASIDE_LABEL: Readonly<Record<Lane["status"], string>> = {

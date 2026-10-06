@@ -11,7 +11,7 @@ import type { Logger } from "./log.js"
  *
  * ## 为什么不能靠猜
  *
- * 「我配的钩子生效了没有」这个问题，之前在 omni 里**没有任何入口能回答**。
+ * 「我配的钩子生效了没有」这个问题，之前在 Switchback 里**没有任何入口能回答**。
  * 而它有好几个各自独立的失败方式，每一个都不报错：
  *
  * 1. 写错了地方（家目录那份 vs 项目那份 vs `settings.local.json`）
@@ -29,7 +29,7 @@ import type { Logger } from "./log.js"
  *
  * ## 四家都做，但不做第三方 ACP 引擎
  *
- * `engines.json` 里挂的那些是**用户自己注册的**，omni 只知道怎么把它们拉起来，
+ * `engines.json` 里挂的那些是**用户自己注册的**，Switchback 只知道怎么把它们拉起来，
  * 不知道它们的配置文件在哪、长什么样。编一个路径出来查，比不查更糟——
  * 界面上会显示「没有钩子」，而那可能是查错了地方。界面上照实说这一句。
  */
@@ -50,7 +50,7 @@ const ENGINES: readonly HookEngine[] = ["claude", "codex", "kimi", "grok"]
 export function installEnvChannel(log: Logger): void {
   // 允许打开的路径**只能是这一页刚发出去的那些**。渲染层拿不到一个能打开任意文件的口子
   const shown = new Set<string>()
-  ipcMain.handle("omni:envConfig", async (_e, cwd?: string): Promise<EnvConfig> => {
+  ipcMain.handle("switchback:envConfig", async (_e, cwd?: string): Promise<EnvConfig> => {
     const claude = await claudeSide(cwd, log)
     const rest = [
       ...(await codexSources(cwd, log)),
@@ -68,7 +68,7 @@ export function installEnvChannel(log: Logger): void {
       managedOnly: claude.managedOnly,
     }
   })
-  ipcMain.on("omni:openEnvFile", (_e, path: string) => {
+  ipcMain.on("switchback:openEnvFile", (_e, path: string) => {
     // 用系统默认编辑器打开，不自己做一个配置界面——理由和 `engines.json` 那条一样
     if (shown.has(path)) void shell.openPath(path)
   })
@@ -112,7 +112,7 @@ async function claudeSide(cwd: string | undefined, log: Logger): Promise<ClaudeS
     const found: HookSource[] = []
     for (const entry of resolved.sources) {
       const scope = scopeOf(entry.source)
-      // `flag` 那一层是 `--settings` 传进来的，omni 从不传——真出现了也没有文件路径可给
+      // `flag` 那一层是 `--settings` 传进来的，Switchback 从不传——真出现了也没有文件路径可给
       if (scope === undefined || entry.path === undefined) continue
       found.push(claudeSource(scope, entry.path, entry.settings as ClaudeSettings))
     }

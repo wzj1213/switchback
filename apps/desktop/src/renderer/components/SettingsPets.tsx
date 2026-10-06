@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import type { PetKit, Settings } from "../../shared/settings.js"
 import { FireSection } from "./SettingsPetsFire.js"
 import { petRoster, type PetSlot } from "../pet-roster.js"

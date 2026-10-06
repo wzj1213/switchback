@@ -1,4 +1,4 @@
-import type { Event, ItemId, ToolCallItem } from "@omni/protocol"
+import type { Event, ItemId, ToolCallItem } from "@switchback/protocol"
 import { applyResult, type ToolResult } from "./translate.js"
 
 interface RawPermissionDenied {

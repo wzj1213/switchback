@@ -24,11 +24,11 @@ import { app, ipcMain } from "electron"
  * 半年后那儿会有几百个文件夹；按天分至少让人能照着日期找回去。
  */
 export function installChatDirChannel(): void {
-  ipcMain.handle("omni:chatDir", async () => {
+  ipcMain.handle("switchback:chatDir", async () => {
     const now = new Date()
     const day = `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
     const at = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
-    const dir = join(app.getPath("documents"), "omni", day, `对话-${at}`)
+    const dir = join(app.getPath("documents"), "Switchback", day, `对话-${at}`)
     await mkdir(dir, { recursive: true })
     return dir
   })

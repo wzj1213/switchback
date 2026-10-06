@@ -17,13 +17,13 @@ const tool = (detail: string): string =>
 const dir = { path: "" }
 
 beforeAll(() => {
-  dir.path = mkdtempSync(join(tmpdir(), "omni-search-"))
+  dir.path = mkdtempSync(join(tmpdir(), "switchback-search-"))
   writeFileSync(
     join(dir.path, "th-aaa.jsonl"),
     [
       JSON.stringify({ type: "thread.started", at: 1, thread: { id: "th-aaa", title: "无关标题" } }),
       line("user_message", "把流式输出改掉", 100),
-      line("agent_message", "好的，我把 omni 的流式渲染换成增量的", 200),
+      line("agent_message", "好的，我把 Switchback 的流式渲染换成增量的", 200),
       tool("git diff --stat"),
     ].join("\n"),
   )

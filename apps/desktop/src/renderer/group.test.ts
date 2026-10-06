@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Item, ToolCallItem } from "@omni/protocol"
+import type { Item, ToolCallItem } from "@switchback/protocol"
 import { foldTurns, groupRows, withAsides } from "./group.js"
 
 const tool = (id: string): ToolCallItem => ({
@@ -82,7 +82,7 @@ describe("一轮的分界", () => {
   })
 
   it("换引擎的交接说明排在最前面：分界线跳过它，落在用户那句之后", () => {
-    const note: Item = { id: "h", turnId: "t1", kind: "user_message", at: 1000, text: "<omni-handoff>…</omni-handoff>", origin: "handoff" }
+    const note: Item = { id: "h", turnId: "t1", kind: "user_message", at: 1000, text: "<switchback-handoff>…</switchback-handoff>", origin: "handoff" }
     const rows = groupRows([note, user("u", "t1", 1000), reply("a", "t1", 3500)])
     expect(rows.map((r) => (r.kind === "item" ? r.item.id : r.kind))).toEqual(["h", "u", "turn", "a"])
   })

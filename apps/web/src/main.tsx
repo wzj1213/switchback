@@ -24,7 +24,7 @@ function registerWorker(): void {
 registerWorker()
 
 const el = document.getElementById("root")
-if (el === null) throw new Error("omni web: 找不到 #root")
+if (el === null) throw new Error("Switchback web: 找不到 #root")
 
 createRoot(el).render(
   <StrictMode>

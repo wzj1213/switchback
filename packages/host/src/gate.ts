@@ -1,5 +1,5 @@
-import type { ApprovalItem, Event, ItemId, QuestionId, QuestionResponse, TurnId } from "@omni/protocol"
-import type { ApprovalAnswer, ApprovalAsk } from "@omni/engine"
+import type { ApprovalItem, Event, ItemId, QuestionId, QuestionResponse, TurnId } from "@switchback/protocol"
+import type { ApprovalAnswer, ApprovalAsk } from "@switchback/engine"
 
 export interface OpenRequest {
   ask: ApprovalAsk

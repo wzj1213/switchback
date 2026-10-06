@@ -1,4 +1,4 @@
-import type { EngineInfo, Trust } from "@omni/protocol"
+import type { EngineInfo, Trust } from "@switchback/protocol"
 import type { NotifyMode, Settings } from "../../shared/settings.js"
 import { TRUSTS } from "./Composer.js"
 import { Field, Group, Segmented, Toggle } from "./SettingsBits.js"
@@ -7,7 +7,7 @@ import { ThemeOptions } from "./theme-options.js"
 /**
  * 「通用」与「新会话」两页。
  *
- * 它们是这块面板里**唯一真正独有的东西**——决定「omni 自己怎么表现」
+ * 它们是这块面板里**唯一真正独有的东西**——决定「Switchback 自己怎么表现」
  * 和「下一个新会话长什么样」，而在此之前后者只能每开一个会话手动改一次。
  */
 
@@ -59,7 +59,7 @@ export function LookSection({
         </Field>
       </Group>
       {/*
-        omni 往模型上下文里写话只有这一处（AGENTS.md 的那条例外），所以它必须是
+        Switchback 往模型上下文里写话只有这一处（AGENTS.md 的那条例外），所以它必须是
         一个看得见、关得掉的开关，而且说清楚会发什么、落在哪。
       */}
       <Group title="换引擎">
@@ -72,7 +72,7 @@ export function LookSection({
           }
           more={
             settings.handoffBrief
-              ? "说明里写的是：此前谁跑了哪几轮、完整转写存在哪（工作区 .omni/handoff/，不进版本库）、各家原始记录在哪、是什么格式。"
+              ? "说明里写的是：此前谁跑了哪几轮、完整转写存在哪（工作区 .switchback/handoff/，不进版本库）、各家原始记录在哪、是什么格式。"
               : "要让它读历史，得你自己把路径给它（/timeline 里有）。"
           }
         >

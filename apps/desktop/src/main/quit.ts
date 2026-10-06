@@ -1,5 +1,5 @@
 import { app, dialog, type BrowserWindow } from "electron"
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 import { busy } from "./awake.js"
 
 /**

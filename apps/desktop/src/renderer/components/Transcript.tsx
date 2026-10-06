@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, TurnId, TurnPace } from "@omni/protocol"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, TurnId, TurnPace } from "@switchback/protocol"
 import { memo, useMemo } from "react"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { TurnStatus, type Reconnecting } from "./TurnStatus.js"

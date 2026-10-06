@@ -1,4 +1,4 @@
-import type { TurnId } from "@omni/protocol"
+import type { TurnId } from "@switchback/protocol"
 
 export interface CompactionContext {
   state: { codexThread: string | undefined; turn: TurnId | undefined }

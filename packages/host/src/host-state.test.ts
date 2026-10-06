@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { type EngineGoal, type Event, type EngineAxis } from "@omni/protocol"
+import { type EngineGoal, type Event, type EngineAxis } from "@switchback/protocol"
 import { type Host } from "./host.js"
 import { setup, create, type Fake } from "./host-fixture.js"
 
 /**
  * 引擎自报的状态**合并进 `Thread.engineState`，绝不碰 `Thread.trust`**。
  *
- * 「绝不碰 trust」那条不是洁癖：`trust` 同时是 omni 本机审批判定器的输入，
- * 引擎报 yolo 就把它写成 full，等于顺手把 omni 自己那层审批也关掉——
+ * 「绝不碰 trust」那条不是洁癖：`trust` 同时是 Switchback 本机审批判定器的输入，
+ * 引擎报 yolo 就把它写成 full，等于顺手把 Switchback 自己那层审批也关掉——
  * 一次用户从没点过的放权，而且没有任何地方会报错。
  */
 describe("引擎自报的状态", () => {

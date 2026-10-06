@@ -1,5 +1,5 @@
-import type { StartRequest } from "@omni/engine"
-import type { ThreadId } from "@omni/protocol"
+import type { StartRequest } from "@switchback/engine"
+import type { ThreadId } from "@switchback/protocol"
 import { isCurrent, type Ctx, type Live } from "./ctx.js"
 import {
   rememberEngineState,

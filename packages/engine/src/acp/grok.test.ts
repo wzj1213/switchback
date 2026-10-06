@@ -22,7 +22,7 @@ describe("grok 工作区目录名", () => {
     ["/Users/you/work/diagen", "%2FUsers%2Fyou%2Fwork%2Fdiagen"],
     // `-` 保持原样：这一条排除了「所有非字母数字都编码」那种规则
     ["/var/folders/8c/T/grok-probe-QCPiIH", "%2Fvar%2Ffolders%2F8c%2FT%2Fgrok-probe-QCPiIH"],
-    ["/Users/you/work/omni", "%2FUsers%2Fyou%2Fwork%2Fomni"],
+    ["/Users/you/work/switchback", "%2FUsers%2Fyou%2Fwork%2Fswitchback"],
   ]
 
   for (const [cwd, dir] of cases) {
@@ -38,7 +38,7 @@ describe("grok 工作区目录名", () => {
 
 /** 摆一个假的 `~/.grok/sessions`，`dir` 是工作区那一层的目录名。 */
 function plant(dir: string, sessionId: string): string {
-  const home = mkdtempSync(join(tmpdir(), "omni-grok-"))
+  const home = mkdtempSync(join(tmpdir(), "switchback-grok-"))
   const session = join(home, ".grok", "sessions", dir, sessionId)
   mkdirSync(session, { recursive: true })
   writeFileSync(join(session, "chat_history.jsonl"), "{}\n")
@@ -46,7 +46,7 @@ function plant(dir: string, sessionId: string): string {
 }
 
 describe("grok 记录定位", () => {
-  const CWD = "/Users/you/work/omni"
+  const CWD = "/Users/you/work/switchback"
   const ID = "01a00e5e-2fea-7233-b9d1-617f71ac0a38"
 
   it("算得中就直接给", async () => {
@@ -72,7 +72,7 @@ describe("grok 记录定位", () => {
   })
 
   it("连 sessions 目录都没有也不抛", async () => {
-    expect(await grokLogPath(mkdtempSync(join(tmpdir(), "omni-grok-空-")), ID, CWD)).toBeUndefined()
+    expect(await grokLogPath(mkdtempSync(join(tmpdir(), "switchback-grok-空-")), ID, CWD)).toBeUndefined()
   })
 })
 
@@ -206,7 +206,7 @@ describe("grok 的原生审批开关", () => {
 })
 
 /**
- * **实测原文**：omni 发完 `session/set_model` 之后 grok 回的那一条，
+ * **实测原文**：Switchback 发完 `session/set_model` 之后 grok 回的那一条，
  * 以及你在它自己的界面里改档时它推的那一条，是同一个形状。
  */
 describe("grok 报「模型 / 强度换了」", () => {

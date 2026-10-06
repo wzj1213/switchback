@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createPlanState, emitPlan, feedPlan, isPlanTool, resetPlan } from "./plan.js"
 
 const create = (subject: string): unknown => ({

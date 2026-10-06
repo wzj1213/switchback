@@ -1,4 +1,4 @@
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 
 /** 模型设置失败时回到诚实的“引擎默认”，不能继续显示一个没设上的选择。 */
 export function withoutModel(thread: Thread): Thread {

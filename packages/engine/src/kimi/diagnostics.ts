@@ -1,4 +1,4 @@
-import type { Event, ThreadId } from "@omni/protocol"
+import type { Event, ThreadId } from "@switchback/protocol"
 import { KimiMcpStatus, type KimiMcpSnapshot } from "./mcp-status.js"
 import type { KimiPayload } from "./wire.js"
 

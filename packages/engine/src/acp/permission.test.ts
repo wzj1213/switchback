@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineStatus, Trust } from "@omni/protocol"
+import type { EngineStatus, Trust } from "@switchback/protocol"
 import type { ServerCall } from "../rpc.js"
 import { pickOption, summarize } from "./approve.js"
 import { applyTrust, modeAxis, needsNativeRestart, pickMode } from "./mode.js"
@@ -142,7 +142,7 @@ describe("判一条审批", () => {
     expect(got.result).toEqual({ outcome: { outcome: "selected", optionId: "allow_always" } })
   })
 
-  it("**read-only 档下 omni 自己就拒了，根本不问**——引擎问不问是它的事，判定是我们的事", async () => {
+  it("**read-only 档下 Switchback 自己就拒了，根本不问**——引擎问不问是它的事，判定是我们的事", async () => {
     const inflight = new Map<string, AcpToolCall>([
       ["c1", { toolCallId: "c1", kind: "edit", content: [{ type: "diff", path: "/w/a.ts", newText: "x" }] }],
     ])
@@ -206,7 +206,7 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
    * 名字在表里，切过去每条命令都被引擎顶回来
    *（`Auto mode is reserved but not implemented yet`，连 `pwd` 都跑不了）。
    *
-   * 2026-08-28 按「omni 的自动审批 = 引擎的 Auto」把 `auto` 提过权重，真机上
+   * 2026-08-28 按「Switchback 的自动审批 = 引擎的 Auto」把 `auto` 提过权重，真机上
    * 整条会话瘫掉，当天回退。这一组就是钉住那次回退——
    * **`availableModes` 是「有哪些名字」的表，不是「哪些能用」的表。**
    */
@@ -296,8 +296,8 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
   }
 
   it("**agent 自己切走之后再切回来，必须真的发出去**——不然切档是个空操作", async () => {
-    // omni 设过 `agent`，随后 agent 自己切到了别处（`current_mode_update` 落不到
-    // 驱动的 state 上，omni 无从得知）。用户在界面上切回 auto-edit ——
+    // Switchback 设过 `agent`，随后 agent 自己切到了别处（`current_mode_update` 落不到
+    // 驱动的 state 上，Switchback 无从得知）。用户在界面上切回 auto-edit ——
     // 上一版在这里比对 `state.mode` 判定「已经是 agent 了」，一发不发：
     // 引擎停在它自己那一档，界面显示切成功了，而且没有任何地方出声
     const h = trustCtx("agent")
@@ -452,7 +452,7 @@ describe("等在途表把命令补齐", () => {
 
 /**
  * 引擎报的当前档 → 一条轴。`match` 三态里 **`unknown` 是这次补的**：
- * 二元装不下「omni 压根没设过」，而实测 grok 正是那种——不报档位表、却推当前档。
+ * 二元装不下「Switchback 压根没设过」，而实测 grok 正是那种——不报档位表、却推当前档。
  */
 describe("引擎报的当前档怎么变成一条轴", () => {
   const REAL = [
@@ -460,7 +460,7 @@ describe("引擎报的当前档怎么变成一条轴", () => {
     { id: "agent", name: "Agent" },
   ]
 
-  it("引擎报的正是 omni 想要的那一档 → aligned", () => {
+  it("引擎报的正是 Switchback 想要的那一档 → aligned", () => {
     expect(modeAxis(REAL, "auto-edit", "agent").match).toBe("aligned")
   })
 
@@ -468,7 +468,7 @@ describe("引擎报的当前档怎么变成一条轴", () => {
     expect(modeAxis(REAL, "auto-edit", "read-only").match).toBe("diverged")
   })
 
-  it("**omni 匹配不出任何目标时是 unknown，不是 diverged**——没设过就谈不上分家", () => {
+  it("**Switchback 匹配不出任何目标时是 unknown，不是 diverged**——没设过就谈不上分家", () => {
     expect(modeAxis([], "auto-edit", "default").match).toBe("unknown")
     expect(modeAxis([{ id: "alpha" }], "auto-edit", "alpha").match).toBe("unknown")
   })

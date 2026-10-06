@@ -1,4 +1,4 @@
-import { itemToOmni } from "./translate.js"
+import { itemToSwitchback } from "./translate.js"
 import type { NotifyContext } from "./notify.js"
 import type { WireItem, WireTerminalInteraction } from "./wire.js"
 
@@ -32,6 +32,6 @@ export function onTerminalInteraction(ctx: NotifyContext, params: WireTerminalIn
   if (!ctx.materialized.has(params.itemId)) return
   const output = ctx.streamed.get(params.itemId)
   const recovered = output === undefined ? item : { ...item, aggregatedOutput: output }
-  const omni = itemToOmni(recovered, { turnId, at: ctx.now() }, false)
-  if (omni !== undefined) ctx.emit({ type: "item.updated", at: ctx.now(), item: omni })
+  const switchback = itemToSwitchback(recovered, { turnId, at: ctx.now() }, false)
+  if (switchback !== undefined) ctx.emit({ type: "item.updated", at: ctx.now(), item: switchback })
 }

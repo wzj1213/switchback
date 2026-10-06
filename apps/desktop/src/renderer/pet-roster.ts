@@ -1,4 +1,4 @@
-import type { EngineId, EngineInfo } from "@omni/protocol"
+import type { EngineId, EngineInfo } from "@switchback/protocol"
 import { lookOf, type PetLook } from "./pets.js"
 
 /**

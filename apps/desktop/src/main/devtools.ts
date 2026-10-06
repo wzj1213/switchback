@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises"
 import { nativeTheme, type BrowserWindow } from "electron"
-import type { Trust } from "@omni/protocol"
+import type { Trust } from "@switchback/protocol"
 import { quitNow } from "./quit.js"
 
 /**
@@ -8,35 +8,35 @@ import { quitNow } from "./quit.js"
  *
  * | 变量 | 作用 |
  * | --- | --- |
- * | `OMNI_DEV_PROMPT` | 默认会话建好后自动发这条提示词 |
- * | `OMNI_DEV_CWD` | 默认会话开在哪个目录，默认 `process.cwd()` |
- * | `OMNI_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
- * | `OMNI_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
- * | `OMNI_DEV_MODEL` | `<模型>[:<强度>]`，默认会话用这个模型跑 |
- * | `OMNI_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
- * | `OMNI_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
- * | `OMNI_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
- * | `OMNI_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
- * | `OMNI_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
- * | `OMNI_DEV_REVIEW` | 过这么多毫秒之后打开审核面板 |
- * | `OMNI_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
- * | `OMNI_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
- * | `OMNI_DEV_SETTINGS` | 截图前打开设置，并切到左列第 N 页（1 起） |
- * | `OMNI_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
- * | `OMNI_DEV_THEME` | `dark` / `light`，自动化验收时强制主题，不改用户设置 |
- * | `OMNI_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
- * | `OMNI_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
- * | `OMNI_DEV_MAXLIVE` | 同时活着的引擎会话上限（默认 4）。设很大等于关掉淘汰 |
- * | `OMNI_DEV_RENAME` | `<ms>:<新名字>`，到点给当前会话改名 |
- * | `OMNI_DEV_DELETE` | 到点删掉当前会话（毫秒） |
- * | `OMNI_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
- * | `OMNI_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
+ * | `SWITCHBACK_DEV_PROMPT` | 默认会话建好后自动发这条提示词 |
+ * | `SWITCHBACK_DEV_CWD` | 默认会话开在哪个目录，默认 `process.cwd()` |
+ * | `SWITCHBACK_DEV_ENGINE` | 默认会话用哪个引擎，默认 `claude` |
+ * | `SWITCHBACK_DEV_TRUST` | 默认会话的信任档，默认 `auto-edit` |
+ * | `SWITCHBACK_DEV_MODEL` | `<模型>[:<强度>]`，默认会话用这个模型跑 |
+ * | `SWITCHBACK_DEV_RESUME` | 置 1 时不新建会话，而是续跑磁盘上最近的那个 |
+ * | `SWITCHBACK_DEV_FIND` | 到点自动打开查找条并填入这段文字 |
+ * | `SWITCHBACK_DEV_INTERRUPT` | 过这么多毫秒之后自动中断当前轮次 |
+ * | `SWITCHBACK_DEV_RELOAD` | 过这么多毫秒之后强制重载渲染层（验证全量重建） |
+ * | `SWITCHBACK_DEV_COMPARE` | 过这么多毫秒之后打开分叉对比视图 |
+ * | `SWITCHBACK_DEV_REVIEW` | 过这么多毫秒之后打开审核面板 |
+ * | `SWITCHBACK_DEV_FILTER` | 截图前把焦点送进侧栏筛选框并打这段字 |
+ * | `SWITCHBACK_DEV_SELECT` | 截图前点开输入区里第 N 个下拉（1 起） |
+ * | `SWITCHBACK_DEV_SETTINGS` | 截图前打开设置，并切到左列第 N 页（1 起） |
+ * | `SWITCHBACK_DEV_ROWMENU` | 截图前在侧栏第 N 行上右键（1 起） |
+ * | `SWITCHBACK_DEV_THEME` | `dark` / `light`，自动化验收时强制主题，不改用户设置 |
+ * | `SWITCHBACK_DEV_HANDOFF` | `<ms>:<引擎>`，到点把会话**接力**给这家 |
+ * | `SWITCHBACK_DEV_FORK` | `<ms>:<引擎>`，到点**分叉**一份给这家（原会话保留） |
+ * | `SWITCHBACK_DEV_MAXLIVE` | 同时活着的引擎会话上限（默认 4）。设很大等于关掉淘汰 |
+ * | `SWITCHBACK_DEV_RENAME` | `<ms>:<新名字>`，到点给当前会话改名 |
+ * | `SWITCHBACK_DEV_DELETE` | 到点删掉当前会话（毫秒） |
+ * | `SWITCHBACK_DEV_SHOT` | 到点把窗口截成 PNG 写到这个路径，然后退出 |
+ * | `SWITCHBACK_DEV_SHOT_DELAY` | 截图前等多少毫秒，默认 45000 |
  *
  * 用 `webContents.capturePage()` 而不是系统级截屏：只拍这个窗口，
  * 不需要录屏权限，也不会把桌面上的其他东西一起拍进去。
  */
 export function devPrompt(): string | undefined {
-  const text = process.env["OMNI_DEV_PROMPT"]
+  const text = process.env["SWITCHBACK_DEV_PROMPT"]
   return text === undefined || text === "" ? undefined : text
 }
 
@@ -48,7 +48,7 @@ export function devPrompt(): string | undefined {
  * 「这里没有那个文件」，看起来像驱动坏了，其实是工作区搞错了。踩过一次。
  */
 export function devCwd(fallback: string): string {
-  const dir = process.env["OMNI_DEV_CWD"]
+  const dir = process.env["SWITCHBACK_DEV_CWD"]
   return dir === undefined || dir === "" ? fallback : dir
 }
 
@@ -72,7 +72,7 @@ export function devCwd(fallback: string): string {
  * 单开一件事做；在那之前，至少不能把边界设成整个磁盘。
  */
 export function defaultWorksite(home: string): string {
-  const dir = process.env["OMNI_DEV_CWD"]
+  const dir = process.env["SWITCHBACK_DEV_CWD"]
   if (dir !== undefined && dir !== "") return dir
   const cwd = process.cwd()
   // 根目录、或者任何不在 home 底下的诡异 cwd（Dock 启动就是 `/`），都退回 home
@@ -81,7 +81,7 @@ export function defaultWorksite(home: string): string {
 
 /** 换引擎跑一遍是验证归一化模型的主要手段，所以给它留了个口子。 */
 export function devEngine(): string {
-  const engine = process.env["OMNI_DEV_ENGINE"]
+  const engine = process.env["SWITCHBACK_DEV_ENGINE"]
   return engine === undefined || engine === "" ? "claude" : engine
 }
 
@@ -89,7 +89,7 @@ const TRUSTS = new Set<Trust>(["read-only", "auto-edit", "full"])
 
 /** 验证运行态时常常需要一个不会被审批打断的档位，所以也留个口子。认不出就用默认。 */
 export function devTrust(): Trust {
-  const value = process.env["OMNI_DEV_TRUST"]
+  const value = process.env["SWITCHBACK_DEV_TRUST"]
   return value !== undefined && TRUSTS.has(value as Trust) ? (value as Trust) : "auto-edit"
 }
 
@@ -105,7 +105,7 @@ export function devTrust(): Trust {
  *（`Unsupported value: 'max' is not supported with the ... model`）。
  */
 export function devModel(): { model: string; effort?: string } | undefined {
-  const spec = process.env["OMNI_DEV_MODEL"]
+  const spec = process.env["SWITCHBACK_DEV_MODEL"]
   if (spec === undefined || spec === "") return undefined
   const [model, effort] = spec.split(":")
   if (model === undefined || model === "") return undefined
@@ -119,13 +119,13 @@ export function devModel(): { model: string; effort?: string } | undefined {
  * 以及内存大的机器可以自己往上调。认不出就用宿主的缺省。
  */
 export function devMaxLive(): number | undefined {
-  const raw = Number(process.env["OMNI_DEV_MAXLIVE"] ?? "")
+  const raw = Number(process.env["SWITCHBACK_DEV_MAXLIVE"] ?? "")
   return Number.isFinite(raw) && raw >= 1 ? raw : undefined
 }
 
 /** 续跑只能靠点按钮触发，自动化验证需要一个口子。 */
 export function devResume(): boolean {
-  return process.env["OMNI_DEV_RESUME"] === "1"
+  return process.env["SWITCHBACK_DEV_RESUME"] === "1"
 }
 
 /**
@@ -134,23 +134,23 @@ export function devResume(): boolean {
  * 走的是**和菜单同一条**通道，所以验证的是真链路，不是一条测试专用的旁路。
  */
 export function scheduleDevFind(win: BrowserWindow): void {
-  const query = process.env["OMNI_DEV_FIND"]
+  const query = process.env["SWITCHBACK_DEV_FIND"]
   if (query === undefined || query === "") return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 2500
+  const delay = Number(process.env["SWITCHBACK_DEV_SHOT_DELAY"] ?? "45000") - 2500
   setTimeout(() => {
-    if (!win.isDestroyed()) win.webContents.send("omni:menu", "find")
+    if (!win.isDestroyed()) win.webContents.send("switchback:menu", "find")
     setTimeout(() => {
-      if (!win.isDestroyed()) win.webContents.send("omni:devFind", query)
+      if (!win.isDestroyed()) win.webContents.send("switchback:devFind", query)
     }, 300)
   }, Math.max(0, delay))
 }
 
 /** 到点自动中断。中断只能靠点按钮或按快捷键触发，自动化验证需要一个口子。 */
 export function scheduleDevInterrupt(win: BrowserWindow): void {
-  const at = Number(process.env["OMNI_DEV_INTERRUPT"] ?? "0")
+  const at = Number(process.env["SWITCHBACK_DEV_INTERRUPT"] ?? "0")
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
-    if (!win.isDestroyed()) win.webContents.send("omni:menu", "interrupt")
+    if (!win.isDestroyed()) win.webContents.send("switchback:menu", "interrupt")
   }, at)
 }
 
@@ -162,7 +162,7 @@ export function scheduleDevInterrupt(win: BrowserWindow): void {
  * 手工按 ⌘R 也能复现，但复现不了「重载期间引擎还在产出事件」那一段。
  */
 export function scheduleDevReload(win: BrowserWindow): void {
-  const at = Number(process.env["OMNI_DEV_RELOAD"] ?? "0")
+  const at = Number(process.env["SWITCHBACK_DEV_RELOAD"] ?? "0")
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
     if (!win.isDestroyed()) win.webContents.reload()
@@ -177,12 +177,12 @@ export function scheduleDevReload(win: BrowserWindow): void {
  * 焦点没落在筛选框上的话，字会一个都进不去（或者跑进输入框里），一眼看得出来。
  */
 export function scheduleDevFilter(win: BrowserWindow): void {
-  const text = process.env["OMNI_DEV_FILTER"]
+  const text = process.env["SWITCHBACK_DEV_FILTER"]
   if (text === undefined || text === "") return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 3000
+  const delay = Number(process.env["SWITCHBACK_DEV_SHOT_DELAY"] ?? "45000") - 3000
   setTimeout(() => {
     if (win.isDestroyed()) return
-    win.webContents.send("omni:menu", "filter-threads")
+    win.webContents.send("switchback:menu", "filter-threads")
     setTimeout(() => {
       if (!win.isDestroyed()) win.webContents.insertText(text)
     }, 400)
@@ -196,9 +196,9 @@ export function scheduleDevFilter(win: BrowserWindow): void {
  * 理由之一**。有了这个钩子，下拉长什么样才进得了自动化验证。
  */
 export function scheduleDevOpenSelect(win: BrowserWindow): void {
-  const nth = Number(process.env["OMNI_DEV_SELECT"] ?? "0")
+  const nth = Number(process.env["SWITCHBACK_DEV_SELECT"] ?? "0")
   if (!Number.isFinite(nth) || nth <= 0) return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 2000
+  const delay = Number(process.env["SWITCHBACK_DEV_SHOT_DELAY"] ?? "45000") - 2000
   setTimeout(() => {
     if (win.isDestroyed()) return
     void win.webContents.executeJavaScript(
@@ -210,17 +210,17 @@ export function scheduleDevOpenSelect(win: BrowserWindow): void {
 /**
  * 截图前把设置面板打开，并切到左列第 N 页。
  *
- * **和 `OMNI_DEV_SELECT` 同一条理由**：这块面板有七页，每一页的内容都要等异步
+ * **和 `SWITCHBACK_DEV_SELECT` 同一条理由**：这块面板有七页，每一页的内容都要等异步
  * （探版本、读配置、扫 journal），靠手点去验等于永远不验。分两拍是必须的——
  * 面板是模态，第一拍还没挂出来，左列那几颗按钮在 DOM 里根本不存在。
  */
 export function scheduleDevSettings(win: BrowserWindow): void {
-  const nth = Number(process.env["OMNI_DEV_SETTINGS"] ?? "0")
+  const nth = Number(process.env["SWITCHBACK_DEV_SETTINGS"] ?? "0")
   if (!Number.isFinite(nth) || nth <= 0) return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 3000
+  const delay = Number(process.env["SWITCHBACK_DEV_SHOT_DELAY"] ?? "45000") - 3000
   setTimeout(() => {
     if (win.isDestroyed()) return
-    win.webContents.send("omni:menu", "settings")
+    win.webContents.send("switchback:menu", "settings")
     setTimeout(() => {
       if (win.isDestroyed()) return
       void win.webContents.executeJavaScript(
@@ -235,18 +235,18 @@ export function scheduleDevSettings(win: BrowserWindow): void {
  * 靠改系统设置去验，等于永远不验。
  */
 export function applyDevTheme(): void {
-  const want = process.env["OMNI_DEV_THEME"]
+  const want = process.env["SWITCHBACK_DEV_THEME"]
   if (want !== "dark" && want !== "light") return
   nativeTheme.themeSource = want
 }
 
 /** 到点在渲染层跑一段 JS，把结果打进日志。排查用，平时不开。 */
 export function scheduleDevProbe(win: BrowserWindow, log: (message: string) => void): void {
-  const code = process.env["OMNI_DEV_PROBE"]
+  const code = process.env["SWITCHBACK_DEV_PROBE"]
   if (code === undefined || code === "") return
   // **自己的时刻**，不跟截图那个。跟着截图的话探针总是只剩 3 秒可用，
   // 而要观察流式这种持续过程，得从早跑到晚
-  const delay = Number(process.env["OMNI_DEV_PROBE_AT"] ?? "4000")
+  const delay = Number(process.env["SWITCHBACK_DEV_PROBE_AT"] ?? "4000")
   setTimeout(() => {
     if (win.isDestroyed()) return
     void win.webContents
@@ -263,12 +263,12 @@ export function scheduleDevProbe(win: BrowserWindow, log: (message: string) => v
 /**
  * 到点在侧栏第 N 行上右键。
  *
- * 和 `OMNI_DEV_SELECT` 一个道理：菜单是浮层，不点开就进不了截图。
+ * 和 `SWITCHBACK_DEV_SELECT` 一个道理：菜单是浮层，不点开就进不了截图。
  */
 export function scheduleDevRowMenu(win: BrowserWindow): void {
-  const nth = Number(process.env["OMNI_DEV_ROWMENU"] ?? "0")
+  const nth = Number(process.env["SWITCHBACK_DEV_ROWMENU"] ?? "0")
   if (!Number.isFinite(nth) || nth <= 0) return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000") - 2000
+  const delay = Number(process.env["SWITCHBACK_DEV_SHOT_DELAY"] ?? "45000") - 2000
   setTimeout(() => {
     if (win.isDestroyed()) return
     void win.webContents.executeJavaScript(
@@ -286,19 +286,19 @@ export function scheduleDevRowMenu(win: BrowserWindow): void {
 
 /** 到点打开对比视图。和查找、中断一样，走的是**菜单同一条通道**，验的是真链路。 */
 export function scheduleDevCompare(win: BrowserWindow): void {
-  const at = Number(process.env["OMNI_DEV_COMPARE"] ?? "0")
+  const at = Number(process.env["SWITCHBACK_DEV_COMPARE"] ?? "0")
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
-    if (!win.isDestroyed()) win.webContents.send("omni:menu", "compare")
+    if (!win.isDestroyed()) win.webContents.send("switchback:menu", "compare")
   }, at)
 }
 
 /** 到点打开审核面板。同上，走菜单那条通道——验的是「⇧⌘R 真的能开出来」。 */
 export function scheduleDevReview(win: BrowserWindow): void {
-  const at = Number(process.env["OMNI_DEV_REVIEW"] ?? "0")
+  const at = Number(process.env["SWITCHBACK_DEV_REVIEW"] ?? "0")
   if (!Number.isFinite(at) || at <= 0) return
   setTimeout(() => {
-    if (!win.isDestroyed()) win.webContents.send("omni:menu", "review")
+    if (!win.isDestroyed()) win.webContents.send("switchback:menu", "review")
   }, at)
 }
 
@@ -308,8 +308,8 @@ export function scheduleDevSwitch(
   run: (kind: "handoff" | "fork", to: string) => void,
 ): void {
   for (const [key, kind] of [
-    ["OMNI_DEV_HANDOFF", "handoff"],
-    ["OMNI_DEV_FORK", "fork"],
+    ["SWITCHBACK_DEV_HANDOFF", "handoff"],
+    ["SWITCHBACK_DEV_FORK", "fork"],
   ] as const) {
     const spec = process.env[key]
     if (spec === undefined || spec === "") continue
@@ -334,7 +334,7 @@ export function scheduleDevThreadOps(
   win: BrowserWindow,
   run: (op: { kind: "rename"; title: string } | { kind: "delete" }) => void,
 ): void {
-  const rename = process.env["OMNI_DEV_RENAME"]
+  const rename = process.env["SWITCHBACK_DEV_RENAME"]
   if (rename !== undefined && rename !== "") {
     // 名字里可能有冒号，所以只按**第一个**冒号切
     const cut = rename.indexOf(":")
@@ -346,7 +346,7 @@ export function scheduleDevThreadOps(
       }, at)
     }
   }
-  const del = Number(process.env["OMNI_DEV_DELETE"] ?? "0")
+  const del = Number(process.env["SWITCHBACK_DEV_DELETE"] ?? "0")
   if (Number.isFinite(del) && del > 0) {
     setTimeout(() => {
       if (!win.isDestroyed()) run({ kind: "delete" })
@@ -355,9 +355,9 @@ export function scheduleDevThreadOps(
 }
 
 export function scheduleDevShot(win: BrowserWindow): void {
-  const target = process.env["OMNI_DEV_SHOT"]
+  const target = process.env["SWITCHBACK_DEV_SHOT"]
   if (target === undefined || target === "") return
-  const delay = Number(process.env["OMNI_DEV_SHOT_DELAY"] ?? "45000")
+  const delay = Number(process.env["SWITCHBACK_DEV_SHOT_DELAY"] ?? "45000")
   setTimeout(() => {
     void win.webContents
       .capturePage()

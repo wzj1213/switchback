@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -27,7 +27,7 @@ import { createClaudeDriver } from "./driver.js"
 
 describe("Claude 的上下文窗口（真跑）", () => {
   it("问得到窗口大小，而且跟着用量一起报上来", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-window-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-window-live-"))
     const events: Event[] = []
     const driver = createClaudeDriver({})
     const session = await driver.start({

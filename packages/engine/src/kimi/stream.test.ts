@@ -59,12 +59,12 @@ describe("Kimi WebSocket", () => {
     sockets[0]?.frame({ type: "server_hello" })
     expect(JSON.parse(sockets[0]?.sent[0] ?? "null")).toEqual({
       type: "subscribe",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       payload: { session_ids: ["s1"], cursors: { s1: { seq: 8, epoch: "ep1" } } },
     })
     sockets[0]?.frame({
       type: "ack",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       code: 0,
       msg: "",
       payload: { accepted: ["s1"], resync_required: [] },
@@ -142,7 +142,7 @@ describe("Kimi WebSocket", () => {
     sockets[0]?.frame({ type: "server_hello" })
     sockets[0]?.frame({
       type: "ack",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       code: 0,
       msg: "",
       payload: { accepted: ["s1"], resync_required: [] },
@@ -156,7 +156,7 @@ describe("Kimi WebSocket", () => {
     })
     sockets[1]?.frame({
       type: "ack",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       code: 0,
       msg: "",
       payload: { accepted: ["s1"], resync_required: [] },
@@ -196,7 +196,7 @@ describe("Kimi WebSocket", () => {
     })
     sockets[1]?.frame({
       type: "ack",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       code: 0,
       msg: "",
       payload: { accepted: ["s1"], resync_required: [] },
@@ -233,7 +233,7 @@ describe("Kimi WebSocket", () => {
     sockets[0]?.frame({ type: "server_hello" })
     sockets[0]?.frame({
       type: "ack",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       code: 0,
       msg: "",
       payload: { accepted: ["s1"], resync_required: [] },
@@ -249,7 +249,7 @@ describe("Kimi WebSocket", () => {
     })
     sockets[1]?.frame({
       type: "ack",
-      id: "omni-subscribe",
+      id: "switchback-subscribe",
       code: 0,
       msg: "",
       payload: { accepted: ["s1"], resync_required: [] },
@@ -262,15 +262,15 @@ describe("Kimi WebSocket", () => {
 describe("断开原因照实报", () => {
   const handshake = (socket: FakeSocket | undefined): void => {
     socket?.frame({ type: "server_hello" })
-    socket?.frame({ type: "ack", id: "omni-subscribe", code: 0, msg: "", payload: { accepted: ["s1"], resync_required: [] } })
+    socket?.frame({ type: "ack", id: "switchback-subscribe", code: 0, msg: "", payload: { accepted: ["s1"], resync_required: [] } })
   }
   const boom = { type: "session_event", session_id: "s1", seq: 9, payload: { type: "boom" } }
   const cases: readonly { name: string; act: (stream: KimiStream, socket: FakeSocket | undefined) => void; want: KimiDisconnect }[] = [
     { name: "对面关的：带上关闭码和原因", act: (_s, socket) => socket?.emit("close", { code: 1001, reason: "heartbeat timeout" }), want: { kind: "closed", code: 1001, reason: "heartbeat timeout" } },
     { name: "没有关闭码就不编一个", act: (_s, socket) => socket?.emit("close", {}), want: { kind: "closed" } },
-    { name: "omni 发现缺口、主动重同步", act: (stream) => stream.requestResync(), want: { kind: "resync", why: "omni 发现流里有缺口" } },
+    { name: "Switchback 发现缺口、主动重同步", act: (stream) => stream.requestResync(), want: { kind: "resync", why: "Switchback 发现流里有缺口" } },
     { name: "服务端要求重同步", act: (_s, socket) => socket?.frame({ type: "resync_required", session_id: "s1" }), want: { kind: "resync", why: "服务端要求重新同步" } },
-    { name: "omni 自己处理某一帧时出错", act: (_s, socket) => socket?.frame(boom), want: { kind: "error", message: "炸了" } },
+    { name: "Switchback 自己处理某一帧时出错", act: (_s, socket) => socket?.frame(boom), want: { kind: "error", message: "炸了" } },
   ]
   for (const one of cases) {
     it(one.name, async () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import { rowLabelOf, type SidebarRow } from "../sidebar.js"
 import { sinceOf } from "../status.js"
 import { labelOf, TRUSTS } from "./Composer.js"

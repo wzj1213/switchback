@@ -1,4 +1,4 @@
-import type { TurnId } from "@omni/protocol"
+import type { TurnId } from "@switchback/protocol"
 import type { NativeTurnStart } from "../contract.js"
 import type { ForeignTurn } from "./caps.js"
 

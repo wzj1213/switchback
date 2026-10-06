@@ -1,4 +1,4 @@
-import type { EngineGoal, GoalStatus } from "@omni/protocol"
+import type { EngineGoal, GoalStatus } from "@switchback/protocol"
 import { compact } from "../usage.js"
 
 const LABEL: Readonly<Record<GoalStatus, string>> = {

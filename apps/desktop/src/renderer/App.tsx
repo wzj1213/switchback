@@ -2,7 +2,7 @@ import {
   forkPeerOf,
   itemsOf,
   turnOf,
-} from "@omni/store"
+} from "@switchback/store"
 import { stampOf } from "./stamp.js"
 import { reportedChangesOf } from "./changes.js"
 import { CompareScreen, EmptyScreen, SettingsScreen } from "./screens.js"

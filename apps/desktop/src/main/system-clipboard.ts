@@ -17,7 +17,7 @@ export function writeClipboard(writer: ClipboardWriter, text: unknown): boolean 
 }
 
 export function installClipboardChannel(log: Logger): void {
-  ipcMain.handle("omni:copy", (_event, text: unknown) => {
+  ipcMain.handle("switchback:copy", (_event, text: unknown) => {
     const copied = writeClipboard(clipboard, text)
     if (!copied) log.write("warn", "ipc", "系统剪贴板写入失败")
     return copied

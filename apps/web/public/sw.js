@@ -1,10 +1,10 @@
 /**
- * omni 浏览器端的 service worker：**推送 + 外壳缓存**。
+ * Switchback 浏览器端的 service worker：**推送 + 外壳缓存**。
  *
  * ## 为什么要缓存外壳（这一条原来没有）
  *
  * 从主屏点开时，如果那一刻 Mac 睡着了、隧道断了、或者你在电梯里，
- * 看到的是**浏览器那张「无法打开页面」**——不是 omni 的界面配一条「正在重连…」。
+ * 看到的是**浏览器那张「无法打开页面」**——不是 Switchback 的界面配一条「正在重连…」。
  * 而后者才是这套东西该给的：界面在、状态说清楚、网一回来自己接上。
  *
  * **缓存的只是外壳，不是内容。** 内容全部来自那条实时连接，
@@ -33,7 +33,7 @@
  * 不这么做的话，一个改过结构的旧缓存会一直躺在那儿，
  * 而它出问题的样子是「换了新包但界面还是旧的」——最难查的一类。
  */
-const SHELL = "omni-shell-v2"
+const SHELL = "switchback-shell-v2"
 const OFFLINE = "/offline.html"
 const NAVIGATION_TIMEOUT_MS = 4000
 
@@ -60,7 +60,7 @@ self.addEventListener("activate", (event) => {
 /** 网络真的不可达时给一张稳定的小页面；它不含任何旧会话或旧协议代码。 */
 async function offlineResponse() {
   const cached = await caches.match(OFFLINE)
-  return cached ?? new Response("omni 暂时连不上那台 Mac。", {
+  return cached ?? new Response("Switchback 暂时连不上那台 Mac。", {
     status: 503,
     headers: { "content-type": "text/plain; charset=utf-8" },
   })
@@ -105,13 +105,13 @@ self.addEventListener("push", (event) => {
   } catch {
     // 推送服务偶尔会发一条空的「唤醒」消息，那不是我们的负载
   }
-  const title = typeof data.title === "string" && data.title !== "" ? data.title : "omni"
+  const title = typeof data.title === "string" && data.title !== "" ? data.title : "Switchback"
   event.waitUntil(
     self.registration.showNotification(title, {
       body: typeof data.body === "string" ? data.body : "",
       // **同一条会话的通知互相替换**：一轮跑完接着来一张审批卡时，
       // 通知中心里不该堆两条，你要的是最新那一条
-      tag: typeof data.threadId === "string" ? data.threadId : "omni",
+      tag: typeof data.threadId === "string" ? data.threadId : "switchback",
       renotify: true,
       data: { threadId: data.threadId },
       icon: "/icon.svg",

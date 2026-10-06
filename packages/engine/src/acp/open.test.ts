@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES } from "@omni/protocol"
+import { NO_CAPABILITIES } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { RpcError } from "../rpc.js"
 import { AcpAuthRequired } from "./auth.js"

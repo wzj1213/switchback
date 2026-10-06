@@ -17,7 +17,7 @@ const dirs = { home: "", repoA: "", repoB: "" }
 
 beforeAll(async () => {
   // realpath：macOS 上 mkdtemp 给的是 /var/…，而 git 吐的是 /private/var/…
-  dirs.home = await realpath(await mkdtemp(join(tmpdir(), "omni-multi-")))
+  dirs.home = await realpath(await mkdtemp(join(tmpdir(), "switchback-multi-")))
   dirs.repoA = join(dirs.home, "仓库甲")
   dirs.repoB = join(dirs.home, "repo-b")
   for (const root of [dirs.repoA, dirs.repoB]) {

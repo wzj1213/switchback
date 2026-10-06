@@ -33,7 +33,7 @@ describe("createRuleStore", () => {
   const state = { dir: "" }
 
   beforeEach(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), "omni-rules-"))
+    state.dir = await mkdtemp(join(tmpdir(), "switchback-rules-"))
   })
   afterEach(async () => {
     await rm(state.dir, { recursive: true, force: true })

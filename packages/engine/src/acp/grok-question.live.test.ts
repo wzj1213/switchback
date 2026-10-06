@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event, QuestionPrompt } from "@omni/protocol"
+import type { Event, QuestionPrompt } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 import { grokInteraction, grokInteractionResolved } from "./grok-interaction.js"
 import { grokNativeApproval } from "./grok.js"
@@ -19,15 +19,15 @@ function finalText(events: readonly Event[]): string {
 
 describe("Grok AskUserQuestion（真跑）", () => {
   it("原生问题进入宿主卡，选择结果只经 reverse-request 回给工具", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-grok-question-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-grok-question-"))
     const events: Event[] = []
     const questions: QuestionPrompt[][] = []
     let complete: (() => void) | undefined
     const done = new Promise<void>((resolve) => { complete = resolve })
     const driver = createAcpDriver({
       id: "grok",
-      command: process.env["OMNI_ACP_COMMAND"] ?? "grok",
-      args: process.env["OMNI_ACP_ARGS"]?.split(" ").filter(Boolean)
+      command: process.env["SWITCHBACK_ACP_COMMAND"] ?? "grok",
+      args: process.env["SWITCHBACK_ACP_ARGS"]?.split(" ").filter(Boolean)
         ?? ["agent", "stdio", "--debug", "--debug-file", join(cwd, "grok-debug.log")],
       nativeApproval: grokNativeApproval,
       interaction: grokInteraction,

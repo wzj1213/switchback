@@ -1,5 +1,5 @@
 import type { ElicitationRequest } from "@anthropic-ai/claude-agent-sdk"
-import type { QuestionPrompt } from "@omni/protocol"
+import type { QuestionPrompt } from "@switchback/protocol"
 import { sanitize } from "./permission.js"
 
 const MAX_URL = 4096

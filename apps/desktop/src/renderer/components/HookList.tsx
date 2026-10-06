@@ -9,7 +9,7 @@ import { EVENT_TEXT, SCOPE_TEXT, shortPath, type HookLine, type HookSource } fro
 
 /** 一份配置文件。**没有这份文件时也要摆出来**——「这儿可以配」本身是信息。 */
 export function SourceCard({ source, home }: { source: HookSource; home: string }): React.JSX.Element {
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
   return (
     <div className={`hk__src${source.exists ? "" : " hk__src--none"}`}>
       <div className="hk__head">

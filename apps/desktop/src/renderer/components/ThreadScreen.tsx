@@ -1,4 +1,4 @@
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import {
   commandsOf,
   itemsOf,
@@ -11,7 +11,7 @@ import {
   thinkingTokensOf,
   turnOf,
   usageOf,
-} from "@omni/store"
+} from "@switchback/store"
 import type { useApp } from "../useApp.js"
 import { scopeWorkbench } from "../workbench.js"
 import { Workspace } from "./Workspace.js"

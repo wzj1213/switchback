@@ -8,7 +8,7 @@ import type {
   Trust,
   TurnId,
   UserMessageOrigin,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import type { ReclaimConfig } from "../subprocess.js"
 
 export interface ForeignNotice {
@@ -182,10 +182,10 @@ export interface AcpDriverConfig {
    * | `session/steer` | `steer failed: Method not found: session/steer` —— **仍然没有** |
    * | `session/compact` | **通**，回一份 snapshot |
    *
-   * 作者问「ZCode 自己的 GUI 明显支持插话，为什么 omni 说不支持」——**GUI 走的
+   * 作者问「ZCode 自己的 GUI 明显支持插话，为什么 Switchback 说不支持」——**GUI 走的
    * 不是 ACP**。`zcode-acp-server` 是一层第三方转接壳，只翻译得出后端公开的那些
    * 入口；GUI 直接跟后端说话，不经过这层转接。「产品支持」和
-   * 「ACP 暴露」是两件事，而 omni 只看得见后一件。
+   * 「ACP 暴露」是两件事，而 Switchback 只看得见后一件。
    *
    * 复测方法（不烧 token）：`initialize` → `session/new` → 在**没有进行中的轮次**上
    * 发一次带 `content` 的 `session/steer`。方法在的话报的会是别的错（比如没有可插话
@@ -216,7 +216,7 @@ export interface AcpDriverConfig {
    *
    * 实测 grok：在自己的 `_x.ai/session_notification` 里推
    * `{sessionUpdate:"model_changed", model_id, reasoning_effort}`——
-   * **你在它自己的界面里改了强度，omni 靠这条才跟得上**。
+   * **你在它自己的界面里改了强度，Switchback 靠这条才跟得上**。
    * 返回 undefined = 这条通知与模型无关。
    */
   modelChanged?: (method: string, params: unknown) => { model?: string; effort?: string } | undefined

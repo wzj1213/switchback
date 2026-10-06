@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process"
 import { promises as dns } from "node:dns"
 import { promisify } from "node:util"
-import type { EngineId, Event } from "@omni/protocol"
-import type { EngineProcess } from "@omni/host"
-import { tree } from "@omni/engine"
+import type { EngineId, Event } from "@switchback/protocol"
+import type { EngineProcess } from "@switchback/host"
+import { tree } from "@switchback/engine"
 import type { Logger } from "./log.js"
 import { createEgressMeter, observe, recordsOf, type EgressAlert, type EgressMeter, type EgressRecord, type Watched } from "./egress-meter.js"
 import { parseLsofPeers, parseNettop, parsePs, treeOf, zcodeMains, type Proc } from "./egress-sample.js"
@@ -14,8 +14,8 @@ import { parseLsofPeers, parseNettop, parsePs, treeOf, zcodeMains, type Proc } f
  * ## 为什么要有
  *
  * 2026-09 ZCode 被扒出来：登录着就在后台把整个工作区——连同完整的 `.git` 历史、LFS 缓存、
- * reflog——打包加密传到阿里云 OSS，设置里那两个开关管不住它。omni 起的每一家引擎都跑在你的
- * 仓库里，**哪一家这么干，omni 都该第一时间看见、并且拦得住**，而不是等别人去逆向。
+ * reflog——打包加密传到阿里云 OSS，设置里那两个开关管不住它。Switchback 起的每一家引擎都跑在你的
+ * 仓库里，**哪一家这么干，Switchback 都该第一时间看见、并且拦得住**，而不是等别人去逆向。
  *
  * ## 边界
  *
@@ -54,14 +54,14 @@ export interface EgressGuard {
 }
 
 /**
- * 开发时演一遍用的两个旋钮：`OMNI_DEV_EGRESS_IFACE=loopback` 只数本机回环（假引擎往本机的
- * 一个口子里「上传」，一个字节都不出这台机器），`OMNI_DEV_EGRESS_LIMIT_MB` 把线调低。
+ * 开发时演一遍用的两个旋钮：`SWITCHBACK_DEV_EGRESS_IFACE=loopback` 只数本机回环（假引擎往本机的
+ * 一个口子里「上传」，一个字节都不出这台机器），`SWITCHBACK_DEV_EGRESS_LIMIT_MB` 把线调低。
  * 不设就是正式的样子：只数离开这台机器的流量，线是 64 MB。
  */
 function devKnobs(): { iface: "external" | "loopback"; limit: number | undefined } {
-  const mb = Number(process.env["OMNI_DEV_EGRESS_LIMIT_MB"])
+  const mb = Number(process.env["SWITCHBACK_DEV_EGRESS_LIMIT_MB"])
   return {
-    iface: process.env["OMNI_DEV_EGRESS_IFACE"] === "loopback" ? "loopback" : "external",
+    iface: process.env["SWITCHBACK_DEV_EGRESS_IFACE"] === "loopback" ? "loopback" : "external",
     limit: Number.isFinite(mb) && mb > 0 ? mb * MB : undefined,
   }
 }
@@ -177,7 +177,7 @@ function detailOf(alert: EgressAlert, mb: string, peers: readonly string[], stop
     : "正常对话一次请求通常不到 1 MB，这个量更像是在把整个工作区往外传。"
   const keep = app ? "要停就退出 ZCode。" : "要停就关掉这条会话。"
   const then = stopped
-    ? "omni 已经停掉了它。确认是你让它传的，可以在「设置 → 数据与排查」里关掉「批量外发时停掉」。"
-    : `「批量外发时停掉」关着，omni 没有停它；${keep}`
+    ? "Switchback 已经停掉了它。确认是你让它传的，可以在「设置 → 数据与排查」里关掉「批量外发时停掉」。"
+    : `「批量外发时停掉」关着，Switchback 没有停它；${keep}`
   return `${who} 一分钟内自己往本机外面发了 ${mb} MB（不算它跑的命令）。${why}${where}${then}`
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES, type Event } from "@omni/protocol"
-import type { EngineDriver, EngineSession } from "@omni/engine"
+import { NO_CAPABILITIES, type Event } from "@switchback/protocol"
+import type { EngineDriver, EngineSession } from "@switchback/engine"
 import { createHost, type Host } from "./host.js"
 import { ask, create, fakeDriver, items, setupTwoEngines } from "./host-fixture.js"
 
@@ -90,7 +90,7 @@ describe("跨引擎接力", () => {
   })
 
   /**
-   * **不塞任何文本。** 上一版把 omni 提炼的一段话挂成草稿等用户按回车——
+   * **不塞任何文本。** 上一版把 Switchback 提炼的一段话挂成草稿等用户按回车——
    * 用户否掉了：那是他没打过的话，而历史对话新的引擎自己会读
    *（路径在 `Thread.segments` 里，`/timeline` 看得见）。
    */
@@ -104,7 +104,7 @@ describe("跨引擎接力", () => {
       .filter((e) => e.thread.id === threadId)
       .map((e) => e.thread.draft)
     expect(drafts.every((d) => d === undefined)).toBe(true)
-    // 换过去之后他说的那句话原样送到新那家，没有任何 omni 编的前言
+    // 换过去之后他说的那句话原样送到新那家，没有任何 Switchback 编的前言
     expect((sessions[1]?.prompts ?? []).map((x) => x.text)).toEqual(["接着弄"])
   })
 

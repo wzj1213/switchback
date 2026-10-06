@@ -1,4 +1,4 @@
-import type { Event, Item, ToolCallItem, TurnId } from "@omni/protocol"
+import type { Event, Item, ToolCallItem, TurnId } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { createDenialState } from "./denials.js"
 import { onAssistant, onToolResults, makeIdMinter, type MessageRef } from "./messages.js"

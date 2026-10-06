@@ -43,7 +43,7 @@ export function EngineNative({
           </Field>
         </Group>
       )}
-      <Group title="配置来源" hint="这家引擎自己读的那几份配置。omni 只帮你打开，不替它改。">
+      <Group title="配置来源" hint="这家引擎自己读的那几份配置。Switchback 只帮你打开，不替它改。">
         <EngineDoors engine={engine} cwd={cwd} dshProfile={dshProfile} onReveal={onReveal} />
       </Group>
     </>

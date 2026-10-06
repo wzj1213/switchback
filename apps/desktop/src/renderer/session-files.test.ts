@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Item, ToolStatus } from "@omni/protocol"
+import type { Item, ToolStatus } from "@switchback/protocol"
 import { fileTouchOf, sessionFileGroupsOf, sessionFilesOf } from "./session-files.js"
 
 const tool = (

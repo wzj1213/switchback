@@ -12,7 +12,7 @@ afterEach(async () => {
 
 describe("引擎内联图片", () => {
   it("保序并行读出受支持图片", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "omni-image-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-image-"))
     dirs.push(dir)
     const first = join(dir, "A.PNG")
     const second = join(dir, "b.jpg")

@@ -1,4 +1,4 @@
-import type { Event, ItemId, NoticeItem, TurnId } from "@omni/protocol"
+import type { Event, ItemId, NoticeItem, TurnId } from "@switchback/protocol"
 
 interface MemoryContext {
   turnId: TurnId

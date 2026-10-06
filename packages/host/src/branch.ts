@@ -1,5 +1,5 @@
-import type { Command, EngineSegment, Event, Item, Thread, ThreadId } from "@omni/protocol"
-import { initial, itemsOf, reduceAll } from "@omni/store"
+import type { Command, EngineSegment, Event, Item, Thread, ThreadId } from "@switchback/protocol"
+import { initial, itemsOf, reduceAll } from "@switchback/store"
 import { discardUnstarted, drainQueued, emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
 import { bornOf } from "./born.js"
 import { copyTranscript } from "./transcript.js"
@@ -144,7 +144,7 @@ function until(items: readonly Item[], turnId: string): readonly Item[] {
  *
  * ## 失败为什么只是退回，不是报错
  *
- * 跨引擎会话格式不通，omni 不翻译、不摘要，也不替用户发话；只保留工作区与血缘。
+ * 跨引擎会话格式不通，Switchback 不翻译、不摘要，也不替用户发话；只保留工作区与血缘。
  */
 interface NativeForkPlan { handle: string; dropTurns?: number }
 interface DerivedLaunchPlan {
@@ -261,7 +261,7 @@ function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
  * L2 跨引擎接力：同一个会话换一家引擎接着做。
  *
  * **不传原始上下文，也不注入摘要或提示词**——各家 session 格式不通，
- * omni 不能替用户翻译，更不能以用户身份发一段他没写过的话。
+ * Switchback 不能替用户翻译，更不能以用户身份发一段他没写过的话。
  * 引擎公开可定位的原生记录路径保留在 `Thread.segments`；用户开着「换引擎自动交接」时，
  * 换家后的第一句话前会附一段只陈述事实的说明，告诉新那家转写与这些记录在哪
  *（见 `handoff-note.ts`，AGENTS.md 那条边界唯一的例外）。
@@ -373,8 +373,8 @@ async function finishSwitch(
  * 那里通常根本不存在）、`nextEngine` 清空。
  *
  * **不传原始上下文，切换本身也不塞任何文本。** 各家 session 格式不通，硬翻既做不对也
- * 维护不起；而 omni 替用户编一段摘要塞进输入框更糟——那是他没打过的话。
- * 上一家若公开可定位的原始记录路径，omni 已存在 `Thread.segments` 里（`/timeline` 看得见），
+ * 维护不起；而 Switchback 替用户编一段摘要塞进输入框更糟——那是他没打过的话。
+ * 上一家若公开可定位的原始记录路径，Switchback 已存在 `Thread.segments` 里（`/timeline` 看得见），
  * 新的一家自己有文件工具，要读的时候读全量原文。「换引擎自动交接」开着时，
  * 由 `prompt` 在换家后的第一句话前附上这些路径（见 `handoff-note.ts`），不在这里。
  */

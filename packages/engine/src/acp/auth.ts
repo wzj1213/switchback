@@ -3,12 +3,12 @@ import type { AcpInitialize } from "./wire.js"
 /**
  * ACP 的登录：agent 在握手时报出自己认的登录方式，客户端替人挑一种去办。
  *
- * ## 为什么这件事归 omni 做，而不算「替引擎攒功能」
+ * ## 为什么这件事归 Switchback 做，而不算「替引擎攒功能」
  *
  * `authenticate` 是协议里的一个方法，登录方式清单是 agent 自己在 `initialize` 里报的——
- * 这就是引擎**当功能暴露出来**的那扇门。omni 只做两件事：把它报的清单原样摆给人看，
+ * 这就是引擎**当功能暴露出来**的那扇门。Switchback 只做两件事：把它报的清单原样摆给人看，
  * 人挑了哪一种就原样转过去。开浏览器、收回调、存凭证全是 agent 自己的事，
- * omni 碰不到任何一个凭证。
+ * Switchback 碰不到任何一个凭证。
  *
  * ## 两种方式，走法完全不同（协议原文）
  *
@@ -52,7 +52,7 @@ export interface AcpAuthMethod {
   /** 旧写法给出的整条命令。有它就用它，别再拿启动命令去拼。 */
   command?: string
   /**
-   * 它在 `_meta["api-key"]` 里标明这一种要 API key。**omni 不代收密钥**
+   * 它在 `_meta["api-key"]` 里标明这一种要 API key。**Switchback 不代收密钥**
    * （README「不另外索要或代管凭证」），界面据此说清楚 key 得从哪儿来。
    */
   apiKey?: boolean

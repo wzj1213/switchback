@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 
 /**
  * 斜杠命令面板的纯逻辑：什么时候算在打命令、怎么筛、怎么替换。
@@ -46,7 +46,7 @@ function hidden(command: SlashCommand): boolean {
   return command.name.startsWith("__") || command.description.trimStart().startsWith("(removed)")
 }
 
-/** 命中就给个分，越像越大；没命中给 undefined。用同一套规则排引擎的和 omni 的。 */
+/** 命中就给个分，越像越大；没命中给 undefined。用同一套规则排引擎的和 Switchback 的。 */
 function score(command: SlashCommand, query: string): number | undefined {
   // 空查询全都要，**不分高下**——先后由分节决定，不由这里塞一个偏置决定
   if (query === "") return 0
@@ -111,7 +111,7 @@ export function ghostOf(command: SlashCommand | undefined, query: string): strin
 const SECTION_MIN = 4
 
 /** 按来源分节，排在前面的先拿配额。**技能在前**，理由见 `matchCommands`。 */
-const ORDER: readonly SlashCommand["source"][] = ["engine", "omni"]
+const ORDER: readonly SlashCommand["source"][] = ["engine", "switchback"]
 
 /**
  * 两节都放不下时怎么分。前一节优先吃满，但各自先保底 `SECTION_MIN`。
@@ -137,14 +137,14 @@ function share(counts: readonly number[], limit: number): readonly number[] {
  *
  * ## 为什么技能排在前面
  *
- * omni 自己那十条**每一条在界面上都另有入口**（顶栏、右键菜单、快捷键）——
- * 那本来就是它们被收进命令面板的标准（见 `omniCommands.ts`）。
+ * Switchback 自己那十条**每一条在界面上都另有入口**（顶栏、右键菜单、快捷键）——
+ * 那本来就是它们被收进命令面板的标准（见 `switchbackCommands.ts`）。
  * 而引擎的技能**在整个界面里没有第二扇门**：不在这儿列出来，
  * 用户根本不知道自己装的二十几个技能能用。没有别的门的那一节排在上面。
  *
  * ## 上一版为什么一条技能都看不见
  *
- * `limit` 是 12，而 omni 有 10 条、还在同分时排前面。于是空查询下
+ * `limit` 是 12，而 Switchback 有 10 条、还在同分时排前面。于是空查询下
  * **技能最多只剩两条**，还落在列表最底下——面板一屏放不下，等于没有。
  * 实测这台机器 codex 报了 22 条技能，一条都没露过面。
  * 所以现在是按节配额 + 面板可滚，而不是一刀切到 12。

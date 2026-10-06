@@ -41,7 +41,7 @@ describe("工作区里的路径写成相对的", () => {
   })
 
   it("Windows 工作区比较忽略盘符与目录大小写", () => {
-    expect(relPath("c:\\Work\\Omni\\src\\App.ts", "C:\\work\\omni")).toBe("src/App.ts")
+    expect(relPath("c:\\Work\\Switchback\\src\\App.ts", "C:\\work\\switchback")).toBe("src/App.ts")
   })
 })
 

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
-import type { EngineGoal } from "@omni/protocol"
+import type { EngineGoal } from "@switchback/protocol"
 import { handleNotification, type NotifyContext } from "./notify.js"
 
 function context(onGoal: (goal: EngineGoal | undefined) => void): NotifyContext {
   return {
-    threadId: "th-omni",
+    threadId: "th-switchback",
     codexThread: () => "th-codex",
     turnId: () => undefined,
     codexTurn: () => undefined,

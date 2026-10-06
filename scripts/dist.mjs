@@ -69,8 +69,8 @@ export function builderConfig(mode, identity, sourcePackage, electronDist = elec
     ...(electronDist === undefined ? {} : { electronDist }),
     extraMetadata: {
       version: identity.version,
-      omni: {
-        ...(sourcePackage.omni ?? {}),
+      switchback: {
+        ...(sourcePackage.switchback ?? {}),
         build: identity.build,
         repo: ROOT,
         claudeExecutable: thin ? "system" : "bundled",
@@ -99,7 +99,7 @@ function run(command, args, env = process.env) {
 }
 
 async function packageMode(mode, identity, sourcePackage, options) {
-  const dir = await mkdtemp(join(tmpdir(), `omni-builder-${mode}-`))
+  const dir = await mkdtemp(join(tmpdir(), `switchback-builder-${mode}-`))
   const config = join(dir, "config.json")
   try {
     // electron-builder 不总能可靠覆盖既有 Electron.app；干净解包目录才可复现。
@@ -110,7 +110,7 @@ async function packageMode(mode, identity, sourcePackage, options) {
     )
     const args = [
       "--filter",
-      "@omni/desktop",
+      "@switchback/desktop",
       "exec",
       "electron-builder",
       "--config",
@@ -153,8 +153,8 @@ async function main() {
     return
   }
   console.log(`构建 ${identity.version}+${identity.build}：${modes.join(" + ")}`)
-  await run("pnpm", ["--filter", "@omni/web", "run", "build"])
-  await run("pnpm", ["--filter", "@omni/desktop", "run", "build"])
+  await run("pnpm", ["--filter", "@switchback/web", "run", "build"])
+  await run("pnpm", ["--filter", "@switchback/desktop", "run", "build"])
   for (const mode of modes) await packageMode(mode, identity, sourcePackage, options)
   if (!options.directory)
     await run(process.execPath, [join(ROOT, "scripts/prune-release.mjs"), "--apply"])

@@ -1,5 +1,5 @@
 import { powerSaveBlocker } from "electron"
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 
 /**
  * 有活在跑的时候，别让机器闲着闲着就睡过去。
@@ -17,7 +17,7 @@ import type { Thread } from "@omni/protocol"
  *   换成一个更烦人的问题。
  * - **合上盖子照样睡。** macOS 的 clamshell sleep 没有任何电源断言拦得住，
  *   所以文案里不能写「合上盖子也接着跑」——那是给不出的承诺。
- * - **跑完立刻放开。** 长期挂着就成了「装了 omni 之后我的笔记本再也不睡了」，
+ * - **跑完立刻放开。** 长期挂着就成了「装了 Switchback 之后我的笔记本再也不睡了」，
  *   那会让人卸载它。所以判据不用计数器（漏一条 `turn.completed` 就永远挂着），
  *   而是每次事件之后**重新看一遍现在还有没有活着的活**。
  */

@@ -1,11 +1,11 @@
 # 打包配置。目标：能装、能双击打开、图标是自己的。
 #
-# 这一步之前 omni 只能从开发目录跑（`pnpm dev` 或者手动调 Electron 二进制）。
+# 这一步之前 Switchback 只能从开发目录跑（`pnpm dev` 或者手动调 Electron 二进制）。
 # 一个只能在 checkout 里跑的东西不算产品。
 
-appId: dev.wzj.omni
-productName: omni
-copyright: omni · 同文
+appId: dev.wzj.switchback
+productName: Switchback
+copyright: Switchback
 
 directories:
   buildResources: build
@@ -25,7 +25,7 @@ files:
 # 按 `process.resourcesPath` 找它。
 #
 # 没有它的话远程服务端照常起、API 照常通，只是页面 404——那是有意的降级，
-# 但发版时不该发生：`pnpm dist` 会先跑 `@omni/web` 的 build。
+# 但发版时不该发生：`pnpm dist` 会先跑 `@switchback/web` 的 build。
 extraResources:
   - from: ../web/dist
     to: web
@@ -47,7 +47,7 @@ mac:
   # 强化运行时**常开**，不等有了 Developer ID 才开。
   #
   # 理由是这条最容易在最后一刻咬人：公证强制要求强化运行时，而强化运行时
-  # 默认会掐掉 JIT 和「加载别人签的二进制」——后者正是 omni 的核心功能
+  # 默认会掐掉 JIT 和「加载别人签的二进制」——后者正是 Switchback 的核心功能
   # （spawn codex / ACP 适配器 / Claude SDK 自带的 CLI）。
   # 等付完 99 刀那天才第一次打开它，就要在最不该调试的时刻调试它。
   # 现在用自签证书就能把这条路走通，授权清单见 build/entitlements.mac.plist。
@@ -76,18 +76,18 @@ mac:
 # 产物文件名。**必须显式写。**
 #
 # 不写的话 Linux / Windows 那边会用 package.json 的 `name`，
-# 而这个包叫 `@omni/desktop`——于是产物落在 `release/@omni/desktop-0.0.0.tar.gz`，
-# 那个 `@omni` 变成了一级目录。实测踩到的。
+# 而这个包叫 `@switchback/desktop`——于是产物落在 `release/@switchback/desktop-0.0.0.tar.gz`，
+# 那个 `@switchback` 变成了一级目录。实测踩到的。
 artifactName: ${productName}-${version}-${arch}.${ext}
 
 dmg:
-  title: omni ${version}
+  title: Switchback ${version}
 
 # ── 以下两个平台：配置写好了，但**没有在真机上跑过** ──────────────
 #
 # 不进默认的 `pnpm dist`（那条只打 mac），要用得显式说：
-#   pnpm --filter @omni/desktop exec electron-builder --linux
-#   pnpm --filter @omni/desktop exec electron-builder --win
+#   pnpm --filter @switchback/desktop exec electron-builder --linux
+#   pnpm --filter @switchback/desktop exec electron-builder --win
 #
 # **已知会缺一块**：Claude Agent SDK 的平台二进制是 optionalDependencies，
 # pnpm 10+ 不会自动装别的平台那几个。实测打 Linux 包时 electron-builder

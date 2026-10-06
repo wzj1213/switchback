@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 import { createHandoffBrief } from "./handoff-brief.js"
 
 const T0 = Date.UTC(2026, 8, 25, 1, 0, 0)
@@ -60,7 +60,7 @@ describe("换引擎交接说明（主进程）", () => {
   const fx: Fixture = { root: "", cwd: "", spare: "", log: "" }
 
   beforeEach(async () => {
-    fx.root = await mkdtemp(join(tmpdir(), "omni-handoff-"))
+    fx.root = await mkdtemp(join(tmpdir(), "switchback-handoff-"))
     fx.cwd = join(fx.root, "work")
     fx.spare = join(fx.root, "userData", "handoff")
     fx.log = join(fx.root, "claude", "s-1.jsonl")
@@ -73,10 +73,10 @@ describe("换引擎交接说明（主进程）", () => {
     await rm(fx.root, { recursive: true, force: true })
   })
 
-  it("开着：转写写进工作区 .omni/handoff/，说明里带路径、分段与原始记录的格式事实", async () => {
+  it("开着：转写写进工作区 .switchback/handoff/，说明里带路径、分段与原始记录的格式事实", async () => {
     const thread = threadOf(fx)
     const note = await briefFor(fx, eventsOf(thread))(thread)
-    const path = join(fx.cwd, ".omni", "handoff", "th-1.md")
+    const path = join(fx.cwd, ".switchback", "handoff", "th-1.md")
     expect(note).toContain("接下来由 Codex 接着进行")
     expect(note).toContain("- Claude Code：第 1 轮，2026-09-25T01:00:01Z – 2026-09-25T01:00:03Z")
     expect(note).toContain(`- ${path}（`)
@@ -87,15 +87,15 @@ describe("换引擎交接说明（主进程）", () => {
     const md = await readFile(path, "utf8")
     expect(md).toContain("## 第 1 轮 · 2026-09-25T01:00:01Z · Claude Code")
     expect(md).toContain("#### 工具 Bash：执行 `pnpm test` — ok〔toolu_01A〕")
-    expect(await readFile(join(fx.cwd, ".omni", ".gitignore"), "utf8")).toContain("\n*\n")
+    expect(await readFile(join(fx.cwd, ".switchback", ".gitignore"), "utf8")).toContain("\n*\n")
   })
 
-  it("用户在 .omni 里自己写过 .gitignore：不覆盖", async () => {
-    await mkdir(join(fx.cwd, ".omni"), { recursive: true })
-    await writeFile(join(fx.cwd, ".omni", ".gitignore"), "handoff/\n", "utf8")
+  it("用户在 .switchback 里自己写过 .gitignore：不覆盖", async () => {
+    await mkdir(join(fx.cwd, ".switchback"), { recursive: true })
+    await writeFile(join(fx.cwd, ".switchback", ".gitignore"), "handoff/\n", "utf8")
     const thread = threadOf(fx)
     await briefFor(fx, eventsOf(thread))(thread)
-    expect(await readFile(join(fx.cwd, ".omni", ".gitignore"), "utf8")).toBe("handoff/\n")
+    expect(await readFile(join(fx.cwd, ".switchback", ".gitignore"), "utf8")).toBe("handoff/\n")
   })
 
   it("工作区写不进去：转写退到应用数据目录", async () => {
@@ -116,7 +116,7 @@ describe("换引擎交接说明（主进程）", () => {
     it(`${c.name}：不附说明，也不往工作区写东西`, async () => {
       const thread = threadOf(fx)
       expect(await briefFor(fx, c.events(thread), c.enabled)(thread)).toBeUndefined()
-      await expect(readFile(join(fx.cwd, ".omni", "handoff", "th-1.md"), "utf8")).rejects.toThrow()
+      await expect(readFile(join(fx.cwd, ".switchback", "handoff", "th-1.md"), "utf8")).rejects.toThrow()
     })
   }
 

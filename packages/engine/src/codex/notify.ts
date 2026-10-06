@@ -1,5 +1,5 @@
-import type { EngineGoal, Event, ItemId, ThreadId, ToolCallItem, TurnId, TurnStatus } from "@omni/protocol"
-import { isStreamingText, itemToOmni, textOf, turnStatus } from "./translate.js"
+import type { EngineGoal, Event, ItemId, ThreadId, ToolCallItem, TurnId, TurnStatus } from "@switchback/protocol"
+import { isStreamingText, itemToSwitchback, textOf, turnStatus } from "./translate.js"
 import { readSettings, type CodexSettings } from "./settings.js"
 import { onPlanUpdate } from "./plan.js"
 import type {
@@ -34,7 +34,7 @@ import { goalOf } from "./goal.js"
 import { onFilePatch, onMcpProgress, retainProgress } from "./item-progress.js"
 
 /**
- * codex 通知 → omni 事件。
+ * codex 通知 → Switchback 事件。
  *
  * 有意做成模块级函数 + 显式 ctx，而不是 class 的私有方法：这样每一支都能单独测，
  * 不用先造一个会话。
@@ -43,7 +43,7 @@ export interface NotifyContext {
   threadId: ThreadId
   /**
    * **codex 自己的** thread id——和上面那个 `threadId` 不是一个命名空间：
-   * 那个是 omni 的会话 id，这个是引擎的。线上的通知带的是后者。
+   * 那个是 Switchback 的会话 id，这个是引擎的。线上的通知带的是后者。
    *
    * 取值函数而不是值：它在握手之后才知道（`thread/start` 的回包），
    * 而 `NotifyContext` 在那之前就造好了。
@@ -51,7 +51,7 @@ export interface NotifyContext {
   codexThread: () => string | undefined
   /**
    * 引擎报了一份设置快照。**这一层只翻译，怎么落由驱动定**——
-   * 「omni 设的和它报的对不对得上」要知道 omni 当前是哪一档，那是驱动才有的上下文。
+   * 「Switchback 设的和它报的对不对得上」要知道 Switchback 当前是哪一档，那是驱动才有的上下文。
    */
   onSettings?: (settings: CodexSettings) => void
   emit: (event: Event) => void
@@ -96,10 +96,10 @@ export interface NotifyContext {
 function materialize(ctx: NotifyContext, item: WireItem, turnId: TurnId): boolean {
   if (ctx.materialized.has(item.id)) return true
   const at = ctx.now()
-  const omni = itemToOmni({ ...item, text: "", summary: [], content: [] }, { turnId, at }, false)
-  if (omni === undefined) return false
+  const switchback = itemToSwitchback({ ...item, text: "", summary: [], content: [] }, { turnId, at }, false)
+  if (switchback === undefined) return false
   ctx.materialized.add(item.id)
-  ctx.emit({ type: "item.started", at, item: omni })
+  ctx.emit({ type: "item.started", at, item: switchback })
   return true
 }
 
@@ -110,10 +110,10 @@ function onItemStarted(ctx: NotifyContext, params: WireItemLifecycle): void {
   const output = params.item.aggregatedOutput
   if (typeof output === "string" && output !== "") ctx.streamed.set(params.item.id, output)
   if (isStreamingText(params.item.type)) return
-  const omni = itemToOmni(params.item, { turnId, at: ctx.now() }, false)
-  if (omni === undefined) return
-  ctx.materialized.add(omni.id)
-  ctx.emit({ type: "item.started", at: ctx.now(), item: omni })
+  const switchback = itemToSwitchback(params.item, { turnId, at: ctx.now() }, false)
+  if (switchback === undefined) return
+  ctx.materialized.add(switchback.id)
+  ctx.emit({ type: "item.started", at: ctx.now(), item: switchback })
 }
 
 function onItemCompleted(ctx: NotifyContext, params: WireItemLifecycle): void {
@@ -128,10 +128,10 @@ function onItemCompleted(ctx: NotifyContext, params: WireItemLifecycle): void {
     if (textOf(item) === "") return
     materialize(ctx, item, turnId)
   }
-  const omni = itemToOmni(item, { turnId, at: ctx.now() }, true)
-  if (omni === undefined) return
-  ctx.materialized.add(omni.id)
-  ctx.emit({ type: "item.updated", at: ctx.now(), item: omni })
+  const switchback = itemToSwitchback(item, { turnId, at: ctx.now() }, true)
+  if (switchback === undefined) return
+  ctx.materialized.add(switchback.id)
+  ctx.emit({ type: "item.updated", at: ctx.now(), item: switchback })
 }
 
 function onDelta(ctx: NotifyContext, params: WireDelta): void {
@@ -165,8 +165,8 @@ export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnSt
     if (!ctx.materialized.has(id)) continue
     const streamed = ctx.streamed.get(id)
     const recovered = recoverStream(item, streamed)
-    const omni = itemToOmni(recovered, { turnId, at: ctx.now() }, true)
-    const closed = omni?.kind === "tool_call" ? closeTool(omni, status) : omni
+    const switchback = itemToSwitchback(recovered, { turnId, at: ctx.now() }, true)
+    const closed = switchback?.kind === "tool_call" ? closeTool(switchback, status) : switchback
     if (closed !== undefined) ctx.emit({ type: "item.updated", at: ctx.now(), item: closed })
   }
   ctx.inflight.clear()

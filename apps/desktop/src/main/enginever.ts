@@ -1,4 +1,4 @@
-import type { ClaudeExecutable } from "@omni/engine"
+import type { ClaudeExecutable } from "@switchback/engine"
 import { ipcMain } from "electron"
 import {
   compare,
@@ -39,7 +39,7 @@ export interface EngineVersionOptions {
    * 这一行的版本号也更新了，而引擎下拉里那家**still 写着「未安装」**——
    * 因为 `engine-catalog` 有自己的一份缓存，进程内永久有效，
    * 除了 DSH 改 profile 之外没有任何东西让它失效。于是 codex 那条安装提示
-   * 只能写成「装好之后重启 omni」——那是把缺陷写进了说明书。
+   * 只能写成「装好之后重启 Switchback」——那是把缺陷写进了说明书。
    *
    * 用回调而不是在这里直接调宿主：这个 store 在宿主起来**之前**就建好了
    *（通道要先挂），拿不到 `attached`。index.ts 用一个可变槽把环解开。
@@ -168,7 +168,7 @@ async function runInstall(
 /**
  * 探一遍。
  *
- * **探不到的那一家不丢掉，换成「没装」那一行。** 丢掉等于「omni 不知道有这一家」，
+ * **探不到的那一家不丢掉，换成「没装」那一行。** 丢掉等于「Switchback 不知道有这一家」，
  * 而事实是它知道得很清楚——它只是没装，而那一行上正好能摆下一条安装命令。
  */
 async function probe(
@@ -191,19 +191,19 @@ async function probe(
 }
 
 function noInstaller(engine: string): UpdateResult {
-  return { ok: false, changed: false, output: `omni 不知道 ${engine} 的安装来源，这一家要按它自己的方式装` }
+  return { ok: false, changed: false, output: `Switchback 不知道 ${engine} 的安装来源，这一家要按它自己的方式装` }
 }
 
 function installOutput(output: string, ok: boolean): string {
   if (ok) return output === "" ? "安装器正常结束，没有额外输出。" : output
-  const checked = "omni 复查：装完之后仍然探不到这个命令。可能装在了不在 PATH 上的位置。"
+  const checked = "Switchback 复查：装完之后仍然探不到这个命令。可能装在了不在 PATH 上的位置。"
   return [output === "" ? "安装命令没有输出。" : output, checked].join("\n\n")
 }
 
 export function installEngineVersionChannel(_log: Logger, versions: EngineVersionStore): void {
-  ipcMain.handle("omni:updateEngine", (_event, engine: string) => versions.update(engine))
-  ipcMain.handle("omni:installEngine", (_event, engine: string) => versions.install(engine))
-  ipcMain.handle("omni:engineVersions", (_event, refresh?: boolean) =>
+  ipcMain.handle("switchback:updateEngine", (_event, engine: string) => versions.update(engine))
+  ipcMain.handle("switchback:installEngine", (_event, engine: string) => versions.install(engine))
+  ipcMain.handle("switchback:engineVersions", (_event, refresh?: boolean) =>
     versions.get(refresh === true),
   )
 }
@@ -228,7 +228,7 @@ function updateSucceeded(check: UpdateVerification): boolean {
 }
 
 function unavailable(engine: string): UpdateResult {
-  return { ok: false, changed: false, output: `${engine} 当前没有可由 omni 执行的更新入口` }
+  return { ok: false, changed: false, output: `${engine} 当前没有可由 Switchback 执行的更新入口` }
 }
 
 function updateOutput(
@@ -238,7 +238,7 @@ function updateOutput(
   after: string | undefined,
 ): string {
   if (ok) return output === "" ? "更新器正常结束，没有额外输出。" : output
-  const checked = `omni 复查版本：${before ?? "?"} → ${after ?? "?"}`
+  const checked = `Switchback 复查版本：${before ?? "?"} → ${after ?? "?"}`
   return [output === "" ? "更新命令没有输出。" : output, checked].join("\n\n")
 }
 

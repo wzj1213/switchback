@@ -26,7 +26,7 @@ function repoAt(base: string): string {
 
 describe("对话工作树基线", () => {
   it("每轮覆盖上一轮快照，不把更早轮次的改动混进来", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-turn-baseline-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-turn-baseline-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, "one.txt"), "head\n")
@@ -50,7 +50,7 @@ describe("对话工作树基线", () => {
   })
 
   it("排除开场前的脏文件，并跨多轮、暂存和提交计算最终净差异", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, "tracked.txt"), "head\n")
@@ -93,7 +93,7 @@ describe("对话工作树基线", () => {
   })
 
   it("无提交仓库、符号链接入口和 staged 新文件都能对齐", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-link-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-link-"))
     try {
       const repo = repoAt(base)
       const linked = join(base, "linked")
@@ -115,7 +115,7 @@ describe("对话工作树基线", () => {
   })
 
   it("开场前的暂存不冒充本轮已暂存，只有最终内容完整进 index 才标记", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-staged-before-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-staged-before-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, "mixed.txt"), "head\n")
@@ -136,7 +136,7 @@ describe("对话工作树基线", () => {
   })
 
   it("明确报告的 ignored 文件不冒充零改动，force-add 后也能进入当前树", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-ignore-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-ignore-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, ".gitignore"), "ignored.txt\n")
@@ -164,7 +164,7 @@ describe("对话工作树基线", () => {
   })
 
   it("开场树已经 force-add 的 ignored 文件仍采用真实树差异", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-tracked-ignore-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-tracked-ignore-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, ".gitignore"), "ignored.txt\n")
@@ -186,7 +186,7 @@ describe("对话工作树基线", () => {
   })
 
   it("cwd 在子目录时，仓库其他目录的 /tmp 绝对别名仍能进入 ignored 核实", async () => {
-    const base = mkdtempSync("/tmp/omni-baseline-root-alias-")
+    const base = mkdtempSync("/tmp/switchback-baseline-root-alias-")
     try {
       const repo = repoAt(base)
       const sub = join(repo, "sub")
@@ -208,7 +208,7 @@ describe("对话工作树基线", () => {
   })
 
   it("500 条上限之外仍保留引擎明确报告的目标", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-many-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-many-"))
     try {
       const repo = repoAt(base)
       const baselines = createWorktreeBaselines(join(base, "cache"))
@@ -228,7 +228,7 @@ describe("对话工作树基线", () => {
   })
 
   it("改名文件的按需补丁保留旧路径，不把新路径冒充整文件新增", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-rename-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-rename-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, "old.txt"), "one\ntwo\n")
@@ -249,7 +249,7 @@ describe("对话工作树基线", () => {
   })
 
   it("按需补丁把 pathspec 魔法前缀当成普通文件名", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-literal-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-literal-"))
     try {
       const repo = repoAt(base)
       const magic = ":(glob)*.txt"
@@ -271,7 +271,7 @@ describe("对话工作树基线", () => {
   })
 
   it("首次取样与删除同拍发生时，迟到取样不会把基线目录建回来", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-remove-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-remove-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, "a.txt"), "a\n")
@@ -287,7 +287,7 @@ describe("对话工作树基线", () => {
   })
 
   it("真实 Git 状态读取失败时不把缺失的暂存信息冒充成成功结果", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-baseline-broken-status-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-baseline-broken-status-"))
     try {
       const repo = repoAt(base)
       writeFileSync(join(repo, "tracked.txt"), "before\n")

@@ -57,8 +57,8 @@ describe("替 agent 起进程", () => {
   it("env 是数组形状，而且**继承父环境**（不然 PATH 就没了）", async () => {
     const out = await run({
       command: "sh",
-      args: ["-c", "echo $OMNI_TEST_VAR; command -v sh >/dev/null && echo PATH_OK"],
-      env: [{ name: "OMNI_TEST_VAR", value: "设上了" }],
+      args: ["-c", "echo $SWITCHBACK_TEST_VAR; command -v sh >/dev/null && echo PATH_OK"],
+      env: [{ name: "SWITCHBACK_TEST_VAR", value: "设上了" }],
     })
     expect(out.output).toContain("设上了")
     expect(out.output).toContain("PATH_OK")

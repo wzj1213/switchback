@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import type { EngineSession } from "../contract.js"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { resolveCommand } from "../probe.js"
 import { createRpc } from "../rpc.js"
 import { createProcessOwner } from "../subprocess.js"
@@ -39,7 +39,7 @@ function writeBlockingHook(home: string): void {
   const script = join(home, "block-hook.mjs")
   writeFileSync(script, [
     "await new Promise((resolve) => setTimeout(resolve, 450))",
-    "process.stdout.write(JSON.stringify({ decision: 'block', reason: 'OMNI_HOOK_BLOCK' }))",
+    "process.stdout.write(JSON.stringify({ decision: 'block', reason: 'SWITCHBACK_HOOK_BLOCK' }))",
   ].join("\n"))
   writeFileSync(join(home, "config.toml"), [
     "[features]",
@@ -49,7 +49,7 @@ function writeBlockingHook(home: string): void {
     "[[hooks.UserPromptSubmit.hooks]]",
     'type = "command"',
     `command = ${JSON.stringify(`${process.execPath} ${script}`)}`,
-    'statusMessage = "OMNI_HOOK_RUNNING"',
+    'statusMessage = "SWITCHBACK_HOOK_RUNNING"',
   ].join("\n"))
 }
 
@@ -77,7 +77,7 @@ async function trustHook(home: string, cwd: string): Promise<void> {
   child.stderr?.resume()
   try {
     await rpc.call("initialize", {
-      clientInfo: { name: "omni-hook-live", title: "omni hook live", version: "0" },
+      clientInfo: { name: "switchback-hook-live", title: "Switchback hook live", version: "0" },
       capabilities: {},
     })
     rpc.notify("initialized")
@@ -109,7 +109,7 @@ async function trustHook(home: string, cwd: string): Promise<void> {
  */
 describe.sequential("Codex hook（真机）", () => {
   it("慢 hook 会显示运行态，拦截理由留在原轮次", async () => {
-    const root = mkdtempSync(join(tmpdir(), "omni-codex-hook-live-"))
+    const root = mkdtempSync(join(tmpdir(), "switchback-codex-hook-live-"))
     const home = join(root, "codex-home")
     const cwd = join(root, "work")
     mkdirSync(home)
@@ -140,7 +140,7 @@ describe.sequential("Codex hook（真机）", () => {
       }))
       expect(events).toContainEqual(expect.objectContaining({
         type: "item.updated",
-        item: expect.objectContaining({ status: "denied", error: "feedback: OMNI_HOOK_BLOCK" }),
+        item: expect.objectContaining({ status: "denied", error: "feedback: SWITCHBACK_HOOK_BLOCK" }),
       }))
     } finally {
       await session?.dispose()

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import type { PreviewTarget } from "../workbench.js"
 import { fileTouchOf, sessionFileGroupsOf } from "../session-files.js"
 import { useFileSearch, type FileSearchState, type SearchFiles } from "../use-file-search.js"

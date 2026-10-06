@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { commandLabel } from "../slash.js"
 import { CommandIcon } from "./icons.js"
 

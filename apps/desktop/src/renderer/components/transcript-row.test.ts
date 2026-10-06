@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES, type Thread } from "@omni/protocol"
-import type { Item } from "@omni/protocol"
+import { NO_CAPABILITIES, type Thread } from "@switchback/protocol"
+import type { Item } from "@switchback/protocol"
 import type { Row } from "../group.js"
 import { answerActs, canRewind } from "./transcript-row.js"
 

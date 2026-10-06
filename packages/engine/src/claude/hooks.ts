@@ -1,4 +1,4 @@
-import type { Event, ThreadId, ToolCallItem, ToolStatus, TurnId } from "@omni/protocol"
+import type { Event, ThreadId, ToolCallItem, ToolStatus, TurnId } from "@switchback/protocol"
 
 interface RawHookMessage {
   subtype?: string

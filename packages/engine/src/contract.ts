@@ -18,8 +18,8 @@ import type {
   TrustApply,
   TurnId,
   UserMessageOrigin,
-} from "@omni/protocol"
-import type { Rule } from "@omni/approval"
+} from "@switchback/protocol"
+import type { Rule } from "@switchback/approval"
 import type { Probe } from "./probe.js"
 
 /** 需要人工裁决时递给宿主的东西。文本字段可能来自引擎，渲染前必须转义。 */
@@ -123,7 +123,7 @@ export interface StartRequest {
   onNativeTurn?: (turn: NativeTurnStart) => TurnId | undefined
   /**
    * 引擎那边的会话句柄，用于续跑。传了就接着上次的对话，不传就是全新会话。
-   * 格式由各家自己定，omni 原样存取。
+   * 格式由各家自己定，Switchback 原样存取。
    */
   resume?: string
   /**
@@ -131,7 +131,7 @@ export interface StartRequest {
    *
    * 宿主只负责原样保存、续跑时原样传回；怎么解释由驱动决定。没有这一项时，
    * 驱动可以采用自己当前的默认组装。它和 `resume` 分开，是为了让原生句柄仍然
-   * 保持原样可复制，不把 omni 的路由元数据编码进别人的 id。
+   * 保持原样可复制，不把 Switchback 的路由元数据编码进别人的 id。
    */
   profile?: string
   /**
@@ -141,7 +141,7 @@ export interface StartRequest {
    *
    * 第一版做成了 `EngineSession.fork()`：老会话复制一份，把新句柄交给新会话去续。
    * 真机上直接失败——`thread ... already has an active writer`。
-   * **分出来的那条归创建它的那个进程管**，而 omni 每个会话一个引擎进程，
+   * **分出来的那条归创建它的那个进程管**，而 Switchback 每个会话一个引擎进程，
    * 于是新进程去续一条老进程还攥着的会话，拿不到写锁。
    * 实测 `thread/unsubscribe` 也不放锁。
    *
@@ -198,7 +198,7 @@ export interface StartRequest {
    */
   onGoal?: (goal: EngineGoal | undefined) => void
   /**
-   * omni 设档的**结果**。
+   * Switchback 设档的**结果**。
    *
    * 存在的理由很具体：`acp/mode.ts` 里那两句「找不到对应项，已保持引擎自己的默认档」
    * 和「没有报告可选档位」以前走 `engine.status` 的 `ready` 档，而 `store` 的 `LOUD`
@@ -215,7 +215,7 @@ export interface EngineSession {
   /**
    * 背后那个引擎进程的 pid（进程组组长，见 `ProcessOwner.pid`）。
    * 几条会话共用一个进程的（kimi web）报的是同一个。**只拿来量它往外发了多少**——
-   * omni 不凭它改引擎的任何行为；只在它批量往外发、用户又开着守卫时停掉它。
+   * Switchback 不凭它改引擎的任何行为；只在它批量往外发、用户又开着守卫时停掉它。
    */
   pid?: () => number | undefined
   /**
@@ -249,10 +249,10 @@ export interface EngineSession {
    */
   steer?: (text: string, attachments?: readonly string[]) => Promise<void>
   /**
-   * 把标题告诉引擎。**不支持就别实现**，omni 侧照常改名。
+   * 把标题告诉引擎。**不支持就别实现**，Switchback 侧照常改名。
    *
    * 为什么值得传：引擎自己也存着一份会话列表（codex 的 `thread/list`），
-   * 你在 omni 里把会话改成「修分页那个」，在 codex 自己的界面里
+   * 你在 Switchback 里把会话改成「修分页那个」，在 codex 自己的界面里
    * 它还叫第一句提问的前二十个字。**同一条会话在两处叫不同名字**，
    * 而你要靠名字找到它。
    */
@@ -261,8 +261,8 @@ export interface EngineSession {
    * 用户删掉了这条会话——引擎那边也收拾一下。
    *
    * **归档不是删除**：codex 的 `thread/archive` 是可逆的，而删除不是。
-   * omni 这边删的是自己的记录，没有理由替用户把引擎那边的原始记录也毁掉；
-   * 但完全不管的话，你在 omni 里删了十条，codex 自己的列表里那十条还在。
+   * Switchback 这边删的是自己的记录，没有理由替用户把引擎那边的原始记录也毁掉；
+   * 但完全不管的话，你在 Switchback 里删了十条，codex 自己的列表里那十条还在。
    *
    * 在 `dispose()` **之前**调用——进程都没了就发不出去了。
    */
@@ -300,7 +300,7 @@ export interface EngineSession {
    * 压缩上下文。**不支持就别实现**——界面据此决定给不给这个入口。
    *
    * Claude 不实现：它自己的 `/compact` 已经在斜杠命令列表里了，
-   * 再加一条 omni 的就是同一件事出现两次。codex 那边 app-server 有
+   * 再加一条 Switchback 的就是同一件事出现两次。codex 那边 app-server 有
    * `thread/compact/start`，但它不在 `skills/list` 里，所以必须由这里补。
    */
   /**
@@ -313,7 +313,7 @@ export interface EngineSession {
    * 引擎自己存着哪些会话（你在终端、在别的界面里跑过的）。
    *
    * **不支持就别实现**——界面据此不显示那一段，不报错。
-   * 顺序由驱动定（最近活动在前），omni 原样用。
+   * 顺序由驱动定（最近活动在前），Switchback 原样用。
    */
   history?: () => Promise<readonly EngineThread[]>
   /** 登录的是哪个账号。拿不到给 undefined，界面据此不画。 */
@@ -323,12 +323,12 @@ export interface EngineSession {
    *
    * ## 这条路径只记录、展示，不自动塞给别的引擎
    *
-   * 换一家引擎的老做法是：omni 从 transcript 里提炼一份「目标 + 追加要求」，
+   * 换一家引擎的老做法是：Switchback 从 transcript 里提炼一份「目标 + 追加要求」，
    * 替用户发给新的那家。两层错——**内容是我编的**（提炼必然丢东西），
    * **动作是我替他做的**（发出去就立刻开跑）。
    *
-   * omni 把路径存进 `Thread.segments`，在时间线里展示、供用户复制。
-   * 用户明确让另一家 review 时，再把路径给它自己读；omni 不自动注入。
+   * Switchback 把路径存进 `Thread.segments`，在时间线里展示、供用户复制。
+   * 用户明确让另一家 review 时，再把路径给它自己读；Switchback 不自动注入。
    *
    * 拿不到就给 undefined（比如协议没有这个概念），时间线据实不提供记录入口。
    */

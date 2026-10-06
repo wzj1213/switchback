@@ -13,7 +13,7 @@
  *
  * ## 没配 feed 就完全关闭
  *
- * 不发请求、不起定时器、菜单项灰掉。omni 不该在用户没要求的情况下
+ * 不发请求、不起定时器、菜单项灰掉。Switchback 不该在用户没要求的情况下
  * 定期往任何地址发请求——哪怕只是一个版本号。
  */
 
@@ -104,13 +104,13 @@ export async function checkForUpdate(deps: UpdateDeps): Promise<UpdateResult> {
 /**
  * feed 地址从哪来。
  *
- * 发布时烤进 `package.json` 的 `omni.updateFeed`；`OMNI_UPDATE_FEED`
+ * 发布时烤进 `package.json` 的 `switchback.updateFeed`；`SWITCHBACK_UPDATE_FEED`
  * 可以覆盖它（测试与企业内网自建源都要用到）。**两处都没有就是关闭**。
  */
-export function feedOf(pkg: { omni?: { updateFeed?: unknown } } | undefined): string {
-  const fromEnv = process.env["OMNI_UPDATE_FEED"]
+export function feedOf(pkg: { switchback?: { updateFeed?: unknown } } | undefined): string {
+  const fromEnv = process.env["SWITCHBACK_UPDATE_FEED"]
   if (typeof fromEnv === "string" && fromEnv !== "") return fromEnv
-  const baked = pkg?.omni?.updateFeed
+  const baked = pkg?.switchback?.updateFeed
   return typeof baked === "string" ? baked : ""
 }
 
@@ -146,7 +146,7 @@ export async function announce(
       detail: [
         result.release.notes,
         // 说清楚为什么要手动装——不说的话，用户会以为这个按钮坏了
-        "omni 目前只提示、不自动安装：自动安装需要应用带 Apple 开发者签名，这个包还没有。",
+        "Switchback 目前只提示、不自动安装：自动安装需要应用带 Apple 开发者签名，这个包还没有。",
       ]
         .filter((x) => x !== undefined && x !== "")
         .join("\n\n"),

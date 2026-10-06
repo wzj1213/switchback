@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -14,7 +14,7 @@ import { createClaudeDriver } from "./driver.js"
  *
  * ## 为什么这条必须真跑
  *
- * progress 与 notification 虽有公开类型，但 omni 走的是自己那份窄声明；编译器管不到
+ * progress 与 notification 虽有公开类型，但 Switchback 走的是自己那份窄声明；编译器管不到
  * 「SDK 真的会不会按 started → progress → updated → notification 推完整序列」。
  *
  * 这条同时是哨兵：SDK 哪天改了字段名或终态顺序，它会红，而不是等界面安静地永久旋转。
@@ -24,7 +24,7 @@ import { createClaudeDriver } from "./driver.js"
 
 describe("子 agent 进度（真跑）", () => {
   it("起一个 Task 子 agent → 活动进度与 lane 原生终态都完整往返", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-tasks-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-tasks-live-"))
     writeFileSync(join(cwd, "a.txt"), "alpha\n")
     writeFileSync(join(cwd, "b.txt"), "beta\n")
     const events: Event[] = []
@@ -50,7 +50,7 @@ describe("子 agent 进度（真跑）", () => {
         events.some((e) => e.type === "lane.updated" && e.lane.status !== "running"))
       const updates = events.filter((e) => e.type === "tasks.updated")
       expect(updates.length).toBeGreaterThan(0)
-      // **每条都得有人话**：那正是 omni 唯一显示的东西
+      // **每条都得有人话**：那正是 Switchback 唯一显示的东西
       const described = updates.flatMap((e) => e.tasks).filter((t) => t.description.length > 0)
       expect(described.length).toBeGreaterThan(0)
       // **收工必须清空**，否则界面上那几行会一直挂着

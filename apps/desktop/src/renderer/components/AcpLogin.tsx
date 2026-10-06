@@ -4,11 +4,11 @@ import { useAcpLogin, type LoginState } from "../use-acp.js"
 /**
  * 一家 ACP 引擎报出来的登录方式，一种一颗按钮。
  *
- * **只列它报的、按它报的顺序，不挑推荐**——那是它的事。omni 做的只是转达：
+ * **只列它报的、按它报的顺序，不挑推荐**——那是它的事。Switchback 做的只是转达：
  * agent 型发一次 `authenticate`（它自己开浏览器、收回调、存凭证），
- * terminal 型在「终端」里跑它自己的登录界面。omni 看不到也存不了任何凭证。
+ * terminal 型在「终端」里跑它自己的登录界面。Switchback 看不到也存不了任何凭证。
  *
- * 要 API key 的那几种照实说 key 从哪儿来：omni 不代收密钥，
+ * 要 API key 的那几种照实说 key 从哪儿来：Switchback 不代收密钥，
  * 它会从环境变量里读——写进 engines.json 这一条的 `env`，或者你的 shell 配置。
  */
 export function AcpLogin({ name, trial }: { name: string; trial: AcpTrialView }): React.JSX.Element | null {
@@ -46,7 +46,7 @@ export function AcpLogin({ name, trial }: { name: string; trial: AcpTrialView })
       </div>
       {keyed ? (
         <p className="acp-login__note">
-          标着 key 的那种要 API key：omni 不代收密钥。它会从环境变量里读——写进 engines.json 这一条的 env，或者你的 shell 配置。
+          标着 key 的那种要 API key：Switchback 不代收密钥。它会从环境变量里读——写进 engines.json 这一条的 env，或者你的 shell 配置。
         </p>
       ) : null}
       <LoginResult state={state} onCancel={cancel} />

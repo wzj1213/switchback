@@ -1,6 +1,6 @@
-# @omni/protocol
+# @switchback/protocol
 
-omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `thread / turn / item`，
+Switchback 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `thread / turn / item`，
 渲染层只认这一套，所以 UI 只写一遍。
 
 三级原语借自 codex `app-server`（见 `agent-learn/codex/codex/codex-rs/app-server/README.md`
@@ -22,7 +22,7 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
   旧 `handoff` 字面量只负责读回历史日志
 - `Event` —— 引擎 → 宿主 → 渲染层的单向事件流；item 可开始、追加、全量更新或由引擎明确撤回；
   原生一次性通知另走 `engine.notification`，保留 key、优先级和超时，不混进 transcript；
-  omni 自己量到的「某个进程在批量往外发」走 `egress.alert`，不冒充引擎自报的 `engine.status`
+  Switchback 自己量到的「某个进程在批量往外发」走 `egress.alert`，不冒充引擎自报的 `engine.status`
 - `Command` —— 渲染层 → 宿主的反向指令（提问、批准、中断、切档、接力）
 - `QuestionPrompt` / `QuestionResponse` / `PendingQuestion` —— 引擎公开给宿主的结构化问题、
   用户原样作出的选择，以及挂在会话上的待回答组；单选、多选、其他答案、选项备注、自由回答、
@@ -41,12 +41,12 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
 ## 不拥有什么
 
 - **不拥有任何逻辑**。没有函数、没有类、没有校验器、没有序列化实现。
-- 不拥有各家引擎的原始事件格式——那是 `@omni/engine` 各驱动的私有细节
-- 不拥有持久化格式——`@omni/journal` 自己决定怎么落盘
+- 不拥有各家引擎的原始事件格式——那是 `@switchback/engine` 各驱动的私有细节
+- 不拥有持久化格式——`@switchback/journal` 自己决定怎么落盘
 - 不拥有 ID 生成——ID 由宿主铸造并传入
 - **不拥有「哪些 item 不许进旁路」这条约束的执行**。`ApprovalItem` / `ErrorItem` 和别的
   item 一样继承 `ItemBase`，类型上拦不住 `lane` 字段——闸门在
-  `@omni/host` 的 `item-scope.ts`（`mainlineOnly`）。规矩是：**审批与错误永远留在主线**，
+  `@switchback/host` 的 `item-scope.ts`（`mainlineOnly`）。规矩是：**审批与错误永远留在主线**，
   否则侧栏关着、或用户在看另一条旁路时，一张正在等他点的审批卡会消失
 
 ## 已知限制
@@ -61,4 +61,4 @@ omni 的**归一化领域模型**。五家引擎的输出都翻译成这一套 `
   `apps/desktop/src/main/sequence.ts`（编号与补发缓冲）与
   `apps/desktop/src/renderer/stream.ts`（游标与补洞）。
 - `Event` 联合有一道**编译期穷尽检查**
-  （`@omni/store` 的 `Handlers` 从 `Event["type"]` 映射出来），新增一种忘了接会编译不过。
+  （`@switchback/store` 的 `Handlers` 从 `Event["type"]` 映射出来），新增一种忘了接会编译不过。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { create, setup } from "./host-fixture.js"
 
 /** 开一条会话、发一句话：宿主开了轮（夹具的时钟恒为 0），驱动拿到了 turnId。 */

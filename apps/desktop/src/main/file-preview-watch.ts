@@ -91,7 +91,7 @@ function startOne(event: IpcMainEvent, value: unknown, context: WatchContext): v
     value: req,
     touched: context.touched.allows,
     owns: context.worksites.owns,
-    changed: () => { if (!event.sender.isDestroyed()) event.sender.send("omni:fileChanged", req.id) },
+    changed: () => { if (!event.sender.isDestroyed()) event.sender.send("switchback:fileChanged", req.id) },
   }).then((stop) => {
     if (stop === undefined) return
     if (!context.requested.has(key)) stop(); else context.records.set(key, stop)
@@ -104,7 +104,7 @@ export function installFilePreviewWatch(touched: TouchedFiles, worksites: Worksi
   const requested = new Set<string>()
   const senders = new Set<number>()
   const context = { touched, worksites, records, requested }
-  ipcMain.on("omni:watchFile", (event, value: unknown) => {
+  ipcMain.on("switchback:watchFile", (event, value: unknown) => {
     if (!senders.has(event.sender.id)) {
       senders.add(event.sender.id)
       event.sender.once("destroyed", () => {
@@ -114,7 +114,7 @@ export function installFilePreviewWatch(touched: TouchedFiles, worksites: Worksi
     }
     startOne(event, value, context)
   })
-  ipcMain.on("omni:unwatchFile", (event, id: unknown) => {
+  ipcMain.on("switchback:unwatchFile", (event, id: unknown) => {
     if (typeof id !== "string") return
     stopOne(records, requested, watchKey(event.sender.id, id))
   })

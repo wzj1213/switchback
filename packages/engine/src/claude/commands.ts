@@ -1,4 +1,4 @@
-import type { Event, SlashCommand, ThreadId } from "@omni/protocol"
+import type { Event, SlashCommand, ThreadId } from "@switchback/protocol"
 
 interface RawCommand {
   name?: unknown

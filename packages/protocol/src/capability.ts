@@ -6,7 +6,7 @@
  * 界面上「给不给这个入口」必须只看能力，**不能看引擎叫什么名字**，
  * 也不能嗅探它报上来的命令名。前者一接第四家就得改，后者更脆——
  * 压缩上下文那条一开始就是靠 `commands.some(c => c.name === "compact")` 判的，
- * 而那意味着：某家引擎哪天把命令改名叫 `condense`，omni 会**默默多出一个
+ * 而那意味着：某家引擎哪天把命令改名叫 `condense`，Switchback 会**默默多出一个
  * 重复入口**，没有任何地方报错。
  *
  * 能力由驱动在握手时自报，一路挂在 `Thread` 上传到界面。
@@ -17,9 +17,9 @@ export interface EngineCapabilities {
   /**
    * 能压缩上下文（把前面的对话总结掉腾出窗口）。
    *
-   * 注意这问的是「**omni 能不能驱动它**」，不是「这家引擎有没有这个概念」。
+   * 注意这问的是「**Switchback 能不能驱动它**」，不是「这家引擎有没有这个概念」。
    * Claude 报 false——它自己的 `/compact` 已经在斜杠命令列表里，
-   * omni 再给一个就是同一件事出现两次。
+   * Switchback 再给一个就是同一件事出现两次。
    */
   compact: boolean
   /** 能接收附件（图片、文件）。 */
@@ -28,7 +28,7 @@ export interface EngineCapabilities {
    * 能**在一轮跑到一半时改向**——不打断它，也不用等它跑完。
    *
    * 人在 agent 跑的时候最常想做的事就是补一句：「不对，用另一个文件」
-   * 「顺便把测试也跑了」。omni 对所有引擎的兜底是**排队**：记下来，
+   * 「顺便把测试也跑了」。Switchback 对所有引擎的兜底是**排队**：记下来，
    * 这一轮停了再发。不丢东西，但那句话要等上几十秒才起作用——
    * 而它往往正是「别再往下走了」，等它跑完再说等于白说。
    *
@@ -53,11 +53,11 @@ export interface EngineCapabilities {
    */
   rewind: boolean
   /**
-   * 引擎会不会**主动告诉 omni 它自己改了档**。
+   * 引擎会不会**主动告诉 Switchback 它自己改了档**。
    *
    * ## 为什么这一位不能省
    *
-   * `Thread.engineState` 缺席有两种截然不同的含义：「这家从不报，omni 不知道」，
+   * `Thread.engineState` 缺席有两种截然不同的含义：「这家从不报，Switchback 不知道」，
    * 和「这家会报，现在恰好是对齐的」。不区分的话，界面上这两种长得一模一样。
    *
    * ## 这一位和上面四位不是同一类，别混
@@ -65,7 +65,7 @@ export interface EngineCapabilities {
    * `compact` / `attachments` / `steer` / `fork` / `rewind` 管的是**给不给入口**——
    * 报 false 就不画那个按钮。
    * `modeReadback` 管的是**这条信息可信到什么程度**：报 false 时档位下拉**照给**
-   *（omni 设得动，只是读不回来），只是下面多一行灰字。
+   *（Switchback 设得动，只是读不回来），只是下面多一行灰字。
    * 当成「不给入口」那一类处理、因为读不回来就不让人改档，那是另一个 bug。
    */
   modeReadback: boolean
@@ -75,7 +75,7 @@ export interface EngineCapabilities {
    * 只认引擎**自己把它当功能暴露出来**的那种（Claude SDK 的
    * `askSideQuestion`，或 Kimi Web 的原生 `:btw` agent）。
    * 拿底层原语替它攒一个（fork 一条临时会话 + 自己塞一段边界提示词）**不算**——
-   * 那撞 `AGENTS.md` 的总纲：omni 与引擎是共建者，不是上下级。
+   * 那撞 `AGENTS.md` 的总纲：Switchback 与引擎是共建者，不是上下级。
    */
   sideQuestion: boolean
   /**
@@ -92,7 +92,7 @@ export interface EngineCapabilities {
    * 写清楚「有，但没实测过」，位报 false。
    *
    * 和 `modeReadback` 一样，false 不等于「这家没有子 agent」——它等于
-   * **「它跑了什么 omni 看不见」**，界面据此不画那一栏，而不是画一栏空的。
+   * **「它跑了什么 Switchback 看不见」**，界面据此不画那一栏，而不是画一栏空的。
    */
   activity: boolean
 }

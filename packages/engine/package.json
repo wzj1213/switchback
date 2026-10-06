@@ -1,9 +1,9 @@
 {
-  "name": "@omni/engine",
+  "name": "@switchback/engine",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "引擎驱动：把各家原生 agent 翻译成 @omni/protocol 的事件模型",
+  "description": "引擎驱动：把各家原生 agent 翻译成 @switchback/protocol 的事件模型",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.231",
-    "@omni/approval": "workspace:*",
-    "@omni/protocol": "workspace:*"
+    "@switchback/approval": "workspace:*",
+    "@switchback/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0"

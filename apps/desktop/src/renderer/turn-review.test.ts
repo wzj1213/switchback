@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { reportBody, reportedLines } from "./turn-review.js"
 import { reportedChangesOf } from "./changes.js"
-import type { FileChange, ToolCallItem } from "@omni/protocol"
+import type { FileChange, ToolCallItem } from "@switchback/protocol"
 
 describe("原始编辑补丁", () => {
   const cases: { name: string; change: FileChange; expected: unknown }[] = [

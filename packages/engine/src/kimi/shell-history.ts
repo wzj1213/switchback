@@ -1,4 +1,4 @@
-import type { Item, NoticeItem, TurnId, UserMessageItem } from "@omni/protocol"
+import type { Item, NoticeItem, TurnId, UserMessageItem } from "@switchback/protocol"
 import type { KimiTranscriptTurn } from "./wire.js"
 
 interface ShellOrigin {

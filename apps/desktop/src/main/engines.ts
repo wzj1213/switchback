@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { createAcpDriver, type EngineDriver } from "@omni/engine"
+import { createAcpDriver, type EngineDriver } from "@switchback/engine"
 import type { Logger } from "./log.js"
 
 /**
@@ -8,8 +8,8 @@ import type { Logger } from "./log.js"
  *
  * ## 为什么是一个文件，而不是一份内置清单
  *
- * ACP 引擎在协议层已经完全通用了（`@omni/engine` 的 `acp/` 一个驱动全接），
- * 差别只剩「这台机器上那个可执行文件叫什么、在哪」。这件事 omni 猜不了：
+ * ACP 引擎在协议层已经完全通用了（`@switchback/engine` 的 `acp/` 一个驱动全接），
+ * 差别只剩「这台机器上那个可执行文件叫什么、在哪」。这件事 Switchback 猜不了：
  *
  * - 内置一份「ZCode 用 `zcode --acp`、Kimi 用 `kimi-acp`」的清单，等于把
  *   别人的命令行参数抄进我们的代码里——对方改一次参数，我们就发一版补丁，
@@ -21,12 +21,12 @@ import type { Logger } from "./log.js"
  * ## 为什么不自动 `npx -y` 拉一个下来
  *
  * 那等于在用户没说话的情况下从网上下载并执行代码。装不装、装哪个版本，
- * 是用户的决定，不是 omni 的。
+ * 是用户的决定，不是 Switchback 的。
  *
  * ## 那 ACP 注册表那条路算什么
  *
  * 「安装与接入」页能从 ACP 官方注册表接一家（`acp-connect.ts`）。它不违背上面两条：
- * 启动命令是各家**自己在注册表里登记的**，omni 运行时现读、原样照做，代码里一条都不写；
+ * 启动命令是各家**自己在注册表里登记的**，Switchback 运行时现读、原样照做，代码里一条都不写；
  * 而且只在人点了「接入」、看过要执行 / 要下载的那一行之后才动手。接进来的条目照样写在这个文件里，
  * 多记一个 `registry` 来源，之后才比得出有没有新版。
  */
@@ -53,7 +53,7 @@ export interface EngineEntry {
   steer?: boolean
   /**
    * 从 ACP 注册表接进来的那几家记着来源：之后拿注册表比一比，才知道有没有新版。
-   * 手接的（「指个文件」）没有这一项——那一家的版本由它自己管，omni 不假装知道。
+   * 手接的（「指个文件」）没有这一项——那一家的版本由它自己管，Switchback 不假装知道。
    */
   registry?: RegistrySource
 }
@@ -173,7 +173,7 @@ export interface AcpReload {
  * 活着的会话底下挂着引擎进程；它一旦要续接重启（换信任档、断线重挂），拿到的就会是
  * **换过的驱动**——对着一条旧句柄起一个可能完全不同的程序，那种故障的样子会非常难查。
  * 没人在用的就没有这个风险：上一版连它们也一律要求重启，于是「从注册表升个版本」
- * 也得重启一次 omni。`inUse` 不给就当全都在用，退回那条最保守的老路。
+ * 也得重启一次 Switchback。`inUse` 不给就当全都在用，退回那条最保守的老路。
  *
  * `known` 里存的是**注册时那份 entry 的 JSON**，用来认出「改过的」——
  * 比对驱动对象是比不出来的，它是个闭包。
@@ -225,7 +225,7 @@ export function acpShapes(file: EngineFile): Map<string, string> {
 /**
  * 把注册表变成驱动。
  *
- * id 一律加 `acp:` 前缀（`@omni/protocol` 的 `EngineId` 就是这么约定的）：
+ * id 一律加 `acp:` 前缀（`@switchback/protocol` 的 `EngineId` 就是这么约定的）：
  * 事件流和落盘的会话里，一眼看得出这个会话是走哪条协议开的。
  * 前缀也防止第三方条目覆盖内置的 `codex` / `claude`。
  */

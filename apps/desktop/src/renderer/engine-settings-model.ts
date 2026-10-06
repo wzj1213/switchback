@@ -1,5 +1,5 @@
-import type { EngineInfo, ModelOption, Thread } from "@omni/protocol"
-import type { ViewState } from "@omni/store"
+import type { EngineInfo, ModelOption, Thread } from "@switchback/protocol"
+import type { ViewState } from "@switchback/store"
 import { BUILTIN_ENGINES } from "../shared/builtin-engines.js"
 import type { EngineAccess } from "../shared/engine-access.js"
 import { dshProfileConfirmed, type EnginePick, type LastUsed } from "../shared/settings.js"
@@ -90,7 +90,7 @@ export function engineSettingState(
   settings: EngineAccess,
 ): EngineSettingState {
   // **用户自己关的排在最前面。** 一家被关掉的引擎连探测都不起，那时候还去报
-  // 「未安装」或者「可用」，说的都是一个 omni 此刻根本没去问过的事
+  // 「未安装」或者「可用」，说的都是一个 Switchback 此刻根本没去问过的事
   if (settings.disabledEngines.includes(item.id)) {
     return {
       label: "已关掉",
@@ -123,7 +123,7 @@ export function engineSettingState(
   return {
     label: item.state === "unknown" ? "未确认" : "等待探测",
     tone: "muted",
-    hint: item.detail ?? "探测没有给出明确结论；omni 不会据此声称它不可用。",
+    hint: item.detail ?? "探测没有给出明确结论；Switchback 不会据此声称它不可用。",
   }
 }
 

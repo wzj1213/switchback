@@ -1,5 +1,5 @@
-import type { Event, Thread } from "@omni/protocol"
-import type { Worksite } from "@omni/worksite"
+import type { Event, Thread } from "@switchback/protocol"
+import type { Worksite } from "@switchback/worksite"
 import { describe, expect, it } from "vitest"
 import { createWorksiteSearch } from "./worksite-search.js"
 

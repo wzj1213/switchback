@@ -1,4 +1,4 @@
-import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@omni/protocol"
+import type { EngineId, EngineInfo, ModelOption, SlashCommand, Trust, Usage } from "@switchback/protocol"
 import type { TrustHint } from "../trustHint.js"
 import { useComposerDraft } from "../use-composer-draft.js"
 import { attachmentWarning, stateOf } from "./composer-state.js"
@@ -22,7 +22,7 @@ import { ComposerBody } from "./composer-body.js"
  * 由引擎自己的分类器做后台安全检查。最高档才是 Full Access / YOLO / Bypass 这类最宽权限。
  *
  * 档位 id 不动（历史 journal 仍然读得回来）；各家底层不完全同型，具体行为仍由
- * 它们正式暴露的权限入口决定，omni 不拿自己的静态判断冒充引擎原生自动审批。
+ * 它们正式暴露的权限入口决定，Switchback 不拿自己的静态判断冒充引擎原生自动审批。
  */
 const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
   { id: "read-only", label: "只读", hint: "只允许读取和只读命令；修改与联网会被拒绝" },
@@ -80,10 +80,10 @@ export interface ComposerProps {
   /** 这一轮点过「本轮剩下的都放行」。芯片要说出来。 */
   passing: boolean
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
-  /** 能用的斜杠命令：引擎报的 ＋ omni 自己的，`Workspace` 拼好再给。 */
+  /** 能用的斜杠命令：引擎报的 ＋ Switchback 自己的，`Workspace` 拼好再给。 */
   commands: readonly SlashCommand[]
-  /** 选中了一条 omni 自己的命令（`source === "omni"`），就地执行。 */
-  onOmni: (name: string) => void
+  /** 选中了一条 Switchback 自己的命令（`source === "switchback"`），就地执行。 */
+  onSwitchback: (name: string) => void
   /** 这家引擎收不收附件。不收就不给贴图入口。 */
   canAttach: boolean
   /**

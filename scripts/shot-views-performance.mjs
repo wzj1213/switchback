@@ -26,11 +26,11 @@ export const PERFORMANCE_VIEWS = [
   },
   {
     name: "31-长会话全文查找",
-    open: `return window.omni.find({ query: '历史查找标记-17', next: false, forward: true })
+    open: `return window.switchback.find({ query: '历史查找标记-17', next: false, forward: true })
       .then(result => { window.historyMatches = result.total })`,
     ready: ".md",
     assert: `window.historyMatches > 0`,
-    after: `window.omni.stopFind()`,
+    after: `window.switchback.stopFind()`,
   },
   {
     name: "32-长会话大纲跳转",

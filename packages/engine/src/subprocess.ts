@@ -152,7 +152,7 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
 
   const doSpawn = (options: SpawnRequest): ChildProcess => {
     // detached: true 让子进程成为新进程组的组长，我们才能用负 pid 一次收掉整棵树。
-    // 代价：omni 硬崩时子进程不会被系统连坐带走——这是有意的取舍，见 README。
+    // 代价：Switchback 硬崩时子进程不会被系统连坐带走——这是有意的取舍，见 README。
     const child = spawn(unpacked(options.command), options.args.map(unpacked), {
       cwd: options.cwd,
       env: options.env,

@@ -8,13 +8,13 @@ import type { AcpInitialize } from "./wire.js"
  *
  * ## 这件事为什么值得单独做
  *
- * 「这台机器上有没有一个能用的 agent」——omni 原来只能靠**猜命令名**回答，
+ * 「这台机器上有没有一个能用的 agent」——Switchback 原来只能靠**猜命令名**回答，
  * 而猜不出来的那些（ZCode 之类）只能让人手写 `engines.json`：写对了才知道对，
  * 写错了得到的是一条起不来的会话，而错在哪不知道。
  *
  * **ACP 是有协议的，这个问题它自己能回答。** 你指一个可执行文件，
  * 我们发一次 `initialize`——它答得上来就是能用的，答不上来的原因也是它自己说的。
- * 命令和参数由用户给，能力由握手探到，**没有一条是 omni 编的**。
+ * 命令和参数由用户给，能力由握手探到，**没有一条是 Switchback 编的**。
  *
  * ## 为什么只到 initialize 为止
  *
@@ -24,7 +24,7 @@ import type { AcpInitialize } from "./wire.js"
  */
 export interface AcpTrial {
   ok: boolean
-  /** 它自报的协议版本。omni 只认到 v1（见 `open.ts`）。 */
+  /** 它自报的协议版本。Switchback 只认到 v1（见 `open.ts`）。 */
   protocolVersion?: number
   /** 它认领了哪几件事。**原样列出，不翻译也不补全**——没声明只是没声明。 */
   capabilities?: readonly string[]
@@ -55,7 +55,7 @@ const TRY_MS = 8000
  * `{loadSession, promptCapabilities:{...}, sessionCapabilities:{list,resume,close,delete,fork}}`
  * 的会被折成 `loadSession / promptCapabilities / sessionCapabilities` 三个词——
  * **真正有用的那几个（fork、resume、list）全丢在里面了**，而它们正好对应
- * omni 界面上的分叉、续接、历史。摊平一层，前缀保留方法名的样子
+ * Switchback 界面上的分叉、续接、历史。摊平一层，前缀保留方法名的样子
  *（`session/fork`），方便对着它自己的文档查。
  *
  * ## 「存在即支持」
@@ -113,7 +113,7 @@ function verdict(result: Initialized, command: string, stderr: string, budget: n
   const version = info.protocolVersion
   if (version !== undefined && version > PROTOCOL_VERSION) {
     return fail(
-      `它讲的是 ACP v${String(version)}，omni 只认到 v${String(PROTOCOL_VERSION)}。请升级 omni。`,
+      `它讲的是 ACP v${String(version)}，Switchback 只认到 v${String(PROTOCOL_VERSION)}。请升级 Switchback。`,
       stderr,
     )
   }

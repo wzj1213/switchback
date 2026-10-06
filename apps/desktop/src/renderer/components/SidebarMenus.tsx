@@ -1,6 +1,6 @@
 import type { Command } from "./Menu.js"
 import type { Group } from "../sidebar.js"
-import type { ThreadRow } from "@omni/store"
+import type { ThreadRow } from "@switchback/store"
 import { CopyIcon, PinIcon, PlusIcon, RevealIcon, SparkIcon, TrashIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 import type { MoveDirection, SidebarMoveActions } from "../sidebarMove.js"

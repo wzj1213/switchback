@@ -1,6 +1,6 @@
 import { isAbsolute, resolve } from "node:path"
-import type { Event, ThreadId } from "@omni/protocol"
-import { createWorksite, type Worksite } from "@omni/worksite"
+import type { Event, ThreadId } from "@switchback/protocol"
+import { createWorksite, type Worksite } from "@switchback/worksite"
 
 export interface WorksiteSearch {
   note: (event: Event) => void

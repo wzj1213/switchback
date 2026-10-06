@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { EngineDriver, EngineSession, StartRequest } from "@omni/engine"
-import { NO_CAPABILITIES, type Event, type Thread } from "@omni/protocol"
+import type { EngineDriver, EngineSession, StartRequest } from "@switchback/engine"
+import { NO_CAPABILITIES, type Event, type Thread } from "@switchback/protocol"
 import { createHost } from "./host.js"
 
 interface Seen {

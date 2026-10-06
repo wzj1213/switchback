@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import type { Thread, TurnId, TurnPace, Usage } from "@omni/protocol"
+import type { Thread, TurnId, TurnPace, Usage } from "@switchback/protocol"
 import type { PetKit } from "../shared/settings.js"
 import type { FireProps } from "./components/PetFx.js"
 

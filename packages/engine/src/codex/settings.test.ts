@@ -22,7 +22,7 @@ describe("codex 报的设置快照", () => {
     },
   }
 
-  it("取出 omni 关心的五样", () => {
+  it("取出 Switchback 关心的五样", () => {
     expect(readSettings(REAL)).toEqual({
       approval: "on-request",
       reviewer: "auto_review",
@@ -32,7 +32,7 @@ describe("codex 报的设置快照", () => {
     })
   })
 
-  it("**沙箱两种形状都认**：通知里是标签联合，而 omni 自己发出去的是裸串", () => {
+  it("**沙箱两种形状都认**：通知里是标签联合，而 Switchback 自己发出去的是裸串", () => {
     expect(readSettings({ threadSettings: { sandboxPolicy: "read-only" } }).sandbox).toBe("read-only")
     expect(readSettings({ threadSettings: { sandboxPolicy: { type: "read-only" } } }).sandbox).toBe("read-only")
   })
@@ -49,9 +49,9 @@ describe("codex 报的设置快照", () => {
 })
 
 /**
- * **实测逼出来的一步**：omni 发 `workspace-write`，codex 报 `workspaceWrite`。
- * 同一个值两种拼写，直接比字符串会给每条 codex 会话常亮一句「引擎那边不是 omni 切的」
- * ——而它就是 omni 切的。
+ * **实测逼出来的一步**：Switchback 发 `workspace-write`，codex 报 `workspaceWrite`。
+ * 同一个值两种拼写，直接比字符串会给每条 codex 会话常亮一句「引擎那边不是 Switchback 切的」
+ * ——而它就是 Switchback 切的。
  */
 describe("比对用的规范形", () => {
   it("两种拼写归一", () => {

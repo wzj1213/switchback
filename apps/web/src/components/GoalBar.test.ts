@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineGoal } from "@omni/protocol"
+import type { EngineGoal } from "@switchback/protocol"
 import { goalDisplay } from "./GoalBar.js"
 
 describe("Web 原生目标状态条", () => {

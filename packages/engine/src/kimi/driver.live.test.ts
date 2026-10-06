@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createKimiDriver } from "./driver.js"
 
 const MARK = "KIMI_STEER_OK_7319"
@@ -24,13 +24,13 @@ function waitFor(label: string, events: readonly Event[], predicate: () => boole
 
 describe("Kimi Web driver · live", () => {
   it(
-    "同一条原生 turn 运行中能 steer，且只有一个 omni turn 收工",
+    "同一条原生 turn 运行中能 steer，且只有一个 Switchback turn 收工",
     async () => {
       const events: Event[] = []
       const driver = createKimiDriver()
       const session = await driver.start({
         threadId: "th-kimi-web-live",
-        cwd: mkdtempSync(join(tmpdir(), "omni-kimi-web-")),
+        cwd: mkdtempSync(join(tmpdir(), "switchback-kimi-web-")),
         trust: "full",
         home: process.env["HOME"] ?? "",
         memory: () => [],

@@ -1,5 +1,5 @@
-import type { Item, PlanStep } from "@omni/protocol"
-import { openPlan, stepProgressOf } from "@omni/store"
+import type { Item, PlanStep } from "@switchback/protocol"
+import { openPlan, stepProgressOf } from "@switchback/store"
 
 function currentStep(steps: readonly PlanStep[]): PlanStep | undefined {
   return (

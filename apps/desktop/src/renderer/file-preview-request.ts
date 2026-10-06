@@ -1,6 +1,6 @@
 import type { PreviewTarget } from "./workbench.js"
 
-const EVENT = "omni:preview-file"
+const EVENT = "switchback:preview-file"
 
 /** 工具行不穿透整条 memo props 链，只发一个纯视图请求给外壳。 */
 export function requestFilePreview(threadId: string, cwd: string, path: string,

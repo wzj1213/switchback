@@ -28,11 +28,11 @@
  *
  * 所以**不能从协议推**，只能各家自己说——和 `modeReadback` 同一条路子
  *（`AcpDriverConfig`）。kimi 有它自己的 `/compact` 斜杠命令，走
- * `available_commands_update` 那条路，omni 早就把它送到界面了：
- * **那不需要这一位为 true**，因为那颗入口不是 omni 给的。
+ * `available_commands_update` 那条路，Switchback 早就把它送到界面了：
+ * **那不需要这一位为 true**，因为那颗入口不是 Switchback 给的。
  */
 
-import type { Event, TurnId } from "@omni/protocol"
+import type { Event, TurnId } from "@switchback/protocol"
 import { sweep, type UpdateContext, type UpdateState } from "./update.js"
 import { stopStatus } from "./translate.js"
 import type { AcpPromptResult } from "./wire.js"
@@ -55,7 +55,7 @@ export interface TurnCtx {
  * 发不出去时说人话。
  *
  * `-32601 Method not found` 对用户毫无意义——他要知道的是「这家做不到，不是坏了」。
- * 而这两件事的入口都是 omni 自己给的按钮，所以**说错一次就是一次「点了没反应」**。
+ * 而这两件事的入口都是 Switchback 自己给的按钮，所以**说错一次就是一次「点了没反应」**。
  */
 function refuse(what: string, id: string): Error {
   return new Error(`${id} 不支持${what}。这不是故障——它的适配器没提供这个方法。`)
@@ -64,8 +64,8 @@ function refuse(what: string, id: string): Error {
 /**
  * 压缩上下文。**只有引擎自己能做**——它才知道哪些能扔、总结成什么样喂回去不失真。
  *
- * 回包里带一份 snapshot（实测 zcode），但 omni 不解析它：压缩之后的历史以引擎为准，
- * omni 这边照常靠后续的 `session/update` 收正文。**拿回包去重建 transcript
+ * 回包里带一份 snapshot（实测 zcode），但 Switchback 不解析它：压缩之后的历史以引擎为准，
+ * Switchback 这边照常靠后续的 `session/update` 收正文。**拿回包去重建 transcript
  * 是替引擎记账**，撞总纲第三条。
  */
 export async function compactSession(ctx: TurnCtx): Promise<void> {
@@ -113,7 +113,7 @@ export async function compactAndReport(
  * 那看起来像「方法坏了」，其实是参数名不对。**同一个错误码兼着两种意思**，
  * 所以这里把名字钉死在注释里。
  *
- * 附件不带：ACP 这条私有扩展没有附件位，而把附件路径拼进正文是 omni 替引擎编格式。
+ * 附件不带：ACP 这条私有扩展没有附件位，而把附件路径拼进正文是 Switchback 替引擎编格式。
  * 有附件时退回排队（宿主那边 `steerInto` 返回 false 就是这个意思）。
  */
 export async function steerSession(ctx: TurnCtx, text: string, attachments?: readonly string[]): Promise<void> {

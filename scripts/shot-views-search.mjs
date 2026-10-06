@@ -41,9 +41,9 @@ export const SEARCH_VIEWS = [
   },
   {
     name: "65-筛选清除按钮反馈",
-    open: [filter('胶水'), `window.__omniSearchBox = document.querySelector('.row--search').getBoundingClientRect().width`],
+    open: [filter('胶水'), `window.__switchbackSearchBox = document.querySelector('.row--search').getBoundingClientRect().width`],
     hover: '.sidebar__clear', ready: '.sidebar__clear',
-    assert: `document.querySelector('.row--search').getBoundingClientRect().width === window.__omniSearchBox &&
+    assert: `document.querySelector('.row--search').getBoundingClientRect().width === window.__switchbackSearchBox &&
       getComputedStyle(document.querySelector('.sidebar__clear')).backgroundColor !== 'rgba(0, 0, 0, 0)'`,
   },
   {
@@ -51,12 +51,12 @@ export const SEARCH_VIEWS = [
     open: `document.querySelector('.sidebar__clear').click()`, ready: '.row--group',
     assert: `document.querySelector('.sidebar__filter').value === '' &&
       document.activeElement.matches('.sidebar__filter') && document.querySelector('.sidebar__clear') === null &&
-      document.querySelector('.row--search').getBoundingClientRect().width === window.__omniSearchBox`,
-    after: `delete window.__omniSearchBox`,
+      document.querySelector('.row--search').getBoundingClientRect().width === window.__switchbackSearchBox`,
+    after: `delete window.__switchbackSearchBox`,
   },
   {
     name: "67-零结果也能清除",
-    open: filter('omni-no-such-conversation-671902'), ready: '.sidebar__empty',
+    open: filter('switchback-no-such-conversation-671902'), ready: '.sidebar__empty',
     assert: `document.querySelectorAll('.row--thread').length === 0 &&
       document.querySelector('.sidebar__empty').textContent.includes('没有匹配') &&
       document.querySelector('.sidebar__clear') !== null`,

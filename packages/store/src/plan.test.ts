@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Item, PlanItem, PlanStep } from "@omni/protocol"
+import type { Item, PlanItem, PlanStep } from "@switchback/protocol"
 import { latestPlan, openPlan, stepProgressOf, visibleSteps } from "./plan.js"
 
 const plan = (id: string, steps: readonly PlanStep[]): PlanItem => ({

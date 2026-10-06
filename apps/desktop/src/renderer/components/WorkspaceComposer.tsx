@@ -1,8 +1,8 @@
-import type { Command, EngineInfo, Thread } from "@omni/protocol"
-import { NO_CAPABILITIES } from "@omni/protocol"
+import type { Command, EngineInfo, Thread } from "@switchback/protocol"
+import { NO_CAPABILITIES } from "@switchback/protocol"
 import { Composer, TRUSTS, labelOf } from "./Composer.js"
 import { trustBlind, trustHint } from "../trustHint.js"
-import type { OmniAction } from "../omniCommands.js"
+import type { SwitchbackAction } from "../switchbackCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 import { modelAcceptsImages } from "../model-options.js"
 
@@ -43,7 +43,7 @@ export function WorkspaceComposer({
   thread: Thread
   stamp: string
   prefill: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
-  actions: readonly OmniAction[]
+  actions: readonly SwitchbackAction[]
 }): React.JSX.Element {
   const send = props.send
   return (
@@ -80,7 +80,7 @@ export function WorkspaceComposer({
       }
       canSteer={(thread.capabilities ?? NO_CAPABILITIES).steer}
       commands={[...actions.map((a) => a.command), ...props.commands]}
-      onOmni={(name: string) => {
+      onSwitchback={(name: string) => {
         actions.find((a) => a.command.name === name)?.run()
       }}
       /*

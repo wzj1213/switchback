@@ -1,4 +1,4 @@
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 
 /** 一段连续由同一家引擎跑的轮次。 */
 export interface Stint {

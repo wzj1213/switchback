@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, ToolCallItem } from "@omni/protocol"
+import type { Event, ToolCallItem } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { createPlanState } from "./plan.js"
 import {

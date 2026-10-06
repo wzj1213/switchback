@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import type { Event, Lane } from "@omni/protocol"
-import { createJournal } from "@omni/journal"
-import { initial, lanesOf, reduceAll } from "@omni/store"
+import type { Event, Lane } from "@switchback/protocol"
+import { createJournal } from "@switchback/journal"
+import { initial, lanesOf, reduceAll } from "@switchback/store"
 import { createHost } from "./host.js"
 import { fakeDriver, create } from "./host-fixture.js"
 
@@ -43,7 +43,7 @@ describe("旁路从驱动到磁盘再回到界面", () => {
   }
 
   async function rig(): Promise<{ events: Event[]; read: () => Promise<readonly Event[]>; threadId: string; emit: (e: Event) => void }> {
-    const dir = await mkdtemp(join(tmpdir(), "omni-lane-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-lane-"))
     const journal = createJournal({ dir })
     // 宿主写日志是故意不阻塞事件出口的；清理必须先等队列排空，否则 rm 会和 append 竞速。
     cleanups.push(async () => {

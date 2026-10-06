@@ -102,7 +102,7 @@ export const FAILURE_TITLE: Readonly<Record<FailureKind, string>> = {
 }
 
 /**
- * 少数几类，omni 自己手里就有下一步：额度和限流等不来的时候，换一家引擎接着做
+ * 少数几类，Switchback 自己手里就有下一步：额度和限流等不来的时候，换一家引擎接着做
  *（输入框左下角那个选择器就是）。别的类别不给建议——给不出靠得住的，就不说。
  */
 export const FAILURE_HINT: Readonly<Partial<Record<FailureKind, string>>> = {

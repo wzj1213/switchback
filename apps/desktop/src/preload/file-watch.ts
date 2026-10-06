@@ -11,10 +11,10 @@ export function watchFile(
   const listener = (_event: unknown, changedId: unknown): void => {
     if (changedId === id) changed()
   }
-  ipcRenderer.on("omni:fileChanged", listener)
-  ipcRenderer.send("omni:watchFile", { id, threadId, cwd, path })
+  ipcRenderer.on("switchback:fileChanged", listener)
+  ipcRenderer.send("switchback:watchFile", { id, threadId, cwd, path })
   return () => {
-    ipcRenderer.off("omni:fileChanged", listener)
-    ipcRenderer.send("omni:unwatchFile", id)
+    ipcRenderer.off("switchback:fileChanged", listener)
+    ipcRenderer.send("switchback:unwatchFile", id)
   }
 }

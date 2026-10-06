@@ -16,7 +16,7 @@ import { baseName } from "./file-row.js"
  * ## 为什么不是 `<img src="file://…">`
  *
  * CSP 挡着（`img-src 'self' data:`），而为了显示缩略图放开 `file:`
- * 等于让渲染层能引用盘上任意路径。所以走 `omni:thumb` 通道，
+ * 等于让渲染层能引用盘上任意路径。所以走 `switchback:thumb` 通道，
  * 主进程缩好了给 data URL——顺带省掉了把整张原图搬进渲染层。
  */
 
@@ -40,7 +40,7 @@ type Thumbnail = { state: "loading" } | { state: "ok"; url: string } | { state: 
 function useThumb(path: string, max: number): Thumbnail {
   const [thumb, setThumb] = useState<Thumbnail>({ state: "loading" })
   useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.omni
+    const bridge = typeof window === "undefined" ? undefined : window.switchback
     if (bridge === undefined) return undefined
     let live = true
     setThumb({ state: "loading" })

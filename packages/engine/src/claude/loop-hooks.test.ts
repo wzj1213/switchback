@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { createTurnRef, runMessageLoop } from "./loop.js"
 

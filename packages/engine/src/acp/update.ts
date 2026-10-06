@@ -6,13 +6,13 @@ import type {
   ThreadId,
   ToolStatus,
   TurnId,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import { catalogOf, type Catalog } from "./setup.js"
 import { merge, toToolCall } from "./translate.js"
 import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js"
 
 /**
- * `session/update` → omni 事件。
+ * `session/update` → Switchback 事件。
  *
  * ## 这一层存在的理由：ACP 的文本块身份**可能缺席**
  *
@@ -45,9 +45,9 @@ export interface UpdateContext {
   /**
    * agent 自己把档位切了。**同样由驱动落到自己的状态上**——这里只负责认出这条通知。
    *
-   * 为什么必须落回去：`OpenState.mode` 记的是「omni 最后一次设过哪一档」，
+   * 为什么必须落回去：`OpenState.mode` 记的是「Switchback 最后一次设过哪一档」，
    * 而 ACP 的 mode 是**双向**的（agent 能自己切）。不落回去，那个字段就永远只是
-   * omni 的一厢情愿——档位回读那一批要拿它和引擎自报的那档并排显示，
+   * Switchback 的一厢情愿——档位回读那一批要拿它和引擎自报的那档并排显示，
    * 对不上时如实说出来，而这要求它至少记的是真话。
    */
   onMode?: (modeId: string) => void
@@ -198,7 +198,7 @@ function onPlan(ctx: UpdateContext, state: UpdateState, update: AcpUpdate): void
 }
 
 /**
- * 上下文用量。ACP 的 `usage_update` 给的正好是 omni 要的那个数——
+ * 上下文用量。ACP 的 `usage_update` 给的正好是 Switchback 要的那个数——
  * `used` 是**这次请求占了多少上下文**，不是累计账单。
  * codex app-server 那边要在 `last` 和 `total` 之间挑，这里不用挑。
  */
@@ -240,7 +240,7 @@ export function emitUsage(
 }
 
 /**
- * 一条 `AvailableCommand` → omni 的 `SlashCommand`。
+ * 一条 `AvailableCommand` → Switchback 的 `SlashCommand`。
  *
  * 没名字的丢掉：**这个字段就是要打进输入框的那串字**，空的话面板上会出现
  * 一条点了什么都不会发生的命令。`label` 不填——引擎报上来的命令没有人话名字
@@ -290,7 +290,7 @@ function onCommands(ctx: UpdateContext, update: AcpUpdate): void {
  * 引擎自己换了档。
  *
  * ACP 的 mode 是**双向**的：客户端能设，agent 也能自己切（比如 `/review`
- * 这类内建命令会切到只读）。不报出来的话，omni 界面上显示的档位会和
+ * 这类内建命令会切到只读）。不报出来的话，Switchback 界面上显示的档位会和
  * 引擎实际在用的档位悄悄分家。
  */
 function onModeChanged(ctx: UpdateContext, update: AcpUpdate): void {

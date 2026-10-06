@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import type { Notice } from "@omni/store"
+import type { Notice } from "@switchback/store"
 
 /**
  * 「某一家刚登录成功」这件事，从设置页那张卡传到横幅那一层。
@@ -7,7 +7,7 @@ import type { Notice } from "@omni/store"
  * 两处隔着设置面板、外壳、工作区好几层，为一件事一路递回调不划算；
  * 和 `turn-review.ts` 同一个做法，走窗口上的一个自定义事件。
  */
-const EVENT = "omni:acp-logged-in"
+const EVENT = "switchback:acp-logged-in"
 
 export function announceLoggedIn(engine: string): void {
   window.dispatchEvent(new CustomEvent<string>(EVENT, { detail: engine }))

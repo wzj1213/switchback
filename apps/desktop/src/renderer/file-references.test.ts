@@ -3,11 +3,11 @@ import { appendFileReferences, fileReference, formatFileReference, newFileRefere
 
 describe("拖入文件引用", () => {
   const relativeCases = [
-    ["工作区文件收成相对路径", "/work/omni", "/work/omni/src/a.ts", { path: "src/a.ts", outside: false }],
-    ["同名目录不算工作区内", "/work/omni", "/work/omnibus/a.ts", { path: "/work/omnibus/a.ts", outside: true }],
-    ["工作区本身用点表示", "/work/omni/", "/work/omni", { path: ".", outside: false }],
+    ["工作区文件收成相对路径", "/work/switchback", "/work/switchback/src/a.ts", { path: "src/a.ts", outside: false }],
+    ["同名目录不算工作区内", "/work/switchback", "/work/switchbackbus/a.ts", { path: "/work/switchbackbus/a.ts", outside: true }],
+    ["工作区本身用点表示", "/work/switchback/", "/work/switchback", { path: ".", outside: false }],
     ["根目录工作区不会把所有文件误报为外部", "/", "/tmp/a.ts", { path: "tmp/a.ts", outside: false }],
-    ["Windows 路径不区分盘符大小写", "C:\\Work\\Omni", "c:\\work\\omni\\a.ts",
+    ["Windows 路径不区分盘符大小写", "C:\\Work\\Switchback", "c:\\work\\switchback\\a.ts",
       { path: "a.ts", outside: false }],
     ["Windows 盘符根目录保留分隔符", "C:\\", "c:\\work\\a.ts", { path: "work/a.ts", outside: false }],
   ] as const

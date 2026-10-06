@@ -10,7 +10,7 @@ import { create, setup } from "./host-fixture.js"
  * retry when the turn is idle.Compaction cancelled.」，三句连在一起、还是英文，
  * 看起来像模型说了句莫名其妙的话。点两次就出现两段。
  *
- * omni 不去掐引擎已经说出口的正文（那是它自报的状态，改它就是替引擎撒谎），
+ * Switchback 不去掐引擎已经说出口的正文（那是它自报的状态，改它就是替引擎撒谎），
  * 能做也该做的是**不把这条注定被拒的请求发出去**。
  */
 describe("压缩上下文要等这一轮跑完", () => {

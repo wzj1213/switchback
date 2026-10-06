@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 import { createTally, dateOf, digestOf, foldThread } from "./activity-fold.js"
 
 /** 本机时区的某一天早上九点。**故意不用 UTC 边界值**——分桶就是按本机日历算的。 */
 const day = (date: string, hour = 9): number => Date.parse(`${date}T${String(hour).padStart(2, "0")}:00:00`)
 
 const thread = (over: Partial<Thread> = {}): Thread => ({
-  id: "t1", title: "改设置页", cwd: "/w/omni", engine: "claude", trust: "auto-edit",
+  id: "t1", title: "改设置页", cwd: "/w/switchback", engine: "claude", trust: "auto-edit",
   status: "idle", createdAt: day("2026-08-01"), updatedAt: day("2026-08-01"), engineHistory: ["claude"],
   ...over,
 })
@@ -121,9 +121,9 @@ describe("排行榜", () => {
     expect(out.totals.asks).toBe(3)
   })
 
-  it("换引擎的交接说明是 omni 附的，不算一次提问", () => {
+  it("换引擎的交接说明是 Switchback 附的，不算一次提问", () => {
     const at = day("2026-08-01")
-    const note = item(at + 1, { id: "h", turnId: "u", kind: "user_message", at: at + 1, text: "<omni-handoff>…</omni-handoff>", origin: "handoff" })
+    const note = item(at + 1, { id: "h", turnId: "u", kind: "user_message", at: at + 1, text: "<switchback-handoff>…</switchback-handoff>", origin: "handoff" })
     const out = digest([started(at), note, said(at + 2, "接着弄")])
     expect(out.totals.asks).toBe(1)
   })
@@ -168,7 +168,7 @@ describe("连续天数", () => {
   ]
   const cases = [
     { name: "今天动过就从今天算", dates: ["2026-08-22", "2026-08-23", "2026-08-24"], streak: 3 },
-    // 早上打开 omni 看见「连续 0 天」而昨天干到半夜，那不是事实
+    // 早上打开 Switchback 看见「连续 0 天」而昨天干到半夜，那不是事实
     { name: "今天还没动、昨天动过，仍然算连着", dates: ["2026-08-22", "2026-08-23"], streak: 2 },
     { name: "断过一天就重新起算", dates: ["2026-08-20", "2026-08-23", "2026-08-24"], streak: 2 },
     { name: "上次是前天，链子已经断了", dates: ["2026-08-21", "2026-08-22"], streak: 0 },

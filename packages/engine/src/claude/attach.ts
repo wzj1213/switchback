@@ -17,7 +17,7 @@ import { loadImages } from "../image.js"
  * 图片要读成 base64——SDK 走的是 Anthropic 的内容块，那边只认内联数据，
  * 没有「给个路径你自己读」的形式（codex 有，所以那边用 `localImage`）。
  * 任一张读不出来就明确拒绝整句：转录区已经显示了这些附件，少送一张再继续
- * 会让界面撒谎；更不能把 omni 自己编的“没送达”说明塞进模型上下文。
+ * 会让界面撒谎；更不能把 Switchback 自己编的“没送达”说明塞进模型上下文。
  */
 export async function toContent(
   text: string,

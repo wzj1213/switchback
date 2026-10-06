@@ -1,12 +1,12 @@
-import type { Thread } from "@omni/protocol"
-import { OmniMark } from "./omni-mark.js"
+import type { Thread } from "@switchback/protocol"
+import { SwitchbackMark } from "./switchback-mark.js"
 import { FolderIcon } from "./icons-folder.js"
 
 /** 空会话说明工作区和开始方式；接管后仍为空才解释历史正文未搬入。 */
 export function TranscriptBlank({ thread }: { thread: Thread }): React.JSX.Element {
   return (
     <div className="blank">
-      <OmniMark />
+      <SwitchbackMark />
       <p className="blank__title">
         {thread.adopted === true ? (
           "继续这段工作"

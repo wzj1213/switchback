@@ -1,4 +1,4 @@
-import type { Event, ThreadId } from "@omni/protocol"
+import type { Event, ThreadId } from "@switchback/protocol"
 import type { WireMcpStatus } from "./wire.js"
 
 interface McpStatusContext {

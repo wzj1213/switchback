@@ -1,4 +1,4 @@
-const project = `[...document.querySelectorAll('.group')].find(group => group.querySelector('.row__label')?.textContent === 'omni')`
+const project = `[...document.querySelectorAll('.group')].find(group => group.querySelector('.row__label')?.textContent === 'switchback')`
 const section = title => `[...document.querySelectorAll('.sidebar__section-main')].find(button => button.textContent === '${title}')`
 const filter = text => `(() => {
   const input = document.querySelector('.sidebar__filter')
@@ -14,14 +14,14 @@ export const SELFCHECK_VIEWS = [
       filter('胶水'), `document.querySelector('.row--thread .row__main').click()`, filter(''),
       `(${project}).querySelector('[aria-label="下一页会话"]').click()`,
       `document.querySelector('.sidebar__list').scrollTop = 180;
-        window.__omniBrowseScroll = document.querySelector('.sidebar__list').scrollTop`,
+        window.__switchbackBrowseScroll = document.querySelector('.sidebar__list').scrollTop`,
       filter('胶水'), filter(''),
     ],
     ready: '.group .project-pages',
     assert: `(${project}).querySelector('.project-pages span').textContent === '21–40 / 503' &&
       (${project}).querySelectorAll('.row--thread').length === 20 &&
-      Math.abs(document.querySelector('.sidebar__list').scrollTop - window.__omniBrowseScroll) < 1`,
-    after: `delete window.__omniBrowseScroll`,
+      Math.abs(document.querySelector('.sidebar__list').scrollTop - window.__switchbackBrowseScroll) < 1`,
+    after: `delete window.__switchbackBrowseScroll`,
   },
   {
     name: '75-搜索保留分区折叠',

@@ -1,4 +1,4 @@
-import type { Event, ThreadId, ToolCallItem, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
+import type { Event, ThreadId, ToolCallItem, ToolStatus, TurnId, TurnStatus } from "@switchback/protocol"
 import type { WireHookLifecycle, WireHookRun } from "./wire.js"
 
 interface HookContext {

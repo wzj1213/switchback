@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import { FileSearchStatus, FilesPage } from "./FilesPage.js"
 import { beginFileSearch, visibleFileSearch, type FileSearchState } from "../use-file-search.js"
 

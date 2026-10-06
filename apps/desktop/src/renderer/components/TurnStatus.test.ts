@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import type { Thread, Turn } from "@omni/protocol"
+import type { Thread, Turn } from "@switchback/protocol"
 import { nextClockDelay, TurnStatus } from "./TurnStatus.js"
 
 const thread: Thread = {

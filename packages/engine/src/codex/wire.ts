@@ -178,7 +178,7 @@ export interface WireHookEntry {
   text?: string
 }
 
-/** `hook/started` / `hook/completed` 共用；窄声明只留 omni 展示与收口需要的字段。 */
+/** `hook/started` / `hook/completed` 共用；窄声明只留 Switchback 展示与收口需要的字段。 */
 export interface WireHookRun {
   id?: string
   eventName?: string

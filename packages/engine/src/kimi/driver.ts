@@ -46,7 +46,7 @@ async function open(lease: KimiLease, req: StartRequest): Promise<Opened> {
       lease.api.get<KimiStatus>(sessionPath(row.id, "/status")),
       lease.api.get<ConfigResponse>("config"),
     ])
-    if (before.busy) throw new Error("这条 Kimi 会话正在另一个界面里运行，请等它停下后再接入 omni")
+    if (before.busy) throw new Error("这条 Kimi 会话正在另一个界面里运行，请等它停下后再接入 Switchback")
     const model = before.model === undefined || before.model === "" ? config.default_model : undefined
     const target = KIMI_TRUST[req.trust]
     await lease.api.post(sessionPath(row.id, "/profile"), {
@@ -62,7 +62,7 @@ async function open(lease: KimiLease, req: StartRequest): Promise<Opened> {
     if (status.model === undefined || status.model === "") {
       throw new Error("Kimi 没有可用的默认模型；请先在 Kimi Code 里完成登录和模型配置")
     }
-    if (snapshot.in_flight_turn !== null) throw new Error("这条 Kimi 会话仍有一轮在运行，暂时不能接入 omni")
+    if (snapshot.in_flight_turn !== null) throw new Error("这条 Kimi 会话仍有一轮在运行，暂时不能接入 Switchback")
     const mcp = await loadKimiMcpSnapshot(lease.api, row.id).catch(() => undefined)
     return {
       id: row.id, status, snapshot,

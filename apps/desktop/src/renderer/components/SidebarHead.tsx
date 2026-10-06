@@ -2,7 +2,7 @@ import { PlusIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
-import { OmniMark } from "./omni-mark.js"
+import { SwitchbackMark } from "./switchback-mark.js"
 import { SidebarSearch } from "./sidebar-search.js"
 
 /*
@@ -53,8 +53,8 @@ export function Head({
     <>
       <div className="sidebar__head">
         <div className="sidebar__brand">
-          <span className="row__slot"><OmniMark /></span>
-          <span className="sidebar__wordmark">omni<span className="sidebar__name">同文</span></span>
+          <span className="row__slot"><SwitchbackMark /></span>
+          <span className="sidebar__wordmark">Switchback</span>
         </div>
       </div>
 

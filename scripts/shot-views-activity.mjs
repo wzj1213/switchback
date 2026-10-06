@@ -4,25 +4,25 @@ export const ACTIVITY_VIEWS = [
     name: "06-后台活动工作台",
     open: [
       `(() => {
-        window.__omniMainWidth = document.querySelector('.main')?.getBoundingClientRect().width
+        window.__switchbackMainWidth = document.querySelector('.main')?.getBoundingClientRect().width
         const resume = [...document.querySelectorAll('button')]
           .find(button => button.textContent.trim() === '继续这个会话')
         const resumeBox = resume?.getBoundingClientRect()
-        window.__omniResumeInline = resume === undefined || (resumeBox !== undefined
+        window.__switchbackResumeInline = resume === undefined || (resumeBox !== undefined
           && resumeBox.width > resumeBox.height * 2 && resume.scrollWidth <= resume.clientWidth)
         const button = document.querySelector('[title="后台活动"]')
         button?.focus(); button?.click()
       })()`,
       `(() => {
         const row = document.querySelector('.activity-row')
-        window.__omniActivityRow = row
+        window.__switchbackActivityRow = row
         row?.focus(); row?.click()
       })()`,
       `(() => {
         const command = document.querySelector('.lane-cmd-block code')
         const output = document.querySelector('.lane-output code')
         if (command === null || output === null) throw new Error('后台命令或输出没有就绪')
-        command.textContent = 'pnpm --filter @omni/desktop test -- --runInBand --reporter verbose --coverage --changedSince origin/main --testNamePattern keyboard-scroll-workbench'
+        command.textContent = 'pnpm --filter @switchback/desktop test -- --runInBand --reporter verbose --coverage --changedSince origin/main --testNamePattern keyboard-scroll-workbench'
         output.textContent = Array.from({ length: 28 }, (_, index) =>
           String(index + 1).padStart(2, '0') + '  renderer activity output line ready',
         ).join('\\n')
@@ -68,11 +68,11 @@ export const ACTIVITY_VIEWS = [
         && getComputedStyle(workbench).position === 'static'
         && Math.abs(workbenchBox.left - mainBox.right) < 1
         && Math.abs(workbenchBox.right - innerWidth) < 1
-      result.resumeStaysInline = window.__omniResumeInline === true
+      result.resumeStaysInline = window.__switchbackResumeInline === true
       if (Object.values(result).every(Boolean)) return true
       throw new Error('后台活动键盘滚动诊断：' + JSON.stringify(result))
     })()`,
-    after: `delete window.__omniMainWidth; delete window.__omniResumeInline`,
+    after: `delete window.__switchbackMainWidth; delete window.__switchbackResumeInline`,
   },
   {
     name: "06-后台命令复制有确认",
@@ -104,9 +104,9 @@ export const ACTIVITY_VIEWS = [
     name: "06-活动返回原行",
     open: `document.querySelector('.activity-detail > .workbench__back')?.click()`,
     ready: ".activity-list:not([hidden]) .activity-row",
-    assert: `document.activeElement === window.__omniActivityRow
-      && window.__omniActivityRow?.isConnected === true
+    assert: `document.activeElement === window.__switchbackActivityRow
+      && window.__switchbackActivityRow?.isConnected === true
       && document.activeElement?.getAttribute('aria-keyshortcuts') === 'ArrowUp ArrowDown Home End'`,
-    after: `delete window.__omniActivityRow`,
+    after: `delete window.__switchbackActivityRow`,
   },
 ]

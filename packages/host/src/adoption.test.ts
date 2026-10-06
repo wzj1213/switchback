@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { EngineDriver, EngineSession } from "@omni/engine"
-import { NO_CAPABILITIES, type EngineAxis, type Event, type Item } from "@omni/protocol"
+import type { EngineDriver, EngineSession } from "@switchback/engine"
+import { NO_CAPABILITIES, type EngineAxis, type Event, type Item } from "@switchback/protocol"
 import { createHost } from "./host.js"
 
 interface Deferred<T> { promise: Promise<T>; resolve: (value: T) => void }

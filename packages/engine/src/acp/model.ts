@@ -1,4 +1,4 @@
-import type { EngineStatus, ModelOption } from "@omni/protocol"
+import type { EngineStatus, ModelOption } from "@switchback/protocol"
 import { modelCall, sayWhy } from "./setup.js"
 
 /**

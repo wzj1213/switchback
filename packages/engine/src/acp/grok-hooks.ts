@@ -1,4 +1,4 @@
-import type { ToolStatus } from "@omni/protocol"
+import type { ToolStatus } from "@switchback/protocol"
 import type { ForeignTool } from "./caps.js"
 
 const record = (value: unknown): Record<string, unknown> | undefined =>

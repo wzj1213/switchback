@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
+import type { EngineAccount, EngineInfo, ModelOption } from "@switchback/protocol"
 import { lastEnabledEngine } from "../../shared/engine-access.js"
 import { dshProfileConfirmed, type Settings } from "../../shared/settings.js"
 import {
@@ -11,7 +11,7 @@ import {
 } from "../engine-settings-model.js"
 import { settingsCopyOf } from "../engine-settings-copy.js"
 import { EngineNative } from "./EngineNative.js"
-import { EngineOmniSettings } from "./EngineOmniSettings.js"
+import { EngineSwitchbackSettings } from "./EngineSwitchbackSettings.js"
 import { EnginePreference } from "./EnginePreference.js"
 import { Field, Group } from "./SettingsBits.js"
 import { DshProfileSettings } from "./DshProfileSettings.js"
@@ -66,7 +66,7 @@ export function EnginesSection({
           </div>
           <span className={`eng-status eng-status--${state.tone}`}>{state.label}</span>
         </header>
-        <EngineOmniSettings
+        <EngineSwitchbackSettings
           item={item}
           state={state}
           settings={settings}
@@ -112,7 +112,7 @@ export function EnginesSection({
         「哦它没装」的，而那一刻他人在这一页。
       */}
       <div className="eng-registry">
-        <span>装一家、升级到新版、或者接一家 omni 还不认识的 ACP 引擎——都在「安装与接入」。</span>
+        <span>装一家、升级到新版、或者接一家 Switchback 还不认识的 ACP 引擎——都在「安装与接入」。</span>
         <button type="button" className="tbtn" onClick={onGoInstall}>
           去那儿
         </button>
@@ -125,7 +125,7 @@ export function EnginesSection({
  * 上沿那排引擎。
  *
  * 每一颗带一个状态点，**关掉的那几家整颗压暗**——不是移走：
- * 「这家我关了」和「omni 不知道有这家」在界面上必须分得出来，
+ * 「这家我关了」和「Switchback 不知道有这家」在界面上必须分得出来，
  * 而移走之后就没有任何地方能把它开回来了。
  */
 function EngineTabs({

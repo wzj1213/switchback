@@ -1,4 +1,4 @@
-import type { EngineAxis, Trust } from "@omni/protocol"
+import type { EngineAxis, Trust } from "@switchback/protocol"
 import { canonical, type CodexSettings } from "./settings.js"
 import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./wire.js"
 
@@ -8,7 +8,7 @@ import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./w
  * 这是接第二家引擎最重要的一个发现，和 Claude 的结构完全不同。
  *
  * Claude 的 `permissionMode` 只是个路由开关，所以我们把它钉死在 `default`，
- * 让**每一次**调用都走 `canUseTool`，档位全部表达在 `@omni/approval` 里。
+ * 让**每一次**调用都走 `canUseTool`，档位全部表达在 `@switchback/approval` 里。
  *
  * codex 不是。它的 `sandbox` 是操作系统级的真沙箱（macOS 上是 seatbelt），
  * 实测下来：**只有沙箱会拦的操作才会来问客户端**。
@@ -18,7 +18,7 @@ import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./w
  *
  * 所以三个旋钮必须一起设，少一个都会把 Codex 原生档位改成另一件事：
  *
- * | omni 档位   | Codex 原生档      | sandbox / approval / reviewer                    |
+ * | Switchback 档位   | Codex 原生档      | sandbox / approval / reviewer                    |
  * | ----------- | ----------------- | ------------------------------------------------ |
  * | `read-only` | Read Only         | `read-only` / `on-request` / `user`               |
  * | `auto-edit` | Approve for me    | `workspace-write` / `on-request` / `auto_review`  |
@@ -26,7 +26,7 @@ import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./w
  *
  * 关键是中间那一列：只有 `on-request` 仍是 “Ask for approval”；再把 reviewer
  * 设成 `auto_review`，才是用户在 Codex 权限菜单里选的 “Approve for me”。
- * omni 不再用自己的静态规则冒充这位原生评审器。
+ * Switchback 不再用自己的静态规则冒充这位原生评审器。
  */
 export const SANDBOX: Readonly<Record<Trust, WireSandbox>> = {
   "read-only": "read-only",

@@ -1,4 +1,4 @@
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 
 /**
  * 「承接上一段」——把**上一家引擎自己那份原始记录的路径**填进输入框。
@@ -7,14 +7,14 @@ import type { Thread } from "@omni/protocol"
  *
  * 一家引擎卡住了要换另一家，现在的路是：开 `/timeline` → 找到上一段 →
  * 复制那条路径 → 回输入框粘上 → 再打一句「读一下这个」。五步里有四步
- * 是搬运，而搬运的东西 omni 手上本来就有（`Thread.segments`）。
+ * 是搬运，而搬运的东西 Switchback 手上本来就有（`Thread.segments`）。
  * 这个函数把那四步收成一次按键。
  *
  * ## 它**只填路径，不填话**
  *
  * 填进去的是一条 `@路径` 引用——和你亲手拖一个文件进来得到的东西一模一样，
- * 看得见、改得动、不发送就不生效。**omni 不替你写那句「读一下这个」**：
- * 那是你的话，不是它的（见 `AGENTS.md`：不往模型的上下文里塞 omni 写的话）。
+ * 看得见、改得动、不发送就不生效。**Switchback 不替你写那句「读一下这个」**：
+ * 那是你的话，不是它的（见 `AGENTS.md`：不往模型的上下文里塞 Switchback 写的话）。
  * 要读多少、读来干什么，由你在后面自己打。
  *
  * ## 「上一段」是哪一段

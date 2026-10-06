@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { matchCommands, slashAt } from "./slash.js"
 import { acceptsCompletion } from "./completion-keys.js"
 

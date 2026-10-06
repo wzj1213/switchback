@@ -68,7 +68,7 @@ describe("workflow 进度 → 一条 lane", () => {
     expect(toLane("字符串", "th-1", 0)).toBeUndefined()
   })
 
-  it("**agent 先于它的 phase 到达也不掉出树**——帧顺序不由 omni 决定", () => {
+  it("**agent 先于它的 phase 到达也不掉出树**——帧顺序不由 Switchback 决定", () => {
     const early = { task_id: "w", description: "d", workflow_progress: [
       { type: "workflow_agent", index: 1, phaseIndex: 2, label: "先到的", state: "running" },
       { type: "workflow_phase", index: 2, title: "后到的阶段" },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES } from "@omni/protocol"
-import type { EngineDriver } from "@omni/engine"
+import { NO_CAPABILITIES } from "@switchback/protocol"
+import type { EngineDriver } from "@switchback/engine"
 import { createHost } from "./host.js"
 import { create } from "./host-fixture.js"
 

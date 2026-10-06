@@ -472,15 +472,6 @@ body {
   font-family: var(--font);
 }
 
-.sidebar__name {
-  flex: none;
-  color: var(--text-faint);
-  font-weight: 400;
-  margin-left: 0;
-  font-size: var(--text-sm);
-  font-family: var(--font);
-}
-
 /* ── 顶上那一行：一颗主要导航动作 + 一颗图标键 ───────────
  * 见 `SidebarHead.tsx` 的注释。**行高仍然是 `--sb-row-h`**：
  * 侧栏所有的量都挂在那三个变量上，多写一个 30 就是本文件开头说的「第三个 padding」。

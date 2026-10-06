@@ -1,4 +1,4 @@
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import type { EngineStint } from "../engine-mark.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"

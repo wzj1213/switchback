@@ -1,4 +1,4 @@
-import type { EngineGoal, GoalStatus } from "@omni/protocol"
+import type { EngineGoal, GoalStatus } from "@switchback/protocol"
 
 const LABEL: Readonly<Record<GoalStatus, string>> = {
   active: "目标进行中",

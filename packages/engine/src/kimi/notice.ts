@@ -1,4 +1,4 @@
-import type { ErrorItem, NoticeItem, TurnId } from "@omni/protocol"
+import type { ErrorItem, NoticeItem, TurnId } from "@switchback/protocol"
 import { kimiMessage } from "./turn-state.js"
 import type { KimiPayload } from "./wire.js"
 

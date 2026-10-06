@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Thread, Turn } from "@omni/protocol"
+import type { Command, EngineInfo, Thread, Turn } from "@switchback/protocol"
 import { ItemView } from "./ItemView.js"
 import { ErrorView, type ErrorContext } from "./Failure.js"
 import type { ErrorPlan, RetryTarget } from "../error-plan.js"

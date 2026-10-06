@@ -57,7 +57,7 @@ async function versionOf(path: string): Promise<string | undefined> {
  *
  * 真机上遇到的：`~/.vendor-cli/vendor-cli/bin/codex` 排在 homebrew 前面，
  * 而那个文件已经不在了（某个第三方 CLI 自更新时留下的空壳目录）。
- * 于是 omni 报「codex 未安装」，而 `/opt/homebrew/bin/codex` 好好的
+ * 于是 Switchback 报「codex 未安装」，而 `/opt/homebrew/bin/codex` 好好的
  * ——用户看到的是「读错地方了」。
  *
  * 所以：**列出全部候选，逐个试 `--version`，第一个跑得起来的算**。

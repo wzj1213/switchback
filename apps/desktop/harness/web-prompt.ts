@@ -1,4 +1,4 @@
-import type { Command, Event } from "@omni/protocol"
+import type { Command, Event } from "@switchback/protocol"
 
 type Prompt = Extract<Command, { type: "thread.prompt" }>
 

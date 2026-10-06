@@ -1,4 +1,4 @@
-import type { TurnStatus } from "@omni/protocol"
+import type { TurnStatus } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { clearTasks } from "./tasks.js"
 import { resetPlan } from "./plan.js"

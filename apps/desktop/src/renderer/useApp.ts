@@ -10,10 +10,10 @@ import {
   type Notice,
   type ThreadRow,
   type ViewState,
-} from "@omni/store"
-import type { Item } from "@omni/protocol"
-import type { Command, EngineThread, RateLimits, Thread } from "@omni/protocol"
-import { useOmni } from "./useOmni.js"
+} from "@switchback/store"
+import type { Item } from "@switchback/protocol"
+import type { Command, EngineThread, RateLimits, Thread } from "@switchback/protocol"
+import { useSwitchback } from "./useSwitchback.js"
 import { useSettings, type SettingsApi } from "./useSettings.js"
 import { useShell, type Shell } from "./useShell.js"
 import type { AccountLine } from "./components/SidebarFoot.js"
@@ -41,7 +41,7 @@ export interface AppApi {
   /**
    * 侧栏那份：**临时会话不在里面**。
    *
-   * 点一下「+」（以及 omni 启动时自动开的那条）先给的是一个**临时窗口**：
+   * 点一下「+」（以及 Switchback 启动时自动开的那条）先给的是一个**临时窗口**：
    * 引擎已经起好了、模型和斜杠命令都能用，但侧栏里没有它——
    * 发出第一句话它才正式出现（见 `Thread.provisional`）。
    *
@@ -62,7 +62,7 @@ export interface AppApi {
   shell: Shell
   prefs: SettingsApi
   bridgeMissing: boolean
-  /** 主进程的全量到了没有。见 `useOmni` 的同名字段。 */
+  /** 主进程的全量到了没有。见 `useSwitchback` 的同名字段。 */
   ready: boolean
   send: (command: Command) => void
   copy: (text: string) => Promise<boolean>
@@ -125,12 +125,12 @@ function viewActions(shell: Shell): Pick<
 const EMPTY_ITEMS: readonly Item[] = []
 
 export function useApp(): AppApi {
-  const omni = useOmni()
+  const switchback = useSwitchback()
   const shell = useShell()
   const prefs = useSettings()
-  const engines = useEnabledEngines(prefs.settings, omni.state.engines)
+  const engines = useEnabledEngines(prefs.settings, switchback.state.engines)
 
-  const rows = useMemo(() => threadRowsOf(omni.state), [omni.state.threads, omni.state.items])
+  const rows = useMemo(() => threadRowsOf(switchback.state), [switchback.state.threads, switchback.state.items])
   /**
    * 新建之后跳到新会话上。
    *
@@ -160,42 +160,42 @@ export function useApp(): AppApi {
   const awaited = useRef<number | undefined>(undefined)
   useEffect(() => {
     const at = awaited.current
-    const started = omni.lastStarted
+    const started = switchback.lastStarted
     if (at === undefined || started === undefined || started.seq <= at) return
     awaited.current = undefined
     shell.select(started.id)
-  }, [omni.lastStarted, shell])
+  }, [switchback.lastStarted, shell])
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
-  useEffect(() => omni.viewing(thread?.id), [omni.viewing, thread?.id])
-  useAuthNotices(omni.state.notices, shell.dismiss)
-  const items = useThreadItems(omni.state, thread)
+  useEffect(() => switchback.viewing(thread?.id), [switchback.viewing, thread?.id])
+  useAuthNotices(switchback.state.notices, shell.dismiss)
+  const items = useThreadItems(switchback.state, thread)
   const visibleRows = useMemo(() => rows.filter((r) => r.thread.provisional !== true), [rows])
   const sidebarRows = useUnread(visibleRows, thread?.id)
 
   // 出口收在 `useSend` 里：它必须引用稳定，而**那条约束不属于「接线」这件事**——
   // 理由（以及它曾经怎么静默地废掉一整条 memo 链）写在那个文件开头
-  const send = useSend(omni.send, {
+  const send = useSend(switchback.send, {
     rows,
     lastUsed: prefs.settings.lastUsed,
     patch: prefs.patch,
     // 分叉 / 重来出来的那条是临时的（侧栏里没有它），**不跳过去就等于点了没反应**
     onBranch: () => {
-      awaited.current = omni.lastStarted?.seq ?? 0
+      awaited.current = switchback.lastStarted?.seq ?? 0
     },
   })
 
   const { open, openChat, openPicker } = useWorkspaceActions({
-    state: omni.state,
+    state: switchback.state,
     thread,
-    send: omni.send,
-    copy: omni.copy,
-    pickFolder: omni.pickFolder,
-    chatDir: omni.chatDir,
-    onMenu: omni.onMenu,
+    send: switchback.send,
+    copy: switchback.copy,
+    pickFolder: switchback.pickFolder,
+    chatDir: switchback.chatDir,
+    onMenu: switchback.onMenu,
     onSelect: shell.select,
     // 点「新建」的那一刻记下当前序号，等一个比它大的
     onCreating: () => {
-      awaited.current = omni.lastStarted?.seq ?? 0
+      awaited.current = switchback.lastStarted?.seq ?? 0
     },
     onOpenProject: (cwd) => {
       prefs.addProject(cwd)
@@ -207,23 +207,23 @@ export function useApp(): AppApi {
   })
 
   return {
-    state: omni.state,
+    state: switchback.state,
     engines,
     rows,
     sidebarRows,
     thread,
     // 关掉的是**那一条**，不是关掉整个通道：后面再来新的还要弹
-    notices: omni.state.notices.filter((n) => !shell.dismissed.has(n.id)),
+    notices: switchback.state.notices.filter((n) => !shell.dismissed.has(n.id)),
     shell,
     prefs,
-    bridgeMissing: omni.bridgeMissing,
-    ready: omni.ready,
+    bridgeMissing: switchback.bridgeMissing,
+    ready: switchback.ready,
     send,
-    copy: omni.copy,
-    reveal: omni.reveal,
-    find: omni.find,
-    stopFind: omni.stopFind,
-    searchFiles: omni.searchFiles,
+    copy: switchback.copy,
+    reveal: switchback.reveal,
+    find: switchback.find,
+    stopFind: switchback.stopFind,
+    searchFiles: switchback.searchFiles,
     open,
     openChat,
     openPicker,
@@ -231,15 +231,15 @@ export function useApp(): AppApi {
       if (thread === undefined) openPicker()
       else open(thread.cwd)
     },
-    itemsOf: (threadId) => itemsOf(omni.state, threadId),
+    itemsOf: (threadId) => itemsOf(switchback.state, threadId),
     items,
-    foreign: foreignByEngine(omni.state),
+    foreign: foreignByEngine(switchback.state),
     adopt: (engine, item) => {
       // 和新建走同一条「记下序号、等 thread.started」的路（见上面那段注释），
       // 接完自动跳过去——不跳的话人得自己去侧栏里找它，
       // 而它刚从「codex 历史」那一段里消失
-      awaited.current = omni.lastStarted?.seq ?? 0
-      omni.send({
+      awaited.current = switchback.lastStarted?.seq ?? 0
+      switchback.send({
         type: "thread.adopt",
         engine,
         handle: item.handle,
@@ -250,7 +250,7 @@ export function useApp(): AppApi {
     },
     // **跟着当前会话的引擎走**：底下那一行说的是「你现在用的是哪个号」，
     // 而你现在用的是哪一家由选中的会话决定。没选会话时退回唯一报过的那家
-    account: accountLineOf(omni.state, thread?.engine),
+    account: accountLineOf(switchback.state, thread?.engine),
   }
 }
 

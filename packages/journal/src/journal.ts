@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import { Buffer } from "node:buffer"
 import { join } from "node:path"
-import type { Event, ThreadId } from "@omni/protocol"
+import type { Event, ThreadId } from "@switchback/protocol"
 import { decodeAll, encode, fileNameOf, shouldPersist, threadIdOf } from "./codec.js"
 
 export interface JournalConfig {
@@ -47,7 +47,7 @@ const DEFAULT_MAX_BYTES = 32 * 1024 * 1024
  * 追加式事件日志，一个会话一个 JSONL 文件。
  *
  * 为什么是追加而不是「存一份状态快照」：事件流本来就是真源，
- * 而 `@omni/store` 的归约器是纯函数——回放一遍就能得到当时的界面状态，
+ * 而 `@switchback/store` 的归约器是纯函数——回放一遍就能得到当时的界面状态，
  * 不需要第二套序列化逻辑，也就不会出现「快照和事件对不上」这类问题。
  *
  * **写入失败一律吞掉并继续。** 磁盘满了、目录被删了，都不该让一个正在跑的

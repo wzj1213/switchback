@@ -4,7 +4,7 @@ import type { GitState } from "../shared/git.js"
  * 审查页「提交」那一条的几句话：现在是什么状态、主按钮提交什么、为什么点不了。
  *
  * **点不了必须说为什么**（这套界面的老规矩，见 `SettingsBits` 的 `Toggle`）：
- * 一颗灰掉又不解释的「提交」会让人以为是 omni 坏了，而真相往往是会话还在跑、或者有冲突没解决。
+ * 一颗灰掉又不解释的「提交」会让人以为是 Switchback 坏了，而真相往往是会话还在跑、或者有冲突没解决。
  */
 
 export function pendingOf(state: GitState): number {

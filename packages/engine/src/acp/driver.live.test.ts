@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 import type { ApprovalAsk } from "../contract.js"
 
@@ -11,11 +11,11 @@ import type { ApprovalAsk } from "../contract.js"
  *
  * ```sh
  * npm i -g @agentclientprotocol/codex-acp     # 或任一 ACP 适配器
- * OMNI_ACP_COMMAND=codex-acp pnpm test:live
+ * SWITCHBACK_ACP_COMMAND=codex-acp pnpm test:live
  *
- * # 讲 ACP 的子命令不止一种叫法，参数用 OMNI_ACP_ARGS 给（空格分隔）：
- * OMNI_ACP_COMMAND=kimi OMNI_ACP_ARGS=acp          pnpm test:live
- * OMNI_ACP_COMMAND=grok OMNI_ACP_ARGS="agent stdio" pnpm test:live
+ * # 讲 ACP 的子命令不止一种叫法，参数用 SWITCHBACK_ACP_ARGS 给（空格分隔）：
+ * SWITCHBACK_ACP_COMMAND=kimi SWITCHBACK_ACP_ARGS=acp          pnpm test:live
+ * SWITCHBACK_ACP_COMMAND=grok SWITCHBACK_ACP_ARGS="agent stdio" pnpm test:live
  * ```
  *
  * **参数必须能传**：ACP 引擎经常不是「一个裸命令就进协议」——例如旧 Kimi 是
@@ -28,11 +28,11 @@ import type { ApprovalAsk } from "../contract.js"
  * 都只可能来自协议层，不会是模型差异——这是验证归一化模型的最干净的实验。
  */
 
-const COMMAND = process.env["OMNI_ACP_COMMAND"]
-const ARGS = (process.env["OMNI_ACP_ARGS"] ?? "").split(" ").filter((a) => a !== "")
+const COMMAND = process.env["SWITCHBACK_ACP_COMMAND"]
+const ARGS = (process.env["SWITCHBACK_ACP_ARGS"] ?? "").split(" ").filter((a) => a !== "")
 
 function workspace(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omni-acp-live-"))
+  const dir = mkdtempSync(join(tmpdir(), "switchback-acp-live-"))
   writeFileSync(join(dir, "hello.txt"), "原始内容\n")
   return dir
 }
@@ -110,13 +110,13 @@ describe.skipIf(COMMAND === undefined)("ACP 驱动真跑", () => {
   )
 
   /**
-   * **这里只能验 omni 这一层能保证的事：问了就必须拒得住。**
+   * **这里只能验 Switchback 这一层能保证的事：问了就必须拒得住。**
    *
    * 「一次都没问」是真实存在的一档，不是测试环境的问题：实测 grok 0.2.106
    * 在 read-only 档下直接把文件改了，`session/request_permission` 一次都没发。
    * 那不是驱动接错了——审批的可见性由 agent 决定（见 `driver.ts` 开头那段，
    * 以及 README 的已知限制）。所以断言写成「文件一定没变」是错的：
-   * 它把一条引擎侧的结构性限制记成了 omni 的失败，然后逼着后来的人
+   * 它把一条引擎侧的结构性限制记成了 Switchback 的失败，然后逼着后来的人
    * 要么删测试、要么改驱动去做它做不到的事。
    */
   it(

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { ThreadRow } from "@omni/store"
-import type { ThreadStatus } from "@omni/protocol"
+import type { ThreadRow } from "@switchback/store"
+import type { ThreadStatus } from "@switchback/protocol"
 import { stepUnread } from "./unread.js"
 import type { SidebarRow } from "./sidebar.js"
 

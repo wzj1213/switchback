@@ -1,4 +1,4 @@
-import type { Event, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ThreadId, TurnId } from "@switchback/protocol"
 
 interface ThinkingMessage {
   subtype?: string

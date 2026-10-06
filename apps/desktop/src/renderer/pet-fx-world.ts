@@ -3,7 +3,7 @@ import type { TrajMode } from "../shared/settings.js"
 import { createGun, type Gun } from "./pet-gun.js"
 import type { Bullet, Glyph } from "./pet-shots.js"
 import type { Foe } from "./pet-foes.js"
-import type { TurnPace } from "@omni/protocol"
+import type { TurnPace } from "@switchback/protocol"
 import type { Field, Stand } from "./pet-fx-geo.js"
 import { createShow, createTarget, type Hole, type Show, type Target } from "./pet-range.js"
 import type { Pet, PetShape } from "./pets.js"
@@ -134,7 +134,7 @@ export interface FxInput {
    * 它不参与任何物理，纯粹是要印到画面上的一行字。和分界线上印的是同一个数。
    */
   pace: TurnPace | undefined
-  /** 这一轮此刻的出字速度（token/秒）。只有靶那一档印它，算法见 `@omni/store` 的 `pace.ts`。 */
+  /** 这一轮此刻的出字速度（token/秒）。只有靶那一档印它，算法见 `@switchback/store` 的 `pace.ts`。 */
   speed: number | undefined
   /** 纸带上下一发落哪个字：模型刚写出来的那一个（`tape-text.ts`）。 */
   nextChar: () => string

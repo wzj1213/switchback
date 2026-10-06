@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, ItemId } from "@omni/protocol"
+import type { Event, ItemId } from "@switchback/protocol"
 import { createStream, onStreamEvent, resetStream, type RawStreamEvent } from "./stream.js"
 
 function rig(): { events: Event[]; feed: (...raw: readonly RawStreamEvent[]) => void; ids: () => string[] } {

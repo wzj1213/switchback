@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { Sealed } from "./types.js"
 
 /**

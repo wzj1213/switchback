@@ -1,6 +1,6 @@
-# @omni/approval
+# @switchback/approval
 
-审批判定器。**omni 是外层策略，引擎自审是内层**——内层弹出的每个权限请求先过这里，
+审批判定器。**Switchback 是外层策略，引擎自审是内层**——内层弹出的每个权限请求先过这里，
 只有判定为 `escalate` 才打断用户。上一版（crew）是「一律 escalate」，实测一小时被打断 20+ 次；
 这里的目标是 escalate 占比 **< 5%**。
 
@@ -29,7 +29,7 @@ Request ─→ normalize ─→ redline ─→ memory ─→ trust ─→ Verdic
   记忆规则由调用方读出来放进 `SessionState.memory`。
 - 不拥有时钟与随机源——需要时间由调用方传入（lint 已禁 `Date.now`）。
 - 不拥有沙箱。沙箱是最后一道防线，由宿主施加；本包只回答「该不该做」。
-- 不拥有与引擎的通信。把 `Verdict` 翻译成各家的应答格式是 `@omni/engine` 各驱动的事。
+- 不拥有与引擎的通信。把 `Verdict` 翻译成各家的应答格式是 `@switchback/engine` 各驱动的事。
 - 不拥有 UI 文案排版——`Verdict.reason` 是给**引擎**读的，不是给人读的。
 
 ## 已知限制

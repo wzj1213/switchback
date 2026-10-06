@@ -6,7 +6,7 @@ import { pickedFilesOf } from "./picked-files.js"
 
 describe("系统选择文件核验", () => {
   it("保留图片和普通文件、排除已消失路径，并只登记有效选择", async () => {
-    const root = await mkdtemp(join(tmpdir(), "omni-picked-files-"))
+    const root = await mkdtemp(join(tmpdir(), "switchback-picked-files-"))
     try {
       const image = join(root, "shot.PNG"), source = join(root, "main.ts"), gone = join(root, "gone.pdf")
       await Promise.all([writeFile(image, "png"), writeFile(source, "export {}")])

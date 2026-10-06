@@ -18,15 +18,15 @@ export function AcpEngineCard({ engine, update, onChanged }: {
   update?: RegistryRow
   onChanged: () => void
 }): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   const [trial, setTrial] = useState<AcpTrialView | undefined>(undefined)
   const [trying, setTrying] = useState(false)
   const [note, setNote] = useState<{ text: string; error: boolean } | undefined>(undefined)
   const probe = (): void => {
-    if (omni === undefined) return
+    if (switchback === undefined) return
     setTrying(true)
     setTrial(undefined)
-    void omni.acpEngineTry(engine.name).then(setTrial, (error: unknown) => setTrial({ ok: false, error: String(error) })).finally(() => setTrying(false))
+    void switchback.acpEngineTry(engine.name).then(setTrial, (error: unknown) => setTrial({ ok: false, error: String(error) })).finally(() => setTrying(false))
   }
   return (
     <div className="acp-card">
@@ -71,7 +71,7 @@ function Remove({ engine, onChanged, onNote }: {
   onChanged: () => void
   onNote: (note: { text: string; error: boolean }) => void
 }): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   const [step, setStep] = useState<"idle" | "confirm" | "busy">("idle")
   if (step === "idle") {
     return <button type="button" className="tbtn" onClick={() => setStep("confirm")}>移除</button>
@@ -85,7 +85,7 @@ function Remove({ engine, onChanged, onNote }: {
       onBlur={() => setStep((current) => (current === "confirm" ? "idle" : current))}
       onClick={() => {
         setStep("busy")
-        void omni?.acpEngineRemove(engine.name).then((done) => {
+        void switchback?.acpEngineRemove(engine.name).then((done) => {
           setStep("idle")
           // 删掉了就不必说话——这一行会随列表刷新消失；在用的与失败的才要说
           if (!done.ok) onNote({ text: done.error ?? "没删成。", error: true })

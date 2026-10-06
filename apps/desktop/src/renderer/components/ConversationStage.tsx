@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, TurnId, TurnPace, Usage } from "@omni/protocol"
+import type { Command, EngineInfo, Item, TaskRun, Thread, Turn, TurnId, TurnPace, Usage } from "@switchback/protocol"
 import type { PetKit } from "../../shared/settings.js"
 import type { Reconnecting } from "./TurnStatus.js"
 import { useFireProps } from "../use-fire-props.js"

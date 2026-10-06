@@ -1,4 +1,4 @@
-import type { EngineGoal, GoalStatus } from "@omni/protocol"
+import type { EngineGoal, GoalStatus } from "@switchback/protocol"
 import type { WireGoalUpdated } from "./wire.js"
 
 const STATUS: Readonly<Record<string, GoalStatus>> = {
@@ -31,7 +31,7 @@ function budgetPatch(value: unknown): Pick<EngineGoal, "tokenBudget"> | undefine
   return tokenBudget === undefined ? undefined : { tokenBudget }
 }
 
-/** Codex 的完整目标快照 → omni 只读镜像；畸形帧不覆盖上一份可信状态。 */
+/** Codex 的完整目标快照 → Switchback 只读镜像；畸形帧不覆盖上一份可信状态。 */
 export function goalOf(params: WireGoalUpdated): EngineGoal | undefined {
   const raw = params.goal
   if (raw === undefined) return undefined

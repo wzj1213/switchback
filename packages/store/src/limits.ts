@@ -1,4 +1,4 @@
-import type { RateLimits } from "@omni/protocol"
+import type { RateLimits } from "@switchback/protocol"
 
 /**
  * 额度事件是逐窗口 patch；空对象是明确清空。

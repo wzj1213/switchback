@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 import { briefOf, logFacts, stintsOf, transcriptOf, turnEnginesOf } from "./index.js"
 
 const T0 = Date.UTC(2026, 7, 25, 2, 0, 0)
@@ -42,7 +42,7 @@ describe("交接转写", () => {
   for (const [name, needle] of cases) {
     it(name, () => { expect(md).toContain(needle) })
   }
-  it("没有原生 id 的（旧记录）不标：omni 自己铸的 id 在原始记录里搜不到", () => {
+  it("没有原生 id 的（旧记录）不标：Switchback 自己铸的 id 在原始记录里搜不到", () => {
     expect(md).toContain("#### 工具 Edit：编辑 src/a.ts（+1 −1） — ok\n")
     expect(md).not.toContain("it-4")
   })
@@ -108,7 +108,7 @@ describe("交接说明", () => {
   const brief = briefOf({
     engine: "Codex",
     stints: [{ engine: "Claude Code", from: at(1), to: at(5), turns: 12 }],
-    transcript: { path: "/work/app/.omni/handoff/th-1.md", lines: 1234, bytes: 220_000, lastTurn: { turn: 12, line: 1180 } },
+    transcript: { path: "/work/app/.switchback/handoff/th-1.md", lines: 1234, bytes: 220_000, lastTurn: { turn: 12, line: 1180 } },
     logs: [
       { engine: "Claude Code", path: "/home/.claude/projects/app/s-1.jsonl", bytes: 9_000_000,
         facts: { format: "jsonl", lines: 4210, types: [["assistant", 1980]], idPath: "message.content[].id", idSample: "toolu_01A", timePath: "timestamp" } },
@@ -118,12 +118,12 @@ describe("交接说明", () => {
     ],
   })
   const cases = [
-    ["包在交接标签里", "<omni-handoff>"],
+    ["包在交接标签里", "<switchback-handoff>"],
     ["此前谁跑了哪几轮", "- Claude Code：第 1–12 轮，2026-08-25T02:01:00Z – 2026-08-25T02:05:00Z"],
-    ["转写路径、体积与最后一轮的位置", "- /work/app/.omni/handoff/th-1.md（1,234 行，215 KB；最后一轮（第 12 轮）从第 1,180 行开始）"],
+    ["转写路径、体积与最后一轮的位置", "- /work/app/.switchback/handoff/th-1.md（1,234 行，215 KB；最后一轮（第 12 轮）从第 1,180 行开始）"],
     ["原始记录的格式事实", "JSONL，每行一个 JSON，4,210 行；顶层 type 取值 assistant 1,980；转写里的原生 id 在这份记录的 message.content[].id 字段，例如 toolu_01A；每行的时间戳在 timestamp 字段（ISO 8601）"],
     ["太大的记录只报路径与体积", "- Gemini：/home/.gemini/big.json（85.8 MB；太大，没有逐行统计格式）"],
-    ["读不了的记录照直说", "- Grok：/home/.grok/locked.jsonl（20 B；omni 读不了这份文件，没有统计格式）"],
+    ["读不了的记录照直说", "- Grok：/home/.grok/locked.jsonl（20 B；Switchback 读不了这份文件，没有统计格式）"],
     ["路径上已经没有文件", "- Kimi：/home/.kimi/gone.jsonl（这个路径上已经没有文件了）"],
   ] as const
   for (const [name, needle] of cases) {

@@ -1,8 +1,8 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { Item, Thread } from "@omni/protocol"
-import type { Journal } from "@omni/journal"
-import { initial, itemsOf, reduceAll } from "@omni/store"
+import type { Item, Thread } from "@switchback/protocol"
+import type { Journal } from "@switchback/journal"
+import { initial, itemsOf, reduceAll } from "@switchback/store"
 import {
   briefOf,
   engineAt,
@@ -12,7 +12,7 @@ import {
   turnEnginesOf,
   type BriefLog,
   type TurnEngines,
-} from "@omni/handoff"
+} from "@switchback/handoff"
 
 /**
  * 换引擎自动交接的**磁盘那一半**：宿主判定「这是换家后的第一句」之后来要说明，
@@ -21,8 +21,8 @@ import {
  * ## 转写为什么写进工作区
  *
  * 每一家都能读自己的工作区，不需要额外的授权；应用数据目录在各家的沙箱与权限规则里
- * 待遇不一，有的要弹审批、有的干脆读不到。所以写 `<工作区>/.omni/handoff/`，
- * 并在 `.omni/` 里放一份内容为 `*` 的 `.gitignore`（和 `.pytest_cache` 一个做法）：
+ * 待遇不一，有的要弹审批、有的干脆读不到。所以写 `<工作区>/.switchback/handoff/`，
+ * 并在 `.switchback/` 里放一份内容为 `*` 的 `.gitignore`（和 `.pytest_cache` 一个做法）：
  * 不进版本库、`rg` 默认也不搜它，但按路径直接读照样读得到。工作区写不进去才退到应用数据目录。
  */
 
@@ -30,7 +30,7 @@ import {
 const PARSE_LIMIT = 64 * 1024 * 1024
 /** 拿去原始记录里定位字段的原生 id：最近这几个就够，搜不到的每个都是一遍全文检索。 */
 const ID_PROBES = 8
-const IGNORE = "# omni 的本地文件（换引擎交接转写），不进版本库\n*\n"
+const IGNORE = "# Switchback 的本地文件（换引擎交接转写），不进版本库\n*\n"
 
 export interface HandoffBriefDeps {
   journal: Pick<Journal, "flush" | "read">
@@ -59,7 +59,7 @@ async function writeInto(dir: string, name: string, text: string): Promise<strin
 async function writeTranscript(thread: Thread, text: string, spareDir: string): Promise<string> {
   const name = `${thread.id}.md`
   try {
-    const root = join(thread.cwd, ".omni")
+    const root = join(thread.cwd, ".switchback")
     await mkdir(root, { recursive: true })
     await ensureIgnored(root)
     return await writeInto(join(root, "handoff"), name, text)

@@ -1,4 +1,4 @@
-import type { EngineInfo, EngineSegment, Thread } from "@omni/protocol"
+import type { EngineInfo, EngineSegment, Thread } from "@switchback/protocol"
 import { Popover } from "./Popover.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 import { engineTint } from "../engine-mark.js"
@@ -10,7 +10,7 @@ import { labelOf } from "./Composer.js"
  * ## 为什么需要它
  *
  * 一条会话可以在几家引擎之间来回切：codex 跑三轮、切 Claude 看一眼、再切回 codex。
- * 每一家在自己那边都留着一条**独立的**会话记录，而 omni 这边看不到它们的存在——
+ * 每一家在自己那边都留着一条**独立的**会话记录，而 Switchback 这边看不到它们的存在——
  * 于是「刚才那段 Claude 的 review 记在哪儿」只能靠猜。
  *
  * 这张卡片把它们摆出来：谁、句柄（可复制，拿去引擎自己的界面里也翻得到）、

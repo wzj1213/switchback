@@ -1,4 +1,4 @@
-import type { QuestionResponse } from "@omni/protocol"
+import type { QuestionResponse } from "@switchback/protocol"
 import { describe, expect, it, vi } from "vitest"
 import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
@@ -60,7 +60,7 @@ describe("Codex 反向 RPC 生命周期", () => {
     const row = unsupported("item/tool/call")
     await requests(() => Promise.resolve({ dismissed: true })).answer(row.call)
     expect(row.replies).toEqual([{
-      error: { code: -32601, message: "omni 未认领 item/tool/call" },
+      error: { code: -32601, message: "Switchback 未认领 item/tool/call" },
     }])
   })
 

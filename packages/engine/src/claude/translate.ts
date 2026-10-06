@@ -1,4 +1,4 @@
-import type { Item, ItemId, ToolCallItem, ToolDetail, TurnId } from "@omni/protocol"
+import type { Item, ItemId, ToolCallItem, ToolDetail, TurnId } from "@switchback/protocol"
 import { fileChangesOf } from "./diff.js"
 
 /**

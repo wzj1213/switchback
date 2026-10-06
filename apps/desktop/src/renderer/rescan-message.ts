@@ -37,6 +37,6 @@ export function rescanMessage(
   if (parts.length === 0) parts.push("查过了，没有变化——装的还是那几家")
   const tail = needsRestart.length === 0
     ? ""
-    : `${needsRestart.join("、")} 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 omni。`
+    : `${needsRestart.join("、")} 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 Switchback。`
   return `${parts.join("；")}。${tail}`
 }

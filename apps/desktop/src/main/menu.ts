@@ -26,13 +26,13 @@ const isMac = process.platform === "darwin"
 /** 菜单回调给的是 `BaseWindow`；只有 `BrowserWindow` 才有 webContents。 */
 function send(action: MenuAction, focused: BaseWindow | undefined): void {
   if (!(focused instanceof BrowserWindow) || focused.isDestroyed()) return
-  focused.webContents.send("omni:menu", action)
+  focused.webContents.send("switchback:menu", action)
 }
 
 /**
  * 应用菜单。
  *
- * Electron 不设菜单时会给一份默认模板——能用，但里面没有任何 omni 自己的动作，
+ * Electron 不设菜单时会给一份默认模板——能用，但里面没有任何 Switchback 自己的动作，
  * 于是**新建会话只能靠鼠标点侧栏**，一个每天用几十次的操作没有快捷键。
  *
  * 编辑/窗口/显示这几栏一律用 `role`：系统会自己本地化、自己接上原生行为
@@ -231,7 +231,7 @@ function helpMenu(
 /**
  * 应用菜单。
  *
- * Electron 不设菜单时会给一份默认模板——能用，但里面**没有任何 omni 自己的动作**，
+ * Electron 不设菜单时会给一份默认模板——能用，但里面**没有任何 Switchback 自己的动作**，
  * 于是「新建会话」这个每天用几十次的操作只能靠鼠标点侧栏。
  *
  * 编辑/显示/窗口三栏一律用 `role`：系统会自己本地化、自己接上原生行为

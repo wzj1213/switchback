@@ -1,5 +1,5 @@
-import { decide, type Request as ApprovalRequest, type Rule } from "@omni/approval"
-import type { Trust } from "@omni/protocol"
+import { decide, type Request as ApprovalRequest, type Rule } from "@switchback/approval"
+import type { Trust } from "@switchback/protocol"
 import { sanitize } from "../claude/permission.js"
 import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
@@ -9,14 +9,14 @@ import { answerUserInput, USER_INPUT_REQUEST } from "./user-input.js"
 import type { WireApprovalRequest, WireDecision, WireItem } from "./wire.js"
 
 /**
- * codex 的审批请求 ↔ `@omni/approval`。
+ * codex 的审批请求 ↔ `@switchback/approval`。
  *
  * **和 Claude 最大的结构差别在这里。** Claude 的 `canUseTool` 把工具名和完整参数
  * 一起递过来，判定所需的一切都在回调里。codex 的审批请求只带一个 `itemId`——
  * 命令、diff、路径全都不在里面，它们在此前那条 `item/started` 通知里。
  *
  * 所以驱动**必须**留着在途 item（见 `driver.ts` 的 `inflight`），否则就只能问用户
- * 「要批准这个吗」而说不出「这个」是什么。这是 omni 接第二家引擎发现的第一个真问题。
+ * 「要批准这个吗」而说不出「这个」是什么。这是 Switchback 接第二家引擎发现的第一个真问题。
  */
 
 /** 方法名 → 工具名。这一步不依赖 item，所以即使 item 丢了也能正确归类。 */
@@ -120,7 +120,7 @@ export function buildRequest(
 
 /**
  * `acceptForSession` 是 codex 侧的「本会话不再问」。勾了记忆就用它——
- * 让 codex 自己记住比 omni 每次拦下来再放行省一个来回，
+ * 让 codex 自己记住比 Switchback 每次拦下来再放行省一个来回，
  * 语义也和用户勾选的那句话完全一致。
  */
 export function decisionFor(allow: boolean, remember: boolean): WireDecision {
@@ -176,7 +176,7 @@ export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promis
     return
   }
   if (TOOL_BY_METHOD[call.method] === undefined) {
-    call.reject({ code: -32601, message: `omni 未认领 ${call.method}` })
+    call.reject({ code: -32601, message: `Switchback 未认领 ${call.method}` })
     return
   }
   const params = call.params as WireApprovalRequest

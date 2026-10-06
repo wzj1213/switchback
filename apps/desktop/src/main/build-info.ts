@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import type { ClaudeExecutable } from "@omni/engine"
+import type { ClaudeExecutable } from "@switchback/engine"
 
 export interface BuildInfo {
   build?: string
@@ -10,15 +10,15 @@ export interface BuildInfo {
 }
 
 export function parseBuildInfo(raw: unknown): BuildInfo {
-  const omni =
+  const switchback =
     typeof raw === "object" && raw !== null
-      ? (raw as { omni?: Record<string, unknown> }).omni
+      ? (raw as { switchback?: Record<string, unknown> }).switchback
       : undefined
   return {
-    ...(typeof omni?.build === "string" ? { build: omni.build } : {}),
-    ...(typeof omni?.repo === "string" ? { repo: omni.repo } : {}),
-    ...(typeof omni?.updateFeed === "string" ? { updateFeed: omni.updateFeed } : {}),
-    claudeExecutable: omni?.claudeExecutable === "system" ? "system" : "bundled",
+    ...(typeof switchback?.build === "string" ? { build: switchback.build } : {}),
+    ...(typeof switchback?.repo === "string" ? { repo: switchback.repo } : {}),
+    ...(typeof switchback?.updateFeed === "string" ? { updateFeed: switchback.updateFeed } : {}),
+    claudeExecutable: switchback?.claudeExecutable === "system" ? "system" : "bundled",
   }
 }
 

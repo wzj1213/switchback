@@ -1,4 +1,4 @@
-import type { Command, Item } from "@omni/protocol"
+import type { Command, Item } from "@switchback/protocol"
 import { switchEngine } from "./branch.js"
 import { emit, isCurrent, setStatus, withQueue, type Ctx, type Live } from "./ctx.js"
 import { handoffNote, withNote } from "./handoff-note.js"

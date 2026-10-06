@@ -1,4 +1,4 @@
-import type { Event, Lane, LaneNode, ThreadId } from "@omni/protocol"
+import type { Event, Lane, LaneNode, ThreadId } from "@switchback/protocol"
 
 interface ActivityOut {
   threadId: ThreadId

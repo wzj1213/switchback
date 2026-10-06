@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Command, ThreadId } from "@omni/protocol"
-import { initial, reduceAll, reduceHistory, type ViewState } from "@omni/store"
+import type { Command, ThreadId } from "@switchback/protocol"
+import { initial, reduceAll, reduceHistory, type ViewState } from "@switchback/store"
 import {
   initialStream,
   received,
@@ -11,15 +11,15 @@ import {
   type ServerFrame,
   type Step,
   type Stream,
-} from "@omni/wire"
+} from "@switchback/wire"
 import { createTransport, type ConnState, type Transport } from "./transport.js"
 import { tokenOf, whoAmI, type Me } from "./auth.js"
 
 /**
- * 事件流 → 视图状态。**和桌面端跑的是同一个归约器**（`@omni/store`），
+ * 事件流 → 视图状态。**和桌面端跑的是同一个归约器**（`@switchback/store`），
  * 所以两端不会漂移：手机上看到的「正在跑」和桌面上那条是同一次判断。
  *
- * 补洞那套（`@omni/wire` 的 `received` / `replayed` / `resynced`）也是同一份。
+ * 补洞那套（`@switchback/wire` 的 `received` / `replayed` / `resynced`）也是同一份。
  * 这一端多出来的只有两件事：**确认**（桌面那条 IPC 不会丢，这条会）
  * 和**去补**（发现序号跳了要主动要那一段）。
  */
@@ -165,7 +165,7 @@ export function useRemote(token: string): Remote {
 
   const send = useCallback((command: Command): boolean => {
     const sent = refs.current.transport?.send({ type: "command", command }) ?? false
-    if (!sent) setNotice("现在没连上 omni，这一下没有发出去。等连上再点一次。")
+    if (!sent) setNotice("现在没连上 Switchback，这一下没有发出去。等连上再点一次。")
     return sent
   }, [])
 

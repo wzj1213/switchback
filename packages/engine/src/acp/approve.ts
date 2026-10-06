@@ -1,11 +1,11 @@
-import type { Request as ApprovalRequest } from "@omni/approval"
-import type { RememberScope } from "@omni/protocol"
+import type { Request as ApprovalRequest } from "@switchback/approval"
+import type { RememberScope } from "@switchback/protocol"
 import { sanitize } from "../claude/permission.js"
 import { detailOf, toolNameOf } from "./translate.js"
 import type { AcpPermissionOption, AcpToolCall } from "./wire.js"
 
 /**
- * ACP 的审批请求 ↔ `@omni/approval`。
+ * ACP 的审批请求 ↔ `@switchback/approval`。
  *
  * ## 第三家，第三种形状
  *
@@ -49,8 +49,8 @@ const REJECT_ORDER: Readonly<Record<"once" | "always", readonly string[]>> = {
  * 反过来也一样：想放行却只有 reject，那就拒，不去猜用户其实想过。
  *
  * 记忆范围往 ACP 的两档上折：`once` 之外的都算 `always`。
- * ACP 只有「这次」和「记住」两种，表达不了 omni 的 session / project 之分——
- * 这个差额由 omni 自己的规则库补上，不指望引擎替我们记。
+ * ACP 只有「这次」和「记住」两种，表达不了 Switchback 的 session / project 之分——
+ * 这个差额由 Switchback 自己的规则库补上，不指望引擎替我们记。
  */
 export function pickOption(
   options: readonly AcpPermissionOption[],
@@ -149,7 +149,7 @@ export function summarize(call: AcpToolCall | undefined): string {
  * ACP 的工具身份是 `kind`，而各家往那张短枚举上映射是**有损的**——实测 kimi 只认
  * 十个名字，k3 那套工具（`Shell`、`ReadFile`…）全报 `other`，于是每条简单命令
  * 在自动编辑档下都要弹一次窗。`title` 是这时候唯一还认得出方向的东西。
- * 判定器只在 `kind` 认不出来时才看它，见 `@omni/approval` 的 `NAME_CATEGORY`。
+ * 判定器只在 `kind` 认不出来时才看它，见 `@switchback/approval` 的 `NAME_CATEGORY`。
  */
 export function buildRequest(
   engine: string,

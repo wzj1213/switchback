@@ -1,4 +1,4 @@
-import type { Command, RememberScope, Trust } from "@omni/protocol"
+import type { Command, RememberScope, Trust } from "@switchback/protocol"
 
 /**
  * 远程客户端能做什么。**这台机器上跑着一个有写和执行权限的 agent**，
@@ -50,7 +50,7 @@ function clampScope(scope: RememberScope, ceiling: Trust): { scope: RememberScop
  * 上限的承诺是「远程能改文件，但每条命令仍然要你点一次」。而一条**桌面上
  * 已经开着的完全档会话**从来不经过 `thread.create`——远程只要往它发一句
  * `thread.prompt`，引擎就按那条会话自己的完全档跑，一次审批都不弹。
- * `thread.fork` 更直接：`@omni/host` 的 branch 里是 `{...entry.thread}`，
+ * `thread.fork` 更直接：`@switchback/host` 的 branch 里是 `{...entry.thread}`，
  * 新会话**继承源会话的档**，于是远程凭空得到一条完全档会话。
  *
  * 所以判据从「这条命令要开哪一档」改成「这条命令作用在哪条会话上」。
@@ -92,7 +92,7 @@ export function clamp(command: Command, ceiling: Trust, trustOf?: (id: string) =
 
 function clampTrust(command: Command, ceiling: Trust): Clamped {
   if (command.type === "thread.adopt") {
-    // **接管没有档位可钳。** `@omni/host` 的 `adopt` 把 trust 写死成 `auto-edit`
+    // **接管没有档位可钳。** `@switchback/host` 的 `adopt` 把 trust 写死成 `auto-edit`
     //（它不猜那条会话原本在引擎里是什么档，猜错的方向如果是放宽就麻烦了）。
     // 于是只读上限对它完全无效：远程白拿一条能改文件的会话。
     // 命令里也没有 trust 字段可改，所以只能整条挡下——

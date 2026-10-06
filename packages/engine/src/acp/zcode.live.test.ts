@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 
 /**
@@ -14,7 +14,7 @@ import { createAcpDriver } from "./driver.js"
  *
  * 它钉的是一件纯函数测不到的事：**这家适配器到底认哪一发 RPC**。
  * 规范拼写的 `session/set_model` 在 zcode-acp-server 上是
- * `-32601 Method not found`（实测），而 omni 一直发的就是它——
+ * `-32601 Method not found`（实测），而 Switchback 一直发的就是它——
  * 用户点一下模型下拉，界面上弹一条红色「引擎故障」。
  *
  * 桩测试永远发现不了这个：桩会照着我们以为的样子回答。
@@ -35,7 +35,7 @@ describe("ZCode · live", () => {
       })
       const session = await driver.start({
         threadId: "th-live",
-        cwd: mkdtempSync(join(tmpdir(), "omni-zcode-")),
+        cwd: mkdtempSync(join(tmpdir(), "switchback-zcode-")),
         trust: "read-only",
         home: process.env["HOME"] ?? "",
         memory: () => [],
@@ -53,7 +53,7 @@ describe("ZCode · live", () => {
          * 不是随手挑第一个：这台机器上桥报的第一条是
          * `anthropic\GLM-5.3`——它的 provider 在 ZCode 的 config.json 里坏着
          *（registry 同步报 `providers.2.models: Too small`），换过去必然失败。
-         * 那是那份配置的问题，不是 omni 的；而这条测试要钉的是**换得成的那条路**。
+         * 那是那份配置的问题，不是 Switchback 的；而这条测试要钉的是**换得成的那条路**。
          */
         const target = models.find((m) => m.isDefault !== true) ?? models[0]
         expect(target).toBeDefined()
@@ -97,7 +97,7 @@ describe("ZCode · live · 压缩上下文", () => {
       })
       const session = await driver.start({
         threadId: "th-live-compact",
-        cwd: mkdtempSync(join(tmpdir(), "omni-zcode-c-")),
+        cwd: mkdtempSync(join(tmpdir(), "switchback-zcode-c-")),
         trust: "read-only",
         home: process.env["HOME"] ?? "",
         memory: () => [],
@@ -125,7 +125,7 @@ describe("ZCode · live · 压缩上下文", () => {
     })
     const session = await driver.start({
       threadId: "th-live-nocompact",
-      cwd: mkdtempSync(join(tmpdir(), "omni-zcode-n-")),
+      cwd: mkdtempSync(join(tmpdir(), "switchback-zcode-n-")),
       trust: "read-only",
       home: process.env["HOME"] ?? "",
       memory: () => [],

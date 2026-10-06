@@ -78,7 +78,7 @@ describe("Codex 权限 profile 审批", () => {
     const d = deps({ allow: true, remember: "once" })
     await answerApproval(row.call, d)
     expect(row.replies).toEqual([{
-      error: { code: -32601, message: "omni 未认领 item/future/requestApproval" },
+      error: { code: -32601, message: "Switchback 未认领 item/future/requestApproval" },
     }])
     expect(d.askUser).not.toHaveBeenCalled()
   })

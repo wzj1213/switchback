@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { app, ipcMain } from "electron"
-import type { Command, Event, Trust } from "@omni/protocol"
-import type { Ledger } from "@omni/wire"
+import type { Command, Event, Trust } from "@switchback/protocol"
+import type { Ledger } from "@switchback/wire"
 import type { Sink, Sinks } from "../sink.js"
 import type { Logger } from "./../log.js"
 import type { Settings } from "../../shared/settings.js"
@@ -229,16 +229,16 @@ interface Channels {
 
 /** 设置面板要用的四条窄通道。**每一条都回一份完整状态**，理由见 preload。 */
 function installChannels(ch: Channels): void {
-  ipcMain.handle("omni:remote/status", () => ch.status())
-  ipcMain.handle("omni:remote/sync", async () => {
+  ipcMain.handle("switchback:remote/status", () => ch.status())
+  ipcMain.handle("switchback:remote/sync", async () => {
     await ch.sync()
     return ch.status()
   })
-  ipcMain.handle("omni:remote/pair", () => {
+  ipcMain.handle("switchback:remote/pair", () => {
     ch.pair()
     return ch.status()
   })
-  ipcMain.handle("omni:remote/revoke", (_e, id: unknown) => {
+  ipcMain.handle("switchback:remote/revoke", (_e, id: unknown) => {
     if (typeof id === "string") ch.revoke(id)
     return ch.status()
   })

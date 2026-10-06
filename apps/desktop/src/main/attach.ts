@@ -35,8 +35,8 @@ async function pickFiles(files: AttachmentFiles): Promise<PickedFiles> {
  * 而会话记录里的路径会指向一个不存在的文件——那比没有更糟。
  */
 export function installAttachChannel(files: AttachmentFiles): void {
-  ipcMain.handle("omni:pickFiles", () => pickFiles(files))
-  ipcMain.handle("omni:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
+  ipcMain.handle("switchback:pickFiles", () => pickFiles(files))
+  ipcMain.handle("switchback:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
     const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined
     const buf = Buffer.from(req.bytes)
@@ -47,15 +47,15 @@ export function installAttachChannel(files: AttachmentFiles): void {
     await writeFile(path, buf)
     return path
   })
-  ipcMain.on("omni:discardImages", (_e, paths: unknown) => {
+  ipcMain.on("switchback:discardImages", (_e, paths: unknown) => {
     if (!Array.isArray(paths)) return
     void files.discard(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
   })
-  ipcMain.on("omni:allowAttachmentPaths", (_e, paths: unknown) => {
+  ipcMain.on("switchback:allowAttachmentPaths", (_e, paths: unknown) => {
     if (!Array.isArray(paths)) return
     files.allow(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
   })
-  ipcMain.handle("omni:thumb", (_e, req: unknown) => {
+  ipcMain.handle("switchback:thumb", (_e, req: unknown) => {
     if (typeof req !== "object" || req === null) return undefined
     const { path, max } = req as { path?: unknown; max?: unknown }
     const size = thumbnailSize(max)

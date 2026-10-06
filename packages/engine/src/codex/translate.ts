@@ -7,7 +7,7 @@ import type {
   ToolStatus,
   TurnId,
   TurnStatus,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import type { WireFileChangeEntry, WireItem, WireTurnStatus } from "./wire.js"
 
 export interface CodexContext {
@@ -209,12 +209,12 @@ export function toToolCall(item: WireItem, ctx: CodexContext, complete = false):
 }
 
 /**
- * `WireItem` → omni `Item`。
+ * `WireItem` → Switchback `Item`。
  *
  * `userMessage` 返回 `undefined`：那条 item 宿主在发 prompt 时已经自己发过了，
  * 引擎再发一遍会在界面上出现两条一样的用户消息。
  */
-export function itemToOmni(item: WireItem, ctx: CodexContext, complete: boolean): Item | undefined {
+export function itemToSwitchback(item: WireItem, ctx: CodexContext, complete: boolean): Item | undefined {
   if (item.type === "userMessage") return undefined
   const base = { id: item.id, turnId: ctx.turnId, at: ctx.at }
   if (item.type === "contextCompaction") {

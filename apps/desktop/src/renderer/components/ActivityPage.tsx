@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react"
-import type { Item, Lane, Thread } from "@omni/protocol"
+import type { Item, Lane, Thread } from "@switchback/protocol"
 import type { ResolveApproval } from "./Approval.js"
 import { groupRows } from "../group.js"
 import { compact } from "../usage.js"

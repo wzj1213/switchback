@@ -1,4 +1,4 @@
-import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@omni/protocol"
+import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import { sanitize } from "../claude/permission.js"
 import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"

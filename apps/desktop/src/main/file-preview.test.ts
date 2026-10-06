@@ -11,8 +11,8 @@ const req = (cwd: string, path: string): { threadId: string; cwd: string; path: 
 
 describe("文件预览边界", () => {
   it("读取工作区文本与 HTML，拒绝越界、符号链接越界和二进制", async () => {
-    const root = await mkdtemp(join(tmpdir(), "omni-preview-root-"))
-    const outside = await mkdtemp(join(tmpdir(), "omni-preview-outside-"))
+    const root = await mkdtemp(join(tmpdir(), "switchback-preview-root-"))
+    const outside = await mkdtemp(join(tmpdir(), "switchback-preview-outside-"))
     try {
       await writeFile(join(root, "page.html"), "<h1>预览</h1>")
       await writeFile(join(root, "binary.bin"), Buffer.from([0, 1, 2, 3]))
@@ -47,8 +47,8 @@ describe("文件预览边界", () => {
   })
 
   it("会话自己读过的文件，工作区外与符号链接外都照读；没读过的仍然挡住", async () => {
-    const root = await mkdtemp(join(tmpdir(), "omni-preview-root-"))
-    const outside = await mkdtemp(join(tmpdir(), "omni-preview-outside-"))
+    const root = await mkdtemp(join(tmpdir(), "switchback-preview-root-"))
+    const outside = await mkdtemp(join(tmpdir(), "switchback-preview-outside-"))
     try {
       const skill = join(outside, "SKILL.md")
       await writeFile(skill, "# 技能")
@@ -86,7 +86,7 @@ describe("文件预览边界", () => {
   })
 
   it("先核对会话真实工作区，伪造根目录时不会读取任意路径", async () => {
-    const outside = await mkdtemp(join(tmpdir(), "omni-preview-forged-"))
+    const outside = await mkdtemp(join(tmpdir(), "switchback-preview-forged-"))
     try {
       const secret = join(outside, "secret.txt")
       await writeFile(secret, "不能泄露")

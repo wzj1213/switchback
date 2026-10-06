@@ -17,10 +17,10 @@ import { CopyIcon } from "./icons.js"
  *
  * ## 命令是抄来的，不是编的
  *
- * 只有 omni 真的知道来源的那几家才给命令（npm 上那两家、加上轻量版 Claude），
- * 其余照实说「omni 不知道这一家怎么装」并指个方向。
+ * 只有 Switchback 真的知道来源的那几家才给命令（npm 上那两家、加上轻量版 Claude），
+ * 其余照实说「Switchback 不知道这一家怎么装」并指个方向。
  * **编一条看起来像模像样的命令是这里最坏的选项**：它一旦是错的，
- * 用户会以为是 omni 把机器装坏了，而 omni 根本没有能力维护那条命令。
+ * 用户会以为是 Switchback 把机器装坏了，而 Switchback 根本没有能力维护那条命令。
  *
  * 命令**永远先摆出来再执行**：那颗按钮逐字跑的就是上面那行字，
  * 不点也可以自己复制去终端跑。
@@ -38,7 +38,7 @@ export function EngineInstall({
   onBusy: (engine: string | undefined) => void
   onDone: (next: EngineVersion) => void
 }): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   const [result, setResult] = useState<UpdateResult | undefined>(undefined)
   const [running, setRunning] = useState(false)
   const command = version.install
@@ -46,7 +46,7 @@ export function EngineInstall({
     <>
       <Field label={version.label} hint={hintOf(version, running, result)} stack={command !== undefined}>
         {command === undefined ? (
-          <span className="set__hint">omni 不代装这一家</span>
+          <span className="set__hint">Switchback 不代装这一家</span>
         ) : (
           <div className="eng-command">
             <code>{command}</code>
@@ -66,7 +66,7 @@ export function EngineInstall({
               aria-busy={running}
               title={`将执行：${command}`}
               onClick={() => {
-                const request = omni?.installEngine(version.engine)
+                const request = switchback?.installEngine(version.engine)
                 if (request === undefined) return
                 setRunning(true)
                 onBusy(version.engine)
@@ -112,7 +112,7 @@ function hintOf(
   const where = version.detail ?? "这一家在这台机器上不在 PATH 上"
   return version.install === undefined
     ? `还没装。${where}`
-    : `还没装。点「安装」会逐字执行右边那条命令，${where === version.detail ? where : "装完 omni 会自己重新探测"}`
+    : `还没装。点「安装」会逐字执行右边那条命令，${where === version.detail ? where : "装完 Switchback 会自己重新探测"}`
 }
 
 function messageOf(error: unknown): string {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { QuestionPrompt } from "@omni/protocol"
+import type { QuestionPrompt } from "@switchback/protocol"
 import { freshDrafts, questionResponse } from "./question-answer.js"
 
 const questions: readonly QuestionPrompt[] = [

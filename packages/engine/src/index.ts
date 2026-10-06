@@ -63,7 +63,7 @@ export { synthDiff } from "./synth.js"
 export { createRpc } from "./rpc.js"
 export { handleNotification } from "./codex/notify.js"
 export {
-  itemToOmni,
+  itemToSwitchback,
   toToolCall,
   toolStatus,
   countDiff,

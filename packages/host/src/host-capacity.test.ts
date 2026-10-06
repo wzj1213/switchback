@@ -4,8 +4,8 @@ import {
   type Event,
   type QuestionPrompt,
   type QuestionResponse,
-} from "@omni/protocol"
-import type { EngineSession } from "@omni/engine"
+} from "@switchback/protocol"
+import type { EngineSession } from "@switchback/engine"
 import { createHost, type Host } from "./host.js"
 import { setup, create, setupTwoEngines } from "./host-fixture.js"
 
@@ -164,7 +164,7 @@ describe("活会话上限：闲着的先收掉", () => {
 /**
  * 临时会话：**发出第一句话才算数**。
  *
- * 点一下「+」（以及 omni 启动时自动开的那条）先给的是一个临时窗口——
+ * 点一下「+」（以及 Switchback 启动时自动开的那条）先给的是一个临时窗口——
  * 引擎照起（模型清单、斜杠命令都要它才有），但它不进侧栏、不落盘。
  * 「不进侧栏」是渲染层的事，这里钉的是它下面那条契约：`Thread.provisional`
  * 什么时候立、什么时候清、以及没人要的那条怎么收场。

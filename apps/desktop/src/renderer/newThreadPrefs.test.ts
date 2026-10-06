@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 import type { LastUsed } from "../shared/settings.js"
 import { learnFrom, openWith, openWithEngines } from "./newThreadPrefs.js"
 

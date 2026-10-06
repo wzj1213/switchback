@@ -1,5 +1,5 @@
-import type { Item } from "@omni/protocol"
-import { itemToOmni, textOf } from "./translate.js"
+import type { Item } from "@switchback/protocol"
+import { itemToSwitchback, textOf } from "./translate.js"
 import type { WireItem, WireTurnStatus } from "./wire.js"
 
 /** `thread/resume` 里随 thread 返回的公开历史窄声明。 */
@@ -80,7 +80,7 @@ function visibleItem(
   if ((wire.type === "agentMessage" || wire.type === "reasoning") && textOf(wire).trim() === "") {
     return undefined
   }
-  return itemToOmni({ ...wire, id: historyId(wire.id, fallbackId) }, { turnId, at }, true)
+  return itemToSwitchback({ ...wire, id: historyId(wire.id, fallbackId) }, { turnId, at }, true)
 }
 
 function failedItem(turn: CodexHistoryTurn, turnId: string, at: number): Item | undefined {

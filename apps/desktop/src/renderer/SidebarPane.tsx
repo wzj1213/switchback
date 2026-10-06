@@ -1,4 +1,4 @@
-import type { Command, EngineInfo, EngineThread, Thread } from "@omni/protocol"
+import type { Command, EngineInfo, EngineThread, Thread } from "@switchback/protocol"
 import { Sidebar } from "./components/Sidebar.js"
 import type { SidebarRow } from "./sidebar.js"
 import type { AccountLine } from "./components/SidebarFoot.js"

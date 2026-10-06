@@ -1,4 +1,4 @@
-import type { Request as ApprovalRequest } from "@omni/approval"
+import type { Request as ApprovalRequest } from "@switchback/approval"
 import { sanitize } from "../claude/permission.js"
 import type { KimiApproval, KimiToolDisplay } from "./wire.js"
 

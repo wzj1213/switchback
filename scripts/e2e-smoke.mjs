@@ -203,7 +203,7 @@ async function inspect(cdp) {
   await waitFor(cdp, "document.querySelector('.shell') !== null")
   const boot = await value(
     cdp,
-    `window.omni.appInfo().then(info => ({ bridge: typeof window.omni.send === "function", version: info.version, shell: document.querySelector(".shell") !== null }))`,
+    `window.switchback.appInfo().then(info => ({ bridge: typeof window.switchback.send === "function", version: info.version, shell: document.querySelector(".shell") !== null }))`,
   )
   assert(
     boot.bridge && boot.shell && typeof boot.version === "string",
@@ -264,7 +264,7 @@ async function inspect(cdp) {
 
 async function main() {
   const port = await freePort()
-  const data = await mkdtemp(join(tmpdir(), "omni-smoke-"))
+  const data = await mkdtemp(join(tmpdir(), "switchback-smoke-"))
   await writeFile(join(data, "settings.json"), `${JSON.stringify({ projects: [ROOT] })}\n`)
   const output = []
   const child = spawn(

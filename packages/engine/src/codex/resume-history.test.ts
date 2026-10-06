@@ -35,7 +35,7 @@ describe("Codex resume 正文", () => {
       args: ["-e", FAKE_RESUME_SERVER],
       reclaim: { exitGraceMs: 200, termGraceMs: 200, killGraceMs: 200 },
     }).start({
-      threadId: "omni-thread",
+      threadId: "switchback-thread",
       resume: "native-requested",
       cwd: process.cwd(),
       home: "/h",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Thread } from "@omni/protocol"
-import { createPaceBook } from "@omni/store"
+import type { Event, Thread } from "@switchback/protocol"
+import { createPaceBook } from "@switchback/store"
 import { emit, liveStateOf, ownerOf } from "./ctx.js"
 import type { Ctx } from "./ctx.js"
 

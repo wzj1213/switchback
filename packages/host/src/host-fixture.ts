@@ -4,9 +4,9 @@ import {
   type EngineGoal,
   type Event,
   type Item,
-} from "@omni/protocol"
-import type { ApprovalAsk, EngineDriver, EngineSession, NativeTurnStart, StartRequest } from "@omni/engine"
-import type { Rule } from "@omni/approval"
+} from "@switchback/protocol"
+import type { ApprovalAsk, EngineDriver, EngineSession, NativeTurnStart, StartRequest } from "@switchback/engine"
+import type { Rule } from "@switchback/approval"
 import { createHost, type Host } from "./host.js"
 import type { HostDeps } from "./deps.js"
 

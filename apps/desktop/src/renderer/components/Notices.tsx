@@ -2,8 +2,8 @@ import { useEffect } from "react"
 import { CloseIcon } from "./icons-panel.js"
 import { AlertIcon } from "./icons-activity.js"
 import { humanize } from "../../shared/failure.js"
-import type { Notice } from "@omni/store"
-import type { ThreadRow } from "@omni/store"
+import type { Notice } from "@switchback/store"
+import type { ThreadRow } from "@switchback/store"
 
 type NoticeTone = "danger" | "warning" | "info"
 
@@ -17,7 +17,7 @@ function toneOf(notice: Notice): NoticeTone {
 
 /**
  * 横幅上摆哪一条。平时是最新那条；**有没关掉的「批量外发」就一直是它**：
- * omni 停掉一个正在往外传的引擎之后，驱动紧接着会报一条「进程退出了」——
+ * Switchback 停掉一个正在往外传的引擎之后，驱动紧接着会报一条「进程退出了」——
  * 按最新摆的话，那条故障会把真正的原因盖掉。
  */
 function shownOf(notices: readonly Notice[]): Notice | undefined {

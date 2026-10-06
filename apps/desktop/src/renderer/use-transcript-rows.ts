@@ -1,4 +1,4 @@
-import type { Item, Thread, Turn, TurnId, TurnPace } from "@omni/protocol"
+import type { Item, Thread, Turn, TurnId, TurnPace } from "@switchback/protocol"
 import { useCallback, useMemo, useState } from "react"
 import { foldTurns, groupRows, withAsides, withEngineMarks, type Row } from "./group.js"
 

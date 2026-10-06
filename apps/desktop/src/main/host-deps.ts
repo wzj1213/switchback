@@ -1,6 +1,6 @@
 import { join } from "node:path"
-import type { HostDeps } from "@omni/host"
-import type { Journal } from "@omni/journal"
+import type { HostDeps } from "@switchback/host"
+import type { Journal } from "@switchback/journal"
 import type { Logger } from "./log.js"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
 import { createHandoffBrief } from "./handoff-brief.js"

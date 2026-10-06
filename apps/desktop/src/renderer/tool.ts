@@ -1,4 +1,4 @@
-import type { ToolCallItem, ToolDetail } from "@omni/protocol"
+import type { ToolCallItem, ToolDetail } from "@switchback/protocol"
 import { fileReference } from "./file-references.js"
 
 /**

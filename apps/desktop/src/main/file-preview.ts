@@ -1,7 +1,7 @@
 import { open, realpath, stat } from "node:fs/promises"
 import { basename, extname, isAbsolute, relative, resolve } from "node:path"
 import { ipcMain, nativeImage } from "electron"
-import type { ThreadId } from "@omni/protocol"
+import type { ThreadId } from "@switchback/protocol"
 import type { FilePreview, FilePreviewRequest } from "../shared/file-preview.js"
 import type { TouchedFiles } from "./touched.js"
 import type { WorksiteSearch } from "./worksite-search.js"
@@ -152,7 +152,7 @@ export async function previewFile(
 }
 
 export function installFilePreviewChannel(touched: TouchedFiles, worksites: WorksiteSearch): void {
-  ipcMain.handle("omni:filePreview", (_event, req: unknown) => (
+  ipcMain.handle("switchback:filePreview", (_event, req: unknown) => (
     previewFile(req, touched.allows, worksites.owns)
   ))
 }

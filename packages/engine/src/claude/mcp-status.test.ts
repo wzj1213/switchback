@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { ClaudeMcpStatus } from "./mcp-status.js"
 
 describe("Claude MCP 启动状态", () => {

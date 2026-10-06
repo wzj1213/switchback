@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
-import type { ThreadId } from "@omni/protocol"
-import { createPaceBook, livePace } from "@omni/store"
-import type { Sealed } from "@omni/wire"
+import type { ThreadId } from "@switchback/protocol"
+import { createPaceBook, livePace } from "@switchback/store"
+import type { Sealed } from "@switchback/wire"
 import { createScope, drain, retarget } from "./flow-scope.js"
 import { clearTapeText, createTapeText, nextChar } from "./tape-text.js"
 import { clearMeter, createMeter, rateOf } from "./throughput.js"
@@ -9,14 +9,14 @@ import { clearMeter, createMeter, rateOf } from "./throughput.js"
 /**
  * 这一条会话此刻吐得多快（token/秒）。
  *
- * ## 为什么自己订一份，而不是搭 `useOmni` 的车
+ * ## 为什么自己订一份，而不是搭 `useSwitchback` 的车
  *
- * `useOmni` 那条路上的每一步都要**改 React 状态**：它维护的是「界面该长什么样」，
+ * `useSwitchback` 那条路上的每一步都要**改 React 状态**：它维护的是「界面该长什么样」，
  * 一批事件进来 `setState` 一次。而流速是**每帧读一次的数**，不该让它经过一次
  * 重渲染——一秒六十次重渲染，只为把一个数字送给一张 canvas。
  *
  * 桥那头是 `ipcRenderer.on`，本来就允许挂多个监听。于是这一层完整地独立：
- * **不碰 `useOmni`、不碰 store、不碰归约器**，关掉它的时候那三样一无所知。
+ * **不碰 `useSwitchback`、不碰 store、不碰归约器**，关掉它的时候那三样一无所知。
  *
  * ## 返回函数而不是数
  *
@@ -26,7 +26,7 @@ import { clearMeter, createMeter, rateOf } from "./throughput.js"
  * ## 为什么返回好几个数
  *
  * `rate` 是**速度表**（最近 1.2 秒多快，驱动开火节奏），`speed` 是这一轮**此刻的出字速度**
- *（和收工后分界线上印的那个同一个算法，见 `@omni/store` 的 `pace.ts`）。两个都从同一条事件流上来，
+ *（和收工后分界线上印的那个同一个算法，见 `@switchback/store` 的 `pace.ts`）。两个都从同一条事件流上来，
  * 但回答的是不同的问题——**合成一个数就一定会有人拿速度表的读数去对账**，所以从这儿出去就是分开的。
  * 跑完的那一轮的成绩不从这儿出：它是宿主量好、跟着 `turn.completed` 落了盘的那一份，从 store 读。
  * `nextChar` 给纸带取字：模型刚写出来的那些字（`tape-text.ts`）。
@@ -67,7 +67,7 @@ export function useFlow(thread: ThreadId | undefined): () => Flow {
   }, [thread])
 
   useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.omni
+    const bridge = typeof window === "undefined" ? undefined : window.switchback
     if (bridge === undefined) return undefined
     return bridge.subscribe((sealed: readonly Sealed[]) => {
       drain(scope.current, { meter: meter.current, book: book.current, tape: tape.current }, sealed, performance.now())

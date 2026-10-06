@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Thread, TurnPace } from "@omni/protocol"
+import type { Event, Thread, TurnPace } from "@switchback/protocol"
 import { initial, latestPaceOf, pacesOf } from "./state.js"
 import { reduceAll, reduceHistory } from "./reduce.js"
 

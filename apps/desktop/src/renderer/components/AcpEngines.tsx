@@ -44,19 +44,19 @@ export function useAcpPage(): {
   engines: Async<readonly AcpEngineRow[]>
   changed: () => void
 } {
-  const omni = bridge()
+  const switchback = bridge()
   const [revision, setRevision] = useState(0)
   const force = useRef(false)
   const loadRegistry = useMemo(() => {
-    if (omni === undefined) return undefined
+    if (switchback === undefined) return undefined
     return (): Promise<RegistryView> => {
       const now = force.current
       force.current = false
-      return omni.acpRegistry(now)
+      return switchback.acpRegistry(now)
     }
     // revision 变了就要一份新的 load，useAsync 才会重读
-  }, [omni, revision])
-  const loadEngines = useMemo(() => (omni === undefined ? undefined : () => omni.acpEngines()), [omni, revision])
+  }, [switchback, revision])
+  const loadEngines = useMemo(() => (switchback === undefined ? undefined : () => switchback.acpEngines()), [switchback, revision])
   const registry = useAsync(loadRegistry)
   const engines = useAsync(loadEngines)
   const { reload } = registry

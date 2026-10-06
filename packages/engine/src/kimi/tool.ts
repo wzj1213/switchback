@@ -1,4 +1,4 @@
-import type { FileChange, ToolCallItem, ToolDetail, ToolStatus, TurnId } from "@omni/protocol"
+import type { FileChange, ToolCallItem, ToolDetail, ToolStatus, TurnId } from "@switchback/protocol"
 import { synthDiff } from "../synth.js"
 import type { KimiPayload, KimiToolDisplay, KimiTranscriptFrame } from "./wire.js"
 

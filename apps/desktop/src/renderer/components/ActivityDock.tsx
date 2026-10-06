@@ -1,4 +1,4 @@
-import type { Lane } from "@omni/protocol"
+import type { Lane } from "@switchback/protocol"
 import { PlanMark } from "./PlanMark.js"
 import { ChevronIcon } from "./icons.js"
 

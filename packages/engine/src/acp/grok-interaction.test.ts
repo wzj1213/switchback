@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { QuestionAnswer, QuestionResponse } from "@omni/protocol"
+import type { QuestionAnswer, QuestionResponse } from "@switchback/protocol"
 import { grokInteraction, grokInteractionResolved } from "./grok-interaction.js"
 
 const PARAMS = {

@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 import { afterEach, describe, expect, it } from "vitest"
 import { createAttachmentFiles, thumbnailSize } from "./attachment-files.js"
 
@@ -12,7 +12,7 @@ afterEach(async () => {
 })
 
 async function fixture(): Promise<{ root: string; dir: string }> {
-  const root = await mkdtemp(join(tmpdir(), "omni-attachment-files-"))
+  const root = await mkdtemp(join(tmpdir(), "switchback-attachment-files-"))
   const dir = join(root, "attachments")
   roots.push(root)
   await mkdir(dir)
@@ -56,7 +56,7 @@ function pathsIn(dir: string): {
 }
 
 describe("粘贴图片文件所有权", () => {
-  it("只回收 omni 管理且没有历史引用的图片；共享引用等最后一条会话删除", async () => {
+  it("只回收 Switchback 管理且没有历史引用的图片；共享引用等最后一条会话删除", async () => {
     const { root, dir } = await fixture()
     const paths = pathsIn(dir)
     const external = join(root, "original.png")

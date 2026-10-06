@@ -1,4 +1,4 @@
-import type { Event, ItemId, NoticeLevel, TurnId, TurnStatus } from "@omni/protocol"
+import type { Event, ItemId, NoticeLevel, TurnId, TurnStatus } from "@switchback/protocol"
 import type { WireModelRerouted, WireModelVerification, WireSafetyBuffering, WireStrictReview } from "./wire.js"
 
 export interface SafetyContext {

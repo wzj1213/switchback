@@ -13,7 +13,7 @@ function profile(home: string, name: string, manifest: unknown, patch = false): 
 
 describe("DSH profile 清单", () => {
   it("保留 bundle 顺序、直接依赖版本与 patch 状态", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omni-dsh-profiles-"))
+    const home = mkdtempSync(join(tmpdir(), "switchback-dsh-profiles-"))
     profile(home, "acp", {
       dependencies: { "@deepseek-ai/dsh-acp": "rc.6", "community-adapter": "1.2.3" },
       dsh: { profile: { bundles: ["@deepseek-ai/dsh-base", "community-adapter"] } },
@@ -34,7 +34,7 @@ describe("DSH profile 清单", () => {
   })
 
   it("坏 manifest 留在清单里并标不可用，profiles/node_modules 不冒充 profile", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omni-dsh-profiles-"))
+    const home = mkdtempSync(join(tmpdir(), "switchback-dsh-profiles-"))
     const broken = join(home, "profiles", "broken")
     mkdirSync(broken, { recursive: true })
     writeFileSync(join(broken, "package.json"), "{", "utf8")

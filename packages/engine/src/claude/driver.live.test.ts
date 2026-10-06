@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir, homedir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 import type { ApprovalAsk } from "../contract.js"
 
@@ -15,8 +15,8 @@ import type { ApprovalAsk } from "../contract.js"
  */
 
 function workspace(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omni-live-"))
-  writeFileSync(join(dir, "hello.txt"), "omni\n")
+  const dir = mkdtempSync(join(tmpdir(), "switchback-live-"))
+  writeFileSync(join(dir, "hello.txt"), "Switchback\n")
   return dir
 }
 
@@ -63,7 +63,7 @@ async function run(prompt: string, answer: boolean, isolate: boolean): Promise<R
 
 describe("Claude 驱动 · live", () => {
   it(
-    "permissionMode:'auto' 下工作区内安全写入不再来问 omni",
+    "permissionMode:'auto' 下工作区内安全写入不再来问 Switchback",
     async () => {
       const { events, asks } = await run(
         "在当前目录创建 safe.txt，内容只写 safe。不要做别的。",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { Thread } from "@omni/protocol"
-import type { ThreadRow } from "@omni/store"
+import type { Thread } from "@switchback/protocol"
+import type { ThreadRow } from "@switchback/store"
 import {
   baseNameOf,
   groupByWorkspace,
@@ -72,8 +72,8 @@ describe("折叠起来的项目行要说什么", () => {
 
 describe("目录名", () => {
   it("取最后一段", () => {
-    expect(baseNameOf("/Users/w/work/omni")).toBe("omni")
-    expect(baseNameOf("/Users/w/work/omni/")).toBe("omni")
+    expect(baseNameOf("/Users/w/work/switchback")).toBe("switchback")
+    expect(baseNameOf("/Users/w/work/switchback/")).toBe("switchback")
   })
 
   it("根目录不要变成空字符串", () => {
@@ -84,37 +84,37 @@ describe("目录名", () => {
 
 describe("一行显示什么", () => {
   it("还没人起过名时才用第一句话——它至少能区分同一项目下的几个会话", () => {
-    expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "omni", preview: "给 add 加 JSDoc" }))).toBe("给 add 加 JSDoc")
+    expect(rowLabelOf(row({ id: "t", cwd: "/w/switchback", title: "switchback", preview: "给 add 加 JSDoc" }))).toBe("给 add 加 JSDoc")
   })
 
   it("**引擎自己起的名字压过第一句话**——第一句常常是一整段命令行", () => {
     const shell = "curl -s https://git.example.com/tools/setup.sh | bash && git clone …"
     // title 已经不是出生时那个目录名了，说明宿主收到过原生标题（rememberTitle）
-    expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "拉取仓库并配置提交钩子", preview: shell })))
+    expect(rowLabelOf(row({ id: "t", cwd: "/w/switchback", title: "拉取仓库并配置提交钩子", preview: shell })))
       .toBe("拉取仓库并配置提交钩子")
   })
 
   it("标题就是目录名时不重复显示——组标题已经说过一遍了", () => {
-    expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "omni" }))).toBe("新会话")
+    expect(rowLabelOf(row({ id: "t", cwd: "/w/switchback", title: "switchback" }))).toBe("新会话")
   })
 
   it("用户自己起过标题就用它", () => {
-    expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "重构审批链路" }))).toBe("重构审批链路")
+    expect(rowLabelOf(row({ id: "t", cwd: "/w/switchback", title: "重构审批链路" }))).toBe("重构审批链路")
   })
 
   it("全是空白的第一句话当没有", () => {
-    expect(rowLabelOf(row({ id: "t", cwd: "/w/omni", title: "omni", preview: "   " }))).toBe("新会话")
+    expect(rowLabelOf(row({ id: "t", cwd: "/w/switchback", title: "switchback", preview: "   " }))).toBe("新会话")
   })
 })
 
 describe("按工作区分组", () => {
   it("同一个目录的收在一组", () => {
     const groups = groupByWorkspace([
-      row({ id: "a", cwd: "/w/omni", title: "omni", preview: "第一件事" }),
+      row({ id: "a", cwd: "/w/switchback", title: "switchback", preview: "第一件事" }),
       row({ id: "b", cwd: "/w/other", title: "other", preview: "别的事" }),
-      row({ id: "c", cwd: "/w/omni", title: "omni", preview: "第二件事" }),
+      row({ id: "c", cwd: "/w/switchback", title: "switchback", preview: "第二件事" }),
     ])
-    expect(groups.map((g) => g.label)).toEqual(["omni", "other"])
+    expect(groups.map((g) => g.label)).toEqual(["switchback", "other"])
     expect(groups[0]?.rows.map((r) => r.thread.id)).toEqual(["a", "c"])
   })
 
@@ -134,20 +134,20 @@ describe("按工作区分组", () => {
 
 describe("侧栏分三段", () => {
   const rows = [
-    row({ id: "a", cwd: "/w/omni", title: "omni", preview: "第一件事", updatedAt: 30 }),
+    row({ id: "a", cwd: "/w/switchback", title: "switchback", preview: "第一件事", updatedAt: 30 }),
     row({ id: "b", cwd: "/w/other", title: "other", preview: "别的事", updatedAt: 10 }),
-    row({ id: "c", cwd: "/w/omni", title: "omni", preview: "第二件事", updatedAt: 20 }),
+    row({ id: "c", cwd: "/w/switchback", title: "switchback", preview: "第二件事", updatedAt: 20 }),
   ]
 
   it("置顶的从项目里挪走，不会两边都出现", () => {
-    const out = sectionsOf(rows, pinsOf(["/w/omni"]))
-    expect(out.pinned.map((g) => g.cwd)).toEqual(["/w/omni"])
+    const out = sectionsOf(rows, pinsOf(["/w/switchback"]))
+    expect(out.pinned.map((g) => g.cwd)).toEqual(["/w/switchback"])
     expect(out.projects.map((g) => g.cwd)).toEqual(["/w/other"])
   })
 
   it("**置顶按用户钉住的先后排**，不按活动时间——底下再自动重排一次就等于没钉", () => {
-    const out = sectionsOf(rows, pinsOf(["/w/other", "/w/omni"]))
-    expect(out.pinned.map((g) => g.cwd)).toEqual(["/w/other", "/w/omni"])
+    const out = sectionsOf(rows, pinsOf(["/w/other", "/w/switchback"]))
+    expect(out.pinned.map((g) => g.cwd)).toEqual(["/w/other", "/w/switchback"])
   })
 
   it("置顶里写了一个不存在的路径就跳过，不留空组", () => {
@@ -161,7 +161,7 @@ describe("侧栏分三段", () => {
 
   it("**一条会话只出现一次**——这条不变量一破，选中/改名/删除确认就会同时亮两处", () => {
     const withChat = [...rows, row({ id: "z", cwd: "/w/聊天目录", title: "随手问问", updatedAt: 9, workspaceKind: "chat" })]
-    for (const pins of [[], ["/w/omni"], ["/w/other", "/w/omni"]]) {
+    for (const pins of [[], ["/w/switchback"], ["/w/other", "/w/switchback"]]) {
       const out = sectionsOf(withChat, pinsOf(pins))
       const ids = [
         ...out.pinned.flatMap((g) => g.rows.map((r) => r.thread.id)),

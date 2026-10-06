@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { SETTINGS_DEFAULTS } from "../shared/settings.js"
 
-const dir = { path: mkdtempSync(join(tmpdir(), "omni-settings-")) }
+const dir = { path: mkdtempSync(join(tmpdir(), "switchback-settings-")) }
 const theme = { source: "system" }
 
 vi.mock("electron", () => ({
@@ -27,7 +27,7 @@ const file = (): string => join(dir.path, "settings.json")
 
 describe("偏好", () => {
   beforeEach(() => {
-    dir.path = mkdtempSync(join(tmpdir(), "omni-settings-"))
+    dir.path = mkdtempSync(join(tmpdir(), "switchback-settings-"))
     theme.source = "system"
   })
 
@@ -97,22 +97,22 @@ describe("偏好", () => {
     }
 
     it("**粘一整个 `https://host:port` 也认**——那一串正是人在手机上打开的地址，粘进来带 scheme 是最自然的动作，不是打错", () => {
-      expect(hosts(["https://omni.example.com:8443"])).toEqual(["omni.example.com:8443"])
+      expect(hosts(["https://switchback.example.com:8443"])).toEqual(["switchback.example.com:8443"])
     })
 
     it("http 的、末尾带斜杠的、前后带空格的，一样收", () => {
-      expect(hosts(["http://omni.example.com/", "  https://a.b:1  "])).toEqual([
-        "omni.example.com",
+      expect(hosts(["http://switchback.example.com/", "  https://a.b:1  "])).toEqual([
+        "switchback.example.com",
         "a.b:1",
       ])
     })
 
     it("裸的原样不动", () => {
-      expect(hosts(["omni.example.com:8443"])).toEqual(["omni.example.com:8443"])
+      expect(hosts(["switchback.example.com:8443"])).toEqual(["switchback.example.com:8443"])
     })
 
     it("**带路径的不猜**——`host/path` 会把整个主机名授权出去，而人以为只授权了那条路径。留给启动时大声失败", () => {
-      expect(hosts(["https://omni.example.com/path"])).toEqual(["https://omni.example.com/path"])
+      expect(hosts(["https://switchback.example.com/path"])).toEqual(["https://switchback.example.com/path"])
     })
 
     it("**档位认不出就回默认，绝不落到最宽的那一档**", () => {
@@ -149,12 +149,12 @@ describe("偏好", () => {
 
   it("写入之后落盘，再读回来还在", () => {
     const store = createSettings(log)
-    store.patch({ pinned: ["/w/omni"], theme: "dark" })
+    store.patch({ pinned: ["/w/switchback"], theme: "dark" })
     expect(JSON.parse(readFileSync(file(), "utf8")) as unknown).toMatchObject({
-      pinned: ["/w/omni"],
+      pinned: ["/w/switchback"],
       theme: "dark",
     })
-    expect(createSettings(log).get().pinned).toEqual(["/w/omni"])
+    expect(createSettings(log).get().pinned).toEqual(["/w/switchback"])
   })
 
   it("**认不出的信任档回落到默认**——查不到的档位在判定器里会落到最宽那一档，那是安全问题", () => {
@@ -180,8 +180,8 @@ describe("偏好", () => {
 
   it("patch 是合并不是替换——只改主题不该把置顶清空", () => {
     const store = createSettings(log)
-    store.patch({ pinned: ["/w/omni"] })
-    expect(store.patch({ theme: "light" }).pinned).toEqual(["/w/omni"])
+    store.patch({ pinned: ["/w/switchback"] })
+    expect(store.patch({ theme: "light" }).pinned).toEqual(["/w/switchback"])
   })
 
   it("改主题会同步到 nativeTheme，否则设置里选了深色但窗口没变", () => {
@@ -221,7 +221,7 @@ describe("项目图标", () => {
 describe("拖动排序存下来的那两项", () => {
   /** 直接写偏好文件——这几项现在只有界面会写，但文件是用户能手改的。 */
   const write = (raw: unknown): void => {
-    dir.path = mkdtempSync(join(tmpdir(), "omni-settings-"))
+    dir.path = mkdtempSync(join(tmpdir(), "switchback-settings-"))
     writeFileSync(file(), JSON.stringify(raw), "utf8")
   }
 

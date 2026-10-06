@@ -6,7 +6,7 @@ export const BRAND_VIEWS = [
     ready: ".sidebar__wordmark",
     assert: `(() => {
       const box = selector => document.querySelector(selector).getBoundingClientRect()
-      const brand = box('.sidebar__brand'), mark = box('.sidebar__brand .omni-mark')
+      const brand = box('.sidebar__brand'), mark = box('.sidebar__brand .switchback-mark')
       const words = ['.sidebar__wordmark', '.sidebar__new-label', '.row--group .row__label']
         .map(selector => box(selector).left)
       const icon = box('.row--group .row__slot')

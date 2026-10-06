@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineStatus } from "@omni/protocol"
+import type { EngineStatus } from "@switchback/protocol"
 import { applyModel } from "./model.js"
 
 /** 一个只记账的 ACP 会话：换模型放行，设强度按开关决定成不成。 */

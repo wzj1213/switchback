@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createCodexDriver } from "./driver.js"
 
 async function waitForWarning(events: readonly Event[]): Promise<Event> {
@@ -35,7 +35,7 @@ async function waitForDeprecation(events: readonly Event[]): Promise<Event> {
  */
 describe("Codex 配置警告（真机）", () => {
   it("未受信任的项目配置会留下可定位的会话提示", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-warning-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-warning-live-"))
     const projectConfig = join(cwd, ".codex")
     mkdirSync(join(cwd, ".git"))
     mkdirSync(projectConfig)
@@ -63,7 +63,7 @@ describe("Codex 配置警告（真机）", () => {
   }, 30_000)
 
   it("旧配置开关会留下原生迁移说明", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-deprecation-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-deprecation-live-"))
     mkdirSync(join(cwd, ".git"))
     const events: Event[] = []
     const driver = createCodexDriver({

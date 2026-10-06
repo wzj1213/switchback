@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createAcpDriver } from "./driver.js"
 import { grokNativeApproval } from "./grok.js"
 
@@ -19,17 +19,17 @@ import { grokNativeApproval } from "./grok.js"
  * 但**写**那一半是查 grok 自己的客户端源码推出来的：它发
  * `SetSessionModelRequest…meta(REASONING_EFFORT_META_KEY)`。
  * 源码级证据比猜强，但它证明的是「grok 的客户端这么发」，
- * 不是「grok 的 agent 收得下 omni 这么发」。只有真发一次才知道。
+ * 不是「grok 的 agent 收得下 Switchback 这么发」。只有真发一次才知道。
  *
  * **不跑轮次**：只到 `session/new` + `session/set_model`，几乎不耗配额。
  */
 
-const COMMAND = process.env["OMNI_ACP_COMMAND"] ?? "grok"
-const ARGS = (process.env["OMNI_ACP_ARGS"] ?? "agent stdio").split(" ").filter((a) => a !== "")
+const COMMAND = process.env["SWITCHBACK_ACP_COMMAND"] ?? "grok"
+const ARGS = (process.env["SWITCHBACK_ACP_ARGS"] ?? "agent stdio").split(" ").filter((a) => a !== "")
 
 describe("grok 的推理强度（真跑）", () => {
   it("模型清单报得出强度档，而且 set_model 带着 _meta 发得进去", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-grok-effort-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-grok-effort-"))
     const events: Event[] = []
     const driver = createAcpDriver({
       id: "acp:grok",

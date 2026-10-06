@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { EngineGoal, Event } from "@omni/protocol"
+import type { EngineGoal, Event } from "@switchback/protocol"
 import { createCodexDriver } from "./driver.js"
 
 async function waitForGoal(events: readonly Event[], goals: readonly (EngineGoal | undefined)[]): Promise<void> {
@@ -18,7 +18,7 @@ async function waitForGoal(events: readonly Event[], goals: readonly (EngineGoal
 /** `pnpm vitest run --mode live packages/engine/src/codex/goal.live.test.ts` */
 describe("Codex 原生目标（真机）", () => {
   it("模型调用 create_goal 后，稳定通知穿过正式驱动回到宿主回调", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-goal-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-goal-live-"))
     const events: Event[] = []
     const goals: (EngineGoal | undefined)[] = []
     const session = await createCodexDriver().start({

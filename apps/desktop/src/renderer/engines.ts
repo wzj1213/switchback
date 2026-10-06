@@ -1,4 +1,4 @@
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import { BUILTIN_ENGINES } from "../shared/builtin-engines.js"
 
 /** 已存在的会话不能因引擎后来退出新建清单，就丢掉名字和当前选择。 */

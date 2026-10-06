@@ -1,4 +1,4 @@
-import type { FileChange, Item } from "@omni/protocol"
+import type { FileChange, Item } from "@switchback/protocol"
 import type { ReviewFile } from "../shared/review.js"
 import { absolute, canonicalPath, isScratch, normalizePath } from "../shared/paths.js"
 

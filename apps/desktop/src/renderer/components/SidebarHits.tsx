@@ -1,6 +1,6 @@
-import type { ThreadRow } from "@omni/store"
+import type { ThreadRow } from "@switchback/store"
 import { useLayoutEffect, useRef, useState } from "react"
-import type { EngineInfo } from "@omni/protocol"
+import type { EngineInfo } from "@switchback/protocol"
 import type { SidebarRow } from "../sidebar.js"
 import { Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"

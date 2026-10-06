@@ -14,7 +14,7 @@ export interface ContextSnapshot {
 interface UsageOptions {
   context?: ContextSnapshot
   latest?: RawUsage
-  /** steer 会把一个 omni 回合切成几段原生结果；生成量要把那些段相加。 */
+  /** steer 会把一个 Switchback 回合切成几段原生结果；生成量要把那些段相加。 */
   outputTokens?: number
 }
 
@@ -66,7 +66,7 @@ function tokensOf(raw: RawUsage): number {
 const valid = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0
 
-/** 把 steer 前后几段的生成量合成这一个 omni 回合的真分子。 */
+/** 把 steer 前后几段的生成量合成这一个 Switchback 回合的真分子。 */
 export function addOutputTokens(total: number | undefined, raw: RawUsage | undefined): number | undefined {
   if (typeof raw?.output_tokens !== "number") return total
   return (total ?? 0) + raw.output_tokens

@@ -1,4 +1,4 @@
-import type { EngineId, SlashCommand } from "@omni/protocol"
+import type { EngineId, SlashCommand } from "@switchback/protocol"
 import { applyCommand } from "./slash.js"
 import type { DraftBlock } from "./composer-blocks.js"
 

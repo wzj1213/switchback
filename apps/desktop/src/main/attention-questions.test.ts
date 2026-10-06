@@ -1,4 +1,4 @@
-import type { Event, Thread } from "@omni/protocol"
+import type { Event, Thread } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import { watchQuestions, type QuestionChange } from "./attention-questions.js"
 

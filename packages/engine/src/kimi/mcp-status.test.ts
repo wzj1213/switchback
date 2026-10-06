@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import type { KimiApi } from "./http.js"
 import { KimiMcpStatus, loadKimiMcpSnapshot } from "./mcp-status.js"

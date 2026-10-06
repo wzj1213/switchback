@@ -1,6 +1,6 @@
 import type { BrowserWindow } from "electron"
-import type { ThreadId } from "@omni/protocol"
-import type { Replay, Sealed } from "@omni/wire"
+import type { ThreadId } from "@switchback/protocol"
+import type { Replay, Sealed } from "@switchback/wire"
 
 /**
  * 一个能收事件的客户端。
@@ -33,14 +33,14 @@ export interface Sink {
 /**
  * 一条要送到客户端的消息。
  *
- * **两条通道各管一段**：`omni:events` 是带序号的增量（常态），
- * `omni:replay` 是不带序号的全量 + `resumeAt`（（重）连接时一次性重建）。
+ * **两条通道各管一段**：`switchback:events` 是带序号的增量（常态），
+ * `switchback:replay` 是不带序号的全量 + `resumeAt`（（重）连接时一次性重建）。
  * 判别式而不是 `(channel, payload: unknown)`：后者让每个 sink 自己去猜
  * payload 是什么，而猜错不会在编译期报错。
  */
 export type SinkMessage =
-  | { channel: "omni:events"; sealed: readonly Sealed[] }
-  | { channel: "omni:replay"; replay: Replay }
+  | { channel: "switchback:events"; sealed: readonly Sealed[] }
+  | { channel: "switchback:replay"; replay: Replay }
 
 export interface Sinks {
   /** 现在活着的全部客户端：窗口是现算的，远程的是注册进来的。 */
@@ -55,7 +55,7 @@ export function windowSink(win: BrowserWindow): Sink {
     id: `win-${String(win.id)}`,
     send: (message) => {
       if (win.isDestroyed()) return
-      if (message.channel === "omni:events") win.webContents.send(message.channel, message.sealed)
+      if (message.channel === "switchback:events") win.webContents.send(message.channel, message.sealed)
       else win.webContents.send(message.channel, message.replay)
     },
     alive: () => !win.isDestroyed(),

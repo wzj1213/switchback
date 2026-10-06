@@ -1,6 +1,6 @@
 import { Suspense, useState } from "react"
 import { CloseIcon } from "./icons-panel.js"
-import type { EngineAccount, EngineInfo, ModelOption } from "@omni/protocol"
+import type { EngineAccount, EngineInfo, ModelOption } from "@switchback/protocol"
 import type { Settings } from "../useSettings.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { LookSection, NewThreadSection } from "./SettingsGeneral.js"
@@ -40,8 +40,8 @@ import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
  *
  * ## 引擎页怎么分边界
  *
- * 接入开关、新会话默认、各家的模型/思考档与 DSH 接入确认由 omni 直接画控件——
- * 它们全都只改 omni 自己的行为。认证、Provider、API Key 与厂商高级项继续走原生入口，
+ * 接入开关、新会话默认、各家的模型/思考档与 DSH 接入确认由 Switchback 直接画控件——
+ * 它们全都只改 Switchback 自己的行为。认证、Provider、API Key 与厂商高级项继续走原生入口，
  * 不把密钥读进 renderer，也不复制一份随版本漂移的厂商配置协议。
  */
 
@@ -208,7 +208,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
           <div className="set__side">
             <div className="set__brand">
               <span className="set__heading">设置</span>
-              <span className="set__ver">omni {props.version}</span>
+              <span className="set__ver">Switchback {props.version}</span>
             </div>
             <Nav tab={tab} onPick={setTab} />
           </div>

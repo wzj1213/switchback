@@ -1,4 +1,4 @@
-import type { Aside, EngineSegment, Item, ToolCallItem, TurnPace } from "@omni/protocol"
+import type { Aside, EngineSegment, Item, ToolCallItem, TurnPace } from "@switchback/protocol"
 import { reportedChangesOf, type Changes } from "./changes.js"
 import { engineSwitches, type EngineStint } from "./engine-mark.js"
 
@@ -31,7 +31,7 @@ export type Row =
    *
    * 它不是一条 item，也不进 journal：`Thread.segments` 已经记着谁在什么时候
    * 接的手，再造一条消息只会多一份要同步的真相。**更要紧的是它不是给模型看的**
-   *——引擎的上下文里不该出现一句 omni 写的「你接手了」。
+   *——引擎的上下文里不该出现一句 Switchback 写的「你接手了」。
    */
   | { kind: "engine"; stint: EngineStint }
 
@@ -142,7 +142,7 @@ export function withAsides(rows: readonly Row[], asides: readonly Aside[]): read
  *
  * 线上只有「切换至 X」。**不写「上一家的记录在哪」，也不写任何给模型的话**——
  * 前者是 `/timeline` 与「承接上一段」那颗键的事，后者根本不该存在
- *（见 `AGENTS.md`：不往模型的上下文里塞 omni 写的话）。
+ *（见 `AGENTS.md`：不往模型的上下文里塞 Switchback 写的话）。
  */
 export function withEngineMarks(
   rows: readonly Row[],

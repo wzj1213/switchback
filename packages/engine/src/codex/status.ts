@@ -1,4 +1,4 @@
-import type { EngineStatus, Event, ThreadId } from "@omni/protocol"
+import type { EngineStatus, Event, ThreadId } from "@switchback/protocol"
 
 /** 会话级引擎状态的唯一组帧处；空详情不写进事件。 */
 export function emitCodexStatus(

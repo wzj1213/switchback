@@ -1,4 +1,4 @@
-const EVENT = "omni:composer-reference"
+const EVENT = "switchback:composer-reference"
 
 interface Detail {
   threadId: string

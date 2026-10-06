@@ -9,7 +9,7 @@ const TWO = { version: "1.0.0", agents: [...ONE.agents, { id: "goose", name: "go
 const HOUR = 60 * 60_000
 
 function setup(options: { cached?: { fetchedAt: number; registry: unknown }; reply?: unknown; fail?: string; now?: number }) {
-  const dir = mkdtempSync(join(tmpdir(), "omni-registry-"))
+  const dir = mkdtempSync(join(tmpdir(), "switchback-registry-"))
   if (options.cached !== undefined) writeFileSync(join(dir, "acp-registry.json"), JSON.stringify(options.cached), "utf8")
   const asked: string[] = []
   const fetcher = ((url: string) => {

@@ -21,10 +21,10 @@ describe("探命令", () => {
   })
 
   it("**没装就要说得出下一步做什么**——一句「不可用」等于什么都没说", async () => {
-    const probe = await probeCommand("omni-绝不存在的命令", "装好之后重启 omni。")
+    const probe = await probeCommand("Switchback-绝不存在的命令", "装好之后重启 Switchback。")
     expect(probe.state).toBe("missing")
     expect(probe.detail).toContain("不在 PATH 上")
-    expect(probe.detail).toContain("装好之后重启 omni。")
+    expect(probe.detail).toContain("装好之后重启 Switchback。")
   })
 
   // Windows 上没有 `false` 这个命令，换一个「一定在 PATH 上但 --version 会失败」的：
@@ -40,7 +40,7 @@ describe("探命令", () => {
   })
 
   it("没给提示时不硬凑一句废话", async () => {
-    const probe = await probeCommand("omni-绝不存在的命令")
+    const probe = await probeCommand("Switchback-绝不存在的命令")
     expect(probe.detail.trim().endsWith("不在 PATH 上。")).toBe(true)
   })
 })
@@ -50,22 +50,22 @@ describe("探命令", () => {
  *
  * 真机上遇到的：`~/.vendor-cli/vendor-cli/bin/codex` 排在 homebrew 前面，
  * 而那个文件已经不在了（第三方 CLI 自更新留下的空壳目录），
- * 于是 omni 报「codex 未安装」，而 `/opt/homebrew/bin/codex` 好好的。
+ * 于是 Switchback 报「codex 未安装」，而 `/opt/homebrew/bin/codex` 好好的。
  * 用户看到的是「codex 读错地方了」。
  *
  * 这里把那个故障原样造出来：**自己搭一个假的 PATH**，前面放坏的、后面放好的。
  */
 describe.skipIf(isWindows)("PATH 上有好几个同名的", () => {
-  /** 造一个目录，里面放一个叫 `omni-探测靶子` 的可执行文件。 */
+  /** 造一个目录，里面放一个叫 `Switchback-探测靶子` 的可执行文件。 */
   function bin(script: string): string {
-    const dir = mkdtempSync(join(tmpdir(), "omni-probe-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-probe-"))
     const file = join(dir, TARGET)
     writeFileSync(file, script)
     chmodSync(file, 0o755)
     return dir
   }
 
-  const TARGET = "omni-探测靶子"
+  const TARGET = "Switchback-探测靶子"
   const GOOD = "#!/bin/sh\necho '靶子 9.9.9'\n"
   /** 坏成两种样子：跑起来就失败，以及**根本不是可执行文件**（空壳）。 */
   const BROKEN = "#!/bin/sh\nexit 1\n"
@@ -119,14 +119,14 @@ describe.skipIf(isWindows)("PATH 上有好几个同名的", () => {
 // 实测 zcode-acp-server：`--version` 退出码 0 但什么都不打。
 // 硬接一个破折号的话，下拉里是 `/opt/homebrew/bin/x — `，看起来像出了错
 it("跑得起来但不报版本 → 只显示路径，不留一个空破折号", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "omni-probe-"))
-  const file = join(dir, "omni-哑靶子")
+  const dir = mkdtempSync(join(tmpdir(), "switchback-probe-"))
+  const file = join(dir, "Switchback-哑靶子")
   writeFileSync(file, "#!/bin/sh\nexit 0\n")
   chmodSync(file, 0o755)
   const saved = process.env["PATH"] ?? ""
   process.env["PATH"] = `${dir}:${saved}`
   try {
-    const probe = await probeCommand("omni-哑靶子")
+    const probe = await probeCommand("Switchback-哑靶子")
     expect(probe.state).toBe("ok")
     expect(probe.detail).toBe(file)
   } finally {

@@ -1,6 +1,6 @@
 import { open, readFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { EngineAccount, EngineThread, Item } from "@omni/protocol"
+import type { EngineAccount, EngineThread, Item } from "@switchback/protocol"
 import { applyResult, assistantItems, toolResults, type ToolResult } from "./translate.js"
 import { findSessionFile, recentSessionFiles } from "./history-files.js"
 
@@ -165,7 +165,7 @@ export async function readEntries(path: string): Promise<readonly Record<string,
 }
 
 /**
- * 一条存在磁盘上的会话 → omni 的 transcript。
+ * 一条存在磁盘上的会话 → Switchback 的 transcript。
  *
  * ## 为什么这件事值得做
  *
@@ -319,9 +319,9 @@ function timeOf(raw: unknown): number | undefined {
 }
 
 /**
- * 一条会话最多搬多少条进 omni。
+ * 一条会话最多搬多少条进 Switchback。
  *
- * 不设上限的话，接一条大会话等于**把它原样复制一份到 omni 的日志里**——
+ * 不设上限的话，接一条大会话等于**把它原样复制一份到 Switchback 的日志里**——
  * 实测最大的一条 56.6MB / 3580 条 item，接十条就是半个 G。
  *
  * 留的是**尾巴**（最近的）：一条对话你回头要接着说的时候，

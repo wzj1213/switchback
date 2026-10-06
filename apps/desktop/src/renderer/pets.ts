@@ -1,4 +1,4 @@
-import type { EngineId } from "@omni/protocol"
+import type { EngineId } from "@switchback/protocol"
 
 /**
  * 输入框上沿那几只。**纯逻辑那一半**：谁长什么样、松手之后怎么动。
@@ -10,7 +10,7 @@ import type { EngineId } from "@omni/protocol"
  *
  * ## 为什么它们值得存在
  *
- * omni 的立意是「一个界面统一驱动各家引擎」，而「此刻是谁在答」在界面上
+ * Switchback 的立意是「一个界面统一驱动各家引擎」，而「此刻是谁在答」在界面上
  * 一直只由输入框最底下那颗下拉说。三只蹲在输入框上沿，是**把这件事画出来**：
  * 谁亮着就是谁在跑。顺带它是这个界面里唯一一处纯粹的玩意儿——
  * 一个天天开着的工具有一处不办正事的地方，不是浪费。

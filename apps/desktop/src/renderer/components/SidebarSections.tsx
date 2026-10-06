@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState } from "react"
-import type { ThreadRow } from "@omni/store"
-import type { EngineInfo, EngineThread } from "@omni/protocol"
+import type { ThreadRow } from "@switchback/store"
+import type { EngineInfo, EngineThread } from "@switchback/protocol"
 import { type Group, type Sections, type SidebarRow } from "../sidebar.js"
 import { ChevronIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
@@ -104,7 +104,7 @@ export interface GroupHandlers extends SidebarMoveActions {
    * 引擎本身就是最强的筛选条件。
    */
   foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
-  /** 把某一家那边的一条会话接过来，在 omni 里接着聊。 */
+  /** 把某一家那边的一条会话接过来，在 Switchback 里接着聊。 */
   onAdopt: (engine: string, item: EngineThread) => void
   /** 拖动接线。不给就是这次不能拖（筛选结果里就不给）。 */
   drag?: RowDrag
@@ -180,7 +180,7 @@ function Chats({
  * 这一段默认展开还是折叠。
  *
  * **历史段默认折叠**：装的是你在别处跑的会话（实测 codex 25 条、Claude 40 条），
- * 展开着的话侧栏一打开就被一段你没在 omni 里建过的东西占满，
+ * 展开着的话侧栏一打开就被一段你没在 Switchback 里建过的东西占满，
  * 而你八成是来找自己那几条的。
  *
  * 做成函数而不是一张初始集合：历史段的键带引擎名，

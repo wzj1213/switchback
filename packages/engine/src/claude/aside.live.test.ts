@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -27,7 +27,7 @@ import { createClaudeDriver } from "./driver.js"
 
 describe("侧问（真跑）", () => {
   it("能力位报 true，且真问得出一句", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-aside-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-aside-live-"))
     const events: Event[] = []
     const driver = createClaudeDriver({})
     const session = await driver.start({

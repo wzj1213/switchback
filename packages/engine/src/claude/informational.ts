@@ -1,4 +1,4 @@
-import type { Event, ItemId, NoticeItem, NoticeLevel, TurnId } from "@omni/protocol"
+import type { Event, ItemId, NoticeItem, NoticeLevel, TurnId } from "@switchback/protocol"
 
 interface RawInformational {
   content?: unknown

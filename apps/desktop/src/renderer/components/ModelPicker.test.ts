@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption } from "@switchback/protocol"
 import { ModelPicker, triggerDetail } from "./ModelPicker.js"
 
 const opus: ModelOption = { id: "opus", label: "Opus", efforts: ["low", "high", "xhigh", "ultracode"], defaultEffort: "high" }

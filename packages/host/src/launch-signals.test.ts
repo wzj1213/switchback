@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Thread } from "@omni/protocol"
+import type { Thread } from "@switchback/protocol"
 import { applyEarly, captureGoal, captureTitle, earlySignals } from "./launch-signals.js"
 
 const thread: Thread = {

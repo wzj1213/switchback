@@ -2,10 +2,10 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event, Lane } from "@omni/protocol"
+import type { Event, Lane } from "@switchback/protocol"
 import { createKimiDriver } from "./driver.js"
 
-const MARK = "OMNI_TASK_OK_5182"
+const MARK = "SWITCHBACK_TASK_OK_5182"
 
 function lanes(events: readonly Event[]): readonly Lane[] {
   return events.filter((event) => event.type === "lane.updated").map((event) => event.lane)
@@ -35,7 +35,7 @@ function waitFor(label: string, predicate: () => boolean, budget = 150_000): Pro
  *
  * **输出不在这条流上**（2026-08-25 真机核对：终止帧只有 command / exitCode /
  * startedAt / endedAt）。它在 REST 那侧的 `output_preview` /
- * `/tasks/{id}?with_output=true`，而 omni 现在只在启动与重连时读回任务表——
+ * `/tasks/{id}?with_output=true`，而 Switchback 现在只在启动与重连时读回任务表——
  * 所以这里不断言 summary，驱动也不假装有。
  */
 describe("Kimi 后台任务 · live", () => {
@@ -46,7 +46,7 @@ describe("Kimi 后台任务 · live", () => {
       const driver = createKimiDriver()
       const session = await driver.start({
         threadId: "th-kimi-task-live",
-        cwd: mkdtempSync(join(tmpdir(), "omni-kimi-task-")),
+        cwd: mkdtempSync(join(tmpdir(), "switchback-kimi-task-")),
         trust: "full",
         home: process.env["HOME"] ?? "",
         memory: () => [],

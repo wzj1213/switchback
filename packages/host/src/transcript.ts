@@ -1,4 +1,4 @@
-import type { Item, Thread } from "@omni/protocol"
+import type { Item, Thread } from "@switchback/protocol"
 import { emit, type Ctx } from "./ctx.js"
 
 /**
@@ -6,10 +6,10 @@ import { emit, type Ctx } from "./ctx.js"
  *
  * 两处要用，所以独立成一个文件（留在任何一边都会和 `session.ts` 成环）：
  *
- * - **原生分叉**：引擎复制了会话，omni 这边也得有同一段记录
+ * - **原生分叉**：引擎复制了会话，Switchback 这边也得有同一段记录
  * - **接管引擎侧会话**：Claude 的历史文件里有全文，读出来摆上
  *
- * 两者面对的是同一个问题——**引擎记得，而 omni 的记录是按会话分文件存的**。
+ * 两者面对的是同一个问题——**引擎记得，而 Switchback 的记录是按会话分文件存的**。
  * 不搬的话你看到一个空对话，而它其实什么都记得；
  * 「看起来丢了但其实没丢」比真丢了更难受：你会把说过的话再说一遍。
  */
@@ -17,7 +17,7 @@ import { emit, type Ctx } from "./ctx.js"
 /**
  * 把上下文抄进新会话的 transcript。
  *
- * 引擎那边已经什么都记得（原生 fork 复制的是真的会话），但 omni 的记录是
+ * 引擎那边已经什么都记得（原生 fork 复制的是真的会话），但 Switchback 的记录是
  * **按会话分文件存的**——不抄的话你看到的是一个空对话，而它其实记得一切。
  * 「看起来丢了但其实没丢」比真丢了更难受：你会把已经说过的话再说一遍。
  *

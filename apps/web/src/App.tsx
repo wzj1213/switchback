@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
-import type { ThreadId } from "@omni/protocol"
-import { projectsOf, threadRowsOf } from "@omni/store"
+import type { ThreadId } from "@switchback/protocol"
+import { projectsOf, threadRowsOf } from "@switchback/store"
 import { forgetToken, tokenOf } from "./auth.js"
 import { useRemote } from "./useRemote.js"
 import { Pair } from "./screens/Pair.js"
@@ -81,7 +81,7 @@ function useHistory(
     if (wanted !== null && wanted !== "") {
       setSelected(wanted)
       watch(wanted)
-      window.history.replaceState({ omni: wanted }, "", "/")
+      window.history.replaceState({ switchback: wanted }, "", "/")
     }
     const onMessage = (event: MessageEvent<{ type?: string; threadId?: string }>): void => {
       if (event.data.type !== "open-thread") return
@@ -103,13 +103,13 @@ function useHistory(
   }, [watch])
   useEffect(() => {
     // 打好基底：首屏那一项也带上 state，前进/后退才对得起来
-    window.history.replaceState({ omni: undefined }, "")
+    window.history.replaceState({ switchback: undefined }, "")
     const onPop = (event: PopStateEvent): void => {
-      const at = event.state as { omni?: ThreadId; creating?: boolean } | null
+      const at = event.state as { switchback?: ThreadId; creating?: boolean } | null
       // **新建屏也是一层。** 不压进历史的话，人在那一屏上做返回手势
       // 会直接退出整个应用——而他只是想回列表
       setCreating(at?.creating === true)
-      const id = at?.omni
+      const id = at?.switchback
       setSelected(id)
       watch(id ?? null)
     }
@@ -133,8 +133,8 @@ export function App(): React.JSX.Element {
       setSelected((prev) => {
         // 从列表进正文压一层；正文里换一条只替换——否则返回键要按满 N 次
         if (id === undefined) window.history.back()
-        else if (prev === undefined) window.history.pushState({ omni: id }, "")
-        else window.history.replaceState({ omni: id }, "")
+        else if (prev === undefined) window.history.pushState({ switchback: id }, "")
+        else window.history.replaceState({ switchback: id }, "")
         return id
       })
       watch(id ?? null)

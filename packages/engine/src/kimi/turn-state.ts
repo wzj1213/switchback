@@ -1,4 +1,4 @@
-import type { TurnStatus } from "@omni/protocol"
+import type { TurnStatus } from "@switchback/protocol"
 import type { KimiSnapshot } from "./wire.js"
 
 export function kimiMessage(raw: unknown): string | undefined {

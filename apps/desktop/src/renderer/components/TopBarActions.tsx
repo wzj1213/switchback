@@ -1,4 +1,4 @@
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import { CompareIcon, ForkIcon } from "./icons.js"
 import { PanelIcon } from "./icons-panel.js"
 

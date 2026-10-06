@@ -20,7 +20,7 @@ describe("ACP 反向请求错误应答", () => {
     rpc.feed('{"jsonrpc":"2.0","id":9,"method":"future/method","params":{}}\n')
 
     expect(sent.map((line) => JSON.parse(line))).toEqual([{
-      jsonrpc: "2.0", id: 9, error: { code: -32601, message: "omni 未认领 future/method" },
+      jsonrpc: "2.0", id: 9, error: { code: -32601, message: "Switchback 未认领 future/method" },
     }])
   })
 })

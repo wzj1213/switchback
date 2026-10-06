@@ -73,7 +73,7 @@ export interface AcpEngineRow {
   inUse: boolean
 }
 
-/** 试接回来的东西，原样给界面画（登录方式就在这里）。形状同 `@omni/engine` 的 `AcpTrial`。 */
+/** 试接回来的东西，原样给界面画（登录方式就在这里）。形状同 `@switchback/engine` 的 `AcpTrial`。 */
 export interface AcpTrialView {
   ok: boolean
   protocolVersion?: number
@@ -85,7 +85,7 @@ export interface AcpTrialView {
   agent?: { name?: string; title?: string; version?: string }
 }
 
-/** 一种登录方式。形状同 `@omni/engine` 的 `AcpAuthMethod`。 */
+/** 一种登录方式。形状同 `@switchback/engine` 的 `AcpAuthMethod`。 */
 export interface AcpAuthMethodView {
   id: string
   name: string

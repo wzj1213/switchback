@@ -4,7 +4,7 @@ import { Buffer } from "node:buffer"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import type { Event, Thread } from "@omni/protocol"
+import type { Event, Thread } from "@switchback/protocol"
 import { createJournal } from "./journal.js"
 
 const thread = (id: string): Thread => ({
@@ -31,7 +31,7 @@ describe("createJournal", () => {
   const state = { dir: "" }
 
   beforeEach(async () => {
-    state.dir = await mkdtemp(join(tmpdir(), "omni-journal-"))
+    state.dir = await mkdtemp(join(tmpdir(), "switchback-journal-"))
   })
 
   afterEach(async () => {
@@ -161,7 +161,7 @@ describe("createJournal", () => {
 
 describe("删会话不能被在途写入救回来", () => {
   it("**删除后残余的 append 不再把文件建回来**——否则盘上留一个界面里删不掉的残留", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-j-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-j-"))
     const j = createJournal({ dir })
     await j.append("th-1", started("th-1"))
     // 排一串在途写入，紧接着删——不等它们落定
@@ -173,7 +173,7 @@ describe("删会话不能被在途写入救回来", () => {
   })
 
   it("删完之后再来的 append 也写不进去", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-j-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-j-"))
     const j = createJournal({ dir })
     await j.append("th-1", started("th-1"))
     await j.remove("th-1")
@@ -183,7 +183,7 @@ describe("删会话不能被在途写入救回来", () => {
   })
 
   it("删一个不影响另一个", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-j-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-j-"))
     const j = createJournal({ dir })
     await j.append("th-1", started("th-1"))
     await j.append("th-2", started("th-2"))
@@ -197,7 +197,7 @@ describe("删会话不能被在途写入救回来", () => {
 
 describe("写满了要出声", () => {
   it("**超限时叫一声**——停笔是对的，停得一声不响不对", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-full-"))
     const full: string[] = []
     // 上限设成 1 字节：第一条写进去，第二条就超
     const journal = createJournal({ dir, maxBytes: 1, onFull: (id) => full.push(id) })
@@ -208,7 +208,7 @@ describe("写满了要出声", () => {
   })
 
   it("**每个会话只叫一次**：之后每条事件都叫等于刷屏", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-full-"))
     const full: string[] = []
     const journal = createJournal({ dir, maxBytes: 1, onFull: (id) => full.push(id) })
     for (let i = 0; i < 5; i += 1) await journal.append("th-1", started("th-1"))
@@ -217,7 +217,7 @@ describe("写满了要出声", () => {
   })
 
   it("没写满就不叫", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-full-"))
     const full: string[] = []
     const journal = createJournal({ dir, onFull: (id) => full.push(id) })
     await journal.append("th-1", started("th-1"))
@@ -226,7 +226,7 @@ describe("写满了要出声", () => {
   })
 
   it("不给回调也不能崩——它是可选的", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "omni-full-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-full-"))
     const journal = createJournal({ dir, maxBytes: 1 })
     await journal.append("th-1", started("th-1"))
     await expect(journal.append("th-1", started("th-1"))).resolves.toBeUndefined()

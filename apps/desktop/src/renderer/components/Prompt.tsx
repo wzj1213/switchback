@@ -1,4 +1,4 @@
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 import { MentionList } from "./MentionList.js"
 import { useMentions } from "../useMentions.js"
 import { useSlash } from "../useSlash.js"
@@ -57,12 +57,12 @@ export function Prompt({
   onPaste: (items: DataTransferItemList | null) => Promise<void>
   /** 一次大段的纯文本粘贴：折成输入框上方一枚芯片，不撑爆正文。 */
   onPasteText: (text: string) => void
-  /** 这个会话能用的斜杠命令：引擎报的 ＋ omni 自己的。 */
+  /** 这个会话能用的斜杠命令：引擎报的 ＋ Switchback 自己的。 */
   commands: readonly SlashCommand[]
   /** 已选中的引擎命令；输入框里的 value 此时只保存参数。 */
   command?: SlashCommand
   onClearCommand: () => void
-  /** 选中了一条。omni 自己的就地执行，引擎的填进输入框等着按回车。 */
+  /** 选中了一条。Switchback 自己的就地执行，引擎的填进输入框等着按回车。 */
   onCommand: (command: SlashCommand) => void
   onChange: (text: string) => void
   /** 参数是「别排队，现在就插进去」（⌘⏎）。 */

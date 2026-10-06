@@ -58,12 +58,12 @@ export interface Usage {
  * 和 `usage` 同一类：它描述的是「此刻」，而不是「发生过什么」。落盘之后重放出来
  * 是一串**早就跑完了的任务还显示在跑**——比没有更糟。轮次一结束就清掉。
  *
- * ## 每个字段都是引擎给的，omni 一个字都不编
+ * ## 每个字段都是引擎给的，Switchback 一个字都不编
  *
  * 实测 claude 的 `system/task_progress` 一帧：
  * `{description:"Reading b.txt", subagent_type:"general-purpose",
  *   last_tool_name:"Read", usage:{tool_uses:3, duration_ms:4186}}`。
- * `description` 是**它自己写的一句人话**——omni 拿现成的，不从工具名拼一句出来。
+ * `description` 是**它自己写的一句人话**——Switchback 拿现成的，不从工具名拼一句出来。
  */
 export interface TaskRun {
   id: string
@@ -89,7 +89,7 @@ export interface ModelOption {
    * 引擎自己认的默认模型。
    *
    * 界面靠它做「恢复默认设置」——没有这一条的话那句话是空的：
-   * omni 不知道该退回到哪个模型。codex 的 `model/list` 报 `isDefault`（实测）。
+   * Switchback 不知道该退回到哪个模型。codex 的 `model/list` 报 `isDefault`（实测）。
    */
   isDefault?: boolean
 }
@@ -248,11 +248,11 @@ export type Event =
       timeoutMs?: number
     }
   /**
-   * omni 的外发守卫看见一个进程在往本机外面**批量**发数据（见 desktop 的 `egress-*.ts`）。
+   * Switchback 的外发守卫看见一个进程在往本机外面**批量**发数据（见 desktop 的 `egress-*.ts`）。
    *
-   * 不是引擎自报的状态，是 omni 自己量的——所以单独一类，不混进 `engine.status`。
-   * `threadId` 是那个引擎所在的会话；不是 omni 起的进程（比如单独开着的 ZCode）时是空串。
-   * `stopped`：omni 已经按设置把它停掉了。不落盘：它说的是「刚才」，重放出来只是一条过期的警报。
+   * 不是引擎自报的状态，是 Switchback 自己量的——所以单独一类，不混进 `engine.status`。
+   * `threadId` 是那个引擎所在的会话；不是 Switchback 起的进程（比如单独开着的 ZCode）时是空串。
+   * `stopped`：Switchback 已经按设置把它停掉了。不落盘：它说的是「刚才」，重放出来只是一条过期的警报。
    */
   | { type: "egress.alert"; at: number; threadId: ThreadId; detail: string; stopped: boolean }
   /** 引擎进程本身的状态，与会话内容无关（启动、退出、崩溃、超时）。 */

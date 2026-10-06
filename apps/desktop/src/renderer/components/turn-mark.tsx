@@ -1,4 +1,4 @@
-import type { TurnPace } from "@omni/protocol"
+import type { TurnPace } from "@switchback/protocol"
 import { paceLine, spent } from "../status.js"
 
 /** 悬停在节奏那半句上时的说明：两个数各是怎么量的。 */

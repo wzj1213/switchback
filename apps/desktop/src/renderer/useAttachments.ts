@@ -91,7 +91,7 @@ export function useAttachments(enabled: boolean, initial: readonly string[] = []
   const [paths, setPaths] = useState<readonly string[]>(() => [...new Set(initial)])
   const knownPaths = useRef(new Set(initial))
   const [notice, setNotice] = useAttachmentNotice()
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   const accept = useCallback((raw: AttachmentResult, text: string): AttachmentAcceptance => {
     const result = withoutExistingAttachments(raw, knownPaths.current, text)

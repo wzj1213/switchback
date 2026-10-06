@@ -4,8 +4,8 @@ import { request } from "node:http"
 import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 import WebSocket from "ws"
-import type { Command, Event, Trust } from "@omni/protocol"
-import { createLedger, createReassembler, type ServerFrame } from "@omni/wire"
+import type { Command, Event, Trust } from "@switchback/protocol"
+import { createLedger, createReassembler, type ServerFrame } from "@switchback/wire"
 import { createTokenStore, type Device } from "./tokens.js"
 import { startRemote, WS_PROTOCOL, type RemoteServer } from "./server.js"
 import type { Sink } from "../sink.js"
@@ -48,13 +48,13 @@ interface BootOptions {
 }
 
 async function boot(options: BootOptions = {}): Promise<Harness> {
-  const dir = mkdtempSync(join(tmpdir(), "omni-remote-"))
+  const dir = mkdtempSync(join(tmpdir(), "switchback-remote-"))
   const file = join(dir, "devices.json")
   writeFileSync(file, "[]", "utf8")
   if (options.webRoot === true) {
     mkdirSync(join(dir, "assets"), { recursive: true })
     // 够大才压得到（阈值 1024）
-    writeFileSync(join(dir, "index.html"), "<!doctype html><title>omni</title>", "utf8")
+    writeFileSync(join(dir, "index.html"), "<!doctype html><title>Switchback</title>", "utf8")
     writeFileSync(join(dir, "assets", "big.js"), `// 巨大\n${"x".repeat(5000)}`, "utf8")
     writeFileSync(join(dir, "small.txt"), "短", "utf8")
     writeFileSync(join(dir, "pic.png"), Buffer.alloc(5000, 7))
@@ -97,7 +97,7 @@ async function boot(options: BootOptions = {}): Promise<Harness> {
     ...(options.heartbeat === undefined ? {} : { heartbeat: options.heartbeat }),
     replay: async (sink) => {
       state.replays += 1
-      sink.send({ channel: "omni:replay", replay: { events: [ev(0)], resumeAt: ledger.latest(), epoch: RUN } })
+      sink.send({ channel: "switchback:replay", replay: { events: [ev(0)], resumeAt: ledger.latest(), epoch: RUN } })
       await Promise.resolve()
     },
     log: () => undefined,
@@ -236,14 +236,14 @@ describe("Host 闸真的在拦", () => {
   })
 
   it("后缀撞名不算命中", async () => {
-    const h = await boot({ trustedHosts: ["omni.example.com"] })
-    expect(await raw(h.server.port(), "/api/me", { host: "omni.example.com.evil.com" })).toBe(403)
+    const h = await boot({ trustedHosts: ["switchback.example.com"] })
+    expect(await raw(h.server.port(), "/api/me", { host: "switchback.example.com.evil.com" })).toBe(403)
   })
 
   it("配进 trustedHosts 就放行", async () => {
-    const h = await boot({ trustedHosts: ["omni.example.com:8443"] })
+    const h = await boot({ trustedHosts: ["switchback.example.com:8443"] })
     // 过了闸，但没带令牌 → 401 而不是 403。**两个状态码分得开**才说明这是两层
-    expect(await raw(h.server.port(), "/api/me", { host: "omni.example.com:8443" })).toBe(401)
+    expect(await raw(h.server.port(), "/api/me", { host: "switchback.example.com:8443" })).toBe(401)
   })
 
   it("Origin 和 Host 对不上就 403", async () => {
@@ -294,7 +294,7 @@ describe("WebSocket", () => {
     socket.send(JSON.stringify({ type: "hello" }))
     await settle()
     const sealed = h.ledger.seal([ev(7)])
-    for (const sink of h.sinks) sink.send({ channel: "omni:events", sealed })
+    for (const sink of h.sinks) sink.send({ channel: "switchback:events", sealed })
     await settle()
     const events = frames.filter((f) => f.type === "events")
     expect(events.at(-1)?.type === "events" ? events.at(-1)?.sealed.length : 0).toBe(1)
@@ -342,7 +342,7 @@ describe("WebSocket", () => {
 
 describe("被闸门拦下时说得出为什么", () => {
   it("**403 的正文要指向要改的那一栏**——手机上只看到「Forbidden」四个字母时，没有任何线索指向桌面那台", async () => {
-    const h = await boot({ trustedHosts: ["omni.example.com"] })
+    const h = await boot({ trustedHosts: ["switchback.example.com"] })
     // `fetch` 改不了 Host，走裸 http
     const body = await rawBody(h.server.port(), "/api/me", { host: "someone-else.example.com" })
     expect(body).toContain("trustedHosts")

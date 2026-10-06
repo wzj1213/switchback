@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineInfo, ModelOption, Thread } from "@omni/protocol"
+import type { EngineInfo, ModelOption, Thread } from "@switchback/protocol"
 import {
   engineModelCatalogs,
   engineSettingState,
@@ -141,7 +141,7 @@ describe("引擎设置页的数据", () => {
   })
 
   // 用户自己关的排在探测结论前面：一家被关掉的引擎连探测都不起，
-  // 那时候还报「未安装」或者「可用」，说的都是一件 omni 此刻根本没去问过的事
+  // 那时候还报「未安装」或者「可用」，说的都是一件 Switchback 此刻根本没去问过的事
   it("关掉的那家不再报探测结论，只说是你关的", () => {
     const [codex] = engineSettingItems([{ id: "codex", label: "Codex", state: "ok" }]).filter(
       (item) => item.id === "codex",

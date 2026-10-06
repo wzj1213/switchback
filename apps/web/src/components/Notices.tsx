@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { Notice } from "@omni/store"
+import type { Notice } from "@switchback/store"
 
 type NoticeTone = "danger" | "warning" | "info"
 

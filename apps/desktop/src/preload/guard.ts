@@ -5,6 +5,6 @@ import type { GuardReport } from "../shared/guard.js"
 export const guardBridge = {
   /** 每个引擎进程这次启动以来往外发了多少，和 ZCode 的防护状态。 */
   async guard(): Promise<GuardReport> {
-    return (await ipcRenderer.invoke("omni:guard")) as GuardReport
+    return (await ipcRenderer.invoke("switchback:guard")) as GuardReport
   },
 }

@@ -1,6 +1,6 @@
 const closeReview = `document.querySelector('.rv [aria-label="关闭审查页"]')?.click()`
 const codeLink = `document.querySelector('.transcript a[href="apps/desktop/src/renderer/throughput.ts:8"]')`
-const docLink = `document.querySelector('.transcript a[href="docs/.omni-link-probe.md"]')`
+const docLink = `document.querySelector('.transcript a[href="docs/.switchback-link-probe.md"]')`
 const closeFiles = `document.querySelector('.workbench [aria-label="关闭文件页"]')?.click()`
 
 export const LINK_REVIEW_VIEWS = [
@@ -75,8 +75,8 @@ export const LINK_REVIEW_VIEWS = [
   },
   {
     name: "01f-Markdown文档预览",
-    createFiles: ['docs/.omni-link-probe.md'],
-    rewriteFiles: [{ path: 'docs/.omni-link-probe.md', text: '# 预览与跳转\n\n这份文档用于验证真实文件阅读。\n\n- [相对路径代码](../apps/desktop/src/renderer/throughput.ts:8)\n- [缺失文件](./.omni-missing-probe.txt)\n\n| 入口 | 行为 |\n| --- | --- |\n| 文件 | 侧栏预览 |\n| 网页 | 浏览器打开 |\n' }],
+    createFiles: ['docs/.switchback-link-probe.md'],
+    rewriteFiles: [{ path: 'docs/.switchback-link-probe.md', text: '# 预览与跳转\n\n这份文档用于验证真实文件阅读。\n\n- [相对路径代码](../apps/desktop/src/renderer/throughput.ts:8)\n- [缺失文件](./.switchback-missing-probe.txt)\n\n| 入口 | 行为 |\n| --- | --- |\n| 文件 | 侧栏预览 |\n| 网页 | 浏览器打开 |\n' }],
     open: `${docLink}?.click()`,
     ready: '.text-preview__document h1',
     assert: `document.querySelector('.text-preview__document h1')?.textContent === '预览与跳转'
@@ -105,16 +105,16 @@ export const LINK_REVIEW_VIEWS = [
       document.querySelector('.text-preview__document')?.focus()
       const event = new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true, cancelable: true })
       document.querySelector('.text-preview__document')?.dispatchEvent(event)
-      window.__omniFileNavigationKeyHandled = event.defaultPrevented
+      window.__switchbackFileNavigationKeyHandled = event.defaultPrevented
     })()`,
     ready: '.source-line[data-line="8"][data-selected="true"]',
-    assert: `window.__omniFileNavigationKeyHandled === true
+    assert: `window.__switchbackFileNavigationKeyHandled === true
       && document.querySelector('[aria-label="前进到下一个文件"]')?.disabled === true
       && document.querySelector('.file-preview__title')?.textContent.includes('throughput.ts') === true`,
   },
   {
     name: "01f-缺失文件有明确提示",
-    open: [`${docLink}?.click()`, `document.querySelector('.text-preview__document a[href="./.omni-missing-probe.txt"]')?.click()`],
+    open: [`${docLink}?.click()`, `document.querySelector('.text-preview__document a[href="./.switchback-missing-probe.txt"]')?.click()`],
     ready: '.file-preview__body .workbench__empty',
     assert: `document.querySelector('.file-preview__body')?.textContent.includes('文件已经不存在') === true
       && document.querySelector('.file-source') === null
@@ -122,9 +122,9 @@ export const LINK_REVIEW_VIEWS = [
   },
   {
     name: "01f-大文件远行定位",
-    createFiles: ['docs/.omni-source-probe.ts'],
-    rewriteFiles: [{ path: 'docs/.omni-source-probe.ts', text: Array.from({ length: 50_000 }, (_, i) => `const n${i} = ${i}\n`).join('') }],
-    open: `document.querySelector('.transcript a[href="docs/.omni-source-probe.ts:40000"]')?.click()`,
+    createFiles: ['docs/.switchback-source-probe.ts'],
+    rewriteFiles: [{ path: 'docs/.switchback-source-probe.ts', text: Array.from({ length: 50_000 }, (_, i) => `const n${i} = ${i}\n`).join('') }],
+    open: `document.querySelector('.transcript a[href="docs/.switchback-source-probe.ts:40000"]')?.click()`,
     ready: '.source-line[data-line="40000"][data-selected="true"]',
     assert: `(() => {
       const row = document.querySelector('.source-line[data-selected="true"]')
@@ -138,7 +138,7 @@ export const LINK_REVIEW_VIEWS = [
   },
   {
     name: "01f-文件更新不抢阅读位置",
-    rewriteFiles: [{ path: 'docs/.omni-source-probe.ts', text: Array.from({ length: 50_001 }, (_, i) => `const n${i} = ${i}\n`).join('') }],
+    rewriteFiles: [{ path: 'docs/.switchback-source-probe.ts', text: Array.from({ length: 50_001 }, (_, i) => `const n${i} = ${i}\n`).join('') }],
     open: `document.querySelector('[aria-label="重新读取文件"]')?.click()`,
     ready: '.file-source[data-line-count="50002"]',
     assert: `document.querySelector('.file-source')?.scrollTop === 1000`,

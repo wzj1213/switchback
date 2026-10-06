@@ -1,4 +1,4 @@
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption } from "@switchback/protocol"
 import type { RpcPeer } from "../rpc.js"
 import { toModelOption, type WireModel } from "./catalog.js"
 

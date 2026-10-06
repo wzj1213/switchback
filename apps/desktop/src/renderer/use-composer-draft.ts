@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { EngineId, SlashCommand } from "@omni/protocol"
+import type { EngineId, SlashCommand } from "@switchback/protocol"
 import { commandText } from "./slash.js"
 import type { useAttachments } from "./useAttachments.js"
 import { useEngineCommand } from "./use-engine-command.js"

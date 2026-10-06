@@ -1,4 +1,4 @@
-import type { Command, Item, Lane, Thread } from "@omni/protocol"
+import type { Command, Item, Lane, Thread } from "@switchback/protocol"
 import { PlanPanel } from "./PlanPanel.js"
 import { QuestionStack } from "./QuestionCard.js"
 import { Queued } from "./Queued.js"

@@ -76,7 +76,7 @@ export function RemotePanel({
   onPatch: (next: Partial<Settings>) => void
 }): React.JSX.Element {
   const [status, setStatus] = useState<RemoteStatus | undefined>(undefined)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   useEffect(() => {
     if (bridge === undefined) return undefined

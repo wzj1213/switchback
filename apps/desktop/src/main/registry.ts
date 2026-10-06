@@ -22,13 +22,13 @@ import {
   grokSteer,
   type EngineDriver,
   type ClaudeExecutable,
-} from "@omni/engine"
+} from "@switchback/engine"
 import { acpShapes, mergeAcpEngines, readEngineFile, registerAcpEngines, type AcpReload } from "./engines.js"
 import type { Logger } from "./log.js"
 import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
 
 /**
- * 这台机器上 omni 认哪些引擎。
+ * 这台机器上 Switchback 认哪些引擎。
  *
  * **驱动表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
  * 写两份的下场是下拉里列着一堆名字，选中直接报「未注册的引擎」——真出过。
@@ -45,12 +45,12 @@ import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
  * - `claude` / `codex`：各有一个专门的驱动。
  * - `kimi`：走它自带的 `kimi web` REST + WebSocket API。
  *   会话、插话、审批、模型、历史都从同一扇公开入口出来；不再借 ACP 的
- *   `terminal/*` 让命令改由 omni 代跑。
+ *   `terminal/*` 让命令改由 Switchback 代跑。
  * - `grok`：同一个 ACP 驱动。它的子命令**不叫 acp**，叫 `grok agent stdio`
  *   ——这是它自带文档里写明的「Agent Mode (ACP) and IDE Integration」，
  *   同样不是猜的。记录路径见 `acp/grok.ts`。
  * - `dsh`：仍走通用 ACP 驱动，只启动 DSH 自己公开的 `--profile acp`。
- *   profile 由 DSH 管理；omni 不替它安装插件，也不拿 Web 内部控制面拼一条私有链路。
+ *   profile 由 DSH 管理；Switchback 不替它安装插件，也不拿 Web 内部控制面拼一条私有链路。
  *
  * 五家都有 `probe()`。前四家随宿主启动探测，没装就在下拉里标成「未安装」；
  * DSH 要先在设置中确认原生 provider、model 与凭证已经配好，确认前既不进清单也不起探测进程。
@@ -125,7 +125,7 @@ export function buildRegistry(
         //（grok-build `app/acp_handler/session_notification.rs`）。
         // kimi / zcode 没查到同样的实据，就按默认的 false——不知道别声称
         modeReadback: true,
-        // 你在 grok 自己的界面里改了模型或强度，omni 靠这条跟上（见 `acp/grok.ts`）
+        // 你在 grok 自己的界面里改了模型或强度，Switchback 靠这条跟上（见 `acp/grok.ts`）
         modelChanged: grokModelChanged,
       }),
       dsh: createDshDriver({ profile: dshProfile }),

@@ -1,4 +1,4 @@
-import type { Event, TurnId } from "@omni/protocol"
+import type { Event, TurnId } from "@switchback/protocol"
 import type { KimiPayload } from "./wire.js"
 import { kimiNativePartId } from "./native-part.js"
 

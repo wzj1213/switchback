@@ -11,7 +11,7 @@ import { ownedWorksite, type OwnedWorksite, type WorksiteGuard } from "./worksit
  *
  * codex 原生读 `AGENTS.md`，Claude 原生读 `CLAUDE.md`。各写一份的结果是
  * **同一件事有两份真源**——改了一边忘了另一边，而两家的行为就此分岔，
- * 却没有任何地方会报错。这正是 omni 要消灭的那类问题（换内核不换工具，
+ * 却没有任何地方会报错。这正是 Switchback 要消灭的那类问题（换内核不换工具，
  * 那说明也不该跟着内核分家）。
  *
  * ## 用的什么机制
@@ -85,12 +85,12 @@ export async function ensureProjectDoc(value: unknown, owns: ProjectDocGuard): P
 }
 
 export function installProjectDocChannel(worksites: WorksiteSearch): void {
-  ipcMain.handle("omni:projectDoc", (_e, req: unknown) => projectDoc(req, worksites.owns))
+  ipcMain.handle("switchback:projectDoc", (_e, req: unknown) => projectDoc(req, worksites.owns))
 
   /** 建起来：缺什么补什么。**已经有内容的 `CLAUDE.md` 绝不覆盖**。 */
-  ipcMain.handle("omni:ensureProjectDoc", (_e, req: unknown) => ensureProjectDoc(req, worksites.owns))
+  ipcMain.handle("switchback:ensureProjectDoc", (_e, req: unknown) => ensureProjectDoc(req, worksites.owns))
 
-  ipcMain.handle("omni:openProjectDoc", async (_e, value: unknown) => {
+  ipcMain.handle("switchback:openProjectDoc", async (_e, value: unknown) => {
     const req = requestOf(value, worksites.owns)
     if (req !== undefined) await shell.openPath(join(req.cwd, AGENTS))
   })

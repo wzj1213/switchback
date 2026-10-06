@@ -1,6 +1,6 @@
 import type { Command, EngineInfo, Item,
-  Lane, TaskRun, Thread, Turn, TurnId, TurnPace } from "@omni/protocol"
-import { buildHandoff, compareRuns, comparisonItems, type Comparison, type FileDiff, type Side } from "@omni/handoff"
+  Lane, TaskRun, Thread, Turn, TurnId, TurnPace } from "@switchback/protocol"
+import { buildHandoff, compareRuns, comparisonItems, type Comparison, type FileDiff, type Side } from "@switchback/handoff"
 import { Transcript } from "./Transcript.js"
 import { labelOf } from "./Composer.js"
 
@@ -16,7 +16,7 @@ import { labelOf } from "./Composer.js"
  * 2. 同一个文件两边最后一次成功上报的量差多少？
  * 3. 各自还剩什么没做？
  *
- * 所以顶上先给结论，下面才是过程。结论用的是 `@omni/handoff` 的
+ * 所以顶上先给结论，下面才是过程。结论用的是 `@switchback/handoff` 的
  * `buildHandoff` + `compareRuns`——复用既有的运行摘要逻辑，
  * 不另写一份，免得同一批记录在两处得出不同摘要。
  *

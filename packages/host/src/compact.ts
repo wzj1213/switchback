@@ -1,4 +1,4 @@
-import type { Command } from "@omni/protocol"
+import type { Command } from "@switchback/protocol"
 import { emit, isCurrent, setStatus, type Ctx } from "./ctx.js"
 
 /**

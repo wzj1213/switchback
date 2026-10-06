@@ -15,7 +15,7 @@ jobs:
     # **三个平台都跑，但地位不一样。**
     #
     # macOS 是目标平台，它必须绿。Linux 与 Windows 跑的是**防坏死**：
-    # `@omni/engine/platform.ts` 里的进程树回收与命令查找各平台各一套，
+    # `@switchback/engine/platform.ts` 里的进程树回收与命令查找各平台各一套，
     # 而我手上只有 macOS——那两支代码在本机永远不会执行，
     # 没有 CI 的话，它们从写下的那一刻起就在慢慢腐烂，而没有人会知道。
     #

@@ -1,4 +1,4 @@
-import type { EngineId, TurnPace } from "@omni/protocol"
+import type { EngineId, TurnPace } from "@switchback/protocol"
 import type { BrassMode, TrajMode } from "../../shared/settings.js"
 import { PetFx } from "./PetFxCanvas.js"
 import { lookOf, type Pet } from "../pets.js"

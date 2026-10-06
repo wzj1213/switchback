@@ -1,4 +1,4 @@
-import type { Command, Event, ThreadId } from "@omni/protocol"
+import type { Command, Event, ThreadId } from "@switchback/protocol"
 
 /**
  * 带序号的增量。
@@ -16,7 +16,7 @@ export interface Sealed {
  *
  * `resumeAt` 之后的增量才需要应用——之前的要么已经在 `events` 里，
  * 要么发生在还没订阅的时候。这条规则是防重的关键，而它成立的前提是
- * **发送端在读完历史之后才取 `resumeAt`**（见 `@omni/host` 侧的调用点）。
+ * **发送端在读完历史之后才取 `resumeAt`**（见 `@switchback/host` 侧的调用点）。
  */
 export interface Replay {
   events: readonly Event[]
@@ -58,7 +58,7 @@ export interface Replay {
 /**
  * 客户端 → 宿主。
  *
- * **`command` 之外的四种都是传输层自己的事**，不进 `@omni/protocol`：
+ * **`command` 之外的四种都是传输层自己的事**，不进 `@switchback/protocol`：
  * 那一层描述的是会话与事件，不描述「我收到第几号了」。
  */
 export type ClientFrame =

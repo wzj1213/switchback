@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import type { EngineId, SlashCommand } from "@omni/protocol"
+import type { EngineId, SlashCommand } from "@switchback/protocol"
 import { applyCommand } from "./slash.js"
 
 /** 换引擎时旧 token 不再冒充仍然有效；退回可编辑原文，同时不丢参数。 */

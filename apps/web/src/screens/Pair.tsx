@@ -31,7 +31,7 @@ export function Pair({ onPaired, expired }: { onPaired: (token: string) => void;
         onPaired(result.token)
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "连不上 omni")
+        setError(reason instanceof Error ? reason.message : "连不上 Switchback")
       })
       .finally(() => {
         setBusy(false)
@@ -40,10 +40,10 @@ export function Pair({ onPaired, expired }: { onPaired: (token: string) => void;
 
   return (
     <form className="pair" onSubmit={submit}>
-      <h1 className="pair__title">omni</h1>
+      <h1 className="pair__title">Switchback</h1>
       <p className="pair__hint">
         {expired
-          ? "这台设备的授权已经不在了（被吊销，或者 omni 换了机器）。重新配一次。"
+          ? "这台设备的授权已经不在了（被吊销，或者 Switchback 换了机器）。重新配一次。"
           : "在桌面上打开「设置 → 远程访问」，点「配对新设备」，把那八位码输进来。"}
       </p>
       <label className="pair__label" htmlFor="code">

@@ -1,8 +1,8 @@
-import { decide } from "@omni/approval"
-import type { RememberScope, Trust } from "@omni/protocol"
+import { decide } from "@switchback/approval"
+import type { RememberScope, Trust } from "@switchback/protocol"
 import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
-import type { Rule } from "@omni/approval"
+import type { Rule } from "@switchback/approval"
 import { buildRequest, pickOption } from "./approve.js"
 import type { AcpPermissionOption, AcpPermissionRequest, AcpToolCall } from "./wire.js"
 

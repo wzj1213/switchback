@@ -1,5 +1,5 @@
-import type { PlanStep } from "@omni/protocol"
-import { visibleSteps } from "@omni/store"
+import type { PlanStep } from "@switchback/protocol"
+import { visibleSteps } from "@switchback/store"
 import { PlanMark } from "./PlanMark.js"
 
 const LABEL: Readonly<Record<PlanStep["status"], string>> = {

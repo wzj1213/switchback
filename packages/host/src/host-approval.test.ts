@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { type Event } from "@omni/protocol"
-import type { StoredRule } from "@omni/journal"
+import { type Event } from "@switchback/protocol"
+import type { StoredRule } from "@switchback/journal"
 import { createHost, type Host } from "./host.js"
 import { create, items, ask, fakeDriver, type Fake } from "./host-fixture.js"
 

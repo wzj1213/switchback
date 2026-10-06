@@ -1,4 +1,4 @@
-import type { Event, Lane, TaskRun, ThreadId } from "@omni/protocol"
+import type { Event, Lane, TaskRun, ThreadId } from "@switchback/protocol"
 import { toLane } from "./workflow.js"
 import { createTaskLinks, rememberTaskParent, type TaskLinks } from "./task-links.js"
 
@@ -165,7 +165,7 @@ function progressLaneOf(raw: unknown, before: Lane | undefined, frame: TaskFrame
  * 而漏发一次的后果是界面上留一条永远在跑的任务。全量替换没有这个失败模式。
  *
  * `description` 是引擎自己写的一句人话。**没有就整条不要**——
- * 拿 `last_tool_name` 拼一句「正在 Read」顶替，是 omni 在替引擎说话。
+ * 拿 `last_tool_name` 拼一句「正在 Read」顶替，是 Switchback 在替引擎说话。
  */
 export function onTaskProgress(
   state: TaskState,

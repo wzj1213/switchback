@@ -1,8 +1,8 @@
-import type { Event, ItemId, PlanStep, TurnId } from "@omni/protocol"
+import type { Event, ItemId, PlanStep, TurnId } from "@switchback/protocol"
 import type { WirePlanUpdate } from "./wire.js"
 
 /**
- * codex 的 `turn/plan/updated` → omni 的 `plan` item。
+ * codex 的 `turn/plan/updated` → Switchback 的 `plan` item。
  *
  * ## 为什么这一路比 claude 那一路短这么多
  *
@@ -31,7 +31,7 @@ import type { WirePlanUpdate } from "./wire.js"
  */
 
 /**
- * codex 的状态词 → omni 的四态。
+ * codex 的状态词 → Switchback 的四态。
  *
  * 两种大小写都收，理由见 `WirePlanUpdate` 的注释：同一个枚举在 codex 仓库里
  * 有 snake / camel 两份序列化，线上这条是 camel 的那份。

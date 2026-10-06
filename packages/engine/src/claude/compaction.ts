@@ -1,4 +1,4 @@
-import type { Event, NoticeItem, TurnId } from "@omni/protocol"
+import type { Event, NoticeItem, TurnId } from "@switchback/protocol"
 
 const KEY = "claude:context-compaction"
 

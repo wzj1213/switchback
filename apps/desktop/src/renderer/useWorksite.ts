@@ -13,10 +13,10 @@ import { useEffect, useState } from "react"
  *
  * 1. **cwd / stamp 变**：切会话、一轮开始、一轮结束。引擎跑完一轮，磁盘上就不是
  *    原来那样了（`stampOf` 的注释解释了为什么用轮次节拍而不是定时器）。
- * 2. **窗口重新获得焦点**：你要去终端里 `git switch`，**必然离开 omni 又回到 omni**。
+ * 2. **窗口重新获得焦点**：你要去终端里 `git switch`，**必然离开 Switchback 又回到 Switchback**。
  *    这一条覆盖「用户自己在别处改了工作区」的全部情况，而且不需要任何 watcher——
  *    全仓库零 watcher 是有意的（见 `packages/worksite/README.md`）。
- * 3. **omni 自己刚动过它**（审查页里暂存、提交）：那一下不离开窗口，焦点事件不会来，
+ * 3. **Switchback 自己刚动过它**（审查页里暂存、提交）：那一下不离开窗口，焦点事件不会来，
  *    由动手的那一方发 `announceWorksiteChanged()`。
  * 没有第四条。别加定时器：问得勤就是每次 spawn 一个 git，问得懒就是界面说假话。
  *
@@ -40,9 +40,9 @@ export interface Worksite {
   dirtyCount?: number
 }
 
-const CHANGED = "omni:worksite-changed"
+const CHANGED = "switchback:worksite-changed"
 
-/** omni 自己刚改过工作区的 Git 状态（暂存、提交）：让分支芯片与环境卡重问一次。 */
+/** Switchback 自己刚改过工作区的 Git 状态（暂存、提交）：让分支芯片与环境卡重问一次。 */
 export function announceWorksiteChanged(): void {
   window.dispatchEvent(new Event(CHANGED))
 }
@@ -51,7 +51,7 @@ export function useWorksite(threadId: string, cwd: string, stamp: string): Works
   const [site, setSite] = useState<Worksite>({})
   // 焦点回来时 +1，进而触发下面那个 effect 重问一次
   const [visit, setVisit] = useState(0)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined

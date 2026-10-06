@@ -44,28 +44,28 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.231
         version: 0.3.231(@anthropic-ai/sdk@0.116.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@4.4.3))(zod@4.4.3)
-      '@omni/engine':
+      '@switchback/engine':
         specifier: workspace:*
         version: link:../../packages/engine
-      '@omni/handoff':
+      '@switchback/handoff':
         specifier: workspace:*
         version: link:../../packages/handoff
-      '@omni/host':
+      '@switchback/host':
         specifier: workspace:*
         version: link:../../packages/host
-      '@omni/journal':
+      '@switchback/journal':
         specifier: workspace:*
         version: link:../../packages/journal
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@omni/store':
+      '@switchback/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@omni/wire':
+      '@switchback/wire':
         specifier: workspace:*
         version: link:../../packages/wire
-      '@omni/worksite':
+      '@switchback/worksite':
         specifier: workspace:*
         version: link:../../packages/worksite
       highlight.js:
@@ -145,13 +145,13 @@ importers:
 
   apps/web:
     dependencies:
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@omni/store':
+      '@switchback/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@omni/wire':
+      '@switchback/wire':
         specifier: workspace:*
         version: link:../../packages/wire
       react-markdown:
@@ -185,7 +185,7 @@ importers:
 
   packages/approval:
     dependencies:
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
 
@@ -194,10 +194,10 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.231
         version: 0.3.231(@anthropic-ai/sdk@0.116.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@4.4.3))(zod@4.4.3)
-      '@omni/approval':
+      '@switchback/approval':
         specifier: workspace:*
         version: link:../approval
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
     devDependencies:
@@ -207,34 +207,34 @@ importers:
 
   packages/handoff:
     dependencies:
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/host:
     dependencies:
-      '@omni/approval':
+      '@switchback/approval':
         specifier: workspace:*
         version: link:../approval
-      '@omni/engine':
+      '@switchback/engine':
         specifier: workspace:*
         version: link:../engine
-      '@omni/handoff':
+      '@switchback/handoff':
         specifier: workspace:*
         version: link:../handoff
-      '@omni/journal':
+      '@switchback/journal':
         specifier: workspace:*
         version: link:../journal
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@omni/store':
+      '@switchback/store':
         specifier: workspace:*
         version: link:../store
 
   packages/journal:
     dependencies:
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
     devDependencies:
@@ -246,13 +246,13 @@ importers:
 
   packages/store:
     dependencies:
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/wire:
     dependencies:
-      '@omni/protocol':
+      '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { Trust } from "@omni/protocol"
+import type { Trust } from "@switchback/protocol"
 import type { RemoteStatus } from "../../main/remote/install.js"
 import type { Settings } from "../../shared/settings.js"
 import { Field, Group, Input, Segmented } from "./SettingsBits.js"
@@ -72,7 +72,7 @@ export function Tunnel({ remote, onPatch }: {
         <Input
           label="隧道那头的域名"
           value={remote.trustedHosts.join(" ")}
-          placeholder="omni.example.com:8443"
+          placeholder="switchback.example.com:8443"
           onChange={(value) => {
             onPatch({ trustedHosts: value.split(/\s+/u).filter((s) => s !== "") })
           }}
@@ -89,7 +89,7 @@ export function Access({ remote, status, onPatch, onStatus }: {
   onPatch: (next: Partial<Settings["remote"]>) => void
   onStatus: (status: RemoteStatus) => void
 }): React.JSX.Element {
-  const omni = typeof window === "undefined" ? undefined : window.omni
+  const switchback = typeof window === "undefined" ? undefined : window.switchback
   return (
     <Group title="谁能进来" hint="手机丢了不该等于在你的仓库里任意执行代码。">
       <Field
@@ -110,7 +110,7 @@ export function Access({ remote, status, onPatch, onStatus }: {
           <Pairing
             status={status}
             onPair={() => {
-              void omni?.remote.pair().then(onStatus)
+              void switchback?.remote.pair().then(onStatus)
             }}
           />
         )}
@@ -118,7 +118,7 @@ export function Access({ remote, status, onPatch, onStatus }: {
       <RemoteDevices
         devices={status?.devices ?? []}
         onRevoke={(id) => {
-          void omni?.remote.revoke(id).then(onStatus)
+          void switchback?.remote.revoke(id).then(onStatus)
         }}
       />
     </Group>

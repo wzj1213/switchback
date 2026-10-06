@@ -1,4 +1,4 @@
-import type { EngineAccount, EngineThread, ModelOption, RateLimits } from "@omni/protocol"
+import type { EngineAccount, EngineThread, ModelOption, RateLimits } from "@switchback/protocol"
 import type { KimiModel, KimiSessionRow } from "./wire.js"
 
 const HISTORY_MAX = 40

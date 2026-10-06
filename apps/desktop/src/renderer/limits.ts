@@ -1,4 +1,4 @@
-import type { RateLimits, RateWindow } from "@omni/protocol"
+import type { RateLimits, RateWindow } from "@switchback/protocol"
 
 /**
  * 额度还剩多少，要不要出声。

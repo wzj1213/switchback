@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { CodexActivityTracker } from "./activity.js"
 
 function setup(): { activity: CodexActivityTracker; events: Event[] } {
@@ -8,7 +8,7 @@ function setup(): { activity: CodexActivityTracker; events: Event[] } {
   return {
     events,
     activity: new CodexActivityTracker({
-      threadId: "omni-thread",
+      threadId: "switchback-thread",
       nativeThread: () => "root-thread",
       emit: (event) => events.push(event),
       now: () => at++,
@@ -38,7 +38,7 @@ describe("Codex 原生子 thread 活动", () => {
     expect(events).toHaveLength(1)
     expect(laneOf(events)).toEqual({
       id: "codex-agent-child-1",
-      threadId: "omni-thread",
+      threadId: "switchback-thread",
       kind: "activity",
       title: "/root/code_audit",
       status: "running",

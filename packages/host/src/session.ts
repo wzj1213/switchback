@@ -1,5 +1,5 @@
-import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
-import type { Rule } from "@omni/approval"
+import type { Command, Event, Thread, ThreadId } from "@switchback/protocol"
+import type { Rule } from "@switchback/approval"
 import { createGate } from "./gate.js"
 import { askQuestion } from "./question.js"
 import { askUser } from "./approval.js"
@@ -184,7 +184,7 @@ function catalog<T>(
 function askCatalogs(ctx: Ctx, entry: Live): void {
   const { thread, session } = entry
   // 模型清单要现问引擎——各家的可选项由它们自己的账号与配置决定，
-  // omni 写死一份清单迟早会和实际能用的对不上。
+  // Switchback 写死一份清单迟早会和实际能用的对不上。
   catalog(ctx, entry, () => session.models(), (models) => {
     if (models.length > 0) {
         // **带上是谁报的**：一条会话中途会换引擎，而渲染层要认得出手上这份
@@ -363,7 +363,7 @@ export function rename(ctx: Ctx, cmd: Extract<Command, { type: "thread.rename" }
   if (entry !== undefined) {
     entry.thread = { ...entry.thread, title, named: true, updatedAt: at }
     // 引擎那边也存着一份会话列表。**不传的话同一条会话在两处叫不同名字**，
-    // 而你正是要靠名字找到它。传不过去不影响 omni 侧改名，所以吞掉错误
+    // 而你正是要靠名字找到它。传不过去不影响 Switchback 侧改名，所以吞掉错误
     void entry.session.setTitle?.(title).catch(() => undefined)
   }
   emit(ctx, { type: "thread.renamed", at, threadId: cmd.threadId, title })

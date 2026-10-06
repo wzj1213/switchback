@@ -154,7 +154,7 @@ describe("引擎版本入口", () => {
         engine: "dsh",
         installed: "0.1.0-rc.6",
         stale: false,
-        detail: "版本与 profiles 由 DSH 自己管理，omni 不代装插件",
+        detail: "版本与 profiles 由 DSH 自己管理，Switchback 不代装插件",
       },
     ])
     expect(versions[0]?.update).toBeUndefined()

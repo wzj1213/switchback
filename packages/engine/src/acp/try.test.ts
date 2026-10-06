@@ -49,7 +49,7 @@ describe("试接一个 ACP 适配器", () => {
   })
 
   it("命令根本不存在 → 说得出下一步，而不是一句 ENOENT", async () => {
-    const trial = await tryAcp({ command: "omni-绝不存在的适配器", cwd: tmpdir() })
+    const trial = await tryAcp({ command: "Switchback-绝不存在的适配器", cwd: tmpdir() })
     expect(trial.ok).toBe(false)
     expect(trial.error).toContain("找不到可执行文件")
   })

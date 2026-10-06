@@ -1,4 +1,4 @@
-import type { Item, PlanItem, PlanStep } from "@omni/protocol"
+import type { Item, PlanItem, PlanStep } from "@switchback/protocol"
 
 /** 计划进度只保留数据，不在 store 里拼任何一端的展示文案。 */
 export interface StepProgress {

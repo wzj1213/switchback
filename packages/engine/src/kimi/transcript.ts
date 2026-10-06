@@ -1,4 +1,4 @@
-import type { ErrorItem, Item, TurnId, UserMessageItem } from "@omni/protocol"
+import type { ErrorItem, Item, TurnId, UserMessageItem } from "@switchback/protocol"
 import { kimiActivation, kimiActivationItem, kimiTranscriptActivation } from "./activation.js"
 import { kimiCronOrigin, kimiCronPrompt } from "./cron.js"
 import { isKimiGoalContinuation } from "./goal-continuation.js"

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app } from "electron"
-import type { ThreadId } from "@omni/protocol"
+import type { ThreadId } from "@switchback/protocol"
 import type { Sinks } from "../sink.js"
 import type { Logger } from "../log.js"
 import { generateVapid, send, type Vapid } from "./push.js"
@@ -68,7 +68,7 @@ export function loadVapid(log: Logger): Vapid {
   } catch {
     // 没有这个文件是常态（第一次开推送）
   }
-  const fresh = generateVapid("https://github.com/wzj1213/omni")
+  const fresh = generateVapid("https://github.com/wzj1213/switchback")
   try {
     writeFileSync(vapidPath(), `${JSON.stringify(fresh, null, 2)}\n`, "utf8")
   } catch (error) {

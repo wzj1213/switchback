@@ -1,6 +1,6 @@
 import { readdir, rm, stat } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
-import type { Event, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ThreadId, TurnId } from "@switchback/protocol"
 
 export interface AttachmentFiles {
   dir: string

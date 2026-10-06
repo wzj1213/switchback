@@ -1,4 +1,4 @@
-import type { ErrorItem, Event, ItemId, NoticeItem, ToolCallItem, TurnId } from "@omni/protocol"
+import type { ErrorItem, Event, ItemId, NoticeItem, ToolCallItem, TurnId } from "@switchback/protocol"
 import type { PlanState } from "./plan.js"
 import { resetPlan } from "./plan.js"
 
@@ -20,7 +20,7 @@ function wireId(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
 
-/** SDK wire uuid → 这一帧在 omni 里投影出的 item。 */
+/** SDK wire uuid → 这一帧在 Switchback 里投影出的 item。 */
 export function rememberMessage(
   state: RetractionState,
   uuid: unknown,

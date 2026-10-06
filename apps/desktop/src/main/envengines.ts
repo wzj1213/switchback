@@ -46,7 +46,7 @@ export function homeOf(env: string, fallback: string): string {
  * - **`hooks.json` 一份独立的文件**（家目录那份常用这个，形状和 Claude 一样）
  *
  * 只读前者的下场实测过：codex 自己的界面显示「用户配置 6 个钩子」，
- * omni 这边一个都没有——那 6 条全写在 `~/.codex/hooks.json` 里。
+ * Switchback 这边一个都没有——那 6 条全写在 `~/.codex/hooks.json` 里。
  * 「配了没生效」本来就是这一页要回答的问题，而它自己漏看了一半。
  */
 export async function codexSources(cwd: string | undefined, log: Logger): Promise<readonly HookSource[]> {

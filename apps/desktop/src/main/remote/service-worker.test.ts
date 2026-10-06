@@ -25,7 +25,7 @@ function worker(fetcher: (request: unknown, init?: unknown) => Promise<Response>
     return Promise.resolve(new Response("stale index"))
   })
   const self = {
-    location: { origin: "https://omni.test" },
+    location: { origin: "https://switchback.test" },
     clients: { claim: () => Promise.resolve() },
     registration: { showNotification: () => Promise.resolve() },
     skipWaiting,
@@ -54,7 +54,7 @@ async function navigate(fetcher: () => Promise<Response>): Promise<Response> {
   const harness = worker(fetcher)
   const state: { response?: Promise<Response> } = {}
   harness.listeners.get("fetch")?.({
-    request: { method: "GET", mode: "navigate", url: "https://omni.test/?thread=keep" },
+    request: { method: "GET", mode: "navigate", url: "https://switchback.test/?thread=keep" },
     respondWith: (response) => { state.response = response },
   })
   if (state.response === undefined) throw new Error("service worker 没有接管导航")
@@ -81,7 +81,7 @@ describe("Web service worker 外壳", () => {
     const respondWith = vi.fn()
     const harness = worker(fetcher)
     harness.listeners.get("fetch")?.({
-      request: { method: "GET", mode: "cors", url: "https://omni.test/assets/index-current.js" },
+      request: { method: "GET", mode: "cors", url: "https://switchback.test/assets/index-current.js" },
       respondWith,
     })
 

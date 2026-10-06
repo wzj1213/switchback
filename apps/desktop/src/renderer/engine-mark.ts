@@ -1,4 +1,4 @@
-import type { EngineSegment } from "@omni/protocol"
+import type { EngineSegment } from "@switchback/protocol"
 import { isBuiltinEngine } from "../shared/builtin-engines.js"
 
 /**

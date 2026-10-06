@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import { KimiTurnTracker } from "./turn.js"
 import { emitKimiLiveWarning, emitKimiSessionWarnings } from "./warnings.js"

@@ -1,4 +1,4 @@
-import type { ErrorItem, Item } from "@omni/protocol"
+import type { ErrorItem, Item } from "@switchback/protocol"
 
 /**
  * 可恢复报错（`fatal: false`）在转录区里的三种样子。
@@ -9,7 +9,7 @@ import type { ErrorItem, Item } from "@omni/protocol"
  * - `absorbed`：同一轮后面跟着一条终态报错。它们说的是同一件事的前半段（重连 5/5 → 放弃），
  *   分开摆就是同一句话灰一遍、红一遍——并进那张卡里。
  *
- * **只看位置，不看措辞**：哪条是重试、哪条是别的可恢复报错，omni 分不清也不去猜。
+ * **只看位置，不看措辞**：哪条是重试、哪条是别的可恢复报错，Switchback 分不清也不去猜。
  */
 export type SoftState = "live" | "past" | "absorbed"
 

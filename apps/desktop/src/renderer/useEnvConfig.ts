@@ -8,7 +8,7 @@ import { bridge, useAsync, type Async } from "./use-async.js"
  * ## 每次打开都重新问
  *
  * 这几份配置是用户在别的窗口里手改的（编辑器、终端里 `codex` 审了一条钩子），
- * omni 没有任何办法知道它们变了。而**一份过期的「生效中」比不显示更危险**——
+ * Switchback 没有任何办法知道它们变了。而**一份过期的「生效中」比不显示更危险**——
  * 这条和 `EnvCard` 里重新问分支名是同一个道理。
  *
  * 代价是打开这一页要读三五个文件（毫秒级，全在主进程），不值得为它做缓存。
@@ -19,10 +19,10 @@ import { bridge, useAsync, type Async } from "./use-async.js"
  * 副本，每一份都少了一样）。留着这个文件是因为**「传哪个 cwd」是这一页自己的事**。
  */
 export function useEnvConfig(cwd: string | undefined): Async<EnvConfig> {
-  const omni = bridge()
+  const switchback = bridge()
   const load = useMemo(
-    () => (omni === undefined ? undefined : () => omni.envConfig(cwd)),
-    [omni, cwd],
+    () => (switchback === undefined ? undefined : () => switchback.envConfig(cwd)),
+    [switchback, cwd],
   )
   return useAsync<EnvConfig>(load)
 }

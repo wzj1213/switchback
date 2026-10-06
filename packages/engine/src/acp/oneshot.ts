@@ -34,7 +34,7 @@ export type Initialized =
   | { kind: "aborted" }
 
 export const PROTOCOL_VERSION = 1
-const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
+const CLIENT_INFO = { name: "switchback", title: "Switchback", version: "0.1.0" }
 const STDERR_KEEP = 4000
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -48,7 +48,7 @@ export async function withAcpProcess<T>(req: OneShotRequest, run: (shot: OneShot
     // 这里没有会话可以答。**必须回错误而不是不理**：不答它会一直等，
     // 而登录那一步本来就可能等上几分钟——两边互等就是一个永远不结束的登录
     onRequest: (call) => {
-      call.reject({ code: -32601, message: "omni 此时没有打开会话，不处理这类请求" })
+      call.reject({ code: -32601, message: "Switchback 此时没有打开会话，不处理这类请求" })
     },
   })
   // **spawn 真正能跑的那个绝对路径**，理由同 `resolveCommand`：裸名字会被 PATH

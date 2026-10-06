@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import { KimiTurnEvents } from "./turn-events.js"
 import { KimiTurnTracker } from "./turn.js"
@@ -7,7 +7,7 @@ import { kimiStepInterruptionMessage } from "./step-outcome.js"
 function setup(): { events: Event[]; handler: KimiTurnEvents } {
   const events: Event[] = []
   const tracker = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
-  tracker.begin("omni-turn", "做事")
+  tracker.begin("switchback-turn", "做事")
   return { events, handler: new KimiTurnEvents(tracker, undefined) }
 }
 
@@ -43,8 +43,8 @@ describe("Kimi step 结论", () => {
       type: "item.started",
       at: 4,
       item: {
-        id: "kimi-error-omni-turn-4-1",
-        turnId: "omni-turn",
+        id: "kimi-error-switchback-turn-4-1",
+        turnId: "switchback-turn",
         at: 4,
         kind: "error",
         message: "Interrupted by user",
@@ -69,8 +69,8 @@ describe("Kimi step 结论", () => {
       type: "item.started",
       at: 4,
       item: {
-        id: "kimi-warning-omni-turn-4-1",
-        turnId: "omni-turn",
+        id: "kimi-warning-switchback-turn-4-1",
+        turnId: "switchback-turn",
         at: 4,
         kind: "notice",
         message: "Model hit max_tokens — no tool call was emitted.",
@@ -80,7 +80,7 @@ describe("Kimi step 结论", () => {
     expect(events.at(-1)).toEqual({
       type: "turn.completed",
       at: 5,
-      turnId: "omni-turn",
+      turnId: "switchback-turn",
       status: "completed",
     })
   })
@@ -105,8 +105,8 @@ describe("Kimi step 结论", () => {
       type: "item.started",
       at: 3,
       item: {
-        id: "kimi-warning-omni-turn-3-1",
-        turnId: "omni-turn",
+        id: "kimi-warning-switchback-turn-3-1",
+        turnId: "switchback-turn",
         at: 3,
         kind: "notice",
         message:
@@ -179,8 +179,8 @@ describe("Kimi step 结论", () => {
         type: "item.started",
         at: 4,
         item: {
-          id: "kimi-warning-omni-turn-4-1",
-          turnId: "omni-turn",
+          id: "kimi-warning-switchback-turn-4-1",
+          turnId: "switchback-turn",
           at: 4,
           kind: "notice",
           message: "Model hit max_tokens — tool call was truncated before it could run.",

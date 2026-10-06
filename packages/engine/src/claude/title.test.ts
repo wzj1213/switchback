@@ -12,7 +12,7 @@ describe("让引擎自己给会话起名", () => {
     expect(canTitle(queryWith("generate"))).toBe(false)
   })
 
-  it("把第一句话原样递过去——不是 omni 写的提示词", async () => {
+  it("把第一句话原样递过去——不是 Switchback 写的提示词", async () => {
     const seen: unknown[] = []
     const query = queryWith((...args: unknown[]) => {
       seen.push(args)

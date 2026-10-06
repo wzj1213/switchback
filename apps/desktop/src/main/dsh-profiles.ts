@@ -89,5 +89,5 @@ export async function readDshProfiles(home = homeOf("DSH_HOME", ".dsh")): Promis
 }
 
 export function installDshProfileChannel(): void {
-  ipcMain.handle("omni:dshProfiles", () => readDshProfiles())
+  ipcMain.handle("switchback:dshProfiles", () => readDshProfiles())
 }

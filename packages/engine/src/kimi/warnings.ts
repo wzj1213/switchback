@@ -1,4 +1,4 @@
-import type { EngineNotificationPriority, Event, ThreadId } from "@omni/protocol"
+import type { EngineNotificationPriority, Event, ThreadId } from "@switchback/protocol"
 import type { KimiPayload, KimiSessionWarning } from "./wire.js"
 
 interface WarningContext {

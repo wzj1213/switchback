@@ -1,4 +1,4 @@
-import type { Aside, Lane, LaneNode } from "@omni/protocol"
+import type { Aside, Lane, LaneNode } from "@switchback/protocol"
 
 const STATUS: Readonly<Record<Lane["status"], string>> = {
   running: "进行中",

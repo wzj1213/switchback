@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { createJournal } from "@omni/journal"
-import type { Event, Thread, ThreadId } from "@omni/protocol"
-import { initial, itemsOf, reduceAll, threadRowsOf, turnOf } from "@omni/store"
+import { createJournal } from "@switchback/journal"
+import type { Event, Thread, ThreadId } from "@switchback/protocol"
+import { initial, itemsOf, reduceAll, threadRowsOf, turnOf } from "@switchback/store"
 import type { ThreadHistory } from "./host.js"
 import { replayEvents } from "./scope.js"
 
@@ -84,7 +84,7 @@ describe("全量重建", () => {
   })
 
   it("无终态快照的监控增量经过真实 journal 后仍能重建", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "omni-monitor-replay-"))
+    const dir = await mkdtemp(join(tmpdir(), "switchback-monitor-replay-"))
     const journal = createJournal({ dir })
     const id = "monitor-replay"
     const turnId = "monitor-turn"
@@ -160,7 +160,7 @@ describe("活着的和历史要分开", () => {
 })
 
 describe("空壳会话不进侧栏", () => {
-  it("**一句话都没说过的不算历史**——omni 每次启动都开一个默认会话，不滤掉的话跑一周侧栏全是空壳", () => {
+  it("**一句话都没说过的不算历史**——Switchback 每次启动都开一个默认会话，不滤掉的话跑一周侧栏全是空壳", () => {
     const state = reduceAll(initial(), replayEvents({ engines: [], threads: [emptyHistory("空", "空")], alive: none, now: 1 }))
     expect(threadRowsOf(state)).toEqual([])
   })
@@ -212,7 +212,7 @@ describe("活着但磁盘上什么都没有的会话", () => {
 /**
  * 进程在轮次中间没了（退应用、崩溃、记录写满）留下的那一轮。
  *
- * 真机现场：Kimi 那条会话发出「继续」之后 omni 被重启，记录里 114 次开始、113 次结束。
+ * 真机现场：Kimi 那条会话发出「继续」之后 Switchback 被重启，记录里 114 次开始、113 次结束。
  * 重启后界面一直显示在跑，停止键发给早已空闲的 Kimi，按多少次都没反应。
  */
 describe("停在半路的那一轮", () => {

@@ -1,9 +1,9 @@
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 
 /**
- * omni 自己的斜杠命令。
+ * Switchback 自己的斜杠命令。
  *
- * ## 收进来的标准：**这件事 omni 真的能做，而且不做成命令就得翻菜单**
+ * ## 收进来的标准：**这件事 Switchback 真的能做，而且不做成命令就得翻菜单**
  *
  * 所以这里只有已经存在的功能，一条新能力都没造。做成命令的价值是
  * 「手不离键盘」——它们本来都藏在右键菜单、顶栏图标或 `⌘` 组合键后面，
@@ -16,12 +16,12 @@ import type { SlashCommand } from "@omni/protocol"
  * - **改模型 / 改信任档**：输入区里已经有两个下拉，就在手边，
  *   再复制一份到命令面板只会有两处状态要同步。
  */
-export interface OmniAction {
+export interface SwitchbackAction {
   command: SlashCommand
   run: () => void
 }
 
-export function omniCommands(acts: {
+export function switchbackCommands(acts: {
   onNew: () => void
   onFork?: () => void
   onHandoff?: () => void
@@ -35,8 +35,8 @@ export function omniCommands(acts: {
   onCompact?: () => void
   /** 承接上一段：把上一家引擎那份原始记录的路径填进输入框。没有可承接的就不给。 */
   onPickup?: { run: () => void; from: string }
-}): readonly OmniAction[] {
-  const list: (OmniAction | undefined)[] = [
+}): readonly SwitchbackAction[] {
+  const list: (SwitchbackAction | undefined)[] = [
     make("new", "新建会话", "在当前工作区另开一个", acts.onNew),
     make("rename", "重命名", "给这个会话改个名字", acts.onRename),
     make("env", "环境信息", "看这个会话跑在什么环境里", acts.onEnv),
@@ -60,7 +60,7 @@ export function omniCommands(acts: {
     make("compact", "压缩上下文", "让引擎把前面的对话总结掉，腾出窗口继续", acts.onCompact),
     make("settings", "设置", "打开设置", acts.onSettings),
   ]
-  return list.filter((a): a is OmniAction => a !== undefined)
+  return list.filter((a): a is SwitchbackAction => a !== undefined)
 }
 
 function make(
@@ -68,6 +68,6 @@ function make(
   label: string,
   description: string,
   run: (() => void) | undefined,
-): OmniAction | undefined {
-  return run === undefined ? undefined : { command: { name, label, description, source: "omni" }, run }
+): SwitchbackAction | undefined {
+  return run === undefined ? undefined : { command: { name, label, description, source: "switchback" }, run }
 }

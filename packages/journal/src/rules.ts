@@ -11,7 +11,7 @@ import { join } from "node:path"
  */
 
 /**
- * 和 `@omni/approval` 的 `Rule` 结构一致。
+ * 和 `@switchback/approval` 的 `Rule` 结构一致。
  *
  * **不 import 那个包**——它和本包同层，架构守卫不允许同层互相依赖。
  * `pattern` 声明成宽松的记录：本包不解释规则内容，只负责它的字节进出。

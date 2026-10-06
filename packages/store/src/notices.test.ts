@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineStatus, Event } from "@omni/protocol"
+import type { EngineStatus, Event } from "@switchback/protocol"
 import { reduceAll } from "./reduce.js"
 import { initial, reconnectingOf } from "./state.js"
 

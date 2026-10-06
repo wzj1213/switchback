@@ -1,4 +1,4 @@
-import type { Item, Thread, ToolCallItem, UserMessageItem } from "@omni/protocol"
+import type { Item, Thread, ToolCallItem, UserMessageItem } from "@switchback/protocol"
 import { shellTranscript, VERB, target } from "./tool.js"
 
 /**

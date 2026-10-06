@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { acpAuthenticate, acpLogout, terminalLoginOf, tryAcp } from "@omni/engine"
+import { acpAuthenticate, acpLogout, terminalLoginOf, tryAcp } from "@switchback/engine"
 import type { AcpEngineRow, AcpLoginOutcome, AcpTrialView } from "../shared/acp-registry.js"
 import { pruneAgents } from "./acp-install.js"
 import { ENGINES_FILE, readEngineFile, type EngineEntry } from "./engines.js"

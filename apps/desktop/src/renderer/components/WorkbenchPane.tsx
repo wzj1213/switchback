@@ -1,4 +1,4 @@
-import type { Item, Lane, Thread } from "@omni/protocol"
+import type { Item, Lane, Thread } from "@switchback/protocol"
 import type { PreviewTarget, WorkbenchState } from "../workbench.js"
 import { useWorkbenchKeys } from "../use-workbench-keys.js"
 import { ActivityPage } from "./ActivityPage.js"

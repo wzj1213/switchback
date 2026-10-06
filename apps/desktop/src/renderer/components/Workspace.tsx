@@ -13,12 +13,12 @@ import type {
   TurnPace,
   Usage,
   TaskRun,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import type { Reconnecting } from "./TurnStatus.js"
-import type { Notice, ThreadRow } from "@omni/store"
+import type { Notice, ThreadRow } from "@switchback/store"
 import type { PetKit } from "../../shared/settings.js"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
-import { useOmniActions } from "../useOmniActions.js"
+import { useSwitchbackActions } from "../useSwitchbackActions.js"
 import { limitNotice } from "../limits.js"
 import { TopBar } from "./TopBar.js"
 import { Notices } from "./Notices.js"
@@ -85,7 +85,7 @@ export interface WorkspaceProps {
   /** 在访达里定位工作区。环境卡片上那颗按钮用。 */
   onReveal: (path: string) => void
   searchFiles: (cwd: string, query: string) => Promise<readonly string[]>
-  /** 引擎报的斜杠命令。omni 自己那几条在这里拼上去。 */
+  /** 引擎报的斜杠命令。Switchback 自己那几条在这里拼上去。 */
   commands: readonly SlashCommand[]
   /** 这家引擎的账号额度。 */
   limits: RateLimits | undefined
@@ -183,7 +183,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
   // 带上 items 是为了**每条 shell 命令收工时也问一次**——只有它能把分支换掉，
   // 而那件事在此之前界面上完全沉默（见 `stamp.ts`）
   const stamp = stampOf(props.turn, props.items)
-  const actions = useOmniActions(props, {
+  const actions = useSwitchbackActions(props, {
     onEnv: () => {
       setEnv(true)
     },

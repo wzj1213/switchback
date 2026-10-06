@@ -9,7 +9,7 @@ import { runCommand } from "./enginever-command.js"
 
 /** 用系统 tar / ditto 现打一个真归档，喂给注入的 fetch——不联网，但解包走的是真命令。 */
 function archiveOf(kind: "tgz" | "zip" | "raw"): { bytes: Buffer; sha: string } {
-  const work = mkdtempSync(join(tmpdir(), "omni-archive-"))
+  const work = mkdtempSync(join(tmpdir(), "switchback-archive-"))
   const src = join(work, "src")
   mkdirSync(join(src, "bin"), { recursive: true })
   writeFileSync(join(src, "bin", "agent"), "#!/bin/sh\necho hi\n", "utf8")
@@ -21,7 +21,7 @@ function archiveOf(kind: "tgz" | "zip" | "raw"): { bytes: Buffer; sha: string } 
   return { bytes, sha: createHash("sha256").update(bytes).digest("hex") }
 }
 
-function deps(bytes: Buffer, root = mkdtempSync(join(tmpdir(), "omni-agents-"))): InstallDeps & { asked: string[]; phases: string[] } {
+function deps(bytes: Buffer, root = mkdtempSync(join(tmpdir(), "switchback-agents-"))): InstallDeps & { asked: string[]; phases: string[] } {
   const asked: string[] = []
   const phases: string[] = []
   return {
@@ -108,7 +108,7 @@ describe("装一家只发二进制的引擎", () => {
 
 describe("收掉没人用的旧版本", () => {
   it("只留还有条目在用的版本目录", async () => {
-    const root = mkdtempSync(join(tmpdir(), "omni-prune-"))
+    const root = mkdtempSync(join(tmpdir(), "switchback-prune-"))
     for (const dir of ["goose/1.0.0", "goose/1.1.0", "goose/.staging-x", "opencode/2.0.0"]) mkdirSync(join(root, dir), { recursive: true })
     const keep = [join(root, "goose", "1.1.0", "goose"), join(root, "opencode", "2.0.0", "bin", "opencode")]
     // 刚动过的暂存目录可能正在下载：先不删

@@ -1,4 +1,4 @@
-import type { QuestionAnswer, QuestionPrompt, QuestionResponse } from "@omni/protocol"
+import type { QuestionAnswer, QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 
 export interface QuestionDraft {
   optionIds: readonly string[]

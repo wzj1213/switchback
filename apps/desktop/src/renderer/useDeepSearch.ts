@@ -43,7 +43,7 @@ const EMPTY: DeepSearch = { hits: [], skipped: 0, busy: false, idle: true }
 export function useDeepSearch(query: string): DeepSearch {
   const [out, setOut] = useState<DeepSearch>(EMPTY)
   useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.omni
+    const bridge = typeof window === "undefined" ? undefined : window.switchback
     const trimmed = query.trim()
     if (trimmed.length < MIN || bridge === undefined) {
       setOut(EMPTY)

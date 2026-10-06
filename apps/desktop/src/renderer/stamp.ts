@@ -1,4 +1,4 @@
-import type { Item, Turn } from "@omni/protocol"
+import type { Item, Turn } from "@switchback/protocol"
 
 /**
  * 「工作区可能变了」的信号。

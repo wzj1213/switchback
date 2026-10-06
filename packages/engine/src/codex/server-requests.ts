@@ -1,5 +1,5 @@
-import type { Rule } from "@omni/approval"
-import type { Trust } from "@omni/protocol"
+import type { Rule } from "@switchback/approval"
+import type { Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { RequestId, ServerCall } from "../rpc.js"
 import { answerApproval } from "./approve.js"

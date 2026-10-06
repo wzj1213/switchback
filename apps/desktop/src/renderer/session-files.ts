@@ -1,4 +1,4 @@
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 import { canonicalPath } from "../shared/paths.js"
 
 export interface SessionFile {

@@ -104,7 +104,7 @@ export interface AcpUpdate {
   entries?: readonly AcpPlanEntry[]
   /** `available_commands_update`：引擎自己认的斜杠命令。 */
   availableCommands?: readonly AcpCommand[]
-  /** `usage_update`：已用 / 窗口大小。**不是累计账单**，正是 omni 要的那个数。 */
+  /** `usage_update`：已用 / 窗口大小。**不是累计账单**，正是 Switchback 要的那个数。 */
   used?: number
   size?: number
   currentModeId?: string
@@ -160,7 +160,7 @@ export interface AcpModel {
    * 拿不到就没有分母，界面上只显示占用数字、不画比例条。
    */
   /**
-   * 扩展位。**omni 只读它认得的那几个键**，其余原样不管。
+   * 扩展位。**Switchback 只读它认得的那几个键**，其余原样不管。
    *
    * `totalContextTokens`：窗口大小（实测 grok 4.6 = 500000）。
    * `reasoningEffort*`：有的 agent 把强度放在这儿而不是 `configOptions`——

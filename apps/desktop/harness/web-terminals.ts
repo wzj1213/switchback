@@ -1,4 +1,4 @@
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 
 const at = 1_760_000_000_000
 
@@ -28,8 +28,8 @@ export const WEB_TERMINALS: readonly Item[] = [
     detail: {
       kind: "shell",
       command: "sh -c 'read line; echo GOT:$line'",
-      output: "GOT:OMNI_TERMINAL_INPUT\n",
-      terminal: { waiting: false, inputs: ["OMNI_TERMINAL_INPUT\n"] },
+      output: "GOT:SWITCHBACK_TERMINAL_INPUT\n",
+      terminal: { waiting: false, inputs: ["SWITCHBACK_TERMINAL_INPUT\n"] },
     },
   },
 ]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { countDiff, isStreamingText, itemToOmni, textOf, toToolCall, toolStatus, turnStatus } from "./translate.js"
+import { countDiff, isStreamingText, itemToSwitchback, textOf, toToolCall, toolStatus, turnStatus } from "./translate.js"
 import type { WireItem } from "./wire.js"
 
 const ctx = { turnId: "tn-1", at: 100 }
@@ -136,13 +136,13 @@ describe("countDiff", () => {
   })
 })
 
-describe("itemToOmni", () => {
+describe("itemToSwitchback", () => {
   it("userMessage 返回 undefined——宿主发 prompt 时已经发过一条了，再发就是重影", () => {
-    expect(itemToOmni({ type: "userMessage", id: "u1" }, ctx, true)).toBeUndefined()
+    expect(itemToSwitchback({ type: "userMessage", id: "u1" }, ctx, true)).toBeUndefined()
   })
 
   it("agentMessage 落 agent_message 并带 complete", () => {
-    expect(itemToOmni({ type: "agentMessage", id: "m1", text: "好" }, ctx, true)).toEqual({
+    expect(itemToSwitchback({ type: "agentMessage", id: "m1", text: "好" }, ctx, true)).toEqual({
       id: "m1",
       turnId: "tn-1",
       at: 100,
@@ -157,7 +157,7 @@ describe("itemToOmni", () => {
   })
 
   it("contextCompaction 是原生状态提示，不冒充未知工具调用", () => {
-    expect(itemToOmni({ type: "contextCompaction", id: "compact-1" }, ctx, true)).toEqual({
+    expect(itemToSwitchback({ type: "contextCompaction", id: "compact-1" }, ctx, true)).toEqual({
       id: "compact-1",
       turnId: "tn-1",
       at: 100,
@@ -168,7 +168,7 @@ describe("itemToOmni", () => {
   })
 
   it("认不出的类型落 tool_call/other，原始 type 带上便于排查", () => {
-    const item = itemToOmni({ type: "imageGeneration", id: "x" }, ctx, true)
+    const item = itemToSwitchback({ type: "imageGeneration", id: "x" }, ctx, true)
     expect(item).toMatchObject({ kind: "tool_call", tool: "imageGeneration", detail: { kind: "other" } })
   })
 })

@@ -1,4 +1,4 @@
-import type { Event, TurnId } from "@omni/protocol"
+import type { Event, TurnId } from "@switchback/protocol"
 import { planSteps } from "./plan.js"
 import { finishTool, startTool } from "./tool.js"
 import { kimiMessage, kimiTurnStatus, snapshotCanFinish, snapshotMatches } from "./turn-state.js"

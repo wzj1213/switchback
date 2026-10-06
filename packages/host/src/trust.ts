@@ -1,4 +1,4 @@
-import type { Command, Event, Thread } from "@omni/protocol"
+import type { Command, Event, Thread } from "@switchback/protocol"
 import { emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"

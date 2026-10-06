@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import type { TurnPace } from "@omni/protocol"
+import type { TurnPace } from "@switchback/protocol"
 import type { BrassMode, TrajMode } from "../../shared/settings.js"
 import { createFx, resetFx, stepFx } from "../pet-fx.js"
 import { createFoeArt } from "../pet-foe-art.js"

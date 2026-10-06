@@ -95,7 +95,7 @@ describe("文件预览操作", () => {
   })
 
   it("点开同名文件后仍把目录归属画在标题里，越界路径明确标记", () => {
-    const render = (path: string, cwd = "/work/omni"): string =>
+    const render = (path: string, cwd = "/work/switchback"): string =>
       renderToStaticMarkup(
         createElement(FilePreviewView, {
           target: { threadId: "thread", cwd, path },
@@ -106,10 +106,10 @@ describe("文件预览操作", () => {
           onCopy: () => undefined,
         }),
       )
-    const inside = render("/work/omni/apps/desktop/src/index.ts")
+    const inside = render("/work/switchback/apps/desktop/src/index.ts")
     const external = render("/Users/me/.codex/skills/review/SKILL.md")
     const externalRoot = render("/manual.md")
-    const windows = render("c:\\Work\\Omni\\src\\App.ts", "C:\\work\\omni")
+    const windows = render("c:\\Work\\Switchback\\src\\App.ts", "C:\\work\\switchback")
     expect(inside).toContain(">index.ts</strong>")
     expect(inside).toContain("…/desktop/src")
     expect(inside).not.toContain("工作区外")

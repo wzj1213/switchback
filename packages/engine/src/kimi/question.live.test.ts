@@ -7,7 +7,7 @@ import type {
   QuestionAnswer,
   QuestionPrompt,
   QuestionResponse,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import { createKimiDriver } from "./driver.js"
 
 const MARK = "KIMI_QUESTION_OK_4827"
@@ -50,7 +50,7 @@ describe("Kimi 结构化问题 · live", () => {
     async () => {
       const events: Event[] = []
       const asked: (readonly QuestionPrompt[])[] = []
-      const cwd = mkdtempSync(join(tmpdir(), "omni-kimi-question-"))
+      const cwd = mkdtempSync(join(tmpdir(), "switchback-kimi-question-"))
       const session = await createKimiDriver().start({
         threadId: "th-kimi-question-live",
         cwd,

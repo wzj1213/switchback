@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { Command, Thread, Trust } from "@omni/protocol"
+import type { Command, Thread, Trust } from "@switchback/protocol"
 
 /**
  * 一条老会话，把它接回引擎。

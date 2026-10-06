@@ -1,6 +1,6 @@
 import { useState } from "react"
-import type { Command, EngineInfo, ThreadId, Trust } from "@omni/protocol"
-import type { Project } from "@omni/store"
+import type { Command, EngineInfo, ThreadId, Trust } from "@switchback/protocol"
+import type { Project } from "@switchback/store"
 
 /**
  * 在手机上开一条新会话。

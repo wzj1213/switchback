@@ -1,8 +1,8 @@
-import type { ThreadId } from "@omni/protocol"
+import type { ThreadId } from "@switchback/protocol"
 import type { EngineCatalog } from "./engine-catalog.js"
-import type { Host } from "@omni/host"
-import type { Ledger } from "@omni/wire"
-import type { createJournal } from "@omni/journal"
+import type { Host } from "@switchback/host"
+import type { Ledger } from "@switchback/wire"
+import type { createJournal } from "@switchback/journal"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
 import type { Sinks } from "./sink.js"
 import type { Awake } from "./awake.js"
@@ -44,7 +44,7 @@ export interface Attached {
   sinks: Sinks
   awake: Awake
   touched: TouchedFiles
-  /** omni 自己复制的图片；历史引用与会话删除都在事件出口登记。 */
+  /** Switchback 自己复制的图片；历史引用与会话删除都在事件出口登记。 */
   attachmentFiles: AttachmentFiles
   worksiteSearch: WorksiteSearch
   log: Logger

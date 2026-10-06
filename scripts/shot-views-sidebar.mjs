@@ -1,4 +1,4 @@
-const project = `[...document.querySelectorAll('.group')].find(group => group.querySelector('.row__label')?.textContent === 'omni')`
+const project = `[...document.querySelectorAll('.group')].find(group => group.querySelector('.row__label')?.textContent === 'switchback')`
 const filter = (text) => `(() => {
   const input = document.querySelector('input[aria-label="筛选会话"]')
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(text)})
@@ -60,7 +60,7 @@ export const SIDEBAR_VIEWS = [
     ],
     sidebarDrag: { from: "历史会话 500", to: "历史会话 502", edge: "after" },
     ready: ".sidebar__droppin .group",
-    assert: `window.omni.settings().then(settings => {
+    assert: `window.switchback.settings().then(settings => {
       const order = Object.values(settings.threadOrder).find(ids => ids.length === 503)
       return settings.pinnedThreads.length === 0 && order?.at(-1) === 'th-page-500' &&
         document.querySelector('.sidebar__droppin .group .row__count').textContent === '503'

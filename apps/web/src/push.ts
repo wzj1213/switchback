@@ -81,7 +81,7 @@ export async function enablePush(token: string): Promise<EnableResult> {
   const registration = await navigator.serviceWorker.register("/sw.js")
   const res = await fetch("/api/push/key")
   const { key } = (await res.json()) as { key: string }
-  if (typeof key !== "string" || key === "") return { ok: false, reason: "omni 没给出推送公钥" }
+  if (typeof key !== "string" || key === "") return { ok: false, reason: "Switchback 没给出推送公钥" }
 
   const sub = await registration.pushManager.subscribe({
     // **只能是 true**：Chrome 会拒掉静默推送，而 iOS 压根没有静默这一档
@@ -96,11 +96,11 @@ export async function enablePush(token: string): Promise<EnableResult> {
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify(shape),
   })
-  if (!saved.ok) return { ok: false, reason: `omni 没存下这个订阅（HTTP ${String(saved.status)}）` }
+  if (!saved.ok) return { ok: false, reason: `Switchback 没存下这个订阅（HTTP ${String(saved.status)}）` }
   return { ok: true }
 }
 
-/** 退订。**两头都要退**：只退浏览器那头的话，omni 还会一直往一个死端点推。 */
+/** 退订。**两头都要退**：只退浏览器那头的话，Switchback 还会一直往一个死端点推。 */
 export async function disablePush(token: string): Promise<void> {
   const registration = await navigator.serviceWorker.getRegistration()
   const sub = await registration?.pushManager.getSubscription()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, TurnPace } from "@omni/protocol"
+import type { Event, Item, TurnPace } from "@switchback/protocol"
 import { createPaceBook, livePace, notePace } from "./pace.js"
 import { estimateTokens } from "./tokens.js"
 

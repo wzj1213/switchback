@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { Event, TurnId } from "@omni/protocol"
+import type { Event, TurnId } from "@switchback/protocol"
 import { closeHooks, createHookState, onHookMessage } from "./hooks.js"
 
 function setup(turn: TurnId | null = "turn-1") {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, Turn } from "@omni/protocol"
-import { createPaceBook, estimateTokens, livePace } from "@omni/store"
+import type { Event, Item, Turn } from "@switchback/protocol"
+import { createPaceBook, estimateTokens, livePace } from "@switchback/store"
 import { absorb, createScope, drain, retarget } from "./flow-scope.js"
 import { createTapeText, nextChar } from "./tape-text.js"
 import { createMeter, rateOf } from "./throughput.js"

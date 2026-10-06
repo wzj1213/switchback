@@ -17,7 +17,7 @@ describe("文件行的名字与目录", () => {
     { path: "apps/desktop/src/main.ts", name: "main.ts", hint: "…/desktop/src", out: false },
     { path: "apps\\desktop\\src\\main.ts", name: "main.ts", hint: "…/desktop/src", out: false },
     // Windows 盘符与目录大小写不敏感；不能因此误贴「工作区外」
-    { path: "c:\\Work\\Omni\\src\\App.ts", name: "App.ts", hint: "src", out: false },
+    { path: "c:\\Work\\Switchback\\src\\App.ts", name: "App.ts", hint: "src", out: false },
     // 工作区外：目录同样收成末两级，完整路径留给 title
     {
       path: "/Users/me/.codex/skills/doc-manage/SKILL.md",
@@ -28,13 +28,13 @@ describe("文件行的名字与目录", () => {
     { path: "/tmp/draft_prd.md", name: "draft_prd.md", hint: "/tmp", out: true },
     // 前缀相同但不是同一个目录，不能算在工作区里
     { path: "/work/repos-old/a.ts", name: "a.ts", hint: "/work/repos-old", out: true },
-    { path: "C:\\work\\omnibus\\app.ts", name: "app.ts", hint: "…/work/omnibus", out: true },
+    { path: "C:\\work\\switchbackbus\\app.ts", name: "app.ts", hint: "…/work/switchbackbus", out: true },
   ]
 
   for (const item of cases) {
     it(`${item.path} → ${item.name}${item.hint === "" ? "" : ` · ${item.hint}`}`, () => {
       expect(baseName(item.path)).toBe(item.name)
-      const root = /^[A-Za-z]:/.test(item.path) ? "C:\\work\\omni" : cwd
+      const root = /^[A-Za-z]:/.test(item.path) ? "C:\\work\\switchback" : cwd
       expect(dirHint(item.path, root)).toBe(item.hint)
       expect(outside(item.path, root)).toBe(item.out)
     })

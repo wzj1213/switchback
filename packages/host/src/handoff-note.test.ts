@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Thread } from "@omni/protocol"
+import type { Event, Thread } from "@switchback/protocol"
 import { create, items, setupTwoEngines } from "./host-fixture.js"
 import { isFirstAfterSwitch } from "./handoff-note.js"
 
@@ -50,7 +50,7 @@ async function workedThenPicked(rig: Rig): Promise<string> {
   return threadId
 }
 
-const NOTE = "<omni-handoff>此前由 fake 跑了第 1 轮</omni-handoff>"
+const NOTE = "<switchback-handoff>此前由 fake 跑了第 1 轮</switchback-handoff>"
 
 function userTexts(events: Event[]): readonly { text: string; origin?: unknown }[] {
   return items(events)

@@ -1,7 +1,7 @@
-import type { Event, ItemId, PlanStep, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ItemId, PlanStep, ThreadId, TurnId } from "@switchback/protocol"
 
 /**
- * claude 的待办清单 → omni 的 `plan` item。
+ * claude 的待办清单 → Switchback 的 `plan` item。
  *
  * ## 全部来自实测（2026-08-19）
  *
@@ -14,7 +14,7 @@ import type { Event, ItemId, PlanStep, ThreadId, TurnId } from "@omni/protocol"
  *
  * 1. **模型真调的是 `TaskCreate` / `TaskUpdate`**，不是 SDK 里同样声明着的 `TodoWrite`
  *   （这台机器上一次都没被调过）。
- * 2. **它们不经过 `canUseTool`**，所以 omni 的判定层看不见它们——
+ * 2. **它们不经过 `canUseTool`**，所以 Switchback 的判定层看不见它们——
  *    方案乙担心的「只读档会拒掉待办」复现不了。
  * 3. **id 是按创建顺序递增的**（1、2、3…）。所以这里按顺序发号，
  *    而不是去正则抠 `Task #(\\d+)` 那句英文——**文案会变，顺序不会**。
@@ -57,7 +57,7 @@ export function isPlanTool(block: unknown): boolean {
 }
 
 /**
- * claude 的状态词 → omni 的四态。
+ * claude 的状态词 → Switchback 的四态。
  *
  * **认不出的一律当 `pending`**：一个状态没认出来，最坏的表现是「显示成还没做」，
  * 而不是「显示成做完了」——猜错的方向必须是保守的那一边。
@@ -86,7 +86,7 @@ export function feedPlan(state: PlanState, block: unknown): boolean {
   if (id === undefined) return false
   const step = state.steps.get(id)
   // **认不出的 id 就丢掉，不凭空建一条**。claude 自己的面板会拿 taskId 当标题建一条，
-  // 那在实时面板上无所谓；而 omni 的 transcript 是事后要读的记录，
+  // 那在实时面板上无所谓；而 Switchback 的 transcript 是事后要读的记录，
   // 一条内容是 id 的步骤读的人只会以为自己记错了
   if (step === undefined) return false
   state.steps.set(id, { ...step, status: statusOf(input?.status) })

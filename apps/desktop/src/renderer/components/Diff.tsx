@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { FileChange, FileChangeKind } from "@omni/protocol"
+import type { FileChange, FileChangeKind } from "@switchback/protocol"
 import { kindLabel, parseDiff, splitPath, type DiffLine } from "../diff.js"
 import { reveal, revealable } from "../reveal.js"
 

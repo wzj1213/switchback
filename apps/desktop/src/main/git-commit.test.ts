@@ -7,13 +7,13 @@ import { gitCommit, gitStage, gitState, gitUndo, parseStatus } from "./git-commi
 
 /** 真仓库。本地配置盖掉全局的签名与钩子：这台机器上的全局设置不该让测试卡住或变红。 */
 function repo(options: { commit?: boolean } = {}): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "omni-git-")))
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "switchback-git-")))
   const git = (...args: string[]): void => {
     execFileSync("git", args, { cwd: dir, stdio: "ignore" })
   }
   git("init", "-q", "-b", "main")
-  git("config", "user.name", "omni-test")
-  git("config", "user.email", "omni-test@example.invalid")
+  git("config", "user.name", "switchback-test")
+  git("config", "user.email", "switchback-test@example.invalid")
   git("config", "commit.gpgsign", "false")
   git("config", "core.hooksPath", join(dir, ".no-hooks"))
   if (options.commit !== false) {
@@ -52,7 +52,7 @@ describe("parseStatus（porcelain v2 -z）", () => {
 
 describe("在真仓库里暂存与提交", () => {
   it("状态：不在仓库里就说不在", async () => {
-    const plain = mkdtempSync(join(tmpdir(), "omni-plain-"))
+    const plain = mkdtempSync(join(tmpdir(), "switchback-plain-"))
     expect(await gitState(plain)).toMatchObject({ repo: false })
   })
 

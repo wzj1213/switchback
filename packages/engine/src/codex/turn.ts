@@ -1,4 +1,4 @@
-import type { TurnId } from "@omni/protocol"
+import type { TurnId } from "@switchback/protocol"
 
 interface TurnState {
   codexThread: string | undefined

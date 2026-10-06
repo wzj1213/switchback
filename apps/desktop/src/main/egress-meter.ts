@@ -33,7 +33,7 @@ export interface Watched {
   key: string
   /** 给人看的名字（`Claude Code`、`ZCode`）。 */
   label: string
-  /** 用着它的会话（kimi web 这种一个进程供几条会话）。不是 omni 起的进程就是空的。 */
+  /** 用着它的会话（kimi web 这种一个进程供几条会话）。不是 Switchback 起的进程就是空的。 */
   threads: readonly string[]
   leader: number
   runtime: readonly number[]

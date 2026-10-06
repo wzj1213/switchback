@@ -17,7 +17,7 @@ import type {
   TurnId,
   TurnPace,
   Usage,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 
 export interface ViewState {
   /** 会话表 */
@@ -65,7 +65,7 @@ export interface ViewState {
   /**
    * 引擎自己存着的会话（你在终端、别的界面里跑过的）。按引擎分。
    *
-   * **和 `threads` 分开存**：那些是 omni 建的、有完整记录的；这些只有一行标题，
+   * **和 `threads` 分开存**：那些是 Switchback 建的、有完整记录的；这些只有一行标题，
    * 内容还在引擎那边。混进同一张表的话，界面就分不出「这条我有记录」和
    * 「这条只是听说过」，而这两者能做的事完全不同。
    */
@@ -74,7 +74,7 @@ export interface ViewState {
   accounts: Readonly<Record<string, EngineAccount>>
   /** 通知序号。归约器是纯函数，不能用时间戳或随机数当 id。 */
   noticeSeq: number
-  /** 每个会话能用的斜杠命令，连同来源引擎；omni 自己那几条在渲染层拼。 */
+  /** 每个会话能用的斜杠命令，连同来源引擎；Switchback 自己那几条在渲染层拼。 */
   commands: Readonly<Record<ThreadId, Readonly<Record<EngineId, readonly SlashCommand[]>>>>
   /** 各家引擎的账号额度。**按引擎存不按会话存**——额度是账号级的。 */
   limits: Readonly<Record<string, RateLimits>>
@@ -120,7 +120,7 @@ export interface FailureNotice extends NoticeBase {
    * `auth` 是引擎明确要求先登录（`engine.status` 的 `unauthenticated`）：抬头写「需要登录」，
    * 桌面端顺手给一条去登录的路。
    *
-   * `egress` 是 omni 的外发守卫看见某个进程在批量往外发数据（`egress.alert`）。
+   * `egress` 是 Switchback 的外发守卫看见某个进程在批量往外发数据（`egress.alert`）。
    * 它不是引擎报的故障，抬头要说清楚是「批量外发」。
    */
   kind: "crashed" | "degraded" | "auth" | "egress"
@@ -251,7 +251,7 @@ export function modelsOf(state: ViewState, threadId: ThreadId, engine: string): 
   return state.models[threadId]?.[engine] ?? []
 }
 
-/** 取一个会话能用的斜杠命令。引擎没报过就是空的，界面据此只显示 omni 自己那几条。 */
+/** 取一个会话能用的斜杠命令。引擎没报过就是空的，界面据此只显示 Switchback 自己那几条。 */
 /** 取一家引擎的额度。没报过就是 undefined，界面据此什么都不画。 */
 export function limitsOf(state: ViewState, engine: string): RateLimits | undefined {
   return state.limits[engine]
@@ -349,8 +349,8 @@ export function projectsOf(rows: readonly ThreadRow[]): readonly Project[] {
 }
 
 /**
- * 引擎自己存着的那些会话。**omni 没有它们的记录**，只有一行标题。
- * 界面据此单独成段——和 omni 建的会话混在一起会让人以为点开就能看见内容。
+ * 引擎自己存着的那些会话。**Switchback 没有它们的记录**，只有一行标题。
+ * 界面据此单独成段——和 Switchback 建的会话混在一起会让人以为点开就能看见内容。
  */
 export function engineThreadsOf(state: ViewState, engine: string): readonly EngineThread[] {
   return state.engineThreads[engine] ?? []
@@ -361,7 +361,7 @@ export function engineThreadsOf(state: ViewState, engine: string): readonly Engi
  *
  * ## 为什么按「装了的引擎」而不是「报过历史的引擎」
  *
- * 历史是**握手时问出来的**，也就是说你没在 omni 里开过 Claude 会话，
+ * 历史是**握手时问出来的**，也就是说你没在 Switchback 里开过 Claude 会话，
  * Claude 那一段就整个不存在。而「这里能放什么」恰恰是还没用过的人最需要知道的
  * ——这条在侧栏别的段上已经吃过一次亏（置顶段空了就整段消失，
  * 于是「怎么置顶」只有会用的人看得见）。空着也给段头，空态里说清楚为什么空。

@@ -6,7 +6,7 @@ import { TrialLine } from "./AcpLogin.js"
 /**
  * 接入 / 升级走到哪一步：确认 → 进行中 → 结果。注册表那一行与已接那张卡共用。
  *
- * **确认这一步不能省**：点下去之后 omni 会执行一条命令、或者从网上下载一个可执行文件——
+ * **确认这一步不能省**：点下去之后 Switchback 会执行一条命令、或者从网上下载一个可执行文件——
  * 那一行字必须先摆在人眼前，和真正会执行的一字不差（`planText` 从同一份计划算出来）。
  */
 export function ConnectStatus({ row, connect, verb }: {

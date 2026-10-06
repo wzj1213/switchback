@@ -23,7 +23,7 @@ export type { ZcodeStatus }
  * 公开的防护办法是给这个目录加不可改标志（`chflags uchg`）：它写不进新包，整条链路就断了。
  * 修好的版本不用这个目录，锁着也不碍事；要解开，关掉设置里那个开关即可（`chflags nouchg`）。
  *
- * omni 不删里面已有的包（那是你的数据，要不要删你来定），只报有几个、多大。
+ * Switchback 不删里面已有的包（那是你的数据，要不要删你来定），只报有几个、多大。
  */
 
 const run = promisify(execFile)

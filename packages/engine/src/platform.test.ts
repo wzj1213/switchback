@@ -56,12 +56,12 @@ describe("从登录 shell 问 PATH", () => {
   })
 
   it("从哨兵之间抠出 PATH", async () => {
-    const got = await resolveLoginPath(base, deps("__OMNI_PATH__/opt/homebrew/bin:/usr/bin__OMNI_END__"))
+    const got = await resolveLoginPath(base, deps("__SWITCHBACK_PATH__/opt/homebrew/bin:/usr/bin__SWITCHBACK_END__"))
     expect(got.split(":")).toContain("/opt/homebrew/bin")
   })
 
   it("**rc 文件的噪声不影响**——取最后一行不可靠，有人的 rc 结尾就打空行", async () => {
-    const noisy = "nvm: 已加载\n今日运势：吉\n__OMNI_PATH__/opt/homebrew/bin__OMNI_END__\n"
+    const noisy = "nvm: 已加载\n今日运势：吉\n__SWITCHBACK_PATH__/opt/homebrew/bin__SWITCHBACK_END__\n"
     expect((await resolveLoginPath(base, deps(noisy))).split(":")).toContain("/opt/homebrew/bin")
   })
 
@@ -78,11 +78,11 @@ describe("从登录 shell 问 PATH", () => {
   })
 
   it("去重且保持先来的优先", async () => {
-    const got = await resolveLoginPath("/a:/b", deps("__OMNI_PATH__/b:/c__OMNI_END__"))
+    const got = await resolveLoginPath("/a:/b", deps("__SWITCHBACK_PATH__/b:/c__SWITCHBACK_END__"))
     expect(got.split(":").slice(0, 3)).toEqual(["/b", "/c", "/a"])
   })
 
   it("**Windows 原样返回**：那边 GUI 进程正常继承环境变量，跑一次 shell 是纯风险", async () => {
-    expect(await resolveLoginPath("C:\\bin", deps("__OMNI_PATH__/nope__OMNI_END__", "win32"))).toBe("C:\\bin")
+    expect(await resolveLoginPath("C:\\bin", deps("__SWITCHBACK_PATH__/nope__SWITCHBACK_END__", "win32"))).toBe("C:\\bin")
   })
 })

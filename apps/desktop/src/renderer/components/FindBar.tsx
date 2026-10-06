@@ -26,7 +26,7 @@ export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
     input.current?.focus()
     input.current?.select()
     // 开发钩子：自动化截图按不了键，从主进程把查找词塞进来
-    return window.omni?.onDevFind((q) => {
+    return window.switchback?.onDevFind((q) => {
       setQuery(q)
     })
   }, [])

@@ -160,8 +160,8 @@ export const VIEWS = [
           responsive: getComputedStyle(document.querySelector('.main')).display === 'flex'
             && document.querySelector('.sidebar').getBoundingClientRect().width > 100,
           clean: !index?.textContent.includes('failed-secret.txt'),
-          scope: scope?.textContent.endsWith('/omni') === true
-            && scope?.getAttribute('title')?.endsWith('/omni') === true,
+          scope: scope?.textContent.endsWith('/switchback') === true
+            && scope?.getAttribute('title')?.endsWith('/switchback') === true,
           copy: document.querySelector('.files-scope')?.textContent.includes('文件变化会自动更新') === true,
           groups: index?.textContent.includes('最近一轮改过') === true
             && index?.textContent.includes('此前碰过') === true
@@ -221,7 +221,7 @@ export const VIEWS = [
     {
       name: "09-搜索返回保留",
       open: [
-        `(() => { window.__omniFileIndex = document.querySelector('.files-index'); window.__omniFileRow = document.activeElement; document.activeElement?.click() })()`,
+        `(() => { window.__switchbackFileIndex = document.querySelector('.files-index'); window.__switchbackFileRow = document.activeElement; document.activeElement?.click() })()`,
         `document.querySelector('.workbench__page:not([hidden]) .workbench__back')?.click()`,
       ],
       ready: ".files-search input",
@@ -231,13 +231,13 @@ export const VIEWS = [
           query: document.querySelector('.files-search input')?.value,
           hasResult: index?.textContent.includes('attachments.ts') === true,
           settled: index?.textContent.includes('正在搜索') === false,
-          sameIndex: index === window.__omniFileIndex,
-          sameRow: document.activeElement === window.__omniFileRow,
+          sameIndex: index === window.__switchbackFileIndex,
+          sameRow: document.activeElement === window.__switchbackFileRow,
           oneTabStop: [...(index?.querySelectorAll('.file-row') ?? [])]
             .filter(row => row.tabIndex === 0).length === 1,
           activeTabStop: document.activeElement?.tabIndex,
           activeClass: document.activeElement?.className,
-          expectedPath: window.__omniFileRow?.dataset?.filePath,
+          expectedPath: window.__switchbackFileRow?.dataset?.filePath,
           activePath: document.activeElement?.dataset?.filePath,
           paths: [...(index?.querySelectorAll('.file-row') ?? [])].map(row => row.dataset.filePath),
         }
@@ -251,7 +251,7 @@ export const VIEWS = [
     {
       name: "09-切页重开保留",
       open: [
-        `window.__omniWorkbench = document.querySelector('.workbench')`,
+        `window.__switchbackWorkbench = document.querySelector('.workbench')`,
         ...openPanelPage("活动"),
         ...openPanelPage("文件"),
         `document.querySelector('.paneltoggle')?.click()`,
@@ -260,12 +260,12 @@ export const VIEWS = [
       ready: ".files-search input",
       assert: `document.querySelector('.files-search input')?.value === 'attachment'
         && document.querySelector('.files-index')?.textContent.includes('attachments.ts') === true
-        && document.querySelector('.files-index') === window.__omniFileIndex
-        && document.querySelector('.workbench') === window.__omniWorkbench
+        && document.querySelector('.files-index') === window.__switchbackFileIndex
+        && document.querySelector('.workbench') === window.__switchbackWorkbench
         && document.activeElement?.matches('.files-search input') === true`,
       after: `(() => {
-        delete window.__omniFileIndex
-        delete window.__omniWorkbench
+        delete window.__switchbackFileIndex
+        delete window.__switchbackWorkbench
         document.querySelector('.files-search input')?.dispatchEvent(
           new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
         )

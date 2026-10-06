@@ -1,4 +1,4 @@
-import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@omni/protocol"
+import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import type { ForeignInteraction } from "./caps.js"
 import { grokExtPayload, recordOf } from "./grok-ext.js"
 

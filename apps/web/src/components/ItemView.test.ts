@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import type { UserMessageItem } from "@omni/protocol"
+import type { UserMessageItem } from "@switchback/protocol"
 import { ItemView } from "./ItemView.js"
 
 describe("移动端消息来源", () => {

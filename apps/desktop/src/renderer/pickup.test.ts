@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineSegment, Thread } from "@omni/protocol"
+import type { EngineSegment, Thread } from "@switchback/protocol"
 import { pickupOf } from "./pickup.js"
 
 const seg = (engine: string, startedAt: number, logPath?: string): EngineSegment => ({

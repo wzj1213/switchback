@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -26,7 +26,7 @@ import { createClaudeDriver } from "./driver.js"
  *（`caps.ts` 抬头那条）。所以这条测试是 `steer: true` 的唯一凭据。
  *
  * 实测 CLI 会先给被打断的一段发 result，再为插话开下一段；测试还要钉住
- * **omni 侧只收工一次**，否则一次插话会把后半段变成无主消息。
+ * **Switchback 侧只收工一次**，否则一次插话会把后半段变成无主消息。
  */
 
 /** 让它跑得够久，好在中途插进去。**别让它用工具**——那会把测的东西搅进审批里。 */
@@ -35,7 +35,7 @@ const CUT_IN = "立即停止原任务，只回复 STEER_OK。"
 
 describe("Claude 当场插话（真跑）", () => {
   it("轮次跑着的时候插进去的话，被**同一轮**吃掉了", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-steer-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-steer-live-"))
     const events: Event[] = []
     const driver = createClaudeDriver({})
     const session = await driver.start({

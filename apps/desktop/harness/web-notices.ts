@@ -1,4 +1,4 @@
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 
 /** 四档原生提示，供远程端真实 CSS 出图与无障碍验收。 */
 export const WEB_NOTICES: readonly Item[] = [

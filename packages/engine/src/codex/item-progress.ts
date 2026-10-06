@@ -1,5 +1,5 @@
-import type { Event, ItemId, TurnId } from "@omni/protocol"
-import { itemToOmni } from "./translate.js"
+import type { Event, ItemId, TurnId } from "@switchback/protocol"
+import { itemToSwitchback } from "./translate.js"
 import type { WireFilePatch, WireItem, WireMcpProgress } from "./wire.js"
 
 interface ProgressContext {
@@ -17,7 +17,7 @@ function update(ctx: ProgressContext, item: WireItem): void {
   const turnId = ctx.turnId()
   if (turnId === undefined || !ctx.materialized.has(item.id)) return
   const at = ctx.now()
-  const mapped = itemToOmni(item, { turnId, at }, false)
+  const mapped = itemToSwitchback(item, { turnId, at }, false)
   if (mapped !== undefined) ctx.emit({ type: "item.updated", at, item: mapped })
 }
 

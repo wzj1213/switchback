@@ -31,12 +31,12 @@ function textOf(node: HTMLElement | null): string {
 }
 
 /**
- * 复制走主进程那条桥（`window.omni.copy`），和界面上别处的每一颗复制同一条路——
+ * 复制走主进程那条桥（`window.switchback.copy`），和界面上别处的每一颗复制同一条路——
  * 不自己碰 `navigator.clipboard`：那条在没有用户手势时会静默失败，
  * 而「点了没反应也不报错」正是这套界面一直在躲的东西。
  */
 async function copyVia(text: string): Promise<boolean> {
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
   try {
     return (await bridge?.copy(text)) ?? false
   } catch {

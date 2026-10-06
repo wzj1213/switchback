@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { EngineInfo, Thread } from "@omni/protocol"
+import type { EngineInfo, Thread } from "@switchback/protocol"
 import { Popover } from "./Popover.js"
 import { BranchIcon, CopyIcon, EngineIcon, RevealIcon, ShieldIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
@@ -45,7 +45,7 @@ export function EnvCard({
   const git = useWorksite(thread.id, thread.cwd, "open")
   const branch = branchLabel(git)
   const [doc, setDoc] = useState<ProjectDoc | undefined>(undefined)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   useEffect(() => {
     if (bridge === undefined) return undefined
@@ -164,7 +164,7 @@ function ProjectDocLine({
   doc: ProjectDoc | undefined
   onDoc: (next: ProjectDoc) => void
 }): React.JSX.Element {
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
   if (doc === undefined) return <>…</>
   if (doc.denied === true) return <>项目说明暂时不可用</>
   if (doc.agents && doc.linked) {

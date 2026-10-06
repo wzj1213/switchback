@@ -103,8 +103,8 @@ export function tallyReview(files: readonly ReviewFile[]): { added: number; remo
   )
 }
 
-const bridgeOf = (): typeof window.omni | undefined =>
-  typeof window === "undefined" ? undefined : window.omni
+const bridgeOf = (): typeof window.switchback | undefined =>
+  typeof window === "undefined" ? undefined : window.switchback
 
 export interface ReviewData {
   root: string
@@ -149,7 +149,7 @@ interface LoadedReview extends Omit<ReviewData, "loading" | "settled" | "reload"
 function loadedReview(
   key: string,
   scope: string,
-  out: Awaited<ReturnType<NonNullable<typeof window.omni>["workReview"]>>,
+  out: Awaited<ReturnType<NonNullable<typeof window.switchback>["workReview"]>>,
 ): LoadedReview {
   if (out === undefined) {
     return { key, scope, root: "", cwd: "", files: [], baseline: false, failed: false,

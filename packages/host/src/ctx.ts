@@ -1,7 +1,7 @@
-import type { Event, ThreadId, Thread, ThreadStatus, TurnId, ItemId } from "@omni/protocol"
-import type { Rule } from "@omni/approval"
-import type { EngineSession } from "@omni/engine"
-import { notePace, type PaceBook } from "@omni/store"
+import type { Event, ThreadId, Thread, ThreadStatus, TurnId, ItemId } from "@switchback/protocol"
+import type { Rule } from "@switchback/approval"
+import type { EngineSession } from "@switchback/engine"
+import { notePace, type PaceBook } from "@switchback/store"
 import type { Gate } from "./gate.js"
 import type { HostDeps } from "./deps.js"
 import { clearThreadLiveState, clearTurnLiveState, rememberLiveState } from "./live-state.js"
@@ -194,7 +194,7 @@ export interface Ctx {
    */
   explained: Map<TurnId, string>
   /**
-   * 每一轮的出字节奏的账本（`@omni/store` 的 `pace.ts`）。**只有这里看得见每一条会话的每一条增量**
+   * 每一轮的出字节奏的账本（`@switchback/store` 的 `pace.ts`）。**只有这里看得见每一条会话的每一条增量**
    * ——渲染层只跟着眼前那条，而增量本身不落盘，回放时已经没东西可量。
    * 所以在这儿量，收工那一刻挂到 `turn.completed` 上，跟着它一起落盘、一起发出去。
    */
@@ -229,7 +229,7 @@ const UNOWNED: ReadonlySet<string> = new Set([
   // 落盘只会在重放时把一份过期的清单塞回界面
   "commands.updated",
   // 引擎自己存的会话清单、以及它登录的账号：同理，都是现问的，
-  // 而且**不属于任何一个 omni 会话**
+  // 而且**不属于任何一个 Switchback 会话**
   "engine.history",
   "account.updated",
 ])
@@ -351,7 +351,7 @@ function shapeOf(event: Event): string {
  *
  * ## 为什么这道闸门在宿主，不在某一家驱动里
  *
- * 撞上它的是 ACP 那条线：`tool_call_update` 逐块推，而 omni 的投影常常吃不下
+ * 撞上它的是 ACP 那条线：`tool_call_update` 逐块推，而 Switchback 的投影常常吃不下
  * 那些块，于是同一份 `{kind:"file_edit",path:"",files:[],added:0,removed:0}`
  * 被翻译出来 9793 遍，一条工具调用写掉 2.7 MB。但**这不是 ACP 独有的形状**：
  * `thread.updated` 从宿主自己十几处发出去，其中 837 条（0.73 MB）是原样重发——

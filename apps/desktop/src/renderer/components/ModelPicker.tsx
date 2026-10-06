@@ -1,4 +1,4 @@
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption } from "@switchback/protocol"
 import { SparkIcon } from "./icons.js"
 import { Select, type Section } from "./Select.js"
 import { currentModel } from "../model-options.js"
@@ -54,7 +54,7 @@ function sectionsOf(
 /**
  * 「恢复默认设置」那一行。
  *
- * **引擎说了算，不是 omni 猜的**：codex 的 `model/list` 里有一条标着 `isDefault`
+ * **引擎说了算，不是 Switchback 猜的**：codex 的 `model/list` 里有一条标着 `isDefault`
  *（实测是 gpt-5.6-sol），连同它自己的默认强度一起用。
  * 没有哪条标默认时**不显示这一行**——一个点了不知道会变成什么的按钮，
  * 比没有这个按钮糟。
@@ -83,7 +83,7 @@ function resetOf(
  *
  * 引擎报上来的是 `low` / `medium` / `high` / `xhigh` / `max` / `ultra`——
  * 那是标识符，不是给人读的。codex 自己的面板上写的是「轻度 / 中 / 高 / 极高 / 最高」，
- * 而 omni 一直原样把英文摆出来。
+ * 而 Switchback 一直原样把英文摆出来。
  *
  * **`ultra` 没有跟着 codex 叫「极高」**：它那张表里「极高」出现了两次
  *（一个带「更快消耗使用额度」的注脚）。两个一模一样的选项摆在一起，

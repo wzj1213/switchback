@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Aside, Item, Lane } from "@omni/protocol"
+import type { Aside, Item, Lane } from "@switchback/protocol"
 import { timelineOf } from "./timeline.js"
 
 const item = (id: string, at: number): Item => ({

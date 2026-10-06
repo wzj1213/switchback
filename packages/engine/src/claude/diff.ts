@@ -1,4 +1,4 @@
-import type { FileChange } from "@omni/protocol"
+import type { FileChange } from "@switchback/protocol"
 import { synthDiff, type Synth } from "../synth.js"
 
 const strOf = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined)

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { toAccount, toEngineThreads } from "./catalog.js"
 
 /**
- * 引擎自己存的会话 → omni 的形状。
+ * 引擎自己存的会话 → Switchback 的形状。
  *
  * 这里钉的两件事都是拿真实响应换来的：时间戳是**秒**（和 rateLimits 的
  * resetsAt 同一个坑），以及缺句柄/缺 cwd 的行绝不能列出来。

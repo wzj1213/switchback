@@ -1,4 +1,4 @@
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { FailureNotice, Notice, ViewState } from "./state.js"
 
 /** 只有这几档需要打断用户；其余是正常引擎生命周期。 */

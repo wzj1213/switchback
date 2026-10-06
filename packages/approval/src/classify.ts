@@ -46,7 +46,7 @@ const TOOL_CATEGORY: Readonly<Record<string, Category>> = {
   // 于是那一档里模型连问都问不了，而提问恰恰是它能做的最安全的动作。
   //
   // 它走这条路不是因为危险，是因为**要交互**：SDK 得让宿主去把问题呈现出来。
-  // omni 拿静态判定去审一件本质是交互的事，审出来的只能是一层多余的窗。
+  // Switchback 拿静态判定去审一件本质是交互的事，审出来的只能是一层多余的窗。
   AskUserQuestion: "meta",
   // `ExitPlanMode` 的孪生兄弟，纯粹的模式开关。它上面那条已经在表里，
   // 只补这一条是为了两个方向别一个认得一个不认得
@@ -140,7 +140,7 @@ function categoryOfName(name: string): Category | undefined {
  *
  * 认成 `exec` 之后并不等于放行：`blindExec` 紧跟着要求 `args.command` 也在。
  * **命令原文看不见的话它照旧退回 `unknown`**——于是这一条只可能在
- * 「omni 同时看得见命令原文」时生效，而那时靠命令原文的那 8 条红线
+ * 「Switchback 同时看得见命令原文」时生效，而那时靠命令原文的那 8 条红线
  *（凭据读取、越界删除、`npm i -g`、`git push`、解析不了…）全都是活的。
  */
 const PARENTHESISED = /[(（]\s*([^)）]+?)\s*[)）]/g

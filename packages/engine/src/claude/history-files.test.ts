@@ -14,7 +14,7 @@ afterEach(async () => {
 
 describe("Claude 会话文件枚举", () => {
   it("只收非空 UUID 会话，跨项目按 mtime 排序", async () => {
-    const home = await mkdtemp(join(tmpdir(), "omni-claude-home-"))
+    const home = await mkdtemp(join(tmpdir(), "switchback-claude-home-"))
     dirs.push(home)
     const a = join(home, ".claude", "projects", "a")
     const b = join(home, ".claude", "projects", "b")
@@ -32,7 +32,7 @@ describe("Claude 会话文件枚举", () => {
   })
 
   it("目录缺失和非 UUID 句柄都安静返回空", async () => {
-    const home = await mkdtemp(join(tmpdir(), "omni-claude-empty-"))
+    const home = await mkdtemp(join(tmpdir(), "switchback-claude-empty-"))
     dirs.push(home)
     await expect(recentSessionFiles(home)).resolves.toEqual([])
     await expect(findSessionFile(home, "agent-deadbeef")).resolves.toBeUndefined()

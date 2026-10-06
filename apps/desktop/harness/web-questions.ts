@@ -1,4 +1,4 @@
-import type { PendingQuestion } from "@omni/protocol"
+import type { PendingQuestion } from "@switchback/protocol"
 
 export const WEB_QUESTIONS: readonly PendingQuestion[] = [
   {
@@ -44,7 +44,7 @@ export const WEB_QUESTIONS: readonly PendingQuestion[] = [
         header: "实现路径",
         question: "这次先走哪条方案？",
         body: "答案会通过引擎自己的结构化接口返回，不会变成一条新的普通消息。",
-        external: { url: "https://accounts.example.com/connect?flow=omni" },
+        external: { url: "https://accounts.example.com/connect?flow=Switchback" },
         options: [
           {
             id: "steady", label: "稳妥修复", description: "只改已经确认的断点，风险更低。",

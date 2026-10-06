@@ -1,6 +1,6 @@
-import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
-import type { Sealed } from "@omni/wire"
-import { estimateTokens, notePace, type PaceBook } from "@omni/store"
+import type { Event, ItemId, ThreadId, TurnId } from "@switchback/protocol"
+import type { Sealed } from "@switchback/wire"
+import { estimateTokens, notePace, type PaceBook } from "@switchback/store"
 import { mark, type Meter } from "./throughput.js"
 import { pushText, type TapeText } from "./tape-text.js"
 
@@ -33,7 +33,7 @@ import { pushText, type TapeText } from "./tape-text.js"
  * 现在只收 `SPOKEN` 那几种。挑这几种还有第二个理由：业界那个 token/s 的分子是
  * `output_tokens`，而**推理 token 是算在 output 里的**——所以 `reasoning` 必须收。
  *
- * 这一轮的 tok/s 不在这儿算：那是 `@omni/store` 的 `pace.ts`，宿主和这里跑的是同一份。
+ * 这一轮的 tok/s 不在这儿算：那是 `@switchback/store` 的 `pace.ts`，宿主和这里跑的是同一份。
  *
  * 纯逻辑：不读时钟、不碰 DOM、不订阅任何东西。
  */

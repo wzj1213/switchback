@@ -1,4 +1,4 @@
-import type { EngineId } from "@omni/protocol"
+import type { EngineId } from "@switchback/protocol"
 import { PetArt } from "./pets-art.js"
 import type { PetSlot } from "../pet-roster.js"
 import type { EntryKind } from "../pet-entry.js"

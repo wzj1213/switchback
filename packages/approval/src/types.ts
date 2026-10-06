@@ -1,4 +1,4 @@
-import type { RememberScope, Trust } from "@omni/protocol"
+import type { RememberScope, Trust } from "@switchback/protocol"
 
 export type { Trust, RememberScope }
 

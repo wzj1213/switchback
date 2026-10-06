@@ -1,4 +1,4 @@
-import type { PlanStep } from "@omni/protocol"
+import type { PlanStep } from "@switchback/protocol"
 import type { KimiToolDisplay } from "./wire.js"
 
 const STATUS: Readonly<Record<string, PlanStep["status"]>> = {

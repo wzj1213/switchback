@@ -89,7 +89,7 @@ function discover(child: ChildProcess, owner: ProcessOwner, budget: number): Pro
 function validate(meta: KimiMeta): void {
   if (meta.capabilities.websocket !== true) throw new Error("这个 Kimi 版本没有公开 WebSocket 能力，请升级 Kimi Code")
   if (meta.dangerous_bypass_auth === true) {
-    throw new Error("Kimi Web 服务关闭了鉴权；omni 拒绝连接这个不安全的实例")
+    throw new Error("Kimi Web 服务关闭了鉴权；Switchback 拒绝连接这个不安全的实例")
   }
 }
 

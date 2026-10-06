@@ -129,7 +129,7 @@ const CASES: readonly Case[] = [
   { name: "重定向到 /dev/null 不用问", trust: "auto-edit", req: bash("noisy 2>/dev/null"), action: "allow" },
   { name: "红线：全局安装要问", trust: "auto-edit", req: bash("npm i -g typescript"), action: "escalate", redline: "global-install" },
   { name: "红线：改引擎配置要问", trust: "full", req: tool("Write", { file_path: "~/.claude/settings.json" }), action: "escalate", redline: "engine-settings-write" },
-  { name: "红线：改 .omni 要问", trust: "full", req: tool("Write", { file_path: ".omni/memory.json" }), action: "escalate", redline: "omni-self-config" },
+  { name: "红线：改 .switchback 要问", trust: "full", req: tool("Write", { file_path: ".switchback/memory.json" }), action: "escalate", redline: "switchback-self-config" },
 
   // ── 解析不了：分两档。见 command.ts 的 OPAQUE_PATTERNS 第三个字段 ──────
   { name: "解析不了 + 会动东西的迹象 → 问", trust: "full", req: bash("rm -rf $(cat target)"), action: "escalate", redline: "unparseable-command" },
@@ -468,7 +468,7 @@ describe("kind 报 other 时按工具名字补一次分类", () => {
     /**
      * **这条是上面那条敢放宽的全部理由。** 认成 `exec` 不等于放行：
      * `blindExec` 紧跟着要求命令原文也在，看不见就退回 `unknown`。
-     * 于是括号这一层只可能在「omni 同时看得见命令」时生效，
+     * 于是括号这一层只可能在「Switchback 同时看得见命令」时生效，
      * 而那时靠命令原文的 8 条红线全是活的。
      */
     it("**命令原文没到就照旧问**——括号只补方向，补不出事实", () => {

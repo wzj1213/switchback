@@ -1,4 +1,4 @@
-import type { PlanStep } from "@omni/protocol"
+import type { PlanStep } from "@switchback/protocol"
 import { LINE, Svg } from "./icon-base.js"
 
 /**

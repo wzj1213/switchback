@@ -1,4 +1,4 @@
-import type { Event, NoticeItem, TurnId } from "@omni/protocol"
+import type { Event, NoticeItem, TurnId } from "@switchback/protocol"
 import type { KimiPayload, KimiTranscriptMarker } from "./wire.js"
 
 type ActivationTrigger = "user-slash" | "model-tool" | "nested-skill"

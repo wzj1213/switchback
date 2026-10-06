@@ -1,4 +1,4 @@
-import type { ModelOption } from "@omni/protocol"
+import type { ModelOption } from "@switchback/protocol"
 
 /** 选中项的退路必须和模型面板一致，避免面板与附件入口各认一台模型。 */
 export function currentModel(

@@ -48,7 +48,7 @@ export function planText(plan: LaunchPlan): { what: string; note: string } {
     const run = commandLine(plan.cmd, plan.args)
     return {
       what: `下载 ${plan.archive}`,
-      note: `${plan.sha256 === undefined ? "注册表没给校验值" : `按注册表的 sha256 校验`}，解到 omni 数据目录的 agents/ 下，之后以 ${run} 启动。`,
+      note: `${plan.sha256 === undefined ? "注册表没给校验值" : `按注册表的 sha256 校验`}，解到 Switchback 数据目录的 agents/ 下，之后以 ${run} 启动。`,
     }
   }
   return {
@@ -65,10 +65,10 @@ export function updateOf(engine: AcpEngineRow, view: RegistryView | undefined): 
 }
 
 /**
- * 注册表里那几家 omni 已经内置了原生入口的（各家官方的 ACP 适配器）。
+ * 注册表里那几家 Switchback 已经内置了原生入口的（各家官方的 ACP 适配器）。
  *
  * 接它们不是错，但会在引擎下拉里另占一项，而且走的是通用 ACP 驱动——
- * 界面上得先说一声，不然人会以为这是 omni 缺的那一家。**只做标注，不拦**：
+ * 界面上得先说一声，不然人会以为这是 Switchback 缺的那一家。**只做标注，不拦**：
  * 这张表过期了（注册表改了 id）的代价只是少一个提示。
  */
 const TWINS: Readonly<Record<string, BuiltinEngineId>> = {

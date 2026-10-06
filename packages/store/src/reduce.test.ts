@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, Thread, ToolCallItem } from "@omni/protocol"
+import type { Event, Item, Thread, ToolCallItem } from "@switchback/protocol"
 import { initial, itemsOf, limitsOf, threadsOf, threadRowsOf } from "./state.js"
 import { coalesce, reduce, reduceAll, reduceHistory } from "./reduce.js"
 

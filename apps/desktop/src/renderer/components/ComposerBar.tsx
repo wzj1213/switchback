@@ -1,4 +1,4 @@
-import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@omni/protocol"
+import type { EngineId, EngineInfo, ModelOption, Trust, Usage } from "@switchback/protocol"
 import { Action } from "./ComposerAction.js"
 import { ModelPicker } from "./ModelPicker.js"
 import { UsageBadge } from "./UsageRing.js"
@@ -166,7 +166,7 @@ export function Bar({
   engines: readonly EngineInfo[]
   trust: Trust
   hint?: TrustHint
-  /** 「这家不会把自己改的档告诉 omni」那句。**挂在档位选择器的悬停上，不常驻。** */
+  /** 「这家不会把自己改的档告诉 Switchback」那句。**挂在档位选择器的悬停上，不常驻。** */
   blind?: string
   /** 侧问模式的芯片。由上层给，`Bar` 只负责摆在哪儿。不在这个模式时是 undefined。 */
   aside?: React.ReactNode

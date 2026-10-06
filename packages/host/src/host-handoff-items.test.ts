@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { initial, itemsOf, reduceAll } from "@omni/store"
-import type { Event } from "@omni/protocol"
+import { initial, itemsOf, reduceAll } from "@switchback/store"
+import type { Event } from "@switchback/protocol"
 import { create, setupTwoEngines } from "./host-fixture.js"
 
 const edit = (turnId: string, path: string): Event => ({

@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -24,7 +24,7 @@ import { createClaudeDriver } from "./driver.js"
 
 describe("Claude 的推理强度（真跑）", () => {
   it("模型清单里报得出强度档，而且设得进去", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-effort-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-effort-live-"))
     const events: Event[] = []
     const driver = createClaudeDriver({})
     const session = await driver.start({

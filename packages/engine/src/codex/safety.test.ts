@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { handleNotification, type NotifyContext } from "./notify.js"
 
 function setup(): { ctx: NotifyContext; events: Event[] } {
@@ -7,10 +7,10 @@ function setup(): { ctx: NotifyContext; events: Event[] } {
   return {
     events,
     ctx: {
-      threadId: "omni-thread",
+      threadId: "switchback-thread",
       codexThread: () => "codex-thread",
       emit: (event) => events.push(event),
-      turnId: () => "omni-turn",
+      turnId: () => "switchback-turn",
       inflight: new Map(),
       streamed: new Map(),
       materialized: new Set(),
@@ -60,7 +60,7 @@ describe("Codex 原生安全状态", () => {
     }
     expect(events.map((event) => event.type)).toEqual(["item.started", "item.started"])
     expect(events.map((event) => event.type === "item.started" ? event.item.id : ""))
-      .toEqual(["codex-strict-review-omni-turn-10", "codex-strict-review-omni-turn-20"])
+      .toEqual(["codex-strict-review-switchback-turn-10", "codex-strict-review-switchback-turn-20"])
   })
 
   it("安全缓冲从等待更新到继续，并保留 Codex 给的更快模型建议", () => {

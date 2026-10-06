@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { initial, itemsOf, reduceAll } from "@omni/store"
+import { initial, itemsOf, reduceAll } from "@switchback/store"
 import { promptEcho } from "./web-prompt.js"
 
 describe("Web 验收台 prompt 回显", () => {

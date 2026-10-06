@@ -1,4 +1,4 @@
-import type { ThreadId } from "@omni/protocol"
+import type { ThreadId } from "@switchback/protocol"
 import { discardUnstarted, emit, type Ctx } from "./ctx.js"
 
 /** 后一条临时会话出现时，取消仍卡在 driver.start、尚未进入 live 表的前一条。 */

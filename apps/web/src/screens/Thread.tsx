@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import type { Thread as ThreadModel } from "@omni/protocol"
-import { itemsOf, lanesOf, mainItems, thinkingTokensOf, turnOf, usageOf } from "@omni/store"
+import type { Thread as ThreadModel } from "@switchback/protocol"
+import { itemsOf, lanesOf, mainItems, thinkingTokensOf, turnOf, usageOf } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { ItemView } from "../components/ItemView.js"
 import { Composer } from "../components/Composer.js"
@@ -213,7 +213,7 @@ export function Thread({
 
 /** 输入框上面那行小字。**说清现在为什么不能发**，而不是只报引擎和档位。 */
 function hintOf(thread: ThreadModel, offline: boolean): string {
-  if (offline) return "没连上 omni，先等重连"
+  if (offline) return "没连上 Switchback，先等重连"
   if (thread.status === "starting") return "引擎正在启动，马上就能说话"
   return `${thread.engine} · ${thread.trust}`
 }

@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineStatus, ModelOption, TurnId } from "@omni/protocol"
+import type { EngineStatus, ModelOption, TurnId } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { ProcessOwner } from "../subprocess.js"
 import { resolveCommand } from "../probe.js"
@@ -66,7 +66,7 @@ export interface OpenCtx {
   wire: (child: ChildProcess) => void
 }
 
-const CLIENT_INFO = { name: "omni", title: "omni 同文", version: "0.1.0" }
+const CLIENT_INFO = { name: "switchback", title: "Switchback", version: "0.1.0" }
 
 /** 握手上限。超过这个还没回 `initialize`，就当它起不来了。 */
 const HANDSHAKE_MS = 20_000
@@ -83,7 +83,7 @@ function startupMessage(command: string, error: Error): string {
   const code = (error as NodeJS.ErrnoException).code
   if (code === "ENOENT") {
     // **这句话出现在用户最需要出路的那一刻**（发出去了，起不来）。原来它只指向终端，
-    // 而 omni 自己就能装这一家——设置里那条命令是抄它官方来源的，不是编的。
+    // 而 Switchback 自己就能装这一家——设置里那条命令是抄它官方来源的，不是编的。
     // 终端那条留着：有人本来就在终端里，而且 `which` 能看出是不是 PATH 的问题
     return `找不到可执行文件 \`${command}\`。设置 → 引擎 → 安装与版本 里可以直接装；已经装过的话，去那儿点「重新探测」（终端里跑 \`which codex\` 能看出是不是 PATH 的问题）。`
   }
@@ -167,7 +167,7 @@ async function openingThread(ctx: OpenCtx): Promise<unknown> {
  *
  * **必须由这个进程自己 fork。** 让原会话那个进程分好再交给这边去 `thread/resume`，
  * 真机上直接失败：`thread ... already has an active writer`——
- * 分出来的那条归创建它的进程管，而 omni 一个会话一个进程。
+ * 分出来的那条归创建它的进程管，而 Switchback 一个会话一个进程。
  * `thread/unsubscribe` 也不放锁（都实测过）。
  *
  * `dropTurns` 先只读源会话的原生 turn id，再把 `lastTurnId` 直接交给

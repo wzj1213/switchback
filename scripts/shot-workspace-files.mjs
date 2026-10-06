@@ -5,7 +5,7 @@ import { join } from "node:path"
 export async function prepareWorkspaceFiles(root, view, created) {
   for (const path of view.createFiles ?? []) {
     const absolute = join(root, path)
-    await writeFile(absolute, "// omni visual refresh probe\n", { flag: "wx" })
+    await writeFile(absolute, "// Switchback visual refresh probe\n", { flag: "wx" })
     created.add(absolute)
   }
   for (const file of view.rewriteFiles ?? []) {

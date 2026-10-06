@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { Command } from "@omni/protocol"
-import { initial, reduceAll, type ViewState } from "@omni/store"
+import type { Command } from "@switchback/protocol"
+import { initial, reduceAll, type ViewState } from "@switchback/store"
 import {
   initialStream,
   received,
@@ -10,9 +10,9 @@ import {
   type Sealed,
   type Step,
   type Stream,
-} from "@omni/wire"
+} from "@switchback/wire"
 
-export interface Omni {
+export interface Switchback {
   state: ViewState
   send: (command: Command) => void
   /** 告诉主进程当前正文是哪条会话，只用于抑制眼前这条的系统通知。 */
@@ -50,7 +50,7 @@ export interface Omni {
 
 const NOOP_VIEWING = (): void => undefined
 
-async function copyText(bridge: typeof window.omni | undefined, text: string): Promise<boolean> {
+async function copyText(bridge: typeof window.switchback | undefined, text: string): Promise<boolean> {
   try {
     return (await bridge?.copy(text)) ?? false
   } catch {
@@ -59,14 +59,14 @@ async function copyText(bridge: typeof window.omni | undefined, text: string): P
 }
 
 /**
- * 订阅主进程的事件流，用 `@omni/store` 的归约器维护视图状态。
+ * 订阅主进程的事件流，用 `@switchback/store` 的归约器维护视图状态。
  *
  * 渲染层和宿主跑**同一个归约器**——两边状态不会漂移。
  * 这里只做订阅与转发，任何「状态该怎么变」的判断都不属于渲染层。
  */
-export function useOmni(): Omni {
+export function useSwitchback(): Switchback {
   const [state, setState] = useState<ViewState>(initial)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   // 游标放 ref 不放 state：它每来一批都变，进 state 会多一轮渲染，
   // 而界面上没有任何东西显示它

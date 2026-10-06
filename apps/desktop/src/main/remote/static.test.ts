@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { safeJoin } from "./static.js"
 
-const ROOT = "/srv/omni/web"
+const ROOT = "/srv/switchback/web"
 
 describe("路径穿越", () => {
   const allowed: readonly [string, string][] = [
-    ["/index.html", "/srv/omni/web/index.html"],
-    ["/assets/app-1a2b3c4d.js", "/srv/omni/web/assets/app-1a2b3c4d.js"],
-    ["/./index.html", "/srv/omni/web/index.html"],
+    ["/index.html", "/srv/switchback/web/index.html"],
+    ["/assets/app-1a2b3c4d.js", "/srv/switchback/web/assets/app-1a2b3c4d.js"],
+    ["/./index.html", "/srv/switchback/web/index.html"],
   ]
   for (const [urlPath, expected] of allowed) {
     it(`放行 ${urlPath}`, () => {
@@ -34,10 +34,10 @@ describe("路径穿越", () => {
   }
 
   it("根目录本身算在内", () => {
-    expect(safeJoin(ROOT, "/")).toBe("/srv/omni/web")
+    expect(safeJoin(ROOT, "/")).toBe("/srv/switchback/web")
   })
 
   it("**判据是解析后的前缀，不是字符串里有没有 `..`**——正常路径里也可以有两个点", () => {
-    expect(safeJoin(ROOT, "/assets/v1..2/app.js")).toBe("/srv/omni/web/assets/v1..2/app.js")
+    expect(safeJoin(ROOT, "/assets/v1..2/app.js")).toBe("/srv/switchback/web/assets/v1..2/app.js")
   })
 })

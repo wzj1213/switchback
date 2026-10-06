@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { deleteSession } from "@anthropic-ai/claude-agent-sdk"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { describe, expect, it } from "vitest"
 import { createClaudeDriver } from "./driver.js"
 
 /** `pnpm vitest run --mode live packages/engine/src/claude/compaction.live.test.ts` */
 describe("Claude 上下文压缩（真跑）", () => {
   it("真实 /compact 从运行态原地更新到带 token 边界的完成态", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-claude-compact-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-claude-compact-live-"))
     const events: Event[] = []
     let handle: string | undefined
     const session = await createClaudeDriver({ isolateSettings: true }).start({

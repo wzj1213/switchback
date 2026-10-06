@@ -53,13 +53,13 @@ describe("rescanMessage", () => {
       name: "改过的那几家没兑现——**单独说**，别混进「已经变了」那句里",
       changed: [],
       restart: ["ZCode"],
-      want: "查过了，没有变化——装的还是那几家。ZCode 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 omni。",
+      want: "查过了，没有变化——装的还是那几家。ZCode 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 Switchback。",
     },
     {
       name: "新接了一家、另一家改过了：两件事各说各的",
       changed: [{ id: "acp:zcode", label: "ZCode", state: "ok" }],
       restart: ["旧适配器"],
-      want: "认出了 ZCode。旧适配器 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 omni。",
+      want: "认出了 ZCode。旧适配器 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 Switchback。",
     },
   ]
   it.each(cases)("$name", ({ changed, restart, want }) => {

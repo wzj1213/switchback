@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { EngineSegment } from "@omni/protocol"
+import type { EngineSegment } from "@switchback/protocol"
 import { engineAt, engineStints, engineSwitches, engineTint } from "./engine-mark.js"
 
 const seg = (engine: string, startedAt: number, profile?: string): EngineSegment => ({

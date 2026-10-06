@@ -1,4 +1,4 @@
-import type { LaneNode } from "@omni/protocol"
+import type { LaneNode } from "@switchback/protocol"
 import type { ForeignActivity } from "./caps.js"
 
 const text = (value: unknown): string | undefined =>

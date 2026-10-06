@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { foreignSessionId, mine, onForeign, type ForeignCtx } from "./route.js"
 
 describe("这条通知归不归我", () => {

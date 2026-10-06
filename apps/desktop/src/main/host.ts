@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { app, dialog, ipcMain, shell, type BrowserWindow } from "electron"
-import type { Command, Event, Thread, ThreadId } from "@omni/protocol"
-import type { Ledger, Sealed } from "@omni/wire"
-import { createHost, type Host } from "@omni/host"
-import { createJournal, createRuleStore } from "@omni/journal"
-import { AcpAuthRequired } from "@omni/engine"
+import type { Command, Event, Thread, ThreadId } from "@switchback/protocol"
+import type { Ledger, Sealed } from "@switchback/wire"
+import { createHost, type Host } from "@switchback/host"
+import { createJournal, createRuleStore } from "@switchback/journal"
+import { AcpAuthRequired } from "@switchback/engine"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
@@ -47,7 +47,7 @@ function installBridgeChannels(deps: Channels): void {
   installClipboardChannel(deps.log)
   // 目录选择必须在主进程弹：渲染层没有、也不该有触碰文件系统的能力。
   // 回给渲染层的只是一个用户亲手选中的路径。
-  ipcMain.handle("omni:pickFolder", async () => {
+  ipcMain.handle("switchback:pickFolder", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
       title: "选择工作区",
@@ -56,16 +56,16 @@ function installBridgeChannels(deps: Channels): void {
   })
 
   // 只定位不打开：`showItemInFolder` 在访达里选中它，不会执行任何东西
-  ipcMain.on("omni:reveal", (_e, path: string) => {
+  ipcMain.on("switchback:reveal", (_e, path: string) => {
     if (typeof path === "string" && path !== "") shell.showItemInFolder(path)
   })
 
-  ipcMain.handle("omni:searchFiles", (_e, req: unknown) => deps.worksiteSearch.search(req))
+  ipcMain.handle("switchback:searchFiles", (_e, req: unknown) => deps.worksiteSearch.search(req))
 
   // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
   // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
   ipcMain.handle(
-    "omni:resync",
+    "switchback:resync",
     (
       _e,
       req: { after: number; epoch: string },
@@ -84,7 +84,7 @@ function installBridgeChannels(deps: Channels): void {
     },
   )
 
-  ipcMain.on("omni:command", (_e, command: Command) => {
+  ipcMain.on("switchback:command", (_e, command: Command) => {
     // 命令失败不能掐掉主进程：翻成一条状态事件送回界面
     void deps.host.dispatch(command).catch((error: unknown) => {
       deps.report(error, "threadId" in command ? command.threadId : undefined)
@@ -95,7 +95,7 @@ function installBridgeChannels(deps: Channels): void {
 /**
  * 落盘。
  *
- * userData 而不是自己拼 `~/.omni`：这是系统给应用的位置，
+ * userData 而不是自己拼 `~/.switchback`：这是系统给应用的位置，
  * 用户换机器迁移、清理应用数据时才找得到、才带得走。
  */
 function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<typeof createJournal> {
@@ -215,7 +215,7 @@ export function attachHost(
   const seen = { thread: undefined as ThreadId | undefined }
   // 叫人这件事认窗口（`isFocused` / `show` / `focus` 是窗口才有的动作），
   // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
-  // 桌面正在看哪条由 `omni:viewing` 报给 attention；远程正在看哪条还要由 relay
+  // 桌面正在看哪条由 `switchback:viewing` 报给 attention；远程正在看哪条还要由 relay
   // 自己再判，因为只有那一层知道每台远程设备停在哪儿。
   const attention = createAttention(windows, relay, ports?.notify)
   const awake = createAwake()
@@ -379,7 +379,7 @@ export async function rebuild(
   if (pruned > 0) attached.log.write("info", "attachments", `清理了 ${String(pruned)} 个过期孤立图片`)
   // 读磁盘期间被封号的那些。它们保证**晚于快照、且还在保留缓冲里**，
   // 所以拼在最后就补上了那条缝。和磁盘那份的重叠是必然的，靠归约器的
-  // 幂等去重（`@omni/store` 的 `appendItem`），不在这里判——
+  // 幂等去重（`@switchback/store` 的 `appendItem`），不在这里判——
   // 判它需要给每条事件一个身份，那是把复杂度推给每一个产生事件的地方。
   const missed = attached.ledger.since(before, attached.ledger.epoch) ?? []
   const scoped = scopeReplay(threads, budget)
@@ -402,7 +402,7 @@ export async function rebuild(
     //（现问引擎的东西落盘只会在重放时塞回一份过期的），于是全量里没有它们；
     // 而它们作为增量发出去的那一次又 `seq <= resumeAt`，被渲染层当旧消息丢掉。
     // 两头都不留，就永久没了——实测去掉这一行，重载之后 `/` 面板里
-    // 22 条技能一条不剩，只剩 omni 自己那 8 条
+    // 22 条技能一条不剩，只剩 Switchback 自己那 8 条
     ...attached.host.liveState(),
     ...missed.map((sealed) => sealed.event),
   ]
@@ -412,14 +412,14 @@ export async function rebuild(
   const bodies =
     budget === undefined ? {} : { bodies: [...scoped.bodies], trimmed: [...scoped.trimmedIds] }
   if (target.alive())
-    target.send({ channel: "omni:replay", replay: { events, resumeAt, epoch, ...bodies } })
+    target.send({ channel: "switchback:replay", replay: { events, resumeAt, epoch, ...bodies } })
   // 有活的就回活的：重载之后应该落在用户正在用的那个会话上，不是列表第一条
   return [...alive.keys()][0] ?? ids[0]
 }
 
 /**
  * 开一个默认会话，指向应用当前工作目录，让界面一进来就能用。
- * `prompt` 只在开发钩子（`OMNI_DEV_PROMPT`）下传入，正常启动不会自动发消息。
+ * `prompt` 只在开发钩子（`SWITCHBACK_DEV_PROMPT`）下传入，正常启动不会自动发消息。
  */
 export async function seedDefaultThread(
   attached: Attached,

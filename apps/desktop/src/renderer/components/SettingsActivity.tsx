@@ -7,12 +7,12 @@ import { ActivityInsight, ActivityRanks, ActivityTokens } from "./ActivityTallie
 import { Actions, Blank, More } from "./SettingsBits.js"
 
 /**
- * 「活动」——**你在 omni 里到底干了多少**。
+ * 「活动」——**你在 Switchback 里到底干了多少**。
  *
  * ## 这一页只说磁盘上有的
  *
- * 它统计的是 omni 自己记下的那些会话，**不是「你用了多少 Claude」**：
- * 你在终端里跑的那些 omni 没有记录，引擎自己的账单 omni 也读不到。
+ * 它统计的是 Switchback 自己记下的那些会话，**不是「你用了多少 Claude」**：
+ * 你在终端里跑的那些 Switchback 没有记录，引擎自己的账单 Switchback 也读不到。
  * 所以抬头那一行必须把口径写出来——一个看起来像账单、实际只覆盖一部分的数字，
  * 比没有这一页更糟。
  *
@@ -72,11 +72,11 @@ function Lead({ digest, dataDir }: { digest: ActivityDigest; dataDir: string }):
   // 路径写短名、完整的放在悬停里：数据页那三行同一个做法，一长串临时目录读起来只是噪声
   return (
     <p className="set__note stat__lead">
-      统计的是 <strong>omni 自己记下的那些会话</strong>
+      统计的是 <strong>Switchback 自己记下的那些会话</strong>
       （<span title={`${dataDir}/threads`}>数据目录/threads</span> 里的 {digest.threads} 条记录，{span}）——
-      <strong>这是你在 omni 里的工作量，不是账单</strong>。
+      <strong>这是你在 Switchback 里的工作量，不是账单</strong>。
       {digest.skipped === 0 ? null : ` 有 ${String(digest.skipped)} 条记录读不动，已跳过。`}
-      <More>你在终端里直接跑引擎的那些不在这儿，引擎自己的账单 omni 也读不到。</More>
+      <More>你在终端里直接跑引擎的那些不在这儿，引擎自己的账单 Switchback 也读不到。</More>
     </p>
   )
 }
@@ -94,12 +94,12 @@ function spanOf(since: number, until: number): string {
 }
 
 export function ActivitySection(props: ActivityProps): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   // **稳定引用**：`useAsync` 拿它当 effect 依赖，每帧新造一个函数会让这一页一直重扫。
   // `again` 直接转给主进程——点了「重新统计」就是要它无视缓存，而不是再拿一次旧的
   const load = useMemo(
-    () => (omni === undefined ? undefined : (again: boolean) => omni.activity(again)),
-    [omni],
+    () => (switchback === undefined ? undefined : (again: boolean) => switchback.activity(again)),
+    [switchback],
   )
   const state = useAsync<ActivityDigest>(load)
 

@@ -1,4 +1,4 @@
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 import type { ActivityDay, ActivityDigest, ActivityTotals, NameTally } from "../shared/activity.js"
 
 /**
@@ -129,7 +129,7 @@ function noteCommand(tally: Tally, text: string): void {
 
 function noteItem(tally: Tally, at: number, item: Item): void {
   if (item.kind === "user_message") {
-    // 换引擎的交接说明是 omni 附的，不算你问的
+    // 换引擎的交接说明是 Switchback 附的，不算你问的
     if (item.origin === "handoff") return
     tally.totals.asks += 1
     dayOf(tally, at).asks += 1
@@ -227,7 +227,7 @@ function rank(map: ReadonlyMap<string, number>, top: number): readonly NameTally
 /**
  * 连续天数。
  *
- * **今天还没动不算断。** 一个人早上打开 omni 看见「连续 0 天」，
+ * **今天还没动不算断。** 一个人早上打开 Switchback 看见「连续 0 天」，
  * 而他昨天干到半夜——那不是事实，是把「还没开始」说成了「断了」。
  * 所以从今天起算，今天空着就退一天再看。
  */

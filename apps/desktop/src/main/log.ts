@@ -76,7 +76,7 @@ function rotate(file: string): void {
  * 同步的代价可以接受。
  */
 export function createLogger(dir: string): Logger {
-  const file = join(dir, "omni.log")
+  const file = join(dir, "switchback.log")
   try {
     mkdirSync(dir, { recursive: true })
   } catch {

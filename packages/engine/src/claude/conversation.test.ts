@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { emitConversationReset } from "./conversation.js"
 
 function run(raw: unknown, turnId: string | null = "turn-1"): Event[] {

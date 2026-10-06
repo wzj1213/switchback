@@ -21,33 +21,33 @@ export function useAcpConnect(agentId: string, onChanged: () => void): {
   start: () => void
   cancel: () => void
 } {
-  const omni = bridge()
+  const switchback = bridge()
   const [state, setState] = useState<ConnectState>({ phase: "idle" })
   const running = state.phase === "running"
   useEffect(() => {
-    if (!running || omni === undefined) return undefined
-    return omni.onAcpProgress((step) => {
+    if (!running || switchback === undefined) return undefined
+    return switchback.onAcpProgress((step) => {
       // 结果先到、迟到的进度后到时不能把「完成」盖回「进行中」
       if (step.agentId === agentId) setState((previous) => (previous.phase === "running" ? { phase: "running", step } : previous))
     })
-  }, [agentId, omni, running])
+  }, [agentId, switchback, running])
   const start = useCallback(() => {
-    if (omni === undefined) return
+    if (switchback === undefined) return
     setState({ phase: "running" })
-    void omni.acpConnect(agentId).then(
+    void switchback.acpConnect(agentId).then(
       (result) => {
         setState({ phase: "done", result })
         if (result.ok) onChanged()
       },
       (error: unknown) => setState({ phase: "done", result: { ok: false, error: String(error) } }),
     )
-  }, [agentId, omni, onChanged])
+  }, [agentId, switchback, onChanged])
   return {
     state,
     ask: () => setState({ phase: "confirm" }),
     back: () => setState({ phase: "idle" }),
     start,
-    cancel: () => omni?.acpCancel(`connect:${agentId}`),
+    cancel: () => switchback?.acpCancel(`connect:${agentId}`),
   }
 }
 
@@ -63,7 +63,7 @@ export function useAcpLogin(name: string): {
   logout: () => void
   cancel: () => void
 } {
-  const omni = bridge()
+  const switchback = bridge()
   const [state, setState] = useState<LoginState>({})
   const run = (method: string, job: Promise<AcpLoginOutcome> | undefined, signIn: boolean): void => {
     if (job === undefined) return
@@ -79,9 +79,9 @@ export function useAcpLogin(name: string): {
   }
   return {
     state,
-    login: (method) => run(method.name, omni?.acpLogin({ name, methodId: method.id, kind: method.kind }), true),
-    logout: () => run("退出登录", omni?.acpLogout(name), false),
-    cancel: () => omni?.acpCancel(`login:${name}`),
+    login: (method) => run(method.name, switchback?.acpLogin({ name, methodId: method.id, kind: method.kind }), true),
+    logout: () => run("退出登录", switchback?.acpLogout(name), false),
+    cancel: () => switchback?.acpCancel(`login:${name}`),
   }
 }
 

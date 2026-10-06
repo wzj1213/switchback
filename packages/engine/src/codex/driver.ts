@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process"
-import type { EngineAccount, EngineCapabilities, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus, Item } from "@omni/protocol"
+import type { EngineAccount, EngineCapabilities, EngineThread, ModelOption, SlashCommand, Trust, TurnId, TurnStatus, Item } from "@switchback/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
@@ -20,7 +20,7 @@ import { toCodexTranscript } from "./history.js"
 import { modelSelection, readModelCatalog } from "./model-catalog.js"
 
 /**
- * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 omni 事件。
+ * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 Switchback 事件。
  *
  * 信任档怎么落到 codex 的**操作系统沙箱**上，是这个驱动最重要的一个决定，
  * 单独写在 `sandbox.ts`——那不是一张查找表，是接第二家引擎时最大的发现。
@@ -122,7 +122,7 @@ class CodexSession implements EngineSession {
   /**
    * 引擎报了一份设置快照。
    *
-   * **`match` 在这里判**：omni 自己设的是三张原生映射表
+   * **`match` 在这里判**：Switchback 自己设的是三张原生映射表
    *（见 `sandbox.ts`），拿它和引擎报的比一比就行——不像 ACP 那边要打分匹配，
    * 这里两边都是固定枚举，对不对得上是**确定**的。
    *
@@ -293,22 +293,22 @@ class CodexSession implements EngineSession {
   /**
    * 压缩上下文。app-server 的 `thread/compact/start`。
    *
-   * 它**不在 `skills/list` 里**（那只报用户装的技能），所以 omni 必须自己
+   * 它**不在 `skills/list` 里**（那只报用户装的技能），所以 Switchback 必须自己
    * 提供入口——否则 codex 会话撞满上下文就只能新开一个，两小时的历史全丢。
    */
   compact(turnId: TurnId): Promise<void> { return startCompaction({ state: this.state, call: (method, params) => this.rpc.call(method, params), fail: (message) => this.endTurn("failed", message) }, turnId) }
 
   pid(): number | undefined { return this.owner.pid() }
 
-  /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 omni 给入口。 */
+  /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 Switchback 给入口。 */
   capabilities(): EngineCapabilities {
     // `modeReadback`：**五家里唯一一个真的**。前置（`claims.ts` 那张认领表 + 双向
     // CI 断言）已经建好，`thread/settings/updated` 也真有人接（`notify.ts` →
     // `adoptSettings`）。这一位曾经落在 false 上没跟着翻——那次提交的说明里写着
     // 「从 false 翻成 true」，而 diff 里这一行根本没动，于是界面上照旧挂着
-    // 「这家不会把它自己改的档告诉 omni」，而它明明会。
+    // 「这家不会把它自己改的档告诉 Switchback」，而它明明会。
     // `sideQuestion`：codex 的侧问只活在它自己的 TUI 里（`tui/src/app/side.rs`），
-    // **没从 app-server 那扇门出来**。照着拼要 omni 抄一份它的边界提示词进来维护，
+    // **没从 app-server 那扇门出来**。照着拼要 Switchback 抄一份它的边界提示词进来维护，
     // 撞 AGENTS.md 的总纲——见 `docs/侧栏与引擎状态方案.md` §0
     return {
       compact: true,
@@ -360,7 +360,7 @@ class CodexSession implements EngineSession {
     return {
       restart: true,
       detail:
-        "Codex 的原生沙箱在会话开场时固定。请等当前轮结束；omni 会续接同一条会话后重启，让新档位真正生效。",
+        "Codex 的原生沙箱在会话开场时固定。请等当前轮结束；Switchback 会续接同一条会话后重启，让新档位真正生效。",
     }
   }
 
@@ -389,7 +389,7 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
   return {
     id: "codex",
     // **这句话会出现在两个地方**：设置页那家的状态说明，和输入区引擎下拉里那一条的说明。
-    // 原文是「装好之后重启 omni」——那曾经是真的（探测结果在进程里只算一次），
+    // 原文是「装好之后重启 Switchback」——那曾经是真的（探测结果在进程里只算一次），
     // 现在不是了：装完会自动重探，手动也有一颗按钮。留着旧话等于教用户做无用功。
     probe: () => probeCommand(command, "设置 → 引擎 → 安装与版本 里可以直接装；在终端里装完点那儿的「重新探测」即可，不用重启。"),
     start: async (req: StartRequest): Promise<EngineSession> => {

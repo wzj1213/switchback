@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createClaudeDriver } from "./driver.js"
 
 /**
@@ -25,7 +25,7 @@ import { createClaudeDriver } from "./driver.js"
 
 describe("claude 的待办清单（真跑）", () => {
   it("多步任务 → transcript 里出现 plan item，且 Task* 不画成工具行", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-plan-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-plan-live-"))
     for (const f of ["a.txt", "b.txt"]) writeFileSync(join(cwd, f), `${f}\n`)
     const events: Event[] = []
     const driver = createClaudeDriver({})

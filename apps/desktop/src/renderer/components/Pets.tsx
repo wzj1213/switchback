@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef } from "react"
-import type { EngineId, EngineInfo } from "@omni/protocol"
+import type { EngineId, EngineInfo } from "@switchback/protocol"
 import { PetOne, Shades } from "./PetParts.js"
 import { gaitOf, lookOf, type Hit, type Pet } from "../pets.js"
 import { petRoster, visibleRoster } from "../pet-roster.js"

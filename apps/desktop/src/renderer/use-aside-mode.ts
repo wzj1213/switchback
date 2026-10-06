@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { SlashCommand } from "@omni/protocol"
+import type { SlashCommand } from "@switchback/protocol"
 
 /**
  * 侧问模式：**这一句发出去不进正文**。
@@ -34,7 +34,7 @@ export const ASIDE_COMMAND: SlashCommand = {
   name: "侧问",
   label: "侧问",
   description: "问一句不进正文的话——答案落在转录区，但不进发给引擎的上下文",
-  source: "omni",
+  source: "switchback",
 }
 
 type Send = (text: string, attachments: readonly string[], steer: boolean) => void
@@ -105,10 +105,10 @@ export function useAsideMode(options: {
     exit,
     commands: (base) => (options.can ? [ASIDE_COMMAND, ...base] : base),
     take: (command, clear) => {
-      /* `/侧问` **就地进模式**，不走 `onOmni`：那一路是「工作区能做的事」
+      /* `/侧问` **就地进模式**，不走 `onSwitchback`：那一路是「工作区能做的事」
          （新建、分叉、导出…），而这一条改的是**手上这一句的去向**，
          它的状态本来就住在输入框里。 */
-      if (command.source !== "omni" || command.name !== ASIDE_COMMAND.name) return false
+      if (command.source !== "switchback" || command.name !== ASIDE_COMMAND.name) return false
       clear()
       setOn(true)
       return true

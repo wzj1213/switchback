@@ -3,7 +3,7 @@ import { bridge } from "../use-async.js"
 import { Actions, Field } from "./SettingsBits.js"
 
 /**
- * 接一家 omni 还不认识的 ACP 引擎。
+ * 接一家 Switchback 还不认识的 ACP 引擎。
  *
  * ## 为什么是「先试再写」，不是「填个表单存下来」
  *
@@ -12,14 +12,14 @@ import { Actions, Field } from "./SettingsBits.js"
  *
  * ACP 是有协议的，这个问题它自己能回答。所以这里先发一次 `initialize`——
  * **答得上来才让你接**，答不上来那句话也是它自己说的。
- * 命令和参数由你给，能力由握手探到，omni 一条都没编。
+ * 命令和参数由你给，能力由握手探到，Switchback 一条都没编。
  *
  * ## 为什么不替你猜参数
  *
  * 各家进 ACP 模式的写法都不一样（`codex-acp` 直接跑、grok 是 `agent stdio`、
- * 有的要 `--experimental-acp`）。omni 内置一张猜出来的表，只会让另一台机器上的人
- * 点了就崩——而那条命令 omni 根本没有能力维护。失败时那句话会提到这一点，
- * 让你去它自己的文档里找，而不是让 omni 假装知道。
+ * 有的要 `--experimental-acp`）。Switchback 内置一张猜出来的表，只会让另一台机器上的人
+ * 点了就崩——而那条命令 Switchback 根本没有能力维护。失败时那句话会提到这一点，
+ * 让你去它自己的文档里找，而不是让 Switchback 假装知道。
  */
 interface Trial {
   ok: boolean
@@ -31,7 +31,7 @@ interface Trial {
 }
 
 export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Element {
-  const omni = bridge()
+  const switchback = bridge()
   const [command, setCommand] = useState("")
   const [args, setArgs] = useState("")
   const [label, setLabel] = useState("")
@@ -59,7 +59,7 @@ export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Ele
         onLabel={setLabel}
         onBrowse={() => {
           run(
-            (omni?.pickExecutable() ?? Promise.resolve(undefined)).then((path) => {
+            (switchback?.pickExecutable() ?? Promise.resolve(undefined)).then((path) => {
               if (path !== undefined) setCommand(path)
             }),
           )
@@ -75,7 +75,7 @@ export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Ele
             setTrial(undefined)
             setNote(undefined)
             run(
-              (omni?.tryAcpEngine({ command: command.trim(), args: argv }) ??
+              (switchback?.tryAcpEngine({ command: command.trim(), args: argv }) ??
                 Promise.resolve({ ok: false, error: "没有可用的桥接。" })).then(setTrial),
             )
           }}
@@ -90,7 +90,7 @@ export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Ele
           onClick={() => {
             const named = label.trim() === "" ? command.trim() : label.trim()
             run(
-              (omni?.addAcpEngine({
+              (switchback?.addAcpEngine({
                 name: named,
                 label: named,
                 command: command.trim(),

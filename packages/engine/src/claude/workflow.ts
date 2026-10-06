@@ -1,4 +1,4 @@
-import type { Lane, LaneNode, ThreadId } from "@omni/protocol"
+import type { Lane, LaneNode, ThreadId } from "@switchback/protocol"
 
 /**
  * claude 的 workflow 进度 → 一条 `Lane`。
@@ -62,7 +62,7 @@ const ENDED: ReadonlySet<LaneNode["state"]> = new Set(["done", "failed", "skippe
  *
  * `workflow_phase` 帧上没有 state 字段（实测），而树上的阶段行总得显示点什么。
  * 算法只用引擎报上来的东西做算术（同 `synthDiff` 拿两份全文算增删行数），
- * 不引入任何 omni 自己的判断——但它终究是**推的**，所以写在这儿，
+ * 不引入任何 Switchback 自己的判断——但它终究是**推的**，所以写在这儿，
  * 免得下次有人拿它当「claude 说这个阶段完成了」。
  */
 function rollUp(kids: readonly LaneNode["state"][]): LaneNode["state"] {
@@ -146,7 +146,7 @@ function laneStatus(nodes: readonly LaneNode[]): Lane["status"] {
  * 一帧 `task_progress` → 一条 lane。认不出形状就返回 undefined，静默丢弃。
  *
  * **`description` 缺席就整条不要**：拿 `last_tool_name` 拼一句「正在 Read」顶替，
- * 是 omni 在替引擎说话（同 `tasks.ts` 的规矩）。
+ * 是 Switchback 在替引擎说话（同 `tasks.ts` 的规矩）。
  */
 export function toLane(raw: unknown, threadId: ThreadId, at: number): Lane | undefined {
   if (typeof raw !== "object" || raw === null) return undefined

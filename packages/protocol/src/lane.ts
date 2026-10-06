@@ -14,11 +14,11 @@ import type { ItemId, ThreadId } from "./ids.js"
  * - grok 三类走同一条私有通知 `_x.ai/session_notification`。
  * - kimi 的 Web UI 已经用同一个侧面板渲染（`'compaction' | 'agent' | 'btw' | diff` 判别式）。
  *
- * 所以这一栏不是 omni 发明的分类，是照引擎给宿主的建议做的。
+ * 所以这一栏不是 Switchback 发明的分类，是照引擎给宿主的建议做的。
  */
 export interface Lane {
   /**
-   * 会话内唯一。活动旁路由驱动铸、宿主在 `item-scope` 里重铸成 omni 全局 id；
+   * 会话内唯一。活动旁路由驱动铸、宿主在 `item-scope` 里重铸成 Switchback 全局 id；
    * 侧问由宿主直接铸全局 id——它是用户发给 `EngineSession.askAside` 的控制请求，
    * 不经过驱动事件流。两条路最终都保证同一会话里不会互相覆盖。
    */
@@ -34,8 +34,8 @@ export interface Lane {
    */
   kind: "aside" | "activity"
   /**
-   * 给人看的一句话。活动旁路由**引擎自己写**，omni 不从工具名拼一句顶替；
-   * 侧问则是用户自己输入的问题。两者都不是 omni 代写的模型内容。
+   * 给人看的一句话。活动旁路由**引擎自己写**，Switchback 不从工具名拼一句顶替；
+   * 侧问则是用户自己输入的问题。两者都不是 Switchback 代写的模型内容。
    */
   title: string
   /** 暂停不是失败，也不能继续转圈；保留独立状态才能如实镜像原生 workflow / task。 */
@@ -60,7 +60,7 @@ export interface Lane {
   progress?: LaneProgress
   /**
    * 引擎侧的句柄：codex 是子 thread id，grok 是 child_session_id，claude 是 task_id。
-   * **omni 只原样存取，不解释它**——和 `Thread.engineHandle` 同一条规矩。
+   * **Switchback 只原样存取，不解释它**——和 `Thread.engineHandle` 同一条规矩。
    */
   handle?: string
   /**
@@ -119,7 +119,7 @@ export interface LaneNode {
  *    同一种东西——侧问的回答就是 `agent_message`，子 agent 的调用就是 `tool_call`。
  *    为侧栏发明第二套 item 类型等于把整套渲染写两遍。
  * 2. **也不该进 `meta`**：那个抽屉的契约是「厂商特有字段，读之前自己判类型」，
- *    而 lane 归属是 omni 自己的一等概念、是渲染层每一帧的主分流轴。
+ *    而 lane 归属是 Switchback 自己的一等概念、是渲染层每一帧的主分流轴。
  * 3. **可选字段**：老日志回放时缺席，全部落主线，不需要迁移。
  */
 export interface LaneRef {

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import { isShell, isToolRoot, parseLsofPeers, parseNettop, parsePs, treeOf, zcodeMains } from "./egress-sample.js"
 
 const PS = [
-  "  100     1   100 /Applications/omni.app/Contents/MacOS/omni",
-  "  101   100   100 /Applications/omni.app/Contents/Frameworks/omni Helper.app/Contents/MacOS/omni Helper --type=gpu-process",
+  "  100     1   100 /Applications/Switchback.app/Contents/MacOS/Switchback",
+  "  101   100   100 /Applications/Switchback.app/Contents/Frameworks/Switchback Helper.app/Contents/MacOS/Switchback Helper --type=gpu-process",
   "  200   100   200 /opt/engines/claude --output-format stream-json --verbose",
   "  201   200   200 /bin/zsh -c git push origin main",
   "  202   201   200 git push origin main",
@@ -20,7 +20,7 @@ describe("读进程表", () => {
   it("路径里带空格的命令行整段留着；读不懂的行跳过", () => {
     const procs = parsePs(PS)
     expect(procs).toHaveLength(11)
-    expect(procs[1]?.command).toBe("/Applications/omni.app/Contents/Frameworks/omni Helper.app/Contents/MacOS/omni Helper --type=gpu-process")
+    expect(procs[1]?.command).toBe("/Applications/Switchback.app/Contents/Frameworks/Switchback Helper.app/Contents/MacOS/Switchback Helper --type=gpu-process")
     expect(procs[2]).toEqual({ pid: 200, ppid: 100, pgid: 200, command: "/opt/engines/claude --output-format stream-json --verbose" })
   })
 })
@@ -36,7 +36,7 @@ describe("一个引擎底下的整棵树", () => {
     expect([...tree.tools].sort()).toEqual([201, 202, 203, 206])
   })
 
-  it("别人的进程一个都不进来：omni 自己、它的 helper、单独开着的 ZCode", () => {
+  it("别人的进程一个都不进来：Switchback 自己、它的 helper、单独开着的 ZCode", () => {
     const all = [...tree.runtime, ...tree.tools]
     for (const pid of [100, 101, 300, 301]) expect(all).not.toContain(pid)
   })

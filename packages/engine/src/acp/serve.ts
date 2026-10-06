@@ -1,4 +1,4 @@
-import type { Trust } from "@omni/protocol"
+import type { Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
 import { handlePermission, type PermissionContext } from "./permission.js"
@@ -11,8 +11,8 @@ import { mine } from "./route.js"
 /**
  * **agent 反过来请求客户端时怎么答。**
  *
- * ACP 是双向的：除了 omni 调 agent，agent 也会调 omni——问审批
- *（`session/request_permission`）、以及认领了 `terminal/*` 之后让 omni 替它起进程。
+ * ACP 是双向的：除了 Switchback 调 agent，agent 也会调 Switchback——问审批
+ *（`session/request_permission`）、以及认领了 `terminal/*` 之后让 Switchback 替它起进程。
  *
  * 单独一个文件的理由和 `route.ts` 一样：驱动那边回答的是「收到这条要做什么」，
  * 这边回答的是「**我们认领了什么、没认领的怎么拒**」。这两件事的判据不同，
@@ -85,7 +85,7 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
 export async function answerCall(ctx: AnswerCtx, call: ServerCall): Promise<void> {
   if (serveTerminal(ctx.terminal, call)) return
   if (call.method !== "session/request_permission") {
-    call.reject({ code: -32601, message: `omni 未认领 ${call.method}` })
+    call.reject({ code: -32601, message: `Switchback 未认领 ${call.method}` })
     return
   }
   await handlePermission(ctx.permission(), call)

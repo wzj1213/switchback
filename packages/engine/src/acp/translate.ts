@@ -1,4 +1,4 @@
-import type { FileChange, ToolCallItem, ToolDetail, ToolStatus, TurnId, TurnStatus } from "@omni/protocol"
+import type { FileChange, ToolCallItem, ToolDetail, ToolStatus, TurnId, TurnStatus } from "@switchback/protocol"
 import { synthDiff } from "../synth.js"
 import type { AcpDiff, AcpStopReason, AcpToolCall } from "./wire.js"
 
@@ -96,7 +96,7 @@ function editDetail(call: AcpToolCall): ToolDetail {
  * 命令的输出在 `rawOutput.formatted_output` 里。
  *
  * ACP 本来的设计是走 `terminal/*`：agent 让**客户端**开终端、客户端回传输出。
- * omni 不advertise `terminal` 能力（引擎跑自己的进程是这个产品的前提），
+ * Switchback 不advertise `terminal` 能力（引擎跑自己的进程是这个产品的前提），
  * 实测 codex-acp 在这种情况下仍然把命令跑在自己那边，输出从 `rawOutput`
  * 和 `_meta.terminal_output_delta` 回来。所以读 `rawOutput` 就够，
  * 不必为了拿输出去实现一整套 `terminal/*`。
@@ -200,7 +200,7 @@ const STOP_DETAIL: Readonly<Partial<Record<AcpStopReason, string>>> = {
 }
 
 /**
- * `stopReason` → omni 轮次状态。
+ * `stopReason` → Switchback 轮次状态。
  *
  * `max_tokens` / `max_turn_requests` 判为 `failed` 是有意的：活儿没干完。
  * 判成 `completed` 的话界面上是一个干干净净的收工态，用户不会知道
@@ -208,7 +208,7 @@ const STOP_DETAIL: Readonly<Partial<Record<AcpStopReason, string>>> = {
  * 前提是他知道发生了什么。附带的解释走 `error` 字段。
  *
  * `refusal` 也判 `failed`，理由不一样：协议原文说被拒的这一轮
- * 「不会进入下一次请求，所以应当在界面上体现出来」。omni 的 transcript
+ * 「不会进入下一次请求，所以应当在界面上体现出来」。Switchback 的 transcript
  * 是照着事件流重放的，它会一直显示这一轮——**那就和模型的记忆对不上了**。
  * 判成 `completed` 等于让界面撒一个很难发现的谎。
  */

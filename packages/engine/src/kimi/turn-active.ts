@@ -1,4 +1,4 @@
-import type { ToolCallItem, TurnId } from "@omni/protocol"
+import type { ToolCallItem, TurnId } from "@switchback/protocol"
 import type { KimiOperation } from "./compaction.js"
 import type { KimiTextState } from "./text-stream.js"
 

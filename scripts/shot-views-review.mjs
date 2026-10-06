@@ -119,7 +119,7 @@ export const REVIEW_VIEWS = [
       input?.focus()
       const insideKey = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
       input?.dispatchEvent(insideKey)
-      window.__omniReviewKeys = {
+      window.__switchbackReviewKeys = {
         before, known, outsidePreserved: document.querySelector('.rv__path')?.textContent === before,
         outsidePrevented: outsideKey.defaultPrevented, insidePrevented: insideKey.defaultPrevented,
       }
@@ -127,7 +127,7 @@ export const REVIEW_VIEWS = [
     })()`,
     ready: ".rv__file",
     assert: `(() => {
-      const keys = window.__omniReviewKeys
+      const keys = window.__switchbackReviewKeys
       const now = document.querySelector('.rv__path')?.textContent
       // 越界那半：面板外面按方向键，选中的文件一个字都不能变
       if (keys?.outsidePreserved !== true || keys.outsidePrevented !== false) return false
@@ -152,17 +152,17 @@ export const REVIEW_VIEWS = [
       // 这一屏验的是「折起来之后节点变少、焦点还在原行」，两种情形都成立。
       // 不退的话 target 是 undefined，什么都不折，ready 直接超时。
       const target = outside ?? dirs[0]
-      window.__omniReviewTree = { path: target?.getAttribute('title'), before: document.querySelectorAll('[role="treeitem"]').length }
+      window.__switchbackReviewTree = { path: target?.getAttribute('title'), before: document.querySelectorAll('[role="treeitem"]').length }
       target?.focus()
       target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
     })()`,
     ready: `[role="treeitem"][aria-expanded="false"]`,
     assert: `(() => {
       const target = [...document.querySelectorAll('[role="treeitem"]')]
-        .find(row => row.getAttribute('title') === window.__omniReviewTree?.path)
+        .find(row => row.getAttribute('title') === window.__switchbackReviewTree?.path)
       return target?.getAttribute('aria-expanded') === 'false'
         && target === document.activeElement
-        && document.querySelectorAll('[role="treeitem"]').length < window.__omniReviewTree?.before
+        && document.querySelectorAll('[role="treeitem"]').length < window.__switchbackReviewTree?.before
     })()`,
     after: `document.activeElement?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))`,
@@ -171,8 +171,8 @@ export const REVIEW_VIEWS = [
     name: "04-审核复制有确认",
     open: `(() => {
       const button = document.querySelector('[aria-label="复制这份文件改动"]')
-      window.__omniReviewDiff = document.querySelector('.rvd')
-      window.__omniReviewPath = document.querySelector('.rv__path')?.textContent
+      window.__switchbackReviewDiff = document.querySelector('.rvd')
+      window.__switchbackReviewPath = document.querySelector('.rv__path')?.textContent
       button?.focus()
       button?.click()
     })()`,
@@ -181,8 +181,8 @@ export const REVIEW_VIEWS = [
       const button = document.querySelector('.rv__act[data-state="copied"]')
       return button?.getAttribute('aria-label') === '文件改动已复制'
         && button === document.activeElement
-        && document.querySelector('.rvd') === window.__omniReviewDiff
-        && document.querySelector('.rv__path')?.textContent === window.__omniReviewPath
+        && document.querySelector('.rvd') === window.__switchbackReviewDiff
+        && document.querySelector('.rv__path')?.textContent === window.__switchbackReviewPath
     })()`,
   },
   {
@@ -202,11 +202,11 @@ export const REVIEW_VIEWS = [
       `document.querySelector('button[aria-label="跳转到文件"]')?.click()`,
       `(() => {
         const input = document.querySelector('input[aria-label="跳转到文件"]')
-        window.__omniJumpInputFocused = document.activeElement === input
+        window.__switchbackJumpInputFocused = document.activeElement === input
         const first = document.querySelector('[role="menu"][aria-label="匹配的审核文件"] .pop__label')
         const rel = first?.getAttribute('title') ?? ''
         const term = (rel.split('/').pop() ?? '').slice(0, 6)
-        window.__omniJumpTerm = term
+        window.__switchbackJumpTerm = term
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
         setter?.call(input, term)
         input?.dispatchEvent(new Event('input', { bubbles: true }))
@@ -217,10 +217,10 @@ export const REVIEW_VIEWS = [
     ready: `[role="dialog"][aria-label="跳转到文件"]`,
     assert: `(() => {
       const rows = [...document.querySelectorAll('[role="menu"][aria-label="匹配的审核文件"] .pop__item')]
-      const term = (window.__omniJumpTerm ?? '').toLowerCase()
+      const term = (window.__switchbackJumpTerm ?? '').toLowerCase()
       // 干净树没有可跳转的文件，这一屏拍的就是空清单——不该因此判失败
-      if (term === '') return window.__omniJumpInputFocused === true
-      return window.__omniJumpInputFocused === true && rows.length > 0
+      if (term === '') return window.__switchbackJumpInputFocused === true
+      return window.__switchbackJumpInputFocused === true && rows.length > 0
         && rows.every(row => row.textContent.toLowerCase().includes(term))
         && document.activeElement?.getAttribute('role') === 'menuitem'
     })()`,

@@ -1,5 +1,5 @@
-import type { Command, EngineId, Event, Thread, ThreadId, TurnId } from "@omni/protocol"
-import type { EngineSession } from "@omni/engine"
+import type { Command, EngineId, Event, Thread, ThreadId, TurnId } from "@switchback/protocol"
+import type { EngineSession } from "@switchback/engine"
 import { resolveApproval } from "./approval.js"
 import { resolveQuestion } from "./question.js"
 import { clearQueue, discardUnstarted, emit, liveStateOf, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
@@ -12,7 +12,7 @@ import { sideQuestion } from "./engine-state.js"
 import { prompt, steerQueued } from "./prompt.js"
 import { recordSegment } from "./segment.js"
 import { compact } from "./compact.js"
-import { createPaceBook } from "@omni/store"
+import { createPaceBook } from "@switchback/store"
 
 export type { HostDeps } from "./deps.js"
 
@@ -157,7 +157,7 @@ const HANDLERS: Handlers = {
    * blocked by the current turn; retry when the turn is idle.Compaction cancelled.」，
    * 三句连在一起、还是英文，看起来像模型自己说了句莫名其妙的话。
    *
-   * omni 不改引擎的行为、也不去掐它已经说出口的正文（那是它自报的状态）；
+   * Switchback 不改引擎的行为、也不去掐它已经说出口的正文（那是它自报的状态）；
    * 能做也该做的是**不把这条请求发出去**。和分叉、运行中换档同一条规矩
    *（`branch.ts` 的 `stableEvents`、`trust.ts` 的 restart 分支）。
    */
@@ -210,7 +210,7 @@ function inflightKey(command: Command): string | undefined {
       // 「连开两条对话」当成重复去掉一条
       return `create:${command.cwd}:${command.engine}:${command.trust}:${command.workspaceKind ?? "project"}`
     case "thread.adopt":
-      // 同一个原生句柄同时接两次会争同一把 writer 锁；omni thread id 此时尚未铸好，
+      // 同一个原生句柄同时接两次会争同一把 writer 锁；Switchback thread id 此时尚未铸好，
       // 所以键必须落在 (engine, handle) 上，而不是之后才有的本地 id。
       return `adopt:${command.engine}:${command.handle}`
     case "thread.resume":

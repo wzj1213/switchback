@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { QuestionResponse } from "@omni/protocol"
+import type { QuestionResponse } from "@switchback/protocol"
 import type { ServerCall } from "../rpc.js"
 import {
   answerUserInput,

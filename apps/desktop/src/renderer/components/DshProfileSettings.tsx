@@ -15,7 +15,7 @@ import { EngineIcon, RevealIcon } from "./icons.js"
  * 「替掉所有原生 select」。一个漏网的原生控件在深色模式下是系统色、
  * 弹出层是系统弹窗、字号和旁边差一档，看起来像是从另一个应用里抠出来的。
  *
- * omni 只选择并展示这棵树，**不代装插件、不改 DSH 的配置**。
+ * Switchback 只选择并展示这棵树，**不代装插件、不改 DSH 的配置**。
  */
 export function DshProfileSettings({
   settings,
@@ -26,8 +26,8 @@ export function DshProfileSettings({
   onPatch: (next: Partial<Settings>) => void
   onReveal: (path: string) => void
 }): React.JSX.Element {
-  const omni = bridge()
-  const load = useMemo(() => (omni === undefined ? undefined : () => omni.dshProfiles()), [omni])
+  const switchback = bridge()
+  const load = useMemo(() => (switchback === undefined ? undefined : () => switchback.dshProfiles()), [switchback])
   const state = useAsync<DshProfileCatalog>(load)
   const profiles = state.data?.profiles ?? []
   const selected = profiles.find((profile) => profile.name === settings.dsh.profile)
@@ -35,7 +35,7 @@ export function DshProfileSettings({
   return (
     <Group
       title="DSH 插件组装"
-      hint="一条 profile 就是一棵独立插件树。omni 只选择并展示它，不代装插件、不改 DSH 配置。"
+      hint="一条 profile 就是一棵独立插件树。Switchback 只选择并展示它，不代装插件、不改 DSH 配置。"
     >
       <Field label="新会话 profile" hint="切换只影响之后新开的 DSH 会话；旧会话固定回到它创建时那棵树。">
         <Select

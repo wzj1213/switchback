@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, TurnId } from "@omni/protocol"
+import type { Event, TurnId } from "@switchback/protocol"
 import { create, setup } from "./host-fixture.js"
 
 /**

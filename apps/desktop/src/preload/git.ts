@@ -7,16 +7,16 @@ import type { CommitResult, GitState } from "../shared/git.js"
  */
 export const gitBridge = {
   async gitState(req: { threadId: string; cwd: string }): Promise<GitState> {
-    return (await ipcRenderer.invoke("omni:gitState", req)) as GitState
+    return (await ipcRenderer.invoke("switchback:gitState", req)) as GitState
   },
   async gitCommit(req: { threadId: string; cwd: string; message: string; all: boolean }): Promise<CommitResult> {
-    return (await ipcRenderer.invoke("omni:gitCommit", req)) as CommitResult
+    return (await ipcRenderer.invoke("switchback:gitCommit", req)) as CommitResult
   },
   async gitStage(req: { threadId: string; cwd: string; rel: string; stage: boolean }): Promise<CommitResult> {
-    return (await ipcRenderer.invoke("omni:gitStage", req)) as CommitResult
+    return (await ipcRenderer.invoke("switchback:gitStage", req)) as CommitResult
   },
   /** 撤销刚才那次提交（`full` 是它的完整哈希；HEAD 已经不是它就不撤）。 */
   async gitUndo(req: { threadId: string; cwd: string; full: string }): Promise<CommitResult> {
-    return (await ipcRenderer.invoke("omni:gitUndo", req)) as CommitResult
+    return (await ipcRenderer.invoke("switchback:gitUndo", req)) as CommitResult
   },
 }

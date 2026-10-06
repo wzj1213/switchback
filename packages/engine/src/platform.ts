@@ -144,7 +144,7 @@ export const tree: TreeControl = isWindows ? windowsTree() : posixTree()
  * 各种 `echo`）。取最后一行不可靠——有人的 rc 结尾就打空行。
  * 用哨兵夹住，从输出里精确抠出来。
  */
-const SENTINEL = { start: "__OMNI_PATH__", end: "__OMNI_END__" }
+const SENTINEL = { start: "__SWITCHBACK_PATH__", end: "__SWITCHBACK_END__" }
 
 /**
  * 问不到时垫上的常见位置。

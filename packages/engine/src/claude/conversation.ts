@@ -1,4 +1,4 @@
-import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ItemId, ThreadId, TurnId } from "@switchback/protocol"
 
 interface RawConversationReset {
   new_conversation_id?: unknown
@@ -13,7 +13,7 @@ interface ResetContext {
 }
 
 /**
- * `/clear` 不删除 omni 的历史：一条 omni 会话本来就能跨多个原生 segment。
+ * `/clear` 不删除 Switchback 的历史：一条 Switchback 会话本来就能跨多个原生 segment。
  * 但必须留下明确分界，并清掉已经不属于新 Claude 上下文的用量。
  * 新的可续跑 session id 不在这条消息里，而在紧随其后的 result 上；见 loop.ts。
  */

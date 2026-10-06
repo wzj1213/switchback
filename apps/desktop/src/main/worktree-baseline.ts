@@ -165,7 +165,7 @@ async function withCurrent<T>(
   repo: RepoInfo,
   run: (current: TreeSnapshot) => Promise<T>,
 ): Promise<T> {
-  const temp = await mkdtemp(join(tmpdir(), "omni-current-tree-"))
+  const temp = await mkdtemp(join(tmpdir(), "switchback-current-tree-"))
   try {
     const made = await snapshot(repo, temp, [repo.objects, join(baselineDir, "objects")])
     return await run(made)

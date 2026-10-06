@@ -6,7 +6,7 @@ import { createProcessOwner } from "../subprocess.js"
 import { createAcpDriver } from "./driver.js"
 import type { AcpInitialize } from "./wire.js"
 
-/** DSH 把 ACP 做成 profile；omni 只启动这扇公开的 stdio 门。 */
+/** DSH 把 ACP 做成 profile；Switchback 只启动这扇公开的 stdio 门。 */
 const DEFAULT_PROFILE = "acp"
 const CHECK_MS = 10_000
 const RECLAIM_MS = 500
@@ -17,7 +17,7 @@ const INITIALIZE = {
     fs: { readTextFile: false, writeTextFile: false },
     terminal: false,
   },
-  clientInfo: { name: "omni", title: "omni 同文", version: "0.1.0" },
+  clientInfo: { name: "switchback", title: "Switchback", version: "0.1.0" },
 }
 
 export type DshCommandProbe = (command: string, hint?: string) => Promise<Probe>
@@ -93,7 +93,7 @@ function statusOf(outcome: CheckOutcome, stderr: string): DshProfileStatus {
     outcome === "timeout"
       ? `DSH 在 ${String(CHECK_MS / 1000)} 秒内没有完成 ACP initialize。`
       : outcome === "incompatible"
-        ? "DSH 返回了 omni 不支持的 ACP initialize 结果。"
+        ? "DSH 返回了 Switchback 不支持的 ACP initialize 结果。"
         : outcome.message
   return { ready: false, detail: stderr.trim() || fallback }
 }
@@ -170,15 +170,15 @@ export async function probeDshAcp(
     return { ...found, detail: details.filter(Boolean).join(" · ") }
   }
   /*
-   * **说的是「omni 观察到什么」，以及「下一步点哪儿」。**
+   * **说的是「Switchback 观察到什么」，以及「下一步点哪儿」。**
    *
    * 上一版第一句是「`web` profile 还不能启动」——那是猜的：那棵 profile
-   * 很可能起得好好的，只是它装的是 web 应用、根本不讲 ACP。omni 能确定的
+   * 很可能起得好好的，只是它装的是 web 应用、根本不讲 ACP。Switchback 能确定的
    * 只有一件事：**它没应答 ACP initialize**。照实说这一件。
    *
    * 第二句给出路。「请给它加入兼容的 ACP 插件」正确但落不了地——
    * profile 是在哪儿换的、这台机器上还有哪几棵，全在设置里那一页
-   *（`DshProfileSettings`），指过去就够了；omni 不代装插件（AGENTS.md 的产品边界）。
+   *（`DshProfileSettings`），指过去就够了；Switchback 不代装插件（AGENTS.md 的产品边界）。
    */
   return {
     state: "unavailable",

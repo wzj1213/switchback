@@ -1,10 +1,10 @@
 /**
- * 一份引擎原始记录**实际长什么样**：从文件内容里读出来的事实，不是 omni 写的格式说明。
+ * 一份引擎原始记录**实际长什么样**：从文件内容里读出来的事实，不是 Switchback 写的格式说明。
  *
  * ## 为什么不写「各家日志格式说明」
  *
- * 各家的会话文件是私有格式，改了不会通知谁。omni 要是维护一份说明，
- * 哪天厂商一改，模型就照着过时的说明去 grep——看到的是 omni 在撒谎。
+ * 各家的会话文件是私有格式，改了不会通知谁。Switchback 要是维护一份说明，
+ * 哪天厂商一改，模型就照着过时的说明去 grep——看到的是 Switchback 在撒谎。
  * 这里只报这一份文件此刻的事实：是不是 JSONL、多少行、`type` 有哪些取值各几条、
  * 已知的原生 id 落在哪个字段。接手的那家拿着这些直接搜，不用先摸索结构。
  */
@@ -71,7 +71,7 @@ function lineAt(content: string, index: number): string {
  * 已知 id 里第一个在记录中找得到的：返回它和它所在的字段路径。
  *
  * 在整段文本上 `indexOf`，不逐行 `includes`：原始记录动辄几十 MB，
- * 而 omni 自己铸的 id 在里面根本搜不到——逐行找的话，每个找不到的 id 都是一遍全量扫描。
+ * 而 Switchback 自己铸的 id 在里面根本搜不到——逐行找的话，每个找不到的 id 都是一遍全量扫描。
  */
 function locate(content: string, ids: readonly string[], whole: boolean): Pick<LogFacts, "idPath" | "idSample"> {
   for (const id of ids) {

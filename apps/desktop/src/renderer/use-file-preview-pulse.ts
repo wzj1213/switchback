@@ -18,7 +18,7 @@ export function useFilePreviewPulse(active: boolean, target: PreviewTarget): num
     }
   }, [active])
   useEffect(() => {
-    const bridge = window.omni
+    const bridge = window.switchback
     if (!active || bridge === undefined) return undefined
     let timer: number | undefined
     const stop = bridge.watchFile(target.threadId, target.cwd, target.path, () => {

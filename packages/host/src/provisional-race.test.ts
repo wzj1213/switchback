@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { NO_CAPABILITIES, type Event } from "@omni/protocol"
-import type { EngineDriver } from "@omni/engine"
+import { NO_CAPABILITIES, type Event } from "@switchback/protocol"
+import type { EngineDriver } from "@switchback/engine"
 import { createHost } from "./host.js"
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {

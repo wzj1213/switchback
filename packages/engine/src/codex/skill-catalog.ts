@@ -1,4 +1,4 @@
-import type { SlashCommand, ThreadId } from "@omni/protocol"
+import type { SlashCommand, ThreadId } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { RpcPeer } from "../rpc.js"
 import { skillsToCommands } from "./catalog.js"

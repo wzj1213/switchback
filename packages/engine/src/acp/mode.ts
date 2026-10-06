@@ -1,5 +1,5 @@
-import type { EngineStatus, Trust, TrustApply } from "@omni/protocol"
-import type { EngineAxis } from "@omni/protocol"
+import type { EngineStatus, Trust, TrustApply } from "@switchback/protocol"
+import type { EngineAxis } from "@switchback/protocol"
 import type { AcpMode } from "./wire.js"
 
 /**
@@ -26,7 +26,7 @@ import type { AcpMode } from "./wire.js"
  * 「能改工作区外的文件、能联网」的模式悄悄打开了。
  *
  * 匹配不上时驱动**不发** `session/set_mode`，保持 agent 自己的默认档，
- * 并经 `TrustCtx.apply` 报一条 `unmapped` 说明。让人知道「omni 的档位
+ * 并经 `TrustCtx.apply` 报一条 `unmapped` 说明。让人知道「Switchback 的档位
  * 在这家引擎上没接上」，比让他以为接上了强得多。
  */
 
@@ -46,7 +46,7 @@ const HINTS: Readonly<Record<Trust, readonly (readonly [string, number])[]>> = {
     /*
      * ⚠️ **`auto` 不能压过 `edit` —— 试过，是错的。**
      *
-     * 2026-08-28 曾把它提到 8 分，理由看着很硬：omni 给这一档写的定义是
+     * 2026-08-28 曾把它提到 8 分，理由看着很硬：Switchback 给这一档写的定义是
      *「优先使用引擎原生安全评审；需要人工决定时才询问」，而 ZCode
      *（`zcode-acp-server 0.5.1`）的档位表里明明白白有一个 `auto`：
      * `plan / build / edit / yolo / auto`。名字对得严丝合缝。
@@ -64,7 +64,7 @@ const HINTS: Readonly<Record<Trust, readonly (readonly [string, number])[]>> = {
      * 停在 `edit`（能改文件、命令要问）最多是多问几次，
      * 停在一个没实现的档是整条会话瘫掉。
      *
-     * 那次真正解决「每条 bash 都要放行」的是另一半——`@omni/approval` 的
+     * 那次真正解决「每条 bash 都要放行」的是另一半——`@switchback/approval` 的
      * `classify.ts` 认出了括号里的工具名（`tool permission (Bash)`），
      * 于是自动审批档下 `exec` 本来就该 `allow`。这一半没有引擎侧的赌注。
      */
@@ -157,7 +157,7 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
     }
     ctx.apply?.({
       result: "unmapped",
-      detail: ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，omni 的信任档只在本机判定层生效。`,
+      detail: ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，Switchback 的信任档只在本机判定层生效。`,
     })
     return
   }
@@ -166,7 +166,7 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
     const names = modes.map((m) => m.id ?? "?").join("、")
     ctx.apply?.({
       result: "unmapped",
-      detail: `omni 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`,
+      detail: `Switchback 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`,
     })
     return
   }
@@ -205,12 +205,12 @@ export function needsNativeRestart(
 /**
  * 引擎报了一个当前档位 → 一条 `EngineAxis`。
  *
- * **`match` 在这里判，不在界面判**：界面手上只有一个 modeId，而「omni 的哪一档
+ * **`match` 在这里判，不在界面判**：界面手上只有一个 modeId，而「Switchback 的哪一档
  * 对应它」是一对多的反向问题；这里有档位表和当前信任档，重算一次 `pickMode`
- * 就知道 omni 想要的是哪个，比一比即可。
+ * 就知道 Switchback 想要的是哪个，比一比即可。
  *
  * `pickMode` 返回 undefined 时算 **`unknown` 而不是 `diverged`**：那种情况下
- * omni 压根没发过 `session/set_mode`（见 `applyTrust`），**没有可比的基准**。
+ * Switchback 压根没发过 `session/set_mode`（见 `applyTrust`），**没有可比的基准**。
  * 报 `diverged` 会在实测的 grok 上常亮一条假警告——它不报档位表、却推当前档。
  * 「为什么没有基准」由 `trustApply` 的 `unmapped` 那条去讲，不塞进这一个字段。
  */

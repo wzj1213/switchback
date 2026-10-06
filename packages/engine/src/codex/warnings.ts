@@ -1,4 +1,4 @@
-import type { Event, ItemId, ThreadId, TurnId } from "@omni/protocol"
+import type { Event, ItemId, ThreadId, TurnId } from "@switchback/protocol"
 import type { WireWarning } from "./wire.js"
 
 interface WarningContext {

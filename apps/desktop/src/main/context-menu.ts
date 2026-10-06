@@ -21,7 +21,7 @@ import { BrowserWindow, Menu, clipboard, type ContextMenuParams, type MenuItemCo
  * （撤销栈、输入法的候选、拼写检查），手写只会做得更差（同 `menu.ts` 那条）。
  * 唯一手写的是「复制链接地址」——它没有对应的 role。
  *
- * ## 不往里塞 omni 自己的动作
+ * ## 不往里塞 Switchback 自己的动作
  *
  * 右键菜单是**系统级的东西**，人对它的预期就是上面这几条。塞「审核」「接力」进去，
  * 代价是此后每一次右键都要先读一遍菜单才知道要点哪个——而那几个动作在界面上

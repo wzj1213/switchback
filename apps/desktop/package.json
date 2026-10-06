@@ -1,7 +1,7 @@
 {
-  "name": "@omni/desktop",
-  "productName": "omni",
-  "omni": {
+  "name": "@switchback/desktop",
+  "productName": "Switchback",
+  "switchback": {
     "_updateFeed": "发布时填一个 https 地址，返回 {version,url,notes}。留空 = 更新检查整个关闭，不发任何请求。",
     "updateFeed": ""
   },
@@ -9,7 +9,7 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
-  "description": "omni 桌面端：Electron 壳 + React 渲染层",
+  "description": "Switchback 桌面端：Electron 壳 + React 渲染层",
   "author": "wzj",
   "main": "./out/main/index.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "dist:all": "node ../../scripts/dist.mjs all",
     "//dist:signed": "有 Developer ID 时用。需要 CSC_NAME 或 CSC_LINK，公证还要 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID。",
     "dist:signed": "node ../../scripts/dist.mjs full --signed",
-    "//dist:local": "只出 release/mac-arm64/omni.app，不打 DMG——本机自更新（应用里那颗「更新到最新代码」）跑的就是这条。DMG 那 208 MB 是给别人装的，自己换一份包用不着，省下的是大头。",
+    "//dist:local": "只出 release/mac-arm64/Switchback.app，不打 DMG——本机自更新（应用里那颗「更新到最新代码」）跑的就是这条。DMG 那 208 MB 是给别人装的，自己换一份包用不着，省下的是大头。",
     "dist:local": "node ../../scripts/dist.mjs full --dir"
   },
   "//optionalDependencies": [
@@ -44,14 +44,14 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.231",
-    "@omni/engine": "workspace:*",
-    "@omni/handoff": "workspace:*",
-    "@omni/host": "workspace:*",
-    "@omni/journal": "workspace:*",
-    "@omni/protocol": "workspace:*",
-    "@omni/store": "workspace:*",
-    "@omni/wire": "workspace:*",
-    "@omni/worksite": "workspace:*",
+    "@switchback/engine": "workspace:*",
+    "@switchback/handoff": "workspace:*",
+    "@switchback/host": "workspace:*",
+    "@switchback/journal": "workspace:*",
+    "@switchback/protocol": "workspace:*",
+    "@switchback/store": "workspace:*",
+    "@switchback/wire": "workspace:*",
+    "@switchback/worksite": "workspace:*",
     "highlight.js": "^11.12.0",
     "lowlight": "^3.3.0",
     "react-markdown": "^10.1.0",

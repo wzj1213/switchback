@@ -82,6 +82,6 @@ export function createWorkReviewChannels(
 
 export function installReviewChannel(baselines: WorktreeBaselines, worksites: WorksiteSearch): void {
   const channels = createWorkReviewChannels(worksites, baselines)
-  ipcMain.handle("omni:workReview", (_e, req: unknown) => channels.review(req))
-  ipcMain.handle("omni:workPatch", (_e, req: unknown) => channels.patch(req))
+  ipcMain.handle("switchback:workReview", (_e, req: unknown) => channels.review(req))
+  ipcMain.handle("switchback:workPatch", (_e, req: unknown) => channels.patch(req))
 }

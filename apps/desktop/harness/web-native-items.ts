@@ -1,4 +1,4 @@
-import type { Item } from "@omni/protocol"
+import type { Item } from "@switchback/protocol"
 
 export const WEB_NATIVE_ITEMS: readonly Item[] = [
   {

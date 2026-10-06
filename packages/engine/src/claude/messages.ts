@@ -1,4 +1,4 @@
-import type { ItemId, NoticeItem, ToolCallItem, TurnId } from "@omni/protocol"
+import type { ItemId, NoticeItem, ToolCallItem, TurnId } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { isFailedCompactionEcho } from "./compaction.js"
 import { emitPlan, feedPlan, isPlanTool, type PlanState } from "./plan.js"

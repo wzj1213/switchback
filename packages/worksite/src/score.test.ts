@@ -81,7 +81,7 @@ describe("rank", () => {
 })
 
 describe("构建产物不该进索引", () => {
-  it("**`release` 也要排除**——electron-builder 的默认输出，omni 自己就用它", () => {
+  it("**`release` 也要排除**——electron-builder 的默认输出，Switchback 自己就用它", () => {
     expect(SKIP_DIRS.has("release")).toBe(true)
   })
 

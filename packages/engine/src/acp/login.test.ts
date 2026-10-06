@@ -6,7 +6,7 @@ import { tryAcp } from "./try.js"
 /**
  * 用**真的子进程**测，理由同 `try.test.ts`：这条链路的价值全在隔着 stdio
  * 和一个陌生程序对话上。假 agent 学 claude-agent-acp：**只有客户端声明了
- * terminal 型登录，它才报 terminal 那一种**——所以这里同时验了 omni 有没有声明。
+ * terminal 型登录，它才报 terminal 那一种**——所以这里同时验了 Switchback 有没有声明。
  */
 const AGENT = (logout: boolean): string => `
 let buf = ""
@@ -49,7 +49,7 @@ const run = (logout = true): { command: string; args: string[]; cwd: string } =>
 })
 
 describe("ACP 登录", () => {
-  it("试接列出它报的登录方式——terminal 那种只在 omni 声明了能跑时才出现", async () => {
+  it("试接列出它报的登录方式——terminal 那种只在 Switchback 声明了能跑时才出现", async () => {
     const trial = await tryAcp(run())
     expect(trial.ok).toBe(true)
     expect(trial.authMethods?.map((one) => `${one.id}:${one.kind}`)).toEqual([

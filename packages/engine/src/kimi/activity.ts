@@ -1,4 +1,4 @@
-import type { Event, Lane, ThreadId } from "@omni/protocol"
+import type { Event, Lane, ThreadId } from "@switchback/protocol"
 import type { KimiPayload, KimiSnapshot, KimiSubagent, KimiTask } from "./wire.js"
 
 interface ActivityOut {
@@ -106,12 +106,12 @@ function isBackgroundTask(kind: unknown): boolean {
 }
 
 /**
- * 后台任务的结论。**全是引擎自己给的原文**，omni 一个字不补。
+ * 后台任务的结论。**全是引擎自己给的原文**，Switchback 一个字不补。
  *
  * 实测（Kimi 0.38.0，2026-08-25 真机）：**WebSocket 的 `task.terminated` 只带
  * 命令、退出码与起止时间，不带输出**；输出在它的 REST 那侧
  *（`GET /sessions/{id}/tasks` 的 `output_preview`、`/tasks/{id}?with_output=true`），
- * 而 omni 目前只在启动与重连时读回任务表。所以这里三个来源都收着：
+ * 而 Switchback 目前只在启动与重连时读回任务表。所以这里三个来源都收着：
  * 哪一头给了就用哪一头，都没给就缺席——**不去翻它 `~/.kimi-code` 下的日志文件**。
  * （`outputTail` 是它自己 wire 日志里的字段名，同一份数据换个门出来时还叫这个。）
  */

@@ -1,4 +1,4 @@
-import type { EngineAxis, Trust } from "@omni/protocol"
+import type { EngineAxis, Trust } from "@switchback/protocol"
 import type { KimiStatus } from "./wire.js"
 
 export interface KimiTrust {
@@ -6,7 +6,7 @@ export interface KimiTrust {
   plan_mode: boolean
 }
 
-/** Kimi 自己公开的三档：Plan / Auto / YOLO，逐一对应 omni 已有的三档。 */
+/** Kimi 自己公开的三档：Plan / Auto / YOLO，逐一对应 Switchback 已有的三档。 */
 export const KIMI_TRUST: Readonly<Record<Trust, KimiTrust>> = {
   "read-only": { permission_mode: "manual", plan_mode: true },
   "auto-edit": { permission_mode: "auto", plan_mode: false },

@@ -1,7 +1,7 @@
 import {
   query, type Options, type PermissionResult, type SDKUserMessage, type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
-import { decide } from "@omni/approval"
+import { decide } from "@switchback/approval"
 import type {
   EngineAccount,
   EngineCapabilities,
@@ -11,7 +11,7 @@ import type {
   SlashCommand,
   Trust,
   TurnId,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createQueue } from "../queue.js"
 import { askAside } from "./aside.js"
@@ -45,7 +45,7 @@ import { ClaudeMcpStatus, reportCurrentMcp } from "./mcp-status.js"
  *
  * 三档因此直接落到它公开的 Plan / Auto / Bypass。`canUseTool` 仍保留：用户原生
  * ask 规则、需要交互的工具，以及 Auto 多次阻断后的人工回退都会从这扇门出来。
- * 只有走到这里时 omni 才负责呈现或应答，不再拿自己的静态判定冒充原生 Auto。
+ * 只有走到这里时 Switchback 才负责呈现或应答，不再拿自己的静态判定冒充原生 Auto。
  */
 /** 等消息循环自然收尾的上限；超过就进入信号阶梯。 */
 const GRACEFUL_WAIT_MS = 4000
@@ -58,12 +58,12 @@ export interface ClaudeDriverConfig {
    * 是否隔离宿主的 Claude 设置。
    *
    * 默认 `false`——沿用 CLI 行为，加载 user/project/local 全部设置与 CLAUDE.md。
-   * 代价是：用户自己配的 allow 规则会**先于** `canUseTool` 放行，omni 的判定器看不到。
+   * 代价是：用户自己配的 allow 规则会**先于** `canUseTool` 放行，Switchback 的判定器看不到。
    * 这是有意的：那些规则是用户自己写的原生配置，和 `matchedAskRule` 同一个道理——
-   * 用户的明示意图压过宿主的自动策略。而且剥掉设置会让 Claude 在 omni 里的行为
+   * 用户的明示意图压过宿主的自动策略。而且剥掉设置会让 Claude 在 Switchback 里的行为
    * 与在终端里不一致，违背「引擎原生」这个前提。
    *
-   * 设为 `true` 时传 `settingSources: []`，omni 成为唯一权威，**但也会丢掉 CLAUDE.md**。
+   * 设为 `true` 时传 `settingSources: []`，Switchback 成为唯一权威，**但也会丢掉 CLAUDE.md**。
    */
   isolateSettings?: boolean
   /** 回收阶梯的三个窗口，见 `subprocess.ts` */
@@ -235,7 +235,7 @@ class ClaudeSession implements EngineSession {
     throw new Error("Claude 输入流已经关闭")
   }
 
-  /** 当前原生阶段停下，随后的 `priority: now` 阶段仍挂在同一个 omni turn 上。 */
+  /** 当前原生阶段停下，随后的 `priority: now` 阶段仍挂在同一个 Switchback turn 上。 */
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const expected = this.turn.current
     if (expected === undefined) throw new Error("Claude 当前没有可插入的轮次")
@@ -275,11 +275,11 @@ class ClaudeSession implements EngineSession {
    * **`compact` 报 false 是有意的。**
    *
    * Claude 当然会压缩上下文——但它的 `/compact` 已经在 `supportedCommands()`
-   * 里，会经斜杠命令面板原样露给用户。omni 再给一个「压缩上下文」，
+   * 里，会经斜杠命令面板原样露给用户。Switchback 再给一个「压缩上下文」，
    * 面板上就有两条长得不一样、干同一件事的入口，
    * 而人会先花时间想「这俩有什么区别」。
    *
-   * 这一条正是这层抽象要表达的东西：能力问的是**「omni 该不该提供入口」**，
+   * 这一条正是这层抽象要表达的东西：能力问的是**「Switchback 该不该提供入口」**，
    * 不是「这家引擎有没有这个概念」。
    */
   /**
@@ -360,7 +360,7 @@ class ClaudeSession implements EngineSession {
       return {
         restart: true,
         detail:
-          "Claude 的完全访问需要在会话启动时显式允许 Bypass。请等当前轮结束；omni 会续接同一条会话后重启。",
+          "Claude 的完全访问需要在会话启动时显式允许 Bypass。请等当前轮结束；Switchback 会续接同一条会话后重启。",
       }
     }
     const handle = this.query

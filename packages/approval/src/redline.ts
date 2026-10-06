@@ -25,7 +25,7 @@ const CREDENTIAL_PREFIXES = [
   "~/.npmrc", "~/.netrc", "~/.pypirc",
 ] as const
 
-const ENGINE_HOME_PREFIXES = ["~/.claude", "~/.codex", "~/.omni", "~/.config/omni"] as const
+const ENGINE_HOME_PREFIXES = ["~/.claude", "~/.codex", "~/.switchback", "~/.config/switchback"] as const
 
 /**
  * 解析不了的命令里，出现这些迹象才拦。
@@ -144,17 +144,17 @@ export const REDLINES: readonly Redline[] = [
       ctx.norm.category === "write" &&
       ctx.norm.paths.some((p) => matchesAnyPrefix(p, ENGINE_HOME_PREFIXES, ctx.state.home)),
     action: always("escalate"),
-    reason: "该路径是引擎或 omni 自身的配置，改动会静默改变权限行为，必须人工确认",
+    reason: "该路径是引擎或 Switchback 自身的配置，改动会静默改变权限行为，必须人工确认",
     memorable: false,
   },
   {
-    id: "omni-self-config",
-    describe: "修改本项目的 omni 状态",
+    id: "switchback-self-config",
+    describe: "修改本项目的 Switchback 状态",
     hit: (ctx) =>
       ctx.norm.category === "write" &&
-      ctx.norm.paths.some((p) => isInside(`${ctx.state.worksite}/.omni`, p)),
+      ctx.norm.paths.some((p) => isInside(`${ctx.state.worksite}/.switchback`, p)),
     action: always("escalate"),
-    reason: ".omni 目录保存本项目的审批记忆与会话状态，不能由 agent 自行修改",
+    reason: ".switchback 目录保存本项目的审批记忆与会话状态，不能由 agent 自行修改",
     memorable: false,
   },
   {

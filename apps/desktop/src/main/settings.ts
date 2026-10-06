@@ -215,7 +215,7 @@ function icons(raw: unknown): Record<string, string> {
  * 上次开工用的那一套。
  *
  * **模型/思维档只做「是不是字符串」的校验，不做白名单**：那份名单在引擎那边，
- * 而且随版本变。写死一份的下场是引擎升级出了新模型，omni 这边把它当脏数据丢掉。
+ * 而且随版本变。写死一份的下场是引擎升级出了新模型，Switchback 这边把它当脏数据丢掉。
  * 认不出来的模型引擎自己会拒，那时用户看到的是引擎的原话——比我们编一句准。
  */
 function lastUsed(raw: unknown): Settings["lastUsed"] {
@@ -282,7 +282,7 @@ export function installSettingsChannel(
   store: Store,
   onPatch?: (before: Settings, after: Settings, patch: Partial<Settings>) => void,
 ): void {
-  ipcMain.handle("omni:settings", (_e, patch?: Partial<Settings>) => {
+  ipcMain.handle("switchback:settings", (_e, patch?: Partial<Settings>) => {
     if (patch === undefined) return store.get()
     const before = store.get()
     const after = store.patch(patch)

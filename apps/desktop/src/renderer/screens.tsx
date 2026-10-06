@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import type { Command, EngineInfo, Thread } from "@omni/protocol"
+import type { Command, EngineInfo, Thread } from "@switchback/protocol"
 import {
   itemsOf, lanesOf, pacesOf, tasksOf, thinkingTokensOf, turnOf,
   type Notice as StoreNotice, type ViewState,
-} from "@omni/store"
+} from "@switchback/store"
 import { Notices } from "./components/Notices.js"
 import { Compare, type ComparePane } from "./components/Compare.js"
 import { SettingsPanel } from "./components/SettingsPanel.js"
@@ -201,7 +201,7 @@ export function SettingsScreen({
   onClose: () => void
 }): React.JSX.Element {
   const [info, setInfo] = useState({ version: "", dataDir: "" })
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
   useEffect(() => {
     if (bridge === undefined) return
     void bridge.appInfo().then(setInfo)

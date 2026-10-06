@@ -14,7 +14,7 @@ import { addEngineEntry, engineNameOf, ensureEngineFile, removeEngineEntry, repl
 import type { Logger } from "./log.js"
 
 function dirWith(content?: string): { dir: string; log: Logger; logged: string[] } {
-  const dir = mkdtempSync(join(tmpdir(), "omni-engines-"))
+  const dir = mkdtempSync(join(tmpdir(), "switchback-engines-"))
   if (content !== undefined) writeFileSync(join(dir, ENGINES_FILE), content, "utf8")
   const logged: string[] = []
   return {
@@ -223,8 +223,8 @@ describe("从命令名推 id", () => {
  * 往注册表里加一条。**这几条守的都是同一件事：那是用户手写的文件。**
  */
 describe("写进 engines.json", () => {
-  const dir = (): string => mkdtempSync(join(tmpdir(), "omni-add-"))
-  const log: Logger = { file: "/tmp/omni-engines-add.log", write: () => undefined }
+  const dir = (): string => mkdtempSync(join(tmpdir(), "switchback-add-"))
+  const log: Logger = { file: "/tmp/switchback-engines-add.log", write: () => undefined }
 
   it("加完能读回来，`acp:` 前缀由这一层给", () => {
     const at = dir()
@@ -293,7 +293,7 @@ describe("写进 engines.json", () => {
 
 describe("换掉与删掉 engines.json 里的一条", () => {
   const dir = (content: Record<string, unknown>): string => {
-    const at = mkdtempSync(join(tmpdir(), "omni-edit-"))
+    const at = mkdtempSync(join(tmpdir(), "switchback-edit-"))
     writeFileSync(join(at, ENGINES_FILE), JSON.stringify(content), "utf8")
     return at
   }
@@ -334,7 +334,7 @@ describe("换掉与删掉 engines.json 里的一条", () => {
   })
 
   it("文件坏了不删也不换", () => {
-    const at = mkdtempSync(join(tmpdir(), "omni-edit-"))
+    const at = mkdtempSync(join(tmpdir(), "switchback-edit-"))
     writeFileSync(join(at, ENGINES_FILE), "[1,2]", "utf8")
     expect(removeEngineEntry(at, "a").ok).toBe(false)
     expect(replaceEngineEntry(at, "a", { label: "A", command: "a" }).ok).toBe(false)

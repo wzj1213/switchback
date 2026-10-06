@@ -12,7 +12,7 @@ import { ownedWorksite, type WorksiteSearch } from "./worksite-search.js"
  */
 const MESSAGE_CHARS = 20_000
 const PATH_CHARS = 4096
-const NOT_OURS: CommitResult = { ok: false, error: "这个工作区不属于任何一条会话，omni 不碰它。" }
+const NOT_OURS: CommitResult = { ok: false, error: "这个工作区不属于任何一条会话，Switchback 不碰它。" }
 const NO_REPO: GitState = { repo: false, staged: 0, unstaged: 0, untracked: 0, conflicted: 0 }
 
 export function createGitChannels(worksites: WorksiteSearch, run: GitRun = runGit): {
@@ -58,8 +58,8 @@ export function createGitChannels(worksites: WorksiteSearch, run: GitRun = runGi
 
 export function installGitChannel(worksites: WorksiteSearch): void {
   const channels = createGitChannels(worksites)
-  ipcMain.handle("omni:gitState", (_event, req: unknown) => channels.state(req))
-  ipcMain.handle("omni:gitCommit", (_event, req: unknown) => channels.commit(req))
-  ipcMain.handle("omni:gitStage", (_event, req: unknown) => channels.stage(req))
-  ipcMain.handle("omni:gitUndo", (_event, req: unknown) => channels.undo(req))
+  ipcMain.handle("switchback:gitState", (_event, req: unknown) => channels.state(req))
+  ipcMain.handle("switchback:gitCommit", (_event, req: unknown) => channels.commit(req))
+  ipcMain.handle("switchback:gitStage", (_event, req: unknown) => channels.stage(req))
+  ipcMain.handle("switchback:gitUndo", (_event, req: unknown) => channels.undo(req))
 }

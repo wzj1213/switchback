@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { Event, TurnId } from "@omni/protocol"
+import type { Event, TurnId } from "@switchback/protocol"
 import { createHookTracker } from "./hooks.js"
 import type { WireHookLifecycle, WireHookRun } from "./wire.js"
 

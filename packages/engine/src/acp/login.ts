@@ -6,7 +6,7 @@ import { startupMessage } from "./setup.js"
  * 替人把「我要用这种方式登录」转给 agent。
  *
  * **只做转达。** 开浏览器、收 OAuth 回调、存凭证全是 agent 自己的事（协议里 `agent` 型的定义），
- * omni 连凭证长什么样都看不见。所以这里的全部工作是：起一个进程、握手、
+ * Switchback 连凭证长什么样都看不见。所以这里的全部工作是：起一个进程、握手、
  * 发 `authenticate`、等它办完、收掉进程。它把凭证存在自己那儿，之后开的会话自然就是登录过的。
  *
  * terminal 型不走这里：协议明说客户端**不得**把它发给 `authenticate`，

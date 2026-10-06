@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import type { Lane } from "@omni/protocol"
+import type { Lane } from "@switchback/protocol"
 import { AsideLaneCard } from "./aside-card.js"
 
 const lane = (status: Lane["status"], summary?: string): Lane => ({

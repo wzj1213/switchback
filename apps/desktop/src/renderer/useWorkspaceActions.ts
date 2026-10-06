@@ -1,5 +1,5 @@
-import type { Command, Thread, Trust } from "@omni/protocol"
-import { itemsOf, type ViewState } from "@omni/store"
+import type { Command, Thread, Trust } from "@switchback/protocol"
+import { itemsOf, type ViewState } from "@switchback/store"
 import { labelOf } from "./components/Composer.js"
 import { toMarkdown } from "./export.js"
 import { useMenuActions } from "./useMenuActions.js"

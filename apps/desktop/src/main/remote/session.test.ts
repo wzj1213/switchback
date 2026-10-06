@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { Command, Event, Trust } from "@omni/protocol"
-import { createLedger, createReassembler, type ServerFrame } from "@omni/wire"
+import type { Command, Event, Trust } from "@switchback/protocol"
+import { createLedger, createReassembler, type ServerFrame } from "@switchback/wire"
 import { createSession } from "./session.js"
 import type { Sink } from "../sink.js"
 
@@ -65,7 +65,7 @@ function harness(options: Options = {}): Harness {
       state.replays += 1
       if (options.replayFails === true) throw new Error("磁盘炸了")
       // 真宿主是读完磁盘才发；这里照样走一遍 sink，`bodies` 的语义才对得上
-      sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: options.bodies ?? [] } })
+      sink.send({ channel: "switchback:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: options.bodies ?? [] } })
     },
     ceiling: () => options.ceiling ?? "full",
     trustOf: () => options.threadTrust,
@@ -208,7 +208,7 @@ describe("确认与观察", () => {
 
   it("**全量里已经带了正文的那些不再补**——否则你打开的第一条必然多读一次磁盘", async () => {
     const h = harness({ history: [ev(1)] })
-    h.session.sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: ["t-1"] } })
+    h.session.sink.send({ channel: "switchback:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: ["t-1"] } })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
     expect(h.reads()).toEqual([])
@@ -216,7 +216,7 @@ describe("确认与观察", () => {
 
   it("`bodies` 缺省 = 全都带，一条都不补——那是同机 IPC 那条路的语义", async () => {
     const h = harness({ history: [ev(1)] })
-    h.session.sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN } })
+    h.session.sink.send({ channel: "switchback:replay", replay: { events: [], resumeAt: 0, epoch: RUN } })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
     expect(h.reads()).toEqual(["t-1"])
@@ -301,7 +301,7 @@ describe("确认与观察", () => {
     await settle()
     expect(h.reads()).toEqual([])
     // 第二份全量不再带 t-1 的正文
-    h.session.sink.send({ channel: "omni:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: [] } })
+    h.session.sink.send({ channel: "switchback:replay", replay: { events: [], resumeAt: 0, epoch: RUN, bodies: [] } })
     send(h, { type: "watch", threadId: "t-2" })
     send(h, { type: "watch", threadId: "t-1" })
     await settle()
@@ -414,7 +414,7 @@ describe("大帧", () => {
   it("超过一片的全量会被切开，客户端能原样重组回来", () => {
     const h = harness()
     const big = Array.from({ length: 3000 }, (_, i) => ev(i))
-    h.session.sink.send({ channel: "omni:replay", replay: { events: big, resumeAt: 0, epoch: RUN } })
+    h.session.sink.send({ channel: "switchback:replay", replay: { events: big, resumeAt: 0, epoch: RUN } })
     const frames = h.frames()
     expect(frames).toHaveLength(1)
     expect(frames[0]?.type).toBe("replay")

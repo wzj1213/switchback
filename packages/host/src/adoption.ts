@@ -1,10 +1,10 @@
-import type { Command, Thread } from "@omni/protocol"
+import type { Command, Thread } from "@switchback/protocol"
 import { copyTranscript } from "./transcript.js"
 import { drainQueued, emit, isCurrent, type Ctx } from "./ctx.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch, remove } from "./session.js"
 
-/** 把引擎自己存的会话接进 omni；拿不到原文时由界面明确显示接管空态。 */
+/** 把引擎自己存的会话接进 Switchback；拿不到原文时由界面明确显示接管空态。 */
 export async function adopt(
   ctx: Ctx,
   cmd: Extract<Command, { type: "thread.adopt" }>,

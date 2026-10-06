@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { foldTurns, groupRows } from "./group.js"
-import type { Item, ToolCallItem } from "@omni/protocol"
+import type { Item, ToolCallItem } from "@switchback/protocol"
 
 const item = (id: string, kind: Item["kind"], turnId: string, at: number): Item =>
   ({ id, kind, turnId, at, text: id }) as Item

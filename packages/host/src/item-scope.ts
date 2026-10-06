@@ -1,9 +1,9 @@
-import type { ApprovalAsk } from "@omni/engine"
-import type { Event, Item, ItemId, LaneRef, TurnId } from "@omni/protocol"
+import type { ApprovalAsk } from "@switchback/engine"
+import type { Event, Item, ItemId, LaneRef, TurnId } from "@switchback/protocol"
 
 /**
- * 引擎给的 item id 只保证在它自己的原生会话里可引用，不能直接当 omni 全局 id。
- * 一条 omni 会话会中途换引擎；两家都报 `c1` 时，store 会把后一条当更新覆盖前一条。
+ * 引擎给的 item id 只保证在它自己的原生会话里可引用，不能直接当 Switchback 全局 id。
+ * 一条 Switchback 会话会中途换引擎；两家都报 `c1` 时，store 会把后一条当更新覆盖前一条。
  */
 export interface ItemScope {
   event: (event: Event) => Event
@@ -15,7 +15,7 @@ export interface ItemScope {
  *
  * 它们和别的 item 一样继承 `ItemBase`，所以类型上拦不住 `lane` 这个字段——
  * 而一旦带上，分流选择器就会把它们抽进侧栏。侧栏关着、或者用户正在看另一条旁路时，
- * 一张**正在等他点**的审批卡就这么没了；而 omni 刚发过一版专治
+ * 一张**正在等他点**的审批卡就这么没了；而 Switchback 刚发过一版专治
  * 「点了没反应、转圈没尽头」，这是在同一个坑上新挖一个入口。
  *
  * 写成运行时闸门而不是 README 里的一句话：类型表达不了「这两种 kind 不许有这个字段」，
@@ -29,7 +29,7 @@ export function createItemScope(newId: (prefix: string) => ItemId): ItemScope {
   const byTurn = new Map<TurnId, Map<ItemId, ItemId>>()
   const latest = new Map<ItemId, ItemId>()
   /**
-   * 引擎的 lane id → omni 的。**不按轮次分**：一条 lane 跨好几轮
+   * 引擎的 lane id → Switchback 的。**不按轮次分**：一条 lane 跨好几轮
    *（workflow 是后台跑的，主循环早收工了），按轮次分会让同一条 lane
    * 在下一轮里变成另一条。
    */

@@ -1,4 +1,4 @@
-import type { Event, RateLimits, RateWindow } from "@omni/protocol"
+import type { Event, RateLimits, RateWindow } from "@switchback/protocol"
 import type { WireRateLimits, WireRateWindow } from "./wire.js"
 
 type LimitFrame = "snapshot" | "patch"

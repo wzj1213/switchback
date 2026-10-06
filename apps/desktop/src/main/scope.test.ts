@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event, Item, Thread } from "@omni/protocol"
+import type { Event, Item, Thread } from "@switchback/protocol"
 import { REMOTE_THREAD_CHARS, bodyOf, headerOf, scopeReplay, withCurrent } from "./scope.js"
 import type { ThreadHistory } from "./host.js"
 

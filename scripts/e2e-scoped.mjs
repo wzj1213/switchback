@@ -27,7 +27,7 @@ import { fixture } from "./e2e-fixture.mjs"
 export async function stepScoped(send, token, deps) {
   const { evaluate, connect, ok, pause } = deps
   console.log("10. 分级 replay：大小预算、只发头、watch → thread 帧")
-  const info = await evaluate(send, "window.omni.appInfo().then(s => JSON.stringify(s))")
+  const info = await evaluate(send, "window.switchback.appInfo().then(s => JSON.stringify(s))")
   const dir = join(info.dataDir, "threads")
   await mkdir(dir, { recursive: true })
   // 六条各约 10 万码元。单条封顶 64K、整份预算 192K，所以最近那两三条带

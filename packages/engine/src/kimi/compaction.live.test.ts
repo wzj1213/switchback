@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createKimiDriver } from "./driver.js"
 
 async function waitForTurn(events: readonly Event[], turnId: string): Promise<void> {
@@ -17,7 +17,7 @@ async function waitForTurn(events: readonly Event[], turnId: string): Promise<vo
 /** `pnpm vitest run --mode live packages/engine/src/kimi/compaction.live.test.ts` */
 describe("Kimi 上下文压缩（真机）", () => {
   it("真实异步压缩事件原地更新提示并收掉宿主轮次", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-kimi-compaction-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-kimi-compaction-live-"))
     const events: Event[] = []
     const session = await createKimiDriver().start({
       threadId: "live-kimi-compaction",

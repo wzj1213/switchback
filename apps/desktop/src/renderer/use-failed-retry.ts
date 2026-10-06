@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import type { Command, Item, Thread, Turn } from "@omni/protocol"
+import type { Command, Item, Thread, Turn } from "@switchback/protocol"
 import { retryTarget, type RetryTarget } from "./error-plan.js"
 
 /**

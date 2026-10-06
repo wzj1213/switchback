@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { Item, Thread } from "@omni/protocol"
+import type { Item, Thread } from "@switchback/protocol"
 import { toMarkdown, textOf } from "./export.js"
 
 const thread: Thread = {
   id: "th",
-  title: "omni",
+  title: "switchback",
   cwd: "/w",
   engine: "codex",
   trust: "auto-edit",

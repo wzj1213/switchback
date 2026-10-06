@@ -1,5 +1,5 @@
-import type { Command, Event, ThreadId, Trust } from "@omni/protocol"
-import { encodeFrame, type ClientFrame, type Ledger, type ServerFrame } from "@omni/wire"
+import type { Command, Event, ThreadId, Trust } from "@switchback/protocol"
+import { encodeFrame, type ClientFrame, type Ledger, type ServerFrame } from "@switchback/wire"
 import type { Sink, SinkMessage } from "../sink.js"
 import { clamp, isCommand } from "./policy.js"
 
@@ -8,7 +8,7 @@ import { clamp, isCommand } from "./policy.js"
  *
  * 它做的事和一扇窗口完全一样（收事件、发命令），差别只在管子：
  * 窗口那条是同进程 IPC，这条要过网络，所以多三件事——**确认、补发、分片**。
- * 那三件都在 `@omni/wire` 里，这里只负责把它们接到一条真的连接上。
+ * 那三件都在 `@switchback/wire` 里，这里只负责把它们接到一条真的连接上。
  */
 
 /** 写出去还没被对端收走的字节超过这个数，就认定它跟不上，断开让它重来。 */
@@ -126,7 +126,7 @@ function writer(deps: SessionDeps, state: State): (frame: ServerFrame) => void {
  * **这正是隧道和地铁的意义所在**：补得上就别把整段历史重发一遍。补不上再走全量。
  *
  * 两个字段必须成对：只报序号不报代号的话，宿主分不出这个游标是不是
- * 上一次运行留下的（见 `@omni/wire` 的 `Replay.epoch`），于是干脆当没带。
+ * 上一次运行留下的（见 `@switchback/wire` 的 `Replay.epoch`），于是干脆当没带。
  */
 function hello(ctx: Ctx, after: number | undefined, epoch: string | undefined): void {
   ctx.deps.ledger.join(ctx.deps.id)
@@ -183,7 +183,7 @@ function resync(ctx: Ctx, after: number, epoch: string): void {
 function command(ctx: Ctx, raw: unknown): void {
   if (!isCommand(raw)) {
     ctx.deps.log("warn", `${ctx.deps.id} 发来一条认不出的命令，已丢弃`)
-    ctx.write({ type: "notice", text: "这条命令的形状 omni 认不出来，没有执行" })
+    ctx.write({ type: "notice", text: "这条命令的形状 Switchback 认不出来，没有执行" })
     return
   }
   const verdict = clamp(raw, ctx.deps.ceiling(), ctx.deps.trustOf)
@@ -322,7 +322,7 @@ export function createSession(deps: SessionDeps): RemoteSession {
   const sink: Sink = {
     id: deps.id,
     send: (message: SinkMessage) => {
-      if (message.channel === "omni:events") {
+      if (message.channel === "switchback:events") {
         write({ type: "events", sealed: message.sealed })
         return
       }

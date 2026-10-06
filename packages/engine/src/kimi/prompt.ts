@@ -1,4 +1,4 @@
-import type { SlashCommand, TurnId } from "@omni/protocol"
+import type { SlashCommand, TurnId } from "@switchback/protocol"
 import { promptContent } from "./attach.js"
 import type { KimiApi } from "./http.js"
 import { sessionPath } from "./http.js"

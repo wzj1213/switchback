@@ -1,4 +1,4 @@
-import type { LaneNode } from "@omni/protocol"
+import type { LaneNode } from "@switchback/protocol"
 import type {
   ForeignActivity,
   ForeignActivityOutput,

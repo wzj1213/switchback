@@ -1,5 +1,5 @@
 import { ipcMain } from "electron"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { ActivityDigest } from "../shared/activity.js"
 import { createTally, digestOf, foldThread } from "./activity-fold.js"
 import type { Attached } from "./host.js"
@@ -61,7 +61,7 @@ async function scan(attached: Attached, now: () => number): Promise<ActivityDige
  */
 export function installActivity(attached: Attached, log: Logger, now = Date.now): void {
   const cache: Cache = { at: 0 }
-  ipcMain.handle("omni:activity", async (_e, refresh?: boolean): Promise<ActivityDigest> => {
+  ipcMain.handle("switchback:activity", async (_e, refresh?: boolean): Promise<ActivityDigest> => {
     const fresh = cache.digest !== undefined && now() - cache.at < TTL
     if (refresh !== true && fresh && cache.digest !== undefined) return cache.digest
     cache.pending ??= scan(attached, now)

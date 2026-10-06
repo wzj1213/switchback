@@ -1,5 +1,5 @@
 {
-  "name": "@omni/journal",
+  "name": "@switchback/journal",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "@omni/protocol": "workspace:*"
+    "@switchback/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0"

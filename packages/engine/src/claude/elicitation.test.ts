@@ -1,5 +1,5 @@
 import type { ElicitationRequest } from "@anthropic-ai/claude-agent-sdk"
-import type { QuestionPrompt, QuestionResponse } from "@omni/protocol"
+import type { QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import { describe, expect, it, vi } from "vitest"
 import type { StartRequest } from "../contract.js"
 import { answerElicitation } from "./elicitation.js"
@@ -20,7 +20,7 @@ describe("Claude MCP 结构化 elicitation", () => {
     const ask: StartRequest["askQuestion"] = (questions) => {
       shown = questions
       return Promise.resolve({ answers: {
-        name: { kind: "note", text: "omni" },
+        name: { kind: "note", text: "switchback" },
         count: { kind: "note", text: "3" },
         notify: { kind: "single", optionId: "true" },
         color: { kind: "single", optionId: "#f00" },
@@ -57,7 +57,7 @@ describe("Claude MCP 结构化 elicitation", () => {
     ] })
     expect(shown[5]).toMatchObject({ optional: true })
     expect(result).toEqual({ action: "accept", content: {
-      name: "omni", count: 3, notify: true, color: "#f00", tags: ["fast", "safe"],
+      name: "switchback", count: 3, notify: true, color: "#f00", tags: ["fast", "safe"],
     } })
   })
 

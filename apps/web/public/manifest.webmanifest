@@ -1,6 +1,6 @@
 {
-  "name": "omni · 同文",
-  "short_name": "omni",
+  "name": "Switchback",
+  "short_name": "Switchback",
   "description": "远程看住并放行你机器上的 agent",
   "start_url": "/",
   "scope": "/",

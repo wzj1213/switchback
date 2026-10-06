@@ -1,5 +1,5 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk"
-import type { ErrorItem, Trust } from "@omni/protocol"
+import type { ErrorItem, Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { createTaskState, onTaskMessage, type TaskState } from "./tasks.js"
 import { createPlanState } from "./plan.js"
@@ -38,7 +38,7 @@ import {
  * 而轮次会在这期间反复开合。
  */
 export interface TurnRef extends MessageRef {
-  /** init 明确标为依赖本地终端的命令；omni 只有 GUI，不向两端菜单冒充可用。 */
+  /** init 明确标为依赖本地终端的命令；Switchback 只有 GUI，不向两端菜单冒充可用。 */
   terminalCommands: Set<string>
   /** init 已被消息循环消费；命令目录据此避开终端标记与开场查询的竞态。 */
   onInit: (at: number) => void
@@ -54,7 +54,7 @@ export interface TurnRef extends MessageRef {
   pendingSteers: number
   /** 最近一次主 agent API 请求的用量；result 是整轮汇总，不能拿来算当前上下文。 */
   latestUsage?: RawUsage
-  /** 一个 omni 回合可能被 steer 切成几段原生结果；输出量在这里合起来。 */
+  /** 一个 Switchback 回合可能被 steer 切成几段原生结果；输出量在这里合起来。 */
   outputTokens?: number
   /** Claude 明确标出 parent_tool_use_id 的子 agent 转录；各 lane 独立维护消息身份。 */
   sidechains: SidechainState
@@ -198,7 +198,7 @@ async function dispatch(msg: RawLoopMessage, ref: TurnRef, ctx: DispatchContext,
 }
 
 /**
- * 消费 SDK 的消息流并翻译成 omni 事件。
+ * 消费 SDK 的消息流并翻译成 Switchback 事件。
  *
  * **不吞异常**：迭代抛出时发一条 `engine.status: crashed` 再重新抛出，
  * 让 `dispose()` 的等待方看得到失败，而不是静默结束。

@@ -1,4 +1,4 @@
-import type { EngineGoal, GoalStatus } from "@omni/protocol"
+import type { EngineGoal, GoalStatus } from "@switchback/protocol"
 import type { KimiGoalSnapshot } from "./wire.js"
 
 const STATUS: Readonly<Record<string, GoalStatus>> = {

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import type { Command, Trust } from "@omni/protocol"
+import type { Command, Trust } from "@switchback/protocol"
 import { clamp, isCommand, lower } from "./policy.js"
 
 describe("档位比较", () => {
@@ -196,7 +196,7 @@ describe("形状表不许落在协议后面", () => {
    * **这条测试是被一次真实的遗漏逼出来的。**
    *
    * `SHAPES` 是一张手维护的白名单，而 `Command` 联合会长。漏一条的后果不是放行
-   * 而是**整条拒掉**——远程发过去只会收到一句「这条命令的形状 omni 认不出来」。
+   * 而是**整条拒掉**——远程发过去只会收到一句「这条命令的形状 Switchback 认不出来」。
    * 实测漏过 `thread.steerQueued` 和 `thread.switchNow`，而前者恰恰是最赶时间的
    * 那个动作：排着的那句往往是「别再往下走了」。
    *

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
-import { resolveLoginPath } from "@omni/engine"
+import { resolveLoginPath } from "@switchback/engine"
 import type { Logger } from "./log.js"
 
 /**

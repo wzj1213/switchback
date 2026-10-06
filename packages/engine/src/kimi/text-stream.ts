@@ -1,4 +1,4 @@
-import type { ItemId, TurnId } from "@omni/protocol"
+import type { ItemId, TurnId } from "@switchback/protocol"
 
 export interface KimiTextState {
   id: ItemId

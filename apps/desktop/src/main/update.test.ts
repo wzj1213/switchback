@@ -55,11 +55,11 @@ describe("查一次", () => {
     const out = await checkForUpdate({
       feed,
       current: "1.0.0",
-      fetchText: () => Promise.resolve('{"version":"1.1.0","url":"https://x.example/omni.dmg","notes":"修了几个 bug"}'),
+      fetchText: () => Promise.resolve('{"version":"1.1.0","url":"https://x.example/switchback.dmg","notes":"修了几个 bug"}'),
     })
     expect(out).toEqual({
       kind: "newer",
-      release: { version: "1.1.0", url: "https://x.example/omni.dmg", notes: "修了几个 bug" },
+      release: { version: "1.1.0", url: "https://x.example/switchback.dmg", notes: "修了几个 bug" },
     })
   })
 
@@ -67,7 +67,7 @@ describe("查一次", () => {
     const out = await checkForUpdate({
       feed,
       current: "2.0.0",
-      fetchText: () => Promise.resolve('{"version":"1.1.0","url":"https://x.example/omni.dmg"}'),
+      fetchText: () => Promise.resolve('{"version":"1.1.0","url":"https://x.example/switchback.dmg"}'),
     })
     expect(out).toEqual({ kind: "current" })
   })
@@ -134,13 +134,13 @@ function ui(choice = 0): {
   }
 }
 
-const RELEASE = { version: "9.9.9", url: "https://x.example/omni.dmg", notes: "修了几个 bug" }
+const RELEASE = { version: "9.9.9", url: "https://x.example/switchback.dmg", notes: "修了几个 bug" }
 
 describe("怎么告诉用户", () => {
   it("有新版本，点「去下载」就用系统浏览器打开——**不在应用里下载**", async () => {
     const box = ui(0)
     await announce({ kind: "newer", release: RELEASE }, box, false)
-    expect(box.opened).toEqual(["https://x.example/omni.dmg"])
+    expect(box.opened).toEqual(["https://x.example/switchback.dmg"])
   })
 
   it("点「以后再说」什么都不做", async () => {

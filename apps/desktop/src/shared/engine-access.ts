@@ -4,7 +4,7 @@ import { dshProfileConfirmed, type Settings } from "./settings.js"
 export type EngineAccess = Pick<Settings, "dsh" | "disabledEngines">
 
 /**
- * 一家引擎是否被用户接入 omni。
+ * 一家引擎是否被用户接入 Switchback。
  *
  * 两道闸门，**顺序有意义**：
  *
@@ -49,7 +49,7 @@ export function withEngineEnabled(
  * 关掉最后一家会让这个应用**什么都开不了**。
  *
  * 挡在这里而不是在 parse 里悄悄纠正：偏好文件是用户改得到的，
- * 而「我把它们全关了，omni 自作主张又打开一家」比空清单更让人迷惑。
+ * 而「我把它们全关了，Switchback 自作主张又打开一家」比空清单更让人迷惑。
  * 界面据此把最后那一家的开关变灰，并说清楚为什么。
  */
 export function lastEnabledEngine(

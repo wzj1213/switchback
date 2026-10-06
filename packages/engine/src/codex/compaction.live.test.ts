@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createCodexDriver } from "./driver.js"
 
 async function waitForTurn(events: readonly Event[], turnId: string): Promise<void> {
@@ -17,7 +17,7 @@ async function waitForTurn(events: readonly Event[], turnId: string): Promise<vo
 /** `pnpm vitest run --mode live packages/engine/src/codex/compaction.live.test.ts` */
 describe("Codex 上下文压缩（真机）", () => {
   it("真实 contextCompaction item 落成提示并用宿主轮次收工", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-compaction-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-compaction-live-"))
     const events: Event[] = []
     const session = await createCodexDriver().start({
       threadId: "live-codex-compaction",

@@ -1,8 +1,8 @@
-import type { EngineAccount, EngineThread, ModelOption, SlashCommand } from "@omni/protocol"
+import type { EngineAccount, EngineThread, ModelOption, SlashCommand } from "@switchback/protocol"
 import type { WireSkill, WireSkillGroup } from "./wire.js"
 
 /*
- * codex 报上来的东西 → omni 的中立形状。
+ * codex 报上来的东西 → Switchback 的中立形状。
  *
  * 从驱动里拆出来的边界是：**驱动只管发 RPC 和收通知，形状转换在这儿。**
  * 这样「codex 的技能长什么样」这件事只有这一个文件知道，
@@ -13,7 +13,7 @@ import type { WireSkill, WireSkillGroup } from "./wire.js"
  * `skills/list` 的结果铺平成斜杠命令。
  *
  * 返回是按 cwd 分组的（一个 app-server 可以同时服务多个工作区），这里全铺平——
- * 一个 omni 会话只对着一个工作区，分组信息对用户没有意义。
+ * 一个 Switchback 会话只对着一个工作区，分组信息对用户没有意义。
  * **停用的技能不给**：它在 codex 那边就不生效，列出来只会让人白点一次。
  */
 export function skillsToCommands(raw: unknown): readonly SlashCommand[] {
@@ -54,7 +54,7 @@ function toSlashCommand(skill: WireSkill): SlashCommand {
 }
 
 /**
- * codex 的 `scope` → omni 的。实测取值是 `user` / `system`；
+ * codex 的 `scope` → Switchback 的。实测取值是 `user` / `system`；
  * **不认的一律丢掉**而不是照抄成字符串——界面按枚举画标签，
  * 混进一个没见过的值只会画出个乱码似的角标。
  */

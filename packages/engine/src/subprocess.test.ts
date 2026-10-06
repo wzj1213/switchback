@@ -93,14 +93,14 @@ describe("pid", () => {
 
 describe("unpacked", () => {
   it("把指进 asar 的路径改到解包目录——spawn 交给操作系统，而 asar 是文件不是目录", () => {
-    expect(unpacked("/Applications/omni.app/Contents/Resources/app.asar/node_modules/x/cli.js")).toBe(
-      "/Applications/omni.app/Contents/Resources/app.asar.unpacked/node_modules/x/cli.js",
+    expect(unpacked("/Applications/Switchback.app/Contents/Resources/app.asar/node_modules/x/cli.js")).toBe(
+      "/Applications/Switchback.app/Contents/Resources/app.asar.unpacked/node_modules/x/cli.js",
     )
   })
 
   it("没有 asar 的路径原样返回——开发时跑的是源码目录", () => {
-    expect(unpacked("/Users/me/work/omni/node_modules/x/cli.js")).toBe(
-      "/Users/me/work/omni/node_modules/x/cli.js",
+    expect(unpacked("/Users/me/work/switchback/node_modules/x/cli.js")).toBe(
+      "/Users/me/work/switchback/node_modules/x/cli.js",
     )
   })
 

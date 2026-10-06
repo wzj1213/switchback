@@ -1,6 +1,6 @@
-import type { EngineId, Event, Thread } from "@omni/protocol"
-import type { EngineDriver } from "@omni/engine"
-import type { Journal, RuleStore } from "@omni/journal"
+import type { EngineId, Event, Thread } from "@switchback/protocol"
+import type { EngineDriver } from "@switchback/engine"
+import type { Journal, RuleStore } from "@switchback/journal"
 
 /** 宿主的外部依赖。单独一个文件，`ctx.ts` 要引它而它不该反过来引 ctx。 */
 

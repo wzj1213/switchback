@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { createCodexDriver } from "./driver.js"
 
 /**
@@ -32,7 +32,7 @@ import { createCodexDriver } from "./driver.js"
 
 describe("codex 的计划（真跑）", () => {
   it("多步任务 → transcript 里出现 plan item，步骤有人话且状态在推进", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-plan-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-plan-live-"))
     for (const f of ["a.txt", "b.txt"]) writeFileSync(join(cwd, f), `${f}\n`)
     const events: Event[] = []
     const driver = createCodexDriver({})

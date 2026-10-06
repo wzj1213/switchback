@@ -22,7 +22,7 @@ describe("是不是有问题的那一版", () => {
 
 describe.runIf(process.platform === "darwin")("快照目录上锁", () => {
   it("锁上之后写不进新包；解开之后照常——已有的包只报数，不动", async () => {
-    const home = await mkdtemp(join(tmpdir(), "omni-zcode-"))
+    const home = await mkdtemp(join(tmpdir(), "switchback-zcode-"))
     try {
       await mkdir(join(home, ".zcode", "v2"), { recursive: true })
       const dir = checkpointsOf(home)
@@ -41,7 +41,7 @@ describe.runIf(process.platform === "darwin")("快照目录上锁", () => {
   })
 
   it("没装过 ZCode（没有 ~/.zcode）的机器上不凭空造它的目录", async () => {
-    const home = await mkdtemp(join(tmpdir(), "omni-zcode-"))
+    const home = await mkdtemp(join(tmpdir(), "switchback-zcode-"))
     try {
       const status = await lockCheckpoints(home, true)
       expect(status.checkpoints.exists).toBe(false)

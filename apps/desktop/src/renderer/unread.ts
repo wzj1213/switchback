@@ -1,4 +1,4 @@
-import type { ThreadStatus } from "@omni/protocol"
+import type { ThreadStatus } from "@switchback/protocol"
 
 /**
  * 「它在你没看的时候跑完了」。
@@ -20,7 +20,7 @@ import type { ThreadStatus } from "@omni/protocol"
  *   「自己按停的不出声」同一个理由）。
  *
  * 状态取自 `Thread.status`，那是宿主的判定（见 `host/ctx.ts` 的 `setStatus`）。
- * **不另立一套判据**：omni 里「它在不在跑」只能有一个答案。
+ * **不另立一套判据**：Switchback 里「它在不在跑」只能有一个答案。
  */
 export interface UnreadStep {
   /** 上一帧每条会话的状态。第一帧是空的，所以冷启动不会凭空点亮一片。 */

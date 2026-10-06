@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { EngineSession } from "../contract.js"
 import { createCodexDriver } from "./driver.js"
 
@@ -35,7 +35,7 @@ function request(cwd: string, events: Event[], onHandle: (handle: string) => voi
  */
 describe("Codex 历史分叉（真机）", () => {
   it("带原生 turn 边界的 thread/fork 保留前一轮并排除后一轮", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "omni-codex-fork-live-"))
+    const cwd = mkdtempSync(join(tmpdir(), "switchback-codex-fork-live-"))
     const driver = createCodexDriver()
     const sourceEvents: Event[] = []
     const forkEvents: Event[] = []
@@ -46,8 +46,8 @@ describe("Codex 历史分叉（真机）", () => {
       source = await driver.start(request(cwd, sourceEvents, (handle) => { handles.source = handle }))
       await source.setModel("gpt-5.3-codex-spark", "low")
       for (const [text, turnId] of [
-        ["只回复 OK。记住标记 OMNI_FORK_KEEP_824。", "source-1"],
-        ["只回复 OK。记住标记 OMNI_FORK_DROP_824。", "source-2"],
+        ["只回复 OK。记住标记 SWITCHBACK_FORK_KEEP_824。", "source-1"],
+        ["只回复 OK。记住标记 SWITCHBACK_FORK_DROP_824。", "source-2"],
       ] as const) {
         await source.prompt(text, turnId)
         await waitForTurn(sourceEvents, turnId)
@@ -60,8 +60,8 @@ describe("Codex 历史分叉（真机）", () => {
       const logPath = await forked.logPath?.()
       if (logPath === undefined) throw new Error("分支没有返回原生记录路径")
       const history = readFileSync(logPath, "utf8")
-      expect(history).toContain("OMNI_FORK_KEEP_824")
-      expect(history).not.toContain("OMNI_FORK_DROP_824")
+      expect(history).toContain("SWITCHBACK_FORK_KEEP_824")
+      expect(history).not.toContain("SWITCHBACK_FORK_DROP_824")
     } finally {
       await forked?.discard?.().catch(() => undefined)
       await forked?.dispose().catch(() => undefined)

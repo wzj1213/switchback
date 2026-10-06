@@ -23,14 +23,14 @@ import { SpinnerIcon } from "./icons.js"
  *
  * ## 为什么要轮询
  *
- * 你在编辑器里改完代码时 omni 是开着的。不轮询的话它要等下次启动才知道，
+ * 你在编辑器里改完代码时 Switchback 是开着的。不轮询的话它要等下次启动才知道，
  * 而「下次启动」正是这颗按钮想省掉的那件事。60 秒一次，跑的是一条剪过枝、
  * 找到第一个就停的 `find`（实测 6 毫秒），不发任何网络请求。
  */
 const POLL_MS = 60_000
 
 export function UpdateButton(): React.JSX.Element | null {
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
   const [state, setState] = useState<SelfUpdate | undefined>(undefined)
   const [running, setRunning] = useState(false)
   const [failed, setFailed] = useState<string | undefined>(undefined)
@@ -89,7 +89,7 @@ function titleOf(state: SelfUpdate, running: boolean, failed: string | undefined
   return [
     "更新到最新代码",
     state.newest === undefined ? "" : `${state.newest} 比装着的这份新`,
-    "点一下：pnpm dist:local → 换掉 /Applications/omni.app → 自动重开",
+    "点一下：pnpm dist:local → 换掉 /Applications/Switchback.app → 自动重开",
     "（会退出重开，正在跑的那一轮会断）",
   ]
     .filter((line) => line !== "")

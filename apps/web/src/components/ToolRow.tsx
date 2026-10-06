@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react"
-import type { ToolCallItem, ToolDetail } from "@omni/protocol"
+import type { ToolCallItem, ToolDetail } from "@switchback/protocol"
 
 /**
  * 一次工具调用，收成一行。

@@ -37,7 +37,7 @@ const log = { file: "x", write: () => undefined }
 const state = { home: "", cwd: "", kimi: "", grok: "" }
 
 const ask = async (cwd?: string): Promise<EnvConfig> =>
-  (await handlers.get("omni:envConfig")?.(undefined, cwd)) as EnvConfig
+  (await handlers.get("switchback:envConfig")?.(undefined, cwd)) as EnvConfig
 
 function write(path: string, text: string): string {
   mkdirSync(join(path, ".."), { recursive: true })
@@ -50,10 +50,10 @@ describe("环境配置", () => {
     handlers.clear()
     listeners.clear()
     opened.length = 0
-    state.home = mkdtempSync(join(tmpdir(), "omni-codex-"))
-    state.cwd = mkdtempSync(join(tmpdir(), "omni-cwd-"))
-    state.kimi = mkdtempSync(join(tmpdir(), "omni-kimi-"))
-    state.grok = mkdtempSync(join(tmpdir(), "omni-grok-"))
+    state.home = mkdtempSync(join(tmpdir(), "switchback-codex-"))
+    state.cwd = mkdtempSync(join(tmpdir(), "switchback-cwd-"))
+    state.kimi = mkdtempSync(join(tmpdir(), "switchback-kimi-"))
+    state.grok = mkdtempSync(join(tmpdir(), "switchback-grok-"))
     // 三家的家目录都指到临时目录：**不能读到跑测试这台机器上的真实配置**，
     // 否则这几条断言会跟着谁装了什么而变
     process.env["CODEX_HOME"] = state.home
@@ -176,7 +176,7 @@ describe("环境配置", () => {
     expect(grok.find((s) => s.path.endsWith("audit.json"))?.hooks).toEqual([
       { event: "Stop", command: "./audit.sh" },
     ])
-    // 这家不标信任：那份记录 omni 读不到，标了就是编
+    // 这家不标信任：那份记录 Switchback 读不到，标了就是编
     expect(grok.every((s) => s.hooks.every((h) => h.trust === undefined))).toBe(true)
   })
 
@@ -250,8 +250,8 @@ describe("环境配置", () => {
   it("打开配置文件只认这一页发出去的路径——渲染层拿不到一个能打开任意文件的口子", async () => {
     const env = await ask(state.cwd)
     const known = env.sources[0]?.path ?? ""
-    listeners.get("omni:openEnvFile")?.(undefined, known)
-    listeners.get("omni:openEnvFile")?.(undefined, "/etc/passwd")
+    listeners.get("switchback:openEnvFile")?.(undefined, known)
+    listeners.get("switchback:openEnvFile")?.(undefined, "/etc/passwd")
     expect(opened).toEqual([known])
   })
 })

@@ -34,7 +34,7 @@ export interface SettingsApi {
 
 export function useSettings(): SettingsApi {
   const [settings, setSettings] = useState<Settings>(FALLBACK)
-  const bridge = typeof window === "undefined" ? undefined : window.omni
+  const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   useEffect(() => {
     if (bridge === undefined) return

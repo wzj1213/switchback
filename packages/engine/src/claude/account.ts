@@ -1,4 +1,4 @@
-import type { EngineAccount } from "@omni/protocol"
+import type { EngineAccount } from "@switchback/protocol"
 
 interface NativeAccount {
   email?: unknown
@@ -8,7 +8,7 @@ interface NativeAccount {
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined
 
-/** Claude SDK `accountInfo()` 的公开身份字段 → omni 账号读数。 */
+/** Claude SDK `accountInfo()` 的公开身份字段 → Switchback 账号读数。 */
 export function claudeAccount(raw: unknown): EngineAccount | undefined {
   if (typeof raw !== "object" || raw === null) return undefined
   const account = raw as NativeAccount

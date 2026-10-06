@@ -16,7 +16,7 @@ const { worksiteInfo, parseStatus } = await import("./worksite.js")
  * 这种只有真跑才知道的事。
  */
 function repo(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omni-git-"))
+  const dir = mkdtempSync(join(tmpdir(), "switchback-git-"))
   execFileSync("git", ["init", "-q", "-b", "试验分支"], { cwd: dir })
   execFileSync("git", ["config", "user.email", "t@t"], { cwd: dir })
   execFileSync("git", ["config", "user.name", "t"], { cwd: dir })
@@ -57,7 +57,7 @@ describe("工作区状态", () => {
   })
 
   it("**不是 git 仓库不算错误**，只是没有分支可显示", async () => {
-    expect(await worksiteInfo(mkdtempSync(join(tmpdir(), "omni-plain-")))).toEqual({})
+    expect(await worksiteInfo(mkdtempSync(join(tmpdir(), "switchback-plain-")))).toEqual({})
   })
 
   it("目录不存在也不抛——界面不该因为一个失效的路径炸掉", async () => {
@@ -67,7 +67,7 @@ describe("工作区状态", () => {
   // 下面两条是 `rev-parse --abbrev-ref HEAD` 实测会说假话的两种情况。
   // 都真跑 git——mock 掉之后就只剩「我写的 if 分支还在」了
   it("**刚 git init、还没有提交，照样报得出分支**——它以前整枚消失，看起来像「这不是个仓库」", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omni-git-empty-"))
+    const dir = mkdtempSync(join(tmpdir(), "switchback-git-empty-"))
     execFileSync("git", ["init", "-q", "-b", "初始分支"], { cwd: dir })
     const info = await worksiteInfo(dir)
     expect(info.branch).toBe("初始分支")

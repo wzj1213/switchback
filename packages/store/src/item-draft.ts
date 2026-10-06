@@ -1,4 +1,4 @@
-import type { Item, ItemId, ThreadId } from "@omni/protocol"
+import type { Item, ItemId, ThreadId } from "@switchback/protocol"
 import type { ViewState } from "./state.js"
 
 interface ItemList {

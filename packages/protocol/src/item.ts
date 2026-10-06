@@ -70,7 +70,7 @@ export interface UserMessageItem extends ItemBase {
   attachments?: readonly string[]
   /**
    * 缺席才表示人亲手发送；存在时必须换形态，不能靠右冒充“你说的”。
-   * `handoff` 是换引擎后 omni 附在第一句话前的交接说明（用户开着「换引擎自动交接」时），
+   * `handoff` 是换引擎后 Switchback 附在第一句话前的交接说明（用户开着「换引擎自动交接」时），
    * 界面原样显示它到底发了什么；旧日志里同名的条目也按它读。structured origin 来自引擎公开事件。
    */
   origin?: UserMessageOrigin
@@ -157,7 +157,7 @@ export interface PlanItem extends ItemBase {
    * 目前实测只有 codex 会带（`turn/plan/updated` 的 `explanation`），
    * ACP 那一路和 claude 的待办工具都没有这个概念。
    *
-   * 各家能报的东西本来就不一样，omni 不替没报的那几家编一句。
+   * 各家能报的东西本来就不一样，Switchback 不替没报的那几家编一句。
    */
   explanation?: string
 }
@@ -180,7 +180,7 @@ export interface ApprovalItem extends ItemBase {
 
 export type NoticeLevel = "info" | "notice" | "suggestion" | "warning"
 
-/** 引擎自己发给人的纯文本提示；不是模型回答，也不是 omni 推断出的状态。 */
+/** 引擎自己发给人的纯文本提示；不是模型回答，也不是 Switchback 推断出的状态。 */
 export interface NoticeItem extends ItemBase {
   kind: "notice"
   message: string
@@ -194,7 +194,7 @@ export interface ErrorItem extends ItemBase {
   /** 可恢复的错误渲染成提示，不可恢复的渲染成终态。 */
   fatal: boolean
   /**
-   * 引擎自己给这条报错补的一句原因。**报了才有，omni 不替它编。**
+   * 引擎自己给这条报错补的一句原因。**报了才有，Switchback 不替它编。**
    *
    * 重试类的报错尤其需要它：`message` 那句只说「还在试」（codex 实测发的是
    * `Reconnecting... 1/5`），为什么断了全在这一句里。

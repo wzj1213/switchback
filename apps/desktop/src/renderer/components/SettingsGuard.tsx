@@ -11,12 +11,12 @@ const GUARD_NOTE =
   "看的是系统自己记的账（macOS 的 nettop，只算离开这台机器的流量，本机回环不算），" +
   "判的是引擎自己一分钟发了多少：模型对话一次请求通常几十到几百 KB，一百万 token 的上下文也就四 MB 上下；" +
   "而整个仓库连同 .git 往外打包是几百 MB。它当着你的面跑的命令（git push、npm publish）照样记账，但不拿来判——那是你让它做的事。" +
-  "omni 只看、只停，不改引擎的配置、不挡它的请求。"
+  "Switchback 只看、只停，不改引擎的配置、不挡它的请求。"
 
 const ZCODE_NOTE =
   "2026-09 有人逆向出来：ZCode 登录着就在后台把整个工作区（完整 .git 历史、LFS 缓存、reflog）打包加密，" +
   "传到阿里云 OSS；设置里的开关管不住它。3.14.0 删掉了这条链路。待传的包先落在它的快照目录里，" +
-  "给这个目录加上不可改标志，它就写不进新包。已经在里面的包是你的代码（加密的，钥匙在对方手里），omni 不删，要不要删你来定。"
+  "给这个目录加上不可改标志，它就写不进新包。已经在里面的包是你的代码（加密的，钥匙在对方手里），Switchback 不删，要不要删你来定。"
 
 function size(bytes: number): string {
   if (bytes < 1024 * 1024) return `${String(Math.round(bytes / 1024))} KB`
@@ -27,7 +27,7 @@ function size(bytes: number): string {
 function useGuard(): GuardReport | undefined {
   const [report, setReport] = useState<GuardReport>()
   useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.omni
+    const bridge = typeof window === "undefined" ? undefined : window.switchback
     if (bridge === undefined) return undefined
     const state = { live: true }
     const read = (): void => {
@@ -89,7 +89,7 @@ function ZcodeGroup({ zcode, lock, onLock, onReveal }: {
       {checkpoints.archives === 0 ? null : (
         <Field
           label="还没传出去的包"
-          hint={`${String(checkpoints.archives)} 个，共 ${size(checkpoints.bytes)}。里面是你的代码，omni 不删它们`}
+          hint={`${String(checkpoints.archives)} 个，共 ${size(checkpoints.bytes)}。里面是你的代码，Switchback 不删它们`}
         >
           <button type="button" className="iconbtn" aria-label="在访达中显示快照目录" data-tip="在访达中显示" onClick={() => { onReveal(checkpoints.path) }}>
             <RevealIcon />
@@ -113,7 +113,7 @@ export function GuardSection({ settings, onPatch, onReveal }: {
   const zcode = report?.zcode
   return (
     <>
-      <Group title="外发守卫" hint="omni 一直看着每个引擎进程往本机外面发了多少——不只是它说了什么。" more={GUARD_NOTE}>
+      <Group title="外发守卫" hint="Switchback 一直看着每个引擎进程往本机外面发了多少——不只是它说了什么。" more={GUARD_NOTE}>
         <Field label="批量外发时停掉" hint="引擎自己一分钟内往外发了超过 64 MB（不算它跑的命令）就停掉它，并告诉你它当时连着谁。关掉就只提醒">
           <Toggle label="批量外发时停掉" on={settings.egressStop} onChange={(egressStop) => { onPatch({ egressStop }) }} />
         </Field>

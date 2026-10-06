@@ -1,4 +1,4 @@
-import type { EngineNotificationPriority, Event, ThreadId } from "@omni/protocol"
+import type { EngineNotificationPriority, Event, ThreadId } from "@switchback/protocol"
 
 interface RawNotification {
   key?: unknown

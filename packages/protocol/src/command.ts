@@ -5,10 +5,10 @@ import type { Trust } from "./thread.js"
 /** 渲染层 → 宿主的反向指令。宿主是唯一执行者，渲染层不直接碰引擎进程。 */
 export type Command =
   /**
-   * 把**引擎自己存的**一条会话接过来，在 omni 里接着聊。
+   * 把**引擎自己存的**一条会话接过来，在 Switchback 里接着聊。
    *
-   * 和 `thread.resume` 的区别：那条是「omni 建过、记录在我这儿」的会话重新接上引擎；
-   * 这条是「omni 从来不知道它存在」的会话——你在终端里、在别的界面里跑的。
+   * 和 `thread.resume` 的区别：那条是「Switchback 建过、记录在我这儿」的会话重新接上引擎；
+   * 这条是「Switchback 从来不知道它存在」的会话——你在终端里、在别的界面里跑的。
    * 所以工作区、标题都得由调用方从引擎的列表里带过来。
    */
   /**
@@ -40,7 +40,7 @@ export type Command =
        * 那期间会话已经能发消息了，抢在里面发出去的第一句会跑在默认模型上——
        * 而用户明明在新建之前就把模型挑好了。
        *
-       * 引擎不认这个模型的话由引擎报错，omni 不预先过滤（见 `main/settings.ts`
+       * 引擎不认这个模型的话由引擎报错，Switchback 不预先过滤（见 `main/settings.ts`
        * 里 `lastUsed` 那段：白名单在引擎那边，抄一份必然过期）。
        */
       model?: string
@@ -99,7 +99,7 @@ export type Command =
    * 压缩上下文：让引擎把前面的对话总结掉，腾出窗口继续。
    *
    * **只有引擎自己能做**——它才知道哪些能扔、总结成什么样喂回去不会失真。
-   * omni 只负责给一个入口。
+   * Switchback 只负责给一个入口。
    */
   | { type: "thread.compact"; threadId: ThreadId }
   /**
@@ -108,7 +108,7 @@ export type Command =
    * ## 为什么是「新开一个」而不是真的把历史砍掉
    *
    * 因为**引擎不会忘**。会话的真实状态在引擎那边（codex 有 rollout 文件、
-   * Claude 有 session），omni 删掉自己这边的记录改变不了它——
+   * Claude 有 session），Switchback 删掉自己这边的记录改变不了它——
    * 那样只会造出一个「界面上看不见、模型却还记得」的分裂状态，
    * 比不给这个功能糟得多。
    *

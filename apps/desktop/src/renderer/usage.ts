@@ -1,4 +1,4 @@
-import type { Usage } from "@omni/protocol"
+import type { Usage } from "@switchback/protocol"
 
 /** 超过这个占比开始提醒；再高就是危险区。 */
 const WARN_AT = 0.7

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import {
   closeText,
   createUpdateState,
@@ -241,7 +241,7 @@ describe("计划与用量", () => {
     expect(s.events.at(-1)).toMatchObject({ type: "engine.status", status: "ready" })
   })
 
-  it("**引擎自己切档要落回驱动的状态**——不落回去，那个字段记的只是 omni 一厢情愿设过什么", () => {
+  it("**引擎自己切档要落回驱动的状态**——不落回去，那个字段记的只是 Switchback 一厢情愿设过什么", () => {
     const s = setup()
     const seen: string[] = []
     handleUpdate({ ...s.ctx, onMode: (id) => seen.push(id) }, s.state, {
@@ -294,7 +294,7 @@ describe("引擎自己认的斜杠命令", () => {
   const update = (commands: unknown): AcpUpdate =>
     ({ sessionUpdate: "available_commands_update", availableCommands: commands }) as AcpUpdate
 
-  it("翻成 omni 的形状，参数提示从 input.hint 里取", () => {
+  it("翻成 Switchback 的形状，参数提示从 input.hint 里取", () => {
     const s = setup()
     handleUpdate(
       s.ctx,

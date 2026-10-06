@@ -3,7 +3,7 @@ import type {
   Command,
   PendingQuestion,
   QuestionResponse,
-} from "@omni/protocol"
+} from "@switchback/protocol"
 import {
   draftOf,
   freshDrafts,

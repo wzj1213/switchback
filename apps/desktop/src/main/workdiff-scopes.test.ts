@@ -39,7 +39,7 @@ function fixture(base: string): string {
 
 describe("Git 审核范围", () => {
   it("每个选择只返回自己声明的 Git 范围", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-review-scopes-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-review-scopes-"))
     try {
       const repo = fixture(base)
       const cases: readonly [ReviewScope, readonly string[]][] = [
@@ -59,7 +59,7 @@ describe("Git 审核范围", () => {
   })
 
   it("补丁与清单使用同一个范围", async () => {
-    const base = mkdtempSync(join(tmpdir(), "omni-review-scope-patch-"))
+    const base = mkdtempSync(join(tmpdir(), "switchback-review-scope-patch-"))
     try {
       const repo = fixture(base)
       const cases: readonly [ReviewScope, string, string][] = [

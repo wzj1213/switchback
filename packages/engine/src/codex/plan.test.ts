@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import { handleNotification, type NotifyContext } from "./notify.js"
 import type { WireItem } from "./wire.js"
 

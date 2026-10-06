@@ -12,8 +12,8 @@ import { readBuildInfo } from "./build-info.js"
  *
  * ## 为什么需要这个东西
  *
- * omni 是从这台机器上的 checkout 打出来的（`pnpm dist`），装在
- * `/Applications/omni.app`。于是每改一行代码，「让它生效」意味着：切到终端、
+ * Switchback 是从这台机器上的 checkout 打出来的（`pnpm dist`），装在
+ * `/Applications/Switchback.app`。于是每改一行代码，「让它生效」意味着：切到终端、
  * 跑一遍打包、等 208 MB 的 DMG、挂载、把 .app 拖进 /Applications、覆盖、重开。
  * 一天十几次——**这段路本身就劝退了「改一点就试一下」这种最该鼓励的用法**。
  *
@@ -22,7 +22,7 @@ import { readBuildInfo } from "./build-info.js"
  *
  * ## 边界：只在「这台机器上有源码」时存在
  *
- * 源码路径是打包时烤进去的（`scripts/dist.mjs` 的临时元数据写 `omni.repo`）。
+ * 源码路径是打包时烤进去的（`scripts/dist.mjs` 的临时元数据写 `switchback.repo`）。
  * 把这个包拷到别人机器上，那个路径不存在，入口整个不出现——**不是灰掉，是不画**。
  * 一个在别人机器上永远点不动的按钮只是噪声。
  *
@@ -53,7 +53,7 @@ export interface SelfUpdateRun {
   output: string
 }
 
-/** 应用包的根（`/Applications/omni.app`）。不是从 .app 里跑的就返回 undefined。 */
+/** 应用包的根（`/Applications/Switchback.app`）。不是从 .app 里跑的就返回 undefined。 */
 export function bundleOf(execPath: string): string | undefined {
   const at = execPath.indexOf(".app/Contents/MacOS/")
   return at === -1 ? undefined : execPath.slice(0, at + ".app".length)
@@ -175,7 +175,7 @@ async function runUpdate(log: Logger): Promise<SelfUpdateRun> {
     log.write("error", "update", `构建失败：${built.output.slice(-400)}`)
     return { ok: false, output: built.output }
   }
-  const fresh = join(repo, "release/mac-arm64/omni.app")
+  const fresh = join(repo, "release/mac-arm64/Switchback.app")
   if (!existsSync(fresh)) {
     return { ok: false, output: `${built.output}\n\n构建跑完了，但没找到 ${fresh}` }
   }
@@ -185,7 +185,7 @@ async function runUpdate(log: Logger): Promise<SelfUpdateRun> {
 
 /** 把换包这件事交给一个独立进程，然后正常退出。 */
 function handoff(log: Logger, from: string, to: string): void {
-  const dir = mkdtempSync(join(tmpdir(), "omni-update-"))
+  const dir = mkdtempSync(join(tmpdir(), "switchback-update-"))
   const file = join(dir, "swap.sh")
   const logFile = join(app.getPath("userData"), "自更新.log")
   writeFileSync(file, swapScript({ pid: process.pid, from, to, log: logFile }), { mode: 0o755 })
@@ -201,13 +201,13 @@ function handoff(log: Logger, from: string, to: string): void {
 }
 
 export function installSelfUpdateChannel(log: Logger): void {
-  ipcMain.handle("omni:selfUpdateStatus", async (): Promise<SelfUpdate> => {
+  ipcMain.handle("switchback:selfUpdateStatus", async (): Promise<SelfUpdate> => {
     const state = await statusOf()
     if (!state.can && state.why !== undefined)
       log.write("info", "update", `自更新不可用：${state.why}`)
     return state
   })
-  ipcMain.handle("omni:selfUpdate", () => runUpdate(log))
+  ipcMain.handle("switchback:selfUpdate", () => runUpdate(log))
 }
 
 /** 跑一条命令，把输出（含 stderr）原样带回来。**失败不抛**——调用方要那段原文。 */

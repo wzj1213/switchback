@@ -1,4 +1,4 @@
-import type { Event, ThreadId } from "@omni/protocol"
+import type { Event, ThreadId } from "@switchback/protocol"
 
 interface RawPluginInstall {
   status?: unknown

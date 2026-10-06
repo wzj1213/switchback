@@ -10,7 +10,7 @@ import type { ContentHit, SearchOut } from "../shared/search.js"
  *
  * 侧栏那个筛选框只搜三样：标题、第一条消息、目录（见 `renderer/filter.ts`）。
  * 而人记得住的往往是中间某一句——「它说要改成流式的那次」「我让它别再用 any 那回」。
- * 那句话就在盘上，`~/Library/Application Support/omni/threads/*.jsonl` 一行一条，
+ * 那句话就在盘上，`~/Library/Application Support/Switchback/threads/*.jsonl` 一行一条，
  * 但**没有任何入口能读到它**：会话不在文件管理器里、不在浏览器历史里，找不到等于没有。
  *
  * ## 只搜「说过的话」，不搜工具调用
@@ -104,7 +104,7 @@ function searchItemOf(line: string): SearchItem | undefined {
  * 扫一个会话文件。
  *
  * **入选的条件是「每个词都出现过」，但不必在同一条消息里**——
- * 「omni 流式」找的是「在 omni 那条会话里聊过流式」，那两个词多半分散在不同轮次。
+ * 「Switchback 流式」找的是「在 Switchback 那条会话里聊过流式」，那两个词多半分散在不同轮次。
  * 按「同一条消息里全中」筛的话，多词查询几乎永远是空的。
  */
 export function scanLines(lines: readonly string[], terms: readonly string[]): Omit<ContentHit, "threadId"> | undefined {
@@ -178,7 +178,7 @@ export async function searchThreads(dir: string, query: string): Promise<SearchO
 
 export function installSearchChannel(): void {
   const dir = join(app.getPath("userData"), "threads")
-  ipcMain.handle("omni:searchThreads", async (_e, query: string) =>
+  ipcMain.handle("switchback:searchThreads", async (_e, query: string) =>
     typeof query === "string" ? searchThreads(dir, query) : { hits: [], skipped: 0 },
   )
 }

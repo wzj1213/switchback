@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
-import type { Item, PlanStep } from "@omni/protocol"
-import { openPlan, stepProgressOf } from "@omni/store"
+import type { Item, PlanStep } from "@switchback/protocol"
+import { openPlan, stepProgressOf } from "@switchback/store"
 import { PlanMark } from "./PlanMark.js"
 import { PlanSteps } from "./PlanSteps.js"
 
@@ -14,7 +14,7 @@ function currentStep(steps: readonly PlanStep[]): PlanStep | undefined {
 /**
  * 胶囊上的进度：有当前序号就「3 / 7」，没有就「· 7 步」。
  * `stepProgressOf` 拿不到当前序号时返回的是「共 N 步」——
- * 胶囊认这个分支，不硬凑一个假的当前序号：**引擎没报的东西，omni 不替它编。**
+ * 胶囊认这个分支，不硬凑一个假的当前序号：**引擎没报的东西，Switchback 不替它编。**
  */
 function pillLabel(steps: readonly PlanStep[]): string {
   const progress = stepProgressOf(steps)

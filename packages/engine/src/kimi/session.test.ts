@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Event } from "@omni/protocol"
+import type { Event } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import type { KimiApi } from "./http.js"
 import type { KimiLease } from "./server.js"

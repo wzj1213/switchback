@@ -14,7 +14,7 @@ import { Group } from "./SettingsBits.js"
  * 前两样原来长在 `EngineNative` 里，也就是长在**每一家的 tab 里面**——
  * 于是同一件事印了五份，而五份里没有一份看得到全貌。
  *
- * 判据是一句话：**这一项改的是「这一家」，还是「omni 认得哪几家」？**
+ * 判据是一句话：**这一项改的是「这一家」，还是「Switchback 认得哪几家」？**
  * 前者留在引擎页（接入开关、新会话默认、模型/思考档、它自己的原生入口），
  * 后者到这儿来。
  *
@@ -46,7 +46,7 @@ export function EngineShared({
       <Group
         title="安装与版本"
         hint="内置五家一次列全。只在你点下按钮后才会运行界面上写出的那条原生命令。"
-        more="还没装的那几家给出装它要跑的命令——omni 确实知道来源的才给，不知道的就照实说不知道。第三方 ACP 引擎在下面几组。"
+        more="还没装的那几家给出装它要跑的命令——Switchback 确实知道来源的才给，不知道的就照实说不知道。第三方 ACP 引擎在下面几组。"
       >
         <EngineVersions onCopy={onCopy} />
       </Group>
@@ -72,8 +72,8 @@ export function EngineShared({
       </Group>
       <Group
         title="手动接入"
-        hint="注册表里没有的：指一个可执行文件，omni 发一次 ACP 的 initialize 试试，答得上来才让你接。"
-        more="命令和参数由你给（各家进 ACP 模式的写法不同，看它自己的文档），omni 不猜。"
+        hint="注册表里没有的：指一个可执行文件，Switchback 发一次 ACP 的 initialize 试试，答得上来才让你接。"
+        more="命令和参数由你给（各家进 ACP 模式的写法不同，看它自己的文档），Switchback 不猜。"
       >
         <AcpConnect onAdded={acp.changed} />
       </Group>

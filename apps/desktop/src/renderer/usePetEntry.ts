@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { EngineId } from "@omni/protocol"
+import type { EngineId } from "@switchback/protocol"
 import { ENTRY_MS, entryOf, type EntryKind } from "./pet-entry.js"
 import type { PetLook } from "./pets.js"
 

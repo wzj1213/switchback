@@ -1,11 +1,11 @@
-import type { EngineThread } from "@omni/protocol"
+import type { EngineThread } from "@switchback/protocol"
 import { FOREIGN_MAX } from "../sidebar.js"
 import { SectionHead } from "./SidebarSections.js"
 import { SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { ForkIcon } from "./icons.js"
 
 /**
- * 「codex 历史」段里的一行：**引擎自己存着、omni 从来不知道的那些会话**。
+ * 「codex 历史」段里的一行：**引擎自己存着、Switchback 从来不知道的那些会话**。
  *
  * ## 为什么长得和普通会话行不一样
  *
@@ -14,7 +14,7 @@ import { ForkIcon } from "./icons.js"
  *
  * 长得一样的话，用户会按普通会话的预期去点，然后看到一片空白，
  * 以为内容丢了。所以图标、副标题（哪个项目 + 什么时候）都不一样，
- * 而且不给右键菜单——改名、删除这些对一条不属于 omni 的会话没有意义。
+ * 而且不给右键菜单——改名、删除这些对一条不属于 Switchback 的会话没有意义。
  */
 export function ForeignRow({
   item,
@@ -28,7 +28,7 @@ export function ForeignRow({
       <button
         type="button"
         className="row__main"
-        title={`${item.cwd}${item.profile === undefined ? "" : `\nDSH profile：${item.profile}`}\n在 omni 里接着聊`}
+        title={`${item.cwd}${item.profile === undefined ? "" : `\nDSH profile：${item.profile}`}\n在 Switchback 里接着聊`}
         onClick={() => {
           onAdopt(item)
         }}
@@ -64,7 +64,7 @@ export function whenOf(at: number, now = Date.now()): string {
 }
 
 /**
- * 「codex 历史」段：**引擎自己存着、omni 从来不知道的那些会话**。
+ * 「codex 历史」段：**引擎自己存着、Switchback 从来不知道的那些会话**。
  *
  * 单独成段（而不是混进项目树）是因为它们能做的事完全不同：
  * 普通会话点开就看见已落盘内容，这些点开是**把原生会话接过来**。
@@ -93,7 +93,7 @@ export function ForeignSection({
           // **说清楚为什么空**：历史是握手时问出来的，没开过这家就问不到。
           // 只写「暂无」的话，人会以为自己在别处跑的会话没被认出来
           <p className="sidebar__empty">
-            在 omni 里开一个 {engine} 会话之后，你在终端或别处跑过的会列在这里。
+            在 Switchback 里开一个 {engine} 会话之后，你在终端或别处跑过的会列在这里。
           </p>
         ) : (
         <>

@@ -1,6 +1,6 @@
-import type { Command, RememberScope, ThreadId } from "@omni/protocol"
-import type { ApprovalAnswer, ApprovalAsk, InteractionWait } from "@omni/engine"
-import type { Rule } from "@omni/approval"
+import type { Command, RememberScope, ThreadId } from "@switchback/protocol"
+import type { ApprovalAnswer, ApprovalAsk, InteractionWait } from "@switchback/engine"
+import type { Rule } from "@switchback/approval"
 import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
 
 /**
@@ -80,7 +80,7 @@ export function remember(ctx: Ctx, entry: Live, rule: Rule, scope: RememberScope
 }
 
 /**
- * 同一条 omni 对话换原生进程时，内存里的审批规则继续生效。
+ * 同一条 Switchback 对话换原生进程时，内存里的审批规则继续生效。
  *
  * 新进程已经从磁盘读了最新 project 规则；旧 Live 里还可能有尚未写完的 project 规则，
  * 以及只属于“此对话”的 session 规则。按 id 合并并让旧 Live 的当前值覆盖，

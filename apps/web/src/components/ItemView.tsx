@@ -1,5 +1,5 @@
 import { memo, useState } from "react"
-import type { Command, Item, ToolCallItem, UserMessageItem, UserMessageOrigin } from "@omni/protocol"
+import type { Command, Item, ToolCallItem, UserMessageItem, UserMessageOrigin } from "@switchback/protocol"
 import { Markdown } from "./Markdown.js"
 import { Approval } from "./Approval.js"
 import { ToolRow } from "./ToolRow.js"

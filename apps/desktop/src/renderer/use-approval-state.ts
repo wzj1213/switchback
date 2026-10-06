@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react"
-import type { Command, Item } from "@omni/protocol"
+import type { Command, Item } from "@switchback/protocol"
 import type { ResolveApproval } from "./components/Approval.js"
 
 function latestPending(items: readonly Item[], turnId: string | undefined): string | undefined {

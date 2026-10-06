@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { QuestionPrompt, QuestionResponse } from "@omni/protocol"
+import type { QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { KimiApiError, type KimiApi } from "./http.js"
 import { KimiInteractions } from "./interactions.js"

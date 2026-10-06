@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import type { Thread } from "@omni/protocol"
-import type { itemsOf, lanesOf } from "@omni/store"
+import type { Thread } from "@switchback/protocol"
+import type { itemsOf, lanesOf } from "@switchback/store"
 import type { ComposerDrafts } from "../composer-drafts.js"
 import type { ComposerFileReference } from "../file-references.js"
 import { fileReference, newFileReferences } from "../file-references.js"
