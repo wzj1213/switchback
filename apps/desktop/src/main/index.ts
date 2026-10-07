@@ -42,7 +42,7 @@ import { installFilePreviewWatch } from "./file-preview-watch.js"
 import { createTouchedFiles } from "./touched.js"
 import { createAttachmentFiles } from "./attachment-files.js"
 import { createWorksiteSearch } from "./worksite-search.js"
-import { adoptLegacyDataDir } from "./legacy-data-dir.js"
+import { adoptLegacyDataDir, legacyNote } from "./legacy-data-dir.js"
 
 /**
  * Electron 主进程。
@@ -56,9 +56,11 @@ const isDev = process.env["ELECTRON_RENDERER_URL"] !== undefined
 const buildInfo = readBuildInfo(app.getAppPath())
 
 // **必须是第一个碰数据目录的**：改名前的旧目录要在这之前搬过来，见 legacy-data-dir.ts
-adoptLegacyDataDir()
+const legacy = adoptLegacyDataDir()
 
 const log = createLogger(join(app.getPath("userData"), "logs"))
+const legacyLine = legacyNote(legacy)
+if (legacyLine !== undefined) log.write(legacy.error === undefined ? "info" : "error", "app", legacyLine)
 
 // **必须在 whenReady 之前**：崩溃处理器要赶在渲染进程被创建之前装上，
 // 否则那些进程崩了不会留下任何转储

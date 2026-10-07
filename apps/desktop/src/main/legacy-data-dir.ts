@@ -1,5 +1,5 @@
-import { readdirSync, readlinkSync, renameSync, rmdirSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, readFileSync, readdirSync, readlinkSync, renameSync, rmdirSync, writeFileSync } from "node:fs"
+import { join, sep } from "node:path"
 import { app, dialog } from "electron"
 
 /**
@@ -22,6 +22,18 @@ import { app, dialog } from "electron"
 export type LegacyMove = "none" | "move" | "blocked"
 
 export const LEGACY_NAME = "omni"
+
+/** 附件路径改写做过一次就留这个标记，以后启动不再扫会话记录。 */
+const REHOMED = ".legacy-attachment-paths"
+
+/** 这一步做了什么。日志要等 `createLogger` 之后才有，由 index.ts 接着记。 */
+export interface LegacyReport {
+  moved: boolean
+  /** 改写了几行会话记录里的附件路径。 */
+  rewritten: number
+  /** 改写失败的原因。不致命：没留标记，下次启动再试。 */
+  error?: string
+}
 
 export interface LegacyFacts {
   /** 当前的数据目录（`app.getPath("userData")`）。 */
@@ -80,8 +92,94 @@ function stop(title: string, detail: string): never {
   process.exit(1)
 }
 
+/**
+ * 一行会话记录里，指着旧附件目录的附件路径换成新目录；没有要换的返回 undefined。
+ *
+ * **只动附件字段**（`attachments` / `draftAttachments` / `queuedAttachments`）：
+ * 这几处是 Switchback 自己管的文件，搬了家就该跟着改。引擎跑命令时输出里顺带出现的
+ * 旧路径是历史原文，不改。
+ *
+ * 不改的代价是实打实的：会话里的图显示不出来；更糟的是孤儿清理按路径认引用，
+ * 对不上就把七天前的图全当孤儿删了——改名后第一次启动就这么删掉过一批。
+ */
+export function rewriteLine(line: string, from: string, to: string): string | undefined {
+  if (!line.includes(from)) return undefined
+  let event: unknown
+  try {
+    event = JSON.parse(line)
+  } catch {
+    return undefined
+  }
+  if (typeof event !== "object" || event === null) return undefined
+  const record = event as Record<string, unknown>
+  const fix = (value: unknown): unknown =>
+    typeof value === "string" && value.startsWith(from) ? to + value.slice(from.length) : value
+  const changed = [
+    patch(record["item"], "attachments", (list) => list.map(fix)),
+    patch(record["thread"], "draftAttachments", (list) => list.map(fix)),
+    patch(record["thread"], "queuedAttachments", (list) => list.map((inner) => (Array.isArray(inner) ? inner.map(fix) : inner))),
+  ].some(Boolean)
+  return changed ? JSON.stringify(event) : undefined
+}
+
+function patch(owner: unknown, key: string, map: (list: unknown[]) => unknown[]): boolean {
+  if (typeof owner !== "object" || owner === null) return false
+  const record = owner as Record<string, unknown>
+  const list = record[key]
+  if (!Array.isArray(list)) return false
+  const next = map(list)
+  if (JSON.stringify(next) === JSON.stringify(list)) return false
+  record[key] = next
+  return true
+}
+
+/** 把一个目录里的 `*.jsonl` 逐行改写，返回改了几行。先写临时文件再换名，半截写坏不了原文件。 */
+export function rewriteJournals(dir: string, from: string, to: string): number {
+  let total = 0
+  for (const name of listDir(dir) ?? []) {
+    if (!name.endsWith(".jsonl")) continue
+    const file = join(dir, name)
+    const text = readFileSync(file, "utf8")
+    if (!text.includes(from)) continue
+    let count = 0
+    const lines = text.split("\n").map((line) => {
+      const fixed = rewriteLine(line, from, to)
+      if (fixed !== undefined) count += 1
+      return fixed ?? line
+    })
+    if (count === 0) continue
+    writeFileSync(`${file}.tmp`, lines.join("\n"))
+    renameSync(`${file}.tmp`, file)
+    total += count
+  }
+  return total
+}
+
+function rehome(current: string, legacy: string): Pick<LegacyReport, "rewritten" | "error"> {
+  const marker = join(current, REHOMED)
+  if (existsSync(marker)) return { rewritten: 0 }
+  try {
+    const rewritten = rewriteJournals(join(current, "threads"), join(legacy, "attachments") + sep, join(current, "attachments") + sep)
+    writeFileSync(marker, "")
+    return { rewritten }
+  } catch (error) {
+    return { rewritten: 0, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+function move(legacy: string, current: string): void {
+  try {
+    // Electron 先建好的那个空目录要先拿掉，rename 才不会撞上它
+    if (listDir(current) !== undefined) rmdirSync(current)
+    renameSync(legacy, current)
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error)
+    stop("旧数据没搬过来", `想把 ${legacy} 挪到 ${current}，失败了：${why}\n两个目录都没动，可以手动挪过去再打开。`)
+  }
+}
+
 /** 在主进程最开头调一次，早于任何 `app.getPath("userData")` 的使用者。 */
-export function adoptLegacyDataDir(): void {
+export function adoptLegacyDataDir(): LegacyReport {
   const appData = app.getPath("appData")
   const legacy = join(appData, LEGACY_NAME)
   const facts: LegacyFacts = {
@@ -95,13 +193,15 @@ export function adoptLegacyDataDir(): void {
   if (plan === "blocked") {
     stop("请先退出 omni", "Switchback 就是改了名的 omni。旧的那个还开着——退出它之后再打开 Switchback，会话和设置会自动搬过来。")
   }
-  if (plan !== "move") return
-  try {
-    // Electron 先建好的那个空目录要先拿掉，rename 才不会撞上它
-    if (listDir(facts.current) !== undefined) rmdirSync(facts.current)
-    renameSync(legacy, facts.current)
-  } catch (error) {
-    const why = error instanceof Error ? error.message : String(error)
-    stop("旧数据没搬过来", `想把 ${legacy} 挪到 ${facts.current}，失败了：${why}\n两个目录都没动，可以手动挪过去再打开。`)
-  }
+  if (plan === "move") move(legacy, facts.current)
+  // 数据目录被指到别处（冒烟测试）时那里的记录和旧目录无关，不碰
+  if (facts.current !== facts.defaultDir) return { moved: false, rewritten: 0 }
+  return { moved: plan === "move", ...rehome(facts.current, legacy) }
+}
+
+/** 给日志的一句话；什么都没发生时不写。 */
+export function legacyNote(r: LegacyReport): string | undefined {
+  if (r.error !== undefined) return `会话记录里的旧附件路径没改成：${r.error}（下次启动再试）`
+  if (!r.moved && r.rewritten === 0) return undefined
+  return `${r.moved ? "旧数据目录已搬过来；" : ""}改写了 ${String(r.rewritten)} 行会话记录里的附件路径`
 }

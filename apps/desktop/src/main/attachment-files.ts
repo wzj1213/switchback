@@ -1,5 +1,5 @@
 import { readdir, rm, stat } from "node:fs/promises"
-import { dirname, isAbsolute, join, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import type { Event, ThreadId, TurnId } from "@switchback/protocol"
 
 export interface AttachmentFiles {
@@ -72,10 +72,16 @@ function allow(state: FileState, paths: readonly string[]): void {
   }
 }
 
+/**
+ * 删之前先认引用。**除了整条路径，还按文件名认**：附件名带时间戳和随机串，不会撞名，
+ * 而整条路径会因为数据目录挪过地方而对不上——改名搬家后第一次启动，会话里记的还是
+ * 旧目录的路径，七天前的图就全被当成孤儿删了。按文件名认，目录怎么挪都删不到还在用的图。
+ */
 async function erase(state: FileState, paths: readonly string[]): Promise<number> {
+  const names = new Set([...state.references.keys()].map((path) => basename(path)))
   const targets = [...new Set(paths.flatMap((path) => {
     const target = managed(state, path)
-    return target === undefined || state.references.has(target) ? [] : [target]
+    return target === undefined || state.references.has(target) || names.has(basename(target)) ? [] : [target]
   }))]
   const removed = await Promise.all(targets.map(async (path) => {
     return rm(path, { force: true }).then(() => 1, () => 0)

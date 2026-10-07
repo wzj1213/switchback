@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process"
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
 import { describe, expect, it } from "vitest"
-import { bundleOf, swapScript } from "./selfupdate.js"
+import { bundleOf, freshBundleOf, swapScript } from "./selfupdate.js"
 
 describe("认出自己装在哪儿", () => {
   it("从 .app 里跑的，取到包根", () => {
@@ -80,3 +80,26 @@ function bundle(dir: string, name: string, who: string): string {
   writeFileSync(join(path, "Contents", "who"), who)
   return path
 }
+
+describe("新包叫什么：按仓库里当前的产品名找", () => {
+  const cases: readonly [string, string | undefined, string][] = [
+    ["读到 productName 就用它", JSON.stringify({ productName: "Switchback" }), "Switchback.app"],
+    ["改了名也跟着走（旧版本照样找得到新包）", JSON.stringify({ productName: "Renamed" }), "Renamed.app"],
+    ["读不到就按默认名", undefined, "Switchback.app"],
+    ["不是 JSON 也按默认名", "{", "Switchback.app"],
+  ]
+  for (const [name, pkg, expected] of cases) {
+    it(name, () => {
+      const repo = mkdtempSync(join(tmpdir(), "selfupdate-repo-"))
+      try {
+        if (pkg !== undefined) {
+          mkdirSync(join(repo, "apps/desktop"), { recursive: true })
+          writeFileSync(join(repo, "apps/desktop/package.json"), pkg)
+        }
+        expect(freshBundleOf(repo)).toBe(join(repo, "release/mac-arm64", expected))
+      } finally {
+        rmSync(repo, { recursive: true, force: true })
+      }
+    })
+  }
+})

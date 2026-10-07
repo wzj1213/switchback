@@ -119,3 +119,20 @@ describe("粘贴图片文件所有权", () => {
     expect(thumbnailSize(input)).toBe(expected)
   })
 })
+
+describe("数据目录挪过地方", () => {
+  it("会话里记的还是旧目录的路径：七天前的图按文件名认出来，不当孤儿删", async () => {
+    const { root, dir } = await fixture()
+    const kept = join(dir, "20260825-105200-kept.png")
+    const orphan = join(dir, "orphan.png")
+    await Promise.all([kept, orphan].map((path) => writeFile(path, "png")))
+    const past = new Date(Date.now() - 8 * 86_400_000)
+    await Promise.all([kept, orphan].map((path) => utimes(path, past, past)))
+
+    const files = createAttachmentFiles(dir)
+    files.noteHistory("th-old", [user("tn-old", [join(root, "omni", "attachments", "20260825-105200-kept.png")])])
+    expect(await files.pruneOnce(Date.now())).toBe(1)
+    expect(await exists(kept)).toBe(true)
+    expect(await exists(orphan)).toBe(false)
+  })
+})

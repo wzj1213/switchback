@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process"
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { app, ipcMain } from "electron"
@@ -175,12 +175,29 @@ async function runUpdate(log: Logger): Promise<SelfUpdateRun> {
     log.write("error", "update", `构建失败：${built.output.slice(-400)}`)
     return { ok: false, output: built.output }
   }
-  const fresh = join(repo, "release/mac-arm64/Switchback.app")
+  const fresh = freshBundleOf(repo)
   if (!existsSync(fresh)) {
+    log.write("error", "update", `构建跑完了，但没找到 ${fresh}`)
     return { ok: false, output: `${built.output}\n\n构建跑完了，但没找到 ${fresh}` }
   }
   handoff(log, fresh, bundle)
   return { ok: true, output: built.output }
+}
+
+/**
+ * 刚构建出来的那个包在哪。**包名读仓库里当前的 `productName`**，不用这个进程编译进去的那个：
+ * 产品改过一次名（omni → Switchback），旧版本按旧名去找，构建明明成功了却一直报「没找到」，
+ * 按钮就卡在「构建失败，再试一次」。读仓库里的，下次再改名也找得到。
+ */
+export function freshBundleOf(repo: string): string {
+  let name = "Switchback"
+  try {
+    const pkg = JSON.parse(readFileSync(join(repo, "apps/desktop/package.json"), "utf8")) as { productName?: unknown }
+    if (typeof pkg.productName === "string" && pkg.productName !== "") name = pkg.productName
+  } catch {
+    // 读不到就按默认名找；真找不到，下面会把路径写进日志
+  }
+  return join(repo, "release/mac-arm64", `${name}.app`)
 }
 
 /** 把换包这件事交给一个独立进程，然后正常退出。 */
