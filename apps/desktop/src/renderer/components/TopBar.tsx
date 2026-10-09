@@ -164,7 +164,9 @@ export function TopBar({
           setTimeline(false)
         }}
       />
-      {thread.detached === true ? <span className="badge badge--muted">历史记录</span> : null}
+      {thread.detached === true ? (
+        <span className="badge badge--muted" title="背后现在没有引擎进程；直接发话会先把它接回来">历史记录</span>
+      ) : null}
       {handedOff ? (
         <span className="badge" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
           接力 {thread.engineHistory.length} 手

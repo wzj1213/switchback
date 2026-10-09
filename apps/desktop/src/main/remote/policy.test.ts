@@ -89,7 +89,8 @@ describe("其余命令原样通过", () => {
   ]
   for (const command of others) {
     it(command.type, () => {
-      expect(clamp(command, "read-only")).toEqual({ command })
+      // 目标会话本身就在上限之内（发话要查得到档位，见 `ON_HISTORY`）
+      expect(clamp(command, "read-only", () => "read-only")).toEqual({ command })
     })
   }
 })
@@ -179,9 +180,32 @@ describe("上限管得住已经开着的会话", () => {
     expect(clamp(prompt, "full", () => "auto-edit").command).toEqual(prompt)
   })
 
-  it("查不到会话时不拦——宿主自己会拒一条指向不存在会话的命令", () => {
-    const prompt = { type: "thread.prompt", threadId: "没有这条", text: "hi" } as const
-    expect(clamp(prompt, "read-only", () => undefined).command).toEqual(prompt)
+  it("查不到会话时，宿主只认活会话的那几条不拦——它自己会拒", () => {
+    const aside = { type: "thread.sideQuestion", threadId: "没有这条", text: "hi" } as const
+    expect(clamp(aside, "read-only", () => undefined).command).toEqual(aside)
+  })
+
+  it("**查不到档位就不许发话、分叉**：宿主会按记录照做，可能开在完全档", () => {
+    for (const command of [
+      { type: "thread.prompt", threadId: "历史", text: "hi" },
+      { type: "thread.switchNow", threadId: "历史" },
+      { type: "thread.fork", threadId: "历史", to: "claude" },
+      { type: "thread.rewind", threadId: "历史", turnId: "u" },
+    ] as const) {
+      const verdict = clamp(command, "auto-edit", () => undefined)
+      expect(verdict.command).toBeUndefined()
+      expect(verdict.note).toContain("接回来")
+    }
+  })
+
+  it("上限就是完全档时没有什么可高过的，查不到也放行", () => {
+    const prompt = { type: "thread.prompt", threadId: "历史", text: "hi" } as const
+    expect(clamp(prompt, "full", () => undefined).command).toEqual(prompt)
+  })
+
+  it("网页端的「接回来」照旧放行（它先降档再接）——查不到档位的缺口是旧的，见 README", () => {
+    const resume = { type: "thread.resume", threadId: "历史" } as const
+    expect(clamp(resume, "auto-edit", () => undefined).command).toEqual(resume)
   })
 
   it("只读上限下 adopt 被拒（它的档位是写死的，钳不动）", () => {

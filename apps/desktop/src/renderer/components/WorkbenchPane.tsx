@@ -49,7 +49,7 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
               back: adjacentPreview(state.fileHistory, -1), forward: adjacentPreview(state.fileHistory, 1),
               onGo: onNavigateFile,
             }}
-            onBack={onFileIndex} onReference={onReference} referenceDisabled={thread.detached === true}
+            onBack={onFileIndex} onReference={onReference}
             onReveal={onReveal} onCopy={onCopy} searchFiles={searchFiles} />
         </div>
       </div>

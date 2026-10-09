@@ -35,7 +35,6 @@ describe("promptPlaceholder", () => {
         starting: false,
         steering: false,
         queueing: true,
-        detached: false,
         aside: true,
       }),
     ).toBe("问一句不进正文的话…（Esc 退回普通发送）")
@@ -48,10 +47,22 @@ describe("promptPlaceholder", () => {
         starting: false,
         steering: false,
         queueing: false,
-        detached: false,
         aside: true,
       }),
     ).toBe("<service>")
+  })
+
+  it("历史会话换成它自己那一句（发出去会怎样）", () => {
+    expect(
+      promptPlaceholder({
+        command: undefined,
+        starting: false,
+        steering: false,
+        queueing: false,
+        history: "历史会话：直接发话，会先接回 Codex 原来的会话。",
+        aside: false,
+      }),
+    ).toBe("历史会话：直接发话，会先接回 Codex 原来的会话。")
   })
 
   for (const row of cases) {
@@ -62,8 +73,7 @@ describe("promptPlaceholder", () => {
           starting: false,
           steering: false,
           queueing: false,
-          detached: false,
-          aside: false,
+            aside: false,
         }),
       ).toBe(row.want)
     })

@@ -60,7 +60,13 @@ export interface WorkspaceProps {
   /** 从任务画布拖入文件后收起右侧工具组，让结果立刻回到输入框。 */
   onFilesDropped: () => void
   models: readonly ModelOption[]
+  /** 显示用：清单里没有这条会话那家时也补上它，名字和下拉才画得出来（见 `withThreadEngines`）。 */
   engines: readonly EngineInfo[]
+  /**
+   * 引擎清单本身（设置里开着、探测完的那些），**不补**这条会话那家。
+   * 历史会话据此判断原来那家还在不在（见 `history-note.ts`）——补过的那份永远「在」。
+   */
+  catalog: readonly EngineInfo[]
   /**
    * 输入框上沿那几只。`on` 关掉是**整块不渲染**（不是藏起来——藏起来它照样
    * 占着指针事件那一层），其余细项见 `PetKit`。

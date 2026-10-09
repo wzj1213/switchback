@@ -257,11 +257,12 @@ export const REVIEW_VIEWS = [
     after: `document.querySelector('[aria-label="显示文件"]')?.click()`,
   },
   {
-    name: "04-历史审核拖放说明",
+    // 历史会话的输入框照样能发（发话时宿主先接回引擎），拖进来的文件同样收下
+    name: "04-历史审核拖放",
     open: [],
     dragFiles: ["apps/desktop/src/renderer/attachment-feedback.ts"],
     dragTarget: ".rv__pane",
-    dragHint: "先继续会话",
+    dragHint: "松手引用",
     holdDrag: true,
     ready: ".composer-drop--surface",
     assert: `(() => {
@@ -271,7 +272,7 @@ export const REVIEW_VIEWS = [
       return hint !== undefined && sidebar !== undefined
         && Math.abs(hint.left - (compact ? 0 : sidebar.right)) < 1
         && Math.abs(hint.right - innerWidth) < 1
-        && document.querySelector('.composer-drop--surface')?.textContent.includes('先继续会话') === true
+        && document.querySelector('.composer-drop--surface')?.textContent.includes('松手引用') === true
     })()`,
   },
   {

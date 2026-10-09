@@ -8,6 +8,7 @@ import { useComposerFiles } from "../use-composer-files.js"
 import { useComposerFocus } from "../use-composer-focus.js"
 import type { ComposerFileReference } from "../file-references.js"
 import { ComposerBody } from "./composer-body.js"
+import type { HistoryNote } from "../history-note.js"
 
 /**
  * 信任档。
@@ -45,8 +46,11 @@ export interface ComposerProps {
   canAside?: boolean
   /** 把这一句当侧问发出去。`canAside` 为真时必然给。 */
   onAsk?: (text: string) => void
-  /** 回放出来的历史会话：背后没有引擎，只能读不能发。 */
-  detached?: boolean
+  /**
+   * 回放出来的历史会话：背后没有引擎，**照样能发**——发话时宿主先接回来。
+   * 给的是输入框先交代的那一句（见 `history-note.ts`），活会话缺席。
+   */
+  history?: HistoryNote
   /** 新建的临时会话挂载后直接准备输入；切换旧会话不抢侧栏焦点。 */
   focusOnMount?: boolean
   /** 引擎还在起、或者上一轮还没跑完。**发不出去，而且要说出来为什么**。 */
@@ -106,14 +110,12 @@ export interface ComposerProps {
   onTrustChange: (trust: Trust) => void
   /** 第三个参数：**别排队，现在就插进正在跑的那一轮**（⌘⏎）。 */
   onSend: (text: string, attachments: readonly string[], steer: boolean) => void
-  /** 让这个历史会话重新接上引擎 */
-  onResume: () => void
 }
 
 export function Composer(props: ComposerProps): React.JSX.Element {
-  const { detached = false, busy = false, starting = false } = props
+  const { busy = false, starting = false } = props
+  const detached = props.history !== undefined
   const focus = useComposerFocus({
-    detached,
     initial: props.focusOnMount === true,
     prefillAt: props.prefill?.at ?? 0,
   })
@@ -133,7 +135,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     aside: aside.on,
   })
   const attachmentBlocked = attachWarning !== undefined
-  const mode = stateOf({ detached, starting, busy, canSteer: props.canSteer })
+  const mode = stateOf({ starting, held: props.history?.held === true, busy, canSteer: props.canSteer })
   const draft = useComposerDraft({
     prefill: props.prefill,
     engine: props.engine,
@@ -148,7 +150,6 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     attach,
     blocks,
     canAttach: imageAttachments,
-    editable: !detached,
     cwd: props.cwd,
     text: draft.text,
     focus: focus.focus,

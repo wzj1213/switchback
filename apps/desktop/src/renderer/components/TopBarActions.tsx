@@ -2,8 +2,8 @@ import type { EngineInfo, Thread } from "@switchback/protocol"
 import { CompareIcon, ForkIcon } from "./icons.js"
 import { PanelIcon } from "./icons-panel.js"
 
-const canForkFrom = (thread: Thread): boolean =>
-  thread.detached !== true && (thread.status === "idle" || thread.status === "failed")
+/** 历史会话也能分：岔出来的那条由它自己的新进程起，来源不必活着（宿主 `branch.ts` 的 `sourceOf`）。 */
+const canForkFrom = (thread: Thread): boolean => thread.status === "idle" || thread.status === "failed"
 
 export function TopBarActions({
   peer,

@@ -7,22 +7,25 @@
  */
 
 /**
- * 输入区现在处在哪一档。**四档互斥**，而且各有各的文案和右下角那颗键：
- * 历史记录 / 引擎还在起 / 跑着但能插话 / 跑着只能排队。
+ * 输入区现在处在哪一档。**各档互斥**，而且各有各的文案和右下角那颗键：
+ * 发不出去（引擎还在起 / 历史会话接不回来）/ 跑着但能插话 / 跑着只能排队。
+ *
+ * **历史会话不在其中**：发话时宿主先把它接回来（`@switchback/host` 的 `revive.ts`）。
+ * 上一版历史记录整个是只读的，要先点「继续」，而那颗按钮只认原来那一家引擎。
  *
  * 拎出来是复杂度闸门逼的，但边界也对：这是一次判定，不是渲染。
  */
-export function stateOf(o: { detached: boolean; starting: boolean; busy: boolean; canSteer: boolean }): {
+export function stateOf(o: { starting: boolean; held: boolean; busy: boolean; canSteer: boolean }): {
   blocked: boolean
   queueing: boolean
   steering: boolean
 } {
-  const running = o.busy && !o.detached
+  const running = o.busy
   return {
-    // 真正发不出去的只有两种：这是历史记录（背后没有引擎），
-    // 以及**引擎还没起来**——后者不禁的话，回车会先清空输入框、
-    // 再撞上宿主那句「会话不存在」，打好的一句话就这么没了
-    blocked: o.detached || o.starting,
+    // 真正发不出去的只有两种：**引擎还没起来**——不禁的话，回车会先清空输入框、
+    // 再撞上宿主那句「会话不存在」，打好的一句话就这么没了；
+    // 以及历史会话上宿主必拒的那种（`history-note.ts` 的 `held`），换一家引擎就能发
+    blocked: o.starting || o.held,
     // **默认排队，不管引擎会不会 steer。** 上一版是「能插就插」，
     // 和 codex 自己的行为正好相反（那边打字回车也是排着的）。
     // `steering` 现在的意思变成「这一条会话**能**当场插入」——

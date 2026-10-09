@@ -56,10 +56,6 @@ export function hoverHint(review: AttachmentReview, enabled: boolean): DropHint 
   return { tone: "ready", text: `松手引用 ${String(references)} 个文件` }
 }
 
-export function blockedDropHint(): DropHint {
-  return { tone: "blocked", text: "这是历史记录；先继续会话，再添加文件" }
-}
-
 export function failedDropHint(notice: { text: string; tone: "info" | "warn" }): DropHint {
   return {
     text: notice.text,

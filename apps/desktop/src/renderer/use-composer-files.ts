@@ -28,7 +28,6 @@ export function useComposerFiles(options: {
   attach: ReturnType<typeof useAttachments>
   blocks: DraftBlocks
   canAttach: boolean
-  editable: boolean
   cwd: string
   text: string
   focus: () => void
@@ -45,13 +44,12 @@ export function useComposerFiles(options: {
   const seenReference = useRef(options.reference?.at ?? 0)
   useEffect(() => {
     const reference = options.reference
-    if (reference === undefined || reference.at === seenReference.current || !options.editable)
-      return
+    if (reference === undefined || reference.at === seenReference.current) return
     seenReference.current = reference.at
     if (reference.quote === undefined) addFiles([reference.path])
     else addPaste(reference.quote, quoteLabel(reference.quote))
     options.focus()
-  }, [addFiles, addPaste, options.editable, options.focus, options.reference])
+  }, [addFiles, addPaste, options.focus, options.reference])
   const drop = useCallback(
     (files: FileList | null) => {
       const result = options.attach.drop(files, options.cwd, sent)
@@ -77,7 +75,7 @@ export function useComposerFiles(options: {
     options.focus()
   }, [addFiles, options.attach.pick, options.cwd, options.focus, sent])
   return {
-    dropzone: useAttachmentDropzone(options.canAttach, options.editable, drop),
+    dropzone: useAttachmentDropzone(options.canAttach, drop),
     paste,
     pick,
   }

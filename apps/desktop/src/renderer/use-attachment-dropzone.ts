@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 import {
-  blockedDropHint,
   hasFileItems,
   hoverHint,
   reviewAttachments,
@@ -17,10 +16,8 @@ function isFileTransfer(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes("Files") || hasFileItems(transfer.items)
 }
 
-function inspect(transfer: DataTransfer, enabled: boolean, editable: boolean): DropHint {
-  return editable
-    ? hoverHint(reviewAttachments(filesOf(transfer.items)), enabled)
-    : blockedDropHint()
+function inspect(transfer: DataTransfer, enabled: boolean): DropHint {
+  return hoverHint(reviewAttachments(filesOf(transfer.items)), enabled)
 }
 
 function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
@@ -29,7 +26,6 @@ function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
 
 interface Options {
   enabled: boolean
-  editable: boolean
   drop: (files: FileList | null) => DropHint | undefined
 }
 
@@ -78,13 +74,13 @@ function listeners(
       event.preventDefault()
       cancelExpiry(expiry)
       depth.current += 1
-      setHint(inspect(transfer, current.current.enabled, current.current.editable))
+      setHint(inspect(transfer, current.current.enabled))
     },
     dragover: (event) => {
       const transfer = transferOf(event)
       if (transfer === undefined) return
       event.preventDefault()
-      const next = inspect(transfer, current.current.enabled, current.current.editable)
+      const next = inspect(transfer, current.current.enabled)
       transfer.dropEffect = next.tone === "ready" ? "copy" : "none"
       setHint((previous) => keepSame(previous, next))
     },
@@ -98,7 +94,7 @@ function listeners(
       if (transfer === undefined) return
       event.preventDefault()
       depth.current = 0
-      const feedback = current.current.editable ? current.current.drop(transfer.files) : undefined
+      const feedback = current.current.drop(transfer.files)
       setHint(feedback)
       if (feedback !== undefined) expireHint(expiry, setHint, feedback)
     },
@@ -121,19 +117,18 @@ function listenForFiles(events: ReturnType<typeof listeners>): () => void {
 /**
  * 当前任务画布都是落点：正文、已打开的工作台或审核组；侧栏与模态不接，
  * 避免文件拖拽和会话排序 / 设置面板互相抢。监听挂 window 是因为 Composer 拿不到
- * 祖先画布的 DOM 入口，实际接不接仍由事件目标裁决。最新能力与可编辑态放 ref，
- * 拖动中切状态也立即生效。
+ * 祖先画布的 DOM 入口，实际接不接仍由事件目标裁决。最新能力放 ref，
+ * 拖动中切状态也立即生效。历史会话照样接：它的输入框能发（发话时宿主先接回引擎）。
  */
 export function useAttachmentDropzone(
   enabled: boolean,
-  editable: boolean,
   drop: (files: FileList | null) => DropHint | undefined,
 ): { hint: DropHint | undefined } {
   const [hint, setHint] = useState<DropHint>()
   const depth = useRef(0)
   const expiry = useRef<number | undefined>(undefined)
-  const current = useRef<Options>({ enabled, editable, drop })
-  current.current = { enabled, editable, drop }
+  const current = useRef<Options>({ enabled, drop })
+  current.current = { enabled, drop }
   useEffect(() => {
     const stop = listenForFiles(listeners(depth, expiry, setHint, current))
     return () => { stop(); cancelExpiry(expiry) }

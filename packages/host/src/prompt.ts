@@ -3,6 +3,7 @@ import { switchEngine } from "./branch.js"
 import { emit, isCurrent, setStatus, withQueue, type Ctx, type Live } from "./ctx.js"
 import { handoffNote, withNote } from "./handoff-note.js"
 import { recordSegment } from "./segment.js"
+import { revive } from "./revive.js"
 
 /**
  * 一句话怎么送到引擎。
@@ -219,8 +220,10 @@ async function sendPrompt(
 }
 
 export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  // **历史会话发话就接回来**，不再要人先点「继续」（见 `revive.ts`）。
+  // 接不回来时那句话退回输入框——按下发送时输入框已经清空了
+  const restore = { text: cmd.text, ...(cmd.attachments === undefined ? {} : { attachments: cmd.attachments }) }
+  const entry = ctx.live.get(cmd.threadId) ?? (await revive(ctx, cmd.threadId, restore))
   // 接力握手期间第二句话先排着。旧实现会暂时把 Live 从表里删除，输入框清空后
   // 才收到“会话不存在”——这是消息丢失，不是普通报错。
   // 接管原生历史、创建与原生分叉都可能已经握手成功，但仍在收尾 starting。

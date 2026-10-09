@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { blockedDropHint, dropNotice, failedDropHint, hasFileItems, hoverHint,
+import { dropNotice, failedDropHint, hasFileItems, hoverHint,
   reviewAttachments } from "./attachment-feedback.js"
 
 describe("附件拖放反馈", () => {
@@ -33,10 +33,6 @@ describe("附件拖放反馈", () => {
   it("粘贴板只要含文件项就同步截住，不能再落成路径文本", () => {
     expect(hasFileItems({ 0: { kind: "string" }, 1: { kind: "file" }, length: 2 })).toBe(true)
     expect(hasFileItems({ 0: { kind: "string" }, length: 1 })).toBe(false)
-  })
-
-  it("历史记录明确阻止拖入，不把文件吞掉", () => {
-    expect(blockedDropHint()).toEqual({ tone: "blocked", text: "这是历史记录；先继续会话，再添加文件" })
   })
 
   it("落下后失败收成非阻塞通知，不继续覆盖整个任务表面", () => {

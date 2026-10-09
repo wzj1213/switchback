@@ -5,6 +5,7 @@ import { trustBlind, trustHint } from "../trustHint.js"
 import type { SwitchbackAction } from "../switchbackCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 import { modelAcceptsImages } from "../model-options.js"
+import { historyNote } from "../history-note.js"
 
 /**
  * 把 `Thread` 上十几个字段翻成输入区要的 props。
@@ -50,7 +51,8 @@ export function WorkspaceComposer({
     <Composer
       threadId={thread.id}
       drafts={props.drafts}
-      detached={thread.detached === true}
+      // 历史会话照样能发：发话时宿主先接回引擎（见 `history-note.ts`）
+      history={historyNote(thread, props.engines, props.catalog)}
       focusOnMount={thread.provisional === true}
       /* **和当前轮次比一比才算数**：`passTurn` 存的是轮次 id，
          所以「过期」不需要谁记得来清一次——下一轮的 id 不一样，这里自然就是 false */
@@ -154,9 +156,6 @@ export function WorkspaceComposer({
           // 只在真要插的时候带这一项：不带 = 排队（见 protocol 的 `steer`）
           ...(steer ? { steer: true } : {}),
         })
-      }}
-      onResume={() => {
-        send({ type: "thread.resume", threadId: thread.id })
       }}
     />
   )

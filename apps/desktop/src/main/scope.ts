@@ -168,8 +168,8 @@ export function headerOf(thread: ThreadHistory): readonly Event[] {
  * 界面看起来完全正常，只是内容是旧的，这比空白难发现得多。
  *
  * 规则和全量那条路（`replayEvents`）是同一条，故意长得一样：
- * 活着的就补它的当前记录；不活着的补一条 `detached`，让界面关掉输入框——
- * **一个能打字却答非所问的输入框比没有输入框糟得多**。
+ * 活着的就补它的当前记录；不活着的补一条 `detached`，让界面知道背后没有进程——
+ * 发话时宿主要先把它接回引擎（`@switchback/host` 的 `revive.ts`），网页端则先给一颗「接回来」。
  */
 export function withCurrent(events: readonly Event[], live: Thread | undefined, now: number): readonly Event[] {
   if (events.length === 0) return events
@@ -280,8 +280,8 @@ export function replayEvents({ engines, threads, alive, now, bodies, cap }: Repl
       .reverse()
       .find((e) => e.type === "thread.started" || e.type === "thread.updated")
     if (last === undefined || (last.type !== "thread.started" && last.type !== "thread.updated")) continue
-    // 回放出来的会话背后没有引擎进程，补一条 `detached` 让界面关掉输入框——
-    // 一个能打字却答非所问的输入框比没有输入框糟得多
+    // 回放出来的会话背后没有引擎进程，补一条 `detached` 让界面知道：
+    // 发话时宿主要先把它接回引擎，而不是对着一个空进程答非所问
     events.push({ type: "thread.updated", at: now, thread: detachedThread(last.thread) })
   }
   events.push(...unlogged(threads, alive, now))

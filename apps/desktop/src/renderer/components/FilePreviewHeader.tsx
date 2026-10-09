@@ -33,28 +33,25 @@ function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
   )
 }
 
-function PreviewActions({ target, busy, refreshing, referenceable, referenceDisabled, revealable,
+function PreviewActions({ target, busy, refreshing, referenceable, revealable,
   onReference, onReload, onReveal }: {
   target: PreviewTarget
   busy: boolean
   refreshing: boolean
   referenceable: boolean
-  referenceDisabled: boolean
   revealable: boolean
   onReference?: (target: PreviewTarget) => void
   onReload: () => void
   onReveal: () => void
 }): React.JSX.Element {
-  const referenceLabel = referenceDisabled ? "继续会话后引用到输入框" : "引用到输入框"
   return (
     <span className="file-preview__actions">
       {onReference === undefined || !referenceable ? null : (
         <button type="button" className="file-preview__reference"
-          title={referenceDisabled ? "继续会话后才能引用" : "引用到输入框"}
-          aria-label={referenceLabel} disabled={referenceDisabled}
+          title="引用到输入框" aria-label="引用到输入框"
           onClick={() => { onReference(target) }}>
           <span aria-hidden="true">@</span>
-          <span className="file-preview__reference-text">{referenceDisabled ? "继续后引用" : "引用"}</span>
+          <span className="file-preview__reference-text">引用</span>
         </button>
       )}
       <button type="button" className="workbench__icon" data-tip="重新读取文件"
@@ -72,7 +69,7 @@ function PreviewActions({ target, busy, refreshing, referenceable, referenceDisa
 }
 
 export function FilePreviewHeader({ target, path, name, refreshing, refreshFailed, busy, referenceable,
-  referenceDisabled, revealable, navigation, onBack, onReference, onReload, onReveal }: {
+  revealable, navigation, onBack, onReference, onReload, onReveal }: {
   target: PreviewTarget
   path: string
   name: string
@@ -80,7 +77,6 @@ export function FilePreviewHeader({ target, path, name, refreshing, refreshFaile
   refreshFailed: boolean
   busy: boolean
   referenceable: boolean
-  referenceDisabled: boolean
   revealable: boolean
   navigation?: PreviewNavigation | undefined
   onBack: () => void
@@ -94,7 +90,7 @@ export function FilePreviewHeader({ target, path, name, refreshing, refreshFaile
       <PreviewTitle path={path} cwd={target.cwd} name={name}
         refreshing={refreshing} refreshFailed={refreshFailed} />
       <PreviewActions target={target} busy={busy} refreshing={refreshing} referenceable={referenceable}
-        referenceDisabled={referenceDisabled} revealable={revealable} onReference={onReference}
+        revealable={revealable} onReference={onReference}
         onReload={onReload} onReveal={onReveal} />
     </header>
   )

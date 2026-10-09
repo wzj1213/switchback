@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { SlashCommand } from "@switchback/protocol"
 import { SendIcon, StopIcon } from "./icons.js"
 
@@ -9,36 +8,38 @@ import { SendIcon, StopIcon } from "./icons.js"
  */
 
 /**
- * 输入区右下角那一颗。**三种状态共用一个位置**：断开时是「继续这个会话」，
- * 跑着时是停止，其余时候是发送。手已经知道往哪儿点，换的是形状不是位置。
+ * 输入区右下角那一颗。**两种状态共用一个位置**：跑着时是停止，其余时候是发送。
+ * 手已经知道往哪儿点，换的是形状不是位置。
+ *
+ * 历史会话上它也是「发送」：上一版这里是一颗「继续这个会话」，要先点它接回引擎才能打字，
+ * 而它只认原来那一家——那一家被删掉，这条会话就再也打不开了。现在发话时宿主先接回来。
  */
 export function Action({
-  detached,
+  held,
   busy,
   starting,
   empty,
   aside,
-  onResume,
   onInterrupt,
   onSend,
 }: {
-  detached: boolean
+  /** 历史会话接不回来（见 `history-note.ts`）：禁着的「发送」，悬停说怎么办。 */
+  held: boolean
   busy: boolean
   /** 引擎还在起。**不是「停止」**：那时没有任何东西可停 */
   starting: boolean
   empty: boolean
   /** 侧问模式：这一下发出去不进正文。**键要跟着变色**——见下面那段。 */
   aside?: boolean
-  onResume?: () => void
   onInterrupt?: () => void
   onSend: () => void
 }): React.JSX.Element {
-  if (detached) return <Resume onResume={onResume} />
   // 起引擎的那几百毫秒里摆一颗禁着的「发送」——摆「停止」是在说谎，
   // 那时候没有任何东西可停
-  if (starting) {
+  const hold = starting ? "引擎正在启动" : held ? "先换一家引擎再发" : undefined
+  if (hold !== undefined) {
     return (
-      <button className="send" type="button" data-tip="引擎正在启动" aria-label="发送" disabled>
+      <button className="send" type="button" data-tip={hold} aria-label="发送" disabled>
         <SendIcon />
       </button>
     )
@@ -71,33 +72,6 @@ export function Action({
       disabled={empty}
     >
       <SendIcon />
-    </button>
-  )
-}
-
-/**
- * 「继续这个会话」——**点下去要立刻有反应**。
- *
- * 恢复会话得把引擎重新拉起来、握手、读回历史，几百毫秒到几秒不等。
- * 上一版点完按钮纹丝不动，于是人会再点一次、再点一次——命令层虽然去重了，
- * 但那是在**兜底**，不是在回应。按钮自己要说话。
- */
-function Resume({ onResume }: { onResume?: () => void }): React.JSX.Element {
-  const [going, setGoing] = useState(false)
-  return (
-    <button
-      /* **不是主按钮。** 近黑的实心块是留给「你现在要做个决定」的（审批卡那颗）；
-         「这条会话是历史」是一个**状态**，不是一件催你办的事。输入框里那句
-         占位文本已经把话说清了，而这是这一条里唯一能点的控件，找不着的风险为零 */
-      className="btn composer__resume"
-      type="button"
-      disabled={going || onResume === undefined}
-      onClick={() => {
-        setGoing(true)
-        onResume?.()
-      }}
-    >
-      {going ? "正在恢复…" : "继续这个会话"}
     </button>
   )
 }

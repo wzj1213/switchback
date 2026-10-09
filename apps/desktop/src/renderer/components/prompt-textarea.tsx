@@ -11,7 +11,8 @@ export function promptPlaceholder(state: {
   starting: boolean
   steering: boolean
   queueing: boolean
-  detached: boolean
+  /** 历史会话先交代的那一句（`history-note.ts`）；活会话缺席。 */
+  history?: string
   aside: boolean
 }): string {
   if (state.command !== undefined) return state.command.argumentHint ?? "输入参数（可选）"
@@ -21,14 +22,13 @@ export function promptPlaceholder(state: {
   if (state.starting) return "引擎正在启动，起来就能发。"
   if (state.steering) return "它还在跑——回车排队，⌘⏎ 直接插入当前轮次。"
   if (state.queueing) return "它还在跑——回车排队，这一轮停下后发送。"
-  if (state.detached) return "这是重启前的历史记录。点右侧「继续」把引擎接回来。"
+  if (state.history !== undefined) return state.history
   return "交代任务…（可拖入文件，@ 搜索，/ 用命令）"
 }
 
 interface Props {
   input: React.RefObject<HTMLTextAreaElement | null>
   value: string
-  detached: boolean
   command: SlashCommand | undefined
   placeholder: string
   mentions: ReturnType<typeof useMentions>
@@ -56,7 +56,6 @@ export function PromptTextarea(props: Props): React.JSX.Element {
     <textarea
       ref={props.input}
       className="composer__input"
-      disabled={props.detached}
       placeholder={props.placeholder}
       value={props.value}
       aria-label={props.command === undefined ? "任务" : `${props.command.name} 的参数`}

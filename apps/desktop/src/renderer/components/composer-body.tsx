@@ -42,11 +42,10 @@ function AttachmentWarning({
 
 /**
  * 「这句话会发到哪儿去」那几枚，缩在控件那一排里（见 `Chips`）。
- * 历史记录没有「发出去」这回事，不给。
+ * 历史会话也给：发话就会接回来，分支和脏标正是发之前该看一眼的。
  */
-function siteChips(view: Props): React.JSX.Element | null {
+function siteChips(view: Props): React.JSX.Element {
   const { composer } = view
-  if (view.detached) return null
   return (
     <Chips threadId={composer.threadId} cwd={composer.cwd} stamp={composer.stamp} passing={composer.passing} />
   )
@@ -88,7 +87,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
         <Prompt
           input={focus.input}
           value={draft.text}
-          detached={detached}
+          history={composer.history?.text}
           starting={starting}
           queueing={mode.queueing}
           steering={mode.steering}
@@ -117,6 +116,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
         <ComposerControls
           key={composer.threadId}
           detached={detached}
+          held={composer.history?.held === true}
           busy={busy}
           starting={starting}
           site={site}
@@ -143,7 +143,6 @@ export function ComposerBody(view: Props): React.JSX.Element {
           onAttach={() => {
             void files.pick()
           }}
-          onResume={composer.onResume}
           onInterrupt={composer.onInterrupt}
           onSend={draft.submit}
         />

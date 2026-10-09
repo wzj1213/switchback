@@ -46,6 +46,10 @@ export type Command =
       model?: string
       effort?: string
     }
+  /**
+   * 发一句话。**会话没接引擎（`Thread.detached`）时宿主先把它接回来再发**：续原来那家，
+   * 或兑现记下的 `nextEngine`；接不回来就报错，并把这句话放回 `Thread.draft` 退给输入框。
+   */
   | {
       type: "thread.prompt"
       threadId: ThreadId
@@ -143,6 +147,8 @@ export type Command =
    *
    * 所以给一条显式的路：他要现在挑模型，就现在切。**不改默认，只是把
    * 「我确实要现在切」这句话变得说得出口。**
+   *
+   * 落在没接引擎的历史会话上，就是直接用记下的那家把它接回来。
    */
   | { type: "thread.switchNow"; threadId: ThreadId }
   | { type: "thread.setTrust"; threadId: ThreadId; trust: Trust }
@@ -151,7 +157,10 @@ export type Command =
    * 因为默认标题取自第一句提问，而回头找它的时候你想的是「那个改分页的」。
    */
   | { type: "thread.rename"; threadId: ThreadId; title: string }
-  /** 让一个从磁盘回放出来的会话重新接上引擎，带着引擎那边的历史继续。 */
+  /**
+   * 让一个从磁盘回放出来的会话重新接上引擎，但不发话（网页端的「接回来」）。
+   * 记着 `nextEngine` 时接的是那一家。桌面端不需要它：历史会话上直接 `thread.prompt` 就会先接回。
+   */
   | { type: "thread.resume"; threadId: ThreadId }
   /** 关掉会话并把它的记录从磁盘上删掉。**不可撤销**，界面必须二次确认。 */
   | { type: "thread.delete"; threadId: ThreadId }
@@ -165,6 +174,7 @@ export type Command =
   /**
    * L2 接力：换引擎继续同一个 thread。不翻译上下文；用户开着「换引擎自动交接」时，
    * 换家后的第一句话前会附上一段交接说明（宿主 `HostDeps.handoffBrief`），否则什么都不附。
+   * 历史会话上也能挑：只记进 `nextEngine`，下一句话接回时兑现。
    */
   | { type: "thread.handoff"; threadId: ThreadId; to: EngineId }
   /**

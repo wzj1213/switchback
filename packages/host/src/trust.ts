@@ -1,8 +1,9 @@
-import type { Command, Event, Thread } from "@switchback/protocol"
+import type { Command, Thread } from "@switchback/protocol"
 import { emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"
 import { carryRules } from "./approval.js"
+import { updateRecord } from "./revive.js"
 
 async function attach(ctx: Ctx, thread: Thread, resume: string | undefined): Promise<Live> {
   // 权限重启仍是同一段对话，只能复用原基线，不能以重启时刻重置差异。
@@ -133,23 +134,10 @@ export async function setTrust(
   await updateDetached(ctx, cmd)
 }
 
-/** 历史会话只改落盘记录；下次 resume 会按新档位开原生进程。 */
-async function updateDetached(
-  ctx: Ctx,
-  cmd: Extract<Command, { type: "thread.setTrust" }>,
-): Promise<void> {
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const record = [...events]
-    .reverse()
-    .find(
-      (event): event is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
-        event.type === "thread.started" || event.type === "thread.updated",
-    )
-  if (record === undefined) return
-  const at = ctx.deps.now()
-  emit(ctx, {
-    type: "thread.updated",
-    at,
-    thread: { ...record.thread, trust: cmd.trust, updatedAt: at },
-  })
+/**
+ * 历史会话只改落盘记录；下次接回时按新档位开原生进程（见 `revive.ts`）。
+ * 网页端「先降档再接回」靠的就是这一条。
+ */
+function updateDetached(ctx: Ctx, cmd: Extract<Command, { type: "thread.setTrust" }>): Promise<void> {
+  return updateRecord(ctx, cmd.threadId, (thread) => ({ ...thread, trust: cmd.trust }))
 }

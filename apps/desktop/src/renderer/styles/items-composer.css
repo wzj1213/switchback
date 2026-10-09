@@ -399,11 +399,6 @@
   }
 }
 
-.composer__resume {
-  flex: none;
-  white-space: nowrap;
-}
-
 /**
  * 档位下面那行说明。**默认不出现**——只在 Switchback 的档和引擎那边分家、
  * 或者 Switchback 明确没设上时才有内容（见 `renderer/trustHint.ts`）。

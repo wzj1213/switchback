@@ -30,7 +30,7 @@ const DEFAULT_MAX_LIVE = 4
  * - **正在跑的**：收掉等于中断用户的活
  * - **等着审批的**：那张卡片还挂在界面上，收掉之后它永远等不到答复
  * - **等着回答原生问题的**：问题卡同样还挂着，收掉会把用户正在填的答案作废
- * - **没有引擎句柄的**：那种收掉就**回不来了**（`resume` 认句柄），
+ * - **没有引擎句柄的**：那种收掉就**回不来了**（接回原来那家认句柄，见 `revive.ts`），
  *   而回不来的不叫「收起来」，叫「弄丢了」
  */
 export async function evict(ctx: Ctx, keep: ThreadId): Promise<void> {
@@ -56,8 +56,7 @@ export async function evict(ctx: Ctx, keep: ThreadId): Promise<void> {
 /**
  * 把一个会话从引擎上摘下来，但**记录全留着**。
  *
- * 界面上它变成「这是历史记录，点继续接回引擎」——那条路本来就有，
- * 用户也已经认识它（重启之后所有会话都是这个样子）。
+ * 界面上它变成历史会话——和重启之后所有会话一个样子，下一句话发出去时自动接回来（`revive.ts`）。
  */
 async function detach(ctx: Ctx, entry: Live): Promise<void> {
   entry.gate.settleAll()

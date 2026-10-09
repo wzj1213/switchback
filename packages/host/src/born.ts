@@ -47,7 +47,7 @@ function forkBoundary(from: string, itemCount: number): Pick<Thread, "forkedFrom
 }
 
 /** 按来源会话与这次分叉的意图，铸出新会话的初始形。 */
-export function bornOf(ctx: Ctx, entry: Live, spec: BornSpec): Thread {
+export function bornOf(ctx: Ctx, entry: Pick<Live, "thread">, spec: BornSpec): Thread {
   return withQueue({
       ...entry.thread,
       id: ctx.deps.newId("th"),
@@ -67,6 +67,9 @@ export function bornOf(ctx: Ctx, entry: Live, spec: BornSpec): Thread {
       capabilities: undefined,
       nextEngine: undefined,
       passTurn: undefined,
+      // 来源可以是磁盘上的历史记录（见 `branch.ts` 的 `sourceOf`），进程断在提问中途时它还挂着卡；
+      // 新会话背后没有任何引擎在等这些答案
+      pendingQuestions: undefined,
       asides: [],
       ...draftOf(ctx, spec.draft),
       adopted: undefined,

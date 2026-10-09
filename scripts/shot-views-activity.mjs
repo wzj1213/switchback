@@ -5,11 +5,6 @@ export const ACTIVITY_VIEWS = [
     open: [
       `(() => {
         window.__switchbackMainWidth = document.querySelector('.main')?.getBoundingClientRect().width
-        const resume = [...document.querySelectorAll('button')]
-          .find(button => button.textContent.trim() === '继续这个会话')
-        const resumeBox = resume?.getBoundingClientRect()
-        window.__switchbackResumeInline = resume === undefined || (resumeBox !== undefined
-          && resumeBox.width > resumeBox.height * 2 && resume.scrollWidth <= resume.clientWidth)
         const button = document.querySelector('[title="后台活动"]')
         button?.focus(); button?.click()
       })()`,
@@ -68,11 +63,10 @@ export const ACTIVITY_VIEWS = [
         && getComputedStyle(workbench).position === 'static'
         && Math.abs(workbenchBox.left - mainBox.right) < 1
         && Math.abs(workbenchBox.right - innerWidth) < 1
-      result.resumeStaysInline = window.__switchbackResumeInline === true
       if (Object.values(result).every(Boolean)) return true
       throw new Error('后台活动键盘滚动诊断：' + JSON.stringify(result))
     })()`,
-    after: `delete window.__switchbackMainWidth; delete window.__switchbackResumeInline`,
+    after: `delete window.__switchbackMainWidth`,
   },
   {
     name: "06-后台命令复制有确认",

@@ -1,4 +1,4 @@
-import type { Command, EngineSegment, Event, Item, Thread, ThreadId } from "@switchback/protocol"
+import type { Command, Event, Item, Thread, ThreadId } from "@switchback/protocol"
 import { initial, itemsOf, reduceAll } from "@switchback/store"
 import { discardUnstarted, drainQueued, emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
 import { bornOf } from "./born.js"
@@ -6,6 +6,8 @@ import { copyTranscript } from "./transcript.js"
 import { dropTemps, launch } from "./session.js"
 import { rememberHandle } from "./engine-state.js"
 import { carryRules } from "./approval.js"
+import { recordOf, retarget } from "./revive.js"
+import { latestSegment, switched } from "./switched.js"
 
 /**
  * 从一条会话岔出另一条：分叉（换引擎）、重来（砍掉后面几轮）、接力（换引擎但不留旧的）。
@@ -26,8 +28,7 @@ import { carryRules } from "./approval.js"
  * 分成两套实现的话，将来改分叉方式就要改两处，而漏改的那处不会报错。
  */
 export async function rewind(ctx: Ctx, cmd: Extract<Command, { type: "thread.rewind" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  const entry = await sourceOf(ctx, cmd.threadId)
   await branch(ctx, entry, {
     to: entry.thread.engine,
     upTo: cmd.turnId,
@@ -40,9 +41,25 @@ export async function rewind(ctx: Ctx, cmd: Extract<Command, { type: "thread.rew
 }
 
 export async function fork(ctx: Ctx, cmd: Extract<Command, { type: "thread.fork" }>): Promise<void> {
-  const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  const entry = await sourceOf(ctx, cmd.threadId)
   await branch(ctx, entry, { to: cmd.to, label: cmd.to })
+}
+
+/**
+ * 分叉、重来从哪儿岔：活会话，或者**磁盘上那份历史记录**。
+ *
+ * 岔出来的那条由它自己的新进程起（原生分叉也是新进程拿着来源的句柄去分，见 `StartRequest.forkOf`），
+ * 来源那条不必活着。上一版要求它活着，于是历史会话得先点「继续」把原来那家拉起来才能分——
+ * 那颗按钮拿掉之后，这么要求就等于历史会话再也分不了；原来那家被删掉的更是从来分不了。
+ */
+type Source = Pick<Live, "thread" | "turn">
+
+async function sourceOf(ctx: Ctx, threadId: ThreadId): Promise<Source> {
+  const live = ctx.live.get(threadId)
+  if (live !== undefined) return live
+  const thread = await recordOf(ctx, threadId)
+  if (thread === undefined) throw new Error(`会话不存在：${threadId}`)
+  return { thread, turn: undefined }
 }
 
 /** `draft` 是重来后交还给输入框的原话，不会注入引擎上下文。 */
@@ -51,7 +68,7 @@ interface BranchOptions {
   draft?: { text: string; attachments?: readonly string[] }
 }
 
-async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly Event[]> {
+async function stableEvents(ctx: Ctx, entry: Source, to: string): Promise<readonly Event[]> {
   if (entry.turn !== undefined) throw new Error("当前轮次尚未结束，不能分叉或从历史轮次重来")
   if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
   // 原生分叉在发出第一句前仍是临时会话，它可见的继承转录只在待提交缓冲里。
@@ -70,7 +87,7 @@ async function stableEvents(ctx: Ctx, entry: Live, to: string): Promise<readonly
  */
 async function branch(
   ctx: Ctx,
-  entry: Live,
+  entry: Source,
   opts: BranchOptions,
 ): Promise<void> {
   const events = await stableEvents(ctx, entry, opts.to)
@@ -154,7 +171,7 @@ interface DerivedLaunchPlan {
 }
 interface NativeDerivedLaunchPlan extends DerivedLaunchPlan { plan: NativeForkPlan }
 
-function derivedPlan(entry: Live, opts: BranchOptions, all: readonly Item[]): DerivedLaunchPlan {
+function derivedPlan(entry: Source, opts: BranchOptions, all: readonly Item[]): DerivedLaunchPlan {
   const items = opts.upTo === undefined ? all : until(all, opts.upTo)
   // 第一轮之前没有任何上下文可保留，也没有公开协议能表达“在首轮之前 fork”。
   // 这时开同工作区的空白分支就是动作的精确定义，不需要伪造 beforeTurnId。
@@ -186,7 +203,7 @@ async function startDerived(
 }
 
 function forkPlan(
-  entry: Live,
+  entry: Source,
   opts: BranchOptions,
   all: readonly Item[],
   keep: readonly Item[],
@@ -268,7 +285,9 @@ function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
  */
 export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff" }>): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  // 历史会话背后没有进程，挑引擎同样只是记一笔意向，下一句话接回时兑现（见 `revive.ts`）。
+  // 上一版这里直接报「会话不存在」：原来那家一删，这条会话就既接不回、也换不了
+  if (entry === undefined) return retarget(ctx, cmd.threadId, cmd.to)
   if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
 
   /**
@@ -427,49 +446,4 @@ export async function switchEngine(
    */
   // 发 live 里的能力；随后补握手期句柄，并在直接切换时继续排队消息。
   await finishSwitch(ctx, entry, current, { early, intoTurn })
-}
-
-function latestSegment(thread: Thread, engine: string): EngineSegment | undefined {
-  const segments = thread.segments ?? []
-  for (let index = segments.length - 1; index >= 0; index -= 1) {
-    const segment = segments[index]
-    if (segment?.engine === engine) return segment
-  }
-  return undefined
-}
-
-/**
- * 换过引擎之后这条会话长什么样。
- *
- * **模型和强度清掉**：它们跟着引擎走，上一家的模型 id 在新的一家那里
- * 通常根本不存在。清单同理——渲染层认「这份是谁报的」（见 store 的 `modelsOf`），
- * 新那家报上来之前，选择器上什么都不摆。
- */
-function switched(
-  prev: Thread,
-  to: string,
-  back: EngineSegment | undefined,
-  transition: { at: number; status: Thread["status"] },
-): Thread {
-  const next: Thread = {
-    ...prev,
-    engine: to,
-    // 临时会话在旧那家**什么都没发生过**，历史里不该留一笔——
-    // 点开下拉挑了三次就记三条的话，`/timeline` 会被「我点错了」填满
-    engineHistory: prev.provisional === true ? [to] : [...prev.engineHistory, to],
-    ...(back === undefined ? { engineHandle: undefined } : { engineHandle: back.handle }),
-    ...(back === undefined ? { engineProfile: undefined } : { engineProfile: back.profile }),
-    model: undefined,
-    effort: undefined,
-    status: transition.status,
-    updatedAt: transition.at,
-  }
-  delete next.nextEngine
-  // 这四份都由当前引擎握手/回调重建。沿用上一家的值会在新状态到达前撒谎，
-  // 更糟的是 `rememberEngineState` 会合并轴，最终把两家状态拼成一份不存在的状态。
-  delete next.engineState
-  delete next.goal
-  delete next.trustApply
-  delete next.capabilities
-  return next
 }

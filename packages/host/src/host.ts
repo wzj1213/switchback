@@ -4,7 +4,8 @@ import { resolveApproval } from "./approval.js"
 import { resolveQuestion } from "./question.js"
 import { clearQueue, discardUnstarted, emit, liveStateOf, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
-import { create, remove, rename, resume, setModel } from "./session.js"
+import { create, remove, rename, setModel } from "./session.js"
+import { resume, switchHistory } from "./revive.js"
 import { adopt } from "./adoption.js"
 import { setTrust } from "./trust.js"
 import { fork, handoff, rewind, switchEngine } from "./branch.js"
@@ -29,8 +30,8 @@ export interface Host {
    * 现在还活着的会话——**背后有引擎进程的那些**。
    *
    * 窗口重载时要用它把「活的」和「磁盘上的历史」分开：两者在 journal 里
-   * 长得一模一样，但活的那个输入框该是能用的，历史那个不该。
-   * 分不开的后果是重载之后整个应用变成只读，而引擎其实还在跑。
+   * 长得一模一样，但历史那个背后没有进程，发话时要先接回引擎（`revive.ts`）。
+   * 分不开的后果是重载之后每条活会话都被当成历史，而引擎其实还在跑。
    */
   live: () => readonly Thread[]
   /**
@@ -169,8 +170,10 @@ const HANDLERS: Handlers = {
    */
   "thread.switchNow": async (ctx, command) => {
     const entry = ctx.live.get(command.threadId)
-    const to = entry?.thread.nextEngine
-    if (entry === undefined || to === undefined || to === entry.thread.engine) return
+    // 历史会话上没有进程可换：兑现记下的那家 = 直接用它接回来（见 `revive.ts`）
+    if (entry === undefined) return switchHistory(ctx, command.threadId)
+    const to = entry.thread.nextEngine
+    if (to === undefined || to === entry.thread.engine) return
     await switchEngine(ctx, command.threadId, to)
   },
   "thread.steerQueued": steerQueued,

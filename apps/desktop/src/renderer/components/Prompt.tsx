@@ -19,7 +19,7 @@ import { PromptTextarea, promptPlaceholder } from "./prompt-textarea.js"
 export function Prompt({
   input,
   value,
-  detached,
+  history,
   starting = false,
   queueing = false,
   steering = false,
@@ -39,7 +39,8 @@ export function Prompt({
 }: {
   input: React.RefObject<HTMLTextAreaElement | null>
   value: string
-  detached: boolean
+  /** 历史会话先交代的那一句（发出去会怎样）。照样能打字、能发，只是占位文字换成它。 */
+  history?: string
   /** 引擎还在起：发不出去，但**不是**因为「正在跑」。 */
   starting?: boolean
   /** 现在发出去会进队列，等这一轮跑完再发。输入框在这里集中说明发送行为。 */
@@ -115,9 +116,11 @@ export function Prompt({
         <PromptTextarea
           input={input}
           value={value}
-          detached={detached}
           command={command}
-          placeholder={promptPlaceholder({ command, starting, steering, queueing, detached, aside: asideMode })}
+          placeholder={promptPlaceholder({
+            command, starting, steering, queueing, aside: asideMode,
+            ...(history === undefined ? {} : { history }),
+          })}
           mentions={mentions}
           slash={slash}
           onChange={onChange}

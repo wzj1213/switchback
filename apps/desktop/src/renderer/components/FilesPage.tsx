@@ -115,7 +115,7 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
 }
 
 export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick, onBack, onReference,
-  referenceDisabled, navigation, onReveal, onCopy, searchFiles }: {
+  navigation, onReveal, onCopy, searchFiles }: {
   threadId: string
   cwd: string
   items: readonly Item[]
@@ -125,7 +125,6 @@ export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick,
   onPick: (target: PreviewTarget) => void
   onBack: () => void
   onReference?: (target: PreviewTarget) => void
-  referenceDisabled?: boolean
   navigation?: PreviewNavigation | undefined
   onReveal: (path: string) => void
   onCopy: (text: string) => void
@@ -141,7 +140,7 @@ export function FilesPage({ threadId, cwd, items, stamp, active, target, onPick,
       {target === undefined ? null : (
         <FilePreviewView target={target} revision={revision} stamp={stamp}
           active={active !== false} navigation={navigation}
-          onBack={onBack} onReference={onReference} referenceDisabled={referenceDisabled}
+          onBack={onBack} onReference={onReference}
           onReveal={onReveal} onCopy={onCopy} />
       )}
     </>

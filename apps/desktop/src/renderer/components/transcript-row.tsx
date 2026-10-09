@@ -35,8 +35,9 @@ export function canAsk(thread: Thread, hasComposer: boolean): boolean {
   return hasComposer && thread.capabilities?.sideQuestion === true
 }
 
+/** 历史会话也能重来：能力位与句柄是记录里留下的，分叉由同一家的新进程拿句柄去做。 */
 export function canRewind(thread: Thread, turn: Turn | undefined, readOnly: boolean): boolean {
-  return !readOnly && turn === undefined && thread.detached !== true &&
+  return !readOnly && turn === undefined &&
     (thread.status === "idle" || thread.status === "failed") &&
     thread.capabilities?.rewind === true && thread.engineHandle !== undefined
 }

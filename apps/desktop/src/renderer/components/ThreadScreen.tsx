@@ -86,6 +86,7 @@ export function ThreadScreen({
         }}
         models={modelsOf(state, thread.id, thread.engine)}
         engines={engines}
+        catalog={app.engines}
         pets={{ on: app.prefs.settings.pets, ...app.prefs.settings.petKit }}
         notices={app.notices}
         onDismiss={shell.dismiss}

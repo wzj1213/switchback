@@ -5,7 +5,10 @@ import { Bar } from "./ComposerBar.js"
 import { nothingToSend } from "./composer-state.js"
 
 interface Props {
+  /** 历史会话：模型清单要接回之后才问得到，档位那行说明也是上一次进程的。 */
   detached: boolean
+  /** 历史会话接不回来（见 `history-note.ts`）：发送键灰着，换一家引擎才能发。 */
+  held: boolean
   busy: boolean
   starting: boolean
   attachmentBlocked: boolean
@@ -27,13 +30,12 @@ interface Props {
   blind: string | undefined
   aside: boolean
   onAsideExit: () => void
-  /** 缩在这一排里的工作区芯片（分支、脏标、本轮已放行）；历史记录没有，是 undefined。 */
+  /** 缩在这一排里的工作区芯片（分支、脏标、本轮已放行）。 */
   site: React.ReactNode
   onEngineChange: (engine: EngineId) => void
   onTrustChange: (trust: Trust) => void
   onModelChange: (model: string, effort?: string) => void
   onAttach: () => void
-  onResume: () => void
   onInterrupt: (() => void) | undefined
   onSend: () => void
 }
@@ -42,6 +44,7 @@ export function ComposerControls(props: Props): React.JSX.Element {
   return (
     <Bar
       detached={props.detached}
+      held={props.held}
       busy={props.busy}
       starting={props.starting}
       empty={nothingToSend({
@@ -68,7 +71,6 @@ export function ComposerControls(props: Props): React.JSX.Element {
       site={props.site}
       onModelChange={props.onModelChange}
       onAttach={props.onAttach}
-      onResume={props.onResume}
       onInterrupt={props.onInterrupt}
       onSend={props.onSend}
     />

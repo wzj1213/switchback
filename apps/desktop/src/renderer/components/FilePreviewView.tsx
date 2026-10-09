@@ -125,7 +125,6 @@ export function FilePreviewView({
   navigation,
   onBack,
   onReference,
-  referenceDisabled = false,
   onReveal,
   onCopy,
 }: {
@@ -136,7 +135,6 @@ export function FilePreviewView({
   navigation?: PreviewNavigation | undefined
   onBack: () => void
   onReference?: (target: PreviewTarget) => void
-  referenceDisabled?: boolean
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
@@ -158,7 +156,6 @@ export function FilePreviewView({
         refreshFailed={refreshFailed}
         busy={load.state === "loading" || refreshing}
         referenceable={referenceable}
-        referenceDisabled={referenceDisabled}
         revealable={revealable}
         navigation={navigation}
         onBack={onBack}

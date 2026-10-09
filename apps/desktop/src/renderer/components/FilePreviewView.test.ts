@@ -77,23 +77,6 @@ describe("文件预览操作", () => {
     expect(button).not.toContain("disabled")
   })
 
-  it("会话只读时把恢复办法直接写在禁用操作上", () => {
-    const html = renderToStaticMarkup(
-      createElement(FilePreviewView, {
-        target: { threadId: "thread", cwd: "/work", path: "src/app.ts" },
-        revision: undefined,
-        stamp: "idle:0",
-        onBack: () => undefined,
-        onReference: () => undefined,
-        referenceDisabled: true,
-        onReveal: () => undefined,
-        onCopy: () => undefined,
-      }),
-    )
-    expect(html).toContain("继续后引用")
-    expect(html).toContain('aria-label="继续会话后引用到输入框"')
-  })
-
   it("点开同名文件后仍把目录归属画在标题里，越界路径明确标记", () => {
     const render = (path: string, cwd = "/work/switchback"): string =>
       renderToStaticMarkup(
@@ -155,7 +138,7 @@ describe("文件预览刷新失败", () => {
     const html = renderToStaticMarkup(createElement(FilePreviewHeader, {
       target: { threadId: "thread", cwd: "/work", path: "app.ts" },
       path: "/work/app.ts", name: "app.ts", refreshing: true, refreshFailed: false,
-      busy: true, referenceable: true, referenceDisabled: false, revealable: true,
+      busy: true, referenceable: true, revealable: true,
       onBack: () => undefined, onReload: () => undefined, onReveal: () => undefined,
     }))
     const reload = html.match(/<button[^>]+aria-label="重新读取文件"[^>]*>/)?.[0]

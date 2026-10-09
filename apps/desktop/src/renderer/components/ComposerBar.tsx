@@ -133,6 +133,7 @@ function EngineSelect({
 
 export function Bar({
   detached,
+  held,
   busy,
   starting,
   empty,
@@ -153,11 +154,16 @@ export function Bar({
   onTrustChange,
   onModelChange,
   onAttach,
-  onResume,
   onInterrupt,
   onSend,
 }: {
+  /**
+   * 历史会话。**照样能发、能换引擎、能改档**（发话时宿主先接回来）；只有两样等接回再说：
+   * 模型清单要引擎起来才问得到，档位下面那行说明说的是上一次进程。
+   */
   detached: boolean
+  /** 历史会话接不回来（没留句柄、也没换家）：发送键灰着，换一家引擎才能发。 */
+  held: boolean
   busy: boolean
   /** 引擎还在起：右下角那颗键是禁着的「发送」，不是「停止」。 */
   starting: boolean
@@ -189,7 +195,6 @@ export function Bar({
   onTrustChange: (next: Trust) => void
   onModelChange: (model: string, effort?: string) => void
   onAttach: () => void
-  onResume?: () => void
   onInterrupt?: () => void
   onSend: () => void
 }): React.JSX.Element {
@@ -197,31 +202,31 @@ export function Bar({
     <div className="composer__barwrap">
       <div className="composer__bar">
         <div className="composer__tools">
-          <AttachmentPick disabled={detached} onPick={onAttach} />
+          <AttachmentPick onPick={onAttach} />
           <TrustSelect trust={trust} blind={blind}
-            disabled={detached || busy || starting || pending !== undefined} onPick={onTrustChange} />
+            disabled={busy || starting || pending !== undefined} onPick={onTrustChange} />
           {site}
           {aside}
         </div>
         <div className="composer__model">
           <UsageBadge usage={usage} />
-          <EngineSelect engine={engine} engines={engines} disabled={detached || starting} onPick={onEngineChange} />
+          <EngineSelect engine={engine} engines={engines} disabled={starting} onPick={onEngineChange} />
           <ModelPicker
             models={models}
             model={model}
             effort={effort}
-            disabled={detached || busy || starting}
+            // 历史会话上挑过别家时，「切到 X 再选模型」那颗是能点的：点了就当场用它接回来
+            disabled={(detached && pending === undefined) || busy || starting}
             pending={pending}
             onChange={onModelChange}
           />
         </div>
         <Action
-          detached={detached}
+          held={held}
           busy={busy}
           starting={starting}
           empty={empty}
           aside={asideMode === true}
-          onResume={onResume}
           onInterrupt={onInterrupt}
           onSend={onSend}
         />

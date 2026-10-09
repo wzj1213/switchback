@@ -1,4 +1,4 @@
-import type { Command, Event, Thread, ThreadId } from "@switchback/protocol"
+import type { Command, Thread, ThreadId } from "@switchback/protocol"
 import type { Rule } from "@switchback/approval"
 import { createGate } from "./gate.js"
 import { askQuestion } from "./question.js"
@@ -15,7 +15,7 @@ import { applyEarly, earlySignals, type EarlySignals } from "./launch-signals.js
 import { signalCallbacks } from "./session-signals.js"
 
 /**
- * 会话的生命周期：建、续跑、接力、发消息、改档、换模型、删。
+ * 会话的生命周期：建、接力、发消息、改档、换模型、删。历史会话怎么接回引擎在 `revive.ts`。
  *
  * 从 `host.ts` 拆出来是因为那个文件撑过了 300 行闸门——但拆完读起来确实更顺：
  * `host.ts` 只剩「事件怎么出去、命令怎么分派」，这里是「一个会话怎么活」。
@@ -308,43 +308,6 @@ export async function create(
   })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
   drainQueued(ctx, ctx.live.get(thread.id))
-}
-
-/**
- * 让一个从磁盘回放出来的会话重新接上引擎。
- *
- * 会话记录只在渲染层（回放不经过宿主），所以这里要**自己从日志里把它读回来**。
- * 没有句柄就不给续——那种情况下起的是个全新会话，模型对上面那段对话一无所知，
- * 而界面看起来像是接上了。**宁可报错也不要制造这种错觉。**
- */
-export async function resume(
-  ctx: Ctx,
-  cmd: Extract<Command, { type: "thread.resume" }>,
-): Promise<void> {
-  if (ctx.live.has(cmd.threadId)) return
-  const events = (await ctx.deps.journal?.read(cmd.threadId)) ?? []
-  const record = [...events]
-    .reverse()
-    .find(
-      (e): e is Extract<Event, { type: "thread.started" | "thread.updated" }> =>
-        e.type === "thread.started" || e.type === "thread.updated",
-    )
-  if (record === undefined) throw new Error(`找不到会话 ${cmd.threadId} 的历史，无法续跑`)
-  const handle = record.thread.engineHandle
-  if (handle === undefined) {
-    throw new Error("这个会话没有留下引擎侧的句柄（可能是旧版本记录），只能新建会话继续")
-  }
-  const at = ctx.deps.now()
-  const thread: Thread = { ...record.thread, detached: false, status: "idle", updatedAt: at }
-  // 旧任务没有保存过基线时不能在这里现抓一份，再把“续跑时刻”冒充整段对话开场。
-  // 已有基线由桌面存储直接复用；没有就诚实退回 legacy 工作区差异。
-  const early = await launch(ctx, thread, { resume: handle, captureBaseline: false })
-  emit(ctx, {
-    type: "thread.updated",
-    at: ctx.deps.now(),
-    thread: ctx.live.get(thread.id)?.thread ?? thread,
-  })
-  if (early !== undefined) rememberHandle(ctx, thread.id, early)
 }
 
 /**
