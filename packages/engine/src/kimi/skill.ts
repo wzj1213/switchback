@@ -84,7 +84,7 @@ export class KimiSkills {
   }
 
   async activate(invocation: KimiSkillInvocation, attachments?: readonly string[]): Promise<void> {
-    const media = await attachmentContent(attachments)
+    const media = attachmentContent(attachments)
     const body = {
       ...(invocation.args === undefined ? {} : { args: invocation.args }),
       ...(media.length === 0 ? {} : { attachments: media }),

@@ -34,7 +34,7 @@ export class KimiPrompter {
         this.turn.activationAccepted(generation)
         return
       }
-      const content = await promptContent(text, attachments)
+      const content = promptContent(text, attachments)
       const prompt = await this.api.post<KimiPrompt>(sessionPath(this.sessionId, "/prompts"), { content })
       if (prompt.status === "blocked") {
         this.turn.promptAccepted(generation, prompt.prompt_id)
@@ -55,7 +55,7 @@ export class KimiPrompter {
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const generation = this.turn.currentGeneration()
     if (generation === undefined) throw new Error("Kimi 没有正在运行的轮次，无法改向")
-    const content = await promptContent(text, attachments)
+    const content = promptContent(text, attachments)
     const prompt = await this.api.post<KimiPrompt>(sessionPath(this.sessionId, "/prompts"), { content })
     if (prompt.status !== "queued" || !this.turn.isActive(generation)) {
       await this.cancel(prompt.prompt_id)

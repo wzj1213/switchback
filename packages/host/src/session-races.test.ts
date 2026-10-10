@@ -679,7 +679,26 @@ describe("失败收口与基线生命周期", () => {
     expect(rig.host.live()[0]?.status).toBe("failed")
   })
 
-  it("队列里的下一句只有成功送达才删除，RPC 拒绝后仍可见", async () => {
+  it("排队那句开了轮却被引擎拒收：只留在转录区等「再试一次」，队里不再摆一份", async () => {
+    const rejecting = new Set<string>()
+    const rig = rigOf({ rejectPrompt: rejecting })
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "第一句" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "排队这句", attachments: ["/tmp/big.png"] })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "后面那句" })
+    rejecting.add("a")
+    complete(rig.probes[0] as Probe)
+    await tick()
+    const said = rig.events.flatMap((event) =>
+      event.type === "item.started" && event.item.kind === "user_message" ? [event.item] : [])
+    expect(said.map((item) => item.text)).toEqual(["第一句", "排队这句"])
+    expect(said[1]?.attachments).toEqual(["/tmp/big.png"])
+    // 失败不陪葬后面那句：它没进转录区，仍是待发送
+    expect(rig.host.live()[0]).toMatchObject({ status: "failed", queued: ["后面那句"] })
+    expect(rig.host.live()[0]?.queuedAttachments).toBeUndefined()
+  })
+
+  it("拒收后点「再试一次」成功，收工时不会把同一句再发一遍", async () => {
     const rejecting = new Set<string>()
     const rig = rigOf({ rejectPrompt: rejecting })
     const id = await created(rig)
@@ -688,7 +707,13 @@ describe("失败收口与基线生命周期", () => {
     rejecting.add("a")
     complete(rig.probes[0] as Probe)
     await tick()
-    expect(rig.host.live()[0]).toMatchObject({ status: "failed", queued: ["排队这句"] })
+    rejecting.delete("a")
+    // 报错卡上的「再试一次」发的就是输入框那条命令
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "排队这句" })
+    complete(rig.probes[0] as Probe)
+    await tick()
+    expect(rig.probes[0]?.prompts.map((prompt) => prompt.text)).toEqual(["第一句", "排队这句", "排队这句"])
+    expect(rig.host.live()[0]).toMatchObject({ status: "idle", queued: [] })
   })
 
   it("当前轮次失败时不替用户删除后面排好的文字与附件", async () => {

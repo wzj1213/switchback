@@ -84,7 +84,7 @@ export interface KimiPrompt {
 
 export interface KimiImageContent {
   type: "image"
-  source: { kind: "base64"; media_type: string; data: string }
+  source: { kind: "path"; path: string }
 }
 
 export type KimiContent = { type: "text"; text: string } | KimiImageContent

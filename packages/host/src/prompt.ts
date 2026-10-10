@@ -300,6 +300,22 @@ function userItem(
   }
 }
 
+/**
+ * 排着的那句此刻要变成转录区里的一句话：从队列里摘掉。
+ *
+ * 摘在这里、不等引擎确认收下：从这一刻起它只在转录区出现一次。引擎拒收的话，
+ * 报错卡上有「再试一次」；要是还留在队里，同一句话界面上摆两处，点过重试之后
+ * 下一轮收工 `drain` 又把它发一遍——引擎收到两份同样的话（mac2 上 Kimi 拒收大图时就是这样）。
+ * 在这之前就失败的（切换回滚、接不回来、附件被拒）没进转录区，仍原位留在队首。
+ */
+function takeDrained(ctx: Ctx, entry: Live, at: number): void {
+  const head = entry.queued[0]
+  if (head === undefined || head !== entry.draining) return
+  entry.queued = entry.queued.slice(1)
+  entry.thread = withQueue(entry.thread, entry.queued, at)
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
 /** 开一轮：转正、记分段、抓基线，发出 turn.started 与用户那句，再送给引擎。 */
 async function startTurn(
   ctx: Ctx,
@@ -325,6 +341,7 @@ async function startTurn(
     status: "running" as const,
     startedAt: at,
   }
+  takeDrained(ctx, entry, at)
   setStatus(ctx, entry, "running")
   emit(ctx, { type: "turn.started", at, turn })
   // 交接说明原样记进转录区，排在用户那句前面——和真正送出去的顺序一致

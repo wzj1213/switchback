@@ -338,7 +338,8 @@ function finishDrain(ctx: Ctx, threadId: ThreadId, next: QueuedPrompt): void {
   const entry = ctx.live.get(threadId)
   if (entry?.draining !== next) return
   entry.draining = undefined
-  // 成功送达之后才摘；失败、切换回滚或用户已经手动取消时都不误删。
+  // 开了轮的那句已经在 `takeDrained`（prompt.ts）里摘掉了；这里只摘没开轮就交出去的原件
+  //（另有一轮在跑或引擎没就绪，它被重新排到了队尾）。切换回滚、用户手动取消时都不误删。
   if (entry.queued[0] !== next) return
   entry.queued = entry.queued.slice(1)
   const at = ctx.deps.now()

@@ -50,7 +50,7 @@
     每-agent 的明细进 `LaneProgress.nodes`；30 个 agent 每 tick 产生 30 条落盘事件
     是不能接受的
   - `history-files.ts` 有界并发枚举主会话与文件头，过滤子 agent / 空文件；`image.ts`
-    是 Claude、Kimi 与 ACP 共用的内联图片格式、体积和 fail-closed 读取边界
+    是 Claude 与 ACP 共用的内联图片格式、体积和 fail-closed 读取边界（codex、Kimi 交路径，不经过它）
   - `driver.ts` 会话生命周期与进程回收
 - `codex/` —— `codex app-server --stdio` 驱动（JSON-RPC 2.0）
   - `rpc.ts` 分帧与请求关联。纯粹字节进字节出，不碰子进程，
@@ -88,6 +88,8 @@
     （`KimiDisconnect`：对面关的带关闭码与原因 / 要重新同步 / Switchback 自己处理某一帧出错），
     `disconnect.ts` 写成 `reconnecting` 的那句 detail；重连 0 → 8 秒退避、共六次，接不回来才报 `crashed`
   - `session.ts` 接会话、审批、模型、档位、历史、侧问与归档；`prompt.ts` 接普通提示与插话
+  - `attach.ts` 把图片附件交成公开 schema 的 `path` 图片源，由 Kimi 自己读盘、压缩、核对；
+    不交 base64——`kimi web` 的请求体上限是 1 MiB，一张 800 KB 的截图编码后就整句被拒
   - `interactions.ts` 接公开的审批与结构化问题：问题文本和选项只做安全清洗，
     单选、多选、其他答案与跳过按 Kimi 原生形状回送；另一客户端落定或快照移除时同步撤销宿主等待
   - `skill.ts` 只投影 Kimi 上报的可激活 skill，并通过公开 `:activate` 入口执行
