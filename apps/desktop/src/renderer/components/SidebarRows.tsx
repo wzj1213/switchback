@@ -9,6 +9,7 @@ import { RowName, type RenameCtl } from "./RowName.js"
 import type { DragItem } from "../useThreadDrag.js"
 import { moveKeyProps } from "../moveKey.js"
 import { rowDragProps } from "../sidebar-row-drag.js"
+import { displayStatus } from "@switchback/store"
 
 /** 一行需要的拖放接线。状态在 `useThreadDrag`，这里只是把它接到 DOM 事件上。 */
 export interface RowDrag {
@@ -162,7 +163,7 @@ export function Row({
             行尾那列答的是「多久以前」，会被转圈/徽注顶掉，两套各管各的。
             项目内行的这一列缩进一级（CSS 的 `margin-left`），文字落在 56px。 */}
         <span className="row__slot">
-          <Dot status={thread.status} unread={unread} />
+          <Dot status={displayStatus(thread)} unread={unread} />
         </span>
         <RowName value={rowLabelOf(row)} />
         <RowEnd

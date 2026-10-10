@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { SlashCommand } from "@switchback/protocol"
 import { createComposerDrafts, recallComposerDraft, type ComposerDraftMemory } from "./composer-drafts.js"
+import type { DraftSink } from "./draft-disk.js"
+import type { StoredDraft } from "../shared/drafts.js"
 
 const command: SlashCommand = { name: "review", description: "审查", source: "engine" }
 const draft = (text: string, engine = "claude"): ComposerDraftMemory => ({
@@ -79,5 +81,64 @@ describe("宿主交回的草稿每一版只并一次", () => {
     drafts.markApplied("th-2", "b")
     drafts.markApplied("th-3", "c")
     expect([drafts.applied("th-1"), drafts.applied("th-2"), drafts.applied("th-3")]).toEqual([undefined, "b", "c"])
+  })
+})
+
+describe("草稿落盘（交给 sink）", () => {
+  const stored = (text: string, patch: Partial<StoredDraft> = {}): StoredDraft => ({
+    engine: "claude", text, attachments: [], blocks: [], aside: false, at: 1, ...patch,
+  })
+  function sinkOf(slots: Readonly<Record<string, string | undefined>>, initial: Record<string, StoredDraft> = {}) {
+    const store = new Map(Object.entries(initial))
+    const saves: (readonly [string, string | undefined])[] = []
+    const sink: DraftSink = {
+      slotOf: (id) => (id in slots ? slots[id] : id),
+      stored: (slot) => store.get(slot),
+      save: (slot, draft) => {
+        saves.push([slot, draft?.text])
+        if (draft === undefined) store.delete(slot)
+        else store.set(slot, draft)
+      },
+      takeMissing: () => undefined,
+    }
+    return { sink, store, saves }
+  }
+
+  it("写一份交给它那一格；发出去写空就是删", () => {
+    const { sink, store } = sinkOf({})
+    const drafts = createComposerDrafts(40, sink)
+    drafts.write("th", draft("写到一半"))
+    expect(store.get("th")).toMatchObject({ text: "写到一半", attachments: ["/写到一半.png"] })
+    drafts.write("th", { engine: "claude", text: "", attachments: [], blocks: [], aside: false })
+    expect(store.has("th")).toBe(false)
+  })
+
+  it("重启后内存里没有：读盘上那一份，并过的宿主草稿版本跟着回来，不再并一遍", () => {
+    const { sink } = sinkOf({}, { th: stored("取回的那句", { applied: "dr-1" }) })
+    const drafts = createComposerDrafts(40, sink)
+    expect(drafts.applied("th")).toBe("dr-1")
+    expect(drafts.read("th")).toMatchObject({ text: "取回的那句" })
+  })
+
+  it("并过一版宿主草稿、字又删光了：也要记下来，不然重启后删掉的字又回来", () => {
+    const { sink, store } = sinkOf({})
+    const drafts = createComposerDrafts(40, sink)
+    drafts.markApplied("th", "dr-2")
+    expect(store.get("th")).toMatchObject({ text: "", applied: "dr-2" })
+  })
+
+  it("临时会话写进「新会话」那一格；重启后新开的那条读得回来", () => {
+    const before = sinkOf({ "th-old": "new" })
+    createComposerDrafts(40, before.sink).write("th-old", draft("新会话里打的"))
+    const after = sinkOf({ "th-new": "new" }, Object.fromEntries(before.store))
+    expect(createComposerDrafts(40, after.sink).read("th-new")).toMatchObject({ text: "新会话里打的" })
+  })
+
+  it("分叉出来的临时会话不落盘", () => {
+    const { sink, saves } = sinkOf({ "th-fork": undefined })
+    const drafts = createComposerDrafts(40, sink)
+    drafts.write("th-fork", draft("分叉里打的"))
+    expect(saves).toEqual([])
+    expect(drafts.read("th-fork")).toMatchObject({ text: "分叉里打的" })
   })
 })

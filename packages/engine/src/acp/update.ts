@@ -63,8 +63,27 @@ export interface UpdateContext {
    * 2. `session/request_permission` **只带 toolCallId**，命令和 diff 全在这张表里
    */
   inflight: Map<string, AcpToolCall>
+  /**
+   * 没有轮次时（主轮收工之后的后台活）报上来的工具调用。转录区没有轮次可挂、不落工具行，
+   * 但记下详情：随后的 `session/request_permission` 只带 id，认出是什么命令全靠它。
+   * 和 `inflight` 分开放：收工扫尾只扫这一轮自己的。
+   */
+  outside?: Map<string, AcpToolCall>
   newId: (prefix: string) => string
   now: () => number
+}
+
+/** 后台工具调用最多记这么多条：只为对上随后的权限请求，不是历史。 */
+const OUTSIDE_CALLS = 50
+
+function noteOutside(ctx: UpdateContext, id: string, update: AcpUpdate): void {
+  const outside = ctx.outside
+  if (outside === undefined) return
+  const call = merge(outside.get(id), update as AcpToolCall)
+  outside.delete(id)
+  outside.set(id, call)
+  const oldest = outside.size > OUTSIDE_CALLS ? outside.keys().next() : undefined
+  if (oldest !== undefined && oldest.done !== true) outside.delete(oldest.value)
 }
 
 /** 正在攒的那条文本 item。界面 id 由我们铸，原生 id 只用于识别边界。 */
@@ -144,7 +163,11 @@ function onTextChunk(
 function onToolCall(ctx: UpdateContext, state: UpdateState, update: AcpUpdate): void {
   const id = update.toolCallId
   const turnId = ctx.turnId()
-  if (id === undefined || turnId === undefined) return
+  if (id === undefined) return
+  if (turnId === undefined) {
+    noteOutside(ctx, id, update)
+    return
+  }
   // 工具调用打断文本：先把正在攒的那条收口，再插工具行
   closeText(ctx, state)
   const call = merge(ctx.inflight.get(id), update as AcpToolCall)
@@ -155,7 +178,11 @@ function onToolCall(ctx: UpdateContext, state: UpdateState, update: AcpUpdate): 
 function onToolUpdate(ctx: UpdateContext, state: UpdateState, update: AcpUpdate): void {
   const id = update.toolCallId
   const turnId = ctx.turnId()
-  if (id === undefined || turnId === undefined) return
+  if (id === undefined) return
+  if (turnId === undefined) {
+    noteOutside(ctx, id, update)
+    return
+  }
   const prev = ctx.inflight.get(id)
   // 没见过这个 id：agent 跳过了 `tool_call` 直接发更新。照样落一条，
   // 丢掉的话界面上会缺一整个工具调用——宁可信息不全，也不能整条不见

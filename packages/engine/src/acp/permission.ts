@@ -21,6 +21,8 @@ export interface PermissionContext {
   memory: () => readonly Rule[]
   /** 在途工具调用表。审批请求只带 id，命令和 diff 全在这里。 */
   inflight: Map<string, AcpToolCall>
+  /** 没有轮次时报上来的工具调用（见 `update.ts` 的 `UpdateContext.outside`）。 */
+  outside?: Map<string, AcpToolCall>
   askUser: (ask: ApprovalAsk, wait?: InteractionWait) => Promise<ApprovalAnswer>
   /** 按停止时撤回这条请求（见 `serve.ts` 的 `cancelPermissions`）。 */
   signal?: AbortSignal
@@ -64,7 +66,7 @@ async function withDetails(
   patch: AcpToolCall,
   ): Promise<AcpToolCall> {
   const budget = ctx.waitMs ?? DETAIL_WAIT_MS
-  const join = (): AcpToolCall => ({ ...ctx.inflight.get(id ?? ""), ...patch })
+  const join = (): AcpToolCall => ({ ...(ctx.inflight.get(id ?? "") ?? ctx.outside?.get(id ?? "")), ...patch })
   if (id === undefined) return join()
   for (let waited = 0; waited < budget; waited += DETAIL_POLL_MS) {
     if (hasDetails(join())) break

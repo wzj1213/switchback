@@ -138,6 +138,7 @@ function detachedThread(thread: Thread): Thread {
   // 背后没有进程：「在跑」「等审批」都作废；「失败」是上一轮的真实结局，留着——侧栏照常标「失败」
   const detached = { ...thread, status: thread.status === "failed" ? "failed" as const : "idle" as const, detached: true }
   delete detached.pendingQuestions
+  delete detached.pendingApprovals
   return detached
 }
 

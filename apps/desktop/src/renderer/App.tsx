@@ -15,7 +15,7 @@ import { useApp } from "./useApp.js"
 import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
 import { useMemo } from "react"
-import { createComposerDrafts } from "./composer-drafts.js"
+import { useDraftStore } from "./use-draft-store.js"
 import { panelShellClass } from "./panel-layout.js"
 
 /**
@@ -131,9 +131,10 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
 
 export function App(): React.JSX.Element {
   useWindowChrome()
-  const drafts = useMemo(createComposerDrafts, [])
   const app = useApp()
   const { shell, state, thread } = app
+  const threads = useMemo(() => app.rows.map((row) => row.thread), [app.rows])
+  const { drafts, hydrated } = useDraftStore(threads)
 
   const sidebar = <Rail app={app} />
 
@@ -148,7 +149,8 @@ export function App(): React.JSX.Element {
     </>
   )
 
-  if (thread === undefined) {
+  // 草稿读回来之前不挂输入框：它只在挂上那一刻读一次（见 `use-draft-store.ts`）
+  if (thread === undefined || !hydrated) {
     return (
       <div className={panelShellClass(false, false, shell.railOpen)}>
         {sidebar}
@@ -158,7 +160,7 @@ export function App(): React.JSX.Element {
           onDismiss={shell.dismiss}
           onLogin={() => { shell.openSettingsAt("install") }}
           bridgeMissing={app.bridgeMissing}
-          ready={app.ready}
+          ready={app.ready && hydrated}
         />
         {settings}
       </div>

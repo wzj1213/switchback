@@ -287,6 +287,21 @@
   font-size: var(--text-sm);
 }
 
+/* 主轮之外来的那种：谁要的、等了多久 */
+.approval__origin {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+/* 主轮之外的权限请求：列在输入框上方，长了就自己滚，不把输入框顶出屏幕 */
+.outside-approvals {
+  flex: none;
+  max-height: 45vh;
+  overflow-y: auto;
+  padding: 0 var(--sp-3);
+}
+
 /* 要被读准的正是这半截路径和这个参数：等宽、不换行、可横滚 */
 .approval__cmd {
   font-family: var(--font-mono);

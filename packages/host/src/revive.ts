@@ -67,6 +67,7 @@ async function historyOf(
 function historic(thread: Thread, at: number): Thread {
   const next: Thread = { ...thread, detached: true, status: resting(thread.status), updatedAt: at }
   delete next.pendingQuestions
+  delete next.pendingApprovals
   return next
 }
 
@@ -130,12 +131,14 @@ function reattached(ctx: Ctx, record: Thread, at: number, ran: ReadonlySet<strin
   if (to !== record.engine) {
     const next = switched(record, to, latestSegment(record, to), { at, status: "idle" })
     delete next.pendingQuestions
+  delete next.pendingApprovals
     return { ...next, detached: false }
   }
   if (record.engineHandle === undefined && ran.has(to)) throw new Error(lostMessage(to))
   const next: Thread = { ...record, detached: false, status: "idle", updatedAt: at }
   delete next.nextEngine
   delete next.pendingQuestions
+  delete next.pendingApprovals
   return next
 }
 

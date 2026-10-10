@@ -88,11 +88,27 @@ describe("Claude canUseTool", () => {
 })
 
 describe("没人能问时", () => {
-  it("照实告诉模型：这一轮已经结束、没有人确认，不说成用户拒绝", async () => {
+  it("照实告诉模型：会话已经关了、没有人确认，不说成用户拒绝", async () => {
     const { canUseTool } = await judgeWith({ allow: false, remember: "once", unattended: true })
     const result = await canUseTool("Bash", { command: "git push origin main" }, {
       signal: new AbortController().signal, toolUseID: "toolu_bg", requestId: "r9",
     })
-    expect(result).toEqual({ behavior: "deny", message: "这一轮已经结束，没有人能确认这次调用，所以没有执行" })
+    expect(result).toEqual({ behavior: "deny", message: "会话已经关闭，没有人能确认这次调用，所以没有执行" })
   })
+})
+
+describe("子 agent 来要权限", () => {
+  const cases = [
+    { name: "SDK 报了 agentID：照原样标出来，宿主据此不让「本轮都放行」吞掉它", meta: { agentID: "agent-7" }, want: { kind: "subagent", id: "agent-7" } },
+    { name: "主 agent 自己要的：不带来源", meta: {}, want: undefined },
+  ]
+  for (const one of cases) {
+    it(one.name, async () => {
+      const { canUseTool, seen } = await judgeWith({ allow: true, remember: "once" })
+      await canUseTool("Bash", { command: "git push origin main" }, {
+        signal: new AbortController().signal, toolUseID: "toolu_s", requestId: "r10", ...one.meta,
+      })
+      expect(seen.asks[0]?.ask.origin).toEqual(one.want)
+    })
+  }
 })

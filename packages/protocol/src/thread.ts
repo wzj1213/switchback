@@ -1,6 +1,7 @@
 import type { EngineCapabilities } from "./capability.js"
 import type { EngineId, ThreadId, TurnId } from "./ids.js"
 import type { PendingQuestion } from "./question.js"
+import type { PendingApproval } from "./item.js"
 
 /** 引擎原生长期目标的状态。字段只复述引擎，不由 Switchback 根据轮次结果推断。 */
 export type GoalStatus =
@@ -150,6 +151,8 @@ export interface Thread {
   asides?: readonly Aside[]
   /** 引擎正在等人回答的结构化问题；可同时有多组（后台提问会这么做）。 */
   pendingQuestions?: readonly PendingQuestion[]
+  /** 主轮之外来的权限请求（后台子 agent、workflow），见 `PendingApproval`。 */
+  pendingApprovals?: readonly PendingApproval[]
   /**
    * 下一句话用哪家引擎。**只是意向，还没生效。**
    *

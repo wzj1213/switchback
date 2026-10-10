@@ -4,6 +4,7 @@ import { sinceOf } from "../status.js"
 import { useMinute } from "../useMinute.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"
+import { displayStatus } from "@switchback/store"
 
 /*
  * 侧栏会话行的状态点和右边那一列。从 `SidebarRows.tsx` 拆出来是行数闸门逼的，
@@ -104,8 +105,10 @@ export function RowEnd({
    */
   unread?: boolean
 }): React.JSX.Element {
-  const note = NOTE[thread.status]
-  const running = thread.status === "running"
+  // 主轮之外还挂着权限请求的，照「待批」画（见 store 的 `displayStatus`）
+  const status = displayStatus(thread)
+  const note = NOTE[status]
+  const running = status === "running"
   // 包一层 `.row__end`：悬停时整列让位给行内操作，操作按钮浮在这一列上（见 app-sidebar.css）
   return (
     <span className="row__end">
@@ -122,7 +125,7 @@ export function RowEnd({
         </span>
       ) : null}
       {note === undefined ? null : (
-        <span className={`row__note${thread.status === "failed" ? " row__note--fail" : ""}`}>
+        <span className={`row__note${status === "failed" ? " row__note--fail" : ""}`}>
           {note}
         </span>
       )}

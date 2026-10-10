@@ -1,6 +1,7 @@
 import type { Command, Item, Lane, Thread } from "@switchback/protocol"
 import { PlanPanel } from "./PlanPanel.js"
 import { QuestionStack } from "./QuestionCard.js"
+import { OutsideApprovals } from "./OutsideApprovals.js"
 import { Queued } from "./Queued.js"
 import { GoalBar } from "./GoalBar.js"
 import { ActivityDock } from "./ActivityDock.js"
@@ -70,6 +71,7 @@ export function Between(props: Props): React.JSX.Element {
           })
         }}
       />
+      <OutsideApprovals approvals={props.thread.pendingApprovals ?? []} send={props.send} now={Date.now()} />
       <QuestionStack
         threadId={props.thread.id}
         groups={props.thread.pendingQuestions ?? []}

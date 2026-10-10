@@ -1,5 +1,41 @@
 /* ── 输入框 ──────────────────────────────────────────── */
 
+/* 待发送：排着的那几句，每句一颗「取回」。和目标条同一套底色与字号 */
+.queued {
+  flex: none;
+  max-height: 30vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.queued__head {
+  padding: var(--sp-2) var(--sp-3) 0;
+  color: var(--text-faint);
+}
+
+.queued__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 0 0 0 var(--sp-3);
+}
+
+.queued__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queued__take {
+  flex: none;
+}
+
 .goalbar {
   display: flex;
   flex: none;

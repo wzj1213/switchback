@@ -15,3 +15,15 @@ export function cannotRevive(thread: Thread): boolean {
   const segments = thread.segments ?? []
   return segments.length === 0 || segments.some((segment) => segment.engine === to)
 }
+
+/**
+ * 侧栏、列表上给这条会话画什么状态。
+ *
+ * 主轮之外的权限请求（`Thread.pendingApprovals`）不改会话状态——`waiting_approval` 在界面上
+ * 等于「这一轮还在跑」，而那时并没有轮次——可列表上它确实在等你，照「待批」画，人才看得见。
+ * 正在跑的照旧画「在跑」：那时转录区里有动静，点进去自然看到上方那张卡。
+ */
+export function displayStatus(thread: Thread): Thread["status"] {
+  if ((thread.pendingApprovals?.length ?? 0) === 0 || thread.status === "running") return thread.status
+  return "waiting_approval"
+}

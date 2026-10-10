@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useRef } from "react"
+import { useDraft, type DraftOptions } from "../useDraft.js"
 
 /**
  * 输入框。
@@ -21,29 +22,22 @@ export function Composer({
   hint,
   onSend,
   onStop,
-  restore,
-  onRestored,
+  draft,
 }: {
   disabled: boolean
   running: boolean
   hint: string
-  /** 返回有没有真的发出去。**发不出去就不能清空输入框**。 */
-  onSend: (text: string) => boolean
+  /**
+   * 返回有没有真的发出去。**发不出去就不能清空输入框**。
+   * `draftRevision`：并进来的那一版宿主草稿，宿主据此消费掉它。
+   */
+  onSend: (text: string, draftRevision: string | undefined) => boolean
   onStop: () => void
-  /** 发出去之后被宿主拒掉、还回来的那句话（见 `Remote.returned`）。 */
-  restore?: { id: number; text: string } | undefined
-  onRestored?: (id: number) => void
+  /** 这条会话的草稿：本机存着的、宿主交回的、被拒还回来的（见 `useDraft`）。 */
+  draft: DraftOptions
 }): React.JSX.Element {
-  const [text, setText] = useState("")
+  const { text, setText, applied } = useDraft(draft)
   const box = useRef<HTMLTextAreaElement>(null)
-
-  // **被拒的那句收回输入框。** 发出去那一刻已经清了框，不还回来就得凭记忆重打；
-  // 这期间又打了字的，还回来的那句排在前面——它是先写的
-  useEffect(() => {
-    if (restore === undefined) return
-    setText((current) => (current.trim() === "" ? restore.text : `${restore.text}\n${current}`))
-    onRestored?.(restore.id)
-  }, [restore, onRestored])
 
   const grow = (): void => {
     const el = box.current
@@ -58,7 +52,7 @@ export function Composer({
     if (value === "" || disabled) return
     // **没发出去就把字留着。** 断线时清空输入框等于把用户刚打的一段话
     // 扔了，而界面上没有任何东西说这里出过事——那是这一端最坏的失败方式
-    if (!onSend(value)) return
+    if (!onSend(value, applied)) return
     setText("")
     // 高度要跟着回到一行，否则清空之后留着一个六行高的空框
     queueMicrotask(grow)

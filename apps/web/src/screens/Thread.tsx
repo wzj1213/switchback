@@ -4,6 +4,8 @@ import { itemsOf, lanesOf, mainItems, thinkingTokensOf, turnOf, usageOf } from "
 import type { Remote } from "../useRemote.js"
 import { ItemView } from "../components/ItemView.js"
 import { ThreadInput } from "../components/ThreadInput.js"
+import { Queued } from "../components/Queued.js"
+import { OutsideApprovals } from "../components/OutsideApprovals.js"
 import { PlanBar } from "../components/PlanBar.js"
 import { QuestionStack } from "../components/QuestionCard.js"
 import { GoalBar } from "../components/GoalBar.js"
@@ -184,7 +186,9 @@ export function Thread({
       )}
       <GoalBar goal={thread.goal} />
       <PlanBar items={itemsOf(remote.state, thread.id)} />
+      <OutsideApprovals approvals={thread.pendingApprovals} send={remote.send} offline={offline} now={Date.now()} />
       <QuestionStack threadId={thread.id} groups={thread.pendingQuestions} send={remote.send} offline={offline} />
+      <Queued thread={thread} send={remote.send} offline={offline} />
       <ThreadInput thread={thread} remote={remote} running={running} offline={offline} />
     </section>
   )

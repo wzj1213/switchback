@@ -41,6 +41,7 @@ function approvalOf(payload: KimiPayload): KimiApproval | undefined {
     tool_name: payload.tool_name,
     action: payload.action,
     tool_input_display: payload.tool_input_display,
+    ...(payload.agentId === undefined || payload.agentId === "main" ? {} : { agent_id: payload.agentId }),
   }
 }
 
@@ -159,6 +160,7 @@ export class KimiInteractions {
         ...(verdict.suggest === undefined
           ? {}
           : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
+        ...(approval.agent_id === undefined ? {} : { origin: { kind: "subagent" as const, id: approval.agent_id } }),
       },
       { signal },
     )

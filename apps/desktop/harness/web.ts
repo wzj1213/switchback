@@ -69,6 +69,11 @@ const thread = (id: string, title: string, status: Thread["status"]): Thread => 
   ...(id === "t-3" ? {
     asides: [{ at: at + 1, question: "这条旧侧问还能看到吗？", answer: "可以，旧日志继续兼容。" }],
   } : {}),
+  // 跑着的时候补的两句：手机上也要看得见、取得回（`components/Queued.tsx`）
+  ...(id === "t-1" ? {
+    queued: ["顺手把 README 里写的端口号也改成 17801", "跑完列一下改了哪些文件，别直接提交"],
+    queuedAttachments: [[], ["/Users/you/Pictures/port.png"]],
+  } : {}),
 })
 
 const WEB_LANES: readonly Lane[] = [

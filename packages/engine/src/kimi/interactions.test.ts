@@ -331,3 +331,31 @@ describe("Kimi 审批", () => {
     await vi.waitFor(() => expect(signals[1]?.aborted).toBe(true))
   })
 })
+
+describe("子 agent 来要权限", () => {
+  const cases = [
+    { name: "帧上带着子 agent 的 agentId：照原样标出来", agentId: "subagent-1", want: { kind: "subagent", id: "subagent-1" } },
+    { name: "主 agent 自己要的：不带来源", agentId: "main", want: undefined },
+  ]
+  for (const one of cases) {
+    it(one.name, async () => {
+      const asks: { origin?: unknown }[] = []
+      const req: StartRequest = {
+        threadId: "th1", cwd: "/work", trust: "auto-edit", home: "/home/u", memory: () => [], emit: () => undefined,
+        askUser: (ask) => {
+          asks.push(ask)
+          return Promise.resolve({ allow: false, remember: "once" })
+        },
+        askQuestion: () => Promise.resolve({ dismissed: true }),
+      }
+      const api: KimiApi = { get: <T>() => Promise.resolve(undefined as T), post: <T>() => Promise.resolve({} as T) }
+      const interactions = new KimiInteractions({ api, sessionId: "s1", req, trust: () => "auto-edit", onError: () => undefined })
+      interactions.handle({
+        type: "event.approval.requested", agentId: one.agentId, approval_id: `ap-${one.agentId}`,
+        tool_call_id: "tc1", tool_name: "WebFetch", action: "Fetch", tool_input_display: { kind: "url_fetch", url: "https://registry.example/x" },
+      })
+      await vi.waitFor(() => expect(asks).toHaveLength(1))
+      expect(asks[0]?.origin).toEqual(one.want)
+    })
+  }
+})

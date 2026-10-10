@@ -36,12 +36,20 @@ export function ThreadInput({
       disabled={offline || thread.status === "starting"}
       running={running}
       hint={hintOf(thread, offline, label)}
-      onSend={(text) => remote.send({ type: "thread.prompt", threadId: thread.id, text })}
+      onSend={(text, applied) => remote.send({
+        type: "thread.prompt", threadId: thread.id, text,
+        // 并进来的就是宿主现在这一版：带上它，宿主据此消费掉，桌面上不会再冒出来一遍
+        ...(applied !== undefined && applied === thread.draftRevision ? { draftRevision: applied } : {}),
+      })}
       onStop={() => {
         remote.send({ type: "thread.interrupt", threadId: thread.id })
       }}
-      restore={remote.returned?.threadId === thread.id ? remote.returned : undefined}
-      onRestored={remote.takeReturned}
+      draft={{
+        threadId: thread.id,
+        host: { draft: thread.draft, revision: thread.draftRevision },
+        restore: remote.returned?.threadId === thread.id ? remote.returned : undefined,
+        onRestored: remote.takeReturned,
+      }}
     />
   )
 }

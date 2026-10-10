@@ -77,8 +77,8 @@ export function withoutExistingAttachments(
   }
 }
 
-function useAttachmentNotice(): [Attachments["notice"], (notice: Attachments["notice"]) => void] {
-  const [notice, setNotice] = useState<Attachments["notice"]>()
+function useAttachmentNotice(initial?: Attachments["notice"]): [Attachments["notice"], (notice: Attachments["notice"]) => void] {
+  const [notice, setNotice] = useState<Attachments["notice"]>(initial)
   useEffect(() => {
     if (notice === undefined) return undefined
     const timer = window.setTimeout(() => { setNotice(undefined) }, 5000)
@@ -87,10 +87,14 @@ function useAttachmentNotice(): [Attachments["notice"], (notice: Attachments["no
   return [notice, setNotice]
 }
 
-export function useAttachments(enabled: boolean, initial: readonly string[] = []): Attachments {
+export function useAttachments(
+  enabled: boolean,
+  initial: readonly string[] = [],
+  initialNotice?: Attachments["notice"],
+): Attachments {
   const [paths, setPaths] = useState<readonly string[]>(() => [...new Set(initial)])
   const knownPaths = useRef(new Set(initial))
-  const [notice, setNotice] = useAttachmentNotice()
+  const [notice, setNotice] = useAttachmentNotice(initialNotice)
   const bridge = typeof window === "undefined" ? undefined : window.switchback
 
   const accept = useCallback((raw: AttachmentResult, text: string): AttachmentAcceptance => {

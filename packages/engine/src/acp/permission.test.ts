@@ -502,3 +502,22 @@ describe("引擎报的当前档怎么变成一条轴", () => {
     expect(modeAxis([{ id: "x" }], "auto-edit", "x").label).toBeUndefined()
   })
 })
+
+describe("主轮之外来的权限请求", () => {
+  it("详情在后台那张表里：照样认得出命令，不退化成「详情未送达」", async () => {
+    const outside = new Map<string, AcpToolCall>([
+      ["bg-1", { toolCallId: "bg-1", kind: "execute", title: "git push origin main", rawInput: { command: "git push origin main" } }],
+    ])
+    const asked: string[] = []
+    const { call } = capture()
+    const late: ServerCall = { ...call, params: { toolCall: { toolCallId: "bg-1" }, options: REAL_OPTIONS } }
+    await handlePermission(
+      { ...ctxWith("auto-edit", new Map(), (ask) => {
+        asked.push(ask.summary)
+        return Promise.resolve({ allow: false, remember: "once" })
+      }), outside },
+      late,
+    )
+    expect(asked[0]).toContain("git push origin main")
+  })
+})

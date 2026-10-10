@@ -1,4 +1,4 @@
-import type { ThreadRow } from "@switchback/store"
+import { displayStatus, type ThreadRow } from "@switchback/store"
 
 /**
  * 侧栏的分组与行文案。
@@ -44,7 +44,7 @@ export interface Group {
 export function tallyOf(group: Group): { running: number; waiting: number; unread: number } {
   return {
     running: group.rows.filter((r) => r.thread.status === "running").length,
-    waiting: group.rows.filter((r) => r.thread.status === "waiting_approval").length,
+    waiting: group.rows.filter((r) => displayStatus(r.thread) === "waiting_approval").length,
     unread: group.rows.filter((r) => r.unread === true).length,
   }
 }

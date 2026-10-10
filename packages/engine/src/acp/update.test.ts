@@ -405,3 +405,20 @@ describe("config_option_update：换完模型，可选项跟着换", () => {
     }).not.toThrow()
   })
 })
+
+describe("没有轮次时报上来的工具调用（主轮收工之后的后台活）", () => {
+  it("不落工具行，但记下详情：随后的权限请求只带 id，要靠它认出是什么命令；收工扫尾不碰它", () => {
+    const { ctx, state, events } = setup()
+    const outside = new Map<string, AcpToolCall>()
+    const idle: UpdateContext = { ...ctx, turnId: () => undefined, outside }
+    handleUpdate(idle, state, {
+      sessionUpdate: "tool_call", toolCallId: "bg-1", title: "git push origin main", kind: "execute",
+      status: "pending", rawInput: { command: "git push origin main" },
+    } as AcpUpdate)
+    expect(events).toEqual([])
+    expect(outside.get("bg-1")).toMatchObject({ kind: "execute", rawInput: { command: "git push origin main" } })
+    sweep({ ...ctx, outside }, state, "interrupted")
+    expect(events.filter((event) => event.type === "item.updated")).toEqual([])
+    expect(outside.has("bg-1")).toBe(true)
+  })
+})

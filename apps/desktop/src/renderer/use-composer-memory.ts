@@ -28,6 +28,8 @@ export function useComposerMemory(options: {
   imageAttachments: boolean
 } {
   const [initial] = useState(() => recallComposerDraft(options.drafts, options.threadId, options.engine))
+  // 重启后读回来的草稿里有图已经不在了：说一声，不悄悄少一张
+  const [missing] = useState(() => options.drafts.missing(options.threadId))
   const aside = useAsideMode({
     can: options.canAside,
     prefill: options.prefill,
@@ -35,7 +37,10 @@ export function useComposerMemory(options: {
     initial: initial?.aside,
   })
   const imageAttachments = imageAttachmentsEnabled(options.canAttach, aside.on)
-  const attach = useAttachments(imageAttachments, initial?.attachments)
+  const attach = useAttachments(imageAttachments, initial?.attachments, missing === undefined ? undefined : {
+    text: `上次没发出去的草稿里有 ${String(missing)} 张图已经不在了，没能放回来`,
+    tone: "warn",
+  })
   const blocks = useDraftBlocks(initial?.blocks)
   return { initial, attach, blocks, aside, imageAttachments }
 }

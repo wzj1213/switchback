@@ -1,6 +1,9 @@
-import { app, dialog, type BrowserWindow } from "electron"
+import { app, BrowserWindow, dialog } from "electron"
 import type { Thread } from "@switchback/protocol"
 import { busy } from "./awake.js"
+import type { Attached } from "./attached.js"
+import { clearMarker } from "./crash.js"
+import type { Logger } from "./log.js"
 
 /**
  * ⌘Q 的时候先问一句——如果真有活在跑。
@@ -46,7 +49,8 @@ export function forcedQuit(): boolean {
  */
 export function quitBlurb(threads: readonly Thread[]): string {
   const running = threads.filter((t) => t.status === "running").length
-  const waiting = threads.filter((t) => t.status === "waiting_approval").length
+  // 主轮之外的权限请求（后台子 agent 在等）也算：会话状态没变，可确实有人在等你
+  const waiting = threads.filter((t) => t.status === "waiting_approval" || (t.pendingApprovals?.length ?? 0) > 0).length
   const questions = threads.reduce((count, thread) => count + (thread.pendingQuestions?.length ?? 0), 0)
   const parts: string[] = []
   if (running > 0) parts.push(`${String(running)} 条正在跑`)
@@ -76,4 +80,79 @@ export function shouldStayOpen(threads: readonly Thread[], win: BrowserWindow | 
     ? dialog.showMessageBoxSync(options)
     : dialog.showMessageBoxSync(win, options)
   return picked === 1
+}
+
+/**
+ * 退出时**等回收跑完**再真的退。
+ *
+ * 原来是 `void attached.host.dispose()`——发出去就不管了，应用当场退出。
+ * 空闲的引擎恰好没事（主进程一死，OS 关掉 stdio 管道，等价于回收阶梯第一步），
+ * **但正在跑工具的时候退，就漏一整棵进程树**：codex、它拉起的 zsh、
+ * 构建进程全部存活并挂到 ppid 1。子进程是 `detached` 的，父死不连坐。
+ * 而那正好是一个有写/执行权限的无头 agent 继续在你仓库里跑。
+ *
+ * 硬超时 8 秒：回收阶梯本身最长 7 秒（3+3+1），再多给一点余量。
+ * **超时也要退**——一个退不掉的应用比漏一个进程更糟。
+ */
+export function guardQuit(deps: {
+  attached: Attached
+  log: Logger
+  closeRemote: () => Promise<void>
+  /** 没发出去的草稿：收摊那几秒里渲染层可能还交过来一份，所以最后才落盘。 */
+  flushDrafts: () => void
+}): void {
+  const { attached, log, closeRemote } = deps
+  let quitting = false
+  app.on("before-quit", (event) => {
+    if (quitting) return
+    // **先拦下来再问**：`preventDefault` 必须在这一拍同步调用，
+    // 弹框是同步的所以顺序上没问题
+    event.preventDefault()
+    // **`quitting` 要在问完之后才置。** 置早了、人又点了「取消」，
+    // 这个标志就永久地把确认框关掉了——第二次 ⌘Q 直接杀，
+    // 而那正是这个框想拦住的事
+    if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined))
+      return
+    quitting = true
+    const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))
+    void Promise.race([shutdown(attached, log, closeRemote), deadline]).then(() => {
+      deps.flushDrafts()
+      clearMarker()
+      app.exit(0)
+    })
+  })
+}
+
+/**
+ * 收摊：先停引擎，再把在途的日志写完。
+ *
+ * **顺序不能反**：`dispose` 里还会 emit 事件（`gate.settleAll()` 把挂着的
+ * 审批落定），那些也要落盘。
+ */
+async function shutdown(
+  attached: Attached,
+  logger: Logger,
+  closeRemote: () => Promise<void>,
+): Promise<void> {
+  // 电源断言先放开：进程马上就没了，但留一个没停的断言给系统是脏活。
+  //
+  // **然后是引擎先回收、远程后关。**
+  //
+  // 反过来（先 await closeRemote）曾经是这里的写法，而它的上界由第三方库和
+  // 网络共同决定：一条正在往隧道里推前端产物、对端却卡在电梯里的连接，
+  // 能让 `server.close()` 撑过外层那 8 秒的兜底——一到点就 `app.exit(0)`，
+  // `host.dispose()` **一次都没跑**，于是漏掉整棵引擎进程树
+  //（子进程是 detached 的，父死不连坐）。那正是这段代码本来要挡的事。
+  //
+  // 远程客户端收不到优雅关闭，最多是多等一次重连；漏一棵有写和执行权限的
+  // 进程树没有「最多」。
+  attached.awake.release()
+  attached.egress.dispose()
+  await attached.host.dispose().catch((error: unknown) => {
+    logger.write("error", "app", `退出时回收引擎失败：${String(error)}`)
+  })
+  await attached.journal.flush().catch(() => undefined)
+  await closeRemote().catch((error: unknown) => {
+    logger.write("warn", "remote", `关闭远程服务端失败：${String(error)}`)
+  })
 }

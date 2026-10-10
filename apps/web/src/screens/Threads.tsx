@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import type { Thread, ThreadId } from "@switchback/protocol"
-import { itemsOf, projectsOf, threadRowsOf } from "@switchback/store"
+import { itemsOf, projectsOf, threadRowsOf, displayStatus } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { PushToggle } from "../components/PushToggle.js"
 
@@ -20,8 +20,10 @@ const STATUS_TEXT: Readonly<Record<Thread["status"], string>> = {
 }
 
 function rank(thread: Thread): number {
-  if (thread.status === "waiting_approval") return 0
-  if (thread.status === "running" || thread.status === "starting") return 1
+  // 后台子 agent 在等权限的也排最前：会话状态没变，可它确实卡在你这儿（见 store 的 `displayStatus`）
+  const status = displayStatus(thread)
+  if (status === "waiting_approval") return 0
+  if (status === "running" || status === "starting") return 1
   return 2
 }
 
@@ -91,11 +93,11 @@ function Row({
         onOpen(thread.id)
       }}
     >
-      <span className={`dot dot--${thread.status}`} aria-hidden="true" />
+      <span className={`dot dot--${displayStatus(thread)}`} aria-hidden="true" />
       <span className="row__body">
         <span className="row__title">{thread.title}</span>
         <span className="row__sub">
-          {STATUS_TEXT[thread.status]} · {thread.engine}
+          {STATUS_TEXT[displayStatus(thread)]} · {thread.engine}
           {thread.detached === true ? " · 未接引擎" : ""}
         </span>
         {preview === undefined ? null : <span className="row__preview">{preview}</span>}

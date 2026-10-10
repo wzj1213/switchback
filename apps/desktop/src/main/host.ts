@@ -142,6 +142,8 @@ export interface HostPorts {
   touched: TouchedFiles
   attachmentFiles: AttachmentFiles
   worksiteSearch: WorksiteSearch
+  /** 没发出去的草稿：会话删了它的那份一起删。 */
+  drafts?: { forget: (threadId: ThreadId) => void }
   relay?: Relay
   engineVisible?: (id: string) => boolean
   dshProfile?: () => string
@@ -194,13 +196,16 @@ function refresherOf(deps: {
 }
 
 /** 每条事件都先进名册再广播：预览工作区外的文件凭它放行（见 `touched.ts`）。 */
-function noting(touched: TouchedFiles, attachments: AttachmentFiles,
-  worksites: WorksiteSearch, publish: (event: Event) => void): (event: Event) => void {
+function noting(ports: Pick<HostPorts, "touched" | "attachmentFiles" | "worksiteSearch" | "drafts">,
+  publish: (event: Event) => void): (event: Event) => void {
   return (event) => {
-    touched.note(event)
-    attachments.note(event)
-    worksites.note(event)
-    if (event.type === "thread.removed") void attachments.removeThread(event.threadId)
+    ports.touched.note(event)
+    ports.attachmentFiles.note(event)
+    ports.worksiteSearch.note(event)
+    if (event.type === "thread.removed") {
+      void ports.attachmentFiles.removeThread(event.threadId)
+      ports.drafts?.forget(event.threadId)
+    }
     publish(event)
   }
 }
@@ -227,7 +232,7 @@ export function attachHost(
 
   const { emit: publish, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
   // 挂在**唯一那个出口**上，不是各个驱动里——漏一处就是某类会话的文件点不开
-  const emit = noting(ports.touched, ports.attachmentFiles, worksiteSearch, publish)
+  const emit = noting(ports, publish)
 
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)

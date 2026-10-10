@@ -11,7 +11,9 @@ prompt 是宿主发出的，所以宿主知道一轮什么时候开始；引擎�
 - `createHost(deps)` —— 命令分发（`Command` → 引擎）与事件汇聚（引擎 → `Event`）
 - 会话注册表：thread id → 活着的 `EngineSession`
 - 审批闸（`gate.ts`）：把驱动的 `askUser` 变成一张 transcript 里的审批卡，
-  等渲染层的 `approval.resolve` 命令来落定；引擎先撤销时标成失效并解开等待
+  等渲染层的 `approval.resolve` 命令来落定；引擎先撤销时标成失效并解开等待。
+  主轮之外来的（后台子 agent、workflow 在主轮收工之后才来要权限）挂在会话上（`outside.ts`），
+  不替引擎拒；「本轮剩下的都放行」不放过任何带来源（`origin`）的请求
 - 结构化问题闸（`question.ts`）：把驱动的 `askQuestion` 投影到 `Thread.pendingQuestions`，
   严格核对题目、选项、备注与答案形状，再由 `question.resolve` 原样回给仍在等待的引擎；
   引擎取消或非阻塞期限到达时清卡并按跳过落定
@@ -89,10 +91,14 @@ prompt 是宿主发出的，所以宿主知道一轮什么时候开始；引擎�
 
 ## 已知限制
 
-- **轮次之外来的审批不出卡，按拒绝回。** 审批卡挂在轮次下面；主轮收工之后才来要权限的
-  （Claude 后台 workflow 里的子 agent、Kimi 后台任务），宿主没有轮次可挂，直接拒，并标明
-  「没人能问」（`ApprovalAnswer.unattended`）——Claude 那边对模型说的是「这一轮已经结束、
-  没有人能确认」，不说成用户拒绝。要让这类请求也出卡，得先定它挂在哪一轮上，那是另一件事。
+- **主轮之外来的审批只认引擎报的来源，认不出就照实写「来源未标明」。** 主轮收工之后才来要权限的
+  （Claude 后台 workflow 里的子 agent、Kimi 后台任务）挂在会话上（`Thread.pendingApprovals`），
+  输入框上方等人点，主轮收工、按停止都不收它（`gate.settleTurn`）。卡上写「谁要的」只用引擎报的 id：
+  Claude 的 `agentID`、Kimi 帧上的 `agentId`；ACP 的 `session/request_permission` 不带来源，codex 也没接。
+  Claude 的 `agentID` 和 workflow 旁路（整批共用一个 task_id）不一定一一对应，所以不去对旁路猜名字。
+  落定之后不在转录区留记录——没有轮次可挂。
+- **被收起的判据只看得到引擎报着的子任务。** `evict` 不收挂着这类请求、或活状态里还有子任务的会话；
+  Claude 在主轮收工时清掉子任务进度，此后仍在跑的后台 agent 宿主看不见，最久没动的那条照样可能被收起。
 
 - **不做背压**。`emit` 必须同步返回得比引擎产出快，否则事件在内存里堆积。
 - **回声闸只认 item 快照变化与 thread.updated，而且只比对上一条。** `item.delta` 永远放行（两条一样的增量是

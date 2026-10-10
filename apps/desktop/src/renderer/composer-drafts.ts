@@ -1,6 +1,8 @@
 import type { EngineId, SlashCommand } from "@switchback/protocol"
+import { blankDraft, MAX_DRAFTS, type StoredDraft } from "../shared/drafts.js"
 import { applyCommand } from "./slash.js"
 import type { DraftBlock } from "./composer-blocks.js"
+import type { DraftSink } from "./draft-disk.js"
 
 export interface ComposerDraftMemory {
   engine: EngineId
@@ -28,9 +30,10 @@ export interface ComposerDrafts {
   applied: (threadId: string) => string | undefined
   /** 不给就是忘掉：宿主草稿随发送消费掉之后，下一份从头算。 */
   markApplied: (threadId: string, identity?: string) => void
+  /** 上次留下的草稿里有几张图已经不在了（重启后读盘时核的）。只报一次。 */
+  missing: (threadId: string) => number | undefined
 }
 
-const MAX_DRAFTS = 40
 
 function empty(draft: ComposerDraftMemory): boolean {
   return draft.text === "" && draft.attachments.length === 0 && draft.blocks.length === 0 &&
@@ -41,32 +44,64 @@ function copy(draft: ComposerDraftMemory): ComposerDraftMemory {
   return { ...draft, attachments: [...draft.attachments], blocks: [...draft.blocks] }
 }
 
-export function createComposerDrafts(limit = MAX_DRAFTS): ComposerDrafts {
+/** 落盘的那一份：正文、附件、芯片、命令、侧问，外加并过的宿主草稿版本。什么都没有就是删。 */
+function toStored(draft: ComposerDraftMemory | undefined, applied: string | undefined): StoredDraft | undefined {
+  const content = draft === undefined ? { text: "", attachments: [], blocks: [], aside: false } : draft
+  const stored = { ...copy({ engine: "", ...content }), ...(applied === undefined ? {} : { applied }), at: Date.now() }
+  return blankDraft(stored) ? undefined : stored
+}
+
+function fromStored(stored: StoredDraft): ComposerDraftMemory {
+  return {
+    engine: stored.engine, text: stored.text, attachments: [...stored.attachments], blocks: [...stored.blocks],
+    aside: stored.aside, ...(stored.command === undefined ? {} : { command: stored.command }),
+  }
+}
+
+/**
+ * 按会话的输入框草稿。内存里一份（切会话立刻能读回来），盘上一份（重启还在，见 `draft-disk.ts`）；
+ * 不给 `sink` 就只在内存里（测试、没有桥的预览）。
+ */
+export function createComposerDrafts(limit = MAX_DRAFTS, sink?: DraftSink): ComposerDrafts {
   const drafts = new Map<string, ComposerDraftMemory>()
   const applied = new Map<string, string>()
+  const slot = (threadId: string): string | undefined => sink?.slotOf(threadId)
+  const disk = (threadId: string): StoredDraft | undefined => {
+    const where = slot(threadId)
+    return where === undefined ? undefined : sink?.stored(where)
+  }
+  const persist = (threadId: string): void => {
+    const where = slot(threadId)
+    if (where !== undefined) sink?.save(where, toStored(drafts.get(threadId), applied.get(threadId)))
+  }
   return {
-    applied: (threadId) => applied.get(threadId),
+    applied: (threadId) => applied.get(threadId) ?? disk(threadId)?.applied,
     markApplied: (threadId, identity) => {
       applied.delete(threadId)
-      if (identity === undefined) return
-      applied.set(threadId, identity)
+      if (identity !== undefined) applied.set(threadId, identity)
       const oldest = applied.size > limit ? applied.keys().next() : undefined
       if (oldest !== undefined && oldest.done !== true) applied.delete(oldest.value)
+      persist(threadId)
     },
     read: (threadId) => {
-      const draft = drafts.get(threadId)
+      const saved = disk(threadId)
+      const draft = drafts.get(threadId) ?? (saved === undefined ? undefined : fromStored(saved))
       if (draft === undefined) return undefined
       drafts.delete(threadId)
       drafts.set(threadId, draft)
+      if (saved?.applied !== undefined && !applied.has(threadId)) applied.set(threadId, saved.applied)
       return copy(draft)
     },
     write: (threadId, draft) => {
       drafts.delete(threadId)
-      if (empty(draft)) return
-      drafts.set(threadId, copy(draft))
-      if (drafts.size <= limit) return
-      const oldest = drafts.keys().next()
-      if (!oldest.done) drafts.delete(oldest.value)
+      if (!empty(draft)) drafts.set(threadId, copy(draft))
+      const oldest = drafts.size > limit ? drafts.keys().next() : undefined
+      if (oldest !== undefined && oldest.done !== true) drafts.delete(oldest.value)
+      persist(threadId)
+    },
+    missing: (threadId) => {
+      const where = slot(threadId)
+      return where === undefined ? undefined : sink?.takeMissing(where)
     },
   }
 }

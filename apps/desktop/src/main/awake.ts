@@ -28,7 +28,8 @@ export function busy(threads: readonly Thread[]): boolean {
     (thread) =>
       thread.status === "running" ||
       thread.status === "waiting_approval" ||
-      (thread.pendingQuestions?.length ?? 0) > 0,
+      (thread.pendingQuestions?.length ?? 0) > 0 ||
+      (thread.pendingApprovals?.length ?? 0) > 0,
   )
 }
 

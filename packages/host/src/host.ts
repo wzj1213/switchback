@@ -131,8 +131,9 @@ const HANDLERS: Handlers = {
     // 引擎先撤自己的（ACP 把挂着的权限请求回成 cancelled、Claude 走 signal），宿主再把剩下的
     // 当场收掉、记成「已失效」：引擎在等这张卡的回音，不回它就收不了这一轮——
     // 实测 ACP 引擎收到 cancel 之后仍等着权限请求的回包，停止键按了也停不下来
+    // 只收主轮自己的：后台子 agent 要的权限照旧等人，引擎撤不撤由它自己的信号说（见 `outside.ts`）
     const stopping = entry?.session.interrupt()
-    entry?.gate.settleAll()
+    entry?.gate.settleTurn()
     await stopping
   },
   "approval.resolve": (ctx, command) => {

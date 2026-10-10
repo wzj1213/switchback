@@ -120,7 +120,7 @@ function noteQuestion(change: QuestionChange, state: QuestionAttention): void {
   state.badge()
   if (!state.enabled() || state.attending(change.threadId) || state.announced.has(key)) return
   state.announced.add(key)
-  state.tell(change.threadId, `等你回答：${change.summary}`)
+  state.tell(change.threadId, change.summary)
 }
 
 function raiseFirst(windows: readonly BrowserWindow[]): void {

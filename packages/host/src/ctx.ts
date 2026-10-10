@@ -524,7 +524,8 @@ export function observe(ctx: Ctx, event: Event): void {
     // 工具行那边早有 `sweepInflight` 扫尾，审批卡漏扫了。
     // 正常情况下 completed 时不会再有审批；但原生事件可能乱序或提前收工。
     // 留着一张已经没有调用方等待的卡，只会让用户事后给失效请求授予规则。
-    entry.gate.settleAll()
+    // 主轮之外来的（后台子 agent 要的权限）不归这一轮，留着等人（见 `outside.ts`）
+    entry.gate.settleTurn()
     setStatus(ctx, entry, event.status === "failed" ? "failed" : "idle")
     // **只有正常跑完才接上队列。** 中断/失败之后接着发排队的话是错的：
     // 人按停止就是要它停下，而不是"停完这句再跑下一句"

@@ -2,6 +2,7 @@ import type { Command, RememberScope, ThreadId } from "@switchback/protocol"
 import type { ApprovalAnswer, ApprovalAsk, InteractionWait } from "@switchback/engine"
 import type { Rule } from "@switchback/approval"
 import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
+import { askOutside, isOutside } from "./outside.js"
 
 /**
  * 审批：问人、记住答案、落定。
@@ -12,7 +13,7 @@ import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
 
 const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
 
-/** 没人能问（轮次之外、会话已关）：照样拒，但让驱动知道这不是用户点的（见 `ApprovalAnswer.unattended`）。 */
+/** 没人能问（会话已经关了）：照样拒，但让驱动知道这不是用户点的（见 `ApprovalAnswer.unattended`）。 */
 const UNATTENDED: ApprovalAnswer = { allow: false, remember: "once", unattended: true }
 
 const PASSED: ApprovalAnswer = { allow: true, remember: "once" }
@@ -25,9 +26,13 @@ const aborted = (wait: InteractionWait | undefined): boolean => wait?.signal?.ab
  * **红线不受它影响。** 那 8 条（凭据读取、越界删除、往工作区外写…）正是最不该
  * 被一次点击盖掉的；一个能盖掉红线的按钮，等于把档位机制整个绕过去了。
  * 界面上也照这句话写，免得用户以为点完就再也不会被打断。
+ *
+ * **子 agent 来要的也不受它影响**（`ask.origin`）：那句话说的是主轮自己的活，
+ * 后台子 agent 恰好在这时来要权限，不该被顺手放过去。
  */
 function passes(entry: Live, ask: ApprovalAsk): boolean {
-  return entry.passTurn !== undefined && entry.passTurn === entry.turn && ask.redline === undefined
+  return entry.passTurn !== undefined && entry.passTurn === entry.turn && ask.redline === undefined &&
+    ask.origin === undefined
 }
 
 export async function askUser(
@@ -37,10 +42,11 @@ export async function askUser(
   wait?: InteractionWait,
 ): Promise<ApprovalAnswer> {
   const entry = ctx.live.get(id)
-  // 会话已关闭、或这一轮已经收工却还有审批请求进来：按拒绝落定，不能让驱动永远等着。
-  // 没有轮次可挂这张卡（后台 workflow、子 agent 在主轮之后才来要权限），见 README 已知限制
+  // 会话已关闭：按拒绝落定，不能让驱动永远等着
   if (aborted(wait)) return DENIED
-  if (entry === undefined || entry.turn === undefined) return UNATTENDED
+  if (entry === undefined) return UNATTENDED
+  // 没有轮次可挂这张卡（后台 workflow、子 agent 在主轮之后才来要权限）：挂在会话上等人
+  if (entry.turn === undefined) return askOutside(ctx, entry, ask, wait)
   // **不发卡、不改状态**：armed 之后再弹一张「已自动允许」的卡，
   // 等于把用户刚才想省掉的那些打断又原样还回去。做了什么在工具行里照样看得见
   if (passes(entry, ask)) return PASSED
@@ -101,13 +107,15 @@ export function carryRules(from: Live, into: Live): void {
 export function resolveApproval(ctx: Ctx, cmd: Extract<Command, { type: "approval.resolve" }>): void {
   for (const entry of ctx.live.values()) {
     const suggest = entry.suggests.get(cmd.itemId)
+    // 落定会同步清掉会话上那一项，所以先看它是不是主轮之外来的
+    const outside = isOutside(entry, cmd.itemId)
     // 范围原样往下传：以前这里压成 boolean，engine 就再也分不出
     // 「这一次」和「这轮对话」了
     const hit = entry.gate.resolve(cmd.itemId, { allow: cmd.allow, remember: cmd.remember })
     if (!hit) continue
     // **只在放行时 arm**：「拒绝并且本轮都放行」不是一个说得通的意图。
-    // 记的是当前轮次 id，下一轮自然失效
-    if (cmd.allow && cmd.passTurn === true) {
+    // 记的是当前轮次 id，下一轮自然失效；主轮之外来的那张不代表任何一轮
+    if (cmd.allow && cmd.passTurn === true && !outside) {
       entry.passTurn = entry.turn
       // 也写进 thread 发出去：这个状态必须在界面上看得见（见 `Thread.passTurn`）
       entry.thread = { ...entry.thread, ...(entry.turn === undefined ? {} : { passTurn: entry.turn }) }

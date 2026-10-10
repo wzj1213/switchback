@@ -43,8 +43,9 @@ export function switched(
   }
   delete next.nextEngine
   // 上一家挂着的问题已经按跳过落定（`gate.settleAll`），新那家背后没有人在等这些答案：
-  // 带过来就成了答不掉、关不掉、还挡着回收与防休眠的死卡
+  // 带过来就成了答不掉、关不掉、还挡着回收与防休眠的死卡。主轮之外的权限请求同理
   delete next.pendingQuestions
+  delete next.pendingApprovals
   // 这四份都由当前引擎握手/回调重建。沿用上一家的值会在新状态到达前撒谎，
   // 更糟的是 `rememberEngineState` 会合并轴，最终把两家状态拼成一份不存在的状态。
   delete next.engineState
@@ -58,5 +59,6 @@ export function switched(
 export function withoutPending(thread: Thread): Thread {
   const next = { ...thread }
   delete next.pendingQuestions
+  delete next.pendingApprovals
   return next
 }

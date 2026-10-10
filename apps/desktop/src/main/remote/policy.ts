@@ -205,7 +205,8 @@ interface Shape {
 const SHAPES: Readonly<Record<string, Shape>> = {
   "thread.adopt": { strings: ["engine", "handle", "cwd", "title"], optionalStrings: ["profile"] },
   "thread.create": { strings: ["cwd", "engine"], enums: { trust: TRUSTS } },
-  "thread.prompt": { strings: ["threadId", "text"] },
+  // 手机把宿主交回的草稿并进输入框之后发出去，带上那一版，宿主据此消费掉它（同桌面端）
+  "thread.prompt": { strings: ["threadId", "text"], optionalStrings: ["draftRevision"] },
   "thread.sideQuestion": { strings: ["threadId", "text"] },
   "thread.interrupt": { strings: ["threadId"] },
   "thread.unqueue": { strings: ["threadId"] },

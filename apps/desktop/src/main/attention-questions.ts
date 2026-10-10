@@ -12,13 +12,18 @@ export interface QuestionWatch {
   clear: () => void
 }
 
+/**
+ * 这条会话现在挂着哪些「等你」：后台问题，和主轮之外来的权限请求（`Thread.pendingApprovals`）。
+ * 值是通知里那句话。主轮里的审批卡走转录区那条路（`attention.ts` 的 `approvalOf`）。
+ */
 function summaries(thread: Thread): Map<string, string> {
-  return new Map(
-    (thread.pendingQuestions ?? []).map((group) => {
-      const first = group.questions[0]
-      return [group.id, first?.header ?? first?.question ?? "引擎需要你的回答"]
-    }),
-  )
+  const questions = (thread.pendingQuestions ?? []).map((group) => {
+    const first = group.questions[0]
+    return [group.id, `等你回答：${first?.header ?? first?.question ?? "引擎需要你的回答"}`] as const
+  })
+  const approvals = (thread.pendingApprovals ?? []).map((one) =>
+    [one.id, `${one.origin === undefined ? "后台" : "子 agent "}在等你确认：${one.summary}`] as const)
+  return new Map([...questions, ...approvals])
 }
 
 function sync(

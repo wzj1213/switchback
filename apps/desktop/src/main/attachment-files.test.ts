@@ -136,3 +136,25 @@ describe("数据目录挪过地方", () => {
     expect(await exists(orphan)).toBe(false)
   })
 })
+
+describe("没发出去的草稿里的图", () => {
+  it("草稿还引用着就不当孤儿删；草稿放手之后照常清", async () => {
+    const { dir } = await fixture()
+    const held = join(dir, "held.png")
+    await writeFile(held, "png")
+    const past = new Date(Date.now() - 8 * 86_400_000)
+    await utimes(held, past, past)
+
+    const kept = createAttachmentFiles(dir)
+    kept.hold("draft:th-1", [held])
+    expect(await kept.pruneOnce(Date.now())).toBe(0)
+    expect(await exists(held)).toBe(true)
+
+    // 草稿把那张图去掉了（或者发出去、删掉了）：整份替换，不再算在用
+    const released = createAttachmentFiles(dir)
+    released.hold("draft:th-1", [held])
+    released.hold("draft:th-1", [])
+    expect(await released.pruneOnce(Date.now())).toBe(1)
+    expect(await exists(held)).toBe(false)
+  })
+})

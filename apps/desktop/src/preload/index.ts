@@ -18,6 +18,7 @@ import { watchFile } from "./file-watch.js"
 import { acpBridge } from "./acp.js"
 import { gitBridge } from "./git.js"
 import { guardBridge } from "./guard.js"
+import { draftsBridge } from "./drafts.js"
 import type { AcpTrialView } from "../shared/acp-registry.js"
 
 /**
@@ -64,6 +65,7 @@ const api = {
   ...acpBridge,
   ...gitBridge,
   ...guardBridge,
+  ...draftsBridge,
   send(command: Command): void {
     ipcRenderer.send("switchback:command", command)
   },

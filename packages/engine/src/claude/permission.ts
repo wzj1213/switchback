@@ -19,6 +19,8 @@ export interface AskMeta {
   displayName?: string
   description?: string
   matchedAskRule?: { source: string; toolName: string; ruleContent?: string }
+  /** 在子 agent 里跑时是它的 id（SDK 原样给）。主 agent 自己要的没有。 */
+  agentID?: string
 }
 
 const MAX_SUMMARY = 300

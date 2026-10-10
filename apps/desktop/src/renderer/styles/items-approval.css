@@ -253,3 +253,22 @@
 .engine-note--warning {
   color: var(--warn);
 }
+
+/* 主轮之外来的权限请求：挂在输入框上方，和后台问题同一处（`OutsideApprovals.tsx`）。
+   卡片本身沿用转录区审批卡的样子，只多一行「谁要的、等了多久」 */
+.outside-approvals {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: min(46vh, 420px);
+  padding: 0 var(--sp-4) var(--sp-3);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.approval__origin {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-weight: 400;
+}

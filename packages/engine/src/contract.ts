@@ -1,4 +1,5 @@
 import type {
+  ApprovalOrigin,
   EngineAccount,
   EngineAxis,
   EngineCapabilities,
@@ -43,6 +44,13 @@ export interface ApprovalAsk {
   /** 可记忆成什么，用作「允许此对话」那一项的标签。没有就用默认文案。 */
   rememberHint?: string
   /**
+   * 引擎报的发起方（子 agent、后台任务）。主 agent 自己要的不带。
+   *
+   * 宿主据此不让「本轮剩下的都放行」吞掉它：那句话说的是主轮自己的活，
+   * 后台子 agent 恰好在这时来要权限，不该被顺手放过去。
+   */
+  origin?: ApprovalOrigin
+  /**
    * 判定器给出的完整建议规则。
    *
    * 只给 `rememberHint`（一句人话）是不够的：用户勾了「始终允许」之后，
@@ -63,8 +71,8 @@ export interface ApprovalAnswer {
    */
   remember: RememberScope
   /**
-   * 没人能问：这一轮已经收工（后台 workflow、子 agent 在主轮之后才来要权限）或会话已经关了。
-   * 宿主按拒绝回，但**这不是用户的决定**——驱动对引擎说话时不能说成「用户拒绝了」。
+   * 没人能问：会话已经关了。宿主按拒绝回，但**这不是用户的决定**——驱动对引擎说话时不能说成「用户拒绝了」。
+   * 主轮之外来的请求（后台 workflow、子 agent 在主轮之后才来要权限）不走这里：宿主把它挂在会话上等人。
    */
   unattended?: boolean
 }

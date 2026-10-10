@@ -110,6 +110,8 @@ export interface KimiApproval {
   approval_id: string
   session_id: string
   turn_id?: number
+  /** 实时帧上带的 `agentId`；主 agent 的不记（见 `interactions.ts`）。 */
+  agent_id?: string
   tool_call_id: string
   tool_name: string
   action: string

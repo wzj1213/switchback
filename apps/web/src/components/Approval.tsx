@@ -31,6 +31,8 @@ export function Approval({
   send,
   offline,
   active,
+  note,
+  rememberable = true,
 }: {
   item: ApprovalItem
   send: (command: Command) => boolean
@@ -41,6 +43,10 @@ export function Approval({
    * 留着的 pending 只是一条历史：画成「已失效」，不摆两颗点了没反应的按钮。和桌面端同一个口径。
    */
   active: boolean
+  /** 卡上补一行小字：谁要的、等了多久（主轮之外来的那种，见 `OutsideApprovals`）。 */
+  note?: string | undefined
+  /** 撞上红线的只能逐次批：不给「本会话都允许」。 */
+  rememberable?: boolean
 }): React.JSX.Element {
   const [scope, setScope] = useState<RememberScope>("once")
 
@@ -60,9 +66,10 @@ export function Approval({
   return (
     <div className="item item--approval approval--pending" role="group" aria-label="需要你确认">
       <p className="approval__why">{item.reason}</p>
+      {note === undefined ? null : <p className="approval__origin">{note}</p>}
       <pre className="approval__cmd approval__cmd--block">{item.summary}</pre>
       <div className="approval__scopes" role="radiogroup" aria-label="记住这次决定的范围">
-        {SCOPES.map((s) => (
+        {SCOPES.filter((s) => rememberable || s.id === "once").map((s) => (
           <button
             key={s.id}
             type="button"

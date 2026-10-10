@@ -30,10 +30,28 @@ describe("结构化问题通知差量", () => {
     note({ type: "thread.removed", at: 3, threadId: "th-1" })
 
     expect(changes).toEqual([
-      { id: "q1", threadId: "th-1", pending: true, summary: "问题 q1" },
-      { id: "q2", threadId: "th-1", pending: true, summary: "问题 q2" },
-      { id: "q1", threadId: "th-1", pending: false, summary: "问题 q1" },
-      { id: "q2", threadId: "th-1", pending: false, summary: "问题 q2" },
+      { id: "q1", threadId: "th-1", pending: true, summary: "等你回答：问题 q1" },
+      { id: "q2", threadId: "th-1", pending: true, summary: "等你回答：问题 q2" },
+      { id: "q1", threadId: "th-1", pending: false, summary: "等你回答：问题 q1" },
+      { id: "q2", threadId: "th-1", pending: false, summary: "等你回答：问题 q2" },
+    ])
+  })
+})
+
+describe("主轮之外的权限请求也叫人", () => {
+  it("新来一张报一次，说清是子 agent 要的；落定就撤", () => {
+    const changes: QuestionChange[] = []
+    const watch = watchQuestions((change) => changes.push(change))
+    const withApproval = (on: boolean): Thread => ({
+      ...thread([]),
+      ...(on ? { pendingApprovals: [{ id: "ap-1", tool: "Bash", summary: "git push", reason: "r", at: 1, origin: { kind: "subagent" as const, id: "a" } }] } : {}),
+    })
+    watch.note({ type: "thread.updated", at: 1, thread: withApproval(true) })
+    watch.note({ type: "thread.updated", at: 2, thread: withApproval(true) })
+    watch.note({ type: "thread.updated", at: 3, thread: withApproval(false) })
+    expect(changes).toEqual([
+      { id: "ap-1", threadId: "th-1", pending: true, summary: "子 agent 在等你确认：git push" },
+      { id: "ap-1", threadId: "th-1", pending: false, summary: "子 agent 在等你确认：git push" },
     ])
   })
 })

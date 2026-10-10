@@ -52,8 +52,10 @@ async function askHuman(
     reason: forced && verdict.action === "allow" ? forcedReason(meta) : verdict.reason,
     ...(redline === undefined ? {} : { redline }),
     ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
+    // 子 agent 里来的请求：照 SDK 给的 id 标出来，不去对旁路猜名字
+    ...(meta.agentID === undefined || meta.agentID === "" ? {} : { origin: { kind: "subagent" as const, id: meta.agentID } }),
   }, meta.signal === undefined ? undefined : { signal: meta.signal })
   if (answer.allow) return toAllow(answer.remember, meta, redline !== undefined)
   // 没人能问时照实说：这不是用户的决定，模型据此不该以为用户明确不让做
-  return toDeny(answer.unattended === true ? "这一轮已经结束，没有人能确认这次调用，所以没有执行" : "用户拒绝了这次调用")
+  return toDeny(answer.unattended === true ? "会话已经关闭，没有人能确认这次调用，所以没有执行" : "用户拒绝了这次调用")
 }

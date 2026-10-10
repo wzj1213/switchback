@@ -176,6 +176,39 @@ export interface ApprovalItem extends ItemBase {
   reason: string
   /** 可选的记忆建议，用户勾选后本会话/本项目不再问。 */
   rememberHint?: string
+  /** 引擎报的发起方（子 agent、后台任务）。主 agent 自己要的权限没有这一项。 */
+  origin?: ApprovalOrigin
+}
+
+/**
+ * 一次权限请求是谁发起的。**只用引擎自己报的 id**（Claude 的 `agentID`、Kimi 的 `agentId`）：
+ * 对得上旁路就能写出名字，对不上就照原样显示 id，不猜。引擎没报就整个缺席，界面写「来源未标明」。
+ */
+export interface ApprovalOrigin {
+  kind: "subagent" | "task"
+  id: string
+  /** 给人看的名字；只有对得上旁路（lane）时才有。 */
+  label?: string
+}
+
+/**
+ * 主轮之外来的一次权限请求：后台子 agent、workflow 在主轮收工之后才来要权限。
+ *
+ * 不进转录区（没有轮次可挂），挂在会话上，输入框上方列出来等人点——和后台问题
+ *（`Thread.pendingQuestions`）同一个位置。不设超时：引擎在等，界面写已经等了多久。
+ * 落定用的仍是 `approval.resolve`，`id` 就是那条命令里的 `itemId`。
+ */
+export interface PendingApproval {
+  id: ItemId
+  tool: string
+  summary: string
+  reason: string
+  rememberHint?: string
+  /** 撞上红线的那种不能记成规则，卡上不给「记住」那几档。 */
+  redline?: boolean
+  origin?: ApprovalOrigin
+  /** 开始等的时刻。 */
+  at: number
 }
 
 export type NoticeLevel = "info" | "notice" | "suggestion" | "warning"

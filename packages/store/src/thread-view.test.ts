@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Thread } from "@switchback/protocol"
-import { cannotRevive } from "./revive.js"
+import { cannotRevive, displayStatus } from "./thread-view.js"
 
 const thread: Thread = {
   id: "t", title: "旧会话", cwd: "/w", engine: "codex", trust: "auto-edit", status: "idle",
@@ -21,5 +21,18 @@ describe("历史会话接不接得回", () => {
   ]
   for (const one of cases) {
     it(one.name, () => expect(cannotRevive(one.thread)).toBe(one.want))
+  }
+})
+
+describe("列表上画什么状态", () => {
+  const waiting = [{ id: "ap-1", tool: "Bash", summary: "git push", reason: "r", at: 1 }]
+  const cases: readonly { name: string; thread: Thread; want: Thread["status"] }[] = [
+    { name: "没有主轮之外的请求：照会话状态", thread: { ...thread, status: "failed" }, want: "failed" },
+    { name: "空闲但后台子 agent 在等权限：画「待批」", thread: { ...thread, pendingApprovals: waiting }, want: "waiting_approval" },
+    { name: "上一轮失败、后台在等权限：也先画「待批」", thread: { ...thread, status: "failed", pendingApprovals: waiting }, want: "waiting_approval" },
+    { name: "主轮正在跑：照画「在跑」", thread: { ...thread, status: "running", pendingApprovals: waiting }, want: "running" },
+  ]
+  for (const one of cases) {
+    it(one.name, () => expect(displayStatus(one.thread)).toBe(one.want))
   }
 })

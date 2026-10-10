@@ -6,6 +6,11 @@ export interface AttachmentFiles {
   dir: string
   note: (event: Event) => void
   noteHistory: (threadId: ThreadId, events: readonly Event[]) => void
+  /**
+   * 一个不是会话的持有者（没发出去的草稿，键是 `draft:<那一格>`）现在引用着哪些图。**整份替换**：
+   * 草稿里去掉的那张不再算在用。给空就是放手。
+   */
+  hold: (owner: string, paths: readonly string[]) => void
   allow: (paths: readonly string[]) => void
   allows: (path: string) => boolean
   discard: (paths: readonly string[]) => Promise<number>
@@ -107,16 +112,21 @@ function note(state: FileState, event: Event): void {
   if (threadId !== undefined) remember(state, threadId, pathsOf(event))
 }
 
-async function removeThread(state: FileState, threadId: ThreadId): Promise<number> {
-  const paths = [...(state.byThread.get(threadId) ?? [])]
-  state.byThread.delete(threadId)
-  for (const [turnId, owner] of state.turns) if (owner === threadId) state.turns.delete(turnId)
+/** 这个持有者引用的图一概放手，返回它原来引用的那些。 */
+function release(state: FileState, owner: string): string[] {
+  const paths = [...(state.byThread.get(owner) ?? [])]
+  state.byThread.delete(owner)
   for (const path of paths) {
     const owners = state.references.get(path)
-    owners?.delete(threadId)
+    owners?.delete(owner)
     if (owners?.size === 0) state.references.delete(path)
   }
-  return erase(state, paths)
+  return paths
+}
+
+async function removeThread(state: FileState, threadId: ThreadId): Promise<number> {
+  for (const [turnId, owner] of state.turns) if (owner === threadId) state.turns.delete(turnId)
+  return erase(state, release(state, threadId))
 }
 
 async function pruneOnce(state: FileState, now: number): Promise<number> {
@@ -142,6 +152,10 @@ export function createAttachmentFiles(rawDir: string): AttachmentFiles {
     note: (event) => { note(state, event) },
     noteHistory: (threadId, events) => {
       for (const event of events) remember(state, threadId, pathsOf(event))
+    },
+    hold: (owner, paths) => {
+      release(state, owner)
+      remember(state, owner, paths)
     },
     allow: (paths) => { allow(state, paths) },
     allows: (path) => {

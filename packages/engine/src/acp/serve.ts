@@ -39,6 +39,7 @@ interface ClientCallDeps {
   req: StartRequest
   config: AcpDriverConfig
   inflight: Map<string, AcpToolCall>
+  outside?: Map<string, AcpToolCall>
   trust: () => Trust
   sessionId: () => string | undefined
 }
@@ -56,6 +57,7 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
     trust: deps.trust,
     memory: req.memory,
     inflight: deps.inflight,
+    ...(deps.outside === undefined ? {} : { outside: deps.outside }),
     askUser: req.askUser,
     ...(signal === undefined ? {} : { signal }),
   })

@@ -4,6 +4,7 @@ import { rowLabelOf, type SidebarRow } from "../sidebar.js"
 import { sinceOf } from "../status.js"
 import { labelOf, TRUSTS } from "./Composer.js"
 import { effortLabel } from "./ModelPicker.js"
+import { displayStatus } from "@switchback/store"
 
 /**
  * 侧栏行的悬停卡：完整路径、引擎、状态原文——只读预览。
@@ -81,7 +82,7 @@ export function usePeek(disabled: boolean): {
 /** 状态那一行：只有「停下来了」才值得说；idle 的行没有这一行。 */
 function statusLine(thread: Thread): { text: string; tone: "warn" | "fail" | "" } | undefined {
   const ago = sinceOf(thread.updatedAt, Date.now())
-  switch (thread.status) {
+  switch (displayStatus(thread)) {
     case "waiting_approval":
       return { text: `待批 · 停在 ${ago}`, tone: "warn" }
     case "failed":

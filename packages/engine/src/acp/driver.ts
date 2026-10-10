@@ -71,6 +71,8 @@ class AcpSession implements EngineSession {
   private readonly owner: ProcessOwner
   private readonly rpc: RpcPeer
   private readonly inflight = new Map<string, AcpToolCall>()
+  /** 没有轮次时报上来的工具调用：只为对上随后的权限请求（见 `update.ts`）。 */
+  private readonly outside = new Map<string, AcpToolCall>()
   private readonly updates: UpdateState = createUpdateState()
   private readonly trust: { current: Trust }
   private readonly activity: ForeignActivityParser | undefined
@@ -115,7 +117,7 @@ class AcpSession implements EngineSession {
       onRequest: (call) => void this.answer(call),
     })
     this.clientCalls = createAcpClientCalls({
-      req, config, inflight: this.inflight, trust: () => this.trust.current,
+      req, config, inflight: this.inflight, outside: this.outside, trust: () => this.trust.current,
       sessionId: () => this.state.acpSession,
     })
     this.revive = new SessionRevive(config.id, this.rpc, req.cwd, this.state)
@@ -137,9 +139,7 @@ class AcpSession implements EngineSession {
       threadId: this.req.threadId,
       engine: this.config.id,
       emit: this.req.emit,
-      onCatalog: (catalog) => {
-        this.recatalog(catalog)
-      },
+      onCatalog: (catalog) => this.recatalog(catalog),
       onMode: (modeId) => {
         this.state.mode = modeId
         this.req.onEngineState?.({ axes: [modeAxis(this.state.modes, this.trust.current, modeId)] })
@@ -147,6 +147,7 @@ class AcpSession implements EngineSession {
       onTitle: (title) => this.req.onTitle?.(title),
       turnId: () => this.state.turn,
       inflight: this.inflight,
+      outside: this.outside,
       newId: (prefix) => {
         this.seq += 1
         return `${prefix}-${String(this.seq)}`
