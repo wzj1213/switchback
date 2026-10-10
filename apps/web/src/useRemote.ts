@@ -68,6 +68,16 @@ export interface Remote {
   /** 宿主捎回来的话（命令被拒、被钳…）。最新一条，用户看完可以关掉。 */
   notice: string | undefined
   dismissNotice: () => void
+  /** 被宿主拒掉、原样还回来的那句话。那条会话的输入框收下之后调 `takeReturned`。 */
+  returned: Returned | undefined
+  takeReturned: (id: number) => void
+}
+
+export interface Returned {
+  /** 同一句话被拒两次也要各还一次，靠它分。 */
+  id: number
+  threadId: ThreadId
+  text: string
 }
 
 interface Refs {
@@ -75,6 +85,8 @@ interface Refs {
   transport: Transport | undefined
   ackTimer: ReturnType<typeof setTimeout> | undefined
   watching: ThreadId | null
+  /** 还回来的话编到第几号了。 */
+  returns: number
 }
 
 export function useRemote(token: string): Remote {
@@ -85,7 +97,8 @@ export function useRemote(token: string): Remote {
   const [trimmed, setTrimmed] = useState<ReadonlySet<ThreadId>>(() => new Set())
   const [me, setMe] = useState<Me | undefined>(undefined)
   const [notice, setNotice] = useState<string | undefined>(undefined)
-  const refs = useRef<Refs>({ stream: initialStream, transport: undefined, ackTimer: undefined, watching: null })
+  const [returned, setReturned] = useState<Returned | undefined>(undefined)
+  const refs = useRef<Refs>({ stream: initialStream, transport: undefined, ackTimer: undefined, watching: null, returns: 0 })
 
   /**
    * 应用一步：落状态、安排一次确认、**缺了就去补**。
@@ -150,6 +163,10 @@ export function useRemote(token: string): Remote {
       }
       if (frame.type === "notice") {
         setNotice(frame.text)
+        if (frame.returned !== undefined) {
+          refs.current.returns += 1
+          setReturned({ ...frame.returned, id: refs.current.returns })
+        }
         return
       }
       if (frame.type === "reset") {
@@ -185,7 +202,11 @@ export function useRemote(token: string): Remote {
     setNotice(undefined)
   }, [])
 
-  return { state, conn, hydrated, loaded, trimmed, me, send, watch, retry, notice, dismissNotice }
+  const takeReturned = useCallback((id: number): void => {
+    setReturned((prev) => (prev?.id === id ? undefined : prev))
+  }, [])
+
+  return { state, conn, hydrated, loaded, trimmed, me, send, watch, retry, notice, dismissNotice, returned, takeReturned }
 }
 
 /** 连接的生老病死。**单独一个 hook**：`useRemote` 已经贴着行数闸门。 */

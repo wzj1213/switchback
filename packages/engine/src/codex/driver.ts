@@ -351,8 +351,13 @@ class CodexSession implements EngineSession {
   }
 
   async interrupt(): Promise<void> {
-    const { codexThread, codexTurn } = this.state
-    if (codexThread === undefined || codexTurn === undefined) return
+    const { codexThread, codexTurn, turn } = this.state
+    if (codexThread === undefined) return
+    // `turn/start` 还没回包（停止键已经出现了）：先记下，拿到原生轮次 id 那一刻补发（见 `turn.ts`）
+    if (codexTurn === undefined) {
+      if (turn !== undefined) this.state.stopRequested = turn
+      return
+    }
     await this.rpc.call("turn/interrupt", { threadId: codexThread, turnId: codexTurn })
   }
 

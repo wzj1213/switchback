@@ -30,6 +30,8 @@ export interface SessionState {
   codexThread: string | undefined
   codexTurn: string | undefined
   turn: TurnId | undefined
+  /** `turn/start` 回包之前就按了停止的那一轮：拿到原生轮次 id 当场补发中断（见 `turn.ts`）。 */
+  stopRequested?: TurnId
   stderr: string
   sandbox: WireSandbox
   approval: WireApprovalPolicy

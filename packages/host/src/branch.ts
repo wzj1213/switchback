@@ -1,6 +1,7 @@
 import type { Command, Event, Item, Thread, ThreadId } from "@switchback/protocol"
 import { initial, itemsOf, reduceAll } from "@switchback/store"
-import { discardUnstarted, drainQueued, emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
+import { discardUnstarted, drainQueued, emit, isCurrent, type Ctx, type Live } from "./ctx.js"
+import { withQueue } from "./queued.js"
 import { bornOf } from "./born.js"
 import { copyTranscript } from "./transcript.js"
 import { dropTemps, launch } from "./session.js"

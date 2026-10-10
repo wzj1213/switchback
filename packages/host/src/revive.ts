@@ -84,8 +84,11 @@ export async function updateRecord(
   const record = await recordOf(ctx, threadId)
   // 读盘期间被删掉的不能再写一条，那会把刚删的文件建回来
   if (record === undefined || ctx.removed.has(threadId) || ctx.live.has(threadId)) return
+  const next = patch(record)
+  // 没改什么（比如取回的下标已经越界）就不重写一遍
+  if (next === record) return
   const at = ctx.deps.now()
-  emit(ctx, { type: "thread.updated", at, thread: historic(patch(record), at) })
+  emit(ctx, { type: "thread.updated", at, thread: historic(next, at) })
 }
 
 /**

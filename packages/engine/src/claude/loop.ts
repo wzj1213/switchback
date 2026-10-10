@@ -24,6 +24,7 @@ import { emitElicitationComplete } from "./elicitation-complete.js"
 import { createStream, onStreamEvent, type StreamState } from "./stream.js"
 import { endTurn, onResult, type ResultContext } from "./result.js"
 import type { RawLoopMessage } from "./loop-wire.js"
+import { createHaltState, haltAgain, type HaltState } from "./halt.js"
 import {
   createSidechainState,
   onSidechainMessage,
@@ -58,6 +59,8 @@ export interface TurnRef extends MessageRef {
   outputTokens?: number
   /** Claude 明确标出 parent_tool_use_id 的子 agent 转录；各 lane 独立维护消息身份。 */
   sidechains: SidechainState
+  /** 按过停止、回执说还有消息照跑的那一轮（见 `halt.ts`）。 */
+  halt: HaltState
 }
 
 export function createTurnRef(onInit: (at: number) => void): TurnRef {
@@ -65,7 +68,7 @@ export function createTurnRef(onInit: (at: number) => void): TurnRef {
     current: undefined, seq: 0, tools: new Map(), notices: new Map(), terminalCommands: new Set(), onInit,
     tasks: createTaskState(), plan: createPlanState(), thinking: createThinkingState(),
     retractions: createRetractionState(), hooks: createHookState(), denials: createDenialState(),
-    stream: createStream(), pendingSteers: 0, sidechains: createSidechainState(),
+    stream: createStream(), pendingSteers: 0, sidechains: createSidechainState(), halt: createHaltState(),
   }
 }
 
@@ -227,6 +230,7 @@ export async function runMessageLoop(
     for await (const msg of handle) {
       const raw = msg as RawLoopMessage
       const at = Date.now()
+      haltAgain(handle, ref, raw.type)
       if (isSidechain(raw)) onSidechainMessage(ref.sidechains, raw, req, at)
       else await dispatch(raw, ref, ctx, at)
     }

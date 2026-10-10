@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react"
-import type { Command } from "@switchback/protocol"
+import type { Command, ThreadId } from "@switchback/protocol"
 import type { ThreadRow } from "@switchback/store"
 import { learnFrom } from "./newThreadPrefs.js"
 import type { LastUsed, Settings } from "../shared/settings.js"
@@ -45,7 +45,7 @@ export interface SendContext {
    * `Thread.provisional`），不跳的话用户点完什么都看不到——界面上没有那一行，
    * 主区还停在原来那条，看起来就是「点了没反应」。
    */
-  onBranch: () => void
+  onBranch: (from: ThreadId) => void
 }
 
 export function useSend(base: (command: Command) => void, context: SendContext): (command: Command) => void {
@@ -60,7 +60,7 @@ export function useSend(base: (command: Command) => void, context: SendContext):
         if (next !== undefined) patch({ lastUsed: next })
       }
       // 分叉 / 重来会生出一条新会话，等它到了就跳过去（理由见 `SendContext.onBranch`）
-      if (command.type === "thread.fork" || command.type === "thread.rewind") latest.current.onBranch()
+      if (command.type === "thread.fork" || command.type === "thread.rewind") latest.current.onBranch(command.threadId)
       base(command)
     },
     [base],

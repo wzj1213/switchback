@@ -55,6 +55,7 @@ function clearTurnUsage(ref: TurnRef): void {
   ref.pendingSteers = 0
   ref.latestUsage = undefined
   ref.outputTokens = undefined
+  ref.halt.turn = undefined
 }
 
 /** 消息流崩溃或退出但没给 result 时的幂等收口。 */

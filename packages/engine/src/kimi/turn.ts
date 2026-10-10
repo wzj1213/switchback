@@ -3,7 +3,9 @@ import { planSteps } from "./plan.js"
 import { finishTool, startTool } from "./tool.js"
 import { kimiMessage, kimiTurnStatus, snapshotCanFinish, snapshotMatches } from "./turn-state.js"
 import type { KimiPayload, KimiSnapshot } from "./wire.js"
-import { compactionEvent, compactionUpdate, type KimiOperation } from "./compaction.js"
+import {
+  compactionAfterGap, compactionEvent, compactionUpdate, type CompactionUpdate, type KimiOperation,
+} from "./compaction.js"
 import { kimiHookResult } from "./hook-result.js"
 import { kimiNotice } from "./notice.js"
 import { kimiNativePartId } from "./native-part.js"
@@ -254,18 +256,14 @@ export class KimiTurnTracker {
 
   compaction(payload: KimiPayload, at: number): void {
     const active = this.active
-    if (active === undefined) return
-    const update = compactionUpdate(active.operation, payload)
-    if (update === undefined) return
+    const update = active === undefined ? undefined : compactionUpdate(active.operation, payload)
+    if (active !== undefined && update !== undefined) this.applyCompaction(active, update, at)
+  }
+
+  private applyCompaction(active: KimiActiveTurn, update: CompactionUpdate, at: number): void {
     this.closeText(active, at)
-    this.deps.emit(
-      compactionEvent(
-        active.turnId,
-        { started: active.compactionStarted, part: active.nativePart },
-        update,
-        at,
-      ),
-    )
+    const part = { started: active.compactionStarted, part: active.nativePart }
+    this.deps.emit(compactionEvent(active.turnId, part, update, at))
     active.compactionStarted = true
     if (update.finish !== undefined) this.finalizer.complete(active, update.finish, at)
   }
@@ -333,9 +331,12 @@ export class KimiTurnTracker {
 
   reconcile(snapshot: KimiSnapshot): void {
     const active = this.active
-    if (active === undefined || active.operation === "compact") return
+    if (active === undefined) return
     const at = this.deps.now()
-    if (snapshot.in_flight_turn === null) this.reconcileIdle(active, snapshot, at)
+    if (active.operation === "compact") {
+      const update = compactionAfterGap(active.activationAccepted, snapshot)
+      if (update !== undefined) this.applyCompaction(active, update, at)
+    } else if (snapshot.in_flight_turn === null) this.reconcileIdle(active, snapshot, at)
     else this.reconcileFlight(active, snapshot, at)
   }
 }

@@ -1,4 +1,5 @@
 import type { Event, ThreadId, Thread, ThreadStatus, TurnId, ItemId } from "@switchback/protocol"
+import { handedBack, promptsOf, withQueue, type QueuedPrompt } from "./queued.js"
 import type { Rule } from "@switchback/approval"
 import type { EngineSession } from "@switchback/engine"
 import { notePace, type PaceBook } from "@switchback/store"
@@ -64,28 +65,6 @@ export interface Live {
   accepted?: { turn: TurnId; at: number }
 }
 
-export interface QueuedPrompt {
-  text: string
-  attachments?: readonly string[]
-}
-
-export function queuedTexts(queued: readonly QueuedPrompt[]): string[] {
-  return queued.map((prompt) => prompt.text)
-}
-
-/** 把宿主的完整队列投影到协议 Thread；附件与文字始终按下标对齐。 */
-export function withQueue(thread: Thread, queued: readonly QueuedPrompt[], updatedAt = thread.updatedAt): Thread {
-  const next = { ...thread }
-  delete next.queuedAttachments
-  const attachments = queued.map((prompt) => [...(prompt.attachments ?? [])])
-  return {
-    ...next,
-    queued: queuedTexts(queued),
-    ...(attachments.some((paths) => paths.length > 0) ? { queuedAttachments: attachments } : {}),
-    updatedAt,
-  }
-}
-
 /**
  * 把排着的几句交回输入框（取回、开轮前就被拒）：从队列里摘掉，文字与附件放进草稿，换一个新身份。
  * 输入框认身份决定要不要并进来（见渲染层 `use-host-draft.ts`），并的时候接在已有正文后面。
@@ -93,27 +72,9 @@ export function withQueue(thread: Thread, queued: readonly QueuedPrompt[], updat
 export function handBack(ctx: Ctx, entry: Live, taken: readonly QueuedPrompt[]): void {
   if (taken.length === 0) return
   entry.queued = entry.queued.filter((prompt) => !taken.includes(prompt))
-  const attachments = [...new Set(taken.flatMap((prompt) => prompt.attachments ?? []))]
   const at = ctx.deps.now()
-  const next = {
-    ...withQueue(entry.thread, entry.queued, at),
-    draft: taken.map((prompt) => prompt.text).join("\n"),
-    draftRevision: ctx.deps.newId("dr"),
-  }
-  delete next.draftAttachments
-  if (attachments.length > 0) next.draftAttachments = attachments
-  entry.thread = next
+  entry.thread = handedBack(entry.thread, { rest: entry.queued, taken }, ctx.deps.newId("dr"), at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
-}
-
-function promptsOf(thread: Thread): QueuedPrompt[] {
-  return (thread.queued ?? []).map((text, index) => {
-    const attachments = thread.queuedAttachments?.[index]
-    return {
-      text,
-      ...(attachments === undefined || attachments.length === 0 ? {} : { attachments }),
-    }
-  })
 }
 
 /** `launch` 握手前的条目；session/gate 会在驱动成功启动后补上。 */

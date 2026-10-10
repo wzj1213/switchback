@@ -3,7 +3,7 @@ import { inputItems, startTurn, type StartTurnContext } from "./turn.js"
 
 function setup(call: StartTurnContext["call"]): StartTurnContext & { failures: string[] } {
   const failures: string[] = []
-  const state = {
+  const state: StartTurnContext["state"] = {
     codexThread: "native-thread",
     codexTurn: undefined,
     turn: undefined,
@@ -45,6 +45,20 @@ describe("Codex 开轮次", () => {
     expect(ctx.state.codexTurn).toBe("native-turn")
     expect(calls[0]).toMatchObject({ model: "gpt", effort: "high" })
     expect(calls[0]).toMatchObject({ input: inputItems("做事", ["/tmp/a.png"]) })
+  })
+
+  it("回包之前就按了停止：拿到原生轮次 id 当场补发中断", async () => {
+    const calls: { method: string; params: unknown }[] = []
+    const ctx = setup((method, params) => {
+      calls.push({ method, params })
+      // 停止键在 turn/start 回包之前按下（驱动的 interrupt 只能先记下来）
+      if (method === "turn/start") ctx.state.stopRequested = "turn-1"
+      return Promise.resolve(method === "turn/start" ? { turn: { id: "native-turn" } } : {})
+    })
+    await startTurn(ctx, "做事", "turn-1")
+    expect(calls.map((call) => call.method)).toEqual(["turn/start", "turn/interrupt"])
+    expect(calls[1]?.params).toEqual({ threadId: "native-thread", turnId: "native-turn" })
+    expect(ctx.state.stopRequested).toBeUndefined()
   })
 
   it("上一轮的 start 失败迟到时，不把已经接替它的新轮收掉", async () => {

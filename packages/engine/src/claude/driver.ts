@@ -21,6 +21,7 @@ import { claudeCommands } from "./commands.js"
 import { type AskMeta } from "./permission.js"
 import { judge } from "./judge.js"
 import { createTurnRef, runMessageLoop } from "./loop.js"
+import { haltTurn, resetHalt } from "./halt.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { CLAUDE_TRUST, needsPermissionRestart, permissionOptions } from "./trust.js"
@@ -87,6 +88,8 @@ class ClaudeSession implements EngineSession {
   private query: ReturnType<typeof query> | undefined
   /** 当前模型的原生上下文快照；去重控制请求，并隔离换模型前的迟到结果。 */
   private readonly context = new ContextProbe()
+  /** 正在装的那条消息（读附件要时间）。停止要等它送进去，中断回执才点得到它。 */
+  private preparing: Promise<unknown> = Promise.resolve()
 
   constructor(
     private readonly req: StartRequest,
@@ -175,12 +178,14 @@ class ClaudeSession implements EngineSession {
   }
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
-    const message = await toUserMessage(text, attachments, this.req.threadId)
+    const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId))
     // 轮次由宿主铸造；引擎只在这里认领它，收工时由消息循环清空
     this.turn.current = turnId
     this.turn.pendingSteers = 0
     this.turn.latestUsage = undefined
     this.turn.outputTokens = undefined
+    resetHalt(this.turn.halt)
+    this.turn.halt.sent.add(message.uuid)
     const accepted = this.input.push(message)
     if (accepted) {
       nameFirst({ once: this.naming, query: this.query, first: text,
@@ -204,9 +209,10 @@ class ClaudeSession implements EngineSession {
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const expected = this.turn.current
     if (expected === undefined) throw new Error("Claude 当前没有可插入的轮次")
-    const message = await toUserMessage(text, attachments, this.req.threadId, "now")
+    const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId, "now"))
     if (this.turn.current !== expected) throw new Error("Claude 原轮次已经结束")
     this.turn.pendingSteers += 1
+    this.turn.halt.sent.add(message.uuid)
     const accepted = this.input.push(message)
     if (accepted) return
     this.turn.pendingSteers -= 1
@@ -315,8 +321,19 @@ class ClaudeSession implements EngineSession {
     return applied === undefined ? {} : { effort: applied }
   }
 
+  /**
+   * 停止。刚按发送、话还在装的那一刻也算：先等它送进去（SDK 取到就同步写进 stdin，
+   * 让出一拍宏任务就写完了），中断才排在它后面，回执才点得到它。之后见 `halt.ts`。
+   */
   async interrupt(): Promise<void> {
-    await this.query?.interrupt()
+    await this.preparing
+    await new Promise((resolve) => setImmediate(resolve))
+    await haltTurn(this.query, this.turn)
+  }
+
+  private prepare<T>(work: Promise<T>): Promise<T> {
+    this.preparing = work.catch(() => undefined)
+    return work
   }
 
   async setTrust(trust: Trust): Promise<TrustChange> {

@@ -439,7 +439,7 @@ describe("换引擎的在途竞态", () => {
     })
   })
 
-  it("慢接力期间删除会话，新引擎会自毁且不会用迟到更新复活", async () => {
+  it("慢接力期间删除会话，新引擎会自毁、不复活，也不为删掉的会话再报失败", async () => {
     const gate = deferred<undefined>()
     const rig = rigOf({ startGate: { b: gate } })
     const id = await created(rig)
@@ -450,7 +450,8 @@ describe("换引擎的在途竞态", () => {
     await tick()
     await rig.host.dispatch({ type: "thread.delete", threadId: id })
     gate.resolve(undefined)
-    await expect(switching).rejects.toThrow("已经删除")
+    // 失败是删除带来的：删的人已经不要它了，命令安静收场，界面不出横幅
+    await expect(switching).resolves.toBeUndefined()
 
     expect(rig.host.live()).toEqual([])
     expect(rig.probes[1]?.disposed).toBe(true)

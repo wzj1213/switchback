@@ -1,4 +1,5 @@
 import type { EngineInfo, Thread } from "@switchback/protocol"
+import { cannotRevive } from "@switchback/store"
 
 /**
  * 历史会话（`Thread.detached`）的输入框先交代的那一句：发出去会发生什么，或者为什么还发不了。
@@ -17,20 +18,6 @@ export interface HistoryNote {
   text: string
   /** 宿主必拒：发送键灰着，换一家引擎才能发。 */
   held: boolean
-}
-
-/**
- * 没换家、原来那家又没留下句柄：宿主接不回来。
- *
- * 例外：记录里有别家的分段、却没有这一家的——它是换过来还没开口就停了（Claude 要等开轮之后
- * 才报句柄），没有上下文可冒充，宿主会新起一条（见 host 的 `reattached`），不拦。
- * 这里只看得到分段；它其实跑过轮次的少见情形由宿主拒绝，那句话会退回输入框。
- */
-export function cannotRevive(thread: Thread): boolean {
-  const to = thread.nextEngine ?? thread.engine
-  if (thread.detached !== true || to !== thread.engine || thread.engineHandle !== undefined) return false
-  const segments = thread.segments ?? []
-  return segments.length === 0 || segments.some((segment) => segment.engine === to)
 }
 
 /**

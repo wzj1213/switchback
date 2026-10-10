@@ -30,15 +30,21 @@ export function Approval({
   item,
   send,
   offline,
+  active,
 }: {
   item: ApprovalItem
   send: (command: Command) => boolean
   /** 没连上时两颗按钮都禁掉。**点了没反应比点不了糟得多**——agent 那头在无超时地等。 */
   offline: boolean
+  /**
+   * 这张卡还有人在等。进程或那一轮已经不在了（历史会话、上次没收尾的卡），
+   * 留着的 pending 只是一条历史：画成「已失效」，不摆两颗点了没反应的按钮。和桌面端同一个口径。
+   */
+  active: boolean
 }): React.JSX.Element {
   const [scope, setScope] = useState<RememberScope>("once")
 
-  if (item.status !== "pending") {
+  if (item.status !== "pending" || !active) {
     return (
       <div className="item item--approval approval--done" data-status={item.status}>
         <span className="approval__verdict">{verdictOf(item)}</span>

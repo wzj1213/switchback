@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /**
  * 输入框。
@@ -21,6 +21,8 @@ export function Composer({
   hint,
   onSend,
   onStop,
+  restore,
+  onRestored,
 }: {
   disabled: boolean
   running: boolean
@@ -28,9 +30,20 @@ export function Composer({
   /** 返回有没有真的发出去。**发不出去就不能清空输入框**。 */
   onSend: (text: string) => boolean
   onStop: () => void
+  /** 发出去之后被宿主拒掉、还回来的那句话（见 `Remote.returned`）。 */
+  restore?: { id: number; text: string } | undefined
+  onRestored?: (id: number) => void
 }): React.JSX.Element {
   const [text, setText] = useState("")
   const box = useRef<HTMLTextAreaElement>(null)
+
+  // **被拒的那句收回输入框。** 发出去那一刻已经清了框，不还回来就得凭记忆重打；
+  // 这期间又打了字的，还回来的那句排在前面——它是先写的
+  useEffect(() => {
+    if (restore === undefined) return
+    setText((current) => (current.trim() === "" ? restore.text : `${restore.text}\n${current}`))
+    onRestored?.(restore.id)
+  }, [restore, onRestored])
 
   const grow = (): void => {
     const el = box.current

@@ -476,6 +476,16 @@ describe("没照着做的都要说一声", () => {
     expect(h.dispatched()).toEqual([])
     const notice = h.frames().find((f) => f.type === "notice")
     expect(notice?.type === "notice" ? notice.text : "").toContain("full")
+    // 被拒的是一句话：原样还给手机的输入框，人不用凭记忆重打
+    expect(notice).toMatchObject({ returned: { threadId: "t", text: "hi" } })
+  })
+
+  it("被拒的不是一句话：没有东西要还", () => {
+    const h = harness({ ceiling: "auto-edit", threadTrust: "full" })
+    send(h, { type: "command", command: { type: "thread.fork", threadId: "t", to: "codex" } })
+    const notice = h.frames().find((f) => f.type === "notice")
+    expect(notice).toBeDefined()
+    expect(notice !== undefined && "returned" in notice).toBe(false)
   })
 
   it("被钳的命令照样执行，但也回一条 notice", () => {

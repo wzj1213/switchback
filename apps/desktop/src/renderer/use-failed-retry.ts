@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import type { Command, Item, Thread, Turn } from "@switchback/protocol"
 import { retryTarget, type RetryTarget } from "./error-plan.js"
-import { cannotRevive } from "./history-note.js"
+import { cannotRevive } from "@switchback/store"
 
 /**
  * 终态报错卡上那颗「再试一次」：把失败那一轮你说的话原样再发一次。

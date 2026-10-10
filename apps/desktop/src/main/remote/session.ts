@@ -189,7 +189,9 @@ function command(ctx: Ctx, raw: unknown): void {
   const verdict = clamp(raw, ctx.deps.ceiling(), ctx.deps.trustOf)
   if (verdict.command === undefined) {
     ctx.deps.log("warn", `${ctx.deps.id} 被拒：${verdict.note}`)
-    ctx.write({ type: "notice", text: verdict.note })
+    // 被拒的是一句话就原样还回去：发出去那一刻手机已经清了输入框
+    const returned = raw.type === "thread.prompt" ? { threadId: raw.threadId, text: raw.text } : undefined
+    ctx.write({ type: "notice", text: verdict.note, ...(returned === undefined ? {} : { returned }) })
     return
   }
   if (verdict.note !== undefined) {

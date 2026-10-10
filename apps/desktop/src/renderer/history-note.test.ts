@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { EngineInfo, Thread } from "@switchback/protocol"
-import { cannotRevive, historyNote } from "./history-note.js"
+import { historyNote } from "./history-note.js"
 
 const thread: Thread = {
   id: "t",
@@ -75,18 +75,4 @@ describe("历史会话的输入框说什么", () => {
       expect(historyNote({ ...thread, ...c.patch }, engines, c.list ?? engines)).toEqual(c.want)
     })
   }
-
-  it("「接不回来」只认历史会话：活会话没有句柄是还没跑过第一轮，不是接不回", () => {
-    expect(cannotRevive({ ...thread, engineHandle: undefined, detached: false })).toBe(false)
-    expect(cannotRevive({ ...thread, engineHandle: undefined })).toBe(true)
-  })
-
-  it("换过来还没开口就停了：记录里有别家的分段、没有这一家的，不拦——宿主会新起一条", () => {
-    const seg = (engine: string): NonNullable<Thread["segments"]>[number] => ({ engine, handle: `h-${engine}`, startedAt: 0 })
-    const claude = { ...thread, engine: "claude", engineHistory: ["codex", "claude"], engineHandle: undefined }
-    expect(cannotRevive({ ...claude, segments: [seg("codex")] })).toBe(false)
-    // 这一家说过话却没留下句柄、或者整条会话一段都没有：照旧拦着
-    expect(cannotRevive({ ...claude, segments: [seg("codex"), seg("claude")] })).toBe(true)
-    expect(cannotRevive({ ...claude, segments: [] })).toBe(true)
-  })
 })

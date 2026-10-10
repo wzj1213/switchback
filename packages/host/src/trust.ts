@@ -1,5 +1,6 @@
 import type { Command, Thread } from "@switchback/protocol"
-import { emit, isCurrent, withQueue, type Ctx, type Live } from "./ctx.js"
+import { emit, isCurrent, type Ctx, type Live } from "./ctx.js"
+import { withQueue } from "./queued.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"
 import { carryRules } from "./approval.js"

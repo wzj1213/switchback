@@ -3,8 +3,7 @@ import type { Thread as ThreadModel } from "@switchback/protocol"
 import { itemsOf, lanesOf, mainItems, thinkingTokensOf, turnOf, usageOf } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { ItemView } from "../components/ItemView.js"
-import { Composer } from "../components/Composer.js"
-import { Reattach } from "../components/Reattach.js"
+import { ThreadInput } from "../components/ThreadInput.js"
 import { PlanBar } from "../components/PlanBar.js"
 import { QuestionStack } from "../components/QuestionCard.js"
 import { GoalBar } from "../components/GoalBar.js"
@@ -85,6 +84,8 @@ function Body({
     if (box === null || was === undefined) return
     box.scrollTop += box.scrollHeight - was
   }, [full, scroller])
+  // 只有活会话正在跑的那一轮里的审批还能裁；和桌面端 `Transcript` 同一条判据
+  const approvalTurn = thread.detached === true ? undefined : turnOf(remote.state, thread.id)?.id
   const hidden = full ? 0 : Math.max(0, all.length - FIRST_SCREEN)
   const items = hidden === 0 ? all : all.slice(hidden)
   if (all.length === 0) {
@@ -118,7 +119,9 @@ function Body({
         <p className="thread__earlier">更早的内容没有加载。完整记录在桌面上。</p>
       ) : null}
       {items.map((row) => {
-        if (row.kind === "item") return <ItemView key={row.key} item={row.item} send={remote.send} offline={offline} />
+        if (row.kind === "item") {
+          return <ItemView key={row.key} item={row.item} send={remote.send} offline={offline} approvalTurn={approvalTurn} />
+        }
         if (row.kind === "aside") return <LegacyAside key={row.key} aside={row.aside} />
         return <LaneCard key={row.key} lane={row.lane} live={!offline && thread.detached !== true} />
       })}
@@ -182,41 +185,7 @@ export function Thread({
       <GoalBar goal={thread.goal} />
       <PlanBar items={itemsOf(remote.state, thread.id)} />
       <QuestionStack threadId={thread.id} groups={thread.pendingQuestions} send={remote.send} offline={offline} />
-      {thread.detached === true ? (
-        // **没接引擎时给的是一个动作，不是一句「去桌面上点」。**
-        // 手机上绝大多数会话都是 detached 的（宿主只留少数几条活的），
-        // 摆一个禁用的输入框等于把这一端做成只读
-        <Reattach
-          thread={thread}
-          ceiling={remote.me?.maxTrust ?? "auto-edit"}
-          offline={offline}
-          send={remote.send}
-        />
-      ) : (
-        <Composer
-          // **按会话分开。** 宽屏并排、或点系统通知原地换会话时这一屏不重挂：没有 key 的话，
-          // 在 A 里打了一半的字切到 B 还在，点发送就发给了 B
-          key={thread.id}
-          // **引擎还在起的时候也不能发。** 不禁的话回车会先清空输入框、
-          // 再撞上宿主那句「会话不存在」——而那句话走的是另一条通道，
-          // 手机上以前一个字都看不到（现在 `Notices` 画了，但**最好是别发生**）。
-          // 桌面端早就是这条判据（`renderer/components/Composer.tsx` 的 `blocked`）
-          disabled={offline || thread.status === "starting"}
-          running={running}
-          hint={hintOf(thread, offline)}
-          onSend={(text) => remote.send({ type: "thread.prompt", threadId: thread.id, text })}
-          onStop={() => {
-            remote.send({ type: "thread.interrupt", threadId: thread.id })
-          }}
-        />
-      )}
+      <ThreadInput thread={thread} remote={remote} running={running} offline={offline} />
     </section>
   )
-}
-
-/** 输入框上面那行小字。**说清现在为什么不能发**，而不是只报引擎和档位。 */
-function hintOf(thread: ThreadModel, offline: boolean): string {
-  if (offline) return "没连上 Switchback，先等重连"
-  if (thread.status === "starting") return "引擎正在启动，马上就能说话"
-  return `${thread.engine} · ${thread.trust}`
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import type { Command, Thread, Trust } from "@switchback/protocol"
+import { cannotRevive } from "@switchback/store"
 
 /**
  * 一条老会话，把它接回引擎。
@@ -12,9 +13,9 @@ import type { Command, Thread, Trust } from "@switchback/protocol"
  *
  * ## 三条判据，缺一条就是「点了没反应」
  *
- * 1. **没有引擎句柄的，压根不给这颗按钮。** `resume` 的硬前提就是它
- *    （`host/session.ts`：没句柄就抛「只能新建会话继续」），而句柄就在
- *    `Thread` 上、手机手上一直有。明知必然失败还摆一颗按钮，是最没道理的一种。
+ * 1. **宿主必拒的，压根不给这颗按钮。** 判据和桌面端是同一条（`@switchback/store` 的
+ *    `cannotRevive`）：没换家、原来那家又没留下句柄。挑过别家的照样接——由那家接着做；
+ *    明知必然失败还摆一颗按钮，是最没道理的一种。
  * 2. **档位高过远程上限的，先切档再接。** 接回来之后每一句话都要过
  *    `RUNS_IN_THREAD` 那道闸，切不下来就是「接上了却说不了话」。
  * 3. **转圈要有尽头。** 失败的路不止一条（引擎起不来、cwd 没了、握手超时），
@@ -26,22 +27,36 @@ const RANK: Readonly<Record<string, number>> = { "read-only": 0, "auto-edit": 1,
 /** 等多久算接不上。引擎起进程 + 载上下文通常几秒，25 秒是很松的上界。 */
 const GIVE_UP_MS = 25_000
 
+const FAILED = "没接上。可能是引擎起不来，或者那个目录不在了——再试一次，或者去桌面上看看。"
+
+/** 还没点时那句话：接回来谁接着做，要不要先降档。 */
+function idleWhy(next: string | undefined, lowered: { from: string; to: string } | undefined): string {
+  const who = next === undefined ? "接回来就能接着说。" : `接回来由 ${next} 接着做。`
+  const trust = lowered === undefined ? "" : `它开在「${lowered.from}」档，高过远程上限——接回来会先切到「${lowered.to}」。`
+  return `这条会话现在没接引擎。${who}${trust}`
+}
+
 export function Reattach({
   thread,
   ceiling,
   offline,
   send,
+  label,
 }: {
   thread: Thread
   /** 远程档位上限（`/api/me` 报的）。 */
   ceiling: string
   offline: boolean
   send: (command: Command) => boolean
+  /** 引擎 id → 名字。 */
+  label: (id: string) => string
 }): React.JSX.Element {
   const [going, setGoing] = useState<string | undefined>(undefined)
   const [failed, setFailed] = useState(false)
   const tooHigh = (RANK[thread.trust] ?? 0) > (RANK[ceiling] ?? 0)
-  const hopeless = thread.engineHandle === undefined
+  const hopeless = cannotRevive(thread)
+  // 桌面上挑过别家：接回来就由那家接着做（宿主 `revive.ts` 的规矩），这里照实说
+  const next = thread.nextEngine !== undefined && thread.nextEngine !== thread.engine ? label(thread.nextEngine) : undefined
 
   // **看门狗。** 成功那一路不需要它（`detached` 一翻假，这个组件连同状态一起卸掉）；
   // 它治的是失败那一路——宿主抛错走的是另一条通道，这里收不到，
@@ -94,11 +109,7 @@ export function Reattach({
 
   return (
     <div className="reattach">
-      <p className="reattach__why">
-        {failed
-          ? "没接上。可能是引擎起不来，或者那个目录不在了——再试一次，或者去桌面上看看。"
-          : `这条会话现在没接引擎。接回来就能接着说。${tooHigh ? `它开在「${thread.trust}」档，高过远程上限——接回来会先切到「${ceiling}」。` : ""}`}
-      </p>
+      <p className="reattach__why">{failed ? FAILED : idleWhy(next, tooHigh ? { from: thread.trust, to: ceiling } : undefined)}</p>
       <button
         className="btn btn--primary reattach__go"
         type="button"

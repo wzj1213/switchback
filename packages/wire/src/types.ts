@@ -129,7 +129,15 @@ export type ServerFrame =
    * **静默丢弃是这条通道上最坏的失败方式**——用户在手机上点了「允许」，
    * 工具被拒，而界面上没有任何东西说这里出过事。
    */
-  | { type: "notice"; text: string }
+  | {
+      type: "notice"
+      text: string
+      /**
+       * 被拒的是一句话：原样还给发它的那个输入框。客户端发出去就清空了输入框，
+       * 不还回去的话人得凭记忆重打一遍。
+       */
+      returned?: { threadId: ThreadId; text: string }
+    }
   | { type: "pong" }
 
 /**

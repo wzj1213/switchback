@@ -1,5 +1,6 @@
 import type { Thread } from "@switchback/protocol"
-import { withQueue, type Ctx, type Live } from "./ctx.js"
+import type { Ctx, Live } from "./ctx.js"
+import { withQueue } from "./queued.js"
 
 /**
  * 岔出来的那条会话**长什么样**。

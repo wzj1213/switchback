@@ -130,6 +130,31 @@ describe("历史会话发话即接回", () => {
   })
 })
 
+describe("历史会话上取回「待发送」：不起进程，改记录", () => {
+  const queued = { queued: ["一", "二", "三"], queuedAttachments: [[], ["/tmp/b.png"], []] }
+  const cases = [
+    { name: "取回一条：从队列里摘掉，放进草稿（带它的图）", index: 1, queued: ["一", "三"], draft: "二", attachments: ["/tmp/b.png"] },
+    { name: "整队取回", index: undefined, queued: [], draft: "一\n二\n三", attachments: ["/tmp/b.png"] },
+  ]
+  for (const one of cases) {
+    it(one.name, async () => {
+      const { host, events, sessions } = history(queued)
+      await host.dispatch({ type: "thread.unqueue", threadId: OLD, ...(one.index === undefined ? {} : { index: one.index }) })
+      expect(sessions).toHaveLength(0)
+      const thread = last(events)
+      expect(thread).toMatchObject({ queued: one.queued, detached: true })
+      expect(thread?.draft).toBe(one.draft)
+      expect(thread?.draftAttachments).toEqual(one.attachments)
+    })
+  }
+
+  it("越界的下标当没说过：记录不重写", async () => {
+    const { host, events } = history(queued)
+    await host.dispatch({ type: "thread.unqueue", threadId: OLD, index: 7 })
+    expect(last(events)).toBeUndefined()
+  })
+})
+
 const broken: EngineDriver = { id: "broken", start: () => Promise.reject(new Error("起不来")) }
 
 describe("接不回来：说清楚，那句话退回输入框", () => {

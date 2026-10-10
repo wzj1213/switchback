@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo } from "react"
 import { useAuthNotices } from "./acp-login-signal.js"
 import {
   accountOf,
@@ -23,6 +23,7 @@ import { useSend } from "./useSend.js"
 import { useUnread } from "./useUnread.js"
 import type { SidebarRow } from "./sidebar.js"
 import { enabledEngines } from "../shared/engine-access.js"
+import { useAwaitedStart } from "./use-awaited-start.js"
 
 /**
  * 把 `App` 需要的一切收在一处。
@@ -157,14 +158,7 @@ export function useApp(): AppApi {
    * 记序号就没有这两个问题：等的是「序号比我点的时候大」，
    * 谁立的、中间重渲染多少次都不影响。
    */
-  const awaited = useRef<number | undefined>(undefined)
-  useEffect(() => {
-    const at = awaited.current
-    const started = switchback.lastStarted
-    if (at === undefined || started === undefined || started.seq <= at) return
-    awaited.current = undefined
-    shell.select(started.id)
-  }, [switchback.lastStarted, shell])
+  const awaitStart = useAwaitedStart(switchback.lastStarted, switchback.state.notices, shell.select)
   const thread = rows.find((r) => r.thread.id === shell.selectedId)?.thread ?? rows[0]?.thread
   useEffect(() => switchback.viewing(thread?.id), [switchback.viewing, thread?.id])
   useAuthNotices(switchback.state.notices, shell.dismiss)
@@ -179,9 +173,7 @@ export function useApp(): AppApi {
     lastUsed: prefs.settings.lastUsed,
     patch: prefs.patch,
     // 分叉 / 重来出来的那条是临时的（侧栏里没有它），**不跳过去就等于点了没反应**
-    onBranch: () => {
-      awaited.current = switchback.lastStarted?.seq ?? 0
-    },
+    onBranch: awaitStart,
   })
 
   const { open, openChat, openPicker } = useWorkspaceActions({
@@ -195,7 +187,7 @@ export function useApp(): AppApi {
     onSelect: shell.select,
     // 点「新建」的那一刻记下当前序号，等一个比它大的
     onCreating: () => {
-      awaited.current = switchback.lastStarted?.seq ?? 0
+      awaitStart()
     },
     onOpenProject: (cwd) => {
       prefs.addProject(cwd)
@@ -238,7 +230,7 @@ export function useApp(): AppApi {
       // 和新建走同一条「记下序号、等 thread.started」的路（见上面那段注释），
       // 接完自动跳过去——不跳的话人得自己去侧栏里找它，
       // 而它刚从「codex 历史」那一段里消失
-      awaited.current = switchback.lastStarted?.seq ?? 0
+      awaitStart()
       switchback.send({
         type: "thread.adopt",
         engine,

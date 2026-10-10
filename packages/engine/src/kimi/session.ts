@@ -277,12 +277,12 @@ export class KimiSession implements EngineSession {
 
   async compact(turnId: TurnId): Promise<void> {
     const generation = this.turn.begin(turnId, "", "compact")
-    try {
-      await this.lease.api.post(sessionPath(this.init.id, ":compact"), {})
-    } catch (error) {
+    await this.lease.api.post(sessionPath(this.init.id, ":compact"), {}).catch((error: unknown) => {
       this.turn.failGeneration(generation, errorText(error))
       throw error
-    }
+    })
+    // 回包时压缩已经开始（Kimi 同步记下「正在压缩」）；此后的空闲快照才说明它结束了
+    this.turn.activationAccepted(generation)
   }
 
   async history(): Promise<readonly EngineThread[]> {

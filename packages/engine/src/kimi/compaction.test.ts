@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { Event } from "@switchback/protocol"
 import { KimiTurnTracker } from "./turn.js"
 import { handleTurnEvent } from "./turn-events.js"
+import type { KimiSnapshot } from "./wire.js"
 
 function tracker(events: Event[]): KimiTurnTracker {
   return new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99 })
@@ -71,5 +72,37 @@ describe("Kimi 上下文压缩", () => {
       turnId: "compact-turn",
       status: "interrupted",
     })
+  })
+
+  describe("压缩时断过线，重连的快照来对账", () => {
+    const snapshot = (busy: boolean, flight = false): KimiSnapshot => ({
+      as_of_seq: 9, epoch: "ep",
+      session: { id: "s1", title: "", busy, metadata: { cwd: "/work" }, agent_config: {} },
+      in_flight_turn: flight ? { turn_id: 8, assistant_text: "", thinking_text: "", running_tools: [] } : null,
+      pending_approvals: [], pending_questions: [],
+    })
+    const cases = [
+      { name: "请求已被接下、Kimi 空闲：压缩已经结束，照实说没收到结果", accepted: true, snap: snapshot(false), ends: ["completed"] },
+      { name: "还在忙：接着等实时帧", accepted: true, snap: snapshot(true), ends: [] },
+      { name: "请求还没回包：空闲快照说的是压缩开始之前", accepted: false, snap: snapshot(false), ends: [] },
+      { name: "又有一轮在跑：不归这次压缩管", accepted: true, snap: snapshot(true, true), ends: [] },
+    ]
+    for (const one of cases) {
+      it(one.name, () => {
+        const events: Event[] = []
+        const turn = tracker(events)
+        const generation = turn.begin("compact-turn", "", "compact")
+        handleTurnEvent(turn, { type: "compaction.started", trigger: "manual" }, 1)
+        if (one.accepted) turn.activationAccepted(generation)
+        turn.reconcile(one.snap)
+        expect(events.flatMap((event) => event.type === "turn.completed" ? [event.status] : [])).toEqual(one.ends)
+        if (one.ends.length > 0) {
+          expect(events.at(-2)).toMatchObject({
+            type: "item.updated",
+            item: { id: "kimi-compaction-compact-turn", message: expect.stringContaining("没收到 Kimi 报的结果") },
+          })
+        }
+      })
+    }
   })
 })
