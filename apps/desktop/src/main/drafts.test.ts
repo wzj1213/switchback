@@ -71,6 +71,15 @@ describe("没发出去的草稿落盘", () => {
     expect(holds.get("draft:th-1")).toEqual([])
   })
 
+  it("会话删了之后才到的那一份不把草稿建回来", async () => {
+    const file = await fixture()
+    const { drafts } = store(file)
+    drafts.forget("th-1")
+    drafts.save("th-1", draft())
+    drafts.flush()
+    expect(drafts.load().drafts).toEqual({})
+  })
+
   it("坏掉的文件当没有，不掀翻启动", async () => {
     const file = await fixture()
     await writeFile(file, "{坏的")

@@ -71,6 +71,8 @@ export function createDraftStore(deps: Deps): DraftStore {
     drafts: new Map(Object.entries(first.drafts)),
     missing: first.missing as LoadedDrafts["missing"],
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
+    // 删掉的会话：渲染层攒着的那一份可能晚一步才到，不能让它把草稿建回来
+    gone: new Set<string>(),
   }
   for (const [key, draft] of state.drafts) deps.hold(ownerOf(key), draft.attachments)
 
@@ -104,8 +106,11 @@ export function createDraftStore(deps: Deps): DraftStore {
       state.missing = {}
       return loaded
     },
-    save: put,
+    save: (key, draft) => {
+      if (!state.gone.has(key)) put(key, draft)
+    },
     forget: (key) => {
+      state.gone.add(key)
       if (state.drafts.has(key)) put(key, undefined)
     },
     flush: write,
