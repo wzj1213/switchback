@@ -25,11 +25,21 @@ function reconnecting(state: ViewState, event: Extract<Event, { type: "engine.st
   return { ...state, reconnecting: Object.fromEntries(rest) }
 }
 
-/** 和最后一条是同一件事（同类、同会话、同一句话）：合成一条、计数加一，并当作新的一条重新出现。 */
+/** 几条会话同一刻报同一句，算同一件事（见 `sameAsLast`）。 */
+const SAME_MOMENT_MS = 2000
+
+/**
+ * 和最后一条是同一件事（同类、同会话、同一句话）：合成一条、计数加一，并当作新的一条重新出现。
+ *
+ * **会话不同、但同一刻报的同一句也算**：几条 Kimi 会话共用一个 `kimi web` 进程，它一退出
+ * 每条各报一次「Kimi Web 服务已退出」——同一件事叠成三条，关掉一条冒出下一条。
+ * 隔了一阵各报各的仍是两件事，不合。合成之后挂在最近那条会话上。
+ */
 function sameAsLast(notices: readonly Notice[], next: Notice): Notice | undefined {
   const last = notices[notices.length - 1]
   if (last === undefined || last.kind === "notification" || next.kind === "notification") return undefined
-  return last.kind === next.kind && last.threadId === next.threadId && last.text === next.text ? last : undefined
+  if (last.kind !== next.kind || last.text !== next.text) return undefined
+  return last.threadId === next.threadId || Math.abs(next.at - last.at) <= SAME_MOMENT_MS ? last : undefined
 }
 
 export function reduceEngineStatus(

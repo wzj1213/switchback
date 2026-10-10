@@ -61,6 +61,27 @@ describe("Kimi 会话能力", () => {
   })
 })
 
+describe("Kimi 服务退出或实时流判死", () => {
+  it("报一次 onExit，交宿主摘下；宿主自己 dispose 之后不再报", async () => {
+    const exits: string[] = []
+    const crash: { fire?: (detail: string) => void } = {}
+    const api: KimiApi = { get: <T>() => Promise.resolve(undefined as T), post: <T>() => Promise.resolve({} as T) }
+    const session = new KimiSession({ ...request([]), onExit: (detail) => exits.push(detail) }, {
+      ...lease(api),
+      onCrash: (listener) => {
+        crash.fire = listener
+        return () => undefined
+      },
+    }, { id: "s1", status: { busy: false, model: "k2" }, snapshot: snapshot() })
+
+    crash.fire?.("Kimi Web 服务已退出（code 1）")
+    expect(exits).toEqual(["Kimi Web 服务已退出（code 1）"])
+    await session.dispose()
+    crash.fire?.("Kimi Web 服务已退出（code 0）")
+    expect(exits).toHaveLength(1)
+  })
+})
+
 describe("Kimi 会话插话", () => {
   it("运行中先排成 queued，再调用原生 prompts:steer", async () => {
     const posts: { path: string; body: unknown }[] = []

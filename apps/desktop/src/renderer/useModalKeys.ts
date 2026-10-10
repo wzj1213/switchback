@@ -75,7 +75,8 @@ export function useModalKeys(
     initial?.focus()
     const onKey = (event: KeyboardEvent): void => {
       const current = box.current
-      if (current === null) return
+      // 输入法组字时的 Esc 是取消组字（改名框里打中文最常见），不是关对话框
+      if (current === null || event.isComposing) return
       if (event.key === "Escape") {
         event.preventDefault()
         event.stopPropagation()

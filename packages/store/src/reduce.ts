@@ -220,6 +220,8 @@ function removeThread(state: ViewState, threadId: ThreadId, draft?: Draft): View
     lanes: omit(state.lanes, threadId),
     models: omit(state.models, threadId),
     commands: omit(state.commands, threadId),
+    // 这条会话的横幅一起收：人往往正是因为它坏了才删的，删完横幅还挂着、点会话名又跳不过去
+    notices: state.notices.filter((notice) => notice.threadId !== threadId),
     owner: keepOwner,
     turnOwner: keepTurnOwner,
   }

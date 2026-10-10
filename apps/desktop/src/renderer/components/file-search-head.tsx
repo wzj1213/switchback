@@ -24,7 +24,7 @@ export function FileSearchHead({ cwd, query, loading, input, onQuery, onEnterRes
               onEnterResults()
               return
             }
-            if (event.key !== "Escape" || !searching) return
+            if (event.key !== "Escape" || !searching || event.nativeEvent.isComposing) return
             event.stopPropagation()
             onQuery("")
           }} />

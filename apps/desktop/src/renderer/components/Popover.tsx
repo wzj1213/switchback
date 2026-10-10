@@ -116,6 +116,7 @@ export function Popover({
       onClose()
     }
     const onKey = (event: KeyboardEvent): void => {
+      if (event.isComposing) return
       if (event.key === "Escape") {
         event.preventDefault()
         event.stopPropagation()

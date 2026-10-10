@@ -24,11 +24,14 @@ function harness(restartGate?: Promise<void>, failStarts: ReadonlySet<number> = 
   events: Event[]
   disposed: { count: number }
   prompts: string[]
+  /** 最近一次起的那个进程的事件出口与它收到的轮次：用来演「这一轮失败了」。 */
+  engine: { emit?: (event: Event) => void; turns: string[] }
 } {
   const starts: { trust: Trust; resume?: string }[] = []
   const events: Event[] = []
   const disposed = { count: 0 }
   const prompts: string[] = []
+  const engine: { emit?: (event: Event) => void; turns: string[] } = { turns: [] }
   const driver: EngineDriver = {
     id: "codex",
     start: async (req: StartRequest): Promise<EngineSession> => {
@@ -36,10 +39,12 @@ function harness(restartGate?: Promise<void>, failStarts: ReadonlySet<number> = 
       if (starts.length > 1) await restartGate
       if (failStarts.has(starts.length)) throw new Error(`start ${String(starts.length)} failed`)
       req.onHandle?.("native-1")
+      engine.emit = req.emit
       return {
         threadId: req.threadId,
-        prompt: (text) => {
+        prompt: (text, turnId) => {
           prompts.push(text)
+          engine.turns.push(turnId)
           return Promise.resolve()
         },
         interrupt: () => Promise.resolve(),
@@ -70,7 +75,7 @@ function harness(restartGate?: Promise<void>, failStarts: ReadonlySet<number> = 
     },
     now: () => ids.value,
   })
-  return { host, starts, events, disposed, prompts }
+  return { host, starts, events, disposed, prompts, engine }
 }
 
 function threadOf(events: readonly Event[]): Thread {
@@ -139,6 +144,22 @@ describe("setTrust", () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(h.prompts).toEqual(["重启期间别丢"])
     expect(h.host.live()[0]?.queued).toEqual([])
+  })
+
+  it("上一轮失败留下的「待发送」不跟着重启发出去", async () => {
+    const h = harness()
+    await h.host.dispatch({ type: "thread.create", cwd: "/w", engine: "codex", trust: "read-only" })
+    const id = threadOf(h.events).id
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "改配置文件" })
+    await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "改完跑一遍部署脚本" })
+    h.engine.emit?.({ type: "turn.completed", at: 1, turnId: h.engine.turns[0] ?? "", status: "failed", error: "沙箱拒写" })
+    expect(h.host.live()[0]).toMatchObject({ status: "failed", queued: ["改完跑一遍部署脚本"] })
+
+    await h.host.dispatch({ type: "thread.setTrust", threadId: id, trust: "full" })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(h.starts).toHaveLength(2)
+    expect(h.prompts).toEqual(["改配置文件"])
+    expect(h.host.live()[0]?.queued).toEqual(["改完跑一遍部署脚本"])
   })
 
   it("新档位与旧档位都重连失败时，握手期间取回的草稿仍留在历史壳", async () => {

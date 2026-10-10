@@ -43,7 +43,8 @@ export function useWorkbenchKeys(
     const panel = box.current
     const origin = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
     const onKey = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || coveredByModal(panel)) return
+      // 输入法组字时的 Esc 是取消组字，不是收面板
+      if (event.defaultPrevented || event.isComposing || coveredByModal(panel)) return
       if (event.key === "Escape") {
         event.preventDefault()
         event.stopPropagation()

@@ -62,9 +62,15 @@ export interface RetryTarget {
   attachments?: readonly string[]
 }
 
-/** 这一轮你自己说的那句话。接力带过来的、定时触发的都不算——重发它们没有意义。 */
+/**
+ * 这一轮你自己说的那句话。接力带过来的、定时触发的都不算——重发它们没有意义。
+ *
+ * 要跳过前面的交接说明：换家之后的第一句，转录区里先是一条 `origin: "handoff"` 的说明、
+ * 再是你那句。只看第一条的话，换家后第一轮失败（没登录、模型不可用——偏偏最容易在这时候出）
+ * 就永远没有「再试一次」。重发的是你那句，说明由宿主照规矩再判定要不要附。
+ */
 function mineIn(turn: readonly Item[]): { text: string; attachments: readonly string[] } | undefined {
-  const asked = turn.find((item) => item.kind === "user_message")
+  const asked = turn.find((item) => item.kind === "user_message" && item.origin !== "handoff")
   if (asked?.kind !== "user_message" || asked.origin !== undefined) return undefined
   const attachments = asked.attachments ?? []
   return asked.text.trim() === "" && attachments.length === 0 ? undefined : { text: asked.text, attachments }

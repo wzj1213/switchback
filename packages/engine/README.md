@@ -14,7 +14,12 @@
   接 ACP 时这个文件从 `codex/` 提到包根，一个字没改就跑通了
 - `claude/` —— Claude Agent SDK 驱动（`@anthropic-ai/claude-agent-sdk`）
   - `permission.ts` 把 SDK 的 `canUseTool` 请求翻成 `@switchback/approval` 的 `Request`，
-    再把 `Verdict` 翻回 SDK 的 `PermissionResult`
+    再把 `Verdict` 翻回 SDK 的 `PermissionResult`。记忆归 Switchback 的规则表：只有「此对话」才借 CLI
+    原生规则，而且只留放行类更新、目的地改成 `session`；红线与用户 ask 规则强制的卡一条都不给——
+    原生 allow 规则先于 `canUseTool` 生效，落进项目设置就永久绕过红线
+  - `judge.ts` 是 `canUseTool` 的管线：问题卡、判定器、问人，三条路在这一处分开
+  - `ask-question.ts` 把 `AskUserQuestion` 交给宿主问题卡，答案按 SDK 公开的 `updatedInput.answers`
+    （键是问题原文、多选用「, 」连）与 `annotations` 交回；整组跳过就是空答案
   - `denials.ts` 配对自动拒绝提示、工具结果与 result 的权威拒绝清单；工具明确落 `denied`，
     保留 Claude 原始原因，拒答回退撤销工具时同步清掉结算缓存
   - `trust.ts` 把三档落到 Claude 原生 Plan / Auto / Bypass；进入 Bypass 时显式带 SDK 安全开关

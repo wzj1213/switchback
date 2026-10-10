@@ -11,6 +11,7 @@ import {
 } from "./engine-state.js"
 import { captureEngine, captureGoal, captureModel, captureTitle, type EarlySignals } from "./launch-signals.js"
 import { beginNativeTurn } from "./native-turn.js"
+import { exited } from "./live.js"
 
 interface Installing {
   installing: boolean
@@ -19,7 +20,7 @@ interface Installing {
 
 type SignalCallbacks = Pick<
   StartRequest,
-  "onHandle" | "onTitle" | "onModel" | "onEngineState" | "onGoal" | "onTrustApply" | "onNativeTurn"
+  "onHandle" | "onTitle" | "onModel" | "onEngineState" | "onGoal" | "onTrustApply" | "onNativeTurn" | "onExit"
 >
 
 function canCapture(ctx: Ctx, id: ThreadId, lease: Installing): boolean {
@@ -54,5 +55,9 @@ export function signalCallbacks(ctx: Ctx, live: Live, id: ThreadId, lease: Insta
       else if (canCapture(ctx, id, lease)) lease.early.trustApply = result
     },
     onNativeTurn: (turn) => beginNativeTurn(ctx, live, turn),
+    // 进程或流没了：摘成历史会话，下一句话接回时重新拉起（见 `live.ts` 的 `exited`）
+    onExit: (detail) => {
+      void exited(ctx, live, detail)
+    },
   }
 }

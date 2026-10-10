@@ -31,7 +31,8 @@ describe("接连报的同一件事合成一条", () => {
   const cases: readonly { name: string; events: readonly Event[]; want: readonly [string, number | undefined][] }[] = [
     { name: "同一句话连报三次", events: [status("crashed", 1, "断了"), status("crashed", 2, "断了"), status("crashed", 3, "断了")], want: [["断了", 3]] },
     { name: "中间夹了别的就不合", events: [status("crashed", 1, "断了"), status("crashed", 2, "别的"), status("crashed", 3, "断了")], want: [["断了", undefined], ["别的", undefined], ["断了", undefined]] },
-    { name: "换了会话不合", events: [status("crashed", 1, "断了"), status("crashed", 2, "断了", "b")], want: [["断了", undefined], ["断了", undefined]] },
+    { name: "换了会话、隔了一阵：两件事，不合", events: [status("crashed", 1, "断了"), status("crashed", 9000, "断了", "b")], want: [["断了", undefined], ["断了", undefined]] },
+    { name: "几条会话同一刻报同一句（共用的进程退了）：合成一条", events: [status("crashed", 1, "Kimi Web 服务已退出"), status("crashed", 3, "Kimi Web 服务已退出", "b"), status("crashed", 4, "Kimi Web 服务已退出", "c")], want: [["Kimi Web 服务已退出", 3]] },
     { name: "换了类别不合", events: [status("crashed", 1, "断了"), status("degraded", 2, "断了")], want: [["断了", undefined], ["断了", undefined]] },
   ]
   for (const one of cases) {
@@ -44,5 +45,16 @@ describe("接连报的同一件事合成一条", () => {
   it("合成的那条拿新 id 和新时刻——界面据此重新亮出来，而不是悄悄改个数字", () => {
     const s = reduceAll(initial(), [status("crashed", 1, "断了"), status("crashed", 2, "断了")])
     expect(s.notices).toEqual([expect.objectContaining({ id: "n2", at: 2, count: 2 })])
+  })
+})
+
+describe("删掉的会话", () => {
+  it("它的横幅一起收，别的会话的留着", () => {
+    const s = reduceAll(initial(), [
+      status("crashed", 1, "进程退了"),
+      status("crashed", 9000, "另一条也坏了", "b"),
+      { type: "thread.removed", at: 9001, threadId: "a" },
+    ])
+    expect(s.notices.map((n) => [n.text, n.threadId])).toEqual([["另一条也坏了", "b"]])
   })
 })

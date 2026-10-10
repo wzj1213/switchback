@@ -64,7 +64,8 @@ export function Prompt({
   command?: SlashCommand
   onClearCommand: () => void
   /** 选中了一条。Switchback 自己的就地执行，引擎的填进输入框等着按回车。 */
-  onCommand: (command: SlashCommand) => void
+  /** `rest` 是命令片段后面原有的话：在已有草稿开头补的命令，选中后那段话留着当参数。 */
+  onCommand: (command: SlashCommand, rest: string) => void
   onChange: (text: string) => void
   /** 参数是「别排队，现在就插进去」（⌘⏎）。 */
   onSubmit: (steer: boolean) => void
@@ -91,8 +92,10 @@ export function Prompt({
   }
 
   const pickCommand = (command: SlashCommand): void => {
+    // 命令片段是开头的 `/` 加已经打的那几个字（见 `slashAt`）；它后面原有的话不能跟着清掉
+    const rest = value.slice(1 + slash.query.length).replace(/^\s+/, "")
     slash.close()
-    onCommand(command)
+    onCommand(command, rest)
   }
 
   const clearCommand = (): void => {

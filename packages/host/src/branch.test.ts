@@ -512,3 +512,16 @@ describe("分叉与重来：没用过的那条不该留下痕迹", () => {
     expect(r.events.filter((e) => e.type === "thread.removed").map((e) => e.threadId)).not.toContain(used)
   })
 })
+
+describe("原生分叉出来的会话一出生就带着上下文", () => {
+  it("还没开口时在下拉里换一家再换回来：续的是它自己的原生分叉，不是起一条空白会话", async () => {
+    const r = rig({ canFork: true, canRewind: true })
+    const { id, turns } = await withTurns(r)
+    await r.host.dispatch({ type: "thread.rewind", threadId: id, turnId: turns[1] ?? "", draft: "第二句：换个说法" })
+    const derived = r.events.filter((e) => e.type === "thread.started").at(-1)?.thread.id ?? ""
+    expect(r.forks.at(-1)).toMatchObject({ dropTurns: 1 })
+    await r.host.dispatch({ type: "thread.handoff", threadId: derived, to: "other" })
+    await r.host.dispatch({ type: "thread.handoff", threadId: derived, to: "fake" })
+    expect(r.resumed.at(-1)).toBe("cx-forked")
+  })
+})

@@ -207,6 +207,22 @@ describe("换引擎的在途竞态", () => {
     expect(rig.host.live()[0]).toMatchObject({ engine: "b", status: "idle" })
   })
 
+  it("排队那句换家之后才发现新那家不收图：退回输入框、不堵后面的，横幅按能力受限报", async () => {
+    const rig = rigOf({ noAttachments: new Set(["b"]) })
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "先开过工" })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "看这张图", attachments: ["/tmp/shot.png"] })
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "后面那句" })
+    await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "b" })
+    complete(rig.probes[0] as Probe)
+    await tick()
+    await tick()
+    expect(rig.host.live()[0]).toMatchObject({ engine: "b", queued: [], draft: "看这张图", draftAttachments: ["/tmp/shot.png"] })
+    expect(rig.probes[1]?.prompts.map((prompt) => prompt.text)).toEqual(["后面那句"])
+    const notice = rig.events.filter((event) => event.type === "engine.status").at(-1)
+    expect(notice).toMatchObject({ status: "degraded", detail: "排队的那句没发出去：b 不支持附件；附件仍在输入区，请移除或换一个引擎" })
+  })
+
   it("同一拍连点两次分叉只启动一个派生会话", async () => {
     const rig = rigOf()
     const id = await created(rig)

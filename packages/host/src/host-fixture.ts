@@ -37,6 +37,8 @@ export interface Fake {
   compacted: () => number
   /** 宿主给压缩操作铸的轮次；驱动必须用它回报异步结果。 */
   compactions: string[]
+  /** 背后的原生进程或实时流没了（`StartRequest.onExit`）。 */
+  exit: (detail: string) => void
 }
 
 /** 引擎回报的强度怎么算。缺省 = 照单全收；传进来就是「它其实用的是这个」。 */
@@ -62,7 +64,7 @@ export function fakeDriver(
         report: (patch) => req.onEngineState?.(patch), goal: (goal) => req.onGoal?.(goal),
         nativeTurn: (turn) => req.onNativeTurn?.(turn), memory: req.memory,
         compacted: () => fake.compactions.length,
-        compactions: [],
+        compactions: [], exit: (detail) => req.onExit?.(detail),
       }
       holder.fake = fake
       const session: EngineSession = {
@@ -180,6 +182,7 @@ function twoEngineDriver(id: string, sessions: Fake[]): EngineDriver {
         memory: req.memory,
         compacted: () => fake.compactions.length,
         compactions: [],
+        exit: (detail) => req.onExit?.(detail),
       }
       sessions.push(fake)
       return Promise.resolve({

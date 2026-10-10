@@ -19,10 +19,18 @@ export interface HistoryNote {
   held: boolean
 }
 
-/** 没换家、原来那家又没留下句柄：宿主接不回来。 */
+/**
+ * 没换家、原来那家又没留下句柄：宿主接不回来。
+ *
+ * 例外：记录里有别家的分段、却没有这一家的——它是换过来还没开口就停了（Claude 要等开轮之后
+ * 才报句柄），没有上下文可冒充，宿主会新起一条（见 host 的 `reattached`），不拦。
+ * 这里只看得到分段；它其实跑过轮次的少见情形由宿主拒绝，那句话会退回输入框。
+ */
 export function cannotRevive(thread: Thread): boolean {
   const to = thread.nextEngine ?? thread.engine
-  return thread.detached === true && to === thread.engine && thread.engineHandle === undefined
+  if (thread.detached !== true || to !== thread.engine || thread.engineHandle !== undefined) return false
+  const segments = thread.segments ?? []
+  return segments.length === 0 || segments.some((segment) => segment.engine === to)
 }
 
 /**

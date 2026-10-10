@@ -6,7 +6,7 @@ import type { Command, Event, Thread, ThreadId } from "@switchback/protocol"
 import type { Ledger, Sealed } from "@switchback/wire"
 import { createHost, type Host } from "@switchback/host"
 import { createJournal, createRuleStore } from "@switchback/journal"
-import { AcpAuthRequired } from "@switchback/engine"
+import { AcpAuthRequired, Unsupported } from "@switchback/engine"
 import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools.js"
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
@@ -160,7 +160,7 @@ function reporter(emit: (event: Event) => void): (error: unknown, threadId?: Thr
       at: Date.now(),
       threadId: threadId ?? "",
       // 引擎明确要先登录时不是故障：报成故障会把人引去查一个没坏的东西
-      status: error instanceof AcpAuthRequired ? "unauthenticated" : "crashed",
+      status: error instanceof AcpAuthRequired ? "unauthenticated" : error instanceof Unsupported ? "degraded" : "crashed",
       detail: error instanceof Error ? error.message : String(error),
       ...(error instanceof AcpAuthRequired ? { engine: error.engine } : {}),
     })

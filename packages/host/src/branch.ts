@@ -7,7 +7,9 @@ import { dropTemps, launch } from "./session.js"
 import { rememberHandle } from "./engine-state.js"
 import { carryRules } from "./approval.js"
 import { recordOf, retarget } from "./revive.js"
-import { latestSegment, switched } from "./switched.js"
+import { latestSegment, switched, withoutPending } from "./switched.js"
+import { nativeTurns } from "./native-turns.js"
+import { recordSegment } from "./segment.js"
 
 /**
  * 从一条会话岔出另一条：分叉（换引擎）、重来（砍掉后面几轮）、接力（换引擎但不留旧的）。
@@ -92,7 +94,7 @@ async function branch(
 ): Promise<void> {
   const events = await stableEvents(ctx, entry, opts.to)
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
-  const launchOptions = derivedPlan(entry, opts, all)
+  const launchOptions = derivedPlan(entry, opts, all, events)
   const at = ctx.deps.now()
   const thread = bornOf(ctx, entry, {
     to: opts.to,
@@ -117,6 +119,10 @@ async function branch(
   if (current !== undefined) current.thread = born
   emit(ctx, { type: "thread.updated", at: born.updatedAt, thread: born })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
+  // 原生分叉出来的这条**一出生就带着上下文**：把它自己的句柄记成一段。
+  // 不记的话还没开口时在下拉里换一家再换回来，切回去找不到可续的句柄，起成一条空白会话——
+  // 抄过来的转录还摆在界面上，引擎却什么都不记得
+  if (launched.forked !== undefined && current !== undefined) void recordSegment(ctx, current, born.updatedAt)
 
   // 原生分叉成功时把 transcript 抄过来：**引擎那边已经什么都知道了**，
   // 人看到的和它记得的就对上了
@@ -171,12 +177,17 @@ interface DerivedLaunchPlan {
 }
 interface NativeDerivedLaunchPlan extends DerivedLaunchPlan { plan: NativeForkPlan }
 
-function derivedPlan(entry: Source, opts: BranchOptions, all: readonly Item[]): DerivedLaunchPlan {
+function derivedPlan(
+  entry: Source,
+  opts: BranchOptions,
+  all: readonly Item[],
+  events: readonly Event[],
+): DerivedLaunchPlan {
   const items = opts.upTo === undefined ? all : until(all, opts.upTo)
   // 第一轮之前没有任何上下文可保留，也没有公开协议能表达“在首轮之前 fork”。
   // 这时开同工作区的空白分支就是动作的精确定义，不需要伪造 beforeTurnId。
   const blankRewind = opts.upTo !== undefined && items.length === 0
-  const plan = blankRewind ? undefined : forkPlan(entry, opts, all, items)
+  const plan = blankRewind ? undefined : forkPlan(entry, opts, { all, keep: items, events })
   if (opts.upTo !== undefined && !blankRewind && plan === undefined) {
     throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
   }
@@ -205,8 +216,7 @@ async function startDerived(
 function forkPlan(
   entry: Source,
   opts: BranchOptions,
-  all: readonly Item[],
-  keep: readonly Item[],
+  history: { all: readonly Item[]; keep: readonly Item[]; events: readonly Event[] },
 ): NativeForkPlan | undefined {
   // 跨引擎时会话格式不通，只能开空白分支；不能冒充原生上下文复制。
   if (opts.to !== entry.thread.engine) return undefined
@@ -216,8 +226,15 @@ function forkPlan(
   const handle = entry.thread.engineHandle
   // 还没拿到引擎侧句柄的会话分不了叉——那通常意味着它还没真正跑过任何一轮
   if (handle === undefined) return undefined
-  const dropTurns = turnsAfter(all, keep)
-  return { handle, ...(dropTurns === 0 ? {} : { dropTurns }) }
+  // 只数这条原生会话自己的轮次（见 `native-turns.ts`）：别家跑的那几轮不在它里面
+  const cut = nativeTurns(history.events, entry.thread, history.all, history.keep)
+  if (opts.upTo !== undefined && cut.before === 0) {
+    throw new Error(
+      `这一轮之前都是别家跑的，${entry.thread.engine} 自己的原生会话里没有它们，没法带着上下文从这里重来。` +
+      "换回原来那家再从这里重来，或者从这一家自己跑的轮次重来。",
+    )
+  }
+  return { handle, ...(cut.after === 0 ? {} : { dropTurns: cut.after }) }
 }
 
 /**
@@ -265,12 +282,6 @@ async function launchDerived(
     await discardUnstarted(ctx, thread.id)
     throw error
   }
-}
-
-/** 要从末尾丢掉几轮：全部轮次数 减去 留下的轮次数。 */
-function turnsAfter(all: readonly Item[], keep: readonly Item[]): number {
-  const total = new Set(all.map((i) => i.turnId)).size
-  return Math.max(0, total - new Set(keep.map((i) => i.turnId)).size)
 }
 
 
@@ -329,7 +340,8 @@ async function replacement(
     const latest = entry.thread
     entry.lease.active = true
     entry.thread = {
-      ...withQueue(previous, entry.queued, at),
+      // 切换前已经 `settleAll` 过，旧进程挂着的问题落定了，退回来也不再带着
+      ...withQueue(withoutPending(previous), entry.queued, at),
       title: latest.title,
       draft: latest.draft,
       draftAttachments: latest.draftAttachments,
@@ -366,7 +378,7 @@ async function finishSwitch(
   ctx: Ctx,
   old: Live,
   current: Live,
-  result: { early: string | undefined; intoTurn: boolean },
+  result: { early: string | undefined; intoTurn: boolean; held: boolean },
 ): Promise<void> {
   await old.session.dispose().catch(() => undefined)
   if (!isCurrent(ctx, current)) return
@@ -378,7 +390,9 @@ async function finishSwitch(
   }
   emit(ctx, { type: "thread.updated", at, thread: current.thread })
   if (result.early !== undefined) rememberHandle(ctx, current.thread.id, result.early)
-  if (!result.intoTurn && current.queued.length > 0) ctx.drain?.(current.thread.id)
+  // 切换前就排着的是上一轮失败留下的「待发送」：等人取回或下一轮跑完再发——
+  // 「切到 X 再选模型」写的是不会自动发送内容，历史会话上的同一颗按钮也不排空队列
+  if (!result.intoTurn && !result.held && current.queued.length > 0) ctx.drain?.(current.thread.id)
 }
 
 /**
@@ -411,6 +425,7 @@ export async function switchEngine(
 
   const at = ctx.deps.now()
   const previous = entry.thread
+  const held = entry.queued.length > 0
   // **切回去要续上那一家自己的那条**，不是新开一条。
   //
   // 上一版把 `engineHandle` 清成 undefined（「换了引擎，上一家的句柄就没用了」），
@@ -445,5 +460,5 @@ export async function switchEngine(
    * 界面上还看不出为什么。用引擎下拉里那个「未安装」的选项就能复现。
    */
   // 发 live 里的能力；随后补握手期句柄，并在直接切换时继续排队消息。
-  await finishSwitch(ctx, entry, current, { early, intoTurn })
+  await finishSwitch(ctx, entry, current, { early, intoTurn, held })
 }

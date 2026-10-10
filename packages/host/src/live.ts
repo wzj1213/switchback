@@ -1,5 +1,5 @@
 import type { ThreadId } from "@switchback/protocol"
-import { emit, type Ctx, type Live } from "./ctx.js"
+import { emit, isCurrent, resting, type Ctx, type Live } from "./ctx.js"
 
 /**
  * **同时活着几条引擎会话，谁该被收掉。**
@@ -64,5 +64,21 @@ async function detach(ctx: Ctx, entry: Live): Promise<void> {
   await entry.session.dispose().catch(() => undefined)
   ctx.live.delete(entry.thread.id)
   const at = ctx.deps.now()
-  emit(ctx, { type: "thread.updated", at, thread: { ...entry.thread, detached: true, status: "idle", updatedAt: at } })
+  emit(ctx, { type: "thread.updated", at, thread: { ...entry.thread, detached: true, status: resting(entry.thread.status), updatedAt: at } })
+}
+
+/**
+ * 引擎自己报告背后的进程或实时流没了（`StartRequest.onExit`）。
+ *
+ * 这条会话再收不到任何回音：摘成历史会话，下一句话照 `revive.ts` 用句柄重新拉起——
+ * 和重启之后、或被上限收起来的会话一个样子。还挂着的那一轮先按失败收口：
+ * 驱动通常已经收过（那时这里什么都不做），没收的话轮次会永远停在 running。
+ */
+export async function exited(ctx: Ctx, entry: Live, detail: string): Promise<void> {
+  if (!isCurrent(ctx, entry)) return
+  const turnId = entry.turn
+  if (turnId !== undefined) {
+    emit(ctx, { type: "turn.completed", at: ctx.deps.now(), turnId, status: "failed", error: detail })
+  }
+  await detach(ctx, entry)
 }

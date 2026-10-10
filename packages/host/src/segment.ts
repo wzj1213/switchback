@@ -10,7 +10,7 @@ interface SegmentRef {
  * 先把续跑所需的身份同步落下；`logPath` 只是之后补充的展示信息，不能反过来
  * 卡住 handle。否则 A → B → A 切得比一次磁盘/RPC 查询快，就会把 A 当成新会话。
  */
-function rememberSegment(ctx: Ctx, entry: Live): SegmentRef | undefined {
+function rememberSegment(ctx: Ctx, entry: Live, since: number | undefined): SegmentRef | undefined {
   const handle = entry.thread.engineHandle
   if (handle === undefined || !isCurrent(ctx, entry)) return undefined
   const engine = entry.thread.engine
@@ -33,19 +33,27 @@ function rememberSegment(ctx: Ctx, entry: Live): SegmentRef | undefined {
   if (last?.engine === engine && last.profile === profile && last.handle === handle) {
     return { engine, ...(profile === undefined ? {} : { profile }), handle }
   }
+  if (since === undefined) return undefined
   const at = ctx.deps.now()
   entry.thread = {
     ...entry.thread,
-    segments: [...had, { engine, ...(profile === undefined ? {} : { profile }), handle, startedAt: at }],
+    segments: [...had, { engine, ...(profile === undefined ? {} : { profile }), handle, startedAt: since }],
     updatedAt: at,
   }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
   return { engine, ...(profile === undefined ? {} : { profile }), handle }
 }
 
-/** 当前段先出现，原始记录路径异步查到后只补这一项。 */
-export async function recordSegment(ctx: Ctx, entry: Live): Promise<void> {
-  const ref = rememberSegment(ctx, entry)
+/**
+ * 当前段先出现，原始记录路径异步查到后只补这一项。
+ *
+ * `since` 是这一段从哪一刻算起——**这一家开口的那一轮开始的时刻**，不是记下它的这一刻：
+ * 分段要等引擎收下那句才记，可界面按时间把转录内容对到「谁跑的」，晚一点就会把换家后的
+ * 第一句算到前一家头上。不给 `since` 时只补已经记下的那一段，不新记：引擎还没收下过
+ * 这一家的任何一句时，时间线上不该出现它，交接说明也就还没「附过」（见 `handoff-note.ts`）。
+ */
+export async function recordSegment(ctx: Ctx, entry: Live, since?: number): Promise<void> {
+  const ref = rememberSegment(ctx, entry, since)
   if (ref === undefined) return
   const path = await entry.session.logPath?.().catch(() => undefined)
   if (path === undefined) return

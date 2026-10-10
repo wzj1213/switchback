@@ -96,7 +96,7 @@ export function PlanPanel({
   useEffect(() => {
     if (!pinned) return undefined
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !event.isComposing) {
         event.preventDefault()
         setPinned(false)
         setPreview(false)

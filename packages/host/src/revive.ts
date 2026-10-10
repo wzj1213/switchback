@@ -1,5 +1,5 @@
 import type { Command, Event, Thread, ThreadId } from "@switchback/protocol"
-import { emit, type Ctx, type Live } from "./ctx.js"
+import { emit, resting, type Ctx, type Live } from "./ctx.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"
 import { latestSegment, switched } from "./switched.js"
@@ -41,6 +41,14 @@ export interface Restore {
  * 一条在历史状态下改过名的会话一接回来就变回旧名字。
  */
 export async function recordOf(ctx: Ctx, threadId: ThreadId): Promise<Thread | undefined> {
+  return (await historyOf(ctx, threadId))?.thread
+}
+
+/** 历史会话最后的样子，外加哪几家在这条会话里真跑过轮次（`turn.started` 记着是谁跑的）。 */
+async function historyOf(
+  ctx: Ctx,
+  threadId: ThreadId,
+): Promise<{ thread: Thread; ran: ReadonlySet<string> } | undefined> {
   // 事件出口不等落盘；刚发生的改名、改档要先落完再读
   await ctx.deps.journal?.flush()
   const events = (await ctx.deps.journal?.read(threadId)) ?? []
@@ -51,12 +59,13 @@ export async function recordOf(ctx: Ctx, threadId: ThreadId): Promise<Thread | u
   for (const event of events.slice(at + 1)) {
     if (event.type === "thread.renamed") thread = { ...thread, title: event.title, named: true }
   }
-  return thread
+  const ran = new Set(events.flatMap((event) => (event.type === "turn.started" ? [event.turn.engine] : [])))
+  return { thread, ran }
 }
 
 /** 宿主手上没有的会话：没有进程，也没有谁在等它那几张卡。和桌面端重建全量时补的那条同一个口径。 */
 function historic(thread: Thread, at: number): Thread {
-  const next: Thread = { ...thread, detached: true, status: "idle", updatedAt: at }
+  const next: Thread = { ...thread, detached: true, status: resting(thread.status), updatedAt: at }
   delete next.pendingQuestions
   return next
 }
@@ -108,10 +117,11 @@ function lostMessage(engine: string): string {
  *
  * - 记着要换的那家（`nextEngine`）：按换引擎的规矩起那一家，那一家以前跑过这条会话的，
  *   续它自己那一段（`latestSegment`）
- * - 没换：续原来那家。**没有句柄就不续**——起一个全新的原生会话却看着像接上了，
- *   是最坏的结果；换一家是明确的动作，不算冒充
+ * - 没换：续原来那家。**跑过轮次却没留下句柄就不续**——起一个全新的原生会话却看着像接上了，
+ *   是最坏的结果；换一家是明确的动作，不算冒充。一轮都没跑过的（换过来还没开口就停了，
+ *   Claude 要等开轮之后才报句柄）没有上下文可冒充，新起一条就是准确结果
  */
-function reattached(ctx: Ctx, record: Thread, at: number): Thread {
+function reattached(ctx: Ctx, record: Thread, at: number, ran: ReadonlySet<string>): Thread {
   const to = record.nextEngine ?? record.engine
   if (ctx.deps.drivers[to] === undefined) throw new Error(goneMessage(to))
   if (to !== record.engine) {
@@ -119,7 +129,7 @@ function reattached(ctx: Ctx, record: Thread, at: number): Thread {
     delete next.pendingQuestions
     return { ...next, detached: false }
   }
-  if (record.engineHandle === undefined) throw new Error(lostMessage(to))
+  if (record.engineHandle === undefined && ran.has(to)) throw new Error(lostMessage(to))
   const next: Thread = { ...record, detached: false, status: "idle", updatedAt: at }
   delete next.nextEngine
   delete next.pendingQuestions
@@ -163,10 +173,15 @@ async function attach(ctx: Ctx, record: Thread, thread: Thread, restore: Restore
   }
 }
 
-async function reviveFrom(ctx: Ctx, record: Thread, restore: Restore | undefined): Promise<Live> {
+async function reviveFrom(
+  ctx: Ctx,
+  history: { thread: Thread; ran: ReadonlySet<string> },
+  restore: Restore | undefined,
+): Promise<Live> {
+  const record = history.thread
   let thread: Thread
   try {
-    thread = reattached(ctx, record, ctx.deps.now())
+    thread = reattached(ctx, record, ctx.deps.now(), history.ran)
   } catch (error) {
     if (restore !== undefined) giveBack(ctx, record, restore)
     throw error
@@ -178,9 +193,9 @@ async function reviveFrom(ctx: Ctx, record: Thread, restore: Restore | undefined
 export async function revive(ctx: Ctx, threadId: ThreadId, restore?: Restore): Promise<Live> {
   const live = ctx.live.get(threadId)
   if (live !== undefined) return live
-  const record = await recordOf(ctx, threadId)
-  if (record === undefined) throw new Error(`找不到会话 ${threadId} 的历史，无法接回引擎`)
-  return reviveFrom(ctx, record, restore)
+  const history = await historyOf(ctx, threadId)
+  if (history === undefined) throw new Error(`找不到会话 ${threadId} 的历史，无法接回引擎`)
+  return reviveFrom(ctx, history, restore)
 }
 
 /** `thread.resume`：不发话、只接回。网页端的「接回来」和开发入口用它。 */
@@ -193,8 +208,8 @@ export async function resume(ctx: Ctx, cmd: Extract<Command, { type: "thread.res
  * 和活会话上那颗按钮同一个意思——先把新那家起起来，好挑它自己报的模型。
  */
 export async function switchHistory(ctx: Ctx, threadId: ThreadId): Promise<void> {
-  const record = await recordOf(ctx, threadId)
-  const to = record?.nextEngine
-  if (record === undefined || to === undefined || to === record.engine || ctx.live.has(threadId)) return
-  await reviveFrom(ctx, record, undefined)
+  const history = await historyOf(ctx, threadId)
+  const to = history?.thread.nextEngine
+  if (history === undefined || to === undefined || to === history.thread.engine || ctx.live.has(threadId)) return
+  await reviveFrom(ctx, history, undefined)
 }

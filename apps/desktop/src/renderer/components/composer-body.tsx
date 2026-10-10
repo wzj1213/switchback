@@ -10,6 +10,7 @@ import { AttachmentDrop } from "./AttachmentDrop.js"
 import { Chips } from "./Chips.js"
 import { ComposerControls } from "./composer-controls.js"
 import { takeCommand } from "./ComposerAction.js"
+import { composeDraft } from "../composer-blocks.js"
 import { Prompt } from "./Prompt.js"
 
 interface Props {
@@ -97,16 +98,19 @@ export function ComposerBody(view: Props): React.JSX.Element {
           commands={aside.commands(composer.commands)}
           command={draft.command}
           onClearCommand={() => draft.setCommand(undefined)}
-          onCommand={(command) => {
-            if (aside.take(command, () => draft.setText(""))) return
-            takeCommand(command, draft.setText, draft.setCommand, composer.onSwitchback)
+          onCommand={(command, rest) => {
+            if (aside.take(command, () => draft.setText(rest))) return
+            takeCommand(command, rest, { setText: draft.setText, setCommand: draft.setCommand, onSwitchback: composer.onSwitchback })
           }}
           searchFiles={composer.searchFiles}
           onChange={draft.setText}
           onSubmit={draft.submit}
           onAside={() =>
-            aside.ask(draft.text, draft.command !== undefined, attachmentBlocked, () => {
+            // 和侧问模式里回车走同一份草稿：芯片里的引用与粘贴一起展开进去，
+            // 不然「这里为什么这样？」发出去了，「这里」指的那段却还留在输入框里
+            aside.ask(composeDraft(draft.text, blocks.blocks), draft.command !== undefined, attachmentBlocked, () => {
               draft.setText("")
+              blocks.clear()
             })
           }
           asideMode={aside.on}

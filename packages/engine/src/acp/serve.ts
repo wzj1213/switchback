@@ -30,6 +30,8 @@ export interface AnswerCtx {
 export interface AcpClientCalls {
   answer: (call: ServerCall) => Promise<void>
   resolved: (method: string, params: unknown) => void
+  /** 按停止：挂着的权限请求一律回 `cancelled`，宿主那边的卡跟着收成「已失效」。 */
+  cancelPermissions: () => void
   dispose: () => void
 }
 
@@ -46,7 +48,8 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
   const { req, config } = deps
   const terminal = config.terminal === true ? createTerminalHost(req.cwd) : undefined
   const interactions = createForeignInteractionCalls(req.askQuestion)
-  const permission = (): PermissionContext => ({
+  const permissions = new Set<AbortController>()
+  const permission = (signal?: AbortSignal): PermissionContext => ({
     engine: config.id,
     cwd: req.cwd,
     home: req.home,
@@ -54,10 +57,20 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
     memory: req.memory,
     inflight: deps.inflight,
     askUser: req.askUser,
+    ...(signal === undefined ? {} : { signal }),
   })
   const answer = async (call: ServerCall): Promise<void> => {
     const interaction = config.interaction?.(call.method, call.params)
-    if (interaction === undefined) return answerCall({ terminal, permission }, call)
+    if (interaction === undefined) {
+      const controller = new AbortController()
+      permissions.add(controller)
+      try {
+        await answerCall({ terminal, permission: () => permission(controller.signal) }, call)
+      } finally {
+        permissions.delete(controller)
+      }
+      return
+    }
     if (!mine(interaction.sessionId, deps.sessionId())) {
       call.reject({ code: -32602, message: `${call.method} 属于另一条会话` })
       return
@@ -68,11 +81,15 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
     const key = config.interactionResolved?.(method, params)
     if (key !== undefined) interactions.resolved(key)
   }
+  const cancelPermissions = (): void => {
+    for (const controller of [...permissions]) controller.abort()
+  }
   const dispose = (): void => {
+    cancelPermissions()
     interactions.abortAll()
     terminal?.disposeAll()
   }
-  return { answer, resolved, dispose }
+  return { answer, resolved, cancelPermissions, dispose }
 }
 
 /**

@@ -17,6 +17,10 @@
  * 越过了 900 行的闸（`check:style-size`），而这一批还要往里加。
  */
 .queued {
+  /* 压在桌宠那一层（`.pets`，z-index 2）上面：它们就站在输入框上沿这一带，
+     不抬的话「取回」「立刻插入」正中点下去点到的是桌宠，只有按钮最右边几个像素点得到 */
+  position: relative;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   gap: 4px;

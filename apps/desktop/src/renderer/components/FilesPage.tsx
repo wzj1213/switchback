@@ -75,7 +75,7 @@ function FileIndex({ threadId, cwd, items, stamp, active, hidden, onPick, search
   }
   return (
     <div ref={root} className="files-index" hidden={hidden} onKeyDown={(event) => {
-      if (event.key !== "Escape" || query === "") return
+      if (event.key !== "Escape" || query === "" || event.nativeEvent.isComposing) return
       event.stopPropagation()
       enterResults.current = false
       setQuery("")

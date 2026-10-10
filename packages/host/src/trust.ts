@@ -4,6 +4,7 @@ import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"
 import { carryRules } from "./approval.js"
 import { updateRecord } from "./revive.js"
+import { withoutPending } from "./switched.js"
 
 async function attach(ctx: Ctx, thread: Thread, resume: string | undefined): Promise<Live> {
   // 权限重启仍是同一段对话，只能复用原基线，不能以重启时刻重置差异。
@@ -35,9 +36,10 @@ function takeQueue(from: Live, into: Live): void {
 async function rollback(
   ctx: Ctx,
   entry: Live,
-  state: { previous: Thread; resume?: string; cause: unknown },
+  state: { previous: Thread; resume?: string; cause: unknown; held: boolean },
 ): Promise<never> {
-  const { previous, resume, cause } = state
+  const { resume, cause, held } = state
+  const previous = withoutPending(state.previous)
   if (ctx.closed || ctx.removed.has(previous.id)) throw cause
   const restored = await attach(ctx, previous, resume).catch(() => undefined)
   const at = ctx.deps.now()
@@ -62,7 +64,7 @@ async function rollback(
   }
   takeQueue(entry, restored)
   emit(ctx, { type: "thread.updated", at, thread: restored.thread })
-  if (restored.queued.length > 0) ctx.drain?.(previous.id)
+  if (!held && restored.queued.length > 0) ctx.drain?.(previous.id)
   throw cause
 }
 
@@ -75,7 +77,9 @@ async function restart(ctx: Ctx, entry: Live, trust: Thread["trust"]): Promise<v
     throw new Error("这条会话没有引擎句柄，无法在保留上下文的前提下重启权限沙箱")
   }
   const at = ctx.deps.now()
-  const next: Thread = { ...previous, trust, status: "starting", updatedAt: at }
+  // 重启前就排着的是上一轮失败留下的「待发送」：等人取回或下一轮跑完，不跟着重启发出去
+  const held = entry.queued.length > 0
+  const next: Thread = { ...withoutPending(previous), trust, status: "starting", updatedAt: at }
   entry.thread = { ...previous, status: "starting", updatedAt: at }
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
   entry.gate.settleAll()
@@ -89,6 +93,7 @@ async function restart(ctx: Ctx, entry: Live, trust: Thread["trust"]): Promise<v
       previous,
       ...(resume === undefined ? {} : { resume }),
       cause: error,
+      held,
     })
   }
   takeQueue(entry, current)
@@ -101,7 +106,7 @@ async function restart(ctx: Ctx, entry: Live, trust: Thread["trust"]): Promise<v
     updatedAt: readyAt,
   }
   emit(ctx, { type: "thread.updated", at: readyAt, thread: current.thread })
-  if (current.queued.length > 0) ctx.drain?.(previous.id)
+  if (!held && current.queued.length > 0) ctx.drain?.(previous.id)
 }
 
 /**

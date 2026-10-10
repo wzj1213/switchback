@@ -22,9 +22,11 @@ export function beginNativeTurn(
   if (!isCurrent(ctx, entry) || entry.turn !== undefined) return undefined
   const { at, prompt, origin } = request
   commitNative(ctx, entry, at)
-  void recordSegment(ctx, entry)
+  // 引擎自己开的这一轮，它当然听到了：照样算这一家开过口
+  void recordSegment(ctx, entry, at)
   const turnId = ctx.deps.newId("tn")
   entry.turn = turnId
+  entry.accepted = { turn: turnId, at }
   setStatus(ctx, entry, "running")
   emit(ctx, {
     type: "turn.started",

@@ -75,7 +75,8 @@ describe("host", () => {
     await expect(answer).resolves.toEqual({ allow: false, remember: "once" })
     expect(session().disposed).toBe(true)
     const settled = items(events).filter((item) => item.kind === "approval").at(-1)
-    expect(settled?.kind === "approval" ? settled.status : "").toBe("denied")
+    // 给引擎的是拒绝；卡片记成「已失效」——这不是用户点的拒绝
+    expect(settled?.kind === "approval" ? settled.status : "").toBe("cancelled")
   })
 
   it("会话状态走完整条链路：running → waiting_approval → running → idle", async () => {
@@ -322,6 +323,8 @@ describe("续跑", () => {
         engineHistory: ["fake"],
       },
     })
+    // 它真跑过一轮：有上下文，却没留下句柄
+    stored.push({ type: "turn.started", at: 0, turn: { id: "tn-x", threadId: "th-x", engine: "fake", status: "running", startedAt: 0 } })
     await expect(host.dispatch({ type: "thread.resume", threadId: "th-x" })).rejects.toThrow("句柄")
   })
 

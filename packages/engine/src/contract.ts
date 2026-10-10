@@ -62,6 +62,11 @@ export interface ApprovalAnswer {
    * 现在与 `Command.remember` 同型，各家驱动自己决定怎么落到原生语义上。
    */
   remember: RememberScope
+  /**
+   * 没人能问：这一轮已经收工（后台 workflow、子 agent 在主轮之后才来要权限）或会话已经关了。
+   * 宿主按拒绝回，但**这不是用户的决定**——驱动对引擎说话时不能说成「用户拒绝了」。
+   */
+  unattended?: boolean
 }
 
 /** 引擎等人的原生请求如何收口；取消时宿主不再留死卡。 */
@@ -107,6 +112,15 @@ export interface StartRequest {
   emit: (event: Event) => void
   /** 判定为 escalate 时调用，等用户裁决 */
   askUser: (ask: ApprovalAsk, wait?: InteractionWait) => Promise<ApprovalAnswer>
+  /**
+   * 这条会话背后的原生进程或实时流已经没了（进程退出、崩溃、重连用尽），之后的 prompt 不会再有回音。
+   *
+   * 宿主据此把会话摘成历史会话：下一句话照「历史会话发话即接回」用句柄重新拉起，
+   * 而不是把话交给一个死掉的进程——Claude 那边会被静默吞掉、永远收不了工，
+   * codex / ACP 那边每次都报「连接已关闭」，报错卡上的「再试一次」点了必然同样失败。
+   * 驱动只在自己确知时调一次；宿主主动 `dispose` 引起的退出不算。
+   */
+  onExit?: (detail: string) => void
   /** 引擎原生提出结构化问题时调用；回答原样回到该引擎，不转成普通提示词。 */
   askQuestion: (
     questions: readonly QuestionPrompt[],

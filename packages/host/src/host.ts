@@ -1,8 +1,8 @@
 import type { Command, EngineId, Event, Thread, ThreadId, TurnId } from "@switchback/protocol"
-import type { EngineSession } from "@switchback/engine"
+import { Unsupported, type EngineSession } from "@switchback/engine"
 import { resolveApproval } from "./approval.js"
 import { resolveQuestion } from "./question.js"
-import { clearQueue, discardUnstarted, emit, liveStateOf, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
+import { clearQueue, discardUnstarted, emit, handBack, liveStateOf, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
 import type { HostDeps } from "./deps.js"
 import { create, remove, rename, setModel } from "./session.js"
 import { resume, switchHistory } from "./revive.js"
@@ -95,24 +95,32 @@ function takeBack(
   command: Extract<Command, { type: "thread.unqueue" }>,
 ): Promise<void> {
   const entry = ctx.live.get(command.threadId)
+  // 换引擎握手里新条目已经登记、还在 activate（Kimi 要先连实时流）：这时取回落在它身上，
+  // 装好那一刻又会被旧壳的队列整份盖掉——撤回的话照样发出去。等这次切换做完再取
+  const switching = entry?.lease.installing === true ? ctx.serial.get(`configure:${command.threadId}`) : undefined
+  if (switching !== undefined) {
+    // 下标是点下去那一刻的位置；等完之后队首可能已经发出去了，按内容找回点的那一句
+    const picked = command.index === undefined ? undefined : entry?.queued[command.index]
+    return switching.catch(() => undefined).then(() => takeBack(ctx, relocated(ctx, command, picked)))
+  }
   if (entry === undefined || entry.queued.length === 0) return Promise.resolve()
   const first = entry.queued[0]
   const offset = first !== undefined && entry.draining === first ? 1 : 0
   const picked = pick(entry.queued, offset, command.index)
-  if (picked === undefined) return Promise.resolve()
-  entry.queued = picked.rest
-  const attachments = [...new Set(picked.taken.flatMap((prompt) => prompt.attachments ?? []))]
-  const at = ctx.deps.now()
-  const next = {
-    ...withQueue(entry.thread, entry.queued, at),
-    draft: picked.taken.map((prompt) => prompt.text).join("\n"),
-    draftRevision: ctx.deps.newId("dr"),
-  }
-  delete next.draftAttachments
-  if (attachments.length > 0) next.draftAttachments = attachments
-  entry.thread = next
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  if (picked !== undefined) handBack(ctx, entry, picked.taken)
   return Promise.resolve()
+}
+
+/** 点的那一句现在排在第几；已经不在队里（发出去了）就给一个必然落空的下标。 */
+function relocated(
+  ctx: Ctx,
+  command: Extract<Command, { type: "thread.unqueue" }>,
+  picked: QueuedPrompt | undefined,
+): Extract<Command, { type: "thread.unqueue" }> {
+  if (picked === undefined) return command
+  const same = (prompt: QueuedPrompt): boolean => prompt.text === picked.text &&
+    (prompt.attachments ?? []).join("\n") === (picked.attachments ?? []).join("\n")
+  return { ...command, index: ctx.live.get(command.threadId)?.queued.findIndex(same) ?? -1 }
 }
 
 /**
@@ -181,9 +189,19 @@ const HANDLERS: Handlers = {
   "thread.interrupt": async (ctx, command) => {
     const entry = ctx.live.get(command.threadId)
     // **按停止就是要它停下**，排着队的那几句一并作废——
-    // 「停完这句再跑下一句」不是任何人按停止时想要的
-    if (entry !== undefined && entry.queued.length > 0) clearQueue(ctx, entry)
-    await entry?.session.interrupt()
+    // 「停完这句再跑下一句」不是任何人按停止时想要的。
+    // 只作废**这一刻**排着的：引擎收手的那几秒里补的一句是停下之后的新话（见 `Live.stopping`）；
+    // 没有轮次在跑时停止什么都不停，上一轮失败留下的「待发送」也不该被它删掉
+    if (entry !== undefined && (entry.turn !== undefined || entry.draining !== undefined)) {
+      entry.stopping = entry.turn
+      if (entry.queued.length > 0) clearQueue(ctx, entry)
+    }
+    // 引擎先撤自己的（ACP 把挂着的权限请求回成 cancelled、Claude 走 signal），宿主再把剩下的
+    // 当场收掉、记成「已失效」：引擎在等这张卡的回音，不回它就收不了这一轮——
+    // 实测 ACP 引擎收到 cancel 之后仍等着权限请求的回包，停止键按了也停不下来
+    const stopping = entry?.session.interrupt()
+    entry?.gate.settleAll()
+    await stopping
   },
   "approval.resolve": (ctx, command) => {
     resolveApproval(ctx, command)
@@ -244,6 +262,8 @@ function serialKey(command: Command): string | undefined {
     case "thread.setModel":
     case "thread.setTrust":
     case "thread.switchNow":
+    case "thread.steerQueued":
+      // 「立刻插入」也排进这条：连点两下时第二下要等第一下落定，那时队列已经空了，不会把同一段插两遍
       return `configure:${command.threadId}`
     default:
       return undefined
@@ -329,9 +349,20 @@ function failDrain(ctx: Ctx, threadId: ThreadId, next: QueuedPrompt, error: unkn
     type: "engine.status",
     at: ctx.deps.now(),
     threadId,
-    status: "crashed",
-    detail: `排队的那句没发出去：${String(error)}`,
+    // 这一家明确不收这句里的东西不是引擎坏了，抬头写「能力受限」，别把人引去查一个没坏的东西
+    status: error instanceof Unsupported ? "degraded" : "crashed",
+    detail: `排队的那句没发出去：${error instanceof Error ? error.message : String(error)}`,
   })
+  if (current !== undefined && movesOn(current, next)) ctx.drain?.(threadId)
+}
+
+/**
+ * 被拒的那句已经退回输入框、不在队首了：会话空着就接着发后面那句。
+ * 切换失败的那句原位留在队首（`retainFailedSwitch`），那种不续，不然就是一圈圈重撞。
+ */
+function movesOn(entry: Live, failed: QueuedPrompt): boolean {
+  return entry.queued[0] !== failed && entry.queued.length > 0 &&
+    entry.turn === undefined && entry.thread.status !== "failed"
 }
 
 function finishDrain(ctx: Ctx, threadId: ThreadId, next: QueuedPrompt): void {
@@ -340,18 +371,26 @@ function finishDrain(ctx: Ctx, threadId: ThreadId, next: QueuedPrompt): void {
   entry.draining = undefined
   // 开了轮的那句已经在 `takeDrained`（prompt.ts）里摘掉了；这里只摘没开轮就交出去的原件
   //（另有一轮在跑或引擎没就绪，它被重新排到了队尾）。切换回滚、用户手动取消时都不误删。
-  if (entry.queued[0] !== next) return
-  entry.queued = entry.queued.slice(1)
-  const at = ctx.deps.now()
-  entry.thread = withQueue(entry.thread, entry.queued, at)
-  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  if (entry.queued[0] === next) {
+    entry.queued = entry.queued.slice(1)
+    const at = ctx.deps.now()
+    entry.thread = withQueue(entry.thread, entry.queued, at)
+    emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+  }
+  // 这一轮在 RPC 回包之前就收工了：那时 `draining` 还占着，收工那一刻的 drain 被跳过，
+  // 后面排着的就再没人发。会话空着、上一轮也不是失败收场，就接着发下一句
+  if (entry.turn === undefined && entry.queued.length > 0 && entry.thread.status !== "failed") {
+    ctx.drain?.(threadId)
+  }
 }
 
 async function drainOne(ctx: Ctx, threadId: ThreadId, next: QueuedPrompt): Promise<void> {
   if (!beginDrain(ctx, threadId, next)) return
+  const command: Command = { type: "thread.prompt", threadId, text: next.text, ...(next.attachments === undefined ? {} : { attachments: next.attachments }) }
+  ctx.drains.set(command, next)
   try {
     // 走统一分派，让排队消息与模型/档位/切换服从同一操作顺序。
-    await dispatch(ctx, { type: "thread.prompt", threadId, text: next.text, ...(next.attachments === undefined ? {} : { attachments: next.attachments }) })
+    await dispatch(ctx, command)
   } catch (error) {
     failDrain(ctx, threadId, next, error)
     return
@@ -373,6 +412,7 @@ export function createHost(deps: HostDeps): Host {
     echo: new Map<string, string>(),
     explained: new Map<TurnId, string>(),
     pace: createPaceBook(),
+    drains: new WeakMap<object, QueuedPrompt>(),
   }
   /**
    * 一轮跑完就把排队的下一句发出去。
@@ -381,9 +421,10 @@ export function createHost(deps: HostDeps): Host {
    * 一口气全推给引擎是错的——那等于把「我看着它跑、随时补一句」
    * 变成「我一次性交代五件事」，而后者本来就该写在同一句话里。
    */
-  ctx.afterTurn = (threadId) => {
+  ctx.afterTurn = (threadId, turnId) => {
     const entry = ctx.live.get(threadId)
-    if (entry !== undefined) void recordSegment(ctx, entry)
+    // 收工时补记这一段（Claude 的句柄要等开轮之后才报）；引擎没收下这一轮就只补路径、不新记
+    if (entry !== undefined) void recordSegment(ctx, entry, entry.accepted?.turn === turnId ? entry.accepted.at : undefined)
   }
   ctx.drain = (threadId) => {
     const entry = ctx.live.get(threadId)

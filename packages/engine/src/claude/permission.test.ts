@@ -1,5 +1,6 @@
+import type { PermissionUpdate } from "@anthropic-ai/claude-agent-sdk"
 import { describe, expect, it } from "vitest"
-import { forcesHumanPrompt, sanitize, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
+import { forcedReason, forcesHumanPrompt, sanitize, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
 import { toolDetail, turnStatus } from "./translate.js"
 
 const meta = (over: Partial<AskMeta> = {}): AskMeta => ({ toolUseID: "toolu_1", ...over })
@@ -47,22 +48,44 @@ describe("PermissionResult 映射", () => {
     expect("interrupt" in result).toBe(false)
   })
 
-  it("不记忆时不回传 updatedPermissions", () => {
-    expect(toAllow(false, meta({ suggestions: [{ type: "setMode", mode: "acceptEdits", destination: "session" }] }))).toEqual({
-      behavior: "allow",
+  const suggestions: PermissionUpdate[] = [
+    { type: "addRules", rules: [{ toolName: "Bash", ruleContent: "git push *" }], behavior: "allow", destination: "localSettings" },
+    { type: "addDirectories", directories: ["/tmp/out"], destination: "localSettings" },
+    { type: "setMode", mode: "acceptEdits", destination: "session" },
+  ]
+  const cases: readonly { name: string; scope: "once" | "session" | "project"; guarded?: boolean; want: unknown }[] = [
+    { name: "只放行这一次：不带规则", scope: "once", want: { behavior: "allow" } },
+    {
+      name: "此对话：只留放行类更新，目的地一律改成 session——不让 CLI 写进项目设置",
+      scope: "session",
+      want: {
+        behavior: "allow",
+        updatedPermissions: [
+          { type: "addRules", rules: [{ toolName: "Bash", ruleContent: "git push *" }], behavior: "allow", destination: "session" },
+          { type: "addDirectories", directories: ["/tmp/out"], destination: "session" },
+        ],
+      },
+    },
+    { name: "本项目始终允许：由 Switchback 自己的规则表记，不再让 CLI 另记一份", scope: "project", want: { behavior: "allow" } },
+    { name: "红线或 ask 规则强制的卡：此对话也不带规则", scope: "session", guarded: true, want: { behavior: "allow" } },
+  ]
+  for (const one of cases) {
+    it(one.name, () => {
+      expect(toAllow(one.scope, meta({ suggestions }), one.guarded)).toEqual(one.want)
     })
-  })
+  }
 
-  it("记忆时把 SDK 的 suggestions 原样回传——这是原生的「本会话不再询问」", () => {
-    const suggestions = [{ type: "setMode", mode: "acceptEdits", destination: "session" }] as const
-    expect(toAllow(true, meta({ suggestions }))).toEqual({
-      behavior: "allow",
-      updatedPermissions: [...suggestions],
-    })
+  it("此对话但 SDK 没给可用的放行建议时退回普通放行", () => {
+    expect(toAllow("session", meta())).toEqual({ behavior: "allow" })
+    expect(toAllow("session", meta({ suggestions: suggestions.slice(2) }))).toEqual({ behavior: "allow" })
   })
+})
 
-  it("记忆但 SDK 没给 suggestions 时退回普通放行", () => {
-    expect(toAllow(true, meta())).toEqual({ behavior: "allow" })
+describe("forcedReason", () => {
+  it("照实写出是哪条 ask 规则，规则文本先过 sanitize", () => {
+    expect(forcedReason(meta({ matchedAskRule: { source: "userSettings", toolName: "Bash", ruleContent: "git\tcommit:*" } })))
+      .toBe("Claude 设置里的 ask 规则要求逐项确认：Bash(git commit:*)")
+    expect(forcedReason(meta())).toBe("")
   })
 })
 

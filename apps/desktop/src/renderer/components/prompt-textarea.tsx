@@ -98,6 +98,8 @@ export function PromptTextarea(props: Props): React.JSX.Element {
 }
 
 function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props): void {
+  // 输入法正在组字：回车是选字、Esc 是取消组字、方向键是翻候选，统统归输入法
+  if (event.nativeEvent.isComposing) return
   if (asideKeys(event, props)) return
   if (removeCommand(event, props)) return
   if (releaseCompletion(event, props)) return
@@ -138,7 +140,10 @@ function asideKeys(event: React.KeyboardEvent<HTMLTextAreaElement>, props: Props
     props.onAside()
     return true
   }
-  if (event.key === "Escape" && props.asideMode === true && props.onAsideExit !== undefined) {
+  // @ / 列表开着时这一下 Esc 归列表（下面 chooseSlash / chooseMention 关它）。抢先退出侧问的话，
+  // 列表还开着，接着两下回车就把这句侧问当正文发给了引擎
+  const listing = props.mentions.open || props.slash.hits.length > 0
+  if (event.key === "Escape" && !listing && props.asideMode === true && props.onAsideExit !== undefined) {
     event.preventDefault()
     props.onAsideExit()
     return true

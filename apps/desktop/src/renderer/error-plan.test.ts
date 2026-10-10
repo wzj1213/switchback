@@ -36,6 +36,11 @@ describe("再试一次重发哪一句", () => {
     { name: "失败的不是最后一轮：不给", items: [asked("t1"), fatal("f", "t1", 2), asked("t2"), said("a", "t2", 3)], want: undefined },
     { name: "最后一轮好好的：不给", items: [asked("t1"), said("a", "t1", 2)], want: undefined },
     { name: "那一句是接力带过来的、不是你说的：不给", items: [asked("t1", "改掉它", "handoff"), fatal("f", "t1", 2)], want: undefined },
+    {
+      name: "换家后第一轮：跳过前面的交接说明，重发你那句",
+      items: [asked("t1", "【交接说明】…", "handoff"), asked("t1", "接着把分页修完"), fatal("f", "t1", 2)],
+      want: { errorId: "f", text: "接着把分页修完" },
+    },
     { name: "一轮里报了两次：挂在最后那张上", items: [asked("t1"), fatal("f1", "t1", 2), fatal("f2", "t1", 3)], want: { errorId: "f2", text: "改掉它" } },
   ]
   for (const one of cases) it(one.name, () => expect(retryTarget(one.items)).toEqual(one.want))

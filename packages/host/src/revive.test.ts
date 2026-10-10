@@ -30,7 +30,10 @@ function record(patch: Partial<Thread> = {}): Thread {
 /** 磁盘上留着一条历史会话的宿主。`extra` 原样补进宿主依赖。 */
 function history(patch: Partial<Thread> = {}, extra: Parameters<typeof setupTwoEngines>[0] = {}): ReturnType<typeof setupTwoEngines> {
   const rig = setupTwoEngines(extra)
-  rig.stored.push({ type: "thread.started", at: 0, thread: record(patch) })
+  const thread = record(patch)
+  rig.stored.push({ type: "thread.started", at: 0, thread })
+  // 原来那家真跑过一轮：历史会话的记录里一定有它（`reattached` 靠它分辨有没有上下文可接）
+  rig.stored.push({ type: "turn.started", at: 0, turn: { id: "tn-old", threadId: OLD, engine: thread.engine, status: "running", startedAt: 0 } })
   return rig
 }
 
@@ -156,6 +159,20 @@ describe("接不回来：说清楚，那句话退回输入框", () => {
       expect(back?.draftRevision).toBeDefined()
     })
   }
+
+  it("换过来还没开口就停了（Claude 开轮之后才报句柄）：这一家一轮没跑过，新起一条", async () => {
+    const rig = setupTwoEngines()
+    rig.stored.push({ type: "thread.started", at: 0, thread: record({ engine: "fake", engineHistory: ["fake"] }) })
+    rig.stored.push({ type: "turn.started", at: 0, turn: { id: "tn-old", threadId: OLD, engine: "fake", status: "running", startedAt: 0 } })
+    rig.stored.push({ type: "thread.updated", at: 1, thread: record({
+      engine: "other", engineHistory: ["fake", "other"], engineHandle: undefined,
+      segments: [{ engine: "fake", handle: "h-old", startedAt: 0 }],
+    }) })
+    await rig.host.dispatch(prompt("接着做"))
+    expect(rig.sessions).toHaveLength(1)
+    expect(rig.sessions[0]?.resume).toBeUndefined()
+    expect(rig.sessions[0]?.prompts.map((p) => p.text)).toEqual(["接着做"])
+  })
 
   it("没有句柄时换一家照样接得上——那是明确的动作，不算冒充", async () => {
     const { host, sessions } = history({ engineHandle: undefined, segments: [], nextEngine: "other" })

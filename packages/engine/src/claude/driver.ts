@@ -1,7 +1,6 @@
 import {
-  query, type Options, type PermissionResult, type SDKUserMessage, type SpawnedProcess,
+  query, type Options, type SDKUserMessage, type SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk"
-import { decide } from "@switchback/approval"
 import type {
   EngineAccount,
   EngineCapabilities,
@@ -19,14 +18,8 @@ import { nameFirst } from "./title.js"
 import { capabilitiesOf } from "./caps.js"
 import { applyEffort, modelOptions } from "./effort.js"
 import { claudeCommands } from "./commands.js"
-import {
-  buildRequest,
-  forcesHumanPrompt,
-  summarize,
-  toAllow,
-  toDeny,
-  type AskMeta,
-} from "./permission.js"
+import { type AskMeta } from "./permission.js"
+import { judge } from "./judge.js"
 import { createTurnRef, runMessageLoop } from "./loop.js"
 import { findSession, listSessions, readAccount, readTranscript } from "./history.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
@@ -85,6 +78,8 @@ class ClaudeSession implements EngineSession {
   private readonly mcp: ClaudeMcpStatus
   private readonly bypassEnabled: boolean
   private loop: Promise<void> | undefined
+  /** 宿主主动收摊。此后消息循环结束是意料之中，不再报 `onExit`。 */
+  private disposing = false
   /** 引擎报上来的 session id。`logPath` 要靠它找到那个 jsonl。 */
   private handle: string | undefined
   /** 起名问过没有。**一条会话只问一次**，见 `title.ts` 的 `nameFirst`。 */
@@ -111,7 +106,7 @@ class ClaudeSession implements EngineSession {
     const options: Options = {
       cwd: this.req.cwd,
       ...permissionOptions(this.req.trust),
-      canUseTool: (tool, input, meta) => this.judge(tool, input, meta as AskMeta),
+      canUseTool: (tool, input, meta) => judge({ req: this.req, trust: () => this.trust.current }, tool, input, meta as AskMeta),
       onElicitation: (request, { signal }) => answerElicitation(request, this.req.askQuestion, signal),
       ...refusalDialogOptions(this.req, this.turn),
       // 只打开 Claude 已执行 Hook 的公开生命周期；不新增、改写或代审任何 Hook 配置。
@@ -164,45 +159,15 @@ class ClaudeSession implements EngineSession {
     )
     // init 要等首条 prompt 后才来；先问一次，第一轮也能拿到正确分母。
     void this.context.read(this.query)
-  }
-
-  /**
-   * `canUseTool` 的实现。管线：红线/档位判定 → 必要时问人。
-   *
-   * 注意 `forcesHumanPrompt`：用户自己配的 ask 规则强制的请求，
-   * 判定器说 allow 也要问人——见 permission.ts 的注释。
-   */
-  private async judge(
-    tool: string,
-    input: Record<string, unknown>,
-    meta: AskMeta,
-  ): Promise<PermissionResult> {
-    // Plan 的退出本身就是放宽权限。只读档不能把它当普通 meta 工具自动放行。
-    if (this.trust.current === "read-only" && tool === "ExitPlanMode") {
-      return toDeny("当前会话是只读档，不能退出 Claude Plan mode；请先由用户切换权限档")
-    }
-    const request = buildRequest(tool, input, meta, { engine: "claude", cwd: this.req.cwd })
-    const verdict = decide(request, {
-      trust: this.trust.current,
-      worksite: this.req.cwd,
-      home: this.req.home,
-      memory: this.req.memory(),
+    void this.loop.then(
+      () => "Claude Code 进程已退出",
+      (error: unknown) => `Claude Code 进程已退出：${error instanceof Error ? error.message : String(error)}`,
+    ).then((detail) => {
+      // 循环一结束就没人再读输入了：关掉它，之后的 prompt 明确失败（见 `prompt`），
+      // 不再被一个没人读的队列静默吞掉。宿主自己 dispose 引起的结束不算「死了」
+      this.input.close()
+      if (!this.disposing) this.req.onExit?.(detail)
     })
-    if (verdict.action === "deny") return toDeny(verdict.reason)
-    if (verdict.action === "allow" && !forcesHumanPrompt(meta)) return toAllow(false, meta)
-
-    const answer = await this.req.askUser({
-      toolCallId: meta.toolUseID,
-      tool,
-      summary: summarize(tool, meta),
-      reason: verdict.reason,
-      ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
-      ...(verdict.suggest === undefined
-        ? {}
-        : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
-    })
-    // `once` 只放行这一次；其余范围回传 SDK 的 suggestions，走它原生的「本会话不再问」
-    return answer.allow ? toAllow(answer.remember !== "once", meta) : toDeny("用户拒绝了这次调用")
   }
 
   get threadId(): StartRequest["threadId"] {
@@ -388,6 +353,7 @@ class ClaudeSession implements EngineSession {
    * 表现出来就是「机器越来越慢」，最难查。
    */
   async dispose(): Promise<void> {
+    this.disposing = true
     this.input.close()
     await Promise.race([this.loop?.catch(() => undefined), sleep(GRACEFUL_WAIT_MS)])
     this.abort.abort()

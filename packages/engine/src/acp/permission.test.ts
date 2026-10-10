@@ -130,6 +130,30 @@ describe("判一条审批", () => {
     expect(got.result).toEqual({ outcome: { outcome: "selected", optionId: "allow_once" } })
   })
 
+  it("按了停止：挂着的那条回 cancelled（规范要求），宿主那边的等待一起撤掉", async () => {
+    const inflight = new Map<string, AcpToolCall>([
+      ["c1", { toolCallId: "c1", kind: "edit", content: [{ type: "diff", path: "/etc/hosts", newText: "x" }] }],
+    ])
+    const controller = new AbortController()
+    const seen: { signal?: AbortSignal } = {}
+    const { call, got } = capture()
+    const handling = handlePermission({
+      ...ctxWith("full", inflight, (_ask, wait) => {
+        if (wait?.signal !== undefined) seen.signal = wait.signal
+        // 宿主那边：撤回就按拒绝落定，卡片记成「已失效」
+        return new Promise((resolve) => {
+          wait?.signal?.addEventListener("abort", () => resolve({ allow: false, remember: "once" }))
+        })
+      }),
+      signal: controller.signal,
+    }, call)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(seen.signal).toBe(controller.signal)
+    controller.abort()
+    await handling
+    expect(got.result).toEqual({ outcome: { outcome: "cancelled" } })
+  })
+
   it("用户选了「本会话不再问」就回 allow_always，让 agent 自己也记住", async () => {
     const inflight = new Map<string, AcpToolCall>([
       ["c1", { toolCallId: "c1", kind: "edit", content: [{ type: "diff", path: "/etc/hosts", newText: "x" }] }],

@@ -63,6 +63,18 @@ describe("失败的轮次要说出为什么", () => {
     expect(errors(events)).toEqual(["重连中 1/5", "重连五次都没成"])
   })
 
+  it("重试提示和最终失败是同一句时，失败卡照样要有——重试条不算「说过了」", async () => {
+    const { events, session, turnId } = await running()
+    session().emit({
+      type: "item.started",
+      at: 8,
+      item: { id: "kimi-retry-1", turnId, at: 8, kind: "error", message: "Connection error.", fatal: false },
+    })
+    session().emit({ type: "turn.completed", at: 9, turnId, status: "failed", error: "Connection error." })
+    const fatal = events.filter((e) => e.type === "item.started" && e.item.kind === "error" && e.item.fatal)
+    expect(fatal).toHaveLength(1)
+  })
+
   it("**中断不算失败**——那是用户自己按的停止，不需要一条报错", async () => {
     const { events, session, turnId } = await running()
     session().emit({ type: "turn.completed", at: 9, turnId, status: "interrupted" })

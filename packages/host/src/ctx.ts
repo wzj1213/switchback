@@ -23,7 +23,7 @@ export interface Live {
    * 一次 `launch` 的身份。thread id 在接力时不变，**对象身份会变**；所有异步回调
    * 都要同时认这两样，不能只凭 thread id 把上一家迟到的结果写进新会话。
    */
-  lease: { active: boolean }
+  lease: { active: boolean; installing?: boolean }
   /** 当前未结束的轮次；审批卡要挂在它下面 */
   turn: TurnId | undefined
   /**
@@ -51,6 +51,17 @@ export interface Live {
   queued: QueuedPrompt[]
   /** 队首已经进入发送流程、尚未收到 prompt RPC 确认；取回时不能再复制这一条。 */
   draining?: QueuedPrompt
+  /**
+   * 按停止时正在跑的那一轮。按下那一刻排着的已经清掉了（`thread.interrupt`），
+   * 所以它以中断收工时，队列里还在的都是**按停止之后**才说的话——照常续发，不能陪着作废。
+   */
+  stopping?: TurnId
+  /**
+   * 引擎确实收下了的最近一轮（prompt RPC 回了包）和它开始的时刻。分段只为它记：prompt 阶段
+   * 就被拒的那句引擎从没听到，不能算「这一家开过口」——否则下一句不再附交接说明（见 `segment.ts`）。
+   * 记下开始时刻是因为分段的起点要写这一轮开始的那一刻，界面靠它把转录内容对到「谁跑的」。
+   */
+  accepted?: { turn: TurnId; at: number }
 }
 
 export interface QueuedPrompt {
@@ -75,6 +86,26 @@ export function withQueue(thread: Thread, queued: readonly QueuedPrompt[], updat
   }
 }
 
+/**
+ * 把排着的几句交回输入框（取回、开轮前就被拒）：从队列里摘掉，文字与附件放进草稿，换一个新身份。
+ * 输入框认身份决定要不要并进来（见渲染层 `use-host-draft.ts`），并的时候接在已有正文后面。
+ */
+export function handBack(ctx: Ctx, entry: Live, taken: readonly QueuedPrompt[]): void {
+  if (taken.length === 0) return
+  entry.queued = entry.queued.filter((prompt) => !taken.includes(prompt))
+  const attachments = [...new Set(taken.flatMap((prompt) => prompt.attachments ?? []))]
+  const at = ctx.deps.now()
+  const next = {
+    ...withQueue(entry.thread, entry.queued, at),
+    draft: taken.map((prompt) => prompt.text).join("\n"),
+    draftRevision: ctx.deps.newId("dr"),
+  }
+  delete next.draftAttachments
+  if (attachments.length > 0) next.draftAttachments = attachments
+  entry.thread = next
+  emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
 function promptsOf(thread: Thread): QueuedPrompt[] {
   return (thread.queued ?? []).map((text, index) => {
     const attachments = thread.queuedAttachments?.[index]
@@ -97,6 +128,11 @@ export function preparingLive(thread: Thread, lease: Live["lease"], rules: Rule[
     suggests: new Map<ItemId, Rule>(),
     queued: promptsOf(thread),
   }
+}
+
+/** 收起来的会话该是什么状态：背后没有进程，「在跑」「等审批」都作废；「失败」是上一轮的真实结局，留着。 */
+export function resting(status: Thread["status"]): Thread["status"] {
+  return status === "failed" ? "failed" : "idle"
 }
 
 /** 这份 Live 仍是该 thread 此刻登记的那一代。 */
@@ -207,12 +243,18 @@ export interface Ctx {
    */
   drain?: (threadId: ThreadId) => void
   /**
+   * `drain` 发出去的那条命令 → 它对应的队首。开轮前用它核对这句还在发送流程里：
+   * 等工作树快照的那几百毫秒里按了停止，`draining` 会被清掉，这句就不能再开轮。
+   * 用命令对象本身作键，不给协议加字段——远程发来的命令不该能冒充队列里的那句。
+   */
+  drains: WeakMap<object, QueuedPrompt>
+  /**
    * 一轮收工之后做点什么。**和 `drain` 同一个理由**留成洞：
    * 直接 import `prompt.ts` 会绕成 ctx → prompt → ctx 的循环。
    *
    * 现在只有一件事：把这一段的 `logPath` 补上——引擎要跑完一轮才把记录落盘。
    */
-  afterTurn?: (threadId: ThreadId) => void
+  afterTurn?: (threadId: ThreadId, turnId: TurnId) => void
 }
 
 /**
@@ -396,7 +438,9 @@ function echoed(ctx: Ctx, event: Event): boolean {
  */
 function explainFailure(ctx: Ctx, event: Event): void {
   if (event.type === "item.started" || event.type === "item.updated") {
-    if (event.item.kind === "error") ctx.explained.set(event.item.turnId, event.item.message)
+    // 只认**致命**的那句。重试提示（`fatal: false`）常和最终失败是同一句话——
+    // Kimi 重试用尽时就是这样——把它当成「已经说过」，失败卡和「再试一次」就都没了
+    if (event.item.kind === "error" && event.item.fatal) ctx.explained.set(event.item.turnId, event.item.message)
     return
   }
   if (event.type !== "turn.completed") return
@@ -525,13 +569,24 @@ export function observe(ctx: Ctx, event: Event): void {
     // 人按停止就是要它停下，而不是"停完这句再跑下一句"
     // **不管跑成没跑成都补一次**：失败的那一轮照样在引擎那边留了记录，
     // 而「上一段跑砸了、记录在哪」恰恰是你最想去读的
-    ctx.afterTurn?.(entry.thread.id)
-    if (event.status === "completed") ctx.drain?.(entry.thread.id)
-    // 失败不是用户取消：后面排好的文字与附件保留成“待发送”，让用户取回确认。
-    // 只有明确中断才清掉，避免停止之后又自动继续。
-    else if (event.status !== "failed" && entry.queued.length > 0) clearQueue(ctx, entry)
+    ctx.afterTurn?.(entry.thread.id, event.turnId)
+    queueAfter(ctx, entry, event)
     return
   }
+}
+
+/** 一轮收工之后排着的话怎么办。 */
+function queueAfter(ctx: Ctx, entry: Live, event: Extract<Event, { type: "turn.completed" }>): void {
+  const stopped = entry.stopping === event.turnId
+  entry.stopping = undefined
+  if (event.status === "completed") ctx.drain?.(entry.thread.id)
+  // 用户按的停止：按下那一刻排着的已经清过，还在的是之后才说的话，接着发
+  else if (event.status === "interrupted" && stopped) {
+    if (entry.queued.length > 0) ctx.drain?.(entry.thread.id)
+  }
+  // 失败不是用户取消：后面排好的文字与附件保留成“待发送”，让用户取回确认。
+  // 引擎那边自己中断的（别的客户端按了停止）照旧清掉，避免停止之后又自动继续。
+  else if (event.status !== "failed" && entry.queued.length > 0) clearQueue(ctx, entry)
 }
 
 /** 清掉待发队列并把变化发出去。中断之后用。 */

@@ -26,8 +26,8 @@ export interface Attachments {
   drop: (files: FileList | null, cwd: string, text: string) => AttachmentAcceptance
   /** 打开系统文件选择器；返回需要写进正文的可见路径引用。 */
   pick: (cwd: string, text: string) => Promise<readonly string[]>
-  /** 用一组已经落盘的路径替换当前附件（取回队列 / 改一改再发）。 */
-  replace: (paths: readonly string[]) => void
+  /** 并进一组已经落盘的路径（取回队列 / 改一改再发）。已有的一张都不动，更不删文件。 */
+  include: (paths: readonly string[]) => void
   remove: (path: string) => void
   clear: () => void
 }
@@ -126,14 +126,12 @@ export function useAttachments(enabled: boolean, initial: readonly string[] = []
     paste,
     drop,
     pick,
-    replace: useCallback((next: readonly string[]) => {
-      const unique = [...new Set(next)]
-      const removed = paths.filter((path) => !unique.includes(path))
-      if (removed.length > 0) bridge?.discardImages(removed)
-      knownPaths.current = new Set(unique)
-      setPaths(unique)
+    include: useCallback((more: readonly string[]) => {
+      if (more.length === 0) return
+      for (const path of more) knownPaths.current.add(path)
+      setPaths((prev) => [...new Set([...prev, ...more])])
       setNotice(undefined)
-    }, [bridge, paths]),
+    }, []),
     remove: useCallback((path: string) => {
       if (!paths.includes(path)) return
       bridge?.discardImages([path])

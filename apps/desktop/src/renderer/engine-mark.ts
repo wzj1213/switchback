@@ -60,8 +60,8 @@ export function engineSwitches(segments: readonly EngineSegment[] = []): readonl
 /**
  * 某一刻归谁跑：最后一个**不晚于它**的段。
  *
- * 段是在那一轮开始时落的（`host/prompt.ts` 的 `recordSegment` 排在
- * 发出 user_message 之前），所以同刻算作已经换过手了。
+ * 段的起点写的是这一家开口那一轮**开始的时刻**（宿主等引擎收下那句才记，起点照轮次开始算，
+ * 见 `host/segment.ts`），所以同刻算作已经换过手了。
  * 比第一段还早的内容（接管进来的历史）没有归属，如实返回 undefined。
  */
 export function engineAt(

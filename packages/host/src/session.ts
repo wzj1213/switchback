@@ -141,7 +141,7 @@ export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = 
     askUser: (ask, wait) =>
       isCurrent(ctx, live)
         ? askUser(ctx, thread.id, itemScope.ask(ask, live.turn), wait)
-        : Promise.resolve({ allow: false, remember: "once" }),
+        : Promise.resolve({ allow: false, remember: "once", unattended: true }),
     askQuestion: (questions, wait) =>
       isCurrent(ctx, live) ? askQuestion(ctx, thread.id, questions, wait) : Promise.resolve({ dismissed: true }),
     ...signalCallbacks(ctx, live, thread.id, lease),

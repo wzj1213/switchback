@@ -1,6 +1,7 @@
 import type { Command, Item } from "@switchback/protocol"
+import { Unsupported } from "@switchback/engine"
 import { switchEngine } from "./branch.js"
-import { emit, isCurrent, setStatus, withQueue, type Ctx, type Live } from "./ctx.js"
+import { emit, handBack, isCurrent, setStatus, withQueue, type Ctx, type Live, type QueuedPrompt } from "./ctx.js"
 import { handoffNote, withNote } from "./handoff-note.js"
 import { recordSegment } from "./segment.js"
 import { revive } from "./revive.js"
@@ -89,7 +90,23 @@ function assertAttachments(entry: Live, cmd: Extract<Command, { type: "thread.pr
   const pending = entry.thread.nextEngine
   if (pending !== undefined && pending !== entry.thread.engine) return
   if (entry.thread.capabilities?.attachments === true) return
-  throw new Error(`${entry.thread.engine} 不支持附件；附件仍在输入区，请移除或换一个引擎`)
+  throw new Unsupported(`${entry.thread.engine} 不支持附件；附件仍在输入区，请移除或换一个引擎`)
+}
+
+/**
+ * 发不出去的那句是队列里排着的：退回输入框，别留在队首。
+ *
+ * 留着的话，之后每一轮收工都会拿它再撞一次（横幅一条条往上叠），排在它后面的全被堵住；
+ * 退回输入框之后「附件仍在输入区」这句才是真的，人去掉图片或换一家再发就行。
+ */
+function acceptedOrHandBack(ctx: Ctx, entry: Live, cmd: Extract<Command, { type: "thread.prompt" }>): void {
+  try {
+    assertAttachments(entry, cmd)
+  } catch (error) {
+    const drained = ctx.drains.get(cmd)
+    if (drained !== undefined && entry.queued[0] === drained) handBack(ctx, entry, [drained])
+    throw error
+  }
 }
 
 /**
@@ -110,16 +127,14 @@ async function steerInto(
   ctx: Ctx,
   entry: Live,
   cmd: Extract<Command, { type: "thread.prompt" }>,
+  refused?: (why: unknown) => void,
 ): Promise<boolean> {
   const turnId = entry.turn
-  const steer = entry.session.steer
-  if (turnId === undefined || steer === undefined || entry.thread.capabilities?.steer !== true) {
-    return false
-  }
-  if (attachmentCount(cmd) > 0 && entry.thread.capabilities?.attachments !== true) return false
+  if (turnId === undefined || !steerable(entry, cmd, refused)) return false
   try {
-    await steer.call(entry.session, cmd.text, cmd.attachments)
-  } catch {
+    await entry.session.steer?.call(entry.session, cmd.text, cmd.attachments)
+  } catch (error) {
+    refused?.(error)
     return false
   }
   // 删除或接力期间旧 session 的迟到结果不能重建日志、也不能覆盖新引擎。
@@ -128,21 +143,20 @@ async function steerInto(
   consumeDraftAt(ctx, entry, cmd.draftRevision, at)
   // **挂在当前这一轮上**，不是新的一轮：它是对这一轮的追加，
   // transcript 里就该出现在它实际插话的那个位置
-  emit(ctx, {
-    type: "item.started",
-    at,
-    item: {
-      id: ctx.deps.newId("it"),
-      turnId,
-      kind: "user_message",
-      at,
-      text: cmd.text,
-      ...(cmd.attachments === undefined || cmd.attachments.length === 0
-        ? {}
-        : { attachments: cmd.attachments }),
-    },
-  })
+  emit(ctx, { type: "item.started", at, item: userItem(cmd, { id: ctx.deps.newId("it"), turnId, at }) })
   return true
+}
+
+/** 这一家此刻插得进这句话吗。插不进而且说得出为什么（带图）时交给 `refused`。 */
+function steerable(
+  entry: Live,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+  refused: ((why: unknown) => void) | undefined,
+): boolean {
+  if (entry.session.steer === undefined || entry.thread.capabilities?.steer !== true) return false
+  if (attachmentCount(cmd) === 0 || entry.thread.capabilities.attachments === true) return true
+  refused?.(new Unsupported(`排着的话里带着图片，${entry.thread.engine} 不收图片；这一轮跑完会照常发出，或者取回去掉图片再插`))
+  return false
 }
 
 /**
@@ -185,16 +199,24 @@ export async function steerQueued(
   // 而用户写它们时是当成一段话写的
   const text = waiting.map((prompt) => prompt.text).join("\n")
   const attachments = waiting.flatMap((prompt) => prompt.attachments ?? [])
+  const why: { error?: unknown } = {}
   const ok = await steerInto(ctx, entry, {
     type: "thread.prompt",
     threadId: cmd.threadId,
     text,
     ...(attachments.length === 0 ? {} : { attachments }),
-  })
-  if (!ok || !isCurrent(ctx, entry)) return
+  }, (error) => { why.error = error })
+  if (!isCurrent(ctx, entry)) return
+  if (!ok) {
+    // 那一轮刚好收工就不用说：这几句本来就会照常发出去。还在跑却插不进去（带图、引擎拒了），
+    // 这颗是用户亲手点的，点了没反应又不说为什么，比不给这颗更糟
+    if (entry.turn !== undefined && why.error !== undefined) throw why.error
+    return
+  }
   const at = ctx.deps.now()
-  entry.queued = []
-  entry.thread = withQueue(entry.thread, [], at)
+  // 只摘真正递进去的那几句：插话在途的时候用户又排了一句，它没被插进去，不能跟着消失
+  entry.queued = entry.queued.filter((prompt) => !waiting.includes(prompt))
+  entry.thread = withQueue(entry.thread, entry.queued, at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
 }
 
@@ -233,7 +255,7 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
     enqueue(ctx, entry, cmd)
     return
   }
-  assertAttachments(entry, cmd)
+  acceptedOrHandBack(ctx, entry, cmd)
   /**
    * **上一轮没跑完时不开新轮次。** 这条硬约束一直没变：`entry.turn` 绝不能被
    * 新 turnId 覆盖——引擎还在往**旧的** turnId 上发 item，覆盖之后那些 item
@@ -254,15 +276,7 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
    *
    * 四版都守住了那条硬约束：steer 和队列**都不碰 `entry.turn`**。
    */
-  if (entry.turn !== undefined) {
-    if (cmd.steer === true) {
-      if (await steerInto(ctx, entry, cmd)) return
-      // steer 失败的同时若已经换代，交给当前会话重新判定，不能改写旧壳。
-      if (!isCurrent(ctx, entry)) return prompt(ctx, cmd)
-    }
-    enqueue(ctx, entry, cmd)
-    return
-  }
+  if (entry.turn !== undefined) return whileRunning(ctx, entry, cmd)
   /**
    * **待切换的引擎在这一刻才真正切。**
    *
@@ -284,6 +298,21 @@ export async function prompt(ctx: Ctx, cmd: Extract<Command, { type: "thread.pro
     return prompt(ctx, cmd)
   }
   return startTurn(ctx, entry, cmd)
+}
+
+/** 上一轮还在跑：⌘⏎ 就试着插进去，其余排队。两条路都不碰 `entry.turn`（见 `prompt` 里那段）。 */
+async function whileRunning(ctx: Ctx, entry: Live, cmd: Extract<Command, { type: "thread.prompt" }>): Promise<void> {
+  if (cmd.steer !== true) {
+    enqueue(ctx, entry, cmd)
+    return
+  }
+  if (await steerInto(ctx, entry, cmd)) return
+  // steer 失败的同时若已经换代，交给当前会话重新判定，不能改写旧壳。
+  if (!isCurrent(ctx, entry)) return prompt(ctx, cmd)
+  enqueue(ctx, entry, cmd)
+  // 插话失败的主因是那一轮刚好收工——收工那一刻的 drain 已经跑过了，
+  // 这句此时才入队，没人会再发它。会话空着就当场接着发（见 `steerInto` 头注释的承诺）
+  if (entry.turn === undefined && entry.draining === undefined) ctx.drain?.(entry.thread.id)
 }
 
 function userItem(
@@ -308,12 +337,30 @@ function userItem(
  * 下一轮收工 `drain` 又把它发一遍——引擎收到两份同样的话（mac2 上 Kimi 拒收大图时就是这样）。
  * 在这之前就失败的（切换回滚、接不回来、附件被拒）没进转录区，仍原位留在队首。
  */
-function takeDrained(ctx: Ctx, entry: Live, at: number): void {
-  const head = entry.queued[0]
-  if (head === undefined || head !== entry.draining) return
+function takeDrained(ctx: Ctx, entry: Live, at: number, drained: QueuedPrompt | undefined): void {
+  if (drained === undefined || entry.queued[0] !== drained) return
   entry.queued = entry.queued.slice(1)
   entry.thread = withQueue(entry.thread, entry.queued, at)
   emit(ctx, { type: "thread.updated", at, thread: entry.thread })
+}
+
+/**
+ * 开轮前等过一段异步之后，现场还是不是发起时的样子：会话被换掉或收起、引擎自己开了一轮、
+ * 或者这句是队列里发出来的而那期间按了停止（`thread.interrupt` 会清掉 `draining`）。
+ */
+function stale(ctx: Ctx, entry: Live, drained: QueuedPrompt | undefined): boolean {
+  return !isCurrent(ctx, entry) || entry.turn !== undefined || (drained !== undefined && entry.draining !== drained)
+}
+
+/** 现场变了：按停止作废的那句就此作罢，其余交回主路重新判定（排队、插话或换到新会话上发）。 */
+function reroute(
+  ctx: Ctx,
+  entry: Live,
+  cmd: Extract<Command, { type: "thread.prompt" }>,
+  drained: QueuedPrompt | undefined,
+): Promise<void> {
+  if (drained !== undefined && entry.draining !== drained && isCurrent(ctx, entry)) return Promise.resolve()
+  return prompt(ctx, cmd)
 }
 
 /** 开一轮：转正、记分段、抓基线，发出 turn.started 与用户那句，再送给引擎。 */
@@ -322,16 +369,16 @@ async function startTurn(
   entry: Live,
   cmd: Extract<Command, { type: "thread.prompt" }>,
 ): Promise<void> {
+  const drained = ctx.drains.get(cmd)
   commit(ctx, entry, ctx.deps.now(), cmd.draftRevision)
   // 交接说明要在记分段**之前**判定：新那家一旦落下自己那一段，就认不出这是第一句了。
   // 它要读盘；等它的这段时间里会话若被换掉、或引擎自己开了一轮，交回主路重新判定
   const note = await handoffNote(ctx, entry)
-  if (!isCurrent(ctx, entry) || entry.turn !== undefined) return prompt(ctx, cmd)
-  // **有实际对话才记这一段。** 切过去没说话就切走，不该在时间线上
-  // 留一条什么都没发生的记录——那样时间线会被「我点错了」填满
-  void recordSegment(ctx, entry)
+  if (stale(ctx, entry, drained)) return reroute(ctx, entry, cmd, drained)
   const turnId = ctx.deps.newId("tn")
+  // 工作树快照可能要几百毫秒到几秒（`git add -A`），回来同样要复查现场
   await captureTurnBaseline(ctx, entry)
+  if (stale(ctx, entry, drained)) return reroute(ctx, entry, cmd, drained)
   entry.turn = turnId
   const at = ctx.deps.now()
   const turn = {
@@ -341,7 +388,7 @@ async function startTurn(
     status: "running" as const,
     startedAt: at,
   }
-  takeDrained(ctx, entry, at)
+  takeDrained(ctx, entry, at, drained)
   setStatus(ctx, entry, "running")
   emit(ctx, { type: "turn.started", at, turn })
   // 交接说明原样记进转录区，排在用户那句前面——和真正送出去的顺序一致
@@ -351,4 +398,8 @@ async function startTurn(
   }
   emit(ctx, { type: "item.started", at, item: userItem(cmd, { id: ctx.deps.newId("it"), turnId, at }) })
   await sendPrompt(ctx, entry, { ...cmd, text: withNote(cmd.text, note) }, turnId)
+  // **引擎收下了才记这一段。** 切过去没说话就切走，不该在时间线上留一条什么都没发生的记录；
+  // prompt 阶段就被拒的那句它从没听到，也不能算开过口——不然下一句不再附交接说明
+  entry.accepted = { turn: turnId, at }
+  void recordSegment(ctx, entry, at)
 }

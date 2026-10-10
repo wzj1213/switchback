@@ -59,6 +59,8 @@ export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
           setQuery(e.target.value)
         }}
         onKeyDown={(e) => {
+          // 输入法组字时 Esc 是取消组字、回车是选字，不是关查找条 / 跳下一个
+          if (e.nativeEvent.isComposing) return
           if (e.key === "Escape") onClose()
           // Enter 下一个，Shift+Enter 上一个——和所有编辑器一致，不要发明新的
           else if (e.key === "Enter") step(!e.shiftKey)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import type {
   Command,
   EngineInfo,
@@ -27,6 +27,7 @@ import { stampOf } from "../stamp.js"
 import { Between } from "./Between.js"
 import { ConversationStage } from "./ConversationStage.js"
 import type { ComposerDrafts } from "../composer-drafts.js"
+import { useHostDraft } from "../use-host-draft.js"
 import type { ComposerFileReference } from "../file-references.js"
 
 export interface WorkspaceProps {
@@ -111,59 +112,6 @@ export interface WorkspaceProps {
  * `App` 只管「选哪个会话、怎么新建」，这里只管「一个会话长什么样」。
  */
 /**
- * 输入框里的待发文本。两个来源：
- *
- * - **「改一改再发」**：点 transcript 里某条消息，把它塞回输入框
- * - **从待发队列取回**：宿主把文字与附件原子地放回输入区
- *
- * 带一个递增序号：连着点同一条两次，文本一样但序号变了——
- * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
- */
-function useDraft(
-  draft: string | undefined,
-  draftAttachments: readonly string[] | undefined,
-  draftRevision: string | undefined,
-): {
-  prefill: { text: string; attachments: readonly string[]; at: number; aside?: boolean }
-  /** `aside` = 填回去之后**顺手进侧问模式**（选中转录区一段话之后那颗「问一句」）。 */
-  reuse: (text: string, attachments?: readonly string[], aside?: boolean) => void
-} {
-  const [prefill, setPrefill] = useState<{
-    text: string
-    attachments: readonly string[]
-    at: number
-    aside?: boolean
-  }>({ text: "", attachments: [], at: 0 })
-  /**
-   * **必须是 effect，不能只在初始化时读一次**：换引擎不会换 thread id，
-   * 于是 `Workspace` 根本不重挂载——草稿是在挂载之后才到的，
-   * 只在初始化读的话它永远进不来（真机跑出来的：切过去输入框是空的）。
-   *
-   * 用 ref 记住上次填过哪一份：不记的话每次渲染都覆盖一遍，
-   * 你在输入框里打的字会被反复冲掉。
-   */
-  const filled = useRef<string | undefined>(undefined)
-  useEffect(() => {
-    if (draft === undefined) {
-      filled.current = undefined
-      return
-    }
-    // 新宿主会给每次取回独立身份；旧记录没有身份时退回文本，保持向后兼容。
-    // 不能只认文本：清空与再次取回同一句若被 React 合并，文字没变但它确实是新草稿。
-    const identity = draftRevision ?? `legacy:${draft}`
-    if (identity === filled.current) return
-    filled.current = identity
-    setPrefill((prev) => ({ text: draft, attachments: draftAttachments ?? [], at: prev.at + 1 }))
-  }, [draft, draftAttachments, draftRevision])
-  // **必须 useCallback**：它一路传到 `Transcript`，而那块是 memo 的。
-  // 行内箭头每次渲染换身份，memo 立刻静默失效——和 `onResolve` 同一条理由
-  const reuse = useCallback((text: string, attachments: readonly string[] = [], aside = false) => {
-    setPrefill((prev) => ({ text, attachments, at: prev.at + 1, aside }))
-  }, [])
-  return { prefill, reuse }
-}
-
-/**
  * 待切换的引擎那一项。
  *
  * 「下一句生效」是对的默认（见 `Thread.nextEngine`），但它有个说不过去的副作用：
@@ -180,11 +128,11 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
    * 带一个递增序号：连着点同一条两次，文本一样但序号变了——
    * 输入框据此知道「这是新的一次要求」，而不是「还是刚才那次」。
    */
-  const { prefill, reuse } = useDraft(
-    props.thread.draft,
-    props.thread.draftAttachments,
-    props.thread.draftRevision,
-  )
+  const { prefill, reuse } = useHostDraft(props.thread.id, {
+    draft: props.thread.draft,
+    attachments: props.thread.draftAttachments,
+    revision: props.thread.draftRevision,
+  }, props.drafts)
   // 一轮开始与结束各问一次 git：引擎改完文件之后「脏不脏」就变了。
   // 带上 items 是为了**每条 shell 命令收工时也问一次**——只有它能把分支换掉，
   // 而那件事在此之前界面上完全沉默（见 `stamp.ts`）

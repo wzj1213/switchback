@@ -139,6 +139,8 @@ export class KimiSession implements EngineSession {
     this.turn.fail(detail)
     this.status("crashed", detail)
     void this.stream.dispose()
+    // 流死了或服务退了，这条会话收不到任何终态了：交给宿主摘下，下一句话用句柄重新接
+    if (!this.disposed) this.req.onExit?.(detail)
   }
 
   private cursorOf(snapshot: KimiSnapshot): KimiCursor {

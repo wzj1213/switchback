@@ -113,12 +113,20 @@ export const ItemView = memo(function ItemView({
       </div>
     )
   }
+  return <ErrorItem item={item} />
+})
+
+/**
+ * 报错那一条。可恢复的那种（重试提示、按停止之后的「已中断」）这一轮还在跑或是自己停的：
+ * 画成淡字、不报成告警——红底的话手机上看着像出错了，容易误按停止或重发。和桌面端同一个口径。
+ */
+function ErrorItem({ item }: { item: Extract<Item, { kind: "error" }> }): React.JSX.Element {
   return (
-    <div className="item item--error" role="alert">
+    <div className={item.fatal ? "item item--error" : "item item--error item--soft"} role={item.fatal ? "alert" : "status"}>
       {item.message}
       {/* 引擎自己补的那句原因（codex 的 `additionalDetails`）。重连那条只有它说得清
           「为什么断了」——抬头那句 `Reconnecting... 1/5` 一个字都没说 */}
       {item.detail === undefined ? null : <p className="item__why">{item.detail}</p>}
     </div>
   )
-})
+}

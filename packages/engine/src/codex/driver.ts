@@ -49,6 +49,8 @@ class CodexSession implements EngineSession {
   private readonly mcpSeen = new Map<string, string>()
   private readonly trust: { current: Trust }
   private readonly state: SessionState
+  /** 宿主主动收摊。此后进程退出是意料之中，不再报 `onExit`。 */
+  private disposing = false
 
   constructor(
     private readonly req: StartRequest,
@@ -169,17 +171,20 @@ class CodexSession implements EngineSession {
     child.stderr?.on("data", (chunk: string) => {
       this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
     })
-    child.on("exit", (code) => {
+    child.on("exit", (code, signal) => {
+      const detail = `codex 进程已退出（${code === null ? `信号 ${String(signal)}` : `code ${String(code)}`}）`
       this.skills.close()
       this.serverRequests.abortAll()
-      this.rpc.close(`codex 进程已退出（code ${String(code)}）`)
+      this.rpc.close(detail)
       // **进程没了，在跑的那一轮必须落终态。**
       // 只发 `crashed` 的话宿主那边 `entry.turn` 和 `status: "running"` 永远留着——
       // 界面上是一条横幅 + 一个一直在涨的计时器 + 一个点了没用的「停止」，
-      // 而且输入框被那个假的「正在跑」永久锁住
-      this.endTurn("failed")
+      // 而且输入框被那个假的「正在跑」永久锁住。带上原因：被信号杀掉时 code 是 null，
+      // 不带的话这一轮在转录区和横幅上都没有任何说明
+      this.endTurn("failed", this.disposing ? undefined : detail)
       this.observers.hooks.close()
       if (code !== 0 && code !== null) emitCodexStatus(this.req.emit, this.req.threadId, "crashed", this.state.stderr)
+      if (!this.disposing) this.req.onExit?.(detail)
     })
   }
 
@@ -372,6 +377,7 @@ class CodexSession implements EngineSession {
    * 3. `owner.reclaim()` 补 SIGTERM → SIGKILL → 整树退出证明
    */
   async dispose(): Promise<void> {
+    this.disposing = true
     this.state.child?.stdin?.end()
     this.skills.close()
     this.observers.hooks.close()

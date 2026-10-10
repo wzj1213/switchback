@@ -25,8 +25,11 @@ export interface Gate {
   cancelApproval: (itemId: ItemId) => boolean
   cancelQuestion: (questionId: QuestionId) => boolean
   /**
-   * 把还挂着的一律按**拒绝**落定。
+   * 把还挂着的一律收掉：给引擎的答复是拒绝，卡片记成「已失效」。
    * 会话关闭时必须调用——否则驱动会永远等在 `canUseTool` 里，`dispose()` 挂死。
+   *
+   * 调它的全是**不是用户点的**收口（轮次收工、按停止、换引擎、改档重启、关会话），
+   * 所以不能记成「已拒绝」：那会让一次中断在回放里读起来像「用户明确拒绝了这次调用」。
    */
   settleAll: () => void
 }
@@ -107,7 +110,7 @@ export function createGate(emit: (event: Event) => void): Gate {
     resolveQuestion: settleQuestion,
     cancelQuestion: (questionId) => settleQuestion(questionId, DISMISSED),
     settleAll: () => {
-      for (const itemId of [...pending.keys()]) settle(itemId, DENIED, Date.now())
+      for (const itemId of [...pending.keys()]) cancelApproval(itemId)
       for (const questionId of [...questions.keys()]) settleQuestion(questionId, DISMISSED)
     },
   }

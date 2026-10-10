@@ -385,6 +385,12 @@
   font-size: var(--text-sm);
 }
 
+/* 可恢复的报错：淡字、不铺红底（见 ItemView） */
+.item--error.item--soft {
+  background: transparent;
+  color: var(--text-faint);
+}
+
 .item--notice {
   color: var(--text-faint);
   font-size: var(--text-sm);

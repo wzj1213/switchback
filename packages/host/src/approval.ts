@@ -12,6 +12,9 @@ import { emit, setStatus, type Ctx, type Live } from "./ctx.js"
 
 const DENIED: ApprovalAnswer = { allow: false, remember: "once" }
 
+/** 没人能问（轮次之外、会话已关）：照样拒，但让驱动知道这不是用户点的（见 `ApprovalAnswer.unattended`）。 */
+const UNATTENDED: ApprovalAnswer = { allow: false, remember: "once", unattended: true }
+
 const PASSED: ApprovalAnswer = { allow: true, remember: "once" }
 
 const aborted = (wait: InteractionWait | undefined): boolean => wait?.signal?.aborted === true
@@ -34,8 +37,10 @@ export async function askUser(
   wait?: InteractionWait,
 ): Promise<ApprovalAnswer> {
   const entry = ctx.live.get(id)
-  // 会话已关闭却还有审批请求进来：按拒绝落定，不能让驱动永远等着
-  if (entry === undefined || entry.turn === undefined || aborted(wait)) return DENIED
+  // 会话已关闭、或这一轮已经收工却还有审批请求进来：按拒绝落定，不能让驱动永远等着。
+  // 没有轮次可挂这张卡（后台 workflow、子 agent 在主轮之后才来要权限），见 README 已知限制
+  if (aborted(wait)) return DENIED
+  if (entry === undefined || entry.turn === undefined) return UNATTENDED
   // **不发卡、不改状态**：armed 之后再弹一张「已自动允许」的卡，
   // 等于把用户刚才想省掉的那些打断又原样还回去。做了什么在工具行里照样看得见
   if (passes(entry, ask)) return PASSED

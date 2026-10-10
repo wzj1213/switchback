@@ -44,14 +44,16 @@ export function Action({
       </button>
     )
   }
-  if (busy) {
+  // 侧问模式不在此列：侧问本来就是**主线跑着的时候**问的，这时候把键换成「停止」，
+  // 点下去打断的恰恰是侧问想绕开的那条主线（停止仍然在 ⌘. 上）
+  if (busy && aside !== true) {
     // 跑着的时候把「发送」换成「停止」而不是灰掉：**这时候人真正想按的是停止**，
     // 而一个灰掉的发送键只告诉他「不能发」，没告诉他还能做什么
     return (
       <button
         className="send send--stop"
         type="button"
-        data-tip="停止（Esc）"
+        data-tip="停止（⌘.）"
         aria-label="停止"
         onClick={onInterrupt}
         disabled={onInterrupt === undefined}
@@ -79,25 +81,27 @@ export function Action({
 /**
  * 选中一条命令之后往哪走。
  *
- * **两种命令，两种去处**：Switchback 自己的就地执行——它们没有参数，
- * 执行完这条输入就完了，所以顺手把输入框清空；引擎的填进输入框，
- * 带参数的还等着人填。
+ * **两种命令，两种去处**：Switchback 自己的就地执行——它们没有参数；引擎的填进输入框，
+ * 带参数的还等着人填。两种都只换掉命令片段本身，输入框里原有的话留着。
  *
  * 统一成「选完再按回车」而不是「没参数的选完就跑」：后者更省一次按键，
  * 但代价是同一个动作有时会发出去、有时不会，而**那个区别在选之前看不出来**。
  */
 export function takeCommand(
   command: SlashCommand,
-  setText: (text: string) => void,
-  setCommand: (command: SlashCommand | undefined) => void,
-  onSwitchback: (name: string) => void,
+  rest: string,
+  ui: {
+    setText: (text: string) => void
+    setCommand: (command: SlashCommand | undefined) => void
+    onSwitchback: (name: string) => void
+  },
 ): void {
+  // 选中命令只换掉命令片段本身：在已有草稿开头补的 `/rev`，后面那段话留着（引擎命令把它当参数）
+  ui.setText(rest)
   if (command.source === "switchback") {
-    setText("")
-    setCommand(undefined)
-    onSwitchback(command.name)
+    ui.setCommand(undefined)
+    ui.onSwitchback(command.name)
     return
   }
-  setText("")
-  setCommand(command)
+  ui.setCommand(command)
 }

@@ -1,6 +1,6 @@
 import { decide } from "@switchback/approval"
 import type { RememberScope, Trust } from "@switchback/protocol"
-import type { ApprovalAnswer, ApprovalAsk } from "../contract.js"
+import type { ApprovalAnswer, ApprovalAsk, InteractionWait } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
 import type { Rule } from "@switchback/approval"
 import { buildRequest, pickOption } from "./approve.js"
@@ -21,7 +21,9 @@ export interface PermissionContext {
   memory: () => readonly Rule[]
   /** 在途工具调用表。审批请求只带 id，命令和 diff 全在这里。 */
   inflight: Map<string, AcpToolCall>
-  askUser: (ask: ApprovalAsk) => Promise<ApprovalAnswer>
+  askUser: (ask: ApprovalAsk, wait?: InteractionWait) => Promise<ApprovalAnswer>
+  /** 按停止时撤回这条请求（见 `serve.ts` 的 `cancelPermissions`）。 */
+  signal?: AbortSignal
   /** 等详情补齐最多等多久（毫秒）。默认 `DETAIL_WAIT_MS`；测试传 0 就不等。 */
   waitMs?: number
 }
@@ -129,6 +131,12 @@ export async function handlePermission(ctx: PermissionContext, call: ServerCall)
     ...(verdict.suggest === undefined
       ? {}
       : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
-  })
+  }, ctx.signal === undefined ? undefined : { signal: ctx.signal })
+  // 按了停止：ACP 规范要求客户端把挂着的权限请求回成 `cancelled`。回「拒绝一次」的话，
+  // 严格照规范实现的 agent 会一直等这条的回音才收尾——停止键按了也停不下来
+  if (ctx.signal?.aborted === true) {
+    call.respond({ outcome: { outcome: "cancelled" } })
+    return
+  }
   respond(call, options, answer.allow, answer.remember)
 }

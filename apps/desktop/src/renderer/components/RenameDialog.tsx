@@ -59,7 +59,7 @@ export function RenameDialog({ title, onSave, onClose }: {
         aria-modal="true"
         aria-labelledby="rename-title"
       >
-        <h2 className="rename__title" id="rename-title">重命名聊天</h2>
+        <h2 className="rename__title" id="rename-title">重命名会话</h2>
         <p className="rename__hint">保持简短且易于识别</p>
         {/* 表单套在里面：`useModalKeys` 给的是 div 的 ref，而回车提交要的是 form */}
         <form

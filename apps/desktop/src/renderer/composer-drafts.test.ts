@@ -54,3 +54,30 @@ describe("按会话保留输入草稿", () => {
     })
   })
 })
+
+describe("宿主交回的草稿每一版只并一次", () => {
+  it("记的是并过哪一版，按会话分开；不给版本就是忘掉", () => {
+    const drafts = createComposerDrafts()
+    drafts.markApplied("th-a", "dr-1")
+    drafts.markApplied("th-b", "dr-9")
+    expect(drafts.applied("th-a")).toBe("dr-1")
+    expect(drafts.applied("th-b")).toBe("dr-9")
+    drafts.markApplied("th-a")
+    expect(drafts.applied("th-a")).toBeUndefined()
+  })
+
+  it("空草稿照样记得并过——清空输入框不等于要再灌一遍", () => {
+    const drafts = createComposerDrafts()
+    drafts.markApplied("th", "dr-1")
+    drafts.write("th", { engine: "claude", text: "", attachments: [], blocks: [], aside: false })
+    expect(drafts.applied("th")).toBe("dr-1")
+  })
+
+  it("记不了无限多：超过上限先忘最早的那条", () => {
+    const drafts = createComposerDrafts(2)
+    drafts.markApplied("th-1", "a")
+    drafts.markApplied("th-2", "b")
+    drafts.markApplied("th-3", "c")
+    expect([drafts.applied("th-1"), drafts.applied("th-2"), drafts.applied("th-3")]).toEqual([undefined, "b", "c"])
+  })
+})

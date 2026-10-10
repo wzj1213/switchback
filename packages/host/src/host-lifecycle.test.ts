@@ -254,7 +254,7 @@ describe("中断之后审批卡不能还挂着", () => {
     session().emit({ type: "turn.completed", at: 1, turnId, status: "completed" })
     await expect(pending).resolves.toMatchObject({ allow: false })
     const card = items(events).filter((item) => item.kind === "approval").at(-1)
-    expect(card?.kind === "approval" ? card.status : "").toBe("denied")
+    expect(card?.kind === "approval" ? card.status : "").toBe("cancelled")
   })
 })
 
@@ -424,7 +424,8 @@ describe("跑着的时候补一句话：默认排队，插入是明确动作", (
     const id = await running(h)
     await h.host.dispatch({ type: "thread.prompt", threadId: id, text: "别再往下走了" })
     h.fail.now = true
-    await h.host.dispatch({ type: "thread.steerQueued", threadId: id })
+    // 这颗是用户亲手点的：插不进去要说出原因（走成横幅），不能点了没反应
+    await expect(h.host.dispatch({ type: "thread.steerQueued", threadId: id })).rejects.toThrow()
     expect(h.steered).toHaveLength(0)
     expect(h.events.filter((e) => e.type === "thread.updated").at(-1)?.thread.queued).toEqual([
       "别再往下走了",

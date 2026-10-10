@@ -19,6 +19,16 @@
   background: var(--bg-raised);
 }
 
+/* 新卡出现时焦点落在卡片上（不落在「允许一次」上）；鼠标点的不画框，键盘过来的才画 */
+.approval:focus {
+  outline: none;
+}
+
+.approval:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /*
  * 正文可滚，**操作行在滚动区之外**。
  * 模型给的命令和 diff 长度不受我们控制；不封顶的话，一条 200 行的补丁

@@ -79,6 +79,8 @@ class AcpSession implements EngineSession {
   private readonly revive: SessionRevive
   private readonly clientCalls: AcpClientCalls
   private readonly state: SessionState
+  /** 宿主主动收摊。此后进程退出是意料之中，不再报 `onExit`。 */
+  private disposing = false
   private seq = 0
 
   constructor(
@@ -160,7 +162,8 @@ class AcpSession implements EngineSession {
    */
   private knobs(): TrustCtx & ModelCtx {
     return {
-      id: this.config.id,
+      // 这个 id 只落进给人看的那几句话（档位对不上、不支持插话……）：用名字，不用 `acp:xxx`
+      id: this.config.label ?? this.config.id,
       call: (method, params) => this.rpc.call(method, params),
       status: (status, detail) => {
         this.status(status, detail)
@@ -243,10 +246,13 @@ class AcpSession implements EngineSession {
     child.stderr?.on("data", (chunk: string) => {
       this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
     })
-    child.on("exit", (code) => {
+    child.on("exit", (code, signal) => {
+      const detail = `${this.config.id} 进程已退出（${code === null ? `信号 ${String(signal)}` : `code ${String(code)}`}）`
       this.clientCalls.dispose()
-      this.rpc.close(`${this.config.id} 进程已退出（code ${String(code)}）`)
+      this.rpc.close(detail)
       if (code !== 0 && code !== null) this.status("crashed", this.state.stderr)
+      // 进程没了，后面的 prompt 只会撞「连接已关闭」：交给宿主摘下，下一句话用句柄重新拉起
+      if (!this.disposing) this.req.onExit?.(detail)
     })
   }
 
@@ -385,14 +391,19 @@ class AcpSession implements EngineSession {
 
   interrupt(): Promise<void> {
     cancelTurn(this.endCtx())
+    // 规范要求：发了 cancel 就把挂着的权限请求都回成 cancelled（见 `permission.ts`）
+    this.clientCalls.cancelPermissions()
     return Promise.resolve()
   }
 
   /** 见 `turn.ts`：谁支持由各家自己说，不支持时抛一句人话而不是 `-32601`。 */
   compact(turnId: TurnId): Promise<void> { return compactAndReport({ ...this.knobs(), can: this.config, emit: this.req.emit }, turnId) }
 
-  steer(text: string, attachments?: readonly string[]): Promise<void> {
-    return steerSession({ ...this.knobs(), can: this.config }, text, attachments)
+  async steer(text: string, attachments?: readonly string[]): Promise<void> {
+    await steerSession({ ...this.knobs(), can: this.config }, text, attachments)
+    // 插进去之后引擎接着说的是对这一句的回应：正在攒的那段先收口，后面的另起一条，
+    // 才排得到插话气泡后面。不收的话后续正文全追加进插话之前那条，插话像是收工之后才说、没人回
+    closeText(this.updateContext(), this.updates)
   }
 
   async setTrust(trust: Trust): Promise<TrustChange> {
@@ -426,6 +437,7 @@ class AcpSession implements EngineSession {
 
 
   async dispose(): Promise<void> {
+    this.disposing = true
     // 有在途文本就先收口，否则最后一条消息会永远停在「正在输入」
     closeText(this.updateContext(), this.updates)
     this.clientCalls.dispose()

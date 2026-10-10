@@ -17,7 +17,8 @@ export function usePanelKeys(onClose: () => void, active = true): React.RefObjec
     panel?.focus({ preventScroll: true })
     const onKey = (event: KeyboardEvent): void => {
       const modal = document.querySelector('[aria-modal="true"]')
-      if (event.defaultPrevented || modal !== null || event.key !== "Escape") return
+      // 输入法组字时的 Esc 是取消组字，不是收面板
+      if (event.defaultPrevented || event.isComposing || modal !== null || event.key !== "Escape") return
       event.preventDefault()
       event.stopPropagation()
       close.current()

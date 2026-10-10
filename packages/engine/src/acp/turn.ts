@@ -33,6 +33,7 @@
  */
 
 import type { Event, TurnId } from "@switchback/protocol"
+import { Unsupported } from "../unsupported.js"
 import { sweep, type UpdateContext, type UpdateState } from "./update.js"
 import { stopStatus } from "./translate.js"
 import type { AcpPromptResult } from "./wire.js"
@@ -58,7 +59,7 @@ export interface TurnCtx {
  * 而这两件事的入口都是 Switchback 自己给的按钮，所以**说错一次就是一次「点了没反应」**。
  */
 function refuse(what: string, id: string): Error {
-  return new Error(`${id} 不支持${what}。这不是故障——它的适配器没提供这个方法。`)
+  return new Unsupported(`${id} 不支持${what}。这不是故障——它的适配器没提供这个方法。`)
 }
 
 /**

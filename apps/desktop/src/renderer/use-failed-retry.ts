@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { Command, Item, Thread, Turn } from "@switchback/protocol"
 import { retryTarget, type RetryTarget } from "./error-plan.js"
 import { cannotRevive } from "./history-note.js"
@@ -17,13 +17,18 @@ export function useFailedRetry(
 ): { target: RetryTarget; run: (target: RetryTarget) => void } | undefined {
   const { thread, turn, readOnly, send } = on
   const target = useMemo(() => retryTarget(items), [items])
-  const open = !readOnly && turn === undefined && !cannotRevive(thread) &&
+  // **点过就收起来，直到现场变了。** 开轮前要先做完工作树快照，那几百毫秒到几秒里会话还是
+  // idle、按钮还在；「没反应再点一下」的第二下会在宿主排进队列，第一轮收工后同一句再发一遍
+  const moment = `${target?.errorId ?? ""}|${thread.status}|${turn?.id ?? ""}`
+  const [pressed, setPressed] = useState<string | undefined>(undefined)
+  const open = !readOnly && turn === undefined && !cannotRevive(thread) && pressed !== moment &&
     (thread.status === "idle" || thread.status === "failed")
   return useMemo(() => {
     if (!open || target === undefined) return undefined
     return {
       target,
       run: (next: RetryTarget) => {
+        setPressed(moment)
         send({
           type: "thread.prompt",
           threadId: thread.id,
@@ -32,5 +37,5 @@ export function useFailedRetry(
         })
       },
     }
-  }, [open, target, send, thread.id])
+  }, [open, target, send, thread.id, moment])
 }

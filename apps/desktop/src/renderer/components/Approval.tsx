@@ -137,7 +137,7 @@ export function Approval({
   readOnly: boolean
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const primary = useRef<HTMLButtonElement>(null)
+  const card = useRef<HTMLDivElement>(null)
   const settled = item.status !== "pending"
 
   /**
@@ -152,9 +152,12 @@ export function Approval({
    */
   useEffect(() => {
     if (settled || !active || !shortcut || readOnly) return undefined
-    if (!isTyping()) primary.current?.focus()
+    // **焦点给卡片本身，不给「允许一次」。** 给了按钮的话，人正在转录区里按空格翻页、
+    // 或者刚点完别处按了回车，下一下就把这张卡批了——审批只认明确的 ⌘⏎ / ⌘⌫ 或点按钮
+    if (!isTyping()) card.current?.focus({ preventScroll: true })
     const onKey = (e: KeyboardEvent): void => {
-      if (!(e.metaKey || e.ctrlKey) || isTyping()) return
+      // 长按不算：按住 ⌘⏎ 的自动重复会把接着冒出来的下一张也批掉
+      if (!(e.metaKey || e.ctrlKey) || e.repeat || isTyping()) return
       if (e.key === "Enter") {
         e.preventDefault()
         onResolve(item.id, true, "once")
@@ -179,7 +182,7 @@ export function Approval({
   if (!active || readOnly) return active ? <ReadOnly item={item} /> : <Expired item={item} />
 
   return (
-    <div className="approval">
+    <div className="approval" ref={card} tabIndex={-1} role="group" aria-label={`需要你确认：${item.summary}`}>
       <div className="approval__body">
         {/* 抬头只说「轮到你了」，一行小字。**要做的那件事不写在这里**——
             它是命令原文，值得自己一块地方（下面那块），混在标签后面会被读漏 */}
@@ -214,7 +217,6 @@ export function Approval({
         </button>
         <div className="approval__split">
           <button
-            ref={primary}
             className="btn btn--primary approval__split-main"
             type="button"
             disabled={settled}
