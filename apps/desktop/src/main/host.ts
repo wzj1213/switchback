@@ -22,6 +22,8 @@ import type { TouchedFiles } from "./touched.js"
 import { createEngineCatalog, type EngineCatalog } from "./engine-catalog.js"
 import type { AttachmentFiles } from "./attachment-files.js"
 import type { Attached, RescanReport } from "./attached.js"
+import { createThreadTrust } from "./thread-trust.js"
+import { noting } from "./noting.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { installClipboardChannel } from "./system-clipboard.js"
 import { egressFor } from "./guard-channel.js"
@@ -195,21 +197,6 @@ function refresherOf(deps: {
   }
 }
 
-/** 每条事件都先进名册再广播：预览工作区外的文件凭它放行（见 `touched.ts`）。 */
-function noting(ports: Pick<HostPorts, "touched" | "attachmentFiles" | "worksiteSearch" | "drafts">,
-  publish: (event: Event) => void): (event: Event) => void {
-  return (event) => {
-    ports.touched.note(event)
-    ports.attachmentFiles.note(event)
-    ports.worksiteSearch.note(event)
-    if (event.type === "thread.removed") {
-      void ports.attachmentFiles.removeThread(event.threadId)
-      ports.drafts?.forget(event.threadId)
-    }
-    publish(event)
-  }
-}
-
 export function attachHost(
   sinks: Sinks,
   windows: () => readonly BrowserWindow[],
@@ -232,7 +219,9 @@ export function attachHost(
 
   const { emit: publish, ledger } = createOutlet({ sinks, attention, awake, live, log, seen })
   // 挂在**唯一那个出口**上，不是各个驱动里——漏一处就是某类会话的文件点不开
-  const emit = noting(ports, publish)
+  // 每条会话（含历史会话）开在哪一档：远程策略同步要查，见 `thread-trust.ts`
+  const threadTrust = createThreadTrust()
+  const emit = noting({ ...ports, trust: threadTrust }, publish)
 
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit)
@@ -271,6 +260,7 @@ export function attachHost(
     awake,
     touched: ports.touched,
     attachmentFiles: ports.attachmentFiles,
+    threadTrust,
     worksiteSearch,
     journal,
     engines,
@@ -378,6 +368,7 @@ export async function rebuild(
   for (const thread of threads) {
     attached.touched.noteHistory(thread.id, thread.events)
     attached.attachmentFiles.noteHistory(thread.id, thread.events)
+    attached.threadTrust.noteHistory(thread.id, thread.events)
     attached.worksiteSearch.noteHistory(thread.events)
   }
   const pruned = await attached.attachmentFiles.pruneOnce(Date.now()).catch(() => 0)

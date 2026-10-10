@@ -77,27 +77,24 @@ const RUNS_IN_THREAD: ReadonlySet<string> = new Set([
  * 落在没接引擎的历史会话上时，宿主**照样按记录去做**的那几条：发话、现在就切会把它接回来
  *（`@switchback/host` 的 `revive.ts`），分叉、重来直接从那份记录岔一条新的（`branch.ts` 的 `sourceOf`）。
  *
- * 它们都开在记录里那一档（分叉继承来源的档），而 `trustOf` 只查得到活会话——查不到就不能放：
- * 放过去等于让手机往一条完全档的历史会话里发话，一次审批都不弹。
- * 上限本身就是完全档时没有什么可高过的，照常放行。
- *
- * `thread.resume` 不在内：网页端的「接回来」只认它，并且先把档切到上限之内再发
- *（`apps/web` 的 `Reattach`）。它查不到档位这个缺口是改这条之前就有的，见 README 已知限制。
+ * 它们都开在记录里那一档（分叉继承来源的档）。`trustOf` 查得到活会话、也查得到历史会话记录里那一档
+ *（`thread-trust.ts`），所以照上面那条同样判；**查不到的**是册上没有的会话（删了、或者根本不存在），
+ * 不能放——放过去等于凭空让宿主按一份没人核过的记录去做。上限本身就是完全档时没有什么可高过的，照常放行。
  */
 const ON_HISTORY: ReadonlySet<string> = new Set(["thread.prompt", "thread.switchNow", "thread.fork", "thread.rewind"])
 
 /**
  * 把一条远程发来的命令钳到上限之内。
  * @param ceiling 远程连接的档位上限，来自 `Settings.remote.maxTrust`。
- * @param trustOf 目标会话现在是哪一档。只认活会话：查不到的可能是不存在的会话（宿主自己会拒），
- *   也可能是没接引擎的历史会话（宿主照样会做）——后者见 `ON_HISTORY`。
+ * @param trustOf 目标会话现在是哪一档：活会话按它现在的档，历史会话按记录里那一档。
+ *   查不到的是册上没有的会话——宿主自己会拒，会被宿主按记录照做的那几条在这里先挡（`ON_HISTORY`）。
  */
 export function clamp(command: Command, ceiling: Trust, trustOf?: (id: string) => Trust | undefined): Clamped {
   const target = "threadId" in command ? trustOf?.(command.threadId) : undefined
   if (target === undefined && ceiling !== "full" && ON_HISTORY.has(command.type)) {
     return {
       refused: true,
-      note: "这条会话没接引擎，远程查不到它开在哪一档。先点「接回来」，接上之后再说。",
+      note: "远程查不到这条会话开在哪一档（可能已经删了），这一下没有执行。",
     }
   }
   if (target !== undefined && RUNS_IN_THREAD.has(command.type) && RANK[target] > RANK[ceiling]) {

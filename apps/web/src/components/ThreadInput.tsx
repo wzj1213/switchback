@@ -1,13 +1,17 @@
 import type { Thread } from "@switchback/protocol"
+import { cannotRevive } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { Composer } from "./Composer.js"
 import { Reattach } from "./Reattach.js"
 
+const RANK: Readonly<Record<string, number>> = { "read-only": 0, "auto-edit": 1, full: 2 }
+
 /**
- * 一条会话最下面那块：接着引擎的给输入框，没接的给「接回来」。
+ * 一条会话最下面那块：接着引擎的给输入框；历史会话（背后没有进程）也给输入框——
+ * 发出去宿主先把它接回来再发（`@switchback/host` 的 `revive.ts`），和桌面端一样少点一下。
  *
- * **没接引擎时给的是一个动作，不是一句「去桌面上点」。** 手机上绝大多数会话都是
- * detached 的（宿主只留少数几条活的），摆一个禁用的输入框等于把这一端做成只读。
+ * 两种还是先给「接回来」：宿主接不回的（`cannotRevive`），和开在远程上限之上的——
+ * 远程策略会挡住那一句（`remote/policy.ts`），「接回来」那一屏会先把档降到上限再接。
  */
 export function ThreadInput({
   thread,
@@ -21,9 +25,11 @@ export function ThreadInput({
   offline: boolean
 }): React.JSX.Element {
   const label = (id: string): string => remote.state.engines.find((engine) => engine.id === id)?.label ?? id
-  if (thread.detached === true) {
+  const ceiling = remote.me?.maxTrust ?? "auto-edit"
+  const tooHigh = (RANK[thread.trust] ?? 0) > (RANK[ceiling] ?? 0)
+  if (thread.detached === true && (cannotRevive(thread) || tooHigh)) {
     return (
-      <Reattach thread={thread} ceiling={remote.me?.maxTrust ?? "auto-edit"} offline={offline} send={remote.send} label={label} />
+      <Reattach thread={thread} ceiling={ceiling} offline={offline} send={remote.send} label={label} />
     )
   }
   return (
@@ -61,5 +67,7 @@ function hintOf(thread: Thread, offline: boolean, label: (id: string) => string)
   // 桌面上挑了别家：发出去那一刻才换，由它接着做。不说的话看着是原来那家在答
   const next = thread.nextEngine
   if (next !== undefined && next !== thread.engine) return `下一句由 ${label(next)} 接着做 · ${thread.trust}`
+  // 历史会话：发出去先接回来，要等几秒
+  if (thread.detached === true) return `历史会话 · 发出去先接回 ${label(thread.engine)}（几秒）· ${thread.trust}`
   return `${label(thread.engine)} · ${thread.trust}`
 }

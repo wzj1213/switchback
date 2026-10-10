@@ -11,6 +11,7 @@ import type { AttachmentFiles } from "./attachment-files.js"
 import type { Logger } from "./log.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import type { EgressGuard } from "./egress-guard.js"
+import type { ThreadTrust } from "./thread-trust.js"
 
 /**
  * 一次全量重探的回执。
@@ -46,6 +47,8 @@ export interface Attached {
   touched: TouchedFiles
   /** Switchback 自己复制的图片；历史引用与会话删除都在事件出口登记。 */
   attachmentFiles: AttachmentFiles
+  /** 每条会话（含历史会话）记录里开在哪一档；远程策略同步要查。 */
+  threadTrust: ThreadTrust
   worksiteSearch: WorksiteSearch
   log: Logger
   report: (error: unknown, threadId?: ThreadId) => void

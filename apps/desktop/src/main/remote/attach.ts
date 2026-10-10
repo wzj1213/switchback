@@ -34,8 +34,10 @@ export function attachRemote(deps: {
       // 而在蜂窝网上那是十几秒的「正在连接…」
       await rebuild(attached, sink, REMOTE_REPLAY_CHARS)
     },
-    // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档
-    trustOf: (threadId) => attached.host.live().find((t) => t.id === threadId)?.trust,
+    // 档位上限要管得住**已经开着的**会话，所以得能查到它现在是哪一档；
+    // 历史会话（背后没有进程）按记录里那一档——发话会按它接回来（见 `thread-trust.ts`）
+    trustOf: (threadId) =>
+      attached.host.live().find((t) => t.id === threadId)?.trust ?? attached.threadTrust.of(threadId),
     // **先把在途写入落完再读。** 宿主发事件不等落盘，所以「发出去了」和
     // 「在文件里了」之间有个窗口；在窗口里读到的是缺一截的一份，而客户端
     // 收到它之后只会按 item id 去重——缺的那几条不会再补回来。
