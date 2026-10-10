@@ -74,39 +74,52 @@ async function audit(send, label) {
   console.log(`  ✓ ${label} axe A/AA`)
 }
 
+/**
+ * 样本里挂着三组问题（Grok 计划审批、Claude 拒答回退、两题一组的实现路径），全都列在输入框上方。
+ * 这几步要的是**两题那组**：一题单选（带可选的补充说明）、一题多选——Tab 要能从上一题走到下一题。
+ */
+const CARD = `[...document.querySelectorAll(".question-card")].find((c) => c.querySelectorAll(".question-field").length >= 2)`
+
+async function tab(send) {
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab" })
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab" })
+}
+
 async function exerciseQuestion(send) {
   const before = await evaluate(
     send,
-    `(() => { const card=document.querySelector(".question-card"); const acts=card?.querySelector(".question-card__actions"); if (!card || !acts) return null; const c=card.getBoundingClientRect(); const a=acts.getBoundingClientRect(); return { actionsVisible: a.top >= c.top && a.bottom <= c.bottom + 1, targets: [...card.querySelectorAll(".question-option")].map(x => x.getBoundingClientRect().height) } })()`,
+    `(() => { const card=${CARD}; const acts=card?.querySelector(".question-card__actions"); if (!card || !acts) return null; const c=card.getBoundingClientRect(); const a=acts.getBoundingClientRect(); return { actionsVisible: a.top >= c.top && a.bottom <= c.bottom + 1, targets: [...card.querySelectorAll(".question-option")].map(x => x.getBoundingClientRect().height) } })()`,
   )
   if (before === null || !before.actionsVisible) throw new Error("问题卡操作行没有留在首屏")
   if (before.targets.some((height) => height < 44)) throw new Error("手机问题选项命中区小于 44px")
-  await evaluate(send, `document.querySelector(".question-option__control")?.focus()`)
+  const controls = `[...(${CARD}?.querySelectorAll(".question-option__control") ?? [])]`
+  await evaluate(send, `${CARD}?.querySelector(".question-option__control")?.focus()`)
   await send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown" })
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown" })
   const radio = await evaluate(
     send,
-    `(() => { const controls=[...document.querySelectorAll(".question-option__control")]; return { index: controls.indexOf(document.activeElement), checked: document.activeElement?.checked === true } })()`,
+    `(() => ({ index: ${controls}.indexOf(document.activeElement), checked: document.activeElement?.checked === true }))()`,
   )
   if (radio.index !== 1 || !radio.checked) throw new Error("单选题方向键切换失效")
-  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab" })
-  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab" })
+  await tab(send)
+  // 选中一项之后，这一题的「补充说明（可选）」随之可填，Tab 先落在它上面——那是对的顺序，再按一下到下一题
+  if (await evaluate(send, `document.activeElement?.classList.contains("question-note__input") === true`)) await tab(send)
   const focused = await evaluate(
     send,
-    `(() => { const controls=[...document.querySelectorAll(".question-option__control")]; const active=document.activeElement; const ring=active?.closest(".question-option"); return { index: controls.indexOf(active), outline: ring === null ? "none" : getComputedStyle(ring).outlineStyle } })()`,
+    `(() => { const active=document.activeElement; const ring=active?.closest(".question-option"); return { index: ${controls}.indexOf(active), outline: ring === null || ring === undefined ? "none" : getComputedStyle(ring).outlineStyle, at: active === null ? "" : active.tagName + "." + String(active.className) } })()`,
   )
   if (focused.index !== 2 || focused.outline === "none") {
     throw new Error(`问题选项的 Tab 顺序或焦点环失效：${JSON.stringify(focused)}`)
   }
   await evaluate(
     send,
-    `(() => { const fields=document.querySelectorAll(".question-field"); fields[0]?.querySelector("input")?.click(); fields[1]?.querySelector("input")?.click(); return !document.querySelector(".question-card__actions .btn--primary")?.disabled })()`,
+    `(() => { const card=${CARD}; const fields=card.querySelectorAll(".question-field"); fields[0]?.querySelector("input")?.click(); fields[1]?.querySelector("input")?.click(); return !card.querySelector(".question-card__actions .btn--primary")?.disabled })()`,
   ).then((ready) => {
     if (!ready) throw new Error("逐题选择后回答按钮仍未启用")
   })
-  await evaluate(send, `document.querySelector(".question-card__actions .btn--primary")?.click()`)
+  await evaluate(send, `${CARD}?.querySelector(".question-card__actions .btn--primary")?.click()`)
   await new Promise((resolve) => setTimeout(resolve, 350))
-  if (await evaluate(send, `document.querySelector(".question-card") !== null`)) {
+  if (await evaluate(send, `${CARD} !== undefined`)) {
     throw new Error("结构化回答发出后问题卡没有落定")
   }
   console.log("  ✓ 手机问题卡命中区、固定操作行、键盘焦点与真实命令往返")

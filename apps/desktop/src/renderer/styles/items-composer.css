@@ -282,6 +282,8 @@
    */
   min-height: 42px;
   max-height: 180px;
+  /* 让它真的跟着内容长：没有这一行，textarea 只会停在 UA 默认的两行高，长了只能在里面滚 */
+  field-sizing: content;
 }
 
 .composer__input::placeholder {

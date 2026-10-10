@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { dropNotice, failedDropHint, hasFileItems, hoverHint,
-  reviewAttachments } from "./attachment-feedback.js"
+  pastesFiles, reviewAttachments } from "./attachment-feedback.js"
 
 describe("附件拖放反馈", () => {
   const cases = [
@@ -56,4 +56,17 @@ describe("附件拖放反馈", () => {
     expect(dropNotice({ images: 0, references: 0, failed: 0, outside: 0, duplicates: 2 }))
       .toBe("没有重复添加：2 个文件已经在待发送内容中。")
   })
+})
+
+describe("一次粘贴按文件收还是按文字收", () => {
+  const file = [{ kind: "file" }]
+  const textOnly = [{ kind: "string" }]
+  const cases = [
+    { name: "Excel / Word 复制一段：有正文和富文本，按文字收（那张图只是它的截图）", types: ["text/plain", "text/html", "text/rtf", "Files"], items: file, text: "a\tb\n1\t2", want: false },
+    { name: "网页复制一段图文：有正文和 HTML，按文字收", types: ["text/plain", "text/html", "Files"], items: file, text: "标题", want: false },
+    { name: "Finder 复制文件：只有文件名文本、没有富文本，按文件收", types: ["text/plain", "Files"], items: file, text: "a.png", want: true },
+    { name: "单独复制的一张图：没有正文，按文件收", types: ["text/html", "Files"], items: file, text: "", want: true },
+    { name: "纯文字：不是文件", types: ["text/plain"], items: textOnly, text: "hello", want: false },
+  ]
+  for (const c of cases) it(c.name, () => expect(pastesFiles(c.types, c.items, c.text)).toBe(c.want))
 })

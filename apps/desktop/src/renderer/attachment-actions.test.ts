@@ -94,6 +94,17 @@ describe("附件三种入口", () => {
     })
   })
 
+  it("剪贴板里的截图超过上限：照实说太大，不说「未能读取」", async () => {
+    const huge = image("shot.png", "image/png", 13 * 1024 * 1024)
+    const items = [{ kind: "file", getAsFile: () => huge }] as unknown as DataTransferItemList
+    const clipboard = { ...bridge, pathForFile: (): string => "" }
+    expect(await pasteFiles(items, true, clipboard, "/tmp")).toMatchObject({
+      paths: [],
+      references: [],
+      notice: { text: "未添加：1 张图片超过 12 MB。", tone: "warn" },
+    })
+  })
+
   it("工作区外文件保留绝对路径并提示引擎权限", () => {
     const files = [image("spec.pdf", "application/pdf")] as unknown as FileList
     expect(droppedFiles(files, true, bridge, "/work/switchback")).toEqual({

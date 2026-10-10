@@ -3,7 +3,7 @@ import { flushSync } from "react-dom"
 import type { SlashCommand } from "@switchback/protocol"
 import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
-import { hasFileItems } from "../attachment-feedback.js"
+import { pastesFiles } from "../attachment-feedback.js"
 import { worthFolding } from "../composer-blocks.js"
 
 export function promptPlaceholder(state: {
@@ -67,7 +67,8 @@ export function PromptTextarea(props: Props): React.JSX.Element {
       }}
       onPaste={(event) => {
         const items = event.clipboardData.items
-        if (hasFileItems(items)) {
+        const text = event.clipboardData.getData("text/plain")
+        if (pastesFiles(event.clipboardData.types, items, text)) {
           // Finder 会同时给图片和路径文本。必须在异步落盘前拦住，`.then()` 里已经太迟。
           event.preventDefault()
           void props.onPaste(items)
@@ -83,7 +84,6 @@ export function PromptTextarea(props: Props): React.JSX.Element {
          * 折的是显示不是内容：发送时它原样接在正文后面（见 `composeDraft`）。
          * 小段粘贴照旧原样进正文——那本来就是你要读、要改的那几行。
          */
-        const text = event.clipboardData.getData("text/plain")
         if (!worthFolding(text)) return
         event.preventDefault()
         props.onPasteText(text)
