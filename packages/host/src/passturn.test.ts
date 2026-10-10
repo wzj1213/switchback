@@ -106,7 +106,7 @@ describe("本轮剩下的都放行", () => {
     expect((await rig.session().ask({ ...plain, toolCallId: "t9" })).remember).toBe("once")
   })
 
-  it("**红线照旧发卡**——那 8 条正是最不该被一次点击盖掉的", async () => {
+  it("**红线照旧发卡**——那几条正是最不该被一次点击盖掉的", async () => {
     const rig = await armed()
     const before = cards(rig.events).length
     void rig.session().ask(redline)

@@ -55,7 +55,7 @@ function hasDetails(call: AcpToolCall): boolean {
  *
  * 审批请求本身只是一个「指回那条工具调用」的引用（实测 kimi 只给
  * `{toolCallId, title, content}`，连 `kind` 都没有），所以先合并；
- * 合完还看不见详情就等——那 8 条靠命令原文的红线全指望这一步。
+ * 合完还看不见详情就等——那几条靠命令原文的红线全指望这一步。
  *
  * **不用 `merge`**：那个函数把 `null` 当「显式清空」（`tool_call_update` 是补丁语义），
  * 而审批请求不是补丁，它是引用；照补丁语义合会把已知的 `kind` 清掉。

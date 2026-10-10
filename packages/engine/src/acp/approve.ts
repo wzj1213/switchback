@@ -84,7 +84,7 @@ function argsOf(call: AcpToolCall | undefined): Record<string, unknown> {
      * "Running: ls -la" 总比空着好），但把它当命令送去判定就是**拿展示文本
      * 冒充事实**：实测 kimi 审批时的 title 就是 `"Bash"`，于是
      * `splitSegments("Bash")` 得到一条叫 Bash 的无害命令，
-     * 靠命令原文的那 8 条红线（凭据读取、越界删除、`npm i -g`、`git push`、
+     * 靠命令原文的那几条红线（凭据读取、越界删除、`npm i -g`、`git push`、
      * 解析不了…）**一条都匹配不上**，然后按档位静默放行。
      *
      * 缺席比编一个好：`command` 不在，判定器就按「看不见」办（落 `unknown`，

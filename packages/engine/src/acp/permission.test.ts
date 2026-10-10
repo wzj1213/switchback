@@ -381,7 +381,7 @@ describe("信任档落到 agent 自己定义的 mode 上", () => {
  * `tool_call`（有 kind、没命令）→ `request_permission`（没 kind、没命令）
  * → **批准之后** `tool_call_update {rawInput:{command}}`，而最后那条只晚 2ms。
  *
- * 不等就判的代价：靠命令原文的 8 条红线一条都匹配不上，然后按档位静默放行。
+ * 不等就判的代价：靠命令原文的那几条红线一条都匹配不上，然后按档位静默放行。
  */
 describe("等在途表把命令补齐", () => {
   const ask = (): { call: ServerCall; got: { result?: unknown } } => {

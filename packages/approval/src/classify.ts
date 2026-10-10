@@ -140,7 +140,7 @@ function categoryOfName(name: string): Category | undefined {
  *
  * 认成 `exec` 之后并不等于放行：`blindExec` 紧跟着要求 `args.command` 也在。
  * **命令原文看不见的话它照旧退回 `unknown`**——于是这一条只可能在
- * 「Switchback 同时看得见命令原文」时生效，而那时靠命令原文的那 8 条红线
+ * 「Switchback 同时看得见命令原文」时生效，而那时靠命令原文的那几条红线
  *（凭据读取、越界删除、`npm i -g`、`git push`、解析不了…）全都是活的。
  */
 const PARENTHESISED = /[(（]\s*([^)）]+?)\s*[)）]/g
@@ -170,7 +170,7 @@ const EXEC_WITHOUT_COMMAND: ReadonlySet<string> = new Set(["KillShell"])
  * ## 为什么不能按 exec 放行
  *
  * `exec` 在 auto-edit 档下是 `allow`。而**一条我们从没见过的命令**被按 exec 放行，
- * 等于那 8 条靠命令原文的红线（凭据读取、越界删除、`exec-writes-outside-worksite`、
+ * 等于那几条靠命令原文的红线（凭据读取、越界删除、`exec-writes-outside-worksite`、
  * `git push`、`git-destructive`、`global-install`、`network`、`unparseable-command`）
  * 全部不存在——它们的判据都在 `norm.split` 里，而 `split` 是从 `args.command` 切出来的。
  *
