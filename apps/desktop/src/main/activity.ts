@@ -1,9 +1,9 @@
-import { ipcMain } from "electron"
 import type { Event } from "@switchback/protocol"
 import type { ActivityDigest } from "../shared/activity.js"
 import { createTally, digestOf, foldThread } from "./activity-fold.js"
 import type { Attached } from "./host.js"
 import type { Logger } from "./log.js"
+import type { Channels } from "./channels.js"
 
 /**
  * 「活动」那一页的数据来源：**把磁盘上的 journal 整个走一遍**。
@@ -59,9 +59,9 @@ async function scan(attached: Attached, now: () => number): Promise<ActivityDige
  * **失败不吞。** 这一页整页就这一份数据，读不出来时界面要能说「读失败了」，
  * 而不是画一屏货真价实的零。
  */
-export function installActivity(attached: Attached, log: Logger, now = Date.now): void {
+export function installActivity(attached: Attached, log: Logger, channels: Channels, now = Date.now): void {
   const cache: Cache = { at: 0 }
-  ipcMain.handle("switchback:activity", async (_e, refresh?: boolean): Promise<ActivityDigest> => {
+  channels.handle("switchback:activity", async (refresh: unknown): Promise<ActivityDigest> => {
     const fresh = cache.digest !== undefined && now() - cache.at < TTL
     if (refresh !== true && fresh && cache.digest !== undefined) return cache.digest
     cache.pending ??= scan(attached, now)

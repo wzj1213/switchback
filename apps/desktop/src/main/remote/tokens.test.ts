@@ -177,3 +177,42 @@ describe("吊销", () => {
     expect(tokens.verify(token)?.name).toBe("原名")
   })
 })
+
+describe("设备的种类与上限", () => {
+  it("**种类跟着配对码走**：在宿主上按「电脑」开的码，配上来的就是电脑", () => {
+    const { tokens, saved } = store()
+    const { code, kind } = tokens.startPairing("desk")
+    expect(kind).toBe("desk")
+    const claimed = tokens.claim(code, "mac2")
+    expect(claimed.ok && claimed.device.kind).toBe("desk")
+    expect(saved()[0]?.kind).toBe("desk")
+  })
+
+  it("缺省按手机配，而且手机不写这个字段——老记录和新记录长得一样", () => {
+    const { tokens, saved } = store()
+    expect(tokens.startPairing().kind).toBe("phone")
+    pair(tokens)
+    expect(saved()[0]).not.toHaveProperty("kind")
+  })
+
+  it("上限按设备改，`undefined` 回到跟着全局走", () => {
+    const { tokens, saved } = store()
+    pair(tokens)
+    const id = tokens.list()[0]?.id ?? ""
+    expect(tokens.setTrust(id, "read-only")).toBe(true)
+    expect(tokens.get(id)?.maxTrust).toBe("read-only")
+    expect(saved()[0]?.maxTrust).toBe("read-only")
+    expect(tokens.setTrust(id, undefined)).toBe(true)
+    expect(tokens.get(id)).not.toHaveProperty("maxTrust")
+  })
+
+  it("改一台不存在的设备回 false；`get` 给的是副本", () => {
+    const { tokens } = store()
+    expect(tokens.setTrust("nope", "full")).toBe(false)
+    pair(tokens)
+    const id = tokens.list()[0]?.id ?? ""
+    const copy = tokens.get(id)
+    if (copy !== undefined) copy.maxTrust = "full"
+    expect(tokens.get(id)?.maxTrust).toBeUndefined()
+  })
+})

@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto"
+import type { Trust } from "@switchback/protocol"
 import type { PushSubscription } from "./push.js"
 
 /**
@@ -16,6 +17,17 @@ import type { PushSubscription } from "./push.js"
  * 令牌有 256 位熵，所以不需要 bcrypt 那种慢哈希——爆破的成本在熵那里，不在哈希这里。
  */
 
+/**
+ * 设备是按什么配的（`docs/远程模式方案.md` §2.3）。
+ *
+ * - `phone`：看住与放行（`apps/web`）。只收事件、发命令。
+ * - `desk`：完整的桌面界面（`/desk/`）。另外还能调白名单里的宿主通道（`exposure.ts`）。
+ *
+ * **种类在宿主上配对时定，设备自己报的不作数**——否则一部手机只要说一句「我是电脑」，
+ * 就多拿到一整个面。
+ */
+export type DeviceKind = "phone" | "desk"
+
 /** 一台配过对的设备。 */
 export interface Device {
   id: string
@@ -25,6 +37,15 @@ export interface Device {
   hash: string
   createdAt: number
   lastSeenAt: number
+  /** 缺省 = `phone`：这个字段之前配的设备全是手机端，老记录不动就是对的。 */
+  kind?: DeviceKind
+  /**
+   * 这台设备自己的档位上限。缺省 = 跟着 `settings.remote.maxTrust` 走。
+   *
+   * 按设备分开是因为手机和电脑该给的不一样：手机会丢，电脑在你自己桌上——
+   * 共用一条线的话，要么手机给得太宽，要么电脑上什么都得点一次。
+   */
+  maxTrust?: Trust
   /**
    * 这台设备的推送订阅。**挂在设备记录上，不另开一张表**——
    * 吊销一台设备就该连带停止推给它，一条记录一个生命周期，没有第二处要记得清。
@@ -54,11 +75,13 @@ export type ClaimResult = { ok: true; token: string; device: Device } | { ok: fa
 export interface Pairing {
   code: string
   expiresAt: number
+  /** 用这个码配上来的设备算哪一种。**码在宿主上开，种类跟着码走**，设备自己说了不算。 */
+  kind: DeviceKind
 }
 
 export interface TokenStore {
-  /** 开一次配对。**新的一开，上一个就作废**——同时挂着两个有效码没有任何好处。 */
-  startPairing: () => Pairing
+  /** 开一次配对。**新的一开，上一个就作废**——同时挂着两个有效码没有任何好处。缺省按手机配。 */
+  startPairing: (kind?: DeviceKind) => Pairing
   /** 现在挂着的配对码；没有或已过期时 undefined。桌面端据此显示/隐藏那块面板。 */
   pending: () => Pairing | undefined
   /** 取消当前配对。 */
@@ -67,6 +90,13 @@ export interface TokenStore {
   claim: (code: string, name: string) => ClaimResult
   /** 校验令牌，顺带记一次「最后见到」。认不出返回 undefined。 */
   verify: (token: string) => Device | undefined
+  /**
+   * 按 id 现查一台（副本）。**不缓存在连接上**：上限和吊销都可能在连接活着的时候改，
+   * 判一条命令、一次调用时读的必须是这一刻的记录。
+   */
+  get: (id: string) => Device | undefined
+  /** 改一台设备的上限；`undefined` = 回到跟着全局走。设备不存在时返回 false。 */
+  setTrust: (id: string, trust: Trust | undefined) => boolean
   list: () => readonly Device[]
   /** 记下（或换掉）一台设备的推送订阅。设备不存在时什么都不做，返回 false。 */
   setPush: (id: string, push: PushSubscription | undefined) => boolean
@@ -118,18 +148,30 @@ function noteFailure(state: State, now: number): ClaimResult {
   return { ok: false, reason: "配对码不对或已过期" }
 }
 
-function mint(state: State, name: string, now: number, flush: () => void): ClaimResult {
+function mint(state: State, who: { name: string; kind: DeviceKind }, now: number, flush: () => void): ClaimResult {
   const token = randomBytes(32).toString("base64url")
   const device: Device = {
     id: randomBytes(8).toString("hex"),
-    name: name.trim().slice(0, 60) || "未命名设备",
+    name: who.name.trim().slice(0, 60) || "未命名设备",
     hash: hashOf(token),
     createdAt: now,
     lastSeenAt: now,
+    // 手机不写这个字段：缺省就是手机，老记录和新记录长得一样
+    ...(who.kind === "desk" ? { kind: who.kind } : {}),
   }
   state.devices.push(device)
   flush()
   return { ok: true, token, device }
+}
+
+/** 改一台的上限。**提到外面**：`createTokenStore` 贴着行数闸门。 */
+function setTrust(state: State, id: string, trust: Trust | undefined, flush: () => void): boolean {
+  const device = state.devices.find((d) => d.id === id)
+  if (device === undefined) return false
+  if (trust === undefined) delete device.maxTrust
+  else device.maxTrust = trust
+  flush()
+  return true
 }
 
 /** 记下（或清掉）一台设备的推送订阅。**提到外面**：`createTokenStore` 已经贴着行数闸门。 */
@@ -196,12 +238,12 @@ export function createTokenStore(deps: TokenDeps): TokenStore {
     // 用掉就作废：一个码只换一台设备
     state.pairing = undefined
     state.failures = 0
-    return mint(state, name, now, flush)
+    return mint(state, { name, kind: pairing.kind }, now, flush)
   }
 
   return {
-    startPairing: () => {
-      const pairing = { code: newCode(), expiresAt: deps.now() + CODE_TTL_MS }
+    startPairing: (kind = "phone") => {
+      const pairing: Pairing = { code: newCode(), expiresAt: deps.now() + CODE_TTL_MS, kind }
       state.pairing = pairing
       state.failures = 0
       return pairing
@@ -212,6 +254,11 @@ export function createTokenStore(deps: TokenDeps): TokenStore {
     },
     claim,
     verify: (token) => verify(state, token, deps.now(), flush),
+    get: (id) => {
+      const device = state.devices.find((d) => d.id === id)
+      return device === undefined ? undefined : { ...device }
+    },
+    setTrust: (id, trust) => setTrust(state, id, trust, flush),
     list: () => state.devices.map((d) => ({ ...d })),
     setPush: (id, push) => setPush(state, id, push, flush),
     dropPush: (id, endpoint) => dropPush(state, id, endpoint, flush),

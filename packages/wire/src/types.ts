@@ -91,6 +91,34 @@ export type ClientFrame =
    */
   | { type: "watch"; threadId: ThreadId | null }
   | { type: "ping" }
+  /**
+   * 调一条宿主上的通道（远程模式，见 `docs/远程模式方案.md`）。
+   *
+   * `method` 就是同机 IPC 的通道名（`switchback:worksite`），`arg` 就是 IPC 那一个参数——
+   * **宿主那侧调的是同一个处理函数**，不为远程另写一份。能不能调由宿主按设备判，
+   * 这一层只管形状。
+   *
+   * **不进序号**：它不是「刚发生的一件事」，丢了由调用方超时重来，不该让整条流去补洞。
+   * `id` 由客户端在这条连接内递增，回话按它配对。
+   */
+  | { type: "call"; id: number; method: string; arg?: unknown }
+
+/**
+ * `call` 的回话。**每一条 `call` 都有且只有一条**——被拒、出错、结果太大都回 `ok: false`，
+ * 不让调用方去等一个不会来的回答。
+ */
+export type CallResult =
+  | { type: "result"; id: number; ok: true; value?: unknown }
+  | { type: "result"; id: number; ok: false; reason: string }
+
+/**
+ * 线上的字节。`ArrayBuffer` 过不了 JSON，`call` 的参数里有它时（贴图）
+ * 编成这个形状，宿主还原成 `Buffer`。只认参数**第一层**的属性——
+ * 通道的参数本来就是扁平的一层对象，往深里递归只会多出一个要设防的面。
+ */
+export interface WireBytes {
+  $bytes: string
+}
 
 /** 宿主 → 客户端。 */
 export type ServerFrame =
@@ -139,6 +167,7 @@ export type ServerFrame =
       returned?: { threadId: ThreadId; text: string }
     }
   | { type: "pong" }
+  | CallResult
 
 /**
  * 一条逻辑帧被切开之后的一片。

@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { ipcMain, shell } from "electron"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { ownedWorksite, type OwnedWorksite, type WorksiteGuard } from "./worksite-search.js"
+import type { Channels } from "./channels.js"
 
 /**
  * 项目说明：一份真源，两家引擎都读得到。
@@ -84,11 +85,11 @@ export async function ensureProjectDoc(value: unknown, owns: ProjectDocGuard): P
   return read(req.cwd)
 }
 
-export function installProjectDocChannel(worksites: WorksiteSearch): void {
-  ipcMain.handle("switchback:projectDoc", (_e, req: unknown) => projectDoc(req, worksites.owns))
+export function installProjectDocChannel(worksites: WorksiteSearch, channels: Channels): void {
+  channels.handle("switchback:projectDoc", (req: unknown) => projectDoc(req, worksites.owns))
 
   /** 建起来：缺什么补什么。**已经有内容的 `CLAUDE.md` 绝不覆盖**。 */
-  ipcMain.handle("switchback:ensureProjectDoc", (_e, req: unknown) => ensureProjectDoc(req, worksites.owns))
+  channels.handle("switchback:ensureProjectDoc", (req: unknown) => ensureProjectDoc(req, worksites.owns))
 
   ipcMain.handle("switchback:openProjectDoc", async (_e, value: unknown) => {
     const req = requestOf(value, worksites.owns)

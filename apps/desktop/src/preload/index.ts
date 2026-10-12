@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron"
-import type { Command } from "@switchback/protocol"
+import type { Command, Trust } from "@switchback/protocol"
 import type { Replay, Sealed } from "@switchback/wire"
 import type { Settings } from "../shared/settings.js"
 import type { ProjectDoc } from "../main/projectdoc.js"
@@ -348,7 +348,7 @@ const api = {
   watchFile,
 
   /**
-   * 远程访问（浏览器端）的四条窄通道。
+   * 远程访问（浏览器端）的五条窄通道。
    *
    * **每一条都回一份完整状态**，而不是各自回各自的结果：配对之后设备表变了、
    * 吊销之后连接数变了、开关一动端口就变了——各回各的会让界面必须再问一次，
@@ -362,9 +362,16 @@ const api = {
     async sync(): Promise<RemoteStatus> {
       return (await ipcRenderer.invoke("switchback:remote/sync")) as RemoteStatus
     },
-    /** 开一次配对，返回带配对码的状态。**新的一开，上一个就作废**。 */
-    async pair(): Promise<RemoteStatus> {
-      return (await ipcRenderer.invoke("switchback:remote/pair")) as RemoteStatus
+    /**
+     * 开一次配对，返回带配对码的状态。**新的一开，上一个就作废**。
+     * `kind` 是用这个码配上来的设备算哪一种：手机（看住与放行）或电脑（完整界面），缺省手机。
+     */
+    async pair(kind?: "phone" | "desk"): Promise<RemoteStatus> {
+      return (await ipcRenderer.invoke("switchback:remote/pair", kind)) as RemoteStatus
+    },
+    /** 改一台设备的档位上限；不传 `trust` = 回到跟着默认那条走。 */
+    async setDeviceTrust(id: string, trust?: Trust): Promise<RemoteStatus> {
+      return (await ipcRenderer.invoke("switchback:remote/deviceTrust", { id, trust })) as RemoteStatus
     },
     /** 吊销一台设备。**正连着的那条会当场断开**，之后也认不出它的令牌。 */
     async revoke(id: string): Promise<RemoteStatus> {

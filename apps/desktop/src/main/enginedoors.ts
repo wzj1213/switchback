@@ -6,6 +6,7 @@ import { homeOf } from "./envengines.js"
 import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
 import { isDshProfileName } from "../shared/settings.js"
 import { installDshProfileChannel } from "./dsh-profiles.js"
+import type { Channels } from "./channels.js"
 
 /**
  * **各家引擎自己的设置在哪儿。**
@@ -132,11 +133,19 @@ export function editableEngineDoorPaths(doors: readonly EngineDoor[]): readonly 
   return doors.filter((door) => door.exists && door.scope !== "managed").map((door) => door.path)
 }
 
-export function installEngineDoorChannel(): void {
+/** 参数逐个核：远程模式下这一条也能被另一台电脑调（`remote/exposure.ts`）。 */
+function doorRequestOf(value: unknown): { cwd?: string; dshProfile?: string } {
+  if (typeof value !== "object" || value === null) return {}
+  const { cwd, dshProfile } = value as { cwd?: unknown; dshProfile?: unknown }
+  return { ...(typeof cwd === "string" ? { cwd } : {}), ...(typeof dshProfile === "string" ? { dshProfile } : {}) }
+}
+
+export function installEngineDoorChannel(channels: Channels): void {
   // 只允许打开刚发给设置页、并且确实存在的那几份。渲染层拿不到通用文件打开口子。
   const shown = new Set<string>()
-  ipcMain.handle("switchback:engineDoors", async (_e, req?: { cwd?: string; dshProfile?: string }) => {
-    const doors = await engineDoors(req?.cwd, req?.dshProfile)
+  channels.handle("switchback:engineDoors", async (value: unknown) => {
+    const req = doorRequestOf(value)
+    const doors = await engineDoors(req.cwd, req.dshProfile)
     shown.clear()
     for (const path of editableEngineDoorPaths(doors)) shown.add(path)
     return doors
@@ -146,7 +155,7 @@ export function installEngineDoorChannel(): void {
   })
 }
 
-export function installEngineDoorChannels(): void {
-  installEngineDoorChannel()
-  installDshProfileChannel()
+export function installEngineDoorChannels(channels: Channels): void {
+  installEngineDoorChannel(channels)
+  installDshProfileChannel(channels)
 }

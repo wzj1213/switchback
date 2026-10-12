@@ -1,14 +1,16 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
-import { hostname } from "node:os"
 import type { Duplex } from "node:stream"
 import { WebSocketServer, type WebSocket } from "ws"
 import type { Command, Event, Trust } from "@switchback/protocol"
 import type { Ledger } from "@switchback/wire"
+import type { Handler } from "../channels.js"
 import type { Sink, Sinks } from "../sink.js"
+import { handleMe, handlePair, handleSubscribe, json, type ApiDeps } from "./api.js"
+import { callFor, kindOf, trustOf } from "./calls.js"
 import { checkRequest, headersOf } from "./fence.js"
 import { createSession } from "./session.js"
 import { serveStatic } from "./static.js"
-import type { TokenStore } from "./tokens.js"
+import type { DeviceKind, TokenStore } from "./tokens.js"
 
 /**
  * 远程服务端。
@@ -25,9 +27,6 @@ import type { TokenStore } from "./tokens.js"
 
 export const WS_PATH = "/api/stream"
 export const WS_PROTOCOL = "switchback.v1"
-
-/** 配对请求的体积上限。它只有两个短字段，给这么多已经是宽的。 */
-const MAX_BODY = 4096
 
 export interface RemoteConfig {
   port: number
@@ -47,11 +46,17 @@ export interface RemoteDeps {
   ledger: Ledger
   sinks: Sinks
   dispatch: (command: Command) => void
-  replay: (sink: Sink) => Promise<void>
+  /** 给一条连接发全量。`kind` 决定预算：电脑比手机宽（`scope.ts`）。 */
+  replay: (sink: Sink, kind: DeviceKind) => Promise<void>
   /** 某条会话现在是哪一档。档位上限靠它才管得住已经开着的会话。 */
   trustOf: (threadId: string) => Trust | undefined
-  /** 一条会话的历史。分级 replay 的另一半——客户端打开哪条就补哪条。 */
-  history: (threadId: string) => Promise<{ events: readonly Event[]; trimmed: boolean }>
+  /** 一条会话的历史。分级 replay 的另一半——客户端打开哪条就补哪条。预算同样按 `kind`。 */
+  history: (threadId: string, kind: DeviceKind) => Promise<{ events: readonly Event[]; trimmed: boolean }>
+  /**
+   * 按名字找宿主通道的处理函数（`main/channels.ts`）。远程模式的「电脑」设备靠它调通道；
+   * 能不能调另由 `exposure.ts` 判。不给 = 一条都不接。
+   */
+  channel?: (name: string) => Handler | undefined
   /**
    * 死连接的判定节奏。**只有测试会传**——真跑时用下面那两个常量。
    *
@@ -79,35 +84,6 @@ export interface RemoteServer {
   close: () => Promise<void>
 }
 
-function json(res: ServerResponse, code: number, body: unknown): void {
-  const text = JSON.stringify(body)
-  res.writeHead(code, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-  })
-  res.end(text)
-}
-
-/** 读请求体，超过上限就掐断。**不 buffer 无限大的东西**。 */
-async function readBody(req: IncomingMessage): Promise<string | undefined> {
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const chunk of req) {
-    const buf = chunk as Buffer
-    size += buf.length
-    if (size > MAX_BODY) return undefined
-    chunks.push(buf)
-  }
-  return Buffer.concat(chunks).toString("utf8")
-}
-
-/** `Authorization: Bearer xxx` 里的令牌。 */
-function bearer(req: IncomingMessage): string {
-  const raw = req.headers.authorization
-  return typeof raw === "string" && raw.startsWith("Bearer ") ? raw.slice(7) : ""
-}
-
 /** WebSocket 握手时令牌走子协议：浏览器的 `WebSocket` 构造器设不了请求头。 */
 function protocolToken(req: IncomingMessage): string {
   const raw = req.headers["sec-websocket-protocol"]
@@ -115,75 +91,11 @@ function protocolToken(req: IncomingMessage): string {
   return parts[0] === WS_PROTOCOL ? (parts[1] ?? "") : ""
 }
 
-async function handlePair(deps: RemoteDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readBody(req)
-  if (body === undefined) {
-    json(res, 413, { error: "请求体过大" })
-    return
-  }
-  const parsed = safeParse(body)
-  const code = typeof parsed?.["code"] === "string" ? parsed["code"] : ""
-  const name = typeof parsed?.["name"] === "string" ? parsed["name"] : ""
-  const claimed = deps.tokens.claim(code, name)
-  if (!claimed.ok) {
-    deps.log("warn", `配对失败：${claimed.reason}`)
-    json(res, 403, { error: claimed.reason })
-    return
-  }
-  deps.log("info", `新设备配对成功：${claimed.device.name}（${claimed.device.id}）`)
-  json(res, 200, { token: claimed.token, device: { id: claimed.device.id, name: claimed.device.name } })
-}
-
-/**
- * 记下一台设备的推送订阅。
- *
- * **要带令牌**：订阅是「往这台设备推」的凭据，谁都能写的话，
- * 任何人都能让 Switchback 把你的会话标题推到他自己的手机上。
- */
-async function handleSubscribe(deps: RemoteDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const device = deps.tokens.verify(bearer(req))
-  if (device === undefined) {
-    json(res, 401, { error: "unauthorized" })
-    return
-  }
-  const body = await readBody(req)
-  if (body === undefined) {
-    json(res, 413, { error: "请求体过大" })
-    return
-  }
-  const parsed = safeParse(body ?? "")
-  // 传 null 表示退订。三个字段缺一不可——半个订阅推不出去，留着只会每次白发一次请求
-  if (parsed?.["endpoint"] === undefined) {
-    deps.tokens.setPush(device.id, undefined)
-    deps.log("info", `${device.name} 取消了推送`)
-    json(res, 200, { ok: true })
-    return
-  }
-  const endpoint = parsed["endpoint"]
-  const p256dh = parsed["p256dh"]
-  const auth = parsed["auth"]
-  if (typeof endpoint !== "string" || typeof p256dh !== "string" || typeof auth !== "string") {
-    json(res, 400, { error: "订阅的形状不对" })
-    return
-  }
-  deps.tokens.setPush(device.id, { endpoint, p256dh, auth })
-  deps.log("info", `${device.name} 开了推送`)
-  json(res, 200, { ok: true })
-}
-
-function safeParse(text: string): Record<string, unknown> | undefined {
-  try {
-    const value: unknown = JSON.parse(text)
-    return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
-  } catch {
-    return undefined
-  }
-}
-
 /** 被闸门拦下时给人的那句话。**指向要改的那一栏**，而不是只说「被拒了」。 */
 const FENCE_HINT = "在那台 Mac 上打开 Switchback → 设置 → 远程访问，把「隧道那头的域名」填成你现在地址栏里的 host[:端口]（不要带 https://）"
 
 function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) => void {
+  const api: ApiDeps = { tokens: deps.tokens, maxTrust: () => deps.config().maxTrust, log: deps.log }
   return (req, res) => {
     const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts)
     if (!verdict.ok) {
@@ -197,20 +109,14 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
     }
     const path = (req.url ?? "/").split("?")[0] ?? "/"
     if (path === "/api/pair" && req.method === "POST") {
-      void handlePair(deps, req, res).catch((error: unknown) => {
+      void handlePair(api, req, res).catch((error: unknown) => {
         deps.log("error", `配对处理失败：${String(error)}`)
         json(res, 500, { error: "internal" })
       })
       return
     }
     if (path === "/api/me") {
-      const device = deps.tokens.verify(bearer(req))
-      if (device === undefined) json(res, 401, { error: "unauthorized" })
-      // `host` 是**连接级常量**，不是事件流里刚发生的一件事——所以走这条路由，
-      // 不新增一种帧（那样每次全量重建都要重发一遍，还要顾 `scopeReplay` 的字节预算）。
-      // 手机上「引擎跑在那台 Mac 上」解释了一大堆事：为什么没有「在访达中显示」、
-      // 为什么信任档被钳住、为什么关掉手机它照样在跑
-      else json(res, 200, { id: device.id, name: device.name, maxTrust: deps.config().maxTrust, host: hostname() })
+      handleMe(api, req, res)
       return
     }
     if (path === "/api/push/key") {
@@ -220,7 +126,7 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
       return
     }
     if (path === "/api/push/subscribe" && req.method === "POST") {
-      void handleSubscribe(deps, req, res).catch((error: unknown) => {
+      void handleSubscribe(api, req, res).catch((error: unknown) => {
         deps.log("error", `处理推送订阅失败：${String(error)}`)
         json(res, 500, { error: "internal" })
       })
@@ -266,6 +172,8 @@ interface Attach {
 }
 
 function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
+  // 种类与上限都**每次现查**：连着的时候改了上限，下一条命令就该按新的钳
+  const device = (): ReturnType<TokenStore["get"]> => deps.tokens.get(deviceId)
   const session = createSession({
     id,
     send: (text) => {
@@ -277,10 +185,19 @@ function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
     buffered: () => ws.bufferedAmount,
     ledger: deps.ledger,
     dispatch: deps.dispatch,
-    replay: deps.replay,
-    ceiling: () => deps.config().maxTrust,
+    replay: (sink) => deps.replay(sink, kindOf(device())),
+    ceiling: () => trustOf(device(), deps.config().maxTrust),
     trustOf: deps.trustOf,
-    history: deps.history,
+    history: (threadId) => deps.history(threadId, kindOf(device())),
+    call: callFor(
+      {
+        tokens: deps.tokens,
+        defaultTrust: () => deps.config().maxTrust,
+        ...(deps.channel === undefined ? {} : { find: deps.channel }),
+        log: deps.log,
+      },
+      deviceId,
+    ),
     log: deps.log,
   })
   const detach = deps.sinks.add(session.sink)

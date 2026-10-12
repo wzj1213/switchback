@@ -9,6 +9,7 @@ import {
 } from "../shared/attachments.js"
 import { thumbnailSize, type AttachmentFiles } from "./attachment-files.js"
 import { pickedFilesOf } from "./picked-files.js"
+import type { Channels } from "./channels.js"
 
 async function pickFiles(files: AttachmentFiles): Promise<PickedFiles> {
   const result = await dialog.showOpenDialog({
@@ -34,12 +35,27 @@ async function pickFiles(files: AttachmentFiles): Promise<PickedFiles> {
  * 放 `userData` 下而不是临时目录：临时目录会被系统清掉，
  * 而会话记录里的路径会指向一个不存在的文件——那比没有更糟。
  */
-export function installAttachChannel(files: AttachmentFiles): void {
+/**
+ * 贴图请求逐个字段核。本机窗口传来的是 `ArrayBuffer`；远程模式下宿主收到的是线上
+ * 还原出来的 `Buffer`（`remote/calls.ts`）——而远程那头传什么都有可能，不核就是
+ * 拿 `Buffer.from(undefined)` 去试。
+ */
+function stashRequestOf(value: unknown): { mime: string; buf: Buffer } | undefined {
+  if (typeof value !== "object" || value === null) return undefined
+  const { mime, bytes } = value as { mime?: unknown; bytes?: unknown }
+  if (typeof mime !== "string") return undefined
+  if (bytes instanceof ArrayBuffer) return { mime, buf: Buffer.from(bytes) }
+  return bytes instanceof Uint8Array ? { mime, buf: Buffer.from(bytes) } : undefined
+}
+
+export function installAttachChannel(files: AttachmentFiles, channels: Channels): void {
   ipcMain.handle("switchback:pickFiles", () => pickFiles(files))
-  ipcMain.handle("switchback:stashImage", async (_e, req: { mime: string; bytes: ArrayBuffer }) => {
+  channels.handle("switchback:stashImage", async (value: unknown) => {
+    const req = stashRequestOf(value)
+    if (req === undefined) return undefined
     const ext = imageExtension(req.mime)
     if (ext === undefined) return undefined
-    const buf = Buffer.from(req.bytes)
+    const buf = req.buf
     if (buf.byteLength === 0 || buf.byteLength > MAX_IMAGE_BYTES) return undefined
     const dir = files.dir
     await mkdir(dir, { recursive: true })
@@ -47,7 +63,7 @@ export function installAttachChannel(files: AttachmentFiles): void {
     await writeFile(path, buf)
     return path
   })
-  ipcMain.on("switchback:discardImages", (_e, paths: unknown) => {
+  channels.on("switchback:discardImages", (paths: unknown) => {
     if (!Array.isArray(paths)) return
     void files.discard(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
   })
@@ -55,7 +71,7 @@ export function installAttachChannel(files: AttachmentFiles): void {
     if (!Array.isArray(paths)) return
     files.allow(paths.filter((path): path is string => typeof path === "string").slice(0, 100))
   })
-  ipcMain.handle("switchback:thumb", (_e, req: unknown) => {
+  channels.handle("switchback:thumb", (req: unknown) => {
     if (typeof req !== "object" || req === null) return undefined
     const { path, max } = req as { path?: unknown; max?: unknown }
     const size = thumbnailSize(max)

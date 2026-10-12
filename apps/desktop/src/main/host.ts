@@ -14,7 +14,7 @@ import type { NotifyMode } from "../shared/settings.js"
 import { createAwake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
-import { REMOTE_THREAD_CHARS, replayEvents, scopeReplay } from "./scope.js"
+import { replayEvents, scopeFor, type RemoteBudget } from "./scope.js"
 import type { Logger } from "./log.js"
 import { createWorktreeBaselines, type WorktreeBaselines } from "./worktree-baseline.js"
 import { readBuildInfo } from "./build-info.js"
@@ -61,8 +61,6 @@ function installBridgeChannels(deps: Channels): void {
   ipcMain.on("switchback:reveal", (_e, path: string) => {
     if (typeof path === "string" && path !== "") shell.showItemInFolder(path)
   })
-
-  ipcMain.handle("switchback:searchFiles", (_e, req: unknown) => deps.worksiteSearch.search(req))
 
   // 渲染层发现自己漏了事件时来补。补不了就明说，由它走全量重建——
   // **绝不返回一个不完整的片段**，那会让界面安静地显示错误内容
@@ -333,10 +331,10 @@ export async function rebuild(
   attached: Attached,
   target: Sink,
   /**
-   * 正文的总条数预算。**只有远程那条路会给**——同机 IPC 上一份几 MB 的全量
-   * 只是一次结构化克隆，而在蜂窝网上那是十几秒的「正在连接…」。
+   * 正文的码元预算（全量合计 + 单条上限）。**只有远程那条路会给**——同机 IPC 上一份几 MB 的全量
+   * 只是一次结构化克隆，而在蜂窝网上那是十几秒的「正在连接…」。手机和电脑各一组，见 `REMOTE_BUDGETS`。
    */
-  budget?: number,
+  budget?: RemoteBudget,
 ): Promise<ThreadId | undefined> {
   // **活着的会话不能标 detached。** 它们和历史在 journal 里长得一模一样，
   // 但背后还有引擎进程。混为一谈的话，重载之后每条活会话都被当成历史，
@@ -378,7 +376,7 @@ export async function rebuild(
   // 幂等去重（`@switchback/store` 的 `appendItem`），不在这里判——
   // 判它需要给每条事件一个身份，那是把复杂度推给每一个产生事件的地方。
   const missed = attached.ledger.since(before, attached.ledger.epoch) ?? []
-  const scoped = scopeReplay(threads, budget)
+  const scoped = scopeFor(threads, budget)
   if (scoped.deferred > 0 || scoped.trimmed > 0) {
     const parts = [
       scoped.deferred > 0 ? `${String(scoped.deferred)} 条先发头` : "",
@@ -392,7 +390,7 @@ export async function rebuild(
       threads,
       alive,
       now: Date.now(),
-      ...(budget === undefined ? {} : { bodies: scoped.bodies, cap: REMOTE_THREAD_CHARS }),
+      ...(budget === undefined ? {} : { bodies: scoped.bodies, cap: budget.thread }),
     }),
     // **不落盘的那些现状要补在最后。** 斜杠命令和额度都不进 journal
     //（现问引擎的东西落盘只会在重放时塞回一份过期的），于是全量里没有它们；

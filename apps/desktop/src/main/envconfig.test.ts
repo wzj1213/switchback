@@ -32,6 +32,8 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 }))
 
 const { installEnvChannel } = await import("./envconfig.js")
+const { createChannels } = await import("./channels.js")
+const { ipcMain } = await import("electron")
 
 const log = { file: "x", write: () => undefined }
 const state = { home: "", cwd: "", kimi: "", grok: "" }
@@ -60,7 +62,7 @@ describe("环境配置", () => {
     process.env["KIMI_CODE_HOME"] = state.kimi
     process.env["GROK_HOME"] = state.grok
     sdk.resolve = () => ({ sources: [], effective: {} })
-    installEnvChannel(log)
+    installEnvChannel(log, createChannels(ipcMain))
   })
 
   it("codex：审过的那条标已审核，没审过的标待审核——这正是「配了却不跑」的原因", async () => {

@@ -3,11 +3,12 @@ import { dirname, join } from "node:path"
 import { app, ipcMain } from "electron"
 import type { Command, Event, Trust } from "@switchback/protocol"
 import type { Ledger } from "@switchback/wire"
+import type { Handler } from "../channels.js"
 import type { Sink, Sinks } from "../sink.js"
 import type { Logger } from "./../log.js"
 import type { Settings } from "../../shared/settings.js"
 import { assertTrustedAuthority } from "./fence.js"
-import { createTokenStore, type Device } from "./tokens.js"
+import { createTokenStore, type Device, type DeviceKind } from "./tokens.js"
 import { startRemote, type RemoteServer } from "./server.js"
 import { createRelay, loadVapid, type Relay } from "./relay.js"
 
@@ -26,8 +27,8 @@ export interface RemoteStatus {
   listening: boolean
   port: number
   devices: readonly Omit<Device, "hash">[]
-  /** 现在挂着的配对码；没有就是 undefined。 */
-  pairing: { code: string; expiresAt: number } | undefined
+  /** 现在挂着的配对码；没有就是 undefined。`kind` 是用它配上来的设备算哪一种。 */
+  pairing: { code: string; expiresAt: number; kind: DeviceKind } | undefined
   /** 起不来时的原因，给人看。 */
   error: string | undefined
 }
@@ -37,11 +38,14 @@ export interface RemoteInstallDeps {
   ledger: Ledger
   sinks: Sinks
   dispatch: (command: Command) => void
-  replay: (sink: Sink) => Promise<void>
+  /** 全量。`kind` 决定预算（电脑比手机宽，见 `scope.ts`）。 */
+  replay: (sink: Sink, kind: DeviceKind) => Promise<void>
   /** 某条会话现在是哪一档。见 `remote/policy.ts` 的 `RUNS_IN_THREAD`。 */
   trustOf: (threadId: string) => Trust | undefined
-  /** 一条会话的历史。分级 replay 的另一半。 */
-  history: (threadId: string) => Promise<{ events: readonly Event[]; trimmed: boolean }>
+  /** 一条会话的历史。分级 replay 的另一半，预算同样按 `kind`。 */
+  history: (threadId: string, kind: DeviceKind) => Promise<{ events: readonly Event[]; trimmed: boolean }>
+  /** 按名字找宿主通道（`main/channels.ts`）。「电脑」设备调通道时用；能不能调由 `exposure.ts` 判。 */
+  channel: (name: string) => Handler | undefined
   log: Logger
 }
 
@@ -74,6 +78,14 @@ function loadDevices(): readonly Device[] {
   }
 }
 
+const KINDS: readonly unknown[] = ["phone", "desk"]
+const TRUSTS: readonly unknown[] = ["read-only", "auto-edit", "full"]
+
+/**
+ * 盘上那一条像不像一台设备。**两个可选字段也要核**：`kind` 写坏了（手改过文件）
+ * 不能被读成 `desk`——那等于凭空多给一整个面；上限写坏了同理。认不出就整条不认，
+ * 那台设备重新配一次，比带着一个说不清的权限活着强。
+ */
 function isDevice(value: unknown): value is Device {
   if (typeof value !== "object" || value === null) return false
   const it = value as Record<string, unknown>
@@ -82,7 +94,9 @@ function isDevice(value: unknown): value is Device {
     typeof it["name"] === "string" &&
     typeof it["hash"] === "string" &&
     typeof it["createdAt"] === "number" &&
-    typeof it["lastSeenAt"] === "number"
+    typeof it["lastSeenAt"] === "number" &&
+    (it["kind"] === undefined || KINDS.includes(it["kind"])) &&
+    (it["maxTrust"] === undefined || TRUSTS.includes(it["maxTrust"]))
   )
 }
 
@@ -154,7 +168,17 @@ export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
     if (had) deps.log.write("info", "remote", `吊销设备 ${id}，顺带掐掉 ${String(cut)} 条正连着的连接`)
   }
 
-  installChannels({ status, sync, revoke, pair: () => { tokens.startPairing() } })
+  installChannels({
+    status,
+    sync,
+    revoke,
+    pair: (kind) => {
+      tokens.startPairing(kind)
+    },
+    setTrust: (id, trust) => {
+      if (tokens.setTrust(id, trust)) deps.log.write("info", "remote", `设备 ${id} 的上限改成 ${trust ?? "跟随默认"}`)
+    },
+  })
   return { relay, status, sync, close: () => stop(state, deps.log) }
 }
 
@@ -199,6 +223,7 @@ async function syncOnce(
         replay: deps.replay,
         trustOf: deps.trustOf,
         history: deps.history,
+        channel: deps.channel,
         log: (level, message) => {
           deps.log.write(level, "remote", message)
         },
@@ -224,18 +249,25 @@ interface Channels {
   status: () => RemoteStatus
   sync: () => Promise<void>
   revoke: (id: string) => void
-  pair: () => void
+  pair: (kind: DeviceKind) => void
+  setTrust: (id: string, trust: Trust | undefined) => void
 }
 
-/** 设置面板要用的四条窄通道。**每一条都回一份完整状态**，理由见 preload。 */
+/** 设置面板要用的五条窄通道。**每一条都回一份完整状态**，理由见 preload。 */
 function installChannels(ch: Channels): void {
   ipcMain.handle("switchback:remote/status", () => ch.status())
   ipcMain.handle("switchback:remote/sync", async () => {
     await ch.sync()
     return ch.status()
   })
-  ipcMain.handle("switchback:remote/pair", () => {
-    ch.pair()
+  // 种类认不出就按手机配：多给一个面的方向不能是默认
+  ipcMain.handle("switchback:remote/pair", (_e, kind: unknown) => {
+    ch.pair(kind === "desk" ? "desk" : "phone")
+    return ch.status()
+  })
+  ipcMain.handle("switchback:remote/deviceTrust", (_e, req: unknown) => {
+    const { id, trust } = (typeof req === "object" && req !== null ? req : {}) as { id?: unknown; trust?: unknown }
+    if (typeof id === "string" && (trust === undefined || TRUSTS.includes(trust))) ch.setTrust(id, trust as Trust | undefined)
     return ch.status()
   })
   ipcMain.handle("switchback:remote/revoke", (_e, id: unknown) => {

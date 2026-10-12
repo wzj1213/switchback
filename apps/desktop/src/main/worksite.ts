@@ -2,7 +2,7 @@ import { execFile } from "node:child_process"
 import { realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { promisify } from "node:util"
-import { ipcMain } from "electron"
+import type { Channels } from "./channels.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { ownedWorksite } from "./worksite-search.js"
 
@@ -163,9 +163,11 @@ export async function workChanges(cwd: string): Promise<WorkChanges | undefined>
   return { root, paths: parseStatus(status.stdout).map((rel) => join(root, rel)) }
 }
 
-export function installWorksiteChannel(worksites: WorksiteSearch): void {
-  ipcMain.handle("switchback:worksite", async (_e, value: unknown) => {
+export function installWorksiteChannel(worksites: WorksiteSearch, channels: Channels): void {
+  channels.handle("switchback:worksite", async (value: unknown) => {
     const req = ownedWorksite(value, worksites.owns)
     return req === undefined ? {} : worksiteInfo(req.cwd)
   })
+  // `@` 的文件模糊搜索。守卫在 `search` 里（只认有会话在用的工作区）
+  channels.handle("switchback:searchFiles", (req: unknown) => worksites.search(req))
 }

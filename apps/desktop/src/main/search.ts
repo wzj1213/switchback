@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
-import { ipcMain, app } from "electron"
+import { app } from "electron"
+import type { Channels } from "./channels.js"
 import type { ContentHit, SearchOut } from "../shared/search.js"
 
 /**
@@ -176,9 +177,9 @@ export async function searchThreads(dir: string, query: string): Promise<SearchO
   return { hits: hits.slice(0, MAX_HITS), skipped }
 }
 
-export function installSearchChannel(): void {
+export function installSearchChannel(channels: Channels): void {
   const dir = join(app.getPath("userData"), "threads")
-  ipcMain.handle("switchback:searchThreads", async (_e, query: string) =>
+  channels.handle("switchback:searchThreads", async (query: unknown) =>
     typeof query === "string" ? searchThreads(dir, query) : { hits: [], skipped: 0 },
   )
 }

@@ -1,9 +1,10 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { app, ipcMain, nativeTheme } from "electron"
+import { app, nativeTheme } from "electron"
 import { isDshProfileName, SETTINGS_DEFAULTS, type EnginePick, type Settings } from "../shared/settings.js"
 import type { Logger } from "./log.js"
 import { paneWidths } from "../shared/pane-widths.js"
+import type { Channels } from "./channels.js"
 
 /**
  * 用户偏好。
@@ -280,10 +281,14 @@ export function createSettings(log: Logger): Store {
 /** 渲染层读写偏好的通道。 */
 export function installSettingsChannel(
   store: Store,
+  channels: Channels,
   onPatch?: (before: Settings, after: Settings, patch: Partial<Settings>) => void,
 ): void {
-  ipcMain.handle("switchback:settings", (_e, patch?: Partial<Settings>) => {
-    if (patch === undefined) return store.get()
+  channels.handle("switchback:settings", (value: unknown) => {
+    // 不是一个普通对象就当「只读」：一个字符串 patch 摊开来是 `{0: …, 1: …}`，
+    // `parse` 会把它当未知键扔掉——结果对，但不该指望下游替这里兜底
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return store.get()
+    const patch = value as Partial<Settings>
     const before = store.get()
     const after = store.patch(patch)
     onPatch?.(before, after, patch)

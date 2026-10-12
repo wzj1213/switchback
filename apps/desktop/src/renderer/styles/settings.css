@@ -892,3 +892,9 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
+
+/* 手机 / 电脑。和「最后见到」同一档的淡字：它是这一行的注脚，不是要点的东西 */
+.devices__kind {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}

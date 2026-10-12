@@ -16,6 +16,7 @@ import {
   type InspectContext,
 } from "./enginever-sources.js"
 import type { Logger } from "./log.js"
+import type { Channels } from "./channels.js"
 
 export type { EngineCommandResult, EngineCommandRunner, EngineVersion }
 
@@ -200,12 +201,11 @@ function installOutput(output: string, ok: boolean): string {
   return [output === "" ? "安装命令没有输出。" : output, checked].join("\n\n")
 }
 
-export function installEngineVersionChannel(_log: Logger, versions: EngineVersionStore): void {
+export function installEngineVersionChannel(_log: Logger, versions: EngineVersionStore, channels: Channels): void {
+  // 装与更新只在本机挂：它们在宿主上执行安装命令（见 `remote/exposure.ts`）
   ipcMain.handle("switchback:updateEngine", (_event, engine: string) => versions.update(engine))
   ipcMain.handle("switchback:installEngine", (_event, engine: string) => versions.install(engine))
-  ipcMain.handle("switchback:engineVersions", (_event, refresh?: boolean) =>
-    versions.get(refresh === true),
-  )
+  channels.handle("switchback:engineVersions", (refresh: unknown) => versions.get(refresh === true))
 }
 
 interface UpdateVerification {

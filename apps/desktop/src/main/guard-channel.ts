@@ -1,5 +1,4 @@
 import { homedir } from "node:os"
-import { ipcMain } from "electron"
 import type { EngineId, Event } from "@switchback/protocol"
 import type { Host } from "@switchback/host"
 import type { GuardReport } from "../shared/guard.js"
@@ -7,6 +6,7 @@ import type { Attached } from "./attached.js"
 import type { Logger } from "./log.js"
 import { watchEgress, type EgressGuard } from "./egress-guard.js"
 import { lockCheckpoints, zcodeStatus } from "./zcode-guard.js"
+import type { Channels } from "./channels.js"
 
 /** 起外发守卫。开关不给＝开着：守卫宁可多停一次，也不放一个仓库出去。 */
 export function egressFor(wiring: {
@@ -26,14 +26,14 @@ export function egressFor(wiring: {
 }
 
 /** 挂上设置页读账的通道；开着「给 ZCode 的快照目录上锁」就在起来时锁上。 */
-export function installGuard(attached: Attached, zcodeLock: boolean, log: Logger): void {
-  installGuardChannel(attached)
+export function installGuard(attached: Attached, zcodeLock: boolean, log: Logger, channels: Channels): void {
+  installGuardChannel(attached, channels)
   if (zcodeLock) void applyZcodeLock(true, log)
 }
 
 /** 设置页「外发守卫」那一组读的东西：每个引擎进程的外发账，和 ZCode 的防护状态。 */
-export function installGuardChannel(attached: Attached): void {
-  ipcMain.handle("switchback:guard", async (): Promise<GuardReport> => ({
+export function installGuardChannel(attached: Attached, channels: Channels): void {
+  channels.handle("switchback:guard", async (): Promise<GuardReport> => ({
     records: attached.egress.records(),
     zcode: await zcodeStatus(homedir()),
   }))

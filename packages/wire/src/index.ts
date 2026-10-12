@@ -1,4 +1,13 @@
-export type { ChunkFrame, ClientFrame, Replay, Sealed, ServerFrame, WireFrame } from "./types.js"
+export type {
+  CallResult,
+  ChunkFrame,
+  ClientFrame,
+  Replay,
+  Sealed,
+  ServerFrame,
+  WireBytes,
+  WireFrame,
+} from "./types.js"
 export { createLedger, type Ledger, type LedgerStats } from "./ledger.js"
 export {
   initialStream,

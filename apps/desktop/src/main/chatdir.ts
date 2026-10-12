@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
-import { app, ipcMain } from "electron"
+import { app } from "electron"
+import type { Channels } from "./channels.js"
 
 /**
  * 给一条「不属于任何项目的对话」准备一个真目录。
@@ -23,8 +24,8 @@ import { app, ipcMain } from "electron"
  * 一天开五条随手问的对话很正常。全平铺在一个目录下，
  * 半年后那儿会有几百个文件夹；按天分至少让人能照着日期找回去。
  */
-export function installChatDirChannel(): void {
-  ipcMain.handle("switchback:chatDir", async () => {
+export function installChatDirChannel(channels: Channels): void {
+  channels.handle("switchback:chatDir", async () => {
     const now = new Date()
     const day = `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
     const at = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`

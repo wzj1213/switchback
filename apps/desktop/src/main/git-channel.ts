@@ -1,7 +1,7 @@
-import { ipcMain } from "electron"
 import type { CommitResult, GitState } from "../shared/git.js"
 import { gitCommit, gitStage, gitState, gitUndo, runGit, type GitRun } from "./git-commit.js"
 import { ownedWorksite, type WorksiteSearch } from "./worksite-search.js"
+import type { Channels } from "./channels.js"
 
 /**
  * 审查页「提交」那一条的通道。守卫同审核面板（`work-review-channel.ts`）：
@@ -56,10 +56,10 @@ export function createGitChannels(worksites: WorksiteSearch, run: GitRun = runGi
   }
 }
 
-export function installGitChannel(worksites: WorksiteSearch): void {
-  const channels = createGitChannels(worksites)
-  ipcMain.handle("switchback:gitState", (_event, req: unknown) => channels.state(req))
-  ipcMain.handle("switchback:gitCommit", (_event, req: unknown) => channels.commit(req))
-  ipcMain.handle("switchback:gitStage", (_event, req: unknown) => channels.stage(req))
-  ipcMain.handle("switchback:gitUndo", (_event, req: unknown) => channels.undo(req))
+export function installGitChannel(worksites: WorksiteSearch, channels: Channels): void {
+  const git = createGitChannels(worksites)
+  channels.handle("switchback:gitState", (req: unknown) => git.state(req))
+  channels.handle("switchback:gitCommit", (req: unknown) => git.commit(req))
+  channels.handle("switchback:gitStage", (req: unknown) => git.stage(req))
+  channels.handle("switchback:gitUndo", (req: unknown) => git.undo(req))
 }

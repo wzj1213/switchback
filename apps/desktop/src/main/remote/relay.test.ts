@@ -99,11 +99,13 @@ async function fakePush(status = 201): Promise<Fake> {
 function tokensWith(devices: { id: string; name: string; push: PushSubscription }[]): TokenStore {
   const state = { devices: [...devices] }
   return {
-    startPairing: () => ({ code: "X", expiresAt: 0 }),
+    startPairing: () => ({ code: "X", expiresAt: 0, kind: "phone" }),
     pending: () => undefined,
     cancelPairing: () => undefined,
     claim: () => ({ ok: false, reason: "不用" }),
     verify: () => undefined,
+    get: () => undefined,
+    setTrust: () => false,
     list: () => [] as readonly Device[],
     setPush: (id, push) => {
       if (push === undefined) {

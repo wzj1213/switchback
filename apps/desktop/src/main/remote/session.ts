@@ -2,6 +2,7 @@ import type { Command, Event, ThreadId, Trust } from "@switchback/protocol"
 import { encodeFrame, type ClientFrame, type Ledger, type ServerFrame } from "@switchback/wire"
 import type { Sink, SinkMessage } from "../sink.js"
 import { clamp, isCommand } from "./policy.js"
+import { createCalls, type CallOutcome, type Calls } from "./session-calls.js"
 
 /**
  * 一条连上来的远程客户端。
@@ -37,6 +38,11 @@ export interface SessionDeps {
    * 光钳「新建」和「切档」的话，桌面上一条完全档会话对远程是完全敞开的。
    */
   trustOf: (threadId: string) => Trust | undefined
+  /**
+   * 判 + 调一条宿主通道（远程模式）。**判定由提供方做**——表外拒、手机拒、只读拒写，
+   * 见 `remote/exposure.ts`。缺省 = 这条连接不支持调用，每条都回「不支持」。
+   */
+  call?: (method: string, arg: unknown) => Promise<CallOutcome>
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -89,6 +95,7 @@ interface Ctx {
   state: State
   write: (frame: ServerFrame) => void
   sink: Sink
+  calls: Calls
 }
 
 function writer(deps: SessionDeps, state: State): (frame: ServerFrame) => void {
@@ -111,6 +118,12 @@ function writer(deps: SessionDeps, state: State): (frame: ServerFrame) => void {
         "error",
         `${deps.id} 的 ${frame.type} 帧有 ${String(encoded.chars)} 个码元，超过 ${String(encoded.limit)}，发不出去`,
       )
+      // **一条调用的结果太大，只让那一条失败。** 走下面的 `reset` 会让客户端把整份
+      // 全量重拉一遍——为一份打不开的补丁付一次最贵的重建，而那份补丁照样还是打不开
+      if (frame.type === "result") {
+        write({ type: "result", id: frame.id, ok: false, reason: "结果太大，远程传不过来——这一项去那台机器上看" })
+        return
+      }
       if (frame.type !== "reset") {
         write({ type: "reset", reason: "这台机器上的历史太长，手机端暂时装不下——先在桌面上删掉几条旧会话" })
       }
@@ -305,6 +318,9 @@ function handle(ctx: Ctx, frame: ClientFrame): void {
     case "ping":
       ctx.write({ type: "pong" })
       return
+    case "call":
+      ctx.calls.receive(frame)
+      return
     default:
       // 认不出的帧一律忽略。**不断连接**——对端可能只是比我们新
       return
@@ -340,7 +356,8 @@ export function createSession(deps: SessionDeps): RemoteSession {
     watching: () => state.watching,
   }
 
-  const ctx: Ctx = { deps, state, write, sink }
+  const calls = createCalls({ ...(deps.call === undefined ? {} : { call: deps.call }), write, log: deps.log })
+  const ctx: Ctx = { deps, state, write, sink, calls }
 
   return {
     sink,

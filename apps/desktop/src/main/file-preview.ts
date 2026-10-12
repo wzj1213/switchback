@@ -1,10 +1,11 @@
 import { open, realpath, stat } from "node:fs/promises"
 import { basename, extname, isAbsolute, relative, resolve } from "node:path"
-import { ipcMain, nativeImage } from "electron"
+import { nativeImage } from "electron"
 import type { ThreadId } from "@switchback/protocol"
 import type { FilePreview, FilePreviewRequest } from "../shared/file-preview.js"
 import type { TouchedFiles } from "./touched.js"
 import type { WorksiteSearch } from "./worksite-search.js"
+import type { Channels } from "./channels.js"
 
 const MAX_TEXT = 1_500_000
 const MAX_IMAGE = 1600
@@ -151,8 +152,8 @@ export async function previewFile(
   }
 }
 
-export function installFilePreviewChannel(touched: TouchedFiles, worksites: WorksiteSearch): void {
-  ipcMain.handle("switchback:filePreview", (_event, req: unknown) => (
+export function installFilePreviewChannel(touched: TouchedFiles, worksites: WorksiteSearch, channels: Channels): void {
+  channels.handle("switchback:filePreview", (req: unknown) => (
     previewFile(req, touched.allows, worksites.owns)
   ))
 }

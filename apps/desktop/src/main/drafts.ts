@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs"
-import { ipcMain } from "electron"
 import { blankDraft, parseDrafts, pruneDrafts, type LoadedDrafts, type StoredDraft } from "../shared/drafts.js"
 import type { Logger } from "./log.js"
+import type { Channels } from "./channels.js"
 
 /**
  * 输入框里没发出去的话，存在数据目录的 `drafts.json`：每条会话一份，另留「新会话」一格
@@ -123,12 +123,13 @@ function keyOf(raw: unknown): string | undefined {
 }
 
 /** 渲染层读写草稿的通道。 */
-export function installDraftsChannel(store: DraftStore): void {
-  ipcMain.handle("switchback:drafts/load", () => store.load())
-  ipcMain.on("switchback:drafts/save", (_e, payload: { key?: unknown; draft?: unknown } | undefined) => {
-    const key = keyOf(payload?.key)
+export function installDraftsChannel(store: DraftStore, channels: Channels): void {
+  channels.handle("switchback:drafts/load", () => store.load())
+  channels.on("switchback:drafts/save", (value: unknown) => {
+    const payload = (typeof value === "object" && value !== null ? value : {}) as { key?: unknown; draft?: unknown }
+    const key = keyOf(payload.key)
     if (key === undefined) return
     // 交过来的那份同样逐字段核：认不出的当删
-    store.save(key, parseDrafts({ [key]: payload?.draft })[key])
+    store.save(key, parseDrafts({ [key]: payload.draft })[key])
   })
 }

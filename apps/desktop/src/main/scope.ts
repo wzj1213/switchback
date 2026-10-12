@@ -53,6 +53,25 @@ export const REMOTE_REPLAY_CHARS = 192 * 1024
  */
 export const REMOTE_THREAD_CHARS = 64 * 1024
 
+/** 一组远程预算：全量里所有正文加起来多少、单条会话最多多少（都按码元）。 */
+export interface RemoteBudget {
+  replay: number
+  thread: number
+}
+
+/**
+ * 按设备种类取预算（`docs/远程模式方案.md` §3）。
+ *
+ * 上面那两个数是为手机定的：Safari 的内存、蜂窝网。**电脑上照搬只会让长会话无端只剩尾巴**——
+ * 而电脑那头往往正是要回头翻长会话的那一端。电脑这组仍然有顶：一条帧最多 16M 码元
+ *（`@switchback/wire` 的 `segment.ts`），中转那条链路也不是局域网——1M 码元压缩后
+ * 大约 260 KB，隔着 kr 是半秒上下的事。
+ */
+export const REMOTE_BUDGETS: Readonly<Record<"phone" | "desk", RemoteBudget>> = {
+  phone: { replay: REMOTE_REPLAY_CHARS, thread: REMOTE_THREAD_CHARS },
+  desk: { replay: 1024 * 1024, thread: 2 * 1024 * 1024 },
+}
+
 export interface Scoped {
   /** 这些会话的正文进这一份全量（可能是**裁过的尾巴**，见 `bodyOf`）。其余只发头。 */
   bodies: ReadonlySet<ThreadId>
@@ -93,8 +112,13 @@ export function bodyOf(thread: ThreadHistory, cap: number): { events: readonly E
  *
  * @param threads 磁盘上的历史，**最近写过的在前**（`journal.list()` 的顺序）。
  * @param budget 正文的总**码元**上限。`undefined` = 不限（桌面窗口那条路）。
+ * @param threadCap 单条会话的码元上限。缺省是手机那一档（见 `REMOTE_BUDGETS`）。
  */
-export function scopeReplay(threads: readonly ThreadHistory[], budget?: number): Scoped {
+export function scopeReplay(
+  threads: readonly ThreadHistory[],
+  budget?: number,
+  threadCap = REMOTE_THREAD_CHARS,
+): Scoped {
   if (budget === undefined) {
     return { bodies: new Set(threads.map((t) => t.id)), deferred: 0, trimmed: 0, trimmedIds: new Set() }
   }
@@ -104,7 +128,7 @@ export function scopeReplay(threads: readonly ThreadHistory[], budget?: number):
   let deferred = 0
   let trimmed = 0
   for (const thread of threads) {
-    const body = bodyOf(thread, REMOTE_THREAD_CHARS)
+    const body = bodyOf(thread, threadCap)
     const cost = body.events.reduce((n, e) => n + sizeOf(e), 0)
     // **第一条永远带正文**，哪怕它自己就超了预算：一个连正文都没有的
     // 「最近那条」是这一端最没用的状态——你打开它看到的是空白。
@@ -121,6 +145,11 @@ export function scopeReplay(threads: readonly ThreadHistory[], budget?: number):
     deferred += 1
   }
   return { bodies, deferred, trimmed, trimmedIds }
+}
+
+/** 按一组预算收窄（`undefined` = 同机 IPC，不收）。给 `rebuild` 用，省它一层分支。 */
+export function scopeFor(threads: readonly ThreadHistory[], budget?: RemoteBudget): Scoped {
+  return budget === undefined ? scopeReplay(threads) : scopeReplay(threads, budget.replay, budget.thread)
 }
 
 /** 一条会话的「头」都有哪些事件：能凭空造出这一行、或者改这一行的那些。 */

@@ -11,6 +11,8 @@ import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
 import { attachRemote } from "./remote/index.js"
+import { EXPOSED } from "./remote/exposure.js"
+import { createChannels } from "./channels.js"
 import { installMenu } from "./menu.js"
 import { installContextMenu } from "./context-menu.js"
 import { installFind } from "./find.js"
@@ -106,6 +108,11 @@ const attachmentFiles = createAttachmentFiles(join(app.getPath("userData"), "att
 /** 输入框里没发出去的话。要在孤儿图片清理之前读盘：草稿里的图算在用（见 `drafts.ts`）。 */
 const drafts = createDraftStore({ file: join(app.getPath("userData"), "drafts.json"), hold: attachmentFiles.hold, log })
 const worksiteSearch = createWorksiteSearch()
+/**
+ * 通道登记表（见 `channels.ts`）。**在这里建、显式传下去**：本机窗口与远程模式调的是
+ * 同一张表上的同一批处理函数，而这个仓库不允许状态挂在模块上。
+ */
+const channels = createChannels(ipcMain)
 
 /**
  * 更新检查。**没配 feed 就整个不存在**——不发请求、不起定时器、菜单里也不出现。
@@ -233,7 +240,7 @@ function createWindow(bounds: {
  * 摆两份实现的下场是其中一份迟早不更新，而那份正好是用户用的那份。
  */
 function installAppChannels(): void {
-  ipcMain.handle("switchback:appInfo", () => ({
+  channels.handle("switchback:appInfo", () => ({
     version: app.getVersion(),
     // 构建标识（短 sha）。**版本号本身回答不了「你装的是哪一次构建」**——
     // 同一个版本号可能对应好几次重打，而 bug 报告要的正是那个精确的点
@@ -332,18 +339,30 @@ if (!claimSingleInstance()) {
  */
 function installChannels(): void {
   installAppChannels()
-  installWorksiteChannel(worksiteSearch)
-  installSearchChannel()
-  installChatDirChannel()
-  installAttachChannel(attachmentFiles)
-  installDraftsChannel(drafts)
-  installFilePreviewChannel(touched, worksiteSearch)
+  installWorksiteChannel(worksiteSearch, channels)
+  installSearchChannel(channels)
+  installChatDirChannel(channels)
+  installAttachChannel(attachmentFiles, channels)
+  installDraftsChannel(drafts, channels)
+  installFilePreviewChannel(touched, worksiteSearch, channels)
   installFilePreviewWatch(touched, worksiteSearch)
-  installProjectDocChannel(worksiteSearch)
-  installEngineVersionChannel(log, engineVersions)
-  installEngineDoorChannels()
-  installEnvChannel(log)
+  installProjectDocChannel(worksiteSearch, channels)
+  installEngineVersionChannel(log, engineVersions, channels)
+  installEngineDoorChannels(channels)
+  installEnvChannel(log, channels)
   installSelfUpdateChannel(log)
+}
+
+/**
+ * 白名单里的每一条都挂上了吗（`remote/exposure.ts`）。
+ *
+ * **漏挂不会让远程多拿到什么**——找不到处理函数就回「没有这条通道」——
+ * 但它会让另一台电脑上某个按钮点了没反应，而那是这类故障里最难查的一种。
+ * 所以启动时自己数一遍，漏了就在日志里吼一声。
+ */
+function checkExposed(): void {
+  const missing = Object.keys(EXPOSED).filter((name) => channels.find(name) === undefined)
+  if (missing.length > 0) log.write("error", "remote", `白名单里有、却没挂到通道表上：${missing.join("、")}`)
 }
 
 async function openMainWindow(attached: Attached): Promise<BrowserWindow> {
@@ -404,20 +423,21 @@ function bootstrap(): Promise<void> {
       handoffBrief: () => settings.get().handoffBrief,
       egressStop: () => settings.get().egressStop,
     })
-    installReviewChannel(attached.baselines, attached.worksiteSearch)
+    installReviewChannel(attached.baselines, attached.worksiteSearch, channels)
     // 审查页底下的暂存与提交：守卫同审核面板，只认有会话在用的工作区
-    installGitChannel(attached.worksiteSearch)
+    installGitChannel(attached.worksiteSearch, channels)
     // 设置面板的「活动」那一页。**只在点进去时才扫盘**，所以挂通道不花任何东西
-    installActivity(attached, log)
+    installActivity(attached, log, channels)
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
-    installEngineSettings(settings, attached, log)
+    installEngineSettings(settings, attached, log, channels)
     // ACP 注册表、接入、登录：同样要宿主（接完当场重探、判断哪几家正在被会话用着）
     installAcpChannels(attached, log)
     // 外发守卫的账和 ZCode 防护状态；开着「给 ZCode 的快照目录上锁」就在起来时锁上
-    installGuard(attached, settings.get().zcodeLock, log)
+    installGuard(attached, settings.get().zcodeLock, log, channels)
+    checkExposed()
     // 环在这儿闭合：从这一刻起，装完一家引擎不必重启 Switchback 就能被认出来
     engineRefresh.run = attached.refreshEngines
-    const remote = attachRemote({ attached, sinks, settings: settings.get, log })
+    const remote = attachRemote({ attached, sinks, settings: settings.get, channels, log })
     relay.notify = remote.relay.notify
     // 远程监听不阻塞本机开窗；失败已有远程设置页与日志承接。
     void remote.sync().catch((error: unknown) => log.write("warn", "remote", String(error)))

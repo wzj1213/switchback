@@ -1,8 +1,8 @@
-import { ipcMain } from "electron"
 import type { ReviewPatch, ReviewScope } from "../shared/review.js"
 import { ownedWorksite, type WorksiteSearch } from "./worksite-search.js"
 import { workPatch, workReview, type Review, type ReviewSource } from "./workdiff.js"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
+import type { Channels } from "./channels.js"
 
 const GONE: ReviewPatch = { patch: "", skip: "gone", added: 0, removed: 0 }
 const WANTED = 1000
@@ -80,8 +80,8 @@ export function createWorkReviewChannels(
   }
 }
 
-export function installReviewChannel(baselines: WorktreeBaselines, worksites: WorksiteSearch): void {
-  const channels = createWorkReviewChannels(worksites, baselines)
-  ipcMain.handle("switchback:workReview", (_e, req: unknown) => channels.review(req))
-  ipcMain.handle("switchback:workPatch", (_e, req: unknown) => channels.patch(req))
+export function installReviewChannel(baselines: WorktreeBaselines, worksites: WorksiteSearch, channels: Channels): void {
+  const review = createWorkReviewChannels(worksites, baselines)
+  channels.handle("switchback:workReview", (req: unknown) => review.review(req))
+  channels.handle("switchback:workPatch", (req: unknown) => review.patch(req))
 }

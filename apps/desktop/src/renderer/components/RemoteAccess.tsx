@@ -18,8 +18,13 @@ const TRUSTS = [
   { id: "full", label: "完全访问" },
 ] as const
 
-/** 配对码那一块。**只有真的在配对时才画**——没有码的时候摆一个空框没有意义。 */
-function Pairing({ status, onPair }: { status: RemoteStatus; onPair: () => void }): React.JSX.Element {
+/**
+ * 配对码那一块。**只有真的在配对时才画**——没有码的时候摆一个空框没有意义。
+ *
+ * 开码时就选这台算手机还是电脑（`docs/远程模式方案.md` §2.3）：**种类跟着码走**，
+ * 设备自己报的不作数——否则一部手机说一句「我是电脑」就多拿到一整个面。
+ */
+function Pairing({ status, onPair }: { status: RemoteStatus; onPair: (kind: "phone" | "desk") => void }): React.JSX.Element {
   const [left, setLeft] = useState(0)
   const expiresAt = status.pairing?.expiresAt
   useEffect(() => {
@@ -35,8 +40,10 @@ function Pairing({ status, onPair }: { status: RemoteStatus; onPair: () => void 
   }, [expiresAt])
 
   if (status.pairing === undefined || left === 0) {
+    // 「配对电脑」等 `/desk/` 真的送得出完整界面再摆（远程模式第 3 阶段）——
+    // 先摆出来就是一颗配上之后什么都打不开的按钮
     return (
-      <button type="button" className="tbtn" onClick={onPair} disabled={!status.listening}>
+      <button type="button" className="tbtn" onClick={() => { onPair("phone") }} disabled={!status.listening}>
         配对新设备…
       </button>
     )
@@ -44,7 +51,10 @@ function Pairing({ status, onPair }: { status: RemoteStatus; onPair: () => void 
   return (
     <div className="pairing">
       <code className="pairing__code">{status.pairing.code}</code>
-      <span className="pairing__left">{left} 秒后失效</span>
+      <span className="pairing__left">
+        {status.pairing.kind === "desk" ? "电脑 · " : "手机 · "}
+        {left} 秒后失效
+      </span>
     </div>
   )
 }
@@ -93,8 +103,8 @@ export function Access({ remote, status, onPatch, onStatus }: {
   return (
     <Group title="谁能进来" hint="手机丢了不该等于在你的仓库里任意执行代码。">
       <Field
-        label="远程档位上限"
-        hint="默认「自动审批」：远程能改文件，但每条 shell 命令仍然要弹审批——也就是你在手机上看得见每一条要跑的命令"
+        label="默认档位上限"
+        hint="默认「自动审批」：远程能改文件，但每条 shell 命令仍然要弹审批——也就是你在手机上看得见每一条要跑的命令。每台设备可以在下面单独改"
         stack
       >
         <Segmented
@@ -109,14 +119,18 @@ export function Access({ remote, status, onPatch, onStatus }: {
         {status === undefined ? null : (
           <Pairing
             status={status}
-            onPair={() => {
-              void switchback?.remote.pair().then(onStatus)
+            onPair={(kind) => {
+              void switchback?.remote.pair(kind).then(onStatus)
             }}
           />
         )}
       </Field>
       <RemoteDevices
         devices={status?.devices ?? []}
+        fallback={remote.maxTrust}
+        onTrust={(id, trust) => {
+          void switchback?.remote.setDeviceTrust(id, trust).then(onStatus)
+        }}
         onRevoke={(id) => {
           void switchback?.remote.revoke(id).then(onStatus)
         }}

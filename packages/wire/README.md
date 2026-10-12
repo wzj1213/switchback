@@ -13,6 +13,8 @@
 ## 拥有什么
 
 - `Sealed` / `Replay` / `ClientFrame` / `ServerFrame` / `ChunkFrame` —— 线上的形状
+- `call` / `result`（`CallResult`）与 `WireBytes` —— 远程模式里「调一条宿主通道」的形状。
+  不进序号、按 `id` 配对；谁能调哪条不归这里管（见 `docs/远程模式方案.md`）
 - `createLedger()` —— 发送端账本：编号 + **按确认保留** + 条数上限
 - `replayed` / `received` / `resynced` / `reset` —— 接收端的游标与补洞（纯函数）
 - `encodeFrame` / `createReassembler` —— 大帧的切分与重组

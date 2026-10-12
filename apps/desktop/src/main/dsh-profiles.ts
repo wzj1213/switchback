@@ -1,8 +1,8 @@
 import { readdir, readFile, stat } from "node:fs/promises"
 import { join } from "node:path"
-import { ipcMain } from "electron"
 import { isDshProfileName } from "../shared/settings.js"
 import { homeOf } from "./envengines.js"
+import type { Channels } from "./channels.js"
 
 export interface DshDependency {
   name: string
@@ -88,6 +88,6 @@ export async function readDshProfiles(home = homeOf("DSH_HOME", ".dsh")): Promis
   return { home, profilesDir, profiles: await Promise.all(names.map((name) => inspectProfile(profilesDir, name))) }
 }
 
-export function installDshProfileChannel(): void {
-  ipcMain.handle("switchback:dshProfiles", () => readDshProfiles())
+export function installDshProfileChannel(channels: Channels): void {
+  channels.handle("switchback:dshProfiles", () => readDshProfiles())
 }

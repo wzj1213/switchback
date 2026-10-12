@@ -1,4 +1,6 @@
+import type { Trust } from "@switchback/protocol"
 import type { RemoteStatus } from "../../main/remote/install.js"
+import { Select } from "./Select.js"
 import { Field } from "./SettingsBits.js"
 
 /**
@@ -26,11 +28,55 @@ function since(at: number, now: number): string {
   return `${String(Math.round(hours / 24))} 天前`
 }
 
+const TRUST_LABELS: Readonly<Record<Trust, string>> = {
+  "read-only": "只读",
+  "auto-edit": "自动审批",
+  full: "完全访问",
+}
+
+/** 「跟随默认」那一项的 id。`Select` 的选项 id 是字符串，「没有自己的上限」得有个名字。 */
+const FOLLOW = "follow"
+
+/**
+ * 一台设备自己的上限。缺省跟着上面那条默认走；**跟随时也写出现在是哪一档**——
+ * 只写「跟随默认」的话，人要回头去找那条默认才知道这台到底能干什么。
+ */
+function DeviceTrust({ device, fallback, onTrust }: {
+  device: RemoteStatus["devices"][number]
+  fallback: Trust
+  onTrust: (id: string, trust?: Trust) => void
+}): React.JSX.Element {
+  const own = device.maxTrust
+  return (
+    <Select
+      label={own === undefined ? `跟随默认（${TRUST_LABELS[fallback]}）` : TRUST_LABELS[own]}
+      name="这台的上限"
+      sections={[
+        {
+          value: own ?? FOLLOW,
+          choices: [
+            { id: FOLLOW, label: `跟随默认（${TRUST_LABELS[fallback]}）` },
+            ...(Object.keys(TRUST_LABELS) as Trust[]).map((id) => ({ id, label: TRUST_LABELS[id] })),
+          ],
+          onPick: (id) => {
+            onTrust(device.id, id === FOLLOW ? undefined : (id as Trust))
+          },
+        },
+      ]}
+    />
+  )
+}
+
 export function RemoteDevices({
   devices,
+  fallback,
+  onTrust,
   onRevoke,
 }: {
   devices: RemoteStatus["devices"]
+  /** 设备没有自己的上限时跟的那条（`settings.remote.maxTrust`）。 */
+  fallback: Trust
+  onTrust: (id: string, trust?: Trust) => void
   onRevoke: (id: string) => void
 }): React.JSX.Element {
   if (devices.length === 0) {
@@ -43,6 +89,9 @@ export function RemoteDevices({
         {devices.map((device) => (
           <li key={device.id} className="devices__row">
             <span className="devices__name">{device.name}</span>
+            {/* 老记录没有种类字段：那时配的全是手机端 */}
+            <span className="devices__kind">{device.kind === "desk" ? "电脑" : "手机"}</span>
+            <DeviceTrust device={device} fallback={fallback} onTrust={onTrust} />
             <span className="devices__seen">{since(device.lastSeenAt, now)}</span>
             <button
               type="button"

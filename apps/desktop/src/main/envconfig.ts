@@ -5,6 +5,7 @@ import { resolveSettings } from "@anthropic-ai/claude-agent-sdk"
 import { hookLines, type EnvConfig, type HookEngine, type HookScope, type HookSource } from "../shared/hooks.js"
 import { codexSources, grokSources, kimiSources, readJson } from "./envengines.js"
 import type { Logger } from "./log.js"
+import type { Channels } from "./channels.js"
 
 /**
  * 「环境」那一页的数据：**各家引擎自己读的那几份配置里，钩子有哪些。**
@@ -47,10 +48,11 @@ const ORDER: readonly HookScope[] = ["managed", "user", "project", "local"]
 /** 引擎之间的顺序。和引擎选择器里那一排一致，不另发明一套。 */
 const ENGINES: readonly HookEngine[] = ["claude", "codex", "kimi", "grok"]
 
-export function installEnvChannel(log: Logger): void {
+export function installEnvChannel(log: Logger, channels: Channels): void {
   // 允许打开的路径**只能是这一页刚发出去的那些**。渲染层拿不到一个能打开任意文件的口子
   const shown = new Set<string>()
-  ipcMain.handle("switchback:envConfig", async (_e, cwd?: string): Promise<EnvConfig> => {
+  channels.handle("switchback:envConfig", async (value: unknown): Promise<EnvConfig> => {
+    const cwd = typeof value === "string" ? value : undefined
     const claude = await claudeSide(cwd, log)
     const rest = [
       ...(await codexSources(cwd, log)),
