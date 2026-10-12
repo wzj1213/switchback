@@ -678,7 +678,8 @@
   height: 48px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  color: var(--accent);
+  /* 品牌标用墨色不用主色：主色只说「你正在操作的那一处」（tokens.css 头注） */
+  color: var(--text);
 }
 
 /* 整个界面的视觉锚点。**必须够大**——15px 的一句话摆在一片空白中间，

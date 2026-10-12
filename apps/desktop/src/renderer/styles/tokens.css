@@ -1,53 +1,74 @@
 /* 中性灰导航、白色会话画布、统一文字与操作对比度。引擎色只编码引擎身份。
  * 界面与正文使用系统字体；代码与路径使用等宽字体，不加载远程字体。
- * 深色浮层使用不透明表面。窗口背景需同步 main/index.ts。 */
+ * 深色浮层使用不透明表面。窗口背景需同步 main/index.ts。
+ *
+ * ## 2026-10-11 视觉语言重构 P0（方案见 docs/UI重构方案-2026-10-11.html）
+ *
+ * - **中性灰去蓝**：冷蓝灰天然是「后台工具」的气质，换成锌灰（#18181b 系）。
+ * - **三级墨色拉开**：`--ink-1/2/3` 对比度（白底）17.7 / 8.7 / 5.5；ink-3 按最深的承载面（选中行、下沉面）
+ *   也过 4.5 来取值，不是只在白底上过。旧的 muted 6.2 与
+ *   faint 4.9 只差一口气，段头、计数、日期、占位全挤在那一撮里，层级被压扁。
+ * - **唯一主色「折返蓝」**：只用于焦点、开关、链接、拖放落点；主操作仍是近黑实心。
+ * - 新名是正名，旧名（`--text` / `--text-muted` / `--text-faint` / `--border` /
+ *   `--border-strong`）先留作别名，P1–P3 逐处迁走之后再下线。深色只改正名。 */
 :root {
   color-scheme: light dark;
-  --ink: 36 39 43;
+  --ink: 24 24 27;
+  --ink-1: rgb(var(--ink));
+  --ink-2: #4a4a52;
+  --ink-3: #696970;
+  --line: #ebebe8;
+  --line-2: #dcdcd8;
   --bg: #ffffff;
-  --bg-sidebar: #f5f6f7;
-  --action: #30353b;
+  --bg-sidebar: #f7f7f5;
+  --action: var(--ink-1);
   --action-ink: #ffffff;
-  --selection: #e8eaed;
-  --selection-ink: #2d3238;
-  --selection-hover: color-mix(in srgb, var(--selection) 90%, var(--accent));
-  --selection-press: color-mix(in srgb, var(--selection) 80%, var(--accent));
+  --selection: #ebebe8;
+  --selection-ink: var(--ink-1);
+  /* 选中行悬停/按下往墨色走，不往主色走：主色现在是蓝，混进来会让选中行泛蓝。 */
+  --selection-hover: color-mix(in srgb, var(--selection) 94%, var(--ink-1));
+  --selection-press: color-mix(in srgb, var(--selection) 88%, var(--ink-1));
   --selection-muted: color-mix(in srgb, var(--selection-ink) 85%, var(--selection));
   --preview-light: #ffffff;
-  --preview-dark: #202225;
-  --preview-rail: #f5f6f7;
-  --bg-sunken: #f5f6f7;
+  --preview-dark: #1b1b1e;
+  --preview-rail: #f7f7f5;
+  --bg-sunken: #f2f2f0;
   --bg-raised: #ffffff;
   --bg-float: var(--bg-raised);
-  --bg-hover: rgb(var(--ink) / 5%);
-  --bg-active: rgb(var(--ink) / 9%);
+  --bg-hover: rgb(var(--ink) / 4.5%);
+  --bg-active: rgb(var(--ink) / 8%);
   --bg-press: rgb(var(--ink) / 12%);
-  --bg-code: #f4f5f6;
+  --bg-code: #f4f4f2;
   --edge-fade: 44px;
-  --bg-said: #eef0f2;
-  --border: #e5e7ea;
-  --border-strong: #d4d8dd;
-  --text: rgb(var(--ink));
-  --text-muted: #5b626c;
-  --text-faint: #68717d;
+  --bg-said: #f2f2ef;
+  --border: var(--line);
+  --border-strong: var(--line-2);
+  --text: var(--ink-1);
+  --text-muted: var(--ink-2);
+  --text-faint: var(--ink-3);
   --text-inverse: #ffffff;
-  --accent: #49596a;
-  --danger: #b63b29;
+  --accent: #3451e0;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* 统一焦点环：1px 主色贴边 + 3px 淡主色外晕。P1 起逐处取代 `outline: 2px solid var(--accent)` */
+  --focus-ring: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-soft);
+  --danger: #c4342d;
   --danger-hover: color-mix(in srgb, var(--danger) 88%, var(--text));
   --danger-press: color-mix(in srgb, var(--danger) 76%, var(--text));
-  --warn: #8a6410;
-  --ok: #2b7248;
+  --warn: #9a6700;
+  --ok: #1f7a4d;
   --radius-mark: 2px;
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius: 12px;
-  --radius-lg: 14px;
+  --radius-lg: 16px;
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
   --sp-5: 24px;
   --sp-6: 32px;
+  --sp-7: 40px;
+  --sp-8: 48px;
   --dur-fast: 70ms;
   --dur: 120ms;
   --dur-slow: 240ms;
@@ -64,7 +85,10 @@
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "PingFang SC", monospace;
-  --text-xs: 11.5px;
+  /* 字阶：Display 28/36 · Title 20/28 · Title2 15/22 · Prose 15/26 · Input 14/22 ·
+     UI 13/20 · Small 12/16 · Label 11/16。`--text-lg`（16）是旧档，P1–P3 迁到 Title/Title2 后下线 */
+  --text-label: 11px;
+  --text-xs: 12px;
   --text-code: 12.5px;
   --lh-code: 20px;
   --text-sm: 13px;
@@ -75,7 +99,10 @@
   --text-prose: 15px;
   --lh-prose: 26px;
   --text-lg: 16px;
-  --text-xl: 27px;
+  --text-title: 20px;
+  --lh-title: 28px;
+  --text-xl: 28px;
+  --lh-xl: 36px;
   --engine-claude: #c2622a;
   --engine-codex: #2f7d78;
   --engine-kimi: #6f4bc0;
@@ -115,32 +142,34 @@
     0 8px 28px rgb(0 0 0 / 12%);
   --shadow-1: 0 1px 2px rgb(0 0 0 / 6%);
   --shadow-composer: 0 2px 4px rgb(0 0 0 / 3%), 0 6px 20px rgb(0 0 0 / 4%);
+  /* 三级抬升。自带 1px 轮廓，**只给去掉了描边的元素用**——叠在 border 上会成双线。
+     e1 抬起（选中行、表单组）· e2 浮起（输入区）· e3 悬浮（菜单、弹窗） */
+  --elev-1: 0 0 0 1px rgb(0 0 0 / 4%), 0 1px 2px rgb(0 0 0 / 6%);
+  --elev-2: 0 0 0 1px rgb(0 0 0 / 5%), 0 2px 4px rgb(0 0 0 / 4%), 0 8px 24px rgb(0 0 0 / 6%);
+  --elev-3: 0 0 0 1px rgb(0 0 0 / 6%), 0 12px 40px rgb(0 0 0 / 14%);
   --border-pop: var(--border);
   --scrim: rgb(0 0 0 / 28%);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: 236 238 241;
-    --bg: #202225;
-    --bg-sidebar: #191b1e;
-    --action: #e6e9ee;
-    --action-ink: #24272b;
-    --selection: #343941;
-    --selection-ink: #f0f2f4;
-    --bg-sunken: #1a1c20;
-    --bg-raised: #272a2e;
-    --bg-float: #2d3035;
-    --bg-hover: rgb(var(--ink) / 8%);
-    --bg-active: rgb(var(--ink) / 13%);
-    --bg-press: rgb(var(--ink) / 17%);
-    --bg-code: #272a2e;
-    --bg-said: #30343b;
-    --border: #353a42;
-    --border-strong: #4b535e;
-    --text: rgb(var(--ink));
-    --text-muted: #b8bdc4;
-    --text-faint: #a4abb4;
-    --text-inverse: #202225;
+    --ink: 236 236 238;
+    --ink-2: #b4b4bb;
+    --ink-3: #96969e;
+    --line: #2c2c31;
+    --line-2: #3c3c43;
+    --bg: #1b1b1e;
+    --bg-sidebar: #141416;
+    --action-ink: #1b1b1e;
+    --selection: #2e2e33;
+    --bg-sunken: #17171a;
+    --bg-raised: #232327;
+    --bg-float: #2a2a2e;
+    --bg-hover: rgb(var(--ink) / 6%);
+    --bg-active: rgb(var(--ink) / 11%);
+    --bg-press: rgb(var(--ink) / 16%);
+    --bg-code: #232327;
+    --bg-said: #2a2a2f;
+    --text-inverse: #1b1b1e;
     --engine-claude: #e0915c;
     --engine-codex: #5fc0b8;
     --engine-kimi: #a58bf0;
@@ -152,14 +181,17 @@
     --hl-number: #f0a868;
     --hl-title: #82aaff;
     --hl-type: #6fd6e0;
-    --accent: #bec8d4;
-    --danger: #e0705c;
-    --warn: #d3a044;
-    --ok: #6cc48d;
+    --accent: #8296ff;
+    --danger: #ef7564;
+    --warn: #d6a540;
+    --ok: #5cc38a;
     --shadow-pop: 0 10px 32px rgb(0 0 0 / 55%);
     --shadow-1: none;
     --shadow-composer: none;
-    --border-pop: #59616d;
+    --elev-1: 0 0 0 1px rgb(255 255 255 / 6%), inset 0 1px 0 rgb(255 255 255 / 4%);
+    --elev-2: 0 0 0 1px rgb(255 255 255 / 7%), 0 8px 24px rgb(0 0 0 / 35%);
+    --elev-3: 0 0 0 1px rgb(255 255 255 / 8%), 0 16px 48px rgb(0 0 0 / 55%);
+    --border-pop: #4a4a52;
     --scrim: rgb(0 0 0 / 60%);
   }
 }

@@ -7,7 +7,7 @@
   height: 20px;
   border-radius: 5px;
   background: var(--selection);
-  color: var(--accent);
+  color: var(--text);
 }
 
 .switchback-mark::before {
