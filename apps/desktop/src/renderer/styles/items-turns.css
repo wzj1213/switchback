@@ -227,3 +227,40 @@
   height: 7px;
   border-radius: 50%;
 }
+
+/* 「附交接说明」：分界线牌子上的一个小尾巴，不抢「切换至」的戏——同色同字号，
+   悬停才提亮。点开的原文是发给引擎的那段，一字不改；画成浅灰等宽小字、
+   左侧一道细线，不用底色卡片，免得又像一条谁说的话 */
+.handmark-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.handmark__brief {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.handmark__brief:hover {
+  color: var(--text-muted);
+}
+
+.handmark__text {
+  margin: 0 auto var(--sp-2);
+  max-width: 640px;
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-3);
+  border-left: 1px solid var(--border);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

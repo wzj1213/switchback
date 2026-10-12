@@ -1,4 +1,4 @@
-import type { Aside, EngineSegment, Item, ToolCallItem, TurnPace } from "@switchback/protocol"
+import type { Aside, EngineSegment, Item, ToolCallItem, TurnPace, UserMessageItem } from "@switchback/protocol"
 import { reportedChangesOf, type Changes } from "./changes.js"
 import { engineSwitches, type EngineStint } from "./engine-mark.js"
 
@@ -33,7 +33,7 @@ export type Row =
    * 接的手，再造一条消息只会多一份要同步的真相。**更要紧的是它不是给模型看的**
    *——引擎的上下文里不该出现一句 Switchback 写的「你接手了」。
    */
-  | { kind: "engine"; stint: EngineStint }
+  | { kind: "engine"; stint: EngineStint; brief?: UserMessageItem }
 
 /**
  * 一轮花了多久，从**这一轮自己的 item** 算。

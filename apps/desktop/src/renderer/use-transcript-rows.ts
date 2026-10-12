@@ -1,6 +1,7 @@
 import type { Item, Thread, Turn, TurnId, TurnPace } from "@switchback/protocol"
 import { useCallback, useMemo, useState } from "react"
 import { foldTurns, groupRows, withAsides, withEngineMarks, type Row } from "./group.js"
+import { withHandoffBriefs } from "./handoff-brief.js"
 
 /** 折/展一轮。集合运算，不是这一屏的事。 */
 function toggled(prev: ReadonlySet<string>, turnId: string): ReadonlySet<string> {
@@ -47,9 +48,11 @@ export function useTranscriptRows(
     // **旁路不进流里**：输入框上方那条状态带（`ActivityDock`）说的是同一件事，
     // 两处画同一条旁路，读到第二处时人要先确认「这是不是刚才那个」
     () =>
-      withEngineMarks(
-        withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd, paces), folded), thread.asides ?? []),
-        thread.segments,
+      withHandoffBriefs(
+        withEngineMarks(
+          withAsides(foldTurns(groupRows(items, turn?.id, thread.cwd, paces), folded), thread.asides ?? []),
+          thread.segments,
+        ),
       ),
     [items, turn?.id, folded, thread.asides, thread.cwd, thread.segments, paces],
   )

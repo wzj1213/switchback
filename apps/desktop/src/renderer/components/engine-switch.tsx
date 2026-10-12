@@ -1,7 +1,10 @@
-import type { EngineInfo } from "@switchback/protocol"
+import { useState } from "react"
+import type { EngineInfo, UserMessageItem } from "@switchback/protocol"
 import type { EngineStint } from "../engine-mark.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"
+import { ChevronIcon } from "./icons.js"
+import { LinkifiedText } from "./linkified-text.js"
 
 /**
  * 转录区里那条「切换至 X」。
@@ -20,19 +23,43 @@ import { labelOf } from "./Composer.js"
 export function EngineSwitchMark({
   stint,
   engines,
+  brief,
 }: {
   stint: EngineStint
   /** 引擎清单：把 id 翻成人话。找不到就退回原 id，不编一个名字。 */
   engines: readonly EngineInfo[]
+  /** 换家时随第一句发过去的交接说明（`withHandoffBriefs` 收进来的）。默认收起，点开是原文。 */
+  brief?: UserMessageItem | undefined
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
   const label = labelOf(engines, stint.engine)
   const name = stint.profile === undefined ? label : `${label} · ${stint.profile}`
   return (
-    <div className="handmark" role="separator" aria-label={`切换至 ${name}`}>
-      <span className="handmark__tag">
-        <i className="handmark__dot" style={{ background: engineTint(stint.engine) }} aria-hidden="true" />
-        切换至 {name}
-      </span>
+    <div className="handmark-wrap">
+      <div className="handmark" role={brief === undefined ? "separator" : undefined} aria-label={`切换至 ${name}`}>
+        <span className="handmark__tag">
+          <i className="handmark__dot" style={{ background: engineTint(stint.engine) }} aria-hidden="true" />
+          切换至 {name}
+          {brief === undefined ? null : (
+            <button
+              type="button"
+              className="handmark__brief"
+              aria-expanded={open}
+              onClick={() => {
+                setOpen((was) => !was)
+              }}
+            >
+              · 附交接说明
+              <ChevronIcon open={open} size={12} />
+            </button>
+          )}
+        </span>
+      </div>
+      {brief !== undefined && open ? (
+        <div className="handmark__text">
+          <LinkifiedText text={brief.text} />
+        </div>
+      ) : null}
     </div>
   )
 }

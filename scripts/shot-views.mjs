@@ -11,7 +11,7 @@ import { EDITABLE_REVIEW_VIEW, REVIEW_VIEWS } from "./shot-views-review.mjs"
 import { CHANGED_VIEWS } from "./shot-views-changed.mjs"
 import { LINK_REVIEW_VIEWS } from "./shot-views-links.mjs"
 import { openPanelPage } from "./shot-panel.mjs"
-import { HANDOFF_VIEW } from "./shot-views-handoff.mjs"
+import { HANDOFF_OPEN_VIEW, HANDOFF_VIEW } from "./shot-views-handoff.mjs"
 export const VIEWS = [
     {
       name: "01-转录区",
@@ -113,6 +113,7 @@ export const VIEWS = [
     },
     ...REVIEW_VIEWS,
     HANDOFF_VIEW,
+    HANDOFF_OPEN_VIEW,
     {
       name: "05-拖入工作区文件",
       open: [

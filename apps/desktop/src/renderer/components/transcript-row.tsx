@@ -240,7 +240,7 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
     )
   }
   if (row.kind === "aside") return <AsideCard aside={row.aside} />
-  if (row.kind === "engine") return <EngineSwitchMark stint={row.stint} engines={engines} />
+  if (row.kind === "engine") return <EngineSwitchMark stint={row.stint} engines={engines} brief={row.brief} />
   /*
    * 「改一改再发」**只挂在最后一句人话上，而且只在能 rewind 的时候**。
    *
