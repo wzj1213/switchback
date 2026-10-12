@@ -56,10 +56,10 @@
    */
   height: min(660px, 100%);
   overflow: hidden;
-  border: 1px solid var(--border-pop);
   border-radius: var(--radius-lg);
   background: var(--bg);
-  box-shadow: var(--shadow-pop);
+  /* `--elev-3` 自带 1px 轮廓，不再另画描边（UI 重构 P3） */
+  box-shadow: var(--elev-3);
 }
 
 .set:focus {
@@ -74,24 +74,34 @@
   z-index: 4;
 }
 
-/* 左列顶上的标题：写的是「这是哪儿」，版本号压一档跟在后面 */
+/*
+ * 左列顶上的标题：写的是「这是哪儿」，版本号压一档**在下面**。
+ *
+ * 上一版两者横排在 172 宽的左列里，「Switchback 0.0.0」用等宽字占掉大半，
+ * 「设置」被挤成竖排两行「设 / 置」——整块面板最伤观感的一处（UI 重构方案诊断第 10 条）。
+ * 现在竖排两行、标题不许折行；版本号回到界面字体——它不是代码。
+ */
 .set__brand {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  padding: 6px 10px var(--sp-3);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--sp-1) 10px var(--sp-4);
 }
 
 .set__heading {
-  font-size: var(--text-lg);
-  font-weight: 600;
   color: var(--text);
+  font-size: var(--text-title);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
 }
 
 .set__ver {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
   color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  white-space: nowrap;
 }
 
 .set__body {
@@ -108,10 +118,10 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  width: 172px;
-  padding: var(--sp-3) var(--sp-2);
+  width: 196px;
+  padding: var(--sp-5) var(--sp-3) var(--sp-3);
   overflow-y: auto;
-  border-right: 1px solid var(--border);
+  /* 和主窗口侧栏同一个道理：纸面与白底靠底色分，不画分隔线 */
   background: var(--bg-sidebar);
 }
 
@@ -146,6 +156,23 @@
   background: var(--selection);
   color: var(--selection-ink);
   font-weight: 600;
+}
+
+/* 选中的那一页和主侧栏的当前会话同一套语汇：浮在纸面上的白卡（UI 重构 P3）。
+   (0,3,0) 压过 interactions.css 的通用选中规则；悬停、按下仍往墨色走一档 */
+.set__nav .set__tab.set__tab--on {
+  background-color: var(--bg-raised);
+  box-shadow: var(--elev-1);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.set__nav .set__tab.set__tab--on:hover {
+  background-color: color-mix(in srgb, var(--bg-raised) 97%, var(--text));
+}
+
+.set__nav .set__tab.set__tab--on:active {
+  background-color: color-mix(in srgb, var(--bg-raised) 93%, var(--text));
 }
 
 /* 图标比文字淡一档：它是路标不是内容。选中那条跟着文字一起提亮 */
@@ -251,9 +278,10 @@
  */
 .set__rows {
   overflow: hidden;
-  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-raised);
+  /* 描边换 `--elev-1`（UI 重构 P3）：卡片是抬起来的，不是框起来的 */
+  box-shadow: var(--elev-1);
 }
 
 /* 一行一件事：左边说明，右边控件。**说明必须写全**——
@@ -265,8 +293,13 @@
   padding: 10px 14px;
 }
 
+/* 行间分隔从文字左缘起、不通栏（iOS 式缩进）：通栏的线把一张卡切成一摞格子，
+   缩进的线只说「这是下一项」。画成背景而不是边框，不占布局 */
 .set__field + .set__field {
-  border-top: 1px solid var(--border);
+  background-image: linear-gradient(var(--border), var(--border));
+  background-position: 14px 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - 14px) 1px;
 }
 
 /* 宽控件（五家引擎并排的那个开关）自己占一整行，说明写在上面。
@@ -378,8 +411,8 @@
  */
 .switch {
   display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--border);
+  /* 和引擎页的分段控件同一副样子（UI 重构 P3）：下沉的槽、无描边、内衬 3 */
+  padding: 3px;
   border-radius: var(--radius-sm);
   background: var(--bg-sunken);
 }
@@ -388,7 +421,7 @@
   padding: 5px var(--sp-3);
   border: 0;
   /* **同心**（见 tokens.css：外圆角 = 内圆角 + 内边距）：
-     外壳 --radius-sm 8 − 内边距 2 − 描边 1 = 5。写成算式，外壳那一档改了
+     外壳 --radius-sm 8 − 内边距 3 = 5。写成算式，外壳那一档改了
      它自己会跟上；写字面 5 的话下次就对不上了 */
   border-radius: calc(var(--radius-sm) - 3px);
   background: transparent;
@@ -403,10 +436,21 @@
   color: var(--text);
 }
 
-.switch__item--on {
-  background: var(--bg-raised);
+/* (0,3,0) 压过 interactions.css 的通用选中规则（否则选中那格是 `--selection` 灰）；
+   悬停、按下仍往墨色走一档 */
+.switch .switch__item.switch__item--on {
+  background-color: var(--bg-raised);
   color: var(--text);
-  box-shadow: var(--shadow-1);
+  font-weight: 500;
+  box-shadow: var(--elev-1);
+}
+
+.switch .switch__item.switch__item--on:hover {
+  background-color: color-mix(in srgb, var(--bg-raised) 97%, var(--text));
+}
+
+.switch .switch__item.switch__item--on:active {
+  background-color: color-mix(in srgb, var(--bg-raised) 93%, var(--text));
 }
 
 /* ── 二元开关 ────────────────────────────────────────

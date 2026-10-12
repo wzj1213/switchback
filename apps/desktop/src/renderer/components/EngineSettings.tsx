@@ -140,30 +140,32 @@ function EngineTabs({
   onSelect: (id: string) => void
 }): React.JSX.Element {
   return (
-    <div className="eng-tabs" role="group" aria-label="选择引擎">
-      {items.map((item) => {
-        const state = engineSettingState(item, settings)
-        const pinned = settings.defaultEngine === item.id
-        const off = settings.disabledEngines.includes(item.id)
-        return (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={item.id === active}
-            aria-controls="engine-settings-panel"
-            aria-label={`${item.label}，${state.label}${pinned ? "，新会话默认" : ""}`}
-            title={`${item.label} · ${state.label}`}
-            className={`eng-tab${item.id === active ? " eng-tab--on" : ""}${off ? " eng-tab--off" : ""}`}
-            onClick={() => {
-              onSelect(item.id)
-            }}
-          >
-            <span className={`eng-dot eng-dot--${state.tone}`} aria-hidden="true" />
-            <span>{item.label}</span>
-            {pinned ? <span className="eng-tab__default">默认</span> : null}
-          </button>
-        )
-      })}
+    <div className="eng-tabs">
+      <div className="eng-tabs__seg" role="group" aria-label="选择引擎">
+        {items.map((item) => {
+          const state = engineSettingState(item, settings)
+          const pinned = settings.defaultEngine === item.id
+          const off = settings.disabledEngines.includes(item.id)
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={item.id === active}
+              aria-controls="engine-settings-panel"
+              aria-label={`${item.label}，${state.label}${pinned ? "，新会话默认" : ""}`}
+              title={`${item.label} · ${state.label}`}
+              className={`eng-tab${item.id === active ? " eng-tab--on" : ""}${off ? " eng-tab--off" : ""}`}
+              onClick={() => {
+                onSelect(item.id)
+              }}
+            >
+              <span className={`eng-dot eng-dot--${state.tone}`} aria-hidden="true" />
+              <span>{item.label}</span>
+              {pinned ? <span className="eng-tab__default">默认</span> : null}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

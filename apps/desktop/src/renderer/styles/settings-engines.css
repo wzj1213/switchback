@@ -14,8 +14,25 @@
   margin: calc(-1 * var(--sp-2)) calc(-1 * var(--pane-x)) var(--sp-4);
   padding: 0 var(--pane-x) var(--sp-2);
   overflow-x: auto;
-  border-bottom: 1px solid var(--border);
+  /* 底线只在内容滚到它底下时才出现（和页标题带子同一套 `set-head-scrolled`） */
+  border-bottom: 1px solid transparent;
   background: var(--bg);
+  animation-name: set-head-scrolled;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0 24px;
+}
+
+/* 分段控件（UI 重构 P3）：五家装在一条下沉的槽里，选中那家是抬起的一块。
+   上一版是五颗散的文字键、选中那颗加一圈深边——读起来像一排链接 */
+.eng-tabs__seg {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
 }
 
 .eng-tab {
@@ -24,9 +41,9 @@
   align-items: center;
   gap: 6px;
   min-height: 30px;
-  padding: 4px var(--sp-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
@@ -40,11 +57,21 @@
   color: var(--text);
 }
 
-.eng-tab--on {
-  border-color: var(--border-strong);
-  background: var(--bg-raised);
+/* (0,3,0)：压过 interactions.css 的通用选中规则（它最后加载，会把底色换成 `--selection` 灰）。
+   悬停、按下仍往墨色走一档 */
+.eng-tabs__seg .eng-tab.eng-tab--on {
+  background-color: var(--bg-raised);
   color: var(--text);
-  box-shadow: var(--shadow-1);
+  font-weight: 500;
+  box-shadow: var(--elev-1);
+}
+
+.eng-tabs__seg .eng-tab.eng-tab--on:hover {
+  background-color: color-mix(in srgb, var(--bg-raised) 97%, var(--text));
+}
+
+.eng-tabs__seg .eng-tab.eng-tab--on:active {
+  background-color: color-mix(in srgb, var(--bg-raised) 93%, var(--text));
 }
 
 .eng-dot {

@@ -1,12 +1,13 @@
 /* 页标题。左列已经高亮了你在哪一页，这里只是给读屏和滚到一半时的一个锚——
-   上一版 22px 粗体，是整块面板里最大的字，而它说的恰恰是最不需要说的那件事 */
+   上一版 22px 粗体，是整块面板里最大的字，而它说的恰恰是最不需要说的那件事。
+   UI 重构 P3 接上字阶的 Title 2（15/22）；20 那一档给了左列顶上的「设置」 */
 .set__page-title {
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: var(--text-lg);
+  font-size: var(--text-title-2);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: var(--lh-title-2);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
