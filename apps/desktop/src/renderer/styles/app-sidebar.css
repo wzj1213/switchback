@@ -154,6 +154,30 @@
   font-weight: 500;
 }
 
+/*
+ * **侧栏里的选中行是「抬起」的，不是灰底**（UI 重构 P1）。侧栏是纸面，
+ * 你正在看的那条是浮在纸上的一张白卡——比再深一档的灰更「定」，也和
+ * 新建会话那颗主按钮同一套语汇。
+ *
+ * 要压过 interactions.css 那条通用选中规则（它在最后加载，悬停/按下会把底色
+ * 换成 `--selection-hover/press`），所以多挂一层 `.sidebar`：(0,3,0)。
+ * 悬停、按下仍要有反馈（「选中之上再加深」那条规矩，出图 47 号守着），
+ * 只是从白往墨色走，一档比一档深，不掉回灰底。
+ */
+.sidebar .row.row--selected {
+  background-color: var(--bg-raised);
+  box-shadow: var(--elev-1);
+  color: var(--text);
+}
+
+.sidebar .row.row--selected:hover {
+  background-color: color-mix(in srgb, var(--bg-raised) 97%, var(--text));
+}
+
+.sidebar .row.row--selected:active {
+  background-color: color-mix(in srgb, var(--bg-raised) 93%, var(--text));
+}
+
 .row.row--selected .row__slot {
   color: var(--selection-ink);
 }
@@ -162,21 +186,22 @@
 /* **焦点环走 inset 阴影，不走 border。** 描边会占 1px 布局，
    于是这一行里的图标和输入框比其余所有行右移 1px——它是四条左缘里
    最不起眼、也最没必要的那一条。阴影不占位，视觉上和 1px 描边一样。 */
+/* **平时没有描边**，只是纸面上浅一层墨（`--bg-hover`）：它是个入口，不是表单。
+   描边留给聚焦——那时候它才真的是一个输入框。 */
 .row--search {
   margin-bottom: var(--sp-3);
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--border);
+  background: var(--bg-hover);
 }
 
 .row--search:hover {
-  background: var(--bg-raised);
+  background: var(--bg-hover);
 }
 
-/* 系统焦点环在 `.sidebar__filter` 上被关掉了，这条边是这个框**唯一**的焦点指示。
-   用强调色兑现 tokens.css 的「强调色只用于焦点与链接」。 */
+/* 系统焦点环在 `.sidebar__filter` 上被关掉了，这圈环是这个框**唯一**的焦点指示。
+   用全局统一的 `--focus-ring`（1px 主色 + 3px 淡主色外晕），不占布局。 */
 .row--search:focus-within {
   background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 /* **拉满行高。** 改之前这个 `input` 只有 17px 高，而它外面那一行是 34——

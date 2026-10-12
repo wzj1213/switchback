@@ -35,6 +35,7 @@ interface SidebarPaneProps {
   onSetIcon: (cwd: string, icon: string) => void
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
+  onRail: () => void
   /** 报过历史的每一家，各一段。 */
   foreign: readonly { engine: string; threads: readonly EngineThread[] }[]
   onAdopt: (engine: string, item: EngineThread) => void

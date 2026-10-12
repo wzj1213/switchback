@@ -212,8 +212,8 @@ export function SectionList({
 
   return (
     <>
-      {/* **空了也渲染段头。** 原来是空就整段不显示，于是「怎么置顶」这件事
-          只有已经会用的人才看得见——而不会用的人恰恰是需要那行提示的人 */}
+      {/* 空的时候整段不画、拖动时才浮出落点（见 `SidebarPinned.tsx`）。
+          「怎么置顶」由会话行菜单里的「置顶」和拖动时浮出的那条提示来教 */}
       <PinnedSection
         sections={sections}
         on={on}

@@ -91,6 +91,8 @@ interface Props {
   engines: readonly EngineInfo[]
   onTogglePin: (cwd: string) => void
   onOpenSettings: () => void
+  /** 收起侧栏（顶带右端那颗开关）。 */
+  onRail: () => void
   /** 变一次就把当前会话切进改名态。`/rename` 命令走这条路。 */
   askRename: number
   /** 开一条不挑项目的对话。「对话」段头那颗 `+` 用。 */
@@ -201,7 +203,7 @@ export function Sidebar(props: Props): React.JSX.Element {
     <aside className="sidebar">
       <Head
         onNew={props.onNew}
-        onOpenFolder={props.onOpenFolder}
+        onOpenFolder={props.onOpenFolder} onRail={props.onRail}
         here={selected?.cwd}
         hereKind={selected?.workspaceKind}
         box={box}

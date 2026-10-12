@@ -99,6 +99,8 @@
   --text-prose: 15px;
   --lh-prose: 26px;
   --text-lg: 16px;
+  --text-title-2: 15px;
+  --lh-title-2: 22px;
   --text-title: 20px;
   --lh-title: 28px;
   --text-xl: 28px;
@@ -121,11 +123,11 @@
   /* 侧栏实际宽度：用户拖出来的那个（`usePaneWidths` 写在根元素上，盖住上面的默认值），
      窗口缩小时先给对话让位，但不低于 200。 */
   --sidebar-live: min(var(--sidebar-w), max(200px, calc(100vw - var(--main-min))));
-  /* 主会话与面板页签条同高；侧栏品牌在独立的窗口控制区下方。
+  /* 窗口顶上那条横带：侧栏顶带（交通灯 + 品牌 + 侧栏开关）、会话顶栏、面板页签条同高。
      **必须等于 `main/index.ts` 的 `titleBarOverlay.height`**：交通灯按那个高度垂直居中，
-     两边对不上，顶栏里的按钮就和红绿灯不在一条水平线上。 */
-  --topbar-h: 48px;
-  --window-controls-h: 40px;
+     两边对不上，顶栏里的按钮就和红绿灯不在一条水平线上。
+     48 → 52（UI 重构 P1）：品牌并进这条带之后，侧栏省掉独占的品牌行（−44），换顶栏 +4。 */
+  --topbar-h: 52px;
   /* 收起导航后，主顶栏与独占面板都要水平避让交通灯。**量出来的，不是估的**：
      开了 titleBarOverlay 之后 Chromium 报出交通灯占到哪（`titlebar-area-x`，实测 78），
      再留一档间距；取不到时退回同一个数。上一版写死 92，是按旧位置估的。 */

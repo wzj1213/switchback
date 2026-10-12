@@ -175,7 +175,7 @@ function createWindow(bounds: {
     // 顺带打开 Window Controls Overlay：CSS 能用 `env(titlebar-area-x)` 读到交通灯占到哪，
     // 收起导航时的避让量就不用再估（实测 78）。只在 macOS 上开——别的平台上
     // 它会在右上角另画一套窗口按钮。
-    ...(process.platform === "darwin" ? { titleBarOverlay: { height: 48 } } : {}),
+    ...(process.platform === "darwin" ? { titleBarOverlay: { height: 52 } } : {}),
     // **和 `tokens.css` 的 `--bg` 逐字对齐。** 这个色是窗口在页面画出来之前、
     // 以及缩放时边缘露出来的那一块；对不上就会在那些时刻闪一下别的颜色。
     // 改调色板时这里必须跟着改——它是唯一一处 CSS 管不到的底色

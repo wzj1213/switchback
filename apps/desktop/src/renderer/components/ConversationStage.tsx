@@ -48,6 +48,7 @@ export function ConversationStage({
   const fire = useFireProps({ pets, thread, usage, running, paces })
   return (
     <div className={`stage${pets.on ? " stage--pets" : ""}`}>
+      <div className="brim" aria-hidden="true" />
       <Transcript
         thread={thread}
         items={items}

@@ -389,9 +389,6 @@ body {
 }
 
 .shell--norail > .sidebar {
-  /* **连那条右边线也收掉。** 列宽是 0，可它自己还有 1px 描边——
-     收起来之后窗口最左边会留下一道谁也说不清的竖线（实测量出来宽度是 1 不是 0） */
-  border-right: 0;
   visibility: hidden;
   transition: visibility 0s var(--dur-shell);
 }
@@ -418,8 +415,9 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg-sidebar);
-  /* 侧栏与正文只差一档浅灰，这根线负责把两块结构收清楚，不再靠深色面分区。 */
-  border-right: 1px solid var(--border);
+  /* **没有右边线。** 侧栏是纸面（#f7f7f5）、正文是白，两块靠底色分开；
+     多一根线就是多一处「框起来」——UI 重构方案的「空间代替线」。
+     收起导航时那条「宽度 1 不是 0」的竖线问题也就跟着没了。 */
   overflow: hidden;
 }
 
@@ -439,7 +437,7 @@ body {
   --sb-pad: var(--sp-3);
   --sb-slot: 28px;
   --sb-ink-offset: var(--sp-2);
-  --sb-row-h: 30px;
+  --sb-row-h: 32px;
   /* 行尾那几颗图标按钮的方形点击区。**必须是方的**：图标 15、盒子 22，
      四边各留 3.5——上下左右一样多，图标中心才等于盒子中心。
      不对称的内边距（原来是 2px 5px）会让两颗按钮的视觉重心既不在同一条
@@ -447,29 +445,45 @@ body {
   --sb-act: 22px;
 }
 
-/* 窗口控制区在上、品牌在下。品牌回到导航的图标/文字列，避免为交通灯
-   水平缩进 92px，造成它与整条侧栏脱节。主会话和工具台仍共用顶栏高度。 */
+/*
+ * 侧栏顶带：交通灯 · 品牌 · 侧栏开关，和会话顶栏同高（`--topbar-h`）、同一条中线。
+ *
+ * 上一版是「窗口控制区 40 + 品牌独占一行 30」：交通灯下面空着一截，品牌又单独占一行，
+ * 和顶栏标题不共任何基线——侧栏顶上三行各自为政（UI 重构方案诊断第 1 条）。
+ * 品牌挪进交通灯右边那段本来就空着的地方，整条侧栏省下 44px 给会话列表。
+ * 左内边距是交通灯实际占到的位置（`titlebar-area-x`，实测 78）再空一档小间距：
+ * 品牌紧挨交通灯读作同一组；用 `--traffic`（再空 12）的话，224 宽的侧栏里
+ * 「Switchback」会被开关挤到省略。
+ */
 .sidebar__head {
   display: flex;
   flex: none;
   align-items: center;
-  height: calc(var(--window-controls-h) + var(--sb-row-h));
-  padding: var(--window-controls-h) var(--sb-pad) 0;
+  gap: var(--sp-1);
+  height: var(--topbar-h);
+  padding: 0 var(--sp-2) 0 calc(env(titlebar-area-x, 78px) + var(--sp-1));
   overflow: hidden;
   -webkit-app-region: drag;
 }
 
 .sidebar__brand {
-  /* 标记与导航图标同列，名称与新建、项目标题同列。 */
-  font-size: var(--text-lg);
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--text);
   display: flex;
+  flex: 1;
   min-width: 0;
   align-items: center;
-  gap: 0;
+  gap: 7px;
+  color: var(--text);
   font-family: var(--font);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+/* 侧栏窄到 200 时，交通灯 + 品牌 + 开关放不下：让字标省略，开关永远在 */
+.sidebar__brand .sidebar__wordmark {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── 顶上那一行：一颗主要导航动作 + 一颗图标键 ───────────
@@ -478,9 +492,12 @@ body {
  */
 /* 品牌和新建之间只留一档间距，搜索前留两档，列表保留独立滚动。 */
 .sidebar__act {
+  /* 新建是全侧栏唯一「抬起」的按钮，比行高一档（36）：它是这一栏的主操作 */
+  --sb-new-h: 36px;
+
   display: flex;
-  gap: var(--sp-2);
-  margin: var(--sp-1) var(--sb-pad) var(--sp-2);
+  gap: var(--sp-1);
+  margin: var(--sp-2) var(--sb-pad);
 }
 
 .sidebar__new {
@@ -493,11 +510,14 @@ body {
      恰恰是三个不守规矩的之一（另两个：段头 38、搜索框 33）。 */
   gap: 0;
   min-width: 0;
-  height: var(--sb-row-h);
+  height: var(--sb-new-h);
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
-  background: transparent;
+  /* **抬起，不是灰底。** 侧栏是纸面，主操作是浮在纸上的一张白卡——
+     和选中的会话同一套语汇（`--elev-1`），整条侧栏只有这两样是抬起的 */
+  background: var(--bg-raised);
+  box-shadow: var(--elev-1);
   color: var(--text);
   font: inherit;
   font-size: var(--text-base);
@@ -506,11 +526,12 @@ body {
 }
 
 .sidebar__new:hover {
-  background: var(--bg-hover);
+  background: var(--bg-raised);
+  box-shadow: var(--elev-1), 0 2px 6px rgb(0 0 0 / 6%);
 }
 
 .sidebar__new:active {
-  background: var(--bg-press);
+  background: color-mix(in srgb, var(--bg-raised) 94%, var(--text));
 }
 
 /* 图标那一格：宽度等于图标列，图标在里面居中 */
@@ -534,8 +555,8 @@ body {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: var(--sb-row-h);
-  height: var(--sb-row-h);
+  width: var(--sb-new-h);
+  height: var(--sb-new-h);
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
@@ -576,14 +597,16 @@ body {
   display: flex;
   align-items: center;
   width: calc(100% - var(--sb-pad) * 2);
-  margin: var(--sp-3) var(--sb-pad) var(--sp-1);
+  margin: var(--sp-4) var(--sb-pad) var(--sp-1);
   /* 对齐导航图标的视觉左缘；图标与状态点仍按自己的中心线排。 */
   padding: 0 0 0 var(--sb-ink-offset);
   min-height: 24px;
   border-radius: var(--radius-sm);
   color: var(--text-faint);
-  font-size: var(--text-xs);
+  /* Label 档（11/600 +.02em）：段头是标签不是标题，比行小两档、字重重一档 */
+  font-size: var(--text-label);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .sidebar__section-main {

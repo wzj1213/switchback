@@ -67,6 +67,7 @@ function Rail({ app }: { app: ReturnType<typeof useApp> }): React.JSX.Element {
       onOpenSettings={() => {
         shell.setSettingsOpen(true)
       }}
+      onRail={shell.toggleRail}
       send={app.send}
     />
   )

@@ -10,8 +10,11 @@
 }
 
 /*
- * 会话顶栏与面板页签条共用高度、底线（`--topbar-h`）。侧栏品牌在独立的
- * 窗口控制区下方，与导航的图标/文字列对齐。
+ * 会话顶栏、侧栏顶带、面板页签条共用高度（`--topbar-h`），拼成窗口顶上一条横带。
+ *
+ * **没有底线**（UI 重构 P1）。分隔交给它下面那道渐隐（`.brim`）：没滚动时渐隐
+ * 落在转录区的上内边距里、什么也盖不住；滚动之后正文从它底下淡出去。
+ * 一根常驻的线是把顶栏「框」起来，渐隐只在有东西需要分开时才分开。
  *
  * `padding-left` 要过渡：导航收起时它从 16 跳到 `--traffic`（约 90），而列宽是
  * 滑过去的——不过渡的话标题**先向右弹 72px，再随列滑回来**，一次收起看得见
@@ -22,8 +25,7 @@
   align-items: center;
   gap: var(--sp-2);
   height: var(--topbar-h);
-  padding: 0 var(--sp-4);
-  border-bottom: 1px solid var(--border);
+  padding: 0 var(--sp-3) 0 var(--sp-5);
   -webkit-app-region: drag;
   min-height: var(--topbar-h);
   transition: padding-left var(--dur-shell) var(--ease-shell);
@@ -53,7 +55,10 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: var(--text-base);
+  /* Title 2 档（15/22 600）：顶栏标题是这一列的名字，比界面字大两档 */
+  font-size: var(--text-title-2);
+  line-height: var(--lh-title-2);
+  letter-spacing: -0.01em;
   /* 550 在 mac 上是半句谎话：PingFang SC 没有 550 面（落到 600），
      而 -apple-system 的拉丁部分能真渲染 550——中英混排的标题里一行两个字重 */
   font-weight: 600;
@@ -85,6 +90,38 @@
 
 .topbar__spacer {
   flex: 1;
+}
+
+/* 标题后面那一行淡字：历史记录、接力几手。**只说明，不可点**，所以不画成胶囊 */
+.topbar__meta {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+
+.topbar__meta + .topbar__meta::before {
+  content: "·";
+  margin-right: var(--sp-2);
+}
+
+/* 顶栏下面那道渐隐：自身高 0 不占布局，伪元素向下盖住转录区最上面 24px
+   （正好是转录区的上内边距，没滚动时什么也盖不住）。和输入区上沿的 `.hem` 是一对 */
+.brim {
+  position: relative;
+  z-index: 1;
+  height: 0;
+}
+
+.brim::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--sp-5);
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  pointer-events: none;
 }
 
 /* 徽章：**只说明状态，永远不可点**。可点的东西是 `.iconbtn` 或 `.trigger`。
@@ -334,12 +371,6 @@
   height: 28px;
   background: linear-gradient(to bottom, transparent, var(--bg));
   pointer-events: none;
-}
-
-/* 历史会话的标记：比引擎/档位那两枚更淡，它是状态不是配置 */
-.badge--muted {
-  color: var(--text-faint);
-  border-style: solid;
 }
 
 .composer__input:disabled {
@@ -811,7 +842,6 @@
    **高度必须是 `--topbar-h`**：空态下侧栏照画，44 的话那条横带在侧栏边界上错一档。 */
 .topbar--bare {
   min-height: var(--topbar-h);
-  border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
 }
 

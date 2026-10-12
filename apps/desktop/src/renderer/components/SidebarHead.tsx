@@ -4,6 +4,7 @@ import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
 import { SwitchbackMark } from "./switchback-mark.js"
 import { SidebarSearch } from "./sidebar-search.js"
+import { RailToggle } from "./rail-toggle.js"
 
 /*
  * 侧栏顶上那一块：品牌、新建、打开文件夹、筛选。
@@ -25,6 +26,7 @@ import { SidebarSearch } from "./sidebar-search.js"
 export function Head({
   onNew,
   onOpenFolder,
+  onRail,
   here,
   hereKind,
   box,
@@ -33,6 +35,8 @@ export function Head({
 }: {
   onNew: () => void
   onOpenFolder: () => void
+  /** 收起侧栏。开关画在顶带右端，见 `rail-toggle.tsx`。 */
+  onRail: () => void
   /**
    * 点「新建会话」会开在哪。
    *
@@ -51,11 +55,13 @@ export function Head({
   const where = here === undefined ? "选文件夹…" : hereKind === "chat" ? "对话" : baseNameOf(here)
   return (
     <>
+      {/* 顶带：交通灯（系统画）· 品牌 · 侧栏开关，和会话顶栏同高同中线 */}
       <div className="sidebar__head">
         <div className="sidebar__brand">
-          <span className="row__slot"><SwitchbackMark /></span>
+          <SwitchbackMark />
           <span className="sidebar__wordmark">Switchback</span>
         </div>
+        <RailToggle open onToggle={onRail} />
       </div>
 
       <div className="sidebar__act">

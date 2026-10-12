@@ -22,17 +22,21 @@ export function PinnedSection({
   on: GroupHandlers
   open: boolean
   onToggle: () => void
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const empty = sections.pinnedThreads.length === 0 && sections.pinned.length === 0
+  /*
+   * **一条都没置顶时整段不画**（UI 重构 P1 拍板）：空的段头 + 常驻垫高在 681 高的
+   * 窗口里白占 8%。拖动开始时它作为落点**浮出来**——浮在列表顶上、不占布局：
+   * 拖拽开始那一帧只要被拖的那一行动了，Chromium 就取消整次拖拽
+   * （见 `SectionHead` 的 `hint`），所以不能用「拖起来才插进来一段」的写法。
+   */
+  if (empty) return on.dragKind === undefined ? null : <PinFloat on={on} />
   return (
     <>
       {/* **整段都是落点。** 只让段头能放的话，落点是一条 24 像素高的线，
-        而拖动时鼠标下面还压着一行——那种精度不该由用户来凑。
-        一条都没置顶时这一段只剩段头，所以**常驻**垫一小截（`--empty`）：
-        必须常驻，拖起来才垫的话，被拖的那一行会跟着往下挪——而那一挪
-        会让 Chromium 取消整次拖拽（见 `SectionHead` 的 `hint`） */}
+        而拖动时鼠标下面还压着一行——那种精度不该由用户来凑 */}
       <div
-        className={`sidebar__droppin${empty ? " sidebar__droppin--empty" : ""}${on.overPinned === true ? " sidebar__droppin--over" : ""}`}
+        className={`sidebar__droppin${on.overPinned === true ? " sidebar__droppin--over" : ""}`}
         onDragOver={(e) => {
           // 会话和项目都能往这儿放
           if (on.dragKind === undefined) return
@@ -62,9 +66,37 @@ export function PinnedSection({
             ? { hint: "松手就置顶" }
             : {})}
         />
-        {open ? empty ? null : <PinnedItems sections={sections} on={on} /> : null}
+        {open ? <PinnedItems sections={sections} on={on} /> : null}
       </div>
     </>
+  )
+}
+
+/**
+ * 空置顶在拖动时浮出来的落点。外层 `sticky` 且高 0：钉在列表可视区顶上、
+ * 一个像素都不挤下面的行；里层绝对定位，盖在「项目」段头那一带。
+ */
+function PinFloat({ on }: { on: GroupHandlers }): React.JSX.Element {
+  return (
+    <div className="sidebar__pinfloat">
+      <div
+        className={`sidebar__droppin sidebar__droppin--float${on.overPinned === true ? " sidebar__droppin--over" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = "move"
+          on.drag?.hoverPinned()
+        }}
+        onDragLeave={() => {
+          on.drag?.hoverRow("")
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          on.onDropPinned?.()
+        }}
+      >
+        松手就置顶
+      </div>
+    </div>
   )
 }
 

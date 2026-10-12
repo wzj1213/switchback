@@ -1,7 +1,7 @@
 import { useRef } from "react"
 import type { EngineInfo, Thread } from "@switchback/protocol"
 import { CaretIcon } from "./icons.js"
-import { RailIcon } from "./icons-panel.js"
+import { RailToggle } from "./rail-toggle.js"
 import { EnvCard } from "./EnvCard.js"
 import { TimelineCard } from "./TimelineCard.js"
 import { labelOf } from "./Composer.js"
@@ -68,26 +68,6 @@ function Cards({
   return null
 }
 
-/**
- * 侧栏开关。**摆在最左，在标题之前**——它管的是标题左边那一列，
- * 而 claude、codex、VS Code 三家的这颗都在同一个位置。
- * 导航收起时交通灯会挪到顶栏里，这颗就紧挨着它们（见 `.shell--norail`）。
- */
-function RailToggle({ open, onToggle }: { open: boolean; onToggle: () => void }): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      className={`iconbtn${open ? "" : " iconbtn--on"}`}
-      data-tip={open ? "收起侧栏（⌘\\）" : "展开侧栏（⌘\\）"}
-      aria-label={open ? "收起侧栏" : "展开侧栏"}
-      aria-pressed={!open}
-      onClick={onToggle}
-    >
-      <RailIcon size={14} className={`rail-icon${open ? "" : " rail-icon--closed"}`} />
-    </button>
-  )
-}
-
 export function TopBar({
   thread,
   engines,
@@ -133,7 +113,8 @@ export function TopBar({
   const envAnchor = useRef<HTMLButtonElement>(null)
   return (
     <header className="topbar">
-      <RailToggle open={railOpen} onToggle={onRail} />
+      {/* 侧栏开着时开关在侧栏顶带里；收起后才落到这里、紧挨交通灯（见 `rail-toggle.tsx`） */}
+      {railOpen ? null : <RailToggle open={false} onToggle={onRail} />}
       {/* 标题点开是环境信息。**把它挂在标题上**而不是另放一颗按钮：
           「我在哪个会话里」和「这个会话跑在什么环境里」是同一个问题的两半 */}
       <button
@@ -164,11 +145,13 @@ export function TopBar({
           setTimeline(false)
         }}
       />
+      {/* **说明状态的话退成一行淡字，不再是胶囊**（UI 重构 P1）。灰底灰字的胶囊
+          看起来像按钮又不太像——而这两样恰恰点不动。字面与悬停说明不变 */}
       {thread.detached === true ? (
-        <span className="badge badge--muted" title="背后现在没有引擎进程；直接发话会先把它接回来">历史记录</span>
+        <span className="topbar__meta" title="背后现在没有引擎进程；直接发话会先把它接回来">历史记录</span>
       ) : null}
       {handedOff ? (
-        <span className="badge" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
+        <span className="topbar__meta" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
           接力 {thread.engineHistory.length} 手
         </span>
       ) : null}
