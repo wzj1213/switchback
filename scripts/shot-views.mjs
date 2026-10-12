@@ -87,16 +87,15 @@ export const VIEWS = [
         const probe = document.createElement('div')
         probe.style.cssText = 'height:72px;width:1px;flex:none'
         brief.append(probe)
+        // UI 重构 P2 起状态行是输入卡顶上的托盘：托盘长高 = 卡片长高，桌宠跟着卡片上沿走。
+        // 验的是「脚始终钉在卡片上沿」与「不踩在托盘上」，不再是「托盘长高时桌宠不动」
         setTimeout(() => {
           const after = pet.getBoundingClientRect().bottom
-          const composer = document.querySelector('.composer')?.getBoundingClientRect().top
+          const card = document.querySelector('.composer__inner')?.getBoundingClientRect().top
+          const briefTop = brief.getBoundingClientRect().top
           probe.remove()
-          const petTop = Math.min(...[...document.querySelectorAll('.pet')]
-            .map(node => node.getBoundingClientRect().top))
-          const briefBottom = brief.getBoundingClientRect().bottom
           document.documentElement.dataset.petGround = String(
-            composer !== undefined && Math.abs(after - before) < 2 && Math.abs(after - composer) < 10
-              && briefBottom <= petTop,
+            card !== undefined && Math.abs(after - card) < 10 && after <= briefTop + 10 && before !== after,
           )
         }, 180)
       })()`,

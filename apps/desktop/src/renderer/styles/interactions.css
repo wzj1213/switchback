@@ -33,7 +33,15 @@
   color: var(--text-muted);
 }
 
-/* 选中是一种持续状态，hover / 按下只在它之上加深，不能掉回未选中的底色。 */
+/* 选中是一种持续状态，hover / 按下只在它之上加深，不能掉回未选中的底色。
+ *
+ * **选中有两副样子，按它坐在什么面上分**（UI 重构 P1–P3 定下来的）：
+ * - 坐在**纸面**（`--bg-sidebar` / `--bg-sunken`）上的——主侧栏的会话行、设置左列、
+ *   分段控件（引擎页签、`.switch`）——选中是**抬起的白块**（`--bg-raised` + `--elev-1`），
+ *   各自用 (0,3,0) 的规则压过这一条，见 app-sidebar.css / settings.css / settings-engines.css；
+ * - 坐在**白底**上的——页签、菜单项、审核树、工具键——白块在白底上看不见，仍是这里的
+ *   `--selection` 灰。
+ * 新加一种选中态时先问它坐在哪个面上，不要第三种画法。 */
 :is(
   .row--selected, .rvl__row--on, .iconbtn--on, .trigger--open, .rv__tool--on,
   .workbench__tab--on, .panel-tab--on, .pop__item--on, .set__tab--on,

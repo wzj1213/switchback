@@ -747,6 +747,17 @@ td code{font-size:12px}
   <tr><td>P3 · 设置与面板</td><td>设置弹窗、分段控件、表单组、右栏页签；修「设/置」折行</td><td><code>settings*.css</code>、<code>workbench*.css</code>、<code>review.css</code></td><td>≈ 10%</td></tr>
   <tr><td>P4 · 收尾</td><td>深色逐屏、axe 对比度、悬停/按下态（<code>CSS.forcePseudoState</code> 验）</td><td>—</td><td>—</td></tr>
 </table>
+<h4>落地记录（2026-10-11 ～ 10-12）</h4>
+<table>
+  <tr><th>期</th><th>提交</th><th>和本方案的出入</th></tr>
+  <tr><td>P0</td><td><code>d0250fe</code></td><td>ink-3 #71717a 在下沉面上只有 4.3:1，axe 拦下；改为 #696970（深色 #96969e），ink-2 跟着调深。品牌标从主色改墨色。</td></tr>
+  <tr><td>P1</td><td><code>deaabbf</code></td><td>顶栏<b>不加</b>引擎名（TopBar 注释：能改的那份留在输入区，顶栏不重复）；右栏<b>不改</b>纸面灰（panel-tabs 注释：灰-白-灰三段像三个应用）；侧栏底部线保留。</td></tr>
+  <tr><td>P1 修</td><td><code>966f73a</code></td><td>用户反馈「侧栏优化丑了」：品牌塞进交通灯旁被截成「Switchb」、新建会话白卡像贴上去的按钮。顶带只留侧栏开关，品牌退出侧栏；新建会话回到平的一行 + ⌘N。选中会话的抬起保留。</td></tr>
+  <tr><td>P2</td><td><code>0fbafda</code></td><td>轮次分界线：展开时不画线，<b>折起时保留虚线</b>（它说的是「这里藏了东西」）。改动卡与人话气泡原本已接近规格，只调了图标色与圆角。</td></tr>
+  <tr><td>P3</td><td><code>1bdde32</code></td><td>设置行<b>不放大</b>到 64（settings.css 注释：950×681 下一屏只装三四项）；页标题用 15/22 而不是 20（注释：页标题是最不需要说的那件事），20 给了左列「设置」。</td></tr>
+  <tr><td>P4</td><td>见下一次提交</td><td>选中态定成两副样子：纸面上抬起白块、白底上灰底（写进 interactions.css）；<code>--text-lg</code> 不再给标题用，只留给配对码这类等宽大字。</td></tr>
+</table>
+
 <h4>每期必须过</h4>
 <ul>
   <li><code>pnpm check</code> 全绿（typecheck / lint / arch / test / check:css / check:docs）；renderer 组件仍 ≤ 200 行。</li>

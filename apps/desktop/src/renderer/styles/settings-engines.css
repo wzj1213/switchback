@@ -130,8 +130,9 @@
 .eng-head h2 {
   margin: 0 0 var(--sp-1);
   color: var(--text);
-  font-size: var(--text-lg);
+  font-size: var(--text-title-2);
   font-weight: 600;
+  line-height: var(--lh-title-2);
 }
 
 .eng-head p {

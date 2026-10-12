@@ -86,7 +86,8 @@
     "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, "PingFang SC", monospace;
   /* 字阶：Display 28/36 · Title 20/28 · Title2 15/22 · Prose 15/26 · Input 14/22 ·
-     UI 13/20 · Small 12/16 · Label 11/16。`--text-lg`（16）是旧档，P1–P3 迁到 Title/Title2 后下线 */
+     UI 13/20 · Small 12/16 · Label 11/16。`--text-lg`（16）不再给标题用（P4 收完），
+     只留给配对码这类要一眼读清的等宽大字 */
   --text-label: 11px;
   --text-xs: 12px;
   --text-code: 12.5px;

@@ -727,7 +727,7 @@
 .rename__title {
   margin: 0;
   color: var(--text);
-  font-size: var(--text-lg);
+  font-size: var(--text-title-2);
   font-weight: 600;
   line-height: var(--lh-sm);
 }
