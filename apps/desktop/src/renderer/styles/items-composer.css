@@ -25,20 +25,34 @@
   container-type: inline-size;
   max-width: var(--content-max);
   margin: 0 auto;
-  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--bg-raised);
-  /* 通栏线拿掉之后卡片得自己站住。浅色用一层短边影和一层宽而淡的环境影；
-     深色下阴影关闭，由描边接手。 */
-  box-shadow: var(--shadow-composer);
+  /* **没有描边，靠 `--elev-2` 浮起来**（UI 重构 P2）。上一版是 `--border-strong`
+     一圈深线：全屏最常用的那块被框在一道铁丝里。e2 自带 5% 的轮廓，再叠一层短影、
+     一层宽而淡的环境影；深色下是 7% 白轮廓 + 黑影。 */
+  box-shadow: var(--elev-2);
   padding: var(--sp-3) var(--sp-4) var(--sp-2);
 }
 
+/* 聚焦：全局统一的焦点环叠在浮起的影子上，不改尺寸 */
 .composer__inner:focus-within {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
-    var(--shadow-composer);
+  box-shadow: var(--focus-ring), var(--elev-2);
+}
+
+/*
+ * 输入卡顶上的托盘（`composer-tray.tsx`）：后台在跑的那一条 + 计划进度。
+ * 负外边距把它铺到卡片四边，上圆角跟卡片走；底色下沉一档、下缘一根浅线，
+ * 读起来是「卡片的抬头」，不是另一块盒子。空的时候 `.brief:empty` 整条不画。
+ */
+.composer__inner > .brief {
+  width: auto;
+  min-height: 36px;
+  margin: calc(-1 * var(--sp-3)) calc(-1 * var(--sp-4)) var(--sp-2);
+  padding: 0 var(--sp-2);
+  align-self: auto;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-sunken);
 }
 
 /* 拖着文件进来时覆盖整个输入卡：松手前就说清收不收，且不让 Chromium 打开文件。 */

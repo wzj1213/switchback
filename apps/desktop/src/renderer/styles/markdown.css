@@ -36,12 +36,19 @@
   line-height: 1.35;
 }
 
+/* 正文标题接上字阶（UI 重构 P2）：h1 = Title 20/28，h2 = Title 2 15/22。
+   原来 h1、h2 都是 16——两级标题一样大，等于只有一级 */
 .md h1 {
-  font-size: var(--text-lg);
+  margin-top: var(--sp-5);
+  font-size: var(--text-title);
+  line-height: var(--lh-title);
+  letter-spacing: -0.01em;
 }
 
 .md h2 {
-  font-size: var(--text-lg);
+  margin-top: var(--sp-5);
+  font-size: var(--text-title-2);
+  line-height: var(--lh-title-2);
 }
 
 .md h3,
@@ -90,6 +97,26 @@
   outline-offset: 2px;
 }
 
+/*
+ * **文件链接是芯片，不是网址**（UI 重构 P2）。它点开的是应用里的预览，不是浏览器——
+ * 用和网页链接一样的蓝色下划线，一行里「查看代码 · 预览文档 · 大文件」读起来像一串网址。
+ * 墨色字 + 下沉底 + 小圆角，图标退到最淡一级；网页链接仍是主色（上面那条）。
+ */
+.outlink--file {
+  padding: 1px 6px 1px 4px;
+  background: var(--bg-sunken);
+  color: var(--text);
+}
+
+.outlink--file .outlink__icon {
+  color: var(--text-faint);
+}
+
+.outlink--file:hover {
+  background: var(--bg-active);
+  text-decoration: none;
+}
+
 .md strong {
   font-weight: 600;
 }
@@ -131,7 +158,7 @@
 .cblock {
   margin: 0 0 var(--sp-3);
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-code);
 }
 

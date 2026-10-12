@@ -30,13 +30,13 @@
   background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px);
 }
 
-/* 线画在文字右边，不是上下各一条：上下夹的那种像分节标题，
-   而这只是一个时间戳 */
+/* **展开时不拖线**（UI 重构 P2）：一道通栏细线把每一轮都切成一格，读起来像表格。
+   轮与轮之间靠留白分；线只在**折起来之后**出现（上面那条虚线），
+   那时它说的是「这里我藏了东西」——那件事光靠箭头不够。 */
 .turnmark::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--border);
 }
 
 /* 分界线上那半句节奏（`首字 0.8 秒 · 34 tok/s`）：数字等宽，

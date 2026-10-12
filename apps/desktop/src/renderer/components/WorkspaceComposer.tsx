@@ -6,6 +6,7 @@ import type { SwitchbackAction } from "../switchbackCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 import { modelAcceptsImages } from "../model-options.js"
 import { historyNote } from "../history-note.js"
+import { ComposerTray } from "./composer-tray.js"
 
 /**
  * 把 `Thread` 上十几个字段翻成输入区要的 props。
@@ -51,6 +52,10 @@ export function WorkspaceComposer({
     <Composer
       threadId={thread.id}
       drafts={props.drafts}
+      tray={
+        <ComposerTray threadId={thread.id} items={props.items} running={thread.status === "running"}
+          lanes={props.lanes} onOpenLane={props.onOpenLane} />
+      }
       // 历史会话照样能发：发话时宿主先接回引擎（见 `history-note.ts`）
       history={historyNote(thread, props.engines, props.catalog)}
       focusOnMount={thread.provisional === true}

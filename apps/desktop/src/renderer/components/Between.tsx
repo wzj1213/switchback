@@ -1,10 +1,8 @@
-import type { Command, Item, Lane, Thread } from "@switchback/protocol"
-import { PlanPanel } from "./PlanPanel.js"
+import type { Command, Item, Thread } from "@switchback/protocol"
 import { QuestionStack } from "./QuestionCard.js"
 import { OutsideApprovals } from "./OutsideApprovals.js"
 import { Queued } from "./Queued.js"
 import { GoalBar } from "./GoalBar.js"
-import { ActivityDock } from "./ActivityDock.js"
 
 interface Props {
   thread: Thread
@@ -15,8 +13,6 @@ interface Props {
   onReveal: (path: string) => void
   onCopy: (text: string) => void
   onReview: () => void
-  lanes: readonly Lane[]
-  onOpenLane: (laneId: string) => void
 }
 
 /**
@@ -39,6 +35,12 @@ interface Props {
  *
  * 现在一轮一张，跟在那一轮末尾（`components/TurnEdits.tsx`）。这一行于是只剩
  * 计划与旁路，「输入框上方最多 1 行」那条验收数守得更稳。
+ *
+ * ## 计划与旁路后来搬进了输入卡
+ *
+ * UI 重构 P2 把那一行做成输入卡顶上的托盘（`composer-tray.tsx`）：它说的就是
+ * 「按下回车之前该知道的」，长在输入卡上比漂在桌宠头顶更对得齐。这里只剩目标、
+ * 待发送与等人回答的那几张。
  */
 export function Between(props: Props): React.JSX.Element {
   const waiting = props.thread.queued ?? []
@@ -46,10 +48,6 @@ export function Between(props: Props): React.JSX.Element {
   return (
     <>
       <GoalBar goal={props.thread.goal} />
-      <div className="brief">
-        <ActivityDock lanes={props.lanes} onOpen={props.onOpenLane} />
-        <PlanPanel key={props.thread.id} items={props.items} running={props.thread.status === "running"} />
-      </div>
       <Queued
         texts={waiting}
         attachments={props.thread.queuedAttachments ?? []}

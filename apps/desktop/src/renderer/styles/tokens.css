@@ -134,7 +134,8 @@
   --traffic: calc(env(titlebar-area-x, 78px) + var(--sp-3));
   --diff-sign-w: 1.4em;
   --diff-pad-r: var(--sp-3);
-  --content-max: 780px;
+  /* 正文列 780 → 720（UI 重构 P2）：一行约 44 个汉字，读起来更稳 */
+  --content-max: 720px;
   --content-gutter: 32px;
   --tip-bg: #23232a;
   --tip-ink: #f4f4f6;

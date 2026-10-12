@@ -3,8 +3,9 @@
 .send {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  /* 32：全屏唯一的主操作，比旁边 28 的控件大一档（UI 重构 P2） */
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: 999px;

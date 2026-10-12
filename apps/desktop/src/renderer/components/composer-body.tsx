@@ -80,6 +80,7 @@ export function ComposerBody(view: Props): React.JSX.Element {
     <div className="composer">
       <div className="composer__inner" onMouseDown={(event) => { focusFromBlank(event, focus.input) }}>
         <AttachmentDrop hint={files.dropzone.hint} surface={composer.dropSurfaceVisible} />
+        {composer.tray}
         <Attachments paths={attach.paths} onRemove={attach.remove} />
         {/* 拖进来的文件、折起来的大段粘贴。**和图片那排并排**：
             你附上的东西都在正文上方，正文里只有你自己打的字 */}

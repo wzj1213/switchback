@@ -200,8 +200,6 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
           onReveal={props.onReveal}
           onCopy={props.onCopy}
           onReview={props.onReview}
-          lanes={props.lanes}
-          onOpenLane={props.onOpenLane}
         />
       </ConversationStage>
       <WorkspaceComposer

@@ -19,7 +19,7 @@
 .msg--user {
   max-width: 78%;
   padding: 10px var(--sp-4);
-  border-radius: var(--radius) var(--radius) var(--radius-xs) var(--radius);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
   background: var(--bg-said);
   font-size: var(--text-prose);
   line-height: var(--lh-prose);

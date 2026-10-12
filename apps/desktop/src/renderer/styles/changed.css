@@ -35,7 +35,8 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--accent);
+  /* 铅笔是图标不是链接：主色只留给焦点、开关、链接（tokens.css 头注） */
+  color: var(--text-faint);
 }
 
 .edits__title {

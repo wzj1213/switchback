@@ -38,6 +38,8 @@ const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
 export interface ComposerProps {
   threadId: string
   drafts: ComposerDrafts
+  /** 输入卡顶上的托盘（后台与计划，见 `composer-tray.tsx`）。没有就不画。 */
+  tray?: React.ReactNode
   /** 档位下面那行说明。**内容由 `trustHint` 算，这一层只往下递、不解释。** */
   hint?: TrustHint
   /** 「这家不报自己的档」那句，挂在档位选择器的悬停上。 */
