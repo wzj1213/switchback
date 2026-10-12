@@ -6,6 +6,7 @@
  * 靠约定对齐 = 没有任何东西在对齐失败时报错。现在全部从 preload 的真实导出走。
  */
 import type { SwitchbackBridge } from "../preload/index.js"
+import type { RemoteExtras } from "./remote/types.js"
 declare global {
   interface Window {
     /**
@@ -20,7 +21,7 @@ declare global {
      * `undefined` 是真实可能：preload 没注入时（打包出错、被安全策略拦掉）
      * 它就是没有。见 `useSwitchback` 的 `bridgeMissing`。
      */
-    switchback?: SwitchbackBridge
+    switchback?: SwitchbackBridge & RemoteExtras
   }
 }
 

@@ -1,0 +1,19 @@
+{
+  "name": "@switchback/link",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "浏览器端连上宿主的那一段：重连、心跳、令牌与配对、调用宿主通道。手机端与电脑端共用。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@switchback/protocol": "workspace:*",
+    "@switchback/wire": "workspace:*"
+  }
+}

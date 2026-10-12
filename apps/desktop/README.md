@@ -1,7 +1,8 @@
 # @switchback/desktop
 
 Electron 壳 + React 渲染层。**这是 Switchback 唯一的完整主界面**；浏览器端是远程看护界面，
-没有面向用户的 CLI。
+没有面向用户的 CLI。另一台电脑要用完整界面时，宿主从 `/desk/` 送出的**就是这份渲染层**
+（远程模式，见下文「远程访问」与 `docs/远程模式方案.md`）。
 
 三个进程角色：
 
@@ -26,6 +27,8 @@ Electron 壳 + React 渲染层。**这是 Switchback 唯一的完整主界面**�
 - `Command` / `Event` 的 IPC 传输
 - **远程服务端**（`main/remote/`）：配对、设备令牌、WebSocket、静态页面、Web Push。
   浏览器端本身是另一个包（`apps/web`），这里只负责把它送出去、并把它接进事件流
+- **远程模式**：`/desk/` 送这份渲染层；`main/channels.ts` 把通道登记成表，`remote/exposure.ts`
+  点名哪些能远程调；`renderer/remote/` 在没有 preload 的页面里装一份走 WebSocket 的 `window.switchback`
 
 ## 界面布局与验收
 
@@ -247,6 +250,21 @@ Dock 角标只算**挂起的审批与问题组**，不算在跑的轮次：角�
 界面上的限制只是提示——那份 JS 跑在用户的浏览器里。
 
 操作手册（含隧道、换密钥、丢了手机）见 [`docs/远程访问设置.md`](../../docs/远程访问设置.md)。
+
+**远程模式：另一台电脑用完整界面**（`docs/远程模式方案.md`）。宿主在 `/desk/` 送出窗口里加载的
+同一份渲染层（打包时 `Resources/desk`），页面里没有 preload，`renderer/remote/boot.tsx` 先问
+「我是谁」，再装一份**形状与 preload 一模一样**、底下走 WebSocket 的 `window.switchback`——
+界面那棵树一行不改。多出来的三条判定也在这一侧：
+
+- **通道白名单**（`remote/exposure.ts`）：命令照旧钳档位，通道不行——`tryAcpEngine`、自更新、
+  `remote/*`、设置的大部分键钳不住，只能逐条点名，表外一律拒。只在本机有意义的通道
+  不挂在通道表上（`main/channels.ts`），写错白名单也找不到处理函数。
+- **设备种类**：配对码在宿主上开时就定了是手机还是电脑，只有电脑能调通道。
+- **每台设备的上限**：命令钳制、读写判定、全量预算都按设备来（电脑那组预算宽，见 `scope.ts`）。
+
+远程窗口里「在访达中显示」「用编辑器打开」这类按钮不逐个藏：桥把它们换成「复制宿主上的那条
+路径并说一声」（`renderer/remote/bridge-local.ts`）；管宿主本身的三页设置（安装与接入、远程访问、
+数据与排查）不摆。
 
 ## 审核面板
 

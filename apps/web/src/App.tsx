@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import type { ThreadId } from "@switchback/protocol"
 import { projectsOf, threadRowsOf } from "@switchback/store"
-import { forgetToken, tokenOf } from "./auth.js"
+import { forgetToken, tokenOf } from "@switchback/link"
 import { useRemote } from "./useRemote.js"
 import { Pair } from "./screens/Pair.js"
 import { Threads } from "./screens/Threads.js"

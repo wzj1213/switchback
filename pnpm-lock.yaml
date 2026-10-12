@@ -56,6 +56,9 @@ importers:
       '@switchback/journal':
         specifier: workspace:*
         version: link:../../packages/journal
+      '@switchback/link':
+        specifier: workspace:*
+        version: link:../../packages/link
       '@switchback/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -145,6 +148,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@switchback/link':
+        specifier: workspace:*
+        version: link:../../packages/link
       '@switchback/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -241,6 +247,15 @@ importers:
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+
+  packages/link:
+    dependencies:
+      '@switchback/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@switchback/wire':
+        specifier: workspace:*
+        version: link:../wire
 
   packages/protocol: {}
 

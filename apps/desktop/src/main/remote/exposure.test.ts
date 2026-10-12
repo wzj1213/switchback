@@ -29,8 +29,15 @@ const CASES: readonly {
   { label: "表外的一律拒：弹宿主屏幕上的目录框", method: "switchback:pickFolder", caller: desk, refused: "只能在那台机器上做" },
   { label: "**`__proto__` 查表不能查到原型上**", method: "__proto__", caller: desk, refused: "只能在那台机器上做" },
   { label: "读设置", method: "switchback:settings", caller: desk },
-  { label: "改界面偏好", method: "switchback:settings", arg: { theme: "dark", pinned: [] }, caller: desk },
-  { label: "只读上限也能改界面偏好——它不碰任何文件", method: "switchback:settings", arg: { theme: "dark" }, caller: deskReadOnly },
+  { label: "改界面偏好", method: "switchback:settings", arg: { pinned: [], projectOrder: [] }, caller: desk },
+  { label: "只读上限也能改界面偏好——它不碰任何文件", method: "switchback:settings", arg: { pinned: [] }, caller: deskReadOnly },
+  {
+    label: "**主题不放行**：它改的是宿主窗口，远程这头跟着自己的系统走",
+    method: "switchback:settings",
+    arg: { theme: "dark" },
+    caller: desk,
+    refused: "这边的明暗跟着这台电脑的系统走",
+  },
   {
     label: "**不能把自己的远程上限调高**",
     method: "switchback:settings",
@@ -42,7 +49,7 @@ const CASES: readonly {
   {
     label: "**整条拒，不放行一半**",
     method: "switchback:settings",
-    arg: { theme: "dark", disabledEngines: [] },
+    arg: { pinned: [], disabledEngines: [] },
     caller: desk,
     refused: "停用的引擎",
   },
@@ -87,7 +94,7 @@ describe("远程可调的通道", () => {
   })
 
   it("设置白名单里没有任何一个会放宽权限的键", () => {
-    for (const key of ["remote", "egressStop", "zcodeLock", "disabledEngines", "defaultTrust", "dsh"]) {
+    for (const key of ["remote", "egressStop", "zcodeLock", "disabledEngines", "defaultTrust", "dsh", "theme"]) {
       expect(PREF_KEYS.has(key)).toBe(false)
     }
   })

@@ -6,16 +6,29 @@
  * 由代码显式带上，跨站的页面读不到它（同源策略），也没有「自动附带」这回事。
  */
 
-const KEY = "switchback.token"
-const NAME_KEY = "switchback.device"
+/**
+ * 令牌与设备名存在哪两个键上。**手机端与电脑端各一套**（`docs/远程模式方案.md` §2.3）。
+ *
+ * 两个界面挂在同一个源下（`/` 与 `/desk/`），共用一份 localStorage。共用一套键的话，
+ * 在同一个浏览器里配一次电脑就把手机端的令牌顶掉了——而拿着手机端的令牌去开完整界面，
+ * 每调一条通道都会被宿主拒（种类跟着令牌走，见 `main/remote/tokens.ts`）。
+ */
+export interface Slot {
+  token: string
+  name: string
+}
+
+export const WEB_SLOT: Slot = { token: "switchback.token", name: "switchback.device" }
+export const DESK_SLOT: Slot = { token: "switchback.desk.token", name: "switchback.desk.device" }
 
 /**
  * 改名（omni → Switchback）之前用的两个键。新键没有、旧键有，就挪过来一次——
  * 不然每台配对过的手机，在桌面端升级之后都会被莫名其妙踢回配对屏。
+ * **只管手机端那一套**：改名那会儿还没有电脑端。
  */
 const LEGACY: readonly (readonly [string, string])[] = [
-  ["omni.token", KEY],
-  ["omni.device", NAME_KEY],
+  ["omni.token", WEB_SLOT.token],
+  ["omni.device", WEB_SLOT.name],
 ]
 
 /** 把旧键的值挪到新键上。新键已经有值时只删旧键，不覆盖。 */
@@ -31,8 +44,10 @@ export function adoptLegacy(storage: Pick<Storage, "getItem" | "setItem" | "remo
 export interface Me {
   id: string
   name: string
-  /** 这条连接的信任档上限。界面据此说明「远程最高能到哪一档」。 */
+  /** 这台设备的信任档上限（它自己的，没有就是宿主的默认）。界面据此说明「远程最高能到哪一档」。 */
   maxTrust: string
+  /** 这台按什么配的。**老桌面不报**——那时按手机算，和宿主那侧的缺省一致。 */
+  kind?: "phone" | "desk"
   /**
    * 引擎实际跑在哪台机器上。**老桌面不报这个字段**，那时整行不显示——
    * 不编一个「本机」出来（在手机上那三个字是错的）。
@@ -40,10 +55,10 @@ export interface Me {
   host?: string
 }
 
-export function tokenOf(): string {
+export function tokenOf(slot: Slot = WEB_SLOT): string {
   try {
     adoptLegacy(window.localStorage)
-    return window.localStorage.getItem(KEY) ?? ""
+    return window.localStorage.getItem(slot.token) ?? ""
   } catch {
     // Safari 的隐私模式会让 localStorage 直接抛。**不能因此白屏**——
     // 退回「没有令牌」，用户会看到配对页，虽然每次刷新都要重配
@@ -51,29 +66,29 @@ export function tokenOf(): string {
   }
 }
 
-export function rememberToken(token: string, name: string): void {
+export function rememberToken(token: string, name: string, slot: Slot = WEB_SLOT): void {
   try {
-    window.localStorage.setItem(KEY, token)
-    window.localStorage.setItem(NAME_KEY, name)
+    window.localStorage.setItem(slot.token, token)
+    window.localStorage.setItem(slot.name, name)
   } catch {
     // 同上：存不下就存不下，这一次会话仍然是可用的
   }
 }
 
-export function forgetToken(): void {
+export function forgetToken(slot: Slot = WEB_SLOT): void {
   try {
-    window.localStorage.removeItem(KEY)
-    window.localStorage.removeItem(NAME_KEY)
+    window.localStorage.removeItem(slot.token)
+    window.localStorage.removeItem(slot.name)
   } catch {
     // 忽略
   }
 }
 
 /** 这台设备默认叫什么。用户可以改；这只是个不用动脑的初值。 */
-export function guessName(): string {
+export function guessName(slot: Slot = WEB_SLOT): string {
   try {
     adoptLegacy(window.localStorage)
-    const saved = window.localStorage.getItem(NAME_KEY)
+    const saved = window.localStorage.getItem(slot.name)
     if (saved !== null && saved !== "") return saved
   } catch {
     // 忽略

@@ -48,6 +48,7 @@
     "@switchback/handoff": "workspace:*",
     "@switchback/host": "workspace:*",
     "@switchback/journal": "workspace:*",
+    "@switchback/link": "workspace:*",
     "@switchback/protocol": "workspace:*",
     "@switchback/store": "workspace:*",
     "@switchback/wire": "workspace:*",

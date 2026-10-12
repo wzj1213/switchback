@@ -8,6 +8,7 @@ export const PACKAGE_GRAPH = Object.freeze({
   "@switchback/approval": Object.freeze(["@switchback/protocol"]),
   "@switchback/store": Object.freeze(["@switchback/protocol"]),
   "@switchback/wire": Object.freeze(["@switchback/protocol"]),
+  "@switchback/link": Object.freeze(["@switchback/protocol", "@switchback/wire"]),
   "@switchback/worksite": Object.freeze([]),
   "@switchback/journal": Object.freeze(["@switchback/protocol"]),
   "@switchback/handoff": Object.freeze(["@switchback/protocol"]),
@@ -26,11 +27,17 @@ export const PACKAGE_GRAPH = Object.freeze({
     "@switchback/handoff",
     "@switchback/host",
     "@switchback/journal",
+    "@switchback/link",
     "@switchback/store",
     "@switchback/wire",
     "@switchback/worksite",
   ]),
-  "@switchback/web": Object.freeze(["@switchback/protocol", "@switchback/store", "@switchback/wire"]),
+  "@switchback/web": Object.freeze([
+    "@switchback/link",
+    "@switchback/protocol",
+    "@switchback/store",
+    "@switchback/wire",
+  ]),
 })
 
 const short = (name) => name.slice("@switchback/".length)

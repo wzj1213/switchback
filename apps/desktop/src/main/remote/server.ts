@@ -42,6 +42,11 @@ export interface RemoteDeps {
   pushKey: () => string
   /** 浏览器端构建产物所在目录。目录不在就只有 API，没有页面——**不假装有**。 */
   webRoot: string
+  /**
+   * 桌面渲染层的构建产物（远程模式，挂在 `/desk/` 下）。不给 = 没有这个挂载点。
+   * 页面和 API 同源：它连的照旧是 `/api/stream`，用的是同一套令牌与闸。
+   */
+  deskRoot?: string
   tokens: TokenStore
   ledger: Ledger
   sinks: Sinks
@@ -137,10 +142,33 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
       json(res, 426, { error: "这条路径只接受 WebSocket 升级" })
       return
     }
+    if (serveDesk(deps, { path, res, req })) return
     void serveStatic(deps.webRoot, path, res, req).then((result) => {
       if (!result.ok && result.reason !== undefined) deps.log("info", `静态：${result.reason}`)
     })
   }
+}
+
+/** 桌面界面挂在哪（`docs/远程模式方案.md`）。 */
+const DESK = "/desk"
+
+/**
+ * 送桌面界面。不归它管的路径返回 false，交回路由往下走。
+ *
+ * **`/desk` 先补斜杠再送**：页面里的资源是相对路径（`./assets/…`），在 `/desk` 下会解析到
+ * `/assets/…`——那是手机端的产物，拿到的是另一份 JS，整页白屏。
+ */
+function serveDesk(deps: RemoteDeps, at: { path: string; res: ServerResponse; req: IncomingMessage }): boolean {
+  const root = deps.deskRoot
+  if (root === undefined || (at.path !== DESK && !at.path.startsWith(`${DESK}/`))) return false
+  if (at.path === DESK) {
+    at.res.writeHead(308, { location: `${DESK}/` }).end()
+    return true
+  }
+  void serveStatic(root, at.path.slice(DESK.length), at.res, at.req).then((result) => {
+    if (!result.ok && result.reason !== undefined) deps.log("info", `静态（desk）：${result.reason}`)
+  })
+  return true
 }
 
 /** 握手就拒。**在协议协商之前**——不要先建起一条连接再说不行。 */

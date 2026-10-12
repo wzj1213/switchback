@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Command } from "@switchback/protocol"
-import { initial, reduceAll, type ViewState } from "@switchback/store"
+import { initial, reduceAll, reduceHistory, type ViewState } from "@switchback/store"
 import {
   initialStream,
   received,
@@ -49,6 +49,20 @@ export interface Switchback {
 }
 
 const NOOP_VIEWING = (): void => undefined
+
+/**
+ * 远程窗口才有：分级全量里没带正文的会话，打开时单独补过来（`remote/bodies.ts`）。
+ * **整段换掉，不是追加**——补来的是那一刻的完整历史，追加会把旧的排在已经流过来的后面
+ *（同一处理由见手机端 `useRemote`）。本机窗口的桥没有 `onHistory`，这里什么都不挂。
+ */
+function historyFeed(
+  bridge: NonNullable<typeof window.switchback>,
+  setState: (next: (prev: ViewState) => ViewState) => void,
+): (() => void) | undefined {
+  return bridge.onHistory?.((history) => {
+    setState((prev) => reduceHistory(prev, history.threadId, history.events))
+  })
+}
 
 async function copyText(bridge: typeof window.switchback | undefined, text: string): Promise<boolean> {
   try {
@@ -138,12 +152,14 @@ export function useSwitchback(): Switchback {
       advance(replayed({ ...stream.current, lastSeq: undefined }, replay))
       setLastStarted(undefined)
     })
+    const offHistory = historyFeed(bridge, setState)
     // **两个监听都挂好之后**才喊「我准备好了」。反过来（主进程一加载完就推）
     // 会把全量发进空气里——重载之后界面是空的，而磁盘上会话都在
     bridge.hello()
     return () => {
       offEvents()
       offReplay()
+      offHistory?.()
     }
   }, [bridge])
 

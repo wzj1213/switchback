@@ -16,6 +16,7 @@ import { engineStints } from "../engine-mark.js"
 import { FileLinkScope } from "./message-link.js"
 import { useProgressiveRows } from "../use-progressive-rows.js"
 import { useTranscriptRows } from "../use-transcript-rows.js"
+import { useBody } from "../remote/use-body.js"
 
 /**
  * 对话正文。
@@ -93,6 +94,8 @@ export const Transcript = memo(function Transcript({
   const again = useFailedRetry(items, { thread, turn, readOnly: readOnly === true, send })
   // 长会话先挂末尾、其余空闲时补齐；上面这些派生仍按整段历史算
   const shown = useProgressiveRows(rows, full === true)
+  // 远程窗口：正文还在路上 / 只带了尾巴。本机窗口恒为否（`remote/use-body.ts`）
+  const body = useBody(thread.id)
   return (
     <div
       className="transcript"
@@ -102,7 +105,10 @@ export const Transcript = memo(function Transcript({
       tabIndex={0}
     >
       <TranscriptNavigation scroller={scroller} inner={inner} points={points} engines={engines} />
-      {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} /> : null}
+      {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} pending={body.pending} /> : null}
+      {body.trimmed ? (
+        <p className="transcript__trimmed">更早的内容没有加载：这条会话太长，远程只带了后面这一段。完整记录在那台机器上。</p>
+      ) : null}
       <FileLinkScope threadId={thread.id} cwd={thread.cwd}>
       <div className="transcript__inner" ref={inner}>
         {shown.map((row) => (

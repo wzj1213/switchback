@@ -126,6 +126,19 @@ export function webRoot(): string {
   return candidates.find((path) => existsSync(join(path, "index.html"))) ?? candidates[0] ?? ""
 }
 
+/**
+ * 桌面渲染层的构建产物在哪（远程模式从 `/desk/` 送出去的那份）。
+ *
+ * 打包时在 `<Contents>/Resources/desk`（`extraResources`）；开发时就是窗口加载的那份
+ * `out/renderer`——**和 `createWindow` 用的是同一个相对位置**，所以 `/desk/` 送出去的
+ * 永远是这台正在跑的那份构建。`pnpm dev` 下渲染层走 vite 开发服务器，`out/renderer`
+ * 可能是旧的或者没有：远程模式要先 `electron-vite build` 一次。
+ */
+export function deskRoot(): string {
+  const candidates = [join(process.resourcesPath, "desk"), join(import.meta.dirname, "..", "renderer")]
+  return candidates.find((path) => existsSync(join(path, "index.html"))) ?? candidates[0] ?? ""
+}
+
 export function installRemote(deps: RemoteInstallDeps): RemoteInstall {
   const tokens = createTokenStore({
     load: loadDevices,
@@ -215,6 +228,7 @@ async function syncOnce(
       state.server = await startRemote({
         config: () => deps.settings().remote,
         webRoot: webRoot(),
+        deskRoot: deskRoot(),
         pushKey: relay.key,
         tokens,
         ledger: deps.ledger,

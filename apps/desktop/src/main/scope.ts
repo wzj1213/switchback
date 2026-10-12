@@ -100,11 +100,35 @@ export function bodyOf(thread: ThreadHistory, cap: number): { events: readonly E
     const one = rest[i]
     if (one === undefined) continue
     const cost = sizeOf(one)
-    if (spent + cost > cap) return { events: [...head, ...kept], trimmed: true }
+    if (spent + cost > cap) return { events: [...head, ...openersOf(rest, kept), ...kept], trimmed: true }
     spent += cost
     kept.unshift(one)
   }
   return { events: thread.events, trimmed: false }
+}
+
+/** 一条事件属于哪一轮。只认归约器要靠它找主人的那几种。 */
+function turnOf(event: Event): string | undefined {
+  if (event.type === "item.started" || event.type === "item.updated") return event.item.turnId
+  return event.type === "turn.completed" ? event.turnId : undefined
+}
+
+/**
+ * 留下来的条目所属的那几轮，**它们的开头**（`turn.started`）。
+ *
+ * 裁尾巴时，最早留下的那一轮常常只剩后半截——开头落在被裁掉的那段里。而归约器只收
+ * 「见过开头的轮」里的条目（`@switchback/store` 的 `turnOwner`）：丢了开头，那一轮留下来的
+ * 条目**整段静默消失**。一条只有一轮的超长会话，裁完之后转录区就是空的，
+ * 顶上却写着「更早的内容没有加载」——好像后面那段已经在了。所以把那一条开头补回去：
+ * 一条事件几百码元，换的是那一轮的后半截看得见。
+ */
+function openersOf(rest: readonly Event[], kept: readonly Event[]): Event[] {
+  const opened = new Set(kept.flatMap((e) => (e.type === "turn.started" ? [e.turn.id] : [])))
+  const needed = new Set(kept.flatMap((e) => {
+    const turn = turnOf(e)
+    return turn === undefined || opened.has(turn) ? [] : [turn]
+  }))
+  return rest.filter((e) => e.type === "turn.started" && needed.has(e.turn.id))
 }
 
 /**

@@ -2,8 +2,23 @@ import type { Thread } from "@switchback/protocol"
 import { SwitchbackMark } from "./switchback-mark.js"
 import { FolderIcon } from "./icons-folder.js"
 
-/** 空会话说明工作区和开始方式；接管后仍为空才解释历史正文未搬入。 */
-export function TranscriptBlank({ thread }: { thread: Thread }): React.JSX.Element {
+/**
+ * 空会话说明工作区和开始方式；接管后仍为空才解释历史正文未搬入。
+ *
+ * `pending`（远程窗口）：正文还在路上。**这时不能说「开始在 X 中工作」**——
+ * 会话明明有内容，只是还没传过来，那句话是确定的假话（`remote/bodies.ts`）。
+ */
+export function TranscriptBlank({ thread, pending = false }: { thread: Thread; pending?: boolean }): React.JSX.Element {
+  if (pending) {
+    return (
+      <div className="blank">
+        <SwitchbackMark />
+        <p className="blank__title">正在取这条会话的内容…</p>
+        <p className="blank__description">它在那台机器上，打开时才传过来。</p>
+        <p className="blank__path" title={thread.cwd}><FolderIcon size={14} /><bdi>{thread.cwd}</bdi></p>
+      </div>
+    )
+  }
   return (
     <div className="blank">
       <SwitchbackMark />

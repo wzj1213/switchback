@@ -59,9 +59,12 @@ export const EXPOSED: Readonly<Record<string, Rule>> = {
  * 不在这里的——`remote`（把自己的上限调到完全档）、`egressStop`（关外发守卫）、
  * `zcodeLock`、`disabledEngines`（启用一家被停用的引擎）、`defaultTrust`、`dsh`、
  * `notify`、`handoffBrief`——都是**宿主上的决定**，去那台机器上改。
+ *
+ * **`theme` 也不在**，理由不一样：它在宿主上是经 `nativeTheme` 生效的，改的是**宿主窗口**的明暗；
+ * 远程窗口跟着自己那台电脑的系统走。放行的话，远程这头点了「深色」自己屏幕上什么都不变，
+ * 宿主那台却翻了——两头都错。
  */
 export const PREF_KEYS: ReadonlySet<string> = new Set([
-  "theme",
   "projects",
   "pinned",
   "pinnedThreads",
@@ -76,6 +79,7 @@ export const PREF_KEYS: ReadonlySet<string> = new Set([
 
 /** 拒的时候人能看懂的名字。没列到的键照原样说——总比一句「有些键不行」强。 */
 const KEY_LABELS: Readonly<Record<string, string>> = {
+  theme: "主题（它改的是那台机器上的窗口；这边的明暗跟着这台电脑的系统走）",
   remote: "远程访问",
   egressStop: "外发守卫",
   zcodeLock: "ZCode 快照锁",

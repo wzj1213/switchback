@@ -1,4 +1,4 @@
-import type { ConnState } from "../transport.js"
+import type { ConnState } from "@switchback/link"
 
 /**
  * 连接状态条。

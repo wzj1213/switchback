@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Event, Item, Thread } from "@switchback/protocol"
+import { initial, itemsOf, reduceAll } from "@switchback/store"
 import { REMOTE_THREAD_CHARS, bodyOf, headerOf, scopeReplay, withCurrent } from "./scope.js"
 import type { ThreadHistory } from "./host.js"
 
@@ -208,5 +209,40 @@ describe("补正文时用当前状态收口", () => {
   it("宿主手上正在跑的那一轮不收——收了正在流的回答就没了主", () => {
     const out = withCurrent(halfway, { ...record("a"), status: "running" }, 99)
     expect(out.some((e) => e.type === "turn.completed")).toBe(false)
+  })
+})
+
+describe("裁尾巴时补回那一轮的开头", () => {
+  /** 一条会话：`turns` 轮，每轮 `per` 条约 1 KB 的回答。 */
+  const turns = (id: string, count: number, per: number): ThreadHistory => ({
+    id,
+    events: [
+      { type: "thread.started", at: 0, thread: record(id) },
+      ...Array.from({ length: count }, (_, t): Event[] => [
+        { type: "turn.started", at: t, turn: { id: `t${String(t)}`, threadId: id, engine: "codex", status: "running", startedAt: t } },
+        ...Array.from({ length: per }, (_, i): Event => ({
+          type: "item.started",
+          at: t,
+          item: { ...msg(`${id}-${String(t)}-${String(i)}`, "x".repeat(1000)), turnId: `t${String(t)}` },
+        })),
+        { type: "turn.completed", at: t, turnId: `t${String(t)}`, status: "completed" },
+      ]).flat(),
+    ],
+  })
+
+  it("**只有一轮的超长会话，裁完之后留下的条目还在**——丢了开头，归约器会把它们整段丢掉", () => {
+    const body = bodyOf(turns("one", 1, 200), 50_000)
+    expect(body.trimmed).toBe(true)
+    expect(body.events.filter((e) => e.type === "turn.started")).toHaveLength(1)
+    expect(itemsOf(reduceAll(initial(), body.events), "one").length).toBeGreaterThan(40)
+  })
+
+  it("最早留下的那一轮只剩后半截时补它的开头；完整留下的轮不重复带", () => {
+    const body = bodyOf(turns("many", 5, 20), 50_000)
+    const starts = body.events.filter((e) => e.type === "turn.started").map((e) => (e.type === "turn.started" ? e.turn.id : ""))
+    expect(new Set(starts).size).toBe(starts.length)
+    // 每一条留下的条目，它那一轮的开头都在
+    const opened = new Set(starts)
+    for (const e of body.events) if (e.type === "item.started") expect(opened.has(e.item.turnId)).toBe(true)
   })
 })

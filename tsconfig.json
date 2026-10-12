@@ -14,6 +14,9 @@
       "path": "packages/wire"
     },
     {
+      "path": "packages/link"
+    },
+    {
       "path": "packages/journal"
     },
     {

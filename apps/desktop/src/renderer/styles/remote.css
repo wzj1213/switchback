@@ -1,0 +1,108 @@
+/* ── 远程窗口才有的两样：配对屏、连接条（`renderer/remote/`）──────────
+ *
+ * 本机窗口一样都用不上：它们只在另一台电脑从宿主的 `/desk/` 打开这一页时出现。
+ */
+
+/* 配对屏：一张居中的窄卡。码是要用眼睛读、用手打的，和设置页里显示它的那块同一副样子 */
+.remote-pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(360px, calc(100% - var(--sp-6)));
+  margin: 18vh auto 0;
+  padding: var(--sp-5);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--elev-2);
+}
+
+.remote-pair__title {
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: var(--lh-title);
+}
+
+.remote-pair__hint {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+}
+
+.remote-pair__label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.remote-pair__code,
+.remote-pair__name {
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.remote-pair__code {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  letter-spacing: 0.22em;
+}
+
+.remote-pair__code:focus-visible,
+.remote-pair__name:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.remote-pair__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/*
+ * 连接条：贴在窗口底边正中的一张浮卡。**连着且没话说时整个不画**——
+ * 只在连不上、断了、令牌不认、宿主捎话回来时出现，人看完就收。
+ */
+.remote-bar {
+  position: fixed;
+  bottom: var(--sp-4);
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: min(720px, calc(100% - var(--sp-6)));
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-float);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  transform: translateX(-50%);
+}
+
+.remote-bar__state {
+  color: var(--text-muted);
+}
+
+/* 宿主捎回来的话可能带着一句被拒的原话（换行分开），原样折行 */
+.remote-bar__notice {
+  white-space: pre-wrap;
+}
+
+/*
+ * 转录区顶上那一行：这条会话太长，远程只带了尾巴。**只说实话，不假装能加载**——
+ * 往上翻加载更早的那条路没做，摆一个点了没反应的按钮比什么都不画糟。
+ */
+.transcript__trimmed {
+  max-width: var(--content-max);
+  margin: var(--sp-4) auto 0;
+  padding: 0 var(--content-gutter);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  text-align: center;
+}

@@ -80,7 +80,7 @@ export function RemoteDevices({
   onRevoke: (id: string) => void
 }): React.JSX.Element {
   if (devices.length === 0) {
-    return <Field label="已配对的设备" hint="还没有。点上面那颗「配对新设备」" children={null} />
+    return <Field label="已配对的设备" hint="还没有。点上面的「配对手机」或「配对电脑」" children={null} />
   }
   const now = Date.now()
   return (

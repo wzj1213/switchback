@@ -31,6 +31,13 @@ extraResources:
     to: web
     filter:
       - "**/*"
+  # 远程模式（`docs/远程模式方案.md`）：另一台电脑从 `/desk/` 打开的**就是这份渲染层**——
+  # 和窗口里加载的同一份构建，所以界面与宿主永远是同一个版本。理由同上放在 asar 外面，
+  # 运行时由 `remote/install.ts` 的 `deskRoot()` 找它
+  - from: out/renderer
+    to: desk
+    filter:
+      - "**/*"
 
 # 完整版里的 Claude Agent SDK 要 spawn 自带的 CLI，不能进 asar——
 # asar 里的文件没有真实路径，它找不到自己的资源。

@@ -8,6 +8,7 @@ import { DataSection, EnginesSection, EnvSection, ActivitySection, RemotePanel, 
 import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon, ToBottomIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
+import { isRemote } from "../remote/where.js"
 
 /**
  * 设置。
@@ -74,8 +75,16 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"]
 
-/** 「看东西」那一段从第几项起。**算一次**，别在渲染里对着数组回头翻。 */
-const CUT = TABS.findIndex((tab) => "look" in tab)
+/**
+ * 远程窗口里不摆的几页：它们管的是**宿主这台机器本身**——装引擎与接入、开远程访问、
+ * 数据目录与诊断。另一台电脑上点下去，事情发生在宿主的屏幕上（`remote/where.ts`）。
+ */
+const HOST_TABS: ReadonlySet<string> = new Set(["install", "remote", "data"])
+
+/** 这扇窗摆哪几页。远程窗口在一页的生命周期里不会变成本机窗口，算一次就够。 */
+function tabsHere(): readonly (typeof TABS)[number][] {
+  return isRemote() ? TABS.filter((tab) => !HOST_TABS.has(tab.id)) : TABS
+}
 
 export interface SettingsPanelProps {
   settings: Settings
@@ -155,15 +164,18 @@ function paneOf(tab: TabId, props: SettingsPanelProps, go: (id: TabId) => void):
 }
 
 function Nav({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }): React.JSX.Element {
+  const tabs = tabsHere()
+  // 「看东西」那一段从第几项起（远程窗口少了几页，所以按摆出来的那份数）
+  const cut = tabs.findIndex((one) => "look" in one)
   return (
     <nav className="set__nav" aria-label="设置分类">
-      {TABS.map((t, index) => (
+      {tabs.map((t, index) => (
         <button
           key={t.id}
           type="button"
           aria-current={t.id === tab}
           // 「看东西」那一段之前画一条分隔：先分两堆，比在七项里挨个读标题快
-          className={`set__tab${t.id === tab ? " set__tab--on" : ""}${index === CUT ? " set__tab--cut" : ""}`}
+          className={`set__tab${t.id === tab ? " set__tab--on" : ""}${index === cut ? " set__tab--cut" : ""}`}
           onClick={() => {
             onPick(t.id)
           }}
@@ -177,7 +189,7 @@ function Nav({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }): Reac
 }
 
 export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
-  const [tab, setTab] = useState<TabId>(() => TABS.find((one) => one.id === props.initialTab)?.id ?? "look")
+  const [tab, setTab] = useState<TabId>(() => tabsHere().find((one) => one.id === props.initialTab)?.id ?? "look")
   // 这是最上层的模态，却曾经是唯一按 Esc 关不掉的浮层（见 `useModalKeys`）
   const box = useModalKeys(props.onClose)
   return (

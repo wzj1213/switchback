@@ -12,8 +12,7 @@ import {
   type Step,
   type Stream,
 } from "@switchback/wire"
-import { createTransport, type ConnState, type Transport } from "./transport.js"
-import { tokenOf, whoAmI, type Me } from "./auth.js"
+import { createTransport, tokenOf, whoAmI, type ConnState, type Me, type Transport } from "@switchback/link"
 
 /**
  * 事件流 → 视图状态。**和桌面端跑的是同一个归约器**（`@switchback/store`），

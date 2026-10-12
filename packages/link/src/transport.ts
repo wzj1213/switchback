@@ -128,95 +128,123 @@ function withTimeout(work: Promise<"ok" | "denied" | "unknown">): Promise<"ok" |
   ])
 }
 
+/**
+ * 一条传输的全部可变状态，加上「再开一次」的入口。
+ *
+ * 拆成顶层函数共用这一份，而不是全写成 `createTransport` 里的闭包：
+ * 那个函数原来 99 行，进包之后要守 60 行的闸门（`apps/web` 按渲染层的尺度放行过它）。
+ */
+interface Ctx {
+  deps: TransportDeps
+  state: State
+  open: () => void
+}
+
+function dropLive(state: State): void {
+  if (state.live?.heartbeat !== undefined) clearInterval(state.live.heartbeat)
+  state.live = undefined
+}
+
+function retry(ctx: Ctx, reason: string): void {
+  const { state, deps } = ctx
+  if (state.stopped) return
+  const inMs = backoffMs(state.attempt)
+  state.attempt += 1
+  deps.onState({ kind: "retrying", inMs, reason })
+  if (state.timer !== undefined) clearTimeout(state.timer)
+  state.timer = setTimeout(ctx.open, inMs)
+}
+
+function attach(ctx: Ctx, live: Live, gen: number): void {
+  const { state, deps } = ctx
+  const stale = (): boolean => gen !== state.gen
+  live.socket.onopen = () => {
+    if (stale()) {
+      live.socket.close(4002, "superseded")
+      return
+    }
+    state.attempt = 0
+    live.lastSeen = Date.now()
+    deps.onState({ kind: "open" })
+    live.socket.send(JSON.stringify(deps.hello()))
+    live.heartbeat = setInterval(() => {
+      beat(live)
+    }, PING_MS)
+  }
+  live.socket.onmessage = (event: MessageEvent<string>) => {
+    if (stale()) return
+    live.lastSeen = Date.now()
+    const seen = live.reassembler.observe(event.data)
+    if (seen.kind === "frame") deps.onFrame(seen.frame)
+    // “pending” 是常态（大帧的中间片）；“dropped” 说明这条流已经不可信，
+    // 断开重来比带着一个洞继续跑安全
+    else if (seen.kind === "dropped") live.socket.close(4001, seen.reason)
+  }
+  live.socket.onclose = (event) => {
+    if (live.heartbeat !== undefined) clearInterval(live.heartbeat)
+    // **过期的连接只许关掉自己。** 它的 onclose 不能把还活着的那条从状态里抹掉，
+    // 也不能触发重连——那会连锁开出第三条
+    if (stale()) return
+    state.live = undefined
+    if (!state.stopped) retry(ctx, event.reason === "" ? "连接断开" : event.reason)
+  }
+  live.socket.onerror = () => {
+    // onerror 之后一定会来 onclose，重连逻辑只写在那一处
+  }
+}
+
+/** 问过令牌之后的那一步：认就开一条，不认就停，问不出来就退避重来。 */
+function afterAuthorize(ctx: Ctx, gen: number, verdict: "ok" | "denied" | "unknown"): void {
+  const { state, deps } = ctx
+  if (state.stopped || gen !== state.gen) return
+  if (verdict === "denied") {
+    deps.onState({ kind: "unauthorized" })
+    return
+  }
+  if (verdict === "unknown") {
+    // 问不出来就当网络问题，接着退避重试——**别把人踢回配对屏**
+    retry(ctx, "连不上 Switchback")
+    return
+  }
+  // 令牌走子协议：浏览器的 `WebSocket` 构造器设不了请求头，
+  // 而放进查询串会进各级访问日志
+  const socket = new WebSocket(wsUrl(), [WS_PROTOCOL, deps.token])
+  const live: Live = { socket, reassembler: createReassembler(), heartbeat: undefined, lastSeen: Date.now() }
+  state.live = live
+  attach(ctx, live, gen)
+}
+
+function open(ctx: Ctx): void {
+  const { state, deps } = ctx
+  if (state.stopped) return
+  // 已经连上、或者还在握手，都不要再开一条
+  const ready = state.live?.socket.readyState
+  if (ready === WebSocket.OPEN || ready === WebSocket.CONNECTING) return
+  state.gen += 1
+  const gen = state.gen
+  dropLive(state)
+  deps.onState({ kind: "connecting" })
+  void withTimeout(deps.authorize())
+    .then((verdict) => {
+      afterAuthorize(ctx, gen, verdict)
+    })
+    .catch((error: unknown) => {
+      if (gen !== state.gen) return
+      retry(ctx, error instanceof Error ? error.message : "连不上")
+    })
+}
+
 export function createTransport(deps: TransportDeps): Transport {
   const state: State = { live: undefined, gen: 0, attempt: 0, timer: undefined, stopped: false }
-
-  const dropLive = (): void => {
-    if (state.live?.heartbeat !== undefined) clearInterval(state.live.heartbeat)
-    state.live = undefined
+  const ctx: Ctx = {
+    deps,
+    state,
+    open: () => {
+      open(ctx)
+    },
   }
 
-  const retry = (reason: string): void => {
-    if (state.stopped) return
-    const inMs = backoffMs(state.attempt)
-    state.attempt += 1
-    deps.onState({ kind: "retrying", inMs, reason })
-    if (state.timer !== undefined) clearTimeout(state.timer)
-    state.timer = setTimeout(open, inMs)
-  }
-
-  const attach = (live: Live, gen: number): void => {
-    const stale = (): boolean => gen !== state.gen
-    live.socket.onopen = () => {
-      if (stale()) {
-        live.socket.close(4002, "superseded")
-        return
-      }
-      state.attempt = 0
-      live.lastSeen = Date.now()
-      deps.onState({ kind: "open" })
-      live.socket.send(JSON.stringify(deps.hello()))
-      live.heartbeat = setInterval(() => {
-        beat(live)
-      }, PING_MS)
-    }
-    live.socket.onmessage = (event: MessageEvent<string>) => {
-      if (stale()) return
-      live.lastSeen = Date.now()
-      const seen = live.reassembler.observe(event.data)
-      if (seen.kind === "frame") deps.onFrame(seen.frame)
-      // “pending” 是常态（大帧的中间片）；“dropped” 说明这条流已经不可信，
-      // 断开重来比带着一个洞继续跑安全
-      else if (seen.kind === "dropped") live.socket.close(4001, seen.reason)
-    }
-    live.socket.onclose = (event) => {
-      if (live.heartbeat !== undefined) clearInterval(live.heartbeat)
-      // **过期的连接只许关掉自己。** 它的 onclose 不能把还活着的那条从状态里抹掉，
-      // 也不能触发重连——那会连锁开出第三条
-      if (stale()) return
-      state.live = undefined
-      if (!state.stopped) retry(event.reason === "" ? "连接断开" : event.reason)
-    }
-    live.socket.onerror = () => {
-      // onerror 之后一定会来 onclose，重连逻辑只写在那一处
-    }
-  }
-
-  const open = (): void => {
-    if (state.stopped) return
-    // 已经连上、或者还在握手，都不要再开一条
-    const ready = state.live?.socket.readyState
-    if (ready === WebSocket.OPEN || ready === WebSocket.CONNECTING) return
-    state.gen += 1
-    const gen = state.gen
-    dropLive()
-    deps.onState({ kind: "connecting" })
-    void withTimeout(deps.authorize())
-      .then((verdict) => {
-        if (state.stopped || gen !== state.gen) return
-        if (verdict === "denied") {
-          deps.onState({ kind: "unauthorized" })
-          return
-        }
-        if (verdict === "unknown") {
-          // 问不出来就当网络问题，接着退避重试——**别把人踢回配对屏**
-          retry("连不上 Switchback")
-          return
-        }
-        // 令牌走子协议：浏览器的 `WebSocket` 构造器设不了请求头，
-        // 而放进查询串会进各级访问日志
-        const socket = new WebSocket(wsUrl(), [WS_PROTOCOL, deps.token])
-        const live: Live = { socket, reassembler: createReassembler(), heartbeat: undefined, lastSeen: Date.now() }
-        state.live = live
-        attach(live, gen)
-      })
-      .catch((error: unknown) => {
-        if (gen !== state.gen) return
-        retry(error instanceof Error ? error.message : "连不上")
-      })
-  }
-
-  open()
+  ctx.open()
 
   return {
     send: (frame) => {
@@ -229,7 +257,7 @@ export function createTransport(deps: TransportDeps): Transport {
       const ready = state.live?.socket.readyState
       if (ready === WebSocket.OPEN || ready === WebSocket.CONNECTING) return
       state.attempt = 0
-      open()
+      ctx.open()
     },
     close: () => {
       state.stopped = true
@@ -237,7 +265,7 @@ export function createTransport(deps: TransportDeps): Transport {
       if (state.timer !== undefined) clearTimeout(state.timer)
       state.timer = undefined
       state.live?.socket.close(1000, "bye")
-      dropLive()
+      dropLive(state)
       deps.onState({ kind: "closed" })
     },
   }

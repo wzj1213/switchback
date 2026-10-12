@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { guessName, pair, rememberToken } from "../auth.js"
+import { guessName, pair, rememberToken } from "@switchback/link"
 
 /**
  * 配对屏。

@@ -40,12 +40,15 @@ function Pairing({ status, onPair }: { status: RemoteStatus; onPair: (kind: "pho
   }, [expiresAt])
 
   if (status.pairing === undefined || left === 0) {
-    // 「配对电脑」等 `/desk/` 真的送得出完整界面再摆（远程模式第 3 阶段）——
-    // 先摆出来就是一颗配上之后什么都打不开的按钮
     return (
-      <button type="button" className="tbtn" onClick={() => { onPair("phone") }} disabled={!status.listening}>
-        配对新设备…
-      </button>
+      <div className="pairing">
+        <button type="button" className="tbtn" onClick={() => { onPair("phone") }} disabled={!status.listening}>
+          配对手机…
+        </button>
+        <button type="button" className="tbtn" onClick={() => { onPair("desk") }} disabled={!status.listening}>
+          配对电脑…
+        </button>
+      </div>
     )
   }
   return (
@@ -115,7 +118,10 @@ export function Access({ remote, status, onPatch, onStatus }: {
           }}
         />
       </Field>
-      <Field label="配对" hint="在手机上打开那个地址，把码输进去。五分钟有效，用一次作废">
+      <Field
+        label="配对"
+        hint="手机打开那个地址；电脑打开地址后面加 /desk/，用的是这台上的完整界面。把码输进去，五分钟有效，用一次作废"
+      >
         {status === undefined ? null : (
           <Pairing
             status={status}

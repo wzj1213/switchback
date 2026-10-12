@@ -157,3 +157,70 @@ describe("远程模式接线", () => {
     expect(me).toMatchObject({ name: "mac2", kind: "desk", maxTrust: "auto-edit" })
   })
 })
+
+describe("`/desk/` 送桌面界面", () => {
+  async function bootWithDesk() {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs")
+    const { tmpdir } = await import("node:os")
+    const { join } = await import("node:path")
+    const root = mkdtempSync(join(tmpdir(), "switchback-desk-"))
+    mkdirSync(join(root, "assets"))
+    writeFileSync(join(root, "index.html"), "<!doctype html><title>desk</title>", "utf8")
+    writeFileSync(join(root, "assets", "index-AbCdEf12.js"), "export {}", "utf8")
+    const tokens = createTokenStore({ load: () => [], save: () => undefined, now: () => Date.now() })
+    const server = await startRemote({
+      config: () => ({ port: 0, trustedHosts: [], maxTrust: "auto-edit" }),
+      webRoot: "/nonexistent",
+      deskRoot: root,
+      pushKey: () => "k",
+      tokens,
+      ledger: createLedger("run", 10),
+      sinks: { list: () => [], add: () => () => undefined },
+      dispatch: () => undefined,
+      trustOf: () => undefined,
+      history: async () => ({ events: [], trimmed: false }),
+      replay: async () => undefined,
+      log: () => undefined,
+    })
+    running.push(server)
+    return `http://127.0.0.1:${String(server.port())}`
+  }
+
+  function get(url: string): Promise<{ status: number; location?: string; cache?: string; body: string }> {
+    return new Promise((done, fail) => {
+      request(url, (res) => {
+        const chunks: Buffer[] = []
+        res.on("data", (c: Buffer) => chunks.push(c))
+        res.on("end", () => {
+          done({
+            status: res.statusCode ?? 0,
+            ...(typeof res.headers.location === "string" ? { location: res.headers.location } : {}),
+            ...(typeof res.headers["cache-control"] === "string" ? { cache: res.headers["cache-control"] } : {}),
+            body: Buffer.concat(chunks).toString("utf8"),
+          })
+        })
+      })
+        .on("error", fail)
+        .end()
+    })
+  }
+
+  it("**`/desk` 先补斜杠**——不补的话页面里的相对资源会解析到手机端的产物上", async () => {
+    const base = await bootWithDesk()
+    expect(await get(`${base}/desk`)).toMatchObject({ status: 308, location: "/desk/" })
+  })
+
+  it("`/desk/` 是渲染层的入口页，带哈希的资源永久缓存", async () => {
+    const base = await bootWithDesk()
+    expect(await get(`${base}/desk/`)).toMatchObject({ status: 200, body: "<!doctype html><title>desk</title>" })
+    expect(await get(`${base}/desk/assets/index-AbCdEf12.js`)).toMatchObject({
+      status: 200,
+      cache: "public, max-age=31536000, immutable",
+    })
+  })
+
+  it("资源找不到老实 404，不拿入口页兜（那会是一份 content-type 是 JS 的 HTML）", async () => {
+    const base = await bootWithDesk()
+    expect((await get(`${base}/desk/assets/gone-ZzZzZzZz.js`)).status).toBe(404)
+  })
+})
