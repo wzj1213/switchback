@@ -122,9 +122,17 @@ async function packageMode(mode, identity, sourcePackage, options) {
       ? process.env
       : { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: "false" }
     await run("pnpm", args, env)
+    assertRenderer()
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+}
+
+// 窗口从 `Resources/desk` 加载（见 electron-builder.yml）。少了它应用照样起、窗口白屏，
+// 而自更新会把这样的包换上去——所以在这里就失败，不让它走到换包那一步
+function assertRenderer() {
+  const page = join(MAC_OUTPUT, "Switchback.app/Contents/Resources/desk/index.html")
+  if (!existsSync(page)) throw new Error(`包里没有渲染层：${page}`)
 }
 
 function argumentsOf(args) {

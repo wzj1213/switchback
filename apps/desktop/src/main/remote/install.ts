@@ -129,9 +129,9 @@ export function webRoot(): string {
 /**
  * 桌面渲染层的构建产物在哪（远程模式从 `/desk/` 送出去的那份）。
  *
- * 打包时在 `<Contents>/Resources/desk`（`extraResources`）；开发时就是窗口加载的那份
- * `out/renderer`——**和 `createWindow` 用的是同一个相对位置**，所以 `/desk/` 送出去的
- * 永远是这台正在跑的那份构建。`pnpm dev` 下渲染层走 vite 开发服务器，`out/renderer`
+ * 打包时在 `<Contents>/Resources/desk`（`extraResources`）；开发时是 `out/renderer`。
+ * **窗口也从这里加载**——electron-builder 会把 extraResources 的来源从 asar 里剔掉，
+ * 打包后 asar 里根本没有 `out/renderer`。所以 `/desk/` 送出去的永远是这台正在跑的那份构建。`pnpm dev` 下渲染层走 vite 开发服务器，`out/renderer`
  * 可能是旧的或者没有：远程模式要先 `electron-vite build` 一次。
  */
 export function deskRoot(): string {

@@ -33,7 +33,9 @@ extraResources:
       - "**/*"
   # 远程模式（`docs/远程模式方案.md`）：另一台电脑从 `/desk/` 打开的**就是这份渲染层**——
   # 和窗口里加载的同一份构建，所以界面与宿主永远是同一个版本。理由同上放在 asar 外面，
-  # 运行时由 `remote/install.ts` 的 `deskRoot()` 找它
+  # 运行时由 `remote/install.ts` 的 `deskRoot()` 找它。
+  # **注意**：electron-builder 会把 extraResources 的来源从 `files` 里剔掉，所以打包后 asar 里
+  # 没有 `out/renderer`——窗口也必须从 `deskRoot()` 加载（0.0.494 在 mac2 上白屏就是这么来的）
   - from: out/renderer
     to: desk
     filter:

@@ -10,7 +10,7 @@ import { installChatDirChannel } from "./chatdir.js"
 import { fixPath } from "./loginpath.js"
 import { attachHost, rebuild, seedDefaultThread, type Attached } from "./host.js"
 import { createSinks, windowSink } from "./sink.js"
-import { attachRemote } from "./remote/index.js"
+import { attachRemote, deskRoot } from "./remote/index.js"
 import { EXPOSED } from "./remote/exposure.js"
 import { createChannels } from "./channels.js"
 import { installMenu } from "./menu.js"
@@ -228,7 +228,9 @@ function createWindow(bounds: {
 
   const devUrl = process.env["ELECTRON_RENDERER_URL"]
   if (isDev && devUrl !== undefined) void win.loadURL(devUrl)
-  else void win.loadFile(join(import.meta.dirname, "../renderer/index.html"))
+  // 打包后渲染层只在 `Resources/desk`：electron-builder 会把 extraResources 的来源从 asar 里剔掉，
+  // 所以窗口和远程 `/desk/` 读的是同一份（`deskRoot()`），开发时它就是 `out/renderer`
+  else void win.loadFile(join(deskRoot(), "index.html"))
 
   return win
 }
