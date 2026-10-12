@@ -18,14 +18,6 @@
   mask: url("../assets/switchback-symbol.svg") center / contain no-repeat;
 }
 
-.sidebar__wordmark {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
 .row--selected .row__time {
   display: none;
 }

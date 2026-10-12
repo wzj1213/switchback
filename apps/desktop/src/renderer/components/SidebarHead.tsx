@@ -2,7 +2,6 @@ import { PlusIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
-import { SwitchbackMark } from "./switchback-mark.js"
 import { SidebarSearch } from "./sidebar-search.js"
 import { RailToggle } from "./rail-toggle.js"
 
@@ -55,12 +54,11 @@ export function Head({
   const where = here === undefined ? "选文件夹…" : hereKind === "chat" ? "对话" : baseNameOf(here)
   return (
     <>
-      {/* 顶带：交通灯（系统画）· 品牌 · 侧栏开关，和会话顶栏同高同中线 */}
+      {/* 顶带：交通灯（系统画）+ 右端的侧栏开关，和会话顶栏同高同中线。
+          **不放品牌**：试过把品牌塞进交通灯右边，真实窗口里侧栏常被拖到 200 上下，
+          「Switchback」被开关挤成「Switchb」——一个被截断的品牌比没有品牌难看。
+          品牌标留在空态那一屏 */}
       <div className="sidebar__head">
-        <div className="sidebar__brand">
-          <SwitchbackMark />
-          <span className="sidebar__wordmark">Switchback</span>
-        </div>
         <RailToggle open onToggle={onRail} />
       </div>
 
@@ -77,6 +75,7 @@ export function Head({
         >
           <PlusIcon size={SIDEBAR_ICON} />
           <span className="sidebar__new-label">新建会话</span>
+          <kbd className="sidebar__kbd">⌘N</kbd>
         </button>
         {/* 低频动作让位给高频动作，这一条就是这次改动的全部意思 */}
         <button
