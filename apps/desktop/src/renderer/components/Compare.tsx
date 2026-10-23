@@ -3,6 +3,8 @@ import type { Command, EngineInfo, Item,
 import { buildHandoff, compareRuns, comparisonItems, type Comparison, type FileDiff, type Side } from "@switchback/handoff"
 import { Transcript } from "./Transcript.js"
 import { labelOf } from "./Composer.js"
+import { useMessages } from "../i18n.js"
+import { COMPARE } from "./Compare.messages.js"
 
 /**
  * 分叉对比。两条有血缘、共用工作区的会话，并排看各自做了什么。
@@ -47,10 +49,11 @@ function sideClass(side: Side): string {
 }
 
 function FileRow({ file }: { file: FileDiff }): React.JSX.Element {
+  const m = useMessages(COMPARE)
   const mark = file.side === "both" ? (file.differs ? "≠" : "=") : file.side === "a" ? "◀" : "▶"
   return (
     <li className={sideClass(file.side)}>
-      <span className="cmp__mark" title={file.side === "both" ? "两边都上报过" : "只有一边上报过"}>
+      <span className="cmp__mark" title={file.side === "both" ? m.both : m.one}>
         {mark}
       </span>
       {/* `<bdi>` 隔离双向文本：不隔的话 `direction: rtl` 会把开头那个 `/` 甩到行尾，
@@ -63,11 +66,12 @@ function FileRow({ file }: { file: FileDiff }): React.JSX.Element {
 }
 
 function Open({ label, steps }: { label: string; steps: readonly string[] }): React.JSX.Element | null {
+  const m = useMessages(COMPARE)
   if (steps.length === 0) return null
   return (
     <div className="cmp__open">
-      <span className="cmp__open-label">{label}还剩</span>
-      <span>{steps.join("、")}</span>
+      <span className="cmp__open-label">{m.remaining(label)}</span>
+      <span>{m.steps(steps)}</span>
     </div>
   )
 }
@@ -85,17 +89,18 @@ function Summary({
   sharedCwd: boolean
 }): React.JSX.Element {
   // 这一节只画文件；命令存在不该把文件空态变成一块什么都没有的空白。
+  const m = useMessages(COMPARE)
   const nothing = diff.files.length === 0
   return (
     <section className="cmp__summary">
       <header className="cmp__head">
-        <span className="cmp__head-label">编辑工具上报（非 Git 净 diff）</span>
+        <span className="cmp__head-label">{m.head}</span>
         <span className="cmp__spacer" />
         <span className="cmp__num cmp__num--head">{left}</span>
         <span className="cmp__num cmp__num--head">{right}</span>
       </header>
       {nothing ? (
-        <p className="cmp__empty">两边都还没有成功的文件编辑上报。</p>
+        <p className="cmp__empty">{m.empty}</p>
       ) : (
         <ul className="cmp__list">
           {diff.files.map((f) => (
@@ -105,12 +110,12 @@ function Summary({
       )}
       {diff.onlyOneSide === 0 ? null : (
         <p className="cmp__flag">
-          有 {diff.onlyOneSide} 个文件<strong>只有一边</strong>上报过——可从这里检查分歧。
+          {m.onlyBefore(diff.onlyOneSide)}<strong>{m.onlyStrong}</strong>{m.onlyAfter}
         </p>
       )}
       {sharedCwd ? (
         <p className="cmp__caveat">
-          两边跑在<strong>同一个工作区</strong>，后跑的那家看得见先跑的改动——这不是一次对照实验。
+          {m.sharedBefore}<strong>{m.sharedStrong}</strong>{m.sharedAfter}
         </p>
       ) : null}
       <Open label={left} steps={diff.open.a} />
@@ -148,6 +153,7 @@ export function Compare({
   onClose: () => void
   send: (command: Command) => void
 }): React.JSX.Element {
+  const m = useMessages(COMPARE)
   const left = labelOf(engines, a.thread.engine)
   const right = labelOf(engines, b.thread.engine)
   const diff = compareRuns(
@@ -157,10 +163,10 @@ export function Compare({
   return (
     <main className="main">
       <header className="topbar">
-        <span className="topbar__title">对比：{left} ⟷ {right}</span>
+        <span className="topbar__title">{m.title(left, right)}</span>
         <span className="topbar__spacer" />
         <button className="tbtn" type="button" onClick={onClose}>
-          退出对比
+          {m.exit}
         </button>
       </header>
       <Summary diff={diff} left={left} right={right} sharedCwd={a.thread.cwd === b.thread.cwd} />
@@ -173,12 +179,12 @@ export function Compare({
               <button
                 className="tbtn"
                 type="button"
-                title="退出对比并切到这一边继续"
+                title={m.useTip}
                 onClick={() => {
                   onPick(side.thread.id)
                 }}
               >
-                接着用这边
+                {m.use}
               </button>
             </header>
             <Transcript

@@ -1,3 +1,6 @@
+import type { Locale } from "@switchback/i18n"
+import { REVIEW_KIND } from "./review.messages.js"
+
 /**
  * 审核面板的数据形状。
  *
@@ -47,16 +50,8 @@ export interface ReviewPatch {
   removed: number
 }
 
-const KIND_LABEL: Readonly<Record<ReviewKind, string>> = {
-  add: "新建",
-  delete: "删除",
-  update: "修改",
-  rename: "改名",
-  untracked: "未跟踪",
-}
-
-export function reviewLabel(kind: ReviewKind): string {
-  return KIND_LABEL[kind]
+export function reviewLabel(kind: ReviewKind, locale: Locale): string {
+  return REVIEW_KIND[locale].kind[kind]
 }
 
 /**

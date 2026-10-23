@@ -3,6 +3,8 @@ import type { ReviewFile } from "../../shared/review.js"
 import { FileIcon } from "./icons-activity.js"
 import { FileSearchIcon } from "./icons-panel.js"
 import { Popover } from "./Popover.js"
+import { useMessages } from "../i18n.js"
+import { REVIEW_FILE_JUMP } from "./review-file-jump.messages.js"
 
 export function filterReviewJumpFiles(
   files: readonly ReviewFile[],
@@ -21,6 +23,7 @@ export function ReviewFileJump({ files, active, onPick }: {
   active: string | undefined
   onPick: (path: string) => void
 }): React.JSX.Element {
+  const m = useMessages(REVIEW_FILE_JUMP)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const trigger = useRef<HTMLButtonElement>(null)
@@ -33,19 +36,19 @@ export function ReviewFileJump({ files, active, onPick }: {
   }
   return (
     <>
-      <button ref={trigger} type="button" className="rv__tool" aria-label="跳转到文件"
-        title="跳转到文件" aria-haspopup="dialog" aria-expanded={open}
+      <button ref={trigger} type="button" className="rv__tool" aria-label={m.jump}
+        title={m.jump} aria-haspopup="dialog" aria-expanded={open}
         onClick={() => { if (open) close(); else setOpen(true) }}><FileSearchIcon /></button>
-      <Popover open={open} anchor={trigger.current} minWidth={320} ariaLabel="跳转到文件"
+      <Popover open={open} anchor={trigger.current} minWidth={320} ariaLabel={m.jump}
         onClose={close}>
         <div className="rv-jump">
           <div className="rv-jump__search">
             <FileSearchIcon size={13} />
             <input ref={input} data-popover-autofocus type="search" value={query}
-              aria-label="跳转到文件" aria-controls={resultsId} placeholder="跳转到文件…"
+              aria-label={m.jump} aria-controls={resultsId} placeholder={m.placeholder}
               onChange={(event) => { setQuery(event.currentTarget.value) }} />
           </div>
-          <div id={resultsId} className="rv-jump__results" role="menu" aria-label="匹配的审核文件">
+          <div id={resultsId} className="rv-jump__results" role="menu" aria-label={m.results}>
             {shown.map((file) => (
               <button key={file.rel} type="button" role="menuitem"
                 className={`pop__item${file.rel === active ? " pop__item--on" : ""}`}
@@ -55,7 +58,7 @@ export function ReviewFileJump({ files, active, onPick }: {
                 <span className="pop__value">+{file.added} −{file.removed}</span>
               </button>
             ))}
-            {shown.length === 0 ? <p className="rv-jump__empty">没有匹配的改动文件</p> : null}
+            {shown.length === 0 ? <p className="rv-jump__empty">{m.none}</p> : null}
           </div>
         </div>
       </Popover>

@@ -50,7 +50,7 @@ describe("引用 diff 里的一段", () => {
 
   it("空段不引用；芯片上写文件与行号", () => {
     expect(quoteHunk("x.ts", numbered(parseDiff("@@ -1,0 +1,0 @@", "update")), 0)).toBeUndefined()
-    expect(quoteLabel("src/a.ts:10-12\n```diff")).toBe("引用 src/a.ts:10-12")
+    expect(quoteLabel("src/a.ts:10-12\n```diff", "zh-CN")).toBe("引用 src/a.ts:10-12")
   })
 
   it("太长的段只附前 300 行", () => {

@@ -128,13 +128,13 @@ describe("tallyReview", () => {
 
 describe("reviewCopyText", () => {
   it("有补丁时复制真实补丁，没有正文时复制路径和明确原因", () => {
-    expect(reviewCopyText("src/a.ts", { patch: "@@ -1 +1 @@", added: 1, removed: 1 }))
+    expect(reviewCopyText("src/a.ts", { patch: "@@ -1 +1 @@", added: 1, removed: 1 }, "zh-CN"))
       .toBe("@@ -1 +1 @@")
-    expect(reviewCopyText("asset.bin", { patch: "", skip: "binary", added: 0, removed: 0 }))
+    expect(reviewCopyText("asset.bin", { patch: "", skip: "binary", added: 0, removed: 0 }, "zh-CN"))
       .toBe("asset.bin\n\n（二进制文件不提供文本补丁）")
-    expect(reviewCopyText("gone.ts", { patch: "", skip: "gone", added: 0, removed: 1 }))
+    expect(reviewCopyText("gone.ts", { patch: "", skip: "gone", added: 0, removed: 1 }, "zh-CN"))
       .toContain("文件已不存在")
-    expect(reviewCopyText("same.ts", { patch: "", added: 0, removed: 0 }))
+    expect(reviewCopyText("same.ts", { patch: "", added: 0, removed: 0 }, "zh-CN"))
       .toContain("没有可复制的净改动")
   })
 })
@@ -145,27 +145,27 @@ describe("reviewCopyText", () => {
  */
 describe("空状态的措辞", () => {
   it("四种情况各说各的", () => {
-    expect(blank({ noRepo: false, loading: true, total: 0, shown: 0 })).toContain("正在问")
-    expect(blank({ noRepo: true, total: 0, shown: 0 })).toContain("不是 git 仓库")
-    expect(blank({ noRepo: false, total: 0, shown: 0 })).toContain("干净")
-    expect(blank({ noRepo: false, total: 5, shown: 0 })).toContain("筛选")
-    expect(blank({ noRepo: false, total: 8, shown: 0, more: 3 })).toContain("3 个文件未载入")
-    expect(blank({ noRepo: false, total: 5, shown: 5 })).toContain("选一个")
+    expect(blank({ noRepo: false, loading: true, total: 0, shown: 0 }, "zh-CN")).toContain("正在问")
+    expect(blank({ noRepo: true, total: 0, shown: 0 }, "zh-CN")).toContain("不是 git 仓库")
+    expect(blank({ noRepo: false, total: 0, shown: 0 }, "zh-CN")).toContain("干净")
+    expect(blank({ noRepo: false, total: 5, shown: 0 }, "zh-CN")).toContain("筛选")
+    expect(blank({ noRepo: false, total: 8, shown: 0, more: 3 }, "zh-CN")).toContain("3 个文件未载入")
+    expect(blank({ noRepo: false, total: 5, shown: 5 }, "zh-CN")).toContain("选一个")
   })
 
   it("加载中压过其余三种——那时还不知道是哪一种", () => {
-    expect(blank({ noRepo: true, loading: true, total: 0, shown: 0 })).toContain("正在问")
+    expect(blank({ noRepo: true, loading: true, total: 0, shown: 0 }, "zh-CN")).toContain("正在问")
   })
 
   it("只有 Git 忽略文件时不冒充本次对话没有改动", () => {
-    const message = blank({ noRepo: false, baseline: true, total: 0, shown: 0, unverified: 2 })
+    const message = blank({ noRepo: false, baseline: true, total: 0, shown: 0, unverified: 2 }, "zh-CN")
     expect(message).toContain("2 个 Git 忽略文件")
     expect(message).toContain("无法核实")
     expect(message).not.toContain("没有净改动")
   })
 
   it("旧会话缺少开场基线时明确说明只能比较 HEAD", () => {
-    const message = blank({ noRepo: false, baseline: false, total: 0, shown: 0 })
+    const message = blank({ noRepo: false, baseline: false, total: 0, shown: 0 }, "zh-CN")
     expect(message).toContain("没有可用的开场基线")
     expect(message).toContain("相对 HEAD")
     expect(message).toContain("无法还原本次对话净改动")

@@ -3,6 +3,8 @@ import type { PatchSkip } from "../../shared/review.js"
 import { paintPatch, type Seg } from "../review-paint.js"
 import type { NumberedLine, SplitRow } from "../review.js"
 import { splitRows } from "../review.js"
+import { useMessages } from "../i18n.js"
+import { REVIEW_DIFF } from "./ReviewDiff.messages.js"
 
 /**
  * 审核面板右边那一片：一个文件的补丁。
@@ -36,12 +38,6 @@ const SIGN: Readonly<Record<NumberedLine["kind"], string>> = {
   meta: " ",
 }
 
-const SKIP: Readonly<Record<PatchSkip, string>> = {
-  binary: "二进制文件，不显示内容",
-  large: "这份改动太大，画出来会把界面卡住——用 git 看它",
-  gone: "取不到这个文件的改动",
-  failed: "读取这份改动失败，请刷新后重试",
-}
 
 type Paint = ReadonlyMap<NumberedLine, readonly Seg[]>
 
@@ -83,10 +79,11 @@ function Text({ line, paint }: { line: NumberedLine; paint: Paint }): React.JSX.
  * 引过的写成「已引用」，免得连点两次塞进去两份。
  */
 function Quote({ quoted, onQuote }: { quoted: boolean; onQuote: () => void }): React.JSX.Element {
+  const m = useMessages(REVIEW_DIFF)
   return (
     <button type="button" className="rvd__quote" disabled={quoted}
-      title={quoted ? "这一段已经放进输入框了" : "把这一段改动连同位置放进输入框，写一句你要它怎么改"} onClick={onQuote}>
-      {quoted ? "已引用" : "引用"}
+      title={quoted ? m.quotedTip : m.quoteTip} onClick={onQuote}>
+      {quoted ? m.quoted : m.quote}
     </button>
   )
 }
@@ -165,6 +162,7 @@ export function ReviewDiff({ lines, path, skip, split, loading, wrap = false, on
 }): React.JSX.Element {
   // 着色和词级高亮一起算，一份补丁一次。切文件、换上下文档位才重算
   const paint = useMemo(() => paintPatch(path, lines), [path, lines])
+  const m = useMessages(REVIEW_DIFF)
   const [quoted, setQuoted] = useState<ReadonlySet<number>>(new Set())
   const quoting: Quoting | undefined = onQuote === undefined ? undefined : {
     quoted,
@@ -173,10 +171,10 @@ export function ReviewDiff({ lines, path, skip, split, loading, wrap = false, on
       setQuoted((had) => new Set([...had, at]))
     },
   }
-  if (skip !== undefined) return <p className="rvd__note">{SKIP[skip]}</p>
+  if (skip !== undefined) return <p className="rvd__note">{m.skip[skip]}</p>
   // **加载中不清空正文**：切文件时闪一下白比等半秒更难受。旧的先留着，压淡
   if (lines.length === 0) {
-    return <p className="rvd__note">{loading ? "正在读改动…" : "当前没有可显示的净改动"}</p>
+    return <p className="rvd__note">{loading ? m.reading : m.noNet}</p>
   }
   const body = split ? (
     <div className="rvd__body rvd__body--split">
@@ -197,7 +195,7 @@ export function ReviewDiff({ lines, path, skip, split, loading, wrap = false, on
     <div
       className={`rvd${loading ? " rvd--stale" : ""}${wrap ? " rvd--wrap" : ""}`}
       role="region"
-      aria-label={split ? "并排文件改动，可滚动" : "文件改动，可滚动"}
+      aria-label={split ? m.splitLabel : m.label}
       tabIndex={0}
     >
       {body}

@@ -2,6 +2,8 @@ import { useState } from "react"
 import type { CommitResult, GitState } from "../../shared/git.js"
 import { actionsOf, blockedOf, pendingOf, summaryOf } from "../commit-bar.js"
 import { BranchIcon } from "./icons.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { COMMIT_BAR_VIEW } from "./CommitBar.messages.js"
 
 /**
  * 审查页底下的「提交」：看完改动顺手提交，不用切去终端。
@@ -21,17 +23,19 @@ export function CommitBar({ state, running, busy, result, onCommit, onUndo, onRe
   onReload: () => void
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
+  const locale = useLocale()
+  const m = COMMIT_BAR_VIEW[locale]
   if (state === undefined || !state.repo) return null
   const pending = pendingOf(state)
   return (
-    <footer className="rv__commit" aria-label="提交">
+    <footer className="rv__commit" aria-label={m.label}>
       <div className="rv__commit-head">
         <BranchIcon size={13} />
-        <span className="rv__commit-sum" title={state.root}>{summaryOf(state)}</span>
-        {state.failed === true ? <button type="button" className="tbtn" onClick={onReload}>重读</button> : null}
+        <span className="rv__commit-sum" title={state.root}>{summaryOf(state, locale)}</span>
+        {state.failed === true ? <button type="button" className="tbtn" onClick={onReload}>{m.reload}</button> : null}
         {pending > 0 ? (
           <button type="button" className="tbtn" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
-            {open ? "收起" : "提交…"}
+            {open ? m.less : m.open}
           </button>
         ) : null}
       </div>
@@ -52,8 +56,10 @@ function CommitForm({ state, running, busy, onCommit, onDone }: {
   onDone: () => void
 }): React.JSX.Element {
   const [message, setMessage] = useState("")
-  const blocked = blockedOf(state, running, message)
-  const { primary, secondary } = actionsOf(state)
+  const locale = useLocale()
+  const m = COMMIT_BAR_VIEW[locale]
+  const blocked = blockedOf(state, running, message, locale)
+  const { primary, secondary } = actionsOf(state, locale)
   const off = blocked !== undefined || busy
   const commit = (all: boolean): void => {
     if (off) return
@@ -69,8 +75,8 @@ function CommitForm({ state, running, busy, onCommit, onDone }: {
         className="rv__commit-msg"
         value={message}
         rows={2}
-        placeholder="提交说明：第一行是标题（⌘↩ 提交）"
-        aria-label="提交说明"
+        placeholder={m.placeholder}
+        aria-label={m.message}
         onChange={(event) => setMessage(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) return
@@ -80,7 +86,7 @@ function CommitForm({ state, running, busy, onCommit, onDone }: {
       />
       <div className="rv__commit-actions">
         <button type="button" className="tbtn tbtn--on" disabled={off} title={blocked} onClick={() => commit(primary.all)}>
-          {busy ? "提交中…" : primary.label}
+          {busy ? m.committing : primary.label}
         </button>
         {secondary === undefined ? null : (
           <button type="button" className="tbtn" disabled={off} title={blocked} onClick={() => commit(secondary.all)}>
@@ -102,18 +108,19 @@ function Outcome({ result, busy, onUndo }: {
   busy: boolean
   onUndo: (full: string) => void
 }): React.JSX.Element | null {
+  const m = useMessages(COMMIT_BAR_VIEW)
   if (result === undefined || (result.ok && result.sha === undefined && result.undone !== true)) return null
   if (result.undone === true) {
-    return <p className="rv__commit-note rv__commit-note--ok" role="status">已撤销那次提交，改动回到了暂存区。</p>
+    return <p className="rv__commit-note rv__commit-note--ok" role="status">{m.undone}</p>
   }
   if (result.ok) {
     const full = result.full
     return (
       <p className="rv__commit-note rv__commit-note--ok" role="status">
-        已提交 <code>{result.sha}</code>「{result.subject}」
+        {m.committed}<code>{result.sha}</code>{m.subject(result.subject ?? "")}
         {full === undefined ? null : (
-          <button type="button" className="rv__stage rv__undo" disabled={busy} title="退回这次提交（git reset --soft），改动留在暂存区" onClick={() => { onUndo(full) }}>
-            撤销
+          <button type="button" className="rv__stage rv__undo" disabled={busy} title={m.undoTip} onClick={() => { onUndo(full) }}>
+            {m.undo}
           </button>
         )}
       </p>
@@ -121,7 +128,7 @@ function Outcome({ result, busy, onUndo }: {
   }
   return (
     <>
-      <p className="rv__commit-note rv__commit-note--error" role="alert">{result.error ?? "没成功。"}</p>
+      <p className="rv__commit-note rv__commit-note--error" role="alert">{result.error ?? m.failed}</p>
       {result.output === undefined || result.output === "" ? null : <pre className="rv__commit-log">{result.output}</pre>}
     </>
   )

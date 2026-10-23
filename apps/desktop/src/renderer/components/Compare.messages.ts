@@ -1,0 +1,41 @@
+import { count, defineMessages } from "@switchback/i18n"
+
+/** 两条分叉并排对比。计划步骤是引擎写的，不翻译。 */
+export const COMPARE = defineMessages(
+  {
+    both: "两边都上报过",
+    one: "只有一边上报过",
+    remaining: (label: string) => `${label}还剩`,
+    steps: (steps: readonly string[]) => steps.join("、"),
+    head: "编辑工具上报（非 Git 净 diff）",
+    empty: "两边都还没有成功的文件编辑上报。",
+    onlyBefore: (n: number) => `有 ${String(n)} 个文件`,
+    onlyStrong: "只有一边",
+    onlyAfter: "上报过——可从这里检查分歧。",
+    sharedBefore: "两边跑在",
+    sharedStrong: "同一个工作区",
+    sharedAfter: "，后跑的那家看得见先跑的改动——这不是一次对照实验。",
+    title: (left: string, right: string) => `对比：${left} ⟷ ${right}`,
+    exit: "退出对比",
+    useTip: "退出对比并切到这一边继续",
+    use: "接着用这边",
+  },
+  {
+    both: "Reported by both",
+    one: "Reported by one side only",
+    remaining: (label) => `${label} still has`,
+    steps: (steps) => steps.join(", "),
+    head: "Edits reported by tools (not a Git net diff)",
+    empty: "Neither side has reported a successful file edit yet.",
+    onlyBefore: (n) => `${count(n, "file")} ${n === 1 ? "was" : "were"} reported by `,
+    onlyStrong: "one side only",
+    onlyAfter: ". Start here to check where they diverge.",
+    sharedBefore: "Both sides ran in ",
+    sharedStrong: "the same workspace",
+    sharedAfter: ", so the later one could see the earlier one's changes. This isn't a controlled experiment.",
+    title: (left, right) => `Compare: ${left} ⟷ ${right}`,
+    exit: "Exit compare",
+    useTip: "Exit compare and continue with this side",
+    use: "Continue with this side",
+  },
+)

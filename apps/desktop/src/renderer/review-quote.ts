@@ -1,4 +1,6 @@
 import type { NumberedLine } from "./review-lines.js"
+import type { Locale } from "@switchback/i18n"
+import { REVIEW_QUOTE } from "./review-quote.messages.js"
 
 /**
  * 审查页里「引用这一段」：把一个 hunk 连同位置写成人会贴进对话的那种样子——
@@ -58,6 +60,6 @@ export function quoteHunk(rel: string, lines: readonly NumberedLine[], at: numbe
 }
 
 /** 芯片上那行字：哪个文件的哪几行。 */
-export function quoteLabel(quote: string): string {
-  return `引用 ${quote.split("\n")[0] ?? ""}`
+export function quoteLabel(quote: string, locale: Locale): string {
+  return REVIEW_QUOTE[locale].label(quote.split("\n")[0] ?? "")
 }

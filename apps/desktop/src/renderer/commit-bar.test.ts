@@ -16,21 +16,21 @@ describe("summaryOf", () => {
     [{ branch: undefined }, "（还没有分支） · 工作区干净"],
     [{ failed: true }, "main · 这一次没读到 Git 状态"],
   ]
-  for (const [patch, want] of table) it(want, () => expect(summaryOf(state(patch))).toBe(want))
+  for (const [patch, want] of table) it(want, () => expect(summaryOf(state(patch), "zh-CN")).toBe(want))
 })
 
 describe("actionsOf", () => {
   it("什么都没暂存：主按钮就是全部提交", () => {
-    expect(actionsOf(state({ unstaged: 2, untracked: 1 }))).toEqual({ primary: { all: true, label: "全部提交（3）" } })
+    expect(actionsOf(state({ unstaged: 2, untracked: 1 }), "zh-CN")).toEqual({ primary: { all: true, label: "全部提交（3）" } })
   })
   it("有暂存也有没暂存的：主按钮只提交暂存的，旁边给全部", () => {
-    expect(actionsOf(state({ staged: 2, unstaged: 1 }))).toEqual({
+    expect(actionsOf(state({ staged: 2, unstaged: 1 }), "zh-CN")).toEqual({
       primary: { all: false, label: "提交已暂存的 2 个" },
       secondary: { all: true, label: "全部提交（3）" },
     })
   })
   it("全都暂存了：只有一颗", () => {
-    expect(actionsOf(state({ staged: 2 }))).toEqual({ primary: { all: false, label: "提交已暂存的 2 个" } })
+    expect(actionsOf(state({ staged: 2 }), "zh-CN")).toEqual({ primary: { all: false, label: "提交已暂存的 2 个" } })
   })
 })
 
@@ -45,6 +45,6 @@ describe("blockedOf：点不了必须说为什么", () => {
     [dirty, false, "修一下", undefined],
   ]
   for (const [git, running, message, want] of table) {
-    it(String(want), () => expect(blockedOf(git, running, message)).toBe(want))
+    it(String(want), () => expect(blockedOf(git, running, message, "zh-CN")).toBe(want))
   }
 })

@@ -8,6 +8,8 @@ import { ReviewList } from "./ReviewList.js"
 import { ReviewNavigationBar } from "./review-navigation-bar.js"
 import { ReportedReviewPane } from "./reported-review-pane.js"
 import { FileListIcon } from "./icons-panel.js"
+import { useMessages } from "../i18n.js"
+import { REPORTED_REVIEW } from "./reported-review.messages.js"
 
 const initialPath = (target: TurnReviewTarget): string | undefined => target.path ?? target.edits.list[0]?.path
 
@@ -31,6 +33,7 @@ export function ReportedReview({ target, panel, panelActive, onClose, onCopy, on
   onCopy: (text: string) => unknown
   onGit: () => void
 }): React.JSX.Element {
+  const m = useMessages(REPORTED_REVIEW)
   const box = usePanelKeys(onClose, panelActive)
   const pane = useRef<HTMLElement>(null)
   const narrow = useNarrowPanel(pane)
@@ -48,29 +51,29 @@ export function ReportedReview({ target, panel, panelActive, onClose, onCopy, on
     if (narrow) { setList(false); if (!panel.full) panel.onFull() }
   }
   return (
-    <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动" hidden={!panelActive}>
+    <section className="rv" ref={box} tabIndex={-1} aria-label={m.label} hidden={!panelActive}>
       <PanelTabs {...panel} onHide={panel.onHide ?? onClose} />
       <header className="rv__head">
-        <span className="rv__title">本轮改动</span>
-        <div className="rv__summary"><span className="rv__count">{all.length} 个文件</span>
+        <span className="rv__title">{m.title}</span>
+        <div className="rv__summary"><span className="rv__count">{m.files(all.length)}</span>
           <span className="diffstat__add">+{target.edits.added}</span>
           <span className="diffstat__del">−{target.edits.removed}</span>
         </div>
         <div className="rv__tools">
           <button type="button" className="rv__seg" aria-pressed={!split || narrow}
-            onClick={() => { setSplit(false) }}>单栏</button>
+            onClick={() => { setSplit(false) }}>{m.unified}</button>
           <button type="button" className="rv__seg" aria-pressed={split && !narrow}
-            onClick={switchSplit}>并排</button>
-          <button type="button" className="rv__tool" aria-label={list ? "隐藏文件" : "显示文件"}
+            onClick={switchSplit}>{m.split}</button>
+          <button type="button" className="rv__tool" aria-label={list ? m.hideFiles : m.showFiles}
             onClick={() => { setList(!list) }}><FileListIcon /></button>
-          <button type="button" className="rv__seg" onClick={onGit}>Git 差异</button>
+          <button type="button" className="rv__seg" onClick={onGit}>{m.git}</button>
         </div>
       </header>
       <ReviewNavigationBar files={files} active={active?.rel} onPick={pick} wrap={wrap} onWrap={setWrap} fixedWrap={split && !narrow} />
       <div className={`rv__body${list ? "" : " rv__body--list-hidden"}`}>
         <ReviewList files={files} active={active?.rel} query={query} onQuery={setQuery} onPick={pick} ignored={[]} />
         <section className="rv__pane" ref={pane}>
-          {file === undefined ? <p className="rvd__note">没有匹配的文件</p> : (
+          {file === undefined ? <p className="rvd__note">{m.noMatch}</p> : (
             <ReportedReviewPane key={`${target.turnId}:${String(target.at)}:${file.path}`} file={file} cwd={target.cwd} threadId={target.threadId}
               split={split && !narrow} wrap={wrap} onCopy={onCopy} onGit={onGit} />
           )}

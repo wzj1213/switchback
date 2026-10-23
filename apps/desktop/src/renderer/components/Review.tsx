@@ -12,18 +12,19 @@ import type { ReviewScope } from "../../shared/review.js"
 import { ReviewNavigationBar } from "./review-navigation-bar.js"
 import { CommitBar } from "./CommitBar.js"
 import { useReviewGit } from "../use-git.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "../i18n.js"
+import { REVIEW } from "./Review.messages.js"
 
-const SCOPES: readonly { id: ReviewScope; label: string; description: string }[] = [
-  { id: "last-turn", label: "上一轮", description: "只看最近一次发送之后留下的改动" },
-  { id: "uncommitted", label: "未提交", description: "当前工作区相对 HEAD 的全部改动" },
-  { id: "unstaged", label: "未暂存", description: "尚未加入暂存区的改动与新文件" },
-  { id: "staged", label: "已暂存", description: "已经加入 Git 暂存区的改动" },
-  { id: "last-commit", label: "已提交", description: "最近一次提交带来的改动" },
-  { id: "branch", label: "分支", description: "当前分支相对上游或主分支的改动" },
-]
+const SCOPES: readonly ReviewScope[] = ["last-turn", "uncommitted", "unstaged", "staged", "last-commit", "branch"]
 
-function scopeLabel(scope: ReviewScope): string {
-  return SCOPES.find((candidate) => candidate.id === scope)?.label ?? "审核范围"
+function scopesOf(locale: Locale): readonly { id: ReviewScope; label: string; description: string }[] {
+  const m = REVIEW[locale]
+  return SCOPES.map((id) => ({ id, label: m.scope[id], description: m.about[id] }))
+}
+
+function scopeLabel(scope: ReviewScope, locale: Locale): string {
+  return scopesOf(locale).find((candidate) => candidate.id === scope)?.label ?? REVIEW[locale].fallback
 }
 
 /**
@@ -65,6 +66,8 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, runni
   onCopy: (text: string) => Promise<boolean>
 }): React.JSX.Element {
   const box = usePanelKeys(onClose, panelActive)
+  const locale = useLocale()
+  const m = REVIEW[locale]
   // 并排的闸门。`split` 记的是「你想怎么看」，`narrow` 记的是「现在放不放得下」——
   // 两件事各存各的，于是拉宽之后自己回到并排，不用人再点一次。
   // **量的是补丁区，不是这扇面板**：面板里还并排站着 260px 的文件清单
@@ -98,20 +101,20 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, runni
     baseline: data.baseline,
     total,
     unverified,
-    range: scopeLabel(scope),
+    range: scopeLabel(scope, locale),
     turnMissing: data.turnMissing,
     ...(data.more === undefined ? {} : { more: data.more }),
   }
   return (
-    <section className="rv" ref={box} tabIndex={-1} aria-label="审核改动" hidden={!panelActive}>
+    <section className="rv" ref={box} tabIndex={-1} aria-label={m.label} hidden={!panelActive}>
       <PanelTabs {...panel} onHide={panel.onHide ?? onClose} />
       <header className="rv__head">
-        <Select label={scopeLabel(scope)} title="选择审核范围" sections={[{
-          choices: SCOPES,
+        <Select label={scopeLabel(scope, locale)} title={m.pick} sections={[{
+          choices: scopesOf(locale),
           value: scope,
           onPick: (id) => {
-            const picked = SCOPES.find((candidate) => candidate.id === id)
-            if (picked !== undefined) setScope(picked.id)
+            const picked = SCOPES.find((candidate) => candidate === id)
+            if (picked !== undefined) setScope(picked)
           },
         }]} />
         <div className="rv__summary">
@@ -143,7 +146,7 @@ export function Review({ cwd, threadId, stamp, wanted, panelActive, panel, runni
           {...(data.more === undefined ? {} : { more: data.more })}
         />
         <ReviewPane file={file} patch={patch}
-          empty={blank({ ...view, shown: files.length })}
+          empty={blank({ ...view, shown: files.length }, locale)}
           split={split && !narrow}
           wrap={wrap}
           cwd={cwd}

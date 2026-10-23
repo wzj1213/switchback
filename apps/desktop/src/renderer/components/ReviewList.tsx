@@ -2,6 +2,8 @@ import type { ReviewFile } from "../../shared/review.js"
 import { reviewLabel } from "../../shared/review.js"
 import { reviewDestination } from "./review-navigation.js"
 import { ReviewTree } from "./review-tree.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { REVIEW_LIST } from "./ReviewList.messages.js"
 
 /**
  * 审核面板右侧文件栏：改了哪些文件。
@@ -32,15 +34,16 @@ function moveSelection(event: React.KeyboardEvent<HTMLDivElement>, files: readon
 }
 
 function Notices({ more, ignored }: { more?: number; ignored: readonly string[] }): React.JSX.Element {
+  const m = useMessages(REVIEW_LIST)
   return <>
     {more === undefined ? null : (
-      <p className="rvl__none">改动太多，这里只列了前面这些，还有 {more} 个没显示</p>
+      <p className="rvl__none">{m.tooMany(more)}</p>
     )}
     {ignored.length === 0 ? null : (
       <p className="rvl__none">
-        另有 {ignored.length} 个 Git 忽略文件无法核实：
-        {ignored.slice(0, 3).join("、")}
-        {ignored.length > 3 ? ` 等 ${String(ignored.length)} 个` : ""}
+        {m.ignored(ignored.length)}
+        {m.join(ignored.slice(0, 3))}
+        {ignored.length > 3 ? m.etc(ignored.length, 3) : ""}
       </p>
     )}
   </>
@@ -57,6 +60,8 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
   /** 被 Git ignore 排除、无法生成可信补丁的引擎上报路径。 */
   ignored: readonly string[]
 }): React.JSX.Element {
+  const locale = useLocale()
+  const m = REVIEW_LIST[locale]
   return (
     <div className="rvl" onKeyDown={(event) => { moveSelection(event, files, active, onPick) }}>
       <div className="rvl__filter">
@@ -64,8 +69,8 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
           className="rvl__input"
           type="text"
           value={query}
-          placeholder="筛选路径…"
-          aria-label="筛选文件"
+          placeholder={m.placeholder}
+          aria-label={m.filter}
           aria-keyshortcuts="ArrowUp ArrowDown Home End"
           onChange={(e) => {
             onQuery(e.target.value)
@@ -77,7 +82,7 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
       {files.length === 0 ? <div className="rvl__rows">
         {query.trim() === "" && more === undefined ? null : (
           <p className="rvl__none">
-            {more === undefined ? "当前筛选条件下没有可显示的文件" : "已列出的文件里没有匹配项"}
+            {more === undefined ? m.noneFiltered : m.noMatch}
           </p>
         )}
         <Notices more={more} ignored={ignored} />
@@ -91,7 +96,7 @@ export function ReviewList({ files, active, query, onQuery, onPick, more, ignore
         {(["add", "update", "delete", "rename", "untracked"] as const).map((kind) => (
           <span key={kind} className="rvl__key">
             <span className={`rvl__kind rvl__kind--${kind}`} aria-hidden="true" />
-            {reviewLabel(kind)}
+            {reviewLabel(kind, locale)}
           </span>
         ))}
       </p>}

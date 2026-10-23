@@ -3,6 +3,8 @@ import type { ReviewFile } from "../../shared/review.js"
 import { FileIcon } from "./icons-activity.js"
 import { ChevronIcon } from "./icons.js"
 import { FolderIcon } from "./icons-folder.js"
+import { useMessages } from "../i18n.js"
+import { REVIEW_TREE } from "./review-tree.messages.js"
 import { revealReviewTreePath, reviewTreeDestination, reviewTreeRows,
   type ReviewTreeRow } from "./review-tree-model.js"
 
@@ -23,9 +25,10 @@ function RowIcon({ row }: { row: ReviewTreeRow }): React.JSX.Element {
 }
 
 function RowTail({ file }: { file: ReviewFile | undefined }): React.JSX.Element | null {
+  const m = useMessages(REVIEW_TREE)
   if (file === undefined) return null
   return <>
-    {file.staged === true ? <span className="rvl__staged" title="已在暂存区">已暂存</span> : null}
+    {file.staged === true ? <span className="rvl__staged" title={m.stagedTip}>{m.staged}</span> : null}
     <Stat file={file} />
   </>
 }
@@ -70,6 +73,7 @@ export function ReviewTree({ files, active, searching, onPick, children }: {
   onPick: (rel: string) => void
   children?: React.ReactNode
 }): React.JSX.Element {
+  const m = useMessages(REVIEW_TREE)
   const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set())
   const [focused, setFocused] = useState<string | undefined>(undefined)
   const rows = useMemo(() => reviewTreeRows(files, searching ? new Set() : closed),
@@ -103,7 +107,7 @@ export function ReviewTree({ files, active, searching, onPick, children }: {
     target?.scrollIntoView({ block: "nearest" })
   }
   return <div className="rvl__rows">
-    <div role="tree" aria-label="改动文件" onKeyDown={keyDown}>
+    <div role="tree" aria-label={m.label} onKeyDown={keyDown}>
       {rows.map((row, index) => <TreeRowView key={row.key} row={row} index={index}
         tabKey={tabKey} active={active} onToggle={toggle} onPick={onPick}
         onFocus={() => { setFocused(row.key) }} />)}
