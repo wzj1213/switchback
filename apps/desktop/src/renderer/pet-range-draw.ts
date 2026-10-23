@@ -1,4 +1,6 @@
 import type { TurnPace } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { PET_RANGE } from "./pet-range-draw.messages.js"
 import { round } from "./pet-foe-art.js"
 import { effOf, spreadOf, TG_R, type Target } from "./pet-range.js"
 
@@ -30,6 +32,8 @@ const RATE_FULL = 240
 
 export interface RangeShot {
   target: Target
+  /** 靶上那行读数说哪种语言。 */
+  locale: Locale
   /** 画多浓。0.18（闲着）到 1（在开火）。见 `pet-range.ts` 的「靶场什么时候显形」。 */
   show: number
   at: { x: number; y: number; ground: number }
@@ -134,12 +138,12 @@ function holes(g: CanvasRenderingContext2D, { target, at, pal, show }: RangeShot
  * - **跑完**：`首字 0.62s · 87 tok/s`。上一轮的**成绩**，和分界线上印的是同一个数：
  *   宿主量好、跟着那一轮落了盘的那一份。引擎报得出生成量时是**真数，不带 ≈**；报不出的那几家仍带。
  */
-function headOf(live: RangeShot["live"]): string {
+function headOf(live: RangeShot["live"], locale: Locale): string {
   if (live.speed !== undefined) return `≈${String(Math.round(live.speed))} tok/s`
   if (live.rate > 1) return `≈${String(Math.round(live.rate))} tok/s`
   const done = live.pace
   if (done === undefined) return "0 tok/s"
-  const first = `首字 ${(done.firstMs / 1000).toFixed(2)}s`
+  const first = PET_RANGE[locale].first((done.firstMs / 1000).toFixed(2))
   if (done.tps === undefined) return first
   return `${first} · ${done.exact ? "" : "≈"}${String(Math.round(done.tps))} tok/s`
 }
@@ -151,7 +155,7 @@ function headOf(live: RangeShot["live"]): string {
  * 但它们不是同一个层级的东西：速度是你一直在扫的，其余是你想起来才查的。
  * 把想起来才查的那些常驻在这儿，等于让每一帧都替一个偶尔的问题付钱。
  */
-function readout(g: CanvasRenderingContext2D, { target, at, live, pal }: RangeShot): void {
+function readout(g: CanvasRenderingContext2D, { target, at, live, pal, locale }: RangeShot): void {
   const spread = spreadOf(target)
   const pct = target.shots > 0 ? `${String(Math.round((target.hits / target.shots) * 100))}%` : "—"
   g.font = pal.font
@@ -159,7 +163,7 @@ function readout(g: CanvasRenderingContext2D, { target, at, live, pal }: RangeSh
   g.textBaseline = "bottom"
   // 在跑用强调色，跑完那个真数用正文色——**估出来的那个不配用正文色**
   g.fillStyle = live.rate > 1 || live.speed !== undefined ? pal.accent : live.pace?.exact === true ? pal.text : pal.faint
-  g.fillText(headOf(live), at.x, at.y - TG_R - 14)
+  g.fillText(headOf(live, locale), at.x, at.y - TG_R - 14)
   g.fillStyle = pal.faint
   const sd = spread === undefined ? "—" : `±${spread.toFixed(1)}px`
   g.fillText(`${String(target.hits)}/${String(target.shots)} · ${pct} · ${sd}`, at.x, at.y + TG_R + 24)

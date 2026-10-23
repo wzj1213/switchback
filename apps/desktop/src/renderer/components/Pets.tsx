@@ -12,6 +12,7 @@ import { useMood } from "../usePetMood.js"
 import { usePetDrag } from "../usePetDrag.js"
 import { applyHit } from "../pet-hit-fx.js"
 import { useDshPetPhase } from "./DshPetEffect.js"
+import { useLocale } from "../i18n.js"
 
 /**
  * 蹲在输入框上沿的那几只。手感与物理在 `renderer/pets.ts`，机械部分在 `usePets.ts`。
@@ -65,9 +66,10 @@ function PetsView({
    */
   fire: FireProps
 }): React.JSX.Element | null {
+  const locale = useLocale()
   const shown = useMemo(
-    () => visibleRoster(petRoster(engines, engine), engine, hidden),
-    [engines, engine, hidden],
+    () => visibleRoster(petRoster(engines, engine, locale), engine, hidden),
+    [engines, engine, hidden, locale],
   )
   const count = shown.length
   /**

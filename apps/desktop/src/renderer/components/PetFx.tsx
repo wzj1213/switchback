@@ -4,6 +4,7 @@ import { PetFx } from "./PetFxCanvas.js"
 import { lookOf, type Pet } from "../pets.js"
 import type { PetSlot } from "../pet-roster.js"
 import { useFlow } from "../useFlow.js"
+import { useLocale } from "../i18n.js"
 
 /**
  * 开火那一层的**接线**。画布本身在 `PetFxCanvas.tsx`——
@@ -60,6 +61,7 @@ export function FireLayer({
   onBite: () => void
 }): React.JSX.Element | null {
   const flow = useFlow(fire.threadId)
+  const locale = useLocale()
   const mine = slots.findIndex((slot) => slot.engine === engine)
   if (!fire.on || reduced || mine < 0) return null
   const look = lookOf(engine)
@@ -80,6 +82,7 @@ export function FireLayer({
       brass={fire.brass}
       traj={fire.traj}
       range={fire.range}
+      locale={locale}
       onBite={onBite}
     />
   )

@@ -1,5 +1,7 @@
 import type { EngineId, EngineInfo } from "@switchback/protocol"
 import { lookOf, type PetLook } from "./pets.js"
+import type { Locale } from "@switchback/i18n"
+import { PET_ROSTER } from "./pet-roster.messages.js"
 
 /**
  * 桌宠花名册和引擎注册表不是一回事：前四个位置画宿主真的给出来的引擎，
@@ -19,20 +21,18 @@ export interface PetSlot {
   look: PetLook
 }
 
-const DSH: PetSlot = {
-  key: "dsh",
-  label: "DSH · 去设置中接入",
-  look: lookOf("dsh"),
+function dshSlot(locale: Locale): PetSlot {
+  return { key: "dsh", label: PET_ROSTER[locale].dsh, look: lookOf("dsh") }
 }
 
-export function petRoster(engines: readonly EngineInfo[], current: EngineId): readonly PetSlot[] {
+export function petRoster(engines: readonly EngineInfo[], current: EngineId, locale: Locale): readonly PetSlot[] {
   const dsh = engines.find(
     (engine) =>
       lookOf(engine.id).tone === "dsh" &&
       ((engine.state !== "missing" && engine.state !== "unavailable") || engine.id === current),
   )
   const others = engines.filter((engine) => lookOf(engine.id).tone !== "dsh")
-  return [...pick(others, current).map(slotOf), dsh === undefined ? DSH : slotOf(dsh)]
+  return [...pick(others, current).map(slotOf), dsh === undefined ? dshSlot(locale) : slotOf(dsh)]
 }
 
 /**

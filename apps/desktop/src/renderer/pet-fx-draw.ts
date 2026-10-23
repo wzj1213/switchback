@@ -2,6 +2,7 @@ import { fadeOf, type Brass } from "./pet-brass.js"
 import { drawFoes, type FoeArtSlot } from "./pet-foe-draw.js"
 import { muzzleOf, tapeAt, targetAt, type FxWorld } from "./pet-fx.js"
 import { drawRange } from "./pet-range-draw.js"
+import type { Locale } from "@switchback/i18n"
 import { posOf } from "./pet-shots.js"
 
 /**
@@ -88,6 +89,7 @@ export interface DrawKit {
   art: FoeArtSlot["art"]
   gen: number
   range: boolean
+  locale: Locale
 }
 
 export function drawFx(
@@ -96,7 +98,7 @@ export function drawFx(
   pal: Palette,
   kit: DrawKit,
 ): void {
-  if (kit.range) drawTarget(g, w, pal)
+  if (kit.range) drawTarget(g, w, pal, kit.locale)
   else drawTape(g, w, pal)
   drawFoes(g, w.foes, { foe: pal.foe, drip: pal.foeDrip, bar: pal.spark }, { art: kit.art, gen: kit.gen })
   drawBrass(g, w.brass, pal)
@@ -104,13 +106,14 @@ export function drawFx(
   if (w.gun.arm > 0.01) drawGun(g, w, pal)
 }
 
-function drawTarget(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette): void {
+function drawTarget(g: CanvasRenderingContext2D, w: FxWorld, pal: Palette, locale: Locale): void {
   const { view } = w
   // **靶从 `view.stand` 算，不从手算**：一张跟着枪走的靶量不出任何东西，
   // 而靶杆也得立在台面的地面线上，不是那只此刻的脚下（见 `pet-range.ts` 开头）
   const at = targetAt(view.stand)
   drawRange(g, {
     target: w.target,
+    locale,
     show: w.show.on,
     at: { x: at.x, y: at.y, ground: view.stand.ground },
     live: { rate: view.rate, speed: view.speed, ratio: view.ratio, pace: view.pace },

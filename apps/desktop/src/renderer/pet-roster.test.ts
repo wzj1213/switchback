@@ -13,6 +13,7 @@ describe("petRoster", () => {
     const roster = petRoster(
       [engine("claude"), engine("codex"), engine("kimi"), engine("grok")],
       "kimi",
+      "zh-CN",
     )
     expect(roster.map((slot) => slot.key)).toEqual([
       "claude",
@@ -29,6 +30,7 @@ describe("petRoster", () => {
     const roster = petRoster(
       [engine("claude"), engine("codex"), engine("kimi"), engine("grok"), engine("zcode")],
       "zcode",
+      "zh-CN",
     )
     expect(roster.slice(0, 4).map((slot) => slot.engine)).toContain("zcode")
     expect(roster).toHaveLength(5)
@@ -38,6 +40,7 @@ describe("petRoster", () => {
     const roster = petRoster(
       [engine("claude"), engine("codex"), engine("kimi"), engine("grok"), engine("dsh")],
       "claude",
+      "zh-CN",
     )
     expect(roster).toHaveLength(5)
     expect(roster.filter((slot) => slot.look.tone === "dsh")).toHaveLength(1)
@@ -46,15 +49,15 @@ describe("petRoster", () => {
 
   it("DSH 未安装或当前 profile 不可用时仍画接入占位", () => {
     for (const state of ["missing", "unavailable"] as const) {
-      const roster = petRoster([engine("claude"), engine("dsh", state)], "claude")
+      const roster = petRoster([engine("claude"), engine("dsh", state)], "claude", "zh-CN")
       expect(roster.at(-1)?.key, state).toBe("dsh")
       expect(roster.at(-1)?.engine, state).toBeUndefined()
     }
   })
 
   it("占位与真 DSH 共用 DOM key，设置里实时接入时鲸鱼不会跳到左上角", () => {
-    const before = petRoster([engine("claude")], "claude").at(-1)
-    const after = petRoster([engine("claude"), engine("dsh")], "claude").at(-1)
+    const before = petRoster([engine("claude")], "claude", "zh-CN").at(-1)
+    const after = petRoster([engine("claude"), engine("dsh")], "claude", "zh-CN").at(-1)
     expect(before?.key).toBe("dsh")
     expect(after?.key).toBe(before?.key)
   })
@@ -64,6 +67,7 @@ describe("visibleRoster", () => {
   const all = petRoster(
     [engine("claude"), engine("codex"), engine("kimi"), engine("grok")],
     "kimi",
+    "zh-CN",
   )
 
   it("没藏过就是全员", () => {

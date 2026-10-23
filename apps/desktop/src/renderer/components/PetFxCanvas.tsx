@@ -7,6 +7,7 @@ import { drawFx, readPalette, type Palette } from "../pet-fx-draw.js"
 import { createFxLoop } from "../pet-fx-loop.js"
 import type { Flow } from "../useFlow.js"
 import { SIZE, type Pet, type PetShape } from "../pets.js"
+import type { Locale } from "@switchback/i18n"
 
 /**
  * 开火那一层的画布。**桌宠本体一无所知**——它和这张 canvas 之间只有一个接口：
@@ -95,7 +96,7 @@ export function PetFx(props: FxProps): React.JSX.Element {
           }
           g.setTransform(box.dpr, 0, 0, box.dpr, 0, 0)
           g.clearRect(0, 0, box.w, box.h)
-          drawFx(g, world, paint.pal, { art, gen: paint.gen, range: props2.range })
+          drawFx(g, world, paint.pal, { art, gen: paint.gen, range: props2.range, locale: props2.locale })
         }
         return world.moving || rate > 1
       }
@@ -233,6 +234,8 @@ interface FxProps {
   traj: TrajMode
   /** 打靶。 */
   range: boolean
+  /** 画在 canvas 上的那几个字（靶上的读数）说哪种语言。 */
+  locale: Locale
   /**
    * 被摸到脸上了。**回调而不是让这一层去改桌宠**：那只的身体归 `Pets` 管，
    * 挨了一下该怎么演已经有一套现成的（`pet-hit-fx.ts`）。

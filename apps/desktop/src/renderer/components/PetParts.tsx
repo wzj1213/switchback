@@ -4,6 +4,9 @@ import type { PetSlot } from "../pet-roster.js"
 import type { EntryKind } from "../pet-entry.js"
 import type { PetDrag } from "../usePetDrag.js"
 import { DshPetEffect, type DshPetPhase } from "./DshPetEffect.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { PET_PARTS } from "./PetParts.messages.js"
 
 /**
  * 一只桌宠身上的那几层，外加影子那一组。
@@ -42,6 +45,7 @@ export function PetOne({
   drag: PetDrag
 }): React.JSX.Element {
   const on = info.engine === look.engine
+  const m = useMessages(PET_PARTS)
   return (
     <button
       type="button"
@@ -54,7 +58,7 @@ export function PetOne({
         refs.nodes.current[at] = n
       }}
       className={classOf(info, look.engine, look.running, look.dshPhase) + enterOf(on, look.entry)}
-      title={titleOf(info.label, on, look.running, info.engine === "dsh" ? look.profile : undefined)}
+      title={titleOf(info.label, on, { running: look.running, profile: info.engine === "dsh" ? look.profile : undefined }, m)}
       onPointerDown={drag.down(at)}
       onPointerMove={drag.move}
       onPointerUp={drag.up}
@@ -169,9 +173,14 @@ function classOf(
     .join(" ")
 }
 
-function titleOf(label: string, on: boolean, running: boolean, profile?: string): string {
+function titleOf(
+  label: string,
+  on: boolean,
+  state: { running: boolean; profile: string | undefined },
+  m: (typeof PET_PARTS)[Locale],
+): string {
   if (!on) return label
-  const routed = profile === undefined ? label : `${label} · ${profile} profile`
-  return running ? `${routed} · 正在跑` : `${routed} · 这一轮归它`
+  const routed = state.profile === undefined ? label : `${label} · ${state.profile} profile`
+  return state.running ? m.running(routed) : m.turn(routed)
 }
 
