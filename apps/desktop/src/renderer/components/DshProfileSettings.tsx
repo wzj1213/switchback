@@ -5,6 +5,9 @@ import { bridge, useAsync } from "../use-async.js"
 import { Select, type Choice } from "./Select.js"
 import { Actions, Blank, Field, Group } from "./SettingsBits.js"
 import { EngineIcon, RevealIcon } from "./icons.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "../i18n.js"
+import { DSH_PROFILE } from "./DshProfileSettings.messages.js"
 
 /**
  * DSH 的插件组装：一条 profile 就是一棵独立插件树。
@@ -29,23 +32,25 @@ export function DshProfileSettings({
   const switchback = bridge()
   const load = useMemo(() => (switchback === undefined ? undefined : () => switchback.dshProfiles()), [switchback])
   const state = useAsync<DshProfileCatalog>(load)
+  const locale = useLocale()
+  const m = DSH_PROFILE[locale]
   const profiles = state.data?.profiles ?? []
   const selected = profiles.find((profile) => profile.name === settings.dsh.profile)
 
   return (
     <Group
-      title="DSH 插件组装"
-      hint="一条 profile 就是一棵独立插件树。Switchback 只选择并展示它，不代装插件、不改 DSH 配置。"
+      title={m.title}
+      hint={m.hint}
     >
-      <Field label="新会话 profile" hint="切换只影响之后新开的 DSH 会话；旧会话固定回到它创建时那棵树。">
+      <Field label={m.profile} hint={m.profileHint}>
         <Select
           label={settings.dsh.profile}
           icon={<EngineIcon />}
-          title="新会话用哪棵插件树"
+          title={m.pickTitle}
           sections={[{
             title: "profile",
             value: settings.dsh.profile,
-            choices: choicesOf(profiles, settings.dsh.profile),
+            choices: choicesOf(profiles, settings.dsh.profile, locale),
             onPick: (profile) => {
               onPatch({ dsh: { ...settings.dsh, profile } })
             },
@@ -62,7 +67,7 @@ export function DshProfileSettings({
               onReveal(selected.dir)
             }}
           >
-            <RevealIcon size={13} /> 在访达中显示
+            <RevealIcon size={13} /> {m.reveal}
           </button>
         )}
         <button
@@ -75,7 +80,7 @@ export function DshProfileSettings({
             onPatch({ dsh: settings.dsh })
           }}
         >
-          {state.loading ? "读取中…" : "重新读取并探测"}
+          {state.loading ? m.reading : m.reload}
         </button>
       </Actions>
     </Group>
@@ -83,15 +88,16 @@ export function DshProfileSettings({
 }
 
 /** 不在目录里的那一条也要列出来：**它正是当前生效的值**，抹掉它等于让人以为自己没选过。 */
-function choicesOf(profiles: readonly DshProfile[], current: string): readonly Choice[] {
+function choicesOf(profiles: readonly DshProfile[], current: string, locale: Locale): readonly Choice[] {
+  const m = DSH_PROFILE[locale]
   const known = profiles.map((profile) => ({
     id: profile.name,
     label: profile.name,
-    ...(profile.valid ? {} : { note: "不可用" }),
+    ...(profile.valid ? {} : { note: m.invalid }),
   }))
   return known.some((choice) => choice.id === current)
     ? known
-    : [...known, { id: current, label: current, note: "未发现" }]
+    : [...known, { id: current, label: current, note: m.unknown }]
 }
 
 function Body({ state, profile, profilesDir }: {
@@ -99,22 +105,23 @@ function Body({ state, profile, profilesDir }: {
   profile: DshProfile | undefined
   profilesDir?: string
 }): React.JSX.Element {
-  if (state.failed) return <Blank tone="error">读取 DSH profiles 失败；点下面那颗可以再试一次。</Blank>
-  if (state.data === undefined) return <Blank>正在读 profile manifest…</Blank>
+  const m = useMessages(DSH_PROFILE)
+  if (state.failed) return <Blank tone="error">{m.failed}</Blank>
+  if (state.data === undefined) return <Blank>{m.loading}</Blank>
   if (profile === undefined) {
-    return <Blank tone="error">当前 profile 不在 {profilesDir ?? "DSH profiles 目录"} 中，不能启动。</Blank>
+    return <Blank tone="error">{m.missing(profilesDir ?? m.missingDir)}</Blank>
   }
-  if (profile.error !== undefined) return <Blank tone="error">package.json 读不懂：{profile.error}</Blank>
+  if (profile.error !== undefined) return <Blank tone="error">{m.unreadable(profile.error)}</Blank>
   return (
     <div className="dsh-profile__map">
-      <PluginLane title="组装层（按加载顺序）" empty="manifest 没有声明 bundle">
+      <PluginLane title={m.bundles} empty={m.noBundles}>
         {profile.bundles.map((bundle, index) => (
           <span className="dsh-plugin dsh-plugin--bundle" key={`${bundle}:${String(index)}`}>
             <b>{String(index + 1)}</b>{bundle}
           </span>
         ))}
       </PluginLane>
-      <PluginLane title="直接依赖（由 profile 声明）" empty="没有额外的 profile 依赖">
+      <PluginLane title={m.deps} empty={m.noDeps}>
         {profile.dependencies.map((dependency) => (
           <span className="dsh-plugin" key={dependency.name} title={dependency.version}>
             {dependency.name}<small>{dependency.version}</small>
@@ -122,7 +129,7 @@ function Body({ state, profile, profilesDir }: {
         ))}
       </PluginLane>
       <div className="dsh-profile__foot">
-        <span>{profile.patchExists ? "检测到 cordis.patch.yml" : "没有 profile patch"}</span>
+        <span>{profile.patchExists ? m.patch : m.noPatch}</span>
         <code title={profile.manifestPath}>{profile.manifestPath}</code>
       </div>
     </div>

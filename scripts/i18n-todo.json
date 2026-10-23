@@ -1,5 +1,4 @@
 [
-  "apps/desktop/src/renderer/components/DshProfileSettings.tsx",
   "apps/desktop/src/renderer/components/PetParts.tsx",
   "apps/desktop/src/renderer/components/RemoteAccess.tsx",
   "apps/desktop/src/renderer/components/RemoteDevices.tsx",
