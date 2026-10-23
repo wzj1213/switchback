@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { limitNotice } from "./limits.js"
+import { limitNotice as noticeIn } from "./limits.js"
+import type { RateLimits } from "@switchback/protocol"
+
+// 下面那些用例写的是中文那版
+const limitNotice = (limits: RateLimits | undefined): ReturnType<typeof noticeIn> => noticeIn(limits, "zh-CN")
 
 describe("额度提示", () => {
   it("**用得少就不出声**——一直摆一根条在那儿，99% 的时间说的是「你还早着呢」", () => {
@@ -70,5 +74,12 @@ describe("打满之后：说什么时候恢复", () => {
     expect(said).toBe(
       `${String(at.getMonth() + 1)}月${String(at.getDate())}日 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`,
     )
+  })
+})
+
+describe("英文那版", () => {
+  it("窗口说成时间段", () => {
+    expect(noticeIn({ primary: { usedPercent: 80, windowDurationMins: 300 } }, "en")?.window).toBe("5-hour window")
+    expect(noticeIn({ primary: { usedPercent: 80, windowDurationMins: 10080 } }, "en")?.window).toBe("weekly window")
   })
 })

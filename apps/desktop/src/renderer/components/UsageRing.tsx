@@ -1,5 +1,6 @@
 import type { Usage } from "@switchback/protocol"
 import { meterOf, type UsageLevel } from "../usage.js"
+import { useLocale } from "../i18n.js"
 
 /**
  * 上下文进度环：模型胶囊**旁边**那枚独立指示。
@@ -60,7 +61,7 @@ export function UsageRing({ ratio, level }: { ratio: number; level: UsageLevel }
  *    `meter.label` 两种情形都已经算好（`23%` / `258k tokens`），直接用。
  */
 export function UsageBadge({ usage }: { usage: Usage | undefined }): React.JSX.Element | null {
-  const meter = meterOf(usage)
+  const meter = meterOf(usage, useLocale())
   if (meter === undefined) return null
   return (
     <span className={`usage usage--${meter.level}`} role="img" aria-label={meter.title}>

@@ -20,7 +20,7 @@ describe("模型按钮上那截强度", () => {
   ]
   for (const c of cases) {
     it(c.name, () => {
-      expect(triggerDetail(models, c.current, c.level)).toEqual(c.want)
+      expect(triggerDetail(models, c.current, c.level, "zh-CN")).toEqual(c.want)
     })
   }
 })

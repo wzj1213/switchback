@@ -1,6 +1,7 @@
 import type { ActivityDigest, NameTally } from "../../shared/activity.js"
 import { bigNumber, dayText } from "../activity-view.js"
 import { effortLabel } from "./ModelPicker.js"
+import { useLocale } from "../i18n.js"
 import { Blank } from "./SettingsBits.js"
 
 /**
@@ -123,6 +124,7 @@ export function ActivityRanks({ digest, name }: {
   digest: ActivityDigest
   name: (id: string) => string
 }): React.JSX.Element {
+  const locale = useLocale()
   return (
     <>
       <TallyCard title="最常用的引擎" rows={digest.engines} name={name} empty="还没有跑过任何一轮。" format={(n) => `${String(n)} 轮`} />
@@ -137,7 +139,7 @@ export function ActivityRanks({ digest, name }: {
       <TallyCard
         title="最常用的思考档"
         rows={digest.efforts}
-        name={(id) => effortLabel(id).label}
+        name={(id) => effortLabel(id, locale).label}
         empty="用过的引擎都没有可切换的思考档。"
         format={(n) => `${String(n)} 轮`}
       />

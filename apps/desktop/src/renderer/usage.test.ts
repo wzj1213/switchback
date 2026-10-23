@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { compact, level, meterOf } from "./usage.js"
+import { compact, level, meterOf as meterIn } from "./usage.js"
+import type { Usage } from "@switchback/protocol"
+
+// 下面那些用例写的是中文那版
+const meterOf = (usage: Usage | undefined): ReturnType<typeof meterIn> => meterIn(usage, "zh-CN")
 
 describe("compact", () => {
   it("1000 以下保留原样——会话刚开始看到「0k」会让人以为它没在工作", () => {
@@ -67,5 +71,11 @@ describe("meterOf", () => {
     const miss = meterOf({ contextUsed: 100, contextWindow: 1000 })
     expect(miss?.cache).toBeUndefined()
     expect(miss?.title).not.toContain("缓存")
+  })
+})
+
+describe("英文那版", () => {
+  it("有窗口时说比例和账单", () => {
+    expect(meterIn({ contextUsed: 15748, contextWindow: 258400, totalTokens: 99999 }, "en")?.title).toBe("Context 15.7k / 258k · 6% · 100k in this thread")
   })
 })

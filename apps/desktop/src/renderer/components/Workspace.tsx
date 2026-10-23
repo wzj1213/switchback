@@ -20,6 +20,7 @@ import type { PetKit } from "../../shared/settings.js"
 import { WorkspaceComposer } from "./WorkspaceComposer.js"
 import { useSwitchbackActions } from "../useSwitchbackActions.js"
 import { limitNotice } from "../limits.js"
+import { useLocale } from "../i18n.js"
 import { TopBar } from "./TopBar.js"
 import { Notices } from "./Notices.js"
 import { FindBar, type FindResult } from "./FindBar.js"
@@ -120,6 +121,7 @@ export interface WorkspaceProps {
  */
 export function Workspace(props: WorkspaceProps): React.JSX.Element {
   const { thread, send } = props
+  const locale = useLocale()
   const [env, setEnv] = useState(false)
   const [timeline, setTimeline] = useState(false)
   /**
@@ -152,7 +154,7 @@ export function Workspace(props: WorkspaceProps): React.JSX.Element {
         setEnv={setEnv}
         timeline={timeline}
         setTimeline={setTimeline}
-        limits={limitNotice(props.limits)}
+        limits={limitNotice(props.limits, locale)}
         thread={thread}
         engines={props.engines}
         peer={props.peer}

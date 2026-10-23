@@ -1,9 +1,19 @@
 import type { ModelOption } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 import { SparkIcon } from "./icons.js"
 import { Select, type Section } from "./Select.js"
 import { currentModel } from "../model-options.js"
 import { triggerLabel } from "../model-label.js"
 import { usePickPending } from "./use-pick-pending.js"
+import { useLocale } from "../i18n.js"
+import { MODEL_PICKER } from "./ModelPicker.messages.js"
+
+/** 面板里那两节共用的：当前强度、选了之后怎么办、说哪种语言。 */
+interface PickCtx {
+  level: string | undefined
+  onChange: (model: string, effort?: string) => void
+  locale: Locale
+}
 
 /**
  * 模型与推理强度。
@@ -17,23 +27,19 @@ import { usePickPending } from "./use-pick-pending.js"
  * ACP 那类把强度编进 modelId 的引擎（`gpt-5.6-sol[low]`）不报 efforts，
  * 于是面板里只有「模型」一节，也就不会出现一个点了没用的控件。
  */
-function sectionsOf(
-  models: readonly ModelOption[],
-  current: ModelOption,
-  level: string | undefined,
-  onChange: (model: string, effort?: string) => void,
-): readonly Section[] {
+function sectionsOf(models: readonly ModelOption[], current: ModelOption, ctx: PickCtx): readonly Section[] {
+  const m = MODEL_PICKER[ctx.locale]
   const modelSection: Section = {
-    title: "模型",
+    title: m.model,
     value: current.id,
     onPick: (id) => {
       // 换模型时把强度重置成新模型的默认：旧模型的 high 在新模型上可能根本不存在
-      onChange(id, models.find((m) => m.id === id)?.defaultEffort)
+      ctx.onChange(id, models.find((one) => one.id === id)?.defaultEffort)
     },
-    choices: models.map((m) => ({
-      id: m.id,
-      label: m.label,
-      ...(m.description === undefined ? {} : { description: m.description }),
+    choices: models.map((one) => ({
+      id: one.id,
+      label: one.label,
+      ...(one.description === undefined ? {} : { description: one.description }),
     })),
   }
   const efforts = current.efforts ?? []
@@ -41,12 +47,12 @@ function sectionsOf(
   return [
     modelSection,
     {
-      title: "推理强度",
-      value: level,
+      title: m.effortTitle,
+      value: ctx.level,
       onPick: (id) => {
-        onChange(current.id, id)
+        ctx.onChange(current.id, id)
       },
-      choices: efforts.map((e) => ({ id: e, ...effortLabel(e) })),
+      choices: efforts.map((e) => ({ id: e, ...effortLabel(e, ctx.locale) })),
     },
   ]
 }
@@ -64,22 +70,21 @@ function sectionsOf(
 function resetOf(
   models: readonly ModelOption[],
   current: ModelOption,
-  level: string | undefined,
-  onChange: (model: string, effort?: string) => void,
+  ctx: PickCtx,
 ): { label: string; run: () => void } | undefined {
   const fallback = models.find((m) => m.isDefault === true)
   if (fallback === undefined) return undefined
-  if (fallback.id === current.id && level === fallback.defaultEffort) return undefined
+  if (fallback.id === current.id && ctx.level === fallback.defaultEffort) return undefined
   return {
-    label: "恢复默认设置",
+    label: MODEL_PICKER[ctx.locale].reset,
     run: () => {
-      onChange(fallback.id, fallback.defaultEffort)
+      ctx.onChange(fallback.id, fallback.defaultEffort)
     },
   }
 }
 
 /**
- * 推理强度说人话。
+ * 推理强度说人话（名字在 `ModelPicker.messages.ts`）。
  *
  * 引擎报上来的是 `low` / `medium` / `high` / `xhigh` / `max` / `ultra`——
  * 那是标识符，不是给人读的。codex 自己的面板上写的是「轻度 / 中 / 高 / 极高 / 最高」，
@@ -88,22 +93,16 @@ function resetOf(
  * **`ultra` 没有跟着 codex 叫「极高」**：它那张表里「极高」出现了两次
  *（一个带「更快消耗使用额度」的注脚）。两个一模一样的选项摆在一起，
  * 靠一行小字区分，是照抄照出来的缺陷，不是要对齐的东西。这里叫「超高」。
+ * `ultracode` 是 claude 的顶档模式：不是强度档，是另一个设置键（CLI 滑块最右那档也是这么拼的）。
  *
  * 认不出的一律原样显示——引擎随时会加档，写死一张表的下场是新档位显示成空白。
  */
-const EFFORT: Readonly<Record<string, { label: string; description?: string }>> = {
-  low: { label: "轻度" },
-  medium: { label: "中" },
-  high: { label: "高" },
-  xhigh: { label: "极高" },
-  max: { label: "最高" },
-  ultra: { label: "超高", description: "更快消耗使用额度" },
-  // claude 的顶档模式：不是强度档，是另一个设置键（CLI 滑块最右那档也是这么拼的）
-  ultracode: { label: "Ultracode", description: "xhigh ＋ 工作流编排，更快消耗使用额度" },
-}
-
-export function effortLabel(id: string): { label: string; description?: string } {
-  return EFFORT[id] ?? { label: id }
+export function effortLabel(id: string, locale: Locale): { label: string; description?: string } {
+  const m = MODEL_PICKER[locale]
+  const labels: Readonly<Partial<Record<string, string>>> = m.effort
+  const notes: Readonly<Partial<Record<string, string>>> = m.effortNote
+  const description = notes[id]
+  return { label: labels[id] ?? id, ...(description === undefined ? {} : { description }) }
 }
 
 /**
@@ -149,9 +148,10 @@ export function triggerDetail(
   models: readonly ModelOption[],
   current: ModelOption,
   level: string | undefined,
+  locale: Locale,
 ): { text: string; strong: boolean } | undefined {
   if ((current.efforts ?? []).length === 0 || level === undefined) return undefined
-  return { text: effortLabel(level).label, strong: costlyOf(models, current.id, level) }
+  return { text: effortLabel(level, locale).label, strong: costlyOf(models, current.id, level) }
 }
 
 export function ModelPicker({
@@ -172,6 +172,8 @@ export function ModelPicker({
 }): React.JSX.Element | null {
   // 选完到引擎回声之间那几秒，按钮照刚选的画（见 `use-pick-pending.ts`）
   const { picked, mark } = usePickPending(model, effort)
+  const locale = useLocale()
+  const m = MODEL_PICKER[locale]
   /**
    * **有待切换的引擎时，这颗控件变成一条出路，而不是一句解释。**
    *
@@ -193,15 +195,15 @@ export function ModelPicker({
       <button
         type="button"
         className="trigger"
-        data-tip={`现在就把原生会话切到 ${pending.label}；不会自动发送内容。换完就能挑它自己报的模型`}
-        aria-label={`切到 ${pending.label} 再选模型`}
+        data-tip={m.switchTip(pending.label)}
+        aria-label={m.switchFirst(pending.label)}
         disabled={disabled}
         onClick={pending.onSwitchNow}
       >
         <span className="trigger__icon">
           <SparkIcon />
         </span>
-        <span className="trigger__label">切到 {pending.label} 再选模型</span>
+        <span className="trigger__label">{m.switchFirst(pending.label)}</span>
       </button>
     )
   }
@@ -212,21 +214,22 @@ export function ModelPicker({
     mark({ model: next, ...(nextEffort === undefined ? {} : { effort: nextEffort }) })
     onChange(next, nextEffort)
   }
+  const ctx: PickCtx = { level, onChange: change, locale }
   // 尾部那对括号只在触发器上裁掉（理由见 `model-label.ts`）；
   // 裁过就把全名挂到悬停上，别让它只能靠打开菜单才找得回来
   const label = triggerLabel(current.label)
-  const reset = resetOf(models, current, level, change)
-  const detail = triggerDetail(models, current, level)
+  const reset = resetOf(models, current, ctx)
+  const detail = triggerDetail(models, current, level, locale)
   return (
     <Select
       label={label}
       {...(detail === undefined ? {} : { detail })}
       // 平时只写名字；输入区收成图标时，名字让位给这枚火花
       compactIcon={<SparkIcon />}
-      name="模型"
+      name={m.model}
       title={current.description ?? (label === current.label ? undefined : current.label)}
       disabled={disabled}
-      sections={sectionsOf(models, current, level, change)}
+      sections={sectionsOf(models, current, ctx)}
       {...(reset === undefined ? {} : { reset })}
     />
   )

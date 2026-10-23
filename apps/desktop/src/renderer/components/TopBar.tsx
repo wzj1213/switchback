@@ -8,6 +8,8 @@ import { labelOf } from "./Composer.js"
 import { nextEngine } from "../engines.js"
 import type { LimitNotice } from "../limits.js"
 import { TopBarActions } from "./TopBarActions.js"
+import { useMessages } from "../i18n.js"
+import { TOP_BAR } from "./TopBar.messages.js"
 
 /**
  * 顶栏。
@@ -108,6 +110,7 @@ export function TopBar({
   railOpen: boolean
   onRail: () => void
 }): React.JSX.Element {
+  const m = useMessages(TOP_BAR)
   const next = nextEngine(engines, thread.engine)
   const handedOff = thread.engineHistory.length > 1
   const envAnchor = useRef<HTMLButtonElement>(null)
@@ -121,7 +124,7 @@ export function TopBar({
         ref={envAnchor}
         type="button"
         className="topbar__title"
-        title="环境信息"
+        title={m.env}
         aria-expanded={env}
         onClick={() => {
           setEnv(!env)
@@ -148,11 +151,11 @@ export function TopBar({
       {/* **说明状态的话退成一行淡字，不再是胶囊**（UI 重构 P1）。灰底灰字的胶囊
           看起来像按钮又不太像——而这两样恰恰点不动。字面与悬停说明不变 */}
       {thread.detached === true ? (
-        <span className="topbar__meta" title="背后现在没有引擎进程；直接发话会先把它接回来">历史记录</span>
+        <span className="topbar__meta" title={m.detachedTip}>{m.detached}</span>
       ) : null}
       {handedOff ? (
         <span className="topbar__meta" title={thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}>
-          接力 {thread.engineHistory.length} 手
+          {m.relay(thread.engineHistory.length)}
         </span>
       ) : null}
       <span className="topbar__spacer" />
@@ -177,17 +180,18 @@ export function TopBar({
  * 满了时你想知道的是**「什么时候恢复」**——那是唯一能照着行动的信息。
  */
 function LimitPill({ limits }: { limits: LimitNotice | undefined }): React.JSX.Element | null {
+  const m = useMessages(TOP_BAR)
   if (limits === undefined) return null
   const tail = limits.blocked
     ? limits.resetsAt === undefined
       ? ""
-      : ` · ${limits.resetsAt} 恢复`
+      : m.resets(limits.resetsAt)
     : limits.window === undefined
       ? ""
       : ` · ${limits.window}`
   return (
-    <span className={`limit${limits.blocked ? " limit--blocked" : ""}`} title="账号额度，不是这个会话的用量">
-      {limits.blocked ? "额度已用尽" : `额度 ${String(limits.percent)}%`}
+    <span className={`limit${limits.blocked ? " limit--blocked" : ""}`} title={m.quotaTip}>
+      {limits.blocked ? m.exhausted : m.quota(limits.percent)}
       {tail}
     </span>
   )

@@ -1,4 +1,6 @@
 import type { Usage } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { USAGE } from "./usage.messages.js"
 
 /** 超过这个占比开始提醒；再高就是危险区。 */
 const WARN_AT = 0.7
@@ -63,12 +65,13 @@ export interface Meter {
  * 百分比直接写进 label：分母是恒定的，让眼睛读两个数去得出比例，
  * 不如直接把比例写出来——那正是这个控件唯一想说的话。
  */
-export function meterOf(usage: Usage | undefined): Meter | undefined {
+export function meterOf(usage: Usage | undefined, locale: Locale): Meter | undefined {
   if (usage === undefined) return undefined
+  const m = USAGE[locale]
   const { contextUsed, contextWindow, totalTokens, cacheRead } = usage
-  const total = totalTokens === undefined ? undefined : `累计 ${compact(totalTokens)}`
-  const cache = cacheRead === undefined ? undefined : `缓存 ${compact(cacheRead)}`
-  const bill = `${totalTokens === undefined ? "" : ` · 本会话累计 ${compact(totalTokens)}`}${cacheRead === undefined ? "" : ` · 缓存命中 ${compact(cacheRead)}`}`
+  const total = totalTokens === undefined ? undefined : m.total(compact(totalTokens))
+  const cache = cacheRead === undefined ? undefined : m.cache(compact(cacheRead))
+  const bill = `${totalTokens === undefined ? "" : m.billTotal(compact(totalTokens))}${cacheRead === undefined ? "" : m.billCache(compact(cacheRead))}`
   if (contextWindow === undefined || contextWindow <= 0) {
     return {
       label: `${compact(contextUsed)} tokens`,
@@ -76,7 +79,7 @@ export function meterOf(usage: Usage | undefined): Meter | undefined {
       total,
       cache,
       level: "ok",
-      title: `上下文占用 ${String(contextUsed)} tokens（引擎未提供窗口大小）${bill}`,
+      title: m.noWindow(contextUsed, bill),
     }
   }
   const ratio = Math.min(1, contextUsed / contextWindow)
@@ -87,6 +90,6 @@ export function meterOf(usage: Usage | undefined): Meter | undefined {
     total,
     cache,
     level: level(ratio),
-    title: `上下文 ${compact(contextUsed)} / ${compact(contextWindow)} · ${pct}${bill}`,
+    title: m.context(compact(contextUsed), compact(contextWindow), pct, bill),
   }
 }

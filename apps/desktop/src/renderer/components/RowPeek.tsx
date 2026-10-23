@@ -116,7 +116,7 @@ export function RowPeek({
   const engine = labelOf(engines, thread.engine)
   const engineRoute = thread.engineProfile === undefined ? engine : `${engine} · ${thread.engineProfile}`
   const model = thread.model ?? m.defaultModel
-  const withEffort = thread.effort === undefined ? model : `${model} · ${effortLabel(thread.effort).label}`
+  const withEffort = thread.effort === undefined ? model : `${model} · ${effortLabel(thread.effort, locale).label}`
   const status = statusLine(thread, locale)
   const relay =
     thread.engineHistory.length > 1

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react"
 import type { SelfUpdate } from "../../main/selfupdate.js"
 import { ResetIcon } from "./icons-activity.js"
 import { SpinnerIcon } from "./icons.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { UPDATE_BUTTON } from "./UpdateButton.messages.js"
 
 /**
  * 侧栏底部那颗**更新键**：改过的代码，一键装上。
@@ -34,6 +37,7 @@ export function UpdateButton(): React.JSX.Element | null {
   const [state, setState] = useState<SelfUpdate | undefined>(undefined)
   const [running, setRunning] = useState(false)
   const [failed, setFailed] = useState<string | undefined>(undefined)
+  const m = useMessages(UPDATE_BUTTON)
 
   useEffect(() => {
     let live = true
@@ -58,8 +62,8 @@ export function UpdateButton(): React.JSX.Element | null {
       type="button"
       className={`foot__act${running ? " foot__act--busy" : ""}${failed === undefined ? "" : " foot__act--warn"}`}
       disabled={running}
-      aria-label={failed === undefined ? "更新到最新代码" : "构建失败，再试一次"}
-      title={titleOf(state, running, failed)}
+      aria-label={failed === undefined ? m.update : m.retry}
+      title={titleOf(state, running, failed, m)}
       onClick={() => {
         setRunning(true)
         setFailed(undefined)
@@ -83,15 +87,10 @@ export function UpdateButton(): React.JSX.Element | null {
  *   按钮背后不藏一条你没看过的命令）。
  * - **代价**：会退出重开，正在跑的那一轮会断。这句必须说在点之前。
  */
-function titleOf(state: SelfUpdate, running: boolean, failed: string | undefined): string {
-  if (failed !== undefined) return `构建失败，点一下重试：\n${failed.slice(-1200)}`
-  if (running) return "正在跑 pnpm dist:local，跑完自动换包并重开。第一次大约十几秒。"
-  return [
-    "更新到最新代码",
-    state.newest === undefined ? "" : `${state.newest} 比装着的这份新`,
-    "点一下：pnpm dist:local → 换掉 /Applications/Switchback.app → 自动重开",
-    "（会退出重开，正在跑的那一轮会断）",
-  ]
+function titleOf(state: SelfUpdate, running: boolean, failed: string | undefined, m: (typeof UPDATE_BUTTON)[Locale]): string {
+  if (failed !== undefined) return m.failedTip(failed.slice(-1200))
+  if (running) return m.running
+  return [m.update, state.newest === undefined ? "" : m.newer(state.newest), m.how, m.warn]
     .filter((line) => line !== "")
     .join("\n")
 }

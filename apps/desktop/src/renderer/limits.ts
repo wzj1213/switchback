@@ -1,4 +1,8 @@
 import type { RateLimits, RateWindow } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { LIMITS } from "./limits.messages.js"
+
+type Text = (typeof LIMITS)[Locale]
 
 /**
  * 额度还剩多少，要不要出声。
@@ -38,12 +42,13 @@ export interface LimitNotice {
   resetsAt?: string
 }
 
-export function limitNotice(limits: RateLimits | undefined): LimitNotice | undefined {
+export function limitNotice(limits: RateLimits | undefined, locale: Locale): LimitNotice | undefined {
+  const m = LIMITS[locale]
   const pick = urgent(limits?.primary, limits?.secondary)
   if (pick === undefined || pick.usedPercent < SPEAK_ABOVE) return undefined
-  const window = describeWindow(pick.windowDurationMins)
+  const window = describeWindow(pick.windowDurationMins, m)
   const blocked = pick.usedPercent >= 100
-  const resets = blocked ? describeReset(pick.resetsAt) : undefined
+  const resets = blocked ? describeReset(pick.resetsAt, m) : undefined
   return {
     percent: Math.round(pick.usedPercent),
     ...(window === undefined ? {} : { window }),
@@ -61,11 +66,11 @@ export function limitNotice(limits: RateLimits | undefined): LimitNotice | undef
  *
  * 解析不出来就缺席：说错一个恢复时间比不说糟得多。
  */
-function describeReset(iso: string | undefined): string | undefined {
+function describeReset(iso: string | undefined, m: Text): string | undefined {
   if (iso === undefined) return undefined
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return undefined
-  return `${String(at.getMonth() + 1)}月${String(at.getDate())}日 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`
+  return m.reset(at.getTime())
 }
 
 /** 谁更紧：百分比高的；同高则窗口短的（它更近在眼前）。 */
@@ -83,10 +88,10 @@ function urgent(a: RateWindow | undefined, b: RateWindow | undefined): RateWindo
  * **不做成「1440 分钟」那种字面翻译**——人对「本周」有感觉，对「10080 分钟」没有。
  * 认不出的时长就不说，只报百分比：说错一个时间窗比不说更糟。
  */
-function describeWindow(mins: number | undefined): string | undefined {
+function describeWindow(mins: number | undefined, m: Text): string | undefined {
   if (mins === undefined || mins <= 0) return undefined
-  if (mins < 60) return `${String(mins)} 分钟内`
-  if (mins < 60 * 24) return `${String(Math.round(mins / 60))} 小时内`
-  if (mins >= 60 * 24 * 6 && mins <= 60 * 24 * 8) return "本周"
-  return `${String(Math.round(mins / (60 * 24)))} 天内`
+  if (mins < 60) return m.minutes(mins)
+  if (mins < 60 * 24) return m.hours(Math.round(mins / 60))
+  if (mins >= 60 * 24 * 6 && mins <= 60 * 24 * 8) return m.week
+  return m.days(Math.round(mins / (60 * 24)))
 }
