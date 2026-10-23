@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { app, nativeTheme } from "electron"
+import { isLocale } from "@switchback/i18n"
 import { isDshProfileName, SETTINGS_DEFAULTS, type EnginePick, type Settings } from "../shared/settings.js"
 import type { Logger } from "./log.js"
 import { paneWidths } from "../shared/pane-widths.js"
@@ -45,6 +46,7 @@ function parse(raw: unknown): Settings {
   const it = raw as Partial<Record<keyof Settings, unknown>>
   return {
     theme: oneOf(it.theme, THEMES, DEFAULTS.theme),
+    language: isLocale(it.language) ? it.language : DEFAULTS.language,
     projects: strings(it.projects) ?? DEFAULTS.projects,
     pinned: strings(it.pinned) ?? DEFAULTS.pinned,
     pinnedThreads: strings(it.pinnedThreads) ?? DEFAULTS.pinnedThreads,
@@ -246,6 +248,8 @@ export interface Store {
   get: () => Settings
   /** 合并写入。返回合并后的完整值，渲染层拿它直接更新界面。 */
   patch: (next: Partial<Settings>) => Settings
+  /** 每次写入之后通知一声（菜单要跟着语言重建，就挂在这里）。 */
+  watch: (listener: (before: Settings, after: Settings) => void) => void
 }
 
 export function createSettings(log: Logger): Store {
@@ -267,13 +271,20 @@ export function createSettings(log: Logger): Store {
     }
   }
 
+  const listeners: ((before: Settings, after: Settings) => void)[] = []
+
   return {
     get: () => current,
     patch: (next) => {
+      const before = current
       current = parse({ ...current, ...next })
       nativeTheme.themeSource = current.theme
       save()
+      for (const listener of listeners) listener(before, current)
       return current
+    },
+    watch: (listener) => {
+      listeners.push(listener)
     },
   }
 }

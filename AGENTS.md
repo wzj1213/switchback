@@ -14,6 +14,7 @@
 | 跨包深引用 | **禁止**（只能 import 包的入口） | `eslint no-restricted-imports` + 包边界 |
 | 未声明依赖 | 禁止 | pnpm workspace + `pnpm arch` |
 | 组件用到的 class 没有任何 CSS 规则 | 禁止 | `pnpm check:css` |
+| 界面文案写死在代码里 | 禁止：放进同名 `*.messages.ts`，中英两版都写；`i18n-todo.json` 里的旧文件逐步迁 | `pnpm check:i18n` |
 
 提交前 `pnpm check` 必须全绿（typecheck + lint + arch + test）。
 
@@ -43,16 +44,17 @@ store ← protocol
 wire ← protocol
 link ← protocol + wire
 worksite ← ∅
+i18n ← ∅
 journal ← protocol
 handoff ← protocol
 engine ← protocol + approval
 host ← protocol + approval + engine + store + journal + handoff
-desktop ← protocol + engine + handoff + host + journal + link + store + wire + worksite
+desktop ← protocol + engine + handoff + host + i18n + journal + link + store + wire + worksite
 web ← link + protocol + store + wire
 ```
 <!-- package-graph:end -->
 
-**纯逻辑包（`protocol` / `approval`）零运行时依赖、零 IO**：不读文件、不发网络、不起进程、
+**纯逻辑包（`protocol` / `approval` / `i18n`）零运行时依赖、零 IO**：不读文件、不发网络、不起进程、
 不读时钟（时间由调用方传入）。这是它们能被表驱动测试穷举的前提。
 
 ## 产品边界

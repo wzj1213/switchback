@@ -1,3 +1,4 @@
+import type { Locale } from "@switchback/i18n"
 import type { Trust } from "@switchback/protocol"
 import { NO_PANES, type PaneWidths } from "./pane-widths.js"
 
@@ -29,6 +30,13 @@ export type NotifyMode = "all" | "approval" | "off"
 
 export interface Settings {
   theme: ThemeChoice
+  /**
+   * 界面语言。**默认中文**；英文给仓库外的读者。
+   *
+   * 主进程启动时把它交给 Electron 的 `--lang`，所以菜单里「编辑」「窗口」这几栏
+   *（系统 `role` 本地化的那些）要重启后才跟着变；Switchback 自己的文案当场就变。
+   */
+  language: Locale
   /**
    * 打开过的项目，按打开的先后。
    *
@@ -364,6 +372,7 @@ export interface EnginePick {
 
 export const SETTINGS_DEFAULTS: Settings = {
   theme: "system",
+  language: "zh-CN",
   projects: [],
   pinned: [],
   pinnedThreads: [],

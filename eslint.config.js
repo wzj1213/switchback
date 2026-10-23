@@ -87,7 +87,7 @@ export default tseslint.config(
 
   // ── 纯逻辑包：额外禁 IO ────────────────────────────────────────
   {
-    files: ["packages/protocol/**/*.ts", "packages/approval/**/*.ts"],
+    files: ["packages/protocol/**/*.ts", "packages/approval/**/*.ts", "packages/i18n/**/*.ts"],
     rules: noIoInPurePackages,
   },
 

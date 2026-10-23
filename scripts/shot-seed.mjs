@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { mainThread, noRepoThread, stubThread } from "./ui-fixture.mjs"
 import { longThread, sidebarThread } from "./ui-performance-fixture.mjs"
 
-export async function seedUi(dir, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS, MANY }) {
+export async function seedUi(dir, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS, MANY, LANG }) {
   const threads = join(dir, "threads")
   const external = join(dir, "会话碰过的工作区外文件.md")
   await mkdir(threads, { recursive: true })
@@ -43,6 +43,7 @@ export async function seedUi(dir, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRE
       projects: [ROOT],
       ...(ENGINE === undefined ? {} : { defaultEngine: ENGINE }),
       theme: DARK ? "dark" : "light",
+      ...(LANG === undefined ? {} : { language: LANG }),
       pets: true,
       ...(PET_LIVE ? { defaultEngine: "claude", petKit: { range: true } } : {}),
     })}\n`,

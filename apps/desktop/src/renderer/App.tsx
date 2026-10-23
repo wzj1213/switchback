@@ -11,7 +11,8 @@ import { ThreadScreen } from "./components/ThreadScreen.js"
 import { SidebarPane } from "./SidebarPane.js"
 import { TipLayer } from "./components/tips.js"
 import { PaneHandles } from "./components/pane-handles.js"
-import { useApp } from "./useApp.js"
+import { useApp, type AppApi } from "./useApp.js"
+import { LocaleProvider, useDocumentLang } from "./i18n.js"
 import { useWindowChrome } from "./use-window-chrome.js"
 import { withThreadEngines } from "./engines.js"
 import { useMemo } from "react"
@@ -130,9 +131,23 @@ function Layers({ app }: { app: ReturnType<typeof useApp> }): {
   return { settings, review }
 }
 
+/**
+ * 外层只做两件事：拿到 `app`、按设置提供界面语言。
+ * 原来的三条分支挪进 `Screens`，`app` 作为参数传进去——`useApp` 只能调一次。
+ */
 export function App(): React.JSX.Element {
   useWindowChrome()
   const app = useApp()
+  const locale = app.prefs.settings.language
+  useDocumentLang(locale)
+  return (
+    <LocaleProvider locale={locale}>
+      <Screens app={app} />
+    </LocaleProvider>
+  )
+}
+
+function Screens({ app }: { app: AppApi }): React.JSX.Element {
   const { shell, state, thread } = app
   const threads = useMemo(() => app.rows.map((row) => row.thread), [app.rows])
   const { drafts, hydrated } = useDraftStore(threads)

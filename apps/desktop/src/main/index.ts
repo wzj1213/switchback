@@ -14,6 +14,7 @@ import { attachRemote, deskRoot } from "./remote/index.js"
 import { EXPOSED } from "./remote/exposure.js"
 import { createChannels } from "./channels.js"
 import { installMenu } from "./menu.js"
+import { langTag } from "@switchback/i18n"
 import { installContextMenu } from "./context-menu.js"
 import { installFind } from "./find.js"
 import { createLogger } from "./log.js"
@@ -74,6 +75,9 @@ const crash = installCrashReporter(log)
  * 否则窗口会先按系统色画一下再跳成用户选的那套。
  */
 const settings = createSettings(log)
+
+// 界面语言交给 Chromium：`role` 菜单、拼写检查、`Intl` 的默认格式都跟着它。必须在 ready 之前
+app.commandLine.appendSwitch("lang", langTag(settings.get().language))
 
 /**
  * 引擎版本的探测结果。**在这里建、显式传下去**，理由和 `settings` 一样：
@@ -386,15 +390,18 @@ function bootstrap(): Promise<void> {
     installChannels()
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
-    installMenu(
-      () => exportReport(log, crash),
-      () => {
+    const relabelMenu = installMenu(settings.get().language, {
+      onDiagnose: () => exportReport(log, crash),
+      onEngines: () => {
         // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
         // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
         void shell.openPath(ensureEngineFile(app.getPath("userData")))
       },
-      feed === "" ? undefined : () => runUpdateCheck(true),
-    )
+      ...(feed === "" ? {} : { onCheckUpdate: () => runUpdateCheck(true) }),
+    })
+    settings.watch((before, after) => {
+      if (before.language !== after.language) relabelMenu(after.language)
+    })
     // 背景检查只在配了 feed 时跑，而且**只在有新版本时才出声**
     if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)
     /**

@@ -1,0 +1,61 @@
+import { defineMessages } from "@switchback/i18n"
+
+/** 「通用」与「新会话」两页的文案。 */
+export const GENERAL = defineMessages(
+  {
+    look: "外观",
+    theme: "主题",
+    notify: "通知",
+    notifyScope: "通知范围",
+    notifyAll: "全部",
+    notifyApproval: "只有审批",
+    notifyOff: "关掉",
+    notifyHintAll: "收到审批、完成或失败时通知。15 秒内完成的任务不会提醒。",
+    notifyHintApproval: "仅在需要你审批时通知。",
+    notifyHintOff: "关闭桌面和手机推送，Dock 角标仍显示待审批数量。",
+    switchEngine: "换引擎",
+    autoHandoff: "自动交接",
+    handoffOnHint: "换了一家之后，你发的第一句话前面会附一段交接说明，原样显示在对话里。",
+    handoffOffHint: "关着：换了一家之后只发你那句话，新的一家不知道此前发生过什么。",
+    handoffOnMore:
+      "说明里写的是：此前谁跑了哪几轮、完整转写存在哪（工作区 .switchback/handoff/，不进版本库）、各家原始记录在哪、是什么格式。",
+    handoffOffMore: "要让它读历史，得你自己把路径给它（/timeline 里有）。",
+    handoffToggle: "换引擎自动交接",
+    newThreadDefaults: "新会话的默认",
+    newThreadHint: "只影响之后新开的会话，正开着的那些一个都不动。",
+    engine: "引擎",
+    engineHint: "留空则跟着上次开工用的那家走（连模型和思维档一起）；这里只列已接入的那几家",
+    sameAsLast: "跟上次",
+    trust: "信任档",
+    trustHint: "决定新会话开在哪一档上。这是安全相关的默认值，改高之前想清楚",
+  },
+  {
+    look: "Appearance",
+    theme: "Theme",
+    notify: "Notifications",
+    notifyScope: "Notify me about",
+    notifyAll: "Everything",
+    notifyApproval: "Approvals only",
+    notifyOff: "Nothing",
+    notifyHintAll: "Approvals, finished runs, and failures. Tasks that finish within 15 seconds don't notify.",
+    notifyHintApproval: "Only when something needs your approval.",
+    notifyHintOff: "Desktop and phone notifications are off. The Dock badge still counts approvals that are waiting.",
+    switchEngine: "Switching engines",
+    autoHandoff: "Automatic handoff",
+    handoffOnHint:
+      "After a switch, your first message to the new engine starts with a handoff note, shown as is in the conversation.",
+    handoffOffHint: "Off: after a switch, only your message is sent, and the new engine doesn't know what happened before.",
+    handoffOnMore:
+      "The note says who ran which turns, where the full transcript is (in the workspace under .switchback/handoff/, never committed), and where each engine's raw logs are and what format they use.",
+    handoffOffMore: "To let it read the history, give it the paths yourself; /timeline lists them.",
+    handoffToggle: "Hand off automatically when switching engines",
+    newThreadDefaults: "Defaults for new threads",
+    newThreadHint: "Only affects threads you open from now on. Threads already open stay as they are.",
+    engine: "Engine",
+    engineHint:
+      "“Same as last time” starts with the engine you used last, including its model and reasoning level. Only connected engines are listed.",
+    sameAsLast: "Same as last time",
+    trust: "Trust tier",
+    trustHint: "Where new threads start. This is a security default, so think it through before raising it.",
+  },
+)

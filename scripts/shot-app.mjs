@@ -2,7 +2,7 @@
 /**
  * 给桌面端出图。**界面改动的唯一验收方式。**
  *
- * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min|--mid|--wide] [--reduce] [--audit]`
+ * 用法：`node scripts/shot-app.mjs [输出目录] [--dark] [--min|--mid|--wide] [--reduce] [--audit] [--lang=en]`
  *
  * ## 为什么不用 `SWITCHBACK_DEV_SHOT`
  *
@@ -53,6 +53,8 @@ const PET_LIVE = process.argv.includes("--pet-live")
 /** 定向巡检：逗号分隔场景名；隔离目录的默认引擎可选，绝不向真实用户设置写入。 */
 const ONLY = process.argv.find(arg => arg.startsWith("--views="))?.slice(8).split(",")
 const ENGINE = process.argv.find(arg => arg.startsWith("--engine="))?.slice(9)
+/** 界面语言：不给就是默认的中文；`--lang=en` 拍英文界面，国际化的验收靠它。 */
+const LANG = process.argv.find(arg => arg.startsWith("--lang="))?.slice(7)
 const STRESS = process.argv.includes("--stress")
 const MANY = process.argv.includes("--sidebar-stress")
 const SCENES = MANY ? [...SIDEBAR_VIEWS, ...SEARCH_VIEWS, ...SELFCHECK_VIEWS] : STRESS ? PERFORMANCE_VIEWS
@@ -288,7 +290,7 @@ async function main() {
   const port = await freePort()
   const data = await mkdtemp(join(tmpdir(), "switchback-shot-"))
   const workspaceFiles = new Set()
-  await seedUi(data, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS, MANY })
+  await seedUi(data, { ROOT, WORK, AT, DARK, ENGINE, PET_LIVE, STRESS, MANY, LANG })
   const child = spawn(
     electron,
     [DESKTOP, `--user-data-dir=${data}`, `--remote-debugging-port=${port}`, "--disable-gpu"],

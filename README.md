@@ -278,11 +278,12 @@ store ← protocol
 wire ← protocol
 link ← protocol + wire
 worksite ← ∅
+i18n ← ∅
 journal ← protocol
 handoff ← protocol
 engine ← protocol + approval
 host ← protocol + approval + engine + store + journal + handoff
-desktop ← protocol + engine + handoff + host + journal + link + store + wire + worksite
+desktop ← protocol + engine + handoff + host + i18n + journal + link + store + wire + worksite
 web ← link + protocol + store + wire
 ```
 <!-- package-graph:end -->

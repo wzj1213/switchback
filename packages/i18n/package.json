@@ -1,0 +1,15 @@
+{
+  "name": "@switchback/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "界面语言与文案的类型：Locale、defineMessages、英文单复数。零依赖，零 IO。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build"
+  }
+}

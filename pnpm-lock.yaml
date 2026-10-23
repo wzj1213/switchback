@@ -53,6 +53,9 @@ importers:
       '@switchback/host':
         specifier: workspace:*
         version: link:../../packages/host
+      '@switchback/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@switchback/journal':
         specifier: workspace:*
         version: link:../../packages/journal
@@ -237,6 +240,8 @@ importers:
       '@switchback/store':
         specifier: workspace:*
         version: link:../store
+
+  packages/i18n: {}
 
   packages/journal:
     dependencies:

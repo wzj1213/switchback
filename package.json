@@ -11,7 +11,7 @@
     "pnpm": "11.18.0"
   },
   "scripts": {
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run check:tokens && pnpm run check:css && pnpm run check:icons && pnpm run check:docs && pnpm run test",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run arch && pnpm run check:tokens && pnpm run check:css && pnpm run check:icons && pnpm run check:i18n && pnpm run check:docs && pnpm run test",
     "typecheck": "tsc --build && tsc -p apps/desktop/tsconfig.json && tsc -p apps/web/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -35,7 +35,8 @@
     "release:prune": "node scripts/prune-release.mjs",
     "图标": "node scripts/make-icon.mjs",
     "check:css": "node scripts/check-css.mjs && node scripts/check-style-size.mjs",
-    "check:icons": "node scripts/check-icons.mjs"
+    "check:icons": "node scripts/check-icons.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

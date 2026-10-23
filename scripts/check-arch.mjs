@@ -16,7 +16,7 @@ import { PACKAGE_GRAPH, renderPackageGraph } from "./package-graph.mjs"
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 
 /** 这些包不得有任何运行时依赖（devDependencies 不限）。 */
-const PURE = new Set(["@switchback/protocol", "@switchback/approval"])
+const PURE = new Set(["@switchback/protocol", "@switchback/approval", "@switchback/i18n"])
 
 const REQUIRED_README_SECTIONS = ["## 拥有什么", "## 不拥有什么", "## 已知限制"]
 
