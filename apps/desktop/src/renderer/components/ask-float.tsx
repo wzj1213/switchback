@@ -7,6 +7,9 @@
  * 填回输入框的是一句**引文开头**（`关于「…」：`），光标落在冒号后面：
  * 上下文已经带上了，你只要把问题打完。
  */
+import { useMessages } from "../i18n.js"
+import { ASK_FLOAT } from "./ask-float.messages.js"
+
 export function AskFloat({
   pick,
   onAsk,
@@ -14,6 +17,7 @@ export function AskFloat({
   pick: { quote: string; x: number; y: number } | undefined
   onAsk?: (text: string, attachments?: readonly string[], aside?: boolean) => void
 }): React.JSX.Element | null {
+  const m = useMessages(ASK_FLOAT)
   if (pick === undefined || onAsk === undefined) return null
   return (
     <button
@@ -24,10 +28,10 @@ export function AskFloat({
         event.preventDefault()
       }}
       onClick={() => {
-        onAsk(`关于「${pick.quote}」：`, [], true)
+        onAsk(m.prefill(pick.quote), [], true)
       }}
     >
-      ✦ 问一句
+      {m.ask}
     </button>
   )
 }

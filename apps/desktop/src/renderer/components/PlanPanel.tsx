@@ -3,6 +3,11 @@ import type { Item, PlanStep } from "@switchback/protocol"
 import { openPlan, stepProgressOf } from "@switchback/store"
 import { PlanMark } from "./PlanMark.js"
 import { PlanSteps } from "./PlanSteps.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { PLAN_PANEL } from "./PlanPanel.messages.js"
+
+type Text = (typeof PLAN_PANEL)[Locale]
 
 function currentStep(steps: readonly PlanStep[]): PlanStep | undefined {
   return (
@@ -16,20 +21,20 @@ function currentStep(steps: readonly PlanStep[]): PlanStep | undefined {
  * `stepProgressOf` 拿不到当前序号时返回的是「共 N 步」——
  * 胶囊认这个分支，不硬凑一个假的当前序号：**引擎没报的东西，Switchback 不替它编。**
  */
-function pillLabel(steps: readonly PlanStep[]): string {
+function pillLabel(steps: readonly PlanStep[], m: Text): string {
   const progress = stepProgressOf(steps)
   return progress.index === undefined
-    ? `· ${String(progress.total)} 步`
+    ? m.steps(progress.total)
     : `${String(progress.index)} / ${String(progress.total)}`
 }
 
-function ariaLabel(steps: readonly PlanStep[], current: PlanStep): string {
+function ariaLabel(steps: readonly PlanStep[], current: PlanStep, m: Text): string {
   const progress = stepProgressOf(steps)
   const where =
     progress.index === undefined
-      ? `共 ${String(progress.total)} 步`
-      : `第 ${String(progress.index)} 步，共 ${String(progress.total)} 步`
-  return `计划：${where}。${current.text}`
+      ? m.total(progress.total)
+      : m.at(progress.index, progress.total)
+  return m.aria(where, current.text)
 }
 
 const WIDE = 330
@@ -48,20 +53,21 @@ function PlanPop({
   running: boolean
   onDismiss: () => void
 }): React.JSX.Element {
+  const m = useMessages(PLAN_PANEL)
   return (
     <div
       className={`plan-pop${pinned ? " plan-pop--pinned" : ""}`}
       style={{ left: spot.left, bottom: spot.bottom }}
-      {...(pinned ? { role: "dialog" as const, "aria-label": "当前计划" } : { "aria-hidden": "true" as const })}
+      {...(pinned ? { role: "dialog" as const, "aria-label": m.current } : { "aria-hidden": "true" as const })}
     >
       <div className="plan-pop__body">
         <PlanSteps steps={steps} max={8} live={running} />
       </div>
       <div className="plan-pop__foot">
-        <span>{pinned ? "Esc 收起" : "点一下钉住"}</span>
+        <span>{pinned ? m.escToClose : m.clickToPin}</span>
         {/* 「本会话收起」从常驻按钮降级到这里：它是低频动作，不该在一排常驻胶囊里占一个目标 */}
         <button type="button" className="plan-pop__dismiss" tabIndex={pinned ? 0 : -1} onClick={onDismiss}>
-          本会话收起计划
+          {m.dismiss}
         </button>
       </div>
     </div>
@@ -84,6 +90,7 @@ export function PlanPanel({
   /** 引擎此刻在跑（不是待批、不是启动中）。环只在它上面转。 */
   running: boolean
 }): React.JSX.Element | null {
+  const m = useMessages(PLAN_PANEL)
   const [pinned, setPinned] = useState(false)
   const [preview, setPreview] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -132,12 +139,12 @@ export function PlanPanel({
     })
   }
   return (
-    <aside className="plan-pillrow" aria-label="当前计划" ref={box}>
+    <aside className="plan-pillrow" aria-label={m.current} ref={box}>
       <button
         type="button"
         className="plan-pill"
         aria-expanded={pinned || preview}
-        aria-label={ariaLabel(plan.steps, current)}
+        aria-label={ariaLabel(plan.steps, current, m)}
         onMouseEnter={() => {
           window.clearTimeout(timer.current)
           timer.current = window.setTimeout(() => {
@@ -157,7 +164,7 @@ export function PlanPanel({
         }}
       >
         <PlanMark status={current.status} spinning={running && current.status === "in_progress"} />
-        <span className="plan-pill__n">{pillLabel(plan.steps)}</span>
+        <span className="plan-pill__n">{pillLabel(plan.steps, m)}</span>
       </button>
       {(pinned || preview) && spot !== undefined ? (
         <PlanPop

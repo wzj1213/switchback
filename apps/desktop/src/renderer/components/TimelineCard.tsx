@@ -3,6 +3,8 @@ import { Popover } from "./Popover.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"
+import { useMessages } from "../i18n.js"
+import { TIMELINE_CARD } from "./TimelineCard.messages.js"
 
 /**
  * 「这条会话都被谁跑过」——一条时间线答完。
@@ -43,16 +45,15 @@ export function TimelineCard({
   onCopy: (text: string) => void
   onReveal: (path: string) => void
 }): React.JSX.Element {
+  const m = useMessages(TIMELINE_CARD)
   const segments = thread.segments ?? []
   return (
-    <Popover open anchor={anchor} minWidth={420} ariaLabel="引擎时间线" onClose={onClose}>
+    <Popover open anchor={anchor} minWidth={420} ariaLabel={m.title} onClose={onClose}>
       <div className="card">
-        <div className="card__head">引擎时间线</div>
+        <div className="card__head">{m.title}</div>
         {segments.length === 0 ? (
           // **说清为什么空**，别只写「暂无」：人会以为功能坏了
-          <p className="card__empty">
-            还没有跑过。说一句话之后，这里会记下是哪家引擎跑的、记录在哪。
-          </p>
+          <p className="card__empty">{m.empty}</p>
         ) : (
           segments.map((seg, i) => (
             <Segment
@@ -86,6 +87,7 @@ function Segment({
   onCopy: (text: string) => void
   onReveal: (path: string) => void
 }): React.JSX.Element {
+  const m = useMessages(TIMELINE_CARD)
   return (
     <div className="seg">
       <div className="seg__head">
@@ -96,14 +98,14 @@ function Segment({
         <span className="seg__engine">
           {label}{seg.profile === undefined ? "" : ` · ${seg.profile}`}
         </span>
-        <span className="seg__when">{whenOf(seg.startedAt)}</span>
+        <span className="seg__when">{seg.startedAt <= 0 ? "" : m.when(seg.startedAt)}</span>
       </div>
-      <Line label="会话 id" value={seg.handle} onCopy={onCopy} />
+      <Line label={m.sessionId} value={seg.handle} onCopy={onCopy} />
       {seg.logPath === undefined ? (
         // 拿不到就明说。留空的话，人会以为是自己没找对地方
-        <p className="seg__none">这家引擎没有提供本地记录的路径。</p>
+        <p className="seg__none">{m.noLog}</p>
       ) : (
-        <Line label="记录" value={seg.logPath} onCopy={onCopy} onReveal={onReveal} />
+        <Line label={m.log} value={seg.logPath} onCopy={onCopy} onReveal={onReveal} />
       )}
     </div>
   )
@@ -121,6 +123,7 @@ function Line({
   onCopy: (text: string) => void
   onReveal?: (path: string) => void
 }): React.JSX.Element {
+  const m = useMessages(TIMELINE_CARD)
   return (
     <div className="seg__line">
       <span className="seg__label">{label}</span>
@@ -128,8 +131,8 @@ function Line({
       <button
         type="button"
         className="iconbtn"
-        aria-label={`复制${label}`}
-        title="复制"
+        aria-label={m.copyOf(label)}
+        title={m.copy}
         onClick={() => {
           onCopy(value)
         }}
@@ -140,8 +143,8 @@ function Line({
         <button
           type="button"
           className="iconbtn"
-          aria-label="在访达中显示"
-          title="在访达中显示"
+          aria-label={m.reveal}
+          title={m.reveal}
           onClick={() => {
             onReveal(value)
           }}
@@ -154,9 +157,4 @@ function Line({
 }
 
 /** 什么时候开始的。这张卡片是回看用的，日期比「几分钟前」更有用。 */
-function whenOf(at: number): string {
-  if (at <= 0) return ""
-  const d = new Date(at)
-  const p = (n: number): string => String(n).padStart(2, "0")
-  return `${String(d.getMonth() + 1)}月${String(d.getDate())}日 ${p(d.getHours())}:${p(d.getMinutes())}`
-}
+

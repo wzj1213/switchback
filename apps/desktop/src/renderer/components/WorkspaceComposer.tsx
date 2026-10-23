@@ -60,7 +60,7 @@ export function WorkspaceComposer({
           lanes={props.lanes} onOpenLane={props.onOpenLane} />
       }
       // 历史会话照样能发：发话时宿主先接回引擎（见 `history-note.ts`）
-      history={historyNote(thread, props.engines, props.catalog)}
+      history={historyNote(thread, props.engines, props.catalog, locale)}
       focusOnMount={thread.provisional === true}
       /* **和当前轮次比一比才算数**：`passTurn` 存的是轮次 id，
          所以「过期」不需要谁记得来清一次——下一轮的 id 不一样，这里自然就是 false */

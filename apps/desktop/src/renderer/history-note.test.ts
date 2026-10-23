@@ -72,7 +72,7 @@ describe("历史会话的输入框说什么", () => {
   ]
   for (const c of cases) {
     it(c.name, () => {
-      expect(historyNote({ ...thread, ...c.patch }, engines, c.list ?? engines)).toEqual(c.want)
+      expect(historyNote({ ...thread, ...c.patch }, engines, c.list ?? engines, "zh-CN")).toEqual(c.want)
     })
   }
 })

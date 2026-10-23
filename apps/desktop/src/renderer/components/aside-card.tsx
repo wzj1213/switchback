@@ -1,9 +1,8 @@
 import type { Aside, Lane } from "@switchback/protocol"
 import { PlanMark, type MarkState } from "./PlanMark.js"
+import { useMessages } from "../i18n.js"
+import { ASIDE_CARD } from "./aside-card.messages.js"
 
-const ASIDE_LABEL: Readonly<Record<Lane["status"], string>> = {
-  running: "回答中", paused: "已暂停", done: "已回答", failed: "失败",
-}
 
 const ASIDE_MARK: Readonly<Record<Lane["status"], MarkState>> = {
   running: "in_progress", paused: "pending", done: "done", failed: "failed",
@@ -20,9 +19,10 @@ const ASIDE_MARK: Readonly<Record<Lane["status"], MarkState>> = {
  * 上一版把问答关在一个点掉就没的浮层里——而它回答的正是你屏幕上正在做的事。
  */
 export function AsideCard({ aside }: { aside: Aside }): React.JSX.Element {
+  const m = useMessages(ASIDE_CARD)
   return (
     <div className="asidecard">
-      <span className="asidecard__tag">侧问 · 不进正文</span>
+      <span className="asidecard__tag">{m.tag}</span>
       <p className="asidecard__q">{aside.question}</p>
       <p className="asidecard__a">{aside.answer}</p>
     </div>
@@ -41,19 +41,20 @@ export function AsideLaneCard({
   onOpen?: (laneId: string) => void
   folded?: boolean
 }): React.JSX.Element {
+  const m = useMessages(ASIDE_CARD)
   const running = lane.status === "running"
   const spinning = running && live
-  const state = running && !live ? "状态待确认" : ASIDE_LABEL[lane.status]
+  const state = running && !live ? m.unknown : m.status[lane.status]
   return (
-    <section className={`asidecard asidecard--${lane.status}`} aria-label={`侧问：${lane.title}`} aria-live="polite">
+    <section className={`asidecard asidecard--${lane.status}`} aria-label={m.label(lane.title)} aria-live="polite">
       <span className="asidecard__tag">
         <PlanMark status={ASIDE_MARK[lane.status]} spinning={spinning} />
-        侧问 · {state} · 不进正文
+        {m.tagWith(state)}
       </span>
       <p className="asidecard__q">{lane.title}</p>
       {onOpen === undefined ? null : (
         <button type="button" className="lane__open" onClick={() => { onOpen(lane.id) }}>
-          {folded ? "已在工作台打开" : "在工作台查看"}
+          {folded ? m.opened : m.view}
         </button>
       )}
       {running || folded ? null : <p className="asidecard__a">{lane.summary}</p>}

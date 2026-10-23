@@ -5,6 +5,8 @@ import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"
 import { ChevronIcon } from "./icons.js"
 import { LinkifiedText } from "./linkified-text.js"
+import { useMessages } from "../i18n.js"
+import { ENGINE_SWITCH } from "./engine-switch.messages.js"
 
 /**
  * 转录区里那条「切换至 X」。
@@ -31,15 +33,16 @@ export function EngineSwitchMark({
   /** 换家时随第一句发过去的交接说明（`withHandoffBriefs` 收进来的）。默认收起，点开是原文。 */
   brief?: UserMessageItem | undefined
 }): React.JSX.Element {
+  const m = useMessages(ENGINE_SWITCH)
   const [open, setOpen] = useState(false)
   const label = labelOf(engines, stint.engine)
   const name = stint.profile === undefined ? label : `${label} · ${stint.profile}`
   return (
     <div className="handmark-wrap">
-      <div className="handmark" role={brief === undefined ? "separator" : undefined} aria-label={`切换至 ${name}`}>
+      <div className="handmark" role={brief === undefined ? "separator" : undefined} aria-label={m.switchTo(name)}>
         <span className="handmark__tag">
           <i className="handmark__dot" style={{ background: engineTint(stint.engine) }} aria-hidden="true" />
-          切换至 {name}
+          {m.switchTo(name)}
           {brief === undefined ? null : (
             <button
               type="button"
@@ -49,7 +52,7 @@ export function EngineSwitchMark({
                 setOpen((was) => !was)
               }}
             >
-              · 附交接说明
+              {m.brief}
               <ChevronIcon open={open} size={12} />
             </button>
           )}

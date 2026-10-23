@@ -2,6 +2,8 @@ import type { DraftBlock } from "../composer-blocks.js"
 import { fileChip, pasteChip } from "../composer-blocks.js"
 import { CloseIcon, LinesIcon } from "./icons-panel.js"
 import { FileIcon } from "./icons-activity.js"
+import { useMessages } from "../i18n.js"
+import { DRAFT_BLOCKS } from "./DraftBlocks.messages.js"
 
 /**
  * 输入框上方那排待发芯片：拖进来的文件、折起来的大段粘贴。
@@ -24,6 +26,7 @@ function Chip({
   block: DraftBlock
   onRemove: () => void
 }): React.JSX.Element {
+  const m = useMessages(DRAFT_BLOCKS)
   const file = block.kind === "file" ? fileChip(block.path) : undefined
   const title = block.kind === "file" ? block.path : peekOf(block.text)
   const label = block.kind === "file" ? "" : (block.label ?? pasteChip(block.text))
@@ -43,7 +46,7 @@ function Chip({
       <button
         type="button"
         className="dblock__x"
-        aria-label={`移除 ${file === undefined ? "这段粘贴文本" : file.name}`}
+        aria-label={m.remove(file === undefined ? m.pasted : file.name)}
         onClick={onRemove}
       >
         <CloseIcon size={11} />

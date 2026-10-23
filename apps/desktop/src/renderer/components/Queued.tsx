@@ -25,18 +25,23 @@
  * 默认排队，插入是一个明确的动作。引擎不支持当场插话时这颗不出现——
  * 不是灰着，是不画。
  */
-function queuedLine(text: string | undefined, attachments: number): string {
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { QUEUED } from "./Queued.messages.js"
+
+type Text = (typeof QUEUED)[Locale]
+
+function queuedLine(text: string | undefined, attachments: number, m: Text): string {
   const parts = [text ?? ""]
-  if (attachments > 0) parts.push(`${String(attachments)} 张图片`)
-  return parts.filter((part) => part !== "").join(" · ") || "待发送内容"
+  if (attachments > 0) parts.push(m.images(attachments))
+  return parts.filter((part) => part !== "").join(" · ") || m.empty
 }
 
-const DROP_TITLE = "把这句话和它的附件取回输入框，先不发。正在跑的那一轮不受影响"
-const INSERT_TITLE = "不等这一轮跑完，现在就递进去"
 
 function InsertButton({ label, onInsert }: { label: string; onInsert: () => void }): React.JSX.Element {
+  const m = useMessages(QUEUED)
   return (
-    <button type="button" className="act queued__act" title={INSERT_TITLE} onClick={onInsert}>
+    <button type="button" className="act queued__act" title={m.insertTip} onClick={onInsert}>
       {label}
     </button>
   )
@@ -53,10 +58,11 @@ export function Queued({ texts, attachments, active, onDrop, onInsert }: {
   /** 引擎支持当场插话时才给。**整队一起插**，见文件头。 */
   onInsert?: () => void
 }): React.JSX.Element | null {
+  const m = useMessages(QUEUED)
   if (texts.length === 0) return null
   const total = texts.length
   const many = total > 1
-  const word = active ? "排队中" : "待发送"
+  const word = active ? m.queued : m.waiting
   const canInsert = active && onInsert !== undefined
   return (
     <div className="queued">
@@ -67,39 +73,39 @@ export function Queued({ texts, attachments, active, onDrop, onInsert }: {
           <span className="queued__badge">
             {word} {many ? `${String(index + 1)}/${String(total)}` : String(total)}
           </span>
-          <span className="queued__text" title={queuedLine(text, attachments[index]?.length ?? 0)}>
-            {queuedLine(text, attachments[index]?.length ?? 0)}
+          <span className="queued__text" title={queuedLine(text, attachments[index]?.length ?? 0, m)}>
+            {queuedLine(text, attachments[index]?.length ?? 0, m)}
           </span>
           {/* 只排一句时插入就挂在这一条上——那时「整队」和「这一条」是同一件事 */}
           {!many && canInsert && onInsert !== undefined ? (
-            <InsertButton label="立刻插入" onInsert={onInsert} />
+            <InsertButton label={m.insert} onInsert={onInsert} />
           ) : null}
           <button
             type="button"
             className="act queued__drop"
-            title={DROP_TITLE}
+            title={m.dropTip}
             onClick={() => {
               onDrop(index)
             }}
           >
-            取回
+            {m.drop}
           </button>
         </div>
       ))}
       {many ? (
         <div className="queued__row queued__row--foot">
           {canInsert && onInsert !== undefined ? (
-            <InsertButton label="全部插入" onInsert={onInsert} />
+            <InsertButton label={m.insertAll} onInsert={onInsert} />
           ) : null}
           <button
             type="button"
             className="act queued__drop"
-            title="把排着的这几句全部取回输入框，按顺序拼成一段"
+            title={m.dropAllTip}
             onClick={() => {
               onDrop()
             }}
           >
-            全部取回
+            {m.dropAll}
           </button>
         </div>
       ) : null}

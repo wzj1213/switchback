@@ -3,12 +3,15 @@ import type { PlanItem } from "@switchback/protocol"
 import { stepProgressOf } from "@switchback/store"
 import { ChevronIcon } from "./icons.js"
 import { PlanSteps } from "./PlanSteps.js"
+import { useMessages } from "../i18n.js"
+import { PLAN_CARD } from "./PlanCard.messages.js"
 
 /** 正文里的计划快照：默认折起，只负责保留“计划在何时变过”。 */
 export function PlanCard({ item }: { item: PlanItem }): React.JSX.Element {
+  const m = useMessages(PLAN_CARD)
   const [open, setOpen] = useState(false)
   const progress = stepProgressOf(item.steps)
-  const count = `${String(progress.total)} 步${progress.done === 0 ? "" : `（${String(progress.done)} 已完成）`}`
+  const count = m.count(progress.total, progress.done)
   return (
     <div className="run plan-card">
       <button
@@ -20,7 +23,7 @@ export function PlanCard({ item }: { item: PlanItem }): React.JSX.Element {
         }}
       >
         <ChevronIcon open={open} />
-        <span className="plan-card__title">计划</span>
+        <span className="plan-card__title">{m.title}</span>
         <span className="plan-card__count">· {count}</span>
       </button>
       {open ? (

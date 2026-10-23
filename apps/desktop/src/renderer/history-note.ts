@@ -1,5 +1,7 @@
 import type { EngineInfo, Thread } from "@switchback/protocol"
 import { cannotRevive } from "@switchback/store"
+import type { Locale } from "@switchback/i18n"
+import { HISTORY_NOTE } from "./history-note.messages.js"
 
 /**
  * 历史会话（`Thread.detached`）的输入框先交代的那一句：发出去会发生什么，或者为什么还发不了。
@@ -28,19 +30,21 @@ export function historyNote(
   thread: Thread,
   engines: readonly EngineInfo[],
   catalog: readonly EngineInfo[],
+  locale: Locale,
 ): HistoryNote | undefined {
   if (thread.detached !== true) return undefined
+  const m = HISTORY_NOTE[locale]
   const label = (id: string): string => engines.find((engine) => engine.id === id)?.label ?? id
   const to = thread.nextEngine ?? thread.engine
-  if (to !== thread.engine) return { text: `历史会话：发出去由 ${label(to)} 接着做。`, held: false }
+  if (to !== thread.engine) return { text: m.next(label(to)), held: false }
   if (cannotRevive(thread)) {
     return {
-      text: `这条会话没留下 ${label(to)} 的会话句柄，接不回原来的上下文——在下面换一家引擎接着做。`,
+      text: m.noHandle(label(to)),
       held: true,
     }
   }
   if (catalog.length > 0 && !catalog.some((engine) => engine.id === to)) {
-    return { text: `引擎列表里已经没有 ${label(to)}——在下面换一家接着做；直接发会先试着接回它。`, held: false }
+    return { text: m.gone(label(to)), held: false }
   }
-  return { text: `历史会话：直接发话，会先接回 ${label(to)} 原来的会话。`, held: false }
+  return { text: m.revive(label(to)), held: false }
 }
