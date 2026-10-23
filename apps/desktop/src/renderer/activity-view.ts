@@ -1,4 +1,6 @@
 import type { ActivityDay, ActivityMetric } from "../shared/activity.js"
+import type { Locale } from "@switchback/i18n"
+import { ACTIVITY_VIEW } from "./activity-view.messages.js"
 
 /**
  * 「活动」那一页的取数与排版。**纯函数，不碰 React、不读时钟**——
@@ -90,7 +92,6 @@ function levelsOf(values: readonly number[]): ReadonlyMap<number, HeatCell["leve
   )
 }
 
-const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
 
 /**
  * 三种口径**共用同一副骨架**。
@@ -107,7 +108,7 @@ function valueOf(mode: HeatMode, per: readonly number[], index: number, weekStar
 
 export function gridOf(
   days: readonly ActivityDay[],
-  options: { metric: ActivityMetric; mode: HeatMode; now: number },
+  options: { metric: ActivityMetric; mode: HeatMode; now: number; locale: Locale },
 ): HeatGrid {
   const byDate = new Map(days.map((day) => [day.date, day]))
   const weeks = weekCount(days[0] === undefined ? undefined : Date.parse(`${days[0].date}T00:00:00`), options.now)
@@ -126,7 +127,7 @@ export function gridOf(
   })
   return {
     weeks: Array.from({ length: weeks }, (_, w) => cells.slice(w * 7, w * 7 + 7)),
-    months: monthsOf(dates, weeks),
+    months: monthsOf(dates, weeks, options.locale),
   }
 }
 
@@ -144,14 +145,16 @@ const MONTH_COLS = 3
  * 月份标签。**同一个月只标一次**，标在它出现的第一列——重复标签只会糊成一条。
  * 同理，**占不满三列的月份干脆不标**：糊成一团的两个名字比少一个名字糟得多。
  */
-function monthsOf(dates: readonly string[], weeks: number): readonly { week: number; label: string }[] {
+function monthsOf(dates: readonly string[], weeks: number, locale: Locale): readonly { week: number; label: string }[] {
+  const m = ACTIVITY_VIEW[locale]
   const all: { week: number; label: string }[] = []
   for (let w = 0; w < weeks; w += 1) {
     const first = dates[w * 7]
     if (first === undefined) continue
     const month = Number(first.slice(5, 7)) - 1
-    if (all.at(-1)?.label === MONTHS[month]) continue
-    all.push({ week: w, label: MONTHS[month] ?? "" })
+    const label = m.month(month)
+    if (all.at(-1)?.label === label) continue
+    all.push({ week: w, label })
   }
   // 宽度按**到下一个标签为止**算，最后一个按到整张图右缘为止
   return all.filter((one, i) => (all[i + 1]?.week ?? weeks) - one.week >= MONTH_COLS)
@@ -161,14 +164,8 @@ function monthsOf(dates: readonly string[], weeks: number): readonly { week: num
  * 大数字说成人话。**用万/亿，不用 k/M**——这一页的读者读的是中文，
  * 而 `2766446k` 这种写法既不好读也没法和别的数字比大小。
  */
-export function bigNumber(n: number): string {
-  if (n < 10_000) return String(Math.round(n))
-  if (n < 100_000_000) return `${trim(n / 10_000)} 万`
-  return `${trim(n / 100_000_000)} 亿`
-}
-
-function trim(n: number): string {
-  return n.toFixed(n < 10 ? 2 : 1).replace(/\.?0+$/u, "")
+export function bigNumber(n: number, locale: Locale): string {
+  return ACTIVITY_VIEW[locale].big(n)
 }
 
 /**
@@ -180,15 +177,16 @@ function trim(n: number): string {
  *
  * **只说两级**：「1 天 21 小时」比「1 天 21 小时 3 分 9 秒」好读。
  */
-export function durationParts(ms: number): { value: string; unit: string; tail?: string } {
+export function durationParts(ms: number, locale: Locale): { value: string; unit: string; tail?: string } {
+  const m = ACTIVITY_VIEW[locale]
   const minutes = Math.floor(ms / 60_000)
-  if (minutes < 60) return { value: String(minutes), unit: "分" }
+  if (minutes < 60) return { value: String(minutes), unit: m.minute }
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return { value: String(hours), unit: "小时", tail: `${String(minutes % 60)} 分` }
-  return { value: String(Math.floor(hours / 24)), unit: "天", tail: `${String(hours % 24)} 小时` }
+  if (hours < 24) return { value: String(hours), unit: m.hour, tail: m.tailMinutes(minutes % 60) }
+  return { value: String(Math.floor(hours / 24)), unit: m.day, tail: m.tailHours(hours % 24) }
 }
 
 /** `2026-08-24` → `8月24日`。热力图的悬停读数用，年份在那儿是噪声。 */
-export function dayText(date: string): string {
-  return `${String(Number(date.slice(5, 7)))}月${String(Number(date.slice(8, 10)))}日`
+export function dayText(date: string, locale: Locale): string {
+  return ACTIVITY_VIEW[locale].date(Number(date.slice(5, 7)), Number(date.slice(8, 10)))
 }

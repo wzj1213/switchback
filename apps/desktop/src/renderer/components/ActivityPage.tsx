@@ -13,6 +13,8 @@ import { ToolRun } from "./ToolRun.js"
 import { ChevronIcon } from "./icons.js"
 import { Markdown } from "./Markdown.js"
 import { focusActivity, focusFirstActivity, moveActivityFocus } from "./activity-navigation.js"
+import { useMessages } from "../i18n.js"
+import { ACTIVITY_PAGE } from "./ActivityPage.messages.js"
 
 const MARK: Readonly<Record<Lane["status"], MarkState>> = {
   running: "in_progress",
@@ -20,18 +22,12 @@ const MARK: Readonly<Record<Lane["status"], MarkState>> = {
   done: "done",
   failed: "failed",
 }
-const LABEL: Readonly<Record<Lane["status"], string>> = {
-  running: "正在运行",
-  paused: "已暂停",
-  done: "已完成",
-  failed: "失败",
-}
 const ignoreApproval: ResolveApproval = () => undefined
 
 /** 一条命令一个「节点」不值得报数——那一行读起来像凑数的。 */
-function nodeCount(lane: Lane): string {
+function nodeCount(lane: Lane, nodesText: (n: number) => string): string {
   const nodes = lane.progress?.nodes.length ?? 0
-  return nodes > 1 ? ` · ${String(nodes)} 个节点` : ""
+  return nodes > 1 ? nodesText(nodes) : ""
 }
 
 function ordered(lanes: readonly Lane[]): readonly Lane[] {
@@ -48,9 +44,10 @@ function ActivityIndex({ lanes, hidden, root, onPick }: {
   root: React.RefObject<HTMLDivElement | null>
   onPick: (id: string) => void
 }): React.JSX.Element {
+  const m = useMessages(ACTIVITY_PAGE)
   return (
     <div ref={root} className="activity-list" hidden={hidden}>
-      {lanes.length === 0 ? <p className="workbench__empty">这条任务还没有后台活动。</p> : null}
+      {lanes.length === 0 ? <p className="workbench__empty">{m.none}</p> : null}
       {ordered(lanes).map((lane) => {
         const live = lane.status === "running"
         return (
@@ -62,8 +59,8 @@ function ActivityIndex({ lanes, hidden, root, onPick }: {
               <span className="activity-row__title">{lane.title}</span>
               {lane.command === undefined ? null : <LaneCommandLine command={lane.command} />}
               <span className="activity-row__meta">
-                {LABEL[lane.status]}
-                {nodeCount(lane)}
+                {m.status[lane.status]}
+                {nodeCount(lane, m.nodes)}
               </span>
             </span>
             <ChevronIcon size={13} />
@@ -81,12 +78,13 @@ function ActivityFeed({ items, threadId, cwd, onCopy }: {
   onCopy: (text: string) => void
 }): React.JSX.Element | null {
   const rows = useMemo(() => groupRows(items), [items])
+  const m = useMessages(ACTIVITY_PAGE)
   // 和转录区同一条规矩：每轮只挂最后一条回答（见 `transcript-row.tsx` 的 `answerActs`）
   const acts = answerActs(rows)
   if (rows.length === 0) return null
   return (
     <div className="activity-feed">
-      <div className="workbench__section">过程</div>
+      <div className="workbench__section">{m.process}</div>
       {rows.map((row) => {
         if (row.kind === "run") {
           return <ToolRun key={row.items[0]?.id} items={row.items} threadId={threadId} cwd={cwd} />
@@ -119,13 +117,14 @@ function ActivityFeed({ items, threadId, cwd, onCopy }: {
  * 不另写一份——两份 markdown 渲染迟早会分岔成两种样子。
  */
 function LaneConclusion({ lane }: { lane: Lane }): React.JSX.Element | null {
+  const m = useMessages(ACTIVITY_PAGE)
   if (lane.summary === undefined) return null
   if (lane.command === undefined) {
     return <div className="activity-detail__summary"><Markdown text={lane.summary} /></div>
   }
   return (
     <>
-      <div className="workbench__section">输出片段</div>
+      <div className="workbench__section">{m.output}</div>
       <LaneOutput text={lane.summary} />
     </>
   )
@@ -138,20 +137,21 @@ function LaneDetail({ lane, items, thread, onBack, onCopy }: {
   onBack: () => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
+  const m = useMessages(ACTIVITY_PAGE)
   const nodes = lane.progress?.nodes ?? []
   const budget = lane.progress?.budget
   const live = lane.status === "running" && thread.detached !== true
   return (
     <div className="activity-detail">
       <button type="button" className="workbench__back" onClick={onBack}>
-        <ChevronIcon size={13} /> 全部活动
+        <ChevronIcon size={13} /> {m.all}
       </button>
       <header className="activity-detail__head">
         <span className="activity-row__mark"><PlanMark status={MARK[lane.status]} spinning={live} /></span>
         <div className="activity-row__copy">
           <strong>{lane.title}</strong>
           <span className="activity-row__meta">
-            {LABEL[lane.status]}
+            {m.status[lane.status]}
             {budget === undefined ? "" : ` · ${compact(budget.used)} tokens`}
           </span>
         </div>
@@ -162,7 +162,7 @@ function LaneDetail({ lane, items, thread, onBack, onCopy }: {
         <LaneConclusion lane={lane} />
         <ActivityFeed items={items} threadId={thread.id} cwd={thread.cwd} onCopy={onCopy} />
         {nodes.length === 0 && lane.summary === undefined && lane.command === undefined && items.length === 0 ? (
-          <p className="workbench__empty">引擎只报告了这条活动的存在，还没有给出逐步明细。</p>
+          <p className="workbench__empty">{m.noDetail}</p>
         ) : null}
       </div>
     </div>

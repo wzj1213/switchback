@@ -1,7 +1,8 @@
 import type { ActivityDigest, NameTally } from "../../shared/activity.js"
 import { bigNumber, dayText } from "../activity-view.js"
 import { effortLabel } from "./ModelPicker.js"
-import { useLocale } from "../i18n.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { ACTIVITY_TALLIES } from "./ActivityTallies.messages.js"
 import { Blank } from "./SettingsBits.js"
 
 /**
@@ -12,7 +13,7 @@ import { Blank } from "./SettingsBits.js"
  */
 
 /** 一张排行榜。条形的长度按**榜首**归一——它回答的是「谁占大头」，不是绝对值。 */
-export function TallyCard({ title, hint, rows, empty, format = bigNumber, name = (id) => id }: {
+export function TallyCard({ title, hint, rows, empty, format, name = (id) => id }: {
   title: string
   hint?: string
   rows: readonly NameTally[]
@@ -20,6 +21,8 @@ export function TallyCard({ title, hint, rows, empty, format = bigNumber, name =
   format?: (n: number) => string
   name?: (id: string) => string
 }): React.JSX.Element {
+  const locale = useLocale()
+  const shown = format ?? ((n: number): string => bigNumber(n, locale))
   const top = rows[0]?.count ?? 1
   return (
     <section className="stat-card">
@@ -35,7 +38,7 @@ export function TallyCard({ title, hint, rows, empty, format = bigNumber, name =
               <span className="stat-rank__bar" aria-hidden="true">
                 <span style={{ width: `${String(Math.max(2, (row.count / top) * 100))}%` }} />
               </span>
-              <span className="stat-rank__n">{format(row.count)}</span>
+              <span className="stat-rank__n">{shown(row.count)}</span>
             </li>
           ))}
         </ul>
@@ -56,25 +59,28 @@ function Line({ label, value, hint }: { label: string; value: string; hint?: str
 
 export function ActivityInsight({ digest }: { digest: ActivityDigest }): React.JSX.Element {
   const { totals } = digest
+  const locale = useLocale()
+  const m = ACTIVITY_TALLIES[locale]
+  const big = (n: number): string => bigNumber(n, locale)
   return (
     <section className="stat-card">
-      <h4 className="stat-card__title">活动洞察</h4>
+      <h4 className="stat-card__title">{m.insight}</h4>
       <ul className="stat-lines">
-        <Line label="你说了多少句" value={`${bigNumber(totals.asks)} 条`} />
-        <Line label="引擎调了多少次工具" value={`${bigNumber(totals.tools)} 次`} />
+        <Line label={m.asks} value={m.asksValue(big(totals.asks))} />
+        <Line label={m.tools} value={m.timesValue(big(totals.tools))} />
         <Line
-          label="停下来问过你"
-          value={`${bigNumber(totals.approvals)} 次`}
-          hint="只算真的弹到你面前、要你点的那些；按规则自动放行的不进 transcript，也不在这里"
+          label={m.approvals}
+          value={m.timesValue(big(totals.approvals))}
+          hint={m.approvalsHint}
         />
-        <Line label="子 agent 与 workflow" value={`${bigNumber(totals.lanes)} 条旁路`} />
-        <Line label="中途换过引擎" value={`${bigNumber(totals.handoffs)} 次`} hint="一条会话里换了几回引擎" />
-        <Line label="涉及的工作区" value={`${bigNumber(totals.projects)} 个`} />
-        <Line label="有活动的天数" value={`${bigNumber(totals.activeDays)} 天`} />
+        <Line label={m.lanes} value={m.lanesValue(big(totals.lanes))} />
+        <Line label={m.handoffs} value={m.timesValue(big(totals.handoffs))} hint={m.handoffsHint} />
+        <Line label={m.projects} value={m.projectsValue(big(totals.projects))} />
+        <Line label={m.activeDays} value={m.daysValue(big(totals.activeDays))} />
         {totals.peakDay === undefined ? null : (
           <Line
-            label="最忙的一天"
-            value={`${dayText(totals.peakDay.date)} · ${bigNumber(totals.peakDay.turns)} 轮`}
+            label={m.peak}
+            value={m.peakValue(dayText(totals.peakDay.date, locale), big(totals.peakDay.turns))}
           />
         )}
       </ul>
@@ -93,26 +99,27 @@ export function ActivityTokens({ digest, name }: {
   digest: ActivityDigest
   name: (id: string) => string
 }): React.JSX.Element {
+  const locale = useLocale()
+  const m = ACTIVITY_TALLIES[locale]
   return (
     <section className="stat-card">
-      <h4 className="stat-card__title">各家报的累计用量</h4>
+      <h4 className="stat-card__title">{m.tokensTitle}</h4>
       <p className="stat-card__hint">
-        <strong>各家口径不是一回事</strong>，别把它们加起来当账单：有的引擎每次请求都把整段上下文重新计一遍，
-        同一段历史会被反复计入。这里只照它自己报的数原样摆出来。
+        <strong>{m.tokensStrong}</strong>{m.tokensRest}
       </p>
       {digest.tokensByEngine.length === 0 ? (
-        <Blank>还没有任何一家报过累计用量。</Blank>
+        <Blank>{m.noTokens}</Blank>
       ) : (
         <ul className="stat-lines">
           {digest.tokensByEngine.map((row) => (
-            <Line key={row.id} label={name(row.id)} value={`${bigNumber(row.count)} token`} />
+            <Line key={row.id} label={name(row.id)} value={m.tokenValue(bigNumber(row.count, locale))} />
           ))}
         </ul>
       )}
       {digest.tokenless.length === 0 ? null : (
         <p className="stat-card__hint">
-          跑过、但一次都没报过累计用量：{digest.tokenless.map(name).join("、")}。
-          <strong>这不等于没用过它</strong>——是 Switchback 手上没有这个数字。
+          {m.tokenlessLead(m.join(digest.tokenless.map(name)))}
+          <strong>{m.tokenlessStrong}</strong>{m.tokenlessRest}
         </p>
       )}
     </section>
@@ -125,31 +132,32 @@ export function ActivityRanks({ digest, name }: {
   name: (id: string) => string
 }): React.JSX.Element {
   const locale = useLocale()
+  const m = useMessages(ACTIVITY_TALLIES)
   return (
     <>
-      <TallyCard title="最常用的引擎" rows={digest.engines} name={name} empty="还没有跑过任何一轮。" format={(n) => `${String(n)} 轮`} />
-      <TallyCard title="最常用的工具" rows={digest.tools} empty="引擎还没有调过工具。" format={(n) => `${String(n)} 次`} />
+      <TallyCard title={m.engines} rows={digest.engines} name={name} empty={m.enginesEmpty} format={m.turns} />
+      <TallyCard title={m.toolsTitle} rows={digest.tools} empty={m.toolsEmpty} format={m.times} />
       <TallyCard
-        title="最常用的模型"
-        hint="只统计引擎真报了模型的那些轮次。"
+        title={m.models}
+        hint={m.modelsHint}
         rows={digest.models}
-        empty="这些轮次里没有一次带着明确的模型。"
-        format={(n) => `${String(n)} 轮`}
+        empty={m.modelsEmpty}
+        format={m.turns}
       />
       <TallyCard
-        title="最常用的思考档"
+        title={m.efforts}
         rows={digest.efforts}
         name={(id) => effortLabel(id, locale).label}
-        empty="用过的引擎都没有可切换的思考档。"
-        format={(n) => `${String(n)} 轮`}
+        empty={m.effortsEmpty}
+        format={m.turns}
       />
       <TallyCard
-        title="打过的斜杠命令"
-        hint="按你输入框里打出的原文算。"
+        title={m.commands}
+        hint={m.commandsHint}
         rows={digest.commands}
         name={(id) => `/${id}`}
-        empty="还没打过斜杠命令。"
-        format={(n) => `${String(n)} 次`}
+        empty={m.commandsEmpty}
+        format={m.times}
       />
     </>
   )

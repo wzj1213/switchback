@@ -11,7 +11,7 @@ const now = Date.parse("2026-08-24T15:00:00")
 
 describe("热力图骨架", () => {
   it("没有数据时也画满 12 周——不是空白一片，是一张还没填的日历", () => {
-    const grid = gridOf([], { metric: "turns", mode: "daily", now })
+    const grid = gridOf([], { metric: "turns", mode: "daily", now, locale: "zh-CN" })
     expect(grid.weeks).toHaveLength(12)
     expect(grid.weeks.every((w) => w.length === 7)).toBe(true)
     expect(grid.weeks.flat().every((c) => c.level === 0)).toBe(true)
@@ -20,13 +20,13 @@ describe("热力图骨架", () => {
   // 一个用了两周的人看见 51 列全空的年历，第一反应是「这图坏了」
   it("历史比 12 周长时跟着长，但不超过 53 周", () => {
     const long = [day("2020-01-01", { turns: 1 }), day("2026-08-20", { turns: 1 })]
-    expect(gridOf(long, { metric: "turns", mode: "daily", now }).weeks).toHaveLength(53)
+    expect(gridOf(long, { metric: "turns", mode: "daily", now, locale: "zh-CN" }).weeks).toHaveLength(53)
     const mid = [day("2026-02-02", { turns: 1 })]
-    expect(gridOf(mid, { metric: "turns", mode: "daily", now }).weeks.length).toBeGreaterThan(12)
+    expect(gridOf(mid, { metric: "turns", mode: "daily", now, locale: "zh-CN" }).weeks.length).toBeGreaterThan(12)
   })
 
   it("最后一格就是今天，周一在每列最上面", () => {
-    const grid = gridOf([day("2026-08-24", { turns: 3 })], { metric: "turns", mode: "daily", now })
+    const grid = gridOf([day("2026-08-24", { turns: 3 })], { metric: "turns", mode: "daily", now, locale: "zh-CN" })
     const last = grid.weeks.at(-1)
     expect(last?.[0]?.date).toBe("2026-08-24")
     expect(last?.[0]?.value).toBe(3)
@@ -36,7 +36,7 @@ describe("热力图骨架", () => {
   it("按口径取不同的数：轮次 / 消息 / 工具 / token 各看各的", () => {
     const days = [day("2026-08-24", { turns: 2, asks: 5, tools: 40, tokens: 900 })]
     const at = (metric: "turns" | "asks" | "tools" | "tokens"): number =>
-      gridOf(days, { metric, mode: "daily", now }).weeks.at(-1)?.[0]?.value ?? -1
+      gridOf(days, { metric, mode: "daily", now, locale: "zh-CN" }).weeks.at(-1)?.[0]?.value ?? -1
     expect([at("turns"), at("asks"), at("tools"), at("tokens")]).toEqual([2, 5, 40, 900])
   })
 })
@@ -47,7 +47,7 @@ describe("三种口径共用同一副骨架", () => {
     day("2026-08-19", { turns: 2 }),
     day("2026-08-24", { turns: 4 }),
   ]
-  const grid = (mode: "daily" | "weekly" | "total") => gridOf(days, { metric: "turns", mode, now })
+  const grid = (mode: "daily" | "weekly" | "total") => gridOf(days, { metric: "turns", mode, now, locale: "zh-CN" })
 
   it("格子的数量与位置一个都不动，只有值变——切换时面板不会跳", () => {
     const shape = (mode: "daily" | "weekly" | "total"): string =>
@@ -78,7 +78,7 @@ describe("深浅按名次分", () => {
       day("2026-08-19", { turns: 30 }),
       day("2026-08-20", { turns: 250_000_000 }),
     ]
-    const levels = gridOf(days, { metric: "turns", mode: "daily", now }).weeks
+    const levels = gridOf(days, { metric: "turns", mode: "daily", now, locale: "zh-CN" }).weeks
       .flat()
       .filter((c) => c.value > 0)
       .map((c) => c.level)
@@ -87,7 +87,7 @@ describe("深浅按名次分", () => {
   })
 
   it("没动过的那天是 0 档，而且带不出 day", () => {
-    const grid = gridOf([day("2026-08-24", { turns: 1 })], { metric: "turns", mode: "daily", now })
+    const grid = gridOf([day("2026-08-24", { turns: 1 })], { metric: "turns", mode: "daily", now, locale: "zh-CN" })
     const empty = grid.weeks.at(-1)?.[1]
     expect(empty?.level).toBe(0)
     expect(empty?.day).toBeUndefined()
@@ -96,7 +96,7 @@ describe("深浅按名次分", () => {
 
 describe("月份标签", () => {
   it("同一个月只标一次，标在它第一次出现的那列", () => {
-    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now })
+    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now, locale: "zh-CN" })
     const labels = grid.months.map((m) => m.label)
     expect(new Set(labels).size).toBe(labels.length)
     expect(labels.at(-1)).toBe("8月")
@@ -108,7 +108,7 @@ describe("月份标签", () => {
    * 实测那一页左端就是「8月」压着「9月」。
    */
   it("挨得太近的两个月份标签不会同时出现——糊成一团比少一个名字糟", () => {
-    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now })
+    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now, locale: "zh-CN" })
     const gaps = grid.months.slice(1).map((m, i) => m.week - (grid.months[i]?.week ?? 0))
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(3)
   })
@@ -121,7 +121,7 @@ describe("月份标签", () => {
   it("最后一个月只占一两列时同样不标", () => {
     // 2026-09-07 是九月第一个周一，第二天收尾：九月在这张图里**只占最后一列**
     const early = Date.parse("2026-09-08T15:00:00")
-    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now: early })
+    const grid = gridOf([day("2026-05-01", { turns: 1 })], { metric: "turns", mode: "daily", now: early, locale: "zh-CN" })
     expect(grid.months.at(-1)?.label).not.toBe("9月")
     const last = grid.months.at(-1)
     expect(grid.weeks.length - (last?.week ?? 0)).toBeGreaterThanOrEqual(3)
@@ -140,7 +140,7 @@ describe("说成人话", () => {
   ] as const
   for (const c of numbers) {
     it(`${String(c.n)} → ${c.want}`, () => {
-      expect(bigNumber(c.n)).toBe(c.want)
+      expect(bigNumber(c.n, "zh-CN")).toBe(c.want)
     })
   }
 
@@ -152,11 +152,19 @@ describe("说成人话", () => {
   ] as const
   for (const c of spans) {
     it(`${String(c.ms)}ms → ${c.want.value} ${c.want.unit}`, () => {
-      expect(durationParts(c.ms)).toEqual(c.want)
+      expect(durationParts(c.ms, "zh-CN")).toEqual(c.want)
     })
   }
 
   it("热力图的悬停读数不带年份", () => {
-    expect(dayText("2026-08-04")).toBe("8月4日")
+    expect(dayText("2026-08-04", "zh-CN")).toBe("8月4日")
+  })
+})
+
+describe("英文那版", () => {
+  it("大数用 K / M，日期用月份缩写，时长用 h / min", () => {
+    expect([bigNumber(12_345, "en"), bigNumber(3_400_000, "en"), bigNumber(999, "en")]).toEqual(["12.3K", "3.4M", "999"])
+    expect(dayText("2026-08-04", "en")).toBe("Aug 4")
+    expect(durationParts(90 * 60_000, "en")).toEqual({ value: "1", unit: "h", tail: "30 min" })
   })
 })

@@ -2,6 +2,11 @@ import { useState } from "react"
 import type { ActivityDay, ActivityMetric } from "../../shared/activity.js"
 import { bigNumber, dayText, gridOf, metricOf, type HeatCell, type HeatMode } from "../activity-view.js"
 import { Segmented } from "./SettingsBits.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "../i18n.js"
+import { ACTIVITY_HEAT } from "./ActivityHeat.messages.js"
+
+type Text = (typeof ACTIVITY_HEAT)[Locale]
 
 /**
  * 一年（或者你用了多久）的活动热力图。
@@ -23,27 +28,12 @@ import { Segmented } from "./SettingsBits.js"
  * 摆在固定的位置上反而更好读：眼睛不用追着指针跑。
  */
 
-const METRICS = [
-  { id: "turns", label: "轮次" },
-  { id: "asks", label: "消息" },
-  { id: "tools", label: "工具" },
-  { id: "tokens", label: "Token" },
-] as const
+const METRICS: readonly ActivityMetric[] = ["turns", "asks", "tools", "tokens"]
 
-const MODES = [
-  { id: "daily", label: "每日" },
-  { id: "weekly", label: "每周" },
-  { id: "total", label: "累计" },
-] as const
+const MODES: readonly HeatMode[] = ["daily", "weekly", "total"]
 
-const UNIT: Readonly<Record<ActivityMetric, string>> = {
-  turns: "轮",
-  asks: "条消息",
-  tools: "次工具调用",
-  tokens: "个 token",
-}
 
-const WEEKDAYS = ["一", "", "三", "", "五", "", "日"]
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const
 
 /**
  * 深浅那一档的类名。
@@ -62,19 +52,21 @@ export function ActivityHeat({ days, now }: {
   const [metric, setMetric] = useState<ActivityMetric>("turns")
   const [mode, setMode] = useState<HeatMode>("daily")
   const [hover, setHover] = useState<string | undefined>(undefined)
-  const grid = gridOf(days, { metric, mode, now })
+  const locale = useLocale()
+  const m = ACTIVITY_HEAT[locale]
+  const grid = gridOf(days, { metric, mode, now, locale })
   const cells = grid.weeks.flat()
   const shown = cells.find((cell) => cell.date === hover)
 
   return (
     <section className="heat">
       <div className="heat__head">
-        <h3 className="set__title heat__title">按天分布</h3>
+        <h3 className="set__title heat__title">{m.title}</h3>
         <span className="heat__readout">
-          {shown === undefined ? readoutHint(mode) : readoutOf(shown, metric, mode)}
+          {shown === undefined ? m.hint[mode] : readoutOf(shown, metric, mode, locale)}
         </span>
-        <Segmented options={METRICS} value={metric} onPick={setMetric} />
-        <Segmented options={MODES} value={mode} onPick={setMode} />
+        <Segmented options={METRICS.map((id) => ({ id, label: m.metric[id] }))} value={metric} onPick={setMetric} />
+        <Segmented options={MODES.map((id) => ({ id, label: m.mode[id] }))} value={mode} onPick={setMode} />
       </div>
       <div className="heat__scroll">
         <div className="heat__months" style={{ gridTemplateColumns: `repeat(${String(grid.weeks.length)}, var(--heat-cell))` }}>
@@ -86,8 +78,8 @@ export function ActivityHeat({ days, now }: {
         </div>
         <div className="heat__body">
           <div className="heat__days">
-            {WEEKDAYS.map((label, index) => (
-              <span key={index} className="heat__weekday">{label}</span>
+            {WEEKDAYS.map((index) => (
+              <span key={index} className="heat__weekday">{m.weekday(index)}</span>
             ))}
           </div>
           {/* 一列一周、周一在上：交给 `grid-auto-flow: column` 按顺序填，
@@ -102,7 +94,7 @@ export function ActivityHeat({ days, now }: {
               <span
                 key={cell.date}
                 className={`heat__cell heat__cell--${LEVEL[cell.level]}`}
-                title={readoutOf(cell, metric, mode)}
+                title={readoutOf(cell, metric, mode, locale)}
                 onMouseEnter={() => {
                   setHover(cell.date)
                 }}
@@ -112,35 +104,30 @@ export function ActivityHeat({ days, now }: {
         </div>
       </div>
       <div className="heat__legend">
-        <span>少</span>
+        <span>{m.less}</span>
         {LEVEL.map((level) => (
           <span key={level} className={`heat__cell heat__cell--${level}`} aria-hidden="true" />
         ))}
-        <span>多</span>
+        <span>{m.more}</span>
       </div>
     </section>
   )
 }
 
-function readoutHint(mode: HeatMode): string {
-  if (mode === "weekly") return "每一格显示它所在那一周的合计"
-  if (mode === "total") return "每一格显示到那天为止的累计"
-  return "把鼠标放在格子上看那天做了什么"
-}
-
-function readoutOf(cell: HeatCell, metric: ActivityMetric, mode: HeatMode): string {
+function readoutOf(cell: HeatCell, metric: ActivityMetric, mode: HeatMode, locale: Locale): string {
+  const m = ACTIVITY_HEAT[locale]
   const { date, value, day } = cell
-  const scope = mode === "weekly" ? "那一周" : mode === "total" ? "到这天累计" : ""
-  const head = `${dayText(date)}${scope === "" ? "" : ` · ${scope}`}`
-  if (value === 0 && day === undefined) return `${head} · 没动`
-  const main = `${bigNumber(value)} ${UNIT[metric]}`
+  const scope = m.scope[mode]
+  const head = `${dayText(date, locale)}${scope === "" ? "" : ` · ${scope}`}`
+  if (value === 0 && day === undefined) return `${head} · ${m.idle}`
+  const main = `${bigNumber(value, locale)} ${m.unit(metric, value)}`
   if (mode !== "daily" || day === undefined) return `${head} · ${main}`
   // 每日口径下顺带把当天别的几项也说出来：一格只画一个数，但人想知道的是那天在干嘛
-  return `${head} · ${main}（${detailOf(day, metric)}）`
+  return m.withDetail(head, main, detailOf(day, metric, m, locale))
 }
 
-function detailOf(day: ActivityDay, metric: ActivityMetric): string {
-  return METRICS.filter((m) => m.id !== metric && metricOf(day, m.id) > 0)
-    .map((m) => `${m.label} ${bigNumber(metricOf(day, m.id))}`)
-    .join(" · ") || "只有这一项"
+function detailOf(day: ActivityDay, metric: ActivityMetric, m: Text, locale: Locale): string {
+  return METRICS.filter((id) => id !== metric && metricOf(day, id) > 0)
+    .map((id) => `${m.metric[id]} ${bigNumber(metricOf(day, id), locale)}`)
+    .join(" · ") || m.nothingElse
 }

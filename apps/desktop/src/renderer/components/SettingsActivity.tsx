@@ -5,6 +5,9 @@ import { bridge, useAsync, type Async } from "../use-async.js"
 import { ActivityHeat } from "./ActivityHeat.js"
 import { ActivityInsight, ActivityRanks, ActivityTokens } from "./ActivityTallies.js"
 import { Actions, Blank, More } from "./SettingsBits.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "../i18n.js"
+import { SETTINGS_ACTIVITY } from "./SettingsActivity.messages.js"
 
 /**
  * 「活动」——**你在 Switchback 里到底干了多少**。
@@ -41,7 +44,7 @@ function Tile({ label, value, unit, tail, hint }: {
     <div className="stat-tile" {...(hint === undefined ? {} : { title: hint })}>
       <span className="stat-tile__v">
         {value}
-        {unit === undefined ? null : <small>{unit}</small>}
+        {unit === undefined || unit === "" ? null : <small>{unit}</small>}
         {tail === undefined ? null : <small>{tail}</small>}
       </span>
       <span className="stat-tile__k">{label}</span>
@@ -51,46 +54,47 @@ function Tile({ label, value, unit, tail, hint }: {
 
 function Tiles({ digest }: { digest: ActivityDigest }): React.JSX.Element {
   const { totals } = digest
+  const locale = useLocale()
+  const m = SETTINGS_ACTIVITY[locale]
   return (
     <div className="stat__tiles">
-      <Tile label="会话" value={bigNumber(totals.threads)} unit="条" />
-      <Tile label="轮次" value={bigNumber(totals.turns)} unit="轮" hint="一轮 = 从你发出一句话到引擎交还控制权" />
+      <Tile label={m.threads} value={bigNumber(totals.threads, locale)} unit={m.threadsUnit} />
+      <Tile label={m.turns} value={bigNumber(totals.turns, locale)} unit={m.turnsUnit} hint={m.turnsHint} />
       <Tile
-        label="最长的一条会话"
-        {...(totals.longest === undefined ? { value: "—" } : durationParts(totals.longest.ms))}
-        hint={totals.longest === undefined ? undefined : `《${totals.longest.title}》从第一条记录到最后一条`}
+        label={m.longest}
+        {...(totals.longest === undefined ? { value: "—" } : durationParts(totals.longest.ms, locale))}
+        hint={totals.longest === undefined ? undefined : m.longestHint(totals.longest.title)}
       />
-      <Tile label="当前连续" value={String(totals.streak)} unit="天" hint="今天还没动、但昨天动过，仍然算连着" />
-      <Tile label="最长连续" value={String(totals.bestStreak)} unit="天" />
+      <Tile label={m.streak} value={String(totals.streak)} unit={m.daysUnit} hint={m.streakHint} />
+      <Tile label={m.best} value={String(totals.bestStreak)} unit={m.daysUnit} />
     </div>
   )
 }
 
 /** 抬头那一行：**这份统计是从哪儿来的、覆盖到哪儿**。 */
 function Lead({ digest, dataDir }: { digest: ActivityDigest; dataDir: string }): React.JSX.Element {
-  const span = digest.since === undefined ? "还没有任何记录" : spanOf(digest.since, digest.until ?? digest.since)
+  const locale = useLocale()
+  const m = SETTINGS_ACTIVITY[locale]
+  const span = digest.since === undefined ? m.noRecords : spanOf(digest.since, digest.until ?? digest.since, locale)
   // 路径写短名、完整的放在悬停里：数据页那三行同一个做法，一长串临时目录读起来只是噪声
   return (
     <p className="set__note stat__lead">
-      统计的是 <strong>Switchback 自己记下的那些会话</strong>
-      （<span title={`${dataDir}/threads`}>数据目录/threads</span> 里的 {digest.threads} 条记录，{span}）——
-      <strong>这是你在 Switchback 里的工作量，不是账单</strong>。
-      {digest.skipped === 0 ? null : ` 有 ${String(digest.skipped)} 条记录读不动，已跳过。`}
-      <More>你在终端里直接跑引擎的那些不在这儿，引擎自己的账单 Switchback 也读不到。</More>
+      {m.leadBefore}<strong>{m.leadStrong}</strong>
+      {m.leadOpen}<span title={`${dataDir}/threads`}>{m.dataDir}</span>{m.leadRecords(digest.threads, span)}
+      <strong>{m.leadStrong2}</strong>{m.leadEnd}
+      {digest.skipped === 0 ? null : m.skipped(digest.skipped)}
+      <More>{m.more}</More>
     </p>
   )
 }
 
-function stamp(at: number, withYear = true): string {
-  const d = new Date(at)
-  const day = `${String(d.getMonth() + 1)} 月 ${String(d.getDate())} 日`
-  return withYear ? `${String(d.getFullYear())} 年 ${day}` : day
-}
+
 
 /** 「2026 年 8 月 22 日—8 月 25 日」：同一年就不再写第二遍年份。 */
-function spanOf(since: number, until: number): string {
+function spanOf(since: number, until: number, locale: Locale): string {
+  const m = SETTINGS_ACTIVITY[locale]
   const sameYear = new Date(since).getFullYear() === new Date(until).getFullYear()
-  return `${stamp(since)}—${stamp(until, !sameYear)}`
+  return m.span(m.stamp(since, true), m.stamp(until, !sameYear))
 }
 
 export function ActivitySection(props: ActivityProps): React.JSX.Element {
@@ -102,12 +106,12 @@ export function ActivitySection(props: ActivityProps): React.JSX.Element {
     [switchback],
   )
   const state = useAsync<ActivityDigest>(load)
-
+  const m = useMessages(SETTINGS_ACTIVITY)
   if (state.data === undefined) {
     return state.failed ? (
-      <Blank tone="error">读不出活动统计。这一页要把会话记录整个走一遍，可以稍后再试。</Blank>
+      <Blank tone="error">{m.failed}</Blank>
     ) : (
-      <Blank>正在把会话记录走一遍…</Blank>
+      <Blank>{m.loading}</Blank>
     )
   }
   return <Loaded digest={state.data} props={props} state={state} />
@@ -118,10 +122,11 @@ function Loaded({ digest, props, state }: {
   props: ActivityProps
   state: Async<ActivityDigest>
 }): React.JSX.Element {
+  const m = useMessages(SETTINGS_ACTIVITY)
   return (
     <div className="stat">
       <Lead digest={digest} dataDir={props.dataDir} />
-      {state.failed ? <Blank tone="error">刚才那次重新统计没成功，下面还是上一次的结果。</Blank> : null}
+      {state.failed ? <Blank tone="error">{m.refreshFailed}</Blank> : null}
       <Tiles digest={digest} />
       <ActivityHeat days={digest.days} now={props.now} />
       {/* 七张卡按两栏**顺着排满**（CSS 多栏），不按行对齐：一行里一高一矮时，
@@ -132,14 +137,14 @@ function Loaded({ digest, props, state }: {
         <ActivityRanks digest={digest} name={props.engineName} />
       </div>
       <Actions>
-        <span className="set__hint stat__foot">走完这 {digest.threads} 条记录用了 {String(digest.ms)} ms</span>
+        <span className="set__hint stat__foot">{m.took(digest.threads, digest.ms)}</span>
         <button
           type="button"
           className="tbtn"
           disabled={state.loading}
           onClick={state.reload}
         >
-          {state.loading ? "统计中…" : "重新统计"}
+          {state.loading ? m.counting : m.recount}
         </button>
       </Actions>
     </div>
