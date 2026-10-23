@@ -111,8 +111,8 @@ web ← link + protocol + store + wire
 
 ## 提交
 
-Conventional Commits，中文摘要：`type(scope): 摘要`。
-提交前先看最近几条提交的风格，不用裸英文句子。
+Conventional Commits，**英文摘要**：`type(scope): summary`（2026-10-23 起；之前的历史是中文，不改）。
+摘要写给仓库外的读者：说这次改动带来了什么，不写过程细节；为什么这么改写在正文里。
 
 ## 命名
 
