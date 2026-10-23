@@ -3,6 +3,8 @@ import { createCalls, createTransport, packBytes, whoAmI, type ConnState, type M
 import { initialStream, type Replay, type Sealed, type ServerFrame, type Stream } from "@switchback/wire"
 import { createBodies, type Bodies } from "./bodies.js"
 import { handleFrame, hub, type Answer, type History } from "./frames.js"
+import { documentLocale } from "../i18n.js"
+import { REMOTE_CONNECTION } from "./connection.messages.js"
 
 export type { History } from "./frames.js"
 
@@ -134,9 +136,9 @@ export function createConnection(token: string): Connection {
       if (refs.watching !== null) sendFrame({ type: "watch", threadId: refs.watching })
       if (refs.resync !== undefined) sendFrame({ type: "resync", after: refs.resync.after, epoch: refs.resync.epoch })
     } else if (state.kind === "unauthorized") {
-      calls.close("这台设备的令牌不认了（被吊销、或者换了机器），要重新配对")
+      calls.close(REMOTE_CONNECTION[documentLocale()].revoked)
     } else {
-      calls.dropped(state.kind === "retrying" ? state.reason : "正在重连")
+      calls.dropped(state.kind === "retrying" ? state.reason : REMOTE_CONNECTION[documentLocale()].reconnecting)
     }
     refs.state = state
     hubs.state.emit(state)
@@ -169,7 +171,7 @@ export function createConnection(token: string): Connection {
     me: () => refs.me,
     close: () => {
       refs.transport?.close()
-      calls.close("页面关了")
+      calls.close(REMOTE_CONNECTION[documentLocale()].closed)
     },
   }
 }

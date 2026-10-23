@@ -1,6 +1,8 @@
 import type { SwitchbackBridge } from "../../preload/index.js"
 import type { PickedFiles } from "../../shared/attachments.js"
 import type { Connection } from "./connection.js"
+import { documentLocale } from "../i18n.js"
+import { REMOTE_LOCAL } from "./bridge-local.messages.js"
 
 /**
  * 远程窗口的桥里，**不走宿主通道**的那两类（`bridge.ts` 的另一半）。
@@ -19,8 +21,9 @@ import type { Connection } from "./connection.js"
  */
 type Bridge = SwitchbackBridge
 
-const ONLY_THERE = "这一项只能在那台机器上做"
-const refuse = (): Promise<never> => Promise.reject(new Error(ONLY_THERE))
+// 这些话是点下去那一刻才说的，语言从 `<html lang>` 现读（远程窗口的桥在 React 外面）
+const say = (): (typeof REMOTE_LOCAL)["zh-CN"] => REMOTE_LOCAL[documentLocale()]
+const refuse = (): Promise<never> => Promise.reject(new Error(say().onlyThere))
 const nothing = (): void => undefined
 const unsubscribe = (): (() => void) => nothing
 
@@ -28,10 +31,10 @@ const unsubscribe = (): (() => void) => nothing
 function pointAt(conn: Connection, path: string, what: string): void {
   void navigator.clipboard.writeText(path).then(
     () => {
-      conn.say(`${what}在那台机器上：${path}（路径已复制）`)
+      conn.say(say().copied(what, path))
     },
     () => {
-      conn.say(`${what}在那台机器上：${path}`)
+      conn.say(say().located(what, path))
     },
   )
 }
@@ -45,25 +48,25 @@ export function hostOnly(conn: Connection) {
     rescanEngines: refuse,
     pickExecutable: () => Promise.resolve(undefined),
     openEngineFile: (path) => {
-      pointAt(conn, path, "这份配置")
+      pointAt(conn, path, say().config)
     },
     openEnvFile: (path) => {
-      pointAt(conn, path, "这份配置")
+      pointAt(conn, path, say().config)
     },
     openProjectDoc: (_threadId, cwd) => {
-      pointAt(conn, `${cwd}/AGENTS.md`, "项目说明")
+      pointAt(conn, `${cwd}/AGENTS.md`, say().doc)
     },
     openEngines: () => {
-      conn.say("引擎注册表（engines.json）在那台机器的数据目录里，去那台上打开")
+      conn.say(say().engines)
     },
     diagnose: () => {
-      conn.say("诊断报告要在那台机器上导出：菜单「帮助 → 导出诊断报告」")
+      conn.say(say().diagnose)
     },
     reveal: (path) => {
-      pointAt(conn, path, "这个文件")
+      pointAt(conn, path, say().file)
     },
     // 「能不能一键更新」：远程窗口里那颗按钮不画（`can: false` 时界面什么都不画）
-    selfUpdateStatus: () => Promise.resolve({ can: false, why: "远程窗口", stale: false }),
+    selfUpdateStatus: () => Promise.resolve({ can: false, why: say().remoteWindow, stale: false }),
     selfUpdate: refuse,
     acpRegistry: refuse,
     acpConnect: refuse,
@@ -133,7 +136,7 @@ export function local(conn: Connection, host: string) {
     // 拖进来的文件在这台电脑上，宿主上没有这条路径
     pathForFile: () => "",
     pickFolder: () => {
-      const typed = window.prompt(`在 ${host} 上的目录（完整路径）：`)
+      const typed = window.prompt(say().folder(host))
       const path = typed?.trim() ?? ""
       return Promise.resolve(path === "" ? undefined : path)
     },

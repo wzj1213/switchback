@@ -2,6 +2,12 @@ import type { Trust } from "@switchback/protocol"
 import type { RemoteStatus } from "../../main/remote/install.js"
 import { Select } from "./Select.js"
 import { Field } from "./SettingsBits.js"
+import type { Locale } from "@switchback/i18n"
+import { trustsOf } from "../trusts.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { REMOTE_DEVICES } from "./RemoteDevices.messages.js"
+
+type Text = (typeof REMOTE_DEVICES)[Locale]
 
 /**
  * 已配对的设备。
@@ -18,20 +24,14 @@ import { Field } from "./SettingsBits.js"
  */
 
 /** 「最后见到」的人话说法。**不显示绝对时间戳**——那要人自己去减。 */
-function since(at: number, now: number): string {
+function since(at: number, now: number, m: Text): string {
   const secs = Math.max(0, Math.round((now - at) / 1000))
-  if (secs < 60) return "刚刚"
+  if (secs < 60) return m.justNow
   const mins = Math.round(secs / 60)
-  if (mins < 60) return `${String(mins)} 分钟前`
+  if (mins < 60) return m.minutesAgo(mins)
   const hours = Math.round(mins / 60)
-  if (hours < 24) return `${String(hours)} 小时前`
-  return `${String(Math.round(hours / 24))} 天前`
-}
-
-const TRUST_LABELS: Readonly<Record<Trust, string>> = {
-  "read-only": "只读",
-  "auto-edit": "自动审批",
-  full: "完全访问",
+  if (hours < 24) return m.hoursAgo(hours)
+  return m.daysAgo(Math.round(hours / 24))
 }
 
 /** 「跟随默认」那一项的 id。`Select` 的选项 id 是字符串，「没有自己的上限」得有个名字。 */
@@ -47,16 +47,20 @@ function DeviceTrust({ device, fallback, onTrust }: {
   onTrust: (id: string, trust?: Trust) => void
 }): React.JSX.Element {
   const own = device.maxTrust
+  const locale = useLocale()
+  const m = REMOTE_DEVICES[locale]
+  const trusts = trustsOf(locale)
+  const labelOf = (id: Trust): string => trusts.find((t) => t.id === id)?.label ?? id
   return (
     <Select
-      label={own === undefined ? `跟随默认（${TRUST_LABELS[fallback]}）` : TRUST_LABELS[own]}
-      name="这台的上限"
+      label={own === undefined ? m.follow(labelOf(fallback)) : labelOf(own)}
+      name={m.limit}
       sections={[
         {
           value: own ?? FOLLOW,
           choices: [
-            { id: FOLLOW, label: `跟随默认（${TRUST_LABELS[fallback]}）` },
-            ...(Object.keys(TRUST_LABELS) as Trust[]).map((id) => ({ id, label: TRUST_LABELS[id] })),
+            { id: FOLLOW, label: m.follow(labelOf(fallback)) },
+            ...trusts.map((t) => ({ id: t.id, label: t.label })),
           ],
           onPick: (id) => {
             onTrust(device.id, id === FOLLOW ? undefined : (id as Trust))
@@ -79,20 +83,21 @@ export function RemoteDevices({
   onTrust: (id: string, trust?: Trust) => void
   onRevoke: (id: string) => void
 }): React.JSX.Element {
+  const m = useMessages(REMOTE_DEVICES)
   if (devices.length === 0) {
-    return <Field label="已配对的设备" hint="还没有。点上面的「配对手机」或「配对电脑」" children={null} />
+    return <Field label={m.devices} hint={m.none} children={null} />
   }
   const now = Date.now()
   return (
-    <Field label="已配对的设备" hint="丢了设备就在这里吊销它——它正连着的那条连接会当场断开">
+    <Field label={m.devices} hint={m.devicesHint}>
       <ul className="devices">
         {devices.map((device) => (
           <li key={device.id} className="devices__row">
             <span className="devices__name">{device.name}</span>
             {/* 老记录没有种类字段：那时配的全是手机端 */}
-            <span className="devices__kind">{device.kind === "desk" ? "电脑" : "手机"}</span>
+            <span className="devices__kind">{device.kind === "desk" ? m.desk : m.phone}</span>
             <DeviceTrust device={device} fallback={fallback} onTrust={onTrust} />
-            <span className="devices__seen">{since(device.lastSeenAt, now)}</span>
+            <span className="devices__seen">{since(device.lastSeenAt, now, m)}</span>
             <button
               type="button"
               className="tbtn tbtn--danger"
@@ -100,7 +105,7 @@ export function RemoteDevices({
                 onRevoke(device.id)
               }}
             >
-              吊销
+              {m.revoke}
             </button>
           </li>
         ))}

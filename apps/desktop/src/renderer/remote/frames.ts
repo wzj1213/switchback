@@ -1,6 +1,8 @@
 import type { Event, ThreadId } from "@switchback/protocol"
 import { received, replayed, reset, resynced, type Replay, type Sealed, type ServerFrame, type Stream } from "@switchback/wire"
 import type { Bodies } from "./bodies.js"
+import { documentLocale } from "../i18n.js"
+import { REMOTE_FRAMES } from "./frames.messages.js"
 
 /**
  * 远程窗口收到一帧之后做什么（`connection.ts` 的另一半，行数闸门逼着拆的）。
@@ -84,7 +86,7 @@ export function handleFrame(frame: ServerFrame, ctx: FrameCtx): void {
       ctx.hubs.history.emit({ threadId: frame.threadId, events: frame.events, trimmed: frame.trimmed === true })
       return
     case "notice":
-      ctx.hubs.notice.emit(frame.returned === undefined ? frame.text : `${frame.text}\n没发出去的那句：${frame.returned.text}`)
+      ctx.hubs.notice.emit(frame.returned === undefined ? frame.text : REMOTE_FRAMES[documentLocale()].unsent(frame.text, frame.returned.text))
       return
     case "result":
       ctx.calls.settle(frame)

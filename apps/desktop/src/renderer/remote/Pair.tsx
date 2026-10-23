@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { DESK_SLOT, guessName, pair, rememberToken } from "@switchback/link"
+import { useDocumentLocale } from "../i18n.js"
+import { REMOTE_PAIR } from "./Pair.messages.js"
 
 /**
  * 远程窗口的配对屏（`docs/远程模式方案.md` §2.3）。
@@ -12,13 +14,9 @@ import { DESK_SLOT, guessName, pair, rememberToken } from "@switchback/link"
  */
 export type PairReason = "fresh" | "expired" | "phone"
 
-const HINTS: Readonly<Record<PairReason, string>> = {
-  fresh: "在那台机器上打开 Switchback →「设置 → 远程访问」，点「配对电脑」，把那八位码输进来。",
-  expired: "这台电脑的授权已经不在了（被吊销，或者那台换了机器）。重新配一次。",
-  phone: "这台浏览器拿的是手机端的授权，只能看住与放行。要完整界面，在那台机器上点「配对电脑」重新配一次。",
-}
 
 export function Pair({ reason }: { reason: PairReason }): React.JSX.Element {
+  const m = REMOTE_PAIR[useDocumentLocale()]
   const [code, setCode] = useState("")
   const [name, setName] = useState(() => guessName(DESK_SLOT))
   const [busy, setBusy] = useState(false)
@@ -40,7 +38,7 @@ export function Pair({ reason }: { reason: PairReason }): React.JSX.Element {
         window.location.reload()
       })
       .catch((failure: unknown) => {
-        setError(failure instanceof Error ? failure.message : "连不上那台机器")
+        setError(failure instanceof Error ? failure.message : m.unreachable)
       })
       .finally(() => {
         setBusy(false)
@@ -50,8 +48,8 @@ export function Pair({ reason }: { reason: PairReason }): React.JSX.Element {
   return (
     <form className="remote-pair" onSubmit={submit}>
       <h1 className="remote-pair__title">Switchback</h1>
-      <p className="remote-pair__hint">{HINTS[reason]}</p>
-      <label className="remote-pair__label" htmlFor="remote-pair-code">配对码</label>
+      <p className="remote-pair__hint">{m.hint[reason]}</p>
+      <label className="remote-pair__label" htmlFor="remote-pair-code">{m.code}</label>
       <input
         id="remote-pair-code"
         className="remote-pair__code"
@@ -64,7 +62,7 @@ export function Pair({ reason }: { reason: PairReason }): React.JSX.Element {
         maxLength={8}
         autoFocus
       />
-      <label className="remote-pair__label" htmlFor="remote-pair-name">这台电脑叫什么</label>
+      <label className="remote-pair__label" htmlFor="remote-pair-name">{m.name}</label>
       <input
         id="remote-pair-name"
         className="remote-pair__name"
@@ -75,7 +73,7 @@ export function Pair({ reason }: { reason: PairReason }): React.JSX.Element {
       />
       {error === "" ? null : <p className="remote-pair__error" role="alert">{error}</p>}
       <button type="submit" className="tbtn" disabled={busy || code.trim().length < 8}>
-        {busy ? "正在配对…" : "配对"}
+        {busy ? m.pairing : m.pair}
       </button>
     </form>
   )

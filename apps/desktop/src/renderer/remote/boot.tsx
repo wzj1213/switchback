@@ -5,6 +5,8 @@ import { remoteBridge } from "./bridge.js"
 import { createConnection } from "./connection.js"
 import { Pair, type PairReason } from "./Pair.js"
 import { RemoteBar } from "./RemoteBar.js"
+import { documentLocale } from "../i18n.js"
+import { REMOTE_BOOT } from "./boot.messages.js"
 
 /**
  * 远程窗口的启动（`docs/远程模式方案.md`）。
@@ -52,7 +54,7 @@ export async function bootRemote(root: HTMLElement, app: React.JSX.Element): Pro
     renderPair(root, "phone")
     return
   }
-  const host = seen.kind === "ok" && seen.me.host !== undefined ? seen.me.host : "那台机器"
+  const host = seen.kind === "ok" && seen.me.host !== undefined ? seen.me.host : REMOTE_BOOT[documentLocale()].host
   const conn = createConnection(token)
   window.switchback = remoteBridge(conn, host)
   // **远程窗口里没人接住的失败要说出来。** 界面各处对桥的调用大多是 `void x().then(…)`——

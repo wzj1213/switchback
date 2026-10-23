@@ -4,6 +4,9 @@ import type { RemoteStatus } from "../../main/remote/install.js"
 import type { Settings } from "../../shared/settings.js"
 import { Field, Group, Input, Segmented } from "./SettingsBits.js"
 import { RemoteDevices } from "./RemoteDevices.js"
+import { trustsOf } from "../trusts.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { REMOTE_ACCESS } from "./RemoteAccess.messages.js"
 
 /**
  * 远程那一页开着之后才出现的两组：**怎么从外面连进来**、**谁能进来**。
@@ -12,12 +15,6 @@ import { RemoteDevices } from "./RemoteDevices.js"
  * 这边管「开了之后的事」——它们只在 `enabled` 为真时才存在。
  */
 
-const TRUSTS = [
-  { id: "read-only", label: "只读" },
-  { id: "auto-edit", label: "自动审批" },
-  { id: "full", label: "完全访问" },
-] as const
-
 /**
  * 配对码那一块。**只有真的在配对时才画**——没有码的时候摆一个空框没有意义。
  *
@@ -25,6 +22,7 @@ const TRUSTS = [
  * 设备自己报的不作数——否则一部手机说一句「我是电脑」就多拿到一整个面。
  */
 function Pairing({ status, onPair }: { status: RemoteStatus; onPair: (kind: "phone" | "desk") => void }): React.JSX.Element {
+  const m = useMessages(REMOTE_ACCESS)
   const [left, setLeft] = useState(0)
   const expiresAt = status.pairing?.expiresAt
   useEffect(() => {
@@ -43,10 +41,10 @@ function Pairing({ status, onPair }: { status: RemoteStatus; onPair: (kind: "pho
     return (
       <div className="pairing">
         <button type="button" className="tbtn" onClick={() => { onPair("phone") }} disabled={!status.listening}>
-          配对手机…
+          {m.pairPhone}
         </button>
         <button type="button" className="tbtn" onClick={() => { onPair("desk") }} disabled={!status.listening}>
-          配对电脑…
+          {m.pairDesk}
         </button>
       </div>
     )
@@ -55,8 +53,8 @@ function Pairing({ status, onPair }: { status: RemoteStatus; onPair: (kind: "pho
     <div className="pairing">
       <code className="pairing__code">{status.pairing.code}</code>
       <span className="pairing__left">
-        {status.pairing.kind === "desk" ? "电脑 · " : "手机 · "}
-        {left} 秒后失效
+        {status.pairing.kind === "desk" ? m.kindDesk : m.kindPhone}
+        {m.expires(left)}
       </span>
     </div>
   )
@@ -67,23 +65,24 @@ export function Tunnel({ remote, onPatch }: {
   remote: Settings["remote"]
   onPatch: (next: Partial<Settings["remote"]>) => void
 }): React.JSX.Element {
+  const m = useMessages(REMOTE_ACCESS)
   return (
     <Group
-      title="从外面怎么连"
-      hint="服务端只听回环，没有绑到公网的开关——一个能改成 0.0.0.0 的选项，迟早会有人在公网机器上打开它，而那台机器上跑着一个有写和执行权限的 agent。"
+      title={m.tunnel}
+      hint={m.tunnelHint}
     >
-      <Field label="先开一条反向隧道" hint="在这台机器上跑这一条，把端口映到你自己的服务器上" stack>
+      <Field label={m.reverse} hint={m.reverseHint} stack>
         <code className="set__code">
-          ssh -R 127.0.0.1:{remote.port}:127.0.0.1:{remote.port} 你的服务器
+          ssh -R 127.0.0.1:{remote.port}:127.0.0.1:{remote.port} {m.server}
         </code>
       </Field>
       <Field
-        label="隧道那头的域名"
-        hint="留空 = 只认回环。把手机上要打开的地址粘进来就行（https:// 会自动去掉）；带路径的会报错"
+        label={m.host}
+        hint={m.hostHint}
         stack
       >
         <Input
-          label="隧道那头的域名"
+          label={m.host}
           value={remote.trustedHosts.join(" ")}
           placeholder="switchback.example.com:8443"
           onChange={(value) => {
@@ -103,15 +102,17 @@ export function Access({ remote, status, onPatch, onStatus }: {
   onStatus: (status: RemoteStatus) => void
 }): React.JSX.Element {
   const switchback = typeof window === "undefined" ? undefined : window.switchback
+  const locale = useLocale()
+  const m = REMOTE_ACCESS[locale]
   return (
-    <Group title="谁能进来" hint="手机丢了不该等于在你的仓库里任意执行代码。">
+    <Group title={m.access} hint={m.accessHint}>
       <Field
-        label="默认档位上限"
-        hint="默认「自动审批」：远程能改文件，但每条 shell 命令仍然要弹审批——也就是你在手机上看得见每一条要跑的命令。每台设备可以在下面单独改"
+        label={m.maxTrust}
+        hint={m.maxTrustHint}
         stack
       >
         <Segmented
-          options={TRUSTS}
+          options={trustsOf(locale).map((t) => ({ id: t.id, label: t.label }))}
           value={remote.maxTrust}
           onPick={(maxTrust) => {
             onPatch({ maxTrust: maxTrust as Trust })
@@ -119,8 +120,8 @@ export function Access({ remote, status, onPatch, onStatus }: {
         />
       </Field>
       <Field
-        label="配对"
-        hint="手机打开那个地址；电脑打开地址后面加 /desk/，用的是这台上的完整界面。把码输进去，五分钟有效，用一次作废"
+        label={m.pair}
+        hint={m.pairHint}
       >
         {status === undefined ? null : (
           <Pairing

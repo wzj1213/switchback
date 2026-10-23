@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
 import { DESK_SLOT, forgetToken, type ConnState } from "@switchback/link"
 import type { Connection } from "./connection.js"
+import type { Locale } from "@switchback/i18n"
+import { useDocumentLocale } from "../i18n.js"
+import { REMOTE_BAR } from "./RemoteBar.messages.js"
 
 /**
  * 远程窗口的连接条：**连着且没话说的时候什么都不画**。
@@ -11,16 +14,16 @@ import type { Connection } from "./connection.js"
  * 不进 `App` 里：那是本机窗口和远程窗口共用的一棵树，远程才有的状态挂在外面，
  * 本机那棵一行不用改。
  */
-function stateText(state: ConnState): string | undefined {
+function stateText(state: ConnState, m: (typeof REMOTE_BAR)[Locale]): string | undefined {
   switch (state.kind) {
     case "connecting":
-      return "正在连那台机器…"
+      return m.connecting
     case "retrying":
-      return `断了（${state.reason}），${String(Math.ceil(state.inMs / 1000))} 秒后重连`
+      return m.retrying(state.reason, Math.ceil(state.inMs / 1000))
     case "unauthorized":
-      return "这台电脑的授权不在了（被吊销，或者那台换了机器）"
+      return m.unauthorized
     case "closed":
-      return "连接已关闭"
+      return m.closed
     default:
       return undefined
   }
@@ -29,6 +32,7 @@ function stateText(state: ConnState): string | undefined {
 export function RemoteBar({ conn }: { conn: Connection }): React.JSX.Element | null {
   const [state, setState] = useState<ConnState>(conn.state)
   const [notice, setNotice] = useState<string | undefined>(undefined)
+  const m = REMOTE_BAR[useDocumentLocale()]
 
   useEffect(() => {
     const offState = conn.onState(setState)
@@ -39,7 +43,7 @@ export function RemoteBar({ conn }: { conn: Connection }): React.JSX.Element | n
     }
   }, [conn])
 
-  const text = stateText(state)
+  const text = stateText(state, m)
   if (text === undefined && notice === undefined) return null
   return (
     <div className="remote-bar" role="status">
@@ -53,13 +57,13 @@ export function RemoteBar({ conn }: { conn: Connection }): React.JSX.Element | n
             window.location.reload()
           }}
         >
-          重新配对
+          {m.repair}
         </button>
       ) : null}
       {notice === undefined ? null : (
         <>
           <span className="remote-bar__notice">{notice}</span>
-          <button type="button" className="tbtn" onClick={() => { setNotice(undefined) }}>知道了</button>
+          <button type="button" className="tbtn" onClick={() => { setNotice(undefined) }}>{m.ok}</button>
         </>
       )}
     </div>

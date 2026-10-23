@@ -3,6 +3,9 @@ import type { RemoteStatus } from "../../main/remote/install.js"
 import type { Settings } from "../../shared/settings.js"
 import { Field, Group, Input, Toggle } from "./SettingsBits.js"
 import { Access, Tunnel } from "./RemoteAccess.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { REMOTE_PANEL } from "./RemotePanel.messages.js"
 
 /**
  * 远程访问（浏览器端）。
@@ -23,33 +26,30 @@ import { Access, Tunnel } from "./RemoteAccess.js"
  * 而界面上**根本没有地方能改它**。
  */
 
-function statusText(status: RemoteStatus): string {
+function statusText(status: RemoteStatus, m: (typeof REMOTE_PANEL)[Locale]): string {
   // **配置有问题和起不来是两回事。** 之前这里一律说「起不来」——
   // 而最常见的那种（域名那栏填错）恰恰是**服务端好好地在听**，
   // 只是每个从隧道进来的请求都被闸门拦掉。写「起不来」会把人支到
   // 完全错误的方向上去查（端口？防火墙？），而真正要改的是下面那一栏
   if (status.error !== undefined) {
-    return status.listening ? `在听，但配置有问题：${status.error}` : `起不来：${status.error}`
+    return status.listening ? m.listeningError(status.error) : m.cantStart(status.error)
   }
-  if (!status.enabled) return "关着。打开之后它只听回环，不会凭空暴露到网上"
-  return status.listening ? `在听 127.0.0.1:${String(status.port)}` : "开着，但没在听"
+  if (!status.enabled) return m.off
+  return status.listening ? m.listening(status.port) : m.notListening
 }
 
 /** 端口那一栏。**空着或者填了个不是数字的东西时不写回去**——那会把服务端挪到 0 号口上。 */
 function PortField({ port, onPort }: { port: number; onPort: (port: number) => void }): React.JSX.Element {
+  const m = useMessages(REMOTE_PANEL)
   const [draft, setDraft] = useState(String(port))
   const bad = parsePort(draft) === undefined
   return (
     <Field
-      label="端口"
-      hint={
-        bad
-          ? "要一个 0–65535 的整数。改完这一栏服务端会重起一次，正连着的设备要刷新一下。"
-          : "回环上的端口。0 = 让系统挑一个空的。改完服务端会重起一次，隧道命令里的号也要跟着改。"
-      }
+      label={m.port}
+      hint={bad ? m.portBad : m.portHint}
     >
       <Input
-        label="远程端口"
+        label={m.portLabel}
         value={draft}
         inputMode="numeric"
         placeholder="17800"
@@ -77,6 +77,7 @@ export function RemotePanel({
 }): React.JSX.Element {
   const [status, setStatus] = useState<RemoteStatus | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.switchback
+  const m = useMessages(REMOTE_PANEL)
 
   useEffect(() => {
     if (bridge === undefined) return undefined
@@ -104,12 +105,12 @@ export function RemotePanel({
     <>
       {/* 组名不再写「远程访问」：页标题就是这四个字，紧跟着再写一遍是同一句话念两次 */}
       <Group
-        title="服务"
-        hint="在手机或另一台电脑的浏览器里接着用同一批会话。服务端跑在这台机器上，默认整个关着。"
+        title={m.service}
+        hint={m.serviceHint}
       >
-        <Field label="开启" hint={status === undefined ? "正在读…" : statusText(status)}>
+        <Field label={m.enable} hint={status === undefined ? m.reading : statusText(status, m)}>
           <Toggle
-            label="远程访问"
+            label={m.toggle}
             on={settings.remote.enabled}
             onChange={(enabled) => {
               patchRemote({ enabled })

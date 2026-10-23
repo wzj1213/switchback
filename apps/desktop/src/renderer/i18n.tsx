@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { DEFAULT_LOCALE, langTag, type Catalog, type Locale, type Messages, type Translation } from "@switchback/i18n"
 
 /**
@@ -34,4 +34,22 @@ export function useDocumentLang(locale: Locale): void {
  */
 export function documentLocale(): Locale {
   return document.documentElement.lang === langTag("en") ? "en" : DEFAULT_LOCALE
+}
+
+/**
+ * 语言上下文之外、但又得跟着语言重画的（远程窗口那条连接条、配对页）：盯着 `<html lang>`。
+ * `App` 一旦按设置写下语言，这里跟着变。
+ */
+export function useDocumentLocale(): Locale {
+  const [locale, setLocale] = useState(documentLocale)
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setLocale(documentLocale())
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] })
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
+  return locale
 }

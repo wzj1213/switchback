@@ -2,6 +2,8 @@ import type { SwitchbackBridge } from "../../preload/index.js"
 import type { Connection } from "./connection.js"
 import { hostOnly, local } from "./bridge-local.js"
 import type { RemoteExtras } from "./types.js"
+import { documentLocale } from "../i18n.js"
+import { REMOTE_BRIDGE } from "./bridge.messages.js"
 
 /**
  * 远程窗口里的 `window.switchback`：**形状与 preload 一模一样**，底下走的是 WebSocket。
@@ -32,7 +34,7 @@ function stream(conn: Connection): Pick<Bridge, "send" | "viewing" | "hello" | "
   return {
     send: (command) => {
       // 没连上时这一下会丢：**说出来**，别让人以为点了「允许」就放行了
-      if (!conn.send(command)) conn.say("现在没连上那台机器，这一下没有发出去。等连上再点一次。")
+      if (!conn.send(command)) conn.say(REMOTE_BRIDGE[documentLocale()].notSent)
     },
     viewing: (threadId) => {
       conn.watch(threadId ?? null)
