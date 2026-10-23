@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" width="1000" height="660" role="img" aria-labelledby="ttl dsc">
+<title id="ttl">Switchback architecture</title>
+<desc id="dsc">On your Mac, the desktop window and the web client talk to the Switchback main process. Inside it, packages are layered from protocol at the bottom to host at the top. Native engines run as separate processes, each reached through its own front door, and call their own model providers outside your Mac.</desc>
+
+<style>
+  svg { --paper:#ffffff; --ground:#f2f2f0; --lane:#f7f7f5; --ink1:#18181b; --ink2:#4a4a52; --ink3:#696970;
+        --line:#dcdcd8; --soft:#ebebe8; --blue:#3451e0; --blue-soft:rgba(52,81,224,.09); --contour:rgba(24,24,27,.055);
+        --glint:rgba(255,255,255,.9); }
+  @media (prefers-color-scheme: dark) {
+    svg { --paper:#1b1b1e; --ground:#141416; --lane:#232327; --ink1:#ececee; --ink2:#b4b4bb; --ink3:#96969e;
+          --line:#3c3c43; --soft:#2c2c31; --blue:#8296ff; --blue-soft:rgba(130,150,255,.13); --contour:rgba(236,236,238,.05);
+          --glint:rgba(255,255,255,.75); }
+  }
+  text { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Inter","Helvetica Neue",Arial,sans-serif; fill:var(--ink2); }
+  .mono { font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace; }
+  .t1 { font-size:20px; font-weight:650; fill:var(--ink1); letter-spacing:-.01em; }
+  .t2 { font-size:13.5px; fill:var(--ink2); }
+  .h { font-size:14px; font-weight:600; fill:var(--ink1); }
+  .b { font-size:12.5px; fill:var(--ink2); }
+  .c { font-size:12px; fill:var(--ink3); }
+  .k { font-size:12.5px; font-weight:600; fill:var(--ink1); }
+  .blue { fill:var(--blue); }
+  .paper { fill:var(--paper); stroke:var(--soft); }
+  .lane { fill:var(--lane); }
+  .ground { fill:var(--ground); }
+  .box { fill:var(--paper); stroke:var(--line); }
+  .panel { fill:var(--lane); stroke:var(--line); }
+  .stratum { fill:var(--paper); stroke:var(--line); }
+  .contour { fill:none; stroke:var(--contour); stroke-width:1.2; }
+  .wire { fill:none; stroke:var(--line); stroke-width:1.5; }
+  .lead { fill:none; stroke:var(--ink3); stroke-width:1; stroke-dasharray:2 3; }
+  .door { fill:none; stroke:var(--blue); stroke-width:1.6; }
+  .halo { fill:none; stroke:var(--blue-soft); stroke-width:18; stroke-linecap:round; stroke-linejoin:round; }
+  .tick { fill:var(--paper); stroke:var(--blue); stroke-width:1.6; }
+  .pill { fill:var(--paper); stroke:var(--line); }
+  .grid { fill:var(--contour); }
+  .frame { fill:none; stroke:var(--ink3); stroke-width:1.2; stroke-dasharray:5 5; opacity:.55; }
+  .trail { fill:none; stroke:var(--blue); stroke-width:6; stroke-linecap:round; stroke-linejoin:round; }
+  .ring { fill:var(--paper); stroke:var(--blue); stroke-width:3; }
+  .dot { fill:var(--blue); }
+  .chip { fill:var(--blue-soft); }
+  .pulse { fill:none; stroke:var(--glint); stroke-width:3; stroke-linecap:round; opacity:0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse { stroke-dasharray:.05 1; animation:travel 7s cubic-bezier(.45,0,.25,1) 1s infinite; }
+  }
+  @keyframes travel {
+    0% { stroke-dashoffset:.05; opacity:0; } 6% { opacity:1; } 62% { stroke-dashoffset:-1; opacity:1; }
+    66%, 100% { stroke-dashoffset:-1; opacity:0; }
+  }
+</style>
+
+<rect x="0.5" y="0.5" width="999" height="659" rx="14" class="paper"/>
+<defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" class="grid"/></pattern></defs><rect x="14" y="14" width="972" height="632" rx="10" fill="url(#g)"/>
+<text x="36" y="46" class="t1">Architecture</text>
+<text x="36" y="70" class="t2">One desktop app on your Mac. Engines stay separate processes with their own login and models.</text>
+<rect x="748" y="14" width="216" height="72" rx="10" class="ground"/>
+<text x="762" y="38" class="h">Model providers</text>
+<text x="762" y="56" class="c">each engine calls its own;</text>
+<text x="762" y="72" class="c">Switchback never proxies them</text>
+<path class="wire" d="M920,86 V134"/>
+<rect x="20" y="96" width="960" height="544" rx="16" class="frame"/>
+<rect x="36" y="88" width="72" height="16" rx="4" class="paper"/>
+<text x="42" y="100" class="c">Your Mac</text>
+<rect x="40" y="134" width="160" height="70" rx="10" class="box"/>
+<text x="54" y="162" class="h">Desktop window</text>
+<text x="54" y="182" class="c mono">apps/desktop</text>
+<rect x="40" y="220" width="160" height="86" rx="10" class="box"/>
+<text x="54" y="248" class="h">Phone or browser</text>
+<text x="54" y="268" class="c mono">apps/web</text>
+<text x="54" y="290" class="c">via your own tunnel</text>
+<path class="wire" d="M200,169 H232"/>
+<path class="wire" d="M200,263 H232"/>
+<text x="216.0" y="162" class="c" text-anchor="middle">IPC</text>
+<text x="216.0" y="256" class="c" text-anchor="middle">WS</text>
+<rect x="232" y="124" width="472" height="400" rx="12" class="panel"/>
+<text x="250" y="150" class="h">Switchback main process</text>
+<text x="250" y="168" class="c">each layer depends only on the layers below it, checked by pnpm arch</text>
+<rect x="248" y="184" width="440.0" height="58" rx="8" class="stratum"/>
+<text x="260" y="206" class="k mono">host</text>
+<text x="260" y="224" class="c">routes your commands to engines and</text>
+<text x="260" y="240" class="c">collects what they report</text>
+<rect x="248" y="252" width="244.2" height="58" rx="8" class="stratum"/>
+<text x="260" y="274" class="k mono">engine</text>
+<text x="260" y="292" class="c">one native driver per</text>
+<text x="260" y="308" class="c">engine front door</text>
+<rect x="500.2" y="252" width="187.8" height="58" rx="8" class="stratum"/>
+<text x="512.2" y="274" class="k mono">link</text>
+<text x="512.2" y="292" class="c">remote transport</text>
+<text x="512.2" y="308" class="c">that reconnects</text>
+<rect x="248" y="320" width="81.6" height="74" rx="8" class="stratum"/>
+<text x="260" y="342" class="k mono">approval</text>
+<text x="260" y="360" class="c">trust tiers,</text>
+<text x="260" y="376" class="c">red lines</text>
+<rect x="337.6" y="320" width="81.6" height="74" rx="8" class="stratum"/>
+<text x="349.6" y="342" class="k mono">journal</text>
+<text x="349.6" y="360" class="c">event log,</text>
+<text x="349.6" y="376" class="c">resume</text>
+<rect x="427.2" y="320" width="81.6" height="74" rx="8" class="stratum"/>
+<text x="439.2" y="342" class="k mono">store</text>
+<text x="439.2" y="360" class="c">events to</text>
+<text x="439.2" y="376" class="c">view state</text>
+<rect x="516.8" y="320" width="81.6" height="74" rx="8" class="stratum"/>
+<text x="528.8" y="342" class="k mono">handoff</text>
+<text x="528.8" y="360" class="c">relay notes,</text>
+<text x="528.8" y="376" class="c">compare</text>
+<rect x="606.4" y="320" width="81.6" height="74" rx="8" class="stratum"/>
+<text x="618.4" y="342" class="k mono">wire</text>
+<text x="618.4" y="360" class="c">sequence,</text>
+<text x="618.4" y="376" class="c">replay</text>
+<rect x="248" y="404" width="244.2" height="58" rx="8" class="stratum"/>
+<text x="260" y="426" class="k mono">protocol</text>
+<text x="260" y="444" class="c">Thread, Turn, Item: the model</text>
+<text x="260" y="460" class="c">every layer shares</text>
+<rect x="500.2" y="404" width="187.8" height="58" rx="8" class="stratum"/>
+<text x="512.2" y="426" class="k mono">worksite</text>
+<text x="512.2" y="444" class="c">file index,</text>
+<text x="512.2" y="460" class="c">git guard</text>
+<text x="248" y="488" class="c">Also in this process: the egress guard watches each engine&#x27;s uploads</text>
+<text x="248" y="504" class="c">and stops one that starts sending its workspace out in bulk.</text>
+<text x="748" y="124" class="c">Native engines</text>
+<rect x="748" y="134" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="154" class="h">Claude Code</text>
+<text x="762" y="170" class="c mono">claude-agent-sdk</text>
+<path class="door" d="M704,281 C734,281 718,157 748,157"/>
+<circle cx="748" cy="157" r="3" class="dot"/>
+<rect x="748" y="190" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="210" class="h">Codex</text>
+<text x="762" y="226" class="c mono">codex app-server --stdio</text>
+<path class="door" d="M704,281 C734,281 718,213 748,213"/>
+<circle cx="748" cy="213" r="3" class="dot"/>
+<rect x="748" y="246" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="266" class="h">Kimi Code</text>
+<text x="762" y="282" class="c mono">kimi web: REST + WebSocket</text>
+<path class="door" d="M704,281 C734,281 718,269 748,269"/>
+<circle cx="748" cy="269" r="3" class="dot"/>
+<rect x="748" y="302" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="322" class="h">Grok</text>
+<text x="762" y="338" class="c mono">grok over ACP</text>
+<path class="door" d="M704,281 C734,281 718,325 748,325"/>
+<circle cx="748" cy="325" r="3" class="dot"/>
+<rect x="748" y="358" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="378" class="h">DSH</text>
+<text x="762" y="394" class="c mono">dsh --profile over ACP</text>
+<path class="door" d="M704,281 C734,281 718,381 748,381"/>
+<circle cx="748" cy="381" r="3" class="dot"/>
+<rect x="748" y="414" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="434" class="h">Any ACP agent</text>
+<text x="762" y="450" class="c mono">from the ACP registry</text>
+<path class="door" d="M704,281 C734,281 718,437 748,437"/>
+<circle cx="748" cy="437" r="3" class="dot"/>
+<circle cx="704" cy="281" r="3.5" class="dot"/>
+<rect x="40" y="548" width="330" height="72" rx="10" class="ground"/>
+<text x="56" y="574" class="h">Your workspace</text>
+<text x="56" y="592" class="c">engines edit the files directly, and</text>
+<text x="56" y="608" class="c">Switchback reviews the diff from git</text>
+<rect x="386" y="548" width="318" height="72" rx="10" class="ground"/>
+<text x="402" y="574" class="h">Local data</text>
+<text x="402" y="592" class="c mono">~/Library/Application Support/Switchback</text>
+<text x="402" y="608" class="c">event log, settings, attachments</text>
+<path class="wire" d="M560,524 V548"/>
+<text x="568" y="541" class="c">writes the event log</text>
+<path class="wire" d="M330,524 V536 H220 V548"/>
+<text x="338" y="541" class="c">reads git</text>
+<path class="wire" d="M856,470 V630 H120 V620"/>
+<rect x="716" y="623" width="128" height="14" rx="3" class="paper"/>
+<text x="780" y="634" class="c" text-anchor="middle">engines edit files</text>
+</svg>

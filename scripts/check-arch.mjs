@@ -98,6 +98,7 @@ function main() {
   checkGraphPackages(pkgs)
   checkGraphDocs("AGENTS.md")
   checkGraphDocs("README.md")
+  checkGraphDocs("README.zh-CN.md")
   for (const pkg of pkgs) {
     checkReadme(pkg)
     checkDependencies(pkg)

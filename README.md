@@ -1,230 +1,274 @@
 # Switchback
 
-> 原生 coding agent 的接力工作台。
+English | [中文](README.zh-CN.md)
 
-**一家卡住，换一家接着干。**
+> A relay workbench for native coding agents.
 
-在 Claude Code、Codex、Kimi Code、Grok 与 DSH 之间延续同一件工作。Switchback 会把目标、
-工作树、各家的原生会话句柄，以及引擎公开可定位的原始记录路径留在同一条工作线上；每一家仍运行自己的原生进程，
-使用自己的登录、模型、配置和工具。换过去时 Switchback 不替你写提示词，也不会把一份自制摘要塞进模型上下文。
+**When one agent gets stuck, hand the work to the next.**
 
-接力之后也可以切回来——上一家自己的原生会话句柄仍然保留。Switchback 管的是一条工作的连续性，
-不是把多家 agent 编成一支自动协作的队伍。
+Carry one piece of work across Claude Code, Codex, Kimi Code, Grok, and DSH. Switchback keeps the goal,
+the worktree, each engine's native session handle, and the paths to whatever raw logs the engine exposes,
+all on one work line. Every engine still runs its own native process, with its own login, models,
+configuration, and tools. When you switch, Switchback doesn't write a prompt for you, and it doesn't slip a
+summary of its own into the model's context.
 
-目前内置五家：Codex、Claude Code、Kimi Code、Grok 与 DSH；其他讲 ACP 的引擎也可以注册。
+You can also switch back: the previous engine keeps its native session handle. Switchback looks after the
+continuity of one piece of work. It does not turn several agents into an automated team.
 
-## 为什么需要接力
+Five engines are built in: Codex, Claude Code, Kimi Code, Grok, and DSH. Any other engine that speaks ACP can be
+registered.
 
-coding agent 各有所长，也都会遇到自己的问题：
+![How a relay works: one work line moves from Claude Code to Codex to Kimi Code and back to Claude Code, over the same workspace](docs/assets/relay.svg)
 
-- 一家卡在某个错误上，想换另一家重新判断
-- 用一家梳理方案，再让另一家接着实现
-- 当前引擎额度不足、服务异常，或者不适合眼前这个阶段
-- 想让另一家从头再试，同时保留原来的结果
+## Why relay
 
-通常这意味着重开窗口、重新选择项目，再找回上一家改到了哪里。
-Switchback 保留同一个工作区、界面历史和每家的原生句柄；需要新引擎看上一段原文时，
-从时间线拿到该引擎确实提供的记录路径，再由你明确让它自己读取。
+Coding agents have different strengths, and each runs into its own problems:
 
-## 接力怎么工作
+- One gets stuck on an error, and you want another to take a fresh look
+- You work out the plan with one, and want another to implement it
+- The current engine is out of quota, having an outage, or wrong for the stage you're in
+- You want another engine to try from scratch while keeping the first result
 
-```mermaid
-flowchart LR
-  W["同一个工作区"] --- A["Claude 原生会话"]
-  A -->|"下一句切换引擎"| B["Codex 原生会话"]
-  B -->|"切回自己的原生句柄"| A
-  W --- B
-```
+Usually that means opening another window, picking the project again, and working out where the last agent left
+off. Switchback keeps the same workspace, the history in its UI, and every engine's native handle. When the new
+engine needs to read the previous segment verbatim, take the log path that engine really provides from the
+timeline, and tell it to read the file itself.
 
-接力不等于把一家模型的上下文翻译成另一家的私有 session 格式，也不自动发送一段“交接话术”。
+## How a relay works
 
-| 会继续保留 | 不会自动送进新引擎上下文 |
+A relay doesn't translate one model's context into another vendor's private session format.
+
+By default, the first message to the new engine starts with a short handoff note that only states facts: which
+engine ran which turns, where Switchback's transcript and each segment's raw logs are, and what format those logs
+are in. It gives no instructions, makes no judgment, and shows up verbatim in the transcript. You can turn it off
+under 设置 → 通用 → 自动交接 (Settings → General → Automatic handoff).
+
+| Kept | Never pushed into the new engine's context |
 | --- | --- |
-| 同一个工作区与磁盘上的真实文件 | Switchback 编写的摘要、提示词或提醒 |
-| Switchback 界面里的完整工作线 | 另一家引擎的隐藏推理与私有模型上下文 |
-| 每一家自己的原生会话句柄 | 凭证与登录信息 |
-| 引擎确实公开的原始记录路径（若有） | Switchback 猜测出来的状态 |
+| The same workspace and the real files on disk | Summaries, prompts, or reminders written by Switchback |
+| The full work line in the Switchback UI | Another engine's hidden reasoning or private model context |
+| Each engine's own native session handle | Credentials and login state |
+| Raw log paths the engine really exposes, if any | State that Switchback has guessed |
 
-工作区是真源；接手后你可以直接给下一句，也可以明确给出时间线里的路径，让它自行核对原文和代码。
+The workspace is the source of truth. After a switch you can simply give the next instruction, or point the engine
+at paths from the timeline so it can check the original record and the code for itself.
 
-## 三种换法
+## Three ways to switch
 
-1. **从合适的一家开始**：新工作直接选择引擎。
-2. **让另一家接着做**：先选下一家，等你发出下一句话时才切换；原工作线和各家句柄都保留。
-3. **换一家从头再试**：保留原结果，另开一条同工作区分支；跨引擎时不自动注入目标或摘要。
+1. **Start with the right engine.** Pick the engine when you start new work.
+2. **Hand off to another engine.** Choose the next engine; the switch happens when you send your next message.
+   The original work line and every engine's handle are kept.
+3. **Retry from scratch with another engine.** Keep the original result and open a branch on the same workspace.
+   Across engines, no goal or summary is injected.
 
-同一家且引擎公开原生 fork 时，第三种会复制它自己的真实上下文；换一家时只能诚实地开空白分支，
-不会附带「已改过哪些文件」——否则另一家会误以为工作已经做了一半。
-有血缘的两条分支可以从顶栏或 `/compare` 进入并排对比：先看两边各自上报的文件、
-未完成项与最后结论，再按需下钻两栏原始记录。两边仍共用同一个工作区，后跑的一家
-会看见先跑一家的改动，所以界面会明确提醒它不是一组隔离的对照实验。
+When it's the same engine and that engine offers a native fork, the third option copies its own real context.
+With a different engine, Switchback can only honestly open a blank branch, without a list of files already
+changed; otherwise the other engine would think the work was half done. Two related branches can be compared side
+by side from the top bar or with `/compare`: first each side's reported files, open items, and final conclusion,
+then the raw records of both columns if you want to dig in. Both branches still share one workspace, so the engine
+that runs second sees the changes of the first, and the UI says plainly that this is not an isolated experiment.
 
-## “原生”意味着什么
+## What "native" means
 
-Switchback 启动的是你本机已经安装并登录过的 coding agent：
+Switchback launches the coding agents you have already installed and signed in to on your machine:
 
-- **不另外索要或代管凭证。** 没有 Switchback 自己的 API key、OAuth 或 token 仓库。
-- **不代理模型请求。** 请求由各家原生进程直接发出。
-- **不重写 agent loop、提示词或工具。** 各家的上游升级会被原样继承。
-- **不替引擎猜能力和状态。** 引擎报告什么，界面就展示什么；分辨不出就明确说不知道。
-- **不碰凭证存储。** 不读 `.credentials.json`、`auth.json` 这类凭证文件，也不访问钥匙串。
-  Switchback 会解析各家的配置文件来说明哪些钩子正在生效，只保留钩子相关字段；
-  具体读哪些文件见下文[「本机数据与网络」](#本机数据与网络)。
+- **No credentials of its own.** There is no Switchback API key, OAuth flow, or token store.
+- **No proxying of model requests.** Each native process sends its own requests.
+- **No rewritten agent loop, prompts, or tools.** Upstream updates carry over unchanged.
+- **No guessing about capabilities or state.** The UI shows what the engine reports; when it can't tell, it says so.
+- **No access to credential stores.** It doesn't read credential files such as `.credentials.json` or `auth.json`,
+  and it doesn't touch the Keychain. Switchback parses each engine's configuration to show which hooks are active,
+  and keeps only the hook-related fields; see [Local data and network](#local-data-and-network) for exactly which
+  files.
 
-源码仓库不包含任何一家的二进制。Claude 完整版使用官方 Agent SDK 提供的平台可执行文件；
-轻量版则使用 `PATH` 上已有的 `claude`。
+The repository contains no engine binaries. The full Claude build uses the platform executable that comes with the
+official Agent SDK; the thin build uses the `claude` already on your `PATH`.
 
-如果你要的是统一模型网关、自己实现的 agent harness，或自动多 agent 编排，Switchback 不是那个产品。
+If you're looking for a unified model gateway, an agent harness of your own, or automatic multi-agent
+orchestration, Switchback is not that product.
 
-## 一条工作线里有什么
+## What's on a work line
 
-- **统一会话**：正文、计划、工具调用、用量、错误和引擎状态用同一套界面呈现
-- **审批与信任档**：不同引擎的原生审批进入同一套可追溯的人工裁决
-- **真实变更**：从 git 工作区生成变更汇总与审核面板，不只相信引擎自报的编辑；看完可以直接暂存、提交（提交能撤销，只在本地，不推送）
-- **项目与环境**：查看分支、工作树状态、项目指令与各家原生 hooks，继续 agent 会话
-- **断点续跑**：事件落盘、原生句柄恢复、正文搜索与跨会话回看
-- **远程接管**：从手机或浏览器查看进度、继续对话、处理审批与结构化问题并接收通知
+- **One session view**: text, plans, tool calls, usage, errors, and engine status, presented the same way for every
+  engine
+- **Approvals and trust tiers**: each engine's native approvals go through one traceable human decision
+- **Real changes**: change summaries and a review panel built from the git worktree, not just the engine's own edit
+  reports; stage and commit right there (commits can be undone, stay local, and are never pushed)
+- **Project and environment**: branch, worktree status, project instructions, and each engine's native hooks
+- **Pick up where you left off**: events on disk, native handles restored, full-text search, and history across
+  sessions
+- **Remote**: from your phone or a browser, follow progress, keep talking, handle approvals and structured
+  questions, and get notifications
 
-## 适合谁
+## Who it's for
 
-Switchback 适合同时使用两家以上原生 coding agent、希望保留各家订阅与配置，
-又不想每次切换都重新交代工作的开发者。
+Switchback is for developers who use two or more native coding agents, want to keep each vendor's subscription
+and configuration, and don't want to explain the work again every time they switch.
 
-它不适合需要统一模型 API、云端 IDE、自动并行 agent 团队，或者纯命令行工作流的人。
-Switchback 唯一的用户界面是 GUI；命令行只用于开发和打包。
+It isn't for people who need a unified model API, a cloud IDE, an automatic team of parallel agents, or a pure
+command-line workflow. Switchback's only user interface is the GUI; the command line is only for development and
+packaging.
 
-## 支持的引擎
+## Supported engines
 
-| 引擎 | 原生入口 | 状态 |
+| Engine | Native entry point | Status |
 | --- | --- | --- |
-| Codex | `codex app-server --stdio` | 内置 |
-| Claude Code | Agent SDK | 内置 |
-| Kimi Code | `kimi web` REST + WebSocket | 内置 |
-| Grok | ACP | 内置 |
-| DSH | `dsh --profile <profile>`（ACP） | 内置；按 profile 选择插件组装并确认接入 |
-| 其他 ACP 引擎 | ACP 官方注册表一键接入，或指一个可执行文件 | 按引擎自报能力接入；登录走它自己报的方式 |
+| Codex | `codex app-server --stdio` | Built in |
+| Claude Code | Agent SDK | Built in |
+| Kimi Code | `kimi web`, REST + WebSocket | Built in |
+| Grok | ACP | Built in |
+| DSH | `dsh --profile <profile>` (ACP) | Built in; choose a profile's plugin assembly and confirm it |
+| Other ACP engines | One click from the official ACP registry, or point at an executable | Connected according to what the engine reports; signs in its own way |
 
-内置引擎会显示真实探测状态；DSH 设置页会从各 profile 的 `package.json` 展示 bundle 加载顺序、
-profile 声明的直接依赖与 patch 状态。确认当前 profile 的原生配置后它才进入清单；会话会记住创建时的 profile，
-以后切默认组装也不会把旧句柄送进另一棵插件树。插件通过 ACP 自报的新模型、命令和会话能力会沿用通用驱动，
-用户自配的 ACP 引擎则只有注册后才会出现。
+Built-in engines show their real probe status. The DSH settings page reads each profile's `package.json` to show
+the bundle load order, the profile's direct dependencies, and their patch status. DSH joins the engine list only
+after you confirm the current profile's native configuration. A session remembers the profile it was created with,
+so switching the default assembly later never sends an old handle into a different plugin tree. New models,
+commands, and session capabilities that plugins report through ACP are handled by the generic driver; ACP engines
+you configure yourself appear only after you register them.
 
-第三方 ACP 引擎在设置 →「安装与接入」里接：
+Third-party ACP engines are added in 设置 → 安装与接入 (Settings → Install and connect):
 
-- **从 ACP 注册表接入**：列出 [ACP 官方注册表](https://agentclientprotocol.com/registry)里各家自己登记的
-  启动方式（Gemini CLI、GitHub Copilot、goose、OpenCode、Qwen Code……）。点「接入」先摆出要执行的命令
-  或要下载的包与校验值，确认后装好、握手试接、写进 `engines.json`，不用重启；注册表有新版时给「升级」。
-- **手动接入**：注册表里没有的，指一个可执行文件，答得上 ACP 握手才让接。
-- **登录**：试接时列出它自己报的登录方式。浏览器那一类由它自己办（Switchback 只转一次 `authenticate`），
-  终端那一类在系统「终端」里跑它自己的登录界面。开会话时它说要先登录，界面会显示「需要登录」并给出去登录的路。
+- **From the ACP registry**: lists the launch methods each vendor registered in the
+  [official ACP registry](https://agentclientprotocol.com/registry) (Gemini CLI, GitHub Copilot, goose, OpenCode,
+  Qwen Code, and more). Clicking connect first shows the command it will run, or the package it will download and
+  its checksum. Once you confirm, it installs the engine, tries the handshake, and writes it into `engines.json`,
+  with no restart. When the registry has a newer version, you get an upgrade button.
+- **Manually**: for anything not in the registry, point at an executable; it's accepted only if it completes the
+  ACP handshake.
+- **Sign-in**: the trial connection lists the sign-in methods the engine reports. Browser sign-in is handled by the
+  engine itself (Switchback only relays one `authenticate` call); terminal sign-in runs the engine's own login in
+  the system Terminal. If a session says it needs you to sign in first, the UI shows that and points you to where
+  you can do it.
 
-## 跑起来
+## Getting started
 
-开发环境：
+Development environment:
 
-- macOS。这是目标平台；Linux / Windows 只在 CI 上跑类型检查和引擎包测试。
-- Node **22.23.2**（见 `.node-version`）。
-- pnpm **11.18.0**。`corepack enable` 之后会按 `package.json` 的 `packageManager` 自动取用这个版本。
-- 第一次跑测试或开发模式时，会从 GitHub 下载 Electron 运行时（约 130 MB）。
+- macOS. This is the target platform; Linux and Windows only run type checks and engine package tests in CI.
+- Node **22.23.2** (see `.node-version`).
+- pnpm **11.18.0**. After `corepack enable`, the version in `packageManager` in `package.json` is used
+  automatically.
+- The first test run or dev session downloads the Electron runtime from GitHub (about 130 MB).
 
 ```sh
 corepack enable
 pnpm install
-pnpm dev          # 开发模式
-pnpm check        # typecheck / lint / 架构守卫 / 日志守卫 / 测试
-pnpm dist         # 完整版 .dmg：内置 Claude 平台可执行文件
-pnpm dist:thin    # 轻量版 .dmg：使用 PATH 上的 claude
-pnpm dist:all     # 一次生成两种
-pnpm test:live    # 真引擎测试，默认不跑；需要本机装好并登录对应引擎
+pnpm dev          # development mode
+pnpm check        # typecheck, lint, architecture and changelog guards, tests
+pnpm dist         # full .dmg, with the Claude platform executable bundled
+pnpm dist:thin    # thin .dmg, uses the claude on your PATH
+pnpm dist:all     # both at once
+pnpm test:live    # real-engine tests, off by default; needs the engines installed and signed in
 ```
 
-使用前提：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh`）并按各家方式完成登录；
-Claude 完整版内置 SDK 对应的平台可执行文件，轻量版要求 `claude --version` 可运行。
-DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让选中的 profile
-能完成 ACP 握手；之后在 Switchback 的设置 → 引擎 → DSH 中选择 profile 并确认接入。
-profile、凭证与插件版本仍由 DSH 自己管理；当前官方 automation-only ACP 没有报告续跑能力时，
-Switchback 会明确拒绝恢复旧会话，不会静默开一条空会话冒充接上。
-它当前也只从 ACP 提交最终 assistant 文本，推理与工具活动留在 DSH 自己的 session log；
-因此 Switchback 的转录区不会编造缺席的工具行，最终文件变化仍由工作树开场基线与审核面板核对。
-Switchback 直接使用各家的原生登录态，不另外配置密钥。
+Before you use it, install the native agents you want (`codex`, `kimi`, `grok`, `dsh`) and sign in to each the way
+its vendor describes. The full Claude build bundles the platform executable that matches the SDK; the thin build
+needs `claude --version` to work.
 
-当前打出来的包没有签名（`identity: null`）。首次打开要在
-「系统设置 → 隐私与安全性」里放行，或者运行：
+DSH also needs a provider, model, and API credentials set up under Models in DSH Web, and the selected profile has
+to complete the ACP handshake. Then choose the profile under 设置 → 引擎 → DSH (Settings → Engines → DSH) and
+confirm it. Profiles, credentials, and plugin versions stay managed by DSH. While the official automation-only ACP
+doesn't report that it can resume, Switchback refuses to resume an old session instead of quietly starting an empty
+one and pretending it reconnected. For now it also only receives the final assistant text over ACP; reasoning and
+tool activity stay in DSH's own session log. So Switchback's transcript doesn't make up the missing tool rows, and
+the final file changes are still checked against the worktree baseline and the review panel.
+
+Switchback uses each engine's own native sign-in; there are no extra keys to configure.
+
+Builds are currently unsigned (`identity: null`). On first launch, allow the app under
+System Settings → Privacy & Security, or run:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Switchback.app
 ```
 
-远程访问的配对、隧道与设备吊销见 [`docs/远程访问设置.md`](docs/远程访问设置.md)。
+Pairing, tunnels, and revoking devices for remote access are described in
+[`docs/远程访问设置.md`](docs/远程访问设置.md) (in Chinese).
 
-## 本机数据与网络
+## Local data and network
 
-### 会读取的别家文件
+### Files from other tools that Switchback reads
 
-这些文件都只在本机使用，Switchback 不会把它们发出去。
+These files are only used on your machine; Switchback never sends them anywhere.
 
-| 读什么 | 为什么 | 留下什么 |
+| What it reads | Why | What it keeps |
 | --- | --- | --- |
-| `~/.claude/settings.json`、`~/.codex/config.toml`、`~/.kimi-code/config.toml`、`~/.grok/` 下的配置与 hooks，以及项目里的同名文件 | 在「环境」页列出正在生效的钩子 | 只留钩子相关字段。这些文件里如果写着 provider key，会随整份文件一起被解析，但不会保留 |
-| `~/.claude/projects/` 下的会话记录 | 列出、接管 Claude 的历史会话 | 接管时，把最近的记录写进 Switchback 自己的会话日志 |
-| `~/.claude.json` | 只在 SDK 取不到账号信息时，用来显示登录的是谁 | `oauthAccount` 里的名字、邮箱、套餐 |
-| `~/.kimi-code/session_index.jsonl`、`~/.grok/sessions/` 的目录结构 | 在时间线上给出引擎原始记录的路径 | 只定位路径，不读记录内容 |
-| `~/.dsh/profiles/*/package.json` | 展示 DSH 各 profile 的组装情况 | bundle 顺序与依赖版本 |
-| 项目里的 `AGENTS.md`、`CLAUDE.md` | 判断项目指令在不在 | 只看文件是否存在 |
+| Configuration and hooks in `~/.claude/settings.json`, `~/.codex/config.toml`, `~/.kimi-code/config.toml`, `~/.grok/`, and the files of the same names in your project | To list the hooks in effect on the Environment page | Only the hook-related fields. A provider key written in those files is parsed along with the rest of the file, but never kept |
+| Session records under `~/.claude/projects/` | To list and take over Claude's past sessions | When taking over, the latest records are written into Switchback's own session log |
+| `~/.claude.json` | Only when the SDK can't provide account details, to show who is signed in | The name, email, and plan in `oauthAccount` |
+| The directory layout of `~/.kimi-code/session_index.jsonl` and `~/.grok/sessions/` | To show the paths of the engine's raw logs on the timeline | Only the paths; record contents aren't read |
+| `~/.dsh/profiles/*/package.json` | To show how each DSH profile is assembled | The bundle order and dependency versions |
+| `AGENTS.md` and `CLAUDE.md` in your project | To tell whether project instructions exist | Only whether the files exist |
 
-- **账号与额度**：优先走各家接口，也就是 Claude Agent SDK、`codex app-server` 和 `kimi web` 的本地 API。
-- **Kimi 的本地会话 token**：来自 Switchback 自己启动的 `kimi web` 进程的输出，只放在内存里，只发往回环地址。
-- **环境变量与 PATH**：引擎子进程继承你的环境变量。启动时，Switchback 会以登录 shell 取一次 `PATH`，这会执行你的 shell 配置文件。
+- **Accounts and quotas** come from each engine's own interface first: the Claude Agent SDK, `codex app-server`,
+  and the local API of `kimi web`.
+- **Kimi's local session token** comes from the output of the `kimi web` process that Switchback starts. It stays
+  in memory and is only sent to the loopback address.
+- **Environment variables and PATH**: engine processes inherit your environment. At startup, Switchback reads
+  `PATH` once from a login shell, which runs your shell profile.
 
-### Switchback 自己存的东西
+### What Switchback stores
 
-数据目录是 `~/Library/Application Support/Switchback`，里面有：
+The data directory is `~/Library/Application Support/Switchback`. It holds:
 
-- 设置、审批规则、粘贴进来的图片
-- 会话事件流，包含完整的提示词、回复和工具输出
-- 日志，其中像凭证的字符串会被抹去
-- `engines.json`：写在它 `env` 里的值是明文
-- `agents/`：从 ACP 注册表接入的二进制引擎，每家每个版本一个目录；没人用的旧版本会被清掉
-- `acp-registry.json`：ACP 注册表的本机缓存
-- 远程设备表：令牌只存哈希
+- Settings, approval rules, and pasted images
+- The session event stream, including full prompts, replies, and tool output
+- Logs, with anything that looks like a credential scrubbed
+- `engines.json`; values written under its `env` are stored in plain text
+- `agents/`: binary engines connected from the ACP registry, one directory per engine and version; old versions
+  nobody uses are cleaned up
+- `acp-registry.json`: a local cache of the ACP registry
+- The remote device list; tokens are stored only as hashes
 
-不属于任何项目的对话，会在 `~/Documents/Switchback/` 下建目录。
+Conversations that don't belong to a project get a directory under `~/Documents/Switchback/`.
 
-### 网络
+### Network
 
-Switchback 没有遥测、统计或崩溃上报，崩溃转储只留在本机。Switchback 自己发起的联网只有下面这些：
+Switchback has no telemetry, analytics, or crash reporting; crash dumps stay on your machine. The only network
+requests Switchback makes itself are these:
 
-- **引擎版本检查**：启动约 8 秒后运行。对用 npm 全局安装的 codex / kimi 执行 `npm view`，装了 grok 时执行 `grok update --check`。
-- **应用更新检查**：`apps/desktop/package.json` 里的 `updateFeed` 默认为空，也就是整个关闭。
-- **ACP 注册表**：打开设置里的「安装与接入」、而本机缓存超过一小时时，从 `cdn.agentclientprotocol.com`
-  取一次注册表（约 60 KB）；点「刷新」也会取。
-- **你在「安装与接入」里点「接入」「升级」时**：npx / uvx 分发的由它们按你自己的 npm / uv 配置下载包；
-  二进制分发的由 Switchback 从注册表登记的地址下载，并按注册表给的 sha256 校验。
-- **你点某种「登录」时**：由那一家引擎自己联网（通常会打开浏览器），Switchback 只转达你选的方式。
-- **远程访问**：默认关闭；打开后也只监听 `127.0.0.1`，由你自己的隧道暴露出去。开启通知后，会向浏览器的推送服务发送加密消息。
-- **你在设置里点「安装 / 更新」引擎时**：执行对应的安装命令。
+- **Engine version checks**, about 8 seconds after launch: `npm view` for codex and kimi installed globally with
+  npm, and `grok update --check` when grok is installed.
+- **App update checks**: `updateFeed` in `apps/desktop/package.json` is empty by default, which turns the feature
+  off entirely.
+- **The ACP registry**: when you open 安装与接入 (Install and connect) in Settings and the local cache is more than
+  an hour old, the registry is fetched once from `cdn.agentclientprotocol.com` (about 60 KB); refreshing fetches it
+  too.
+- **When you connect or upgrade an engine** there: engines distributed through npx or uvx are downloaded by those
+  tools using your own npm or uv configuration; binary distributions are downloaded by Switchback from the address
+  in the registry and verified against the sha256 the registry gives.
+- **When you choose a sign-in method**: the engine itself goes online, usually by opening the browser; Switchback
+  only relays your choice.
+- **Remote access** is off by default. When it's on, it only listens on `127.0.0.1` and is exposed through your own
+  tunnel. With notifications enabled, it sends encrypted messages to the browser's push service.
+- **When you install or update an engine** in Settings: the matching install command runs.
 
-模型请求、登录和引擎自己的更新，都由各家原生进程发出。
+Model requests, sign-in, and each engine's own updates are all sent by the native processes themselves.
 
-## 架构与开发
+## Architecture and development
+
+![Switchback architecture: the desktop window and web client talk to the main process; packages are layered from protocol up to host; native engines run as separate processes and call their own model providers](docs/assets/architecture.svg)
 
 ```
 packages/
-  protocol/   领域模型 thread / turn / item（零依赖，纯类型）
-  approval/   信任档 + 红线表 + 判定器（纯函数，零 IO）
-  store/      事件流到视图状态的纯归约器
-  wire/       序号、重放、分片与补洞
-  engine/     原生引擎驱动：acp / codex / claude / kimi
-  worksite/   工作区安全：git guard、写范围
-  journal/    持久化、断点、恢复
-  handoff/    运行摘要与分支对比（不发送给引擎）
-  host/       会话编制与进程生命周期
+  protocol/   domain model: thread, turn, item (no dependencies, types only)
+  approval/   trust tiers, red lines, and the decision function (pure, no IO)
+  store/      pure reducer from the event stream to view state
+  wire/       sequence numbers, replay, chunking, and gap filling
+  link/       remote transport that reconnects and resumes where it stopped
+  engine/     native engine drivers: acp, codex, claude, kimi
+  worksite/   workspace safety: git guard, write scope
+  journal/    persistence, checkpoints, recovery
+  handoff/    run summaries and branch comparison (never sent to an engine)
+  host/       session orchestration and process lifecycle
 apps/
-  desktop/    Electron 壳 + React 渲染层
-  web/        远程浏览器端
+  desktop/    Electron shell and React renderer
+  web/        the remote browser client
 ```
 
-精确依赖边由 `pnpm arch` 强制，依赖增删必须同步改真源：
+The exact dependency edges are enforced by `pnpm arch`; adding or removing a dependency means updating the source of
+truth as well:
 
 <!-- package-graph:start -->
 ```text
@@ -244,23 +288,25 @@ web ← link + protocol + store + wire
 <!-- package-graph:end -->
 
 ```sh
-pnpm check       # 提交前必须全绿
+pnpm check       # must be green before every commit
 pnpm test:watch
 ```
 
-工程规范见 [`AGENTS.md`](AGENTS.md)。名字是山路上的之字形折返道（switchback）：坡太陡，就折个弯接着往上走；也是字面上的「切回去」——接力之后，随时能切回上一家。
+The engineering rules are in [`AGENTS.md`](AGENTS.md) (in Chinese). The name comes from a switchback, the zigzag
+turn of a mountain trail: when the slope gets too steep, you turn and keep climbing. It also means what it says:
+after a relay, you can always switch back to the previous engine.
 
-## 许可与商标
+## License and trademarks
 
-Switchback 的源码以 [Apache License 2.0](LICENSE) 发布。
+Switchback's source code is released under the [Apache License 2.0](LICENSE).
 
-- **Claude Agent SDK 不在此列。** `@anthropic-ai/claude-agent-sdk` 及其平台可执行文件是 Anthropic 的专有软件，
-  使用受 Anthropic 的条款约束。
-  - 源码仓库只通过 npm 依赖它。
-  - `pnpm dist` 打出的完整版会把 SDK 和平台可执行文件放进安装包。
-  - 轻量版只带 SDK 的 JavaScript 部分，不带平台可执行文件。
-  - 自行分发安装包之前，请先确认符合 Anthropic 的条款。
-- **与各厂商无关联。** Switchback 是独立的个人项目，与 Anthropic、OpenAI、Moonshot AI、xAI、DeepSeek
-  以及其他引擎的提供方都没有关联，也没有获得它们的认可或赞助。
-  Claude、Claude Code、Codex、Kimi、Grok、DSH 等名称与商标归各自的所有者所有，
-  本文提到它们只是为了说明 Switchback 能驱动哪些引擎。
+- **The Claude Agent SDK is not covered.** `@anthropic-ai/claude-agent-sdk` and its platform executables are
+  Anthropic's proprietary software, used under Anthropic's terms.
+  - The repository only depends on it through npm.
+  - The full build from `pnpm dist` bundles the SDK and the platform executable into the installer.
+  - The thin build only includes the SDK's JavaScript, without the platform executable.
+  - Before distributing an installer yourself, make sure you comply with Anthropic's terms.
+- **Not affiliated with any vendor.** Switchback is an independent personal project. It is not affiliated with,
+  endorsed by, or sponsored by Anthropic, OpenAI, Moonshot AI, xAI, DeepSeek, or the provider of any other engine.
+  Claude, Claude Code, Codex, Kimi, Grok, DSH, and other names and trademarks belong to their respective owners and
+  are mentioned here only to describe which engines Switchback can drive.
