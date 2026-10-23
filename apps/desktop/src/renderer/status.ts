@@ -1,6 +1,8 @@
 import type { Item, Thread, TurnPace } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 import { runningToolLabel } from "./tool.js"
 import { headingOf } from "./reasoning.js"
+import { STATUS } from "./status.messages.js"
 
 /**
  * 运行态说什么。
@@ -10,8 +12,9 @@ import { headingOf } from "./reasoning.js"
  * codex 的界面把每个加载态都起了名字（正在加载项目…、正在加载差异…），
  * 这条是同一个道理。
  */
-export function statusLabel(thread: Thread, items: readonly Item[]): string | undefined {
-  if (thread.status === "waiting_approval") return "等待批准"
+export function statusLabel(thread: Thread, items: readonly Item[], locale: Locale): string | undefined {
+  const m = STATUS[locale]
+  if (thread.status === "waiting_approval") return m.waitingApproval
   if (thread.status !== "running") return undefined
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i]
@@ -19,7 +22,7 @@ export function statusLabel(thread: Thread, items: readonly Item[]): string | un
     // **正在往外写的那段回答**：上一版越过它去找前面的推理，于是模型明明在写答案和代码，
     // 状态行还挂着「正在思考」。写完了的回答不算——那之后它在干别的（想下一步、调工具）
     if (item.kind === "agent_message") {
-      if (!item.complete) return "正在回答"
+      if (!item.complete) return m.answering
       continue
     }
     // **最后一条推理里模型自己给这一段起的小标题**，比「正在思考」有信息量得多。
@@ -32,9 +35,9 @@ export function statusLabel(thread: Thread, items: readonly Item[]): string | un
     }
     if (item.kind !== "tool_call") continue
     if (item.status !== "running" && item.status !== "pending") break
-    return runningToolLabel(item)
+    return runningToolLabel(item, locale)
   }
-  return "正在思考"
+  return m.thinking
 }
 
 /**
@@ -44,12 +47,13 @@ export function statusLabel(thread: Thread, items: readonly Item[]): string | un
  * 一秒一跳、要等宽数字防抖；这个是**跑完之后**的总结，是给人读的一句话
  * （`2 分 11 秒`），不会再变，所以可以从容一点。
  */
-export function spent(ms: number): string {
+export function spent(ms: number, locale: Locale): string {
+  const m = STATUS[locale]
   const total = Math.floor(ms / 1000)
-  if (total < 60) return `${String(total)} 秒`
+  if (total < 60) return m.seconds(total)
   const minutes = Math.floor(total / 60)
   const seconds = total % 60
-  return seconds === 0 ? `${String(minutes)} 分` : `${String(minutes)} 分 ${String(seconds)} 秒`
+  return seconds === 0 ? m.minutes(minutes) : m.minutesSeconds(minutes, seconds)
 }
 
 /**
@@ -59,8 +63,8 @@ export function spent(ms: number): string {
  * 首字十秒以内留一位小数、再往上取整；速度十以上取整、以下留一位——和 DSH 那一行同一个写法：
  * 小数只留在它真有信息量的那一档。
  */
-export function paceLine(pace: TurnPace): string {
-  const first = `首字 ${oneDecimalBelow(pace.firstMs / 1000, 10)} 秒`
+export function paceLine(pace: TurnPace, locale: Locale): string {
+  const first = STATUS[locale].firstToken(oneDecimalBelow(pace.firstMs / 1000, 10))
   if (pace.tps === undefined) return first
   return `${first} · ${pace.exact ? "" : "≈ "}${oneDecimalBelow(pace.tps, 10)} tok/s`
 }
@@ -87,16 +91,22 @@ function oneDecimalBelow(value: number, edge: number): string {
  *
  * 「昨天」单独一档：它比「1 天前」好读，而且这是人回忆时真正用的词。
  */
-export function sinceOf(at: number, now: number): string {
+export function sinceOf(at: number, now: number, locale: Locale): string {
+  const m = STATUS[locale]
   const ms = now - at
   // 时钟回拨、或者引擎报了一个未来的时间戳：不显示负数，当成刚刚
-  if (ms < MINUTE) return "现在"
-  if (ms < HOUR) return `${String(Math.floor(ms / MINUTE))} 分钟前`
-  if (ms < DAY) return `${String(Math.floor(ms / HOUR))} 小时前`
-  if (ms < DAY * 2) return "昨天"
-  if (ms < DAY * 7) return `${String(Math.floor(ms / DAY))} 天前`
+  if (ms < MINUTE) return m.now
+  if (ms < HOUR) return m.minutesAgo(Math.floor(ms / MINUTE))
+  if (ms < DAY) return m.hoursAgo(Math.floor(ms / HOUR))
+  if (ms < DAY * 2) return m.yesterday
+  if (ms < DAY * 7) return m.daysAgo(Math.floor(ms / DAY))
+  return dayOf(at, locale)
+}
+
+/** 哪一天（本地时区）：`10 月 3 日` / `Oct 3`。不带年份——这里说的都是最近的事。 */
+export function dayOf(at: number, locale: Locale): string {
   const day = new Date(at)
-  return `${String(day.getMonth() + 1)} 月 ${String(day.getDate())} 日`
+  return STATUS[locale].day(day.getMonth() + 1, day.getDate())
 }
 
 const MINUTE = 60_000

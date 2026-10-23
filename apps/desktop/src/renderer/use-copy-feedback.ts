@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from "react"
+import type { Locale } from "@switchback/i18n"
+import { COPY_FEEDBACK } from "./use-copy-feedback.messages.js"
 
 const COPY_FLASH_MS = 1200
 
 export type CopyFeedback = "idle" | "copied" | "failed"
 
-export function copyFeedbackLabel(feedback: CopyFeedback): string {
-  if (feedback === "copied") return "已复制"
-  return feedback === "failed" ? "复制失败" : "复制"
+export function copyFeedbackLabel(feedback: CopyFeedback, locale: Locale): string {
+  return COPY_FEEDBACK[locale].label[feedback]
 }
 
-export function copyFeedbackTitle(feedback: CopyFeedback, idle: string, copied = "内容已复制"): string {
-  if (feedback === "copied") return copied
-  return feedback === "failed" ? "复制失败，请重试" : idle
+/** 悬停与读屏用的那句：平时说这颗键复制什么（`idle`），按过之后说结果。 */
+export function copyFeedbackTitle(feedback: CopyFeedback, locale: Locale, idle: string, copied?: string): string {
+  const m = COPY_FEEDBACK[locale]
+  if (feedback === "copied") return copied ?? m.copied
+  return feedback === "failed" ? m.failed : idle
 }
 
 export async function resolveCopyFeedback(copy: () => unknown): Promise<CopyFeedback> {

@@ -1,4 +1,6 @@
 import type { Thread } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { TRUST_HINT } from "./trustHint.messages.js"
 
 /**
  * 档位下面那一行说明：**Switchback 的档和引擎那边对不对得上，对不上是哪一种对不上。**
@@ -40,10 +42,11 @@ export interface TrustHint {
  * 但 Switchback 压根没设过、没有可比的基准」——那不是分家，说成分家就是一条常亮的假警告
  *（实测 grok：不报档位表、却推当前档）。`unknown` 该走下面的 `unmapped` 那条说明。
  */
-function divergedHint(thread: Thread, engineLabel: string, trustLabel: string): TrustHint | undefined {
+function divergedHint(thread: Thread, engineLabel: string, trustLabel: string, locale: Locale): TrustHint | undefined {
   const diverged = thread.engineState?.axes.find((a) => a.match === "diverged")
   if (diverged === undefined) return undefined
   const name = diverged.label ?? diverged.id
+  const m = TRUST_HINT[locale]
   return {
     kind: "diverged",
     /*
@@ -62,30 +65,28 @@ function divergedHint(thread: Thread, engineLabel: string, trustLabel: string): 
      * ④ **「切回来」切什么回来。** 上面一行常常正好是「切到 Grok」，同一个动词
      *    用在两件毫不相干的事上。改成把**去处**写进按钮。
      */
-    text: `权限档不一致：${engineLabel} 在「${name}」，Switchback 这条会话是「${trustLabel}」。`,
+    text: m.diverged(engineLabel, name, trustLabel),
     /*
      * **红线那句不枚举到底有哪几条。** `redline.ts` 里 `always("escalate" | "deny")`
      * 的规则会随版本增减，把清单抄进一句 UI 文案，迟早变成一句谎——
      * 而这个仓库把「说谎的注释比没注释贵」当规矩。举三个例子、后面留省略号。
      */
-    tip:
-      `不是 Switchback 切的——引擎那边被改过。Switchback 的审批层不吃引擎的档：` +
-      `它仍按「${trustLabel}」判定，红线动作（工作区外的删除、读凭据、推远端…）` +
-      `任何档位下都要问过你。右边那颗键把 Switchback 的档重新推给 ${engineLabel}。`,
-    action: { label: `改回「${trustLabel}」`, kind: "reapply" },
+    tip: m.divergedTip(engineLabel, trustLabel),
+    action: { label: m.reapply(trustLabel), kind: "reapply" },
   }
 }
 
 /** Switchback 设档没设上，或者这家压根不报——两种都只是说明，**没有动作可做**。 */
-function applyHint(thread: Thread, engineLabel: string): TrustHint | undefined {
+function applyHint(thread: Thread, engineLabel: string, locale: Locale): TrustHint | undefined {
   const apply = thread.trustApply
+  const m = TRUST_HINT[locale]
   if (apply?.result === "fixed") {
     // 不给动作：能做的是「新开一条会话」，而那是另一个入口的事，
     // 在这里再放一个按钮等于把同一件事摆两处
-    return { kind: "fixed", text: apply.detail ?? `${engineLabel} 的档位在开会话时就定死了，换档要重开一条会话。` }
+    return { kind: "fixed", text: apply.detail ?? m.fixed(engineLabel) }
   }
   if (apply?.result === "unmapped") {
-    return { kind: "unmapped", text: apply.detail ?? `这一档在 ${engineLabel} 上只在 Switchback 本机判定层生效。` }
+    return { kind: "unmapped", text: apply.detail ?? m.unmapped(engineLabel) }
   }
   return undefined
 }
@@ -93,10 +94,10 @@ function applyHint(thread: Thread, engineLabel: string): TrustHint | undefined {
 /**
  * @param engineLabel 引擎的显示名。**插值进去，不写字面量**——写死「Claude」的话，
  *   换一家引擎那句话就在撒谎。
- * @param trustLabel Switchback 当前档位的中文名，用来说「Switchback 的审批层仍按 X 在拦」。
+ * @param trustLabel Switchback 当前档位的名字，用来说「Switchback 的审批层仍按 X 在拦」。
  */
-export function trustHint(thread: Thread, engineLabel: string, trustLabel: string): TrustHint | undefined {
-  return divergedHint(thread, engineLabel, trustLabel) ?? applyHint(thread, engineLabel)
+export function trustHint(thread: Thread, engineLabel: string, trustLabel: string, locale: Locale): TrustHint | undefined {
+  return divergedHint(thread, engineLabel, trustLabel, locale) ?? applyHint(thread, engineLabel, locale)
 }
 
 /**
@@ -112,8 +113,8 @@ export function trustHint(thread: Thread, engineLabel: string, trustLabel: strin
  * **此刻发生了什么**，这一种描述的是**这家引擎是什么样**。前者该主动说，
  * 后者该在你去看档位时能查到——所以它挂在档位选择器的悬停上。
  */
-export function trustBlind(thread: Thread, engineLabel: string): string | undefined {
+export function trustBlind(thread: Thread, engineLabel: string, locale: Locale): string | undefined {
   if (thread.capabilities?.modeReadback !== false) return undefined
   if (thread.engineState !== undefined) return undefined
-  return `${engineLabel} 不会把它自己改的档位告诉 Switchback；这里显示的是 Switchback 让它去的那一档。`
+  return TRUST_HINT[locale].blind(engineLabel)
 }

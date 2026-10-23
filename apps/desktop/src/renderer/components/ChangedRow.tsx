@@ -6,6 +6,7 @@ import { CheckIcon, CopyIcon, RevealIcon } from "./icons.js"
 import { FileIcon } from "./icons-activity.js"
 import { outside } from "./file-row.js"
 import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
+import { useLocale } from "../i18n.js"
 
 interface Props {
   file: ChangedFile
@@ -77,7 +78,7 @@ export function ChangedRow({
 }: Props): React.JSX.Element {
   const shown = splitPath(relPath(file.path, cwd))
   const [feedback, copy] = useCopyFeedback(() => onCopy(`${file.path}\n\n${file.last.diff ?? "引擎未提供补丁内容"}`))
-  const copyTitle = copyFeedbackTitle(feedback, "复制这次编辑记录", "编辑记录已复制")
+  const copyTitle = copyFeedbackTitle(feedback, useLocale(), "复制这次编辑记录", "编辑记录已复制")
   return (
     <div className="changed__file">
       <div className="changed__row">

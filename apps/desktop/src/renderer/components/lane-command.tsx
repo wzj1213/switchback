@@ -1,5 +1,7 @@
 import { copyFeedbackLabel, copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { LANE_COMMAND } from "./lane-command.messages.js"
 
 /**
  * 一条后台旁路的**命令原文**与**输出片段**——两者都是引擎自己报的，这里只负责画。
@@ -23,23 +25,26 @@ export function LaneCommandBlock({ command, onCopy }: {
   onCopy: (text: string) => unknown
 }): React.JSX.Element {
   const [feedback, copy] = useCopyFeedback(() => onCopy(command))
+  const locale = useLocale()
+  const m = LANE_COMMAND[locale]
   return (
     <div className="lane-cmd-block">
       <div className="lane-cmd-block__toolbar">
         <button type="button" className="lane-cmd-block__copy" aria-live="polite"
-          data-state={feedback} data-tip={copyFeedbackTitle(feedback, "复制后台命令")} onClick={copy}>
+          data-state={feedback} data-tip={copyFeedbackTitle(feedback, locale, m.copy)} onClick={copy}>
           {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-          {copyFeedbackLabel(feedback)}
+          {copyFeedbackLabel(feedback, locale)}
         </button>
       </div>
-      <pre tabIndex={0} aria-label="可横向滚动的后台命令"><code>{command}</code></pre>
+      <pre tabIndex={0} aria-label={m.command}><code>{command}</code></pre>
     </div>
   )
 }
 
 export function LaneOutput({ text }: { text: string }): React.JSX.Element {
+  const m = useMessages(LANE_COMMAND)
   return (
-    <pre className="lane-output" tabIndex={0} aria-label="可滚动的后台输出">
+    <pre className="lane-output" tabIndex={0} aria-label={m.output}>
       <code>{text}</code>
     </pre>
   )

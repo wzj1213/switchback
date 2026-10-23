@@ -5,7 +5,7 @@
 ## 拥有什么
 
 - `Locale`（`"zh-CN" | "en"`）、`DEFAULT_LOCALE`（中文）、`isLocale`、`langTag`
-- `defineMessages(zh, en)`：一份文案的中英两版。英文那一版少一个键、带参数的文案参数对不上，类型检查都过不去
+- `defineMessages(zh, en)`：一份文案的中英两版。一条文案是一句话、一个拼句子的函数，或一张「id → 名字」的表；英文那一版少一个键（表里的也算）、带参数的文案参数对不上，类型检查都过不去
 - `count`：英文的单复数
 
 ## 不拥有什么
@@ -40,6 +40,7 @@
 | 项目 | project |
 | 侧栏 | sidebar |
 | 侧边面板 | side panel |
+| 工作台 | workbench |
 | 桌宠 | pet |
 | 外发守卫 | egress guard |
 | 远程 | remote |

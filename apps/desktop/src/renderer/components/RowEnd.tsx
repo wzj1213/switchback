@@ -5,6 +5,8 @@ import { useMinute } from "../useMinute.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"
 import { displayStatus } from "@switchback/store"
+import { useLocale, useMessages } from "../i18n.js"
+import { ROW_END } from "./RowEnd.messages.js"
 
 /*
  * 侧栏会话行的状态点和右边那一列。从 `SidebarRows.tsx` 拆出来是行数闸门逼的，
@@ -21,9 +23,6 @@ const DOT_CLASS: Record<ThreadStatus, string> = {
   failed: " row__dot--failed",
 }
 
-/** 未读那颗点的说明。**颜色之外必须有一句话**：读屏用户没有颜色。 */
-const UNREAD = "跑完了，还没打开过"
-
 /**
  * 行首那颗状态点。
  *
@@ -32,16 +31,11 @@ const UNREAD = "跑完了，还没打开过"
  * 再改一次颜色只会把「现在到底怎么了」说糊。
  */
 export function Dot({ status, unread }: { status: ThreadStatus; unread: boolean }): React.JSX.Element {
+  const m = useMessages(ROW_END)
   if (!unread || status !== "idle") return <span className={`row__dot${DOT_CLASS[status]}`} />
-  // `role="img"` 是必须的：光挂 `aria-label` 的裸 span，读屏不保证念得出来
-  return <span className="row__dot row__dot--unread" role="img" aria-label={UNREAD} title={UNREAD} />
-}
-
-/** 光靠颜色说不清「要你去做什么」，这几档补一句字。 */
-const NOTE: Partial<Record<ThreadStatus, string>> = {
-  waiting_approval: "待批",
-  starting: "启动中",
-  failed: "失败",
+  // `role="img"` 是必须的：光挂 `aria-label` 的裸 span，读屏不保证念得出来。
+  // 未读那颗点的说明：**颜色之外必须有一句话**，读屏用户没有颜色
+  return <span className="row__dot row__dot--unread" role="img" aria-label={m.unread} title={m.unread} />
 }
 
 /**
@@ -61,9 +55,9 @@ function EngineDot({
   thread: Thread
   engines: readonly EngineInfo[]
 }): React.JSX.Element | null {
+  const m = useMessages(ROW_END)
   if (thread.engineHistory.length < 2) return null
-  const name = labelOf(engines, thread.engine)
-  const note = `现在归 ${name} 跑 · 接力 ${String(thread.engineHistory.length)} 手`
+  const note = m.engine(labelOf(engines, thread.engine), thread.engineHistory.length)
   return (
     <span
       className="row__engine"
@@ -105,9 +99,12 @@ export function RowEnd({
    */
   unread?: boolean
 }): React.JSX.Element {
+  const m = useMessages(ROW_END)
   // 主轮之外还挂着权限请求的，照「待批」画（见 store 的 `displayStatus`）
   const status = displayStatus(thread)
-  const note = NOTE[status]
+  // 光靠颜色说不清「要你去做什么」，这几档补一句字
+  const notes: Partial<Record<ThreadStatus, string>> = m.note
+  const note = notes[status]
   const running = status === "running"
   // 包一层 `.row__end`：悬停时整列让位给行内操作，操作按钮浮在这一列上（见 app-sidebar.css）
   return (
@@ -120,7 +117,7 @@ export function RowEnd({
       {/* 跑着的时候右侧转一个圈。**这是唯一能在不切会话的情况下看出「那边还在忙」
           的地方**——状态点太小、又和「有未读」这类含义抢同一个位置 */}
       {running ? (
-        <span className="row__spin" aria-label="正在运行">
+        <span className="row__spin" aria-label={m.running}>
           <SpinnerIcon />
         </span>
       ) : null}
@@ -138,7 +135,7 @@ export function RowEnd({
  * 不该是整行——那一行还挂着拖放、改名、删除确认一堆状态。
  */
 function Since({ at, bright = false }: { at: number; bright?: boolean }): React.JSX.Element {
-  return <span className={`row__time${bright ? " row__time--bright" : ""}`}>{sinceOf(at, useMinute())}</span>
+  return <span className={`row__time${bright ? " row__time--bright" : ""}`}>{sinceOf(at, useMinute(), useLocale())}</span>
 }
 
 /**
@@ -152,18 +149,19 @@ export function GroupEnd({ collapsed, waiting, running, unread, count }: {
   unread: number
   count: number
 }): React.JSX.Element {
-  const unreadLabel = `${String(unread)} 条跑完了还没看`
+  const m = useMessages(ROW_END)
+  const unreadLabel = m.groupUnread(unread)
   return (
     <span className="row__end">
       {/* 折起来的时候，「这个项目里有没有东西在跑」只剩这一个出口。
               展开时每行自己会转圈，这里就不重复了 */}
       {collapsed && waiting > 0 ? (
-        <span className="row__wait" aria-label={`${String(waiting)} 个等你批`}>
-          待批
+        <span className="row__wait" aria-label={m.groupWaiting(waiting)}>
+          {m.note.waiting_approval}
         </span>
       ) : null}
       {collapsed && running > 0 ? (
-        <span className="row__spin" aria-label={`${String(running)} 个在跑`}>
+        <span className="row__spin" aria-label={m.groupRunning(running)}>
           <SpinnerIcon />
         </span>
       ) : null}

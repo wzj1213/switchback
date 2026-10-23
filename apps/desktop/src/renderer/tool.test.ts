@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { relPath, shellTranscript, summarize } from "./tool.js"
+import type { ToolDetail } from "@switchback/protocol"
+import { relPath, shellTranscript as transcriptIn, summarize as summarizeIn } from "./tool.js"
+
+// 下面那些用例写的是中文那版；英文那版的差别集中在文末
+const summarize = (kinds: readonly ToolDetail["kind"][]): string => summarizeIn(kinds, "zh-CN")
+const shellTranscript = (detail: Extract<ToolDetail, { kind: "shell" }>): string | undefined => transcriptIn(detail, "zh-CN")
 
 describe("工具活动折成一句话", () => {
   it("**按首次出现去重**——连着读五个文件不该写五遍「读取了文件」", () => {
@@ -55,5 +60,17 @@ describe("后台终端记录", () => {
         terminal: { waiting: false, inputs: ["yes\n", "done\n"] },
       }),
     ).toBe("终端输出：\nready\n\n\n后台终端输入 1：\nyes\n\n\n后台终端输入 2：\ndone\n")
+  })
+})
+
+describe("英文那版", () => {
+  it("折叠摘要按种类报个数，顺序仍是首次出现的顺序", () => {
+    expect(summarizeIn(["file_read", "shell", "file_read", "file_read"], "en")).toBe("Read 3 files · Ran 1 command")
+  })
+
+  it("终端记录的分区标题", () => {
+    expect(
+      transcriptIn({ kind: "shell", command: "read a", output: "ok\n", terminal: { waiting: false, inputs: ["y\n"] } }, "en"),
+    ).toBe("Terminal output:\nok\n\n\nBackground terminal input 1:\ny\n")
   })
 })

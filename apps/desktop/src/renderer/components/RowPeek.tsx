@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { EngineInfo, Thread } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 import { rowLabelOf, type SidebarRow } from "../sidebar.js"
-import { sinceOf } from "../status.js"
-import { labelOf, TRUSTS } from "./Composer.js"
+import { dayOf, sinceOf } from "../status.js"
+import { labelOf } from "./Composer.js"
+import { trustsOf } from "../trusts.js"
 import { effortLabel } from "./ModelPicker.js"
 import { displayStatus } from "@switchback/store"
+import { useLocale } from "../i18n.js"
+import { ROW_PEEK } from "./RowPeek.messages.js"
 
 /**
  * 侧栏行的悬停卡：完整路径、引擎、状态原文——只读预览。
@@ -80,17 +84,18 @@ export function usePeek(disabled: boolean): {
 }
 
 /** 状态那一行：只有「停下来了」才值得说；idle 的行没有这一行。 */
-function statusLine(thread: Thread): { text: string; tone: "warn" | "fail" | "" } | undefined {
-  const ago = sinceOf(thread.updatedAt, Date.now())
+function statusLine(thread: Thread, locale: Locale): { text: string; tone: "warn" | "fail" | "" } | undefined {
+  const m = ROW_PEEK[locale]
+  const ago = sinceOf(thread.updatedAt, Date.now(), locale)
   switch (displayStatus(thread)) {
     case "waiting_approval":
-      return { text: `待批 · 停在 ${ago}`, tone: "warn" }
+      return { text: m.waiting(ago), tone: "warn" }
     case "failed":
-      return { text: `失败 · ${ago}`, tone: "fail" }
+      return { text: m.failed(ago), tone: "fail" }
     case "running":
-      return { text: "正在跑", tone: "" }
+      return { text: m.running, tone: "" }
     case "starting":
-      return { text: "启动中", tone: "" }
+      return { text: m.starting, tone: "" }
     default:
       return undefined
   }
@@ -106,23 +111,24 @@ export function RowPeek({
   spot: PeekSpot
 }): React.JSX.Element {
   const { thread } = row
+  const locale = useLocale()
+  const m = ROW_PEEK[locale]
   const engine = labelOf(engines, thread.engine)
   const engineRoute = thread.engineProfile === undefined ? engine : `${engine} · ${thread.engineProfile}`
-  const model = thread.model ?? "默认"
+  const model = thread.model ?? m.defaultModel
   const withEffort = thread.effort === undefined ? model : `${model} · ${effortLabel(thread.effort).label}`
-  const status = statusLine(thread)
+  const status = statusLine(thread, locale)
   const relay =
     thread.engineHistory.length > 1
       ? thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")
       : undefined
-  const created = new Date(thread.createdAt)
   return (
     // aria-hidden：内容和行本身重复，读屏不需要听第二遍
     <span className="peek" style={{ left: spot.x, top: spot.y }} aria-hidden="true">
       <span className="peek__title">{rowLabelOf(row)}</span>
       <span className="peek__path">{thread.cwd}</span>
       <span className="peek__meta">
-        {engineRoute} · {withEffort} · {labelOf(TRUSTS, thread.trust)}
+        {engineRoute} · {withEffort} · {labelOf(trustsOf(locale), thread.trust)}
       </span>
       {status === undefined ? null : (
         <span className={`peek__status${status.tone === "" ? "" : ` peek__status--${status.tone}`}`}>
@@ -130,8 +136,8 @@ export function RowPeek({
         </span>
       )}
       <span className="peek__foot">
-        {relay === undefined ? "" : `接力 ${relay} · `}创建于 {created.getMonth() + 1} 月{" "}
-        {created.getDate()} 日
+        {relay === undefined ? "" : m.relay(relay)}
+        {m.created(dayOf(thread.createdAt, locale))}
       </span>
     </span>
   )

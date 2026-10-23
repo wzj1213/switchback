@@ -3,6 +3,7 @@ import type { Command, EngineInfo, Item, Thread, Turn } from "@switchback/protoc
 import { labelOf } from "./components/Composer.js"
 import { nextEngine } from "./engines.js"
 import { toMarkdown } from "./export.js"
+import { useLocale } from "./i18n.js"
 import { switchbackCommands, type SwitchbackAction } from "./switchbackCommands.js"
 import { pickupOf } from "./pickup.js"
 import { requestComposerReference } from "./composer-reference-request.js"
@@ -34,6 +35,7 @@ export function useSwitchbackActions(
   extra: { onEnv: () => void; onTimeline: () => void },
 ): readonly SwitchbackAction[] {
   const { thread, send } = props
+  const locale = useLocale()
   const next = nextEngine(props.engines, thread.engine)
   // **只看能力，不看引擎叫什么、也不嗅探命令名。**
   // 原来这里是 `commands.some(c => c.name === "compact")`——那意味着某家引擎
@@ -48,7 +50,7 @@ export function useSwitchbackActions(
     onEnv: extra.onEnv,
     onTimeline: extra.onTimeline,
     onExport: () => {
-      props.onCopy(toMarkdown(thread, props.items, labelOf(props.engines, thread.engine)))
+      props.onCopy(toMarkdown(thread, props.items, labelOf(props.engines, thread.engine), locale))
     },
     ...(props.peer === undefined ? {} : { onCompare: props.onCompare }),
     ...(pickup === undefined

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * 界面文案守卫 —— 挡住「把中文直接写进组件」。
- * 用法：node scripts/check-i18n.mjs        检查
- *       node scripts/check-i18n.mjs --list 列出每个文件还剩几条（迁移时看进度用）
+ * 用法：node scripts/check-i18n.mjs         检查
+ *       node scripts/check-i18n.mjs --list  列出每个文件还剩几条（迁移时看进度用）
+ *       node scripts/check-i18n.mjs --prune 把已经迁完、或已经删掉的文件从名单里划掉
  *
  * ## 规矩
  *
@@ -18,7 +19,7 @@
  * 先管纯界面的两处：桌面端渲染层与网页端。主进程和各个包里还混着只给开发看的日志，
  * 迁到那一步时再把它们加进 ROOTS（连同「日志不算」的判据）。
  */
-import { readFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { execFileSync } from "node:child_process"
 import { dirname, join } from "node:path"
@@ -62,9 +63,18 @@ function hits(file) {
   return found
 }
 
+/** 名单只会变短：迁完的、删掉的划掉，别的一个不动。 */
+function prune(todo, files) {
+  const present = new Set(files)
+  const keep = [...todo].filter((file) => present.has(file) && hits(file).length > 0)
+  writeFileSync(TODO_FILE, `${JSON.stringify(keep, null, 2)}\n`)
+  console.log(`从名单里划掉 ${String(todo.size - keep.length)} 个，还剩 ${String(keep.length)} 个`)
+}
+
 function main() {
   const todo = new Set(JSON.parse(readFileSync(TODO_FILE, "utf8")))
   const files = sources()
+  if (process.argv.includes("--prune")) return prune(todo, files)
   const present = new Set(files)
   const errors = []
   const left = []

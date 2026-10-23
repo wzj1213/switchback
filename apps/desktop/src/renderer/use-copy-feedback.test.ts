@@ -9,13 +9,18 @@ describe("复制反馈文案", () => {
   ] as const
   for (const [feedback, label, title] of cases) {
     it(feedback, () => {
-      expect(copyFeedbackLabel(feedback)).toBe(label)
-      expect(copyFeedbackTitle(feedback, "复制后台命令")).toBe(title)
+      expect(copyFeedbackLabel(feedback, "zh-CN")).toBe(label)
+      expect(copyFeedbackTitle(feedback, "zh-CN", "复制后台命令")).toBe(title)
       if (feedback === "copied") {
-        expect(copyFeedbackTitle(feedback, "复制", "文件改动已复制")).toBe("文件改动已复制")
+        expect(copyFeedbackTitle(feedback, "zh-CN", "复制", "文件改动已复制")).toBe("文件改动已复制")
       }
     })
   }
+
+  it("英文", () => {
+    expect(["idle", "copied", "failed"].map((f) => copyFeedbackLabel(f as "idle", "en"))).toEqual(["Copy", "Copied", "Copy failed"])
+    expect(copyFeedbackTitle("failed", "en", "Copy code")).toBe("Couldn't copy. Try again.")
+  })
 })
 
 describe("复制结果只认回执", () => {

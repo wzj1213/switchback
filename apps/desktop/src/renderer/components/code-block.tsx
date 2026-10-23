@@ -1,6 +1,8 @@
 import { useRef } from "react"
 import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
+import { useLocale } from "../i18n.js"
+import { CODE_BLOCK } from "./code-block.messages.js"
 
 /**
  * 代码块自带的一条工具栏：**这是什么语言**，还有**把它拿走**。
@@ -50,17 +52,19 @@ export function CodeBlock({ children, lang }: {
 }): React.JSX.Element {
   const box = useRef<HTMLPreElement>(null)
   const [feedback, copy] = useCopyFeedback(() => copyVia(textOf(box.current)))
+  const locale = useLocale()
+  const m = CODE_BLOCK[locale]
   return (
     <div className="cblock">
       <div className="cblock__bar">
-        <span className="cblock__lang">{lang ?? "代码"}</span>
+        <span className="cblock__lang">{lang ?? m.code}</span>
         <button
           type="button"
           className="cblock__copy"
           aria-live="polite"
           data-state={feedback}
-          aria-label={copyFeedbackTitle(feedback, "复制这段代码")}
-          data-tip={copyFeedbackTitle(feedback, "复制这段代码")}
+          aria-label={copyFeedbackTitle(feedback, locale, m.copy)}
+          data-tip={copyFeedbackTitle(feedback, locale, m.copy)}
           onClick={copy}
         >
           {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}

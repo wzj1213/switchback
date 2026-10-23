@@ -2,6 +2,8 @@ import type { Command, Thread, Trust } from "@switchback/protocol"
 import { itemsOf, type ViewState } from "@switchback/store"
 import { labelOf } from "./components/Composer.js"
 import { toMarkdown } from "./export.js"
+import { useLocale } from "./i18n.js"
+import { WORKSPACE_ACTIONS } from "./useWorkspaceActions.messages.js"
 import { useMenuActions } from "./useMenuActions.js"
 import type { Opened } from "./newThreadPrefs.js"
 import { pickupOf } from "./pickup.js"
@@ -55,6 +57,7 @@ export function useWorkspaceActions(deps: {
   defaultTrust: Trust
 }): WorkspaceActions {
   const { state, thread, send } = deps
+  const locale = useLocale()
 
   /**
    * 开新会话。
@@ -67,7 +70,7 @@ export function useWorkspaceActions(deps: {
     send({
       type: "thread.create",
       cwd,
-      ...(kind === "chat" ? { workspaceKind: "chat" as const, title: "新对话" } : {}),
+      ...(kind === "chat" ? { workspaceKind: "chat" as const, title: WORKSPACE_ACTIONS[locale].newChat } : {}),
       ...deps.opened,
       trust: deps.defaultTrust,
       title: cwd.split("/").filter(Boolean).pop() ?? cwd,
@@ -136,10 +139,10 @@ export function useWorkspaceActions(deps: {
       },
       copyMarkdown: () => {
         if (thread === undefined) return
-        deps.copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine)))
+        deps.copy(toMarkdown(thread, itemsOf(state, thread.id), labelOf(state.engines, thread.engine), locale))
       },
     },
-    [thread?.id, thread?.cwd, state],
+    [thread?.id, thread?.cwd, state, locale],
   )
 
   return { open, openChat, openPicker }

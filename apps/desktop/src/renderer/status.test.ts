@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest"
-import type { Item, Thread, ToolCallItem } from "@switchback/protocol"
-import { elapsed, paceLine, statusLabel } from "./status.js"
-import { brief, target } from "./tool.js"
+import type { Item, Thread, ToolCallItem, ToolDetail, TurnPace } from "@switchback/protocol"
+import { elapsed, paceLine as paceIn, sinceOf, spent, statusLabel as statusIn } from "./status.js"
+import { brief as briefIn, target as targetIn } from "./tool.js"
+
+// 下面那些用例写的是中文那版；英文那版的差别集中在文末
+const statusLabel = (t: Thread, items: readonly Item[]): string | undefined => statusIn(t, items, "zh-CN")
+const target = (detail: ToolDetail): string => targetIn(detail, "zh-CN")
+const brief = (detail: ToolDetail): string => briefIn(detail, "zh-CN")
+const paceLine = (pace: TurnPace): string => paceIn(pace, "zh-CN")
 
 const thread = (status: Thread["status"]): Thread => ({
   id: "th",
@@ -153,4 +159,34 @@ describe("paceLine", () => {
       expect(paceLine(pace)).toBe(want)
     })
   }
+})
+
+describe("英文那版", () => {
+  const MIN = 60_000
+  const at = new Date(2026, 9, 3, 12).getTime()
+  const cases: readonly (readonly [string, () => string | undefined, string])[] = [
+    ["等待批准", () => statusIn(thread("waiting_approval"), [], "en"), "Waiting for approval"],
+    ["正在跑的工具用进行时", () => statusIn(thread("running"), [tool()], "en"), "Running pnpm test"],
+    ["没有工具时在想", () => statusIn(thread("running"), [], "en"), "Thinking"],
+    ["时长", () => spent(131_000, "en"), "2m 11s"],
+    ["整分钟", () => spent(120_000, "en"), "2m"],
+    ["节奏", () => paceIn({ firstMs: 800, tps: 34.4, tokens: 900, exact: false }, "en"), "first token 0.8s · ≈ 34 tok/s"],
+    ["刚刚", () => sinceOf(at, at + 10_000, "en"), "now"],
+    ["分钟", () => sinceOf(at, at + 5 * MIN, "en"), "5m ago"],
+    ["昨天", () => sinceOf(at, at + 30 * 60 * MIN, "en"), "yesterday"],
+    ["一周以上报日期", () => sinceOf(at, at + 10 * 24 * 60 * MIN, "en"), "Oct 3"],
+    ["多文件改动", () => targetIn({ kind: "file_edit", path: "/w/a", files: [
+      { path: "/w/a", kind: "add", added: 1, removed: 0 },
+      { path: "/w/b", kind: "add", added: 1, removed: 0 },
+    ], added: 2, removed: 0 }, "en"), "2 files"],
+  ]
+  for (const [name, run, want] of cases) {
+    it(name, () => {
+      expect(run()).toBe(want)
+    })
+  }
+
+  it("中文那版的日期和时长不变", () => {
+    expect([sinceOf(at, at + 10 * 24 * 60 * MIN, "zh-CN"), spent(131_000, "zh-CN")]).toEqual(["10 月 3 日", "2 分 11 秒"])
+  })
 })

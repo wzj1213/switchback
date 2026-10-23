@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 import type { EngineAxis, Thread, TrustApply } from "@switchback/protocol"
-import { trustBlind, trustHint } from "./trustHint.js"
+import { trustBlind as blindIn, trustHint as hintIn } from "./trustHint.js"
+
+// 下面那些用例写的是中文那版；英文那版的差别集中在文末
+const trustHint = (t: Thread, engine: string, trust: string): ReturnType<typeof hintIn> => hintIn(t, engine, trust, "zh-CN")
+const trustBlind = (t: Thread, engine: string): string | undefined => blindIn(t, engine, "zh-CN")
 
 const BASE = {
   id: "t1",
@@ -147,5 +151,17 @@ describe("「这家不报自己的档」那句话", () => {
       engineState: { axes: [axis("aligned")], at: 1 },
     })
     expect(trustBlind(thread, "G")).toBeUndefined()
+  })
+})
+
+describe("英文那版", () => {
+  it("分家那一句：轴名在前，两边的档都带引号，按钮说去处", () => {
+    const hint = hintIn(with_({ engineState: { axes: [axis("diverged", "yolo", "Yolo")], at: 1 } }), "ZCode", "Full access", "en")
+    expect(hint?.text).toBe("Permission tiers don't match: ZCode is on “Yolo”, and this thread in Switchback is on “Full access”.")
+    expect(hint?.action?.label).toBe("Set back to “Full access”")
+  })
+
+  it("引擎自己给了原因就照原样用，不翻译", () => {
+    expect(hintIn(with_({ trustApply: apply("fixed", "定死了") }), "G", "Auto-approve", "en")?.text).toBe("定死了")
   })
 })

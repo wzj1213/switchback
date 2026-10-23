@@ -3,6 +3,8 @@ import type { Item } from "@switchback/protocol"
 import { textOf } from "../export.js"
 import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
+import { useLocale } from "../i18n.js"
+import { COPYABLE } from "./Copyable.messages.js"
 
 /**
  * 给一条消息挂一排动作。
@@ -41,7 +43,9 @@ export function Copyable({
   /** 同一条动作栏里再挂几颗（「改一改再发」走这里）。 */
   extra?: ReactNode
 }): React.JSX.Element {
-  const [feedback, copy] = useCopyFeedback(() => onCopy(textOf(item)))
+  const locale = useLocale()
+  const m = COPYABLE[locale]
+  const [feedback, copy] = useCopyFeedback(() => onCopy(textOf(item, locale)))
   if (item.kind === "approval") return <>{children}</>
   // 左边那条导航按「你问的一次」摆格子，位置只能从 DOM 量（见 `use-transcript-rail.ts`），
   // 所以人话这一层要留一个认得出的锚点。**只挂人亲手发的**：交接说明、定时触发这些
@@ -69,8 +73,8 @@ export function Copyable({
             type="button"
             aria-live="polite"
             data-state={feedback}
-            aria-label={copyFeedbackTitle(feedback, "复制", "已复制")}
-            data-tip={copyFeedbackTitle(feedback, "复制", "已复制")}
+            aria-label={copyFeedbackTitle(feedback, locale, m.copy, m.copied)}
+            data-tip={copyFeedbackTitle(feedback, locale, m.copy, m.copied)}
             onClick={copy}
           >
             {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}

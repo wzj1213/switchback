@@ -10,31 +10,6 @@ import type { ComposerFileReference } from "../file-references.js"
 import { ComposerBody } from "./composer-body.js"
 import type { HistoryNote } from "../history-note.js"
 
-/**
- * 信任档。
- *
- * `hint` 不是可有可无的：这三个词说得出**档位叫什么**，说不出
- * **它到底会不会问我**。而这正是用户在改这个控件时唯一关心的事。
- *
- * ## 为什么现在叫「自动审批 / 完全访问」
- *
- * 用户要的中间档就是 Codex 的 “Approve for me”：越界时先交给引擎自己的评审器，
- * 只有它判成潜在不安全才问人。Claude、Kimi 与 Grok 都对应各自的原生 Auto，
- * 由引擎自己的分类器做后台安全检查。最高档才是 Full Access / YOLO / Bypass 这类最宽权限。
- *
- * 档位 id 不动（历史 journal 仍然读得回来）；各家底层不完全同型，具体行为仍由
- * 它们正式暴露的权限入口决定，Switchback 不拿自己的静态判断冒充引擎原生自动审批。
- */
-const TRUSTS: readonly { id: Trust; label: string; hint: string }[] = [
-  { id: "read-only", label: "只读", hint: "只允许读取和只读命令；修改与联网会被拒绝" },
-  {
-    id: "auto-edit",
-    label: "自动审批",
-    hint: "优先使用引擎原生安全评审；需要人工决定时才询问",
-  },
-  { id: "full", label: "完全访问", hint: "最宽权限；允许工作区外操作与联网，通常不再询问" },
-]
-
 export interface ComposerProps {
   threadId: string
   drafts: ComposerDrafts
@@ -187,12 +162,10 @@ export function Composer(props: ComposerProps): React.JSX.Element {
   )
 }
 
-/** 引擎/档位 id → 展示名。顶栏、导出、菜单都要用同一套措辞。 */
+/** 引擎/档位 id → 展示名。顶栏、导出、菜单都要用同一套措辞（档位见 `trusts.ts`）。 */
 export function labelOf<T extends { id: string; label: string }>(
   list: readonly T[],
   id: string,
 ): string {
   return list.find((x) => x.id === id)?.label ?? id
 }
-
-export { TRUSTS }

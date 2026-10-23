@@ -4,9 +4,12 @@ import { ModelPicker } from "./ModelPicker.js"
 import { UsageBadge } from "./UsageRing.js"
 import { Select } from "./Select.js"
 import { EngineIcon, ShieldIcon } from "./icons.js"
-import { TRUSTS, labelOf } from "./Composer.js"
+import { labelOf } from "./Composer.js"
+import { trustsOf } from "../trusts.js"
 import type { TrustHint } from "../trustHint.js"
 import { AttachmentPick } from "./attachment-pick.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { COMPOSER_BAR } from "./ComposerBar.messages.js"
 
 /**
  * 输入框下面那一排：引擎 / 信任档 / 模型 ＋ 右下角那颗键。
@@ -69,11 +72,13 @@ function TrustSelect({
   disabled: boolean
   onPick: (next: Trust) => void
 }): React.JSX.Element {
+  const locale = useLocale()
+  const trusts = trustsOf(locale)
   return (
     <Select
-      label={labelOf(TRUSTS, trust)}
+      label={labelOf(trusts, trust)}
       icon={<ShieldIcon />}
-      name="信任档"
+      name={COMPOSER_BAR[locale].trust}
       title={blind}
       disabled={disabled}
       sections={[
@@ -82,7 +87,7 @@ function TrustSelect({
           onPick: (id) => {
             onPick(id as Trust)
           },
-          choices: TRUSTS.map((item) => ({
+          choices: trusts.map((item) => ({
             id: item.id,
             label: item.label,
             description: item.hint,
@@ -108,11 +113,12 @@ function EngineSelect({
   disabled: boolean
   onPick: (next: EngineId) => void
 }): React.JSX.Element {
+  const m = useMessages(COMPOSER_BAR)
   return (
     <Select
       label={labelOf(engines, engine)}
       icon={<EngineIcon />}
-      name="引擎"
+      name={m.engine}
       disabled={disabled}
       sections={[
         {
@@ -121,8 +127,8 @@ function EngineSelect({
           choices: engines.map((item) => ({
             id: item.id,
             label: item.label,
-            ...(item.state === "missing" ? { note: "未安装" } : {}),
-            ...(item.state === "unavailable" ? { note: "起不来" } : {}),
+            ...(item.state === "missing" ? { note: m.missing } : {}),
+            ...(item.state === "unavailable" ? { note: m.unavailable } : {}),
             ...(item.detail === undefined ? {} : { description: item.detail }),
           })),
         },

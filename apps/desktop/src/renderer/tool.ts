@@ -1,39 +1,30 @@
 import type { ToolCallItem, ToolDetail } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 import { fileReference } from "./file-references.js"
+import { TOOL } from "./tool.messages.js"
 
 /**
  * 工具形态 → 动词。
  *
- * **工具阶梯已经改成图标呈现，那里这张表降级为 `aria-label`**；
- * 但运行态状态行（`status.ts`）与 Markdown 导出（`export.ts`）仍然取字面文本，
- * 所以这张表**不能删**，措辞也要和图标表达的意思保持一致。
+ * **工具阶梯已经改成图标呈现，那里这个词降级为 `aria-label`**；
+ * 但 Markdown 导出（`export.ts`）仍然取字面文本，
+ * 所以这组词**不能删**，措辞也要和图标表达的意思保持一致。
  */
-export const VERB: Readonly<Record<ToolDetail["kind"], string>> = {
-  shell: "执行",
-  file_edit: "编辑",
-  file_read: "读取",
-  fetch: "请求",
-  other: "调用",
+export function verbOf(kind: ToolDetail["kind"], locale: Locale): string {
+  return TOOL[locale].verb[kind]
 }
 
-const TOOL_STATE: Partial<Record<ToolCallItem["status"], string>> = {
-  running: "运行中",
-  pending: "等待",
-  failed: "失败",
-  denied: "已拒绝",
-  interrupted: "已中断",
+/** 原生空 stdin 轮询：它在等后台终端，不是在跑一条新命令。 */
+function waitingTerminal(item: ToolCallItem): boolean {
+  return item.status === "running" && item.detail.kind === "shell" && item.detail.terminal?.waiting === true
 }
 
-/** 后台轮询比泛化的「运行中」更具体；其余状态沿用统一中文标签。 */
-export function toolStatusText(item: ToolCallItem): string | undefined {
-  if (
-    item.status === "running" &&
-    item.detail.kind === "shell" &&
-    item.detail.terminal?.waiting === true
-  ) {
-    return "等待后台终端"
-  }
-  return TOOL_STATE[item.status]
+/** 后台轮询比泛化的「运行中」更具体；成功不说，其余状态各有一个词。 */
+export function toolStatusText(item: ToolCallItem, locale: Locale): string | undefined {
+  const m = TOOL[locale]
+  if (waitingTerminal(item)) return m.waitingTerminal
+  const state: Partial<Record<ToolCallItem["status"], string>> = m.state
+  return state[item.status]
 }
 
 /**
@@ -54,7 +45,7 @@ export function relPath(path: string, cwd: string): string {
   return reference.outside || reference.path === "." ? path : reference.path
 }
 
-export function target(detail: ToolDetail, cwd?: string): string {
+export function target(detail: ToolDetail, locale: Locale, cwd?: string): string {
   switch (detail.kind) {
     case "shell":
       return detail.command
@@ -62,7 +53,7 @@ export function target(detail: ToolDetail, cwd?: string): string {
     // 「编辑 index.js」而实际上 math.js 也被改了——**说了假话**。
     case "file_edit":
       return detail.files.length > 1
-        ? `${String(detail.files.length)} 个文件`
+        ? TOOL[locale].files(detail.files.length)
         : shorten(detail.path, cwd)
     case "file_read":
       return shorten(detail.path, cwd)
@@ -96,8 +87,8 @@ function unwrap(command: string): string {
  * 状态行用的短形态。命令剥壳并只取第一行、路径只取文件名——状态行是一行字，
  * 塞一条 120 字符的完整命令进去，等于什么都没说。
  */
-export function brief(detail: ToolDetail): string {
-  const full = target(detail)
+export function brief(detail: ToolDetail, locale: Locale): string {
+  const full = target(detail, locale)
   const short =
     detail.kind === "file_edit" || detail.kind === "file_read"
       ? (full.split("/").pop() ?? full)
@@ -106,48 +97,39 @@ export function brief(detail: ToolDetail): string {
 }
 
 /** 运行横幅与工具行共用同一事实判断，避免一处说等待、另一处仍说执行。 */
-export function runningToolLabel(item: ToolCallItem): string {
-  const verb = toolStatusText(item) === "等待后台终端" ? "等待后台终端" : VERB[item.detail.kind]
-  return `${verb} ${brief(item.detail)}`
+export function runningToolLabel(item: ToolCallItem, locale: Locale): string {
+  const m = TOOL[locale]
+  const verb = waitingTerminal(item) ? m.waitingTerminal : m.running[item.detail.kind]
+  return `${verb} ${brief(item.detail, locale)}`
 }
 
 /** 后台输入与 stdout 分区展示，不能把模型写入终端的内容冒充成进程输出。 */
 export function shellTranscript(
   detail: Extract<ToolDetail, { kind: "shell" }>,
+  locale: Locale,
 ): string | undefined {
+  const m = TOOL[locale]
   const inputs = detail.terminal?.inputs ?? []
   if (inputs.length === 0) return detail.output
-  const sections = inputs.map((input, index) => `后台终端输入 ${String(index + 1)}：\n${input}`)
+  const sections = inputs.map((input, index) => `${m.terminalInput(index + 1)}\n${input}`)
   if (detail.output !== undefined && detail.output !== "")
-    sections.unshift(`终端输出：\n${detail.output}`)
+    sections.unshift(`${m.terminalOutput}\n${detail.output}`)
   return sections.join("\n\n")
-}
-
-/**
- * 做完之后怎么说这件事。
- *
- * 和 `VERB` 分开：那个是**正在做**（「执行」「编辑」），配在单行上；
- * 这个是**做过了**（「运行了命令」「编辑了文件」），配在折叠摘要上。
- * codex 的折叠行用的就是这套过去式措辞。
- */
-export const DONE_VERB: Readonly<Record<ToolDetail["kind"], string>> = {
-  shell: "运行了命令",
-  file_edit: "编辑了文件",
-  file_read: "读取了文件",
-  fetch: "请求了网页",
-  other: "调用了工具",
 }
 
 /**
  * 一串工具调用折成一句话。
  *
+ * 和 `verbOf` 分开：那个是**这一步是什么**（「执行」「编辑」），配在单行上；
+ * 这里是**做过了**（「运行了命令」「编辑了文件」），配在折叠摘要上。
+ * codex 的折叠行用的就是这套过去式措辞。
+ *
  * **按首次出现去重**：连着读了五个文件不该写五遍「读取了文件」，
- * 但顺序要保留——它就是它做事的顺序。
+ * 但顺序要保留——它就是它做事的顺序。英文那版顺带报个数（`Read 5 files`）。
  */
-export function summarize(kinds: readonly ToolDetail["kind"][]): string {
-  const seen: ToolDetail["kind"][] = []
-  for (const kind of kinds) {
-    if (!seen.includes(kind)) seen.push(kind)
-  }
-  return seen.map((k) => DONE_VERB[k]).join(" · ")
+export function summarize(kinds: readonly ToolDetail["kind"][], locale: Locale): string {
+  const seen = new Map<ToolDetail["kind"], number>()
+  for (const kind of kinds) seen.set(kind, (seen.get(kind) ?? 0) + 1)
+  const m = TOOL[locale]
+  return [...seen].map(([kind, n]) => m.done(kind, n)).join(" · ")
 }

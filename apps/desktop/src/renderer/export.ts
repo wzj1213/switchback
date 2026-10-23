@@ -1,5 +1,7 @@
 import type { Item, Thread, ToolCallItem, UserMessageItem } from "@switchback/protocol"
-import { shellTranscript, VERB, target } from "./tool.js"
+import type { Locale } from "@switchback/i18n"
+import { shellTranscript, target, verbOf } from "./tool.js"
+import { EXPORT } from "./export.messages.js"
 
 /**
  * 把一段会话导成 Markdown。
@@ -20,8 +22,8 @@ function fence(text: string, lang = ""): string {
   return `${bar}${lang}\n${text.replace(/\n$/, "")}\n${bar}`
 }
 
-function toolBlock(item: ToolCallItem): string {
-  const head = `**${VERB[item.detail.kind]}** \`${target(item.detail)}\` — ${item.status}`
+function toolBlock(item: ToolCallItem, locale: Locale): string {
+  const head = `**${verbOf(item.detail.kind, locale)}** \`${target(item.detail, locale)}\` — ${item.status}`
   if (item.detail.kind === "file_edit") {
     const files = item.detail.files
       .filter((f) => f.diff !== undefined && f.diff !== "")
@@ -29,33 +31,35 @@ function toolBlock(item: ToolCallItem): string {
     return files.length === 0 ? head : `${head}\n\n${files.join("\n\n")}`
   }
   if (item.detail.kind === "shell") {
-    const transcript = shellTranscript(item.detail)
+    const transcript = shellTranscript(item.detail, locale)
     if (transcript !== undefined && transcript !== "") return `${head}\n\n${fence(transcript)}`
   }
   return head
 }
 
-function userHeading(item: UserMessageItem): string {
-  if (item.origin === undefined) return "你"
-  if (item.origin === "handoff") return "历史交接"
-  if (item.origin.kind === "shell") return "终端命令"
-  return item.origin.kind === "goal_continuation" ? "长期目标续跑" : "定时任务"
+function userHeading(item: UserMessageItem, locale: Locale): string {
+  const m = EXPORT[locale]
+  if (item.origin === undefined) return m.you
+  if (item.origin === "handoff") return m.handoff
+  if (item.origin.kind === "shell") return m.shell
+  return item.origin.kind === "goal_continuation" ? m.goal : m.scheduled
 }
 
-function block(item: Item, engineLabel: string): string | undefined {
+function block(item: Item, engineLabel: string, locale: Locale): string | undefined {
+  const m = EXPORT[locale]
   switch (item.kind) {
     case "user_message":
-      return `### ${userHeading(item)}${item.text === "" ? "" : `\n\n${item.text}`}`
+      return `### ${userHeading(item, locale)}${item.text === "" ? "" : `\n\n${item.text}`}`
     case "agent_message":
       return `### ${engineLabel}\n\n${item.text}`
     case "tool_call":
-      return toolBlock(item)
+      return toolBlock(item, locale)
     case "plan":
-      return `**计划**\n\n${item.steps.map((s) => `- [${s.status === "done" ? "x" : " "}] ${s.text}`).join("\n")}`
+      return `**${m.plan}**\n\n${item.steps.map((s) => `- [${s.status === "done" ? "x" : " "}] ${s.text}`).join("\n")}`
     case "approval":
-      return `> **需要确认**：${item.summary}（${item.status}）\n> ${item.reason}`
+      return m.approval(item.summary, item.status, item.reason)
     case "notice":
-      return `> **引擎提示 · ${item.level}**\n>\n> ${item.message.replace(/\n/g, "\n> ")}`
+      return `> **${m.notice(item.level)}**\n>\n> ${item.message.replace(/\n/g, "\n> ")}`
     case "error":
       // 引擎补的那句原因一并带走。**报错是最要靠原文的东西**——
       // 导出的那份是拿去开 issue、拿去搜的，少一句就少一条线索
@@ -66,20 +70,20 @@ function block(item: Item, engineLabel: string): string | undefined {
   }
 }
 
-export function toMarkdown(thread: Thread, items: readonly Item[], engineLabel: string): string {
-  const head = `# ${thread.title}\n\n> 工作区 \`${thread.cwd}\` · 引擎 ${engineLabel}`
+export function toMarkdown(thread: Thread, items: readonly Item[], engineLabel: string, locale: Locale): string {
+  const head = `# ${thread.title}\n\n> ${EXPORT[locale].head(thread.cwd, engineLabel)}`
   const body = items
-    .map((item) => block(item, engineLabel))
+    .map((item) => block(item, engineLabel, locale))
     .filter((b): b is string => b !== undefined)
   return `${[head, ...body].join("\n\n")}\n`
 }
 
 /** 单条消息的可复制文本。工具调用复制的是它执行的东西，不是它的标题。 */
-export function textOf(item: Item): string {
+export function textOf(item: Item, locale: Locale): string {
   if (item.kind === "user_message" || item.kind === "agent_message" || item.kind === "reasoning") {
     return item.text
   }
-  if (item.kind === "tool_call") return target(item.detail)
+  if (item.kind === "tool_call") return target(item.detail, locale)
   if (item.kind === "error") return item.detail === undefined ? item.message : `${item.message}\n${item.detail}`
   if (item.kind === "notice") return item.message
   if (item.kind === "approval") return `${item.summary}\n${item.reason}`

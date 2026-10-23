@@ -29,13 +29,14 @@ describe("英文单复数", () => {
 
 describe("一份文案的中英两版", () => {
   const MESSAGES = defineMessages(
-    { title: "设置", files: (n: number) => `改了 ${String(n)} 个文件` },
-    { title: "Settings", files: (n) => `${count(n, "file")} changed` },
+    { title: "设置", files: (n: number) => `改了 ${String(n)} 个文件`, state: { ok: "好了", failed: "失败" } },
+    { title: "Settings", files: (n) => `${count(n, "file")} changed`, state: { ok: "Done", failed: "Failed" } },
   )
 
   it("按语言取", () => {
     expect([MESSAGES["zh-CN"].title, MESSAGES.en.title]).toEqual(["设置", "Settings"])
     expect([MESSAGES["zh-CN"].files(2), MESSAGES.en.files(1)]).toEqual(["改了 2 个文件", "1 file changed"])
+    expect([MESSAGES["zh-CN"].state.failed, MESSAGES.en.state.ok]).toEqual(["失败", "Done"])
   })
 
   it("英文少一个键、参数对不上，类型检查过不去", () => {
@@ -43,6 +44,8 @@ describe("一份文案的中英两版", () => {
     defineMessages({ title: "设置", files: (n: number) => String(n) }, { title: "Settings" })
     // @ts-expect-error files 的参数对不上
     defineMessages({ files: (n: number) => String(n) }, { files: (n: string) => n })
+    // @ts-expect-error 表里少了 failed 这一项
+    defineMessages({ state: { ok: "好了", failed: "失败" } }, { state: { ok: "Done" } })
     expect(true).toBe(true)
   })
 })

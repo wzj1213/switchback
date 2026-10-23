@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 import type { Item, Thread } from "@switchback/protocol"
-import { toMarkdown, textOf } from "./export.js"
+import { toMarkdown as markdownIn, textOf as textIn } from "./export.js"
+
+// 下面那些用例写的是中文那版；英文那版的差别集中在文末
+const toMarkdown = (t: Thread, items: readonly Item[], engine: string): string => markdownIn(t, items, engine, "zh-CN")
+const textOf = (item: Item): string => textIn(item, "zh-CN")
 
 const thread: Thread = {
   id: "th",
@@ -261,5 +265,24 @@ describe("textOf", () => {
         detail: { kind: "shell", command: "pnpm test" },
       }),
     ).toBe("pnpm test")
+  })
+})
+
+describe("英文那版", () => {
+  it("表头、小节名和引用块都换成英文，结构不变", () => {
+    const md = markdownIn(
+      thread,
+      [
+        user("question"),
+        { id: "ap", turnId: "t", kind: "approval", at: 0, toolCallId: "x", tool: "shell", summary: "rm x", status: "denied", reason: "outside" },
+        { id: "e", turnId: "t", kind: "tool_call", at: 0, tool: "shell", status: "ok", detail: { kind: "shell", command: "ls" } },
+      ],
+      "Codex",
+      "en",
+    )
+    expect(md).toContain("> Workspace `/w` · Engine Codex")
+    expect(md).toContain("### You\n\nquestion")
+    expect(md).toContain("> **Needs approval**: rm x (denied)\n> outside")
+    expect(md).toContain("**Run** `ls` — ok")
   })
 })

@@ -1,6 +1,7 @@
 import { reviewLabel, type ReviewFile } from "../../shared/review.js"
 import { revealable } from "../reveal.js"
 import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
+import { useLocale } from "../i18n.js"
 import { CheckIcon, CopyIcon, RevealIcon } from "./icons.js"
 import { FileIcon } from "./icons-activity.js"
 import { splitPath } from "../diff.js"
@@ -17,9 +18,10 @@ export function ReviewFileHead({ file, copyDisabled, onReveal, onCopy, onPreview
   const canGo = file.kind !== "delete" && revealable(file.path)
   const shown = splitPath(file.rel)
   const [copyFeedback, copy] = useCopyFeedback(onCopy)
+  const locale = useLocale()
   const copyTitle = copyDisabled
     ? "文件改动读取完成后才能复制"
-    : copyFeedbackTitle(copyFeedback, "复制这份文件改动", "文件改动已复制")
+    : copyFeedbackTitle(copyFeedback, locale, "复制这份文件改动", "文件改动已复制")
   return (
     <div className="rv__file">
       <span className={`rvl__kind rvl__kind--${file.kind}`} aria-hidden="true" />

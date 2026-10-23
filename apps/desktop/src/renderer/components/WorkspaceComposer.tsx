@@ -1,7 +1,9 @@
 import type { Command, EngineInfo, Thread } from "@switchback/protocol"
 import { NO_CAPABILITIES } from "@switchback/protocol"
-import { Composer, TRUSTS, labelOf } from "./Composer.js"
+import { Composer, labelOf } from "./Composer.js"
+import { trustsOf } from "../trusts.js"
 import { trustBlind, trustHint } from "../trustHint.js"
+import { useLocale } from "../i18n.js"
 import type { SwitchbackAction } from "../switchbackCommands.js"
 import type { WorkspaceProps } from "./Workspace.js"
 import { modelAcceptsImages } from "../model-options.js"
@@ -47,6 +49,7 @@ export function WorkspaceComposer({
   prefill: { text: string; attachments?: readonly string[]; at: number; aside?: boolean }
   actions: readonly SwitchbackAction[]
 }): React.JSX.Element {
+  const locale = useLocale()
   const send = props.send
   return (
     <Composer
@@ -94,8 +97,8 @@ export function WorkspaceComposer({
        * 档位下面那行说明。**引擎名与档位名都是插值**——写死的话换一家引擎那句就在撒谎。
        * 权限描述当前**实际活着**的原生会话；nextEngine 只是下一句意向，切换前不能提前冒充。
        */
-      hint={trustHint(thread, labelOf(props.engines, thread.engine), labelOf(TRUSTS, thread.trust))}
-      blind={trustBlind(thread, labelOf(props.engines, thread.engine))}
+      hint={trustHint(thread, labelOf(props.engines, thread.engine), labelOf(trustsOf(locale), thread.trust), locale)}
+      blind={trustBlind(thread, labelOf(props.engines, thread.engine), locale)}
       /*
        * 侧问。**入口不再是那一排里的一颗按钮**——那一排说的是「正文这一句的去向」，
        * 而一颗打开另一条通道的按钮站在那儿，就成了那排唯一带描边的东西。

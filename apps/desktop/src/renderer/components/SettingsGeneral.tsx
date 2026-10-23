@@ -1,9 +1,9 @@
 import type { EngineInfo, Trust } from "@switchback/protocol"
 import type { NotifyMode, Settings } from "../../shared/settings.js"
-import { TRUSTS } from "./Composer.js"
+import { trustsOf } from "../trusts.js"
 import { Field, Group, Segmented, Toggle } from "./SettingsBits.js"
 import { ThemeOptions } from "./theme-options.js"
-import { useMessages } from "../i18n.js"
+import { useLocale, useMessages } from "../i18n.js"
 import { GENERAL } from "./SettingsGeneral.messages.js"
 
 /**
@@ -96,6 +96,7 @@ export function NewThreadSection({
   onPatch: (next: Partial<Settings>) => void
 }): React.JSX.Element {
   const m = useMessages(GENERAL)
+  const trusts = trustsOf(useLocale())
   const selected = engines.some((engine) => engine.id === settings.defaultEngine)
     ? settings.defaultEngine
     : ""
@@ -124,7 +125,7 @@ export function NewThreadSection({
         stack
       >
         <Segmented
-          options={TRUSTS.map((t) => ({ id: t.id, label: t.label }))}
+          options={trusts.map((t) => ({ id: t.id, label: t.label }))}
           value={settings.defaultTrust}
           onPick={(defaultTrust) => {
             onPatch({ defaultTrust: defaultTrust as Trust })

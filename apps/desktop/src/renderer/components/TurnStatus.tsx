@@ -3,6 +3,8 @@ import type { Item, TaskRun, Thread, Turn } from "@switchback/protocol"
 import { Shimmer } from "./Shimmer.js"
 import { elapsed, statusLabel } from "../status.js"
 import { compact } from "../usage.js"
+import { useLocale } from "../i18n.js"
+import { TURN_STATUS } from "./TurnStatus.messages.js"
 
 /** 多久之后才显示计时器。抄 dsh：**短轮次不需要秒表**，三秒的事摆个计时器只是噪声。 */
 const CLOCK_AFTER_MS = 15_000
@@ -97,7 +99,9 @@ export function TurnStatus({
   const now = useTurnClock(turn?.startedAt)
   const linkDown = useReached(reconnecting === undefined ? undefined : reconnecting.since + RECONNECT_AFTER_MS)
 
-  const label = statusLabel(thread, items)
+  const locale = useLocale()
+  const m = TURN_STATUS[locale]
+  const label = statusLabel(thread, items, locale)
   if (turn === undefined || label === undefined) return null
   // 计时器只在跑久了才出现：一轮三秒钟的事摆个秒表，读数还没看清就没了
   const showClock = now - turn.startedAt >= CLOCK_AFTER_MS
@@ -108,9 +112,9 @@ export function TurnStatus({
         <span
           className="turnstatus__tokens"
           aria-hidden="true"
-          title="当前思考块的近似值，不是最终用量"
+          title={m.tokensTip}
         >
-          约 {compact(thinkingTokens)} tokens
+          {m.tokens(compact(thinkingTokens))}
         </span>
       )}
       {showClock ? <span className="turnstatus__clock">{elapsed(turn.startedAt, now)}</span> : null}
@@ -118,7 +122,7 @@ export function TurnStatus({
           真接不回来时驱动会另报一次崩溃，那才弹横幅 */}
       {linkDown ? (
         <span className="turnstatus__link" title={reconnecting?.detail}>
-          连接断了，正在接回…
+          {m.reconnecting}
         </span>
       ) : null}
       {/*
