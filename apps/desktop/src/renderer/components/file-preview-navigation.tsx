@@ -3,6 +3,9 @@ import type { PreviewTarget } from "../workbench.js"
 import { ChevronIcon } from "./icons.js"
 import { FileListIcon } from "./icons-panel.js"
 import { baseName } from "./file-row.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { PREVIEW_NAV } from "./file-preview-navigation.messages.js"
 
 export interface PreviewNavigation {
   back?: PreviewTarget | undefined
@@ -21,25 +24,26 @@ export function navigatePreviewKey(event: KeyboardEvent, navigation: PreviewNavi
   navigation.onGo(direction)
 }
 
-function tip(target: PreviewTarget | undefined, label: string, key: string): string {
-  return target === undefined ? `没有可${label}的文件` : `${label}到 ${baseName(target.path)}（${key}）`
+function tip(target: PreviewTarget | undefined, verb: string, key: string, m: (typeof PREVIEW_NAV)[Locale]): string {
+  return target === undefined ? m.none(verb) : m.to(verb, baseName(target.path), key)
 }
 
 export function FilePreviewNavigation({ navigation, onIndex }: {
   navigation: PreviewNavigation | undefined
   onIndex: () => void
 }): React.JSX.Element {
+  const m = useMessages(PREVIEW_NAV)
   return (
-    <span className="file-preview-nav" aria-label="文件阅读导航">
-      <button type="button" className="workbench__back" onClick={onIndex} aria-label="返回文件列表">
-        <FileListIcon size={13} /> 文件
+    <span className="file-preview-nav" aria-label={m.label}>
+      <button type="button" className="workbench__back" onClick={onIndex} aria-label={m.index}>
+        <FileListIcon size={13} /> {m.files}
       </button>
       {navigation === undefined ? null : <>
-        <button type="button" className="workbench__icon file-preview-nav__previous" aria-label="后退到上一个文件"
-          title={tip(navigation.back, "后退", "⌥←")} disabled={navigation.back === undefined}
+        <button type="button" className="workbench__icon file-preview-nav__previous" aria-label={m.backLabel}
+          title={tip(navigation.back, m.back, "⌥←", m)} disabled={navigation.back === undefined}
           onClick={() => { navigation.onGo(-1) }}><ChevronIcon size={13} /></button>
-        <button type="button" className="workbench__icon" aria-label="前进到下一个文件"
-          title={tip(navigation.forward, "前进", "⌥→")} disabled={navigation.forward === undefined}
+        <button type="button" className="workbench__icon" aria-label={m.forwardLabel}
+          title={tip(navigation.forward, m.forward, "⌥→", m)} disabled={navigation.forward === undefined}
           onClick={() => { navigation.onGo(1) }}><ChevronIcon size={13} /></button>
       </>}
     </span>

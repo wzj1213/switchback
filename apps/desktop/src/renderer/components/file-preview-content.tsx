@@ -4,6 +4,8 @@ import { sandboxHtml } from "../safe-html.js"
 import { Source } from "./file-source.js"
 import { TextPreview } from "./text-preview.js"
 import type { PreviewTarget } from "../workbench.js"
+import { useMessages } from "../i18n.js"
+import { PREVIEW_CONTENT } from "./file-preview-content.messages.js"
 export { fileCopyLabel, fileCopyTitle } from "./file-source.js"
 
 type CopyText = (text: string) => unknown
@@ -37,6 +39,7 @@ export function HtmlPreview({
   onCopy: CopyText
   target?: PreviewTarget | undefined
 }): React.JSX.Element {
+  const m = useMessages(PREVIEW_CONTENT)
   const [picked, setPicked] = useState<HtmlMode>(file.truncated || target?.line !== undefined ? "source" : "preview")
   const mode = resolvedHtmlMode(picked, file.truncated)
   useEffect(() => { if (target?.line !== undefined) setPicked("source") }, [target?.line, target?.at])
@@ -54,7 +57,7 @@ export function HtmlPreview({
   }
   return (
     <div className="html-preview">
-      <div className="html-preview__switch" role="tablist" aria-label="HTML 查看方式">
+      <div className="html-preview__switch" role="tablist" aria-label={m.mode}>
         <button
           ref={preview}
           id={`${base}-preview`}
@@ -69,7 +72,7 @@ export function HtmlPreview({
             setPicked("preview")
           }}
         >
-          预览
+          {m.preview}
         </button>
         <button
           ref={source}
@@ -84,7 +87,7 @@ export function HtmlPreview({
             setPicked("source")
           }}
         >
-          源码
+          {m.source}
         </button>
       </div>
       <div id={panelId} className="html-preview__panel" role="tabpanel" aria-labelledby={tabId}>
@@ -93,7 +96,7 @@ export function HtmlPreview({
         ) : (
           <iframe
             className="html-preview__frame"
-            title={`${file.name} 预览`}
+            title={m.frame(file.name)}
             sandbox="allow-scripts"
             referrerPolicy="no-referrer"
             srcDoc={sandboxHtml(file.text)}

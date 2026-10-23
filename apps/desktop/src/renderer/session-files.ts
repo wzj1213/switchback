@@ -4,7 +4,7 @@ import { canonicalPath } from "../shared/paths.js"
 export interface SessionFile {
   path: string
   at: number
-  action: "读取" | "编辑" | "删除"
+  action: "read" | "edit" | "delete"
   deleted: boolean
 }
 
@@ -30,14 +30,14 @@ function put(
   const path = canonicalPath(entry.raw, cwd)
   if (path === "") return
   const before = files.get(path)
-  const action = entry.action === "读取" && before !== undefined && before.action !== "读取"
+  const action = entry.action === "read" && before !== undefined && before.action !== "read"
     ? before.action
     : entry.action
   files.set(path, {
     path,
     at: Math.max(entry.at, before?.at ?? entry.at),
     action,
-    deleted: entry.action === "删除",
+    deleted: entry.action === "delete",
   })
 }
 
@@ -47,18 +47,18 @@ export function sessionFilesOf(items: readonly Item[], cwd: string): readonly Se
   for (const item of items) {
     if (item.kind !== "tool_call" || item.status !== "ok") continue
     if (item.detail.kind === "file_read") {
-      put(files, cwd, { raw: item.detail.path, at: item.at, action: "读取" })
+      put(files, cwd, { raw: item.detail.path, at: item.at, action: "read" })
       continue
     }
     if (item.detail.kind !== "file_edit") continue
     if (item.detail.files.length === 0) {
-      put(files, cwd, { raw: item.detail.path, at: item.at, action: "编辑" })
+      put(files, cwd, { raw: item.detail.path, at: item.at, action: "edit" })
     }
     for (const file of item.detail.files) {
       put(files, cwd, {
         raw: file.path,
         at: item.at,
-        action: file.kind === "delete" ? "删除" : "编辑",
+        action: file.kind === "delete" ? "delete" : "edit",
       })
     }
   }
@@ -87,8 +87,8 @@ export function sessionFileGroupsOf(items: readonly Item[], cwd: string): Sessio
   for (const file of earlier) seen.add(file.path)
   const inherited = unseen(sessionFilesOf(items.filter((item) => item.inherited === true), cwd), seen)
   return {
-    recentEdited: recent.filter((file) => file.action !== "读取"),
-    recentRead: recent.filter((file) => file.action === "读取"),
+    recentEdited: recent.filter((file) => file.action !== "read"),
+    recentRead: recent.filter((file) => file.action === "read"),
     earlier,
     inherited,
   }

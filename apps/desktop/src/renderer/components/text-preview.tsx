@@ -4,12 +4,15 @@ import type { PreviewTarget } from "../workbench.js"
 import { headingSlug } from "../message-links.js"
 import { Markdown } from "./Markdown.js"
 import { Source } from "./file-source.js"
+import { useMessages } from "../i18n.js"
+import { TEXT_PREVIEW } from "./text-preview.messages.js"
 
 export function TextPreview({ file, target, onCopy }: {
   file: Extract<FilePreview, { kind: "text" }>
   target?: PreviewTarget | undefined
   onCopy: (text: string) => unknown
 }): React.JSX.Element {
+  const m = useMessages(TEXT_PREVIEW)
   const [source, setSource] = useState(target?.line !== undefined)
   const box = useRef<HTMLDivElement>(null)
   const markdown = file.language === "markdown" && !file.truncated && file.text.length < 200_000
@@ -23,12 +26,12 @@ export function TextPreview({ file, target, onCopy }: {
   if (!markdown) return <Source file={file} target={target} onCopy={onCopy} />
   return (
     <div className="text-preview">
-      <div className="html-preview__switch" aria-label="Markdown 查看方式">
-        <button type="button" aria-pressed={!source} onClick={() => { setSource(false) }}>预览</button>
-        <button type="button" aria-pressed={source} onClick={() => { setSource(true) }}>源码</button>
+      <div className="html-preview__switch" aria-label={m.mode}>
+        <button type="button" aria-pressed={!source} onClick={() => { setSource(false) }}>{m.preview}</button>
+        <button type="button" aria-pressed={source} onClick={() => { setSource(true) }}>{m.source}</button>
       </div>
       {source ? <Source file={file} target={target} onCopy={onCopy} /> : (
-        <div className="text-preview__document" ref={box} tabIndex={0} aria-label="Markdown 文档预览">
+        <div className="text-preview__document" ref={box} tabIndex={0} aria-label={m.document}>
           <Markdown text={file.text} />
         </div>
       )}

@@ -3,12 +3,10 @@ import { pressSelect } from "../press.js"
 import { CompareIcon } from "./icons.js"
 import { DotBoxIcon, FileIcon } from "./icons-activity.js"
 import { CloseIcon, ExpandIcon } from "./icons-panel.js"
+import { useMessages } from "../i18n.js"
+import { PANEL_TABS } from "./PanelTabs.messages.js"
 
-const PAGES: readonly { id: PanelPage; label: string; description: string }[] = [
-  { id: "review", label: "审查", description: "查看工作区的真实 Git 差异" },
-  { id: "files", label: "文件", description: "搜索并预览当前工作区文件" },
-  { id: "activity", label: "活动", description: "查看引擎公开的后台任务与输出" },
-]
+const PAGES: readonly PanelPage[] = ["review", "files", "activity"]
 
 function PageIcon({ page }: { page: PanelPage }): React.JSX.Element {
   if (page === "review") return <CompareIcon size={14} />
@@ -37,17 +35,18 @@ export interface PanelTabsProps {
  * 切换按下即生效（`press.ts`），说明文字进悬停提示。
  */
 export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
+  const m = useMessages(PANEL_TABS)
   return (
     <header className="panel-tabs">
-      <nav className="panel-tabs__list" aria-label="侧边面板页面">
+      <nav className="panel-tabs__list" aria-label={m.pages}>
         {PAGES.map((page) => {
-          const active = props.active === page.id
-          const pick = (): void => { props.onSelect(page.id) }
+          const active = props.active === page
+          const pick = (): void => { props.onSelect(page) }
           return (
-            <span className={`panel-tab${active ? " panel-tab--on" : ""}`} key={page.id}>
+            <span className={`panel-tab${active ? " panel-tab--on" : ""}`} key={page}>
               <button type="button" className="panel-tab__pick" aria-current={active ? "page" : undefined}
-                data-tip={page.description} {...pressSelect(!active, pick)} onClick={pick}>
-                <PageIcon page={page.id} /><span className="panel-tab__label">{page.label}</span>
+                data-tip={m.about[page]} {...pressSelect(!active, pick)} onClick={pick}>
+                <PageIcon page={page} /><span className="panel-tab__label">{m.label[page]}</span>
               </button>
             </span>
           )
@@ -55,13 +54,13 @@ export function PanelTabs(props: PanelTabsProps): React.JSX.Element {
       </nav>
       <span className="panel-tabs__spacer" />
       <button type="button" className="panel-tabs__button panel-tabs__expand"
-        aria-label={props.full ? "并排显示侧边面板" : "展开侧边面板"}
-        data-tip={props.full ? "并排显示侧边面板" : "展开侧边面板"} onClick={props.onFull}>
+        aria-label={props.full ? m.sideBySide : m.expand}
+        data-tip={props.full ? m.sideBySide : m.expand} onClick={props.onFull}>
         <ExpandIcon />
       </button>
       {props.onHide === undefined ? null : (
         <button type="button" className="panel-tabs__button panel-tabs__hide"
-          aria-label="收起侧边面板" data-tip="收起侧边面板" onClick={props.onHide}>
+          aria-label={m.hide} data-tip={m.hide} onClick={props.onHide}>
           <CloseIcon size={14} />
         </button>
       )}

@@ -6,6 +6,8 @@ import { FilesPage } from "./FilesPage.js"
 import type { SearchFiles } from "../use-file-search.js"
 import { PanelTabs, type PanelTabsProps } from "./PanelTabs.js"
 import { adjacentPreview } from "../preview-history.js"
+import { useMessages } from "../i18n.js"
+import { WORKBENCH_PANE } from "./WorkbenchPane.messages.js"
 
 export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
   onActivityIndex, onPickFile, onFileIndex, onReference, onHide, onReveal, onCopy, searchFiles,
@@ -30,9 +32,10 @@ export function WorkbenchPane({ state, thread, lanes, items, stamp, onPickLane,
   panel: PanelTabsProps
 }): React.JSX.Element | null {
   const box = useWorkbenchKeys(state, onHide)
+  const m = useMessages(WORKBENCH_PANE)
   return (
     <section ref={box} className="workbench" tabIndex={-1}
-      aria-label="任务工作台" hidden={!state.visible}>
+      aria-label={m.label} hidden={!state.visible}>
       <PanelTabs {...panel} onHide={onHide} />
       {notice === undefined ? null : <p className="workbench__notice" role="status">{notice}</p>}
       <div className="workbench__body">

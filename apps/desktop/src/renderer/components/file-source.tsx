@@ -5,17 +5,22 @@ import { codeLanguage, highlightLines } from "../highlight.js"
 import { sourceWindow, SOURCE_LINE_HEIGHT } from "../source-window.js"
 import { useCopyFeedback, type CopyFeedback } from "../use-copy-feedback.js"
 import { CheckIcon, CopyIcon } from "./icons.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "../i18n.js"
+import { FILE_SOURCE } from "./file-source.messages.js"
 
-export function fileCopyLabel(truncated: boolean, feedback: CopyFeedback): string {
-  if (feedback === "failed") return "复制失败"
-  if (feedback === "copied") return truncated ? "已复制显示部分" : "已复制"
-  return truncated ? "复制显示部分" : "复制"
+export function fileCopyLabel(truncated: boolean, feedback: CopyFeedback, locale: Locale): string {
+  const m = FILE_SOURCE[locale]
+  if (feedback === "failed") return m.failed
+  if (feedback === "copied") return truncated ? m.copiedPart : m.copied
+  return truncated ? m.copyPart : m.copy
 }
 
-export function fileCopyTitle(truncated: boolean, feedback: CopyFeedback): string {
-  if (feedback === "failed") return "复制失败，请重试"
-  if (feedback === "copied") return truncated ? "当前显示的前 1.5 MB 已复制" : "文件内容已复制"
-  return truncated ? "只复制当前显示的前 1.5 MB" : "复制文件内容"
+export function fileCopyTitle(truncated: boolean, feedback: CopyFeedback, locale: Locale): string {
+  const m = FILE_SOURCE[locale]
+  if (feedback === "failed") return m.failedTip
+  if (feedback === "copied") return truncated ? m.copiedPartTip : m.copiedTip
+  return truncated ? m.copyPartTip : m.copyTip
 }
 
 export function Source({ file, onCopy, target }: {
@@ -24,6 +29,8 @@ export function Source({ file, onCopy, target }: {
   target?: PreviewTarget | undefined
 }): React.JSX.Element {
   const [feedback, copy] = useCopyFeedback(() => onCopy(file.text))
+  const locale = useLocale()
+  const m = FILE_SOURCE[locale]
   const box = useRef<HTMLDivElement>(null)
   const positioned = useRef("")
   const [scroll, setScroll] = useState(0)
@@ -51,17 +58,17 @@ export function Source({ file, onCopy, target }: {
     setScroll(top)
   }, [line, target?.at, lines.length])
   return (
-    <div className="file-source" tabIndex={0} aria-label="可横向滚动的文件源码" ref={box} data-line-count={lines.length}
+    <div className="file-source" tabIndex={0} aria-label={m.label} ref={box} data-line-count={lines.length}
       onScroll={(event) => { setScroll(event.currentTarget.scrollTop) }}>
-      {file.truncated ? <p className="file-preview__note">文件较大，只显示前 1.5 MB。</p> : null}
-      {line !== undefined && line > lines.length ? <p className="file-preview__note" role="status">当前内容没有第 {line} 行。</p> : null}
+      {file.truncated ? <p className="file-preview__note">{m.truncated}</p> : null}
+      {line !== undefined && line > lines.length ? <p className="file-preview__note" role="status">{m.noLine(line)}</p> : null}
       <div className="file-source__toolbar">
-        <span className="file-source__info" title={file.language ?? "文本"}>{lines.length.toLocaleString()} 行</span>
-        {line === undefined ? null : <span className="file-source__info">第 {line.toLocaleString()} 行</span>}
+        <span className="file-source__info" title={file.language ?? m.text}>{m.lines(lines.length.toLocaleString(locale))}</span>
+        {line === undefined ? null : <span className="file-source__info">{m.line(line.toLocaleString(locale))}</span>}
         <button type="button" className="file-preview__copy" aria-live="polite" data-state={feedback}
-          data-tip={fileCopyTitle(file.truncated, feedback)} onClick={copy}>
+          data-tip={fileCopyTitle(file.truncated, feedback, locale)} onClick={copy}>
           {feedback === "copied" ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-          {fileCopyLabel(file.truncated, feedback)}
+          {fileCopyLabel(file.truncated, feedback, locale)}
         </button>
       </div>
       <pre style={{ paddingTop: range.start * SOURCE_LINE_HEIGHT, paddingBottom: (lines.length - range.end) * SOURCE_LINE_HEIGHT }}>

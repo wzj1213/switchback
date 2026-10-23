@@ -36,8 +36,8 @@ describe("任务文件清单", () => {
     ]
 
     expect(sessionFilesOf(items, "/work")).toEqual([
-      { path: "/work/old.ts", at: 3, action: "删除", deleted: true },
-      { path: "/work/src/a.ts", at: 2, action: "编辑", deleted: false },
+      { path: "/work/old.ts", at: 3, action: "delete", deleted: true },
+      { path: "/work/src/a.ts", at: 2, action: "edit", deleted: false },
     ])
   })
 
@@ -54,7 +54,7 @@ describe("任务文件清单", () => {
     ]
 
     expect(sessionFilesOf(items, "/work")).toEqual([
-      { path: "/work/src/a.ts", at: 5, action: "编辑", deleted: false },
+      { path: "/work/src/a.ts", at: 5, action: "edit", deleted: false },
     ])
   })
 
@@ -69,7 +69,7 @@ describe("任务文件清单", () => {
     const running = tool("p", 7, { kind: "file_read", path: "pending.txt" }, { status: "running" })
 
     expect(sessionFilesOf([deleted, restored, failed, running], "/work")).toEqual([
-      { path: "/work/back.txt", at: 5, action: "删除", deleted: false },
+      { path: "/work/back.txt", at: 5, action: "delete", deleted: false },
     ])
     expect(fileTouchOf([restored, failed], "/work", "secret.txt")).toBeUndefined()
   })
@@ -100,10 +100,10 @@ describe("任务文件清单", () => {
       kind: "file_edit", path: "now.ts", files: [], added: 1, removed: 0,
     })
     expect(sessionFileGroupsOf([earlier, replaced, inherited, currentRead, currentEdit], "/work")).toEqual({
-      recentEdited: [{ path: "/work/now.ts", at: 5, action: "编辑", deleted: false }],
-      recentRead: [{ path: "/work/shared.ts", at: 4, action: "读取", deleted: false }],
-      earlier: [{ path: "/work/old.ts", at: 1, action: "读取", deleted: false }],
-      inherited: [{ path: "/work/parent.ts", at: 3, action: "读取", deleted: false }],
+      recentEdited: [{ path: "/work/now.ts", at: 5, action: "edit", deleted: false }],
+      recentRead: [{ path: "/work/shared.ts", at: 4, action: "read", deleted: false }],
+      earlier: [{ path: "/work/old.ts", at: 1, action: "read", deleted: false }],
+      inherited: [{ path: "/work/parent.ts", at: 3, action: "read", deleted: false }],
     })
   })
 
@@ -112,7 +112,7 @@ describe("任务文件清单", () => {
     const message: Item = { id: "user", turnId: "turn-1", kind: "user_message", text: "继续", at: 2 }
     expect(sessionFileGroupsOf([old, message], "/work")).toEqual({
       recentEdited: [], recentRead: [],
-      earlier: [{ path: "/work/old.ts", at: 1, action: "读取", deleted: false }],
+      earlier: [{ path: "/work/old.ts", at: 1, action: "read", deleted: false }],
       inherited: [],
     })
   })

@@ -1,5 +1,7 @@
 import { useId } from "react"
 import { ReloadIcon } from "./reload-icon.js"
+import { useMessages } from "../i18n.js"
+import { FILE_SEARCH_HEAD } from "./file-search-head.messages.js"
 
 export function FileSearchHead({ cwd, query, loading, input, onQuery, onEnterResults, onRefresh }: {
   cwd: string
@@ -11,12 +13,13 @@ export function FileSearchHead({ cwd, query, loading, input, onQuery, onEnterRes
   onRefresh: () => void
 }): React.JSX.Element {
   const searchId = useId()
+  const m = useMessages(FILE_SEARCH_HEAD)
   const searching = query.trim() !== ""
   return (
     <div className="files-search">
-      <label className="sr-only" htmlFor={searchId}>搜索工作区文件</label>
+      <label className="sr-only" htmlFor={searchId}>{m.label}</label>
       <div className="files-search__field">
-        <input id={searchId} ref={input} value={query} placeholder="搜索工作区文件…"
+        <input id={searchId} ref={input} value={query} placeholder={m.placeholder}
           onChange={(event) => { onQuery(event.currentTarget.value) }}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown") {
@@ -28,18 +31,18 @@ export function FileSearchHead({ cwd, query, loading, input, onQuery, onEnterRes
             event.stopPropagation()
             onQuery("")
           }} />
-        <button type="button" className="workbench__icon" aria-label="立即刷新搜索结果"
-          data-tip="立即刷新搜索结果" aria-busy={loading}
+        <button type="button" className="workbench__icon" aria-label={m.refresh}
+          data-tip={m.refresh} aria-busy={loading}
           disabled={!searching} onClick={onRefresh}>
           <ReloadIcon />
         </button>
       </div>
       <span className="files-scope">
         <span className="files-scope__root">
-          <span>搜索范围</span>
+          <span>{m.scope}</span>
           <bdi title={cwd}>{cwd}</bdi>
         </span>
-        <span>文件变化会自动更新；最近一轮优先，此前与分支继承分组保留。</span>
+        <span>{m.hint}</span>
       </span>
     </div>
   )

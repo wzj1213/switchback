@@ -2,6 +2,8 @@ import type { PreviewTarget } from "../workbench.js"
 import { fileReference } from "../file-references.js"
 import { relPath } from "../tool.js"
 import { FileIcon } from "./icons-activity.js"
+import { useMessages } from "../i18n.js"
+import { FILE_ROW } from "./file-row.messages.js"
 
 /**
  * 侧栏文件清单的一行。
@@ -82,13 +84,14 @@ export function PathRow({ path, cwd, threadId, meta, disabled, tabStop, onFocusP
   onFocusPath?: (path: string) => void
   onPick: (target: PreviewTarget) => void
 }): React.JSX.Element {
+  const m = useMessages(FILE_ROW)
   const hint = dirHint(path, cwd)
-  const tag = disabled === true ? "已删除" : (outside(path, cwd) ? "工作区外" : meta)
+  const tag = disabled === true ? m.deleted : (outside(path, cwd) ? m.outside : meta)
   return (
     <button type="button" className="file-row" disabled={disabled}
       data-file-path={path}
       tabIndex={disabled === true || !tabStop ? -1 : 0}
-      title={disabled === true ? `${path}\n文件已删除` : path}
+      title={disabled === true ? m.deletedTip(path) : path}
       aria-keyshortcuts="ArrowUp ArrowDown Home End"
       onFocus={() => { onFocusPath?.(path) }}
       onKeyDown={moveFocus}

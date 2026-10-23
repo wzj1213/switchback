@@ -8,6 +8,8 @@ import { FilePreviewContent } from "./file-preview-content.js"
 import { useFilePreviewPulse } from "../use-file-preview-pulse.js"
 import { FileLinkScope } from "./message-link.js"
 import { navigatePreviewKey, type PreviewNavigation } from "./file-preview-navigation.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { PREVIEW_VIEW } from "./FilePreviewView.messages.js"
 
 export type PreviewLoad =
   | { state: "loading" }
@@ -60,6 +62,7 @@ function usePreview({ target, revision, stamp, manual, active }: {
   const lastTarget = useRef("")
   const identity = identityOf(target)
   const visit = useFilePreviewPulse(active, target)
+  const locale = useLocale()
   useEffect(() => {
     if (!active) return undefined
     let alive = true
@@ -77,7 +80,7 @@ function usePreview({ target, revision, stamp, manual, active }: {
         path: target.path,
         name: target.path,
         reason: "failed",
-        message: "桌面桥没有接通，暂时不能读取文件。",
+        message: PREVIEW_VIEW[locale].noBridge,
       }))
       return () => {
         alive = false
@@ -100,7 +103,7 @@ function usePreview({ target, revision, stamp, manual, active }: {
               path: target.path,
               name: target.path,
               reason: "failed",
-              message: "读取这份文件失败，请稍后重试。",
+              message: PREVIEW_VIEW[locale].failed,
             }
             setLoad((before) => refreshing
               ? failedPreviewLoad(before, identity, failure)
@@ -113,7 +116,7 @@ function usePreview({ target, revision, stamp, manual, active }: {
       alive = false
       window.clearTimeout(timer)
     }
-  }, [active, manual, revision, stamp, target.threadId, target.cwd, target.path, visit])
+  }, [active, manual, revision, stamp, target.threadId, target.cwd, target.path, visit, locale])
   return load.state === "ready" && load.identity !== identity ? LOADING : load
 }
 
@@ -140,6 +143,7 @@ export function FilePreviewView({
 }): React.JSX.Element {
   const [manual, setManual] = useState(0)
   const load = usePreview({ target, revision, stamp, manual, active })
+  const m = useMessages(PREVIEW_VIEW)
   const path = load.state === "ready" ? load.file.path : target.path
   const name = load.state === "ready" ? load.file.name : baseName(target.path)
   const revealable = canRevealPreview(load.state === "ready" ? load.file : undefined, path)
@@ -169,7 +173,7 @@ export function FilePreviewView({
       />
       <div className="file-preview__body">
         {load.state === "loading" ? (
-          <p className="workbench__empty">正在读取…</p>
+          <p className="workbench__empty">{m.reading}</p>
         ) : (
           <FileLinkScope threadId={target.threadId} cwd={target.cwd} documentPath={path}>
             <FilePreviewContent key={`${load.file.kind}:${load.file.path}`}

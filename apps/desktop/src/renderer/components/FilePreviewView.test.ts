@@ -222,8 +222,8 @@ describe("文件复制反馈", () => {
   ] as const
   for (const [truncated, feedback, label, title] of cases) {
     it(`截断=${String(truncated)} · 状态=${feedback}`, () => {
-      expect(fileCopyLabel(truncated, feedback)).toBe(label)
-      expect(fileCopyTitle(truncated, feedback)).toBe(title)
+      expect(fileCopyLabel(truncated, feedback, "zh-CN")).toBe(label)
+      expect(fileCopyTitle(truncated, feedback, "zh-CN")).toBe(title)
     })
   }
 })

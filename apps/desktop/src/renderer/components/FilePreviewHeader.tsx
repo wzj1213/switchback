@@ -3,6 +3,8 @@ import { dirHint, outside } from "./file-row.js"
 import { RevealIcon } from "./icons.js"
 import { ReloadIcon } from "./reload-icon.js"
 import { FilePreviewNavigation, type PreviewNavigation } from "./file-preview-navigation.js"
+import { useMessages } from "../i18n.js"
+import { PREVIEW_HEADER } from "./FilePreviewHeader.messages.js"
 
 function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
   path: string
@@ -13,7 +15,8 @@ function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
 }): React.JSX.Element {
   const directory = dirHint(path, cwd)
   const external = outside(path, cwd)
-  const status = refreshing ? "正在更新…" : refreshFailed ? "更新失败" : undefined
+  const m = useMessages(PREVIEW_HEADER)
+  const status = refreshing ? m.updating : refreshFailed ? m.updateFailed : undefined
   return (
     <span className="file-preview__title" title={path}>
       <span className="file-preview__identity">
@@ -25,7 +28,7 @@ function PreviewTitle({ path, cwd, name, refreshing, refreshFailed }: {
       </span>
       {directory === "" && !external ? null : (
         <span className="file-preview__path">
-          {external ? <span className="file-preview__scope">工作区外</span> : null}
+          {external ? <span className="file-preview__scope">{m.outside}</span> : null}
           {directory === "" ? null : <span>{directory}</span>}
         </span>
       )}
@@ -44,23 +47,24 @@ function PreviewActions({ target, busy, refreshing, referenceable, revealable,
   onReload: () => void
   onReveal: () => void
 }): React.JSX.Element {
+  const m = useMessages(PREVIEW_HEADER)
   return (
     <span className="file-preview__actions">
       {onReference === undefined || !referenceable ? null : (
         <button type="button" className="file-preview__reference"
-          title="引用到输入框" aria-label="引用到输入框"
+          title={m.reference} aria-label={m.reference}
           onClick={() => { onReference(target) }}>
           <span aria-hidden="true">@</span>
-          <span className="file-preview__reference-text">引用</span>
+          <span className="file-preview__reference-text">{m.referenceShort}</span>
         </button>
       )}
-      <button type="button" className="workbench__icon" data-tip="重新读取文件"
-        aria-label="重新读取文件" aria-busy={busy} disabled={busy && !refreshing} onClick={onReload}>
+      <button type="button" className="workbench__icon" data-tip={m.reload}
+        aria-label={m.reload} aria-busy={busy} disabled={busy && !refreshing} onClick={onReload}>
         <ReloadIcon />
       </button>
       {revealable ? (
-        <button type="button" className="workbench__icon" data-tip="在访达中显示"
-          aria-label="在访达中显示" onClick={onReveal}>
+        <button type="button" className="workbench__icon" data-tip={m.reveal}
+          aria-label={m.reveal} onClick={onReveal}>
           <RevealIcon size={14} />
         </button>
       ) : null}

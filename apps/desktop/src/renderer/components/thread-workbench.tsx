@@ -8,6 +8,8 @@ import { composeDraft } from "../composer-blocks.js"
 import type { useApp } from "../useApp.js"
 import type { scopeWorkbench } from "../workbench.js"
 import { WorkbenchPane } from "./WorkbenchPane.js"
+import { useMessages } from "../i18n.js"
+import { THREAD_WORKBENCH } from "./thread-workbench.messages.js"
 
 interface Props {
   app: ReturnType<typeof useApp>
@@ -28,6 +30,7 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
   const { app, thread, lanes, items, stamp, state, setReference } = props
   const { shell } = app
   const [notice, setNotice] = useState<{ text: string; at: number }>()
+  const m = useMessages(THREAD_WORKBENCH)
   useEffect(() => { setNotice(undefined) }, [state.file?.path, state.page, state.visible])
   useEffect(() => {
     if (notice === undefined) return undefined
@@ -61,7 +64,7 @@ export function ThreadWorkbench(props: Props): React.JSX.Element {
         const text = saved === undefined ? "" : composeDraft(saved.text, saved.blocks)
         if (newFileReferences(text, [path]).length === 0) {
           setNotice((before) => ({
-            text: "这个文件已经在输入框中，没有重复添加。",
+            text: m.already,
             at: (before?.at ?? 0) + 1,
           }))
           return

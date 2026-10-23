@@ -1,19 +1,18 @@
 import { useEffect } from "react"
 import { PANEL_MAX, PANEL_MIN, SIDEBAR_MAX, SIDEBAR_MIN, type PaneWidths } from "../../shared/pane-widths.js"
 import { applyPaneWidth, usePaneDrag, type PaneSide } from "../use-pane-drag.js"
+import { useMessages } from "../i18n.js"
+import { PANE_HANDLES } from "./pane-handles.messages.js"
 
 const LIMITS: Record<PaneSide, readonly [number, number]> = {
   rail: [SIDEBAR_MIN, SIDEBAR_MAX],
   panel: [PANEL_MIN, PANEL_MAX],
 }
 
-const LABEL: Record<PaneSide, string> = {
-  rail: "调整侧栏宽度，双击恢复默认",
-  panel: "调整侧边面板宽度，双击恢复默认",
-}
 
 function PaneHandle({ side, onCommit }: { side: PaneSide; onCommit: (width: number) => void }): React.JSX.Element {
   const drag = usePaneDrag(side, onCommit)
+  const m = useMessages(PANE_HANDLES)
   const [min, max] = LIMITS[side]
   return (
     <div
@@ -21,7 +20,7 @@ function PaneHandle({ side, onCommit }: { side: PaneSide; onCommit: (width: numb
       className={`pane-handle pane-handle--${side}${drag.live ? " pane-handle--live" : ""}`}
       role="separator"
       aria-orientation="vertical"
-      aria-label={LABEL[side]}
+      aria-label={m.label[side]}
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={Math.min(Math.max(drag.now, min), max)}

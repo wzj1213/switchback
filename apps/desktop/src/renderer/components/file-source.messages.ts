@@ -1,0 +1,41 @@
+import { defineMessages } from "@switchback/i18n"
+
+/** 文件预览里的源码视图。 */
+export const FILE_SOURCE = defineMessages(
+  {
+    failed: "复制失败",
+    copiedPart: "已复制显示部分",
+    copied: "已复制",
+    copyPart: "复制显示部分",
+    copy: "复制",
+    failedTip: "复制失败，请重试",
+    copiedPartTip: "当前显示的前 1.5 MB 已复制",
+    copiedTip: "文件内容已复制",
+    copyPartTip: "只复制当前显示的前 1.5 MB",
+    copyTip: "复制文件内容",
+    label: "可横向滚动的文件源码",
+    truncated: "文件较大，只显示前 1.5 MB。",
+    noLine: (line: number) => `当前内容没有第 ${String(line)} 行。`,
+    text: "文本",
+    lines: (n: string) => `${n} 行`,
+    line: (n: string) => `第 ${n} 行`,
+  },
+  {
+    failed: "Copy failed",
+    copiedPart: "Copied what's shown",
+    copied: "Copied",
+    copyPart: "Copy what's shown",
+    copy: "Copy",
+    failedTip: "Couldn't copy. Try again.",
+    copiedPartTip: "The first 1.5 MB shown here was copied",
+    copiedTip: "File contents copied",
+    copyPartTip: "Copies only the first 1.5 MB shown here",
+    copyTip: "Copy file contents",
+    label: "File source, scrolls horizontally",
+    truncated: "This file is large; only the first 1.5 MB is shown.",
+    noLine: (line) => `The current content has no line ${String(line)}.`,
+    text: "Text",
+    lines: (n) => `${n} lines`,
+    line: (n) => `Line ${n}`,
+  },
+)
