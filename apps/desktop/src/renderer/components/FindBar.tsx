@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { CloseIcon } from "./icons-panel.js"
+import { useMessages } from "../i18n.js"
+import { FIND_BAR } from "./FindBar.messages.js"
 
 export interface FindResult {
   active: number
@@ -18,6 +20,7 @@ interface Props {
  * 只给总数的话人会数不清自己转了几圈。
  */
 export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
+  const m = useMessages(FIND_BAR)
   const [query, setQuery] = useState("")
   const [result, setResult] = useState<FindResult>({ active: 0, total: 0 })
   const input = useRef<HTMLInputElement>(null)
@@ -53,7 +56,7 @@ export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
       <input
         ref={input}
         className={`findbar__input${empty ? " findbar__input--empty" : ""}`}
-        placeholder="在会话中查找…"
+        placeholder={m.placeholder}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)
@@ -68,17 +71,17 @@ export function FindBar({ onFind, onClose }: Props): React.JSX.Element {
       />
       <span
         className="findbar__count"
-        title="计数覆盖整个窗口，含侧栏的会话预览与查找框自身"
+        title={m.countTip}
       >
         {query === "" ? "" : `${String(result.active)}/${String(result.total)}`}
       </span>
-      <button className="findbar__btn" type="button" aria-label="上一个" onClick={() => { step(false) }}>
+      <button className="findbar__btn" type="button" aria-label={m.prev} onClick={() => { step(false) }}>
         ↑
       </button>
-      <button className="findbar__btn" type="button" aria-label="下一个" onClick={() => { step(true) }}>
+      <button className="findbar__btn" type="button" aria-label={m.next} onClick={() => { step(true) }}>
         ↓
       </button>
-      <button className="findbar__btn" type="button" aria-label="关闭查找" data-tip="关闭查找（Esc）" onClick={onClose}>
+      <button className="findbar__btn" type="button" aria-label={m.close} data-tip={m.closeTip} onClick={onClose}>
         <CloseIcon size={14} />
       </button>
     </div>

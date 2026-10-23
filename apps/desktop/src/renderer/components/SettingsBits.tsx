@@ -1,5 +1,7 @@
 import { useId, useState } from "react"
 import { ChevronIcon } from "./icons.js"
+import { useMessages } from "../i18n.js"
+import { SETTINGS_BITS } from "./SettingsBits.messages.js"
 
 /**
  * 设置面板里反复出现的那几个小件：分组、一行设置项、三段式开关、二元开关、
@@ -27,6 +29,7 @@ import { ChevronIcon } from "./icons.js"
  * 提示只留「改了会怎样」那一句，为什么收在这里——想知道的人点一下，一个字不少。
  */
 export function More({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const m = useMessages(SETTINGS_BITS)
   const [open, setOpen] = useState(false)
   const id = useId()
   return (
@@ -40,7 +43,7 @@ export function More({ children }: { children: React.ReactNode }): React.JSX.Ele
           setOpen((was) => !was)
         }}
       >
-        说明
+        {m.more}
         <ChevronIcon open={open} size={11} />
       </button>
       {open ? <span id={id} className="set__more-text">{children}</span> : null}

@@ -1,13 +1,13 @@
 export type LinkPart = { kind: "text"; text: string } | { kind: "link"; text: string; href: string }
 
-const URL_SOURCE = String.raw`https?:\/\/[^\s<>"'，。；：！？、]+`
+const URL_SOURCE = String.raw`https?:\/\/[^\s<>"'，。；：！？、]+` // i18n-ok：网址在中文标点处截断
 const TRAILING = /[.,;:!，。；：！、]+$/u
 const BRACKETS = [
   ["(", ")"],
   ["[", "]"],
   ["{", "}"],
-  ["（", "）"],
-  ["【", "】"],
+  ["（", "）"], // i18n-ok：中文括号也是网址的边界
+  ["【", "】"], // i18n-ok
 ] as const
 
 function count(text: string, needle: string): number {

@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react"
 import { CloseIcon } from "./icons-panel.js"
 import { Popover } from "./Popover.js"
+import { useMessages } from "../i18n.js"
+import { MENU_TEXT } from "./Menu.messages.js"
 
 /**
  * 右键菜单。和下拉共用 `Popover`，区别只在于**定位到光标**、条目带图标。
@@ -56,6 +58,7 @@ export function useContextMenu(): {
   open: (event: React.MouseEvent, commands: readonly Command[], head?: React.ReactNode) => void
   menu: React.JSX.Element | null
 } {
+  const m = useMessages(MENU_TEXT)
   const [state, setState] = useState<MenuState | undefined>(undefined)
 
   const open = useCallback(
@@ -84,7 +87,7 @@ export function useContextMenu(): {
   const menu =
     state === undefined ? null : (
       <Popover open anchor={state.anchor} at={state.at} minWidth={170} onClose={close}>
-        <div role="menu" aria-label="操作">
+        <div role="menu" aria-label={m.label}>
           {state.head === undefined ? null : <div className="pop__head">{state.head}</div>}
           {state.commands.map((command) =>
             command.pick === undefined ? (
@@ -130,8 +133,8 @@ export function useContextMenu(): {
                   type="button"
                   className="pop__pick-one pop__pick-clear"
                   role="menuitem"
-                  aria-label={`清除${command.label}`}
-                  title="不要图标"
+                  aria-label={m.clear(command.label)}
+                  title={m.noIcon}
                   onClick={() => {
                     close()
                     command.run()

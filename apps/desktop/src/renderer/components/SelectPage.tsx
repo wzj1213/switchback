@@ -1,5 +1,7 @@
 import { CheckIcon } from "./icons.js"
 import type { Choice, Section } from "./Select.js"
+import { useMessages } from "../i18n.js"
+import { SELECT_PAGE } from "./SelectPage.messages.js"
 
 /**
  * 分层下拉的二级页与选项行。
@@ -53,6 +55,7 @@ export function Page({
   onBack?: () => void
   onClose: () => void
 }): React.JSX.Element | null {
+  const m = useMessages(SELECT_PAGE)
   if (section === undefined) return null
   return (
     <>
@@ -61,7 +64,7 @@ export function Page({
           <span className="pop__back-arrow" aria-hidden="true">
             ‹
           </span>
-          {section.title ?? "返回"}
+          {section.title ?? m.back}
         </button>
       )}
       <div className="pop__section">

@@ -3,6 +3,9 @@ import { CaretIcon, ChevronIcon } from "./icons.js"
 import { ResetIcon } from "./icons-activity.js"
 import { Popover } from "./Popover.js"
 import { Page } from "./SelectPage.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "../i18n.js"
+import { SELECT } from "./Select.messages.js"
 
 /**
  * 自绘下拉。替掉所有原生 `<select>`——理由见 `Popover.tsx` 开头。
@@ -90,9 +93,9 @@ export function triggerWords({
   label,
   detail,
   title,
-}: Pick<SelectProps, "name" | "label" | "detail" | "title">): { tip: string; spoken?: string } {
+}: Pick<SelectProps, "name" | "label" | "detail" | "title">, locale: Locale): { tip: string; spoken?: string } {
   if (name === undefined) return { tip: title ?? label }
-  const spoken = `${name}：${detail === undefined ? label : `${label} · ${detail.text}`}`
+  const spoken = SELECT[locale].spoken(name, detail === undefined ? label : `${label} · ${detail.text}`)
   return { tip: title === undefined ? spoken : `${spoken}\n${title}`, spoken }
 }
 
@@ -113,7 +116,7 @@ export function Select({
   const trigger = useRef<HTMLButtonElement>(null)
   const many = sections.length > 1
   const shown = many ? page : 0
-  const words = triggerWords({ name, label, detail, title })
+  const words = triggerWords({ name, label, detail, title }, useLocale())
 
   const close = (): void => {
     setOpen(false)
@@ -210,6 +213,7 @@ function Top({
   onOpen: (index: number) => void
   onClose: () => void
 }): React.JSX.Element {
+  const m = useMessages(SELECT)
   return (
     <>
       {sections.map((section, index) => (
@@ -222,9 +226,9 @@ function Top({
             onOpen(index)
           }}
         >
-          <span className="pop__label">{section.title ?? "选项"}</span>
-          <span className="pop__value" title={currentLabel(section)}>
-            {currentLabel(section)}
+          <span className="pop__label">{section.title ?? m.options}</span>
+          <span className="pop__value" title={currentLabel(section, m.fallback)}>
+            {currentLabel(section, m.fallback)}
           </span>
           <ChevronIcon open={false} size={14} />
         </button>
@@ -248,7 +252,7 @@ function Top({
 }
 
 /** 当前值那一段文字。没选过就说「默认」——比留一片空白说得清楚。 */
-function currentLabel(section: Section): string {
+function currentLabel(section: Section, fallback: string): string {
   const hit = section.choices.find((c) => c.id === section.value)
-  return hit?.label ?? "默认"
+  return hit?.label ?? fallback
 }

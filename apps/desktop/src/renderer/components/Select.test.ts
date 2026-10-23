@@ -32,7 +32,7 @@ describe("触发器的悬停提示与读屏名", () => {
   ]
   for (const c of cases) {
     it(c.name, () => {
-      expect(triggerWords(c.input)).toEqual(c.want)
+      expect(triggerWords(c.input, "zh-CN")).toEqual(c.want)
     })
   }
 })

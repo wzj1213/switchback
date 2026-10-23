@@ -11,6 +11,9 @@ import { SpinnerIcon } from "./components/icons.js"
 import { AlertIcon } from "./components/icons-activity.js"
 import type { SettingsApi } from "./useSettings.js"
 import { engineModelCatalogs } from "./engine-settings-model.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "./i18n.js"
+import { SCREENS } from "./screens.messages.js"
 
 /**
  * 除主区之外的几块屏。
@@ -29,12 +32,11 @@ import { engineModelCatalogs } from "./engine-settings-model.js"
  *
  * 现在四档：通道没建立 / 有故障 / 全量还没到（转圈）/ 真的一条都没有（给出路）。
  */
-function emptyText(state: { bridgeMissing: boolean; failed: boolean; ready: boolean }): string {
-  if (state.bridgeMissing) {
-    return "与主进程的通道没建立（preload 未注入）。界面此时点什么都不会有反应——先查主进程日志。"
-  }
-  if (state.failed) return "没有可用的会话。上方的故障说明了原因；处理好之后点「＋ 新建会话」重试。"
-  return state.ready ? "还没有会话" : "正在打开工作区…"
+function emptyText(state: { bridgeMissing: boolean; failed: boolean; ready: boolean }, locale: Locale): string {
+  const m = SCREENS[locale]
+  if (state.bridgeMissing) return m.bridgeMissing
+  if (state.failed) return m.failed
+  return state.ready ? m.none : m.opening
 }
 
 /**
@@ -55,6 +57,7 @@ function Notice({ text, fatal, waiting }: {
   fatal: boolean
   waiting: boolean
 }): React.JSX.Element {
+  const m = useMessages(SCREENS)
   /*
    * **`.blank` 必须是 `.transcript` 的直接子元素。**
    *
@@ -69,12 +72,12 @@ function Notice({ text, fatal, waiting }: {
    */
   if (fatal) {
     return (
-      <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
+      <div className="transcript" role="region" aria-label={m.region} tabIndex={0}>
         <div className="transcript__inner">
           <div className="failcard">
             <div className="failcard__head">
               <span className="failcard__icon"><AlertIcon size={14} /></span>
-              <span className="failcard__title">界面和后台没接上</span>
+              <span className="failcard__title">{m.disconnected}</span>
             </div>
             <p className="failcard__text">{text}</p>
           </div>
@@ -83,7 +86,7 @@ function Notice({ text, fatal, waiting }: {
     )
   }
   return (
-    <div className="transcript" role="region" aria-label="应用状态" tabIndex={0}>
+    <div className="transcript" role="region" aria-label={m.region} tabIndex={0}>
       {/* 纯等待/纯状态：**两个方向都居中**。它没有下一步动作可以对齐——
           新会话那一屏靠左是因为你下一秒就要在同一条左缘上打字，这里没有那件事 */}
       <div className="blank blank--notice">
@@ -113,6 +116,7 @@ export function EmptyScreen({
   ready: boolean
 }): React.JSX.Element {
   const failed = notices.length > 0
+  const locale = useLocale()
   return (
     <main className="main">
       {/* 顶栏那条线先在：主区一片空白、连边都没有的那一版看起来像应用坏了 */}
@@ -121,7 +125,7 @@ export function EmptyScreen({
       <Notice
         fatal={bridgeMissing}
         waiting={!bridgeMissing && !failed && !ready}
-        text={emptyText({ bridgeMissing, failed, ready })}
+        text={emptyText({ bridgeMissing, failed, ready }, locale)}
       />
       {/* 输入框的位子。**只是个位子**——没有会话时打进去的字无处可去 */}
       <div className="composer composer--waiting" aria-hidden="true">

@@ -6,5 +6,6 @@ export function restorePanelFocus(origin: HTMLElement | undefined): void {
     origin.focus({ preventScroll: true })
     return
   }
-  document.querySelector<HTMLElement>('[aria-label="显示侧边面板"]')?.focus({ preventScroll: true })
+  // 认 class 不认读屏名：读屏名随界面语言变，按名字找会在英文界面上找不到
+  document.querySelector<HTMLElement>(".paneltoggle")?.focus({ preventScroll: true })
 }
