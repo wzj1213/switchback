@@ -4,6 +4,11 @@ import { bridge, useAsync } from "../use-async.js"
 import { Actions, Blank, Field } from "./SettingsBits.js"
 import { EngineInstall } from "./EngineInstall.js"
 import { rescanMessage } from "../rescan-message.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "../i18n.js"
+import { ENGINE_VERSIONS } from "./EngineVersions.messages.js"
+
+type Text = (typeof ENGINE_VERSIONS)[Locale]
 
 /**
  * 安装与版本——**所有引擎一次列全**。
@@ -40,6 +45,8 @@ export function EngineVersions({
     [switchback],
   )
   const state = useAsync<readonly EngineVersion[]>(load)
+  const locale = useLocale()
+  const m = ENGINE_VERSIONS[locale]
   const [updating, setUpdating] = useState<string | undefined>(undefined)
   const [rescanning, setRescanning] = useState(false)
   // 上一次重新探测的结果。**大多数时候它是「没有变化」**——而那句话
@@ -83,17 +90,17 @@ export function EngineVersions({
           type="button"
           className="tbtn"
           disabled={busy}
-          title="重新看这台机器上装了哪几家（本地跑一遍 which 与 --version）"
+          title={m.rescanTip}
           onClick={() => {
             setRescanning(true)
             setRescanned(undefined)
             setPatched({})
             void (switchback?.rescanEngines() ?? Promise.resolve({ changed: [], needsRestart: [] }))
               .then((done) => {
-                setRescanned(rescanMessage(done.changed, done.needsRestart))
+                setRescanned(rescanMessage(done.changed, done.needsRestart, locale))
               })
               .catch(() => {
-                setRescanned("探测没跑起来；日志里有原文。")
+                setRescanned(m.rescanFailed)
               })
               .finally(() => {
                 setRescanning(false)
@@ -101,19 +108,19 @@ export function EngineVersions({
               })
           }}
         >
-          {rescanning ? "正在探…" : "重新探测"}
+          {rescanning ? m.rescanning : m.rescan}
         </button>
         <button
           type="button"
           className="tbtn"
           disabled={busy}
-          title="无视缓存，重新询问 npm 与各家原生更新器有没有新版"
+          title={m.checkTip}
           onClick={() => {
             setPatched({})
             state.reload()
           }}
         >
-          {state.loading ? "正在查…" : "检查新版"}
+          {state.loading ? m.checking : m.check}
         </button>
         {/* 结果紧挨着那颗按钮，不另起一块：它是那一下的回执，不是一条独立通知 */}
         {rescanned === undefined ? null : (
@@ -134,8 +141,9 @@ export function EngineVersions({
  * 状态。摊平成一张表之后没有来源的那几家压根不在表里，那句话搬进了组说明。
  */
 function Probe({ loading, failed }: { loading: boolean; failed: boolean }): React.JSX.Element | null {
-  if (loading) return <Blank>正在检查安装版本…</Blank>
-  if (failed) return <Blank tone="error">版本探测失败；点上面那颗可以再试一次。</Blank>
+  const m = useMessages(ENGINE_VERSIONS)
+  if (loading) return <Blank>{m.probing}</Blank>
+  if (failed) return <Blank tone="error">{m.probeFailed}</Blank>
   return null
 }
 
@@ -156,19 +164,20 @@ function EngineRow({
 }: EngineRowProps): React.JSX.Element {
   const [result, setResult] = useState<UpdateResult | undefined>(undefined)
   const switchback = bridge()
+  const m = useMessages(ENGINE_VERSIONS)
   const running = active === version.engine
   const actionable = version.update !== undefined && (version.stale || version.latest === undefined)
 
   return (
     <>
-      <Field label={version.label} hint={hintOf(version, running, result)}>
+      <Field label={version.label} hint={hintOf(version, running, result, m)}>
         {actionable ? (
           <button
             type="button"
             className="tbtn"
             disabled={checking || active !== undefined}
             aria-busy={running}
-            title={`将执行：${version.update ?? ""}`}
+            title={m.willRun(version.update ?? "")}
             onClick={() => {
               const request = switchback?.updateEngine(version.engine)
               if (request === undefined) return
@@ -180,11 +189,11 @@ function EngineRow({
                   if (next.ok)
                     onDone({ ...version, installed: next.after ?? version.installed, stale: false })
                 })
-                .catch((error: unknown) => setResult(failedResult(error)))
+                .catch((error: unknown) => setResult(failedResult(error, m)))
                 .finally(() => onActive(undefined))
             }}
           >
-            {running ? "更新中…" : actionOf(version)}
+            {running ? m.updating : actionOf(version, m)}
           </button>
         ) : null}
       </Field>
@@ -197,27 +206,28 @@ function EngineRow({
   )
 }
 
-function actionOf(version: EngineVersion): string {
-  return version.stale ? `更新到 ${version.latest ?? "最新"}` : "检查并更新"
+function actionOf(version: EngineVersion, m: Text): string {
+  return version.stale ? m.updateTo(version.latest ?? m.latest) : m.checkUpdate
 }
 
 function hintOf(
   version: EngineVersion,
   running: boolean,
   result: UpdateResult | undefined,
+  m: Text,
 ): string {
-  if (result !== undefined) return resultHint(version, result)
-  if (running) return "正在更新，别关窗口…"
-  if (version.stale) return `装的是 ${shown(version.installed)}，最新 ${shown(version.latest)}`
+  if (result !== undefined) return resultHint(version, result, m)
+  if (running) return m.runningHint
+  if (version.stale) return m.stale(shown(version.installed), shown(version.latest))
   if (version.detail !== undefined) return detailHint(version)
-  return `${shown(version.installed)}（已是最新）`
+  return m.upToDate(shown(version.installed))
 }
 
-function resultHint(version: EngineVersion, result: UpdateResult): string {
+function resultHint(version: EngineVersion, result: UpdateResult, m: Text): string {
   const after = shown(result.after === undefined ? version.installed : result.after)
-  if (!result.ok) return `没更新成（还是 ${after}）`
-  if (result.changed) return `已更新到 ${after}`
-  return `更新器已检查（仍是 ${after}）`
+  if (!result.ok) return m.notUpdated(after)
+  if (result.changed) return m.updated(after)
+  return m.unchanged(after)
 }
 
 function detailHint(version: EngineVersion): string {
@@ -229,8 +239,8 @@ function shown(value: string | undefined): string {
   return value === undefined ? "?" : value
 }
 
-function failedResult(error: unknown): UpdateResult {
-  return { ok: false, changed: false, output: `更新请求失败：${messageOf(error)}` }
+function failedResult(error: unknown, m: Text): UpdateResult {
+  return { ok: false, changed: false, output: m.requestFailed(messageOf(error)) }
 }
 
 function messageOf(error: unknown): string {

@@ -15,6 +15,8 @@ import { EngineSwitchbackSettings } from "./EngineSwitchbackSettings.js"
 import { EnginePreference } from "./EnginePreference.js"
 import { Field, Group } from "./SettingsBits.js"
 import { DshProfileSettings } from "./DshProfileSettings.js"
+import { useMessages } from "../i18n.js"
+import { ENGINE_SETTINGS } from "./EngineSettings.messages.js"
 
 export function EnginesSection({
   settings,
@@ -38,13 +40,14 @@ export function EnginesSection({
   /** 「装一家、升级、接一家新的」都在另一页；这里给一条过去的路。 */
   onGoInstall: () => void
 }): React.JSX.Element {
+  const m = useMessages(ENGINE_SETTINGS)
   const items = engineSettingItems(catalog)
   const root = useRef<HTMLElement>(null)
   const [selected, setSelected] = useState(() =>
     initialEngine(items, settings.defaultEngine, settings.lastUsed.engine),
   )
   const item = items.find((candidate) => candidate.id === selected) ?? items[0]
-  if (item === undefined) return <p className="set__blank">还没有可配置的引擎。</p>
+  if (item === undefined) return <p className="set__blank">{m.none}</p>
   const state = engineSettingState(item, settings)
   const copy = settingsCopyOf(item.id)
   const off = settings.disabledEngines.includes(item.id)
@@ -56,7 +59,7 @@ export function EnginesSection({
   }
 
   return (
-    <section ref={root} className="eng-settings" aria-label="引擎配置">
+    <section ref={root} className="eng-settings" aria-label={m.label}>
       <EngineTabs items={items} active={item.id} settings={settings} onSelect={showEngine} />
       <div id="engine-settings-panel" className="eng-panel">
         <header className="eng-head">
@@ -78,14 +81,12 @@ export function EnginesSection({
           <DshProfileSettings settings={settings} onPatch={onPatch} onReveal={onReveal} />
         ) : null}
         <Group
-          title="新会话的模型与思考档"
-          hint="平时会记住这家上一次开工时的选择；这里可以直接改，也可以退回引擎默认。"
+          title={m.modelTitle}
+          hint={m.modelHint}
         >
           <Field
-            label="沿用配置"
-            hint={(models[item.id] ?? []).length === 0
-              ? "先用这家开过会话，才会列出它自己报告的模型"
-              : "只影响之后新开的会话，当前会话不会被重启。选项是这家引擎本次实际报告的清单"}
+            label={m.carry}
+            hint={(models[item.id] ?? []).length === 0 ? m.carryEmpty : m.carryHint}
           >
             <EnginePreference
               pick={settings.lastUsed.byEngine[item.id]}
@@ -112,9 +113,9 @@ export function EnginesSection({
         「哦它没装」的，而那一刻他人在这一页。
       */}
       <div className="eng-registry">
-        <span>装一家、升级到新版、或者接一家 Switchback 还不认识的 ACP 引擎——都在「安装与接入」。</span>
+        <span>{m.installNote}</span>
         <button type="button" className="tbtn" onClick={onGoInstall}>
-          去那儿
+          {m.go}
         </button>
       </div>
     </section>
@@ -139,9 +140,10 @@ function EngineTabs({
   settings: Settings
   onSelect: (id: string) => void
 }): React.JSX.Element {
+  const m = useMessages(ENGINE_SETTINGS)
   return (
     <div className="eng-tabs">
-      <div className="eng-tabs__seg" role="group" aria-label="选择引擎">
+      <div className="eng-tabs__seg" role="group" aria-label={m.pick}>
         {items.map((item) => {
           const state = engineSettingState(item, settings)
           const pinned = settings.defaultEngine === item.id
@@ -152,7 +154,7 @@ function EngineTabs({
               type="button"
               aria-pressed={item.id === active}
               aria-controls="engine-settings-panel"
-              aria-label={`${item.label}，${state.label}${pinned ? "，新会话默认" : ""}`}
+              aria-label={m.tab(item.label, state.label, pinned)}
               title={`${item.label} · ${state.label}`}
               className={`eng-tab${item.id === active ? " eng-tab--on" : ""}${off ? " eng-tab--off" : ""}`}
               onClick={() => {
@@ -161,7 +163,7 @@ function EngineTabs({
             >
               <span className={`eng-dot eng-dot--${state.tone}`} aria-hidden="true" />
               <span>{item.label}</span>
-              {pinned ? <span className="eng-tab__default">默认</span> : null}
+              {pinned ? <span className="eng-tab__default">{m.pinned}</span> : null}
             </button>
           )
         })}

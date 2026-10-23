@@ -180,46 +180,6 @@ function snake(event: string): string {
   return event.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()
 }
 
-/**
- * 事件说明。**只写认得的那些**，认不出就把原名摆出来——
- * 各家都在加新事件，编一句解释比不解释更糟。
- */
-export const EVENT_TEXT: Readonly<Record<string, string>> = {
-  PreToolUse: "工具执行前",
-  PostToolUse: "工具执行后",
-  PostToolUseFailure: "工具执行失败后",
-  UserPromptSubmit: "你发出一句话时",
-  Notification: "引擎要通知你时",
-  SessionStart: "会话开始时",
-  SessionEnd: "会话结束时",
-  Stop: "这一轮答完之前",
-  StopFailure: "这一轮出错收尾时",
-  SubagentStart: "子 agent 开始时",
-  SubagentStop: "子 agent 收尾时",
-  PreCompact: "压缩上下文之前",
-  PostCompact: "压缩上下文之后",
-  PermissionRequest: "要权限时",
-  PermissionDenied: "权限被拒后",
-  Setup: "首次装配时",
-  FileChanged: "文件变了时",
-  CwdChanged: "换目录时",
-  // 以下几个只有 Kimi Code 有
-  UserPromptQueued: "你的话被排进队列时",
-  TurnStarted: "这一轮开始时",
-  Interrupt: "被打断时",
-  SessionHeartbeat: "会话心跳",
-  TaskStarted: "后台任务开始时",
-  PermissionResult: "权限判完之后",
-}
-
-/** 那一层配置的中文说法。**和界面上的分组标题共用这一份**，不写第二遍。 */
-export const SCOPE_TEXT: Readonly<Record<HookScope, string>> = {
-  managed: "管理员配置",
-  user: "用户配置",
-  project: "项目配置",
-  local: "本机私有配置",
-}
-
 /** 把家目录缩成 `~`。缩不了就原样——**不猜**。 */
 export function shortPath(path: string, home: string): string {
   return home !== "" && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path

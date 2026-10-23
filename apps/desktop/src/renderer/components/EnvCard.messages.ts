@@ -1,0 +1,51 @@
+import { count, defineMessages } from "@switchback/i18n"
+
+/** 顶栏标题点开的那张「环境信息」卡。档位的名字用 `trusts.ts` 那一份，这里只补一句说明。 */
+export const ENV_CARD = defineMessages(
+  {
+    title: "环境信息",
+    workspace: "工作区",
+    branch: "分支",
+    dirty: (n: number) => `${String(n)} 个文件未提交`,
+    engine: "引擎",
+    trust: "信任档",
+    trustNote: {
+      "read-only": "只读操作可执行，修改与联网会被拒绝",
+      "auto-edit": "优先使用引擎原生安全评审",
+      full: "允许工作区外操作与联网",
+    },
+    trustLine: (label: string, note: string) => `${label}——${note}`,
+    doc: "说明",
+    relayed: "接力过",
+    reveal: "在访达中显示",
+    copyBranch: "复制分支名",
+    docDenied: "项目说明暂时不可用",
+    docShared: "AGENTS.md（Claude 也读这份）",
+    docSplit: "两份说明各写各的 · 打开看看",
+    docLink: "有 AGENTS.md，但 Claude 还读不到 · 建立指向",
+    docCreate: "还没有项目说明 · 建一份",
+  },
+  {
+    title: "Environment",
+    workspace: "Workspace",
+    branch: "Branch",
+    dirty: (n) => `${count(n, "file")} uncommitted`,
+    engine: "Engine",
+    trust: "Trust tier",
+    trustNote: {
+      "read-only": "read-only actions run; edits and network access are refused",
+      "auto-edit": "the engine's own safety review decides first",
+      full: "works outside the workspace and uses the network",
+    },
+    trustLine: (label, note) => `${label}: ${note}`,
+    doc: "Project doc",
+    relayed: "Handed off",
+    reveal: "Show in Finder",
+    copyBranch: "Copy branch name",
+    docDenied: "Project instructions are unavailable for now",
+    docShared: "AGENTS.md (Claude reads it too)",
+    docSplit: "Two separate instruction files · Open",
+    docLink: "AGENTS.md exists, but Claude can't read it yet · Link it",
+    docCreate: "No project instructions yet · Create one",
+  },
+)

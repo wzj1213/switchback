@@ -3,6 +3,11 @@ import type { EngineVersion, UpdateResult } from "../../main/enginever.js"
 import { bridge } from "../use-async.js"
 import { Blank, Field } from "./SettingsBits.js"
 import { CopyIcon } from "./icons.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { ENGINE_INSTALL } from "./EngineInstall.messages.js"
+
+type Text = (typeof ENGINE_INSTALL)[Locale]
 
 /**
  * 这台机器上**没有这一家**的时候，这一行说什么。
@@ -39,14 +44,15 @@ export function EngineInstall({
   onDone: (next: EngineVersion) => void
 }): React.JSX.Element {
   const switchback = bridge()
+  const m = useMessages(ENGINE_INSTALL)
   const [result, setResult] = useState<UpdateResult | undefined>(undefined)
   const [running, setRunning] = useState(false)
   const command = version.install
   return (
     <>
-      <Field label={version.label} hint={hintOf(version, running, result)} stack={command !== undefined}>
+      <Field label={version.label} hint={hintOf(version, running, result, m)} stack={command !== undefined}>
         {command === undefined ? (
-          <span className="set__hint">Switchback 不代装这一家</span>
+          <span className="set__hint">{m.noInstall}</span>
         ) : (
           <div className="eng-command">
             <code>{command}</code>
@@ -57,14 +63,14 @@ export function EngineInstall({
                 onCopy(command)
               }}
             >
-              <CopyIcon /> 复制命令
+              <CopyIcon /> {m.copy}
             </button>
             <button
               type="button"
               className="tbtn"
               disabled={busy}
               aria-busy={running}
-              title={`将执行：${command}`}
+              title={m.willRun(command)}
               onClick={() => {
                 const request = switchback?.installEngine(version.engine)
                 if (request === undefined) return
@@ -79,7 +85,7 @@ export function EngineInstall({
                     }
                   })
                   .catch((error: unknown) => {
-                    setResult({ ok: false, changed: false, output: messageOf(error) })
+                    setResult({ ok: false, changed: false, output: messageOf(error, m) })
                   })
                   .finally(() => {
                     setRunning(false)
@@ -87,7 +93,7 @@ export function EngineInstall({
                   })
               }}
             >
-              {running ? "安装中…" : "安装"}
+              {running ? m.installing : m.install}
             </button>
           </div>
         )}
@@ -97,7 +103,7 @@ export function EngineInstall({
           {result.output.slice(-1200)}
         </pre>
       ) : null}
-      {result?.ok === true ? <Blank>装好了：{result.after ?? "已就绪"}。</Blank> : null}
+      {result?.ok === true ? <Blank>{m.done(result.after ?? m.ready)}</Blank> : null}
     </>
   )
 }
@@ -106,15 +112,16 @@ function hintOf(
   version: EngineVersion,
   running: boolean,
   result: UpdateResult | undefined,
+  m: Text,
 ): string {
-  if (running) return "正在装，别关窗口…"
-  if (result !== undefined && !result.ok) return "没装成；下面是原文"
-  const where = version.detail ?? "这一家在这台机器上不在 PATH 上"
+  if (running) return m.running
+  if (result !== undefined && !result.ok) return m.failed
+  const where = version.detail ?? m.notOnPath
   return version.install === undefined
-    ? `还没装。${where}`
-    : `还没装。点「安装」会逐字执行右边那条命令，${where === version.detail ? where : "装完 Switchback 会自己重新探测"}`
+    ? m.notInstalled(where)
+    : m.clickInstall(where === version.detail ? where : m.redetect)
 }
 
-function messageOf(error: unknown): string {
-  return `安装请求失败：${error instanceof Error ? error.message : String(error)}`
+function messageOf(error: unknown, m: Text): string {
+  return m.requestFailed(error instanceof Error ? error.message : String(error))
 }

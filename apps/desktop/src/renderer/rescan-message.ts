@@ -14,6 +14,9 @@
  * **这一家现在能不能用。** 「起不来」和「没装」在这句总结里是同一拨——
  * 具体差别由那一行自己的状态说明去讲，不在这句话里塞四个词。
  */
+import type { Locale } from "@switchback/i18n"
+import { RESCAN } from "./rescan-message.messages.js"
+
 export interface EngineChange {
   id: string
   label: string
@@ -27,16 +30,16 @@ export interface EngineChange {
  */
 export function rescanMessage(
   changed: readonly EngineChange[],
-  needsRestart: readonly string[] = [],
+  needsRestart: readonly string[],
+  locale: Locale,
 ): string {
+  const m = RESCAN[locale]
   const ready = changed.filter((one) => one.state === "ok").map((one) => one.label)
   const lost = changed.filter((one) => one.state !== "ok").map((one) => one.label)
   const parts: string[] = []
-  if (ready.length > 0) parts.push(`认出了 ${ready.join("、")}`)
-  if (lost.length > 0) parts.push(`${lost.join("、")} 现在用不了了`)
-  if (parts.length === 0) parts.push("查过了，没有变化——装的还是那几家")
-  const tail = needsRestart.length === 0
-    ? ""
-    : `${needsRestart.join("、")} 改过了，但有会话正在用它——关掉那些会话后再点一次，或者重启 Switchback。`
-  return `${parts.join("；")}。${tail}`
+  if (ready.length > 0) parts.push(m.ready(m.join(ready)))
+  if (lost.length > 0) parts.push(m.lost(m.join(lost)))
+  if (parts.length === 0) parts.push(m.none)
+  const tail = needsRestart.length === 0 ? "" : m.restart(m.join(needsRestart))
+  return m.whole(parts, tail)
 }

@@ -9,6 +9,8 @@ import { ChartIcon, EngineIcon, PetIcon, PlusIcon, SparkIcon, ToBottomIcon } fro
 import { FolderIcon } from "./icons-folder.js"
 import { GlobeIcon, TerminalIcon } from "./icons-activity.js"
 import { isRemote } from "../remote/where.js"
+import { useMessages } from "../i18n.js"
+import { SETTINGS_PANEL } from "./SettingsPanel.messages.js"
 
 /**
  * 设置。
@@ -47,12 +49,12 @@ import { isRemote } from "../remote/where.js"
  */
 
 const TABS = [
-  { id: "look", label: "通用", icon: <SparkIcon size={14} /> },
+  { id: "look", icon: <SparkIcon size={14} /> },
   // 排在通用后面：桌宠是**外观**。它既不属于后面那几件「要开的事」，
   // 也不属于分界线下面「拿来看的东西」
-  { id: "pets", label: "桌宠", icon: <PetIcon size={14} /> },
-  { id: "new", label: "新会话", icon: <PlusIcon size={14} /> },
-  { id: "engines", label: "引擎", icon: <EngineIcon size={14} /> },
+  { id: "pets", icon: <PetIcon size={14} /> },
+  { id: "new", icon: <PlusIcon size={14} /> },
+  { id: "engines", icon: <EngineIcon size={14} /> },
   /*
    * **和「引擎」分开的两个理由，第二个是硬的。**
    *
@@ -65,12 +67,12 @@ const TABS = [
    *    挂在引擎页上的话，每次进去改个默认模型都白付一次这个代价——
    *    而那才是引擎页真正的日常用途。
    */
-  { id: "install", label: "安装与接入", icon: <ToBottomIcon size={14} /> },
-  { id: "env", label: "环境", icon: <TerminalIcon size={14} /> },
+  { id: "install", icon: <ToBottomIcon size={14} /> },
+  { id: "env", icon: <TerminalIcon size={14} /> },
   // 排在「看东西」那一段之前：它是一件要**开**的事
-  { id: "remote", label: "远程访问", icon: <GlobeIcon size={14} /> },
-  { id: "activity", label: "活动", icon: <ChartIcon size={14} />, look: true },
-  { id: "data", label: "数据与排查", icon: <FolderIcon size={14} />, look: true },
+  { id: "remote", icon: <GlobeIcon size={14} /> },
+  { id: "activity", icon: <ChartIcon size={14} />, look: true },
+  { id: "data", icon: <FolderIcon size={14} />, look: true },
 ] as const
 
 type TabId = (typeof TABS)[number]["id"]
@@ -165,10 +167,11 @@ function paneOf(tab: TabId, props: SettingsPanelProps, go: (id: TabId) => void):
 
 function Nav({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }): React.JSX.Element {
   const tabs = tabsHere()
+  const m = useMessages(SETTINGS_PANEL)
   // 「看东西」那一段从第几项起（远程窗口少了几页，所以按摆出来的那份数）
   const cut = tabs.findIndex((one) => "look" in one)
   return (
-    <nav className="set__nav" aria-label="设置分类">
+    <nav className="set__nav" aria-label={m.nav}>
       {tabs.map((t, index) => (
         <button
           key={t.id}
@@ -181,7 +184,7 @@ function Nav({ tab, onPick }: { tab: TabId; onPick: (id: TabId) => void }): Reac
           }}
         >
           <span className="set__tabicon">{t.icon}</span>
-          {t.label}
+          {m.tab[t.id]}
         </button>
       ))}
     </nav>
@@ -192,6 +195,7 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
   const [tab, setTab] = useState<TabId>(() => tabsHere().find((one) => one.id === props.initialTab)?.id ?? "look")
   // 这是最上层的模态，却曾经是唯一按 Esc 关不掉的浮层（见 `useModalKeys`）
   const box = useModalKeys(props.onClose)
+  const m = useMessages(SETTINGS_PANEL)
   return (
     <div
       className="set__scrim"
@@ -208,18 +212,18 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="设置"
+        aria-label={m.title}
       >
         {/* 标题收进左列顶上：上一版在整块面板上面横着压了一条 60px 的抬头，
             只写着「设置」和版本号，而左列选中的那一项本来就说明了你在哪儿 */}
         {/* 关闭键浮在右上角，但在 DOM 里排第一个：键盘进来先碰到的还是它 */}
-        <button type="button" className="iconbtn set__close" aria-label="关闭" data-tip="关闭设置（Esc）" onClick={props.onClose}>
+        <button type="button" className="iconbtn set__close" aria-label={m.close} data-tip={m.closeTip} onClick={props.onClose}>
           <CloseIcon />
         </button>
         <div className="set__body">
           <div className="set__side">
             <div className="set__brand">
-              <span className="set__heading">设置</span>
+              <span className="set__heading">{m.title}</span>
               <span className="set__ver">Switchback {props.version}</span>
             </div>
             <Nav tab={tab} onPick={setTab} />
@@ -230,9 +234,9 @@ export function SettingsPanel(props: SettingsPanelProps): React.JSX.Element {
             {/* 页标题那一条吸顶：右上角的关闭键就落在这条带子里，内容滚上来从它底下过，
                 不会再和关闭键叠在一起 */}
             <div className="set__pagehead">
-              <h2 className="set__page-title">{TABS.find((entry) => entry.id === tab)?.label}</h2>
+              <h2 className="set__page-title">{m.tab[tab]}</h2>
             </div>
-            <Suspense fallback={<p className="set__loading" role="status">正在加载设置…</p>}>
+            <Suspense fallback={<p className="set__loading" role="status">{m.loading}</p>}>
               {paneOf(tab, props, setTab)}
             </Suspense>
           </div>

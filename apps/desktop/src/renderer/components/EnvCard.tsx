@@ -8,6 +8,8 @@ import type { ProjectDoc } from "../../main/projectdoc.js"
 import { labelOf } from "./Composer.js"
 import { branchLabel, useWorksite } from "../useWorksite.js"
 import { useLocale } from "../i18n.js"
+import { trustsOf } from "../trusts.js"
+import { ENV_CARD } from "./EnvCard.messages.js"
 
 /**
  * 「这个会话跑在什么环境里」——一张卡片答完。
@@ -45,6 +47,7 @@ export function EnvCard({
   // 都在 `useWorksite` 里，和 `Chips` 共用一份——两份会分头走偏
   const git = useWorksite(thread.id, thread.cwd, "open")
   const locale = useLocale()
+  const m = ENV_CARD[locale]
   const branch = branchLabel(git, locale)
   const [doc, setDoc] = useState<ProjectDoc | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.switchback
@@ -61,32 +64,32 @@ export function EnvCard({
   }, [bridge, thread.cwd, thread.id])
 
   return (
-    <Popover open anchor={anchor} minWidth={260} ariaLabel="环境信息" onClose={onClose}>
+    <Popover open anchor={anchor} minWidth={260} ariaLabel={m.title} onClose={onClose}>
       <div className="env">
-        <div className="env__title">环境信息</div>
-        <Line icon={<FolderIcon />} label="工作区">
+        <div className="env__title">{m.title}</div>
+        <Line icon={<FolderIcon />} label={m.workspace}>
           <bdi>{thread.cwd}</bdi>
         </Line>
         {branch === undefined ? null : (
-          <Line icon={<BranchIcon />} label="分支">
+          <Line icon={<BranchIcon />} label={m.branch}>
             {branch}
             {git.dirtyCount === undefined || git.dirtyCount === 0 ? null : (
-              <span className="env__warn">{git.dirtyCount} 个文件未提交</span>
+              <span className="env__warn">{m.dirty(git.dirtyCount)}</span>
             )}
           </Line>
         )}
-        <Line icon={<EngineIcon />} label="引擎">
+        <Line icon={<EngineIcon />} label={m.engine}>
           {labelOf(engines, thread.engine)}
           {thread.model === undefined ? "" : ` · ${thread.model}`}
         </Line>
-        <Line icon={<ShieldIcon />} label="信任档">
-          {TRUST_TEXT[thread.trust]}
+        <Line icon={<ShieldIcon />} label={m.trust}>
+          {m.trustLine(trustsOf(locale).find((one) => one.id === thread.trust)?.label ?? thread.trust, m.trustNote[thread.trust])}
         </Line>
-        <Line icon={<FileIcon size={15} />} label="说明">
+        <Line icon={<FileIcon size={15} />} label={m.doc}>
           <ProjectDocLine threadId={thread.id} cwd={thread.cwd} doc={doc} onDoc={setDoc} />
         </Line>
         {thread.engineHistory.length <= 1 ? null : (
-          <Line icon={<EngineIcon />} label="接力过">
+          <Line icon={<EngineIcon />} label={m.relayed}>
             {thread.engineHistory.map((e) => labelOf(engines, e)).join(" → ")}
           </Line>
         )}
@@ -99,7 +102,7 @@ export function EnvCard({
             }}
           >
             <RevealIcon size={14} />
-            在访达中显示
+            {m.reveal}
           </button>
           {/* codex 那张卡片上唯一一颗按钮就是「复制分支名称」——
               因为分支名是这里面**最常要粘到别处去**的一个（切分支、提 PR） */}
@@ -112,7 +115,7 @@ export function EnvCard({
             }}
           >
             <CopyIcon size={14} />
-            复制分支名
+            {m.copyBranch}
           </button>
         </div>
       </div>
@@ -120,12 +123,6 @@ export function EnvCard({
   )
 }
 
-/** 三档的名字必须和输入框那个选择器**逐字一致**，理由见 `Composer.tsx` 的 `TRUSTS`。 */
-const TRUST_TEXT = {
-  "read-only": "只读——只读操作可执行，修改与联网会被拒绝",
-  "auto-edit": "自动审批——优先使用引擎原生安全评审",
-  full: "完全访问——允许工作区外操作与联网",
-} as const
 
 function Line({
   icon,
@@ -167,8 +164,9 @@ function ProjectDocLine({
   onDoc: (next: ProjectDoc) => void
 }): React.JSX.Element {
   const bridge = typeof window === "undefined" ? undefined : window.switchback
+  const m = ENV_CARD[useLocale()]
   if (doc === undefined) return <>…</>
-  if (doc.denied === true) return <>项目说明暂时不可用</>
+  if (doc.denied === true) return <>{m.docDenied}</>
   if (doc.agents && doc.linked) {
     return (
       <button
@@ -178,7 +176,7 @@ function ProjectDocLine({
           bridge?.openProjectDoc(threadId, cwd)
         }}
       >
-        AGENTS.md（Claude 也读这份）
+        {m.docShared}
       </button>
     )
   }
@@ -191,7 +189,7 @@ function ProjectDocLine({
           bridge?.openProjectDoc(threadId, cwd)
         }}
       >
-        两份说明各写各的 · 打开看看
+        {m.docSplit}
       </button>
     )
   }
@@ -203,7 +201,7 @@ function ProjectDocLine({
         void bridge?.ensureProjectDoc(threadId, cwd).then(onDoc)
       }}
     >
-      {doc.agents ? "有 AGENTS.md，但 Claude 还读不到 · 建立指向" : "还没有项目说明 · 建一份"}
+      {doc.agents ? m.docLink : m.docCreate}
     </button>
   )
 }

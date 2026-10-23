@@ -63,6 +63,6 @@ describe("rescanMessage", () => {
     },
   ]
   it.each(cases)("$name", ({ changed, restart, want }) => {
-    expect(rescanMessage(changed, restart)).toBe(want)
+    expect(rescanMessage(changed, restart ?? [], "zh-CN")).toBe(want)
   })
 })

@@ -1,5 +1,7 @@
 import { Field, Group } from "./SettingsBits.js"
 import { CopyIcon, RevealIcon } from "./icons.js"
+import { useMessages } from "../i18n.js"
+import { SETTINGS_DATA } from "./SettingsData.messages.js"
 
 /**
  * 「数据与排查」——**东西在哪儿、出问题了往哪儿看**。
@@ -26,47 +28,48 @@ export function DataSection({
   onDiagnose: () => void
   onOpenEngines: () => void
 }): React.JSX.Element {
+  const m = useMessages(SETTINGS_DATA)
   return (
     <>
-      <Group title="东西都在哪儿" hint="Switchback 的全部本地数据都在这一个目录下；换机器时整份带走就行。">
-        <PathRow label="数据目录" path={dataDir} hint="偏好、会话记录、审批规则、附件、日志，都在这儿" onReveal={onReveal} onCopy={onCopy} />
+      <Group title={m.where} hint={m.whereHint}>
+        <PathRow label={m.dataDir} path={dataDir} hint={m.dataDirHint} onReveal={onReveal} onCopy={onCopy} />
         <PathRow
-          label="会话记录"
+          label={m.threads}
           path={`${dataDir}/threads`}
-          shown="数据目录/threads"
-          hint="一条会话一个 .jsonl，追加式。重启之后历史还在，靠的就是它"
+          shown={m.threadsShown}
+          hint={m.threadsHint}
           onReveal={onReveal}
           onCopy={onCopy}
         />
         <PathRow
-          label="运行日志"
+          label={m.log}
           path={`${dataDir}/logs/switchback.log`}
-          shown="数据目录/logs/switchback.log"
-          hint="引擎起停、崩溃、写盘失败都记在这儿。不含对话内容"
+          shown={m.logShown}
+          hint={m.logHint}
           onReveal={onReveal}
           onCopy={onCopy}
         />
       </Group>
-      <Group title="第三方引擎" hint="内置那几家在「引擎」页；这里是你自己往里加的那些。">
+      <Group title={m.thirdParty} hint={m.thirdPartyHint}>
         <Field
-          label="引擎注册表"
+          label={m.registry}
           hint={
             <>
-              一份十行的 JSON，用你自己的编辑器改；存盘后到「安装与接入」点「重新探测」就生效
+              {m.registryHint}
               <br />
-              <code className="set__path" title={`${dataDir}/engines.json`}>数据目录/engines.json</code>
+              <code className="set__path" title={`${dataDir}/engines.json`}>{m.registryShown}</code>
             </>
           }
         >
           <button type="button" className="tbtn" onClick={onOpenEngines}>
-            用编辑器打开
+            {m.openEditor}
           </button>
         </Field>
       </Group>
-      <Group title="出问题了" hint="报问题时把这一份带上，比描述现象快得多。">
-        <Field label="诊断报告" hint="版本、引擎探测结果、崩溃记录、日志尾部，不含会话内容。导出后会在访达里选中它">
+      <Group title={m.trouble} hint={m.troubleHint}>
+        <Field label={m.diagnose} hint={m.diagnoseHint}>
           <button type="button" className="tbtn" onClick={onDiagnose}>
-            导出…
+            {m.export}
           </button>
         </Field>
       </Group>
@@ -91,6 +94,7 @@ function PathRow({ label, path, shown, hint, onReveal, onCopy }: {
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element {
+  const m = useMessages(SETTINGS_DATA)
   return (
     <Field
       label={label}
@@ -105,8 +109,8 @@ function PathRow({ label, path, shown, hint, onReveal, onCopy }: {
       <button
         type="button"
         className="iconbtn"
-        aria-label={`在访达中显示${label}`}
-        data-tip="在访达中显示"
+        aria-label={m.revealOf(label)}
+        data-tip={m.reveal}
         onClick={() => {
           onReveal(path)
         }}
@@ -116,8 +120,8 @@ function PathRow({ label, path, shown, hint, onReveal, onCopy }: {
       <button
         type="button"
         className="iconbtn"
-        aria-label={`复制${label}的路径`}
-        data-tip="复制完整路径"
+        aria-label={m.copyOf(label)}
+        data-tip={m.copy}
         onClick={() => {
           onCopy(path)
         }}

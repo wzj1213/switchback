@@ -1,0 +1,41 @@
+import { defineMessages } from "@switchback/i18n"
+
+/** 设置 → 安装与接入。 */
+export const ENGINE_SHARED = defineMessages(
+  {
+    label: "所有引擎共用",
+    versions: "安装与版本",
+    versionsHint: "内置五家一次列全。只在你点下按钮后才会运行界面上写出的那条原生命令。",
+    versionsMore: "还没装的那几家给出装它要跑的命令——Switchback 确实知道来源的才给，不知道的就照实说不知道。第三方 ACP 引擎在下面几组。",
+    acp: "已接入的 ACP 引擎",
+    acpHint: "写在 engines.json 里的那几家。「试接」只握手不开会话，顺带列出它自己报的登录方式。",
+    acpMore: "升级、移除当场生效——正在被会话用着的那家，要等那些会话关掉。",
+    registry: "从 ACP 注册表接入",
+    registryHint: "ACP 官方注册表里各家自己登记的启动方式。点「接入」先把要执行、要下载的东西摆出来，确认了才装。",
+    registryMore: "确认后装好（只有二进制要装）、握手试接、写进 engines.json，不用重启。打开这一页时，本机那份超过一小时才联网取一次。",
+    manual: "手动接入",
+    manualHint: "注册表里没有的：指一个可执行文件，Switchback 发一次 ACP 的 initialize 试试，答得上来才让你接。",
+    manualMore: "命令和参数由你给（各家进 ACP 模式的写法不同，看它自己的文档），Switchback 不猜。",
+    footBefore: "接好的都写在 ",
+    footAfter: " 里，也可以自己拿编辑器改；改完点上面的「重新探测」，没有会话在用的那几家当场生效。",
+    openRegistry: "打开注册表",
+  },
+  {
+    label: "Shared by all engines",
+    versions: "Install and versions",
+    versionsHint: "All built-in engines are listed. A native command shown here runs only when you click its button.",
+    versionsMore: "For engines not installed yet, the install command is shown only when Switchback actually knows the source; otherwise it says so. Third-party ACP engines are in the groups below.",
+    acp: "Connected ACP engines",
+    acpHint: "The ones in engines.json. “Try” only does the handshake without opening a thread, and lists the sign-in methods it reports.",
+    acpMore: "Upgrades and removals take effect right away; for an engine a thread is using, once those threads close.",
+    registry: "Connect from the ACP registry",
+    registryHint: "Launch methods each engine registered in the official ACP registry. “Connect” first shows what will run and download, and installs only after you confirm.",
+    registryMore: "After you confirm, it installs (only binaries need installing), does a handshake, and writes engines.json, with no restart. Opening this page refetches the local copy only when it's over an hour old.",
+    manual: "Connect manually",
+    manualHint: "For engines not in the registry: point at an executable, Switchback sends one ACP initialize, and lets you connect only if it answers.",
+    manualMore: "You give the command and arguments (each engine enters ACP mode differently; see its docs). Switchback doesn't guess.",
+    footBefore: "Connected engines are written to ",
+    footAfter: ", which you can also edit yourself. Then click “Detect again” above; engines no thread is using take effect right away.",
+    openRegistry: "Open registry",
+  },
+)

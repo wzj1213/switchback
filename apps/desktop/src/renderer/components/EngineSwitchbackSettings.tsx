@@ -3,6 +3,9 @@ import { withEngineEnabled } from "../../shared/engine-access.js"
 import { dshProfileConfirmed, type Settings } from "../../shared/settings.js"
 import type { EngineSettingItem, EngineSettingState } from "../engine-settings-model.js"
 import { Field, Group, Toggle } from "./SettingsBits.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { ENGINE_SWITCHBACK } from "./EngineSwitchbackSettings.messages.js"
 
 /**
  * 「在 Switchback 中」——**这一组里的每一件事都是 Switchback 自己的**。
@@ -42,24 +45,21 @@ export function EngineSwitchbackSettings({
   locked: boolean
   onPatch: (next: Partial<Settings>) => void
 }): React.JSX.Element {
+  const m = useMessages(ENGINE_SWITCHBACK)
   const isDefault = settings.defaultEngine === item.id
   const off = settings.disabledEngines.includes(item.id)
   const ready = item.id !== "dsh" || dshProfileConfirmed(settings.dsh)
   return (
-    <Group title="在 Switchback 中" hint="这一组只改 Switchback 自己的行为；引擎那边一个字节都不动。">
+    <Group title={m.title} hint={m.hint}>
       <Field
-        label="接入"
-        hint={
-          off
-            ? "关着：不探测它、也不出现在引擎选择器里。你在终端里跑这家一切照旧。"
-            : "开着：Switchback 启动时会探它一次，它出现在新会话的引擎选择器里。关掉能省下那次探测。"
-        }
+        label={m.connect}
+        hint={off ? m.off : m.on}
       >
         <Toggle
-          label={`接入 ${item.label}`}
+          label={m.connectToggle(item.label)}
           on={!off}
           disabled={locked}
-          hint={locked ? "至少留一家：全关掉之后新会话一条都开不起来" : undefined}
+          hint={locked ? m.locked : undefined}
           onChange={(on) => {
             // **一次 patch 把两件事一起写**。分两次发的话，两条 IPC 各自回一份合并结果，
             // 后回来的那份可能是先发那次的——界面会闪回旧值
@@ -76,14 +76,14 @@ export function EngineSwitchbackSettings({
       </Field>
       {item.id === "dsh" ? (
         <Field
-          label="原生配置就绪"
-          hint={`确认 ${settings.dsh.profile} 已在 DSH Web 配好 Provider、模型与凭证。ACP 的握手不公开凭证是否就绪，所以只能由你替它作证；确认按 profile 分开记。`}
+          label={m.dshReady}
+          hint={m.dshReadyHint(settings.dsh.profile)}
         >
           <Toggle
-            label="DSH 原生配置就绪"
+            label={m.dshToggle}
             on={ready}
             disabled={off}
-            hint={off ? "先把上面的接入打开" : undefined}
+            hint={off ? m.dshOff : undefined}
             onChange={(on) => {
               const confirmed = new Set(settings.dsh.confirmedProfiles)
               if (on) confirmed.add(settings.dsh.profile)
@@ -93,30 +93,30 @@ export function EngineSwitchbackSettings({
           />
         </Field>
       ) : null}
-      <Field label="新会话默认用这家" hint="钉死这家，或者继续跟随你上一次实际开工用的引擎。">
+      <Field label={m.default} hint={m.defaultHint}>
         <Toggle
-          label={`新会话默认用 ${item.label}`}
+          label={m.defaultToggle(item.label)}
           on={isDefault}
           disabled={off || !ready}
-          hint={off || !ready ? "这家还没接入" : undefined}
+          hint={off || !ready ? m.notConnected : undefined}
           onChange={(on) => {
             onPatch({ defaultEngine: on ? item.id : "" })
           }}
         />
       </Field>
       {/* 状态那两个字已经在这一页抬头的徽章上（`eng-status`），这一行只摆它探到的实情，不再右边再写一遍 */}
-      <Field label="运行状态" hint={state.hint}>
+      <Field label={m.status} hint={state.hint}>
         {null}
       </Field>
-      <Field label="账号" hint={accountHint(account)}>
-        <span className="eng-readout">{account?.label ?? "未报告"}</span>
+      <Field label={m.account} hint={accountHint(account, m)}>
+        <span className="eng-readout">{account?.label ?? m.notReported}</span>
       </Field>
     </Group>
   )
 }
 
 /** 「这家没报」和「你没登录」是两回事。**说不准的时候要说自己说不准。** */
-function accountHint(account: EngineAccount | undefined): string {
-  if (account === undefined) return "这家没有向 Switchback 报告账号；这不等于未登录。"
-  return account.plan === undefined ? "由引擎自己报告" : `由引擎自己报告 · ${account.plan}`
+function accountHint(account: EngineAccount | undefined, m: (typeof ENGINE_SWITCHBACK)[Locale]): string {
+  if (account === undefined) return m.accountMissing
+  return account.plan === undefined ? m.accountReported : m.accountPlan(account.plan)
 }

@@ -1,0 +1,53 @@
+import { defineMessages } from "@switchback/i18n"
+
+/** 设置 → 引擎 → 「在 Switchback 中」那一组。 */
+export const ENGINE_SWITCHBACK = defineMessages(
+  {
+    title: "在 Switchback 中",
+    hint: "这一组只改 Switchback 自己的行为；引擎那边一个字节都不动。",
+    connect: "接入",
+    off: "关着：不探测它、也不出现在引擎选择器里。你在终端里跑这家一切照旧。",
+    on: "开着：Switchback 启动时会探它一次，它出现在新会话的引擎选择器里。关掉能省下那次探测。",
+    connectToggle: (label: string) => `接入 ${label}`,
+    locked: "至少留一家：全关掉之后新会话一条都开不起来",
+    dshReady: "原生配置就绪",
+    dshReadyHint: (profile: string) =>
+      `确认 ${profile} 已在 DSH Web 配好 Provider、模型与凭证。ACP 的握手不公开凭证是否就绪，所以只能由你替它作证；确认按 profile 分开记。`,
+    dshToggle: "DSH 原生配置就绪",
+    dshOff: "先把上面的接入打开",
+    default: "新会话默认用这家",
+    defaultHint: "钉死这家，或者继续跟随你上一次实际开工用的引擎。",
+    defaultToggle: (label: string) => `新会话默认用 ${label}`,
+    notConnected: "这家还没接入",
+    status: "运行状态",
+    account: "账号",
+    notReported: "未报告",
+    accountMissing: "这家没有向 Switchback 报告账号；这不等于未登录。",
+    accountReported: "由引擎自己报告",
+    accountPlan: (plan: string) => `由引擎自己报告 · ${plan}`,
+  },
+  {
+    title: "In Switchback",
+    hint: "These only change how Switchback behaves; nothing on the engine's side is touched.",
+    connect: "Enabled",
+    off: "Off: it isn't detected and doesn't appear in the engine picker. Running it in a terminal works as usual.",
+    on: "On: Switchback detects it once at startup, and it appears in the engine picker for new threads. Turning it off saves that check.",
+    connectToggle: (label) => `Enable ${label}`,
+    locked: "Keep at least one: with all of them off, no new thread can start",
+    dshReady: "Native setup ready",
+    dshReadyHint: (profile) =>
+      `Confirm that ${profile} has its provider, models, and credentials set up in DSH Web. The ACP handshake doesn't say whether credentials are ready, so you vouch for it; confirmations are kept per profile.`,
+    dshToggle: "DSH native setup ready",
+    dshOff: "Turn on the switch above first",
+    default: "Default for new threads",
+    defaultHint: "Pin this engine, or keep following the engine you last used.",
+    defaultToggle: (label) => `Use ${label} for new threads by default`,
+    notConnected: "This engine isn't enabled yet",
+    status: "Status",
+    account: "Account",
+    notReported: "Not reported",
+    accountMissing: "This engine didn't report an account to Switchback; that doesn't mean you're signed out.",
+    accountReported: "Reported by the engine",
+    accountPlan: (plan) => `Reported by the engine · ${plan}`,
+  },
+)

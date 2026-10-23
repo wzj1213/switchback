@@ -4,6 +4,8 @@ import { bridge, useAsync } from "../use-async.js"
 import { PencilIcon } from "./icons-activity.js"
 import { RevealIcon } from "./icons.js"
 import { Blank } from "./SettingsBits.js"
+import { useMessages } from "../i18n.js"
+import { ENGINE_DOORS } from "./EngineDoors.messages.js"
 
 /**
  * 一家引擎实际会读的原生配置来源。
@@ -28,12 +30,13 @@ export function EngineDoors({
     [switchback, cwd, dshProfile],
   )
   const state = useAsync<readonly EngineDoor[]>(load)
+  const m = useMessages(ENGINE_DOORS)
 
-  if (state.failed) return <Blank tone="error">没能读取原生配置来源；可以稍后重开设置再试。</Blank>
-  if (state.data === undefined) return <Blank>正在确认配置来源…</Blank>
+  if (state.failed) return <Blank tone="error">{m.failed}</Blank>
+  if (state.data === undefined) return <Blank>{m.loading}</Blank>
   const rows = state.data.filter((door) => door.id === engine)
   if (rows.length === 0) {
-    return <Blank>这家由 engines.json 接入；Switchback 不知道它自己的配置放在哪里。</Blank>
+    return <Blank>{m.registry}</Blank>
   }
   return (
     <div className="doors">
@@ -51,13 +54,14 @@ function DoorRow({
   door: EngineDoor
   onReveal: (path: string) => void
 }): React.JSX.Element {
+  const m = useMessages(ENGINE_DOORS)
   const editable = door.exists && door.scope !== "managed"
   return (
     <div className={`doors__row${door.exists ? "" : " doors__row--none"}`}>
       <div className="doors__top">
-        <span className={`doors__scope doors__scope--${door.scope}`}>{SCOPE[door.scope]}</span>
+        <span className={`doors__scope doors__scope--${door.scope}`}>{m.scope[door.scope]}</span>
         <span className={`doors__state doors__state--${door.exists ? "ready" : "missing"}`}>
-          {door.exists ? "已存在" : "尚未创建"}
+          {door.exists ? m.exists : m.missing}
         </span>
         <span className="doors__note">{door.note}</span>
         <span className="doors__actions">
@@ -69,15 +73,15 @@ function DoorRow({
                 window.switchback?.openEngineFile(door.path)
               }}
             >
-              <PencilIcon /> 编辑
+              <PencilIcon /> {m.edit}
             </button>
           ) : null}
           {door.exists ? (
             <button
               type="button"
               className="tbtn"
-              aria-label={`在访达中显示 ${door.path}`}
-              title="在访达中显示"
+              aria-label={m.revealPath(door.path)}
+              title={m.reveal}
               onClick={() => {
                 onReveal(door.path)
               }}
@@ -94,8 +98,3 @@ function DoorRow({
   )
 }
 
-const SCOPE: Readonly<Record<EngineDoor["scope"], string>> = {
-  user: "用户级",
-  project: "项目级",
-  managed: "厂商维护",
-}
