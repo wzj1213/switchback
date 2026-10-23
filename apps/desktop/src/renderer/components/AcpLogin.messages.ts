@@ -1,0 +1,43 @@
+import { defineMessages } from "@switchback/i18n"
+
+/** ACP 引擎的登录方式与试接结果。方式的名字与说明是引擎报的，不翻译。 */
+export const ACP_LOGIN = defineMessages(
+  {
+    none: "它没有报任何登录方式：要么不用登录，要么只能照它自己的文档在终端里登。",
+    methods: "登录方式",
+    terminal: "终端",
+    logout: "退出登录",
+    keyNote: "标着 key 的那种要 API key：Switchback 不代收密钥。它会从环境变量里读——写进 engines.json 这一条的 env，或者你的 shell 配置。",
+    howTerminal: "会在「终端」里打开它自己的登录界面",
+    howAgent: "交给它自己办（通常会打开浏览器）",
+    titleWith: (description: string, how: string) => `${description}——${how}`,
+    busy: (method: string) => `正在办「${method}」…浏览器那边走完它才会回话（最多等五分钟）。`,
+    cancel: "取消",
+    terminalOpened: (method: string) => `已在「终端」里打开「${method}」。在那边走完之后回来点「试接」确认。`,
+    done: (method: string) => `「${method}」办完了。之后开的会话就是登录过的。`,
+    failed: "没办成。",
+    trialFailed: "试接失败。",
+    ok: (who: readonly string[]) => `握手成功${who.length === 0 ? "" : `（${who.join(" · ")}）`}。`,
+    noCaps: "它没有声明额外能力。",
+    caps: (list: readonly string[]) => `它认领了：${list.join("、")}。`,
+  },
+  {
+    none: "It reports no sign-in methods: either it doesn't need one, or you sign in from a terminal following its own docs.",
+    methods: "Sign in with",
+    terminal: "Terminal",
+    logout: "Sign out",
+    keyNote: "Methods marked key need an API key. Switchback doesn't collect keys; the engine reads it from an environment variable, set in this entry's env in engines.json or in your shell config.",
+    howTerminal: "Opens its own sign-in screen in Terminal",
+    howAgent: "Handled by the engine itself (usually opens a browser)",
+    titleWith: (description, how) => `${description}. ${how}`,
+    busy: (method) => `Working on “${method}”… It replies once you finish in the browser (up to five minutes).`,
+    cancel: "Cancel",
+    terminalOpened: (method) => `Opened “${method}” in Terminal. When you're done there, come back and click “Try” to confirm.`,
+    done: (method) => `“${method}” is done. Threads you open from now on are signed in.`,
+    failed: "That didn't work.",
+    trialFailed: "The trial failed.",
+    ok: (who) => `Handshake succeeded${who.length === 0 ? "" : ` (${who.join(" · ")})`}. `,
+    noCaps: "It declared no extra capabilities.",
+    caps: (list) => `It claims: ${list.join(", ")}.`,
+  },
+)

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react"
 import type { AcpAuthMethodView, AcpLoginOutcome, ConnectProgress, ConnectResult } from "../shared/acp-registry.js"
 import { announceLoggedIn } from "./acp-login-signal.js"
 import { bridge } from "./use-async.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "./i18n.js"
+import { USE_ACP } from "./use-acp.messages.js"
 
 /**
  * 接一家、登录一家——两件都要等很久（下载、npx 首次运行、浏览器里走 OAuth），
@@ -64,6 +67,7 @@ export function useAcpLogin(name: string): {
   cancel: () => void
 } {
   const switchback = bridge()
+  const locale = useLocale()
   const [state, setState] = useState<LoginState>({})
   const run = (method: string, job: Promise<AcpLoginOutcome> | undefined, signIn: boolean): void => {
     if (job === undefined) return
@@ -80,19 +84,20 @@ export function useAcpLogin(name: string): {
   return {
     state,
     login: (method) => run(method.name, switchback?.acpLogin({ name, methodId: method.id, kind: method.kind }), true),
-    logout: () => run("退出登录", switchback?.acpLogout(name), false),
+    logout: () => run(USE_ACP[locale].logout, switchback?.acpLogout(name), false),
     cancel: () => switchback?.acpCancel(`login:${name}`),
   }
 }
 
 /** 进行中那一步给人看的一句。 */
-export function stepText(step: ConnectProgress | undefined, sizeOf: (bytes: number) => string): string {
-  if (step === undefined) return "准备中…"
+export function stepText(step: ConnectProgress | undefined, sizeOf: (bytes: number) => string, locale: Locale): string {
+  const m = USE_ACP[locale]
+  if (step === undefined) return m.preparing
   if (step.phase === "download") {
-    if (step.received === undefined) return "开始下载…"
-    return `下载中 ${sizeOf(step.received)}${step.total === undefined ? "" : ` / ${sizeOf(step.total)}`}`
+    if (step.received === undefined) return m.startDownload
+    return m.downloading(sizeOf(step.received), step.total === undefined ? undefined : sizeOf(step.total))
   }
-  if (step.phase === "extract") return "解包中…"
-  if (step.phase === "trial") return "握手试接中…（npx / uvx 第一次运行要先下载，可能要一两分钟）"
-  return "写进 engines.json…"
+  if (step.phase === "extract") return m.extracting
+  if (step.phase === "trial") return m.trial
+  return m.writing
 }

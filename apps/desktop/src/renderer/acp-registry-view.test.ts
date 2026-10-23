@@ -33,7 +33,7 @@ describe("ageOf", () => {
     [now - 5 * 24 * 60 * 60_000, "5 天前取的"],
     [now + 60_000, "刚刚取的"],
   ]
-  for (const [at, want] of table) it(want, () => expect(ageOf(at, now)).toBe(want))
+  for (const [at, want] of table) it(want, () => expect(ageOf(at, now, "zh-CN")).toBe(want))
 })
 
 describe("sizeOf / commandLine", () => {
@@ -50,17 +50,17 @@ describe("sizeOf / commandLine", () => {
 
 describe("planText", () => {
   it("npx：说出要执行的那一行，以及第一次会下载什么", () => {
-    const text = planText({ kind: "npx", command: "npx", args: ["-y", "@google/gemini-cli@0.61.0", "--acp"], package: "@google/gemini-cli@0.61.0" })
+    const text = planText({ kind: "npx", command: "npx", args: ["-y", "@google/gemini-cli@0.61.0", "--acp"], package: "@google/gemini-cli@0.61.0" }, "zh-CN")
     expect(text.what).toBe("运行 npx -y @google/gemini-cli@0.61.0 --acp")
     expect(text.note).toContain("@google/gemini-cli@0.61.0")
     expect(text.note).toContain("npm")
   })
   it("二进制：下载地址、有没有校验值、之后怎么起", () => {
-    const text = planText({ kind: "binary", archive: "https://x/goose.tar.bz2", cmd: "./goose", args: ["acp"], sha256: "a".repeat(64) })
+    const text = planText({ kind: "binary", archive: "https://x/goose.tar.bz2", cmd: "./goose", args: ["acp"], sha256: "a".repeat(64) }, "zh-CN")
     expect(text.what).toBe("下载 https://x/goose.tar.bz2")
     expect(text.note).toContain("sha256")
     expect(text.note).toContain("./goose acp")
-    expect(planText({ kind: "binary", archive: "https://x/y", cmd: "./y", args: [] }).note).toContain("没给校验值")
+    expect(planText({ kind: "binary", archive: "https://x/y", cmd: "./y", args: [] }, "zh-CN").note).toContain("没给校验值")
   })
 })
 

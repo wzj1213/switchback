@@ -1,5 +1,8 @@
 import type { AcpTrialView } from "../../shared/acp-registry.js"
 import { useAcpLogin, type LoginState } from "../use-acp.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { ACP_LOGIN } from "./AcpLogin.messages.js"
 
 /**
  * 一家 ACP 引擎报出来的登录方式，一种一颗按钮。
@@ -13,40 +16,41 @@ import { useAcpLogin, type LoginState } from "../use-acp.js"
  */
 export function AcpLogin({ name, trial }: { name: string; trial: AcpTrialView }): React.JSX.Element | null {
   const { state, login, logout, cancel } = useAcpLogin(name)
+  const m = useMessages(ACP_LOGIN)
   const methods = trial.authMethods ?? []
   if (methods.length === 0 && trial.logout !== true) {
-    return <p className="acp-login__note">它没有报任何登录方式：要么不用登录，要么只能照它自己的文档在终端里登。</p>
+    return <p className="acp-login__note">{m.none}</p>
   }
   const keyed = methods.some((method) => method.apiKey === true)
   return (
     <div className="acp-login">
       <div className="acp-login__row">
-        <span className="acp-login__label">登录方式</span>
+        <span className="acp-login__label">{m.methods}</span>
         {methods.map((method) => (
           <button
             key={method.id}
             type="button"
             className="tbtn"
             disabled={state.busy !== undefined}
-            title={titleOf(method.description, method.kind)}
+            title={titleOf(method.description, method.kind, m)}
             onClick={() => {
               login(method)
             }}
           >
             {method.name}
-            {method.kind === "terminal" ? <span className="acp-login__kind">终端</span> : null}
+            {method.kind === "terminal" ? <span className="acp-login__kind">{m.terminal}</span> : null}
             {method.apiKey === true ? <span className="acp-login__kind">key</span> : null}
           </button>
         ))}
         {trial.logout === true ? (
           <button type="button" className="tbtn" disabled={state.busy !== undefined} onClick={logout}>
-            退出登录
+            {m.logout}
           </button>
         ) : null}
       </div>
       {keyed ? (
         <p className="acp-login__note">
-          标着 key 的那种要 API key：Switchback 不代收密钥。它会从环境变量里读——写进 engines.json 这一条的 env，或者你的 shell 配置。
+          {m.keyNote}
         </p>
       ) : null}
       <LoginResult state={state} onCancel={cancel} />
@@ -54,17 +58,18 @@ export function AcpLogin({ name, trial }: { name: string; trial: AcpTrialView })
   )
 }
 
-function titleOf(description: string | undefined, kind: "agent" | "terminal"): string {
-  const how = kind === "terminal" ? "会在「终端」里打开它自己的登录界面" : "交给它自己办（通常会打开浏览器）"
-  return description === undefined ? how : `${description}——${how}`
+function titleOf(description: string | undefined, kind: "agent" | "terminal", m: (typeof ACP_LOGIN)[Locale]): string {
+  const how = kind === "terminal" ? m.howTerminal : m.howAgent
+  return description === undefined ? how : m.titleWith(description, how)
 }
 
 function LoginResult({ state, onCancel }: { state: LoginState; onCancel: () => void }): React.JSX.Element | null {
+  const m = useMessages(ACP_LOGIN)
   if (state.busy !== undefined) {
     return (
       <p className="acp-login__note" role="status">
-        正在办「{state.busy}」…浏览器那边走完它才会回话（最多等五分钟）。
-        <button type="button" className="tbtn acp-login__cancel" onClick={onCancel}>取消</button>
+        {m.busy(state.busy)}
+        <button type="button" className="tbtn acp-login__cancel" onClick={onCancel}>{m.cancel}</button>
       </p>
     )
   }
@@ -74,14 +79,14 @@ function LoginResult({ state, onCancel }: { state: LoginState; onCancel: () => v
     return (
       <p className="acp-login__note acp-login__note--ok" role="status">
         {result.terminal === true
-          ? `已在「终端」里打开「${result.method}」。在那边走完之后回来点「试接」确认。`
-          : `「${result.method}」办完了。之后开的会话就是登录过的。`}
+          ? m.terminalOpened(result.method)
+          : m.done(result.method)}
       </p>
     )
   }
   return (
     <>
-      <p className="acp-login__note acp-login__note--error" role="alert">{result.error ?? "没办成。"}</p>
+      <p className="acp-login__note acp-login__note--error" role="alert">{result.error ?? m.failed}</p>
       {result.stderr === undefined ? null : <pre className="set__log">{result.stderr.slice(-1200)}</pre>}
     </>
   )
@@ -89,22 +94,23 @@ function LoginResult({ state, onCancel }: { state: LoginState; onCancel: () => v
 
 /** 试接的结论一句话，成功就接着摆登录方式。 */
 export function TrialLine({ name, trial }: { name: string; trial: AcpTrialView }): React.JSX.Element {
+  const m = useMessages(ACP_LOGIN)
   if (!trial.ok) {
     return (
       <>
-        <p className="acp-card__note acp-card__note--error" role="alert">{trial.error ?? "试接失败。"}</p>
+        <p className="acp-card__note acp-card__note--error" role="alert">{trial.error ?? m.trialFailed}</p>
         {trial.stderr === undefined ? null : <pre className="set__log">{trial.stderr.slice(-1200)}</pre>}
       </>
     )
   }
   const who = [trial.protocolVersion === undefined ? undefined : `ACP v${String(trial.protocolVersion)}`,
     trial.agent === undefined ? undefined : [trial.agent.title ?? trial.agent.name, trial.agent.version].filter(Boolean).join(" ")]
-    .filter((part) => part !== undefined && part !== "")
+    .filter((part): part is string => part !== undefined && part !== "")
   return (
     <>
       <p className="acp-card__note acp-card__note--ok" role="status">
-        握手成功{who.length === 0 ? "" : `（${who.join(" · ")}）`}。
-        {(trial.capabilities ?? []).length === 0 ? "它没有声明额外能力。" : `它认领了：${(trial.capabilities ?? []).join("、")}。`}
+        {m.ok(who)}
+        {(trial.capabilities ?? []).length === 0 ? m.noCaps : m.caps(trial.capabilities ?? [])}
       </p>
       <AcpLogin name={name} trial={trial} />
     </>

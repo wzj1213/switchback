@@ -3,6 +3,8 @@ import type { AcpEngineRow, RegistryView } from "../../shared/acp-registry.js"
 import { updateOf } from "../acp-registry-view.js"
 import { bridge, useAsync, type Async } from "../use-async.js"
 import { AcpEngineCard } from "./AcpEngineCard.js"
+import { useMessages } from "../i18n.js"
+import { ACP_ENGINES } from "./AcpEngines.messages.js"
 
 /**
  * 已经写进 engines.json 的第三方 ACP 引擎，一家一张卡。
@@ -15,12 +17,13 @@ export function AcpEngines({ engines, registry, onChanged }: {
   registry: RegistryView | undefined
   onChanged: () => void
 }): React.JSX.Element {
+  const m = useMessages(ACP_ENGINES)
   const list = engines.data ?? []
   if (engines.data === undefined) {
-    return <p className="set__blank">{engines.failed ? "读不到 engines.json。" : "正在读…"}</p>
+    return <p className="set__blank">{engines.failed ? m.unreadable : m.reading}</p>
   }
   if (list.length === 0) {
-    return <p className="set__blank">还没接过第三方 ACP 引擎。从下面的注册表里挑一家，或者指一个可执行文件。</p>
+    return <p className="set__blank">{m.none}</p>
   }
   return (
     <div className="acp-cards">

@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { bridge } from "../use-async.js"
 import { Actions, Field } from "./SettingsBits.js"
+import { useMessages } from "../i18n.js"
+import { ACP_CONNECT } from "./AcpConnect.messages.js"
 
 /**
  * 接一家 Switchback 还不认识的 ACP 引擎。
@@ -32,6 +34,7 @@ interface Trial {
 
 export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Element {
   const switchback = bridge()
+  const m = useMessages(ACP_CONNECT)
   const [command, setCommand] = useState("")
   const [args, setArgs] = useState("")
   const [label, setLabel] = useState("")
@@ -70,23 +73,23 @@ export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Ele
           type="button"
           className="tbtn"
           disabled={busy || command.trim() === ""}
-          title="发一次 ACP 的 initialize。只握手，不会开会话、也不会让它开始干活"
+          title={m.tryTip}
           onClick={() => {
             setTrial(undefined)
             setNote(undefined)
             run(
               (switchback?.tryAcpEngine({ command: command.trim(), args: argv }) ??
-                Promise.resolve({ ok: false, error: "没有可用的桥接。" })).then(setTrial),
+                Promise.resolve({ ok: false, error: m.noBridge })).then(setTrial),
             )
           }}
         >
-          {busy ? "正在试…" : "试一下"}
+          {busy ? m.trying : m.try}
         </button>
         <button
           type="button"
           className="tbtn"
           disabled={busy || trial?.ok !== true}
-          title={trial?.ok === true ? "写进 engines.json 并当场接上" : "先试通过再接"}
+          title={trial?.ok === true ? m.addTip : m.tryFirst}
           onClick={() => {
             const named = label.trim() === "" ? command.trim() : label.trim()
             run(
@@ -95,8 +98,8 @@ export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Ele
                 label: named,
                 command: command.trim(),
                 args: argv,
-              }) ?? Promise.resolve({ ok: false, error: "没有可用的桥接。" })).then((done) => {
-                setNote(done.ok ? `已接入 ${done.id ?? named}，现在就能在引擎里选它。` : done.error)
+              }) ?? Promise.resolve({ ok: false, error: m.noBridge })).then((done) => {
+                setNote(done.ok ? m.added(done.id ?? named) : done.error)
                 // 接完把表单清空：留着上一条会让人以为还没提交，然后再点一次
                 //（第二次会撞上「已经有一条叫 X 的了」，看起来像出了错）
                 if (done.ok) {
@@ -110,7 +113,7 @@ export function AcpConnect({ onAdded }: { onAdded?: () => void }): React.JSX.Ele
             )
           }}
         >
-          接入
+          {m.connect}
         </button>
       </Actions>
       <TrialResult trial={trial} note={note} />
@@ -141,9 +144,10 @@ function Inputs({
   onLabel: (next: string) => void
   onBrowse: () => void
 }): React.JSX.Element {
+  const m = useMessages(ACP_CONNECT)
   return (
     <>
-      <Field label="可执行文件" hint="命令名或绝对路径。装在 PATH 上的直接写名字" stack>
+      <Field label={m.exe} hint={m.exeHint} stack>
         <div className="acp-add__row">
           <input
             className="set__input"
@@ -152,11 +156,11 @@ function Inputs({
             onChange={(e) => onCommand(e.target.value)}
           />
           <button type="button" className="tbtn" disabled={busy} onClick={onBrowse}>
-            浏览…
+            {m.browse}
           </button>
         </div>
       </Field>
-      <Field label="参数" hint="进 ACP 模式要带的那几个；不用就空着。各家写法不同，看它自己的文档" stack>
+      <Field label={m.args} hint={m.argsHint} stack>
         <input
           className="set__input"
           value={args}
@@ -164,7 +168,7 @@ function Inputs({
           onChange={(e) => onArgs(e.target.value)}
         />
       </Field>
-      <Field label="显示名" hint="留空就用可执行文件的名字" stack>
+      <Field label={m.name} hint={m.nameHint} stack>
         <input
           className="set__input"
           value={label}
@@ -178,13 +182,14 @@ function Inputs({
 
 /** 试接结果。**成功和失败都要说得具体**——「不可用」等于什么都没说。 */
 function TrialResult({ trial, note }: { trial?: Trial; note?: string }): React.JSX.Element | null {
+  const m = useMessages(ACP_CONNECT)
   if (note !== undefined) return <p className="set__blank">{note}</p>
   if (trial === undefined) return null
   if (!trial.ok) {
     return (
       <>
         <p className="set__blank set__blank--error" role="alert">
-          {trial.error ?? "试接失败。"}
+          {trial.error ?? m.trialFailed}
         </p>
         {/* **它自己打的那几行是唯一的线索**，别吞掉 */}
         {trial.stderr === undefined ? null : <pre className="set__log">{trial.stderr.slice(-1200)}</pre>}
@@ -195,9 +200,9 @@ function TrialResult({ trial, note }: { trial?: Trial; note?: string }): React.J
   const logins = (trial.authMethods ?? []).map((method) => method.name)
   return (
     <p className="set__blank">
-      握手成功{trial.protocolVersion === undefined ? "" : `（ACP v${String(trial.protocolVersion)}）`}。
-      {caps.length === 0 ? "它没有声明任何能力——那只是没声明，不代表不行。" : `它认领了：${caps.join("、")}。`}
-      {logins.length === 0 ? "" : `它报了这些登录方式：${logins.join("、")}——接入后在上面「已接入的 ACP 引擎」里登录。`}
+      {m.ok(trial.protocolVersion)}
+      {caps.length === 0 ? m.noCaps : m.caps(m.join(caps))}
+      {logins.length === 0 ? "" : m.logins(m.join(logins))}
     </p>
   )
 }

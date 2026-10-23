@@ -1,5 +1,7 @@
 import type { AcpEngineRow, LaunchPlan, RegistryRow, RegistryView } from "../shared/acp-registry.js"
 import { BUILTIN_ENGINE_LABELS, type BuiltinEngineId } from "../shared/builtin-engines.js"
+import type { Locale } from "@switchback/i18n"
+import { ACP_VIEW } from "./acp-registry-view.messages.js"
 
 /**
  * 「安装与接入」页 ACP 那几块的纯计算：筛选、说多旧、说多大、把要执行的东西写成一行字。
@@ -19,13 +21,14 @@ export function filterRows(rows: readonly RegistryRow[], query: string): readonl
 }
 
 /** 「12 分钟前」这类说法。离线时人要知道手上这份清单有多旧。 */
-export function ageOf(at: number | undefined, now: number): string {
-  if (at === undefined) return "还没取到过"
+export function ageOf(at: number | undefined, now: number, locale: Locale): string {
+  const m = ACP_VIEW[locale]
+  if (at === undefined) return m.never
   const minutes = Math.max(0, Math.floor((now - at) / 60_000))
-  if (minutes < 1) return "刚刚取的"
-  if (minutes < 60) return `${String(minutes)} 分钟前取的`
+  if (minutes < 1) return m.justNow
+  if (minutes < 60) return m.minutesAgo(minutes)
   const hours = Math.floor(minutes / 60)
-  return hours < 48 ? `${String(hours)} 小时前取的` : `${String(Math.floor(hours / 24))} 天前取的`
+  return hours < 48 ? m.hoursAgo(hours) : m.daysAgo(Math.floor(hours / 24))
 }
 
 export function sizeOf(bytes: number): string {
@@ -43,17 +46,18 @@ export function commandLine(command: string, args: readonly string[]): string {
 }
 
 /** 「接入」前摆出来的那两句：要做什么、做之前你该知道什么。 */
-export function planText(plan: LaunchPlan): { what: string; note: string } {
+export function planText(plan: LaunchPlan, locale: Locale): { what: string; note: string } {
+  const m = ACP_VIEW[locale]
   if (plan.kind === "binary") {
     const run = commandLine(plan.cmd, plan.args)
     return {
-      what: `下载 ${plan.archive}`,
-      note: `${plan.sha256 === undefined ? "注册表没给校验值" : `按注册表的 sha256 校验`}，解到 Switchback 数据目录的 agents/ 下，之后以 ${run} 启动。`,
+      what: m.download(plan.archive),
+      note: m.binaryNote(plan.sha256 === undefined ? m.noSha : m.sha, run),
     }
   }
   return {
-    what: `运行 ${commandLine(plan.command, plan.args)}`,
-    note: `第一次运行时 ${plan.kind} 会下载 ${plan.package}（走你自己的 ${plan.kind === "npx" ? "npm" : "uv"} 配置），之后用本机缓存。`,
+    what: m.run(commandLine(plan.command, plan.args)),
+    note: m.packageNote(plan.kind, plan.package, plan.kind === "npx" ? "npm" : "uv"),
   }
 }
 

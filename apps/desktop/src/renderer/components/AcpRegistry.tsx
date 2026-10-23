@@ -4,6 +4,9 @@ import { ageOf, builtinTwin, filterRows } from "../acp-registry-view.js"
 import { useAcpConnect } from "../use-acp.js"
 import { ConnectStatus } from "./AcpConnectStatus.js"
 import { ExternalLink } from "./external-link.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "../i18n.js"
+import { ACP_REGISTRY } from "./AcpRegistry.messages.js"
 
 /**
  * ACP 官方注册表里的各家：筛一筛、点「接入」。
@@ -19,9 +22,11 @@ export function AcpRegistry({ view, loading, failed, onRefresh, onChanged }: {
   onChanged: () => void
 }): React.JSX.Element {
   const [query, setQuery] = useState("")
+  const locale = useLocale()
+  const m = ACP_REGISTRY[locale]
   const rows = filterRows(view?.rows ?? [], query)
   const fold = useFold(rows, query)
-  const status = statusOf(view, loading)
+  const status = statusOf(view, loading, locale)
   return (
     <div className="acp-reg">
       <div className="acp-reg__bar">
@@ -29,19 +34,19 @@ export function AcpRegistry({ view, loading, failed, onRefresh, onChanged }: {
           className="set__input acp-reg__search"
           type="search"
           value={query}
-          placeholder="按名字、作者或描述筛选"
-          aria-label="筛选注册表"
+          placeholder={m.placeholder}
+          aria-label={m.filter}
           onChange={(event) => {
             setQuery(event.target.value)
           }}
         />
         <span className="acp-reg__age">{status}</span>
-        <button type="button" className="tbtn" disabled={loading} onClick={onRefresh} title="不管本机那份新不新，现在就从网上取一次">
-          {loading ? "取中…" : "刷新"}
+        <button type="button" className="tbtn" disabled={loading} onClick={onRefresh} title={m.refreshTip}>
+          {loading ? m.fetching : m.refresh}
         </button>
       </div>
       {view?.error === undefined ? null : <p className="acp-reg__error" role="alert">{view.error}</p>}
-      {failed && view === undefined ? <p className="acp-reg__error" role="alert">读不到注册表。</p> : null}
+      {failed && view === undefined ? <p className="acp-reg__error" role="alert">{m.unreadable}</p> : null}
       <ul className="acp-reg__list">
         {fold.shown.map((row) => (
           <AcpRegistryRow key={row.id} row={row} onChanged={onChanged} />
@@ -49,7 +54,7 @@ export function AcpRegistry({ view, loading, failed, onRefresh, onChanged }: {
       </ul>
       {fold.toggle}
       {view !== undefined && view.rows.length > 0 && rows.length === 0 ? (
-        <p className="acp-reg__empty">没有匹配「{query}」的。</p>
+        <p className="acp-reg__empty">{m.noMatch(query)}</p>
       ) : null}
     </div>
   )
@@ -64,6 +69,7 @@ const FIRST = 8
 /** 折起来的那几行和「显示全部」那颗开关。有筛选词时不折：那时要的就是全部匹配。 */
 function useFold(rows: readonly RegistryRow[], query: string): { shown: readonly RegistryRow[]; toggle: React.ReactNode } {
   const [all, setAll] = useState(false)
+  const m = useMessages(ACP_REGISTRY)
   if (query.trim() !== "" || rows.length <= FIRST) return { shown: rows, toggle: null }
   return {
     shown: all ? rows : rows.slice(0, FIRST),
@@ -76,15 +82,16 @@ function useFold(rows: readonly RegistryRow[], query: string): { shown: readonly
           setAll((was) => !was)
         }}
       >
-        {all ? "收起" : `显示全部 ${String(rows.length)} 家`}
+        {all ? m.less : m.all(rows.length)}
       </button>
     ),
   }
 }
 
-function statusOf(view: RegistryView | undefined, loading: boolean): string {
-  if (view === undefined) return loading ? "正在取注册表…" : ""
-  return `${String(view.rows.length)} 家 · ${ageOf(view.fetchedAt, Date.now())}`
+function statusOf(view: RegistryView | undefined, loading: boolean, locale: Locale): string {
+  const m = ACP_REGISTRY[locale]
+  if (view === undefined) return loading ? m.loading : ""
+  return m.status(view.rows.length, ageOf(view.fetchedAt, Date.now(), locale))
 }
 
 function AcpRegistryRow({ row, onChanged }: { row: RegistryRow; onChanged: () => void }): React.JSX.Element {
@@ -92,9 +99,9 @@ function AcpRegistryRow({ row, onChanged }: { row: RegistryRow; onChanged: () =>
   const open = connect.state.phase !== "idle"
   // **动词在点下去那一刻定**：接完之后清单会重读，这一行随即变成「已接入」——
   // 那时再现算，第一次接入的结果会被写成「已升级」
-  const [verb, setVerb] = useState<"接入" | "升级">("接入")
+  const [verb, setVerb] = useState<"connect" | "upgrade">("connect")
   const ask = (): void => {
-    setVerb(row.connected === undefined ? "接入" : "升级")
+    setVerb(row.connected === undefined ? "connect" : "upgrade")
     connect.ask()
   }
   return (
@@ -124,24 +131,26 @@ function AcpRegistryRow({ row, onChanged }: { row: RegistryRow; onChanged: () =>
 /** Switchback 已经内置了原生入口的那几家：标一下，不拦。 */
 function Twin({ id }: { id: string }): React.JSX.Element | null {
   const builtin = builtinTwin(id)
+  const m = useMessages(ACP_REGISTRY)
   if (builtin === undefined) return null
   return (
-    <span className="acp-row__twin" title={`Switchback 已内置 ${builtin}，走它自己的原生入口；这一条是它的 ACP 版本，接了会在引擎下拉里另占一项`}>
-      已内置
+    <span className="acp-row__twin" title={m.twinTip(builtin)}>
+      {m.twin}
     </span>
   )
 }
 
 /** 行尾那一格：接入 / 升级 / 已接入 / 起不了。流程展开时让位给下面那块。 */
 function RowAction({ row, idle, onAsk }: { row: RegistryRow; idle: boolean; onAsk: () => void }): React.JSX.Element | null {
+  const m = useMessages(ACP_REGISTRY)
   if (!idle) return null
   if (row.connected !== undefined && !row.connected.update) {
-    return <span className="acp-row__done" title={`engines.json 里的 ${row.connected.name}`}>已接入</span>
+    return <span className="acp-row__done" title={m.connectedTip(row.connected.name)}>{m.connected}</span>
   }
-  if (row.plan === undefined) return <span className="acp-row__missing" title={row.missing}>起不了</span>
+  if (row.plan === undefined) return <span className="acp-row__missing" title={row.missing}>{m.cantRun}</span>
   return (
     <button type="button" className="tbtn" onClick={onAsk}>
-      {row.connected === undefined ? "接入" : `升级到 v${row.version}`}
+      {row.connected === undefined ? m.connect : m.upgradeTo(row.version)}
     </button>
   )
 }
