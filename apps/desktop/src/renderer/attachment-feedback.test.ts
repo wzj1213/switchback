@@ -26,7 +26,7 @@ describe("附件拖放反馈", () => {
 
   for (const row of cases) {
     it(row.name, () => {
-      expect(hoverHint(reviewAttachments(row.files), row.enabled)).toEqual({ tone: row.tone, text: row.text })
+      expect(hoverHint(reviewAttachments(row.files), row.enabled, "zh-CN")).toEqual({ tone: row.tone, text: row.text })
     })
   }
 
@@ -42,18 +42,18 @@ describe("附件拖放反馈", () => {
   })
 
   it("落下后把附件、引用、失败和工作区外路径都说清", () => {
-    expect(dropNotice({ images: 1, references: 2, failed: 1, outside: 1 })).toBe(
+    expect(dropNotice({ images: 1, references: 2, failed: 1, outside: 1 }, "zh-CN")).toBe(
       "已添加 1 张图片，并引用 2 个文件；另有 1 个文件未能读取。其中 1 个在当前工作区外，已保留绝对路径；能否读取由引擎权限决定。",
     )
   })
 
   it("没有一个路径能读取时不把失败句写成成功语气", () => {
-    expect(dropNotice({ images: 0, references: 0, failed: 2, outside: 0 }))
+    expect(dropNotice({ images: 0, references: 0, failed: 2, outside: 0 }, "zh-CN"))
       .toBe("未添加：2 个文件未能读取。")
   })
 
   it("重复项既不计入成功数量，也明确说明没有再次添加", () => {
-    expect(dropNotice({ images: 0, references: 0, failed: 0, outside: 0, duplicates: 2 }))
+    expect(dropNotice({ images: 0, references: 0, failed: 0, outside: 0, duplicates: 2 }, "zh-CN"))
       .toBe("没有重复添加：2 个文件已经在待发送内容中。")
   })
 })
@@ -69,4 +69,19 @@ describe("一次粘贴按文件收还是按文字收", () => {
     { name: "纯文字：不是文件", types: ["text/plain"], items: textOnly, text: "hello", want: false },
   ]
   for (const c of cases) it(c.name, () => expect(pastesFiles(c.types, c.items, c.text)).toBe(c.want))
+})
+
+describe("英文那版的附件提示", () => {
+  const cases: readonly (readonly [string, string | undefined, string])[] = [
+    ["拖着", hoverHint(reviewAttachments([{ type: "image/png", size: 10 }, { type: "text/plain", size: 10 }]), true, "en").text,
+      "Drop to add 1 image and reference 1 file"],
+    ["几段拼成一句", dropNotice({ images: 1, references: 2, failed: 1, outside: 1 }, "en"),
+      "Added 1 image and referenced 2 files; 1 other file couldn't be read. 1 of them is outside this workspace, so the absolute path is kept; whether the engine can read it depends on its permissions."],
+    ["全失败", dropNotice({ images: 0, references: 0, failed: 2, outside: 0 }, "en"), "Not added: 2 files couldn't be read."],
+  ]
+  for (const [name, got, want] of cases) {
+    it(name, () => {
+      expect(got).toBe(want)
+    })
+  }
 })

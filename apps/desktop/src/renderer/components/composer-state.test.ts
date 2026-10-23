@@ -14,7 +14,7 @@ describe("输入区发送状态", () => {
       "当前引擎或模型不支持图片附件；附件已保留，请移除或切换后再发"],
     ["普通图片可发送", { attachments: 1, canAttach: true, pending: false, aside: false }, undefined],
   ] as const)("%s", (_name, state, expected) => {
-    expect(attachmentWarning(state)).toBe(expected)
+    expect(attachmentWarning(state, "zh-CN")).toBe(expected)
   })
 
   it("附件被挡住时发送键禁用，即使还有正文", () => {

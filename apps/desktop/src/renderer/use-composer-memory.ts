@@ -5,6 +5,8 @@ import { useAsideMode } from "./use-aside-mode.js"
 import { useAttachments } from "./useAttachments.js"
 import { useDraftBlocks, type DraftBlocks } from "./use-draft-blocks.js"
 import type { DraftBlock } from "./composer-blocks.js"
+import { useMessages } from "./i18n.js"
+import { COMPOSER_MEMORY } from "./use-composer-memory.messages.js"
 
 /** 侧问只收文字；此时新图片走用户可见的路径引用，不能先收下再锁死发送。 */
 export function imageAttachmentsEnabled(canAttach: boolean, aside: boolean): boolean {
@@ -30,6 +32,7 @@ export function useComposerMemory(options: {
   const [initial] = useState(() => recallComposerDraft(options.drafts, options.threadId, options.engine))
   // 重启后读回来的草稿里有图已经不在了：说一声，不悄悄少一张
   const [missing] = useState(() => options.drafts.missing(options.threadId))
+  const m = useMessages(COMPOSER_MEMORY)
   const aside = useAsideMode({
     can: options.canAside,
     prefill: options.prefill,
@@ -38,7 +41,7 @@ export function useComposerMemory(options: {
   })
   const imageAttachments = imageAttachmentsEnabled(options.canAttach, aside.on)
   const attach = useAttachments(imageAttachments, initial?.attachments, missing === undefined ? undefined : {
-    text: `上次没发出去的草稿里有 ${String(missing)} 张图已经不在了，没能放回来`,
+    text: m.missing(missing),
     tone: "warn",
   })
   const blocks = useDraftBlocks(initial?.blocks)

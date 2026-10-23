@@ -1,4 +1,6 @@
 import type { SlashCommand } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { SWITCHBACK_COMMANDS } from "./switchbackCommands.messages.js"
 
 /**
  * Switchback 自己的斜杠命令。
@@ -35,30 +37,24 @@ export function switchbackCommands(acts: {
   onCompact?: () => void
   /** 承接上一段：把上一家引擎那份原始记录的路径填进输入框。没有可承接的就不给。 */
   onPickup?: { run: () => void; from: string }
-}): readonly SwitchbackAction[] {
+}, locale: Locale): readonly SwitchbackAction[] {
+  const { label, description: about, pickup } = SWITCHBACK_COMMANDS[locale]
   const list: (SwitchbackAction | undefined)[] = [
-    make("new", "新建会话", "在当前工作区另开一个", acts.onNew),
-    make("rename", "重命名", "给这个会话改个名字", acts.onRename),
-    make("env", "环境信息", "看这个会话跑在什么环境里", acts.onEnv),
-    make("timeline", "引擎时间线", "这条会话都被哪几家引擎跑过、记录在哪", acts.onTimeline),
-    make("export", "导出对话", "整段复制成 Markdown", acts.onExport),
+    make("new", label.new, about.new, acts.onNew),
+    make("rename", label.rename, about.rename, acts.onRename),
+    make("env", label.env, about.env, acts.onEnv),
+    make("timeline", label.timeline, about.timeline, acts.onTimeline),
+    make("export", label.export, about.export, acts.onExport),
     // 下面这几条**没有对象就不给**：一个点了没反应的命令比没有这条命令更糟
-    make("fork", "分叉", "用另一家引擎另开一条同工作区分支", acts.onFork),
-    make("handoff", "接力", "换一家引擎接着做这个会话", acts.onHandoff),
+    make("fork", label.fork, about.fork, acts.onFork),
+    make("handoff", label.handoff, about.handoff, acts.onHandoff),
     // 名字里带上是谁：这条命令的全部价值就在「承接的是哪一段」，
     // 写成干巴巴的「承接上一段」的话，一条会话切过三家之后你不知道拿到的是谁那份
-    make(
-      "pickup",
-      "承接上一段",
-      acts.onPickup === undefined
-        ? ""
-        : `把 ${acts.onPickup.from} 那份原始记录的路径填进输入框，让新的一家自己去读`,
-      acts.onPickup?.run,
-    ),
-    make("compare", "对比", "和分叉出来的那个并排比一比", acts.onCompare),
-    make("stop", "停止", "打断正在跑的这一轮", acts.onStop),
-    make("compact", "压缩上下文", "让引擎把前面的对话总结掉，腾出窗口继续", acts.onCompact),
-    make("settings", "设置", "打开设置", acts.onSettings),
+    make("pickup", label.pickup, acts.onPickup === undefined ? "" : pickup(acts.onPickup.from), acts.onPickup?.run),
+    make("compare", label.compare, about.compare, acts.onCompare),
+    make("stop", label.stop, about.stop, acts.onStop),
+    make("compact", label.compact, about.compact, acts.onCompact),
+    make("settings", label.settings, about.settings, acts.onSettings),
   ]
   return list.filter((a): a is SwitchbackAction => a !== undefined)
 }

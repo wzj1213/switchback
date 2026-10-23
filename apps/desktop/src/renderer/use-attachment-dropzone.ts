@@ -5,6 +5,8 @@ import {
   reviewAttachments,
   type DropHint,
 } from "./attachment-feedback.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "./i18n.js"
 
 function filesOf(items: DataTransferItemList): readonly Pick<File, "type" | "size">[] {
   return Array.from(items)
@@ -16,8 +18,8 @@ function isFileTransfer(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes("Files") || hasFileItems(transfer.items)
 }
 
-function inspect(transfer: DataTransfer, enabled: boolean): DropHint {
-  return hoverHint(reviewAttachments(filesOf(transfer.items)), enabled)
+function inspect(transfer: DataTransfer, options: Options): DropHint {
+  return hoverHint(reviewAttachments(filesOf(transfer.items)), options.enabled, options.locale)
 }
 
 function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
@@ -27,6 +29,7 @@ function keepSame(previous: DropHint | undefined, next: DropHint): DropHint {
 interface Options {
   enabled: boolean
   drop: (files: FileList | null) => DropHint | undefined
+  locale: Locale
 }
 
 const TASK_SURFACE = ".main, .workbench:not([hidden]), .rv"
@@ -74,13 +77,13 @@ function listeners(
       event.preventDefault()
       cancelExpiry(expiry)
       depth.current += 1
-      setHint(inspect(transfer, current.current.enabled))
+      setHint(inspect(transfer, current.current))
     },
     dragover: (event) => {
       const transfer = transferOf(event)
       if (transfer === undefined) return
       event.preventDefault()
-      const next = inspect(transfer, current.current.enabled)
+      const next = inspect(transfer, current.current)
       transfer.dropEffect = next.tone === "ready" ? "copy" : "none"
       setHint((previous) => keepSame(previous, next))
     },
@@ -127,8 +130,9 @@ export function useAttachmentDropzone(
   const [hint, setHint] = useState<DropHint>()
   const depth = useRef(0)
   const expiry = useRef<number | undefined>(undefined)
-  const current = useRef<Options>({ enabled, drop })
-  current.current = { enabled, drop }
+  const locale = useLocale()
+  const current = useRef<Options>({ enabled, drop, locale })
+  current.current = { enabled, drop, locale }
   useEffect(() => {
     const stop = listenForFiles(listeners(depth, expiry, setHint, current))
     return () => { stop(); cancelExpiry(expiry) }

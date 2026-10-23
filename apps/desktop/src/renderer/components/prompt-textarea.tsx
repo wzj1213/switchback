@@ -5,6 +5,9 @@ import type { useMentions } from "../useMentions.js"
 import type { useSlash } from "../useSlash.js"
 import { pastesFiles } from "../attachment-feedback.js"
 import { worthFolding } from "../composer-blocks.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { PROMPT_TEXTAREA } from "./prompt-textarea.messages.js"
 
 export function promptPlaceholder(state: {
   command: SlashCommand | undefined
@@ -14,16 +17,17 @@ export function promptPlaceholder(state: {
   /** 历史会话先交代的那一句（`history-note.ts`）；活会话缺席。 */
   history?: string
   aside: boolean
-}): string {
-  if (state.command !== undefined) return state.command.argumentHint ?? "输入参数（可选）"
+}, locale: Locale): string {
+  const m = PROMPT_TEXTAREA[locale]
+  if (state.command !== undefined) return state.command.argumentHint ?? m.args
   // 侧问模式排在最前：它改的是**这一句去哪儿**，比「它还在跑」更要紧——
   // 那几句说的都是「什么时候到」，而这一句说的是「到不到正文里」
-  if (state.aside) return "问一句不进正文的话…（Esc 退回普通发送）"
-  if (state.starting) return "引擎正在启动，起来就能发。"
-  if (state.steering) return "它还在跑——回车排队，⌘⏎ 直接插入当前轮次。"
-  if (state.queueing) return "它还在跑——回车排队，这一轮停下后发送。"
+  if (state.aside) return m.aside
+  if (state.starting) return m.starting
+  if (state.steering) return m.steering
+  if (state.queueing) return m.queueing
   if (state.history !== undefined) return state.history
-  return "交代任务…（可拖入文件，@ 搜索，/ 用命令）"
+  return m.idle
 }
 
 interface Props {
@@ -49,6 +53,7 @@ interface Props {
 }
 
 export function PromptTextarea(props: Props): React.JSX.Element {
+  const m = useMessages(PROMPT_TEXTAREA)
   useEffect(() => {
     if (props.mentions.pendingPath !== undefined) props.choose(props.mentions.pendingPath)
   }, [props.choose, props.mentions.pendingPath])
@@ -58,7 +63,7 @@ export function PromptTextarea(props: Props): React.JSX.Element {
       className="composer__input"
       placeholder={props.placeholder}
       value={props.value}
-      aria-label={props.command === undefined ? "任务" : `${props.command.name} 的参数`}
+      aria-label={props.command === undefined ? m.task : m.argsOf(props.command.name)}
       onChange={(event) => {
         props.onChange(event.target.value)
         props.mentions.refresh(event.target.value, event.target.selectionStart)

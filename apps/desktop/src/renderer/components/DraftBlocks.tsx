@@ -2,7 +2,7 @@ import type { DraftBlock } from "../composer-blocks.js"
 import { fileChip, pasteChip } from "../composer-blocks.js"
 import { CloseIcon, LinesIcon } from "./icons-panel.js"
 import { FileIcon } from "./icons-activity.js"
-import { useMessages } from "../i18n.js"
+import { useLocale } from "../i18n.js"
 import { DRAFT_BLOCKS } from "./DraftBlocks.messages.js"
 
 /**
@@ -26,10 +26,11 @@ function Chip({
   block: DraftBlock
   onRemove: () => void
 }): React.JSX.Element {
-  const m = useMessages(DRAFT_BLOCKS)
+  const locale = useLocale()
+  const m = DRAFT_BLOCKS[locale]
   const file = block.kind === "file" ? fileChip(block.path) : undefined
   const title = block.kind === "file" ? block.path : peekOf(block.text)
-  const label = block.kind === "file" ? "" : (block.label ?? pasteChip(block.text))
+  const label = block.kind === "file" ? "" : (block.label ?? pasteChip(block.text, locale))
   return (
     <span className="dblock" title={title}>
       <span className="dblock__glyph" aria-hidden="true">

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react"
 import { splitPath } from "../diff.js"
+import { useMessages } from "../i18n.js"
+import { MENTION_LIST } from "./MentionList.messages.js"
 
 /**
  * `@` 文件引用的候选列表。
@@ -26,6 +28,7 @@ export function MentionList({
   onPick: (path: string) => void
   onRetry: () => void
 }): React.JSX.Element | null {
+  const m = useMessages(MENTION_LIST)
   const box = useRef<HTMLDivElement>(null)
 
   // 键盘上下移动时把选中项滚进视野——不然按到第八条就看不见自己在哪了
@@ -40,7 +43,7 @@ export function MentionList({
   return (
     <div className="mentions">
       <MentionScope cwd={cwd} />
-      <div ref={box} role="listbox" aria-label={`工作区文件：${cwd}`}>
+      <div ref={box} role="listbox" aria-label={m.files(cwd)}>
         {paths.map((path, i) => {
           const { dir, name } = splitPath(path)
           return (
@@ -70,9 +73,10 @@ export function MentionList({
 }
 
 function MentionScope({ cwd }: { cwd: string }): React.JSX.Element {
+  const m = useMessages(MENTION_LIST)
   return (
     <div className="mentions__scope">
-      <span>搜索范围</span>
+      <span>{m.scope}</span>
       <bdi title={cwd}>{cwd}</bdi>
     </div>
   )
@@ -84,16 +88,17 @@ export function MentionStatus({ cwd, loading, failed, onRetry }: {
   failed: boolean
   onRetry: () => void
 }): React.JSX.Element {
+  const m = useMessages(MENTION_LIST)
   const state = loading
-    ? <div className="mentions__status" role="status">正在搜索工作区文件…</div>
+    ? <div className="mentions__status" role="status">{m.searching}</div>
     : !failed
-      ? <div className="mentions__status" role="status">没有匹配的工作区文件</div>
+      ? <div className="mentions__status" role="status">{m.none}</div>
       : (
         <div className="mentions__status" role="alert">
-          <span>文件搜索失败</span>
+          <span>{m.failed}</span>
           <button type="button" className="mentions__retry" onMouseDown={(event) => {
             event.preventDefault()
-          }} onClick={onRetry}>重试</button>
+          }} onClick={onRetry}>{m.retry}</button>
         </div>
       )
   return (

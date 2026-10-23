@@ -1,8 +1,20 @@
 import { canAttachImage, imageExtension, MAX_IMAGE_BYTES } from "../shared/attachments.js"
-import { dropNotice, type AttachmentSummary } from "./attachment-feedback.js"
+import { dropNotice, unavailableNotice, type AttachmentSummary } from "./attachment-feedback.js"
 import { fileReference } from "./file-references.js"
+import type { Locale } from "@switchback/i18n"
 
 type Bridge = Pick<NonNullable<Window["switchback"]>, "pathForFile" | "pickFiles" | "stashImage">
+
+/**
+ * 一次收文件的上下文：图片能不能当附件、主进程那条桥、落在哪个工作区、提示说哪种语言。
+ * 收成一个对象是参数个数闸门逼的，也省得三个入口各排一遍参数顺序。
+ */
+export interface AttachContext {
+  enabled: boolean
+  bridge: Bridge | undefined
+  cwd: string
+  locale: Locale
+}
 
 export interface AttachmentResult {
   paths: readonly string[]
@@ -12,10 +24,10 @@ export interface AttachmentResult {
   notice?: { text: string; tone: "info" | "warn" }
 }
 
-function unavailable(): AttachmentResult {
+function unavailable(locale: Locale): AttachmentResult {
   return {
     paths: [], references: [],
-    notice: { text: "文件入口暂时不可用，请重新打开 Switchback。", tone: "warn" },
+    notice: { text: unavailableNotice(locale), tone: "warn" },
   }
 }
 
@@ -50,7 +62,7 @@ async function stash(bridge: Bridge, file: File): Promise<string | undefined> {
   }
 }
 
-function finish(result: Routed): AttachmentResult {
+function finish(result: Routed, locale: Locale): AttachmentResult {
   const paths = [...new Set(result.paths)]
   const references = [...new Set(result.references)]
   const outsideReferences = [...new Set(result.outside)]
@@ -58,7 +70,7 @@ function finish(result: Routed): AttachmentResult {
   const summary = { images: paths.length, references: references.length,
     failed: result.failed, outside: outsideReferences.length, duplicates,
     ...(result.oversized === undefined ? {} : { oversized: result.oversized }) }
-  const text = dropNotice(summary)
+  const text = dropNotice(summary, locale)
   return {
     paths,
     references,
@@ -91,42 +103,31 @@ async function routePasted(
   }
 }
 
-export async function pasteFiles(
-  items: DataTransferItemList | null,
-  enabled: boolean,
-  bridge: Bridge | undefined,
-  cwd: string,
-): Promise<AttachmentResult> {
+export async function pasteFiles(items: DataTransferItemList | null, ctx: AttachContext): Promise<AttachmentResult> {
+  const { enabled, bridge, cwd, locale } = ctx
   const files = Array.from(items ?? []).filter((item) => item.kind === "file").map((item) => item.getAsFile())
-  if (bridge === undefined) return unavailable()
+  if (bridge === undefined) return unavailable(locale)
   const result: Routed = { paths: [], references: [], failed: 0, outside: [] }
   for (const file of files) await routePasted(result, file, { enabled, bridge, cwd })
-  return finish(result)
+  return finish(result, locale)
 }
 
-export function droppedFiles(
-  list: FileList | null,
-  enabled: boolean,
-  bridge: Bridge | undefined,
-  cwd: string,
-): AttachmentResult {
+export function droppedFiles(list: FileList | null, ctx: AttachContext): AttachmentResult {
+  const { enabled, bridge, cwd, locale } = ctx
   const files = Array.from(list ?? [])
-  if (bridge === undefined) return unavailable()
+  if (bridge === undefined) return unavailable(locale)
   const result: Routed = { paths: [], references: [], failed: 0, outside: [] }
   for (const file of files) {
     const path = pathOf(bridge, file)
     if (enabled && canAttachImage(file) && path !== "") result.paths.push(path)
     else routeReference(result, cwd, path)
   }
-  return finish(result)
+  return finish(result, locale)
 }
 
-export async function pickedFiles(
-  bridge: Bridge | undefined,
-  enabled: boolean,
-  cwd: string,
-): Promise<AttachmentResult> {
-  if (bridge === undefined) return unavailable()
+export async function pickedFiles(ctx: AttachContext): Promise<AttachmentResult> {
+  const { enabled, bridge, cwd, locale } = ctx
+  if (bridge === undefined) return unavailable(locale)
   try {
     const picked = await bridge.pickFiles()
     if (picked.canceled) return { paths: [], references: [] }
@@ -135,8 +136,8 @@ export async function pickedFiles(
       if (enabled && file.image) routed.paths.push(file.path)
       else routeReference(routed, cwd, file.path)
     }
-    return finish(routed)
+    return finish(routed, locale)
   } catch {
-    return unavailable()
+    return unavailable(locale)
   }
 }

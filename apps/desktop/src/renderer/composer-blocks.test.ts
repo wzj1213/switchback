@@ -30,8 +30,8 @@ describe("芯片上写什么", () => {
     expect(fileChip("README.md")).toEqual({ parent: "", name: "README.md" })
   })
   it("粘贴块报行数，够大才补字节", () => {
-    expect(pasteChip("a\nb\nc")).toBe("粘贴文本 · 3 行")
-    expect(pasteChip("x".repeat(2048))).toBe("粘贴文本 · 1 行 · 2.0 KB")
+    expect(pasteChip("a\nb\nc", "zh-CN")).toBe("粘贴文本 · 3 行")
+    expect(pasteChip("x".repeat(2048), "zh-CN")).toBe("粘贴文本 · 1 行 · 2.0 KB")
   })
 })
 

@@ -1,4 +1,6 @@
 import { appendFileReferences, formatFileReference } from "./file-references.js"
+import type { Locale } from "@switchback/i18n"
+import { COMPOSER_BLOCKS } from "./composer-blocks.messages.js"
 
 /**
  * 输入框上方那排「待发的东西」。
@@ -53,12 +55,11 @@ export function fileChip(path: string): { parent: string; name: string } {
 }
 
 /** 粘贴芯片上那行字。行数是人对「这坨有多大」的直觉单位，字节只在够大时才补。 */
-export function pasteChip(text: string): string {
+export function pasteChip(text: string, locale: Locale): string {
+  const m = COMPOSER_BLOCKS[locale]
   const lines = text.split("\n").length
   const kb = text.length / 1024
-  return kb < 1
-    ? `粘贴文本 · ${String(lines)} 行`
-    : `粘贴文本 · ${String(lines)} 行 · ${kb.toFixed(kb < 10 ? 1 : 0)} KB`
+  return kb < 1 ? m.paste(lines) : m.pasteSize(lines, kb.toFixed(kb < 10 ? 1 : 0))
 }
 
 function pathsOf(blocks: readonly DraftBlock[]): readonly string[] {

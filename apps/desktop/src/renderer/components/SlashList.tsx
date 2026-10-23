@@ -13,6 +13,8 @@ import {
 } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 import { FileSearchIcon } from "./icons-panel.js"
+import { useMessages } from "../i18n.js"
+import { SLASH_LIST } from "./SlashList.messages.js"
 
 /**
  * Switchback 自己那几条各配各的图标——**它们和界面上已有的动作是同一件事**，
@@ -63,6 +65,7 @@ export function SlashList({
   active: number
   onPick: (command: SlashCommand) => void
 }): React.JSX.Element | null {
+  const m = useMessages(SLASH_LIST)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -77,7 +80,7 @@ export function SlashList({
           {/* 来源一变就起一节。**分节是给「行为不同」用的**：
               引擎的技能发给引擎，Switchback 那几条就地执行 */}
           {command.source === commands[i - 1]?.source ? null : (
-            <div className="slash__head">{SECTION[command.source]}</div>
+            <div className="slash__head">{m.section[command.source]}</div>
           )}
           <Row command={command} query={query} active={i === active} onPick={onPick} />
         </Fragment>
@@ -87,10 +90,6 @@ export function SlashList({
 }
 
 /** 分节抬头的字。照 codex 那张：小字、灰、贴在第一条上面。 */
-const SECTION: Readonly<Record<SlashCommand["source"], string>> = {
-  engine: "技能",
-  switchback: "Switchback",
-}
 
 /**
  * 「这条命令是哪儿来的」，画在最右边——codex 那张图上就是这一列。
@@ -98,11 +97,6 @@ const SECTION: Readonly<Record<SlashCommand["source"], string>> = {
  * 不是装饰：`system` 是引擎自带的，`user` 是你自己写的，
  * **出了问题该去改哪儿完全不同**。
  */
-const SCOPE: Readonly<Record<NonNullable<SlashCommand["scope"]>, string>> = {
-  user: "个人",
-  project: "项目",
-  system: "系统",
-}
 
 /**
  * 名字里被打中的那几个字加粗。
@@ -138,6 +132,7 @@ function Row({
   // 引擎技能的 label 是 displayName（「berth 收编」），但真正要打进输入框的是
   // `name`。两者不同就把 `/name` 也画出来——菜单上显示一个、插进去另一个，
   // 第一次遇到时人会以为自己点错了
+  const m = useMessages(SLASH_LIST)
   const named = command.label !== undefined && command.label !== command.name
   return (
     <button
@@ -169,7 +164,7 @@ function Row({
         ) : null}
       </span>
       <span className="slash__desc">{command.description}</span>
-      {command.scope === undefined ? null : <span className="slash__scope">{SCOPE[command.scope]}</span>}
+      {command.scope === undefined ? null : <span className="slash__scope">{m.scope[command.scope]}</span>}
     </button>
   )
 }

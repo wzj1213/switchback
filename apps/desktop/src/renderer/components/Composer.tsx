@@ -9,6 +9,7 @@ import { useComposerFocus } from "../use-composer-focus.js"
 import type { ComposerFileReference } from "../file-references.js"
 import { ComposerBody } from "./composer-body.js"
 import type { HistoryNote } from "../history-note.js"
+import { useLocale } from "../i18n.js"
 
 export interface ComposerProps {
   threadId: string
@@ -110,7 +111,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
     canAttach: props.canAttach,
     pending: props.pending !== undefined,
     aside: aside.on,
-  })
+  }, useLocale())
   const attachmentBlocked = attachWarning !== undefined
   const mode = stateOf({ starting, held: props.history?.held === true, busy, canSteer: props.canSteer })
   const draft = useComposerDraft({

@@ -15,6 +15,9 @@
  *
  * 拎出来是复杂度闸门逼的，但边界也对：这是一次判定，不是渲染。
  */
+import type { Locale } from "@switchback/i18n"
+import { COMPOSER_STATE } from "./composer-state.messages.js"
+
 export function stateOf(o: { starting: boolean; held: boolean; busy: boolean; canSteer: boolean }): {
   blocked: boolean
   queueing: boolean
@@ -62,10 +65,11 @@ export function attachmentWarning(o: {
   canAttach: boolean
   pending: boolean
   aside: boolean
-}): string | undefined {
+}, locale: Locale): string | undefined {
+  const m = COMPOSER_STATE[locale]
   if (o.attachments === 0) return undefined
-  if (o.aside) return "侧问不支持图片附件；图片已保留，请移除或退出侧问后再发"
-  if (o.pending) return "请先完成引擎切换，再确认新引擎能否接收这些附件；附件会保留"
-  if (!o.canAttach) return "当前引擎或模型不支持图片附件；附件已保留，请移除或切换后再发"
+  if (o.aside) return m.aside
+  if (o.pending) return m.pending
+  if (!o.canAttach) return m.unsupported
   return undefined
 }

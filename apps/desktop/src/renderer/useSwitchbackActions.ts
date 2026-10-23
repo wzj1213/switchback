@@ -90,5 +90,5 @@ export function useSwitchbackActions(
             send({ type: "thread.interrupt", threadId: thread.id })
           },
         }),
-  })
+  }, locale)
 }

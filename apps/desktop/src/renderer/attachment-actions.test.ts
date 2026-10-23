@@ -35,7 +35,7 @@ describe("附件三种入口", () => {
 
   it("拖入时图片走附件、普通文件写成工作区引用", () => {
     const files = [image("a.png"), image("code.ts", "text/typescript")] as unknown as FileList
-    expect(droppedFiles(files, true, bridge, "/tmp")).toEqual({
+    expect(droppedFiles(files, { enabled: true, bridge, cwd: "/tmp", locale: "zh-CN" })).toEqual({
       paths: ["/tmp/a.png"],
       references: ["code.ts"],
       summary: { images: 1, references: 1, failed: 0, outside: 0, duplicates: 0 },
@@ -46,7 +46,7 @@ describe("附件三种入口", () => {
 
   it("模型不支持图片不妨碍源码成为可见引用", () => {
     const files = [image("code.ts", "text/typescript")] as unknown as FileList
-    expect(droppedFiles(files, false, bridge, "/tmp")).toEqual({
+    expect(droppedFiles(files, { enabled: false, bridge, cwd: "/tmp", locale: "zh-CN" })).toEqual({
       paths: [],
       references: ["code.ts"],
       summary: { images: 0, references: 1, failed: 0, outside: 0, duplicates: 0 },
@@ -57,7 +57,7 @@ describe("附件三种入口", () => {
 
   it("图片附件关闭时，拖入的图片也保留为可见引用", () => {
     const files = [image("a.png")] as unknown as FileList
-    expect(droppedFiles(files, false, bridge, "/tmp")).toEqual({
+    expect(droppedFiles(files, { enabled: false, bridge, cwd: "/tmp", locale: "zh-CN" })).toEqual({
       paths: [],
       references: ["a.png"],
       summary: { images: 0, references: 1, failed: 0, outside: 0, duplicates: 0 },
@@ -70,7 +70,7 @@ describe("附件三种入口", () => {
     const items = [image("a.png"), image("notes.txt", "text/plain")].map((file) => ({
       kind: "file", getAsFile: () => file,
     })) as unknown as DataTransferItemList
-    expect(await pasteFiles(items, true, bridge, "/tmp")).toEqual({
+    expect(await pasteFiles(items, { enabled: true, bridge, cwd: "/tmp", locale: "zh-CN" })).toEqual({
       paths: ["/saved/png.png"],
       references: ["notes.txt"],
       summary: { images: 1, references: 1, failed: 0, outside: 0, duplicates: 0 },
@@ -85,7 +85,7 @@ describe("附件三种入口", () => {
       arrayBuffer: async () => { throw new Error("read failed") },
     } as File
     const items = [{ kind: "file", getAsFile: () => broken }] as unknown as DataTransferItemList
-    expect(await pasteFiles(items, true, bridge, "/tmp")).toEqual({
+    expect(await pasteFiles(items, { enabled: true, bridge, cwd: "/tmp", locale: "zh-CN" })).toEqual({
       paths: [],
       references: ["broken.png"],
       summary: { images: 0, references: 1, failed: 0, outside: 0, duplicates: 0 },
@@ -98,7 +98,7 @@ describe("附件三种入口", () => {
     const huge = image("shot.png", "image/png", 13 * 1024 * 1024)
     const items = [{ kind: "file", getAsFile: () => huge }] as unknown as DataTransferItemList
     const clipboard = { ...bridge, pathForFile: (): string => "" }
-    expect(await pasteFiles(items, true, clipboard, "/tmp")).toMatchObject({
+    expect(await pasteFiles(items, { enabled: true, bridge: clipboard, cwd: "/tmp", locale: "zh-CN" })).toMatchObject({
       paths: [],
       references: [],
       notice: { text: "未添加：1 张图片超过 12 MB。", tone: "warn" },
@@ -107,7 +107,7 @@ describe("附件三种入口", () => {
 
   it("工作区外文件保留绝对路径并提示引擎权限", () => {
     const files = [image("spec.pdf", "application/pdf")] as unknown as FileList
-    expect(droppedFiles(files, true, bridge, "/work/switchback")).toEqual({
+    expect(droppedFiles(files, { enabled: true, bridge, cwd: "/work/switchback", locale: "zh-CN" })).toEqual({
       paths: [],
       references: ["/tmp/spec.pdf"],
       summary: { images: 0, references: 1, failed: 0, outside: 1, duplicates: 0 },
@@ -120,7 +120,7 @@ describe("附件三种入口", () => {
   })
 
   it("系统选择器与拖入走同一套图片附件和文件引用分流", async () => {
-    expect(await pickedFiles(bridge, true, "/picked")).toEqual({
+    expect(await pickedFiles({ enabled: true, bridge, cwd: "/picked", locale: "zh-CN" })).toEqual({
       paths: ["/picked/a.png"],
       references: ["code.ts"],
       summary: { images: 1, references: 1, failed: 0, outside: 0, duplicates: 0 },
@@ -130,7 +130,7 @@ describe("附件三种入口", () => {
   })
 
   it("模型不支持图片时，选择的图片也保留为可见引用", async () => {
-    expect(await pickedFiles(bridge, false, "/picked")).toEqual({
+    expect(await pickedFiles({ enabled: false, bridge, cwd: "/picked", locale: "zh-CN" })).toEqual({
       paths: [],
       references: ["a.png", "code.ts"],
       summary: { images: 0, references: 2, failed: 0, outside: 0, duplicates: 0 },
@@ -141,12 +141,12 @@ describe("附件三种入口", () => {
 
   it("系统选择器取消时不制造提示", async () => {
     const canceled = { ...bridge, pickFiles: async () => ({ files: [], failed: 0, canceled: true }) }
-    expect(await pickedFiles(canceled, true, "/picked")).toEqual({ paths: [], references: [] })
+    expect(await pickedFiles({ enabled: true, bridge: canceled, cwd: "/picked", locale: "zh-CN" })).toEqual({ paths: [], references: [] })
   })
 
   it("同批重复图片在生成通知前只计一次", () => {
     const files = [image("a.png"), image("a.png")] as unknown as FileList
-    expect(droppedFiles(files, true, bridge, "/tmp")).toMatchObject({
+    expect(droppedFiles(files, { enabled: true, bridge, cwd: "/tmp", locale: "zh-CN" })).toMatchObject({
       paths: ["/tmp/a.png"],
       summary: { images: 1, references: 0, failed: 0, outside: 0, duplicates: 1 },
       notice: {
@@ -159,9 +159,10 @@ describe("附件三种入口", () => {
   it("再次拖入正文与附件已有文件时不制造假成功", () => {
     const files = [image("a.png"), image("code.ts", "text/typescript")] as unknown as FileList
     const result = withoutExistingAttachments(
-      droppedFiles(files, true, bridge, "/tmp"),
+      droppedFiles(files, { enabled: true, bridge, cwd: "/tmp", locale: "zh-CN" }),
       new Set(["/tmp/a.png"]),
       "检查 @code.ts ",
+      "zh-CN",
     )
     expect(result).toMatchObject({
       paths: [], references: [],

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import type { SlashCommand } from "@switchback/protocol"
+import { LOCALES, type Locale } from "@switchback/i18n"
+import { useLocale } from "./i18n.js"
+import { ASIDE_MODE } from "./use-aside-mode.messages.js"
 
 /**
  * 侧问模式：**这一句发出去不进正文**。
@@ -30,12 +33,13 @@ import type { SlashCommand } from "@switchback/protocol"
  * 以及输入框和发送键的样子。摊回 `Composer` 里就是四段互相看不见的 if——
  * 收在这里，`Composer` 只剩「把它接上」。
  */
-export const ASIDE_COMMAND: SlashCommand = {
-  name: "侧问",
-  label: "侧问",
-  description: "问一句不进正文的话——答案落在转录区，但不进发给引擎的上下文",
-  source: "switchback",
+export function asideCommand(locale: Locale): SlashCommand {
+  const m = ASIDE_MODE[locale]
+  return { name: m.name, label: m.label, description: m.description, source: "switchback" }
 }
+
+/** 两种语言的命令名都认：语言是在列表画出来之后才切的，也照样接得住。 */
+const ASIDE_NAMES: ReadonlySet<string> = new Set(LOCALES.map((locale) => ASIDE_MODE[locale].name))
 
 type Send = (text: string, attachments: readonly string[], steer: boolean) => void
 
@@ -80,6 +84,7 @@ export function useAsideMode(options: {
   initial?: boolean
 }): AsideMode {
   const [on, setOn] = useState(options.initial === true)
+  const locale = useLocale()
   // **能力没了就退出。** 换引擎、断开、或者会话被回放成历史都会走到这里；
   // 留在一个发不出去的模式里，用户下一次回车会什么都不发生
   useEffect(() => {
@@ -103,12 +108,12 @@ export function useAsideMode(options: {
   return {
     on: live,
     exit,
-    commands: (base) => (options.can ? [ASIDE_COMMAND, ...base] : base),
+    commands: (base) => (options.can ? [asideCommand(locale), ...base] : base),
     take: (command, clear) => {
       /* `/侧问` **就地进模式**，不走 `onSwitchback`：那一路是「工作区能做的事」
          （新建、分叉、导出…），而这一条改的是**手上这一句的去向**，
          它的状态本来就住在输入框里。 */
-      if (command.source !== "switchback" || command.name !== ASIDE_COMMAND.name) return false
+      if (command.source !== "switchback" || !ASIDE_NAMES.has(command.name)) return false
       clear()
       setOn(true)
       return true

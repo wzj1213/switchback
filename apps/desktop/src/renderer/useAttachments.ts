@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { droppedFiles, pasteFiles, pickedFiles, type AttachmentResult } from "./attachment-actions.js"
 import { dropNotice } from "./attachment-feedback.js"
 import { newFileReferences } from "./file-references.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "./i18n.js"
 
 /**
  * 输入区的附件：贴进来、拖进来、去掉。
@@ -50,6 +52,7 @@ export function withoutExistingAttachments(
   result: AttachmentResult,
   existingPaths: ReadonlySet<string>,
   text: string,
+  locale: Locale,
 ): AttachmentResult {
   if (result.summary === undefined) return result
   const paths = result.paths.filter((path) => !existingPaths.has(path))
@@ -64,7 +67,7 @@ export function withoutExistingAttachments(
     duplicates: result.summary.duplicates + result.paths.length - paths.length
       + result.references.length - references.length,
   }
-  const notice = dropNotice(summary)
+  const notice = dropNotice(summary, locale)
   return {
     paths,
     references,
@@ -96,9 +99,10 @@ export function useAttachments(
   const knownPaths = useRef(new Set(initial))
   const [notice, setNotice] = useAttachmentNotice(initialNotice)
   const bridge = typeof window === "undefined" ? undefined : window.switchback
+  const locale = useLocale()
 
   const accept = useCallback((raw: AttachmentResult, text: string): AttachmentAcceptance => {
-    const result = withoutExistingAttachments(raw, knownPaths.current, text)
+    const result = withoutExistingAttachments(raw, knownPaths.current, text, locale)
     if (result.paths.length > 0) {
       // 同一张图贴两次没有意义，而且会让模型多读一遍
       for (const path of result.paths) knownPaths.current.add(path)
@@ -106,23 +110,23 @@ export function useAttachments(
     }
     setNotice(result.notice)
     return attachmentAcceptance(result)
-  }, [])
+  }, [locale])
 
   const paste = useCallback(async (
     items: DataTransferItemList | null,
     cwd: string,
     text: string,
   ): Promise<readonly string[]> => {
-    return accept(await pasteFiles(items, enabled, bridge, cwd), text).references
-  }, [accept, bridge, enabled])
+    return accept(await pasteFiles(items, { enabled, bridge, cwd, locale }), text).references
+  }, [accept, bridge, enabled, locale])
 
   const drop = useCallback((files: FileList | null, cwd: string, text: string): AttachmentAcceptance => {
-    return accept(droppedFiles(files, enabled, bridge, cwd), text)
-  }, [accept, bridge, enabled])
+    return accept(droppedFiles(files, { enabled, bridge, cwd, locale }), text)
+  }, [accept, bridge, enabled, locale])
 
   const pick = useCallback(async (cwd: string, text: string): Promise<readonly string[]> => {
-    return accept(await pickedFiles(bridge, enabled, cwd), text).references
-  }, [accept, bridge, enabled])
+    return accept(await pickedFiles({ enabled, bridge, cwd, locale }), text).references
+  }, [accept, bridge, enabled, locale])
 
   return {
     paths,

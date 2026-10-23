@@ -36,7 +36,7 @@ describe("promptPlaceholder", () => {
         steering: false,
         queueing: true,
         aside: true,
-      }),
+      }, "zh-CN"),
     ).toBe("问一句不进正文的话…（Esc 退回普通发送）")
   })
 
@@ -48,7 +48,7 @@ describe("promptPlaceholder", () => {
         steering: false,
         queueing: false,
         aside: true,
-      }),
+      }, "zh-CN"),
     ).toBe("<service>")
   })
 
@@ -61,7 +61,7 @@ describe("promptPlaceholder", () => {
         queueing: false,
         history: "历史会话：直接发话，会先接回 Codex 原来的会话。",
         aside: false,
-      }),
+      }, "zh-CN"),
     ).toBe("历史会话：直接发话，会先接回 Codex 原来的会话。")
   })
 
@@ -74,7 +74,7 @@ describe("promptPlaceholder", () => {
           steering: false,
           queueing: false,
             aside: false,
-        }),
+        }, "zh-CN"),
       ).toBe(row.want)
     })
   }

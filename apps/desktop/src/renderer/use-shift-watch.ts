@@ -56,6 +56,7 @@ function describe(entry: ShiftEntry): string {
       return `${nameOf(s.node)} Δ${String(dx)},${String(dy)}`
     })
     .join(" / ")
+  // i18n-ok：开发用的控制台警告，不上界面
   return `窗口回来之后界面跳了一下（${entry.value.toFixed(3)}）：${moved === "" ? "没报出是谁" : moved}`
 }
 

@@ -1,4 +1,8 @@
 import { imageExtension, MAX_IMAGE_BYTES } from "../shared/attachments.js"
+import type { Locale } from "@switchback/i18n"
+import { ATTACHMENT_FEEDBACK } from "./attachment-feedback.messages.js"
+
+type Text = (typeof ATTACHMENT_FEEDBACK)[Locale]
 
 export interface AttachmentReview {
   total: number
@@ -61,15 +65,16 @@ export function pastesFiles(types: readonly string[], items: ArrayLike<ItemLike>
   return !rich || text.trim() === ""
 }
 
-export function hoverHint(review: AttachmentReview, enabled: boolean): DropHint {
+export function hoverHint(review: AttachmentReview, enabled: boolean, locale: Locale): DropHint {
+  const m = ATTACHMENT_FEEDBACK[locale]
   const images = enabled ? review.accepted : 0
   const references = review.total - images
-  if (review.total === 0) return { tone: "ready", text: "松手添加文件" }
+  if (review.total === 0) return { tone: "ready", text: m.dropAny }
   if (images > 0 && references > 0) {
-    return { tone: "ready", text: `松手添加 ${String(images)} 张图片并引用 ${String(references)} 个文件` }
+    return { tone: "ready", text: m.dropBoth(images, references) }
   }
-  if (images > 0) return { tone: "ready", text: `松手添加 ${String(images)} 张图片` }
-  return { tone: "ready", text: `松手引用 ${String(references)} 个文件` }
+  if (images > 0) return { tone: "ready", text: m.dropImages(images) }
+  return { tone: "ready", text: m.dropRefs(references) }
 }
 
 export function failedDropHint(notice: { text: string; tone: "info" | "warn" }): DropHint {
@@ -80,15 +85,15 @@ export function failedDropHint(notice: { text: string; tone: "info" | "warn" }):
   }
 }
 
-function addedText(images: number, references: number): string {
-  if (images > 0 && references > 0) return `已添加 ${String(images)} 张图片，并引用 ${String(references)} 个文件`
-  if (images > 0) return `已添加 ${String(images)} 张图片`
-  return references > 0 ? `已引用 ${String(references)} 个文件` : ""
+function addedText(images: number, references: number, m: Text): string {
+  if (images > 0 && references > 0) return m.addedBoth(images, references)
+  if (images > 0) return m.addedImages(images)
+  return references > 0 ? m.addedRefs(references) : ""
 }
 
 /** 接一句：前面什么都没说就用打头的说法，否则用「；另有……」接上。 */
-function clause(text: string, lead: string, follow: string): string {
-  return text === "" ? lead : `${text}；${follow}`
+function clause(text: string, lead: string, follow: string, m: Text): string {
+  return text === "" ? lead : m.join(text, follow)
 }
 
 export function dropNotice(summary: {
@@ -98,20 +103,19 @@ export function dropNotice(summary: {
   outside: number
   duplicates?: number
   oversized?: number
-}): string | undefined {
+}, locale: Locale): string | undefined {
+  const m = ATTACHMENT_FEEDBACK[locale]
   const { images, references, failed, outside, duplicates = 0, oversized = 0 } = summary
   const limit = `${String(MAX_IMAGE_BYTES / 1024 / 1024)} MB`
-  let text = addedText(images, references)
-  if (oversized > 0) {
-    text = clause(text, `未添加：${String(oversized)} 张图片超过 ${limit}`, `另有 ${String(oversized)} 张图片超过 ${limit}，没有添加`)
-  }
-  if (failed > 0) text = clause(text, `未添加：${String(failed)} 个文件未能读取`, `另有 ${String(failed)} 个文件未能读取`)
-  if (duplicates > 0) {
-    text = clause(text, `没有重复添加：${String(duplicates)} 个文件已经在待发送内容中`,
-      `另有 ${String(duplicates)} 个文件已经在待发送内容中，没有重复添加`)
-  }
-  if (outside > 0) {
-    text += `。其中 ${String(outside)} 个在当前工作区外，已保留绝对路径；能否读取由引擎权限决定`
-  }
-  return text === "" ? undefined : `${text}。`
+  let text = addedText(images, references, m)
+  if (oversized > 0) text = clause(text, m.oversizedLead(oversized, limit), m.oversizedFollow(oversized, limit), m)
+  if (failed > 0) text = clause(text, m.failedLead(failed), m.failedFollow(failed), m)
+  if (duplicates > 0) text = clause(text, m.duplicateLead(duplicates), m.duplicateFollow(duplicates), m)
+  if (outside > 0) text += m.outside(outside)
+  return text === "" ? undefined : m.end(text)
+}
+
+/** 文件入口（主进程那条桥）不在时的那一句。 */
+export function unavailableNotice(locale: Locale): string {
+  return ATTACHMENT_FEEDBACK[locale].unavailable
 }

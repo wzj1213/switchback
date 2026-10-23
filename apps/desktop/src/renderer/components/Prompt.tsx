@@ -6,6 +6,7 @@ import { ghostOf } from "../slash.js"
 import { SlashList } from "./SlashList.js"
 import { CommandToken } from "./command-token.js"
 import { PromptTextarea, promptPlaceholder } from "./prompt-textarea.js"
+import { useLocale } from "../i18n.js"
 
 /**
  * 输入区：文本框 ＋ `@` 文件引用 ＋ `/` 命令面板。
@@ -76,6 +77,7 @@ export function Prompt({
   onAsideExit?: () => void
 }): React.JSX.Element {
   const mentions = useMentions(cwd, searchFiles)
+  const locale = useLocale()
   const slash = useSlash(commands)
 
   const choose = (path: string): void => {
@@ -123,7 +125,7 @@ export function Prompt({
           placeholder={promptPlaceholder({
             command, starting, steering, queueing, aside: asideMode,
             ...(history === undefined ? {} : { history }),
-          })}
+          }, locale)}
           mentions={mentions}
           slash={slash}
           onChange={onChange}

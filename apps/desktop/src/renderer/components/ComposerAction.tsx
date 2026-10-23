@@ -1,5 +1,7 @@
 import type { SlashCommand } from "@switchback/protocol"
 import { SendIcon, StopIcon } from "./icons.js"
+import { useMessages } from "../i18n.js"
+import { COMPOSER_ACTION } from "./ComposerAction.messages.js"
 
 /*
  * 输入区右下角那颗键，以及「选中一条命令之后往哪走」。
@@ -36,10 +38,11 @@ export function Action({
 }): React.JSX.Element {
   // 起引擎的那几百毫秒里摆一颗禁着的「发送」——摆「停止」是在说谎，
   // 那时候没有任何东西可停
-  const hold = starting ? "引擎正在启动" : held ? "先换一家引擎再发" : undefined
+  const m = useMessages(COMPOSER_ACTION)
+  const hold = starting ? m.starting : held ? m.held : undefined
   if (hold !== undefined) {
     return (
-      <button className="send" type="button" data-tip={hold} aria-label="发送" disabled>
+      <button className="send" type="button" data-tip={hold} aria-label={m.send} disabled>
         <SendIcon />
       </button>
     )
@@ -53,8 +56,8 @@ export function Action({
       <button
         className="send send--stop"
         type="button"
-        data-tip="停止（⌘.）"
-        aria-label="停止"
+        data-tip={m.stopTip}
+        aria-label={m.stop}
         onClick={onInterrupt}
         disabled={onInterrupt === undefined}
       >
@@ -68,8 +71,8 @@ export function Action({
     <button
       className={`send${aside === true ? " send--aside" : ""}`}
       type="button"
-      data-tip={aside === true ? "作为侧问发送（⌥⌘↵）——不进正文" : "发送（⌘↵）"}
-      aria-label={aside === true ? "作为侧问发送" : "发送"}
+      data-tip={aside === true ? m.asideTip : m.sendTip}
+      aria-label={aside === true ? m.asideSend : m.send}
       onClick={onSend}
       disabled={empty}
     >
