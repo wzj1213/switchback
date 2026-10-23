@@ -7,6 +7,7 @@ import { FileIcon } from "./icons-activity.js"
 import type { ProjectDoc } from "../../main/projectdoc.js"
 import { labelOf } from "./Composer.js"
 import { branchLabel, useWorksite } from "../useWorksite.js"
+import { useLocale } from "../i18n.js"
 
 /**
  * 「这个会话跑在什么环境里」——一张卡片答完。
@@ -43,7 +44,8 @@ export function EnvCard({
   // 每次打开都重新问一次（这张卡随浮层挂载）。取数时机与「换工作区清旧值」
   // 都在 `useWorksite` 里，和 `Chips` 共用一份——两份会分头走偏
   const git = useWorksite(thread.id, thread.cwd, "open")
-  const branch = branchLabel(git)
+  const locale = useLocale()
+  const branch = branchLabel(git, locale)
   const [doc, setDoc] = useState<ProjectDoc | undefined>(undefined)
   const bridge = typeof window === "undefined" ? undefined : window.switchback
 

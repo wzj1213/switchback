@@ -1,5 +1,8 @@
 import { BranchIcon } from "./icons.js"
 import { branchLabel, dirtyMark, useWorksite } from "../useWorksite.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "../i18n.js"
+import { CHIPS } from "./Chips.messages.js"
 
 /**
  * 输入区上方那一条：**这句话会发到哪儿去**。
@@ -47,13 +50,15 @@ export function Chips({
   passing: boolean
 }): React.JSX.Element {
   const git = useWorksite(threadId, cwd, stamp)
-  const branch = branchLabel(git)
+  const locale = useLocale()
+  const m = CHIPS[locale]
+  const branch = branchLabel(git, locale)
 
   return (
     <div className="chips">
       {passing ? (
-        <span className="chip chip--warn" title="这一轮剩下的审批都自动放行了（红线除外）。要收回：⌘. 中断这一轮">
-          本轮已放行
+        <span className="chip chip--warn" title={m.passingTip}>
+          {m.passing}
         </span>
       ) : null}
       {branch === undefined ? null : (
@@ -61,7 +66,7 @@ export function Chips({
           className={`chip${git.dirty === true ? " chip--warn" : ""}`}
           /* 缩进那一排之后项目名没了，工作区路径就挂到这枚上——
              「它到底在哪儿动手」不能只剩一个分支名 */
-          title={`${cwd}\n${branchTitle(git.detached === true, git.dirtyCount)}`}
+          title={`${cwd}\n${branchTitle(git.detached === true, git.dirtyCount, m)}`}
         >
           <BranchIcon />
           <span className="chip__name">{branch}</span>
@@ -77,10 +82,8 @@ export function Chips({
  * 「游离 HEAD」四个字对不熟 git 的人等于没说，而这里真正要紧的是
  * 「在这上面提交的东西不属于任何分支，切走就找不着了」。
  */
-function branchTitle(detached: boolean, dirtyCount: number | undefined): string {
-  const head = detached
-    ? "HEAD 没指向任何分支（游离）——在这上面产生的提交不属于任何分支，切走之后就很难找回来了"
-    : "当前分支"
+function branchTitle(detached: boolean, dirtyCount: number | undefined, m: (typeof CHIPS)[Locale]): string {
+  const head = detached ? m.detached : m.branch
   if (dirtyCount === undefined || dirtyCount === 0) return head
-  return `${head}；${String(dirtyCount)} 个文件有未提交的改动——引擎会在这些改动之上继续动手`
+  return m.dirty(head, dirtyCount)
 }

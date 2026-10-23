@@ -3,6 +3,8 @@ import { createPortal } from "react-dom"
 import { CloseIcon } from "./icons-panel.js"
 import { useModalKeys } from "../useModalKeys.js"
 import { baseName } from "./file-row.js"
+import { useMessages } from "../i18n.js"
+import { IMAGE_THUMB } from "./ImageThumb.messages.js"
 
 /**
  * 图片缩略图 + 点开看大图。
@@ -63,6 +65,7 @@ export function Thumb({
   /** 给了就画一个角标的 ×。历史消息里的图删不掉，所以那边不给。 */
   onRemove?: (path: string) => void
 }): React.JSX.Element {
+  const m = useMessages(IMAGE_THUMB)
   const thumb = useThumb(path, THUMB_PX)
   const [open, setOpen] = useState(false)
   return (
@@ -70,7 +73,7 @@ export function Thumb({
       <button
         type="button"
         className="thumb__hit"
-        aria-label={`预览 ${baseName(path)}`}
+        aria-label={m.preview(baseName(path))}
         onClick={() => {
           setOpen(true)
         }}
@@ -85,8 +88,8 @@ export function Thumb({
         <button
           type="button"
           className="thumb__drop"
-          aria-label="去掉这个附件"
-          title="去掉这个附件"
+          aria-label={m.remove}
+          title={m.remove}
           onClick={() => {
             onRemove(path)
           }}
@@ -116,6 +119,7 @@ export function ImageLightbox({ path, onClose }: {
   path: string
   onClose: () => void
 }): React.JSX.Element {
+  const m = useMessages(IMAGE_THUMB)
   const full = useThumb(path, FULL_PX)
   const box = useModalKeys(onClose, true)
 
@@ -126,14 +130,14 @@ export function ImageLightbox({ path, onClose }: {
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
-      aria-label={`图片预览：${baseName(path)}`}
+      aria-label={m.lightbox(baseName(path))}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <button type="button" className="lightbox__close" aria-label="关闭图片预览" data-tip="关闭（Esc）" onClick={onClose}><CloseIcon size={18} /></button>
-      {full.state === "loading" ? <span className="lightbox__miss" role="status">正在打开…</span> : null}
-      {full.state === "miss" ? <span className="lightbox__miss" role="alert">这张图打不开了：{path}</span> : null}
+      <button type="button" className="lightbox__close" aria-label={m.close} data-tip={m.closeTip} onClick={onClose}><CloseIcon size={18} /></button>
+      {full.state === "loading" ? <span className="lightbox__miss" role="status">{m.opening}</span> : null}
+      {full.state === "miss" ? <span className="lightbox__miss" role="alert">{m.broken(path)}</span> : null}
       {full.state === "ok" ? <img src={full.url} alt={baseName(path)} /> : null}
     </div>
   )

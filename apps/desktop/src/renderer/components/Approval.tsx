@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import type { ApprovalItem, ItemId, RememberScope } from "@switchback/protocol"
 import { ShieldIcon } from "./icons.js"
+import { useMessages } from "../i18n.js"
+import { APPROVAL } from "./Approval.messages.js"
 
 /** 用户对一张审批卡的裁决。 */
 export type ResolveApproval = (
@@ -53,14 +55,15 @@ function More({ hint, onPick }: {
   hint: string | undefined
   onPick: (allow: boolean, scope: RememberScope, passTurn?: boolean) => void
 }): React.JSX.Element {
+  const m = useMessages(APPROVAL)
   return (
     <div className="menu">
       <button className="menu__item" type="button" onClick={() => { onPick(true, "session") }}>
-        允许此对话{hint === undefined ? "" : `：${hint}`}
+        {m.allowSession(hint)}
       </button>
       <button className="menu__item" type="button" onClick={() => { onPick(true, "once", true) }}>
-        本轮剩下的都放行
-        <span className="menu__note">红线仍会逐条问；下一轮恢复</span>
+        {m.passTurn}
+        <span className="menu__note">{m.passTurnNote}</span>
       </button>
     </div>
   )
@@ -83,8 +86,9 @@ function More({ hint, onPick }: {
  * 拦下来的理由挂在 `title` 上：它在做决定时是主角，事后是脚注。
  */
 function Settled({ item }: { item: ApprovalItem }): React.JSX.Element {
+  const m = useMessages(APPROVAL)
   const denied = item.status === "denied"
-  const verdict = item.status === "cancelled" ? "已失效" : denied ? "已拒绝" : "已允许"
+  const verdict = item.status === "cancelled" ? m.expired : denied ? m.denied : m.allowed
   return (
     <div className="approval--done" title={item.reason}>
       <span className="approval__mark" aria-hidden="true">
@@ -100,10 +104,11 @@ function Settled({ item }: { item: ApprovalItem }): React.JSX.Element {
 
 /** 进程或轮次已经不在时，旧 pending 只是一条历史，不能继续授予权限。 */
 function Expired({ item }: { item: ApprovalItem }): React.JSX.Element {
+  const m = useMessages(APPROVAL)
   return (
-    <div className="approval--done" title="原生审批请求已经失效，不能再执行">
+    <div className="approval--done" title={m.expiredTip}>
       <span className="approval__mark" aria-hidden="true"><ShieldIcon size={13} /></span>
-      <span className="approval__verdict">已失效</span>
+      <span className="approval__verdict">{m.expired}</span>
       <code className="approval__done-cmd">{item.summary}</code>
     </div>
   )
@@ -111,10 +116,11 @@ function Expired({ item }: { item: ApprovalItem }): React.JSX.Element {
 
 /** 对比页是只读的；仍有效的请求要回到单栏处理，不能在两栏里误批错边。 */
 function ReadOnly({ item }: { item: ApprovalItem }): React.JSX.Element {
+  const m = useMessages(APPROVAL)
   return (
-    <div className="approval--done" title="对比视图只读；退出对比后可处理这项请求">
+    <div className="approval--done" title={m.readOnlyTip}>
       <span className="approval__mark" aria-hidden="true"><ShieldIcon size={13} /></span>
-      <span className="approval__verdict">待处理</span>
+      <span className="approval__verdict">{m.pending}</span>
       <code className="approval__done-cmd">{item.summary}</code>
     </div>
   )
@@ -136,6 +142,7 @@ export function Approval({
   /** 对比页只展示仍有效的请求，不在双栏里执行有副作用的裁决。 */
   readOnly: boolean
 }): React.JSX.Element {
+  const m = useMessages(APPROVAL)
   const [open, setOpen] = useState(false)
   const card = useRef<HTMLDivElement>(null)
   const settled = item.status !== "pending"
@@ -182,7 +189,7 @@ export function Approval({
   if (!active || readOnly) return active ? <ReadOnly item={item} /> : <Expired item={item} />
 
   return (
-    <div className="approval" ref={card} tabIndex={-1} role="group" aria-label={`需要你确认：${item.summary}`}>
+    <div className="approval" ref={card} tabIndex={-1} role="group" aria-label={m.confirmLabel(item.summary)}>
       <div className="approval__body">
         {/* 抬头只说「轮到你了」，一行小字。**要做的那件事不写在这里**——
             它是命令原文，值得自己一块地方（下面那块），混在标签后面会被读漏 */}
@@ -190,7 +197,7 @@ export function Approval({
           <span className="approval__mark" aria-hidden="true">
             <ShieldIcon size={13} />
           </span>
-          需要你确认
+          {m.confirm}
         </div>
         {/* 命令原文走等宽、单独一块底色：**它是要被读准的东西**，比例字体下
             l/1/I 分不清；和界面文字挤在一行时，人会顺着句子读过去而不是逐字读它。
@@ -205,14 +212,14 @@ export function Approval({
           <button
             className="btn approval__always"
             type="button"
-            title={`始终允许：${item.rememberHint}`}
+            title={m.alwaysTip(item.rememberHint)}
             onClick={() => { decide(true, "project") }}
           >
-            始终允许
+            {m.always}
           </button>
         )}
         <button className="btn" type="button" disabled={settled} onClick={() => { decide(false, "once") }}>
-          {item.status === "denied" ? "已拒绝" : "拒绝"}
+          {item.status === "denied" ? m.denied : m.deny}
           {settled ? null : <Kbd>⌘⌫</Kbd>}
         </button>
         <div className="approval__split">
@@ -222,14 +229,14 @@ export function Approval({
             disabled={settled}
             onClick={() => { decide(true, "once") }}
           >
-            {item.status === "allowed" ? "已允许" : "允许一次"}
+            {item.status === "allowed" ? m.allowed : m.once}
             {settled ? null : <Kbd>⌘⏎</Kbd>}
           </button>
           <button
             className="btn btn--primary approval__split-more"
             type="button"
             disabled={settled}
-            aria-label="审批选项"
+            aria-label={m.options}
             aria-expanded={open}
             onClick={() => { setOpen((v) => !v) }}
           >

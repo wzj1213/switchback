@@ -17,6 +17,8 @@ import { FileLinkScope } from "./message-link.js"
 import { useProgressiveRows } from "../use-progressive-rows.js"
 import { useTranscriptRows } from "../use-transcript-rows.js"
 import { useBody } from "../remote/use-body.js"
+import { useMessages } from "../i18n.js"
+import { TRANSCRIPT } from "./Transcript.messages.js"
 
 /**
  * 对话正文。
@@ -96,18 +98,19 @@ export const Transcript = memo(function Transcript({
   const shown = useProgressiveRows(rows, full === true)
   // 远程窗口：正文还在路上 / 只带了尾巴。本机窗口恒为否（`remote/use-body.ts`）
   const body = useBody(thread.id)
+  const m = useMessages(TRANSCRIPT)
   return (
     <div
       className="transcript"
       ref={scroller}
       role="region"
-      aria-label={`对话记录：${thread.title}`}
+      aria-label={m.region(thread.title)}
       tabIndex={0}
     >
       <TranscriptNavigation scroller={scroller} inner={inner} points={points} engines={engines} />
       {items.length === 0 && turn === undefined ? <TranscriptBlank thread={thread} pending={body.pending} /> : null}
       {body.trimmed ? (
-        <p className="transcript__trimmed">更早的内容没有加载：这条会话太长，远程只带了后面这一段。完整记录在那台机器上。</p>
+        <p className="transcript__trimmed">{m.trimmed}</p>
       ) : null}
       <FileLinkScope threadId={thread.id} cwd={thread.cwd}>
       <div className="transcript__inner" ref={inner}>
@@ -143,7 +146,7 @@ export const Transcript = memo(function Transcript({
           不是把状态行钉住，而是给一个「回到底部」 */}
       <AskFloat pick={ask} onAsk={onReuse} />
       {atBottom ? null : (
-        <button type="button" className="tobottom" aria-label="回到底部" data-tip="回到底部" onClick={toBottom}>
+        <button type="button" className="tobottom" aria-label={m.toBottom} data-tip={m.toBottom} onClick={toBottom}>
           <ToBottomIcon />
         </button>
       )}

@@ -12,6 +12,8 @@ import { ChevronIcon } from "./icons.js"
 import { PencilIcon, ResetIcon } from "./icons-activity.js"
 import type { Row } from "../group.js"
 import { TurnMarkText } from "./turn-mark.js"
+import { useMessages } from "../i18n.js"
+import { TRANSCRIPT_ROW } from "./transcript-row.messages.js"
 
 /**
  * 转录区里的**一行**。四种形态在这里分派，`Transcript` 只管遍历。
@@ -192,6 +194,7 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
   shortcutApproval: string | undefined
   readOnly: boolean
 }): React.JSX.Element {
+  const m = useMessages(TRANSCRIPT_ROW)
   // 一轮的分界。codex 在提问和回答之间放一条「已处理 X」加一道细线——
   // 没有它的话，连着问三轮的 transcript 是一条看不出接缝的长流
   if (row.kind === "turn") {
@@ -217,8 +220,8 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
           <button
             type="button"
             className="msgact turnmark__act"
-            aria-label="从这里重来"
-            data-tip="从这里重来：新开会话，只带这轮之前的上下文"
+            aria-label={m.rewind}
+            data-tip={m.rewindTip}
             onClick={() => {
               onRewind(row.turnId)
             }}
@@ -268,8 +271,8 @@ export function RowView({ row, threadId, cwd, acts, engines, onRewind, onRetry, 
               <button
                 type="button"
                 className="msgact"
-                aria-label="改一改再发"
-                data-tip="改一改再发"
+                aria-label={m.reuse}
+                data-tip={m.reuse}
                 onClick={onRetry}
               >
                 <PencilIcon size={13} />

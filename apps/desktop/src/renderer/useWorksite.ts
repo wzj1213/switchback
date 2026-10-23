@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react"
+import type { Locale } from "@switchback/i18n"
+import { WORKSITE } from "./useWorksite.messages.js"
 
 /**
  * 「这条会话所在的工作区此刻是什么样」——分支、游离与否、脏不脏。
@@ -90,9 +92,9 @@ export function useWorksite(threadId: string, cwd: string, stamp: string): Works
  * 分支芯片上显示什么。游离时**不显示成一个叫 `HEAD` 的分支**——
  * 那是 `rev-parse --abbrev-ref` 的字面输出，纯属编造（见 `main/worksite.ts`）。
  */
-export function branchLabel(site: Worksite): string | undefined {
+export function branchLabel(site: Worksite, locale: Locale): string | undefined {
   if (site.branch === undefined || site.branch === "") return undefined
-  return site.detached === true ? `游离 · ${site.branch}` : site.branch
+  return site.detached === true ? WORKSITE[locale].detached(site.branch) : site.branch
 }
 
 /**

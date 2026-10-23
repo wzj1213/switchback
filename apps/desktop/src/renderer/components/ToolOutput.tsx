@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { useMessages } from "../i18n.js"
+import { TOOL_OUTPUT } from "./ToolOutput.messages.js"
 
 /*
  * 工具行展开出来的那段输出。从 `ToolRun.tsx` 拆出来是行数闸门逼的，
@@ -23,6 +25,7 @@ const CLIP_AT = 12
  * 展开之后不封顶，直接长在流里——转录区本来就会滚，那是它的活。
  */
 export function Output({ text }: { text: string }): React.JSX.Element {
+  const m = useMessages(TOOL_OUTPUT)
   const [all, setAll] = useState(false)
   const lines = text.split("\n").length
   const clip = !all && lines > CLIP_AT
@@ -37,7 +40,7 @@ export function Output({ text }: { text: string }): React.JSX.Element {
             setAll((v) => !v)
           }}
         >
-          {all ? "收起" : `展开全部（还有 ${String(lines - CLIP_AT)} 行）`}
+          {all ? m.less : m.all(lines - CLIP_AT)}
         </button>
       ) : null}
     </>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { ChevronIcon } from "./icons.js"
+import { useMessages } from "../i18n.js"
+import { CLAMPED } from "./clamped.messages.js"
 
 /**
  * 太长的那条收起来，底下给一颗「显示更多」。
@@ -30,6 +32,7 @@ export function needsClamp(scrollHeight: number, max = CLAMP_MAX, slack = SLACK)
 }
 
 export function Clamped({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const m = useMessages(CLAMPED)
   const box = useRef<HTMLDivElement>(null)
   const [tall, setTall] = useState(false)
   const [open, setOpen] = useState(false)
@@ -67,7 +70,7 @@ export function Clamped({ children }: { children: React.ReactNode }): React.JSX.
             setOpen((was) => !was)
           }}
         >
-          {open ? "收起" : "显示更多"}
+          {open ? m.less : m.more}
           <ChevronIcon open={open} size={13} />
         </button>
       ) : null}

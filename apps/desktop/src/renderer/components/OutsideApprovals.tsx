@@ -1,19 +1,24 @@
 import type { ApprovalOrigin, Command, PendingApproval, RememberScope } from "@switchback/protocol"
 import { ShieldIcon } from "./icons.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "../i18n.js"
+import { OUTSIDE_APPROVALS } from "./OutsideApprovals.messages.js"
 
 /** 卡上写「谁要的」。只写引擎报的 id，不去对旁路猜名字；引擎没报就照实说。 */
-export function originText(origin: ApprovalOrigin | undefined): string {
-  if (origin === undefined) return "后台来的请求 · 来源未标明"
-  const who = origin.kind === "task" ? "后台任务" : "子 agent"
+export function originText(origin: ApprovalOrigin | undefined, locale: Locale): string {
+  const m = OUTSIDE_APPROVALS[locale]
+  if (origin === undefined) return m.unknownOrigin
+  const who = origin.kind === "task" ? m.task : m.subagent
   return `${who} · ${origin.label ?? origin.id}`
 }
 
 /** 已经等了多久。不设超时，只说实话。 */
-export function waitedText(at: number, now: number): string {
+export function waitedText(at: number, now: number, locale: Locale): string {
+  const m = OUTSIDE_APPROVALS[locale]
   const minutes = Math.floor((now - at) / 60_000)
-  if (minutes < 1) return "刚刚"
-  if (minutes < 60) return `已等 ${String(minutes)} 分钟`
-  return `已等 ${String(Math.floor(minutes / 60))} 小时`
+  if (minutes < 1) return m.justNow
+  if (minutes < 60) return m.waitedMinutes(minutes)
+  return m.waitedHours(Math.floor(minutes / 60))
 }
 
 /**
@@ -31,40 +36,42 @@ export function OutsideApprovals({ approvals, send, now }: {
   send: (command: Command) => void
   now: number
 }): React.JSX.Element | null {
+  const locale = useLocale()
+  const m = OUTSIDE_APPROVALS[locale]
   if (approvals.length === 0) return null
   const decide = (itemId: string, allow: boolean, remember: RememberScope): void => {
     send({ type: "approval.resolve", itemId, allow, remember })
   }
   return (
-    <div className="outside-approvals" aria-label="后台在等你确认">
+    <div className="outside-approvals" aria-label={m.label}>
       {approvals.map((one) => (
-        <div key={one.id} className="approval" role="group" aria-label={`需要你确认：${one.summary}`}>
+        <div key={one.id} className="approval" role="group" aria-label={m.confirmLabel(one.summary)}>
           <div className="approval__body">
             <div className="approval__head">
               <span className="approval__mark" aria-hidden="true">
                 <ShieldIcon size={13} />
               </span>
-              需要你确认
-              <span className="approval__origin">{originText(one.origin)} · {waitedText(one.at, now)}</span>
+              {m.confirm}
+              <span className="approval__origin">{originText(one.origin, locale)} · {waitedText(one.at, now, locale)}</span>
             </div>
             <code className="approval__cmd">{one.summary}</code>
             <div className="approval__reason">{one.reason}</div>
           </div>
           <div className="approval__actions">
             {one.redline === true || one.rememberHint === undefined ? null : (
-              <button className="btn approval__always" type="button" title={`始终允许：${one.rememberHint}`}
+              <button className="btn approval__always" type="button" title={m.alwaysTip(one.rememberHint)}
                 onClick={() => { decide(one.id, true, "project") }}>
-                始终允许
+                {m.always}
               </button>
             )}
             {one.redline === true ? null : (
               <button className="btn" type="button" onClick={() => { decide(one.id, true, "session") }}>
-                {one.origin === undefined ? "允许此对话" : "允许此对话（主对话也算）"}
+                {one.origin === undefined ? m.allowSession : m.allowSessionMain}
               </button>
             )}
-            <button className="btn" type="button" onClick={() => { decide(one.id, false, "once") }}>拒绝</button>
+            <button className="btn" type="button" onClick={() => { decide(one.id, false, "once") }}>{m.deny}</button>
             <button className="btn btn--primary" type="button" onClick={() => { decide(one.id, true, "once") }}>
-              允许一次
+              {m.once}
             </button>
           </div>
         </div>

@@ -3,6 +3,8 @@ import { ChevronIcon } from "./icons.js"
 import { ThinkIcon } from "./icons-activity.js"
 import { Markdown } from "./Markdown.js"
 import { headingOf, summaryOf } from "../reasoning.js"
+import { useMessages } from "../i18n.js"
+import { REASONING } from "./Reasoning.messages.js"
 
 /**
  * 推理。**跑的时候是一行，不是一大段。**
@@ -36,6 +38,7 @@ import { headingOf, summaryOf } from "../reasoning.js"
  */
 
 export function Reasoning({ text, running }: { text: string; running: boolean }): React.JSX.Element {
+  const m = useMessages(REASONING)
   const [open, setOpen] = useState(false)
   const line = useRef<HTMLSpanElement>(null)
   const summary = running ? summaryOf(text, true) : (headingOf(text) ?? summaryOf(text, false))
@@ -60,7 +63,7 @@ export function Reasoning({ text, running }: { text: string; running: boolean })
         <span className="think__icon">
           <ThinkIcon />
         </span>
-        <span className="think__label">思考</span>
+        <span className="think__label">{m.label}</span>
         <span className="think__dot" aria-hidden="true" />
         <span className="think__line" ref={line}>
           {summary}

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { branchLabel, dirtyMark } from "./useWorksite.js"
+import { branchLabel as labelIn, dirtyMark } from "./useWorksite.js"
+import type { Worksite } from "./useWorksite.js"
+
+// 下面那些用例写的是中文那版
+const branchLabel = (site: Worksite): string | undefined => labelIn(site, "zh-CN")
 
 /**
  * 只测这个纯函数。hook 本身（焦点重问、换 cwd 清值、切走之后回来的响应不写界面）
@@ -48,5 +52,11 @@ describe("芯片上跟在分支后面那一小截", () => {
   it("没有计数就退回一个点，不把「脏」丢掉", () => {
     expect(dirtyMark({ dirty: true })).toBe(" ·")
     expect(dirtyMark({ dirty: false })).toBe("")
+  })
+})
+
+describe("英文那版的游离标记", () => {
+  it("detached · 提交号", () => {
+    expect(labelIn({ branch: "b31ccdd", detached: true }, "en")).toBe("detached · b31ccdd")
   })
 })

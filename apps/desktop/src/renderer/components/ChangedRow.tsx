@@ -6,7 +6,8 @@ import { CheckIcon, CopyIcon, RevealIcon } from "./icons.js"
 import { FileIcon } from "./icons-activity.js"
 import { outside } from "./file-row.js"
 import { copyFeedbackTitle, useCopyFeedback } from "../use-copy-feedback.js"
-import { useLocale } from "../i18n.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { CHANGED_ROW } from "./ChangedRow.messages.js"
 
 interface Props {
   file: ChangedFile
@@ -28,14 +29,15 @@ function Stat({ added, removed }: { added: number; removed: number }): React.JSX
 }
 
 function RevealFile({ file, onReveal }: { file: ChangedFile; onReveal: (path: string) => void }): React.JSX.Element | null {
+  const m = useMessages(CHANGED_ROW)
   const review = file.review
   if (review?.kind === "delete" || (review === undefined && file.last.kind === "delete")) return null
   return (
     <button
       type="button"
       className="changed__act"
-      aria-label="在访达中显示"
-      title="在访达中显示"
+      aria-label={m.reveal}
+      title={m.reveal}
       onClick={() => {
         onReveal(file.path)
       }}
@@ -50,14 +52,15 @@ function PreviewFile({ file, threadId, cwd }: {
   threadId: string
   cwd: string
 }): React.JSX.Element | null {
+  const m = useMessages(CHANGED_ROW)
   const deleted = file.review?.kind === "delete" || (file.review === undefined && file.last.kind === "delete")
   if (deleted) return null
   return (
     <button
       type="button"
       className="changed__act"
-      aria-label="预览文件"
-      title="在工作台预览"
+      aria-label={m.preview}
+      title={m.previewTip}
       onClick={() => {
         requestFilePreview(threadId, cwd, file.path)
       }}
@@ -76,16 +79,18 @@ export function ChangedRow({
   onCopy,
   onOpen,
 }: Props): React.JSX.Element {
+  const locale = useLocale()
+  const m = CHANGED_ROW[locale]
   const shown = splitPath(relPath(file.path, cwd))
-  const [feedback, copy] = useCopyFeedback(() => onCopy(`${file.path}\n\n${file.last.diff ?? "引擎未提供补丁内容"}`))
-  const copyTitle = copyFeedbackTitle(feedback, useLocale(), "复制这次编辑记录", "编辑记录已复制")
+  const [feedback, copy] = useCopyFeedback(() => onCopy(`${file.path}\n\n${file.last.diff ?? m.noPatch}`))
+  const copyTitle = copyFeedbackTitle(feedback, locale, m.copy, m.copied)
   return (
     <div className="changed__file">
       <div className="changed__row">
         <button
           type="button"
           className="changed__name"
-          title={`查看本轮编辑记录\n${file.path}`}
+          title={m.open(file.path)}
           onClick={() => {
             onOpen(file.path)
           }}
@@ -95,7 +100,7 @@ export function ChangedRow({
         </button>
         {/* 「对话不在目标改动目录」时，这一行是唯一能看出来的地方——
             而那正是补丁看不看得到、文件点不点得开的分水岭 */}
-        {outside(file.path, cwd) ? <span className="changed__tag">工作区外</span> : null}
+        {outside(file.path, cwd) ? <span className="changed__tag">{m.outside}</span> : null}
         <span className="changed__stat">
           <Stat added={file.added} removed={file.removed} />
         </span>

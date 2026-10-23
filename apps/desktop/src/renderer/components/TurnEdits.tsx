@@ -4,6 +4,8 @@ import { ChangedRow } from "./ChangedRow.js"
 import { CaretIcon, CompareIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 import { requestTurnReview } from "../turn-review.js"
+import { useMessages } from "../i18n.js"
+import { TURN_EDITS } from "./TurnEdits.messages.js"
 
 /** 展开摘要后默认露几个文件，长清单再按需展开。 */
 const PREVIEW = 4
@@ -35,26 +37,27 @@ export function TurnEdits({ edits, cwd, threadId, turnId, onReveal, onCopy }: {
   onReveal: (path: string) => void
   onCopy: (text: string) => void
 }): React.JSX.Element | null {
+  const m = useMessages(TURN_EDITS)
   const [all, setAll] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
   if (edits.files === 0) return null
   const shown = all ? edits.list : edits.list.slice(0, PREVIEW)
   return (
-    <section className="edits" aria-label={`这一轮编辑了 ${String(edits.files)} 个文件`}>
+    <section className="edits" aria-label={m.label(edits.files)}>
       <div className="edits__head">
         <button type="button" className="edits__toggle" aria-expanded={expanded} aria-controls={listId}
           onClick={() => { setExpanded((was) => !was) }}>
           <span className="edits__glyph"><PencilIcon size={13} /></span>
-          <span className="edits__title">已编辑 {edits.files} 个文件</span>
+          <span className="edits__title">{m.title(edits.files)}</span>
           <span className="edits__stat">
             {edits.added > 0 ? <span className="diffstat__add">+{edits.added}</span> : null}
             {edits.removed > 0 ? <span className="diffstat__del">−{edits.removed}</span> : null}
           </span>
           <CaretIcon size={12} />
         </button>
-        <button type="button" className="edits__review" aria-label="查看本轮改动"
-          data-tip="查看本轮改动" onClick={() => { requestTurnReview({ threadId, cwd, turnId, edits }) }}>
+        <button type="button" className="edits__review" aria-label={m.review}
+          data-tip={m.review} onClick={() => { requestTurnReview({ threadId, cwd, turnId, edits }) }}>
           <CompareIcon size={14} />
         </button>
       </div>
@@ -66,7 +69,7 @@ export function TurnEdits({ edits, cwd, threadId, turnId, onReveal, onCopy }: {
         )) : null}
         {!expanded || edits.list.length <= PREVIEW ? null : (
           <button type="button" className="changed__more" onClick={() => { setAll((was) => !was) }}>
-            {all ? `只显示前 ${String(PREVIEW)} 个文件` : `再显示 ${String(edits.list.length - PREVIEW)} 个文件`}
+            {all ? m.fewer(PREVIEW) : m.more(edits.list.length - PREVIEW)}
           </button>
         )}
       </div>

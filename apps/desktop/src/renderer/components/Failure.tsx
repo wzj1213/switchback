@@ -5,6 +5,8 @@ import { AlertIcon } from "./icons-activity.js"
 import { LinkifiedText } from "./linkified-text.js"
 import { FAILURE_HINT, FAILURE_TITLE, failureKind, humanize } from "../../shared/failure.js"
 import type { SoftState } from "../error-plan.js"
+import { useMessages } from "../i18n.js"
+import { FAILURE } from "./Failure.messages.js"
 
 /**
  * 报错。**先说人话，原文折起来**——翻出来的那句在上面，原文在「详情」里。
@@ -24,9 +26,10 @@ import type { SoftState } from "../error-plan.js"
 
 /** 「详情」那颗开关。整行都是热区，不是一个 12px 的小箭头。 */
 function MoreToggle({ open, onToggle }: { open: boolean; onToggle: () => void }): React.JSX.Element {
+  const m = useMessages(FAILURE)
   return (
     <button type="button" className="error__more" aria-expanded={open} onClick={onToggle}>
-      详情
+      {m.details}
       <ChevronIcon open={open} size={12} />
     </button>
   )
@@ -66,13 +69,14 @@ function priorText(prior: readonly ErrorItem[]): string {
 
 /** 抬头下面那几行小字：引擎补的原因、被并进来的那几条、Switchback 手里有的下一步。 */
 function CardNotes({ item, prior, hint }: { item: ErrorItem; prior: readonly ErrorItem[]; hint: string | undefined }): React.JSX.Element {
+  const m = useMessages(FAILURE)
   const last = prior[prior.length - 1]
   return (
     <>
       {item.detail === undefined || item.detail === "" ? null : <p className="failcard__why">{item.detail}</p>}
       {last === undefined ? null : (
         <p className="failcard__note">
-          {prior.length === 1 ? "在这之前还报过：" : `在这之前还报过 ${String(prior.length)} 次，最后一次：`}
+          {prior.length === 1 ? m.priorOnce : m.priorMany(prior.length)}
           {humanize(last.message).text}
         </p>
       )}
@@ -93,10 +97,11 @@ export function FailCard({
   /** 把这一轮那句话原样再发一次。只挂在最后一轮、而且此刻能发的时候。 */
   onRetry?: (() => void) | undefined
 }): React.JSX.Element {
+  const m = useMessages(FAILURE)
   const [open, setOpen] = useState(false)
   const kind = failureKind(`${item.message}\n${item.detail ?? ""}`)
   const failure = humanize(item.message)
-  const raw = [failure.detailed ? item.message : undefined, prior.length > 0 ? `此前：\n${priorText(prior)}` : undefined]
+  const raw = [failure.detailed ? item.message : undefined, prior.length > 0 ? `${m.earlier}\n${priorText(prior)}` : undefined]
     .filter((part) => part !== undefined)
     .join("\n\n")
   return (
@@ -107,8 +112,8 @@ export function FailCard({
         </span>
         <span className="failcard__title">{FAILURE_TITLE[kind]}</span>
         {onRetry === undefined ? null : (
-          <button type="button" className="btn btn--slim failcard__retry" onClick={onRetry} title="把这一轮你说的那句话原样再发一次">
-            再试一次
+          <button type="button" className="btn btn--slim failcard__retry" onClick={onRetry} title={m.retryTip}>
+            {m.retry}
           </button>
         )}
       </div>

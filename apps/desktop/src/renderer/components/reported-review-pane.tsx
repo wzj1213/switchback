@@ -3,6 +3,7 @@ import type { ChangedFile } from "../changes.js"
 import { reportBody, reportedLines, reportedReviewFile } from "../turn-review.js"
 import { requestFilePreview } from "../file-preview-request.js"
 import { reveal } from "../reveal.js"
+import { useLocale } from "../i18n.js"
 import { ReviewDiff } from "./ReviewDiff.js"
 import { ReviewFileHead } from "./review-file-head.js"
 
@@ -19,7 +20,7 @@ export function ReportedReviewPane({ file, cwd, threadId, split, wrap, onCopy, o
   const history = file.edits ?? [file.last]
   const [picked, setPicked] = useState(history.length - 1)
   const edit = history[picked] ?? file.last
-  const note = reportBody(edit)
+  const note = reportBody(edit, useLocale())
   const lines = useMemo(() => note === undefined ? reportedLines(edit) : [], [edit, note])
   const current = reportedReviewFile({ ...file, last: edit }, cwd)
   const preview = (): void => { requestFilePreview(threadId, cwd, file.path) }

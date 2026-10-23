@@ -39,7 +39,7 @@ import "./styles/interactions.css"
 import "./styles/remote.css"
 
 const root = document.getElementById("root")
-if (root === null) throw new Error("找不到 #root 挂载点")
+if (root === null) throw new Error("找不到 #root 挂载点") // i18n-ok：开发期错误，不上界面
 
 const app = (
   <StrictMode>

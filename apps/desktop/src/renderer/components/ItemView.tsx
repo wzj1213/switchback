@@ -8,18 +8,21 @@ import type { Item, ToolCallItem, UserMessageItem, UserMessageOrigin } from "@sw
 import { PlanCard } from "./PlanCard.js"
 import { LinkifiedText } from "./linkified-text.js"
 import { Clamped } from "./clamped.js"
+import { useMessages } from "../i18n.js"
+import { ITEM_VIEW } from "./ItemView.messages.js"
 
 function OriginMeta({ origin }: { origin: UserMessageOrigin }): React.JSX.Element {
-  if (origin === "handoff") return <div className="msg__origin">历史交接</div>
-  if (origin.kind === "shell") return <div className="msg__origin">终端命令</div>
-  if (origin.kind === "goal_continuation") return <div className="msg__origin">长期目标续跑</div>
+  const m = useMessages(ITEM_VIEW)
+  if (origin === "handoff") return <div className="msg__origin">{m.handoff}</div>
+  if (origin.kind === "shell") return <div className="msg__origin">{m.shell}</div>
+  if (origin.kind === "goal_continuation") return <div className="msg__origin">{m.goal}</div>
   return (
     <div className="msg__origin">
-      <span>定时触发</span>
+      <span>{m.scheduled}</span>
       <code>{origin.schedule}</code>
-      {origin.recurring ? null : <span>单次</span>}
-      {origin.coalescedCount > 1 ? <span>合并 {origin.coalescedCount} 次</span> : null}
-      {origin.stale ? <span>最后一次</span> : null}
+      {origin.recurring ? null : <span>{m.once}</span>}
+      {origin.coalescedCount > 1 ? <span>{m.merged(origin.coalescedCount)}</span> : null}
+      {origin.stale ? <span>{m.last}</span> : null}
     </div>
   )
 }

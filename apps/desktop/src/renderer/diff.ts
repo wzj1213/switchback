@@ -1,4 +1,6 @@
 import type { FileChange, FileChangeKind } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { DIFF_KIND } from "./diff.messages.js"
 
 /**
  * 一行 diff 的语义。
@@ -53,14 +55,9 @@ export function parseDiff(diff: string, kind: FileChangeKind): readonly DiffLine
   })
 }
 
-const KIND_LABEL: Readonly<Record<FileChangeKind, string>> = {
-  add: "新建",
-  delete: "删除",
-  update: "修改",
-}
 
-export function kindLabel(kind: FileChangeKind): string {
-  return KIND_LABEL[kind]
+export function kindLabel(kind: FileChangeKind, locale: Locale): string {
+  return DIFF_KIND[locale].kind[kind]
 }
 
 /** 文件名与它上面的目录分开：文件名给足权重，路径压成次级信息。 */

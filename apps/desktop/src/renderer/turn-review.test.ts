@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { reportBody, reportedLines } from "./turn-review.js"
+import { reportBody as bodyIn, reportedLines } from "./turn-review.js"
 import { reportedChangesOf } from "./changes.js"
 import type { FileChange, ToolCallItem } from "@switchback/protocol"
+
+// 下面那些用例写的是中文那版
+const reportBody = (change: FileChange): string | undefined => bodyIn(change, "zh-CN")
 
 describe("原始编辑补丁", () => {
   const cases: { name: string; change: FileChange; expected: unknown }[] = [

@@ -3,6 +3,8 @@ import type { EngineInfo } from "@switchback/protocol"
 import { railPeek, type RailMark } from "../transcript-rail.js"
 import { engineTint } from "../engine-mark.js"
 import { labelOf } from "./Composer.js"
+import { useMessages } from "../i18n.js"
+import { TRANSCRIPT_RAIL } from "./TranscriptRail.messages.js"
 
 /**
  * 转录区左缘那条大纲。一格 = **你问的一次**；为什么长成一块波形，见 `transcript-rail.ts`。
@@ -38,6 +40,7 @@ export function TranscriptRail({ marks, activeId, engines, onJump, navRef }: {
   engines: readonly EngineInfo[]
   onJump: (id: string) => void
 }): React.JSX.Element | null {
+  const m = useMessages(TRANSCRIPT_RAIL)
   const [hover, setHover] = useState<string | undefined>(undefined)
   // 松开那一下不立刻关：指针正从格挪向卡，中间那几十毫秒不该让它闪
   const timer = useRef(0)
@@ -56,7 +59,7 @@ export function TranscriptRail({ marks, activeId, engines, onJump, navRef }: {
   const shown = marks.find((mark) => mark.id === hover)
   const peek = shown === undefined ? undefined : railPeek(shown.text)
   return (
-    <nav className="rail" aria-label="按提问跳转" ref={navRef}>
+    <nav className="rail" aria-label={m.nav} ref={navRef}>
       {marks.map((mark) => (
         <button
           key={mark.id}
@@ -64,7 +67,7 @@ export function TranscriptRail({ marks, activeId, engines, onJump, navRef }: {
           className="rail__tick"
           data-on={mark.id === activeId}
           style={{ top: mark.y }}
-          aria-label={`跳到这一问：${railPeek(mark.text).title}`}
+          aria-label={m.jump(railPeek(mark.text).title)}
           aria-current={mark.id === activeId ? "true" : undefined}
           tabIndex={mark.id === activeId ? 0 : -1}
           onMouseEnter={() => {

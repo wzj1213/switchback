@@ -27,3 +27,11 @@ export function useDocumentLang(locale: Locale): void {
     document.documentElement.lang = langTag(locale)
   }, [locale])
 }
+
+/**
+ * 语言上下文**之外**用的：崩溃页这种包在 `App` 外面的，从 `<html lang>` 读回当前语言
+ *（`useDocumentLang` 写的那个）。读不到就是默认的中文。
+ */
+export function documentLocale(): Locale {
+  return document.documentElement.lang === langTag("en") ? "en" : DEFAULT_LOCALE
+}

@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
+import { documentLocale } from "../i18n.js"
+import { BOUNDARY } from "./Boundary.messages.js"
 
 interface Props {
   children: ReactNode
@@ -37,20 +39,20 @@ export class Boundary extends Component<Props, State> {
     // 另一处是 `use-shift-watch.ts`（诊断要进用户拿得到的那份日志，而渲染层
     // 只有 `warn` / `error` 会被主进程转发过去）。
     // eslint-disable-next-line no-console
-    console.error("渲染层崩溃：", error, info.componentStack)
+    console.error("渲染层崩溃：", error, info.componentStack) // i18n-ok：开发日志，不上界面
   }
 
   override render(): ReactNode {
     const { message, stack } = this.state
     if (message === undefined) return this.props.children
+    // 这一层包在语言上下文外面（`main.tsx`），语言从 `<html lang>` 读回来
+    const m = BOUNDARY[documentLocale()]
     return (
       <div className="crash">
         <div className="crash__box">
-          <div className="crash__title">界面崩了</div>
+          <div className="crash__title">{m.title}</div>
           <div className="crash__msg">{message}</div>
-          <p className="crash__hint">
-            引擎进程还活着，会话记录也已经落盘——重载窗口就能回到刚才的状态。
-          </p>
+          <p className="crash__hint">{m.hint}</p>
           <div className="crash__actions">
             <button
               className="btn btn--primary"
@@ -59,7 +61,7 @@ export class Boundary extends Component<Props, State> {
                 window.location.reload()
               }}
             >
-              重载窗口
+              {m.reload}
             </button>
           </div>
           {stack === undefined ? null : <pre className="crash__stack">{stack}</pre>}

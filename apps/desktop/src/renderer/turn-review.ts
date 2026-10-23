@@ -4,6 +4,8 @@ import type { ReviewFile } from "../shared/review.js"
 import { parseDiff } from "./diff.js"
 import { numbered, trimMeta, type NumberedLine } from "./review-lines.js"
 import { relPath } from "./tool.js"
+import type { Locale } from "@switchback/i18n"
+import { TURN_REVIEW } from "./turn-review.messages.js"
 
 export interface TurnReviewTarget {
   threadId: string
@@ -43,11 +45,12 @@ export function reportedLines(change: FileChange): readonly NumberedLine[] {
   }))
 }
 
-export function reportBody(change: FileChange): string | undefined {
-  if (change.diff === undefined) return "引擎记录了这次编辑，但没有提供补丁内容。"
+export function reportBody(change: FileChange, locale: Locale): string | undefined {
+  const m = TURN_REVIEW[locale]
+  if (change.diff === undefined) return m.noPatch
   if (change.diff.length > 1_500_000 || change.diff.split("\n").length > 10_000) {
-    return "这份编辑记录过大，无法在面板中完整显示。"
+    return m.tooLarge
   }
-  if (change.diff === "") return "这次编辑没有文本差异。"
+  if (change.diff === "") return m.empty
   return undefined
 }

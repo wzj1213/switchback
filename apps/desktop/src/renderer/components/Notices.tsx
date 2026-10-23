@@ -4,6 +4,9 @@ import { AlertIcon } from "./icons-activity.js"
 import { humanize } from "../../shared/failure.js"
 import type { Notice } from "@switchback/store"
 import type { ThreadRow } from "@switchback/store"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { NOTICES } from "./Notices.messages.js"
 
 type NoticeTone = "danger" | "warning" | "info"
 
@@ -24,12 +27,12 @@ function shownOf(notices: readonly Notice[]): Notice | undefined {
   return notices.findLast((notice) => notice.kind === "egress") ?? notices[notices.length - 1]
 }
 
-function labelOf(notice: Notice): string {
-  if (notice.kind === "crashed") return "引擎故障"
-  if (notice.kind === "degraded") return "能力受限"
-  if (notice.kind === "auth") return "需要登录"
-  if (notice.kind === "egress") return "批量外发"
-  return "引擎提示"
+function labelOf(notice: Notice, m: (typeof NOTICES)[Locale]): string {
+  if (notice.kind === "crashed") return m.crashed
+  if (notice.kind === "degraded") return m.degraded
+  if (notice.kind === "auth") return m.auth
+  if (notice.kind === "egress") return m.egress
+  return m.notice
 }
 
 /**
@@ -58,6 +61,7 @@ export function Notices({
   /** 「需要登录」那一类直接给一条去登录的路（设置 → 安装与接入）。 */
   onLogin?: () => void
 }): React.JSX.Element | null {
+  const m = useMessages(NOTICES)
   const latest = shownOf(notices)
   useEffect(() => {
     if (latest?.kind !== "notification" || latest.timeoutMs === undefined) return
@@ -85,11 +89,11 @@ export function Notices({
           <div className="notice__head">
             {/* **抬头照实写。** 上一版一律写「引擎故障」，而「MCP 没起来」「没登录」
                 这两种引擎好好的——顶着「故障」端出去，就是把排查引到错的方向 */}
-            <span className="notice__badge">{labelOf(latest)}</span>
+            <span className="notice__badge">{labelOf(latest, m)}</span>
             {/* 同一件事接连报了几次：合成一条、记个数，不是再弹一张一模一样的 */}
             {(latest.count ?? 1) > 1 ? <span className="notice__count">{`×${String(latest.count)}`}</span> : null}
             {source === undefined ? null : (
-              <button type="button" className="notice__go" title={`跳到「${source.title}」`} onClick={() => { onSelect(source.id) }}>
+              <button type="button" className="notice__go" title={m.goTo(source.title)} onClick={() => { onSelect(source.id) }}>
                 {source.title}
               </button>
             )}
@@ -98,11 +102,11 @@ export function Notices({
           <p className="notice__text" title={latest.text}>{text}</p>
         </div>
         {latest.kind === "auth" && onLogin !== undefined ? (
-          <button type="button" className="btn btn--slim notice__act" title="打开 设置 → 安装与接入，在那一家的卡片上登录" onClick={onLogin}>
-            去登录
+          <button type="button" className="btn btn--slim notice__act" title={m.loginTip} onClick={onLogin}>
+            {m.login}
           </button>
         ) : null}
-        <button className="notice__close" type="button" aria-label="关闭" onClick={() => { onDismiss(latest.id) }}>
+        <button className="notice__close" type="button" aria-label={m.close} onClick={() => { onDismiss(latest.id) }}>
           <CloseIcon size={14} />
         </button>
       </div>

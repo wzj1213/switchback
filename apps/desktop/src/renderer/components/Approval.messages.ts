@@ -1,0 +1,41 @@
+import { defineMessages } from "@switchback/i18n"
+
+/** 对话流里的审批卡。 */
+export const APPROVAL = defineMessages(
+  {
+    allowSession: (hint: string | undefined) => `允许此对话${hint === undefined ? "" : `：${hint}`}`,
+    passTurn: "本轮剩下的都放行",
+    passTurnNote: "红线仍会逐条问；下一轮恢复",
+    expired: "已失效",
+    denied: "已拒绝",
+    allowed: "已允许",
+    expiredTip: "原生审批请求已经失效，不能再执行",
+    readOnlyTip: "对比视图只读；退出对比后可处理这项请求",
+    pending: "待处理",
+    confirmLabel: (summary: string) => `需要你确认：${summary}`,
+    confirm: "需要你确认",
+    alwaysTip: (hint: string) => `始终允许：${hint}`,
+    always: "始终允许",
+    deny: "拒绝",
+    once: "允许一次",
+    options: "审批选项",
+  },
+  {
+    allowSession: (hint) => `Allow for this thread${hint === undefined ? "" : `: ${hint}`}`,
+    passTurn: "Allow the rest of this turn",
+    passTurnNote: "Red lines still ask one by one. The next turn asks again.",
+    expired: "Expired",
+    denied: "Denied",
+    allowed: "Allowed",
+    expiredTip: "The engine's approval request has expired and can't run anymore",
+    readOnlyTip: "The compare view is read-only. Leave it to handle this request.",
+    pending: "Pending",
+    confirmLabel: (summary) => `Needs your approval: ${summary}`,
+    confirm: "Needs your approval",
+    alwaysTip: (hint) => `Always allow: ${hint}`,
+    always: "Always allow",
+    deny: "Deny",
+    once: "Allow once",
+    options: "Approval options",
+  },
+)

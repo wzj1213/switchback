@@ -7,6 +7,8 @@ import { LinkedCode, MessageLink } from "./message-link.js"
 import { messageTarget } from "../message-links.js"
 import { CodeBlock, langOf } from "./code-block.js"
 import { mendTail } from "../stream-mend.js"
+import { useMessages } from "../i18n.js"
+import { MARKDOWN } from "./Markdown.messages.js"
 
 /**
  * 渲染模型产出的 Markdown。
@@ -26,8 +28,9 @@ import { mendTail } from "../stream-mend.js"
 
 /** 宽表格由外层容器滚动——给 table 自己加 overflow 会拆散 thead/tbody。 */
 function Table({ children }: { children?: React.ReactNode }): React.JSX.Element {
+  const m = useMessages(MARKDOWN)
   return (
-    <div className="md__scroll" tabIndex={0} aria-label="可横向滚动的表格">
+    <div className="md__scroll" tabIndex={0} aria-label={m.table}>
       <table>{children}</table>
     </div>
   )

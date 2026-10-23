@@ -3,6 +3,8 @@ import { headingSlug, inlineTarget, messageTarget, resolveMessagePath } from "..
 import { requestFilePreview } from "../file-preview-request.js"
 import { ExternalLink } from "./external-link.js"
 import { FileIcon } from "./icons-activity.js"
+import { useMessages } from "../i18n.js"
+import { MESSAGE_LINK } from "./message-link.messages.js"
 
 interface LinkScope { threadId: string; cwd: string; documentPath?: string | undefined }
 const Context = createContext<LinkScope | undefined>(undefined)
@@ -24,6 +26,7 @@ function jumpHeading(link: HTMLAnchorElement, fragment: string): void {
 
 export function MessageLink({ href, children: content }: { href?: string; children?: ReactNode }): React.JSX.Element {
   const scope = useContext(Context)
+  const m = useMessages(MESSAGE_LINK)
   const children = <InsideLink value={true}>{content}</InsideLink>
   const target = messageTarget(href ?? "")
   if (target.kind === "external") return <ExternalLink href={target.href}>{children}</ExternalLink>
@@ -34,12 +37,12 @@ export function MessageLink({ href, children: content }: { href?: string; childr
     }}>{children}</a>
   )
   if (target.kind === "unsupported" || scope === undefined) {
-    return <span title="此链接暂不支持打开">{children}</span>
+    return <span title={m.unsupported}>{children}</span>
   }
   const path = resolveMessagePath(target.path, scope.cwd, scope.documentPath)
   const location = target.line === undefined ? "" : `:${String(target.line)}`
   return (
-    <a className="outlink outlink--file" href={href} title={`预览文件 · ${path}${location}`}
+    <a className="outlink outlink--file" href={href} title={m.preview(`${path}${location}`)}
       onClick={(event) => {
         event.preventDefault()
         requestFilePreview(scope.threadId, scope.cwd, path, target)
