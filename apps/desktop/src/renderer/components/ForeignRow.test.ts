@@ -7,7 +7,7 @@ import { whenOf } from "./ForeignRow.js"
  */
 describe("什么时候", () => {
   const now = new Date("2026-08-16T12:00:00Z").getTime()
-  const ago = (ms: number): string => whenOf(now - ms, now)
+  const ago = (ms: number): string => whenOf(now - ms, "zh-CN", now)
 
   it("一分钟内说「刚刚」", () => {
     expect(ago(30_000)).toBe("刚刚")
@@ -24,6 +24,11 @@ describe("什么时候", () => {
   })
 
   it("没有时间戳就不说，别显示成 1970 年", () => {
-    expect(whenOf(0, now)).toBe("")
+    expect(whenOf(0, "zh-CN", now)).toBe("")
+  })
+
+  it("英文", () => {
+    expect([30_000, 20 * 60_000].map((ms) => whenOf(now - ms, "en", now))).toEqual(["just now", "20m ago"])
+    expect(whenOf(now - 12 * 86400_000, "en", now)).toMatch(/^Aug \d+$/)
   })
 })

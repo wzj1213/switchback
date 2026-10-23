@@ -105,8 +105,7 @@ export function sinceOf(at: number, now: number, locale: Locale): string {
 
 /** 哪一天（本地时区）：`10 月 3 日` / `Oct 3`。不带年份——这里说的都是最近的事。 */
 export function dayOf(at: number, locale: Locale): string {
-  const day = new Date(at)
-  return STATUS[locale].day(day.getMonth() + 1, day.getDate())
+  return STATUS[locale].day(at)
 }
 
 const MINUTE = 60_000

@@ -7,13 +7,16 @@ import {
   ordered,
   orderedGroups,
   reorder,
-  rowLabelOf,
+  rowLabelOf as labelIn,
   sectionsOf,
   tallyOf,
   type Group,
   type Pins,
   type SidebarRow,
 } from "./sidebar.js"
+
+// 下面那些用例写的是中文那版
+const rowLabelOf = (r: ThreadRow): string => labelIn(r, "zh-CN")
 import { canDrop } from "./useThreadDrag.js"
 
 /** 老用例只关心「置顶了哪些项目」，其余用空的。 */
@@ -319,5 +322,12 @@ describe("项目排序", () => {
     const rows = [row({ id: "t1", cwd: "/a", title: "a" }), row({ id: "t2", cwd: "/b", title: "b" })]
     const out = sectionsOf(rows, { projects: [], threads: [], order: {}, known: [], projectOrder: ["/b", "/a"] })
     expect(out.projects.map((g) => g.cwd)).toEqual(["/b", "/a"])
+  })
+})
+
+describe("英文那版的标题回落", () => {
+  it("连话都还没说的显示 New thread", () => {
+    const row: ThreadRow = { thread: { id: "t", cwd: "/w/x", title: "x" } as Thread } as ThreadRow
+    expect(labelIn(row, "en")).toBe("New thread")
   })
 })

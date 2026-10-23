@@ -2,6 +2,8 @@ import { baseNameOf, type Sections } from "../sidebar.js"
 import { Row } from "./SidebarRows.js"
 import { SectionHead, type GroupHandlers } from "./SidebarSections.js"
 import { GroupBlock } from "./SidebarGroup.js"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_PINNED } from "./SidebarPinned.messages.js"
 
 /**
  * 「置顶」那一段：钉住的**会话**和钉住的**项目**。
@@ -23,6 +25,7 @@ export function PinnedSection({
   open: boolean
   onToggle: () => void
 }): React.JSX.Element | null {
+  const m = useMessages(SIDEBAR_PINNED)
   const empty = sections.pinnedThreads.length === 0 && sections.pinned.length === 0
   /*
    * **一条都没置顶时整段不画**（UI 重构 P1 拍板）：空的段头 + 常驻垫高在 681 高的
@@ -57,13 +60,13 @@ export function PinnedSection({
         }}
       >
         <SectionHead
-          title="置顶"
+          title={m.title}
           open={open}
           onToggle={() => {
             onToggle()
           }}
           {...(on.dragKind !== undefined && on.draggingPinned !== true
-            ? { hint: "松手就置顶" }
+            ? { hint: m.dropToPin }
             : {})}
         />
         {open ? <PinnedItems sections={sections} on={on} /> : null}
@@ -77,6 +80,7 @@ export function PinnedSection({
  * 一个像素都不挤下面的行；里层绝对定位，盖在「项目」段头那一带。
  */
 function PinFloat({ on }: { on: GroupHandlers }): React.JSX.Element {
+  const m = useMessages(SIDEBAR_PINNED)
   return (
     <div className="sidebar__pinfloat">
       <div
@@ -94,7 +98,7 @@ function PinFloat({ on }: { on: GroupHandlers }): React.JSX.Element {
           on.onDropPinned?.()
         }}
       >
-        松手就置顶
+        {m.dropToPin}
       </div>
     </div>
   )

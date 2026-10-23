@@ -3,6 +3,11 @@ import { FileIcon } from "./icons-activity.js"
 import { GearIcon } from "./icons.js"
 import { Popover } from "./Popover.js"
 import { UpdateButton } from "./UpdateButton.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_FOOT } from "./SidebarFoot.messages.js"
+
+type Text = (typeof SIDEBAR_FOOT)[Locale]
 
 /**
  * 侧栏最底下**那一行**。
@@ -40,6 +45,7 @@ export function SidebarFoot({
   account: AccountLine | undefined
   onOpenSettings: () => void
 }): React.JSX.Element {
+  const m = useMessages(SIDEBAR_FOOT)
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const close = (): void => {
@@ -52,7 +58,7 @@ export function SidebarFoot({
         ref={trigger}
         className={`foot__who${open ? " foot__who--open" : ""}`}
         // 没有账号时这一行**就是**设置，点了直接开——不弹一个只有一项的菜单
-        title={account === undefined ? "设置" : hoverOf(account)}
+        title={account === undefined ? m.settings : hoverOf(account, m)}
         {...(account === undefined
           ? {}
           : { "aria-haspopup": "menu" as const, "aria-expanded": open })}
@@ -72,18 +78,18 @@ export function SidebarFoot({
             </span>
           )}
         </span>
-        <span className="foot__name">{account === undefined ? "设置" : nameOf(account)}</span>
+        <span className="foot__name">{account === undefined ? m.settings : nameOf(account)}</span>
       </button>
       <UpdateButton />
       {account === undefined ? null : (
         <Popover open={open} anchor={trigger.current} minWidth={210} onClose={close}>
-          <div role="menu" aria-label="账号操作">
+          <div role="menu" aria-label={m.account}>
             {/* 身份再说一遍，连着额度——**「剩余 12%」单独摆出来是有歧义的**：
                 一台机器上换过号的人，第一个问题是「谁的 12%」 */}
             <div className="pop__head">
               <div className="pop__head-title">{account.label}</div>
-              {metaOf(account) === undefined ? null : (
-                <div className="pop__head-meta">{metaOf(account)}</div>
+              {metaOf(account, m) === undefined ? null : (
+                <div className="pop__head-meta">{metaOf(account, m)}</div>
               )}
             </div>
             <button
@@ -98,7 +104,7 @@ export function SidebarFoot({
               <span className="pop__cmd-icon">
                 <GearIcon size={13} />
               </span>
-              <span>设置</span>
+              <span>{m.settings}</span>
               <span className="pop__cmd-hint">⌘,</span>
             </button>
             {/* 出问题时要交出去的那份东西。**和菜单栏里那一项是同一条路**，
@@ -115,7 +121,7 @@ export function SidebarFoot({
               <span className="pop__cmd-icon">
                 <FileIcon size={13} />
               </span>
-              <span>导出诊断报告</span>
+              <span>{m.diagnose}</span>
             </button>
           </div>
         </Popover>
@@ -154,17 +160,17 @@ function initialOf(label: string): string {
 }
 
 /** 菜单抬头第二行：套餐 · 还剩多少。两样都没有就不摆这一行。 */
-function metaOf(account: AccountLine): string | undefined {
+function metaOf(account: AccountLine, m: Text): string | undefined {
   const parts = [
     account.plan,
-    account.remain === undefined ? undefined : `剩余 ${String(account.remain)}%`,
+    account.remain === undefined ? undefined : m.remain(account.remain),
   ]
   const text = parts.filter((p) => p !== undefined && p !== "").join(" · ")
   return text === "" ? undefined : text
 }
 
 /** 悬停时不用点开也看得见额度——菜单是给要动手的时候用的。 */
-function hoverOf(account: AccountLine): string {
-  const meta = metaOf(account)
+function hoverOf(account: AccountLine, m: Text): string {
+  const meta = metaOf(account, m)
   return meta === undefined ? account.label : `${account.label}\n${meta}`
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import type { EngineInfo } from "@switchback/protocol"
 import { rowLabelOf, type DropEdge, type SidebarRow } from "../sidebar.js"
+import { useLocale } from "../i18n.js"
 import { Dot, RowEnd } from "./RowEnd.js"
 import { useRowPeek } from "./RowPeek.js"
 import { RowActions } from "./RowActions.js"
@@ -121,6 +122,7 @@ export function Row({
   selectOnPress?: boolean
 }): React.JSX.Element {
   const { thread } = row
+  const locale = useLocale()
   // 后台跑完、还没打开过的那条要**亮着**：整行提亮 + 行首那颗点换亮色（见 `Dot`）。
   // 选中的那条不算——你正看着它
   const unread = row.unread === true && !selected
@@ -165,7 +167,7 @@ export function Row({
         <span className="row__slot">
           <Dot status={displayStatus(thread)} unread={unread} />
         </span>
-        <RowName value={rowLabelOf(row)} />
+        <RowName value={rowLabelOf(row, locale)} />
         <RowEnd
           thread={thread}
           engines={engines}

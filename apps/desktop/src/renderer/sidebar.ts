@@ -1,4 +1,6 @@
 import { displayStatus, type ThreadRow } from "@switchback/store"
+import type { Locale } from "@switchback/i18n"
+import { SIDEBAR } from "./sidebar.messages.js"
 
 /**
  * 侧栏的分组与行文案。
@@ -71,11 +73,11 @@ export function baseNameOf(cwd: string): string {
  * 就取自 cwd 末级（`useWorkspaceActions`），所以只要它变过，就一定是
  * 上面两条之一写的。不为此另加一个字段——那要同时改协议、落盘和回放。
  */
-export function rowLabelOf(row: ThreadRow): string {
+export function rowLabelOf(row: ThreadRow, locale: Locale): string {
   if (row.thread.named === true) return row.thread.title
   if (row.thread.title !== baseNameOf(row.thread.cwd)) return row.thread.title
   const preview = row.preview?.trim()
-  return preview === undefined || preview === "" ? "新会话" : preview
+  return preview === undefined || preview === "" ? SIDEBAR[locale].untitled : preview
 }
 
 /**

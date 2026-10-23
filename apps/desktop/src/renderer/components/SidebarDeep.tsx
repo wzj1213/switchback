@@ -1,6 +1,8 @@
 import type { ThreadRow } from "@switchback/store"
 import type { DeepHit } from "../useDeepSearch.js"
 import { whenOf } from "./ForeignRow.js"
+import { useLocale, useMessages } from "../i18n.js"
+import { SIDEBAR_DEEP } from "./SidebarDeep.messages.js"
 
 /**
  * 「标题里没有，但正文里提过」的那几条。
@@ -26,6 +28,7 @@ function Line({ row, hit, selected, onSelect }: {
   selected: boolean
   onSelect: () => void
 }): React.JSX.Element {
+  const locale = useLocale()
   return (
     <button type="button" className={`deep__row${selected ? " deep__row--on" : ""}`} onClick={onSelect}>
       <span className="deep__head">
@@ -33,7 +36,7 @@ function Line({ row, hit, selected, onSelect }: {
         {/* **时间不是装饰**：同名会话很常见（同一个项目开了好几条），
             光靠标题分不出是哪一条，而「上周那次」恰恰是人记得住的线索 */}
         <span className="deep__count">
-          {hit.count} 处{hit.at > 0 ? ` · ${whenOf(hit.at)}` : ""}
+          {SIDEBAR_DEEP[locale].hits(hit.count)}{hit.at > 0 ? ` · ${whenOf(hit.at, locale)}` : ""}
         </span>
       </span>
       <span className="deep__snip">{hit.snippet}</span>
@@ -52,6 +55,7 @@ export function Deep({ hits, rows, shown, selectedId, busy, skipped, onSelect }:
   skipped: number
   onSelect: (id: string) => void
 }): React.JSX.Element | null {
+  const m = useMessages(SIDEBAR_DEEP)
   const byId = new Map(rows.map((r) => [r.thread.id, r]))
   const extra = hits.filter((h) => !shown.has(h.threadId) && byId.has(h.threadId))
   // 一条都没多出来的时候整段不画：一个永远写着「0 条」的小节是纯噪音。
@@ -59,8 +63,8 @@ export function Deep({ hits, rows, shown, selectedId, busy, skipped, onSelect }:
   if (extra.length === 0 && !busy) return null
   return (
     <>
-      <div className="sidebar__section sidebar__section--static" title="只搜说过的话，不搜工具调用的命令原文">
-        正文里提到{busy ? "…" : ` ${String(extra.length)} 条`}
+      <div className="sidebar__section sidebar__section--static" title={m.tip}>
+        {m.heading(busy, extra.length)}
       </div>
       {extra.map((hit) => {
         const row = byId.get(hit.threadId)
@@ -76,7 +80,7 @@ export function Deep({ hits, rows, shown, selectedId, busy, skipped, onSelect }:
           />
         )
       })}
-      {skipped > 0 ? <p className="sidebar__empty">历史太多，还有 {skipped} 条会话没来得及翻</p> : null}
+      {skipped > 0 ? <p className="sidebar__empty">{m.skipped(skipped)}</p> : null}
     </>
   )
 }

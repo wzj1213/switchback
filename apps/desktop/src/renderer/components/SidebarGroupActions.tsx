@@ -1,6 +1,8 @@
 import type { Group } from "../sidebar.js"
 import { EllipsisIcon, PlusIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
+import { useMessages } from "../i18n.js"
+import { GROUP_ACTIONS } from "./SidebarGroupActions.messages.js"
 
 export function GroupActions({
   group,
@@ -11,13 +13,14 @@ export function GroupActions({
   onNewIn: (cwd: string) => void
   onMenu: (event: React.MouseEvent, group: Group) => void
 }): React.JSX.Element {
+  const m = useMessages(GROUP_ACTIONS)
   return (
     <>
       <button
         type="button"
         className="row__act"
-        aria-label={`在 ${group.label} 新建会话`}
-        title={`在 ${group.cwd} 新建会话`}
+        aria-label={m.newIn(group.label)}
+        title={m.newIn(group.cwd)}
         onClick={() => {
           onNewIn(group.cwd)
         }}
@@ -27,8 +30,8 @@ export function GroupActions({
       <button
         type="button"
         className="row__act"
-        aria-label="项目操作"
-        title="项目操作"
+        aria-label={m.menu}
+        title={m.menu}
         onClick={(event) => {
           onMenu(event, group)
         }}

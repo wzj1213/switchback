@@ -4,6 +4,8 @@ import { SIDEBAR_ICON } from "./icon-base.js"
 import { baseNameOf } from "../sidebar.js"
 import { SidebarSearch } from "./sidebar-search.js"
 import { RailToggle } from "./rail-toggle.js"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_HEAD } from "./SidebarHead.messages.js"
 
 /*
  * 侧栏顶上那一块：品牌、新建、打开文件夹、筛选。
@@ -51,7 +53,8 @@ export function Head({
 }): React.JSX.Element {
   // 落点名的取值沿用原来按钮右侧附注那一套：没会话 → 选文件夹；
   // 对话态 → 「对话」；否则项目目录名
-  const where = here === undefined ? "选文件夹…" : hereKind === "chat" ? "对话" : baseNameOf(here)
+  const m = useMessages(SIDEBAR_HEAD)
+  const where = here === undefined ? m.pickFolder : hereKind === "chat" ? m.chat : baseNameOf(here)
   return (
     <>
       {/* 顶带：交通灯（系统画）+ 右端的侧栏开关，和会话顶栏同高同中线。
@@ -71,10 +74,10 @@ export function Head({
           type="button"
           className="sidebar__new"
           onClick={onNew}
-          data-tip={`新建会话 —— 落在 ${where}`}
+          data-tip={m.newTip(where)}
         >
           <PlusIcon size={SIDEBAR_ICON} />
-          <span className="sidebar__new-label">新建会话</span>
+          <span className="sidebar__new-label">{m.newThread}</span>
           <kbd className="sidebar__kbd">⌘N</kbd>
         </button>
         {/* 低频动作让位给高频动作，这一条就是这次改动的全部意思 */}
@@ -82,8 +85,8 @@ export function Head({
           type="button"
           className="sidebar__folder"
           onClick={onOpenFolder}
-          data-tip="打开文件夹…"
-          aria-label="打开文件夹…"
+          data-tip={m.openFolder}
+          aria-label={m.openFolder}
         >
           <FolderIcon size={SIDEBAR_ICON} />
         </button>

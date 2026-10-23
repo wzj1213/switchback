@@ -3,6 +3,9 @@ import { FOREIGN_MAX } from "../sidebar.js"
 import { SectionHead } from "./SidebarSections.js"
 import { SIDEBAR_ICON_SMALL } from "./icon-base.js"
 import { ForkIcon } from "./icons.js"
+import type { Locale } from "@switchback/i18n"
+import { useLocale, useMessages } from "../i18n.js"
+import { FOREIGN } from "./ForeignRow.messages.js"
 
 /**
  * 「codex 历史」段里的一行：**引擎自己存着、Switchback 从来不知道的那些会话**。
@@ -23,12 +26,13 @@ export function ForeignRow({
   item: EngineThread
   onAdopt: (item: EngineThread) => void
 }): React.JSX.Element {
+  const locale = useLocale()
   return (
     <div className="row row--thread row--flat">
       <button
         type="button"
         className="row__main"
-        title={`${item.cwd}${item.profile === undefined ? "" : `\nDSH profile：${item.profile}`}\n在 Switchback 里接着聊`}
+        title={FOREIGN[locale].title(item.cwd, item.profile)}
         onClick={() => {
           onAdopt(item)
         }}
@@ -37,7 +41,7 @@ export function ForeignRow({
           <ForkIcon size={SIDEBAR_ICON_SMALL} />
         </span>
         <span className="row__label">{item.title}</span>
-        <span className="row__aside">{item.profile ?? whenOf(item.updatedAt)}</span>
+        <span className="row__aside">{item.profile ?? whenOf(item.updatedAt, locale)}</span>
       </button>
     </div>
   )
@@ -50,17 +54,17 @@ export function ForeignRow({
  * 精确的日期有用。**超过一周就给日期**——「12 天前」这种说法，
  * 人还得自己换算一次才知道是哪天。
  */
-export function whenOf(at: number, now = Date.now()): string {
+export function whenOf(at: number, locale: Locale, now = Date.now()): string {
   if (at <= 0) return ""
+  const m = FOREIGN[locale]
   const mins = Math.floor((now - at) / 60000)
-  if (mins < 1) return "刚刚"
-  if (mins < 60) return `${String(mins)} 分钟前`
+  if (mins < 1) return m.justNow
+  if (mins < 60) return m.minutesAgo(mins)
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${String(hours)} 小时前`
+  if (hours < 24) return m.hoursAgo(hours)
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${String(days)} 天前`
-  const d = new Date(at)
-  return `${String(d.getMonth() + 1)}月${String(d.getDate())}日`
+  if (days < 7) return m.daysAgo(days)
+  return m.day(at)
 }
 
 /**
@@ -83,18 +87,17 @@ export function ForeignSection({
   onToggle: () => void
   onAdopt: (engine: string, item: EngineThread) => void
 }): React.JSX.Element {
+  const m = useMessages(FOREIGN)
   return (
     <>
       {/* **默认折叠**（见 `defaultOpen`）：这一段的条数由引擎决定，
           展开着会把你自己那几条挤下去 */}
-      <SectionHead title={`${engine} 历史`} open={open} onToggle={onToggle} />
+      <SectionHead title={m.history(engine)} open={open} onToggle={onToggle} />
       {open ? (
         threads.length === 0 ? (
           // **说清楚为什么空**：历史是握手时问出来的，没开过这家就问不到。
           // 只写「暂无」的话，人会以为自己在别处跑的会话没被认出来
-          <p className="sidebar__empty">
-            在 Switchback 里开一个 {engine} 会话之后，你在终端或别处跑过的会列在这里。
-          </p>
+          <p className="sidebar__empty">{m.empty(engine)}</p>
         ) : (
         <>
           {threads.map((item) => (
@@ -109,7 +112,7 @@ export function ForeignSection({
           {/* **截断要说出来。** 不说的话「就这些了」和「只给你看了这些」
               在界面上长得一模一样 */}
           {threads.length >= FOREIGN_MAX ? (
-            <p className="sidebar__empty">只列最近 {FOREIGN_MAX} 条。更早的去 {engine} 里找。</p>
+            <p className="sidebar__empty">{m.latest(FOREIGN_MAX, engine)}</p>
           ) : null}
         </>
         )

@@ -4,6 +4,8 @@ import { FolderIcon } from "./icons-folder.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
 import { GroupBlock } from "./SidebarGroup.js"
 import { SectionHead, type GroupHandlers } from "./SidebarSections.js"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_PROJECTS } from "./SidebarProjects.messages.js"
 
 /**
  * 「项目」那一段。
@@ -28,6 +30,7 @@ export function ProjectsSection({
   open: boolean
   onToggle: () => void
 }): React.JSX.Element {
+  const m = useMessages(SIDEBAR_PROJECTS)
   return (
     <div
       className={`sidebar__dropproj${on.overProjects === true ? " sidebar__dropproj--over" : ""}`}
@@ -46,20 +49,20 @@ export function ProjectsSection({
       }}
     >
       <SectionHead
-        title="项目"
+        title={m.title}
         open={open}
         onToggle={onToggle}
         // **图标不能和「对话」段那颗 `+` 一样**：这颗是「加一个项目（选文件夹）」，
         // 那颗是「开一条对话」。同形不同义比没有图标更误导
         action={{
-          label: "打开一个文件夹",
+          label: m.openFolder,
           icon: <FolderIcon size={SIDEBAR_ICON} />,
           run: on.onOpenFolder,
         }}
         // 拖着一个置顶过的东西时才说：落在这一段上是**取消置顶**。
         // 「只进不出的落点是陷阱」那条规矩得有人说出口，而这是唯一说得起的位置——
         // 它绝对定位、不占位（拖起来时挪动任何一行都会让 Chromium 取消拖拽）
-        {...(on.draggingPinned === true ? { hint: "松手取消置顶" } : {})}
+        {...(on.draggingPinned === true ? { hint: m.dropToUnpin } : {})}
       />
       {open ? <Projects groups={sections.projects} on={on} /> : null}
     </div>
@@ -79,6 +82,7 @@ function Projects({
   groups: readonly Group[]
   on: GroupHandlers
 }): React.JSX.Element {
+  const m = useMessages(SIDEBAR_PROJECTS)
   const [all, setAll] = useState(on.view.allProjects)
   useLayoutEffect(() => { on.view.allProjects = all }, [on.view, all])
   const shown = all ? groups : groups.slice(0, PROJECT_MAX)
@@ -118,7 +122,7 @@ function Projects({
             setAll((was) => !was)
           }}
         >
-          {all ? "收起" : `展开显示（还有 ${String(groups.length - PROJECT_MAX)} 个）`}
+          {all ? m.less : m.more(groups.length - PROJECT_MAX)}
         </button>
       )}
     </>

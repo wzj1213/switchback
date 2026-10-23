@@ -1,16 +1,19 @@
 import { useLayoutEffect, useState } from "react"
 import type { ThreadRow } from "@switchback/store"
 import type { EngineInfo, EngineThread } from "@switchback/protocol"
-import { type Group, type Sections, type SidebarRow } from "../sidebar.js"
-import { ChevronIcon, PlusIcon } from "./icons.js"
-import { SIDEBAR_ICON, SIDEBAR_ICON_SMALL } from "./icon-base.js"
-import { Row, type RowDrag } from "./SidebarRows.js"
+import { type Group, type Sections } from "../sidebar.js"
+import { ChevronIcon } from "./icons.js"
+import { SIDEBAR_ICON_SMALL } from "./icon-base.js"
+import type { RowDrag } from "./SidebarRows.js"
 import { ForeignSection } from "./ForeignRow.js"
 import { PinnedSection } from "./SidebarPinned.js"
 import { ProjectsSection } from "./SidebarProjects.js"
+import { ChatsSection } from "./SidebarChats.js"
 import type { RenameCtl } from "./RowName.js"
 import type { SidebarMoveActions } from "../sidebarMove.js"
 import type { SidebarNavigation } from "../use-sidebar-navigation.js"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_SECTIONS } from "./SidebarSections.messages.js"
 
 /**
  * 侧栏的三段：置顶 / 项目 / 最近。
@@ -134,49 +137,6 @@ export interface GroupHandlers extends SidebarMoveActions {
 }
 
 /**
- * 对话段：**不属于任何项目的会话**。
- *
- * 上一版这段叫「最近」，装的是全量会话按时间排前六条——和项目树重复，
- * 于是同一条会话两行同时高亮、双击改名两个输入框一起进编辑态。
- * 换成「属不属于项目」之后互斥是天然的（见 `sidebar.ts` 的 `sectionsOf`）。
- *
- * 这里**不挂项目名**（上一版挂了，因为那段是跨项目的）：
- * 这一段里的会话本来就没有项目。
- */
-function Chats({
-  rows,
-  on,
-}: {
-  rows: readonly SidebarRow[]
-  on: GroupHandlers
-}): React.JSX.Element {
-  return (
-    <>
-      {rows.map((row) => (
-        <Row
-          key={`recent-${row.thread.id}`}
-          row={row}
-          selected={row.thread.id === on.selectedId}
-          flat
-          engines={on.engines}
-          onSelect={() => {
-            on.onSelect(row.thread.id)
-          }}
-          onDelete={() => {
-            on.onDelete(row.thread.id)
-          }}
-          selectOnPress
-          rename={on.rename}
-          onMenu={(e, arm, ren) => {
-            on.onRowMenu(e, row, arm, ren)
-          }}
-        />
-      ))}
-    </>
-  )
-}
-
-/**
  * 这一段默认展开还是折叠。
  *
  * **历史段默认折叠**：装的是你在别处跑的会话（实测 codex 25 条、Claude 40 条），
@@ -198,6 +158,7 @@ export function SectionList({
   on: GroupHandlers
 }): React.JSX.Element {
   // 记的是「被人扳过的段」，不是「收起来的段」——默认值由 `defaultOpen` 说了算
+  const m = useMessages(SIDEBAR_SECTIONS)
   const [toggled, setToggled] = useState(on.view.sections)
   useLayoutEffect(() => { on.view.sections = toggled }, [on.view, toggled])
   const toggle = (key: string): void => {
@@ -232,29 +193,14 @@ export function SectionList({
         }}
       />
 
-      {/* **段头常驻，空了也在。** 上一版空了整段消失，于是「这里能放什么」
-          只有已经知道的人才看得见——置顶段的老毛病同理 */}
-      <SectionHead
-        title="对话"
+      <ChatsSection
+        sections={sections}
+        on={on}
         open={open("chat")}
         onToggle={() => {
           toggle("chat")
         }}
-        action={{
-          label: "新开一条对话",
-          icon: <PlusIcon size={SIDEBAR_ICON} />,
-          run: on.onNewChat,
-        }}
       />
-      {open("chat") ? (
-        sections.chats.length === 0 ? (
-          /* 压成一行：那颗 `+` 就在段头右边，「点右边的 +」这半句是在说一个
-             你已经看得见的东西；「不用先选项目」也只有在你以为必须先选时才有意义 */
-          <p className="sidebar__empty sidebar__empty--one">还没有独立对话</p>
-        ) : (
-          <Chats rows={sections.chats} on={on} />
-        )
-      ) : null}
 
       {/*
         **一家一段，但这几段收在同一个抬头底下。**
@@ -268,7 +214,7 @@ export function SectionList({
       {on.foreign.length === 0 ? null : (
         <>
           <SectionHead
-            title="别处的历史"
+            title={m.elsewhere}
             open={open("hist")}
             onToggle={() => {
               toggle("hist")

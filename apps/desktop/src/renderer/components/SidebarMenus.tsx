@@ -4,6 +4,11 @@ import type { ThreadRow } from "@switchback/store"
 import { CopyIcon, PinIcon, PlusIcon, RevealIcon, SparkIcon, TrashIcon } from "./icons.js"
 import { PencilIcon } from "./icons-activity.js"
 import type { MoveDirection, SidebarMoveActions } from "../sidebarMove.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_MENUS } from "./SidebarMenus.messages.js"
+
+type Text = (typeof SIDEBAR_MENUS)[Locale]
 
 /*
  * 侧栏右键菜单的内容：能做什么（`workspaceCommands`）、点的是什么（`ProjectHead`）。
@@ -31,10 +36,11 @@ function moveCommands(
   id: string,
   canMove: (id: string, direction: MoveDirection) => boolean,
   move: (id: string, direction: MoveDirection) => void,
+  m: Text,
 ): readonly Command[] {
   return [
-    ...(canMove(id, -1) ? [{ label: "上移", run: () => move(id, -1) }] : []),
-    ...(canMove(id, 1) ? [{ label: "下移", run: () => move(id, 1) }] : []),
+    ...(canMove(id, -1) ? [{ label: m.moveUp, run: () => move(id, -1) }] : []),
+    ...(canMove(id, 1) ? [{ label: m.moveDown, run: () => move(id, 1) }] : []),
   ]
 }
 
@@ -44,31 +50,31 @@ function moveCommands(
  * 共用是有意的：两者的右键菜单**前四项必须一样**——用户不该记得
  * 「在会话上右键有复制路径，在项目上右键没有」。会话那边只是多一条删除。
  */
-export function workspaceCommands(cwd: string, acts: Acts): readonly Command[] {
+export function workspaceCommands(cwd: string, acts: Acts, m: Text): readonly Command[] {
   return [
     {
-      label: "在此新建会话",
+      label: m.newHere,
       icon: <PlusIcon />,
       run: () => {
         acts.onNewIn(cwd)
       },
     },
     {
-      label: acts.pinned.includes(cwd) ? "取消置顶" : "置顶项目",
+      label: acts.pinned.includes(cwd) ? m.unpin : m.pinProject,
       icon: <PinIcon />,
       run: () => {
         acts.onTogglePin(cwd)
       },
     },
     {
-      label: "在访达中显示",
+      label: m.reveal,
       icon: <RevealIcon />,
       run: () => {
         acts.onReveal(cwd)
       },
     },
     {
-      label: "复制路径",
+      label: m.copyPath,
       icon: <CopyIcon />,
       run: () => {
         acts.onCopy(cwd)
@@ -85,6 +91,7 @@ export function workspaceCommands(cwd: string, acts: Acts): readonly Command[] {
  * 所以这里把完整路径摊开，顺带交代「几个会话、几个在跑」。
  */
 export function ProjectHead({ group }: { group: Group }): React.JSX.Element {
+  const m = useMessages(SIDEBAR_MENUS)
   const running = group.rows.filter((r) => r.thread.status === "running").length
   return (
     <>
@@ -97,8 +104,8 @@ export function ProjectHead({ group }: { group: Group }): React.JSX.Element {
         <bdi>{group.cwd}</bdi>
       </div>
       <div className="pop__head-meta">
-        {group.rows.length} 个会话
-        {running > 0 ? ` · ${String(running)} 个在跑` : ""}
+        {m.threads(group.rows.length)}
+        {running > 0 ? m.running(running) : ""}
       </div>
     </>
   )
@@ -117,6 +124,7 @@ export function useSidebarMenus(
   rowMenu: (event: React.MouseEvent, row: ThreadRow, arm: () => void, ren: () => void) => void
   groupMenu: (event: React.MouseEvent, group: Group) => void
 } {
+  const m = useMessages(SIDEBAR_MENUS)
   return {
     rowMenu: (event, row, arm, ren) => {
       // 置顶排在最前：它是这个菜单里唯一**改变这条会话在侧栏位置**的动作，
@@ -124,31 +132,31 @@ export function useSidebarMenus(
       const isPinned = acts.pinnedThreads.includes(row.thread.id)
       openMenu(event, [
         {
-          label: isPinned ? "取消置顶" : "置顶这个会话",
+          label: isPinned ? m.unpin : m.pinThread,
           icon: <PinIcon />,
           run: () => {
             acts.onPinThread(row.thread.id, !isPinned)
           },
         },
-        { label: "重命名", icon: <PencilIcon />, run: ren },
-        ...moveCommands(row.thread.id, acts.canMoveThread, acts.moveThread),
-        ...workspaceCommands(row.thread.cwd, acts),
-        { label: "删除会话…", icon: <TrashIcon />, danger: true, run: arm },
+        { label: m.rename, icon: <PencilIcon />, run: ren },
+        ...moveCommands(row.thread.id, acts.canMoveThread, acts.moveThread, m),
+        ...workspaceCommands(row.thread.cwd, acts, m),
+        { label: m.remove, icon: <TrashIcon />, danger: true, run: arm },
       ])
     },
     groupMenu: (event, group) => {
       openMenu(
         event,
         [
-          ...workspaceCommands(group.cwd, acts),
-          ...moveCommands(group.cwd, acts.canMoveProject, acts.moveProject),
-          ...iconCommands(group.cwd, acts),
+          ...workspaceCommands(group.cwd, acts, m),
+          ...moveCommands(group.cwd, acts.canMoveProject, acts.moveProject, m),
+          ...iconCommands(group.cwd, acts, m),
           // **只有空项目才给这一条。** 有会话的项目是从会话推出来的，
           // 移不走——摆一个点了没反应的菜单项比没有更糟
           ...(group.rows.length === 0
             ? [
                 {
-                  label: "移出侧栏",
+                  label: m.dropProject,
                   icon: <TrashIcon />,
                   run: () => {
                     acts.onDropProject(group.cwd)
@@ -177,12 +185,12 @@ export function useSidebarMenus(
  */
 const ICONS = ["🟦", "🟩", "🟧", "🟪", "🔴", "⚫️", "🐳", "🧪"] as const
 
-function iconCommands(cwd: string, acts: Acts): readonly Command[] {
+function iconCommands(cwd: string, acts: Acts, m: Text): readonly Command[] {
   const set = acts.onSetIcon
   if (set === undefined) return []
   return [
     {
-      label: "图标",
+      label: m.icon,
       icon: <SparkIcon />,
       // 这一条的 `run` 是「清掉图标」（菜单里那个 ×）
       run: () => {

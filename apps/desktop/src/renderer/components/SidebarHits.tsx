@@ -6,6 +6,8 @@ import { Row } from "./SidebarRows.js"
 import type { RenameCtl } from "./RowName.js"
 import { threadPage } from "../sidebar-page.js"
 import { SidebarPages } from "./sidebar-pages.js"
+import { useMessages } from "../i18n.js"
+import { SIDEBAR_HITS } from "./SidebarHits.messages.js"
 
 /**
  * 筛选命中的结果。**不分段**——命中的几条散在各组里，
@@ -33,6 +35,7 @@ export function Hits({
     engines: readonly EngineInfo[]
   }
 }): React.JSX.Element {
+  const m = useMessages(SIDEBAR_HITS)
   const [page, setPage] = useState(0)
   const visible = threadPage(rows, page)
   const heading = useRef<HTMLDivElement>(null)
@@ -42,11 +45,11 @@ export function Hits({
   return (
     <>
       <div ref={heading} className="sidebar__section sidebar__section--static">
-        会话信息 {rows.length} / {total}
+        {m.heading(rows.length, total)}
       </div>
-      <SidebarPages {...visible} total={rows.length} label="搜索结果" onPage={setPage} />
+      <SidebarPages {...visible} total={rows.length} label={m.results} onPage={setPage} />
       {/* 空列表什么都不说的话，看起来像「会话全没了」 */}
-      {rows.length === 0 ? <p className="sidebar__empty">标题、首句和目录没有匹配。</p> : null}
+      {rows.length === 0 ? <p className="sidebar__empty">{m.none}</p> : null}
       {visible.rows.map((row) => (
         <Row
           key={row.thread.id}

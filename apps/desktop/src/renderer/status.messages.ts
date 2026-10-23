@@ -1,6 +1,6 @@
 import { defineMessages } from "@switchback/i18n"
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const
+const EN_DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" })
 
 /** 运行态、时长、「多久以前」。 */
 export const STATUS = defineMessages(
@@ -17,7 +17,10 @@ export const STATUS = defineMessages(
     hoursAgo: (n: number) => `${String(n)} 小时前`,
     yesterday: "昨天",
     daysAgo: (n: number) => `${String(n)} 天前`,
-    day: (month: number, day: number) => `${String(month)} 月 ${String(day)} 日`,
+    day: (at: number) => {
+      const d = new Date(at)
+      return `${String(d.getMonth() + 1)} 月 ${String(d.getDate())} 日`
+    },
   },
   {
     waitingApproval: "Waiting for approval",
@@ -32,6 +35,6 @@ export const STATUS = defineMessages(
     hoursAgo: (n) => `${String(n)}h ago`,
     yesterday: "yesterday",
     daysAgo: (n) => `${String(n)}d ago`,
-    day: (month, day) => `${MONTHS[month - 1] ?? String(month)} ${String(day)}`,
+    day: (at) => EN_DAY.format(at),
   },
 )

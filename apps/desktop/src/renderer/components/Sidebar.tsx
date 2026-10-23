@@ -12,6 +12,7 @@ import { Head } from "./SidebarHead.js"
 import { useRenaming, type RenameCtl } from "./RowName.js"
 import { RenameDialog } from "./RenameDialog.js"
 import { rowLabelOf } from "../sidebar.js"
+import { useLocale } from "../i18n.js"
 import { SectionList } from "./SidebarSections.js"
 import { sidebarMoves } from "../sidebarMove.js"
 import { SidebarFound } from "./SidebarFound.js"
@@ -113,10 +114,11 @@ interface Props {
  *（人亲自起的名 > 引擎起的名 > 第一句话）。抽出来是函数行数闸门逼的。
  */
 function Renaming({ row, ctl }: { row: SidebarRow | undefined; ctl: RenameCtl }): React.JSX.Element | null {
+  const locale = useLocale()
   if (row === undefined) return null
   return (
     <RenameDialog
-      title={rowLabelOf(row)}
+      title={rowLabelOf(row, locale)}
       onSave={(title) => {
         ctl.commit(row.thread.id, title)
       }}

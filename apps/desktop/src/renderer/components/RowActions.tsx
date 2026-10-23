@@ -1,5 +1,7 @@
 import { EllipsisIcon } from "./icons.js"
 import { SIDEBAR_ICON } from "./icon-base.js"
+import { useMessages } from "../i18n.js"
+import { ROW_ACTIONS } from "./RowActions.messages.js"
 
 /**
  * 行尾那颗按钮：平时是「更多」，武装之后变成「确认」。
@@ -18,17 +20,18 @@ export function RowActions({
   onDisarm: () => void
   onMenu: (event: React.MouseEvent) => void
 }): React.JSX.Element {
+  const m = useMessages(ROW_ACTIONS)
   if (confirming) {
     return (
       <button
         type="button"
         className="row__act row__act--danger"
-        aria-label="确认删除"
-        data-tip="再点一次就真的删了，不可撤销"
+        aria-label={m.confirmLabel}
+        data-tip={m.confirmTip}
         onClick={onDelete}
         onBlur={onDisarm}
       >
-        确认
+        {m.confirm}
       </button>
     )
   }
@@ -36,8 +39,8 @@ export function RowActions({
     <button
       type="button"
       className="row__act"
-      aria-label="更多操作"
-      data-tip="更多操作"
+      aria-label={m.more}
+      data-tip={m.more}
       onClick={onMenu}
     >
       <EllipsisIcon size={SIDEBAR_ICON} />

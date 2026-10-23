@@ -125,7 +125,7 @@ export function RowPeek({
   return (
     // aria-hidden：内容和行本身重复，读屏不需要听第二遍
     <span className="peek" style={{ left: spot.x, top: spot.y }} aria-hidden="true">
-      <span className="peek__title">{rowLabelOf(row)}</span>
+      <span className="peek__title">{rowLabelOf(row, locale)}</span>
       <span className="peek__path">{thread.cwd}</span>
       <span className="peek__meta">
         {engineRoute} · {withEffort} · {labelOf(trustsOf(locale), thread.trust)}

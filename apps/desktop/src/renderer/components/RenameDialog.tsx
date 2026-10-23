@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useModalKeys } from "../useModalKeys.js"
+import { useMessages } from "../i18n.js"
+import { RENAME_DIALOG } from "./RenameDialog.messages.js"
 
 /**
  * 改名对话框。
@@ -29,6 +31,7 @@ export function RenameDialog({ title, onSave, onClose }: {
   onSave: (title: string) => void
   onClose: () => void
 }): React.JSX.Element {
+  const m = useMessages(RENAME_DIALOG)
   const box = useModalKeys(onClose)
   const input = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState(title)
@@ -59,8 +62,8 @@ export function RenameDialog({ title, onSave, onClose }: {
         aria-modal="true"
         aria-labelledby="rename-title"
       >
-        <h2 className="rename__title" id="rename-title">重命名会话</h2>
-        <p className="rename__hint">保持简短且易于识别</p>
+        <h2 className="rename__title" id="rename-title">{m.title}</h2>
+        <p className="rename__hint">{m.hint}</p>
         {/* 表单套在里面：`useModalKeys` 给的是 div 的 ref，而回车提交要的是 form */}
         <form
           onSubmit={(e) => {
@@ -73,15 +76,15 @@ export function RenameDialog({ title, onSave, onClose }: {
             className="rename__input"
             value={draft}
             maxLength={200}
-            aria-label="会话名字"
+            aria-label={m.name}
             onChange={(e) => {
               setDraft(e.target.value)
             }}
           />
           <div className="rename__acts">
-            <button type="button" className="rename__cancel" onClick={onClose}>取消</button>
+            <button type="button" className="rename__cancel" onClick={onClose}>{m.cancel}</button>
             {/* 空名字不给保存：保存了侧栏那一行会变成一块什么都不写的空白 */}
-            <button type="submit" className="rename__save" disabled={clean === ""}>保存</button>
+            <button type="submit" className="rename__save" disabled={clean === ""}>{m.save}</button>
           </div>
         </form>
       </div>
