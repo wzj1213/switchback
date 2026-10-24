@@ -93,6 +93,7 @@ app.commandLine.appendSwitch("lang", langTag(settings.get().language))
 const engineRefresh: { run?: (id?: string) => Promise<unknown> } = {}
 const engineVersions = createEngineVersions(log, {
   claudeExecutable: buildInfo.claudeExecutable,
+  locale: () => settings.get().language,
   onChanged: () => {
     void engineRefresh.run?.().catch((error: unknown) => {
       log.write("warn", "engines", `装完之后重探引擎失败：${String(error)}`)

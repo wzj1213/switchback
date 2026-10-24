@@ -199,4 +199,12 @@ describe("引擎版本入口", () => {
       ).toBeGreaterThanOrEqual(2)
     }
   })
+
+  it("英文界面下，更新入口不在时那句话也说英文", async () => {
+    const { store } = fixture({ locale: () => "en" })
+    await expect(store.update("claude")).resolves.toMatchObject({
+      ok: false,
+      output: "claude has no update entry point that Switchback can run right now",
+    })
+  })
 })

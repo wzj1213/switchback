@@ -3,6 +3,8 @@ import type { ViewState } from "@switchback/store"
 import { BUILTIN_ENGINES } from "../shared/builtin-engines.js"
 import type { EngineAccess } from "../shared/engine-access.js"
 import { dshProfileConfirmed, type EnginePick, type LastUsed } from "../shared/settings.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ENGINE_STATE } from "./engine-settings-model.messages.js"
 
 export interface EngineSettingItem extends EngineInfo {
   builtin: boolean
@@ -88,23 +90,21 @@ export function initialEngine(
 export function engineSettingState(
   item: EngineSettingItem,
   settings: EngineAccess,
+  locale: Locale = DEFAULT_LOCALE,
 ): EngineSettingState {
+  const m = ENGINE_STATE[locale]
   // **用户自己关的排在最前面。** 一家被关掉的引擎连探测都不起，那时候还去报
   // 「未安装」或者「可用」，说的都是一个 Switchback 此刻根本没去问过的事
   if (settings.disabledEngines.includes(item.id)) {
-    return {
-      label: "已关掉",
-      tone: "muted",
-      hint: "你在这儿关掉了它：不探测、不出现在引擎选择器里。它自己的命令行照常能用。",
-    }
+    return { label: m.off, tone: "muted", hint: m.offHint }
   }
-  const dsh = dshSettingState(item, settings.dsh)
+  const dsh = dshSettingState(item, settings.dsh, m)
   if (dsh !== undefined) return dsh
   if (item.state === "ok") {
-    return { label: "可用", tone: "ok", hint: item.detail ?? "宿主已探测到这家引擎。" }
+    return { label: m.ok, tone: "ok", hint: item.detail ?? m.okHint }
   }
   if (item.state === "missing") {
-    return { label: "未安装", tone: "warn", hint: item.detail ?? "当前 PATH 中没有探测到它。" }
+    return { label: m.missing, tone: "warn", hint: item.detail ?? m.missingHint }
   }
   if (item.state === "unavailable") {
     /*
@@ -118,25 +118,18 @@ export function engineSettingState(
      * 两种成因共有的只有一件事：它在，但起不来。那就说这句。
      * 具体是哪一种由 `detail` 说——它一直是照实写的。
      */
-    return { label: "起不来", tone: "warn", hint: item.detail ?? "探到了，但它启动不了。" }
+    return { label: m.broken, tone: "warn", hint: item.detail ?? m.brokenHint }
   }
-  return {
-    label: item.state === "unknown" ? "未确认" : "等待探测",
-    tone: "muted",
-    hint: item.detail ?? "探测没有给出明确结论；Switchback 不会据此声称它不可用。",
-  }
+  return { label: item.state === "unknown" ? m.unknown : m.waiting, tone: "muted", hint: item.detail ?? m.unsureHint }
 }
 
 function dshSettingState(
   item: EngineSettingItem,
   dsh: EngineAccess["dsh"],
+  m: (typeof ENGINE_STATE)[Locale],
 ): EngineSettingState | undefined {
   if (item.id !== "dsh") return undefined
-  if (!dshProfileConfirmed(dsh)) {
-    return { label: "未接入", tone: "muted", hint: "确认原生配置后才探测，也不会提前启动 DSH。" }
-  }
-  if (item.profile !== dsh.profile) {
-    return { label: "等待探测", tone: "muted", hint: `正在探测 \`${dsh.profile}\` profile。` }
-  }
+  if (!dshProfileConfirmed(dsh)) return { label: m.dshOff, tone: "muted", hint: m.dshOffHint }
+  if (item.profile !== dsh.profile) return { label: m.waiting, tone: "muted", hint: m.dshProbing(dsh.profile) }
   return undefined
 }

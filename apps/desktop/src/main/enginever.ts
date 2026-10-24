@@ -17,6 +17,10 @@ import {
 } from "./enginever-sources.js"
 import type { Logger } from "./log.js"
 import type { Channels } from "./channels.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ENGINE_VERSION } from "./enginever.messages.js"
+
+type Text = (typeof ENGINE_VERSION)[Locale]
 
 export type { EngineCommandResult, EngineCommandRunner, EngineVersion }
 
@@ -46,6 +50,8 @@ export interface EngineVersionOptions {
    *（通道要先挂），拿不到 `attached`。index.ts 用一个可变槽把环解开。
    */
   onChanged?: () => void
+  /** 装完、更新完接在输出后面那句话用哪种语言，每次现读。缺省中文。 */
+  locale?: () => Locale
 }
 
 export interface EngineVersionStore {
@@ -57,6 +63,7 @@ export interface EngineVersionStore {
 }
 
 const TTL_MS = 6 * 60 * 60 * 1000
+const textOf = (options: EngineVersionOptions): Text => ENGINE_VERSION[options.locale?.() ?? DEFAULT_LOCALE]
 const UPDATE_MS = 180_000
 
 /**
@@ -103,7 +110,7 @@ export function createEngineVersions(
 
   const update = async (engine: string): Promise<UpdateResult> => {
     const spec = known.find((candidate) => candidate.engine === engine)
-    if (spec?.update === undefined) return unavailable(engine)
+    if (spec?.update === undefined) return unavailable(engine, textOf(options))
     const before = await versionOf(spec.bin, run)
     log.write("info", "engines", `开始更新 ${engine}（当前 ${before ?? "未知"}）`)
     const command = await run(spec.update.command, spec.update.args, UPDATE_MS)
@@ -123,14 +130,14 @@ export function createEngineVersions(
       changed,
       ...(before === undefined ? {} : { before }),
       ...(after === undefined ? {} : { after }),
-      output: updateOutput(command.output, ok, before, after),
+      output: updateOutput(command.output, { ok, before, after }, textOf(options)),
     }
   }
 
   const install = async (engine: string): Promise<UpdateResult> => {
     const spec = known.find((candidate) => candidate.engine === engine)
-    if (spec?.install === undefined) return noInstaller(engine)
-    const done = await runInstall(spec, { run, log })
+    if (spec?.install === undefined) return noInstaller(engine, textOf(options))
+    const done = await runInstall(spec, { run, log, m: textOf(options) })
     settle(done.ok)
     return done
   }
@@ -147,10 +154,10 @@ export function createEngineVersions(
  */
 async function runInstall(
   spec: EngineSpec,
-  deps: { run: EngineCommandRunner; log: Logger },
+  deps: { run: EngineCommandRunner; log: Logger; m: Text },
 ): Promise<UpdateResult> {
   const step = spec.install
-  if (step === undefined) return noInstaller(spec.engine)
+  if (step === undefined) return noInstaller(spec.engine, deps.m)
   const before = await versionOf(spec.bin, deps.run)
   deps.log.write("info", "engines", `开始安装 ${spec.engine}`)
   const command = await deps.run(step.command, step.args, UPDATE_MS)
@@ -162,7 +169,7 @@ async function runInstall(
     changed: ok && before === undefined,
     ...(before === undefined ? {} : { before }),
     ...(after === undefined ? {} : { after }),
-    output: installOutput(command.output, ok),
+    output: installOutput(command.output, ok, deps.m),
   }
 }
 
@@ -191,14 +198,13 @@ async function probe(
   return list
 }
 
-function noInstaller(engine: string): UpdateResult {
-  return { ok: false, changed: false, output: `Switchback 不知道 ${engine} 的安装来源，这一家要按它自己的方式装` }
+function noInstaller(engine: string, m: Text): UpdateResult {
+  return { ok: false, changed: false, output: m.noInstaller(engine) }
 }
 
-function installOutput(output: string, ok: boolean): string {
-  if (ok) return output === "" ? "安装器正常结束，没有额外输出。" : output
-  const checked = "Switchback 复查：装完之后仍然探不到这个命令。可能装在了不在 PATH 上的位置。"
-  return [output === "" ? "安装命令没有输出。" : output, checked].join("\n\n")
+function installOutput(output: string, ok: boolean, m: Text): string {
+  if (ok) return output === "" ? m.installQuiet : output
+  return [output === "" ? m.installSilent : output, m.installMissing].join("\n\n")
 }
 
 export function installEngineVersionChannel(_log: Logger, versions: EngineVersionStore, channels: Channels): void {
@@ -227,19 +233,17 @@ function updateSucceeded(check: UpdateVerification): boolean {
   )
 }
 
-function unavailable(engine: string): UpdateResult {
-  return { ok: false, changed: false, output: `${engine} 当前没有可由 Switchback 执行的更新入口` }
+function unavailable(engine: string, m: Text): UpdateResult {
+  return { ok: false, changed: false, output: m.noUpdater(engine) }
 }
 
 function updateOutput(
   output: string,
-  ok: boolean,
-  before: string | undefined,
-  after: string | undefined,
+  check: { ok: boolean; before: string | undefined; after: string | undefined },
+  m: Text,
 ): string {
-  if (ok) return output === "" ? "更新器正常结束，没有额外输出。" : output
-  const checked = `Switchback 复查版本：${before ?? "?"} → ${after ?? "?"}`
-  return [output === "" ? "更新命令没有输出。" : output, checked].join("\n\n")
+  if (check.ok) return output === "" ? m.updateQuiet : output
+  return [output === "" ? m.updateSilent : output, m.recheck(check.before ?? "?", check.after ?? "?")].join("\n\n")
 }
 
 function isPresent<T>(value: T | undefined): value is T {

@@ -162,4 +162,19 @@ describe("引擎设置页的数据", () => {
       label: "已关掉",
     })
   })
+
+  it("英文界面下状态牌说英文；探测给了原话就照用原话", () => {
+    const items = engineSettingItems([
+      { id: "codex", label: "Codex", state: "missing" },
+      { id: "kimi", label: "Kimi", state: "ok", detail: "/usr/local/bin/kimi — 2.3.1" },
+    ])
+    const access = { dsh: { profile: "acp", confirmedProfiles: [] }, disabledEngines: [] }
+    const stateOf = (id: string) => {
+      const item = items.find((one) => one.id === id)
+      return item === undefined ? undefined : engineSettingState(item, access, "en")
+    }
+    expect(stateOf("codex")).toEqual({ label: "Not installed", tone: "warn", hint: "It wasn't found on the current PATH." })
+    expect(stateOf("kimi")).toEqual({ label: "Available", tone: "ok", hint: "/usr/local/bin/kimi — 2.3.1" })
+    expect(stateOf("dsh")?.label).toBe("Not connected")
+  })
 })

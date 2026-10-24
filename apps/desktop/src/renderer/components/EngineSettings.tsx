@@ -15,7 +15,7 @@ import { EngineSwitchbackSettings } from "./EngineSwitchbackSettings.js"
 import { EnginePreference } from "./EnginePreference.js"
 import { Field, Group } from "./SettingsBits.js"
 import { DshProfileSettings } from "./DshProfileSettings.js"
-import { useMessages } from "../i18n.js"
+import { useLocale, useMessages } from "../i18n.js"
 import { ENGINE_SETTINGS } from "./EngineSettings.messages.js"
 
 export function EnginesSection({
@@ -41,6 +41,7 @@ export function EnginesSection({
   onGoInstall: () => void
 }): React.JSX.Element {
   const m = useMessages(ENGINE_SETTINGS)
+  const locale = useLocale()
   const items = engineSettingItems(catalog)
   const root = useRef<HTMLElement>(null)
   const [selected, setSelected] = useState(() =>
@@ -48,7 +49,7 @@ export function EnginesSection({
   )
   const item = items.find((candidate) => candidate.id === selected) ?? items[0]
   if (item === undefined) return <p className="set__blank">{m.none}</p>
-  const state = engineSettingState(item, settings)
+  const state = engineSettingState(item, settings, locale)
   const copy = settingsCopyOf(item.id)
   const off = settings.disabledEngines.includes(item.id)
   const connected = !off && (item.id !== "dsh" || dshProfileConfirmed(settings.dsh))
@@ -141,11 +142,12 @@ function EngineTabs({
   onSelect: (id: string) => void
 }): React.JSX.Element {
   const m = useMessages(ENGINE_SETTINGS)
+  const locale = useLocale()
   return (
     <div className="eng-tabs">
       <div className="eng-tabs__seg" role="group" aria-label={m.pick}>
         {items.map((item) => {
-          const state = engineSettingState(item, settings)
+          const state = engineSettingState(item, settings, locale)
           const pinned = settings.defaultEngine === item.id
           const off = settings.disabledEngines.includes(item.id)
           return (
