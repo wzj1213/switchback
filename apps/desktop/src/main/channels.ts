@@ -39,7 +39,7 @@ export function createChannels(ipc: Pick<IpcMain, "handle" | "on">): Channels {
   // **同名挂两次是 bug，当场炸。** `ipcMain.handle` 自己也会抛，但 `on` 不会——
   // 它会安静地多挂一个监听，于是一次 send 跑两遍处理函数（存两份草稿、删两次图）
   const remember = (name: string, fn: Handler): void => {
-    if (table.has(name)) throw new Error(`通道 ${name} 挂了两次`)
+    if (table.has(name)) throw new Error(`通道 ${name} 挂了两次`) // i18n-ok：写代码时的错，起不来就是 bug
     table.set(name, fn)
   }
   return {

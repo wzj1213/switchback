@@ -52,6 +52,7 @@ export async function applyZcodeLock(on: boolean, log: Logger): Promise<void> {
     const status = await lockCheckpoints(homedir(), on)
     const { checkpoints } = status
     if (!checkpoints.exists) return
+    // i18n-ok：只拼给下面的日志
     const left = checkpoints.archives > 0 ? `；里面还有 ${String(checkpoints.archives)} 个没传出去的包，Switchback 没动它们` : ""
     log.write("info", "zcode", `快照目录${checkpoints.locked ? "已上锁" : "已解锁"}：${checkpoints.path}${left}`)
   } catch (error) {

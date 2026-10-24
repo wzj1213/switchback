@@ -22,14 +22,14 @@ export interface ExternalUrlDeps {
 export async function openExternalSafely(raw: string, deps: ExternalUrlDeps): Promise<boolean> {
   const url = safeExternalUrl(raw)
   if (url === undefined) {
-    deps.report(`已拦截不受支持的外链：${raw}`)
+    deps.report(`已拦截不受支持的外链：${raw}`) // i18n-ok：report 进日志
     return false
   }
   try {
     await deps.open(url)
     return true
   } catch (error) {
-    deps.report(`打开外链失败：${String(error)}`)
+    deps.report(`打开外链失败：${String(error)}`) // i18n-ok：同上
     return false
   }
 }

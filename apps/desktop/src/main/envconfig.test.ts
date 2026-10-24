@@ -88,7 +88,8 @@ describe("环境配置", () => {
     const env = await ask(state.cwd)
     const source = env.sources.find((s) => s.engine === "codex" && s.scope === "project")
     expect(source?.exists).toBe(true)
-    expect(source?.error).toMatch(/TOML/)
+    expect(source?.error?.format).toBe("toml")
+    expect(source?.error?.detail).not.toBe("")
   })
 
   it("没有的那几份文件照样摆出来：「这儿可以配」本身是信息", async () => {

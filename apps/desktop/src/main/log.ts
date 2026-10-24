@@ -20,8 +20,9 @@ const MAX_BYTES = 2 * 1024 * 1024
  */
 const MAX_LINE = 2000
 
+// i18n-ok：日志里的记号，只给排查的人看
 const TRUNCATED = "〔已截断〕"
-const MASK = "〔已抹去〕"
+const MASK = "〔已抹去〕" // i18n-ok
 
 /**
  * 看起来像凭据的东西。

@@ -11,7 +11,8 @@ import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
 import type { NotifyMode } from "../shared/settings.js"
-import type { Locale } from "@switchback/i18n"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { HOST } from "./host.messages.js"
 import { createAwake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
@@ -39,6 +40,7 @@ interface Channels {
   ledger: Ledger
   report: (error: unknown, threadId?: ThreadId) => void
   worksiteSearch: WorksiteSearch
+  locale: () => Locale
 }
 
 /**
@@ -53,7 +55,7 @@ function installBridgeChannels(deps: Channels): void {
   ipcMain.handle("switchback:pickFolder", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
-      title: "选择工作区",
+      title: HOST[deps.locale()].pickFolder,
     })
     return result.canceled ? undefined : result.filePaths[0]
   })
@@ -99,7 +101,7 @@ function installBridgeChannels(deps: Channels): void {
  * userData 而不是自己拼 `~/.switchback`：这是系统给应用的位置，
  * 用户换机器迁移、清理应用数据时才找得到、才带得走。
  */
-function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<typeof createJournal> {
+function openJournal(log: Logger, emit: (event: Event) => void, locale: () => Locale): ReturnType<typeof createJournal> {
   return createJournal({
     dir: join(app.getPath("userData"), "threads"),
     // **写满了要说出来。** 停笔本身是对的（无声地把磁盘写满更糟），
@@ -112,21 +114,19 @@ function openJournal(log: Logger, emit: (event: Event) => void): ReturnType<type
         at: Date.now(),
         threadId,
         status: "degraded",
-        detail:
-          "这个会话的本地记录写满了（单个会话上限 32 MB），**之后说的话不会再落盘**。" +
-          "对话本身照常进行，但重启之后看不到接下来这些。要留存的话，新开一个会话继续。",
+        detail: HOST[locale()].journalFull,
       })
     },
   })
 }
 
-function openStores(log: Logger, emit: (event: Event) => void): {
+function openStores(log: Logger, emit: (event: Event) => void, locale: () => Locale): {
   journal: ReturnType<typeof createJournal>
   rules: ReturnType<typeof createRuleStore>
   baselines: WorktreeBaselines
 } {
   return {
-    journal: openJournal(log, emit),
+    journal: openJournal(log, emit, locale),
     rules: createRuleStore(join(app.getPath("userData"), "rules")),
     baselines: createWorktreeBaselines(join(app.getPath("userData"), "worktree-baselines")),
   }
@@ -225,7 +225,7 @@ export function attachHost(
   const emit = noting({ ...ports, trust: threadTrust }, publish)
 
   // 规则和事件分开存；对话基线也有独立生命周期。
-  const { journal, rules, baselines } = openStores(log, emit)
+  const { journal, rules, baselines } = openStores(log, emit, () => ports.locale?.() ?? DEFAULT_LOCALE)
 
   const { drivers, labels, reload } = buildRegistry(app.getPath("userData"), log,
     readBuildInfo(app.getAppPath()).claudeExecutable, ports?.dshProfile)
@@ -247,7 +247,7 @@ export function attachHost(
   const egress = egressFor({ host, emit, log, stop: ports.egressStop, labels, locale: ports.locale })
 
   holder.host = host
-  installBridgeChannels({ host, log, ledger, report, worksiteSearch })
+  installBridgeChannels({ host, log, ledger, report, worksiteSearch, locale: () => ports.locale?.() ?? DEFAULT_LOCALE })
 
   const engines = createEngineCatalog(drivers, labels, log, {
     visible: ports?.engineVisible,
@@ -381,6 +381,7 @@ export async function rebuild(
   const missed = attached.ledger.since(before, attached.ledger.epoch) ?? []
   const scoped = scopeFor(threads, budget)
   if (scoped.deferred > 0 || scoped.trimmed > 0) {
+    // i18n-ok：只拼给下面的日志
     const parts = [
       scoped.deferred > 0 ? `${String(scoped.deferred)} 条先发头` : "",
       scoped.trimmed > 0 ? `${String(scoped.trimmed)} 条只带了尾巴` : "",
@@ -447,7 +448,7 @@ async function seed(attached: Attached, cwd: string, prompt?: string): Promise<v
     cwd,
     engine: devEngine(),
     trust: devTrust(),
-    title: cwd.split("/").pop() ?? "工作区",
+    title: cwd.split("/").pop() ?? "工作区", // i18n-ok：开发用的种子会话
   })
   const threadId = attached.lastThreadId()
   if (threadId === undefined) return

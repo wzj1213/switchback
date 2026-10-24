@@ -4,6 +4,8 @@ import { ipcMain, shell } from "electron"
 import type { WorksiteSearch } from "./worksite-search.js"
 import { ownedWorksite, type OwnedWorksite, type WorksiteGuard } from "./worksite-search.js"
 import type { Channels } from "./channels.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { PROJECT_DOC } from "./projectdoc.messages.js"
 
 /**
  * 项目说明：一份真源，两家引擎都读得到。
@@ -42,25 +44,6 @@ export interface ProjectDoc {
 
 export type ProjectDocGuard = WorksiteGuard
 
-const STARTER = `# 项目说明
-
-写给在这个项目里干活的 agent 看。**两家引擎读的是同一份**——
-\`CLAUDE.md\` 只有一行 \`@AGENTS.md\` 指到这里。
-
-## 这是个什么项目
-
-（一两句话说清它是干什么的、给谁用的）
-
-## 动手前要知道的
-
-- （构建/测试怎么跑）
-- （哪些地方不要碰）
-
-## 约定
-
-- （代码风格、提交信息、命名之类，只写和别处不一样的那些）
-`
-
 function requestOf(value: unknown, owns: ProjectDocGuard): OwnedWorksite | undefined {
   return ownedWorksite(value, owns)
 }
@@ -74,22 +57,26 @@ export async function projectDoc(value: unknown, owns: ProjectDocGuard): Promise
   return req === undefined ? denied() : read(req.cwd)
 }
 
-export async function ensureProjectDoc(value: unknown, owns: ProjectDocGuard): Promise<ProjectDoc> {
+export async function ensureProjectDoc(
+  value: unknown,
+  owns: ProjectDocGuard,
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<ProjectDoc> {
   const req = requestOf(value, owns)
   if (req === undefined) return denied()
   const before = await read(req.cwd)
-  if (!before.agents) await writeFile(join(req.cwd, AGENTS), STARTER, "utf8")
+  if (!before.agents) await writeFile(join(req.cwd, AGENTS), PROJECT_DOC[locale].starter, "utf8")
   // 只在「压根没有」时写指路牌。人家自己写过 CLAUDE.md 的话，
   // 那是他的内容，我们没有资格替他扔掉
   if (!before.claude) await writeFile(join(req.cwd, CLAUDE), `${POINTER}\n`, "utf8")
   return read(req.cwd)
 }
 
-export function installProjectDocChannel(worksites: WorksiteSearch, channels: Channels): void {
+export function installProjectDocChannel(worksites: WorksiteSearch, channels: Channels, locale: () => Locale): void {
   channels.handle("switchback:projectDoc", (req: unknown) => projectDoc(req, worksites.owns))
 
   /** 建起来：缺什么补什么。**已经有内容的 `CLAUDE.md` 绝不覆盖**。 */
-  channels.handle("switchback:ensureProjectDoc", (req: unknown) => ensureProjectDoc(req, worksites.owns))
+  channels.handle("switchback:ensureProjectDoc", (req: unknown) => ensureProjectDoc(req, worksites.owns, locale()))
 
   ipcMain.handle("switchback:openProjectDoc", async (_e, value: unknown) => {
     const req = requestOf(value, worksites.owns)

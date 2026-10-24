@@ -10,10 +10,12 @@ import {
 import { thumbnailSize, type AttachmentFiles } from "./attachment-files.js"
 import { pickedFilesOf } from "./picked-files.js"
 import type { Channels } from "./channels.js"
+import type { Locale } from "@switchback/i18n"
+import { ATTACH } from "./attach.messages.js"
 
-async function pickFiles(files: AttachmentFiles): Promise<PickedFiles> {
+async function pickFiles(files: AttachmentFiles, locale: Locale): Promise<PickedFiles> {
   const result = await dialog.showOpenDialog({
-    title: "添加文件或图片",
+    title: ATTACH[locale].pick,
     properties: ["openFile", "multiSelections"],
   })
   if (result.canceled) return { files: [], failed: 0, canceled: true }
@@ -48,8 +50,8 @@ function stashRequestOf(value: unknown): { mime: string; buf: Buffer } | undefin
   return bytes instanceof Uint8Array ? { mime, buf: Buffer.from(bytes) } : undefined
 }
 
-export function installAttachChannel(files: AttachmentFiles, channels: Channels): void {
-  ipcMain.handle("switchback:pickFiles", () => pickFiles(files))
+export function installAttachChannel(files: AttachmentFiles, channels: Channels, locale: () => Locale): void {
+  ipcMain.handle("switchback:pickFiles", () => pickFiles(files, locale()))
   channels.handle("switchback:stashImage", async (value: unknown) => {
     const req = stashRequestOf(value)
     if (req === undefined) return undefined

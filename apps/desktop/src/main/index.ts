@@ -251,7 +251,7 @@ function installAppChannels(): void {
     version: app.getVersion(),
     // 构建标识（短 sha）。**版本号本身回答不了「你装的是哪一次构建」**——
     // 同一个版本号可能对应好几次重打，而 bug 报告要的正是那个精确的点
-    build: buildInfo.build ?? "开发版",
+    build: buildInfo.build ?? "dev",
     dataDir: app.getPath("userData"),
   }))
   ipcMain.on("switchback:openEngines", () => {
@@ -348,12 +348,12 @@ function installChannels(): void {
   installAppChannels()
   installWorksiteChannel(worksiteSearch, channels)
   installSearchChannel(channels)
-  installChatDirChannel(channels)
-  installAttachChannel(attachmentFiles, channels)
+  installChatDirChannel(channels, () => settings.get().language)
+  installAttachChannel(attachmentFiles, channels, () => settings.get().language)
   installDraftsChannel(drafts, channels)
-  installFilePreviewChannel(touched, worksiteSearch, channels)
+  installFilePreviewChannel(touched, worksiteSearch, channels, () => settings.get().language)
   installFilePreviewWatch(touched, worksiteSearch)
-  installProjectDocChannel(worksiteSearch, channels)
+  installProjectDocChannel(worksiteSearch, channels, () => settings.get().language)
   installEngineVersionChannel(log, engineVersions, channels)
   installEngineDoorChannels(channels)
   installEnvChannel(log, channels)

@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { parse as parseToml } from "smol-toml"
-import { hookLines, hookLinesFlat, trustKeyOf, type HookScope, type HookSource } from "../shared/hooks.js"
+import { hookLines, hookLinesFlat, trustKeyOf, type HookScope, type HookSource, type HookSourceError } from "../shared/hooks.js"
 import type { Logger } from "./log.js"
 
 /**
@@ -28,7 +28,7 @@ import type { Logger } from "./log.js"
 export interface Read {
   exists: boolean
   value?: unknown
-  error?: string
+  error?: HookSourceError
 }
 
 /** 家目录：环境变量优先。**跟着它们走，不写死 `~/.x`**——改过家目录的人正是最需要这些页的。 */
@@ -190,7 +190,7 @@ export async function readJson(path: string): Promise<Read> {
   try {
     return { exists: true, value: JSON.parse(raw) as unknown }
   } catch (error) {
-    return { exists: true, error: `这份 JSON 解析不了：${String(error)}` }
+    return { exists: true, error: { format: "json", detail: String(error) } }
   }
 }
 
@@ -201,6 +201,6 @@ export async function readToml(path: string, log: Logger): Promise<Read> {
     return { exists: true, value: parseToml(raw) }
   } catch (error) {
     log.write("warn", "env", `${path} 解析不了：${String(error)}`)
-    return { exists: true, error: `这份 TOML 解析不了：${String(error)}` }
+    return { exists: true, error: { format: "toml", detail: String(error) } }
   }
 }

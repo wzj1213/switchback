@@ -111,7 +111,7 @@ async function snapshot(repo: RepoInfo, dir: string, alternates: readonly string
   if (!seeded) await git(repo.root, ["read-tree", "--empty"], env)
   await git(repo.root, ["add", "-A", "--", "."], env)
   const tree = (await git(repo.root, ["write-tree"], env)).trim()
-  if (!/^[0-9a-f]{40,64}$/.test(tree)) throw new Error("Git 工作区基线没有生成有效 tree")
+  if (!/^[0-9a-f]{40,64}$/.test(tree)) throw new Error("Git 工作区基线没有生成有效 tree") // i18n-ok：内部错，排查时看
   return { tree, env, ...(indexTree === undefined ? {} : { indexTree }) }
 }
 

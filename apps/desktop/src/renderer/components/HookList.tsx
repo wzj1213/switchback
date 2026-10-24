@@ -38,7 +38,7 @@ export function SourceCard({ source, home }: { source: HookSource; home: string 
           </button>
         ) : null}
       </div>
-      {source.error === undefined ? null : <p className="hk__alarm">{source.error}</p>}
+      {source.error === undefined ? null : <p className="hk__alarm">{m.parseFailed(source.error.format, source.error.detail)}</p>}
       {source.hooks.map((hook, i) => (
         <HookRow key={`${hook.event}-${String(i)}`} hook={hook} />
       ))}

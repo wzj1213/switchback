@@ -55,6 +55,12 @@ export interface HookLine {
   trust?: "trusted" | "pending"
 }
 
+/** 配置文件解析不了：哪种格式，加上解析器的原话（原话不翻译；前面那句说明在 `HookList.messages.ts`）。 */
+export interface HookSourceError {
+  format: "json" | "toml"
+  detail: string
+}
+
 /** 一个配置来源：一份文件 + 它里面的钩子。 */
 export interface HookSource {
   engine: HookEngine
@@ -63,8 +69,8 @@ export interface HookSource {
   path: string
   exists: boolean
   hooks: readonly HookLine[]
-  /** 读不动/解析不了时引擎给的原话。有这一项就说明下面那份钩子**不完整**。 */
-  error?: string
+  /** 解析不了。有这一项就说明下面那份钩子**不完整**。 */
+  error?: HookSourceError
 }
 
 /** 「环境」那一页要的全部。 */

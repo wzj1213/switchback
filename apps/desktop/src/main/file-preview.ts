@@ -6,6 +6,10 @@ import type { FilePreview, FilePreviewRequest } from "../shared/file-preview.js"
 import type { TouchedFiles } from "./touched.js"
 import type { WorksiteSearch } from "./worksite-search.js"
 import type { Channels } from "./channels.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { PREVIEW } from "./file-preview.messages.js"
+
+type Text = (typeof PREVIEW)[Locale]
 
 const MAX_TEXT = 1_500_000
 const MAX_IMAGE = 1600
@@ -56,12 +60,12 @@ function reported(req: FilePreviewRequest, touched: PreviewGuard): boolean {
   return touched(req.threadId, req.cwd, req.path)
 }
 
-async function safeTarget(req: FilePreviewRequest, touched: PreviewGuard): Promise<string | FilePreview> {
+async function safeTarget(req: FilePreviewRequest, touched: PreviewGuard, m: Text): Promise<string | FilePreview> {
   const lexicalRoot = resolve(req.cwd)
   const lexicalTarget = resolve(lexicalRoot, req.path)
   const noted = reported(req, touched)
   if (!noted && !beneath(lexicalRoot, lexicalTarget)) {
-    return unavailable(lexicalTarget, "outside", "这个文件在工作区外，而且这条会话没读过它。")
+    return unavailable(lexicalTarget, "outside", m.unread)
   }
   try {
     const [root, target] = await Promise.all([realpath(lexicalRoot), realpath(lexicalTarget)])
@@ -69,9 +73,9 @@ async function safeTarget(req: FilePreviewRequest, touched: PreviewGuard): Promi
     // 这里再挡一次只挡得住用户自己
     return noted || beneath(root, target)
       ? target
-      : unavailable(lexicalTarget, "outside", "这个路径通过符号链接离开了当前工作区。")
+      : unavailable(lexicalTarget, "outside", m.symlink)
   } catch {
-    return unavailable(lexicalTarget, "missing", "文件已经不存在，或者暂时无法读取。")
+    return unavailable(lexicalTarget, "missing", m.missing)
   }
 }
 
@@ -83,7 +87,8 @@ export async function previewWatchTarget(
 ): Promise<string | undefined> {
   const req = requestOf(value)
   if (req === undefined || !owns(req.threadId, req.cwd)) return undefined
-  const target = await safeTarget(req, touched)
+  // 监听只要「能不能看」，说法用不上，给默认的那份就行
+  const target = await safeTarget(req, touched, PREVIEW[DEFAULT_LOCALE])
   return typeof target === "string" ? target : undefined
 }
 
@@ -122,22 +127,24 @@ export async function previewFile(
   value: unknown,
   touched: PreviewGuard,
   owns: WorkspaceGuard,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<FilePreview> {
+  const m = PREVIEW[locale]
   const req = requestOf(value)
-  if (req === undefined) return unavailable("", "failed", "没有可预览的文件路径。")
+  if (req === undefined) return unavailable("", "failed", m.noPath)
   if (!owns(req.threadId, req.cwd)) {
-    return unavailable(req.path, "outside", "这条会话没有使用这个工作区，不能预览其中的文件。")
+    return unavailable(req.path, "outside", m.foreign)
   }
-  const target = await safeTarget(req, touched)
+  const target = await safeTarget(req, touched, m)
   if (typeof target !== "string") return target
   try {
     const info = await stat(target)
-    if (!info.isFile()) return unavailable(target, "directory", "这是一个目录，不能作为文件预览。")
+    if (!info.isFile()) return unavailable(target, "directory", m.directory)
     const image = imagePreview(target)
     if (image !== undefined) return image
     const truncated = info.size > MAX_TEXT
     const buffer = await readHead(target, Math.min(info.size, MAX_TEXT))
-    if (looksBinary(buffer)) return unavailable(target, "binary", "这是二进制文件，不能按文本预览。")
+    if (looksBinary(buffer)) return unavailable(target, "binary", m.binary)
     const ext = extname(target).toLowerCase()
     return {
       kind: HTML_EXT.has(ext) ? "html" : "text",
@@ -148,12 +155,17 @@ export async function previewFile(
       ...(LANG[ext] === undefined ? {} : { language: LANG[ext] }),
     }
   } catch {
-    return unavailable(target, "failed", "读取这份文件失败，请稍后重试。")
+    return unavailable(target, "failed", m.failed)
   }
 }
 
-export function installFilePreviewChannel(touched: TouchedFiles, worksites: WorksiteSearch, channels: Channels): void {
+export function installFilePreviewChannel(
+  touched: TouchedFiles,
+  worksites: WorksiteSearch,
+  channels: Channels,
+  locale: () => Locale,
+): void {
   channels.handle("switchback:filePreview", (req: unknown) => (
-    previewFile(req, touched.allows, worksites.owns)
+    previewFile(req, touched.allows, worksites.owns, locale())
   ))
 }

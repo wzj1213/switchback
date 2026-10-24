@@ -21,7 +21,8 @@ export function ignoredPaths(cwd: string, paths: readonly string[]): Promise<rea
     child.once("error", reject)
     child.once("close", (code) => {
       if (code !== 0 && code !== 1) {
-        reject(new Error(Buffer.concat(stderr).toString("utf8") || `git check-ignore 退出 ${String(code)}`))
+        // i18n-ok：内部错，排查时看
+      reject(new Error(Buffer.concat(stderr).toString("utf8") || `git check-ignore 退出 ${String(code)}`))
         return
       }
       resolve(Buffer.concat(stdout).toString("utf8").split("\0").filter((path) => path !== ""))

@@ -47,6 +47,7 @@ export const HOOK_LIST = defineMessages(
     trustedTip: "引擎的信任表里有这一条。改了命令的话它会重新问一次",
     pending: "待审核",
     trusted: "已审核",
+    parseFailed: (format: "json" | "toml", detail: string) => `这份 ${format === "json" ? "JSON" : "TOML"} 解析不了：${detail}`,
   },
   {
     event: {
@@ -87,5 +88,6 @@ export const HOOK_LIST = defineMessages(
     trustedTip: "This hook is in the engine's trust list. If the command changes, it asks again",
     pending: "Waiting for review",
     trusted: "Reviewed",
+    parseFailed: (format, detail) => `Couldn't parse this ${format === "json" ? "JSON" : "TOML"} file: ${detail}`,
   },
 )
