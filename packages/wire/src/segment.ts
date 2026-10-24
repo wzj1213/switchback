@@ -97,6 +97,10 @@ export function encodeFrame(frame: ServerFrame, id: number, maxChars = MAX_CHUNK
 export type Assembled =
   | { kind: "frame"; frame: ServerFrame }
   | { kind: "pending" }
+  /**
+   * `reason` 是简短的英文技术说明：link 会把它当成 WebSocket 的关闭原因送出去（上限 123 字节），
+   * 给人看的那句由 link 按界面语言包在外面。
+   */
   | { kind: "dropped"; reason: string }
 
 export interface Reassembler {
@@ -114,9 +118,9 @@ interface Assembly {
 
 /** 一片是不是自洽的（不看它和在装配的那条对不对得上）。 */
 function malformed(chunk: ChunkFrame): string | undefined {
-  if (!Number.isInteger(chunk.count) || chunk.count <= 0 || chunk.count > MAX_CHUNKS) return "片数不合法"
-  if (!Number.isInteger(chunk.index) || chunk.index < 0 || chunk.index >= chunk.count) return "片号越界"
-  if (typeof chunk.body !== "string") return "片体不是字符串"
+  if (!Number.isInteger(chunk.count) || chunk.count <= 0 || chunk.count > MAX_CHUNKS) return "invalid chunk count"
+  if (!Number.isInteger(chunk.index) || chunk.index < 0 || chunk.index >= chunk.count) return "chunk index out of range"
+  if (typeof chunk.body !== "string") return "chunk body isn't a string"
   return undefined
 }
 
@@ -138,11 +142,11 @@ export function createReassembler(maxAssembled = MAX_ASSEMBLED_CHARS): Reassembl
         ? state.current
         : { id: chunk.id, count: chunk.count, next: 0, parts: [], chars: 0 }
     state.current = current
-    if (chunk.count !== current.count) return drop("同一条帧的片数前后不一致")
+    if (chunk.count !== current.count) return drop("chunk count changed within one frame")
     // 严格按序：乱序意味着中间漏了片，而漏了片拼出来的是一段坏 JSON
-    if (chunk.index !== current.next) return drop(`片号跳了：期待 ${String(current.next)}，来的是 ${String(chunk.index)}`)
+    if (chunk.index !== current.next) return drop(`chunk index skipped: expected ${String(current.next)}, got ${String(chunk.index)}`)
     current.chars += chunk.body.length
-    if (current.chars > maxAssembled) return drop("重组超过上限")
+    if (current.chars > maxAssembled) return drop("reassembled frame is over the limit")
     current.parts.push(chunk.body)
     current.next += 1
     if (current.next < current.count) return { kind: "pending" }
@@ -155,7 +159,7 @@ export function createReassembler(maxAssembled = MAX_ASSEMBLED_CHARS): Reassembl
     try {
       return { kind: "frame", frame: JSON.parse(text) as ServerFrame }
     } catch (error) {
-      return { kind: "dropped", reason: `不是合法 JSON：${String(error)}` }
+      return { kind: "dropped", reason: `not valid JSON: ${String(error)}` }
     }
   }
 
@@ -165,7 +169,7 @@ export function createReassembler(maxAssembled = MAX_ASSEMBLED_CHARS): Reassembl
       try {
         frame = JSON.parse(text) as WireFrame
       } catch (error) {
-        return drop(`不是合法 JSON：${String(error)}`)
+        return drop(`not valid JSON: ${String(error)}`)
       }
       if (frame.type !== "chunk") {
         // 整帧到达时把在装配的那条作废：它已经不可能拼完了

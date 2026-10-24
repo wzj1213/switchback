@@ -98,7 +98,7 @@ export function Notices({
           <span className="notice__kind">
             {(latest.count ?? 1) > 1 ? `${labelOf(latest, m)} ×${String(latest.count)}` : labelOf(latest, m)}
           </span>
-          <span className="notice__text">{latest.text}</span>
+          <span className="notice__text">{latest.text === "" ? m.noDetail : latest.text}</span>
           <button
             className="btn btn--ghost"
             type="button"

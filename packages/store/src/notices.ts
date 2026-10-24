@@ -52,7 +52,8 @@ export function reduceEngineStatus(
   const notice: Notice = {
     id: `n${String(seq)}`,
     at: event.at,
-    text: event.detail ?? "引擎报告了一个没有描述的故障",
+    // 引擎没说是什么故障就留空：那句「没有描述」由界面按它的语言补上，这一层不认语言
+    text: event.detail ?? "",
     kind: kindOf(event.status),
     threadId: event.threadId === "" ? undefined : event.threadId,
     ...(event.engine === undefined ? {} : { engine: event.engine }),

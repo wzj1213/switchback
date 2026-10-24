@@ -78,6 +78,7 @@ function openTransport(
 ): Transport {
   return createTransport({
     token,
+    language: documentLocale,
     authorize: async () => {
       const seen = await whoAmI(token)
       if (seen.kind === "ok") refs.me = seen.me
@@ -104,9 +105,14 @@ export function createConnection(token: string): Connection {
   const refs = freshRefs()
 
   const sendFrame: Parameters<typeof createCalls>[0]["send"] = (frame) => refs.transport?.send(frame) ?? false
-  const calls = createCalls({ send: sendFrame, setTimer: (run, ms) => setTimeout(run, ms), clearTimer: (h) => {
-    clearTimeout(h as ReturnType<typeof setTimeout>)
-  } })
+  const calls = createCalls({
+    send: sendFrame,
+    setTimer: (run, ms) => setTimeout(run, ms),
+    clearTimer: (h) => {
+      clearTimeout(h as ReturnType<typeof setTimeout>)
+    },
+    language: documentLocale,
+  })
 
   const scheduleAck = (): void => {
     if (refs.ackTimer !== undefined) return

@@ -1,4 +1,6 @@
 import { createReassembler, type ClientFrame, type ServerFrame } from "@switchback/wire"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { TRANSPORT } from "./transport.messages.js"
 
 /**
  * 浏览器这一端的连接。
@@ -60,6 +62,8 @@ export interface TransportDeps {
   onState: (state: ConnState) => void
   /** 重连成功后要发的第一帧（带上游标）。由调用方给，因为游标是它在管。 */
   hello: () => ClientFrame
+  /** `ConnState.retrying.reason` 用哪种语言说。现读，缺省中文。 */
+  language?: () => Locale
 }
 
 export interface Transport {
@@ -140,6 +144,16 @@ interface Ctx {
   open: () => void
 }
 
+/** 自己关掉一条不可信的流时用的关闭码；收到它就知道 `reason` 是 wire 的技术说明。 */
+const BAD_FRAME = 4001
+
+const say = (ctx: Ctx): (typeof TRANSPORT)[Locale] => TRANSPORT[ctx.deps.language?.() ?? DEFAULT_LOCALE]
+
+function closeReason(ctx: Ctx, event: CloseEvent): string {
+  if (event.code === BAD_FRAME) return say(ctx).badFrame(event.reason)
+  return event.reason === "" ? say(ctx).closed : event.reason
+}
+
 function dropLive(state: State): void {
   if (state.live?.heartbeat !== undefined) clearInterval(state.live.heartbeat)
   state.live = undefined
@@ -178,7 +192,7 @@ function attach(ctx: Ctx, live: Live, gen: number): void {
     if (seen.kind === "frame") deps.onFrame(seen.frame)
     // “pending” 是常态（大帧的中间片）；“dropped” 说明这条流已经不可信，
     // 断开重来比带着一个洞继续跑安全
-    else if (seen.kind === "dropped") live.socket.close(4001, seen.reason)
+    else if (seen.kind === "dropped") live.socket.close(BAD_FRAME, seen.reason)
   }
   live.socket.onclose = (event) => {
     if (live.heartbeat !== undefined) clearInterval(live.heartbeat)
@@ -186,7 +200,7 @@ function attach(ctx: Ctx, live: Live, gen: number): void {
     // 也不能触发重连——那会连锁开出第三条
     if (stale()) return
     state.live = undefined
-    if (!state.stopped) retry(ctx, event.reason === "" ? "连接断开" : event.reason)
+    if (!state.stopped) retry(ctx, closeReason(ctx, event))
   }
   live.socket.onerror = () => {
     // onerror 之后一定会来 onclose，重连逻辑只写在那一处
@@ -203,7 +217,7 @@ function afterAuthorize(ctx: Ctx, gen: number, verdict: "ok" | "denied" | "unkno
   }
   if (verdict === "unknown") {
     // 问不出来就当网络问题，接着退避重试——**别把人踢回配对屏**
-    retry(ctx, "连不上 Switchback")
+    retry(ctx, say(ctx).unreachable)
     return
   }
   // 令牌走子协议：浏览器的 `WebSocket` 构造器设不了请求头，
@@ -230,7 +244,7 @@ function open(ctx: Ctx): void {
     })
     .catch((error: unknown) => {
       if (gen !== state.gen) return
-      retry(ctx, error instanceof Error ? error.message : "连不上")
+      retry(ctx, error instanceof Error ? error.message : say(ctx).unreachable)
     })
 }
 

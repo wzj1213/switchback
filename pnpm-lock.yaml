@@ -267,6 +267,9 @@ importers:
 
   packages/link:
     dependencies:
+      '@switchback/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol

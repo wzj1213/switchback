@@ -8,7 +8,7 @@ export const PACKAGE_GRAPH = Object.freeze({
   "@switchback/approval": Object.freeze(["@switchback/i18n", "@switchback/protocol"]),
   "@switchback/store": Object.freeze(["@switchback/protocol"]),
   "@switchback/wire": Object.freeze(["@switchback/protocol"]),
-  "@switchback/link": Object.freeze(["@switchback/protocol", "@switchback/wire"]),
+  "@switchback/link": Object.freeze(["@switchback/protocol", "@switchback/wire", "@switchback/i18n"]),
   "@switchback/worksite": Object.freeze([]),
   "@switchback/i18n": Object.freeze([]),
   "@switchback/journal": Object.freeze(["@switchback/protocol"]),

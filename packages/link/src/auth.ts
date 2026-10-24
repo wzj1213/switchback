@@ -131,14 +131,14 @@ export async function whoAmI(token: string): Promise<WhoAmI> {
   try {
     res = await fetch("/api/me", { headers: { authorization: `Bearer ${token}` } })
   } catch (error) {
-    return { kind: "unknown", reason: error instanceof Error ? error.message : "连不上" }
+    return { kind: "unknown", reason: error instanceof Error ? error.message : String(error) }
   }
   if (res.status === 401 || res.status === 403) return { kind: "denied" }
   if (!res.ok) return { kind: "unknown", reason: `HTTP ${String(res.status)}` }
   try {
     return { kind: "ok", me: (await res.json()) as Me }
   } catch (error) {
-    return { kind: "unknown", reason: error instanceof Error ? error.message : "回的不是 JSON" }
+    return { kind: "unknown", reason: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -153,7 +153,8 @@ export async function pair(code: string, name: string): Promise<PairResult> {
   })
   const body = (await res.json().catch(() => ({}))) as { token?: string; error?: string }
   if (!res.ok || typeof body.token !== "string") {
-    return { ok: false, reason: body.error ?? `配对失败（HTTP ${String(res.status)}）` }
+    // 服务端说了为什么就用它的（配对接口按宿主的语言说）；没说就只剩状态码
+    return { ok: false, reason: body.error ?? `HTTP ${String(res.status)}` }
   }
   return { ok: true, token: body.token, name }
 }

@@ -288,8 +288,8 @@ describe("引擎故障通知", () => {
     expect(s.notices.map((n) => n.kind)).toEqual(["crashed", "degraded", "auth"])
   })
 
-  it("没有 detail 时也要有一句话，不能是空白横幅", () => {
-    expect(reduceAll(initial(), [status("crashed")]).notices[0]?.text).toContain("没有描述")
+  it("没有 detail 时记成空串，「没有描述」那句由界面按它的语言补上——横幅照样不是空白的", () => {
+    expect(reduceAll(initial(), [status("crashed")]).notices[0]?.text).toBe("")
   })
 
   it("threadId 为空串时归一成 undefined——建会话就失败时还没有会话", () => {

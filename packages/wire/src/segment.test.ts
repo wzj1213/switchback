@@ -78,11 +78,11 @@ describe("切分与重组", () => {
 
 describe("坏输入一律丢掉并说清楚", () => {
   const bad: readonly { name: string; text: string; hit: string }[] = [
-    { name: "不是 JSON", text: "{坏的", hit: "不是合法 JSON" },
-    { name: "片数为 0", text: JSON.stringify({ type: "chunk", id: 1, index: 0, count: 0, body: "x" }), hit: "片数不合法" },
-    { name: "片数过大", text: JSON.stringify({ type: "chunk", id: 1, index: 0, count: 99999, body: "x" }), hit: "片数不合法" },
-    { name: "片号越界", text: JSON.stringify({ type: "chunk", id: 1, index: 5, count: 2, body: "x" }), hit: "片号越界" },
-    { name: "片体不是字符串", text: JSON.stringify({ type: "chunk", id: 1, index: 0, count: 2, body: 3 }), hit: "片体不是字符串" },
+    { name: "不是 JSON", text: "{坏的", hit: "not valid JSON" },
+    { name: "片数为 0", text: JSON.stringify({ type: "chunk", id: 1, index: 0, count: 0, body: "x" }), hit: "invalid chunk count" },
+    { name: "片数过大", text: JSON.stringify({ type: "chunk", id: 1, index: 0, count: 99999, body: "x" }), hit: "invalid chunk count" },
+    { name: "片号越界", text: JSON.stringify({ type: "chunk", id: 1, index: 5, count: 2, body: "x" }), hit: "chunk index out of range" },
+    { name: "片体不是字符串", text: JSON.stringify({ type: "chunk", id: 1, index: 0, count: 2, body: 3 }), hit: "chunk body isn't a string" },
   ]
 
   for (const { name, text, hit } of bad) {
@@ -98,7 +98,7 @@ describe("坏输入一律丢掉并说清楚", () => {
     expect(reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 0, count: 3, body: "a" })).kind).toBe("pending")
     const seen = reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 2, count: 3, body: "c" }))
     expect(seen.kind).toBe("dropped")
-    expect(seen.kind === "dropped" ? seen.reason : "").toContain("片号跳了")
+    expect(seen.kind === "dropped" ? seen.reason : "").toContain("chunk index skipped")
   })
 
   it("同一条帧的片数前后不一致也作废", () => {
@@ -128,7 +128,7 @@ describe("坏输入一律丢掉并说清楚", () => {
     reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 0, count: 2, body: "x".repeat(6) }))
     const seen = reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 1, count: 2, body: "y".repeat(6) }))
     expect(seen.kind).toBe("dropped")
-    expect(seen.kind === "dropped" ? seen.reason : "").toContain("重组超过上限")
+    expect(seen.kind === "dropped" ? seen.reason : "").toContain("over the limit")
   })
 
   it("拼出来不是合法 JSON 时说清楚，而不是抛出去", () => {
@@ -136,7 +136,7 @@ describe("坏输入一律丢掉并说清楚", () => {
     reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 0, count: 2, body: "{坏" }))
     const seen = reassembler.observe(JSON.stringify({ type: "chunk", id: 1, index: 1, count: 2, body: "的}" }))
     expect(seen.kind).toBe("dropped")
-    expect(seen.kind === "dropped" ? seen.reason : "").toContain("不是合法 JSON")
+    expect(seen.kind === "dropped" ? seen.reason : "").toContain("not valid JSON")
   })
 })
 

@@ -76,7 +76,7 @@ export function Notices({
    */
   const source = rows.find((r) => r.thread.id === latest.threadId)?.thread
   const tone = toneOf(latest)
-  const text = latest.kind === "notification" ? latest.text : humanize(latest.text).text
+  const text = latest.text === "" ? m.noDetail : latest.kind === "notification" ? latest.text : humanize(latest.text).text
   return (
     // **零高度的锚**：卡浮在正文上面，出现和消失都不把对话往下推——
     // 上一版是一整条插进版面里的色带，每弹一次整屏跳一下，弹得越勤越烦

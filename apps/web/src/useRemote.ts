@@ -223,6 +223,7 @@ function useConnection(deps: {
     if (token === "") return undefined
     const transport = createTransport({
       token,
+      language: documentLocale,
       authorize: async () => {
         const seen = await whoAmI(token)
         if (seen.kind === "ok") setMe(seen.me)

@@ -8,6 +8,7 @@ export const NOTICES = defineMessages(
     auth: "需要登录",
     egress: "批量外发",
     notice: "引擎提示",
+    noDetail: "引擎报告了一个没有描述的故障",
     dismiss: "知道了",
   },
   {
@@ -16,6 +17,7 @@ export const NOTICES = defineMessages(
     auth: "Sign-in needed",
     egress: "Bulk upload",
     notice: "Engine notice",
+    noDetail: "The engine reported a failure without a description",
     dismiss: "Dismiss",
   },
 )

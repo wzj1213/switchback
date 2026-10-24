@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@switchback/protocol": "workspace:*",
-    "@switchback/wire": "workspace:*"
+    "@switchback/wire": "workspace:*",
+    "@switchback/i18n": "workspace:*"
   }
 }

@@ -42,7 +42,7 @@ protocol ← ∅
 approval ← i18n + protocol
 store ← protocol
 wire ← protocol
-link ← protocol + wire
+link ← protocol + wire + i18n
 worksite ← ∅
 i18n ← ∅
 journal ← protocol

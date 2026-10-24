@@ -1,4 +1,6 @@
 import type { CallResult, ClientFrame } from "@switchback/wire"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CALLS } from "./calls.messages.js"
 
 /**
  * 客户端这一侧的 `call` → `result`（远程模式，见 `docs/远程模式方案.md` §3）。
@@ -27,6 +29,8 @@ export interface CallsDeps {
   send: (frame: ClientFrame) => boolean
   setTimer: (run: () => void, ms: number) => unknown
   clearTimer: (handle: unknown) => void
+  /** 超时、断线时那句话用哪种语言。现读，缺省中文。 */
+  language?: () => Locale
 }
 
 export interface Calls {
@@ -78,7 +82,7 @@ export function createCalls(deps: CallsDeps): Calls {
       const frame: Pending["frame"] = { type: "call", id, method, ...(arg === undefined ? {} : { arg }) }
       const timer = deps.setTimer(() => {
         if (finish(id) === undefined) return
-        reject(new Error(`等了 ${String(Math.round(timeoutMs / 1000))} 秒，那台机器没有回音`))
+        reject(new Error(CALLS[deps.language?.() ?? DEFAULT_LOCALE].timeout(Math.round(timeoutMs / 1000))))
       }, timeoutMs)
       const one: Pending = { frame, sent: false, timer, resolve, reject }
       state.pending.set(id, one)
@@ -99,7 +103,7 @@ export function createCalls(deps: CallsDeps): Calls {
       else one.reject(new Error(frame.reason))
     },
     dropped: (reason) => {
-      failWhere((one) => one.sent, `连接断了（${reason}），这一下没有做完`)
+      failWhere((one) => one.sent, CALLS[deps.language?.() ?? DEFAULT_LOCALE].dropped(reason))
     },
     close: (reason) => {
       failWhere(() => true, reason)
