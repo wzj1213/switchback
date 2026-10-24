@@ -19,8 +19,11 @@
  *
  * ## 管哪些目录
  *
- * 渲染层、网页端，以及主进程（含 `shared/`、`preload/`）。各个包迟一步：它们写的话有一部分是给模型看的
- *（交接说明、拒绝理由），该用哪种语言要单独定，到那一步再加进来。
+ * 渲染层、网页端、主进程（含 `shared/`、`preload/`），以及全部 `packages/`。包里写给模型看的那几句
+ *（交接说明、审批拒绝的理由）也跟着界面语言走——那是 2026-10 定下的，见 `docs/工程时间线.md`。
+ *
+ * `EXCLUDE` 里是**另一条线正在写、还没落地**的目录：它们落地时不该被这道闸挡住，
+ * 落地之后把那一行删掉，再照常迁它们的文案。
  */
 import { readFileSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
@@ -30,7 +33,9 @@ import { fileURLToPath } from "node:url"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const ts = createRequire(join(ROOT, "package.json"))("typescript")
-const ROOTS = ["apps/desktop/src/renderer/", "apps/web/src/", "apps/desktop/src/main/", "apps/desktop/src/shared/", "apps/desktop/src/preload/"]
+const ROOTS = ["apps/desktop/src/renderer/", "apps/web/src/", "apps/desktop/src/main/", "apps/desktop/src/shared/", "apps/desktop/src/preload/", "packages/"]
+/** 正在写的新引擎（Antigravity）。落地之后删掉这一行，再迁它的文案。 */
+const EXCLUDE = ["packages/engine/src/antigravity/"]
 const TODO_FILE = join(ROOT, "scripts/i18n-todo.json")
 const CJK = /[\u3400-\u9fff\uff00-\uffef\u3000-\u303f]/
 const SKIP = /\.test\.tsx?$|\.d\.ts$|\.messages\.ts$/
@@ -47,7 +52,8 @@ const TEXT_KINDS = new Set([
 
 function sources() {
   const out = execFileSync("git", ["-C", ROOT, "-c", "core.quotepath=off", "ls-files", "-co", "--exclude-standard"], { encoding: "utf8" })
-  return out.split("\n").filter((f) => /\.tsx?$/.test(f) && !SKIP.test(f) && ROOTS.some((r) => f.startsWith(r)))
+  return out.split("\n").filter((f) =>
+    /\.tsx?$/.test(f) && !SKIP.test(f) && ROOTS.some((r) => f.startsWith(r)) && !EXCLUDE.some((x) => f.startsWith(x)))
 }
 
 /** 往上找到同一个函数里的调用：有一层是日志调用就算日志。 */

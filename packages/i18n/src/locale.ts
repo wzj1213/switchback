@@ -18,6 +18,7 @@ export function isLocale(value: unknown): value is Locale {
  * 每种语言**用它自己的文字**怎么称呼自己。选语言的地方照这个显示：
  * 切到一种看不懂的语言之后，还得认得出切回去的那一项。
  */
+// i18n-ok：语言名用它自己的文字写，不随界面语言换
 export const LOCALE_NAMES: Readonly<Record<Locale, string>> = { "zh-CN": "简体中文", en: "English" }
 
 /** 给 `Intl.*`、`<html lang>` 与 Electron 的 `--lang` 用的 BCP 47 标签。 */
