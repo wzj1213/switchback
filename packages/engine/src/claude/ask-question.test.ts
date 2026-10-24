@@ -85,7 +85,7 @@ describe("问题卡的回答 → CLI 认的 updatedInput", () => {
     const result = await askQuestions(input, "toolu_1", (prompts, wait) => {
       seen.push({ prompts, ...(wait?.signal === undefined ? {} : { signal: wait.signal }) })
       return Promise.resolve({ answers: { "toolu_1:q0": { kind: "single", optionId: "date-fns" } } })
-    }, controller.signal)
+    }, { signal: controller.signal })
     expect(seen[0]?.prompts).toHaveLength(2)
     expect(seen[0]?.signal).toBe(controller.signal)
     expect(result).toMatchObject({ behavior: "allow", updatedInput: { answers: { "用哪个日期库？": "date-fns" } } })

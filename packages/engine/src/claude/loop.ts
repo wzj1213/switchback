@@ -32,6 +32,7 @@ import {
   syncSidechainTask,
   type SidechainState,
 } from "./sidechain.js"
+import { localeOf } from "../locale.js"
 
 /**
  * 当前轮次。宿主在 `prompt()` 时写入，引擎在收到 result 时清空。
@@ -100,16 +101,16 @@ function emitModelRefusal(msg: RawLoopMessage, ref: TurnRef, req: StartRequest, 
 function emitCurrentSystem(msg: RawLoopMessage, ref: TurnRef, req: StartRequest, at: number): void {
   const turnId = ref.current
   if (turnId === undefined) return
-  const itemContext = { turnId, at, nextId: makeIdMinter(ref, turnId), emit: req.emit }
+  const itemContext = { turnId, at, nextId: makeIdMinter(ref, turnId), emit: req.emit, locale: () => localeOf(req) }
   if (msg.subtype === "informational") emitInformational(msg, ref.notices, itemContext)
   if (msg.subtype === "local_command_output") emitLocalCommandOutput(msg, itemContext)
   emitThinking(ref.thinking, msg, {
     turnId, at, threadId: req.threadId, emit: req.emit,
   })
-  emitCompaction(msg, ref.notices, { turnId, at, emit: req.emit })
+  emitCompaction(msg, ref.notices, { turnId, at, emit: req.emit, locale: () => localeOf(req) })
   emitMemoryRecall(msg, itemContext)
   if (msg.subtype === "api_retry") {
-    ref.retry = emitRetry(msg, ref.retry, { turnId, at, emit: req.emit }) ?? ref.retry
+    ref.retry = emitRetry(msg, ref.retry, { turnId, at, emit: req.emit, locale: () => localeOf(req) }) ?? ref.retry
   }
 }
 
@@ -119,10 +120,10 @@ function onSystem(msg: RawLoopMessage, ref: TurnRef, ctx: DispatchContext, at: n
     emitNotification(msg, { threadId: req.threadId, at, emit: req.emit })
   }
   if (msg.subtype === "plugin_install") {
-    emitPluginInstall(msg, { threadId: req.threadId, at, emit: req.emit })
+    emitPluginInstall(msg, { threadId: req.threadId, at, emit: req.emit, locale: () => localeOf(req) })
   }
   if (msg.subtype === "elicitation_complete") {
-    emitElicitationComplete(msg, { threadId: req.threadId, at, emit: req.emit })
+    emitElicitationComplete(msg, { threadId: req.threadId, at, emit: req.emit, locale: () => localeOf(req) })
   }
   captureTerminalCommands(msg, ref.terminalCommands)
   if (msg.permissionMode !== undefined) {
@@ -137,9 +138,9 @@ function onSystem(msg: RawLoopMessage, ref: TurnRef, ctx: DispatchContext, at: n
   }
   emitCurrentSystem(msg, ref, req, at)
   onHookMessage(ref.hooks, msg, {
-    threadId: req.threadId, turnId: () => ref.current, emit: req.emit, now: () => at,
+    threadId: req.threadId, turnId: () => ref.current, emit: req.emit, now: () => at, locale: () => localeOf(req),
   })
-  onPermissionDenied(msg, ref.denials, ref.tools, { at, emit: req.emit })
+  onPermissionDenied(msg, ref.denials, ref.tools, { at, emit: req.emit, locale: () => localeOf(req) })
   emitModelRefusal(msg, ref, req, at)
   onTaskMessage(ref.tasks, msg, at, req)
   syncSidechainTask(ref.sidechains, ref.tasks, msg, { turnId: ref.current, req, at })
@@ -187,6 +188,7 @@ async function dispatch(msg: RawLoopMessage, ref: TurnRef, ctx: DispatchContext,
         at,
         ...(turnId === undefined ? {} : { nextId: makeIdMinter(ref, turnId) }),
         emit: req.emit,
+        locale: () => localeOf(req),
       })
       return
     }

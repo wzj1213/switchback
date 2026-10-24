@@ -1,10 +1,14 @@
 import type { Event, ItemId, NoticeItem, TurnId } from "@switchback/protocol"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_MEMORY } from "./memory.messages.js"
 
 interface MemoryContext {
   turnId: TurnId
   at: number
   nextId: () => ItemId
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 interface RawMemory {
@@ -12,11 +16,6 @@ interface RawMemory {
   scope?: unknown
 }
 
-const SCOPE_LABELS: Readonly<Record<string, string>> = {
-  personal: "个人",
-  team: "团队",
-  organization: "组织",
-}
 
 /** 文件名允许换行，但 transcript 里不能让控制字符伪造下一条状态。 */
 function displayPath(value: unknown): string | undefined {
@@ -25,7 +24,8 @@ function displayPath(value: unknown): string | undefined {
   return safe === "" ? undefined : safe
 }
 
-function memoryRows(value: unknown): readonly string[] {
+function memoryRows(value: unknown, m: (typeof CLAUDE_MEMORY)[Locale]): readonly string[] {
+  const scopes: Readonly<Record<string, string>> = m.scope
   if (!Array.isArray(value)) return []
   const rows: string[] = []
   const seen = new Set<string>()
@@ -33,7 +33,7 @@ function memoryRows(value: unknown): readonly string[] {
     if (typeof raw !== "object" || raw === null) continue
     const memory = raw as RawMemory
     const path = displayPath(memory.path)
-    const scope = typeof memory.scope === "string" ? SCOPE_LABELS[memory.scope] : undefined
+    const scope = typeof memory.scope === "string" && Object.hasOwn(scopes, memory.scope) ? scopes[memory.scope] : undefined
     if (path === undefined || scope === undefined || seen.has(path)) continue
     seen.add(path)
     rows.push(`- [${scope}] ${path}`)
@@ -52,14 +52,15 @@ export function emitMemoryRecall(raw: unknown, ctx: MemoryContext): void {
   const message = raw as { subtype?: unknown; mode?: unknown; memories?: unknown }
   if (message.subtype !== "memory_recall") return
   if (message.mode !== "select" && message.mode !== "synthesize") return
-  const rows = memoryRows(message.memories)
+  const m = CLAUDE_MEMORY[localeOf(ctx)]
+  const rows = memoryRows(message.memories, m)
   if (rows.length === 0) return
   const item: NoticeItem = {
     id: ctx.nextId(),
     turnId: ctx.turnId,
     at: ctx.at,
     kind: "notice",
-    message: `Claude 已从记忆中召回 ${String(rows.length)} 条：\n${rows.join("\n")}`,
+    message: m.recalled(rows),
     level: "info",
   }
   ctx.emit({ type: "item.started", at: ctx.at, item })

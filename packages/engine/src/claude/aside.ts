@@ -19,6 +19,9 @@
  * 只可能过期；问一句 `typeof === "function"` 永远是当下的事实。
  */
 
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_ASIDE } from "./aside.messages.js"
+
 /** SDK 没声明的那一小块。**只声明我们真的会调的部分**——多写一个字段就是多猜一次。 */
 interface SideQuestionCapable {
   askSideQuestion: (question: string) => Promise<{ response: string } | null>
@@ -42,10 +45,10 @@ export function canAside(query: unknown): boolean {
  * 回 `null` 表示引擎那边没给出答案（实测签名允许）。**不编一句占位**：
  * 一条编出来的「没有回答」和一条真的回答在界面上分不出来。
  */
-export async function askAside(query: unknown, text: string): Promise<string> {
-  if (!capable(query)) throw new Error("这条会话不支持侧问")
+export async function askAside(query: unknown, text: string, locale: Locale = DEFAULT_LOCALE): Promise<string> {
+  if (!capable(query)) throw new Error(CLAUDE_ASIDE[locale].unsupported)
   const result = await query.askSideQuestion(text)
   const answer = result?.response
-  if (answer === undefined || answer === "") throw new Error("引擎没有给出侧问的回答")
+  if (answer === undefined || answer === "") throw new Error(CLAUDE_ASIDE[locale].noAnswer)
   return answer
 }

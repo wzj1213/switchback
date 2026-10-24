@@ -1,4 +1,6 @@
 import type { Lane, LaneNode, ThreadId } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_WORKFLOW } from "./workflow.messages.js"
 
 /**
  * claude 的 workflow 进度 → 一条 `Lane`。
@@ -105,7 +107,7 @@ function flatten(phases: Map<number, Phase>, loose: readonly LaneNode[]): readon
 }
 
 /** 扁平节点表。 */
-function nodesOf(entries: readonly RawEntry[]): readonly LaneNode[] {
+function nodesOf(entries: readonly RawEntry[], locale: Locale): readonly LaneNode[] {
   const phases = new Map<number, Phase>()
   const loose: LaneNode[] = []
   for (const raw of entries) {
@@ -113,23 +115,23 @@ function nodesOf(entries: readonly RawEntry[]): readonly LaneNode[] {
     if (index === undefined) continue
     const type = str(raw.type)
     if (type === "workflow_phase") {
-      register(phases, index).title = str(raw.title) ?? `阶段 ${String(index)}`
+      register(phases, index, locale).title = str(raw.title) ?? CLAUDE_WORKFLOW[locale].phase(index)
       continue
     }
     if (type !== "workflow_agent") continue
     const node = agentNode(raw, index)
     const phase = int(raw.phaseIndex)
     if (phase === undefined) loose.push(node)
-    else register(phases, phase).kids.push(node)
+    else register(phases, phase, locale).kids.push(node)
   }
   return flatten(phases, loose)
 }
 
 /** 取或建。**agent 先于它的 phase 到达时也要占上位**——不占的话那一批会整个掉出树。 */
-function register(phases: Map<number, Phase>, index: number): Phase {
+function register(phases: Map<number, Phase>, index: number, locale: Locale): Phase {
   const known = phases.get(index)
   if (known !== undefined) return known
-  const made: Phase = { title: `阶段 ${String(index)}`, kids: [] }
+  const made: Phase = { title: CLAUDE_WORKFLOW[locale].phase(index), kids: [] }
   phases.set(index, made)
   return made
 }
@@ -148,7 +150,7 @@ function laneStatus(nodes: readonly LaneNode[]): Lane["status"] {
  * **`description` 缺席就整条不要**：拿 `last_tool_name` 拼一句「正在 Read」顶替，
  * 是 Switchback 在替引擎说话（同 `tasks.ts` 的规矩）。
  */
-export function toLane(raw: unknown, threadId: ThreadId, at: number): Lane | undefined {
+export function toLane(raw: unknown, threadId: ThreadId, at: number, locale: Locale = DEFAULT_LOCALE): Lane | undefined {
   if (typeof raw !== "object" || raw === null) return undefined
   const msg = raw as { task_id?: unknown; description?: unknown; workflow_progress?: unknown }
   const id = str(msg.task_id)
@@ -164,6 +166,6 @@ export function toLane(raw: unknown, threadId: ThreadId, at: number): Lane | und
   // 而不是画一棵只有一个节点、内容还和标题重复的树。**不是缺陷是降级**——
   // Task 子 agent 那一路本来就没有阶段的概念。
   if (entries === undefined) return { ...head, status: "running" }
-  const nodes = nodesOf(entries)
+  const nodes = nodesOf(entries, locale)
   return { ...head, status: laneStatus(nodes), progress: { nodes } }
 }

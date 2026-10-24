@@ -1,6 +1,8 @@
 import type { Event, Lane, TaskRun, ThreadId } from "@switchback/protocol"
 import { toLane } from "./workflow.js"
 import { createTaskLinks, rememberTaskParent, type TaskLinks } from "./task-links.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
 
 /**
  * Claude 后台任务的四条公开消息按 `task_id` 汇成一条生命周期：started 给稳定标题，
@@ -55,6 +57,7 @@ interface RawTaskNotification {
 interface TaskOut {
   threadId: ThreadId
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 interface TaskFrame {
@@ -152,7 +155,7 @@ function taskProgressOf(raw: unknown): TaskRun | undefined {
 }
 
 function progressLaneOf(raw: unknown, before: Lane | undefined, frame: TaskFrame): Lane | undefined {
-  const translated = toLane(raw, frame.out.threadId, frame.at)
+  const translated = toLane(raw, frame.out.threadId, frame.at, localeOf(frame.out))
   if (translated === undefined) return undefined
   // 纯心跳帧不带树，不代表树被清空；started 的整批标题也比当前 agent 描述稳定。
   return { ...before, ...translated, title: before?.title ?? translated.title, at: before?.at ?? frame.at }

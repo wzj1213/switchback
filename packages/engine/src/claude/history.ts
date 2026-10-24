@@ -3,6 +3,8 @@ import { join } from "node:path"
 import type { EngineAccount, EngineThread, Item } from "@switchback/protocol"
 import { applyResult, assistantItems, toolResults, type ToolResult } from "./translate.js"
 import { findSessionFile, recentSessionFiles } from "./history-files.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_HISTORY } from "./history.messages.js"
 
 /**
  * Claude 存在磁盘上的会话：怎么列出来。
@@ -43,7 +45,7 @@ interface HeadInfo {
  * 取不到就给空数组——**不抛**。这是锦上添花的一段，
  * 一个读不了的目录不该让整个会话起不来。
  */
-export async function listSessions(home: string): Promise<readonly EngineThread[]> {
+export async function listSessions(home: string, locale: Locale = DEFAULT_LOCALE): Promise<readonly EngineThread[]> {
   const files = await recentSessionFiles(home)
   const out: EngineThread[] = []
   for (let offset = 0; offset < files.length && out.length < LIST_MAX; offset += HEAD_BATCH) {
@@ -55,7 +57,7 @@ export async function listSessions(home: string): Promise<readonly EngineThread[
       if (file === undefined || head.cwd === undefined) continue
       out.push({
         handle: file.id,
-        title: head.title ?? head.first ?? "（没有标题）",
+        title: head.title ?? head.first ?? CLAUDE_HISTORY[locale].untitled,
         cwd: head.cwd,
         updatedAt: file.at,
       })
@@ -187,7 +189,7 @@ export async function readEntries(path: string): Promise<readonly Record<string,
  *   摆成用户消息会看到一条几千字的「自己说的话」。
  * - `isMeta` / 各类元数据行（标题、模式、队列）：它们不是对话内容。
  */
-export function toItems(entries: readonly Record<string, unknown>[], now: number): readonly Item[] {
+export function toItems(entries: readonly Record<string, unknown>[], now: number, locale: Locale = DEFAULT_LOCALE): readonly Item[] {
   const out: Item[] = []
   const byId = new Map<string, number>()
   const seq = { n: 0 }
@@ -198,9 +200,9 @@ export function toItems(entries: readonly Record<string, unknown>[], now: number
     const content = contentOf(entry)
     if (content === undefined) continue
     const at = timeOf(entry["timestamp"]) ?? now
-    if (entry["type"] === "user") takeUser(out, byId, content, { at, seq, turn, nextId })
+    if (entry["type"] === "user") takeUser(out, byId, content, { at, seq, turn, nextId, locale })
     else if (entry["type"] === "assistant" && Array.isArray(content)) {
-      takeAssistant(out, byId, content, { turnId: turn.id, at, nextId })
+      takeAssistant(out, byId, content, { turnId: turn.id, at, nextId, locale })
     }
   }
   return out
@@ -242,6 +244,7 @@ interface Cursor {
   /** 当前轮次。每句人话开一轮。 */
   turn: { id: string }
   nextId: () => string
+  locale: Locale
 }
 
 /**
@@ -252,7 +255,7 @@ function takeUser(out: Item[], byId: Map<string, number>, content: unknown, cur:
   if (Array.isArray(content)) {
     const results = toolResults(content)
     if (results.length > 0) {
-      applyResults(out, byId, results)
+      applyResults(out, byId, results, cur.locale)
       return
     }
   }
@@ -288,7 +291,7 @@ function takeAssistant(
   out: Item[],
   byId: Map<string, number>,
   content: readonly unknown[],
-  ctx: { turnId: string; at: number; nextId: () => string },
+  ctx: { turnId: string; at: number; nextId: () => string; locale: Locale },
 ): void {
   for (const item of assistantItems(content, ctx)) {
     if (item.kind === "tool_call") byId.set(item.id, out.length)
@@ -301,13 +304,14 @@ function applyResults(
   out: Item[],
   byId: Map<string, number>,
   results: readonly ToolResult[],
+  locale: Locale,
 ): void {
   for (const result of results) {
     const at = byId.get(result.toolUseId)
     if (at === undefined) continue
     const item = out[at]
     if (item?.kind !== "tool_call") continue
-    out[at] = applyResult(item, result)
+    out[at] = applyResult(item, result, locale)
   }
 }
 
@@ -336,10 +340,10 @@ export interface Transcript {
 }
 
 /** 读一条会话的全文并翻成 items。找不到文件就给空的。 */
-export async function readTranscript(home: string, id: string, now: number): Promise<Transcript> {
+export async function readTranscript(home: string, id: string, now: number, locale: Locale = DEFAULT_LOCALE): Promise<Transcript> {
   const path = await findSession(home, id)
   if (path === undefined) return { items: [], total: 0 }
-  const all = toItems(await readEntries(path), now)
+  const all = toItems(await readEntries(path), now, locale)
   return { items: all.length > ITEM_MAX ? all.slice(-ITEM_MAX) : all, total: all.length }
 }
 

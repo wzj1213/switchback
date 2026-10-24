@@ -1,8 +1,10 @@
 import { probeCommand, resolveCommand, type Probe } from "../probe.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_EXECUTABLE } from "./executable.messages.js"
 
 export type ClaudeExecutable = "bundled" | "system"
 
-type ProbeCommand = (command: string, hint?: string) => Promise<Probe>
+type ProbeCommand = (command: string, hint?: string, locale?: Locale) => Promise<Probe>
 type ResolveCommand = (command: string) => Promise<string>
 
 export async function claudePath(
@@ -16,14 +18,10 @@ export async function claudePath(
 export async function probeClaude(
   mode: ClaudeExecutable,
   probe: ProbeCommand = probeCommand,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<Probe> {
-  const found = await probe(
-    "claude",
-    mode === "system" ? "轻量版不内置 Claude，请先安装 Claude Code。" : undefined,
-  )
+  const m = CLAUDE_EXECUTABLE[locale]
+  const found = await probe("claude", mode === "system" ? m.thin : undefined, locale)
   if (mode === "system" || found.state === "ok") return found
-  return {
-    state: "unknown",
-    detail: "PATH 上没有 `claude`，但完整版会使用 SDK 内置版本；真起不来时再显示引擎原话。",
-  }
+  return { state: "unknown", detail: m.bundled }
 }

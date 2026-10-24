@@ -1,4 +1,7 @@
 import type { Event, ThreadId, ToolCallItem, ToolStatus, TurnId } from "@switchback/protocol"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { clip } from "../clip.js"
 
 interface RawHookMessage {
   subtype?: string
@@ -17,6 +20,7 @@ interface HookContext {
   turnId: () => TurnId | undefined
   emit: (event: Event) => void
   now: () => number
+  locale?: () => Locale
 }
 
 interface ActiveHook {
@@ -54,9 +58,8 @@ function outputOf(msg: RawHookMessage): string | undefined {
   return separate.join("\n")
 }
 
-function clipped(value: string | undefined): string | undefined {
-  if (value === undefined || value.length <= MAX_OUTPUT) return value
-  return `${value.slice(0, MAX_OUTPUT)}\n…（已截断）`
+function clipped(value: string | undefined, locale: Locale): string | undefined {
+  return value === undefined ? undefined : clip(value, MAX_OUTPUT, locale)
 }
 
 function statusOf(outcome: unknown): ToolStatus {
@@ -85,8 +88,8 @@ function itemOf(active: ActiveHook, status: ToolStatus): ToolCallItem | undefine
   }
 }
 
-function resolvedOutput(msg: RawHookMessage, previous?: ActiveHook): string | undefined {
-  const output = clipped(outputOf(msg))
+function resolvedOutput(msg: RawHookMessage, previous: ActiveHook | undefined, locale: Locale): string | undefined {
+  const output = clipped(outputOf(msg), locale)
   return output === undefined ? previous?.output : output
 }
 
@@ -104,7 +107,7 @@ function activeOf(msg: RawHookMessage, ctx: HookContext, previous?: ActiveHook):
   if (previous !== undefined) {
     return {
       ...previous, id, name, event,
-      output: resolvedOutput(msg, previous),
+      output: resolvedOutput(msg, previous, localeOf(ctx)),
       exitCode: resolvedExitCode(msg, previous),
     }
   }
@@ -115,7 +118,7 @@ function activeOf(msg: RawHookMessage, ctx: HookContext, previous?: ActiveHook):
     turnId: ctx.turnId(),
     at: ctx.now(),
     materialized: false,
-    output: resolvedOutput(msg),
+    output: resolvedOutput(msg, undefined, localeOf(ctx)),
     exitCode: resolvedExitCode(msg),
   }
 }

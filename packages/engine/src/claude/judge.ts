@@ -4,6 +4,8 @@ import type { Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
 import { ASK_USER_QUESTION, askQuestions } from "./ask-question.js"
 import { buildRequest, forcedReason, forcesHumanPrompt, summarize, toAllow, toDeny, type AskMeta } from "./permission.js"
+import { localeOf } from "../locale.js"
+import { CLAUDE_JUDGE } from "./judge.messages.js"
 
 /**
  * `canUseTool` 的实现。管线：红线/档位判定 → 必要时问人。
@@ -23,13 +25,15 @@ export async function judge(
   const { req } = deps
   // 模型交给人回答的问题走问题卡，答案按 SDK 公开字段交回（见 ask-question.ts）。
   // 问人本身不改任何东西，所以不过判定器、任何档位都问
-  if (tool === ASK_USER_QUESTION) return askQuestions(input, meta.toolUseID, req.askQuestion, meta.signal)
+  if (tool === ASK_USER_QUESTION) {
+    return askQuestions(input, meta.toolUseID, req.askQuestion, { signal: meta.signal, locale: localeOf(req) })
+  }
   // Plan 的退出本身就是放宽权限。只读档不能把它当普通 meta 工具自动放行。
   if (deps.trust() === "read-only" && tool === "ExitPlanMode") {
-    return toDeny("当前会话是只读档，不能退出 Claude Plan mode；请先由用户切换权限档")
+    return toDeny(CLAUDE_JUDGE[localeOf(req)].planReadOnly)
   }
   const request = buildRequest(tool, input, meta, { engine: "claude", cwd: req.cwd })
-  const verdict = decide(request, { trust: deps.trust(), worksite: req.cwd, home: req.home, memory: req.memory() })
+  const verdict = decide(request, { trust: deps.trust(), worksite: req.cwd, home: req.home, memory: req.memory(), locale: localeOf(req) })
   if (verdict.action === "deny") return toDeny(verdict.reason)
   const forced = forcesHumanPrompt(meta)
   if (verdict.action === "allow" && !forced) return toAllow("once", meta)
@@ -49,7 +53,7 @@ async function askHuman(
     toolCallId: meta.toolUseID,
     tool,
     summary: summarize(tool, meta),
-    reason: forced && verdict.action === "allow" ? forcedReason(meta) : verdict.reason,
+    reason: forced && verdict.action === "allow" ? forcedReason(meta, localeOf(req)) : verdict.reason,
     ...(redline === undefined ? {} : { redline }),
     ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
     // 子 agent 里来的请求：照 SDK 给的 id 标出来，不去对旁路猜名字
@@ -57,5 +61,6 @@ async function askHuman(
   }, meta.signal === undefined ? undefined : { signal: meta.signal })
   if (answer.allow) return toAllow(answer.remember, meta, redline !== undefined)
   // 没人能问时照实说：这不是用户的决定，模型据此不该以为用户明确不让做
-  return toDeny(answer.unattended === true ? "会话已经关闭，没有人能确认这次调用，所以没有执行" : "用户拒绝了这次调用")
+  const m = CLAUDE_JUDGE[localeOf(req)]
+  return toDeny(answer.unattended === true ? m.closed : m.denied)
 }

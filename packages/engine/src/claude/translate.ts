@@ -1,5 +1,7 @@
 import type { Item, ItemId, ToolCallItem, ToolDetail, TurnId } from "@switchback/protocol"
 import { fileChangesOf } from "./diff.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { clip } from "../clip.js"
 
 /**
  * Claude 内容块的**结构性**最小类型。
@@ -35,8 +37,8 @@ const TOOL_KIND: Readonly<Record<string, ToolDetail["kind"]>> = {
 }
 
 /** Claude 不给 diff，只给编辑参数——由 `diff.ts` 合成，否则界面上一片空白。 */
-function fileEdit(name: string, input: Record<string, unknown>): ToolDetail {
-  const files = fileChangesOf(name, input)
+function fileEdit(name: string, input: Record<string, unknown>, locale: Locale): ToolDetail {
+  const files = fileChangesOf(name, input, locale)
   const tally = files.reduce(
     (acc, f) => ({ added: acc.added + f.added, removed: acc.removed + f.removed }),
     { added: 0, removed: 0 },
@@ -45,14 +47,14 @@ function fileEdit(name: string, input: Record<string, unknown>): ToolDetail {
 }
 
 /** 认不出的工具落 `other`，原始参数原样带上供 UI 兜底展示。 */
-export function toolDetail(name: string, input: Record<string, unknown>): ToolDetail {
+export function toolDetail(name: string, input: Record<string, unknown>, locale: Locale = DEFAULT_LOCALE): ToolDetail {
   switch (TOOL_KIND[name]) {
     case "shell":
       return { kind: "shell", command: strOf(input["command"]) ?? "" }
     case "file_read":
       return { kind: "file_read", path: strOf(input["file_path"]) ?? "" }
     case "file_edit":
-      return fileEdit(name, input)
+      return fileEdit(name, input, locale)
     case "fetch":
       return { kind: "fetch", url: strOf(input["url"]) ?? "" }
     default:
@@ -73,6 +75,8 @@ export interface TranslateContext {
    * 缺席就照旧铸一个新的——没开流式、或者那个块一个字都没吐过。
    */
   reuse?: (order: number) => ItemId | undefined
+  /** 合成 diff 的分段头、截断记号用哪种语言。缺省中文。 */
+  locale?: Locale
 }
 
 /**
@@ -109,7 +113,7 @@ function blockToItem(block: RawBlock, ctx: TranslateContext, order?: number): It
         kind: "tool_call",
         tool: block.name ?? "unknown",
         status: "running",
-        detail: toolDetail(block.name ?? "unknown", block.input ?? {}),
+        detail: toolDetail(block.name ?? "unknown", block.input ?? {}, ctx.locale),
       }
     default:
       return undefined
@@ -174,8 +178,8 @@ export function toolResults(content: readonly unknown[]): readonly ToolResult[] 
 const MAX_OUTPUT = 4000
 
 /** 把结果并进已发出的工具调用 item。输出截断，避免单条 item 撑爆事件流。 */
-export function applyResult(item: ToolCallItem, result: ToolResult): ToolCallItem {
-  const text = result.text.length > MAX_OUTPUT ? `${result.text.slice(0, MAX_OUTPUT)}\n…（已截断）` : result.text
+export function applyResult(item: ToolCallItem, result: ToolResult, locale: Locale = DEFAULT_LOCALE): ToolCallItem {
+  const text = clip(result.text, MAX_OUTPUT, locale)
   const status = result.isError ? "failed" : "ok"
   const detail: ToolDetail =
     item.detail.kind === "shell" ? { ...item.detail, output: text } : item.detail

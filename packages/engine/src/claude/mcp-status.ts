@@ -1,4 +1,7 @@
 import type { Event, ThreadId } from "@switchback/protocol"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_MCP } from "./mcp-status.messages.js"
 
 interface RawMcpStatus {
   name?: unknown
@@ -9,6 +12,7 @@ interface RawMcpStatus {
 interface McpOut {
   threadId: ThreadId
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 interface McpHandle {
@@ -18,13 +22,13 @@ interface McpHandle {
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : undefined
 
-function failure(server: RawMcpStatus): string | undefined {
+function failure(server: RawMcpStatus, m: (typeof CLAUDE_MCP)[Locale]): string | undefined {
   const name = text(server.name)
   if (name === undefined) return undefined
-  if (server.status === "needs-auth") return `MCP 服务器「${name}」需要授权；请在 Claude 中完成登录后重试`
+  if (server.status === "needs-auth") return m.needsAuth(name)
   if (server.status !== "failed") return undefined
   const detail = text(server.error)
-  return `MCP 服务器「${name}」没起来，它提供的工具当前不可用${detail === undefined ? "" : `：${detail}`}`
+  return m.failed(name, detail)
 }
 
 /** 初始化快照与控制请求共用去重状态，只在失败翻面时报告能力降级。 */
@@ -44,7 +48,7 @@ export class ClaudeMcpStatus {
       const key = `${status}:${text(server.error) ?? ""}`
       if (this.seen.get(name) === key) continue
       this.seen.set(name, key)
-      const detail = failure(server)
+      const detail = failure(server, CLAUDE_MCP[localeOf(this.out)])
       if (detail !== undefined) {
         this.out.emit({ type: "engine.status", at, threadId: this.out.threadId, status: "degraded", detail })
       }

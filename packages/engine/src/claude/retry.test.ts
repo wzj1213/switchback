@@ -28,4 +28,12 @@ describe("Claude API 重试", () => {
       else expect(item).toMatchObject(row.want)
     }
   })
+
+  it("英文界面说英文；错误类别与状态码照原样排在 detail 里", () => {
+    const raw = { attempt: 3, max_retries: 10, retry_delay_ms: 800, error_status: 529, error: "overloaded" }
+    expect(retryItem(raw, "turn-1", 7, "en")).toMatchObject({
+      message: "The Claude API is retrying (3/10, in 800ms)",
+      detail: "overloaded · HTTP 529",
+    })
+  })
 })

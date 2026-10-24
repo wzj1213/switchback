@@ -1,6 +1,8 @@
 import type { PermissionResult, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk"
 import type { Request as ApprovalRequest } from "@switchback/approval"
 import type { RememberScope } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_PERMISSION } from "./permission.messages.js"
 
 /**
  * `canUseTool` 回调携带的上下文。字段名与 SDK 一致。
@@ -55,11 +57,11 @@ export function forcesHumanPrompt(meta: AskMeta): boolean {
  * 用户 ask 规则强制的那张卡为什么出现。判定器那边说的是放行，它的理由是空的；
  * 照实写出是哪条规则（规则文本来自用户配置，同样先过 `sanitize`）。
  */
-export function forcedReason(meta: AskMeta): string {
+export function forcedReason(meta: AskMeta, locale: Locale = DEFAULT_LOCALE): string {
   const rule = meta.matchedAskRule
   if (rule === undefined) return ""
   const content = rule.ruleContent === undefined ? "" : `(${rule.ruleContent})`
-  return `Claude 设置里的 ask 规则要求逐项确认：${sanitize(`${rule.toolName}${content}`)}`
+  return CLAUDE_PERMISSION[locale].askRule(sanitize(`${rule.toolName}${content}`))
 }
 
 /** 优先用 SDK 渲染好的人话标题；它比我们从 tool+args 拼的准。 */

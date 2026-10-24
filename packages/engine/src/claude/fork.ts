@@ -1,4 +1,6 @@
 import { findSession, humanTurn, readEntries } from "./history.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_FORK } from "./fork.messages.js"
 
 /**
  * 原生分叉：从一条已经存在的会话岔出一条，可以只带前面若干轮。
@@ -50,14 +52,15 @@ export interface ForkPlan {
 export async function planFork(
   home: string,
   forkOf: { handle: string; dropTurns?: number },
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<ForkPlan> {
   const drop = forkOf.dropTurns ?? 0
   if (drop <= 0) return { resume: forkOf.handle, at: undefined }
   const path = await findSession(home, forkOf.handle)
-  if (path === undefined) throw new Error(`找不到 Claude 的会话记录：${forkOf.handle}`)
+  if (path === undefined) throw new Error(CLAUDE_FORK[locale].noSession(forkOf.handle))
   const entries = await readEntries(path)
   const at = cutAt(entries, drop)
-  if (at === undefined) throw new Error("这条会话里没有那么多轮，分不出这个分叉点")
+  if (at === undefined) throw new Error(CLAUDE_FORK[locale].tooFew)
   return { resume: forkOf.handle, at }
 }
 

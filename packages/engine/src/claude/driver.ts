@@ -33,6 +33,8 @@ import { toUserMessage } from "./attach.js"
 import { ContextProbe } from "./context-probe.js"
 import { claudeAccount } from "./account.js"
 import { ClaudeMcpStatus, reportCurrentMcp } from "./mcp-status.js"
+import { localeOf } from "../locale.js"
+import { CLAUDE_DRIVER } from "./driver.messages.js"
 
 /**
  * Claude Code 2.1.83 起正式暴露 `auto`：由另一只模型分类器审批工具调用。
@@ -100,7 +102,7 @@ class ClaudeSession implements EngineSession {
   ) {
     this.trust = { current: req.trust }
     this.bypassEnabled = req.trust === "full"
-    this.mcp = new ClaudeMcpStatus({ threadId: req.threadId, emit: req.emit })
+    this.mcp = new ClaudeMcpStatus({ threadId: req.threadId, emit: req.emit, locale: () => localeOf(req) })
     // 字段初始化器里读不到构造参数属性，只能在这里建
     this.owner = createProcessOwner(config.reclaim)
   }
@@ -110,7 +112,7 @@ class ClaudeSession implements EngineSession {
       cwd: this.req.cwd,
       ...permissionOptions(this.req.trust),
       canUseTool: (tool, input, meta) => judge({ req: this.req, trust: () => this.trust.current }, tool, input, meta as AskMeta),
-      onElicitation: (request, { signal }) => answerElicitation(request, this.req.askQuestion, signal),
+      onElicitation: (request, { signal }) => answerElicitation(request, this.req.askQuestion, signal, localeOf(this.req)),
       ...refusalDialogOptions(this.req, this.turn),
       // 只打开 Claude 已执行 Hook 的公开生命周期；不新增、改写或代审任何 Hook 配置。
       includeHookEvents: true,
@@ -163,8 +165,8 @@ class ClaudeSession implements EngineSession {
     // init 要等首条 prompt 后才来；先问一次，第一轮也能拿到正确分母。
     void this.context.read(this.query)
     void this.loop.then(
-      () => "Claude Code 进程已退出",
-      (error: unknown) => `Claude Code 进程已退出：${error instanceof Error ? error.message : String(error)}`,
+      () => CLAUDE_DRIVER[localeOf(this.req)].exited,
+      (error: unknown) => CLAUDE_DRIVER[localeOf(this.req)].exitedWith(error instanceof Error ? error.message : String(error)),
     ).then((detail) => {
       // 循环一结束就没人再读输入了：关掉它，之后的 prompt 明确失败（见 `prompt`），
       // 不再被一个没人读的队列静默吞掉。宿主自己 dispose 引起的结束不算「死了」
@@ -199,24 +201,24 @@ class ClaudeSession implements EngineSession {
         at: Date.now(),
         turnId,
         status: "failed",
-        error: "Claude 输入流已经关闭，这句话没有送达。请重新连接会话后再试。",
+        error: CLAUDE_DRIVER[localeOf(this.req)].inputClosed,
       })
     }
-    throw new Error("Claude 输入流已经关闭")
+    throw new Error(CLAUDE_DRIVER[localeOf(this.req)].inputClosedShort)
   }
 
   /** 当前原生阶段停下，随后的 `priority: now` 阶段仍挂在同一个 Switchback turn 上。 */
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const expected = this.turn.current
-    if (expected === undefined) throw new Error("Claude 当前没有可插入的轮次")
+    if (expected === undefined) throw new Error(CLAUDE_DRIVER[localeOf(this.req)].noTurn)
     const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId, "now"))
-    if (this.turn.current !== expected) throw new Error("Claude 原轮次已经结束")
+    if (this.turn.current !== expected) throw new Error(CLAUDE_DRIVER[localeOf(this.req)].turnEnded)
     this.turn.pendingSteers += 1
     this.turn.halt.sent.add(message.uuid)
     const accepted = this.input.push(message)
     if (accepted) return
     this.turn.pendingSteers -= 1
-    throw new Error("Claude 输入流已经关闭")
+    throw new Error(CLAUDE_DRIVER[localeOf(this.req)].inputClosedShort)
   }
 
   /**
@@ -261,7 +263,7 @@ class ClaudeSession implements EngineSession {
    * 要的句柄。所以这条是读盘，不是问 SDK（细节见 `history.ts`）。
    */
   async history(): Promise<readonly EngineThread[]> {
-    return listSessions(this.req.home)
+    return listSessions(this.req.home, localeOf(this.req))
   }
 
   /**
@@ -289,7 +291,7 @@ class ClaudeSession implements EngineSession {
   async transcript(): Promise<{ items: readonly Item[]; total: number }> {
     const id = this.req.resume
     if (id === undefined) return { items: [], total: 0 }
-    return readTranscript(this.req.home, id, Date.now())
+    return readTranscript(this.req.home, id, Date.now(), localeOf(this.req))
   }
 
   pid(): number | undefined { return this.owner.pid() }
@@ -299,7 +301,7 @@ class ClaudeSession implements EngineSession {
   }
 
   askAside(text: string): Promise<string> {
-    return askAside(this.query, text)
+    return askAside(this.query, text, localeOf(this.req))
   }
 
   async setModel(model: string, effort?: string): Promise<{ effort?: string }> {
@@ -314,7 +316,7 @@ class ClaudeSession implements EngineSession {
         at: Date.now(),
         threadId: this.req.threadId,
         status: "degraded",
-        detail: `Claude 设推理强度失败：${error instanceof Error ? error.message : String(error)}`,
+        detail: CLAUDE_DRIVER[localeOf(this.req)].effortFailed(error instanceof Error ? error.message : String(error)),
       })
       return undefined
     })
@@ -341,12 +343,11 @@ class ClaudeSession implements EngineSession {
     if (needsPermissionRestart(this.bypassEnabled, trust)) {
       return {
         restart: true,
-        detail:
-          "Claude 的完全访问需要在会话启动时显式允许 Bypass。请等当前轮结束；Switchback 会续接同一条会话后重启。",
+        detail: CLAUDE_DRIVER[localeOf(this.req)].bypass,
       }
     }
     const handle = this.query
-    if (handle === undefined) throw new Error("Claude 会话尚未就绪，无法切换权限档")
+    if (handle === undefined) throw new Error(CLAUDE_DRIVER[localeOf(this.req)].notReady)
     const previous = this.trust.current
     this.trust.current = trust
     try {
@@ -381,7 +382,7 @@ class ClaudeSession implements EngineSession {
         at: Date.now(),
         threadId: this.req.threadId,
         status: "crashed",
-        detail: `引擎进程组未能回收（pid ${String(report.pid)}），可能已泄漏`,
+        detail: CLAUDE_DRIVER[localeOf(this.req)].leaked(String(report.pid)),
       })
     }
   }
@@ -391,9 +392,9 @@ export function createClaudeDriver(config: ClaudeDriverConfig = {}): EngineDrive
   const mode = config.executable ?? "bundled"
   return {
     id: "claude",
-    probe: () => probeClaude(mode),
+    probe: (locale) => probeClaude(mode, undefined, locale),
     start: async (req: StartRequest): Promise<EngineSession> => {
-      const fork = req.forkOf === undefined ? undefined : await planFork(req.home, req.forkOf)
+      const fork = req.forkOf === undefined ? undefined : await planFork(req.home, req.forkOf, localeOf(req))
       const session = new ClaudeSession(req, config, await claudePath(mode), fork)
       session.start()
       return session

@@ -1,4 +1,7 @@
 import type { Event, ItemId, ThreadId, TurnId } from "@switchback/protocol"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_CONVERSATION } from "./conversation.messages.js"
 
 interface RawConversationReset {
   new_conversation_id?: unknown
@@ -10,6 +13,7 @@ interface ResetContext {
   at: number
   nextId?: () => ItemId
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 /**
@@ -32,7 +36,7 @@ export function emitConversationReset(raw: unknown, ctx: ResetContext): void {
       at: ctx.at,
       kind: "notice",
       level: "notice",
-      message: "Claude 已清空上下文；上方记录仍保留供你查看，但后续回答不会再读取它。",
+      message: CLAUDE_CONVERSATION[localeOf(ctx)].cleared,
     },
   })
 }

@@ -10,6 +10,8 @@ import { resetStream } from "./stream.js"
 import { addOutputTokens, claudeUsage, type ContextSnapshot } from "./usage.js"
 import type { TurnRef } from "./loop.js"
 import type { RawLoopMessage } from "./loop-wire.js"
+import { localeOf } from "../locale.js"
+import { CLAUDE_RESULT } from "./result.messages.js"
 
 export interface ResultContext {
   req: StartRequest
@@ -30,7 +32,7 @@ function sweepTools({ ref, req, at }: Phase, status: TurnStatus): void {
     req.emit({
       type: "item.updated", at,
       item: status === "completed"
-        ? { ...item, status: "failed", error: "Claude 在轮次结束前没有报告这次工具调用的结果。" }
+        ? { ...item, status: "failed", error: CLAUDE_RESULT[localeOf(req)].noToolResult }
         : { ...item, status: ending },
     })
   }

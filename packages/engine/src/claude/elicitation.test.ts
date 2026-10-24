@@ -79,6 +79,22 @@ describe("Claude MCP 结构化 elicitation", () => {
     expect(result).toEqual({ action: "accept", content: { count: 4 } })
   })
 
+  it("英文界面的重问提示说英文；字段名是服务器写的，原样保留", async () => {
+    const seen: (readonly QuestionPrompt[])[] = []
+    const replies: QuestionResponse[] = [
+      { answers: { count: { kind: "note", text: "2.5" } } },
+      { answers: { count: { kind: "note", text: "4" } } },
+    ]
+    await answerElicitation(request({ requestedSchema: {
+      type: "object", required: ["count"], properties: { count: { type: "integer", title: "人数" } },
+    } }), (questions) => {
+      seen.push(questions)
+      return Promise.resolve(replies.shift() ?? { dismissed: true })
+    }, controller().signal, "en")
+
+    expect(seen[1]?.[0]?.body).toContain("人数: enter a whole number")
+  })
+
   it("没有字段的原生确认仍由人决定，不自动放行", async () => {
     const result = await answerElicitation(request({ requestedSchema: {
       type: "object", properties: {},

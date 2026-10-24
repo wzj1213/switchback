@@ -1,6 +1,8 @@
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk"
 import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import type { InteractionWait } from "../contract.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_ASK } from "./ask-question.messages.js"
 
 /**
  * Claude 的 `AskUserQuestion`：模型明确交给人回答的一组结构化问题。
@@ -48,7 +50,7 @@ function sourceOptions(raw: unknown): SourceOption[] {
   })
 }
 
-function parsedQuestion(raw: unknown, toolUseId: string, index: number): ParsedQuestion | undefined {
+function parsedQuestion(raw: unknown, toolUseId: string, index: number, m: (typeof CLAUDE_ASK)[Locale]): ParsedQuestion | undefined {
   const item = recordOf(raw)
   const question = nonBlank(item?.["question"])
   if (question === undefined) return undefined
@@ -70,21 +72,21 @@ function parsedQuestion(raw: unknown, toolUseId: string, index: number): ParsedQ
       multiSelect: item?.["multiSelect"] === true,
       // 工具说明原话：「There should be no 'Other' option, that will be provided automatically」
       allowOther: true,
-      otherLabel: "其他",
-      otherDescription: "写下你的答案",
+      otherLabel: m.other,
+      otherDescription: m.writeAnswer,
       ...(options.length === 0 ? {} : {
-        allowNote: true, noteLabel: "补充说明（可选）", noteDescription: "可选：补充上下文",
+        allowNote: true, noteLabel: m.note, noteDescription: m.addContext,
       }),
       optional: true,
     },
   }
 }
 
-export function parsedQuestions(input: Raw, toolUseId: string): ParsedQuestion[] {
+export function parsedQuestions(input: Raw, toolUseId: string, locale: Locale = DEFAULT_LOCALE): ParsedQuestion[] {
   const raw = input["questions"]
   if (!Array.isArray(raw)) return []
   return raw.flatMap((value, index) => {
-    const parsed = parsedQuestion(value, toolUseId, index)
+    const parsed = parsedQuestion(value, toolUseId, index, CLAUDE_ASK[locale])
     return parsed === undefined ? [] : [parsed]
   })
 }
@@ -143,9 +145,9 @@ export async function askQuestions(
   input: Raw,
   toolUseId: string,
   ask: (questions: readonly QuestionPrompt[], wait?: InteractionWait) => Promise<QuestionResponse>,
-  signal?: AbortSignal,
+  { signal, locale }: { signal?: AbortSignal | undefined; locale?: Locale } = {},
 ): Promise<PermissionResult> {
-  const questions = parsedQuestions(input, toolUseId)
+  const questions = parsedQuestions(input, toolUseId, locale)
   if (questions.length === 0) return { behavior: "allow" }
   const response = await ask(questions.map((question) => question.prompt), signal === undefined ? undefined : { signal })
   return { behavior: "allow", updatedInput: { ...answeredInput(input, questions, response) } }

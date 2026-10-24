@@ -1,5 +1,8 @@
 import type { Event, ItemId, ToolCallItem } from "@switchback/protocol"
 import { applyResult, type ToolResult } from "./translate.js"
+import { localeOf } from "../locale.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { clip } from "../clip.js"
 
 interface RawPermissionDenied {
   subtype?: unknown
@@ -14,6 +17,7 @@ interface RawResult {
 interface DenialContext {
   at: number
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 export interface DenialState {
@@ -29,9 +33,9 @@ function idOf(value: unknown): ItemId | undefined {
   return typeof value === "string" && value !== "" ? value : undefined
 }
 
-function messageOf(value: unknown): string | undefined {
+function messageOf(value: unknown, locale: Locale): string | undefined {
   if (typeof value !== "string" || value === "") return undefined
-  return value.length > 4000 ? `${value.slice(0, 4000)}\n…（已截断）` : value
+  return clip(value, 4000, locale)
 }
 
 function deniedItem(item: ToolCallItem, message?: string): ToolCallItem {
@@ -54,7 +58,7 @@ export function onPermissionDenied(
   if (raw.subtype !== "permission_denied") return
   const id = idOf(raw.tool_use_id)
   if (id === undefined) return
-  const message = messageOf(raw.message)
+  const message = messageOf(raw.message, localeOf(ctx))
   if (message !== undefined) state.messages.set(id, message)
   const pending = tools.get(id) ?? state.settled.get(id)
   if (pending === undefined) return
@@ -69,11 +73,12 @@ export function applyToolResult(
   result: ToolResult,
   state: DenialState,
   tools: Map<ItemId, ToolCallItem>,
+  locale: Locale = DEFAULT_LOCALE,
 ): ToolCallItem | undefined {
   const pending = tools.get(result.toolUseId) ?? state.settled.get(result.toolUseId)
   if (pending === undefined) return undefined
   tools.delete(result.toolUseId)
-  const applied = applyResult(pending, result)
+  const applied = applyResult(pending, result, locale)
   const message = state.messages.get(result.toolUseId)
   const item = pending.status === "denied" || message !== undefined ? deniedItem(applied, message) : applied
   state.settled.set(result.toolUseId, item)

@@ -1,5 +1,8 @@
 import type { Event, ThreadId } from "@switchback/protocol"
 import { sanitize } from "./permission.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_ELICITATION_DONE } from "./elicitation-complete.messages.js"
 
 interface RawElicitationComplete {
   mcp_server_name?: unknown
@@ -10,6 +13,7 @@ interface ElicitationCompleteContext {
   threadId: ThreadId
   at: number
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 const TIMEOUT_MS = 8000
@@ -34,7 +38,7 @@ export function emitElicitationComplete(
     threadId: ctx.threadId,
     engine: "claude",
     key: `elicitation-complete:${server}:${id}`,
-    message: `MCP 服务“${server}”已确认外部交互完成（${id}）`,
+    message: CLAUDE_ELICITATION_DONE[localeOf(ctx)].done(server, id),
     priority: "low",
     timeoutMs: TIMEOUT_MS,
   })

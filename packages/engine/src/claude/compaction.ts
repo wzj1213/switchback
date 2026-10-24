@@ -1,4 +1,7 @@
 import type { Event, NoticeItem, TurnId } from "@switchback/protocol"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_COMPACTION } from "./compaction.messages.js"
 
 const KEY = "claude:context-compaction"
 
@@ -20,7 +23,10 @@ interface CompactionContext {
   turnId: TurnId
   at: number
   emit: (event: Event) => void
+  locale?: () => Locale
 }
+
+type Text = (typeof CLAUDE_COMPACTION)[Locale]
 
 function count(value: unknown): number | undefined {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
@@ -32,19 +38,13 @@ function metadataOf(value: unknown): CompactMetadata | undefined {
   return typeof value === "object" && value !== null ? value as CompactMetadata : undefined
 }
 
-function completedMessage(raw: RawCompaction): string {
+function completedMessage(raw: RawCompaction, m: Text): string {
   const metadata = metadataOf(raw.compact_metadata)
-  const before = count(metadata?.pre_tokens)
-  const after = count(metadata?.post_tokens)
-  const label = metadata?.trigger === "auto" ? "上下文已自动压缩" : "上下文已压缩"
-  return before === undefined || after === undefined
-    ? `${label}。`
-    : `${label}：${String(before)} → ${String(after)} tokens。`
+  return m.compacted(metadata?.trigger === "auto", count(metadata?.pre_tokens), count(metadata?.post_tokens))
 }
 
-function failedMessage(raw: RawCompaction): string {
-  const detail = typeof raw.compact_error === "string" ? raw.compact_error.trim() : ""
-  return detail === "" ? "上下文压缩未完成。" : `上下文压缩未完成：${detail}`
+function failedMessage(raw: RawCompaction, m: Text): string {
+  return m.failed(typeof raw.compact_error === "string" ? raw.compact_error.trim() : "")
 }
 
 function update(
@@ -74,17 +74,18 @@ export function emitCompaction(
   notices: Map<string, NoticeItem>,
   ctx: CompactionContext,
 ): void {
+  const m = CLAUDE_COMPACTION[localeOf(ctx)]
   if (raw.subtype === "compact_boundary") {
-    update(notices, ctx, completedMessage(raw), "info")
+    update(notices, ctx, completedMessage(raw, m), "info")
     return
   }
   if (raw.subtype !== "status") return
   if (raw.status === "compacting") {
-    update(notices, ctx, "正在压缩上下文…", "info")
+    update(notices, ctx, m.compacting, "info")
   } else if (raw.compact_result === "success") {
-    update(notices, ctx, "上下文已压缩。", "info")
+    update(notices, ctx, m.done, "info")
   } else if (raw.compact_result === "failed") {
-    update(notices, ctx, failedMessage(raw), "notice")
+    update(notices, ctx, failedMessage(raw, m), "notice")
   }
 }
 
@@ -94,5 +95,6 @@ export function isFailedCompactionEcho(
   notices: ReadonlyMap<string, NoticeItem>,
 ): boolean {
   return raw.message?.model === "<synthetic>"
-    && notices.get(KEY)?.message.startsWith("上下文压缩未完成") === true
+    // 压缩失败是这一条唯一落 `notice` 级的情况（见 `emitCompaction`）。认级别不认文字：文字随界面语言变
+    && notices.get(KEY)?.level === "notice"
 }

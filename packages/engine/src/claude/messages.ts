@@ -7,6 +7,7 @@ import { clearThinking, type ThinkingState } from "./thinking.js"
 import { assistantItems, toolResults } from "./translate.js"
 import { applyToolResult, type DenialState } from "./denials.js"
 import { resetStream, type StreamState } from "./stream.js"
+import { localeOf } from "../locale.js"
 
 interface RawMessage {
   message?: { content?: unknown; model?: unknown }
@@ -64,7 +65,7 @@ export function onAssistant(msg: RawMessage, ref: MessageRef, req: StartRequest,
     const nextId = makeIdMinter(ref, turnId)
     const planId = updatePlan(content, ref, req, at)
     const items = assistantItems(content.filter((block) => !isPlanTool(block)), {
-      turnId, at, nextId, reuse: (order) => ref.stream.byOrder.get(order),
+      turnId, at, nextId, reuse: (order) => ref.stream.byOrder.get(order), locale: localeOf(req),
     })
     for (const item of items) {
       if (item.kind === "tool_call") ref.tools.set(item.id, item)
@@ -85,7 +86,7 @@ export function onToolResults(msg: RawMessage, ref: MessageRef, req: StartReques
   if (!Array.isArray(content) || turnId === undefined) return
   const itemIds: ItemId[] = []
   for (const result of toolResults(content)) {
-    const item = applyToolResult(result, ref.denials, ref.tools)
+    const item = applyToolResult(result, ref.denials, ref.tools, localeOf(req))
     if (item === undefined) continue
     itemIds.push(item.id)
     req.emit({ type: "item.updated", at, item })

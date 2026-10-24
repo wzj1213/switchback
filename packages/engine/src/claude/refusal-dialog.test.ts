@@ -29,7 +29,7 @@ describe("Claude 原生拒答选择框", () => {
       return new Promise((resolve) => { answer = resolve })
     }
     const pending = answerRefusalDialog(
-      dialog(payload), ask, new AbortController().signal, (uuids) => retracted.push(uuids),
+      dialog(payload), { askQuestion: ask }, new AbortController().signal, (uuids) => retracted.push(uuids),
     )
     expect(retracted).toEqual([])
     expect(prompts[0]?.[0]).toMatchObject({
@@ -56,15 +56,15 @@ describe("Claude 原生拒答选择框", () => {
     ] as const
     for (const sample of cases) {
       const ask = (): Promise<QuestionResponse> => Promise.resolve(sample.response)
-      await expect(answerRefusalDialog(dialog(payload), ask, new AbortController().signal, () => undefined))
+      await expect(answerRefusalDialog(dialog(payload), { askQuestion: ask }, new AbortController().signal, () => undefined))
         .resolves.toEqual({ behavior: "completed", result: sample.result })
     }
     const ask = vi.fn<StartRequest["askQuestion"]>(() => Promise.resolve({ dismissed: true }))
     await expect(answerRefusalDialog(
-      { dialogKind: "future-dialog", payload }, ask, new AbortController().signal, () => undefined,
+      { dialogKind: "future-dialog", payload }, { askQuestion: ask }, new AbortController().signal, () => undefined,
     )).resolves.toEqual({ behavior: "cancelled" })
     await expect(answerRefusalDialog(
-      dialog({ ...payload, fallbackModel: 7 }), ask, new AbortController().signal, () => undefined,
+      dialog({ ...payload, fallbackModel: 7 }), { askQuestion: ask }, new AbortController().signal, () => undefined,
     )).resolves.toEqual({ behavior: "cancelled" })
     expect(ask).not.toHaveBeenCalled()
   })
@@ -75,7 +75,7 @@ describe("Claude 原生拒答选择框", () => {
     const ask: StartRequest["askQuestion"] = (_questions, wait) => new Promise((resolve) => {
       wait?.signal?.addEventListener("abort", () => resolve({ dismissed: true }), { once: true })
     })
-    const pending = answerRefusalDialog(dialog(payload), ask, controller.signal, (uuids) => retracted.push(uuids))
+    const pending = answerRefusalDialog(dialog(payload), { askQuestion: ask }, controller.signal, (uuids) => retracted.push(uuids))
     controller.abort()
     await expect(pending).resolves.toEqual({ behavior: "cancelled" })
     expect(retracted).toEqual([])

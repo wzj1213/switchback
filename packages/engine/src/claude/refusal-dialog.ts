@@ -6,6 +6,9 @@ import type { StartRequest } from "../contract.js"
 import type { PlanState } from "./plan.js"
 import { sanitize } from "./permission.js"
 import { retractMessages, type RetractionState } from "./retraction.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_REFUSAL } from "./refusal-dialog.messages.js"
 
 const DIALOG_KIND = "refusal_fallback_prompt"
 const QUESTION_ID = "claude-refusal-fallback"
@@ -43,22 +46,18 @@ function payloadOf(request: UserDialogRequest): Payload | undefined {
   }
 }
 
-function promptOf(payload: Payload): QuestionPrompt {
+function promptOf(payload: Payload, m: (typeof CLAUDE_REFUSAL)[Locale]): QuestionPrompt {
   const original = sanitize(payload.originalModel)
   const fallback = sanitize(payload.fallbackModel)
   const guidance = payload.guidanceText === undefined ? "" : sanitize(payload.guidanceText)
   return {
     id: QUESTION_ID,
-    header: "Claude · 会话已暂停",
-    question: "这次请求被原模型拒绝，接下来怎么做？",
+    header: m.header,
+    question: m.question,
     ...(guidance === "" ? {} : { body: guidance }),
     options: [
-      { id: "retry_fallback", label: `切换到 ${fallback}`, description: "用备用模型重试当前请求" },
-      {
-        id: "edit_prompt",
-        label: `修改后继续用 ${original}`,
-        description: "结束当前轮；在输入框修改后重新发送",
-      },
+      { id: "retry_fallback", label: m.retry(fallback), description: m.retryHint },
+      { id: "edit_prompt", label: m.edit(original), description: m.editHint },
     ],
   }
 }
@@ -77,7 +76,7 @@ type AskQuestion = StartRequest["askQuestion"]
 /** 回答原生拒答对话；撤回只在用户选择/取消落定之后发生，中止轮次则保留现场。 */
 export async function answerRefusalDialog(
   request: UserDialogRequest,
-  askQuestion: AskQuestion,
+  asker: { askQuestion: AskQuestion; locale?: () => Locale },
   signal: AbortSignal,
   resolved: (uuids: readonly string[]) => void,
 ): Promise<UserDialogResult> {
@@ -85,7 +84,7 @@ export async function answerRefusalDialog(
   if (payload === undefined || signal.aborted) return CANCELLED
   let response: QuestionResponse
   try {
-    response = await askQuestion([promptOf(payload)], { signal })
+    response = await asker.askQuestion([promptOf(payload, CLAUDE_REFUSAL[localeOf(asker)])], { signal })
   } catch {
     if (signal.aborted) return CANCELLED
     response = { dismissed: true }
@@ -103,14 +102,14 @@ interface DialogTurn {
 
 /** 只声明两端真实可渲染的 kind；未知新 kind 继续由 SDK fail closed。 */
 export function refusalDialogOptions(
-  req: Pick<StartRequest, "askQuestion" | "emit">,
+  req: Pick<StartRequest, "askQuestion" | "emit" | "locale">,
   turn: DialogTurn,
 ): Pick<Options, "onUserDialog" | "supportedDialogKinds"> {
   return {
     supportedDialogKinds: [DIALOG_KIND],
     onUserDialog: (request, { signal }) => answerRefusalDialog(
       request,
-      req.askQuestion,
+      req,
       signal,
       (uuids) => retractMessages(turn.retractions, uuids, {
         at: Date.now(), emit: req.emit, tools: turn.tools, plan: turn.plan,

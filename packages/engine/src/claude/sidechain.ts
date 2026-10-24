@@ -9,6 +9,9 @@ import { taskIdForParent } from "./task-links.js"
 import type { TaskState } from "./tasks.js"
 import { createThinkingState } from "./thinking.js"
 import type { RawLoopMessage } from "./loop-wire.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CLAUDE_RESULT } from "./result.messages.js"
 
 interface SidechainRef extends MessageRef {
   laneId: string
@@ -111,16 +114,16 @@ export function onSidechainMessage(
   }
 }
 
-function unsettled(item: ToolCallItem, done: boolean): ToolCallItem {
+function unsettled(item: ToolCallItem, done: boolean, locale: Locale): ToolCallItem {
   return done
-    ? { ...item, status: "failed", error: "Claude 在子任务结束前没有报告这次工具调用的结果。" }
+    ? { ...item, status: "failed", error: CLAUDE_RESULT[locale].noSubtaskResult }
     : { ...item, status: "failed" }
 }
 
 function settleRef(ref: SidechainRef, done: boolean, req: StartRequest, at: number): void {
   const child = childRequest(req, ref)
   for (const [nativeId, item] of ref.tools) {
-    const ended = unsettled(item, done)
+    const ended = unsettled(item, done, localeOf(req))
     ref.denials.settled.set(nativeId, ended)
     child.emit({ type: "item.updated", at, item: ended })
   }

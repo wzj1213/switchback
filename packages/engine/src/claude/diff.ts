@@ -1,5 +1,7 @@
 import type { FileChange } from "@switchback/protocol"
 import { synthDiff, type Synth } from "../synth.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CLAUDE_DIFF } from "./diff.messages.js"
 
 const strOf = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined)
 
@@ -9,10 +11,10 @@ interface RawEdit {
 }
 
 /** `MultiEdit` 的多处改动落在同一个文件上，合成一条，用 hunk 头分段。 */
-function multi(edits: readonly RawEdit[]): Synth {
+function multi(edits: readonly RawEdit[], locale: Locale): Synth {
   const parts = edits.map((e, i) => {
     const one = synthDiff(strOf(e.old_string) ?? "", strOf(e.new_string) ?? "")
-    return { header: `@@ 第 ${String(i + 1)} 处 @@`, ...one }
+    return { header: CLAUDE_DIFF[locale].hunk(i + 1), ...one }
   })
   return {
     diff: parts.map((p) => `${p.header}\n${p.diff}`).join("\n"),
@@ -31,6 +33,7 @@ function multi(edits: readonly RawEdit[]): Synth {
 export function fileChangesOf(
   tool: string,
   input: Readonly<Record<string, unknown>>,
+  locale: Locale = DEFAULT_LOCALE,
 ): readonly FileChange[] {
   const path = strOf(input["file_path"]) ?? ""
   if (path === "") return []
@@ -41,7 +44,7 @@ export function fileChangesOf(
   }
   const edits = input["edits"]
   const synth = Array.isArray(edits)
-    ? multi(edits as readonly RawEdit[])
+    ? multi(edits as readonly RawEdit[], locale)
     : synthDiff(strOf(input["old_string"]) ?? "", strOf(input["new_string"]) ?? "")
   if (synth.added === 0 && synth.removed === 0) return []
   return [{ path, kind: "update", diff: synth.diff, added: synth.added, removed: synth.removed }]
