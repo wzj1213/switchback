@@ -109,7 +109,7 @@ export const INTERACTION_VIEWS = [
     name: "56-设置选中项悬停",
     open: [
       `document.querySelector('.foot__who')?.click()`,
-      `[...document.querySelectorAll('[role=menuitem]')].find(m => m.textContent.includes('设置'))?.click()`,
+      `[...document.querySelectorAll('[role=menuitem]')].find(m => /设置|Settings/.test(m.textContent))?.click()`,
       baseline('.set__tab--on'),
     ],
     hover: '.set__tab--on', ready: '.set', assert: feedback('.set__tab--on'),

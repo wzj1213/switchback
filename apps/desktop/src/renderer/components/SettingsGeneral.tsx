@@ -1,4 +1,5 @@
 import type { EngineInfo, Trust } from "@switchback/protocol"
+import { LOCALES, LOCALE_NAMES } from "@switchback/i18n"
 import type { NotifyMode, Settings } from "../../shared/settings.js"
 import { trustsOf } from "../trusts.js"
 import { Field, Group, Segmented, Toggle } from "./SettingsBits.js"
@@ -34,6 +35,15 @@ export function LookSection({
   return (
     <>
       <Group title={m.look}>
+        <Field label={m.language} hint={m.languageHint}>
+          <Segmented
+            options={LOCALES.map((id) => ({ id, label: LOCALE_NAMES[id] }))}
+            value={settings.language}
+            onPick={(language) => {
+              onPatch({ language })
+            }}
+          />
+        </Field>
         <Field label={m.theme} stack>
           <ThemeOptions
             value={settings.theme}

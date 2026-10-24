@@ -4,6 +4,8 @@ import { defineMessages } from "@switchback/i18n"
 export const GENERAL = defineMessages(
   {
     look: "外观",
+    language: "语言",
+    languageHint: "Switchback 自己说的话跟着它换：界面、通知、菜单、交接说明。引擎和模型说的话原样显示，不翻译。",
     theme: "主题",
     notify: "通知",
     notifyScope: "通知范围",
@@ -31,6 +33,8 @@ export const GENERAL = defineMessages(
   },
   {
     look: "Appearance",
+    language: "Language",
+    languageHint: "Switchback's own words follow this: the interface, notifications, menus, and the handoff note. What engines and models say is shown as is, untranslated.",
     theme: "Theme",
     notify: "Notifications",
     notifyScope: "Notify me about",
