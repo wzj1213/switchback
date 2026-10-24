@@ -139,6 +139,8 @@ pnpm dist:all     # 一次生成两种
 pnpm test:live    # 真引擎测试，默认不跑；需要本机装好并登录对应引擎
 ```
 
+界面默认中文，在 设置 → 通用 → 外观 → 语言 可以换成 English，当场生效；手机和浏览器那头跟着这台电脑的语言走。
+
 使用前提：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh` / `agy`）并按各家方式完成登录；
 Claude 完整版内置 SDK 对应的平台可执行文件，轻量版要求 `claude --version` 可运行。
 DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让选中的 profile
@@ -219,6 +221,7 @@ Switchback 没有遥测、统计或崩溃上报，崩溃转储只留在本机。
 ```
 packages/
   protocol/   领域模型 thread / turn / item（零依赖，纯类型）
+  i18n/       界面语言与文案表的类型（零依赖，零 IO）
   approval/   信任档 + 红线表 + 判定器（纯函数，零 IO）
   store/      事件流到视图状态的纯归约器
   wire/       序号、重放、分片与补洞

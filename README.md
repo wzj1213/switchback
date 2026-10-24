@@ -41,7 +41,7 @@ A relay doesn't translate one model's context into another vendor's private sess
 By default, the first message to the new engine starts with a short handoff note that only states facts: which
 engine ran which turns, where Switchback's transcript and each segment's raw logs are, and what format those logs
 are in. It gives no instructions, makes no judgment, and shows up verbatim in the transcript. You can turn it off
-under 设置 → 通用 → 自动交接 (Settings → General → Automatic handoff).
+under Settings → General → Automatic handoff.
 
 | Kept | Never pushed into the new engine's context |
 | --- | --- |
@@ -128,7 +128,7 @@ so switching the default assembly later never sends an old handle into a differe
 commands, and session capabilities that plugins report through ACP are handled by the generic driver; ACP engines
 you configure yourself appear only after you register them.
 
-Third-party ACP engines are added in 设置 → 安装与接入 (Settings → Install and connect):
+Third-party ACP engines are added under Settings → Install & connect:
 
 - **From the ACP registry**: lists the launch methods each vendor registered in the
   [official ACP registry](https://agentclientprotocol.com/registry) (Gemini CLI, GitHub Copilot, goose, OpenCode,
@@ -163,13 +163,16 @@ pnpm dist:all     # both at once
 pnpm test:live    # real-engine tests, off by default; needs the engines installed and signed in
 ```
 
+The interface starts in Chinese. To switch it to English, open 设置 → 通用 → 外观 → 语言 (Settings → General →
+Appearance → Language) and choose English; it applies right away, and the phone and browser clients follow the
+desktop. The rest of this README uses the English labels.
+
 Before you use it, install the native agents you want (`codex`, `kimi`, `grok`, `dsh`, `agy`) and sign in to each the way
 its vendor describes. The full Claude build bundles the platform executable that matches the SDK; the thin build
 needs `claude --version` to work.
 
 DSH also needs a provider, model, and API credentials set up under Models in DSH Web, and the selected profile has
-to complete the ACP handshake. Then choose the profile under 设置 → 引擎 → DSH (Settings → Engines → DSH) and
-confirm it. Profiles, credentials, and plugin versions stay managed by DSH. While the official automation-only ACP
+to complete the ACP handshake. Then choose the profile under Settings → Engines → DSH and confirm it. Profiles, credentials, and plugin versions stay managed by DSH. While the official automation-only ACP
 doesn't report that it can resume, Switchback refuses to resume an old session instead of quietly starting an empty
 one and pretending it reconnected. For now it also only receives the final assistant text over ACP; reasoning and
 tool activity stay in DSH's own session log. So Switchback's transcript doesn't make up the missing tool rows, and
@@ -239,7 +242,7 @@ requests Switchback makes itself are these:
   npm, and `grok update --check` when grok is installed.
 - **App update checks**: `updateFeed` in `apps/desktop/package.json` is empty by default, which turns the feature
   off entirely.
-- **The ACP registry**: when you open 安装与接入 (Install and connect) in Settings and the local cache is more than
+- **The ACP registry**: when you open Settings → Install & connect and the local cache is more than
   an hour old, the registry is fetched once from `cdn.agentclientprotocol.com` (about 60 KB); refreshing fetches it
   too.
 - **When you connect or upgrade an engine** there: engines distributed through npx or uvx are downloaded by those
@@ -260,6 +263,7 @@ Model requests, sign-in, and each engine's own updates are all sent by the nativ
 ```
 packages/
   protocol/   domain model: thread, turn, item (no dependencies, types only)
+  i18n/       interface languages and message catalog types (no dependencies, no IO)
   approval/   trust tiers, red lines, and the decision function (pure, no IO)
   store/      pure reducer from the event stream to view state
   wire/       sequence numbers, replay, chunking, and gap filling

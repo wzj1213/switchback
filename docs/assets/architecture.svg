@@ -107,14 +107,18 @@
 <text x="618.4" y="342" class="k mono">wire</text>
 <text x="618.4" y="360" class="c">sequence,</text>
 <text x="618.4" y="376" class="c">replay</text>
-<rect x="248" y="404" width="244.2" height="58" rx="8" class="stratum"/>
+<rect x="248" y="404" width="210" height="58" rx="8" class="stratum"/>
 <text x="260" y="426" class="k mono">protocol</text>
 <text x="260" y="444" class="c">Thread, Turn, Item: the model</text>
 <text x="260" y="460" class="c">every layer shares</text>
-<rect x="500.2" y="404" width="187.8" height="58" rx="8" class="stratum"/>
-<text x="512.2" y="426" class="k mono">worksite</text>
-<text x="512.2" y="444" class="c">file index,</text>
-<text x="512.2" y="460" class="c">git guard</text>
+<rect x="466" y="404" width="106" height="58" rx="8" class="stratum"/>
+<text x="478" y="426" class="k mono">i18n</text>
+<text x="478" y="444" class="c">UI text in</text>
+<text x="478" y="460" class="c">zh-CN and en</text>
+<rect x="580" y="404" width="108" height="58" rx="8" class="stratum"/>
+<text x="592" y="426" class="k mono">worksite</text>
+<text x="592" y="444" class="c">file index,</text>
+<text x="592" y="460" class="c">git guard</text>
 <text x="248" y="488" class="c">Also in this process: the egress guard watches each engine&#x27;s uploads</text>
 <text x="248" y="504" class="c">and stops one that starts sending its workspace out in bulk.</text>
 <text x="748" y="124" class="c">Native engines</text>
