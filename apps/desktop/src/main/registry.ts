@@ -2,6 +2,7 @@ import {
   createAcpDriver,
   createClaudeDriver,
   createCodexDriver,
+  createAntigravityDriver,
   createDshDriver,
   createKimiDriver,
   grokCacheRead,
@@ -32,7 +33,7 @@ import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
  *
  * **驱动表就是真源**：界面上能选的引擎从这里来，不在渲染层写第二份。
  * 写两份的下场是下拉里列着一堆名字，选中直接报「未注册的引擎」——真出过。
- * 五家稳定的 id / 顺序 / 名字放在 `shared/builtin-engines.ts`，设置页要靠它画出
+ * 内置引擎的 id / 顺序 / 名字放在 `shared/builtin-engines.ts`，设置页要靠它画出
  * 尚未进入可见清单的 DSH；这里也复用那份名字，避免同一家在两处改出两个称呼。
  *
  * 从 `host.ts` 拆出来是行数闸门逼的，但边界本来就该有：
@@ -40,9 +41,10 @@ import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
  */
 
 /**
- * 内置五家。**内置的判据是「验过」，不是「听说过」**：
+ * 内置引擎分别走自己的公开入口：
  *
  * - `claude` / `codex`：各有一个专门的驱动。
+ * - `antigravity`：原生 agy stream-json，每轮独立进程，用 conversation ID 续接。
  * - `kimi`：走它自带的 `kimi web` REST + WebSocket API。
  *   会话、插话、审批、模型、历史都从同一扇公开入口出来；不再借 ACP 的
  *   `terminal/*` 让命令改由 Switchback 代跑。
@@ -52,7 +54,7 @@ import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
  * - `dsh`：仍走通用 ACP 驱动，只启动 DSH 自己公开的 `--profile acp`。
  *   profile 由 DSH 管理；Switchback 不替它安装插件，也不拿 Web 内部控制面拼一条私有链路。
  *
- * 五家都有 `probe()`。前四家随宿主启动探测，没装就在下拉里标成「未安装」；
+ * 每家都有 `probe()`。除 DSH 外随宿主启动探测，没装就在下拉里标成「未安装」；
  * DSH 要先在设置中确认原生 provider、model 与凭证已经配好，确认前既不进清单也不起探测进程。
  * `engines.ts` 反对的是「列出没装的东西」和「把别人的参数抄进代码」——
  * 前者由 probe / 接入开关挡掉，后者在 kimi / grok / dsh 这里不成立
@@ -86,6 +88,7 @@ export function buildRegistry(
     drivers: {
       claude: createClaudeDriver({ executable: claudeExecutable }),
       codex: createCodexDriver(),
+      antigravity: createAntigravityDriver(),
       kimi: createKimiDriver(),
       grok: createAcpDriver({
         id: "grok",

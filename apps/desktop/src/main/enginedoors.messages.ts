@@ -11,6 +11,7 @@ export const ENGINE_DOORS = defineMessages(
     dshSettings: "模型、权限与通用偏好",
     dshProfile: (profile: string) => `当前 ${profile} profile 的补丁；增删请走 dsh plugin`,
     project: "只对这个项目生效",
+    antigravity: "原生权限规则、模型与偏好",
   },
   {
     claude: "Permissions, hooks, model defaults",
@@ -21,5 +22,6 @@ export const ENGINE_DOORS = defineMessages(
     dshSettings: "Models, permissions, and general preferences",
     dshProfile: (profile) => `Patch for the current ${profile} profile; add or remove plugins with dsh plugin`,
     project: "Applies to this project only",
+    antigravity: "Native permission rules, models, and preferences",
   },
 )

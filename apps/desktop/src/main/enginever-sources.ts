@@ -92,7 +92,7 @@ export function missingOf(spec: EngineSpec): EngineVersion {
   }
 }
 
-/** 五家各走自己暴露的路径：npm 安装、原生更新器、随应用更新，或只报版本。 */
+/** 各家走自己暴露的路径：npm 安装、原生更新器、随应用更新，或只报版本。 */
 export function specs(claude: ClaudeExecutable): readonly EngineSpec[] {
   return [
     claudeSpec(claude),
@@ -100,6 +100,7 @@ export function specs(claude: ClaudeExecutable): readonly EngineSpec[] {
     npmSpec("kimi", BUILTIN_ENGINE_LABELS.kimi, "kimi", "@moonshot-ai/kimi-code"),
     grokSpec(),
     dshSpec(),
+    antigravitySpec(),
   ]
 }
 
@@ -281,4 +282,19 @@ async function inspectGrok(
 
 function nativeUpdate(bin: string): UpdateCommand {
   return { command: bin, args: ["update"], display: `${bin} update`, unchangedOk: true }
+}
+
+function antigravitySpec(): EngineSpec {
+  return {
+    engine: "antigravity", label: BUILTIN_ENGINE_LABELS.antigravity, bin: "agy",
+    update: nativeUpdate("agy"),
+    where: "antigravity-where",
+    inspect: async ({ run }) => {
+      const installed = await versionOf("agy", run)
+      return installed === undefined ? undefined : {
+        engine: "antigravity", label: BUILTIN_ENGINE_LABELS.antigravity, installed,
+        stale: false, update: "agy update", note: "antigravity-self",
+      }
+    },
+  }
 }

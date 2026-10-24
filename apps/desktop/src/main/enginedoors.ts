@@ -69,6 +69,13 @@ function layout(cwd: string | undefined, dshProfile: string, m: Text): readonly 
   const project = (rest: string): readonly string[] => (cwd === undefined ? [] : [join(cwd, rest)])
   const rows: Door[] = [
     {
+      id: "antigravity",
+      label: BUILTIN_ENGINE_LABELS.antigravity,
+      scope: "user",
+      path: join(homedir(), ".gemini", "antigravity-cli", "settings.json"),
+      note: m.antigravity,
+    },
+    {
       id: "claude",
       label: BUILTIN_ENGINE_LABELS.claude,
       scope: "user",

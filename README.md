@@ -6,7 +6,7 @@ English | [中文](README.zh-CN.md)
 
 **When one agent gets stuck, hand the work to the next.**
 
-Carry one piece of work across Claude Code, Codex, Kimi Code, Grok, and DSH. Switchback keeps the goal,
+Carry one piece of work across Claude Code, Codex, Kimi Code, Grok, DSH, and Antigravity. Switchback keeps the goal,
 the worktree, each engine's native session handle, and the paths to whatever raw logs the engine exposes,
 all on one work line. Every engine still runs its own native process, with its own login, models,
 configuration, and tools. When you switch, Switchback doesn't write a prompt for you, and it doesn't slip a
@@ -15,8 +15,8 @@ summary of its own into the model's context.
 You can also switch back: the previous engine keeps its native session handle. Switchback looks after the
 continuity of one piece of work. It does not turn several agents into an automated team.
 
-Five engines are built in: Codex, Claude Code, Kimi Code, Grok, and DSH. Any other engine that speaks ACP can be
-registered.
+Six engines are built in: Codex, Claude Code, Kimi Code, Grok, DSH, and Antigravity. Any other engine that speaks ACP
+can be registered.
 
 ![How a relay works: one work line moves from Claude Code to Codex to Kimi Code and back to Claude Code, over the same workspace](docs/assets/relay.svg)
 
@@ -118,6 +118,7 @@ packaging.
 | Kimi Code | `kimi web`, REST + WebSocket | Built in |
 | Grok | ACP | Built in |
 | DSH | `dsh --profile <profile>` (ACP) | Built in; choose a profile's plugin assembly and confirm it |
+| Antigravity | `agy` stream-json, one process per turn | Built in; text only, and no Read only tier |
 | Other ACP engines | One click from the official ACP registry, or point at an executable | Connected according to what the engine reports; signs in its own way |
 
 Built-in engines show their real probe status. The DSH settings page reads each profile's `package.json` to show
@@ -162,7 +163,7 @@ pnpm dist:all     # both at once
 pnpm test:live    # real-engine tests, off by default; needs the engines installed and signed in
 ```
 
-Before you use it, install the native agents you want (`codex`, `kimi`, `grok`, `dsh`) and sign in to each the way
+Before you use it, install the native agents you want (`codex`, `kimi`, `grok`, `dsh`, `agy`) and sign in to each the way
 its vendor describes. The full Claude build bundles the platform executable that matches the SDK; the thin build
 needs `claude --version` to work.
 
@@ -173,6 +174,12 @@ doesn't report that it can resume, Switchback refuses to resume an old session i
 one and pretending it reconnected. For now it also only receives the final assistant text over ACP; reasoning and
 tool activity stay in DSH's own session log. So Switchback's transcript doesn't make up the missing tool rows, and
 the final file changes are still checked against the worktree baseline and the review panel.
+
+Antigravity runs through `agy`'s own headless stream-json mode: one process per turn, resumed by its conversation
+ID, text only for now. Actions that need approval are refused by the CLI itself, because that mode has no way to
+ask, so set permissions in its native settings. Its plan mode isn't a read-only permission, so the Read only tier
+isn't offered. Google's [FAQ](https://antigravity.google/docs/faq/) says personal subscriptions don't support using
+the CLI inside third-party apps, and connecting it to Switchback doesn't lift any account, region, or plan limit.
 
 Switchback uses each engine's own native sign-in; there are no extra keys to configure.
 
@@ -257,7 +264,7 @@ packages/
   store/      pure reducer from the event stream to view state
   wire/       sequence numbers, replay, chunking, and gap filling
   link/       remote transport that reconnects and resumes where it stopped
-  engine/     native engine drivers: acp, codex, claude, kimi
+  engine/     native engine drivers: acp, antigravity, codex, claude, kimi
   worksite/   workspace safety: git guard, write scope
   journal/    persistence, checkpoints, recovery
   handoff/    run summaries and branch comparison (never sent to an engine)

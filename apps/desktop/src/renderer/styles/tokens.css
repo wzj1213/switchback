@@ -111,6 +111,7 @@
   --engine-kimi: #6f4bc0;
   --engine-grok: #55607a;
   --engine-dsh: #a63f7a;
+  --engine-antigravity: #247b9c;
   --engine-other: rgb(var(--ink) / 45%);
   --hl-keyword: #8250df;
   --hl-string: #0a6640;
@@ -179,6 +180,7 @@
     --engine-kimi: #a58bf0;
     --engine-grok: #94a0bb;
     --engine-dsh: #e07cb4;
+    --engine-antigravity: #70beda;
     --engine-other: rgb(var(--ink) / 45%);
     --hl-keyword: #c792ea;
     --hl-string: #7fd3a2;

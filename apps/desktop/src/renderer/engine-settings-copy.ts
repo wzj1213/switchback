@@ -18,6 +18,7 @@ const NATIVE_COMMAND: Readonly<Record<BuiltinEngineId, string>> = {
   kimi: "kimi web",
   grok: "grok login",
   dsh: "dsh web",
+  antigravity: "agy",
 }
 
 function builtin(id: string): id is BuiltinEngineId {

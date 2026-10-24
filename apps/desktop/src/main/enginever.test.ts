@@ -29,6 +29,7 @@ function fixture(options: Partial<EngineVersionOptions> = {}): {
       grok: "1.0.4",
       claude: "2.1.238",
       dsh: "0.1.0-rc.6",
+      agy: "1.4.0",
     },
     latest: { "@openai/codex": "0.149.0", "@moonshot-ai/kimi-code": "0.37.2", grok: "1.0.5" },
     globals: { "@openai/codex": "0.148.0", "@moonshot-ai/kimi-code": "0.37.1" },
@@ -130,7 +131,7 @@ describe("引擎版本入口", () => {
     }
   })
 
-  it("按实际安装来源给五家展示正确状态与命令", async () => {
+  it("按实际安装来源给内置引擎展示正确状态与命令", async () => {
     const { store } = fixture()
     const versions = await store.get()
     expect(versions).toMatchObject([
@@ -156,6 +157,7 @@ describe("引擎版本入口", () => {
         stale: false,
         detail: "版本与 profiles 由 DSH 自己管理，Switchback 不代装插件",
       },
+      { engine: "antigravity", installed: "1.4.0", stale: false, update: "agy update" },
     ])
     expect(versions[0]?.update).toBeUndefined()
   })

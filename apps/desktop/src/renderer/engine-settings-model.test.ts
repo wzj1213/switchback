@@ -9,7 +9,7 @@ import {
 } from "./engine-settings-model.js"
 
 describe("引擎设置页的数据", () => {
-  it("未接入 DSH 时仍画全五家，第三方引擎跟在后面", () => {
+  it("未接入 DSH 时仍画全内置引擎，第三方引擎跟在后面", () => {
     const catalog: EngineInfo[] = [
       { id: "claude", label: "Claude", state: "ok" },
       { id: "acp:zcode", label: "ZCode", state: "unknown" },
@@ -21,6 +21,7 @@ describe("引擎设置页的数据", () => {
       "kimi",
       "grok",
       "dsh",
+      "antigravity",
       "acp:zcode",
     ])
     expect(items[0]?.state).toBe("ok")

@@ -7,6 +7,10 @@
 
 ## 拥有什么
 
+- `antigravity/` —— 原生 `agy --input-format stream-json --output-format stream-json` 驱动。
+  每轮发送一条用户消息后关闭 stdin，由 CLI 完成本轮并退出；后续轮次通过原生 `conversation_id`
+  和 `--conversation` 精确续接。映射正文增量、工具输入输出和原生结果，停止时回收进程组。
+  模型清单来自 `agy models`，通过下一轮 `--model` 选择；不接管登录、密钥或原生权限配置。
 - `EngineDriver` / `EngineSession` 契约（`contract.ts`）
 - `subprocess.ts` —— 进程组所有权与回收阶梯，各引擎共用；`pid()` 报组长 pid（退了就不报），
   各驱动经 `EngineSession.pid` 交给宿主，桌面端的外发守卫靠它把流量记到这一家、这条会话上
@@ -190,6 +194,16 @@
 
 ## 已知限制
 
+- **Antigravity CLI 接入边界（1.4.0）**：公开 headless 接口只接受文本；不提供交互审批回包，
+  需要 Ask 的操作由 CLI 自己拒绝，stderr 原样显示，不由 Switchback 改成自动放行。
+  自动审批（`auto-edit`）映射 `--mode accept-edits`；完全访问（`full`）额外使用 `--dangerously-skip-permissions`。
+  `plan` 只是规划模式，不能保证只读，所以只读档明确拒绝。运行中换档/换模型需先停止当前轮。
+  暂不声明附件、插话、分叉、回退、压缩、侧问、活动视图和持续档位读回；不解析私有会话文件，
+  原生历史导入与日志路径未提供。累计 usage 不能代表上下文占用，因此不显示猜测的用量。
+  协议回归使用独立进程替身；2026-10-17 本机 agy 1.4.0 已实测文件读取工具、首轮生成和跨进程记忆续聊。
+  Google 的 [FAQ](https://antigravity.google/docs/faq/) 明确个人订阅不支持在第三方应用内包装 CLI；
+  接入不会解除账号、地区或方案限制。公开接口依据：[Headless](https://antigravity.google/docs/cli/headless/)、
+  [执行模式](https://antigravity.google/docs/cli/modes/)、[权限](https://antigravity.google/docs/permissions?tab=cli)。
 - **只有 claude 与 grok 报得出「这一次请求生成了多少 token」（`Usage.outputTokens`）。**
   claude 取 `result.usage.output_tokens`，grok 取 `_x.ai/session_notification` 的
   `turn_completed.usage.outputTokens`——两个都是这一轮的量。**kimi、codex、通用 ACP 报不出**：

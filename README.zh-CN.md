@@ -6,14 +6,14 @@
 
 **一家卡住，换一家接着干。**
 
-在 Claude Code、Codex、Kimi Code、Grok 与 DSH 之间延续同一件工作。Switchback 会把目标、
+在 Claude Code、Codex、Kimi Code、Grok、DSH 与 Antigravity 之间延续同一件工作。Switchback 会把目标、
 工作树、各家的原生会话句柄，以及引擎公开可定位的原始记录路径留在同一条工作线上；每一家仍运行自己的原生进程，
 使用自己的登录、模型、配置和工具。换过去时 Switchback 不替你写提示词，也不会把一份自制摘要塞进模型上下文。
 
 接力之后也可以切回来——上一家自己的原生会话句柄仍然保留。Switchback 管的是一条工作的连续性，
 不是把多家 agent 编成一支自动协作的队伍。
 
-目前内置五家：Codex、Claude Code、Kimi Code、Grok 与 DSH；其他讲 ACP 的引擎也可以注册。
+目前内置六家：Codex、Claude Code、Kimi Code、Grok、DSH 与 Antigravity；其他讲 ACP 的引擎也可以注册。
 
 ![接力怎么走：一条工作线从 Claude Code 交给 Codex、再交给 Kimi Code，最后切回 Claude Code，始终在同一个工作区上](docs/assets/relay.svg)
 
@@ -102,6 +102,7 @@ Switchback 唯一的用户界面是 GUI；命令行只用于开发和打包。
 | Kimi Code | `kimi web` REST + WebSocket | 内置 |
 | Grok | ACP | 内置 |
 | DSH | `dsh --profile <profile>`（ACP） | 内置；按 profile 选择插件组装并确认接入 |
+| Antigravity | `agy` stream-json，每轮一个进程 | 内置；只接文本，没有只读档 |
 | 其他 ACP 引擎 | ACP 官方注册表一键接入，或指一个可执行文件 | 按引擎自报能力接入；登录走它自己报的方式 |
 
 内置引擎会显示真实探测状态；DSH 设置页会从各 profile 的 `package.json` 展示 bundle 加载顺序、
@@ -138,7 +139,7 @@ pnpm dist:all     # 一次生成两种
 pnpm test:live    # 真引擎测试，默认不跑；需要本机装好并登录对应引擎
 ```
 
-使用前提：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh`）并按各家方式完成登录；
+使用前提：机器上装好要使用的原生 agent（`codex` / `kimi` / `grok` / `dsh` / `agy`）并按各家方式完成登录；
 Claude 完整版内置 SDK 对应的平台可执行文件，轻量版要求 `claude --version` 可运行。
 DSH 还要求在 DSH Web 的 Models 设置里配好 provider、model 与 API 凭证，并让选中的 profile
 能完成 ACP 握手；之后在 Switchback 的设置 → 引擎 → DSH 中选择 profile 并确认接入。
@@ -147,6 +148,11 @@ Switchback 会明确拒绝恢复旧会话，不会静默开一条空会话冒充
 它当前也只从 ACP 提交最终 assistant 文本，推理与工具活动留在 DSH 自己的 session log；
 因此 Switchback 的转录区不会编造缺席的工具行，最终文件变化仍由工作树开场基线与审核面板核对。
 Switchback 直接使用各家的原生登录态，不另外配置密钥。
+
+Antigravity 走 `agy` 自己的 headless stream-json：每轮起一个进程，用它的 conversation ID 续接，目前只接文本。
+需要审批的操作由 CLI 自己拒绝（这种模式没有问人的通道），权限请在它的原生设置里配；它的 plan 是规划模式、
+不是只读权限，所以不提供只读档。Google 的 [FAQ](https://antigravity.google/docs/faq/) 写明个人订阅不支持在
+第三方应用里使用 CLI，接进 Switchback 也不会解除账号、地区或方案上的限制。
 
 当前打出来的包没有签名（`identity: null`）。首次打开要在
 「系统设置 → 隐私与安全性」里放行，或者运行：
@@ -217,7 +223,7 @@ packages/
   store/      事件流到视图状态的纯归约器
   wire/       序号、重放、分片与补洞
   link/       远程传输：断了会自己重连，回来时说得清停在哪
-  engine/     原生引擎驱动：acp / codex / claude / kimi
+  engine/     原生引擎驱动：acp / antigravity / codex / claude / kimi
   worksite/   工作区安全：git guard、写范围
   journal/    持久化、断点、恢复
   handoff/    运行摘要与分支对比（不发送给引擎）

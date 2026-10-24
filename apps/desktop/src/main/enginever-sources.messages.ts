@@ -15,6 +15,8 @@ export const VERSION_NOTE = defineMessages(
       "grok-latest-unknown": "暂时没从 Grok 更新器查到最新版",
       "dsh-where": "DSH 的版本与 profiles 由它自己管理，Switchback 不代装；装好后确保 dsh 在 PATH 上",
       "dsh-self": "版本与 profiles 由 DSH 自己管理，Switchback 不代装插件",
+      "antigravity-where": "请从 https://antigravity.google/download 安装 Antigravity CLI，确保 agy 在 PATH 中",
+      "antigravity-self": "由 Antigravity 自己检查并安装新版",
     },
   },
   {
@@ -27,6 +29,8 @@ export const VERSION_NOTE = defineMessages(
       "grok-latest-unknown": "Couldn't get the latest version from Grok's updater for now",
       "dsh-where": "DSH manages its own versions and profiles, and Switchback doesn't install it; once it's installed, make sure dsh is on PATH",
       "dsh-self": "DSH manages its own versions and profiles; Switchback doesn't install plugins for it",
+      "antigravity-where": "Install the Antigravity CLI from https://antigravity.google/download and make sure agy is on PATH",
+      "antigravity-self": "Antigravity checks for and installs new versions itself",
     },
   },
 )

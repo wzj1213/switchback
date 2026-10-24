@@ -144,10 +144,15 @@
 <path class="door" d="M704,281 C734,281 718,381 748,381"/>
 <circle cx="748" cy="381" r="3" class="dot"/>
 <rect x="748" y="414" width="216" height="46" rx="9" class="box"/>
-<text x="762" y="434" class="h">Any ACP agent</text>
-<text x="762" y="450" class="c mono">from the ACP registry</text>
+<text x="762" y="434" class="h">Antigravity</text>
+<text x="762" y="450" class="c mono">agy stream-json per turn</text>
 <path class="door" d="M704,281 C734,281 718,437 748,437"/>
 <circle cx="748" cy="437" r="3" class="dot"/>
+<rect x="748" y="470" width="216" height="46" rx="9" class="box"/>
+<text x="762" y="490" class="h">Any ACP agent</text>
+<text x="762" y="506" class="c mono">from the ACP registry</text>
+<path class="door" d="M704,281 C734,281 718,493 748,493"/>
+<circle cx="748" cy="493" r="3" class="dot"/>
 <circle cx="704" cy="281" r="3.5" class="dot"/>
 <rect x="40" y="548" width="330" height="72" rx="10" class="ground"/>
 <text x="56" y="574" class="h">Your workspace</text>
@@ -161,7 +166,7 @@
 <text x="568" y="541" class="c">writes the event log</text>
 <path class="wire" d="M330,524 V536 H220 V548"/>
 <text x="338" y="541" class="c">reads git</text>
-<path class="wire" d="M856,470 V630 H120 V620"/>
+<path class="wire" d="M856,526 V630 H120 V620"/>
 <rect x="716" y="623" width="128" height="14" rx="3" class="paper"/>
 <text x="780" y="634" class="c" text-anchor="middle">engines edit files</text>
 </svg>

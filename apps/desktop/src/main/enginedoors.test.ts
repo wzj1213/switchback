@@ -11,8 +11,9 @@ describe("各家自己的设置在哪儿", () => {
   it("**没有工作区时不列项目级的那几份**——那时它们无处可指", async () => {
     const doors = await engineDoors(undefined)
     expect(doors.every((d) => d.scope !== "project")).toBe(true)
-    // 五家的用户级配置都要在
+    // 内置引擎的用户级配置都要在
     expect([...new Set(doors.map((d) => d.id))].sort()).toEqual([
+      "antigravity",
       "claude",
       "codex",
       "dsh",
