@@ -116,7 +116,7 @@ export function createRelay(deps: RelayDeps): Relay {
             else deps.log.write("info", "remote", `${target.name} 的旧订阅失效，但它已经换过一条新的，留着`)
             return
           }
-          const why = result.reason === undefined ? "" : `（${result.reason}）`
+          const why = result.reason === undefined ? "" : `（${result.reason}）` // i18n-ok：只拼给下面的日志
           deps.log.write("warn", "remote", `推给 ${target.name} 失败：HTTP ${String(result.status)}${why}`)
         })
       }

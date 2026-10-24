@@ -60,7 +60,7 @@ const CASES: readonly {
 describe("远程可调的通道", () => {
   for (const one of CASES) {
     it(one.label, () => {
-      const verdict = judgeCall(one.method, one.arg, one.caller)
+      const verdict = judgeCall(one.method, one.arg, one.caller, "zh-CN")
       if (one.refused === undefined) {
         expect(verdict).toEqual({ ok: true })
         return
@@ -69,6 +69,13 @@ describe("远程可调的通道", () => {
       expect(verdict.ok ? "" : verdict.reason).toContain(one.refused)
     })
   }
+
+  it("宿主是英文界面时拒的理由也说英文，设置名用人能看懂的那个", () => {
+    const verdict = judgeCall("switchback:settings", { remote: {}, brandNew: 1 }, desk, "en")
+    expect(verdict.ok ? "" : verdict.reason).toBe(
+      "“Remote access”, “brandNew” can only be changed on the host machine. Remotely you can only change interface preferences",
+    )
+  })
 
   it("白名单里的通道名都带 `switchback:` 前缀——写错一个字就是一条永远调不通的通道", () => {
     for (const name of Object.keys(EXPOSED)) expect(name.startsWith("switchback:")).toBe(true)

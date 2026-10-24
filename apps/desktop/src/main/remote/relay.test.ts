@@ -102,7 +102,7 @@ function tokensWith(devices: { id: string; name: string; push: PushSubscription 
     startPairing: () => ({ code: "X", expiresAt: 0, kind: "phone" }),
     pending: () => undefined,
     cancelPairing: () => undefined,
-    claim: () => ({ ok: false, reason: "不用" }),
+    claim: () => ({ ok: false, reason: "wrong-code" }),
     verify: () => undefined,
     get: () => undefined,
     setTrust: () => false,

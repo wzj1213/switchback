@@ -4,6 +4,7 @@ import type { Trust } from "@switchback/protocol"
 import type { Locale } from "@switchback/i18n"
 import { kindOf, trustOf } from "./calls.js"
 import type { TokenStore } from "./tokens.js"
+import { REMOTE_API } from "./api.messages.js"
 
 /**
  * 远程服务端那几条普通 HTTP 接口：配对、我是谁、推送订阅。
@@ -55,18 +56,19 @@ export function bearer(req: IncomingMessage): string {
 }
 
 export async function handlePair(deps: ApiDeps, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const m = REMOTE_API[deps.language()]
   const body = await readBody(req)
   if (body === undefined) {
-    json(res, 413, { error: "请求体过大" })
+    json(res, 413, { error: m.tooLarge })
     return
   }
   const parsed = safeParse(body)
   const code = typeof parsed?.["code"] === "string" ? parsed["code"] : ""
   const name = typeof parsed?.["name"] === "string" ? parsed["name"] : ""
-  const claimed = deps.tokens.claim(code, name)
+  const claimed = deps.tokens.claim(code, name.trim() === "" ? m.unnamed : name)
   if (!claimed.ok) {
     deps.log("warn", `配对失败：${claimed.reason}`)
-    json(res, 403, { error: claimed.reason })
+    json(res, 403, { error: m.refused[claimed.reason] })
     return
   }
   deps.log("info", `新设备配对成功：${claimed.device.name}（${claimed.device.id}）`)
@@ -87,7 +89,7 @@ export async function handleSubscribe(deps: ApiDeps, req: IncomingMessage, res: 
   }
   const body = await readBody(req)
   if (body === undefined) {
-    json(res, 413, { error: "请求体过大" })
+    json(res, 413, { error: REMOTE_API[deps.language()].tooLarge })
     return
   }
   const parsed = safeParse(body ?? "")
@@ -102,7 +104,7 @@ export async function handleSubscribe(deps: ApiDeps, req: IncomingMessage, res: 
   const p256dh = parsed["p256dh"]
   const auth = parsed["auth"]
   if (typeof endpoint !== "string" || typeof p256dh !== "string" || typeof auth !== "string") {
-    json(res, 400, { error: "订阅的形状不对" })
+    json(res, 400, { error: REMOTE_API[deps.language()].badSubscription })
     return
   }
   deps.tokens.setPush(device.id, { endpoint, p256dh, auth })

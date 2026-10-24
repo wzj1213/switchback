@@ -12,6 +12,7 @@ import { checkRequest, headersOf } from "./fence.js"
 import { createSession } from "./session.js"
 import { serveStatic } from "./static.js"
 import type { DeviceKind, TokenStore } from "./tokens.js"
+import { REMOTE_SERVER } from "./server.messages.js"
 
 /**
  * 远程服务端。
@@ -100,19 +101,17 @@ function protocolToken(req: IncomingMessage): string {
 }
 
 /** 被闸门拦下时给人的那句话。**指向要改的那一栏**，而不是只说「被拒了」。 */
-const FENCE_HINT = "在那台 Mac 上打开 Switchback → 设置 → 远程访问，把「隧道那头的域名」填成你现在地址栏里的 host[:端口]（不要带 https://）"
-
 function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) => void {
   const api: ApiDeps = { tokens: deps.tokens, maxTrust: () => deps.config().maxTrust, language: deps.language, log: deps.log }
   return (req, res) => {
-    const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts)
+    const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts, deps.language())
     if (!verdict.ok) {
       deps.log("warn", `拦下一个请求：${verdict.reason}`)
       // **把理由说出来。** 之前这里只回一个 `{"error":"forbidden"}`——
       // 而人在手机上看到的就是「Forbidden」四个字母，没有任何线索指向
       // 「桌面那台上域名那一栏填错了」。这段话不泄露任何东西：
       // 对面已经知道自己被拦了，也已经知道自己用的是哪个 Host
-      json(res, 403, { error: "forbidden", reason: verdict.reason, hint: FENCE_HINT })
+      json(res, 403, { error: "forbidden", reason: verdict.reason, hint: REMOTE_SERVER[deps.language()].fenceHint })
       return
     }
     const path = (req.url ?? "/").split("?")[0] ?? "/"
@@ -142,7 +141,7 @@ function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) =>
     }
     if (path === WS_PATH) {
       // 普通 GET 打到这条路径上：明说要升级，不退化成别的东西
-      json(res, 426, { error: "这条路径只接受 WebSocket 升级" })
+      json(res, 426, { error: REMOTE_SERVER[deps.language()].wsOnly })
       return
     }
     if (serveDesk(deps, { path, res, req })) return
@@ -225,10 +224,12 @@ function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
         tokens: deps.tokens,
         defaultTrust: () => deps.config().maxTrust,
         ...(deps.channel === undefined ? {} : { find: deps.channel }),
+        language: deps.language,
         log: deps.log,
       },
       deviceId,
     ),
+    language: deps.language,
     log: deps.log,
   })
   const detach = deps.sinks.add(session.sink)
@@ -274,7 +275,7 @@ function attachSocket({ deps, ws, id, live, deviceId }: Attach): void {
 
 function upgrade(deps: RemoteDeps, wss: WebSocketServer, counter: { n: number }, live: Map<string, Set<WebSocket>>) {
   return (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
-    const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts)
+    const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts, deps.language())
     if (!verdict.ok) {
       deps.log("warn", `拦下一次升级：${verdict.reason}`)
       reject(socket, 403, "Forbidden")

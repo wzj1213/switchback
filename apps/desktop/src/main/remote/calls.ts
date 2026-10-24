@@ -4,6 +4,8 @@ import type { Handler } from "../channels.js"
 import { judgeCall } from "./exposure.js"
 import type { CallOutcome } from "./session-calls.js"
 import type { Device, DeviceKind, TokenStore } from "./tokens.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { REMOTE_CALLER } from "./calls.messages.js"
 
 /**
  * 一台设备发来的调用，在宿主这侧怎么落地：**现查记录 → 判 → 找处理函数 → 调**。
@@ -18,6 +20,8 @@ export interface CallerDeps {
   defaultTrust: () => Trust
   /** 按名字找处理函数（`main/channels.ts`）。没给 = 这台宿主不接受任何调用。 */
   find?: (name: string) => Handler | undefined
+  /** 宿主的界面语言：拒的理由照它说。缺省＝默认的中文。 */
+  language?: () => Locale
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -49,16 +53,17 @@ export function unpackBytes(arg: unknown): unknown {
 /** 给一台设备造它的 `call`。 */
 export function callFor(deps: CallerDeps, deviceId: string): (method: string, arg: unknown) => Promise<CallOutcome> {
   return async (method, arg) => {
+    const locale = deps.language?.() ?? DEFAULT_LOCALE
     const device = deps.tokens.get(deviceId)
-    if (device === undefined) return { ok: false, reason: "这台设备已经被吊销" }
-    const verdict = judgeCall(method, arg, { kind: kindOf(device), maxTrust: trustOf(device, deps.defaultTrust()) })
+    if (device === undefined) return { ok: false, reason: REMOTE_CALLER[locale].revoked }
+    const verdict = judgeCall(method, arg, { kind: kindOf(device), maxTrust: trustOf(device, deps.defaultTrust()) }, locale)
     if (!verdict.ok) {
       deps.log("info", `${device.name} 调 ${method} 被拒：${verdict.reason}`)
       return verdict
     }
     const handler = deps.find?.(method)
     // 白名单里有、表上却没有：宿主自己漏挂了（见 `main/index.ts` 启动时那条自查）
-    if (handler === undefined) return { ok: false, reason: `那台机器上没有挂这条通道（${method}）` }
+    if (handler === undefined) return { ok: false, reason: REMOTE_CALLER[locale].noChannel(method) }
     return { ok: true, value: await handler(unpackBytes(arg)) }
   }
 }

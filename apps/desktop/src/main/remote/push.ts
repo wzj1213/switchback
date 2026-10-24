@@ -122,6 +122,7 @@ export function encrypt(
   // service worker 那侧 `JSON.parse` 抛——通知同样不响，而排查时
   // 看到的是「推送服务返回 201」，一切正常的样子。裁要在**组 JSON 之前**裁文字
   //（见 `relay.ts`），这一条是最后一道明确的失败
+  // i18n-ok：推送发不出去只记日志，不上界面
   if (raw.length > MAX_PAYLOAD) throw new Error(`推送载荷 ${String(raw.length)} 字节，超过一条记录的 ${String(MAX_PAYLOAD)}`)
   const plaintext = Buffer.concat([raw, Buffer.from([2])])
   const cipher = createCipheriv("aes-128-gcm", cek, nonce)

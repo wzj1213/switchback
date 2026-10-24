@@ -1,5 +1,7 @@
 import type { Trust } from "@switchback/protocol"
 import type { DeviceKind } from "./tokens.js"
+import type { Locale } from "@switchback/i18n"
+import { REMOTE_EXPOSURE } from "./exposure.messages.js"
 
 /**
  * 远程模式里，另一台电脑上的桌面界面**能调哪几条宿主通道**（`docs/远程模式方案.md` §2.2）。
@@ -77,19 +79,6 @@ export const PREF_KEYS: ReadonlySet<string> = new Set([
   "petKit",
 ])
 
-/** 拒的时候人能看懂的名字。没列到的键照原样说——总比一句「有些键不行」强。 */
-const KEY_LABELS: Readonly<Record<string, string>> = {
-  theme: "主题（它改的是那台机器上的窗口；这边的明暗跟着这台电脑的系统走）",
-  remote: "远程访问",
-  egressStop: "外发守卫",
-  zcodeLock: "ZCode 快照锁",
-  disabledEngines: "停用的引擎",
-  defaultTrust: "默认档位",
-  dsh: "DSH",
-  notify: "通知",
-  handoffBrief: "换引擎自动交接",
-}
-
 export interface Caller {
   kind: DeviceKind
   /** 这台设备**现在**的上限（设备自己的，缺省时是全局那条）。 */
@@ -105,14 +94,15 @@ const refuse = (reason: string): Verdict => ({ ok: false, reason })
  * 放行一半等于让界面以为全写进去了——它拿回去的那份完整设置里，被丢掉的那几项还是旧值，
  * 而界面上的开关已经拨过去了。
  */
-function judgeSettings(patch: unknown): Verdict {
+function judgeSettings(patch: unknown, m: (typeof REMOTE_EXPOSURE)[Locale]): Verdict {
   if (typeof patch !== "object" || patch === null || Array.isArray(patch)) {
-    return refuse("设置的写入要一个对象")
+    return refuse(m.notObject)
   }
   const blocked = Object.keys(patch).filter((key) => !PREF_KEYS.has(key))
   if (blocked.length === 0) return { ok: true }
-  const names = blocked.map((key) => KEY_LABELS[key] ?? key).join("、")
-  return refuse(`「${names}」只能在那台机器上改，远程只能改界面偏好`)
+  // 拒的时候说人能看懂的名字；没列到的键照原样说——总比一句「有些键不行」强
+  const labels: Readonly<Record<string, string>> = m.keys
+  return refuse(m.hostOnly(blocked.map((key) => (Object.hasOwn(labels, key) ? labels[key] : undefined) ?? key)))
 }
 
 /**
@@ -121,15 +111,16 @@ function judgeSettings(patch: unknown): Verdict {
  * **查表必须查自有属性**：`EXPOSED["__proto__"]` 拿到的是 `Object.prototype`——
  * 一个真值（`policy.ts` 的 `shapeOf` 踩过同一个坑）。
  */
-export function judgeCall(method: string, arg: unknown, caller: Caller): Verdict {
+export function judgeCall(method: string, arg: unknown, caller: Caller, locale: Locale): Verdict {
+  const m = REMOTE_EXPOSURE[locale]
   if (caller.kind !== "desk") {
-    return refuse("这台设备是按手机配对的，只能看住与放行；要完整界面，在那台机器上按「电脑」重新配对")
+    return refuse(m.phone)
   }
   const rule = Object.hasOwn(EXPOSED, method) ? EXPOSED[method] : undefined
-  if (rule === undefined) return refuse(`这一项只能在那台机器上做（${method}）`)
-  if (method === "switchback:settings" && arg !== undefined) return judgeSettings(arg)
+  if (rule === undefined) return refuse(m.hostOnlyCall(method))
+  if (method === "switchback:settings" && arg !== undefined) return judgeSettings(arg, m)
   if (rule === "write" && caller.maxTrust === "read-only") {
-    return refuse("这台设备的远程上限是只读，改不了那台机器上的文件")
+    return refuse(m.readOnly)
   }
   return { ok: true }
 }

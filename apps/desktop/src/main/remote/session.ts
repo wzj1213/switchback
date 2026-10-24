@@ -3,6 +3,8 @@ import { encodeFrame, type ClientFrame, type Ledger, type ServerFrame } from "@s
 import type { Sink, SinkMessage } from "../sink.js"
 import { clamp, isCommand } from "./policy.js"
 import { createCalls, type CallOutcome, type Calls } from "./session-calls.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { REMOTE_SESSION } from "./session.messages.js"
 
 /**
  * 一条连上来的远程客户端。
@@ -43,8 +45,12 @@ export interface SessionDeps {
    * 见 `remote/exposure.ts`。缺省 = 这条连接不支持调用，每条都回「不支持」。
    */
   call?: (method: string, arg: unknown) => Promise<CallOutcome>
+  /** 宿主的界面语言：回给这条连接的提示照它说。缺省＝默认的中文。 */
+  language?: () => Locale
   log: (level: "info" | "warn" | "error", message: string) => void
 }
+
+const say = (deps: SessionDeps): (typeof REMOTE_SESSION)[Locale] => REMOTE_SESSION[deps.language?.() ?? DEFAULT_LOCALE]
 
 export interface RemoteSession {
   sink: Sink
@@ -121,11 +127,11 @@ function writer(deps: SessionDeps, state: State): (frame: ServerFrame) => void {
       // **一条调用的结果太大，只让那一条失败。** 走下面的 `reset` 会让客户端把整份
       // 全量重拉一遍——为一份打不开的补丁付一次最贵的重建，而那份补丁照样还是打不开
       if (frame.type === "result") {
-        write({ type: "result", id: frame.id, ok: false, reason: "结果太大，远程传不过来——这一项去那台机器上看" })
+        write({ type: "result", id: frame.id, ok: false, reason: say(deps).resultTooBig })
         return
       }
       if (frame.type !== "reset") {
-        write({ type: "reset", reason: "这台机器上的历史太长，手机端暂时装不下——先在桌面上删掉几条旧会话" })
+        write({ type: "reset", reason: say(deps).historyTooBig })
       }
       return
     }
@@ -156,7 +162,7 @@ function hello(ctx: Ctx, after: number | undefined, epoch: string | undefined): 
   if (resumable) ctx.deps.log("info", `${ctx.deps.id} 停在 ${String(after)}，续不上或补不动，转全量重建`)
   void ctx.deps.replay(ctx.sink).catch((error: unknown) => {
     ctx.deps.log("error", `${ctx.deps.id} 全量重建失败：${String(error)}`)
-    ctx.write({ type: "reset", reason: "全量重建失败，请重连" })
+    ctx.write({ type: "reset", reason: say(ctx.deps).replayFailed })
     // 全量没出去，但也别把补正文永久卡在闸后面——客户端接到 reset 会重连，
     // 而在那之前挂着的那些 promise 该有个了结
     release(ctx.state)
@@ -173,14 +179,14 @@ function resync(ctx: Ctx, after: number, epoch: string): void {
   const missed = ctx.deps.ledger.since(after, epoch)
   if (missed === undefined) {
     ctx.deps.log("warn", `${ctx.deps.id} 停在 ${String(after)}，补不了，让它重新握手`)
-    ctx.write({ type: "reset", reason: "缺口太老，补不回来了" })
+    ctx.write({ type: "reset", reason: say(ctx.deps).gapTooOld })
     return
   }
   // **补得动才补。** 见 `TOO_MUCH_TO_CATCH_UP`：补不动时反复要同一帧
   // 是个不会自己好的死循环，而走全量那条路已经封了顶
   if (tooMuch(missed)) {
     ctx.deps.log("warn", `${ctx.deps.id} 停在 ${String(after)}，这一段太大补不动，让它走全量`)
-    ctx.write({ type: "reset", reason: "断开太久了，重新拉一份" })
+    ctx.write({ type: "reset", reason: say(ctx.deps).awayTooLong })
     return
   }
   ctx.write({ type: "catchup", sealed: missed })
@@ -196,10 +202,10 @@ function resync(ctx: Ctx, after: number, epoch: string): void {
 function command(ctx: Ctx, raw: unknown): void {
   if (!isCommand(raw)) {
     ctx.deps.log("warn", `${ctx.deps.id} 发来一条认不出的命令，已丢弃`)
-    ctx.write({ type: "notice", text: "这条命令的形状 Switchback 认不出来，没有执行" })
+    ctx.write({ type: "notice", text: say(ctx.deps).unknownCommand })
     return
   }
-  const verdict = clamp(raw, ctx.deps.ceiling(), ctx.deps.trustOf)
+  const verdict = clamp(raw, ctx.deps.ceiling(), ctx.deps.trustOf, ctx.deps.language?.())
   if (verdict.command === undefined) {
     ctx.deps.log("warn", `${ctx.deps.id} 被拒：${verdict.note}`)
     // 被拒的是一句话就原样还回去：发出去那一刻手机已经清了输入框
@@ -356,7 +362,12 @@ export function createSession(deps: SessionDeps): RemoteSession {
     watching: () => state.watching,
   }
 
-  const calls = createCalls({ ...(deps.call === undefined ? {} : { call: deps.call }), write, log: deps.log })
+  const calls = createCalls({
+    ...(deps.call === undefined ? {} : { call: deps.call }),
+    ...(deps.language === undefined ? {} : { language: deps.language }),
+    write,
+    log: deps.log,
+  })
   const ctx: Ctx = { deps, state, write, sink, calls }
 
   return {

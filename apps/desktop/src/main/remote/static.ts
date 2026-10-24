@@ -132,12 +132,12 @@ export async function serveStatic(
   const target = safeJoin(root, urlPath === "/" ? "/index.html" : urlPath)
   if (target === undefined) {
     res.writeHead(400).end("bad path")
-    return { ok: false, reason: `路径越界：${urlPath}` }
+    return { ok: false, reason: `路径越界：${urlPath}` } // i18n-ok：只进日志（见 server.ts）
   }
   const file = (await isFile(target)) ? target : await fallback(root, urlPath)
   if (file === undefined) {
     res.writeHead(404).end("not found")
-    return { ok: false, reason: `找不到：${urlPath}` }
+    return { ok: false, reason: `找不到：${urlPath}` } // i18n-ok：同上
   }
   // **ETag 是兜底。** 上面那条判据再漏一类，最坏也只是退化成 304 而不是全量重传。
   // 用 mtime+size 而不是内容哈希：`stat` 已经拿到了，不必为此把文件读一遍

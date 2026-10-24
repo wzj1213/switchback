@@ -70,7 +70,10 @@ const LOCKOUT_MS = 60_000
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 const CODE_LEN = 8
 
-export type ClaimResult = { ok: true; token: string; device: Device } | { ok: false; reason: string }
+/** 配对没成的两种情况。说法在配对接口那一层（`api.messages.ts`），这里只报是哪一种。 */
+export type ClaimRefusal = "wrong-code" | "locked"
+
+export type ClaimResult = { ok: true; token: string; device: Device } | { ok: false; reason: ClaimRefusal }
 
 export interface Pairing {
   code: string
@@ -86,7 +89,7 @@ export interface TokenStore {
   pending: () => Pairing | undefined
   /** 取消当前配对。 */
   cancelPairing: () => void
-  /** 用配对码换一个长期令牌。 */
+  /** 用配对码换一个长期令牌。名字空着的占位由调用方按界面语言给，这里只截长。 */
   claim: (code: string, name: string) => ClaimResult
   /** 校验令牌，顺带记一次「最后见到」。认不出返回 undefined。 */
   verify: (token: string) => Device | undefined
@@ -145,14 +148,14 @@ function noteFailure(state: State, now: number): ClaimResult {
     state.lockedUntil = now + LOCKOUT_MS
     state.failures = 0
   }
-  return { ok: false, reason: "配对码不对或已过期" }
+  return { ok: false, reason: "wrong-code" }
 }
 
 function mint(state: State, who: { name: string; kind: DeviceKind }, now: number, flush: () => void): ClaimResult {
   const token = randomBytes(32).toString("base64url")
   const device: Device = {
     id: randomBytes(8).toString("hex"),
-    name: who.name.trim().slice(0, 60) || "未命名设备",
+    name: who.name.trim().slice(0, 60),
     hash: hashOf(token),
     createdAt: now,
     lastSeenAt: now,
@@ -229,7 +232,7 @@ export function createTokenStore(deps: TokenDeps): TokenStore {
 
   const claim = (code: string, name: string): ClaimResult => {
     const now = deps.now()
-    if (now < state.lockedUntil) return { ok: false, reason: "配对码试错太多次，先等一分钟" }
+    if (now < state.lockedUntil) return { ok: false, reason: "locked" }
     const pairing = livePairing()
     // **码不对和没在配对，回同一句话**——分开说等于告诉对方「现在有码可试」
     if (pairing === undefined || !constantEqual(code.trim().toUpperCase(), pairing.code)) {

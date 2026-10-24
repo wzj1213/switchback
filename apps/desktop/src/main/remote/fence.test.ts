@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest"
 import { assertTrustedAuthority, checkRequest, headersOf, isLoopbackHostname } from "./fence.js"
 
 const ask = (headers: Record<string, string>, trusted: readonly string[] = []): boolean =>
-  checkRequest(headersOf(headers), trusted).ok
+  checkRequest(headersOf(headers), trusted, "zh-CN").ok
 
 const why = (headers: Record<string, string>, trusted: readonly string[] = []): string => {
-  const verdict = checkRequest(headersOf(headers), trusted)
+  const verdict = checkRequest(headersOf(headers), trusted, "zh-CN")
   return verdict.ok ? "" : verdict.reason
 }
 
@@ -101,7 +101,7 @@ describe("配置项校验：打错了要大声失败", () => {
   it("裸 authority 通过", () => {
     for (const entry of ["switchback.example.com", "switchback.example.com:8443", "198.51.100.9:8080"]) {
       expect(() => {
-        assertTrustedAuthority(entry)
+        assertTrustedAuthority(entry, "zh-CN")
       }).not.toThrow()
     }
   })
@@ -119,7 +119,7 @@ describe("配置项校验：打错了要大声失败", () => {
   for (const [why_, entry] of bad) {
     it(`拒：${why_}（${JSON.stringify(entry)}）`, () => {
       expect(() => {
-        assertTrustedAuthority(entry)
+        assertTrustedAuthority(entry, "zh-CN")
       }).toThrow()
     })
   }

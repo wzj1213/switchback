@@ -221,7 +221,10 @@ describe("配对", () => {
       body: JSON.stringify({ code: "ZZZZZZZZ", name: "坏人" }),
     })
     expect(res.status).toBe(403)
-    expect(await res.json()).not.toHaveProperty("token")
+    const body = (await res.json()) as Record<string, unknown>
+    expect(body).not.toHaveProperty("token")
+    // 配对页把 `error` 原样显示：照宿主的语言说（这套宿主是英文）
+    expect(body["error"]).toBe("The pairing code is wrong or has expired")
   })
 
   it("没有令牌时 `/api/me` 是 401", async () => {
@@ -347,8 +350,9 @@ describe("被闸门拦下时说得出为什么", () => {
     // `fetch` 改不了 Host，走裸 http
     const body = await rawBody(h.server.port(), "/api/me", { host: "someone-else.example.com" })
     expect(body).toContain("trustedHosts")
-    expect(body).toContain("远程访问")
-    expect(body).toContain("不要带 https://")
+    // 这套宿主报的是英文（见上面的 `language`），提示就照英文说
+    expect(body).toContain("Remote access")
+    expect(body).toContain("without https://")
   })
 })
 

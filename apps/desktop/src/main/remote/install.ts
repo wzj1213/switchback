@@ -213,7 +213,7 @@ async function syncOnce(
     // 手机上全部 403，而面板上写着「在听 127.0.0.1:17800」，一个红字都没有。
     state.error = undefined
     try {
-      for (const entry of remote.trustedHosts) assertTrustedAuthority(entry)
+      for (const entry of remote.trustedHosts) assertTrustedAuthority(entry, deps.settings().language)
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error)
       deps.log.write("error", "remote", `trustedHosts 配置有问题：${state.error}`)

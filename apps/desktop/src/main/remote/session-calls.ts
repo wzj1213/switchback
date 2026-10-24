@@ -1,4 +1,6 @@
 import type { CallResult, ClientFrame, ServerFrame } from "@switchback/wire"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { REMOTE_CALLS } from "./session-calls.messages.js"
 
 /**
  * 一条连接上的 `call` → `result`（远程模式，见 `docs/远程模式方案.md`）。
@@ -29,6 +31,8 @@ export interface CallsDeps {
    */
   call?: (method: string, arg: unknown) => Promise<CallOutcome>
   write: (frame: ServerFrame) => void
+  /** 回给对端的理由用哪种语言。缺省＝默认的中文。 */
+  language?: () => Locale
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -42,12 +46,13 @@ function idOf(value: unknown): number | undefined {
 }
 
 /** 出错时给人看的那句话。**不带栈**：栈里是宿主上的路径，远程那端用不着，也不该拿到。 */
-function reasonOf(error: unknown): string {
-  return error instanceof Error && error.message !== "" ? error.message : "宿主执行这一条时出错了"
+function reasonOf(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message !== "" ? error.message : fallback
 }
 
 export function createCalls(deps: CallsDeps): Calls {
   const state = { inFlight: 0 }
+  const say = (): (typeof REMOTE_CALLS)[Locale] => REMOTE_CALLS[deps.language?.() ?? DEFAULT_LOCALE]
 
   const answer = (id: number, outcome: CallOutcome): void => {
     const frame: CallResult = outcome.ok
@@ -61,7 +66,7 @@ export function createCalls(deps: CallsDeps): Calls {
     void call(method, arg)
       .catch((error: unknown): CallOutcome => {
         deps.log("warn", `调用 ${method} 出错：${String(error)}`)
-        return { ok: false, reason: reasonOf(error) }
+        return { ok: false, reason: reasonOf(error, say().failed) }
       })
       .then((outcome) => {
         state.inFlight -= 1
@@ -78,15 +83,15 @@ export function createCalls(deps: CallsDeps): Calls {
         return
       }
       if (typeof frame.method !== "string" || frame.method === "") {
-        answer(id, { ok: false, reason: "调用没写要调哪条通道" })
+        answer(id, { ok: false, reason: say().noMethod })
         return
       }
       if (deps.call === undefined) {
-        answer(id, { ok: false, reason: "这条连接不支持调用宿主通道" })
+        answer(id, { ok: false, reason: say().unsupported })
         return
       }
       if (state.inFlight >= MAX_IN_FLIGHT) {
-        answer(id, { ok: false, reason: `同时在途的调用超过 ${String(MAX_IN_FLIGHT)} 条，这一条没有执行` })
+        answer(id, { ok: false, reason: say().tooMany(MAX_IN_FLIGHT) })
         return
       }
       run(id, frame.method, frame.arg, deps.call)

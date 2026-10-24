@@ -82,7 +82,7 @@ describe("试错限速", () => {
     for (let i = 0; i < 10; i += 1) tokens.claim("ZZZZZZZZ", "x")
     const locked = tokens.claim(code, "对的码")
     expect(locked.ok).toBe(false)
-    expect(locked.ok === false ? locked.reason : "").toContain("等一分钟")
+    expect(locked.ok === false ? locked.reason : "").toBe("locked")
     tick(60_000)
     expect(tokens.claim(code, "过了锁定期").ok).toBe(true)
   })
@@ -136,10 +136,10 @@ describe("设备令牌", () => {
     expect(tokens.verify(token)?.lastSeenAt).toBe(1_000 + 90_000)
   })
 
-  it("名字空着时给个占位，过长截断", () => {
+  it("名字空着就记空（占位由配对接口按界面语言给），过长截断", () => {
     const { tokens } = store()
     pair(tokens, "   ")
-    expect(tokens.list()[0]?.name).toBe("未命名设备")
+    expect(tokens.list()[0]?.name).toBe("")
     pair(tokens, "长".repeat(200))
     expect(tokens.list()[1]?.name).toHaveLength(60)
   })

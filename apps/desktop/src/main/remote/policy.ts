@@ -1,4 +1,8 @@
 import type { Command, RememberScope, Trust } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { REMOTE_POLICY } from "./policy.messages.js"
+
+type Text = (typeof REMOTE_POLICY)[Locale]
 
 /**
  * 远程客户端能做什么。**这台机器上跑着一个有写和执行权限的 agent**，
@@ -37,9 +41,9 @@ export type Clamped =
   | { command: Command; note?: string }
   | { command?: undefined; refused: true; note: string }
 
-function clampScope(scope: RememberScope, ceiling: Trust): { scope: RememberScope; note?: string } {
+function clampScope(scope: RememberScope, ceiling: Trust, m: Text): { scope: RememberScope; note?: string } {
   if (ceiling === "full" || scope !== "project") return { scope }
-  return { scope: "session", note: "远程批准只记到本会话；要记成项目级规则请在桌面上勾" }
+  return { scope: "session", note: m.sessionOnly }
 }
 
 /**
@@ -89,24 +93,30 @@ const ON_HISTORY: ReadonlySet<string> = new Set(["thread.prompt", "thread.switch
  * @param trustOf 目标会话现在是哪一档：活会话按它现在的档，历史会话按记录里那一档。
  *   查不到的是册上没有的会话——宿主自己会拒，会被宿主按记录照做的那几条在这里先挡（`ON_HISTORY`）。
  */
-export function clamp(command: Command, ceiling: Trust, trustOf?: (id: string) => Trust | undefined): Clamped {
+export function clamp(
+  command: Command,
+  ceiling: Trust,
+  trustOf?: (id: string) => Trust | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+): Clamped {
+  const m = REMOTE_POLICY[locale]
   const target = "threadId" in command ? trustOf?.(command.threadId) : undefined
   if (target === undefined && ceiling !== "full" && ON_HISTORY.has(command.type)) {
     return {
       refused: true,
-      note: "远程查不到这条会话开在哪一档（可能已经删了），这一下没有执行。",
+      note: m.unknownTrust,
     }
   }
   if (target !== undefined && RUNS_IN_THREAD.has(command.type) && RANK[target] > RANK[ceiling]) {
     return {
       refused: true,
-      note: `这条会话开在 ${target} 档，高过远程上限 ${ceiling}。先在手机上把它切到 ${ceiling}（切低是允许的），或者在桌面上调高远程上限。`,
+      note: m.aboveLimit(target, ceiling),
     }
   }
-  return clampTrust(command, ceiling)
+  return clampTrust(command, ceiling, m)
 }
 
-function clampTrust(command: Command, ceiling: Trust): Clamped {
+function clampTrust(command: Command, ceiling: Trust, m: Text): Clamped {
   if (command.type === "thread.adopt") {
     // **接管没有档位可钳。** `@switchback/host` 的 `adopt` 把 trust 写死成 `auto-edit`
     //（它不猜那条会话原本在引擎里是什么档，猜错的方向如果是放宽就麻烦了）。
@@ -114,7 +124,7 @@ function clampTrust(command: Command, ceiling: Trust): Clamped {
     // 命令里也没有 trust 字段可改，所以只能整条挡下——
     // **钳不动的东西必须拒，不能放过去**。
     if (ceiling === "read-only") {
-      return { refused: true, note: "远程上限是只读，而接管过来的会话固定开在自动审批档，所以这一步只能在桌面上做" }
+      return { refused: true, note: m.adoptReadOnly }
     }
     return { command }
   }
@@ -122,16 +132,16 @@ function clampTrust(command: Command, ceiling: Trust): Clamped {
     const trust = lower(command.trust, ceiling)
     return trust === command.trust
       ? { command }
-      : { command: { ...command, trust }, note: `远程新建的会话按 ${trust} 开（上限）` }
+      : { command: { ...command, trust }, note: m.createdAt(trust) }
   }
   if (command.type === "thread.setTrust") {
     const trust = lower(command.trust, ceiling)
     return trust === command.trust
       ? { command }
-      : { command: { ...command, trust }, note: `远程最高只能切到 ${trust}` }
+      : { command: { ...command, trust }, note: m.cappedAt(trust) }
   }
   if (command.type === "approval.resolve") {
-    const { scope, note } = clampScope(command.remember, ceiling)
+    const { scope, note } = clampScope(command.remember, ceiling, m)
     return scope === command.remember ? { command } : { command: { ...command, remember: scope }, ...(note === undefined ? {} : { note }) }
   }
   return { command }

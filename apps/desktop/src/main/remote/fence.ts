@@ -26,6 +26,9 @@
  *（`tokens.ts`）。两层都要过。
  */
 
+import type { Locale } from "@switchback/i18n"
+import { REMOTE_FENCE } from "./fence.messages.js"
+
 /** 请求里这一层要读的东西。Node 的 `IncomingHttpHeaders` 和 Fetch 的 `Headers` 都能喂进来。 */
 export interface FenceHeaders {
   get: (name: string) => string | undefined
@@ -80,10 +83,10 @@ function canonicalAuthority(entry: string, parsed: URL): string {
  * 而更坏的一类是**悄悄扩大授权**：`switchback.example.com/path` 会授权其中的主机名，
  * `switchback.example.com:` 这种悬空冒号会把「只信这个端口」放宽成「任意端口」。
  */
-export function assertTrustedAuthority(entry: string): void {
+export function assertTrustedAuthority(entry: string, locale: Locale): void {
   const parsed = parseAuthority(entry)
   if (parsed !== undefined && canonicalAuthority(entry, parsed) === entry.toLowerCase()) return
-  throw new Error(`remote: trustedHosts 里的 ${JSON.stringify(entry)} 不是一个裸 host[:port]`)
+  throw new Error(REMOTE_FENCE[locale].badEntry(JSON.stringify(entry)))
 }
 
 /**
@@ -110,23 +113,24 @@ export type FenceVerdict = { ok: true } | { ok: false; reason: string }
  * 这个请求能不能进。
  * @param trustedHosts 这次部署对外服务的非回环 authority。隧道那头的域名要写在这里。
  */
-export function checkRequest(headers: FenceHeaders, trustedHosts: readonly string[]): FenceVerdict {
+export function checkRequest(headers: FenceHeaders, trustedHosts: readonly string[], locale: Locale): FenceVerdict {
+  const m = REMOTE_FENCE[locale]
   const host = headers.get("host")
-  if (host === undefined) return { ok: false, reason: "没有 Host 头" }
+  if (host === undefined) return { ok: false, reason: m.noHost }
   const parsed = parseAuthority(host)
-  if (parsed === undefined) return { ok: false, reason: `Host 解析不了：${host}` }
+  if (parsed === undefined) return { ok: false, reason: m.badHost(host) }
   if (!isLoopbackHostname(parsed.hostname) && !isTrustedAuthority(parsed, trustedHosts)) {
-    return { ok: false, reason: `Host 既不是回环也不在 trustedHosts 里：${host}` }
+    return { ok: false, reason: m.untrusted(host) }
   }
   // 现代浏览器会在每次 fetch 上标出发起方关系；明确标了跨站的一律拒，不看 Origin
-  if (headers.get("sec-fetch-site") === "cross-site") return { ok: false, reason: "标了 cross-site" }
+  if (headers.get("sec-fetch-site") === "cross-site") return { ok: false, reason: m.crossSite }
   // 带了 Origin 就必须**正好是这个 authority**。没带不算问题——上面的 Host 闸已经拦过一道。
   // 字面量 "null"（沙箱 iframe、file: 页面）是不透明来源，解析不出 host，照样拒
   const origin = headers.get("origin")
   if (origin === undefined) return { ok: true }
   try {
-    return new URL(origin).host === parsed.host ? { ok: true } : { ok: false, reason: `Origin 对不上：${origin}` }
+    return new URL(origin).host === parsed.host ? { ok: true } : { ok: false, reason: m.badOrigin(origin) }
   } catch {
-    return { ok: false, reason: `Origin 解析不了：${origin}` }
+    return { ok: false, reason: m.unreadableOrigin(origin) }
   }
 }
