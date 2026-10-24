@@ -16,7 +16,7 @@ export const TRANSCRIPT_BLANK = defineMessages(
   },
   {
     fetching: "Loading this thread…",
-    fetchingNote: "It lives on the other Mac and comes over when you open it.",
+    fetchingNote: "It lives on the host machine and comes over when you open it.",
     resume: "Pick up where this left off",
     startBefore: "Start working in ",
     startAfter: "",

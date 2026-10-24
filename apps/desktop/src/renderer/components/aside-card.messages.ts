@@ -17,7 +17,7 @@ export const ASIDE_CARD = defineMessages(
     unknown: "Status unknown",
     label: (title) => `Side question: ${title}`,
     tagWith: (state) => `Side question · ${state} · not in the main thread`,
-    opened: "Open in workbench",
+    opened: "Opened in workbench",
     view: "View in workbench",
   },
 )

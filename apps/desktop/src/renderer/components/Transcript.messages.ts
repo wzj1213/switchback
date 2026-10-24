@@ -9,7 +9,7 @@ export const TRANSCRIPT = defineMessages(
   },
   {
     region: (title) => `Conversation: ${title}`,
-    trimmed: "Earlier messages aren't loaded: this thread is too long, so remote access only brought the latest part. The full history is on the other Mac.",
+    trimmed: "Earlier messages aren't loaded: this thread is too long, so remote access only brought the latest part. The full history is on the host machine.",
     toBottom: "Jump to bottom",
   },
 )

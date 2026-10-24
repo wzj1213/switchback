@@ -31,7 +31,7 @@ export const SETTINGS_DATA = defineMessages(
   },
   {
     where: "Where things live",
-    whereHint: "All of Switchback's local data is in this one folder. To move to another Mac, take the whole folder.",
+    whereHint: "All of Switchback's local data is in this one folder. To move to another machine, take the whole folder.",
     dataDir: "Data folder",
     dataDirHint: "Preferences, thread history, approval rules, attachments, and logs all live here",
     threads: "Thread history",
