@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { ENGINES_FILE, type RegistrySource } from "./engines.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ENGINES_FILE_TEXT } from "./engines-file.messages.js"
 
 /**
  * 往 `engines.json` 里**写**的那几件事：加一条、换一条、删一条、第一次写样板。
@@ -10,7 +12,7 @@ import { ENGINES_FILE, type RegistrySource } from "./engines.js"
  *
  * ## 三条规矩
  *
- * 1. **读原文、只改一个键、原样写回。** `readEngineFile` 会把文件规范化（丢掉 `_说明`、
+ * 1. **读原文、只改一个键、原样写回。** `readEngineFile` 会把文件规范化（丢掉 `_说明` 这类注释键、
  *    丢掉不认识的字段），拿它的结果写回去等于把用户手写的东西一起删掉——
  *    用别人的配置文件当自己的数据结构用，是最容易背刺人的一种写法。
  * 2. **文件坏了就不写。** 不是 JSON、最外层不是对象：宁可让人自己去修，
@@ -37,7 +39,7 @@ export interface EntryInput {
 
 type Loaded = { ok: true; file: Record<string, unknown> } | { ok: false; error: string }
 
-function load(dir: string): Loaded {
+function load(dir: string, locale: Locale): Loaded {
   const path = join(dir, ENGINES_FILE)
   let text: string
   try {
@@ -50,10 +52,10 @@ function load(dir: string): Loaded {
   try {
     raw = JSON.parse(text)
   } catch {
-    return { ok: false, error: `${ENGINES_FILE} 现在不是合法的 JSON，Switchback 不敢往里写。请先自己打开修一下。` }
+    return { ok: false, error: ENGINES_FILE_TEXT[locale].badJson(ENGINES_FILE) }
   }
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: `${ENGINES_FILE} 的最外层不是一个对象，Switchback 不敢往里写。` }
+    return { ok: false, error: ENGINES_FILE_TEXT[locale].notObject(ENGINES_FILE) }
   }
   return { ok: true, file: raw as Record<string, unknown> }
 }
@@ -74,12 +76,10 @@ function shapeOf(entry: EntryInput): Record<string, unknown> {
 }
 
 /** 加一条。重名不覆盖——那可能是一条正在被会话使用的配置。 */
-export function addEngineEntry(dir: string, name: string, entry: EntryInput): AddResult {
-  const loaded = load(dir)
+export function addEngineEntry(dir: string, name: string, entry: EntryInput, locale: Locale = DEFAULT_LOCALE): AddResult {
+  const loaded = load(dir, locale)
   if (!loaded.ok) return { ok: false, error: loaded.error }
-  if (Object.hasOwn(loaded.file, name)) {
-    return { ok: false, error: `${ENGINES_FILE} 里已经有一条叫 \`${name}\` 的了。换个名字，或者先自己去改那一条。` }
-  }
+  if (Object.hasOwn(loaded.file, name)) return { ok: false, error: ENGINES_FILE_TEXT[locale].taken(ENGINES_FILE, name) }
   loaded.file[name] = shapeOf(entry)
   save(dir, loaded.file)
   return { ok: true, id: `acp:${name}` }
@@ -91,12 +91,12 @@ export function addEngineEntry(dir: string, name: string, entry: EntryInput): Ad
  * **那一条里 Switchback 不认识的字段原样留着**：人可能手加过 `compact` / `steer`，
  * 或者将来版本才认的键——升级不该把它们一起抹掉。
  */
-export function replaceEngineEntry(dir: string, name: string, entry: EntryInput): AddResult {
-  const loaded = load(dir)
+export function replaceEngineEntry(dir: string, name: string, entry: EntryInput, locale: Locale = DEFAULT_LOCALE): AddResult {
+  const loaded = load(dir, locale)
   if (!loaded.ok) return { ok: false, error: loaded.error }
   const before = loaded.file[name]
   if (typeof before !== "object" || before === null || Array.isArray(before)) {
-    return { ok: false, error: `${ENGINES_FILE} 里没有 \`${name}\` 这一条了，可能刚被你手改过。重新打开这一页再试。` }
+    return { ok: false, error: ENGINES_FILE_TEXT[locale].vanished(ENGINES_FILE, name) }
   }
   const kept = Object.fromEntries(
     Object.entries(before as Record<string, unknown>).filter(([key]) => !["label", "command", "args", "env", "registry"].includes(key)),
@@ -107,46 +107,44 @@ export function replaceEngineEntry(dir: string, name: string, entry: EntryInput)
 }
 
 /** 删一条。**只删这一个键**，文件里其余的一字不动。 */
-export function removeEngineEntry(dir: string, name: string): AddResult {
-  const loaded = load(dir)
+export function removeEngineEntry(dir: string, name: string, locale: Locale = DEFAULT_LOCALE): AddResult {
+  const loaded = load(dir, locale)
   if (!loaded.ok) return { ok: false, error: loaded.error }
-  if (!Object.hasOwn(loaded.file, name)) return { ok: false, error: `${ENGINES_FILE} 里已经没有 \`${name}\` 了。` }
+  if (!Object.hasOwn(loaded.file, name)) return { ok: false, error: ENGINES_FILE_TEXT[locale].gone(ENGINES_FILE, name) }
   Reflect.deleteProperty(loaded.file, name)
   save(dir, loaded.file)
   return { ok: true, id: `acp:${name}` }
 }
 
-/** 第一次打开时写进去的样板。**注释在 `_说明` 里**——JSON 没有注释。 */
-const TEMPLATE = {
-  _说明: [
-    "这里注册讲 ACP（Agent Client Protocol）的第三方引擎。",
-    "键是引擎 id，会以 acp: 前缀出现在界面上；值里的 command 是可执行文件。",
-    "更省事的接法：设置 → 安装与接入，从 ACP 注册表里点「接入」，或者指一个可执行文件让它自己回答。",
-    "手改这个文件之后去 设置 → 安装与接入 点「重新探测」：新加的当场可用，改过或删掉的只要没有会话在用也当场生效。",
-    "正在被会话用着的那几家要等那些会话关掉（或重启 Switchback）——它们还握着旧的那份。",
-    "下面 example 那一条是样板，删掉它或改成你真正装了的适配器。",
-  ],
-  example: {
-    label: "示例（把这条删掉）",
-    command: "codex-acp",
-    args: [] as readonly string[],
-    // 这两位 ACP 握手里问不出来，只能你告诉 Switchback；不填就是没有。
-    // 只写真正对当前后端活体验证过的能力；桥里有路由不等于后端兑现
-    compact: false,
-    steer: false,
-  },
+/** 样板里那条示例的其余字段。名字按界面语言另填（见 `templateOf`）。 */
+const EXAMPLE = {
+  command: "codex-acp",
+  args: [] as readonly string[],
+  // 这两位 ACP 握手里问不出来，只能你告诉 Switchback；不填就是没有。
+  // 只写真正对当前后端活体验证过的能力；桥里有路由不等于后端兑现
+  compact: false,
+  steer: false,
 } as const
+
+/**
+ * 第一次打开时写进去的样板，按当时的界面语言写。**注释在 `_说明`（英文版 `_notes`）里**——JSON 没有注释，
+ * 而下划线开头的键 `readEngineFile` 一律跳过。
+ */
+function templateOf(locale: Locale): Record<string, unknown> {
+  const m = ENGINES_FILE_TEXT[locale]
+  return { [m.notesKey]: Object.values(m.notes), example: { label: m.exampleLabel, ...EXAMPLE } }
+}
 
 /**
  * 文件不存在就写一份样板出来。已存在**绝不覆盖**——那是用户的配置。
  * 返回路径，供菜单里「用编辑器打开」用。
  */
-export function ensureEngineFile(dir: string): string {
+export function ensureEngineFile(dir: string, locale: Locale = DEFAULT_LOCALE): string {
   const path = join(dir, ENGINES_FILE)
   try {
     readFileSync(path, "utf8")
   } catch {
-    writeFileSync(path, `${JSON.stringify(TEMPLATE, null, 2)}\n`, "utf8")
+    writeFileSync(path, `${JSON.stringify(templateOf(locale), null, 2)}\n`, "utf8")
   }
   return path
 }
@@ -159,6 +157,6 @@ export function engineNameOf(raw: string): string | undefined {
     .replace(/\.(exe|cmd|bat|sh|js|mjs)$/u, "")
     .replace(/[^a-z0-9]+/gu, "-")
     .replace(/^-+|-+$/gu, "")
-  // 下划线开头是注释键（见 `TEMPLATE._说明`），空的也不行
+  // 下划线开头是注释键（见 `templateOf`），空的也不行
   return id === "" || id.startsWith("_") ? undefined : id
 }

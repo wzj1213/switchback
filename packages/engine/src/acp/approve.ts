@@ -1,8 +1,12 @@
 import type { Request as ApprovalRequest } from "@switchback/approval"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import type { RememberScope } from "@switchback/protocol"
 import { sanitize } from "../claude/permission.js"
 import { detailOf, toolNameOf } from "./translate.js"
 import type { AcpPermissionOption, AcpToolCall } from "./wire.js"
+import { ACP_APPROVE } from "./approve.messages.js"
+
+type Text = (typeof ACP_APPROVE)[Locale]
 
 /**
  * ACP 的审批请求 ↔ `@switchback/approval`。
@@ -118,28 +122,26 @@ const MAX_FILES = 3
  * 没有 title 时照实说「详情未送达」。一张写着「批准吗？」却不说批准什么的卡片，
  * 比不弹卡片更糟。
  */
-function editSummary(files: readonly { path: string }[]): string {
+function editSummary(files: readonly { path: string }[], m: Text): string {
   const paths = files.map((f) => f.path).filter((p) => p !== "")
-  if (paths.length === 0) return "修改文件（详情未送达）"
-  const shown = paths.slice(0, MAX_FILES).map((p) => sanitize(p)).join("、")
-  const more = paths.length > MAX_FILES ? ` 等 ${String(paths.length)} 个文件` : ""
-  return `修改 ${shown}${more}`
+  if (paths.length === 0) return m.noFiles
+  return m.edit(paths.slice(0, MAX_FILES).map((p) => sanitize(p)), paths.length, MAX_FILES)
 }
 
-function detailSummary(call: AcpToolCall): string {
+function detailSummary(call: AcpToolCall, m: Text): string {
   const detail = detailOf(call)
-  if (detail.kind === "shell" && detail.command !== "") return `执行 ${sanitize(detail.command)}`
-  if (detail.kind === "file_edit") return editSummary(detail.files)
-  if (detail.kind === "file_read") return `读取 ${sanitize(detail.path)}`
-  if (detail.kind === "fetch") return `访问 ${sanitize(detail.url)}`
-  return `执行 ${sanitize(toolNameOf(call.kind))}（详情未送达）`
+  if (detail.kind === "shell" && detail.command !== "") return m.run(sanitize(detail.command))
+  if (detail.kind === "file_edit") return editSummary(detail.files, m)
+  if (detail.kind === "file_read") return m.read(sanitize(detail.path))
+  if (detail.kind === "fetch") return m.fetch(sanitize(detail.url))
+  return m.unknown(sanitize(toolNameOf(call.kind)))
 }
 
-export function summarize(call: AcpToolCall | undefined): string {
+export function summarize(call: AcpToolCall | undefined, locale: Locale = DEFAULT_LOCALE): string {
   const title = call?.title
   if (title !== undefined && title !== null && title !== "") return sanitize(title)
-  if (call === undefined) return "执行一项操作（详情未送达）"
-  return detailSummary(call)
+  if (call === undefined) return ACP_APPROVE[locale].nothing
+  return detailSummary(call, ACP_APPROVE[locale])
 }
 
 /**
@@ -155,6 +157,7 @@ export function buildRequest(
   engine: string,
   call: AcpToolCall | undefined,
   cwd: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): ApprovalRequest {
   const label = call?.title ?? ""
   return {
@@ -163,6 +166,6 @@ export function buildRequest(
     ...(label === "" ? {} : { toolLabel: label }),
     args: argsOf(call),
     cwd,
-    summary: summarize(call),
+    summary: summarize(call, locale),
   }
 }

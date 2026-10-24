@@ -4,6 +4,7 @@ import { resolveCommand } from "../probe.js"
 import { createRpc, type RpcPeer } from "../rpc.js"
 import { CLIENT_AUTH } from "./auth.js"
 import type { AcpInitialize } from "./wire.js"
+import type { Locale } from "@switchback/i18n"
 
 /**
  * 起一个 ACP 进程、握一次手、办完一件事就收掉。
@@ -17,6 +18,8 @@ export interface OneShotRequest {
   args?: readonly string[]
   env?: Readonly<Record<string, string | undefined>>
   cwd: string
+  /** 失败时那句话用哪种语言。缺省中文。 */
+  locale?: Locale
 }
 
 export interface OneShot {
@@ -48,7 +51,7 @@ export async function withAcpProcess<T>(req: OneShotRequest, run: (shot: OneShot
     // 这里没有会话可以答。**必须回错误而不是不理**：不答它会一直等，
     // 而登录那一步本来就可能等上几分钟——两边互等就是一个永远不结束的登录
     onRequest: (call) => {
-      call.reject({ code: -32601, message: "Switchback 此时没有打开会话，不处理这类请求" })
+      call.reject({ code: -32601, message: "Switchback 此时没有打开会话，不处理这类请求" }) // i18n-ok：回给引擎进程的协议错误，不上界面
     },
   })
   // **spawn 真正能跑的那个绝对路径**，理由同 `resolveCommand`：裸名字会被 PATH
@@ -69,7 +72,7 @@ export async function withAcpProcess<T>(req: OneShotRequest, run: (shot: OneShot
   try {
     return await run({ rpc, died: owner.died(), stderr: () => box.stderr })
   } finally {
-    rpc.close("办完了")
+    rpc.close("办完了") // i18n-ok：收摊时拒掉没回音的调用，那时已经没人在等它
     child.stdin?.end()
     await owner.reclaim()
   }

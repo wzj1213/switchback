@@ -395,7 +395,7 @@ describe("重名的模型要分得开", () => {
 
 describe("失败要说人话", () => {
   it("Method not found 翻成「这家不支持」，并说下一步怎么办", () => {
-    const said = sayWhy("acp:zcode", "换模型", new Error('"Method not found": session/set_model'))
+    const said = sayWhy("acp:zcode", "model", new Error('"Method not found": session/set_model'))
     expect(said).toContain("不支持")
     expect(said).toContain("新开一条会话")
     // **不把协议原文摆给用户**：他看不出那是什么，也做不了什么
@@ -403,7 +403,13 @@ describe("失败要说人话", () => {
   })
 
   it("**其余错误原样带出去**——编不出更好的话时，原文比编的话有用", () => {
-    expect(sayWhy("kimi", "换模型", new Error("connection closed"))).toContain("connection closed")
+    expect(sayWhy("kimi", "model", new Error("connection closed"))).toContain("connection closed")
+  })
+
+  it("英文界面下同样两种说法", () => {
+    expect(sayWhy("acp:zcode", "effort", new Error("Method not found"), "en"))
+      .toBe("The acp:zcode adapter can't set the reasoning level inside a thread (it doesn't implement that ACP method). Change it in its own interface or config, then start a new thread.")
+    expect(sayWhy("kimi", "model", new Error("connection closed"), "en")).toBe("kimi couldn't switch models: connection closed")
   })
 })
 

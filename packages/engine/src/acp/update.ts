@@ -8,6 +8,9 @@ import type {
   TurnId,
 } from "@switchback/protocol"
 import { catalogOf, type Catalog } from "./setup.js"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
+import { ACP_UPDATE } from "./update.messages.js"
 import { merge, toToolCall } from "./translate.js"
 import type { AcpCommand, AcpPlanEntry, AcpToolCall, AcpUpdate } from "./wire.js"
 
@@ -71,6 +74,8 @@ export interface UpdateContext {
   outside?: Map<string, AcpToolCall>
   newId: (prefix: string) => string
   now: () => number
+  /** 自己说的那几句（换档、重名模型）用哪种语言。缺省中文。 */
+  locale?: () => Locale
 }
 
 /** 后台工具调用最多记这么多条：只为对上随后的权限请求，不是历史。 */
@@ -328,7 +333,7 @@ function onModeChanged(ctx: UpdateContext, update: AcpUpdate): void {
     at: ctx.now(),
     threadId: ctx.threadId,
     status: "ready",
-    detail: `引擎把档位切到了 ${update.currentModeId}。`,
+    detail: ACP_UPDATE[localeOf(ctx)].modeChanged(update.currentModeId),
   })
 }
 
@@ -343,7 +348,7 @@ function onModeChanged(ctx: UpdateContext, update: AcpUpdate): void {
  */
 function onConfigOptions(ctx: UpdateContext, update: AcpUpdate): void {
   if (update.configOptions === undefined) return
-  ctx.onCatalog?.(catalogOf({ configOptions: update.configOptions }))
+  ctx.onCatalog?.(catalogOf({ configOptions: update.configOptions }, localeOf(ctx)))
 }
 
 /** 原生标题只往宿主报告；是否已被用户亲自命名，只有宿主知道。 */

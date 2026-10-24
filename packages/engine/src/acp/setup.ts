@@ -1,4 +1,5 @@
 import type { EngineCapabilities, EngineThread, ModelOption } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import type {
   AcpConfigOption,
   AcpInitialize,
@@ -6,6 +7,9 @@ import type {
   AcpNewSession,
   AcpSessionRow,
 } from "./wire.js"
+import { ACP_SETUP } from "./setup.messages.js"
+
+type Text = (typeof ACP_SETUP)[Locale]
 
 /** `session/new` 的兼容翻译；保持纯函数，所有协议分支都可直接单测。 */
 
@@ -92,22 +96,24 @@ function withLevels(
   }
 }
 
-export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
+export function modelCatalogOf(session: AcpNewSession, locale: Locale = DEFAULT_LOCALE): ModelCatalog {
+  const m = ACP_SETUP[locale]
   const direct = session.models?.availableModels
   if (direct !== undefined && direct.length > 0) {
     const current = session.models?.currentModelId
     return {
       models: distinct(
-        direct.map((m) => {
-          const option = toModelOption(m)
+        direct.map((raw) => {
+          const option = toModelOption(raw)
           return option.id === current ? { ...option, isDefault: true } : option
         }),
+        m,
       ),
       ...(current === undefined ? {} : { current }),
     }
   }
   const option = session.configOptions?.find((o) => o.id === "model")
-  const models = distinct(fromConfigOption(option))
+  const models = distinct(fromConfigOption(option), m)
   const current = currentOf(option)
   return {
     models,
@@ -117,17 +123,17 @@ export function modelCatalogOf(session: AcpNewSession): ModelCatalog {
 }
 
 /** 不替 agent 判可用性；只给重名项补 id，让用户能区分线上身份。 */
-function distinct(models: readonly ModelOption[]): readonly ModelOption[] {
+function distinct(models: readonly ModelOption[], m: Text): readonly ModelOption[] {
   const count = new Map<string, number>()
-  for (const m of models) count.set(m.label, (count.get(m.label) ?? 0) + 1)
-  return models.map((m) =>
-    (count.get(m.label) ?? 0) > 1 ? { ...m, label: `${m.label}（${m.id}）` } : m,
+  for (const model of models) count.set(model.label, (count.get(model.label) ?? 0) + 1)
+  return models.map((model) =>
+    (count.get(model.label) ?? 0) > 1 ? { ...model, label: m.withId(model.label, model.id) } : model,
   )
 }
 
 /** 只要清单的那一半。换模型要连「设回哪儿」一起看，用 `modelCatalogOf`。 */
-export function modelsOf(session: AcpNewSession): readonly ModelOption[] {
-  return modelCatalogOf(session).models
+export function modelsOf(session: AcpNewSession, locale: Locale = DEFAULT_LOCALE): readonly ModelOption[] {
+  return modelCatalogOf(session, locale).models
 }
 
 /** 模型、强度和两条设置路由的一致快照，开场与配置更新共用。 */
@@ -143,8 +149,8 @@ export interface Catalog {
   effort?: string
 }
 
-export function catalogOf(session: AcpNewSession): Catalog {
-  const { models, configId, current } = modelCatalogOf(session)
+export function catalogOf(session: AcpNewSession, locale: Locale = DEFAULT_LOCALE): Catalog {
+  const { models, configId, current } = modelCatalogOf(session, locale)
   const levels = effortsOf(session)
   return {
     // 不把当前模型的强度猜成别的模型也支持；目标模型未报告时让 agent 用原生默认。
@@ -197,23 +203,25 @@ export function contextWindows(session: AcpNewSession): Readonly<Record<string, 
 }
 
 /** 只翻译明确的未实现错误；其余保留 agent 原文。 */
-export function sayWhy(engine: string, what: string, error: unknown): string {
+export function sayWhy(engine: string, what: "model" | "effort", error: unknown, locale: Locale = DEFAULT_LOCALE): string {
+  const m = ACP_SETUP[locale]
   const text = error instanceof Error ? error.message : String(error)
-  if (!/method not found|-32601/i.test(text)) return `${engine} ${what}失败：${text}`
-  return `${engine} 这个适配器不支持在会话里${what}（对应的 ACP 方法它没实现）。要改就去它自己的界面或配置里改，改完新开一条会话。`
+  if (!/method not found|-32601/i.test(text)) return m.failed(engine, m.action[what], text)
+  return m.unsupported(engine, m.action[what])
 }
 
 /** 把明确的 spawn 失败补成可执行的安装/权限提示。 */
-export function startupMessage(command: string, error: Error): string {
+export function startupMessage(command: string, error: Error, locale: Locale = DEFAULT_LOCALE): string {
+  const m = ACP_SETUP[locale]
   const code = (error as NodeJS.ErrnoException).code
   if (code === "ENOENT") {
     // **不提「设置里可以装」**：第三方适配器 Switchback 不知道怎么装，也不该编一条命令。
     // 但「装完怎么让 Switchback 认出来」是能说的——那一步现在不用重启了。
     // （新往 engines.json 里加一家仍然要重启：驱动表在启动时建一次。）
-    return `找不到可执行文件 \`${command}\`。请确认这个 ACP 适配器已安装且在 PATH 上（终端里跑 \`which ${command}\` 验证）；装好之后在 设置 → 引擎 → 安装与版本 点「重新探测」即可，不用重启。`
+    return m.notFound(command)
   }
-  if (code === "EACCES") return `没有权限执行 \`${command}\`。`
-  return `启动 \`${command}\` 失败：${error.message}`
+  if (code === "EACCES") return m.noPermission(command)
+  return m.startFailed(command, error.message)
 }
 
 /**
@@ -273,24 +281,24 @@ export function canList(info: AcpInitialize | undefined): boolean {
 }
 
 /** `session/list` 翻译；缺句柄无法续跑，缺 cwd 无法守住工作区边界，均丢弃。 */
-export function sessionsOf(raw: unknown, max: number): readonly EngineThread[] {
+export function sessionsOf(raw: unknown, max: number, locale: Locale = DEFAULT_LOCALE): readonly EngineThread[] {
   const rows = (raw as { sessions?: readonly AcpSessionRow[] } | undefined)?.sessions ?? []
   return rows
-    .map(toEngineThread)
+    .map((row) => toEngineThread(row, ACP_SETUP[locale].untitled))
     .filter((t): t is EngineThread => t !== undefined)
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, max)
 }
 
 /** 一行 → 一条会话。缺句柄或缺工作区就作废（理由见 `sessionsOf`）。 */
-function toEngineThread(row: AcpSessionRow): EngineThread | undefined {
+function toEngineThread(row: AcpSessionRow, untitled: string): EngineThread | undefined {
   const handle = row.sessionId ?? ""
   const cwd = row.cwd ?? ""
   if (handle === "" || cwd === "") return undefined
   const title = (row.title ?? "").trim()
   return {
     handle,
-    title: title === "" ? "（没有标题）" : title,
+    title: title === "" ? untitled : title,
     cwd,
     updatedAt: timeOf(row.updatedAt),
   }

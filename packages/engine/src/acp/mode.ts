@@ -1,6 +1,9 @@
 import type { EngineStatus, Trust, TrustApply } from "@switchback/protocol"
 import type { EngineAxis } from "@switchback/protocol"
 import type { AcpMode } from "./wire.js"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
+import { ACP_MODE } from "./mode.messages.js"
 
 /**
  * 信任档 → ACP 的 mode。
@@ -140,6 +143,8 @@ export interface TrustCtx {
     native: { meta?: Readonly<Record<string, unknown>>; note?: string } | undefined
   }
   nativeApproval?: (trust: Trust) => { meta?: Readonly<Record<string, unknown>>; note?: string }
+  /** 落不上时那句话用哪种语言。缺省中文。 */
+  locale?: () => Locale
 }
 
 /**
@@ -157,17 +162,14 @@ export async function applyTrust(ctx: TrustCtx, trust: Trust, modes: readonly Ac
     }
     ctx.apply?.({
       result: "unmapped",
-      detail: ctx.state.native?.note ?? `${ctx.id} 没有报告可选档位，Switchback 的信任档只在本机判定层生效。`,
+      detail: ctx.state.native?.note ?? ACP_MODE[localeOf(ctx)].noModes(ctx.id),
     })
     return
   }
   const target = pickMode(modes, trust)
   if (target === undefined) {
-    const names = modes.map((m) => m.id ?? "?").join("、")
-    ctx.apply?.({
-      result: "unmapped",
-      detail: `Switchback 的「${trust}」档在 ${ctx.id} 的档位（${names}）里找不到对应项，已保持引擎自己的默认档。`,
-    })
+    const names = modes.map((m) => m.id ?? "?")
+    ctx.apply?.({ result: "unmapped", detail: ACP_MODE[localeOf(ctx)].unmapped(trust, ctx.id, names) })
     return
   }
   // **不因为「看起来已经是这一档」而跳过。**

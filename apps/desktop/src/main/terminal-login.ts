@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto"
 import { chmod, mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { TERMINAL_LOGIN } from "./terminal-login.messages.js"
 
 /**
  * ACP 的 terminal 型登录：在「终端」里跑引擎**自己的**登录界面。
@@ -35,7 +37,8 @@ export function shellQuote(value: string): string {
 
 const SAFE_ENV = /^[A-Za-z_][A-Za-z0-9_]*$/u
 
-export function loginScriptOf(login: TerminalLogin): string {
+export function loginScriptOf(login: TerminalLogin, locale: Locale = DEFAULT_LOCALE): string {
+  const m = TERMINAL_LOGIN[locale]
   const exports = Object.entries({ PATH: login.path, ...login.env })
     .filter(([key]) => SAFE_ENV.test(key))
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
@@ -45,11 +48,11 @@ export function loginScriptOf(login: TerminalLogin): string {
     'rm -f -- "$0"',
     ...exports,
     `cd ${shellQuote(login.cwd)} || exit 1`,
-    `printf '%s\\n\\n' ${shellQuote(`Switchback：下面是 ${login.label} 自己的登录流程。走完之后回到 Switchback，点「试接」确认。`)}`,
+    `printf '%s\\n\\n' ${shellQuote(m.intro(login.label))}`,
     line,
     "code=$?",
     "echo",
-    `if [ "$code" -eq 0 ]; then echo ${shellQuote("登录流程已结束。可以关掉这个窗口，回到 Switchback。")}; else echo "登录流程以 $code 退出。"; fi`,
+    `if [ "$code" -eq 0 ]; then echo ${shellQuote(m.done)}; else echo "${m.exited}"; fi`,
     "",
   ].join("\n")
 }
@@ -59,11 +62,12 @@ export async function openTerminalLogin(
   dir: string,
   login: TerminalLogin,
   open: (path: string) => Promise<string>,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<string | undefined> {
   await mkdir(dir, { recursive: true, mode: 0o700 })
   const file = join(dir, `login-${randomUUID()}.command`)
-  await writeFile(file, loginScriptOf(login), { encoding: "utf8", mode: 0o700 })
+  await writeFile(file, loginScriptOf(login, locale), { encoding: "utf8", mode: 0o700 })
   await chmod(file, 0o700)
   const error = await open(file)
-  return error === "" ? undefined : `没能打开「终端」：${error}`
+  return error === "" ? undefined : TERMINAL_LOGIN[locale].openFailed(error)
 }

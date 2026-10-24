@@ -31,7 +31,7 @@ export function createForeignInteractionCalls(
   const answer = async (call: ServerCall, interaction: ForeignInteraction): Promise<void> => {
     resolved(interaction.key)
     if (interaction.questions.length === 0) {
-      call.reject({ code: -32602, message: `${call.method} 没有可呈现的问题` })
+      call.reject({ code: -32602, message: `${call.method} 没有可呈现的问题` }) // i18n-ok：回给引擎进程的协议错误，不上界面
       return
     }
     const controller = new AbortController()

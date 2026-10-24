@@ -1,5 +1,7 @@
 import type { EngineStatus, ModelOption } from "@switchback/protocol"
 import { modelCall, sayWhy } from "./setup.js"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 
 /**
  * 换模型、换推理强度**怎么落到引擎上**。
@@ -33,6 +35,8 @@ export interface ModelCtx {
     windowOf: Readonly<Record<string, number>>
     contextWindow: number | undefined
   }
+  /** 换不了时那句话用哪种语言。缺省中文。 */
+  locale?: () => Locale
 }
 
 /**
@@ -71,7 +75,7 @@ export async function applyModel(ctx: ModelCtx, model: string, effort?: string):
   // 走扩展位那条路时，强度和模型是**同一发**——分两发的话中间那一刻模型换了、强度还是旧的
   const meta = effort !== undefined && metaRoute(ctx, model) ? { _meta: { reasoningEffort: effort } } : undefined
   await ctx.call(method, { ...params, ...meta }).catch((error: unknown) => {
-    throw new Error(sayWhy(ctx.id, "换模型", error))
+    throw new Error(sayWhy(ctx.id, "model", error, localeOf(ctx)))
   })
   if (meta !== undefined) ctx.state.effort = effort
   else if (effort === undefined || ctx.state.effortConfig === undefined) ctx.state.effort = undefined
@@ -100,6 +104,6 @@ async function applyEffort(ctx: ModelCtx, sessionId: string, effort?: string): P
       ctx.state.effort = effort
     })
     .catch((error: unknown) => {
-      ctx.status("degraded", sayWhy(ctx.id, "设推理强度", error))
+      ctx.status("degraded", sayWhy(ctx.id, "effort", error, localeOf(ctx)))
     })
 }

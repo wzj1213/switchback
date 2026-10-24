@@ -66,13 +66,23 @@ describe("从注册表接一家", () => {
   })
 
   it("试接没过：一个字都不写；npx 超时要补一句怎么先让它下载完", async () => {
-    const h = setup({ trial: { ok: false, error: "180 秒内没有回应。", stderr: "npm http fetch…" } })
+    const h = setup({ trial: { ok: false, error: "180 秒内没有回应。", timedOut: true, stderr: "npm http fetch…" } })
     const done = await connectAgent("gemini", h.deps)
     expect(done.ok).toBe(false)
     expect(done.error).toContain("先在终端里跑一次")
     expect(done.stderr).toBe("npm http fetch…")
     expect(() => h.file()).toThrow()
     expect(h.refreshed).toHaveLength(0)
+  })
+
+  it("**认的是「没回应」这个标记，不认措辞**：英文界面下照样补那一句，别的失败不补", async () => {
+    const slow = setup({ trial: { ok: false, error: "No answer within 180 seconds.", timedOut: true } })
+    const done = await connectAgent("gemini", { ...slow.deps, locale: "en" })
+    expect(done.error).toBe(
+      "No answer within 180 seconds. The first run makes npx download @google/gemini-cli@0.61.0, which can take over three minutes on a slow network. Run `npx -y @google/gemini-cli@0.61.0 --acp` once in a terminal to let it finish downloading, then come back and click “Connect”.",
+    )
+    const broken = setup({ trial: { ok: false, error: "没有回应的样子，但其实是别的错" } })
+    expect((await connectAgent("gemini", broken.deps)).error).toBe("没有回应的样子，但其实是别的错")
   })
 
   it("接过同一家就是升级：换掉那一条（键沿用、人手加的字段留着），不另起一条", async () => {

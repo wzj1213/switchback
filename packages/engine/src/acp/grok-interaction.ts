@@ -1,5 +1,9 @@
 import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse } from "@switchback/protocol"
 import type { ForeignInteraction } from "./caps.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { GROK_INTERACTION } from "./grok-interaction.messages.js"
+
+type Text = (typeof GROK_INTERACTION)[Locale]
 import { grokExtPayload, recordOf } from "./grok-ext.js"
 
 const ASK = "x.ai/ask_user_question"
@@ -38,7 +42,7 @@ function sourceOptions(raw: unknown): SourceOption[] {
   return options
 }
 
-function parsedQuestion(raw: unknown, toolCallId: string, index: number): ParsedQuestion | undefined {
+function parsedQuestion(raw: unknown, toolCallId: string, index: number, m: Text): ParsedQuestion | undefined {
   const item = recordOf(raw)
   const question = nonBlank(item?.["question"])
   if (question === undefined) return undefined
@@ -57,20 +61,18 @@ function parsedQuestion(raw: unknown, toolCallId: string, index: number): Parsed
       options,
       multiSelect: item?.["multiSelect"] === true || item?.["multi_select"] === true,
       allowOther: true,
-      otherLabel: "其他",
-      otherDescription: "写下你的答案",
-      ...(options.length === 0 ? {} : {
-        allowNote: true, noteLabel: "补充说明（可选）", noteDescription: "可选：补充上下文",
-      }),
+      otherLabel: m.other,
+      otherDescription: m.writeAnswer,
+      ...(options.length === 0 ? {} : { allowNote: true, noteLabel: m.note, noteDescription: m.addContext }),
       optional: true,
     },
   }
 }
 
-function parsedQuestions(raw: unknown, toolCallId: string): ParsedQuestion[] {
+function parsedQuestions(raw: unknown, toolCallId: string, m: Text): ParsedQuestion[] {
   if (!Array.isArray(raw)) return []
   return raw.flatMap((value, index) => {
-    const parsed = parsedQuestion(value, toolCallId, index)
+    const parsed = parsedQuestion(value, toolCallId, index, m)
     return parsed === undefined ? [] : [parsed]
   })
 }
@@ -125,18 +127,18 @@ function accepted(response: QuestionResponse, questions: readonly ParsedQuestion
 }
 
 /** Grok 明确公开给 ACP client 的阻塞式结构化问题。 */
-export function grokInteraction(method: string, params: unknown): ForeignInteraction | undefined {
+export function grokInteraction(method: string, params: unknown, locale: Locale = DEFAULT_LOCALE): ForeignInteraction | undefined {
   const payload = grokExtPayload(method, params, ASK)
-  if (payload !== undefined) return askInteraction(payload)
+  if (payload !== undefined) return askInteraction(payload, GROK_INTERACTION[locale])
   const plan = grokExtPayload(method, params, EXIT_PLAN)
-  return plan === undefined ? undefined : planInteraction(plan)
+  return plan === undefined ? undefined : planInteraction(plan, GROK_INTERACTION[locale])
 }
 
-function askInteraction(payload: Record<string, unknown>): ForeignInteraction | undefined {
+function askInteraction(payload: Record<string, unknown>, m: Text): ForeignInteraction | undefined {
   const sessionId = nonBlank(payload?.["sessionId"])
   const toolCallId = nonBlank(payload?.["toolCallId"])
   if (sessionId === undefined || toolCallId === undefined) return undefined
-  const questions = parsedQuestions(payload?.["questions"], toolCallId)
+  const questions = parsedQuestions(payload?.["questions"], toolCallId, m)
   return {
     sessionId,
     key: toolCallId,
@@ -155,7 +157,7 @@ function planReply(response: QuestionResponse, id: string): unknown {
   return { outcome: "cancelled", ...(feedback === undefined || feedback === "" ? {} : { feedback: answer.note }) }
 }
 
-function planInteraction(payload: Record<string, unknown>): ForeignInteraction | undefined {
+function planInteraction(payload: Record<string, unknown>, m: Text): ForeignInteraction | undefined {
   const sessionId = nonBlank(payload["sessionId"])
   const toolCallId = nonBlank(payload["toolCallId"])
   if (sessionId === undefined || toolCallId === undefined) return undefined
@@ -166,17 +168,17 @@ function planInteraction(payload: Record<string, unknown>): ForeignInteraction |
     key: toolCallId,
     questions: [{
       id,
-      header: "Grok 计划审批",
-      question: "如何处理这份计划？",
-      body: plan ?? "Grok 未提供计划正文。",
+      header: m.planHeader,
+      question: m.planQuestion,
+      body: plan ?? m.noPlan,
       options: [
-        { id: "approved", label: "批准并执行", description: "退出计划模式并开始执行" },
-        { id: "cancelled", label: "要求修改", description: "把补充说明反馈给 Grok，继续规划" },
-        { id: "abandoned", label: "放弃计划", description: "退出计划模式但不执行" },
+        { id: "approved", label: m.approve, description: m.approveHint },
+        { id: "cancelled", label: m.revise, description: m.reviseHint },
+        { id: "abandoned", label: m.abandon, description: m.abandonHint },
       ],
       allowNote: true,
-      noteLabel: "修改意见（可选）",
-      noteDescription: "选择“要求修改”时，可在这里说明要改什么",
+      noteLabel: m.planNote,
+      noteDescription: m.planNoteHint,
     }],
     reply: (response) => planReply(response, id),
   }

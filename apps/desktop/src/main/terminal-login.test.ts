@@ -37,6 +37,15 @@ describe("登录脚本", () => {
     expect(script).toContain("'/opt/homebrew/bin/npx' '-y' '@agentclientprotocol/claude-agent-acp@0.81.2' '--cli' 'auth' 'login' '--claudeai'")
   })
 
+  it("英文界面下提示说英文；退出码那句仍交给 shell 展开 $code", () => {
+    const script = loginScriptOf(login, "en")
+    // 撇号照 shellQuote 的规矩转义过：`'` → `'\\''`
+    expect(script).toContain("'Switchback: what follows is Claude Agent'\\''s own sign-in flow.")
+    expect(script).toContain('else echo "The sign-in flow exited with code $code."; fi')
+    expect(execFileSync("/bin/sh", ["-c", 'code=3; echo "The sign-in flow exited with code $code."'], { encoding: "utf8" }))
+      .toBe("The sign-in flow exited with code 3.\n")
+  })
+
   it("真的跑一遍：命令拿到的参数与环境一字不差，跑完脚本已经不在盘上", async () => {
     const dir = mkdtempSync(join(tmpdir(), "switchback-login-"))
     const out = join(dir, "seen.txt")

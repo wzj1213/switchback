@@ -1,5 +1,6 @@
 import type { Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
+import { localeOf } from "../locale.js"
 import type { ServerCall } from "../rpc.js"
 import { handlePermission, type PermissionContext } from "./permission.js"
 import { createTerminalHost, type TerminalHost } from "./terminal.js"
@@ -56,13 +57,14 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
     home: req.home,
     trust: deps.trust,
     memory: req.memory,
+    locale: () => localeOf(req),
     inflight: deps.inflight,
     ...(deps.outside === undefined ? {} : { outside: deps.outside }),
     askUser: req.askUser,
     ...(signal === undefined ? {} : { signal }),
   })
   const answer = async (call: ServerCall): Promise<void> => {
-    const interaction = config.interaction?.(call.method, call.params)
+    const interaction = config.interaction?.(call.method, call.params, localeOf(req))
     if (interaction === undefined) {
       const controller = new AbortController()
       permissions.add(controller)
@@ -74,7 +76,7 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
       return
     }
     if (!mine(interaction.sessionId, deps.sessionId())) {
-      call.reject({ code: -32602, message: `${call.method} 属于另一条会话` })
+      call.reject({ code: -32602, message: `${call.method} 属于另一条会话` }) // i18n-ok：回给引擎进程的协议错误，不上界面
       return
     }
     await interactions.answer(call, interaction)
@@ -104,7 +106,7 @@ export function createAcpClientCalls(deps: ClientCallDeps): AcpClientCalls {
 export async function answerCall(ctx: AnswerCtx, call: ServerCall): Promise<void> {
   if (serveTerminal(ctx.terminal, call)) return
   if (call.method !== "session/request_permission") {
-    call.reject({ code: -32601, message: `Switchback 未认领 ${call.method}` })
+    call.reject({ code: -32601, message: `Switchback 未认领 ${call.method}` }) // i18n-ok：回给引擎进程的协议错误，不上界面
     return
   }
   await handlePermission(ctx.permission(), call)

@@ -7,6 +7,8 @@ import { ENGINES_FILE, readEngineFile, type EngineEntry } from "./engines.js"
 import { removeEngineEntry } from "./engines-file.js"
 import type { Logger } from "./log.js"
 import type { TerminalLogin } from "./terminal-login.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_ENGINES } from "./acp-engines.messages.js"
 
 /**
  * 已经写进 `engines.json` 的第三方 ACP 引擎：列出来、试接、登录、退出、移除。
@@ -21,6 +23,8 @@ export interface EngineOpsDeps {
   inUse: (id: string) => boolean
   refresh: () => Promise<unknown>
   openTerminal: (login: TerminalLogin) => Promise<string | undefined>
+  /** 说话用的语言，每次现读。缺省中文。 */
+  locale?: () => Locale
 }
 
 /** 已接的这几家起一次握手最多等多久。npx 缓存过的是秒级；给一分钟是为了慢启动的 JVM 类。 */
@@ -42,24 +46,37 @@ function entryOf(deps: EngineOpsDeps, name: string): EngineEntry | undefined {
   return readEngineFile(deps.userData, deps.log)[name]
 }
 
-const GONE = { ok: false, error: `${ENGINES_FILE} 里已经没有这一条了，重新打开这一页看看。` } as const
+const localeOf = (deps: Pick<EngineOpsDeps, "locale">): Locale => deps.locale?.() ?? DEFAULT_LOCALE
 
-function launchOf(entry: EngineEntry, cwd: string): { command: string; args: readonly string[]; env?: Readonly<Record<string, string>>; cwd: string } {
-  return { command: entry.command, args: entry.args ?? [], ...(entry.env === undefined ? {} : { env: entry.env }), cwd }
+function gone(deps: EngineOpsDeps): { ok: false; error: string } {
+  return { ok: false, error: ACP_ENGINES[localeOf(deps)].gone(ENGINES_FILE) }
+}
+
+/** 起它要的全部：命令、参数、环境以 engines.json 那一条为准；语言是这一刻的界面语言。 */
+function launchOf(entry: EngineEntry, deps: EngineOpsDeps): {
+  command: string
+  args: readonly string[]
+  env?: Readonly<Record<string, string>>
+  cwd: string
+  locale: Locale
+} {
+  const env = entry.env === undefined ? {} : { env: entry.env }
+  return { command: entry.command, args: entry.args ?? [], ...env, cwd: deps.home, locale: localeOf(deps) }
 }
 
 export async function tryEngine(name: string, deps: EngineOpsDeps): Promise<AcpTrialView> {
   const entry = entryOf(deps, name)
-  if (entry === undefined) return GONE
-  return tryAcp({ ...launchOf(entry, deps.home), timeoutMs: TRY_MS })
+  if (entry === undefined) return gone(deps)
+  return tryAcp({ ...launchOf(entry, deps), timeoutMs: TRY_MS })
 }
 
 /** terminal 型：现场握手问它要这一种的参数，再在「终端」里跑它自己的登录界面。 */
 async function terminalLogin(entry: EngineEntry, methodId: string, deps: EngineOpsDeps): Promise<AcpLoginOutcome> {
-  const trial = await tryAcp({ ...launchOf(entry, deps.home), timeoutMs: TRY_MS })
-  if (!trial.ok) return { ok: false, error: trial.error ?? "试接失败，没法登录。", ...(trial.stderr === undefined ? {} : { stderr: trial.stderr }) }
+  const m = ACP_ENGINES[localeOf(deps)]
+  const trial = await tryAcp({ ...launchOf(entry, deps), timeoutMs: TRY_MS })
+  if (!trial.ok) return { ok: false, error: trial.error ?? m.trialFailed, ...(trial.stderr === undefined ? {} : { stderr: trial.stderr }) }
   const method = trial.authMethods?.find((one) => one.id === methodId && one.kind === "terminal")
-  if (method === undefined) return { ok: false, error: "它这一次没有报这种登录方式了。点「试接」重新看看它现在认哪几种。" }
+  if (method === undefined) return { ok: false, error: m.noMethod }
   const line = terminalLoginOf(entry, method)
   const error = await deps.openTerminal({ label: entry.label, ...line, cwd: deps.home, path: process.env["PATH"] ?? "" })
   return error === undefined ? { ok: true, terminal: true } : { ok: false, error }
@@ -71,14 +88,14 @@ export async function loginEngine(
   signal?: AbortSignal,
 ): Promise<AcpLoginOutcome> {
   const entry = entryOf(deps, req.name)
-  if (entry === undefined) return GONE
+  if (entry === undefined) return gone(deps)
   if (req.kind === "terminal") return terminalLogin(entry, req.methodId, deps)
-  return acpAuthenticate({ ...launchOf(entry, deps.home), methodId: req.methodId, ...(signal === undefined ? {} : { signal }) })
+  return acpAuthenticate({ ...launchOf(entry, deps), methodId: req.methodId, ...(signal === undefined ? {} : { signal }) })
 }
 
 export async function logoutEngine(name: string, deps: EngineOpsDeps): Promise<AcpLoginOutcome> {
   const entry = entryOf(deps, name)
-  return entry === undefined ? GONE : acpLogout(launchOf(entry, deps.home))
+  return entry === undefined ? gone(deps) : acpLogout(launchOf(entry, deps))
 }
 
 /**
@@ -87,7 +104,7 @@ export async function logoutEngine(name: string, deps: EngineOpsDeps): Promise<A
  */
 export async function removeEngine(name: string, deps: EngineOpsDeps): Promise<{ ok: boolean; error?: string; pending?: boolean }> {
   const using = deps.inUse(`acp:${name}`)
-  const done = removeEngineEntry(deps.userData, name)
+  const done = removeEngineEntry(deps.userData, name, localeOf(deps))
   if (!done.ok) return { ok: false, ...(done.error === undefined ? {} : { error: done.error }) }
   await deps.refresh()
   if (!using) await pruneUnused(deps.userData)

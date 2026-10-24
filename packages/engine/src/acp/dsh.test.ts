@@ -30,12 +30,10 @@ describe("DSH ACP 入口", () => {
       },
     ] as const
     for (const item of cases) {
-      const result = await probeDshAcp(
-        "dsh",
-        "acp",
-        async () => item.base,
-        async () => item.profile,
-      )
+      const result = await probeDshAcp("dsh", "acp", {
+        commandProbe: async () => item.base,
+        profileCheck: async () => item.profile,
+      })
       expect(result, item.name).toMatchObject({ state: item.state })
       expect(result.detail, item.name).toContain(item.text)
     }
@@ -59,6 +57,17 @@ describe("DSH ACP 入口", () => {
     expect(driver.id).toBe("dsh")
     await expect(driver.probe?.()).resolves.toMatchObject({ state: "ok" })
     expect(seen).toEqual(["/opt/dsh", "/opt/dsh:team"])
+  })
+
+  it("英文界面下探测结果说英文；profile 名与它自报的身份原样", async () => {
+    const result = await probeDshAcp("dsh", "acp", {
+      commandProbe: async () => found,
+      profileCheck: async () => ({ ready: false, detail: "MODULE_NOT_FOUND" }),
+      locale: "en",
+    })
+    expect(result.detail).toContain("DSH is installed, but the `acp` profile didn't answer ACP")
+    expect(result.detail).toContain("MODULE_NOT_FOUND")
+    expect(() => dshProfileOf("a/b", undefined, "en")).toThrow("Invalid DSH profile name")
   })
 
   it("续跑保存的 profile 优先于当前默认，非法名称在 spawn 前拒绝", () => {

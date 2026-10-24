@@ -1,15 +1,7 @@
 [
-  "apps/desktop/src/main/acp-connect.ts",
-  "apps/desktop/src/main/acp-engines.ts",
-  "apps/desktop/src/main/acp-install.ts",
-  "apps/desktop/src/main/acp-registry-model.ts",
-  "apps/desktop/src/main/acp-registry.ts",
-  "apps/desktop/src/main/engine-settings.ts",
   "apps/desktop/src/main/enginedoors.ts",
-  "apps/desktop/src/main/engines-file.ts",
   "apps/desktop/src/main/enginever-sources.ts",
   "apps/desktop/src/main/enginever.ts",
-  "apps/desktop/src/main/terminal-login.ts",
   "apps/desktop/src/renderer/engine-settings-copy.ts",
   "apps/desktop/src/renderer/engine-settings-model.ts"
 ]

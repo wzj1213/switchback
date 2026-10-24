@@ -1,4 +1,7 @@
 import type { RpcPeer } from "../rpc.js"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
+import { ACP_REVIVE } from "./revive.messages.js"
 
 /**
  * 会话睡着了：重新挂上，让这一轮重发一次。
@@ -79,9 +82,9 @@ export class SessionRevive {
   private lastAt = 0
 
   constructor(
-    private readonly id: string,
+    /** 引擎 id、工作区、以及挂不回来时那句话用哪种语言。 */
+    private readonly who: { id: string; cwd: string; locale?: () => Locale },
     private readonly rpc: Pick<RpcPeer, "call">,
-    private readonly cwd: string,
     private readonly state: ReviveState,
   ) {}
 
@@ -97,15 +100,15 @@ export class SessionRevive {
 
   async run(): Promise<void> {
     const handle = this.state.acpSession
-    if (handle === undefined) throw new Error(`${this.id} 还没有会话句柄，挂不回来`)
-    if (!this.state.loadSession) throw new Error(`${this.id} 没有声明 loadSession，这条会话挂不回来`)
+    if (handle === undefined) throw new Error(ACP_REVIVE[localeOf(this.who)].noHandle(this.who.id))
+    if (!this.state.loadSession) throw new Error(ACP_REVIVE[localeOf(this.who)].noLoad(this.who.id))
     this.active = true
     this.lastAt = Date.now()
     try {
       const meta = this.state.native?.meta
       await this.rpc.call("session/load", {
         sessionId: handle,
-        cwd: this.cwd,
+        cwd: this.who.cwd,
         mcpServers: [],
         ...(meta === undefined ? {} : { _meta: meta }),
       })

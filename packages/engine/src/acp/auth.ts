@@ -1,4 +1,6 @@
 import type { AcpInitialize } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_AUTH } from "./auth.messages.js"
 
 /**
  * ACP 的登录：agent 在握手时报出自己认的登录方式，客户端替人挑一种去办。
@@ -157,9 +159,9 @@ export function authRequiredText(
   who: string,
   methods: readonly AcpAuthMethod[],
   said: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  const offered = methods.length === 0
-    ? "它没有报任何登录方式，只能照它自己的文档在终端里登录"
-    : `它提供的登录方式：${methods.map((method) => method.name).join("、")}`
-  return `${who} 要先登录才能开会话（它说：${said}）。${offered}。到 设置 → 安装与接入，在它那张卡上点「试接」再挑一种登录方式，登完再开一次。`
+  const m = ACP_AUTH[locale]
+  const offered = methods.length === 0 ? m.none : m.offered(methods.map((method) => method.name))
+  return m.required(who, said, offered)
 }

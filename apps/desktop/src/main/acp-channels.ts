@@ -2,6 +2,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { app, ipcMain, shell, type WebContents } from "electron"
 import { probeCommand, tryAcp } from "@switchback/engine"
+import type { Locale } from "@switchback/i18n"
 import type { ConnectProgress, RegistryRow, RegistryView } from "../shared/acp-registry.js"
 import { connectAgent } from "./acp-connect.js"
 import { engineRows, loginEngine, logoutEngine, pruneUnused, removeEngine, tryEngine, type EngineOpsDeps } from "./acp-engines.js"
@@ -53,17 +54,17 @@ function infoOf(agent: RegistryAgent): Omit<RegistryRow, "plan" | "missing" | "c
   }
 }
 
-function rowOf(agent: RegistryAgent, found: { npx: boolean; uvx: boolean }, file: EngineFile): RegistryRow {
-  const plan = planOf(agent, platformOf(process.platform, process.arch), found)
+function rowOf(agent: RegistryAgent, found: { npx: boolean; uvx: boolean }, file: EngineFile, locale: Locale): RegistryRow {
+  const plan = planOf(agent, platformOf(process.platform, process.arch), found, locale)
   const connected = connectedOf(agent, file)
   return { ...infoOf(agent), ...plan, ...(connected === undefined ? {} : { connected }) }
 }
 
-async function viewOf(snapshot: RegistrySnapshot, userData: string, log: Logger): Promise<RegistryView> {
+async function viewOf(snapshot: RegistrySnapshot, at: { userData: string; log: Logger; locale: Locale }): Promise<RegistryView> {
   const found = await launchers()
-  const file = readEngineFile(userData, log)
+  const file = readEngineFile(at.userData, at.log)
   return {
-    rows: snapshot.agents.map((agent) => rowOf(agent, found, file)),
+    rows: snapshot.agents.map((agent) => rowOf(agent, found, file, at.locale)),
     source: snapshot.source,
     ...(snapshot.fetchedAt === undefined ? {} : { fetchedAt: snapshot.fetchedAt }),
     ...(snapshot.error === undefined ? {} : { error: snapshot.error }),
@@ -82,14 +83,14 @@ function progressTo(sender: WebContents): (step: ConnectProgress) => void {
   }
 }
 
-export function installAcpChannels(attached: Attached, log: Logger): void {
+export function installAcpChannels(attached: Attached, log: Logger, locale: () => Locale): void {
   const userData = app.getPath("userData")
-  const registry = createAcpRegistry({ dir: userData, fetch, now: () => Date.now(), log })
+  const registry = createAcpRegistry({ dir: userData, fetch, now: () => Date.now(), log, locale })
   const inUse = (id: string): boolean => attached.host.live().some((thread) => thread.engine === id)
   const refresh = (): Promise<unknown> => attached.refreshEngines()
   const ops: EngineOpsDeps = {
-    userData, log, home: homedir(), inUse, refresh,
-    openTerminal: (login) => openTerminalLogin(join(userData, "login"), login, (path) => shell.openPath(path)),
+    userData, log, home: homedir(), inUse, refresh, locale,
+    openTerminal: (login) => openTerminalLogin(join(userData, "login"), login, (path) => shell.openPath(path), locale()),
   }
   const pending = new Map<string, AbortController>()
   const abortable = (key: string): AbortSignal => {
@@ -99,17 +100,19 @@ export function installAcpChannels(attached: Attached, log: Logger): void {
     return controller.signal
   }
 
-  ipcMain.handle("switchback:acpRegistry", async (_event, force?: boolean) => viewOf(await registry.read(force === true), userData, log))
+  ipcMain.handle("switchback:acpRegistry", async (_event, force?: boolean) =>
+    viewOf(await registry.read(force === true), { userData, log, locale: locale() }))
   ipcMain.handle("switchback:acpConnect", async (event, agentId: string) => {
     const signal = abortable(`connect:${agentId}`)
     const progress = progressTo(event.sender)
+    const language = locale()
     return connectAgent(agentId, {
       userData, log, home: homedir(), platform: platformOf(process.platform, process.arch),
-      registry: () => registry.read(), launchers, refresh, inUse, progress,
+      registry: () => registry.read(), launchers, refresh, inUse, progress, locale: language,
       // 同一个信号：下载时点「取消」停下载，试接时点停握手（npx 第一次下载能等三分钟）
-      trial: (req) => tryAcp({ ...req, signal }),
+      trial: (req) => tryAcp({ ...req, signal, locale: language }),
       install: (agent, plan) => installBinary(agent, plan, {
-        root: join(userData, "agents"), fetch, run: runCommand, platform: process.platform, signal,
+        root: join(userData, "agents"), fetch, run: runCommand, platform: process.platform, signal, locale: language,
         onProgress: (phase, received, total) => progress({ agentId, phase, ...(received === undefined ? {} : { received }), ...(total === undefined ? {} : { total }) }),
       }),
     })

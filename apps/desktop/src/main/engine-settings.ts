@@ -7,6 +7,7 @@ import type { Logger } from "./log.js"
 import { installSettingsChannel, type Store } from "./settings.js"
 import { applyZcodeLock } from "./guard-channel.js"
 import type { Channels } from "./channels.js"
+import { ENGINE_SETTINGS } from "./engine-settings.messages.js"
 
 /**
  * 改到「哪几家算接入」的那些偏好之后，让宿主把同一份新清单推给桌面与远程端。
@@ -45,13 +46,13 @@ export function installEngineSettings(store: Store, attached: Attached, log: Log
    * 那正是 AGENTS.md 里「不把别人的参数抄进代码」允许的做法。
    */
   ipcMain.handle("switchback:tryAcpEngine", async (_event, req: { command: string; args?: readonly string[] }) =>
-    tryAcp({ command: req.command, ...(req.args === undefined ? {} : { args: req.args }), cwd: homedir() }),
+    tryAcp({ command: req.command, ...(req.args === undefined ? {} : { args: req.args }), cwd: homedir(), locale: store.get().language }),
   )
 
   /** 挑一个可执行文件。取消就返回 undefined，调用方什么都不做。 */
   ipcMain.handle("switchback:pickExecutable", async () => {
     const picked = await dialog.showOpenDialog({
-      title: "选一个 ACP 适配器的可执行文件",
+      title: ENGINE_SETTINGS[store.get().language].pickTitle,
       properties: ["openFile"],
     })
     return picked.canceled ? undefined : picked.filePaths[0]
@@ -68,12 +69,10 @@ export function installEngineSettings(store: Store, attached: Attached, log: Log
     "switchback:addAcpEngine",
     async (_event, req: { name: string; label: string; command: string; args?: readonly string[] }) => {
       const name = engineNameOf(req.name)
-      if (name === undefined) return { ok: false, error: "这个名字里没有能当 id 用的字符，换一个。" }
-      const done = addEngineEntry(app.getPath("userData"), name, {
-        label: req.label,
-        command: req.command,
-        ...(req.args === undefined ? {} : { args: req.args }),
-      })
+      const locale = store.get().language
+      if (name === undefined) return { ok: false, error: ENGINE_SETTINGS[locale].badName }
+      const entry = { label: req.label, command: req.command, ...(req.args === undefined ? {} : { args: req.args }) }
+      const done = addEngineEntry(app.getPath("userData"), name, entry, locale)
       if (done.ok) await attached.refreshEngines()
       return done
     },

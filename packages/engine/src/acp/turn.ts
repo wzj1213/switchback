@@ -33,7 +33,10 @@
  */
 
 import type { Event, TurnId } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import { Unsupported } from "../unsupported.js"
+import { ACP_TURN } from "./turn.messages.js"
 import { sweep, type UpdateContext, type UpdateState } from "./update.js"
 import { stopStatus } from "./translate.js"
 import type { AcpPromptResult } from "./wire.js"
@@ -50,6 +53,7 @@ export interface TurnCtx {
   state: { acpSession: string | undefined }
   /** 这家认不认这两个方法。由 `AcpDriverConfig` 注入，见文件头那张表。 */
   can: { compact?: boolean; steer?: boolean; steerCall?: ForeignSteer }
+  locale?: () => Locale
 }
 
 /**
@@ -58,8 +62,9 @@ export interface TurnCtx {
  * `-32601 Method not found` 对用户毫无意义——他要知道的是「这家做不到，不是坏了」。
  * 而这两件事的入口都是 Switchback 自己给的按钮，所以**说错一次就是一次「点了没反应」**。
  */
-function refuse(what: string, id: string): Error {
-  return new Unsupported(`${id} 不支持${what}。这不是故障——它的适配器没提供这个方法。`)
+function refuse(what: "compact" | "steer" | "attach", ctx: TurnCtx): Error {
+  const m = ACP_TURN[localeOf(ctx)]
+  return new Unsupported(m.unsupported(ctx.id, m.what[what]))
 }
 
 /**
@@ -71,8 +76,8 @@ function refuse(what: string, id: string): Error {
  */
 export async function compactSession(ctx: TurnCtx): Promise<void> {
   const sessionId = ctx.state.acpSession
-  if (sessionId === undefined) throw new Error("会话还没建立，压缩不了")
-  if (ctx.can.compact !== true) throw refuse("压缩上下文", ctx.id)
+  if (sessionId === undefined) throw new Error(ACP_TURN[localeOf(ctx)].noSessionCompact)
+  if (ctx.can.compact !== true) throw refuse("compact", ctx)
   await ctx.call("session/compact", { sessionId })
 }
 
@@ -81,6 +86,7 @@ export function reportCompaction(
   emit: (event: Event) => void,
   turnId: TurnId,
   at: number,
+  locale: Locale = DEFAULT_LOCALE,
 ): void {
   emit({
     type: "item.started",
@@ -90,7 +96,7 @@ export function reportCompaction(
       turnId,
       at,
       kind: "notice",
-      message: "上下文已压缩。",
+      message: ACP_TURN[locale].compacted,
       level: "info",
     },
   })
@@ -102,7 +108,7 @@ export async function compactAndReport(
   turnId: TurnId,
 ): Promise<void> {
   await compactSession(ctx)
-  reportCompaction(ctx.emit, turnId, Date.now())
+  reportCompaction(ctx.emit, turnId, Date.now(), localeOf(ctx))
 }
 
 /**
@@ -119,9 +125,9 @@ export async function compactAndReport(
  */
 export async function steerSession(ctx: TurnCtx, text: string, attachments?: readonly string[]): Promise<void> {
   const sessionId = ctx.state.acpSession
-  if (sessionId === undefined) throw new Error("会话还没建立，插不进去")
-  if (ctx.can.steer !== true && ctx.can.steerCall === undefined) throw refuse("中途插话", ctx.id)
-  if (attachments !== undefined && attachments.length > 0) throw refuse("带附件插话", ctx.id)
+  if (sessionId === undefined) throw new Error(ACP_TURN[localeOf(ctx)].noSessionSteer)
+  if (ctx.can.steer !== true && ctx.can.steerCall === undefined) throw refuse("steer", ctx)
+  if (attachments !== undefined && attachments.length > 0) throw refuse("attach", ctx)
   const request = ctx.can.steerCall?.(sessionId, text) ?? {
     method: "session/steer",
     params: { sessionId, content: text },
@@ -143,6 +149,7 @@ export interface EndCtx {
   updates: UpdateState
   emit: (event: Event) => void
   notify: (method: string, params: unknown) => void
+  locale?: () => Locale
 }
 
 /**
@@ -152,7 +159,7 @@ export interface EndCtx {
  */
 export function finishTurn(ctx: EndCtx, turnId: TurnId, reason: AcpPromptResult["stopReason"]): void {
   if (ctx.state.turn !== turnId) return
-  const { status, error } = stopStatus(reason)
+  const { status, error } = stopStatus(reason, localeOf(ctx))
   sweep(ctx.update(), ctx.updates, status === "interrupted" ? "interrupted" : "failed")
   ctx.state.turn = undefined
   ctx.emit({ type: "turn.completed", at: Date.now(), turnId, status, ...(error === undefined ? {} : { error }) })

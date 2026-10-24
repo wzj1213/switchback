@@ -1,6 +1,8 @@
 import type { FileChange, ToolCallItem, ToolDetail, ToolStatus, TurnId, TurnStatus } from "@switchback/protocol"
 import { synthDiff } from "../synth.js"
 import type { AcpDiff, AcpStopReason, AcpToolCall } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_STOP } from "./translate.messages.js"
 
 /**
  * ACP 的工具身份是 `kind`，不是工具名——协议里根本没有「工具名」这个字段。
@@ -193,10 +195,10 @@ const STOP_STATUS: Readonly<Record<AcpStopReason, TurnStatus>> = {
   max_turn_requests: "failed",
 }
 
-const STOP_DETAIL: Readonly<Partial<Record<AcpStopReason, string>>> = {
-  max_tokens: "模型输出达到长度上限，这一轮没说完就停了。",
-  max_turn_requests: "达到单轮内的请求次数上限，引擎主动停手了。",
-  refusal: "引擎拒绝了这一轮。**这条提问和它之后的内容不会进入下一次请求**——界面上还看得见，但模型已经不记得了。",
+function stopDetail(reason: AcpStopReason, m: (typeof ACP_STOP)[Locale]): string | undefined {
+  if (reason === "max_tokens") return m.maxTokens
+  if (reason === "max_turn_requests") return m.maxTurnRequests
+  return reason === "refusal" ? m.refusal : undefined
 }
 
 /**
@@ -212,11 +214,11 @@ const STOP_DETAIL: Readonly<Partial<Record<AcpStopReason, string>>> = {
  * 是照着事件流重放的，它会一直显示这一轮——**那就和模型的记忆对不上了**。
  * 判成 `completed` 等于让界面撒一个很难发现的谎。
  */
-export function stopStatus(reason: AcpStopReason | undefined): {
+export function stopStatus(reason: AcpStopReason | undefined, locale: Locale = DEFAULT_LOCALE): {
   status: TurnStatus
   error?: string
 } {
   if (reason === undefined) return { status: "completed" }
-  const detail = STOP_DETAIL[reason]
+  const detail = stopDetail(reason, ACP_STOP[locale])
   return { status: STOP_STATUS[reason] ?? "completed", ...(detail === undefined ? {} : { error: detail }) }
 }

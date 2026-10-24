@@ -6,6 +6,10 @@ import { Readable, Transform } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import type { ReadableStream as WebStream } from "node:stream/web"
 import type { BinaryDist } from "./acp-registry-model.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_INSTALL } from "./acp-install.messages.js"
+
+const textOf = (deps: Pick<InstallDeps, "locale">): (typeof ACP_INSTALL)[Locale] => ACP_INSTALL[deps.locale ?? DEFAULT_LOCALE]
 
 /**
  * 注册表里只发二进制的那几家（goose、opencode、Cursor…）怎么落到这台机器上。
@@ -34,6 +38,8 @@ export interface InstallDeps {
   platform: string
   signal?: AbortSignal
   onProgress?: (phase: "download" | "extract", received?: number, total?: number) => void
+  /** 出岔子时那句话用哪种语言。缺省中文。 */
+  locale?: Locale
 }
 
 export type InstallResult = { ok: true; command: string } | { ok: false; error: string }
@@ -63,7 +69,8 @@ async function exists(path: string): Promise<boolean> {
 async function download(dist: BinaryDist, to: string, deps: InstallDeps): Promise<void> {
   const signal = deps.signal === undefined ? AbortSignal.timeout(DOWNLOAD_MS) : AbortSignal.any([deps.signal, AbortSignal.timeout(DOWNLOAD_MS)])
   const response = await deps.fetch(dist.archive, { signal })
-  if (!response.ok || response.body === null) throw new Error(`下载失败：HTTP ${String(response.status)}`)
+  const m = textOf(deps)
+  if (!response.ok || response.body === null) throw new Error(m.downloadFailed(response.status))
   const total = Number(response.headers.get("content-length")) || undefined
   const hash = createHash("sha256")
   const seen = { bytes: 0 }
@@ -78,7 +85,7 @@ async function download(dist: BinaryDist, to: string, deps: InstallDeps): Promis
   await pipeline(Readable.fromWeb(response.body as WebStream<Uint8Array>), count, createWriteStream(to), { signal })
   const digest = hash.digest("hex")
   if (dist.sha256 !== undefined && digest !== dist.sha256) {
-    throw new Error(`校验没过：注册表写的 sha256 是 ${dist.sha256}，下载到的是 ${digest}。没有解包。`)
+    throw new Error(m.checksum(dist.sha256, digest))
   }
 }
 
@@ -88,9 +95,10 @@ async function extract(
   deps: InstallDeps,
 ): Promise<void> {
   const { kind, archive, out } = from
+  const m = textOf(deps)
   if (kind === "raw") {
     const target = commandIn(out, dist.cmd)
-    if (target === undefined) throw new Error("可执行文件的路径不在安装目录里")
+    if (target === undefined) throw new Error(m.outside)
     await mkdir(dirname(target), { recursive: true })
     await copyFile(archive, target)
     return
@@ -99,7 +107,7 @@ async function extract(
     ? ["tar", ["-xf", archive, "-C", out]]
     : deps.platform === "darwin" ? ["ditto", ["-x", "-k", archive, out]] : ["unzip", ["-q", "-o", archive, "-d", out]]
   const done = await deps.run(command, args, EXTRACT_MS)
-  if (!done.ok) throw new Error(`解包失败：${done.output.slice(-600)}`)
+  if (!done.ok) throw new Error(m.extractFailed(done.output.slice(-600)))
 }
 
 /** 下载、校验、解包、挪到位。已经装过同一个版本就直接用。 */
@@ -108,9 +116,10 @@ export async function installBinary(
   dist: BinaryDist,
   deps: InstallDeps,
 ): Promise<InstallResult> {
+  const m = textOf(deps)
   const dir = join(deps.root, agent.id, agent.version)
   const target = commandIn(dir, dist.cmd)
-  if (target === undefined) return { ok: false, error: "注册表给的可执行文件路径不在安装目录里，没有安装。" }
+  if (target === undefined) return { ok: false, error: m.registryOutside }
   if (await exists(target)) return { ok: true, command: target }
   const staging = join(deps.root, agent.id, `.staging-${randomUUID()}`)
   const kind = archiveKindOf(dist.archive)
@@ -122,7 +131,7 @@ export async function installBinary(
     deps.onProgress?.("extract")
     await extract({ kind, archive, out }, dist, deps)
     if (commandIn(out, dist.cmd) === undefined || !(await exists(join(out, dist.cmd)))) {
-      throw new Error(`解包后没找到注册表说的 ${dist.cmd}。`)
+      throw new Error(m.missingCmd(dist.cmd))
     }
     await rm(dir, { recursive: true, force: true })
     await rename(out, dir)
@@ -130,7 +139,7 @@ export async function installBinary(
     return { ok: true, command: target }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return { ok: false, error: /abort/iu.test(message) && deps.signal?.aborted === true ? "已取消。" : message }
+    return { ok: false, error: /abort/iu.test(message) && deps.signal?.aborted === true ? m.cancelled : message }
   } finally {
     await rm(staging, { recursive: true, force: true })
   }

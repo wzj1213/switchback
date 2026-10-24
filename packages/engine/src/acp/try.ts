@@ -2,6 +2,8 @@ import { authMethodsOf, canLogout, type AcpAuthMethod } from "./auth.js"
 import { initializeOnce, PROTOCOL_VERSION, withAcpProcess, type Initialized, type OneShotRequest } from "./oneshot.js"
 import { startupMessage } from "./setup.js"
 import type { AcpInitialize } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_ONESHOT } from "./oneshot.messages.js"
 
 /**
  * 试着和一个可执行文件握一次 ACP 的手。
@@ -30,6 +32,11 @@ export interface AcpTrial {
   capabilities?: readonly string[]
   /** 失败时那句话。照 `Probe.detail` 的规矩：必须说得出下一步做什么。 */
   error?: string
+  /**
+   * 失败是因为**时限内没回应**。调用方据此补一句（npx 第一次要现下载）——
+   * 以前是拿 `error` 里有没有「没有回应」四个字来判，换一种语言就判不出来了。
+   */
+  timedOut?: boolean
   /** 它自己打到 stderr 的尾巴。**失败时这常常是唯一的线索**，别吞掉。 */
   stderr?: string
   /**
@@ -92,7 +99,7 @@ export async function tryAcp(req: OneShotRequest & {
     return await withAcpProcess(req, async (shot) => {
       const result = await initializeOnce(shot, budget, req.signal)
       tail.stderr = shot.stderr()
-      return verdict(result, req.command, tail.stderr, budget)
+      return verdict(result, { command: req.command, stderr: tail.stderr, budget, locale: req.locale ?? DEFAULT_LOCALE })
     })
   } catch (error) {
     // 对方答了但答的是错误（JSON-RPC error），或者进程中途关了流
@@ -100,23 +107,15 @@ export async function tryAcp(req: OneShotRequest & {
   }
 }
 
-function verdict(result: Initialized, command: string, stderr: string, budget: number): AcpTrial {
-  if (result.kind === "aborted") return { ok: false, error: "已取消。" }
-  if (result.kind === "timeout") {
-    return fail(
-      `${String(Math.round(budget / 1000))} 秒内没有回应。它可能不讲 ACP，或者要换一组参数才进 ACP 模式（有几家是 \`<命令> acp\` 或 \`<命令> agent stdio\`）。`,
-      stderr,
-    )
-  }
-  if (result.kind === "died") return fail(startupMessage(command, result.error), stderr)
+function verdict(result: Initialized, run: { command: string; stderr: string; budget: number; locale: Locale }): AcpTrial {
+  const { command, stderr, budget, locale } = run
+  const m = ACP_ONESHOT[locale]
+  if (result.kind === "aborted") return { ok: false, error: m.cancelled }
+  if (result.kind === "timeout") return { ...fail(m.noAnswer(Math.round(budget / 1000)), stderr), timedOut: true }
+  if (result.kind === "died") return fail(startupMessage(command, result.error, locale), stderr)
   const info = result.info
   const version = info.protocolVersion
-  if (version !== undefined && version > PROTOCOL_VERSION) {
-    return fail(
-      `它讲的是 ACP v${String(version)}，Switchback 只认到 v${String(PROTOCOL_VERSION)}。请升级 Switchback。`,
-      stderr,
-    )
-  }
+  if (version !== undefined && version > PROTOCOL_VERSION) return fail(m.tooNew(version, PROTOCOL_VERSION), stderr)
   const agent = info.agentInfo
   return {
     ok: true,

@@ -10,6 +10,7 @@ import type {
   UserMessageOrigin,
 } from "@switchback/protocol"
 import type { ReclaimConfig } from "../subprocess.js"
+import type { Locale } from "@switchback/i18n"
 
 export interface ForeignNotice {
   message: string
@@ -57,7 +58,7 @@ export interface ForeignInteraction {
   reply: (response: QuestionResponse) => unknown
 }
 
-export type ForeignInteractionParser = (method: string, params: unknown) => ForeignInteraction | undefined
+export type ForeignInteractionParser = (method: string, params: unknown, locale?: Locale) => ForeignInteraction | undefined
 export type ForeignInteractionResolvedParser = (method: string, params: unknown) => string | undefined
 
 /** 厂商公开的 ACP 扩展请求；方法名与参数形状都由该厂商适配器负责。 */

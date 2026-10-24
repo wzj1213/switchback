@@ -1,4 +1,6 @@
 import type { LaunchPlan } from "../shared/acp-registry.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_PLAN } from "./acp-registry-model.messages.js"
 
 /**
  * ACP 官方注册表（`cdn.agentclientprotocol.com/registry/v1/latest/registry.json`）的**纯解析**。
@@ -164,6 +166,7 @@ export function planOf(
   agent: RegistryAgent,
   platform: RegistryPlatform | undefined,
   has: { npx: boolean; uvx: boolean },
+  locale: Locale = DEFAULT_LOCALE,
 ): { plan?: LaunchPlan; missing?: string } {
   if (agent.npx !== undefined && has.npx) {
     const { package: pkg, args, env } = agent.npx
@@ -175,7 +178,8 @@ export function planOf(
   }
   const binary = platform === undefined ? undefined : agent.binary[platform]
   if (binary !== undefined) return { plan: { kind: "binary", ...binary } }
-  if (agent.npx !== undefined) return { missing: "它用 npx 分发，这台机器上没找到 npx（装 Node.js 会带上）" }
-  if (agent.uvx !== undefined) return { missing: "它用 uvx 分发，这台机器上没找到 uvx（装 uv 会带上）" }
-  return { missing: "它没有发布这个平台的包" }
+  const m = ACP_PLAN[locale]
+  if (agent.npx !== undefined) return { missing: m.noNpx }
+  if (agent.uvx !== undefined) return { missing: m.noUvx }
+  return { missing: m.noBuild }
 }

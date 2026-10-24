@@ -6,6 +6,9 @@ import type { ForeignTurn } from "./caps.js"
 import { AcpNativeTurnQueue } from "./native-turn.js"
 import { isAsleep } from "./revive.js"
 import type { AcpPromptResult } from "./wire.js"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
+import { ACP_PROMPT } from "./prompt.messages.js"
 
 interface PromptState {
   acpSession: string | undefined
@@ -27,6 +30,7 @@ interface PromptBridgeOptions {
    */
   revive?: (() => Promise<void>) | undefined
   now: () => number
+  locale?: () => Locale
 }
 
 /** 一次发送的全部内容。**捆成一个**是参数个数闸门逼的，边界也顺：重发要原样再发一遍。 */
@@ -51,8 +55,8 @@ export class AcpPromptBridge {
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
     const { state } = this.options
-    if (state.acpSession === undefined) throw new Error(`${this.options.id} 会话尚未就绪`)
-    const prompt = [{ type: "text", text }, ...(await imageBlocks(attachments, state.caps.attachments))]
+    if (state.acpSession === undefined) throw new Error(ACP_PROMPT[localeOf(this.options)].notReady(this.options.id))
+    const prompt = [{ type: "text", text }, ...(await imageBlocks(attachments, state.caps.attachments, localeOf(this.options)))]
     this.send({ prompt, meta: this.options.promptMeta?.(turnId), again: false }, turnId)
     this.nativeTurns.poke()
   }
@@ -74,7 +78,7 @@ export class AcpPromptBridge {
   private send(sent: Sent, turnId: TurnId): void {
     const { state } = this.options
     if (state.acpSession === undefined) {
-      this.options.fail(turnId, `${this.options.id} 会话尚未就绪`)
+      this.options.fail(turnId, ACP_PROMPT[localeOf(this.options)].notReady(this.options.id))
       return
     }
     state.turn = turnId
@@ -109,7 +113,7 @@ export class AcpPromptBridge {
       await revive()
     } catch (broken: unknown) {
       const why = broken instanceof Error ? broken.message : String(broken)
-      this.options.fail(turnId, `${message}（重新挂上也失败了：${why}）`)
+      this.options.fail(turnId, ACP_PROMPT[localeOf(this.options)].reviveFailed(message, why))
       return
     }
     this.send({ ...sent, again: true }, turnId)

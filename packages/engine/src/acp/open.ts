@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process"
 import type { EngineCapabilities, EngineStatus, ModelOption, Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
+import { localeOf } from "../locale.js"
 import type { ProcessOwner } from "../subprocess.js"
 import { resolveCommand } from "../probe.js"
 import { rpcCodeOf, RpcError, type RpcPeer } from "../rpc.js"
@@ -17,6 +18,7 @@ import {
 import type { Catalog } from "./setup.js"
 import type { ForeignFork, ForeignSteer } from "./caps.js"
 import type { AcpInitialize, AcpNewSession } from "./wire.js"
+import { ACP_OPEN } from "./open.messages.js"
 
 /**
  * 一条 ACP 会话**怎么开场**：握手、开新的 / 续上一条 / 分一条出来。
@@ -162,20 +164,19 @@ export async function handshake(ctx: OpenCtx): Promise<EngineCapabilities> {
     ctx.owner.died().then((error) => ({ died: error })),
     sleep(HANDSHAKE_MS).then(() => "timeout" as const),
   ])
+  const m = ACP_OPEN[localeOf(ctx.req)]
   if (result === "timeout") {
     const tail = ctx.state.stderr === "" ? "" : `\n${ctx.state.stderr}`
-    throw new Error(`${ctx.config.id} 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已放弃。${tail}`)
+    throw new Error(`${m.handshake(ctx.config.id, HANDSHAKE_MS / 1000)}${tail}`)
   }
   if (typeof result === "object" && result !== null && "died" in result) {
-    throw new Error(startupMessage(ctx.config.command, (result as { died: Error }).died))
+    throw new Error(startupMessage(ctx.config.command, (result as { died: Error }).died, localeOf(ctx.req)))
   }
   const info = result as AcpInitialize
   const version = info.protocolVersion
   // 版本不合就直接说。协议原文：客户端不支持返回的版本时应当断开
   if (version !== undefined && version > PROTOCOL_VERSION) {
-    throw new Error(
-      `${ctx.config.id} 讲的是 ACP v${String(version)}，Switchback 只认到 v${String(PROTOCOL_VERSION)}。请升级 Switchback。`,
-    )
+    throw new Error(m.tooNew(ctx.config.id, version, PROTOCOL_VERSION))
   }
   ctx.state.loadSession = info.agentCapabilities?.loadSession === true
   ctx.state.authMethods = authMethodsOf(info)
@@ -233,7 +234,8 @@ export async function startSession(ctx: StartCtx): Promise<void> {
 function loginFirst(ctx: OpenCtx, error: unknown): unknown {
   if (rpcCodeOf(error) !== AUTH_REQUIRED) return error
   const said = error instanceof RpcError && error.said !== "" ? error.said : "Authentication required"
-  return new AcpAuthRequired(authRequiredText(ctx.config.label ?? ctx.config.id, ctx.state.authMethods ?? [], said), ctx.config.id)
+  const text = authRequiredText(ctx.config.label ?? ctx.config.id, ctx.state.authMethods ?? [], said, localeOf(ctx.req))
+  return new AcpAuthRequired(text, ctx.config.id)
 }
 
 /**
@@ -259,17 +261,14 @@ async function openOrFail(ctx: OpenCtx): Promise<void> {
     mcpServers: [],
     ...(native?.meta === undefined ? {} : { _meta: native.meta }),
   }
+  const m = ACP_OPEN[localeOf(ctx.req)]
   if (ctx.req.forkOf !== undefined) {
-    if ((ctx.req.forkOf.dropTurns ?? 0) > 0) {
-      throw new Error(`${ctx.config.id} 的 ACP 分叉不能停在历史轮次，已拒绝完整历史冒充回退。`)
-    }
+    if ((ctx.req.forkOf.dropTurns ?? 0) > 0) throw new Error(m.forkTail(ctx.config.id))
     await forkSession(ctx, ctx.req.forkOf.handle, shared)
     return
   }
   if (ctx.req.resume !== undefined) {
-    if (!ctx.state.loadSession) {
-      throw new Error(`${ctx.config.id} 不支持续跑（没有 loadSession 能力），这个会话没法接着上次跑。`)
-    }
+    if (!ctx.state.loadSession) throw new Error(m.noResume(ctx.config.id))
     // **回包要接住。** 上一版把它整个丢了，于是续跑的会话上目录全空：
     // 强度设不上（`effortConfig` 空 → `applyEffort` 静默 return）、
     // **信任档落不到引擎上**（`modes` 空 → `applyTrust` 直接返回）、
@@ -311,11 +310,12 @@ async function forkSession(ctx: OpenCtx, handle: string, shared: Shared): Promis
 
 /** 厂商扩展只负责复制；新进程再用标准 load 接住，避免 fork 出来却仍连着父会话。 */
 async function forkForeign(ctx: OpenCtx, adapter: ForeignFork, handle: string, shared: Shared): Promise<void> {
-  if (!ctx.state.loadSession) throw new Error(`${ctx.config.id} 的原生分叉需要 loadSession，但它没有声明这项能力。`)
+  const m = ACP_OPEN[localeOf(ctx.req)]
+  if (!ctx.state.loadSession) throw new Error(m.forkNeedsLoad(ctx.config.id))
   const request = adapter.request(handle, shared.cwd)
   const raw = await ctx.rpc.call(request.method, request.params)
   const forked = adapter.handle(raw)
-  if (forked === undefined) throw new Error(`${ctx.config.id} 的原生分叉没有返回新会话句柄。`)
+  if (forked === undefined) throw new Error(m.forkNoHandle(ctx.config.id))
   const loaded = ((await ctx.rpc.call("session/load", { sessionId: forked, ...shared })) ?? {}) as AcpNewSession
   ctx.state.acpSession = forked
   ctx.req.onHandle?.(forked)
@@ -358,7 +358,7 @@ export function adoptCatalog(state: OpenState, catalog: Catalog): void {
  */
 function adoptCatalogue(ctx: OpenCtx, session: AcpNewSession): void {
   // 模型、强度、以及**它们各自设回哪儿**：一次算齐（见 `catalogOf`）
-  adoptCatalog(ctx.state, catalogOf(session))
+  adoptCatalog(ctx.state, catalogOf(session, localeOf(ctx.req)))
   ctx.state.modes = modesOf(session)
   ctx.state.mode = currentModeOf(session)
   ctx.state.windowOf = contextWindows(session)
@@ -369,7 +369,7 @@ function adoptCatalogue(ctx: OpenCtx, session: AcpNewSession): void {
 /** 认领一个刚开出来（或分出来）的会话：记下 id，再认领目录。 */
 function adopt(ctx: OpenCtx, created: AcpNewSession): void {
   const id = created.sessionId
-  if (id === undefined) throw new Error(`${ctx.config.id} 没有返回 sessionId，无法继续`)
+  if (id === undefined) throw new Error(ACP_OPEN[localeOf(ctx.req)].noSessionId(ctx.config.id))
   ctx.state.acpSession = id
   ctx.req.onHandle?.(id)
   adoptCatalogue(ctx, created)

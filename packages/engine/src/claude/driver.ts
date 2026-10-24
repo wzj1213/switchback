@@ -180,7 +180,7 @@ class ClaudeSession implements EngineSession {
   }
 
   async prompt(text: string, turnId: TurnId, attachments?: readonly string[]): Promise<void> {
-    const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId))
+    const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId, { locale: localeOf(this.req) }))
     // 轮次由宿主铸造；引擎只在这里认领它，收工时由消息循环清空
     this.turn.current = turnId
     this.turn.pendingSteers = 0
@@ -211,7 +211,7 @@ class ClaudeSession implements EngineSession {
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const expected = this.turn.current
     if (expected === undefined) throw new Error(CLAUDE_DRIVER[localeOf(this.req)].noTurn)
-    const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId, "now"))
+    const message = await this.prepare(toUserMessage(text, attachments, this.req.threadId, { priority: "now", locale: localeOf(this.req) }))
     if (this.turn.current !== expected) throw new Error(CLAUDE_DRIVER[localeOf(this.req)].turnEnded)
     this.turn.pendingSteers += 1
     this.turn.halt.sent.add(message.uuid)

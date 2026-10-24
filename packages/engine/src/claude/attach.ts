@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import { loadImages } from "../image.js"
 
 /**
@@ -23,9 +24,10 @@ import { loadImages } from "../image.js"
 export async function toContent(
   text: string,
   attachments: readonly string[] | undefined,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<SDKUserMessage["message"]["content"]> {
   if (attachments === undefined || attachments.length === 0) return text
-  const images = await loadImages(attachments)
+  const images = await loadImages(attachments, locale)
   const blocks: unknown[] = images.map(({ mime, data }) => ({
     type: "image", source: { type: "base64", media_type: mime, data: data.toString("base64") },
   }))
@@ -43,11 +45,12 @@ export async function toUserMessage(
   text: string,
   attachments: readonly string[] | undefined,
   sessionId: string,
-  priority?: SDKUserMessage["priority"],
+  options: { priority?: SDKUserMessage["priority"]; locale?: Locale } = {},
 ): Promise<SDKUserMessage & { uuid: string }> {
+  const { priority, locale } = options
   return {
     type: "user",
-    message: { role: "user", content: await toContent(text, attachments) },
+    message: { role: "user", content: await toContent(text, attachments, locale) },
     parent_tool_use_id: null,
     session_id: sessionId,
     uuid: randomUUID(),

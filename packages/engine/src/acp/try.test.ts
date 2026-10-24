@@ -83,6 +83,8 @@ describe("试接一个 ACP 适配器", () => {
       timeoutMs: 300,
     })
     expect(trial.ok).toBe(false)
+    // 「没回应」单独标出来：调用方据此补一句 npx 第一次要现下载，不再去认措辞
+    expect(trial.timedOut).toBe(true)
     expect(trial.error).toContain("没有回应")
     // **这句是关键**：不讲 ACP 和「参数不对」在现象上一模一样，得把后一种可能说出来
     expect(trial.error).toContain("参数")

@@ -2,6 +2,10 @@ import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { parseRegistry, type RegistryAgent } from "./acp-registry-model.js"
 import type { Logger } from "./log.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_REGISTRY } from "./acp-registry.messages.js"
+
+type Text = (typeof ACP_REGISTRY)[Locale]
 
 /**
  * 取 ACP 注册表，并在本机留一份。
@@ -41,6 +45,8 @@ export interface RegistryDeps {
   fetch: typeof fetch
   now: () => number
   log: Logger
+  /** 取不到时那句话用哪种语言。缺省中文。 */
+  locale?: () => Locale
 }
 
 async function readCache(dir: string): Promise<Cached | undefined> {
@@ -52,17 +58,17 @@ async function readCache(dir: string): Promise<Cached | undefined> {
   }
 }
 
-async function download(deps: RegistryDeps): Promise<unknown> {
+async function download(deps: RegistryDeps, m: Text): Promise<unknown> {
   const response = await deps.fetch(REGISTRY_URL, { signal: AbortSignal.timeout(FETCH_MS) })
-  if (!response.ok) throw new Error(`注册表返回 HTTP ${String(response.status)}`)
+  if (!response.ok) throw new Error(m.http(response.status))
   const body = await response.text()
-  if (body.length > MAX_BYTES) throw new Error("注册表大得不正常，没有采用")
+  if (body.length > MAX_BYTES) throw new Error(m.tooBig)
   return JSON.parse(body) as unknown
 }
 
-function reason(error: unknown): string {
+function reason(error: unknown, m: Text): string {
   const message = error instanceof Error ? error.message : String(error)
-  return /abort|timeout/iu.test(message) ? "15 秒内没取到" : message
+  return /abort|timeout/iu.test(message) ? m.slow : message
 }
 
 export function createAcpRegistry(deps: RegistryDeps): { read: (force?: boolean) => Promise<RegistrySnapshot> } {
@@ -72,18 +78,19 @@ export function createAcpRegistry(deps: RegistryDeps): { read: (force?: boolean)
     if (!force && fresh) {
       return { agents: parseRegistry(cached.registry), fetchedAt: cached.fetchedAt, source: "cache" }
     }
+    const m = ACP_REGISTRY[deps.locale?.() ?? DEFAULT_LOCALE]
     try {
-      const registry = await download(deps)
+      const registry = await download(deps, m)
       const fetchedAt = deps.now()
       const agents = parseRegistry(registry)
       // 一家都认不出的不写盘：别拿一份坏的盖掉还能用的那份
       if (agents.length > 0) await writeFile(join(deps.dir, CACHE_FILE), JSON.stringify({ fetchedAt, registry }), "utf8")
       return { agents, fetchedAt, source: "network" }
     } catch (error) {
-      const why = `取不到 ACP 注册表（${reason(error)}）`
-      deps.log.write("warn", "registry", why)
-      if (cached === undefined) return { agents: [], source: "none", error: `${why}。联网后点「刷新」再试。` }
-      return { agents: parseRegistry(cached.registry), fetchedAt: cached.fetchedAt, source: "cache", error: `${why}，下面是本机存的那份。` }
+      const why = m.unreachable(reason(error, m))
+      deps.log.write("warn", "registry", `取不到 ACP 注册表（${error instanceof Error ? error.message : String(error)}）`)
+      if (cached === undefined) return { agents: [], source: "none", error: m.offline(why) }
+      return { agents: parseRegistry(cached.registry), fetchedAt: cached.fetchedAt, source: "cache", error: m.cached(why) }
     }
   }
   return { read }

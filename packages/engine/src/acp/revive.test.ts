@@ -40,7 +40,7 @@ describe("SessionRevive", () => {
     s: { acpSession: string | undefined; loadSession: boolean; native: { meta?: Readonly<Record<string, unknown>> | undefined } | undefined },
     call: (method: string, params: unknown) => Promise<unknown> = () => Promise.resolve({}),
   ): SessionRevive {
-    return new SessionRevive("acp:zcode", { call }, "/w", s)
+    return new SessionRevive({ id: "acp:zcode", cwd: "/w" }, { call }, s)
   }
 
   it("拿当前句柄去 `session/load`，带上工作区和这家的原生审批开关", async () => {

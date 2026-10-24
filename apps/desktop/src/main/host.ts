@@ -227,8 +227,7 @@ export function attachHost(
   // 规则和事件分开存；对话基线也有独立生命周期。
   const { journal, rules, baselines } = openStores(log, emit, () => ports.locale?.() ?? DEFAULT_LOCALE)
 
-  const { drivers, labels, reload } = buildRegistry(app.getPath("userData"), log,
-    readBuildInfo(app.getAppPath()).claudeExecutable, ports?.dshProfile)
+  const { drivers, labels, reload } = buildRegistry(app.getPath("userData"), log, readBuildInfo(app.getAppPath()).claudeExecutable, ports?.dshProfile)
 
   const host = createHost({
     drivers,

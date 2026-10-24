@@ -83,6 +83,14 @@ describe("写样板", () => {
     expect(readFileSync(join(dir, ENGINES_FILE), "utf8")).toBe('{"mine":{"command":"my-acp"}}')
   })
 
+  it("英文界面写英文样板：注释键换成 _notes，照样被当成注释跳过", () => {
+    const { dir, log } = dirWith()
+    const raw = JSON.parse(readFileSync(ensureEngineFile(dir, "en"), "utf8")) as Record<string, unknown>
+    expect(Object.keys(raw)).toEqual(["_notes", "example"])
+    expect(raw["example"]).toMatchObject({ label: "Example (delete this entry)", command: "codex-acp" })
+    expect(Object.keys(readEngineFile(dir, log))).toEqual(["example"])
+  })
+
   it("样板里的示例条目本身是可解析的，但它只是样板", () => {
     const { dir, log } = dirWith()
     ensureEngineFile(dir)

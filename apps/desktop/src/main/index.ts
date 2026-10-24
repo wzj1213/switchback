@@ -255,7 +255,7 @@ function installAppChannels(): void {
     dataDir: app.getPath("userData"),
   }))
   ipcMain.on("switchback:openEngines", () => {
-    void shell.openPath(ensureEngineFile(app.getPath("userData")))
+    void shell.openPath(ensureEngineFile(app.getPath("userData"), settings.get().language))
   })
   ipcMain.on("switchback:diagnose", () => {
     void exportReport(log, crash, settings.get().language)
@@ -396,7 +396,7 @@ function bootstrap(): Promise<void> {
       onEngines: () => {
         // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
         // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
-        void shell.openPath(ensureEngineFile(app.getPath("userData")))
+        void shell.openPath(ensureEngineFile(app.getPath("userData"), settings.get().language))
       },
       ...(feed === "" ? {} : { onCheckUpdate: () => runUpdateCheck(true) }),
     })
@@ -447,7 +447,7 @@ function bootstrap(): Promise<void> {
     // 等宿主建好再挂：设置变化才能把新清单同时推给桌面与远程端。
     installEngineSettings(settings, attached, log, channels)
     // ACP 注册表、接入、登录：同样要宿主（接完当场重探、判断哪几家正在被会话用着）
-    installAcpChannels(attached, log)
+    installAcpChannels(attached, log, () => settings.get().language)
     // 外发守卫的账和 ZCode 防护状态；开着「给 ZCode 的快照目录上锁」就在起来时锁上
     installGuard(attached, settings.get().zcodeLock, log, channels)
     checkExposed()

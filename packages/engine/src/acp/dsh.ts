@@ -1,10 +1,15 @@
 import type { ChildProcess } from "node:child_process"
 import type { EngineDriver } from "../contract.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import { probeCommand, type Probe } from "../probe.js"
 import { createRpc, type RpcPeer } from "../rpc.js"
 import { createProcessOwner } from "../subprocess.js"
 import { createAcpDriver } from "./driver.js"
 import type { AcpInitialize } from "./wire.js"
+import { ACP_DSH } from "./dsh.messages.js"
+
+type Text = (typeof ACP_DSH)[Locale]
 
 /** DSH 把 ACP 做成 profile；Switchback 只启动这扇公开的 stdio 门。 */
 const DEFAULT_PROFILE = "acp"
@@ -20,7 +25,7 @@ const INITIALIZE = {
   clientInfo: { name: "switchback", title: "Switchback", version: "0.1.0" },
 }
 
-export type DshCommandProbe = (command: string, hint?: string) => Promise<Probe>
+export type DshCommandProbe = (command: string, hint?: string, locale?: Locale) => Promise<Probe>
 export interface DshProfileStatus {
   ready: boolean
   detail?: string
@@ -29,7 +34,7 @@ export interface DshProfileStatus {
   /** initialize 中能确认的能力；没有能力位时明确写“会话仅新建”。 */
   capabilities?: readonly string[]
 }
-export type DshProfileCheck = (command: string, profile: string) => Promise<DshProfileStatus>
+export type DshProfileCheck = (command: string, profile: string, locale?: Locale) => Promise<DshProfileStatus>
 
 export interface DshDriverOptions {
   command?: string
@@ -48,9 +53,9 @@ function argsOf(profile: string): readonly string[] {
   return ["--profile", profile]
 }
 
-export function dshProfileOf(requested?: string, current?: () => string): string {
+export function dshProfileOf(requested?: string, current?: () => string, locale: Locale = DEFAULT_LOCALE): string {
   const profile = requested ?? current?.() ?? DEFAULT_PROFILE
-  if (!isDshProfileName(profile)) throw new Error(`DSH profile 名称无效：${JSON.stringify(profile)}`)
+  if (!isDshProfileName(profile)) throw new Error(ACP_DSH[locale].badProfile(JSON.stringify(profile)))
   return profile
 }
 
@@ -62,39 +67,32 @@ function compatible(result: unknown): result is AcpInitialize {
 
 type CheckOutcome = { kind: "ready"; info: AcpInitialize } | "incompatible" | "timeout" | Error
 
-function capabilitiesOf(info: AcpInitialize): readonly string[] {
+function capabilitiesOf(info: AcpInitialize, m: Text): readonly string[] {
   const session = info.agentCapabilities?.sessionCapabilities ?? {}
   const sessions = [
-    ...(Object.hasOwn(session, "list") ? ["列表"] : []),
-    ...(info.agentCapabilities?.loadSession === true ? ["续跑"] : []),
-    ...(Object.hasOwn(session, "fork") ? ["分叉"] : []),
+    ...(Object.hasOwn(session, "list") ? [m.cap.list] : []),
+    ...(info.agentCapabilities?.loadSession === true ? [m.cap.resume] : []),
+    ...(Object.hasOwn(session, "fork") ? [m.cap.fork] : []),
   ]
-  const sessionText = sessions.length === 0 ? "会话仅新建" : `会话：${sessions.join("/")}`
-  return [
-    sessionText,
-    ...(info.agentCapabilities?.promptCapabilities?.image === true ? ["图片提示"] : []),
-  ]
+  const sessionText = sessions.length === 0 ? m.newOnly : m.sessions(sessions)
+  return [sessionText, ...(info.agentCapabilities?.promptCapabilities?.image === true ? [m.image] : [])]
 }
 
-function readyStatus(info: AcpInitialize): DshProfileStatus {
+function readyStatus(info: AcpInitialize, m: Text): DshProfileStatus {
   const identity = info.agentInfo
   const name = identity?.title ?? identity?.name
   const agent = [name, identity?.version].filter((item): item is string => item !== undefined).join(" ")
   return {
     ready: true,
     ...(agent === "" ? {} : { agent }),
-    capabilities: capabilitiesOf(info),
+    capabilities: capabilitiesOf(info, m),
   }
 }
 
-function statusOf(outcome: CheckOutcome, stderr: string): DshProfileStatus {
-  if (typeof outcome === "object" && !(outcome instanceof Error)) return readyStatus(outcome.info)
+function statusOf(outcome: CheckOutcome, stderr: string, m: Text): DshProfileStatus {
+  if (typeof outcome === "object" && !(outcome instanceof Error)) return readyStatus(outcome.info, m)
   const fallback =
-    outcome === "timeout"
-      ? `DSH 在 ${String(CHECK_MS / 1000)} 秒内没有完成 ACP initialize。`
-      : outcome === "incompatible"
-        ? "DSH 返回了 Switchback 不支持的 ACP initialize 结果。"
-        : outcome.message
+    outcome === "timeout" ? m.timeout(CHECK_MS / 1000) : outcome === "incompatible" ? m.incompatible : outcome.message
   return { ready: false, detail: stderr.trim() || fallback }
 }
 
@@ -109,7 +107,7 @@ function wire(child: ChildProcess, rpc: RpcPeer, output: { stderr: string }): vo
 }
 
 /** 真起公开 profile 并做 initialize；只读配置会漏掉插件依赖不兼容。 */
-const checkProfile: DshProfileCheck = async (command, profile) => {
+const checkProfile: DshProfileCheck = async (command, profile, locale = DEFAULT_LOCALE) => {
   const owner = createProcessOwner({
     exitGraceMs: RECLAIM_MS,
     termGraceMs: RECLAIM_MS,
@@ -137,36 +135,33 @@ const checkProfile: DshProfileCheck = async (command, profile) => {
       owner.died(),
       timeout,
     ])
-    return statusOf(outcome, output.stderr)
+    return statusOf(outcome, output.stderr, ACP_DSH[locale])
   } catch (error) {
     return { ready: false, detail: error instanceof Error ? error.message : String(error) }
   } finally {
     if (timer !== undefined) clearTimeout(timer)
     state.child?.stdin?.end()
-    rpc.close("DSH profile 探测结束")
+    rpc.close("DSH profile 探测结束") // i18n-ok：收摊时拒掉没回音的调用，那时已经没人在等它
     await owner.reclaim().catch(() => undefined)
   }
 }
 
-export async function probeDshAcp(
-  command = "dsh",
-  profile = DEFAULT_PROFILE,
-  commandProbe: DshCommandProbe = probeCommand,
-  profileCheck: DshProfileCheck = checkProfile,
-): Promise<Probe> {
-  if (!isDshProfileName(profile)) {
-    return { state: "unavailable", detail: `DSH profile 名称无效：${JSON.stringify(profile)}` }
-  }
-  const found = await commandProbe(command, `请先安装 DSH，并配置名为 \`${profile}\` 的 ACP profile。`)
+/** 探测要注入的两步，以及说话用的语言。测试换掉前两样就不必真起 DSH。 */
+export interface DshProbeDeps {
+  commandProbe?: DshCommandProbe
+  profileCheck?: DshProfileCheck
+  locale?: Locale
+}
+
+export async function probeDshAcp(command = "dsh", profile = DEFAULT_PROFILE, deps: DshProbeDeps = {}): Promise<Probe> {
+  const locale = deps.locale ?? DEFAULT_LOCALE
+  const m = ACP_DSH[locale]
+  if (!isDshProfileName(profile)) return { state: "unavailable", detail: m.badProfile(JSON.stringify(profile)) }
+  const found = await (deps.commandProbe ?? probeCommand)(command, m.install(profile), locale)
   if (found.state !== "ok" || found.path === undefined) return found
-  const checked = await profileCheck(found.path, profile)
+  const checked = await (deps.profileCheck ?? checkProfile)(found.path, profile, locale)
   if (checked.ready) {
-    const details = [
-      found.detail,
-      `\`${profile}\` profile 可握手`,
-      checked.agent,
-      ...(checked.capabilities ?? []),
-    ]
+    const details = [found.detail, m.handshakes(profile), checked.agent, ...(checked.capabilities ?? [])]
     return { ...found, detail: details.filter(Boolean).join(" · ") }
   }
   /*
@@ -182,12 +177,7 @@ export async function probeDshAcp(
    */
   return {
     state: "unavailable",
-    detail: [
-      `DSH 装着，但 \`${profile}\` 这棵 profile 没有应答 ACP。到「设置 → 引擎 → DSH」换一棵装了 ACP 插件的；\`dsh --profile ${profile}\` 能看它自己的报错。`,
-      checked.detail,
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    detail: [m.noAcp(profile), checked.detail].filter(Boolean).join("\n"),
   }
 }
 
@@ -197,16 +187,15 @@ export function createDshDriver(options: DshDriverOptions = {}): EngineDriver {
   return {
     id: "dsh",
     start: (req) => {
-      const profile = dshProfileOf(req.profile, options.profile)
+      const profile = dshProfileOf(req.profile, options.profile, localeOf(req))
       const driver = createAcpDriver({ id: "dsh", label: "DSH", command, args: argsOf(profile) })
       return driver.start({ ...req, profile })
     },
-    probe: () =>
-      probeDshAcp(
-        command,
-        options.profile?.() ?? DEFAULT_PROFILE,
-        options.commandProbe ?? probeCommand,
-        options.profileCheck ?? checkProfile,
-      ),
+    probe: (locale) =>
+      probeDshAcp(command, options.profile?.() ?? DEFAULT_PROFILE, {
+        ...(options.commandProbe === undefined ? {} : { commandProbe: options.commandProbe }),
+        ...(options.profileCheck === undefined ? {} : { profileCheck: options.profileCheck }),
+        ...(locale === undefined ? {} : { locale }),
+      }),
   }
 }

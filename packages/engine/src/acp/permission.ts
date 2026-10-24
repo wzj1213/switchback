@@ -3,6 +3,8 @@ import type { RememberScope, Trust } from "@switchback/protocol"
 import type { ApprovalAnswer, ApprovalAsk, InteractionWait } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
 import type { Rule } from "@switchback/approval"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import { buildRequest, pickOption } from "./approve.js"
 import type { AcpPermissionOption, AcpPermissionRequest, AcpToolCall } from "./wire.js"
 
@@ -28,6 +30,8 @@ export interface PermissionContext {
   signal?: AbortSignal
   /** 等详情补齐最多等多久（毫秒）。默认 `DETAIL_WAIT_MS`；测试传 0 就不等。 */
   waitMs?: number
+  /** 审批卡上那几句（摘要、判定理由）用哪种语言。缺省中文。 */
+  locale?: () => Locale
 }
 
 /**
@@ -112,13 +116,9 @@ export async function handlePermission(ctx: PermissionContext, call: ServerCall)
   const params = call.params as AcpPermissionRequest
   const id = params.toolCall?.toolCallId
   const merged = await withDetails(ctx, id, params.toolCall ?? {})
-  const request = buildRequest(ctx.engine, merged, ctx.cwd)
-  const verdict = decide(request, {
-    trust: ctx.trust(),
-    worksite: ctx.cwd,
-    home: ctx.home,
-    memory: ctx.memory(),
-  })
+  const locale = localeOf(ctx)
+  const request = buildRequest(ctx.engine, merged, ctx.cwd, locale)
+  const verdict = decide(request, { trust: ctx.trust(), worksite: ctx.cwd, home: ctx.home, memory: ctx.memory(), locale })
   const options = params.options ?? []
   if (verdict.action !== "escalate") {
     respond(call, options, verdict.action === "allow", "once")

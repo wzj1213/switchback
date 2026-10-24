@@ -2,6 +2,8 @@ import type { ChildProcess } from "node:child_process"
 import { NO_CAPABILITIES } from "@switchback/protocol"
 import type { EngineCapabilities, EngineStatus, EngineThread, ModelOption, Trust, TurnId } from "@switchback/protocol"
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
+import { DEFAULT_LOCALE } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import { createRpc, type RpcPeer, type ServerCall } from "../rpc.js"
 import { createProcessOwner, type ProcessOwner } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
@@ -17,6 +19,7 @@ import type { AcpNotification, AcpPromptResult, AcpToolCall } from "./wire.js"
 import { foreignSessionId, mine, onForeign } from "./route.js"
 import { AcpPromptBridge } from "./prompt.js"
 import { SessionRevive } from "./revive.js"
+import { ACP_DRIVER } from "./driver.messages.js"
 
 /**
  * 通用 ACP 驱动。**一个驱动接所有讲 ACP 的引擎**——这是接第三家协议的全部意义：
@@ -115,12 +118,13 @@ class AcpSession implements EngineSession {
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
       onNotification: (method, params) => this.onNotification(method, params),
       onRequest: (call) => void this.answer(call),
+      language: () => localeOf(req),
     })
     this.clientCalls = createAcpClientCalls({
       req, config, inflight: this.inflight, outside: this.outside, trust: () => this.trust.current,
       sessionId: () => this.state.acpSession,
     })
-    this.revive = new SessionRevive(config.id, this.rpc, req.cwd, this.state)
+    this.revive = new SessionRevive({ id: config.id, cwd: req.cwd, locale: () => localeOf(req) }, this.rpc, this.state)
     this.prompts = new AcpPromptBridge({
       id: config.id,
       rpc: this.rpc,
@@ -131,6 +135,7 @@ class AcpSession implements EngineSession {
       complete: (turnId, reason) => this.finishTurn(turnId, reason),
       fail: (turnId, message) => this.failTurn(turnId, message),
       revive: () => this.revive.run(),
+      locale: () => localeOf(req),
     })
   }
 
@@ -153,6 +158,7 @@ class AcpSession implements EngineSession {
         return `${prefix}-${String(this.seq)}`
       },
       now: () => Date.now(),
+      locale: () => localeOf(this.req),
     }
   }
 
@@ -174,6 +180,7 @@ class AcpSession implements EngineSession {
         this.req.onTrustApply?.({ ...result, at: Date.now() })
       },
       state: this.state,
+      locale: () => localeOf(this.req),
       ...(this.config.nativeApproval === undefined ? {} : { nativeApproval: this.config.nativeApproval }),
     }
   }
@@ -186,23 +193,12 @@ class AcpSession implements EngineSession {
     adoptCatalog(this.state, catalog)
     this.req.onModel?.(catalog.model, catalog.effort)
     if (catalog.model !== undefined) this.req.onEngineState?.({ modelId: catalog.model })
-    this.req.emit({
-      type: "models.updated",
-      at: Date.now(),
-      threadId: this.req.threadId,
-      engine: this.config.id,
-      models: catalog.models,
-    })
+    this.req.emit({ type: "models.updated", at: Date.now(), threadId: this.req.threadId, engine: this.config.id, models: catalog.models })
   }
 
   private status(status: EngineStatus, detail?: string): void {
-    this.req.emit({
-      type: "engine.status",
-      at: Date.now(),
-      threadId: this.req.threadId,
-      status,
-      ...(detail === undefined || detail === "" ? {} : { detail }),
-    })
+    const event = { type: "engine.status", at: Date.now(), threadId: this.req.threadId, status } as const
+    this.req.emit(detail === undefined || detail === "" ? event : { ...event, detail })
   }
 
   private onNotification(method: string, params: unknown): void {
@@ -248,7 +244,8 @@ class AcpSession implements EngineSession {
       this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
     })
     child.on("exit", (code, signal) => {
-      const detail = `${this.config.id} 进程已退出（${code === null ? `信号 ${String(signal)}` : `code ${String(code)}`}）`
+      const m = ACP_DRIVER[localeOf(this.req)]
+      const detail = m.exited(this.config.id, code === null ? m.bySignal(String(signal)) : `code ${String(code)}`)
       this.clientCalls.dispose()
       this.rpc.close(detail)
       if (code !== 0 && code !== null) this.status("crashed", this.state.stderr)
@@ -315,6 +312,7 @@ class AcpSession implements EngineSession {
       notify: (method, params) => {
         this.rpc.notify(method, params)
       },
+      locale: () => localeOf(this.req),
     }
   }
 
@@ -373,7 +371,7 @@ class AcpSession implements EngineSession {
     if (this.state.canList === false) return []
     const raw = await this.rpc.call("session/list", { cwd: this.req.cwd }).catch(() => undefined)
     this.state.canList = raw !== undefined
-    const sessions = sessionsOf(raw, HISTORY_MAX)
+    const sessions = sessionsOf(raw, HISTORY_MAX, localeOf(this.req))
     return this.req.profile === undefined ? sessions
       : sessions.map((session) => ({ ...session, profile: this.req.profile }))
   }
@@ -410,7 +408,7 @@ class AcpSession implements EngineSession {
   async setTrust(trust: Trust): Promise<TrustChange> {
     if (trust === this.trust.current) return { restart: false }
     if (needsNativeRestart(this.state.native, this.config.nativeApproval?.(trust))) {
-      return { restart: true, detail: `${this.config.id} 的原生审批档要在开场设置；请等当前轮结束后续接重启。` }
+      return { restart: true, detail: ACP_DRIVER[localeOf(this.req)].nativeRestart(this.config.id) }
     }
     /*
      * **先记下新档，再去发 `session/set_mode`。**
@@ -445,10 +443,10 @@ class AcpSession implements EngineSession {
     // **替 agent 起的那些进程要一起收掉**：它们的父进程是 Switchback，不是引擎，
     // 所以引擎那边的回收管不着它们——不杀就会活过整个应用
     this.state.child?.stdin?.end()
-    this.rpc.close("会话正在关闭")
+    this.rpc.close(ACP_DRIVER[localeOf(this.req)].closing)
     const report = await this.owner.reclaim()
     if (report.rung === "escaped") {
-      this.status("crashed", `${this.config.id} 进程组未能回收（pid ${String(report.pid)}），可能已泄漏`)
+      this.status("crashed", ACP_DRIVER[localeOf(this.req)].leaked(this.config.id, String(report.pid)))
     }
   }
 }
@@ -456,7 +454,7 @@ class AcpSession implements EngineSession {
 export function createAcpDriver(config: AcpDriverConfig): EngineDriver {
   return {
     id: config.id,
-    probe: () => probeCommand(config.command, "检查 engines.json 里写的路径对不对；改完那个文件要重启 Switchback。"),
+    probe: (locale) => probeCommand(config.command, ACP_DRIVER[locale ?? DEFAULT_LOCALE].probeHint, locale),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new AcpSession(req, config)
       // **握手失败也要回收。** `start()` 第一件事就是 spawn，而握手超时 / 对端回

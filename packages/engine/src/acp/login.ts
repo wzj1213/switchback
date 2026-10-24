@@ -1,6 +1,9 @@
 import { authMethodsOf, canLogout, type AcpAuthMethod } from "./auth.js"
 import { abortedBy, initializeOnce, sleep, withAcpProcess, type OneShot, type OneShotRequest } from "./oneshot.js"
 import { startupMessage } from "./setup.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ACP_LOGIN } from "./login.messages.js"
+import { ACP_ONESHOT } from "./oneshot.messages.js"
 
 /**
  * 替人把「我要用这种方式登录」转给 agent。
@@ -38,11 +41,11 @@ async function settle(
   ])
 }
 
-function outcomeText(outcome: Outcome, command: string): string | undefined {
-  if (outcome === "timeout") return "等了五分钟还没办完，已放弃。浏览器那边没走完的话，再点一次「登录」。"
-  if (outcome === "aborted") return "已取消。"
-  if ("died" in outcome) return startupMessage(command, outcome.died)
-  if ("failed" in outcome) return `它没办成：${outcome.failed.message}`
+function outcomeText(outcome: Outcome, command: string, locale: Locale): string | undefined {
+  if (outcome === "timeout") return ACP_LOGIN[locale].timeout
+  if (outcome === "aborted") return ACP_ONESHOT[locale].cancelled
+  if ("died" in outcome) return startupMessage(command, outcome.died, locale)
+  if ("failed" in outcome) return ACP_LOGIN[locale].failed(outcome.failed.message)
   return undefined
 }
 
@@ -51,10 +54,11 @@ async function methodFrom(
   shot: OneShot,
   req: OneShotRequest & { methodId: string },
 ): Promise<{ method?: AcpAuthMethod; logout: boolean; error?: string }> {
+  const locale = req.locale ?? DEFAULT_LOCALE
   const init = await initializeOnce(shot, HANDSHAKE_MS)
-  if (init.kind === "timeout") return { logout: false, error: "它 30 秒内没有完成握手，没法登录。先点「试接」看看它还起不起得来。" }
-  if (init.kind === "died") return { logout: false, error: startupMessage(req.command, init.error) }
-  if (init.kind === "aborted") return { logout: false, error: "已取消。" }
+  if (init.kind === "timeout") return { logout: false, error: ACP_LOGIN[locale].loginHandshake }
+  if (init.kind === "died") return { logout: false, error: startupMessage(req.command, init.error, locale) }
+  if (init.kind === "aborted") return { logout: false, error: ACP_ONESHOT[locale].cancelled }
   const method = authMethodsOf(init.info).find((one) => one.id === req.methodId)
   return { logout: canLogout(init.info), ...(method === undefined ? {} : { method }) }
 }
@@ -62,17 +66,16 @@ async function methodFrom(
 type LoginRequest = OneShotRequest & { methodId: string; signal?: AbortSignal; timeoutMs?: number }
 
 async function authenticateIn(shot: OneShot, req: LoginRequest): Promise<AcpLoginResult> {
+  const locale = req.locale ?? DEFAULT_LOCALE
   const found = await methodFrom(shot, req)
   if (found.error !== undefined) return { ok: false, error: found.error }
-  if (found.method === undefined) {
-    return { ok: false, error: `它这一次没有报「${req.methodId}」这种登录方式。点「试接」重新看看它现在认哪几种。` }
-  }
-  if (found.method.kind === "terminal") return { ok: false, error: "这一种要在终端里登录，不能直接转给它。" }
+  if (found.method === undefined) return { ok: false, error: ACP_LOGIN[locale].noMethod(req.methodId) }
+  if (found.method.kind === "terminal") return { ok: false, error: ACP_LOGIN[locale].terminalOnly }
   const outcome = await settle(shot, shot.rpc.call("authenticate", { methodId: req.methodId }), {
     ms: req.timeoutMs ?? LOGIN_MS,
     ...(req.signal === undefined ? {} : { signal: req.signal }),
   })
-  const error = outcomeText(outcome, req.command)
+  const error = outcomeText(outcome, req.command, locale)
   return error === undefined ? { ok: true } : { ok: false, error }
 }
 
@@ -87,14 +90,15 @@ export async function acpAuthenticate(req: LoginRequest): Promise<AcpLoginResult
 
 /** 退出登录。**只对报了 `auth.logout` 的发**——没报就照实说不认，不去撞一个 `-32601`。 */
 export async function acpLogout(req: OneShotRequest): Promise<AcpLoginResult> {
+  const locale = req.locale ?? DEFAULT_LOCALE
   return withAcpProcess(req, async (shot): Promise<AcpLoginResult> => {
     const init = await initializeOnce(shot, HANDSHAKE_MS)
-    if (init.kind === "timeout") return { ok: false, error: "它 30 秒内没有完成握手，没法退出登录。" }
-    if (init.kind === "died") return { ok: false, error: startupMessage(req.command, init.error) }
-    if (init.kind === "aborted") return { ok: false, error: "已取消。" }
-    if (!canLogout(init.info)) return { ok: false, error: "它没有声明支持退出登录，只能照它自己的文档来。" }
+    if (init.kind === "timeout") return { ok: false, error: ACP_LOGIN[locale].logoutHandshake }
+    if (init.kind === "died") return { ok: false, error: startupMessage(req.command, init.error, locale) }
+    if (init.kind === "aborted") return { ok: false, error: ACP_ONESHOT[locale].cancelled }
+    if (!canLogout(init.info)) return { ok: false, error: ACP_LOGIN[locale].noLogout }
     const outcome = await settle(shot, shot.rpc.call("logout", {}), { ms: HANDSHAKE_MS })
-    const error = outcomeText(outcome, req.command)
+    const error = outcomeText(outcome, req.command, locale)
     return error === undefined ? { ok: true } : { ok: false, error }
   }).catch((error: unknown): AcpLoginResult => ({ ok: false, error: error instanceof Error ? error.message : String(error) }))
 }

@@ -1,3 +1,4 @@
+import type { Locale } from "@switchback/i18n"
 import { loadImages, mimeOfImage } from "../image.js"
 
 /**
@@ -22,9 +23,10 @@ import { loadImages, mimeOfImage } from "../image.js"
 export async function imageBlocks(
   paths: readonly string[] | undefined,
   allowed: boolean,
+  locale?: Locale,
 ): Promise<readonly unknown[]> {
   if (paths === undefined || paths.length === 0 || !allowed) return []
-  return (await loadImages(paths)).map(({ data, mime }) => (
+  return (await loadImages(paths, locale)).map(({ data, mime }) => (
     { type: "image", data: data.toString("base64"), mimeType: mime }
   ))
 }
