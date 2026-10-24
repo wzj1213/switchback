@@ -1,6 +1,7 @@
 import type { Event, ThreadId, TurnId } from "@switchback/protocol"
 import { CodexActivityTracker } from "./activity.js"
 import { createHookTracker, type HookTracker } from "./hooks.js"
+import type { Locale } from "@switchback/i18n"
 
 interface ObserverOut {
   threadId: ThreadId
@@ -8,6 +9,8 @@ interface ObserverOut {
   turnId: () => TurnId | undefined
   emit: (event: Event) => void
   now: () => number
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 export interface CodexObservers {
@@ -24,6 +27,7 @@ export function createCodexObservers(out: ObserverOut): CodexObservers {
       turnId: out.turnId,
       emit: out.emit,
       now: out.now,
+      ...(out.locale === undefined ? {} : { locale: out.locale }),
     }),
   }
 }

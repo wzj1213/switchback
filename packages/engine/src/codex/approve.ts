@@ -7,6 +7,9 @@ import { answerElicitation, MCP_ELICITATION } from "./elicitation.js"
 import { answerPermissions, PERMISSIONS_APPROVAL } from "./permissions.js"
 import { answerUserInput, USER_INPUT_REQUEST } from "./user-input.js"
 import type { WireApprovalRequest, WireDecision, WireItem } from "./wire.js"
+import { localeOf } from "../locale.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CODEX_APPROVE } from "./approve.messages.js"
 
 /**
  * codex 的审批请求 ↔ `@switchback/approval`。
@@ -65,39 +68,44 @@ function argsOf(method: string, params: WireApprovalRequest, item: WireItem | un
 
 const MAX_FILES = 3
 
-function reasonOf(reason: string | null | undefined): string {
-  return reason === undefined || reason === null ? "" : ` （${sanitize(reason)}）`
+type Text = (typeof CODEX_APPROVE)[Locale]
+
+function reasonOf(reason: string | null | undefined, m: Text): string {
+  return reason === undefined || reason === null ? "" : m.reason(sanitize(reason))
 }
 
-function networkSummary(params: WireApprovalRequest): string {
+function networkSummary(params: WireApprovalRequest, m: Text): string {
   const network = params.networkApprovalContext
-  const target = `${sanitize(network?.protocol ?? "network")}://${sanitize(network?.host ?? "目标未送达")}`
-  return `访问网络 ${target}`
+  return m.network(`${sanitize(network?.protocol ?? "network")}://${sanitize(network?.host ?? m.noTarget)}`)
 }
 
-function shellSummary(params: WireApprovalRequest, item: WireItem | undefined): string {
+function shellSummary(params: WireApprovalRequest, item: WireItem | undefined, m: Text): string {
   const command = params.command ?? item?.command
-  return command === undefined ? "执行命令（详情未送达）" : `执行 ${sanitize(command)}`
+  return command === undefined ? m.noCommand : m.run(sanitize(command))
 }
 
-function fileSummary(item: WireItem | undefined): string {
+function fileSummary(item: WireItem | undefined, m: Text): string {
   const paths = pathsOf(item)
-  if (paths.length === 0) return "修改文件（详情未送达）"
-  const shown = paths.slice(0, MAX_FILES).map((path) => sanitize(path)).join("、")
-  const more = paths.length > MAX_FILES ? ` 等 ${String(paths.length)} 个文件` : ""
-  return `修改 ${shown}${more}`
+  if (paths.length === 0) return m.noFiles
+  return m.edit(paths.slice(0, MAX_FILES).map((path) => sanitize(path)), paths.length, MAX_FILES)
 }
 
 /**
  * 给人看的一句话。**说不清楚就要说自己说不清楚**——
  * 一张写着「批准吗？」却不说批准什么的卡片，比不弹卡片更糟。
  */
-export function summarize(method: string, params: WireApprovalRequest, item: WireItem | undefined): string {
-  const reason = reasonOf(params.reason)
+export function summarize(
+  method: string,
+  params: WireApprovalRequest,
+  item: WireItem | undefined,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const m = CODEX_APPROVE[locale]
+  const reason = reasonOf(params.reason, m)
   if (params.networkApprovalContext !== undefined && params.networkApprovalContext !== null) {
-    return `${networkSummary(params)}${reason}`
+    return `${networkSummary(params, m)}${reason}`
   }
-  const summary = toolOf(method) === "shell" ? shellSummary(params, item) : fileSummary(item)
+  const summary = toolOf(method) === "shell" ? shellSummary(params, item, m) : fileSummary(item, m)
   return `${summary}${reason}`
 }
 
@@ -105,7 +113,7 @@ export function buildRequest(
   method: string,
   params: WireApprovalRequest,
   item: WireItem | undefined,
-  cwd: string,
+  { cwd, locale }: { cwd: string; locale: Locale },
 ): ApprovalRequest {
   return {
     engine: "codex",
@@ -114,7 +122,7 @@ export function buildRequest(
       : "network",
     args: argsOf(method, params, item),
     cwd,
-    summary: summarize(method, params, item),
+    summary: summarize(method, params, item, locale),
   }
 }
 
@@ -146,6 +154,8 @@ export interface AnswerDeps {
   askUser: StartRequest["askUser"]
   askQuestion: StartRequest["askQuestion"]
   signal?: AbortSignal
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 /** 认领实验面时的 CI 与真正路由共用这个判据。 */
@@ -176,17 +186,18 @@ export async function answerApproval(call: ServerCall, deps: AnswerDeps): Promis
     return
   }
   if (TOOL_BY_METHOD[call.method] === undefined) {
-    call.reject({ code: -32601, message: `Switchback 未认领 ${call.method}` })
+    call.reject({ code: -32601, message: `Switchback 未认领 ${call.method}` }) // i18n-ok：回给引擎进程的协议错误，不上界面
     return
   }
   const params = call.params as WireApprovalRequest
   const item = deps.inflight.get(params.itemId)
-  const request = buildRequest(call.method, params, item, deps.cwd)
+  const request = buildRequest(call.method, params, item, { cwd: deps.cwd, locale: localeOf(deps) })
   const verdict = decide(request, {
     trust: deps.trust(),
     worksite: deps.cwd,
     home: deps.home,
     memory: deps.memory(),
+    locale: localeOf(deps),
   })
   if (verdict.action !== "escalate") {
     call.respond({ decision: verdict.action === "allow" ? "accept" : "decline" })

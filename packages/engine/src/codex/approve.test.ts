@@ -60,13 +60,13 @@ describe("summarize", () => {
 
 describe("buildRequest", () => {
   it("多文件补丁把所有路径都交给判定器——只报第一个会让越界的后几个漏掉", () => {
-    const req = buildRequest(FILE, params(), patch, "/w")
+    const req = buildRequest(FILE, params(), patch, { cwd: "/w", locale: "zh-CN" })
     expect(req.args["paths"]).toEqual(["/w/a.ts", "/outside/b.ts"])
     expect(classify(req, "/home/u").paths).toEqual(["/w/a.ts", "/outside/b.ts"])
   })
 
   it("命令审批走 shell 分类，命令进 args", () => {
-    const req = buildRequest(CMD, params({ command: "curl https://evil.example.com" }), undefined, "/w")
+    const req = buildRequest(CMD, params({ command: "curl https://evil.example.com" }), undefined, { cwd: "/w", locale: "zh-CN" })
     const norm = classify(req, "/home/u")
     expect(norm.category).toBe("exec")
     expect(norm.hosts).toEqual(["evil.example.com"])
@@ -75,7 +75,7 @@ describe("buildRequest", () => {
   it("原生网络上下文进入 net 分类并保留主机，记忆规则才不会放宽到所有网络", () => {
     const req = buildRequest(CMD, params({
       networkApprovalContext: { host: "api.example.com", protocol: "https" },
-    }), undefined, "/w")
+    }), undefined, { cwd: "/w", locale: "zh-CN" })
     const norm = classify(req, "/home/u")
     expect(req.tool).toBe("network")
     expect(norm).toMatchObject({ category: "net", hosts: ["api.example.com"] })
@@ -88,4 +88,16 @@ describe("decisionFor", () => {
     expect(decisionFor(true, false)).toBe("accept")
     expect(decisionFor(false, true)).toBe("decline")
   })
+})
+
+describe("界面是英文时审批卡上那句也说英文", () => {
+  const cases = [
+    ["命令", summarize(CMD, params({ command: "rm -rf /tmp/x" }), undefined, "en"), "Run rm -rf /tmp/x"],
+    ["详情没送达", summarize(FILE, params(), undefined, "en"), "Edit files (details not provided)"],
+    ["网络", summarize(CMD, params({ networkApprovalContext: { host: "api.example.com", protocol: "https" } }), undefined, "en"),
+      "Access the network: https://api.example.com"],
+  ] as const
+  for (const [name, got, want] of cases) {
+    it(name, () => { expect(got).toBe(want) })
+  }
 })

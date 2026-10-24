@@ -1,5 +1,7 @@
 import type { EngineAccount, EngineThread, ModelOption, SlashCommand } from "@switchback/protocol"
 import type { WireSkill, WireSkillGroup } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CODEX_CATALOG } from "./catalog.messages.js"
 
 /*
  * codex 报上来的东西 → Switchback 的中立形状。
@@ -128,7 +130,7 @@ interface WireThreadRow {
   recencyAt?: number | null
 }
 
-export function toEngineThreads(raw: unknown): readonly EngineThread[] {
+export function toEngineThreads(raw: unknown, locale: Locale = DEFAULT_LOCALE): readonly EngineThread[] {
   const rows = (raw as { data?: readonly WireThreadRow[] } | undefined)?.data ?? []
   const out: EngineThread[] = []
   for (const row of rows) {
@@ -139,7 +141,7 @@ export function toEngineThreads(raw: unknown): readonly EngineThread[] {
     if (handle === "" || cwd === "") continue
     out.push({
       handle,
-      title: titleOf(row),
+      title: titleOf(row, locale),
       cwd,
       // codex 报的是**秒**（和 rateLimits 的 resetsAt 同一个坑）
       updatedAt: (row.updatedAt ?? row.recencyAt ?? 0) * 1000,
@@ -155,11 +157,11 @@ export function toEngineThreads(raw: unknown): readonly EngineThread[] {
  * 优先用户起的名字；没有就拿 preview 的**第一行**——它是整段提问，
  * 里面常常有换行和代码块，整段塞进一行标题里只会看到一堆反引号。
  */
-function titleOf(row: WireThreadRow): string {
+function titleOf(row: WireThreadRow, locale: Locale): string {
   const named = (row.name ?? "").trim()
   if (named !== "") return named
   const first = (row.preview ?? "").split("\n").find((l) => l.trim() !== "")?.trim() ?? ""
-  if (first === "") return "（没有标题）"
+  if (first === "") return CODEX_CATALOG[locale].untitled
   return first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX)}…` : first
 }
 

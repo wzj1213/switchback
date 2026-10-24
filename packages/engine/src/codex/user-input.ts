@@ -2,6 +2,9 @@ import type { QuestionAnswer, QuestionOption, QuestionPrompt, QuestionResponse }
 import { sanitize } from "../claude/permission.js"
 import type { StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
+import { localeOf } from "../locale.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CODEX_USER_INPUT } from "./user-input.messages.js"
 
 export const USER_INPUT_REQUEST = "item/tool/requestUserInput"
 /** 0.149.0 原生 TUI：60 秒静默窗 + 60 秒可见倒计时。 */
@@ -31,6 +34,8 @@ export interface WireUserInputRequest {
 export interface UserInputDeps {
   askQuestion: StartRequest["askQuestion"]
   signal?: AbortSignal
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 const record = (value: unknown): Record<string, unknown> | undefined =>
@@ -66,7 +71,7 @@ function hasQuestionText(question: WireUserInputQuestion | undefined): question 
     typeof question.question === "string" && question.question !== ""
 }
 
-function promptOf(raw: unknown): QuestionPrompt | undefined {
+function promptOf(raw: unknown, m: (typeof CODEX_USER_INPUT)[Locale]): QuestionPrompt | undefined {
   const question = record(raw) as WireUserInputQuestion | undefined
   if (!hasQuestionText(question)) return undefined
   const options = optionsOf(question.options)
@@ -76,25 +81,26 @@ function promptOf(raw: unknown): QuestionPrompt | undefined {
     question: sanitize(question.question),
     options,
     allowNote: true,
-    noteLabel: freeform ? "回答" : "补充说明（可选）",
-    noteDescription: freeform ? "输入回答" : "可选：补充上下文",
+    noteLabel: freeform ? m.answer : m.note,
+    noteDescription: freeform ? m.typeAnswer : m.addContext,
     optional: true,
     ...(typeof question.header === "string" && question.header !== ""
       ? { header: sanitize(question.header) }
       : {}),
     ...(question.isOther === true && !freeform
-      ? { allowOther: true, otherLabel: "以上都不是", otherDescription: "写下你的答案" }
+      ? { allowOther: true, otherLabel: m.none, otherDescription: m.writeAnswer }
       : {}),
     ...(question.isSecret === true ? { secret: true } : {}),
   }
 }
 
-export function userInputPrompts(params: WireUserInputRequest): QuestionPrompt[] {
+export function userInputPrompts(params: WireUserInputRequest, locale: Locale = DEFAULT_LOCALE): QuestionPrompt[] {
+  const m = CODEX_USER_INPUT[locale]
   if (!Array.isArray(params.questions)) return []
   const seen = new Set<string>()
   const prompts: QuestionPrompt[] = []
   for (const raw of params.questions) {
-    const prompt = promptOf(raw)
+    const prompt = promptOf(raw, m)
     if (prompt === undefined || seen.has(prompt.id)) continue
     seen.add(prompt.id)
     prompts.push(prompt)
@@ -140,7 +146,7 @@ function timeoutOf(params: WireUserInputRequest): number | undefined {
 /** 结构化问题只走原生 RPC 回包，不转成一条新的模型提示。 */
 export async function answerUserInput(call: ServerCall, deps: UserInputDeps): Promise<void> {
   const params = call.params as WireUserInputRequest
-  const prompts = userInputPrompts(params)
+  const prompts = userInputPrompts(params, localeOf(deps))
   if (prompts.length === 0) {
     call.respond({ answers: {} })
     return

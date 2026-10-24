@@ -9,10 +9,14 @@ import type {
   TurnStatus,
 } from "@switchback/protocol"
 import type { WireFileChangeEntry, WireItem, WireTurnStatus } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CODEX_TRANSLATE } from "./translate.messages.js"
 
 export interface CodexContext {
   turnId: TurnId
   at: number
+  /** 「上下文已压缩」那一条用哪种语言。缺省中文。 */
+  locale?: Locale
 }
 
 /**
@@ -218,7 +222,7 @@ export function itemToSwitchback(item: WireItem, ctx: CodexContext, complete: bo
   if (item.type === "userMessage") return undefined
   const base = { id: item.id, turnId: ctx.turnId, at: ctx.at }
   if (item.type === "contextCompaction") {
-    return { ...base, kind: "notice", message: "上下文已压缩。", level: "info" }
+    return { ...base, kind: "notice", message: CODEX_TRANSLATE[ctx.locale ?? DEFAULT_LOCALE].compacted, level: "info" }
   }
   if (item.type === "agentMessage") {
     return { ...base, kind: "agent_message", text: textOf(item), complete }

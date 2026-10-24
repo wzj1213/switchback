@@ -18,6 +18,10 @@ import { createCodexObservers, type CodexObservers } from "./observers.js"
 import { emitCodexStatus } from "./status.js"
 import { toCodexTranscript } from "./history.js"
 import { modelSelection, readModelCatalog } from "./model-catalog.js"
+import { localeOf } from "../locale.js"
+import { DEFAULT_LOCALE } from "@switchback/i18n"
+import { CODEX_DRIVER } from "./driver.messages.js"
+import { CODEX_CAPABILITIES } from "./capabilities.js"
 
 /**
  * codex 驱动。讲 `codex app-server --stdio` 的 JSON-RPC，翻成 Switchback 事件。
@@ -61,6 +65,7 @@ class CodexSession implements EngineSession {
       inflight: this.inflight, cwd: req.cwd, home: req.home,
       trust: () => this.trust.current, memory: req.memory,
       askUser: req.askUser, askQuestion: req.askQuestion,
+      locale: () => localeOf(req),
     })
     this.owner = createProcessOwner(config.reclaim)
     this.state = {
@@ -77,13 +82,14 @@ class CodexSession implements EngineSession {
       options: [],
       openedThread: undefined,
     }
-    this.observers = createCodexObservers({ threadId: req.threadId, nativeThread: () => this.state.codexThread, turnId: () => this.state.turn, emit: req.emit, now: () => Date.now() })
+    this.observers = createCodexObservers({ threadId: req.threadId, nativeThread: () => this.state.codexThread, turnId: () => this.state.turn, emit: req.emit, now: () => Date.now(), locale: () => localeOf(req) })
     this.rpc = createRpc({
       send: (line) => this.state.child?.stdin?.write(`${line}\n`),
       onNotification: (method, params) => {
         if (!this.observers.activity.handle(method, params)) handleNotification(this.notifyContext(), method, params)
       },
       onRequest: (call) => { void this.serverRequests.answer(call) },
+      language: () => localeOf(req),
     })
     this.skills = createSkillCatalog({
       call: (method, params) => this.rpc.call(method, params),
@@ -118,6 +124,7 @@ class CodexSession implements EngineSession {
       onGoal: this.req.onGoal,
       hooks: this.observers.hooks,
       now: () => Date.now(),
+      locale: () => localeOf(this.req),
     }
   }
 
@@ -172,7 +179,8 @@ class CodexSession implements EngineSession {
       this.state.stderr = (this.state.stderr + chunk).slice(-STDERR_KEEP)
     })
     child.on("exit", (code, signal) => {
-      const detail = `codex 进程已退出（${code === null ? `信号 ${String(signal)}` : `code ${String(code)}`}）`
+      const m = CODEX_DRIVER[localeOf(this.req)]
+      const detail = m.exited(code === null ? m.bySignal(String(signal)) : `code ${String(code)}`)
       this.skills.close()
       this.serverRequests.abortAll()
       this.rpc.close(detail)
@@ -218,6 +226,7 @@ class CodexSession implements EngineSession {
         call: (method, params) => this.rpc.call(method, params),
         fail: (message) => this.endTurn("failed", message),
         discard: (native) => this.settledTurns.add(native),
+        locale: () => localeOf(this.req),
       },
       text,
       turnId,
@@ -243,7 +252,7 @@ class CodexSession implements EngineSession {
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const { codexThread, codexTurn } = this.state
     if (codexThread === undefined || codexTurn === undefined) {
-      throw new Error("没有正在跑的轮次，改不了向")
+      throw new Error(CODEX_DRIVER[localeOf(this.req)].noTurn)
     }
     await this.rpc.call("turn/steer", {
       threadId: codexThread,
@@ -262,10 +271,10 @@ class CodexSession implements EngineSession {
   }
 
   /** codex 自己存着哪些会话；清单与正文来自两条公开返回，互不猜测。 */
-  async history(): Promise<readonly EngineThread[]> { return toEngineThreads(await this.rpc.call("thread/list", { limit: CODEX_HISTORY_LIMIT }).catch(() => undefined)) }
+  async history(): Promise<readonly EngineThread[]> { return toEngineThreads(await this.rpc.call("thread/list", { limit: CODEX_HISTORY_LIMIT }).catch(() => undefined), localeOf(this.req)) }
 
   /** `thread/resume` 自带完整 turns；接管流程在实时流激活前把它搬进 journal。 */
-  transcript(): Promise<{ items: readonly Item[]; total: number }> { return Promise.resolve(toCodexTranscript(this.state.openedThread, Date.now())) }
+  transcript(): Promise<{ items: readonly Item[]; total: number }> { return Promise.resolve(toCodexTranscript(this.state.openedThread, Date.now(), localeOf(this.req))) }
 
   /**
    * 这条会话的 rollout 文件在哪。`thread/list` 每条都带 `path`（实测）。
@@ -301,32 +310,13 @@ class CodexSession implements EngineSession {
    * 它**不在 `skills/list` 里**（那只报用户装的技能），所以 Switchback 必须自己
    * 提供入口——否则 codex 会话撞满上下文就只能新开一个，两小时的历史全丢。
    */
-  compact(turnId: TurnId): Promise<void> { return startCompaction({ state: this.state, call: (method, params) => this.rpc.call(method, params), fail: (message) => this.endTurn("failed", message) }, turnId) }
+  compact(turnId: TurnId): Promise<void> { return startCompaction({ state: this.state, call: (method, params) => this.rpc.call(method, params), fail: (message) => this.endTurn("failed", message), locale: () => localeOf(this.req) }, turnId) }
 
   pid(): number | undefined { return this.owner.pid() }
 
-  /** `thread/compact/start` **不在 `skills/list` 里**，所以必须由 Switchback 给入口。 */
+  /** 每一项的判据见 `capabilities.ts`。 */
   capabilities(): EngineCapabilities {
-    // `modeReadback`：**五家里唯一一个真的**。前置（`claims.ts` 那张认领表 + 双向
-    // CI 断言）已经建好，`thread/settings/updated` 也真有人接（`notify.ts` →
-    // `adoptSettings`）。这一位曾经落在 false 上没跟着翻——那次提交的说明里写着
-    // 「从 false 翻成 true」，而 diff 里这一行根本没动，于是界面上照旧挂着
-    // 「这家不会把它自己改的档告诉 Switchback」，而它明明会。
-    // `sideQuestion`：codex 的侧问只活在它自己的 TUI 里（`tui/src/app/side.rs`），
-    // **没从 app-server 那扇门出来**。照着拼要 Switchback 抄一份它的边界提示词进来维护，
-    // 撞 AGENTS.md 的总纲——见 `docs/侧栏与引擎状态方案.md` §0
-    return {
-      compact: true,
-      attachments: true,
-      steer: true,
-      fork: true,
-      rewind: true,
-      modeReadback: true,
-      sideQuestion: false,
-      // 0.149.0 的公开 thread/read 已在生产历史抓到 SubAgentActivity，子 thread 的
-      // started/status 通知也有稳定协议；这里只镜像 Codex 自己启动的活动，不做编排。
-      activity: true,
-    }
+    return CODEX_CAPABILITIES
   }
 
   /**
@@ -369,8 +359,7 @@ class CodexSession implements EngineSession {
     }
     return {
       restart: true,
-      detail:
-        "Codex 的原生沙箱在会话开场时固定。请等当前轮结束；Switchback 会续接同一条会话后重启，让新档位真正生效。",
+      detail: CODEX_DRIVER[localeOf(this.req)].trustRestart,
     }
   }
 
@@ -387,10 +376,10 @@ class CodexSession implements EngineSession {
     this.skills.close()
     this.observers.hooks.close()
     this.serverRequests.abortAll()
-    this.rpc.close("会话正在关闭")
+    this.rpc.close(CODEX_DRIVER[localeOf(this.req)].closing)
     const report = await this.owner.reclaim()
     if (report.rung === "escaped") {
-      emitCodexStatus(this.req.emit, this.req.threadId, "crashed", `codex 进程组未能回收（pid ${String(report.pid)}），可能已泄漏`)
+      emitCodexStatus(this.req.emit, this.req.threadId, "crashed", CODEX_DRIVER[localeOf(this.req)].leaked(String(report.pid)))
     }
   }
 }
@@ -402,7 +391,7 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
     // **这句话会出现在两个地方**：设置页那家的状态说明，和输入区引擎下拉里那一条的说明。
     // 原文是「装好之后重启 Switchback」——那曾经是真的（探测结果在进程里只算一次），
     // 现在不是了：装完会自动重探，手动也有一颗按钮。留着旧话等于教用户做无用功。
-    probe: () => probeCommand(command, "设置 → 引擎 → 安装与版本 里可以直接装；在终端里装完点那儿的「重新探测」即可，不用重启。"),
+    probe: (locale) => probeCommand(command, CODEX_DRIVER[locale ?? DEFAULT_LOCALE].probeHint, locale),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new CodexSession(req, config)
       // 握手失败要在这里就抛出来，别让宿主拿到一个看着正常、一发消息就炸的会话

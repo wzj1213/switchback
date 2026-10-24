@@ -1,5 +1,8 @@
 import type { Event, ItemId, NoticeLevel, TurnId, TurnStatus } from "@switchback/protocol"
 import type { WireModelRerouted, WireModelVerification, WireSafetyBuffering, WireStrictReview } from "./wire.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CODEX_SAFETY } from "./safety.messages.js"
 
 export interface SafetyContext {
   emit: (event: Event) => void
@@ -7,6 +10,8 @@ export interface SafetyContext {
   materialized: Set<ItemId>
   safetyActive?: Set<TurnId>
   now: () => number
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 function upsert(
@@ -33,7 +38,7 @@ export function onModelVerification(ctx: SafetyContext, params: WireModelVerific
   upsert(
     ctx,
     `codex-cyber-verification-${turnId}`,
-    "这段会话多次触发了可能的网络安全风险标记，因此 Codex 已启用额外安全检查，响应可能更慢。如需进行经授权的安全工作，可申请 Trusted Access for Cyber：https://chatgpt.com/cyber",
+    CODEX_SAFETY[localeOf(ctx)].cyber,
     "warning",
   )
 }
@@ -44,8 +49,8 @@ export function onModelRerouted(ctx: SafetyContext, params: WireModelRerouted): 
   const from = params.fromModel?.trim()
   const to = params.toModel?.trim()
   if (turnId === undefined || from === undefined || from === "" || to === undefined || to === "") return
-  const reason = params.reason === "highRiskCyberActivity" ? "（触发网络安全风险检查）" : ""
-  upsert(ctx, `codex-model-rerouted-${turnId}`, `Codex 已将模型从 ${from} 改为 ${to}${reason}。`, "warning")
+  const message = CODEX_SAFETY[localeOf(ctx)].rerouted(from, to, params.reason === "highRiskCyberActivity")
+  upsert(ctx, `codex-model-rerouted-${turnId}`, message, "warning")
 }
 
 export function onStrictReview(ctx: SafetyContext, params: WireStrictReview): void {
@@ -55,7 +60,7 @@ export function onStrictReview(ctx: SafetyContext, params: WireStrictReview): vo
   upsert(
     ctx,
     `codex-strict-review-${turnId}-${stamp}`,
-    "这个请求需要额外安全检查，部分工具调用可能会花更久。",
+    CODEX_SAFETY[localeOf(ctx)].strict,
     "warning",
   )
 }
@@ -66,15 +71,13 @@ export function onSafetyBuffering(ctx: SafetyContext, params: WireSafetyBufferin
   const id = `codex-safety-buffering-${turnId}`
   if (params.showBufferingUi === true) {
     ctx.safetyActive?.add(turnId)
-    const faster = typeof params.fasterModel === "string" && params.fasterModel !== ""
-      ? ` Codex 也提供更快模型「${params.fasterModel}」供重试；如需改用，请先停止当前轮。`
-      : ""
-    upsert(ctx, id, `Codex 正在对这个请求做额外安全检查，响应可能需要更久；无需操作，它会继续等待。${faster}`, "info")
+    const faster = typeof params.fasterModel === "string" && params.fasterModel !== "" ? params.fasterModel : undefined
+    upsert(ctx, id, CODEX_SAFETY[localeOf(ctx)].buffering(faster), "info")
     return
   }
   if (params.showBufferingUi === false && ctx.materialized.has(id)) {
     ctx.safetyActive?.delete(turnId)
-    upsert(ctx, id, "Codex 已结束额外安全检查，正在继续响应。", "info")
+    upsert(ctx, id, CODEX_SAFETY[localeOf(ctx)].resumed, "info")
   }
 }
 
@@ -82,8 +85,7 @@ export function onSafetyBuffering(ctx: SafetyContext, params: WireSafetyBufferin
 export function finishSafetyBuffering(ctx: SafetyContext, status: TurnStatus): void {
   const turnId = ctx.turnId()
   if (turnId === undefined || ctx.safetyActive?.delete(turnId) !== true) return
-  const message = status === "completed"
-    ? "Codex 已结束额外安全检查。"
-    : `Codex 的额外安全检查已随本轮${status === "interrupted" ? "中断" : "失败"}结束。`
+  const m = CODEX_SAFETY[localeOf(ctx)]
+  const message = status === "completed" ? m.finished : m.endedWith(status === "interrupted")
   upsert(ctx, `codex-safety-buffering-${turnId}`, message, status === "failed" ? "warning" : "notice")
 }

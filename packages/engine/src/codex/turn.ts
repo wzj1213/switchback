@@ -1,4 +1,7 @@
 import type { TurnId } from "@switchback/protocol"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CODEX_TURN } from "./turn.messages.js"
 
 interface TurnState {
   codexThread: string | undefined
@@ -14,6 +17,8 @@ export interface StartTurnContext {
   call: (method: string, params: unknown) => Promise<unknown>
   fail: (message: string) => void
   discard?: (nativeTurn: string) => void
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 /** `turn/start` 失败也必须落宿主终态；否则输入框会永久停在 running。 */
@@ -24,7 +29,7 @@ export async function startTurn(
   attachments?: readonly string[],
 ): Promise<void> {
   const { state } = ctx
-  if (state.codexThread === undefined) throw new Error("codex 会话尚未就绪")
+  if (state.codexThread === undefined) throw new Error(CODEX_TURN[localeOf(ctx)].notReady)
   state.turn = turnId
   state.codexTurn = undefined
   try {

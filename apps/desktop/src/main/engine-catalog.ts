@@ -1,8 +1,9 @@
 import type { EngineInfo } from "@switchback/protocol"
 import type { Logger } from "./log.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 
 interface ProbeDriver {
-  probe?: () => Promise<{ state: string; detail: string }>
+  probe?: (locale?: Locale) => Promise<{ state: string; detail: string }>
 }
 
 interface CatalogOptions {
@@ -10,6 +11,8 @@ interface CatalogOptions {
   revision?: (id: string) => string
   /** 把 profile 同时纳入缓存边界和返回值，渲染层才能识别切换期间的旧结果。 */
   profile?: (id: string) => string | undefined
+  /** 探测说明用哪种语言。换语言时由调用方整张重探（见 `index.ts` 的 `settings.watch`）。 */
+  locale?: () => Locale
 }
 
 export interface EngineCatalog {
@@ -57,7 +60,7 @@ export function createEngineCatalog(
     const inspected = await Promise.all(
       entries.map(async ({ id, driver, profile, revision }) => ({
         engine: await cachedProbe(cached, {
-          key: `${id}\0${revision}`, id, driver, labels,
+          key: `${id}\0${revision}`, id, driver, labels, locale: options.locale?.() ?? DEFAULT_LOCALE,
           ...(profile === undefined ? {} : { profile }),
         }),
         revision,
@@ -115,22 +118,24 @@ function cachedProbe(
     driver: ProbeDriver
     labels: Readonly<Record<string, string>>
     profile?: string
+    locale: Locale
   },
 ): Promise<EngineInfo> {
   const found = cached.get(req.key)
   if (found !== undefined) return found
-  const pending = inspect(req.id, req.driver, req.labels, req.profile)
+  const pending = inspect(req)
   cached.set(req.key, pending)
   return pending
 }
 
-async function inspect(
-  id: string,
-  driver: ProbeDriver,
-  labels: Readonly<Record<string, string>>,
-  profile?: string,
-): Promise<EngineInfo> {
-  const probe = await driver.probe?.().catch(() => undefined)
+async function inspect({ id, driver, labels, profile, locale }: {
+  id: string
+  driver: ProbeDriver
+  labels: Readonly<Record<string, string>>
+  profile?: string
+  locale: Locale
+}): Promise<EngineInfo> {
+  const probe = await driver.probe?.(locale).catch(() => undefined)
   return {
     id,
     label: labels[id] ?? id,

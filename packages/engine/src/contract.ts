@@ -392,5 +392,5 @@ export interface EngineDriver {
    *
    * 不实现就是「不知道」，界面照常显示，不做任何标注。
    */
-  probe?: () => Promise<Probe>
+  probe?: (locale?: Locale) => Promise<Probe>
 }

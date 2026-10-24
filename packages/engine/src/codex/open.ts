@@ -10,6 +10,9 @@ import { forkCodexThread } from "./fork.js"
 import type { CodexHistoryThread } from "./history.js"
 import { raceStartup } from "./startup-deadline.js"
 import type { WireApprovalPolicy, WireApprovalsReviewer, WireSandbox } from "./wire.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CODEX_OPEN } from "./open.messages.js"
 
 /**
  * 这条会话**怎么开场**：起进程 → 握手 → 开/续/分一条 codex thread。
@@ -81,16 +84,18 @@ const OPEN_THREAD_MS = 20_000
  * `Error: spawn codex ENOENT` 对用户毫无意义——他要知道的是「装了没」「装哪了」。
  * 这是生产可用与否的分界线之一：报错必须说得出下一步该干什么。
  */
-function startupMessage(command: string, error: Error): string {
+type Text = (typeof CODEX_OPEN)[Locale]
+
+function startupMessage(command: string, error: Error, m: Text): string {
   const code = (error as NodeJS.ErrnoException).code
   if (code === "ENOENT") {
     // **这句话出现在用户最需要出路的那一刻**（发出去了，起不来）。原来它只指向终端，
     // 而 Switchback 自己就能装这一家——设置里那条命令是抄它官方来源的，不是编的。
     // 终端那条留着：有人本来就在终端里，而且 `which` 能看出是不是 PATH 的问题
-    return `找不到可执行文件 \`${command}\`。设置 → 引擎 → 安装与版本 里可以直接装；已经装过的话，去那儿点「重新探测」（终端里跑 \`which codex\` 能看出是不是 PATH 的问题）。`
+    return m.notFound(command)
   }
-  if (code === "EACCES") return `没有权限执行 \`${command}\`。`
-  return `启动 \`${command}\` 失败：${error.message}`
+  if (code === "EACCES") return m.noPermission(command)
+  return m.failed(command, error.message)
 }
 
 export async function openSession(ctx: OpenCtx): Promise<void> {
@@ -105,6 +110,7 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
     args: ctx.config.args ?? ["app-server", "--stdio"],
     cwd: ctx.req.cwd,
     env: process.env,
+    language: () => localeOf(ctx.req),
   })
   ctx.state.child = child
   ctx.wire(child)
@@ -113,7 +119,7 @@ export async function openSession(ctx: OpenCtx): Promise<void> {
   const started = await openingThread(ctx)
   const thread = (started as { thread?: CodexHistoryThread } | undefined)?.thread
   const id = thread?.id
-  if (id === undefined) throw new Error("codex 没有返回 thread id，无法继续")
+  if (id === undefined) throw new Error(CODEX_OPEN[localeOf(ctx.req)].noThreadId)
   ctx.state.openedThread = thread
   ctx.state.codexThread = id
   // codex 的 thread id 就是它的会话句柄——落盘之后下次能凭它续跑
@@ -142,10 +148,10 @@ function openThread(ctx: OpenCtx): Promise<unknown> {
   return ctx.rpc.call("thread/resume", { threadId: ctx.req.resume, ...shared })
 }
 
-function openingLabel(ctx: OpenCtx): string {
-  if (ctx.req.forkOf !== undefined) return "分叉会话（thread/fork）"
-  if (ctx.req.resume !== undefined) return "续接会话（thread/resume）"
-  return "新建会话（thread/start）"
+function openingLabel(ctx: OpenCtx, m: Text): string {
+  if (ctx.req.forkOf !== undefined) return m.opening.fork
+  if (ctx.req.resume !== undefined) return m.opening.resume
+  return m.opening.start
 }
 
 function stderrTail(ctx: OpenCtx): string {
@@ -155,12 +161,11 @@ function stderrTail(ctx: OpenCtx): string {
 /** 第二段开场也要有和握手同样的退出、超时护栏。 */
 async function openingThread(ctx: OpenCtx): Promise<unknown> {
   const command = ctx.config.command ?? "codex"
+  const m = CODEX_OPEN[localeOf(ctx.req)]
   const result = await raceStartup(openThread(ctx), ctx.owner.died(), OPEN_THREAD_MS)
   if (result.kind === "ready") return result.value
-  if (result.kind === "died") throw new Error(startupMessage(command, result.error))
-  throw new Error(
-    `codex 在 ${String(OPEN_THREAD_MS / 1000)} 秒内没有完成${openingLabel(ctx)}，已停止并回收进程。${stderrTail(ctx)}`,
-  )
+  if (result.kind === "died") throw new Error(startupMessage(command, result.error, m))
+  throw new Error(m.openTimeout(OPEN_THREAD_MS / 1000, openingLabel(ctx, m), stderrTail(ctx)))
 }
 
 /**
@@ -188,6 +193,7 @@ async function openingThread(ctx: OpenCtx): Promise<unknown> {
  */
 async function handshake(ctx: OpenCtx): Promise<void> {
   const command = ctx.config.command ?? "codex"
+  const m = CODEX_OPEN[localeOf(ctx.req)]
   const result = await raceStartup(
     // **认领什么只有一个来源**（`claims.ts`），代码里不另写一份——
     // 写两份的下场是那张表变成一份没人对照的文档
@@ -197,12 +203,8 @@ async function handshake(ctx: OpenCtx): Promise<void> {
     ctx.owner.died(),
     HANDSHAKE_MS,
   )
-  if (result.kind === "died") throw new Error(startupMessage(command, result.error))
-  if (result.kind === "timeout") {
-    throw new Error(
-      `codex 在 ${String(HANDSHAKE_MS / 1000)} 秒内没有完成握手，已停止并回收进程。${stderrTail(ctx)}`,
-    )
-  }
+  if (result.kind === "died") throw new Error(startupMessage(command, result.error, m))
+  if (result.kind === "timeout") throw new Error(m.handshakeTimeout(HANDSHAKE_MS / 1000, stderrTail(ctx)))
   ctx.rpc.notify("initialized")
   // 账号侧的现状（额度、登录）——**在动手之前问**，见 `account.ts`
   reportAccount(
@@ -211,5 +213,6 @@ async function handshake(ctx: OpenCtx): Promise<void> {
       ctx.status(status, detail)
     },
     ctx.req.emit,
+    localeOf(ctx.req),
   )
 }

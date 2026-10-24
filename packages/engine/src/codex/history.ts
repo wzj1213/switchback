@@ -1,6 +1,7 @@
 import type { Item } from "@switchback/protocol"
 import { itemToSwitchback, textOf } from "./translate.js"
 import type { WireItem, WireTurnStatus } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 
 /** `thread/resume` 里随 thread 返回的公开历史窄声明。 */
 export interface CodexHistoryTurn {
@@ -69,9 +70,7 @@ function userMessage(
 
 function visibleItem(
   item: CodexHistoryItem,
-  turnId: string,
-  at: number,
-  fallbackId: string,
+  { turnId, at, fallbackId, locale }: { turnId: string; at: number; fallbackId: string; locale: Locale },
 ): Item | undefined {
   if (item.type === "hookPrompt" || item.type === "subAgentActivity") return undefined
   if (item.type === "userMessage")
@@ -80,7 +79,7 @@ function visibleItem(
   if ((wire.type === "agentMessage" || wire.type === "reasoning") && textOf(wire).trim() === "") {
     return undefined
   }
-  return itemToSwitchback({ ...wire, id: historyId(wire.id, fallbackId) }, { turnId, at }, true)
+  return itemToSwitchback({ ...wire, id: historyId(wire.id, fallbackId) }, { turnId, at, locale }, true)
 }
 
 function failedItem(turn: CodexHistoryTurn, turnId: string, at: number): Item | undefined {
@@ -99,6 +98,7 @@ function failedItem(turn: CodexHistoryTurn, turnId: string, at: number): Item | 
 export function toCodexTranscript(
   thread: CodexHistoryThread | undefined,
   now: number,
+  locale: Locale = DEFAULT_LOCALE,
 ): { items: readonly Item[]; total: number } {
   const turns = thread?.turns ?? []
   // 旧协议可能省略 itemsView（其 serde 默认就是 full）；明确说 summary/notLoaded 时
@@ -111,12 +111,7 @@ export function toCodexTranscript(
     const turnId = historyId(turn.id, `history-turn-${String(turnIndex)}`)
     const at = millis(turn.startedAt, now)
     for (const [itemIndex, item] of (turn.items ?? []).entries()) {
-      const mapped = visibleItem(
-        item,
-        turnId,
-        at,
-        `history-item-${String(turnIndex)}-${String(itemIndex)}`,
-      )
+      const mapped = visibleItem(item, { turnId, at, fallbackId: `history-item-${String(turnIndex)}-${String(itemIndex)}`, locale })
       if (mapped !== undefined) all.push(mapped)
     }
     const error = failedItem(turn, turnId, millis(turn.completedAt, at))

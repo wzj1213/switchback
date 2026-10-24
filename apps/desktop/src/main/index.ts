@@ -401,7 +401,12 @@ function bootstrap(): Promise<void> {
       ...(feed === "" ? {} : { onCheckUpdate: () => runUpdateCheck(true) }),
     })
     settings.watch((before, after) => {
-      if (before.language !== after.language) relabelMenu(after.language)
+      if (before.language === after.language) return
+      relabelMenu(after.language)
+      // 引擎卡片上的探测说明也跟着换语言：整张重探一遍再广播（缓存里那份是旧语言说的）
+      void engineRefresh.run?.().catch((error: unknown) => {
+        log.write("warn", "engines", `换语言后重探引擎失败：${String(error)}`)
+      })
     })
     // 背景检查只在配了 feed 时跑，而且**只在有新版本时才出声**
     if (feed !== "") setTimeout(() => void runUpdateCheck(false), 10_000)

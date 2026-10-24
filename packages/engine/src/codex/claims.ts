@@ -36,6 +36,7 @@ export interface Claim {
   checked: string
 }
 
+// i18n-ok：认领清单是写给核对协议的人看的记录，不上界面
 export const CLAIMS: Readonly<Record<string, Claim>> = {
   experimentalApi: {
     why: "换 `thread/settings/updated` 的原生档位回读、`item/tool/requestUserInput` 的结构化问题与严格安全复核提示。它们都有现成产品落点；不认领才会把引擎能力伪装成空白。",

@@ -32,6 +32,9 @@ import { onTerminalInteraction, retainTerminalInputs } from "./terminal.js"
 import { onUsage } from "./usage.js"
 import { goalOf } from "./goal.js"
 import { onFilePatch, onMcpProgress, retainProgress } from "./item-progress.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CODEX_NOTIFY } from "./notify.messages.js"
 
 /**
  * codex 通知 → Switchback 事件。
@@ -90,13 +93,15 @@ export interface NotifyContext {
   /** 原生 hook 有延时显示与跨通知收口，状态必须属于会话实例。 */
   hooks?: HookTracker
   now: () => number
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 /** 流式文本等第一段真实内容再落地，避免空 item 打断工具分组。 */
 function materialize(ctx: NotifyContext, item: WireItem, turnId: TurnId): boolean {
   if (ctx.materialized.has(item.id)) return true
   const at = ctx.now()
-  const switchback = itemToSwitchback({ ...item, text: "", summary: [], content: [] }, { turnId, at }, false)
+  const switchback = itemToSwitchback({ ...item, text: "", summary: [], content: [] }, { turnId, at, locale: localeOf(ctx) }, false)
   if (switchback === undefined) return false
   ctx.materialized.add(item.id)
   ctx.emit({ type: "item.started", at, item: switchback })
@@ -110,7 +115,7 @@ function onItemStarted(ctx: NotifyContext, params: WireItemLifecycle): void {
   const output = params.item.aggregatedOutput
   if (typeof output === "string" && output !== "") ctx.streamed.set(params.item.id, output)
   if (isStreamingText(params.item.type)) return
-  const switchback = itemToSwitchback(params.item, { turnId, at: ctx.now() }, false)
+  const switchback = itemToSwitchback(params.item, { turnId, at: ctx.now(), locale: localeOf(ctx) }, false)
   if (switchback === undefined) return
   ctx.materialized.add(switchback.id)
   ctx.emit({ type: "item.started", at: ctx.now(), item: switchback })
@@ -128,7 +133,7 @@ function onItemCompleted(ctx: NotifyContext, params: WireItemLifecycle): void {
     if (textOf(item) === "") return
     materialize(ctx, item, turnId)
   }
-  const switchback = itemToSwitchback(item, { turnId, at: ctx.now() }, true)
+  const switchback = itemToSwitchback(item, { turnId, at: ctx.now(), locale: localeOf(ctx) }, true)
   if (switchback === undefined) return
   ctx.materialized.add(switchback.id)
   ctx.emit({ type: "item.updated", at: ctx.now(), item: switchback })
@@ -165,8 +170,8 @@ export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnSt
     if (!ctx.materialized.has(id)) continue
     const streamed = ctx.streamed.get(id)
     const recovered = recoverStream(item, streamed)
-    const switchback = itemToSwitchback(recovered, { turnId, at: ctx.now() }, true)
-    const closed = switchback?.kind === "tool_call" ? closeTool(switchback, status) : switchback
+    const switchback = itemToSwitchback(recovered, { turnId, at: ctx.now(), locale: localeOf(ctx) }, true)
+    const closed = switchback?.kind === "tool_call" ? closeTool(switchback, status, CODEX_NOTIFY[localeOf(ctx)]) : switchback
     if (closed !== undefined) ctx.emit({ type: "item.updated", at: ctx.now(), item: closed })
   }
   ctx.inflight.clear()
@@ -175,12 +180,12 @@ export function sweepInflight(ctx: NotifyContext, turnId: TurnId, status: TurnSt
   ctx.materialized.clear()
 }
 
-function closeTool(item: ToolCallItem, status: TurnStatus): ToolCallItem {
+function closeTool(item: ToolCallItem, status: TurnStatus, m: (typeof CODEX_NOTIFY)[Locale]): ToolCallItem {
   if (status !== "completed") {
     return { ...item, status: status === "interrupted" ? "interrupted" : "failed" }
   }
   if (item.status !== "running" && item.status !== "pending") return item
-  return { ...item, status: "failed", error: "Codex 在轮次结束前没有报告这次工具调用的结果。" }
+  return { ...item, status: "failed", error: m.noToolResult }
 }
 
 function recoverStream(item: WireItem, streamed: string | undefined): WireItem {
@@ -228,7 +233,7 @@ function onError(ctx: NotifyContext, params: WireError): void {
       turnId,
       at,
       kind: "error",
-      message: params.error?.message ?? "codex 报了一个没有描述的错误",
+      message: params.error?.message ?? CODEX_NOTIFY[localeOf(ctx)].noDescription,
       fatal: !retry,
       ...(detail === undefined || detail === null || detail === "" ? {} : { detail }),
     },

@@ -3,6 +3,9 @@ import type { Trust } from "@switchback/protocol"
 import { sanitize } from "../claude/permission.js"
 import type { ApprovalAnswer, ApprovalAsk, StartRequest } from "../contract.js"
 import type { ServerCall } from "../rpc.js"
+import { localeOf } from "../locale.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CODEX_PERMISSIONS } from "./permissions.messages.js"
 
 export const PERMISSIONS_APPROVAL = "item/permissions/requestApproval"
 
@@ -29,7 +32,11 @@ export interface PermissionDeps {
   memory: () => readonly Rule[]
   askUser: StartRequest["askUser"]
   signal?: AbortSignal
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
+
+type Text = (typeof CODEX_PERMISSIONS)[Locale]
 
 interface FileAccess {
   raw: WireFileSystemPermission
@@ -93,34 +100,30 @@ function networkPermission(raw: unknown): Record<string, unknown> | undefined {
   return network?.["enabled"] === true ? network : undefined
 }
 
-const shown = (values: readonly string[]): string => {
-  const head = values.slice(0, 3).map(sanitize).join("、")
-  return values.length > 3 ? `${head} 等 ${String(values.length)} 项` : head
-}
+const shown = (values: readonly string[], m: Text): string => m.shown(values.slice(0, 3).map(sanitize), values.length)
 
-function permissionParts(params: WirePermissionsRequest): string[] {
+function permissionParts(params: WirePermissionsRequest, m: Text): string[] {
   const fs = fileAccess(params.permissions?.fileSystem)
   const parts: string[] = []
-  if (networkPermission(params.permissions?.network) !== undefined) parts.push("访问网络")
-  if (fs !== undefined && fs.read.length > 0) parts.push(`读取 ${shown(fs.read)}`)
-  if (fs !== undefined && fs.write.length > 0) parts.push(`写入 ${shown(fs.write)}`)
+  if (networkPermission(params.permissions?.network) !== undefined) parts.push(m.network)
+  if (fs !== undefined && fs.read.length > 0) parts.push(m.read(shown(fs.read, m)))
+  if (fs !== undefined && fs.write.length > 0) parts.push(m.write(shown(fs.write, m)))
   return parts
 }
 
-function permissionReason(reason: unknown): string {
-  return typeof reason === "string" && reason !== "" ? ` （${sanitize(reason)}）` : ""
+function permissionReason(reason: unknown, m: Text): string {
+  return typeof reason === "string" && reason !== "" ? m.reason(sanitize(reason)) : ""
 }
 
-export function permissionsSummary(params: WirePermissionsRequest): string {
-  const parts = permissionParts(params)
-  const base = parts.length === 0
-    ? "Codex 申请额外权限（详情未送达）"
-    : `Codex 申请额外权限：${parts.join("；")}`
-  return `${base}${permissionReason(params.reason)}`
+export function permissionsSummary(params: WirePermissionsRequest, locale: Locale = DEFAULT_LOCALE): string {
+  const m = CODEX_PERMISSIONS[locale]
+  const parts = permissionParts(params, m)
+  const base = parts.length === 0 ? m.noDetail : m.asks(parts)
+  return `${base}${permissionReason(params.reason, m)}`
 }
 
-function permissionRequests(params: WirePermissionsRequest, cwd: string): ApprovalRequest[] {
-  const summary = permissionsSummary(params)
+function permissionRequests(params: WirePermissionsRequest, cwd: string, locale: Locale): ApprovalRequest[] {
+  const summary = permissionsSummary(params, locale)
   const requests: ApprovalRequest[] = []
   const fs = fileAccess(params.permissions?.fileSystem)
   if (fs !== undefined) {
@@ -164,12 +167,12 @@ function approvalAsk(
   params: WirePermissionsRequest,
   requests: readonly ApprovalRequest[],
   verdict: Verdict,
-  itemId: string,
+  { itemId, locale }: { itemId: string; locale: Locale },
 ): ApprovalAsk {
   return {
     toolCallId: itemId,
     tool: requests.length === 1 ? requests[0]?.tool ?? "codex_permissions" : "codex_permissions",
-    summary: permissionsSummary(params),
+    summary: permissionsSummary(params, locale),
     reason: verdict.reason,
     ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
     ...(verdict.suggest === undefined ? {} : { rememberHint: verdict.suggest.describe, suggest: verdict.suggest }),
@@ -181,19 +184,20 @@ export async function answerPermissions(call: ServerCall, deps: PermissionDeps):
   const params = call.params as WirePermissionsRequest
   const itemId = valueOr(params.itemId, String(call.id))
   const cwd = valueOr(params.cwd, deps.cwd)
-  const requests = permissionRequests(params, cwd)
+  const locale = localeOf(deps)
+  const requests = permissionRequests(params, cwd, locale)
   if (requests.length === 0) {
     call.respond(response({}, "turn"))
     return
   }
   const verdict = strongest(requests.map((request) => decide(request, {
-    trust: deps.trust(), worksite: deps.cwd, home: deps.home, memory: deps.memory(),
+    trust: deps.trust(), worksite: deps.cwd, home: deps.home, memory: deps.memory(), locale,
   })))
   if (verdict?.action !== "escalate") {
     call.respond(response(verdict?.action === "allow" ? grantOf(params) : {}, "turn"))
     return
   }
-  const ask = approvalAsk(params, requests, verdict, itemId)
+  const ask = approvalAsk(params, requests, verdict, { itemId, locale })
   const answer = deps.signal === undefined
     ? await deps.askUser(ask)
     : await deps.askUser(ask, { signal: deps.signal })

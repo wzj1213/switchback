@@ -4,6 +4,7 @@ import type { StartRequest } from "../contract.js"
 import type { RequestId, ServerCall } from "../rpc.js"
 import { answerApproval } from "./approve.js"
 import type { WireItem } from "./wire.js"
+import type { Locale } from "@switchback/i18n"
 
 export interface ServerRequestDeps {
   inflight: Map<string, WireItem>
@@ -13,6 +14,8 @@ export interface ServerRequestDeps {
   memory: () => readonly Rule[]
   askUser: StartRequest["askUser"]
   askQuestion: StartRequest["askQuestion"]
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 export interface ServerRequests {

@@ -6,13 +6,20 @@ import type {
   WireMcpElicitation,
   WireMcpElicitationResponse,
 } from "./wire.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CODEX_ELICITATION } from "./elicitation.messages.js"
 
 export const MCP_ELICITATION = "mcpServer/elicitation/request"
 
 export interface ElicitationDeps {
   askUser: StartRequest["askUser"]
   signal?: AbortSignal
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
+
+type Text = (typeof CODEX_ELICITATION)[Locale]
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -34,16 +41,15 @@ function textOf(value: unknown): string | undefined {
   return undefined
 }
 
-function detailsOf(meta: WireElicitationMeta | null | undefined): string {
-  const rows = meta?.tool_params_display ?? []
-  return rows
+function detailsOf(meta: WireElicitationMeta | null | undefined, m: Text): string {
+  const rows = (meta?.tool_params_display ?? [])
     .map((row) => {
       const name = textOf(row.display_name) ?? textOf(row.name)
       const value = textOf(row.value)
-      return name === undefined || value === undefined ? undefined : `${name}：${value}`
+      return name === undefined || value === undefined ? undefined : m.field(name, value)
     })
     .filter((row): row is string => row !== undefined)
-    .join("，")
+  return m.fields(rows)
 }
 
 function supports(meta: WireElicitationMeta | null | undefined, scope: string): boolean {
@@ -54,11 +60,10 @@ function connectorOf(params: WireMcpElicitation): string {
   return textOf(params._meta?.connector_name) ?? textOf(params.serverName) ?? "MCP"
 }
 
-function reasonOf(params: WireMcpElicitation, connector: string, details: string): string {
+function reasonOf(params: WireMcpElicitation, connector: string, details: string, m: Text): string {
   const subtitle = textOf(params._meta?.subtitle)
   if (subtitle !== undefined) return subtitle
-  const operation = textOf(params._meta?.tool_name) ?? "工具调用"
-  return `${connector} 请求调用 ${operation}${details === "" ? "" : `（${details}）`}`
+  return m.wantsTool(connector, textOf(params._meta?.tool_name) ?? m.toolCall, details)
 }
 
 function rememberHintOf(meta: WireElicitationMeta | null | undefined, connector: string, details: string): string | undefined {
@@ -66,18 +71,19 @@ function rememberHintOf(meta: WireElicitationMeta | null | undefined, connector:
   return `${connector}${details === "" ? "" : ` · ${details}`}`
 }
 
-function requestFor(call: ServerCall, params: WireMcpElicitation): ApprovalAsk {
+function requestFor(call: ServerCall, params: WireMcpElicitation, m: Text): ApprovalAsk {
   const meta = params._meta
   const connector = connectorOf(params)
-  const details = detailsOf(meta)
+  const details = detailsOf(meta, m)
   const rememberHint = rememberHintOf(meta, connector, details)
   return {
     toolCallId: textOf(meta?.tool_call_id) ?? `mcp-elicitation-${String(call.id)}`,
     tool: connector,
-    summary: textOf(params.message) ?? `${connector} 请求授权`,
-    reason: reasonOf(params, connector, details),
+    summary: textOf(params.message) ?? m.wantsAuth(connector),
+    reason: reasonOf(params, connector, details, m),
     // 引擎明确发的是人工授权请求，不能被「本轮剩下的都放行」吞掉。
-    redline: "引擎要求逐项确认这次 MCP 工具授权",
+    // 这一栏只看有没有（不显示），写成一个标识就够
+    redline: "mcp-elicitation",
     ...(rememberHint === undefined ? {} : { rememberHint }),
   }
 }
@@ -107,7 +113,7 @@ export async function answerElicitation(call: ServerCall, deps: ElicitationDeps)
     call.respond({ action: "cancel", content: null, _meta: null } satisfies WireMcpElicitationResponse)
     return
   }
-  const ask = requestFor(call, params)
+  const ask = requestFor(call, params, CODEX_ELICITATION[localeOf(deps)])
   const answer = deps.signal === undefined
     ? await deps.askUser(ask)
     : await deps.askUser(ask, { signal: deps.signal })

@@ -1,6 +1,13 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { lookupCommand } from "./platform.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { PROBE } from "./probe.messages.js"
+
+/** 留下非空的那几段。 */
+function present(parts: readonly (string | undefined)[]): string[] {
+  return parts.filter((part): part is string => part !== undefined && part !== "")
+}
 
 const run = promisify(execFile)
 
@@ -80,10 +87,11 @@ export async function resolveCommand(command: string): Promise<string> {
  * 只问第一步是不够的：装了但装坏了（依赖缺失、架构不对、空壳文件）在 `which`
  * 那关看不出来。而只看第一个也不够——理由见 `resolveCommand`。
  */
-export async function probeCommand(command: string, hint?: string): Promise<Probe> {
+export async function probeCommand(command: string, hint?: string, locale: Locale = DEFAULT_LOCALE): Promise<Probe> {
+  const m = PROBE[locale]
   const paths = await candidates(command)
   if (paths.length === 0) {
-    return { state: "missing", detail: [`\`${command}\` 不在 PATH 上。`, hint].filter(Boolean).join("") }
+    return { state: "missing", detail: m.join(present([m.missing(command), hint])) }
   }
   for (const path of paths) {
     const version = await versionOf(path)
@@ -93,7 +101,7 @@ export async function probeCommand(command: string, hint?: string): Promise<Prob
   }
   // 一个都跑不起来。**把试过几个说出来**：只报第一个的话，用户会拿着一条
   // 「/a/b/codex 装坏了」的提示去修一个根本不该用的文件
-  const tried = paths.length === 1 ? `\`${paths[0] ?? ""}\`` : `PATH 上 ${String(paths.length)} 个同名文件（${paths.join("、")}）`
+  const tried = paths.length === 1 ? `\`${paths[0] ?? ""}\`` : m.many(paths)
   /*
    * **这一支原来一个「下一步」都没有。**
    *
@@ -104,10 +112,7 @@ export async function probeCommand(command: string, hint?: string): Promise<Prob
    * 多个候选时那句话尤其要紧：**坏的多半是排在最前面的那个**（后面的往往好好的），
    * 而不说这一句的话，用户会对着 homebrew 那份完好的文件反复重装。
    */
-  const which =
-    paths.length === 1
-      ? ""
-      : "PATH 上靠前的那个先被用到，坏的多半是它；后面几个可能好好的。"
+  const which = paths.length === 1 ? "" : m.firstBroken
   return {
     /*
      * **`unavailable` 而不是 `missing`。**
@@ -126,8 +131,6 @@ export async function probeCommand(command: string, hint?: string): Promise<Prob
      * 只换掉那个词，不改任何行为。
      */
     state: "unavailable",
-    detail: [`${tried} 都跑不起来 \`--version\`——装坏了、版本不兼容，或者那只是个空壳。`, which, hint]
-      .filter(Boolean)
-      .join(""),
+    detail: m.join(present([m.broken(tried), which, hint])),
   }
 }

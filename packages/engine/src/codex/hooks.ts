@@ -1,11 +1,16 @@
 import type { Event, ThreadId, ToolCallItem, ToolStatus, TurnId, TurnStatus } from "@switchback/protocol"
 import type { WireHookLifecycle, WireHookRun } from "./wire.js"
+import { localeOf } from "../locale.js"
+import type { Locale } from "@switchback/i18n"
+import { CODEX_HOOKS } from "./hooks.messages.js"
 
 interface HookContext {
   threadId: ThreadId
   turnId: () => TurnId | undefined
   emit: (event: Event) => void
   now: () => number
+  /** 适配器自己写的话用哪种语言（`StartRequest.locale`）。缺省中文。 */
+  locale?: () => Locale
 }
 
 interface ActiveHook {
@@ -106,11 +111,9 @@ function activeHook(ctx: HookContext, lifecycle: WireHookLifecycle, previous?: A
   }
 }
 
-function closeItem(item: ToolCallItem, status: TurnStatus): ToolCallItem {
+function closeItem(item: ToolCallItem, status: TurnStatus, m: (typeof CODEX_HOOKS)[Locale]): ToolCallItem {
   if (status === "interrupted") return { ...item, status: "interrupted" }
-  const missing = status === "completed"
-    ? "Codex 在轮次结束前没有报告这次 hook 的结果。"
-    : item.error
+  const missing = status === "completed" ? m.noResult : item.error
   return { ...item, status: "failed", ...(missing === undefined ? {} : { error: missing }) }
 }
 
@@ -178,7 +181,7 @@ class CodexHookTracker implements HookTracker {
         const item = hookItem(current, current.run)
         if (item !== undefined) {
           this.ctx.emit({
-            type: "item.updated", at: this.ctx.now(), item: closeItem(item, status),
+            type: "item.updated", at: this.ctx.now(), item: closeItem(item, status, CODEX_HOOKS[localeOf(this.ctx)]),
           })
         }
       }

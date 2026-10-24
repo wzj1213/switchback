@@ -9,6 +9,9 @@
  * 不碰子进程，所以没装任何引擎的机器上也能跑测试。
  */
 
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { RPC } from "./rpc.messages.js"
+
 /** JSON-RPC 允许 id 是字符串或数字。**数字包括 0**——见 `dispatch` 里的判据。 */
 export type RequestId = string | number
 
@@ -31,6 +34,8 @@ export interface RpcHandlers {
   onRequest: (call: ServerCall) => void
   /** 解析不了的行。不抛——对端多打一行日志不该掀翻会话。 */
   onGarbage?: (line: string) => void
+  /** 这一层自己说的那几句（对端没说原因、连接已关闭）用哪种语言。现读，缺省中文。 */
+  language?: () => Locale
 }
 
 export interface RpcPeer {
@@ -64,8 +69,8 @@ export class RpcError extends Error {
   /** 对端 `message` 的原文，不带 `data`。拿它转述给人时不会拖出一串 JSON。 */
   readonly said: string
 
-  constructor(error: { message?: string; code?: number; data?: unknown }) {
-    super(errorText(error))
+  constructor(error: { message?: string; code?: number; data?: unknown }, locale: Locale = DEFAULT_LOCALE) {
+    super(errorText(error, RPC[locale]))
     this.name = "RpcError"
     this.code = error.code
     this.data = error.data
@@ -102,6 +107,7 @@ interface RpcState {
   buffer: string
   closed: boolean
   pending: Map<RequestId, Pending>
+  locale: () => Locale
 }
 
 function settleReply(state: RpcState, msg: Incoming): void {
@@ -111,7 +117,7 @@ function settleReply(state: RpcState, msg: Incoming): void {
   if (waiter === undefined) return
   state.pending.delete(id)
   if (msg.error === undefined) waiter.resolve(msg.result)
-  else waiter.reject(new RpcError(msg.error))
+  else waiter.reject(new RpcError(msg.error, state.locale()))
 }
 
 /**
@@ -124,10 +130,10 @@ function settleReply(state: RpcState, msg: Incoming): void {
  *
  * `data` 不是字符串时整个 JSON 化：**编不出更好的话时，原文比编的话有用**。
  */
-function errorText(error: { message?: string; data?: unknown }): string {
-  const head = error.message ?? "对端返回了错误"
+function errorText(error: { message?: string; data?: unknown }, m: (typeof RPC)[Locale]): string {
+  const head = error.message ?? m.peerError
   const detail = detailOf(error.data)
-  return detail === undefined ? head : `${head}：${detail}`
+  return detail === undefined ? head : m.withDetail(head, detail)
 }
 
 function detailOf(data: unknown): string | undefined {
@@ -175,14 +181,16 @@ function dispatch(state: RpcState, handlers: RpcHandlers, write: Write, line: st
 }
 
 export function createRpc(handlers: RpcHandlers): RpcPeer {
-  const state: RpcState = { seq: 0, buffer: "", closed: false, pending: new Map() }
+  const state: RpcState = {
+    seq: 0, buffer: "", closed: false, pending: new Map(), locale: () => handlers.language?.() ?? DEFAULT_LOCALE,
+  }
   const write: Write = (payload) => {
     handlers.send(JSON.stringify({ jsonrpc: "2.0", ...payload }))
   }
 
   return {
     call: (method, params) => {
-      if (state.closed) return Promise.reject(new Error(`连接已关闭，${method} 未发出`))
+      if (state.closed) return Promise.reject(new Error(RPC[state.locale()].closed(method)))
       state.seq += 1
       const id = state.seq
       return new Promise<unknown>((resolve, reject) => {

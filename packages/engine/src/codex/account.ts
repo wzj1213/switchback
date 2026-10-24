@@ -2,6 +2,8 @@ import type { EngineStatus, Event } from "@switchback/protocol"
 import type { RpcPeer } from "../rpc.js"
 import { emitLimits } from "./limits.js"
 import type { WireRateLimits } from "./wire.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CODEX_ACCOUNT } from "./account.messages.js"
 
 /**
  * 账号侧的现状：额度还剩多少、登没登录。**握手完主动问一次。**
@@ -24,6 +26,7 @@ export function reportAccount(
   rpc: RpcPeer,
   status: (status: EngineStatus, detail?: string) => void,
   emit: (event: Event) => void,
+  locale: Locale = DEFAULT_LOCALE,
 ): void {
   void rpc
     .call("account/rateLimits/read")
@@ -34,7 +37,7 @@ export function reportAccount(
   void rpc
     .call("account/read", { refreshToken: false })
     .then((raw) => {
-      const why = notSignedIn(raw)
+      const why = notSignedIn(raw, locale)
       if (why !== undefined) status("degraded", why)
     })
     .catch(() => undefined)
@@ -46,9 +49,9 @@ export function reportAccount(
  * 0.149.0 的公开 v2 形状：登录态在 `account`，登出是 null；
  * `requiresOpenaiAuth` 只说明这套 provider 是否要求 OpenAI 登录。
  */
-function notSignedIn(raw: unknown): string | undefined {
+function notSignedIn(raw: unknown, locale: Locale): string | undefined {
   const auth = raw as { account?: unknown; requiresOpenaiAuth?: boolean } | undefined
   if (auth?.requiresOpenaiAuth !== true) return undefined
   if (auth.account !== null && auth.account !== undefined) return undefined
-  return "codex 还没登录，这个会话发什么都会失败。在终端里跑 `codex login`，然后重开一个会话。"
+  return CODEX_ACCOUNT[locale].signedOut
 }

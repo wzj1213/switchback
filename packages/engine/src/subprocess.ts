@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import { tree } from "./platform.js"
 import { sep } from "node:path"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { SUBPROCESS } from "./subprocess.messages.js"
 
 /**
  * 起一个引擎进程要的最少信息。
@@ -14,6 +16,8 @@ export interface SpawnRequest {
   args: readonly string[]
   cwd?: string
   env?: Readonly<Record<string, string | undefined>>
+  /** 进程退出时那句话用哪种语言。现读，缺省中文。 */
+  language?: () => Locale
 }
 
 export interface ReclaimConfig {
@@ -118,7 +122,7 @@ interface Owned {
  * 两件事都不能省：`error` 必须无条件监听（没人听就是未捕获异常，掀翻整个进程），
  * `died` 必须只 resolve 一次（后续的 exit 不该覆盖最先发生的那个原因）。
  */
-function own(child: ChildProcess): Owned {
+function own(child: ChildProcess, language: (() => Locale) | undefined): Owned {
   const deferred: { settle: (error: Error) => void } = { settle: () => undefined }
   const died = new Promise<Error>((resolve) => {
     deferred.settle = resolve
@@ -141,7 +145,7 @@ function own(child: ChildProcess): Owned {
     owned.exited = true
     owned.code = code
     owned.signal = signal
-    owned.settle(new Error(`进程已退出（code ${String(code)}${signal === null ? "" : ` signal ${signal}`}）`))
+    owned.settle(new Error(SUBPROCESS[language?.() ?? DEFAULT_LOCALE].exited(String(code), signal)))
   })
   return owned
 }
@@ -159,7 +163,7 @@ export function createProcessOwner(config: Partial<ReclaimConfig> = {}): Process
       stdio: ["pipe", "pipe", "pipe"],
       detached: true,
     })
-    state.owned = own(child)
+    state.owned = own(child, options.language)
     return child
   }
 

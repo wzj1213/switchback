@@ -253,6 +253,7 @@ export function attachHost(
   const engines = createEngineCatalog(drivers, labels, log, {
     visible: ports?.engineVisible,
     profile: (id) => id === "dsh" ? (ports?.dshProfile?.() ?? "acp") : undefined,
+    ...(ports.locale === undefined ? {} : { locale: ports.locale }),
   })
   const refreshEngines = refresherOf({ reload, engines, emit, labels, live: () => host.live() })
 
