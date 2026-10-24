@@ -9,7 +9,6 @@
   "apps/desktop/src/main/engines-file.ts",
   "apps/desktop/src/main/enginever-sources.ts",
   "apps/desktop/src/main/enginever.ts",
-  "apps/desktop/src/main/handoff-brief.ts",
   "apps/desktop/src/main/terminal-login.ts",
   "apps/desktop/src/renderer/engine-settings-copy.ts",
   "apps/desktop/src/renderer/engine-settings-model.ts"

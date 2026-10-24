@@ -236,7 +236,7 @@ export function attachHost(
     journal,
     rules,
     ...baselineDeps(log, baselines),
-    ...handoffDeps({ journal, labels, log, userData: app.getPath("userData"), enabled: ports.handoffBrief }),
+    ...handoffDeps({ journal, labels, log, userData: app.getPath("userData"), enabled: ports.handoffBrief, locale: ports.locale }),
     ...(devMaxLive() === undefined ? {} : { maxLive: devMaxLive() }),
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,

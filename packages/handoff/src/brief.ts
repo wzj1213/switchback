@@ -1,5 +1,9 @@
 import type { LogFacts } from "./log-facts.js"
 import { isoAt, type Stint } from "./stints.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { BRIEF } from "./brief.messages.js"
+
+type Text = (typeof BRIEF)[Locale]
 
 /**
  * 换引擎后第一句话前面那段交接说明。
@@ -30,6 +34,8 @@ export interface BriefInput {
   stints: readonly Stint[]
   transcript: { path: string; lines: number; bytes: number; lastTurn?: { turn: number; line: number } }
   logs: readonly BriefLog[]
+  /** 用哪种语言说（交接那一刻的界面语言）。缺省中文；转写要用同一种。 */
+  locale?: Locale
 }
 
 export function sizeOf(bytes: number): string {
@@ -42,56 +48,56 @@ function count(n: number): string {
   return n.toLocaleString("en-US")
 }
 
-function stintLines(stints: readonly Stint[]): readonly string[] {
+function stintLines(stints: readonly Stint[], m: Text): readonly string[] {
   let next = 1
   return stints.map((stint) => {
-    const range = stint.turns === 1 ? `第 ${String(next)} 轮` : `第 ${String(next)}–${String(next + stint.turns - 1)} 轮`
+    const range = stint.turns === 1 ? m.turnOne(next) : m.turnRange(next, next + stint.turns - 1)
     next += stint.turns
-    return `- ${stint.engine}：${range}，${isoAt(stint.from)} – ${isoAt(stint.to)}`
+    return m.stint(stint.engine, range, isoAt(stint.from), isoAt(stint.to))
   })
 }
 
-function factsText(facts: LogFacts): string {
-  const kind = { jsonl: "JSONL，每行一个 JSON", json: "整份 JSON", text: "纯文本" }[facts.format]
-  const parts = [`${kind}，${count(facts.lines)} 行`]
+function factsText(facts: LogFacts, m: Text): string {
+  const parts = [m.lines(m.format[facts.format], count(facts.lines))]
   if (facts.types.length > 0) {
-    parts.push(`顶层 type 取值 ${facts.types.slice(0, 6).map(([name, n]) => `${name} ${count(n)}`).join("、")}`)
+    parts.push(m.types(facts.types.slice(0, 6).map(([name, n]) => `${name} ${count(n)}`)))
   }
   if (facts.idPath !== undefined && facts.idSample !== undefined) {
-    parts.push(`转写里的原生 id 在这份记录的 ${facts.idPath} 字段，例如 ${facts.idSample}`)
+    parts.push(m.idAt(facts.idPath === "" ? m.wholeLine : facts.idPath, facts.idSample))
   }
-  if (facts.timePath !== undefined) parts.push(`每行的时间戳在 ${facts.timePath} 字段（ISO 8601）`)
-  return parts.join("；")
+  if (facts.timePath !== undefined) parts.push(m.timeAt(facts.timePath))
+  return m.join(parts)
 }
 
-function logLine(log: BriefLog): string {
-  if (log.bytes === undefined) return `- ${log.engine}：${log.path}（这个路径上已经没有文件了）`
-  const facts = log.facts === "large" ? "太大，没有逐行统计格式"
-    : log.facts === "unreadable" ? "Switchback 读不了这份文件，没有统计格式" : factsText(log.facts)
-  return `- ${log.engine}：${log.path}（${sizeOf(log.bytes)}；${facts}）`
+function logLine(log: BriefLog, m: Text): string {
+  if (log.bytes === undefined) return m.gone(log.engine, log.path)
+  const facts = log.facts === "large" ? m.large
+    : log.facts === "unreadable" ? m.unreadable : factsText(log.facts, m)
+  return m.log(log.engine, log.path, sizeOf(log.bytes), facts)
 }
 
-function logLines(logs: readonly BriefLog[]): readonly string[] {
-  if (logs.length === 0) return ["- 这几家没有报出本地原始记录，只有上面的转写。"]
-  return logs.map(logLine)
+function logLines(logs: readonly BriefLog[], m: Text): readonly string[] {
+  if (logs.length === 0) return [m.noLogs]
+  return logs.map((log) => logLine(log, m))
 }
 
-function transcriptLine(t: BriefInput["transcript"]): string {
-  const last = t.lastTurn === undefined ? "" : `；最后一轮（第 ${String(t.lastTurn.turn)} 轮）从第 ${count(t.lastTurn.line)} 行开始`
-  return `- ${t.path}（${count(t.lines)} 行，${sizeOf(t.bytes)}${last}）`
+function transcriptLine(t: BriefInput["transcript"], m: Text): string {
+  const last = t.lastTurn === undefined ? "" : m.lastTurn(t.lastTurn.turn, count(t.lastTurn.line))
+  return m.transcript(t.path, count(t.lines), sizeOf(t.bytes), last)
 }
 
 export function briefOf(input: BriefInput): string {
+  const m = BRIEF[input.locale ?? DEFAULT_LOCALE]
   return [
     "<switchback-handoff>",
-    `这条会话中途换了引擎，接下来由 ${input.engine} 接着进行。此前的工作：`,
-    ...stintLines(input.stints),
+    m.intro(input.engine),
+    ...stintLines(input.stints, m),
     "",
-    "完整转写（Switchback 从会话记录整理：每轮的提问、回答、思考、工具调用与完整输出、改动 diff；按 `## 第 N 轮` 分节，标题里是这一轮的开始时间（UTC），工具调用行尾〔…〕是原生 id）：",
-    transcriptLine(input.transcript),
+    m.transcriptHead,
+    transcriptLine(input.transcript, m),
     "",
-    "各段原始记录（引擎自己的会话文件，下面的格式是从文件里读出来的）：",
-    ...logLines(input.logs),
+    m.logsHead,
+    ...logLines(input.logs, m),
     "</switchback-handoff>",
   ].join("\n")
 }

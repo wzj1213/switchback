@@ -47,6 +47,7 @@ function briefFor(fx: Fixture, events: readonly Event[], enabled = true): Return
     label: (id) => LABELS[id] ?? id,
     spareDir: fx.spare,
     now: () => T0 + 60_000,
+    locale: () => "zh-CN",
   })
 }
 

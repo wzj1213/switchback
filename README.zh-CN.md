@@ -239,7 +239,7 @@ link ← protocol + wire + i18n
 worksite ← ∅
 i18n ← ∅
 journal ← protocol
-handoff ← protocol
+handoff ← protocol + i18n
 engine ← protocol + approval + i18n
 host ← protocol + approval + engine + store + journal + handoff + i18n
 desktop ← protocol + engine + handoff + host + i18n + journal + link + store + wire + worksite

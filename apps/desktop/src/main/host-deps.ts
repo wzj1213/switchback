@@ -4,6 +4,7 @@ import type { Journal } from "@switchback/journal"
 import type { Logger } from "./log.js"
 import type { WorktreeBaselines } from "./worktree-baseline.js"
 import { createHandoffBrief } from "./handoff-brief.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 
 /**
  * `HostDeps` 里那几项**可选的外部 IO** 在桌面端怎么接。
@@ -43,6 +44,8 @@ export interface HandoffWiring {
   userData: string
   /** 「换引擎自动交接」开着没有。不给＝关着。 */
   enabled: (() => boolean) | undefined
+  /** 交接说明与转写的语言。不给＝默认的中文。 */
+  locale: (() => Locale) | undefined
 }
 
 /** 换引擎交接说明：写不出来就不附（宿主照旧只发用户那句），但要留一笔，不然「为什么这次没交接」无从查起。 */
@@ -53,6 +56,7 @@ export function handoffDeps(wiring: HandoffWiring): Pick<HostDeps, "handoffBrief
     label: (id) => wiring.labels[id] ?? id,
     spareDir: join(wiring.userData, "handoff"),
     now: () => Date.now(),
+    locale: () => wiring.locale?.() ?? DEFAULT_LOCALE,
   })
   return {
     handoffBrief: (thread) => brief(thread).catch((error: unknown) => {

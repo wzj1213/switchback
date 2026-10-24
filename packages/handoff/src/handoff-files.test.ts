@@ -137,3 +137,33 @@ describe("交接说明", () => {
     expect(brief).not.toMatch(/请|务必|你需要|应该/)
   })
 })
+
+/** 界面是英文时，交接说明和转写一起说英文——说明里讲的分节标题、id 记号得和转写里真实出现的对得上。 */
+describe("英文的交接说明与转写", () => {
+  const { text: md } = transcriptOf({ thread, items, label, at: at(80), locale: "en" })
+  const brief = briefOf({
+    engine: "Codex",
+    stints: [{ engine: "Claude Code", from: at(1), to: at(5), turns: 1 }],
+    transcript: { path: "/x.md", lines: 1234, bytes: 220_000, lastTurn: { turn: 2, line: 1180 } },
+    logs: [
+      { engine: "Claude Code", path: "/l.jsonl", bytes: 9_000_000,
+        facts: { format: "jsonl", lines: 4210, types: [["assistant", 1980]], idPath: "", idSample: "toolu_01A" } },
+    ],
+    locale: "en",
+  })
+  const cases = [
+    ["转写的分节标题", md, "## Turn 1 · 2026-08-25T02:01:00Z · Claude Code"],
+    ["转写里的工具行带原生 id", md, "#### Tool Bash: Run `pnpm test` — ok [toolu_01A]"],
+    ["转写的头部", md, "- 2 turns; engines: Claude Code → Codex"],
+    ["说明里讲的分节标题和转写一致", brief, "sectioned by `## Turn N`"],
+    ["此前谁跑了哪一轮", brief, "- Claude Code: turn 1, 2026-08-25T02:01:00Z – 2026-08-25T02:05:00Z"],
+    ["转写的位置", brief, "- /x.md (1,234 lines, 215 KB; the last turn (turn 2) starts at line 1,180)"],
+    ["整行就是原生 id 的记录", brief, "the native ids in the transcript are in this record's (the whole line) field, e.g. toolu_01A"],
+  ] as const
+  for (const [name, text, needle] of cases) {
+    it(name, () => { expect(text).toContain(needle) })
+  }
+  it("一个中文字都不夹", () => {
+    expect(brief).not.toMatch(/[一-鿿]/)
+  })
+})

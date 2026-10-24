@@ -13,6 +13,8 @@ import {
   type BriefLog,
   type TurnEngines,
 } from "@switchback/handoff"
+import type { Locale } from "@switchback/i18n"
+import { HANDOFF_FILES } from "./handoff-brief.messages.js"
 
 /**
  * 换引擎自动交接的**磁盘那一半**：宿主判定「这是换家后的第一句」之后来要说明，
@@ -30,7 +32,6 @@ import {
 const PARSE_LIMIT = 64 * 1024 * 1024
 /** 拿去原始记录里定位字段的原生 id：最近这几个就够，搜不到的每个都是一遍全文检索。 */
 const ID_PROBES = 8
-const IGNORE = "# Switchback 的本地文件（换引擎交接转写），不进版本库\n*\n"
 
 export interface HandoffBriefDeps {
   journal: Pick<Journal, "flush" | "read">
@@ -40,11 +41,13 @@ export interface HandoffBriefDeps {
   /** 工作区写不进去时，转写退到这里。 */
   spareDir: string
   now: () => number
+  /** 交接说明与转写用哪种语言：交接那一刻的界面语言。 */
+  locale: () => Locale
 }
 
-async function ensureIgnored(dir: string): Promise<void> {
+async function ensureIgnored(dir: string, locale: Locale): Promise<void> {
   // `wx`：已经有了就不动——用户改过它的话，那是他的决定
-  await writeFile(join(dir, ".gitignore"), IGNORE, { encoding: "utf8", flag: "wx" }).catch((error: unknown) => {
+  await writeFile(join(dir, ".gitignore"), HANDOFF_FILES[locale].ignore, { encoding: "utf8", flag: "wx" }).catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
   })
 }
@@ -56,15 +59,15 @@ async function writeInto(dir: string, name: string, text: string): Promise<strin
   return path
 }
 
-async function writeTranscript(thread: Thread, text: string, spareDir: string): Promise<string> {
+async function writeTranscript(thread: Thread, text: string, where: { spareDir: string; locale: Locale }): Promise<string> {
   const name = `${thread.id}.md`
   try {
     const root = join(thread.cwd, ".switchback")
     await mkdir(root, { recursive: true })
-    await ensureIgnored(root)
+    await ensureIgnored(root, where.locale)
     return await writeInto(join(root, "handoff"), name, text)
   } catch {
-    return writeInto(spareDir, name, text)
+    return writeInto(where.spareDir, name, text)
   }
 }
 
@@ -114,8 +117,9 @@ export function createHandoffBrief(deps: HandoffBriefDeps): (thread: Thread) => 
     const items = itemsOf(reduceAll(initial(), events), thread.id)
     if (items.length === 0) return undefined
     const engines = turnEnginesOf(events)
-    const transcript = transcriptOf({ thread, items, label: deps.label, at: deps.now(), engines })
-    const path = await writeTranscript(thread, transcript.text, deps.spareDir)
+    const locale = deps.locale()
+    const transcript = transcriptOf({ thread, items, label: deps.label, at: deps.now(), engines, locale })
+    const path = await writeTranscript(thread, transcript.text, { spareDir: deps.spareDir, locale })
     const logs = await Promise.all(
       earlierLogs(thread).map((log) => describeLog(log, probes(thread, items, engines, log.engine), deps.label)),
     )
@@ -129,6 +133,7 @@ export function createHandoffBrief(deps: HandoffBriefDeps): (thread: Thread) => 
         ...(transcript.lastTurn === undefined ? {} : { lastTurn: transcript.lastTurn }),
       },
       logs,
+      locale,
     })
   }
 }

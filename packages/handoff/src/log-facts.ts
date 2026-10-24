@@ -35,7 +35,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 /** 在一棵 JSON 里找值恰好等于 `needle` 的字段，返回它的路径；数组下标写成 `[]`。 */
 export function pathOf(value: unknown, needle: string, at = ""): string | undefined {
-  if (value === needle) return at === "" ? "(整行)" : at
+  // 整行就是空路径；交接说明里怎么称呼它由 `brief.messages.ts` 说
+  if (value === needle) return at
   if (Array.isArray(value)) {
     for (const child of value) {
       const hit = pathOf(child, needle, `${at}[]`)

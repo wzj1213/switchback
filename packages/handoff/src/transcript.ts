@@ -1,5 +1,9 @@
 import type { Item, PlanItem, Thread, ToolCallItem } from "@switchback/protocol"
 import { isoAt, ownerOf, stintsOf, turnsOf, type TurnEngines } from "./stints.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { TRANSCRIPT } from "./transcript.messages.js"
+
+type Text = (typeof TRANSCRIPT)[Locale]
 
 /**
  * 交接用的会话转写：**尽量无损**，给接手的那家引擎自己去读。
@@ -21,6 +25,8 @@ export interface TranscriptInput {
   at: number
   /** 每一轮是哪家开的（`turnEnginesOf`）。缺了的轮次按分段开始时间推断。 */
   engines?: TurnEngines
+  /** 标题与记法用哪种语言（交接那一刻的界面语言）。缺省中文。 */
+  locale?: Locale
 }
 
 export interface Transcript {
@@ -44,14 +50,14 @@ function quote(text: string): string {
   return text.split("\n").map((line) => `> ${line}`).join("\n")
 }
 
-function toolHead(item: ToolCallItem): string {
+function toolHead(item: ToolCallItem, m: Text): string {
   const detail = item.detail
-  const what = detail.kind === "shell" ? `执行 \`${detail.command}\``
-    : detail.kind === "file_edit" ? `编辑 ${detail.path}（+${String(detail.added)} −${String(detail.removed)}）`
-    : detail.kind === "file_read" ? `读取 ${detail.path}${detail.range === undefined ? "" : `（第 ${String(detail.range[0])}–${String(detail.range[1])} 行）`}`
-    : detail.kind === "fetch" ? `抓取 ${detail.url}`
+  const what = detail.kind === "shell" ? m.run(detail.command)
+    : detail.kind === "file_edit" ? m.edit(detail.path, detail.added, detail.removed)
+    : detail.kind === "file_read" ? m.read(detail.path, detail.range)
+    : detail.kind === "fetch" ? m.fetch(detail.url)
     : `${detail.name}`
-  return `#### 工具 ${item.tool}：${what} — ${item.status}${item.nativeId === undefined ? "" : `〔${item.nativeId}〕`}`
+  return m.tool(item.tool, what, item.status, item.nativeId)
 }
 
 function json(value: unknown): string {
@@ -64,88 +70,88 @@ function json(value: unknown): string {
 
 type Detail<K extends ToolCallItem["detail"]["kind"]> = Extract<ToolCallItem["detail"], { kind: K }>
 
-function shellBody(detail: Detail<"shell">): readonly string[] {
+function shellBody(detail: Detail<"shell">, m: Text): readonly string[] {
   return [
-    ...(detail.exitCode === undefined ? [] : [`退出码 ${String(detail.exitCode)}`]),
+    ...(detail.exitCode === undefined ? [] : [m.exitCode(detail.exitCode)]),
     ...(detail.output === undefined || detail.output === "" ? [] : [fence(detail.output)]),
   ]
 }
 
-function editBody(detail: Detail<"file_edit">): readonly string[] {
+function editBody(detail: Detail<"file_edit">, m: Text): readonly string[] {
   return detail.files
     .filter((file) => file.diff !== undefined && file.diff !== "")
-    .map((file) => `${file.path}（${file.kind}）\n${fence(file.diff ?? "", "diff")}`)
+    .map((file) => `${m.file(file.path, file.kind)}\n${fence(file.diff ?? "", "diff")}`)
 }
 
-function otherBody(detail: Detail<"other">): readonly string[] {
+function otherBody(detail: Detail<"other">, m: Text): readonly string[] {
   const output = detail.output
   return [
-    ...(detail.input === undefined ? [] : [`输入\n${fence(json(detail.input), "json")}`]),
-    ...(output === undefined ? [] : [`输出\n${fence(typeof output === "string" ? output : json(output))}`]),
+    ...(detail.input === undefined ? [] : [`${m.input}\n${fence(json(detail.input), "json")}`]),
+    ...(output === undefined ? [] : [`${m.output}\n${fence(typeof output === "string" ? output : json(output))}`]),
   ]
 }
 
-function toolBody(item: ToolCallItem): readonly string[] {
+function toolBody(item: ToolCallItem, m: Text): readonly string[] {
   const detail = item.detail
-  const body = detail.kind === "shell" ? shellBody(detail)
-    : detail.kind === "file_edit" ? editBody(detail)
-    : detail.kind === "other" ? otherBody(detail) : []
-  return item.error === undefined || item.error === "" ? body : [...body, `错误：${item.error}`]
+  const body = detail.kind === "shell" ? shellBody(detail, m)
+    : detail.kind === "file_edit" ? editBody(detail, m)
+    : detail.kind === "other" ? otherBody(detail, m) : []
+  return item.error === undefined || item.error === "" ? body : [...body, m.error(item.error)]
 }
 
-function planBlock(item: PlanItem): string {
+function planBlock(item: PlanItem, m: Text): string {
   const mark = { pending: " ", in_progress: "~", done: "x", dropped: "-" } as const
   const steps = item.steps.map((step) => `- [${mark[step.status]}] ${step.text}`).join("\n")
-  return `#### 计划\n\n${item.explanation === undefined ? "" : `${item.explanation}\n\n`}${steps}`
+  return `${m.plan}\n\n${item.explanation === undefined ? "" : `${item.explanation}\n\n`}${steps}`
 }
 
-function lanePrefix(item: Item): string {
-  return item.lane === undefined ? "" : `（旁路 ${item.lane.id}）`
+function lanePrefix(item: Item, m: Text): string {
+  return item.lane === undefined ? "" : m.lane(item.lane.id)
 }
 
 type Of<K extends Item["kind"]> = Extract<Item, { kind: K }>
 
-function userBlock(item: Of<"user_message">): string {
-  const who = item.origin === undefined ? "用户" : item.origin === "handoff" ? "交接说明" : "自动触发"
-  const files = (item.attachments ?? []).length === 0 ? "" : `\n\n附件：${(item.attachments ?? []).join("、")}`
-  return `#### ${who}${lanePrefix(item)}\n\n${item.text}${files}`
+function userBlock(item: Of<"user_message">, m: Text): string {
+  const who = item.origin === undefined ? m.who.user : item.origin === "handoff" ? m.who.handoff : m.who.auto
+  const files = (item.attachments ?? []).length === 0 ? "" : `\n\n${m.attachments(item.attachments ?? [])}`
+  return `#### ${who}${lanePrefix(item, m)}\n\n${item.text}${files}`
 }
 
-function errorBlock(item: Of<"error">): string {
+function errorBlock(item: Of<"error">, m: Text): string {
   const detail = item.detail === undefined ? "" : `\n\n${fence(item.detail)}`
-  return `#### 报错${item.fatal ? "（致命）" : ""}\n\n${item.message}${detail}`
+  return `${m.errorHead(item.fatal)}\n\n${item.message}${detail}`
 }
 
-function approvalBlock(item: Of<"approval">): string {
-  return `#### 审批 ${item.tool} — ${item.status}\n\n${item.summary}${item.reason === "" ? "" : `\n\n理由：${item.reason}`}`
+function approvalBlock(item: Of<"approval">, m: Text): string {
+  return `${m.approval(item.tool, item.status)}\n\n${item.summary}${item.reason === "" ? "" : `\n\n${m.reason(item.reason)}`}`
 }
 
-const RENDER: { [K in Item["kind"]]: (item: Of<K>) => string } = {
+const RENDER: { [K in Item["kind"]]: (item: Of<K>, m: Text) => string } = {
   user_message: userBlock,
-  agent_message: (item) => `#### 回答${lanePrefix(item)}${item.complete ? "" : "（未完成）"}\n\n${item.text}`,
-  reasoning: (item) => `#### 思考${lanePrefix(item)}\n\n${quote(item.text)}`,
-  tool_call: (item) => [`${toolHead(item)}${lanePrefix(item)}`, ...toolBody(item)].join("\n\n"),
+  agent_message: (item, m) => `${m.answer(lanePrefix(item, m), item.complete)}\n\n${item.text}`,
+  reasoning: (item, m) => `${m.thinking(lanePrefix(item, m))}\n\n${quote(item.text)}`,
+  tool_call: (item, m) => [`${toolHead(item, m)}${lanePrefix(item, m)}`, ...toolBody(item, m)].join("\n\n"),
   plan: planBlock,
   approval: approvalBlock,
-  notice: (item) => `#### 提示（${item.level}）\n\n${item.message}`,
+  notice: (item, m) => `${m.notice(item.level)}\n\n${item.message}`,
   error: errorBlock,
 }
 
-function block(item: Item): string {
-  return (RENDER[item.kind] as (item: Item) => string)(item)
+function block(item: Item, m: Text): string {
+  return (RENDER[item.kind] as (item: Item, m: Text) => string)(item, m)
 }
 
-function header(input: TranscriptInput, turns: number): string {
+function header(input: TranscriptInput, turns: number, m: Text): string {
   const { thread } = input
   const route = stintsOf(thread, input.items, input.engines).map((stint) => input.label(stint.engine))
   return [
-    `# 会话转写：${thread.title}`,
+    m.title(thread.title),
     "",
-    `- 会话 id：${thread.id}`,
-    `- 工作区：${thread.cwd}`,
-    `- 生成时间：${isoAt(input.at)}（Switchback 从会话记录整理）`,
-    `- 共 ${String(turns)} 轮；引擎：${route.length === 0 ? input.label(thread.engine) : route.join(" → ")}`,
-    "- 记法：每轮标题写着第几轮、开始时间（UTC）、哪家引擎在跑；工具调用行尾〔…〕是引擎自己报的调用 id，用来到它的原始记录里对位。",
+    m.id(thread.id),
+    m.cwd(thread.cwd),
+    m.at(isoAt(input.at)),
+    m.turns(turns, route.length === 0 ? input.label(thread.engine) : route.join(" → ")),
+    m.legend,
   ].join("\n")
 }
 
@@ -154,14 +160,15 @@ function lineCount(text: string): number {
 }
 
 export function transcriptOf(input: TranscriptInput): Transcript {
+  const m = TRANSCRIPT[input.locale ?? DEFAULT_LOCALE]
   const turns = turnsOf(input.items)
   const sections = turns.map((turn, index) => {
     const first = turn.items[0]
     const who = input.label(ownerOf(input.thread, turn, input.engines))
     const when = first === undefined ? "" : ` · ${isoAt(first.at)} · ${who}`
-    return [`## 第 ${String(index + 1)} 轮${when}`, ...turn.items.map(block)].join("\n\n")
+    return [m.turn(index + 1, when), ...turn.items.map((item) => block(item, m))].join("\n\n")
   })
-  const parts = [header(input, turns.length), ...sections]
+  const parts = [header(input, turns.length, m), ...sections]
   const text = `${parts.join("\n\n")}\n`
   // 各段之间空一行：最后一节的起始行＝前面各节行数之和，加上每节后面那一行空行
   const before = parts.slice(0, -1).reduce((sum, part) => sum + lineCount(part) + 1, 0)
