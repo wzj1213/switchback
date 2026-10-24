@@ -2,7 +2,8 @@ import type { Command, EngineId, Event, Thread, ThreadId, TurnId } from "@switch
 import { Unsupported, type EngineSession } from "@switchback/engine"
 import { resolveApproval } from "./approval.js"
 import { resolveQuestion } from "./question.js"
-import { clearQueue, discardUnstarted, emit, liveStateOf, type Ctx, type Live } from "./ctx.js"
+import { clearQueue, discardUnstarted, emit, hostError, liveStateOf, localeOf, type Ctx, type Live } from "./ctx.js"
+import { HOST } from "./host.messages.js"
 import { withQueue, type QueuedPrompt } from "./queued.js"
 import { takeBack } from "./take-back.js"
 import type { HostDeps } from "./deps.js"
@@ -211,7 +212,7 @@ function serialKey(command: Command): string | undefined {
  * 每个入口各加一次防抖迟早会漏掉一个，而漏掉的代价是一个孤儿子进程。
  */
 async function runCommand(ctx: Ctx, command: Command): Promise<void> {
-  if (ctx.closed) throw new Error("宿主已经关闭")
+  if (ctx.closed) throw hostError.closed(ctx)
   const handler = HANDLERS[command.type] as (ctx: Ctx, command: Command) => Promise<void>
   try {
     await handler(ctx, command)
@@ -248,7 +249,7 @@ async function serialDispatch(ctx: Ctx, command: Command): Promise<void> {
 }
 
 async function dispatch(ctx: Ctx, command: Command): Promise<void> {
-  if (ctx.closed) throw new Error("宿主已经关闭")
+  if (ctx.closed) throw hostError.closed(ctx)
   const key = inflightKey(command)
   if (key === undefined) return serialDispatch(ctx, command)
   const running = ctx.inflight.get(key)
@@ -296,7 +297,7 @@ function failDrain(ctx: Ctx, threadId: ThreadId, next: QueuedPrompt, error: unkn
     threadId,
     // 这一家明确不收这句里的东西不是引擎坏了，抬头写「能力受限」，别把人引去查一个没坏的东西
     status: error instanceof Unsupported ? "degraded" : "crashed",
-    detail: `排队的那句没发出去：${error instanceof Error ? error.message : String(error)}`,
+    detail: HOST[localeOf(ctx)].queuedFailed(error instanceof Error ? error.message : String(error)),
   })
   if (current !== undefined && movesOn(current, next)) ctx.drain?.(threadId)
 }

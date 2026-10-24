@@ -1,5 +1,6 @@
 import type { Command } from "@switchback/protocol"
-import { emit, isCurrent, setStatus, type Ctx } from "./ctx.js"
+import { emit, isCurrent, localeOf, setStatus, type Ctx } from "./ctx.js"
+import { COMPACT } from "./compact.messages.js"
 
 /**
  * 压缩本身也是一段有起止的引擎工作：否则异步完成通知没有宿主 turn 可归属，
@@ -11,7 +12,7 @@ export async function compact(
 ): Promise<void> {
   const entry = ctx.live.get(command.threadId)
   if (entry === undefined || !entry.lease.active || entry.session.compact === undefined) return
-  if (entry.turn !== undefined) throw new Error("这一轮还在跑，压缩要等它停下来")
+  if (entry.turn !== undefined) throw new Error(COMPACT[localeOf(ctx)].busy)
 
   const at = ctx.deps.now()
   const turnId = ctx.deps.newId("tn")

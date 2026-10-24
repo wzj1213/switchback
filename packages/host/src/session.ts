@@ -3,7 +3,10 @@ import type { Rule } from "@switchback/approval"
 import { createGate } from "./gate.js"
 import { askQuestion } from "./question.js"
 import { askUser } from "./approval.js"
-import { attachStarted, discardUnstarted, drainQueued, emit, ensureLaunchable, isCurrent, preparingLive, type Ctx, type Live } from "./ctx.js"
+import {
+  attachStarted, discardUnstarted, drainQueued, emit, ensureLaunchable, hostError, isCurrent, localeOf, preparingLive, type Ctx, type Live,
+} from "./ctx.js"
+import { SESSION } from "./session.messages.js"
 import { evict } from "./live.js"
 import {
   rememberHandle,
@@ -25,13 +28,14 @@ function newThread(
   cmd: Extract<Command, { type: "thread.create" }>,
   id: ThreadId,
   at: number,
+  untitled: string,
 ): Thread {
   return {
     id,
     // **临时的**：引擎照起（模型清单、斜杠命令要它才有），但在发出第一句话之前
     // 它不进侧栏、不落盘、切引擎当场生效（见 `Thread.provisional`）
     provisional: true,
-    title: cmd.title ?? "新会话",
+    title: cmd.title ?? untitled,
     ...(cmd.workspaceKind === undefined ? {} : { workspaceKind: cmd.workspaceKind }),
     cwd: cmd.cwd,
     engine: cmd.engine,
@@ -114,7 +118,7 @@ function clearSessionState(ctx: Ctx, thread: Thread): void {
 export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = {}): Promise<string | undefined> {
   const { resume, forkOf, captureBaseline = true, beforeActivate } = options
   const driver = ctx.deps.drivers[thread.engine]
-  if (driver === undefined) throw new Error(`未注册的引擎：${thread.engine}`)
+  if (driver === undefined) throw hostError.noEngine(ctx, thread.engine)
   // 必须在引擎能动工作区之前取样；接力/权限重启沿用同一个 thread id，自然复用。
   await ensureLaunchable(ctx, thread, captureBaseline)
   // 同一个 thread 会接力、续跑和权限重启。新进程尚未报目录时，上一进程的模型与
@@ -132,6 +136,7 @@ export async function launch(ctx: Ctx, thread: Thread, options: LaunchOptions = 
     cwd: thread.cwd,
     trust: thread.trust,
     home: ctx.deps.home,
+    locale: () => localeOf(ctx),
     memory: () => live.rules,
     emit: (event) => {
       if ((lease.installing && !ctx.closed && !ctx.removed.has(thread.id)) || isCurrent(ctx, live)) {
@@ -266,7 +271,7 @@ export async function create(
   cmd: Extract<Command, { type: "thread.create" }>,
 ): Promise<void> {
   const at = ctx.deps.now()
-  const thread = newThread(cmd, ctx.deps.newId("th"), at)
+  const thread = newThread(cmd, ctx.deps.newId("th"), at, SESSION[localeOf(ctx)].untitled)
   // **先挂进待提交表再发事件**：新会话在发出第一句话之前不落盘，
   // 否则点一下「+」就在磁盘上留一条空会话，重启还在（见 `Ctx.uncommitted`）。
   // 只有「新建」走这条路——续跑和接管的会话本来就已经在磁盘上了。

@@ -9,13 +9,28 @@ export interface RedlineContext {
   state: SessionState
 }
 
+export type RedlineId =
+  | "unparseable-command"
+  | "credential-read"
+  | "engine-settings-write"
+  | "switchback-self-config"
+  | "rm-outside-worksite"
+  | "write-outside-worksite"
+  | "exec-writes-outside-worksite"
+  | "write-unknown-target"
+  | "git-push"
+  | "git-destructive"
+  | "global-install"
+  | "network"
+
+/**
+ * 一条红线。说明与理由按 `id` 放在 `redline.messages.ts`：理由是写给引擎读的，
+ * 让它能改方案而不是撞墙；同一句也出现在审批卡上，所以跟着界面语言。
+ */
 export interface Redline {
-  id: string
-  describe: string
+  id: RedlineId
   hit(ctx: RedlineContext): boolean
   action(trust: Trust): Action
-  /** 写给引擎读的理由，让它能改方案而不是撞墙 */
-  reason: string
   /** 是否允许被记忆规则豁免。除网络外一律 false。 */
   memorable: boolean
 }
@@ -114,68 +129,55 @@ function gitSubcommandWithFlag(norm: Normalized, sub: string, ...flags: string[]
 export const REDLINES: readonly Redline[] = [
   {
     id: "unparseable-command",
-    describe: "命令含无法静态判定的结构，而且看起来会动东西",
     hit: (ctx) =>
       ctx.norm.split.unparseable &&
       // `hard` = 真正跑的东西不是你看到的这段（eval、解释器内联脚本…），一律问；
       // 其余（取值替换）只在文本里露出会动东西的迹象时才问
       (ctx.norm.split.hard === true || smellsRisky(rawCommand(ctx.req))),
     action: always("escalate"),
-    reason: "命令里有无法静态判定的结构，看不出它会动什么，需要人工确认",
     memorable: false,
   },
   {
     id: "credential-read",
-    describe: "读取凭据文件或钥匙串",
     hit: (ctx) =>
       ctx.norm.paths.some(
         (p) => matchesAnyPrefix(p, CREDENTIAL_PREFIXES, ctx.state.home) || isDotEnv(p),
       ) || segmentSignatureIs(ctx.norm, "security"),
     action: always("deny"),
-    reason: "拒绝访问凭据文件。如果任务确实需要某个密钥，请说明用途并让用户手工提供，不要直接读取凭据文件",
     memorable: false,
   },
   // ↓ 这两条比「工作区外写」更具体，必须排在它前面，否则会被泛规则抢先命中、
   //   用户看到的理由就变成「不在工作区内」而不是「这会改掉引擎自己的权限配置」。
   {
     id: "engine-settings-write",
-    describe: "修改引擎自身配置",
     hit: (ctx) =>
       ctx.norm.category === "write" &&
       ctx.norm.paths.some((p) => matchesAnyPrefix(p, ENGINE_HOME_PREFIXES, ctx.state.home)),
     action: always("escalate"),
-    reason: "该路径是引擎或 Switchback 自身的配置，改动会静默改变权限行为，必须人工确认",
     memorable: false,
   },
   {
     id: "switchback-self-config",
-    describe: "修改本项目的 Switchback 状态",
     hit: (ctx) =>
       ctx.norm.category === "write" &&
       ctx.norm.paths.some((p) => isInside(`${ctx.state.worksite}/.switchback`, p)),
     action: always("escalate"),
-    reason: ".switchback 目录保存本项目的审批记忆与会话状态，不能由 agent 自行修改",
     memorable: false,
   },
   {
     id: "rm-outside-worksite",
-    describe: "在工作区外递归删除",
     hit: (ctx) => hasProgramWithFlag(ctx.norm, "rm", "-r", "-f", "--recursive", "--force") && anyPathOutside(ctx),
     action: always("deny"),
-    reason: "拒绝在工作区外递归删除。请把操作限制在当前工作区内",
     memorable: false,
   },
   {
     id: "write-outside-worksite",
-    describe: "工作区外写入",
     hit: (ctx) => ctx.norm.category === "write" && anyPathOutside(ctx),
     action: (trust) => (trust === "read-only" ? "deny" : "escalate"),
-    reason: "目标路径不在当前工作区内。若确需修改，请说明理由；只读档下一律拒绝",
     memorable: false,
   },
   {
     id: "exec-writes-outside-worksite",
-    describe: "命令看起来会写到工作区外",
     hit: (ctx) =>
       ctx.norm.category === "exec" &&
       ctx.norm.split.segments.some(
@@ -187,39 +189,31 @@ export const REDLINES: readonly Redline[] = [
             anyPathOutside(ctx)),
       ),
     action: (trust) => (trust === "full" ? "allow" : "escalate"),
-    reason: "命令带有写入语义且目标疑似在工作区外，需要人工确认",
     memorable: false,
   },
   {
     id: "write-unknown-target",
-    describe: "写操作但判不出目标路径",
     hit: (ctx) => ctx.norm.category === "write" && ctx.norm.paths.length === 0,
     action: always("escalate"),
-    reason: "无法从参数中判定写入目标，需要人工确认",
     memorable: false,
   },
   {
     id: "git-push",
-    describe: "推送到远端",
     hit: (ctx) => segmentSignatureIs(ctx.norm, "git push"),
     action: always("escalate"),
-    reason: "推送到远端是对外可见的不可逆动作，必须人工确认",
     memorable: false,
   },
   {
     id: "git-destructive",
-    describe: "丢弃未提交改动或未跟踪文件",
     hit: (ctx) =>
       gitSubcommandWithFlag(ctx.norm, "reset", "--hard") ||
       gitSubcommandWithFlag(ctx.norm, "clean", "-f", "--force") ||
       gitSubcommandWithFlag(ctx.norm, "checkout", "--force"),
     action: always("escalate"),
-    reason: "该命令会丢弃未提交改动或未跟踪文件，无法恢复，必须人工确认",
     memorable: false,
   },
   {
     id: "global-install",
-    describe: "安装全局包",
     hit: (ctx) =>
       ctx.norm.split.segments.some(
         (s) =>
@@ -228,15 +222,12 @@ export const REDLINES: readonly Redline[] = [
           (["pip", "pip3"].includes(s.program) && s.operands[0] === "install"),
       ),
     action: always("escalate"),
-    reason: "全局安装会污染宿主环境，必须人工确认。优先考虑项目内依赖",
     memorable: false,
   },
   {
     id: "network",
-    describe: "网络访问",
     hit: (ctx) => ctx.norm.category === "net" || ctx.norm.hosts.length > 0,
     action: (trust) => (trust === "read-only" ? "deny" : trust === "full" ? "allow" : "escalate"),
-    reason: "网络访问需要确认目标主机",
     memorable: true,
   },
 ]

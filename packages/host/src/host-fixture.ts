@@ -46,7 +46,7 @@ export type EffortOf = (effort?: string) => { effort?: string } | Promise<{ effo
 
 export function fakeDriver(
   effortOf?: EffortOf, aside = true,
-  asideAnswer: (text: string) => Promise<string> = (text) => Promise.resolve(`答：${text}`),
+  asideAnswer: (text: string) => Promise<string> = (text) => Promise.resolve(`答：${text}`), // i18n-ok：测试夹具
 ): { driver: EngineDriver; session: () => Fake } {
   const holder: { fake: Fake | undefined } = { fake: undefined }
   const driver: EngineDriver = {
@@ -101,7 +101,7 @@ export function fakeDriver(
     driver,
     session: () => {
       const fake = holder.fake
-      if (fake === undefined) throw new Error("会话还没建")
+      if (fake === undefined) throw new Error("会话还没建") // i18n-ok：测试夹具
       return fake
     },
   }
@@ -150,7 +150,7 @@ export const ask: ApprovalAsk = {
   toolCallId: "toolu_1",
   tool: "Bash",
   summary: "git push",
-  reason: "推送到远端不可逆",
+  reason: "推送到远端不可逆", // i18n-ok：测试夹具
 }
 
 /** 两家引擎的宿主。接力与分叉两节共用。 */

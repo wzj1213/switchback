@@ -22,6 +22,8 @@ Request ─→ normalize ─→ redline ─→ memory ─→ trust ─→ Verdic
 - 红线表（`redline.ts`）—— 表驱动，每条配正反例
 - 命令切分与签名归一（`command.ts`）—— 供记忆规则做模式匹配
 - 工具分类表（`classify.ts`）—— 把各家的工具名归一成 read/write/exec/net
+- 理由与规则称呼的中英两版（`*.messages.ts`）—— `SessionState.locale` 选哪一版，缺省中文。
+  只按类型依赖 `@switchback/i18n`（文案表直接写成 `Catalog` 字面量），运行时仍然零依赖
 
 ## 不拥有什么
 
@@ -30,7 +32,7 @@ Request ─→ normalize ─→ redline ─→ memory ─→ trust ─→ Verdic
 - 不拥有时钟与随机源——需要时间由调用方传入（lint 已禁 `Date.now`）。
 - 不拥有沙箱。沙箱是最后一道防线，由宿主施加；本包只回答「该不该做」。
 - 不拥有与引擎的通信。把 `Verdict` 翻译成各家的应答格式是 `@switchback/engine` 各驱动的事。
-- 不拥有 UI 文案排版——`Verdict.reason` 是给**引擎**读的，不是给人读的。
+- 不拥有 UI 文案排版——`Verdict.reason` 首先是给**引擎**读的（让它能改方案而不是撞墙），审批卡只是把同一句原样摆出来。
 
 ## 已知限制
 

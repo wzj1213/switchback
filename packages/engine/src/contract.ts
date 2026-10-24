@@ -22,6 +22,7 @@ import type {
 } from "@switchback/protocol"
 import type { Rule } from "@switchback/approval"
 import type { Probe } from "./probe.js"
+import type { Locale } from "@switchback/i18n"
 
 /** 需要人工裁决时递给宿主的东西。文本字段可能来自引擎，渲染前必须转义。 */
 export interface ApprovalAsk {
@@ -106,6 +107,8 @@ export interface StartRequest {
   /** 工作区绝对路径 */
   cwd: string
   trust: Trust
+  /** 适配器自己写的话（报错、转录区提示、审批摘要、表单标签）用哪种语言。现读，缺省中文。 */
+  locale?: () => Locale
   /** 用户 home 绝对路径。approval 是纯函数，不读环境，所以由这里传。 */
   home: string
   /**

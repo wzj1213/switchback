@@ -1,5 +1,6 @@
 import type { Command, Thread } from "@switchback/protocol"
-import { emit, isCurrent, type Ctx, type Live } from "./ctx.js"
+import { emit, isCurrent, localeOf, type Ctx, type Live } from "./ctx.js"
+import { TRUST_RESTART } from "./trust.messages.js"
 import { withQueue } from "./queued.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"
@@ -15,7 +16,7 @@ async function attach(ctx: Ctx, thread: Thread, resume: string | undefined): Pro
   })
   if (early !== undefined) rememberHandle(ctx, thread.id, early)
   const current = ctx.live.get(thread.id)
-  if (current === undefined) throw new Error("权限档重启后会话没有重新接入")
+  if (current === undefined) throw new Error(TRUST_RESTART[localeOf(ctx)].notAttached)
   return current
 }
 
@@ -75,7 +76,7 @@ async function restart(ctx: Ctx, entry: Live, trust: Thread["trust"]): Promise<v
   const resume = previous.engineHandle
   if (resume === undefined && previous.provisional !== true) {
     await entry.session.setTrust(previous.trust)
-    throw new Error("这条会话没有引擎句柄，无法在保留上下文的前提下重启权限沙箱")
+    throw new Error(TRUST_RESTART[localeOf(ctx)].noHandle)
   }
   const at = ctx.deps.now()
   // 重启前就排着的是上一轮失败留下的「待发送」：等人取回或下一轮跑完，不跟着重启发出去

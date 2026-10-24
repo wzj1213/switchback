@@ -1,5 +1,6 @@
 import type { Command, EngineAxis, EngineGoal, Lane, ThreadId, TrustApply } from "@switchback/protocol"
-import { emit, isCurrent, type Ctx } from "./ctx.js"
+import { emit, hostError, isCurrent, localeOf, type Ctx } from "./ctx.js"
+import { ENGINE_STATE } from "./engine-state.messages.js"
 
 /**
  * **引擎那边先发生、Switchback 后知道**的那些变化，落到 `Thread` 上并广播。
@@ -129,10 +130,10 @@ export async function sideQuestion(
   cmd: Extract<Command, { type: "thread.sideQuestion" }>,
 ): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
-  if (!isCurrent(ctx, entry)) throw new Error("会话正在切换或重启，暂时不能侧问")
+  if (entry === undefined) throw hostError.noThread(ctx, cmd.threadId)
+  if (!isCurrent(ctx, entry)) throw new Error(ENGINE_STATE[localeOf(ctx)].switching)
   const ask = entry.session.askAside
-  if (ask === undefined) throw new Error(`${entry.thread.engine} 不支持侧问`)
+  if (ask === undefined) throw new Error(ENGINE_STATE[localeOf(ctx)].noAside(entry.thread.engine))
   const question = cmd.text.trim()
   if (question === "") return
   const at = ctx.deps.now()

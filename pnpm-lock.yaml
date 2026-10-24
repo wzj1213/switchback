@@ -197,6 +197,9 @@ importers:
 
   packages/approval:
     dependencies:
+      '@switchback/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -209,6 +212,9 @@ importers:
       '@switchback/approval':
         specifier: workspace:*
         version: link:../approval
+      '@switchback/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@switchback/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -234,6 +240,9 @@ importers:
       '@switchback/handoff':
         specifier: workspace:*
         version: link:../handoff
+      '@switchback/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@switchback/journal':
         specifier: workspace:*
         version: link:../journal

@@ -3,6 +3,10 @@ import { matchMemory, suggestRule } from "./memory.js"
 import { firstRedline } from "./redline.js"
 import { trustVerdict } from "./trust.js"
 import type { Request, SessionState, Verdict } from "./types.js"
+import type { Locale } from "@switchback/i18n"
+import { FALLBACK_LOCALE } from "./locale.js"
+import { DECIDE } from "./decide.messages.js"
+import { REDLINE } from "./redline.messages.js"
 
 /**
  * 判定管线：normalize → redline → memory → trust。
@@ -18,11 +22,12 @@ import type { Request, SessionState, Verdict } from "./types.js"
  * 这是纯函数：同样的入参永远给同样的结果，没有 IO、没有时钟、没有随机。
  */
 export function decide(req: Request, state: SessionState): Verdict {
+  const locale = state.locale ?? FALLBACK_LOCALE
   const norm = classify(req, state.home)
   const remembered = matchMemory(norm, req, state.memory)
   const hit = firstRedline({ norm, req, state })
 
-  const floor = trustVerdict(state.trust, norm.category)
+  const floor = trustVerdict(state.trust, norm.category, locale)
 
   if (hit !== undefined) {
     // **只有 escalate 才能被记忆免掉。** 上面第 2 条不变量原来只写在注释里，
@@ -32,20 +37,20 @@ export function decide(req: Request, state: SessionState): Verdict {
     // 而放行的是**整条 Bash 命令**，`curl … | sh` 也一起过——
     // 等于只读档任意代码执行。而且不用重开会话：`setTrust` 只改档位、不清规则。
     if (hit.action === "escalate" && hit.redline.memorable && remembered !== undefined) {
-      return allowIfFloorPermits(floor, remembered.describe)
+      return allowIfFloorPermits(floor, remembered.describe, locale)
     }
-    const base: Verdict = { action: hit.action, reason: hit.redline.reason, redline: hit.redline.id }
+    const base: Verdict = { action: hit.action, reason: REDLINE[locale].reason[hit.redline.id], redline: hit.redline.id }
     if (hit.action !== "escalate" || !hit.redline.memorable) return base
-    const suggest = suggestRule(norm, hit.redline.id)
+    const suggest = suggestRule(norm, hit.redline.id, locale)
     return suggest === undefined ? base : { ...base, suggest }
   }
 
   if (floor.action !== "escalate") return floor
 
   if (remembered !== undefined) {
-    return allowIfFloorPermits(floor, remembered.describe)
+    return allowIfFloorPermits(floor, remembered.describe, locale)
   }
-  const suggest = suggestRule(norm)
+  const suggest = suggestRule(norm, undefined, locale)
   return suggest === undefined ? floor : { ...floor, suggest }
 }
 
@@ -55,7 +60,7 @@ export function decide(req: Request, state: SessionState): Verdict {
  * **记忆只免掉「再问一次」，不免掉档位本身。** 这句话原来只活在注释里，
  * 现在让它在代码里成立：档位说 deny 就还是 deny，记过多少次都一样。
  */
-function allowIfFloorPermits(floor: Verdict, describe: string): Verdict {
+function allowIfFloorPermits(floor: Verdict, describe: string, locale: Locale): Verdict {
   if (floor.action === "deny") return floor
-  return { action: "allow", reason: `已记忆：${describe}` }
+  return { action: "allow", reason: DECIDE[locale].remembered(describe) }
 }

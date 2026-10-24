@@ -8,7 +8,8 @@ import type {
   ThreadId,
 } from "@switchback/protocol"
 import type { InteractionWait } from "@switchback/engine"
-import { emit, isCurrent, type Ctx, type Live } from "./ctx.js"
+import { emit, isCurrent, localeOf, type Ctx, type Live } from "./ctx.js"
+import { QUESTION } from "./question.messages.js"
 
 const DISMISSED: QuestionResponse = { dismissed: true }
 
@@ -135,6 +136,6 @@ export function resolveQuestion(
   const entry = ctx.live.get(command.threadId)
   const pending = entry?.thread.pendingQuestions?.find((question) => question.id === command.questionId)
   if (entry === undefined || pending === undefined) return
-  if (!validQuestionResponse(pending, command.response)) throw new Error("回答与当前问题不匹配，请重新选择")
+  if (!validQuestionResponse(pending, command.response)) throw new Error(QUESTION[localeOf(ctx)].mismatch)
   entry.gate.resolveQuestion(command.questionId, command.response)
 }

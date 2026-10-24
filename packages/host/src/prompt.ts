@@ -1,7 +1,9 @@
 import type { Command, Item } from "@switchback/protocol"
 import { Unsupported } from "@switchback/engine"
 import { switchEngine } from "./branch.js"
-import { emit, handBack, isCurrent, setStatus, type Ctx, type Live } from "./ctx.js"
+import { emit, handBack, hostError, isCurrent, localeOf, setStatus, type Ctx, type Live } from "./ctx.js"
+import type { Locale } from "@switchback/i18n"
+import { PROMPT } from "./prompt.messages.js"
 import { withQueue, type QueuedPrompt } from "./queued.js"
 import { handoffNote, withNote } from "./handoff-note.js"
 import { recordSegment } from "./segment.js"
@@ -86,12 +88,12 @@ function attachmentCount(cmd: Extract<Command, { type: "thread.prompt" }>): numb
 }
 
 /** 当前这一家明确不收附件时拒绝；待切换的先切完，再由新会话重新判定。 */
-function assertAttachments(entry: Live, cmd: Extract<Command, { type: "thread.prompt" }>): void {
+function assertAttachments(entry: Live, cmd: Extract<Command, { type: "thread.prompt" }>, m: (typeof PROMPT)[Locale]): void {
   if (attachmentCount(cmd) === 0) return
   const pending = entry.thread.nextEngine
   if (pending !== undefined && pending !== entry.thread.engine) return
   if (entry.thread.capabilities?.attachments === true) return
-  throw new Unsupported(`${entry.thread.engine} 不支持附件；附件仍在输入区，请移除或换一个引擎`)
+  throw new Unsupported(m.noAttachments(entry.thread.engine))
 }
 
 /**
@@ -102,7 +104,7 @@ function assertAttachments(entry: Live, cmd: Extract<Command, { type: "thread.pr
  */
 function acceptedOrHandBack(ctx: Ctx, entry: Live, cmd: Extract<Command, { type: "thread.prompt" }>): void {
   try {
-    assertAttachments(entry, cmd)
+    assertAttachments(entry, cmd, PROMPT[localeOf(ctx)])
   } catch (error) {
     const drained = ctx.drains.get(cmd)
     if (drained !== undefined && entry.queued[0] === drained) handBack(ctx, entry, [drained])
@@ -131,7 +133,7 @@ async function steerInto(
   refused?: (why: unknown) => void,
 ): Promise<boolean> {
   const turnId = entry.turn
-  if (turnId === undefined || !steerable(entry, cmd, refused)) return false
+  if (turnId === undefined || !steerable(entry, cmd, refused, PROMPT[localeOf(ctx)])) return false
   try {
     await entry.session.steer?.call(entry.session, cmd.text, cmd.attachments)
   } catch (error) {
@@ -153,10 +155,11 @@ function steerable(
   entry: Live,
   cmd: Extract<Command, { type: "thread.prompt" }>,
   refused: ((why: unknown) => void) | undefined,
+  m: (typeof PROMPT)[Locale],
 ): boolean {
   if (entry.session.steer === undefined || entry.thread.capabilities?.steer !== true) return false
   if (attachmentCount(cmd) === 0 || entry.thread.capabilities.attachments === true) return true
-  refused?.(new Unsupported(`排着的话里带着图片，${entry.thread.engine} 不收图片；这一轮跑完会照常发出，或者取回去掉图片再插`))
+  refused?.(new Unsupported(m.noImages(entry.thread.engine)))
   return false
 }
 
@@ -193,7 +196,7 @@ export async function steerQueued(
   cmd: Extract<Command, { type: "thread.steerQueued" }>,
 ): Promise<void> {
   const entry = ctx.live.get(cmd.threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${cmd.threadId}`)
+  if (entry === undefined) throw hostError.noThread(ctx, cmd.threadId)
   const waiting = entry.queued
   if (entry.turn === undefined || waiting.length === 0) return
   // 多句合成一段递进去：分几次 steer 的话，中间那几句可能落在不同的工具调用之间，

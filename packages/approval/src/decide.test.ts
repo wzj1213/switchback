@@ -558,3 +558,51 @@ describe("看不见命令就不能按 exec 放行", () => {
     expect(decide({ ...blind("acp:read"), args: { path: "src/a.ts" } }, state("auto-edit")).action).toBe("allow")
   })
 })
+
+/**
+ * 理由会出现在审批卡上，拒绝时也原样回给引擎——界面是英文，这两处都该是英文。
+ * 一张表把四条出口（红线、档位拒、档位问、记忆放行）都走一遍。
+ */
+describe("理由跟着会话的语言", () => {
+  const net: Rule = { id: "host:a.com", describe: "Automatically allow access to a.com", pattern: { host: "a.com" }, scope: "project" }
+  const cases: readonly { name: string; req: Request; state: SessionState; reason: string; describe?: string }[] = [
+    {
+      name: "红线",
+      req: bash("git push origin main"),
+      state: { ...state("auto-edit"), locale: "en" },
+      reason: "Pushing to a remote is visible to others and can't be undone, so it needs manual approval",
+    },
+    {
+      name: "只读档拒",
+      req: tool("Write", { file_path: `${WORKSITE}/a.ts` }),
+      state: { ...state("read-only"), locale: "en" },
+      reason: "This thread is read-only: it can't write files, run commands, or access the network. To continue, ask the user to raise the tier",
+    },
+    {
+      name: "记忆放行",
+      req: bash("curl https://a.com/x"),
+      state: { ...state("auto-edit", [net]), locale: "en" },
+      reason: "Remembered: Automatically allow access to a.com",
+    },
+    {
+      name: "网络红线给的建议规则也用英文称呼",
+      req: bash("curl https://b.com/x"),
+      state: { ...state("auto-edit"), locale: "en" },
+      reason: "Network access needs the target host confirmed",
+      describe: "Automatically allow access to b.com",
+    },
+    {
+      name: "不给语言就是中文",
+      req: bash("git push origin main"),
+      state: state("auto-edit"),
+      reason: "推送到远端是对外可见的不可逆动作，必须人工确认",
+    },
+  ]
+  for (const one of cases) {
+    it(one.name, () => {
+      const verdict = decide(one.req, one.state)
+      expect(verdict.reason).toBe(one.reason)
+      if (one.describe !== undefined) expect(verdict.suggest?.describe).toBe(one.describe)
+    })
+  }
+})

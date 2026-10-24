@@ -1,6 +1,9 @@
 import type { Normalized } from "./classify.js"
 import { isInside } from "./path.js"
 import type { Request, Rule, RulePattern } from "./types.js"
+import type { Locale } from "@switchback/i18n"
+import { FALLBACK_LOCALE } from "./locale.js"
+import { MEMORY } from "./memory.messages.js"
 
 interface MatchInput {
   norm: Normalized
@@ -70,14 +73,14 @@ export function matchMemory(
  *
  * @param redline 这次命中的是哪条红线。问的是什么，就得记什么。
  */
-export function suggestRule(norm: Normalized, redline?: string): Rule | undefined {
+export function suggestRule(norm: Normalized, redline?: string, locale: Locale = FALLBACK_LOCALE): Rule | undefined {
   const host = norm.hosts[0]
   // 多个主机（或一个都认不出）时**不给建议**：记一条模糊的规则比不记糟得多
   if (host === undefined || norm.hosts.length !== 1) return undefined
   if (redline !== "network" && norm.category !== "net") return undefined
   return {
     id: `host:${host}`,
-    describe: `自动允许访问 ${host}`,
+    describe: MEMORY[locale].allowHost(host),
     pattern: { host },
     scope: "project",
   }

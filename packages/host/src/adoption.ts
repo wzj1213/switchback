@@ -1,6 +1,7 @@
 import type { Command, Thread } from "@switchback/protocol"
 import { copyTranscript } from "./transcript.js"
-import { drainQueued, emit, isCurrent, type Ctx } from "./ctx.js"
+import { drainQueued, emit, isCurrent, localeOf, type Ctx } from "./ctx.js"
+import { ADOPTION } from "./adoption.messages.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch, remove } from "./session.js"
 
@@ -70,6 +71,6 @@ async function fillTranscript(ctx: Ctx, thread: Thread): Promise<void> {
     at: ctx.deps.now(),
     threadId: thread.id,
     status: "degraded",
-    detail: `这条会话有 ${String(got.total)} 条记录，只搬了最近 ${String(got.items.length)} 条进来。完整的还在引擎那边，它自己看得见。`,
+    detail: ADOPTION[localeOf(ctx)].trimmed(got.total, got.items.length),
   })
 }

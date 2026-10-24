@@ -1,5 +1,6 @@
 import type { Thread } from "@switchback/protocol"
-import type { Ctx, Live } from "./ctx.js"
+import { localeOf, type Ctx, type Live } from "./ctx.js"
+import { BORN } from "./born.messages.js"
 import { withQueue } from "./queued.js"
 
 /**
@@ -75,7 +76,7 @@ export function bornOf(ctx: Ctx, entry: Pick<Live, "thread">, spec: BornSpec): T
       ...draftOf(ctx, spec.draft),
       adopted: undefined,
       // 标题带上来路，否则侧栏里两个会话长得一模一样
-      title: `${entry.thread.title}（${spec.label}）`,
+      title: BORN[localeOf(ctx)].titled(entry.thread.title, spec.label),
       // 留下血缘，事后才对比得起来。**分叉的意义就在于能比**
       // 来源会话在这里之前都是共同历史；对比时从这个精确边界之后再算来源侧新动作。
       ...forkBoundary(entry.thread.id, spec.kept),

@@ -1,5 +1,8 @@
 import type { Category } from "./classify.js"
 import type { Action, Trust } from "./types.js"
+import type { Locale } from "@switchback/i18n"
+import { FALLBACK_LOCALE } from "./locale.js"
+import { TRUST } from "./trust.messages.js"
 
 /**
  * 三档信任矩阵。**红线优先于本表**——本表只回答「没踩红线时按档位该怎么办」。
@@ -34,20 +37,17 @@ const MATRIX: Readonly<Record<Trust, Readonly<Record<Category, Action>>>> = {
   },
 }
 
-const DENY_REASON: Readonly<Record<Trust, string>> = {
-  "read-only": "当前会话是只读档，不能写文件、执行命令或访问网络。如需继续请让用户升档",
-  "auto-edit": "当前档位不允许该动作",
-  full: "当前档位不允许该动作",
-}
-
-const FALLBACK_REASON = "当前档位不允许该动作"
-
-export function trustVerdict(trust: Trust, category: Category): { action: Action; reason: string } {
+export function trustVerdict(
+  trust: Trust,
+  category: Category,
+  locale: Locale = FALLBACK_LOCALE,
+): { action: Action; reason: string } {
+  const m = TRUST[locale]
   // `?? "escalate"` 是防御性的：档位或类别将来加了新取值而这里忘了补，
   // 表现是「多问一次」而不是「静默放行」。
   const action = MATRIX[trust]?.[category] ?? "escalate"
   if (action === "allow") return { action, reason: "" }
-  if (action === "deny") return { action, reason: DENY_REASON[trust] ?? FALLBACK_REASON }
+  if (action === "deny") return { action, reason: (m.deny as Partial<Record<string, string>>)[trust] ?? m.deny["auto-edit"] }
   /*
    * **`unknown` 要单独说一句。**
    *
@@ -67,7 +67,7 @@ export function trustVerdict(trust: Trust, category: Category): { action: Action
    * `?? "escalate"` 是同一个用意：忘了补表时多问一次，而不是静默放行）。
    */
   if (category === "unknown") {
-    return { action, reason: "Switchback 没认出这是什么动作（读 / 写 / 执行 / 联网都对不上），所以按最保守的一档处理" }
+    return { action, reason: m.unknown }
   }
-  return { action, reason: "该动作超出当前档位的自动放行范围，等待用户确认" }
+  return { action, reason: m.escalate }
 }

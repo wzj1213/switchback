@@ -1,5 +1,6 @@
 import type { Command, Event, Thread, ThreadId } from "@switchback/protocol"
-import { emit, resting, type Ctx, type Live } from "./ctx.js"
+import { emit, hostError, localeOf, resting, type Ctx, type Live } from "./ctx.js"
+import { REVIVE } from "./revive.messages.js"
 import { rememberHandle } from "./engine-state.js"
 import { launch } from "./session.js"
 import { latestSegment, switched } from "./switched.js"
@@ -99,21 +100,12 @@ export async function updateRecord(
  */
 export function retarget(ctx: Ctx, threadId: ThreadId, to: string): Promise<void> {
   return updateRecord(ctx, threadId, (thread) => {
-    if (to !== thread.engine && ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
+    if (to !== thread.engine && ctx.deps.drivers[to] === undefined) throw hostError.noEngine(ctx, to)
     const next = { ...thread }
     if (to === thread.engine) delete next.nextEngine
     else next.nextEngine = to
     return next
   })
-}
-
-function goneMessage(engine: string): string {
-  return `原来的引擎 ${engine} 已经不在了。在输入框下面换一家引擎，再发一次就能接着做。`
-}
-
-function lostMessage(engine: string): string {
-  return `这条会话没有留下 ${engine} 的会话句柄（可能是旧版本记录），接不回原来的上下文。` +
-    "在输入框下面换一家引擎就能接着做。"
 }
 
 /**
@@ -127,14 +119,14 @@ function lostMessage(engine: string): string {
  */
 function reattached(ctx: Ctx, record: Thread, at: number, ran: ReadonlySet<string>): Thread {
   const to = record.nextEngine ?? record.engine
-  if (ctx.deps.drivers[to] === undefined) throw new Error(goneMessage(to))
+  if (ctx.deps.drivers[to] === undefined) throw new Error(REVIVE[localeOf(ctx)].gone(to))
   if (to !== record.engine) {
     const next = switched(record, to, latestSegment(record, to), { at, status: "idle" })
     delete next.pendingQuestions
   delete next.pendingApprovals
     return { ...next, detached: false }
   }
-  if (record.engineHandle === undefined && ran.has(to)) throw new Error(lostMessage(to))
+  if (record.engineHandle === undefined && ran.has(to)) throw new Error(REVIVE[localeOf(ctx)].lost(to))
   const next: Thread = { ...record, detached: false, status: "idle", updatedAt: at }
   delete next.nextEngine
   delete next.pendingQuestions
@@ -167,7 +159,7 @@ async function attach(ctx: Ctx, record: Thread, thread: Thread, restore: Restore
       captureBaseline: false,
     })
     const entry = ctx.live.get(thread.id)
-    if (entry === undefined) throw new Error("引擎起来之后会话没有接入")
+    if (entry === undefined) throw new Error(REVIVE[localeOf(ctx)].notAttached)
     // 换了一家：引擎那边的会话清单也要叫同一个名字（和 `switchEngine` 同一条）
     if (entry.thread.engine !== record.engine) void entry.session.setTitle?.(entry.thread.title).catch(() => undefined)
     emit(ctx, { type: "thread.updated", at: ctx.deps.now(), thread: entry.thread })
@@ -200,7 +192,7 @@ export async function revive(ctx: Ctx, threadId: ThreadId, restore?: Restore): P
   const live = ctx.live.get(threadId)
   if (live !== undefined) return live
   const history = await historyOf(ctx, threadId)
-  if (history === undefined) throw new Error(`找不到会话 ${threadId} 的历史，无法接回引擎`)
+  if (history === undefined) throw new Error(REVIVE[localeOf(ctx)].noHistory(threadId))
   return reviveFrom(ctx, history, restore)
 }
 

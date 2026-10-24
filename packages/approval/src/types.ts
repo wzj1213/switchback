@@ -1,4 +1,5 @@
 import type { RememberScope, Trust } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 
 export type { Trust, RememberScope }
 
@@ -55,6 +56,11 @@ export interface SessionState {
   home: string
   /** 已生效的记忆规则（session 级与 project 级合并后） */
   memory: readonly Rule[]
+  /**
+   * 理由与规则称呼用哪种语言。这几句会出现在审批卡上，拒绝时也原样回给引擎。
+   * 缺省＝默认的中文。
+   */
+  locale?: Locale
 }
 
 export interface Verdict {

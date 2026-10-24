@@ -6,8 +6,23 @@ import { notePace, type PaceBook } from "@switchback/store"
 import type { Gate } from "./gate.js"
 import type { HostDeps } from "./deps.js"
 import { clearThreadLiveState, clearTurnLiveState, rememberLiveState } from "./live-state.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { CTX } from "./ctx.messages.js"
 
 export { liveStateOf } from "./live-state.js"
+
+/** 宿主说话用的语言：`HostDeps.locale` 现读，缺省中文。 */
+export function localeOf(ctx: Ctx): Locale {
+  return ctx.deps.locale?.() ?? DEFAULT_LOCALE
+}
+
+/** 宿主好几处都会抛的那几种错。说法在 `ctx.messages.ts`。 */
+export const hostError = {
+  closed: (ctx: Ctx): Error => new Error(CTX[localeOf(ctx)].closed),
+  removed: (ctx: Ctx, id: string): Error => new Error(CTX[localeOf(ctx)].removed(id)),
+  noThread: (ctx: Ctx, id: string): Error => new Error(CTX[localeOf(ctx)].noThread(id)),
+  noEngine: (ctx: Ctx, id: string): Error => new Error(CTX[localeOf(ctx)].noEngine(id)),
+}
 
 /**
  * 宿主的共享状态与**事件的唯一出口**。
@@ -119,11 +134,11 @@ export async function ensureLaunchable(
   thread: Thread,
   captureBaseline: boolean,
 ): Promise<void> {
-  if (ctx.closed) throw new Error("宿主已经关闭")
-  if (ctx.removed.has(thread.id)) throw new Error(`会话已经删除：${thread.id}`)
+  if (ctx.closed) throw hostError.closed(ctx)
+  if (ctx.removed.has(thread.id)) throw hostError.removed(ctx, thread.id)
   if (captureBaseline) await ctx.deps.ensureWorktreeBaseline?.(thread.id, thread.cwd)
-  if (ctx.closed) throw new Error("宿主已经关闭")
-  if (ctx.removed.has(thread.id)) throw new Error(`会话已经删除：${thread.id}`)
+  if (ctx.closed) throw hostError.closed(ctx)
+  if (ctx.removed.has(thread.id)) throw hostError.removed(ctx, thread.id)
 }
 
 /** driver.start 与删除撞车时，刚起好的进程在登记前自行回收。 */
@@ -132,7 +147,7 @@ export async function attachStarted(ctx: Ctx, entry: Live, session: EngineSessio
   if (!ctx.closed && !ctx.removed.has(entry.thread.id)) return
   entry.lease.active = false
   await entry.session.dispose().catch(() => undefined)
-  throw new Error(ctx.closed ? "宿主已经关闭" : `会话已经删除：${entry.thread.id}`)
+  throw ctx.closed ? hostError.closed(ctx) : hostError.removed(ctx, entry.thread.id)
 }
 
 export interface Ctx {

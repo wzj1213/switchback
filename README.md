@@ -273,7 +273,7 @@ truth as well:
 <!-- package-graph:start -->
 ```text
 protocol ← ∅
-approval ← protocol
+approval ← i18n + protocol
 store ← protocol
 wire ← protocol
 link ← protocol + wire
@@ -281,8 +281,8 @@ worksite ← ∅
 i18n ← ∅
 journal ← protocol
 handoff ← protocol
-engine ← protocol + approval
-host ← protocol + approval + engine + store + journal + handoff
+engine ← protocol + approval + i18n
+host ← protocol + approval + engine + store + journal + handoff + i18n
 desktop ← protocol + engine + handoff + host + i18n + journal + link + store + wire + worksite
 web ← i18n + link + protocol + store + wire
 ```

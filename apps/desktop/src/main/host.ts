@@ -241,6 +241,7 @@ export function attachHost(
     emit,
     newId: (prefix) => `${prefix}-${randomUUID()}`,
     now: () => Date.now(),
+    locale: () => ports.locale?.() ?? DEFAULT_LOCALE,
   })
 
   const report = reporter(emit)

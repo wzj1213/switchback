@@ -1,6 +1,7 @@
 import type { EngineId, Event, Thread } from "@switchback/protocol"
 import type { EngineDriver } from "@switchback/engine"
 import type { Journal, RuleStore } from "@switchback/journal"
+import type { Locale } from "@switchback/i18n"
 
 /** 宿主的外部依赖。单独一个文件，`ctx.ts` 要引它而它不该反过来引 ctx。 */
 
@@ -43,4 +44,9 @@ export interface HostDeps {
    * 缺省见 `session.ts` 的 `DEFAULT_MAX_LIVE`。
    */
   maxLive?: number
+  /**
+   * 界面语言。宿主自己写的话（报错、横幅、没给标题的新会话叫什么）照它说，
+   * 也原样交给每个引擎会话（`StartRequest.locale`）。现读，缺省＝默认的中文。
+   */
+  locale?: () => Locale
 }

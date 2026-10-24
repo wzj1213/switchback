@@ -40,7 +40,10 @@ export interface Segment {
 export interface SplitResult {
   segments: readonly Segment[]
   unparseable: boolean
-  /** unparseable 时说明原因，会进 Verdict.reason */
+  /**
+   * unparseable 时说明原因。只在调试判定器时看：给人和引擎看的理由是红线那一句
+   *（`redline.messages.ts` 的 `unparseable-command`），这一句不上界面。
+   */
   reason?: string
   /**
    * 这次「解析不了」严不严重：true = 真正跑的东西不是你看到的这段（eval、
@@ -67,6 +70,7 @@ export interface SplitResult {
  * 所以后者改成「解析不了 **且** 文本里露出会动东西的迹象」才问，
  * 判据见 `redline.ts` 的 `OPAQUE_RISK`。
  */
+// i18n-ok：这几个名字只拼进 `SplitResult.reason`，不上界面（见上）
 const OPAQUE_PATTERNS: readonly (readonly [RegExp, string, boolean])[] = [
   [/\$\(/, "命令替换 $(...)", false],
   [/`/, "反引号命令替换", false],
@@ -231,7 +235,7 @@ export function splitSegments(raw: string): SplitResult {
   const command = unwrapShell(raw)
   for (const [pattern, label, hard] of OPAQUE_PATTERNS) {
     if (pattern.test(command)) {
-      return { segments: [], unparseable: true, reason: `命令含${label}，无法静态判定`, hard }
+      return { segments: [], unparseable: true, reason: `命令含${label}，无法静态判定`, hard } // i18n-ok
     }
   }
   const parsed = command
@@ -240,7 +244,7 @@ export function splitSegments(raw: string): SplitResult {
     .filter((s): s is Segment => s !== undefined)
 
   if (parsed.length === 0) {
-    return { segments: [], unparseable: true, reason: "命令为空或无法切分" }
+    return { segments: [], unparseable: true, reason: "命令为空或无法切分" } // i18n-ok
   }
 
   // 顺序扫一遍跟踪 `cd`：它之后各段的相对路径都按新目录算
@@ -249,7 +253,7 @@ export function splitSegments(raw: string): SplitResult {
   for (const segment of parsed) {
     const target = cdTarget(segment)
     if (target === null) {
-      return { segments: [], unparseable: true, reason: "命令里的 `cd` 目标静态判不出" }
+      return { segments: [], unparseable: true, reason: "命令里的 `cd` 目标静态判不出" } // i18n-ok
     }
     segments.push(cwd === undefined ? segment : { ...segment, cwd })
     if (target !== undefined) cwd = target

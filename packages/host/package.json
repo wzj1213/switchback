@@ -18,6 +18,7 @@
     "@switchback/protocol": "workspace:*",
     "@switchback/store": "workspace:*",
     "@switchback/journal": "workspace:*",
-    "@switchback/handoff": "workspace:*"
+    "@switchback/handoff": "workspace:*",
+    "@switchback/i18n": "workspace:*"
   }
 }

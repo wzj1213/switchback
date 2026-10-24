@@ -1,6 +1,8 @@
 import type { Command, Event, Item, Thread, ThreadId } from "@switchback/protocol"
 import { initial, itemsOf, reduceAll } from "@switchback/store"
-import { discardUnstarted, drainQueued, emit, isCurrent, type Ctx, type Live } from "./ctx.js"
+import { discardUnstarted, drainQueued, emit, hostError, isCurrent, localeOf, type Ctx, type Live } from "./ctx.js"
+import type { Locale } from "@switchback/i18n"
+import { BRANCH } from "./branch.messages.js"
 import { withQueue } from "./queued.js"
 import { bornOf } from "./born.js"
 import { copyTranscript } from "./transcript.js"
@@ -35,7 +37,7 @@ export async function rewind(ctx: Ctx, cmd: Extract<Command, { type: "thread.rew
   await branch(ctx, entry, {
     to: entry.thread.engine,
     upTo: cmd.turnId,
-    label: "重来",
+    label: BRANCH[localeOf(ctx)].rewindLabel,
     // 「改一改再发」：回到那一轮之前，并把原话交还到新会话的输入框里
     ...(cmd.draft === undefined
       ? {}
@@ -61,9 +63,11 @@ async function sourceOf(ctx: Ctx, threadId: ThreadId): Promise<Source> {
   const live = ctx.live.get(threadId)
   if (live !== undefined) return live
   const thread = await recordOf(ctx, threadId)
-  if (thread === undefined) throw new Error(`会话不存在：${threadId}`)
+  if (thread === undefined) throw hostError.noThread(ctx, threadId)
   return { thread, turn: undefined }
 }
+
+type Text = (typeof BRANCH)[Locale]
 
 /** `draft` 是重来后交还给输入框的原话，不会注入引擎上下文。 */
 interface BranchOptions {
@@ -72,8 +76,8 @@ interface BranchOptions {
 }
 
 async function stableEvents(ctx: Ctx, entry: Source, to: string): Promise<readonly Event[]> {
-  if (entry.turn !== undefined) throw new Error("当前轮次尚未结束，不能分叉或从历史轮次重来")
-  if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
+  if (entry.turn !== undefined) throw new Error(BRANCH[localeOf(ctx)].busy)
+  if (ctx.deps.drivers[to] === undefined) throw hostError.noEngine(ctx, to)
   // 原生分叉在发出第一句前仍是临时会话，它可见的继承转录只在待提交缓冲里。
   // 此时再分一次若只读 journal，会得到空历史：引擎记得，界面却什么都没有。
   const pending = ctx.uncommitted.get(entry.thread.id)
@@ -95,7 +99,7 @@ async function branch(
 ): Promise<void> {
   const events = await stableEvents(ctx, entry, opts.to)
   const all = itemsOf(reduceAll(initial(), events), entry.thread.id)
-  const launchOptions = derivedPlan(entry, opts, all, events)
+  const launchOptions = derivedPlan(entry, opts, { all, events }, BRANCH[localeOf(ctx)])
   const at = ctx.deps.now()
   const thread = bornOf(ctx, entry, {
     to: opts.to,
@@ -148,9 +152,9 @@ function derivedStatus(current: Live | undefined): "idle" | "running" {
  * 边界是「不含这一轮」：用户点「从这里重来」，指的是**回到还没发生这一轮的时候**，
  * 而不是「再看一遍这一轮」。含进去的话，新会话开局就带着那次走错的尝试。
  */
-function until(items: readonly Item[], turnId: string): readonly Item[] {
+function until(items: readonly Item[], turnId: string, m: Text): readonly Item[] {
   const at = items.findIndex((item) => item.turnId === turnId)
-  if (at === -1) throw new Error(`找不到要重来的历史轮次：${turnId}`)
+  if (at === -1) throw new Error(m.noTurn(turnId))
   return items.slice(0, at)
 }
 
@@ -181,16 +185,16 @@ interface NativeDerivedLaunchPlan extends DerivedLaunchPlan { plan: NativeForkPl
 function derivedPlan(
   entry: Source,
   opts: BranchOptions,
-  all: readonly Item[],
-  events: readonly Event[],
+  { all, events }: { all: readonly Item[]; events: readonly Event[] },
+  m: Text,
 ): DerivedLaunchPlan {
-  const items = opts.upTo === undefined ? all : until(all, opts.upTo)
+  const items = opts.upTo === undefined ? all : until(all, opts.upTo, m)
   // 第一轮之前没有任何上下文可保留，也没有公开协议能表达“在首轮之前 fork”。
   // 这时开同工作区的空白分支就是动作的精确定义，不需要伪造 beforeTurnId。
   const blankRewind = opts.upTo !== undefined && items.length === 0
-  const plan = blankRewind ? undefined : forkPlan(entry, opts, { all, keep: items, events })
+  const plan = blankRewind ? undefined : forkPlan(entry, opts, { all, keep: items, events }, m)
   if (opts.upTo !== undefined && !blankRewind && plan === undefined) {
-    throw new Error(`${entry.thread.engine} 当前不能带着原生上下文从这一轮重来`)
+    throw new Error(m.noContext(entry.thread.engine))
   }
   return {
     ...(plan === undefined ? {} : { plan }),
@@ -218,6 +222,7 @@ function forkPlan(
   entry: Source,
   opts: BranchOptions,
   history: { all: readonly Item[]; keep: readonly Item[]; events: readonly Event[] },
+  m: Text,
 ): NativeForkPlan | undefined {
   // 跨引擎时会话格式不通，只能开空白分支；不能冒充原生上下文复制。
   if (opts.to !== entry.thread.engine) return undefined
@@ -230,10 +235,7 @@ function forkPlan(
   // 只数这条原生会话自己的轮次（见 `native-turns.ts`）：别家跑的那几轮不在它里面
   const cut = nativeTurns(history.events, entry.thread, history.all, history.keep)
   if (opts.upTo !== undefined && cut.before === 0) {
-    throw new Error(
-      `这一轮之前都是别家跑的，${entry.thread.engine} 自己的原生会话里没有它们，没法带着上下文从这里重来。` +
-      "换回原来那家再从这里重来，或者从这一家自己跑的轮次重来。",
-    )
+    throw new Error(m.notNative(entry.thread.engine))
   }
   return { handle, ...(cut.after === 0 ? {} : { dropTurns: cut.after }) }
 }
@@ -300,7 +302,7 @@ export function handoff(ctx: Ctx, cmd: Extract<Command, { type: "thread.handoff"
   // 历史会话背后没有进程，挑引擎同样只是记一笔意向，下一句话接回时兑现（见 `revive.ts`）。
   // 上一版这里直接报「会话不存在」：原来那家一删，这条会话就既接不回、也换不了
   if (entry === undefined) return retarget(ctx, cmd.threadId, cmd.to)
-  if (ctx.deps.drivers[cmd.to] === undefined) throw new Error(`未注册的引擎：${cmd.to}`)
+  if (ctx.deps.drivers[cmd.to] === undefined) throw hostError.noEngine(ctx, cmd.to)
 
   /**
    * **临时会话当场切**（见 `Thread.provisional`）。
@@ -358,7 +360,7 @@ async function replacement(
 
 function installed(ctx: Ctx, threadId: ThreadId, old: Live): Live {
   const current = ctx.live.get(threadId)
-  if (current === undefined || current === old) throw new Error("新引擎启动后会话没有接入")
+  if (current === undefined || current === old) throw new Error(BRANCH[localeOf(ctx)].notAttached)
   current.queued = [...old.queued]
   current.draining = old.draining
   carryRules(old, current)
@@ -419,10 +421,10 @@ export async function switchEngine(
   intoTurn = false,
 ): Promise<void> {
   const entry = ctx.live.get(threadId)
-  if (entry === undefined) throw new Error(`会话不存在：${threadId}`)
+  if (entry === undefined) throw hostError.noThread(ctx, threadId)
   if (entry.thread.engine === to) return
-  if (ctx.deps.drivers[to] === undefined) throw new Error(`未注册的引擎：${to}`)
-  if (entry.turn !== undefined) throw new Error("当前轮次尚未结束，不能立即切换引擎")
+  if (ctx.deps.drivers[to] === undefined) throw hostError.noEngine(ctx, to)
+  if (entry.turn !== undefined) throw new Error(BRANCH[localeOf(ctx)].switchBusy)
 
   const at = ctx.deps.now()
   const previous = entry.thread

@@ -37,6 +37,12 @@ interface Rig {
   host: Host
   events: Event[]
   probes: Probe[]
+  /** 每个引擎会话起来时拿到的语言。 */
+  locales: (string | undefined)[]
+}
+
+function noteLocale(req: StartRequest, seen: (string | undefined)[]): void {
+  seen.push(req.locale?.())
 }
 
 function emitEarly(req: StartRequest, engine: string, enabled: ReadonlySet<string> | undefined): void {
@@ -74,6 +80,8 @@ function rigOf(options: {
   earlyEvent?: ReadonlySet<string>
   earlySignals?: boolean
   noAttachments?: ReadonlySet<string>
+  /** 宿主照英文界面说话。 */
+  en?: true
   deps?: {
     ensure?: (threadId: string, cwd: string) => Promise<void>
     capture?: (threadId: string, cwd: string) => Promise<void>
@@ -82,9 +90,11 @@ function rigOf(options: {
 } = {}): Rig {
   const events: Event[] = []
   const probes: Probe[] = []
+  const locales: (string | undefined)[] = []
   const driver = (engine: string): EngineDriver => ({
     id: engine,
     start: async (req) => {
+      noteLocale(req, locales)
       const probe = probeOf(req, engine)
       probes.push(probe)
       emitEarly(req, engine, options.earlyEvent)
@@ -154,8 +164,9 @@ function rigOf(options: {
     ...(options.deps?.remove === undefined
       ? {}
       : { removeWorktreeBaseline: options.deps.remove }),
+    ...(options.en === true ? { locale: () => "en" as const } : {}),
   })
-  return { host, events, probes }
+  return { host, events, probes, locales }
 }
 
 const create = { type: "thread.create", cwd: "/w", engine: "a", trust: "auto-edit" } as const
@@ -205,6 +216,18 @@ describe("换引擎的在途竞态", () => {
     ).rejects.toThrow("不支持附件")
     expect(rig.probes[1]?.prompts).toEqual([])
     expect(rig.host.live()[0]).toMatchObject({ engine: "b", status: "idle" })
+  })
+
+  it("界面是英文时宿主的报错也说英文，并把语言交给引擎会话", async () => {
+    const rig = rigOf({ noAttachments: new Set(["b"]), en: true })
+    const id = await created(rig)
+    await rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "first" })
+    complete(rig.probes[0] as Probe)
+    await rig.host.dispatch({ type: "thread.handoff", threadId: id, to: "b" })
+    await expect(
+      rig.host.dispatch({ type: "thread.prompt", threadId: id, text: "with image", attachments: ["/tmp/kept.png"] }),
+    ).rejects.toThrow("b doesn't support attachments. They're still in the input; remove them or switch engines")
+    expect(rig.locales).toEqual(["en", "en"])
   })
 
   it("排队那句换家之后才发现新那家不收图：退回输入框、不堵后面的，横幅按能力受限报", async () => {
