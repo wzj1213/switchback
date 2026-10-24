@@ -1,5 +1,7 @@
 import type { EngineAccount, EngineThread, ModelOption, RateLimits } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import type { KimiModel, KimiSessionRow } from "./wire.js"
+import { KIMI_CATALOG } from "./catalog.messages.js"
 
 const HISTORY_MAX = 40
 const TITLE_MAX = 60
@@ -11,16 +13,16 @@ function atOf(raw: string | number | undefined): number {
   return Number.isNaN(at) ? 0 : at
 }
 
-function titleOf(row: KimiSessionRow): string {
-  const title = row.title.trim() || (row.last_prompt ?? "").split("\n").find((line) => line.trim() !== "")?.trim() || "（没有标题）"
+function titleOf(row: KimiSessionRow, locale: Locale): string {
+  const title = row.title.trim() || (row.last_prompt ?? "").split("\n").find((line) => line.trim() !== "")?.trim() || KIMI_CATALOG[locale].untitled
   return title.length > TITLE_MAX ? `${title.slice(0, TITLE_MAX)}…` : title
 }
 
-export function toHistory(rows: readonly KimiSessionRow[]): readonly EngineThread[] {
+export function toHistory(rows: readonly KimiSessionRow[], locale: Locale = DEFAULT_LOCALE): readonly EngineThread[] {
   const out: EngineThread[] = []
   for (const row of rows) {
     if (row.id === "" || row.metadata.cwd === "") continue
-    out.push({ handle: row.id, title: titleOf(row), cwd: row.metadata.cwd, updatedAt: atOf(row.updated_at) })
+    out.push({ handle: row.id, title: titleOf(row, locale), cwd: row.metadata.cwd, updatedAt: atOf(row.updated_at) })
     if (out.length >= HISTORY_MAX) break
   }
   return out

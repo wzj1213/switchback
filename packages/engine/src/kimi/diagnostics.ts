@@ -1,4 +1,5 @@
 import type { Event, ThreadId } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 import { KimiMcpStatus, type KimiMcpSnapshot } from "./mcp-status.js"
 import type { KimiPayload } from "./wire.js"
 
@@ -7,6 +8,8 @@ export type { KimiMcpSnapshot } from "./mcp-status.js"
 interface ErrorOut {
   threadId: ThreadId
   emit: (event: Event) => void
+  /** 只给 MCP 那几条连起来时用；Kimi 自己报的错照原样显示。 */
+  locale?: () => Locale
 }
 
 interface NativeError {

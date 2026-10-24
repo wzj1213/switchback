@@ -1,10 +1,14 @@
 import type { Event, ThreadId } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import type { KimiApi } from "./http.js"
 import type { KimiPayload } from "./wire.js"
+import { KIMI_MCP } from "./mcp-status.messages.js"
 
 interface McpOut {
   threadId: ThreadId
   emit: (event: Event) => void
+  locale?: () => Locale
 }
 
 interface NativeMcpServer {
@@ -92,7 +96,8 @@ async function newestSession(api: KimiApi): Promise<string | undefined> {
     newest = takeNewest(page, newest)
     if (!page.has_more) return newest?.id
     const next = page.items.at(-1)?.id
-    if (next === undefined || seen.has(next)) throw new Error("Kimi MCP 会话校验的分页游标没有前进")
+    // 开会话时这一步失败只是不带 MCP 快照（见 driver.ts），这个错不进界面
+    if (next === undefined || seen.has(next)) throw new Error("Kimi MCP session check: page cursor did not advance")
     seen.add(next)
     before = next
   }
@@ -135,7 +140,7 @@ export class KimiMcpStatus {
     const failures = [...this.servers.values()].map(failure).filter((why): why is string => why !== undefined)
     if (failures.length > 0) {
       this.out.emit({
-        type: "engine.status", at, threadId: this.out.threadId, status: "degraded", detail: failures.join("；"),
+        type: "engine.status", at, threadId: this.out.threadId, status: "degraded", detail: KIMI_MCP[localeOf(this.out)].join(failures),
       })
     }
   }

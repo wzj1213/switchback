@@ -30,6 +30,12 @@ describe("Kimi 清单翻译", () => {
     ).toEqual([{ handle: "s1", title: "第一句", cwd: "/w", updatedAt: 1787184000000 }])
   })
 
+  it("既没标题也没首句的那条，按界面语言写「没有标题」", () => {
+    const row = { id: "s2", title: "", busy: false, agent_config: {}, usage: undefined, metadata: { cwd: "/w" } }
+    expect(toHistory([row])[0]?.title).toBe("（没有标题）")
+    expect(toHistory([row], "en")[0]?.title).toBe("(untitled)")
+  })
+
   it("账号周期换成协议使用的分钟和百分比", () => {
     expect(
       toLimits({

@@ -67,8 +67,8 @@ export async function readKimiTranscript(
     items = [...translated.items, ...items].slice(-TRANSCRIPT_ITEM_MAX)
     if (!page.has_more) return { items, total }
     const next = oldestTurn(page)
-    if (next === undefined || seen.has(next.turnId))
-      throw new Error("Kimi transcript 分页游标没有前进")
+    // 读转写的那头吞掉这个错（host 的 adoption 只是不搬），它只写给排查的人看
+    if (next === undefined || seen.has(next.turnId)) throw new Error("Kimi transcript page cursor did not advance")
     seen.add(next.turnId)
     before = next.turnId
     boundary = next

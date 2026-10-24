@@ -1,5 +1,6 @@
 import type { EngineAccount, EngineCapabilities, EngineThread, Item, ModelOption, SlashCommand, Trust, TurnId } from "@switchback/protocol"
 import type { EngineSession, StartRequest, TrustChange } from "../contract.js"
+import { localeOf } from "../locale.js"
 import { KimiActivations } from "./activation.js"
 import { KimiActivityTracker } from "./activity.js"
 import { KimiAsides } from "./aside.js"
@@ -12,6 +13,7 @@ import { KimiInteractions } from "./interactions.js"
 import { kimiLogPath } from "./log.js"
 import { KimiPrompter } from "./prompt.js"
 import type { KimiLease } from "./server.js"
+import { KIMI_SESSION } from "./session.messages.js"
 import { KimiStateReporter } from "./state.js"
 import { KimiStream, type KimiCursor } from "./stream.js"
 import { KIMI_TRUST } from "./trust.js"
@@ -63,33 +65,34 @@ export class KimiSession implements EngineSession {
   ) {
     this.goalActive = kimiGoalUpdate(init.goal)?.goal?.status === "active"
     this.trust = { current: req.trust }
-    this.turn = new KimiTurnTracker({ emit: req.emit, now: () => Date.now() })
+    this.turn = new KimiTurnTracker({ emit: req.emit, now: () => Date.now(), locale: () => localeOf(req) })
     this.turnEvents = new KimiTurnEvents(this.turn, req.onNativeTurn, () => this.goalActive)
-    this.prompter = new KimiPrompter(lease.api, init.id, this.turn)
+    this.prompter = new KimiPrompter(lease.api, init.id, this.turn, () => localeOf(req))
     this.reporter = new KimiStateReporter(req, () => this.trust.current)
     this.interactions = new KimiInteractions({
       api: lease.api,
       sessionId: init.id,
       req,
       trust: () => this.trust.current,
-      onError: (message) => this.status("degraded", `Kimi 交互请求应答失败：${message}`),
+      onError: (message) => this.status("degraded", KIMI_SESSION[localeOf(req)].interactionFailed(message)),
     })
     this.activations = new KimiActivations({ emit: req.emit, turnId: () => this.turn.currentTurnId() })
-    this.asides = new KimiAsides(lease.api, init.id)
+    this.asides = new KimiAsides(lease.api, init.id, () => localeOf(req))
     this.activity = new KimiActivityTracker({ threadId: req.threadId, emit: req.emit })
-    this.diagnostics = new KimiDiagnostics({ threadId: req.threadId, emit: req.emit }, init.mcp)
+    this.diagnostics = new KimiDiagnostics({ threadId: req.threadId, emit: req.emit, locale: () => localeOf(req) }, init.mcp)
     this.stream = new KimiStream({
       wsUrl: lease.wsUrl,
       protocol: lease.protocol,
+      locale: () => localeOf(req),
       sessionId: init.id,
       cursor: this.cursorOf(init.snapshot),
       onFrame: (frame) => this.onFrame(frame),
       onResync: () => this.resync(),
       // 断了先报「正在重连」而不是 `degraded`：它不是故障，界面不为它弹横幅；
       // 接上报 `ready` 收起，接不回来才报 `crashed`
-      onDisconnect: (cause) => this.status("reconnecting", disconnectText(cause)),
+      onDisconnect: (cause) => this.status("reconnecting", disconnectText(cause, localeOf(req))),
       onRecovered: () => this.status("ready"),
-      onFatal: (error) => this.crashed(`Kimi 的实时连接重试多次都没接上：${error.message}`),
+      onFatal: (error) => this.crashed(KIMI_SESSION[localeOf(req)].streamDead(error.message)),
     })
     this.unlisten = lease.onCrash((detail) => this.crashed(detail))
   }
@@ -114,23 +117,19 @@ export class KimiSession implements EngineSession {
   }
   get threadId(): StartRequest["threadId"] { return this.req.threadId }
   private status(status: "ready" | "degraded" | "crashed" | "reconnecting", detail?: string): void {
-    this.req.emit({
-      type: "engine.status",
-      at: Date.now(),
-      threadId: this.req.threadId,
-      status,
-      ...(detail === undefined ? {} : { detail }),
-    })
+    const event = { type: "engine.status", at: Date.now(), threadId: this.req.threadId, status } as const
+    this.req.emit(detail === undefined ? event : { ...event, detail })
   }
 
   /** 主操作完成后的状态读回是校验，不该反过来把已经拿到的结果报成失败。 */
-  private async refreshStatus(action: string): Promise<KimiStatus | undefined> {
+  private async refreshStatus(action: "trust" | "models" | "model"): Promise<KimiStatus | undefined> {
     try {
       const status = await this.lease.api.get<KimiStatus>(sessionPath(this.init.id, "/status"))
       this.reporter.status(status)
       return status
     } catch (error) {
-      this.status("degraded", `Kimi ${action}已完成，但状态读回失败：${errorText(error)}`)
+      const m = KIMI_SESSION[localeOf(this.req)]
+      this.status("degraded", m.readback(m.action[action], errorText(error)))
       return undefined
     }
   }
@@ -245,7 +244,7 @@ export class KimiSession implements EngineSession {
     const target = KIMI_TRUST[trust]
     await this.lease.api.post(sessionPath(this.init.id, "/profile"), { agent_config: target })
     this.trust.current = trust
-    await this.refreshStatus("权限切换")
+    await this.refreshStatus("trust")
     this.req.onTrustApply?.({ result: "applied", at: Date.now() })
     return { restart: false }
   }
@@ -257,7 +256,7 @@ export class KimiSession implements EngineSession {
     ])
     this.options = toModels(catalog.items, config.default_model)
     this.reporter.setOptions(this.options)
-    await this.refreshStatus("模型清单加载")
+    await this.refreshStatus("models")
     return this.options
   }
 
@@ -268,7 +267,7 @@ export class KimiSession implements EngineSession {
     await this.lease.api.post(sessionPath(this.init.id, "/profile"), {
       agent_config: { model, ...(wanted === undefined ? {} : { thinking: wanted }) },
     })
-    const status = await this.refreshStatus("模型切换")
+    const status = await this.refreshStatus("model")
     const applied = status?.thinking_level
     return option?.efforts?.includes(applied ?? "") === true ? { effort: applied } : {}
   }
@@ -289,7 +288,7 @@ export class KimiSession implements EngineSession {
     const raw = await this.lease.api.get<{ items: readonly KimiSessionRow[] }>(
       "sessions?page_size=40&include_archive=false&exclude_empty=true",
     )
-    return toHistory(raw.items)
+    return toHistory(raw.items, localeOf(this.req))
   }
 
   async account(): Promise<EngineAccount | undefined> {

@@ -8,6 +8,7 @@ export const PROBE = defineMessages(
     firstBroken: "PATH 上靠前的那个先被用到，坏的多半是它；后面几个可能好好的。",
     broken: (tried: string) => `${tried} 都跑不起来 \`--version\`——装坏了、版本不兼容，或者那只是个空壳。`,
     join: (parts: readonly string[]) => parts.join(""),
+    installHint: "设置 → 安装与接入 → 安装与版本 里可以直接装；在终端里装完点那儿的「重新探测」即可，不用重启。",
   },
   {
     missing: (command) => `\`${command}\` isn't on PATH.`,
@@ -15,5 +16,6 @@ export const PROBE = defineMessages(
     firstBroken: "The one earlier on PATH is used first, so it's most likely the broken one; the later ones may be fine.",
     broken: (tried) => `${tried} can't run \`--version\`: the install is broken, the version is incompatible, or it's just an empty shell.`,
     join: (parts) => parts.join(" "),
+    installHint: "You can install it from Settings → Install & connect → Install and versions; after installing in a terminal, click “Detect again” there. No restart needed.",
   },
 )

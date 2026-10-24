@@ -1,10 +1,12 @@
 import type { SlashCommand, TurnId } from "@switchback/protocol"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import { promptContent } from "./attach.js"
 import type { KimiApi } from "./http.js"
 import { sessionPath } from "./http.js"
 import { KimiSkills } from "./skill.js"
 import type { KimiTurnTracker } from "./turn.js"
 import type { KimiPrompt } from "./wire.js"
+import { KIMI_PROMPT } from "./prompt.messages.js"
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -17,6 +19,7 @@ export class KimiPrompter {
     private readonly api: KimiApi,
     private readonly sessionId: string,
     private readonly turn: KimiTurnTracker,
+    private readonly locale: () => Locale = () => DEFAULT_LOCALE,
   ) {
     this.skills = new KimiSkills(api, sessionId)
   }
@@ -34,7 +37,7 @@ export class KimiPrompter {
         this.turn.activationAccepted(generation)
         return
       }
-      const content = promptContent(text, attachments)
+      const content = promptContent(text, attachments, this.locale())
       const prompt = await this.api.post<KimiPrompt>(sessionPath(this.sessionId, "/prompts"), { content })
       if (prompt.status === "blocked") {
         this.turn.promptAccepted(generation, prompt.prompt_id)
@@ -43,7 +46,7 @@ export class KimiPrompter {
       }
       if (prompt.status !== "running") {
         await this.cancel(prompt.prompt_id)
-        throw new Error(`Kimi 没有开始这一轮（状态：${prompt.status}）`)
+        throw new Error(KIMI_PROMPT[this.locale()].notStarted(prompt.status))
       }
       this.turn.promptAccepted(generation, prompt.prompt_id)
     } catch (error) {
@@ -54,12 +57,12 @@ export class KimiPrompter {
 
   async steer(text: string, attachments?: readonly string[]): Promise<void> {
     const generation = this.turn.currentGeneration()
-    if (generation === undefined) throw new Error("Kimi 没有正在运行的轮次，无法改向")
-    const content = promptContent(text, attachments)
+    if (generation === undefined) throw new Error(KIMI_PROMPT[this.locale()].noTurn)
+    const content = promptContent(text, attachments, this.locale())
     const prompt = await this.api.post<KimiPrompt>(sessionPath(this.sessionId, "/prompts"), { content })
     if (prompt.status !== "queued" || !this.turn.isActive(generation)) {
       await this.cancel(prompt.prompt_id)
-      throw new Error("Kimi 的上一轮刚好已经结束，这句话改为排队发送")
+      throw new Error(KIMI_PROMPT[this.locale()].missed)
     }
     try {
       await this.api.post(sessionPath(this.sessionId, "/prompts:steer"), { prompt_ids: [prompt.prompt_id] })

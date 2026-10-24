@@ -1,4 +1,6 @@
 import type { Event, TurnId } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import { planSteps } from "./plan.js"
 import { finishTool, startTool } from "./tool.js"
 import { kimiMessage, kimiTurnStatus, snapshotCanFinish, snapshotMatches } from "./turn-state.js"
@@ -9,14 +11,17 @@ import {
 import { kimiHookResult } from "./hook-result.js"
 import { kimiNotice } from "./notice.js"
 import { kimiNativePartId } from "./native-part.js"
-import { kimiRetryEvent } from "./retry.js"
+import { kimiRetryEvent, kimiRetryMessage } from "./retry.js"
 import { alignKimiDelta, kimiTextState, type KimiTextState } from "./text-stream.js"
 import type { KimiActiveTurn } from "./turn-active.js"
 import { KimiTurnFinalizer } from "./turn-finalize.js"
+import { KIMI_TURN } from "./turn.messages.js"
 
 export interface TurnTrackerDeps {
   emit: (event: Event) => void
   now: () => number
+  /** 轮次里那几句自己说的话用哪种语言。缺省中文。 */
+  locale?: () => Locale
 }
 
 export class KimiTurnTracker {
@@ -33,7 +38,7 @@ export class KimiTurnTracker {
   }
 
   begin(turnId: TurnId, prompt: string, operation: KimiOperation = "prompt"): number {
-    if (this.active !== undefined) throw new Error("Kimi 还有一轮正在运行")
+    if (this.active !== undefined) throw new Error(KIMI_TURN[localeOf(this.deps)].busy)
     const generation = ++this.serial
     this.active = {
       generation,
@@ -243,20 +248,14 @@ export class KimiTurnTracker {
     const active = this.bind(payload.turnId)
     if (active === undefined) return
     this.closeText(active, at)
-    this.deps.emit(
-      kimiRetryEvent(
-        payload,
-        active.turnId,
-        { started: active.retryStarted, part: active.nativePart },
-        at,
-      ),
-    )
+    const message = kimiRetryMessage(payload, localeOf(this.deps))
+    this.deps.emit(kimiRetryEvent(message, active.turnId, { started: active.retryStarted, part: active.nativePart }, at))
     active.retryStarted = true
   }
 
   compaction(payload: KimiPayload, at: number): void {
     const active = this.active
-    const update = active === undefined ? undefined : compactionUpdate(active.operation, payload)
+    const update = active === undefined ? undefined : compactionUpdate(active.operation, payload, localeOf(this.deps))
     if (active !== undefined && update !== undefined) this.applyCompaction(active, update, at)
   }
 
@@ -334,7 +333,7 @@ export class KimiTurnTracker {
     if (active === undefined) return
     const at = this.deps.now()
     if (active.operation === "compact") {
-      const update = compactionAfterGap(active.activationAccepted, snapshot)
+      const update = compactionAfterGap(active.activationAccepted, snapshot, localeOf(this.deps))
       if (update !== undefined) this.applyCompaction(active, update, at)
     } else if (snapshot.in_flight_turn === null) this.reconcileIdle(active, snapshot, at)
     else this.reconcileFlight(active, snapshot, at)

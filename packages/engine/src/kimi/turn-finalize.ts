@@ -1,13 +1,17 @@
 import type { Event, TurnStatus } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { localeOf } from "../locale.js"
 import { sweepTool } from "./tool.js"
 import type { KimiActiveTurn } from "./turn-active.js"
 import { kimiTextState, type KimiTextState } from "./text-stream.js"
+import { KIMI_TURN } from "./turn.messages.js"
 
 interface FinalizerDeps {
   emit: (event: Event) => void
   now: () => number
   current: () => KimiActiveTurn | undefined
   clear: (active: KimiActiveTurn) => void
+  locale?: () => Locale
 }
 
 export class KimiTurnFinalizer {
@@ -79,7 +83,7 @@ export class KimiTurnFinalizer {
     for (const item of active.tools.values()) {
       const missing = status === "completed" && (item.status === "running" || item.status === "pending")
       const swept = missing
-        ? { ...item, status: "failed" as const, error: "Kimi 在轮次结束前没有报告这次工具调用的结果。" }
+        ? { ...item, status: "failed" as const, error: KIMI_TURN[localeOf(this.deps)].noToolResult }
         : sweepTool(item, ending)
       if (swept !== item) this.deps.emit({ type: "item.updated", at, item: swept })
     }

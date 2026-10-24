@@ -1,4 +1,6 @@
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import type { KimiContent, KimiImageContent } from "./wire.js"
+import { KIMI_PROMPT } from "./prompt.messages.js"
 
 /**
  * 附件交给 Kimi 的是**路径**，不是图片本身——和 codex 的 `localImage` 一样。
@@ -14,9 +16,13 @@ export function attachmentContent(attachments?: readonly string[]): readonly Kim
   return (attachments ?? []).map((path) => ({ type: "image", source: { kind: "path", path } }))
 }
 
-export function promptContent(text: string, attachments?: readonly string[]): readonly KimiContent[] {
+export function promptContent(
+  text: string,
+  attachments?: readonly string[],
+  locale: Locale = DEFAULT_LOCALE,
+): readonly KimiContent[] {
   const content: KimiContent[] = text === "" ? [] : [{ type: "text", text }]
   content.push(...attachmentContent(attachments))
-  if (content.length === 0) throw new Error("Kimi 的提示内容不能为空")
+  if (content.length === 0) throw new Error(KIMI_PROMPT[locale].empty)
   return content
 }

@@ -3,6 +3,7 @@ import type { EngineAccount, EngineCapabilities, EngineThread, ModelOption, Slas
 import type { EngineDriver, EngineSession, StartRequest, TrustChange } from "../contract.js"
 import { createProcessOwner, type ProcessOwner, type ReclaimConfig } from "../subprocess.js"
 import { probeCommand } from "../probe.js"
+import { PROBE } from "../probe.messages.js"
 import { createRpc, type RpcPeer } from "../rpc.js"
 import { CODEX_HISTORY_LIMIT, toAccount, toEngineThreads } from "./catalog.js"
 import { nativeAxes, nativeTrustDiffers, POLICY, REVIEWER, SANDBOX } from "./sandbox.js"
@@ -391,7 +392,7 @@ export function createCodexDriver(config: CodexDriverConfig = {}): EngineDriver 
     // **这句话会出现在两个地方**：设置页那家的状态说明，和输入区引擎下拉里那一条的说明。
     // 原文是「装好之后重启 Switchback」——那曾经是真的（探测结果在进程里只算一次），
     // 现在不是了：装完会自动重探，手动也有一颗按钮。留着旧话等于教用户做无用功。
-    probe: (locale) => probeCommand(command, CODEX_DRIVER[locale ?? DEFAULT_LOCALE].probeHint, locale),
+    probe: (locale) => probeCommand(command, PROBE[locale ?? DEFAULT_LOCALE].installHint, locale),
     start: async (req: StartRequest): Promise<EngineSession> => {
       const session = new CodexSession(req, config)
       // 握手失败要在这里就抛出来，别让宿主拿到一个看着正常、一发消息就炸的会话

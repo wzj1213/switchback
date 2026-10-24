@@ -31,6 +31,19 @@ describe("Kimi 上下文压缩", () => {
     ])
   })
 
+  it("英文界面下开始与结果都说英文，条数和 token 数照原样", () => {
+    const events: Event[] = []
+    const turn = new KimiTurnTracker({ emit: (event) => events.push(event), now: () => 99, locale: () => "en" })
+    turn.begin("compact-turn", "", "compact")
+    handleTurnEvent(turn, { type: "compaction.started", trigger: "manual" }, 1)
+    handleTurnEvent(turn, { type: "compaction.completed", trigger: "manual", result }, 2)
+    expect(events).toMatchObject([
+      { item: { message: "Compacting context…" } },
+      { item: { message: "Context compacted: 12 messages, 48000 → 8000 tokens." } },
+      { status: "completed" },
+    ])
+  })
+
   it("自动压缩只分隔当前回答，不提前结束模型还在跑的那一轮", () => {
     const events: Event[] = []
     const turn = tracker(events)

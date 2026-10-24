@@ -1,9 +1,13 @@
 import type { ChildProcess } from "node:child_process"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import type { ReclaimConfig } from "../subprocess.js"
 import { createProcessOwner, type ProcessOwner } from "../subprocess.js"
 import { resolveCommand } from "../probe.js"
 import { createKimiApi, type KimiApi, type KimiFetch } from "./http.js"
 import type { KimiMeta } from "./wire.js"
+import { KIMI_SERVER } from "./server.messages.js"
+
+type Text = (typeof KIMI_SERVER)[Locale]
 
 export interface KimiDriverConfig {
   command?: string
@@ -63,7 +67,7 @@ export function parseServerOutput(output: string): (KimiEndpoint & { token: stri
   }
 }
 
-function discover(child: ChildProcess, owner: ProcessOwner, budget: number): Promise<KimiEndpoint & { token: string }> {
+function discover(child: ChildProcess, owner: ProcessOwner, budget: number, m: Text): Promise<KimiEndpoint & { token: string }> {
   const state = { buffer: "", settled: false }
   return new Promise((resolve, reject) => {
     const finish = (error: Error | undefined, endpoint?: KimiEndpoint & { token: string }): void => {
@@ -72,31 +76,34 @@ function discover(child: ChildProcess, owner: ProcessOwner, budget: number): Pro
       clearTimeout(timer)
       child.stdout?.off("data", onData)
       if (endpoint !== undefined) resolve(endpoint)
-      else reject(error ?? new Error("Kimi Web 服务没有报告地址"))
+      else reject(error ?? new Error(m.noAddress))
     }
     const onData = (chunk: string): void => {
       state.buffer = (state.buffer + chunk).slice(-8192)
       const endpoint = parseServerOutput(state.buffer)
       if (endpoint !== undefined) finish(undefined, endpoint)
     }
-    const timer = setTimeout(() => finish(new Error(`Kimi Web 服务在 ${String(budget / 1000)} 秒内没有就绪`)), budget)
+    const timer = setTimeout(() => finish(new Error(m.notReady(budget / 1000))), budget)
     child.stdout?.setEncoding("utf8")
     child.stdout?.on("data", onData)
     void owner.died().then((error) => finish(error))
   })
 }
 
-function validate(meta: KimiMeta): void {
-  if (meta.capabilities.websocket !== true) throw new Error("这个 Kimi 版本没有公开 WebSocket 能力，请升级 Kimi Code")
-  if (meta.dangerous_bypass_auth === true) {
-    throw new Error("Kimi Web 服务关闭了鉴权；Switchback 拒绝连接这个不安全的实例")
-  }
+function validate(meta: KimiMeta, m: Text): void {
+  if (meta.capabilities.websocket !== true) throw new Error(m.noWebSocket)
+  if (meta.dangerous_bypass_auth === true) throw new Error(m.noAuth)
 }
 
 export class KimiServerPool {
   private state: ServerState | undefined
   private opening: Promise<ServerState> | undefined
   private closing: Promise<void> | undefined
+  /**
+   * 最近来借的那条会话说的语言。语言是全局设置，谁的读法都一样；
+   * 进程起不来、退了、收不回时照它说——那几句不属于哪一条会话。
+   */
+  private locale: () => Locale = () => DEFAULT_LOCALE
 
   constructor(
     private readonly config: KimiDriverConfig = {},
@@ -117,10 +124,10 @@ export class KimiServerPool {
       stderr.value = (stderr.value + chunk).slice(-STDERR_KEEP)
     })
     try {
-      const discovered = await discover(child, owner, this.config.startupMs ?? STARTUP_MS)
+      const discovered = await discover(child, owner, this.config.startupMs ?? STARTUP_MS, KIMI_SERVER[this.locale()])
       const { token, ...endpoint } = discovered
-      const api = createKimiApi(endpoint.baseUrl, token, this.fetcher)
-      validate(await api.get<KimiMeta>("meta"))
+      const api = createKimiApi(endpoint.baseUrl, token, this.fetcher, () => this.locale())
+      validate(await api.get<KimiMeta>("meta"), KIMI_SERVER[this.locale()])
       const state: ServerState = {
         ...endpoint,
         api,
@@ -149,7 +156,7 @@ export class KimiServerPool {
     if (this.state === state) this.state = undefined
     if (state.intentional) return
     const tail = state.stderr === "" ? "" : `\n${state.stderr}`
-    const detail = `Kimi Web 服务已退出（code ${String(code)}）${tail}`
+    const detail = `${KIMI_SERVER[this.locale()].exited(String(code))}${tail}`
     for (const listener of state.listeners) listener(detail)
   }
 
@@ -164,7 +171,8 @@ export class KimiServerPool {
     return state
   }
 
-  async acquire(): Promise<KimiLease> {
+  async acquire(locale?: () => Locale): Promise<KimiLease> {
+    if (locale !== undefined) this.locale = locale
     const state = await this.ready()
     state.refs += 1
     const released = { value: false }
@@ -202,7 +210,7 @@ export class KimiServerPool {
     state.child.stdin?.end()
     const report = await state.owner.reclaim()
     if (report.rung === "escaped") {
-      throw new Error(`Kimi Web 进程组未能回收（pid ${String(report.pid)}），可能已泄漏`)
+      throw new Error(KIMI_SERVER[this.locale()].leaked(String(report.pid)))
     }
   }
 }

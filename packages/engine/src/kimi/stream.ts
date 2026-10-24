@@ -1,4 +1,8 @@
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import type { KimiFrame } from "./wire.js"
+import { KIMI_STREAM } from "./stream.messages.js"
+
+type Text = (typeof KIMI_STREAM)[Locale]
 
 interface SocketLike {
   addEventListener: (type: string, listener: (event: unknown) => void) => void
@@ -20,7 +24,7 @@ export interface KimiCursor {
  */
 export type KimiDisconnect =
   | { kind: "closed"; code?: number; reason?: string }
-  | { kind: "resync"; why: string }
+  | { kind: "resync"; by: "switchback" | "kimi" }
   | { kind: "error"; message: string }
 
 export interface KimiStreamDeps {
@@ -35,6 +39,8 @@ export interface KimiStreamDeps {
   onFatal: (error: Error) => void
   handshakeMs?: number
   socket?: SocketFactory
+  /** 连不上、被拒时那几句用哪种语言说。缺省中文。 */
+  locale?: () => Locale
 }
 
 /**
@@ -46,7 +52,7 @@ const HANDSHAKE_MS = 15_000
 
 class ResyncError extends Error {}
 
-const GAP: KimiDisconnect = { kind: "resync", why: "Switchback 发现流里有缺口" }
+const GAP: KimiDisconnect = { kind: "resync", by: "switchback" }
 
 function closedBy(event: unknown): KimiDisconnect {
   const { code, reason } = (event ?? {}) as { code?: unknown; reason?: unknown }
@@ -58,22 +64,21 @@ function closedBy(event: unknown): KimiDisconnect {
 }
 
 function causeOf(error: unknown): KimiDisconnect {
-  if (error instanceof ResyncError) return { kind: "resync", why: "服务端要求重新同步" }
+  if (error instanceof ResyncError) return { kind: "resync", by: "kimi" }
   return { kind: "error", message: error instanceof Error ? error.message : String(error) }
 }
 
-function defaultSocket(url: string, protocols: readonly string[]): SocketLike {
+function defaultSocket(url: string, protocols: readonly string[], m: Text): SocketLike {
   const Ctor = (
     globalThis as unknown as {
       WebSocket?: new (target: string, protocols: readonly string[]) => SocketLike
     }
   ).WebSocket
-  if (Ctor === undefined)
-    throw new Error("当前 Node 运行时没有 WebSocket，请使用 Node 22 或更新版本")
+  if (Ctor === undefined) throw new Error(m.noRuntime)
   return new Ctor(url, protocols)
 }
 
-function frameOf(event: unknown): KimiFrame {
+function frameOf(event: unknown, m: Text): KimiFrame {
   const data = (event as { data?: unknown }).data
   if (typeof data === "string") return JSON.parse(data) as KimiFrame
   if (data instanceof ArrayBuffer)
@@ -82,7 +87,7 @@ function frameOf(event: unknown): KimiFrame {
     return JSON.parse(
       Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8"),
     ) as KimiFrame
-  throw new Error("Kimi WebSocket 发来了无法识别的数据帧")
+  throw new Error(m.badFrame)
 }
 
 function strings(raw: unknown): readonly string[] {
@@ -100,6 +105,10 @@ export class KimiStream {
 
   constructor(private readonly deps: KimiStreamDeps) {
     this.cursor = deps.cursor
+  }
+
+  private text(): Text {
+    return KIMI_STREAM[this.deps.locale?.() ?? DEFAULT_LOCALE]
   }
 
   private subscription(socket: SocketLike): void {
@@ -133,7 +142,7 @@ export class KimiStream {
 
   private takeEvent(frame: KimiFrame): void {
     if (this.pong(frame)) return
-    if (frame.type === "resync_required") throw new ResyncError("Kimi WebSocket 要求重新同步")
+    if (frame.type === "resync_required") throw new ResyncError(this.text().resync)
     if (frame.session_id !== this.deps.sessionId || frame.payload === undefined) return
     if (!this.advance(frame)) return
     this.deps.onFrame(frame)
@@ -142,16 +151,17 @@ export class KimiStream {
   private ack(frame: KimiFrame): void {
     const payload = (frame.payload ?? {}) as Record<string, unknown>
     if (frame.code !== 0 || !strings(payload["accepted"]).includes(this.deps.sessionId)) {
-      throw new Error(frame.msg || "Kimi WebSocket 拒绝订阅这个会话")
+      throw new Error(frame.msg || this.text().refused)
     }
     if (strings(payload["resync_required"]).includes(this.deps.sessionId)) {
-      throw new ResyncError("Kimi WebSocket 要求重新同步")
+      throw new ResyncError(this.text().resync)
     }
   }
 
   private connectOnce(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const socket = (this.deps.socket ?? defaultSocket)(this.deps.wsUrl, [this.deps.protocol])
+      const m = this.text()
+      const socket = this.deps.socket?.(this.deps.wsUrl, [this.deps.protocol]) ?? defaultSocket(this.deps.wsUrl, [this.deps.protocol], m)
       this.socket = socket
       const state: { settled: boolean; subscribed: boolean; ready: boolean; cause?: KimiDisconnect } = {
         settled: false, subscribed: false, ready: false,
@@ -164,12 +174,12 @@ export class KimiStream {
         else reject(error)
       }
       const timer = setTimeout(() => {
-        settle(new Error("Kimi WebSocket 在订阅握手阶段没有响应"))
+        settle(new Error(m.handshake))
         socket.close()
       }, this.deps.handshakeMs ?? HANDSHAKE_MS)
       socket.addEventListener("message", (event) => {
         try {
-          const frame = frameOf(event)
+          const frame = frameOf(event, m)
           if (frame.type === "server_hello" && !state.subscribed) {
             state.subscribed = true
             this.subscription(socket)
@@ -188,13 +198,11 @@ export class KimiStream {
           socket.close()
         }
       })
-      socket.addEventListener("error", () => settle(new Error("Kimi WebSocket 连接失败")))
+      socket.addEventListener("error", () => settle(new Error(m.failed)))
       socket.addEventListener("close", (event) => {
         if (this.socket === socket) this.socket = undefined
         if (!state.settled) {
-          const error = this.forceSnapshot
-            ? new ResyncError("Kimi 流式 offset 要求重新同步")
-            : new Error("Kimi WebSocket 在订阅完成前断开")
+          const error = this.forceSnapshot ? new ResyncError(m.offsetResync) : new Error(m.closedEarly)
           settle(error)
         } else if (state.ready && !this.disposed) {
           void this.recover(state.cause ?? (this.forceSnapshot ? GAP : closedBy(event)))
@@ -228,7 +236,7 @@ export class KimiStream {
   }
 
   private async tryRecover(): Promise<void> {
-    let last = new Error("Kimi WebSocket 重连失败")
+    let last = new Error(this.text().reconnectFailed)
     for (const delay of RETRY_MS) {
       if (this.disposed) return
       await wait(delay)

@@ -1,6 +1,7 @@
 import { decide } from "@switchback/approval"
 import type { QuestionAnswer, QuestionPrompt, QuestionResponse, Trust } from "@switchback/protocol"
 import type { StartRequest } from "../contract.js"
+import { localeOf } from "../locale.js"
 import { sanitize } from "../claude/permission.js"
 import { approvalRequest, approvalSummary } from "./approve.js"
 import { KimiApiError, sessionPath, type KimiApi } from "./http.js"
@@ -131,12 +132,14 @@ export class KimiInteractions {
   }
 
   private async decide(approval: KimiApproval, signal: AbortSignal): Promise<void> {
-    const req = approvalRequest(approval, this.deps.req.cwd)
+    const locale = localeOf(this.deps.req)
+    const req = approvalRequest(approval, this.deps.req.cwd, locale)
     const verdict = decide(req, {
       trust: this.deps.trust(),
       worksite: this.deps.req.cwd,
       home: this.deps.req.home,
       memory: this.deps.req.memory(),
+      locale,
     })
     if (verdict.action === "allow") {
       await this.resolve(approval.approval_id, { allow: true, remember: "once" }, signal)
@@ -154,7 +157,7 @@ export class KimiInteractions {
       {
         toolCallId: approval.tool_call_id,
         tool: approval.tool_name,
-        summary: approvalSummary(approval),
+        summary: approvalSummary(approval, locale),
         reason: verdict.reason,
         ...(verdict.redline === undefined ? {} : { redline: verdict.redline }),
         ...(verdict.suggest === undefined

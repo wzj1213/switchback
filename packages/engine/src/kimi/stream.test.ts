@@ -268,8 +268,8 @@ describe("断开原因照实报", () => {
   const cases: readonly { name: string; act: (stream: KimiStream, socket: FakeSocket | undefined) => void; want: KimiDisconnect }[] = [
     { name: "对面关的：带上关闭码和原因", act: (_s, socket) => socket?.emit("close", { code: 1001, reason: "heartbeat timeout" }), want: { kind: "closed", code: 1001, reason: "heartbeat timeout" } },
     { name: "没有关闭码就不编一个", act: (_s, socket) => socket?.emit("close", {}), want: { kind: "closed" } },
-    { name: "Switchback 发现缺口、主动重同步", act: (stream) => stream.requestResync(), want: { kind: "resync", why: "Switchback 发现流里有缺口" } },
-    { name: "服务端要求重同步", act: (_s, socket) => socket?.frame({ type: "resync_required", session_id: "s1" }), want: { kind: "resync", why: "服务端要求重新同步" } },
+    { name: "Switchback 发现缺口、主动重同步", act: (stream) => stream.requestResync(), want: { kind: "resync", by: "switchback" } },
+    { name: "服务端要求重同步", act: (_s, socket) => socket?.frame({ type: "resync_required", session_id: "s1" }), want: { kind: "resync", by: "kimi" } },
     { name: "Switchback 自己处理某一帧时出错", act: (_s, socket) => socket?.frame(boom), want: { kind: "error", message: "炸了" } },
   ]
   for (const one of cases) {
