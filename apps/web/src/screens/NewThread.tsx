@@ -1,6 +1,8 @@
 import { useState } from "react"
 import type { Command, EngineInfo, ThreadId, Trust } from "@switchback/protocol"
 import type { Project } from "@switchback/store"
+import { useMessages } from "../i18n.js"
+import { NEW_THREAD } from "./NewThread.messages.js"
 
 /**
  * 在手机上开一条新会话。
@@ -44,15 +46,14 @@ export function NewThread({
   const usable = engines.filter((e) => e.state !== "missing" && e.state !== "unavailable")
   const [cwd, setCwd] = useState(projects[0]?.cwd ?? "")
   const [engine, setEngine] = useState(usable[0]?.id ?? "")
+  const m = useMessages(NEW_THREAD)
 
   if (projects.length === 0) {
     // **「还没到」和「真的没有」必须分开。** 从锁屏点通知进来的第一秒，
     // 全量还在路上，`projects` 必然是空的——这时候说「还没有可用的项目」
     // 是一句确定的假话，而人看完就退出了，以为手机上开不了。
     // 这和列表那边用骨架修掉的是同一类错误
-    const why = hydrated
-      ? "还没有可用的项目。到桌面上开第一条会话，这里就能接着开了。"
-      : "正在取项目清单…"
+    const why = hydrated ? m.noProjects : m.loading
     return (
       <section className="newthread">
         <Head onCancel={onCancel} />
@@ -65,7 +66,7 @@ export function NewThread({
     <section className="newthread">
       <Head onCancel={onCancel} />
       <div className="newthread__body">
-        <p className="newthread__label">在哪个项目</p>
+        <p className="newthread__label">{m.project}</p>
         <ul className="newthread__list">
           {projects.map((p) => (
             <li key={p.cwd}>
@@ -78,7 +79,7 @@ export function NewThread({
           ))}
         </ul>
 
-        <p className="newthread__label">用哪家引擎</p>
+        <p className="newthread__label">{m.engine}</p>
         <ul className="newthread__list newthread__list--row">
           {usable.map((e) => (
             <li key={e.id}>
@@ -90,7 +91,7 @@ export function NewThread({
         </ul>
 
         <p className="newthread__note">
-          开出来是「{maxTrust}」档——这是远程的上限，改档位要去桌面上。
+          {m.note(maxTrust)}
         </p>
       </div>
       <footer className="newthread__foot">
@@ -104,7 +105,7 @@ export function NewThread({
             onCreate({ type: "thread.create", cwd, engine, trust: maxTrust as Trust })
           }}
         >
-          {offline ? "等重连…" : "开一条"}
+          {offline ? m.waiting : m.create}
         </button>
       </footer>
     </section>
@@ -112,12 +113,13 @@ export function NewThread({
 }
 
 function Head({ onCancel }: { onCancel: () => void }): React.JSX.Element {
+  const m = useMessages(NEW_THREAD)
   return (
     <header className="threads__head">
-      <button className="btn btn--ghost thread__back" type="button" onClick={onCancel} aria-label="返回列表">
+      <button className="btn btn--ghost thread__back" type="button" onClick={onCancel} aria-label={m.back}>
         ‹
       </button>
-      <span className="threads__title">新会话</span>
+      <span className="threads__title">{m.title}</span>
     </header>
   )
 }

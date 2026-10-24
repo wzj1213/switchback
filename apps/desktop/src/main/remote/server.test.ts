@@ -78,6 +78,7 @@ async function boot(options: BootOptions = {}): Promise<Harness> {
       trustedHosts: options.trustedHosts ?? [],
       maxTrust: options.maxTrust ?? "full",
     }),
+    language: () => "en",
     webRoot: dir,
     pushKey: () => "测试用的假公钥",
     tokens,
@@ -196,7 +197,7 @@ describe("配对", () => {
     expect(token).not.toBe("")
     const me = await fetch(`${h.base}/api/me`, { headers: { authorization: `Bearer ${token}` } })
     expect(me.status).toBe(200)
-    expect(await me.json()).toMatchObject({ name: "iPhone", maxTrust: "full" })
+    expect(await me.json()).toMatchObject({ name: "iPhone", maxTrust: "full", language: "en" })
   })
 
   // 手机上「引擎跑在那台 Mac 上」解释了一大堆事，而这是连接级常量，

@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from "react"
-import { disablePush, enablePush, pushState, type PushState } from "../push.js"
+import { disablePush, enablePush, pushState, type PushFailure, type PushState } from "../push.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { PUSH_TOGGLE } from "./PushToggle.messages.js"
+
+function failureText(failure: PushFailure, m: (typeof PUSH_TOGGLE)[Locale]): string {
+  if (failure.kind === "unsupported") return m.why[failure.why]
+  if (failure.kind === "refused") return m.refused
+  if (failure.kind === "no-key") return m.noKey
+  if (failure.kind === "bad-subscription") return m.badSubscription
+  return m.notSaved(failure.status)
+}
 
 /**
  * 「跑完了叫我一声」的开关。
@@ -13,6 +24,7 @@ import { disablePush, enablePush, pushState, type PushState } from "../push.js"
 export function PushToggle({ token }: { token: string }): React.JSX.Element | null {
   const [state, setState] = useState<PushState>({ kind: "working" })
   const [error, setError] = useState("")
+  const m = useMessages(PUSH_TOGGLE)
 
   useEffect(() => {
     void pushState().then(setState)
@@ -25,15 +37,15 @@ export function PushToggle({ token }: { token: string }): React.JSX.Element | nu
       .then((result) => {
         if (result.ok) setState({ kind: "on" })
         else {
-          setError(result.reason)
+          setError(failureText(result.failure, m))
           void pushState().then(setState)
         }
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "开不起来")
+        setError(reason instanceof Error ? reason.message : m.failed)
         setState({ kind: "off" })
       })
-  }, [token])
+  }, [token, m])
 
   const turnOff = useCallback(() => {
     setState({ kind: "working" })
@@ -43,10 +55,10 @@ export function PushToggle({ token }: { token: string }): React.JSX.Element | nu
   }, [token])
 
   if (state.kind === "unsupported") {
-    return <p className="push push--why">{state.why}</p>
+    return <p className="push push--why">{m.why[state.why]}</p>
   }
   if (state.kind === "denied") {
-    return <p className="push push--why">通知权限被拒过了，浏览器不会再问——要开得去系统设置里改。</p>
+    return <p className="push push--why">{m.denied}</p>
   }
   return (
     <div className="push">
@@ -56,7 +68,7 @@ export function PushToggle({ token }: { token: string }): React.JSX.Element | nu
         disabled={state.kind === "working"}
         onClick={state.kind === "on" ? turnOff : turnOn}
       >
-        {state.kind === "on" ? "关掉通知" : state.kind === "working" ? "…" : "跑完了叫我一声"}
+        {state.kind === "on" ? m.off : state.kind === "working" ? "…" : m.on}
       </button>
       {error === "" ? null : <span className="push__error">{error}</span>}
     </div>

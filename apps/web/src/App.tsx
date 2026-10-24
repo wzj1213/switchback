@@ -9,6 +9,8 @@ import { Thread } from "./screens/Thread.js"
 import { NewThread } from "./screens/NewThread.js"
 import { ConnBar } from "./components/ConnBar.js"
 import { Notices } from "./components/Notices.js"
+import { LocaleProvider, useHostLocale, useMessages } from "./i18n.js"
+import { APP } from "./App.messages.js"
 
 /**
  * 两屏一栏：手机上一次只看一屏（列表 ↔ 正文），桌面浏览器上并排。
@@ -120,11 +122,14 @@ function useHistory(
   }, [watch])
 }
 
-export function App(): React.JSX.Element {
-  const [token, setToken] = useState(tokenOf)
+function Screens({ token, setToken, remote }: {
+  token: string
+  setToken: (next: string) => void
+  remote: ReturnType<typeof useRemote>
+}): React.JSX.Element {
   const [selected, setSelected] = useState<ThreadId | undefined>(undefined)
   const [creating, setCreating] = useState(false)
-  const remote = useRemote(token)
+  const m = useMessages(APP)
 
   const { watch } = remote
 
@@ -148,12 +153,12 @@ export function App(): React.JSX.Element {
 
   const paired = useCallback((next: string) => {
     setToken(next)
-  }, [])
+  }, [setToken])
 
   const unpair = useCallback(() => {
     forgetToken()
     setToken("")
-  }, [])
+  }, [setToken])
 
   if (token === "" || remote.conn.kind === "unauthorized") {
     return <Pair onPaired={paired} expired={token !== ""} />
@@ -194,7 +199,7 @@ export function App(): React.JSX.Element {
         </aside>
         <main className="pane pane--detail">
           {thread === undefined ? (
-            <p className="empty">选一条会话，或者点右上角开一条新的。</p>
+            <p className="empty">{m.pick}</p>
           ) : (
             <Thread
               remote={remote}
@@ -207,5 +212,17 @@ export function App(): React.JSX.Element {
         </main>
       </div>
     </div>
+  )
+}
+
+/** 外框：先连上宿主，再照宿主那边的语言说话（配对前用上次记下的，见 `i18n.tsx`）。 */
+export function App(): React.JSX.Element {
+  const [token, setToken] = useState(tokenOf)
+  const remote = useRemote(token)
+  const locale = useHostLocale(remote.me?.language)
+  return (
+    <LocaleProvider locale={locale}>
+      <Screens token={token} setToken={setToken} remote={remote} />
+    </LocaleProvider>
   )
 }

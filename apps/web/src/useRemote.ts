@@ -13,6 +13,8 @@ import {
   type Stream,
 } from "@switchback/wire"
 import { createTransport, tokenOf, whoAmI, type ConnState, type Me, type Transport } from "@switchback/link"
+import { documentLocale } from "./i18n.js"
+import { USE_REMOTE } from "./useRemote.messages.js"
 
 /**
  * 事件流 → 视图状态。**和桌面端跑的是同一个归约器**（`@switchback/store`），
@@ -181,7 +183,7 @@ export function useRemote(token: string): Remote {
 
   const send = useCallback((command: Command): boolean => {
     const sent = refs.current.transport?.send({ type: "command", command }) ?? false
-    if (!sent) setNotice("现在没连上 Switchback，这一下没有发出去。等连上再点一次。")
+    if (!sent) setNotice(USE_REMOTE[documentLocale()].notSent)
     return sent
   }, [])
 

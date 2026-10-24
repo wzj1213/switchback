@@ -14,9 +14,12 @@
  * 三条都不满足时**说清楚是哪一条**，而不是回一个「开启失败」。
  */
 
+/** 这个环境给不了推送的几种原因。这里只报原因码，说法在 `PushToggle.messages.ts`。 */
+export type Unsupported = "insecure" | "no-worker" | "no-push" | "no-notification" | "ios-tab"
+
 export type PushState =
   /** 这个环境压根不支持（不是安全上下文、没加主屏、浏览器太老）。 */
-  | { kind: "unsupported"; why: string }
+  | { kind: "unsupported"; why: Unsupported }
   | { kind: "off" }
   | { kind: "on" }
   /** 用户拒过了。**浏览器不给第二次机会**，只能去系统设置里改。 */
@@ -33,16 +36,16 @@ export async function pushState(): Promise<PushState> {
   return sub === null || sub === undefined ? { kind: "off" } : { kind: "on" }
 }
 
-function unsupportedWhy(): string | undefined {
-  if (!window.isSecureContext) return "这个地址不是 https，浏览器不给推送"
-  if (!("serviceWorker" in navigator)) return "这个浏览器没有 service worker"
-  if (!("PushManager" in window)) return "这个浏览器不支持 Web Push"
-  if (!("Notification" in window)) return "这个浏览器不支持通知"
+function unsupportedWhy(): Unsupported | undefined {
+  if (!window.isSecureContext) return "insecure"
+  if (!("serviceWorker" in navigator)) return "no-worker"
+  if (!("PushManager" in window)) return "no-push"
+  if (!("Notification" in window)) return "no-notification"
   // iOS：只有加到主屏之后 standalone 才为真，而标签页里的 PWA 收不到推送
   const standalone = window.matchMedia("(display-mode: standalone)").matches
   const iosStandalone = (window.navigator as { standalone?: boolean }).standalone === true
   const ios = /iPhone|iPad|iPod/.test(window.navigator.userAgent)
-  if (ios && !standalone && !iosStandalone) return "iPhone 上要先「分享 → 添加到主屏幕」，标签页里收不到推送"
+  if (ios && !standalone && !iosStandalone) return "ios-tab"
   return undefined
 }
 
@@ -69,19 +72,27 @@ function shapeOf(sub: PushSubscription): { endpoint: string; p256dh: string; aut
   return { endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth }
 }
 
-export type EnableResult = { ok: true } | { ok: false; reason: string }
+/** 开不起来的几种情况，同样只报原因码。 */
+export type PushFailure =
+  | { kind: "unsupported"; why: Unsupported }
+  | { kind: "refused" }
+  | { kind: "no-key" }
+  | { kind: "bad-subscription" }
+  | { kind: "not-saved"; status: number }
+
+export type EnableResult = { ok: true } | { ok: false; failure: PushFailure }
 
 /** **必须在用户手势里调**（见文件头第 2 条）。 */
 export async function enablePush(token: string): Promise<EnableResult> {
   const why = unsupportedWhy()
-  if (why !== undefined) return { ok: false, reason: why }
+  if (why !== undefined) return { ok: false, failure: { kind: "unsupported", why } }
   const granted = await Notification.requestPermission()
-  if (granted !== "granted") return { ok: false, reason: "你拒绝了通知权限。浏览器不会再问第二次，要开得去系统设置里改。" }
+  if (granted !== "granted") return { ok: false, failure: { kind: "refused" } }
 
   const registration = await navigator.serviceWorker.register("/sw.js")
   const res = await fetch("/api/push/key")
   const { key } = (await res.json()) as { key: string }
-  if (typeof key !== "string" || key === "") return { ok: false, reason: "Switchback 没给出推送公钥" }
+  if (typeof key !== "string" || key === "") return { ok: false, failure: { kind: "no-key" } }
 
   const sub = await registration.pushManager.subscribe({
     // **只能是 true**：Chrome 会拒掉静默推送，而 iOS 压根没有静默这一档
@@ -89,14 +100,14 @@ export async function enablePush(token: string): Promise<EnableResult> {
     applicationServerKey: keyBytes(key),
   })
   const shape = shapeOf(sub)
-  if (shape === undefined) return { ok: false, reason: "浏览器给的订阅缺字段" }
+  if (shape === undefined) return { ok: false, failure: { kind: "bad-subscription" } }
 
   const saved = await fetch("/api/push/subscribe", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify(shape),
   })
-  if (!saved.ok) return { ok: false, reason: `Switchback 没存下这个订阅（HTTP ${String(saved.status)}）` }
+  if (!saved.ok) return { ok: false, failure: { kind: "not-saved", status: saved.status } }
   return { ok: true }
 }
 

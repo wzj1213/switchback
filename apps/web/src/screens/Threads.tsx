@@ -3,6 +3,8 @@ import type { Thread, ThreadId } from "@switchback/protocol"
 import { itemsOf, projectsOf, threadRowsOf, displayStatus } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { PushToggle } from "../components/PushToggle.js"
+import { useMessages } from "../i18n.js"
+import { THREADS } from "./Threads.messages.js"
 
 /**
  * 会话列表。
@@ -10,14 +12,6 @@ import { PushToggle } from "../components/PushToggle.js"
  * **等审批的排最前**，不按时间。这一端的用途就是「它卡住了，我去放行」——
  * 而卡住的那条按时间排可能在第七位。次序是：等审批 → 在跑 → 其余按活跃度。
  */
-
-const STATUS_TEXT: Readonly<Record<Thread["status"], string>> = {
-  starting: "正在起引擎",
-  idle: "空闲",
-  running: "在跑",
-  waiting_approval: "等你确认",
-  failed: "出错了",
-}
 
 function rank(thread: Thread): number {
   // 后台子 agent 在等权限的也排最前：会话状态没变，可它确实卡在你这儿（见 store 的 `displayStatus`）
@@ -43,6 +37,7 @@ function lastAt(items: readonly { at: number }[]): number {
  * 这件事在手机上不可逆，所以判据不同。
  */
 function Unpair({ onUnpair }: { onUnpair: () => void }): React.JSX.Element {
+  const m = useMessages(THREADS)
   const [asking, setAsking] = useState(false)
   if (!asking) {
     return (
@@ -53,18 +48,18 @@ function Unpair({ onUnpair }: { onUnpair: () => void }): React.JSX.Element {
           setAsking(true)
         }}
       >
-        解除配对
+        {m.unpair}
       </button>
     )
   }
   return (
     <span className="unpair">
-      <span className="unpair__ask">解除后要在桌面上重新取码</span>
+      <span className="unpair__ask">{m.unpairAsk}</span>
       <button className="btn btn--ghost unpair__no" type="button" onClick={() => { setAsking(false) }}>
-        取消
+        {m.cancel}
       </button>
       <button className="btn btn--ghost unpair__yes" type="button" onClick={onUnpair}>
-        解除
+        {m.unpairYes}
       </button>
     </span>
   )
@@ -84,6 +79,7 @@ function Row({
   selected: boolean
   onOpen: (id: ThreadId) => void
 }): React.JSX.Element {
+  const m = useMessages(THREADS)
   return (
     <button
       className="row"
@@ -97,8 +93,8 @@ function Row({
       <span className="row__body">
         <span className="row__title">{thread.title}</span>
         <span className="row__sub">
-          {STATUS_TEXT[displayStatus(thread)]} · {thread.engine}
-          {thread.detached === true ? " · 未接引擎" : ""}
+          {m.status[displayStatus(thread)]} · {thread.engine}
+          {thread.detached === true ? m.detached : ""}
         </span>
         {preview === undefined ? null : <span className="row__preview">{preview}</span>}
       </span>
@@ -154,11 +150,12 @@ export function Threads({
     [remote.state],
   )
   const projects = useMemo(() => projectsOf(rows), [rows])
+  const m = useMessages(THREADS)
 
   return (
     <div className="threads">
       <header className="threads__head">
-        <span className="threads__title">会话</span>
+        <span className="threads__title">{m.title}</span>
         {/*
           **「开一条」放在这儿，而不是藏进设置里。** 用户最早提的要求原话就是
           「手机在远程也能直接看到在本机跑的对话，并且能继续开新对话进行开发」——
@@ -166,7 +163,7 @@ export function Threads({
           已经在用的那些项目就是清单（见 `NewThread`）。
         */}
         <button className="btn btn--ghost" type="button" onClick={onNew}>
-          ＋ 开一条
+          {m.create}
         </button>
         <Unpair onUnpair={onUnpair} />
       </header>
@@ -176,7 +173,7 @@ export function Threads({
         // 骨架还顺带给出高度，全量到达时列表不会整块跳一下
         <Skeleton />
       ) : rows.length === 0 ? (
-        <p className="empty">还没有会话。到桌面上新建一条，这里就会出现。</p>
+        <p className="empty">{m.empty}</p>
       ) : (
         <ul className="threads__list">
           {projects.map((project) => (
@@ -213,8 +210,8 @@ export function Threads({
           <span className="threads__who">
             {remote.me.name}
             {/* 老桌面不报 host，那时这一截整个不显示——不编一个「本机」出来 */}
-            {remote.me.host === undefined || remote.me.host === "" ? null : ` · 在 ${remote.me.host} 上跑`} · 远程上限{" "}
-            {remote.me.maxTrust}
+            {remote.me.host === undefined || remote.me.host === "" ? null : m.runsOn(remote.me.host)}
+            {m.limit(remote.me.maxTrust)}
           </span>
         )}
       </footer>

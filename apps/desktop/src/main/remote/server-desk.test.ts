@@ -32,6 +32,7 @@ async function boot(maxTrust: Trust = "auto-edit") {
   const handled: { name: string; arg: unknown }[] = []
   const server = await startRemote({
     config: () => ({ port: 0, trustedHosts: [], maxTrust }),
+    language: () => "zh-CN",
     webRoot: "/nonexistent",
     pushKey: () => "k",
     tokens,
@@ -170,6 +171,7 @@ describe("`/desk/` 送桌面界面", () => {
     const tokens = createTokenStore({ load: () => [], save: () => undefined, now: () => Date.now() })
     const server = await startRemote({
       config: () => ({ port: 0, trustedHosts: [], maxTrust: "auto-edit" }),
+      language: () => "zh-CN",
       webRoot: "/nonexistent",
       deskRoot: root,
       pushKey: () => "k",

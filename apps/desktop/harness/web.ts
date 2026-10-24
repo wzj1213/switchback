@@ -33,6 +33,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 /** 端口与可信 Host 都能用环境变量覆盖：隧道那头的域名要填进来才过得了 Host 闸。 */
 const PORT = Number(process.env["SWITCHBACK_HARNESS_PORT"] ?? 17801)
 const TRUSTED = (process.env["SWITCHBACK_HARNESS_HOSTS"] ?? "").split(/\s+/).filter((s) => s !== "")
+/** 网页端跟着宿主说话；`SWITCHBACK_HARNESS_LANG=en` 拍英文界面。 */
+const LANG = process.env["SWITCHBACK_HARNESS_LANG"] === "en" ? "en" : "zh-CN"
 /** 固定令牌，**只在这个 harness 里**。真实的令牌是 32 字节随机数。 */
 const DEV_TOKEN = "harness-dev-token-not-a-secret"
 
@@ -220,6 +222,7 @@ function main(): void {
 
   void startRemote({
     config: () => ({ port: PORT, trustedHosts: TRUSTED, maxTrust: "auto-edit" }),
+    language: () => LANG,
     webRoot: join(ROOT, "apps/web/dist"),
     pushKey: () => "harness 不推送",
     tokens,

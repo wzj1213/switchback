@@ -1,5 +1,7 @@
 import { useRef } from "react"
 import { useDraft, type DraftOptions } from "../useDraft.js"
+import { useMessages } from "../i18n.js"
+import { COMPOSER } from "./Composer.messages.js"
 
 /**
  * 输入框。
@@ -38,6 +40,7 @@ export function Composer({
 }): React.JSX.Element {
   const { text, setText, applied } = useDraft(draft)
   const box = useRef<HTMLTextAreaElement>(null)
+  const m = useMessages(COMPOSER)
 
   const grow = (): void => {
     const el = box.current
@@ -68,14 +71,14 @@ export function Composer({
           value={text}
           rows={1}
           disabled={disabled}
-          placeholder={disabled ? "这条会话现在不能发消息" : "说点什么…"}
+          placeholder={disabled ? m.locked : m.placeholder}
           onChange={(e) => {
             setText(e.target.value)
             grow()
           }}
         />
         {running ? (
-          <button className="btn btn--stop" type="button" onClick={onStop} aria-label="停下">
+          <button className="btn btn--stop" type="button" onClick={onStop} aria-label={m.stop}>
             ◼
           </button>
         ) : (
@@ -84,7 +87,7 @@ export function Composer({
             type="button"
             onClick={submit}
             disabled={disabled || text.trim() === ""}
-            aria-label="发送"
+            aria-label={m.send}
           >
             ↑
           </button>

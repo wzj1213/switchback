@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { UserMessageItem } from "@switchback/protocol"
 import { ItemView } from "./ItemView.js"
+import { LocaleProvider } from "../i18n.js"
 
 describe("移动端消息来源", () => {
   it("原生定时触发使用独立形态并保留原任务", () => {
@@ -69,5 +70,20 @@ describe("移动端消息来源", () => {
     expect(html).toContain("item--native")
     expect(html).toContain("长期目标续跑")
     expect(html).not.toContain("native__text")
+  })
+
+  it("宿主说英文时来源标记也说英文", () => {
+    const item: UserMessageItem = {
+      id: "shell", turnId: "t4", at: 0, kind: "user_message", text: "$ printf ok", origin: { kind: "shell" },
+    }
+    const html = renderToStaticMarkup(
+      createElement(LocaleProvider, {
+        locale: "en",
+        children: createElement(ItemView, { item, send: () => true, offline: false }),
+      }),
+    )
+
+    expect(html).toContain("Terminal command")
+    expect(html).not.toContain("终端命令")
   })
 })

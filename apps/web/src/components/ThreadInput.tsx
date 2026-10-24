@@ -3,6 +3,9 @@ import { cannotRevive } from "@switchback/store"
 import type { Remote } from "../useRemote.js"
 import { Composer } from "./Composer.js"
 import { Reattach } from "./Reattach.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { THREAD_INPUT } from "./ThreadInput.messages.js"
 
 const RANK: Readonly<Record<string, number>> = { "read-only": 0, "auto-edit": 1, full: 2 }
 
@@ -26,6 +29,7 @@ export function ThreadInput({
 }): React.JSX.Element {
   const label = (id: string): string => remote.state.engines.find((engine) => engine.id === id)?.label ?? id
   const ceiling = remote.me?.maxTrust ?? "auto-edit"
+  const m = useMessages(THREAD_INPUT)
   const tooHigh = (RANK[thread.trust] ?? 0) > (RANK[ceiling] ?? 0)
   if (thread.detached === true && (cannotRevive(thread) || tooHigh)) {
     return (
@@ -41,7 +45,7 @@ export function ThreadInput({
       // 再撞上宿主那句「会话不存在」。桌面端早就是这条判据（`renderer/components/Composer.tsx` 的 `blocked`）
       disabled={offline || thread.status === "starting"}
       running={running}
-      hint={hintOf(thread, offline, label)}
+      hint={hintOf(thread, offline, label, m)}
       onSend={(text, applied) => remote.send({
         type: "thread.prompt", threadId: thread.id, text,
         // 并进来的就是宿主现在这一版：带上它，宿主据此消费掉，桌面上不会再冒出来一遍
@@ -61,13 +65,13 @@ export function ThreadInput({
 }
 
 /** 输入框上面那行小字。**说清现在为什么不能发、发出去谁来接**，而不是只报引擎和档位。 */
-function hintOf(thread: Thread, offline: boolean, label: (id: string) => string): string {
-  if (offline) return "没连上 Switchback，先等重连"
-  if (thread.status === "starting") return "引擎正在启动，马上就能说话"
+function hintOf(thread: Thread, offline: boolean, label: (id: string) => string, m: (typeof THREAD_INPUT)[Locale]): string {
+  if (offline) return m.offline
+  if (thread.status === "starting") return m.starting
   // 桌面上挑了别家：发出去那一刻才换，由它接着做。不说的话看着是原来那家在答
   const next = thread.nextEngine
-  if (next !== undefined && next !== thread.engine) return `下一句由 ${label(next)} 接着做 · ${thread.trust}`
+  if (next !== undefined && next !== thread.engine) return m.next(label(next), thread.trust)
   // 历史会话：发出去先接回来，要等几秒
-  if (thread.detached === true) return `历史会话 · 发出去先接回 ${label(thread.engine)}（几秒）· ${thread.trust}`
+  if (thread.detached === true) return m.revive(label(thread.engine), thread.trust)
   return `${label(thread.engine)} · ${thread.trust}`
 }

@@ -53,6 +53,11 @@ export interface Me {
    * 不编一个「本机」出来（在手机上那三个字是错的）。
    */
   host?: string
+  /**
+   * 宿主那边的界面语言（`zh-CN` / `en`）。**老桌面不报**——那时按默认的中文。
+   * 网页端跟着它走，不另设一份语言设置：手机和那台桌面说同一种话。
+   */
+  language?: string
 }
 
 export function tokenOf(slot: Slot = WEB_SLOT): string {
@@ -84,8 +89,13 @@ export function forgetToken(slot: Slot = WEB_SLOT): void {
   }
 }
 
-/** 这台设备默认叫什么。用户可以改；这只是个不用动脑的初值。 */
-export function guessName(slot: Slot = WEB_SLOT): string {
+/**
+ * 这台设备默认叫什么。用户可以改；这只是个不用动脑的初值。
+ *
+ * 手机和平板直接用型号；电脑上是「哪个系统上的浏览器」——这句话怎么说归界面（它知道用哪种语言），
+ * 由 `browser` 给出，这一层只认系统。
+ */
+export function guessName(browser: (os: "Mac" | "Windows" | undefined) => string, slot: Slot = WEB_SLOT): string {
   try {
     adoptLegacy(window.localStorage)
     const saved = window.localStorage.getItem(slot.name)
@@ -97,9 +107,9 @@ export function guessName(slot: Slot = WEB_SLOT): string {
   if (/iPhone/.test(ua)) return "iPhone"
   if (/iPad/.test(ua)) return "iPad"
   if (/Android/.test(ua)) return "Android"
-  if (/Macintosh/.test(ua)) return "Mac 上的浏览器"
-  if (/Windows/.test(ua)) return "Windows 上的浏览器"
-  return "浏览器"
+  if (/Macintosh/.test(ua)) return browser("Mac")
+  if (/Windows/.test(ua)) return browser("Windows")
+  return browser(undefined)
 }
 
 /**

@@ -50,7 +50,7 @@ handoff ← protocol
 engine ← protocol + approval
 host ← protocol + approval + engine + store + journal + handoff
 desktop ← protocol + engine + handoff + host + i18n + journal + link + store + wire + worksite
-web ← link + protocol + store + wire
+web ← i18n + link + protocol + store + wire
 ```
 <!-- package-graph:end -->
 

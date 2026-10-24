@@ -24,7 +24,7 @@ function registerWorker(): void {
 registerWorker()
 
 const el = document.getElementById("root")
-if (el === null) throw new Error("Switchback web: 找不到 #root")
+if (el === null) throw new Error("Switchback web: 找不到 #root") // i18n-ok：开发期错误，不上界面
 
 createRoot(el).render(
   <StrictMode>

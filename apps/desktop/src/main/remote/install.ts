@@ -227,6 +227,7 @@ async function syncOnce(
     try {
       state.server = await startRemote({
         config: () => deps.settings().remote,
+        language: () => deps.settings().language,
         webRoot: webRoot(),
         deskRoot: deskRoot(),
         pushKey: relay.key,

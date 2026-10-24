@@ -13,6 +13,7 @@ export const REMOTE_PAIR = defineMessages(
     unreachable: "连不上那台机器",
     pairing: "正在配对…",
     pair: "配对",
+    browser: (os: string | undefined) => (os === undefined ? "浏览器" : `${os} 上的浏览器`),
   },
   {
     hint: {
@@ -25,5 +26,6 @@ export const REMOTE_PAIR = defineMessages(
     unreachable: "Can't reach the host machine",
     pairing: "Pairing…",
     pair: "Pair",
+    browser: (os) => (os === undefined ? "Browser" : `Browser on ${os}`),
   },
 )

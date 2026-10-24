@@ -1,4 +1,6 @@
 import type { Command, Thread } from "@switchback/protocol"
+import { useMessages } from "../i18n.js"
+import { QUEUED } from "./Queued.messages.js"
 
 /**
  * 排着队、还没发出去的那几句（「待发送」）。
@@ -17,16 +19,17 @@ export function Queued({
   send: (command: Command) => boolean
   offline: boolean
 }): React.JSX.Element | null {
+  const m = useMessages(QUEUED)
   const waiting = thread.queued ?? []
   if (waiting.length === 0) return null
   return (
-    <div className="queued" role="list" aria-label="待发送">
-      <div className="queued__head">待发送 {waiting.length}</div>
+    <div className="queued" role="list" aria-label={m.label}>
+      <div className="queued__head">{m.head(waiting.length)}</div>
       {waiting.map((text, index) => {
         const images = thread.queuedAttachments?.[index]?.length ?? 0
         return (
           <div className="queued__row" role="listitem" key={`${String(index)}-${text}`}>
-            <span className="queued__text">{images > 0 ? `${text} · ${String(images)} 张图` : text}</span>
+            <span className="queued__text">{images > 0 ? m.images(text, images) : text}</span>
             <button
               className="btn btn--ghost queued__take"
               type="button"
@@ -35,7 +38,7 @@ export function Queued({
                 send({ type: "thread.unqueue", threadId: thread.id, index })
               }}
             >
-              取回
+              {m.take}
             </button>
           </div>
         )

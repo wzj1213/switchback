@@ -12,6 +12,9 @@ import { GoalBar } from "../components/GoalBar.js"
 import { useStickToBottom } from "../useStickToBottom.js"
 import { LaneCard, LegacyAside } from "../components/LaneCard.js"
 import { timelineOf } from "../timeline.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { THREAD } from "./Thread.messages.js"
 
 /** 上下文用量的条。引擎没报就整个不画——**没有数据时不要画一个空进度条**。 */
 function Usage({
@@ -21,10 +24,11 @@ function Usage({
   used: number
   window: number | undefined
 }): React.JSX.Element | null {
+  const m = useMessages(THREAD)
   if (total === undefined || total === 0) return null
   const pct = Math.min(100, Math.round((used / total) * 100))
   return (
-    <span className="usage" title={`上下文 ${String(used)} / ${String(total)}`}>
+    <span className="usage" title={m.context(used, total)}>
       <span className="usage__fill" style={{ width: `${String(pct)}%` }} />
     </span>
   )
@@ -48,8 +52,8 @@ function Usage({
  */
 const FIRST_SCREEN = 80
 
-function runningText(thinkingTokens: number | undefined): string {
-  return thinkingTokens === undefined ? "正在跑…" : `正在思考 · 约 ${String(thinkingTokens)} tokens`
+function runningText(thinkingTokens: number | undefined, m: (typeof THREAD)[Locale]): string {
+  return thinkingTokens === undefined ? m.running : m.thinking(thinkingTokens)
 }
 
 function Body({
@@ -90,11 +94,12 @@ function Body({
   const approvalTurn = thread.detached === true ? undefined : turnOf(remote.state, thread.id)?.id
   const hidden = full ? 0 : Math.max(0, all.length - FIRST_SCREEN)
   const items = hidden === 0 ? all : all.slice(hidden)
+  const m = useMessages(THREAD)
   if (all.length === 0) {
     // **正文没到 ≠ 这条会话是空的。** 分级 replay 之后「正文晚一拍到」
     // 是常态（全量只带最近几条的正文，其余打开时才补），
     // 而说「还没有内容」是一句会让人以为记录丢了的假话
-    const why = remote.loaded.has(thread.id) ? "这条会话还没有内容。" : "正在取这条会话的内容…"
+    const why = remote.loaded.has(thread.id) ? m.empty : m.loading
     return <p className="empty">{why}</p>
   }
   return (
@@ -108,7 +113,7 @@ function Body({
             setFull(true)
           }}
         >
-          显示更早的 {hidden} 条
+          {m.earlier(hidden)}
         </button>
       ) : null}
       {/*
@@ -118,7 +123,7 @@ function Body({
         这里只说实话，不假装能加载：往上翻加载更早的那条路还没做。
       */}
       {remote.trimmed.has(thread.id) && hidden === 0 ? (
-        <p className="thread__earlier">更早的内容没有加载。完整记录在桌面上。</p>
+        <p className="thread__earlier">{m.trimmed}</p>
       ) : null}
       {items.map((row) => {
         if (row.kind === "item") {
@@ -158,6 +163,7 @@ export function Thread({
 
   const running = thread.status === "running" || turn?.status === "running"
   const offline = remote.conn.kind !== "open"
+  const m = useMessages(THREAD)
 
   return (
     <section className="thread">
@@ -166,7 +172,7 @@ export function Thread({
           className="btn btn--ghost thread__back"
           type="button"
           onClick={onBack}
-          aria-label="返回列表"
+          aria-label={m.back}
         >
           ‹
         </button>
@@ -176,12 +182,12 @@ export function Thread({
       <div className="thread__body" ref={scroller}>
         <div className="thread__inner" ref={inner}>
           <Body thread={thread} remote={remote} offline={offline} scroller={scroller} />
-          {running ? <p className="thread__running">{runningText(thinkingTokens)}</p> : null}
+          {running ? <p className="thread__running">{runningText(thinkingTokens, m)}</p> : null}
         </div>
       </div>
       {atBottom ? null : (
         <button className="tobottom" type="button" onClick={toBottom}>
-          ↓ 回到底部
+          ↓ {m.toBottom}
         </button>
       )}
       <GoalBar goal={thread.goal} />

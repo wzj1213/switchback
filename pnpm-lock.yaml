@@ -151,6 +151,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@switchback/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@switchback/link':
         specifier: workspace:*
         version: link:../../packages/link

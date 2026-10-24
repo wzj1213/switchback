@@ -1,16 +1,21 @@
 import type { ApprovalItem, ApprovalOrigin, Command, PendingApproval } from "@switchback/protocol"
 import { Approval } from "./Approval.js"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { OUTSIDE_APPROVALS } from "./OutsideApprovals.messages.js"
+
+type Text = (typeof OUTSIDE_APPROVALS)[Locale]
 
 /** 谁要的：只写引擎报的 id，不猜名字；没报就照实说。和桌面端同一个口径。 */
-function originText(origin: ApprovalOrigin | undefined): string {
-  if (origin === undefined) return "后台来的请求 · 来源未标明"
-  return `${origin.kind === "task" ? "后台任务" : "子 agent"} · ${origin.label ?? origin.id}`
+function originText(origin: ApprovalOrigin | undefined, m: Text): string {
+  if (origin === undefined) return m.unknownOrigin
+  return `${origin.kind === "task" ? m.task : m.subagent} · ${origin.label ?? origin.id}`
 }
 
-function waitedText(at: number, now: number): string {
+function waitedText(at: number, now: number, m: Text): string {
   const minutes = Math.floor((now - at) / 60_000)
-  if (minutes < 1) return "刚刚"
-  return minutes < 60 ? `已等 ${String(minutes)} 分钟` : `已等 ${String(Math.floor(minutes / 60))} 小时`
+  if (minutes < 1) return m.justNow
+  return minutes < 60 ? m.waitedMinutes(minutes) : m.waitedHours(Math.floor(minutes / 60))
 }
 
 /** 借审批卡的样子画：它不在任何一轮里，`turnId` 留空。 */
@@ -35,9 +40,10 @@ export function OutsideApprovals({ approvals, send, offline, now }: {
   offline: boolean
   now: number
 }): React.JSX.Element | null {
+  const m = useMessages(OUTSIDE_APPROVALS)
   if (approvals === undefined || approvals.length === 0) return null
   return (
-    <div className="outside-approvals" aria-label="后台在等你确认">
+    <div className="outside-approvals" aria-label={m.label}>
       {approvals.map((one) => (
         <Approval
           key={one.id}
@@ -45,7 +51,7 @@ export function OutsideApprovals({ approvals, send, offline, now }: {
           send={send}
           offline={offline}
           active
-          note={`${originText(one.origin)} · ${waitedText(one.at, now)}`}
+          note={`${originText(one.origin, m)} · ${waitedText(one.at, now, m)}`}
           rememberable={one.redline !== true}
         />
       ))}

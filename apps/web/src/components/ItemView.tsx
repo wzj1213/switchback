@@ -3,6 +3,8 @@ import type { Command, Item, ToolCallItem, UserMessageItem, UserMessageOrigin } 
 import { Markdown } from "./Markdown.js"
 import { Approval } from "./Approval.js"
 import { ToolRow } from "./ToolRow.js"
+import { useMessages } from "../i18n.js"
+import { ITEM_VIEW } from "./ItemView.messages.js"
 
 /**
  * 一条 item 怎么画。
@@ -15,13 +17,14 @@ import { ToolRow } from "./ToolRow.js"
 
 function Reasoning({ text, complete }: { text: string; complete: boolean }): React.JSX.Element {
   const [open, setOpen] = useState(false)
+  const m = useMessages(ITEM_VIEW)
   return (
     <div className="item item--reasoning">
       <button className="fold" type="button" onClick={() => { setOpen(!open) }} aria-expanded={open}>
         <span className="fold__caret" data-open={open} aria-hidden="true">
           ›
         </span>
-        思考{complete ? "" : "中…"}
+        {complete ? m.thinking : m.thinkingLive}
       </button>
       {open ? <pre className="reasoning__text">{text}</pre> : null}
     </div>
@@ -29,16 +32,17 @@ function Reasoning({ text, complete }: { text: string; complete: boolean }): Rea
 }
 
 function OriginMeta({ origin }: { origin: UserMessageOrigin }): React.JSX.Element {
-  if (origin === "handoff") return <div className="native__meta">历史交接</div>
-  if (origin.kind === "shell") return <div className="native__meta">终端命令</div>
-  if (origin.kind === "goal_continuation") return <div className="native__meta">长期目标续跑</div>
+  const m = useMessages(ITEM_VIEW)
+  if (origin === "handoff") return <div className="native__meta">{m.handoff}</div>
+  if (origin.kind === "shell") return <div className="native__meta">{m.shell}</div>
+  if (origin.kind === "goal_continuation") return <div className="native__meta">{m.goal}</div>
   return (
     <div className="native__meta">
-      <span>定时触发</span>
+      <span>{m.scheduled}</span>
       <code>{origin.schedule}</code>
-      {origin.recurring ? null : <span>单次</span>}
-      {origin.coalescedCount > 1 ? <span>合并 {origin.coalescedCount} 次</span> : null}
-      {origin.stale ? <span>最后一次</span> : null}
+      {origin.recurring ? null : <span>{m.once}</span>}
+      {origin.coalescedCount > 1 ? <span>{m.merged(origin.coalescedCount)}</span> : null}
+      {origin.stale ? <span>{m.last}</span> : null}
     </div>
   )
 }

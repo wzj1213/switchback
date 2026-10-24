@@ -18,7 +18,7 @@ export type PairReason = "fresh" | "expired" | "phone"
 export function Pair({ reason }: { reason: PairReason }): React.JSX.Element {
   const m = REMOTE_PAIR[useDocumentLocale()]
   const [code, setCode] = useState("")
-  const [name, setName] = useState(() => guessName(DESK_SLOT))
+  const [name, setName] = useState(() => guessName(m.browser, DESK_SLOT))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 

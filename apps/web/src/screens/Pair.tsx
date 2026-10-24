@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { guessName, pair, rememberToken } from "@switchback/link"
+import { useMessages } from "../i18n.js"
+import { PAIR } from "./Pair.messages.js"
 
 /**
  * 配对屏。
@@ -11,8 +13,9 @@ import { guessName, pair, rememberToken } from "@switchback/link"
  * 「现在有码可试」。所以这屏上的提示也只有一句。
  */
 export function Pair({ onPaired, expired }: { onPaired: (token: string) => void; expired: boolean }): React.JSX.Element {
+  const m = useMessages(PAIR)
   const [code, setCode] = useState("")
-  const [name, setName] = useState(guessName)
+  const [name, setName] = useState(() => guessName(m.browser))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 
@@ -31,7 +34,7 @@ export function Pair({ onPaired, expired }: { onPaired: (token: string) => void;
         onPaired(result.token)
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "连不上 Switchback")
+        setError(reason instanceof Error ? reason.message : m.unreachable)
       })
       .finally(() => {
         setBusy(false)
@@ -42,12 +45,10 @@ export function Pair({ onPaired, expired }: { onPaired: (token: string) => void;
     <form className="pair" onSubmit={submit}>
       <h1 className="pair__title">Switchback</h1>
       <p className="pair__hint">
-        {expired
-          ? "这台设备的授权已经不在了（被吊销，或者 Switchback 换了机器）。重新配一次。"
-          : "在桌面上打开「设置 → 远程访问」，点「配对新设备」，把那八位码输进来。"}
+        {expired ? m.expired : m.fresh}
       </p>
       <label className="pair__label" htmlFor="code">
-        配对码
+        {m.code}
       </label>
       <input
         id="code"
@@ -65,7 +66,7 @@ export function Pair({ onPaired, expired }: { onPaired: (token: string) => void;
         aria-describedby={error === "" ? undefined : "pair-error"}
       />
       <label className="pair__label" htmlFor="name">
-        这台设备叫什么
+        {m.name}
       </label>
       <input
         id="name"
@@ -83,11 +84,10 @@ export function Pair({ onPaired, expired }: { onPaired: (token: string) => void;
         </p>
       )}
       <button className="btn btn--primary pair__go" type="submit" disabled={busy || code.trim().length < 8}>
-        {busy ? "正在配对…" : "配对"}
+        {busy ? m.pairing : m.pair}
       </button>
       <p className="pair__note">
-        配好之后，这台设备能做的事有上限——具体到哪一档由桌面上的「远程档位上限」决定。
-        丢了设备就在桌面上吊销它。
+        {m.note}
       </p>
     </form>
   )

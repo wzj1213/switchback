@@ -1,5 +1,8 @@
 import { memo, useMemo, useState } from "react"
 import type { ToolCallItem, ToolDetail } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { useLocale } from "../i18n.js"
+import { TOOL_ROW } from "./ToolRow.messages.js"
 
 /**
  * 一次工具调用，收成一行。
@@ -18,16 +21,17 @@ const STATUS_MARK: Readonly<Record<ToolCallItem["status"], string>> = {
 }
 
 /** 一行标题：说清「在干什么」，不说「用了哪个工具」。 */
-export function titleOf(detail: ToolDetail): string {
+export function titleOf(detail: ToolDetail, locale: Locale): string {
+  const m = TOOL_ROW[locale]
   switch (detail.kind) {
     case "shell":
-      return detail.terminal?.waiting === true ? `等后台终端 · ${detail.command}` : detail.command
+      return detail.terminal?.waiting === true ? m.waiting(detail.command) : detail.command
     case "file_edit":
-      return `改 ${detail.path}${detail.files.length > 1 ? ` 等 ${String(detail.files.length)} 个文件` : ""}`
+      return m.edit(detail.path, detail.files.length)
     case "file_read":
-      return `读 ${detail.path}`
+      return m.read(detail.path)
     case "fetch":
-      return `取 ${detail.url}`
+      return m.fetch(detail.url)
     default:
       return detail.name
   }
@@ -50,8 +54,8 @@ export function hasBody(detail: ToolDetail): boolean {
 }
 
 /** 展开之后有什么可看。没有就不给「展开」这个动作——**一个点了没反应的箭头比没有箭头糟**。 */
-export function bodyOf(detail: ToolDetail): string | undefined {
-  if (detail.kind === "shell") return shellBody(detail)
+export function bodyOf(detail: ToolDetail, locale: Locale): string | undefined {
+  if (detail.kind === "shell") return shellBody(detail, TOOL_ROW[locale])
   if (detail.kind === "file_edit") {
     const parts = detail.files.map((f) => `${f.kind} ${f.path}\n${f.diff ?? ""}`)
     return parts.join("\n\n") || undefined
@@ -62,12 +66,12 @@ export function bodyOf(detail: ToolDetail): string | undefined {
   return undefined
 }
 
-function shellBody(detail: Extract<ToolDetail, { kind: "shell" }>): string | undefined {
+function shellBody(detail: Extract<ToolDetail, { kind: "shell" }>, m: (typeof TOOL_ROW)[Locale]): string | undefined {
   const inputs = detail.terminal?.inputs ?? []
   if (inputs.length === 0) return detail.output
-  const sections = inputs.map((input, index) => `后台终端输入 ${String(index + 1)}：\n${input}`)
+  const sections = inputs.map((input, index) => `${m.input(index + 1)}\n${input}`)
   if (detail.output !== undefined && detail.output !== "")
-    sections.unshift(`终端输出：\n${detail.output}`)
+    sections.unshift(`${m.output}\n${detail.output}`)
   return sections.join("\n\n")
 }
 
@@ -80,10 +84,11 @@ export const ToolRow = memo(function ToolRow({ item }: { item: ToolCallItem }): 
   const [open, setOpen] = useState(false)
   const detail = item.detail
   const can = hasBody(detail)
+  const locale = useLocale()
   // **只有真的展开了才拼。** 折叠着的时候 `body` 是 undefined，而箭头给不给按
   // 由上面那个便宜的 `can` 决定
-  const body = useMemo(() => (open ? bodyOf(detail) : undefined), [open, detail])
-  const title = titleOf(item.detail)
+  const body = useMemo(() => (open ? bodyOf(detail, locale) : undefined), [open, detail, locale])
+  const title = titleOf(item.detail, locale)
 
   return (
     <div className="item item--tool" data-status={item.status}>

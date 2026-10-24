@@ -1,5 +1,8 @@
 import { useState } from "react"
 import type { ApprovalItem, Command, RememberScope } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { APPROVAL } from "./Approval.messages.js"
 
 /**
  * 审批卡。**这一端最要紧的一屏。**
@@ -18,13 +21,10 @@ import type { ApprovalItem, Command, RememberScope } from "@switchback/protocol"
  * 所以这里干脆不摆那个选项，而不是摆一个点了会被悄悄改掉的按钮。
  */
 
-const SCOPES: readonly { id: RememberScope; label: string }[] = [
-  { id: "once", label: "就这次" },
-  { id: "session", label: "本会话都允许" },
-]
+const SCOPES = ["once", "session"] as const satisfies readonly RememberScope[]
 
-const verdictOf = (item: ApprovalItem): string =>
-  item.status === "allowed" ? "已允许" : item.status === "denied" ? "已拒绝" : "已失效"
+const verdictOf = (item: ApprovalItem, m: (typeof APPROVAL)[Locale]): string =>
+  item.status === "allowed" ? m.allowed : item.status === "denied" ? m.denied : m.expired
 
 export function Approval({
   item,
@@ -49,11 +49,12 @@ export function Approval({
   rememberable?: boolean
 }): React.JSX.Element {
   const [scope, setScope] = useState<RememberScope>("once")
+  const m = useMessages(APPROVAL)
 
   if (item.status !== "pending" || !active) {
     return (
       <div className="item item--approval approval--done" data-status={item.status}>
-        <span className="approval__verdict">{verdictOf(item)}</span>
+        <span className="approval__verdict">{verdictOf(item, m)}</span>
         <code className="approval__cmd">{item.summary}</code>
       </div>
     )
@@ -64,24 +65,24 @@ export function Approval({
   }
 
   return (
-    <div className="item item--approval approval--pending" role="group" aria-label="需要你确认">
+    <div className="item item--approval approval--pending" role="group" aria-label={m.confirm}>
       <p className="approval__why">{item.reason}</p>
       {note === undefined ? null : <p className="approval__origin">{note}</p>}
       <pre className="approval__cmd approval__cmd--block">{item.summary}</pre>
-      <div className="approval__scopes" role="radiogroup" aria-label="记住这次决定的范围">
-        {SCOPES.filter((s) => rememberable || s.id === "once").map((s) => (
+      <div className="approval__scopes" role="radiogroup" aria-label={m.scopes}>
+        {SCOPES.filter((id) => rememberable || id === "once").map((id) => (
           <button
-            key={s.id}
+            key={id}
             type="button"
             role="radio"
-            aria-checked={scope === s.id}
+            aria-checked={scope === id}
             className="chip"
-            data-on={scope === s.id}
+            data-on={scope === id}
             onClick={() => {
-              setScope(s.id)
+              setScope(id)
             }}
           >
-            {s.label}
+            {m.scope[id]}
           </button>
         ))}
       </div>
@@ -94,7 +95,7 @@ export function Approval({
             resolve(false)
           }}
         >
-          拒绝
+          {m.deny}
         </button>
         <button
           className="btn btn--primary"
@@ -104,10 +105,10 @@ export function Approval({
             resolve(true)
           }}
         >
-          允许
+          {m.allow}
         </button>
       </div>
-      {offline ? <p className="approval__offline">没连上 Switchback，先等重连——它那头还在等你。</p> : null}
+      {offline ? <p className="approval__offline">{m.offline}</p> : null}
     </div>
   )
 }

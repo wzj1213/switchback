@@ -1,5 +1,7 @@
 import type { QuestionPrompt } from "@switchback/protocol"
 import type { QuestionDraft } from "../question-answer.js"
+import { useMessages } from "../i18n.js"
+import { QUESTION_FIELD } from "./QuestionField.messages.js"
 
 const MAX_EXTERNAL_URL = 4096
 
@@ -34,6 +36,7 @@ function answerType(question: QuestionPrompt): "password" | "text" {
 }
 
 function OtherAnswer({ question, index, prefix, draft, update }: Props): React.JSX.Element | null {
+  const m = useMessages(QUESTION_FIELD)
   if (question.allowOther !== true) return null
   const multi = question.multiSelect === true
   const id = `${prefix}-other-${String(index)}`
@@ -50,7 +53,7 @@ function OtherAnswer({ question, index, prefix, draft, update }: Props): React.J
             update({ ...draft, other: event.target.checked, ...(multi ? {} : { optionIds: [] }) })
           }}
         />
-        <span className="question-option__copy">{question.otherLabel ?? "其他"}</span>
+        <span className="question-option__copy">{question.otherLabel ?? m.other}</span>
       </label>
       {draft.other ? (
         <input
@@ -59,8 +62,8 @@ function OtherAnswer({ question, index, prefix, draft, update }: Props): React.J
           autoComplete="off"
           spellCheck={question.secret !== true}
           value={draft.otherText}
-          aria-label={question.otherLabel ?? "其他答案"}
-          placeholder={question.otherDescription ?? "写下你的答案"}
+          aria-label={question.otherLabel ?? m.otherAnswer}
+          placeholder={question.otherDescription ?? m.otherPlaceholder}
           onChange={(event) => {
             update({ ...draft, other: true, otherText: event.target.value })
           }}
@@ -71,14 +74,15 @@ function OtherAnswer({ question, index, prefix, draft, update }: Props): React.J
 }
 
 function NoteAnswer({ question, index, prefix, draft, update }: Props): React.JSX.Element | null {
+  const m = useMessages(QUESTION_FIELD)
   if (question.allowNote !== true || draft.other) return null
   const id = `${prefix}-note-${String(index)}`
   const ready = question.options.length === 0 || draft.optionIds.length > 0
-  const fallback = question.options.length === 0 ? "输入回答" : "可选：补充上下文"
+  const fallback = question.options.length === 0 ? m.typeAnswer : m.addContext
   return (
     <label className="question-note" htmlFor={id}>
       <span className="question-note__label">
-        {question.noteLabel ?? (question.options.length === 0 ? "回答" : "补充说明（可选）")}
+        {question.noteLabel ?? (question.options.length === 0 ? m.answer : m.note)}
       </span>
       <input
         className="question-note__input"
@@ -88,7 +92,7 @@ function NoteAnswer({ question, index, prefix, draft, update }: Props): React.JS
         spellCheck={question.secret !== true}
         disabled={!ready}
         value={draft.noteText}
-        placeholder={ready ? question.noteDescription ?? fallback : "先选择一项"}
+        placeholder={ready ? question.noteDescription ?? fallback : m.pickFirst}
         onChange={(event) => {
           update({ ...draft, noteText: event.target.value })
         }}
@@ -120,6 +124,7 @@ function ExternalQuestion({ question, disabled }: Pick<Props, "question" | "disa
 
 export function QuestionField(props: Props): React.JSX.Element {
   const { question, index, prefix, draft, update, disabled } = props
+  const m = useMessages(QUESTION_FIELD)
   const multi = question.multiSelect === true
   const bodyId = question.body === undefined ? undefined : `${prefix}-body-${String(index)}`
   return (
@@ -129,7 +134,7 @@ export function QuestionField(props: Props): React.JSX.Element {
           <span className="question-field__header">{question.header}</span>
         )}
         <span>{question.question}</span>
-        {question.optional === true ? <span className="question-field__optional">可跳过</span> : null}
+        {question.optional === true ? <span className="question-field__optional">{m.optional}</span> : null}
       </legend>
       {question.body === undefined ? null : (
         <p className="question-field__body" id={bodyId}>{question.body}</p>
@@ -165,7 +170,7 @@ export function QuestionField(props: Props): React.JSX.Element {
         <OtherAnswer {...props} />
         <NoteAnswer {...props} />
         {question.options.length === 0 && question.allowOther !== true && question.allowNote !== true ? (
-          <p className="question-field__empty">没有可选项，可以跳过这组问题。</p>
+          <p className="question-field__empty">{m.empty}</p>
         ) : null}
       </div>
     </fieldset>

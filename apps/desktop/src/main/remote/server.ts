@@ -3,6 +3,7 @@ import type { Duplex } from "node:stream"
 import { WebSocketServer, type WebSocket } from "ws"
 import type { Command, Event, Trust } from "@switchback/protocol"
 import type { Ledger } from "@switchback/wire"
+import type { Locale } from "@switchback/i18n"
 import type { Handler } from "../channels.js"
 import type { Sink, Sinks } from "../sink.js"
 import { handleMe, handlePair, handleSubscribe, json, type ApiDeps } from "./api.js"
@@ -38,6 +39,8 @@ export interface RemoteConfig {
 
 export interface RemoteDeps {
   config: () => RemoteConfig
+  /** 宿主的界面语言，「我是谁」报给网页端。 */
+  language: () => Locale
   /** 推送用的公钥（base64url 的未压缩点）。前端拿它做 `applicationServerKey`。 */
   pushKey: () => string
   /** 浏览器端构建产物所在目录。目录不在就只有 API，没有页面——**不假装有**。 */
@@ -100,7 +103,7 @@ function protocolToken(req: IncomingMessage): string {
 const FENCE_HINT = "在那台 Mac 上打开 Switchback → 设置 → 远程访问，把「隧道那头的域名」填成你现在地址栏里的 host[:端口]（不要带 https://）"
 
 function route(deps: RemoteDeps): (req: IncomingMessage, res: ServerResponse) => void {
-  const api: ApiDeps = { tokens: deps.tokens, maxTrust: () => deps.config().maxTrust, log: deps.log }
+  const api: ApiDeps = { tokens: deps.tokens, maxTrust: () => deps.config().maxTrust, language: deps.language, log: deps.log }
   return (req, res) => {
     const verdict = checkRequest(headersOf(req.headers), deps.config().trustedHosts)
     if (!verdict.ok) {

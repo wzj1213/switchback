@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@switchback/i18n": "workspace:*",
     "@switchback/link": "workspace:*",
     "@switchback/protocol": "workspace:*",
     "@switchback/store": "workspace:*",

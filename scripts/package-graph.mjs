@@ -35,6 +35,7 @@ export const PACKAGE_GRAPH = Object.freeze({
     "@switchback/worksite",
   ]),
   "@switchback/web": Object.freeze([
+    "@switchback/i18n",
     "@switchback/link",
     "@switchback/protocol",
     "@switchback/store",

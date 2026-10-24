@@ -1,4 +1,6 @@
 import type { ConnState } from "@switchback/link"
+import { useMessages } from "../i18n.js"
+import { CONN_BAR } from "./ConnBar.messages.js"
 
 /**
  * 连接状态条。
@@ -10,12 +12,13 @@ import type { ConnState } from "@switchback/link"
  * 在用户眼里是同一个东西。
  */
 export function ConnBar({ conn, onRetry }: { conn: ConnState; onRetry: () => void }): React.JSX.Element | null {
+  const m = useMessages(CONN_BAR)
   if (conn.kind === "open") return null
 
   if (conn.kind === "connecting") {
     return (
       <div className="connbar" data-kind="connecting" role="status">
-        正在连接…
+        {m.connecting}
       </div>
     )
   }
@@ -24,10 +27,10 @@ export function ConnBar({ conn, onRetry }: { conn: ConnState; onRetry: () => voi
     return (
       <div className="connbar" data-kind="retrying" role="status">
         <span>
-          {conn.reason} · {String(Math.round(conn.inMs / 1000))} 秒后重试
+          {conn.reason} · {m.retryIn(Math.round(conn.inMs / 1000))}
         </span>
         <button className="btn btn--ghost" type="button" onClick={onRetry}>
-          立刻重试
+          {m.retryNow}
         </button>
       </div>
     )
@@ -35,7 +38,7 @@ export function ConnBar({ conn, onRetry }: { conn: ConnState; onRetry: () => voi
 
   return (
     <div className="connbar" data-kind="closed" role="status">
-      连接已关闭
+      {m.closed}
     </div>
   )
 }

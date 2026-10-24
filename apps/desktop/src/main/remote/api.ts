@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { hostname } from "node:os"
 import type { Trust } from "@switchback/protocol"
+import type { Locale } from "@switchback/i18n"
 import { kindOf, trustOf } from "./calls.js"
 import type { TokenStore } from "./tokens.js"
 
@@ -19,6 +20,8 @@ export interface ApiDeps {
   tokens: TokenStore
   /** 全局上限。设备没有自己的上限时，「我是谁」报的就是这条。 */
   maxTrust: () => Trust
+  /** 宿主的界面语言。「我是谁」带上它，网页端照着它说话。 */
+  language: () => Locale
   log: (level: "info" | "warn" | "error", message: string) => void
 }
 
@@ -137,5 +140,6 @@ export function handleMe(deps: ApiDeps, req: IncomingMessage, res: ServerRespons
     maxTrust: trustOf(device, deps.maxTrust()),
     kind: kindOf(device),
     host: hostname(),
+    language: deps.language(),
   })
 }

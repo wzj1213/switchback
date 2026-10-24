@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
 import type { Command, Thread, Trust } from "@switchback/protocol"
 import { cannotRevive } from "@switchback/store"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { REATTACH } from "./Reattach.messages.js"
 
 /**
  * 一条老会话，把它接回引擎。
@@ -28,13 +31,13 @@ const RANK: Readonly<Record<string, number>> = { "read-only": 0, "auto-edit": 1,
 /** 等多久算接不上。引擎起进程 + 载上下文通常几秒，25 秒是很松的上界。 */
 const GIVE_UP_MS = 25_000
 
-const FAILED = "没接上。可能是引擎起不来，或者那个目录不在了——再试一次，或者去桌面上看看。"
+type Text = (typeof REATTACH)[Locale]
 
 /** 还没点时那句话：接回来谁接着做，要不要先降档。 */
-function idleWhy(next: string | undefined, lowered: { from: string; to: string } | undefined): string {
-  const who = next === undefined ? "接回来就能接着说。" : `接回来由 ${next} 接着做。`
-  const trust = lowered === undefined ? "" : `它开在「${lowered.from}」档，高过远程上限——接回来会先切到「${lowered.to}」。`
-  return `这条会话现在没接引擎。${who}${trust}`
+function idleWhy(next: string | undefined, lowered: { from: string; to: string } | undefined, m: Text): string {
+  const who = next === undefined ? m.resume : m.resumeWith(next)
+  const trust = lowered === undefined ? "" : m.lowered(lowered.from, lowered.to)
+  return m.detached(who, trust)
 }
 
 export function Reattach({
@@ -52,6 +55,7 @@ export function Reattach({
   /** 引擎 id → 名字。 */
   label: (id: string) => string
 }): React.JSX.Element {
+  const m = useMessages(REATTACH)
   const [going, setGoing] = useState<string | undefined>(undefined)
   const [failed, setFailed] = useState(false)
   const tooHigh = (RANK[thread.trust] ?? 0) > (RANK[ceiling] ?? 0)
@@ -84,7 +88,7 @@ export function Reattach({
     // 不是「非得是这一条」——所以直接把新建摆出来，目录和引擎从这条会话上抄
     return (
       <div className="reattach">
-        <p className="reattach__why">这条会话没留下引擎侧的句柄（旧版本记录），接不回来了。</p>
+        <p className="reattach__why">{m.hopeless}</p>
         <button
           className="btn btn--primary reattach__go"
           type="button"
@@ -93,7 +97,7 @@ export function Reattach({
             send({ type: "thread.create", cwd: thread.cwd, engine: thread.engine, trust: ceiling as Trust })
           }}
         >
-          {offline ? "等重连…" : "在同一个项目里开一条新的"}
+          {offline ? m.waiting : m.fresh}
         </button>
       </div>
     )
@@ -102,15 +106,15 @@ export function Reattach({
   if (going !== undefined) {
     return (
       <div className="reattach">
-        <p className="reattach__why">正在把它接回引擎…</p>
-        <p className="reattach__hint">引擎要重新起一个进程并载入上下文，通常几秒。</p>
+        <p className="reattach__why">{m.going}</p>
+        <p className="reattach__hint">{m.goingHint}</p>
       </div>
     )
   }
 
   return (
     <div className="reattach">
-      <p className="reattach__why">{failed ? FAILED : idleWhy(next, tooHigh ? { from: thread.trust, to: ceiling } : undefined)}</p>
+      <p className="reattach__why">{failed ? m.failed : idleWhy(next, tooHigh ? { from: thread.trust, to: ceiling } : undefined, m)}</p>
       <button
         className="btn btn--primary reattach__go"
         type="button"
@@ -128,7 +132,7 @@ export function Reattach({
           }
         }}
       >
-        {offline ? "等重连…" : failed ? "再试一次" : "接回来，继续说"}
+        {offline ? m.waiting : failed ? m.retry : m.go}
       </button>
     </div>
   )

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
 import type { Notice } from "@switchback/store"
+import type { Locale } from "@switchback/i18n"
+import { useMessages } from "../i18n.js"
+import { NOTICES } from "./Notices.messages.js"
 
 type NoticeTone = "danger" | "warning" | "info"
 
@@ -16,13 +19,13 @@ function shownOf(notices: readonly Notice[]): Notice | undefined {
   return notices.findLast((notice) => notice.kind === "egress") ?? notices.at(-1)
 }
 
-function labelOf(notice: Notice): string {
-  if (notice.kind === "crashed") return "出错了"
-  if (notice.kind === "degraded") return "能力受限"
+function labelOf(notice: Notice, m: (typeof NOTICES)[Locale]): string {
+  if (notice.kind === "crashed") return m.crashed
+  if (notice.kind === "degraded") return m.degraded
   // 登录只能在那台 Mac 上办（它会开浏览器或终端），这里只照实说
-  if (notice.kind === "auth") return "需要登录"
-  if (notice.kind === "egress") return "批量外发"
-  return "引擎提示"
+  if (notice.kind === "auth") return m.auth
+  if (notice.kind === "egress") return m.egress
+  return m.notice
 }
 
 /**
@@ -58,6 +61,7 @@ export function Notices({
   onDismissWire: () => void
 }): React.JSX.Element | null {
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set())
+  const m = useMessages(NOTICES)
   // 只画最新那条：小屏上堆三条横幅等于把正文挤没了，而人要看的是最近发生的事
   const latest = shownOf(notices.filter((n) => !gone.has(n.id)))
   useEffect(() => {
@@ -76,7 +80,7 @@ export function Notices({
       {wire === undefined ? null : (
         <div className="notice" role="alert">
           <span className="notice__text">{wire}</span>
-          <button className="btn btn--ghost" type="button" onClick={onDismissWire} aria-label="知道了">
+          <button className="btn btn--ghost" type="button" onClick={onDismissWire} aria-label={m.dismiss}>
             ✕
           </button>
         </div>
@@ -92,13 +96,13 @@ export function Notices({
               顶着「引擎故障」端出去会把排查引到错的方向 */}
           {/* 同一件事接连报了几次，store 里已经合成一条；这里照实带上次数 */}
           <span className="notice__kind">
-            {(latest.count ?? 1) > 1 ? `${labelOf(latest)} ×${String(latest.count)}` : labelOf(latest)}
+            {(latest.count ?? 1) > 1 ? `${labelOf(latest, m)} ×${String(latest.count)}` : labelOf(latest, m)}
           </span>
           <span className="notice__text">{latest.text}</span>
           <button
             className="btn btn--ghost"
             type="button"
-            aria-label="知道了"
+            aria-label={m.dismiss}
             onClick={() => {
               setGone((prev) => new Set(prev).add(latest.id))
             }}
