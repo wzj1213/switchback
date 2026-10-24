@@ -9,6 +9,11 @@ import {
   type NpmGlobalState,
 } from "./enginever-command.js"
 import { BUILTIN_ENGINE_LABELS } from "../shared/builtin-engines.js"
+import type { Locale } from "@switchback/i18n"
+import type { VERSION_NOTE } from "./enginever-sources.messages.js"
+
+/** 一行附的那句说明是哪一句。说法在 `enginever-sources.messages.ts`。 */
+export type VersionNote = keyof (typeof VERSION_NOTE)[Locale]["note"]
 
 /** 设置页里一家引擎的版本与更新入口。 */
 export interface EngineVersion {
@@ -36,8 +41,13 @@ export interface EngineVersion {
    * 编出来的那条一旦是错的，用户会以为是 Switchback 装坏了。
    */
   install?: string
-  /** 解释为什么没按钮，或最新版为什么暂时查不到。 */
+  /** 解释为什么没按钮，或最新版为什么暂时查不到。由 `note` 按当时的界面语言说出来。 */
   detail?: string
+  /**
+   * `detail` 是哪一句。**探测结果缓存几个小时，存码不存话**：换了界面语言，
+   * 下次取的时候照新语言说；往外给之前换成 `detail`（见 `enginever.ts` 的 `phrased`）。
+   */
+  note?: VersionNote
 }
 
 export interface InspectContext {
@@ -61,7 +71,7 @@ export interface EngineSpec {
   /** 没装时用它。见 `EngineVersion.install`。 */
   install?: UpdateCommand
   /** 没装、又没有可执行的安装命令时，说清楚该去哪儿装。 */
-  where?: string
+  where?: VersionNote
   inspect: (context: InspectContext) => Promise<EngineVersion | undefined>
 }
 
@@ -78,7 +88,7 @@ export function missingOf(spec: EngineSpec): EngineVersion {
     stale: false,
     missing: true,
     ...(spec.install === undefined ? {} : { install: spec.install.display }),
-    ...(spec.where === undefined ? {} : { detail: spec.where }),
+    ...(spec.where === undefined ? {} : { note: spec.where }),
   }
 }
 
@@ -118,7 +128,7 @@ function claudeSpec(mode: ClaudeExecutable): EngineSpec {
         installed,
         stale: false,
         update: "claude update",
-        detail: "由 Claude 自己检查并安装新版",
+        note: "claude-self",
       }
     },
   }
@@ -129,7 +139,7 @@ function bundledClaude(): EngineVersion {
     engine: "claude",
     label: BUILTIN_ENGINE_LABELS.claude,
     stale: false,
-    detail: "完整版使用随 Switchback 打包的 Claude；更新 Switchback 才会换掉它",
+    note: "claude-bundled",
   }
 }
 
@@ -179,7 +189,7 @@ async function inspectNpm(
     ...(latest === undefined ? {} : { latest }),
     stale,
     ...(stale ? { update: source.update } : {}),
-    ...(latest === undefined ? { detail: "暂时没查到 npm 上的最新版" } : {}),
+    ...(latest === undefined ? { note: "npm-latest-unknown" as const } : {}),
   }
 }
 
@@ -210,7 +220,7 @@ function otherInstall(engine: string, label: string, installed: string): EngineV
     label,
     installed,
     stale: false,
-    detail: "当前不是 Switchback 验过的 npm 全局安装；为免装出第二份，请用原安装来源更新",
+    note: "other-install",
   }
 }
 
@@ -223,7 +233,7 @@ function grokSpec(): EngineSpec {
     update,
     // **不给命令**：这台机器上的 grok 装在 `~/.grok/bin`，那是它自己的安装器铺的，
     // Switchback 手上没有一个验证过的包名。编一条出来一旦是错的，用户会以为是 Switchback 装坏了
-    where: "grok 由它自己的安装器铺在 ~/.grok 下；装好后确保 grok 在 PATH 上",
+    where: "grok-where",
     inspect: async ({ run }) => inspectGrok(run, update.display),
   }
 }
@@ -233,7 +243,7 @@ function dshSpec(): EngineSpec {
     engine: "dsh",
     label: BUILTIN_ENGINE_LABELS.dsh,
     bin: "dsh",
-    where: "DSH 的版本与 profiles 由它自己管理，Switchback 不代装；装好后确保 dsh 在 PATH 上",
+    where: "dsh-where",
     inspect: async ({ run }) => {
       const installed = await versionOf("dsh", run)
       if (installed === undefined) return undefined
@@ -242,7 +252,7 @@ function dshSpec(): EngineSpec {
         label: BUILTIN_ENGINE_LABELS.dsh,
         installed,
         stale: false,
-        detail: "版本与 profiles 由 DSH 自己管理，Switchback 不代装插件",
+        note: "dsh-self",
       }
     },
   }
@@ -265,7 +275,7 @@ async function inspectGrok(
     ...(latest === undefined ? {} : { latest }),
     stale,
     ...(stale ? { update } : {}),
-    ...(checked === undefined ? { detail: "暂时没从 Grok 更新器查到最新版" } : {}),
+    ...(checked === undefined ? { note: "grok-latest-unknown" as const } : {}),
   }
 }
 

@@ -19,6 +19,7 @@ import type { Logger } from "./log.js"
 import type { Channels } from "./channels.js"
 import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 import { ENGINE_VERSION } from "./enginever.messages.js"
+import { VERSION_NOTE } from "./enginever-sources.messages.js"
 
 type Text = (typeof ENGINE_VERSION)[Locale]
 
@@ -89,11 +90,11 @@ export function createEngineVersions(
   }
 
   const get = async (refresh = false): Promise<readonly EngineVersion[]> => {
-    if (!refresh && cached !== undefined && now() - cached.at < TTL_MS) return cached.list
+    if (!refresh && cached !== undefined && now() - cached.at < TTL_MS) return phrased(cached.list, options)
     inflight ??= probeAll().finally(() => {
       inflight = undefined
     })
-    return inflight
+    return phrased(await inflight, options)
   }
 
   /**
@@ -244,6 +245,15 @@ function updateOutput(
 ): string {
   if (check.ok) return output === "" ? m.updateQuiet : output
   return [output === "" ? m.updateSilent : output, m.recheck(check.before ?? "?", check.after ?? "?")].join("\n\n")
+}
+
+/**
+ * 缓存里存的是码（`note`），往外给的时候才按**这一刻**的界面语言换成那句话（`detail`）。
+ * 渲染层拿到的形状和以前一样，切了语言也不必重新探测——那要跑一串子进程、还要联网查最新版。
+ */
+function phrased(list: readonly EngineVersion[], options: EngineVersionOptions): readonly EngineVersion[] {
+  const m = VERSION_NOTE[options.locale?.() ?? DEFAULT_LOCALE]
+  return list.map(({ note, ...rest }) => (note === undefined ? rest : { ...rest, detail: m.note[note] }))
 }
 
 function isPresent<T>(value: T | undefined): value is T {

@@ -50,7 +50,7 @@ export function EnginesSection({
   const item = items.find((candidate) => candidate.id === selected) ?? items[0]
   if (item === undefined) return <p className="set__blank">{m.none}</p>
   const state = engineSettingState(item, settings, locale)
-  const copy = settingsCopyOf(item.id)
+  const copy = settingsCopyOf(item.id, locale)
   const off = settings.disabledEngines.includes(item.id)
   const connected = !off && (item.id !== "dsh" || dshProfileConfirmed(settings.dsh))
   const locked = lastEnabledEngine(settings, items.map((entry) => entry.id)) === item.id

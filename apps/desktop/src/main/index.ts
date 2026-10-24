@@ -356,7 +356,7 @@ function installChannels(): void {
   installFilePreviewWatch(touched, worksiteSearch)
   installProjectDocChannel(worksiteSearch, channels, () => settings.get().language)
   installEngineVersionChannel(log, engineVersions, channels)
-  installEngineDoorChannels(channels)
+  installEngineDoorChannels(channels, () => settings.get().language)
   installEnvChannel(log, channels)
   installSelfUpdateChannel(log, () => settings.get().language)
 }

@@ -200,6 +200,16 @@ describe("引擎版本入口", () => {
     }
   })
 
+  it("附的说明存码不存话：缓存着的那份也照这一刻的界面语言说", async () => {
+    const language: { value: "zh-CN" | "en" } = { value: "zh-CN" }
+    const { store } = fixture({ locale: () => language.value })
+    const dsh = async (): Promise<string | undefined> => (await store.get()).find((v) => v.engine === "dsh")?.detail
+    expect(await dsh()).toBe("版本与 profiles 由 DSH 自己管理，Switchback 不代装插件")
+    language.value = "en"
+    expect(await dsh()).toBe("DSH manages its own versions and profiles; Switchback doesn't install plugins for it")
+    expect((await store.get()).some((version) => "note" in version)).toBe(false)
+  })
+
   it("英文界面下，更新入口不在时那句话也说英文", async () => {
     const { store } = fixture({ locale: () => "en" })
     await expect(store.update("claude")).resolves.toMatchObject({

@@ -84,4 +84,13 @@ describe("各家自己的设置在哪儿", () => {
       ]),
     ).toEqual(["/user"])
   })
+
+  it("英文界面下那句说明说英文；路径照原样", async () => {
+    const doors = await engineDoors("/w", "team", "en")
+    expect(doors.find((d) => d.id === "codex" && d.scope === "user")?.note).toBe("Sandbox, approval policy, model")
+    expect(doors.find((d) => d.path.endsWith("cordis.patch.yml"))?.note)
+      .toBe("Patch for the current team profile; add or remove plugins with dsh plugin")
+    expect(doors.filter((d) => d.scope === "project").map((d) => d.note))
+      .toEqual(["Applies to this project only", "Applies to this project only", "Applies to this project only"])
+  })
 })
