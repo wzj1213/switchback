@@ -12,7 +12,7 @@ import type { Channels } from "./channels.js"
  */
 const MESSAGE_CHARS = 20_000
 const PATH_CHARS = 4096
-const NOT_OURS: CommitResult = { ok: false, error: "这个工作区不属于任何一条会话，Switchback 不碰它。" }
+const NOT_OURS: CommitResult = { ok: false, error: "not-ours" }
 const NO_REPO: GitState = { repo: false, staged: 0, unstaged: 0, untracked: 0, conflicted: 0 }
 
 export function createGitChannels(worksites: WorksiteSearch, run: GitRun = runGit): {
@@ -36,21 +36,21 @@ export function createGitChannels(worksites: WorksiteSearch, run: GitRun = runGi
       const owned = ownedWorksite(value, worksites.owns)
       if (owned === undefined) return NOT_OURS
       const { message, all } = value as { message?: unknown; all?: unknown }
-      if (typeof message !== "string" || message.length > MESSAGE_CHARS) return { ok: false, error: "提交说明不对。" }
+      if (typeof message !== "string" || message.length > MESSAGE_CHARS) return { ok: false, error: "bad-message" }
       return queued(owned.cwd, () => gitCommit(owned.cwd, { message, all: all === true }, run))
     },
     stage: async (value) => {
       const owned = ownedWorksite(value, worksites.owns)
       if (owned === undefined) return NOT_OURS
       const { rel, stage } = value as { rel?: unknown; stage?: unknown }
-      if (typeof rel !== "string" || rel === "" || rel.length > PATH_CHARS) return { ok: false, error: "路径不对。" }
+      if (typeof rel !== "string" || rel === "" || rel.length > PATH_CHARS) return { ok: false, error: "bad-path" }
       return queued(owned.cwd, () => gitStage(owned.cwd, { rel, stage: stage === true }, run))
     },
     undo: async (value) => {
       const owned = ownedWorksite(value, worksites.owns)
       if (owned === undefined) return NOT_OURS
       const { full } = value as { full?: unknown }
-      if (typeof full !== "string" || !/^[0-9a-f]{40}([0-9a-f]{24})?$/u.test(full)) return { ok: false, error: "要撤销的提交不对。" }
+      if (typeof full !== "string" || !/^[0-9a-f]{40}([0-9a-f]{24})?$/u.test(full)) return { ok: false, error: "bad-commit" }
       return queued(owned.cwd, () => gitUndo(owned.cwd, { full }, run))
     },
   }

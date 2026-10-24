@@ -4,6 +4,7 @@ import { actionsOf, blockedOf, pendingOf, summaryOf } from "../commit-bar.js"
 import { BranchIcon } from "./icons.js"
 import { useLocale, useMessages } from "../i18n.js"
 import { COMMIT_BAR_VIEW } from "./CommitBar.messages.js"
+import type { Locale } from "@switchback/i18n"
 
 /**
  * 审查页底下的「提交」：看完改动顺手提交，不用切去终端。
@@ -99,6 +100,11 @@ function CommitForm({ state, running, busy, onCommit, onDone }: {
   )
 }
 
+function refusalText(result: CommitResult, m: (typeof COMMIT_BAR_VIEW)[Locale]): string {
+  if (result.error === undefined) return m.failed
+  return result.error === "pushed" ? m.pushed(result.remote ?? "") : m.refused[result.error]
+}
+
 /**
  * 刚才那一下的结果。暂存成功不必说话（清单上那枚「已暂存」就是回答），失败与提交成功要说。
  * 提交成功那一行带「撤销」：HEAD 还是它、也没推到远程时，改动原样退回暂存区。
@@ -128,7 +134,7 @@ function Outcome({ result, busy, onUndo }: {
   }
   return (
     <>
-      <p className="rv__commit-note rv__commit-note--error" role="alert">{result.error ?? m.failed}</p>
+      <p className="rv__commit-note rv__commit-note--error" role="alert">{refusalText(result, m)}</p>
       {result.output === undefined || result.output === "" ? null : <pre className="rv__commit-log">{result.output}</pre>}
     </>
   )

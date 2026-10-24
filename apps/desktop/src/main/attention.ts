@@ -4,6 +4,8 @@ import type { Event, ThreadId, TurnId } from "@switchback/protocol"
 import { humanize } from "../shared/failure.js"
 import type { NotifyMode } from "../shared/settings.js"
 import { watchQuestions, type QuestionChange } from "./attention-questions.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
+import { ATTENTION } from "./attention.messages.js"
 
 /**
  * 「有人在等你批/答」「它跑完了」「它跑挂了」——出声的三类事，以及 Dock 角标。
@@ -136,6 +138,7 @@ export function createAttention(
   windows: () => readonly BrowserWindow[],
   relay?: Relay,
   mode: () => NotifyMode = () => "all",
+  locale: () => Locale = () => DEFAULT_LOCALE,
 ): Attention {
   const pending = new Set<string>()
   const announced = new Set<string>()
@@ -158,11 +161,11 @@ export function createAttention(
   }
   const turns = watchTurns((threadId, body) => {
     if (mode() === "all" && !attending(threadId)) tell(threadId, body)
-  })
+  }, Date.now, locale)
   const questionState: QuestionAttention = {
     pending, announced, badge, attending, enabled: () => mode() !== "off", tell,
   }
-  const questions = watchQuestions((change) => noteQuestion(change, questionState))
+  const questions = watchQuestions((change) => noteQuestion(change, questionState), locale)
 
   return connectViewing({
     note: (event) => {
@@ -184,7 +187,7 @@ export function createAttention(
       // 角标已经挂上了，下面这一步只决定要不要出声
       if (mode() === "off" || attending(seen.threadId) || announced.has(seen.id)) return
       announced.add(seen.id)
-      askFor(seen, titles.get(seen.threadId) ?? "Switchback 在等你确认", raise, relay)
+      askFor(seen, { banner: ATTENTION[locale()].waiting, thread: titles.get(seen.threadId) }, raise, relay)
     },
     viewing: (threadId) => {
       view.threadId = threadId
@@ -209,14 +212,14 @@ export function createAttention(
  */
 function askFor(
   seen: { summary: string; threadId: ThreadId },
-  title: string,
+  title: { banner: string; thread: string | undefined },
   raise: () => void,
   relay: Relay | undefined,
 ): void {
-  new Notification({ title: "Switchback 在等你确认", body: seen.summary, silent: false })
+  new Notification({ title: title.banner, body: seen.summary, silent: false })
     .on("click", raise)
     .show()
-  relay?.(seen.threadId, title, seen.summary)
+  relay?.(seen.threadId, title.thread ?? title.banner, seen.summary)
 }
 
 /**
@@ -226,6 +229,7 @@ function askFor(
 export function watchTurns(
   tell: (threadId: ThreadId, body: string) => void,
   now: () => number = Date.now,
+  locale: () => Locale = () => DEFAULT_LOCALE,
 ): { note: (event: Event) => void; threadOf: (turnId: TurnId) => ThreadId | undefined } {
   const running = new Map<TurnId, Running>()
   const note = (event: Event): void => {
@@ -236,15 +240,16 @@ export function watchTurns(
     if (event.type !== "turn.completed") return
     const was = running.get(event.turnId)
     running.delete(event.turnId)
+    const m = ATTENTION[locale()]
     // **自己按停的不报**：那是你刚做的动作，报告它等于回声
     if (was === undefined || event.status === "interrupted") return
     if (event.status === "failed") {
       // 原文不丢——横幅里那份仍然是全的，这里只取给人看的那一句
-      tell(was.threadId, `跑挂了：${humanize(event.error ?? "引擎没有说原因").text}`)
+      tell(was.threadId, m.failed(humanize(event.error ?? m.noReason).text))
       return
     }
     if (now() - was.startedAt < QUIET_MS) return
-    tell(was.threadId, `跑完了，用了 ${spent(now() - was.startedAt)}`)
+    tell(was.threadId, m.done(spent(now() - was.startedAt, m)))
   }
   // 审批卡上只有 `turnId`，而推送要能直达那条会话。这张表本来就在，顺手开一个口
   return { note, threadOf: (turnId) => running.get(turnId)?.threadId }
@@ -258,12 +263,12 @@ export function watchTurns(
  * 为一个七行的格式化函数把整条依赖链拖进主进程，代价比抄七行大得多——
  * **改措辞时两处一起改**，这句话就是给下一个人看的。
  */
-function spent(ms: number): string {
+function spent(ms: number, m: (typeof ATTENTION)[Locale]): string {
   const total = Math.floor(ms / 1000)
-  if (total < 60) return `${String(total)} 秒`
+  if (total < 60) return m.seconds(total)
   const minutes = Math.floor(total / 60)
   const seconds = total % 60
-  return seconds === 0 ? `${String(minutes)} 分` : `${String(minutes)} 分 ${String(seconds)} 秒`
+  return seconds === 0 ? m.minutes(minutes) : m.minutesSeconds(minutes, seconds)
 }
 
 /**

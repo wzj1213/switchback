@@ -46,7 +46,7 @@ export function useGitActions(threadId: string, cwd: string, changed: () => void
   const run = async (job: Promise<CommitResult> | undefined): Promise<boolean> => {
     if (job === undefined) return false
     setBusy(true)
-    const done = await job.catch((error: unknown): CommitResult => ({ ok: false, error: String(error) }))
+    const done = await job.catch((error: unknown): CommitResult => ({ ok: false, output: String(error) }))
     setBusy(false)
     setResult(done)
     changed()

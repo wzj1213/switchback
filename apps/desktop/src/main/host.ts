@@ -11,6 +11,7 @@ import { devEngine, devMaxLive, devModel, devResume, devTrust } from "./devtools
 import { createAttention, type Relay } from "./attention.js"
 import { createOutlet } from "./outlet.js"
 import type { NotifyMode } from "../shared/settings.js"
+import type { Locale } from "@switchback/i18n"
 import { createAwake } from "./awake.js"
 import { buildRegistry } from "./registry.js"
 import type { Sink, Sinks } from "./sink.js"
@@ -148,6 +149,8 @@ export interface HostPorts {
   engineVisible?: (id: string) => boolean
   dshProfile?: () => string
   notify?: () => NotifyMode
+  /** 界面语言：系统通知、宿主自己写进转录区的话照它说。不给＝默认的中文。 */
+  locale?: () => Locale
   /** 「换引擎自动交接」开着没有。不给＝关着。 */
   handoffBrief?: () => boolean
   /** 「批量外发时停掉」开着没有。不给＝开着：守卫宁可多停一次，也不放一个仓库出去。 */
@@ -207,7 +210,7 @@ export function attachHost(
   // 但**同一个出口再送一份到手机上**——`relay` 就是那条路。
   // 桌面正在看哪条由 `switchback:viewing` 报给 attention；远程正在看哪条还要由 relay
   // 自己再判，因为只有那一层知道每台远程设备停在哪儿。
-  const attention = createAttention(windows, relay, ports?.notify)
+  const attention = createAttention(windows, relay, ports?.notify, ports?.locale)
   const awake = createAwake()
   const worksiteSearch = ports.worksiteSearch
   // **迟绑定**：outlet 比 host 先建，而它要问 host「现在有几条在跑」。
@@ -241,7 +244,7 @@ export function attachHost(
   })
 
   const report = reporter(emit)
-  const egress = egressFor({ host, emit, log, stop: ports.egressStop, labels })
+  const egress = egressFor({ host, emit, log, stop: ports.egressStop, labels, locale: ports.locale })
 
   holder.host = host
   installBridgeChannels({ host, log, ledger, report, worksiteSearch })

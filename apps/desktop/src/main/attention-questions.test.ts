@@ -54,4 +54,11 @@ describe("主轮之外的权限请求也叫人", () => {
       { id: "ap-1", threadId: "th-1", pending: false, summary: "子 agent 在等你确认：git push" },
     ])
   })
+
+  it("界面是英文时那句话也是英文", () => {
+    const changes: QuestionChange[] = []
+    const watch = watchQuestions((change) => changes.push(change), () => "en")
+    watch.note({ type: "thread.started", at: 0, thread: thread(["q1"]) })
+    expect(changes).toEqual([{ id: "q1", threadId: "th-1", pending: true, summary: "Needs your answer: 问题 q1" }])
+  })
 })

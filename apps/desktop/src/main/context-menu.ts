@@ -1,4 +1,6 @@
 import { BrowserWindow, Menu, clipboard, type ContextMenuParams, type MenuItemConstructorOptions, type WebContents } from "electron"
+import type { Locale } from "@switchback/i18n"
+import { CONTEXT_MENU } from "./context-menu.messages.js"
 
 /**
  * 右键菜单。
@@ -29,11 +31,12 @@ import { BrowserWindow, Menu, clipboard, type ContextMenuParams, type MenuItemCo
  */
 
 /** 这一次右键该给哪几项。给不出来就是空数组，调用方据此不弹。 */
-export function contextItems(params: ContextMenuParams): MenuItemConstructorOptions[] {
+export function contextItems(params: ContextMenuParams, locale: Locale): MenuItemConstructorOptions[] {
+  const m = CONTEXT_MENU[locale]
   const items: MenuItemConstructorOptions[] = []
   if (params.linkURL !== "") {
     items.push({
-      label: "复制链接地址",
+      label: m.copyLink,
       click: () => {
         clipboard.writeText(params.linkURL)
       },
@@ -42,11 +45,11 @@ export function contextItems(params: ContextMenuParams): MenuItemConstructorOpti
   if (params.isEditable) {
     if (items.length > 0) items.push({ type: "separator" })
     items.push(
-      { role: "cut", label: "剪切", enabled: params.editFlags.canCut },
-      { role: "copy", label: "复制", enabled: params.editFlags.canCopy },
-      { role: "paste", label: "粘贴", enabled: params.editFlags.canPaste },
+      { role: "cut", label: m.cut, enabled: params.editFlags.canCut },
+      { role: "copy", label: m.copy, enabled: params.editFlags.canCopy },
+      { role: "paste", label: m.paste, enabled: params.editFlags.canPaste },
       { type: "separator" },
-      { role: "selectAll", label: "全选" },
+      { role: "selectAll", label: m.selectAll },
     )
     return items
   }
@@ -54,15 +57,15 @@ export function contextItems(params: ContextMenuParams): MenuItemConstructorOpti
   // 比不弹更让人以为是坏的
   if (params.selectionText.trim() !== "") {
     if (items.length > 0) items.push({ type: "separator" })
-    items.push({ role: "copy", label: "复制" })
+    items.push({ role: "copy", label: m.copy })
   }
   return items
 }
 
 /** 给一个窗口接上右键菜单。**每扇窗口各接一次**，跟着 webContents 走。 */
-export function installContextMenu(contents: WebContents): void {
+export function installContextMenu(contents: WebContents, locale: () => Locale): void {
   contents.on("context-menu", (_event, params) => {
-    const items = contextItems(params)
+    const items = contextItems(params, locale())
     if (items.length === 0) return
     const window = BrowserWindow.fromWebContents(contents)
     Menu.buildFromTemplate(items).popup(window === null ? {} : { window })

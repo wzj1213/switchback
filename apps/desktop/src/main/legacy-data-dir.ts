@@ -174,6 +174,7 @@ function move(legacy: string, current: string): void {
     renameSync(legacy, current)
   } catch (error) {
     const why = error instanceof Error ? error.message : String(error)
+    // i18n-ok：只有改名前用过 omni 的人会看到，而且这时设置还没读出来，没有界面语言可依
     stop("旧数据没搬过来", `想把 ${legacy} 挪到 ${current}，失败了：${why}\n两个目录都没动，可以手动挪过去再打开。`)
   }
 }
@@ -191,6 +192,7 @@ export function adoptLegacyDataDir(): LegacyReport {
   }
   const plan = planLegacyMove(facts)
   if (plan === "blocked") {
+    // i18n-ok：同上，只给改名前的老用户
     stop("请先退出 omni", "Switchback 就是改了名的 omni。旧的那个还开着——退出它之后再打开 Switchback，会话和设置会自动搬过来。")
   }
   if (plan === "move") move(legacy, facts.current)
@@ -201,7 +203,9 @@ export function adoptLegacyDataDir(): LegacyReport {
 
 /** 给日志的一句话；什么都没发生时不写。 */
 export function legacyNote(r: LegacyReport): string | undefined {
+  // i18n-ok：只进日志
   if (r.error !== undefined) return `会话记录里的旧附件路径没改成：${r.error}（下次启动再试）`
   if (!r.moved && r.rewritten === 0) return undefined
+  // i18n-ok：只进日志
   return `${r.moved ? "旧数据目录已搬过来；" : ""}改写了 ${String(r.rewritten)} 行会话记录里的附件路径`
 }

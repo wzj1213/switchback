@@ -6,6 +6,8 @@ import { app, ipcMain } from "electron"
 import type { Logger } from "./log.js"
 import { quitNow } from "./quit.js"
 import { readBuildInfo } from "./build-info.js"
+import type { Locale } from "@switchback/i18n"
+import { SELF_UPDATE } from "./selfupdate.messages.js"
 
 /**
  * 从**本机源码**把自己重装一遍。
@@ -73,8 +75,9 @@ export function bundleOf(execPath: string): string | undefined {
  */
 export function swapScript(o: { pid: number; from: string; to: string; log: string }): string {
   const q = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
-  const stage = `${o.to}.更新中`
-  const backup = `${o.to}.上一版`
+  const stage = `${o.to}.更新中` // i18n-ok：临时目录名，不上界面
+  const backup = `${o.to}.上一版` // i18n-ok：同上
+  // i18n-ok：脚本的 echo 只写进「自更新.log」，给排查的人看
   return [
     "#!/bin/sh",
     `exec >> ${q(o.log)} 2>&1`,
@@ -121,14 +124,15 @@ async function newerThan(repo: string, stamp: string): Promise<string | undefine
 }
 
 /** 现在是什么情况。**界面和更新动作读的是同一份判断**，不各算各的。 */
-export async function statusOf(): Promise<SelfUpdate> {
+export async function statusOf(locale: Locale): Promise<SelfUpdate> {
+  const m = SELF_UPDATE[locale]
   const { repo, build } = readBuildInfo(app.getAppPath())
   const bundle = bundleOf(process.execPath)
   const built = build === undefined ? {} : { built: build }
   if (!app.isPackaged || bundle === undefined) {
     return {
       can: false,
-      why: "不是从 .app 跑的（开发模式下改完存盘就生效，用不着这个）",
+      why: m.devMode,
       stale: false,
       ...built,
     }
@@ -136,13 +140,13 @@ export async function statusOf(): Promise<SelfUpdate> {
   if (repo === undefined || !existsSync(repo)) {
     return {
       can: false,
-      why: `这个包烤进去的源码路径不在这台机器上：${repo ?? "（没烤）"}`,
+      why: m.noRepo(repo),
       stale: false,
       ...built,
     }
   }
   const stamp = join(bundle, "Contents/Resources/app.asar")
-  if (!existsSync(stamp)) return { can: false, why: `找不到 ${stamp}`, stale: false, ...built }
+  if (!existsSync(stamp)) return { can: false, why: m.noStamp(stamp), stale: false, ...built }
   const newest = await newerThan(repo, stamp)
   return {
     can: true,
@@ -161,12 +165,13 @@ export async function statusOf(): Promise<SelfUpdate> {
  *
  * 换包不在这个进程里做：它要等这个进程死掉才能动手（见 `swapScript`）。
  */
-async function runUpdate(log: Logger): Promise<SelfUpdateRun> {
-  const state = await statusOf()
+async function runUpdate(log: Logger, locale: Locale): Promise<SelfUpdateRun> {
+  const m = SELF_UPDATE[locale]
+  const state = await statusOf(locale)
   const { repo } = readBuildInfo(app.getAppPath())
   const bundle = bundleOf(process.execPath)
   if (!state.can || repo === undefined || bundle === undefined) {
-    return { ok: false, output: state.why ?? "这台机器上不能自更新" }
+    return { ok: false, output: state.why ?? m.cannot }
   }
   log.write("info", "update", `开始从源码重建：${repo}`)
   // 给足时间：electron-builder 打一次 mac 包实测一两分钟，机器忙的时候更久
@@ -178,7 +183,7 @@ async function runUpdate(log: Logger): Promise<SelfUpdateRun> {
   const fresh = freshBundleOf(repo)
   if (!existsSync(fresh)) {
     log.write("error", "update", `构建跑完了，但没找到 ${fresh}`)
-    return { ok: false, output: `${built.output}\n\n构建跑完了，但没找到 ${fresh}` }
+    return { ok: false, output: `${built.output}\n\n${m.missing(fresh)}` }
   }
   handoff(log, fresh, bundle)
   return { ok: true, output: built.output }
@@ -204,7 +209,7 @@ export function freshBundleOf(repo: string): string {
 function handoff(log: Logger, from: string, to: string): void {
   const dir = mkdtempSync(join(tmpdir(), "switchback-update-"))
   const file = join(dir, "swap.sh")
-  const logFile = join(app.getPath("userData"), "自更新.log")
+  const logFile = join(app.getPath("userData"), "自更新.log") // i18n-ok：文件名
   writeFileSync(file, swapScript({ pid: process.pid, from, to, log: logFile }), { mode: 0o755 })
   const child = spawn("/bin/sh", [file], { detached: true, stdio: "ignore" })
   child.unref()
@@ -217,14 +222,14 @@ function handoff(log: Logger, from: string, to: string): void {
   }, 300)
 }
 
-export function installSelfUpdateChannel(log: Logger): void {
+export function installSelfUpdateChannel(log: Logger, locale: () => Locale): void {
   ipcMain.handle("switchback:selfUpdateStatus", async (): Promise<SelfUpdate> => {
-    const state = await statusOf()
+    const state = await statusOf(locale())
     if (!state.can && state.why !== undefined)
       log.write("info", "update", `自更新不可用：${state.why}`)
     return state
   })
-  ipcMain.handle("switchback:selfUpdate", () => runUpdate(log))
+  ipcMain.handle("switchback:selfUpdate", () => runUpdate(log, locale()))
 }
 
 /** 跑一条命令，把输出（含 stderr）原样带回来。**失败不抛**——调用方要那段原文。 */

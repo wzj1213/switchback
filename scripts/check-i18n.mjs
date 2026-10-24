@@ -12,12 +12,15 @@
  *
  * - 文件不在 `scripts/i18n-todo.json`（改名单前的旧文件）里却含中文文案 → 报错。新代码从一开始就走 messages。
  * - 名单里的文件已经一条都不剩 → 也报错：迁完了就从名单里删掉，名单只会越来越短。
- * - 确实要写中文的（比如匹配中文标点的正则），在那一行或上一行写 `i18n-ok` 并说明为什么。
+ * - 确实要写中文的（比如匹配中文标点的正则、只写进日志文件的脚本输出），在那一行或上一行写 `i18n-ok`
+ *   并说明为什么；写在一条语句的上一行，就管住这一整条语句。
+ * - **日志不算**：落在 `log.write(…)`、`logger.write(…)`、`deps.log(…)`、`console.*(…)` 这类调用里的字
+ *   只给排查的人看，不迁。判据是「它在哪个调用的参数里」，所以别把界面文案塞进日志调用再拿出来用。
  *
  * ## 管哪些目录
  *
- * 先管纯界面的两处：桌面端渲染层与网页端。主进程和各个包里还混着只给开发看的日志，
- * 迁到那一步时再把它们加进 ROOTS（连同「日志不算」的判据）。
+ * 渲染层、网页端，以及主进程（含 `shared/`、`preload/`）。各个包迟一步：它们写的话有一部分是给模型看的
+ *（交接说明、拒绝理由），该用哪种语言要单独定，到那一步再加进来。
  */
 import { readFileSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
@@ -27,10 +30,12 @@ import { fileURLToPath } from "node:url"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const ts = createRequire(join(ROOT, "package.json"))("typescript")
-const ROOTS = ["apps/desktop/src/renderer/", "apps/web/src/"]
+const ROOTS = ["apps/desktop/src/renderer/", "apps/web/src/", "apps/desktop/src/main/", "apps/desktop/src/shared/", "apps/desktop/src/preload/"]
 const TODO_FILE = join(ROOT, "scripts/i18n-todo.json")
 const CJK = /[\u3400-\u9fff\uff00-\uffef\u3000-\u303f]/
 const SKIP = /\.test\.tsx?$|\.d\.ts$|\.messages\.ts$/
+/** 日志调用：落在它们参数里的字只给排查的人看。 */
+const LOG_CALL = /(^|\.)(log|logger)(\.(write|info|warn|error|debug))?$|^console\.\w+$/
 const TEXT_KINDS = new Set([
   ts.SyntaxKind.StringLiteral,
   ts.SyntaxKind.NoSubstitutionTemplateLiteral,
@@ -45,17 +50,33 @@ function sources() {
   return out.split("\n").filter((f) => /\.tsx?$/.test(f) && !SKIP.test(f) && ROOTS.some((r) => f.startsWith(r)))
 }
 
+/** 往上找到同一个函数里的调用：有一层是日志调用就算日志。 */
+function inLog(node, sf) {
+  for (let at = node.parent; at !== undefined; at = at.parent) {
+    if (ts.isFunctionLike(at) || ts.isSourceFile(at)) return false
+    if (ts.isCallExpression(at) && LOG_CALL.test(at.expression.getText(sf).replace(/\s+/g, ""))) return true
+  }
+  return false
+}
+
+/** 这个节点所在的那条语句从哪一行开始（`i18n-ok` 写在它上一行，管住整条语句）。 */
+function statementLine(node, sf) {
+  let at = node
+  while (at.parent !== undefined && !ts.isBlock(at.parent) && !ts.isSourceFile(at.parent) && !ts.isCaseClause(at.parent)) at = at.parent
+  return sf.getLineAndCharacterOfPosition(at.getStart(sf)).line
+}
+
 /** 一个文件里含中文的文案：[行号, 文字]。 */
 function hits(file) {
   const src = readFileSync(join(ROOT, file), "utf8")
   const lines = src.split("\n")
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const marked = (line) => /i18n-ok/.test(lines[line] ?? "") || /i18n-ok/.test(lines[line - 1] ?? "")
   const found = []
   const visit = (node) => {
-    if (TEXT_KINDS.has(node.kind) && CJK.test(node.text)) {
+    if (TEXT_KINDS.has(node.kind) && CJK.test(node.text) && !inLog(node, sf)) {
       const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line
-      const ok = /i18n-ok/.test(lines[line] ?? "") || /i18n-ok/.test(lines[line - 1] ?? "")
-      if (!ok) found.push([line + 1, node.text.trim().slice(0, 40)])
+      if (!marked(line) && !marked(statementLine(node, sf))) found.push([line + 1, node.text.trim().slice(0, 40)])
     }
     ts.forEachChild(node, visit)
   }

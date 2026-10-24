@@ -59,6 +59,14 @@ describe("一轮跑完要不要出声", () => {
     expect(r.said).toEqual(["th-1: 跑完了，用了 4 分 12 秒"])
   })
 
+  it("界面是英文时通知也说英文", () => {
+    const said: string[] = []
+    const turns = watchTurns((threadId, body) => said.push(`${threadId}: ${body}`), () => 252_000, () => "en")
+    turns.note(started("tn-1", "th-1", 0))
+    turns.note({ type: "turn.completed", at: 252_000, turnId: "tn-1", status: "completed" })
+    expect(said).toEqual(["th-1: Done in 4m 12s"])
+  })
+
   it("**十五秒以内的不出声**——那种你八成还盯着屏幕", () => {
     const r = rig(0)
     r.note(started("tn-1", "th-1", 0))

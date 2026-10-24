@@ -7,6 +7,7 @@ import type { Logger } from "./log.js"
 import { watchEgress, type EgressGuard } from "./egress-guard.js"
 import { lockCheckpoints, zcodeStatus } from "./zcode-guard.js"
 import type { Channels } from "./channels.js"
+import { DEFAULT_LOCALE, type Locale } from "@switchback/i18n"
 
 /** 起外发守卫。开关不给＝开着：守卫宁可多停一次，也不放一个仓库出去。 */
 export function egressFor(wiring: {
@@ -15,6 +16,7 @@ export function egressFor(wiring: {
   log: Logger
   stop: (() => boolean) | undefined
   labels: Readonly<Record<EngineId, string>>
+  locale: (() => Locale) | undefined
 }): EgressGuard {
   return watchEgress({
     processes: () => wiring.host.processes(),
@@ -22,6 +24,7 @@ export function egressFor(wiring: {
     log: wiring.log,
     stop: () => wiring.stop?.() ?? true,
     label: (id) => wiring.labels[id] ?? id,
+    locale: () => wiring.locale?.() ?? DEFAULT_LOCALE,
   })
 }
 

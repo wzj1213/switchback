@@ -82,14 +82,14 @@ describe("在真仓库里暂存与提交", () => {
     writeFileSync(join(dir, "a.txt"), "a2\n")
     const done = await gitCommit(dir, { message: "x", all: false })
     expect(done.ok).toBe(false)
-    expect(done.error).toContain("全部提交")
+    expect(done.error).toBe("nothing-staged")
     expect(log(dir).trim()).toBe("init")
   })
 
   it("空说明、没有改动：都不提交", async () => {
     const dir = repo()
-    expect((await gitCommit(dir, { message: "  \n", all: true })).error).toContain("空的")
-    expect((await gitCommit(dir, { message: "x", all: true })).error).toContain("没有可提交")
+    expect((await gitCommit(dir, { message: "  \n", all: true })).error).toBe("empty-message")
+    expect((await gitCommit(dir, { message: "x", all: true })).error).toBe("nothing")
   })
 
   it("钩子拦下来：原文带回来", async () => {
@@ -118,8 +118,8 @@ describe("在真仓库里暂存与提交", () => {
 
   it("路径必须在仓库里，按字面处理（不当通配）", async () => {
     const dir = repo()
-    expect((await gitStage(dir, { rel: "../x", stage: true })).error).toContain("不在仓库里")
-    expect((await gitStage(dir, { rel: "/etc/hosts", stage: true })).error).toContain("不在仓库里")
+    expect((await gitStage(dir, { rel: "../x", stage: true })).error).toBe("outside")
+    expect((await gitStage(dir, { rel: "/etc/hosts", stage: true })).error).toBe("outside")
     writeFileSync(join(dir, "a.txt"), "a2\n")
     writeFileSync(join(dir, "b.txt"), "b2\n")
     await gitStage(dir, { rel: "*.txt", stage: true })
@@ -148,7 +148,7 @@ describe("撤销刚才那次提交", () => {
     await gitCommit(dir, { message: "二", all: true })
     const refused = await gitUndo(dir, { full: first.full ?? "" })
     expect(refused.ok).toBe(false)
-    expect(refused.error).toContain("HEAD 已经不是")
+    expect(refused.error).toBe("head-moved")
     expect(log(dir).split("\n")[0]).toBe("二")
   })
 
@@ -158,7 +158,7 @@ describe("撤销刚才那次提交", () => {
     const done = await gitCommit(dir, { message: "推过的", all: true })
     execFileSync("git", ["update-ref", "refs/remotes/origin/main", "HEAD"], { cwd: dir })
     const refused = await gitUndo(dir, { full: done.full ?? "" })
-    expect(refused.error).toContain("origin/main")
+    expect(refused).toMatchObject({ error: "pushed", remote: "origin/main" })
     expect(log(dir).split("\n")[0]).toBe("推过的")
   })
 

@@ -3,6 +3,10 @@ import { app, dialog } from "electron"
 import { probeCommand } from "@switchback/engine"
 import type { Logger } from "./log.js"
 import { dumpDir, type CrashInfo } from "./crash.js"
+import type { Locale } from "@switchback/i18n"
+import { DIAGNOSE } from "./diagnose.messages.js"
+
+type Text = (typeof DIAGNOSE)[Locale]
 
 /** 日志尾部取多少行进诊断包。够看出「崩之前发生了什么」，又不至于变成一整份日志。 */
 const TAIL_LINES = 400
@@ -22,9 +26,9 @@ async function probeEngine(command: string): Promise<string> {
   return `${command}: ${probe.state} — ${probe.detail}`
 }
 
-async function tail(file: string): Promise<string> {
+async function tail(file: string, m: Text): Promise<string> {
   const text = await readFile(file, "utf8").catch(() => "")
-  if (text === "") return "（没有日志）"
+  if (text === "") return m.noLog
   return text.split("\n").slice(-TAIL_LINES).join("\n")
 }
 
@@ -47,13 +51,13 @@ async function tail(file: string): Promise<string> {
  * 用户的代码、提示词和路径——这份报告是要发给别人的。
  * 附上目录路径，真要深挖的人自己去拿。
  */
-function crashSection(crash: CrashInfo): readonly string[] {
-  if (!crash.uncleanExit && crash.dumps.length === 0) return ["- 没有崩溃记录。"]
-  const lines = crash.uncleanExit ? ["- **上次不是正常退出的。**"] : []
-  if (crash.dumps.length === 0) return [...lines, "- 没有崩溃转储文件。"]
+function crashSection(crash: CrashInfo, m: Text): readonly string[] {
+  if (!crash.uncleanExit && crash.dumps.length === 0) return [m.noCrash]
+  const lines = crash.uncleanExit ? [m.unclean] : []
+  if (crash.dumps.length === 0) return [...lines, m.noDumps]
   return [
     ...lines,
-    `- 转储目录：\`${dumpDir()}\`（**内容不在本报告里**，里面可能有内存快照）`,
+    m.dumpDir(dumpDir()),
     ...crash.dumps
       .slice(0, 5)
       .map((d) => `- ${d.name} — ${new Date(d.at).toISOString()}`),
@@ -65,50 +69,48 @@ function crashSection(crash: CrashInfo): readonly string[] {
  * 诊断报告最该好使的时刻恰恰是「什么都不太对劲」的时候，
  * 为一个可有可无的字段抛异常是本末倒置。（`getSystemVersion` 是 Electron 才有的。）
  */
-function systemVersion(): string {
+function systemVersion(m: Text): string {
   const fn = (process as NodeJS.Process & { getSystemVersion?: () => string }).getSystemVersion
-  return typeof fn === "function" ? fn.call(process) : "（取不到系统版本）"
+  return typeof fn === "function" ? fn.call(process) : m.noSystem
 }
 
-export async function buildReport(logger: Logger, crash: CrashInfo): Promise<string> {
+export async function buildReport(logger: Logger, crash: CrashInfo, locale: Locale): Promise<string> {
+  const m = DIAGNOSE[locale]
   const engines = await Promise.all([probeEngine("codex"), probeEngine("claude")])
   return [
-    "# Switchback 诊断报告",
+    m.title,
     "",
-    "> **不含会话内容**：没有提示词、没有模型回复、没有文件内容、没有命令输出。",
-    ">",
-    "> 下方日志里含引擎自己打的错误输出，可能带路径或命令片段。",
-    "> 像凭据的部分已按模式抹去，但那份模式清单不可能完备——**发出去之前扫一眼**。",
+    m.privacy,
     "",
-    "## 版本",
+    m.versions,
     `- Switchback ${app.getVersion()}`,
     `- Electron ${process.versions.electron} / Chromium ${process.versions.chrome} / Node ${process.versions.node}`,
-    `- ${process.platform} ${process.arch} ${systemVersion()}`,
-    `- 已打包：${app.isPackaged ? "是" : "否（开发模式）"}`,
+    `- ${process.platform} ${process.arch} ${systemVersion(m)}`,
+    m.packaged(app.isPackaged),
     "",
-    "## 引擎",
+    m.engines,
     ...engines.map((e) => `- ${e}`),
     "",
-    "## 崩溃",
-    ...crashSection(crash),
+    m.crashes,
+    ...crashSection(crash, m),
     "",
-    "## 数据目录",
+    m.dataDir,
     `- ${app.getPath("userData")}`,
     "",
-    `## 日志尾部（最后 ${String(TAIL_LINES)} 行）`,
+    m.logTail(TAIL_LINES),
     "```",
-    await tail(logger.file),
+    await tail(logger.file, m),
     "```",
     "",
   ].join("\n")
 }
 
 /** 让用户选个地方存下来。取消就什么都不做。 */
-export async function exportReport(logger: Logger, crash: CrashInfo): Promise<void> {
-  const report = await buildReport(logger, crash)
+export async function exportReport(logger: Logger, crash: CrashInfo, locale: Locale): Promise<void> {
+  const report = await buildReport(logger, crash, locale)
   const target = await dialog.showSaveDialog({
-    title: "导出诊断报告",
-    defaultPath: `Switchback-诊断-${new Date().toISOString().slice(0, 10)}.md`,
+    title: DIAGNOSE[locale].save,
+    defaultPath: DIAGNOSE[locale].file(new Date().toISOString().slice(0, 10)),
     filters: [{ name: "Markdown", extensions: ["md"] }],
   })
   if (target.canceled || target.filePath === undefined) return

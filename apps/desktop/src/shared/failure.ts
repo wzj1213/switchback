@@ -91,21 +91,3 @@ export function failureKind(raw: string): FailureKind {
   for (const [kind, pattern] of KINDS) if (pattern.test(raw)) return kind
   return "other"
 }
-
-export const FAILURE_TITLE: Readonly<Record<FailureKind, string>> = {
-  quota: "额度用完了",
-  rate: "请求太频繁，被限流了",
-  auth: "需要重新登录",
-  server: "服务端出错了",
-  network: "连接断了",
-  other: "出错了",
-}
-
-/**
- * 少数几类，Switchback 自己手里就有下一步：额度和限流等不来的时候，换一家引擎接着做
- *（输入框左下角那个选择器就是）。别的类别不给建议——给不出靠得住的，就不说。
- */
-export const FAILURE_HINT: Readonly<Partial<Record<FailureKind, string>>> = {
-  quota: "等额度恢复，或者在输入框里换一家引擎接着做。",
-  rate: "稍等片刻再试，或者在输入框里换一家引擎接着做。",
-}

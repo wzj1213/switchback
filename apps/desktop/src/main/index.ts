@@ -140,6 +140,7 @@ const runUpdateCheck = async (manual: boolean): Promise<void> => {
       },
     },
     manual,
+    settings.get().language,
   )
 }
 
@@ -228,7 +229,7 @@ function createWindow(bounds: {
 
   // 右键。**Electron 不给默认菜单**，不接的话右键什么都不弹——
   // 而「选中一段话 → 右键 → 复制」是大多数人复制文字唯一会走的那条路
-  installContextMenu(win.webContents)
+  installContextMenu(win.webContents, () => settings.get().language)
 
   const devUrl = process.env["ELECTRON_RENDERER_URL"]
   if (isDev && devUrl !== undefined) void win.loadURL(devUrl)
@@ -257,7 +258,7 @@ function installAppChannels(): void {
     void shell.openPath(ensureEngineFile(app.getPath("userData")))
   })
   ipcMain.on("switchback:diagnose", () => {
-    void exportReport(log, crash)
+    void exportReport(log, crash, settings.get().language)
   })
 }
 
@@ -356,7 +357,7 @@ function installChannels(): void {
   installEngineVersionChannel(log, engineVersions, channels)
   installEngineDoorChannels(channels)
   installEnvChannel(log, channels)
-  installSelfUpdateChannel(log)
+  installSelfUpdateChannel(log, () => settings.get().language)
 }
 
 /**
@@ -391,7 +392,7 @@ function bootstrap(): Promise<void> {
     applyDevTheme()
     log.write("info", "app", `启动 ${app.getVersion()} / ${process.platform} ${process.arch}`)
     const relabelMenu = installMenu(settings.get().language, {
-      onDiagnose: () => exportReport(log, crash),
+      onDiagnose: () => exportReport(log, crash, settings.get().language),
       onEngines: () => {
         // 用系统默认编辑器打开，不自己造一个配置界面：这是一份十行的 JSON，
         // 用户自己的编辑器有语法高亮和括号匹配，我们做不过它
@@ -429,6 +430,7 @@ function bootstrap(): Promise<void> {
       relay: (id, title, body) => relay.notify?.(id, title, body),
       engineVisible: (id) => engineEnabled(settings.get(), id), dshProfile: () => settings.get().dsh.profile,
       notify: () => settings.get().notify,
+      locale: () => settings.get().language,
       handoffBrief: () => settings.get().handoffBrief,
       egressStop: () => settings.get().egressStop,
     })
@@ -455,7 +457,7 @@ function bootstrap(): Promise<void> {
     win.webContents.once("did-finish-load", () => {
       installDevHooks(win, attached, log)
     })
-    guardQuit({ attached, log, closeRemote: remote.close, flushDrafts: drafts.flush })
+    guardQuit({ attached, log, closeRemote: remote.close, flushDrafts: drafts.flush, locale: () => settings.get().language })
   })
 }
 

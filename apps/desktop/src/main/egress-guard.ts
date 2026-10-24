@@ -7,6 +7,8 @@ import { tree } from "@switchback/engine"
 import type { Logger } from "./log.js"
 import { createEgressMeter, observe, recordsOf, type EgressAlert, type EgressMeter, type EgressRecord, type Watched } from "./egress-meter.js"
 import { parseLsofPeers, parseNettop, parsePs, treeOf, zcodeMains, type Proc } from "./egress-sample.js"
+import type { Locale } from "@switchback/i18n"
+import { EGRESS } from "./egress-guard.messages.js"
 
 /**
  * 外发守卫：盯着每个引擎进程（和单独开着的 ZCode）往本机外面发了多少，**批量往外发就停掉它**。
@@ -45,6 +47,14 @@ export interface EgressDeps {
   stop: () => boolean
   /** 引擎 id → 给人看的名字。 */
   label: (engine: EngineId) => string
+  /** 报警那段话用哪种语言说。 */
+  locale: () => Locale
+}
+
+/** 当时连着的一个对端：地址，反查得出就带上主机名。 */
+interface Peer {
+  address: string
+  host?: string
 }
 
 export interface EgressGuard {
@@ -117,12 +127,15 @@ async function respond(deps: EgressDeps, alert: EgressAlert): Promise<void> {
   const peers = await peersOf(alert.runtime)
   const stopped = deps.stop() && halt(alert.leader)
   const mb = String(Math.round(alert.bytes / MB))
+  // i18n-ok：这一行只拼给下面的日志
+  const seen = peers.map((p) => (p.host === undefined ? p.address : `${p.address}（${p.host}）`))
   deps.log.write(
     "warn",
     "egress",
-    `${alert.label}（pid ${String(alert.leader)}）一分钟内自己往外发了 ${mb} MB${stopped ? "，已停掉" : ""}；对端：${peers.join("、") || "没抓到"}`,
+    `${alert.label}（pid ${String(alert.leader)}）一分钟内自己往外发了 ${mb} MB${stopped ? "，已停掉" : ""}；对端：${seen.join("、") || "没抓到"}`,
   )
-  deps.emit({ type: "egress.alert", at: Date.now(), threadId: alert.threads[0] ?? "", detail: detailOf(alert, mb, peers, stopped), stopped })
+  const detail = detailOf(alert, { mb, peers, stopped }, EGRESS[deps.locale()])
+  deps.emit({ type: "egress.alert", at: Date.now(), threadId: alert.threads[0] ?? "", detail, stopped })
 }
 
 /**
@@ -148,7 +161,7 @@ function halt(pid: number): boolean {
 }
 
 /** 当时它连着谁：对端地址，能反查出主机名的带上主机名。抓不到就是空的，不耽误报警。 */
-async function peersOf(pids: readonly number[]): Promise<string[]> {
+async function peersOf(pids: readonly number[]): Promise<Peer[]> {
   if (pids.length === 0) return []
   try {
     const out = await run("lsof", ["-nP", "-a", "-iTCP", "-sTCP:ESTABLISHED", "-p", pids.join(",")], { timeout: 2000, maxBuffer: 4 * MB })
@@ -159,25 +172,22 @@ async function peersOf(pids: readonly number[]): Promise<string[]> {
   }
 }
 
-async function named(peer: string): Promise<string> {
+async function named(peer: string): Promise<Peer> {
   const ip = peer.replace(/^\[/, "").replace(/\]?:\d+$/, "")
   const host = await Promise.race([
     dns.reverse(ip).then((names) => names[0]).catch(() => undefined),
     new Promise<undefined>((resolve) => setTimeout(resolve, 800, undefined)),
   ])
-  return host === undefined ? peer : `${peer}（${host}）`
+  return host === undefined ? { address: peer } : { address: peer, host }
 }
 
-function detailOf(alert: EgressAlert, mb: string, peers: readonly string[], stopped: boolean): string {
+function detailOf(
+  alert: EgressAlert,
+  facts: { mb: string; peers: readonly Peer[]; stopped: boolean },
+  m: (typeof EGRESS)[Locale],
+): string {
   const app = alert.key.startsWith("zcode:")
-  const who = app ? "单独开着的 ZCode" : alert.label
-  const where = peers.length === 0 ? "" : `当时它连着：${peers.join("、")}。`
-  const why = app
-    ? "ZCode 3.14.0 之前的版本会在后台把整个工作区连同 .git 历史打包上传。"
-    : "正常对话一次请求通常不到 1 MB，这个量更像是在把整个工作区往外传。"
-  const keep = app ? "要停就退出 ZCode。" : "要停就关掉这条会话。"
-  const then = stopped
-    ? "Switchback 已经停掉了它。确认是你让它传的，可以在「设置 → 数据与排查」里关掉「批量外发时停掉」。"
-    : `「批量外发时停掉」关着，Switchback 没有停它；${keep}`
-  return `${who} 一分钟内自己往本机外面发了 ${mb} MB（不算它跑的命令）。${why}${where}${then}`
+  const where = facts.peers.length === 0 ? [] : [m.peers(facts.peers.map((p) => m.peer(p.address, p.host)))]
+  const then = facts.stopped ? m.stopped : m.notStopped(app ? m.quitZcode : m.closeThread)
+  return m.detail(app ? m.zcode : alert.label, facts.mb, [app ? m.zcodeWhy : m.engineWhy, ...where, then])
 }

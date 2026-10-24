@@ -121,18 +121,18 @@ export async function gitCommit(
   run: GitRun = runGit,
 ): Promise<CommitResult> {
   const message = req.message.trim()
-  if (message === "") return { ok: false, error: "提交说明是空的。" }
+  if (message === "") return { ok: false, error: "empty-message" }
   const root = await rootOf(cwd, run)
-  if (root === undefined) return { ok: false, error: "这个工作区不在 Git 仓库里。" }
+  if (root === undefined) return { ok: false, error: "not-repo" }
   if (req.all) {
     const added = await run(["add", "-A"], root, ADD_MS)
-    if (!added.ok) return { ok: false, error: "git add 没成功。", output: tail(added) }
+    if (!added.ok) return { ok: false, error: "add-failed", output: tail(added) }
   }
   // `diff --cached --quiet`：有已暂存的改动时退出码是 1
   const pending = await run(["diff", "--cached", "--quiet"], root, STATUS_MS)
-  if (pending.ok) return { ok: false, error: req.all ? "没有可提交的改动。" : "暂存区是空的：先暂存要提交的文件，或者选「全部提交」。" }
+  if (pending.ok) return { ok: false, error: req.all ? "nothing" : "nothing-staged" }
   const committed = await run(["commit", "-m", message], root, COMMIT_MS)
-  if (!committed.ok) return { ok: false, error: "git commit 没成功（钩子或签名的原文在下面）。", output: tail(committed) }
+  if (!committed.ok) return { ok: false, error: "commit-failed", output: tail(committed) }
   const head = await run(["rev-parse", "HEAD"], root, STATUS_MS)
   const full = head.stdout.trim()
   return { ok: true, sha: full.slice(0, 7), full, subject: message.split("\n")[0] ?? message }
@@ -147,16 +147,16 @@ export async function gitCommit(
  */
 export async function gitUndo(cwd: string, req: { full: string }, run: GitRun = runGit): Promise<CommitResult> {
   const root = await rootOf(cwd, run)
-  if (root === undefined) return { ok: false, error: "这个工作区不在 Git 仓库里。" }
+  if (root === undefined) return { ok: false, error: "not-repo" }
   const head = await run(["rev-parse", "HEAD"], root, STATUS_MS)
   if (!head.ok || head.stdout.trim() !== req.full) {
-    return { ok: false, error: "HEAD 已经不是那次提交了（之后又提交过或切过分支），没法安全撤销。" }
+    return { ok: false, error: "head-moved" }
   }
   const remote = await run(["branch", "-r", "--contains", req.full], root, STATUS_MS)
-  if (remote.ok && remote.stdout.trim() !== "") return { ok: false, error: `这次提交已经在 ${remote.stdout.trim().split("\n")[0]?.trim() ?? "远程"} 里了，本地撤销会和远程分叉。` }
+  if (remote.ok && remote.stdout.trim() !== "") return { ok: false, error: "pushed", remote: remote.stdout.trim().split("\n")[0]?.trim() ?? "" }
   const parent = (await run(["rev-parse", "--verify", "-q", "HEAD~1"], root, STATUS_MS)).ok
   const undo = parent ? await run(["reset", "--soft", "HEAD~1"], root, ADD_MS) : await run(["update-ref", "-d", "HEAD"], root, ADD_MS)
-  return undo.ok ? { ok: true, undone: true } : { ok: false, error: "撤销没成功。", output: tail(undo) }
+  return undo.ok ? { ok: true, undone: true } : { ok: false, error: "undo-failed", output: tail(undo) }
 }
 
 /** 相对仓库根、而且确实在仓库里面的路径才收。 */
@@ -176,15 +176,15 @@ export async function gitStage(
   run: GitRun = runGit,
 ): Promise<CommitResult> {
   const root = await rootOf(cwd, run)
-  if (root === undefined) return { ok: false, error: "这个工作区不在 Git 仓库里。" }
+  if (root === undefined) return { ok: false, error: "not-repo" }
   const rel = relIn(root, req.rel)
-  if (rel === undefined) return { ok: false, error: "这个路径不在仓库里。" }
+  if (rel === undefined) return { ok: false, error: "outside" }
   if (req.stage) {
     const added = await run(["add", "-A", "--", rel], root, ADD_MS)
-    return added.ok ? { ok: true } : { ok: false, error: "git add 没成功。", output: tail(added) }
+    return added.ok ? { ok: true } : { ok: false, error: "add-failed", output: tail(added) }
   }
   const hasHead = (await run(["rev-parse", "--verify", "-q", "HEAD"], root, STATUS_MS)).ok
   const args = hasHead ? ["restore", "--staged", "--", rel] : ["rm", "--cached", "-q", "--", rel]
   const undone = await run(args, root, ADD_MS)
-  return undone.ok ? { ok: true } : { ok: false, error: "取消暂存没成功。", output: tail(undone) }
+  return undone.ok ? { ok: true } : { ok: false, error: "unstage-failed", output: tail(undone) }
 }

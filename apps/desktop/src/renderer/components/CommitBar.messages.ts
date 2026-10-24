@@ -1,6 +1,6 @@
 import { defineMessages } from "@switchback/i18n"
 
-/** 提交栏的表单与结果。失败原因是 git 报的原话，不翻译。 */
+/** 提交栏的表单与结果。`refused` 按主进程报的种类说（`GitRefusal`）；git 自己打的原文不翻译。 */
 export const COMMIT_BAR_VIEW = defineMessages(
   {
     label: "提交",
@@ -16,6 +16,23 @@ export const COMMIT_BAR_VIEW = defineMessages(
     undoTip: "退回这次提交（git reset --soft），改动留在暂存区",
     undo: "撤销",
     failed: "没成功。",
+    refused: {
+      "empty-message": "提交说明是空的。",
+      "not-repo": "这个工作区不在 Git 仓库里。",
+      "add-failed": "git add 没成功。",
+      nothing: "没有可提交的改动。",
+      "nothing-staged": "暂存区是空的：先暂存要提交的文件，或者选「全部提交」。",
+      "commit-failed": "git commit 没成功（钩子或签名的原文在下面）。",
+      "head-moved": "HEAD 已经不是那次提交了（之后又提交过或切过分支），没法安全撤销。",
+      "undo-failed": "撤销没成功。",
+      outside: "这个路径不在仓库里。",
+      "unstage-failed": "取消暂存没成功。",
+      "not-ours": "这个工作区不属于任何一条会话，Switchback 不碰它。",
+      "bad-message": "提交说明不对。",
+      "bad-path": "路径不对。",
+      "bad-commit": "要撤销的提交不对。",
+    },
+    pushed: (remote: string) => `这次提交已经在 ${remote === "" ? "远程" : remote} 里了，本地撤销会和远程分叉。`,
   },
   {
     label: "Commit",
@@ -31,5 +48,22 @@ export const COMMIT_BAR_VIEW = defineMessages(
     undoTip: "Undo this commit (git reset --soft); the changes stay staged",
     undo: "Undo",
     failed: "That didn't work.",
+    refused: {
+      "empty-message": "The commit message is empty.",
+      "not-repo": "This workspace isn't in a Git repository.",
+      "add-failed": "git add failed.",
+      nothing: "There are no changes to commit.",
+      "nothing-staged": "Nothing is staged. Stage the files you want to commit first, or choose “Commit all”.",
+      "commit-failed": "git commit failed (the hook or signing output is below).",
+      "head-moved": "HEAD isn't that commit anymore (something was committed or the branch changed since), so it can't be undone safely.",
+      "undo-failed": "Undo failed.",
+      outside: "This path isn't in the repository.",
+      "unstage-failed": "Unstaging failed.",
+      "not-ours": "This workspace doesn't belong to any thread, so Switchback won't touch it.",
+      "bad-message": "The commit message isn't valid.",
+      "bad-path": "The path isn't valid.",
+      "bad-commit": "The commit to undo isn't valid.",
+    },
+    pushed: (remote) => `This commit is already on ${remote === "" ? "the remote" : remote}, so undoing it locally would diverge from it.`,
   },
 )

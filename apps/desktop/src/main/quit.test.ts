@@ -59,24 +59,29 @@ describe("quitBlurb", () => {
       thread("b", "running"),
       thread("c", "waiting_approval"),
       thread("d", "idle"),
-    ])
+    ], "zh-CN")
     expect(text).toContain("2 条正在跑")
     expect(text).toContain("1 条等着你批")
   })
 
   it("只有一种的时候不留下空的另一半", () => {
-    const text = quitBlurb([thread("a", "running")])
+    const text = quitBlurb([thread("a", "running")], "zh-CN")
     expect(text).toContain("1 条正在跑")
     expect(text).not.toContain("等着你批")
     expect(text.startsWith("、")).toBe(false)
   })
 
   it("说出后果，不只是报数", () => {
-    expect(quitBlurb([thread("a", "running")])).toContain("结束")
+    expect(quitBlurb([thread("a", "running")], "zh-CN")).toContain("结束")
   })
 
   it("原生问题单独计数，让人知道退出会丢掉什么", () => {
-    expect(quitBlurb([questioning()])).toContain("1 组等着你回答")
+    expect(quitBlurb([questioning()], "zh-CN")).toContain("1 组等着你回答")
+  })
+
+  it("英文界面用英文数，逗号分开", () => {
+    expect(quitBlurb([thread("a", "running"), thread("b", "running"), thread("c", "waiting_approval")], "en"))
+      .toBe("2 threads running, 1 waiting for your approval. Quitting now stops their work, and any half-edited files stay as they are.")
   })
 })
 

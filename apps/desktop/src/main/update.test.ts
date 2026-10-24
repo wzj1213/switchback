@@ -79,7 +79,7 @@ describe("查一次", () => {
         current: "1.0.0",
         fetchText: () => Promise.resolve(JSON.stringify({ version: "9.9.9", url })),
       })
-      expect(out.kind).toBe("failed")
+      expect(out.kind).toBe("garbled")
     }
   })
 
@@ -100,7 +100,14 @@ describe("查一次", () => {
 
   it("缺字段的 JSON 说得出缺什么", async () => {
     const out = await checkForUpdate({ feed, current: "1.0.0", fetchText: () => Promise.resolve('{"version":"9.9.9"}') })
-    expect(out.kind === "failed" ? out.detail : "").toContain("version 和 https 的 url")
+    expect(out.kind).toBe("garbled")
+    const zh = ui()
+    await announce(out, zh, true, "zh-CN")
+    expect(zh.asked[0]?.detail).toContain("version 和 https 的 url")
+    const en = ui()
+    await announce(out, en, true, "en")
+    expect(en.asked[0]).toMatchObject({ message: "Couldn't check for updates", buttons: ["OK"] })
+    expect(en.asked[0]?.detail).toContain("a version and an https url")
   })
 })
 
@@ -139,47 +146,47 @@ const RELEASE = { version: "9.9.9", url: "https://x.example/switchback.dmg", not
 describe("怎么告诉用户", () => {
   it("有新版本，点「去下载」就用系统浏览器打开——**不在应用里下载**", async () => {
     const box = ui(0)
-    await announce({ kind: "newer", release: RELEASE }, box, false)
+    await announce({ kind: "newer", release: RELEASE }, box, false, "zh-CN")
     expect(box.opened).toEqual(["https://x.example/switchback.dmg"])
   })
 
   it("点「以后再说」什么都不做", async () => {
     const box = ui(1)
-    await announce({ kind: "newer", release: RELEASE }, box, false)
+    await announce({ kind: "newer", release: RELEASE }, box, false, "zh-CN")
     expect(box.opened).toEqual([])
   })
 
   it("**要说清楚为什么得手动装**——不说的话用户会以为按钮坏了", async () => {
     const box = ui(1)
-    await announce({ kind: "newer", release: RELEASE }, box, true)
+    await announce({ kind: "newer", release: RELEASE }, box, true, "zh-CN")
     expect(box.asked[0]?.detail).toContain("修了几个 bug")
     expect(box.asked[0]?.detail).toContain("不自动安装")
   })
 
   it("**背景检查报「已是最新」是纯噪声**，只有手动点才回答", async () => {
     const quiet = ui()
-    await announce({ kind: "current" }, quiet, false)
+    await announce({ kind: "current" }, quiet, false, "zh-CN")
     expect(quiet.asked).toEqual([])
 
     const asked = ui()
-    await announce({ kind: "current" }, asked, true)
+    await announce({ kind: "current" }, asked, true, "zh-CN")
     expect(asked.asked[0]?.message).toContain("最新")
   })
 
   it("失败一律记日志；只有手动点才弹窗——背景动作不该拿网络抖动打断人", async () => {
     const quiet = ui()
-    await announce({ kind: "failed", detail: "ENOTFOUND" }, quiet, false)
+    await announce({ kind: "failed", detail: "ENOTFOUND" }, quiet, false, "zh-CN")
     expect(quiet.asked).toEqual([])
     expect(quiet.logged[0]).toContain("ENOTFOUND")
 
     const asked = ui()
-    await announce({ kind: "failed", detail: "ENOTFOUND" }, asked, true)
+    await announce({ kind: "failed", detail: "ENOTFOUND" }, asked, true, "zh-CN")
     expect(asked.asked).toHaveLength(1)
   })
 
   it("没配 feed 时连日志都不写——这个功能整个不存在", async () => {
     const box = ui()
-    await announce({ kind: "off" }, box, true)
+    await announce({ kind: "off" }, box, true, "zh-CN")
     expect(box.asked).toEqual([])
     expect(box.logged).toEqual([])
   })

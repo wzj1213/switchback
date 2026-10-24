@@ -29,26 +29,29 @@ describe("诊断报告里的崩溃那一段", () => {
     const report = await buildReport(logger, {
       uncleanExit: true,
       dumps: [{ name: "abc-123.dmp", at: 1_700_000_000_000 }],
-    })
+    }, "zh-CN")
     expect(report).toContain("abc-123.dmp")
     expect(report).toContain("内容不在本报告里")
     expect(report).toContain("上次不是正常退出的")
   })
 
   it("没崩过就直说没崩过，不留一段空标题让人以为漏了", async () => {
-    const report = await buildReport(logger, { uncleanExit: false, dumps: [] })
+    const report = await buildReport(logger, { uncleanExit: false, dumps: [] }, "zh-CN")
     expect(report).toContain("没有崩溃记录")
   })
 
   it("退出不干净但没有转储时，两件事分开说", async () => {
-    const report = await buildReport(logger, { uncleanExit: true, dumps: [] })
+    const report = await buildReport(logger, { uncleanExit: true, dumps: [] }, "zh-CN")
     expect(report).toContain("上次不是正常退出的")
     expect(report).toContain("没有崩溃转储文件")
   })
 
   it("**报告头上照实写「发出去之前扫一眼」**——说满了比说少了危险", async () => {
-    const report = await buildReport(logger, { uncleanExit: false, dumps: [] })
+    const report = await buildReport(logger, { uncleanExit: false, dumps: [] }, "zh-CN")
     expect(report).toContain("不含会话内容")
     expect(report).toContain("发出去之前扫一眼")
+    const en = await buildReport(logger, { uncleanExit: false, dumps: [] }, "en")
+    expect(en).toContain("No conversation content")
+    expect(en).toContain("Skim it before you send it")
   })
 })

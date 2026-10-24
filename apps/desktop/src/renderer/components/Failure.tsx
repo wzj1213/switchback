@@ -3,7 +3,7 @@ import type { ErrorItem } from "@switchback/protocol"
 import { ChevronIcon } from "./icons.js"
 import { AlertIcon } from "./icons-activity.js"
 import { LinkifiedText } from "./linkified-text.js"
-import { FAILURE_HINT, FAILURE_TITLE, failureKind, humanize } from "../../shared/failure.js"
+import { failureKind, humanize } from "../../shared/failure.js"
 import type { SoftState } from "../error-plan.js"
 import { useMessages } from "../i18n.js"
 import { FAILURE } from "./Failure.messages.js"
@@ -110,7 +110,7 @@ export function FailCard({
         <span className="failcard__icon">
           <AlertIcon size={14} />
         </span>
-        <span className="failcard__title">{FAILURE_TITLE[kind]}</span>
+        <span className="failcard__title">{m.title[kind]}</span>
         {onRetry === undefined ? null : (
           <button type="button" className="btn btn--slim failcard__retry" onClick={onRetry} title={m.retryTip}>
             {m.retry}
@@ -120,7 +120,7 @@ export function FailCard({
       <p className="failcard__text">
         <LinkifiedText text={failure.text} />
       </p>
-      <CardNotes item={item} prior={prior} hint={FAILURE_HINT[kind]} />
+      <CardNotes item={item} prior={prior} hint={kind === "quota" || kind === "rate" ? m.hint[kind] : undefined} />
       {raw === "" ? null : <MoreToggle open={open} onToggle={() => { setOpen((v) => !v) }} />}
       {open && raw !== "" ? <pre className="error__raw">{raw}</pre> : null}
     </div>

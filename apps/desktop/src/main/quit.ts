@@ -4,6 +4,8 @@ import { busy } from "./awake.js"
 import type { Attached } from "./attached.js"
 import { clearMarker } from "./crash.js"
 import type { Logger } from "./log.js"
+import type { Locale } from "@switchback/i18n"
+import { QUIT } from "./quit.messages.js"
 
 /**
  * ⌘Q 的时候先问一句——如果真有活在跑。
@@ -47,16 +49,17 @@ export function forcedQuit(): boolean {
  * 框里那句话。**说清楚有几条、以及退出会把它们怎么样**——
  * 「确定要退出吗？」这种问法给不出任何判断依据，人只能凭手感按。
  */
-export function quitBlurb(threads: readonly Thread[]): string {
+export function quitBlurb(threads: readonly Thread[], locale: Locale): string {
   const running = threads.filter((t) => t.status === "running").length
   // 主轮之外的权限请求（后台子 agent 在等）也算：会话状态没变，可确实有人在等你
   const waiting = threads.filter((t) => t.status === "waiting_approval" || (t.pendingApprovals?.length ?? 0) > 0).length
   const questions = threads.reduce((count, thread) => count + (thread.pendingQuestions?.length ?? 0), 0)
+  const m = QUIT[locale]
   const parts: string[] = []
-  if (running > 0) parts.push(`${String(running)} 条正在跑`)
-  if (waiting > 0) parts.push(`${String(waiting)} 条等着你批`)
-  if (questions > 0) parts.push(`${String(questions)} 组等着你回答`)
-  return `${parts.join("、")}。现在退出会结束它们手上的活，改到一半的文件就停在那儿了。`
+  if (running > 0) parts.push(m.running(running))
+  if (waiting > 0) parts.push(m.waiting(waiting))
+  if (questions > 0) parts.push(m.questions(questions))
+  return m.blurb(parts)
 }
 
 /**
@@ -66,15 +69,16 @@ export function quitBlurb(threads: readonly Thread[]): string {
  * 定下退不退——异步返回时那次 quit 事件早就过去了，再想续上只能自己
  * 再发一次 `app.quit()`，那条路上还得防重入。
  */
-export function shouldStayOpen(threads: readonly Thread[], win: BrowserWindow | undefined): boolean {
+export function shouldStayOpen(threads: readonly Thread[], win: BrowserWindow | undefined, locale: Locale): boolean {
   if (forcedQuit() || !busy(threads)) return false
+  const m = QUIT[locale]
   const options = {
     type: "warning" as const,
-    buttons: ["退出", "取消"],
+    buttons: [m.quit, m.cancel],
     defaultId: 1,
     cancelId: 1,
-    message: "还有活没跑完",
-    detail: quitBlurb(threads),
+    message: m.title,
+    detail: quitBlurb(threads, locale),
   }
   const picked = win === undefined || win.isDestroyed()
     ? dialog.showMessageBoxSync(options)
@@ -98,6 +102,7 @@ export function guardQuit(deps: {
   attached: Attached
   log: Logger
   closeRemote: () => Promise<void>
+  locale: () => Locale
   /** 没发出去的草稿：收摊那几秒里渲染层可能还交过来一份，所以最后才落盘。 */
   flushDrafts: () => void
 }): void {
@@ -111,7 +116,7 @@ export function guardQuit(deps: {
     // **`quitting` 要在问完之后才置。** 置早了、人又点了「取消」，
     // 这个标志就永久地把确认框关掉了——第二次 ⌘Q 直接杀，
     // 而那正是这个框想拦住的事
-    if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined))
+    if (shouldStayOpen(attached.host.live(), BrowserWindow.getFocusedWindow() ?? undefined, deps.locale()))
       return
     quitting = true
     const deadline = new Promise<void>((resolve) => setTimeout(resolve, 8000))

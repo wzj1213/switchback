@@ -17,6 +17,9 @@
  * 定期往任何地址发请求——哪怕只是一个版本号。
  */
 
+import type { Locale } from "@switchback/i18n"
+import { UPDATE } from "./update.messages.js"
+
 /** 一次检查要用的东西。抽成参数是为了能在没有网络的机器上跑测试。 */
 export interface UpdateDeps {
   feed: string
@@ -36,6 +39,8 @@ export type UpdateResult =
   | { kind: "current" }
   | { kind: "off" }
   | { kind: "failed"; detail: string }
+  /** 拿到了，但不是要的那个形状（缺 version、url 不是 https）。说法在 `announce` 那一层。 */
+  | { kind: "garbled" }
 
 /**
  * 版本比大小。
@@ -93,7 +98,7 @@ export async function checkForUpdate(deps: UpdateDeps): Promise<UpdateResult> {
   if (deps.feed === "") return { kind: "off" }
   try {
     const release = parseRelease(await deps.fetchText(deps.feed))
-    if (release === undefined) return { kind: "failed", detail: "更新源返回的内容看不懂（要 version 和 https 的 url）" }
+    if (release === undefined) return { kind: "garbled" }
     return isNewer(release.version, deps.current) ? { kind: "newer", release } : { kind: "current" }
   } catch (error) {
     return { kind: "failed", detail: error instanceof Error ? error.message : String(error) }
@@ -117,7 +122,7 @@ export function feedOf(pkg: { switchback?: { updateFeed?: unknown } } | undefine
 /** 用内置 fetch 取文本，带超时。检查更新卡住不该拖住任何东西。 */
 export async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-  if (!response.ok) throw new Error(`更新源返回 ${String(response.status)}`)
+  if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
   return response.text()
 }
 
@@ -137,28 +142,31 @@ export async function announce(
     log: (level: "info" | "warn", message: string) => void
   },
   manual: boolean,
+  locale: Locale,
 ): Promise<void> {
   if (result.kind === "off") return
+  const m = UPDATE[locale]
   if (result.kind === "newer") {
     ui.log("info", `有新版本 ${result.release.version}`)
     const choice = await ui.ask({
-      message: `有新版本 ${result.release.version}`,
+      message: m.newer(result.release.version),
       detail: [
         result.release.notes,
         // 说清楚为什么要手动装——不说的话，用户会以为这个按钮坏了
-        "Switchback 目前只提示、不自动安装：自动安装需要应用带 Apple 开发者签名，这个包还没有。",
+        m.manualOnly,
       ]
         .filter((x) => x !== undefined && x !== "")
         .join("\n\n"),
-      buttons: ["去下载", "以后再说"],
+      buttons: [m.download, m.later],
     })
     if (choice === 0) ui.open(result.release.url)
     return
   }
-  if (result.kind === "failed") {
-    ui.log("warn", `检查更新失败：${result.detail}`)
-    if (manual) await ui.ask({ message: "检查更新失败", detail: result.detail, buttons: ["知道了"] })
+  if (result.kind === "failed" || result.kind === "garbled") {
+    const detail = result.kind === "garbled" ? m.garbled : result.detail
+    ui.log("warn", `检查更新失败：${detail}`)
+    if (manual) await ui.ask({ message: m.failed, detail, buttons: [m.ok] })
     return
   }
-  if (manual) await ui.ask({ message: "已经是最新版本。", buttons: ["好"] })
+  if (manual) await ui.ask({ message: m.current, buttons: [m.fine] })
 }

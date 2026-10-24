@@ -12,7 +12,7 @@ const paramsWith = (over: Partial<ContextMenuParams>): ContextMenuParams =>
   }) as ContextMenuParams
 
 const labels = (params: ContextMenuParams): readonly string[] =>
-  contextItems(params).map((item) => item.label ?? item.type ?? "?")
+  contextItems(params, "zh-CN").map((item) => item.label ?? item.type ?? "?")
 
 describe("右键菜单给哪几项", () => {
   it("选中了文字就给复制——这是「选中一段话拿不走」的唯一出路", () => {
@@ -25,11 +25,16 @@ describe("右键菜单给哪几项", () => {
     const items = contextItems(paramsWith({
       isEditable: true,
       editFlags: { canCut: true, canCopy: true, canPaste: false } as ContextMenuParams["editFlags"],
-    }))
+    }), "zh-CN")
     expect(items.map((i) => i.label ?? i.type)).toEqual(["剪切", "复制", "粘贴", "separator", "全选"])
     // 剪贴板是空的时候摆一个能点的「粘贴」是骗人
     expect(items.find((i) => i.label === "粘贴")?.enabled).toBe(false)
     expect(items.find((i) => i.label === "剪切")?.enabled).toBe(true)
+  })
+
+  it("英文界面用 macOS 的英文菜单说法", () => {
+    expect(contextItems(paramsWith({ linkURL: "https://example.com/a", selectionText: "看这里" }), "en")
+      .map((item) => item.label ?? item.type)).toEqual(["Copy Link Address", "separator", "Copy"])
   })
 
   it("落在链接上多给一条复制链接地址", () => {
